@@ -395,7 +395,8 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
   display:flex; justify-content:space-between; align-items:center; gap:16px; touch-action:none}
 .dpad{display:grid; grid-template-columns:repeat(3,var(--k)); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
 .keys{display:grid; grid-template-columns:repeat(2,calc(var(--k) * 1.45)); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
-/* The nav/edit pad: the command row inverted. Buttons in a screen's colour, on white outlined offset blocks. */
+/* The nav/edit pad: the command row inverted. A darker grey panel; buttons in a screen's colour, on white outlined offset blocks. */
+.tctl{background:color-mix(in srgb, var(--side) 84%, #000)}
 #tPad .k{background:var(--sh, var(--voice)); color:#1b2130; box-shadow:4px 4px 0 0 #fff, 4px 4px 0 1.5px var(--line); transition:transform .06s, box-shadow .06s}
 #tPad .k.dn{transform:translate(3px,3px); box-shadow:1px 1px 0 0 #fff, 1px 1px 0 1.5px var(--line)}
 #tPad .k.dn, #tPad .k.on{background:var(--ink); color:var(--inv)}
@@ -4035,7 +4036,10 @@ function draw(){
     const TCV = {song:'#dbe6f8', chain:'#e9e0f8', phrase:'#d8f0e2', inst:'#fbe2d2', mixer:'#f6edc8', fx:'#f8dce8', project:'#d5eef2'};
     let i = 0; $('tCmd').querySelectorAll('button[data-c]').forEach(b => { const on = !(onSong ? b.dataset.c === 'b:-16' || b.dataset.c === 'b:16' : b.dataset.c === 'clone' || b.dataset.c === 'cldn');
       if (on) b.style.setProperty('--sh', TCV[seq[i++ % seq.length]]); });
-    i = 0; for (const k of ['up', 'left', 'down', 'right', 'shift', 'play', 'opt', 'edit']){ const b = $('tPad').querySelector(`.k[data-b=${k}]`); if (b) b.style.setProperty('--sh', TCV[seq[i++ % seq.length]]); } }
+    // The pad takes the same colours in turn, except PLAY is always green (Phrase): it swaps with whichever key had green.
+    const pc = {}; i = 0; for (const k of ['up', 'left', 'down', 'right', 'shift', 'play', 'opt', 'edit']) pc[k] = TCV[seq[i++ % seq.length]];
+    const g = Object.keys(pc).reverse().find(k => pc[k] === TCV.phrase && k !== 'play'); if (g && pc.play !== TCV.phrase){ pc[g] = pc.play; pc.play = TCV.phrase; }
+    for (const k in pc){ const b = $('tPad').querySelector(`.k[data-b=${k}]`); if (b) b.style.setProperty('--sh', pc[k]); } }
   $('tCmd').querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = onSong);
   $('tCmd').querySelectorAll('[data-c=clone],[data-c=cldn]').forEach(b => b.hidden = !onSong); $('tCmd').classList.toggle('song', onSong);
   const selB = $('tCmd').querySelector('[data-c=sel]'); if (selB) selB.classList.toggle('on', !!selA);
