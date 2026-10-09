@@ -3699,9 +3699,12 @@ function cmdAction(a){
   if (c === 'song'){ if (tp.on) tStop(); else tStart('song', {row:cs.song.y}); }
 }
 for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type = 'button'; b.dataset.c = a; b.setAttribute('aria-label', lbl); b.title = lbl; $('tCmd').append(b); }
-$('tCmd').addEventListener('pointerdown', e => { const b = e.target.closest('button[data-c]'); if (!b) return; e.preventDefault();
+// A tap fires pointerdown and then a click; the click only counts when no pointerdown just ran the
+// button (keyboard Enter/Space, accessibility tools), so SELECT, CLN, PASTE… never fire twice.
+let cmdDown = 0;
+$('tCmd').addEventListener('pointerdown', e => { const b = e.target.closest('button[data-c]'); if (!b) return; e.preventDefault(); cmdDown = performance.now();
   b.classList.add('dn'); setTimeout(() => b.classList.remove('dn'), 110); cmdAction(b.dataset.c); });
-$('tCmd').addEventListener('click', e => { const b = e.target.closest('button[data-c]'); if (b && e.detail === 0) cmdAction(b.dataset.c); });
+$('tCmd').addEventListener('click', e => { const b = e.target.closest('button[data-c]'); if (b && performance.now() - cmdDown > 800) cmdAction(b.dataset.c); });
 
 /* ---------- drawing ---------- */
 const scr = $('tScr'), grid = $('tGrid');
@@ -4122,6 +4125,8 @@ grid.addEventListener('pointerdown', e => {
   const x = +s.dataset.x, y = +s.dataset.y, c = cs[tv];
   if (y === -1){ S.mix[x].mute = !S.mix[x].mute; mixChanged(); draw(); return; }
   if (tv === 'song' && e.altKey && y >= 0){ e.preventDefault(); toggleBlockMute(y, x); return; }
+  // While selecting, a tap only moves the selection's corner there: it never opens or edits the cell.
+  if (selA && selA.v === tv && GRIDV.has(tv) && y >= 0){ c.x = x; c.y = y; draw(); return startScroll(e); }
   const was = GRIDV.has(tv) || tv === 'mixer' ? c.x === x && c.y === y : c.y === y;
   c.x = x; c.y = y; if (!was) draw();
   // A drag that starts on the cursor's own cell changes its value; one that starts anywhere else scrolls.
