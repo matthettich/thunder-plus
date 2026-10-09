@@ -38,10 +38,12 @@ An 8-pad drum synth and 16-track tracker for the browser, built for a Galaxy Z F
 
 ## Settings
 
-The **⚙ Settings** button in the top bar holds everything that isn't the sound itself.
+The top bar has two menus that work like ...Seeds': **File ▾** and **⚙ Settings ▾** each open a dropdown under the button. Only one is open at a time; tap outside it, tap the button again, or press Esc to close it.
 
-- **On the synth page** it opens a Settings band with tabs: **Kit** (save, load, factory, clear), **MIDI**, **Export**, **Skin** and **Audio**. It remembers the last tab.
-- **On the tracker page** it opens a full-screen menu with everything on the Project screen as touch controls (checkboxes, dropdowns, sliders with − and +, buttons), grouped into Input, Screen, Song, Render, Project file and App, plus the same Audio settings. The Project screen is still there and changes the same settings. Esc or Back closes it.
+- **File ▾**: Save project, Save as… and Load project…, with their keyboard shortcuts (plus Export / Import chains; on the …waves and …chains screens it drives that patch instead).
+- **⚙ Settings ▾**: one scrolling list with a section per topic, ruled off from each other: **Kit** (save, load, factory, clear), **MIDI**, **Export**, **Skin** and **Audio**. On the tracker, a **Project** section comes first with everything on the Project screen as touch controls (checkboxes, dropdowns, sliders with − and +, buttons), grouped into Input, Screen, Song, Render, Project file and App. On the …waves and …chains screens a section for that patch comes first instead. The Project screen is still there and changes the same settings.
+
+**Colourful boxes.** Everything you press at the bottom of the screen uses the look of the tracker's PAD-mode nav pad: a darker grey panel, each button in one of the screens' pastels on a white offset block. That's the nav pad, the command row, the KEYS-mode keypad (PLAY is always green, sharps stay black) and the 16 pads on the synth page.
 
 **Audio** picks the output device (Chrome, Edge and the desktop app on a computer; Android plays through the system's output, so pick it in the system's media output switcher), the overall level, the latency (Lowest, Balanced or Safest, for when you hear crackles) and the sample rate (Device, 44.1k or 48k). The output and level change at once; latency and rate need **Restart audio**, which reloads the app with your song and kit kept. **Show device names** appears when the browser only numbers the outputs (it asks for the microphone once, just to get the names, and closes it). **Test sound** plays a short tone.
 

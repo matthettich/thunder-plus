@@ -87,7 +87,8 @@ button{cursor:pointer}
 .ctxitem:disabled{opacity:.4}
 
 /* ---------- layout ---------- */
-.split{display:grid; grid-template-columns:38px minmax(0,1fr); min-height:0; border-bottom:10px solid var(--frame)}
+/* The bar under the patch: the same darker grey as the tracker's control bar in ...Thunder Plus. */
+.split{display:grid; grid-template-columns:38px minmax(0,1fr); min-height:0; border-bottom:10px solid color-mix(in srgb, var(--side) 84%, #000)}
 .split > *{border-bottom:1px solid #111}
 
 /* ---------- module list ---------- */

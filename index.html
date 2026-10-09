@@ -22,6 +22,7 @@
 @font-face{font-family:Jost; src:url(fonts/Jost-700.woff) format("woff"); font-weight:700 900; font-display:swap}
 @font-face{font-family:"JetBrains Mono"; src:url(fonts/JetBrainsMono-400.woff2) format("woff2"); font-weight:400 500; font-display:swap}
 @font-face{font-family:"JetBrains Mono"; src:url(fonts/JetBrainsMono-700.woff2) format("woff2"); font-weight:600 900; font-display:swap}
+
 </style>
 <style>
 /* Layout: Seeds "Minimal" skin, light only (as in Seeds). Full-width bands split by 1px ink lines:
@@ -41,48 +42,59 @@
 /* settings sheets: the synth's Settings band tabs and the tracker's full-screen settings menu */
 .top #bSet{gap:7px; min-width:40px}
 .top #bSet .setg{width:22px; height:22px; flex:none; display:block}
-/* Settings: one dropdown menu under the gear, on every screen. */
+/* Menus work like ...Seeds: File ▾ and Settings ▾ open a dropdown under the button. One open at a time;
+   a tap outside, the button again or Esc closes it. Flat panel, 1px ink border, no shadow, sections ruled off. */
 .setwrap{position:relative; display:flex}
-.gset{position:absolute; top:calc(100% + 8px); right:0; z-index:120; width:min(520px, calc(100vw - 20px)); max-height:calc(100vh - 96px); overflow-y:auto; overscroll-behavior:contain; background:var(--panel); border:1px solid var(--ink); box-shadow:6px 6px 0 rgba(0,0,0,.12)}
-@supports (height: 1dvh){ .gset{max-height:calc(100dvh - 96px)} }
-.gset[hidden]{display:none}
-.gsetbar{position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:6px; padding:8px 10px; background:var(--panel); border-bottom:1px solid var(--line)}
-.gsetbar .settabs{flex:1; flex-wrap:wrap; gap:4px 3px; overflow:visible}
-.gsetbar .settabs button{flex:none; padding:4px 10px; font-size:12px}
-.gsetbody{padding:10px 12px 16px}
-.gset .band, .gset .band.grey{padding:0; border:0; background:none}
-.gset .band .bar{display:none}
-.gset .pbody{padding-top:2px}
+.setmenu{position:absolute; top:calc(100% + 6px); left:0; z-index:120; background:var(--panel); color:var(--ink); border:1px solid var(--ink); box-shadow:none; padding:6px; white-space:normal}
+.setmenu[hidden]{display:none}
+#bFile, .top #bSet{min-height:34px; padding:0 12px; font-size:12px; font-weight:700; letter-spacing:.04em; border:1px solid var(--line); background:var(--panel); white-space:nowrap}
+#bFile:hover, .top #bSet:hover{border-color:var(--ink)}
+#bFile.on, .top #bSet.on{background:var(--ink); color:var(--inv); border-color:var(--ink)}
+.top #bSet .setg{width:18px; height:18px}
+.top #bSet .setx{font-size:12px}
+/* File */
+.gfile{width:260px; display:grid; gap:2px}
+.gfile .fitem{display:flex; justify-content:space-between; align-items:center; gap:12px; width:100%; min-height:0; border:0; background:none; padding:7px 10px; font-size:14px; text-align:left; color:var(--ink)}
+.gfile .fitem:hover:not(:disabled){background:var(--panel2)}
+.gfile .fitem:disabled{opacity:.4}
+.gfile .fitem kbd{font:inherit; font-size:12px; color:var(--muted)}
+.gfile hr{border:0; border-top:1px solid var(--line); margin:4px 2px; width:auto}
+/* Settings: one scrolling list, a section per topic (no tabs) */
+.gset{width:min(400px, calc(100vw - 20px)); max-height:calc(100vh - 80px); overflow-y:auto; overscroll-behavior:contain}
+@supports (height: 1dvh){ .gset{max-height:calc(100dvh - 80px)} }
+.gsetbody{padding:0}
+.gset .gsec{padding:8px 8px 10px; display:grid; gap:8px}
+.gset .gsec + .gsec{border-top:1px solid var(--line)}
 .gset .gsec[hidden]{display:none}
-.gset .tsec{padding-top:4px}
-.gset h3{font-size:12.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; margin:12px 0 4px; padding-bottom:5px; border-bottom:1px solid var(--line)}
-.gset .tsr{display:grid; grid-template-columns:minmax(96px,142px) minmax(0,1fr); gap:4px 12px; align-items:center; padding:9px 0; border-bottom:1px solid var(--track)}
-.gset .tsr .tsl{font-size:13px; font-weight:500}
+.gset .sethead, .gset .band .bar .ttl{font-weight:600; font-size:14px; letter-spacing:0; text-transform:none}
+.gset .band, .gset .band.grey{padding:0; border:0; background:none}
+.gset .gsec.band, .gset .gsec.band.grey{padding:10px 8px 12px}
+.gset .gsec + .gsec, .gset .gsec.band + .gsec.band{border-top:1px solid var(--line)}
+.gset .band .bar{display:flex; align-items:baseline; gap:10px; margin:0 0 6px; min-height:0; padding:0; border:0; background:none}
+.gset .band .bar .lbl{font-size:12.5px; color:var(--muted)}
+.gset .pbody{padding:0}
+.gset .note{font-size:12.5px; color:var(--muted)}
+.gset .tsec{padding-top:2px}
+.gset h3{font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:10px 0 2px; padding-bottom:4px; border-bottom:1px solid var(--track)}
+.gset .tsr{display:grid; grid-template-columns:minmax(90px,130px) minmax(0,1fr); gap:4px 10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--track)}
+.gset .tsr:last-child{border-bottom:0}
+.gset .tsr .tsl{font-size:13.5px; font-weight:600}
 .gset .tsr .tsc{display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0}
-.gset .tsr .tsi{grid-column:2; color:var(--muted); font-size:11.5px; line-height:1.4}
+.gset .tsr .tsi{grid-column:2; color:var(--muted); font-size:12.5px; line-height:1.4}
 .gset .tsr select{min-width:0; flex:1 1 140px; max-width:240px}
 .gset .tsr input[type=text]{flex:1 1 140px; max-width:240px}
-.gset .tsr input[type=range]{flex:1 1 110px; width:auto; min-width:90px}
-.gset .tsr output{min-width:86px; font-variant-numeric:tabular-nums; font-size:12.5px}
+.gset .tsr input[type=range]{flex:1 1 100px; width:auto; min-width:80px}
+.gset .tsr output{min-width:70px; font-variant-numeric:tabular-nums; font-size:12.5px}
 .gset .tsr .stp{min-width:34px; padding-inline:0}
+/* checkbox rows: box, bold title, the explanation under it (Seeds' setrow) */
 .gset .tsr.ck{grid-template-columns:minmax(0,1fr)}
-.gset .tsr.ck .tsi{grid-column:1; padding-left:28px}
-.gset .tsr.act{grid-template-columns:minmax(96px,142px) minmax(0,1fr)}
+.gset .tsr.ck .tsi{grid-column:1; padding-left:26px; margin-top:-4px}
+.gset .tsr.act{grid-template-columns:minmax(90px,130px) minmax(0,1fr)}
 .gset .tsr.act .tsi{grid-column:auto}
-.gset label.cb{display:flex; align-items:center; gap:9px; font-size:13px; font-weight:500; cursor:pointer; min-height:32px}
-.gset label.cb input{width:18px; height:18px; margin:0; accent-color:var(--ink); flex:none}
+.gset label.cb{display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600; cursor:pointer; min-height:30px}
+.gset label.cb input{width:16px; height:16px; margin:0; accent-color:var(--ink); flex:none}
 .gset .skins{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 @media (max-width:560px){ .gset .tsr, .gset .tsr.act{grid-template-columns:minmax(0,1fr)} .gset .tsr .tsi{grid-column:1} }
-/* File menu: a persistent dropdown in the top bar. */
-#bFile{min-height:34px; padding:0 12px; font-size:12px; font-weight:700; letter-spacing:.04em; border:1px solid var(--line); background:var(--panel); white-space:nowrap}
-#bFile:hover{border-color:var(--ink)}
-#bFile.on{background:var(--ink); color:var(--inv); border-color:var(--ink)}
-.gfile{position:absolute; top:calc(100% + 8px); right:0; z-index:121; min-width:220px; background:var(--panel); border:1px solid var(--ink); box-shadow:6px 6px 0 rgba(0,0,0,.12); padding:6px}
-.gfile[hidden]{display:none}
-.gfile button{display:block; width:100%; text-align:left; background:none; border:0; padding:8px 10px; font-size:13.5px}
-.gfile button:hover{background:var(--track)}
-.gfile button:disabled{opacity:.4}
-.gfile hr{border:0; border-top:1px solid var(--line); margin:5px 2px}
 .setband .bar{gap:10px}
 .setband .settabs{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none}
 .setband .settabs button{flex:none; padding-inline:14px}
@@ -542,6 +554,27 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 .tagrid b.c:not(.f):not(.m):not(.z):not(.p){color:var(--ar-dim)}
 .tafoot{flex:none; font-size:10px; line-height:1.35; color:var(--ar-dim); padding:6px 10px 8px; border-top:1px solid var(--ar-line); font-family:var(--font)}
 @media (max-width:480px){ .top{flex-wrap:wrap} .top .brand{display:none} .top .kitname{order:9; flex:1 1 100%} .top button{white-space:nowrap} .ttabs button{padding:0 10px; font-size:12px} .tmode .mx{display:none} .tmode{padding:0 10px} .tctl{padding-inline:10px} .tcmd{padding-inline:10px} }
+/* Colourful boxes at the bottom of every screen, the same as the tracker's PAD-mode nav pad: a darker grey
+   panel, each button filled with one of the screens' pastels (Song, Chain, Phrase, Inst, Mixer, FX, Project in
+   turn) and sitting on a white, outlined offset block. Used by the command row, the KEYS keypad and the synth's pads. */
+.tcmd, .dock{background:color-mix(in srgb, var(--side) 84%, #000)}
+.tcmd button, .tkp .kp, .pads .pad{background:var(--sh, var(--voice)); color:#1b2130; border-color:var(--line);
+  box-shadow:4px 4px 0 0 #fff, 4px 4px 0 1.5px var(--line); transition:transform .06s, box-shadow .06s}
+.tcmd button.dn, .tkp .kp.dn, .pads .pad.hit{transform:translate(3px,3px); box-shadow:1px 1px 0 0 #fff, 1px 1px 0 1.5px var(--line)}
+.tcmd button.dn, .tkp .kp.dn, .pads .pad.hit, :root[data-skin] .pads .pad.hit.hit{background:var(--ink)!important; color:var(--inv)}
+.tcmd button.on, .tkp .kp.on{background:var(--pl); color:var(--inv)}
+.tkp .kp.blk{background:var(--ink); color:var(--inv)}
+.tkp .kp.lbl, .tkp .kp:disabled{background:none; box-shadow:none; border-color:transparent; color:var(--ink); opacity:1}
+.tcmd{gap:12px 10px; padding-right:20px}
+.tkp{gap:10px; padding-right:4px}
+.kpr{gap:10px 9px}
+.kpc{gap:10px; height:calc(var(--k) * 1.95 + 16px)}
+.pads{gap:10px 10px; padding-right:4px}
+.pads .pad .pm{color:rgba(27,33,48,.7)}
+.pads .pad.syn b::after{color:rgba(27,33,48,.6)}
+.pads .pad.hit .pm, .pads .pad.syn.hit b::after{color:var(--inv)}
+.dock{padding-block:10px 14px}
+@media (max-width:600px){ .pads{gap:9px 8px} }
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 </head>
@@ -558,9 +591,8 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
     <div class="setmenu gfile" id="gfile" hidden role="menu"></div>
   </div>
   <div class="setwrap">
-  <button id="bSet" aria-expanded="false" aria-label="Settings" title="Settings: kit, MIDI, export, skin and audio (in the tracker: the Project settings)"><svg class="setg" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="setx">Settings</span></button>
+  <button id="bSet" aria-haspopup="true" aria-expanded="false" aria-label="Settings" title="Settings: kit, MIDI, export, skin and audio (in the tracker: the Project settings)"><svg class="setg" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="setx">Settings ▾</span></button>
   <div class="setmenu gset" id="gset" hidden role="dialog" aria-label="Settings">
-    <div class="gsetbar"><div class="seg settabs" id="gsetTabs" aria-label="Settings section"></div><button class="sm" id="gsetX" aria-label="Close settings">✕</button></div>
     <div class="gsetbody" id="gsetBody"><div class="gsec" id="gsecProj" hidden></div><div class="gsec" id="gsecPatch" hidden></div></div>
   </div>
   </div>
@@ -1793,11 +1825,13 @@ function renderStrip(){
     host.append(c);
   });
 }
+// The screens' pastels (Song, Chain, Phrase, Inst, Mixer, FX, Project): the colourful boxes at the bottom.
+const BOXPAL = ['#dbe6f8', '#e9e0f8', '#d8f0e2', '#fbe2d2', '#f6edc8', '#f8dce8', '#d5eef2'], BOXGREEN = '#d8f0e2';
 const padEls = [];
 function buildPads(){
   const host = $('pads');
   for (let i = 0; i < NSLOT; i++){
-    const p = el('button', 'pad' + (isSyn(i) ? ' syn' : '')); p.type = 'button';
+    const p = el('button', 'pad' + (isSyn(i) ? ' syn' : '')); p.type = 'button'; p.style.setProperty('--sh', BOXPAL[i % BOXPAL.length]);
     const p1 = el('span', 'p1'), b = el('b', null, hx(i)), m = el('span', 'pm'), n = el('span', 'pn');
     p1.append(b, m); p.append(p1, n); host.append(p); padEls.push({p, n, m, b});
     // Synth slots sound while the pad is held, then release.
@@ -2037,34 +2071,40 @@ makeSeg($('segNoteName'), [[false,'Pad name'],[true,'+ note']], () => ex.noteNam
 
 /* ---------- settings (synth page): Kit, MIDI, Export, Skin and Audio under one button ---------- */
 /* ---------- settings: one dropdown menu under the gear, on every screen ---------- */
-const GLOBAL_SECS = [['pKit', 'Kit'], ['pMidi', 'MIDI'], ['pExport', 'Export'], ['pSkin', 'Skin'], ['pAudio', 'Audio']], STABK = 'thunderplus-settab-v1';
-let setTab = (() => { try { const v = localStorage.getItem(STABK); if (v === 'gsecProj' || v === 'gsecPatch' || GLOBAL_SECS.some(([id]) => id === v)) return v; } catch(e){} return 'pKit'; })();
+const GLOBAL_SECS = [['pKit', 'Kit'], ['pMidi', 'MIDI'], ['pExport', 'Export'], ['pSkin', 'Skin'], ['pAudio', 'Audio']];
 const gsetOpen = () => !$('gset').hidden;
 const gsetSecs = () => [
   ...((view === 'waves' || view === 'chains') ? [['gsecPatch', 'Patch']] : []),
   ...(view === 'tracker' ? [['gsecProj', 'Project']] : []),
   ...GLOBAL_SECS
 ];
-const gsetBox = id => $(id);
+// Every section is shown at once, one under the other with a rule between, as in ...Seeds' Settings menu.
 function showGset(){
-  const secs = gsetSecs();
-  if (!secs.some(([id]) => id === setTab)) setTab = secs[0][0];
-  makeSeg($('gsetTabs'), secs, () => setTab, v => { setTab = v; try { localStorage.setItem(STABK, v); } catch(e){} showGset(); });
-  if (setTab === 'gsecProj') buildProj();
-  else if (setTab === 'gsecPatch') buildPatch();
-  for (const id of ['gsecProj', 'gsecPatch', ...GLOBAL_SECS.map(([x]) => x)]){ const b = gsetBox(id); if (b) b.hidden = id !== setTab; }
-  if (setTab === 'pAudio') audRefresh();
+  const secs = gsetSecs(), on = new Set(secs.map(([id]) => id));
+  for (const id of ['gsecProj', 'gsecPatch', ...GLOBAL_SECS.map(([x]) => x)]){ const b = $(id); if (b) b.hidden = !on.has(id); }
+  // Keep them in order: Patch / Project first, then Kit, MIDI, Export, Skin, Audio.
+  for (const [id] of secs){ const b = $(id); if (b) $('gsetBody').append(b); }
+  for (const id of ['gsecProj', 'gsecPatch', ...GLOBAL_SECS.map(([x]) => x)]){ const b = $(id); if (b && b.hidden) $('gsetBody').append(b); }
+  if (on.has('gsecProj')) buildProj();
+  if (on.has('gsecPatch')) buildPatch();
+  audRefresh();
+}
+// Keep a dropdown inside the window: it hangs from its button's left edge, and moves left if it would run off.
+function placeMenu(menu){
+  menu.style.left = '0px'; menu.style.right = 'auto';
+  const r = menu.getBoundingClientRect(), over = r.right - (innerWidth - 8);
+  if (over > 0) menu.style.left = Math.max(-r.left + 8, -over) + 'px';
 }
 function gsetToggle(open = !gsetOpen()){
+  if (open && !$('gfile').hidden) gfileToggle(false);
   $('gset').hidden = !open;
   $('bSet').classList.toggle('on', open); $('bSet').setAttribute('aria-expanded', String(open));
-  if (open) showGset();
+  if (open){ showGset(); $('gset').scrollTop = 0; placeMenu($('gset')); }
 }
 // The global sections sit in #main in the source for clarity; move them into the menu so the
 // same settings are reachable from every screen (synth, tracker, Waves, Chains).
 for (const [id] of GLOBAL_SECS){ const s = $(id); if (s){ s.hidden = true; s.classList.add('gsec'); $('gsetBody').append(s); } }
 $('bSet').addEventListener('click', () => gsetToggle());
-$('gsetX').addEventListener('click', () => gsetToggle(false));
 window.addEventListener('pointerdown', e => { if (gsetOpen() && !$('gset').contains(e.target) && !$('bSet').contains(e.target)) gsetToggle(false); }, true);
 
 /* ---------- File menu: a persistent dropdown in the top bar ----------
@@ -2081,22 +2121,27 @@ function fileItems(){
     ['Export custom modules…', () => f.exportCustom()], ['Import custom modules…', () => f.importCustom()]
   ];
   return [
-    ['Save project', () => saveProj(false)], ['Save as…', () => saveProj(true)], ['Load project…', openProj],
+    ['Save project', () => saveProj(false), null, 'S'], ['Save as…', () => saveProj(true), null, '⇧S'], ['Load project…', openProj, null, 'O'],
     null,
     ['Export chains…', exportChains], ['Import chains…', () => $('chainsIn').click()]
   ];
 }
+const MACK = /Mac|iPhone|iPad/.test(navigator.platform);
 function gfileToggle(open = $('gfile').hidden){
+  if (open && gsetOpen()) gsetToggle(false);
   const host = $('gfile'); host.replaceChildren();
   for (const it of fileItems()){
     if (!it){ host.append(el('hr')); continue; }
-    const b = el('button', null, it[0]); b.type = 'button';
+    const b = el('button', 'fitem'); b.type = 'button'; b.setAttribute('role', 'menuitem');
+    b.append(el('span', null, it[0]));
+    if (it[3]) b.append(el('kbd', null, MACK ? it[3].replace('⇧', '⇧⌘').replace(/^([A-Z])$/, '⌘$1') : 'Ctrl+' + it[3].replace('⇧', 'Shift+')));
     if (it[2] && it[2]()) b.disabled = true;
     b.addEventListener('click', () => { gfileToggle(false); it[1](); });
     host.append(b);
   }
   $('gfile').hidden = !open;
   $('bFile').classList.toggle('on', open); $('bFile').setAttribute('aria-expanded', String(open));
+  if (open) placeMenu($('gfile'));
 }
 $('bFile').addEventListener('click', () => gfileToggle());
 window.addEventListener('pointerdown', e => { if (!$('gfile').hidden && !$('gfile').contains(e.target) && !$('bFile').contains(e.target)) gfileToggle(false); }, true);
@@ -4865,10 +4910,13 @@ function drawKeypad(){
   if (sig === kpSig) return; kpSig = sig;
   host.innerHTML = '';
   // The context rows share one fixed-height box, so moving between columns never changes the layout.
-  const rows = kpButtons(kind), box = el('div', 'kpc');
+  const rows = kpButtons(kind), box = el('div', 'kpc'); let ci = 0;
   rows.forEach((row, i) => {
     const r = el('div', 'kpr'); r.style.setProperty('--n', row.length);
-    for (const b of row){ const k = el('button', 'kp ' + b.cls, b.t); k.type = 'button'; k.dataset.a = b.a; if (b.a === 'noop') k.disabled = true; r.append(k); }
+    for (const b of row){ const k = el('button', 'kp ' + b.cls, b.t); k.type = 'button'; k.dataset.a = b.a; if (b.a === 'noop') k.disabled = true;
+      if (b.a === 'play'){ k.style.setProperty('--sh', BOXGREEN); if (tp.on) k.classList.add('on'); }
+      else if (b.a !== 'noop' && !/\bblk\b/.test(b.cls)){ let c = BOXPAL[ci++ % BOXPAL.length]; if (c === BOXGREEN) c = BOXPAL[ci++ % BOXPAL.length]; k.style.setProperty('--sh', c); }
+      r.append(k); }
     (i < rows.length - 1 ? box : host).append(r);
     if (i === rows.length - 2) host.append(box);
   });
@@ -4990,7 +5038,7 @@ function tsetRow(r){
     row.classList.add('act'); const b = el('button', null, tsetLabel(r.l)); b.type = 'button';
     b.addEventListener('click', () => {
       if (r.dbl && !confirm(tsetLabel(r.l) + '?\n\n' + inf.textContent)) return;
-      r.act(); draw(); setTimeout(() => { if (setTab === 'gsecProj') buildProj(); }, 50);
+      r.act(); draw(); setTimeout(() => { if (gsetOpen() && view === 'tracker') buildProj(); }, 50);
     });
     row.append(b, inf); return row;
   }
@@ -5029,7 +5077,7 @@ function tsetRow(r){
 // The Project tab of the settings menu: the same rows as the Project screen (projRows).
 function buildProj(){
   const list = $('gsecProj'); if (!list) return;
-  const body = $('gsetBody'), keep = body.scrollTop; list.innerHTML = '';
+  const body = $('gset'), keep = body.scrollTop; list.innerHTML = ''; list.append(el('div', 'sethead', 'Project'));
   let sec = null;
   for (const r of projRows()){
     if (r.sec || !sec){ sec = el('section', 'tsec'); sec.append(el('h3', null, r.sec || 'Tracker')); list.append(sec); }
@@ -5042,7 +5090,7 @@ function fmtBak(t){ const d = new Date(t); return d.toLocaleDateString() + ' ' +
 function buildPatch(){
   const host = $('gsecPatch'); if (!host) return;
   const a = frameApi();
-  const box = el('div', 'pbody'); host.replaceChildren(box);
+  const box = el('div', 'pbody'); host.replaceChildren(el('div', 'sethead', (view === 'chains' ? 'Chains' : 'Waves') + ' patch'), box);
   if (!a || !a.patchSettings){ box.append(el('p', 'note', 'Patch settings are on the Waves and Chains screens.')); return; }
   const s = a.patchSettings();
   const row = (label, ctl) => { const r = el('div', 'tsr'), c = el('div', 'tsc'); c.append(ctl); r.append(el('div', 'tsl', label), c); return r; };
@@ -5064,7 +5112,7 @@ function buildPatch(){
   if (!list.length) box.append(el('p', 'note', 'Backups appear here while you work.'));
   for (const b of list){
     const r = el('div', 'tsr'), btn = el('button', null, 'Restore'); btn.type = 'button';
-    btn.addEventListener('click', () => { a.restoreBackup(b.i); setTimeout(() => { if (setTab === 'gsecPatch') buildPatch(); }, 60); });
+    btn.addEventListener('click', () => { a.restoreBackup(b.i); setTimeout(() => { if (gsetOpen() && view !== 'tracker') buildPatch(); }, 60); });
     const c = el('div', 'tsc'); c.append(btn);
     r.append(el('div', 'tsl', fmtBak(b.t) + ' · ' + b.name), c);
     box.append(r);
@@ -5072,6 +5120,7 @@ function buildPatch(){
 }
 // While the settings menu is open the tracker's keys stay out of the way (Esc closes).
 addEventListener('keydown', e => {
+  if (!$('gfile').hidden && e.key === 'Escape'){ e.preventDefault(); e.stopImmediatePropagation(); gfileToggle(false); return; }
   if (!gsetOpen() || helpOpen()) return;
   e.stopImmediatePropagation();
   if (e.key === 'Escape'){ e.preventDefault(); gsetToggle(false); }
