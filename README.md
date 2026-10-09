@@ -10,7 +10,7 @@
 
 **Files.** `waves/` holds the …waves editor and engine (`waves/waves-worklet.js`, from the waves repo); Thunder Plus loads the same engine to render patches into the pads, using the Plaits, Elements and effects code already in `index.html`.
 
-**...Thunder opens Thunder Plus files.** ...Thunder (https://matthettich.github.io/Thunder-/) is built from this app with the …waves and …chains editors hidden: `python3 tools/build-thunder.py ../Thunder-` writes its `index.html` and copies the two sound engines. Songs and kits go both ways between the apps, and …waves layers and …chains effects play in ...Thunder too. After changing this app, rebuild ...Thunder so the two stay in step.
+**...Thunder opens Thunder Plus files.** ...Thunder (https://matthettich.github.io/Thunder-/) is built from this app with the …waves and …chains editors hidden: `python3 tools/build-thunder.py ../Thunder-` writes its `index.html` and desktop `electron/main.js` and copies the two sound engines, so ...Thunder behaves the same on the web, on the phone and as a desktop app. Songs and kits go both ways between the apps, and …waves layers and …chains effects play in ...Thunder too. After changing this app, rebuild ...Thunder so the two stay in step.
 
 The rest of this README is ...Thunder's.
 
@@ -53,6 +53,7 @@ The top bar has two menus that work like ...Seeds': **File ▾** and **⚙ Setti
 
 - **Hide chains page** (on by default) hides the chain screen; see Tracker below.
 - **Display steps as decimal** (on by default) numbers the rows in decimal: song rows 000–255, phrase rows 00–31, chain rows 00–15, the arrange overview too. Off shows hex. Phrase, chain and instrument numbers and values stay hex.
+- **View neighboring phrases** (off by default): on the Phrase screen, a faint, read-only copy of the notes the tracks either side play at the same song row, the left track's in violet before the note column and the right track's in mustard after it, so you can see the parts around the one you're editing.
 - **Follow playhead** (off by default) scrolls Song and Phrase with the playhead while the song plays; the cursor rides along and Phrase switches to whatever the cursor's track is playing.
 - **Show side panel** (on by default): the grey column at the right on wide screens. Turn it off for more room.
 - **Text size** (60–200%) makes the tracker's text and lines bigger or smaller. Bigger shows fewer rows; when a line gets wider than the screen it scrolls sideways to follow the cursor.

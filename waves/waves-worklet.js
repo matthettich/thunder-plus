@@ -529,6 +529,9 @@ class Graph {
 class WavesEngine {
   constructor(sampleRate, opts = {}){
     this.sr = sampleRate; this.hosted = !!opts.hosted;
+    // A seed makes every random thing in this engine (noise, Random, oscillator start phases' seeds) repeat exactly:
+    // ...Thunder uses it for renders, so they come out the same every time.
+    if (opts.seed != null) seedN = opts.seed >>> 0;
     this.transport = Object.assign({ tempo:120, lpb:4, ticks:6, ppq:0, playing:false }, opts.transport || {});
     this.quality = opts.quality || 'full';
     this.costCeiling = opts.costCeiling ?? .9;

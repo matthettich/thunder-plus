@@ -8,9 +8,10 @@ It keeps its own name and its own saved data (thunder-* in the browser, not thun
 Usage (from the thunder-plus folder):
     python3 tools/build-thunder.py ../Thunder-
 
-That rewrites ../Thunder-/index.html and copies the two sound engines it needs
-(waves/waves-worklet.js, chains/chains-worklet.js). Everything else in the Thunder- repo
-(README, manifest, icons, sw.js, electron) stays as it is.
+That rewrites ../Thunder-/index.html and electron/main.js (the desktop app works the same way as
+Thunder Plus's), and copies the two sound engines it needs (waves/waves-worklet.js,
+chains/chains-worklet.js). Everything else in the Thunder- repo (README, manifest, icons, sw.js,
+electron/package.json) stays as it is.
 """
 import os, shutil, sys
 
@@ -56,6 +57,11 @@ s = s[:a] + ('<p>...Thunder has two pages: the <b>Synth</b>, where you build an 
              'A kit’s <b>…waves</b> layers and a song’s <b>…chains</b> effects (Mixer → CHN) play here as they do there; to edit those patches, open the file in ...Thunder Plus.</p>') + s[b:]
 
 open(os.path.join(dst, 'index.html'), 'w', encoding='utf-8').write(s)
+m = open(os.path.join(here, 'electron', 'main.js'), encoding='utf-8').read()
+for a, b in [('// ...Thunder Plus as a desktop app', '// ...Thunder as a desktop app'), ("title: '...Thunder Plus'", "title: '...Thunder'")]:
+    if m.count(a) != 1: sys.exit('build-thunder: electron/main.js changed near %r; update this script.' % a)
+    m = m.replace(a, b)
+open(os.path.join(dst, 'electron', 'main.js'), 'w', encoding='utf-8').write(m)
 for f in ['waves/waves-worklet.js', 'chains/chains-worklet.js']:
     os.makedirs(os.path.join(dst, os.path.dirname(f)), exist_ok=True)
     shutil.copyfile(os.path.join(here, f), os.path.join(dst, f))
