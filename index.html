@@ -578,12 +578,20 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 /* Mono and poly tracks: a gentle outline around each track's column in Song and Mixer (and the phrase's notes):
    pink for the one-note-at-a-time tracks, green for the polyphonic (chord) tracks. */
 .tscr{--tk-mono:#eba3bd; --tk-poly:#86c99a}
-.tgrid .ln span.tkm, .tgrid .ln span.tkp{display:inline-block; height:1.3em; vertical-align:top; margin:0 -.18em; padding:0 .18em;
-  box-shadow:inset 2px 0 0 var(--tk), inset -2px 0 0 var(--tk)}
-.tgrid span.tkm{--tk:var(--tk-mono)} .tgrid span.tkp{--tk:var(--tk-poly)}
-.tgrid .ln span.tkt{box-shadow:inset 2px 0 0 var(--tk), inset -2px 0 0 var(--tk), inset 0 2px 0 var(--tk)}
-.tgrid .ln span.tkb{box-shadow:inset 2px 0 0 var(--tk), inset -2px 0 0 var(--tk), inset 0 -2px 0 var(--tk)}
-.tgrid .ln span.tkt.tkb{box-shadow:inset 0 0 0 2px var(--tk)}
+.tgrid span.gm{--tk:var(--tk-mono)} .tgrid span.gp{--tk:var(--tk-poly)}
+/* Song and Mixer: one box around all the mono tracks and one around all the poly tracks, each with its label. */
+.tgrid{position:relative}
+.tgrid.grp{padding-top:1.15em}
+.tgbox{position:absolute; pointer-events:none; border:2px solid var(--tk); border-radius:3px; z-index:0}
+.tgbox.gm{--tk:var(--tk-mono)} .tgbox.gp{--tk:var(--tk-poly)}
+.tgbox b{position:absolute; left:6px; top:0; transform:translateY(-100%); font:600 .62em/1.35 var(--mono); letter-spacing:.08em;
+  padding:0 .5em; background:var(--tk); color:#1b2130; border-radius:3px 3px 0 0; white-space:nowrap}
+.tgbox.gp b{left:auto; right:6px}
+/* Phrase: the note column takes the open track's colour. */
+.tgrid .ln span.gc{display:inline-block; height:1.3em; vertical-align:top; margin:0 -.18em; padding:0 .18em; box-shadow:inset 2px 0 0 var(--tk), inset -2px 0 0 var(--tk)}
+.tgrid .ln span.gc.gt{box-shadow:inset 2px 0 0 var(--tk), inset -2px 0 0 var(--tk), inset 0 2px 0 var(--tk)}
+.tgrid .ln span.gc.gb{box-shadow:inset 2px 0 0 var(--tk), inset -2px 0 0 var(--tk), inset 0 -2px 0 var(--tk)}
+.tgrid .ln span.gc.gt.gb{box-shadow:inset 0 0 0 2px var(--tk)}
 /* View neighbouring phrases: the tracks either side, faint and not editable. */
 .tscr .nb{opacity:.55; pointer-events:none} .tscr .nbl{color:#9b82d6} .tscr .nbr{color:#c9a227}
 </style>
@@ -859,7 +867,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots. <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song.</p>
 <h3>Chords and polyphony</h3>
-<p><b>The second half of the tracks is polyphonic</b> (9–16 with 16 tracks, 17–32 with 32; Settings → Song → Tracks), outlined in green; the first half, outlined in pink, plays one note at a time. Open a phrase from a polyphonic track and it shows four note columns, N1–N4, so a row can hold a chord. Notes on these tracks ring over each other, up to 4 at a time per track; a fifth steals the oldest. A note OFF in any note column releases everything on the track. The mono tracks stay one note at a time, and a phrase played there uses only N1.</p>
+<p><b>The second half of the tracks is polyphonic</b> (9–16 with 16 tracks, 17–32 with 32; Settings → Song → Tracks): the green POLY box on the right of Song and Mixer. The first half, in the pink MONO box on the left, plays one note at a time. Open a phrase from a polyphonic track and it shows four note columns, N1–N4, so a row can hold a chord. Notes on these tracks ring over each other, up to 4 at a time per track; a fifth steals the oldest. A note OFF in any note column releases everything on the track. The mono tracks stay one note at a time, and a phrase played there uses only N1.</p>
 <h3>Two input modes</h3>
 <p><b>PAD</b> is a d-pad plus SHIFT, PLAY, OPTION and EDIT, good with a thumb. <b>KEYS</b> is direct entry: type notes, hex and effects, with an on-screen keypad on touch screens. Switch with ⚙ Settings → Input (or Project → INPUT).</p>
 </section>
@@ -4307,14 +4315,29 @@ function fit(){
   if (tScale !== 100) scr.style.fontSize = Math.max(5, fs * tScale / 100).toFixed(2) + 'px';
 }
 // Song shows 16 rows, more when the screen is tall (unfolded in portrait).
-function songRows(){ const fs = parseFloat(scr.style.fontSize) || 14, h = grid.clientHeight; return h > 0 ? clamp(Math.floor(h / (fs * 1.3) + 0.05) - 1, 8, 48) : 16; }
+function songRows(){ const fs = parseFloat(scr.style.fontSize) || 14, h = grid.clientHeight - (grid.classList.contains('grp') ? fs * .9 : 0); return h > 0 ? clamp(Math.floor(h / (fs * 1.3) + 0.05) - 1, 8, 48) : 16; }
 const BLK = ' ▁▂▃▄▅▆▇█';
 const lvl = p => p <= 0.0001 ? 0 : clamp((20 * Math.log10(p) + 48) / 48, 0, 1);
 let hKey = '';
+// Song and Mixer: a box around the mono group of tracks (left, pink) and the poly group (right, green), with a label.
+// Built from the header cells (gt) and the bottom row (gb) of each group that is on screen.
+function groupBoxes(){
+  if (!(tv === 'song' || tv === 'mixer')) return;
+  const g = grid.getBoundingClientRect(), fs = parseFloat(getComputedStyle(grid).fontSize) || 14, padX = fs * .3, padY = fs * .12;
+  for (const k of ['gm', 'gp']){
+    const top = grid.querySelectorAll('span.gt.' + k), bot = grid.querySelectorAll('span.gb.' + k); if (!top.length) continue;
+    const a = top[0].getBoundingClientRect(), z = top[top.length - 1].getBoundingClientRect(), b = (bot.length ? bot[bot.length - 1] : top[0]).getBoundingClientRect();
+    const box = el('div', 'tgbox ' + k), first = k === 'gm' ? 1 : polyFrom() + 1, last = k === 'gm' ? polyFrom() : ntr();
+    box.style.left = (a.left - g.left + grid.scrollLeft - padX) + 'px'; box.style.top = (a.top - g.top + grid.scrollTop - padY) + 'px';
+    box.style.width = (z.right - a.left + padX * 2) + 'px'; box.style.height = (b.bottom - a.top + padY * 2) + 'px';
+    box.append(el('b', null, (k === 'gm' ? 'MONO ' : 'POLY ') + d2(first) + (last > first ? '–' + d2(last) : '')));
+    grid.append(box);
+  }
+}
 function draw(){
   if (view !== 'tracker') return;
   if (selA && selA.v !== tv) selA = null;
-  scr.dataset.v = tv;
+  scr.dataset.v = tv; grid.classList.toggle('grp', tv === 'song' || tv === 'mixer');   // room above the grid for the MONO / POLY labels
   const c = cs[tv], dm = dims(tv);
   if (onPset()) c.x = clamp(c.x, 0, 1); else { c.x = clamp(c.x, 0, dm.w - 1); c.y = clamp(c.y, 0, dm.h - 1); }
   const P = tp.on ? tp.pos : null, L = [];
@@ -4323,16 +4346,16 @@ function draw(){
   const rsel = y => sr && selA.line && y >= sr.y0 && y <= sr.y1 ? ' sel' : '';
   const cc = (x, y, base) => base + (sr && x >= sr.x0 && x <= sr.x1 && y >= sr.y0 && y <= sr.y1 ? ' sel' : '') + (c.x === x && c.y === y ? ' cur' : '');
   const mc = t => (S.mix[t].mute ? ' mu' : '') + (S.mix[t].solo ? ' so' : '');
-  const tk = t => isPolyT(t) ? ' tkp' : ' tkm';   // the column's outline: pink mono, green poly
+  const tk = t => isPolyT(t) ? ' gp' : ' gm';   // the track's group: pink mono, green poly
   const playRows = test => { const s = new Set(); if (P) P.forEach(p => { const r = p && test(p); if (r != null) s.add(r); }); return s; };
   if (tv === 'song'){
     const [T0, T1] = trackWin(c, stepDec ? 4 : 3), ts = trkSub(T0, T1); sub = ts ? ts + '  ' + S.name : S.name;
     const VR = songRows(); if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; c.top = clamp(c.top, 0, 256 - VR);
-    const hd = [stepDec ? '    ' : '   ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t) + tk(t) + ' tkt', x:t, y:-1}, ' '); L.push(hd);
+    const hd = [stepDec ? '    ' : '   ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t) + tk(t) + ' gt', x:t, y:-1}, ' '); L.push(hd);
     for (let y = c.top; y < c.top + VR; y++){
       const ln = [{t:rS(y, 3), cls:'rn' + (y % 4 ? '' : ' rn4') + rsel(y), r:y}, ' '];
       for (let t = T0; t < T1; t++){ const v = S.song[y][t], pl = P && tp.mode === 'song' && P[t] && P[t].row === y;
-        ln.push({t:h2(v), cls:cc(t, y, (v < 0 ? 'e' : 'v') + (pl ? ' pl' : '') + (v >= 0 && blockMuted(S, y, t) ? ' sm' : '')) + tk(t) + (y === c.top + VR - 1 ? ' tkb' : ''), x:t, y}, ' '); }
+        ln.push({t:h2(v), cls:cc(t, y, (v < 0 ? 'e' : 'v') + (pl ? ' pl' : '') + (v >= 0 && blockMuted(S, y, t) ? ' sm' : '')) + tk(t) + (y === c.top + VR - 1 ? ' gb' : ''), x:t, y}, ' '); }
       L.push(ln);
     }
   } else if (tv === 'chain'){
@@ -4361,7 +4384,7 @@ function draw(){
       const ln = [{t:rS(y), cls:'rn' + (y % 4 ? '' : ' rn4') + (pr.has(y) ? ' pl' : '') + rsel(y), r:y}, ' '];
       const yl = Math.min(len, c.top + VR) - 1;
       if (nbOn) ln.push(nbCell(nbL, y, 'nbl'), ' ');
-      for (let q = 0; q < (poly ? NCOL : 1); q++) ln.push({t:noteS(r[q]), cls:cc(q, y, r[q] < 0 ? 'e' : 'cn') + tk(cTrack) + (y === c.top ? ' tkt' : '') + (y === yl ? ' tkb' : ''), x:q, y}, ' ');
+      for (let q = 0; q < (poly ? NCOL : 1); q++) ln.push({t:noteS(r[q]), cls:cc(q, y, r[q] < 0 ? 'e' : 'cn') + tk(cTrack) + ' gc' + (y === c.top ? ' gt' : '') + (y === yl ? ' gb' : ''), x:q, y}, ' ');
       if (nbOn) ln.push(nbCell(nbR, y, 'nbr'), ' ');
       ln.push({t:h2(r[VC]), cls:cc(VC, y, r[VC] < 0 ? 'e' : 'cv'), x:VC, y}, ' ', {t:h2(r[IC]), cls:cc(IC, y, r[IC] < 0 ? 'e' : 'ci'), x:IC, y});
       for (let k = FX0; k < RW; k += 2) ln.push(' ', {t:r[k] < 0 ? '---' : (FXC[r[k]] || '???'), cls:cc(k, y, r[k] < 0 ? 'e' : 'cf'), x:k, y}, ' ', {t:h2(r[k + 1]), cls:cc(k + 1, y, r[k + 1] < 0 ? 'e' : 'v'), x:k + 1, y});
@@ -4369,7 +4392,7 @@ function draw(){
     }
   } else if (tv === 'mixer'){
     const [T0, T1] = trackWin(c, 4); mixL = T0; mixN = T1 - T0; sub = trkSub(T0, T1);
-    const hd = ['    ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t) + tk(t) + ' tkt', x:t, y:-1}, ' '); L.push(hd);
+    const hd = ['    ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t) + tk(t) + ' gt', x:t, y:-1}, ' '); L.push(hd);
     ['VOL ', 'PAN ', 'MUT ', 'SOL '].forEach((n, y) => {
       const ln = [{t:n, cls:'lb'}];
       for (let t = T0; t < T1; t++){ const m = S.mix[t];
@@ -4391,7 +4414,7 @@ function draw(){
     // Level meters, 8 lines of 6 dB each: red above −6 dB, yellow above −12.
     for (let k = 0; k < MH; k++){
       const ml = [{t:(k ? String(-6 * k) : '0').padStart(3) + ' ', cls:'lb'}];
-      for (let t = T0; t < T1; t++) ml.push({t:'  ', cls:'mt ' + (k === 0 ? 'm3' : k === 1 ? 'm2' : 'm1') + tk(t) + (k === MH - 1 ? ' tkb' : '')}, ' ');
+      for (let t = T0; t < T1; t++) ml.push({t:'  ', cls:'mt ' + (k === 0 ? 'm3' : k === 1 ? 'm2' : 'm1') + tk(t) + (k === MH - 1 ? ' gb' : '')}, ' ');
       L.push(ml);
     }
     const mn = fxCount(S.mfx);
@@ -4423,6 +4446,7 @@ function draw(){
     if (!cu || grid.scrollWidth <= grid.clientWidth + 1) grid.scrollLeft = 0;
     else { const g = grid.getBoundingClientRect(), r = cu.getBoundingClientRect(), m = r.width;
       if (r.right + m > g.right) grid.scrollLeft += r.right - g.right + m; else if (r.left - m < g.left) grid.scrollLeft -= g.left - r.left + m; } }
+  groupBoxes();
   meterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mt')] : []; masterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mm')] : [];
   $('tTitle').textContent = title; $('tSub').textContent = sub;
   $('tInfo').textContent = info(); $('tHint').textContent = (tv === 'phrase' ? 'NOW ' + curS() + (inMode === 'keys' ? ' · oct ' + kOct + ' · step ' + kStep : '') + ' · ' : '') +
