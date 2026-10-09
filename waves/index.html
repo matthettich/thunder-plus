@@ -1,0 +1,1902 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="waves">
+<title>…waves</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<style>
+@font-face{font-family:Jost;src:url('./fonts/Jost-400.woff') format('woff');font-weight:400;font-display:swap}
+@font-face{font-family:Jost;src:url('./fonts/Jost-500.woff') format('woff');font-weight:500;font-display:swap}
+@font-face{font-family:Jost;src:url('./fonts/Jost-600.woff') format('woff');font-weight:600;font-display:swap}
+@font-face{font-family:Jost;src:url('./fonts/Jost-700.woff') format('woff');font-weight:700;font-display:swap}
+/* ═══ …waves skin: the Minimal skin of ...Seeds (white, square, line art) ═══ */
+:root{
+  --bench:#ffffff; --panel:#ffffff; --panel-2:#f3f3f3; --edge:#111111; --ink:#111111; --muted:#555555; --track:#e6e6e6;
+  --side:#efefef; --frame:#efefef; --glass:#050607;
+  --video:#e3962a; --audio:#22958d; --audio-dark:#16625d; --mod:#7a58c8; --mod-dark:#4b318e; --gate:#c93d78; --gate-dark:#86214c; --rec:#cc3a2c;
+  --selc:#ff3d8b;
+  --font:Futura, "Futura PT", Jost, "Century Gothic", "Avenir Next", system-ui, sans-serif;
+  color-scheme:light; box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:border-box}
+*:not(.jack):not(.sw):not(input){border-radius:0 !important}
+html{height:100%}
+body{height:100%; margin:0; background:var(--bench); color:var(--ink); font-family:var(--font); font-size:14px;
+  display:grid; grid-template-rows:auto minmax(0,1fr); overflow:hidden; overscroll-behavior:none}
+[hidden]{display:none !important}
+button,select,input,textarea{font:inherit; color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--video); outline-offset:2px}
+
+/* ---------- top bar ---------- */
+.bar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:9px 12px; background:var(--panel);
+  border-bottom:1px solid var(--edge); white-space:nowrap; position:relative; z-index:6}
+.bar h1{font-size:19px; font-weight:600; margin:0 6px 0 0; letter-spacing:-.01em}
+.bar .spacer{flex:1}
+.pname{width:140px; padding:5px 8px; border:1px solid transparent; background:transparent; font-size:15px; font-weight:500}
+.pname:hover{border-color:var(--edge)}
+.pname:focus{border-color:var(--muted); background:var(--panel-2); outline:none}
+.vsep{width:1px; align-self:stretch; background:var(--edge); margin:0 2px}
+.tb{display:inline-flex; align-items:center; gap:7px; padding:6px 11px; border:1px solid var(--edge); background:#fff}
+.tb:hover{border-color:var(--muted)}
+.tb.on{background:#111; color:#fff; border-color:#111}
+.tb.small{padding:3px 9px; font-size:12.5px}
+.tb:disabled{opacity:.4; cursor:default}
+.fps{font-size:13px; font-variant-numeric:tabular-nums; padding:6px 9px; border:1px solid var(--edge); color:var(--muted); line-height:1.2; white-space:nowrap}
+.fps.good{color:#2e9e5b; border-color:#2e9e5b} .fps.ok{color:#c99a00; border-color:#c99a00} .fps.low{color:var(--rec); border-color:var(--rec)}
+.meters{display:inline-flex; align-items:center; gap:3px; padding:6px 8px}
+.meters .b{width:12px; height:9px; background:var(--track); position:relative; overflow:hidden}
+.meters .b i{position:absolute; inset:0; transform-origin:left; background:var(--audio); transform:scaleX(0)}
+.zoomctl{display:flex; align-items:center; gap:4px}
+.zoomctl .tb{padding:6px 9px; min-width:34px; justify-content:center}
+#zoomval{min-width:58px; font-variant-numeric:tabular-nums}
+
+/* menus */
+.setwrap{position:relative}
+.setmenu{position:absolute; left:0; top:calc(100% + 6px); width:320px; z-index:2000001; background:var(--panel); border:1px solid #111;
+  padding:6px; white-space:normal; max-height:calc(100vh - 80px); overflow-y:auto}
+.filemenu{width:260px; display:grid; gap:2px}
+.filemenu hr{border:0; border-top:1px solid var(--edge); margin:4px 2px; width:auto}
+.fitem{display:flex; justify-content:space-between; align-items:center; gap:12px; border:0; background:none; padding:7px 10px; font-size:14px; text-align:left; color:var(--ink)}
+.fitem:hover:not(:disabled){background:var(--panel-2)}
+.fitem:disabled{opacity:.4}
+.fitem kbd{font:inherit; font-size:12px; color:var(--muted)}
+.setsec{padding:8px 8px 10px; display:grid; gap:10px}
+.setsec + .setsec{border-top:1px solid var(--edge)}
+.sethead{font-weight:600; font-size:14px}
+.setrow{display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:start; font-size:14px; cursor:pointer}
+.setrow input{margin-top:3px; width:16px; height:16px; accent-color:var(--ink)}
+.setsub{font-size:12.5px; color:var(--muted); font-weight:400}
+.setsel{display:grid; grid-template-columns:78px 1fr; gap:8px; align-items:center; font-size:13.5px}
+.bklist{display:grid; gap:5px}
+.bkrow{display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; font-size:12.5px}
+.bkrow .btn{padding:3px 9px; font-size:12.5px}
+.ctxmenu{position:fixed; z-index:2000000; min-width:220px; padding:4px; background:var(--panel); border:1px solid #111; display:grid}
+.ctxitem{border:0; background:none; text-align:left; padding:7px 12px; font-size:14px}
+.ctxitem:hover{background:var(--panel-2)}
+.ctxitem:disabled{opacity:.4}
+
+/* ---------- layout ---------- */
+.split{display:grid; grid-template-columns:38px minmax(0,1fr); min-height:0; border-bottom:10px solid var(--frame)}
+.split > *{border-bottom:1px solid #111}
+
+/* ---------- module list ---------- */
+.drawer{display:grid; grid-template-rows:minmax(0,1fr); width:38px; min-height:0; background:var(--side); border-right:1px solid var(--edge); position:relative; z-index:20}
+.dtoggle{display:flex; flex-direction:column; justify-content:flex-start; align-items:center; gap:8px; padding:12px 0; height:100%;
+  border:0; background:var(--side); font-weight:600; font-size:14px; color:var(--ink)}
+.dtoggle:hover{filter:brightness(.97)}
+.dlabel{writing-mode:vertical-rl; transform:rotate(180deg); letter-spacing:.04em}
+.dchev{width:8px; height:8px; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted); transform:rotate(135deg); margin:0 2px}
+.drawer.collapsed .dchev{transform:rotate(-45deg)}
+.drawer.collapsed .palette{display:none}
+.palette{position:absolute; left:38px; top:0; bottom:0; width:300px; display:grid; grid-template-rows:auto minmax(0,1fr); min-height:0;
+  background:var(--side); border-right:1px solid var(--edge); box-shadow:8px 0 24px rgba(0,0,0,.18); user-select:none; -webkit-user-select:none}
+.palette > header{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border-bottom:1px solid var(--edge)}
+.palette > header span:first-child{font-weight:600; font-size:15px}
+.dresize{position:absolute; top:0; bottom:0; width:8px; cursor:col-resize; z-index:5}
+.drawer.collapsed .dresize{display:none}
+.plist{overflow-y:auto; overscroll-behavior:contain; padding:8px 10px 12px}
+.quick{padding:10px 10px 12px; margin:-8px -10px 8px; border-bottom:1px solid var(--edge); background:var(--side)}
+.qhead{display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin:0 2px 8px}
+.qt{font-weight:600; font-size:14.5px}
+.qhint{color:var(--muted); font-size:12.5px}
+.qgrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:6px}
+.qempty{color:var(--muted); font-size:13px; padding:4px 2px}
+.psection{margin:16px 2px 6px; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--edge); padding-bottom:4px}
+.pgroup{display:flex; align-items:center; gap:8px; width:100%; margin:4px 0; padding:8px 8px; border:2.5px solid var(--edge); background:#fff; color:var(--ink); font-size:14px; font-weight:600; text-align:left}
+.pgroup.tinted{background:color-mix(in srgb, #fff 64%, var(--edge) 36%)}
+.pgroup.tinted:hover{background:color-mix(in srgb, #fff 50%, var(--edge) 50%)}
+.pgroup.allgrp{--edge:#c6ccd5; border-width:1px; background:#eceef1}
+.pgroup.allgrp:hover{background:#e1e4e9}
+.pgroup .chev{width:8px; height:8px; border-right:2px solid var(--ink); border-bottom:2px solid var(--ink); transform:rotate(-45deg); transition:transform .15s; margin:0 4px 0 2px; flex:none; opacity:.7}
+.pgroup.open .chev{transform:rotate(45deg)}
+.pgroup .pcount{margin-left:auto; color:var(--muted); font-size:12.5px; font-weight:400}
+.pgrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:4px; padding:2px 0 8px}
+.pwrap{position:relative; display:grid}
+.pwrap .pitem{padding-right:30px}
+.pitem{display:flex; align-items:center; gap:9px; width:100%; text-align:left; padding:8px 10px; border:2.5px solid var(--edge); background:#fff; color:var(--ink); touch-action:none; cursor:grab}
+.pitem:hover{background:var(--panel-2)}
+.pitem.big{padding:11px 30px 11px 12px; font-size:15px; font-weight:500}
+.pstar,.qx{position:absolute; right:4px; top:50%; transform:translateY(-50%); width:24px; height:24px; padding:0; border:0; background:none; color:var(--muted); font-size:15px; line-height:24px; text-align:center}
+.pstar{opacity:.35}
+.pwrap:hover .pstar, .pstar:focus-visible, .pstar.on{opacity:1}
+.pstar.on{color:#d79b16}
+.pstar:hover, .qx:hover{background:rgba(0,0,0,.06); color:var(--ink)}
+.qx{opacity:0}
+.pwrap:hover .qx, .qx:focus-visible{opacity:1}
+@media (hover: none){ .pstar, .qx{opacity:1} }
+.sw{width:9px; height:9px; border-radius:50%; background:var(--k); flex:none}
+.pghost{position:fixed; z-index:1000003; pointer-events:none; padding:6px 10px; background:#fff; border:2.5px solid var(--edge); font-size:14px; display:flex; gap:8px; align-items:center}
+
+/* module families (Minimal: white panels, colored edges) */
+.fam-midi{--edge:#b8865a} .fam-gen{--edge:#139a9a} .fam-afx{--edge:#b24fb0} .fam-mod{--edge:#c99a00}
+.fam-aout{--edge:#3f6fb5} .fam-grp{--edge:#8a73c9} .fam-util{--edge:#e07a2e}
+
+/* ---------- patch ---------- */
+.ws{position:relative; isolation:isolate; overflow:hidden; touch-action:none; cursor:grab; min-width:0; min-height:0; background:var(--bench)}
+.ws.panning{cursor:grabbing}
+.world{position:absolute; left:0; top:0; width:0; height:0; transform-origin:0 0}
+svg.cables{position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; pointer-events:none; z-index:1000000}
+svg.cables .cln{stroke-width:2.5px; stroke-linecap:square; stroke-linejoin:miter}
+svg.cables .cln.ctl{stroke-width:2px; stroke-dasharray:6 4}
+svg.cables .hit{cursor:pointer}
+svg.cables rect.bend{fill:var(--panel); stroke:var(--ink); stroke-width:1.5; pointer-events:none; opacity:0; cursor:move}
+body.alting svg.cables rect.bend{opacity:1; pointer-events:all}
+
+.node{position:absolute; width:250px; background:var(--panel); border:3.5px solid var(--edge); user-select:none; -webkit-user-select:none; cursor:default}
+.node > header{display:flex; align-items:center; gap:8px; padding:7px 8px 7px 12px; cursor:grab; border-bottom:2px solid var(--edge); touch-action:none}
+.node > header .t{flex:1; font-weight:600; font-size:17px; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.node > header .x{border:0; background:none; color:var(--muted); font-size:19px; line-height:1; width:26px; height:26px; flex:none}
+.node > header .x:hover{background:var(--panel-2); color:var(--ink)}
+.node > header .fold{border:0; background:none; color:var(--muted); width:20px; height:22px; margin-left:-6px; padding:0; display:grid; place-items:center; flex:none}
+.node > header .fold:hover{background:var(--panel-2); color:var(--ink)}
+.node > header .fold svg{transition:transform .15s}
+.node.collapsed > header .fold svg{transform:rotate(-90deg)}
+.node.collapsed > .body{display:none}
+.node.collapsed > .ports{border-bottom:0}
+@media (prefers-reduced-motion: reduce){ .node > header .fold svg{transition:none} }
+.node.selected{outline:3px solid var(--selc) !important; outline-offset:3px}
+.node.selected > header{background:color-mix(in srgb, var(--panel-2) 70%, var(--selc) 30%) !important}
+.node.selected::after{content:''; position:absolute; inset:0; background:var(--selc); opacity:.07; pointer-events:none}
+
+.ports{display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:2px solid var(--edge)}
+.ins,.outs{display:grid; gap:4px; align-content:start}
+.port{display:flex; align-items:center; gap:7px; height:24px; color:var(--muted); font-size:13px}
+.ins .port{margin-left:-10px}
+.outs .port{margin-right:-10px; flex-direction:row-reverse}
+.jack{width:20px; height:20px; border-radius:50%; flex:none; cursor:crosshair; touch-action:none;
+  background:radial-gradient(circle, var(--glass) 0 4px, #4a4f57 4.5px 6px, var(--k) 6.5px);
+  box-shadow:0 0 0 2px var(--panel), 0 1px 3px rgba(0,0,0,.35)}
+.jack[data-kind="audio"]{--k:var(--audio)}
+.jack[data-kind="mod"]{--k:var(--mod)}
+.jack[data-kind="gate"]{--k:var(--gate)}
+.jack.small{width:16px; height:16px; position:absolute; left:-20px; top:50%; margin-top:-8px;
+  background:radial-gradient(circle, var(--glass) 0 3px, #4a4f57 3.5px 4.5px, var(--k) 5px)}
+.jack.target{box-shadow:0 0 0 2px var(--panel), 0 0 0 5px var(--k)}
+
+.body{display:grid; gap:9px; padding:10px 12px 12px}
+.row{display:grid; grid-template-columns:70px 1fr 64px; align-items:center; gap:8px; font-size:12.5px; letter-spacing:-.01em; min-height:24px; position:relative}
+.row.wide{grid-template-columns:70px 1fr}
+.row > span:first-child{color:var(--muted); line-height:1.15; overflow-wrap:anywhere; hyphens:auto}
+.row .val{text-align:right; font-variant-numeric:tabular-nums; cursor:text}
+.rng{position:relative; display:grid; align-items:center}
+.mark{position:absolute; bottom:-5px; width:3px; height:6px; margin-left:-1.5px; background:var(--mod); pointer-events:none}
+.row.modded .val{color:var(--mod); font-weight:600}
+.cmval{position:absolute; right:24px; top:50%; transform:translateY(-50%); font-size:11px; font-weight:600; background:var(--mod); color:#fff; padding:1px 7px; pointer-events:none; max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.numsmall{width:90px; padding:4px 6px; border:1px solid #111; background:#fff; font-size:13px}
+.valedit{width:100%; padding:1px 4px; font-size:13px; text-align:right; background:var(--panel); border:1px solid var(--muted); color:var(--ink)}
+input[type=range]{width:100%; accent-color:#111; margin:0}
+select{width:100%; padding:4px 6px; background:#fff; border:1px solid #111; font-size:13px; min-width:0}
+.btn{padding:6px 10px; border:1px solid #111; background:#fff; font-weight:500}
+.btn:hover{border-color:var(--muted)}
+.status{font-size:12.5px; color:var(--muted); white-space:pre-line; min-height:1.2em; overflow-wrap:anywhere}
+.prog{height:6px; background:var(--panel-2); overflow:hidden; border:1px solid var(--track)}
+.prog span{display:block; height:100%; width:100%; background:var(--audio); transform-origin:left; transform:scaleX(0)}
+
+/* MIDI learn */
+body.learning .ws{background-color:#ffd9e6 !important}
+body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
+.row.sl.armed{outline:2px solid var(--gate) !important; outline-offset:3px}
+.row.sl.mapped > .lbl::after{content:" •"; color:var(--gate); font-weight:700}
+.learnbar{position:fixed; left:50%; top:64px; transform:translateX(-50%); z-index:1000002; display:flex; gap:12px; align-items:center;
+  max-width:calc(100% - 24px); padding:8px 8px 8px 14px; background:var(--gate); color:#fff; font-size:13.5px}
+.learnbar .tb{background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.4); color:#fff}
+
+/* groups drawn on the patch */
+.decor{position:absolute; z-index:1; user-select:none; -webkit-user-select:none}
+.decor.box{border:2px solid; pointer-events:none}
+.decor.box > *{pointer-events:auto}
+.decor.box .dtext{padding:6px 36px 6px 10px; font-weight:600; font-size:15px; cursor:move; display:block; min-height:31px; color:#1f2328; overflow:hidden; white-space:nowrap; text-overflow:ellipsis}
+.dx{position:absolute; top:4px; right:4px; width:23px; height:23px; padding:0; border:0; background:rgba(20,22,26,.6); color:#fff; font-size:16px; line-height:23px; text-align:center; opacity:0; transition:opacity .12s; z-index:1}
+.decor:hover .dx, .dx:focus-visible{opacity:1}
+.dx:hover{background:var(--rec)}
+@media (hover: none){ .dx{opacity:1} }
+
+.lasso{position:absolute; border:1.5px dashed var(--video); background:rgba(227,150,42,.08); z-index:1000002; pointer-events:none}
+.hint{position:absolute; left:12px; bottom:12px; max-width:min(62ch, calc(100% - 200px)); padding:7px 10px;
+  font-size:12.5px; color:var(--muted); background:var(--panel); border:1px solid #111; z-index:1000001; display:flex; gap:10px; align-items:start}
+.hint button{border:0; background:none; color:var(--muted); font-size:16px; line-height:1; padding:0}
+.toast{position:absolute; left:50%; top:14px; transform:translateX(-50%); background:var(--ink); color:var(--panel);
+  padding:7px 12px; font-size:13px; z-index:1000002; pointer-events:none; max-width:90%}
+.emptylbl{position:absolute; left:50%; top:50%; transform:translate(-50%, -50%); z-index:0; pointer-events:none; font-family:var(--font); font-weight:700; font-size:clamp(34px, 6vw, 76px); letter-spacing:.02em; white-space:nowrap}
+.dock{position:absolute; right:10px; display:grid; gap:6px; justify-items:end; z-index:1000001}
+.dock.bottom{bottom:10px}
+.dockport{display:flex; align-items:center; gap:8px; padding:4px 5px 4px 10px; background:var(--panel); border:1px solid #111; font-size:13px; color:var(--ink); user-select:none; -webkit-user-select:none}
+.touchkeys{display:flex; gap:3px}
+.touchkeys button{font-size:12px; padding:6px 0; width:30px; border:1px solid #111; background:#fff; touch-action:none}
+.touchkeys button.on{background:#111; color:#fff}
+
+/* dialogs and help */
+.dlgov{position:fixed; inset:0; z-index:4000000; background:rgba(0,0,0,.28); display:grid; place-items:center}
+.dlg{background:var(--panel); border:1px solid #111; padding:18px 20px; width:min(420px, 92vw); display:grid; gap:12px}
+.dlg p{margin:0; font-size:15px; line-height:1.45}
+.dlginput{font-size:15px; padding:7px 9px; border:1px solid var(--edge); background:var(--panel-2); color:var(--ink)}
+.dlgbtns{display:flex; justify-content:flex-end; gap:8px}
+.helpov{position:fixed; inset:24px; z-index:3000000; background:#ececec; border:3px solid #111; box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.helpov iframe{width:100%; height:100%; border:0; display:block}
+.helpx{position:absolute; top:10px; right:14px}
+
+/* ---------- touch screens and narrow windows ---------- */
+@media (pointer: coarse){
+  .tb, .btn{min-height:42px}
+  select, input{font-size:16px}
+  input[type=range]{height:34px}
+  .row{min-height:40px}
+  .touchkeys button{min-height:42px; width:34px}
+}
+@media (max-width: 1340px){ .bar .zoomctl #zoomfit, .bar .vsep{display:none} .bar h1{font-size:17px} .bar .pname{width:96px; font-size:14px} .bar .fps{font-size:12px; padding:5px 6px} }
+@media (max-width: 760px){ .bar .meters, #vcount{display:none} .hint{max-width:calc(100% - 24px)} }
+</style>
+</head><body>
+
+<div class="bar">
+  <button class="tb on" id="donebtn" hidden title="Save this patch into the kit and go back to …Thunder Plus">‹ Thunder</button>
+  <h1>...waves</h1>
+  <input id="pname" class="pname" aria-label="Patch name" maxlength="60" spellcheck="false">
+  <span class="vsep" aria-hidden="true"></span>
+  <div class="setwrap"><button class="tb" id="filebtn" aria-haspopup="true">File ▾</button>
+    <div class="setmenu filemenu" id="filemenu" hidden role="menu">
+      <button class="fitem" id="fnew"><span>New</span><kbd data-k="N"></kbd></button>
+      <button class="fitem" id="fopen"><span>Open…</span><kbd data-k="O"></kbd></button>
+      <button class="fitem" id="fsave"><span>Save</span><kbd data-k="S"></kbd></button>
+      <button class="fitem" id="fsaveas"><span>Save as…</span><kbd data-k="⇧S"></kbd></button>
+      <hr>
+      <button class="fitem" id="undobtn"><span>Undo</span><kbd data-k="Z"></kbd></button>
+      <button class="fitem" id="redobtn"><span>Redo</span><kbd data-k="⇧Z"></kbd></button>
+      <hr>
+      <button class="fitem" id="fexpmods"><span>Export custom modules…</span></button>
+      <button class="fitem" id="fimpmods"><span>Import custom modules…</span></button>
+    </div>
+  </div>
+  <div class="setwrap"><button class="tb" id="setbtn" aria-haspopup="true" aria-expanded="false">Settings ▾</button>
+    <div class="setmenu" id="setmenu" hidden>
+      <div class="setsec">
+        <label class="setrow"><input type="checkbox" id="settips"><span><b>Show tips</b><br><span class="setsub">The help note in the corner of the patch.</span></span></label>
+        <label class="setrow"><input type="checkbox" id="setkeys"><span><b>On-screen keys</b><br><span class="setsub">A small keyboard in the corner of the patch for playing notes by touch.</span></span></label>
+      </div>
+      <div class="setsec">
+        <div class="sethead">Sound</div>
+        <label class="setsel"><span>Quality</span><select id="setquality"><option value="full">Full quality</option><option value="draft">Draft (lighter on the CPU)</option></select></label>
+        <label class="setsel"><span>Voices</span><select id="setvoices"></select></label>
+        <label class="setsel"><span>Tempo</span><span><input type="number" id="settempo" class="numsmall" min="20" max="300" step="0.1"> BPM</span></label>
+        <div class="setsub">How many notes can sound at once. Changing it restarts the sound engine. When the CPU gets too busy, …waves drops voices by itself.</div>
+        <div class="sethead">MIDI</div>
+        <label class="setsel"><span>Controller</span><select id="setmidiin"><option value="all">All connected MIDI inputs</option></select></label>
+        <div class="setsub" id="setmidiinfo">Notes and CC from this controller play and control …waves.</div>
+      </div>
+      <div class="setsec">
+        <div class="sethead">Backups</div>
+        <div class="bklist" id="bklist"></div>
+        <div class="setsub">Earlier versions of your patch, saved automatically. Restoring can be undone.</div>
+      </div>
+    </div>
+  </div>
+  <button class="tb" id="helpbtn" title="How to use …waves, and every module explained">Help</button>
+  <input type="file" id="fileload" accept=".json,application/json" hidden>
+  <div class="spacer"></div>
+  <span class="fps" id="cpuv" title="How busy the sound engine is">CPU –</span>
+  <span class="fps" id="vcount" title="Notes sounding now">0 voices</span>
+  <span class="fps meters" id="meters" title="Out 1–8"></span>
+  <button class="tb" id="midilearn">MIDI learn</button>
+  <div class="zoomctl"><button class="tb" id="zoomout" aria-label="Zoom out">−</button><button class="tb" id="zoomval" title="Click to type a zoom level">100%</button><button class="tb" id="zoomin" aria-label="Zoom in">+</button><button class="tb" id="zoomfit">Fit</button></div>
+</div>
+
+<div class="split" id="split">
+<aside class="drawer collapsed" id="drawer">
+  <button class="dtoggle" id="dtoggle" aria-expanded="false" title="Show or hide the module list"><span class="dchev" aria-hidden="true"></span><span class="dlabel">Modules</span></button>
+  <div class="palette" id="palette" aria-label="Modules">
+    <header><span>Modules</span><button class="tb small" id="pall">Expand all</button></header>
+    <div class="plist" id="plist"><div class="quick" id="quick"></div></div>
+  </div>
+</aside>
+<div class="ws" id="ws">
+  <div class="world" id="world">
+    <div id="groups"></div>
+    <svg class="cables" id="cables" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+  <div class="hint" id="hint"><span>Drag from an output jack to an input jack to patch. Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Double-click a cable to remove it, or a module’s title bar to collapse it. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Play notes on your computer keyboard: Z to M and Q to P, with - and = for octaves.</span><button id="hintx" aria-label="Hide tips">×</button></div>
+  <div class="dock bottom" id="dockbot"><div class="dockport" id="keysdock" hidden><span>Keys</span><span class="touchkeys" id="touchkeys"></span></div></div>
+  <div class="lasso" id="lasso" hidden></div>
+  <div class="emptylbl" id="emptylbl" aria-hidden="true" hidden></div>
+  <div class="toast" id="toast" hidden></div>
+</div>
+</div>
+<div class="learnbar" id="learnbar" hidden><span id="learntext"></span><button class="tb" id="learndone">Done</button></div>
+<div class="ctxmenu" id="ctxmenu" hidden role="menu"></div>
+<script type="module">
+/* ═══ …waves ═══
+   The patch page works like the Patch page of ...Seeds (Minimal skin): module list on the
+   left, modules with jacks on the edges, straight colored cables, right-click menu, lasso,
+   pan and zoom. The sound engine lives in waves-worklet.js; this page only edits the patch
+   document and sends changes to it through WavesBridge. */
+const PROTOCOL = 2, TARGET = 'waves', BUS_COUNT = 8;
+
+/* Module table. It mirrors MODULES in waves-worklet.js (inputs, outputs and parameter ranges must match).
+   ui: per-parameter label (l), value format (f) and dropdown choices (c). */
+const pct = v => Math.round(v * 100) + '%';
+const spct = v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%';
+const semis = v => (v > 0 ? '+' : '') + Math.round(v) + ' st';
+const cents = v => (v > 0 ? '+' : '') + Math.round(v) + ' ct';
+const secs = v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s';
+const hz = v => (v < 10 ? v.toFixed(2) : v.toFixed(1)) + ' Hz';
+const db = v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB';
+const khz = v => v >= 1000 ? (v / 1000).toFixed(1) + ' kHz' : Math.round(v) + ' Hz';
+const wet = v => Math.round(v * 100) + '% wet';
+const times = v => '×' + v.toFixed(2);
+const NOTE_NAMES = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+const noteName = v => { const n = Math.round(v) + 60; return NOTE_NAMES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); };
+const opts = names => names.map((t, i) => [i, t]);
+const PL_NAMES = ['VA + filter','Phase distortion','6-op FM I','6-op FM II','6-op FM III','Wave terrain','String machine','Chiptune',
+  'Virtual analog','Waveshaping','2-op FM','Grain / formant','Additive','Wavetable','Chords','Speech',
+  'Swarm','Filtered noise','Particle','Inharmonic string','Modal resonator','Bass drum','Snare drum','Hi-hat'];
+const RATIOS = [0.25,0.5,0.75,1,1.25,1.5,1.75,2,2.5,3,3.5,4,4.5,5,6,7,8,9,10,11,12,13,14,16];
+const MIXP = { mix:{l:'Mix', f:wet} };
+const step = k => ({ l:'Step ' + k, f: v => v <= -25 ? 'Rest' : noteName(v) });
+
+const MODULES = {
+  hostIn:{ label:'Host In', scope:'root', inputs:{}, outputs:{ pitch:'cv', gate:'gate', vel:'cv' },
+    params:{ transpose:[0,-48,48,1] }, ui:{ transpose:{l:'Transpose', f:semis} } },
+  seq:{ label:'Sequencer', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ pitch:'cv', gate:'gate', clock:'gate' },
+    params:{ run:[1,0,1,1], rate:[3,0,5,1], steps:[8,1,8,1], length:[.5,.05,1,.01],
+      s1:[0,-25,24,1], s2:[3,-25,24,1], s3:[7,-25,24,1], s4:[12,-25,24,1], s5:[10,-25,24,1], s6:[7,-25,24,1], s7:[3,-25,24,1], s8:[-25,-25,24,1] },
+    ui:{ run:{l:'Run', c:opts(['Stop','Play'])}, rate:{l:'Rate', c:opts(['1/4','1/8','1/8 triplet','1/16','1/16 triplet','1/32'])},
+      steps:{l:'Steps', f:v => String(Math.round(v))}, length:{l:'Gate', f:pct},
+      s1:step(1), s2:step(2), s3:step(3), s4:step(4), s5:step(5), s6:step(6), s7:step(7), s8:step(8) } },
+
+  vco:{ label:'VCO', scope:'poly', inputs:{ pitch:'cv', fm:'cv' }, outputs:{ out:'audio' },
+    params:{ wave:[1,0,3,1], tune:[0,-24,24,1], fine:[0,-100,100,1] },
+    ui:{ wave:{l:'Wave', c:opts(['Saw','Square','Triangle','Sine'])}, tune:{l:'Tune', f:semis}, fine:{l:'Fine', f:cents} } },
+  fm:{ label:'FM', scope:'poly', inputs:{ pitch:'cv', fm:'cv', index:'cv' }, outputs:{ out:'audio' },
+    params:{ model:[0,0,3,1], tune:[0,-24,24,1], fine:[0,-100,100,1], ratio:[.13,0,1,.01], index:[.4,0,1,.01] },
+    ui:{ model:{l:'Model', c:opts(['2-op','Feedback','Metal','Cross'])}, tune:{l:'Tune', f:semis}, fine:{l:'Fine', f:cents},
+      ratio:{l:'Ratio', f:v => RATIOS[Math.round(v * (RATIOS.length - 1))] + '×'}, index:{l:'Index', f:pct} } },
+  additive:{ label:'Additive', scope:'poly', inputs:{ pitch:'cv', gate:'gate' }, outputs:{ out:'audio' },
+    params:{ model:[0,0,5,1], tune:[0,-24,24,1], shape:[.3,0,1,.01], color:[.4,0,1,.01] },
+    ui:{ model:{l:'Model', c:opts(['Harmonic','Odd harmonics','Membrane','Bell','Bar','Chord'])}, tune:{l:'Tune', f:semis}, shape:{l:'Shape', f:pct}, color:{l:'Color', f:pct} } },
+  noise:{ label:'Noise', scope:'poly', inputs:{ pitch:'cv' }, outputs:{ out:'audio' },
+    params:{ model:[0,0,7,1], shape:[0,0,1,.01], color:[0,0,1,.01] },
+    ui:{ model:{l:'Model', c:opts(['White','Pink','Brown','Blue','Metal 808','Digital','Crackle','S&H'])}, shape:{l:'Shape', f:pct}, color:{l:'Color', f:pct} } },
+  plaits:{ label:'Plaits', scope:'poly', inputs:{ pitch:'cv', gate:'gate', timbre:'cv', morph:'cv', harmonics:'cv' }, outputs:{ out:'audio', aux:'audio' },
+    params:{ engine:[8,0,23,1], harmonics:[.5,0,1,.01], timbre:[.5,0,1,.01], morph:[.5,0,1,.01], decay:[.5,0,1,.01], lpg:[.5,0,1,.01] },
+    ui:{ engine:{l:'Engine', c:opts(PL_NAMES)}, harmonics:{l:'Harmonics', f:pct}, timbre:{l:'Timbre', f:pct}, morph:{l:'Morph', f:pct}, decay:{l:'Decay', f:pct}, lpg:{l:'LPG color', f:pct} } },
+  elements:{ label:'Elements', scope:'poly', inputs:{ pitch:'cv', gate:'gate', strength:'cv' }, outputs:{ out:'audio', aux:'audio' },
+    params:{ model:[0,0,2,1], contour:[0,0,1,.01], bow:[0,0,1,.01], blow:[0,0,1,.01], strike:[.8,0,1,.01], mallet:[.5,0,1,.01], timbre:[.5,0,1,.01],
+      flow:[.5,0,1,.01], geometry:[.3,0,1,.01], brightness:[.5,0,1,.01], damping:[.6,0,1,.01], position:[.3,0,1,.01], space:[.3,0,1,.01] },
+    ui:{ model:{l:'Resonator', c:opts(['Modal','String','Strings'])}, contour:{l:'Contour', f:pct}, bow:{l:'Bow', f:pct}, blow:{l:'Blow', f:pct}, strike:{l:'Strike', f:pct},
+      mallet:{l:'Mallet', f:pct}, timbre:{l:'Exciter timbre', f:pct}, flow:{l:'Flow', f:pct}, geometry:{l:'Geometry', f:pct}, brightness:{l:'Brightness', f:pct},
+      damping:{l:'Damping', f:pct}, position:{l:'Position', f:pct}, space:{l:'Space', f:pct} } },
+
+  vcf:{ label:'VCF', scope:'poly', inputs:{ in:'audio', cutoff:'cv' }, outputs:{ out:'audio' },
+    params:{ cutoff:[.5,0,1,.001], res:[.3,0,1,.001], mode:[0,0,2,1] },
+    ui:{ cutoff:{l:'Cutoff', f:pct}, res:{l:'Resonance', f:pct}, mode:{l:'Mode', c:opts(['Low-pass','Band-pass','High-pass'])} } },
+  vca:{ label:'VCA', scope:'poly', inputs:{ in:'audio', cv:'cv' }, outputs:{ out:'audio' },
+    params:{ gain:[1,0,4,.01] }, ui:{ gain:{l:'Gain', f:times} } },
+  mixer:{ label:'Mixer', scope:'poly', inputs:{ in1:'audio', in2:'audio', in3:'audio', in4:'audio' }, outputs:{ out:'audio' },
+    params:{ l1:[.8,0,1.5,.01], l2:[.8,0,1.5,.01], l3:[.8,0,1.5,.01], l4:[.8,0,1.5,.01], level:[1,0,2,.01] },
+    ui:{ l1:{l:'Level 1', f:pct}, l2:{l:'Level 2', f:pct}, l3:{l:'Level 3', f:pct}, l4:{l:'Level 4', f:pct}, level:{l:'Master', f:pct} } },
+
+  eq:{ label:'EQ', fx:true, params:{ treble:[.5,0,1,.01], mid:[.5,0,1,.01], bass:[.5,0,1,.01], tfreq:[.4,0,1,.01], bfreq:[.4,0,1,.01], lowpass:[1,0,1,.01], hipass:[0,0,1,.01], out:[.5,0,1,.01] },
+    ui:{ treble:{l:'Treble', f:v => db(v * 24 - 12)}, mid:{l:'Mid', f:v => db(v * 24 - 12)}, bass:{l:'Bass', f:v => db(v * 24 - 12)},
+      tfreq:{l:'Treble freq', f:v => khz((v * v * 15 + 1) * 1000)}, bfreq:{l:'Bass freq', f:v => khz(v * v * 1570 + 30)},
+      lowpass:{l:'Low-pass', f:v => khz((v * v * 15 + 1) * 1000)}, hipass:{l:'High-pass', f:v => v > 0 ? khz(v * v * 1570 + 30) : 'Off'}, out:{l:'Output', f:v => db(v * 36 - 18)} } },
+  comp:{ label:'Compressor', fx:true, params:{ press:[.4,0,1,.01], speed:[.2,0,1,.01], mew:[1,0,1,.01], out:[1,0,1,.01], mix:[1,0,1,.01] },
+    ui:Object.assign({ press:{l:'Pressure', f:v => v > 0 ? pct(v) : 'Off'}, speed:{l:'Speed', f:pct}, mew:{l:'Mewiness', f:v => (v * 2 - 1).toFixed(2)}, out:{l:'Output', f:pct} }, MIXP) },
+  saturation:{ label:'Saturation', fx:true, params:{ drive:[.4,0,1,.01], hipass:[0,0,1,.01], out:[.8,0,1,.01], mix:[1,0,1,.01] },
+    ui:Object.assign({ drive:{l:'Drive', f:pct}, hipass:{l:'High-pass', f:pct}, out:{l:'Output', f:pct} }, MIXP) },
+  tape:{ label:'Tape', fx:true, params:{ input:[.5,0,1,.01], soften:[.5,0,1,.01], bump:[.5,0,1,.01], flutter:[.5,0,1,.01], out:[.5,0,1,.01], mix:[1,0,1,.01] },
+    ui:Object.assign({ input:{l:'Input', f:pct}, soften:{l:'Soften', f:pct}, bump:{l:'Head bump', f:pct}, flutter:{l:'Flutter', f:pct}, out:{l:'Output', f:pct} }, MIXP) },
+  chorus:{ label:'Chorus', fx:true, params:{ depth:[.5,0,1,.01], rate:[.41,0,1,.01], delay:[.24,0,1,.01], fb:[.21,0,1,.01], mix:[.5,0,1,.01] },
+    ui:Object.assign({ depth:{l:'Depth', f:pct}, rate:{l:'Rate', f:v => hz(.05 * Math.pow(160, v))}, delay:{l:'Delay', f:v => (1 + v * 29).toFixed(1) + ' ms'}, fb:{l:'Feedback', f:v => Math.round(v * 95) + '%'} }, MIXP) },
+  crush:{ label:'Bitcrush', fx:true, params:{ down:[.4,0,1,.01], bits:[8,1,16,1], smooth:[0,0,1,1], mix:[1,0,1,.01] },
+    ui:Object.assign({ down:{l:'Downsample', f:pct}, bits:{l:'Bits', f:v => Math.round(v) + ' bit'}, smooth:{l:'Crush', c:opts(['Hard','Smooth'])} }, MIXP) },
+  delay:{ label:'Tape delay', fx:true, params:{ time:[.375,.07,1.8,.001], regen:[.38,0,1,.01], tone:[.5,0,1,.01], reso:[0,0,1,.01], flutter:[0,0,1,.01], mix:[.25,0,1,.01] },
+    ui:Object.assign({ time:{l:'Time', f:secs}, regen:{l:'Repeats', f:pct}, tone:{l:'Tone', f:pct}, reso:{l:'Resonance', f:pct}, flutter:{l:'Flutter', f:pct} }, MIXP) },
+  reverb:{ label:'Reverb', fx:true, params:{ replace:[.5,0,1,.01], bright:[.5,0,1,.01], detune:[.5,0,1,.01], big:[1,0,1,.01], mix:[.25,0,1,.01] },
+    ui:{ replace:{l:'Replace', f:pct}, bright:{l:'Brightness', f:pct}, detune:{l:'Detune', f:pct}, big:{l:'Size', f:pct}, mix:{l:'Mix', f:v => Math.round((1 - Math.pow(1 - v, 3)) * 100) + '% wet'} } },
+  rings:{ label:'Rings', fx:true, extraIn:{ pitch:'cv' },
+    params:{ model:[0,0,5,1], poly:[0,0,2,1], note:[0,-24,36,1], structure:[.4,0,1,.01], bright:[.5,0,1,.01], damp:[.6,0,1,.01], pos:[.3,0,1,.01], input:[.5,0,1,.01], mix:[.8,0,1,.01] },
+    ui:Object.assign({ model:{l:'Model', c:opts(['Modal','Sympathetic','String','FM voice','Quantized','String + reverb'])}, poly:{l:'Voices', c:opts(['1','2','4'])},
+      note:{l:'Note', f:noteName}, structure:{l:'Structure', f:pct}, bright:{l:'Brightness', f:pct}, damp:{l:'Damping', f:pct}, pos:{l:'Position', f:pct}, input:{l:'Input', f:v => times(v * 2)} }, MIXP) },
+  clouds:{ label:'Clouds', fx:true, params:{ mode:[0,0,3,1], lofi:[0,0,1,1], freeze:[0,0,1,1], pos:[.1,0,1,.01], size:[.5,0,1,.01], pitch:[0,-24,24,1], density:[.6,0,1,.01],
+      texture:[.5,0,1,.01], blend:[.5,0,1,.01], fb:[.2,0,1,.01], verb:[.5,0,1,.01], spread:[.5,0,1,.01] },
+    ui:{ mode:{l:'Mode', c:opts(['Granular','Stretch','Loop delay','Spectral'])}, lofi:{l:'Quality', c:opts(['Hi-fi','Lo-fi'])}, freeze:{l:'Freeze', c:opts(['Off','On'])},
+      pos:{l:'Position', f:pct}, size:{l:'Size', f:pct}, pitch:{l:'Pitch', f:semis}, density:{l:'Density', f:pct}, texture:{l:'Texture', f:pct},
+      blend:{l:'Blend', f:wet}, fb:{l:'Feedback', f:pct}, verb:{l:'Reverb', f:pct}, spread:{l:'Spread', f:pct} } },
+
+  lfo:{ label:'LFO', scope:'mono', inputs:{ reset:'gate' }, outputs:{ out:'cv' },
+    params:{ rate:[1,.02,40,.01], sync:[0,0,1,1], shape:[0,0,4,1], depth:[.5,0,1,.01] },
+    ui:{ rate:{l:'Rate', f:hz}, sync:{l:'Sync', c:opts(['Off (use Rate)','To tempo'])}, shape:{l:'Shape', c:opts(['Sine','Square','Ramp','Triangle','Random'])}, depth:{l:'Depth', f:pct} } },
+  adsr:{ label:'ADSR', scope:'poly', inputs:{ gate:'gate' }, outputs:{ out:'cv' },
+    params:{ a:[.01,0,4,.001], d:[.2,0,4,.001], s:[.7,0,1,.001], r:[.3,0,8,.001], depth:[1,0,1,.01] },
+    ui:{ a:{l:'Attack', f:secs}, d:{l:'Decay', f:secs}, s:{l:'Sustain', f:pct}, r:{l:'Release', f:secs}, depth:{l:'Depth', f:pct} } },
+  random:{ label:'Random', scope:'mono', inputs:{ clock:'gate' }, outputs:{ out:'cv' },
+    params:{ rate:[4,.05,40,.01], smooth:[0,0,1,.01], depth:[.5,0,1,.01] }, ui:{ rate:{l:'Rate', f:hz}, smooth:{l:'Smooth', f:pct}, depth:{l:'Depth', f:pct} } },
+  atten:{ label:'Attenuverter', scope:'poly', inputs:{ in:'cv' }, outputs:{ out:'cv' },
+    params:{ amount:[1,-1,1,.01], offset:[0,-1,1,.01] }, ui:{ amount:{l:'Amount', f:spct}, offset:{l:'Offset', f:spct} } },
+
+  out:{ label:'Out', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{},
+    params:{ slot:[1,1,BUS_COUNT,1], level:[1,0,2,.01] },
+    ui:{ slot:{l:'Output', c:Array.from({length:BUS_COUNT}, (_, i) => [i + 1, 'Waves In ' + (i + 1)])}, level:{l:'Level', f:pct} } }
+};
+for (const [t, d] of Object.entries(MODULES)){
+  d.type = t;
+  if (d.fx){ d.scope = 'mono'; d.inputs = Object.assign({ in:'audio', inR:'audio' }, d.extraIn || {}); d.outputs = { out:'audio', outR:'audio' }; }
+}
+const plabel = (t, k) => (MODULES[t].ui[k] || {}).l || k;
+const fmtOf = (t, k) => (MODULES[t].ui[k] || {}).f || (v => (+v).toFixed(2));
+const choicesOf = (t, k) => (MODULES[t].ui[k] || {}).c || null;
+
+/* Families give each module its edge color, as in ...Seeds. */
+const FAMILY = { hostIn:'midi', seq:'midi', vco:'gen', fm:'gen', additive:'gen', noise:'gen', plaits:'gen', elements:'gen',
+  vcf:'util', vca:'util', mixer:'util', lfo:'mod', adsr:'mod', random:'mod', atten:'mod', out:'aout' };
+const famOf = t => FAMILY[t] || (MODULES[t] && MODULES[t].fx ? 'afx' : 'gen');
+/* Cable kinds: audio (teal), modulation (purple, dashed), gate (pink, dashed). */
+const KIND = { audio:'audio', cv:'mod', gate:'gate' };
+const DOT = t => ({ hostIn:'gate', seq:'gate', lfo:'mod', adsr:'mod', random:'mod', atten:'mod' }[t] || 'audio');
+const CABLE = { audio:['#22958d','#16625d'], mod:['#7a58c8','#4b318e'], gate:['#c93d78','#86214c'] };
+const isCtl = k => k === 'mod' || k === 'gate';
+const PORT_LABEL = { pitch:'Pitch', gate:'Gate', vel:'Velocity', fm:'FM', out:'Out', outR:'Out R', reset:'Reset', in:'In', inR:'In R', cv:'CV',
+  cutoff:'Cutoff', timbre:'Timbre', morph:'Morph', harmonics:'Harmonics', aux:'Aux', index:'Index', strength:'Strength', clock:'Clock',
+  in1:'In 1', in2:'In 2', in3:'In 3', in4:'In 4' };
+const NOTES = {
+  hostIn:'Notes from your computer keyboard, MIDI, the on-screen keys and Sequencers.',
+  seq:'Plays its steps through Host In, like a keyboard. Set the tempo in Settings.',
+  plaits: () => WASM_OK.dsp ? null : 'Couldn’t load the Plaits code (dsp/thunder-dsp.wasm).',
+  elements: () => WASM_OK.dsp ? null : 'Couldn’t load the Elements code (dsp/thunder-dsp.wasm).',
+  out: m => EMBED ? 'Plays on Waves In ' + m.params.slot + '. In …Thunder Plus, choose “…waves” as a layer’s oscillator and pick Waves In ' + m.params.slot + '.'
+    : 'Plays on Waves In ' + m.params.slot + '. On its own, …waves plays every output through your speakers. Patch only In for mono.'
+};
+for (const t in MODULES) if (MODULES[t].fx && !NOTES[t]) NOTES[t] = () => WASM_OK.tfx ? null : 'Couldn’t load the effects code (dsp/tfx.wasm), so this passes sound through unchanged.';
+let WASM_OK = { dsp:true, tfx:true };
+
+/* ---------- helpers ---------- */
+function h(tag, props, ...kids){
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})){
+    if (k === 'class') e.className = v;
+    else if (k === 'text') e.textContent = v;
+    else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
+    else if (v === true) e.setAttribute(k, '');
+    else if (v !== false && v != null) e.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null) e.append(c);
+  return e;
+}
+const SVGNS = 'http://www.w3.org/2000/svg';
+const svgEl = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+const MAC = /Mac|iPhone|iPad/.test(navigator.platform);
+const MOD = MAC ? 'Cmd' : 'Ctrl';
+let toastT = 0;
+function toast(msg, ms){ const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms || 2600); }
+function askDialog(msg, opts){
+  opts = opts || {};
+  return new Promise(res => {
+    const inp = opts.input != null ? h('input', {class:'dlginput', value: opts.input, 'aria-label': opts.label || 'Name'}) : null;
+    const ok = h('button', {class:'tb on', text: opts.ok || 'OK'}), no = h('button', {class:'tb', text: opts.cancel || 'Cancel'});
+    const box = h('div', {class:'dlg', role:'dialog', 'aria-modal':'true'}, h('p', {text: msg}), inp, h('div', {class:'dlgbtns'}, no, ok));
+    const ov = h('div', {class:'dlgov'}, box); document.body.append(ov);
+    const done = v => { ov.remove(); window.removeEventListener('keydown', key, true); res(v); };
+    const key = e => { if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); done(null); } if (e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); done(inp ? inp.value : true); } };
+    window.addEventListener('keydown', key, true);
+    ok.addEventListener('click', () => done(inp ? inp.value : true)); no.addEventListener('click', () => done(null));
+    (inp || ok).focus(); if (inp) inp.select();
+  });
+}
+const typing = e => e.target && e.target.closest && e.target.closest('input:not([type=range]):not([type=checkbox]), select, textarea, [contenteditable="true"]');
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const newId = p => (p || 'm') + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
+/* Inside …Thunder Plus the editor runs in a frame: the patch lives in Thunder's kit (window.parent.thunderWaves),
+   and everything else is saved under its own names so it never mixes with the standalone …waves. */
+const TW = (() => { try { return window.parent !== window && window.parent.thunderWaves || null; } catch (e) { return null; } })();
+const EMBED = !!TW, KP = EMBED ? 'thunderplus.waves.' : 'waves.';
+if (EMBED) document.documentElement.classList.add('embed');
+const SETKEY = KP + 'settings';
+let settings = {};
+try { settings = JSON.parse(localStorage.getItem(SETKEY) || '{}') || {}; } catch (e) {}
+const saveSettings = () => { try { localStorage.setItem(SETKEY, JSON.stringify(settings)); } catch (e) {} };
+
+/* ---------- patch document, autosave, undo and backups ---------- */
+const STORE_KEY = KP + 'patch', BAK_KEY = KP + 'backups', MAX_BAK = 10;
+class PatchStore {
+  constructor(doc){ this.doc = doc; this.onRestore = function(){}; this.undo = []; this.redo = []; this._timer = 0; this.dirty = false; }
+  /* Call before changing the patch: the current state becomes one Undo step. */
+  snapshot(){
+    this.undo.push(JSON.stringify(this.doc));
+    if (this.undo.length > 60) this.undo.shift();
+    this.redo.length = 0; this._schedule();
+  }
+  back(){ if (!this.undo.length) return false; this.redo.push(JSON.stringify(this.doc)); this._restore(this.undo.pop()); return true; }
+  forward(){ if (!this.redo.length) return false; this.undo.push(JSON.stringify(this.doc)); this._restore(this.redo.pop()); return true; }
+  _restore(json){ const d = JSON.parse(json); for (const k of Object.keys(this.doc)) if (!(k in d)) delete this.doc[k]; Object.assign(this.doc, d); this.onRestore(this.doc); this._schedule(); }
+  touch(){ this._schedule(); }
+  _schedule(){ this.dirty = true; clearTimeout(this._timer); this._timer = setTimeout(() => this.save(), 1200); }
+  save(){
+    if (!this.dirty) return;
+    try {
+      const prev = localStorage.getItem(STORE_KEY);
+      if (prev){
+        const baks = PatchStore.backups(), last = baks[baks.length - 1];
+        if (!last || Date.now() - last.t > 60000){ baks.push({ t: Date.now(), p: prev }); while (baks.length > MAX_BAK) baks.shift(); localStorage.setItem(BAK_KEY, JSON.stringify(baks)); }
+      }
+      this.doc.meta.modified = Math.floor(Date.now() / 1000);
+      localStorage.setItem(STORE_KEY, JSON.stringify(this.doc));
+      this.dirty = false;
+    } catch (e) {}
+    if (EMBED){ try { TW.save(JSON.parse(JSON.stringify(this.doc))); } catch (e) {} this.dirty = false; }
+  }
+  static open(){
+    if (EMBED){ try { const d = TW.load(); if (d) return d; } catch (e) {} }
+    try { return JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) { return null; }
+  }
+  static backups(){ try { return JSON.parse(localStorage.getItem(BAK_KEY) || '[]'); } catch (e) { return []; } }
+  exportTo(name){
+    const blob = new Blob([JSON.stringify(this.doc, null, 2)], { type:'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = (name || this.doc.meta.name || 'patch').replace(/[\\/:*?"<>|]+/g, '') + '.waves.json';
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  importFrom(file){
+    return file.text().then(txt => {
+      const d = JSON.parse(txt);
+      if (d.format !== 'waves.patch') throw new Error('That file isn’t a …waves patch.');
+      this.snapshot(); this._restore(JSON.stringify(d));
+    });
+  }
+  exportCustom(){
+    const blob = new Blob([JSON.stringify({ format:'waves.custom', custom:this.doc.custom }, null, 2)], { type:'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'custom-modules.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  importCustom(file){
+    return file.text().then(txt => {
+      const d = JSON.parse(txt);
+      if (d.format !== 'waves.custom') throw new Error('That file doesn’t hold custom modules.');
+      this.snapshot(); this.doc.custom = this.doc.custom.concat(d.custom); return d.custom.length;
+    });
+  }
+}
+
+/* ---------- MIDI learn: CC → slider ---------- */
+const LEARN_KEY = KP + 'midi';
+class MidiLearn {
+  constructor(getRange){
+    try { this.map = JSON.parse(localStorage.getItem(LEARN_KEY)) || {}; } catch (e) { this.map = {}; }
+    this.on = false; this.armed = null; this.getRange = getRange;
+  }
+  _save(){ try { localStorage.setItem(LEARN_KEY, JSON.stringify(this.map)); } catch (e) {} }
+  arm(ref){ this.armed = ref; }
+  clear(ref){ for (const cc in this.map) if (this.map[cc].id === ref.id && this.map[cc].name === ref.name) delete this.map[cc]; this._save(); }
+  handle(cc, value){
+    if (this.on && this.armed){
+      for (const k in this.map) if (this.map[k].id === this.armed.id && this.map[k].name === this.armed.name) delete this.map[k];
+      this.map[cc] = { id:this.armed.id, name:this.armed.name };
+      const ref = this.armed; this.armed = null; this._save();
+      return { learned:cc, ref };
+    }
+    const t = this.map[cc]; if (!t) return {};
+    const r = this.getRange(t.id, t.name); if (!r) return {};
+    let v = r.min + (value / 127) * (r.max - r.min);
+    if (r.step) v = Math.round((v - r.min) / r.step) * r.step + r.min;
+    return { applied:true, id:t.id, name:t.name, value:+v.toFixed(6) };
+  }
+  ccFor(id, name){ for (const cc in this.map) if (this.map[cc].id === id && this.map[cc].name === name) return +cc; return null; }
+}
+
+class WavesMidi {
+  constructor(handlers){
+    handlers = handlers || {};
+    this.onNote = handlers.onNote || function(){}; this.onCC = handlers.onCC || function(){};
+    this.onTransport = handlers.onTransport || function(){}; this.onDevices = handlers.onDevices || function(){};
+    this.access = null; this.selected = 'all';
+    this.clock = { ticks:0, ppq:24, running:false, tempo:0 }; this._last = 0;
+    this.supported = typeof navigator !== 'undefined' && !!navigator.requestMIDIAccess;
+  }
+  start(){
+    if (!this.supported) return Promise.resolve({ ok:false, reason:'no-web-midi' });
+    return navigator.requestMIDIAccess({ sysex:false }).then(access => {
+      this.access = access; this._bind();
+      access.onstatechange = () => this._bind();
+      return { ok:true, inputs:this.list() };
+    });
+  }
+  list(){ if (!this.access) return []; const out = []; this.access.inputs.forEach(i => out.push({ id:i.id, name:i.name })); return out; }
+  _bind(){ if (this.access) this.access.inputs.forEach(i => { i.onmidimessage = e => this._msg(e, i); }); this.onDevices(this.list()); }
+  _msg(e, input){
+    if (this.selected !== 'all' && input.id !== this.selected) return;
+    const s = e.data[0], d1 = e.data[1], d2 = e.data[2], cmd = s & 0xf0;
+    if (cmd === 0x90){ if (d2 > 0) this.onNote({ on:true, pitch:d1 - 60, vel:d2 / 127 }); else this.onNote({ on:false, pitch:d1 - 60 }); }
+    else if (cmd === 0x80) this.onNote({ on:false, pitch:d1 - 60, vel:d2 / 127 });
+    else if (cmd === 0xb0) this.onCC(d1, d2);
+    else if (s === 0xf8) this._tick();
+    else if (s === 0xfa) this._transport('start');
+    else if (s === 0xfb) this._transport('continue');
+    else if (s === 0xfc) this._transport('stop');
+  }
+  _tick(){
+    const now = performance.now(), dt = (now - (this._last || now)) || 16.7;
+    this._last = now; this.clock.ticks++;
+    const tempo = 60000 / (dt * this.clock.ppq);
+    this.clock.tempo = this.clock.tempo ? this.clock.tempo * .85 + tempo * .15 : tempo;
+    this.onTransport({ type:'clock', tempo:this.clock.tempo });
+  }
+  _transport(kind){ setTimeout(() => this.onTransport({ type:kind }), 0); }
+}
+
+/* ---------- bridge to the audio engine ---------- */
+class WavesBridge {
+  constructor(ctx, node){
+    this.ctx = ctx; this.node = node; this.port = node.port;
+    this._ready = false; this._queue = []; this._params = new Map(); this._raf = 0;
+    this._on = { ready:[], meter:[], shed:[], error:[] };
+    this.port.onmessage = e => this._recv(e.data);
+  }
+  /* The Plaits/Elements and effects code from ...Thunder. A worklet can't fetch, so the page does. */
+  static wasm(){
+    const get = u => fetch(u).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null);
+    return WavesBridge._wasm || (WavesBridge._wasm = Promise.all([get('./dsp/thunder-dsp.wasm'), get('./dsp/tfx.wasm')]));
+  }
+  static standalone(opts){
+    opts = opts || {};
+    const url = opts.url || './waves-worklet.js?v=3';
+    const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
+    return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
+      const node = new AudioWorkletNode(ctx, 'waves', {
+        numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2],
+        processorOptions:{ protocol:PROTOCOL, maxVoices:opts.maxVoices || 8, quality:opts.quality || 'full', transport:opts.transport, dspBytes, tfxBytes }
+      });
+      node.connect(ctx.destination);
+      return new WavesBridge(ctx, node);
+    });
+  }
+  on(evt, fn){ (this._on[evt] = this._on[evt] || []).push(fn); return this; }
+  _emit(evt, v){ for (const f of this._on[evt] || []) f(v); }
+  _recv(m){
+    if (!m || (m.target && m.target !== TARGET)) return;
+    if (m.op === 'ready'){
+      if (m.value.protocol !== PROTOCOL){ this._emit('error', { message:'Stale engine: bump CACHE in sw.js and reload.' }); return; }
+      this._ready = true;
+      for (const q of this._queue) this.port.postMessage(q);
+      this._queue.length = 0; this._emit('ready', m.value);
+    } else if (m.op === 'meter') this._emit('meter', m.value);
+    else if (m.op === 'shed') this._emit('shed', m.value);
+    else if (m.op === 'error') this._emit('error', m.value);
+  }
+  _send(msg){ msg.target = TARGET; msg.protocol = PROTOCOL; if (this._ready) this.port.postMessage(msg); else this._queue.push(msg); }
+  loadPatch(doc){ this._send({ op:'patch', value:JSON.parse(JSON.stringify(doc)) }); }
+  addModule(id, type, o){ o = o || {}; this._send({ op:'add', id, type, params:o.params, pos:o.pos }); }
+  removeModule(id){ this._send({ op:'remove', id }); }
+  connect(a, b){ this._send({ op:'connect', a, b }); }
+  disconnect(a, b){ this._send({ op:'disconnect', a, b }); }
+  setParam(id, name, value){
+    this._params.set(id + '\u0000' + name, [id, name, value]);
+    if (this._raf) return;
+    this._raf = requestAnimationFrame(() => { this._raf = 0; this.flush(); });
+  }
+  flush(){ if (!this._params.size) return; this._send({ op:'params', list:Array.from(this._params.values()) }); this._params.clear(); }
+  noteOn(pitch, vel){ this._send({ op:'noteOn', pitch, vel:(vel == null ? 1 : vel) }); }
+  noteOff(pitch){ this._send({ op:'noteOff', pitch }); }
+  panic(){ this._send({ op:'panic' }); }
+  setQuality(q){ this._send({ op:'quality', value:q }); }
+  setTransport(t){ this._send({ op:'transport', value:t }); }
+  telemetry(on){ this._send({ op:'telemetry', value:on }); }
+  resume(){ if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {}); }
+  dispose(){
+    if (this._raf) cancelAnimationFrame(this._raf);
+    this.port.onmessage = null;
+    try { this.node.disconnect(); } catch (e) {}
+    try { this.ctx.close(); } catch (e) {}
+  }
+}
+
+/* ---------- starting patches ---------- */
+function blankDoc(){
+  const now = Math.floor(Date.now() / 1000);
+  return { format:'waves.patch', version:1,
+    meta:{ name:'Untitled', created:now, modified:now },
+    voice:{ mode:'poly', maxVoices:8, steal:'oldest', glide:0 },
+    transport:{ tempo:120, lpb:4, ticks:6, swing:0 },
+    host:{ envelopes:'internal' },
+    modules:[], cables:[], groups:[], custom:[], view:{ x:0, y:0, zoom:1, ui:2 } };
+}
+function starterDoc(){
+  const d = blankDoc();
+  d.modules = [
+    { id:'m1', type:'hostIn', scope:'poly', pos:[  24, 150], collapsed:false, params:{ transpose:0 } },
+    { id:'m2', type:'vco',    scope:'poly', pos:[ 354,  40], collapsed:false, params:{ wave:1, tune:0, fine:0 } },
+    { id:'m3', type:'adsr',   scope:'poly', pos:[ 354, 330], collapsed:false, params:{ a:.005, d:.2, s:.7, r:.3 } },
+    { id:'m4', type:'vca',    scope:'poly', pos:[ 694, 150], collapsed:false, params:{ gain:1 } },
+    { id:'m5', type:'out',    scope:'mono', pos:[1004, 150], collapsed:false, params:{ slot:1, level:1 } }
+  ];
+  d.cables = [
+    { from:['m1','pitch'], to:['m2','pitch'], bend:0 },
+    { from:['m1','gate'],  to:['m3','gate'],  bend:0 },
+    { from:['m2','out'],   to:['m4','in'],    bend:0 },
+    { from:['m3','out'],   to:['m4','cv'],    bend:0 },
+    { from:['m4','out'],   to:['m5','in'],    bend:0 }
+  ];
+  return d;
+}
+function normalize(d){
+  d.modules = d.modules || []; d.cables = d.cables || []; d.groups = d.groups || []; d.custom = d.custom || [];
+  d.meta = d.meta || { name:'Untitled' }; d.voice = d.voice || { maxVoices:8 };
+  d.view = d.view || { x:0, y:0, zoom:1 };
+  // Cables into a slider's jack go to "p:name" (older patches used the bare name).
+  for (const c of d.cables){
+    const m = d.modules.find(x => x.id === c.to[0]), def = m && MODULES[m.type];
+    if (def && !(c.to[1] in def.inputs) && (c.to[1] in def.params)) c.to = [c.to[0], 'p:' + c.to[1]];
+  }
+  d.transport = d.transport || { tempo:120 };
+  // Patches made before the wider modules: spread them out so they don't overlap.
+  if (!d.view.ui){ for (const m of d.modules) m.pos = [Math.round(m.pos[0] * 1.32), m.pos[1]]; d.view.ui = 2; }
+  return d;
+}
+
+/* ═══════════════ the patch ═══════════════ */
+const ws = document.getElementById('ws'), world = document.getElementById('world'), svg = document.getElementById('cables');
+const groupsEl = document.getElementById('groups');
+let doc = null, store = null, bridge = null, learn = null, midi = null;
+const nodes = new Map();      // module id → {m, el, head, jacks, ctl, foldBtn}
+let selected = new Set(), zTop = 10;
+const view = () => doc.view;
+const modById = id => doc.modules.find(m => m.id === id);
+const busPeaks = new Array(BUS_COUNT).fill(0);
+
+/* ----- controls ----- */
+function makeJack(n, port, kind, dir, small){
+  const j = h('span', {class: small ? 'jack small' : 'jack', 'data-id': n.m.id, 'data-port': port, 'data-dir': dir, 'data-kind': kind,
+    title: small ? plabel(n.m.type, port.slice(2)) + ' modulation input' : (PORT_LABEL[port] || port) + (dir === 'in' ? ' input' : ' output')});
+  n.jacks[dir + ':' + port] = j;
+  j.addEventListener('pointerdown', e => onJackDown(e, j));
+  return j;
+}
+function portEl(n, port, kind, dir){ return h('div', {class:'port'}, makeJack(n, port, KIND[kind] || 'mod', dir), h('span', {text: PORT_LABEL[port] || port})); }
+function setParam(n, key, v, fromUser){
+  n.m.params[key] = v;
+  if (bridge) bridge.setParam(n.m.id, key, v);
+  const c = n.ctl[key]; if (c && !fromUser) c.show();
+  if (n.m.type === 'out' && key === 'slot') paintNote(n);
+  store.touch();
+}
+function slider(n, key, spec){
+  const [def, min, max, step] = spec, fmt = fmtOf(n.m.type, key), label = plabel(n.m.type, key);
+  const out = h('span', {class:'val', title:'Double-click to type a value'}), mark = h('span', {class:'mark', hidden:true});
+  const inp = h('input', {type:'range', min, max, step, 'aria-label': label});
+  const show = () => { inp.value = n.m.params[key]; if (!out.querySelector('input') && !r.classList.contains('modded')) out.textContent = fmt(+n.m.params[key]); };
+  n.ctl[key] = { show, range:{min, max, step} };
+  out.addEventListener('dblclick', e => {
+    e.stopPropagation();
+    if (out.querySelector('input')) return;
+    const shown = fmt(+n.m.params[key]), num = (shown.match(/[-−]?\d+(\.\d+)?/) || [''])[0].replace('−', '-');
+    const ed = h('input', {type:'text', class:'valedit', 'aria-label': label + ' value', inputmode:'decimal'});
+    ed.value = num; out.replaceChildren(ed); ed.focus(); ed.select();
+    let done = false;
+    const finish = commit => {
+      if (done) return; done = true;
+      if (commit){
+        const txt = ed.value.trim().replace(',', '.');
+        let v = parseFloat(txt.replace('−', '-'));
+        if (!isNaN(v)){
+          if (fmt(max).includes('%')) v /= 100;
+          else if (/ms/i.test(txt) && / s$/.test(fmt(max))) v /= 1000;
+          v = Math.max(min, Math.min(max, v));
+          store.snapshot(); setParam(n, key, +v.toFixed(6), true); inp.value = v;
+        }
+      }
+      out.textContent = fmt(+n.m.params[key]);
+    };
+    ed.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') finish(true); if (ev.key === 'Escape') finish(false); });
+    ed.addEventListener('blur', () => finish(true));
+    ed.addEventListener('pointerdown', ev => ev.stopPropagation());
+  });
+  inp.addEventListener('pointerdown', () => { store.snapshot(); armLearn(n, key, r); });
+  inp.addEventListener('input', () => { setParam(n, key, +inp.value, true); out.textContent = fmt(+inp.value); });
+  inp.addEventListener('dblclick', () => { store.snapshot(); setParam(n, key, def); });
+  inp.title = 'Double-click to reset';
+  const r = h('div', {class:'row sl', 'data-jackhost':'', 'data-id': n.m.id, 'data-key': key},
+    makeJack(n, 'p:' + key, 'mod', 'in', true), h('span', {class:'lbl', text: label}), h('div', {class:'rng'}, inp, mark), out);
+  n.ctl[key].row = r; n.ctl[key].out = out; n.ctl[key].mark = mark; n.ctl[key].fmt = fmt;
+  r.addEventListener('pointerdown', e => { if (learn && learn.on && !e.target.closest('.jack')) armLearn(n, key, r); });
+  show();
+  return r;
+}
+function choice(n, key, options){
+  const label = plabel(n.m.type, key);
+  const sel = h('select', {'aria-label': label}, options.map(([v, t]) => h('option', {value: v, text: t})));
+  const show = () => { sel.value = String(Math.round(n.m.params[key])); };
+  n.ctl[key] = { show, range:{min: options[0][0], max: options[options.length - 1][0], step:1} };
+  sel.addEventListener('pointerdown', () => store.snapshot());
+  sel.addEventListener('keydown', e => e.stopPropagation());
+  sel.addEventListener('change', () => setParam(n, key, +sel.value, true));
+  const r = h('label', {class:'row wide sl', 'data-jackhost':'', 'data-id': n.m.id, 'data-key': key},
+    makeJack(n, 'p:' + key, 'mod', 'in', true), h('span', {class:'lbl', text: label}), sel);
+  n.ctl[key].row = r; n.ctl[key].sel = sel; n.ctl[key].opts = options;
+  n.ctl[key].tag = h('span', {class:'cmval', hidden:true}); r.append(n.ctl[key].tag);
+  r.addEventListener('pointerdown', e => { if (learn && learn.on && !e.target.closest('.jack')){ e.preventDefault(); armLearn(n, key, r); } });
+  show();
+  return r;
+}
+function paintNote(n){
+  const nt = NOTES[n.m.type]; if (!nt || !n.note) return;
+  const t = typeof nt === 'function' ? nt(n.m) : nt;
+  n.note.textContent = t || ''; n.note.hidden = !t;
+}
+
+/* ----- modules ----- */
+const FOLD_SVG = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function buildNode(m){
+  const def = MODULES[m.type]; if (!def) return null;
+  const n = { m, jacks:{}, ctl:{} };
+  const title = m.label || def.label;
+  const fold = h('button', {class:'fold', 'aria-label':'Collapse ' + title, 'aria-expanded':'true', title:'Collapse (or double-click the title bar)'});
+  fold.innerHTML = FOLD_SVG;
+  fold.addEventListener('click', () => { store.snapshot(); setCollapsed(n, !m.collapsed); });
+  n.foldBtn = fold;
+  const head = h('header', {title:'Double-click to collapse or expand'}, fold, h('span', {class:'t', text: title}),
+    h('button', {class:'x', 'aria-label':'Remove ' + title, title:'Remove', text:'×', onclick: () => { store.snapshot(); removeModule(m.id); }}));
+  const ins = Object.keys(def.inputs), outs = Object.keys(def.outputs);
+  const ports = (ins.length || outs.length) ? h('div', {class:'ports'},
+    h('div', {class:'ins'}, ins.map(p => portEl(n, p, def.inputs[p], 'in'))),
+    h('div', {class:'outs'}, outs.map(p => portEl(n, p, def.outputs[p], 'out')))) : null;
+  const kids = [];
+  for (const k in def.params){
+    if (m.params[k] == null) m.params[k] = def.params[k][0];
+    const ch = choicesOf(m.type, k);
+    kids.push(ch ? choice(n, k, ch) : slider(n, k, def.params[k]));
+  }
+  if (m.type === 'out'){ n.meter = h('span'); kids.push(h('div', {class:'prog', title:'Level'}, n.meter)); }
+  if (NOTES[m.type]){ n.note = h('div', {class:'status'}); kids.push(n.note); }
+  const body = h('div', {class:'body'}, kids);
+  n.el = h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id}, head, ports, body);
+  n.head = head;
+  n.el.style.left = m.pos[0] + 'px'; n.el.style.top = m.pos[1] + 'px';
+  n.el.style.zIndex = ++zTop;
+  paintNote(n);
+  n.el.addEventListener('pointerdown', e => { e.stopPropagation(); n.el.style.zIndex = ++zTop; });
+  head.addEventListener('dblclick', e => { if (e.target.closest('button')) return; store.snapshot(); setCollapsed(n, !m.collapsed); });
+  head.addEventListener('pointerdown', e => {
+    if (e.target.closest('button') || e.button === 2) return;
+    e.preventDefault();
+    if (e.shiftKey){ setSel(m.id, !selected.has(m.id)); return; }
+    if (!selected.has(m.id)){ clearSel(); setSel(m.id, true); }
+    head.setPointerCapture(e.pointerId);
+    // Dragging a selected module moves the whole selection.
+    const group = [...selected].map(id => nodes.get(id)).filter(Boolean);
+    const sx = e.clientX, sy = e.clientY, start = group.map(g => [g, g.m.pos[0], g.m.pos[1]]);
+    let extra = [0, 0], lastEv = e, moved = false;
+    const place = () => {
+      const z = view().zoom, dx = (lastEv.clientX - sx - extra[0]) / z, dy = (lastEv.clientY - sy - extra[1]) / z;
+      if (!moved && Math.hypot(dx, dy) > 1){ moved = true; store.snapshot(); }
+      if (!moved) return;
+      for (const [g, ox, oy] of start){ g.m.pos = [Math.round(ox + dx), Math.round(oy + dy)]; g.el.style.left = g.m.pos[0] + 'px'; g.el.style.top = g.m.pos[1] + 'px'; }
+    };
+    nodeDragging = v => { extra[0] -= v[0]; extra[1] -= v[1]; place(); };
+    const mv = ev => { lastEv = ev; autoPanAt(ev); place(); };
+    const up = () => { nodeDragging = null; autoPanV = [0, 0]; head.removeEventListener('pointermove', mv); head.removeEventListener('pointerup', up); head.removeEventListener('pointercancel', up); if (moved) store.touch(); };
+    head.addEventListener('pointermove', mv); head.addEventListener('pointerup', up); head.addEventListener('pointercancel', up);
+  });
+  if (m.collapsed) setCollapsed(n, true, true);
+  if (selected.has(m.id)) n.el.classList.add('selected');
+  world.append(n.el);
+  nodes.set(m.id, n);
+  return n;
+}
+function setCollapsed(n, c, quiet){
+  n.m.collapsed = !!c;
+  n.el.classList.toggle('collapsed', n.m.collapsed);
+  n.foldBtn.setAttribute('aria-expanded', String(!n.m.collapsed));
+  if (!quiet) store.touch();
+}
+function renderAll(){
+  for (const n of nodes.values()) n.el.remove();
+  nodes.clear();
+  for (const m of doc.modules) buildNode(m);
+  selected = new Set([...selected].filter(id => nodes.has(id)));
+  renderGroups(); syncCableEls(); markMapped(); applyPan(); renderCustom();
+  document.getElementById('pname').value = doc.meta.name || 'Untitled';
+  ws.style.backgroundColor = (doc.view && doc.view.bg) || '';
+}
+function addModule(type, x, y, params){
+  const def = MODULES[type]; if (!def) return null;
+  const p = {}; for (const k in def.params) p[k] = def.params[k][0];
+  const m = { id:newId(), type, scope:def.scope, pos:[x, y], collapsed:false, params:Object.assign(p, params || {}) };
+  doc.modules.push(m);
+  if (bridge) bridge.addModule(m.id, type, { params:m.params, pos:m.pos });
+  buildNode(m); store.touch();
+  return m;
+}
+function removeModule(id){
+  const n = nodes.get(id);
+  for (const c of doc.cables.filter(c => c.from[0] === id || c.to[0] === id)) if (bridge) bridge.disconnect(c.from, c.to);
+  doc.cables = doc.cables.filter(c => c.from[0] !== id && c.to[0] !== id);
+  doc.modules = doc.modules.filter(m => m.id !== id);
+  for (const g of doc.groups) g.modules = (g.modules || []).filter(x => x !== id);
+  if (bridge) bridge.removeModule(id);
+  if (n) n.el.remove(); nodes.delete(id); selected.delete(id);
+  syncCableEls(); store.touch();
+}
+function addAtCenter(type){
+  const v = view();
+  const x = Math.round((-v.x + ws.clientWidth / 2) / v.zoom - 125 + (Math.random() * 80 - 40));
+  const y = Math.round((-v.y + ws.clientHeight / 2) / v.zoom - 120 + (Math.random() * 80 - 40));
+  addItem(type, x, y);
+}
+function addItem(type, x, y){
+  store.snapshot();
+  if (type.startsWith('c:')){ const ids = addCustom(type.slice(2), [x, y]); clearSel(); ids.forEach(id => setSel(id, true)); return; }
+  const m = addModule(type, x, y); if (m){ clearSel(); setSel(m.id, true); }
+}
+
+/* ----- selection ----- */
+function setSel(id, on){ const n = nodes.get(id); on ? selected.add(id) : selected.delete(id); if (n) n.el.classList.toggle('selected', on); }
+function clearSel(){ for (const id of selected){ const n = nodes.get(id); if (n) n.el.classList.remove('selected'); } selected.clear(); }
+
+/* ----- cables ----- */
+const cableEls = new Map();
+function cableKind(c){
+  const src = modById(c.from[0]); const k = src && MODULES[src.type] && MODULES[src.type].outputs[c.from[1]];
+  return KIND[k] || 'mod';
+}
+function cableGroup(kind){
+  const g = svgEl('g', {});
+  const line = svgEl('path', {class:'cln' + (isCtl(kind) ? ' ctl' : ''), fill:'none', stroke: CABLE[kind][0]});
+  g.append(line);
+  const ends = [0, 1].map(() => { const c = svgEl('circle', {r:3.5, fill: CABLE[kind][1]}); g.append(c); return c; });
+  return { g, line, ends, kind };
+}
+function syncCableEls(){
+  for (const [c, el] of cableEls) if (!doc.cables.includes(c)){ el.g.remove(); cableEls.delete(c); }
+  for (const c of doc.cables){
+    if (cableEls.has(c)) continue;
+    const el = cableGroup(cableKind(c));
+    const hit = svgEl('path', {fill:'none', stroke:'transparent', 'stroke-width':16, 'pointer-events':'stroke', class:'hit'});
+    const title = svgEl('title', {}); title.textContent = 'Double-click to remove'; hit.append(title);
+    hit.addEventListener('pointerdown', ev => {
+      ev.stopPropagation();
+      // A cable lying over a jack shouldn't block it: pass the press through to the jack.
+      const jack = document.elementsFromPoint(ev.clientX, ev.clientY).find(x => x.classList && x.classList.contains('jack'));
+      if (jack){ onJackDown(ev, jack); return; }
+      if (ev.altKey){ ev.preventDefault(); cableBendAt(ev, c); }
+    });
+    hit.addEventListener('dblclick', () => { store.snapshot(); disconnect(c); });
+    el.g.append(hit); el.hit = hit;
+    svg.append(el.g); cableEls.set(c, el);
+  }
+}
+function jackPos(id, dir, port, wr){
+  const n = nodes.get(id); if (!n) return null;
+  const el = n.jacks[dir + ':' + port];
+  if (!el) return null;
+  const z = view().zoom;
+  let r = el.getBoundingClientRect();
+  // Slider jacks are hidden while a module is collapsed: plug their cables into the title bar instead.
+  if (!r.width){ const hr = n.head.getBoundingClientRect(); return { x:(hr.left - wr.left) / z, y:(hr.top + hr.height / 2 - wr.top) / z }; }
+  return { x:(r.left + r.width / 2 - wr.left) / z, y:(r.top + r.height / 2 - wr.top) / z };
+}
+function cablePath(a, b, pts){
+  return 'M' + [[a.x, a.y], ...(pts || []), [b.x, b.y]].map(q => (q.x != null ? q.x + ',' + q.y : q[0] + ',' + q[1])).join(' L');
+}
+function placeCable(el, a, b, pts, c){
+  const d = cablePath(a, b, pts);
+  if (c) syncHandles(el, c);
+  el.line.setAttribute('d', d);
+  if (el.hit) el.hit.setAttribute('d', d);
+  el.ends[0].setAttribute('cx', a.x); el.ends[0].setAttribute('cy', a.y);
+  el.ends[1].setAttribute('cx', b.x); el.ends[1].setAttribute('cy', b.y);
+}
+function drawCables(){
+  const wr = world.getBoundingClientRect();
+  for (const [c, el] of cableEls){
+    const a = jackPos(c.from[0], 'out', c.from[1], wr), b = jackPos(c.to[0], 'in', c.to[1], wr);
+    const show = !!(a && b); if (el.shown !== show){ el.shown = show; el.g.style.display = show ? '' : 'none'; }
+    if (show) placeCable(el, a, b, c.pts, c);
+  }
+  if (drag){
+    const p = jackPos(drag.anchor.id, drag.anchor.dir, drag.anchor.port, wr), z = view().zoom;
+    let q = { x:(drag.x - wr.left) / z, y:(drag.y - wr.top) / z };
+    if (drag.drawing){ const sp = snapBend(drag, [q.x, q.y], drag.shift); q = { x:sp[0], y:sp[1] }; }
+    if (p) drag.anchor.dir === 'out' ? placeCable(drag.el, p, q, drag.pts) : placeCable(drag.el, q, p, drag.pts.slice().reverse());
+  }
+}
+const edgeInto = (id, port) => doc.cables.find(c => c.to[0] === id && c.to[1] === port);
+function reaches(a, b){
+  const seen = new Set([a]), q = [a];
+  while (q.length){ const c = q.shift(); if (c === b) return true; for (const e of doc.cables) if (e.from[0] === c && !seen.has(e.to[0])){ seen.add(e.to[0]); q.push(e.to[0]); } }
+  return false;
+}
+function connect(from, to, pts){
+  if (from[0] === to[0]){ toast('A module can’t feed itself.'); return false; }
+  if (reaches(to[0], from[0])){ toast('That cable would make a loop.'); return false; }
+  const old = edgeInto(to[0], to[1]); if (old) disconnect(old, true);
+  const c = { from, to, bend:0 }; if (pts && pts.length) c.pts = pts;
+  doc.cables.push(c);
+  if (bridge) bridge.connect(from, to);
+  syncCableEls(); store.touch();
+  return true;
+}
+function disconnect(c, quiet){
+  doc.cables = doc.cables.filter(x => x !== c);
+  if (bridge) bridge.disconnect(c.from, c.to);
+  if (!quiet){ syncCableEls(); store.touch(); }
+}
+
+/* ----- patching by dragging between jacks ----- */
+let drag = null;
+function onJackDown(e, jack){
+  e.stopPropagation(); e.preventDefault();
+  if (drag) return; // already drawing a cable: this click finishes it
+  let anchor = { id: jack.dataset.id, port: jack.dataset.port, dir: jack.dataset.dir, kind: jack.dataset.kind };
+  let snapped = false;
+  if (anchor.dir === 'in'){
+    const ex = edgeInto(anchor.id, anchor.port);
+    // Picking up a patched input moves its cable.
+    if (ex){ store.snapshot(); snapped = true; disconnect(ex); anchor = { id: ex.from[0], port: ex.from[1], dir:'out', kind: cableKind(ex) }; }
+  }
+  const el = cableGroup(anchor.kind); el.g.style.opacity = .8; svg.append(el.g);
+  drag = { anchor, el, x: e.clientX, y: e.clientY, pts: [] };
+  const want = anchor.dir === 'out' ? 'in' : 'out';
+  document.querySelectorAll('.jack[data-dir="' + want + '"]').forEach(j => { if (j.dataset.id !== anchor.id) j.classList.add('target'); });
+  const mv = ev => { drag.x = ev.clientX; drag.y = ev.clientY; drag.shift = ev.shiftKey; autoPanAt(ev); };
+  const findTarget = ev => {
+    for (const x of document.elementsFromPoint(ev.clientX, ev.clientY)){
+      if (!x.closest) continue;
+      const j = x.closest('.jack'); if (j) return j;
+      const host = x.closest('.port, [data-jackhost]'); if (host) return host.querySelector('.jack');
+    }
+    return null;
+  };
+  const esc = ev => { if (ev.key === 'Escape'){ ev.preventDefault(); up({ type:'pointercancel', manual:true }); } };
+  const up = ev => {
+    if (drag.drawing && ev.type === 'pointercancel' && !ev.manual) return;
+    if (ev.type !== 'pointercancel' && (ev.altKey || drag.drawing) && !findTarget(ev)){
+      // Drawing by hand: each click on empty space becomes a bend; click a jack to finish, Escape to cancel.
+      drag.pts.push(snapBend(drag, worldPt(ev), ev.shiftKey)); drag.drawing = true; return;
+    }
+    window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); window.removeEventListener('keydown', esc);
+    document.querySelectorAll('.jack.target').forEach(j => j.classList.remove('target'));
+    const d = drag; drag = null; d.el.g.remove(); autoPanV = [0, 0];
+    if (ev.type === 'pointercancel') return;
+    const t = findTarget(ev);
+    if (!t) return;
+    const tt = { id: t.dataset.id, port: t.dataset.port, dir: t.dataset.dir };
+    if (tt.dir === d.anchor.dir) return;
+    const out = d.anchor.dir === 'out' ? d.anchor : tt, inp = d.anchor.dir === 'out' ? tt : d.anchor;
+    if (!snapped) store.snapshot();
+    connect([out.id, out.port], [inp.id, inp.port], d.anchor.dir === 'out' ? d.pts : d.pts.slice().reverse());
+  };
+  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up); window.addEventListener('keydown', esc);
+}
+function worldPt(ev){ const wr = world.getBoundingClientRect(), z = view().zoom; return [Math.round((ev.clientX - wr.left) / z), Math.round((ev.clientY - wr.top) / z)]; }
+// Bends snap to straight horizontal and vertical lines (Shift: also 45°).
+function snapBend(d, P, shift){
+  let prev = d.pts[d.pts.length - 1];
+  if (!prev){ const a = jackPos(d.anchor.id, d.anchor.dir, d.anchor.port, world.getBoundingClientRect()); if (!a) return P; prev = [a.x, a.y]; }
+  const dx = P[0] - prev[0], dy = P[1] - prev[1], ang = Math.atan2(dy, dx), L = Math.hypot(dx, dy);
+  const step = shift ? Math.PI / 4 : Math.PI / 2, near = Math.round(ang / step) * step;
+  if (shift || Math.abs(ang - near) < 0.2) return [Math.round(prev[0] + Math.cos(near) * L), Math.round(prev[1] + Math.sin(near) * L)];
+  return P;
+}
+// Square handles on each bend point; they show while Option/Alt is held.
+function syncHandles(el, c){
+  const pts = c.pts || [];
+  el.hdl = el.hdl || [];
+  while (el.hdl.length > pts.length) el.hdl.pop().remove();
+  while (el.hdl.length < pts.length){
+    const r = svgEl('rect', {class:'bend', width:10, height:10});
+    r.addEventListener('pointerdown', ev => bendDrag(ev, c, () => el.hdl.indexOf(r)));
+    el.g.append(r); el.hdl.push(r);
+  }
+  el.hdl.forEach((r, i) => { r.setAttribute('x', pts[i][0] - 5); r.setAttribute('y', pts[i][1] - 5); });
+}
+// Drag a bend point. Option/Alt-click a point without moving it to remove it.
+function bendDrag(ev, c, idx){
+  ev.stopPropagation(); ev.preventDefault();
+  const i = idx(), sx = ev.clientX, sy = ev.clientY; let moved = false;
+  store.snapshot();
+  const mv = e => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 3) moved = true; if (moved) c.pts[i] = worldPt(e); };
+  const up = e => {
+    window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
+    if (!moved && e.altKey){ c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; }
+    store.touch();
+  };
+  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+}
+// Option/Alt-drag on an existing cable adds a bend where you grab it.
+function cableBendAt(ev, c){
+  const wr = world.getBoundingClientRect();
+  const a = jackPos(c.from[0], 'out', c.from[1], wr), b = jackPos(c.to[0], 'in', c.to[1], wr); if (!a || !b) return;
+  const P = worldPt(ev), poly = [[a.x, a.y], ...(c.pts || []), [b.x, b.y]];
+  let best = 0, bd = Infinity;
+  for (let k = 0; k < poly.length - 1; k++){
+    const [x1, y1] = poly[k], [x2, y2] = poly[k + 1], L2 = (x2 - x1) ** 2 + (y2 - y1) ** 2 || 1;
+    const t = Math.max(0, Math.min(1, ((P[0] - x1) * (x2 - x1) + (P[1] - y1) * (y2 - y1)) / L2));
+    const d = Math.hypot(P[0] - (x1 + t * (x2 - x1)), P[1] - (y1 + t * (y2 - y1)));
+    if (d < bd){ bd = d; best = k; }
+  }
+  c.pts = c.pts || []; c.pts.splice(best, 0, P);
+  bendDrag(ev, c, () => best);
+}
+window.addEventListener('keydown', e => { if (e.key === 'Alt') document.body.classList.add('alting'); });
+window.addEventListener('keyup', e => { if (e.key === 'Alt') document.body.classList.remove('alting'); });
+window.addEventListener('blur', () => document.body.classList.remove('alting'));
+
+/* ----- scrolling the patch while dragging near its edge ----- */
+let autoPanV = [0, 0], nodeDragging = null;
+function autoPanAt(ev){
+  const r = ws.getBoundingClientRect(), m = 36, f = d => d < m ? (m - d) / m : 0;
+  autoPanV = [(f(ev.clientX - r.left) - f(r.right - ev.clientX)) * 14, (f(ev.clientY - r.top) - f(r.bottom - ev.clientY)) * 14];
+}
+function autoPanStep(){
+  if (!(autoPanV[0] || autoPanV[1])) return;
+  if (!drag && !nodeDragging){ autoPanV = [0, 0]; return; }
+  view().x += autoPanV[0]; view().y += autoPanV[1]; applyPan();
+  if (nodeDragging) nodeDragging(autoPanV);
+}
+
+/* ----- pan and zoom ----- */
+const zoomVal = document.getElementById('zoomval');
+const ZMIN = 0.25, ZMAX = 2.5;
+function applyPan(){
+  const v = view();
+  world.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.zoom})`;
+  zoomVal.textContent = Math.round(v.zoom * 100) + '%';
+}
+// Zoom so the point under (cx, cy) stays put.
+function zoomAt(cx, cy, z){
+  const v = view();
+  z = Math.max(ZMIN, Math.min(ZMAX, z));
+  const r = ws.getBoundingClientRect(), mx = cx - r.left, my = cy - r.top;
+  const wx = (mx - v.x) / v.zoom, wy = (my - v.y) / v.zoom;
+  v.zoom = z; v.x = mx - wx * z; v.y = my - wy * z;
+  applyPan(); store.touch();
+}
+function zoomCenter(z){ const r = ws.getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, z); }
+let inGesture = false, gestureZ = 1;
+ws.addEventListener('wheel', e => {
+  const k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1, v = view();
+  if (e.ctrlKey || e.metaKey){ e.preventDefault(); if (inGesture) return; zoomAt(e.clientX, e.clientY, v.zoom * Math.exp(-e.deltaY * k * 0.01)); return; }
+  if (e.target.closest('select')) return;
+  e.preventDefault();
+  // A mouse wheel moves in big steps on one axis; a trackpad sends small, smooth amounts.
+  const mouse = e.deltaMode !== 0 || (e.deltaX === 0 && Math.abs(e.deltaY) >= 40 && Math.abs(e.deltaY) % 1 === 0);
+  if (e.shiftKey){ v.y -= (e.deltaY || e.deltaX) * k; applyPan(); store.touch(); return; }
+  if (mouse){ zoomAt(e.clientX, e.clientY, v.zoom * Math.exp(-e.deltaY * k * 0.0018)); return; }
+  v.x -= e.deltaX * k; v.y -= e.deltaY * k; applyPan(); store.touch();
+}, { passive:false });
+// Safari reports trackpad pinches as gesture events.
+ws.addEventListener('gesturestart', e => { e.preventDefault(); inGesture = true; gestureZ = view().zoom; }, { passive:false });
+ws.addEventListener('gesturechange', e => { e.preventDefault(); zoomAt(e.clientX, e.clientY, gestureZ * e.scale); }, { passive:false });
+ws.addEventListener('gestureend', e => { e.preventDefault(); inGesture = false; }, { passive:false });
+document.getElementById('zoomin').addEventListener('click', () => zoomCenter(view().zoom * 1.2));
+document.getElementById('zoomout').addEventListener('click', () => zoomCenter(view().zoom / 1.2));
+zoomVal.addEventListener('click', () => {
+  if (zoomVal.querySelector('input')) return;
+  const ed = h('input', {class:'valedit', 'aria-label':'Zoom percent', inputmode:'decimal', style:'width:48px; text-align:center'}); ed.value = Math.round(view().zoom * 100);
+  zoomVal.replaceChildren(ed); ed.focus(); ed.select();
+  let done = false;
+  const fin = ok => { if (done) return; done = true; const v = parseFloat(ed.value); zoomVal.textContent = Math.round(view().zoom * 100) + '%'; if (ok && v > 0) zoomCenter(v / 100); };
+  ed.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') fin(true); if (e.key === 'Escape') fin(false); });
+  ed.addEventListener('blur', () => fin(true));
+});
+document.getElementById('zoomfit').addEventListener('click', () => fitAll());
+function fitAll(){
+  const list = [...nodes.values()];
+  if (!list.length || !ws.clientWidth) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const n of list){ x0 = Math.min(x0, n.m.pos[0]); y0 = Math.min(y0, n.m.pos[1]); x1 = Math.max(x1, n.m.pos[0] + n.el.offsetWidth); y1 = Math.max(y1, n.m.pos[1] + n.el.offsetHeight); }
+  for (const g of doc.groups){ x0 = Math.min(x0, g.bounds[0]); y0 = Math.min(y0, g.bounds[1]); x1 = Math.max(x1, g.bounds[0] + g.bounds[2]); y1 = Math.max(y1, g.bounds[1] + g.bounds[3]); }
+  const pad = 40, W = ws.clientWidth - pad * 2, H = ws.clientHeight - pad * 2, v = view();
+  v.zoom = Math.max(ZMIN, Math.min(1.5, W / (x1 - x0), H / (y1 - y0)));
+  v.x = pad + (W - (x1 - x0) * v.zoom) / 2 - x0 * v.zoom; v.y = pad + (H - (y1 - y0) * v.zoom) / 2 - y0 * v.zoom;
+  applyPan(); store.touch();
+}
+// Two fingers on a touch screen: pinch to zoom, move to pan.
+const touches = new Map(); let pinch = null;
+ws.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') touches.set(e.pointerId, [e.clientX, e.clientY]); }, true);
+window.addEventListener('pointermove', e => {
+  if (!touches.has(e.pointerId)) return;
+  touches.set(e.pointerId, [e.clientX, e.clientY]);
+  if (touches.size !== 2 || drag || nodeDragging) { pinch = null; return; }
+  const [[ax, ay], [bx, by]] = [...touches.values()], d = Math.hypot(bx - ax, by - ay), cx = (ax + bx) / 2, cy = (ay + by) / 2;
+  if (!pinch){ pinch = { d, cx, cy }; return; }
+  const v = view(); v.x += cx - pinch.cx; v.y += cy - pinch.cy;
+  zoomAt(cx, cy, v.zoom * d / pinch.d); pinch = { d, cx, cy };
+}, true);
+const touchEnd = e => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; };
+window.addEventListener('pointerup', touchEnd, true); window.addEventListener('pointercancel', touchEnd, true);
+
+ws.addEventListener('pointerdown', e => {
+  if (drag) return;
+  if (e.target.closest('.node, .hint, .hit, .decor, .dock, .bend')) return;
+  if (e.button === 2) return;
+  if (e.shiftKey){
+    const lasso = document.getElementById('lasso'), r0 = ws.getBoundingClientRect(), sx = e.clientX, sy = e.clientY;
+    ws.setPointerCapture(e.pointerId); lasso.hidden = false;
+    const box = ev => [Math.min(sx, ev.clientX), Math.min(sy, ev.clientY), Math.max(sx, ev.clientX), Math.max(sy, ev.clientY)];
+    const mv = ev => { const [a, b, c, d] = box(ev); Object.assign(lasso.style, { left:(a - r0.left) + 'px', top:(b - r0.top) + 'px', width:(c - a) + 'px', height:(d - b) + 'px' }); };
+    const up = ev => {
+      ws.removeEventListener('pointermove', mv); ws.removeEventListener('pointerup', up); lasso.hidden = true;
+      const [a, b, c, d] = box(ev);
+      for (const n of nodes.values()){ const r = n.el.getBoundingClientRect(); if (r.right > a && r.left < c && r.bottom > b && r.top < d) setSel(n.m.id, true); }
+    };
+    mv(e); ws.addEventListener('pointermove', mv); ws.addEventListener('pointerup', up);
+    return;
+  }
+  clearSel();
+  if (touches.size > 1) return;
+  ws.setPointerCapture(e.pointerId); ws.classList.add('panning');
+  const sx = e.clientX, sy = e.clientY, ox = view().x, oy = view().y;
+  const mv = ev => { if (pinch) return; view().x = ox + ev.clientX - sx; view().y = oy + ev.clientY - sy; applyPan(); };
+  const up = () => { ws.removeEventListener('pointermove', mv); ws.removeEventListener('pointerup', up); ws.removeEventListener('pointercancel', up); ws.classList.remove('panning'); store.touch(); };
+  ws.addEventListener('pointermove', mv); ws.addEventListener('pointerup', up); ws.addEventListener('pointercancel', up);
+});
+
+/* ----- groups: colored boxes around modules ----- */
+const hexA = (hex, a) => { const v = parseInt(hex.slice(1), 16); return `rgba(${v >> 16},${(v >> 8) & 255},${v & 255},${a})`; };
+function renderGroups(){
+  groupsEl.replaceChildren(...doc.groups.map(g => {
+    const label = h('span', {class:'dtext', text: g.name, title:'Drag to move the group. Double-click to rename.'});
+    label.style.background = hexA(g.color, .35);
+    const x = h('button', {class:'dx', text:'×', title:'Remove the group (its modules stay)', 'aria-label':'Remove group'});
+    const box = h('div', {class:'decor box'}, label, x);
+    Object.assign(box.style, { left:g.bounds[0] + 'px', top:g.bounds[1] + 'px', width:g.bounds[2] + 'px', height:g.bounds[3] + 'px', borderColor:g.color, background:hexA(g.color, .08) });
+    x.addEventListener('pointerdown', e => e.stopPropagation());
+    x.addEventListener('click', () => { store.snapshot(); doc.groups = doc.groups.filter(q => q !== g); renderGroups(); store.touch(); });
+    label.addEventListener('dblclick', async () => { const nm = await askDialog('Name this group:', { input:g.name, ok:'Rename' }); if (nm && nm.trim()){ store.snapshot(); g.name = nm.trim(); renderGroups(); } });
+    label.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      e.stopPropagation(); e.preventDefault(); label.setPointerCapture(e.pointerId);
+      const sx = e.clientX, sy = e.clientY, b0 = g.bounds.slice(), members = (g.modules || []).map(id => nodes.get(id)).filter(Boolean), p0 = members.map(n => n.m.pos.slice());
+      let moved = false;
+      const mv = ev => {
+        const z = view().zoom, dx = Math.round((ev.clientX - sx) / z), dy = Math.round((ev.clientY - sy) / z);
+        if (!moved && (dx || dy)){ moved = true; store.snapshot(); }
+        g.bounds[0] = b0[0] + dx; g.bounds[1] = b0[1] + dy; box.style.left = g.bounds[0] + 'px'; box.style.top = g.bounds[1] + 'px';
+        members.forEach((n, i) => { n.m.pos = [p0[i][0] + dx, p0[i][1] + dy]; n.el.style.left = n.m.pos[0] + 'px'; n.el.style.top = n.m.pos[1] + 'px'; });
+      };
+      const up = () => { label.removeEventListener('pointermove', mv); label.removeEventListener('pointerup', up); if (moved) store.touch(); };
+      label.addEventListener('pointermove', mv); label.addEventListener('pointerup', up);
+    });
+    return box;
+  }));
+}
+const GROUP_COLORS = ['#8a73c9', '#139a9a', '#c99a00', '#b24fb0', '#3f6fb5', '#2e9e5b'];
+function groupSel(){
+  const ids = [...selected]; if (!ids.length) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const id of ids){ const n = nodes.get(id); x0 = Math.min(x0, n.m.pos[0]); y0 = Math.min(y0, n.m.pos[1]); x1 = Math.max(x1, n.m.pos[0] + n.el.offsetWidth); y1 = Math.max(y1, n.m.pos[1] + n.el.offsetHeight); }
+  store.snapshot();
+  doc.groups.push({ id:newId('g'), name:'Group', color:GROUP_COLORS[doc.groups.length % GROUP_COLORS.length], modules:ids, collapsed:false,
+    bounds:[x0 - 24, y0 - 54, x1 - x0 + 48, y1 - y0 + 78] });
+  clearSel(); renderGroups(); store.touch();
+}
+function tidy(){
+  store.snapshot();
+  const list = [...nodes.values()], cols = Math.max(1, Math.round(Math.sqrt(list.length + 1)));
+  let y = 24;
+  for (let r = 0; r < list.length; r += cols){
+    const row = list.slice(r, r + cols); let tall = 0;
+    row.forEach((n, i) => { n.m.pos = [24 + i * 290, y]; n.el.style.left = n.m.pos[0] + 'px'; n.el.style.top = y + 'px'; tall = Math.max(tall, n.el.offsetHeight); });
+    y += tall + 40;
+  }
+  doc.groups = []; renderGroups(); store.touch();
+}
+
+/* ----- custom modules: a saved set of modules and the cables between them ----- */
+function captureCustom(name, ids){
+  const inside = new Set(ids), picked = doc.modules.filter(m => inside.has(m.id));
+  if (!picked.length) return null;
+  const ox = Math.min(...picked.map(m => m.pos[0])), oy = Math.min(...picked.map(m => m.pos[1]));
+  const map = new Map(picked.map((m, i) => [m.id, 'c' + i]));
+  const mods = picked.map(m => ({ id:map.get(m.id), type:m.type, scope:m.scope, pos:[m.pos[0] - ox, m.pos[1] - oy], collapsed:!!m.collapsed, params:Object.assign({}, m.params) }));
+  const cables = doc.cables.filter(c => inside.has(c.from[0]) && inside.has(c.to[0]))
+    .map(c => ({ from:[map.get(c.from[0]), c.from[1]], to:[map.get(c.to[0]), c.to[1]], bend:0 }));
+  store.snapshot();
+  const def = { id:newId('u'), name, color:'#8a73c9', graph:{ modules:mods, cables } };
+  doc.custom.push(def); renderCustom(); store.touch();
+  return def;
+}
+function pasteGraph(graph, pos){
+  const idmap = new Map(), ids = [];
+  for (const cm of graph.modules){
+    if (!MODULES[cm.type]) continue;
+    const m = { id:newId(), type:cm.type, scope:cm.scope || MODULES[cm.type].scope, pos:[pos[0] + cm.pos[0], pos[1] + cm.pos[1]], collapsed:!!cm.collapsed, params:Object.assign({}, cm.params) };
+    idmap.set(cm.id, m.id); doc.modules.push(m);
+    if (bridge) bridge.addModule(m.id, m.type, { params:m.params, pos:m.pos });
+    buildNode(m); ids.push(m.id);
+  }
+  for (const cc of graph.cables){
+    const from = [idmap.get(cc.from[0]), cc.from[1]], to = [idmap.get(cc.to[0]), cc.to[1]];
+    if (!from[0] || !to[0]) continue;
+    const c = { from, to, bend:0 }; if (cc.pts) c.pts = cc.pts.map(p => [p[0] + pos[0], p[1] + pos[1]]);
+    doc.cables.push(c); if (bridge) bridge.connect(from, to);
+  }
+  syncCableEls(); store.touch();
+  return ids;
+}
+function addCustom(defId, pos){ const def = doc.custom.find(c => c.id === defId); return def ? pasteGraph(def.graph, pos) : []; }
+
+/* ----- copy, paste and duplicate ----- */
+let clip = null;
+function copySel(quiet){
+  const picked = doc.modules.filter(m => selected.has(m.id)); if (!picked.length) return false;
+  const ox = Math.min(...picked.map(m => m.pos[0])), oy = Math.min(...picked.map(m => m.pos[1]));
+  const ids = new Set(picked.map(m => m.id));
+  clip = { ox, oy, graph:{
+    modules: picked.map(m => ({ id:m.id, type:m.type, scope:m.scope, pos:[m.pos[0] - ox, m.pos[1] - oy], collapsed:!!m.collapsed, params:Object.assign({}, m.params) })),
+    cables: doc.cables.filter(c => ids.has(c.from[0]) && ids.has(c.to[0])).map(c => ({ from:c.from.slice(), to:c.to.slice(), pts:c.pts && c.pts.map(p => [p[0] - ox, p[1] - oy]) })) } };
+  if (!quiet) toast(picked.length === 1 ? 'Copied 1 module.' : 'Copied ' + picked.length + ' modules.');
+  return true;
+}
+function pasteClip(){
+  if (!clip) return;
+  store.snapshot();
+  clip.ox += 40; clip.oy += 40;
+  const ids = pasteGraph(clip.graph, [clip.ox, clip.oy]);
+  clearSel(); ids.forEach(id => setSel(id, true));
+}
+
+/* ----- the right-click menu ----- */
+const ctx = document.getElementById('ctxmenu');
+function showMenu(x, y, items){
+  ctx.replaceChildren(...items.map(([label, fn, dis]) => { const b = h('button', {class:'ctxitem', text: label}); if (dis) b.disabled = true; b.addEventListener('click', () => { hideMenu(); fn(); }); return b; }));
+  ctx.hidden = false;
+  const r = ctx.getBoundingClientRect();
+  ctx.style.left = Math.min(x, window.innerWidth - r.width - 8) + 'px'; ctx.style.top = Math.min(y, window.innerHeight - r.height - 8) + 'px';
+}
+function hideMenu(){ ctx.hidden = true; }
+window.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  hideMenu();
+  for (const id of ['filemenu', 'setmenu']) document.getElementById(id).hidden = true;
+});
+window.addEventListener('pointerdown', e => { if (!ctx.hidden && !ctx.contains(e.target)) hideMenu(); }, true);
+ws.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const el = e.target.closest('.node'), id = el && el.dataset.id;
+  if (id && !selected.has(id)){ clearSel(); setSel(id, true); }
+  const sel = [...selected], n = sel.length, items = [];
+  const these = n === 1 ? 'this module' : 'these ' + n + ' modules';
+  if (n) items.push(['Make custom module from ' + these + '…', async () => {
+    const nm = await askDialog('Name the new custom module:', { input:'My voice', ok:'Make it' }); if (!nm || !nm.trim()) return;
+    const def = captureCustom(nm.trim(), sel); if (def) toast('“' + def.name + '” is in the module list under Custom.');
+  }]);
+  if (n) items.push(['Group ' + (n === 1 ? 'module' : n + ' modules'), () => groupSel()]);
+  if (n) items.push(['Copy (' + MOD + '+C)', () => copySel()], ['Duplicate (' + MOD + '+D)', () => { if (copySel(true)) pasteClip(); }]);
+  if (clip) items.push(['Paste (' + MOD + '+V)', () => pasteClip()]);
+  if (n) items.push(['Delete ' + (n === 1 ? 'module' : n + ' modules'), () => { store.snapshot(); for (const x of sel) removeModule(x); clearSel(); }]);
+  items.push(['Select all', () => { for (const k of nodes.keys()) setSel(k, true); }]);
+  if (!id) items.push(['Tidy up', () => tidy()]);
+  if (!id) items.push(['Patch background color…', () => pickPatchBg()]);
+  if (!id && doc.view.bg) items.push(['Reset background color', () => { store.snapshot(); delete doc.view.bg; ws.style.backgroundColor = ''; store.touch(); }]);
+  showMenu(e.clientX, e.clientY, items);
+});
+function pickPatchBg(){
+  const inp = h('input', {type:'color', value: doc.view.bg || '#ffffff', style:'position:fixed; left:-40px; top:0; opacity:0'});
+  document.body.append(inp);
+  let snapped = false;
+  inp.addEventListener('input', () => { if (!snapped){ store.snapshot(); snapped = true; } doc.view.bg = inp.value; ws.style.backgroundColor = inp.value; store.touch(); });
+  inp.addEventListener('change', () => inp.remove());
+  inp.click();
+}
+
+/* ═══════════════ module list ═══════════════ */
+const plist = document.getElementById('plist'), palette = document.getElementById('palette');
+const drawer = document.getElementById('drawer'), dtoggle = document.getElementById('dtoggle');
+const PALETTE = [
+  ['§Sound', []],
+  ['Sound sources', [['vco','VCO'],['fm','FM'],['additive','Additive'],['noise','Noise'],['plaits','Plaits'],['elements','Elements']]],
+  ['Filters and amps', [['vcf','VCF'],['vca','VCA'],['mixer','Mixer']]],
+  ['Effects', [['eq','EQ'],['comp','Compressor'],['saturation','Saturation'],['tape','Tape'],['chorus','Chorus'],['crush','Bitcrush'],['delay','Tape delay'],['reverb','Reverb'],['rings','Rings'],['clouds','Clouds']]],
+  ['Output', [['out','Out']]],
+  ['§Control', []],
+  ['Notes and MIDI', [['hostIn','Host In'],['seq','Sequencer']]],
+  ['Modulation sources', [['lfo','LFO'],['adsr','ADSR'],['random','Random'],['atten','Attenuverter']]]
+];
+const GROUP_FAM = { 'Sound sources':'gen', 'Filters and amps':'util', 'Effects':'afx', 'Output':'aout', 'Notes and MIDI':'midi', 'Modulation sources':'mod' };
+const isSection = g => g.startsWith('§');
+const PSTORE = KP + 'palette';
+let pstate = { open:{}, quick:['hostIn', 'vco', 'adsr', 'vca', 'out'] };
+try { const v = JSON.parse(localStorage.getItem(PSTORE) || 'null'); if (v){ if (v.open) pstate.open = v.open; if (Array.isArray(v.quick)) pstate.quick = v.quick; pstate.drawer = !!v.drawer; pstate.dw = v.dw; } } catch (e) {}
+const psave = () => { try { localStorage.setItem(PSTORE, JSON.stringify(pstate)); } catch (e) {} };
+const LABELS = {};
+for (const [, items] of PALETTE) for (const [t, l] of items) LABELS[t] = l;
+const quickEl = document.getElementById('quick'), stars = {};
+function paletteItem(type, label, big){
+  const custom = type.startsWith('c:');
+  const kind = custom ? 'mod' : DOT(type);
+  const sw = () => h('span', {class:'sw', style:'--k:var(--' + kind + ')'});
+  const famCls = custom ? ' fam-grp' : ' fam-' + famOf(type);
+  const b = h('button', {class:'pitem' + famCls + (big ? ' big' : ''), title:'Click to add, or drag onto the patch'}, sw(), label);
+  // Click adds to the middle of the view; dragging places it where you drop.
+  b.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault(); b.setPointerCapture(e.pointerId);
+    const sx = e.clientX, sy = e.clientY; let ghost = null;
+    const mv = ev => {
+      if (!ghost && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 6){ ghost = h('div', {class:'pghost' + famCls}, sw(), label); document.body.append(ghost); }
+      if (ghost){ ghost.style.left = (ev.clientX + 10) + 'px'; ghost.style.top = (ev.clientY + 8) + 'px'; }
+    };
+    const up = ev => {
+      b.removeEventListener('pointermove', mv); b.removeEventListener('pointerup', up); b.removeEventListener('pointercancel', up);
+      const r = ws.getBoundingClientRect(), v = view();
+      if (ghost){
+        ghost.remove();
+        if (ev.type === 'pointercancel') return;
+        const inside = ev.clientX > r.left && ev.clientX < r.right && ev.clientY > r.top && ev.clientY < r.bottom && !palette.contains(document.elementFromPoint(ev.clientX, ev.clientY));
+        if (!inside) return;
+        addItem(type, Math.round((ev.clientX - r.left - v.x) / v.zoom - 20), Math.round((ev.clientY - r.top - v.y) / v.zoom - 16));
+      } else if (ev.type !== 'pointercancel') addAtCenter(type);
+    };
+    b.addEventListener('pointermove', mv); b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+  });
+  b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); addAtCenter(type); } });
+  return b;
+}
+function togglePin(type){
+  const i = pstate.quick.indexOf(type);
+  if (i >= 0) pstate.quick.splice(i, 1); else pstate.quick.push(type);
+  psave(); renderQuick();
+}
+function renderQuick(){
+  const grid = h('div', {class:'qgrid'});
+  for (const t of pstate.quick){
+    if (!LABELS[t]) continue;
+    const un = h('button', {class:'qx', title:'Remove from Quick access', 'aria-label':'Remove ' + LABELS[t] + ' from Quick access', text:'×'});
+    un.addEventListener('click', () => togglePin(t));
+    grid.append(h('div', {class:'pwrap'}, paletteItem(t, LABELS[t], true), un));
+  }
+  quickEl.replaceChildren(
+    h('div', {class:'qhead'}, h('span', {class:'qt', text:'Quick access'}), h('span', {class:'qhint', text:'★ a module below to add it here'})),
+    pstate.quick.length ? grid : h('div', {class:'qempty', text:'Nothing here yet. Star any module below to keep it handy.'}));
+  for (const [key, st] of Object.entries(stars)){
+    const t = key.replace(/:all$/, ''), on = pstate.quick.includes(t);
+    st.textContent = on ? '★' : '☆'; st.classList.toggle('on', on); st.setAttribute('aria-pressed', String(on));
+  }
+}
+const groupOpeners = [];
+function groupHeader(name, count, cls, onOpen){
+  const open = !!pstate.open[name];
+  const grid = h('div', {class:'pgrid', hidden: !open});
+  const cnt = h('span', {class:'pcount', text: count == null ? '' : String(count)});
+  const hdr = h('button', {class:'pgroup ' + cls, 'aria-expanded': String(open)}, h('span', {class:'chev', 'aria-hidden':'true'}), h('span', {text: name}), cnt);
+  const setOpen = o => { grid.hidden = !o; hdr.setAttribute('aria-expanded', String(o)); hdr.classList.toggle('open', o); pstate.open[name] = o; };
+  setOpen(open);
+  hdr.addEventListener('click', () => { setOpen(grid.hidden); psave(); updateAllBtn(); });
+  groupOpeners.push(setOpen);
+  plist.append(hdr, grid);
+  return { grid, cnt };
+}
+function starFor(type, label, key){
+  const st = h('button', {class:'pstar', title:'Keep in Quick access', 'aria-label':'Keep ' + label + ' in Quick access'});
+  st.addEventListener('click', () => togglePin(type));
+  stars[key] = st;
+  return st;
+}
+for (const [group, items] of PALETTE){
+  if (isSection(group)){ plist.append(h('div', {class:'psection', text: group.slice(1)})); continue; }
+  const { grid } = groupHeader(group, items.length, 'tinted fam-' + GROUP_FAM[group]);
+  for (const [type, label] of items) grid.append(h('div', {class:'pwrap'}, paletteItem(type, label, false), starFor(type, label, type)));
+}
+plist.append(h('div', {class:'psection', text:'Custom'}));
+const customUI = groupHeader('Custom modules', 0, 'tinted fam-grp');
+{
+  const all = PALETTE.filter(([g]) => !isSection(g)).flatMap(([, items]) => items).sort((a, b) => a[1].localeCompare(b[1]));
+  const { grid } = groupHeader('All modules', all.length, 'allgrp');
+  for (const [type, label] of all) grid.append(h('div', {class:'pwrap'}, paletteItem(type, label, false), starFor(type, label, type + ':all')));
+}
+function renderCustom(){
+  if (!doc) return;
+  customUI.cnt.textContent = String(doc.custom.length);
+  customUI.grid.replaceChildren(...(doc.custom.length ? doc.custom.map(c => {
+    const b = paletteItem('c:' + c.id, c.name, false);
+    b.addEventListener('contextmenu', e => { e.preventDefault(); showMenu(e.clientX, e.clientY, [
+      ['Rename “' + c.name + '”…', async () => { const nm = await askDialog('Rename this custom module:', { input:c.name, ok:'Rename' }); if (nm && nm.trim()){ store.snapshot(); c.name = nm.trim(); renderCustom(); } }],
+      ['Delete “' + c.name + '”', () => { store.snapshot(); doc.custom = doc.custom.filter(x => x !== c); renderCustom(); store.touch(); }]]); });
+    return h('div', {class:'pwrap'}, b);
+  }) : [h('div', {class:'qempty', text:'Select modules (Shift-click), right-click and choose Make custom module.'})]));
+}
+const allBtn = document.getElementById('pall');
+function updateAllBtn(){ const any = Object.values(pstate.open).some(Boolean); allBtn.textContent = any ? 'Collapse all' : 'Expand all'; }
+allBtn.addEventListener('click', () => { const any = Object.values(pstate.open).some(Boolean); groupOpeners.forEach(f => f(!any)); psave(); updateAllBtn(); });
+updateAllBtn();
+renderQuick();
+// The module list starts closed; it remembers whether you left it open.
+const setDrawer = open => { drawer.classList.toggle('collapsed', !open); dtoggle.setAttribute('aria-expanded', String(open)); pstate.drawer = open; psave(); };
+setDrawer(!!pstate.drawer);
+dtoggle.addEventListener('click', () => setDrawer(drawer.classList.contains('collapsed')));
+// Drag the right edge of the open module list to make it wider or narrower.
+{
+  const rz = h('div', {class:'dresize', title:'Drag to resize the module list'}); drawer.append(rz);
+  const apply = w => { palette.style.width = w + 'px'; rz.style.left = (38 + w - 4) + 'px'; };
+  apply(pstate.dw || 300);
+  rz.addEventListener('pointerdown', e => {
+    e.preventDefault(); rz.setPointerCapture(e.pointerId);
+    const mv = ev => { const w = Math.max(220, Math.min(560, ev.clientX - drawer.getBoundingClientRect().left - 38)); pstate.dw = w; apply(w); };
+    const up = () => { rz.removeEventListener('pointermove', mv); rz.removeEventListener('pointerup', up); psave(); };
+    rz.addEventListener('pointermove', mv); rz.addEventListener('pointerup', up);
+  });
+}
+
+/* ═══════════════ top bar ═══════════════ */
+const fileMenu = document.getElementById('filemenu'), fileBtn = document.getElementById('filebtn');
+const setMenu = document.getElementById('setmenu'), setBtn = document.getElementById('setbtn');
+fileMenu.querySelectorAll('kbd').forEach(k => { const v = k.dataset.k; k.textContent = MAC ? v.replace('⇧', '⇧⌘').replace(/^([A-Z])$/, '⌘$1') : 'Ctrl+' + v.replace('⇧', 'Shift+'); });
+fileBtn.addEventListener('click', () => { document.getElementById('undobtn').disabled = !store.undo.length; document.getElementById('redobtn').disabled = !store.redo.length; fileMenu.hidden = !fileMenu.hidden; });
+fileMenu.addEventListener('click', e => { if (e.target.closest('.fitem')) fileMenu.hidden = true; });
+window.addEventListener('pointerdown', e => { if (!fileMenu.hidden && !fileMenu.contains(e.target) && e.target !== fileBtn) fileMenu.hidden = true; }, true);
+setBtn.addEventListener('click', () => { renderBackups(); setMenu.hidden = !setMenu.hidden; setBtn.setAttribute('aria-expanded', String(!setMenu.hidden)); });
+window.addEventListener('pointerdown', e => { if (!setMenu.hidden && !setMenu.contains(e.target) && e.target !== setBtn){ setMenu.hidden = true; setBtn.setAttribute('aria-expanded', 'false'); } }, true);
+
+function undo(){ if (store.back()) toast('Undone.'); }
+function redo(){ if (store.forward()) toast('Redone.'); }
+function newPatch(){
+  store.snapshot();
+  const b = blankDoc(); for (const k of Object.keys(doc)) delete doc[k]; Object.assign(doc, b);
+  clearSel(); renderAll(); if (bridge) bridge.loadPatch(doc); store.touch();
+  toast('New empty patch. Press ' + MOD + '+Z to get the previous one back.');
+}
+const fileLoad = document.getElementById('fileload');
+let loadMode = 'patch';
+function pickFile(mode){ loadMode = mode; fileLoad.value = ''; fileLoad.click(); }
+fileLoad.addEventListener('change', () => {
+  const f = fileLoad.files[0]; if (!f) return;
+  const p = loadMode === 'custom'
+    ? store.importCustom(f).then(k => { renderCustom(); store.touch(); toast('Imported ' + k + ' custom module' + (k === 1 ? '' : 's') + '.'); })
+    : store.importFrom(f).then(() => toast('Opened “' + doc.meta.name + '”.'));
+  p.catch(err => toast(err.message || 'Couldn’t open that file.'));
+});
+async function savePatch(as){
+  let name = doc.meta.name || 'Untitled';
+  if (as){ const nm = await askDialog('Save the patch as:', { input:name, ok:'Save' }); if (!nm || !nm.trim()) return; name = nm.trim(); doc.meta.name = name; document.getElementById('pname').value = name; }
+  store.dirty = true; store.save(); store.exportTo(name); toast('Saved “' + name + '”.');
+}
+document.getElementById('fnew').addEventListener('click', newPatch);
+document.getElementById('fopen').addEventListener('click', () => pickFile('patch'));
+document.getElementById('fsave').addEventListener('click', () => savePatch(false));
+document.getElementById('fsaveas').addEventListener('click', () => savePatch(true));
+document.getElementById('undobtn').addEventListener('click', undo);
+document.getElementById('redobtn').addEventListener('click', redo);
+document.getElementById('fexpmods').addEventListener('click', () => { if (!doc.custom.length){ toast('No custom modules yet.'); return; } store.exportCustom(); });
+document.getElementById('fimpmods').addEventListener('click', () => pickFile('custom'));
+const pnameEl = document.getElementById('pname');
+{
+  const done = document.getElementById('donebtn');
+  if (EMBED){
+    done.hidden = false;
+    done.addEventListener('click', () => { store.dirty = true; store.save(); held.forEach(p => bridge && bridge.noteOff(p)); TW.close(); });
+    window.addEventListener('pagehide', () => { if (store.dirty) store.save(); });
+  }
+}
+pnameEl.addEventListener('change', () => { store.snapshot(); doc.meta.name = pnameEl.value.trim() || 'Untitled'; pnameEl.value = doc.meta.name; });
+pnameEl.addEventListener('keydown', e => { if (e.key === 'Enter') pnameEl.blur(); });
+
+window.addEventListener('keydown', e => {
+  if (!(e.metaKey || e.ctrlKey)) return;
+  const k = e.key.toLowerCase();
+  if (k === 's'){ e.preventDefault(); savePatch(e.shiftKey); return; }
+  if (k === 'o'){ e.preventDefault(); pickFile('patch'); return; }
+  if (k === 'n' && !e.shiftKey){ e.preventDefault(); newPatch(); return; }
+  if (k === 'm' && !e.shiftKey){ e.preventDefault(); setLearn(!learn.on); return; }
+  if (typing(e)) return;
+  if (k === 'z' && !e.shiftKey){ e.preventDefault(); undo(); }
+  else if ((k === 'z' && e.shiftKey) || k === 'y'){ e.preventDefault(); redo(); }
+  else if (k === 'c'){ if (copySel()) e.preventDefault(); }
+  else if (k === 'v' && clip){ e.preventDefault(); pasteClip(); }
+  else if (k === 'd'){ e.preventDefault(); if (copySel(true)) pasteClip(); }
+});
+
+/* settings */
+function renderBackups(){
+  const host = document.getElementById('bklist'), list = PatchStore.backups().slice().reverse();
+  const fmt = t => { const d = new Date(t), today = new Date().toDateString() === d.toDateString(); return (today ? 'Today ' : d.toLocaleDateString() + ' ') + d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }); };
+  host.replaceChildren(...(list.length ? list.map(b => {
+    let info = ''; try { const d = JSON.parse(b.p); info = ', ' + ((d.meta && d.meta.name) || 'Untitled') + ', ' + (d.modules || []).length + ' modules'; } catch (e) {}
+    const r = h('button', {class:'btn', text:'Restore'});
+    r.addEventListener('click', () => { store.snapshot(); store._restore(JSON.stringify(normalize(JSON.parse(b.p)))); toast('Restored the version from ' + fmt(b.t) + '. Press ' + MOD + '+Z to undo.'); });
+    return h('div', {class:'bkrow'}, h('span', {text: fmt(b.t) + info}), r);
+  }) : [h('span', {class:'setsub', text:'Backups appear here while you work.'})]));
+}
+const hint = document.getElementById('hint'), tipsBox = document.getElementById('settips');
+hint.hidden = settings.tips === false; tipsBox.checked = settings.tips !== false;
+tipsBox.addEventListener('change', () => { settings.tips = tipsBox.checked; saveSettings(); hint.hidden = !settings.tips; });
+document.getElementById('hintx').addEventListener('click', () => { hint.hidden = true; settings.tips = false; saveSettings(); tipsBox.checked = false; });
+const keysBox = document.getElementById('setkeys');
+keysBox.addEventListener('change', () => { settings.keys = keysBox.checked; saveSettings(); paintKeys(); });
+
+/* help */
+function helpDoc(){
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+  const EDGE = { midi:'#b8865a', gen:'#139a9a', afx:'#b24fb0', mod:'#c99a00', aout:'#3f6fb5', util:'#e07a2e' };
+  const KC = { audio:'#22958d', mod:'#7a58c8', gate:'#c93d78' };
+  const ABOUT = {
+    hostIn:'Turns the notes you play into control signals: Pitch, Gate (held while a key is down) and Velocity. One copy runs for every voice, so anything it feeds becomes polyphonic.',
+    seq:'An 8-step sequencer. It plays its steps through Host In, like a keyboard, at the tempo in Settings (or from a Clock cable). Set a step to Rest for silence. Clock, Pitch and Gate come out for driving other modules.',
+    vco:'A simple oscillator: saw, square, triangle or sine. Patch Pitch from Host In; FM bends the pitch for vibrato or harsher sounds.',
+    fm:'FM oscillators from …Thunder: 2-operator, feedback, 808-style metal and cross-modulation. Ratio picks the modulator’s pitch, Index how much it bends the sound.',
+    additive:'Additive oscillators from …Thunder: harmonic and odd-harmonic stacks, membrane, bell and bar partials, and chords. A Gate restarts the partials’ decay, for struck sounds.',
+    noise:'Noise from …Thunder: white, pink, brown and blue (Shape lowers the rate, Color the bit depth), 808 metal, digital, crackle and sample-and-hold. Pitch moves the metal, digital and S&H noises.',
+    plaits:'A macro oscillator with 24 sound engines (Mutable Instruments Plaits, as in …Thunder). Patch a Gate to strike its built-in envelope and low-pass gate; without one it drones. Harmonics, Timbre and Morph change the sound.',
+    elements:'Mutable Instruments Elements: a modal voice where a bow, a breath and a mallet excite a resonator. Patch Pitch and Gate from Host In.',
+    vcf:'A filter. Low-pass softens, band-pass keeps the middle, high-pass thins. Patch an envelope into Cutoff for classic sweeps.',
+    vca:'An amplifier. Patch an envelope into CV so notes start and stop (with nothing in CV it stays open); Gain sets the loudness.',
+    mixer:'Mixes up to four sounds, each with its own level, plus a master level.',
+    eq:'Airwindows EQ: treble, mid and bass with their frequencies, plus low-pass and high-pass filters.',
+    comp:'Airwindows Pressure4: a compressor. Pressure sets how hard it works; Mix blends in the dry sound for parallel compression.',
+    saturation:'Airwindows Density: warm saturation and drive.',
+    tape:'Airwindows ToTape6: the sound of tape, with soft highs, head bump and flutter.',
+    chorus:'DaisySP chorus, in stereo.',
+    crush:'DaisySP decimator: lower sample rate and fewer bits.',
+    delay:'Airwindows TapeDelay2: a tape echo up to 1.8 seconds, with repeats, tone and flutter.',
+    reverb:'Airwindows Galactic: a huge, lush reverb.',
+    rings:'Mutable Instruments Rings: sound in excites a resonator tuned to Note (plus the Pitch input).',
+    clouds:'Mutable Instruments Clouds: granular textures, time stretch, looping delay and spectral blur. Freeze holds what it heard.',
+    lfo:'A slow oscillator for wobbles and sweeps. Depth sets how far it moves a slider; Sync to tempo follows the tempo. Reset restarts its cycle.',
+    adsr:'An envelope: Attack, Decay, Sustain and Release shape each note from its Gate.',
+    random:'A new random value at Rate, or each time Clock fires. Smooth glides between values.',
+    atten:'Scales a modulation signal (negative turns it upside down) and adds an offset.',
+    out:'Sends sound out, in stereo if you patch In R. Output picks which Waves In bus it plays on (in …Thunder each is its own input); on its own …waves plays them all.'
+  };
+  const guide = [
+    ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal cables carry sound, purple dashed cables carry modulation and pink dashed cables carry gates. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
+    ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the centre, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
+    ['Polyphony', 'Host In runs once for every voice, and so does anything it feeds; everything else (effects, LFOs, Out) runs once. Put effects after the voices, before Out.'],
+    ['Moving around', 'Drag the background or scroll with two fingers to pan. Pinch, Ctrl-scroll or a mouse wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
+    ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
+    ['Selecting and the right-click menu', 'Shift-click or Shift-drag to select modules. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
+    ['Playing', 'Your computer keyboard plays notes: Z to M is the lower octave, Q to P the upper one, and - and = change octave. MIDI keyboards work too, and on touch screens the Keys bar in the corner of the patch plays notes.'],
+    ['MIDI learn', 'Press MIDI learn, click a slider, then move a knob on your controller. Press Delete to clear the slider’s mapping, and Done when you’re finished.'],
+    ['Saving', 'Your patch saves itself as you work. File → Save downloads it as a file; Open loads one. Settings → Backups holds earlier versions.']
+  ];
+  const groups = PALETTE.filter(([g]) => !isSection(g)).map(([g, items]) => '<div class="mgroup"><h3>' + esc(g) + '</h3><div class="mgrid">' + items.map(([t]) => {
+    const d = MODULES[t], ed = EDGE[famOf(t)];
+    const io = (lbl, o) => Object.keys(o).length ? '<div class="io"><b>' + lbl + '</b>' + Object.entries(o).map(([p, k]) => '<span class="pt"><i style="background:' + KC[KIND[k]] + '"></i>' + esc(PORT_LABEL[p] || p) + '</span>').join('') + '</div>' : '';
+    return '<div class="mcard" style="--ed:' + ed + '"><h4>' + esc(d.label) + '</h4><p>' + esc(ABOUT[t]) + '</p>' + io('Inputs', d.inputs) + io('Outputs', d.outputs) + '</div>';
+  }).join('') + '</div></div>').join('');
+  return '<!doctype html><html><head><meta charset="utf-8"><style>' +
+    "@font-face{font-family:Jost;src:url('./fonts/Jost-400.woff') format('woff');font-weight:400}@font-face{font-family:Jost;src:url('./fonts/Jost-600.woff') format('woff');font-weight:600}" +
+    '*{box-sizing:border-box} html,body{height:100%; margin:0}' +
+    'body{font-family:Futura,"Futura PT",Jost,"Century Gothic","Avenir Next",system-ui,sans-serif; color:#111; background:#ececec; display:grid; grid-template-columns:250px 1fr}' +
+    'nav{background:#cfcfd3; border-right:3px solid #111; padding:18px 14px; overflow-y:auto; height:100vh}' +
+    'nav h1{font-size:22px; margin:0 0 12px; font-weight:600} nav a{display:block; color:#111; text-decoration:none; padding:5px 8px; font-size:14px; border-left:3px solid transparent}' +
+    'nav a:hover{background:#e4e4e7; border-left-color:#111} main{overflow-y:auto; height:100vh; padding:26px 34px 60px}' +
+    '.guide{background:#fff; border:3px solid #111; padding:4px 24px 10px; margin-bottom:22px} .guide h2{font-size:20px; margin:22px 0 8px; font-weight:600}' +
+    '.guide p{font-size:15px; line-height:1.55; max-width:78ch} .mgroup h3{font-size:19px; margin:28px 0 12px; font-weight:600; border-bottom:3px solid #111; padding-bottom:6px}' +
+    '.mgrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr)); gap:14px} .mcard{background:#fff; border:3.5px solid var(--ed); padding:12px 14px}' +
+    '.mcard h4{margin:0 0 6px; font-size:16.5px; font-weight:600; border-bottom:2px solid var(--ed); padding-bottom:6px} .mcard p{margin:0 0 8px; font-size:14px; line-height:1.5}' +
+    '.io{display:flex; flex-wrap:wrap; gap:5px 10px; align-items:center; font-size:12.5px; margin-top:4px} .io b{font-size:12px; min-width:62px}' +
+    '.pt{display:inline-flex; align-items:center; gap:5px; background:#fff; border:1.5px solid #111; padding:1px 7px} .pt i{width:9px; height:9px; border-radius:50%; display:inline-block}' +
+    '@media (max-width:700px){ body{grid-template-columns:1fr} nav{display:none} main{padding:16px} }' +
+    '</style></head><body><nav><h1>…waves Help</h1>' + guide.map(([t], i) => '<a href="#g' + i + '">' + esc(t) + '</a>').join('') +
+    '</nav><main><div class="guide">' + guide.map(([t, b], i) => '<h2 id="g' + i + '">' + esc(t) + '</h2><p>' + esc(b) + '</p>').join('') + '</div>' + groups + '</main></body></html>';
+}
+function openHelp(){
+  let ov = document.getElementById('helpov');
+  if (!ov){
+    ov = h('div', {class:'helpov', id:'helpov'}, h('iframe', {title:'…waves Help'}), h('button', {class:'tb helpx', text:'Close help', onclick: () => ov.hidden = true}));
+    document.body.append(ov);
+    ov.querySelector('iframe').srcdoc = helpDoc();
+  }
+  ov.hidden = false;
+}
+document.getElementById('helpbtn').addEventListener('click', openHelp);
+window.addEventListener('keydown', e => { const ov = document.getElementById('helpov'); if (e.key === 'Escape' && ov && !ov.hidden) ov.hidden = true; });
+
+/* "start making waves" in big letters, each a different color, until a module is added. */
+{
+  const lbl = document.getElementById('emptylbl'), cols = ['#2e9e5b','#139a9a','#2f6fc7','#5b5bd6','#8a4fd0','#c447b0','#d1456e','#e07a2e','#c99a00','#5f9e28','#2f6fc7'];
+  lbl.replaceChildren(...'start making waves'.split('').map((ch, i) => { const sp = h('span', {text: ch}); sp.style.color = cols[i % cols.length]; return sp; }));
+  setInterval(() => { const empty = !!doc && !doc.modules.length; if (lbl.hidden === empty) lbl.hidden = !empty; }, 400);
+}
+
+/* ═══════════════ meters, MIDI learn, keyboard ═══════════════ */
+const meterBars = [];
+{
+  const host = document.getElementById('meters');
+  for (let k = 0; k < BUS_COUNT; k++){ const b = h('span', {class:'b', title:'Out ' + (k + 1) + ' / Waves In ' + (k + 1)}, h('i')); host.append(b); meterBars.push(b.firstChild); }
+}
+function onMeter(m){
+  const el = document.getElementById('cpuv'), p = Math.round(m.load * 100);
+  el.textContent = 'CPU ' + p + '%' + (m.quality === 'draft' ? ' · draft' : '');
+  el.className = 'fps ' + (m.load < .5 ? 'good' : m.load <= .8 ? 'ok' : 'low');
+  el.title = m.load < .5 ? 'Plenty of room' : m.load <= .8 ? 'Getting busy' : 'Overloaded: voices will drop. Try Draft quality or fewer voices.';
+  document.getElementById('vcount').textContent = m.active + ' voice' + (m.active === 1 ? '' : 's');
+  for (let k = 0; k < BUS_COUNT; k++){ busPeaks[k] = m.buses[k] || 0; meterBars[k].style.transform = 'scaleX(' + Math.min(1, busPeaks[k]) + ')'; }
+  paintMods(m.mods || []);
+  if (m.wasm && (m.wasm.dsp !== WASM_OK.dsp || m.wasm.tfx !== WASM_OK.tfx)){ WASM_OK = m.wasm; for (const n of nodes.values()) paintNote(n); }
+  for (const n of nodes.values()) if (n.meter) n.meter.style.transform = 'scaleX(' + Math.min(1, busPeaks[(n.m.params.slot | 0) - 1] || 0) + ')';
+}
+
+/* Modulated sliders show the live value in purple, with a mark on the track (as in ...Seeds). */
+let modded = new Map();
+function paintMods(list){
+  const now = new Map();
+  for (const [id, k, v] of list){
+    const n = nodes.get(id), c = n && n.ctl[k]; if (!c || !c.row) continue;
+    now.set(id + '\u0000' + k, c);
+    c.row.classList.add('modded');
+    if (c.out){
+      const [, mn, mx] = MODULES[n.m.type].params[k];
+      if (!c.out.querySelector('input')) c.out.textContent = c.fmt(v);
+      c.mark.hidden = false; c.mark.style.left = `calc(8px + (100% - 16px) * ${(v - mn) / (mx - mn)})`;
+    } else if (c.tag){
+      const o = c.opts.find(q => q[0] === Math.round(v)); c.tag.textContent = o ? o[1] : ''; c.tag.hidden = !o || Math.round(v) === Math.round(n.m.params[k]);
+    }
+  }
+  for (const [key, c] of modded) if (!now.has(key)){
+    c.row.classList.remove('modded');
+    if (c.mark) c.mark.hidden = true; if (c.tag) c.tag.hidden = true;
+    c.show();
+  }
+  modded = now;
+}
+const learnBar = document.getElementById('learnbar'), learnText = document.getElementById('learntext'), learnBtn = document.getElementById('midilearn');
+function setLearn(on){
+  learn.on = on; learn.armed = null;
+  document.body.classList.toggle('learning', on); learnBar.hidden = !on; learnBtn.classList.toggle('on', on);
+  document.querySelectorAll('.armed').forEach(x => x.classList.remove('armed'));
+  if (on){
+    learnText.textContent = midi && midi.access ? 'MIDI learn: click a slider, then move a control on your controller.' : 'MIDI learn: no MIDI controller found yet. Connect one, then click a slider and move a control.';
+    if (midi && !midi.access) startMidi();
+  }
+}
+function armLearn(n, key, el){
+  if (!learn || !learn.on) return;
+  document.querySelectorAll('.armed').forEach(x => x.classList.remove('armed'));
+  learn.arm({ id:n.m.id, name:key }); el.classList.add('armed');
+  learnText.textContent = 'Now move a knob or fader on your controller. Press Delete to clear this mapping.';
+}
+function markMapped(){
+  document.querySelectorAll('.row.sl.mapped').forEach(x => { x.classList.remove('mapped'); x.removeAttribute('title'); });
+  if (!learn) return;
+  for (const cc in learn.map){
+    const t = learn.map[cc], el = document.querySelector('.row.sl[data-id="' + t.id + '"][data-key="' + t.name + '"]');
+    if (el){ el.classList.add('mapped'); el.title = 'CC ' + cc; }
+  }
+}
+learnBtn.addEventListener('click', () => setLearn(!learn.on));
+document.getElementById('learndone').addEventListener('click', () => setLearn(false));
+window.addEventListener('keydown', e => {
+  if (learn && learn.on && learn.armed && (e.key === 'Delete' || e.key === 'Backspace') && !typing(e)){
+    e.preventDefault(); learn.clear(learn.armed); learn.armed = null;
+    document.querySelectorAll('.armed').forEach(x => x.classList.remove('armed'));
+    markMapped(); learnText.textContent = 'Mapping cleared. Click another slider to map it.';
+  }
+});
+
+/* computer keyboard: two octaves of notes */
+const K_LOW = ['z','s','x','d','c','v','g','b','h','n','j','m',',','l','.',';','/'];
+const K_UP  = ['q','2','w','3','e','r','5','t','6','y','7','u','i','9','o','0','p'];
+let octave = 0;
+const held = new Map();
+function pitchOf(k){ const i = K_LOW.indexOf(k), j = K_UP.indexOf(k); return i >= 0 ? i : (j >= 0 ? 12 + j : -1); }
+window.addEventListener('keydown', e => {
+  if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || typing(e) || !bridge) return;
+  const key = e.key.toLowerCase();
+  if (key === '-' || key === '='){ octave = Math.max(-4, Math.min(4, octave + (key === '=' ? 1 : -1))); toast('Octave ' + (octave + 4)); return; }
+  const p = pitchOf(key); if (p < 0 || held.has(key)) return;
+  const pitch = p + octave * 12; held.set(key, pitch); bridge.resume(); bridge.noteOn(pitch, 1);
+});
+window.addEventListener('keyup', e => { const key = e.key.toLowerCase(), pitch = held.get(key); if (pitch == null) return; held.delete(key); if (bridge) bridge.noteOff(pitch); });
+window.addEventListener('blur', () => { held.forEach(p => bridge && bridge.noteOff(p)); held.clear(); });
+/* on-screen keys */
+{
+  const host = document.getElementById('touchkeys');
+  const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B','C'];
+  names.forEach((nm, i) => {
+    const b = h('button', {text: nm, 'aria-label':'Play ' + nm});
+    const on = e => { e.preventDefault(); e.stopPropagation(); if (b.classList.contains('on') || !bridge) return; b.classList.add('on'); bridge.resume(); bridge.noteOn(i + octave * 12, 1); b._p = i + octave * 12; };
+    const off = () => { if (!b.classList.contains('on')) return; b.classList.remove('on'); if (bridge) bridge.noteOff(b._p); };
+    b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
+    host.append(b);
+  });
+}
+let midiOk = false;
+function paintKeys(){
+  const auto = !midiOk || matchMedia('(pointer: coarse)').matches;
+  const on = settings.keys == null ? auto : settings.keys;
+  keysBox.checked = on; document.getElementById('keysdock').hidden = !on;
+}
+
+/* ═══════════════ start ═══════════════ */
+doc = normalize(PatchStore.open() || starterDoc());
+const firstRun = !PatchStore.open();
+store = new PatchStore(doc);
+store.onRestore = () => { normalize(doc); clearSel(); renderAll(); if (bridge) bridge.loadPatch(doc); };
+learn = new MidiLearn((id, name) => { const n = nodes.get(id); return n && n.ctl[name] ? n.ctl[name].range : null; });
+renderAll();
+if (firstRun) requestAnimationFrame(() => fitAll());
+
+function loop(){ autoPanStep(); drawCables(); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+
+/* settings that talk to the engine */
+const qSel = document.getElementById('setquality'), vSel = document.getElementById('setvoices');
+for (let i = 1; i <= 16; i++) vSel.append(h('option', {value: i, text: i + (i === 1 ? ' voice' : ' voices')}));
+qSel.value = doc.quality || 'full'; vSel.value = String((doc.voice && doc.voice.maxVoices) || 8);
+const tSel = document.getElementById('settempo');
+tSel.value = (doc.transport && doc.transport.tempo) || 120;
+tSel.addEventListener('change', () => { const v = clamp(parseFloat(tSel.value) || 120, 20, 300); tSel.value = v; doc.transport.tempo = v; if (bridge) bridge.setTransport({ tempo:v }); store.touch(); });
+tSel.addEventListener('keydown', e => e.stopPropagation());
+qSel.addEventListener('change', () => { doc.quality = qSel.value; if (bridge) bridge.setQuality(qSel.value); store.touch(); });
+function wireBridge(b){
+  bridge = b;
+  b.telemetry(true);
+  b.on('meter', onMeter);
+  b.on('shed', s => toast('The CPU is busy: dropped to ' + s.voices + ' voices.'));
+  b.on('error', e => toast(e.message));
+  b.loadPatch(doc);
+  if (doc.quality) b.setQuality(doc.quality);
+}
+function startEngine(maxVoices){
+  return WavesBridge.standalone({ maxVoices, quality: doc.quality || 'full', transport: doc.transport }).then(wireBridge)
+    .catch(err => toast('The sound engine couldn’t start: ' + (err && err.message || err), 6000));
+}
+vSel.addEventListener('change', () => {
+  const nv = +vSel.value; doc.voice.maxVoices = nv; store.dirty = true; store.save();
+  toast('Restarting the sound with ' + nv + ' voice' + (nv === 1 ? '' : 's') + '…');
+  const old = bridge; bridge = null; if (old) old.dispose();
+  startEngine(nv).then(() => bridge && bridge.resume());
+});
+startEngine((doc.voice && doc.voice.maxVoices) || 8);
+function unlockAudio(){ if (bridge){ bridge.resume(); removeEventListener('pointerdown', unlockAudio, true); removeEventListener('keydown', unlockAudio, true); } }
+addEventListener('pointerdown', unlockAudio, true);
+addEventListener('keydown', unlockAudio, true);
+
+/* MIDI */
+const midiSel = document.getElementById('setmidiin');
+midi = new WavesMidi({
+  onNote: o => { if (!bridge) return; if (o.on) bridge.noteOn(o.pitch, o.vel); else bridge.noteOff(o.pitch); },
+  onCC: (cc, val) => {
+    const r = learn.handle(cc, val);
+    if (r.learned != null){
+      const n = nodes.get(r.ref.id), lbl = n ? (n.m.label || MODULES[n.m.type].label) + ' ' + plabel(n.m.type, r.ref.name) : r.ref.name;
+      learnText.textContent = 'CC ' + r.learned + ' now controls ' + lbl + '. Click another slider to map it.';
+      document.querySelectorAll('.armed').forEach(x => x.classList.remove('armed'));
+      markMapped();
+    } else if (r.applied){ const n = nodes.get(r.id); if (n) setParam(n, r.name, r.value); }
+  },
+  onTransport: t => { if (t.tempo && bridge) bridge.setTransport({ tempo: Math.round(t.tempo * 10) / 10 }); },
+  onDevices: list => {
+    midiSel.replaceChildren(h('option', {value:'all', text:'All connected MIDI inputs'}), ...list.map(i => h('option', {value: i.id, text: i.name})));
+    midiSel.value = list.some(i => i.id === midi.selected) ? midi.selected : 'all';
+    document.getElementById('setmidiinfo').textContent = list.length ? 'Notes and CC from this controller play and control …waves.' : 'No MIDI controller is connected.';
+  }
+});
+midiSel.addEventListener('change', () => { midi.selected = midiSel.value; });
+function startMidi(){
+  return midi.start().then(st => { midiOk = !!(st.ok && st.inputs && st.inputs.length); paintKeys(); }).catch(() => { midiOk = false; paintKeys(); });
+}
+paintKeys();
+startMidi();
+</script>
+<script>
+  if ('serviceWorker' in navigator && location.protocol !== 'file:' && window.parent === window) navigator.serviceWorker.register('./sw.js');
+</script>
+</body></html>

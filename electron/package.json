@@ -1,0 +1,31 @@
+{
+  "name": "thunder-plus",
+  "productName": "...Thunder Plus",
+  "version": "1.0.0",
+  "description": "An 8-pad drum synth and M8-style tracker for making one-shots.",
+  "author": "Matt Hettich",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "copy": "node copy-app.js",
+    "start": "npm run copy && electron .",
+    "dist": "npm run copy && electron-builder",
+    "dist:win": "npm run copy && electron-builder --win",
+    "dist:mac": "npm run copy && electron-builder --mac",
+    "dist:linux": "npm run copy && electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.matthettich.thunderplus",
+    "productName": "...Thunder Plus",
+    "files": ["main.js", "app/**/*"],
+    "directories": { "output": "dist", "buildResources": "build" },
+    "win": { "target": ["nsis", "portable"], "icon": "app/icons/icon-512.png" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
+    "mac": { "target": ["dmg"], "category": "public.app-category.music", "icon": "app/icons/icon-512.png" },
+    "linux": { "target": ["AppImage", "deb"], "category": "Audio", "icon": "app/icons/icon-512.png" }
+  }
+}
