@@ -393,8 +393,12 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .tlegend dd{margin:0; color:var(--muted)}
 .tctl{flex:none; background:var(--side); border-top:1px solid var(--line); padding-block:10px 12px; padding-inline:16px;
   display:flex; justify-content:space-between; align-items:center; gap:16px; touch-action:none}
-.dpad{display:grid; grid-template-columns:repeat(3,var(--k)); grid-template-rows:repeat(2,var(--k)); gap:6px}
-.keys{display:grid; grid-template-columns:repeat(2,calc(var(--k) * 1.45)); grid-template-rows:repeat(2,var(--k)); gap:6px}
+.dpad{display:grid; grid-template-columns:repeat(3,var(--k)); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
+.keys{display:grid; grid-template-columns:repeat(2,calc(var(--k) * 1.45)); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
+/* The nav/edit pad: a slightly darker panel, and the same screen-coloured offset shadows as the command row. */
+.tctl{background:color-mix(in srgb, var(--side) 90%, #000)}
+#tPad .k{box-shadow:4px 4px 0 0 var(--sh, transparent), 4px 4px 0 1.5px var(--line); transition:transform .06s, box-shadow .06s}
+#tPad .k.dn{transform:translate(3px,3px); box-shadow:1px 1px 0 0 var(--sh, transparent), 1px 1px 0 1.5px var(--line)}
 .k{min-height:0; padding:0; font-size:18px; font-weight:600; touch-action:none}
 .k.kw{font-size:12.5px; letter-spacing:.06em}
 .k.dn,.k.on{background:var(--ink); color:var(--inv)}
@@ -4029,7 +4033,8 @@ function draw(){
   { const seq = ['song', ...(chainsOn ? ['chain'] : []), 'phrase', 'inst', 'mixer', 'fx', 'project'];
     const TCV = {song:'#dbe6f8', chain:'#e9e0f8', phrase:'#d8f0e2', inst:'#fbe2d2', mixer:'#f6edc8', fx:'#f8dce8', project:'#d5eef2'};
     let i = 0; $('tCmd').querySelectorAll('button[data-c]').forEach(b => { const on = !(onSong ? b.dataset.c === 'b:-16' || b.dataset.c === 'b:16' : b.dataset.c === 'clone' || b.dataset.c === 'cldn');
-      if (on) b.style.setProperty('--sh', TCV[seq[i++ % seq.length]]); }); }
+      if (on) b.style.setProperty('--sh', TCV[seq[i++ % seq.length]]); });
+    i = 0; for (const k of ['up', 'left', 'down', 'right', 'shift', 'play', 'opt', 'edit']){ const b = $('tPad').querySelector(`.k[data-b=${k}]`); if (b) b.style.setProperty('--sh', TCV[seq[i++ % seq.length]]); } }
   $('tCmd').querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = onSong);
   $('tCmd').querySelectorAll('[data-c=clone],[data-c=cldn]').forEach(b => b.hidden = !onSong); $('tCmd').classList.toggle('song', onSong);
   const selB = $('tCmd').querySelector('[data-c=sel]'); if (selB) selB.classList.toggle('on', !!selA);
