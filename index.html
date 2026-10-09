@@ -395,10 +395,9 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
   display:flex; justify-content:space-between; align-items:center; gap:16px; touch-action:none}
 .dpad{display:grid; grid-template-columns:repeat(3,var(--k)); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
 .keys{display:grid; grid-template-columns:repeat(2,calc(var(--k) * 1.45)); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
-/* The nav/edit pad: the command row inverted. A white panel; buttons in a screen's colour on grey outlined offset blocks. */
-.tctl{background:#fff}
-#tPad .k{background:var(--sh, var(--voice)); color:#1b2130; box-shadow:4px 4px 0 0 var(--side), 4px 4px 0 1.5px var(--line); transition:transform .06s, box-shadow .06s}
-#tPad .k.dn{transform:translate(3px,3px); box-shadow:1px 1px 0 0 var(--side), 1px 1px 0 1.5px var(--line)}
+/* The nav/edit pad: the command row inverted. Buttons in a screen's colour, on white outlined offset blocks. */
+#tPad .k{background:var(--sh, var(--voice)); color:#1b2130; box-shadow:4px 4px 0 0 #fff, 4px 4px 0 1.5px var(--line); transition:transform .06s, box-shadow .06s}
+#tPad .k.dn{transform:translate(3px,3px); box-shadow:1px 1px 0 0 #fff, 1px 1px 0 1.5px var(--line)}
 #tPad .k.dn, #tPad .k.on{background:var(--ink); color:var(--inv)}
 #tPad .k.lt, #tPad #kPlay.on{background:var(--pl); color:var(--inv)}
 .k{min-height:0; padding:0; font-size:18px; font-weight:600; touch-action:none}
