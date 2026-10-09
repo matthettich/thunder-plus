@@ -40,6 +40,7 @@ button{cursor:pointer}
   border-bottom:1px solid var(--edge); white-space:nowrap; position:relative; z-index:6}
 .bar h1{font-size:19px; font-weight:600; margin:0 6px 0 0; letter-spacing:-.01em}
 .bar .spacer{flex:1}
+.embed .bar h1{display:none}
 .pname{width:140px; padding:5px 8px; border:1px solid transparent; background:transparent; font-size:15px; font-weight:500}
 .pname:hover{border-color:var(--edge)}
 .pname:focus{border-color:var(--muted); background:var(--panel-2); outline:none}
@@ -257,8 +258,7 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
 </head><body>
 
 <div class="bar">
-  <button class="tb on" id="donebtn" hidden title="Save this patch into the kit and go back to …Thunder Plus">‹ Thunder</button>
-  <h1>...waves</h1>
+    <h1>...waves</h1>
   <input id="pname" class="pname" aria-label="Patch name" maxlength="60" spellcheck="false">
   <span class="vsep" aria-hidden="true"></span>
   <div class="setwrap"><button class="tb" id="filebtn" aria-haspopup="true">File ▾</button>
@@ -664,7 +664,7 @@ class WavesBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './waves-worklet.js?v=3';
+    const url = opts.url || './waves-worklet.js?v=2';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'waves', {
@@ -1587,10 +1587,12 @@ document.getElementById('fexpmods').addEventListener('click', () => { if (!doc.c
 document.getElementById('fimpmods').addEventListener('click', () => pickFile('custom'));
 const pnameEl = document.getElementById('pname');
 {
-  const done = document.getElementById('donebtn');
   if (EMBED){
-    done.hidden = false;
-    done.addEventListener('click', () => { store.dirty = true; store.save(); held.forEach(p => bridge && bridge.noteOff(p)); TW.close(); });
+    // …Thunder Plus shows this page as its "…waves" screen: it pauses the sound when you switch away and saves into the kit.
+    window.wavesEmbed = {
+      pause(){ clearTimeout(store._timer); if (store.dirty) store.save(); held.forEach(p => bridge && bridge.noteOff(p)); held.clear(); if (bridge) bridge.ctx.suspend().catch(() => {}); },
+      resume(){ if (bridge) bridge.resume(); }
+    };
     window.addEventListener('pagehide', () => { if (store.dirty) store.save(); });
   }
 }

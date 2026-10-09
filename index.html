@@ -115,11 +115,11 @@ input[type=range]{width:100%; accent-color:var(--ink); height:30px; margin:0; to
 .top{display:flex; align-items:center; gap:10px; padding-block:9px; padding-inline:16px; border-bottom:1px solid var(--line); flex:none; flex-wrap:wrap; background:var(--bench)}
 .brand{font-weight:600; font-size:22px; letter-spacing:.01em; white-space:nowrap; margin-right:6px}
 .brand .plus{color:var(--wv)}
-.top .bwaves{border:2px solid var(--wv); font-weight:600}
 :root{--wv:#22958d}
-.wvov{position:fixed; inset:0; z-index:60; background:#fff; display:flex}
-.wvov[hidden]{display:none}
-.wvov iframe{flex:1; border:0; width:100%; height:100%}
+.wvview{flex:1; min-height:0; min-width:0; display:flex; background:var(--bench)}
+.wvview[hidden]{display:none}
+.wvview iframe{flex:1; border:0; width:100%; height:100%; display:block}
+body.wvv #bSet{display:none}
 .kitname{width:150px}
 
 /* scrolling editor made of bands */
@@ -501,7 +501,6 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 
 <div class="top">
   <div class="brand">...Thunder <span class="plus">Plus</span></div>
-  <button type="button" class="bwaves" id="bWaves" title="Open the …waves modular synth: its Out modules feed the …waves oscillator in your layers">…waves</button>
   <div class="seg" id="segView" role="group" aria-label="Screen"></div>
   <input id="kitName" class="kitname" type="text" aria-label="Kit name" spellcheck="false">
   <div class="sp"></div>
@@ -644,6 +643,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
   <div class="pads" id="pads"></div>
 </div>
 
+<div class="wvview" id="wvView" hidden></div>
 <div class="trk" id="trk" hidden>
   <div class="ttabbar"><nav class="ttabs" id="tTabs" aria-label="Tracker screens"></nav>
     <div class="tpat" id="tPat">
@@ -878,7 +878,7 @@ function elementsPre(L, V, dur, pA, ptau){
 
 /* ...waves: the kit holds one modular patch (kit.waves). A layer set to "…waves patch" plays one of its
    Out buses: the patch is run offline for one note, held for the pad's Gate, like Plaits above. */
-const WV = { ready:false, doc:null };   // doc: the kit's patch (kept here, where the renderer can see it)
+const WV = { ready:false, doc:null, frame:null };   // doc: the kit's patch (kept here, where the renderer can see it)
 function wavesDoc(){ return WV.doc; }
 function wavesPre(L, V, dur, pA, ptau){
   const W = globalThis.WavesDSP, doc = wavesDoc(); if (!W || !doc) return null;
@@ -1881,7 +1881,7 @@ function save(){
   catch(e){ try { localStorage.setItem(KEY, JSON.stringify(kitToJSON(true))); } catch(e2){} }
 }
 function loadSaved(){ try { const s = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY); return s ? kitFromJSON(JSON.parse(s)) : null; } catch(e){ console.warn('Couldn’t load the saved kit', e); return null; } }
-function setKit(k){ kit = k; WV.doc = kit.waves || null; cur = 0; for (let i = 0; i < NSLOT; i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
+function setKit(k){ kit = k; WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0; for (let i = 0; i < NSLOT; i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
 
 /* ---------- files out ---------- */
 function wavBytes(data, sr, bits){
@@ -2249,7 +2249,6 @@ let plFailed = false;
 })();
 
 /* ---------- ...waves editor: a full-screen frame; the patch is read from and saved into the kit ---------- */
-let wvOv = null;
 const usesWaves = v => v.layers.some(l => l.on && l.type === 'waves');
 function wavesChanged(){ WV.doc = kit.waves || null; for (let i = 0; i < NSLOT; i++) if (usesWaves(kit.voices[i])){ dirty[i] = true; cache[i] = null; } clearTimeout(sTimer); sTimer = setTimeout(save, 900); }
 window.thunderWaves = {
@@ -2257,18 +2256,19 @@ window.thunderWaves = {
   save: d => { kit.waves = d; wavesChanged(); },
   close: () => closeWaves()
 };
-function openWaves(){
-  if (!wvOv){ wvOv = el('div', 'wvov'); wvOv.id = 'wvOv'; document.body.append(wvOv); }
-  wvOv.replaceChildren(); const f = document.createElement('iframe'); f.title = '…waves'; f.allow = 'midi; autoplay'; f.src = 'waves/index.html'; wvOv.append(f);
-  wvOv.hidden = false;
+const wvApi = () => { try { return WV.frame && WV.frame.contentWindow && WV.frame.contentWindow.wavesEmbed; } catch(e){ return null; } };
+function showWaves(){
+  if (!WV.frame){ WV.frame = document.createElement('iframe'); WV.frame.title = '…waves'; WV.frame.allow = 'midi; autoplay'; WV.frame.src = 'waves/index.html'; $('wvView').append(WV.frame); }
+  else { const a = wvApi(); if (a) a.resume(); }
+  setTimeout(() => { try { WV.frame.contentWindow.focus(); } catch(e){} }, 0);   // keys go to …waves, not the pads
 }
-function closeWaves(){
-  if (!wvOv) return;
-  wvOv.hidden = true; wvOv.replaceChildren();   // removing the frame stops its sound engine
+/* Leaving the …waves screen: pause its sound, save the patch into the kit and re-render the pads that use it. */
+function leaveWaves(){
+  const a = wvApi(); if (a) a.pause();
   for (let i = 0; i < NSLOT; i++) if (usesWaves(kit.voices[i])) dirty[i] = true;
-  refreshLayer(); ensure(cur); drawWave(); renderStrip(); renderPads();
 }
-$('bWaves').addEventListener('click', openWaves);
+function openWaves(){ setView('waves'); }
+function closeWaves(){ setView('synth'); }
 
 /* ===TRACKER START=== */
 /* An M8-style tracker for ...Thunder. Song (256 rows × 16 tracks) → Chain (16 phrases) → Phrase (16 steps:
@@ -4379,17 +4379,21 @@ const HINTK = {
 /* ---------- switching between the synth and the tracker ---------- */
 let updView = () => {};
 function setView(v){
-  view = v === 'tracker' ? 'tracker' : 'synth';
-  const tr = view === 'tracker';
-  $('main').hidden = $('dock').hidden = tr; $('trk').hidden = !tr;
-  $('kitName').hidden = tr;
-  if (tr) toggleSettings(false);
+  const was = view;
+  view = v === 'tracker' || v === 'waves' ? v : 'synth';
+  const tr = view === 'tracker', wv = view === 'waves';
+  $('main').hidden = $('dock').hidden = tr || wv; $('trk').hidden = !tr; $('wvView').hidden = !wv;
+  $('kitName').hidden = tr || wv;
+  if (tr || wv) toggleSettings(false);
+  document.body.classList.toggle('wvv', wv);
+  if (wv) showWaves(); else if (was === 'waves') leaveWaves();
   $('bSet').title = tr ? 'Tracker settings: everything on the Project screen, plus audio' : 'Settings: kit, MIDI, export, skin and audio';
   document.body.classList.toggle('trkv', tr); songBtn();
   try { localStorage.setItem(VK, view); } catch(e){}
   updView();
   if (tr){ releaseAll(); measure(); fit(); draw(); if (!raf) raf = requestAnimationFrame(frame); }
-  else { releaseAll(); refreshAll(); }
+  else if (!wv){ releaseAll(); refreshAll(); }
+  else releaseAll();
 }
 const trap = () => { try { history.pushState({thunder:1}, ''); } catch(e){} };
 trap();
@@ -4402,7 +4406,8 @@ addEventListener('popstate', () => {
     else if (tv !== 'song') go(midV === 'song' || !MID.includes(midV) ? 'song' : midV);
     else setView('synth');
     trap();
-  } else toast('Back again to leave ...Thunder');
+  } else if (view === 'waves'){ setView('synth'); trap(); }
+  else toast('Back again to leave ...Thunder');
 });
 /* ---------- help ---------- */
 const helpOpen = () => !$('help').hidden;
@@ -4514,7 +4519,7 @@ addEventListener('keydown', e => {
   e.stopImmediatePropagation();
   if (e.key === 'Escape'){ e.preventDefault(); tsetHide(); }
 }, true);
-updView = makeSeg($('segView'), [['tracker', 'Tracker'], ['synth', 'Synth']], () => view, setView);
+updView = makeSeg($('segView'), [['tracker', 'Tracker'], ['synth', 'Synth'], ['waves', '…waves']], () => view, setView);
 /* ===TRACKER END=== */
 
 /* ---------- boot ---------- */
@@ -4542,7 +4547,7 @@ refreshAll();
 loadCur();
 if (!chainsOn){ if (tv === 'chain') tv = 'phrase'; if (midV === 'chain') midV = 'phrase'; }
 chainVis(); arrBody();
-try { if (localStorage.getItem(VK) !== 'synth') setView('tracker'); } catch(e){ setView('tracker'); }
+try { const v = localStorage.getItem(VK); if (v !== 'synth') setView(v === 'waves' ? 'waves' : 'tracker'); } catch(e){ setView('tracker'); }
 })();
 </script>
 
