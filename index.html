@@ -313,6 +313,19 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .tbody{flex:1; min-height:0; display:flex}
 .tscr{flex:1; min-width:0; font-family:var(--mono); font-size:14px; padding:8px 12px;
   display:flex; flex-direction:column; overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none; font-variant-ligatures:none}
+/* FX command picker: a list over the tracker screen (EDIT on an FX column). */
+.tscr{position:relative}
+.fxpick{position:absolute; inset:6px; z-index:6; display:flex; flex-direction:column; background:var(--ts-bg); color:var(--ts-ink); border:2px solid var(--ts-ink); font-family:var(--mono); touch-action:auto}
+.fxpick[hidden]{display:none}
+.fph{display:flex; align-items:center; gap:10px; padding:4px 4px 4px 10px; border-bottom:1px solid var(--ts-line); flex:none}
+.fph span{flex:1; min-width:0; color:var(--ts-hint); font-size:.8em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.fph button{min-height:34px; min-width:40px; padding:0 8px}
+.fpl{flex:1; min-height:0; overflow-y:auto; touch-action:pan-y; overscroll-behavior:contain}
+.fpi{display:flex; gap:12px; align-items:baseline; padding:.55em 10px; border-bottom:1px solid var(--ts-line); cursor:pointer; line-height:1.3}
+.fpi b{flex:none; width:3.4ch; color:var(--ts-fx)}
+.fpi span{color:var(--ts-info); font-family:var(--font); font-size:.92em}
+.fpi i{margin-left:auto; flex:none; font-style:normal; font-size:.75em; color:var(--ts-hint)}
+.fpi.on{background:var(--ts-cur-bg)} .fpi.on :is(b,span,i){color:var(--ts-cur)}
 .thd{display:flex; justify-content:space-between; gap:12px; font-weight:700; line-height:1.3; flex:none}
 .tsub{color:var(--ts-th); font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .tgrid{flex:1; min-height:0; overflow:hidden; padding-top:.25em}
@@ -663,6 +676,10 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
       <div class="thd"><span id="tTitle">SONG</span><span class="tsub" id="tSub"></span></div>
       <div class="tgrid" id="tGrid"></div>
       <div class="tinfo"><div id="tInfo"></div><div class="thint" id="tHint"></div></div>
+      <div class="fxpick" id="fxPick" hidden role="dialog" aria-label="Pick an effect command">
+        <div class="fph"><b>FX COMMAND</b><span id="fxPickHint"></span><button type="button" id="fxPickX" aria-label="Close">✕</button></div>
+        <div class="fpl" id="fxPickList" role="listbox"></div>
+      </div>
     </div>
     <aside class="tarr" id="tArr" aria-label="Song arrangement">
       <div class="tarrh" id="tArrH" role="separator" aria-orientation="vertical" aria-label="Drag to resize the arrange panel" title="Drag to resize · double-tap: big / normal"></div>
@@ -683,7 +700,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
         <dt>?</dt><dd>help: every key and how it all works</dd>
         <dt>SHIFT + ◀▶</dt><dd>change screen</dd>
         <dt>SHIFT + ▲▼</dt><dd>select whole lines (Song, Chain, Phrase); other screens: Project / Mixer</dd>
-        <dt>EDIT</dt><dd>add, or run a › row</dd>
+        <dt>EDIT</dt><dd>add, or run a › row · on an FX column, pick a command from a list</dd>
         <dt>EDIT + arrows</dt><dd>change the value</dd>
         <dt>OPTION + EDIT</dt><dd>clear</dd>
         <dt>SHIFT + OPTION</dt><dd>select, then OPTION copies</dd>
@@ -1506,6 +1523,11 @@ function vuFrame(){
 
 // Keys belong to a text box or dropdown only while it is on screen; one left focused on a hidden page
 // (say the synth's add-effect list, after switching to the tracker) must not swallow the keys.
+// Buttons act on pointerdown; their click handlers are only a fallback for keyboard and accessibility
+// clicks, so they skip any click that follows a real press (a tap would otherwise act twice).
+let lastPtrDown = -1e9;
+addEventListener('pointerdown', () => { lastPtrDown = performance.now(); }, true);
+const ptrJust = () => performance.now() - lastPtrDown < 800;
 function typing(e){ const t = e.target; return !!(t && t.matches && t.matches('input[type=text],select') && t.getClientRects().length); }
 /* ---------- change handling ---------- */
 let rTimer = 0, sTimer = 0;
@@ -1748,7 +1770,7 @@ function buildPads(){
     p.addEventListener('pointerdown', e => { e.preventDefault(); try { p.setPointerCapture(e.pointerId); } catch(_){} padPress(i, true); });
     const up = () => { if (padHeld[i]){ releaseNote(padHeld[i]); padHeld[i] = null; } };
     p.addEventListener('pointerup', up); p.addEventListener('pointercancel', up);
-    p.addEventListener('click', e => { if (e.detail === 0) padPress(i); });
+    p.addEventListener('click', () => { if (!ptrJust()) padPress(i); });
   }
 }
 function renderPads(){
@@ -3371,6 +3393,73 @@ function bump(d, big){
   const r = rowsOf(tv)[c.y]; if (!r || !r.get) return;
   r.set(clamp(r.get() + d * (big ? (r.big || 1) : (r.step || 1)), r.min, r.max)); if (r.after) r.after(); saveS(); draw();
 }
+/* ---------- FX command picker ---------- */
+// EDIT on a phrase FX column opens a list of every command with a short note on what it does.
+// Touch: tap one to highlight it, tap it again to choose. Pad: ▲▼ move, EDIT chooses, OPTION closes.
+// Keyboard: arrows, Enter chooses, Esc closes, a letter jumps. Mouse: a click chooses.
+const FXB = {ARP:'Arpeggio: the note, +X and +Y semitones', ARC:'Arpeggio shape (X) and speed in ticks (Y)', CHA:'Chance the note plays (00 never – FF always)',
+  DEL:'Delay the note by ticks', GRV:'Groove: ticks on even (X) and odd (Y) steps', GGR:'Groove for every track at once', HOP:'End the phrase here; the next starts at row Y',
+  INS:'Play the note with this instrument', KIL:'Cut the note after ticks', OFF:'Fade the note out after ticks', NTH:'Play only on pass Y of every X times',
+  RET:'Retrigger every Y ticks; X fades each hit', REP:'Repeat the track’s last command, adding the value', RND:'Randomise the command to the left (or the pitch)',
+  RNL:'Like RND, as a random walk from the last value', PSL:'Slide the pitch from the last note over ticks', PBN:'Bend the pitch ± semitones over the step',
+  PVB:'Vibrato: X speed, Y depth', SED:'Seed the randomness so it repeats the same way', TPO:'Set the tempo in BPM (hex)', TSP:'Transpose the track from here on',
+  VOL:'Set the volume (also of a playing note)', PIT:'Pitch the note ± semitones', FIN:'Fine tune ± cents', PLY:'Play reversed (01) or forwards (00)',
+  STA:'Start part way into the sound', PAN:'Pan left or right (80 centre)', TIC:'Ticks a step from here on'};
+const FXLIST = [-1, ...FXC.map((n, i) => i).sort((a, b) => FXC[a] < FXC[b] ? -1 : 1)];
+const fxp = {open:false, x:0, y:0, i:0, now:-1};
+function fxpOpen(x, y){
+  const v = getCell('phrase', x, y); fxp.now = v;
+  Object.assign(fxp, {open:true, x, y, i:Math.max(0, FXLIST.indexOf(v >= 0 ? v : last.fxc))});
+  const L = $('fxPickList'); L.innerHTML = '';
+  FXLIST.forEach((f, k) => { const it = el('div', 'fpi'); it.dataset.k = k; it.setAttribute('role', 'option');
+    it.append(el('b', null, f < 0 ? '---' : FXC[f]), el('span', null, f < 0 ? 'No command (clear this cell)' : FXB[FXC[f]] || ''));
+    if (f === v) it.append(el('i', null, 'NOW')); L.append(it); });
+  $('fxPickHint').textContent = coarse ? 'Tap twice or EDIT · OPTION closes' : 'Click, or ▲▼ and Enter · Esc closes';
+  $('fxPick').hidden = false; fxpShow(true);
+}
+function fxpClose(){ if (!fxp.open) return; fxp.open = false; $('fxPick').hidden = true; }
+function fxpShow(jump){
+  $('fxPickList').querySelectorAll('.fpi').forEach((it, k) => { const on = k === fxp.i; it.classList.toggle('on', on); it.setAttribute('aria-selected', on);
+    if (on) it.scrollIntoView({block:jump ? 'center' : 'nearest'}); });
+}
+function fxpMove(d){ fxp.i = clamp(fxp.i + d, 0, FXLIST.length - 1); fxpShow(false); }
+function fxpChoose(k = fxp.i){
+  const f = FXLIST[k], {x, y} = fxp; fxpClose();
+  if (f < 0){ setCell('phrase', x, y, -1); setCell('phrase', x + 1, y, -1); saveS(); draw(); return; }
+  setCell('phrase', x, y, f); after('fxc', 'phrase', x, y, f);
+  toast(FXC[f] + ': ' + (FXB[FXC[f]] || ''));
+}
+// The pad's buttons while the list is open. Returns true when it used the press.
+function fxpPad(b){
+  if (b === 'up' || b === 'down'){ fxpMove(b === 'down' ? 1 : -1); return true; }
+  if (b === 'left' || b === 'right'){ fxpMove(b === 'right' ? 8 : -8); return true; }
+  if (b === 'edit'){ fxpChoose(); return true; }
+  if (b === 'opt' || b === 'shift'){ fxpClose(); return true; }
+  return true;
+}
+function fxpKeys(e){
+  const k = e.key;
+  if (k === 'ArrowUp' || k === 'ArrowDown'){ fxpMove(k === 'ArrowDown' ? 1 : -1); return true; }
+  if (k === 'PageUp' || k === 'PageDown'){ fxpMove(k === 'PageDown' ? 8 : -8); return true; }
+  if (k === 'Home' || k === 'End'){ fxp.i = k === 'Home' ? 0 : FXLIST.length - 1; fxpShow(false); return true; }
+  if (k === 'Enter'){ if (!e.repeat) fxpChoose(); return true; }
+  if (k === 'Escape'){ fxpClose(); return true; }
+  if (inMode === 'keys' && k.length === 1 && /[a-z]/i.test(k) && !e.ctrlKey && !e.metaKey && !e.altKey){
+    const L = k.toUpperCase(), n = FXLIST.length;
+    for (let j = 1; j <= n; j++){ const q = (fxp.i + j) % n, f = FXLIST[q]; if (f >= 0 && FXC[f][0] === L){ fxp.i = q; fxpShow(false); break; } }
+    return true;
+  }
+  return false;
+}
+let fxpDown = null;
+$('fxPickList').addEventListener('pointerdown', e => { const it = e.target.closest('.fpi'); fxpDown = it ? {k:+it.dataset.k, x:e.clientX, y:e.clientY, id:e.pointerId} : null; });
+$('fxPickList').addEventListener('pointercancel', () => { fxpDown = null; });
+$('fxPickList').addEventListener('pointerup', e => {
+  const d = fxpDown; fxpDown = null; if (!d || d.id !== e.pointerId || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 10) return;
+  if (e.pointerType === 'mouse' || d.k === fxp.i) return fxpChoose(d.k);
+  fxp.i = d.k; fxpShow(false);
+});
+$('fxPickX').addEventListener('click', fxpClose);
 let lastTap = {t:0, key:'', empty:false};
 function editTap(){
   const c = cs[tv], key = tv + c.x + ':' + c.y + ':' + cChain + ':' + cPhrase, now = performance.now();
@@ -3386,6 +3475,7 @@ function editTap(){
       else { r[IC] = last.inst; after('inst', 'phrase', c.x, c.y, last.inst); }
       return;
     }
+    if (tv === 'phrase' && k === 'fxc'){ lastTap = {t:0, key:'', empty:false}; return fxpOpen(c.x, c.y); }
     if (tv === 'phrase') pickUp(c.x, c.y);
     if (k !== 'tsp' && v < 0){ lastTap.empty = true; insertAt(c.x, c.y, k); }
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
@@ -3596,6 +3686,7 @@ function toggleBlockMute(y, t){
   toast((blockMuted(S, y, t) ? 'Muted' : 'Unmuted') + ` row ${rS(y, 3)} · track ${d2(t + 1)}`);
 }
 function go(v){
+  fxpClose();
   if (v === 'chain' && !chainsOn) v = 'phrase';
   if (v === 'phrase' && tv === 'song' && !chainsOn) ensureChainPhrase(S.song[cs.song.y][cs.song.x]);
   if (v === 'chain'){ const id = S.song[cs.song.y][cs.song.x]; if (tv === 'song' && id >= 0){ cChain = id; cTrack = cs.song.x; } }
@@ -3677,6 +3768,7 @@ function dirPress(b, l = {}){
   const m = {up:[0, -1], down:[0, 1], left:[-1, 0], right:[1, 0]}[b]; move(m[0], m[1]);
 }
 function press(b, fromKey){
+  if (fxp.open){ clearTimeout(rep); if (b !== 'play') return void fxpPad(b); fxpClose(); }
   if (b in held){
     held[b] = true; used[b] = false;
     if ((b === 'opt' && mod('shift')) || (b === 'shift' && mod('opt'))){ used.shift = used.opt = true; takeLatch(); toggleSel(); }
@@ -3717,6 +3809,7 @@ const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b
   ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on the row below (Ctrl/⌘+Shift+D)'], ['copy', 'COPY', 'Copy the selection (OPTION)'],
   ['cut', 'CUT', 'Cut the selection (OPTION+EDIT)'], ['paste', 'PASTE', 'Paste (SHIFT+EDIT)'], ['song', '▶', 'Play the song from the cursor row, or stop it (SHIFT+PLAY)']];
 function cmdAction(a){
+  fxpClose();
   takeLatch();
   const [c, n] = a.split(':');
   if (c === 'b') return bump(Math.sign(+n), Math.abs(+n) > 1);
@@ -4144,7 +4237,7 @@ document.querySelectorAll('#trk .k[data-b]').forEach(k => {
   k.addEventListener('pointerdown', e => { e.preventDefault(); try { k.setPointerCapture(e.pointerId); } catch(_){} ptrs.add(e.pointerId); if (!(b in held)) k.classList.add('dn'); press(b); });
   const up = e => { if (!ptrs.delete(e.pointerId)) return; if (!(b in held)) k.classList.remove('dn'); release(b); };
   k.addEventListener('pointerup', up); k.addEventListener('pointercancel', up);
-  k.addEventListener('click', e => { if (e.detail === 0){ press(b, true); release(b, true); } });
+  k.addEventListener('click', () => { if (!ptrJust()){ press(b, true); release(b, true); } });
 });
 $('trk').addEventListener('contextmenu', e => e.preventDefault());
 let drag = null;
@@ -4194,7 +4287,7 @@ for (const t of [scr, arrGrid]) for (const ev of ['touchend', 'contextmenu']) t.
   if (!e.target.closest('input,textarea,select,button,[contenteditable]') && e.cancelable) e.preventDefault();
 }, {passive:false});
 scr.addEventListener('pointerdown', e => {
-  if (sdrag || drag || (e.button && e.button > 0) || e.target.closest('[data-x],[data-r]')) return;
+  if (sdrag || drag || (e.button && e.button > 0) || e.target.closest('[data-x],[data-r],#fxPick')) return;
   startScroll(e);
 });
 scr.addEventListener('pointermove', e => {
@@ -4233,6 +4326,7 @@ grid.addEventListener('pointerup', dragEnd); grid.addEventListener('pointercance
 // Mouse wheel moves the cursor a row per notch, so long screens scroll.
 let wAcc = 0;
 scr.addEventListener('wheel', e => {
+  if (fxp.open) return;
   if (tv === 'mixer' || onPset()) return; e.preventDefault();
   wAcc += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
   const n = Math.trunc(wAcc / 40); if (!n) return; wAcc -= n * 40;
@@ -4283,6 +4377,7 @@ document.addEventListener('keydown', e => {
   if (typing(e)) return;
   if (fileKeys(e)){ e.preventDefault(); return; }
   if (view !== 'tracker') return;
+  if (fxp.open && fxpKeys(e)){ e.preventDefault(); return; }
   if (globalKeys(e)){ e.preventDefault(); return; }
   if (inMode === 'keys'){ if (keysDown(e)) e.preventDefault(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -4439,6 +4534,11 @@ function drawKeypad(){
 }
 function kpAction(a){
   const [cmd, arg] = a.split(':'), n = +arg;
+  if (fxp.open){
+    if (cmd === 'mv'){ if (arg === 'up' || arg === 'down') fxpMove(arg === 'down' ? 1 : -1); else fxpMove(arg === 'right' ? 8 : -8); return; }
+    if (cmd === 'ent') return fxpChoose();
+    fxpClose(); if (cmd !== 'play') return;
+  }
   if (cmd === 'n') return typeNote(n);
   if (cmd === 'h') return typeHex(n);
   if (cmd === 'f') return typeFx(n);
@@ -4455,7 +4555,7 @@ $('tKp').addEventListener('pointerdown', e => {
   const b = e.target.closest('button[data-a]'); if (!b || b.disabled) return; e.preventDefault();
   b.classList.add('dn'); setTimeout(() => b.classList.remove('dn'), 110); kpAction(b.dataset.a);
 });
-$('tKp').addEventListener('click', e => { const b = e.target.closest('button[data-a]'); if (b && e.detail === 0 && !b.disabled) kpAction(b.dataset.a); });
+$('tKp').addEventListener('click', e => { const b = e.target.closest('button[data-a]'); if (b && !ptrJust() && !b.disabled) kpAction(b.dataset.a); });
 $('tSong').addEventListener('click', () => { if (tp.on) tStop(); else tStart('song', {row:cs.song.y}); songBtn(); });
 const HINTK = {
   song:'Type hex · Enter add or open · Enter×2 new chain · Del clear · M mute block · Alt+arrows ±1/±16 · Shift+→ open · Shift+↑↓ lines',
@@ -4471,6 +4571,7 @@ const HINTK = {
 /* ---------- switching between the synth and the tracker ---------- */
 let updView = () => {};
 function setView(v){
+  fxpClose();
   const was = view;
   view = v === 'tracker' || v === 'waves' ? v : 'synth';
   const tr = view === 'tracker', wv = view === 'waves';
