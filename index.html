@@ -315,7 +315,7 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .tgrid{flex:1; min-height:0; overflow:hidden; padding-top:.25em}
 .tgrid .ln{white-space:pre; line-height:1.3; height:1.3em}
 .tgrid span[data-x],.tgrid span[data-r]{cursor:pointer}
-/* Screen colours. Dark is the M8 look; the pastel ones keep every colour at readable contrast (4.5:1 or more for text). */
+/* Screen colours. Dark is the black look; the pastel ones keep every colour at readable contrast (4.5:1 or more for text). */
 .tscr{--ts-bg:#000000; --ts-ink:#ffffff; --ts-dim:#4f4f4f; --ts-rn:#6f6f6f; --ts-rn4:#b5b5b5; --ts-th:#8a8a8a; --ts-vol:#7fd3cf; --ts-inst:#a6c2f0; --ts-fx:#e8a5de;
   --ts-mute:#e0564a; --ts-solo:#e8b93c; --ts-pl-bg:#4a3c0c; --ts-pl:#ffd659; --ts-sel:#2c3a55; --ts-cur-bg:#ffffff; --ts-cur:#000000; --ts-line:#3a3a3a; --ts-info:#c9c9c9; --ts-hint:#7a7a7a;
   --ts-ok:var(--meter-ok); --ts-hot:var(--meter-hot); --ts-clip:var(--meter-clip); background:var(--ts-bg); color:var(--ts-ink)}
@@ -690,7 +690,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
       <dl class="tlegend" id="tLegKeys" hidden>
         <dt>? or F1</dt><dd>all the keys, and how the tracker works</dd>
         <dt>Alt + 1–7</dt><dd>Song, Chain, Phrase, Inst, Mixer, FX, Project · Alt+0 the synth</dd>
-        <dt>F2 F3 F4</dt><dd>Phrase, Mixer, Inst (like Renoise’s editor keys)</dd>
+        <dt>F2 F3 F4</dt><dd>Phrase, Mixer, Inst</dd>
         <dt>F5 F6 F7 F8</dt><dd>play song · play this screen · song from cursor · stop</dd>
         <dt>Arrows</dt><dd>move · Shift+◀▶ or Ctrl/⌘+Shift+arrows change screen</dd>
         <dt>Shift + ▲▼</dt><dd>select whole lines (Song, Chain, Phrase); tap row numbers on a touch screen</dd>
@@ -742,22 +742,22 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
   <div class="hbody" id="helpBody" tabindex="-1"><div class="hwrap">
     <section id="hStart">
 <h2>Getting started</h2>
-<p>...Thunder has two pages: the <b>Synth</b>, where you build an 8-pad kit, and the <b>Tracker</b>, an M8-style sequencer that plays that kit. Switch with <b>Synth / Tracker</b> at the top. Everything saves in the browser as you work; <b>Save</b> writes a project file (song and kit) you can keep or move to another device.</p>
+<p>...Thunder has two pages: the <b>Synth</b>, where you build an 8-pad kit, and the <b>Tracker</b>, a sequencer that plays that kit. Switch with <b>Synth / Tracker</b> at the top. Everything saves in the browser as you work; <b>Save</b> writes a project file (song and kit) you can keep or move to another device.</p>
 <h3>How a song fits together</h3>
 <p><b>Song</b> (256 rows × 16 tracks of chain numbers) → <b>Chain</b> (up to 16 phrases, each with a transpose) → <b>Phrase</b> (up to 32 rows of note, volume, instrument and three effects) → <b>Inst</b> (which pad a note plays, with transpose, volume, pan, reverse and start). <b>Mixer</b>, <b>FX</b> and <b>Project</b> sit around them.</p>
-<p><b>Chains are hidden by default</b> (⚙ Settings → Hide chains page, or Project → CHAINS), Renoise style: EDIT×2 on an empty song cell makes a block that already holds a phrase, SHIFT+▶ opens that phrase, and EDIT×2 on a filled block makes a unique copy. Set CHAINS to SHOWN for the M8 chain screen; nothing is lost either way.</p>
+<p><b>Chains are hidden by default</b> (⚙ Settings → Hide chains page, or Project → CHAINS): EDIT×2 on an empty song cell makes a block that already holds a phrase, SHIFT+▶ opens that phrase, and EDIT×2 on a filled block makes a unique copy. Set CHAINS to SHOWN for the chain screen; nothing is lost either way.</p>
 <p><b>Arrange</b> (wide screens): the blue overview at the right shows the whole song. Tap a block to go to it, twice to open its phrase, a row number to play from there. <b>Alt-click or hold a block to mute it</b>: the phrase stays in place, silent, so you can drop parts in and out while arranging. TAP: MUTE makes every tap a mute; M does it on the Song screen in KEYS mode.</p>
-<p>The screens are laid out like the M8's map: Song ▶ Chain ▶ Phrase ▶ Inst left to right, Project above, Mixer below, FX to the right of the Mixer. You move between them with the screen keys below, the tabs, or the map in the side panel.</p>
+<p>The screens are laid out as a map: Song ▶ Chain ▶ Phrase ▶ Inst left to right, Project above, Mixer below, FX to the right of the Mixer. You move between them with the screen keys below, the tabs, or the map in the side panel.</p>
 <h3>Settings</h3>
-<p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex, M8 style) and change the <b>Text size</b> of the tracker screen. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
+<p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex) and change the <b>Text size</b> of the tracker screen. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots. <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song.</p>
 <h3>Chords and polyphony</h3>
 <p><b>Tracks 9–16 are polyphonic.</b> Open a phrase from one of them and it shows four note columns, N1–N4, so a row can hold a chord. Notes on these tracks ring over each other, up to 4 at a time per track; a fifth steals the oldest. A note OFF in any note column releases everything on the track. Tracks 1–8 stay one note at a time, and a phrase played there uses only N1.</p>
 <h3>Two input modes</h3>
-<p><b>PAD</b> is the M8 way: a d-pad plus SHIFT, PLAY, OPTION and EDIT, good with a thumb. <b>KEYS</b> is direct entry: type notes, hex and effects, Renoise style, with an on-screen keypad on touch screens. Switch with ⚙ Settings → Input (or Project → INPUT).</p>
+<p><b>PAD</b> is a d-pad plus SHIFT, PLAY, OPTION and EDIT, good with a thumb. <b>KEYS</b> is direct entry: type notes, hex and effects, with an on-screen keypad on touch screens. Switch with ⚙ Settings → Input (or Project → INPUT).</p>
 </section>
-    <section id="hAll"><h2>Keys that work everywhere</h2><table><tr><td><kbd>?</kbd> or <kbd>F1</kbd></td><td>Open or close this help</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>S</kbd></td><td>Save the project (writes back to the same file where the browser allows)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Ctrl/⌘</kbd> <kbd>S</kbd></td><td>Save As: a new file</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>O</kbd></td><td>Open a project file</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Z</kbd> / <kbd>Ctrl/⌘</kbd> <kbd>Y</kbd></td><td>Undo / redo in the tracker (also <kbd>Shift</kbd> <kbd>Ctrl/⌘</kbd> <kbd>Z</kbd>). A paste or cut undoes in one step</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Song, Chain, Phrase, Inst, Mixer, FX, Project · <kbd>Alt</kbd> <kbd>0</kbd> back to the synth</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>arrows</kbd></td><td>Change screen, M8 style (▲ Project, ▼ Mixer, ◀▶ along every screen: Song, Chain, Phrase, Inst, Mixer, FX, Project)</td></tr><tr><td><kbd>F2</kbd> <kbd>F3</kbd> <kbd>F4</kbd></td><td>Phrase, Mixer, Inst</td></tr><tr><td><kbd>F5</kbd> <kbd>F6</kbd> <kbd>F7</kbd> <kbd>F8</kbd></td><td>Play song from the top · play this screen · song from the cursor row · stop</td></tr></table></section>
+    <section id="hAll"><h2>Keys that work everywhere</h2><table><tr><td><kbd>?</kbd> or <kbd>F1</kbd></td><td>Open or close this help</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>S</kbd></td><td>Save the project (writes back to the same file where the browser allows)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Ctrl/⌘</kbd> <kbd>S</kbd></td><td>Save As: a new file</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>O</kbd></td><td>Open a project file</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Z</kbd> / <kbd>Ctrl/⌘</kbd> <kbd>Y</kbd></td><td>Undo / redo in the tracker (also <kbd>Shift</kbd> <kbd>Ctrl/⌘</kbd> <kbd>Z</kbd>). A paste or cut undoes in one step</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Song, Chain, Phrase, Inst, Mixer, FX, Project · <kbd>Alt</kbd> <kbd>0</kbd> back to the synth</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>arrows</kbd></td><td>Change screen (▲ Project, ▼ Mixer, ◀▶ along every screen: Song, Chain, Phrase, Inst, Mixer, FX, Project)</td></tr><tr><td><kbd>F2</kbd> <kbd>F3</kbd> <kbd>F4</kbd></td><td>Phrase, Mixer, Inst</td></tr><tr><td><kbd>F5</kbd> <kbd>F6</kbd> <kbd>F7</kbd> <kbd>F8</kbd></td><td>Play song from the top · play this screen · song from the cursor row · stop</td></tr></table></section>
     <section id="hKeys"><h2>Tracker · KEYS mode</h2><h3>Moving</h3><table><tr><td><kbd>arrows</kbd></td><td>Move the cursor (drops a line selection)</td></tr><tr><td><kbd>Shift</kbd> <kbd>◀</kbd> <kbd>Shift</kbd> <kbd>▶</kbd></td><td>Previous / next screen, in tab order (Song → … → Inst → Mixer → FX → Project)</td></tr><tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd> <kbd>Tab</kbd></td><td>Next / previous column (phrase) or track</td></tr><tr><td><kbd>Home</kbd> <kbd>End</kbd> <kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>Top, bottom, 16 rows up or down</td></tr><tr><td><kbd>[</kbd> <kbd>]</kbd> or <kbd>Ctrl/⌘</kbd> <kbd>▲▼</kbd></td><td>Previous / next chain, phrase, instrument or FX track</td></tr><tr><td>Mouse wheel</td><td>Scroll the screen a row at a time</td></tr></table><h3>Typing</h3><table><tr><td><kbd>Z</kbd> <kbd>S</kbd> <kbd>X</kbd> … <kbd>/</kbd></td><td>Notes, lower octave (S D G H J are the sharps); on tracks 9–16, Tab to N2–N4 to add chord notes</td></tr><tr><td><kbd>Q</kbd> <kbd>2</kbd> <kbd>W</kbd> … <kbd>P</kbd></td><td>Notes, upper octave</td></tr><tr><td><kbd>1</kbd> or <kbd>Caps Lock</kbd></td><td>Note off</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd> or numpad <kbd>/</kbd> <kbd>*</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>0</kbd>–<kbd>9</kbd> <kbd>A</kbd>–<kbd>F</kbd></td><td>Hex values: two digits, or one for an instrument</td></tr><tr><td>Letters</td><td>Commands in FX columns (press again to cycle: R gives RET, REP, RND, RNL)</td></tr><tr><td><kbd>{</kbd> <kbd>}</kbd></td><td>Edit step down / up: how far the cursor moves after you type</td></tr><tr><td><kbd>Alt</kbd> <kbd>arrows</kbd></td><td>Change the value (◀▶ by 1, ▲▼ by more)</td></tr><tr><td><kbd>Enter</kbd></td><td>Add, open, or run a › row · twice for a new chain or phrase · in a phrase, picks up what’s there as the current values: the row’s instrument, plus the note, volume, or effect and its value under the cursor (shown after NOW on the hint line)</td></tr></table><h3>Rows</h3><table><tr><td><kbd>Delete</kbd></td><td>Clear the row and step down · <kbd>Shift</kbd> <kbd>Delete</kbd> just the cell</td></tr><tr><td><kbd>Insert</kbd></td><td>Add a blank row (rows below move down)</td></tr><tr><td><kbd>Backspace</kbd></td><td>Same as Delete: clear the row and step down; rows below stay where they are</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Backspace</kbd></td><td>Remove the row (rows below move up)</td></tr></table><h3>Selecting, copy and paste</h3><table><tr><td><kbd>Shift</kbd> <kbd>▲</kbd> <kbd>Shift</kbd> <kbd>▼</kbd></td><td>Select whole lines in Song, Chain and Phrase. The first press takes the cursor’s line, the next ones grow it</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>A</kbd></td><td>Select every line</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>B</kbd></td><td>Start a block selection; arrows grow it</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>C</kbd> <kbd>Ctrl/⌘</kbd> <kbd>X</kbd></td><td>Copy / cut the selection</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>V</kbd></td><td>Paste at the cursor row, or over a selection from its top. Lines paste into any phrase</td></tr><tr><td><kbd>Esc</kbd></td><td>Drop the selection</td></tr><tr><td>Row numbers</td><td>Tap or click one to select that line; another to grow the selection to it</td></tr></table><h3>Playing</h3><table><tr><td><kbd>Space</kbd></td><td>Play or stop this screen (phrase, chain or song)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the song from the cursor row</td></tr></table></section>
     <section id="hPad"><h2>Tracker · PAD mode</h2><table><tr><td>Arrows</td><td>Move</td></tr><tr><td>SHIFT + arrows</td><td>Change screen (◀▶ go through every screen in tab order)</td></tr><tr><td>EDIT</td><td>Add, or run a › row · in a phrase, picks up the row’s instrument and the note, volume or effect under the cursor · tap twice for a new chain or phrase, or a note off</td></tr><tr><td>EDIT + arrows</td><td>Change the value (◀▶ by 1, ▲▼ by more)</td></tr><tr><td>OPTION + EDIT</td><td>Clear (with a selection: cut)</td></tr><tr><td>OPTION + arrows</td><td>Other chain, phrase, instrument or FX track · in Song, page up/down</td></tr><tr><td>SHIFT + OPTION</td><td>Start or cancel a selection; arrows grow it, OPTION copies</td></tr><tr><td>SHIFT + EDIT</td><td>Paste</td></tr><tr><td>PLAY · SHIFT + PLAY</td><td>Play this screen · play the song</td></tr><tr><td>Row numbers</td><td>Tap to select whole lines, then COPY and PASTE</td></tr></table><p><b>One finger is enough.</b> With <b>Sticky keys</b> on, tap SHIFT or OPTION alone and it stays lit for the next button. The <b>command row</b> (Project → COMMANDS) gives every two-key command its own button: change, prev/next, clear, select, copy, cut, paste, play song.</p><p>On a computer keyboard in PAD mode: arrows, <kbd>Shift</kbd>, <kbd>Z</kbd> = OPTION, <kbd>X</kbd> = EDIT, <kbd>Space</kbd> = PLAY.</p><h3>Touch</h3><p>Tap a cell to move there; tap it again to open or add. Drag up or down on the cursor’s cell to change its value; drag elsewhere to scroll.</p></section>
     <section id="hFx"><h2>FX column commands</h2>
@@ -1316,7 +1316,7 @@ function factorySynths(){
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
-const inClaude = !!(window.claude && typeof window.claude.use === 'function');
+const inAI = !!(window.claude && typeof window.claude.use === 'function');
 // ...Thunder Plus saves under its own names. The first time it opens it starts from a copy of ...Thunder's kit and song (only read, never written).
 const KEY = 'thunderplus-kit-v1', OLD_KEY = 'thunder-kit-v1';
 
@@ -1778,7 +1778,7 @@ function refreshAll(){
 document.addEventListener('keydown', e => {
   if (view === 'tracker' || typing(e) || e.repeat || e.ctrlKey || e.metaKey) return;
   if (e.altKey && /^Digit[1-7]$/.test(e.code)){ e.preventDefault(); setView('tracker'); go(VIEWS[+e.code.slice(5) - 1]); return; }
-  // Keyboard: Renoise-style notes play the selected pad chromatically (C-4 = its own pitch);
+  // Keyboard: notes play the selected pad chromatically (C-4 = its own pitch);
   // Shift+1–8 or ◀ ▶ pick a pad; − = (or numpad / *) change the octave; Space plays the pad.
   if (e.altKey) return;
   const pd = /^Digit[1-8]$/.test(e.code) ? +e.code.slice(5) - 1 : -1;
@@ -1934,7 +1934,7 @@ function padWav(i){
   return {name: `${String(i + 1).padStart(2, '0')} ${safe(v.name)}${nt}.wav`, data: wavBytes(d, ex.sr, ex.bits)};
 }
 async function deliver(filename, blob){
-  if (inClaude){
+  if (inAI){
     let dl = null; try { dl = await window.claude.use('downloads'); } catch(e){}
     if (!dl){ toast('Saving files isn’t available in this view.'); return; }
     try { await dl.save({filename, data:blob}); toast('Saved ' + filename); }
@@ -1948,11 +1948,11 @@ async function deliver(filename, blob){
 const kitBase = () => safe(kit.name || 'Thunder kit');
 $('bExPad').addEventListener('click', () => {
   const w = padWav(cur);
-  if (inClaude) deliver(w.name.replace(/\.wav$/, '.zip'), zipBlob([w]));
+  if (inAI) deliver(w.name.replace(/\.wav$/, '.zip'), zipBlob([w]));
   else deliver(w.name, new Blob([w.data], {type:'audio/wav'}));
 });
 $('bExKit').addEventListener('click', () => { const fs = []; for (let i = 0; i < NSLOT; i++) fs.push(padWav(i)); deliver(kitBase() + '.zip', zipBlob(fs)); });
-const canShare = !inClaude && !!(navigator.canShare && window.File) && (() => { try { return navigator.canShare({files:[new File([new Uint8Array(4)], 'a.wav', {type:'audio/wav'})]}); } catch(e){ return false; } })();
+const canShare = !inAI && !!(navigator.canShare && window.File) && (() => { try { return navigator.canShare({files:[new File([new Uint8Array(4)], 'a.wav', {type:'audio/wav'})]}); } catch(e){ return false; } })();
 async function share(files){
   try { await navigator.share({files, title:'...Thunder'}); }
   catch(e){ if (e && e.name !== 'AbortError') toast('Sharing didn’t work here. Use Save instead.'); }
@@ -1962,9 +1962,9 @@ if (canShare){
   $('bShPad').addEventListener('click', () => { const w = padWav(cur); share([new File([w.data], w.name, {type:'audio/wav'})]); });
   $('bShKit').addEventListener('click', () => { const fs = []; for (let i = 0; i < NSLOT; i++){ const w = padWav(i); fs.push(new File([w.data], w.name, {type:'audio/wav'})); } share(fs); });
 }
-if (inClaude){
+if (inAI){
   $('bExPad').textContent = 'Save this pad (WAV in .zip)';
-  $('exNote').textContent = 'Inside Claude, files come out as .zip (WAV inside). Open the zip in Files, then import the WAVs into Koala or a SunVox Sampler. The standalone copy saves plain WAVs and can share straight to Koala.';
+  $('exNote').textContent = 'Inside AI, files come out as .zip (WAV inside). Open the zip in Files, then import the WAVs into Koala or a SunVox Sampler. The standalone copy saves plain WAVs and can share straight to Koala.';
 }
 makeSeg($('segRate'), [[44100,'44.1k'],[48000,'48k']], () => ex.sr, v => ex.sr = v);
 makeSeg($('segBits'), [[16,'16'],[24,'24']], () => ex.bits, v => ex.bits = v);
@@ -2180,13 +2180,13 @@ function hookInputs(){
 }
 async function connectMidi(){
   if (midi.access){ hookInputs(); return; }
-  if (!navigator.requestMIDIAccess){ midiStatus(inClaude ? 'MIDI is blocked inside Claude. Use the installed app.' : 'This browser has no MIDI support.'); return; }
+  if (!navigator.requestMIDIAccess){ midiStatus(inAI ? 'MIDI is blocked inside AI. Use the installed app.' : 'This browser has no MIDI support.'); return; }
   try {
     midi.access = await navigator.requestMIDIAccess();
     midi.on = true; saveMidi(); hookInputs(); renderPads();
     $('bMidiOn').textContent = 'Connected'; $('bMidiOn').classList.add('on');
     midi.access.onstatechange = hookInputs;
-  } catch(err){ midiStatus(inClaude ? 'MIDI is blocked inside Claude. Use the installed app.' : 'MIDI permission was refused. Allow it for this site in Chrome.'); }
+  } catch(err){ midiStatus(inAI ? 'MIDI is blocked inside AI. Use the installed app.' : 'MIDI permission was refused. Allow it for this site in Chrome.'); }
 }
 function setLearn(on){
   midi.learn = on; midi.target = -1; midi.ccTarget = '';
@@ -2271,7 +2271,7 @@ function openWaves(){ setView('waves'); }
 function closeWaves(){ setView('synth'); }
 
 /* ===TRACKER START=== */
-/* An M8-style tracker for ...Thunder. Song (256 rows × 16 tracks) → Chain (16 phrases) → Phrase (16 steps:
+/* A tracker for ...Thunder. Song (256 rows × 16 tracks) → Chain (16 phrases) → Phrase (16 steps:
    note, volume, instrument, 3 effects). 16 instruments each play one of the 8 pads. Pads are pre-rendered to
    buffers, so the sequencer only triggers buffers, which keeps 16 tracks cheap on a phone. The same event list
    drives live playback and offline renders, so a render sounds like what you hear. */
@@ -2288,7 +2288,7 @@ const sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'}[c]));
 const panS = v => v === 128 ? 'Pan centre' : v < 128 ? `Pan ${Math.round((128 - v) / 128 * 100)}% left` : `Pan ${Math.round((v - 128) / 127 * 100)}% right`;
-// The FX column, named and laid out like the M8's: its sequencer commands, then the sampler-style
+// The FX column: its sequencer commands, then the sampler-style
 // instrument commands that make sense for a pad (no tables, filters or MIDI here).
 const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC'];   // new commands go on the end, so saved songs keep their numbers
 const FXC_V1 = ['RET','DEL','CUT','CHA','PSL','RND','OFS','REV','PAN','TPO','HOP'];   // song files before v2
@@ -2503,7 +2503,7 @@ function normSong(j){
   if (Array.isArray(j.song)) j.song.slice(0, 256).forEach((r, i) => { if (Array.isArray(r)) for (let t = 0; t < NT; t++) S.song[i][t] = clamp(int(r[t], -1), -1, 255); });
   if (Array.isArray(j.chains)) j.chains.slice(0, 256).forEach((c, i) => { if (Array.isArray(c)) S.chains[i] = Array.from({length:16}, (_, k) => {
     const r = Array.isArray(c[k]) ? c[k] : []; return [clamp(int(r[0], -1), -1, 255), clamp(int(r[1], 0), -128, 127)]; }); });
-  // Songs from before v2 used the first FX list (RET DEL CUT CHA PSL RND OFS REV PAN TPO HOP): move them to the M8 names.
+  // Songs from before v2 used the first FX list (RET DEL CUT CHA PSL RND OFS REV PAN TPO HOP): move them to the current names.
   const v1 = !(int(j.v, 1) >= 2);
   const fxIdx = (c, v) => {
     if (c < 0) return [-1, v];
@@ -2597,7 +2597,7 @@ function freePhrase(){
   return -1;
 }
 const audible = t => { const any = S.mix.some(m => m.solo); return !S.mix[t].mute && (!any || S.mix[t].solo); };
-// A muted song block: the chain stays on the song, it just plays silently (Renoise's pattern-matrix mute).
+// A muted song block: the chain stays on the song, it just plays silently (a pattern-matrix mute).
 const blockMuted = (Sx, y, t) => !!(Sx.smute && y >= 0 && y < 256 && (Sx.smute[y] >> t) & 1);
 // Chains and phrases with the same number, when both are free, so the song's numbers match the phrases they open.
 function freePair(){
@@ -2630,7 +2630,7 @@ function makeSeq(S, mode, o){
   const rand = () => { if (!seeded) return Math.random(); let x = seeded.s += 0x6D2B79F5; x = Math.imul(x ^ x >>> 15, x | 1); x ^= x + Math.imul(x ^ x >>> 7, x | 61); return ((x ^ x >>> 14) >>> 0) / 4294967296; };
   const chainId = (T, t) => mode === 'song' ? (T.row < 256 ? S.song[T.row][t] : -1) : o.chain;
   // Moves a track forward until it points at a chain row with a phrase (song: loops back to the top of
-  // the block of filled rows, like the M8; renders stop at the first empty row instead).
+  // the block of filled rows; renders stop at the first empty row instead).
   function settle(T, t){
     T.empty = false;
     if (mode === 'phrase') return;
@@ -3044,7 +3044,7 @@ async function renderOut(stems){
     }
     lastR = files;
     if (stems) await deliver(`${base} stems.zip`, zipBlob(files));
-    else if (inClaude) await deliver(`${base} mix.zip`, zipBlob(files));
+    else if (inAI) await deliver(`${base} mix.zip`, zipBlob(files));
     else await deliver(files[0].name, new Blob([files[0].data], {type:'audio/wav'}));
   } catch(err){ toast('Render failed: ' + ((err && err.message) || err)); }
   finally { rendering = false; draw(); }
@@ -3057,13 +3057,13 @@ async function shareLast(){
 // Save writes back to the file the project came from (or was last saved as) where the browser allows it
 // (desktop Chrome and Edge); elsewhere it downloads a copy. Save As always asks for a new file.
 let projFile = null;
-const canFS = !inClaude && typeof window.showSaveFilePicker === 'function';
+const canFS = !inAI && typeof window.showSaveFilePicker === 'function';
 const PJT = [{description:'...Thunder project', accept:{'application/json':['.json']}}];
 const projBlob = () => new Blob([JSON.stringify({app:'thunder-project', v:1, song:S, kit:kitToJSON(false)})], {type:'application/json'});
 const projName = () => `${safe(S.name || 'Song')} project.json`;
 // Sharing the project file: the share sheet on phones (Drive, Gmail, Quick Share, Nearby…), so a song started on the
 // phone can be opened on the computer with LOAD PROJECT, and the other way round.
-const canShareProj = () => !inClaude && !!(navigator.canShare && window.File) && (() => { try { return navigator.canShare({files:[new File(['{}'], 'a.json', {type:'application/json'})]}); } catch(e){ return false; } })();
+const canShareProj = () => !inAI && !!(navigator.canShare && window.File) && (() => { try { return navigator.canShare({files:[new File(['{}'], 'a.json', {type:'application/json'})]}); } catch(e){ return false; } })();
 async function shareProj(){
   flushS();
   const f = new File([projBlob()], projName(), {type:'application/json'});
@@ -3122,7 +3122,7 @@ const MID = ['song', 'chain', 'phrase', 'inst'], VIEWS = ['song', 'chain', 'phra
 const VNAME = {song:'SONG', chain:'CHAIN', phrase:'PHRASE', inst:'INST', mixer:'MIXER', fx:'FX', project:'PROJECT'};
 let tv = 'song', midV = 'song';
 // CHAINS (Project): hidden by default. The chain screen and its data stay, the song just points straight at
-// phrases, Renoise style: a new song block gets its own chain with one phrase in it, and SHIFT+▶ opens the phrase.
+// phrases: a new song block gets its own chain with one phrase in it, and SHIFT+▶ opens the phrase.
 const CHK = 'thunderplus-chains-v1', ARK = 'thunderplus-arrange-v1';
 let chainsOn = (() => { try { return localStorage.getItem(CHK) === '1'; } catch(e){ return false; } })();
 // ARRANGE (Project): the song overview at the right of the screen when there is room (unfolded, tablet, computer).
@@ -3139,13 +3139,13 @@ function setChains(on){
   if (!on){ if (tv === 'chain') tv = 'phrase'; if (midV === 'chain') midV = 'phrase'; }
   chainVis(); draw();
 }
-// STEP NUMBERS (Project): row numbers in decimal (the default) or the M8's hex. TEXT SIZE scales the screen's text.
+// STEP NUMBERS (Project): row numbers in decimal (the default) or hex. TEXT SIZE scales the screen's text.
 const SDK = 'thunderplus-stepdec-v1', TSK = 'thunderplus-textsize-v1';
 let stepDec = (() => { try { return localStorage.getItem(SDK) !== '0'; } catch(e){ return true; } })();
 let tScale = (() => { try { const v = parseInt(localStorage.getItem(TSK), 10); return v >= 60 && v <= 200 ? v : 100; } catch(e){ return 100; } })();
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
-// FOLLOW (Project): while the song plays, the cursor rides the playhead (Renoise's follow). Off by default.
+// FOLLOW (Project): while the song plays, the cursor rides the playhead. Off by default.
 const FLK = 'thunderplus-follow-v1';
 let followOn = (() => { try { return localStorage.getItem(FLK) === '1'; } catch(e){ return false; } })();
 function setFollow(on){ followOn = on; try { localStorage.setItem(FLK, on ? '1' : '0'); } catch(e){} if (on) followPlay(); draw(); }
@@ -3240,20 +3240,20 @@ function fxRows(){
 }
 function projRows(){
   return [
-    {l:'INPUT', sec:'Input', get:() => inMode === 'keys' ? 1 : 0, set:v => setInput(v ? 'keys' : 'pad'), min:0, max:1, tog:true, d:0, fmt:v => v ? 'KEYS' : 'PAD', info:() => 'PAD: M8-style d-pad and four keys. KEYS: type notes and hex, with an on-screen keypad on touch screens'},
+    {l:'INPUT', sec:'Input', get:() => inMode === 'keys' ? 1 : 0, set:v => setInput(v ? 'keys' : 'pad'), min:0, max:1, tog:true, d:0, fmt:v => v ? 'KEYS' : 'PAD', info:() => 'PAD: d-pad and four keys. KEYS: type notes and hex, with an on-screen keypad on touch screens'},
     {l:'COMMANDS', get:() => cmdOn ? 1 : 0, set:v => setCmd(!!v), min:0, max:1, tog:true, d:+coarse, fmt:onOff, info:() => 'A row of buttons for the two-key commands: change value, clear, select, copy, cut, paste, other chain or phrase, play the song'},
     {l:'STICKY KEYS', get:() => latchOn ? 1 : 0, set:v => setLatch(!!v), min:0, max:1, tog:true, d:1, fmt:onOff, info:() => 'Tap SHIFT or OPTION on its own and it stays lit for the next button, so no command needs two fingers. Tap it again to cancel'},
-    {l:'EDIT STEP', get:() => kStep, set:v => kStep = v, min:0, max:16, big:4, fmt:v => v + (v === 1 ? ' row' : ' rows'), info:() => 'How far the cursor moves after you type a note or value or delete a row (Renoise’s edit step). Keyboard: { and }'},
-    {l:'SCREEN', sec:'Screen', gap:true, opts:true, get:() => SCREENS.findIndex(x => x[0] === tScreen), set:v => setScreen(SCREENS[v][0]), min:0, max:SCREENS.length - 1, fmt:v => SCREENS[v][1], info:() => 'Colour of the screen: BY SCREEN gives Song, Chain, Phrase and the rest their own pastel (the same as their tabs), or pick one pastel, or the M8’s black'},
+    {l:'EDIT STEP', get:() => kStep, set:v => kStep = v, min:0, max:16, big:4, fmt:v => v + (v === 1 ? ' row' : ' rows'), info:() => 'How far the cursor moves after you type a note or value or delete a row (the edit step). Keyboard: { and }'},
+    {l:'SCREEN', sec:'Screen', gap:true, opts:true, get:() => SCREENS.findIndex(x => x[0] === tScreen), set:v => setScreen(SCREENS[v][0]), min:0, max:SCREENS.length - 1, fmt:v => SCREENS[v][1], info:() => 'Colour of the screen: BY SCREEN gives Song, Chain, Phrase and the rest their own pastel (the same as their tabs), or pick one pastel, or black'},
     {l:'SKIN', opts:true, get:() => SKINS.findIndex(k => k.id === skin), set:v => applySkin(SKINS[v].id), min:0, max:SKINS.length - 1, fmt:v => SKINS[v].name.toUpperCase(), info:() => 'The look of the whole app: the ...Seeds skins'},
     {l:'CHAINS', ck:'Hide chains page', inv:true, get:() => chainsOn ? 1 : 0, set:v => setChains(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
-      info:() => 'HIDDEN: the song opens straight into phrases, like Renoise patterns (each new song block gets its own chain with one phrase). SHOWN brings back the M8 chain screen. Nothing is deleted either way'},
+      info:() => 'HIDDEN: the song opens straight into phrases, like patterns (each new song block gets its own chain with one phrase). SHOWN brings back the chain screen. Nothing is deleted either way'},
     {l:'ARRANGE', opts:true, get:() => arrMode, set:v => setArr(v), tap:() => setArr((arrMode + 1) % 3), min:0, max:2, d:1, fmt:v => ['OFF', 'AUTO', 'ON'][v],
       info:() => `Song overview at the right. AUTO shows it on wide screens (600 × 500 and up), ON at any size. This screen: ${innerWidth} × ${innerHeight}` + (arrMode === 1 && !arrEl.offsetWidth ? ' (too small for AUTO)' : '')},
     {l:'SIDE PANEL', ck:'Show side panel', get:() => sideOn ? 1 : 0, set:v => setSide(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'The grey column at the right on wide screens: the screen map, track meters and key reminders. Hide it to give the tracker and Arrange more room'},
     {l:'STEP NUMBERS', ck:'Display steps as decimal', get:() => stepDec ? 1 : 0, set:v => setStepDec(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'DECIMAL' : 'HEX',
-      info:() => 'Row numbers in Song, Chain, Phrase and Arrange: DECIMAL counts 0, 1, 2… (song rows 000–255, phrase rows 00–31); HEX is the M8’s 00–FF. Phrase, chain and instrument numbers and the values stay hex'},
+      info:() => 'Row numbers in Song, Chain, Phrase and Arrange: DECIMAL counts 0, 1, 2… (song rows 000–255, phrase rows 00–31); HEX is 00–FF. Phrase, chain and instrument numbers and the values stay hex'},
     {l:'TEXT SIZE', get:() => tScale, set:v => setTScale(v), min:60, max:200, step:10, big:20, d:100, fmt:v => v + '%',
       info:() => 'Size of the text and lines on the tracker screen. Bigger shows fewer rows (and scrolls sideways when a line no longer fits); drag a finger up or down anywhere on the screen to scroll'},
     {l:'FOLLOW', ck:'Follow playhead', get:() => followOn ? 1 : 0, set:v => setFollow(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
@@ -3262,8 +3262,8 @@ function projRows(){
     {l:'TRACKS', get:() => ntr(), set:v => setNtr(v), min:8, max:NT, big:8, d:16, fmt:v => v + ' tracks',
       info:() => `How many tracks this song uses, 8 to ${NT}. Song and Mixer show as many as fit and scroll sideways (arrows, or swipe left and right). Tracks past this number are hidden and silent; their notes are kept`},
     {l:'TEMPO', get:() => S.bpm, set:v => S.bpm = v, min:40, max:300, big:10, d:120, fmt:v => v + ' BPM', after:rtAllFx, info:() => 'Beats per minute, 4 steps to a beat. Track delays follow it'},
-    {l:'LPB', get:() => S.lpb, set:v => S.lpb = v, min:1, max:16, big:4, d:4, fmt:v => v + ' lines/beat · 1/' + (v * 4), info:() => 'Lines per beat, like Renoise: 4 makes each row a 16th, 8 a 32nd, 3 or 6 triplets. A phrase can set its own on its LEN line'},
-    {l:'TICKS', get:() => S.ticks || TICKS, set:v => S.ticks = v, min:1, max:32, big:4, d:TICKS, fmt:v => v + ' ticks a step', info:() => 'How many ticks each step is cut into for DEL, RET, KIL, OFF, ARC, PSL and GRV (6 like the M8). A TIC command in a phrase changes it from that row on'},
+    {l:'LPB', get:() => S.lpb, set:v => S.lpb = v, min:1, max:16, big:4, d:4, fmt:v => v + ' lines/beat · 1/' + (v * 4), info:() => 'Lines per beat: 4 makes each row a 16th, 8 a 32nd, 3 or 6 triplets. A phrase can set its own on its LEN line'},
+    {l:'TICKS', get:() => S.ticks || TICKS, set:v => S.ticks = v, min:1, max:32, big:4, d:TICKS, fmt:v => v + ' ticks a step', info:() => 'How many ticks each step is cut into for DEL, RET, KIL, OFF, ARC, PSL and GRV (6 by default). A TIC command in a phrase changes it from that row on'},
     {l:'PATTERN LEN', get:() => S.dlen || 16, set:v => setDefLen(v), min:1, max:PROWS, big:4, d:16, fmt:v => v + (v === 1 ? ' row' : ' rows') + ' · new phrases', info:() => 'How many rows a new phrase starts with (empty phrases follow it too). Change one phrase with ROWS at the right of the tab bar, or its LEN line'},
     {l:'› ALL PHRASES TO ' + (S.dlen || 16), dbl:true, act:() => { for (let i = 0; i < 256; i++) S.plen[i] = S.dlen || 16; saveS(); draw(); toast(`Every phrase now plays ${S.dlen || 16} rows. Notes past that are kept, just not played.`); },
       info:() => `Sets every phrase, used or not, to ${S.dlen || 16} rows. Rows past the end keep their notes. Tap EDIT twice`},
@@ -3430,7 +3430,7 @@ function del(){
   if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ S.master = 224; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else m.solo = false; } mixChanged(); return draw(); }
   const r = rowsOf(tv)[c.y]; if (r && r.get && r.d != null){ r.set(r.d); if (r.after) r.after(); saveS(); draw(); }
 }
-// Whole rows, Renoise style: clear a row, insert a blank one (rows below move down), or remove one (rows below move up).
+// Whole rows: clear a row, insert a blank one (rows below move down), or remove one (rows below move up).
 function rowBlank(v){ return v === 'chain' ? [-1, 0] : blankRow(); }
 function rowsArr(v){
   if (v === 'chain'){ if (!S.chains[cChain]) S.chains[cChain] = freshChain(); return S.chains[cChain]; }
@@ -3587,7 +3587,7 @@ function playCtx(){
 /* ---------- input: d-pad, four keys, touch and keyboard ---------- */
 const held = {shift:false, opt:false, edit:false}, used = {shift:false, opt:false, edit:false};
 // Sticky keys: a lone tap on SHIFT or OPTION (on screen) stays on for the next button, so every
-// M8 combination can be played with one finger.
+// button combination can be played with one finger.
 const latch = {shift:false, opt:false}, LK = 'thunderplus-latch-v1';
 let latchOn = (() => { try { return localStorage.getItem(LK) !== '0'; } catch(e){ return true; } })();
 const mod = b => held[b] || !!latch[b];
@@ -3730,7 +3730,7 @@ function fit(){
   // TEXT SIZE (Project): scale what fits. Bigger shows fewer rows and the lines can scroll sideways.
   if (tScale !== 100) scr.style.fontSize = Math.max(5, fs * tScale / 100).toFixed(2) + 'px';
 }
-// Song shows 16 rows like the M8, more when the screen is tall (unfolded in portrait).
+// Song shows 16 rows, more when the screen is tall (unfolded in portrait).
 function songRows(){ const fs = parseFloat(scr.style.fontSize) || 14, h = grid.clientHeight; return h > 0 ? clamp(Math.floor(h / (fs * 1.3) + 0.05) - 1, 8, 48) : 16; }
 const BLK = ' ▁▂▃▄▅▆▇█';
 const lvl = p => p <= 0.0001 ? 0 : clamp((20 * Math.log10(p) + 48) / 48, 0, 1);
@@ -4211,12 +4211,12 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { me
 
 /* ---------- KEYS input mode: type notes, hex and effects directly (physical keyboard or on-screen keypad) ---------- */
 const IK = 'thunderplus-input-v1', SCK = 'thunderplus-screen-v1';
-const SCREENS = [['rainbow', 'BY SCREEN'], ['blue', 'PASTEL BLUE'], ['lilac', 'LILAC'], ['mint', 'MINT'], ['peach', 'PEACH'], ['butter', 'BUTTER'], ['dark', 'DARK (M8)']];
+const SCREENS = [['rainbow', 'BY SCREEN'], ['blue', 'PASTEL BLUE'], ['lilac', 'LILAC'], ['mint', 'MINT'], ['peach', 'PEACH'], ['butter', 'BUTTER'], ['dark', 'DARK']];
 let tScreen = (() => { try { const v = localStorage.getItem(SCK); if (SCREENS.some(x => x[0] === v) && !(v === 'blue' && !localStorage.getItem(SCK + '-r'))) return v; } catch(e){} return 'rainbow'; })();
 try { localStorage.setItem(SCK + '-r', '1'); } catch(e){}   // the colour per screen came in as the new default once; after that the choice sticks
 function setScreen(v){ tScreen = v; try { localStorage.setItem(SCK, v); } catch(e){} $('tScr').dataset.ts = v; }
 $('tScr').dataset.ts = tScreen;
-let kStep = 1;     // edit step: rows the cursor moves after typing, like Renoise
+let kStep = 1;     // edit step: rows the cursor moves after typing
 let inMode = (() => { try { const m = localStorage.getItem(IK); if (m === 'keys' || m === 'pad') return m; } catch(e){} return matchMedia('(pointer:fine)').matches ? 'keys' : 'pad'; })();
 let kOct = 4, hexBuf = {key:'', n:0, t:0}, kpSig = '';
 const PIANO = {z:0, s:1, x:2, d:3, c:4, v:5, g:6, b:7, h:8, n:9, j:10, m:11, ',':12, l:13, '.':14, ';':15, '/':16,
@@ -4288,7 +4288,7 @@ function keysDown(e){
   if (k === ' '){ if (!e.repeat){ if (e.shiftKey){ if (tp.on) tStop(); else tStart('song', {row:cs.song.y}); } else playCtx(); } return true; }
   if (k === 'Enter'){ if (!e.repeat) editTap(); return true; }
   // Delete and Backspace clear the whole row and step down (Shift: just the cell); Ctrl/⌘+Backspace removes the
-  // row (rows below move up); Insert adds a blank row (rows below move down). As in Renoise.
+  // row (rows below move up); Insert adds a blank row (rows below move down).
   if (k === 'Delete'){ if (e.shiftKey) del(); else rowOp('clear'); return true; }
   if (k === 'Backspace'){ if (e.shiftKey) del(); else rowOp('clear'); return true; }
   if (k === 'Insert'){ rowOp('insert'); return true; }

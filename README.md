@@ -47,8 +47,8 @@ The **⚙ Settings** button in the top bar holds everything that isn't the sound
 
 **Tracker display settings** (in the menu and on the Project screen):
 
-- **Hide chains page** (on by default) hides the M8 chain screen; see Tracker below.
-- **Display steps as decimal** (on by default) numbers the rows in decimal: song rows 000–255, phrase rows 00–31, chain rows 00–15, the arrange overview too. Off shows the M8's hex. Phrase, chain and instrument numbers and values stay hex.
+- **Hide chains page** (on by default) hides the chain screen; see Tracker below.
+- **Display steps as decimal** (on by default) numbers the rows in decimal: song rows 000–255, phrase rows 00–31, chain rows 00–15, the arrange overview too. Off shows hex. Phrase, chain and instrument numbers and values stay hex.
 - **Follow playhead** (off by default) scrolls Song and Phrase with the playhead while the song plays; the cursor rides along and Phrase switches to whatever the cursor's track is playing.
 - **Show side panel** (on by default): the grey column at the right on wide screens. Turn it off for more room.
 - **Text size** (60–200%) makes the tracker's text and lines bigger or smaller. Bigger shows fewer rows; when a line gets wider than the screen it scrolls sideways to follow the cursor.
@@ -63,29 +63,29 @@ The kit has 16 slots. 1–8 are the drum pads (one-shots). 9–16 are synths for
 
 ## Playing pads from the computer keyboard
 
-On the synth page the keyboard plays the selected pad chromatically, Renoise style: Z to / is the lower octave (S D G H J for sharps), Q to P the upper (2 3 5 6 7 9 0 for sharps). C-4 is the pad at its own pitch; − and = (or numpad / and *) change the octave. Shift+1–8 or ◀ ▶ pick a pad (◀ ▶ go through all 16 slots), Space plays it as it is. On a synth slot, notes hold while the keys are down.
+On the synth page the keyboard plays the selected pad chromatically: Z to / is the lower octave (S D G H J for sharps), Q to P the upper (2 3 5 6 7 9 0 for sharps). C-4 is the pad at its own pitch; − and = (or numpad / and *) change the octave. Shift+1–8 or ◀ ▶ pick a pad (◀ ▶ go through all 16 slots), Space plays it as it is. On a synth slot, notes hold while the keys are down.
 
 ## Tracker
 
 Press **?** (or F1, or the **?** button at the top right) for a help screen with every key and a guide to how the tracker works.
 
-Tap **Tracker** at the top for an M8-style sequencer that plays the kit. 16 tracks, built the M8 way:
+Tap **Tracker** at the top for a sequencer that plays the kit. 16 tracks:
 
 - **Song** – 256 rows × 16 tracks of chain numbers (up to 32: Settings → Song → Tracks; Song and Mixer then show as many tracks as fit and scroll sideways with the cursor, or by swiping left and right). Each track loops back to the top of its block of filled rows when it reaches an empty row.
 - **Chain** – up to 16 phrases in order, each with a transpose.
 
-**Chains are hidden by default** (Settings → Hide chains page, or Project → CHAINS). The song then works like Renoise's pattern sequence: EDIT×2 (Enter×2) on an empty song cell makes a new block that already holds one phrase (numbered the same when that's free), and SHIFT+▶ goes straight from the song to that phrase. EDIT×2 on a filled block makes a unique copy of it and its phrase. Nothing is deleted: set CHAINS to SHOWN and the chain screen is back, with everything in it.
+**Chains are hidden by default** (Settings → Hide chains page, or Project → CHAINS). The song then works like a pattern sequence: EDIT×2 (Enter×2) on an empty song cell makes a new block that already holds one phrase (numbered the same when that's free), and SHIFT+▶ goes straight from the song to that phrase. EDIT×2 on a filled block makes a unique copy of it and its phrase. Nothing is deleted: set CHAINS to SHOWN and the chain screen is back, with everything in it.
 
 **Arrange.** On a wide screen (the Fold unfolded, a tablet, a computer) a blue song overview sits at the right of the tracker: every filled song row as blocks, one column per track, with the playing rows lit. Tap a block to go to it (from the Phrase screen it opens that block's phrase), tap it twice to open its phrase, tap a row number to play from there, and tap a track number to mute the track. **Alt-click or hold a block to mute it**: it stays on the song with its phrase, just silent, so you can drop the hi-hats out of a section and bring them back without touching the phrases. TAP: MUTE in its header makes every tap a mute (handy on touch). Muted blocks are struck through on the Song screen too, and M toggles the block under the cursor in KEYS mode. Drag the grip on its left edge to make it wider (the blocks get bigger with it), or double-tap the grip to jump between big and normal; it remembers the size. Project → ARRANGE: AUTO (the default) shows it when the screen is at least 600 × 500, which includes the Fold 6 unfolded in either orientation; ON shows it at any size; OFF hides it. Its info line shows this screen's size.
 - **Phrase** – up to 32 rows of note, volume, instrument and three effects. **ROWS** (− 16 +, at the right of the tab bar) sets how many rows the open phrase plays, 1–32; tap the number to type one. On the Chain screen it changes the phrase on the cursor's row. Press ▲ on the top row to reach the same LEN plus LPB (lines per beat for this phrase; -- uses the song's).
 - **Inst** – 16 instruments. Each plays one of the 8 pads with its own transpose, volume, pan, reverse and start point. C-4 plays a pad at its own pitch.
 - **Mixer** – volume, pan, mute, solo and effects per track, level meters per track (green, yellow above −12 dB, red above −6 dB), and a stereo master meter with peak and CLIP.
 - **FX** – up to 4 effects per track and 4 on the master, running live as the song plays (see below).
-- **Project** – tempo, LPB (lines per beat, like Renoise: 4 = 16ths, 8 = 32nds, 3 or 6 = triplets), TICKS (ticks a step, 6 by default), PATTERN LEN (how many rows a new phrase starts with, 16 by default; ALL PHRASES TO sets every phrase to it), swing, limiter, render settings, renders, and project files (song and kit together).
+- **Project** – tempo, LPB (lines per beat: 4 = 16ths, 8 = 32nds, 3 or 6 = triplets), TICKS (ticks a step, 6 by default), PATTERN LEN (how many rows a new phrase starts with, 16 by default; ALL PHRASES TO sets every phrase to it), swing, limiter, render settings, renders, and project files (song and kit together).
 
 **Chords and polyphony.** Tracks 9 and up are polyphonic. A phrase opened from one of them shows four note columns (N1–N4), so a row can hold a chord, and notes ring over each other up to 4 per track (a fifth steals the oldest). A note OFF in any note column releases every note on the track; on synth slots that's their release, drum pads stop at once. Tracks 1–8 stay monophonic and play only N1. Instruments 08–0F play the synth slots in new songs (older songs keep their instruments as they were). Songs saved before the chord columns open with their notes in N1.
 
-**FX column.** Named and laid out like the M8's. Sequencer commands:
+**FX column.** Sequencer commands:
 
 | | | | |
 |---|---|---|---|
@@ -96,7 +96,7 @@ Tap **Tracker** at the top for an M8-style sequencer that plays the kit. 16 trac
 | `PVB` vibrato (X speed, Y depth) | `SED` seed the random numbers | `TPO` tempo from this row on | `TSP` transpose the track from here on |
 | `TIC` ticks a step from this row on (00 goes back to the project's) | | | |
 
-Instrument commands, like the M8 sampler's: `VOL` volume, `PIT` pitch (signed semitones), `FIN` fine tune (cents), `PLY` 00 forwards / 01 reversed, `STA` start point, `PAN`. On a row with no note they change the note that is already playing (so do `ARP`, `PBN`, `PVB`, `KIL` and `OFF`). There are 6 ticks to a step unless Project → TICKS or a `TIC` command changes it. Not here yet: tables (`TBL`, `TBX`, `THO`, `TIC`), `SNG`, `NXT`, `RTO`, `PVX`, filter and MIDI commands. In this version `GRV` sets the groove for every track, the same as `GGR`. Songs from earlier versions are converted on load (`CUT` becomes `KIL`, `OFS` `STA`, `REV` `PLY`).
+Instrument commands: `VOL` volume, `PIT` pitch (signed semitones), `FIN` fine tune (cents), `PLY` 00 forwards / 01 reversed, `STA` start point, `PAN`. On a row with no note they change the note that is already playing (so do `ARP`, `PBN`, `PVB`, `KIL` and `OFF`). There are 6 ticks to a step unless Project → TICKS or a `TIC` command changes it. Not here yet: tables (`TBL`, `TBX`, `THO`, `TIC`), `SNG`, `NXT`, `RTO`, `PVX`, filter and MIDI commands. In this version `GRV` sets the groove for every track, the same as `GGR`. Songs from earlier versions are converted on load (`CUT` becomes `KIL`, `OFS` `STA`, `REV` `PLY`).
 
 **Track effects.** Open FX from the tab, from the mixer's FX row (EDIT), or with SHIFT+▶ in the mixer (on the MASTER row it opens the master chain). Each track has 4 slots that run top to bottom; EDIT on an empty slot adds an effect, EDIT+arrows picks another type, OPTION+EDIT removes it. The settings of the slot you were last on are listed underneath, as hex values like the rest of the tracker. The effects:
 
@@ -110,7 +110,7 @@ Instrument commands, like the M8 sampler's: `VOL` volume, `PIT` pitch (signed se
 
 Renders include the effects and let reverb and delay tails ring out. Stems skip the master effects and the limiter, so they add up to the mix when the master chain is empty. Each effect costs some phone CPU; Clouds and Rings are the heaviest. The **CPU** meter in the top bar shows the load (Chrome's own audio load where it reports one, otherwise the share of real time the track effects take); it turns gold past 50% and red past 80% or on dropouts. Tap it to see which tracks cost the most.
 
-**One finger is enough.** Every M8 combination works without holding two buttons:
+**One finger is enough.** Every button combination works without holding two buttons:
 
 - **Sticky keys** – tap SHIFT or OPTION on its own and it lights up and stays on for the next button (tap it again to cancel). So SHIFT, then ▶ changes screen; OPTION, then EDIT clears; SHIFT, then OPTION selects; SHIFT, then EDIT pastes; SHIFT, then PLAY plays the song. Holding still works as before.
 - **Command row** – a row of buttons above the d-pad: − − / − / + / + + (change the value), ◀ PREV / NEXT ▶ (other chain, phrase, instrument or FX track), CLEAR, SELECT, COPY, CUT, PASTE and ▶ SONG.
@@ -119,14 +119,14 @@ Both are on by default on touch screens and can be turned off in Project (COMMAN
 
 **Two input modes** (⚙ Settings → Input, or Project → INPUT):
 
-- **PAD** – a d-pad plus SHIFT, PLAY, OPTION and EDIT, used like an M8: SHIFT+arrows changes screen, EDIT adds (twice for a new chain or phrase), EDIT+arrows changes a value, OPTION+EDIT clears, SHIFT+OPTION selects, SHIFT+EDIT pastes. On a computer keyboard: arrows, Shift, Z = Option, X = Edit, Space = Play.
+- **PAD** – a d-pad plus SHIFT, PLAY, OPTION and EDIT, used like this: SHIFT+arrows changes screen, EDIT adds (twice for a new chain or phrase), EDIT+arrows changes a value, OPTION+EDIT clears, SHIFT+OPTION selects, SHIFT+EDIT pastes. On a computer keyboard: arrows, Shift, Z = Option, X = Edit, Space = Play.
 - **KEYS** – direct entry. On a keyboard: notes on Z–M and Q–I, `-`/`=` octave, `1` note off, 0–F for hex, letters for effects, Enter to add or open (on a phrase row it also picks up what's there as the current values: the row's instrument, plus the note, volume, or effect and its value under the cursor, which new entries then use; the hint line shows them after NOW), Delete to clear, Alt+arrows to change values, `[` `]` for the previous/next chain or phrase, Ctrl/⌘ B, C, X, V to select, copy, cut and paste. On a touch screen the dock turns into a keypad that follows the cursor: a piano in the note column, 0–F in hex columns, effect names in effect columns.
 
-**Computer keyboard** (KEYS mode, with Renoise habits where they fit the M8 layout):
+**Computer keyboard** (KEYS mode):
 
 - **Screens:** Alt+1–7 for Song, Chain, Phrase, Inst, Mixer, FX, Project (Alt+0 goes back to the synth); F2 Phrase, F3 Mixer, F4 Inst. Shift+◀▶ step through every screen in tab order (Song, Chain, Phrase, Inst, Mixer, FX, Project), and Ctrl/⌘+Shift+arrows change screen from anywhere (▲ Project, ▼ Mixer), since Shift+▲▼ selects lines.
 - **Transport:** F5 plays the song from the top, F6 this screen, F7 the song from the cursor row, F8 stops. Space plays this screen, Shift+Space the song.
-- **Notes:** Z to / and Q to P as in Renoise (S D G H J and 2 3 5 6 7 9 0 for sharps), 1 or Caps Lock for note off, − = or numpad / * for octave.
+- **Notes:** Z to / and Q to P (S D G H J and 2 3 5 6 7 9 0 for sharps), 1 or Caps Lock for note off, − = or numpad / * for octave.
 - **Editing:** Delete clears the whole row and steps down; Shift+Delete clears just the cell; Backspace does the same as Delete (nothing below moves); Insert adds a blank row; Ctrl/⌘+Backspace removes the row and pulls the rows below up. { and } set the edit step (how far the cursor moves after typing). Ctrl/⌘+Z undo, Ctrl/⌘+Y or Shift+Z redo.
 - **Lines and clipboard:** Shift+▲▼ selects whole lines in Song, Chain and Phrase (the first press takes the cursor's line, the next ones grow it); on a touch screen, tap the row numbers instead. Ctrl/⌘+C copies, Ctrl/⌘+X cuts, Ctrl/⌘+V pastes at the cursor row (or over a selection, from its top), Ctrl/⌘+A selects every line, Ctrl/⌘+B starts a block selection, Esc drops it. Lines copied in one phrase paste into any other phrase. A paste or cut undoes in one step.
 - **Files:** Ctrl/⌘+S saves the project, Shift+Ctrl/⌘+S saves it as a new file, Ctrl/⌘+O opens one (these work on the synth page too). In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first.
@@ -140,7 +140,7 @@ These screen, transport and undo keys also work in PAD mode.
 
 **Moving a project between phone and computer.** Project → SHARE PROJECT (on phones) sends the project file, song and kit together, to Drive, Gmail, Quick Share or any app on the share sheet. On the other device, Project → LOAD PROJECT (Ctrl/⌘+O) opens it. SAVE works too: it downloads the `.json` on a phone, and writes straight back to the file on desktop Chrome and Edge, so you can keep one file in a synced folder.
 
-**Screen colour.** Every tracker screen has its own pastel, on its tab and its button in the side map: Song blue, Chain lilac, Phrase mint, Inst peach, Mixer butter, FX pink, Project aqua. Project → SCREEN set to BY SCREEN (the default) colours the screen to match; or pick one pastel for all of them (blue, lilac, mint, peach, butter), or the M8's black. The pastels use dark text at readable contrast.
+**Screen colour.** Every tracker screen has its own pastel, on its tab and its button in the side map: Song blue, Chain lilac, Phrase mint, Inst peach, Mixer butter, FX pink, Project aqua. Project → SCREEN set to BY SCREEN (the default) colours the screen to match; or pick one pastel for all of them (blue, lilac, mint, peach, butter), or black. The pastels use dark text at readable contrast.
 
 On touch, tap a cell to move there, tap it again to open or add, and drag up or down on the cursor's cell to change the value. Drag a finger up or down anywhere else on the screen (between or beside the lines, the title, the info lines) to scroll through the rows; sideways too when big text makes the lines wider than the screen. Tap a track number to mute it.
 

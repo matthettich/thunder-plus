@@ -2,7 +2,7 @@
   "name": "thunder-plus",
   "productName": "...Thunder Plus",
   "version": "1.0.0",
-  "description": "An 8-pad drum synth and M8-style tracker for making one-shots.",
+  "description": "An 8-pad drum synth and tracker for making one-shots.",
   "author": "Matt Hettich",
   "main": "main.js",
   "private": true,
