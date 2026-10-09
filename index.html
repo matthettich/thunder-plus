@@ -41,6 +41,48 @@
 /* settings sheets: the synth's Settings band tabs and the tracker's full-screen settings menu */
 .top #bSet{gap:7px; min-width:40px}
 .top #bSet .setg{width:22px; height:22px; flex:none; display:block}
+/* Settings: one dropdown menu under the gear, on every screen. */
+.setwrap{position:relative; display:flex}
+.gset{position:absolute; top:calc(100% + 8px); right:0; z-index:120; width:min(520px, calc(100vw - 20px)); max-height:calc(100vh - 96px); overflow-y:auto; overscroll-behavior:contain; background:var(--panel); border:1px solid var(--ink); box-shadow:6px 6px 0 rgba(0,0,0,.12)}
+@supports (height: 1dvh){ .gset{max-height:calc(100dvh - 96px)} }
+.gset[hidden]{display:none}
+.gsetbar{position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:6px; padding:8px 10px; background:var(--panel); border-bottom:1px solid var(--line)}
+.gsetbar .settabs{flex:1; flex-wrap:wrap; gap:4px 3px; overflow:visible}
+.gsetbar .settabs button{flex:none; padding:4px 10px; font-size:12px}
+.gsetbody{padding:10px 12px 16px}
+.gset .band, .gset .band.grey{padding:0; border:0; background:none}
+.gset .band .bar{display:none}
+.gset .pbody{padding-top:2px}
+.gset .gsec[hidden]{display:none}
+.gset .tsec{padding-top:4px}
+.gset h3{font-size:12.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; margin:12px 0 4px; padding-bottom:5px; border-bottom:1px solid var(--line)}
+.gset .tsr{display:grid; grid-template-columns:minmax(96px,142px) minmax(0,1fr); gap:4px 12px; align-items:center; padding:9px 0; border-bottom:1px solid var(--track)}
+.gset .tsr .tsl{font-size:13px; font-weight:500}
+.gset .tsr .tsc{display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0}
+.gset .tsr .tsi{grid-column:2; color:var(--muted); font-size:11.5px; line-height:1.4}
+.gset .tsr select{min-width:0; flex:1 1 140px; max-width:240px}
+.gset .tsr input[type=text]{flex:1 1 140px; max-width:240px}
+.gset .tsr input[type=range]{flex:1 1 110px; width:auto; min-width:90px}
+.gset .tsr output{min-width:86px; font-variant-numeric:tabular-nums; font-size:12.5px}
+.gset .tsr .stp{min-width:34px; padding-inline:0}
+.gset .tsr.ck{grid-template-columns:minmax(0,1fr)}
+.gset .tsr.ck .tsi{grid-column:1; padding-left:28px}
+.gset .tsr.act{grid-template-columns:minmax(96px,142px) minmax(0,1fr)}
+.gset .tsr.act .tsi{grid-column:auto}
+.gset label.cb{display:flex; align-items:center; gap:9px; font-size:13px; font-weight:500; cursor:pointer; min-height:32px}
+.gset label.cb input{width:18px; height:18px; margin:0; accent-color:var(--ink); flex:none}
+.gset .skins{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+@media (max-width:560px){ .gset .tsr, .gset .tsr.act{grid-template-columns:minmax(0,1fr)} .gset .tsr .tsi{grid-column:1} }
+/* File menu: a persistent dropdown in the top bar. */
+#bFile{min-height:34px; padding:0 12px; font-size:12px; font-weight:700; letter-spacing:.04em; border:1px solid var(--line); background:var(--panel); white-space:nowrap}
+#bFile:hover{border-color:var(--ink)}
+#bFile.on{background:var(--ink); color:var(--inv); border-color:var(--ink)}
+.gfile{position:absolute; top:calc(100% + 8px); right:0; z-index:121; min-width:220px; background:var(--panel); border:1px solid var(--ink); box-shadow:6px 6px 0 rgba(0,0,0,.12); padding:6px}
+.gfile[hidden]{display:none}
+.gfile button{display:block; width:100%; text-align:left; background:none; border:0; padding:8px 10px; font-size:13.5px}
+.gfile button:hover{background:var(--track)}
+.gfile button:disabled{opacity:.4}
+.gfile hr{border:0; border-top:1px solid var(--line); margin:5px 2px}
 .setband .bar{gap:10px}
 .setband .settabs{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none}
 .setband .settabs button{flex:none; padding-inline:14px}
@@ -49,31 +91,7 @@
 .audrow select{flex:1 1 220px; min-width:0}
 .audrow input[type=range]{flex:1 1 200px; width:auto; min-width:120px}
 .audrow output{min-width:64px; text-align:right; font-variant-numeric:tabular-nums}
-.tset{z-index:59}
-.tset .hhead .lbl{font-size:12.5px}
-.tset .tsec{padding-top:6px}
-.tset h3{font-size:13px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; margin:16px 0 4px; padding-bottom:5px; border-bottom:1px solid var(--line)}
-.tset .tsr{display:grid; grid-template-columns:minmax(120px,190px) minmax(0,1fr); gap:4px 14px; align-items:center; padding:9px 0; border-bottom:1px solid var(--track)}
-.tset .tsr .tsl{font-size:13.5px; font-weight:500}
-.tset .tsr .tsc{display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0}
-.tset .tsr .tsi{grid-column:2; color:var(--muted); font-size:12px; line-height:1.4}
-.tset .tsr select{min-width:0; flex:1 1 200px; max-width:340px}
-.tset .tsr input[type=text]{flex:1 1 200px; max-width:340px}
-.tset .tsr input[type=range]{flex:1 1 160px; width:auto; min-width:110px}
-.tset .tsr output{min-width:120px; font-variant-numeric:tabular-nums; font-size:13px}
-.tset .tsr .stp{min-width:40px; padding-inline:0}
-.tset .tsr.ck{grid-template-columns:minmax(0,1fr)}
-.tset .tsr.ck .tsi{grid-column:1; padding-left:30px}
-.tset label.cb{display:flex; align-items:center; gap:10px; font-size:13.5px; font-weight:500; cursor:pointer; min-height:34px}
-.tset label.cb input{width:20px; height:20px; margin:0; accent-color:var(--ink); flex:none}
-.tset .tsr.act{grid-template-columns:minmax(120px,190px) minmax(0,1fr)}
-.tset .tsr.act .tsi{grid-column:auto}
-.tset #tsetAud .band{border:1px solid var(--line); margin-top:8px}
-body.tsetv .toast{z-index:70; bottom:calc(24px + env(safe-area-inset-bottom,0px))}
-@media (max-width:560px){ .tset .tsr, .tset .tsr.act{grid-template-columns:minmax(0,1fr)} .tset .tsr .tsi, .tset .tsr.act .tsi{grid-column:1} .tset .hhead .lbl{display:none} }
 @media (max-width:480px){ body:not(.trkv) .top #bSet .setx{display:none} }
-.help.tset .hhead b{display:inline}
-.tset #tsetAud .band .bar .ttl{display:none}
 .help{position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; background:var(--bench); color:var(--ink)}
 .help .hhead{display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--side); flex:none}
 .help #helpNav{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; min-width:0; flex:0 1 auto}
@@ -114,12 +132,13 @@ input[type=range]{width:100%; accent-color:var(--ink); height:30px; margin:0; to
 /* top bar, like the Seeds title bar */
 .top{display:flex; align-items:center; gap:10px; padding-block:9px; padding-inline:16px; border-bottom:1px solid var(--line); flex:none; flex-wrap:wrap; background:var(--bench)}
 .brand{font-weight:600; font-size:22px; letter-spacing:.01em; white-space:nowrap; margin-right:6px}
-.brand .plus{color:var(--wv)}
+.brand .plus{position:relative; z-index:1; display:inline-block; margin-left:3px; font-weight:700; color:var(--wv);
+  -webkit-text-stroke:.05em #111; paint-order:stroke fill}
+.brand .plus::before{content:'+'; position:absolute; left:0; top:0; z-index:-1; color:#ff1493; -webkit-text-stroke:.05em #111; paint-order:stroke fill; transform:translate(2px, 3px)}
 :root{--wv:#22958d}
-.wvview{flex:1; min-height:0; min-width:0; display:flex; background:var(--bench)}
-.wvview[hidden]{display:none}
-.wvview iframe{flex:1; border:0; width:100%; height:100%; display:block}
-body.wvv #bSet{display:none}
+.wvview,.chview{flex:1; min-height:0; min-width:0; display:flex; background:var(--bench)}
+.wvview[hidden],.chview[hidden]{display:none}
+.wvview iframe,.chview iframe{flex:1; border:0; width:100%; height:100%; display:block}
 .kitname{width:150px}
 
 /* scrolling editor made of bands */
@@ -448,8 +467,9 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
   .trows button{min-height:40px; min-width:44px}
   .ttabbar .ttabs button{flex:1 0 auto; padding:0 6px; font-size:11.5px; letter-spacing:.02em}
 }
-.tsong{border:0; border-left:1px solid var(--line); min-height:36px; padding:0 14px; font-size:12px; font-weight:700; letter-spacing:.04em; flex:none; white-space:nowrap}
-.tsong.on{background:var(--pl); color:var(--inv)}
+.tsong{border:1px solid var(--line); min-height:34px; padding:0 14px; margin:0 4px; font-size:12px; font-weight:700; letter-spacing:.04em; flex:none; white-space:nowrap; background:var(--panel)}
+.tsong:hover{border-color:var(--ink)}
+.tsong.on{background:var(--pl); color:var(--inv); border-color:var(--pl)}
 .tcpu{border:0; border-left:1px solid var(--line); min-height:36px; padding:0 10px; font-size:12px; font-weight:600; letter-spacing:.04em; flex:none; white-space:nowrap;
   font-variant-numeric:tabular-nums; position:relative; min-width:84px; text-align:left; background:var(--side)}
 .tcpu i{position:absolute; left:0; bottom:0; height:4px; width:0; background:var(--ink); transition:width .3s}
@@ -529,20 +549,27 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 
 
 <div class="top">
-  <div class="brand">...Thunder <span class="plus">Plus</span></div>
+  <div class="brand" aria-label="...Thunder Plus">...Thunder<span class="plus" aria-hidden="true">+</span></div>
   <div class="seg" id="segView" role="group" aria-label="Screen"></div>
   <input id="kitName" class="kitname" type="text" aria-label="Kit name" spellcheck="false">
   <div class="sp"></div>
+  <div class="setwrap">
+    <button id="bFile" aria-haspopup="true" aria-expanded="false" title="File: save or open a project, or the Waves / Chains patch">File ▾</button>
+    <div class="setmenu gfile" id="gfile" hidden role="menu"></div>
+  </div>
+  <div class="setwrap">
   <button id="bSet" aria-expanded="false" aria-label="Settings" title="Settings: kit, MIDI, export, skin and audio (in the tracker: the Project settings)"><svg class="setg" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="setx">Settings</span></button>
+  <div class="setmenu gset" id="gset" hidden role="dialog" aria-label="Settings">
+    <div class="gsetbar"><div class="seg settabs" id="gsetTabs" aria-label="Settings section"></div><button class="sm" id="gsetX" aria-label="Close settings">✕</button></div>
+    <div class="gsetbody" id="gsetBody"><div class="gsec" id="gsecProj" hidden></div><div class="gsec" id="gsecPatch" hidden></div></div>
+  </div>
+  </div>
   <button type="button" class="tsong" id="tSong" aria-label="Play or stop the song" title="Play the song from the tracker's cursor row, or stop it" hidden>▶ SONG</button>
   <button type="button" class="tcpu" id="tCpu" aria-label="Audio load"><span>CPU --</span><i></i></button>
   <button type="button" id="bHelp" aria-label="Help and keys (?)" title="Help and keys (? or F1)">?</button>
 </div>
 
 <div class="main" id="main">
-  <section class="band grey setband" id="pSet" hidden>
-    <div class="bar"><span class="ttl">Settings</span><div class="seg settabs" id="segSet" aria-label="Settings section"></div><div class="sp"></div><button class="sm" id="bSetX" aria-label="Close settings">Close ✕</button></div>
-  </section>
 
   <section class="band grey" id="pKit" hidden>
     <div class="bar"><span class="ttl">Kit</span></div>
@@ -673,6 +700,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 </div>
 
 <div class="wvview" id="wvView" hidden></div>
+<div class="chview" id="chView" hidden></div>
 <div class="trk" id="trk" hidden>
   <div class="ttabbar"><nav class="ttabs" id="tTabs" aria-label="Tracker screens"></nav>
     <div class="tpat" id="tPat">
@@ -767,6 +795,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
     </div>
   </div>
   <input type="file" id="projIn" accept=".json,application/json,text/plain,application/octet-stream" hidden>
+  <input type="file" id="chainsIn" accept=".json,application/json" hidden>
 </div>
 <input type="file" id="fileIn" accept="audio/*,.wav,.mp3,.ogg,.m4a,.flac" hidden>
 <div class="help" id="help" hidden role="dialog" aria-modal="true" aria-label="Help">
@@ -776,7 +805,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
   <div class="hbody" id="helpBody" tabindex="-1"><div class="hwrap">
     <section id="hStart">
 <h2>Getting started</h2>
-<p>...Thunder has two pages: the <b>Synth</b>, where you build an 8-pad kit, and the <b>Tracker</b>, a sequencer that plays that kit. Switch with <b>Synth / Tracker</b> at the top. Everything saves in the browser as you work; <b>Save</b> writes a project file (song and kit) you can keep or move to another device.</p>
+<p>...Thunder has four screens: the <b>Synth</b>, where you build an 8-pad kit; the <b>Tracker</b>, a sequencer that plays that kit; <b>…waves</b>, a modular synth that plays as a layer oscillator; and <b>…chains</b>, where you design modular effects chains for the tracker’s tracks (Phase 1: design and save; audio routing follows). Switch at the top. Everything saves in the browser as you work; <b>Save</b> writes a project file (song and kit) you can keep or move to another device.</p>
 <h3>How a song fits together</h3>
 <p><b>Song</b> (256 rows × 16 tracks of chain numbers) → <b>Chain</b> (up to 16 phrases, each with a transpose) → <b>Phrase</b> (up to 32 rows of note, volume, instrument and three effects) → <b>Inst</b> (which pad a note plays, with transpose, volume, pan, reverse and start). <b>Mixer</b>, <b>FX</b> and <b>Project</b> sit around them.</p>
 <p><b>Chains are hidden by default</b> (⚙ Settings → Hide chains page, or Project → CHAINS): EDIT×2 on an empty song cell makes a block that already holds a phrase, SHIFT+▶ opens that phrase, and EDIT×2 on a filled block makes a unique copy. Set CHAINS to SHOWN for the chain screen; nothing is lost either way.</p>
@@ -801,10 +830,6 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 <p>Each track and the master have 4 effect slots (FX screen, or EDIT on the Mixer’s FX row): EQ, compressor, reverb, tape delay, saturation, tape, chorus, bitcrush, Rings and Clouds. Renders include them; stems skip the master effects and limiter.</p></section>
     <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Kit ▾</b> saves and loads kits, <b>Export ▾</b> writes WAVs for Koala and SunVox, <b>MIDI ▾</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off), <b>Skin ▾</b> changes the look.</p><h2>Files and rendering</h2><p><b>Project</b> holds SAVE, SAVE AS and LOAD PROJECT, plus RENDER SONG (a stereo WAV) and RENDER STEMS (a zip with the mix and one WAV per track). In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/Thunder-#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
-</div>
-<div class="help tset" id="tset" hidden role="dialog" aria-modal="true" aria-label="Tracker settings">
-  <div class="hhead"><b>SETTINGS</b><span class="lbl">Everything on the Project screen, plus audio</span><div class="sp"></div><button type="button" id="tsetX" aria-label="Close settings"><span class="hx">Close </span>✕</button></div>
-  <div class="hbody" id="tsetBody" tabindex="-1"><div class="hwrap"><div id="tsetList"></div><section class="tsec" id="tsetAud"><h3>Audio</h3></section></div></div>
 </div>
 <div class="toast" id="toast" hidden></div>
 
@@ -1420,7 +1445,7 @@ function fromPos(d, p){
 let kit = loadSaved() || factoryKit();
 WV.doc = kit.waves || null;
 let cur = 0;
-let view = 'synth';   // 'synth' or 'tracker'
+let view = 'synth';   // 'synth', 'tracker', 'waves' or 'chains'
 const cache = new Array(NSLOT).fill(null), dirty = new Array(NSLOT).fill(true), bufs = new Array(NSLOT).fill(null);
 let clipVoice = null, clipLayer = null;
 const ex = {sr:48000, bits:24, norm:true, noteName:false};
@@ -2011,21 +2036,70 @@ makeSeg($('segNorm'), [[true,'Normalise'],[false,'As is']], () => ex.norm, v => 
 makeSeg($('segNoteName'), [[false,'Pad name'],[true,'+ note']], () => ex.noteName, v => ex.noteName = v);
 
 /* ---------- settings (synth page): Kit, MIDI, Export, Skin and Audio under one button ---------- */
-const SETTABS = [['pKit', 'Kit'], ['pMidi', 'MIDI'], ['pExport', 'Export'], ['pSkin', 'Skin'], ['pAudio', 'Audio']], STABK = 'thunderplus-settab-v1';
-let setTab = (() => { try { const v = localStorage.getItem(STABK); if (SETTABS.some(t => t[0] === v)) return v; } catch(e){} return 'pKit'; })();
-const setOpen = () => !$('pSet').hidden;
-function showSetTab(){
-  const open = setOpen() && view !== 'tracker';
-  SETTABS.forEach(([id]) => { if ($(id).parentNode === $('main')) $(id).hidden = !open || id !== setTab; });
-  if (open && setTab === 'pAudio') audRefresh();
+/* ---------- settings: one dropdown menu under the gear, on every screen ---------- */
+const GLOBAL_SECS = [['pKit', 'Kit'], ['pMidi', 'MIDI'], ['pExport', 'Export'], ['pSkin', 'Skin'], ['pAudio', 'Audio']], STABK = 'thunderplus-settab-v1';
+let setTab = (() => { try { const v = localStorage.getItem(STABK); if (v === 'gsecProj' || v === 'gsecPatch' || GLOBAL_SECS.some(([id]) => id === v)) return v; } catch(e){} return 'pKit'; })();
+const gsetOpen = () => !$('gset').hidden;
+const gsetSecs = () => [
+  ...((view === 'waves' || view === 'chains') ? [['gsecPatch', 'Patch']] : []),
+  ...(view === 'tracker' ? [['gsecProj', 'Project']] : []),
+  ...GLOBAL_SECS
+];
+const gsetBox = id => $(id);
+function showGset(){
+  const secs = gsetSecs();
+  if (!secs.some(([id]) => id === setTab)) setTab = secs[0][0];
+  makeSeg($('gsetTabs'), secs, () => setTab, v => { setTab = v; try { localStorage.setItem(STABK, v); } catch(e){} showGset(); });
+  if (setTab === 'gsecProj') buildProj();
+  else if (setTab === 'gsecPatch') buildPatch();
+  for (const id of ['gsecProj', 'gsecPatch', ...GLOBAL_SECS.map(([x]) => x)]){ const b = gsetBox(id); if (b) b.hidden = id !== setTab; }
+  if (setTab === 'pAudio') audRefresh();
 }
-const updSetTabs = makeSeg($('segSet'), SETTABS, () => setTab, v => { setTab = v; try { localStorage.setItem(STABK, v); } catch(e){} showSetTab(); });
-function toggleSettings(open = !setOpen()){
-  $('pSet').hidden = !open; $('bSet').classList.toggle('on', open); $('bSet').setAttribute('aria-expanded', String(open));
-  updSetTabs(); showSetTab(); if (open) $('main').scrollTop = 0;
+function gsetToggle(open = !gsetOpen()){
+  $('gset').hidden = !open;
+  $('bSet').classList.toggle('on', open); $('bSet').setAttribute('aria-expanded', String(open));
+  if (open) showGset();
 }
-$('bSet').addEventListener('click', () => { if (view === 'tracker') return tsetOpen() ? tsetHide() : tsetShow(); toggleSettings(); });
-$('bSetX').addEventListener('click', () => toggleSettings(false));
+// The global sections sit in #main in the source for clarity; move them into the menu so the
+// same settings are reachable from every screen (synth, tracker, Waves, Chains).
+for (const [id] of GLOBAL_SECS){ const s = $(id); if (s){ s.hidden = true; s.classList.add('gsec'); $('gsetBody').append(s); } }
+$('bSet').addEventListener('click', () => gsetToggle());
+$('gsetX').addEventListener('click', () => gsetToggle(false));
+window.addEventListener('pointerdown', e => { if (gsetOpen() && !$('gset').contains(e.target) && !$('bSet').contains(e.target)) gsetToggle(false); }, true);
+
+/* ---------- File menu: a persistent dropdown in the top bar ----------
+   On the Waves and Chains screens it drives that patch (New, Open, Save, Undo, custom modules);
+   elsewhere it drives the project file (save/load, chains import/export). */
+const frameApi = () => view === 'waves' ? wvApi() : view === 'chains' ? chApi() : null;
+function fileItems(){
+  const a = frameApi(), f = a && a.file;
+  if (f) return [
+    ['New', () => f.new()], ['Open…', () => f.open()], ['Save', () => f.save()], ['Save as…', () => f.saveAs()],
+    null,
+    ['Undo', () => f.undo(), () => !f.canUndo()], ['Redo', () => f.redo(), () => !f.canRedo()],
+    null,
+    ['Export custom modules…', () => f.exportCustom()], ['Import custom modules…', () => f.importCustom()]
+  ];
+  return [
+    ['Save project', () => saveProj(false)], ['Save as…', () => saveProj(true)], ['Load project…', openProj],
+    null,
+    ['Export chains…', exportChains], ['Import chains…', () => $('chainsIn').click()]
+  ];
+}
+function gfileToggle(open = $('gfile').hidden){
+  const host = $('gfile'); host.replaceChildren();
+  for (const it of fileItems()){
+    if (!it){ host.append(el('hr')); continue; }
+    const b = el('button', null, it[0]); b.type = 'button';
+    if (it[2] && it[2]()) b.disabled = true;
+    b.addEventListener('click', () => { gfileToggle(false); it[1](); });
+    host.append(b);
+  }
+  $('gfile').hidden = !open;
+  $('bFile').classList.toggle('on', open); $('bFile').setAttribute('aria-expanded', String(open));
+}
+$('bFile').addEventListener('click', () => gfileToggle());
+window.addEventListener('pointerdown', e => { if (!$('gfile').hidden && !$('gfile').contains(e.target) && !$('bFile').contains(e.target)) gfileToggle(false); }, true);
 
 /* ---------- audio settings panel ---------- */
 const sinkOk = !!(window.AudioContext && 'setSinkId' in AudioContext.prototype);
@@ -2309,6 +2383,73 @@ function leaveWaves(){
 function openWaves(){ setView('waves'); }
 function closeWaves(){ setView('synth'); }
 
+/* ---------- …chains editor: a full-screen frame; the patch is read from and saved into the song ---------- */
+const CH = { doc:null, frame:null };   // doc: the song's chains patch (kept here, where Phase 2 routing can see it)
+function chainsChanged(){ CH.doc = S.chainPatch || null; saveS(); chainsPush(); }
+window.thunderChains = {
+  load: () => S.chainPatch ? JSON.parse(JSON.stringify(S.chainPatch)) : null,
+  save: d => { S.chainPatch = d; chainsChanged(); },
+  /* A single slider: update the patch and push JUST that param to the live engines.
+     No structural diff, no native-FX rebuild — smooth while dragging. */
+  param(id, name, value){
+    const d = S.chainPatch; if (!d || !Array.isArray(d.modules)) return;
+    const m = d.modules.find(x => x.id === id); if (m) (m.params = m.params || {})[name] = value;
+    if (!rt || !rt.pl) return;
+    const msg = { target:'chains-host', op:'param', id, name, value };
+    for (const b of rt.pl.buses){
+      if (!b || !b.chn || !b.chn._send) continue;
+      b.chn._send(msg);
+      const s = b.chn._sent && (b.chn._sent.modules || []).find(x => x.id === id);
+      if (s) (s.params = s.params || {})[name] = value;   // keep _sent in step so the next diff is empty
+    }
+  },
+  close: () => closeChains(),
+  /* Transport from the …chains screen: Space starts/stops the song from the tracker's cursor row. */
+  play(){ if (tp.on) tStop(); else tStart('song', {row:cs.song.y}); },
+  playing: () => tp.on
+};
+const chApi = () => { try { return CH.frame && CH.frame.contentWindow && (CH.frame.contentWindow.chainsEmbed || CH.frame.contentWindow.wavesEmbed); } catch(e){ return null; } };
+let chMeterWanted = false;
+function showChains(){
+  chMeterWanted = true;
+  if (!CH.frame){ CH.frame = document.createElement('iframe'); CH.frame.title = '…chains'; CH.frame.allow = 'midi; autoplay'; CH.frame.src = 'chains/index.html'; $('chView').append(CH.frame); }
+  else { const a = chApi(); if (a) a.resume(); }
+  setTimeout(() => { try { CH.frame.contentWindow.focus(); } catch(e){} }, 0);   // keys go to …chains, not the pads
+}
+/* Leaving the …chains screen: pause its sound and save the patch into the song. */
+function leaveChains(){
+  chMeterWanted = false;
+  const a = chApi(); if (a) a.pause();
+}
+function openChains(){ setView('chains'); }
+function closeChains(){ setView('synth'); }
+/* The chains patch lives in the song file, but can be saved/loaded on its own as a .chains.json file. */
+function exportChains(){
+  if (!S.chainPatch){ toast('No chains patch yet. Press …chains to make one.'); return; }
+  deliver(safe(S.name || 'Song') + ' chains.json', new Blob([JSON.stringify(S.chainPatch, null, 2)], {type:'application/json'}));
+}
+async function importChainsFile(f){
+  try {
+    const d = JSON.parse(await f.text());
+    if (!d || typeof d !== 'object' || (d.format !== 'chains.patch' && d.format !== 'waves.patch')) throw new Error('That file isn’t a …chains patch.');
+    S.chainPatch = d.format === 'chains.patch' ? d : normalizeChainsImport(d);
+    CH.doc = S.chainPatch; if (CH.frame){ CH.frame.remove(); CH.frame = null; }
+    if (view === 'chains') showChains();
+    saveS(); chainsReload(); toast('Loaded “' + (d.meta && d.meta.name || f.name) + '”.');
+    return true;
+  } catch(err){ toast(err.message || 'Couldn’t read that chains file.'); return false; }
+}
+/* A …waves patch opened as chains: keep FX/utils/IO, drop synth-only modules, Out becomes Chain Out. */
+function normalizeChainsImport(d){
+  const keep = new Set(['trackIn','vcf','vca','mixer','eq','comp','saturation','tape','chorus','crush','delay','reverb','rings','clouds','lfo','adsr','random','atten','chainOut']);
+  const ids = new Set();
+  d.format = 'chains.patch';
+  d.modules = (d.modules || []).filter(m => { const ok = m && keep.has(m.type); if (ok) ids.add(m.id); return ok; });
+  d.cables = (d.cables || []).filter(c => c && ids.has(c.from[0]) && ids.has(c.to[0]));
+  for (const m of d.modules) if (m.type === 'out'){ m.type = 'chainOut'; m.params = Object.assign({ track:1, level:1 }, m.params); if (m.params.slot && !m.params.track) m.params.track = m.params.slot; delete m.params.slot; }
+  return d;
+}
+
 /* ===TRACKER START=== */
 /* A tracker for ...Thunder. Song (256 rows × 16 tracks) → Chain (16 phrases) → Phrase (16 steps:
    note, volume, instrument, 3 effects). 16 instruments each play one of the 8 pads. Pads are pre-rendered to
@@ -2489,6 +2630,94 @@ registerProcessor('thunder-tfx', ThunderFx);
 `;
 let tfxBytes = null, tfxURL = null;
 const tfxLoaded = new WeakMap();
+/* …chains host: one thunder-chains node per track (chains/chains-worklet.js).
+   Loaded lazily per AudioContext, reusing the same tfx.wasm bytes as the track FX. */
+let chnURL = null;
+const chnLoaded = new WeakMap();
+function chnBin(){
+  const b = tfxBin();   // chains FX are the same tfx.wasm build as the track FX
+  return b || null;
+}
+function chainsReady(ac){
+  if (!chnLoaded.has(ac)){
+    chnLoaded.set(ac, (async () => {
+      if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
+      if (!chnURL){
+        const src = await (await fetch('chains/chains-worklet.js?v=1')).text();
+        chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
+      }
+      await ac.audioWorklet.addModule(chnURL);
+      return true;
+    })().catch(() => false));
+  }
+  return chnLoaded.get(ac);
+}
+const chnSync = new WeakSet();
+const chnClone = o => o == null ? o : JSON.parse(JSON.stringify(o));
+/* What changed between two chains patches, as engine ops. Params become `param` (the engine
+   reads them every block, so sliders move the sound smoothly); only real structure becomes
+   add/remove/connect/disconnect. A missing/short previous patch forces a full reload. */
+function chnDiff(prev, next){
+  if (!next) return [];
+  if (!prev || prev.format !== 'chains.patch' || !Array.isArray(prev.modules)) return [{ op:'patch', value:next }];
+  const ops = [];
+  const pm = new Map((prev.modules || []).map(m => [m.id, m]));
+  const nm = new Map((next.modules || []).map(m => [m.id, m]));
+  for (const [id, m] of nm) if (!pm.has(id)) ops.push({ op:'add', id, type:m.type, params:chnClone(m.params), pos:chnClone(m.pos) });
+  for (const id of pm.keys()) if (!nm.has(id)) ops.push({ op:'remove', id });
+  for (const [id, m] of nm){
+    const q = pm.get(id); if (!q) continue;
+    const a = q.params || {}, b = m.params || {};
+    for (const k in b) if (b[k] !== a[k]) ops.push({ op:'param', id, name:k, value:b[k] });
+  }
+  const key = c => c.from[0] + '.' + c.from[1] + '>' + c.to[0] + '.' + c.to[1];
+  const pc = new Map((prev.cables || []).map(c => [key(c), c]));
+  const nc = new Map((next.cables || []).map(c => [key(c), c]));
+  for (const [k, c] of nc) if (!pc.has(k)) ops.push({ op:'connect', a:c.from, b:c.to });
+  for (const [k, c] of pc) if (!nc.has(k)) ops.push({ op:'disconnect', a:c.from, b:c.to });
+  return ops;
+}
+function chainsNode(ac, track, patch, tempo){
+  if (!chnSync.has(ac)) return null;   // module not loaded yet: caller re-routes when ready
+  const n = new AudioWorkletNode(ac, 'thunder-chains', {numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
+    channelCountMode:'explicit', channelInterpretation:'speakers',
+    processorOptions:{bytes:chnBin(), track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}}});
+  n.load = 0;
+  n.an = ac.createAnalyser(); n.an.fftSize = 256;   // hears the chains return: the chain screen's meters
+  n.connect(n.an);
+  n._mBuf = new Float32Array(n.an.fftSize);
+  n._live = false; n._q = [];   // messages queued until the processor is ready
+  n._send = m => {
+    const v = m && m.value && typeof m.value === 'object' ? Object.assign({}, m, {value:JSON.parse(JSON.stringify(m.value))}) : m;
+    if (n._live){ try { n.port.postMessage(v); } catch(e){} }
+    else n._q.push(v);
+  };
+  n.port.onmessage = e => {
+    const d = e.data;
+    if (!d || d.target !== 'chains-host') return;
+    if (d.op === 'meter' && d.value){ n.load = d.value.load || 0; if (n.onMeter) n.onMeter(d.value); }
+    if (d.op === 'ready'){
+      n._live = true;
+      for (const m of n._q){ try { n.port.postMessage(m); } catch(e){} }
+      n._q.length = 0;
+      // Start the engine's load/meter stream, same as the …chains screen does on its own engine.
+      n._send({target:'chains-host', op:'telemetry', value:true});
+    }
+    if (d.op === 'shed' && d.value) toast('…chains is busy: dropped to draft quality.', 5000);
+    if (d.op === 'error' && d.value) toast('…chains: ' + (d.value.message || d.value.op), 5000);
+  };
+  n._sent = patch ? chnClone(patch) : null;   // the patch this node already has
+  return n;   // the processorOptions above load the initial patch; later changes go as diffs
+}
+/* Which tracks run through …chains: the Mixer CHN flag, AND a Chain Out wired to that track.
+   With no Chain Out for the track the signal must pass through dry — never mute it. */
+function chainsTracks(){
+  const ids = new Set();
+  for (const m of ((S.chainPatch && S.chainPatch.modules) || []))
+    if (m && m.type === 'chainOut'){ const k = clamp(int(m.params && m.params.track, 1), 1, NT) - 1; ids.add(k); }
+  return ids;
+}
+const chainsFeed = t => !!(S.chainOn && S.chainOn[t] && chainsTracks().has(t));
 function tfxBin(){
   if (tfxBytes === null){
     try { const b = atob($('tfxWasm').textContent.trim()); tfxBytes = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) tfxBytes[i] = b.charCodeAt(i); }
@@ -2527,10 +2756,10 @@ const isPolyT = t => t >= NPAD && t < NT;
 const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0});   // instruments 08–0F play the synth slots
 const freshMix = () => ({vol:224, pan:128, mute:false, solo:false});
 function freshSong(){
-  return {app:'thunder-song', v:4, name:'Song 1', bpm:120, swing:50, limiter:true, renderFrom:0, master:255,
+  return {app:'thunder-song', v:5, name:'Song 1', bpm:120, swing:50, limiter:true, renderFrom:0, master:255, chainPatch:null,
     song:Array.from({length:256}, () => new Array(NT).fill(-1)), chains:new Array(256).fill(null), phrases:new Array(256).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
-    tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), lpb:4, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
+    tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:4, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
     ntr:16, smute:new Array(256).fill(0)};   // ntr: tracks in use (8–32). smute[row]: a bit per track, set = that song block is muted (it stays in place)
 }
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;
@@ -2576,6 +2805,8 @@ function normSong(j){
     m.vol = clamp(int(o.vol, 224), 0, 255); m.pan = clamp(int(o.pan, 128), 0, 255); m.mute = !!o.mute; m.solo = !!o.solo; } });
   if (Array.isArray(j.tfx)) for (let t = 0; t < NT; t++) S.tfx[t] = normChainFx(j.tfx[t]);
   S.mfx = normChainFx(j.mfx);
+  if (Array.isArray(j.chainOn)) for (let t = 0; t < NT; t++) S.chainOn[t] = !!j.chainOn[t];
+  if (j.chainPatch && typeof j.chainPatch === 'object' && (j.chainPatch.format === 'chains.patch' || j.chainPatch.format === 'waves.patch')) S.chainPatch = j.chainPatch;
   if (Array.isArray(j.smute)) j.smute.slice(0, 256).forEach((v, i) => S.smute[i] = int(v, 0) | 0);
   S.ntr = clamp(int(j.ntr, 16), 8, NT);
   return S;
@@ -2612,8 +2843,8 @@ function undoStep(dir){
   // replacing it would keep playing the old song (the screen would show the undo, the speakers wouldn't).
   undo.busy = true; const n = normSong(JSON.parse(undo.cur));
   for (const k of Object.keys(S)) if (!(k in n)) delete S[k];
-  Object.assign(S, n); saveS(); undo.busy = false;
-  if (rt){ rtAllFx(); rtRoute(); rt.pl.applyMix(); }
+  Object.assign(S, n); CH.doc = S.chainPatch || null; if (CH.frame){ CH.frame.remove(); CH.frame = null; } saveS(); undo.busy = false;
+  if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); }
   draw(); toast(dir < 0 ? 'Undo' : 'Redo');
 }
 function flushS(){ clearTimeout(sT); try { localStorage.setItem(TK, JSON.stringify(S)); } catch(e){} }
@@ -2828,7 +3059,7 @@ function makePlayer(ac, out, getBuf, live){
   for (let t = 0; t <= NT; t++){
     const inp = ac.createGain(), g = ac.createGain(), p = ac.createStereoPanner(); inp.connect(g); g.connect(p); p.connect(out);
     let an = null; if (live && t < NT){ an = ac.createAnalyser(); an.fftSize = 512; p.connect(an); }
-    buses.push({inp, g, p, an, lv:0, pk:0, fx:null});
+    buses.push({inp, g, p, an, lv:0, pk:0, fx:null, chn:null});
   }
   function kill(v, at, tc = 0.004){
     if (!v || v.ended || (v.stopAt != null && v.stopAt <= at)) return;
@@ -2901,18 +3132,49 @@ function makePlayer(ac, out, getBuf, live){
     });
   }
   // Puts track t's effects between its input and its fader, or takes them out when the list is empty.
+  // Phase 2: …chains sits first (inp -> chains -> native FX -> g), so anything after it —
+  // the track's own FX slots, fader, mute/solo, pan — still hears the chains return.
   function setFx(t, chain, ok){
     const b = buses[t]; if (!b) return;
-    if (!ok || !chain.length){
-      if (b.fx){ try { b.inp.disconnect(); b.fx.disconnect(); } catch(e){} b.fx.port.postMessage(null); b.fx = null; b.inp.connect(b.g); }
-      return;
-    }
-    if (b.fx){ b.fx.port.postMessage(chain); return; }
-    try { b.fx = tfxNode(ac, chain); } catch(e){ b.fx = null; return; }
-    try { b.inp.disconnect(); } catch(e){}
-    b.inp.connect(b.fx); b.fx.connect(b.g);
+    routeTrack(t, chain, ok);
   }
-  return {play, stopAll, applyMix, setFx, buses};
+  // Rebuild one track's insert chain: inp -> [chains?] -> [native fx?] -> g.
+  function routeTrack(t, chain, fxOk){
+    const b = buses[t]; if (!b) return;
+    // …chains readiness is its own thing (chainsNode self-guards and retries), so it must NOT
+    // ride on the native-FX flag: a browser without the fx worklet should still run chains.
+    const wantChn = chainsFeed(t) && !!S.chainPatch && S.chainPatch.format === 'chains.patch';
+    const wantFx = !!fxOk && chain.length > 0;
+    if (!wantChn && b.chn){ try { if (b.chn._send) b.chn._send({target:'chains-host', op:'dispose'}); } catch(e){} b.chn = null; }
+    if (!wantFx && b.fx){ try { b.fx.port.postMessage(null); } catch(e){} b.fx = null; }
+    if (!wantChn && !wantFx){ try { b.inp.disconnect(); } catch(e){} b.inp.connect(b.g); return; }
+    if (wantChn && !b.chn){
+      try {
+        b.chn = chainsNode(ac, t, S.chainPatch, S.bpm);
+        if (!b.chn) chainsReady(ac).then(ok => { if (ok){ chnSync.add(ac); if (typeof rt !== 'undefined' && rt) rtFx(t); } });
+      } catch(e){ b.chn = null; }
+    } else if (wantChn && b.chn && b.chn._send){
+      // Send only what changed: moving a fader must not reload the whole patch (that reset the
+      // effects' state and clicked). Params reach the engine in a few samples and glide.
+      for (const op of chnDiff(b.chn._sent, S.chainPatch)) b.chn._send(Object.assign({target:'chains-host'}, op));
+      b.chn._sent = chnClone(S.chainPatch);
+    }
+    if (wantFx && !b.fx){ try { b.fx = tfxNode(ac, chain); } catch(e){ b.fx = null; } }
+    else if (wantFx && b.fx){ try { b.fx.port.postMessage(chain); } catch(e){} }
+    // Rewire only when which nodes sit in the slot changed: disconnecting/reconnecting a
+    // running worklet every param change is its own little click.
+    if (b._chnRef !== b.chn || b._fxRef !== b.fx){
+      try { b.inp.disconnect(); } catch(e){}
+      try { if (b.fx) b.fx.disconnect(); } catch(e){}
+      try { if (b.chn) b.chn.disconnect(); } catch(e){}
+      let head = b.inp;
+      if (b.chn){ head.connect(b.chn); head = b.chn; }
+      if (b.fx){ head.connect(b.fx); head = b.fx; }
+      head.connect(b.g);
+      b._chnRef = b.chn; b._fxRef = b.fx;
+    }
+  }
+  return {play, stopAll, applyMix, setFx, routeTrack, buses};
 }
 
 /* ---------- live playback ---------- */
@@ -2932,11 +3194,12 @@ function rtInit(){
   audio();
   if (!rt){
     const out = ctx.createGain(), lim = mkLimiter(ctx); lim.connect(master);
-    rt = {out, lim, mfx:null, fxOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix();
+    rt = {out, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix();
     // the master meter listens to everything going out, synth pads included
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
     master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
     tfxReady(ctx).then(ok => { rt.fxOk = ok; rtAllFx(); if (!ok && (S.tfx.some(fxCount) || fxCount(S.mfx))) toast('Track effects need a newer browser here.'); });
+    chainsReady(ctx).then(ok => { rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean)) toast('…chains needs a newer browser here.'); });
   }
   return rt;
 }
@@ -2951,12 +3214,23 @@ function rtRoute(){
 function rtFx(t){
   if (!rt) return;
   if (t < NT) return rt.pl.setFx(t, tfxChain(S.tfx[t], ctx.sampleRate, S.bpm), rt.fxOk);
+  // (setFx re-seats inp -> [chains?] -> [fx?] -> g, and retries when the chains module finishes loading.)
   const chain = rt.fxOk ? tfxChain(S.mfx, ctx.sampleRate, S.bpm) : [];
   if (chain.length){ if (rt.mfx) rt.mfx.port.postMessage(chain); else { try { rt.mfx = tfxNode(ctx, chain); } catch(e){ rt.mfx = null; } rtRoute(); } }
   else if (rt.mfx){ rt.mfx.port.postMessage(null); try { rt.mfx.disconnect(); } catch(e){} rt.mfx = null; rtRoute(); }
 }
 function rtAllFx(){ for (let t = 0; t <= NT; t++) rtFx(t); }
 function fxChanged(t){ saveS(); rtFx(t); }
+function chainsFeedChanged(t){ saveS(); rtFx(t); draw(); }
+function chainsPush(){ if (!rt) return; for (let t = 0; t < NT; t++) if (chainsFeed(t)) rtFx(t); }
+/* The whole patch changed (song load, undo, import): the old node state is meaningless, so make the
+   next push a full reload instead of a diff. */
+function chainsReload(){ if (rt && rt.pl) for (const b of rt.pl.buses) if (b && b.chn) b.chn._sent = null; chainsPush(); }
+function chainsTempo(){
+  if (!rt || !rt.pl || !rt.pl.buses) return;
+  const m = {target:'chains-host', op:'transport', value:{tempo:S.bpm, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}};
+  for (const b of rt.pl.buses) if (b && b.chn && b.chn._send) b.chn._send(m);
+}
 function mixChanged(){ if (rt) rt.pl.applyMix(); saveS(); }
 const tp = {on:false, mode:'', seq:null, timer:0, q:[], pos:null, bpm:120, tks:TICKS, line:0.125, st:0};
 function tStart(mode, o){
@@ -2967,11 +3241,11 @@ function tStart(mode, o){
   for (let i = 0; i < NSLOT; i++) ensure(i);
   seq.time = ctx.currentTime + 0.08;
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, bpm:seq.bpm, tks:seq.tks, st:0});
-  tp.timer = setInterval(pump, 25); pump(); draw(); songBtn();
+  tp.timer = setInterval(pump, 25); pump(); draw(); songBtn(); chainsTempo();
   void r;
 }
 // The SONG button in the synth's top bar: play the song from the tracker's cursor row, or stop it.
-function songBtn(){ const b = $('tSong'); if (!b) return; b.hidden = view === 'tracker'; b.textContent = tp.on ? '■ STOP' : '▶ SONG'; b.classList.toggle('on', tp.on); }
+function songBtn(){ const b = $('tSong'); if (!b) return; b.hidden = false; b.textContent = tp.on ? '■ STOP' : '▶ SONG'; b.classList.toggle('on', tp.on); }
 function pump(){
   if (!tp.on) return;
   if (view !== 'tracker' && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open
@@ -2991,6 +3265,7 @@ function tStop(quiet){
   tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null;
   if (rt) rt.pl.stopAll(ctx.currentTime);
   songBtn();
+  chainsTempo();
   if (!quiet) draw();
 }
 function preview(ii, note, vol, poly){
@@ -3010,14 +3285,22 @@ function mkBuf(d, sr){
 async function pass(evs, keep, N, sr, getB, lim, masterFx){
   const O = window.OfflineAudioContext || window.webkitOfflineAudioContext, oc = new O(2, N, sr), out = oc.createGain();
   out.gain.value = curve(S.master);
+  const wantChn = [...keep].some(t => chainsFeed(t)) && S.chainPatch && S.chainPatch.format === 'chains.patch';
   const wantFx = [...keep].some(t => fxCount(S.tfx[t])) || (masterFx && fxCount(S.mfx));
   const ok = wantFx ? await tfxReady(oc) : false;
+  const chnOk = wantChn ? await chainsReady(oc) : false;
+  if (chnOk) chnSync.add(oc);
   let head = out;
   if (ok && masterFx && fxCount(S.mfx)){ const m = tfxNode(oc, tfxChain(S.mfx, sr, S.bpm)); out.connect(m); head = m; }
   if (lim){ const c = mkLimiter(oc); head.connect(c); c.connect(oc.destination); } else head.connect(oc.destination);
   const pl = makePlayer(oc, out, getB, false);
   pl.applyMix(t => keep.has(t));       // every track plays (so chokes match the mix), only `keep` is heard
-  if (ok) for (const t of keep) pl.setFx(t, tfxChain(S.tfx[t], sr, S.bpm), true);
+  for (const t of keep){
+    pl.setFx(t, tfxChain(S.tfx[t], sr, S.bpm), ok);
+    if (chnOk) pl.routeTrack(t, tfxChain(S.tfx[t], sr, S.bpm), ok);
+  }
+  // …chains tempo follows the song, like the live engines.
+  if (chnOk) for (const b of pl.buses) if (b && b.chn){ try { b.chn.port.postMessage({target:'chains-host', op:'transport', value:{tempo:S.bpm, lpb:S.lpb || 4, ticks:S.ticks || 6, playing:true}}); } catch(e){} }
   for (const e of evs) pl.play(e);
   const b = await oc.startRendering();
   return [b.getChannelData(0), b.getChannelData(1)];
@@ -3061,7 +3344,7 @@ async function renderOut(stems){
     let end = seq.time;
     for (const e of notes){ const len = pads.get(e.pad).length / sr / Math.min(e.rate, e.slide ? e.slide.from : e.rate); end = Math.max(end, e.cut != null ? Math.min(e.t + len, e.cut + 0.06) : e.t + len); }
     // Reverb, delay and resonator tails ring past the last note: render extra, then trim the silence.
-    const tail = keepT.some(t => hasTail(S.tfx[t])) || hasTail(S.mfx) ? 8 : 0;
+    const tail = keepT.some(t => hasTail(S.tfx[t])) || hasTail(S.mfx) || keepT.some(t => chainsFeed(t)) ? 8 : 0;
     const N0 = Math.ceil((end + 0.05) * sr), N = N0 + Math.ceil(tail * sr), secs = (N0 / sr).toFixed(1);
     toast(`Rendering mix (${secs} s${tail ? ' + effect tails' : ''})…`); await idle();
     let mix = await pass(evs, new Set(keepT), N, sr, getB, S.limiter, true);
@@ -3160,7 +3443,7 @@ function loadCur(){
   } catch(e){}
 }
 function resetCursors(){ cChain = cPhrase = cInst = cTrack = cFxT = cFxS = 0; for (const k in cs) Object.assign(cs[k], {x:0, y:0, top:0}); selA = null; }
-function setSong(s, msg){ tStop(true); S = s; projFile = null; resetCursors(); if (rt){ rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); }
+function setSong(s, msg){ tStop(true); S = s; projFile = null; resetCursors(); CH.doc = S.chainPatch || null; if (CH.frame){ CH.frame.remove(); CH.frame = null; } if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); }
 
 /* ---------- views ---------- */
 const MID = ['song', 'chain', 'phrase', 'inst'], VIEWS = ['song', 'chain', 'phrase', 'inst', 'mixer', 'fx', 'project'], GRIDV = new Set(['song', 'chain', 'phrase']);
@@ -3290,6 +3573,8 @@ function projRows(){
     {l:'› SAVE', sec:'Project file', act:() => saveProj(false), info:() => (projFile ? 'Saves over ' + projFile.name : 'Saves the song and kit as one .json file') + ' · Ctrl/⌘+S'},
     {l:'› SAVE AS', act:() => saveProj(true), info:() => 'Saves to a new file, keeping the old one · Shift+Ctrl/⌘+S'},
     {l:'› LOAD PROJECT', act:openProj, info:() => 'Load a project file (song and kit) · Ctrl/⌘+O'},
+    {l:'› EXPORT CHAINS', act:exportChains, info:() => 'Save the …chains patch (lives in the song) as its own .chains.json file'},
+    {l:'› IMPORT CHAINS', act:() => $('chainsIn').click(), info:() => 'Load a .chains.json file into this song (…waves patches work too, keeping their effects)'},
     ...(canShareProj() ? [{l:'› SHARE PROJECT', act:shareProj, info:() => 'Send the project file (song and kit) to Drive, email, a chat or your other device, then open it there with LOAD PROJECT'}] : []),
     {l:'› NEW SONG', dbl:true, act:() => setSong(freshSong(), 'New song. The kit is unchanged.'), info:() => 'Clears the song, keeps the kit. Tap EDIT twice'},
     {l:'› LOAD DEMO', dbl:true, act:() => setSong(demoSong(), 'Loaded the starter beat.'), info:() => 'Replaces the song with the starter beat. Tap EDIT twice'},
@@ -3314,9 +3599,9 @@ function projRows(){
     {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:() => { const n = prompt('Song name', S.name); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); } }, info:() => 'EDIT renames the song'},
     {l:'TRACKS', get:() => ntr(), set:v => setNtr(v), min:8, max:NT, big:8, d:16, fmt:v => v + ' tracks',
       info:() => `How many tracks this song uses, 8 to ${NT}. Song and Mixer show as many as fit and scroll sideways (arrows, or swipe left and right). Tracks past this number are hidden and silent; their notes are kept`},
-    {l:'TEMPO', get:() => S.bpm, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; }, min:40, max:300, big:10, d:120, fmt:v => v + ' BPM', after:rtAllFx, info:() => 'Beats per minute, 4 steps to a beat. Track delays follow it'},
+    {l:'TEMPO', get:() => S.bpm, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; }, min:40, max:300, big:10, d:120, fmt:v => v + ' BPM', after:() => { rtAllFx(); chainsTempo(); }, info:() => 'Beats per minute, 4 steps to a beat. Track delays follow it'},
     {l:'LPB', get:() => S.lpb, set:v => S.lpb = v, min:1, max:16, big:4, d:4, fmt:v => v + ' lines/beat · 1/' + (v * 4), info:() => 'Lines per beat: 4 makes each row a 16th, 8 a 32nd, 3 or 6 triplets. A phrase can set its own on its LEN line'},
-    {l:'TICKS', get:() => S.ticks || TICKS, set:v => { S.ticks = v; if (tp.on && tp.seq) tp.seq.tks = v; }, min:1, max:32, big:4, d:TICKS, fmt:v => v + ' ticks a step', info:() => 'How many ticks each step is cut into for DEL, RET, KIL, OFF, ARC, PSL and GRV (6 by default). A TIC command in a phrase changes it from that row on'},
+    {l:'TICKS', get:() => S.ticks || TICKS, set:v => { S.ticks = v; if (tp.on && tp.seq) tp.seq.tks = v; }, min:1, max:32, big:4, d:TICKS, fmt:v => v + ' ticks a step', after:chainsTempo, info:() => 'How many ticks each step is cut into for DEL, RET, KIL, OFF, ARC, PSL and GRV (6 by default). A TIC command in a phrase changes it from that row on'},
     {l:'PATTERN LEN', get:() => S.dlen || 16, set:v => setDefLen(v), min:1, max:PROWS, big:4, d:16, fmt:v => v + (v === 1 ? ' row' : ' rows') + ' · new phrases', info:() => 'How many rows a new phrase starts with (empty phrases follow it too). Change one phrase with ROWS at the right of the tab bar, or its LEN line'},
     {l:'› ALL PHRASES TO ' + (S.dlen || 16), dbl:true, act:() => { for (let i = 0; i < 256; i++) S.plen[i] = S.dlen || 16; saveS(); draw(); toast(`Every phrase now plays ${S.dlen || 16} rows. Notes past that are kept, just not played.`); },
       info:() => `Sets every phrase, used or not, to ${S.dlen || 16} rows. Rows past the end keep their notes. Tap EDIT twice`},
@@ -3338,7 +3623,7 @@ function dims(v){
   if (v === 'song') return {w:ntr(), h:256};
   if (v === 'chain') return {w:2, h:16};
   if (v === 'phrase') return {w:RW, h:plen(cPhrase)};
-  if (v === 'mixer') return {w:ntr(), h:6};
+  if (v === 'mixer') return {w:ntr(), h:7};
   return {w:1, h:rowsOf(v).length};
 }
 
@@ -3394,8 +3679,9 @@ function bump(d, big){
     setCell(tv, c.x, c.y, v); after(k, tv, c.x, c.y, v); return;
   }
   if (tv === 'mixer'){
-    if (c.y === 5) S.master = clamp(S.master + d * (big ? 16 : 1), 0, 255), rtRoute();
+    if (c.y === 6) S.master = clamp(S.master + d * (big ? 16 : 1), 0, 255), rtRoute();
     else if (c.y === 4) return;
+    else if (c.y === 5){ S.chainOn[c.x] = d > 0; chainsFeedChanged(c.x); draw(); return; }
     else { const m = S.mix[c.x];
       if (c.y === 0) m.vol = clamp(m.vol + d * (big ? 16 : 1), 0, 255);
       else if (c.y === 1) m.pan = clamp(m.pan + d * (big ? 16 : 1), 0, 255);
@@ -3494,7 +3780,7 @@ function editTap(){
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
   }
-  if (tv === 'mixer'){ if (c.y === 4) return go('fx'); if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
+  if (tv === 'mixer'){ if (c.y === 4) return go('fx'); if (c.y === 5){ S.chainOn[c.x] = !S.chainOn[c.x]; chainsFeedChanged(c.x); draw(); return; } if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
   const r = rowsOf(tv)[c.y]; if (!r) return;
   if (r.act){ if (r.dbl) return toast('Tap EDIT again to ' + r.l.replace('› ', '').toLowerCase() + '.'); return r.act(); }
   if (r.tog){ r.set(r.get() ? 0 : 1); if (r.after) r.after(); saveS(); draw(); return; }
@@ -3582,7 +3868,7 @@ function del(){
     if (tv === 'phrase' && k === 'note'){ const r = S.phrases[cPhrase] && S.phrases[cPhrase][c.y]; if (r && r.slice(0, NCOL).every(n => n < 0)) r[IC] = -1; }
     return draw();
   }
-  if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else m.solo = false; } mixChanged(); return draw(); }
+  if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ S.chainOn[c.x] = false; chainsFeedChanged(c.x); return draw(); } if (c.y === 6){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else m.solo = false; } mixChanged(); return draw(); }
   const r = rowsOf(tv)[c.y]; if (r && r.get && r.d != null){ r.set(r.d); if (r.after) r.after(); saveS(); draw(); }
 }
 // Whole rows: clear a row, insert a blank one (rows below move down), or remove one (rows below move up).
@@ -3707,7 +3993,7 @@ function go(v){
     if (cid >= 0){ cChain = cid; cTrack = cs.song.x; const ch = S.chains[cid]; const r = ch ? ch.findIndex(q => q[0] >= 0) : -1; if (r >= 0){ cs.chain.y = r; cPhrase = ch[r][0]; } } }
   if (v === 'phrase' && tv === 'chain'){ const ch = S.chains[cChain], id = ch ? ch[cs.chain.y][0] : -1; if (id >= 0) cPhrase = id; }
   if (v === 'inst' && tv === 'phrase'){ const p = S.phrases[cPhrase], r = p && p[cs.phrase.y]; if (r && r[IC] >= 0) cInst = r[IC]; }
-  if (v === 'fx' && tv === 'mixer') cFxT = cs.mixer.y === 5 ? NT : cs.mixer.x;
+  if (v === 'fx' && tv === 'mixer') cFxT = cs.mixer.y === 6 ? NT : cs.mixer.x;
   // Mixer and FX open on the track being edited (the song cursor's track, or the chain/phrase's track).
   if (tv === 'song' && v !== 'song') cTrack = cs.song.x;
   if (v === 'fx' && tv !== 'mixer' && tv !== 'fx') cFxT = cTrack;
@@ -3859,7 +4145,7 @@ const HINT = {
   chain:'EDIT add phrase · EDIT×2 new · EDIT+arrows change · SHIFT+▶ open · SHIFT+◀ song · OPT+◀▶ other chain',
   phrase:'EDIT add note · EDIT×2 note off · EDIT+◀▶ ±1 ▲▼ ±octave · OPT+EDIT clear · ▲ from row 0: LEN/LPB · SHIFT+▶ inst',
   inst:'EDIT+◀▶ ±1 ▲▼ ±more · EDIT on › runs it · OPT+◀▶ other instrument · SHIFT+◀ phrase',
-  mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · EDIT mutes, solos or opens FX · OPT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
+  mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · EDIT mutes, solos, toggles CHN or opens FX · OPT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
   fx:'EDIT adds · EDIT+◀▶ change · OPT+EDIT remove or reset · OPT+◀▶ other track · SHIFT+◀ mixer',
   project:'EDIT on › runs it · EDIT+◀▶ change · OPT+EDIT reset · SHIFT+▼ back',
 };
@@ -3888,7 +4174,12 @@ function info(){
     return ci < 0 || !FXC[ci] ? 'No command. EDIT adds one; EDIT+▲▼ or letters pick from ' + FXC.join(' ') : `${FXC[ci]} ${h2(vv)} · ${FXI[FXC[ci]](Math.max(0, vv))}`;
   }
   if (tv === 'mixer'){
-    if (c.y === 5) return 'Master ' + dB(curve(S.master)) + (fxCount(S.mfx) ? ' · FX ' + fxList(S.mfx) : '') + ' · SHIFT+▶ master effects';
+    if (c.y === 6) return 'Master ' + dB(curve(S.master)) + (fxCount(S.mfx) ? ' · FX ' + fxList(S.mfx) : '') + ' · SHIFT+▶ master effects';
+    if (c.y === 5){
+      const on = chainsFeed(c.x), flag = !!(S.chainOn && S.chainOn[c.x]);
+      return `TRACK ${d2(c.x + 1)} · …chains ` + (on ? 'ON (track runs through the chains patch)'
+        : flag ? 'MISS: patch needs a Chain Out set to track ' + d2(c.x + 1) + ' · EDIT toggles' : 'off · EDIT toggles');
+    }
     if (c.y === 4){ const A = S.tfx[c.x]; return `TRACK ${d2(c.x + 1)} · ` + (A.some(Boolean) ? 'FX ' + fxList(A) : 'no effects') + ' · EDIT opens FX'; }
     const m = S.mix[c.x]; return `TRACK ${d2(c.x + 1)} · ${dB(curve(m.vol))} · ${panS(m.pan)}` + (m.mute ? ' · muted' : '') + (m.solo ? ' · solo' : '');
   }
@@ -3982,6 +4273,13 @@ function draw(){
     const fl = [{t:'FX  ', cls:'lb'}];
     for (let t = T0; t < T1; t++){ const n = fxCount(S.tfx[t]); fl.push({t:n ? d2(n) : '--', cls:cc(t, 4, n ? 'cf' : 'e'), x:t, y:4}, ' '); }
     L.push(fl);
+    const cl = [{t:'CHN ', cls:'lb'}];
+    const ct = chainsTracks();
+    for (let t = T0; t < T1; t++){
+      const on = chainsFeed(t), flag = !!(S.chainOn && S.chainOn[t]), tx = on ? 'ON' : flag && !ct.has(t) ? 'MISS' : '--';
+      cl.push({t:tx, cls:cc(t, 5, on ? 'cf' : flag ? 'v' : 'e'), x:t, y:5}, ' ');
+    }
+    L.push(cl);
     // Level meters, 8 lines of 6 dB each: red above −6 dB, yellow above −12.
     for (let k = 0; k < MH; k++){
       const ml = [{t:(k ? String(-6 * k) : '0').padStart(3) + ' ', cls:'lb'}];
@@ -3989,7 +4287,7 @@ function draw(){
       L.push(ml);
     }
     const mn = fxCount(S.mfx);
-    L.push([{t:'MASTER ', cls:'lb'}, {t:hx(S.master), cls:'v' + (c.y === 5 ? ' cur' : ''), x:0, y:5}, '  ', {t:dB(curve(S.master)), cls:'lb'}, '   ', {t:mn ? 'FX ' + fxList(S.mfx) : 'FX --', cls:mn ? 'cf' : 'e'}]);
+    L.push([{t:'MASTER ', cls:'lb'}, {t:hx(S.master), cls:'v' + (c.y === 6 ? ' cur' : ''), x:0, y:6}, '  ', {t:dB(curve(S.master)), cls:'lb'}, '   ', {t:mn ? 'FX ' + fxList(S.mfx) : 'FX --', cls:mn ? 'cf' : 'e'}]);
     for (const ch of ['L', 'R']) L.push([{t:ch + '   ', cls:'lb'}, {t:'', cls:'mm m1'}, {t:'', cls:'mm m2'}, {t:'', cls:'mm m3'}, {t:'', cls:'mm e'}, ' ', {t:'', cls:'mm lb'}]);
   } else {
     if (tv === 'inst'){ title = 'INST ' + hx(cInst); const I = S.insts[cInst]; sub = (isSyn(I.pad) ? 'SYNTH ' : 'PAD ') + hx(I.pad); }
@@ -4201,8 +4499,14 @@ const mbuf = new Float32Array(512), mbuf2 = new Float32Array(1024);
 function fxLoads(){
   const L = []; if (!rt) return L;
   rt.pl.buses.forEach((b, t) => { if (t < NT && b.fx) L.push([d2(t + 1), b.fx.load || 0]); });
+  rt.pl.buses.forEach((b, t) => { if (t < NT && b.chn) L.push([d2(t + 1) + ' chn', b.chn.load || 0]); });
   if (rt.mfx) L.push(['MST', rt.mfx.load || 0]);
   return L;
+}
+function globalCpuValue(){
+  if (!ctx) return null;
+  const cap = cpu.cap && performance.now() - cpu.cap.t < 3000 ? cpu.cap : null;
+  return cap ? cap.avg : fxLoads().reduce((a, x) => a + x[1], 0);
 }
 function cpuMeter(){
   const now = performance.now(); if (now - cpu.t < 500) return; cpu.t = now;
@@ -4212,8 +4516,23 @@ function cpuMeter(){
   b.querySelector('span').textContent = v == null ? 'CPU --' : 'CPU ' + Math.round(v * 100) + '%';
   b.querySelector('i').style.width = v == null ? '0' : Math.min(100, v * 100).toFixed(0) + '%';
   b.classList.toggle('warn', v != null && v > 0.5); b.classList.toggle('hot', v != null && (v > 0.8 || (cap && cap.under > 0)));
+  b.title = cap ? 'Whole audio engine (Chrome’s render capacity), not just the effects.' : 'The time the track effects and …chains take (this browser doesn’t report the total audio load).';
 }
 setInterval(() => { if (view !== 'tracker' && !document.hidden) cpuMeter(); }, 500);
+// …chains screen meters: sample each routed track's chains return and push it into the frame.
+// Runs on its own timer (the tracker frame loop is off while the …chains screen is open).
+setInterval(() => {
+  if (view !== 'chains' || document.hidden || !rt || !CH.frame) return;
+  const out = new Array(NT).fill(0);
+  let any = false;
+  for (let t = 0; t < ntr(); t++){
+    const b = rt.pl.buses[t]; if (!b.chn || !b.chn.an) continue;
+    b.chn.an.getFloatTimeDomainData(b.chn._mBuf);
+    let p = 0; for (let i = 0; i < b.chn._mBuf.length; i++){ const a = Math.abs(b.chn._mBuf[i]); if (a > p) p = a; }
+    out[t] = p; if (p > 0.002) any = true;
+  }
+  if (any || chMeterWanted){ const api = chApi(); if (api && api.meters) api.meters({ peaks:out, load:globalCpuValue() }); }
+}, 60);
 $('tCpu').addEventListener('click', () => {
   const cap = cpu.cap, L = fxLoads().filter(x => x[1] > 0.0005).sort((a, b) => b[1] - a[1]);
   const fx = L.length ? 'Effects: ' + L.map(([n, v]) => `${n} ${(v * 100).toFixed(1)}%`).join(' · ') : 'No track effects running.';
@@ -4413,6 +4732,7 @@ $('tRowsUp').addEventListener('click', () => setRows(plen(rowsId()) + 1));
 $('tRowsV').addEventListener('click', () => { const id = rowsId(), n = prompt(`Rows for phrase ${hx(id)} (1–${PROWS})`, plen(id)); if (n != null && Number.isFinite(+n) && n.trim() !== '') setRows(Math.round(+n)); });
 $('tClk').addEventListener('click', () => toast(`${tp.on ? tp.bpm : S.bpm} BPM, ${tp.on ? tp.tks : S.ticks || TICKS} ticks a step. Set them in Project (TEMPO, TICKS); TPO and TIC change them as the song plays.`));
 $('projIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadProjFile(f); });
+$('chainsIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importChainsFile(f); });
 new ResizeObserver(() => { fit(); draw(); }).observe(scr);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { measure(); fit(); });
 
@@ -4452,7 +4772,7 @@ function typeHex(d){
     const y = c.y; setCell(tv, c.x, y, val); if (done){ down1(); hexBuf.key = ''; } after(k, tv, c.x, y, val); return;
   }
   if (tv === 'mixer'){
-    if (c.y === 5){ S.master = v; rtRoute(); } else if (c.y === 0) S.mix[c.x].vol = v; else if (c.y === 1) S.mix[c.x].pan = v; else return;
+    if (c.y === 6){ S.master = v; rtRoute(); } else if (c.y === 5){ S.chainOn[c.x] = !!v; chainsFeedChanged(c.x); return; } else if (c.y === 0) S.mix[c.x].vol = v; else if (c.y === 1) S.mix[c.x].pan = v; else return;
     if (done) hexBuf.key = ''; mixChanged(); draw(); return;
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.get || r.tog) return;
@@ -4584,7 +4904,7 @@ const HINTK = {
   chain:'Type hex · Enter add or open · Enter×2 new phrase · Del clear · [ ] other chain · Shift+→ open · Shift+↑↓ lines',
   phrase:'Notes Z–/ and Q–P · 1 off · −/= octave · Del/Bksp clear row · Ins add row · Shift+↑↓ lines · Ctrl+C/V',
   inst:'Alt+arrows change · Enter runs › rows · [ ] other instrument · Shift+← phrase',
-  mixer:'Type hex for VOL and PAN · Enter mutes, solos or opens FX · Del resets · Shift+→ FX · Shift+↑ back',
+  mixer:'Type hex for VOL and PAN · Enter mutes, solos, toggles CHN or opens FX · Del resets · Shift+→ FX · Shift+↑ back',
   fx:'Type hex · Alt+arrows change · Enter adds · Del removes or resets · [ ] other track · Shift+← mixer',
   project:'Alt+arrows change · Enter runs › rows · Del resets · Ctrl+S save · Shift+Ctrl+S save as · Ctrl+O open',
 };
@@ -4594,14 +4914,18 @@ let updView = () => {};
 function setView(v){
   fxpClose();
   const was = view;
-  view = v === 'tracker' || v === 'waves' ? v : 'synth';
-  const tr = view === 'tracker', wv = view === 'waves';
-  $('main').hidden = $('dock').hidden = tr || wv; $('trk').hidden = !tr; $('wvView').hidden = !wv;
-  $('kitName').hidden = tr || wv;
-  if (tr || wv) toggleSettings(false);
+  view = v === 'tracker' || v === 'waves' || v === 'chains' ? v : 'synth';
+  const tr = view === 'tracker', wv = view === 'waves', ch = view === 'chains';
+  $('main').hidden = $('dock').hidden = tr || wv || ch; $('trk').hidden = !tr; $('wvView').hidden = !wv; $('chView').hidden = !ch;
+  $('kitName').hidden = tr || wv || ch;
+  if (tr || wv || ch){ gsetToggle(false); gfileToggle(false); }
   document.body.classList.toggle('wvv', wv);
+  document.body.classList.toggle('chv', ch);
   if (wv) showWaves(); else if (was === 'waves') leaveWaves();
-  $('bSet').title = tr ? 'Tracker settings: everything on the Project screen, plus audio' : 'Settings: kit, MIDI, export, skin and audio';
+  if (ch) showChains(); else if (was === 'chains') leaveChains();
+  if (ch || was === 'chains') CH.doc = S.chainPatch || null;
+  $('bSet').title = tr ? 'Settings: the Project rows plus kit, MIDI, export, skin and audio'
+    : 'Settings: kit, MIDI, export, skin and audio';
   document.body.classList.toggle('trkv', tr); songBtn();
   try { localStorage.setItem(VK, view); } catch(e){}
   updView();
@@ -4613,14 +4937,14 @@ const trap = () => { try { history.pushState({thunder:1}, ''); } catch(e){} };
 trap();
 addEventListener('popstate', () => {
   if (helpOpen()){ hideHelp(); trap(); return; }
-  if (tsetOpen()){ tsetHide(); trap(); return; }
+  if (gsetOpen()){ gsetToggle(false); trap(); return; }
   flushS(); saveCur();
   if (view === 'tracker'){
     if (tv === 'chain' || tv === 'phrase' || tv === 'inst') nav('left');
     else if (tv !== 'song') go(midV === 'song' || !MID.includes(midV) ? 'song' : midV);
     else setView('synth');
     trap();
-  } else if (view === 'waves'){ setView('synth'); trap(); }
+  } else if (view === 'waves' || view === 'chains'){ setView('synth'); trap(); }
   else toast('Back again to leave ...Thunder');
 });
 /* ---------- help ---------- */
@@ -4655,7 +4979,6 @@ addEventListener('keydown', e => {
 // Built from the same rows as the Project screen (projRows), so the two always match: on/off rows become
 // checkboxes, choices dropdowns, numbers a slider with − and +, and › rows buttons. Audio settings (from
 // the synth's Settings) are lent to it while it is open.
-const tsetOpen = () => !$('tset').hidden;
 const tsetLabel = l => { const t = l.replace(/^›\s*/, '').toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
 const tsetInfo = r => { try { return typeof r.info === 'function' ? r.info(r.get ? r.get() : 0) : (r.info || ''); } catch(e){ return ''; } };
 function tsetSet(r, v){ r.set(clamp(v, r.min, r.max)); if (r.after) r.after(); saveS(); draw(); }
@@ -4667,7 +4990,7 @@ function tsetRow(r){
     row.classList.add('act'); const b = el('button', null, tsetLabel(r.l)); b.type = 'button';
     b.addEventListener('click', () => {
       if (r.dbl && !confirm(tsetLabel(r.l) + '?\n\n' + inf.textContent)) return;
-      r.act(); draw(); setTimeout(tsetBuild, 50);
+      r.act(); draw(); setTimeout(() => { if (setTab === 'gsecProj') buildProj(); }, 50);
     });
     row.append(b, inf); return row;
   }
@@ -4697,15 +5020,16 @@ function tsetRow(r){
   const out = el('output', null, show(r.get())), rg = el('input');
   rg.type = 'range'; rg.min = r.min; rg.max = r.max; rg.step = st; rg.value = r.get(); rg.setAttribute('aria-label', tsetLabel(r.l));
   const put = v => { tsetSet(r, v); rg.value = r.get(); out.textContent = show(r.get()); refresh(); };
-  const btn = (t, d, a) => { const b = el('button', 'stp', t); b.type = 'button'; b.setAttribute('aria-label', a); b.addEventListener('click', () => { put(r.get() + d); if (r.l === 'PATTERN LEN') tsetBuild(); }); return b; };
+  const btn = (t, d, a) => { const b = el('button', 'stp', t); b.type = 'button'; b.setAttribute('aria-label', a); b.addEventListener('click', () => { put(r.get() + d); if (r.l === 'PATTERN LEN') buildProj(); }); return b; };
   rg.addEventListener('input', () => put(+rg.value));
-  rg.addEventListener('change', () => { if (r.l === 'PATTERN LEN') tsetBuild(); });
+  rg.addEventListener('change', () => { if (r.l === 'PATTERN LEN') buildProj(); });
   c.append(btn('−', -st, 'Less'), rg, btn('+', st, 'More'), out);
   row.append(lab(), c, inf); return row;
 }
-function tsetBuild(){
-  if (!tsetOpen()) return;
-  const list = $('tsetList'), body = $('tsetBody'), keep = body.scrollTop; list.innerHTML = '';
+// The Project tab of the settings menu: the same rows as the Project screen (projRows).
+function buildProj(){
+  const list = $('gsecProj'); if (!list) return;
+  const body = $('gsetBody'), keep = body.scrollTop; list.innerHTML = '';
   let sec = null;
   for (const r of projRows()){
     if (r.sec || !sec){ sec = el('section', 'tsec'); sec.append(el('h3', null, r.sec || 'Tracker')); list.append(sec); }
@@ -4713,27 +5037,46 @@ function tsetBuild(){
   }
   body.scrollTop = keep;
 }
-function tsetShow(){
-  releaseAll(); $('tset').hidden = false; document.body.classList.add('tsetv');
-  $('bSet').classList.add('on'); $('bSet').setAttribute('aria-expanded', 'true');
-  const a = $('pAudio'); $('tsetAud').append(a); a.hidden = false; audRefresh();
-  $('tsetBody').scrollTop = 0; tsetBuild(); $('tsetBody').focus({preventScroll:true});
+// The Patch tab of the settings menu: the Waves/Chains patch's own settings (quality, tempo, MIDI, backups).
+function fmtBak(t){ const d = new Date(t); return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+function buildPatch(){
+  const host = $('gsecPatch'); if (!host) return;
+  const a = frameApi();
+  const box = el('div', 'pbody'); host.replaceChildren(box);
+  if (!a || !a.patchSettings){ box.append(el('p', 'note', 'Patch settings are on the Waves and Chains screens.')); return; }
+  const s = a.patchSettings();
+  const row = (label, ctl) => { const r = el('div', 'tsr'), c = el('div', 'tsc'); c.append(ctl); r.append(el('div', 'tsl', label), c); return r; };
+  const q = el('select'); q.append(new Option('Full quality', 'full'), new Option('Draft (lighter on the CPU)', 'draft')); q.value = s.quality;
+  q.addEventListener('change', () => a.setPatchSetting('quality', q.value));
+  const tp = el('input'); tp.type = 'number'; tp.className = 'numsmall'; tp.min = 20; tp.max = 300; tp.step = 0.1; tp.value = s.tempo;
+  tp.addEventListener('change', () => a.setPatchSetting('tempo', tp.value));
+  const tips = el('label', 'cb'), cb = el('input'); cb.type = 'checkbox'; cb.checked = !!s.tips;
+  cb.addEventListener('change', () => a.setPatchSetting('tips', cb.checked));
+  tips.append(cb, document.createTextNode('Show tips'));
+  box.append(row('Quality', q), row('Tempo', tp), tips);
+  const d = el('select');
+  const devs = s.midiDevices || [];
+  if (devs.length) for (const dev of devs) d.append(new Option(dev.name, dev.id)); else d.append(new Option('All connected MIDI inputs', 'all'));
+  d.value = s.midi; d.addEventListener('change', () => a.setPatchSetting('midi', d.value));
+  box.append(row('MIDI learn', d));
+  box.append(el('h3', null, 'Backups'));
+  const list = a.backups ? a.backups() : [];
+  if (!list.length) box.append(el('p', 'note', 'Backups appear here while you work.'));
+  for (const b of list){
+    const r = el('div', 'tsr'), btn = el('button', null, 'Restore'); btn.type = 'button';
+    btn.addEventListener('click', () => { a.restoreBackup(b.i); setTimeout(() => { if (setTab === 'gsecPatch') buildPatch(); }, 60); });
+    const c = el('div', 'tsc'); c.append(btn);
+    r.append(el('div', 'tsl', fmtBak(b.t) + ' · ' + b.name), c);
+    box.append(r);
+  }
 }
-function tsetHide(){
-  if (!tsetOpen()) return;
-  $('tset').hidden = true; document.body.classList.remove('tsetv');
-  $('bSet').classList.remove('on'); $('bSet').setAttribute('aria-expanded', 'false');
-  const a = $('pAudio'); $('pExport').after(a); a.hidden = true; showSetTab();
-  draw();
-}
-$('tsetX').addEventListener('click', tsetHide);
-// While the settings are open the tracker's keys stay out of the way (Esc closes).
+// While the settings menu is open the tracker's keys stay out of the way (Esc closes).
 addEventListener('keydown', e => {
-  if (!tsetOpen() || helpOpen()) return;
+  if (!gsetOpen() || helpOpen()) return;
   e.stopImmediatePropagation();
-  if (e.key === 'Escape'){ e.preventDefault(); tsetHide(); }
+  if (e.key === 'Escape'){ e.preventDefault(); gsetToggle(false); }
 }, true);
-updView = makeSeg($('segView'), [['tracker', 'Tracker'], ['synth', 'Synth'], ['waves', '…waves']], () => view, setView);
+updView = makeSeg($('segView'), [['tracker', 'Tracker'], ['synth', 'Synth'], ['waves', 'Waves'], ['chains', 'Chains']], () => view, setView);
 /* ===TRACKER END=== */
 
 /* ---------- boot ---------- */
@@ -4761,7 +5104,7 @@ refreshAll();
 loadCur();
 if (!chainsOn){ if (tv === 'chain') tv = 'phrase'; if (midV === 'chain') midV = 'phrase'; }
 chainVis(); arrBody();
-try { const v = localStorage.getItem(VK); if (v !== 'synth') setView(v === 'waves' ? 'waves' : 'tracker'); } catch(e){ setView('tracker'); }
+try { const v = localStorage.getItem(VK); if (v !== 'synth') setView(v === 'chains' ? 'chains' : v === 'waves' ? 'waves' : 'tracker'); } catch(e){ setView('tracker'); }
 })();
 </script>
 

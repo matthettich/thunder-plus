@@ -5,8 +5,8 @@
 <meta name="theme-color" content="#ffffff">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="waves">
-<title>…waves</title>
+<meta name="apple-mobile-web-app-title" content="chains">
+<title>…chains</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icons/icon-192.png">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
@@ -15,7 +15,7 @@
 @font-face{font-family:Jost;src:url('./fonts/Jost-500.woff') format('woff');font-weight:500;font-display:swap}
 @font-face{font-family:Jost;src:url('./fonts/Jost-600.woff') format('woff');font-weight:600;font-display:swap}
 @font-face{font-family:Jost;src:url('./fonts/Jost-700.woff') format('woff');font-weight:700;font-display:swap}
-/* ═══ …waves skin: the Minimal skin of ...Seeds (white, square, line art) ═══ */
+/* ═══ …chains skin: the Minimal skin of ...Seeds (white, square, line art) ═══ */
 :root{
   --bench:#ffffff; --panel:#ffffff; --panel-2:#f3f3f3; --edge:#111111; --ink:#111111; --muted:#555555; --track:#e6e6e6;
   --side:#efefef; --frame:#efefef; --glass:#050607;
@@ -232,9 +232,6 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
 .dock{position:absolute; right:10px; display:grid; gap:6px; justify-items:end; z-index:1000001}
 .dock.bottom{bottom:10px}
 .dockport{display:flex; align-items:center; gap:8px; padding:4px 5px 4px 10px; background:var(--panel); border:1px solid #111; font-size:13px; color:var(--ink); user-select:none; -webkit-user-select:none}
-.touchkeys{display:flex; gap:3px}
-.touchkeys button{font-size:12px; padding:6px 0; width:30px; border:1px solid #111; background:#fff; touch-action:none}
-.touchkeys button.on{background:#111; color:#fff}
 
 /* dialogs and help */
 .dlgov{position:fixed; inset:0; z-index:4000000; background:rgba(0,0,0,.28); display:grid; place-items:center}
@@ -252,15 +249,14 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
   select, input{font-size:16px}
   input[type=range]{height:34px}
   .row{min-height:40px}
-  .touchkeys button{min-height:42px; width:34px}
 }
 @media (max-width: 1340px){ .bar .zoomctl #zoomfit, .bar .vsep{display:none} .bar h1{font-size:17px} .bar .pname{width:96px; font-size:14px} .bar .fps{font-size:12px; padding:5px 6px} }
-@media (max-width: 760px){ .bar .meters, #vcount{display:none} .hint{max-width:calc(100% - 24px)} }
+@media (max-width: 760px){ .bar .meters{display:none} .hint{max-width:calc(100% - 24px)} }
 </style>
 </head><body>
 
 <div class="bar">
-    <h1>...waves</h1>
+    <h1>…chains</h1>
   <input id="pname" class="pname" aria-label="Patch name" maxlength="60" spellcheck="false">
   <span class="vsep" aria-hidden="true"></span>
   <div class="setwrap"><button class="tb" id="filebtn" aria-haspopup="true">File ▾</button>
@@ -281,17 +277,16 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
     <div class="setmenu" id="setmenu" hidden>
       <div class="setsec">
         <label class="setrow"><input type="checkbox" id="settips"><span><b>Show tips</b><br><span class="setsub">The help note in the corner of the patch.</span></span></label>
-        <label class="setrow"><input type="checkbox" id="setkeys"><span><b>On-screen keys</b><br><span class="setsub">A small keyboard in the corner of the patch for playing notes by touch.</span></span></label>
+        <label class="setrow"><input type="checkbox" id="setkeys" hidden><span hidden><b>On-screen keys</b><br><span class="setsub">Not used in …chains.</span></span></label>
       </div>
       <div class="setsec">
         <div class="sethead">Sound</div>
         <label class="setsel"><span>Quality</span><select id="setquality"><option value="full">Full quality</option><option value="draft">Draft (lighter on the CPU)</option></select></label>
-        <label class="setsel"><span>Voices</span><select id="setvoices"></select></label>
         <label class="setsel"><span>Tempo</span><span><input type="number" id="settempo" class="numsmall" min="20" max="300" step="0.1"> BPM</span></label>
-        <div class="setsub">How many notes can sound at once. Changing it restarts the sound engine. When the CPU gets too busy, …waves drops voices by itself.</div>
+        <div class="setsub">Tempo drives synced LFOs and delays. When the CPU gets too busy, …chains drops to draft quality by itself.</div>
         <div class="sethead">MIDI</div>
         <label class="setsel"><span>Controller</span><select id="setmidiin"><option value="all">All connected MIDI inputs</option></select></label>
-        <div class="setsub" id="setmidiinfo">Notes and CC from this controller play and control …waves.</div>
+        <div class="setsub" id="setmidiinfo">CC from this controller controls …chains sliders (MIDI learn).</div>
       </div>
       <div class="setsec">
         <div class="sethead">Backups</div>
@@ -300,12 +295,11 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
       </div>
     </div>
   </div>
-  <button class="tb" id="helpbtn" title="How to use …waves, and every module explained">Help</button>
+  <button class="tb" id="helpbtn" title="How to use …chains, and every module explained">Help</button>
   <input type="file" id="fileload" accept=".json,application/json" hidden>
   <div class="spacer"></div>
   <span class="fps" id="cpuv" title="How busy the sound engine is">CPU –</span>
-  <span class="fps" id="vcount" title="Notes sounding now">0 voices</span>
-  <span class="fps meters" id="meters" title="Out 1–8"></span>
+  <span class="fps meters" id="meters" title="Chain 1–16"></span>
   <button class="tb" id="midilearn">MIDI learn</button>
   <div class="zoomctl"><button class="tb" id="zoomout" aria-label="Zoom out">−</button><button class="tb" id="zoomval" title="Click to type a zoom level">100%</button><button class="tb" id="zoomin" aria-label="Zoom in">+</button><button class="tb" id="zoomfit">Fit</button></div>
 </div>
@@ -323,8 +317,7 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
     <div id="groups"></div>
     <svg class="cables" id="cables" xmlns="http://www.w3.org/2000/svg"></svg>
   </div>
-  <div class="hint" id="hint"><span>Drag from an output jack to an input jack to patch. Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Double-click a cable to remove it, or a module’s title bar to collapse it. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Play notes on your computer keyboard: Z to M and Q to P, with - and = for octaves.</span><button id="hintx" aria-label="Hide tips">×</button></div>
-  <div class="dock bottom" id="dockbot"><div class="dockport" id="keysdock" hidden><span>Keys</span><span class="touchkeys" id="touchkeys"></span></div></div>
+  <div class="hint" id="hint"><span>Drag from an output jack to an input jack to patch. Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Double-click a cable to remove it, or a module’s title bar to collapse it. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Start with a Track In (your tracker track) and end with a Chain Out back to the same track.</span><button id="hintx" aria-label="Hide tips">×</button></div>
   <div class="lasso" id="lasso" hidden></div>
   <div class="emptylbl" id="emptylbl" aria-hidden="true" hidden></div>
   <div class="toast" id="toast" hidden></div>
@@ -333,14 +326,16 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
 <div class="learnbar" id="learnbar" hidden><span id="learntext"></span><button class="tb" id="learndone">Done</button></div>
 <div class="ctxmenu" id="ctxmenu" hidden role="menu"></div>
 <script type="module">
-/* ═══ …waves ═══
-   The patch page works like the Patch page of ...Seeds (Minimal skin): module list on the
+/* ═══ …chains ═══
+   A patch page like …waves (the Patch page of ...Seeds, Minimal skin): module list on the
    left, modules with jacks on the edges, straight colored cables, right-click menu, lasso,
-   pan and zoom. The sound engine lives in waves-worklet.js; this page only edits the patch
-   document and sends changes to it through WavesBridge. */
-const PROTOCOL = 2, TARGET = 'waves', BUS_COUNT = 8;
+   pan and zoom. The sound engine lives in chains-worklet.js; this page only edits the patch
+   document and sends changes to it through ChainsBridge.
+   Phase 1 is UI-only: Track In modules are silence standalone; the host wires
+   tracker audio in Phase 2. */
+const PROTOCOL = 2, TARGET = 'chains', CHAN_COUNT = 16;
 
-/* Module table. It mirrors MODULES in waves-worklet.js (inputs, outputs and parameter ranges must match).
+/* Module table. It mirrors MODULES in chains-worklet.js (inputs, outputs and parameter ranges must match).
    ui: per-parameter label (l), value format (f) and dropdown choices (c). */
 const pct = v => Math.round(v * 100) + '%';
 const spct = v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%';
@@ -355,52 +350,19 @@ const times = v => '×' + v.toFixed(2);
 const NOTE_NAMES = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
 const noteName = v => { const n = Math.round(v) + 60; return NOTE_NAMES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); };
 const opts = names => names.map((t, i) => [i, t]);
-const PL_NAMES = ['VA + filter','Phase distortion','6-op FM I','6-op FM II','6-op FM III','Wave terrain','String machine','Chiptune',
-  'Virtual analog','Waveshaping','2-op FM','Grain / formant','Additive','Wavetable','Chords','Speech',
-  'Swarm','Filtered noise','Particle','Inharmonic string','Modal resonator','Bass drum','Snare drum','Hi-hat'];
-const RATIOS = [0.25,0.5,0.75,1,1.25,1.5,1.75,2,2.5,3,3.5,4,4.5,5,6,7,8,9,10,11,12,13,14,16];
 const MIXP = { mix:{l:'Mix', f:wet} };
-const step = k => ({ l:'Step ' + k, f: v => v <= -25 ? 'Rest' : noteName(v) });
 
 const MODULES = {
-  hostIn:{ label:'Host In', scope:'root', inputs:{}, outputs:{ pitch:'cv', gate:'gate', vel:'cv' },
-    params:{ transpose:[0,-48,48,1] }, ui:{ transpose:{l:'Transpose', f:semis} } },
-  seq:{ label:'Sequencer', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ pitch:'cv', gate:'gate', clock:'gate' },
-    params:{ run:[1,0,1,1], rate:[3,0,5,1], steps:[8,1,8,1], length:[.5,.05,1,.01],
-      s1:[0,-25,24,1], s2:[3,-25,24,1], s3:[7,-25,24,1], s4:[12,-25,24,1], s5:[10,-25,24,1], s6:[7,-25,24,1], s7:[3,-25,24,1], s8:[-25,-25,24,1] },
-    ui:{ run:{l:'Run', c:opts(['Stop','Play'])}, rate:{l:'Rate', c:opts(['1/4','1/8','1/8 triplet','1/16','1/16 triplet','1/32'])},
-      steps:{l:'Steps', f:v => String(Math.round(v))}, length:{l:'Gate', f:pct},
-      s1:step(1), s2:step(2), s3:step(3), s4:step(4), s5:step(5), s6:step(6), s7:step(7), s8:step(8) } },
+  trackIn:{ label:'Track In', scope:'mono', inputs:{}, outputs:{ out:'audio', outR:'audio' },
+    params:{ track:[1,1,CHAN_COUNT,1] },
+    ui:{ track:{l:'Track', c:Array.from({length:CHAN_COUNT}, (_, i) => [i + 1, 'Track ' + (i + 1)])} } },
 
-  vco:{ label:'VCO', scope:'poly', inputs:{ pitch:'cv', fm:'cv' }, outputs:{ out:'audio' },
-    params:{ wave:[1,0,3,1], tune:[0,-24,24,1], fine:[0,-100,100,1] },
-    ui:{ wave:{l:'Wave', c:opts(['Saw','Square','Triangle','Sine'])}, tune:{l:'Tune', f:semis}, fine:{l:'Fine', f:cents} } },
-  fm:{ label:'FM', scope:'poly', inputs:{ pitch:'cv', fm:'cv', index:'cv' }, outputs:{ out:'audio' },
-    params:{ model:[0,0,3,1], tune:[0,-24,24,1], fine:[0,-100,100,1], ratio:[.13,0,1,.01], index:[.4,0,1,.01] },
-    ui:{ model:{l:'Model', c:opts(['2-op','Feedback','Metal','Cross'])}, tune:{l:'Tune', f:semis}, fine:{l:'Fine', f:cents},
-      ratio:{l:'Ratio', f:v => RATIOS[Math.round(v * (RATIOS.length - 1))] + '×'}, index:{l:'Index', f:pct} } },
-  additive:{ label:'Additive', scope:'poly', inputs:{ pitch:'cv', gate:'gate' }, outputs:{ out:'audio' },
-    params:{ model:[0,0,5,1], tune:[0,-24,24,1], shape:[.3,0,1,.01], color:[.4,0,1,.01] },
-    ui:{ model:{l:'Model', c:opts(['Harmonic','Odd harmonics','Membrane','Bell','Bar','Chord'])}, tune:{l:'Tune', f:semis}, shape:{l:'Shape', f:pct}, color:{l:'Color', f:pct} } },
-  noise:{ label:'Noise', scope:'poly', inputs:{ pitch:'cv' }, outputs:{ out:'audio' },
-    params:{ model:[0,0,7,1], shape:[0,0,1,.01], color:[0,0,1,.01] },
-    ui:{ model:{l:'Model', c:opts(['White','Pink','Brown','Blue','Metal 808','Digital','Crackle','S&H'])}, shape:{l:'Shape', f:pct}, color:{l:'Color', f:pct} } },
-  plaits:{ label:'Plaits', scope:'poly', inputs:{ pitch:'cv', gate:'gate', timbre:'cv', morph:'cv', harmonics:'cv' }, outputs:{ out:'audio', aux:'audio' },
-    params:{ engine:[8,0,23,1], harmonics:[.5,0,1,.01], timbre:[.5,0,1,.01], morph:[.5,0,1,.01], decay:[.5,0,1,.01], lpg:[.5,0,1,.01] },
-    ui:{ engine:{l:'Engine', c:opts(PL_NAMES)}, harmonics:{l:'Harmonics', f:pct}, timbre:{l:'Timbre', f:pct}, morph:{l:'Morph', f:pct}, decay:{l:'Decay', f:pct}, lpg:{l:'LPG color', f:pct} } },
-  elements:{ label:'Elements', scope:'poly', inputs:{ pitch:'cv', gate:'gate', strength:'cv' }, outputs:{ out:'audio', aux:'audio' },
-    params:{ model:[0,0,2,1], contour:[0,0,1,.01], bow:[0,0,1,.01], blow:[0,0,1,.01], strike:[.8,0,1,.01], mallet:[.5,0,1,.01], timbre:[.5,0,1,.01],
-      flow:[.5,0,1,.01], geometry:[.3,0,1,.01], brightness:[.5,0,1,.01], damping:[.6,0,1,.01], position:[.3,0,1,.01], space:[.3,0,1,.01] },
-    ui:{ model:{l:'Resonator', c:opts(['Modal','String','Strings'])}, contour:{l:'Contour', f:pct}, bow:{l:'Bow', f:pct}, blow:{l:'Blow', f:pct}, strike:{l:'Strike', f:pct},
-      mallet:{l:'Mallet', f:pct}, timbre:{l:'Exciter timbre', f:pct}, flow:{l:'Flow', f:pct}, geometry:{l:'Geometry', f:pct}, brightness:{l:'Brightness', f:pct},
-      damping:{l:'Damping', f:pct}, position:{l:'Position', f:pct}, space:{l:'Space', f:pct} } },
-
-  vcf:{ label:'VCF', scope:'poly', inputs:{ in:'audio', cutoff:'cv' }, outputs:{ out:'audio' },
+  vcf:{ label:'VCF', scope:'mono', inputs:{ in:'audio', cutoff:'cv' }, outputs:{ out:'audio' },
     params:{ cutoff:[.5,0,1,.001], res:[.3,0,1,.001], mode:[0,0,2,1] },
     ui:{ cutoff:{l:'Cutoff', f:pct}, res:{l:'Resonance', f:pct}, mode:{l:'Mode', c:opts(['Low-pass','Band-pass','High-pass'])} } },
-  vca:{ label:'VCA', scope:'poly', inputs:{ in:'audio', cv:'cv' }, outputs:{ out:'audio' },
+  vca:{ label:'VCA', scope:'mono', inputs:{ in:'audio', cv:'cv' }, outputs:{ out:'audio' },
     params:{ gain:[1,0,4,.01] }, ui:{ gain:{l:'Gain', f:times} } },
-  mixer:{ label:'Mixer', scope:'poly', inputs:{ in1:'audio', in2:'audio', in3:'audio', in4:'audio' }, outputs:{ out:'audio' },
+  mixer:{ label:'Mixer', scope:'mono', inputs:{ in1:'audio', in2:'audio', in3:'audio', in4:'audio' }, outputs:{ out:'audio' },
     params:{ l1:[.8,0,1.5,.01], l2:[.8,0,1.5,.01], l3:[.8,0,1.5,.01], l4:[.8,0,1.5,.01], level:[1,0,2,.01] },
     ui:{ l1:{l:'Level 1', f:pct}, l2:{l:'Level 2', f:pct}, l3:{l:'Level 3', f:pct}, l4:{l:'Level 4', f:pct}, level:{l:'Master', f:pct} } },
 
@@ -424,7 +386,7 @@ const MODULES = {
     ui:{ replace:{l:'Replace', f:pct}, bright:{l:'Brightness', f:pct}, detune:{l:'Detune', f:pct}, big:{l:'Size', f:pct}, mix:{l:'Mix', f:v => Math.round((1 - Math.pow(1 - v, 3)) * 100) + '% wet'} } },
   rings:{ label:'Rings', fx:true, extraIn:{ pitch:'cv' },
     params:{ model:[0,0,5,1], poly:[0,0,2,1], note:[0,-24,36,1], structure:[.4,0,1,.01], bright:[.5,0,1,.01], damp:[.6,0,1,.01], pos:[.3,0,1,.01], input:[.5,0,1,.01], mix:[.8,0,1,.01] },
-    ui:Object.assign({ model:{l:'Model', c:opts(['Modal','Sympathetic','String','FM voice','Quantized','String + reverb'])}, poly:{l:'Voices', c:opts(['1','2','4'])},
+    ui:Object.assign({ model:{l:'Model', c:opts(['Modal','Sympathetic','String','FM voice','Quantized','String + reverb'])}, poly:{l:'Width', c:opts(['1','2','4'])},
       note:{l:'Note', f:noteName}, structure:{l:'Structure', f:pct}, bright:{l:'Brightness', f:pct}, damp:{l:'Damping', f:pct}, pos:{l:'Position', f:pct}, input:{l:'Input', f:v => times(v * 2)} }, MIXP) },
   clouds:{ label:'Clouds', fx:true, params:{ mode:[0,0,3,1], lofi:[0,0,1,1], freeze:[0,0,1,1], pos:[.1,0,1,.01], size:[.5,0,1,.01], pitch:[0,-24,24,1], density:[.6,0,1,.01],
       texture:[.5,0,1,.01], blend:[.5,0,1,.01], fb:[.2,0,1,.01], verb:[.5,0,1,.01], spread:[.5,0,1,.01] },
@@ -435,17 +397,17 @@ const MODULES = {
   lfo:{ label:'LFO', scope:'mono', inputs:{ reset:'gate' }, outputs:{ out:'cv' },
     params:{ rate:[1,.02,40,.01], sync:[0,0,1,1], shape:[0,0,4,1], depth:[.5,0,1,.01] },
     ui:{ rate:{l:'Rate', f:hz}, sync:{l:'Sync', c:opts(['Off (use Rate)','To tempo'])}, shape:{l:'Shape', c:opts(['Sine','Square','Ramp','Triangle','Random'])}, depth:{l:'Depth', f:pct} } },
-  adsr:{ label:'ADSR', scope:'poly', inputs:{ gate:'gate' }, outputs:{ out:'cv' },
+  adsr:{ label:'ADSR', scope:'mono', inputs:{ gate:'gate' }, outputs:{ out:'cv' },
     params:{ a:[.01,0,4,.001], d:[.2,0,4,.001], s:[.7,0,1,.001], r:[.3,0,8,.001], depth:[1,0,1,.01] },
     ui:{ a:{l:'Attack', f:secs}, d:{l:'Decay', f:secs}, s:{l:'Sustain', f:pct}, r:{l:'Release', f:secs}, depth:{l:'Depth', f:pct} } },
   random:{ label:'Random', scope:'mono', inputs:{ clock:'gate' }, outputs:{ out:'cv' },
     params:{ rate:[4,.05,40,.01], smooth:[0,0,1,.01], depth:[.5,0,1,.01] }, ui:{ rate:{l:'Rate', f:hz}, smooth:{l:'Smooth', f:pct}, depth:{l:'Depth', f:pct} } },
-  atten:{ label:'Attenuverter', scope:'poly', inputs:{ in:'cv' }, outputs:{ out:'cv' },
+  atten:{ label:'Attenuverter', scope:'mono', inputs:{ in:'cv' }, outputs:{ out:'cv' },
     params:{ amount:[1,-1,1,.01], offset:[0,-1,1,.01] }, ui:{ amount:{l:'Amount', f:spct}, offset:{l:'Offset', f:spct} } },
 
-  out:{ label:'Out', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{},
-    params:{ slot:[1,1,BUS_COUNT,1], level:[1,0,2,.01] },
-    ui:{ slot:{l:'Output', c:Array.from({length:BUS_COUNT}, (_, i) => [i + 1, 'Waves In ' + (i + 1)])}, level:{l:'Level', f:pct} } }
+  chainOut:{ label:'Chain Out', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{},
+    params:{ track:[1,1,CHAN_COUNT,1], level:[1,0,2,.01] },
+    ui:{ track:{l:'Track', c:Array.from({length:CHAN_COUNT}, (_, i) => [i + 1, 'Track ' + (i + 1)])}, level:{l:'Level', f:pct} } }
 };
 for (const [t, d] of Object.entries(MODULES)){
   d.type = t;
@@ -456,27 +418,24 @@ const fmtOf = (t, k) => (MODULES[t].ui[k] || {}).f || (v => (+v).toFixed(2));
 const choicesOf = (t, k) => (MODULES[t].ui[k] || {}).c || null;
 
 /* Families give each module its edge color, as in ...Seeds. */
-const FAMILY = { hostIn:'midi', seq:'midi', vco:'gen', fm:'gen', additive:'gen', noise:'gen', plaits:'gen', elements:'gen',
-  vcf:'util', vca:'util', mixer:'util', lfo:'mod', adsr:'mod', random:'mod', atten:'mod', out:'aout' };
+const FAMILY = { trackIn:'aout',
+  vcf:'util', vca:'util', mixer:'util', lfo:'mod', adsr:'mod', random:'mod', atten:'mod', chainOut:'aout' };
 const famOf = t => FAMILY[t] || (MODULES[t] && MODULES[t].fx ? 'afx' : 'gen');
 /* Cable kinds: audio (teal), modulation (purple, dashed), gate (pink, dashed). */
 const KIND = { audio:'audio', cv:'mod', gate:'gate' };
-const DOT = t => ({ hostIn:'gate', seq:'gate', lfo:'mod', adsr:'mod', random:'mod', atten:'mod' }[t] || 'audio');
+const DOT = t => ({ trackIn:'audio', chainOut:'audio', lfo:'mod', adsr:'mod', random:'mod', atten:'mod' }[t] || 'audio');
 const CABLE = { audio:['#22958d','#16625d'], mod:['#7a58c8','#4b318e'], gate:['#c93d78','#86214c'] };
 const isCtl = k => k === 'mod' || k === 'gate';
 const PORT_LABEL = { pitch:'Pitch', gate:'Gate', vel:'Velocity', fm:'FM', out:'Out', outR:'Out R', reset:'Reset', in:'In', inR:'In R', cv:'CV',
   cutoff:'Cutoff', timbre:'Timbre', morph:'Morph', harmonics:'Harmonics', aux:'Aux', index:'Index', strength:'Strength', clock:'Clock',
   in1:'In 1', in2:'In 2', in3:'In 3', in4:'In 4' };
 const NOTES = {
-  hostIn:'Notes from your computer keyboard, MIDI, the on-screen keys and Sequencers.',
-  seq:'Plays its steps through Host In, like a keyboard. Set the tempo in Settings.',
-  plaits: () => WASM_OK.dsp ? null : 'Couldn’t load the Plaits code (dsp/thunder-dsp.wasm).',
-  elements: () => WASM_OK.dsp ? null : 'Couldn’t load the Elements code (dsp/thunder-dsp.wasm).',
-  out: m => EMBED ? 'Plays on Waves In ' + m.params.slot + '. In …Thunder Plus, choose “…waves” as a layer’s oscillator and pick Waves In ' + m.params.slot + '.'
-    : 'Plays on Waves In ' + m.params.slot + '. On its own, …waves plays every output through your speakers. Patch only In for mono.'
+  trackIn: m => 'Tracker track ' + (m.params.track | 0) + ' in (stereo). Standalone this is silence; in …Thunder Plus it carries that track’s sound.',
+  chainOut: m => 'Returns to tracker track ' + (m.params.track | 0) + ' (stereo, after Level). In …Thunder Plus the Mixer sends it back through that track and anything after it.'
 };
 for (const t in MODULES) if (MODULES[t].fx && !NOTES[t]) NOTES[t] = () => WASM_OK.tfx ? null : 'Couldn’t load the effects code (dsp/tfx.wasm), so this passes sound through unchanged.';
-let WASM_OK = { dsp:true, tfx:true };
+NOTES.rings = NOTES.rings || NOTES.eq; NOTES.clouds = NOTES.clouds || NOTES.eq;
+let WASM_OK = { tfx:true };
 
 /* ---------- helpers ---------- */
 function h(tag, props, ...kids){
@@ -514,10 +473,10 @@ function askDialog(msg, opts){
 const typing = e => e.target && e.target.closest && e.target.closest('input:not([type=range]):not([type=checkbox]), select, textarea, [contenteditable="true"]');
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const newId = p => (p || 'm') + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
-/* Inside …Thunder Plus the editor runs in a frame: the patch lives in Thunder's kit (window.parent.thunderWaves),
-   and everything else is saved under its own names so it never mixes with the standalone …waves. */
-const TW = (() => { try { return window.parent !== window && window.parent.thunderWaves || null; } catch (e) { return null; } })();
-const EMBED = !!TW, KP = EMBED ? 'thunderplus.waves.' : 'waves.';
+/* Inside …Thunder Plus the editor runs in a frame: the patch lives in Thunder's song (window.parent.thunderChains),
+   and everything else is saved under its own names so it never mixes with the standalone …chains. */
+const TW = (() => { try { return window.parent !== window && window.parent.thunderChains || null; } catch (e) { return null; } })();
+const EMBED = !!TW, KP = EMBED ? 'thunderplus.chains.' : 'chains.';
 if (EMBED) document.documentElement.classList.add('embed');
 const SETKEY = KP + 'settings';
 let settings = {};
@@ -561,25 +520,25 @@ class PatchStore {
   exportTo(name){
     const blob = new Blob([JSON.stringify(this.doc, null, 2)], { type:'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = (name || this.doc.meta.name || 'patch').replace(/[\\/:*?"<>|]+/g, '') + '.waves.json';
+    a.download = (name || this.doc.meta.name || 'patch').replace(/[\\/:*?"<>|]+/g, '') + '.chains.json';
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
   importFrom(file){
     return file.text().then(txt => {
       const d = JSON.parse(txt);
-      if (d.format !== 'waves.patch') throw new Error('That file isn’t a …waves patch.');
+      if (d.format !== 'chains.patch' && d.format !== 'waves.patch') throw new Error('That file isn’t a …chains patch.');
       this.snapshot(); this._restore(JSON.stringify(d));
     });
   }
   exportCustom(){
-    const blob = new Blob([JSON.stringify({ format:'waves.custom', custom:this.doc.custom }, null, 2)], { type:'application/json' });
+    const blob = new Blob([JSON.stringify({ format:'chains.custom', custom:this.doc.custom }, null, 2)], { type:'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = 'custom-modules.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    a.download = 'chains-custom-modules.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
   importCustom(file){
     return file.text().then(txt => {
       const d = JSON.parse(txt);
-      if (d.format !== 'waves.custom') throw new Error('That file doesn’t hold custom modules.');
+      if (d.format !== 'chains.custom' && d.format !== 'waves.custom') throw new Error('That file doesn’t hold custom modules.');
       this.snapshot(); this.doc.custom = this.doc.custom.concat(d.custom); return d.custom.length;
     });
   }
@@ -611,7 +570,7 @@ class MidiLearn {
   ccFor(id, name){ for (const cc in this.map) if (this.map[cc].id === id && this.map[cc].name === name) return +cc; return null; }
 }
 
-class WavesMidi {
+class ChainsMidi {
   constructor(handlers){
     handlers = handlers || {};
     this.onNote = handlers.onNote || function(){}; this.onCC = handlers.onCC || function(){};
@@ -652,29 +611,29 @@ class WavesMidi {
 }
 
 /* ---------- bridge to the audio engine ---------- */
-class WavesBridge {
+class ChainsBridge {
   constructor(ctx, node){
     this.ctx = ctx; this.node = node; this.port = node.port;
     this._ready = false; this._queue = []; this._params = new Map(); this._raf = 0;
     this._on = { ready:[], meter:[], shed:[], error:[] };
     this.port.onmessage = e => this._recv(e.data);
   }
-  /* The Plaits/Elements and effects code from ...Thunder. A worklet can't fetch, so the page does. */
+  /* The effects code from ...Thunder (tfx.wasm). A worklet can't fetch, so the page does. */
   static wasm(){
     const get = u => fetch(u).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null);
-    return WavesBridge._wasm || (WavesBridge._wasm = Promise.all([get('./dsp/thunder-dsp.wasm'), get('./dsp/tfx.wasm')]));
+    return ChainsBridge._wasm || (ChainsBridge._wasm = Promise.all([get('./dsp/tfx.wasm')]));
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './waves-worklet.js?v=2';
+    const url = opts.url || './chains-worklet.js?v=1';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
-    return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
-      const node = new AudioWorkletNode(ctx, 'waves', {
+    return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
+      const node = new AudioWorkletNode(ctx, 'chains', {
         numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2],
-        processorOptions:{ protocol:PROTOCOL, maxVoices:opts.maxVoices || 8, quality:opts.quality || 'full', transport:opts.transport, dspBytes, tfxBytes }
+        processorOptions:{ protocol:PROTOCOL, quality:opts.quality || 'full', transport:opts.transport, tfxBytes }
       });
       node.connect(ctx.destination);
-      return new WavesBridge(ctx, node);
+      return new ChainsBridge(ctx, node);
     });
   }
   on(evt, fn){ (this._on[evt] = this._on[evt] || []).push(fn); return this; }
@@ -702,9 +661,7 @@ class WavesBridge {
     this._raf = requestAnimationFrame(() => { this._raf = 0; this.flush(); });
   }
   flush(){ if (!this._params.size) return; this._send({ op:'params', list:Array.from(this._params.values()) }); this._params.clear(); }
-  noteOn(pitch, vel){ this._send({ op:'noteOn', pitch, vel:(vel == null ? 1 : vel) }); }
-  noteOff(pitch){ this._send({ op:'noteOff', pitch }); }
-  panic(){ this._send({ op:'panic' }); }
+  panic(){}
   setQuality(q){ this._send({ op:'quality', value:q }); }
   setTransport(t){ this._send({ op:'transport', value:t }); }
   telemetry(on){ this._send({ op:'telemetry', value:on }); }
@@ -720,34 +677,37 @@ class WavesBridge {
 /* ---------- starting patches ---------- */
 function blankDoc(){
   const now = Math.floor(Date.now() / 1000);
-  return { format:'waves.patch', version:1,
+  return { format:'chains.patch', version:1,
     meta:{ name:'Untitled', created:now, modified:now },
-    voice:{ mode:'poly', maxVoices:8, steal:'oldest', glide:0 },
     transport:{ tempo:120, lpb:4, ticks:6, swing:0 },
-    host:{ envelopes:'internal' },
     modules:[], cables:[], groups:[], custom:[], view:{ x:0, y:0, zoom:1, ui:2 } };
 }
 function starterDoc(){
   const d = blankDoc();
   d.modules = [
-    { id:'m1', type:'hostIn', scope:'poly', pos:[  24, 150], collapsed:false, params:{ transpose:0 } },
-    { id:'m2', type:'vco',    scope:'poly', pos:[ 354,  40], collapsed:false, params:{ wave:1, tune:0, fine:0 } },
-    { id:'m3', type:'adsr',   scope:'poly', pos:[ 354, 330], collapsed:false, params:{ a:.005, d:.2, s:.7, r:.3 } },
-    { id:'m4', type:'vca',    scope:'poly', pos:[ 694, 150], collapsed:false, params:{ gain:1 } },
-    { id:'m5', type:'out',    scope:'mono', pos:[1004, 150], collapsed:false, params:{ slot:1, level:1 } }
+    { id:'m1', type:'trackIn',  scope:'mono', pos:[  24, 150], collapsed:false, params:{ track:1 } },
+    { id:'m2', type:'delay',    scope:'mono', pos:[ 354,  60], collapsed:false, params:{ time:.375, regen:.38, tone:.5, reso:0, flutter:0, mix:.25 } },
+    { id:'m3', type:'reverb',   scope:'mono', pos:[ 684,  60], collapsed:false, params:{ replace:.5, bright:.5, detune:.5, big:1, mix:.25 } },
+    { id:'m4', type:'chainOut', scope:'mono', pos:[1014, 150], collapsed:false, params:{ track:1, level:1 } }
   ];
   d.cables = [
-    { from:['m1','pitch'], to:['m2','pitch'], bend:0 },
-    { from:['m1','gate'],  to:['m3','gate'],  bend:0 },
-    { from:['m2','out'],   to:['m4','in'],    bend:0 },
-    { from:['m3','out'],   to:['m4','cv'],    bend:0 },
-    { from:['m4','out'],   to:['m5','in'],    bend:0 }
+    { from:['m1','out'],  to:['m2','in'], bend:0 },
+    { from:['m2','out'],  to:['m3','in'], bend:0 },
+    { from:['m2','outR'], to:['m3','inR'], bend:0 },
+    { from:['m3','out'],  to:['m4','in'], bend:0 },
+    { from:['m3','outR'], to:['m4','inR'], bend:0 }
   ];
   return d;
 }
 function normalize(d){
+  d.format = 'chains.patch';
   d.modules = d.modules || []; d.cables = d.cables || []; d.groups = d.groups || []; d.custom = d.custom || [];
-  d.meta = d.meta || { name:'Untitled' }; d.voice = d.voice || { maxVoices:8 };
+  d.meta = d.meta || { name:'Untitled' };
+  // Waves patches opened here: drop synth-only modules, keep FX/utils/IO.
+  { const keep = new Set(Object.keys(MODULES)); const ids = new Set();
+    d.modules = d.modules.filter(m => { const ok = m && keep.has(m.type); if (ok) ids.add(m.id); return ok; });
+    d.cables = d.cables.filter(c => c && ids.has(c.from[0]) && ids.has(c.to[0]));
+    for (const m of d.modules){ if (m.type === 'out'){ m.type = 'chainOut'; m.params = Object.assign({ track:1, level:1 }, m.params); if (m.params.slot && !m.params.track) m.params.track = m.params.slot; delete m.params.slot; } } }
   d.view = d.view || { x:0, y:0, zoom:1 };
   // Cables into a slider's jack go to "p:name" (older patches used the bare name).
   for (const c of d.cables){
@@ -768,7 +728,7 @@ const nodes = new Map();      // module id → {m, el, head, jacks, ctl, foldBtn
 let selected = new Set(), zTop = 10;
 const view = () => doc.view;
 const modById = id => doc.modules.find(m => m.id === id);
-const busPeaks = new Array(BUS_COUNT).fill(0);
+const busPeaks = new Array(CHAN_COUNT).fill(0);
 
 /* ----- controls ----- */
 function makeJack(n, port, kind, dir, small){
@@ -782,8 +742,9 @@ function portEl(n, port, kind, dir){ return h('div', {class:'port'}, makeJack(n,
 function setParam(n, key, v, fromUser){
   n.m.params[key] = v;
   if (bridge) bridge.setParam(n.m.id, key, v);
+  else if (EMBED && TW && TW.param) TW.param(n.m.id, key, v);   // live, granular — no full reload
   const c = n.ctl[key]; if (c && !fromUser) c.show();
-  if (n.m.type === 'out' && key === 'slot') paintNote(n);
+  if ((n.m.type === 'chainOut' || n.m.type === 'trackIn') && key === 'track') paintNote(n);
   store.touch();
 }
 function slider(n, key, spec){
@@ -872,7 +833,7 @@ function buildNode(m){
     const ch = choicesOf(m.type, k);
     kids.push(ch ? choice(n, k, ch) : slider(n, k, def.params[k]));
   }
-  if (m.type === 'out'){ n.meter = h('span'); kids.push(h('div', {class:'prog', title:'Level'}, n.meter)); }
+  if (m.type === 'chainOut' || m.type === 'trackIn'){ n.meter = h('span'); kids.push(h('div', {class:'prog', title:'Level of track ' + ((m.params.track | 0) || 1)}, n.meter)); }
   if (NOTES[m.type]){ n.note = h('div', {class:'status'}); kids.push(n.note); }
   const body = h('div', {class:'body'}, kids);
   n.el = h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id}, head, ports, body);
@@ -1412,19 +1373,17 @@ function pickPatchBg(){
 const plist = document.getElementById('plist'), palette = document.getElementById('palette');
 const drawer = document.getElementById('drawer'), dtoggle = document.getElementById('dtoggle');
 const PALETTE = [
-  ['§Sound', []],
-  ['Sound sources', [['vco','VCO'],['fm','FM'],['additive','Additive'],['noise','Noise'],['plaits','Plaits'],['elements','Elements']]],
+  ['§Tracks', []],
+  ['Track I/O', [['trackIn','Track In'],['chainOut','Chain Out']]],
   ['Filters and amps', [['vcf','VCF'],['vca','VCA'],['mixer','Mixer']]],
   ['Effects', [['eq','EQ'],['comp','Compressor'],['saturation','Saturation'],['tape','Tape'],['chorus','Chorus'],['crush','Bitcrush'],['delay','Tape delay'],['reverb','Reverb'],['rings','Rings'],['clouds','Clouds']]],
-  ['Output', [['out','Out']]],
   ['§Control', []],
-  ['Notes and MIDI', [['hostIn','Host In'],['seq','Sequencer']]],
   ['Modulation sources', [['lfo','LFO'],['adsr','ADSR'],['random','Random'],['atten','Attenuverter']]]
 ];
-const GROUP_FAM = { 'Sound sources':'gen', 'Filters and amps':'util', 'Effects':'afx', 'Output':'aout', 'Notes and MIDI':'midi', 'Modulation sources':'mod' };
+const GROUP_FAM = { 'Track I/O':'aout', 'Filters and amps':'util', 'Effects':'afx', 'Modulation sources':'mod' };
 const isSection = g => g.startsWith('§');
 const PSTORE = KP + 'palette';
-let pstate = { open:{}, quick:['hostIn', 'vco', 'adsr', 'vca', 'out'] };
+let pstate = { open:{}, quick:['trackIn', 'eq', 'delay', 'reverb', 'chainOut'] };
 try { const v = JSON.parse(localStorage.getItem(PSTORE) || 'null'); if (v){ if (v.open) pstate.open = v.open; if (Array.isArray(v.quick)) pstate.quick = v.quick; pstate.drawer = !!v.drawer; pstate.dw = v.dw; } } catch (e) {}
 const psave = () => { try { localStorage.setItem(PSTORE, JSON.stringify(pstate)); } catch (e) {} };
 const LABELS = {};
@@ -1467,6 +1426,7 @@ function togglePin(type){
   psave(); renderQuick();
 }
 function renderQuick(){
+  pstate.quick = pstate.quick.filter(t => LABELS[t]);
   const grid = h('div', {class:'qgrid'});
   for (const t of pstate.quick){
     if (!LABELS[t]) continue;
@@ -1590,9 +1550,9 @@ document.getElementById('fimpmods').addEventListener('click', () => pickFile('cu
 const pnameEl = document.getElementById('pname');
 {
   if (EMBED){
-    // …Thunder Plus shows this page as its "…waves" screen: it pauses the sound when you switch away and saves into the kit.
-    window.wavesEmbed = {
-      pause(){ clearTimeout(store._timer); if (store.dirty) store.save(); held.forEach(p => bridge && bridge.noteOff(p)); held.clear(); if (bridge) bridge.ctx.suspend().catch(() => {}); },
+    // …Thunder Plus shows this page as its "…chains" screen: it pauses the sound when you switch away and saves into the song.
+    window.chainsEmbed = {
+      pause(){ clearTimeout(store._timer); if (store.dirty) store.save(); if (bridge) bridge.ctx.suspend().catch(() => {}); },
       resume(){ if (bridge) bridge.resume(); },
       /* The app's Settings gear opens this patch's settings menu. */
       settings(){ const b = document.getElementById('setbtn'); if (b) b.click(); },
@@ -1616,13 +1576,41 @@ const pnameEl = document.getElementById('pname');
         else if (k === 'midi'){ if (midi) midi.selected = v; const s = document.getElementById('setmidiin'); if (s) s.value = v; }
       },
       backups(){ return PatchStore.backups().slice().reverse().map((b, i) => { let n = 'Untitled'; try { n = (JSON.parse(b.p).meta || {}).name || n; } catch(e){} return { i, t:b.t, name:n }; }); },
-      restoreBackup(i){ const all = PatchStore.backups(), b = all[all.length - 1 - i]; if (!b) return; store.snapshot(); store._restore(JSON.stringify(normalize(JSON.parse(b.p)))); toast('Restored a backup.'); }
+      restoreBackup(i){ const all = PatchStore.backups(), b = all[all.length - 1 - i]; if (!b) return; store.snapshot(); store._restore(JSON.stringify(normalize(JSON.parse(b.p)))); toast('Restored a backup.'); },
+      /* Transport: Space in …chains starts/stops the song, same as the tracker. */
+      play(){ if (TW && TW.play) TW.play(); },
+      playing(){ return !!(TW && TW.playing && TW.playing()); },
+      /* Host meters: one peak per tracker track (the chains return). Track In and Chain Out
+         modules show the level of the track they're set to, so patching is visible live. */
+      meters(payload){
+        const peaks = Array.isArray(payload) ? payload : (payload && payload.peaks) || [];
+        hostPeaks = peaks;
+        hostCpu = payload && typeof payload.load === 'number' ? payload.load : null;
+        hostSeen = Date.now();
+        paintHostMeters(); paintHostCpu();
+      }
     };
+    window.wavesEmbed = window.chainsEmbed;   // back-compat alias
     window.addEventListener('pagehide', () => { if (store.dirty) store.save(); });
   }
 }
 pnameEl.addEventListener('change', () => { store.snapshot(); doc.meta.name = pnameEl.value.trim() || 'Untitled'; pnameEl.value = doc.meta.name; });
 pnameEl.addEventListener('keydown', e => { if (e.key === 'Enter') pnameEl.blur(); });
+
+/* Space: start/stop the song, like the tracker. Skipped while typing, or when a menu,
+   dialog or help overlay is up (those own the keyboard). */
+window.addEventListener('keydown', e => {
+  if (e.key !== ' ' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+  if (typing(e)) return;
+  const ov = document.getElementById('helpov');
+  if (learn && learn.on) return;
+  if (ov && !ov.hidden) return;
+  if (!fileMenu.hidden || !setMenu.hidden) return;
+  if (!ctx.hidden) return;
+  if (document.querySelector('.dlgov')) return;
+  e.preventDefault();
+  if (window.chainsEmbed && window.chainsEmbed.play) window.chainsEmbed.play();
+}, true);
 
 window.addEventListener('keydown', e => {
   if (!(e.metaKey || e.ctrlKey)) return;
@@ -1654,23 +1642,15 @@ const hint = document.getElementById('hint'), tipsBox = document.getElementById(
 hint.hidden = settings.tips === false; tipsBox.checked = settings.tips !== false;
 tipsBox.addEventListener('change', () => { settings.tips = tipsBox.checked; saveSettings(); hint.hidden = !settings.tips; });
 document.getElementById('hintx').addEventListener('click', () => { hint.hidden = true; settings.tips = false; saveSettings(); tipsBox.checked = false; });
-const keysBox = document.getElementById('setkeys');
-keysBox.addEventListener('change', () => { settings.keys = keysBox.checked; saveSettings(); paintKeys(); });
+
 
 /* help */
 function helpDoc(){
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
-  const EDGE = { midi:'#b8865a', gen:'#139a9a', afx:'#b24fb0', mod:'#c99a00', aout:'#3f6fb5', util:'#e07a2e' };
+  const EDGE = { afx:'#b24fb0', mod:'#c99a00', aout:'#3f6fb5', util:'#e07a2e' };
   const KC = { audio:'#22958d', mod:'#7a58c8', gate:'#c93d78' };
   const ABOUT = {
-    hostIn:'Turns the notes you play into control signals: Pitch, Gate (held while a key is down) and Velocity. One copy runs for every voice, so anything it feeds becomes polyphonic.',
-    seq:'An 8-step sequencer. It plays its steps through Host In, like a keyboard, at the tempo in Settings (or from a Clock cable). Set a step to Rest for silence. Clock, Pitch and Gate come out for driving other modules.',
-    vco:'A simple oscillator: saw, square, triangle or sine. Patch Pitch from Host In; FM bends the pitch for vibrato or harsher sounds.',
-    fm:'FM oscillators from …Thunder: 2-operator, feedback, 808-style metal and cross-modulation. Ratio picks the modulator’s pitch, Index how much it bends the sound.',
-    additive:'Additive oscillators from …Thunder: harmonic and odd-harmonic stacks, membrane, bell and bar partials, and chords. A Gate restarts the partials’ decay, for struck sounds.',
-    noise:'Noise from …Thunder: white, pink, brown and blue (Shape lowers the rate, Color the bit depth), 808 metal, digital, crackle and sample-and-hold. Pitch moves the metal, digital and S&H noises.',
-    plaits:'A macro oscillator with 24 sound engines (Mutable Instruments Plaits, as in …Thunder). Patch a Gate to strike its built-in envelope and low-pass gate; without one it drones. Harmonics, Timbre and Morph change the sound.',
-    elements:'Mutable Instruments Elements: a modal voice where a bow, a breath and a mallet excite a resonator. Patch Pitch and Gate from Host In.',
+    trackIn:'Your tracker track, in stereo. Pick the track (1–16); in …Thunder Plus it carries that track’s sound. On its own it is silence — patch it through effects into a Chain Out.',
     vcf:'A filter. Low-pass softens, band-pass keeps the middle, high-pass thins. Patch an envelope into Cutoff for classic sweeps.',
     vca:'An amplifier. Patch an envelope into CV so notes start and stop (with nothing in CV it stays open); Gain sets the loudness.',
     mixer:'Mixes up to four sounds, each with its own level, plus a master level.',
@@ -1685,21 +1665,21 @@ function helpDoc(){
     rings:'Mutable Instruments Rings: sound in excites a resonator tuned to Note (plus the Pitch input).',
     clouds:'Mutable Instruments Clouds: granular textures, time stretch, looping delay and spectral blur. Freeze holds what it heard.',
     lfo:'A slow oscillator for wobbles and sweeps. Depth sets how far it moves a slider; Sync to tempo follows the tempo. Reset restarts its cycle.',
-    adsr:'An envelope: Attack, Decay, Sustain and Release shape each note from its Gate.',
+    adsr:'An envelope for shaping effects: patch a gate into it and its output into a slider’s modulation jack.',
     random:'A new random value at Rate, or each time Clock fires. Smooth glides between values.',
     atten:'Scales a modulation signal (negative turns it upside down) and adds an offset.',
-    out:'Sends sound out, in stereo if you patch In R. Output picks which Waves In bus it plays on (in …Thunder each is its own input); on its own …waves plays them all.'
+    chainOut:'Sends sound back to a tracker track, in stereo if you patch In R. Track picks which track it returns to (use the same track as your Track In); in …Thunder the Mixer sends it back through that track and anything after it.',
+    adsr:'An envelope for shaping effects: patch a gate into it and its output into a slider’s modulation jack.'
   };
   const guide = [
     ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal cables carry sound, purple dashed cables carry modulation and pink dashed cables carry gates. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the centre, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
-    ['Polyphony', 'Host In runs once for every voice, and so does anything it feeds; everything else (effects, LFOs, Out) runs once. Put effects after the voices, before Out.'],
+    ['Tracks', 'Start with a Track In (your tracker track, 1–16) and end with a Chain Out back to the same track. Keep one pair per track; the buses are hard-assigned, so Track 3 always feeds Chain 3.'],
     ['Moving around', 'Drag the background or scroll with two fingers to pan. Pinch, Ctrl-scroll or a mouse wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
     ['Selecting and the right-click menu', 'Shift-click or Shift-drag to select modules. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
-    ['Playing', 'Your computer keyboard plays notes: Z to M is the lower octave, Q to P the upper one, and - and = change octave. MIDI keyboards work too, and on touch screens the Keys bar in the corner of the patch plays notes.'],
     ['MIDI learn', 'Press MIDI learn, click a slider, then move a knob on your controller. Press Delete to clear the slider’s mapping, and Done when you’re finished.'],
-    ['Saving', 'Your patch saves itself as you work. File → Save downloads it as a file; Open loads one. Settings → Backups holds earlier versions.']
+    ['Saving', 'Your patch saves itself as you work. File → Save downloads it as a .chains.json file; Open loads one (…waves patches open too, keeping their effects). Settings → Backups holds earlier versions.']
   ];
   const groups = PALETTE.filter(([g]) => !isSection(g)).map(([g, items]) => '<div class="mgroup"><h3>' + esc(g) + '</h3><div class="mgrid">' + items.map(([t]) => {
     const d = MODULES[t], ed = EDGE[famOf(t)];
@@ -1720,13 +1700,13 @@ function helpDoc(){
     '.io{display:flex; flex-wrap:wrap; gap:5px 10px; align-items:center; font-size:12.5px; margin-top:4px} .io b{font-size:12px; min-width:62px}' +
     '.pt{display:inline-flex; align-items:center; gap:5px; background:#fff; border:1.5px solid #111; padding:1px 7px} .pt i{width:9px; height:9px; border-radius:50%; display:inline-block}' +
     '@media (max-width:700px){ body{grid-template-columns:1fr} nav{display:none} main{padding:16px} }' +
-    '</style></head><body><nav><h1>…waves Help</h1>' + guide.map(([t], i) => '<a href="#g' + i + '">' + esc(t) + '</a>').join('') +
+    '</style></head><body><nav><h1>…chains Help</h1>' + guide.map(([t], i) => '<a href="#g' + i + '">' + esc(t) + '</a>').join('') +
     '</nav><main><div class="guide">' + guide.map(([t, b], i) => '<h2 id="g' + i + '">' + esc(t) + '</h2><p>' + esc(b) + '</p>').join('') + '</div>' + groups + '</main></body></html>';
 }
 function openHelp(){
   let ov = document.getElementById('helpov');
   if (!ov){
-    ov = h('div', {class:'helpov', id:'helpov'}, h('iframe', {title:'…waves Help'}), h('button', {class:'tb helpx', text:'Close help', onclick: () => ov.hidden = true}));
+    ov = h('div', {class:'helpov', id:'helpov'}, h('iframe', {title:'…chains Help'}), h('button', {class:'tb helpx', text:'Close help', onclick: () => ov.hidden = true}));
     document.body.append(ov);
     ov.querySelector('iframe').srcdoc = helpDoc();
   }
@@ -1735,10 +1715,10 @@ function openHelp(){
 document.getElementById('helpbtn').addEventListener('click', openHelp);
 window.addEventListener('keydown', e => { const ov = document.getElementById('helpov'); if (e.key === 'Escape' && ov && !ov.hidden) ov.hidden = true; });
 
-/* "start making waves" in big letters, each a different color, until a module is added. */
+/* "start making chains" in big letters, each a different color, until a module is added. */
 {
   const lbl = document.getElementById('emptylbl'), cols = ['#2e9e5b','#139a9a','#2f6fc7','#5b5bd6','#8a4fd0','#c447b0','#d1456e','#e07a2e','#c99a00','#5f9e28','#2f6fc7'];
-  lbl.replaceChildren(...'start making waves'.split('').map((ch, i) => { const sp = h('span', {text: ch}); sp.style.color = cols[i % cols.length]; return sp; }));
+  lbl.replaceChildren(...'start making chains'.split('').map((ch, i) => { const sp = h('span', {text: ch}); sp.style.color = cols[i % cols.length]; return sp; }));
   setInterval(() => { const empty = !!doc && !doc.modules.length; if (lbl.hidden === empty) lbl.hidden = !empty; }, 400);
 }
 
@@ -1746,18 +1726,26 @@ window.addEventListener('keydown', e => { const ov = document.getElementById('he
 const meterBars = [];
 {
   const host = document.getElementById('meters');
-  for (let k = 0; k < BUS_COUNT; k++){ const b = h('span', {class:'b', title:'Out ' + (k + 1) + ' / Waves In ' + (k + 1)}, h('i')); host.append(b); meterBars.push(b.firstChild); }
+  for (let k = 0; k < CHAN_COUNT; k++){ const b = h('span', {class:'b', title:'Chain ' + (k + 1) + ' / Track ' + (k + 1)}, h('i')); host.append(b); meterBars.push(b.firstChild); }
 }
 function onMeter(m){
   const el = document.getElementById('cpuv'), p = Math.round(m.load * 100);
   el.textContent = 'CPU ' + p + '%' + (m.quality === 'draft' ? ' · draft' : '');
   el.className = 'fps ' + (m.load < .5 ? 'good' : m.load <= .8 ? 'ok' : 'low');
-  el.title = m.load < .5 ? 'Plenty of room' : m.load <= .8 ? 'Getting busy' : 'Overloaded: voices will drop. Try Draft quality or fewer voices.';
-  document.getElementById('vcount').textContent = m.active + ' voice' + (m.active === 1 ? '' : 's');
-  for (let k = 0; k < BUS_COUNT; k++){ busPeaks[k] = m.buses[k] || 0; meterBars[k].style.transform = 'scaleX(' + Math.min(1, busPeaks[k]) + ')'; }
+  // The label must say which engine this is: in …Thunder this page's engine is the preview only.
+  el.title = EMBED
+    ? 'Preview engine only (the silent test tone and the patch’s own output). The song’s real CPU load is the meter in the Tracker top bar — its tooltip names the breakdown. When the song plays, levels here are the tracker audio.'
+    : (m.load < .5 ? 'Plenty of room' : m.load <= .8 ? 'Getting busy' : 'Overloaded: try Draft quality or fewer heavy effects.');
+  if (EMBED){
+    // Standalone peaks stay in the top-bar strip (this engine’s own buses).
+    for (let k = 0; k < CHAN_COUNT; k++){ busPeaks[k] = m.buses[k] || 0; if (meterBars[k]) meterBars[k].style.transform = 'scaleX(' + Math.min(1, busPeaks[k]) + ')'; }
+    paintMods(m.mods || []);
+    return;   // module meters belong to the host audio (paintHostMeters)
+  }
+  for (let k = 0; k < CHAN_COUNT; k++){ busPeaks[k] = m.buses[k] || 0; if (meterBars[k]) meterBars[k].style.transform = 'scaleX(' + Math.min(1, busPeaks[k]) + ')'; }
   paintMods(m.mods || []);
-  if (m.wasm && (m.wasm.dsp !== WASM_OK.dsp || m.wasm.tfx !== WASM_OK.tfx)){ WASM_OK = m.wasm; for (const n of nodes.values()) paintNote(n); }
-  for (const n of nodes.values()) if (n.meter) n.meter.style.transform = 'scaleX(' + Math.min(1, busPeaks[(n.m.params.slot | 0) - 1] || 0) + ')';
+  if (m.wasm && (m.wasm.tfx !== WASM_OK.tfx)){ WASM_OK = m.wasm; for (const n of nodes.values()) paintNote(n); }
+  for (const n of nodes.values()) if (n.meter) n.meter.style.transform = 'scaleX(' + Math.min(1, busPeaks[((n.m.params.track | 0) || 1) - 1] || 0) + ')';
 }
 
 /* Modulated sliders show the live value in purple, with a mark on the track (as in ...Seeds). */
@@ -1782,6 +1770,34 @@ function paintMods(list){
     c.show();
   }
   modded = now;
+}
+let hostPeaks = [], hostSeen = 0, hostCpu = null;
+/* Embedded, the CPU label shows the song's load (the same number as the Tracker meter),
+   not a separate preview engine — so the two meters agree. */
+function paintHostCpu(){
+  if (!EMBED) return;
+  const el = document.getElementById('cpuv'); if (!el) return;
+  const v = Date.now() - hostSeen < 1500 ? hostCpu : null;
+  el.textContent = v == null ? 'CPU --' : 'CPU ' + Math.round(v * 100) + '%';
+  el.className = 'fps ' + (v == null ? '' : v < .5 ? 'good' : v <= .8 ? 'ok' : 'low');
+  el.title = 'The song’s CPU load — the same value as the Tracker’s top-bar meter, not this page.';
+}
+function paintHostMeters(){
+  // The host pushes peaks while the song plays. When it goes quiet (stopped, or this
+  // screen is gone), decay to zero so the meters don't freeze at their last value.
+  const fresh = Date.now() - hostSeen < 400;
+  if (!fresh) for (let k = 0; k < hostPeaks.length; k++) hostPeaks[k] *= .82;
+  // Module meters: the tracker audio level of the track each Track In / Chain Out is set to.
+  for (const n of nodes.values()){
+    if (!n.meter) continue;
+    const k = clamp((n.m.params.track | 0) - 1, 0, CHAN_COUNT - 1);
+    n.meter.style.transform = 'scaleX(' + Math.min(1, hostPeaks[k] || 0) + ')';
+  }
+  // The bus strip: the tracker audio wins over the preview engine's own buses.
+  for (let k = 0; k < CHAN_COUNT; k++){
+    const v = hostPeaks[k] != null ? hostPeaks[k] : (busPeaks[k] || 0);
+    if (meterBars[k]) meterBars[k].style.transform = 'scaleX(' + Math.min(1, v) + ')';
+  }
 }
 const learnBar = document.getElementById('learnbar'), learnText = document.getElementById('learntext'), learnBtn = document.getElementById('midilearn');
 function setLearn(on){
@@ -1817,56 +1833,29 @@ window.addEventListener('keydown', e => {
   }
 });
 
-/* computer keyboard: two octaves of notes */
-const K_LOW = ['z','s','x','d','c','v','g','b','h','n','j','m',',','l','.',';','/'];
-const K_UP  = ['q','2','w','3','e','r','5','t','6','y','7','u','i','9','o','0','p'];
-let octave = 0;
-const held = new Map();
-function pitchOf(k){ const i = K_LOW.indexOf(k), j = K_UP.indexOf(k); return i >= 0 ? i : (j >= 0 ? 12 + j : -1); }
-window.addEventListener('keydown', e => {
-  if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || typing(e) || !bridge) return;
-  const key = e.key.toLowerCase();
-  if (key === '-' || key === '='){ octave = Math.max(-4, Math.min(4, octave + (key === '=' ? 1 : -1))); toast('Octave ' + (octave + 4)); return; }
-  const p = pitchOf(key); if (p < 0 || held.has(key)) return;
-  const pitch = p + octave * 12; held.set(key, pitch); bridge.resume(); bridge.noteOn(pitch, 1);
-});
-window.addEventListener('keyup', e => { const key = e.key.toLowerCase(), pitch = held.get(key); if (pitch == null) return; held.delete(key); if (bridge) bridge.noteOff(pitch); });
-window.addEventListener('blur', () => { held.forEach(p => bridge && bridge.noteOff(p)); held.clear(); });
-/* on-screen keys */
-{
-  const host = document.getElementById('touchkeys');
-  const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B','C'];
-  names.forEach((nm, i) => {
-    const b = h('button', {text: nm, 'aria-label':'Play ' + nm});
-    const on = e => { e.preventDefault(); e.stopPropagation(); if (b.classList.contains('on') || !bridge) return; b.classList.add('on'); bridge.resume(); bridge.noteOn(i + octave * 12, 1); b._p = i + octave * 12; };
-    const off = () => { if (!b.classList.contains('on')) return; b.classList.remove('on'); if (bridge) bridge.noteOff(b._p); };
-    b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
-    host.append(b);
-  });
-}
+/* …chains has no note input: no keyboard playing and no on-screen keys. */
 let midiOk = false;
-function paintKeys(){
-  const auto = !midiOk || matchMedia('(pointer: coarse)').matches;
-  const on = settings.keys == null ? auto : settings.keys;
-  keysBox.checked = on; document.getElementById('keysdock').hidden = !on;
-}
+function paintKeys(){ const kb = document.getElementById('setkeys'); if (kb) kb.checked = false; }
 
 /* ═══════════════ start ═══════════════ */
 doc = normalize(PatchStore.open() || starterDoc());
 const firstRun = !PatchStore.open();
 store = new PatchStore(doc);
 store.onRestore = () => { normalize(doc); clearSel(); renderAll(); if (bridge) bridge.loadPatch(doc); };
+// Register this patch with the song right away: the host only sees patches the editor saves,
+// and the editor doesn't save until an edit. Without this a freshly-opened song had no patch,
+// so toggling CHN did nothing until you happened to change something.
+if (EMBED){ try { TW.save(JSON.parse(JSON.stringify(doc))); } catch (e) {} }
 learn = new MidiLearn((id, name) => { const n = nodes.get(id); return n && n.ctl[name] ? n.ctl[name].range : null; });
 renderAll();
 if (firstRun) requestAnimationFrame(() => fitAll());
 
-function loop(){ autoPanStep(); drawCables(); requestAnimationFrame(loop); }
+function loop(){ autoPanStep(); drawCables(); if (EMBED){ if (hostPeaks.length) paintHostMeters(); paintHostCpu(); } requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
 
 /* settings that talk to the engine */
-const qSel = document.getElementById('setquality'), vSel = document.getElementById('setvoices');
-for (let i = 1; i <= 16; i++) vSel.append(h('option', {value: i, text: i + (i === 1 ? ' voice' : ' voices')}));
-qSel.value = doc.quality || 'full'; vSel.value = String((doc.voice && doc.voice.maxVoices) || 8);
+const qSel = document.getElementById('setquality');
+qSel.value = doc.quality || 'full';
 const tSel = document.getElementById('settempo');
 tSel.value = (doc.transport && doc.transport.tempo) || 120;
 tSel.addEventListener('change', () => { const v = clamp(parseFloat(tSel.value) || 120, 20, 300); tSel.value = v; doc.transport.tempo = v; if (bridge) bridge.setTransport({ tempo:v }); store.touch(); });
@@ -1876,30 +1865,25 @@ function wireBridge(b){
   bridge = b;
   b.telemetry(true);
   b.on('meter', onMeter);
-  b.on('shed', s => toast('The CPU is busy: dropped to ' + s.voices + ' voices.'));
+  b.on('shed', () => toast('The CPU is busy: switched to draft quality.'));
   b.on('error', e => toast(e.message));
   b.loadPatch(doc);
   if (doc.quality) b.setQuality(doc.quality);
 }
-function startEngine(maxVoices){
-  return WavesBridge.standalone({ maxVoices, quality: doc.quality || 'full', transport: doc.transport }).then(wireBridge)
+function startEngine(){
+  return ChainsBridge.standalone({ quality: doc.quality || 'full', transport: doc.transport }).then(wireBridge)
     .catch(err => toast('The sound engine couldn’t start: ' + (err && err.message || err), 6000));
 }
-vSel.addEventListener('change', () => {
-  const nv = +vSel.value; doc.voice.maxVoices = nv; store.dirty = true; store.save();
-  toast('Restarting the sound with ' + nv + ' voice' + (nv === 1 ? '' : 's') + '…');
-  const old = bridge; bridge = null; if (old) old.dispose();
-  startEngine(nv).then(() => bridge && bridge.resume());
-});
-startEngine((doc.voice && doc.voice.maxVoices) || 8);
+// Embedded (…Thunder): the host owns the audio, so don't start a second, silent engine here —
+// it wasted CPU and made this page's meter disagree with the Tracker's. Standalone keeps it.
+if (!EMBED) startEngine();
 function unlockAudio(){ if (bridge){ bridge.resume(); removeEventListener('pointerdown', unlockAudio, true); removeEventListener('keydown', unlockAudio, true); } }
 addEventListener('pointerdown', unlockAudio, true);
 addEventListener('keydown', unlockAudio, true);
 
 /* MIDI */
 const midiSel = document.getElementById('setmidiin');
-midi = new WavesMidi({
-  onNote: o => { if (!bridge) return; if (o.on) bridge.noteOn(o.pitch, o.vel); else bridge.noteOff(o.pitch); },
+midi = new ChainsMidi({
   onCC: (cc, val) => {
     const r = learn.handle(cc, val);
     if (r.learned != null){
@@ -1913,7 +1897,7 @@ midi = new WavesMidi({
   onDevices: list => {
     midiSel.replaceChildren(h('option', {value:'all', text:'All connected MIDI inputs'}), ...list.map(i => h('option', {value: i.id, text: i.name})));
     midiSel.value = list.some(i => i.id === midi.selected) ? midi.selected : 'all';
-    document.getElementById('setmidiinfo').textContent = list.length ? 'Notes and CC from this controller play and control …waves.' : 'No MIDI controller is connected.';
+    document.getElementById('setmidiinfo').textContent = list.length ? 'CC from this controller controls …chains sliders (MIDI learn).' : 'No MIDI controller is connected.';
   }
 });
 midiSel.addEventListener('change', () => { midi.selected = midiSel.value; });

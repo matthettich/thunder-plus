@@ -1,0 +1,14 @@
+{
+  "name": "…chains",
+  "short_name": "chains",
+  "description": "Route tracker tracks through modular effects chains.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }
+  ]
+}
