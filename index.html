@@ -394,11 +394,10 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .tcmd .ca{font-size:.9em}
 @media (max-width:600px){ .tcmd button{flex-direction:column; gap:1px; line-height:1.1; letter-spacing:.02em} .tcmd button[data-c=next]{flex-direction:column-reverse} .tcmd .ca{font-size:10px} }
 .tcmd button.on{background:var(--pl); color:var(--inv)}
-.tcmd button[hidden]{display:none} .tcmd button[data-c=song]{font-size:17px}
-/* One row on wide screens: PREV and NEXT get wider columns so they don't crop. */
+.tcmd button[hidden]{display:none} .tcmd button[data-c=song]{font-size:17px} .tcmd :is([data-c=prev],[data-c=next]){font-size:24px; font-weight:500; line-height:1}
+/* One row on wide screens. */
 @media (min-width:700px){
-  .tcmd{grid-template-columns:repeat(4,minmax(0,1fr)) repeat(2,minmax(0,1.5fr)) repeat(6,minmax(0,1fr))}
-  .tcmd.song{grid-template-columns:repeat(2,minmax(0,1fr)) repeat(2,minmax(0,1.5fr)) repeat(8,minmax(0,1fr))}
+  .tcmd, .tcmd.song{grid-template-columns:repeat(12,minmax(0,1fr))}
 }
 body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bottom,0px))}
 
@@ -3619,9 +3618,16 @@ function nav(dir){
   if (tv === 'chain'){ const ch = S.chains[cChain]; if (!ch || ch[cs.chain.y][0] < 0){ go('phrase'); return toast(`No phrase on that row: showing phrase ${hx(cPhrase)}, the last one open.`); } return go('phrase'); }
   if (tv === 'phrase'){ const p = S.phrases[cPhrase], r = p && p[cs.phrase.y]; cInst = r && r[IC] >= 0 ? r[IC] : last.inst; tv = 'inst'; midV = 'inst'; draw(); }
 }
+// PREV / NEXT on the song: the cursor jumps to the previous or next block (pattern) in its track.
+function songJump(d){
+  const c = cs.song; let y = c.y + d;
+  while (y >= 0 && y < 256 && getCell('song', c.x, y) < 0) y += d;
+  if (y < 0 || y > 255) return toast(d > 0 ? 'No more blocks below in this track.' : 'No more blocks above in this track.');
+  c.y = y; draw();
+}
 function optDir(dir){
   const d = dir === 'right' || dir === 'up' ? 1 : -1, big = dir === 'up' || dir === 'down';
-  if (tv === 'song'){ if (big) move(0, -d * 16); return; }
+  if (tv === 'song'){ if (big) move(0, -d * 16); else songJump(d); return; }
   if (tv === 'chain'){ cChain = clamp(cChain + d * (big ? 16 : 1), 0, 255); selA = null; return draw(); }
   if (tv === 'phrase'){ cPhrase = clamp(cPhrase + d * (big ? 16 : 1), 0, 255); selA = null; return draw(); }
   if (tv === 'inst'){ cInst = clamp(cInst + d, 0, NI - 1); return draw(); }
@@ -3696,7 +3702,7 @@ const CK = 'thunderplus-cmd-v1', coarse = matchMedia('(pointer:coarse)').matches
 let cmdOn = (() => { try { const v = localStorage.getItem(CK); if (v === '1' || v === '0') return v === '1'; } catch(e){} return coarse; })();
 function setCmd(on){ cmdOn = on; try { localStorage.setItem(CK, on ? '1' : '0'); } catch(e){} draw(); fit(); }
 const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b:-1', '−', 'Change the value down (EDIT+◀)'], ['b:1', '+', 'Change the value up (EDIT+▶)'],
-  ['b:16', '++', 'Change the value up a lot (EDIT+▲)'], ['prev', '<span class="ca">◀</span><span>PREV</span>', 'Previous chain, phrase, instrument or FX track (OPTION+◀)'], ['next', '<span>NEXT</span><span class="ca">▶</span>', 'Next chain, phrase, instrument or FX track (OPTION+▶)'],
+  ['b:16', '++', 'Change the value up a lot (EDIT+▲)'], ['prev', '‹', 'Previous: the block above in the song; the previous chain, phrase, instrument or FX track elsewhere (OPTION+◀)'], ['next', '›', 'Next: the block below in the song; the next chain, phrase, instrument or FX track elsewhere (OPTION+▶)'],
   ['clr', 'CLEAR', 'Clear (OPTION+EDIT)'], ['sel', 'SELECT', 'Start or cancel a selection (SHIFT+OPTION)'],
   ['clone', 'CLN', 'Clone the block under the cursor into a new, unique number (Ctrl/⌘+D)'],
   ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on the row below (Ctrl/⌘+Shift+D)'], ['copy', 'COPY', 'Copy the selection (OPTION)'],
@@ -3707,7 +3713,7 @@ function cmdAction(a){
   if (c === 'b') return bump(Math.sign(+n), Math.abs(+n) > 1);
   if (c === 'prev' || c === 'next'){
     const d = c === 'next' ? 1 : -1;
-    if (tv === 'song') return move(0, d * 16);
+    if (tv === 'song') return songJump(d);
     if (tv === 'mixer') return move(d, 0);
     if (tv === 'project') return move(0, d);
     return optDir(d > 0 ? 'right' : 'left');
