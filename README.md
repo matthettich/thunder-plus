@@ -10,6 +10,8 @@
 
 **Files.** `waves/` holds the …waves editor and engine (`waves/waves-worklet.js`, from the waves repo); Thunder Plus loads the same engine to render patches into the pads, using the Plaits, Elements and effects code already in `index.html`.
 
+**...Thunder opens Thunder Plus files.** ...Thunder (https://matthettich.github.io/Thunder-/) is built from this app with the …waves and …chains editors hidden: `python3 tools/build-thunder.py ../Thunder-` writes its `index.html` and copies the two sound engines. Songs and kits go both ways between the apps, and …waves layers and …chains effects play in ...Thunder too. After changing this app, rebuild ...Thunder so the two stay in step.
+
 The rest of this README is ...Thunder's.
 
 # ...Thunder
