@@ -2498,7 +2498,7 @@ const isPolyT = t => t >= NPAD && t < NT;
 const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0});   // instruments 08–0F play the synth slots
 const freshMix = () => ({vol:224, pan:128, mute:false, solo:false});
 function freshSong(){
-  return {app:'thunder-song', v:4, name:'Song 1', bpm:120, swing:50, limiter:true, renderFrom:0, master:224,
+  return {app:'thunder-song', v:4, name:'Song 1', bpm:120, swing:50, limiter:true, renderFrom:0, master:255,
     song:Array.from({length:256}, () => new Array(NT).fill(-1)), chains:new Array(256).fill(null), phrases:new Array(256).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
     tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), lpb:4, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
@@ -2509,7 +2509,7 @@ function normSong(j){
   const S = freshSong(); if (!j || typeof j !== 'object') return S;
   if (typeof j.name === 'string') S.name = j.name.slice(0, 40);
   S.bpm = clamp(int(j.bpm, 120), 40, 300); S.swing = clamp(int(j.swing, 50), 50, 75); S.limiter = j.limiter !== false;
-  S.renderFrom = clamp(int(j.renderFrom, 0), 0, 255); S.master = clamp(int(j.master, 224), 0, 255);
+  S.renderFrom = clamp(int(j.renderFrom, 0), 0, 255); S.master = clamp(int(j.master, 255), 0, 255);
   if (Array.isArray(j.song)) j.song.slice(0, 256).forEach((r, i) => { if (Array.isArray(r)) for (let t = 0; t < NT; t++) S.song[i][t] = clamp(int(r[t], -1), -1, 255); });
   if (Array.isArray(j.chains)) j.chains.slice(0, 256).forEach((c, i) => { if (Array.isArray(c)) S.chains[i] = Array.from({length:16}, (_, k) => {
     const r = Array.isArray(c[k]) ? c[k] : []; return [clamp(int(r[0], -1), -1, 255), clamp(int(r[1], 0), -128, 127)]; }); });
@@ -3291,7 +3291,7 @@ function projRows(){
       info:() => `Sets every phrase, used or not, to ${S.dlen || 16} rows. Rows past the end keep their notes. Tap EDIT twice`},
     {l:'SWING', get:() => S.swing, set:v => S.swing = v, min:50, max:75, big:5, d:50, fmt:v => v + '%', info:() => '50% is straight; higher pushes every second step later'},
     {l:'LIMITER', get:() => S.limiter ? 1 : 0, set:v => S.limiter = !!v, min:0, max:1, tog:true, d:1, fmt:onOff, after:rtRoute, info:() => 'Catches peaks on the master. Renders use it on the mix only, so stems stay clean'},
-    {l:'MASTER', get:() => S.master, set:v => S.master = v, min:0, max:255, big:16, d:224, after:rtRoute, info:v => 'Master level ' + dB(curve(v))},
+    {l:'MASTER', get:() => S.master, set:v => S.master = v, min:0, max:255, big:16, d:255, after:rtRoute, info:v => 'Master level ' + dB(curve(v))},
     {l:'RENDER FROM', sec:'Render', get:() => S.renderFrom, set:v => S.renderFrom = v, min:0, max:255, big:16, d:0, fmt:v => 'ROW ' + rS(v, 3), gap:true, info:() => 'Renders play from this row until each track reaches an empty row'},
     {l:'RATE', get:() => ex.sr === 48000 ? 1 : 0, set:v => ex.sr = v ? 48000 : 44100, min:0, max:1, tog:true, d:1, fmt:v => v ? '48K' : '44.1K', info:() => 'Sample rate for renders (shared with the synth’s export)'},
     {l:'BITS', get:() => ex.bits === 24 ? 1 : 0, set:v => ex.bits = v ? 24 : 16, min:0, max:1, tog:true, d:1, fmt:v => v ? '24' : '16', info:() => 'Bit depth for renders'},
@@ -3451,7 +3451,7 @@ function del(){
     if (k === 'fxc') setCell(tv, c.x + 1, c.y, -1);
     return draw();
   }
-  if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ S.master = 224; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else m.solo = false; } mixChanged(); return draw(); }
+  if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else m.solo = false; } mixChanged(); return draw(); }
   const r = rowsOf(tv)[c.y]; if (r && r.get && r.d != null){ r.set(r.d); if (r.after) r.after(); saveS(); draw(); }
 }
 // Whole rows: clear a row, insert a blank one (rows below move down), or remove one (rows below move up).
@@ -3581,7 +3581,7 @@ function go(v){
   if (v === 'fx' && tv !== 'mixer' && tv !== 'fx') cFxT = cTrack;
   if (v === 'mixer' && tv !== 'mixer'){
     if (tv === 'fx'){ if (cFxT < NT) cs.mixer.x = cFxT; }
-    else { cs.mixer.x = Math.min(cTrack, ntr() - 1); if (cs.mixer.y === 5) cs.mixer.y = 0; }
+    else { cs.mixer.x = Math.min(cTrack, ntr() - 1); }
   }
   tv = v; if (MID.includes(v)) midV = v; selA = null; draw(); saveCur();
 }
