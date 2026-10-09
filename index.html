@@ -575,6 +575,15 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 .pads .pad.hit .pm, .pads .pad.syn.hit b::after{color:var(--inv)}
 .dock{padding-block:10px 14px}
 @media (max-width:600px){ .pads{gap:9px 8px} }
+/* Mono and poly tracks: a gentle outline around each track's column in Song and Mixer (and the phrase's notes):
+   pink for the one-note-at-a-time tracks, green for the polyphonic (chord) tracks. */
+.tscr{--tk-mono:#eba3bd; --tk-poly:#86c99a}
+.tgrid .ln span.tkm, .tgrid .ln span.tkp{display:inline-block; height:1.3em; vertical-align:top; margin:0 -.18em; padding:0 .18em;
+  box-shadow:inset 2px 0 0 var(--tk), inset -2px 0 0 var(--tk)}
+.tgrid span.tkm{--tk:var(--tk-mono)} .tgrid span.tkp{--tk:var(--tk-poly)}
+.tgrid .ln span.tkt{box-shadow:inset 2px 0 0 var(--tk), inset -2px 0 0 var(--tk), inset 0 2px 0 var(--tk)}
+.tgrid .ln span.tkb{box-shadow:inset 2px 0 0 var(--tk), inset -2px 0 0 var(--tk), inset 0 -2px 0 var(--tk)}
+.tgrid .ln span.tkt.tkb{box-shadow:inset 0 0 0 2px var(--tk)}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 </head>
@@ -848,7 +857,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots. <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song.</p>
 <h3>Chords and polyphony</h3>
-<p><b>Tracks 9–16 are polyphonic.</b> Open a phrase from one of them and it shows four note columns, N1–N4, so a row can hold a chord. Notes on these tracks ring over each other, up to 4 at a time per track; a fifth steals the oldest. A note OFF in any note column releases everything on the track. Tracks 1–8 stay one note at a time, and a phrase played there uses only N1.</p>
+<p><b>The second half of the tracks is polyphonic</b> (9–16 with 16 tracks, 17–32 with 32; Settings → Song → Tracks), outlined in green; the first half, outlined in pink, plays one note at a time. Open a phrase from a polyphonic track and it shows four note columns, N1–N4, so a row can hold a chord. Notes on these tracks ring over each other, up to 4 at a time per track; a fifth steals the oldest. A note OFF in any note column releases everything on the track. The mono tracks stay one note at a time, and a phrase played there uses only N1.</p>
 <h3>Two input modes</h3>
 <p><b>PAD</b> is a d-pad plus SHIFT, PLAY, OPTION and EDIT, good with a thumb. <b>KEYS</b> is direct entry: type notes, hex and effects, with an on-screen keypad on touch screens. Switch with ⚙ Settings → Input (or Project → INPUT).</p>
 </section>
@@ -2801,7 +2810,9 @@ const PROWS = 32;   // rows stored per phrase; each phrase plays its own LEN (16
 const NCOL = 4, VC = 4, IC = 5, FX0 = 6, RW = 12;
 const blankRow = () => new Array(RW).fill(-1);
 const freshPhrase = () => Array.from({length:PROWS}, blankRow);
-const isPolyT = t => t >= NPAD && t < NT;
+// The first half of the song's tracks play one note at a time (mono); the second half are polyphonic. With an odd
+// count the mono half gets the extra track. 16 tracks: 1–8 mono, 9–16 poly; 32 tracks: 1–16 mono, 17–32 poly.
+const polyFrom = () => Math.ceil(ntr() / 2), isPolyT = t => t >= polyFrom() && t < NT;
 const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0});   // instruments 08–0F play the synth slots
 const freshMix = () => ({vol:224, pan:128, mute:false, solo:false});
 function freshSong(){
@@ -4226,8 +4237,8 @@ function info(){
       : `${what} · arrows extend · OPTION copies · OPTION+EDIT cuts · SHIFT+OPTION cancels`;
   }
   if (tv === 'song'){ const v = S.song[c.y][c.x], mu = blockMuted(S, c.y, c.x) ? ' · MUTED' : '';
-    if (!chainsOn) return `TRACK ${d2(c.x + 1)} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty · EDIT×2 new phrase' : isEmptyChain(S.chains[v]) ? `block ${hx(v)} · no phrase yet (SHIFT+▶ makes one)` : `phrase ${hx(firstPhrase(v))}` + (isEmptyPhrase(S.phrases[firstPhrase(v)]) ? ' (empty)' : '') + (firstPhrase(v) !== v ? ` · block ${hx(v)}` : '')) + mu;
-    return `TRACK ${d2(c.x + 1)} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty' : `chain ${hx(v)}` + (isEmptyChain(S.chains[v]) ? ' (empty)' : '')) + mu; }
+    if (!chainsOn) return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty · EDIT×2 new phrase' : isEmptyChain(S.chains[v]) ? `block ${hx(v)} · no phrase yet (SHIFT+▶ makes one)` : `phrase ${hx(firstPhrase(v))}` + (isEmptyPhrase(S.phrases[firstPhrase(v)]) ? ' (empty)' : '') + (firstPhrase(v) !== v ? ` · block ${hx(v)}` : '')) + mu;
+    return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty' : `chain ${hx(v)}` + (isEmptyChain(S.chains[v]) ? ' (empty)' : '')) + mu; }
   if (tv === 'chain'){ const ch = S.chains[cChain], r = ch ? ch[c.y] : [-1, 0];
     return c.x === 0 ? (r[0] < 0 ? 'No phrase. The chain ends at the first empty row.' : `Phrase ${hx(r[0])}` + (isEmptyPhrase(S.phrases[r[0]]) ? ' (empty)' : '')) : `Transpose ${sgn(r[1])} semitones for this row`; }
   if (onPset()){ const len = plen(cPhrase), lpb = S.plpb[cPhrase] || 0, e2 = lpb || S.lpb;
@@ -4246,11 +4257,11 @@ function info(){
     if (c.y === 6) return 'Master ' + dB(curve(S.master)) + (fxCount(S.mfx) ? ' · FX ' + fxList(S.mfx) : '') + ' · SHIFT+▶ master effects';
     if (c.y === 5){
       const on = chainsFeed(c.x), flag = !!(S.chainOn && S.chainOn[c.x]);
-      return `TRACK ${d2(c.x + 1)} · …chains ` + (on ? 'ON (track runs through the chains patch)'
+      return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · …chains ` + (on ? 'ON (track runs through the chains patch)'
         : flag ? 'MISS: patch needs a Chain Out set to track ' + d2(c.x + 1) + ' · EDIT toggles' : 'off · EDIT toggles');
     }
-    if (c.y === 4){ const A = S.tfx[c.x]; return `TRACK ${d2(c.x + 1)} · ` + (A.some(Boolean) ? 'FX ' + fxList(A) : 'no effects') + ' · EDIT opens FX'; }
-    const m = S.mix[c.x]; return `TRACK ${d2(c.x + 1)} · ${dB(curve(m.vol))} · ${panS(m.pan)}` + (m.mute ? ' · muted' : '') + (m.solo ? ' · solo' : '');
+    if (c.y === 4){ const A = S.tfx[c.x]; return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ` + (A.some(Boolean) ? 'FX ' + fxList(A) : 'no effects') + ' · EDIT opens FX'; }
+    const m = S.mix[c.x]; return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ${dB(curve(m.vol))} · ${panS(m.pan)}` + (m.mute ? ' · muted' : '') + (m.solo ? ' · solo' : '');
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.info) return '';
   return typeof r.info === 'function' ? r.info(r.get ? r.get() : 0) : r.info;
@@ -4293,15 +4304,16 @@ function draw(){
   const rsel = y => sr && selA.line && y >= sr.y0 && y <= sr.y1 ? ' sel' : '';
   const cc = (x, y, base) => base + (sr && x >= sr.x0 && x <= sr.x1 && y >= sr.y0 && y <= sr.y1 ? ' sel' : '') + (c.x === x && c.y === y ? ' cur' : '');
   const mc = t => (S.mix[t].mute ? ' mu' : '') + (S.mix[t].solo ? ' so' : '');
+  const tk = t => isPolyT(t) ? ' tkp' : ' tkm';   // the column's outline: pink mono, green poly
   const playRows = test => { const s = new Set(); if (P) P.forEach(p => { const r = p && test(p); if (r != null) s.add(r); }); return s; };
   if (tv === 'song'){
     const [T0, T1] = trackWin(c, stepDec ? 4 : 3), ts = trkSub(T0, T1); sub = ts ? ts + '  ' + S.name : S.name;
     const VR = songRows(); if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; c.top = clamp(c.top, 0, 256 - VR);
-    const hd = [stepDec ? '    ' : '   ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t), x:t, y:-1}, ' '); L.push(hd);
+    const hd = [stepDec ? '    ' : '   ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t) + tk(t) + ' tkt', x:t, y:-1}, ' '); L.push(hd);
     for (let y = c.top; y < c.top + VR; y++){
       const ln = [{t:rS(y, 3), cls:'rn' + (y % 4 ? '' : ' rn4') + rsel(y), r:y}, ' '];
       for (let t = T0; t < T1; t++){ const v = S.song[y][t], pl = P && tp.mode === 'song' && P[t] && P[t].row === y;
-        ln.push({t:h2(v), cls:cc(t, y, (v < 0 ? 'e' : 'v') + (pl ? ' pl' : '') + (v >= 0 && blockMuted(S, y, t) ? ' sm' : '')), x:t, y}, ' '); }
+        ln.push({t:h2(v), cls:cc(t, y, (v < 0 ? 'e' : 'v') + (pl ? ' pl' : '') + (v >= 0 && blockMuted(S, y, t) ? ' sm' : '')) + tk(t) + (y === c.top + VR - 1 ? ' tkb' : ''), x:t, y}, ' '); }
       L.push(ln);
     }
   } else if (tv === 'chain'){
@@ -4311,7 +4323,7 @@ function draw(){
     for (let y = 0; y < 16; y++){ const r = ch ? ch[y] : [-1, 0];
       L.push([{t:stepDec ? d2(y) : hx(y, 1), cls:'rn' + (y % 4 ? '' : ' rn4') + (pr.has(y) ? ' pl' : '') + rsel(y), r:y}, ' ', {t:h2(r[0]), cls:cc(0, y, r[0] < 0 ? 'e' : 'v'), x:0, y}, ' ', {t:hx(r[1]), cls:cc(1, y, r[1] ? 'v' : 'e'), x:1, y}]); }
   } else if (tv === 'phrase'){
-    title = 'PHRASE ' + hx(cPhrase); sub = 'TRACK ' + d2(cTrack + 1) + (polyView() ? ' · POLY' : '');
+    title = 'PHRASE ' + hx(cPhrase); sub = 'TRACK ' + d2(cTrack + 1) + (polyView() ? ' · POLY' : ' · MONO');
     const poly = polyView(); if (!poly && c.x >= 1 && c.x < NCOL) c.x = 0;
     const p = S.phrases[cPhrase], pr = playRows(q => q.phrase === cPhrase ? q.step : null), len = plen(cPhrase), lpb = S.plpb[cPhrase] || 0, el2 = lpb || S.lpb;
     L.push([{t:'LEN ', cls:'lb'}, {t:d2(len), cls:cc(0, -2, 'v'), x:0, y:-2}, {t:'  LPB ', cls:'lb'}, {t:lpb ? d2(lpb) : '--', cls:cc(1, -2, lpb ? 'v' : 'e'), x:1, y:-2},
@@ -4323,36 +4335,37 @@ function draw(){
     for (let y = c.top; y < Math.min(len, c.top + VR); y++){
       const r = p ? p[y] : blankRow();
       const ln = [{t:rS(y), cls:'rn' + (y % 4 ? '' : ' rn4') + (pr.has(y) ? ' pl' : '') + rsel(y), r:y}, ' '];
-      for (let q = 0; q < (poly ? NCOL : 1); q++) ln.push({t:noteS(r[q]), cls:cc(q, y, r[q] < 0 ? 'e' : 'cn'), x:q, y}, ' ');
+      const yl = Math.min(len, c.top + VR) - 1;
+      for (let q = 0; q < (poly ? NCOL : 1); q++) ln.push({t:noteS(r[q]), cls:cc(q, y, r[q] < 0 ? 'e' : 'cn') + tk(cTrack) + (y === c.top ? ' tkt' : '') + (y === yl ? ' tkb' : ''), x:q, y}, ' ');
       ln.push({t:h2(r[VC]), cls:cc(VC, y, r[VC] < 0 ? 'e' : 'cv'), x:VC, y}, ' ', {t:h2(r[IC]), cls:cc(IC, y, r[IC] < 0 ? 'e' : 'ci'), x:IC, y});
       for (let k = FX0; k < RW; k += 2) ln.push(' ', {t:r[k] < 0 ? '---' : (FXC[r[k]] || '???'), cls:cc(k, y, r[k] < 0 ? 'e' : 'cf'), x:k, y}, ' ', {t:h2(r[k + 1]), cls:cc(k + 1, y, r[k + 1] < 0 ? 'e' : 'v'), x:k + 1, y});
       L.push(ln);
     }
   } else if (tv === 'mixer'){
     const [T0, T1] = trackWin(c, 4); mixL = T0; mixN = T1 - T0; sub = trkSub(T0, T1);
-    const hd = ['    ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t), x:t, y:-1}, ' '); L.push(hd);
+    const hd = ['    ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t) + tk(t) + ' tkt', x:t, y:-1}, ' '); L.push(hd);
     ['VOL ', 'PAN ', 'MUT ', 'SOL '].forEach((n, y) => {
       const ln = [{t:n, cls:'lb'}];
       for (let t = T0; t < T1; t++){ const m = S.mix[t];
         const tx = y === 0 ? hx(m.vol) : y === 1 ? hx(m.pan) : y === 2 ? (m.mute ? 'MU' : '--') : (m.solo ? 'SO' : '--');
         const on = y < 2 || (y === 2 ? m.mute : m.solo);
-        ln.push({t:tx, cls:cc(t, y, on ? (y === 2 ? 'v mu2' : y === 3 ? 'v so2' : 'v') : 'e'), x:t, y}, ' '); }
+        ln.push({t:tx, cls:cc(t, y, on ? (y === 2 ? 'v mu2' : y === 3 ? 'v so2' : 'v') : 'e') + tk(t), x:t, y}, ' '); }
       L.push(ln);
     });
     const fl = [{t:'FX  ', cls:'lb'}];
-    for (let t = T0; t < T1; t++){ const n = fxCount(S.tfx[t]); fl.push({t:n ? d2(n) : '--', cls:cc(t, 4, n ? 'cf' : 'e'), x:t, y:4}, ' '); }
+    for (let t = T0; t < T1; t++){ const n = fxCount(S.tfx[t]); fl.push({t:n ? d2(n) : '--', cls:cc(t, 4, n ? 'cf' : 'e') + tk(t), x:t, y:4}, ' '); }
     L.push(fl);
     const cl = [{t:'CHN ', cls:'lb'}];
     const ct = chainsTracks();
     for (let t = T0; t < T1; t++){
       const on = chainsFeed(t), flag = !!(S.chainOn && S.chainOn[t]), tx = on ? 'ON' : flag && !ct.has(t) ? 'MISS' : '--';
-      cl.push({t:tx, cls:cc(t, 5, on ? 'cf' : flag ? 'v' : 'e'), x:t, y:5}, ' ');
+      cl.push({t:tx, cls:cc(t, 5, on ? 'cf' : flag ? 'v' : 'e') + tk(t), x:t, y:5}, ' ');
     }
     L.push(cl);
     // Level meters, 8 lines of 6 dB each: red above −6 dB, yellow above −12.
     for (let k = 0; k < MH; k++){
       const ml = [{t:(k ? String(-6 * k) : '0').padStart(3) + ' ', cls:'lb'}];
-      for (let t = T0; t < T1; t++) ml.push({t:'  ', cls:'mt ' + (k === 0 ? 'm3' : k === 1 ? 'm2' : 'm1')}, ' ');
+      for (let t = T0; t < T1; t++) ml.push({t:'  ', cls:'mt ' + (k === 0 ? 'm3' : k === 1 ? 'm2' : 'm1') + tk(t) + (k === MH - 1 ? ' tkb' : '')}, ' ');
       L.push(ml);
     }
     const mn = fxCount(S.mfx);
