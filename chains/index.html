@@ -706,9 +706,11 @@ function normalize(d){
   d.meta = d.meta || { name:'Untitled' };
   // Waves patches opened here: drop synth-only modules, keep FX/utils/IO.
   { const keep = new Set(Object.keys(MODULES)); const ids = new Set();
+    // Out becomes Chain Out first; filtering first dropped it (and its cables), so a waves patch lost its output.
+    for (const m of d.modules){ if (m && m.type === 'out'){ m.type = 'chainOut'; const p0 = m.params || {}; m.params = Object.assign({ track: p0.slot || 1, level:1 }, p0); delete m.params.slot; } }
     d.modules = d.modules.filter(m => { const ok = m && keep.has(m.type); if (ok) ids.add(m.id); return ok; });
     d.cables = d.cables.filter(c => c && ids.has(c.from[0]) && ids.has(c.to[0]));
-    for (const m of d.modules){ if (m.type === 'out'){ m.type = 'chainOut'; m.params = Object.assign({ track:1, level:1 }, m.params); if (m.params.slot && !m.params.track) m.params.track = m.params.slot; delete m.params.slot; } } }
+  }
   d.view = d.view || { x:0, y:0, zoom:1 };
   // Cables into a slider's jack go to "p:name" (older patches used the bare name).
   for (const c of d.cables){

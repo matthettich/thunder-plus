@@ -2430,10 +2430,13 @@ function closeWaves(){ setView('synth'); }
 
 /* ---------- …chains editor: a full-screen frame; the patch is read from and saved into the song ---------- */
 const CH = { doc:null, frame:null };   // doc: the song's chains patch (kept here, where Phase 2 routing can see it)
+/* Throw the editor frame away (a new song, an import, an undo): it reloads from the song next time. Removing it fires its
+   pagehide, which saves its own (now stale) patch; ignore that, or it wrote the old patch over the one just loaded. */
+function chainsDropFrame(){ if (!CH.frame) return; CH.dropping = true; try { CH.frame.remove(); } finally { CH.dropping = false; } CH.frame = null; }
 function chainsChanged(){ CH.doc = S.chainPatch || null; saveS(); chainsPush(); }
 window.thunderChains = {
   load: () => S.chainPatch ? JSON.parse(JSON.stringify(S.chainPatch)) : null,
-  save: d => { S.chainPatch = d; chainsChanged(); },
+  save: d => { if (CH.dropping) return; S.chainPatch = d; chainsChanged(); },
   /* A single slider: update the patch and push JUST that param to the live engines.
      No structural diff, no native-FX rebuild — smooth while dragging. */
   param(id, name, value){
@@ -2478,7 +2481,7 @@ async function importChainsFile(f){
     const d = JSON.parse(await f.text());
     if (!d || typeof d !== 'object' || (d.format !== 'chains.patch' && d.format !== 'waves.patch')) throw new Error('That file isn’t a …chains patch.');
     S.chainPatch = d.format === 'chains.patch' ? d : normalizeChainsImport(d);
-    CH.doc = S.chainPatch; if (CH.frame){ CH.frame.remove(); CH.frame = null; }
+    CH.doc = S.chainPatch; chainsDropFrame();
     if (view === 'chains') showChains();
     saveS(); chainsReload(); toast('Loaded “' + (d.meta && d.meta.name || f.name) + '”.');
     return true;
@@ -2489,9 +2492,10 @@ function normalizeChainsImport(d){
   const keep = new Set(['trackIn','vcf','vca','mixer','eq','comp','saturation','tape','chorus','crush','delay','reverb','rings','clouds','lfo','adsr','random','atten','chainOut']);
   const ids = new Set();
   d.format = 'chains.patch';
+  // Out becomes Chain Out BEFORE the filter (it used to be filtered out first, so a waves patch lost its output and cables).
+  for (const m of (d.modules || [])) if (m && m.type === 'out'){ m.type = 'chainOut'; const p0 = m.params || {}; m.params = Object.assign({ track: p0.slot || 1, level:1 }, p0); delete m.params.slot; }
   d.modules = (d.modules || []).filter(m => { const ok = m && keep.has(m.type); if (ok) ids.add(m.id); return ok; });
   d.cables = (d.cables || []).filter(c => c && ids.has(c.from[0]) && ids.has(c.to[0]));
-  for (const m of d.modules) if (m.type === 'out'){ m.type = 'chainOut'; m.params = Object.assign({ track:1, level:1 }, m.params); if (m.params.slot && !m.params.track) m.params.track = m.params.slot; delete m.params.slot; }
   return d;
 }
 
@@ -2888,7 +2892,7 @@ function undoStep(dir){
   // replacing it would keep playing the old song (the screen would show the undo, the speakers wouldn't).
   undo.busy = true; const n = normSong(JSON.parse(undo.cur));
   for (const k of Object.keys(S)) if (!(k in n)) delete S[k];
-  Object.assign(S, n); CH.doc = S.chainPatch || null; if (CH.frame){ CH.frame.remove(); CH.frame = null; } saveS(); undo.busy = false;
+  Object.assign(S, n); CH.doc = S.chainPatch || null; chainsDropFrame(); saveS(); undo.busy = false;
   if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); }
   draw(); toast(dir < 0 ? 'Undo' : 'Redo');
 }
@@ -3267,7 +3271,9 @@ function rtFx(t){
 function rtAllFx(){ for (let t = 0; t <= NT; t++) rtFx(t); }
 function fxChanged(t){ saveS(); rtFx(t); }
 function chainsFeedChanged(t){ saveS(); rtFx(t); draw(); }
-function chainsPush(){ if (!rt) return; for (let t = 0; t < NT; t++) if (chainsFeed(t)) rtFx(t); }
+// Re-route every track that runs through …chains now, AND every track that did until this change (its Chain Out
+// was deleted or set to another track): without that, the old track kept a chains node with no way out and went silent.
+function chainsPush(){ if (!rt) return; for (let t = 0; t < NT; t++){ const b = rt.pl && rt.pl.buses[t]; if (chainsFeed(t) || (b && b.chn)) rtFx(t); } }
 /* The whole patch changed (song load, undo, import): the old node state is meaningless, so make the
    next push a full reload instead of a diff. */
 function chainsReload(){ if (rt && rt.pl) for (const b of rt.pl.buses) if (b && b.chn) b.chn._sent = null; chainsPush(); }
@@ -3488,7 +3494,7 @@ function loadCur(){
   } catch(e){}
 }
 function resetCursors(){ cChain = cPhrase = cInst = cTrack = cFxT = cFxS = 0; for (const k in cs) Object.assign(cs[k], {x:0, y:0, top:0}); selA = null; }
-function setSong(s, msg){ tStop(true); S = s; projFile = null; resetCursors(); CH.doc = S.chainPatch || null; if (CH.frame){ CH.frame.remove(); CH.frame = null; } if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); }
+function setSong(s, msg){ tStop(true); S = s; projFile = null; resetCursors(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); }
 
 /* ---------- views ---------- */
 const MID = ['song', 'chain', 'phrase', 'inst'], VIEWS = ['song', 'chain', 'phrase', 'inst', 'mixer', 'fx', 'project'], GRIDV = new Set(['song', 'chain', 'phrase']);
