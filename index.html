@@ -395,7 +395,12 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 @media (max-width:600px){ .tcmd button{flex-direction:column; gap:1px; line-height:1.1; letter-spacing:.02em} .tcmd button[data-c=next]{flex-direction:column-reverse} .tcmd .ca{font-size:10px} }
 .tcmd button.on{background:var(--pl); color:var(--inv)}
 .tcmd button[hidden]{display:none} .tcmd.song button[data-c=song]{grid-column:span 2}
-@media (min-width:700px){ .tcmd{grid-template-columns:repeat(12,minmax(0,1fr))} }
+/* One row on wide screens: PREV and NEXT get wider columns, ▶ SONG a little extra, so none of them crop. */
+@media (min-width:700px){
+  .tcmd{grid-template-columns:repeat(4,minmax(0,1fr)) repeat(2,minmax(0,1.5fr)) repeat(5,minmax(0,1fr)) minmax(0,1.25fr)}
+  .tcmd.song{grid-template-columns:repeat(2,minmax(0,1fr)) repeat(2,minmax(0,1.5fr)) repeat(6,minmax(0,1fr)) minmax(0,1.25fr)}
+  .tcmd.song button[data-c=song]{grid-column:auto}
+}
 body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bottom,0px))}
 
 .ttabbar{display:flex; flex:none; border-bottom:1px solid var(--line); background:var(--side); min-width:0}
