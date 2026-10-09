@@ -6,6 +6,8 @@
 
 **Separate from ...Thunder.** Thunder Plus saves its kit, song and settings under its own names, so it never changes ...Thunder's. The first time it opens, it starts from a copy of ...Thunder's kit and song. Its offline cache is its own too.
 
+**Desktop app.** The Electron build serves the app from its own `app://thunder/` address instead of opening plain files, so the …waves editor frame can load its sound engine and save into the kit as it does on the web. Build it as below (`npm start` to try it); `waves/` is copied in with the rest.
+
 **Files.** `waves/` holds the …waves editor and engine (`waves/waves-worklet.js`, from the waves repo); Thunder Plus loads the same engine to render patches into the pads, using the Plaits, Elements and effects code already in `index.html`.
 
 The rest of this README is ...Thunder's.
