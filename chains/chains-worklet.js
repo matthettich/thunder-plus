@@ -13,7 +13,7 @@
    since a worklet can't fetch. */
 
 (() => {   // everything lives in this scope, so a page that loads it keeps its own names
-const BLOCK = 128, CHAN_COUNT = 16, PROTOCOL = 2, TARGET = 'chains';
+const BLOCK = 128, CHAN_COUNT = 32, PROTOCOL = 2, TARGET = 'chains';
 
 /* ── shared helpers ───────────────────────────────────────────────────────── */
 const TS = 4096, SIN = new Float32Array(TS + 1);

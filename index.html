@@ -2692,7 +2692,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=1')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=2')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -2991,7 +2991,7 @@ function makeSeq(S, mode, o){
     let rel0 = Infinity; for (const T of tr) if (T.on && T.rel < rel0) rel0 = T.rel;
     if (rel0 === Infinity) rel0 = api.time - api.base;
     const t0 = api.base + rel0, evs = [], pos = new Array(NT).fill(null), sw = clamp(S.swing, 50, 75) / 100;
-    let nb = api.bpm, ngrv = api.grv;
+    let nb = api.bpm, ngrv = api.grv; const tks0 = api.tks;
     for (let t = 0; t < NT; t++){
       const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
       const cid = mode === 'phrase' ? -1 : chainId(T, t), ch = cid >= 0 ? S.chains[cid] : null;
@@ -3091,6 +3091,8 @@ function makeSeq(S, mode, o){
       { const np = mode === 'phrase' ? o.phrase : T.on && !T.empty ? ((S.chains[chainId(T, t)] || [])[T.cr] || [-1])[0] : -1; if (T.step >= lenOf(np)) T.step = 0; }
       T.rel += dur; T.g++;
     }
+    // TPO or TIC on this row: tell the player, so tempo-synced …chains modules follow (live and in renders).
+    if (nb !== api.bpm || api.tks !== tks0) evs.push({type:'tempo', t:t0, bpm:nb, tks:api.tks});
     api.bpm = nb; api.grv = ngrv;
     let nx = Infinity; for (const T of tr) if (T.on && T.rel < nx) nx = T.rel;
     api.time = api.base + (nx === Infinity ? rel0 : nx);
@@ -3129,7 +3131,23 @@ function makePlayer(ac, out, getBuf, live){
       }
     } catch(e){}
   }
+  // A tempo change from the song (TPO / TIC) goes to every …chains node at its time: live by timer (the
+  // sequencer runs a little ahead), in an offline render by suspending the render at that moment.
+  const tempoAt = new Map();
+  function tempoTo(ev){
+    const m = {target:'chains-host', op:'transport', value:{tempo:ev.bpm, ticks:ev.tks}};
+    const send = () => { for (const b of buses) if (b && b.chn){ try { if (b.chn._send) b.chn._send(m); else b.chn.port.postMessage(m); } catch(e){} } };
+    const O = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (O && ac instanceof O){
+      const q = 128 / ac.sampleRate, at = Math.ceil(ev.t / q) * q;
+      if (!(at > 0 && at < ac.length / ac.sampleRate)){ send(); return; }
+      if (tempoAt.has(at)){ tempoAt.get(at).push(send); return; }
+      const list = [send]; tempoAt.set(at, list);
+      try { ac.suspend(at).then(() => { for (const f of list) f(); return ac.resume(); }).catch(() => {}); } catch(e){ send(); }
+    } else setTimeout(send, Math.max(0, (ev.t - ac.currentTime) * 1000));
+  }
   function play(ev){
+    if (ev.type === 'tempo'){ tempoTo(ev); return; }
     const T = vs[ev.track];
     // OFF releases every note on the track: synth slots over their release, drum pads at once.
     if (ev.type === 'off'){ for (const v of T) kill(v, ev.t, relTc(v)); T.length = 0; return; }

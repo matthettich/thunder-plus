@@ -54,8 +54,8 @@ button{cursor:pointer}
 .tb:disabled{opacity:.4; cursor:default}
 .fps{font-size:13px; font-variant-numeric:tabular-nums; padding:6px 9px; border:1px solid var(--edge); color:var(--muted); line-height:1.2; white-space:nowrap}
 .fps.good{color:#2e9e5b; border-color:#2e9e5b} .fps.ok{color:#c99a00; border-color:#c99a00} .fps.low{color:var(--rec); border-color:var(--rec)}
-.meters{display:inline-flex; align-items:center; gap:3px; padding:6px 8px}
-.meters .b{width:12px; height:9px; background:var(--track); position:relative; overflow:hidden}
+.meters{display:inline-flex; align-items:center; gap:2px; padding:6px 8px}
+.meters .b{width:6px; height:9px; background:var(--track); position:relative; overflow:hidden}
 .meters .b i{position:absolute; inset:0; transform-origin:left; background:var(--audio); transform:scaleX(0)}
 .zoomctl{display:flex; align-items:center; gap:4px}
 .zoomctl .tb{padding:6px 9px; min-width:34px; justify-content:center}
@@ -300,7 +300,7 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
   <input type="file" id="fileload" accept=".json,application/json" hidden>
   <div class="spacer"></div>
   <span class="fps" id="cpuv" title="How busy the sound engine is">CPU –</span>
-  <span class="fps meters" id="meters" title="Chain 1–16"></span>
+  <span class="fps meters" id="meters" title="Chain 1–32"></span>
   <button class="tb" id="midilearn">MIDI learn</button>
   <div class="zoomctl"><button class="tb" id="zoomout" aria-label="Zoom out">−</button><button class="tb" id="zoomval" title="Click to type a zoom level">100%</button><button class="tb" id="zoomin" aria-label="Zoom in">+</button><button class="tb" id="zoomfit">Fit</button></div>
 </div>
@@ -334,7 +334,7 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
    document and sends changes to it through ChainsBridge.
    Phase 1 is UI-only: Track In modules are silence standalone; the host wires
    tracker audio in Phase 2. */
-const PROTOCOL = 2, TARGET = 'chains', CHAN_COUNT = 16;
+const PROTOCOL = 2, TARGET = 'chains', CHAN_COUNT = 32;
 
 /* Module table. It mirrors MODULES in chains-worklet.js (inputs, outputs and parameter ranges must match).
    ui: per-parameter label (l), value format (f) and dropdown choices (c). */
@@ -626,7 +626,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=1';
+    const url = opts.url || './chains-worklet.js?v=2';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -1653,7 +1653,7 @@ function helpDoc(){
   const EDGE = { afx:'#b24fb0', mod:'#c99a00', aout:'#3f6fb5', util:'#e07a2e' };
   const KC = { audio:'#22958d', mod:'#7a58c8', gate:'#c93d78' };
   const ABOUT = {
-    trackIn:'Your tracker track, in stereo. Pick the track (1–16); in …Thunder Plus it carries that track’s sound. On its own it is silence — patch it through effects into a Chain Out.',
+    trackIn:'Your tracker track, in stereo. Pick the track (1–32); in …Thunder Plus it carries that track’s sound. On its own it is silence — patch it through effects into a Chain Out.',
     vcf:'A filter. Low-pass softens, band-pass keeps the middle, high-pass thins. Patch an envelope into Cutoff for classic sweeps.',
     vca:'An amplifier. Patch an envelope into CV so notes start and stop (with nothing in CV it stays open); Gain sets the loudness.',
     mixer:'Mixes up to four sounds, each with its own level, plus a master level.',
@@ -1677,7 +1677,7 @@ function helpDoc(){
   const guide = [
     ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal cables carry sound, purple dashed cables carry modulation and pink dashed cables carry gates. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the centre, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
-    ['Tracks', 'Start with a Track In (your tracker track, 1–16) and end with a Chain Out back to the same track. Keep one pair per track; the buses are hard-assigned, so Track 3 always feeds Chain 3.'],
+    ['Tracks', 'Start with a Track In (your tracker track, 1–32) and end with a Chain Out back to the same track. Keep one pair per track; the buses are hard-assigned, so Track 3 always feeds Chain 3.'],
     ['Moving around', 'Drag the background or scroll with two fingers to pan. Pinch, Ctrl-scroll or a mouse wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
     ['Selecting and the right-click menu', 'Shift-click or Shift-drag to select modules. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
