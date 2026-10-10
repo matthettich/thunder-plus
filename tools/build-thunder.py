@@ -42,7 +42,7 @@ s = s.replace("'thunderplus-", "'thunder-")
 # Only the Tracker and Synth screens; …waves and …chains play but aren't edited here
 rep("[['tracker', 'Tracker'], ['synth', 'Synth'], ['waves', 'Waves'], ['chains', 'Chains']]", "[['tracker', 'Tracker'], ['synth', 'Synth']]")
 rep("if (v !== 'synth') setView(v === 'chains' ? 'chains' : v === 'waves' ? 'waves' : 'tracker');", "if (v !== 'synth') setView('tracker');")
-rep('title="File: save or open a project, or the Waves / Chains patch"', 'title="File: save or open a project"')
+rep('title="File: new, open, save, share, render and export (on Waves / Chains: that patch)"', 'title="File: new, open, save, share, render and export"')
 rep("""    null,
     ['Export chains…', exportChains], ['Import chains…', () => $('chainsIn').click()]""", "")
 rep("""    {l:'› EXPORT CHAINS', act:exportChains, info:() => 'Save the …chains patch (lives in the song) as its own .chains.json file'},

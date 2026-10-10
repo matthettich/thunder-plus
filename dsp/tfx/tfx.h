@@ -2,7 +2,13 @@
 // AudioWorklet, one instance per tracker track (and one on the master). Every effect is an
 // object, so a track can hold several of the same kind.
 #pragma once
+#include <stdlib.h>
+#include <string.h>
 struct Fx {
+  // Every effect starts in zeroed memory, as on the hardware (where they are statics). Without this a
+  // Clouds made where a freed Reverb used to be inherited its leftovers and stayed silent.
+  static void* operator new(size_t n) { void* q = malloc(n); if (q) memset(q, 0, n); return q; }
+  static void operator delete(void* q) { free(q); }
   float p[12];                 // parameters, written by the worklet straight into wasm memory
   float sr = 48000.f;
   Fx() { for (int i = 0; i < 12; ++i) p[i] = 0.f; }

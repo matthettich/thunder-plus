@@ -227,6 +227,9 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
 .hint{position:absolute; left:12px; bottom:12px; max-width:min(62ch, calc(100% - 200px)); padding:7px 10px;
   font-size:12.5px; color:var(--muted); background:var(--panel); border:1px solid #111; z-index:1000001; display:flex; gap:10px; align-items:start}
 .hint button{border:0; background:none; color:var(--muted); font-size:16px; line-height:1; padding:0}
+/* The tip box never blocks the patch under it (jacks at the bottom of a module sat beneath it): only its close button takes touches. */
+.hint{pointer-events:none; opacity:.92} .hint button{pointer-events:auto}
+@media (pointer: coarse){ .hint button{min-width:36px; min-height:36px; font-size:20px} }
 .toast{position:absolute; left:50%; top:14px; transform:translateX(-50%); background:var(--ink); color:var(--panel);
   padding:7px 12px; font-size:13px; z-index:1000002; pointer-events:none; max-width:90%}
 .emptylbl{position:absolute; left:50%; top:50%; transform:translate(-50%, -50%); z-index:0; pointer-events:none; font-family:var(--font); font-weight:700; font-size:clamp(34px, 6vw, 76px); letter-spacing:.02em; white-space:nowrap}
@@ -246,6 +249,9 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
 
 /* ---------- touch screens and narrow windows ---------- */
 @media (pointer: coarse){
+  .port{height:32px} .ins, .outs{gap:8px}
+  .jack{position:relative} .jack::before{content:''; position:absolute; inset:-9px; border-radius:50%}
+  svg.cables .hit{stroke-width:26px}
   .tb, .btn{min-height:42px}
   select, input{font-size:16px}
   input[type=range]{height:34px}
@@ -318,7 +324,7 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
     <div id="groups"></div>
     <svg class="cables" id="cables" xmlns="http://www.w3.org/2000/svg"></svg>
   </div>
-  <div class="hint" id="hint"><span>Drag from an output jack to an input jack to patch. Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Double-click a cable to remove it, or a module’s title bar to collapse it. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Start with a Track In (your tracker track) and end with a Chain Out back to the same track.</span><button id="hintx" aria-label="Hide tips">×</button></div>
+  <div class="hint" id="hint"><span>Drag from an output jack to an input jack to patch (on a touch screen you can also tap one jack, then the other; double-tap a cable to remove it). Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Double-click a cable to remove it, or a module’s title bar to collapse it. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Start with a Track In (your tracker track) and end with a Chain Out back to the same track.</span><button id="hintx" aria-label="Hide tips">×</button></div>
   <div class="lasso" id="lasso" hidden></div>
   <div class="emptylbl" id="emptylbl" aria-hidden="true" hidden></div>
   <div class="toast" id="toast" hidden></div>
@@ -626,7 +632,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=2';
+    const url = opts.url || './chains-worklet.js?v=3';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -741,7 +747,11 @@ function makeJack(n, port, kind, dir, small){
   j.addEventListener('pointerdown', e => onJackDown(e, j));
   return j;
 }
-function portEl(n, port, kind, dir){ return h('div', {class:'port'}, makeJack(n, port, KIND[kind] || 'mod', dir), h('span', {text: PORT_LABEL[port] || port})); }
+function portEl(n, port, kind, dir){
+  const j = makeJack(n, port, KIND[kind] || 'mod', dir), row = h('div', {class:'port'}, j, h('span', {text: PORT_LABEL[port] || port}));
+  row.addEventListener('pointerdown', e => { if (e.target !== j && e.button !== 2) onJackDown(e, j); });
+  return row;
+}
 function setParam(n, key, v, fromUser){
   n.m.params[key] = v;
   if (bridge) bridge.setParam(n.m.id, key, v);
@@ -948,9 +958,14 @@ function syncCableEls(){
       // A cable lying over a jack shouldn't block it: pass the press through to the jack.
       const jack = document.elementsFromPoint(ev.clientX, ev.clientY).find(x => x.classList && x.classList.contains('jack'));
       if (jack){ onJackDown(ev, jack); return; }
-      if (ev.altKey){ ev.preventDefault(); cableBendAt(ev, c); }
+      if (ev.altKey){ ev.preventDefault(); cableBendAt(ev, c); return; }
+      if (ev.pointerType === 'touch'){
+        const now = performance.now(), lt = hit._tap;
+        if (lt && now - lt.t < 450 && Math.hypot(ev.clientX - lt.x, ev.clientY - lt.y) < 30){ hit._tap = null; store.snapshot(); disconnect(c); toast('Cable removed.'); }
+        else { hit._tap = { t:now, x:ev.clientX, y:ev.clientY }; toast('Double-tap a cable to remove it.'); }
+      }
     });
-    hit.addEventListener('dblclick', () => { store.snapshot(); disconnect(c); });
+    hit.addEventListener('dblclick', () => { if (!doc.cables.includes(c)) return; store.snapshot(); disconnect(c); });
     el.g.append(hit); el.hit = hit;
     svg.append(el.g); cableEls.set(c, el);
   }
@@ -1038,9 +1053,15 @@ function onJackDown(e, jack){
     return null;
   };
   const esc = ev => { if (ev.key === 'Escape'){ ev.preventDefault(); up({ type:'pointercancel', manual:true }); } };
+  const sx = e.clientX, sy = e.clientY, touch = e.pointerType === 'touch';
   const up = ev => {
     if (drag.drawing && ev.type === 'pointercancel' && !ev.manual) return;
-    if (ev.type !== 'pointercancel' && (ev.altKey || drag.drawing) && !findTarget(ev)){
+    // Touch: a tap on a jack (no drag) picks the cable up; the next tap on a jack plugs it in, a tap anywhere else drops it.
+    if (touch && !drag.armed && ev.type === 'pointerup' && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 12){
+      drag.armed = true; toast(snapped ? 'Tap a jack to move the cable there, or empty space to remove it.' : 'Now tap the jack to connect to.'); return;
+    }
+    if (drag.armed && ev.type === 'pointercancel' && !ev.manual) return;
+    if (ev.type !== 'pointercancel' && (ev.altKey || drag.drawing) && !drag.armed && !findTarget(ev)){
       // Drawing by hand: each click on empty space becomes a bend; click a jack to finish, Escape to cancel.
       drag.pts.push(snapBend(drag, worldPt(ev), ev.shiftKey)); drag.drawing = true; return;
     }
@@ -1049,9 +1070,9 @@ function onJackDown(e, jack){
     const d = drag; drag = null; d.el.g.remove(); autoPanV = [0, 0];
     if (ev.type === 'pointercancel') return;
     const t = findTarget(ev);
-    if (!t) return;
+    if (!t){ if (snapped) toast('Cable removed.'); return; }
     const tt = { id: t.dataset.id, port: t.dataset.port, dir: t.dataset.dir };
-    if (tt.dir === d.anchor.dir) return;
+    if (tt.dir === d.anchor.dir){ if (snapped) toast('Cable removed.'); return; }
     const out = d.anchor.dir === 'out' ? d.anchor : tt, inp = d.anchor.dir === 'out' ? tt : d.anchor;
     if (!snapped) store.snapshot();
     connect([out.id, out.port], [inp.id, inp.port], d.anchor.dir === 'out' ? d.pts : d.pts.slice().reverse());
@@ -1184,7 +1205,10 @@ function fitAll(){
 }
 // Two fingers on a touch screen: pinch to zoom, move to pan.
 const touches = new Map(); let pinch = null;
-ws.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') touches.set(e.pointerId, [e.clientX, e.clientY]); }, true);
+// The first finger down (isPrimary) starts afresh: a touch whose lift was never seen (the screen hidden mid-touch, a module
+// rebuilt under the finger) used to stay in the map, so from then on every single touch counted as two fingers.
+ws.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') return; if (e.isPrimary){ touches.clear(); pinch = null; } touches.set(e.pointerId, [e.clientX, e.clientY]); }, true);
+addEventListener('blur', () => { touches.clear(); pinch = null; }); document.addEventListener('visibilitychange', () => { touches.clear(); pinch = null; });
 window.addEventListener('pointermove', e => {
   if (!touches.has(e.pointerId)) return;
   touches.set(e.pointerId, [e.clientX, e.clientY]);

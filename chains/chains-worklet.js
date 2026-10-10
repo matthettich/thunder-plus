@@ -36,7 +36,10 @@ function wasmInit(o){
   o = o || {};
   try {
     if (o.tfxModule || o.tfxBytes){
-      WASM.tfx = o.tfxModule || new WebAssembly.Module(o.tfxBytes);
+      // Compiled once per audio thread and kept: every track's node used to compile its own copy on the audio
+      // thread as it was made, a hitch you could hear. Each node still gets its own instance (own memory).
+      WASM.tfx = o.tfxModule || (WASM._bytesLen === o.tfxBytes.byteLength && WASM._mod) || new WebAssembly.Module(o.tfxBytes);
+      if (!o.tfxModule){ WASM._mod = WASM.tfx; WASM._bytesLen = o.tfxBytes.byteLength; }
       const x = new WebAssembly.Instance(WASM.tfx, WASI).exports;
       if (x._initialize) x._initialize();
       WASM.tfxX = x;
@@ -245,7 +248,7 @@ const MODULES = { trackIn:TrackIn,
 /* A cable into "p:name" modulates that parameter instead of feeding an input. */
 const isParamPort = p => typeof p === 'string' && p.startsWith('p:');
 class Graph {
-  constructor(){ this.mods = new Map(); this.cables = []; this.order = []; this.inc = new Map(); }
+  constructor(){ this.mods = new Map(); this.cables = []; this.order = []; this.inc = new Map(); this.ver = 0; }
   add(id, def, inst){ this.mods.set(id, { id, def, inst }); this.compile(); }
   remove(id){ this.mods.delete(id); this.cables = this.cables.filter(c => c.a[0] !== id && c.b[0] !== id); this.compile(); }
   connect(a, b){
@@ -264,7 +267,7 @@ class Graph {
     const q = [...indeg].filter(([, d]) => d === 0).map(([k]) => k), order = [];
     while (q.length){ const k = q.shift(); order.push(k); for (const n of adj.get(k)){ indeg.set(n, indeg.get(n) - 1); if (indeg.get(n) === 0) q.push(n); } }
     for (const k of this.mods.keys()) if (!order.includes(k)) order.push(k);
-    this.order = order;
+    this.order = order; this.ver++;
   }
 }
 
@@ -281,6 +284,9 @@ class ChainsEngine {
     this._busy = 0; this._frames = 0;
     /* Phase 2: the host sets trackInL/trackInR so Track In modules read tracker audio. */
     this.trackInL = null; this.trackInR = null;
+    /* focus: in Thunder each track's node only runs the modules that lead to a Chain Out for ITS track (and what
+       modulates them). It used to run the whole patch, so 4 tracks on …chains did 4× every track's effects. -1 = all. */
+    this.focus = opts.focus == null ? -1 : opts.focus; this._act = null; this._actKey = '';
     this._ctx = { sr:sampleRate, block:BLOCK, quality:this.quality, transport:this.transport, engine:this,
       trackInL:k => this.trackInL ? this.trackInL.subarray(k * BLOCK, (k + 1) * BLOCK) : null,
       trackInR:k => this.trackInR ? this.trackInR.subarray(k * BLOCK, (k + 1) * BLOCK) : null,
@@ -297,7 +303,17 @@ class ChainsEngine {
   removeModule(id){ this._drop(id); this.graph.remove(id); this._sync(); }
   connect(a, b){ this.graph.connect(a, b); this._sync(); }
   disconnect(a, b){ this.graph.disconnect(a, b); this._sync(); }
-  setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number') m.inst.params[name] = v; }
+  setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number'){ m.inst.params[name] = v; if (name === 'track') this._actKey = ''; } }
+  /* The modules this node has to run (null: all of them). */
+  _active(){
+    if (this.focus < 0) return null;
+    const g = this.graph, key = g.ver + ':' + g.mods.size;
+    if (this._act && this._actKey === key) return this._act;
+    const act = new Set(), q = [];
+    for (const m of g.mods.values()) if (m.def === ChainOut && clamp((m.inst.params.track | 0) - 1, 0, CHAN_COUNT - 1) === this.focus){ act.add(m.id); q.push(m.id); }
+    while (q.length){ for (const c of g.inc.get(q.pop()) || []) if (!act.has(c.a[0])){ act.add(c.a[0]); q.push(c.a[0]); } }
+    this._act = act; this._actKey = key; return act;
+  }
   setParams(list){ for (const [id, name, v] of list) this.setParam(id, name, v); }
   setTransport(t){ Object.assign(this.transport, t); }
   /* Keep every module's state (filter memories, reverb tails) when the patch changes. */
@@ -374,7 +390,9 @@ class ChainsEngine {
     const ctx = this._ctx;
     ctx.block = frames; ctx.quality = this.quality; ctx.transport = this.transport;
     ctx._inL = this.trackInL; ctx._inR = this.trackInR;
+    const act = this._active();
     for (const id of this.graph.order){
+      if (act && !act.has(id)) continue;
       const m = this.graph.mods.get(id);
       const io = this._bufs(m); this._gather(m, io);
       m.def.process(this._state(m), io, ctx);
@@ -482,6 +500,7 @@ class ThunderChains extends AudioWorkletProcessor {
     wasmInit({ tfxBytes:o.bytes || o.tfxBytes, tfxModule:o.tfxModule });
     this.track = Math.max(0, Math.min(CHAN_COUNT - 1, (o.track | 0) || 0));
     this.engine = new ChainsEngine(sampleRate, {
+      focus:this.track,
       quality:o.quality ?? 'full',
       transport:Object.assign({ tempo:120, lpb:4, ticks:6, playing:false }, o.transport || {})
     });
