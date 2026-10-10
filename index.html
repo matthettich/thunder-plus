@@ -573,15 +573,12 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 .tcmd{gap:12px 10px; padding-right:20px}
 .tkp{gap:10px; padding-right:4px}
 /* Two panels under the screen that read as two things: the command row (top) is a light strip with a dark rule
-   and a label, the nav pad (bottom) a darker block. The d-pad's arrows take the free width instead of sitting in
-   small squares with a gap in the middle. */
+   and a label, the nav pad (bottom) a darker block. The d-pad keeps its square, thumb-sized keys. */
 .tcmd{background:color-mix(in srgb, var(--panel) 70%, var(--side)); border-top:2px solid var(--ink); border-bottom:0; position:relative; padding-top:18px}
 .tcmd::before{content:'COMMANDS'; position:absolute; left:16px; top:3px; font-size:9px; font-weight:700; letter-spacing:.12em; color:var(--muted)}
 .tctl{background:color-mix(in srgb, var(--side) 62%, #000); border-top:4px solid var(--ink)}
 .tcmd:not([hidden]) + .tctl{border-top:4px solid var(--ink)}
-.tpad{gap:20px}
-.tpad .dpad{flex:1 1 auto; max-width:calc(var(--k) * 6.2); grid-template-columns:repeat(3,minmax(var(--k),1fr)); gap:10px 10px}
-@media (max-width:480px){ .tcmd::before{left:10px} .tpad{gap:12px} .tcmd button{font-size:11px; letter-spacing:0} }
+@media (max-width:480px){ .tcmd::before{left:10px} .tcmd button{font-size:11px; letter-spacing:0} }
 .kpr{gap:10px 9px}
 .kpc{gap:10px; height:calc(var(--k) * 1.95 + 16px)}
 .pads{gap:10px 10px; padding-right:4px}
