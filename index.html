@@ -32,6 +32,8 @@
   --bench:#ffffff; --panel:#ffffff; --panel2:#f3f3f3; --side:#efefef; --ink:#111111; --muted:#555555;
   --track:#e6e6e6; --inv:#ffffff; --voice:#e8def9; --screen:#000000; --screen-ink:#ffffff; --screen-line:#3a3a3a;
   --std:#2f6fc7; --fm:#8a4fd0; --add:#139a9a; --noise:#e07a2e; --smp:#d1456e; --pl:#b8860b; --fx:#c447b0; --rec:#d33b2c;
+  /* voicecard accent: a complement near each fam colour, so the voice card always contrasts with the layer card */
+  --stdc:#c78f2f; --fmc:#50c74f; --addc:#9a3013; --noisec:#2e5de0; --smpc:#45d1a8; --plc:#0b4bb8; --wvc:#d15522;
   --line:var(--ink); --meter-ok:#4fd18a; --meter-hot:#e8b93c; --meter-clip:#e0564a;
   --font:Futura,"Futura PT",Jost,"Century Gothic","Avenir Next",system-ui,sans-serif;
   color-scheme:light;
@@ -170,6 +172,9 @@ input[type=range]{width:100%; accent-color:var(--ink); height:30px; margin:0; to
 .row{display:grid; grid-template-columns:70px minmax(0,1fr) 64px; align-items:center; gap:6px; font-size:12.5px; min-height:30px}
 .row label{color:var(--muted); user-select:none; -webkit-user-select:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:default}
 .row output{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+.row output:hover{background:var(--panel2)}
+/* typed value box: double-click or double-tap a row's value; inherits the app's skin */
+.vtype{font:inherit; color:var(--ink); background:var(--inv); border:1px solid var(--line); width:11ch; padding:0 3px; text-align:right}
 .segrow{display:flex; align-items:center; gap:6px; min-height:34px; font-size:12.5px}
 .segrow>span{color:var(--muted); width:70px; flex:none}
 .segrow{min-width:0}
@@ -210,6 +215,14 @@ input[type=range]{width:100%; accent-color:var(--ink); height:30px; margin:0; to
 .famtag{font-size:12px; color:var(--muted)}
 .fxcard{border:3.5px solid var(--fx); background:var(--panel)}
 .fxcard>header{display:flex; align-items:center; gap:8px; padding:8px 8px 8px 12px; border-bottom:2px solid var(--fx); flex-wrap:wrap}
+/* the voice pitch/filter/amp card: same Seeds card shape, opposite-side colour of the layer card's fam
+   (the fam colour rotated 180°, so one card always complements the other) */
+.voicecard{border:3.5px solid var(--famc, var(--pl)); background:var(--panel)}
+.voicecard>header{display:flex; align-items:center; gap:8px; padding:8px 8px 8px 12px; border-bottom:2px solid var(--famc); flex-wrap:wrap}
+.voicecard .ttl{font-size:14px; font-weight:600}
+.voicecard .lbl{font-size:12px; color:var(--muted)}
+.voicecard .sec h3::before{background:var(--famc)}
+#layerCard{--famc:hue-rotate-180deg}
 .fxtail{padding:8px 12px 4px; max-width:420px}
 .fxslot{border-top:1px solid var(--track); padding:8px 12px 10px}
 .fxslot:first-child{border-top:0}
@@ -231,11 +244,18 @@ input[type=range]{width:100%; accent-color:var(--ink); height:30px; margin:0; to
 .readout{font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; min-height:18px; padding-left:76px}
 
 /* recorder dock */
-.dock{flex:none; background:var(--side); border-top:1px solid var(--line); padding-block:9px 11px; padding-inline:16px; display:grid; gap:8px}
+.dock{flex:none; background:var(--side); border-top:1px solid var(--line); padding-block:9px 11px; padding-inline:16px; display:grid; gap:8px;
+  /* Two rows of pads, in both modes: with a voice per track the extra pads scroll instead of growing the
+     band, so the synth page's layout never shifts when the option is toggled. 2 rows (70px + 10px gap),
+     the dock's 24px block padding and its 1px top border. */
+  height:calc(70px * 2 + 10px + 24px + 1px); overflow-y:auto; touch-action:pan-y; overscroll-behavior:contain}
 .pads{display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:6px}
 .pad{height:70px; border:1px solid var(--line); background:var(--panel); display:flex; flex-direction:column;
   justify-content:space-between; align-items:flex-start; padding:6px 8px; text-align:left; font-size:12.5px; touch-action:none; min-width:0; gap:0}
 .pad b{font-size:16px; font-weight:600}
+/* A voice per track adds up to 32 track pads past the 8 drums: same 8-across pads, same 70px height,
+   scrolling up and down inside the dock (the band above keeps its own place). */
+.dock.vtrk{overscroll-behavior:contain}   /* the dock's height is constant now, in both modes */
 .pad .p1{display:flex; justify-content:space-between; align-items:baseline; width:100%; gap:4px}
 .pad .pm{font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums}
 .pad.hit .pm{color:var(--inv)}
@@ -263,6 +283,7 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
   .pads{grid-template-columns:repeat(8,minmax(0,1fr)); gap:4px}
   .pad{height:46px; padding:4px 5px; font-size:10.5px} .pad b{font-size:13px} .pad.syn b::after{content:""} .pad .pm{display:none}
   .pad.sel{padding:2px 3px}
+  .dock{height:calc(46px * 2 + 9px + 24px + 1px)}
   .top{gap:6px}
   .brand{font-size:19px}
   .kitname{width:auto; flex:1 1 60px; min-width:0}
@@ -278,32 +299,41 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 :root[data-skin="mincolor"]{--bench:#ececec; --side:#cfcfd3}
 :root[data-skin="mincolor"] :is(.lcell,.layercard){background:color-mix(in srgb, var(--fam) 15%, #ffffff)}
 :root[data-skin="mincolor"] .fxcard{background:color-mix(in srgb, var(--fx) 12%, #ffffff)}
+:root[data-skin="mincolor"] .voicecard{background:color-mix(in srgb, var(--famc, var(--pl)) 12%, #ffffff)}
 /* Monotone: black and white */
-:root[data-skin="monotone"]{--std:#111; --fm:#111; --add:#111; --noise:#111; --smp:#111; --pl:#555; --fx:#111; --rec:#111; --side:#e6e6e6; --voice:#f2f2f2}
+:root[data-skin="monotone"]{--std:#111; --fm:#111; --add:#111; --noise:#111; --smp:#111; --pl:#555; --fx:#111; --rec:#111; --side:#e6e6e6; --voice:#f2f2f2;
+  --stdc:#999; --fmc:#999; --addc:#999; --noisec:#999; --smpc:#999; --plc:#555; --wvc:#555}
+/* Minimal black and Minimal colors black */
 /* Minimal black and Minimal colors black */
 :root[data-skin="minblack"], :root[data-skin="mincolorblack"]{--bench:#000; --panel:#000; --panel2:#141414; --side:#1a1a1a; --ink:#f4f4f4; --muted:#a6a6a6;
   --track:#2a2a2a; --inv:#000; --voice:#17131f; --line:#ffffff; --std:#5a8fe0; --fm:#b07ef0; --add:#3fd6d6; --noise:#f09a55; --smp:#f06b92; --pl:#ecc23a;
-  --fx:#e76fd0; --rec:#ff5a4a; color-scheme:dark}
+  --fx:#e76fd0; --rec:#ff5a4a;
+  --stdc:#e09f5a; --fmc:#80e09b; --addc:#d6633f; --noisec:#5587f0; --smpc:#70f0b8; --plc:#3a8ce0; --wvc:#e0793a; color-scheme:dark}
 :root[data-skin="mincolorblack"]{--bench:#0b0b0d; --side:#26262b}
 :root[data-skin="mincolorblack"] :is(.lcell,.layercard){background:color-mix(in srgb, var(--fam) 22%, #000)}
 :root[data-skin="mincolorblack"] .fxcard{background:color-mix(in srgb, var(--fx) 18%, #000)}
+:root[data-skin="mincolorblack"] .voicecard{background:color-mix(in srgb, var(--famc, var(--pl)) 18%, #000)}
 /* Neon: black with glowing colours */
 :root[data-skin="neon"]{--bench:#05050a; --panel:#0c0c14; --panel2:#13131d; --side:#13131d; --ink:#f2f2ff; --muted:#9ea3c0; --track:#1b1b28; --inv:#05050a;
   --line:#2b2b3d; --voice:#120a1c; --std:#3d8bff; --fm:#c04bff; --add:#00f0ff; --noise:#ff9a3d; --smp:#ff2bd6; --pl:#ffe14b; --fx:#ff2bd6; --rec:#ff3355;
+  --stdc:#ff8f3d; --fmc:#50ff4b; --addc:#ff0033; --noisec:#3d66ff; --smpc:#2bff9d; --plc:#4b6cff; --wvc:#ff7030;
   --meter-ok:#39ff88; --meter-hot:#ffe14b; --meter-clip:#ff3355; color-scheme:dark}
 :root[data-skin="neon"] :is(.lcell,.layercard){box-shadow:0 0 14px -5px var(--fam)}
 :root[data-skin="neon"] .fxcard{box-shadow:0 0 14px -5px var(--fx)}
+:root[data-skin="neon"] .voicecard{box-shadow:0 0 14px -5px var(--famc)}
 :root[data-skin="neon"] button.on, :root[data-skin="neon"] .seg button.on, :root[data-skin="neon"] .ttabs button.on{background:#00f0ff; color:#05050a; border-color:#00f0ff}
 :root[data-skin="neon"] .pad.hit{background:#ff2bd6; color:#05050a}
 /* Pastel: Seeds' soft default, light or following the system */
 :root[data-skinbase="pastel"]{--bench:#d6dbe4; --panel:#f8f9fb; --panel2:#eef1f6; --side:#eef1f6; --ink:#232830; --muted:#5d6573; --track:#dde2ea; --inv:#ffffff;
-  --line:#c3cad6; --voice:#e7e1f6; --std:#3f7fd1; --fm:#7a58c8; --add:#22958d; --noise:#e3962a; --smp:#c93d78; --pl:#c9a227; --fx:#b24fb0; --rec:#cc3a2c}
+  --line:#c3cad6; --voice:#e7e1f6; --std:#3f7fd1; --fm:#7a58c8; --add:#22958d; --noise:#e3962a; --smp:#c93d78; --pl:#c9a227; --fx:#b24fb0; --rec:#cc3a2c;
+  --stdc:#d1973f; --fmc:#58c87e; --addc:#8d4a22; --noisec:#2a6ee3; --smpc:#3dc88f; --plc:#7a9e27; --wvc:#d1554d}
 @media (prefers-color-scheme: dark){ :root[data-skin="auto"]{--bench:#272a2f; --panel:#373c43; --panel2:#2f343a; --side:#2f343a; --ink:#e9ebe6; --muted:#a5aaae;
   --track:#24282d; --inv:#232830; --line:#4b5159; --voice:#3c304f; --fm:#9b80e2; --smp:#e2649a; color-scheme:dark} }
 :root[data-skinbase="pastel"] :is(button,select,input[type=text],.seg,.lcell,.layercard,.fxcard,.pad,.mtr,.kp,.k,.tcmd button){border-radius:9px}
 :root[data-skinbase="pastel"] .seg{overflow:hidden} :root[data-skinbase="pastel"] :is(.seg button,.ttabs button){border-radius:0}
-:root[data-skinbase="pastel"] :is(.lcell,.layercard,.fxcard,.pad){box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 10px 22px -14px rgba(40,50,75,.5)}
+:root[data-skinbase="pastel"] :is(.lcell,.layercard,.fxcard,.voicecard,.pad){box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 10px 22px -14px rgba(40,50,75,.5)}
 :root[data-skinbase="pastel"] :is(.lcell,.layercard){background:color-mix(in srgb, var(--fam) 10%, var(--panel))}
+:root[data-skinbase="pastel"] .voicecard{background:color-mix(in srgb, var(--famc, var(--pl)) 10%, var(--panel))}
 /* pads take a colour each in the colour skins */
 :root:is([data-skin="mincolor"],[data-skinbase="pastel"]) .pad:nth-child(8n+1){background:#def9e7} :root:is([data-skin="mincolor"],[data-skinbase="pastel"]) .pad:nth-child(8n+2){background:#def9f7}
 :root:is([data-skin="mincolor"],[data-skinbase="pastel"]) .pad:nth-child(8n+3){background:#deedf9} :root:is([data-skin="mincolor"],[data-skinbase="pastel"]) .pad:nth-child(8n+4){background:#dee2f9}
@@ -664,10 +694,13 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
         <button id="bFactory">Factory kit</button>
         <button id="bClearKit">Clear all slots</button>
       </div>
+      <div class="btnrow">
+        <label class="cb"><input type="checkbox" id="ckVtrk">A voice per track</label>
+      </div>
       <div class="btnrow" id="confirmRow" hidden>
         <span id="confirmMsg"></span><button id="bYes" class="on">Yes</button><button id="bNo">Cancel</button>
       </div>
-      <p class="note">The kit saves itself in this browser as you work. A kit file keeps every pad, including recorded samples.</p>
+      <p class="note">The kit saves itself in this browser as you work. A kit file keeps every pad, including recorded samples. A voice per track grows the kit past 16 slots: every song track gets its own pad (drums on mono tracks, a simple synth on poly ones), and the pads scroll up and down.</p>
     </div>
   </section>
 
@@ -741,11 +774,6 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
   </section>
 
   <section class="band">
-    <div class="bar" style="margin-bottom:8px"><span class="ttl">Voice pitch, filter &amp; amp</span><span class="lbl">shapes every layer at once</span></div>
-    <div class="secs" id="voiceSecs"></div>
-  </section>
-
-  <section class="band">
     <div class="bar" style="margin-bottom:8px"><span class="ttl">Layers</span><span class="lbl">tap to edit, tick to turn on</span></div>
     <div class="strip" id="strip"></div>
   </section>
@@ -781,11 +809,23 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
     <p class="note fxempty" id="fxEmpty">No effects on this pad yet. EQ, Compressor, Reverb and Tape delay shape and place the sound; Rings turns any hit into a tuned resonance, Clouds makes granular clouds; Saturation, Tape, Chorus and Bitcrush colour it. Each effect’s meter shows the level coming out of it.</p>
   </section>
   </div>
+
+  <!-- The voice-wide filter/amp card: same Seeds card shape as the layer card above, but with the
+       complementary color, like the layer card's own fam colour shifted to its opposite side. -->
+  <div class="cardwrap" style="padding-top:0">
+  <section class="voicecard" id="voiceCard">
+    <header>
+      <span class="ttl">Voice pitch, filter &amp; amp</span>
+      <span class="lbl">shapes every layer at once</span>
+    </header>
+    <div class="secs" id="voiceSecs"></div>
+  </section>
+  </div>
 </div>
 
-<div class="dock" id="dock">
-  <div class="pads" id="pads"></div>
-</div>
+  <div class="dock" id="dock">
+    <div class="pads" id="pads" role="list" aria-label="Pads"></div>
+  </div>
 
 <div class="wvview" id="wvView" hidden></div>
 <div class="chview" id="chView" hidden></div>
@@ -912,7 +952,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 <h3>Settings</h3>
 <p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex) and change the <b>Text size</b> of the tracker screen. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
 <h3>Drum pads and synths</h3>
-<p>The kit has 16 slots. <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song.</p>
+<p>The kit has 16 slots. <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song. <b>A voice per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chords and polyphony</h3>
 <p><b>The second half of the tracks is polyphonic</b> (9–16 with 16 tracks, 17–32 with 32; Settings → Song → Tracks): the green POLY box on the right of Song and Mixer. The first half, in the pink MONO box on the left, plays one note at a time. Open a phrase from a polyphonic track and it shows four note columns, N1–N4, so a row can hold a chord. Notes on these tracks ring over each other, up to 4 at a time per track; a fifth steals the oldest. A note OFF in any note column releases everything on the track. The mono tracks stay one note at a time, and a phrase played there uses only N1.</p>
 <h3>Two input modes</h3>
@@ -1446,7 +1486,13 @@ function blockPeaks(a){ const n = Math.ceil(a.length / VUB), e = new Float32Arra
   return e; }
 // Slots 9–16 are synths: notes hold until released. They render with the gate held for the voice's
 // Max len (`hold`, in seconds), and letting go fades the sound over the voice's release (relOf).
-const NPAD = 8, NSLOT = 16, isSyn = i => i >= NPAD;
+// With a voice per track (vtrk, the settings checkbox), every song track gets its own pad: mono tracks
+// 1–16 drum pads, poly tracks 17–32 synth pads. Off, the kit stays at the classic 16 slots.
+// (The slot helpers live with the song state below, next to ntr(), because they read it.)
+const NPAD = 8; let NSLOT = 16;
+const VTRK = 'thunderplus-vtrk-v1';
+let vtrk = (() => { try { return localStorage.getItem(VTRK) === '1'; } catch(e){ return false; } })();
+const isSyn = i => i >= NPAD;
 function relOf(V){ let r = 0; for (const L of V.layers) if (L.on && L.level > 0 && L.mode === 'ADSR') r = Math.max(r, L.rel); return Math.max(30, r) / 1000; }
 // Voice-wide filter and amp: they run on the layers AFTER they are summed, so one setting shapes every
 // layer of the voice at once. The filter is the same 2-pole low-pass the layers use; the amp is an
@@ -1665,7 +1711,10 @@ let kit = loadSaved() || factoryKit();
 WV.doc = kit.waves || null;
 let cur = 0;
 let view = 'synth';   // 'synth', 'tracker', 'waves' or 'chains'
-const cache = new Array(NSLOT).fill(null), dirty = new Array(NSLOT).fill(true), bufs = new Array(NSLOT).fill(null);
+// Per-slot render state follows the slot count (grows when a voice per track is on); slotAt pads or
+// trims so every index the UI touches has an entry.
+const cache = [], dirty = [], bufs = [];
+function slotAt(a, i){ while (a.length < nslots()) a.push(null); return a[i]; }
 let clipVoice = null, clipLayer = null;
 const ex = {sr:48000, bits:24, norm:true, noteName:false};
 const noteName = m => NOTE[((m % 12) + 12) % 12].replace('♯', '#') + (Math.floor(m / 12) - 1);
@@ -1684,7 +1733,7 @@ let aLive = null; // the latency and rate the running context was made with
 /* ---------- audio ---------- */
 let ctx = null, master = null;
 const cpu = {cap:null, t:0};
-const playing = new Array(NSLOT).fill(null);
+const playing = [];
 function audio(){
   if (!ctx){
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -1695,21 +1744,21 @@ function audio(){
     try { if (ctx.renderCapacity){ ctx.renderCapacity.addEventListener('update', e => { cpu.cap = {avg:e.averageLoad, peak:e.peakLoad, under:e.underrunRatio, t:performance.now()}; }); ctx.renderCapacity.start({updateInterval:0.5}); } } catch(e){}
     master = ctx.createGain(); master.gain.value = clamp(aset.vol, 0, 100) / 100; master.connect(ctx.destination);
     ctx.addEventListener && ctx.addEventListener('statechange', () => audStatus());
-    for (let i = 0; i < NSLOT; i++) dirty[i] = true;
+    for (let i = 0; i < nslots(); i++) dirty[i] = true;
     setTimeout(prerender, 30);
   }
   if (ctx.state === 'suspended') ctx.resume();
   return ctx;
 }
-function prerender(){ let i = 0; const step = () => { if (i < NSLOT){ ensure(i++); setTimeout(step, 0); } }; step(); }
+function prerender(){ let i = 0; const step = () => { if (i < nslots()){ ensure(i++); setTimeout(step, 0); } }; step(); }
 function ensure(i){
   const sr = ctx ? ctx.sampleRate : 48000;
-  if (dirty[i] || !cache[i] || cache[i].sr !== sr){ const st = new Map(); const v = kit.voices[i]; cache[i] = {sr, data:renderVoice(v, sr, st, isSyn(i) ? v.len : 0), st}; dirty[i] = false; bufs[i] = null; }
+  if (slotAt(dirty, i) || !slotAt(cache, i) || slotAt(cache, i).sr !== sr){ const st = new Map(); const v = kit.voices[i]; cache[i] = {sr, data:renderVoice(v, sr, st, isSyn(i) ? v.len : 0), st}; dirty[i] = false; bufs[i] = null; }
   return cache[i];
 }
 function buffer(i){
   const c = ensure(i);
-  if (!bufs[i]){ const b = ctx.createBuffer(1, c.data.length, c.sr); b.copyToChannel(c.data, 0); bufs[i] = b; }
+  if (!slotAt(bufs, i)){ const b = ctx.createBuffer(1, c.data.length, c.sr); b.copyToChannel(c.data, 0); bufs[i] = b; }
   return bufs[i];
 }
 function stopVoice(i){
@@ -1738,11 +1787,10 @@ function releaseNote(h, at){
 }
 function play(i, vel = 1){
   audio();
-  // A synth slot played as a one-shot (Space, Shift+number, MIDI pad) holds for the voice's Gate.
   if (isSyn(i)){ stopVoice(i); const h = holdNote(i, 0, vel); playing[i] = h; releaseNote(h, ctx.currentTime + kit.voices[i].gate / 1000); return; }
   const v = kit.voices[i];
   stopVoice(i);
-  if (v.choke) for (let j = 0; j < NSLOT; j++) if (j !== i && kit.voices[j].choke === v.choke) stopVoice(j);
+  if (v.choke) for (let j = 0; j < nslots(); j++) if (j !== i && kit.voices[j].choke === v.choke) stopVoice(j);
   const src = ctx.createBufferSource(), g = ctx.createGain();
   g.gain.value = vel;
   src.buffer = buffer(i); src.connect(g); g.connect(master); src.start();
@@ -1752,13 +1800,13 @@ function play(i, vel = 1){
 /* ---------- effect meters: each effect card shows the level coming out of it while the pad sounds ---------- */
 // Pads are rendered ahead of time, so the levels after each effect are stored with the render (cache[i].st)
 // and the meters replay them in step with the sound.
-const hits = Array.from({length:NSLOT}, () => []);
+const hits = [];
 let vuRaf = 0, vuEls = [];
-function vuHit(i, rate, vel, mono){ const c = cache[i]; if (!c) return; if (mono) hits[i].length = 0; hits[i].push({t0:ctx.currentTime, rate, vel, c}); if (hits[i].length > 8) hits[i].shift(); if (!vuRaf) vuRaf = requestAnimationFrame(vuFrame); }
+function vuHit(i, rate, vel, mono){ const c = slotAt(cache, i); if (!c) return; slotAt(hits, i); if (mono) hits[i].length = 0; hits[i].push({t0:ctx.currentTime, rate, vel, c}); if (hits[i].length > 8) hits[i].shift(); if (!vuRaf) vuRaf = requestAnimationFrame(vuFrame); }
 function vuFrame(){
   vuRaf = 0; if (!ctx) return;
-  const now = ctx.currentTime, H = hits[cur]; let live = false;
-  for (let i = 0; i < NSLOT; i++) hits[i] = hits[i].filter(h => (now - h.t0) * h.rate * h.c.sr < h.c.data.length + h.c.sr * 0.3);
+  const now = ctx.currentTime, H = slotAt(hits, cur) || []; let live = false;
+  for (let i = 0; i < nslots(); i++){ slotAt(hits, i); hits[i] = hits[i].filter(h => (now - h.t0) * h.rate * h.c.sr < h.c.data.length + h.c.sr * 0.3); }
   for (const m of vuEls){
     let pk = 0;
     for (const h of H){ const env = h.c.st && h.c.st.get(m.f); if (!env) continue;
@@ -1793,6 +1841,46 @@ function changed(i = cur, light){
 
 /* ---------- UI helpers ---------- */
 function el(tag, cls, txt){ const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+// Type a value into a row's value box (double-click or double-tap). Entries accept the unit shown next to
+// the slider (Hz, kHz, ms, s, %, semitones, dB) or the bare number; the entry is clamped to the row's range
+// and applied through row.refresh(), so it behaves exactly like dragging its slider.
+function rowTypeBox(row, opts){
+  if (row.out.querySelector('input')) return;
+  const d = row.def, fmt = row.fmt || d.f || pct, prev = row.getObj()[row.key];
+  const inp = el('input', 'vtype');
+  inp.type = 'text'; inp.inputMode = 'decimal'; inp.value = fmt(prev); inp.setAttribute('aria-label', d.l + ' value');
+  row.out.replaceChildren(inp); inp.focus(); inp.select();
+  let done = false;
+  const finish = commit => {
+    if (done) return; done = true;
+    if (commit){
+      const txt = inp.value.trim().replace(',', '.').replace('−', '-'), low = txt.toLowerCase();
+      const m = txt.match(/[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?/);
+      const n = m ? parseFloat(m[0]) : NaN;
+      if (!isNaN(n)){
+        let v;
+        if (low.includes('khz')) v = n * 1000;
+        else if (low.includes('db')) v = n;                    // dB, semitones and Hz are the row's own units
+        else if (low.includes('st')) v = n;
+        else if (low.includes('hz')) v = n;
+        else if (low.includes('%')) v = n / 100 * pctBase(d);  // an explicit % is "of the range"
+        else if (low.includes('ms')) v = n / 1000;
+        else if (d.max <= 1 && d.min === 0) v = n > 1 ? n / 100 : n;  // bare number on a 0..1 row: 50 means 50%
+        else if (d.min === -36 && d.max === 6 && (n > 6 || n < -36)) v = d.min + (n / 100) * (d.max - d.min);  // voice Level: 50 means halfway
+        else v = n;                                            // bare number or 's': the row's own units
+        v = Math.max(d.min, Math.min(d.max, v));
+        row.getObj()[row.key] = v; row.refresh(); (opts.on || (() => changed(cur, true)))();
+      }
+    }
+    row.refresh();
+  };
+  inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); });
+  inp.addEventListener('blur', () => finish(true));
+  inp.addEventListener('pointerdown', e => e.stopPropagation());
+}
+// The number a '%' entry means: rows whose whole range is 0..1 take 0..100 (so "50" ≈ 0.5); the voice
+// Level row's −36..+6 dB range takes 0..100 too (so "50" ≈ −15 dB), matching how its out reads.
+function pctBase(d){ return d.max <= 1 ? 1 : (d.min === -36 && d.max === 6 ? 1 : d.max - d.min); }
 const rows = [];
 function makeRow(def, key, getObj, opts = {}){
   const id = 'r_' + (opts.idp || '') + key;
@@ -1803,6 +1891,19 @@ function makeRow(def, key, getObj, opts = {}){
     refresh(){ const o = getObj(); const v = o[key]; inp.value = Math.round(toPos(this.def, v) * 1000); out.textContent = (this.fmt || this.def.f || pct)(v); }};
   inp.addEventListener('input', () => { const o = getObj(); o[key] = fromPos(row.def, inp.value / 1000);
     out.textContent = (row.fmt || row.def.f || pct)(o[key]); (opts.on || (() => changed(cur, true)))(); });
+  out.title = 'Double-click to type a value';
+  out.style.cursor = 'text';
+  const typeBox = () => rowTypeBox(row, opts);
+  out.addEventListener('dblclick', e => { e.stopPropagation(); typeBox(); });
+  // Touch screens: double-tap the value box to type a value (tap, lift, tap).
+  let lastValTap = null;
+  out.addEventListener('pointerup', e => {
+    if (e.pointerType === 'touch' && e.isPrimary && !out.querySelector('input')){
+      const now = performance.now(), cx = e.clientX, cy = e.clientY;
+      if (lastValTap && now - lastValTap.t < 450 && Math.hypot(cx - lastValTap.x, cy - lastValTap.y) < 30){ lastValTap = null; typeBox(); }
+      else lastValTap = {t:now, x:cx, y:cy};
+    }
+  });
   lab.addEventListener('dblclick', () => { getObj()[key] = row.def.d; row.refresh(); (opts.on || (() => changed(cur, true)))(); });
   if (!opts.noTrack) rows.push(row);
   return row;
@@ -1950,6 +2051,8 @@ function pitchReadout(){
 function refreshLayer(){
   const v = V(), L = Lc(), T = TYPE[L.type];
   $('layerCard').style.setProperty('--fam', `var(--${T.fam})`);
+  // Keep the voice card complementary to the layer card's family colour.
+  $('voiceCard').style.setProperty('--famc', `var(--${T.fam}c, var(--pl))`);
   $('lTitle').textContent = 'Layer ' + (v.sel + 1);
   sel.value = L.type;
   const on = $('lOn'); on.textContent = L.on ? 'On' : 'Off'; on.classList.toggle('on', L.on); on.setAttribute('aria-pressed', L.on);
@@ -2043,10 +2146,14 @@ function renderStrip(){
 // The screens' pastels (Song, Sect, Phrase, Inst, Mixer, FX, Project): the colourful boxes at the bottom.
 const BOXPAL = ['#dbe6f8', '#e9e0f8', '#d8f0e2', '#fbe2d2', '#f6edc8', '#f8dce8', '#d5eef2'], BOXGREEN = '#d8f0e2';
 const padEls = [];
+function trackOfPad(i){ return vtrk ? i - NPAD : i; }
+// The pad's number (its badge): incremental with the pad's position, never tied to which audio track is
+// playing. With a voice per track the track pads follow the drums (pads 8–39 double as tracks 1–32),
+// so each synth voice has one-to-one parity with its track by position alone.
 function buildPads(){
-  const host = $('pads');
-  for (let i = 0; i < NSLOT; i++){
-    const p = el('button', 'pad' + (isSyn(i) ? ' syn' : '')); p.type = 'button'; p.style.setProperty('--sh', BOXPAL[i % BOXPAL.length]);
+  const host = $('pads'); host.innerHTML = ''; padEls.length = 0;
+  for (let i = 0; i < nslots(); i++){
+    const p = el('button', 'pad' + (isSyn(i) ? ' syn' : '')); p.type = 'button'; p.setAttribute('role', 'listitem'); p.style.setProperty('--sh', BOXPAL[i % BOXPAL.length]);
     const p1 = el('span', 'p1'), b = el('b', null, hx(i)), m = el('span', 'pm'), n = el('span', 'pn');
     p1.append(b, m); p.append(p1, n); host.append(p); padEls.push({p, n, m, b});
     // Synth slots sound while the pad is held, then release.
@@ -2055,16 +2162,23 @@ function buildPads(){
     p.addEventListener('pointerup', up); p.addEventListener('pointercancel', up);
     p.addEventListener('click', () => { if (!ptrJust()) padPress(i); });
   }
+  // A voice per track adds up to 32 track pads: same 8-across pads, but the dock scrolls up and down.
+  $('dock').classList.toggle('vtrk', vtrk);
+  // The checkbox and the dock follow the mode even when it is flipped from the tracker.
+  try { $('ckVtrk').checked = vtrk; } catch(e){}
 }
 function renderPads(){
   kit.voices.forEach((v, i) => {
+    if (i >= padEls.length) return;
     const {p, n, m, b} = padEls[i];
     n.textContent = v.name || '—';
-    // The number is the tracker instrument that plays this pad (00–0F, as in a phrase's I column); normally it's the
-    // pad's own number. If instruments were pointed elsewhere it lists the ones that play it, or shows -- for none.
+    // The badge is the pad's own sequential number (00, 01, 02…), independent of which audio track is
+    // playing — so toggling the mode never changes label widths or reflows the grid. A voice per track
+    // keeps one-to-one parity by position: pads 8+ are tracks 1+.
+    b.textContent = hx(i);
+    // The tooltip names the tracker instruments that play this pad, plus its track when it has one.
     let ins = [i]; try { ins = S.insts.map((I, k) => I.pad === i ? k : -1).filter(k => k >= 0); } catch(e){}   // S may not exist yet at start-up
-    b.textContent = ins.length ? ins.slice(0, 2).map(k => hx(k)).join(' ') + (ins.length > 2 ? '+' : '') : '--';
-    p.title = ins.length ? `Instrument ${ins.map(k => hx(k)).join(', ')} in the tracker` : 'No tracker instrument plays this pad';
+    p.title = (vtrk && trackOfPad(i) >= 0 ? `Track ${d2(trackOfPad(i) + 1)} · ` : '') + (ins.length ? `Instrument ${ins.map(k => hx(k)).join(', ')} in the tracker` : 'No tracker instrument plays this pad');
     m.textContent = midi.on ? (midi.notes[i] >= 0 ? noteName(midi.notes[i]) : isSyn(i) ? '' : '—') : '';
     p.classList.toggle('sel', i === cur);
     p.classList.toggle('learn', midi.learn && midi.target !== i);
@@ -2074,7 +2188,7 @@ function renderPads(){
 }
 function flash(i){ const p = padEls[i].p; p.classList.add('hit'); setTimeout(() => p.classList.remove('hit'), 90); }
 function select(i){ if (i === cur) return; cur = i; refreshAll(); }
-const padHeld = new Array(NSLOT).fill(null);
+const padHeld = [];
 function padPress(i, held){
   if (held && isSyn(i) && !midi.learn){ if (padHeld[i]) releaseNote(padHeld[i]); padHeld[i] = holdNote(i, 0, 1); select(i); return; }
   if (midi.learn){ midi.target = i; midi.ccTarget = ''; select(i); renderPads(); ccBadges(); midiStatus(`Now hit a note on the controller for pad ${hx(i)}` + (midi.notes[i] >= 0 ? ` (now ${noteName(midi.notes[i])}; Unlearn removes it).` : '.')); return; }
@@ -2097,7 +2211,7 @@ document.addEventListener('keydown', e => {
   if (e.altKey) return;
   const pd = /^Digit[1-8]$/.test(e.code) ? +e.code.slice(5) - 1 : -1;
   if (e.shiftKey && pd >= 0){ padPress(pd); e.preventDefault(); return; }
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){ if (!e.target.matches('input[type=range]')){ select((cur + (e.key === 'ArrowRight' ? 1 : NSLOT - 1)) % NSLOT); e.preventDefault(); } return; }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){ if (!e.target.matches('input[type=range]')){ select((cur + (e.key === 'ArrowRight' ? 1 : nslots() - 1)) % nslots()); e.preventDefault(); } return; }
   if (e.key === '-' || e.key === '=' || e.code === 'NumpadDivide' || e.code === 'NumpadMultiply'){
     setOct(kOct + (e.key === '=' || e.code === 'NumpadMultiply' ? 1 : -1)); e.preventDefault(); return; }
   const lo = e.key.length === 1 ? e.key.toLowerCase() : '';
@@ -2185,17 +2299,38 @@ function voiceFromJSON(j){ const v = mkVoice(j.name || 'Pad', []); Object.assign
 function kitToJSON(noSmp){ return {app:'thunder', v:1, name:kit.name, voices:kit.voices.map(v => voiceToJSON(v, noSmp)), waves:kit.waves || undefined}; }
 function kitFromJSON(j){
   if (!j || !Array.isArray(j.voices) || j.voices.length < 1) throw new Error('This file isn’t a ...Thunder kit.');
-  const vs = j.voices.slice(0, NSLOT).map(voiceFromJSON); while (vs.length < NPAD) vs.push(mkVoice('Pad ' + (vs.length + 1), []));
+  const vs = j.voices.slice(0, Math.max(nslots(), 40)).map(voiceFromJSON); while (vs.length < NPAD) vs.push(mkVoice('Pad ' + (vs.length + 1), []));
   // Kits from before the synth slots get the factory synths in slots 9–16.
-  if (vs.length < NSLOT){ const fs = factorySynths(); while (vs.length < NSLOT) vs.push(fs[vs.length - NPAD]); }
+  if (vs.length < Math.min(nslots(), NSLOT)){ const fs = factorySynths(); while (vs.length < Math.min(nslots(), NSLOT)) vs.push(fs[vs.length - NPAD]); }
   return {name:j.name || 'Kit', voices:vs, waves:(j.waves && Array.isArray(j.waves.modules)) ? j.waves : undefined};
+}
+// Grow the kit to the slot count, keeping one-to-one parity between synth voices and tracks: creating a
+// new track instantiates its voice (a drum one-shot on mono tracks, a simple synth on poly ones).
+// Existing voices are never touched.
+function growKit(){
+  const n = nslots();
+  while (kit.voices.length < n){
+    const i = kit.voices.length;
+    if (!vtrk || i < NPAD) kit.voices.push(mkVoice('Pad ' + (i + 1), []));
+    else { const t = trackOfPad(i);
+      // Mono tracks get a drum one-shot (a copy of the factory Kick's voice, renamed for the track),
+      // poly tracks a simple held saw synth.
+      if (isPolyT(t)) kit.voices.push(mkVoice('Synth T' + d2(t + 1), [{type:'saw', mode:'ADSR', atk:2, dec:400, sus:0.7, rel:200, level:0.8}], {tune:24, len:6, gate:400, tail:2}));
+      else { const kv = voiceFromJSON(JSON.parse(JSON.stringify(voiceToJSON(factoryKit().voices[0])))); kv.name = 'Drums T' + d2(t + 1); kit.voices.push(kv); } }
+  }
+  cur = Math.min(cur, n - 1); buildPads(); refreshAll(); save();
+}
+function setVtrk(on){
+  vtrk = !!on; try { localStorage.setItem(VTRK, vtrk ? '1' : '0'); } catch(e){}
+  for (let i = 0; i < Math.max(nslots(), 40); i++){ dirty[i] = true; cache[i] = null; }
+  growKit();
 }
 function save(){
   try { localStorage.setItem(KEY, JSON.stringify(kitToJSON(false))); }
   catch(e){ try { localStorage.setItem(KEY, JSON.stringify(kitToJSON(true))); } catch(e2){} }
 }
 function loadSaved(){ try { const s = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY); return s ? kitFromJSON(JSON.parse(s)) : null; } catch(e){ console.warn('Couldn’t load the saved kit', e); return null; } }
-function setKit(k){ kit = k; WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0; for (let i = 0; i < NSLOT; i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
+function setKit(k){ kit = k; WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0; for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
 
 /* ---------- files out ---------- */
 function wavBytes(data, sr, bits){
@@ -2265,7 +2400,7 @@ $('bExPad').addEventListener('click', () => {
   if (inAI) deliver(w.name.replace(/\.wav$/, '.zip'), zipBlob([w]));
   else deliver(w.name, new Blob([w.data], {type:'audio/wav'}));
 });
-$('bExKit').addEventListener('click', () => { const fs = []; for (let i = 0; i < NSLOT; i++) fs.push(padWav(i)); deliver(kitBase() + '.zip', zipBlob(fs)); });
+$('bExKit').addEventListener('click', () => { const fs = []; for (let i = 0; i < nslots(); i++) fs.push(padWav(i)); deliver(kitBase() + '.zip', zipBlob(fs)); });
 const canShare = !inAI && !!(navigator.canShare && window.File) && (() => { try { return navigator.canShare({files:[new File([new Uint8Array(4)], 'a.wav', {type:'audio/wav'})]}); } catch(e){ return false; } })();
 async function share(files){
   try { await navigator.share({files, title:'...Thunder'}); }
@@ -2274,7 +2409,7 @@ async function share(files){
 if (canShare){
   $('bShPad').hidden = false; $('bShKit').hidden = false;
   $('bShPad').addEventListener('click', () => { const w = padWav(cur); share([new File([w.data], w.name, {type:'audio/wav'})]); });
-  $('bShKit').addEventListener('click', () => { const fs = []; for (let i = 0; i < NSLOT; i++){ const w = padWav(i); fs.push(new File([w.data], w.name, {type:'audio/wav'})); } share(fs); });
+  $('bShKit').addEventListener('click', () => { const fs = []; for (let i = 0; i < nslots(); i++){ const w = padWav(i); fs.push(new File([w.data], w.name, {type:'audio/wav'})); } share(fs); });
 }
 if (inAI){
   $('bExPad').textContent = 'Save this pad (WAV in .zip)';
@@ -2287,7 +2422,7 @@ makeSeg($('segNoteName'), [[false,'Pad name'],[true,'+ note']], () => ex.noteNam
 
 /* ---------- settings (synth page): Kit, MIDI, Export, Skin and Audio under one button ---------- */
 /* ---------- settings: one dropdown menu under the gear, on every screen ---------- */
-const GLOBAL_SECS = [['pMidi', 'MIDI'], ['pExport', 'Export'], ['pSkin', 'Skin'], ['pAudio', 'Audio']];   // the Kit's save / load / reset are in File
+const GLOBAL_SECS = [['pKit', 'Kit'], ['pMidi', 'MIDI'], ['pExport', 'Export'], ['pSkin', 'Skin'], ['pAudio', 'Audio']];   // the Kit's save / load / reset are in File
 { const k = $('pKit'); if (k) k.hidden = true; }
 const gsetOpen = () => !$('gset').hidden;
 const gsetSecs = () => [
@@ -2475,6 +2610,9 @@ for (const sk of SKINS){
 applySkin(skin);
 $('bSaveKit').addEventListener('click', () => deliver(kitBase() + '.json', new Blob([JSON.stringify(kitToJSON(false))], {type:'application/json'})));
 $('bLoadKit').addEventListener('click', () => $('kitIn').click());
+// A voice per track (off by default: the classic 16 slots). On, slots 9+ follow the song's tracks.
+$('ckVtrk').checked = vtrk;
+$('ckVtrk').addEventListener('change', e => setVtrk(e.target.checked));
 $('kitIn').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   try { setKit(kitFromJSON(JSON.parse(await f.text()))); toast('Loaded ' + kit.name); } catch(err){ toast(err.message || 'Couldn’t read that kit file.'); }
@@ -2484,10 +2622,10 @@ function ask(msg, fn){ pending = fn; $('confirmMsg').textContent = msg; $('confi
 $('bYes').addEventListener('click', () => { $('confirmRow').hidden = true; if (pending) pending(); pending = null; });
 $('bNo').addEventListener('click', () => { $('confirmRow').hidden = true; pending = null; });
 $('bFactory').addEventListener('click', () => ask('Replace all 8 pads with the factory kit?', () => setKit(factoryKit())));
-function clearKit(){ setKit({name:'New kit', voices:Array.from({length:NSLOT}, (_, i) => isSyn(i)
+function clearKit(){ setKit({name:'New kit', voices:Array.from({length:nslots()}, (_, i) => isSyn(i)
   ? mkVoice('Synth ' + (i + 1), [{type:'saw', mode:'ADSR', atk:2, dec:400, sus:0.7, rel:200, lpCut:3000, level:0.7}], {tune:24, len:6, gate:400})
   : mkVoice('Pad ' + (i + 1), [{type:'sine', b:0.25, pAmt:24, pDec:50, atk:0.1, dec:400}]))}); }
-$('bClearKit').addEventListener('click', () => ask('Clear all 16 slots?', clearKit));
+$('bClearKit').addEventListener('click', () => ask(`Clear all ${nslots()} slots?`, clearKit));
 
 /* ---------- load an audio file as a sample layer ---------- */
 function assignSample(vi, data, sr, name){
@@ -2644,14 +2782,14 @@ let plFailed = false;
       WavesDSP.wasmInit({dspModule, tfxModule}); WV.ready = true;
     }
   } catch(e){ console.warn('…waves WebAssembly', e); }
-  for (let i = 0; i < NSLOT; i++){ const v = kit.voices[i]; if (v.layers.some(l => l.on && (l.type === 'plaits' || l.type === 'elements' || l.type === 'waves')) || (v.fx || []).some(f => f.on)) dirty[i] = true; }
+  for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; if (v && v.layers.some(l => l.on && (l.type === 'plaits' || l.type === 'elements' || l.type === 'waves')) || (v.fx || []).some(f => f.on)) dirty[i] = true; }
   refreshLayer(); renderFx();
   ensure(cur); drawWave(); renderStrip();
 })();
 
 /* ---------- ...waves editor: a full-screen frame; the patch is read from and saved into the kit ---------- */
 const usesWaves = v => v.layers.some(l => l.on && l.type === 'waves');
-function wavesChanged(){ WV.doc = kit.waves || null; for (let i = 0; i < NSLOT; i++) if (usesWaves(kit.voices[i])){ dirty[i] = true; cache[i] = null; } clearTimeout(sTimer); sTimer = setTimeout(save, 900); }
+function wavesChanged(){ WV.doc = kit.waves || null; for (let i = 0; i < nslots(); i++) if (usesWaves(kit.voices[i])){ dirty[i] = true; cache[i] = null; } clearTimeout(sTimer); sTimer = setTimeout(save, 900); }
 window.thunderWaves = {
   load: () => kit.waves ? JSON.parse(JSON.stringify(kit.waves)) : null,
   save: d => { kit.waves = d; wavesChanged(); },
@@ -2666,7 +2804,7 @@ function showWaves(){
 /* Leaving the …waves screen: pause its sound, save the patch into the kit and re-render the pads that use it. */
 function leaveWaves(){
   const a = wvApi(); if (a) a.pause();
-  for (let i = 0; i < NSLOT; i++) if (usesWaves(kit.voices[i])) dirty[i] = true;
+  for (let i = 0; i < nslots(); i++) if (kit.voices[i] && usesWaves(kit.voices[i])) dirty[i] = true;
 }
 function openWaves(){ setView('waves'); }
 function closeWaves(){ setView('synth'); }
@@ -3086,21 +3224,28 @@ const blankRow = () => new Array(RW).fill(-1);
 const freshPhrase = () => Array.from({length:PROWS}, blankRow);
 // The first half of the song's tracks play one note at a time (mono); the second half are polyphonic. With an odd
 // count the mono half gets the extra track. 16 tracks: 1–8 mono, 9–16 poly; 32 tracks: 1–16 mono, 17–32 poly.
+// (ntr() lives with the song state below; these arrows only call it after everything is initialized.)
 const polyFrom = () => Math.ceil(ntr() / 2), isPolyT = t => t >= polyFrom() && t < NT;
+// freshInst needs the pad count, but nslots() (with the song state, below) isn't initialized yet when the
+// first song is made — the default instrument layout only needs the classic 16 anyway.
 const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0});   // instruments 08–0F play the synth slots
 const freshMix = () => ({vol:224, pan:128, mute:false, solo:false});
 function freshSong(){
-  return {app:'thunder-song', v:5, name:'Song 1', bpm:120, swing:50, limiter:true, renderFrom:0, master:255, chainPatch:null,
+  // MPC swing: the classic hardware's shuffle, applied on 8th, 16th or dotted-8th grid.
+  // Voice-per-track parity: one synth voice per song track — ntr tracks need ntr + 8 pads, capped at 32.
+  return {app:'thunder-song', v:5, name:'Song 1', bpm:120, swing:50, swingB:2, limiter:true, renderFrom:0, master:255, chainPatch:null,
     song:Array.from({length:256}, () => new Array(NT).fill(-1)), chains:new Array(256).fill(null), phrases:new Array(256).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
     tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:4, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
-    ntr:16, smute:new Array(256).fill(0)};   // ntr: tracks in use (8–32). smute[row]: a bit per track, set = that song block is muted (it stays in place)
+    ntr:16, smute:new Array(256).fill(0)};   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
 }
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;
 function normSong(j){
   const S = freshSong(); if (!j || typeof j !== 'object') return S;
   if (typeof j.name === 'string') S.name = j.name.slice(0, 40);
-  S.bpm = clamp(int(j.bpm, 120), 40, 300); S.swing = clamp(int(j.swing, 50), 50, 75); S.limiter = j.limiter !== false;
+  S.bpm = clamp(int(j.bpm, 120), 40, 300);
+  // MPC swing: the classic hardware's 50–75% range, where 50% is straight and 66–67% is the triplet feel.
+  S.swing = clamp(int(j.swing, 50), 50, 75); S.swingB = clamp(int(j.swingB, 2), 1, 7); S.limiter = j.limiter !== false;
   S.renderFrom = clamp(int(j.renderFrom, 0), 0, 255); S.master = clamp(int(j.master, 255), 0, 255);
   if (Array.isArray(j.song)) j.song.slice(0, 256).forEach((r, i) => { if (Array.isArray(r)) for (let t = 0; t < NT; t++) S.song[i][t] = clamp(int(r[t], -1), -1, 255); });
   if (Array.isArray(j.chains)) j.chains.slice(0, 256).forEach((c, i) => { if (Array.isArray(c)) S.chains[i] = Array.from({length:16}, (_, k) => {
@@ -3116,6 +3261,7 @@ function normSong(j){
     if (old === 'HOP' && v === 255) v = 0;                             // was "end the phrase"
     return [FXC.indexOf(nm), v];
   };
+  // The MPC swing note value (which beat the swing lands on) follows the song; the hardware defaulted to 16ths.
   S.lpb = clamp(int(j.lpb, 4), 1, 16); S.ticks = clamp(int(j.ticks, TICKS), 1, 32); S.dlen = clamp(int(j.dlen, 16), 1, PROWS);
   S.plen.fill(S.dlen);
   if (Array.isArray(j.plen)) j.plen.slice(0, 256).forEach((v, i) => S.plen[i] = clamp(int(v, S.dlen), 1, PROWS));
@@ -3133,7 +3279,7 @@ function normSong(j){
   // (only the ones still on that old default) at the synth slots 08–0F they're numbered for.
   const old8 = !(int(j.v, 1) >= 4);
   if (Array.isArray(j.insts)) j.insts.slice(0, NI).forEach((o, i) => { if (o && typeof o === 'object'){ const I = S.insts[i];
-    I.pad = clamp(int(o.pad, I.pad), 0, NSLOT - 1); if (old8 && i >= NPAD && I.pad === i - NPAD) I.pad = i; I.tsp = clamp(int(o.tsp, 0), -48, 48); I.vol = clamp(int(o.vol, 255), 0, 255);
+    I.pad = clamp(int(o.pad, I.pad), 0, nslots() - 1); if (old8 && i >= NPAD && I.pad === i - NPAD) I.pad = i; I.tsp = clamp(int(o.tsp, 0), -48, 48); I.vol = clamp(int(o.vol, 255), 0, 255);
     I.pan = clamp(int(o.pan, 128), 0, 255); I.rev = o.rev ? 1 : 0; I.ofs = clamp(int(o.ofs, 0), 0, 255); } });
   if (Array.isArray(j.mix)) j.mix.slice(0, NT).forEach((o, i) => { if (o && typeof o === 'object'){ const m = S.mix[i];
     m.vol = clamp(int(o.vol, 224), 0, 255); m.pan = clamp(int(o.pan, 128), 0, 255); m.mute = !!o.mute; m.solo = !!o.solo; } });
@@ -3142,7 +3288,12 @@ function normSong(j){
   if (Array.isArray(j.chainOn)) for (let t = 0; t < NT; t++) S.chainOn[t] = !!j.chainOn[t];
   if (j.chainPatch && typeof j.chainPatch === 'object' && (j.chainPatch.format === 'chains.patch' || j.chainPatch.format === 'waves.patch')) S.chainPatch = j.chainPatch;
   if (Array.isArray(j.smute)) j.smute.slice(0, 256).forEach((v, i) => S.smute[i] = int(v, 0) | 0);
-  S.ntr = clamp(int(j.ntr, 16), 8, NT);
+// Voice-per-track parity: one synth voice per song track. ntr caps at 24, because 24 tracks need pads
+// 8–31: exactly 32 voices.
+  S.ntr = clamp(int(j.ntr, 16), 8, 24);
+  // A voice per track is a synth-page setting, not a song setting — but if the saved kit needs track pads,
+  // leave the checkbox on so the kit's voices stay visible.
+  try { if (localStorage.getItem(VTRK) !== '1' && j.voices && j.voices.length > 16) { vtrk = true; localStorage.setItem(VTRK, '1'); } } catch(e){}
   return S;
 }
 function demoSong(){
@@ -3238,6 +3389,8 @@ function ensureSectPhrase(cid){
 const firstPhrase = cid => { const c = cid >= 0 ? S.chains[cid] : null, r = c ? c.find(q => q[0] >= 0) : null; return r ? r[0] : -1; };
 
 /* ---------- sequencer: turns the song into timed note events ---------- */
+// MPC swing note values (the hardware's 1/8, 1/16, 1/16T … grid): how many groove counts make one pair.
+const SWINGB = ['8ths', '16ths', 'Triplet', 'Dotted-8th', 'Half', 'Wide-6', 'Wide-7'];
 function makeSeq(S, mode, o){
   const once = !!o.once, tr = []; let loop = o.loop || null;   // loop: {y0,y1} rows to cycle; api.setLoop swaps it while playing
   for (let t = 0; t < NT; t++) tr.push({on:false, empty:false, row:0, cr:0, step:0, inst:0, rate:1, tsp:0, next:-1, last:null, rnl:{}, rnlNote:0, nth:new Map(), arc:{mode:0, spd:1},
@@ -3251,6 +3404,10 @@ function makeSeq(S, mode, o){
   let seeded = null;
   const rand = () => { if (!seeded) return Math.random(); let x = seeded.s += 0x6D2B79F5; x = Math.imul(x ^ x >>> 15, x | 1); x ^= x + Math.imul(x ^ x >>> 7, x | 61); return ((x ^ x >>> 14) >>> 0) / 4294967296; };
   const sectId = (T, t) => mode === 'song' ? (T.row < 256 ? S.song[T.row][t] : -1) : o.sect;
+  // Where in the swing pair this track's current step sits, counting phrase rows from the start of the
+  // song cell (so a 2-row pattern swings exactly like two rows of a longer one would).
+  const offInSong = (T, t) => { let k = 0; const pid = (T, t) => ((S.chains[sectId(T, t)] || [])[T.cr] || [-1])[0];
+    const c0 = T.cr; while (T.cr > 0){ T.cr--; if (pid(T, t) >= 0) k += lenOf(pid(T, t)); } T.cr = c0; return k + T.step; };
   // Moves a track forward until it points at a sect row with a phrase (song: loops back to the top of
   // the block of filled rows; renders stop at the first empty row instead). With a selection loop,
   // song rows stay inside the loop (empty rows are skipped forward, wrapping) and sects restart
@@ -3308,11 +3465,14 @@ function makeSeq(S, mode, o){
   const ticCmd = r => { let v = null; for (let k = FX0; k < RW; k += 2) if (r[k] === TICI) v = Math.max(0, r[k + 1]); return v; };
   // Each call plays the next line of every track that is due. Tracks keep their own clocks, so a phrase
   // can use its own lines per beat (LPB) and every track its own groove.
+  // The MPC swing factor (50–75%): how late the off-beat lands. The SWING NOTE setting below picks the
+  // grid it lands on — 8ths swing pairs of steps, 16ths swing the back half of each beat, Triplet a 3-grid.
+  function swingOf(){ return {amt:clamp(S.swing, 50, 75) / 100, beat:clamp(S.swingB || 2, 1, 7)}; }
   api.step = () => {
     if (api.base == null) api.base = api.time;
     let rel0 = Infinity; for (const T of tr) if (T.on && T.rel < rel0) rel0 = T.rel;
     if (rel0 === Infinity) rel0 = api.time - api.base;
-    const t0 = api.base + rel0, evs = [], pos = new Array(NT).fill(null), sw = clamp(S.swing, 50, 75) / 100;
+    const t0 = api.base + rel0, evs = [], pos = new Array(NT).fill(null), {amt:sw, beat:swB} = swingOf();
     let nb = api.bpm, ngrv = api.grv; const tks0 = api.tks;
     for (let t = 0; t < NT; t++){
       const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
@@ -3322,7 +3482,12 @@ function makeSeq(S, mode, o){
       // TIC on this row changes the ticks a step from here on (for every track, like TPO), and counts already for this row.
       if (r0(T, pid)){ const tc = ticCmd(r0(T, pid)); if (tc != null) api.tks = tc ? clamp(tc, 1, 32) : clamp(S.ticks || TICKS, 1, 32); }
       const tick = line / api.tks, gv = T.grv || api.grv;
-      const dur = gv ? gv[T.g % 2] * tick : T.g % 2 === 0 ? 2 * line * sw : 2 * line * (1 - sw);
+    // The MPC shuffle: the off-beat step borrows (sw − 50%) of the swing pair and hands it to the beat.
+    // sw = 50%: every step lasts one line (straight). sw = 66⅔% on 16ths: the classic triplet feel.
+    // Pair assignment follows the phrase, not a global count (T.g counts steps only while this track runs),
+    // so a 2-row pattern still swings exactly like two rows of a longer one would.
+    const pair = 2 * swB, slot = (T.step + (mode === 'song' ? offInSong(T, t) : 0)) % pair, offB = slot >= swB;
+    const dur = gv ? gv[(T.g || 0) % 2] * tick : pair * line * (offB ? 1 - sw : sw);
       const ctsp = !T.empty && chRow ? chRow[1] : 0;
       pos[t] = {row:T.row, cr:T.cr, step:T.step, sect:cid, phrase:pid};
       // A muted song block still runs its rows (so tempo and timing carry on) but its notes are dropped.
@@ -3379,7 +3544,7 @@ function makeSeq(S, mode, o){
           notes.forEach((n, q) => {
             const note = n + ctsp + I.tsp + T.tsp + pit + nrnd, rate = Math.pow(2, (note - ROOT) / 12);
             if (!q) firstRate = rate;
-            const ev = {type:'note', t:at, track:t, poly, pad:I.pad, rate, gain, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
+            const ev = {type:'note', t:at, track:t, poly, pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? at + fx.KIL * tick : null, rel:fx.OFF != null ? at + fx.OFF * tick : null,
               slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, ...mods};
             evs.push(ev);
@@ -3640,7 +3805,7 @@ function tStart(mode, o){
   const r = rtInit();
   const seq = makeSeq(S, mode, o);
   if (!seq.alive()){ toast(mode === 'song' ? `Row ${rS(o.row, 3)} is empty. Put a sect on it, or move to a row that has some.` : 'Nothing to play here yet.'); draw(); return; }
-  for (let i = 0; i < NSLOT; i++) ensure(i);
+  for (let i = 0; i < nslots(); i++) ensure(i);
   seq.time = ctx.currentTime + 0.08;
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : ''});
   tp.timer = setInterval(pump, 25); pump(); draw(); songBtn(); chainsTempo();
@@ -3725,7 +3890,7 @@ function wavN(chs, sr, bits){
   return u8;
 }
 function stemName(t, notes){
-  const n = new Array(NSLOT).fill(0); for (const e of notes) if (e.track === t) n[e.pad]++;
+  const n = new Array(nslots()).fill(0); for (const e of notes) if (e.track === t && e.pad < n.length) n[e.pad]++;
   const p = n.indexOf(Math.max(...n)); return (kit.voices[p] && kit.voices[p].name) || 'Pad ' + (p + 1);
 }
 async function renderOut(stems){
@@ -3911,11 +4076,21 @@ function followPlay(){
   else if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0){ cSect = own.sect; cs.sect.y = own.cr; } }
   else if (tv === 'phrase'){ if (own.phrase >= 0){ cPhrase = own.phrase; cs.phrase.y = own.step; } }
 }
-// TRACKS (Song): how many of the 32 tracks this song uses. Song and Mixer show as many as fit and scroll sideways.
+// TRACKS (Song): how many tracks this song uses (8–32, but 24 at most with a voice per track, so every
+// track keeps its own voice within 40 kit voices). Song and Mixer show as many as fit and scroll sideways.
 const ntr = () => S.ntr || 16;
+// Voice-per-track parity: 8 drums + one voice per song track. ntr caps at 24, so creating a track
+// always has a pad waiting — pads 8–31 are tracks 1–24, one-to-one by position. ntr()+NPAD can never
+// pass 32 voices, so the slot count needs no second cap.
+const NVOICES = 32;
+// ntr()/S are initialized after this line runs, so nslots() falls back to the classic 16 until they exist.
+const nslots = () => { try { return vtrk ? (ntr() || 16) + NPAD : NSLOT; } catch(e){ return NSLOT; } };
+const voiceForTrack = t => vtrk ? NPAD + t : t % NSLOT;
 function setNtr(v){
-  S.ntr = clamp(v, 8, NT); const n = S.ntr;
+  S.ntr = clamp(v, 8, vtrk ? 24 : NT); const n = S.ntr;
   if (cTrack >= n) cTrack = n - 1; if (cs.song.x >= n) cs.song.x = n - 1; if (cs.mixer.x >= n) cs.mixer.x = n - 1;
+  // A new track instantiates its voice before the redraw, so the kit keeps one-to-one voice/track parity.
+  if (vtrk) growKit();
   if (cFxT < NT && cFxT >= n) cFxT = 0; arrSig = ''; saveS(); draw();
 }
 // The window of tracks a Song or Mixer line has room for (each track takes 3 characters after a lab-wide label).
@@ -3960,7 +4135,7 @@ function setCell(v, x, y, val){
 function instRows(){
   const I = S.insts[cInst], pre = () => preview(cInst, ROOT, -1);
   return [
-    {l:'PAD', get:() => I.pad, set:v => I.pad = v, min:0, max:NSLOT - 1, big:NPAD, d:cInst % NSLOT, fmt:v => hx(v) + '  ' + (isSyn(v) ? 'SYNTH ' : '') + ((kit.voices[v] && kit.voices[v].name) || 'Pad ' + (v + 1)),
+    {l:'PAD', get:() => I.pad, set:v => I.pad = v, min:0, max:nslots() - 1, big:NPAD, d:cInst % nslots(), fmt:v => hx(v) + '  ' + (isSyn(v) ? 'SYNTH ' : '') + ((kit.voices[v] && kit.voices[v].name) || 'Pad ' + (v + 1)),
       info:() => 'Which ...Thunder slot this instrument plays: 00–07 drum pads, 08–0F synths (they hold until a note OFF). EDIT plays it.', after:pre, tap:pre},
     {l:'TRANSPOSE', get:() => I.tsp, set:v => I.tsp = v, min:-48, max:48, big:12, d:0, info:v => sgn(v) + ' semitones on every note'},
     {l:'VOLUME', get:() => I.vol, set:v => I.vol = v, min:0, max:255, big:16, d:255, info:v => 'Instrument level ' + dB(curve(v))},
@@ -4059,14 +4234,16 @@ function projRows(){
       info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. Only to look at; they can’t be edited'},
     {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:() => { const n = prompt('Song name', S.name); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); } }, info:() => 'EDIT renames the song'},
     {l:'TRACKS', get:() => ntr(), set:v => setNtr(v), min:8, max:NT, big:8, d:16, fmt:v => v + ' tracks',
-      info:() => `How many tracks this song uses, 8 to ${NT}. Song and Mixer show as many as fit and scroll sideways (arrows, or swipe left and right). Tracks past this number are hidden and silent; their notes are kept`},
+      info:() => `How many tracks this song uses, 8 to ${vtrk ? 24 : NT} with ${vtrk ? 'a voice per track (one voice each)' : 'the shared 16 voices'}. Song and Mixer show as many as fit and scroll sideways (arrows, or swipe left and right). Tracks past this number are hidden and silent; their notes are kept`},
     {l:'TEMPO', get:() => S.bpm, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; }, min:40, max:300, big:10, d:120, fmt:v => v + ' BPM', after:() => { rtAllFx(); chainsTempo(); }, info:() => 'Beats per minute, 4 steps to a beat. Track delays follow it'},
     {l:'LPB', get:() => S.lpb, set:v => S.lpb = v, min:1, max:16, big:4, d:4, fmt:v => v + ' lines/beat · 1/' + (v * 4), info:() => 'Lines per beat: 4 makes each row a 16th, 8 a 32nd, 3 or 6 triplets. A phrase can set its own on its LEN line'},
     {l:'TICKS', get:() => S.ticks || TICKS, set:v => { S.ticks = v; if (tp.on && tp.seq) tp.seq.tks = v; }, min:1, max:32, big:4, d:TICKS, fmt:v => v + ' ticks a step', after:chainsTempo, info:() => 'How many ticks each step is cut into for DEL, RET, KIL, OFF, ARC, PSL and GRV (6 by default). A TIC command in a phrase changes it from that row on'},
     {l:'PATTERN LEN', get:() => S.dlen || 16, set:v => setDefLen(v), min:1, max:PROWS, big:4, d:16, fmt:v => v + (v === 1 ? ' row' : ' rows') + ' · new phrases', info:() => 'How many rows a new phrase starts with (empty phrases follow it too). Change one phrase with ROWS at the right of the tab bar, or its LEN line'},
     {l:'› ALL PHRASES TO ' + (S.dlen || 16), dbl:true, act:() => { for (let i = 0; i < 256; i++) S.plen[i] = S.dlen || 16; saveS(); draw(); toast(`Every phrase now plays ${S.dlen || 16} rows. Notes past that are kept, just not played.`); },
       info:() => `Sets every phrase, used or not, to ${S.dlen || 16} rows. Rows past the end keep their notes. Tap EDIT twice`},
-    {l:'SWING', get:() => S.swing, set:v => S.swing = v, min:50, max:75, big:5, d:50, fmt:v => v + '%', info:() => '50% is straight; higher pushes every second step later'},
+    {l:'SWING', get:() => S.swing, set:v => S.swing = v, min:50, max:75, big:5, d:50, fmt:v => v + '%', info:() => 'MPC swing amount: 50% is straight; higher pushes the off-beat of each pair later. 66–67% is the triplet feel'},
+    {l:'SWING NOTE', opts:true, get:() => clamp(S.swingB || 2, 1, 7), set:v => S.swingB = v, tap:() => S.swingB = (S.swingB || 2) % 7 + 1, min:1, max:7, d:2, fmt:v => SWINGB[v - 1],
+      info:() => 'MPC swing note value: the beat the swing lands on (the hardware’s 1/16, 1/16T, 1/8, 1/8T… settings). 16ths pairs steps 2 3, 6 7…; 8ths pairs 1 2, 3 4…'},
     {l:'LIMITER', get:() => S.limiter ? 1 : 0, set:v => S.limiter = !!v, min:0, max:1, tog:true, d:1, fmt:onOff, after:rtRoute, info:() => 'Catches peaks on the master. Renders use it on the mix only, so stems stay clean'},
     {l:'MASTER', get:() => S.master, set:v => S.master = v, min:0, max:255, big:16, d:255, after:rtRoute, info:v => 'Master level ' + dB(curve(v))},
     {l:'RENDER FROM', sec:'Render', get:() => S.renderFrom, set:v => S.renderFrom = v, min:0, max:255, big:16, d:0, fmt:v => 'ROW ' + rS(v, 3), gap:true, info:() => 'Renders play from this row until each track reaches an empty row'},
@@ -5811,6 +5988,8 @@ setTimeout(() => checkUpdate(false), 3000);
 
 buildPads();
 refreshAll();
+// A saved voice-per-track session grows the kit to its tracks before anything plays.
+if (vtrk) growKit();
 loadCur();
 if (!sectsOn){ if (tv === 'sect') tv = 'phrase'; if (midV === 'sect') midV = 'phrase'; }
 sectVis(); arrBody(); applyCmdOrder();

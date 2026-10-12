@@ -762,12 +762,11 @@ function setParam(n, key, v, fromUser){
 }
 function slider(n, key, spec){
   const [def, min, max, step] = spec, fmt = fmtOf(n.m.type, key), label = plabel(n.m.type, key);
-  const out = h('span', {class:'val', title:'Double-click to type a value'}), mark = h('span', {class:'mark', hidden:true});
+  const out = h('span', {class:'val', title:'Double-click or double-tap to type a value'}), mark = h('span', {class:'mark', hidden:true});
   const inp = h('input', {type:'range', min, max, step, 'aria-label': label});
   const show = () => { inp.value = n.m.params[key]; if (!out.querySelector('input') && !r.classList.contains('modded')) out.textContent = fmt(+n.m.params[key]); };
   n.ctl[key] = { show, range:{min, max, step} };
-  out.addEventListener('dblclick', e => {
-    e.stopPropagation();
+  const typeBox = () => {
     if (out.querySelector('input')) return;
     const shown = fmt(+n.m.params[key]), num = (shown.match(/[-−]?\d+(\.\d+)?/) || [''])[0].replace('−', '-');
     const ed = h('input', {type:'text', class:'valedit', 'aria-label': label + ' value', inputmode:'decimal'});
@@ -790,6 +789,16 @@ function slider(n, key, spec){
     ed.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') finish(true); if (ev.key === 'Escape') finish(false); });
     ed.addEventListener('blur', () => finish(true));
     ed.addEventListener('pointerdown', ev => ev.stopPropagation());
+  };
+  out.addEventListener('dblclick', e => { e.stopPropagation(); typeBox(); });
+  // Touch screens: double-tap the value (tap, lift, tap) to type one, as with double-click on desktop.
+  let lastValTap = null;
+  out.addEventListener('pointerup', e => {
+    if (e.pointerType === 'touch' && e.isPrimary && !out.querySelector('input')){
+      const now = performance.now(), cx = e.clientX, cy = e.clientY;
+      if (lastValTap && now - lastValTap.t < 450 && Math.hypot(cx - lastValTap.x, cy - lastValTap.y) < 30){ lastValTap = null; typeBox(); }
+      else lastValTap = {t:now, x:cx, y:cy};
+    }
   });
   inp.addEventListener('pointerdown', () => { store.snapshot(); armLearn(n, key, r); });
   inp.addEventListener('input', () => { setParam(n, key, +inp.value, true); out.textContent = fmt(+inp.value); });
