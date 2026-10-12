@@ -4624,13 +4624,13 @@ function bump(d, big){
     setCell(tv, c.x, c.y, v); after(k, tv, c.x, c.y, v); return;
   }
   if (tv === 'mixer'){
-    if (c.y === 6) S.master = clamp(S.master + d * (big ? 16 : 1), 0, 255), rtRoute();
+    if (c.y === 7) S.master = clamp(S.master + d * (big ? 16 : 1), 0, 255), rtRoute();
     else if (c.y === 4) return fxActiveStep(c.x, d > 0 ? 1 : -1);
     else if (c.y === 5){ setChainOn(c.x, d > 0); draw(); return; }
     else { const m = S.mix[c.x];
       if (c.y === 0) m.vol = clamp(m.vol + d * (big ? 16 : 1), 0, 255);
       else if (c.y === 1) m.pan = clamp(m.pan + d * (big ? 16 : 1), 0, 255);
-      else if (c.y === 2) m.mute = d > 0; else if (c.y === 3) m.solo = d > 0; else if (c.y === 7) m.sc = d > 0; }
+      else if (c.y === 2) m.mute = d > 0; else if (c.y === 3) m.solo = d > 0; else if (c.y === 6) m.sc = d > 0; }
     mixChanged(); draw(); return;
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.get) return;
@@ -4725,7 +4725,7 @@ function editTap(){
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
   }
-  if (tv === 'mixer'){ if (c.y === 4) return go('fx'); if (c.y === 5){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (c.y === 7){ const m = S.mix[c.x]; m.sc = !m.sc; mixChanged(); draw(); return; } if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
+  if (tv === 'mixer'){ if (c.y === 4) return go('fx'); if (c.y === 5){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (c.y === 6){ const m = S.mix[c.x]; m.sc = !m.sc; mixChanged(); draw(); return; } if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
   const r = rowsOf(tv)[c.y]; if (!r) return;
   if (r.act){ if (r.dbl) return toast('Tap EDIT again to ' + r.l.replace('› ', '').toLowerCase() + '.'); return r.act(); }
   if (r.tog){ r.set(r.get() ? 0 : 1); if (r.after) r.after(); saveS(); draw(); return; }
@@ -4831,7 +4831,7 @@ function del(){
     if (tv === 'phrase' && k === 'note'){ const r = S.phrases[cPhrase] && S.phrases[cPhrase][c.y]; if (r && r.slice(0, NCOL).every(n => n < 0)) r[IC] = -1; }
     return draw();
   }
-  if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ setChainOn(c.x, false); return draw(); } if (c.y === 6){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; else if (c.y === 7) m.sc = false; } mixChanged(); return draw(); }
+  if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ setChainOn(c.x, false); return draw(); } if (c.y === 7){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; else if (c.y === 6) m.sc = false; } mixChanged(); return draw(); }
   const r = rowsOf(tv)[c.y]; if (r && r.get && r.d != null){ r.set(r.d); if (r.after) r.after(); saveS(); draw(); }
 }
 // Whole rows: clear a row, insert a blank one (rows below move down), or remove one (rows below move up).
@@ -5043,7 +5043,7 @@ function go(v){
     if (cid >= 0){ cSect = cid; cTrack = cs.song.x; const ch = S.chains[cid]; const r = ch ? ch.findIndex(q => q[0] >= 0) : -1; if (r >= 0){ cs.sect.y = r; cPhrase = ch[r][0]; } } }
   if (v === 'phrase' && tv === 'sect'){ const r = sectRow(cSect, cs.sect.y); if (r && r[0] >= 0) cPhrase = r[0]; }
   if (v === 'inst' && tv === 'phrase'){ const p = S.phrases[cPhrase], r = p && p[cs.phrase.y]; if (r && r[IC] >= 0) cInst = r[IC]; }
-  if (v === 'fx' && tv === 'mixer') cFxT = cs.mixer.y === 6 ? NT : cs.mixer.x;
+  if (v === 'fx' && tv === 'mixer') cFxT = cs.mixer.y === 7 ? NT : cs.mixer.x;
   // Mixer and FX open on the track being edited (the song cursor's track, or the sect/phrase's track).
   if (tv === 'song' && v !== 'song') cTrack = cs.song.x;
   if (v === 'fx' && tv !== 'mixer' && tv !== 'fx') cFxT = cTrack;
@@ -5291,13 +5291,13 @@ function info(){
     return ci < 0 || !FXC[ci] ? 'No command. EDIT adds one; EDIT+▲▼ or letters pick from ' + FXC.join(' ') : `${FXC[ci]} ${h2(vv)} · ${FXI[FXC[ci]](Math.max(0, vv))}`;
   }
   if (tv === 'mixer'){
-    if (c.y === 6) return 'Master ' + dB(curve(S.master)) + (fxCount(S.mfx) ? ' · FX ' + fxList(S.mfx) : '') + ' · SHIFT+▶ master effects';
+    if (c.y === 7) return 'Master ' + dB(curve(S.master)) + (fxCount(S.mfx) ? ' · FX ' + fxList(S.mfx) : '') + ' · SHIFT+▶ master effects';
     if (c.y === 5){
       const on = chainsFeed(c.x), flag = !!(S.chainOn && S.chainOn[c.x]);
       return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · …chains ` + (on ? 'ON (track runs through the chains patch)'
         : flag ? 'MISS: patch needs a Chain Out set to track ' + d2(c.x + 1) + ' · EDIT toggles' : 'off · EDIT toggles');
     }
-    if (c.y === 7){ const on = !!(S.mix[c.x] && S.mix[c.x].sc);
+    if (c.y === 6){ const on = !!(S.mix[c.x] && S.mix[c.x].sc);
       return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · Sidechain Out ` + (on ? 'ON — this track feeds the sidechain bus (patch Sidechain In or a Sidechain Comp in …chains)' : 'off · EDIT toggles, to feed another track’s sidechain'); }
     if (c.y === 4){ const A = S.tfx[c.x], n = fxCount(A);
       return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ${n}/${FXSLOTS} active` + (A.some(Boolean) ? ' · ' + fxList(A) : '') + ' · OPTION+▲▶ turn effects on, OPTION+▼◀ off (settings kept) · EDIT opens FX'; }
@@ -5438,7 +5438,7 @@ function draw(){
     }
     L.push(cl);
     const sl = [{t:'SC  ', cls:'lb'}];
-    for (let t = T0; t < T1; t++){ const on = !!(S.mix[t] && S.mix[t].sc); sl.push({t:on ? 'ON' : '--', cls:cc(t, 7, on ? 'cf' : 'e') + tk(t), x:t, y:7}, ' '); }
+    for (let t = T0; t < T1; t++){ const on = !!(S.mix[t] && S.mix[t].sc); sl.push({t:on ? 'ON' : '--', cls:cc(t, 6, on ? 'cf' : 'e') + tk(t), x:t, y:6}, ' '); }
     L.push(sl);
     // Level meters, 8 lines of 6 dB each: red above −6 dB, yellow above −12.
     for (let k = 0; k < MH; k++){
@@ -5447,7 +5447,7 @@ function draw(){
       L.push(ml);
     }
     const mn = fxCount(S.mfx);
-    L.push([{t:'MASTER ', cls:'lb'}, {t:hx(S.master), cls:'v' + (c.y === 6 ? ' cur' : ''), x:0, y:6}, '  ', {t:dB(curve(S.master)), cls:'lb'}, '   ', {t:mn ? 'FX ' + fxList(S.mfx) : 'FX --', cls:mn ? 'cf' : 'e'}]);
+    L.push([{t:'MASTER ', cls:'lb'}, {t:hx(S.master), cls:'v' + (c.y === 7 ? ' cur' : ''), x:0, y:7}, '  ', {t:dB(curve(S.master)), cls:'lb'}, '   ', {t:mn ? 'FX ' + fxList(S.mfx) : 'FX --', cls:mn ? 'cf' : 'e'}]);
     for (const ch of ['L', 'R']) L.push([{t:ch + '   ', cls:'lb'}, {t:'', cls:'mm m1'}, {t:'', cls:'mm m2'}, {t:'', cls:'mm m3'}, {t:'', cls:'mm e'}, ' ', {t:'', cls:'mm lb'}]);
   } else {
     if (tv === 'inst'){ title = 'INST ' + hx(cInst); const I = S.insts[cInst]; sub = (isSyn(I.pad) ? 'SYNTH ' : 'PAD ') + hx(I.pad); }
@@ -5979,7 +5979,7 @@ function typeHex(d){
     const y = c.y; setCell(tv, c.x, y, val); if (done){ down1(); hexBuf.key = ''; } after(k, tv, c.x, y, val); return;
   }
   if (tv === 'mixer'){
-    if (c.y === 6){ S.master = v; rtRoute(); } else if (c.y === 5){ setChainOn(c.x, !!v); return; } else if (c.y === 0) S.mix[c.x].vol = v; else if (c.y === 1) S.mix[c.x].pan = v; else return;
+    if (c.y === 7){ S.master = v; rtRoute(); } else if (c.y === 5){ setChainOn(c.x, !!v); return; } else if (c.y === 0) S.mix[c.x].vol = v; else if (c.y === 1) S.mix[c.x].pan = v; else return;
     if (done) hexBuf.key = ''; mixChanged(); draw(); return;
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.get || r.tog) return;
