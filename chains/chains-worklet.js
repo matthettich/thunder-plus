@@ -319,6 +319,124 @@ const Quant = {
 
 
 
+/* ── Phase 2: filters, shapers and stereo effects (all original DSP) ────────── */
+
+/* Dual (2/4-pole) multimode filter with drive. Cutoff follows the VCF's mapping so the % reads the same. */
+const Blades = {
+  type:'blades', scope:'mono', cost:1.2,
+  inputs:{ in:'audio', cutoff:'cv', res:'cv' }, outputs:{ out:'audio' },
+  params:{ cutoff:[.5,0,1,.001], res:[.3,0,1,.001], drive:[0,0,1,.01], mode:[0,0,3,1], slope:[2,2,4,2] },
+  create:() => ({ ic1:0, ic2:0, jc1:0, jc2:0 }),
+  process(st, io, ctx){
+    const mode = io.p.mode | 0, four = (io.p.slope | 0) >= 4, dr = 1 + io.p.drive * 6, norm = Math.tanh(dr) || 1;
+    for (let i = 0; i < ctx.block; i++){
+      const fc = Math.min(.49, (.01 + Math.pow(10, (io.p.cutoff + io.in.cutoff[i]) * 3) * .004) * 44100 / ctx.sr);
+      const g = Math.tan(Math.PI * fc), k = 2 - 2 * Math.min(clamp(io.p.res + io.in.res[i], 0, 1), .98);
+      const a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2;
+      const x = Math.tanh(io.in.in[i] * dr) / norm;
+      // Stage 1 (TPT state-variable)
+      const v3 = x - st.ic2, v1 = a1 * st.ic1 + a2 * v3, v2 = st.ic2 + a2 * st.ic1 + a3 * v3;
+      st.ic1 = 2 * v1 - st.ic1; st.ic2 = 2 * v2 - st.ic2;
+      let y = mode === 0 ? v2 : mode === 1 ? v1 : mode === 2 ? (x - k * v1 - v2) : (x - k * v1);
+      if (four){
+        const x2 = mode === 1 ? v1 : v2;
+        const u3 = x2 - st.jc2, u1 = a1 * st.jc1 + a2 * u3, u2 = st.jc2 + a2 * st.jc1 + a3 * u3;
+        st.jc1 = 2 * u1 - st.jc1; st.jc2 = 2 * u2 - st.jc2;
+        y = mode === 0 ? u2 : mode === 1 ? u1 : mode === 2 ? (x2 - k * u1 - u2) : (x2 - k * u1);
+      }
+      io.out.out[i] = y;
+    }
+  }
+};
+
+/* Meta-modulator (Warps-style): crossfade, ring mod, wave fold or comparator between In and Mod. */
+const Meta = {
+  type:'meta', scope:'mono', cost:.3,
+  inputs:{ in:'audio', mod:'audio' }, outputs:{ out:'audio' },
+  params:{ mode:[0,0,3,1], amount:[.5,0,1,.01], mix:[1,0,1,.01] },
+  create:() => ({}),
+  process(st, io, ctx){
+    const mode = io.p.mode | 0, a = io.p.amount, mx = io.p.mix;
+    for (let i = 0; i < ctx.block; i++){
+      const x = io.in.in[i], m = io.in.mod[i]; let y;
+      if (mode === 0) y = x * (1 - a) + m * a;                       // crossfade
+      else if (mode === 1) y = x * ((1 - a) + a * m * 1.4142);       // ring mod
+      else if (mode === 2) y = Math.sin(x * (1 + a * 7) * Math.PI);  // wave fold (sine shaper)
+      else y = x * (m >= 0 ? 1 : -1);                                // comparator (mod flips sign)
+      io.out.out[i] = x + (y - x) * mx;
+    }
+  }
+};
+
+/* Phaser: swept all-pass stages through an LFO or the CV input. */
+const Phaser = {
+  type:'phaser', scope:'mono', cost:.4,
+  inputs:{ in:'audio', cv:'cv' }, outputs:{ out:'audio' },
+  params:{ rate:[.3,0,1,.01], depth:[.5,0,1,.01], feedback:[.4,0,1,.01], stages:[4,2,8,2], mix:[.5,0,1,.01], sync:[0,0,1,1] },
+  create:() => ({ ph:0, z:new Float32Array(8), fb:0 }),
+  process(st, io, ctx){
+    const hz = io.p.sync >= .5 ? (ctx.transport.tempo / 60) * io.p.rate : .05 * Math.pow(160, io.p.rate);
+    const n = clamp(io.p.stages | 0, 2, 8), dep = io.p.depth, fbk = io.p.feedback * .9, mx = io.p.mix, cv = linked(io, 'cv');
+    for (let i = 0; i < ctx.block; i++){
+      st.ph += hz / ctx.sr; st.ph -= Math.floor(st.ph);
+      const f = clamp(.5 + (sinT(st.ph) * dep + (cv ? io.in.cv[i] : 0)) * .5, 0, .999);
+      const a = (1 - f) / (1 + f);
+      let x = io.in.in[i] + st.fb * fbk;
+      for (let s = 0; s < n; s++){ const y = a * x + st.z[s]; st.z[s] = x - a * y; x = y; }
+      st.fb = x; io.out.out[i] = io.in.in[i] * (1 - mx) + x * mx;
+    }
+  }
+};
+
+/* Stereo width (mid/side) with a bass-mono control. In R is optional (mono up to stereo). */
+const Width = {
+  type:'width', scope:'mono', cost:.1,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ width:[1,0,2,.01], bass:[0,0,1,.01], level:[1,0,2,.01] },
+  create:() => ({ lp:0 }),
+  process(st, io, ctx){
+    const R = linked(io, 'inR') ? io.in.inR : io.in.in, w = io.p.width, b = io.p.bass, g = io.p.level;
+    const k = 1 - Math.exp(-2 * Math.PI * 200 / ctx.sr);
+    for (let i = 0; i < ctx.block; i++){
+      const l = io.in.in[i], r = R[i], mid = (l + r) * .5, side = (l - r) * .5;
+      st.lp += (side - st.lp) * k;
+      const sOut = (side - st.lp * b) * w;
+      io.out.out[i] = (mid + sOut) * g; io.out.outR[i] = (mid - sOut) * g;
+    }
+  }
+};
+
+/* Tempo-synced ping-pong delay (or free time). In R is optional. */
+const PP_DIVS = [['1/16', .25], ['1/8T', 1 / 3], ['1/8', .5], ['1/4T', 2 / 3], ['1/4', 1], ['1/2', 2], ['1 bar', 4]];
+const PingPong = {
+  type:'pingpong', scope:'mono', cost:.7,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ div:[4,0,PP_DIVS.length - 1,1], sync:[1,0,1,1], time:[.3,.02,1.5,.001], fb:[.4,0,1,.01], tone:[.5,0,1,.01], mix:[.3,0,1,.01] },
+  create(){
+    const N = 1 << 17;
+    return { bL:new Float32Array(N), bR:new Float32Array(N), mask:N - 1, w:0, lp:0, lpR:0 };
+  },
+  process(st, io, ctx){
+    const R = linked(io, 'inR') ? io.in.inR : io.in.in;
+    const beat = 60 / Math.max(ctx.transport.tempo, 20);
+    const tSec = io.p.sync >= .5 ? beat * PP_DIVS[clamp(io.p.div | 0, 0, PP_DIVS.length - 1)][1] : io.p.time;
+    const d = clamp(Math.round(tSec * ctx.sr), 1, 65536), fb = io.p.fb * .95, mx = io.p.mix, k = .05 + io.p.tone * .9;
+    const mask = st.mask;
+    for (let i = 0; i < ctx.block; i++){
+      const rd = (st.w - d) & mask;
+      let dl = st.bL[rd], dr = st.bR[rd];
+      st.lp += (dl - st.lp) * k; st.lpR += (dr - st.lpR) * k;
+      const wl = st.lp, wr = st.lpR;
+      st.bL[st.w] = io.in.in[i] + wr * fb;   // left takes the input and the right's tail
+      st.bR[st.w] = wl * fb;                 // right echoes the left (ping-pong)
+      st.w = (st.w + 1) & mask;
+      io.out.out[i] = io.in.in[i] * (1 - mx) + dl * mx;
+      io.out.outR[i] = R[i] * (1 - mx) + dr * mx;
+    }
+  }
+};
+
+
 /* Track In: hard-assigned tracker track input (stereo). Standalone it is silence;
    in Thunder (Phase 2) the host fills per-track buffers before rendering. */
 const TrackIn = {
@@ -353,7 +471,8 @@ const MODULES = { trackIn:TrackIn,
   vcf:VCF, vca:VCA, mixer:Mixer,
   eq:EQ, comp:Comp, saturation:Saturation, tape:Tape, chorus:Chorus, crush:Crush, delay:Delay, reverb:Reverb, rings:Rings, clouds:Clouds,
   lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter,
-  envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant, chainOut:ChainOut };
+  envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant,
+  blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong, chainOut:ChainOut };
 
 /* A cable into "p:name" modulates that parameter instead of feeding an input. */
 const isParamPort = p => typeof p === 'string' && p.startsWith('p:');
