@@ -9,7 +9,7 @@ static float io_l[128], io_r[128];
 extern "C" {
 __attribute__((export_name("tfx_l"))) float* tfx_l() { return io_l; }
 __attribute__((export_name("tfx_r"))) float* tfx_r() { return io_r; }
-// type: 0 rings, 1 clouds, 2 density, 3 tape, 4 chorus, 5 crush, 6 eq, 7 comp, 8 reverb, 9 delay
+// type: 0 rings, 1 clouds, 2 density, 3 tape, 4 chorus, 5 crush, 6 eq, 7 comp, 8 reverb, 9 delay, 10 beads
 __attribute__((export_name("tfx_new"))) int tfx_new(int type, float sr) {
   int h = 0; while (h < 32 && slots[h]) h++;
   if (h == 32) return -1;
@@ -20,6 +20,7 @@ __attribute__((export_name("tfx_new"))) int tfx_new(int type, float sr) {
     case 4: f = make_chorus(sr); break;  case 5: f = make_crush(sr); break;
     case 6: f = make_eq(sr); break;      case 7: f = make_comp(sr); break;
     case 8: f = make_reverb(sr); break;  case 9: f = make_delay(sr); break;
+    case 10: f = make_beads(sr); break;
   }
   if (!f) return -1;
   f->sr = sr;

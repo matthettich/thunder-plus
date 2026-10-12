@@ -34,6 +34,10 @@ cc "-DTEST -include cstdio -I$H -I$E" "$H/fx_mi.cc" \
   $E/clouds/dsp/granular_processor.cc $E/clouds/dsp/correlator.cc $E/clouds/dsp/mu_law.cc $E/clouds/resources.cc \
   $E/clouds/dsp/pvoc/frame_transformation.cc $E/clouds/dsp/pvoc/phase_vocoder.cc $E/clouds/dsp/pvoc/stft.cc \
   $E/stmlib/dsp/atan.cc $E/stmlib/dsp/units.cc $E/stmlib/utils/random.cc
+# Mutable Instruments Beads (MIT): the texture synthesizer, ported as a track effect (see fx_beads.cc).
+cc "-DTEST -include cstdio -I$H -I$E" "$H/fx_beads.cc" \
+  $E/beads/dsp/delay_clock.cc $E/beads/dsp/delay_controller.cc $E/beads/dsp/mu_law.cc \
+  $E/beads/dsp/processor.cc $E/beads/dsp/trigger_generator.cc $E/beads/resources.cc
 cc "-I$H -I$D/Source -I$D/Source/Effects -I$D/Source/Utility" "$H/fx_ds.cc" $D/Source/Effects/chorus.cpp $D/Source/Effects/decimator.cpp
 for p in $AW; do cc "-I$H -I$H/../stub -I$W/aw -include stdlib.h" "$H/aw_$p.cc" "$W/aw/$p/$p.cpp" "$W/aw/$p/${p}Proc.cpp"; done
 $CXX -mexec-model=reactor -Wl,--export=_initialize -Wl,--export=malloc -Wl,--strip-all -Wl,-z,stack-size=262144 "$O"/*.o -o tfx.wasm

@@ -4,10 +4,10 @@
 both compiled to WebAssembly and embedded in `index.html`, are built from the following MIT-licensed projects. The wrappers and the build
 script, including two small patches, are in the `dsp` folder.
 
-## Mutable Instruments: Plaits, Rings, Clouds, Elements (and stmlib)
+## Mutable Instruments: Plaits, Rings, Clouds, Beads, Elements (and stmlib)
 
 https://github.com/pichenettes/eurorack. Copyright Emilie Gillet.
-"Mutable Instruments", "Plaits", "Rings", "Clouds" and "Elements" are names of Mutable Instruments'
+"Mutable Instruments", "Plaits", "Rings", "Clouds", "Beads" and "Elements" are names of Mutable Instruments'
 products; ...Thunder is not affiliated with or endorsed by Mutable Instruments.
 
 ## Airwindows: Density, ToTape6, EQ, Pressure4, Galactic and TapeDelay2

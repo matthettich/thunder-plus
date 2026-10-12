@@ -25,3 +25,4 @@ Fx* make_eq(float sr);
 Fx* make_comp(float sr);
 Fx* make_reverb(float sr);
 Fx* make_delay(float sr);
+Fx* make_beads(float sr);

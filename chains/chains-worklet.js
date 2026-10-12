@@ -141,6 +141,10 @@ Rings.inputs = { in:'audio', inR:'audio', pitch:'cv' };
 const Clouds = effect('clouds', 1, { mode:[0,0,3,1], lofi:[0,0,1,1], freeze:[0,0,1,1], pos:[.1,0,1,.01], size:[.5,0,1,.01], pitch:[0,-24,24,1], density:[.6,0,1,.01],
     texture:[.5,0,1,.01], blend:[.5,0,1,.01], fb:[.2,0,1,.01], verb:[.5,0,1,.01], spread:[.5,0,1,.01] },
   p => [p.mode | 0, p.lofi >= .5 ? 1 : 0, p.freeze >= .5 ? 1 : 0, u(p.pos), u(p.size), p.pitch, u(p.density), u(p.texture), u(p.blend), u(p.fb), u(p.verb), u(p.spread)], 4);
+/* Mutable Instruments Beads (MIT): time, size, pitch, shape, density, feedback, blend, reverb + media. */
+const Beads = effect('beads', 10, { media:[3,0,3,1], freeze:[0,0,1,1], time:[.2,0,1,.01], size:[.5,0,1,.01], pitch:[.5,0,1,.01], shape:[.5,0,1,.01],
+    density:[.85,0,1,.01], fb:[.2,0,1,.01], blend:[1,0,1,.01], verb:[.25,0,1,.01] },
+  p => [p.media | 0, 0, p.freeze >= .5 ? 1 : 0, u(p.time), u(p.size), u(p.pitch), u(p.shape), u(p.density), u(p.fb), u(p.blend), u(p.verb), 0], 5);
 
 /* ── control ──────────────────────────────────────────────────────────────── */
 const LFO = {
@@ -469,7 +473,7 @@ const ChainOut = {
 
 const MODULES = { trackIn:TrackIn,
   vcf:VCF, vca:VCA, mixer:Mixer,
-  eq:EQ, comp:Comp, saturation:Saturation, tape:Tape, chorus:Chorus, crush:Crush, delay:Delay, reverb:Reverb, rings:Rings, clouds:Clouds,
+  eq:EQ, comp:Comp, saturation:Saturation, tape:Tape, chorus:Chorus, crush:Crush, delay:Delay, reverb:Reverb, rings:Rings, clouds:Clouds, beads:Beads,
   lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant,
   blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong, chainOut:ChainOut };
