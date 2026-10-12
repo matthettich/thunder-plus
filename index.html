@@ -5948,6 +5948,9 @@ function keysDown(e, pad){
   // OPTION/EDIT, and Alt+▲▼◀▶ are OPTION+arrow (optDir) instead of the keys-mode value bump.
   if (pad){
     if (!mod && !e.altKey && !e.shiftKey && (lo === 'z' || lo === 'x')) return false;
+    // Plain / Shift arrows go to the pad's own d-pad, so EDIT (x) + arrow changes the value and OPTION (z)
+    // + arrow pages, exactly like the on-screen buttons. Alt+arrows still page (OPTION+arrow).
+    if (!mod && !e.altKey && (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight')) return false;
     if (e.altKey && !mod){ const a = {ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right'}[k]; if (a){ optDir(a); return true; } }
   }
   if (mod){
