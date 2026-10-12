@@ -3105,6 +3105,14 @@ function leaveChains(){
 }
 function openChains(){ setView('chains'); }
 function closeChains(){ setView('synth'); }
+// Jump to the …chains screen and centre + highlight a track's chain (used when its CHN is switched on and
+// the track already has a chain, and when picking a track that is already used inside the editor).
+let chainFocusT = null;
+function focusChainHit(t){
+  chainFocusT = t; openChains();
+  const go = () => { const a = chApi(); if (a && a.focusTrack && chainFocusT != null){ a.focusTrack(chainFocusT + 1); chainFocusT = null; return true; } return false; };
+  if (!go()){ setTimeout(go, 150); setTimeout(go, 450); }   // a freshly made frame needs its patch before it can focus
+}
 /* The chains patch lives in the song file, but can be saved/loaded on its own as a .chains.json file. */
 function exportChains(){
   if (!S.chainPatch){ toast('No chains patch yet. Press …chains to make one.'); return; }
@@ -4033,6 +4041,7 @@ function setChainOn(t, on){
   saveS();
   if (added && CH.frame) chainsDropFrame();   // the editor reloads with the new pair when it next opens
   chainsPush(); draw();
+  if (on && !added && !was) focusChainHit(t);   // already had a chain: jump to and highlight it
 }
 // Re-route every track that runs through …chains now, AND every track that did until this change (its Chain Out
 // was deleted or set to another track): without that, the old track kept a chains node with no way out and went silent.

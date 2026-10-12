@@ -805,14 +805,14 @@ function chainTrackLists(){ const ins = [], outs = []; for (const x of nodes.val
 function routeTrackChange(n, v){
   const N = Math.max(1, Math.min(CHAN_COUNT, Math.round(+v) || 1)), { ins, outs } = chainTrackLists(), old = n.m.params.track | 0;
   if (n.m.type === 'trackIn'){
-    if (ins.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a Track In — one audio input per track.'); return { reject:true }; }
+    if (ins.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain — showing it.'); focusChainTrack(N); return { reject:true }; }
     for (const o of outs) if ((o.params.track | 0) === old) applyChainTrack(o, N);   // this pair's Chain Out follows
     return { v:N };
   }
   // The Chain Out always follows its Track In, so a lone output snaps back rather than moving the input.
   const mate = ins.find(m => (m.params.track | 0) === old);
   if (mate){ const it = mate.params.track | 0; if (N !== it){ toast('Chain Out follows its Track In — track ' + it + '.'); return { v:it }; } }
-  if (outs.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a Chain Out — one audio output per track.'); return { reject:true }; }
+  if (outs.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain — showing it.'); focusChainTrack(N); return { reject:true }; }
   return { v:N };
 }
 function alignChainTracks(quiet){
@@ -990,6 +990,12 @@ function addModule(type, x, y, params){
   const def = MODULES[type]; if (!def) return null;
   const p = {}; for (const k in def.params) p[k] = def.params[k][0];
   const m = { id:newId(), type, scope:def.scope, pos:[x, y], collapsed:false, params:Object.assign(p, params || {}) };
+  // A new Track In / Chain Out takes a free track (or a lone Track In), so two never share a track by accident.
+  if (type === 'trackIn' || type === 'chainOut'){
+    const same = doc.modules.filter(x => x.type === type), used = new Set(same.map(x => x.params.track | 0));
+    if (type === 'chainOut'){ const ti = doc.modules.filter(x => x.type === 'trackIn'); if (ti.length === 1) m.params.track = ti[0].params.track | 0; }
+    if (used.has(m.params.track | 0)){ let n = 1; while (n <= CHAN_COUNT && used.has(n)) n++; m.params.track = Math.min(n, CHAN_COUNT); }
+  }
   doc.modules.push(m);
   if (bridge) bridge.addModule(m.id, type, { params:m.params, pos:m.pos });
   else if (EMBED && TW && TW.mod) TW.mod({ op:'add', id:m.id, type, params:m.params, pos:m.pos });
@@ -1246,6 +1252,18 @@ function applyPan(){
   const v = view();
   world.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.zoom})`;
   zoomVal.textContent = Math.round(v.zoom * 100) + '%';
+}
+// Jump the view to a track's Track In / Chain Out pair and highlight it. Used when a track is picked that
+// already has a chain, so the existing one is shown instead of the selection just being refused.
+function focusChainTrack(N){
+  const ms = doc.modules.filter(m => m && (m.type === 'trackIn' || m.type === 'chainOut') && (m.params.track | 0) === N);
+  if (!ms.length) return false;
+  clearSel(); for (const m of ms) setSel(m.id, true);
+  let cx = 0, cy = 0; for (const m of ms){ cx += (m.pos && m.pos[0]) || 0; cy += (m.pos && m.pos[1]) || 0; } cx /= ms.length; cy /= ms.length;
+  const v = view(), r = ws.getBoundingClientRect();
+  v.x = r.width / 2 - (cx + 105) * v.zoom; v.y = r.height / 2 - (cy + 55) * v.zoom;
+  applyPan(); store.touch();
+  return true;
 }
 // Zoom so the point under (cx, cy) stays put.
 function zoomAt(cx, cy, z){
@@ -1705,6 +1723,8 @@ const pnameEl = document.getElementById('pname');
       /* Transport: Space in …chains starts/stops the song, same as the tracker. */
       play(){ if (TW && TW.play) TW.play(); },
       playing(){ return !!(TW && TW.playing && TW.playing()); },
+      /* The app jumps to a track's chain (e.g. from the Mixer) by centring and highlighting its pair. */
+      focusTrack(N){ return focusChainTrack(Math.max(1, Math.min(CHAN_COUNT, N | 0))); },
       /* Host meters: one peak per tracker track (the chains return). Track In and Chain Out
          modules show the level of the track they're set to, so patching is visible live. */
       meters(payload){
@@ -1811,7 +1831,7 @@ function helpDoc(){
     ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal cables carry sound, purple dashed cables carry modulation and pink dashed cables carry gates. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the centre, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
     ['Sound as modulation', 'Audio can drive anything a control voltage can. Patch a sound into Envelope Follow to make it swell a filter or level, into Gate Extract to fire envelopes and clocks from hits, or into Pitch Follow to track a monophonic melody. Then shape it with Slew (to smooth it), Sample & Hold (to step it) or Quantizer (to snap it to a scale).'],
-    ['Tracks', 'Each track has its own Track In and Chain Out. In the Mixer, turning a track’s CHN on adds that track’s pair (wired straight through, placed below everything else), so every track gets its own chain and toggling one never disturbs another. The output always follows its own input — set the Track In and its Chain Out moves with it, and a Chain Out can’t be pointed elsewhere. A track takes one pair; control (cv/gate) inputs are not limited.'],
+    ['Tracks', 'Each track has its own Track In and Chain Out. In the Mixer, turning a track’s CHN on adds that track’s pair (wired straight through, placed below everything else), so every track gets its own chain and toggling one never disturbs another. If that track already has a chain, switching its CHN on jumps here to that chain instead of making a new one. The output always follows its own input — set the Track In and its Chain Out moves with it, and a Chain Out can’t be pointed elsewhere. Picking a track that is already used also jumps to and highlights the existing chain. A track takes one pair; control (cv/gate) inputs are not limited.'],
     ['Moving around', 'Drag the background or scroll with two fingers to pan. Pinch, Ctrl-scroll or a mouse wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
     ['Selecting and the right-click menu', 'Shift-click or Shift-drag to select modules. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
