@@ -3391,7 +3391,7 @@ function chnDiff(prev, next){
 }
 function chainsNode(ac, track, patch, tempo){
   if (!chnSync.has(ac)) return null;   // module not loaded yet: caller re-routes when ready
-  const n = new AudioWorkletNode(ac, 'thunder-chains', {numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
+  const n = new AudioWorkletNode(ac, 'thunder-chains', {numberOfInputs:2, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
     channelCountMode:'explicit', channelInterpretation:'speakers',
     processorOptions:{bytes:chnBin(), track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}}});
   n.load = 0;
@@ -3476,7 +3476,7 @@ const polyFrom = () => Math.ceil(ntr() / 2), isPolyT = t => t >= polyFrom() && t
 // freshInst needs the pad count, but nslots() (with the song state, below) isn't initialized yet when the
 // first song is made — the default instrument layout only needs the classic 16 anyway.
 const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0});   // instruments 08–0F play the synth slots
-const freshMix = () => ({vol:224, pan:128, mute:false, solo:false});
+const freshMix = () => ({vol:224, pan:128, mute:false, solo:false, sc:false});
 function freshSong(){
   // MPC swing: the classic hardware's shuffle, applied on 8th, 16th or dotted-8th grid.
   // Voice-per-track parity: one synth voice per song track — ntr tracks need ntr + 8 pads, capped at 32.
@@ -3529,7 +3529,7 @@ function normSong(j){
     I.pad = clamp(int(o.pad, I.pad), 0, nslots() - 1); if (old8 && i >= NPAD && I.pad === i - NPAD) I.pad = i; I.tsp = clamp(int(o.tsp, 0), -48, 48); I.vol = clamp(int(o.vol, 255), 0, 255);
     I.pan = clamp(int(o.pan, 128), 0, 255); I.rev = o.rev ? 1 : 0; I.ofs = clamp(int(o.ofs, 0), 0, 255); } });
   if (Array.isArray(j.mix)) j.mix.slice(0, NT).forEach((o, i) => { if (o && typeof o === 'object'){ const m = S.mix[i];
-    m.vol = clamp(int(o.vol, 224), 0, 255); m.pan = clamp(int(o.pan, 128), 0, 255); m.mute = !!o.mute; m.solo = !!o.solo; } });
+    m.vol = clamp(int(o.vol, 224), 0, 255); m.pan = clamp(int(o.pan, 128), 0, 255); m.mute = !!o.mute; m.solo = !!o.solo; m.sc = !!o.sc; } });
   if (Array.isArray(j.tfx)) for (let t = 0; t < NT; t++) S.tfx[t] = normChainFx(j.tfx[t]);
   S.mfx = normChainFx(j.mfx);
   if (Array.isArray(j.chainOn)) for (let t = 0; t < NT; t++) S.chainOn[t] = !!j.chainOn[t];
@@ -3854,10 +3854,15 @@ function makePlayer(ac, out, getBuf, live){
   const buses = [], vs = Array.from({length:NT + 1}, () => []), alive = new Set(), POLY = 4;
   const relTc = v => v.syn ? v.rel / 4.6 : 0.004;
   const live1 = (v, at) => v && !v.ended && !(v.stopAt != null && v.stopAt <= at);
+  // The sidechain detector bus: tracks send into it (Sidechain Out), every …chains node reads it as input 1.
+  // It is never connected to the output, so it makes no sound on its own.
+  const scBus = ac.createGain();
   for (let t = 0; t <= NT; t++){
-    const inp = ac.createGain(), g = ac.createGain(), p = ac.createStereoPanner(); inp.connect(g); g.connect(p); p.connect(out);
+    const inp = ac.createGain(), g = ac.createGain(), p = ac.createStereoPanner(), scs = ac.createGain();
+    inp.connect(g); g.connect(p); p.connect(out);
+    scs.gain.value = 0; g.connect(scs); scs.connect(scBus);   // post-fader Sidechain Out send
     let an = null; if (live && t < NT){ an = ac.createAnalyser(); an.fftSize = 512; p.connect(an); }
-    buses.push({inp, g, p, an, lv:0, pk:0, fx:null, chn:null});
+    buses.push({inp, g, p, an, scs, lv:0, pk:0, fx:null, chn:null});
   }
   function kill(v, at, tc = 0.004){
     if (!v || v.ended || (v.stopAt != null && v.stopAt <= at)) return;
@@ -3942,7 +3947,8 @@ function makePlayer(ac, out, getBuf, live){
     buses.forEach((b, t) => {
       if (t >= NT){ b.g.gain.value = 1; return; }
       const m = S.mix[t], gv = (filter ? filter(t) : audible(t)) ? curve(m.vol) : 0, pv = clamp((m.pan - 128) / 127, -1, 1);
-      if (live){ b.g.gain.setTargetAtTime(gv, at, 0.012); b.p.pan.setTargetAtTime(pv, at, 0.012); } else { b.g.gain.value = gv; b.p.pan.value = pv; }
+      const scv = m.sc ? 1 : 0;
+      if (live){ b.g.gain.setTargetAtTime(gv, at, 0.012); b.p.pan.setTargetAtTime(pv, at, 0.012); b.scs.gain.setTargetAtTime(scv, at, 0.012); } else { b.g.gain.value = gv; b.p.pan.value = pv; b.scs.gain.value = scv; }
     });
   }
   // Puts track t's effects between its input and its fader, or takes them out when the list is empty.
@@ -3965,6 +3971,7 @@ function makePlayer(ac, out, getBuf, live){
     if (wantChn && !b.chn){
       try {
         b.chn = chainsNode(ac, t, S.chainPatch, S.bpm);
+        if (b.chn) try { scBus.connect(b.chn, 0, 1); } catch(e){}   // input 1 = the sidechain detector bus
         if (!b.chn) chainsReady(ac).then(ok => { if (ok){ chnSync.add(ac); if (typeof rt !== 'undefined' && rt) rtFx(t); } });
       } catch(e){ b.chn = null; }
     } else if (wantChn && b.chn && b.chn._send){
@@ -4552,7 +4559,7 @@ function dims(v){
   if (v === 'song') return {w:ntr(), h:256};
   if (v === 'sect') return {w:2, h:16};
   if (v === 'phrase') return {w:RW, h:plen(cPhrase)};
-  if (v === 'mixer') return {w:ntr(), h:7};
+  if (v === 'mixer') return {w:ntr(), h:8};
   return {w:1, h:rowsOf(v).length};
 }
 
@@ -4623,7 +4630,7 @@ function bump(d, big){
     else { const m = S.mix[c.x];
       if (c.y === 0) m.vol = clamp(m.vol + d * (big ? 16 : 1), 0, 255);
       else if (c.y === 1) m.pan = clamp(m.pan + d * (big ? 16 : 1), 0, 255);
-      else if (c.y === 2) m.mute = d > 0; else m.solo = d > 0; }
+      else if (c.y === 2) m.mute = d > 0; else if (c.y === 3) m.solo = d > 0; else if (c.y === 7) m.sc = d > 0; }
     mixChanged(); draw(); return;
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.get) return;
@@ -4718,7 +4725,7 @@ function editTap(){
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
   }
-  if (tv === 'mixer'){ if (c.y === 4) return go('fx'); if (c.y === 5){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
+  if (tv === 'mixer'){ if (c.y === 4) return go('fx'); if (c.y === 5){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (c.y === 7){ const m = S.mix[c.x]; m.sc = !m.sc; mixChanged(); draw(); return; } if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
   const r = rowsOf(tv)[c.y]; if (!r) return;
   if (r.act){ if (r.dbl) return toast('Tap EDIT again to ' + r.l.replace('› ', '').toLowerCase() + '.'); return r.act(); }
   if (r.tog){ r.set(r.get() ? 0 : 1); if (r.after) r.after(); saveS(); draw(); return; }
@@ -4824,7 +4831,7 @@ function del(){
     if (tv === 'phrase' && k === 'note'){ const r = S.phrases[cPhrase] && S.phrases[cPhrase][c.y]; if (r && r.slice(0, NCOL).every(n => n < 0)) r[IC] = -1; }
     return draw();
   }
-  if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ setChainOn(c.x, false); return draw(); } if (c.y === 6){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else m.solo = false; } mixChanged(); return draw(); }
+  if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ setChainOn(c.x, false); return draw(); } if (c.y === 6){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; else if (c.y === 7) m.sc = false; } mixChanged(); return draw(); }
   const r = rowsOf(tv)[c.y]; if (r && r.get && r.d != null){ r.set(r.d); if (r.after) r.after(); saveS(); draw(); }
 }
 // Whole rows: clear a row, insert a blank one (rows below move down), or remove one (rows below move up).
@@ -5255,7 +5262,7 @@ const HINT = {
   sect:'EDIT add phrase · EDIT×2 new · EDIT+arrows change · SHIFT+▶ open · SHIFT+◀ song · OPT+◀▶ other sect',
   phrase:'EDIT add note · EDIT×2 note off · EDIT+◀▶ ±1 ▲▼ ±octave · OPT+EDIT clear · OPT+▲▼ pattern · SHIFT+▶ inst',
   inst:'EDIT+◀▶ ±1 ▲▼ ±more · EDIT on › runs it · OPT+◀▶ other instrument · SHIFT+◀ phrase',
-  mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · FX row: OPT+▲▶ FX on (up to 4), OPT+▼◀ off · EDIT mutes, solos, toggles CHN or opens FX · OPT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
+  mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · FX row: OPT+▲▶ FX on (up to 4), OPT+▼◀ off · EDIT mutes, solos, toggles CHN or opens FX · SC row: EDIT sends this track to the sidechain bus · OPT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
   fx:'EDIT adds · ▶ opens its controls · EDIT+◀▶ change · OPT+EDIT remove or reset · OPT+◀▶ other track · SHIFT+◀ mixer',
   project:'EDIT on › runs it · EDIT+◀▶ change · OPT+EDIT reset · SHIFT+▼ back',
 };
@@ -5290,6 +5297,8 @@ function info(){
       return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · …chains ` + (on ? 'ON (track runs through the chains patch)'
         : flag ? 'MISS: patch needs a Chain Out set to track ' + d2(c.x + 1) + ' · EDIT toggles' : 'off · EDIT toggles');
     }
+    if (c.y === 7){ const on = !!(S.mix[c.x] && S.mix[c.x].sc);
+      return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · Sidechain Out ` + (on ? 'ON — this track feeds the sidechain bus (patch Sidechain In or a Sidechain Comp in …chains)' : 'off · EDIT toggles, to feed another track’s sidechain'); }
     if (c.y === 4){ const A = S.tfx[c.x], n = fxCount(A);
       return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ${n}/${FXSLOTS} active` + (A.some(Boolean) ? ' · ' + fxList(A) : '') + ' · OPTION+▲▶ turn effects on, OPTION+▼◀ off (settings kept) · EDIT opens FX'; }
     const m = S.mix[c.x]; return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ${dB(curve(m.vol))} · ${panS(m.pan)}` + (m.mute ? ' · muted' : '') + (m.solo ? ' · solo' : '');
@@ -5428,6 +5437,9 @@ function draw(){
       cl.push({t:tx, cls:cc(t, 5, on ? 'cf' : flag ? 'v' : 'e') + tk(t), x:t, y:5}, ' ');
     }
     L.push(cl);
+    const sl = [{t:'SC  ', cls:'lb'}];
+    for (let t = T0; t < T1; t++){ const on = !!(S.mix[t] && S.mix[t].sc); sl.push({t:on ? 'ON' : '--', cls:cc(t, 7, on ? 'cf' : 'e') + tk(t), x:t, y:7}, ' '); }
+    L.push(sl);
     // Level meters, 8 lines of 6 dB each: red above −6 dB, yellow above −12.
     for (let k = 0; k < MH; k++){
       const ml = [{t:(k ? String(-6 * k) : '0').padStart(3) + ' ', cls:'lb'}];
@@ -6125,7 +6137,7 @@ const HINTK = {
   sect:'Type hex · Enter add or open · Enter×2 new phrase · Del cell · Shift+Del line · [ ] other sect · Shift+→ open · Shift+↑↓ lines',
   phrase:'Notes Z–/ and Q–P · 1 off · −/= octave · Del cell · Shift+Del row · Ins add row · Shift+↑↓ lines · Ctrl+C/V',
   inst:'Alt+arrows change · Enter runs › rows · [ ] other instrument · Shift+← phrase',
-  mixer:'Type hex for VOL and PAN · FX row: Alt+▲▶ on (up to 4), Alt+▼◀ off · Enter mutes, solos, toggles CHN or opens FX · Del resets · Shift+→ FX · Shift+↑ back',
+  mixer:'Type hex for VOL and PAN · FX row: Alt+▲▶ on (up to 4), Alt+▼◀ off · Enter mutes, solos, toggles CHN or opens FX · SC row: Enter sends to the sidechain bus · Del resets · Shift+→ FX · Shift+↑ back',
   fx:'Type hex · Alt+arrows change · Enter adds · → opens its controls · Del removes or resets · [ ] other track · Shift+← mixer',
   project:'Alt+arrows change · Enter runs › rows · Del resets · Ctrl+S save · Shift+Ctrl+S save as · Ctrl+O open',
 };

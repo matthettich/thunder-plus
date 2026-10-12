@@ -406,6 +406,10 @@ const MODULES = {
     ui:{ media:{l:'Media', c:opts(['Dirty tape','Clean tape','Vintage','Digital'])}, freeze:{l:'Freeze', c:opts(['Off','On'])},
       time:{l:'Time', f:pct}, size:{l:'Size', f:pct}, pitch:{l:'Pitch', f:pct}, shape:{l:'Shape', f:pct}, density:{l:'Density', f:pct},
       fb:{l:'Feedback', f:pct}, blend:{l:'Blend', f:wet}, verb:{l:'Reverb', f:pct} } },
+  scin:{ label:'Sidechain In', scope:'mono', inputs:{}, outputs:{ out:'audio', env:'cv' }, params:{ send:[1,0,1,.01] },
+    ui:{ send:{l:'Level', f:pct} } },
+  sccomp:{ label:'Sidechain Comp', scope:'mono', inputs:{ in:'audio', sc:'audio' }, outputs:{ out:'audio' }, params:{ threshold:[.3,0,1,.001], ratio:[4,1,20,.1], attack:[6,.1,200,.1], release:[140,5,2000,1], makeup:[1,1,4,.01], mix:[1,0,1,.01] },
+    ui:{ threshold:{l:'Threshold', f:pct}, ratio:{l:'Ratio', f:v => v.toFixed(1) + ':1'}, attack:{l:'Attack', f:v => Math.round(v) + ' ms'}, release:{l:'Release', f:v => Math.round(v) + ' ms'}, makeup:{l:'Makeup', f:pct}, mix:{l:'Mix', f:wet} } },
 
   lfo:{ label:'LFO', scope:'mono', inputs:{ reset:'gate' }, outputs:{ out:'cv' },
     params:{ rate:[1,.02,40,.01], sync:[0,0,1,1], shape:[0,0,4,1], depth:[.5,0,1,.01] },
@@ -1521,6 +1525,7 @@ const PALETTE = [
   ['Filters and amps', [['vcf','VCF'],['blades','Blades filter'],['vca','VCA'],['mixer','Mixer']]],
   ['Effects', [['eq','EQ'],['comp','Compressor'],['saturation','Saturation'],['tape','Tape'],['chorus','Chorus'],['crush','Bitcrush'],['delay','Tape delay'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['phaser','Phaser'],['reverb','Reverb'],['rings','Rings'],['clouds','Clouds'],['beads','Beads']]],
   ['Stereo', [['width','Width']]],
+  ['Sidechain', [['scin','Sidechain In'],['sccomp','Sidechain Comp']]],
   ['§Control', []],
   ['Modulation sources', [['lfo','LFO'],['adsr','ADSR'],['random','Random'],['atten','Attenuverter']]],
   ['§Audio → CV', []],
@@ -1528,7 +1533,7 @@ const PALETTE = [
   ['CV utilities', [['slew','Slew'],['snh','Sample & Hold'],['quant','Quantizer']]]
 ];
 const GROUP_FAM = { 'Track I/O':'aout', 'Filters and amps':'util', 'Effects':'afx', 'Modulation sources':'mod',
-  'Audio followers':'mod', 'CV utilities':'util', 'Stereo':'afx' };
+  'Audio followers':'mod', 'CV utilities':'util', 'Stereo':'afx', 'Sidechain':'afx' };
 const isSection = g => g.startsWith('§');
 const PSTORE = KP + 'palette';
 let pstate = { open:{}, quick:['trackIn', 'eq', 'delay', 'reverb', 'chainOut'] };
@@ -1815,6 +1820,8 @@ function helpDoc(){
     rings:'Mutable Instruments Rings: sound in excites a resonator tuned to Note (plus the Pitch input).',
     clouds:'Mutable Instruments Clouds: granular textures, time stretch, looping delay and spectral blur. Freeze holds what it heard.',
     beads:'Mutable Instruments Beads: a granular texture synthesizer — Time, Size, Shape, Pitch and Density grow the grains, Feedback and Reverb blend them, Freeze holds what it heard. Media picks Digital (clean), Vintage, or the tape characters.',
+    scin:'Sidechain In: copies the sidechain bus here. Turn a track’s Sidechain Out on in the Mixer and it feeds this module in every track’s chain — Out is the sound, Env is its level as a control voltage. Patch them anywhere, or just drop a Sidechain Comp after this track’s sound.',
+    sccomp:'Sidechain Comp: ducks its In by the sidechain — either the Mixer sidechain bus or whatever is patched into SC (so a kick on another track can pump this one). Threshold, Ratio, Attack, Release, Makeup and Mix. With nothing on the sidechain bus it falls back to compressing its own input.',
     lfo:'A slow oscillator for wobbles and sweeps. Depth sets how far it moves a slider; Sync to tempo follows the tempo. Reset restarts its cycle.',
     adsr:'An envelope for shaping effects: patch a gate into it and its output into a slider’s modulation jack.',
     random:'A new random value at Rate, or each time Clock fires. Smooth glides between values.',

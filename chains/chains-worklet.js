@@ -471,9 +471,50 @@ const ChainOut = {
   }
 };
 
+/* ── Sidechain ──────────────────────────────────────────────────────────────
+   The Mixer's Sidechain Out sends a track's audio to a detector bus every chain node receives.
+   Sidechain In copies that bus out (audio) and as an envelope (cv), so it can be patched anywhere;
+   Sidechain Comp ducks its own input by that bus (or by whatever is patched into its SC input). */
+const SidechainIn = {
+  type:'scin', scope:'mono', cost:.05,
+  inputs:{}, outputs:{ out:'audio', env:'cv' },
+  params:{ send:[1,0,1,.01] },
+  create:()=>({ env:0 }),
+  process(st, io, ctx){
+    const L = ctx.scL, R = ctx.scR, g = io.p.send;
+    for (let i = 0; i < ctx.block; i++){
+      const x = (L[i] + R[i]) * .5 * g, a = Math.abs(x);
+      st.env += (a - st.env) * (a > st.env ? .5 : .02);
+      io.out.out[i] = x; io.out.env[i] = st.env;
+    }
+  }
+};
+const SidechainComp = {
+  type:'sccomp', scope:'mono', cost:.2,
+  inputs:{ in:'audio', sc:'audio' }, outputs:{ out:'audio' },
+  params:{ threshold:[.3,0,1,.001], ratio:[4,1,20,.1], attack:[6,.1,200,.1], release:[140,5,2000,1], makeup:[1,1,4,.01], mix:[1,0,1,.01] },
+  create:()=>({ env:0 }),
+  process(st, io, ctx){
+    const patched = linked(io, 'sc'), busOn = ctx.scOn();
+    const thr = -60 + io.p.threshold * 60, rat = Math.max(1, io.p.ratio);
+    const ka = 1 - Math.exp(-1 / Math.max(1, io.p.attack / 1000 * ctx.sr)), kr = 1 - Math.exp(-1 / Math.max(1, io.p.release / 1000 * ctx.sr));
+    const mk = io.p.makeup, mx = io.p.mix, L = ctx.scL, R = ctx.scR;
+    for (let i = 0; i < ctx.block; i++){
+      // Detector: the SC input if patched, else the Mixer sidechain bus, else the input itself (plain comp).
+      const det = patched ? io.in.sc[i] : (busOn ? (L[i] + R[i]) * .5 : io.in.in[i]);
+      const a = Math.abs(det);
+      st.env += (a - st.env) * (a > st.env ? ka : kr);
+      const over = 20 * Math.log10(st.env + 1e-9) - thr;
+      const g = over > 0 ? Math.pow(10, -over * (1 - 1 / rat) / 20) : 1;
+      io.out.out[i] = io.in.in[i] * (1 - mx) + io.in.in[i] * g * mk * mx;
+    }
+  }
+};
+
 const MODULES = { trackIn:TrackIn,
   vcf:VCF, vca:VCA, mixer:Mixer,
   eq:EQ, comp:Comp, saturation:Saturation, tape:Tape, chorus:Chorus, crush:Crush, delay:Delay, reverb:Reverb, rings:Rings, clouds:Clouds, beads:Beads,
+  scin:SidechainIn, sccomp:SidechainComp,
   lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant,
   blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong, chainOut:ChainOut };
@@ -517,13 +558,17 @@ class ChainsEngine {
     this._busy = 0; this._frames = 0;
     /* Phase 2: the host sets trackInL/trackInR so Track In modules read tracker audio. */
     this.trackInL = null; this.trackInR = null;
+    /* Sidechain: a stereo detector bus the host feeds from the tracks' Sidechain Outs. Modules read it
+       through ctx (Sidechain In copies it out; Sidechain Comp uses it when nothing is patched). */
+    this.scL = new Float32Array(BLOCK); this.scR = new Float32Array(BLOCK); this.scOn = false;
     /* focus: in Thunder each track's node only runs the modules that lead to a Chain Out for ITS track (and what
        modulates them). It used to run the whole patch, so 4 tracks on …chains did 4× every track's effects. -1 = all. */
     this.focus = opts.focus == null ? -1 : opts.focus; this._act = null; this._actKey = '';
     this._ctx = { sr:sampleRate, block:BLOCK, quality:this.quality, transport:this.transport, engine:this,
       trackInL:k => this.trackInL ? this.trackInL.subarray(k * BLOCK, (k + 1) * BLOCK) : null,
       trackInR:k => this.trackInR ? this.trackInR.subarray(k * BLOCK, (k + 1) * BLOCK) : null,
-      busL:k => this.busesL.subarray(k * BLOCK, (k + 1) * BLOCK), busR:k => this.busesR.subarray(k * BLOCK, (k + 1) * BLOCK) };
+      busL:k => this.busesL.subarray(k * BLOCK, (k + 1) * BLOCK), busR:k => this.busesR.subarray(k * BLOCK, (k + 1) * BLOCK),
+      scL:this.scL, scR:this.scR, scOn:() => this.scOn };
   }
   addModule(id, type, o = {}){
     const def = MODULES[type]; if (!def) return;
@@ -567,6 +612,15 @@ class ChainsEngine {
     return { modules:(doc.modules || []).length, cables:(doc.cables || []).length };
   }
   setTrackInputs(L, R){ this.trackInL = L; this.trackInR = R; }
+  /* The host feeds the sidechain bus here each block (stereo; n frames). scOn says whether any track is
+     sending, so a Sidechain Comp with nothing patched falls back to its own input when nothing is sent. */
+  setSidechain(L, R, n){
+    n = Math.min(BLOCK, n || BLOCK);
+    this.scL.fill(0); this.scR.fill(0);
+    if (L) this.scL.set(L.subarray(0, n));
+    if (R) this.scR.set(R.subarray(0, n)); else if (L) this.scR.set(L.subarray(0, n));
+    this.scOn = !!L;
+  }
   process(frames = BLOCK){
     const t0 = Date.now();
     this.busesL.fill(0); this.busesR.fill(0); this._render(frames);
@@ -701,6 +755,7 @@ class ChainsProcessor extends AudioWorkletProcessor {
   /* Standalone, every chain bus plays through the speakers; in Thunder each bus is its own track return. */
   process(_ins, outs){
     const e = this.engine;
+    { const sc = _ins && _ins[1]; e.setSidechain(sc && sc[0], sc && (sc[1] || sc[0]), BLOCK); }
     try { e.process(BLOCK); }
     catch (err){ e.busesL.fill(0); e.busesR.fill(0); if ((this._blocks & 255) === 0) this.port.postMessage({ target:TARGET, op:OP.error, value:{ op:'process', message:String(err?.message || err) } }); }
     const out = outs[0], L = out[0], R = out[1] || out[0];
@@ -767,6 +822,7 @@ class ThunderChains extends AudioWorkletProcessor {
     this._tmpL.fill(0); this._tmpR.fill(0);
     if (i && i.length){ this._tmpL.set(i[0].subarray(0, n), this.track * BLOCK); this._tmpR.set((i[1] || i[0]).subarray(0, n), this.track * BLOCK); }
     e.setTrackInputs(this._tmpL, this._tmpR);
+    { const sc = ins[1]; e.setSidechain(sc && sc[0], sc && (sc[1] || sc[0]), n); }
     try { e.process(BLOCK); }
     catch (err){ e.busesL.fill(0); e.busesR.fill(0); if ((this._blocks & 255) === 0) this.port.postMessage({ target:'chains-host', op:OP.error, value:{ op:'process', message:String(err?.message || err) } }); }
     // Return this track's bus (the sum of its Chain Out modules) downstream.
