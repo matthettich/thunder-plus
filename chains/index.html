@@ -481,7 +481,7 @@ const KIND = { audio:'audio', cv:'mod', gate:'gate' };
 const DOT = t => ({ trackIn:'audio', chainOut:'audio', lfo:'mod', adsr:'mod', random:'mod', atten:'mod' }[t] || 'audio');
 const CABLE = { audio:['#22958d','#16625d'], mod:['#7a58c8','#4b318e'], gate:['#c93d78','#86214c'] };
 const isCtl = k => k === 'mod' || k === 'gate';
-const PORT_LABEL = { pitch:'Pitch', gate:'Gate', vel:'Velocity', fm:'FM', out:'Out', outR:'Out R', reset:'Reset', in:'In', inR:'In R', cv:'CV',
+const PORT_LABEL = { pitch:'Pitch', gate:'Gate', vel:'Velocity', fm:'FM', out:'Out', outR:'Out R', reset:'Reset', in:'In', inR:'In R', cv:'CV', env:'Env', sc:'SC',
   cutoff:'Cutoff', timbre:'Timbre', morph:'Morph', harmonics:'Harmonics', aux:'Aux', index:'Index', strength:'Strength', clock:'Clock',
   in1:'In 1', in2:'In 2', in3:'In 3', in4:'In 4' };
 const NOTES = {
@@ -788,15 +788,25 @@ const modById = id => doc.modules.find(m => m.id === id);
 const busPeaks = new Array(CHAN_COUNT).fill(0);
 
 /* ----- controls ----- */
+/* Per-module port tooltips (and an optional label) so jacks like the Sidechain In's explain themselves.
+   Out is the raw sidechain sound; Env is its loudness as a control voltage. */
+const PORT_TIP = {
+  scin:{ out:{ l:'Audio', t:'Sidechain audio — the sound on the sidechain bus. Patch into any audio input.' },
+         env:{ l:'Envelope', t:'Sidechain envelope — how loud the sidechain is, as a control voltage. Patch into a CV jack (a cutoff, a VCA…).' } },
+  sccomp:{ sc:{ t:'Sidechain input — patch a signal here to duck by it, or leave it unpatched to use the Mixer’s Sidechain Out bus.' } },
+};
+function portTip(type, port){ return PORT_TIP[type] && PORT_TIP[type][port]; }
 function makeJack(n, port, kind, dir, small){
+  const pt = portTip(n.m.type, port);
   const j = h('span', {class: small ? 'jack small' : 'jack', 'data-id': n.m.id, 'data-port': port, 'data-dir': dir, 'data-kind': kind,
-    title: small ? plabel(n.m.type, port.slice(2)) + ' modulation input' : (PORT_LABEL[port] || port) + (dir === 'in' ? ' input' : ' output')});
+    title: pt ? pt.t : small ? plabel(n.m.type, port.slice(2)) + ' modulation input' : (PORT_LABEL[port] || port) + (dir === 'in' ? ' input' : ' output')});
   n.jacks[dir + ':' + port] = j;
   j.addEventListener('pointerdown', e => onJackDown(e, j));
   return j;
 }
 function portEl(n, port, kind, dir){
-  const j = makeJack(n, port, KIND[kind] || 'mod', dir), row = h('div', {class:'port'}, j, h('span', {text: PORT_LABEL[port] || port}));
+  const j = makeJack(n, port, KIND[kind] || 'mod', dir), pt = portTip(n.m.type, port);
+  const row = h('div', {class:'port'}, j, h('span', {text: (pt && pt.l) || PORT_LABEL[port] || port}));
   row.addEventListener('pointerdown', e => { if (e.target !== j && e.button !== 2) onJackDown(e, j); });
   return row;
 }

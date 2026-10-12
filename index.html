@@ -5437,8 +5437,9 @@ function draw(){
       cl.push({t:tx, cls:cc(t, 5, on ? 'cf' : flag ? 'v' : 'e') + tk(t), x:t, y:5}, ' ');
     }
     L.push(cl);
-    const sl = [{t:'SC  ', cls:'lb'}];
-    for (let t = T0; t < T1; t++){ const on = !!(S.mix[t] && S.mix[t].sc); sl.push({t:on ? 'ON' : '--', cls:cc(t, 6, on ? 'cf' : 'e') + tk(t), x:t, y:6}, ' '); }
+    const sl = [{t:'SC  ', cls:'lb', title:'Sidechain Out: send this track to the sidechain bus, which …chains modules (Sidechain In / Sidechain Comp) read as their sidechain'}];
+    for (let t = T0; t < T1; t++){ const on = !!(S.mix[t] && S.mix[t].sc); sl.push({t:on ? 'ON' : '--', cls:cc(t, 6, on ? 'cf' : 'e') + tk(t), x:t, y:6,
+      title:'Track ' + d2(t + 1) + ' Sidechain Out ' + (on ? 'on — this track feeds the sidechain bus' : 'off — EDIT/Enter sends this track to the sidechain bus (a Sidechain Comp ducks by it)')}, ' '); }
     L.push(sl);
     // Level meters, 8 lines of 6 dB each: red above −6 dB, yellow above −12.
     for (let k = 0; k < MH; k++){
@@ -5460,7 +5461,7 @@ function draw(){
       L.push([{t:r.l.padEnd(12), cls:'lb', x:0, y}, {t:val, cls:cc(0, y, 'v'), x:0, y}]);
     });
   }
-  const spanH = s => typeof s === 'string' ? s : `<span class="${s.cls || ''}"${s.x != null ? ` data-x="${s.x}" data-y="${s.y}"` : ''}${s.r != null ? ` data-r="${s.r}"` : ''}>${esc(s.t)}</span>`;
+  const spanH = s => typeof s === 'string' ? s : `<span class="${s.cls || ''}"${s.x != null ? ` data-x="${s.x}" data-y="${s.y}"` : ''}${s.r != null ? ` data-r="${s.r}"` : ''}${s.title ? ` title="${esc(s.title)}"` : ''}>${esc(s.t)}</span>`;
   const gh = L.map(ln => '<div class="ln">' + ln.map(spanH).join('') + '</div>').join('');
   if (gh !== gridHTML){ gridHTML = gh; grid.innerHTML = gh; }   // unchanged screens (most redraws while playing) skip the rebuild
   const ph = pset ? pset.map(spanH).join('') : ''; if (ph !== psetHTML){ psetHTML = ph; $('tPset').innerHTML = ph; }
