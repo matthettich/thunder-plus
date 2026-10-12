@@ -904,6 +904,7 @@ function addModule(type, x, y, params){
   const m = { id:newId(), type, scope:def.scope, pos:[x, y], collapsed:false, params:Object.assign(p, params || {}) };
   doc.modules.push(m);
   if (bridge) bridge.addModule(m.id, type, { params:m.params, pos:m.pos });
+  else if (EMBED && TW && TW.mod) TW.mod({ op:'add', id:m.id, type, params:m.params, pos:m.pos });
   buildNode(m); store.touch();
   return m;
 }
@@ -914,6 +915,7 @@ function removeModule(id){
   doc.modules = doc.modules.filter(m => m.id !== id);
   for (const g of doc.groups) g.modules = (g.modules || []).filter(x => x !== id);
   if (bridge) bridge.removeModule(id);
+  else if (EMBED && TW && TW.mod) TW.mod({ op:'remove', id });   // the remove op also drops its cables
   if (n) n.el.remove(); nodes.delete(id); selected.delete(id);
   syncCableEls(); store.touch();
 }
@@ -1018,12 +1020,14 @@ function connect(from, to, pts){
   const c = { from, to, bend:0 }; if (pts && pts.length) c.pts = pts;
   doc.cables.push(c);
   if (bridge) bridge.connect(from, to);
+  else if (EMBED && TW && TW.mod) TW.mod({ op:'connect', a:from, b:to });
   syncCableEls(); store.touch();
   return true;
 }
 function disconnect(c, quiet){
   doc.cables = doc.cables.filter(x => x !== c);
   if (bridge) bridge.disconnect(c.from, c.to);
+  else if (EMBED && TW && TW.mod) TW.mod({ op:'disconnect', a:c.from, b:c.to });
   if (!quiet){ syncCableEls(); store.touch(); }
 }
 
@@ -1548,7 +1552,7 @@ function redo(){ if (store.forward()) toast('Redone.'); }
 function newPatch(){
   store.snapshot();
   const b = blankDoc(); for (const k of Object.keys(doc)) delete doc[k]; Object.assign(doc, b);
-  clearSel(); renderAll(); if (bridge) bridge.loadPatch(doc); store.touch();
+  clearSel(); renderAll(); loadIntoEngine(); store.touch();
   toast('New empty patch. Press ' + MOD + '+Z to get the previous one back.');
 }
 const fileLoad = document.getElementById('fileload');
@@ -1868,7 +1872,7 @@ function paintKeys(){ const kb = document.getElementById('setkeys'); if (kb) kb.
 doc = normalize(PatchStore.open() || starterDoc());
 const firstRun = !PatchStore.open();
 store = new PatchStore(doc);
-store.onRestore = () => { normalize(doc); clearSel(); renderAll(); if (bridge) bridge.loadPatch(doc); };
+store.onRestore = () => { normalize(doc); clearSel(); renderAll(); loadIntoEngine(); };
 // Register this patch with the song right away: the host only sees patches the editor saves,
 // and the editor doesn't save until an edit. Without this a freshly-opened song had no patch,
 // so toggling CHN did nothing until you happened to change something.
@@ -1888,6 +1892,8 @@ tSel.value = (doc.transport && doc.transport.tempo) || 120;
 tSel.addEventListener('change', () => { const v = clamp(parseFloat(tSel.value) || 120, 20, 300); tSel.value = v; doc.transport.tempo = v; if (bridge) bridge.setTransport({ tempo:v }); store.touch(); });
 tSel.addEventListener('keydown', e => e.stopPropagation());
 qSel.addEventListener('change', () => { doc.quality = qSel.value; if (bridge) bridge.setQuality(qSel.value); store.touch(); });
+// A whole patch (new, undo, redo, import): send it to this page's own engine, or to the host's engines.
+function loadIntoEngine(){ if (bridge) bridge.loadPatch(doc); else if (EMBED && TW && TW.reload) TW.reload(JSON.parse(JSON.stringify(doc))); }
 function wireBridge(b){
   bridge = b;
   b.telemetry(true);
