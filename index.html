@@ -233,6 +233,10 @@ input[type=range]{width:100%; accent-color:var(--ink); height:30px; margin:0; to
 .voicecard .ttl{font-size:14px; font-weight:600}
 .voicecard .lbl{font-size:12px; color:var(--muted)}
 .voicecard .sec h3::before{background:var(--famc)}
+/* 32-step sequencer: a compact grid of little bars */
+.stepgrid{display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:3px 6px; margin:6px 0}
+.stepgrid input[type=range]{width:100%; height:20px}
+@media (max-width:600px){ .stepgrid{grid-template-columns:repeat(4,minmax(0,1fr))} }
 #layerCard{--famc:hue-rotate-180deg}
 .fxtail{padding:8px 12px 4px; max-width:420px}
 .fxslot{border-top:1px solid var(--track); padding:8px 12px 10px}
@@ -981,7 +985,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 <p>Each track and the master have 4 effect slots (FX screen, or the Mixer’s FX row): EQ, compressor, reverb, tape delay, saturation, tape, chorus, bitcrush, Rings and Clouds. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to four, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
 <p><b>…chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback.</p></section>
-    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Kit ▾</b> saves and loads kits, <b>Export ▾</b> writes WAVs for Koala and SunVox, <b>MIDI ▾</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off), <b>Skin ▾</b> changes the look.</p><h2>Files and rendering</h2><p><b>Project</b> holds SAVE, SAVE AS and LOAD PROJECT, plus RENDER SONG (a stereo WAV) and RENDER STEMS (a zip with the mix and one WAV per track). In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/Thunder-#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
+    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level.</p><p><b>Kit ▾</b> saves and loads kits, <b>Export ▾</b> writes WAVs for Koala and SunVox, <b>MIDI ▾</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off), <b>Skin ▾</b> changes the look.</p><h2>Files and rendering</h2><p><b>Project</b> holds SAVE, SAVE AS and LOAD PROJECT, plus RENDER SONG (a stereo WAV) and RENDER STEMS (a zip with the mix and one WAV per track). In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/Thunder-#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -1379,7 +1383,10 @@ function renderLayer(L, V, sr, out, N){
     return m; };
   const fA = Math.max(L.fAtk, 0.05) / 1000, fD = Math.max(L.fDec, 1) / 1000;
   const fenv = t => t < fA ? t / fA : Math.exp(-6.9 * (t - fA) / fD);
-  const lpOn = L.lpCut < 19900 || L.lpEnv !== 0, hpOn = L.hpCut > 20.5 || L.hpEnv !== 0;
+  // A matrix route to a cutoff opens that filter even if its slider sits at the open/closed end.
+  const modLp = [1,2,3,4,5,6,7].some(k => (V['r' + k + 'dst'] | 0) === 3 && (V['r' + k + 'amt'] || 0) !== 0);
+  const modHp = [1,2,3,4,5,6,7].some(k => (V['r' + k + 'dst'] | 0) === 4 && (V['r' + k + 'amt'] || 0) !== 0);
+  const lpOn = L.lpCut < 19900 || L.lpEnv !== 0 || modLp, hpOn = L.hpCut > 20.5 || L.hpEnv !== 0 || modHp;
   const nyq = sr * 0.45;
   let l1 = 0, l2 = 0, h1 = 0, h2 = 0, la1 = 0, la2 = 0, la3 = 0, lk = 2, ha1 = 0, ha2 = 0, ha3 = 0, hk = 2;
   const tEnd = layerLen(L, V) + 0.002;
@@ -1390,20 +1397,22 @@ function renderLayer(L, V, sr, out, N){
   for (let i = 0; i < M; i += BLK){
     const t = i / sr; if (t > tEnd) break;
     const e0 = ePrev, e1 = ampAt((i + BLK) / sr); ePrev = e1;
-    const inc = f0 * Math.pow(2, (pA * Math.exp(-t / ptau) + (gPA ? gPA * Math.exp(-((d0 + i) / sr) / gPtau) : 0)) / 12) / sr;
+    const mo = voiceMod(V, t);
+    const inc = f0 * Math.pow(2, (pA * Math.exp(-t / ptau) + (gPA ? gPA * Math.exp(-((d0 + i) / sr) / gPtau) : 0) + mo.pitch) / 12) / sr;
     osc.blk(t, e0, inc);
     if (lpOn || hpOn){ const fe = fenv(t);
-      if (hpOn){ const fc = Math.min(Math.max(L.hpCut * Math.pow(2, L.hpEnv*8*fe), 10), nyq), g = Math.tan(Math.PI * fc / sr);
+      if (hpOn){ const fc = Math.min(Math.max(L.hpCut * Math.pow(2, L.hpEnv*8*fe + mo.hpcut), 10), nyq), g = Math.tan(Math.PI * fc / sr);
         hk = 2 - 2 * Math.min(L.hpRes, 0.98); ha1 = 1 / (1 + g * (g + hk)); ha2 = g * ha1; ha3 = g * ha2; }
-      if (lpOn){ const fc = Math.min(Math.max(L.lpCut * Math.pow(2, L.lpEnv*8*fe), 10), nyq), g = Math.tan(Math.PI * fc / sr);
+      if (lpOn){ const fc = Math.min(Math.max(L.lpCut * Math.pow(2, L.lpEnv*8*fe + mo.lpcut), 10), nyq), g = Math.tan(Math.PI * fc / sr);
         lk = 2 - 2 * Math.min(L.lpRes, 0.98); la1 = 1 / (1 + g * (g + lk)); la2 = g * la1; la3 = g * la2; }
     }
+    const lvl = Math.max(0, 1 + mo.level);
     const n = Math.min(BLK, M - i), de = (e1 - e0) / BLK, o = d0 + i;
     for (let j = 0; j < n; j++){
       let x = osc.s(inc);
       if (hpOn){ const v3 = x - h2, v1 = ha1*h1 + ha2*v3, v2 = h2 + ha2*h1 + ha3*v3; h1 = 2*v1 - h1; h2 = 2*v2 - h2; x = x - hk*v1 - v2; }
       if (lpOn){ const v3 = x - l2, v1 = la1*l1 + la2*v3, v2 = l2 + la2*l1 + la3*v3; l1 = 2*v1 - l1; l2 = 2*v2 - l2; x = v2; }
-      out[o + j] += x * (e0 + de*j) * gain;
+      out[o + j] += x * (e0 + de*j) * gain * lvl;
     }
   }
 }
@@ -1610,6 +1619,32 @@ function freshLayer(o){
     eGeo:0.3, eBright:0.5, eDamp:0.6, ePos:0.3, eSpace:0.3,
     seed:(_seed = (_seed * 1103515245 + 12345) >>> 0) || 1, sample:null}, o || {});
 }
+/* Voice modulation matrix: 3 LFOs, 3 envelopes and a 32-step sequencer, each routed to one destination
+   (pitch, level, or low-/high-pass cutoff) with a signed amount. Stateless in t, so it can be evaluated
+   per block in renderLayer without any per-layer bookkeeping. Nothing routes by default (all amounts 0). */
+function voiceMod(V, t){
+  let pitch = 0, level = 0, lpcut = 0, hpcut = 0;
+  const gate = Math.max(V.gate, 1) / 1000;
+  const add = (dst, v) => { if (dst === 1) pitch += v; else if (dst === 2) level += v; else if (dst === 3) lpcut += v; else if (dst === 4) hpcut += v; };
+  for (let i = 1; i <= 3; i++){
+    const rate = V['lfo' + i + 'Rate'] || 0, shape = V['lfo' + i + 'Shape'] | 0, dep = V['lfo' + i + 'Depth'] || 0;
+    let p = t * rate; p -= Math.floor(p);
+    const s = shape === 1 ? (p < .5 ? 1 : -1) : shape === 2 ? 2 * p - 1 : shape === 3 ? 1 - 4 * Math.abs(p - .5) : Math.sin(2 * Math.PI * p);
+    add(V['r' + i + 'dst'] | 0, s * dep * (V['r' + i + 'amt'] || 0));
+  }
+  for (let i = 1; i <= 3; i++){
+    const a = Math.max(V['env' + i + 'A'] || 1, 1) / 1000, d = Math.max(V['env' + i + 'D'] || 1, 1) / 1000,
+          sus = V['env' + i + 'S'] || 0, r = Math.max(V['env' + i + 'R'] || 1, 1) / 1000;
+    let e;
+    if (t < a) e = t / a;
+    else if (t < gate) e = sus + (1 - sus) * Math.exp(-6.9 * (t - a) / d);
+    else { const tg = sus + (1 - sus) * Math.exp(-6.9 * Math.max(gate - a, 0) / d); e = tg * Math.exp(-6.9 * (t - gate) / r); }
+    add(V['r' + (3 + i) + 'dst'] | 0, e * (V['r' + (3 + i) + 'amt'] || 0));
+  }
+  { const steps = V.seq || [], rate = V.seqRate || 4, idx = ((Math.floor(t * rate) % 32) + 32) % 32;
+    add(V.r7dst | 0, (steps[idx] || 0) * (V.seqDepth || 0) * (V.r7amt || 0)); }
+  return { pitch, level, lpcut, hpcut };
+}
 function mkVoice(name, layers, o){
   const ls = layers.map(l => freshLayer(Object.assign({on:true}, l)));
   while (ls.length < 8) ls.push(freshLayer());
@@ -1618,7 +1653,12 @@ function mkVoice(name, layers, o){
   return Object.assign({name, level:0, tune:0, drive:0, gate:200, len:4, choke:0, sel:0, layers:ls, fx:[], tail:2,
     gPAmt:0, gPDec:60,
     gLpCut:20000, gLpRes:0, gLpEnv:0, gFAtk:0.5, gFDec:200,
-    gAmpOn:false, gMode:'ADSR', gAtk:0.5, gHold:0, gDec:300, gSus:1, gRel:1, gAmpAmt:1}, o || {});
+    gAmpOn:false, gMode:'ADSR', gAtk:0.5, gHold:0, gDec:300, gSus:1, gRel:1, gAmpAmt:1,
+    // Voice modulation (see voiceMod): inert until an amount is dialled in.
+    lfo1Rate:2, lfo1Shape:0, lfo1Depth:0, lfo2Rate:0.5, lfo2Shape:0, lfo2Depth:0, lfo3Rate:8, lfo3Shape:0, lfo3Depth:0,
+    env1A:10, env1D:300, env1S:0.7, env1R:200, env2A:10, env2D:300, env2S:0, env2R:200, env3A:1, env3D:500, env3S:0.5, env3R:300,
+    seqRate:8, seqDepth:0, seq:new Array(32).fill(0),
+    r1dst:0, r1amt:0, r2dst:0, r2amt:0, r3dst:0, r3amt:0, r4dst:0, r4amt:0, r5dst:0, r5amt:0, r6dst:0, r6amt:0, r7dst:0, r7amt:0}, o || {});
 }
 const rA = r => Math.max(0, RATIOS.indexOf(r)) / (RATIOS.length - 1);
 const cA = n => CHORDS.findIndex(c => c[0] === n) / (CHORDS.length - 1);
@@ -1754,6 +1794,23 @@ const VGP = {
   gFDec:{l:'VCF decay', min:1, max:6000, c:'log', d:200, f:ms},
   gAmpAmt:{l:'Amount', min:0, max:1, c:'lin', d:1, f:pct},
 };
+// Voice modulation matrix params (see voiceMod). Rates/depths for 3 LFOs, ADSR for 3 envelopes, a step
+// sequencer rate/depth, and a route amount per source (1–3 LFO, 4–6 env, 7 seq). Destinations are picks.
+const spctF = v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%';
+const VM = {
+  lfo1Rate:{l:'LFO 1 rate', min:.02, max:40, c:'log', d:2, f:hz}, lfo1Depth:{l:'LFO 1 depth', min:0, max:1, c:'lin', d:0, f:pct},
+  lfo2Rate:{l:'LFO 2 rate', min:.02, max:40, c:'log', d:.5, f:hz}, lfo2Depth:{l:'LFO 2 depth', min:0, max:1, c:'lin', d:0, f:pct},
+  lfo3Rate:{l:'LFO 3 rate', min:.02, max:40, c:'log', d:8, f:hz}, lfo3Depth:{l:'LFO 3 depth', min:0, max:1, c:'lin', d:0, f:pct},
+  env1A:{l:'Env 1 attack', min:.1, max:2000, c:'log', d:10, f:ms}, env1D:{l:'Env 1 decay', min:1, max:8000, c:'log', d:300, f:ms}, env1S:{l:'Env 1 sustain', min:0, max:1, c:'lin', d:.7, f:pct}, env1R:{l:'Env 1 release', min:1, max:8000, c:'log', d:200, f:ms},
+  env2A:{l:'Env 2 attack', min:.1, max:2000, c:'log', d:10, f:ms}, env2D:{l:'Env 2 decay', min:1, max:8000, c:'log', d:300, f:ms}, env2S:{l:'Env 2 sustain', min:0, max:1, c:'lin', d:0, f:pct}, env2R:{l:'Env 2 release', min:1, max:8000, c:'log', d:200, f:ms},
+  env3A:{l:'Env 3 attack', min:.1, max:2000, c:'log', d:1, f:ms}, env3D:{l:'Env 3 decay', min:1, max:8000, c:'log', d:500, f:ms}, env3S:{l:'Env 3 sustain', min:0, max:1, c:'lin', d:.5, f:pct}, env3R:{l:'Env 3 release', min:1, max:8000, c:'log', d:300, f:ms},
+  seqRate:{l:'Seq rate', min:.5, max:32, c:'log', d:8, f:v => v.toFixed(1) + '/s'}, seqDepth:{l:'Seq depth', min:0, max:1, c:'lin', d:0, f:pct},
+  r1amt:{l:'LFO 1 amount', min:-1, max:1, c:'lin', d:0, f:spctF}, r2amt:{l:'LFO 2 amount', min:-1, max:1, c:'lin', d:0, f:spctF}, r3amt:{l:'LFO 3 amount', min:-1, max:1, c:'lin', d:0, f:spctF},
+  r4amt:{l:'Env 1 amount', min:-1, max:1, c:'lin', d:0, f:spctF}, r5amt:{l:'Env 2 amount', min:-1, max:1, c:'lin', d:0, f:spctF}, r6amt:{l:'Env 3 amount', min:-1, max:1, c:'lin', d:0, f:spctF},
+  r7amt:{l:'Seq amount', min:-1, max:1, c:'lin', d:0, f:spctF},
+};
+const MOD_DESTS = ['Off', 'Pitch', 'Level', 'LP cutoff', 'HP cutoff'];
+const MOD_SRC = [['r1', 'LFO 1'], ['r2', 'LFO 2'], ['r3', 'LFO 3'], ['r4', 'Env 1'], ['r5', 'Env 2'], ['r6', 'Env 3'], ['r7', 'Seq']];
 const toPos = (d, v) => d.c === 'log' ? Math.log(v / d.min) / Math.log(d.max / d.min)
   : d.c === 'sq' ? Math.sqrt(Math.max(0, (v - d.min) / (d.max - d.min))) : (v - d.min) / (d.max - d.min);
 function fromPos(d, p){
@@ -2081,11 +2138,12 @@ section('Filter', ['lpCut','lpRes','lpEnv','hpCut','hpRes','hpEnv','fAtk','fDec'
 // These edit the voice object (V), not the selected layer, and renderVoice applies them to all the
 // layers at once: a low-pass filter with its own envelope, and an amp envelope over the whole voice.
 let vAmpModeUpd, vAmpOnUpd;
-const vgRows = [], vAmpRows = {};
+const vgRows = [], vAmpRows = {}, vmSelUpd = [];
 function refreshVoiceGlobals(){
   const v = V(), adsr = v.gMode === 'ADSR';
   vAmpRows.gHold.r.hidden = adsr; vAmpRows.gSus.r.hidden = !adsr; vAmpRows.gRel.r.hidden = !adsr;
   vAmpOnUpd(); vAmpModeUpd();
+  for (const f of vmSelUpd) f();
   for (const r of vgRows) r.refresh();
 }
 (function buildVoiceGlobals(){
@@ -2103,6 +2161,44 @@ function refreshVoiceGlobals(){
   { const r = makeRow(VGP.gAmpAmt, 'gAmpAmt', V, {idp:'vg'}); as.append(r.r); vgRows.push(r); }
   for (const [k, def] of [['gAtk',P.atk],['gHold',P.hold],['gDec',P.dec],['gSus',P.sus],['gRel',P.rel]]){
     const r = makeRow(def, k, V, {idp:'vg'}); as.append(r.r); vgRows.push(r); vAmpRows[k] = r; }
+})();
+
+/* ---------- voice modulation UI ---------- */
+function modSelect(host, label, key){
+  const r = el('div', 'segrow'); r.append(el('span', null, label));
+  const s = document.createElement('select'); s.setAttribute('aria-label', label + ' destination');
+  MOD_DESTS.forEach((d, i) => { const o = document.createElement('option'); o.value = i; o.textContent = d; s.append(o); });
+  s.addEventListener('change', () => { V()[key + 'dst'] = +s.value; changed(); });
+  r.append(s); host.append(r);
+  vmSelUpd.push(() => { s.value = String(V()[key + 'dst'] | 0); });
+}
+(function buildVoiceMod(){
+  const host = $('voiceSecs');
+  const vsec = t => { const s = el('div', 'sec'); s.append(el('h3', null, t)); host.append(s); return s; };
+  const ls = vsec('Mod LFOs');
+  for (let i = 1; i <= 3; i++){
+    const r = el('div', 'segrow'); r.append(el('span', null, 'LFO ' + i));
+    const s = document.createElement('select'); s.setAttribute('aria-label', 'LFO ' + i + ' shape');
+    ['Sine', 'Square', 'Ramp', 'Triangle'].forEach((n, k) => { const o = document.createElement('option'); o.value = k; o.textContent = n; s.append(o); });
+    s.addEventListener('change', () => { V()['lfo' + i + 'Shape'] = +s.value; changed(); });
+    r.append(s); ls.append(r); vmSelUpd.push(() => { s.value = String(V()['lfo' + i + 'Shape'] | 0); });
+    for (const k of ['lfo' + i + 'Rate', 'lfo' + i + 'Depth']){ const rr = makeRow(VM[k], k, V, {idp:'vg'}); ls.append(rr.r); vgRows.push(rr); }
+  }
+  const es = vsec('Mod envelopes');
+  for (let i = 1; i <= 3; i++) for (const k of ['env' + i + 'A', 'env' + i + 'D', 'env' + i + 'S', 'env' + i + 'R']){ const rr = makeRow(VM[k], k, V, {idp:'vg'}); es.append(rr.r); vgRows.push(rr); }
+  const ss = vsec('Mod sequence');
+  for (const k of ['seqRate', 'seqDepth']){ const rr = makeRow(VM[k], k, V, {idp:'vg'}); ss.append(rr.r); vgRows.push(rr); }
+  const grid = el('div', 'stepgrid'), stepEls = [];
+  for (let i = 0; i < 32; i++){
+    const inp = document.createElement('input'); inp.type = 'range'; inp.min = '-1'; inp.max = '1'; inp.step = '0.01'; inp.value = '0'; inp.setAttribute('aria-label', 'Step ' + (i + 1));
+    inp.addEventListener('input', () => { const v = V(); if (!Array.isArray(v.seq)) v.seq = new Array(32).fill(0); v.seq[i] = +inp.value; changed(); });
+    grid.append(inp); stepEls.push(inp);
+  }
+  ss.append(grid);
+  const st = el('div', 'readout', '32 steps, played at Seq rate and scaled by Seq depth.'); st.style.paddingLeft = '0'; ss.append(st);
+  const ms = vsec('Mod matrix');
+  for (const [key, label] of MOD_SRC){ modSelect(ms, label, key); const rr = makeRow(VM[key + 'amt'], key + 'amt', V, {idp:'vg'}); ms.append(rr.r); vgRows.push(rr); }
+  vmSelUpd.push(() => { const v = V(), steps = Array.isArray(v.seq) ? v.seq : []; for (let i = 0; i < 32; i++) stepEls[i].value = String(steps[i] || 0); });
 })();
 
 function pitchReadout(){
