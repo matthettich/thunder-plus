@@ -1917,9 +1917,9 @@ function makeSeg(host, options, get, set){
 }
 let tt = 0;
 function toast(msg){ const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(tt);
-  // Dismiss quickly so it doesn't distract, but long enough to read: short confirmations clear in ~1.4s,
-  // longer messages get more time, capped at 2.4s.
-  tt = setTimeout(() => t.hidden = true, clamp(1100 + msg.length * 24, 1400, 2400)); }
+  // Dismiss quickly so it doesn't distract, but long enough to read: short confirmations clear in ~1.3s,
+  // longer messages get more time, capped at 2.0s.
+  tt = setTimeout(() => t.hidden = true, clamp(1000 + msg.length * 20, 1300, 2000)); }
 
 /* ---------- voice card ---------- */
 const vRows = [];
