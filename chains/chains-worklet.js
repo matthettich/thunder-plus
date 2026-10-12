@@ -207,6 +207,115 @@ const Attenuverter = {
   process(st, io, ctx){ const a = io.p.amount, o = io.p.offset; for (let i = 0; i < ctx.block; i++) io.out.out[i] = io.in.in[i] * a + o; }
 };
 
+/* ── audio → CV and CV utilities ──────────────────────────────────────────────
+   Pitch CV convention: 0.5 = A4 (440 Hz), one octave = 0.125. */
+
+/* Envelope follow: audio in, CV out (peak or squared), with a gate above Gate level. */
+const EnvFol = {
+  type:'envfol', scope:'mono', cost:.05,
+  inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
+  params:{ atk:[.01,0,1,.001], rel:[.15,0,2,.001], gain:[2,0,16,.01], thr:[.3,0,1,.001], mode:[0,0,1,1] },
+  create:() => ({ env:0 }),
+  process(st, io, ctx){
+    const dt = 1 / ctx.sr, ka = 1 - Math.exp(-dt / Math.max(io.p.atk, 1e-4)), kr = 1 - Math.exp(-dt / Math.max(io.p.rel, 1e-4));
+    const gain = io.p.gain, thr = io.p.thr, sq = io.p.mode >= .5;
+    for (let i = 0; i < ctx.block; i++){
+      const x = io.in.in[i] * gain, y = sq ? x * x : Math.abs(x);
+      st.env += (y - st.env) * (y > st.env ? ka : kr);
+      io.out.out[i] = st.env; io.out.gate[i] = st.env > thr ? 1 : 0;
+    }
+  }
+};
+
+/* Gate extract: audio in → gate while it stays above Threshold (with hysteresis), plus a smoothed env. */
+const GateEx = {
+  type:'gateex', scope:'mono', cost:.03,
+  inputs:{ in:'audio' }, outputs:{ out:'gate', env:'cv' },
+  params:{ thr:[.1,0,1,.001], hyst:[.25,0,1,.01], rel:[.05,0,1,.001] },
+  create:() => ({ on:0, env:0 }),
+  process(st, io, ctx){
+    const thr = io.p.thr, hy = thr * (1 - io.p.hyst), kr = 1 - Math.exp(-1 / (ctx.sr * Math.max(io.p.rel, 1e-4)));
+    for (let i = 0; i < ctx.block; i++){
+      const a = Math.abs(io.in.in[i]);
+      if (st.on){ if (a < hy) st.on = 0; } else if (a > thr) st.on = 1;
+      st.env += ((st.on ? 1 : 0) - st.env) * kr;
+      io.out.out[i] = st.on; io.out.env[i] = st.env;
+    }
+  }
+};
+
+/* Pitch follow (monophonic): zero-crossing estimate → CV (0.5 = A4) + a voiced gate. Best on simple tones.
+   Estimates over a rolling ~85 ms window (one 128-sample block is far too short for a stable reading). */
+const PitchFol = {
+  type:'pitchfol', scope:'mono', cost:.2,
+  inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
+  params:{ thr:[.02,0,1,.001], glide:[.05,0,.5,.001], depth:[1,0,1,.01], min:[60,40,500,1], max:[1400,100,4000,1] },
+  create:() => ({ buf:new Float32Array(4096), w:0, filled:0, ph:.5, voiced:0, f:0 }),
+  process(st, io, ctx){
+    const N = st.buf.length; let peak = 0;
+    for (let i = 0; i < ctx.block; i++){ const x = io.in.in[i]; st.buf[st.w] = x; st.w = (st.w + 1) % N; if (st.filled < N) st.filled++; const a = Math.abs(x); if (a > peak) peak = a; }
+    const M = st.filled;
+    let cross = 0, prev = st.buf[(st.w - M + N * 2) % N];
+    for (let i = 1; i < M; i++){ const s = st.buf[(st.w - M + i + N * 2) % N]; if ((s >= 0) !== (prev >= 0)) cross++; prev = s; }
+    const f = M > 1 ? cross * 0.5 * ctx.sr / M : 0;
+    st.voiced = peak > io.p.thr && f >= io.p.min && f <= io.p.max ? 1 : 0;
+    if (st.voiced) st.f = f;
+    const g = 1 - Math.exp(-ctx.block / (ctx.sr * Math.max(io.p.glide, 1e-4)));
+    const target = st.voiced ? clamp(0.5 + Math.log2(Math.max(st.f, 1) / 440) / 8, 0, 1) : st.ph;
+    st.ph = clamp(st.ph + (target - st.ph) * g, 0, 1);
+    io.out.out.fill(st.ph * io.p.depth); io.out.gate.fill(st.voiced);
+  }
+};
+
+/* Slew / lag: smooths a CV with separate rise and fall times. */
+const Slew = {
+  type:'slew', scope:'mono', cost:.03,
+  inputs:{ in:'cv' }, outputs:{ out:'cv' },
+  params:{ up:[.05,0,1,.001], dn:[.05,0,1,.001] },
+  create:() => ({ y:0 }),
+  process(st, io, ctx){
+    const ku = 1 - Math.exp(-1 / (ctx.sr * Math.max(io.p.up, 1e-4))), kd = 1 - Math.exp(-1 / (ctx.sr * Math.max(io.p.dn, 1e-4)));
+    for (let i = 0; i < ctx.block; i++){ const x = io.in.in[i]; st.y += (x - st.y) * (x > st.y ? ku : kd); io.out.out[i] = st.y; }
+  }
+};
+
+/* Sample & hold: samples CV on a Trigger rising edge (or at Rate) and holds it, with a stepped noise out. */
+const SampleHold = {
+  type:'snh', scope:'mono', cost:.08,
+  inputs:{ in:'cv', trig:'gate' }, outputs:{ out:'cv', noise:'cv' },
+  params:{ rate:[4,.05,40,.01], smooth:[0,0,1,.01], depth:[1,0,1,.01] },
+  create:() => ({ R:rng(nextSeed()), ph:0, t:0, held:0, noise:0, y:0, ny:0 }),
+  process(st, io, ctx){
+    const trig = linked(io, 'trig'), k = 1 - Math.pow(io.p.smooth, .15) * .9995, dep = io.p.depth;
+    for (let i = 0; i < ctx.block; i++){
+      let fire = false;
+      if (trig){ const g = io.in.trig[i] > .5; fire = g && !st.t; st.t = g; }
+      else { st.ph += io.p.rate / ctx.sr; if (st.ph >= 1){ st.ph -= 1; fire = true; } }
+      if (fire){ st.held = io.in.in[i]; st.noise = st.R() * 2 - 1; }
+      st.y += (st.held - st.y) * k; st.ny += (st.noise - st.ny) * k;
+      io.out.out[i] = st.y * dep; io.out.noise[i] = st.ny * dep;
+    }
+  }
+};
+
+/* Quantizer: snaps a pitch CV to the nearest note of a scale (pitch CV: 0.5 = A4, 0.125 per octave). */
+const SCALES = [[0,2,4,5,7,9,11],[0,2,3,5,7,8,10],[0,2,3,5,7,8,11],[0,3,5,7,10],[0,2,4,6,8,10],[0,1,2,3,4,5,6,7,8,9,10,11],[0,5,7]];
+const Quant = {
+  type:'quant', scope:'mono', cost:.03,
+  inputs:{ in:'cv' }, outputs:{ out:'cv' },
+  params:{ scale:[0,0,6,1], transpose:[0,-24,24,1], depth:[1,0,1,.01] },
+  create:() => ({}),
+  process(st, io, ctx){
+    const sc = SCALES[clamp(io.p.scale | 0, 0, SCALES.length - 1)], tr = io.p.transpose, dep = io.p.depth;
+    for (let i = 0; i < ctx.block; i++){
+      const semi = Math.round((io.in.in[i] - .5) * 96) + tr, oct = Math.floor(semi / 12), pc = ((semi % 12) + 12) % 12;
+      let best = sc[0], bd = 99;
+      for (const s of sc){ const d = Math.abs(s - pc); if (d < bd){ bd = d; best = s; } }
+      io.out.out[i] = ((oct * 12 + best) / 96 + .5) * dep;
+    }
+  }
+};
+
 
 
 
@@ -243,7 +352,8 @@ const ChainOut = {
 const MODULES = { trackIn:TrackIn,
   vcf:VCF, vca:VCA, mixer:Mixer,
   eq:EQ, comp:Comp, saturation:Saturation, tape:Tape, chorus:Chorus, crush:Crush, delay:Delay, reverb:Reverb, rings:Rings, clouds:Clouds,
-  lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter, chainOut:ChainOut };
+  lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter,
+  envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant, chainOut:ChainOut };
 
 /* A cable into "p:name" modulates that parameter instead of feeding an input. */
 const isParamPort = p => typeof p === 'string' && p.startsWith('p:');

@@ -412,6 +412,25 @@ const MODULES = {
   atten:{ label:'Attenuverter', scope:'mono', inputs:{ in:'cv' }, outputs:{ out:'cv' },
     params:{ amount:[1,-1,1,.01], offset:[0,-1,1,.01] }, ui:{ amount:{l:'Amount', f:spct}, offset:{l:'Offset', f:spct} } },
 
+  /* audio → CV and CV utilities. Pitch CV: 0.5 = A4 (440 Hz), one octave = 0.125. */
+  envfol:{ label:'Envelope Follow', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
+    params:{ atk:[.01,0,1,.001], rel:[.15,0,2,.001], gain:[2,0,16,.01], thr:[.3,0,1,.001], mode:[0,0,1,1] },
+    ui:{ atk:{l:'Attack', f:secs}, rel:{l:'Release', f:secs}, gain:{l:'Gain', f:times}, thr:{l:'Gate level', f:pct}, mode:{l:'Detect', c:opts(['Peak','Squared'])} } },
+  gateex:{ label:'Gate Extract', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'gate', env:'cv' },
+    params:{ thr:[.1,0,1,.001], hyst:[.25,0,1,.01], rel:[.05,0,1,.001] },
+    ui:{ thr:{l:'Threshold', f:pct}, hyst:{l:'Hysteresis', f:pct}, rel:{l:'Release', f:secs} } },
+  pitchfol:{ label:'Pitch Follow', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
+    params:{ thr:[.02,0,1,.001], glide:[.05,0,.5,.001], depth:[1,0,1,.01], min:[60,40,500,1], max:[1400,100,4000,1] },
+    ui:{ thr:{l:'Threshold', f:pct}, glide:{l:'Glide', f:secs}, depth:{l:'Depth', f:pct}, min:{l:'Min', f:hz}, max:{l:'Max', f:hz} } },
+  slew:{ label:'Slew', scope:'mono', inputs:{ in:'cv' }, outputs:{ out:'cv' },
+    params:{ up:[.05,0,1,.001], dn:[.05,0,1,.001] }, ui:{ up:{l:'Rise', f:secs}, dn:{l:'Fall', f:secs} } },
+  snh:{ label:'Sample & Hold', scope:'mono', inputs:{ in:'cv', trig:'gate' }, outputs:{ out:'cv', noise:'cv' },
+    params:{ rate:[4,.05,40,.01], smooth:[0,0,1,.01], depth:[1,0,1,.01] },
+    ui:{ rate:{l:'Rate', f:hz}, smooth:{l:'Smooth', f:pct}, depth:{l:'Depth', f:pct} } },
+  quant:{ label:'Quantizer', scope:'mono', inputs:{ in:'cv' }, outputs:{ out:'cv' },
+    params:{ scale:[0,0,6,1], transpose:[0,-24,24,1], depth:[1,0,1,.01] },
+    ui:{ scale:{l:'Scale', c:opts(['Major','Natural minor','Harmonic minor','Minor pentatonic','Whole tone','Chromatic','Power'])}, transpose:{l:'Transpose', f:semis}, depth:{l:'Depth', f:pct} } },
+
   chainOut:{ label:'Chain Out', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{},
     params:{ track:[1,1,CHAN_COUNT,1], level:[1,0,2,.01] },
     ui:{ track:{l:'Track', c:Array.from({length:CHAN_COUNT}, (_, i) => [i + 1, 'Track ' + (i + 1)])}, level:{l:'Level', f:pct} } }
@@ -1418,9 +1437,13 @@ const PALETTE = [
   ['Filters and amps', [['vcf','VCF'],['vca','VCA'],['mixer','Mixer']]],
   ['Effects', [['eq','EQ'],['comp','Compressor'],['saturation','Saturation'],['tape','Tape'],['chorus','Chorus'],['crush','Bitcrush'],['delay','Tape delay'],['reverb','Reverb'],['rings','Rings'],['clouds','Clouds']]],
   ['§Control', []],
-  ['Modulation sources', [['lfo','LFO'],['adsr','ADSR'],['random','Random'],['atten','Attenuverter']]]
+  ['Modulation sources', [['lfo','LFO'],['adsr','ADSR'],['random','Random'],['atten','Attenuverter']]],
+  ['§Audio → CV', []],
+  ['Audio followers', [['envfol','Envelope Follow'],['gateex','Gate Extract'],['pitchfol','Pitch Follow']]],
+  ['CV utilities', [['slew','Slew'],['snh','Sample & Hold'],['quant','Quantizer']]]
 ];
-const GROUP_FAM = { 'Track I/O':'aout', 'Filters and amps':'util', 'Effects':'afx', 'Modulation sources':'mod' };
+const GROUP_FAM = { 'Track I/O':'aout', 'Filters and amps':'util', 'Effects':'afx', 'Modulation sources':'mod',
+  'Audio followers':'mod', 'CV utilities':'util' };
 const isSection = g => g.startsWith('§');
 const PSTORE = KP + 'palette';
 let pstate = { open:{}, quick:['trackIn', 'eq', 'delay', 'reverb', 'chainOut'] };
@@ -1708,12 +1731,19 @@ function helpDoc(){
     adsr:'An envelope for shaping effects: patch a gate into it and its output into a slider’s modulation jack.',
     random:'A new random value at Rate, or each time Clock fires. Smooth glides between values.',
     atten:'Scales a modulation signal (negative turns it upside down) and adds an offset.',
+    envfol:'Turns sound into modulation: the louder the input, the higher the output. Attack and Release set how quickly it follows; Gate level sets where its gate output turns on. Patch the output into any slider’s modulation jack (a filter’s cutoff, say) and the sound drives it.',
+    gateex:'Turns sound into a gate: on while the input stays above Threshold, off when it falls (Hysteresis stops it chattering). Env is a smoothed version. Use it to trigger envelopes, clocks or Sample & Hold from audio.',
+    pitchfol:'Follows the pitch of a monophonic sound and outputs it as modulation (0.5 = A4, one octave = 0.125), plus a voiced Gate. Best on simple tones. Patch it into an oscillator’s pitch on …waves, or into a Quantizer here.',
+    slew:'Slows a modulation signal down, with separate Rise and Fall times. Smooths stepped or jittery control voltages.',
+    snh:'Sample & Hold: takes a snapshot of the input on a Trigger rising edge (or at Rate) and holds it; Noise outputs a matching random step. Patch a stepped sequence into a filter for classic sample-and-hold sweeps.',
+    quant:'Snaps a pitch modulation signal to the nearest note of a Scale (pitch CV: 0.5 = A4). Transpose shifts it in semitones; Depth scales the output.',
     chainOut:'Sends sound back to a tracker track, in stereo if you patch In R. Track picks which track it returns to (use the same track as your Track In); in …Thunder the Mixer sends it back through that track and anything after it.',
     adsr:'An envelope for shaping effects: patch a gate into it and its output into a slider’s modulation jack.'
   };
   const guide = [
     ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal cables carry sound, purple dashed cables carry modulation and pink dashed cables carry gates. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the centre, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
+    ['Sound as modulation', 'Audio can drive anything a control voltage can. Patch a sound into Envelope Follow to make it swell a filter or level, into Gate Extract to fire envelopes and clocks from hits, or into Pitch Follow to track a monophonic melody. Then shape it with Slew (to smooth it), Sample & Hold (to step it) or Quantizer (to snap it to a scale).'],
     ['Tracks', 'Start with a Track In (your tracker track, 1–32) and end with a Chain Out back to the same track. Keep one pair per track; the buses are hard-assigned, so Track 3 always feeds Chain 3.'],
     ['Moving around', 'Drag the background or scroll with two fingers to pan. Pinch, Ctrl-scroll or a mouse wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
