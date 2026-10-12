@@ -791,12 +791,50 @@ function portEl(n, port, kind, dir){
   row.addEventListener('pointerdown', e => { if (e.target !== j && e.button !== 2) onJackDown(e, j); });
   return row;
 }
+// Keep each track's chain input and output aligned, and only one of each per track. A Chain Out on a
+// different track can't work in the host: each track's node runs only its own track and returns only its
+// own bus, so the Chain Out must follow the Track In. Control (cv/gate) jacks are unaffected — this only
+// touches the Track number on Track In / Chain Out modules, never modulation connections.
+function applyChainTrack(m, N){
+  m.params.track = N;
+  if (bridge) bridge.setParam(m.id, 'track', N);
+  else if (EMBED && TW && TW.param) TW.param(m.id, 'track', N);
+  const n = nodes.get(m.id); if (n){ const c = n.ctl.track; if (c) c.show(); paintNote(n); }
+}
+function chainTrackLists(){ const ins = [], outs = []; for (const x of nodes.values()){ if (x.m.type === 'trackIn') ins.push(x.m); else if (x.m.type === 'chainOut') outs.push(x.m); } return { ins, outs }; }
+function routeTrackChange(n, v){
+  const N = Math.max(1, Math.min(CHAN_COUNT, Math.round(+v) || 1)), { ins, outs } = chainTrackLists();
+  if (n.m.type === 'trackIn'){
+    if (ins.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a Track In — one audio input per track.'); return { reject:true }; }
+    if (ins.length === 1) for (const o of outs) applyChainTrack(o, N);   // the output follows the input
+    return { v:N };
+  }
+  // chainOut
+  if (ins.length === 1){ const t = ins[0].params.track | 0; if (N !== t){ toast('Chain Out follows the Track In — track ' + t + '.'); return { v:t }; } }
+  if (outs.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a Chain Out — one audio output per track.'); return { reject:true }; }
+  return { v:N };
+}
+function alignChainTracks(quiet){
+  const { ins, outs } = chainTrackLists();
+  if (ins.length !== 1) return;   // with several Track Ins, pairing is up to the user
+  const N = ins[0].params.track | 0;
+  for (const o of outs) if ((o.params.track | 0) !== N){ applyChainTrack(o, N); if (!quiet) toast('Chain Out follows the Track In — track ' + N + '.'); }
+}
 function setParam(n, key, v, fromUser){
+  if (key === 'track' && (n.m.type === 'trackIn' || n.m.type === 'chainOut')){
+    const r = routeTrackChange(n, v), c = n.ctl.track;
+    if (r.reject){ if (c) c.show(); return; }   // show() puts the select back to the real value
+    v = r.v;
+    n.m.params[key] = v;
+    if (bridge) bridge.setParam(n.m.id, key, v);
+    else if (EMBED && TW && TW.param) TW.param(n.m.id, key, v);
+    if (c) c.show(); paintNote(n); store.touch();
+    return;
+  }
   n.m.params[key] = v;
   if (bridge) bridge.setParam(n.m.id, key, v);
   else if (EMBED && TW && TW.param) TW.param(n.m.id, key, v);   // live, granular — no full reload
   const c = n.ctl[key]; if (c && !fromUser) c.show();
-  if ((n.m.type === 'chainOut' || n.m.type === 'trackIn') && key === 'track') paintNote(n);
   store.touch();
 }
 function slider(n, key, spec){
@@ -942,6 +980,7 @@ function renderAll(){
   nodes.clear();
   for (const m of doc.modules) buildNode(m);
   selected = new Set([...selected].filter(id => nodes.has(id)));
+  alignChainTracks(true);   // keep each track's input and output in step on load, undo and redo
   renderGroups(); syncCableEls(); markMapped(); applyPan(); renderCustom();
   document.getElementById('pname').value = doc.meta.name || 'Untitled';
   ws.style.backgroundColor = (doc.view && doc.view.bg) || '';
@@ -954,6 +993,7 @@ function addModule(type, x, y, params){
   if (bridge) bridge.addModule(m.id, type, { params:m.params, pos:m.pos });
   else if (EMBED && TW && TW.mod) TW.mod({ op:'add', id:m.id, type, params:m.params, pos:m.pos });
   buildNode(m); store.touch();
+  if (type === 'trackIn' || type === 'chainOut') alignChainTracks(true);
   return m;
 }
 function removeModule(id){
@@ -1770,7 +1810,7 @@ function helpDoc(){
     ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal cables carry sound, purple dashed cables carry modulation and pink dashed cables carry gates. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the centre, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
     ['Sound as modulation', 'Audio can drive anything a control voltage can. Patch a sound into Envelope Follow to make it swell a filter or level, into Gate Extract to fire envelopes and clocks from hits, or into Pitch Follow to track a monophonic melody. Then shape it with Slew (to smooth it), Sample & Hold (to step it) or Quantizer (to snap it to a scale).'],
-    ['Tracks', 'Start with a Track In (your tracker track, 1–32) and end with a Chain Out back to the same track. Keep one pair per track; the buses are hard-assigned, so Track 3 always feeds Chain 3.'],
+    ['Tracks', 'Start with a Track In (your tracker track, 1–32) and end with a Chain Out back to the same track. The output always follows the input — set the Track In and the Chain Out moves with it, and a Chain Out can’t be pointed at another track, because each track’s audio is only returned on its own track. A track takes one Track In and one Chain Out; control (cv/gate) inputs are not limited. Turning a track’s CHN on in the Mixer also points a single Track In / Chain Out pair at that track.'],
     ['Moving around', 'Drag the background or scroll with two fingers to pan. Pinch, Ctrl-scroll or a mouse wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
     ['Selecting and the right-click menu', 'Shift-click or Shift-drag to select modules. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],

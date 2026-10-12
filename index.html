@@ -4007,6 +4007,22 @@ function rtFx(t){
 function rtAllFx(){ for (let t = 0; t <= NT; t++) rtFx(t); }
 function fxChanged(t){ saveS(); rtFx(t); }
 function chainsFeedChanged(t){ saveS(); rtFx(t); draw(); }
+// Turning a track's CHN on points the patch's single Track In / Chain Out at that track, so the audio that
+// feeds chains is the same track the chain reads and returns (the mismatch that made track 9 do nothing).
+function alignPatchTrack(N){
+  const P = S.chainPatch; if (!P || !Array.isArray(P.modules)) return false;
+  const ins = P.modules.filter(m => m && m.type === 'trackIn');
+  if (ins.length !== 1) return false;
+  let changed = false;
+  if ((ins[0].params.track | 0) !== N){ ins[0].params.track = N; changed = true; }
+  for (const m of P.modules) if (m && m.type === 'chainOut' && (m.params.track | 0) !== N){ m.params.track = N; changed = true; }
+  return changed;
+}
+function setChainOn(t, on){
+  const was = !!S.chainOn[t]; S.chainOn[t] = !!on;
+  if (on && !was && alignPatchTrack(t + 1)){ saveS(); chainsPush(); }
+  chainsFeedChanged(t);
+}
 // Re-route every track that runs through …chains now, AND every track that did until this change (its Chain Out
 // was deleted or set to another track): without that, the old track kept a chains node with no way out and went silent.
 function chainsPush(){ if (!rt) return; for (let t = 0; t < NT; t++){ const b = rt.pl && rt.pl.buses[t]; if (chainsFeed(t) || (b && b.chn)) rtFx(t); } }
@@ -4555,7 +4571,7 @@ function bump(d, big){
   if (tv === 'mixer'){
     if (c.y === 6) S.master = clamp(S.master + d * (big ? 16 : 1), 0, 255), rtRoute();
     else if (c.y === 4) return fxActiveStep(c.x, d > 0 ? 1 : -1);
-    else if (c.y === 5){ S.chainOn[c.x] = d > 0; chainsFeedChanged(c.x); draw(); return; }
+    else if (c.y === 5){ setChainOn(c.x, d > 0); draw(); return; }
     else { const m = S.mix[c.x];
       if (c.y === 0) m.vol = clamp(m.vol + d * (big ? 16 : 1), 0, 255);
       else if (c.y === 1) m.pan = clamp(m.pan + d * (big ? 16 : 1), 0, 255);
@@ -4654,7 +4670,7 @@ function editTap(){
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
   }
-  if (tv === 'mixer'){ if (c.y === 4) return go('fx'); if (c.y === 5){ S.chainOn[c.x] = !S.chainOn[c.x]; chainsFeedChanged(c.x); draw(); return; } if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
+  if (tv === 'mixer'){ if (c.y === 4) return go('fx'); if (c.y === 5){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
   const r = rowsOf(tv)[c.y]; if (!r) return;
   if (r.act){ if (r.dbl) return toast('Tap EDIT again to ' + r.l.replace('› ', '').toLowerCase() + '.'); return r.act(); }
   if (r.tog){ r.set(r.get() ? 0 : 1); if (r.after) r.after(); saveS(); draw(); return; }
@@ -4760,7 +4776,7 @@ function del(){
     if (tv === 'phrase' && k === 'note'){ const r = S.phrases[cPhrase] && S.phrases[cPhrase][c.y]; if (r && r.slice(0, NCOL).every(n => n < 0)) r[IC] = -1; }
     return draw();
   }
-  if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ S.chainOn[c.x] = false; chainsFeedChanged(c.x); return draw(); } if (c.y === 6){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else m.solo = false; } mixChanged(); return draw(); }
+  if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ setChainOn(c.x, false); return draw(); } if (c.y === 6){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else m.solo = false; } mixChanged(); return draw(); }
   const r = rowsOf(tv)[c.y]; if (r && r.get && r.d != null){ r.set(r.d); if (r.after) r.after(); saveS(); draw(); }
 }
 // Whole rows: clear a row, insert a blank one (rows below move down), or remove one (rows below move up).
@@ -5882,7 +5898,7 @@ function typeHex(d){
     const y = c.y; setCell(tv, c.x, y, val); if (done){ down1(); hexBuf.key = ''; } after(k, tv, c.x, y, val); return;
   }
   if (tv === 'mixer'){
-    if (c.y === 6){ S.master = v; rtRoute(); } else if (c.y === 5){ S.chainOn[c.x] = !!v; chainsFeedChanged(c.x); return; } else if (c.y === 0) S.mix[c.x].vol = v; else if (c.y === 1) S.mix[c.x].pan = v; else return;
+    if (c.y === 6){ S.master = v; rtRoute(); } else if (c.y === 5){ setChainOn(c.x, !!v); return; } else if (c.y === 0) S.mix[c.x].vol = v; else if (c.y === 1) S.mix[c.x].pan = v; else return;
     if (done) hexBuf.key = ''; mixChanged(); draw(); return;
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.get || r.tog) return;
