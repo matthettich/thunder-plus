@@ -491,6 +491,13 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 .tsong{border:1px solid var(--line); min-height:34px; padding:0 14px; margin:0 4px; font-size:12px; font-weight:700; letter-spacing:.04em; flex:none; white-space:nowrap; background:var(--panel)}
 .tsong:hover{border-color:var(--ink)}
 .tsong.on{background:var(--pl); color:var(--inv); border-color:var(--pl)}
+/* The transport button's label flips between Song and Stop. Both labels sit in one grid cell, so the
+   button keeps a single width and position as it toggles — it never resizes or nudges the CPU readout. */
+#tSong:not([hidden]){display:inline-grid; place-items:center}
+#tSong .tl{grid-area:1 / 1; white-space:nowrap}
+#tSong .tl.alt{visibility:hidden}
+#tSong.on .tl:not(.alt){visibility:hidden}
+#tSong.on .tl.alt{visibility:visible}
 .tcpu{border:0; border-left:1px solid var(--line); min-height:36px; padding:0 10px; font-size:12px; font-weight:600; letter-spacing:.04em; flex:none; white-space:nowrap;
   font-variant-numeric:tabular-nums; position:relative; min-width:84px; text-align:left; background:var(--side)}
 .tcpu i{position:absolute; left:0; bottom:0; height:4px; width:0; background:var(--ink); transition:width .3s}
@@ -640,7 +647,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
   </div>
   <button type="button" class="tsong" id="tLoopTop" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L in KEYS mode)" hidden>Lp. Sel.</button>
   <button type="button" class="tsong" id="tKeyTrans" aria-label="Key transpose" title="Key transpose: tap to arm, then ▲ up / ▼ down transposes the selection a semitone" hidden>Key Trans.</button>
-  <button type="button" class="tsong" id="tSong" aria-label="Play or stop the song" title="Play the song from the tracker's cursor row, or stop it" hidden>▶ Song</button>
+  <button type="button" class="tsong" id="tSong" aria-label="Play or stop the song" title="Play the song from the tracker's cursor row, or stop it" hidden><span class="tl">▶ Song</span><span class="tl alt" aria-hidden="true">■ Stop</span></button>
   <button type="button" class="tcpu" id="tCpu" aria-label="Audio load"><span>CPU --</span><i></i></button>
   <button type="button" id="bHelp" aria-label="Help and keys (?)" title="Help and keys (? or F1)">?</button>
 </div>
@@ -731,6 +738,11 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
   <section class="band voice">
     <div class="wmeta" id="wMeta"></div>
     <div class="vrows" id="vRows"></div>
+  </section>
+
+  <section class="band">
+    <div class="bar" style="margin-bottom:8px"><span class="ttl">Voice pitch, filter &amp; amp</span><span class="lbl">shapes every layer at once</span></div>
+    <div class="secs" id="voiceSecs"></div>
   </section>
 
   <section class="band">
@@ -916,7 +928,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 <p>Each track and the master have 4 effect slots (FX screen, or the Mixer’s FX row): EQ, compressor, reverb, tape delay, saturation, tape, chorus, bitcrush, Rings and Clouds. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to four, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
 <p><b>…chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback.</p></section>
-    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Kit ▾</b> saves and loads kits, <b>Export ▾</b> writes WAVs for Koala and SunVox, <b>MIDI ▾</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off), <b>Skin ▾</b> changes the look.</p><h2>Files and rendering</h2><p><b>Project</b> holds SAVE, SAVE AS and LOAD PROJECT, plus RENDER SONG (a stereo WAV) and RENDER STEMS (a zip with the mix and one WAV per track). In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/Thunder-#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
+    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Kit ▾</b> saves and loads kits, <b>Export ▾</b> writes WAVs for Koala and SunVox, <b>MIDI ▾</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off), <b>Skin ▾</b> changes the look.</p><h2>Files and rendering</h2><p><b>Project</b> holds SAVE, SAVE AS and LOAD PROJECT, plus RENDER SONG (a stereo WAV) and RENDER STEMS (a zip with the mix and one WAV per track). In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/Thunder-#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -947,6 +959,62 @@ const BELLA = [0.9,1,0.7,0.6,0.55,0.45,0.4,0.35,0.28,0.22,0.16,0.12];
 const BAR = [1,2.756,5.404,8.933,13.344,18.638];
 const HAT = [205.3,304.4,369.6,522.7,540,800];
 
+/* Shared FM engine. Every FM model below exposes the same two core controls — Algorithm (a) and
+   Feedback (b) — and differs in operator count, ratios, algorithm table and chip character. Operators
+   are sines (or the model's waveform); each algorithm is a small DAG: mods[k] lists the operators that
+   modulate operator k (all computed earlier in `order`), and cars lists the ones that reach the output. */
+const FM_ALGS4 = [
+  {order:[0,1,2,3], mods:[[],[0],[1],[2]], cars:[3]},          // 1: chain 0→1→2→3
+  {order:[0,1,2,3], mods:[[],[0],[1],[1]], cars:[3]},          // 2: two mods into the last
+  {order:[0,1,2,3], mods:[[],[0],[0,1],[2]], cars:[3]},        // 3
+  {order:[0,1,2,3], mods:[[],[0],[1],[2]], cars:[2,3]},        // 4: two carriers
+  {order:[0,1,2,3], mods:[[],[0],[1],[2]], cars:[0,1,3]},      // 5
+  {order:[0,1,2,3], mods:[[],[],[0],[1]], cars:[2,3]},         // 6: two pairs
+  {order:[0,1,2,3], mods:[[],[],[0],[0,1]], cars:[2,3]},       // 7
+  {order:[0,1,2,3], mods:[[],[],[],[]], cars:[0,1,2,3]},       // 8: additive
+];
+const FM_ALGS6 = [
+  {order:[0,1,2,3,4,5], mods:[[],[0],[1],[2],[3],[4]], cars:[5]},          // long chain
+  {order:[0,1,2,3,4,5], mods:[[],[0],[1],[1],[3],[4]], cars:[5]},
+  {order:[0,1,2,3,4,5], mods:[[],[0],[0],[2],[3],[4]], cars:[3,5]},
+  {order:[0,1,2,3,4,5], mods:[[],[],[0],[1],[3],[4]], cars:[1,5]},
+  {order:[0,1,2,3,4,5], mods:[[],[],[],[],[],[]], cars:[0,1,2,3,4,5]},     // additive
+];
+const FM_MODELS = {
+  fm4:     {n:4, ratios:[1,2,3,4],         idx:6, fbMax:1.2, algs:FM_ALGS4},
+  fm6:     {n:6, ratios:[1,1,2,3,4,5],     idx:5, fbMax:1.2, algs:FM_ALGS6},
+  genesis: {n:4, ratios:[1,2,4,8],         idx:6, fbMax:1.8, algs:FM_ALGS4, q:511},    // YM2612: 4-op, 9-bit DAC
+  sb:      {n:4, ratios:[1,2,4,6],         idx:7, fbMax:1.0, algs:FM_ALGS4, wf:'opl'},  // OPL: half-sine modulators
+  arcade:  {n:4, ratios:[1,1.007,2,3.01],  idx:8, fbMax:2.2, algs:FM_ALGS4, wf:'fold'}, // bright, folded operators
+};
+const fmAlg = (v, id) => 1 + Math.round(v * (FM_MODELS[id].algs.length - 1));
+function fmOsc(L, A, B, m){
+  const n = m.n, q = m.q | 0, wf = m.wf, ph = new Float64Array(n), o = new Float64Array(n);
+  const ai = Math.max(0, Math.min(m.algs.length - 1, Math.round(A * (m.algs.length - 1)))), alg = m.algs[ai];
+  const fb = B * m.fbMax * 0.159155, base = m.idx || 0;
+  const wave = q ? (k, p) => { const y = sinT(p); return Math.round(y * q) / q; }
+    : wf === 'opl' ? (k, p) => k & 1 ? Math.abs(sinT(p)) * 2 - 1 : sinT(p)
+    : wf === 'fold' ? (k, p) => sinT(sinT(p) * 0.8)
+    : (k, p) => sinT(p);
+  let f1 = 0, f2 = 0, I = 0;
+  return {
+    blk(t, env){ I = base * (0.15 + 0.85 * (env || 0)) * 0.159155; },
+    s(inc){
+      for (let q2 = 0; q2 < alg.order.length; q2++){
+        const k = alg.order[q2], md = alg.mods[k];
+        let sum = 0; if (md.length){ for (let j = 0; j < md.length; j++) sum += o[md[j]]; sum *= I / md.length; }
+        let p = ph[k] + sum;
+        if (k === 0 && fb) p += fb * (f1 + f2) * 0.5;
+        const y = wave(k, p);
+        if (k === 0){ f2 = f1; f1 = y; }
+        o[k] = y; ph[k] += inc * m.ratios[k];
+      }
+      let out = 0; for (const c of alg.cars) out += o[c];
+      return out / alg.cars.length;
+    }
+  };
+}
+
 const pct = v => Math.round(v * 100) + '%';
 const noiseRate = (a) => a < 0.01 ? 'Full' : '÷' + (1 + Math.round(a*a*63));
 const noiseBits = (b) => b < 0.01 ? 'Off' : Math.round(16 - b*14) + ' bit';
@@ -961,6 +1029,11 @@ const TYPES = [
   {id:'fmfb',    name:'FM feedback',  fam:'fm',    a:'Feedback',b:'Env→FB', fa:pct, fb:pct},
   {id:'fmmetal', name:'FM metal',     fam:'fm',    a:'Spread',  b:'Index',  fa:pct, fb:v=>(v*v*9).toFixed(1)},
   {id:'fmcross', name:'FM cross',     fam:'fm',    a:'Ratio',   b:'Index',  fa:v=>fmRatio(v)+'×', fb:pct},
+  {id:'fm4',     name:'FM 4-op',      fam:'fm',    a:'Algorithm',b:'Feedback', fa:v=>'ALG '+fmAlg(v,'fm4'),     fb:pct},
+  {id:'fm6',     name:'FM 6-op',      fam:'fm',    a:'Algorithm',b:'Feedback', fa:v=>'ALG '+fmAlg(v,'fm6'),     fb:pct},
+  {id:'genesis', name:'FM Genesis',   fam:'fm',    a:'Algorithm',b:'Feedback', fa:v=>'ALG '+fmAlg(v,'genesis'), fb:pct},
+  {id:'sb',      name:'FM SoundBlaster', fam:'fm', a:'Algorithm',b:'Feedback', fa:v=>'ALG '+fmAlg(v,'sb'),      fb:pct},
+  {id:'arcade',  name:'FM Arcade',    fam:'fm',    a:'Algorithm',b:'Feedback', fa:v=>'ALG '+fmAlg(v,'arcade'),  fb:pct},
   {id:'addsaw',  name:'Additive',     fam:'add',   a:'Partials',b:'Tilt',   fa:v=>String(1+Math.round(v*31)), fb:pct},
   {id:'addodd',  name:'Additive odd', fam:'add',   a:'Partials',b:'Tilt',   fa:v=>String(1+Math.round(v*31)), fb:pct},
   {id:'membrane',name:'Membrane',     fam:'add',   a:'Modes',   b:'Damp',   fa:v=>String(2+Math.round(v*10)), fb:pct},
@@ -1132,6 +1205,8 @@ function makeOsc(L, sr, pre){
     case 'fmcross': { const ratio = fmRatio(A); let p = 0, pa = 0, pb = 0, I = 0;
       return {blk(t, env){ I = B * 1.8 * (0.2 + 0.8*env) * 0.159155; },
         s(inc){ const a = sinT(p + I * pb), b = sinT(p * ratio + I * pa); pa = a; pb = b; p += inc; return (a + b) * 0.5; }}; }
+    // The standardized FM models: Algorithm (a) and Feedback (b) on a shared multi-operator engine.
+    case 'fm4': case 'fm6': case 'genesis': case 'sb': case 'arcade': return fmOsc(L, A, B, FM_MODELS[L.type]);
     case 'addsaw': case 'addodd': { const n = 1 + Math.round(A*31), odd = L.type === 'addodd', rs = [], am = [], dm = [];
       for (let k = 0; k < n; k++){ const r = odd ? 2*k + 1 : k + 1; rs.push(r); am.push(Math.pow(r, -(0.4 + B*1.6))); dm.push(k * 3); }
       return addOsc(rs, am, dm); }
@@ -1194,6 +1269,9 @@ function renderLayer(L, V, sr, out, N){
   const d0 = Math.round(L.delay / 1000 * sr); if (d0 >= N) return;
   const f0 = BASE * Math.pow(2, (L.tune + V.tune + L.fine/100) / 12);
   const ptau = Math.max(L.pDec, 1) / 4000, pA = L.pAmt;
+  // The voice-wide pitch envelope bends every layer together; it is added to each layer's own pitch
+  // envelope (which is unchanged), so one setting moves the whole voice in pitch over time.
+  const gPtau = Math.max(V.gPDec || 60, 1) / 4000, gPA = V.gPAmt || 0;
   const atk = Math.max(L.atk, 0.05) / 1000, hold = L.hold / 1000, dec = Math.max(L.dec, 1) / 1000, sus = L.sus,
         rel = Math.max(L.rel, 1) / 1000, gate = V.gate / 1000, adsr = L.mode === 'ADSR';
   const nb = L.burst | 0, sp = L.spacing / 1000, bd = Math.max(Math.min(dec, sp*1.5), 0.003);
@@ -1220,7 +1298,7 @@ function renderLayer(L, V, sr, out, N){
   for (let i = 0; i < M; i += BLK){
     const t = i / sr; if (t > tEnd) break;
     const e0 = ePrev, e1 = ampAt((i + BLK) / sr); ePrev = e1;
-    const inc = f0 * Math.pow(2, pA * Math.exp(-t / ptau) / 12) / sr;
+    const inc = f0 * Math.pow(2, (pA * Math.exp(-t / ptau) + (gPA ? gPA * Math.exp(-((d0 + i) / sr) / gPtau) : 0)) / 12) / sr;
     osc.blk(t, e0, inc);
     if (lpOn || hpOn){ const fe = fenv(t);
       if (hpOn){ const fc = Math.min(Math.max(L.hpCut * Math.pow(2, L.hpEnv*8*fe), 10), nyq), g = Math.tan(Math.PI * fc / sr);
@@ -1370,10 +1448,42 @@ function blockPeaks(a){ const n = Math.ceil(a.length / VUB), e = new Float32Arra
 // Max len (`hold`, in seconds), and letting go fades the sound over the voice's release (relOf).
 const NPAD = 8, NSLOT = 16, isSyn = i => i >= NPAD;
 function relOf(V){ let r = 0; for (const L of V.layers) if (L.on && L.level > 0 && L.mode === 'ADSR') r = Math.max(r, L.rel); return Math.max(30, r) / 1000; }
+// Voice-wide filter and amp: they run on the layers AFTER they are summed, so one setting shapes every
+// layer of the voice at once. The filter is the same 2-pole low-pass the layers use; the amp is an
+// ADSR/AHD over the whole voice, keyed on the pad's Gate like the layers' own envelopes.
+function voiceFilter(V, sr, out, N){
+  const nyq = sr * 0.45, fA = Math.max(V.gFAtk, 0.05) / 1000, fD = Math.max(V.gFDec, 1) / 1000, BLK = 16;
+  const fenv = t => t < fA ? t / fA : Math.exp(-6.9 * (t - fA) / fD);
+  let l1 = 0, l2 = 0, lk = 2, la1 = 0, la2 = 0, la3 = 0;
+  for (let i = 0; i < N; i += BLK){
+    const fc = Math.min(Math.max(V.gLpCut * Math.pow(2, V.gLpEnv * 8 * fenv(i / sr)), 10), nyq), g = Math.tan(Math.PI * fc / sr);
+    lk = 2 - 2 * Math.min(V.gLpRes, 0.98); la1 = 1 / (1 + g * (g + lk)); la2 = g * la1; la3 = g * la2;
+    const n = Math.min(BLK, N - i);
+    for (let j = 0; j < n; j++){ const x = out[i + j], v3 = x - l2, v1 = la1 * l1 + la2 * v3, v2 = l2 + la2 * l1 + la3 * v3; l1 = 2 * v1 - l1; l2 = 2 * v2 - l2; out[i + j] = v2; }
+  }
+}
+function voiceAmp(V, sr, out, N){
+  const atk = Math.max(V.gAtk, 0.05) / 1000, hold = V.gHold / 1000, dec = Math.max(V.gDec, 1) / 1000, sus = V.gSus,
+        rel = Math.max(V.gRel, 1) / 1000, gate = V.gate / 1000, adsr = V.gMode === 'ADSR';
+  const amt = V.gAmpAmt == null ? 1 : Math.max(0, Math.min(1, V.gAmpAmt));   // how much the envelope shapes the amp
+  const lv = t => t < atk ? t / atk : sus + (1 - sus) * Math.exp(-6.9 * (t - atk) / dec);
+  const gLv = lv(gate);
+  const env = t => { if (t < 0) return 0;
+    if (adsr) return t < gate ? lv(t) : gLv * Math.exp(-6.9 * (t - gate) / rel);
+    if (t < atk) return t / atk; if (t < atk + hold) return 1; return Math.exp(-6.9 * (t - atk - hold) / dec); };
+  for (let i = 0; i < N; i++) out[i] *= 1 + (env(i / sr) - 1) * amt;
+}
 function renderVoice(V, sr, stages, hold){
   if (hold) V = Object.assign({}, V, {gate:hold * 1000, len:hold});
-  const N = Math.max(1, Math.ceil(voiceLen(V) * sr)), out = new Float32Array(N);
+  // The voice-wide filter is open by default and the voice-wide amp is off, so a default voice renders
+  // exactly as its layers alone would; turning either on only adds shaping across all the layers.
+  const gFilt = V.gLpCut < 19900 || V.gLpEnv !== 0, gAmpOn = !!V.gAmpOn, gRel = Math.max(V.gRel || 1, 1) / 1000;
+  let N = Math.max(1, Math.ceil(voiceLen(V) * sr));
+  if (gAmpOn) N = Math.min(Math.ceil(Math.max(voiceLen(V), V.gate / 1000 + gRel) * sr), sr * 12);   // room for the voice's release
+  const out = new Float32Array(N);
   for (const L of V.layers) if (L.on && L.level > 0) renderLayer(L, V, sr, out, N);
+  if (gFilt) voiceFilter(V, sr, out, N);
+  if (gAmpOn) voiceAmp(V, sr, out, N);
   const g = Math.pow(10, V.level / 20), dr = V.drive;
   if (dr > 0.001){ const k = 1 + dr*dr*24, nrm = 1 / Math.tanh(k); for (let i = 0; i < N; i++) out[i] = Math.tanh(out[i] * k) * nrm * g; }
   else for (let i = 0; i < N; i++) out[i] *= g;
@@ -1404,7 +1514,12 @@ function freshLayer(o){
 function mkVoice(name, layers, o){
   const ls = layers.map(l => freshLayer(Object.assign({on:true}, l)));
   while (ls.length < 8) ls.push(freshLayer());
-  return Object.assign({name, level:0, tune:0, drive:0, gate:200, len:4, choke:0, sel:0, layers:ls, fx:[], tail:2}, o || {});
+  // The voice-wide filter/amp (see renderVoice): open filter, amp off, so a voice sounds as its layers do
+  // until one is turned on. gLpEnv/gFAtk/gFDec are the filter envelope; gAtk…gRel the amp envelope.
+  return Object.assign({name, level:0, tune:0, drive:0, gate:200, len:4, choke:0, sel:0, layers:ls, fx:[], tail:2,
+    gPAmt:0, gPDec:60,
+    gLpCut:20000, gLpRes:0, gLpEnv:0, gFAtk:0.5, gFDec:200,
+    gAmpOn:false, gMode:'ADSR', gAtk:0.5, gHold:0, gDec:300, gSus:1, gRel:1, gAmpAmt:1}, o || {});
 }
 const rA = r => Math.max(0, RATIOS.indexOf(r)) / (RATIOS.length - 1);
 const cA = n => CHORDS.findIndex(c => c[0] === n) / (CHORDS.length - 1);
@@ -1522,6 +1637,18 @@ const VP = {
   drive:{l:'Drive', min:0, max:1, c:'lin', d:0, f:pct},
   gate:{l:'Gate', min:5, max:4000, c:'log', d:200, f:ms},
   len:{l:'Max len', min:0.1, max:8, c:'lin', d:4, f:v => v.toFixed(2) + ' s'},
+};
+// Voice-wide rows (the amp rows reuse P.atk…P.rel). These edit the whole voice, not one layer.
+// Each envelope has an Amount slider: how far its envelope is applied to pitch, filter or amp.
+const VGP = {
+  gPAmt:{l:'Amount', min:-48, max:48, c:'half', d:0, f:st},
+  gPDec:{l:'Pitch time', min:1, max:2000, c:'log', d:60, f:ms},
+  gLpCut:{l:'VCF cut', min:20, max:20000, c:'log', d:20000, f:v => v >= 19900 ? 'Open' : hz(v)},
+  gLpRes:{l:'VCF res', min:0, max:1, c:'lin', d:0, f:pct},
+  gLpEnv:{l:'Amount', min:-1, max:1, c:'lin', d:0, f:oct},
+  gFAtk:{l:'VCF attack', min:0.1, max:2000, c:'log', d:0.5, f:ms},
+  gFDec:{l:'VCF decay', min:1, max:6000, c:'log', d:200, f:ms},
+  gAmpAmt:{l:'Amount', min:0, max:1, c:'lin', d:1, f:pct},
 };
 const toPos = (d, v) => d.c === 'log' ? Math.log(v / d.min) / Math.log(d.max / d.min)
   : d.c === 'sq' ? Math.sqrt(Math.max(0, (v - d.min) / (d.max - d.min))) : (v - d.min) / (d.max - d.min);
@@ -1700,7 +1827,7 @@ $('kitName').addEventListener('input', e => { kit.name = e.target.value; clearTi
 $('vPlay').addEventListener('click', () => play(cur));
 $('wave').addEventListener('pointerdown', () => play(cur));
 $('vRand').addEventListener('click', () => { randVoice(V()); afterVoiceSwap(); play(cur); });
-$('vInit').addEventListener('click', () => { const n = V().name; kit.voices[cur] = mkVoice(n, [{type:'sine', b:0.25, pAmt:24, pDec:50, atk:0.1, dec:400}]); afterVoiceSwap(); });
+$('vInit').addEventListener('click', () => { const n = V().name; kit.voices[cur] = mkVoice(n, [{type:'sine'}]); afterVoiceSwap(); });
 $('vCopy').addEventListener('click', () => { clipVoice = JSON.stringify(voiceToJSON(V())); toast('Copied pad ' + hx(cur)); });
 $('vPaste').addEventListener('click', () => { if (!clipVoice) return toast('Copy a pad first'); kit.voices[cur] = voiceFromJSON(JSON.parse(clipVoice)); afterVoiceSwap(); toast('Pasted into pad ' + hx(cur)); });
 function afterVoiceSwap(){ changed(cur); refreshAll(); }
@@ -1785,6 +1912,34 @@ const ampRows = section('Amp', [], s => {
 for (const k of ['atk','hold','dec','sus','rel']){ const r = makeRow(P[k], k, Lc, {idp:'l', on:() => changed()}); secs.lastChild.append(r.r); ampRows[k] = r; }
 const gateNote = el('div', 'readout', 'Sustain holds for the pad’s Gate time.'); secs.lastChild.append(gateNote);
 section('Filter', ['lpCut','lpRes','lpEnv','hpCut','hpRes','hpEnv','fAtk','fDec']);
+
+/* ---------- voice-wide filter & amp ---------- */
+// These edit the voice object (V), not the selected layer, and renderVoice applies them to all the
+// layers at once: a low-pass filter with its own envelope, and an amp envelope over the whole voice.
+let vAmpModeUpd, vAmpOnUpd;
+const vgRows = [], vAmpRows = {};
+function refreshVoiceGlobals(){
+  const v = V(), adsr = v.gMode === 'ADSR';
+  vAmpRows.gHold.r.hidden = adsr; vAmpRows.gSus.r.hidden = !adsr; vAmpRows.gRel.r.hidden = !adsr;
+  vAmpOnUpd(); vAmpModeUpd();
+  for (const r of vgRows) r.refresh();
+}
+(function buildVoiceGlobals(){
+  const host = $('voiceSecs');
+  const vsec = t => { const s = el('div', 'sec'); s.append(el('h3', null, t)); host.append(s); return s; };
+  const ps = vsec('Voice pitch');
+  for (const k of ['gPAmt','gPDec']){ const r = makeRow(VGP[k], k, V, {idp:'vg'}); ps.append(r.r); vgRows.push(r); }
+  const fs = vsec('Voice low-pass');
+  for (const k of ['gLpCut','gLpRes','gLpEnv','gFAtk','gFDec']){ const r = makeRow(VGP[k], k, V, {idp:'vg'}); fs.append(r.r); vgRows.push(r); }
+  const as = vsec('Voice amp');
+  const onR = el('div', 'segrow'); onR.append(el('span', null, 'Envelope')); const onG = el('div', 'seg'); onR.append(onG); as.append(onR);
+  vAmpOnUpd = makeSeg(onG, [[false,'Off'],[true,'On']], () => !!V().gAmpOn, x => { V().gAmpOn = x; refreshVoiceGlobals(); changed(); });
+  const shR = el('div', 'segrow'); shR.append(el('span', null, 'Shape')); const shG = el('div', 'seg'); shR.append(shG); as.append(shR);
+  vAmpModeUpd = makeSeg(shG, [['AHD','A·H·D'],['ADSR','ADSR']], () => V().gMode, x => { V().gMode = x; refreshVoiceGlobals(); changed(); });
+  { const r = makeRow(VGP.gAmpAmt, 'gAmpAmt', V, {idp:'vg'}); as.append(r.r); vgRows.push(r); }
+  for (const [k, def] of [['gAtk',P.atk],['gHold',P.hold],['gDec',P.dec],['gSus',P.sus],['gRel',P.rel]]){
+    const r = makeRow(def, k, V, {idp:'vg'}); as.append(r.r); vgRows.push(r); vAmpRows[k] = r; }
+})();
 
 function pitchReadout(){
   const L = Lc(), ro = $('pitchRO');
@@ -1929,6 +2084,7 @@ function refreshAll(){
   $('vNum').textContent = (isSyn(cur) ? 'Synth ' : 'Pad ') + hx(cur);
   $('vName').value = V().name; $('kitName').value = kit.name;
   vRows.forEach(r => r.refresh()); updChoke();
+  refreshVoiceGlobals();
   refreshLayer(); renderPads(); renderFx();
   ensure(cur); drawWave();
   try { ccBadges(); } catch(e){}   // sliders may have been rebuilt (another layer type or effect)
@@ -2917,6 +3073,11 @@ function tfxNode(ac, chain){
 
 /* ---------- song data ---------- */
 const freshSect = () => Array.from({length:16}, () => [-1, 0]);
+// A sect holds 16 rows of [phrase, transpose]. A chain that is missing, or shorter than that (an empty
+// or hand-made pattern), is read as blank instead of throwing. sectRow reads; sectRowEdit also pads the
+// chain out to 16 rows so an edit always has somewhere to go.
+const sectRow = (cid, y) => { const c = cid >= 0 ? S.chains[cid] : null; return c && c[y] ? c[y] : null; };
+function sectRowEdit(cid, y){ let c = S.chains[cid]; if (!Array.isArray(c)) c = S.chains[cid] = freshSect(); while (c.length < 16) c.push([-1, 0]); return c[y]; }
 const PROWS = 32;   // rows stored per phrase; each phrase plays its own LEN (16 by default)
 // A phrase row: four note columns (2–4 play only on the polyphonic tracks 9–16), volume, instrument,
 // then three effect command/value pairs. Songs before v3 had one note column; normSong moves them over.
@@ -3072,8 +3233,7 @@ function freePhraseNear(src){
 function ensureSectPhrase(cid){
   if (cid < 0 || !isEmptySect(S.chains[cid])) return;
   const pid = phraseFree(cid) ? cid : freePhrase(); if (pid < 0) return toast('No free phrases left.');
-  if (!S.chains[cid]) S.chains[cid] = freshSect();
-  S.chains[cid][0][0] = pid; S.plen[pid] = S.dlen || 16; S.plpb[pid] = 0; saveS();
+  sectRowEdit(cid, 0)[0] = pid; S.plen[pid] = S.dlen || 16; S.plpb[pid] = 0; saveS();
 }
 const firstPhrase = cid => { const c = cid >= 0 ? S.chains[cid] : null, r = c ? c.find(q => q[0] >= 0) : null; return r ? r[0] : -1; };
 
@@ -3084,6 +3244,9 @@ function makeSeq(S, mode, o){
     rel:0, g:0, grv:null});
   const api = {time:0, bpm:S.bpm, tks:clamp(S.ticks || TICKS, 1, 32), grv:null, base:null};
   const lenOf = id => id >= 0 && S.plen ? clamp(S.plen[id] || 16, 1, PROWS) : 16;
+  // A numbered song cell whose sect has no phrases still plays one empty pattern; use the project's
+  // pattern length so it lasts as long as a fresh phrase would.
+  const emptyLen = () => clamp(S.dlen || 16, 1, PROWS);
   // Random numbers: Math.random until a SED command seeds them, so a seeded song plays the same every time.
   let seeded = null;
   const rand = () => { if (!seeded) return Math.random(); let x = seeded.s += 0x6D2B79F5; x = Math.imul(x ^ x >>> 15, x | 1); x ^= x + Math.imul(x ^ x >>> 7, x | 61); return ((x ^ x >>> 14) >>> 0) / 4294967296; };
@@ -3109,8 +3272,12 @@ function makeSeq(S, mode, o){
           if (T.row > 255 || S.song[T.row][t] < 0){ T.on = false; return; }
         }
       }
-      const c = S.chains[sectId(T, t)];
-      if (c && T.cr < 16 && c[T.cr][0] >= 0) return;
+      const cid = sectId(T, t), c = cid >= 0 ? S.chains[cid] : null, cRow = c ? c[T.cr] : null;
+      if (cRow && cRow[0] >= 0) return;
+      // A cell that holds a sect number is a playable step even when the sect has no phrases: hold the
+      // cell for one empty pattern (its first pass) so the playhead advances and keeps time, instead of
+      // skipping it like an unnumbered cell.
+      if (mode === 'song' && cid >= 0 && T.cr === 0) return;
       if (mode === 'sect'){
         if (loop){ T.cr = loop.y0; continue; }
         if (T.cr > 0){ T.cr = 0; continue; } T.empty = true; return;
@@ -3149,14 +3316,14 @@ function makeSeq(S, mode, o){
     let nb = api.bpm, ngrv = api.grv; const tks0 = api.tks;
     for (let t = 0; t < NT; t++){
       const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
-      const cid = mode === 'phrase' ? -1 : sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null;
-      const pid = mode === 'phrase' ? o.phrase : (!T.empty && ch ? ch[T.cr][0] : -1);
+      const cid = mode === 'phrase' ? -1 : sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null;
+      const pid = mode === 'phrase' ? o.phrase : (!T.empty && chRow ? chRow[0] : -1);
       const line = 60 / api.bpm / plpbOf(S, pid);
       // TIC on this row changes the ticks a step from here on (for every track, like TPO), and counts already for this row.
       if (r0(T, pid)){ const tc = ticCmd(r0(T, pid)); if (tc != null) api.tks = tc ? clamp(tc, 1, 32) : clamp(S.ticks || TICKS, 1, 32); }
       const tick = line / api.tks, gv = T.grv || api.grv;
       const dur = gv ? gv[T.g % 2] * tick : T.g % 2 === 0 ? 2 * line * sw : 2 * line * (1 - sw);
-      const ctsp = ch && !T.empty ? ch[T.cr][1] : 0;
+      const ctsp = !T.empty && chRow ? chRow[1] : 0;
       pos[t] = {row:T.row, cr:T.cr, step:T.step, sect:cid, phrase:pid};
       // A muted song block still runs its rows (so tempo and timing carry on) but its notes are dropped.
       const muted = mode === 'song' && blockMuted(S, T.row, t), ev0 = evs.length;
@@ -3240,7 +3407,7 @@ function makeSeq(S, mode, o){
       }
       if (muted){ evs.length = ev0; if (!T.mut) evs.push({type:'off', t:t0, track:t}); }   // entering a muted block silences what is ringing
       T.mut = muted;
-      const L = lenOf(pid);
+      const L = (mode === 'song' && pid < 0) ? emptyLen() : lenOf(pid);
       if (hop >= 0){ T.step = L; T.next = hop; } else T.step++;
       // A phrase selection loops mid-phrase: wrap as soon as the step passes the loop's last row.
       if (mode === 'phrase' && loop && T.next < 0 && (T.step > loop.y1 || T.step < loop.y0)) T.step = loop.y0;
@@ -3251,7 +3418,10 @@ function makeSeq(S, mode, o){
           if (loop && mode === 'sect' && (T.cr > loop.y1 || T.cr < loop.y0)) T.cr = loop.y0;
           settle(T, t); }
       }
-      { const np = mode === 'phrase' ? o.phrase : T.on && !T.empty ? ((S.chains[sectId(T, t)] || [])[T.cr] || [-1])[0] : -1; if (T.step >= lenOf(np)) T.step = 0; }
+      // The row just moved to: an empty numbered song cell counts as an empty pattern, so its steps
+      // run to emptyLen() rather than the plain default.
+      { const np = mode === 'phrase' ? o.phrase : T.on && !T.empty ? ((S.chains[sectId(T, t)] || [])[T.cr] || [-1])[0] : -1;
+        if (T.step >= ((mode === 'song' && np < 0) ? emptyLen() : lenOf(np))) T.step = 0; }
       T.rel += dur; T.g++;
     }
     // TPO or TIC on this row: tell the player, so tempo-synced …chains modules follow (live and in renders).
@@ -3477,7 +3647,9 @@ function tStart(mode, o){
   void r;
 }
 // The SONG button in the synth's top bar: play the song from the tracker's cursor row, or stop it.
-function songBtn(){ const b = $('tSong'); if (!b) return; b.hidden = false; b.textContent = tp.on ? '■ Stop' : '▶ Song'; b.classList.toggle('on', tp.on);
+// The label (Song / Stop) is switched by the .on class in CSS, so the button's size and position never
+// change with the transport state.
+function songBtn(){ const b = $('tSong'); if (!b) return; b.hidden = false; b.classList.toggle('on', tp.on);
 }
 function pump(){
   if (!tp.on) return;
@@ -3776,12 +3948,12 @@ const pCols = () => polyView() ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 4,
 const kindAt = (v, x) => v === 'song' ? 'sect' : v === 'sect' ? (x ? 'tsp' : 'phrase') : PK[x];
 function getCell(v, x, y){
   if (v === 'song') return S.song[y][x];
-  if (v === 'sect'){ const c = S.chains[cSect]; return c ? c[y][x] : (x ? 0 : -1); }
+  if (v === 'sect'){ const r = sectRow(cSect, y); return r ? r[x] : (x ? 0 : -1); }
   const p = S.phrases[cPhrase]; return p ? p[y][x] : -1;
 }
 function setCell(v, x, y, val){
   if (v === 'song'){ S.song[y][x] = val; if (val < 0) S.smute[y] &= ~(1 << x); }
-  else if (v === 'sect'){ if (!S.chains[cSect]) S.chains[cSect] = freshSect(); S.chains[cSect][y][x] = val; }
+  else if (v === 'sect'){ sectRowEdit(cSect, y)[x] = val; }
   else { if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase(); S.phrases[cPhrase][y][x] = val; }
   saveS();
 }
@@ -4181,7 +4353,7 @@ function del(){
 // Whole rows: clear a row, insert a blank one (rows below move down), or remove one (rows below move up).
 function rowBlank(v){ return v === 'sect' ? [-1, 0] : blankRow(); }
 function rowsArr(v){
-  if (v === 'sect'){ if (!S.chains[cSect]) S.chains[cSect] = freshSect(); return S.chains[cSect]; }
+  if (v === 'sect'){ sectRowEdit(cSect, 0); return S.chains[cSect]; }
   if (v === 'phrase'){ if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase(); return S.phrases[cPhrase]; }
   return null;
 }
@@ -4383,7 +4555,7 @@ function go(v){
   if (v === 'sect'){ const id = S.song[cs.song.y][cs.song.x]; if (tv === 'song' && id >= 0){ cSect = id; cTrack = cs.song.x; } }
   if (v === 'phrase' && tv === 'song'){ const cid = S.song[cs.song.y][cs.song.x];
     if (cid >= 0){ cSect = cid; cTrack = cs.song.x; const ch = S.chains[cid]; const r = ch ? ch.findIndex(q => q[0] >= 0) : -1; if (r >= 0){ cs.sect.y = r; cPhrase = ch[r][0]; } } }
-  if (v === 'phrase' && tv === 'sect'){ const ch = S.chains[cSect], id = ch ? ch[cs.sect.y][0] : -1; if (id >= 0) cPhrase = id; }
+  if (v === 'phrase' && tv === 'sect'){ const r = sectRow(cSect, cs.sect.y); if (r && r[0] >= 0) cPhrase = r[0]; }
   if (v === 'inst' && tv === 'phrase'){ const p = S.phrases[cPhrase], r = p && p[cs.phrase.y]; if (r && r[IC] >= 0) cInst = r[IC]; }
   if (v === 'fx' && tv === 'mixer') cFxT = cs.mixer.y === 6 ? NT : cs.mixer.x;
   // Mixer and FX open on the track being edited (the song cursor's track, or the sect/phrase's track).
@@ -4406,7 +4578,7 @@ function nav(dir){
   // On an empty cell, still change screen: show the sect or phrase that was last open.
   if (tv === 'song' && !sectsOn){ cTrack = cs.song.x; const e = S.song[cs.song.y][cs.song.x] < 0; go('phrase'); return e ? toast(`Empty block: showing phrase ${hx(cPhrase)}, the last one open. EDIT×2 makes a new one.`) : null; }
   if (tv === 'song'){ if (S.song[cs.song.y][cs.song.x] < 0){ cTrack = cs.song.x; go('sect'); return toast(`Empty row: showing sect ${hx(cSect)}, the last one open.`); } return go('sect'); }
-  if (tv === 'sect'){ const ch = S.chains[cSect]; if (!ch || ch[cs.sect.y][0] < 0){ go('phrase'); return toast(`No phrase on that row: showing phrase ${hx(cPhrase)}, the last one open.`); } return go('phrase'); }
+  if (tv === 'sect'){ const r = sectRow(cSect, cs.sect.y); if (!r || r[0] < 0){ go('phrase'); return toast(`No phrase on that row: showing phrase ${hx(cPhrase)}, the last one open.`); } return go('phrase'); }
   if (tv === 'phrase'){ const p = S.phrases[cPhrase], r = p && p[cs.phrase.y]; cInst = r && r[IC] >= 0 ? r[IC] : last.inst; tv = 'inst'; midV = 'inst'; draw(); }
 }
 // PREV / NEXT on the song: the cursor jumps to the previous or next block (pattern) in its track.
@@ -4599,7 +4771,7 @@ function info(){
   if (tv === 'song'){ const v = S.song[c.y][c.x], mu = blockMuted(S, c.y, c.x) ? ' · MUTED' : '';
     if (!sectsOn) return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty · EDIT×2 new phrase' : isEmptySect(S.chains[v]) ? `block ${hx(v)} · no phrase yet (SHIFT+▶ makes one)` : `phrase ${hx(firstPhrase(v))}` + (isEmptyPhrase(S.phrases[firstPhrase(v)]) ? ' (empty)' : '') + (firstPhrase(v) !== v ? ` · block ${hx(v)}` : '')) + mu;
     return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty' : `sect ${hx(v)}` + (isEmptySect(S.chains[v]) ? ' (empty)' : '')) + mu; }
-  if (tv === 'sect'){ const ch = S.chains[cSect], r = ch ? ch[c.y] : [-1, 0];
+  if (tv === 'sect'){ const r = sectRow(cSect, c.y) || [-1, 0];
     return c.x === 0 ? (r[0] < 0 ? 'No phrase. The sect ends at the first empty row.' : `Phrase ${hx(r[0])}` + (isEmptyPhrase(S.phrases[r[0]]) ? ' (empty)' : '')) : `Transpose ${sgn(r[1])} semitones for this row`; }
   if (onPset()){ const len = plen(cPhrase), lpb = S.plpb[cPhrase] || 0, e2 = lpb || S.lpb;
     return c.x === 0 ? `Phrase length: plays ${len} row${len > 1 ? 's' : ''} (1–32), then the sect moves on`
@@ -4670,13 +4842,24 @@ function groupBoxes(){
   }
 }
 let gridHTML = '', psetHTML = '';
+// The one playhead the whole tracker reads: Song and Arrange both take their lit rows from here, so
+// their indicators can never drift apart. Positions live in tp.pos (filled by frame() as the song
+// plays). Song mode only: in phrase and sect playback the row fields are placeholders, so nothing is
+// lit — the same gate both views used to apply on their own. Returns an NT-length array of song rows
+// (-1 where a track is silent) shared by both, or null when nothing should be lit.
+function playhead(){
+  if (!tp.on || tp.mode !== 'song' || !tp.pos) return null;
+  const rows = new Array(NT).fill(-1);
+  for (let t = 0; t < NT; t++){ const p = tp.pos[t]; if (p && p.row >= 0) rows[t] = p.row; }
+  return rows;
+}
 function draw(){
   if (view !== 'tracker') return;
   if (selA && selA.v !== tv) selA = null;
   scr.dataset.v = tv; grid.classList.toggle('grp', tv === 'song' || tv === 'mixer');   // room above the grid for the MONO / POLY labels
   const c = cs[tv], dm = dims(tv);
   if (onPset()) c.x = clamp(c.x, 0, 1); else { c.x = clamp(c.x, 0, dm.w - 1); c.y = clamp(c.y, 0, dm.h - 1); }
-  const P = tp.on ? tp.pos : null, L = [];
+  const P = tp.on ? tp.pos : null, PH = playhead(), L = [];
   let title = VNAME[tv], sub = '', pset = null;
   const sr = selA ? selRect() : null;
   const rsel = y => sr && selA.line && y >= sr.y0 && y <= sr.y1 ? ' sel' : '';
@@ -4690,7 +4873,7 @@ function draw(){
     const hd = [stepDec ? '    ' : '   ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t) + tk(t) + ' gt', x:t, y:-1}, ' '); L.push(hd);
     for (let y = c.top; y < c.top + VR; y++){
       const ln = [{t:rS(y, 3), cls:'rn' + (y % 4 ? '' : ' rn4') + rsel(y), r:y}, ' '];
-      for (let t = T0; t < T1; t++){ const v = S.song[y][t], pl = P && tp.mode === 'song' && P[t] && P[t].row === y;
+      for (let t = T0; t < T1; t++){ const v = S.song[y][t], pl = PH && PH[t] === y;
         ln.push({t:h2(v), cls:cc(t, y, (v < 0 ? 'e' : 'v') + (pl ? ' pl' : '') + (v >= 0 && blockMuted(S, y, t) ? ' sm' : '')) + tk(t) + (y === c.top + VR - 1 ? ' gb' : ''), x:t, y}, ' '); }
       L.push(ln);
     }
@@ -4698,7 +4881,7 @@ function draw(){
     title = 'SECT ' + hx(cSect); sub = 'TRACK ' + d2(cTrack + 1);
     const ch = S.chains[cSect], pr = playRows(p => tp.mode !== 'phrase' && p.sect === cSect ? p.cr : null);
     L.push([stepDec ? '   ' : '  ', {t:'PH', cls:'th'}, ' ', {t:'TP', cls:'th'}]);
-    for (let y = 0; y < 16; y++){ const r = ch ? ch[y] : [-1, 0];
+    for (let y = 0; y < 16; y++){ const r = sectRow(cSect, y) || [-1, 0];
       L.push([{t:stepDec ? d2(y) : hx(y, 1), cls:'rn' + (y % 4 ? '' : ' rn4') + (pr.has(y) ? ' pl' : '') + rsel(y), r:y}, ' ', {t:h2(r[0]), cls:cc(0, y, r[0] < 0 ? 'e' : 'v'), x:0, y}, ' ', {t:hx(r[1]), cls:cc(1, y, r[1] ? 'v' : 'e'), x:1, y}]); }
   } else if (tv === 'phrase'){
     title = 'PHRASE ' + hx(cPhrase); sub = 'TRACK ' + d2(cTrack + 1) + (polyView() ? ' · POLY' : ' · MONO');
@@ -4792,7 +4975,7 @@ function draw(){
   if (tv === 'phrase' && inMode !== 'keys' && !patNavOn) hintTxt = hintTxt.replace('OPT+▲▼ pattern', 'OPT+▲▼ page');
   if (tv === 'fx' && cs.fx.y > FXSLOTS) hintTxt = 'Slot ' + (cFxS + 1) + ' controls · ▲▼ pick one · ' + (inMode === 'keys' ? '← or Esc back to the slots' : '◀ back to the slots');
   $('tHint').textContent = (tv === 'phrase' ? 'NOW ' + curS() + (inMode === 'keys' ? ' · oct ' + kOct + ' · step ' + kStep : '') + ' · ' : '') + hintTxt;
-  drawArr(P);
+  drawArr(PH);
   const km = inMode === 'keys'; $('tKp').hidden = !km; $('tPad').hidden = km; $('tLegKeys').hidden = !km; $('tLegPad').hidden = km;
   drawPat();
   $('tOct').hidden = !km; $('tOctN').textContent = kOct;
@@ -4889,7 +5072,7 @@ const arrGripUp = e => {
   arrLayout(true);
 };
 $('tArrH').addEventListener('pointerup', arrGripUp); $('tArrH').addEventListener('pointercancel', arrGripUp);
-function drawArr(P){
+function drawArr(PH){
   if (!arrShown()) return;
   arrEl.classList.toggle('dk', tScreen === 'dark');
   // Blocks grow with the panel: row height follows the column width (16–40px).
@@ -4899,8 +5082,7 @@ function drawArr(P){
     arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', clamp(Math.round(rh * 0.5), 8, 16) + 'px'); }
   let lastR = -1; for (let y = 255; y >= 0; y--) if (S.song[y].some(v => v >= 0)){ lastR = y; break; }
   const N = clamp(Math.max(lastR + 2, 16, cs.song.y + 1, (cs.song.top || 0) + 40), 1, 256);   // room to line up with the Song screen's top row
-  const play = new Array(NT).fill(-1);
-  if (P && tp.mode === 'song') P.forEach((p, t) => { if (p) play[t] = p.row; });
+  const play = PH || new Array(NT).fill(-1);   // the shared playhead, so Arrange lights the same rows as Song
   const anySolo = S.mix.some(m => m.solo);
   let h = '';
   for (let y = 0; y < N; y++){
@@ -5160,7 +5342,7 @@ const dragEnd = e => {
   if (d.edit && !d.moved && e.type === 'pointerup'){
     const c = cs[tv];
     if (tv === 'song' && S.song[c.y][c.x] >= 0) return nav('right');
-    if (tv === 'sect' && c.x === 0 && S.chains[cSect] && S.chains[cSect][c.y][0] >= 0) return nav('right');
+    if (tv === 'sect' && c.x === 0){ const r = sectRow(cSect, c.y); if (r && r[0] >= 0) return nav('right'); }
     editTap();
   }
 };
