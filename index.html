@@ -1077,6 +1077,7 @@ const TYPES = [
   {id:'saw',     name:'Saw',          fam:'std',   a:'Sync',    b:'Phase',  fa:v=>(1+v*7).toFixed(2)+'×', fb:v=>Math.round(v*360)+'°'},
   {id:'square',  name:'Square',       fam:'std',   a:'Sync',    b:'Phase',  fa:v=>(1+v*7).toFixed(2)+'×', fb:v=>Math.round(v*360)+'°'},
   {id:'pulse',   name:'Pulse',        fam:'std',   a:'Width',   b:'Phase',  fa:v=>Math.round((0.5-v*0.47)*100)+'%', fb:v=>Math.round(v*360)+'°'},
+  {id:'wavetable',name:'Wavetable',   fam:'std',   a:'Position',b:'Formant',fa:pct, fb:v=>(v>0?'+':'')+Math.round(v*100)+'%'},
   {id:'click',   name:'Click',        fam:'std',   a:'Width',   b:'Shape',  fa:v=>(0.05+v*v*5).toFixed(2)+' ms', fb:v=>v<0.5?'Single':'Double'},
   {id:'fm2',     name:'FM 2-op',      fam:'fm',    a:'Ratio',   b:'Index',  fa:v=>fmRatio(v)+'×', fb:v=>(v*v*12).toFixed(1)},
   {id:'fmfb',    name:'FM feedback',  fam:'fm',    a:'Feedback',b:'Env→FB', fa:pct, fb:pct},
@@ -1229,7 +1230,44 @@ function addOsc(rs, amps, damps){
   };
 }
 const nop = () => {};
-
+/* Wavetable oscillator (original DSP): morphs across four band-limited spectra (sine → triangle → saw →
+   square), with a formant tilt, a phase Bend, up to 8 detuned unison voices, a sub and noise. The single
+   cycle is rebuilt only when the pitch rises past the harmonic limit already built, so it never aliases. */
+function wavetableOsc(L, sr, A, B, R){
+  const TN = 1024, tab = new Float32Array(TN + 1);
+  const uni = Math.max(1, Math.min(8, Math.round(L.wtUni || 1))), spread = L.wtSpread || 0, sub = L.wtSub || 0, noise = L.wtNoise || 0, bend = L.wtBend || 0;
+  const phases = new Float64Array(uni), dets = new Float64Array(uni);
+  for (let v = 0; v < uni; v++){ const o = uni === 1 ? 0 : (v / (uni - 1)) * 2 - 1; dets[v] = Math.pow(2, o * spread * 0.5 / 12); phases[v] = R(); }
+  let builtH = -1, subPh = 0;
+  function build(hmax){
+    const W = [0, 0, 0, 0], seg = Math.max(0, Math.min(1, A)) * 3, i0 = Math.min(2, seg | 0), tf = seg - i0;
+    W[i0] += 1 - tf; W[Math.min(3, i0 + 1)] += tf;
+    for (let i = 0; i <= TN; i++){ const p = i / TN; let y = 0;
+      for (let k = 1; k <= hmax; k++){
+        const odd = k & 1, sine = k === 1 ? 1 : 0, tri = odd ? 1 / (k * k) : 0, saw = 1 / k, sq = odd ? 1 / k : 0;
+        y += (W[0] * sine + W[1] * tri + W[2] * saw + W[3] * sq) * Math.pow(k, -B * 1.5) * Math.sin(2 * Math.PI * k * p);
+      }
+      tab[i] = y;
+    }
+    let pk = 0; for (let i = 0; i < TN; i++) pk = Math.max(pk, Math.abs(tab[i])); if (pk > 0) for (let i = 0; i <= TN; i++) tab[i] /= pk;
+    builtH = hmax;
+  }
+  const warp = p => !bend ? p : (bend > 0 ? Math.pow(p, 1 + bend * 3) : 1 - Math.pow(1 - p, 1 - bend * 3));
+  return {
+    blk(t, env, inc){
+      const f = Math.max(inc * sr, 1), h = Math.max(1, Math.min(64, Math.floor(sr * 0.5 / f) - 1));
+      if (builtH < 0 || h < builtH) build(h);
+    },
+    s(inc){
+      let y = 0;
+      for (let v = 0; v < uni; v++){ const x = warp(phases[v]) * TN, i = x | 0, fr = x - i; y += tab[i] + (tab[i + 1] - tab[i]) * fr; phases[v] += inc * dets[v]; if (phases[v] >= 1) phases[v] -= Math.floor(phases[v]); }
+      y /= uni;
+      if (sub > 0){ y += sub * sinT(subPh); subPh += inc * 0.5; }
+      if (noise > 0) y += noise * (R() * 2 - 1);
+      return y;
+    }
+  };
+}
 function makeOsc(L, sr, pre){
   const A = L.a, B = L.b, R = rng(L.seed || 7);
   switch (L.type){
@@ -1246,6 +1284,7 @@ function makeOsc(L, sr, pre){
       return {blk:nop, s(inc){ const dt = Math.min(inc, 0.5);
         const y = (ph < w ? 1 : -1) + blep(ph, dt) - blep(frac(ph + 1 - w), dt) - (2*w - 1);
         ph += inc; if (ph >= 1) ph -= Math.floor(ph); return y * 0.8; }}; }
+    case 'wavetable': return wavetableOsc(L, sr, A, B, R);
     case 'click': { const W = Math.max(1, (0.05 + A*A*5) / 1000 * sr), dbl = B >= 0.5; let n = 0;
       return {blk:nop, s(){ if (n >= W) return 0; const y = dbl ? sinT(n / W) : sinT(0.5 * n / W); n++; return y; }}; }
     case 'fm2': { const ratio = fmRatio(A), I0 = B*B*12; let p = 0, I = 0;
@@ -1566,6 +1605,7 @@ function freshLayer(o){
     lpCut:20000, lpRes:0, lpEnv:0, hpCut:20, hpRes:0, hpEnv:0, fAtk:0.5, fDec:200,
     delay:0, burst:0, spacing:10,
     pEng:8, pHarm:0.5, pTim:0.5, pMor:0.5, pDecay:0.5, pLpg:0.5, pFm:0, pTimEnv:0, pMorEnv:0, pStrike:true, pAux:false,
+    wtBend:0, wtUni:1, wtSpread:0.3, wtSub:0, wtNoise:0,
     eModel:0, eStrength:0.8, eContour:0, eBow:0, eBlow:0, eStrike:0.8, eBowT:0.5, eFlow:0.5, eBlowT:0.5, eMallet:0.5, eStrikeT:0.5,
     eGeo:0.3, eBright:0.5, eDamp:0.6, ePos:0.3, eSpace:0.3,
     seed:(_seed = (_seed * 1103515245 + 12345) >>> 0) || 1, sample:null}, o || {});
@@ -1680,6 +1720,11 @@ const P = {
   pTimEnv:{l:'Env→Timb', min:-1, max:1, c:'lin', d:0, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'},
   pMorEnv:{l:'Env→Morph', min:-1, max:1, c:'lin', d:0, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'},
   pFm:{l:'Env→Pitch', min:-1, max:1, c:'lin', d:0, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'},
+  wtBend:{l:'Bend', min:-1, max:1, c:'lin', d:0, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'},
+  wtUni:{l:'Unison', min:1, max:8, c:'int', d:1, f:v => Math.round(v) + '×'},
+  wtSpread:{l:'Spread', min:0, max:1, c:'lin', d:0.3, f:pct},
+  wtSub:{l:'Sub', min:0, max:1, c:'lin', d:0, f:pct},
+  wtNoise:{l:'Noise', min:0, max:1, c:'lin', d:0, f:pct},
   eContour:{l:'Contour', min:0, max:1, c:'lin', d:0, f:pct},
   eBow:{l:'Bow', min:0, max:1, c:'lin', d:0, f:pct}, eBowT:{l:'Bow timbre', min:0, max:1, c:'lin', d:0.5, f:pct},
   eBlow:{l:'Blow', min:0, max:1, c:'lin', d:0, f:pct}, eFlow:{l:'Flow', min:0, max:1, c:'lin', d:0.5, f:pct}, eBlowT:{l:'Blow timbre', min:0, max:1, c:'lin', d:0.5, f:pct},
@@ -1994,6 +2039,8 @@ const plRows = section('Plaits', ['pHarm','pTim','pMor','pDecay','pLpg','pTimEnv
   const st = el('div', 'readout'); st.id = 'plStat'; st.style.paddingLeft = '0'; s.append(st);
 });
 const plSec = secs.lastChild;
+const wtRows = section('Wavetable', ['wtBend','wtUni','wtSpread','wtSub','wtNoise']);
+const wtSec = secs.lastChild;
 section('…waves', [], s => {
   const br = el('div', 'selrow'); br.append(el('span', null, 'Output'));
   const bs = document.createElement('select'); bs.id = 'wvBus'; bs.setAttribute('aria-label', '…waves output');
@@ -2083,6 +2130,7 @@ function refreshLayer(){
   const isEl = L.type === 'elements';
   const isWv = L.type === 'waves';
   plSec.hidden = !isPl; elExSec.hidden = elResSec.hidden = !isEl; srcRows.a.r.hidden = srcRows.b.r.hidden = isPl || isEl || isWv;
+  wtSec.hidden = L.type !== 'wavetable';
   wvSec.hidden = !isWv;
   if (isWv){ $('wvBus').value = String(L.wBus || 1); $('wvStat').textContent = wvStatus(); }
   if (isEl) elModelUpd();

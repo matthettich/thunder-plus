@@ -23,6 +23,7 @@ An 8-pad drum synth and 16-track tracker for the browser, built for a Galaxy Z F
 - **8 pads, 8 layers each.** Every layer has its own oscillator, pitch envelope, amp envelope (A·H·D or ADSR), low-pass and high-pass filters with an envelope, delay and clap-style bursts. On top of the layers, each voice also has a voice-wide pitch envelope, a low-pass filter with its own envelope, and an amp envelope (A·H·D or ADSR), each with an Amount slider — they shape all of that voice's layers together from the Voice pitch, filter & amp card on the synth page.
 - **Oscillators**
   - Standard: sine, triangle, saw, square, pulse, click
+  - Wavetable: a morphing oscillator — Position blends sine → triangle → saw → square, Formant tilts the spectrum, Bend warps the cycle, plus up to 8-voice unison with spread, a sub and noise. All generated in-app (no bundled wave files)
   - FM: 2-op, feedback, metal, cross-mod, plus a standardized family sharing the same core controls — Algorithm and Feedback: 4-op, 6-op, Genesis (a 4-op YM2612-style chip with its 9-bit DAC), Sound Blaster (a 4-op OPL-style chip with half-sine operators) and an arcade 4-op
   - Additive: harmonic, odd, membrane, bell, bar, chord
   - Noise: white, pink, brown, blue, 808 metal, digital LFSR, crackle, sample-and-hold
