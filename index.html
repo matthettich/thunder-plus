@@ -967,7 +967,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 <p><b>Arrange</b> (wide screens): the blue overview at the right shows the whole song, lined up with the Song screen (scroll either one and the other follows). <b>A tap on a block goes to it</b> (a second tap opens its phrase). <b>Holding a block mutes or unmutes just that one</b> — the phrase stays in place, silent, so you can drop parts in and out while arranging. Tap a row number to play from there; in KEYS mode M mutes the block under the Song cursor. Whole tracks are muted in the Mixer, never here, so a slip can’t silence a track.</p>
 <p>The screens are laid out as a map: Song ▶ Sect ▶ Phrase ▶ Inst left to right, Project above, Mixer below, FX to the right of the Mixer. You move between them with the screen keys below, the tabs, or the map in the side panel.</p>
 <h3>Settings</h3>
-<p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex) and change the <b>Text size</b> of the tracker screen. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
+<p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), and change the <b>Text size</b> of the tracker screen. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots. <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song. <b>A voice per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chords and polyphony</h3>
@@ -4287,6 +4287,11 @@ function setFollow(on){ followOn = on; try { localStorage.setItem(FLK, on ? '1' 
 const PNK = 'thunderplus-patnav-v1';
 let patNavOn = (() => { try { const v = localStorage.getItem(PNK); if (v === '0' || v === '1') return v === '1'; } catch(e){} return true; })();
 function setPatNav(on){ patNavOn = on; try { localStorage.setItem(PNK, on ? '1' : '0'); } catch(e){} draw(); }
+// Play note on entry: typing a note into the phrase editor auditions the instrument right away. On by
+// default; off makes note entry silent (nothing else changes).
+const POK = 'thunderplus-pnoe-v1';
+let pnoeOn = (() => { try { const v = localStorage.getItem(POK); if (v === '0' || v === '1') return v === '1'; } catch(e){} return true; })();
+function setPnoe(on){ pnoeOn = !!on; try { localStorage.setItem(POK, pnoeOn ? '1' : '0'); } catch(e){} }
 // Song: the cursor's row follows its track. Sect and Phrase: they switch to what the cursor's track is
 // playing and the cursor rides along. Not while a selection is being made.
 function followPlay(){
@@ -4436,6 +4441,8 @@ function projRows(){
     {l:'EDIT STEP', get:() => kStep, set:v => kStep = v, min:0, max:16, big:4, fmt:v => v + (v === 1 ? ' row' : ' rows'), info:() => 'How far the cursor moves after you type a note or value or delete a row (the edit step). Keyboard: { and }'},
     {l:'PATTERN NAV', ck:'Option + ▲▼ steps patterns', get:() => patNavOn ? 1 : 0, set:v => setPatNav(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Pads: in the phrase editor, hold OPTION and press ▲ or ▼ to open the previous or next pattern, one at a time. OFF jumps 16 patterns, as before. KEYS mode is not affected (it uses Ctrl/⌘+▲▼)'},
+    {l:'PLAY NOTE ON ENTRY', ck:'Play note on entry', get:() => pnoeOn ? 1 : 0, set:v => setPnoe(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'Typing a note into the phrase editor plays that instrument’s sound on the spot, so you hear what you enter. Off makes note entry silent'},
     {l:'SCREEN', sec:'Screen', gap:true, opts:true, get:() => SCREENS.findIndex(x => x[0] === tScreen), set:v => setScreen(SCREENS[v][0]), min:0, max:SCREENS.length - 1, fmt:v => SCREENS[v][1], info:() => 'Colour of the screen: BY SCREEN gives Song, Sect, Phrase and the rest their own pastel (the same as their tabs), or pick one pastel, or black'},
     {l:'SKIN', opts:true, get:() => SKINS.findIndex(k => k.id === skin), set:v => applySkin(SKINS[v].id), min:0, max:SKINS.length - 1, fmt:v => SKINS[v].name.toUpperCase(), info:() => 'The look of the whole app: the ...Seeds skins'},
     {l:'SECT', ck:'Hide sect page', inv:true, get:() => sectsOn ? 1 : 0, set:v => setSects(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
@@ -5850,6 +5857,8 @@ function typeNote(semi){
   const c = cs[tv]; if (tv !== 'phrase' || PK[c.x] !== 'note' || c.y < 0) return;
   const n = clamp(kOct * 12 + semi, 0, 119), x = c.x;
   setCell('phrase', x, c.y, n); const y = c.y; down1(); after('note', 'phrase', x, y, n);
+  // Play note on entry: audition the instrument that this note will play (the row's, or the current one).
+  if (pnoeOn){ const r = S.phrases[cPhrase] && S.phrases[cPhrase][y], ii = r && r[IC] >= 0 ? r[IC] : cInst; preview(ii, n, -1, false); }
 }
 function typeOff(){ const c = cs[tv]; if (tv !== 'phrase' || PK[c.x] !== 'note' || c.y < 0) return; const x = c.x; setCell('phrase', x, c.y, OFF); const y = c.y; down1(); after('note', 'phrase', x, y, OFF); }
 function typeHex(d){
