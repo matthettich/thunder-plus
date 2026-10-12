@@ -59,6 +59,7 @@ The top bar has two menus that work like ...Seeds': **File ▾** and **⚙ Setti
 - **Hide chains page** (on by default) hides the chain screen; see Tracker below.
 - **Display steps as decimal** (on by default) numbers the rows in decimal: song rows 000–255, phrase rows 00–31, chain rows 00–15, the arrange overview too. Off shows hex. Phrase, chain and instrument numbers and values stay hex.
 - **Play note on entry** (on by default) auditions the instrument as you type a note into the phrase editor, so you hear what you enter. Off makes note entry silent.
+- **Show on-screen keypad** (on by default) shows the KEYS-mode keypad at the bottom for tapping in notes. Off hides it; the computer keyboard still types, and the octave (OCT, top bar) stays. PAD mode is unchanged.
 - **View neighboring phrases** (off by default): on the Phrase screen, a faint, read-only copy of the notes the tracks either side play at the same song row, the left track's in violet before the note column and the right track's in mustard after it, so you can see the parts around the one you're editing.
 - **Follow playhead** (off by default) scrolls Song and Phrase with the playhead while the song plays; the cursor rides along and Phrase switches to whatever the cursor's track is playing.
 - **Show side panel** (on by default): the grey column at the right on wide screens. Turn it off for more room.
