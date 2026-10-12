@@ -4007,21 +4007,32 @@ function rtFx(t){
 function rtAllFx(){ for (let t = 0; t <= NT; t++) rtFx(t); }
 function fxChanged(t){ saveS(); rtFx(t); }
 function chainsFeedChanged(t){ saveS(); rtFx(t); draw(); }
-// Turning a track's CHN on points the patch's single Track In / Chain Out at that track, so the audio that
-// feeds chains is the same track the chain reads and returns (the mismatch that made track 9 do nothing).
-function alignPatchTrack(N){
-  const P = S.chainPatch; if (!P || !Array.isArray(P.modules)) return false;
-  const ins = P.modules.filter(m => m && m.type === 'trackIn');
-  if (ins.length !== 1) return false;
-  let changed = false;
-  if ((ins[0].params.track | 0) !== N){ ins[0].params.track = N; changed = true; }
-  for (const m of P.modules) if (m && m.type === 'chainOut' && (m.params.track | 0) !== N){ m.params.track = N; changed = true; }
-  return changed;
+// Each enabled track gets its own Track In + Chain Out pair, wired straight through, so every track keeps
+// its own chain and toggling one never disturbs another. The pair is placed below everything already in
+// the patch (so it never overlaps); the chains editor reloads to show it when next opened.
+function ensureChainPair(t){
+  const P = S.chainPatch;
+  if (!P || P.format !== 'chains.patch' || !Array.isArray(P.modules)) return false;
+  const N = t + 1;
+  if (P.modules.some(m => m && m.type === 'chainOut' && (m.params.track | 0) === N)) return false;
+  let maxY = 0; for (const m of P.modules) if (m && m.pos) maxY = Math.max(maxY, m.pos[1] | 0);
+  const idx = P.modules.filter(m => m && m.type === 'trackIn').length;
+  const tag = Date.now().toString(36) + Math.floor(Math.random() * 1e5).toString(36);
+  const idIn = 'tin' + tag, idOut = 'tou' + tag, y = Math.round(maxY + 220 + idx * 160);
+  P.modules.push({ id:idIn,  type:'trackIn',  scope:'mono', pos:[24, y],       collapsed:false, params:{ track:N } });
+  P.modules.push({ id:idOut, type:'chainOut', scope:'mono', pos:[354, y], collapsed:false, params:{ track:N, level:1 } });
+  P.cables = P.cables || [];
+  P.cables.push({ from:[idIn, 'out'],  to:[idOut, 'in'],  bend:0 });
+  P.cables.push({ from:[idIn, 'outR'], to:[idOut, 'inR'], bend:0 });
+  CH.doc = P;
+  return true;
 }
 function setChainOn(t, on){
   const was = !!S.chainOn[t]; S.chainOn[t] = !!on;
-  if (on && !was && alignPatchTrack(t + 1)){ saveS(); chainsPush(); }
-  chainsFeedChanged(t);
+  const added = on && !was && ensureChainPair(t);
+  saveS();
+  if (added && CH.frame) chainsDropFrame();   // the editor reloads with the new pair when it next opens
+  chainsPush(); draw();
 }
 // Re-route every track that runs through …chains now, AND every track that did until this change (its Chain Out
 // was deleted or set to another track): without that, the old track kept a chains node with no way out and went silent.
