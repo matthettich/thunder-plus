@@ -985,7 +985,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 <p>Each track and the master have 4 effect slots (FX screen, or the Mixer’s FX row): EQ, compressor, reverb, tape delay, saturation, tape, chorus, bitcrush, Rings and Clouds. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to four, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
 <p><b>…chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback.</p></section>
-    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level.</p><p><b>Kit ▾</b> saves and loads kits, <b>Export ▾</b> writes WAVs for Koala and SunVox, <b>MIDI ▾</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off), <b>Skin ▾</b> changes the look.</p><h2>Files and rendering</h2><p><b>Project</b> holds SAVE, SAVE AS and LOAD PROJECT, plus RENDER SONG (a stereo WAV) and RENDER STEMS (a zip with the mix and one WAV per track). In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/Thunder-#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
+    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Kit ▾</b> saves and loads kits, <b>Export ▾</b> writes WAVs for Koala and SunVox, <b>MIDI ▾</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off), <b>Skin ▾</b> changes the look.</p><h2>Files and rendering</h2><p><b>Project</b> holds SAVE, SAVE AS and LOAD PROJECT, plus RENDER SONG (a stereo WAV) and RENDER STEMS (a zip with the mix and one WAV per track). In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/Thunder-#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -1654,6 +1654,7 @@ function mkVoice(name, layers, o){
     gPAmt:0, gPDec:60,
     gLpCut:20000, gLpRes:0, gLpEnv:0, gFAtk:0.5, gFDec:200,
     gAmpOn:false, gMode:'ADSR', gAtk:0.5, gHold:0, gDec:300, gSus:1, gRel:1, gAmpAmt:1,
+    glide:0, legato:false, mono:false,
     // Voice modulation (see voiceMod): inert until an amount is dialled in.
     lfo1Rate:2, lfo1Shape:0, lfo1Depth:0, lfo2Rate:0.5, lfo2Shape:0, lfo2Depth:0, lfo3Rate:8, lfo3Shape:0, lfo3Depth:0,
     env1A:10, env1D:300, env1S:0.7, env1R:200, env2A:10, env2D:300, env2S:0, env2R:200, env3A:1, env3D:500, env3S:0.5, env3R:300,
@@ -1793,6 +1794,7 @@ const VGP = {
   gFAtk:{l:'VCF attack', min:0.1, max:2000, c:'log', d:0.5, f:ms},
   gFDec:{l:'VCF decay', min:1, max:6000, c:'log', d:200, f:ms},
   gAmpAmt:{l:'Amount', min:0, max:1, c:'lin', d:1, f:pct},
+  glide:{l:'Glide', min:0, max:2000, c:'log', d:0, f:v => v < 1 ? 'Off' : ms(v)},
 };
 // Voice modulation matrix params (see voiceMod). Rates/depths for 3 LFOs, ADSR for 3 envelopes, a step
 // sequencer rate/depth, and a route amount per source (1–3 LFO, 4–6 env, 7 seq). Destinations are picks.
@@ -1884,19 +1886,39 @@ function stopVoice(i){
 function playNote(i, semis, vel = 1){
   audio();
   const src = ctx.createBufferSource(), g = ctx.createGain();
-  src.buffer = buffer(i); src.playbackRate.value = Math.pow(2, semis / 12); g.gain.value = vel;
-  src.connect(g); g.connect(master); src.start(); flash(i); vuHit(i, Math.pow(2, semis / 12), vel);
+  src.buffer = buffer(i); src.playbackRate.value = noteRate(semis); g.gain.value = vel;
+  src.connect(g); g.connect(master); src.start(); flash(i); vuHit(i, noteRate(semis), vel);
+}
+// The sounding note per synth pad, for glide and legato (one per pad; poly notes just create new sources).
+const synHeld = [];
+// Playback rate for a semitone offset from C-4, including the song's microtuning (cents per pitch class).
+function noteRate(semis){
+  let cents = 0; try { const t = S.tune, pc = ((semis % 12) + 12) % 12; if (t && t[pc]) cents = t[pc]; } catch(e){}
+  return Math.pow(2, semis / 12) * Math.pow(2, cents / 1200);
 }
 // Synth slots: a held note sounds until releaseNote, which fades it over the voice's release time.
+// Glide ramps the pitch from the previous note; Mono + Legato retunes the sounding note instead of
+// retriggering, so a melody played legato slides between notes.
 function holdNote(i, semis, vel = 1){
   audio();
-  const src = ctx.createBufferSource(), g = ctx.createGain(), r = Math.pow(2, semis / 12);
-  src.buffer = buffer(i); src.playbackRate.value = r; g.gain.value = vel;
+  const kv = kit.voices[i], gl = Math.max(0, kv.glide || 0) / 1000, leg = !!kv.legato, mono = !!kv.mono, r = noteRate(semis), t = ctx.currentTime;
+  const prev = synHeld[i];
+  if (mono && leg && prev && !prev.done){
+    try { prev.src.playbackRate.cancelScheduledValues(t); prev.src.playbackRate.setValueAtTime(prev.src.playbackRate.value, t);
+      if (gl > 0) prev.src.playbackRate.linearRampToValueAtTime(r, t + gl); else prev.src.playbackRate.value = r; } catch(e){}
+    prev.rate = r; prev.vel = Math.max(prev.vel || 1, vel); return prev;
+  }
+  const src = ctx.createBufferSource(), g = ctx.createGain();
+  src.buffer = buffer(i);
+  const from = (mono && gl > 0 && prev && !prev.done) ? (prev.rate || r) : null;
+  if (from != null){ src.playbackRate.setValueAtTime(from, t); src.playbackRate.linearRampToValueAtTime(r, t + gl); } else src.playbackRate.value = r;
+  g.gain.value = vel;
   src.connect(g); g.connect(master); src.start(); flash(i); vuHit(i, r, vel);
-  return {src, g, i, done:false};
+  const h = {src, g, i, rate:r, vel, done:false}; synHeld[i] = h; return h;
 }
 function releaseNote(h, at){
   if (!h || h.done) return; h.done = true;
+  if (synHeld[h.i] === h) synHeld[h.i] = null;
   const t = Math.max(at || 0, ctx.currentTime), rel = relOf(kit.voices[h.i]);
   try { h.g.gain.cancelScheduledValues(t); h.g.gain.setValueAtTime(h.g.gain.value, t); h.g.gain.setTargetAtTime(0, t, rel / 4.6); h.src.stop(t + rel * 1.6 + 0.05); } catch(e){}
 }
@@ -2163,6 +2185,41 @@ function refreshVoiceGlobals(){
     const r = makeRow(def, k, V, {idp:'vg'}); as.append(r.r); vgRows.push(r); vAmpRows[k] = r; }
 })();
 
+/* ---------- voice play (glide / legato / mono) ---------- */
+(function buildVoicePlay(){
+  const host = $('voiceSecs'), s = el('div', 'sec'); s.append(el('h3', null, 'Voice play')); host.append(s);
+  const mr = el('div', 'segrow'); mr.append(el('span', null, 'Mode')); const mg = el('div', 'seg'); mr.append(mg); s.append(mr);
+  vmSelUpd.push(makeSeg(mg, [[0, 'Poly'], [1, 'Mono']], () => V().mono ? 1 : 0, x => { V().mono = !!x; changed(); }));
+  const lr = el('div', 'segrow'); lr.append(el('span', null, 'Legato')); const lg = el('div', 'seg'); lr.append(lg); s.append(lr);
+  vmSelUpd.push(makeSeg(lg, [[0, 'Off'], [1, 'On']], () => V().legato ? 1 : 0, x => { V().legato = !!x; changed(); }));
+  const r = makeRow(VGP.glide, 'glide', V, {idp:'vg'}); s.append(r.r); vgRows.push(r);
+  const note = el('div', 'readout', 'Glide slides the pitch from the last note. Mono + Legato retunes the sounding note instead of retriggering.'); note.style.paddingLeft = '0'; s.append(note);
+})();
+
+/* ---------- tuning (song-level microtuning: cents per pitch class) ---------- */
+const TUNE_SETS = {
+  Equal: [0,0,0,0,0,0,0,0,0,0,0,0],
+  Just: [0,11.7,3.9,15.6,-13.7,-1.9,3.9,-15.6,-11.7,1.9,-13.7,-3.9],
+  Pythagorean: [0,13.7,3.9,5.9,7.8,-1.9,1.9,-7.8,5.9,-3.9,13.7,1.9],
+  'Meantone': [0,-24,-7,-10,-14,-3,-17,-20,3,-21,-10,-7],
+};
+const tuneUI = [];
+function applyTune(name){ const t = TUNE_SETS[name]; if (!t) return; S.tune = t.slice(); refreshTune(); saveS(); changed(); }
+function refreshTune(){ if (!S.tune) S.tune = new Array(12).fill(0); for (const u of tuneUI){ const c = S.tune[u.pc] || 0; u.inp.value = String(c); u.out.textContent = (c > 0 ? '+' : '') + c.toFixed(0) + ' ct'; } }
+(function buildTuning(){
+  const host = $('voiceSecs'), s = el('div', 'sec'); s.append(el('h3', null, 'Tuning (song)')); host.append(s);
+  const pr = el('div', 'segrow'); pr.append(el('span', null, 'Preset')); const pg = document.createElement('select'); pg.setAttribute('aria-label', 'Tuning preset');
+  Object.keys(TUNE_SETS).forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; pg.append(o); });
+  pg.addEventListener('change', () => applyTune(pg.value)); pr.append(pg); s.append(pr);
+  for (let pc = 0; pc < 12; pc++){
+    const row = el('div', 'row'); row.append(el('label', null, NOTE[pc]));
+    const inp = document.createElement('input'); inp.type = 'range'; inp.min = '-100'; inp.max = '100'; inp.step = '1'; inp.setAttribute('aria-label', NOTE[pc] + ' tuning');
+    const out = el('output');
+    inp.addEventListener('input', () => { S.tune[pc] = +inp.value; out.textContent = (+inp.value > 0 ? '+' : '') + (+inp.value).toFixed(0) + ' ct'; saveS(); changed(); });
+    row.append(inp, out); s.append(row); tuneUI.push({ inp, out, pc });
+  }
+})();
+
 /* ---------- voice modulation UI ---------- */
 function modSelect(host, label, key){
   const r = el('div', 'segrow'); r.append(el('span', null, label));
@@ -2359,7 +2416,7 @@ function refreshAll(){
   $('vNum').textContent = (isSyn(cur) ? 'Synth ' : 'Pad ') + hx(cur);
   $('vName').value = V().name; $('kitName').value = kit.name;
   vRows.forEach(r => r.refresh()); updChoke();
-  refreshVoiceGlobals();
+  refreshVoiceGlobals(); refreshTune();
   refreshLayer(); renderPads(); renderFx();
   ensure(cur); drawWave();
   try { ccBadges(); } catch(e){}   // sliders may have been rebuilt (another layer type or effect)
@@ -3398,7 +3455,7 @@ function freshSong(){
     song:Array.from({length:256}, () => new Array(NT).fill(-1)), chains:new Array(256).fill(null), phrases:new Array(256).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
     tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:4, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
-    ntr:16, smute:new Array(256).fill(0)};   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
+    ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0)};   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
 }
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;
 function normSong(j){
@@ -3452,6 +3509,8 @@ function normSong(j){
 // Voice-per-track parity: one synth voice per song track. ntr caps at 24, because 24 tracks need pads
 // 8–31: exactly 32 voices.
   S.ntr = clamp(int(j.ntr, 16), 8, 24);
+  // Microtuning: cents per pitch class, clamped to ±100 (a semitone).
+  S.tune = Array.from({length:12}, (_, k) => clamp(Number.isFinite(+((j.tune || [])[k])) ? +j.tune[k] : 0, -100, 100));
   // A voice per track is a synth-page setting, not a song setting — but if the saved kit needs track pads,
   // leave the checkbox on so the kit's voices stay visible.
   try { if (localStorage.getItem(VTRK) !== '1' && j.voices && j.voices.length > 16) { vtrk = true; localStorage.setItem(VTRK, '1'); } } catch(e){}
@@ -3703,7 +3762,7 @@ function makeSeq(S, mode, o){
           const every = (fx.RET || 0) & 15, fade = (fx.RET || 0) >> 4;
           let firstRate = 0;
           notes.forEach((n, q) => {
-            const note = n + ctsp + I.tsp + T.tsp + pit + nrnd, rate = Math.pow(2, (note - ROOT) / 12);
+            const note = n + ctsp + I.tsp + T.tsp + pit + nrnd, rel = note - ROOT, npc = ((rel % 12) + 12) % 12, ntc = (S.tune && S.tune[npc]) || 0, rate = Math.pow(2, rel / 12) * Math.pow(2, ntc / 1200);
             if (!q) firstRate = rate;
             const ev = {type:'note', t:at, track:t, poly, pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? at + fx.KIL * tick : null, rel:fx.OFF != null ? at + fx.OFF * tick : null,
