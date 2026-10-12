@@ -212,7 +212,18 @@ input[type=range]{width:100%; accent-color:var(--ink); height:30px; margin:0; to
 .cardwrap{padding-block:12px; padding-inline:16px; flex:none}
 .layercard{border:3.5px solid var(--fam); background:var(--panel)}
 .layercard>header{display:flex; align-items:center; gap:8px; padding:8px 8px 8px 12px; border-bottom:2px solid var(--fam); flex-wrap:wrap}
-.famtag{font-size:12px; color:var(--muted)}
+/* The layer card's action buttons are one group, so they never split across lines, and the family tag
+   shrinks (ellipsis) instead of pushing them — the long "Mutable Instruments" tag used to force a wrap for
+   Plaits and squeeze the panel below. */
+.acts{display:flex; align-items:center; gap:8px; flex:none; margin-left:auto}
+.famtag{font-size:12px; color:var(--muted); min-width:0; max-width:32vw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+/* On phones / small tablets keep the layer header to one row (it fit two only because of long tags). */
+@media (max-width:780px){
+  .layercard>header{gap:5px; padding:6px 8px 6px 10px}
+  .layercard>header button.sm{padding:3px 6px}
+  .layercard>header select{max-width:34vw}
+  .acts{gap:5px}
+}
 .fxcard{border:3.5px solid var(--fx); background:var(--panel)}
 .fxcard>header{display:flex; align-items:center; gap:8px; padding:8px 8px 8px 12px; border-bottom:2px solid var(--fx); flex-wrap:wrap}
 /* the voice pitch/filter/amp card: same Seeds card shape, opposite-side colour of the layer card's fam
@@ -786,11 +797,13 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
       <button class="sm" id="lOn">On</button>
       <span class="famtag" id="lFam"></span>
       <div class="sp"></div>
-      <button class="sm" id="bLoad">Load sample</button>
-      <button class="sm" id="lRand">Random</button>
-      <button class="sm" id="lCopy">Copy</button>
-      <button class="sm" id="lPaste">Paste</button>
-      <button class="sm" id="lClear">Clear</button>
+      <div class="acts">
+        <button class="sm" id="bLoad">Load sample</button>
+        <button class="sm" id="lRand">Random</button>
+        <button class="sm" id="lCopy">Copy</button>
+        <button class="sm" id="lPaste">Paste</button>
+        <button class="sm" id="lClear">Clear</button>
+      </div>
     </header>
     <div class="secs" id="secs"></div>
   </section>
@@ -2059,7 +2072,8 @@ function refreshLayer(){
   $('lTitle').textContent = 'Layer ' + (v.sel + 1);
   sel.value = L.type;
   const on = $('lOn'); on.textContent = L.on ? 'On' : 'Off'; on.classList.toggle('on', L.on); on.setAttribute('aria-pressed', L.on);
-  $('lFam').textContent = FAMS[T.fam];
+  $('lFam').textContent = T.fam === 'pl' ? 'Mutable' : FAMS[T.fam];   // short tag so the header row never wraps for Plaits
+  $('lFam').title = FAMS[T.fam];
   srcRows.a.lab.textContent = T.a; srcRows.a.fmt = T.fa;
   srcRows.b.lab.textContent = T.b; srcRows.b.fmt = T.fb;
   const adsr = L.mode === 'ADSR';
