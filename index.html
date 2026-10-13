@@ -477,9 +477,15 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .mtr.mu{border-style:dashed}
 .mtr.mu .mn{color:var(--rec); text-decoration:line-through}
 .mtr.mu .mb i{background:var(--muted)}
-.tlegend{margin:0; display:grid; grid-template-columns:auto 1fr; gap:3px 8px; font-size:11.5px; line-height:1.35}
-.tlegend dt{font-weight:600; white-space:nowrap}
-.tlegend dd{margin:0; color:var(--muted)}
+.tlegend{margin:0; display:grid; grid-template-columns:minmax(0,max-content) minmax(0,1fr); gap:3px 8px; font-size:11.5px; line-height:1.35; min-width:0}
+.tlegend dt{font-weight:600}
+.tlegend dd{margin:0; color:var(--muted); min-width:0; overflow-wrap:anywhere}
+.tlegend dt{max-width:96px; white-space:normal}
+.tside{position:relative; padding-top:26px}
+.tsidex{position:absolute; top:2px; right:2px; min-height:0; width:20px; height:20px; padding:0; font-size:10px; line-height:1; border:0; background:transparent; color:var(--muted); z-index:2}
+.tsidex:hover{color:var(--ink); background:var(--panel2)}
+/* Lp. Sel. and TRANS − + sit side by side: one rule between neighbours, not two. */
+.trows .rv + .rv{border-left:0}
 .tctl{flex:none; background:var(--side); border-top:1px solid var(--line); padding-block:10px 12px; padding-inline:16px;
   display:flex; justify-content:space-between; align-items:center; gap:16px; touch-action:none}
 .dpad{display:grid; grid-template-columns:repeat(3,var(--k)); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
@@ -521,7 +527,8 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 /* Rows of the open phrase, beside INPUT, with the live tempo and ticks (dots light up tick by tick as it plays). */
 .tpat{display:flex; align-items:stretch; flex:none; border-left:1px solid var(--line); font-variant-numeric:tabular-nums}
 .tclk{display:flex; align-items:center; gap:2px; padding:0 8px; font-size:11px; white-space:nowrap; border-right:1px solid var(--line)}
-.tclk b{font-weight:700; font-size:11.5px} .tclk small{font-size:8.5px; letter-spacing:.05em; color:var(--muted); margin-right:4px}
+.tclk b{font-weight:700; font-size:11.5px} .tclk .tce{cursor:text; padding:1px 2px; border-radius:2px} .tclk .tce:hover{background:var(--panel2)}
+.tclk .tcin{width:3.6ch; min-height:0; height:20px; padding:0 2px; font:inherit; font-weight:700; text-align:center; border:1px solid var(--ink); background:var(--panel); color:var(--ink); user-select:text; -webkit-user-select:text} .tclk small{font-size:8.5px; letter-spacing:.05em; color:var(--muted); margin-right:4px}
 .tclk.live b{color:var(--pl)}
 .tdots{display:inline-grid; grid-auto-flow:column; grid-template-rows:repeat(2,3px); gap:2px; margin-left:1px}
 .tdots i{width:3px; height:3px; border-radius:50%; background:var(--line)}
@@ -714,7 +721,7 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
   background:color-mix(in srgb, var(--dkc) var(--dkp), var(--panel))}
 .dks:first-child, .dks.first{border-left:0}
 .dks[hidden]{display:none!important}
-#dkScope{--dkc:#dbe6f8; flex:0 1 var(--dkws, 300px); min-width:150px}
+#dkScope{--dkc:#dbe6f8; flex:0 6 var(--dkws, 300px); min-width:90px}
 #dkInst{--dkc:#fbe2d2; flex:1 1 0; min-width:210px}
 #dkFx{--dkc:#f8dce8; flex:0 1 var(--dkwf, 320px); min-width:200px}
 #dkStrip{--dkc:#d8f0e2; flex:0 0 176px}
@@ -1027,7 +1034,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <div class="trk" id="trk" hidden>
   <div class="ttabbar"><nav class="ttabs" id="tTabs" aria-label="Tracker screens"></nav>
     <div class="tpat" id="tPat">
-      <span class="tclk" id="tClk" title="Tempo and ticks a step (TPO and TIC change them as the song plays)"><b id="tClkB">120</b><small>BPM</small><b id="tClkT">6</b><small>TK</small><span class="tdots" id="tDots"></span></span>
+      <span class="tclk" id="tClk" title="Tempo and lines per beat · double-click a number to type it (TPO changes the tempo as the song plays; ticks are in Settings)"><b id="tClkB" class="tce" data-k="bpm">120</b><small>BPM</small><b id="tClkT" class="tce" data-k="lpb">4</b><small>LPB</small><span class="tdots" id="tDots"></span></span>
       <span class="trows" role="group" aria-label="Rows in this phrase"><button type="button" id="tRowsDn" aria-label="Fewer rows">−</button><button type="button" id="tRowsV" class="rv" aria-label="Rows in this phrase"><small id="tRowsP">PH 00</small><b id="tRowsN">16</b></button><button type="button" id="tRowsUp" aria-label="More rows">+</button></span>
       <span class="trows toct" id="tOct" role="group" aria-label="Octave for note entry" hidden><button type="button" id="tOctDn" aria-label="Octave down">−</button><button type="button" id="tOctV" class="rv" aria-label="Octave, tap to reset to 4" title="Octave for typed and keypad notes (− and = on a keyboard) · tap for 4"><small>OCT</small><b id="tOctN">4</b></button><button type="button" id="tOctUp" aria-label="Octave up">+</button></span>
       <span class="trows" id="tSelBar" role="group" aria-label="Loop and transpose the selection"><button type="button" id="tLoop" class="rv" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L)"><small>Lp. Sel.</small><b id="tLoopN">OFF</b></button><button type="button" id="tXposeDn" class="rv" aria-label="Transpose selection down a semitone" title="Transpose the selection down a semitone (Alt+,)"><small>TRANS.</small><b>−</b></button><button type="button" id="tXposeUp" class="rv" aria-label="Transpose selection up a semitone" title="Transpose the selection up a semitone (Alt+.)"><small>TRANS.</small><b>+</b></button></span>
@@ -1051,6 +1058,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
       <div class="tafoot">TAP: GO · a tap goes to a block, twice opens its phrase · HOLD · holding a block mutes or unmutes just that one (the phrase stays) · tap a row number to play from there</div>
     </aside>
     <aside class="tside" aria-label="Tracker status">
+      <button type="button" class="tsidex" id="tSideX" title="Hide this side panel (⚙ Settings → SIDE PANEL brings it back)" aria-label="Hide the side panel">✕</button>
       <div class="tmap" id="tMap">
         <button type="button" data-v="project" class="wide">PROJECT</button>
         <button type="button" data-v="song">SONG</button><button type="button" data-v="sect">SECT</button><button type="button" data-v="phrase">PHRASE</button><button type="button" data-v="inst">INST</button>
@@ -1167,7 +1175,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p><b>Arrange</b> (wide screens): the blue overview at the right shows the whole song, lined up with the Song screen (scroll either one and the other follows). <b>A tap on a block goes to it</b> (a second tap opens its phrase). <b>Holding a block mutes or unmutes just that one</b> — the phrase stays in place, silent, so you can drop parts in and out while arranging. Tap a row number to play from there; in KEYS mode M mutes the block under the Song cursor. Whole tracks are muted in the Mixer, never here, so a slip can’t silence a track.</p>
 <p>The screens are laid out as a map: Song ▶ Sect ▶ Phrase ▶ Inst left to right, Project above, Mixer below, FX to the right of the Mixer. You move between them with the screen keys below, the tabs, or the map in the side panel.</p>
 <h3>Settings</h3>
-<p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound and the current track’s effects, and a channel strip for the current track (meter, fader, pan, M and S). Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
+<p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound and the current track’s effects, and a channel strip for the current track (meter, fader, pan, M and S). Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots. <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song. <b>A voice per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chopping breaks</h3>
@@ -5271,6 +5279,7 @@ const SPK = 'thunderplus-side-v1';
 let sideOn = (() => { try { return localStorage.getItem(SPK) !== '0'; } catch(e){ return true; } })();
 function setSide(on){ sideOn = on; try { localStorage.setItem(SPK, on ? '1' : '0'); } catch(e){} document.body.classList.toggle('noside', !on); arrLayout(true); }
 document.body.classList.toggle('noside', !sideOn);
+$('tSideX').addEventListener('click', () => { setSide(false); toast('Side panel hidden. ⚙ Settings → SIDE PANEL brings it back.'); });
 function setStepDec(on){ stepDec = on; try { localStorage.setItem(SDK, on ? '1' : '0'); } catch(e){} arrSig = ''; draw(); }
 function setTScale(v){ tScale = clamp(Math.round(v / 10) * 10, 60, 200); try { localStorage.setItem(TSK, String(tScale)); } catch(e){} fit(); draw(); }
 function setArr(m){ arrMode = m; try { localStorage.setItem(ARK, String(m)); } catch(e){} arrBody(); arrSig = ''; draw(); fit(); }
@@ -5894,10 +5903,36 @@ function setDefLen(v){
 // On the sect screen it's the phrase on the cursor's row; elsewhere the phrase last opened.
 function rowsId(){ if (tv === 'sect'){ const ch = S.chains[cSect], r = ch && ch[cs.sect.y]; if (r && r[0] >= 0) return r[0]; } return cPhrase; }
 function setRows(v){ const id = rowsId(); S.plen[id] = clamp(v, 1, PROWS); if (id === cPhrase){ const c = cs.phrase; if (c.y >= S.plen[id]) c.y = S.plen[id] - 1; } saveS(); draw(); }
+// Tempo and LPB in the tab bar: double-click (or double-tap) a number to type a new one; Enter or a tap away
+// sets it, Esc cancels. Ticks a step stay in Settings.
+const CLK = {bpm:{min:40, max:300, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; rtAllFx(); chainsTempo(); }, name:'Tempo'},
+  lpb:{min:1, max:16, set:v => { S.lpb = v; }, name:'LPB'}};
+function clkEdit(b){
+  if (b.querySelector('input')) return;
+  const k = b.dataset.k, d = CLK[k], inp = el('input'); inp.type = 'text'; inp.inputMode = 'numeric'; inp.className = 'tcin';
+  inp.value = k === 'bpm' ? S.bpm : (S.lpb || 4); inp.setAttribute('aria-label', d.name);
+  b.replaceChildren(inp); inp.focus(); inp.select();
+  let done = false;
+  const fin = ok => { if (done) return; done = true;
+    if (ok){ const v = parseInt(inp.value, 10);
+      if (Number.isFinite(v)){ const c = clamp(v, d.min, d.max); d.set(c); saveS(); if (c !== v) toast(`${d.name} goes from ${d.min} to ${d.max}: set to ${c}.`); }
+      else toast(`Type a number for ${d.name.toLowerCase()}.`); }
+    b.textContent = ''; drawPat(); draw(); };
+  inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter'){ e.preventDefault(); fin(true); } else if (e.key === 'Escape'){ e.preventDefault(); fin(false); } });
+  inp.addEventListener('keyup', e => e.stopPropagation()); inp.addEventListener('keypress', e => e.stopPropagation());
+  inp.addEventListener('blur', () => fin(true));
+}
+document.querySelectorAll('#tClk .tce').forEach(b => {
+  b.addEventListener('dblclick', e => { e.preventDefault(); clkEdit(b); });
+  let last = null;   // touch screens: tap, lift, tap
+  b.addEventListener('pointerup', e => { if (e.pointerType !== 'touch') return; const now = performance.now();
+    if (last && now - last < 450){ last = null; clkEdit(b); } else last = now; });
+});
 function drawPat(){
   const id = rowsId(); $('tRowsP').textContent = 'PH ' + hx(id); $('tRowsN').textContent = plen(id);
   const live = tp.on, tk = live ? tp.tks : (S.ticks || TICKS);
-  $('tClkB').textContent = live ? tp.bpm : S.bpm; $('tClkT').textContent = tk; $('tClk').classList.toggle('live', live);
+  if (!$('tClk').querySelector('input')){ $('tClkB').textContent = live ? tp.bpm : S.bpm; $('tClkT').textContent = S.lpb || 4; }
+  $('tClk').classList.toggle('live', live);
   const D = $('tDots'), n = Math.min(tk, 16);
   if (D.childElementCount !== n) D.innerHTML = '<i></i>'.repeat(n);
 }
@@ -6460,7 +6495,16 @@ const deckSave = () => { try { localStorage.setItem(DKK, JSON.stringify(deck)); 
 const deckShown = () => !$('tDeck').hidden;
 const dkSec = k => $('dk' + k[0].toUpperCase() + k.slice(1));
 // The track the panel follows: the Mixer's or FX screen's track there, otherwise the current track.
-const dkTrack = () => Math.min(tv === 'mixer' ? cs.mixer.x : tv === 'fx' && cFxT < NT ? cFxT : cTrack, ntr() - 1);
+const dkTrack = () => Math.min(tv === 'song' ? cs.song.x : tv === 'mixer' ? cs.mixer.x : tv === 'fx' && cFxT < NT ? cFxT : cTrack, ntr() - 1);
+// The instrument the panel shows: on Song, the one the block under the cursor plays; on Mixer and FX, the first
+// one the track's blocks play; in a phrase (and anywhere else) the current instrument.
+function dkInstNow(){
+  const blockInst = (y, t) => { const v = S.song[y] ? S.song[y][t] : -1; if (v < 0) return -1; const ph = firstPhrase(v); return ph >= 0 ? phraseInfo(ph).inst : -1; };
+  if (tv === 'song'){ const i = blockInst(cs.song.y, cs.song.x); if (i >= 0) return i; }
+  if (tv === 'song' || tv === 'mixer' || tv === 'fx'){ const t = dkTrack(); for (let y = 0; y < 256; y++){ const i = blockInst(y, t); if (i >= 0) return i; } }
+  return cInst;
+}
+let dkInst = 0;
 function setDeck(k, v){ deck[k] = !!v; deckSave(); deckLayout(); fit(); draw(); }
 document.querySelectorAll('#tDeck .dkt').forEach(b => { b.title = 'Hide this section (it waits as a dashed button in the header)'; b.addEventListener('click', () => setDeck(b.dataset.k, false)); });
 for (const [k, l] of DK_SECS){ const b = el('button', 'dkoff', '+ ' + l); b.type = 'button'; b.dataset.k = k; b.title = 'Show ' + l.toLowerCase(); b.addEventListener('click', () => setDeck(k, true)); $('dkOffs').append(b); }
@@ -6559,12 +6603,13 @@ function deckScope(now){
 let dkInstSig = '', dkInstRows = [], dkFxSig = '', dkFxRows = [], dkFxSel = 0;
 function deckInst(){
   if (!deckShown() || !deck.inst) return;
-  const I = S.insts[cInst], pad = I.pad, v = kit.voices[pad], sig = cInst + ':' + pad + ':' + nslots();
-  $('dkInstT').textContent = `INST ${hx(cInst)} · ${hx(pad)} ${(v && v.name) || 'Pad ' + (pad + 1)}`;
+  dkInst = dkInstNow();
+  const I = S.insts[dkInst], pad = I.pad, v = kit.voices[pad], sig = dkInst + ':' + pad + ':' + nslots();
+  $('dkInstT').textContent = `INST ${hx(dkInst)} · ${hx(pad)} ${(v && v.name) || 'Pad ' + (pad + 1)}`;
   if (sig !== dkInstSig){
     dkInstSig = sig; const box = $('dkInstRows'); box.replaceChildren(); dkInstRows = [];
     if (!v){ box.append(el('p', 'note', 'This instrument’s pad is empty.')); return; }
-    const getV = () => kit.voices[S.insts[cInst].pad], on = () => changed(S.insts[cInst].pad, true);
+    const getV = () => kit.voices[S.insts[dkInst].pad], on = () => changed(S.insts[dkInst].pad, true);
     for (const [def, k] of [[VP.level, 'level'], [VP.tune, 'tune'], [VP.drive, 'drive'], [VP.gate, 'gate'], [VGP.gLpCut, 'gLpCut'], [VGP.gLpRes, 'gLpRes']]){
       const r = makeRow(def, k, getV, {idp:'dki', on}); box.append(r.r); dkInstRows.push(r); }
   }
@@ -6603,7 +6648,7 @@ const dkRefit = () => { if (!dkFitRaf) dkFitRaf = requestAnimationFrame(() => { 
 dkDrag($('dkGrip'), (dx, dy, st) => { deck.h = clamp(Math.round(st.h - dy), 110, Math.max(140, Math.round(innerHeight * 0.6))); $('tDeck').style.setProperty('--dkh', deck.h + 'px'); dkRefit(); }, dkRefit);
 $('dkGrip').addEventListener('dblclick', () => { deck.h = 168; deckSave(); deckLayout(); dkRefit(); });
 const dkMaxW = () => Math.max(220, $('dkBody').clientWidth - 420);
-dkDrag($('dkScope').querySelector('.dkw'), (dx, dy, st) => { deck.ws = clamp(Math.round(st.ws + dx), 150, dkMaxW()); $('tDeck').style.setProperty('--dkws', deck.ws + 'px'); });
+dkDrag($('dkScope').querySelector('.dkw'), (dx, dy, st) => { deck.ws = clamp(Math.round(st.ws + dx), 90, dkMaxW()); $('tDeck').style.setProperty('--dkws', deck.ws + 'px'); });
 dkDrag($('dkFx').querySelector('.dkw'), (dx, dy, st) => { deck.wf = clamp(Math.round(st.wf - dx), 200, dkMaxW()); $('tDeck').style.setProperty('--dkwf', deck.wf + 'px'); });
 // A skin's font can arrive after the screen was measured (Share Tech Mono in the terminal skins): fit and redraw
 // once it lands, so the MONO/POLY boxes and the type size match the real letters.
