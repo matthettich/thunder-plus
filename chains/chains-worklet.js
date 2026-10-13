@@ -538,7 +538,7 @@ const Vocoder = {
   create(){ return {
     mc1:new Float32Array(64), mc2:new Float32Array(64), cc1:new Float32Array(64), cc2:new Float32Array(64), env:new Float32Array(64), C:new Float32Array(192),
     win:null, pcar:new Float32Array(FFTH), pmod:new Float32Array(FFTH), acc:new Float32Array(FFTH),
-    re:new Float32Array(FFTN), im:new Float32Array(FFTN), mre:new Float32Array(FFTN), mim:new Float32Array(FFTN), out:new Float32Array(FFTN) }; },
+    re:new Float32Array(FFTN), im:new Float32Array(FFTN), mre:new Float32Array(FFTN), mim:new Float32Array(FFTN) }; },
   process(st, io, ctx){
     const mode = clamp(io.p.mode | 0, 0, 6), mix = io.p.mix, lvl = io.p.level;
     const car = io.in.in, mod = linked(io, 'inR') ? io.in.inR : io.in.in, out = io.out.out, outR = io.out.outR;
@@ -577,7 +577,7 @@ function vocBands(st, io, ctx, N, car, mod, out, mix, lvl, talk){
 // Spectral vocoder: 256-point FFT, 50% overlap. The carrier's bins take the modulator's magnitude.
 function vocSpectral(st, ctx, car, mod, out, mix, lvl){
   if (!st.win){ st.win = new Float32Array(FFTN); for (let i = 0; i < FFTN; i++) st.win[i] = .5 - .5 * Math.cos(2 * Math.PI * i / FFTN); }
-  const re = st.re, im = st.im, mre = st.mre, mim = st.mim, y = st.out, w = st.win;
+  const re = st.re, im = st.im, mre = st.mre, mim = st.mim, w = st.win;
   for (let i = 0; i < FFTN; i++){ const v = i < FFTH ? st.pcar[i] : car[i - FFTH]; re[i] = v * w[i]; im[i] = 0;
     const u = i < FFTH ? st.pmod[i] : mod[i - FFTH]; mre[i] = u * w[i]; mim[i] = 0; }
   fftInPlace(re, im, false); fftInPlace(mre, mim, false);
@@ -586,8 +586,13 @@ function vocSpectral(st, ctx, car, mod, out, mix, lvl){
     re[b] *= s; im[b] *= s;
   }
   fftInPlace(re, im, true);
-  const g = lvl * 1.34;
-  for (let i = 0; i < FFTH; i++) out[i] = car[i] * (1 - mix) + (st.acc[i] + re[i] * w[i]) * g * mix;
+  const g = lvl;
+  for (let i = 0; i < FFTH; i++){
+    const norm = w[i] * w[i] + w[i + FFTH] * w[i + FFTH];
+    const dry = st.pcar[i];
+    const wet = norm > 1e-8 ? (st.acc[i] + re[i] * w[i]) / norm : 0;
+    out[i] = dry * (1 - mix) + wet * g * mix;
+  }
   for (let i = 0; i < FFTH; i++) st.acc[i] = re[FFTH + i] * w[FFTH + i];
   for (let i = 0; i < FFTH; i++){ st.pcar[i] = car[i]; st.pmod[i] = mod[i]; }
 }

@@ -7,10 +7,12 @@ work session.
 ## Where things stand
 
 - **Repo:** `https://github.com/matthettich/thunder-plus` · branch `main`.
-- **HEAD:** `5a17b51` — *"Add a Vocoder …chains module: Talkbox, 4-64 band banks and spectral cross-synthesis"* (pushed).
-- **Working tree (uncommitted, do not commit without asking):** `README.md` modified
-  ("ten effects" → "eleven effects", plus earlier build-note/running-locally additions);
-  `HANDOVER.md` untracked (this file).
+- **HEAD:** `b0a2e1d` — docs and handover commit; original Vocoder implementation is `5a17b51`.
+- **Current uncommitted changes (do not commit without asking):** the Spectral Vocoder mix/alignment
+  fix, cache-buster changes to `?v=5`, service-worker cache bump, and updates to this handover file.
+  The downstream `../Thunder-` repo has the matching worklet/index/cache changes uncommitted.
+- **Prior docs/rebuild commits (local, not pushed):** `thunder-plus` docs commit `b0a2e1d`; `../Thunder-`
+  rebuild commit `eba1dd5` (Thunder- branch `main`, based on `6c4dc71`).
 - **App:** no build step. `index.html` is the whole tracker/synth app; `chains/index.html` and
   `waves/index.html` are the two modular patch editors loaded in frames.
 - **Local dev server:** running (persistent) at **http://127.0.0.1:8734/** — see *Running it locally*.
@@ -24,9 +26,9 @@ A new audio module for the **…chains** editor. Carrier = **In** (left), modula
 |---|---|---|
 | `chains/chains-worklet.js` | `FFTN`/`fftInPlace` ~518, `Vocoder` 532–549, `vocBands` 551, `vocSpectral` 578, registered 596 | The DSP and the module definition. |
 | `chains/index.html` | table 409, palette 1541, help 1838 | Editor mirror: params, UI labels, palette entry, help text. |
-| `index.html` | `chainsReady()` 3358 | Cache-buster `?v=3` → `?v=4`. |
-| `chains/index.html` | `ChainsBridge.standalone()` 688 | Cache-buster `?v=3` → `?v=4`. |
-| `sw.js` | 3, 7 | Cache name `v27` → `v28`; precache `chains-worklet.js?v=4`. |
+| `index.html` | `chainsReady()` 3358 | Current cache-buster `?v=5`. |
+| `chains/index.html` | `ChainsBridge.standalone()` 688 | Current cache-buster `?v=5`. |
+| `sw.js` | 3, 7 | Current cache name `thunderplus-v29`; precaches `chains-worklet.js?v=5`. |
 | `README.md` | 40 | Module list mentions the Vocoder. |
 
 **Parameters** (worklet `params` must equal the editor table's, `[default, min, max, step]`):
@@ -47,11 +49,12 @@ caps at 16.
 effects code" note. It has no third-party code (a hand-written radix-2 FFT and biquads), so
 `THIRD_PARTY_NOTICES.md` was **not** changed.
 
-**Validated:** `node --check` on the worklet, `sw.js`, and all inline scripts; a Node DSP harness
-(see below) confirmed every mode is non-silent, `inR` falls back to `in`, `mix=0` passes the dry
-carrier exactly, draft caps bands, out-of-range modes clamp; an engine-graph test
-(`trackIn → vocoder → chainOut`) is non-silent; headless Chrome renders the palette item and help.
-Not yet verified with **live audio** in a browser (headless can't run the AudioWorklet).
+**Validated:** syntax checks passed on both worklets, service workers, Electron entry points, the build script,
+and inline app scripts. DSP harness confirmed every mode is non-silent, `inR` fallback, `mix=0` dry pass,
+out-of-range mode clamping, and draft band capping. Spectral overlap-add regression: identical 187.5 Hz
+carrier/modulator remains RMS 0.707 with correlation 1.0 across Mix 0, .25, .5, .75 and 1. All three Plus
+pages and rebuilt Thunder- loaded in headless Chrome with clean console output. The engine-graph test
+(`trackIn → vocoder → chainOut`) is non-silent. Not verified with live AudioWorklet audio in a real browser.
 
 ## Running it locally
 
@@ -87,26 +90,45 @@ If a link stops working, the server process was stopped — restart it with the 
 
 ## Open items / where to pick up
 
-1. **…Thunder is rebuilt (2026-10-13 session, NOT committed there).** A fresh clone now lives at
-   `../Thunder-` (sibling of this repo, as the build script expects). `python3 tools/build-thunder.py
-   ../Thunder-` ran clean and `Thunder-/sw.js` was bumped (`thunder-v52` → `v53`,
-   `chains-worklet.js?v=3` → `?v=4`). Its diff vs its HEAD (`6c4dc71`) is large because it lagged by
-   several Plus commits, not just the Vocoder. **Still to do in `../Thunder-`:** review the diff,
-   commit, and push (needs confirmation — never commit without asking).
-2. **README wording — done.** The …chains bullet now says "eleven effects" (EQ, Comp, Saturation,
+1. **Existing commits are local, not pushed:** Thunder Plus has `b0a2e1d` (README/HANDOVER docs), and
+   `../Thunder-` has `eba1dd5` (rebuild from Plus `5a17b51`, based on Thunder- `6c4dc71`). The rebuild
+   contains all Plus changes since `63dcaae`, not just the Vocoder. The build is reproducible.
+2. **Current DSP fix is uncommitted in both repos.** In `vocSpectral`, dry now has the same 128-frame
+   latency as wet, and the Hann overlap-add is normalized per sample. Before the fix, identical
+   187.5 Hz carrier/modulator fell from RMS 0.707 dry to 0.083 at mix=.5; with the fix the RMS stays
+   0.707 and correlation is 1.0 at Mix 0, .25, .5, .75 and 1. Worklet references are `?v=5`, with
+   caches `thunderplus-v29` and `thunder-v54`; `../Thunder-`'s worklet is byte-identical to Plus.
+   These changes should be reviewed and committed when authorized; nothing has been pushed.
+3. **README wording — done.** The …chains bullet now says "eleven effects" (EQ, Comp, Saturation,
    Tape, Chorus, Crush, Delay, Reverb, Rings, Clouds, Beads; the Vocoder is called out separately).
-3. **`normalizeChainsImport`** (`index.html` ~3150) has a `keep` set used when opening a …waves patch
+4. **`normalizeChainsImport`** (`index.html` ~3150) has a `keep` set used when opening a …waves patch
    as a …chains patch. The Vocoder is intentionally **not** in it (a …waves patch can't contain one).
-4. **Hear it for real.** Load `chains/index.html`, add a **Vocoder**, patch Track In → In, put a
+5. **Additional bugs found + fixed (all uncommitted).**
+   - **`sw.js` (both repos):** the navigate branch stored every page under the constant key
+     `./index.html`, so opening the …chains/…waves editor overwrote the cached app page (offline root
+     reload would then serve the editor), and it cached non-`ok` responses over good ones. Now keyed by
+     the request and gated on `res.ok`. Behaviour verified in a mocked Cache/fetch harness.
+   - **`Thunder-/sw.js`:** `activate` deleted *every* cache on the origin (`k !== CACHE`); scoped to
+     `k.startsWith('thunder-')` like Plus's `thunderplus-` scope.
+   - **`Thunder-` hidden editors:** `build-thunder.py` stripped the Waves/Chains seg but left
+     `openWaves`/`openChains`/`focusChainHit` reachable, so turning CHN on for an already-chained track
+     jumped to a `chains/index.html` iframe that isn't shipped (404). The build now makes
+     `openWaves`/`openChains` no-ops and drops the auto-focus call; verified the paths are unreachable.
+   - **`electron/main.js` (both):** `app://thunder` (no trailing slash) 404'd; now maps `''` to
+     `index.html` too.
+   - **`waves/index.html`:** the editor loaded `waves-worklet.js?v=2` while the app and SW use `?v=4`,
+     so the worklet was fetched under a key the precache doesn't cover (editor broken offline on a
+     fresh install). Now `?v=4`.
+   - **`tools/build-thunder.py`:** now syncs the two engine `?v=` strings into `../Thunder-/sw.js` and
+     bumps its `thunder-vNN` cache name when they change (idempotent when already matching), instead
+     of leaving Thunder-'s sw.js silently stale after a worklet bump.
+6. **Hear it for real.** Load `chains/index.html`, add a **Vocoder**, patch Track In → In, put a
    synth/loop into In R as the modulator, and sweep Mode/Resonance. Confirm CPU headroom on a phone.
-   Re-verified headless this session (2026-10-13): all 7 modes non-silent (rms 0.13–0.44 after
-   settling), `inR` falls back to `in`, `mix=0` passes dry exactly, `mode=99`/`-3` clamp, draft caps
-   64→16 bands, `trackIn → vocoder → chainOut` graph non-silent in bands and spectral modes, and
-   headless Chrome renders the palette item + help (Talkbox…Spectral choices, `?v=4` fetches in
-   `index.html`/`chains/index.html`/Thunder rebuild). Still not verified with **live audio** in a
-   real browser (headless can't run the AudioWorklet). **Harness note:** fake `io` objects need a
-   `linked: new Set(...)` — `linked(io,'inR')` reads `io.linked.has`, not the presence of `io.in.inR`.
-5. **Behaviour to know:** on bands >16, `draft` quality silently drops to 16 bands (load shedding).
+   Verified this session: every mode non-silent, `inR` fallback works, `mix=0` is dry-exact, invalid
+   modes clamp, draft caps banks to 16, and `trackIn → vocoder → chainOut` is non-silent. Plus's root,
+   chains and waves pages and the rebuilt Thunder- page all rendered in headless Chrome with clean
+   consoles; syntax/cache checks pass. A local Node benchmark on this machine measured 64-band full
+   mode at ~1.3% of one CPU core. Live AudioWorklet playback still needs a real browser.
 
 ## Checklist — adding another …chains module
 

@@ -9,11 +9,11 @@ Usage (from the thunder-plus folder):
     python3 tools/build-thunder.py ../Thunder-
 
 That rewrites ../Thunder-/index.html and electron/main.js (the desktop app works the same way as
-Thunder Plus's), and copies the two sound engines it needs (waves/waves-worklet.js,
-chains/chains-worklet.js). Everything else in the Thunder- repo (README, manifest, icons, sw.js,
-electron/package.json) stays as it is.
+Thunder Plus's), copies the two sound engines it needs (waves/waves-worklet.js, chains/chains-worklet.js),
+and syncs their cache-busters in ../Thunder-/sw.js (its own cache name prefix and file list stay as they
+are). Everything else in the Thunder- repo (README, manifest, icons, electron/package.json) stays as it is.
 """
-import os, shutil, sys
+import os, re, shutil, sys
 
 here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 dst = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, '..', 'Thunder-')
@@ -42,6 +42,9 @@ s = s.replace("'thunderplus-", "'thunder-")
 # Only the Tracker and Synth screens; …waves and …chains play but aren't edited here
 rep("[['tracker', 'Tracker'], ['synth', 'Synth'], ['waves', 'Waves'], ['chains', 'Chains']]", "[['tracker', 'Tracker'], ['synth', 'Synth']]")
 rep("if (v !== 'synth') setView(v === 'chains' ? 'chains' : v === 'waves' ? 'waves' : 'tracker');", "if (v !== 'synth') setView('tracker');")
+rep("function openWaves(){ setView('waves'); }", "function openWaves(){}")
+rep("function openChains(){ setView('chains'); }", "function openChains(){}")
+rep("  if (on && !added && !was) focusChainHit(t);   // already had a chain: jump to and highlight it\n", "")
 rep('title="File: new, open, save, share, render and export (on Waves / Chains: that patch)"', 'title="File: new, open, save, share, render and export"')
 rep("""    null,
     ['Export chains…', exportChains], ['Import chains…', () => $('chainsIn').click()]""", "")
@@ -65,4 +68,16 @@ open(os.path.join(dst, 'electron', 'main.js'), 'w', encoding='utf-8').write(m)
 for f in ['waves/waves-worklet.js', 'chains/chains-worklet.js']:
     os.makedirs(os.path.join(dst, os.path.dirname(f)), exist_ok=True)
     shutil.copyfile(os.path.join(here, f), os.path.join(dst, f))
+# Thunder- keeps its own sw.js, but its engine cache-busters must match the files just copied, or a
+# rebuilt engine is fetched under an old key and the cache name never invalidates it.
+swp = os.path.join(dst, 'sw.js')
+if os.path.exists(swp):
+    sw = open(swp, encoding='utf-8').read(); before = sw
+    for name in ('waves', 'chains'):
+        m2 = re.search(r'%s-worklet\.js\?v=(\d+)' % name, s)
+        if m2: sw = re.sub(r'%s-worklet\.js\?v=\d+' % name, '%s-worklet.js?v=%s' % (name, m2.group(1)), sw)
+    if sw != before:
+        sw = re.sub(r"const CACHE = 'thunder-v(\d+)'", lambda mm: "const CACHE = 'thunder-v%d'" % (int(mm.group(1)) + 1), sw)
+        open(swp, 'w', encoding='utf-8').write(sw)
+        print('Updated', swp)
 print('Wrote', os.path.join(dst, 'index.html'), 'and the two sound engines.')

@@ -31,7 +31,7 @@ function createWindow(){
 app.whenReady().then(() => {
   protocol.handle('app', req => {
     let p = decodeURIComponent(new URL(req.url).pathname);
-    if (p.endsWith('/')) p += 'index.html';
+    if (p === '' || p.endsWith('/')) p += 'index.html';
     const file = path.normalize(path.join(ROOT, p));
     if (!file.startsWith(ROOT + path.sep)) return new Response('Not found', { status:404 });
     return net.fetch(pathToFileURL(file).toString());
