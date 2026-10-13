@@ -737,63 +737,72 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 @media (max-width:700px){ .dkbody{height:min(170px, 30vh); overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:none}
   .dkbody > .dks, .dkbody > #dkMeters{flex:0 0 100%; width:auto; scroll-snap-align:start} .dkhead .dkchips button{padding:0 7px} }
 
-/* ---------- Matrix skin: neon green on black, green outlines, terminal type with a phosphor glow ----------
-   Share Tech Mono (fonts/, SIL OFL) for everything. It comes last so it wins over the pastel boxes,
-   the tracker's own screen colours and the pads' per-pad shades. */
+/* ---------- Terminal skins: Matrix (neon green on black), Black & white (Helvetica) and Mustard (on lavender) ----------
+   One set of rules drawn from a few colours per skin: --mx (text, outlines, fills), --mx2 (secondary text),
+   --mxdim (faint lines), --mxbg/--mxpanel/--mxpanel2 (backgrounds), --mxon (text on a filled button),
+   --mxsoft (lit keys, hot meters), --mxpoly (the poly tracks), --mxglowc (the glow; transparent for none).
+   Comes last so it wins over the pastel boxes, the tracker's own screen colours and the pads' shades. */
 @font-face{font-family:"Share Tech Mono"; src:url(fonts/ShareTechMono-400.woff) format("woff"); font-weight:100 900; font-display:swap}
-:root[data-skin="matrix"]{
-  --mx:#00ff41; --mx2:#00c834; --mxdim:#0a7a25; --mxbg:#000000; --mxpanel:#010d04; --mxpanel2:#03180a; --mxglow:0 0 6px rgba(0,255,65,.55);
+:root[data-skin="matrix"]{--mx:#00ff41; --mx2:#00c834; --mxdim:#0a7a25; --mxbg:#000000; --mxpanel:#010d04; --mxpanel2:#03180a; --mxon:#000000;
+  --mxsoft:#b6ffc9; --mxpoly:#9dffb5; --mxglowc:rgba(0,255,65,.55); --mxscan:rgba(0,255,65,.045); --mxred:#ff3b3b;
+  --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:dark}
+:root[data-skin="bwterm"]{--mx:#ffffff; --mx2:#bdbdbd; --mxdim:#5a5a5a; --mxbg:#000000; --mxpanel:#0a0a0a; --mxpanel2:#161616; --mxon:#000000;
+  --mxsoft:#d6d6d6; --mxpoly:#9a9a9a; --mxglowc:transparent; --mxscan:transparent; --mxred:#ff4d4d;
+  --font:"Helvetica Neue",Helvetica,Arial,"Nimbus Sans","Liberation Sans",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:dark}
+:root[data-skin="mustard"]{--mx:#a37800; --mx2:#7d6a3c; --mxdim:#b5a2dc; --mxbg:#e3d9f6; --mxpanel:#eae2f9; --mxpanel2:#d8cbf1; --mxon:#fffaf0;
+  --mxsoft:#f2cf63; --mxpoly:#6f55bf; --mxglowc:transparent; --mxscan:transparent; --mxred:#c0392b;
+  --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skinbase="term"]{
   --bench:var(--mxbg); --panel:var(--mxbg); --panel2:var(--mxpanel2); --side:var(--mxpanel); --ink:var(--mx); --muted:var(--mx2);
-  --track:#06260f; --inv:#000; --voice:var(--mxpanel); --line:var(--mx); --screen:#000; --screen-ink:var(--mx); --screen-line:var(--mxdim);
-  --std:#00ff41; --fm:#5dff8a; --add:#9dffb5; --noise:#00c834; --smp:#3dff7a; --pl:#b6ffc9; --fx:#00ff9c; --rec:#00ff41;
-  --stdc:#00a82b; --fmc:#00a82b; --addc:#00a82b; --noisec:#00a82b; --smpc:#00a82b; --plc:#00a82b; --wvc:#00a82b;
-  --meter-ok:#00ff41; --meter-hot:#b6ffc9; --meter-clip:#ff3b3b;
-  --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace;
-  color-scheme:dark}
-:root[data-skin="matrix"] body{background:#000; color:var(--mx); font-family:var(--font); text-shadow:var(--mxglow)}
-:root[data-skin="matrix"] :is(button,select,input,textarea,kbd,code,.tscr,.fxpick){font-family:var(--font)}
-:root[data-skin="matrix"] :is(button,select,input[type=text],input[type=number],textarea){background:#000; color:var(--mx); border-color:var(--mx)}
-:root[data-skin="matrix"] :is(button.on,.seg button.on,.ttabs button.on,.ttabs button[data-v].on,.tmap button[data-v].on,#bFile.on,.top #bSet.on){
-  background:var(--mx)!important; color:#000!important; border-color:var(--mx); text-shadow:none; box-shadow:0 0 12px rgba(0,255,65,.6)}
-:root[data-skin="matrix"] :is(.ttabs button[data-v],.tmap button[data-v]){background:#000; color:var(--mx)}
-:root[data-skin="matrix"] :is(.lcell,.layercard,.fxcard,.voicecard){background:var(--mxpanel); border-color:var(--mx); box-shadow:0 0 10px -4px rgba(0,255,65,.7)}
-:root[data-skin="matrix"] input[type=range]{accent-color:var(--mx)}
-:root[data-skin="matrix"] input[type=checkbox]{accent-color:var(--mx)}
-:root[data-skin="matrix"] :is(svg){color:var(--mx)}
-:root[data-skin="matrix"] button.on svg{color:#000}
-:root[data-skin="matrix"] .brand .plus{color:var(--mx)} :root[data-skin="matrix"] .brand .plus::before{color:var(--mxdim); -webkit-text-stroke:.05em #000}
-:root[data-skin="matrix"] .setmenu{background:#000; border-color:var(--mx); box-shadow:0 0 18px -4px rgba(0,255,65,.6)}
-:root[data-skin="matrix"] .gset .gsec + .gsec, :root[data-skin="matrix"] .gset h3{border-color:var(--mxdim)}
-/* pads, command row and keypad: black keys with green outlines and a green offset block; a hit fills green */
-:root[data-skin="matrix"] :is(.tcmd,.dock,.tctl){background:#000}
-:root[data-skin="matrix"] :is(.tcmd button,.tkp .kp,.pads .pad){background:#000; color:var(--mx); border-color:var(--mx);
-  box-shadow:4px 4px 0 0 #000, 4px 4px 0 1.5px var(--mxdim)}
-:root[data-skin="matrix"] :is(.tcmd button.dn,.tkp .kp.dn,.pads .pad.hit,.pads .pad.hit.hit){background:var(--mx)!important; color:#000!important; text-shadow:none;
-  box-shadow:1px 1px 0 0 #000, 1px 1px 0 1.5px var(--mxdim), 0 0 16px rgba(0,255,65,.8)}
-:root[data-skin="matrix"] :is(.tcmd button.on,.tkp .kp.on,.tkp .kp.blk){background:var(--mxpanel2); color:var(--mx)}
-:root[data-skin="matrix"] :is(.pads .pad .pm,.pads .pad.syn b::after){color:var(--mx2)}
-:root[data-skin="matrix"] .tcmd::before{color:var(--mx2)}
-/* PAD-mode nav pad: the keys that are pastel in the other skins are solid neon green; pressed or on turns them black */
-:root[data-skin="matrix"] #tPad .k{background:var(--mx); color:#000; border-color:var(--mx); text-shadow:none;
-  box-shadow:4px 4px 0 0 #000, 4px 4px 0 1.5px var(--mxdim), 0 0 12px -2px rgba(0,255,65,.55)}
-:root[data-skin="matrix"] :is(#tPad .k.dn,#tPad .k.on){background:#000; color:var(--mx); text-shadow:var(--mxglow);
-  box-shadow:1px 1px 0 0 #000, 1px 1px 0 1.5px var(--mxdim), 0 0 16px rgba(0,255,65,.8)}
-:root[data-skin="matrix"] :is(#tPad .k.lt,#tPad #kPlay.on){background:#b6ffc9; color:#000}
-:root[data-skin="matrix"] :is(.tcmd,.tctl,.tcmd:not([hidden]) + .tctl){border-top-color:var(--mx)}
-/* the tracker screen: black whatever its own colour setting, with green rows, a solid green cursor and faint scanlines */
-:root[data-skin="matrix"] :is(.tscr,.tscr[data-ts]){--ts-bg:#000; --ts-ink:#00ff41; --ts-dim:#0b5e20; --ts-rn:#0a8a2a; --ts-rn4:#5dff8a; --ts-th:#00c834;
-  --ts-vol:#9dffb5; --ts-inst:#5dff8a; --ts-fx:#00ff9c; --ts-mute:#ff3b3b; --ts-solo:#e8ff6a; --ts-pl-bg:#00ff41; --ts-pl:#000; --ts-sel:#0a3d18;
-  --ts-cur-bg:#00ff41; --ts-cur:#000; --ts-line:#0a5a1e; --ts-info:#00c834; --ts-hint:#0a8a2a; --ts-ok:#00ff41; --ts-hot:#b6ffc9; --ts-clip:#ff3b3b;
-  --tk-mono:#00ff41; --tk-poly:#9dffb5;
-  background-image:repeating-linear-gradient(to bottom, rgba(0,255,65,.045) 0 1px, transparent 1px 3px)}
-:root[data-skin="matrix"] .tarr, :root[data-skin="matrix"] .tarr.dk{--ar-bg:#000; --ar-ink:#00ff41; --ar-dim:#0a8a2a; --ar-blk:#00c834; --ar-blk-ink:#000;
-  --ar-empty:rgba(0,255,65,.08); --ar-line:rgba(0,255,65,.25); --ar-pl:#b6ffc9; --ar-pl-ink:#000; --ar-cur:#00ff41; --ar-mu:#ff3b3b; --tk-mono:#00ff41; --tk-poly:#9dffb5}
-:root[data-skin="matrix"] :is(.tagp b,.tgbox b){color:#000; text-shadow:none}
-:root[data-skin="matrix"] .tdeck{--tk-mono:#00ff41; --tk-poly:#9dffb5} :root[data-skin="matrix"] .dkhead{background:#000}
-:root[data-skin="matrix"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, #000)} :root[data-skin="matrix"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 16%, #000)}
-:root[data-skin="matrix"] .tarr{--ar-blk:#00ff41} :root[data-skin="matrix"] .tagrid b.f[style]{background:var(--ibm, #00ff41); color:#000} :root[data-skin="matrix"] .tagrid b.f{text-shadow:none; box-shadow:0 0 8px rgba(0,255,65,.7)}
-:root[data-skin="matrix"] .tscr .nbl, :root[data-skin="matrix"] .tscr .nbr{color:#0a8a2a}
-:root[data-skin="matrix"] ::selection{background:var(--mx); color:#000}
+  --track:var(--mxpanel2); --inv:var(--mxon); --voice:var(--mxpanel); --line:var(--mx); --screen:var(--mxbg); --screen-ink:var(--mx); --screen-line:var(--mxdim);
+  --std:var(--mx); --fm:var(--mx2); --add:var(--mxpoly); --noise:var(--mx2); --smp:var(--mx); --pl:var(--mxsoft); --fx:var(--mx); --rec:var(--mxred);
+  --stdc:var(--mxdim); --fmc:var(--mxdim); --addc:var(--mxdim); --noisec:var(--mxdim); --smpc:var(--mxdim); --plc:var(--mxdim); --wvc:var(--mxdim);
+  --meter-ok:var(--mx); --meter-hot:var(--mxsoft); --meter-clip:var(--mxred); --mxglow:0 0 6px var(--mxglowc)}
+:root[data-skinbase="term"] body{background:var(--mxbg); color:var(--mx); font-family:var(--font); text-shadow:var(--mxglow)}
+:root[data-skinbase="term"] :is(button,select,input,textarea){font-family:var(--font)}
+:root[data-skinbase="term"] :is(kbd,code,.tscr,.fxpick){font-family:var(--mono)}
+:root[data-skinbase="term"] :is(button,select,input[type=text],input[type=number],textarea){background:var(--mxbg); color:var(--mx); border-color:var(--mx)}
+:root[data-skinbase="term"] :is(button.on,.seg button.on,.ttabs button.on,.ttabs button[data-v].on,.tmap button[data-v].on,#bFile.on,.top #bSet.on){
+  background:var(--mx)!important; color:var(--mxon)!important; border-color:var(--mx); text-shadow:none; box-shadow:0 0 12px var(--mxglowc)}
+:root[data-skinbase="term"] :is(.ttabs button[data-v],.tmap button[data-v]){background:var(--mxbg); color:var(--mx)}
+:root[data-skinbase="term"] :is(.lcell,.layercard,.fxcard,.voicecard){background:var(--mxpanel); border-color:var(--mx); box-shadow:0 0 10px -4px var(--mxglowc)}
+:root[data-skinbase="term"] input[type=range], :root[data-skinbase="term"] input[type=checkbox]{accent-color:var(--mx)}
+:root[data-skinbase="term"] :is(svg){color:var(--mx)}
+:root[data-skinbase="term"] button.on svg{color:var(--mxon)}
+:root[data-skinbase="term"] .brand .plus{color:var(--mx)} :root[data-skinbase="term"] .brand .plus::before{color:var(--mxdim); -webkit-text-stroke:.05em var(--mxbg)}
+:root[data-skinbase="term"] .setmenu{background:var(--mxbg); border-color:var(--mx); box-shadow:0 0 18px -4px var(--mxglowc)}
+:root[data-skinbase="term"] .gset .gsec + .gsec, :root[data-skinbase="term"] .gset h3{border-color:var(--mxdim)}
+/* pads, command row and keypad: plain keys with outlines and an offset block; a hit fills */
+:root[data-skinbase="term"] :is(.tcmd,.dock,.tctl){background:var(--mxbg)}
+:root[data-skinbase="term"] :is(.tcmd button,.tkp .kp,.pads .pad){background:var(--mxbg); color:var(--mx); border-color:var(--mx);
+  box-shadow:4px 4px 0 0 var(--mxbg), 4px 4px 0 1.5px var(--mxdim)}
+:root[data-skinbase="term"] :is(.tcmd button.dn,.tkp .kp.dn,.pads .pad.hit,.pads .pad.hit.hit){background:var(--mx)!important; color:var(--mxon)!important; text-shadow:none;
+  box-shadow:1px 1px 0 0 var(--mxbg), 1px 1px 0 1.5px var(--mxdim), 0 0 16px var(--mxglowc)}
+:root[data-skinbase="term"] :is(.tcmd button.on,.tkp .kp.on,.tkp .kp.blk){background:var(--mxpanel2); color:var(--mx)}
+:root[data-skinbase="term"] :is(.pads .pad .pm,.pads .pad.syn b::after){color:var(--mx2)}
+:root[data-skinbase="term"] .tcmd::before{color:var(--mx2)}
+/* PAD-mode nav pad: the keys that are pastel in the other skins are solid; pressed or on turns them back */
+:root[data-skinbase="term"] #tPad .k{background:var(--mx); color:var(--mxon); border-color:var(--mx); text-shadow:none;
+  box-shadow:4px 4px 0 0 var(--mxbg), 4px 4px 0 1.5px var(--mxdim), 0 0 12px -2px var(--mxglowc)}
+:root[data-skinbase="term"] :is(#tPad .k.dn,#tPad .k.on){background:var(--mxbg); color:var(--mx); text-shadow:var(--mxglow);
+  box-shadow:1px 1px 0 0 var(--mxbg), 1px 1px 0 1.5px var(--mxdim), 0 0 16px var(--mxglowc)}
+:root[data-skinbase="term"] :is(#tPad .k.lt,#tPad #kPlay.on){background:var(--mxsoft); color:var(--mxon)}
+:root[data-skinbase="term"] :is(.tcmd,.tctl,.tcmd:not([hidden]) + .tctl){border-top-color:var(--mx)}
+/* the tracker screen: the skin's background whatever its own colour setting, a solid cursor and (Matrix) faint scanlines */
+:root[data-skinbase="term"] :is(.tscr,.tscr[data-ts]){--ts-bg:var(--mxbg); --ts-ink:var(--mx); --ts-dim:var(--mxdim); --ts-rn:var(--mx2); --ts-rn4:var(--mx); --ts-th:var(--mx2);
+  --ts-vol:var(--mxpoly); --ts-inst:var(--mx2); --ts-fx:var(--mx); --ts-mute:var(--mxred); --ts-solo:var(--mxsoft); --ts-pl-bg:var(--mx); --ts-pl:var(--mxon);
+  --ts-sel:color-mix(in srgb, var(--mx) 22%, var(--mxbg)); --ts-cur-bg:var(--mx); --ts-cur:var(--mxon); --ts-line:var(--mxdim); --ts-info:var(--mx2); --ts-hint:var(--mx2);
+  --ts-ok:var(--mx); --ts-hot:var(--mxsoft); --ts-clip:var(--mxred); --tk-mono:var(--mx); --tk-poly:var(--mxpoly);
+  background-image:repeating-linear-gradient(to bottom, var(--mxscan) 0 1px, transparent 1px 3px)}
+:root[data-skinbase="term"] .tarr, :root[data-skinbase="term"] .tarr.dk{--ar-bg:var(--mxbg); --ar-ink:var(--mx); --ar-dim:var(--mx2); --ar-blk:var(--mx); --ar-blk-ink:var(--mxon);
+  --ar-empty:color-mix(in srgb, var(--mx) 8%, transparent); --ar-line:color-mix(in srgb, var(--mx) 25%, transparent); --ar-pl:var(--mxsoft); --ar-pl-ink:var(--mxon);
+  --ar-cur:var(--mx); --ar-mu:var(--mxred); --tk-mono:var(--mx); --tk-poly:var(--mxpoly)}
+:root[data-skinbase="term"] :is(.tagp b,.tgbox b){color:var(--mxon); text-shadow:none}
+:root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly)}
+:root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
+:root[data-skinbase="term"] .tagrid b.f[style]{background:color-mix(in srgb, var(--mx) var(--ibp, 100%), var(--mxsoft)); color:var(--mxon)} :root[data-skinbase="term"] .tagrid b.f{text-shadow:none; box-shadow:0 0 8px var(--mxglowc)}
+:root[data-skinbase="term"] .tscr .nbl, :root[data-skinbase="term"] .tscr .nbr{color:var(--mx2)}
+:root[data-skinbase="term"] ::selection{background:var(--mx); color:var(--mxon)}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <script>
@@ -3357,7 +3366,9 @@ const SKINS = [
   {id:'minblack', name:'Minimal black', base:'minimal', dots:['#000000', '#1a1a1a', '#ffffff', '#5a8fe0']},
   {id:'mincolorblack', name:'Minimal colors black', base:'minimal', dots:['#0b0b0d', '#26262b', '#1f3550', '#4a2232']},
   {id:'neon', name:'Neon', dots:['#05050a', '#00f0ff', '#ff2bd6', '#a8ff3d']},
-  {id:'matrix', name:'Matrix', dots:['#000000', '#00ff41', '#0a7a25', '#b6ffc9']},
+  {id:'matrix', name:'Matrix', base:'term', dots:['#000000', '#00ff41', '#0a7a25', '#b6ffc9']},
+  {id:'bwterm', name:'Matrix black & white', base:'term', dots:['#000000', '#ffffff', '#5a5a5a', '#9a9a9a']},
+  {id:'mustard', name:'Matrix mustard', base:'term', dots:['#e3d9f6', '#a37800', '#f2cf63', '#6f55bf']},
 ];
 const SKK = 'thunderplus-skin-v1';
 let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k => k.id === v)) return v; } catch(e){} return 'minimal'; })();
@@ -3373,23 +3384,28 @@ function applySkin(id){
 }
 // …waves and …chains are their own pages (white, Minimal) in frames. The Matrix skin is carried into them
 // with a stylesheet added to each frame's page; other skins leave them as they are.
-const MATRIX_FRAME_CSS = `@font-face{font-family:"Share Tech Mono"; src:url(../fonts/ShareTechMono-400.woff) format("woff"); font-weight:100 900}
-:root{--bench:#000; --panel:#000; --panel-2:#03180a; --edge:#00ff41; --ink:#00ff41; --muted:#00c834; --track:#06260f; --side:#010d04; --frame:#010d04;
-  --video:#b6ffc9; --audio:#00ff41; --audio-dark:#00a82b; --mod:#5dff8a; --mod-dark:#0a7a25; --gate:#9dffb5; --gate-dark:#0a7a25; --rec:#ff3b3b; --selc:#e8ff6a;
-  --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:dark}
-body{text-shadow:0 0 6px rgba(0,255,65,.5)}
+// Built from the terminal skin's own colours, read off the page.
+function termFrameCss(){
+  const cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k).trim();
+  const mx = v('--mx'), mx2 = v('--mx2'), dim = v('--mxdim'), bg = v('--mxbg'), p1 = v('--mxpanel'), p2 = v('--mxpanel2'), on = v('--mxon'), soft = v('--mxsoft'), poly = v('--mxpoly'), glow = v('--mxglowc'), red = v('--mxred');
+  return `@font-face{font-family:"Share Tech Mono"; src:url(../fonts/ShareTechMono-400.woff) format("woff"); font-weight:100 900}
+:root{--bench:${bg}; --panel:${bg}; --panel-2:${p2}; --edge:${mx}; --ink:${mx}; --muted:${mx2}; --track:${p2}; --side:${p1}; --frame:${p1};
+  --video:${soft}; --audio:${mx}; --audio-dark:${dim}; --mod:${poly}; --mod-dark:${dim}; --gate:${soft}; --gate-dark:${dim}; --rec:${red}; --selc:${soft};
+  --font:${v('--font')}; color-scheme:${v('color-scheme') || 'dark'}}
+body{text-shadow:0 0 6px ${glow}}
 body,button,select,input,textarea{font-family:var(--font)!important}
-:is(.tb,.pgroup,.pitem,.pghost,.numsmall,select,.btn,.touchkeys button,button,input[type=text],input[type=number],textarea){background:#000!important; color:#00ff41; border-color:#00ff41!important}
-:is(.tb.on,.touchkeys button.on,button.on){background:#00ff41!important; color:#000!important; text-shadow:none; box-shadow:0 0 12px rgba(0,255,65,.6)}
-input[type=range],input[type=checkbox]{accent-color:#00ff41}
-.node{border-color:#00ff41!important; box-shadow:0 0 14px -5px rgba(0,255,65,.8)} .node > header, .node > .ports{border-bottom-color:#0a7a25!important}
-svg.cables .cln{stroke:#00ff41!important; filter:drop-shadow(0 0 3px rgba(0,255,65,.7))} svg.cables .cln.ctl{stroke:#9dffb5!important}
-::selection{background:#00ff41; color:#000}`;
+:is(.tb,.pgroup,.pitem,.pghost,.numsmall,select,.btn,.touchkeys button,button,input[type=text],input[type=number],textarea){background:${bg}!important; color:${mx}; border-color:${mx}!important}
+:is(.tb.on,.touchkeys button.on,button.on){background:${mx}!important; color:${on}!important; text-shadow:none; box-shadow:0 0 12px ${glow}}
+input[type=range],input[type=checkbox]{accent-color:${mx}}
+.node{border-color:${mx}!important; box-shadow:0 0 14px -5px ${glow}} .node > header, .node > .ports{border-bottom-color:${dim}!important}
+svg.cables .cln{stroke:${mx}!important; filter:drop-shadow(0 0 3px ${glow})} svg.cables .cln.ctl{stroke:${poly}!important}
+::selection{background:${mx}; color:${on}}`;
+}
 function skinFrame(f){
   try {
     const d = f && f.contentDocument; if (!d || !d.head) return;
     let s = d.getElementById('tpSkin');
-    if (skin === 'matrix'){ if (!s){ s = d.createElement('style'); s.id = 'tpSkin'; d.head.append(s); } s.textContent = MATRIX_FRAME_CSS; }
+    if ((SKINS.find(k => k.id === skin) || {}).base === 'term'){ if (!s){ s = d.createElement('style'); s.id = 'tpSkin'; d.head.append(s); } s.textContent = termFrameCss(); }
     else if (s) s.remove();
   } catch(e){}
 }
@@ -6497,6 +6513,9 @@ function deckFx(){
   }
   dkFxRows.forEach(r => { if (r.getObj()) r.refresh(); });
 }
+// A skin's font can arrive after the screen was measured (Share Tech Mono in the terminal skins): fit and redraw
+// once it lands, so the MONO/POLY boxes and the type size match the real letters.
+if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { try { if (view === 'tracker'){ arrSig = ''; fit(); draw(); } } catch(e){} });
 function deckDraw(){ deckLayout(); if (!deckShown()) return; if (deck.meters){ deckMetersBuild(); deckMetersPaint(); } deckInst(); deckFx(); }
 /* ---------- ARRANGE: the song overview beside the screen ---------- */
 // Every filled row of the song as blocks, one column per track. A block shows its phrase (or its sect with
@@ -6560,9 +6579,8 @@ function phraseInfo(pid){
   }
   return {inst, hits: d ? `<svg class="atk" viewBox="0 0 ${L} 1" preserveAspectRatio="none" aria-hidden="true"><path d="${d}"/></svg>` : ''};
 }
-// Instrument colours: spread round the wheel so neighbouring numbers differ; the Matrix skin uses greens.
+// Instrument colours: spread round the wheel so neighbouring numbers differ; the terminal skins use shades of their one colour.
 const instHue = i => `hsl(${Math.round((i * 137.508) % 360)} 52% 44%)`;
-const instGreen = i => `hsl(${128 + (i % 4) * 9} 100% ${48 + (i % 5) * 7}%)`;
 function drawArr(PH){
   if (!arrShown()) return;
   arrEl.classList.toggle('dk', tScreen === 'dark');
@@ -6589,7 +6607,7 @@ function drawArr(PH){
         cls += empty ? 'z' : 'f'; lab = sectsOn || ph < 0 ? hx(v) : hx(ph);
         if (blockMuted(S, y, t)) cls = cls.replace(/[zf]$/, 'm');
         // Coloured by the instrument its phrase plays, with the phrase's notes as ticks when the blocks are big.
-        if (!empty && ph >= 0){ const pi = phraseInfo(ph); if (pi.inst >= 0) sty = ` style="--ib:${instHue(pi.inst)};--ibm:${instGreen(pi.inst)}"`;
+        if (!empty && ph >= 0){ const pi = phraseInfo(ph); if (pi.inst >= 0) sty = ` style="--ib:${instHue(pi.inst)};--ibp:${100 - (pi.inst % 5) * 17}%"`;
           if (arRH >= 26 && pi.hits) lab += pi.hits; }
       }
       if (S.mix[t].mute || (anySolo && !S.mix[t].solo)) cls += ' tm';
