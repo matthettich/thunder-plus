@@ -613,6 +613,9 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
   border-radius:3px 3px 0 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 2px 0 var(--tk)}
 .tagp b.gp{--tk:var(--tk-poly); text-align:right}
 .tath i.gm{box-shadow:inset 0 -2px 0 var(--tk-mono)} .tath i.gp{box-shadow:inset 0 -2px 0 var(--tk-poly)}
+/* The mono and poly sections are filled with their tab colours: each empty cell takes its group's colour. */
+.tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 55%, transparent)} .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 55%, transparent)}
+.tarr.dk .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 30%, transparent)} .tarr.dk .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 30%, transparent)}
 body.arrsmall .tagp{grid-template-columns:18px var(--arcols, repeat(8,minmax(0,1fr)) 4px repeat(8,minmax(0,1fr))); gap:1px; padding:0 6px}
 body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tath{flex:none; font-size:9px; color:var(--ar-dim); padding-bottom:3px; border-bottom:1px solid var(--ar-line)}
@@ -740,6 +743,8 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 :root[data-skin="matrix"] .tarr, :root[data-skin="matrix"] .tarr.dk{--ar-bg:#000; --ar-ink:#00ff41; --ar-dim:#0a8a2a; --ar-blk:#00c834; --ar-blk-ink:#000;
   --ar-empty:rgba(0,255,65,.08); --ar-line:rgba(0,255,65,.25); --ar-pl:#b6ffc9; --ar-pl-ink:#000; --ar-cur:#00ff41; --ar-mu:#ff3b3b; --tk-mono:#00ff41; --tk-poly:#9dffb5}
 :root[data-skin="matrix"] :is(.tagp b,.tgbox b){color:#000; text-shadow:none}
+:root[data-skin="matrix"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, #000)} :root[data-skin="matrix"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 16%, #000)}
+:root[data-skin="matrix"] .tarr{--ar-blk:#00ff41} :root[data-skin="matrix"] .tagrid b.f{text-shadow:none; box-shadow:0 0 8px rgba(0,255,65,.7)}
 :root[data-skin="matrix"] .tscr .nbl, :root[data-skin="matrix"] .tscr .nbr{color:#0a8a2a}
 :root[data-skin="matrix"] ::selection{background:var(--mx); color:#000}
 </style>
@@ -6383,16 +6388,17 @@ function drawArr(PH){
   const play = PH || new Array(NT).fill(-1);   // the shared playhead, so Arrange lights the same rows as Song
   const anySolo = S.mix.some(m => m.solo);
   let h = '';
+  const PFg = polyFrom();   // each block carries its track's group, so the mono and poly sections take their colours
   for (let y = 0; y < N; y++){
     h += `<div class="ar"><span class="rn${y % 4 ? '' : ' r4'}" data-ry="${y}">${rS(y, 3)}</span>`;
     for (let t = 0; t < NA; t++){
       if (t && t % 8 === 0) h += '<span></span>';
       const v = S.song[y][t];
-      let cls = '', lab = '';
+      let cls = t < PFg ? 'gm ' : 'gp ', lab = '';
       if (v >= 0){
         const empty = isEmptySect(S.chains[v]), ph = firstPhrase(v);
-        cls = empty ? 'z' : 'f'; lab = sectsOn || ph < 0 ? hx(v) : hx(ph);
-        if (blockMuted(S, y, t)) cls = 'm';
+        cls += empty ? 'z' : 'f'; lab = sectsOn || ph < 0 ? hx(v) : hx(ph);
+        if (blockMuted(S, y, t)) cls = cls.replace(/[zf]$/, 'm');
       }
       if (S.mix[t].mute || (anySolo && !S.mix[t].solo)) cls += ' tm';
       if (cs.song.x === t && cs.song.y === y) cls += ' c';
