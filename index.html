@@ -784,6 +784,42 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 @media (max-width:700px){ .dkbody{overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:none}
   .dkbody > .dks{flex:0 0 100%!important; width:auto!important; scroll-snap-align:start} .dkw{display:none} }
 
+/* ---------- the stage: the space beside the tracker grid on big screens ----------
+   Two dancing dogs (outline cartoons of the pittie-dachshund and the husky) that hop on every beat while the song
+   plays and breathe slowly when it stops, or a preview of the phrase under the cursor. Settings → STAGE. */
+.tstage{position:absolute; z-index:2; pointer-events:none; display:flex; flex-direction:column}
+.tstage[hidden]{display:none}
+.stgx{position:absolute; top:0; right:0; pointer-events:auto; min-height:0; width:22px; height:22px; padding:0; border:0; background:transparent; color:var(--muted); opacity:0; transition:opacity .15s; font-size:var(--fs-3)}
+.tstage:hover .stgx, .stgx:focus-visible{opacity:1}
+.stgdogs{flex:1; min-height:0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:2px}
+.stgdogs .dogs{max-width:420px; max-height:100%; color:var(--ts-ink)}
+.tstage .dogs{--dk-ink:var(--ts-ink); --dk-fill:var(--ts-bg)}
+.stgph{flex:1; min-height:0; display:flex; flex-direction:column; gap:4px; font:var(--fs-2)/1.2 var(--mono); color:var(--ts-dim)}
+.stgph b{font-weight:600; letter-spacing:.06em}
+.stgph canvas{flex:1; min-height:0; width:100%; display:block}
+.dogs{--dk-ink:var(--ink); --dk-fill:var(--panel); --dk-pink:#f4a9c4; width:100%; height:100%; overflow:visible}
+.dogs .ln{fill:var(--dk-fill); stroke:var(--dk-ink); stroke-width:2.2; stroke-linejoin:round; stroke-linecap:round}
+.dogs .o{fill:none; stroke:var(--dk-ink); stroke-width:13; stroke-linecap:round}
+.dogs .f{fill:none; stroke:var(--dk-fill); stroke-width:8.6; stroke-linecap:round}
+.dogs .o.t{stroke-width:8} .dogs .f.t{stroke-width:3.6}
+.dogs .ink{fill:var(--dk-ink); stroke:none}
+.dogs .eye{fill:none}
+.dogs .band{fill:var(--dk-pink)}
+.dogs .blaze{stroke-dasharray:3 2.4}
+.dogs :is(.bob,.arm,.head,.tail){transform-box:fill-box}
+.dogs .bob{transform-origin:50% 100%}
+.dogs .al{transform-origin:100% 0%; transform:rotate(var(--aL, 0deg))} .dogs .ar{transform-origin:0% 0%; transform:rotate(var(--aR, 0deg))}
+.dogs .head{transform-origin:50% 90%}
+.dogs .d1 .tail{transform-origin:0% 100%} .dogs .d2 .tail{transform-origin:0% 85%}
+.dogs.idle .bob{animation:dkBreath 3.4s ease-in-out infinite} .dogs.idle .d2 .bob{animation-delay:-1.7s}
+.dogs.idle .tail{animation:dkWag 2.6s ease-in-out infinite}
+.dogs.dance .dog{--aL:112deg; --aR:-112deg}
+.dogs .al, .dogs .ar{transition:transform .14s ease-out}
+@keyframes dkBreath{0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.025)}}
+@keyframes dkWag{0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-10deg)}}
+@media (prefers-reduced-motion: reduce){ .dogs .bob, .dogs .tail{animation:none!important} }
+:root[data-skinbase="term"] .dogs{--dk-pink:var(--mxsoft)}
+
 /* ---------- Terminal skins: Matrix (neon green on black) and the Simple set: black, white (both Helvetica) and mustard (on lavender) ----------
    One set of rules drawn from a few colours per skin: --mx (text, outlines, fills), --mx2 (secondary text),
    --mxdim (faint lines), --mxbg/--mxpanel/--mxpanel2 (backgrounds), --mxon (text on a filled button),
@@ -1081,6 +1117,57 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     </div></div>
   <div class="tbody">
     <div class="tscr" id="tScr">
+      <div class="tstage" id="tStage" hidden aria-hidden="true">
+        <button type="button" class="stgx" id="tStageX" title="Hide (Settings → STAGE brings it back)" aria-label="Hide the stage"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
+        <div class="stgdogs" id="tStageDogs"><svg class="dogs" viewBox="0 0 270 210" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+  <!-- Pittie-dachshund: chunky, short legs, one ear perked and flopped, white chest blaze, happy squint -->
+  <g class="dog d1" transform="translate(8 28)">
+    <g class="bob">
+      <g class="tail"><path class="o t" d="M84 132 Q108 128 114 104"/><path class="f t" d="M84 132 Q108 128 114 104"/></g>
+      <g class="leg"><path class="o" d="M48 134 L45 162"/><path class="f" d="M48 134 L45 162"/><path class="o" d="M72 134 L75 162"/><path class="f" d="M72 134 L75 162"/>
+        <path class="ln" d="M34 169 Q45 157 55 169 Z M65 169 Q75 157 86 169 Z"/></g>
+      <g class="arm al"><path class="o" d="M36 94 L24 120"/><path class="f" d="M36 94 L24 120"/></g>
+      <g class="arm ar"><path class="o" d="M84 94 L96 120"/><path class="f" d="M84 94 L96 120"/></g>
+      <path class="ln" d="M60 76 C90 76 96 100 94 118 C92 138 78 146 60 146 C42 146 28 138 26 118 C24 100 30 76 60 76 Z"/>
+      <path class="ln blaze" d="M50 86 Q60 92 70 86 L62 108 Q60 112 58 108 Z"/>
+      <g class="head">
+        <path class="ln" d="M36 36 Q26 36 24 52 Q32 54 40 46 Z"/>
+        <path class="ln" d="M80 34 Q84 14 98 18 Q104 22 96 28 Q88 32 82 44 Z"/>
+        <path class="ln" d="M60 24 C80 24 90 34 89 48 C88 62 80 70 60 70 C40 70 32 62 31 48 C30 34 40 24 60 24 Z"/>
+        <path class="ln" d="M60 52 C72 52 76 58 75 63 C74 70 68 73 60 73 C52 73 46 70 45 63 C44 58 48 52 60 52 Z"/>
+        <path class="ln eye" d="M45 46 Q50 41 55 46 M65 46 Q70 41 75 46"/>
+        <ellipse class="ink" cx="60" cy="57" rx="5" ry="3.4"/>
+        <path class="ln eye" d="M53 64 Q60 70 67 64"/>
+      </g>
+    </g>
+  </g>
+  <!-- Husky mix: taller and fluffy, big ears, curled tail, pink bandana, long muzzle, tongue out -->
+  <g class="dog d2" transform="translate(138 4)">
+    <g class="bob">
+      <g class="tail"><path class="o" d="M82 156 Q120 156 114 120 Q110 100 94 110"/><path class="f" d="M82 156 Q120 156 114 120 Q110 100 94 110"/></g>
+      <g class="leg"><path class="o" d="M48 156 L44 190"/><path class="f" d="M48 156 L44 190"/><path class="o" d="M72 156 L76 190"/><path class="f" d="M72 156 L76 190"/>
+        <path class="ln" d="M33 197 Q44 185 54 197 Z M66 197 Q76 185 87 197 Z"/></g>
+      <g class="arm al"><path class="o" d="M38 104 L26 134"/><path class="f" d="M38 104 L26 134"/></g>
+      <g class="arm ar"><path class="o" d="M82 104 L94 134"/><path class="f" d="M82 104 L94 134"/></g>
+      <path class="ln" d="M60 84 C86 84 90 112 88 136 C86 162 72 170 60 170 C48 170 34 162 32 136 C30 112 34 84 60 84 Z"/>
+      <path class="ln eye" d="M48 128 l4 6 l4 -6 l4 6 l4 -6 l4 6 l4 -6"/>
+      <path class="ln band" d="M36 90 Q60 100 84 90 L67 114 Q60 119 53 114 Z"/>
+      <g class="head">
+        <path class="ln" d="M40 44 L32 8 L58 32 Z"/>
+        <path class="ln" d="M80 44 L88 8 L62 32 Z"/>
+        <path class="ln" d="M60 26 C78 26 86 36 86 48 L90 54 L84 58 L87 64 L80 66 C76 74 70 80 60 80 C50 80 44 74 40 66 L33 64 L36 58 L30 54 L34 48 C34 36 42 26 60 26 Z"/>
+        <path class="ln eye" d="M40 52 Q48 44 56 52 Q60 56 64 52 Q72 44 80 52"/>
+        <path class="ln" d="M60 56 C68 56 71 62 70 68 C69 76 64 80 60 80 C56 80 51 76 50 68 C49 62 52 56 60 56 Z"/>
+        <circle class="ink" cx="51" cy="49" r="2.6"/><circle class="ink" cx="69" cy="49" r="2.6"/>
+        <ellipse class="ink" cx="60" cy="62" rx="4.4" ry="3.1"/>
+        <path class="ln eye" d="M54 70 Q60 75 66 70"/>
+        <path class="ln band" d="M57 72 Q60 84 63 72 Z"/>
+      </g>
+    </g>
+  </g>
+</svg></div>
+        <div class="stgph" id="tStagePh" hidden><b id="tStagePhT"></b><canvas id="tStageC"></canvas></div>
+      </div>
       <div class="thd"><span class="thl"><span id="tTitle">SONG</span><span class="tpset" id="tPset"></span></span><span class="tsub" id="tSub"></span></div>
       <div class="tgrid" id="tGrid"></div>
       <div class="tinfo"><div id="tInfo"></div><div class="thint" id="tHint"></div></div>
@@ -1215,7 +1302,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p><b>Arrange</b> (wide screens): the blue overview at the right shows the whole song, lined up with the Song screen (scroll either one and the other follows). <b>A tap on a block goes to it</b> (a second tap opens its phrase). <b>Holding a block mutes or unmutes just that one</b> — the phrase stays in place, silent, so you can drop parts in and out while arranging. Tap a row number to play from there; in KEYS mode M mutes the block under the Song cursor. Whole tracks are muted in the Mixer, never here, so a slip can’t silence a track.</p>
 <p>The screens are laid out as a map: Song ▶ Sect ▶ Phrase ▶ Inst left to right, Project above, Mixer below, FX to the right of the Mixer. You move between them with the screen keys below, the tabs, or the map in the side panel.</p>
 <h3>Settings</h3>
-<p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound and the current track’s effects, and a channel strip for the current track (stereo meter, fader with 0 dB at E0 and +6 dB at the top, pan, M and S). Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
+<p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound and the current track’s effects, and a channel strip for the current track (stereo meter, fader with 0 dB at E0 and +6 dB at the top, pan, M and S). Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. On a big screen the space beside the grid is the <b>stage</b> (Settings → STAGE): DOGS dance to the beat while the song plays, PHRASE previews the phrase under the cursor, OFF leaves it empty. The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots. <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song. <b>A voice per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chopping breaks</h3>
@@ -4990,7 +5077,7 @@ function tStart(mode, o){
   const seq = makeSeq(S, mode, o);
   if (!seq.alive()){ toast(mode === 'song' ? `Row ${rS(o.row, 3)} is empty. Put a sect on it, or move to a row that has some.` : 'Nothing to play here yet.'); draw(); return; }
   for (let i = 0; i < nslots(); i++) ensureLive(i);   // up to date, or the last render while the Worker finishes
-  seq.time = ctx.currentTime + 0.08;
+  seq.time = ctx.currentTime + 0.08; stageStart(seq.time);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : ''});
   tp.timer = setInterval(pump, 25); pump(); draw(); songBtn(); chainsTempo();
@@ -5493,6 +5580,8 @@ function projRows(){
       info:() => 'KEYS mode: show the on-screen keypad at the bottom for tapping in notes. Off hides it — the computer keyboard still types notes and hex, and the octave (OCT, top bar) stays. PAD mode is unchanged'},
     {l:'BOTTOM PANEL', ck:'Show the bottom panel', get:() => deck.on ? 1 : 0, set:v => setDeck('on', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'KEYS mode with the keypad off: a panel at the bottom with a spectrum of the master, quick controls for the current instrument and the current track’s effects, and a channel strip for the current track. Its buttons hide each part'},
+    {l:'STAGE', opts:true, get:() => STG.indexOf(stage), set:v => setStage(STG[v]), min:0, max:STG.length - 1, d:0, fmt:v => STG_NAMES[v],
+      info:() => 'Big screens: the space beside the grid. DOGS dance to the beat while the song plays; PHRASE shows the phrase under the cursor as a little piano roll; OFF leaves it empty (and saves a little power)'},
     {l:'SCREEN', sec:'Screen', gap:true, opts:true, get:() => SCREENS.findIndex(x => x[0] === tScreen), set:v => setScreen(SCREENS[v][0]), min:0, max:SCREENS.length - 1, fmt:v => SCREENS[v][1], info:() => 'Colour of the screen: BY SCREEN gives Song, Sect, Phrase and the rest their own pastel (the same as their tabs), or pick one pastel, or black'},
     {l:'SKIN', opts:true, get:() => SKINS.findIndex(k => k.id === skin), set:v => applySkin(SKINS[v].id), min:0, max:SKINS.length - 1, fmt:v => SKINS[v].name.toUpperCase(), info:() => 'The look of the whole app: the ...Seeds skins'},
     {l:'SECT', ck:'Hide sect page', inv:true, get:() => sectsOn ? 1 : 0, set:v => setSects(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
@@ -6523,7 +6612,7 @@ function draw(){
   $('tHint').textContent = (tv === 'phrase' ? 'NOW ' + curS() + (inMode === 'keys' ? ' · oct ' + kOct + ' · step ' + kStep : '') + ' · ' : '') + hintTxt;
   drawArr(PH);
   const km = inMode === 'keys'; $('tKp').hidden = !km || !kpOn; $('tPad').hidden = km; $('tLegKeys').hidden = !km; $('tLegPad').hidden = km;
-  deckDraw();
+  deckDraw(); stageLayout();
   drawPat();
   $('tOct').hidden = !km; $('tOctN').textContent = kOct;
   if (km) drawKeypad();
@@ -6571,6 +6660,80 @@ function paintMeters(){
       masterEls[base + 4].textContent = pk > 0.00002 ? (20 * Math.log10(pk)).toFixed(1).padStart(5) + (pk >= 0.999 ? ' CLIP' : '') : '  −∞';
     });
   }
+}
+/* ---------- the stage beside the tracker grid (big screens) ---------- */
+const STK = 'thunderplus-stage-v1', STG = ['dogs', 'phrase', 'off'], STG_NAMES = ['DOGS', 'PHRASE', 'OFF'];
+let stage = (() => { try { const v = localStorage.getItem(STK); if (STG.includes(v)) return v; } catch(e){} return 'dogs'; })();
+function setStage(v){ stage = v; try { localStorage.setItem(STK, v); } catch(e){} stageLayout(); }
+$('tStageX').addEventListener('click', () => { setStage('off'); toast('Stage hidden. Settings → STAGE brings it back.'); });
+// It sits in the space to the right of the grid's text, the grid's height, when that space is big enough.
+function stageLayout(){
+  const box = $('tStage');
+  if (view !== 'tracker' || stage === 'off'){ box.hidden = true; return; }
+  const sr = scr.getBoundingClientRect(), gr = grid.getBoundingClientRect(), rg = document.createRange();
+  let right = 0; const lines = grid.querySelectorAll('.ln');
+  for (let i = 0; i < Math.min(lines.length, 8); i++){ rg.selectNodeContents(lines[i]); const r = rg.getBoundingClientRect(); if (r.width && r.right > right) right = r.right; }
+  grid.querySelectorAll('.tgbox').forEach(b => { const r = b.getBoundingClientRect(); if (r.right > right) right = r.right; });
+  const left = right - sr.left + 18, w = sr.width - left - 14, top = gr.top - sr.top, h = gr.height;
+  const show = right > 0 && w >= 150 && h >= 150; box.hidden = !show; if (!show) return;
+  Object.assign(box.style, {left:left + 'px', top:top + 'px', width:w + 'px', height:h + 'px'});
+  $('tStageDogs').hidden = stage !== 'dogs'; $('tStagePh').hidden = stage !== 'phrase';
+  if (stage === 'phrase') stagePhrase(); else dogsState();
+}
+// Dogs: arms up and dancing while the song plays, a slow breath and a lazy tail when it stops.
+function dogsState(){
+  const d = $('tStageDogs').querySelector('.dogs'), on = !!tp.on; d.classList.toggle('dance', on); d.classList.toggle('idle', !on);
+  if (!on) d.querySelectorAll('.dog').forEach(g => { g.style.removeProperty('--aL'); g.style.removeProperty('--aR'); });
+}
+// Beat clock: counted from the moment the song starts, at its tempo (re-anchored when TPO changes it),
+// against the output's latency so a hop lands with the sound.
+let stgT0 = 0, stgBeat = -1, stgBpm = 120, stgSide = 1, stgOn = false;
+function stageStart(t0){ stgT0 = t0; stgBeat = -1; stgBpm = S.bpm; }
+function stageTick(){
+  if (stgOn !== !!tp.on){ stgOn = !!tp.on; if (stage === 'dogs' && !$('tStage').hidden) dogsState(); }
+  if (stage !== 'dogs' || !tp.on || !ctx || $('tStage').hidden) return;
+  const lat = ctx.outputLatency || ctx.baseLatency || 0, t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
+  if (bpm !== stgBpm){ const b = (t - stgT0) * stgBpm / 60; stgBpm = bpm; stgT0 = t - b * 60 / bpm; }
+  const per = 60 / bpm, b = Math.floor((t - stgT0) / per);
+  if (b < 0 || b === stgBeat) return; stgBeat = b;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  dogsBeat(b % 4 === 0, per * 1000);
+}
+function dogsBeat(bar, ms){
+  stgSide = -stgSide; const d = Math.min(ms * 0.85, 650);
+  $('tStageDogs').querySelectorAll('.dog').forEach((g, i) => {
+    const sd = stgSide * (i ? -1 : 1), hop = bar ? 15 : 8;
+    g.querySelector('.bob').animate([{transform:'translateY(0) rotate(0deg)'}, {transform:`translateY(${-hop}px) rotate(${sd * 5}deg)`, offset:.35}, {transform:'translateY(0) rotate(0deg)'}], {duration:d, easing:'ease-out'});
+    g.querySelector('.head').animate([{transform:'rotate(0deg)'}, {transform:`rotate(${sd * 9}deg)`, offset:.4}, {transform:'rotate(0deg)'}], {duration:d, easing:'ease-out'});
+    g.querySelector('.tail').animate([{transform:'rotate(0deg)'}, {transform:'rotate(-20deg)'}, {transform:'rotate(10deg)'}, {transform:'rotate(0deg)'}], {duration:d});
+    g.style.setProperty('--aL', (112 + sd * 22) + 'deg'); g.style.setProperty('--aR', (-112 + sd * 22) + 'deg');
+  });
+}
+// Phrase preview: the phrase under the cursor as a little piano roll, time running down like the tracker.
+function stagePhraseId(){
+  if (tv === 'song'){ const r = S.song[cs.song.y], v = r ? r[cs.song.x] : -1; return v >= 0 ? firstPhrase(v) : -1; }
+  if (tv === 'sect'){ const ch = S.chains[cSect], r = ch && ch[cs.sect.y]; return r && r[0] >= 0 ? r[0] : -1; }
+  return cPhrase;
+}
+function stagePhrase(){
+  const pid = stagePhraseId(), c = $('tStageC'), p = pid >= 0 ? S.phrases[pid] : null;
+  const r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (!r.width || !r.height) return;
+  c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+  const g = c.getContext('2d'), W = c.width, H = c.height, st = getComputedStyle(scr);
+  const ink = st.getPropertyValue('--ts-ink').trim() || '#111', dim = st.getPropertyValue('--ts-line').trim() || '#ccc', vol = st.getPropertyValue('--ts-vol').trim() || ink;
+  g.clearRect(0, 0, W, H);
+  if (pid < 0){ $('tStagePhT').textContent = 'NO PHRASE HERE'; return; }
+  const L = plen(pid), notes = []; let lo = 999, hi = -1, inst = -1;
+  if (p) for (let y = 0; y < L && y < p.length; y++) for (let k = 0; k < NCOL; k++){ const n = p[y][k];
+    if (n >= 0 && n < OFF){ notes.push([y, n, k]); lo = Math.min(lo, n); hi = Math.max(hi, n); if (inst < 0 && p[y][IC] >= 0) inst = p[y][IC]; } }
+  $('tStagePhT').textContent = `PHRASE ${hx(pid)} · ${L} ROWS` + (inst >= 0 ? ` · INST ${hx(inst)}` : '') + (notes.length ? '' : ' · EMPTY');
+  const lpb = S.plpb && S.plpb[pid] ? S.plpb[pid] : (S.lpb || 4), rh = H / L;
+  g.strokeStyle = dim; g.lineWidth = dpr;
+  for (let y = 0; y <= L; y += lpb){ const yy = Math.round(y * rh) + .5; g.beginPath(); g.moveTo(0, yy); g.lineTo(W, yy); g.stroke(); }
+  g.strokeRect(.5, .5, W - 1, H - 1);
+  if (!notes.length) return;
+  lo -= 2; hi += 2; const cw = W / (hi - lo + 1);
+  for (const [y, n, k] of notes){ g.fillStyle = k ? vol : ink; g.fillRect(Math.round((n - lo) * cw + 1), Math.round(y * rh + rh * .12), Math.max(2, Math.round(cw - 2)), Math.max(2, Math.round(rh * .76))); }
 }
 /* ---------- bottom panel (KEYS mode with the keypad off) ---------- */
 const DKK = 'thunderplus-deck-v1';
@@ -7006,7 +7169,7 @@ function frame(){
         if (p >= rt.mpk[s] || now - rt.mpt[s] > 1500){ if (p !== rt.mpk[s]) any = true; rt.mpk[s] = p; rt.mpt[s] = now; } }); }
     if (any){ paintMeters(); deckMetersPaint(); }
   }
-  deckScope(mt); deckStripMeter(mt);
+  deckScope(mt); deckStripMeter(mt); stageTick();
 }
 
 /* ---------- building the screen ---------- */
