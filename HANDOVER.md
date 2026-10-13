@@ -6,8 +6,9 @@ Keep this file up to date at the end of a work session.
 
 ## Where things stand (13 Oct 2026, morning)
 
-- **Repos:** `matthettich/thunder-plus` (this one) and `matthettich/Thunder-` (built from this one), both
-  branch `main`, both pushed. Nothing uncommitted.
+- **One repo now:** `matthettich/thunder-plus` (this one), branch `main`, pushed, nothing uncommitted.
+  `matthettich/Thunder-` is **retired** (13 Oct): its page forwards to this app and its service worker removes
+  itself. Don't build or edit it; its old app code is in its history (last build 58a0a43).
 - **Commits this session** (Plus, oldest first):
   - `2dcda77`: 14 new effects, 6 oscillators, tempo-synced modulation, …chains Steps/Clock/Repeat, and the
     song phrase-number fix.
@@ -16,11 +17,12 @@ Keep this file up to date at the end of a work session.
   - Thunder- has a matching rebuild after each of them.
   - 13 Oct: the **Beads crash fix** and effect crash guards (see below), with a Thunder- rebuild.
   - 13 Oct: **one app, two setups** (Settings → App → Mobile) and the first-PLAY render fix (see below);
-    `build-thunder.py` rewritten so Thunder- is Plus starting in Mobile.
+    then the owner chose **one app, one repo**: Thunder- retired (forwarding page), `build-thunder.py` removed.
+  - 13 Oct: **pad rendering moved to a Worker** (see below), and the offer to open ...Thunder's saved work.
 - **App:** no build step. `index.html` is the whole tracker/synth app; `chains/index.html` and
   `waves/index.html` are the two modular patch editors loaded in frames.
 - **Cache-busters now:** `chains-worklet.js?v=8` (index.html, chains/index.html, sw.js). Caches are
-  `thunderplus-v39`; `build-thunder.py` bumps Thunder-'s `thunder-vNN` itself.
+  `thunderplus-v40`.
 
 ## Licensing rule (the owner may sell the app later)
 
@@ -174,12 +176,17 @@ with a run-time setting.
     back restores it. A first run in Mobile starts in PAD.
   - …waves layers and …chains effects still **play** in Mobile, so files are the same in both.
   - `PF_DEFAULT`: Mobile on a coarse pointer, else Desktop.
-- **`tools/build-thunder.py` is now small:** the Thunder- page is Plus's with `PF_DEFAULT = 'mobile'`, its
-  own storage names (`thunder-*`) and install name. It copies all of `chains/` and `waves/` (Desktop works in
-  Thunder too) and merges their files into Thunder-'s `sw.js` list, bumping `thunder-vNN` when anything
-  changed. Thunder-'s README, manifest, icons and electron/package.json stay its own.
-- **Still two URLs and two saved-data sets** (same origin, `thunder-*` vs `thunderplus-*`). Retiring one
-  install is the owner's call (see open items).
+- **...Thunder retired (13 Oct, the owner's choice):** one app, one repo.
+  - `matthettich/Thunder-` now holds only a forwarding `index.html` (clears `thunder-*` caches, unregisters its
+    service worker, then `location.replace('../thunder-plus/')`), a self-removing `sw.js`, README, manifest and
+    icons. Tested locally with the old service worker installed: it was removed and the page forwarded.
+  - **Saved work:** both apps lived at matthettich.github.io, so Plus reads Thunder's `thunder-kit-v1`,
+    `thunder-song-v1` and IndexedDB `thunder-samples` (only reads). `thunderOffer()` (2.5 s after start-up)
+    asks once, with `confirm()`, when Thunder's work differs from Plus's. Yes: it downloads Plus's song and
+    kit as `<song> project (before Thunder import).json`, then opens Thunder's and copies its samples into
+    `thunderplus-samples`. No: it keeps Plus's. The answer is stored in `thunderplus-thunder-import-v1`.
+    Nothing is asked when Plus has no work of its own (it already opened Thunder's) or both are the same.
+    **File → Open ...Thunder's saved work…** appears while Thunder's data exists.
 
 ### Performance: what costs what (13 Oct, measured)
 
@@ -199,9 +206,46 @@ Headless Chromium with a phone-sized screen and CPU throttled 4× (Playwright + 
     again when audio starts.
   - Result at 4×: first PLAY takes 144 ms once the kit has rendered (about 10 s after opening at that
     speed), and 2.7 s if pressed straight away.
+- **Then the Worker (below) took pad rendering off the UI thread altogether.**
 - **Not worth a switch:** the …chains engine's draft quality only trims Vocoder bands (and turns on by itself
   under load), …waves' draft mutes modules, and the editors cost nothing until opened. So Mobile hides
   editors but doesn't change sound or quality.
+
+### Pad rendering in a Worker (13 Oct)
+
+- **What:** `rwStart()` builds a Worker from this page's own `/* ===ENGINE START=== */` … `/* ===ENGINE END=== */`
+  block (the synthesis code: oscillators, `renderVoice`, pad FX), plus a small glue script. The block must
+  stay free of DOM use at top level; the Worker has no `document`, `window` or `localStorage`.
+  - **Wasm:** the loader compiles each wasm once (`plMod`, `txMod`) and shares the modules with the …waves
+    engine and the Worker. This also fixed the double base64 decode.
+  - **…waves:** the Worker `importScripts` `waves/waves-worklet.js`.
+  - **Tempo:** the Worker's `S` only carries `bpm`.
+- **Main-thread API** (next to `ensure`):
+  - `ensure(i)`: up to date, now, rendered here if needed. Used by chops, slice info and anything that must
+    be exact.
+  - `ensureLive(i)`: for playing. Returns the last render while the Worker makes the new one. Used by
+    `buffer()`, `rtBuf*` and `tStart()`.
+  - `bgRender(i)`: one Worker job per pad. An edit made meanwhile re-sends the newest state when the job
+    lands, and `padRev[]` stops an older result replacing a newer one.
+  - `showCur()`: draws the current pad now and refreshes it in the background.
+  - `renderAsync()`: the song render's pads also go to the Worker.
+- **Fallbacks:**
+  - No Worker, or a Worker that errors (`rwDown`): everything renders on the UI thread as before.
+  - A voice that can't be posted: that pad renders on the UI thread.
+  - A …waves voice when the Worker couldn't load …waves: that pad renders on the UI thread.
+  - Both "no Worker" and "Worker crashes" were tested.
+- **Same sound:** the Worker's output is bit-identical to the old main-thread render for the factory kit,
+  every oscillator type (sample/grains/PWM with a sample), every pad FX (34) and a …waves patch.
+- **Measured at 4× CPU throttle, phone screen:**
+
+  | | Before | After |
+  |---|---|---|
+  | First 6 s after opening | 17 frames, 2 s freezes | 359 frames, no long tasks |
+  | Dragging a synth-pad slider for 3 s | 32 frames over 100 ms, 2 s stalls | no frame over 33 ms |
+  | PLAY | ~0.1–0.2 s | ~0.1–0.2 s |
+
+  On a real phone, rendering still takes as long, but in the background. A pad tapped before its first
+  render lands still renders on the UI thread (`ensureLive` with no cache).
 
 ## Running it locally
 
@@ -233,7 +277,7 @@ E=eurorack D=DaisySP A=airwindows/plugins/LinuxVST/src C=CloudSeedCore WASI_SDK=
 Then copy `dsp/tfx/tfx.wasm` to `chains/dsp/` and `waves/dsp/`, put its base64 into the `tfxWasm` script tag
 in `index.html`, and delete the build output from `dsp/tfx/`. **Check the old effects still match**: render
 ids 0–10 with the old and new wasm and compare (this session they were bit-identical). Then bump the
-caches and rebuild Thunder-.
+caches.
 
 ## How to validate (there is no test suite)
 
@@ -250,6 +294,9 @@ caches and rebuild Thunder-.
 4. **In the page:** headless Chromium (Playwright is installed) with a copy of `index.html` that adds
    `window.__T = {…}` before the main script's closing `})();`. That gives you `S`, `FX`, `freshFx`,
    `applyFx`, `pass`, `makeSeq`, `applyChop` and so on. Never commit that copy.
+5. **Worker matches:** in that copy, compare `renderVoice(v, sr, null, hold)` with
+   `(await renderAsync(v, sr, hold)).data` for every TYPES oscillator and FX key (they should be identical).
+   For responsiveness, use CDP `Emulation.setCPUThrottlingRate` 4 and a `longtask` PerformanceObserver.
 
 ## Open items / where to pick up
 
@@ -258,12 +305,9 @@ caches and rebuild Thunder-.
    - The trance gate landing on the downbeat.
    - STRETCH and LOOP on a real break.
    - Touch on the new INST rows.
-2. **Move pad rendering to a Worker (biggest remaining win, both platforms).** Measured above: each synth
-   pad blocks the UI for ~0.2–0.4 s at full speed and ~1–2 s at 4× throttle, after every edit (a 45 ms
-   debounce), in the idle pre-render and at kit load. `renderVoice` needs makeOsc, the plaits/tfx wasm,
-   the …waves offline engine and sample data. A Worker built from the same script, or an extracted DSP
-   module, would make edits and start-up smooth on the Fold. Then the synth-slot render length (Max len) could
-   also be rendered in pieces.
+2. **Long synth renders:** a synth slot renders its whole Max len (6–8 s, up to 30 s) each time. It's now in
+   the background, but a phone still takes a second or more before an edit is heard. Rendering in pieces
+   (the first second first) would shorten that.
 3. **…waves editor** doesn't list the new effects (the shared wasm already has them). Adding them means
    mirroring the …chains editor entries in `waves/index.html` and `waves/waves-worklet.js`, which come from
    the separate `matthettich/waves` repo.
@@ -276,10 +320,8 @@ caches and rebuild Thunder-.
    - An envelope filter with sidechain.
 6. **Still left from the earlier mobile pass:** incremental playhead painting in `draw()`/`drawArr()`
    (`draw()` costs ~13 ms at 4× even when nothing changed, because it rebuilds the grid string to compare).
-7. **One install or two?** Thunder- is now a build of the same app. The owner could keep both installs, or
-   retire one: Thunder-'s `index.html` could become a pointer to Plus. Saved work would then need moving
-   (`thunder-*` to `thunderplus-*`, IndexedDB `thunder-samples`, which Plus already reads).
-8. **Start-up decodes `tfxWasm` from base64 twice** (track FX and the …waves engine). Minor.
+7. **On the phone:** the owner should install ...Thunder Plus from its page and remove the old ...Thunder icon
+   (the old one now just forwards). Check that the offer to bring Thunder's work over appears there.
 
 ## Conventions worth knowing
 
@@ -293,7 +335,6 @@ caches and rebuild Thunder-.
   5. Use `fx:true` only for `tfx.wasm` effects.
 - **`README.md`:** the top part is Thunder Plus's; the rest is …Thunder's (the base app).
 - **Two engines:** `waves/waves-worklet.js` (from the waves repo) and `chains/chains-worklet.js`.
-- **`tools/build-thunder.py`** writes ../Thunder-'s `index.html` and `electron/main.js`, copies `chains/` and
-  `waves/`, and updates its `sw.js`. It fails loudly when a string it replaces has moved; update the script then.
-- **Never hide a feature with `build-thunder.py` any more:** use `isMobile()` in the page, so both installs
-  stay the same code.
+- **Mobile vs Desktop:** anything that should differ uses `isMobile()` in the page; there is no second build.
+- **Engine block:** code that renders pads goes between the `===ENGINE===` markers, with no DOM, `window` or
+  `localStorage` at top level, because the render Worker runs that block as-is.

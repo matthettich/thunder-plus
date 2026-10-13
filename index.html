@@ -1018,7 +1018,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p>Each track and the master have 4 effect slots (FX screen, or the Mixer’s FX row): EQ, compressor, reverb, tape delay, saturation, tape, chorus, bitcrush, Rings and Clouds. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to four, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
 <p><b>…chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback.</p></section>
-    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Kit ▾</b> saves and loads kits, <b>Export ▾</b> writes WAVs for Koala and SunVox, <b>MIDI ▾</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off), <b>Skin ▾</b> changes the look.</p><h2>Files and rendering</h2><p><b>Project</b> holds SAVE, SAVE AS and LOAD PROJECT, plus RENDER SONG (a stereo WAV) and RENDER STEMS (a zip with the mix and one WAV per track). In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/Thunder-#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
+    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Kit ▾</b> saves and loads kits, <b>Export ▾</b> writes WAVs for Koala and SunVox, <b>MIDI ▾</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off), <b>Skin ▾</b> changes the look.</p><h2>Files and rendering</h2><p><b>Project</b> holds SAVE, SAVE AS and LOAD PROJECT, plus RENDER SONG (a stereo WAV) and RENDER STEMS (a zip with the mix and one WAV per track). In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -2031,7 +2031,7 @@ let view = 'synth';   // 'synth', 'tracker', 'waves' or 'chains'
 /* ---------- platform: Mobile (...Thunder) or Desktop (...Thunder Plus) ----------
    One app, two setups. Mobile hides the …waves and …chains editors and switches the tracker to PAD input; their
    layers and effects still play, so kits and songs open and sound the same in both. Desktop shows everything.
-   PF_DEFAULT is a touch screen's first choice (the ...Thunder build sets it to 'mobile'). */
+   PF_DEFAULT: Mobile on a touch screen, Desktop otherwise. (The separate ...Thunder install is retired.) */
 const PFK = 'thunderplus-platform-v1', DIK = 'thunderplus-desktop-input-v1';
 const PF_DEFAULT = matchMedia('(pointer:coarse)').matches ? 'mobile' : 'desktop';
 let platform = (() => { try { const p = localStorage.getItem(PFK); if (p === 'mobile' || p === 'desktop') return p; } catch(e){} return PF_DEFAULT; })();
@@ -2110,26 +2110,124 @@ function audio(){
   if (ctx.state === 'suspended') ctx.resume();
   return ctx;
 }
-// Renders the pads ahead of time, one per idle moment, so PLAY and the first tap of a pad don't have to.
-// A pad that is already up to date costs nothing. Runs once after start-up and again when audio starts.
+/* ---------- pad rendering: a background Worker, with the UI thread as the fallback ----------
+   Rendering a pad (renderVoice) takes 10–90 ms for a drum and 0.2–0.4 s for a synth slot on a computer, and
+   several times that on a phone. It used to run on the UI thread after every edit, at kit load and at the first
+   PLAY, so touch and scrolling stalled. Now a Worker runs the same engine code (the ===ENGINE=== block of this
+   script, with its own copies of the wasm and the …waves engine) and the page installs each result when it lands.
+   - ensure(i): the pad, up to date, now. Renders on this thread if it must (offline renders, chops, exports).
+   - ensureLive(i): for playing. An up-to-date render, or the last one while the Worker makes the new one.
+   - bgRender(i): ask the Worker. One job per pad at a time; an edit made meanwhile sends the newest state
+     when the job lands, so a slider drag never queues a backlog. padRev[] makes sure an older result can never
+     replace a newer one (whichever thread made it).
+   If the Worker can't start (or a voice needs …waves and the Worker couldn't load it), everything renders here
+   as before. */
+const pend = [], padRev = [];
+const PW = {w:null, ready:false, wv:false, id:0, jobs:new Map()};
+function rwStart(plMod, txMod){
+  try {
+    const sc = [...document.scripts].find(x => x.textContent.includes('===ENGINE ' + 'START==='));
+    const t = sc.textContent, A = t.indexOf('/* ===ENGINE ' + 'START=== */'), B = t.indexOf('/* ===ENGINE ' + 'END=== */');
+    if (A < 0 || B < A) return;
+    const glue = `
+var S = {bpm:120}, WVOK = false;
+self.onmessage = async e => {
+  const m = e.data;
+  if (m.op === 'init'){
+    const z = () => 0, imp = {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}};
+    try { if (m.pl){ PL = await WebAssembly.instantiate(m.pl, imp); if (PL.exports._initialize) PL.exports._initialize(); } } catch(err){ PL = null; }
+    try { if (m.tx){ TX = await WebAssembly.instantiate(m.tx, imp); if (TX.exports._initialize) TX.exports._initialize(); } } catch(err){ TX = null; }
+    try { if (m.wv && m.pl && m.tx){ importScripts(m.wv); if (self.WavesDSP){ WavesDSP.wasmInit({dspModule:m.pl, tfxModule:m.tx}); WV.ready = true; WVOK = true; } } } catch(err){}
+    postMessage({op:'ready', wv:WVOK, pl:!!PL, tx:!!TX}); return;
+  }
+  if (m.op === 'render'){
+    try {
+      S = {bpm:m.bpm || 120}; WV.doc = m.waves || null;
+      const st = m.stages ? new Map() : null, d = renderVoice(m.v, m.sr, st, m.hold), sts = [];
+      if (st) (m.v.fx || []).forEach((f, k) => { const pk = st.get(f); if (pk) sts.push([k, pk]); });
+      postMessage({op:'done', id:m.id, data:d, st:sts}, [d.buffer]);
+    } catch(err){ postMessage({op:'fail', id:m.id, err:String(err && err.message || err)}); }
+  }
+};`;
+    const url = URL.createObjectURL(new Blob([t.slice(A, B), glue], {type:'text/javascript'}));
+    const w = new Worker(url); URL.revokeObjectURL(url);
+    w.onmessage = e => {
+      const m = e.data;
+      if (m.op === 'ready'){ PW.ready = !!(m.pl || !plMod) && !!(m.tx || !txMod); PW.wv = !!m.wv; if (PW.ready) prerender(); return; }
+      const j = PW.jobs.get(m.id); if (!j) return; PW.jobs.delete(m.id);
+      if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
+    };
+    w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
+    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=4', location.href).href});
+    PW.w = w;
+  } catch(e){ PW.w = null; }
+}
+// The Worker stopped (or never started): pending jobs fall back to this thread.
+function rwDown(){ PW.ready = false; try { PW.w && PW.w.terminate(); } catch(e){} PW.w = null; for (const j of PW.jobs.values()) j.no(new Error('worker')); PW.jobs.clear(); }
+// Can the Worker render this voice? (It has no …waves engine if loading that failed.)
+const rwCan = v => PW.ready && PW.w && !(PW.wv === false && WV.doc && v.layers.some(l => l.on && l.type === 'waves'));
+// Renders a voice in the Worker: resolves to {data, st:[[fx index, peaks]…]}. Rejects when the Worker can't.
+function renderAsync(v, sr, hold, stages){
+  if (!rwCan(v)) return Promise.reject(new Error('no worker'));
+  return new Promise((ok, no) => {
+    const id = ++PW.id; PW.jobs.set(id, {ok, no});
+    try { PW.w.postMessage({op:'render', id, v, sr, hold, stages:!!stages, bpm:songBpm(), waves:WV.doc}); }
+    catch(e){ PW.jobs.delete(id); no(e); }   // a voice the Worker can't be sent: render here
+  });
+}
+const padSR = () => ctx ? ctx.sampleRate : srGuess;
+const padBpm = i => voiceSynced(kit.voices[i]) ? songBpm() : 0;
+function stale(i){ const c = slotAt(cache, i); return !c || slotAt(dirty, i) || c.sr !== padSR() || (c.bpm || 0) !== padBpm(i); }
+function install(i, c){ slotAt(padRev, i); padRev[i] = (padRev[i] || 0) + 1; cache[i] = c; dirty[i] = false; bufs[i] = null; }
+function bgRender(i){
+  slotAt(pend, i);
+  if (pend[i]) return;                     // one at a time: when it lands, dirty[i] decides whether to go again
+  const v = kit.voices[i]; if (!v) return;
+  if (!rwCan(v)){ ensure(i); rendered(i); return; }
+  const sr = padSR(), tb = padBpm(i), r0 = (slotAt(padRev, i) || 0);
+  dirty[i] = false; pend[i] = true;
+  renderAsync(v, sr, isSyn(i) ? v.len : 0, true).then(r => {
+    pend[i] = false;
+    if (kit.voices[i] !== v || (padRev[i] || 0) !== r0){ if (stale(i)) bgRender(i); return; }   // another kit, or rendered here meanwhile
+    if (dirty[i] || padSR() !== sr || padBpm(i) !== tb){ dirty[i] = true; bgRender(i); return; }   // edited meanwhile: go again
+    install(i, {sr, bpm:tb, data:r.data, st:new Map(r.st.map(([k, pk]) => [v.fx[k], pk]))});
+    rendered(i);
+  }, () => { pend[i] = false; if (kit.voices[i] === v){ dirty[i] = true; ensure(i); rendered(i); } });
+}
+// A fresh render arrived for pad i: show it if it's the one on screen.
+function rendered(i){ if (i === cur && view === 'synth'){ try { drawWave(); } catch(e){} } }
+// The pad on screen: drawn now from what there is, brought up to date in the background.
+function showCur(){ if (PW.ready && (stale(cur) || slotAt(pend, cur))){ bgRender(cur); drawWave(); } else { ensure(cur); drawWave(); } }   // bgRender does nothing while a job is out
+
+// Renders the pads ahead of time so PLAY and the first tap of a pad don't have to: all of them in the Worker,
+// or one per idle moment here. Runs after start-up, when the Worker is ready and when audio starts.
 let preT = 0;
 function prerender(){
-  clearTimeout(preT); let i = 0;
+  clearTimeout(preT);
+  if (PW.ready){ for (let i = 0; i < nslots(); i++) if (stale(i)) bgRender(i); return; }
+  let i = 0;
   const idle = window.requestIdleCallback ? f => requestIdleCallback(f, {timeout:1500}) : f => setTimeout(f, 30);
   // ensure() returns at once for a pad that is up to date, so skip through those and stop after one real render.
-  const step = () => { while (i < nslots()){ const t = performance.now(); ensure(i++); if (performance.now() - t > 4) break; }
+  const step = () => { if (PW.ready) return prerender();
+    while (i < nslots()){ const t = performance.now(); ensure(i++); if (performance.now() - t > 4) break; }
     if (i < nslots()) idle(step); };
   preT = setTimeout(() => idle(step), 30);
 }
 function ensure(i){
-  const sr = ctx ? ctx.sampleRate : srGuess;
-  const v0 = kit.voices[i], tb = voiceSynced(v0) ? songBpm() : 0;
-  if (slotAt(dirty, i) || !slotAt(cache, i) || slotAt(cache, i).sr !== sr || (slotAt(cache, i).bpm || 0) !== tb){ const st = new Map(); const v = kit.voices[i]; cache[i] = {sr, bpm:tb, data:renderVoice(v, sr, st, isSyn(i) ? v.len : 0), st}; dirty[i] = false; bufs[i] = null; }
+  if (stale(i) || slotAt(pend, i)){
+    const v = kit.voices[i], st = new Map();
+    install(i, {sr:padSR(), bpm:padBpm(i), data:renderVoice(v, padSR(), st, isSyn(i) ? v.len : 0), st});
+  }
   return cache[i];
 }
+function ensureLive(i){
+  const c = slotAt(cache, i);
+  if (c && c.sr === padSR() && PW.ready){ if (stale(i)) bgRender(i); return c; }
+  return ensure(i);
+}
 function buffer(i){
-  const c = ensure(i);
-  if (!slotAt(bufs, i)){ const b = ctx.createBuffer(1, c.data.length, c.sr); b.copyToChannel(c.data, 0); bufs[i] = b; }
+  const c = ensureLive(i);
+  if (!slotAt(bufs, i) || bufs[i]._d !== c.data){ const b = ctx.createBuffer(1, c.data.length, c.sr); b.copyToChannel(c.data, 0); b._d = c.data; bufs[i] = b; }
   return bufs[i];
 }
 function stopVoice(i){
@@ -2225,7 +2323,7 @@ function typing(e){ const t = e.target; return !!(t && t.matches && t.matches('i
 let rTimer = 0, sTimer = 0;
 function changed(i = cur, light){
   dirty[i] = true;
-  clearTimeout(rTimer); rTimer = setTimeout(() => { ensure(cur); drawWave(); }, 45);
+  clearTimeout(rTimer); rTimer = setTimeout(showCur, 45);
   clearTimeout(sTimer); sTimer = setTimeout(save, 900);
   if (!light){ renderStrip(); renderPads(); }
 }
@@ -2689,7 +2787,7 @@ function refreshAll(){
   vRows.forEach(r => r.refresh()); updChoke();
   refreshVoiceGlobals(); refreshTune();
   refreshLayer(); renderPads(); renderFx();
-  ensure(cur); drawWave();
+  showCur();
   try { ccBadges(); } catch(e){}   // sliders may have been rebuilt (another layer type or effect)
 }
 document.addEventListener('keydown', e => {
@@ -3038,6 +3136,7 @@ function fileItems(){
     ['Open project…', openProj, null, 'O'], ['Save project', () => saveProj(false), null, 'S'], ['Save as…', () => saveProj(true), null, '⇧S'],
     ...(canShareProj() ? [['Share project…', shareProj]] : []),
     ['Load demo song', () => setSong(demoSong(), 'Loaded the starter beat.'), null, null, true],
+    ...(hasThunderWork() ? [['Open ...Thunder’s saved work…', () => thunderImport(false)]] : []),
     null,
     ['Render song (WAV)', () => renderOut(false)], ['Render stems (.zip)', () => renderOut(true)],
     ...(canShare && lastR ? [['Share last render…', shareLast]] : []),
@@ -3309,32 +3408,27 @@ makeSeg($('segVel'), [[true,'On'],[false,'Off']], () => midi.vel, v => { midi.ve
 if (midi.want && navigator.requestMIDIAccess) connectMidi();
 
 /* ---------- Plaits loader ---------- */
+// Each wasm is decoded and compiled once and shared: the synth here, the …waves engine and the render Worker.
 let plFailed = false;
 (async () => {
+  const bytes = id => { const b = atob($(id).textContent.trim()), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+  const z = () => 0, imp = {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}};
+  let plMod = null, txMod = null;
   try {
-    const b64 = $('plaitsWasm').textContent.trim(), bin = atob(b64), u8 = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-    const {instance} = await WebAssembly.instantiate(u8, {wasi_snapshot_preview1:{fd_close:() => 0, fd_seek:() => 0, fd_write:() => 0}});
-    if (instance.exports._initialize) instance.exports._initialize();
-    PL = instance;
-  } catch(e){ plFailed = true; }
+    plMod = await WebAssembly.compile(bytes('plaitsWasm'));
+    PL = await WebAssembly.instantiate(plMod, imp); if (PL.exports._initialize) PL.exports._initialize();
+  } catch(e){ plFailed = true; plMod = null; }
   try {
-    const bin = atob($('tfxWasm').textContent.trim()), u8 = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-    const z = () => 0, {instance} = await WebAssembly.instantiate(u8, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}});
-    if (instance.exports._initialize) instance.exports._initialize();
-    TX = instance;
-  } catch(e){}
+    txMod = await WebAssembly.compile(bytes('tfxWasm'));
+    TX = await WebAssembly.instantiate(txMod, imp); if (TX.exports._initialize) TX.exports._initialize();
+  } catch(e){ txMod = null; }
   try {
-    if (globalThis.WavesDSP){
-      const bytes = id => { const b = atob($(id).textContent.trim()), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
-      const [dspModule, tfxModule] = await Promise.all([WebAssembly.compile(bytes('plaitsWasm')), WebAssembly.compile(bytes('tfxWasm'))]);
-      WavesDSP.wasmInit({dspModule, tfxModule}); WV.ready = true;
-    }
+    if (globalThis.WavesDSP && plMod && txMod){ WavesDSP.wasmInit({dspModule:plMod, tfxModule:txMod}); WV.ready = true; }
   } catch(e){ console.warn('…waves WebAssembly', e); }
+  if (typeof Worker !== 'undefined') rwStart(plMod, txMod);
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; if (v && v.layers.some(l => l.on && (l.type === 'plaits' || l.type === 'elements' || l.type === 'waves')) || (v.fx || []).some(f => f.on)) dirty[i] = true; }
   refreshLayer(); renderFx();
-  ensure(cur); drawWave(); renderStrip();
+  showCur(); renderStrip();
   prerender();   // the rest of the kit in idle moments, so the first PLAY doesn't render them all at once
 })();
 
@@ -4500,7 +4594,7 @@ function applyChop(ev, I, pad, n, semis, bpm, data, sr){
 }
 function rtBuf(pad, rev, st){
   if (st){
-    const c = ensure(pad), k = pad + (rev ? 'r' : 'f') + stKey(st); let e = rtB.get(k);
+    const c = ensureLive(pad), k = pad + (rev ? 'r' : 'f') + stKey(st); let e = rtB.get(k);
     if (!e || e.d !== c.data){ let d = stretchData(c.data, c.sr, loopSecs(pad, c.data, c.sr), st); if (rev) d = d.reverse();
       const b = ctx.createBuffer(1, d.length, c.sr); b.copyToChannel(d, 0); e = {d:c.data, b}; rtB.set(k, e);
       if (rtB.size > 96) rtB.delete(rtB.keys().next().value); }
@@ -4509,7 +4603,7 @@ function rtBuf(pad, rev, st){
   return rtBufPlain(pad, rev);
 }
 function rtBufPlain(pad, rev){
-  const c = ensure(pad), k = pad + (rev ? 'r' : 'f');
+  const c = ensureLive(pad), k = pad + (rev ? 'r' : 'f');
   let e = rtB.get(k);
   if (!e || e.d !== c.data){
     const d = rev ? c.data.slice().reverse() : c.data, b = ctx.createBuffer(1, d.length, c.sr); b.copyToChannel(d, 0);
@@ -4599,7 +4693,7 @@ function tStart(mode, o){
   const r = rtInit();
   const seq = makeSeq(S, mode, o);
   if (!seq.alive()){ toast(mode === 'song' ? `Row ${rS(o.row, 3)} is empty. Put a sect on it, or move to a row that has some.` : 'Nothing to play here yet.'); draw(); return; }
-  for (let i = 0; i < nslots(); i++) ensure(i);
+  for (let i = 0; i < nslots(); i++) ensureLive(i);   // up to date, or the last render while the Worker finishes
   seq.time = ctx.currentTime + 0.08;
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : ''});
@@ -4718,7 +4812,10 @@ async function renderOut(stems){
     if (!keepT.length) return toast('Every track with notes is muted.');
     toast('Rendering pads…'); await idle();
     const pads = new Map();
-    for (const e of notes) if (!pads.has(e.pad)){ const v = kit.voices[e.pad]; pads.set(e.pad, renderVoice(v, sr, null, isSyn(e.pad) ? v.len : 0)); await idle(); }
+    // In the Worker when it can (the page stays responsive), here otherwise.
+    for (const e of notes) if (!pads.has(e.pad)){ const v = kit.voices[e.pad], hold = isSyn(e.pad) ? v.len : 0;
+      let d; try { d = (await renderAsync(v, sr, hold, false)).data; } catch(err){ d = renderVoice(v, sr, null, hold); await idle(); }
+      pads.set(e.pad, d); }
     const bufs = new Map();
     const getB = (pad, rev, st) => { const k = pad + (rev ? 'r' : 'f') + stKey(st); let b = bufs.get(k);
       if (!b){ const d0 = pads.get(pad); if (!d0) return null; let d = st ? stretchData(d0, sr, loopSecs(pad, d0, sr), st) : d0;
@@ -4813,6 +4910,49 @@ async function openProj(){
     return;
   }
   $('projIn').click();
+}
+/* ---------- bringing over ...Thunder's saved work ----------
+   ...Thunder (the separate phone install) is retired: ...Thunder Plus is the one app, with Settings → App → Mobile.
+   Both lived at the same address, so Plus can read what Thunder saved in this browser (thunder-kit-v1,
+   thunder-song-v1, samples in IndexedDB thunder-samples). The first time Plus opens where Thunder left work, it
+   offers to open it, saving Plus's own song and kit to a project file first. File → Open ...Thunder's saved work
+   does the same any time. Thunder's data is only read, never changed. */
+const TIK = 'thunderplus-thunder-import-v1', T_KIT = 'thunder-kit-v1', T_SONG = 'thunder-song-v1';
+const lsGet = k => { try { return localStorage.getItem(k); } catch(e){ return null; } };
+const hasThunderWork = () => !!(lsGet(T_KIT) || lsGet(T_SONG));
+async function thunderImport(asked){
+  const tk = lsGet(T_KIT), ts = lsGet(T_SONG); if (!tk && !ts) return toast('No ...Thunder work saved in this browser.');
+  let kitJ = null, songJ = null;
+  try { if (tk) kitJ = kitFromJSON(JSON.parse(tk)); if (ts) songJ = normSong(JSON.parse(ts)); }
+  catch(e){ return toast('Couldn’t read ...Thunder’s saved work: ' + ((e && e.message) || e)); }
+  if (!asked){
+    const what = [songJ && `song “${songJ.name || 'Song'}”`, kitJ && `kit “${kitJ.name || 'Kit'}”`].filter(Boolean).join(' and ');
+    if (!confirm(`...Thunder is now part of ...Thunder Plus (Settings → App → Mobile).\n\nFound ...Thunder’s ${what} in this browser. Open them here?\n\nYour current song “${S.name || 'Song'}” and kit “${kit.name || 'Kit'}” are saved to a project file first. You can also do this later from File.`)){
+      try { localStorage.setItem(TIK, 'no'); } catch(e){} toast('Kept this song and kit. File → Open ...Thunder’s saved work brings Thunder’s over any time.', 5000); return;
+    }
+  }
+  // Wait until this kit's samples are back from storage, so the backup carries them.
+  for (let k = 0; k < 100 && smpResolving; k++) await new Promise(r => setTimeout(r, 100));
+  flushS();
+  await deliver(`${safe(S.name || 'Song')} project (before Thunder import).json`, projBlob());
+  if (kitJ){
+    setKit(kitJ);
+    // Samples come from Thunder's store; once they're back, copy them into Plus's own.
+    await new Promise(r => setTimeout(r, 50)); for (let k = 0; k < 100 && (smpResolving || kit.voices.some(v => v.layers.some(L => L.sample && L.sample.id && !L.sample.data))); k++) await new Promise(r => setTimeout(r, 100));
+    for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.id && L.sample.data) smpStored.delete(L.sample.id);
+    save();
+  }
+  if (songJ) setSong(songJ, 'Opened ...Thunder’s song and kit. Your previous ones are in the project file.');
+  else toast('Opened ...Thunder’s kit. Your previous song and kit are in the project file.');
+  try { localStorage.setItem(TIK, 'yes'); } catch(e){}
+}
+// At start-up: offer once. Nothing to ask when Plus has no work of its own yet (it already opened Thunder's) or
+// when both hold the same.
+function thunderOffer(){
+  if (inAI || lsGet(TIK) || !hasThunderWork()) return;
+  const same = (lsGet(T_KIT) || '') === (lsGet(KEY) || '') && (lsGet(T_SONG) || '') === (lsGet(TK) || '');
+  if (same || (!lsGet(KEY) && !lsGet(TK))){ try { localStorage.setItem(TIK, 'auto'); } catch(e){} return; }
+  thunderImport(false);
 }
 const CUK = 'thunderplus-cursor-v1';
 function saveCur(){ try { localStorage.setItem(CUK, JSON.stringify({tv, midV, cSect, cPhrase, cInst, cTrack, cFxT, cs})); } catch(e){} }
@@ -6931,6 +7071,7 @@ async function checkUpdate(manual){
 if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadSW) updBanner(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(false); });
 setTimeout(() => checkUpdate(false), 3000);
+setTimeout(thunderOffer, 2500);
 
 buildPads();
 refreshAll();
