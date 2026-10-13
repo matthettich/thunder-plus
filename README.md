@@ -204,10 +204,15 @@ The `electron` folder wraps the same app as a desktop program for Windows, macOS
 engine load their audio worklets as they do on the web. Songs and kits are saved inside the app (separately from
 the browser's copy); use File → Save to move work between them.
 
+**Updates.** Installed copies check GitHub Releases when they open (and every few hours): on Windows and Linux
+the new version downloads by itself and asks to restart; on a Mac (unsigned) it says a new version is out and opens
+https://github.com/matthettich/thunder-plus/releases/latest, which is also the link to give testers. To ship one,
+push a version tag: `git tag v1.1.1 && git push origin v1.1.1`. The workflow sets the app's version from the tag,
+builds everything and publishes the release.
+
 **Option A: build on GitHub (no setup).** Push the repo, then on GitHub open **Actions → Desktop app → Run
 workflow**. When it finishes (about 10 minutes), the run's page has three downloads: the Windows installer and
-portable .exe, the Mac .dmg (Apple silicon and Intel in one), and a Linux AppImage. Pushing a tag such as
-`v1.1.0` (`git tag v1.1.0 && git push origin v1.1.0`) does the same and attaches them to a GitHub Release.
+portable .exe, the Mac .dmg (Apple silicon and Intel in one), and a Linux AppImage. A version tag (above) also publishes them as a release.
 
 **Option B: build on your computer.** Install [Node.js](https://nodejs.org) (the LTS version), then:
 

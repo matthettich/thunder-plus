@@ -23,12 +23,75 @@
     "appId": "com.matthettich.thunderplus",
     "productName": "Thunder Plus",
     "artifactName": "Thunder-Plus-${version}-${os}-${arch}.${ext}",
-    "files": ["main.js", "app/**/*"],
-    "directories": { "output": "dist", "buildResources": "build" },
-    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }, { "target": "portable", "arch": ["x64"] }], "icon": "app/icons/plus-icon-512.png" },
-    "portable": { "artifactName": "Thunder-Plus-${version}-portable.${ext}" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "shortcutName": "...Thunder Plus" },
-    "mac": { "target": [{ "target": "dmg", "arch": ["universal"] }], "category": "public.app-category.music", "icon": "app/icons/plus-icon-512.png" },
-    "linux": { "target": ["AppImage"], "category": "Audio", "icon": "app/icons/plus-icon-512.png" }
+    "files": [
+      "main.js",
+      "updater.js",
+      "app/**/*"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "app/icons/plus-icon-512.png"
+    },
+    "portable": {
+      "artifactName": "Thunder-Plus-${version}-portable.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "...Thunder Plus"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.music",
+      "icon": "app/icons/plus-icon-512.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Audio",
+      "icon": "app/icons/plus-icon-512.png"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "matthettich",
+        "repo": "thunder-plus",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.0"
   }
 }

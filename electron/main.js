@@ -2,6 +2,7 @@
 const { app, BrowserWindow, session, shell, Menu, protocol, net } = require('electron');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { setupUpdates } = require('./updater');
 
 // The app is served from app://thunder/ rather than opened as plain files. Plain files can't fetch each
 // other, load audio worklets or talk across frames, which the …waves and …chains editors (frames inside
@@ -49,6 +50,8 @@ app.whenReady().then(() => {
   session.defaultSession.setPermissionCheckHandler((wc, perm) => ALLOW.has(perm));
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null);   // the Mac keeps its menu so ⌘C / ⌘V / ⌘Q work
   createWindow();
+  // New versions come from the GitHub Releases page (see updater.js).
+  setupUpdates({ name: '...Thunder Plus', page: 'https://github.com/matthettich/thunder-plus/releases/latest' });
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

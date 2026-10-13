@@ -8875,7 +8875,7 @@ function updBanner(){
 // The desktop app (Electron, served from app://) carries its own copy of these files: it updates by
 // installing a newer build, so the update check and the install offer are web-only.
 const DESKTOP_APP = location.protocol === 'app:';
-{ const u = document.getElementById('updBtn'); if (u){ if (DESKTOP_APP){ u.hidden = true; const n = el('span', 'lbl', 'Desktop app: to update, install a newer build.'); u.after(n); } else u.addEventListener('click', () => checkUpdate(true)); } }
+{ const u = document.getElementById('updBtn'); if (u){ if (DESKTOP_APP){ u.hidden = true; const n = el('span', 'lbl', 'Desktop app: it checks for a new version when it opens and offers to install it.'); u.after(n); } else u.addEventListener('click', () => checkUpdate(true)); } }
 async function checkUpdate(manual){
   if (DESKTOP_APP) return;
   const sw = navigator.serviceWorker && location.protocol === 'https:';

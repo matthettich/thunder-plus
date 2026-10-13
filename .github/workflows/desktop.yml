@@ -1,15 +1,23 @@
 # Builds the desktop app (Electron) for Windows, macOS and Linux on GitHub's machines.
-# Run it from the Actions tab (Desktop app → Run workflow), or push a tag like v1.1.0 to also
-# attach the installers to a GitHub Release.
+#
+#   Try a build:     Actions → Desktop app → Run workflow. The installers are downloads on the run's page
+#                    (only you can see them; they expire after 90 days).
+#   Release it:      push a version tag, e.g.  git tag v1.1.1  then  git push origin v1.1.1
+#                    The installers go on a GitHub Release, and installed copies update themselves from it.
+#                    Testers' link (always the newest): https://github.com/matthettich/thunder-plus/releases/latest
 name: Desktop app
 
 on:
   workflow_dispatch:
   push:
-    tags: ['v*']
+    tags: ['v*.*.*']
 
 permissions:
   contents: write
+
+env:
+  APP_DIR: electron                        # where package.json is
+  RELEASE_REPO: matthettich/thunder-plus   # where releases go (the app's updater reads them from here)
 
 jobs:
   build:
@@ -17,39 +25,53 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            script: dist:win
-            files: |
-              electron/dist/*.exe
-          - os: macos-latest
-            script: dist:mac
-            files: |
-              electron/dist/*.dmg
-          - os: ubuntu-latest
-            script: dist:linux
-            files: |
-              electron/dist/*.AppImage
+          - { os: windows-latest, args: --win }
+          - { os: macos-latest,   args: --mac }
+          - { os: ubuntu-latest,  args: --linux }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+        with: { node-version: 22 }
+      - name: Version from the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: ${{ env.APP_DIR }}
+        shell: bash
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
       - name: Install
-        working-directory: electron
+        working-directory: ${{ env.APP_DIR }}
         run: npm install
       - name: Build
-        working-directory: electron
-        run: npm run ${{ matrix.script }}
+        working-directory: ${{ env.APP_DIR }}
+        shell: bash
+        run: |
+          if [ -f copy-app.js ]; then node copy-app.js; fi
+          npx electron-builder ${{ matrix.args }} --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # no signing certificate: unsigned builds
       - uses: actions/upload-artifact@v4
         with:
-          name: thunder-plus-${{ matrix.os }}
-          path: ${{ matrix.files }}
+          name: desktop-${{ matrix.os }}
           if-no-files-found: error
-      - name: Attach to the release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ matrix.files }}
+          path: |
+            ${{ env.APP_DIR }}/dist/*.exe
+            ${{ env.APP_DIR }}/dist/*.dmg
+            ${{ env.APP_DIR }}/dist/*.zip
+            ${{ env.APP_DIR }}/dist/*.AppImage
+            ${{ env.APP_DIR }}/dist/*.blockmap
+            ${{ env.APP_DIR }}/dist/latest*.yml
+
+  release:
+    # Only for version tags: one release with every platform's files, published when all of them built.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: out, merge-multiple: true }
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          ls -la out
+          gh release create "$GITHUB_REF_NAME" out/* --repo "$RELEASE_REPO" --title "$GITHUB_REF_NAME" --notes "Desktop build $GITHUB_REF_NAME. Windows: the Setup .exe (or the portable .exe). Mac: the .dmg. Linux: the AppImage. Installed copies update themselves."

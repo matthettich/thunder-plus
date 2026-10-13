@@ -362,3 +362,5 @@ caches.
 - `.github/workflows/desktop.yml` builds Windows/Mac/Linux on demand or on a `v*` tag.
 - In the page, `DESKTOP_APP` (protocol `app:`) turns off the web update check and shows a note under App.
 - Not built or run in the cloud session (no npm registry access there): first real run is the owner's.
+- Auto-update: `electron/updater.js` (electron-updater, GitHub provider `matthettich/thunder-plus`). The workflow's
+  `release` job (tags `vX.Y.Z` only) runs `gh release create` with every platform's files incl. `latest*.yml`.
