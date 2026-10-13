@@ -1057,6 +1057,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div class="bar"><span class="ttl">App</span><span class="lbl">...Thunder or ...Thunder Plus</span></div>
     <div class="pbody">
       <div class="btnrow"><label class="cb"><input type="checkbox" id="ckMobile">Mobile (...Thunder)</label></div>
+      <div class="btnrow"><button type="button" id="updBtn">Check for update</button></div>
       <div class="btnrow" id="installRow" hidden><button type="button" id="installBtn" hidden>Install app</button><span class="lbl" id="installMsg"></span></div>
       <p class="note">Mobile is ...Thunder: the <b>…waves</b> and <b>…chains</b> editors are hidden and the tracker switches to PAD input. Kits and songs keep their …waves layers and …chains effects, and they still play, so files open and sound the same either way. Turn it off for Desktop (...Thunder Plus) to edit those patches. This is saved for this browser.</p>
     </div>
@@ -1459,7 +1460,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <h3>Mastering</h3>
 <p><b>Settings → Master → Open mastering…</b> (or › MASTERING on the FX screen's master) puts a chain on the master bus: <b>EQ → Suppress → Compress → Limit</b>. Each has its own switch; the readouts show short-term loudness in and out (LUFS) and the highest peak. <b>EQ</b>: drag a point (left/right is frequency, up/down is gain), shift-drag or scroll for width, double-click empty space to add a bell, double-click a point to switch it off; the band row sets exact values. <b>Suppress</b> turns down resonances that stick out of the spectrum (Depth, Sharpness, Selectivity, Speed; drag the lines to set its range; Delta plays only what it removes). <b>Compress</b> is a glue compressor (its sidechain high-pass keeps the bass from pumping it). <b>Limit</b> catches every peak at the Ceiling, between samples too. Renders of the song include the chain and keep its ceiling; stems don't.</p>
 <h3>Settings</h3>
-<p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound and the current track’s effects, and a channel strip for the current track (stereo meter, fader with 0 dB at E0 and +6 dB at the top, pan, M and S). Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. On a big screen the space beside the grid is the <b>stage</b> (Settings → STAGE): DOGS dance to the beat while the song plays, PHRASE previews the phrase under the cursor, OFF leaves it empty. The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
+<p><b>⚙ Settings</b> at the top: it starts with Audio (output device, level, latency, rate), then this screen’s own settings (in the tracker every Project setting: Song, Input, Screen, Render), then Master, Skin, Export, MIDI, Kit and App (Mobile, install, check for update). There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound and the current track’s effects, and a channel strip for the current track (stereo meter, fader with 0 dB at E0 and +6 dB at the top, pan, M and S). Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. On a big screen the space beside the grid is the <b>stage</b> (Settings → STAGE): DOGS dance to the beat while the song plays, PHRASE previews the phrase under the cursor, OFF leaves it empty. The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots. <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song. <b>A voice per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chopping breaks</h3>
@@ -3880,19 +3881,22 @@ makeSeg($('segNoteName'), [[false,'Pad name'],[true,'+ note']], () => ex.noteNam
 
 /* ---------- settings (synth page): Kit, MIDI, Export, Skin and Audio under one button ---------- */
 /* ---------- settings: one dropdown menu under the gear, on every screen ---------- */
-const GLOBAL_SECS = [['pMaster', 'Master'], ['pApp', 'App'], ['pKit', 'Kit'], ['pMidi', 'MIDI'], ['pExport', 'Export'], ['pSkin', 'Skin'], ['pAudio', 'Audio']];   // the Kit's save / load / reset are in File
+// Menu order: Audio first (the thing to fix when there's no sound), then this screen's own settings (Patch or
+// Project), then the master, the look, export, MIDI, the kit, and the app itself last.
+const GLOBAL_SECS = [['pAudio', 'Audio'], ['pMaster', 'Master'], ['pSkin', 'Skin'], ['pExport', 'Export'], ['pMidi', 'MIDI'], ['pKit', 'Kit'], ['pApp', 'App']];   // the Kit's save / load / reset are in File
 { const k = $('pKit'); if (k) k.hidden = true; }
 const gsetOpen = () => !$('gset').hidden;
 const gsetSecs = () => [
+  GLOBAL_SECS[0],
   ...((view === 'waves' || view === 'chains') ? [['gsecPatch', 'Patch']] : []),
   ...(view === 'tracker' ? [['gsecProj', 'Project']] : []),
-  ...GLOBAL_SECS
+  ...GLOBAL_SECS.slice(1)
 ];
 // Every section is shown at once, one under the other with a rule between, as in ...Seeds' Settings menu.
 function showGset(){
   const secs = gsetSecs(), on = new Set(secs.map(([id]) => id));
   for (const id of ['gsecProj', 'gsecPatch', ...GLOBAL_SECS.map(([x]) => x)]){ const b = $(id); if (b) b.hidden = !on.has(id); }
-  // Keep them in order: Patch / Project first, then Kit, MIDI, Export, Skin, Audio.
+  // Keep them in order: Audio, Patch / Project, Master, Skin, Export, MIDI, Kit, App.
   for (const [id] of secs){ const b = $(id); if (b) $('gsetBody').append(b); }
   for (const id of ['gsecProj', 'gsecPatch', ...GLOBAL_SECS.map(([x]) => x)]){ const b = $(id); if (b && b.hidden) $('gsetBody').append(b); }
   if (on.has('gsecProj')) buildProj();
@@ -6144,7 +6148,8 @@ function setPnoe(on){ pnoeOn = !!on; try { localStorage.setItem(POK, pnoeOn ? '1
 // On-screen keypad (the bottom panel) in KEYS mode. On by default; off hides it but the computer keyboard
 // still types. Persisted per device, like the other Settings toggles.
 const KPOK = 'thunderplus-keyspad-v1';
-let kpOn = (() => { try { const v = localStorage.getItem(KPOK); if (v === '0' || v === '1') return v === '1'; } catch(e){} return true; })();
+// Off unless you turn it on (desktop keyboards have the keys); the Mobile setup starts with it on.
+let kpOn = (() => { try { const v = localStorage.getItem(KPOK); if (v === '0' || v === '1') return v === '1'; } catch(e){} return isMobile(); })();
 function setKp(on){ kpOn = !!on; try { localStorage.setItem(KPOK, kpOn ? '1' : '0'); } catch(e){} draw(); fit(); draw(); }
 // Song: the cursor's row follows its track. Sect and Phrase: they switch to what the cursor's track is
 // playing and the cursor rides along. Not while a selection is being made.
@@ -8803,9 +8808,13 @@ function buildProj(){
   let sec = null;
   const inFile = new Set(['› SAVE', '› SAVE AS', '› LOAD PROJECT', '› EXPORT CHAINS', '› IMPORT CHAINS', '› SHARE PROJECT', '› NEW SONG', '› LOAD DEMO', '› RENDER SONG', '› RENDER STEMS', '› SHARE LAST RENDER']);
   list.append(el('p', 'note', 'Saving, opening, rendering and exporting are in the File menu.'));
-  for (const r of projRows().filter(r => !inFile.has(r.l))){
-    if (r.sec || !sec){ sec = el('section', 'tsec'); sec.append(el('h3', null, r.sec || 'Tracker')); list.append(sec); }
-    sec.append(tsetRow(r));
+  // In the menu: the song first, then how you play, the screen and rendering. (UPDATE APP is under App.)
+  const groups = new Map(); let g = 'Tracker';
+  for (const r of projRows()){ if (r.sec) g = r.sec; if (inFile.has(r.l) || g === 'App') continue; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(r); }
+  const order = ['Song', 'Input', 'Screen', 'Render'];
+  for (const name of [...order.filter(n => groups.has(n)), ...[...groups.keys()].filter(n => !order.includes(n))]){
+    sec = el('section', 'tsec'); sec.append(el('h3', null, name)); list.append(sec);
+    for (const r of groups.get(name)) sec.append(tsetRow(r));
   }
   body.scrollTop = keep;
 }
@@ -8863,6 +8872,7 @@ function updBanner(){
   const b = el('button', 'updb', 'New version ready · tap to update'); b.id = 'updB'; b.type = 'button';
   b.addEventListener('click', applyUpdate); document.body.append(b);
 }
+{ const u = document.getElementById('updBtn'); if (u) u.addEventListener('click', () => checkUpdate(true)); }
 async function checkUpdate(manual){
   const sw = navigator.serviceWorker && location.protocol === 'https:';
   if (sw){ try { const r = await navigator.serviceWorker.getRegistration(); if (r) await r.update(); } catch(e){} }
