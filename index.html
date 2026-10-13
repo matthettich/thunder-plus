@@ -824,6 +824,55 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 @media (prefers-reduced-motion: reduce){ .dogs .bob, .dogs .tail{animation:none!important} }
 :root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .dogs{--dk-pink:var(--mxsoft)}
 
+/* ---------- mastering window ----------
+   A sheet over the app in its own colours: header with the on switch, the chain (EQ → SUPPRESS → COMPRESS → LIMIT,
+   each with its switch and how hard it's working) and the readouts; below, the editor of the selected stage. */
+.mstwin{position:fixed; inset:24px; z-index:60; display:flex; flex-direction:column; background:var(--panel); color:var(--ink); border:1px solid var(--ink); box-shadow:6px 6px 0 0 var(--ink)}
+.mstwin[hidden]{display:none}
+@media (max-width:700px){ .mstwin{inset:0; box-shadow:none; border:0} }
+.mwhead{flex:none; display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--line); background:var(--side); flex-wrap:wrap}
+.mwhead > b{font-size:var(--fs-4); letter-spacing:.08em}
+.mwon{min-height:30px; padding:0 14px; font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--panel)}
+.mwon.on{background:var(--ink); color:var(--inv)}
+.mwchain{display:flex; align-items:stretch; gap:0; flex:1 1 auto; min-width:0; flex-wrap:wrap}
+.mwst{display:flex; align-items:center; gap:7px; min-height:34px; padding:0 10px; border:1px solid var(--line); background:var(--panel); font-size:var(--fs-3); letter-spacing:.05em; cursor:pointer}
+.mwst + .mwarrow + .mwst{margin-left:0}
+.mwarrow{display:flex; align-items:center; padding:0 6px; color:var(--muted)}
+.mwst.sel{outline:2px solid var(--ink); outline-offset:-3px}
+.mstwin .mwst .sw{min-height:0; width:15px; height:15px; padding:0; border:1.5px solid var(--ink)!important; background:transparent!important; flex:none; box-shadow:none}
+.mstwin .mwst.on .sw{background:var(--ink)!important}
+.mwst:not(.on) .nm{color:var(--muted)}
+.mwst .gr{font:var(--fs-2)/1 var(--mono); color:var(--muted); min-width:3.6em; text-align:right; font-variant-numeric:tabular-nums}
+.mwread{display:flex; gap:12px; font:var(--fs-2)/1.2 var(--mono); color:var(--muted); font-variant-numeric:tabular-nums}
+.mwread b{color:var(--ink); font-weight:600}
+.mwread button{min-height:0; padding:1px 6px; font-size:var(--fs-1); border:1px solid var(--line); background:var(--panel)}
+.mwx{min-height:30px; width:34px; padding:0; border:1px solid var(--line); background:var(--panel)}
+.mwbody{flex:1; min-height:0; display:flex; overflow:auto}
+.mwsec{flex:1; min-width:0; display:flex; flex-direction:column; gap:8px; padding:10px 12px}
+.mwsec[hidden]{display:none}
+.mwsec canvas{display:block; width:100%; flex:1; min-height:180px; border:1px solid var(--line); background:var(--panel); touch-action:none}
+.mweqtop{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.mwbands{display:flex; gap:4px; flex-wrap:wrap}
+.mwbands button{min-height:26px; min-width:30px; padding:0 8px; font:600 var(--fs-2)/1 var(--mono); border:1px solid var(--line); background:var(--panel)}
+.mwbands button.sel{background:var(--ink); color:var(--inv)}
+.mwbands button.off{opacity:.45; text-decoration:line-through}
+.mwhint{font-size:var(--fs-2); color:var(--muted)}
+.mwband{display:flex; align-items:center; gap:10px 14px; flex-wrap:wrap; font-size:var(--fs-3)}
+.mwband label{display:flex; align-items:center; gap:6px; color:var(--muted)}
+.mwband select, .mwband input[type=number]{min-height:28px; font:var(--fs-3) var(--mono); border:1px solid var(--line); background:var(--panel); color:var(--ink); padding:0 6px}
+.mwband input[type=number]{width:7.5em}
+.mwband button{min-height:28px; padding:0 10px; border:1px solid var(--line); background:var(--panel)}
+.mwrows{display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:2px 18px; align-content:start}
+.mwrows .row{grid-template-columns:92px minmax(60px,1fr) 70px}
+.mwrows .mwtog{grid-column:1 / -1; display:flex; align-items:center; gap:10px; min-height:32px; font-size:var(--fs-3)}
+.mwrows .mwtog span{white-space:normal}
+.mwrows .mwtog button{min-height:26px; padding:0 10px; border:1px solid var(--line); background:var(--panel)}
+.mwrows .mwtog button.on{background:var(--ink); color:var(--inv)}
+.mwsplit{flex:1; min-height:0; display:grid; grid-template-columns:minmax(240px, 40%) 1fr; grid-template-rows:minmax(0,1fr); gap:14px}
+.mwsplit canvas{min-height:240px; height:100%}
+@media (max-width:700px){ .mwsplit{grid-template-columns:1fr} .mwread{order:9; flex:1 1 100%} }
+.dkt.mstb{background:var(--panel); color:var(--ink)}
+
 /* ---------- Terminal skins: Matrix (neon green on black) and the Simple set: black, white (both Helvetica) and mustard (on lavender) ----------
    One set of rules drawn from a few colours per skin: --mx (text, outlines, fills), --mx2 (secondary text),
    --mxdim (faint lines), --mxbg/--mxpanel/--mxpanel2 (backgrounds), --mxon (text on a filled button),
@@ -982,6 +1031,13 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 
 <div class="main" id="main">
 
+  <section class="band grey" id="pMaster" hidden>
+    <div class="bar"><span class="ttl">Master</span><span class="lbl" id="mstLbl">Off</span></div>
+    <div class="pbody">
+      <div class="btnrow"><button id="bMst">Open mastering…</button></div>
+      <p class="note">EQ, resonance suppressor, compressor and limiter on the master bus, saved with the song. Renders of the song include them; stems don't.</p>
+    </div>
+  </section>
   <section class="band grey" id="pApp" hidden>
     <div class="bar"><span class="ttl">App</span><span class="lbl">...Thunder or ...Thunder Plus</span></div>
     <div class="pbody">
@@ -1325,6 +1381,32 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
   <input type="file" id="chainsIn" accept=".json,application/json" hidden>
 </div>
 <input type="file" id="fileIn" accept="audio/*,.wav,.mp3,.ogg,.m4a,.flac" hidden>
+<div class="mstwin" id="mstWin" hidden role="dialog" aria-modal="true" aria-label="Mastering">
+  <div class="mwhead">
+    <b>MASTERING</b>
+    <button type="button" class="mwon" id="mwOn" aria-pressed="false" title="Mastering on the master bus (renders include it)">OFF</button>
+    <div class="mwchain" id="mwChain" role="tablist" aria-label="Mastering chain"></div>
+    <div class="mwread" id="mwRead" aria-live="off"></div>
+    <button type="button" class="mwx" id="mwX" aria-label="Close mastering"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
+  </div>
+  <div class="mwbody" id="mwBody">
+    <section class="mwsec" id="mwEq" data-s="eq">
+      <div class="mweqtop"><div class="mwbands" id="mwBands"></div><span class="mwhint">Drag a point · shift-drag or scroll for width · double-click to add a bell, on a point to switch it off</span></div>
+      <canvas id="mwEqC" aria-label="EQ curve over the spectrum"></canvas>
+      <div class="mwband" id="mwBand"></div>
+    </section>
+    <section class="mwsec" id="mwSup" data-s="sup" hidden>
+      <canvas id="mwSupC" aria-label="Spectrum with the reduction"></canvas>
+      <div class="mwrows" id="mwSupRows"></div>
+    </section>
+    <section class="mwsec" id="mwComp" data-s="comp" hidden>
+      <div class="mwsplit"><canvas id="mwCompC" aria-label="Compressor curve"></canvas><div class="mwrows" id="mwCompRows"></div></div>
+    </section>
+    <section class="mwsec" id="mwLim" data-s="lim" hidden>
+      <div class="mwsplit"><canvas id="mwLimC" aria-label="Limiter gain reduction"></canvas><div class="mwrows" id="mwLimRows"></div></div>
+    </section>
+  </div>
+</div>
 <div class="help" id="help" hidden role="dialog" aria-modal="true" aria-label="Help">
   <div class="hhead"><b>HELP</b>
     <div class="seg" id="helpNav"><button type="button" data-h="hStart">Start</button><button type="button" data-h="hAll">Everywhere</button><button type="button" data-h="hKeys">KEYS mode</button><button type="button" data-h="hPad">PAD mode</button><button type="button" data-h="hFx">FX</button><button type="button" data-h="hSynth">Synth</button></div>
@@ -1339,6 +1421,8 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p><b>Sects are hidden by default</b> (⚙ Settings → Hide sect page, or Project → SECT): EDIT×2 on an empty song cell makes a block that already holds a phrase, SHIFT+▶ opens that phrase, and EDIT×2 on a filled block makes a unique copy. Set SECT to SHOWN for the sect screen; nothing is lost either way.</p>
 <p><b>Arrange</b> (wide screens): the blue overview at the right shows the whole song, lined up with the Song screen (scroll either one and the other follows). <b>A tap on a block goes to it</b> (a second tap opens its phrase). <b>Holding a block mutes or unmutes just that one</b> — the phrase stays in place, silent, so you can drop parts in and out while arranging. Tap a row number to play from there; in KEYS mode M mutes the block under the Song cursor. Whole tracks are muted in the Mixer, never here, so a slip can’t silence a track.</p>
 <p>The screens are laid out as a map: Song ▶ Sect ▶ Phrase ▶ Inst left to right, Project above, Mixer below, FX to the right of the Mixer. You move between them with the screen keys below, the tabs, or the map in the side panel.</p>
+<h3>Mastering</h3>
+<p><b>Settings → Master → Open mastering…</b> (or › MASTERING on the FX screen's master) puts a chain on the master bus: <b>EQ → Suppress → Compress → Limit</b>. Each has its own switch; the readouts show short-term loudness in and out (LUFS) and the highest peak. <b>EQ</b>: drag a point (left/right is frequency, up/down is gain), shift-drag or scroll for width, double-click empty space to add a bell, double-click a point to switch it off; the band row sets exact values. <b>Suppress</b> turns down resonances that stick out of the spectrum (Depth, Sharpness, Selectivity, Speed; drag the lines to set its range; Delta plays only what it removes). <b>Compress</b> is a glue compressor (its sidechain high-pass keeps the bass from pumping it). <b>Limit</b> catches every peak at the Ceiling, between samples too. Renders of the song include the chain and keep its ceiling; stems don't.</p>
 <h3>Settings</h3>
 <p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound and the current track’s effects, and a channel strip for the current track (stereo meter, fader with 0 dB at E0 and +6 dB at the top, pan, M and S). Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. On a big screen the space beside the grid is the <b>stage</b> (Settings → STAGE): DOGS dance to the beat while the song plays, PHRASE previews the phrase under the cursor, OFF leaves it empty. The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
 <h3>Drum pads and synths</h3>
@@ -3414,7 +3498,7 @@ makeSeg($('segNoteName'), [[false,'Pad name'],[true,'+ note']], () => ex.noteNam
 
 /* ---------- settings (synth page): Kit, MIDI, Export, Skin and Audio under one button ---------- */
 /* ---------- settings: one dropdown menu under the gear, on every screen ---------- */
-const GLOBAL_SECS = [['pApp', 'App'], ['pKit', 'Kit'], ['pMidi', 'MIDI'], ['pExport', 'Export'], ['pSkin', 'Skin'], ['pAudio', 'Audio']];   // the Kit's save / load / reset are in File
+const GLOBAL_SECS = [['pMaster', 'Master'], ['pApp', 'App'], ['pKit', 'Kit'], ['pMidi', 'MIDI'], ['pExport', 'Export'], ['pSkin', 'Skin'], ['pAudio', 'Audio']];   // the Kit's save / load / reset are in File
 { const k = $('pKit'); if (k) k.hidden = true; }
 const gsetOpen = () => !$('gset').hidden;
 const gsetSecs = () => [
@@ -4401,6 +4485,36 @@ const polyFrom = () => Math.ceil(ntr() / 2), isPolyT = t => t >= polyFrom() && t
 // first song is made — the default instrument layout only needs the classic 16 anyway.
 const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0, slc:0, smode:0, sync:0, beats:4, grain:1});   // instruments 08–0F play the synth slots
 const freshMix = () => ({vol:224, pan:128, mute:false, solo:false, sc:false});
+/* ---------- mastering on the master bus ----------
+   S.mst, saved with the song:
+     on    the whole chain (off = the master bus as before)
+     eq    {on, bands:[{type, f, g, q, slope, on}]}  type: lowcut | lowshelf | bell | highshelf | highcut;
+           f Hz, g dB (shelves and bells), q (bells; cuts use Butterworth stages), slope 12/24/48 dB/oct (cuts)
+     sup   resonance suppressor {on, depth 0–1, sharp 0–1, sel dB, atk ms, rel ms, lo Hz, hi Hz, mix 0–1, delta}
+     comp  {on, thr dB, ratio, atk ms, rel ms, auto (program release), knee dB, makeup dB, automk, mix 0–1, hpf Hz}
+     lim   {on, drive dB, ceil dB, rel ms, look ms, tp (intersample peaks)}
+   Order: EQ → suppressor → compressor → limiter. The EQ is native biquads; the rest is master-worklet.js. */
+const MST_TYPES = ['lowcut', 'lowshelf', 'bell', 'highshelf', 'highcut'];
+const freshBand = (type, f, g = 0, q = 1, on = true, slope = 24) => ({type, f, g, q, slope, on});
+const freshMst = () => ({on:false,
+  eq:{on:true, bands:[freshBand('lowcut', 28, 0, .71, true, 24), freshBand('lowshelf', 110, 0, .7), freshBand('bell', 350, 0, 1.2), freshBand('bell', 2500, 0, 1.2), freshBand('highshelf', 9000, 0, .7), freshBand('highcut', 19000, 0, .71, false, 12)]},
+  sup:{on:false, depth:.4, sharp:.5, sel:4, atk:8, rel:90, lo:150, hi:12000, mix:1, delta:false},
+  comp:{on:true, thr:-14, ratio:2, atk:10, rel:150, auto:true, knee:6, makeup:0, automk:true, mix:1, hpf:80},
+  lim:{on:true, drive:0, ceil:-1, rel:120, look:3, tp:true}});
+const MST_RANGES = {sup:{depth:[0,1], sharp:[0,1], sel:[0,12], atk:[1,100], rel:[10,500], lo:[20,2000], hi:[1000,20000], mix:[0,1]},
+  comp:{thr:[-40,0], ratio:[1,20], atk:[0.1,100], rel:[20,1500], knee:[0,12], makeup:[0,18], mix:[0,1], hpf:[0,300]},
+  lim:{drive:[0,18], ceil:[-6,0], rel:[10,1000], look:[1,10]}};
+function normMst(j){
+  const M = freshMst(); if (!j || typeof j !== 'object') return M;
+  M.on = !!j.on;
+  for (const k of ['sup', 'comp', 'lim']){ const src = j[k]; if (!src || typeof src !== 'object') continue;
+    for (const p in M[k]){ const v = src[p]; if (typeof M[k][p] === 'boolean'){ if (typeof v === 'boolean') M[k][p] = v; }
+      else if (Number.isFinite(+v)){ const r = (MST_RANGES[k] || {})[p]; M[k][p] = r ? clamp(+v, r[0], r[1]) : +v; } } }
+  if (j.eq && typeof j.eq === 'object'){ M.eq.on = j.eq.on !== false;
+    if (Array.isArray(j.eq.bands)) M.eq.bands = j.eq.bands.slice(0, 8).filter(b => b && MST_TYPES.includes(b.type)).map(b =>
+      freshBand(b.type, clamp(+b.f || 1000, 20, 20000), clamp(+b.g || 0, -18, 18), clamp(+b.q || 1, 0.1, 18), b.on !== false, [12, 24, 48].includes(+b.slope) ? +b.slope : 24)); }
+  return M;
+}
 function freshSong(){
   // MPC swing: the classic hardware's shuffle, applied on 8th, 16th or dotted-8th grid.
   // Voice-per-track parity: one synth voice per song track — ntr tracks need ntr + 8 pads, capped at 32.
@@ -4408,7 +4522,7 @@ function freshSong(){
     song:Array.from({length:256}, () => new Array(NT).fill(-1)), chains:new Array(256).fill(null), phrases:new Array(256).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
     tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:4, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
-    ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0)};   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
+    ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0), mst:freshMst()};   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
 }
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;
 function normSong(j){
@@ -4416,6 +4530,7 @@ function normSong(j){
   if (typeof j.name === 'string') S.name = j.name.slice(0, 40);
   S.bpm = clamp(int(j.bpm, 120), 40, 300);
   // MPC swing: the classic hardware's 50–75% range, where 50% is straight and 66–67% is the triplet feel.
+  S.mst = normMst(j.mst);
   S.swing = clamp(int(j.swing, 50), 50, 75); S.swingB = clamp(int(j.swingB, 2), 1, 7); S.limiter = j.limiter !== false;
   S.renderFrom = clamp(int(j.renderFrom, 0), 0, 255); S.master = clamp(int(j.master, 255), 0, 255);
   if (Array.isArray(j.song)) j.song.slice(0, 256).forEach((r, i) => { if (Array.isArray(r)) for (let t = 0; t < NT; t++) S.song[i][t] = clamp(int(r[t], -1), -1, 255); });
@@ -4526,7 +4641,7 @@ function undoStep(dir){
   undo.busy = true; const n = normSong(JSON.parse(undo.cur));
   for (const k of Object.keys(S)) if (!(k in n)) delete S[k];
   Object.assign(S, n); CH.doc = S.chainPatch || null; chainsDropFrame(); saveS(); undo.busy = false;
-  if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); }
+  if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); mstSync(); }
   draw(); toast(dir < 0 ? 'Undo' : 'Redo');
 }
 setTimeout(kitUndoReset, 0);
@@ -5078,7 +5193,7 @@ function rtInit(){
   audio();
   if (!rt){
     const out = ctx.createGain(), lim = mkLimiter(ctx); lim.connect(master);
-    rt = {out, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix();
+    rt = {out, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync();
     // the master meter listens to everything going out, synth pads included
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
     master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
@@ -5087,11 +5202,58 @@ function rtInit(){
   }
   return rt;
 }
+
+const MW_URL = 'master-worklet.js?v=1', mwLoad = new WeakMap();
+function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
+const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
+const mstNeedsWk = M => M.sup.on || M.comp.on || M.lim.on;
+// Samples the chain delays the sound by (the suppressor's FFT and the limiter's lookahead); renders trim it off.
+const mstLatency = (M, sr) => !M.on ? 0 : (M.sup.on ? 2048 : 0) + (M.lim.on ? Math.max(1, Math.round(sr * M.lim.look / 1000)) : 0);
+const BUTTER = {12:[0.7071], 24:[0.5412, 1.3066], 48:[0.5098, 0.6013, 0.9000, 2.5629]};
+// The EQ as native biquads: bells and shelves are one filter each; cuts are Butterworth stages for their slope.
+function eqBuild(ac, eq){
+  const nodes = []; if (!eq.on) return nodes;
+  for (const b of eq.bands){ if (!b.on) continue;
+    if (b.type === 'lowcut' || b.type === 'highcut'){ for (const q of BUTTER[b.slope] || BUTTER[24]){ const n = ac.createBiquadFilter(); n.type = b.type === 'lowcut' ? 'highpass' : 'lowpass'; n.frequency.value = b.f; n.Q.value = 20 * Math.log10(q);   /* Web Audio takes the cuts' Q in dB */ n._b = b; nodes.push(n); } }
+    else { const n = ac.createBiquadFilter(); n.type = b.type === 'bell' ? 'peaking' : b.type; n.frequency.value = b.f; n.gain.value = b.g; n.Q.value = b.q; n._b = b; nodes.push(n); }
+  }
+  return nodes;
+}
+const eqShape = eq => !eq.on ? 'off' : eq.bands.map(b => b.on ? b.type + (b.type.endsWith('cut') ? b.slope : '') : '-').join(',');
+function mstChain(ac, M, live){
+  const input = ac.createGain(), output = ac.createGain(), eq = eqBuild(ac, M.eq);
+  let wk = null;
+  if (mstNeedsWk(M)){ try { wk = new AudioWorkletNode(ac, 'thunder-master', {numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2], channelCount:2, channelCountMode:'explicit', processorOptions:{set:mstSet(M), meters:live}}); } catch(e){ wk = null; } }
+  let h = input; for (const n of eq){ h.connect(n); h = n; } if (wk){ h.connect(wk); h = wk; } h.connect(output);
+  return {input, output, eq, wk, shape:eqShape(M.eq) + '|' + !!wk};
+}
+// Live: rebuilt when the EQ's shape or the worklet's presence changes; otherwise values glide into place.
+let mstMeter = null;
+async function mstSync(){
+  if (!rt || !ctx) return;
+  const M = S.mst; let ok = true;
+  if (M.on && mstNeedsWk(M)) ok = await mwReady(ctx);
+  const shape = eqShape(M.eq) + '|' + !!(M.on && mstNeedsWk(M) && ok);
+  if (!M.on){ if (rt.mst){ try { rt.mst.output.disconnect(); } catch(e){} rt.mst = null; rtRoute(); } return; }
+  if (!rt.mst || rt.mst.shape !== shape){
+    if (rt.mst){ try { rt.mst.output.disconnect(); } catch(e){} }
+    rt.mst = mstChain(ctx, M, true);
+    if (rt.mst.wk) rt.mst.wk.port.onmessage = e => { if (e.data && e.data.meter) mstMeter = e.data.meter; };
+    rtRoute(); return;
+  }
+  const t = ctx.currentTime;
+  for (const n of rt.mst.eq){ const b = n._b; n.frequency.setTargetAtTime(b.f, t, 0.01); if (n.type === 'peaking' || n.type.endsWith('shelf')){ n.gain.setTargetAtTime(b.g, t, 0.01); n.Q.setTargetAtTime(b.q, t, 0.01); } }
+  if (rt.mst.wk) rt.mst.wk.port.postMessage({set:mstSet(M)});
+}
 function rtRoute(){
   if (!rt) return;
-  const dest = S.limiter ? rt.lim : master;
+  // With mastering on, its own limiter replaces the simple safety limiter.
+  const ms = S.mst && S.mst.on && rt.mst ? rt.mst : null, mLim = ms && ms.wk && S.mst.lim.on;
+  const dest = S.limiter && !mLim ? rt.lim : master;
   try { rt.out.disconnect(); } catch(e){}
-  if (rt.mfx){ try { rt.mfx.disconnect(); } catch(e){} rt.out.connect(rt.mfx); rt.mfx.connect(dest); } else rt.out.connect(dest);
+  if (ms){ try { ms.output.disconnect(); } catch(e){} ms.output.connect(dest); }
+  const into = ms ? ms.input : dest;
+  if (rt.mfx){ try { rt.mfx.disconnect(); } catch(e){} rt.out.connect(rt.mfx); rt.mfx.connect(into); } else rt.out.connect(into);
   rt.out.gain.value = curve(S.master);
 }
 // Sends a track's (or with t = NT, the master's) effect list to the live worklets.
@@ -5223,7 +5385,8 @@ function mkBuf(d, sr){
   b.copyToChannel(d, 0); return b;
 }
 async function pass(evs, keep, N, sr, getB, lim, masterFx){
-  const O = window.OfflineAudioContext || window.webkitOfflineAudioContext, oc = new O(2, N, sr), out = oc.createGain();
+  const M = S.mst, useM = !!(masterFx && M && M.on), lat = useM ? mstLatency(M, sr) : 0;
+  const O = window.OfflineAudioContext || window.webkitOfflineAudioContext, oc = new O(2, N + lat, sr), out = oc.createGain();
   out.gain.value = curve(S.master);
   const wantChn = [...keep].some(t => chainsFeed(t)) && S.chainPatch && S.chainPatch.format === 'chains.patch';
   const wantFx = [...keep].some(t => fxCount(S.tfx[t])) || (masterFx && fxCount(S.mfx));
@@ -5232,7 +5395,9 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   if (chnOk) chnSync.add(oc);
   let head = out;
   if (ok && masterFx && fxCount(S.mfx)){ const m = tfxNode(oc, tfxChain(S.mfx, sr, S.bpm)); out.connect(m); head = m; }
-  if (lim){ const c = mkLimiter(oc); head.connect(c); c.connect(oc.destination); } else head.connect(oc.destination);
+  let mLim = false;
+  if (useM){ const wkOk = mstNeedsWk(M) ? await mwReady(oc) : true; const ch = mstChain(oc, M, false); head.connect(ch.input); head = ch.output; mLim = !!(ch.wk && M.lim.on); if (!wkOk && mstNeedsWk(M)) toast('Mastering effects couldn’t load for this render; EQ only.'); }
+  if (lim && !mLim){ const c = mkLimiter(oc); head.connect(c); c.connect(oc.destination); } else head.connect(oc.destination);
   const pl = makePlayer(oc, out, getB, false);
   pl.applyMix(t => keep.has(t));       // every track plays (so chokes match the mix), only `keep` is heard
   for (const t of keep){
@@ -5243,7 +5408,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   if (chnOk) for (const b of pl.buses) if (b && b.chn){ try { b.chn.port.postMessage({target:'chains-host', op:'transport', value:{tempo:S.bpm, lpb:S.lpb || 4, ticks:S.ticks || 6, playing:true}}); } catch(e){} }
   for (const e of evs) pl.play(e);
   const b = await oc.startRendering();
-  return [b.getChannelData(0), b.getChannelData(1)];
+  return lat ? [b.getChannelData(0).slice(lat, lat + N), b.getChannelData(1).slice(lat, lat + N)] : [b.getChannelData(0), b.getChannelData(1)];
 }
 function wavN(chs, sr, bits){
   const nc = chs.length, n = chs[0].length, bps = bits / 8, buf = new ArrayBuffer(44 + n * nc * bps), dv = new DataView(buf), u8 = new Uint8Array(buf);
@@ -5303,7 +5468,9 @@ async function renderOut(stems){
       for (const ch of out) for (let i = 0; i < fl; i++) ch[len - 1 - i] *= i / fl; return out; };
     mix = cut(mix);
     let pk = 0; for (const ch of mix) for (let i = 0; i < ch.length; i++){ const a = Math.abs(ch[i]); if (a > pk) pk = a; }
-    const g = ex.norm ? (pk > 0 ? 0.966 / pk : 1) : (pk > 1 ? 0.999 / pk : 1);
+    // With the mastering limiter on, its ceiling is the level: Normalise would undo it, so the mix stays as mastered.
+    const mastered = !!(S.mst && S.mst.on && S.mst.lim.on);
+    const g = ex.norm && !mastered ? (pk > 0 ? 0.966 / pk : 1) : (pk > 1 ? 0.999 / pk : 1);
     const scale = chs => { if (g !== 1) for (const ch of chs) for (let i = 0; i < ch.length; i++) ch[i] *= g; return chs; };
     const base = safe(S.name || 'Song');
     const files = [{name:`${base} mix.wav`, data:wavN(scale(mix), sr, ex.bits)}];
@@ -5433,7 +5600,7 @@ function resetCursors(){ cSect = cPhrase = cInst = cTrack = cFxT = cFxS = 0; for
 // A song's pattern numbering starts at 00. last.sect/last.phrase are the last sect/phrase NUMBER placed, and
 // they seed the first empty cell you type into — so a new song used to inherit the old song's number (a new
 // song began at 06 after the last one ended at 05). They are song-scoped, so reset them with the song.
-function setSong(s, msg){ tStop(true); S = s; projFile = null; resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); }
+function setSong(s, msg){ tStop(true); S = s; setTimeout(mstSync, 0); projFile = null; resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -5620,12 +5787,12 @@ function fxRows(){
     tap:() => { if (!A[k]){ A[k] = freshTfx(lastFxType); fxChanged(t); } cFxS = k; cs.fx.y = FXSLOTS + 1; draw(); },
     info:v => v ? `Slot ${k + 1} runs ${TFX[FXT_LIST[v - 1]].long}. EDIT+arrows picks another, OPTION+EDIT removes it` : `Empty. EDIT adds ${TFX[lastFxType].long}; EDIT+arrows picks one. Slots run top to bottom`});
   const k = cFxS, f = A[k];
-  if (!f){ rows.push({l:'› ADD TO SLOT ' + (k + 1), gap:true, act:() => { A[k] = freshTfx(lastFxType); fxChanged(t); draw(); }, info:() => `Puts ${TFX[lastFxType].long} in slot ${k + 1}`}); return rows; }
+  if (!f){ rows.push({l:'› ADD TO SLOT ' + (k + 1), gap:true, act:() => { A[k] = freshTfx(lastFxType); fxChanged(t); draw(); }, info:() => `Puts ${TFX[lastFxType].long} in slot ${k + 1}`}); return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows); }
   rows.push({l:'ACTIVE', gap:true, tog:true, get:() => f.on ? 1 : 0, set:v => { f.on = !!v; fxChanged(t); }, min:0, max:1, d:1, fmt:v => onOff(v) + `  slot ${k + 1} ` + TFX[f.type].n,
     info:() => `Slot ${k + 1}: ${TFX[f.type].long}. OFF bypasses it`});
   for (const q of TFX[f.type].ps) rows.push({l:q.l, get:() => f[q.k], set:v => { f[q.k] = v; fxChanged(t); }, min:q.min, max:q.max, big:q.names ? 1 : 16, d:q.d, tog:q.names && q.names.length === 2,
     fmt:v => q.names ? q.names[v] : (q.min < 0 ? sgn(v) : q.max > 99 ? hx(v) : d2(v)) + '  ' + q.fmt(v), info:() => TFX[f.type].long + ' · ' + q.l.toLowerCase()});
-  return rows;
+  return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows);
 }
 // The FX screen is two regions: the slot list (TRACK + SLOT 1–4) and the controls of one slot
 // (ACTIVE + its parameters). ▶ (or a sideways swipe right) opens the slot under the cursor; ◀ (or a
@@ -6901,6 +7068,224 @@ function stageChain(){
     if (i < items.length - 1){ g.strokeStyle = X.mid; g.beginPath(); g.moveTo(W / 2, y + bh); g.lineTo(W / 2, y + bh + gap); g.moveTo(W / 2 - 4 * dpr, y + bh + gap - 5 * dpr); g.lineTo(W / 2, y + bh + gap); g.lineTo(W / 2 + 4 * dpr, y + bh + gap - 5 * dpr); g.stroke(); }
     y += bh + gap; });
 }
+/* ---------- mastering window ---------- */
+const MW_STAGES = [['eq', 'EQ'], ['sup', 'SUPPRESS'], ['comp', 'COMPRESS'], ['lim', 'LIMIT']];
+let mwSel = 'eq', mwBand = 0, mwOpenNow = false, mwRaf = 0, mwSyncT = 0;
+let mwProto = null;   // an idle offline context whose biquads draw the EQ curve exactly as the real ones sound
+const mwP = () => mwProto || (mwProto = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 48000));
+const stageOn = k => k === 'eq' ? S.mst.eq.on : S.mst[k].on;
+function mstChanged(){ saveS(); clearTimeout(mwSyncT); mwSyncT = setTimeout(mstSync, 16); mwEqDirty = true; mwChain(); mstLabel(); }
+function mstLabel(){ const l = $('mstLbl'); if (l) l.textContent = S.mst.on ? 'On: ' + MW_STAGES.filter(([k]) => stageOn(k)).map(([, n]) => n.toLowerCase()).join(' → ') : 'Off'; }
+function openMst(stage){
+  if (stage) mwSel = stage;
+  // below the top bar, so the transport (Song / Stop) stays in reach while you listen
+  const tb = document.querySelector('.top'), top = tb ? Math.round(tb.getBoundingClientRect().bottom) : 0;
+  $('mstWin').style.top = (top + (innerWidth > 700 ? 8 : 0)) + 'px';
+  $('mstWin').hidden = false; mwOpenNow = true; mwBuild(); mwLoop();
+  try { gsetToggle(false); } catch(e){}
+}
+function closeMst(){ $('mstWin').hidden = true; mwOpenNow = false; cancelAnimationFrame(mwRaf); }
+$('mwX').addEventListener('click', closeMst);
+document.addEventListener('keydown', e => { if (mwOpenNow && e.key === 'Escape' && !typing(e)){ e.preventDefault(); e.stopPropagation(); closeMst(); } }, true);
+$('mwOn').addEventListener('click', () => { S.mst.on = !S.mst.on; if (S.mst.on && !S.mst.eq.on && !mstNeedsWk(S.mst)) S.mst.eq.on = true; mstChanged(); mwBuild();
+  toast(S.mst.on ? 'Mastering on. Renders of the song include it.' : 'Mastering off: the master bus as before.'); });
+// The chain: each stage's switch, its name (shows its editor) and how hard it's working.
+function mwChain(){
+  const box = $('mwChain'); if (!box) return; box.replaceChildren();
+  $('mwOn').textContent = S.mst.on ? 'ON' : 'OFF'; $('mwOn').classList.toggle('on', S.mst.on); $('mwOn').setAttribute('aria-pressed', String(S.mst.on));
+  MW_STAGES.forEach(([k, n], i) => {
+    if (i) box.append(el('span', 'mwarrow', '→'));
+    const b = el('div', 'mwst' + (stageOn(k) ? ' on' : '') + (mwSel === k ? ' sel' : '')); b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(mwSel === k)); b.dataset.k = k;
+    const sw = el('button', 'sw'); sw.type = 'button'; sw.title = (stageOn(k) ? 'Switch off ' : 'Switch on ') + n.toLowerCase(); sw.setAttribute('aria-label', sw.title);
+    sw.addEventListener('click', e => { e.stopPropagation(); if (k === 'eq') S.mst.eq.on = !S.mst.eq.on; else S.mst[k].on = !S.mst[k].on;
+      if (stageOn(k)){ mwSel = k; if (!S.mst.on){ S.mst.on = true; toast('Mastering on.'); } } mstChanged(); mwBuild(); });
+    b.append(sw, el('span', 'nm', n), el('span', 'gr')); b.addEventListener('click', () => { mwSel = k; mwBuild(); });
+    box.append(b);
+  });
+}
+function mwBuild(){
+  mwChain(); mstLabel();
+  for (const [k] of MW_STAGES) $('mw' + k[0].toUpperCase() + k.slice(1)).hidden = mwSel !== k;
+  if (mwSel === 'eq') mwEqPanel();
+  if (mwSel === 'sup') mwRows('mwSupRows', 'sup', [
+    ['depth', {l:'Depth', min:0, max:1, c:'lin', d:.4, f:pct}], ['sharp', {l:'Sharpness', min:0, max:1, c:'lin', d:.5, f:pct}],
+    ['sel', {l:'Selectivity', min:0, max:12, c:'half', d:4, f:v => v.toFixed(1) + ' dB'}], ['atk', {l:'Attack', min:1, max:100, c:'log', d:8, f:v => Math.round(v) + ' ms'}],
+    ['rel', {l:'Release', min:10, max:500, c:'log', d:90, f:v => Math.round(v) + ' ms'}], ['lo', {l:'Focus low', min:20, max:2000, c:'log', d:150, f:hzF}],
+    ['hi', {l:'Focus high', min:1000, max:20000, c:'log', d:12000, f:hzF}], ['mix', {l:'Mix', min:0, max:1, c:'lin', d:1, f:pct}]],
+    [['delta', 'Delta: hear only what it removes']]);
+  if (mwSel === 'comp') mwRows('mwCompRows', 'comp', [
+    ['thr', {l:'Threshold', min:-40, max:0, c:'half', d:-14, f:v => v.toFixed(1) + ' dB'}], ['ratio', {l:'Ratio', min:1, max:20, c:'sq', d:2, f:v => v.toFixed(1) + ':1'}],
+    ['atk', {l:'Attack', min:0.1, max:100, c:'log', d:10, f:v => (v < 10 ? v.toFixed(1) : Math.round(v)) + ' ms'}], ['rel', {l:'Release', min:20, max:1500, c:'log', d:150, f:v => Math.round(v) + ' ms'}],
+    ['knee', {l:'Knee', min:0, max:12, c:'half', d:6, f:v => v.toFixed(1) + ' dB'}], ['makeup', {l:'Make-up', min:0, max:18, c:'half', d:0, f:v => '+' + v.toFixed(1) + ' dB'}],
+    ['mix', {l:'Mix', min:0, max:1, c:'lin', d:1, f:pct}], ['hpf', {l:'SC high-pass', min:0, max:300, c:'int', d:80, f:v => v < 16 ? 'Off' : v + ' Hz'}]],
+    [['auto', 'Auto release (longer when it works hard)'], ['automk', 'Auto make-up']]);
+  if (mwSel === 'lim') mwRows('mwLimRows', 'lim', [
+    ['drive', {l:'Input gain', min:0, max:18, c:'half', d:0, f:v => '+' + v.toFixed(1) + ' dB'}], ['ceil', {l:'Ceiling', min:-6, max:0, c:'lin', d:-1, f:v => v.toFixed(1) + ' dB'}],
+    ['rel', {l:'Release', min:10, max:1000, c:'log', d:120, f:v => Math.round(v) + ' ms'}], ['look', {l:'Lookahead', min:1, max:10, c:'half', d:3, f:v => v.toFixed(1) + ' ms'}]],
+    [['tp', 'True peak (catch peaks between samples)']]);
+  mwEqDirty = true;
+}
+const hzF = v => v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 1 : 2) + ' kHz' : Math.round(v) + ' Hz';
+function mwRows(id, k, rows, togs){
+  const box = $(id); box.replaceChildren();
+  for (const [key, def] of rows){ const r = makeRow(def, key, () => S.mst[k], {idp:'mw' + k, on:() => { if (key === 'ceil') S.mst.lim.ceil = Math.round(S.mst.lim.ceil * 10) / 10; mstChanged(); }}); r.refresh(); box.append(r.r); }
+  for (const [key, label] of togs || []){
+    const t = el('div', 'mwtog'), b = el('button', S.mst[k][key] ? 'on' : '', S.mst[k][key] ? 'ON' : 'OFF'); b.type = 'button'; b.setAttribute('aria-pressed', String(!!S.mst[k][key]));
+    b.addEventListener('click', () => { S.mst[k][key] = !S.mst[k][key]; mstChanged(); mwBuild(); }); t.append(b, el('span', null, label)); box.append(t);
+  }
+}
+/* EQ editor */
+let mwEqDirty = true, mwCurve = null, mwDrag = null;
+const EQ_F = Array.from({length:240}, (_, i) => 20 * Math.pow(1000, i / 239));
+const EQ_NAMES = {lowcut:'Low cut', lowshelf:'Low shelf', bell:'Bell', highshelf:'High shelf', highcut:'High cut'};
+function mwEqCurve(){
+  // the combined response, from the same biquads the engine uses (in an idle offline context)
+  const tot = new Float32Array(EQ_F.length), f = new Float32Array(EQ_F), mag = new Float32Array(EQ_F.length), ph = new Float32Array(EQ_F.length);
+  if (S.mst.eq.on) for (const n of eqBuild(mwP(), S.mst.eq)){ n.getFrequencyResponse(f, mag, ph); for (let i = 0; i < tot.length; i++) tot[i] += 20 * Math.log10(Math.max(1e-6, mag[i])); }
+  mwCurve = tot; mwEqDirty = false;
+}
+function mwGeo(c){ const r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
+  if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
+  const pad = 14 * dpr; return {r, dpr, W, H, pad, x:f => Math.log(f / 20) / Math.log(1000) * W, f:x => 20 * Math.pow(1000, clamp(x / W, 0, 1)),
+    y:g => H / 2 - g / 18 * (H / 2 - pad), g:y => clamp((H / 2 - y) / (H / 2 - pad) * 18, -18, 18)}; }
+function mwColors(){ const st = getComputedStyle($('mstWin')), v = k => st.getPropertyValue(k).trim(); return {ink:v('--ink') || '#111', muted:v('--muted') || '#666', line:v('--track') || '#e6e6e6', panel:v('--panel') || '#fff', fill:v('--tk-mono') || '#eba3bd', font:v('--mono') || 'monospace', clip:v('--meter-clip') || '#e0564a'}; }
+function mwGrid(g, G, C, gains){
+  g.lineWidth = G.dpr; g.strokeStyle = C.line; g.fillStyle = C.muted; g.font = `${10 * G.dpr}px ${C.font}`; g.textBaseline = 'alphabetic';
+  for (const f of [30, 50, 100, 200, 500, 1000, 2000, 5000, 10000]){ const x = Math.round(G.x(f)) + .5; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, G.H); g.stroke(); g.fillText(f >= 1000 ? f / 1000 + 'k' : String(f), x + 3 * G.dpr, G.H - 4 * G.dpr); }
+  if (gains) for (const d of [-12, -6, 0, 6, 12]){ const y = Math.round(G.y(d)) + .5; g.strokeStyle = d ? C.line : C.muted; g.beginPath(); g.moveTo(0, y); g.lineTo(G.W, y); g.stroke(); g.fillText((d > 0 ? '+' : '') + d, 4 * G.dpr, y - 3 * G.dpr); }
+}
+function mwSpectrum(g, G, C, top, bot){
+  const an = specAnalyser(); if (!an || !(tp.on || performance.now() - audioWake < 1500)) return;
+  an.getFloatFrequencyData(dkSpec); const sr = ctx.sampleRate, N = dkSpec.length, yOf = db => clamp((top - db) / (top - bot), 0, 1) * G.H;
+  g.beginPath(); g.moveTo(0, G.H);
+  for (let x = 0; x <= G.W; x += 3 * G.dpr){ const f0 = G.f(x), f1 = G.f(x + 3 * G.dpr), b0 = Math.max(1, Math.floor(f0 / (sr / 2) * N)), b1 = Math.min(N - 1, Math.max(b0, Math.ceil(f1 / (sr / 2) * N)));
+    let d = -200; for (let b = b0; b <= b1; b++) if (dkSpec[b] > d) d = dkSpec[b]; g.lineTo(x, yOf(d)); }
+  g.lineTo(G.W, G.H); g.closePath(); g.globalAlpha = .45; g.fillStyle = C.fill; g.fill(); g.globalAlpha = 1;
+}
+const bandY = b => b.type.endsWith('cut') ? 0 : b.g;
+function mwEqDraw(){
+  const c = $('mwEqC'), G = mwGeo(c), g = c.getContext('2d'), C = mwColors(); if (!G.W) return;
+  if (mwEqDirty || !mwCurve) mwEqCurve();
+  g.clearRect(0, 0, G.W, G.H); mwSpectrum(g, G, C, -10, -100); mwGrid(g, G, C, true);
+  // the curve
+  g.strokeStyle = C.ink; g.lineWidth = 2.2 * G.dpr; g.lineJoin = 'miter'; g.beginPath();
+  EQ_F.forEach((f, i) => { const x = G.x(f), y = G.y(clamp(mwCurve[i], -24, 24)); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke();
+  // the points: squares with their number; the selected one filled
+  S.mst.eq.bands.forEach((b, i) => { const x = G.x(b.f), y = G.y(bandY(b)), s = 9 * G.dpr, sel = i === mwBand;
+    g.globalAlpha = b.on ? 1 : .4; g.fillStyle = sel ? C.ink : C.panel; g.strokeStyle = C.ink; g.lineWidth = 1.6 * G.dpr;
+    g.fillRect(x - s, y - s, s * 2, s * 2); g.strokeRect(x - s + .5, y - s + .5, s * 2 - 1, s * 2 - 1);
+    g.fillStyle = sel ? C.panel : C.ink; g.font = `600 ${10 * G.dpr}px ${C.font}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(i + 1), x, y + .5 * G.dpr); g.textAlign = 'left'; g.globalAlpha = 1; });
+}
+function mwHit(G, ex, ey){ let best = -1, bd = 1e9; S.mst.eq.bands.forEach((b, i) => { const d = Math.hypot(G.x(b.f) - ex, G.y(bandY(b)) - ey); if (d < bd){ bd = d; best = i; } }); return bd < 16 * G.dpr ? best : -1; }
+{ const c = $('mwEqC');
+  const pt = e => { const G = mwGeo(c); return {G, x:(e.clientX - G.r.left) * G.dpr, y:(e.clientY - G.r.top) * G.dpr}; };
+  c.addEventListener('pointerdown', e => { const {G, x, y} = pt(e), i = mwHit(G, x, y); if (i < 0) return;
+    e.preventDefault(); try { c.setPointerCapture(e.pointerId); } catch(_){} mwBand = i; const b = S.mst.eq.bands[i]; mwDrag = {id:e.pointerId, y0:y, q0:b.q}; mwEqPanel(); });
+  c.addEventListener('pointermove', e => { if (!mwDrag || e.pointerId !== mwDrag.id) return; const {G, x, y} = pt(e), b = S.mst.eq.bands[mwBand];
+    if (e.shiftKey && b.type === 'bell') b.q = clamp(mwDrag.q0 * Math.pow(2, (mwDrag.y0 - y) / (60 * G.dpr)), 0.1, 18);
+    else { b.f = Math.round(clamp(G.f(x), 20, 20000)); if (!b.type.endsWith('cut')) b.g = Math.round(G.g(y) * 10) / 10; }
+    mstChanged(); mwEqPanel(true); });
+  const end = e => { if (mwDrag && e.pointerId === mwDrag.id) mwDrag = null; };
+  c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
+  c.addEventListener('wheel', e => { const b = S.mst.eq.bands[mwBand]; if (!b) return; e.preventDefault();
+    if (b.type === 'bell') b.q = clamp(b.q * Math.exp(-e.deltaY * 0.0025), 0.1, 18);
+    else if (b.type.endsWith('cut')){ const sl = [12, 24, 48], k = sl.indexOf(b.slope); b.slope = sl[clamp(k + (e.deltaY > 0 ? -1 : 1), 0, 2)]; }
+    else b.g = clamp(Math.round((b.g - e.deltaY * 0.01) * 10) / 10, -18, 18);
+    mstChanged(); mwEqPanel(true); }, {passive:false});
+  c.addEventListener('dblclick', e => { const {G, x, y} = pt(e), i = mwHit(G, x, y);
+    if (i >= 0){ S.mst.eq.bands[i].on = !S.mst.eq.bands[i].on; }
+    else if (S.mst.eq.bands.length < 8){ S.mst.eq.bands.push(freshBand('bell', Math.round(G.f(x)), Math.round(G.g(y) * 10) / 10, 1.2)); mwBand = S.mst.eq.bands.length - 1; }
+    else return toast('The EQ has 8 bands at most.');
+    if (!S.mst.eq.on) S.mst.eq.on = true; mstChanged(); mwEqPanel(); });
+}
+function mwEqPanel(valuesOnly){
+  const bands = S.mst.eq.bands; mwBand = clamp(mwBand, 0, Math.max(0, bands.length - 1));
+  if (!valuesOnly){
+    const bx = $('mwBands'); bx.replaceChildren();
+    bands.forEach((b, i) => { const t = el('button', (i === mwBand ? 'sel' : '') + (b.on ? '' : ' off'), String(i + 1)); t.type = 'button'; t.title = EQ_NAMES[b.type] + ' ' + hzF(b.f); t.addEventListener('click', () => { mwBand = i; mwEqPanel(); }); bx.append(t); });
+    if (bands.length < 8){ const a = el('button', null, '+'); a.type = 'button'; a.title = 'Add a bell'; a.addEventListener('click', () => { bands.push(freshBand('bell', 1000, 0, 1.2)); mwBand = bands.length - 1; mstChanged(); mwEqPanel(); }); bx.append(a); }
+  }
+  const p = $('mwBand'), b = bands[mwBand];
+  if (!b){ p.replaceChildren(el('span', 'mwhint', 'No bands. Double-click the graph to add one.')); return; }
+  if (valuesOnly && p.dataset.b === String(mwBand) && p.dataset.t === b.type){
+    for (const inp of p.querySelectorAll('input[data-k]')) if (document.activeElement !== inp){ const k = inp.dataset.k; inp.value = k === 'f' ? b.f : k === 'g' ? b.g : b.q.toFixed(2); }
+    return; }
+  p.dataset.b = String(mwBand); p.dataset.t = b.type; p.replaceChildren();
+  const lab = (t, inp) => { const l = el('label', null, t); l.append(inp); return l; };
+  const type = el('select'); for (const t of MST_TYPES){ const o = el('option', null, EQ_NAMES[t]); o.value = t; if (t === b.type) o.selected = true; type.append(o); }
+  type.addEventListener('change', () => { b.type = type.value; if (b.type.endsWith('cut')){ b.g = 0; b.slope = b.slope || 24; } mstChanged(); mwEqPanel(); });
+  const num = (k, min, max, step) => { const i = el('input'); i.type = 'number'; i.min = min; i.max = max; i.step = step; i.dataset.k = k; i.value = k === 'q' ? b.q.toFixed(2) : b[k];
+    i.addEventListener('change', () => { const v = parseFloat(i.value); if (Number.isFinite(v)){ b[k] = clamp(v, min, max); mstChanged(); } i.value = k === 'q' ? b.q.toFixed(2) : b[k]; }); i.addEventListener('keydown', e => e.stopPropagation()); return i; };
+  p.append(el('b', null, 'Band ' + (mwBand + 1)), lab('Type', type), lab('Hz', num('f', 20, 20000, 1)));
+  if (!b.type.endsWith('cut')) p.append(lab('dB', num('g', -18, 18, 0.1)));
+  if (b.type === 'bell') p.append(lab('Q', num('q', 0.1, 18, 0.05)));
+  if (b.type.endsWith('cut')){ const sl = el('select'); for (const v of [12, 24, 48]){ const o = el('option', null, v + ' dB/oct'); o.value = v; if (v === b.slope) o.selected = true; sl.append(o); }
+    sl.addEventListener('change', () => { b.slope = +sl.value; mstChanged(); }); p.append(lab('Slope', sl)); }
+  const on = el('button', null, b.on ? 'On' : 'Off'); on.type = 'button'; on.addEventListener('click', () => { b.on = !b.on; mstChanged(); mwEqPanel(); });
+  const del = el('button', null, 'Delete'); del.type = 'button'; del.addEventListener('click', () => { bands.splice(mwBand, 1); mwBand = Math.max(0, mwBand - 1); mstChanged(); mwEqPanel(); });
+  const flat = el('button', null, 'Flat'); flat.type = 'button'; flat.title = 'Every gain to 0 dB'; flat.addEventListener('click', () => { bands.forEach(x => { if (!x.type.endsWith('cut')) x.g = 0; }); mstChanged(); mwEqPanel(); });
+  p.append(on, del, flat);
+}
+/* Suppressor display: the spectrum, the reduction hanging from the top, and the focus range (drag its edges) */
+let mwSupDrag = null;
+function mwSupDraw(){
+  const c = $('mwSupC'), G = mwGeo(c), g = c.getContext('2d'), C = mwColors(); if (!G.W) return; const M = S.mst.sup;
+  g.clearRect(0, 0, G.W, G.H);
+  g.fillStyle = C.line; g.globalAlpha = .55; g.fillRect(0, 0, G.x(M.lo), G.H); g.fillRect(G.x(M.hi), 0, G.W - G.x(M.hi), G.H); g.globalAlpha = 1;
+  mwSpectrum(g, G, C, -10, -100); mwGrid(g, G, C, false);
+  const red = mstMeter && mstMeter.sup; if (red && M.on){ const n = red.length; g.fillStyle = C.ink; for (let i = 0; i < n; i++){ const h = red[i] / 20 * G.H * .6; if (h > .5) g.fillRect(i / n * G.W + 1, 0, G.W / n - 2, h); } }
+  g.strokeStyle = C.ink; g.lineWidth = 2 * G.dpr; for (const f of [M.lo, M.hi]){ const x = Math.round(G.x(f)) + .5; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, G.H); g.stroke(); }
+  g.fillStyle = C.muted; g.font = `${10 * G.dpr}px ${C.font}`; g.fillText('reduction ↓  · drag the lines to set the range', 6 * G.dpr, G.H - 18 * G.dpr);
+}
+{ const c = $('mwSupC');
+  c.addEventListener('pointerdown', e => { const G = mwGeo(c), x = (e.clientX - G.r.left) * G.dpr, M = S.mst.sup;
+    const k = Math.abs(x - G.x(M.lo)) < Math.abs(x - G.x(M.hi)) ? 'lo' : 'hi'; if (Math.abs(x - G.x(M[k])) > 20 * G.dpr) return;
+    e.preventDefault(); try { c.setPointerCapture(e.pointerId); } catch(_){} mwSupDrag = {k, id:e.pointerId}; });
+  c.addEventListener('pointermove', e => { if (!mwSupDrag || e.pointerId !== mwSupDrag.id) return; const G = mwGeo(c), M = S.mst.sup, f = Math.round(G.f((e.clientX - G.r.left) * G.dpr));
+    if (mwSupDrag.k === 'lo') M.lo = clamp(f, 20, Math.min(2000, M.hi / 2)); else M.hi = clamp(f, Math.max(1000, M.lo * 2), 20000); mstChanged(); mwBuild(); });
+  const end = e => { if (mwSupDrag && e.pointerId === mwSupDrag.id) mwSupDrag = null; }; c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end); }
+/* Compressor: its curve (in → out) and the gain reduction now */
+function mwCompDraw(){
+  const c = $('mwCompC'), G = mwGeo(c), g = c.getContext('2d'), C = mwColors(); if (!G.W) return; const M = S.mst.comp, P = 10 * G.dpr, sz = Math.min(G.W - 40 * G.dpr, G.H) - 2 * P;
+  g.clearRect(0, 0, G.W, G.H); const X = d => P + (d + 60) / 60 * sz, Y = d => P + sz - (d + 60) / 60 * sz;
+  g.strokeStyle = C.line; g.lineWidth = G.dpr; for (let d = -60; d <= 0; d += 12){ g.beginPath(); g.moveTo(X(d), Y(-60)); g.lineTo(X(d), Y(0)); g.moveTo(X(-60), Y(d)); g.lineTo(X(0), Y(d)); g.stroke(); }
+  g.setLineDash([4 * G.dpr, 4 * G.dpr]); g.strokeStyle = C.muted; g.beginPath(); g.moveTo(X(-60), Y(-60)); g.lineTo(X(0), Y(0)); g.stroke(); g.setLineDash([]);
+  const cv = x => { const s = 1 - 1 / M.ratio, o = x - M.thr; if (M.knee > 0 && Math.abs(o) <= M.knee / 2) return -s * (o + M.knee / 2) ** 2 / (2 * M.knee); return o > 0 ? -s * o : 0; };
+  const mk = M.automk ? -cv(0) * 0.5 + M.makeup : M.makeup;
+  g.strokeStyle = C.ink; g.lineWidth = 2.2 * G.dpr; g.beginPath(); for (let d = -60; d <= 0; d += .5){ const y = clamp(d + cv(d) + mk, -60, 6); d === -60 ? g.moveTo(X(d), Y(y)) : g.lineTo(X(d), Y(y)); } g.stroke();
+  const gr = mstMeter && M.on && S.mst.on ? mstMeter.comp : 0, bx = G.W - 26 * G.dpr, bh = sz;
+  g.strokeStyle = C.ink; g.lineWidth = G.dpr; g.strokeRect(bx + .5, P + .5, 14 * G.dpr, bh); g.fillStyle = C.fill; g.fillRect(bx + 1, P + 1, 14 * G.dpr - 1, clamp(-gr / 20, 0, 1) * bh);
+  g.fillStyle = C.muted; g.font = `${10 * G.dpr}px ${C.font}`; g.fillText('GR', bx - 2 * G.dpr, P + bh + 12 * G.dpr);
+}
+/* Limiter: its gain reduction over the last few seconds */
+const mwLimHist = new Float32Array(240); let mwLimI = 0;
+function mwLimDraw(){
+  const c = $('mwLimC'), G = mwGeo(c), g = c.getContext('2d'), C = mwColors(); if (!G.W) return;
+  g.clearRect(0, 0, G.W, G.H); const yOf = d => clamp(-d / 12, 0, 1) * (G.H - 20 * G.dpr) + 4 * G.dpr;
+  g.strokeStyle = C.line; g.lineWidth = G.dpr; g.fillStyle = C.muted; g.font = `${10 * G.dpr}px ${C.font}`;
+  for (const d of [0, -3, -6, -9, -12]){ const y = Math.round(yOf(d)) + .5; g.beginPath(); g.moveTo(0, y); g.lineTo(G.W, y); g.stroke(); g.fillText(d + ' dB', 4 * G.dpr, y - 3 * G.dpr); }
+  g.fillStyle = C.fill; const n = mwLimHist.length, w = G.W / n;
+  for (let i = 0; i < n; i++){ const v = mwLimHist[(mwLimI + i) % n]; if (v < -0.05) g.fillRect(i * w, yOf(0), Math.ceil(w), yOf(v) - yOf(0)); }
+  g.fillStyle = C.muted; g.fillText('gain reduction, last few seconds', 6 * G.dpr, G.H - 5 * G.dpr);
+}
+function mwLoop(){
+  if (!mwOpenNow) return;
+  mwRaf = requestAnimationFrame(mwLoop);
+  const now = performance.now(); if (now - (mwLoop.t || 0) < 33) return; mwLoop.t = now;
+  const m = mstMeter, live = !!(m && S.mst.on && (tp.on || now - audioWake < 1500));
+  // chain readouts
+  $('mwChain').querySelectorAll('.mwst').forEach(b => { const k = b.dataset.k, gr = b.querySelector('.gr');
+    if (!live || !stageOn(k) || k === 'eq'){ gr.textContent = ''; return; }
+    const v = k === 'comp' ? m.comp : k === 'lim' ? m.lim : (m.sup ? -Math.max(...m.sup) : 0); gr.textContent = v < -0.05 ? v.toFixed(1) : '0.0'; });
+  const lu = v => Number.isFinite(v) && v > -70 ? v.toFixed(1) : '—';
+  $('mwRead').innerHTML = `<span>IN <b>${live ? lu(m.inLu) : '—'}</b> LUFS</span><span>OUT <b>${live ? lu(m.outLu) : '—'}</b> LUFS</span><span>PEAK <b>${m && m.tp > 0 ? (20 * Math.log10(m.tp)).toFixed(1) : '—'}</b> dB</span>`;
+  if (m && S.mst.on){ mwLimHist[mwLimI] = live ? m.lim : 0; mwLimI = (mwLimI + 1) % mwLimHist.length; }
+  if (mwSel === 'eq') mwEqDraw(); else if (mwSel === 'sup') mwSupDraw(); else if (mwSel === 'comp') mwCompDraw(); else mwLimDraw();
+}
+$('mwRead').addEventListener('click', () => { if (rt && rt.mst && rt.mst.wk) rt.mst.wk.port.postMessage({resetPeak:true}); });
+$('mwRead').title = 'Short-term loudness in and out (3 s, BS.1770) and the highest output peak · tap to reset the peak';
+$('bMst').addEventListener('click', () => openMst());
+mstLabel();
 /* ---------- bottom panel (KEYS mode with the keypad off) ---------- */
 const DKK = 'thunderplus-deck-v1';
 const DK_SECS = [['scope', 'SCOPE'], ['inst', 'INST'], ['fx', 'FX'], ['strip', 'TRACK']];
