@@ -47,6 +47,11 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
   color-scheme:light;
 }
 *{box-sizing:border-box; border-radius:0}
+/* icons: drawn in the text colour with 2px lines (outline shapes), sized to the text around them */
+.ic{width:1.05em; height:1.05em; flex:none; display:inline-block; vertical-align:-.17em; fill:none; stroke:currentColor; stroke-width:2; stroke-linejoin:miter; stroke-linecap:square; overflow:visible}
+.tl .ic, .tstat .ic{margin-right:.4em}
+.k .ick{width:1.35em; height:1.35em; stroke-width:1.8}
+.setg.ic{stroke-width:1.7}
 [hidden]{display:none!important}
 /* help sheet: a full-screen page over everything, in the same bands-and-lines look */
 /* settings sheets: the synth's Settings band tabs and the tracker's full-screen settings menu */
@@ -794,6 +799,18 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 :root[data-skin="bwlight"]{--mx:#000000; --mx2:#4d4d4d; --mxdim:#b3b3b3; --mxbg:#ffffff; --mxpanel:#f6f6f6; --mxpanel2:#ebebeb; --mxon:#ffffff;
   --mxsoft:#3a3a3a; --mxpoly:#6b6b6b; --mxglowc:transparent; --mxscan:transparent; --mxred:#d0302a;
   --font:"Helvetica Neue",Helvetica,Arial,"Nimbus Sans","Liberation Sans",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:light}
+:root[data-skin="sage"]{--mx:#2f5d3a; --mx2:#5b7a61; --mxdim:#b3c7ad; --mxbg:#e2ecdc; --mxpanel:#eaf1e5; --mxpanel2:#d4e2cc; --mxon:#f7fbf4;
+  --mxsoft:#8fb88f; --mxpoly:#a3612c; --mxglowc:transparent; --mxscan:transparent; --mxred:#b73a2c; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="navy"]{--mx:#1f3a68; --mx2:#4d5f80; --mxdim:#cfc3a4; --mxbg:#f6f0e1; --mxpanel:#faf6ec; --mxpanel2:#ece3cc; --mxon:#fffdf6;
+  --mxsoft:#e2b75a; --mxpoly:#a3442f; --mxglowc:transparent; --mxscan:transparent; --mxred:#b73a2c; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="tomato"]{--mx:#b8392a; --mx2:#8a5248; --mxdim:#e8b8ab; --mxbg:#f9e6df; --mxpanel:#fcefea; --mxpanel2:#f1d4ca; --mxon:#fff8f5;
+  --mxsoft:#f08f78; --mxpoly:#2f6f73; --mxglowc:transparent; --mxscan:transparent; --mxred:#7a1a12; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="ocean"]{--mx:#0f5d63; --mx2:#3f7377; --mxdim:#a9d3d1; --mxbg:#ddf0ee; --mxpanel:#e9f6f4; --mxpanel2:#c9e6e3; --mxon:#f5fcfb;
+  --mxsoft:#5fb7b0; --mxpoly:#c06a2b; --mxglowc:transparent; --mxscan:transparent; --mxred:#b73a2c; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="plum"]{--mx:#6b2d5c; --mx2:#7f5a76; --mxdim:#d6b7cf; --mxbg:#f3e5ef; --mxpanel:#f8eef5; --mxpanel2:#e8d2e2; --mxon:#fff9fd;
+  --mxsoft:#c78ab6; --mxpoly:#3e6e4c; --mxglowc:transparent; --mxscan:transparent; --mxred:#b73a2c; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="night"]{--mx:#f0b43c; --mx2:#c9a35f; --mxdim:#3a3f5e; --mxbg:#14182b; --mxpanel:#191e35; --mxpanel2:#232945; --mxon:#14182b;
+  --mxsoft:#ffd884; --mxpoly:#7fb6e6; --mxglowc:transparent; --mxscan:transparent; --mxred:#ff6b5a; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:dark}
 :root[data-skin="mustard"]{--mx:#a37800; --mx2:#7d6a3c; --mxdim:#b5a2dc; --mxbg:#e3d9f6; --mxpanel:#eae2f9; --mxpanel2:#d8cbf1; --mxon:#fffaf0;
   --mxsoft:#f2cf63; --mxpoly:#6f55bf; --mxglowc:transparent; --mxscan:transparent; --mxred:#c0392b;
   --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
@@ -812,7 +829,7 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 :root[data-skinbase="term"] :is(.ttabs button[data-v],.tmap button[data-v]){background:var(--mxbg); color:var(--mx)}
 :root[data-skinbase="term"] :is(.lcell,.layercard,.fxcard,.voicecard){background:var(--mxpanel); border-color:var(--mx); box-shadow:0 0 10px -4px var(--mxglowc)}
 :root[data-skinbase="term"] input[type=range], :root[data-skinbase="term"] input[type=checkbox]{accent-color:var(--mx)}
-:root[data-skinbase="term"] :is(svg){color:var(--mx)}
+:root[data-skinbase="term"] svg:not(.ic){color:var(--mx)} :root[data-skinbase="term"] svg.ic{color:inherit}
 :root[data-skinbase="term"] button.on svg{color:var(--mxon)}
 :root[data-skinbase="term"] .brand .plus{color:var(--mx)} :root[data-skinbase="term"] .brand .plus::before{color:var(--mxdim); -webkit-text-stroke:.05em var(--mxbg)}
 :root[data-skinbase="term"] .setmenu{background:var(--mxbg); border-color:var(--mx); box-shadow:0 0 18px -4px var(--mxglowc)}
@@ -858,6 +875,20 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 </script>
 </head>
 <body>
+<!-- One icon set, drawn like the rest of the app: 2px lines, outline shapes, square ends. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <symbol id="ic-play" viewBox="0 0 24 24"><path d="M7 4.5 L19.5 12 L7 19.5Z"/></symbol>
+  <symbol id="ic-stop" viewBox="0 0 24 24"><rect x="5.5" y="5.5" width="13" height="13"/></symbol>
+  <symbol id="ic-close" viewBox="0 0 24 24"><path d="M6 6 L18 18 M18 6 L6 18"/></symbol>
+  <symbol id="ic-gear" viewBox="0 0 24 24"><path d="M9.49 4.72 L9.71 2.06 L14.29 2.06 L14.51 4.72 L15.38 5.08 L17.41 3.35 L20.65 6.59 L18.92 8.62 L19.28 9.49 L21.94 9.71 L21.94 14.29 L19.28 14.51 L18.92 15.38 L20.65 17.41 L17.41 20.65 L15.38 18.92 L14.51 19.28 L14.29 21.94 L9.71 21.94 L9.49 19.28 L8.62 18.92 L6.59 20.65 L3.35 17.41 L5.08 15.38 L4.72 14.51 L2.06 14.29 L2.06 9.71 L4.72 9.49 L5.08 8.62 L3.35 6.59 L6.59 3.35 L8.62 5.08Z"/><circle cx="12" cy="12" r="3.4"/></symbol>
+  <symbol id="ic-up" viewBox="0 0 24 24"><path d="M12 5.5 L19.5 17.5 L4.5 17.5Z"/></symbol>
+  <symbol id="ic-down" viewBox="0 0 24 24"><path d="M12 18.5 L19.5 6.5 L4.5 6.5Z"/></symbol>
+  <symbol id="ic-left" viewBox="0 0 24 24"><path d="M5.5 12 L17.5 4.5 L17.5 19.5Z"/></symbol>
+  <symbol id="ic-right" viewBox="0 0 24 24"><path d="M18.5 12 L6.5 4.5 L6.5 19.5Z"/></symbol>
+  <symbol id="ic-arrup" viewBox="0 0 24 24"><path d="M12 19 L12 5 M6 11 L12 5 L18 11"/></symbol>
+  <symbol id="ic-arrdown" viewBox="0 0 24 24"><path d="M12 5 L12 19 M6 13 L12 19 L18 13"/></symbol>
+  <symbol id="ic-render" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></symbol>
+</defs></svg>
 
 
 <div class="top">
@@ -870,14 +901,14 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div class="setmenu gfile" id="gfile" hidden role="menu"></div>
   </div>
   <div class="setwrap">
-  <button id="bSet" aria-haspopup="true" aria-expanded="false" aria-label="Settings" title="Settings: kit, MIDI, export, skin and audio (in the tracker: the Project settings)"><svg class="setg" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="setx">Settings ▾</span></button>
+  <button id="bSet" aria-haspopup="true" aria-expanded="false" aria-label="Settings" title="Settings: kit, MIDI, export, skin and audio (in the tracker: the Project settings)"><svg class="setg ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-gear"/></svg><span class="setx">Settings ▾</span></button>
   <div class="setmenu gset" id="gset" hidden role="dialog" aria-label="Settings">
     <div class="gsetbody" id="gsetBody"><div class="gsec" id="gsecProj" hidden></div><div class="gsec" id="gsecPatch" hidden></div></div>
   </div>
   </div>
   <button type="button" class="tsong" id="tLoopTop" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L in KEYS mode)" hidden>Loop</button>
   <button type="button" class="tsong" id="tKeyTrans" aria-label="Key transpose" title="Key transpose: tap to arm, then ▲ up / ▼ down transposes the selection a semitone" hidden>Transpose ▲▼</button>
-  <button type="button" class="tsong" id="tSong" aria-label="Play or stop the song" title="Play the song from the tracker's cursor row, or stop it" hidden><span class="tl">▶ Song</span><span class="tl alt" aria-hidden="true">■ Stop</span></button>
+  <button type="button" class="tsong" id="tSong" aria-label="Play or stop the song" title="Play the song from the tracker's cursor row, or stop it" hidden><span class="tl"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Song</span><span class="tl alt" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>Stop</span></button>
   <button type="button" class="tcpu" id="tCpu" aria-label="Audio load"><span>CPU --</span><i></i></button>
   <button type="button" id="bHelp" aria-label="Help and keys (?)" title="Help and keys (? or F1)">?</button>
 </div>
@@ -914,7 +945,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
   </section>
 
   <section class="band grey" id="pSkin" hidden>
-    <div class="bar"><span class="ttl">Skin</span><span class="lbl">The ...Seeds skins, plus Matrix</span></div>
+    <div class="bar"><span class="ttl">Skin</span><span class="lbl">The ...Seeds skins, Matrix and the Simple set</span></div>
     <div class="pbody"><div class="skins" id="skins" role="radiogroup" aria-label="Skin"></div></div>
   </section>
 
@@ -1054,7 +1085,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
       <div class="tgrid" id="tGrid"></div>
       <div class="tinfo"><div id="tInfo"></div><div class="thint" id="tHint"></div></div>
       <div class="fxpick" id="fxPick" hidden role="dialog" aria-label="Pick an effect command">
-        <div class="fph"><b>FX COMMAND</b><span id="fxPickHint"></span><button type="button" id="fxPickX" aria-label="Close">✕</button></div>
+        <div class="fph"><b>FX COMMAND</b><span id="fxPickHint"></span><button type="button" id="fxPickX" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
         <div class="fpl" id="fxPickList" role="listbox"></div>
       </div>
     </div>
@@ -1067,13 +1098,13 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
       <div class="tafoot">TAP: GO · a tap goes to a block, twice opens its phrase · HOLD · holding a block mutes or unmutes just that one (the phrase stays) · tap a row number to play from there</div>
     </aside>
     <aside class="tside" aria-label="Tracker status">
-      <button type="button" class="tsidex" id="tSideX" title="Hide this side panel (⚙ Settings → SIDE PANEL brings it back)" aria-label="Hide the side panel">✕</button>
+      <button type="button" class="tsidex" id="tSideX" title="Hide this side panel (Settings → SIDE PANEL brings it back)" aria-label="Hide the side panel"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
       <div class="tmap" id="tMap">
         <button type="button" data-v="project" class="wide">PROJECT</button>
         <button type="button" data-v="song">SONG</button><button type="button" data-v="sect">SECT</button><button type="button" data-v="phrase">PHRASE</button><button type="button" data-v="inst">INST</button>
         <button type="button" data-v="mixer" style="grid-column:span 2">MIXER</button><button type="button" data-v="fx" style="grid-column:span 2">FX</button>
       </div>
-      <div class="tstat"><b id="tState">■ STOPPED</b><span id="tBpm"></span></div>
+      <div class="tstat"><b id="tState"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>STOPPED</b><span id="tBpm"></span></div>
       <div class="tmeters" id="tMeters"></div>
       <dl class="tlegend" id="tLegPad">
         <dt>?</dt><dd>help: every key and how it all works</dd>
@@ -1135,7 +1166,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div class="tdeck" id="tDeck" hidden>
       <div class="dkgrip" id="dkGrip" role="separator" aria-orientation="horizontal" aria-label="Drag to resize the panel" title="Drag to resize · double-click: default height"></div>
       <span class="dkoffs" id="dkOffs"></span>
-      <span class="dktail" id="dkTail"><button type="button" class="dksolo" id="dkSolo" hidden title="A track is soloed, so the others are silent. Tap to clear every solo">SOLO · CLEAR</button><button type="button" class="dkx" id="dkHide" title="Hide the panel (⚙ Settings → BOTTOM PANEL brings it back)" aria-label="Hide the panel">✕</button></span>
+      <span class="dktail" id="dkTail"><button type="button" class="dksolo" id="dkSolo" hidden title="A track is soloed, so the others are silent. Tap to clear every solo">SOLO · CLEAR</button><button type="button" class="dkx" id="dkHide" title="Hide the panel (Settings → BOTTOM PANEL brings it back)" aria-label="Hide the panel"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></span>
       <div class="dkbody" id="dkBody">
         <section class="dks" id="dkScope" data-s="scope"><div class="dkh"><button type="button" class="dkt" data-k="scope">SCOPE</button><span class="dki">master · 20 Hz – 20 kHz</span></div>
           <div class="dkb"><canvas id="dkScopeC" aria-label="Spectrum of the master output"></canvas></div><div class="dkw" data-w="ws" title="Drag to resize"></div></section>
@@ -1156,8 +1187,8 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div class="tkp" id="tKp" hidden></div>
     <div class="tpad" id="tPad">
     <div class="dpad">
-      <span></span><button type="button" class="k" data-b="up" aria-label="Up">▲</button><span></span>
-      <button type="button" class="k" data-b="left" aria-label="Left">◀</button><button type="button" class="k" data-b="down" aria-label="Down">▼</button><button type="button" class="k" data-b="right" aria-label="Right">▶</button>
+      <span></span><button type="button" class="k" data-b="up" aria-label="Up"><svg class="ic ick" aria-hidden="true"><use href="#ic-up"/></svg></button><span></span>
+      <button type="button" class="k" data-b="left" aria-label="Left"><svg class="ic ick" aria-hidden="true"><use href="#ic-left"/></svg></button><button type="button" class="k" data-b="down" aria-label="Down"><svg class="ic ick" aria-hidden="true"><use href="#ic-down"/></svg></button><button type="button" class="k" data-b="right" aria-label="Right"><svg class="ic ick" aria-hidden="true"><use href="#ic-right"/></svg></button>
     </div>
     <div class="keys wide">
       <button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
@@ -1172,7 +1203,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <div class="help" id="help" hidden role="dialog" aria-modal="true" aria-label="Help">
   <div class="hhead"><b>HELP</b>
     <div class="seg" id="helpNav"><button type="button" data-h="hStart">Start</button><button type="button" data-h="hAll">Everywhere</button><button type="button" data-h="hKeys">KEYS mode</button><button type="button" data-h="hPad">PAD mode</button><button type="button" data-h="hFx">FX</button><button type="button" data-h="hSynth">Synth</button></div>
-    <div class="sp"></div><button type="button" id="helpX" aria-label="Close help"><span class="hx">Close </span>✕</button></div>
+    <div class="sp"></div><button type="button" id="helpX" aria-label="Close help"><span class="hx">Close </span><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
   <div class="hbody" id="helpBody" tabindex="-1"><div class="hwrap">
     <section id="hStart">
 <h2>Getting started</h2>
@@ -2508,13 +2539,14 @@ function typing(e){ const t = e.target; return !!(t && t.matches && t.matches('i
 /* ---------- change handling ---------- */
 let rTimer = 0, sTimer = 0;
 function changed(i = cur, light){
-  dirty[i] = true;
+  dirty[i] = true; kitSnap(i);
   clearTimeout(rTimer); rTimer = setTimeout(showCur, 45);
   clearTimeout(sTimer); sTimer = setTimeout(save, 900);
   if (!light){ renderStrip(); renderPads(); }
 }
 
 /* ---------- UI helpers ---------- */
+const ico = (n, c = 'ic') => `<svg class="${c}" aria-hidden="true"><use href="#ic-${n}"/></svg>`;
 function el(tag, cls, txt){ const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
 // Type a value into a row's value box (double-click or double-tap). Entries accept the unit shown next to
 // the slider (Hz, kHz, ms, s, %, semitones, dB) or the bare number; the entry is clamped to the row's range
@@ -2878,9 +2910,9 @@ function renderFx(){
     head.append(el('span', 'n', d.name), el('span', 'cr', FX_CREDIT[f.type]), el('div', 'sp'));
     const mk = (label, fn, aria) => { const b = el('button', 'sm', label); b.type = 'button'; if (aria) b.setAttribute('aria-label', aria); b.addEventListener('click', fn); head.append(b); return b; };
     const onB = mk(f.on ? 'On' : 'Off', () => { f.on = !f.on; renderFx(); changed(); }); onB.classList.toggle('on', f.on);
-    const up = mk('↑', () => { v.fx.splice(idx - 1, 0, v.fx.splice(idx, 1)[0]); renderFx(); changed(); }, 'Move up'); up.disabled = idx === 0;
-    const dn = mk('↓', () => { v.fx.splice(idx + 1, 0, v.fx.splice(idx, 1)[0]); renderFx(); changed(); }, 'Move down'); dn.disabled = idx === v.fx.length - 1;
-    mk('✕', () => { v.fx.splice(idx, 1); renderFx(); changed(); }, 'Remove effect');
+    const up = mk('', () => { v.fx.splice(idx - 1, 0, v.fx.splice(idx, 1)[0]); renderFx(); changed(); }, 'Move up'); up.disabled = idx === 0;
+    const dn = mk('', () => { v.fx.splice(idx + 1, 0, v.fx.splice(idx, 1)[0]); renderFx(); changed(); }, 'Move down'); dn.disabled = idx === v.fx.length - 1;
+    const rmB = mk('', () => { v.fx.splice(idx, 1); renderFx(); changed(); }, 'Remove effect'); rmB.innerHTML = ico('close'); up.innerHTML = ico('arrup'); dn.innerHTML = ico('arrdown');
     const vu = el('span', 'fxvu'), bar = el('i'), txt = el('b', null, '−∞'); vu.title = 'Level out of this effect (dB peak)'; vu.append(bar); head.insertBefore(vu, head.querySelector('.sp')); head.insertBefore(txt, head.querySelector('.sp'));
     txt.className = 'fxdb'; vuEls.push({f, bar, txt, lv:0, pk:0, pt:0});
     const grid = el('div', 'fxgrid');
@@ -3165,7 +3197,7 @@ function save(){
   catch(e){ try { localStorage.setItem(KEY, JSON.stringify(kitToJSON(true))); } catch(e2){} }
 }
 function loadSaved(){ try { const s = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY); return s ? kitFromJSON(JSON.parse(s)) : null; } catch(e){ console.warn('Couldn’t load the saved kit', e); return null; } }
-function setKit(k){ kit = k; setTimeout(() => resolveSamples(), 0); WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0; for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
+function setKit(k){ kit = k; setTimeout(kitUndoReset, 0); setTimeout(() => resolveSamples(), 0); WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0; for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
 
 /* ---------- files out ---------- */
 function wavBytes(data, sr, bits){
@@ -3318,6 +3350,8 @@ function fileItems(){
   // Everything that saves, opens, renders or exports lives here, on every screen. Items with a 5th entry true
   // replace what you have, so they ask for a second tap.
   return [
+    ['Undo', () => undoStep(-1), () => !undo.past.length && !vUndo.t.some(Boolean), 'Z'], ['Redo', () => undoStep(1), () => !undo.future.length, '⇧Z'],
+    null,
     ['New song', () => setSong(freshSong(), 'New song. The kit is unchanged.'), null, null, true],
     ['Open project…', openProj, null, 'O'], ['Save project', () => saveProj(false), null, 'S'], ['Save as…', () => saveProj(true), null, '⇧S'],
     ...(canShareProj() ? [['Share project…', shareProj]] : []),
@@ -3429,9 +3463,15 @@ const SKINS = [
   {id:'bwterm', name:'Simple black', base:'term', dots:['#000000', '#ffffff', '#5a5a5a', '#9a9a9a']},
   {id:'bwlight', name:'Simple white', base:'term', dots:['#ffffff', '#000000', '#a6a6a6', '#6b6b6b']},
   {id:'mustard', name:'Simple mustard', base:'term', dots:['#e3d9f6', '#a37800', '#f2cf63', '#6f55bf']},
+  {id:'sage', name:'Simple sage', base:'term', dots:['#e2ecdc', '#2f5d3a', '#8fb88f', '#a3612c']},
+  {id:'navy', name:'Simple navy', base:'term', dots:['#f6f0e1', '#1f3a68', '#e2b75a', '#a3442f']},
+  {id:'tomato', name:'Simple tomato', base:'term', dots:['#f9e6df', '#b8392a', '#f08f78', '#2f6f73']},
+  {id:'ocean', name:'Simple ocean', base:'term', dots:['#ddf0ee', '#0f5d63', '#5fb7b0', '#c06a2b']},
+  {id:'plum', name:'Simple plum', base:'term', dots:['#f3e5ef', '#6b2d5c', '#c78ab6', '#3e6e4c']},
+  {id:'night', name:'Simple night', base:'term', dots:['#14182b', '#f0b43c', '#ffd884', '#7fb6e6']},
 ];
 const SKK = 'thunderplus-skin-v1';
-let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k => k.id === v)) return v; } catch(e){} return 'minimal'; })();
+let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k => k.id === v)) return v; } catch(e){} return 'mustard'; })();   // Simple mustard for a first visit
 function applySkin(id){
   const sk = SKINS.find(k => k.id === id) || SKINS[2]; skin = sk.id;
   const de = document.documentElement;
@@ -4281,14 +4321,37 @@ function snap(){
   queueMicrotask(() => {
     undo.pend = false;
     const j = JSON.stringify(S);
-    if (undo.cur !== null && j !== undo.cur){ undo.past.push(undo.cur); if (undo.past.length > 200) undo.past.shift(); undo.future = []; }
+    if (undo.cur !== null && j !== undo.cur){ undo.past.push({k:'S', j:undo.cur}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; }
     undo.cur = j;
   });
 }
+// Sound edits (the Synth page, and the bottom panel's instrument controls) share the same history: each pad's last
+// settled state is kept, and a change settles 350 ms after the last move, so a slider drag undoes as one step.
+const vUndo = {cur:[], t:[]};
+function kitUndoReset(){
+  try { vUndo.t.forEach(clearTimeout); vUndo.t = []; vUndo.cur = kit.voices.map(v => { try { return JSON.stringify(voiceToJSON(v, false)); } catch(e){ return null; } });
+    undo.past = undo.past.filter(e => e.k !== 'V'); undo.future = undo.future.filter(e => e.k !== 'V'); } catch(e){}
+}
+function kitSettle(i){
+  const v = kit.voices[i]; if (!v) return; const j = JSON.stringify(voiceToJSON(v, false)), prev = vUndo.cur[i];
+  if (prev != null && j !== prev){ undo.past.push({k:'V', i, j:prev}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; }
+  vUndo.cur[i] = j;
+}
+function kitSnap(i){
+  try { if (undo.busy) return; clearTimeout(vUndo.t[i]); vUndo.t[i] = setTimeout(() => { vUndo.t[i] = 0; kitSettle(i); }, 350); } catch(e){}
+}
+function kitFlush(){ vUndo.t.forEach((h, i) => { if (h){ clearTimeout(h); vUndo.t[i] = 0; kitSettle(i); } }); }
 function undoStep(dir){
+  kitFlush();
   const from = dir < 0 ? undo.past : undo.future, to = dir < 0 ? undo.future : undo.past;
   if (!from.length) return toast(dir < 0 ? 'Nothing to undo' : 'Nothing to redo');
-  to.push(undo.cur); undo.cur = from.pop();
+  const e = from.pop();
+  if (e.k === 'V'){   // a sound edit: put the pad back as it was
+    to.push({k:'V', i:e.i, j:vUndo.cur[e.i]}); vUndo.cur[e.i] = e.j;
+    undo.busy = true; try { kit.voices[e.i] = voiceFromJSON(JSON.parse(e.j)); changed(e.i); try { refreshAll(); } catch(_){} } finally { undo.busy = false; }
+    const v = kit.voices[e.i]; draw(); return toast(`${dir < 0 ? 'Undo' : 'Redo'}: pad ${hx(e.i)} ${(v && v.name) || ''}`.trim());
+  }
+  to.push({k:'S', j:undo.cur}); undo.cur = e.j;
   // Swap the contents in place rather than the object: the running sequencer holds this object, so
   // replacing it would keep playing the old song (the screen would show the undo, the speakers wouldn't).
   undo.busy = true; const n = normSong(JSON.parse(undo.cur));
@@ -4297,6 +4360,13 @@ function undoStep(dir){
   if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); }
   draw(); toast(dir < 0 ? 'Undo' : 'Redo');
 }
+setTimeout(kitUndoReset, 0);
+// On the Synth page too (the tracker has its own keys): Ctrl/⌘+Z undoes, with Shift (or Y) redoes.
+addEventListener('keydown', e => {
+  if (view !== 'synth' || e.altKey || !(e.ctrlKey || e.metaKey) || typing(e)) return;
+  const k = e.key.toLowerCase(); if (k !== 'z' && k !== 'y') return;
+  e.preventDefault(); undoStep(k === 'y' || e.shiftKey ? 1 : -1);
+});
 function flushS(){ clearTimeout(sT); try { localStorage.setItem(TK, JSON.stringify(S)); } catch(e){} }
 addEventListener('pagehide', () => { flushS(); saveCur(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden){ flushS(); saveCur(); } });
@@ -5296,7 +5366,7 @@ const SPK = 'thunderplus-side-v1';
 let sideOn = (() => { try { return localStorage.getItem(SPK) !== '0'; } catch(e){ return true; } })();
 function setSide(on){ sideOn = on; try { localStorage.setItem(SPK, on ? '1' : '0'); } catch(e){} document.body.classList.toggle('noside', !on); arrLayout(true); }
 document.body.classList.toggle('noside', !sideOn);
-$('tSideX').addEventListener('click', () => { setSide(false); toast('Side panel hidden. ⚙ Settings → SIDE PANEL brings it back.'); });
+$('tSideX').addEventListener('click', () => { setSide(false); toast('Side panel hidden. Settings → SIDE PANEL brings it back.'); });
 function setStepDec(on){ stepDec = on; try { localStorage.setItem(SDK, on ? '1' : '0'); } catch(e){} arrSig = ''; draw(); }
 function setTScale(v){ tScale = clamp(Math.round(v / 10) * 10, 60, 200); try { localStorage.setItem(TSK, String(tScale)); } catch(e){} fit(); draw(); }
 function setArr(m){ arrMode = m; try { localStorage.setItem(ARK, String(m)); } catch(e){} arrBody(); arrSig = ''; draw(); fit(); }
@@ -6479,7 +6549,7 @@ function draw(){
   $('tCmd').querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = onSong);
   $('tCmd').querySelectorAll('[data-c=clone],[data-c=cldn]').forEach(b => b.hidden = !onSong); $('tCmd').classList.toggle('song', onSong);
   const selB = $('tCmd').querySelector('[data-c=sel]'); if (selB) selB.classList.toggle('on', !!selA);
-  $('tState').textContent = tp.on ? '▶ PLAYING ' + VNAME[tp.mode] : rendering ? '● RENDERING' : '■ STOPPED';
+  $('tState').innerHTML = tp.on ? ico('play') + 'PLAYING ' + VNAME[tp.mode] : rendering ? ico('render') + 'RENDERING' : ico('stop') + 'STOPPED';
   $('tBpm').textContent = (tp.on ? tp.bpm : S.bpm) + ' BPM · ' + (tp.on ? tp.tks : S.ticks || TICKS) + ' TICKS' + (S.swing > 50 ? ' · SWING ' + S.swing + '%' : '');
   document.querySelectorAll('#tMeters .mtr').forEach((m, t) => { m.classList.toggle('mu', !audible(t)); m.hidden = t >= ntr(); });
   paintMeters();
@@ -6526,7 +6596,7 @@ let dkInst = 0;
 function setDeck(k, v){ deck[k] = !!v; deckSave(); deckLayout(); fit(); draw(); }
 document.querySelectorAll('#tDeck .dkt').forEach(b => { b.title = 'Hide this section (it waits as a dashed button in the header)'; b.addEventListener('click', () => setDeck(b.dataset.k, false)); });
 for (const [k, l] of DK_SECS){ const b = el('button', 'dkoff', '+ ' + l); b.type = 'button'; b.dataset.k = k; b.title = 'Show ' + l.toLowerCase(); b.addEventListener('click', () => setDeck(k, true)); $('dkOffs').append(b); }
-$('dkHide').addEventListener('click', () => { setDeck('on', false); toast('Panel hidden. ⚙ Settings → BOTTOM PANEL brings it back.'); });
+$('dkHide').addEventListener('click', () => { setDeck('on', false); toast('Panel hidden. Settings → BOTTOM PANEL brings it back.'); });
 $('dkSolo').addEventListener('click', () => { S.mix.forEach(m => m.solo = false); mixChanged(); draw(); toast('Solo cleared: every track plays.'); });
 // Shown in KEYS mode when the keypad is off and the panel is on. The shown-sections' buttons sit in their own
 // headers; hidden sections wait as dashed "+" buttons in the first header, and ✕ (and SOLO) in the last.
