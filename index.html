@@ -5868,7 +5868,7 @@ function songBtn(){ const b = $('tSong'); if (!b) return; b.hidden = false; b.cl
 function pump(){
   if (!tp.on) return;
   audioWake = performance.now();
-  if (view !== 'tracker' && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open
+  if ((view !== 'tracker' || DECK) && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open
   const s = tp.seq; let n = 0;
   while (s.alive() && s.time < ctx.currentTime + 0.15 && n++ < 64){
     const r = s.step(); for (const e of r.evs){ rt.pl.play(e); if (e.type === 'note') padBlink(e); } tp.q.push({t:r.t, pos:r.pos, bpm:s.bpm, tks:r.tks, line:r.line});
@@ -5894,14 +5894,28 @@ function tStop(quiet){
    - play(at, row): plays the song from `row` with its first step exactly at `at`.
    - stop(at): silences the deck at `at` (notes scheduled after it never sound).
    - setBpm(bpm, at): the playing tempo from `at` on (the sequencer reads it every step).
-   - info(): name, tempo, lines per beat, whether it's playing and when it started. */
+   - info(): name, tempo, lines per beat, whether it's playing and when it started.
+   - save(): the deck's song and kit as project file text (to keep edits made in the deck). */
 if (DECK) window.__deck = {
   async ready(){
     rtInit();
     await Promise.all([tfxReady(ctx), chainsReady(ctx), bassReady(ctx)]);
+    // Pads render in this deck's Worker, so loading a clip never stalls the page thread (which the playing deck
+    // shares). Only without a Worker do they render here, one per turn.
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    for (let k = 0; k < 200 && !PW.ready; k++) await wait(50);   // the Worker starts once the wasm has loaded
+    if (PW.ready){
+      for (let k = 0; k < 1200; k++){
+        let busy = false;
+        for (let i = 0; i < nslots(); i++){ if (slotAt(pend, i)) busy = true; else if (stale(i)){ bgRender(i); busy = true; } }
+        if (!busy) return true;
+        await wait(50);
+      }
+    }
     for (let i = 0; i < nslots(); i++){ ensure(i); await idle(); }
     return true;
   },
+  save(){ return JSON.stringify({app:'thunder-project', v:1, song:S, kit:kitToJSON(false)}); },
   async open(text){
     const ok = await loadProjFile(new File([text], 'project.json', {type:'application/json'}));
     if (ok) await this.ready();
