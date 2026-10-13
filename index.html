@@ -3185,6 +3185,7 @@ function normalizeChainsImport(d){
 const TK = 'thunderplus-song-v1', VK = 'thunderplus-view-v1';
 const NT = 32, NI = 16, ROOT = 48, OFF = 200, TICKS = 6, BASEW = 52, FITROWS = 18;
 const NN = ['C-','C#','D-','D#','E-','F-','F#','G-','G#','A-','A#','B-'];
+const NBL = 'CcDdEFfGgAaB';   // one letter per note for a neighbour's chord: capitals natural, small sharp (c = C#)
 const hx = (v, n = 2) => ((v & (n === 1 ? 15 : 255)) >>> 0).toString(16).toUpperCase().padStart(n, '0');
 const h2 = v => v < 0 ? '--' : hx(v);
 const d2 = n => String(n).padStart(2, '0');
@@ -4551,7 +4552,7 @@ function projRows(){
     {l:'FOLLOW', ck:'Follow playhead', get:() => followOn ? 1 : 0, set:v => setFollow(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'While the song plays, Song and Phrase scroll with the playhead: the cursor rides along, and Phrase (and Sect) switch to what the cursor’s track is playing. Off leaves the screen where you put it'},
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
-      info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. Only to look at; they can’t be edited'},
+      info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. A poly track shows its whole chord: all four notes when there is room (unfolded, desktop), otherwise one letter per voice (capital = natural, small = sharp, so CEGa is C E G A#; · is an empty voice, × a note off). Only to look at; they can’t be edited'},
     {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:() => { const n = prompt('Song name', S.name); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); } }, info:() => 'EDIT renames the song'},
     {l:'TRACKS', get:() => ntr(), set:v => setNtr(v), min:8, max:NT, big:8, d:16, fmt:v => v + ' tracks',
       info:() => `How many tracks this song uses, 8 to ${vtrk ? 24 : NT} with ${vtrk ? 'a voice per track (one voice each)' : 'the shared 16 voices'}. Song and Mixer show as many as fit and scroll sideways (arrows, or swipe left and right). Tracks past this number are hidden and silent; their notes are kept`},
@@ -5427,15 +5428,31 @@ function draw(){
     const p = S.phrases[cPhrase], pr = playRows(q => q.phrase === cPhrase ? q.step : null), len = plen(cPhrase), lpb = S.plpb[cPhrase] || 0, el2 = lpb || S.lpb;
     pset = [{t:'LEN ', cls:'lb'}, {t:d2(len), cls:cc(0, -2, 'v'), x:0, y:-2}, {t:' LPB ', cls:'lb'}, {t:lpb ? d2(lpb) : '--', cls:cc(1, -2, lpb ? 'v' : 'e'), x:1, y:-2},
       {t:' 1/' + (el2 * 4) + (el2 % 3 === 0 ? ' trip' : '') + (lpb ? '' : ' song'), cls:'lb'}];
-    L.push(['   ', ...(nbOn ? [{t:cTrack > 0 ? d2(cTrack) + '  ' : '    ', cls:'nb nbl'}] : []), ...(poly ? [{t:'N1  N2  N3  N4 ', cls:'th'}] : [{t:'N  ', cls:'th'}]), ' ',
-      ...(nbOn ? [{t:cTrack + 1 < ntr() ? d2(cTrack + 2) + '  ' : '    ', cls:'nb nbr'}] : []), {t:'V ', cls:'th'}, ' ', {t:'I ', cls:'th'}, ' ', {t:'FX1   ', cls:'th'}, ' ', {t:'FX2   ', cls:'th'}, ' ', {t:'FX3', cls:'th'}]);
+    // Neighbours: a mono track shows its note (C-4). A poly track shows its whole chord: all four notes when the line still
+    // fits the screen at this text size (unfolded, desktop), otherwise one letter per voice in a single cell (C E G A# → CEGa).
+    const nbHasL = nbOn && cTrack > 0, nbHasR = nbOn && cTrack + 1 < ntr();
+    const nbPL = nbHasL && isPolyT(cTrack - 1), nbPR = nbHasR && isPolyT(cTrack + 1);
+    let nbWide = false;
+    if (nbPL || nbPR){
+      const fs = parseFloat(scr.style.fontSize) || 14, fitCh = Math.floor((scr.clientWidth - 24) / (fs * CW));
+      const base = rS(0).length + 1 + (poly ? NCOL : 1) * 4 + 5 + 3 * 7;
+      const side = (has, pl) => !has ? 0 : pl ? NCOL * 4 : 4;
+      nbWide = base + side(nbHasL, nbPL) + side(nbHasR, nbPR) <= fitCh;
+    }
+    const nbW = pl => pl ? (nbWide ? NCOL * 4 - 1 : NCOL) : 3;   // the cell's width, before its trailing space
+    const nbHead = (has, t, pl) => (has ? d2(t + 1) : '  ').padEnd(nbW(pl) + 1);
+    L.push(['   ', ...(nbOn ? [{t:nbHead(nbHasL, cTrack - 1, nbPL), cls:'nb nbl'}] : []), ...(poly ? [{t:'N1  N2  N3  N4 ', cls:'th'}] : [{t:'N  ', cls:'th'}]), ' ',
+      ...(nbOn ? [{t:nbHead(nbHasR, cTrack + 1, nbPR), cls:'nb nbr'}] : []), {t:'V ', cls:'th'}, ' ', {t:'I ', cls:'th'}, ' ', {t:'FX1   ', cls:'th'}, ' ', {t:'FX2   ', cls:'th'}, ' ', {t:'FX3', cls:'th'}]);
     const VR = Math.max(4, songRows()); if (c.top == null) c.top = 0;
     if (c.y >= 0){ if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; }
     c.top = clamp(c.top, 0, Math.max(0, len - VR));
     const nbL = nbOn ? nbPhrase(cTrack - 1) : -1, nbR = nbOn ? nbPhrase(cTrack + 1) : -1;
     const nbCell = (pid, y, cls) => { const q = pid >= 0 && S.phrases[pid] && y < plen(pid) ? S.phrases[pid][y] : null;
-      const n = q ? (isPolyT(cTrack + (cls === 'nbl' ? -1 : 1)) ? q.slice(0, NCOL).find(v => v >= 0) : q[0]) : -1;
-      return {t:n != null && n >= 0 ? noteS(n) : '   ', cls:'nb ' + cls}; };
+      const pl = cls === 'nbl' ? nbPL : nbPR, w = nbW(pl);
+      if (!pl){ const n = q ? q[0] : -1; return {t:n != null && n >= 0 ? noteS(n) : '   ', cls:'nb ' + cls}; }
+      const vs = q ? q.slice(0, NCOL) : []; if (!vs.some(v => v >= 0)) return {t:' '.repeat(w), cls:'nb ' + cls};
+      if (nbWide) return {t:vs.map(v => v >= 0 ? noteS(v) : '---').join(' '), cls:'nb ' + cls};
+      return {t:vs.map(v => v < 0 ? '·' : v === OFF ? '×' : NBL[v % 12]).join(''), cls:'nb ' + cls}; };
     for (let y = c.top; y < Math.min(len, c.top + VR); y++){
       const r = p ? p[y] : blankRow();
       const ln = [{t:rS(y), cls:'rn' + (y % 4 ? '' : ' rn4') + (pr.has(y) ? ' pl' : '') + rsel(y), r:y}, ' '];
