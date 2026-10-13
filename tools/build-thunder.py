@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
 """Make ...Thunder from ...Thunder Plus.
 
-...Thunder is the same app as ...Thunder Plus with the …waves and …chains editors hidden: songs and kits
-from either app open in the other, and …waves layers and …chains effects still play in ...Thunder.
-It keeps its own name and its own saved data (thunder-* in the browser, not thunderplus-*).
+...Thunder and ...Thunder Plus are one app. Settings → App → Mobile switches it between the two at run time:
+Mobile (...Thunder) hides the …waves and …chains editors and uses PAD input; Desktop (...Thunder Plus) shows
+everything. Their layers and effects play in both, so files open in either.
+
+The ...Thunder build (the Thunder- repo, installed on the phone) is the same page with three differences:
+  * it starts in Mobile on any device (Thunder Plus picks Mobile only on a touch screen);
+  * it keeps its own saved data (thunder-* in the browser, not thunderplus-*), as it always has;
+  * its install name is ...Thunder (title, home-screen name, desktop window title).
+Ticking Mobile off in ...Thunder gives the full ...Thunder Plus, so the two editors are copied in too.
 
 Usage (from the thunder-plus folder):
     python3 tools/build-thunder.py ../Thunder-
 
-That rewrites ../Thunder-/index.html and electron/main.js (the desktop app works the same way as
-Thunder Plus's), copies the two sound engines it needs (waves/waves-worklet.js, chains/chains-worklet.js),
-and syncs their cache-busters in ../Thunder-/sw.js (its own cache name prefix and file list stay as they
-are). Everything else in the Thunder- repo (README, manifest, icons, electron/package.json) stays as it is.
+That rewrites ../Thunder-/index.html and electron/main.js, copies chains/ and waves/ (editors, engines, wasm,
+fonts), and updates ../Thunder-/sw.js: its offline file list gets the same chains/ and waves/ files as
+Thunder Plus's (its own icons and manifest stay), and its cache name is bumped when anything changed.
+Everything else in the Thunder- repo (README, manifest, icons, electron/package.json) stays as it is.
 """
-import os, re, shutil, sys
+import os, re, shutil, sys, filecmp
 
 here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 dst = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, '..', 'Thunder-')
@@ -26,10 +32,12 @@ def rep(old, new, count=1):
         sys.exit('build-thunder: expected %d of %r, found %d. Thunder Plus changed here; update this script.' % (count, old[:70], n))
     s = s.replace(old, new)
 
-# Name
+# Install name (the page's title and brand follow the Mobile setting at run time)
 rep('<meta name="apple-mobile-web-app-title" content="Thunder+">', '<meta name="apple-mobile-web-app-title" content="Thunder">')
 rep('<title>...Thunder Plus</title>', '<title>...Thunder</title>')
-rep('<div class="brand" aria-label="...Thunder Plus">...Thunder<span class="plus" aria-hidden="true">+</span></div>', '<div class="brand">...Thunder</div>')
+
+# Starts in Mobile everywhere
+rep("const PF_DEFAULT = matchMedia('(pointer:coarse)').matches ? 'mobile' : 'desktop';", "const PF_DEFAULT = 'mobile';")
 
 # Its own saved data (the names ...Thunder always used)
 rep("// ...Thunder Plus saves under its own names. The first time it opens it starts from a copy of ...Thunder's kit and song (only read, never written).\n", '')
@@ -39,45 +47,46 @@ n = s.count("'thunderplus-")
 if n < 15: sys.exit('build-thunder: only %d thunderplus- storage names found' % n)
 s = s.replace("'thunderplus-", "'thunder-")
 
-# Only the Tracker and Synth screens; …waves and …chains play but aren't edited here
-rep("[['tracker', 'Tracker'], ['synth', 'Synth'], ['waves', 'Waves'], ['chains', 'Chains']]", "[['tracker', 'Tracker'], ['synth', 'Synth']]")
-rep("if (v !== 'synth') setView(v === 'chains' ? 'chains' : v === 'waves' ? 'waves' : 'tracker');", "if (v !== 'synth') setView('tracker');")
-rep("function openWaves(){ setView('waves'); }", "function openWaves(){}")
-rep("function openChains(){ setView('chains'); }", "function openChains(){}")
-rep("  if (on && !added && !was) focusChainHit(t);   // already had a chain: jump to and highlight it\n", "")
-rep('title="File: new, open, save, share, render and export (on Waves / Chains: that patch)"', 'title="File: new, open, save, share, render and export"')
-rep("""    null,
-    ['Export chains…', exportChains], ['Import chains…', () => $('chainsIn').click()]""", "")
-rep("""    {l:'› EXPORT CHAINS', act:exportChains, info:() => 'Save the …chains patch (lives in the song) as its own .chains.json file'},
-    {l:'› IMPORT CHAINS', act:() => $('chainsIn').click(), info:() => 'Load a .chains.json file into this song (…waves patches work too, keeping their effects)'},
-""", "")
-rep("""  const b = el('button', null, 'Edit the …waves patch'); b.type = 'button'; b.addEventListener('click', openWaves); s.append(b);""",
-    """  s.append(el('p', 'note', 'Plays the kit’s …waves patch. Make or change the patch in ...Thunder Plus; the kit keeps it.'));""")
-a = s.index('<p>...Thunder has four screens:'); b = s.index('</p>', a) + 4
-s = s[:a] + ('<p>...Thunder has two pages: the <b>Synth</b>, where you build an 8-pad kit, and the <b>Tracker</b>, a sequencer that plays that kit. '
-             'Switch with <b>Synth / Tracker</b> at the top. Everything saves in the browser as you work; <b>Save</b> writes a project file (song and kit) '
-             'you can keep or move to another device.</p>\n<p><b>...Thunder Plus files open here too</b>, and files from here open in Thunder Plus. '
-             'A kit’s <b>…waves</b> layers and a song’s <b>…chains</b> effects (Mixer → CHN) play here as they do there; to edit those patches, open the file in ...Thunder Plus.</p>') + s[b:]
+out = os.path.join(dst, 'index.html')
+changed = not os.path.exists(out) or open(out, encoding='utf-8').read() != s
+open(out, 'w', encoding='utf-8').write(s)
 
-open(os.path.join(dst, 'index.html'), 'w', encoding='utf-8').write(s)
 m = open(os.path.join(here, 'electron', 'main.js'), encoding='utf-8').read()
 for a, b in [('// ...Thunder Plus as a desktop app', '// ...Thunder as a desktop app'), ("title: '...Thunder Plus'", "title: '...Thunder'")]:
     if m.count(a) != 1: sys.exit('build-thunder: electron/main.js changed near %r; update this script.' % a)
     m = m.replace(a, b)
 open(os.path.join(dst, 'electron', 'main.js'), 'w', encoding='utf-8').write(m)
-for f in ['waves/waves-worklet.js', 'chains/chains-worklet.js']:
-    os.makedirs(os.path.join(dst, os.path.dirname(f)), exist_ok=True)
-    shutil.copyfile(os.path.join(here, f), os.path.join(dst, f))
-# Thunder- keeps its own sw.js, but its engine cache-busters must match the files just copied, or a
-# rebuilt engine is fetched under an old key and the cache name never invalidates it.
+
+# The two editors and their engines, as Thunder Plus has them
+for d in ['chains', 'waves']:
+    a, b = os.path.join(here, d), os.path.join(dst, d)
+    if os.path.isdir(b):
+        cmp = filecmp.dircmp(a, b)
+        def differs(c): return bool(c.left_only or c.right_only or c.diff_files or c.funny_files or any(differs(x) for x in c.subdirs.values()))
+        if differs(cmp): changed = True
+        shutil.rmtree(b)
+    else: changed = True
+    shutil.copytree(a, b)
+
+# Offline list: Thunder's own page, manifest, icons and fonts, plus Thunder Plus's chains/ and waves/ files
 swp = os.path.join(dst, 'sw.js')
 if os.path.exists(swp):
     sw = open(swp, encoding='utf-8').read(); before = sw
-    for name in ('waves', 'chains'):
-        m2 = re.search(r'%s-worklet\.js\?v=(\d+)' % name, s)
-        if m2: sw = re.sub(r'%s-worklet\.js\?v=\d+' % name, '%s-worklet.js?v=%s' % (name, m2.group(1)), sw)
-    if sw != before:
+    plus = open(os.path.join(here, 'sw.js'), encoding='utf-8').read()
+    ed = re.findall(r"'\./(?:waves|chains)/[^']*'", plus)
+    if not ed: sys.exit('build-thunder: no waves/chains files in thunder-plus/sw.js')
+    m2 = re.search(r"const FILES = \[(.*?)\];", sw, re.S)
+    if not m2: sys.exit('build-thunder: no FILES list in Thunder-/sw.js')
+    own = [f for f in re.findall(r"'[^']*'", m2.group(1)) if not re.match(r"'\./(?:waves|chains)/", f)]
+    files = own + ed
+    lines, cur = [], ''
+    for f in files:
+        if len(cur) + len(f) > 180: lines.append(cur.rstrip()); cur = ''
+        cur += f + ', '
+    lines.append(cur.rstrip().rstrip(','))
+    sw = sw[:m2.start()] + 'const FILES = [' + '\n  '.join(lines) + '];' + sw[m2.end():]
+    if sw != before or changed:
         sw = re.sub(r"const CACHE = 'thunder-v(\d+)'", lambda mm: "const CACHE = 'thunder-v%d'" % (int(mm.group(1)) + 1), sw)
         open(swp, 'w', encoding='utf-8').write(sw)
         print('Updated', swp)
-print('Wrote', os.path.join(dst, 'index.html'), 'and the two sound engines.')
+print('Wrote', out, 'and the chains/ and waves/ folders.')

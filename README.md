@@ -1,6 +1,8 @@
 # ...Thunder Plus
 
-...Thunder with **…waves** built in: a modular synth whose Out modules feed a new oscillator type in the layers. It's a separate app from ...Thunder (https://matthettich.github.io/Thunder-/), which stays as it is.
+...Thunder with **…waves** built in: a modular synth whose Out modules feed a new oscillator type in the layers. ...Thunder (https://matthettich.github.io/Thunder-/) is the same app.
+
+**Mobile and Desktop.** ⚙ Settings → App → **Mobile** switches the app between ...Thunder and ...Thunder Plus. Mobile (...Thunder) shows only Synth and Tracker, hides the …waves and …chains editors and puts the tracker in PAD input; Desktop (...Thunder Plus) shows all four screens and goes back to the input you used there. …waves layers and …chains effects play in both, live and in renders, so the same kit and project files open and sound the same either way. Mobile is the first choice on a touch screen (and always in the ...Thunder install); the choice is saved per browser. The two installs keep separate saved work in the browser (thunderplus-* and thunder-*); move a song between them with a project file.
 
 **Using …waves.** **…waves** is a third screen next to Tracker and Synth: the modular patch editor (the same as https://matthettich.github.io/waves/). The kit holds one waves patch, saved into the kit as you edit; switching to another screen pauses the editor's sound and re-renders the pads that use it. In any layer, choose **…waves patch** as the oscillator and pick an **Output** (Waves In 1–8): the layer plays whatever the patch's Out modules send to that output. The patch is played for one note, held for the pad's Gate (synth slots: up to Max len), then the layer's envelope, filters and the pad's effects apply as usual. Tune 0 st plays middle C (C4) into the patch's Host In, so Tune and the pitch envelope move the patch's pitch. Sequencers and LFOs inside the patch run during that note, at the song's tempo.
 

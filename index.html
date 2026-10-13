@@ -156,6 +156,8 @@ input[type=range]{width:100%; accent-color:var(--ink); height:30px; margin:0; to
 .brand{font-weight:600; font-size:22px; letter-spacing:.01em; white-space:nowrap; margin-right:6px}
 .brand .plus{position:relative; z-index:1; display:inline-block; margin-left:3px; font-weight:700; color:var(--wv);
   -webkit-text-stroke:.05em #111; paint-order:stroke fill}
+body.mob .brand .plus, body.mob .wvEdit{display:none !important}
+body:not(.mob) .wvMobNote{display:none}
 .brand .plus::before{content:'+'; position:absolute; left:0; top:0; z-index:-1; color:#ff1493; -webkit-text-stroke:.05em #111; paint-order:stroke fill; transform:translate(2px, 3px)}
 :root{--wv:#22958d}
 .wvview,.chview{flex:1; min-height:0; min-width:0; display:flex; background:var(--bench)}
@@ -719,6 +721,14 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 
 <div class="main" id="main">
 
+  <section class="band grey" id="pApp" hidden>
+    <div class="bar"><span class="ttl">App</span><span class="lbl">...Thunder or ...Thunder Plus</span></div>
+    <div class="pbody">
+      <div class="btnrow"><label class="cb"><input type="checkbox" id="ckMobile">Mobile (...Thunder)</label></div>
+      <p class="note">Mobile is ...Thunder: the <b>…waves</b> and <b>…chains</b> editors are hidden and the tracker switches to PAD input. Kits and songs keep their …waves layers and …chains effects, and they still play, so files open and sound the same either way. Turn it off for Desktop (...Thunder Plus) to edit those patches. This is saved for this browser.</p>
+    </div>
+  </section>
+
   <section class="band grey" id="pKit" hidden>
     <div class="bar"><span class="ttl">Kit</span></div>
     <div class="pbody">
@@ -980,7 +990,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
   <div class="hbody" id="helpBody" tabindex="-1"><div class="hwrap">
     <section id="hStart">
 <h2>Getting started</h2>
-<p>...Thunder has four screens: the <b>Synth</b>, where you build an 8-pad kit; the <b>Tracker</b>, a sequencer that plays that kit; <b>…waves</b>, a modular synth that plays as a layer oscillator; and <b>…chains</b>, where you design modular effects chains for the tracker’s tracks (Phase 1: design and save; audio routing follows). Switch at the top. Everything saves in the browser as you work; <b>Save</b> writes a project file (song and kit) you can keep or move to another device.</p>
+<p>...Thunder has four screens: the <b>Synth</b>, where you build an 8-pad kit; the <b>Tracker</b>, a sequencer that plays that kit; <b>…waves</b>, a modular synth that plays as a layer oscillator; and <b>…chains</b>, where you design modular effects chains for the tracker’s tracks (Mixer → CHN). Switch at the top. <b>⚙ Settings → App → Mobile</b> turns the app into ...Thunder for phones: Synth and Tracker only, with PAD input. …waves layers and …chains effects still play there, so the same files work in both. Everything saves in the browser as you work; <b>Save</b> writes a project file (song and kit) you can keep or move to another device.</p>
 <h3>How a song fits together</h3>
 <p><b>Song</b> (256 rows × 16 tracks of sect numbers) → <b>Sect</b> (up to 16 phrases, each with a transpose) → <b>Phrase</b> (up to 32 rows of note, volume, instrument and three effects) → <b>Inst</b> (which pad a note plays, with transpose, volume, pan, reverse and start). <b>Mixer</b>, <b>FX</b> and <b>Project</b> sit around them.</p>
 <p><b>Starting a new song resets the pattern numbering to 00.</b> Project → › NEW SONG (EDIT×2) or › LOAD DEMO begins with its first block at 00; the numbers never carry over from the previous song.</p>
@@ -2018,6 +2028,41 @@ setTimeout(() => resolveSamples(), 0);   // samples saved in IndexedDB arrive ju
 WV.doc = kit.waves || null;
 let cur = 0;
 let view = 'synth';   // 'synth', 'tracker', 'waves' or 'chains'
+/* ---------- platform: Mobile (...Thunder) or Desktop (...Thunder Plus) ----------
+   One app, two setups. Mobile hides the …waves and …chains editors and switches the tracker to PAD input; their
+   layers and effects still play, so kits and songs open and sound the same in both. Desktop shows everything.
+   PF_DEFAULT is a touch screen's first choice (the ...Thunder build sets it to 'mobile'). */
+const PFK = 'thunderplus-platform-v1', DIK = 'thunderplus-desktop-input-v1';
+const PF_DEFAULT = matchMedia('(pointer:coarse)').matches ? 'mobile' : 'desktop';
+let platform = (() => { try { const p = localStorage.getItem(PFK); if (p === 'mobile' || p === 'desktop') return p; } catch(e){} return PF_DEFAULT; })();
+const isMobile = () => platform === 'mobile';
+function setPlatform(p){
+  p = p === 'mobile' ? 'mobile' : 'desktop';
+  if (p === platform){ applyPlatform(); return; }
+  platform = p; try { localStorage.setItem(PFK, p); } catch(e){}
+  if (p === 'mobile'){
+    // Remember Desktop's input so switching back restores it, then go to PAD.
+    try { localStorage.setItem(DIK, inMode); } catch(e){}
+    if (inMode !== 'pad') setInput('pad');
+    if (view === 'waves' || view === 'chains') setView('synth');
+  } else {
+    let m = null; try { m = localStorage.getItem(DIK); } catch(e){}
+    if ((m === 'keys' || m === 'pad') && m !== inMode) setInput(m);
+  }
+  applyPlatform();
+  toast(p === 'mobile' ? 'Mobile (...Thunder): PAD input; the …waves and …chains editors are hidden but still play.'
+                       : 'Desktop (...Thunder Plus): the …waves and …chains editors are back.');
+}
+function applyPlatform(){
+  const m = isMobile();
+  document.body.classList.toggle('mob', m);
+  document.title = m ? '...Thunder' : '...Thunder Plus';
+  const br = document.querySelector('.brand'); if (br) br.setAttribute('aria-label', document.title);
+  const ck = $('ckMobile'); if (ck) ck.checked = m;
+  updView = makeSeg($('segView'), m ? [['tracker', 'Tracker'], ['synth', 'Synth']]
+    : [['tracker', 'Tracker'], ['synth', 'Synth'], ['waves', 'Waves'], ['chains', 'Chains']], () => view, setView);
+}
+$('ckMobile').addEventListener('change', e => setPlatform(e.target.checked ? 'mobile' : 'desktop'));
 // Per-slot render state follows the slot count (grows when a voice per track is on); slotAt pads or
 // trims so every index the UI touches has an entry.
 const cache = [], dirty = [], bufs = [];
@@ -2039,6 +2084,15 @@ let aLive = null; // the latency and rate the running context was made with
 
 /* ---------- audio ---------- */
 let ctx = null, master = null;
+/* The rate pads render at before audio starts. Audio can only start on a tap, so ask the browser now which
+   rate it will use (a context made and closed straight away makes no sound). Before this, pads rendered at
+   start-up at a guessed 48 kHz were all rendered again at the first sound, on the UI thread, which froze the
+   first PLAY for about 2 s on a computer and several seconds on a phone. */
+let srGuess = 48000;
+try {
+  if (aset.rate) srGuess = aset.rate;
+  else { const AC = window.AudioContext || window.webkitAudioContext, c = new AC({latencyHint:aset.lat || 'interactive'}); srGuess = c.sampleRate || 48000; if (c.close) c.close().catch(() => {}); }
+} catch(e){}
 const cpu = {cap:null, t:0};
 const playing = [];
 function audio(){
@@ -2051,15 +2105,24 @@ function audio(){
     try { if (ctx.renderCapacity){ ctx.renderCapacity.addEventListener('update', e => { cpu.cap = {avg:e.averageLoad, peak:e.peakLoad, under:e.underrunRatio, t:performance.now()}; }); ctx.renderCapacity.start({updateInterval:0.5}); } } catch(e){}
     master = ctx.createGain(); master.gain.value = clamp(aset.vol, 0, 100) / 100; master.connect(ctx.destination);
     ctx.addEventListener && ctx.addEventListener('statechange', () => audStatus());
-    for (let i = 0; i < nslots(); i++) dirty[i] = true;
-    setTimeout(prerender, 30);
+    prerender();   // ensure() re-renders only the pads whose rate differs from this context's
   }
   if (ctx.state === 'suspended') ctx.resume();
   return ctx;
 }
-function prerender(){ let i = 0; const step = () => { if (i < nslots()){ ensure(i++); setTimeout(step, 0); } }; step(); }
+// Renders the pads ahead of time, one per idle moment, so PLAY and the first tap of a pad don't have to.
+// A pad that is already up to date costs nothing. Runs once after start-up and again when audio starts.
+let preT = 0;
+function prerender(){
+  clearTimeout(preT); let i = 0;
+  const idle = window.requestIdleCallback ? f => requestIdleCallback(f, {timeout:1500}) : f => setTimeout(f, 30);
+  // ensure() returns at once for a pad that is up to date, so skip through those and stop after one real render.
+  const step = () => { while (i < nslots()){ const t = performance.now(); ensure(i++); if (performance.now() - t > 4) break; }
+    if (i < nslots()) idle(step); };
+  preT = setTimeout(() => idle(step), 30);
+}
 function ensure(i){
-  const sr = ctx ? ctx.sampleRate : 48000;
+  const sr = ctx ? ctx.sampleRate : srGuess;
   const v0 = kit.voices[i], tb = voiceSynced(v0) ? songBpm() : 0;
   if (slotAt(dirty, i) || !slotAt(cache, i) || slotAt(cache, i).sr !== sr || (slotAt(cache, i).bpm || 0) !== tb){ const st = new Map(); const v = kit.voices[i]; cache[i] = {sr, bpm:tb, data:renderVoice(v, sr, st, isSyn(i) ? v.len : 0), st}; dirty[i] = false; bufs[i] = null; }
   return cache[i];
@@ -2317,7 +2380,8 @@ section('…waves', [], s => {
   for (let k = 1; k <= 8; k++){ const o = document.createElement('option'); o.value = k; o.textContent = 'Waves In ' + k; bs.append(o); }
   bs.addEventListener('change', () => { Lc().wBus = +bs.value; changed(); });
   br.append(bs); s.append(br);
-  const b = el('button', null, 'Edit the …waves patch'); b.type = 'button'; b.addEventListener('click', openWaves); s.append(b);
+  const b = el('button', 'wvEdit', 'Edit the …waves patch'); b.type = 'button'; b.addEventListener('click', openWaves); s.append(b);
+  s.append(el('p', 'note wvMobNote', 'Plays the kit’s …waves patch. To change the patch, turn off Settings → App → Mobile (or open the file in ...Thunder Plus).'));
   const st = el('div', 'readout'); st.id = 'wvStat'; st.style.paddingLeft = '0'; s.append(st);
 });
 const wvSec = secs.lastChild;
@@ -2909,7 +2973,7 @@ makeSeg($('segNoteName'), [[false,'Pad name'],[true,'+ note']], () => ex.noteNam
 
 /* ---------- settings (synth page): Kit, MIDI, Export, Skin and Audio under one button ---------- */
 /* ---------- settings: one dropdown menu under the gear, on every screen ---------- */
-const GLOBAL_SECS = [['pKit', 'Kit'], ['pMidi', 'MIDI'], ['pExport', 'Export'], ['pSkin', 'Skin'], ['pAudio', 'Audio']];   // the Kit's save / load / reset are in File
+const GLOBAL_SECS = [['pApp', 'App'], ['pKit', 'Kit'], ['pMidi', 'MIDI'], ['pExport', 'Export'], ['pSkin', 'Skin'], ['pAudio', 'Audio']];   // the Kit's save / load / reset are in File
 { const k = $('pKit'); if (k) k.hidden = true; }
 const gsetOpen = () => !$('gset').hidden;
 const gsetSecs = () => [
@@ -2983,8 +3047,7 @@ function fileItems(){
     null,
     ['Export this pad (WAV)', () => $('bExPad').click()], ['Export all 8 pads (.zip)', () => $('bExKit').click()],
     ...(canShare ? [['Share this pad…', () => $('bShPad').click()], ['Share all 8 pads…', () => $('bShKit').click()]] : []),
-    null,
-    ['Export chains…', exportChains], ['Import chains…', () => $('chainsIn').click()]
+    ...(isMobile() ? [] : [null, ['Export chains…', exportChains], ['Import chains…', () => $('chainsIn').click()]])
   ];
 }
 const MACK = /Mac|iPhone|iPad/.test(navigator.platform);
@@ -3272,6 +3335,7 @@ let plFailed = false;
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; if (v && v.layers.some(l => l.on && (l.type === 'plaits' || l.type === 'elements' || l.type === 'waves')) || (v.fx || []).some(f => f.on)) dirty[i] = true; }
   refreshLayer(); renderFx();
   ensure(cur); drawWave(); renderStrip();
+  prerender();   // the rest of the kit in idle moments, so the first PLAY doesn't render them all at once
 })();
 
 /* ---------- ...waves editor: a full-screen frame; the patch is read from and saved into the kit ---------- */
@@ -3293,7 +3357,7 @@ function leaveWaves(){
   const a = wvApi(); if (a) a.pause();
   for (let i = 0; i < nslots(); i++) if (kit.voices[i] && usesWaves(kit.voices[i])) dirty[i] = true;
 }
-function openWaves(){ setView('waves'); }
+function openWaves(){ if (!isMobile()) setView('waves'); }
 function closeWaves(){ setView('synth'); }
 
 /* ---------- …chains editor: a full-screen frame; the patch is read from and saved into the song ---------- */
@@ -3372,7 +3436,7 @@ function leaveChains(){
   chMeterWanted = false;
   const a = chApi(); if (a) a.pause();
 }
-function openChains(){ setView('chains'); }
+function openChains(){ if (!isMobile()) setView('chains'); }
 function closeChains(){ setView('synth'); }
 // Jump to the …chains screen and centre + highlight a track's chain (used when its CHN is switched on and
 // the track already has a chain, and when picking a track that is already used inside the editor).
@@ -4512,7 +4576,7 @@ function setChainOn(t, on){
   saveS();
   if (added && CH.frame) chainsDropFrame();   // the editor reloads with the new pair when it next opens
   chainsPush(); draw();
-  if (on && !added && !was) focusChainHit(t);   // already had a chain: jump to and highlight it
+  if (on && !added && !was && !isMobile()) focusChainHit(t);   // already had a chain: jump to and highlight it
 }
 // Re-route every track that runs through …chains now, AND every track that did until this change (its Chain Out
 // was deleted or set to another track): without that, the old track kept a chains node with no way out and went silent.
@@ -4975,8 +5039,8 @@ function projRows(){
     {l:'› SAVE', sec:'Project file', act:() => saveProj(false), info:() => (projFile ? 'Saves over ' + projFile.name : 'Saves the song and kit as one .json file') + ' · Ctrl/⌘+S'},
     {l:'› SAVE AS', act:() => saveProj(true), info:() => 'Saves to a new file, keeping the old one · Shift+Ctrl/⌘+S'},
     {l:'› LOAD PROJECT', act:openProj, info:() => 'Load a project file (song and kit) · Ctrl/⌘+O'},
-    {l:'› EXPORT CHAINS', act:exportChains, info:() => 'Save the …chains patch (lives in the song) as its own .chains.json file'},
-    {l:'› IMPORT CHAINS', act:() => $('chainsIn').click(), info:() => 'Load a .chains.json file into this song (…waves patches work too, keeping their effects)'},
+    ...(isMobile() ? [] : [{l:'› EXPORT CHAINS', act:exportChains, info:() => 'Save the …chains patch (lives in the song) as its own .chains.json file'},
+    {l:'› IMPORT CHAINS', act:() => $('chainsIn').click(), info:() => 'Load a .chains.json file into this song (…waves patches work too, keeping their effects)'}]),
     ...(canShareProj() ? [{l:'› SHARE PROJECT', act:shareProj, info:() => 'Send the project file (song and kit) to Drive, email, a chat or your other device, then open it there with LOAD PROJECT'}] : []),
     {l:'› NEW SONG', dbl:true, act:() => setSong(freshSong(), 'New song. The kit is unchanged.'), info:() => 'Clears the song, keeps the kit. Tap EDIT twice'},
     {l:'› LOAD DEMO', dbl:true, act:() => setSong(demoSong(), 'Loaded the starter beat.'), info:() => 'Replaces the song with the starter beat. Tap EDIT twice'},
@@ -6480,7 +6544,7 @@ try { localStorage.setItem(SCK + '-r', '1'); } catch(e){}   // the colour per sc
 function setScreen(v){ tScreen = v; try { localStorage.setItem(SCK, v); } catch(e){} $('tScr').dataset.ts = v; }
 $('tScr').dataset.ts = tScreen;
 let kStep = 1;     // edit step: rows the cursor moves after typing
-let inMode = (() => { try { const m = localStorage.getItem(IK); if (m === 'keys' || m === 'pad') return m; } catch(e){} return matchMedia('(pointer:fine)').matches ? 'keys' : 'pad'; })();
+let inMode = (() => { try { const m = localStorage.getItem(IK); if (m === 'keys' || m === 'pad') return m; } catch(e){} return !isMobile() && matchMedia('(pointer:fine)').matches ? 'keys' : 'pad'; })();   // Mobile starts in PAD
 let kOct = 4, hexBuf = {key:'', n:0, t:0}, kpSig = '';
 const PIANO = {z:0, s:1, x:2, d:3, c:4, v:5, g:6, b:7, h:8, n:9, j:10, m:11, ',':12, l:13, '.':14, ';':15, '/':16,
   q:12, 2:13, w:14, 3:15, e:16, r:17, 5:18, t:19, 6:20, y:21, 7:22, u:23, i:24, 9:25, o:26, 0:27, p:28};
@@ -6679,6 +6743,7 @@ let updView = () => {};
 function setView(v){
   fxpClose();
   const was = view;
+  if (isMobile() && (v === 'waves' || v === 'chains')) v = 'synth';   // Mobile: no editors (they still play)
   view = v === 'tracker' || v === 'waves' || v === 'chains' ? v : 'synth';
   const tr = view === 'tracker', wv = view === 'waves', ch = view === 'chains';
   $('main').hidden = $('dock').hidden = tr || wv || ch; $('trk').hidden = !tr; $('wvView').hidden = !wv; $('chView').hidden = !ch;
@@ -6844,7 +6909,7 @@ addEventListener('keydown', e => {
   e.stopImmediatePropagation();
   if (e.key === 'Escape'){ e.preventDefault(); gsetToggle(false); }
 }, true);
-updView = makeSeg($('segView'), [['tracker', 'Tracker'], ['synth', 'Synth'], ['waves', 'Waves'], ['chains', 'Chains']], () => view, setView);
+applyPlatform();
 /* ===TRACKER END=== */
 
 /* ---------- boot ---------- */
