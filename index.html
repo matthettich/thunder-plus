@@ -35,6 +35,8 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
    grey control bands, a black monitor screen for the waveform, white module cards with thick
    family-coloured borders, and a grey dock with the 8 pads. */
 :root{
+  /* One type scale for the whole app: micro labels, small caps labels, secondary text, body and values, headings. */
+  --fs-1:9px; --fs-2:10.5px; --fs-3:12px; --fs-4:13.5px; --fs-5:16px;
   --bench:#ffffff; --panel:#ffffff; --panel2:#f3f3f3; --side:#efefef; --ink:#111111; --muted:#555555;
   --track:#e6e6e6; --inv:#ffffff; --voice:#e8def9; --screen:#000000; --screen-ink:#ffffff; --screen-line:#3a3a3a;
   --std:#2f6fc7; --fm:#8a4fd0; --add:#139a9a; --noise:#e07a2e; --smp:#d1456e; --pl:#b8860b; --fx:#c447b0; --rec:#d33b2c;
@@ -55,17 +57,17 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .setwrap{position:relative; display:flex}
 .setmenu{position:absolute; top:calc(100% + 6px); left:0; z-index:120; background:var(--panel); color:var(--ink); border:1px solid var(--ink); box-shadow:none; padding:6px; white-space:normal}
 .setmenu[hidden]{display:none}
-#bFile, .top #bSet{min-height:34px; padding:0 12px; font-size:12px; font-weight:700; letter-spacing:.04em; border:1px solid var(--line); background:var(--panel); white-space:nowrap}
+#bFile, .top #bSet{min-height:34px; padding:0 12px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; border:1px solid var(--line); background:var(--panel); white-space:nowrap}
 #bFile:hover, .top #bSet:hover{border-color:var(--ink)}
 #bFile.on, .top #bSet.on{background:var(--ink); color:var(--inv); border-color:var(--ink)}
 .top #bSet .setg{width:18px; height:18px}
-.top #bSet .setx{font-size:12px}
+.top #bSet .setx{font-size:var(--fs-3)}
 /* File */
 .gfile{width:260px; display:grid; gap:2px}
-.gfile .fitem{display:flex; justify-content:space-between; align-items:center; gap:12px; width:100%; min-height:0; border:0; background:none; padding:7px 10px; font-size:14px; text-align:left; color:var(--ink)}
+.gfile .fitem{display:flex; justify-content:space-between; align-items:center; gap:12px; width:100%; min-height:0; border:0; background:none; padding:7px 10px; font-size:var(--fs-4); text-align:left; color:var(--ink)}
 .gfile .fitem:hover:not(:disabled){background:var(--panel2)}
 .gfile .fitem:disabled{opacity:.4}
-.gfile .fitem kbd{font:inherit; font-size:12px; color:var(--muted)}
+.gfile .fitem kbd{font:inherit; font-size:var(--fs-3); color:var(--muted)}
 .gfile hr{border:0; border-top:1px solid var(--line); margin:4px 2px; width:auto}
 .gfile{max-height:calc(100vh - 80px); overflow-y:auto}
 .gfile .fitem.sure{background:var(--ink); color:var(--inv)}
@@ -76,39 +78,39 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .gset .gsec{padding:8px 8px 10px; display:grid; gap:8px}
 .gset .gsec + .gsec{border-top:1px solid var(--line)}
 .gset .gsec[hidden]{display:none}
-.gset .sethead, .gset .band .bar .ttl{font-weight:600; font-size:14px; letter-spacing:0; text-transform:none}
+.gset .sethead, .gset .band .bar .ttl{font-weight:600; font-size:var(--fs-4); letter-spacing:0; text-transform:none}
 .gset .band, .gset .band.grey{padding:0; border:0; background:none}
 .gset .gsec.band, .gset .gsec.band.grey{padding:10px 8px 12px}
 .gset .gsec + .gsec, .gset .gsec.band + .gsec.band{border-top:1px solid var(--line)}
 .gset .band .bar{display:flex; align-items:baseline; gap:10px; margin:0 0 6px; min-height:0; padding:0; border:0; background:none}
-.gset .band .bar .lbl{font-size:12.5px; color:var(--muted)}
+.gset .band .bar .lbl{font-size:var(--fs-3); color:var(--muted)}
 .gset .pbody{padding:0}
-.gset .note{font-size:12.5px; color:var(--muted)}
+.gset .note{font-size:var(--fs-3); color:var(--muted)}
 .gset .tsec{padding-top:2px}
-.gset h3{font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:10px 0 2px; padding-bottom:4px; border-bottom:1px solid var(--track)}
+.gset h3{font-size:var(--fs-3); font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:10px 0 2px; padding-bottom:4px; border-bottom:1px solid var(--track)}
 .gset .tsr{display:grid; grid-template-columns:minmax(90px,130px) minmax(0,1fr); gap:4px 10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--track)}
 .gset .tsr:last-child{border-bottom:0}
-.gset .tsr .tsl{font-size:13.5px; font-weight:600}
+.gset .tsr .tsl{font-size:var(--fs-4); font-weight:600}
 .gset .tsr .tsc{display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0}
-.gset .tsr .tsi{grid-column:2; color:var(--muted); font-size:12.5px; line-height:1.4}
+.gset .tsr .tsi{grid-column:2; color:var(--muted); font-size:var(--fs-3); line-height:1.4}
 .gset .tsr select{min-width:0; flex:1 1 140px; max-width:240px}
 .gset .tsr input[type=text]{flex:1 1 140px; max-width:240px}
 .gset .tsr input[type=range]{flex:1 1 100px; width:auto; min-width:80px}
-.gset .tsr output{min-width:70px; font-variant-numeric:tabular-nums; font-size:12.5px}
+.gset .tsr output{min-width:70px; font-variant-numeric:tabular-nums; font-size:var(--fs-3)}
 .gset .tsr .stp{min-width:34px; padding-inline:0}
 /* checkbox rows: box, bold title, the explanation under it (Seeds' setrow) */
 .gset .tsr.ck{grid-template-columns:minmax(0,1fr)}
 .gset .tsr.ck .tsi{grid-column:1; padding-left:26px; margin-top:-4px}
 .gset .tsr.act{grid-template-columns:minmax(90px,130px) minmax(0,1fr)}
 .gset .tsr.act .tsi{grid-column:auto}
-.gset label.cb{display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600; cursor:pointer; min-height:30px}
+.gset label.cb{display:flex; align-items:center; gap:10px; font-size:var(--fs-4); font-weight:600; cursor:pointer; min-height:30px}
 .gset label.cb input{width:16px; height:16px; margin:0; accent-color:var(--ink); flex:none}
 .gset .skins{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 @media (max-width:560px){ .gset .tsr, .gset .tsr.act{grid-template-columns:minmax(0,1fr)} .gset .tsr .tsi{grid-column:1} }
 .setband .bar{gap:10px}
 .setband .settabs{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none}
 .setband .settabs button{flex:none; padding-inline:14px}
-.audrow{display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-height:34px; font-size:12.5px}
+.audrow{display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-height:34px; font-size:var(--fs-3)}
 .audrow>span:first-child{color:var(--muted); width:70px; flex:none}
 .audrow select{flex:1 1 220px; min-width:0}
 .audrow input[type=range]{flex:1 1 200px; width:auto; min-width:120px}
@@ -123,20 +125,20 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .help .hbody{flex:1; overflow-y:auto; padding:6px 16px 40px; outline:none; overscroll-behavior:contain}
 .help .hwrap{max-width:860px; margin:0 auto}
 .help section{padding-top:14px}
-.help h2{font-size:15px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; margin:10px 0 6px; padding-bottom:5px; border-bottom:1px solid var(--line)}
-.help h3{font-size:13px; font-weight:600; margin:14px 0 4px; letter-spacing:.03em}
-.help p{margin:6px 0; font-size:14px; line-height:1.45}
-.help table{width:100%; border-collapse:collapse; font-size:13.5px; margin:4px 0 8px}
+.help h2{font-size:var(--fs-5); font-weight:600; letter-spacing:.06em; text-transform:uppercase; margin:10px 0 6px; padding-bottom:5px; border-bottom:1px solid var(--line)}
+.help h3{font-size:var(--fs-4); font-weight:600; margin:14px 0 4px; letter-spacing:.03em}
+.help p{margin:6px 0; font-size:var(--fs-4); line-height:1.45}
+.help table{width:100%; border-collapse:collapse; font-size:var(--fs-4); margin:4px 0 8px}
 .help td{padding:5px 8px 5px 0; vertical-align:top; border-bottom:1px solid var(--track); line-height:1.4}
 .help td:first-child{width:36%; white-space:nowrap}
-.help kbd{font-family:var(--mono, "JetBrains Mono", monospace); font-size:12px; border:1px solid var(--line); padding:0 5px; background:var(--panel); white-space:nowrap; display:inline-block; margin:1px 0}
-.help .fxg{display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:2px 18px; font-size:13px; margin:4px 0 8px}
+.help kbd{font-family:var(--mono, "JetBrains Mono", monospace); font-size:var(--fs-3); border:1px solid var(--line); padding:0 5px; background:var(--panel); white-space:nowrap; display:inline-block; margin:1px 0}
+.help .fxg{display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:2px 18px; font-size:var(--fs-4); margin:4px 0 8px}
 .help .fxg div{padding:3px 0; border-bottom:1px solid var(--track)}
 .help .fxg code{font-family:var(--mono, "JetBrains Mono", monospace); font-weight:700; margin-right:6px}
 @media (max-width:560px){ .help td:first-child{width:auto; white-space:normal} .help .hhead{padding-inline:10px; gap:6px} .help .hhead b{display:none} .help .hhead .seg button{padding:3px 8px} .help #helpX .hx{display:none} }
 
 html,body{height:100%}
-body{margin:0; background:var(--bench); color:var(--ink); font-family:var(--font); font-size:14px;
+body{margin:0; background:var(--bench); color:var(--ink); font-family:var(--font); font-size:var(--fs-4);
   display:flex; flex-direction:column; overflow:hidden; -webkit-tap-highlight-color:transparent; letter-spacing:-.01em}
 button,select,input{font:inherit; color:var(--ink)}
 button{background:var(--panel); border:1px solid var(--line); padding:6px 11px; min-height:34px; cursor:pointer;
@@ -144,8 +146,10 @@ button{background:var(--panel); border:1px solid var(--line); padding:6px 11px; 
 button:hover{border-color:var(--muted)}
 button.on{background:var(--ink); color:var(--inv); border-color:var(--line)}
 button:disabled{opacity:.4; cursor:default}
-button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--line); outline-offset:2px}
-button.sm{min-height:30px; padding:3px 9px; font-size:12.5px}
+button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+/* Numbers that change while you work keep their width, so nothing shifts as they count. */
+output,.rv b,.tclk b,.stvv,.mtr,.dkrows output,.row output,.stpan output,#tRowsN,#tOctN{font-variant-numeric:tabular-nums}
+button.sm{min-height:30px; padding:3px 9px; font-size:var(--fs-3)}
 select{background:var(--panel); border:1px solid var(--line); min-height:34px; padding:0 6px; max-width:100%}
 input[type=text]{background:var(--panel); border:1px solid var(--line); min-height:34px; padding:0 9px; min-width:0}
 input[type=range]{width:100%; accent-color:var(--ink); height:30px; margin:0; touch-action:pan-y}
@@ -171,31 +175,31 @@ body:not(.mob) .wvMobNote{display:none}
 .band.grey{background:var(--side)}
 .band.voice{background:var(--voice)}
 .bar{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
-.ttl{font-weight:600; font-size:15px; white-space:nowrap}
+.ttl{font-weight:600; font-size:var(--fs-5); white-space:nowrap}
 .lbl{color:var(--muted)}
 .pbody{display:flex; flex-direction:column; gap:10px; padding-top:8px}
 .btnrow{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
-.note{color:var(--muted); font-size:12.5px; line-height:1.45; margin:0; max-width:68ch}
+.note{color:var(--muted); font-size:var(--fs-3); line-height:1.45; margin:0; max-width:68ch}
 
-.row{display:grid; grid-template-columns:70px minmax(0,1fr) 64px; align-items:center; gap:6px; font-size:12.5px; min-height:30px}
+.row{display:grid; grid-template-columns:70px minmax(0,1fr) 64px; align-items:center; gap:6px; font-size:var(--fs-3); min-height:30px}
 .row label{color:var(--muted); user-select:none; -webkit-user-select:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:default}
 .row output{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
 .row output:hover{background:var(--panel2)}
 /* typed value box: double-click or double-tap a row's value; inherits the app's skin */
 .vtype{font:inherit; color:var(--ink); background:var(--inv); border:1px solid var(--line); width:11ch; padding:0 3px; text-align:right}
-.segrow{display:flex; align-items:center; gap:6px; min-height:34px; font-size:12.5px}
+.segrow{display:flex; align-items:center; gap:6px; min-height:34px; font-size:var(--fs-3)}
 .segrow>span{color:var(--muted); width:70px; flex:none}
 .segrow{min-width:0}
 .fxgrid .segrow{grid-column:1 / -1}
 .seg{display:inline-flex; flex-wrap:wrap; border:1px solid var(--line); background:var(--panel); max-width:100%; min-width:0}
-.seg button{border:0; border-right:1px solid var(--line); min-height:30px; padding:3px 12px; font-weight:500; font-size:12.5px; background:none}
+.seg button{border:0; border-right:1px solid var(--line); min-height:30px; padding:3px 12px; font-weight:500; font-size:var(--fs-3); background:none}
 .seg button.on{background:var(--ink); color:var(--inv)}
 .seg button:last-child{border-right:0}
 
 /* monitor screen (Seeds' black main view) */
 .screen{flex:none; background:var(--screen); border-bottom:1px solid var(--line); position:relative}
 .wave{width:100%; height:150px; display:block; cursor:pointer}
-.wmeta{display:flex; gap:14px; flex-wrap:wrap; font-size:12.5px; color:#4a4257; font-variant-numeric:tabular-nums}
+.wmeta{display:flex; gap:14px; flex-wrap:wrap; font-size:var(--fs-3); color:#4a4257; font-variant-numeric:tabular-nums}
 .vrows{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:0 22px; padding-top:4px}
 
 /* layer list, like the Seeds module palette items */
@@ -204,7 +208,7 @@ body:not(.mob) .wvMobNote{display:none}
   display:flex; flex-direction:column; justify-content:space-between; align-items:stretch; gap:3px; min-width:0; font-weight:400}
 .lcell:hover{border-color:var(--fam)}
 .lcell .l1{display:flex; align-items:center; justify-content:space-between; gap:4px; font-weight:600}
-.lcell .tn{font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.lcell .tn{font-size:var(--fs-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .lcell .lv{height:4px; background:var(--track); position:relative}
 .lcell .lv i{position:absolute; left:0; top:0; bottom:0; background:var(--ink)}
 .lcell.off{border-style:dashed}
@@ -224,7 +228,7 @@ body:not(.mob) .wvMobNote{display:none}
    shrinks (ellipsis) instead of pushing them — the long "Mutable Instruments" tag used to force a wrap for
    Plaits and squeeze the panel below. */
 .acts{display:flex; align-items:center; gap:8px; flex:none; margin-left:auto}
-.famtag{font-size:12px; color:var(--muted); min-width:0; max-width:32vw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.famtag{font-size:var(--fs-3); color:var(--muted); min-width:0; max-width:32vw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 /* On phones / small tablets keep the layer header to one row (it fit two only because of long tags). */
 @media (max-width:780px){
   .layercard>header{gap:5px; padding:6px 8px 6px 10px}
@@ -238,8 +242,8 @@ body:not(.mob) .wvMobNote{display:none}
    (the fam colour rotated 180°, so one card always complements the other) */
 .voicecard{border:3.5px solid var(--famc, var(--pl)); background:var(--panel)}
 .voicecard>header{display:flex; align-items:center; gap:8px; padding:8px 8px 8px 12px; border-bottom:2px solid var(--famc); flex-wrap:wrap}
-.voicecard .ttl{font-size:14px; font-weight:600}
-.voicecard .lbl{font-size:12px; color:var(--muted)}
+.voicecard .ttl{font-size:var(--fs-4); font-weight:600}
+.voicecard .lbl{font-size:var(--fs-3); color:var(--muted)}
 .voicecard .sec h3::before{background:var(--famc)}
 /* 32-step sequencer: a compact grid of little bars */
 .stepgrid{display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:3px 6px; margin:6px 0}
@@ -251,9 +255,9 @@ body:not(.mob) .wvMobNote{display:none}
 .fxslot:first-child{border-top:0}
 .fxslot.off .fxgrid{opacity:.45}
 .fxhead{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:4px}
-.fxhead .n{font-weight:600; font-size:14px; display:flex; align-items:center; gap:7px}
+.fxhead .n{font-weight:600; font-size:var(--fs-4); display:flex; align-items:center; gap:7px}
 .fxhead .n::before{content:""; width:9px; height:9px; background:var(--fx); flex:none}
-.fxhead .cr{font-size:12px; color:var(--muted)}
+.fxhead .cr{font-size:var(--fs-3); color:var(--muted)}
 .fxvu{width:90px; height:10px; border:1px solid var(--line); background:var(--panel2); position:relative; overflow:hidden; flex:none; margin-left:6px}
 .fxvu i{position:absolute; left:0; top:0; bottom:0; width:0; background:var(--meter-ok)}
 .fxvu i.warm{background:var(--meter-ok)} .fxvu i.hot{background:var(--meter-hot)} .fxvu i.clip{background:var(--meter-clip)}
@@ -262,9 +266,9 @@ body:not(.mob) .wvMobNote{display:none}
 .fxempty{padding:10px 12px 12px; margin:0}
 .secs{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:8px 22px; padding:10px 12px 12px}
 .sec{min-width:0}
-.sec h3{font-size:13px; font-weight:600; margin:2px 0 4px; color:var(--ink); display:flex; align-items:center; gap:7px}
+.sec h3{font-size:var(--fs-4); font-weight:600; margin:2px 0 4px; color:var(--ink); display:flex; align-items:center; gap:7px}
 .sec h3::before{content:""; width:9px; height:9px; background:var(--fam); flex:none}
-.readout{font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; min-height:18px; padding-left:76px}
+.readout{font-size:var(--fs-3); color:var(--muted); font-variant-numeric:tabular-nums; min-height:18px; padding-left:76px}
 
 /* recorder dock */
 .dock{flex:none; background:var(--side); border-top:1px solid var(--line); padding-block:9px 11px; padding-inline:16px; display:grid; gap:8px;
@@ -274,37 +278,37 @@ body:not(.mob) .wvMobNote{display:none}
   height:calc(70px * 2 + 10px + 24px + 1px); overflow-y:auto; touch-action:pan-y; overscroll-behavior:contain}
 .pads{display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:6px}
 .pad{height:70px; border:1px solid var(--line); background:var(--panel); display:flex; flex-direction:column;
-  justify-content:space-between; align-items:flex-start; padding:6px 8px; text-align:left; font-size:12.5px; touch-action:none; min-width:0; gap:0}
-.pad b{font-size:16px; font-weight:600}
+  justify-content:space-between; align-items:flex-start; padding:6px 8px; text-align:left; font-size:var(--fs-3); touch-action:none; min-width:0; gap:0}
+.pad b{font-size:var(--fs-5); font-weight:600}
 /* A voice per track adds up to 32 track pads past the 8 drums: same 8-across pads, same 70px height,
    scrolling up and down inside the dock (the band above keeps its own place). */
 .dock.vtrk{overscroll-behavior:contain}   /* the dock's height is constant now, in both modes */
 .pad .p1{display:flex; justify-content:space-between; align-items:baseline; width:100%; gap:4px}
-.pad .pm{font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums}
+.pad .pm{font-size:var(--fs-2); color:var(--muted); font-variant-numeric:tabular-nums}
 .pad.hit .pm{color:var(--inv)}
 .pad.learn{border-style:dashed}
 .pad.learning{border:3.5px solid var(--pl); padding:3.5px 5.5px}
 /* MIDI learn: every slider gets a dashed outline, the one waiting for a knob a solid one; learned sliders show their CC. */
 body.mlearn .row input[type=range]{outline:1.5px dashed var(--muted); outline-offset:3px}
 body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-offset:3px}
-.row label[data-cc]::after{content:" " attr(data-cc); font-size:9px; font-weight:600; letter-spacing:.04em; color:var(--muted); white-space:nowrap}
-.selrow{display:grid; grid-template-columns:70px minmax(0,1fr); align-items:center; gap:6px; font-size:12.5px; min-height:36px}
+.row label[data-cc]::after{content:" " attr(data-cc); font-size:var(--fs-1); font-weight:600; letter-spacing:.04em; color:var(--muted); white-space:nowrap}
+.selrow{display:grid; grid-template-columns:70px minmax(0,1fr); align-items:center; gap:6px; font-size:var(--fs-3); min-height:36px}
 .selrow>span{color:var(--muted)}
 .selrow select{width:100%}
 .pad .pn{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%}
 .pad.sel{border-width:3.5px; padding:3.5px 5.5px}
 .pad.hit{background:var(--ink); color:var(--inv)}
 .pad.syn{background:var(--panel2)}
-.pad.syn b::after{content:" SYN"; font-size:10px; font-weight:500; letter-spacing:.06em; color:var(--muted)}
+.pad.syn b::after{content:" SYN"; font-size:var(--fs-2); font-weight:500; letter-spacing:.06em; color:var(--muted)}
 .pad.syn.hit b::after{color:var(--inv)}
 
 .toast{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(110px + env(safe-area-inset-bottom,0px));
-  background:var(--ink); color:var(--inv); padding:9px 15px; font-size:13px; z-index:9; max-width:calc(100% - 32px)}
+  background:var(--panel); color:var(--ink); border:2px solid var(--ink); box-shadow:4px 4px 0 0 var(--ink); padding:9px 15px; font-size:var(--fs-4); z-index:9; max-width:calc(100% - 32px)}
 
 @media (max-width:600px){
   .strip{grid-template-columns:repeat(4,minmax(0,1fr))}
   .pads{grid-template-columns:repeat(8,minmax(0,1fr)); gap:4px}
-  .pad{height:46px; padding:4px 5px; font-size:10.5px} .pad b{font-size:13px} .pad.syn b::after{content:""} .pad .pm{display:none}
+  .pad{height:46px; padding:4px 5px; font-size:var(--fs-2)} .pad b{font-size:var(--fs-4)} .pad.syn b::after{content:""} .pad .pm{display:none}
   .pad.sel{padding:2px 3px}
   .dock{height:calc(46px * 2 + 9px + 24px + 1px)}
   .top{gap:6px}
@@ -372,15 +376,15 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .wmeta{color:var(--muted)}
 /* skin picker */
 .skins{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:6px}
-.skin{justify-content:flex-start; gap:10px; text-align:left; font-size:13px; min-height:38px}
+.skin{justify-content:flex-start; gap:10px; text-align:left; font-size:var(--fs-4); min-height:38px}
 .skin .dots{display:flex; gap:3px; flex:none}
 .skin .dots i{width:12px; height:12px; border-radius:50%; border:1px solid rgba(127,127,127,.5); display:block}
 .skin[aria-checked="true"]{outline:2px solid var(--ink); outline-offset:-3px}
 /* CPU meter in the top bar */
-.top .tmode{border:1px solid var(--line); min-height:34px; background:var(--panel); padding:0 10px; font-size:12px; font-weight:600; letter-spacing:.04em; white-space:nowrap}
+.top .tmode{border:1px solid var(--line); min-height:34px; background:var(--panel); padding:0 10px; font-size:var(--fs-3); font-weight:600; letter-spacing:.04em; white-space:nowrap}
 .top .tmode.on{background:var(--ink); color:var(--inv)}
 .top .tmode[hidden]{display:none}
-.updb{position:fixed; left:50%; transform:translateX(-50%); top:calc(10px + env(safe-area-inset-top,0px)); z-index:20; background:var(--pl); color:var(--inv); border:0; padding:12px 18px; font-size:14px; font-weight:600; box-shadow:0 4px 16px rgba(0,0,0,.25); white-space:nowrap}
+.updb{position:fixed; left:50%; transform:translateX(-50%); top:calc(10px + env(safe-area-inset-top,0px)); z-index:20; background:var(--pl); color:var(--inv); border:0; padding:12px 18px; font-size:var(--fs-4); font-weight:600; box-shadow:0 4px 16px rgba(0,0,0,.25); white-space:nowrap}
 @media (max-width:480px){ .top .tmode .mx{display:inline} .top .tmode,.top .tcpu{padding:0 8px} .top .tcpu{min-width:72px} }
 .top .tcpu{border:1px solid var(--line); min-height:34px; background:var(--panel); padding:0 10px; min-width:84px; overflow:hidden}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
@@ -394,7 +398,7 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .trk :is(input,textarea,[contenteditable]){user-select:text; -webkit-user-select:text}
 .trk{flex:1; min-height:0; min-width:0; overflow:hidden; display:flex; flex-direction:column; background:var(--bench)}
 .ttabs{display:flex; flex:none; border-bottom:1px solid var(--line); background:var(--side); overflow-x:auto; scrollbar-width:none}
-.ttabs button{border:0; border-right:1px solid var(--line); background:none; min-height:36px; padding:0 14px; font-weight:500; font-size:13px; letter-spacing:.04em; flex:none}
+.ttabs button{border:0; border-right:1px solid var(--line); background:none; min-height:36px; padding:0 14px; font-weight:500; font-size:var(--fs-4); letter-spacing:.04em; flex:none}
 .ttabs button.on{background:var(--ink); color:var(--inv)}
 .tbody{flex:1; min-height:0; display:flex}
 .tscr{flex:1; min-width:0; font-family:var(--mono); font-size:14px; padding:8px 12px;
@@ -465,24 +469,24 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .thint{color:var(--ts-hint)}
 .tside{width:236px; flex:none; border-left:1px solid var(--line); background:var(--side); padding:12px; display:flex; flex-direction:column; gap:12px; overflow:auto}
 .tmap{display:grid; grid-template-columns:repeat(4,1fr); gap:4px}
-.tmap button{min-height:28px; padding:0 2px; font-size:10.5px; font-weight:600; letter-spacing:.03em}
+.tmap button{min-height:28px; padding:0 2px; font-size:var(--fs-2); font-weight:600; letter-spacing:.03em}
 .tmap .wide{grid-column:1 / -1}
 .tmap button.on{background:var(--ink); color:var(--inv)}
-.tstat{display:flex; flex-direction:column; gap:2px; font-size:13px; font-variant-numeric:tabular-nums}
+.tstat{display:flex; flex-direction:column; gap:2px; font-size:var(--fs-4); font-variant-numeric:tabular-nums}
 .tmeters{display:grid; grid-template-columns:repeat(8,1fr); gap:4px}
 .mtr{min-height:0; padding:0; border:1px solid var(--line); background:var(--panel); height:58px; display:flex; flex-direction:column; align-items:stretch; gap:0}
 .mtr .mb{flex:1; position:relative; display:block}
 .mtr .mb i{position:absolute; left:0; right:0; bottom:0; height:0; background:var(--ink)}
-.mtr .mn{font-size:10px; line-height:14px; border-top:1px solid var(--line); text-align:center}
+.mtr .mn{font-size:var(--fs-2); line-height:14px; border-top:1px solid var(--line); text-align:center}
 .mtr.mu{border-style:dashed}
 .mtr.mu .mn{color:var(--rec); text-decoration:line-through}
 .mtr.mu .mb i{background:var(--muted)}
-.tlegend{margin:0; display:grid; grid-template-columns:minmax(0,max-content) minmax(0,1fr); gap:3px 8px; font-size:11.5px; line-height:1.35; min-width:0}
+.tlegend{margin:0; display:grid; grid-template-columns:minmax(0,max-content) minmax(0,1fr); gap:3px 8px; font-size:var(--fs-3); line-height:1.35; min-width:0}
 .tlegend dt{font-weight:600}
 .tlegend dd{margin:0; color:var(--muted); min-width:0; overflow-wrap:anywhere}
 .tlegend dt{max-width:96px; white-space:normal}
 .tside{position:relative; padding-top:26px}
-.tsidex{position:absolute; top:2px; right:2px; min-height:0; width:20px; height:20px; padding:0; font-size:10px; line-height:1; border:0; background:transparent; color:var(--muted); z-index:2}
+.tsidex{position:absolute; top:2px; right:2px; min-height:0; width:20px; height:20px; padding:0; font-size:var(--fs-2); line-height:1; border:0; background:transparent; color:var(--muted); z-index:2}
 .tsidex:hover{color:var(--ink); background:var(--panel2)}
 /* Lp. Sel. and TRANS − + sit side by side: one rule between neighbours, not two. */
 .trows .rv + .rv{border-left:0}
@@ -498,8 +502,8 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 #tPad .k.dn, #tPad .k.on{background:var(--ink); color:var(--inv)}
 #tPad .k.lt, #tPad #kPlay.on{background:var(--pl); color:var(--inv)}
 .k{min-height:0; padding:0; font-size:18px; font-weight:600; touch-action:none}
-.k.kw{font-size:11px; letter-spacing:.04em}
-.keys.wide .k.kw{font-size:10.5px}
+.k.kw{font-size:var(--fs-2); letter-spacing:.04em}
+.keys.wide .k.kw{font-size:var(--fs-2)}
 .k.dn,.k.on{background:var(--ink); color:var(--inv)}
 #kPlay.on{background:var(--pl); border-color:var(--line); color:var(--inv)}
 .k.lt{background:var(--pl); color:var(--inv); border-color:var(--line)}
@@ -508,12 +512,12 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .tcmd button{box-shadow:4px 4px 0 0 var(--sh, transparent), 4px 4px 0 1.5px var(--line); transition:transform .06s, box-shadow .06s}
 .tcmd button.dn{transform:translate(3px,3px); box-shadow:1px 1px 0 0 var(--sh, transparent), 1px 1px 0 1.5px var(--line)}
 .tcmd:not([hidden]) + .tctl{border-top:0}
-.tcmd button{min-height:calc(var(--k) * .62); padding:0 2px; font-size:12px; font-weight:600; letter-spacing:.03em; min-width:0; touch-action:none; white-space:nowrap; overflow:hidden}
+.tcmd button{min-height:calc(var(--k) * .62); padding:0 2px; font-size:var(--fs-3); font-weight:600; letter-spacing:.03em; min-width:0; touch-action:none; white-space:nowrap; overflow:hidden}
 .tcmd button.dn{background:var(--ink); color:var(--inv)}
 .tcmd .ca{font-size:.9em}
-@media (max-width:600px){ .tcmd button{flex-direction:column; gap:1px; line-height:1.1; letter-spacing:.02em} .tcmd button[data-c=next]{flex-direction:column-reverse} .tcmd .ca{font-size:10px} }
+@media (max-width:600px){ .tcmd button{flex-direction:column; gap:1px; line-height:1.1; letter-spacing:.02em} .tcmd button[data-c=next]{flex-direction:column-reverse} .tcmd .ca{font-size:var(--fs-2)} }
 .tcmd button.on{background:var(--pl); color:var(--inv)}
-.tcmd button[hidden]{display:none} .tcmd button[data-c=song]{font-size:17px} .tcmd.cpad :is([data-c=undo],[data-c=redo]){font-size:20px; font-weight:500; line-height:1} .tcmd :is([data-c=prev],[data-c=next]){font-size:24px; font-weight:500; line-height:1}
+.tcmd button[hidden]{display:none} .tcmd button[data-c=song]{font-size:var(--fs-5)} .tcmd.cpad :is([data-c=undo],[data-c=redo]){font-size:20px; font-weight:500; line-height:1} .tcmd :is([data-c=prev],[data-c=next]){font-size:24px; font-weight:500; line-height:1}
 /* One row on wide screens. */
 @media (min-width:700px){
   .tcmd, .tcmd.song{grid-template-columns:repeat(14,minmax(0,1fr))}
@@ -522,21 +526,21 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 
 .ttabbar{display:flex; flex:none; border-bottom:1px solid var(--line); background:var(--side); min-width:0}
 .ttabbar .ttabs{border-bottom:0; flex:1; min-width:0}
-.tmode{border:0; border-left:1px solid var(--line); min-height:36px; padding:0 12px; font-size:12px; font-weight:600; letter-spacing:.04em; flex:none; white-space:nowrap}
+.tmode{border:0; border-left:1px solid var(--line); min-height:36px; padding:0 12px; font-size:var(--fs-3); font-weight:600; letter-spacing:.04em; flex:none; white-space:nowrap}
 .tmode.on{background:var(--ink); color:var(--inv)}
 /* Rows of the open phrase, beside INPUT, with the live tempo and ticks (dots light up tick by tick as it plays). */
 .tpat{display:flex; align-items:stretch; flex:none; border-left:1px solid var(--line); font-variant-numeric:tabular-nums}
-.tclk{display:flex; align-items:center; gap:2px; padding:0 8px; font-size:11px; white-space:nowrap; border-right:1px solid var(--line)}
-.tclk b{font-weight:700; font-size:11.5px} .tclk .tce{cursor:text; padding:1px 2px; border-radius:2px} .tclk .tce:hover{background:var(--panel2)}
+.tclk{display:flex; align-items:center; gap:2px; padding:0 8px; font-size:var(--fs-2); white-space:nowrap; border-right:1px solid var(--line)}
+.tclk b{font-weight:700; font-size:var(--fs-3)} .tclk .tce{cursor:text; padding:1px 2px; border-radius:2px} .tclk .tce:hover{background:var(--panel2)}
 .tclk .tcin{width:3.6ch; min-height:0; height:20px; padding:0 2px; font:inherit; font-weight:700; text-align:center; border:1px solid var(--ink); background:var(--panel); color:var(--ink); user-select:text; -webkit-user-select:text} .tclk small{font-size:8.5px; letter-spacing:.05em; color:var(--muted); margin-right:4px}
 .tclk.live b{color:var(--pl)}
 .tdots{display:inline-grid; grid-auto-flow:column; grid-template-rows:repeat(2,3px); gap:2px; margin-left:1px}
 .tdots i{width:3px; height:3px; border-radius:50%; background:var(--line)}
 .tdots i.on{background:var(--ink)} .tclk.live .tdots i.on{background:var(--pl)}
 .trows{display:flex; align-items:stretch}
-.trows button{border:0; border-radius:0; min-height:36px; min-width:34px; padding:0 8px; font-size:16px; font-weight:600; background:none}
+.trows button{border:0; border-radius:0; min-height:36px; min-width:34px; padding:0 8px; font-size:var(--fs-5); font-weight:600; background:none}
 .trows .rv{display:flex; flex-direction:column; justify-content:center; align-items:center; line-height:1.05; min-width:46px; border-inline:1px solid var(--line)}
-.trows .rv small{font-size:9px; letter-spacing:.06em; color:var(--muted)} .trows .rv b{font-size:14px}
+.trows .rv small{font-size:var(--fs-1); letter-spacing:.06em; color:var(--muted)} .trows .rv b{font-size:var(--fs-4)}
 .trows button:active{background:var(--ink); color:var(--inv)}
 .trows button.on{background:var(--pl); color:var(--inv)}
 .trows button.on .rv small, .trows button.on small{color:var(--inv)}
@@ -546,9 +550,9 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
   .ttabbar{flex-wrap:wrap} .ttabbar .ttabs{flex:1 1 100%; border-bottom:1px solid var(--line)}
   .tpat{flex:1; border-left:0} .tclk{flex:1}
   .trows button{min-height:40px; min-width:44px}
-  .ttabbar .ttabs button{flex:1 0 auto; padding:0 6px; font-size:11.5px; letter-spacing:.02em}
+  .ttabbar .ttabs button{flex:1 0 auto; padding:0 6px; font-size:var(--fs-3); letter-spacing:.02em}
 }
-.tsong{border:1px solid var(--line); min-height:34px; padding:0 14px; margin:0 4px; font-size:12px; font-weight:700; letter-spacing:.04em; flex:none; white-space:nowrap; background:var(--panel)}
+.tsong{border:1px solid var(--line); min-height:34px; padding:0 14px; margin:0 4px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; flex:none; white-space:nowrap; background:var(--panel)}
 .tsong:hover{border-color:var(--ink)}
 .tsong.on{background:var(--pl); color:var(--inv); border-color:var(--pl)}
 /* The transport button's label flips between Song and Stop. Both labels sit in one grid cell, so the
@@ -558,7 +562,7 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 #tSong .tl.alt{visibility:hidden}
 #tSong.on .tl:not(.alt){visibility:hidden}
 #tSong.on .tl.alt{visibility:visible}
-.tcpu{border:0; border-left:1px solid var(--line); min-height:36px; padding:0 10px; font-size:12px; font-weight:600; letter-spacing:.04em; flex:none; white-space:nowrap;
+.tcpu{border:0; border-left:1px solid var(--line); min-height:36px; padding:0 10px; font-size:var(--fs-3); font-weight:600; letter-spacing:.04em; flex:none; white-space:nowrap;
   font-variant-numeric:tabular-nums; position:relative; min-width:84px; text-align:left; background:var(--side)}
 .tcpu i{position:absolute; left:0; bottom:0; height:4px; width:0; background:var(--ink); transition:width .3s}
 .tcpu.warn i{background:var(--pl)}
@@ -566,7 +570,7 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 .tpad{display:flex; justify-content:space-between; align-items:center; gap:16px; flex:1}
 .tkp{flex:1; min-width:0; display:flex; flex-direction:column; gap:5px}
 .kpr{display:grid; grid-template-columns:repeat(var(--n),minmax(0,1fr)); gap:5px}
-.kp{min-height:calc(var(--k) * .7); padding:0 2px; font-size:13px; font-weight:600; letter-spacing:.02em; touch-action:none; min-width:0}
+.kp{min-height:calc(var(--k) * .7); padding:0 2px; font-size:var(--fs-4); font-weight:600; letter-spacing:.02em; touch-action:none; min-width:0}
 .kp.blk{background:var(--ink); color:var(--inv)}
 .kp.dn{background:var(--muted)!important; color:var(--inv)}
 .kp.lbl{border-color:transparent; background:none; opacity:1}
@@ -575,7 +579,7 @@ body.trkv .toast{bottom:calc(var(--k) * 2 + 40px + env(safe-area-inset-bottom,0p
 /* Phones: taller buttons under the screen, easier to hit with a thumb (the screen's text shrinks to keep 16 rows in view). */
 @media (pointer:coarse) and (max-width:760px){
   .tcmd{gap:10px 8px; padding-top:8px}
-  .tcmd button{min-height:max(46px, calc(var(--k) * .95)); font-size:12.5px}
+  .tcmd button{min-height:max(46px, calc(var(--k) * .95)); font-size:var(--fs-3)}
   .dpad,.keys{grid-template-rows:repeat(2,calc(var(--k) * 1.3))}
   .kp{min-height:max(46px, calc(var(--k) * .95))}
   .kpc{height:calc(var(--k) * 2.5 + 12px)}
@@ -608,9 +612,9 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 .tarrh{position:absolute; left:-10px; top:0; bottom:0; width:20px; cursor:ew-resize; touch-action:none; z-index:3}
 .tarrh::after{content:''; position:absolute; left:8px; top:50%; width:4px; height:48px; margin-top:-24px; border-radius:2px; background:var(--ar-dim); opacity:.6}
 .tarrh:hover::after,.tarrh.dn::after{opacity:1; background:var(--ar-ink)}
-.tahd{display:flex; align-items:center; gap:8px; padding:8px 10px 6px; font-size:12px; font-weight:700; letter-spacing:.05em; flex:none}
+.tahd{display:flex; align-items:center; gap:8px; padding:8px 10px 6px; font-size:var(--fs-3); font-weight:700; letter-spacing:.05em; flex:none}
 .tahd span{flex:1; min-width:0; font-weight:400; color:var(--ar-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:0}
-.tahd button{min-height:24px; padding:0 8px; font-size:10.5px; font-weight:700; letter-spacing:.04em; background:transparent; color:var(--ar-ink); border:1px solid var(--ar-line); border-radius:4px}
+.tahd button{min-height:24px; padding:0 8px; font-size:var(--fs-2); font-weight:700; letter-spacing:.04em; background:transparent; color:var(--ar-ink); border:1px solid var(--ar-line); border-radius:4px}
 .tahd button.on{background:var(--ar-mu); border-color:var(--ar-mu); color:#fff}
 .tath,.tagrid .ar{display:grid; grid-template-columns:22px var(--arcols, repeat(8,minmax(0,1fr)) 4px repeat(8,minmax(0,1fr))); gap:2px; padding:0 8px}
 .tarr{--tk-mono:#eba3bd; --tk-poly:#86c99a}
@@ -625,12 +629,12 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 .tarr.dk .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 30%, transparent)} .tarr.dk .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 30%, transparent)}
 body.arrsmall .tagp{grid-template-columns:18px var(--arcols, repeat(8,minmax(0,1fr)) 4px repeat(8,minmax(0,1fr))); gap:1px; padding:0 6px}
 body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
-.tath{flex:none; font-size:9px; color:var(--ar-dim); padding-bottom:3px; border-bottom:1px solid var(--ar-line)}
+.tath{flex:none; font-size:var(--fs-1); color:var(--ar-dim); padding-bottom:3px; border-bottom:1px solid var(--ar-line)}
 .tath i{font-style:normal; text-align:center; line-height:16px}   /* a label now: tracks are muted in the Mixer, not here */
 .tath i.mu{color:var(--ar-mu); text-decoration:line-through}
 .tagrid{flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:3px 0 8px; touch-action:pan-y}
 .tagrid .ar{margin-bottom:2px}
-.tagrid .rn{font-size:9px; line-height:var(--arh,16px); color:var(--ar-dim); cursor:pointer}
+.tagrid .rn{font-size:var(--fs-1); line-height:var(--arh,16px); color:var(--ar-dim); cursor:pointer}
 .tagrid .rn.r4{color:var(--ar-ink); font-weight:700}
 .tagrid .rn.pl{background:var(--ar-pl); color:var(--ar-pl-ink); border-radius:2px}
  .tagrid b{display:block; position:relative; height:var(--arh,16px); line-height:var(--arh,16px); font-size:var(--arf,9px); font-weight:600; text-align:center; border-radius:2px; background:var(--ar-empty); color:transparent; cursor:pointer}
@@ -650,8 +654,8 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tagrid b.tm{opacity:.35}
 .tagrid b.c{outline:2px solid var(--ar-cur); outline-offset:0; position:relative; z-index:1}
 .tagrid b.c:not(.f):not(.m):not(.z):not(.p){color:var(--ar-dim)}
-.tafoot{flex:none; font-size:10px; line-height:1.35; color:var(--ar-dim); padding:6px 10px 8px; border-top:1px solid var(--ar-line); font-family:var(--font)}
-@media (max-width:480px){ .top{flex-wrap:wrap} .top .brand{display:none} .top .kitname{order:9; flex:1 1 100%} .top button{white-space:nowrap} .ttabs button{padding:0 10px; font-size:12px} .tmode .mx{display:none} .tmode{padding:0 10px} .tctl{padding-inline:10px} .tcmd{padding-inline:10px} }
+.tafoot{flex:none; font-size:var(--fs-2); line-height:1.35; color:var(--ar-dim); padding:6px 10px 8px; border-top:1px solid var(--ar-line); font-family:var(--font)}
+@media (max-width:480px){ .top{flex-wrap:wrap} .top .brand{display:none} .top .kitname{order:9; flex:1 1 100%} .top button{white-space:nowrap} .ttabs button{padding:0 10px; font-size:var(--fs-3)} .tmode .mx{display:none} .tmode{padding:0 10px} .tctl{padding-inline:10px} .tcmd{padding-inline:10px} }
 /* Colourful boxes at the bottom of every screen, the same as the tracker's PAD-mode nav pad: a darker grey
    panel, each button filled with one of the screens' pastels (Song, Sect, Phrase, Inst, Mixer, FX, Project in
    turn) and sitting on a white, outlined offset block. Used by the command row, the KEYS keypad and the synth's pads. */
@@ -669,10 +673,10 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
    and a label, the nav pad (bottom) a darker block. The d-pad keeps its square, thumb-sized keys. */
 .tcmd{background:color-mix(in srgb, var(--panel) 70%, var(--side)); border-top:2px solid var(--ink); border-bottom:0; position:relative; padding-top:18px}
 .lforow{display:flex; gap:6px; align-items:center; min-width:0} .lforow select{flex:1 1 0; min-width:0; width:auto}
-.tcmd::before{content:'COMMANDS'; position:absolute; left:16px; top:3px; font-size:9px; font-weight:700; letter-spacing:.12em; color:var(--muted)}
+.tcmd::before{content:'COMMANDS'; position:absolute; left:16px; top:3px; font-size:var(--fs-1); font-weight:700; letter-spacing:.12em; color:var(--muted)}
 .tctl{background:color-mix(in srgb, var(--side) 62%, #000); border-top:4px solid var(--ink)}
 .tcmd:not([hidden]) + .tctl{border-top:4px solid var(--ink)}
-@media (max-width:480px){ .tcmd::before{left:10px} .tcmd button{font-size:11px; letter-spacing:0} }
+@media (max-width:480px){ .tcmd::before{left:10px} .tcmd button{font-size:var(--fs-2); letter-spacing:0} }
 .kpr{gap:10px 9px}
 .kpc{gap:10px; height:calc(var(--k) * 1.95 + 16px)}
 .pads{gap:10px 10px; padding-right:4px}
@@ -727,13 +731,13 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 #dkStrip{--dkc:#d8f0e2; flex:0 0 176px}
 /* the thin grey header: one cell per section, its button over it, a rule between sections */
 .dkh{flex:none; display:flex; align-items:center; gap:5px; height:22px; padding:0 6px; background:var(--side); border-bottom:1px solid var(--line); min-width:0}
-.dkh .dkt{min-height:0; height:17px; padding:0 7px; font-size:10.5px; font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--ink); color:var(--inv);
+.dkh .dkt{min-height:0; height:17px; padding:0 7px; font-size:var(--fs-2); font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--ink); color:var(--inv);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; flex:0 1 auto; min-width:0}
-.dkh .dki{font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto}
+.dkh .dki{font-size:var(--fs-2); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto}
 .dkh .dksp{flex:1 1 0}
-.dkh .dkoff{min-height:0; height:17px; padding:0 6px; font-size:10px; letter-spacing:.04em; border:1px dashed var(--line); background:transparent; color:var(--muted); flex:none}
-.dkh .dkx{min-height:0; height:17px; width:22px; padding:0; font-size:11px; border:1px solid var(--line); background:var(--panel); flex:none}
-.dkh .dksolo{min-height:0; height:17px; padding:0 6px; font-size:10px; font-weight:700; letter-spacing:.04em; border:0; background:var(--meter-hot); color:#1b2130; flex:none}
+.dkh .dkoff{min-height:0; height:17px; padding:0 6px; font-size:var(--fs-2); letter-spacing:.04em; border:1px dashed var(--line); background:transparent; color:var(--muted); flex:none}
+.dkh .dkx{min-height:0; height:17px; width:22px; padding:0; font-size:var(--fs-2); border:1px solid var(--line); background:var(--panel); flex:none}
+.dkh .dksolo{min-height:0; height:17px; padding:0 6px; font-size:var(--fs-2); font-weight:700; letter-spacing:.04em; border:0; background:var(--meter-hot); color:#1b2130; flex:none}
 .dkb{flex:1; min-height:0; display:flex; flex-direction:column; padding:6px 10px 8px}
 /* drag handles for the scope's and FX section's widths */
 .dkw{position:absolute; top:0; bottom:0; width:10px; cursor:ew-resize; touch-action:none; z-index:3}
@@ -743,37 +747,39 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 #dkScopeC{flex:1; min-height:0; width:100%; display:block; border:1px solid var(--line); background:var(--panel)}
 /* instrument and FX controls */
 .dkrows{flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; display:grid; align-content:start; gap:0}
-.dkrows .row{grid-template-columns:54px minmax(50px,1fr) 52px; min-height:21px; font-size:11.5px}
+.dkrows .row{grid-template-columns:54px minmax(50px,1fr) 52px; min-height:21px; font-size:var(--fs-3)}
 .dkrows .row input[type=range]{height:18px; margin:0}
 .dkrows .row output{overflow:hidden; text-overflow:ellipsis}
-.dkrows .note{font-size:11.5px; color:var(--muted); margin:2px 0}
+.dkrows .note{font-size:var(--fs-3); color:var(--muted); margin:2px 0}
 .dkslots{display:flex; gap:4px; margin-bottom:4px; flex-wrap:wrap}
-.dkslots button{min-height:22px; padding:0 7px; font-size:10.5px; border:1px solid var(--line); background:var(--panel)}
+.dkslots button{min-height:22px; padding:0 7px; font-size:var(--fs-2); border:1px solid var(--line); background:var(--panel)}
 .dkslots button.on{background:var(--ink); color:var(--inv)} .dkslots button.off{opacity:.5}
 /* channel strip: meter, fader, pan, mute and solo for the current track */
-.dkstrip{display:grid; grid-template-columns:16px minmax(0,1fr) 38px; grid-template-rows:minmax(0,1fr) auto auto; gap:4px 8px; padding:6px 10px 8px}
-.stm{grid-row:1 / 3; position:relative; border:1px solid var(--line); background:var(--panel2); overflow:hidden}
-.stm i{position:absolute; left:0; right:0; bottom:0; height:0; background:var(--tk, var(--meter-ok))}
-.stm.hot i{background:var(--meter-hot)} .stm.clip i{background:var(--meter-clip)}
-.dkstrip.gm{--tk:var(--tk-mono)} .dkstrip.gp{--tk:var(--tk-poly)}
-.stfad{grid-row:1; grid-column:2; justify-self:center; position:relative; width:30px; min-height:0; cursor:ns-resize; touch-action:none; outline-offset:2px}
-.stfad::before{content:''; position:absolute; left:50%; top:6px; bottom:6px; width:4px; margin-left:-2px; background:var(--track); border:1px solid var(--line)}
-.stfill{position:absolute; left:50%; bottom:6px; width:4px; margin-left:-2px; background:var(--ink)}
-.stcap{position:absolute; left:2px; right:2px; height:12px; margin-bottom:-6px; background:var(--panel); border:1.5px solid var(--ink); box-shadow:inset 0 -2px 0 var(--ink)}
-.st0{position:absolute; left:0; right:0; height:0; border-top:1px dashed var(--muted); opacity:.7}
-.stvv{grid-row:2; grid-column:2; text-align:center; font-size:10.5px; font-variant-numeric:tabular-nums; white-space:nowrap}
-.stms{grid-row:1 / 3; grid-column:3; display:flex; flex-direction:column; gap:5px}
-.stms button{min-height:0; height:28px; padding:0; font-weight:700; font-size:12px; border:1px solid var(--line); background:var(--panel)}
+.dkstrip{display:grid; grid-template-columns:18px 26px minmax(0,1fr) 38px; grid-template-rows:minmax(0,1fr) auto auto; gap:4px 6px; padding:6px 10px 8px}
+/* stereo meter, right beside the fader: two pink bars (the skin's colour in the terminal skins), red at clip */
+.stm{grid-row:1; grid-column:1; display:flex; gap:2px; position:relative}
+.stm i{flex:1; position:relative; border:1px solid var(--line); background:var(--panel2); overflow:hidden}
+.stm i::after{content:''; position:absolute; left:0; right:0; bottom:0; height:var(--lv, 0%); background:var(--stpink, #eba3bd)}
+.stm i.clip::after{background:var(--meter-clip)}
+/* the fader looks like the app's other sliders: a thin track filled in ink up to a round thumb */
+.stfad{grid-row:1; grid-column:2; justify-self:center; position:relative; width:26px; min-height:0; cursor:ns-resize; touch-action:none; outline-offset:2px; border-radius:3px}
+.stfad::before{content:''; position:absolute; left:50%; top:8px; bottom:8px; width:4px; margin-left:-2px; border-radius:2px; background:var(--track)}
+.stfill{position:absolute; left:50%; bottom:8px; width:4px; margin-left:-2px; border-radius:2px; background:var(--ink)}
+.stcap{position:absolute; left:50%; width:16px; height:16px; margin:0 0 -8px -8px; border-radius:50%; background:var(--ink)}
+.st0{position:absolute; left:2px; right:2px; height:0; border-top:1px solid var(--muted); opacity:.6}
+.stvv{grid-row:2; grid-column:1 / 3; text-align:center; font-size:var(--fs-2); white-space:nowrap}
+.stms{grid-row:1 / 3; grid-column:4; display:flex; flex-direction:column; gap:5px}
+.stms button{min-height:0; height:28px; padding:0; font-weight:700; font-size:var(--fs-3); border:1px solid var(--line); background:var(--panel)}
 .stms button.mu.on{background:var(--meter-clip); color:#fff; border-color:var(--meter-clip)}
 .stms button.so.on{background:var(--meter-hot); color:#1b2130; border-color:var(--meter-hot)}
-.stpan{grid-row:3; grid-column:1 / 4; display:grid; grid-template-columns:24px minmax(0,1fr) 34px; align-items:center; gap:6px; font-size:10.5px}
+.stpan{grid-row:3; grid-column:1 / 5; display:grid; grid-template-columns:24px minmax(0,1fr) 34px; align-items:center; gap:6px; font-size:var(--fs-2)}
 .stpan input{margin:0; height:18px; accent-color:var(--ink)} .stpan output{text-align:right; font-variant-numeric:tabular-nums}
 .stpan span{color:var(--muted); letter-spacing:.06em}
 /* Phones: one section at a time, swipe sideways between them, so the tracker keeps its room. */
 @media (max-width:700px){ .dkbody{overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:none}
   .dkbody > .dks{flex:0 0 100%!important; width:auto!important; scroll-snap-align:start} .dkw{display:none} }
 
-/* ---------- Terminal skins: Matrix (neon green on black), Black & white (Helvetica) and Mustard (on lavender) ----------
+/* ---------- Terminal skins: Matrix (neon green on black) and the Simple set: black, white (both Helvetica) and mustard (on lavender) ----------
    One set of rules drawn from a few colours per skin: --mx (text, outlines, fills), --mx2 (secondary text),
    --mxdim (faint lines), --mxbg/--mxpanel/--mxpanel2 (backgrounds), --mxon (text on a filled button),
    --mxsoft (lit keys, hot meters), --mxpoly (the poly tracks), --mxglowc (the glow; transparent for none).
@@ -785,6 +791,9 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 :root[data-skin="bwterm"]{--mx:#ffffff; --mx2:#bdbdbd; --mxdim:#5a5a5a; --mxbg:#000000; --mxpanel:#0a0a0a; --mxpanel2:#161616; --mxon:#000000;
   --mxsoft:#d6d6d6; --mxpoly:#9a9a9a; --mxglowc:transparent; --mxscan:transparent; --mxred:#ff4d4d;
   --font:"Helvetica Neue",Helvetica,Arial,"Nimbus Sans","Liberation Sans",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:dark}
+:root[data-skin="bwlight"]{--mx:#000000; --mx2:#4d4d4d; --mxdim:#b3b3b3; --mxbg:#ffffff; --mxpanel:#f6f6f6; --mxpanel2:#ebebeb; --mxon:#ffffff;
+  --mxsoft:#3a3a3a; --mxpoly:#6b6b6b; --mxglowc:transparent; --mxscan:transparent; --mxred:#d0302a;
+  --font:"Helvetica Neue",Helvetica,Arial,"Nimbus Sans","Liberation Sans",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:light}
 :root[data-skin="mustard"]{--mx:#a37800; --mx2:#7d6a3c; --mxdim:#b5a2dc; --mxbg:#e3d9f6; --mxpanel:#eae2f9; --mxpanel2:#d8cbf1; --mxon:#fffaf0;
   --mxsoft:#f2cf63; --mxpoly:#6f55bf; --mxglowc:transparent; --mxscan:transparent; --mxred:#c0392b;
   --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
@@ -834,7 +843,7 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
   --ar-empty:color-mix(in srgb, var(--mx) 8%, transparent); --ar-line:color-mix(in srgb, var(--mx) 25%, transparent); --ar-pl:var(--mxsoft); --ar-pl-ink:var(--mxon);
   --ar-cur:var(--mx); --ar-mu:var(--mxred); --tk-mono:var(--mx); --tk-poly:var(--mxpoly)}
 :root[data-skinbase="term"] :is(.tagp b,.tgbox b){color:var(--mxon); text-shadow:none}
-:root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg))}
+:root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg)); --stpink:var(--mx)}
 :root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
 :root[data-skinbase="term"] .dkh .dksolo{background:var(--mxsoft); color:var(--mxon)} :root[data-skinbase="term"] .stms button.so.on{background:var(--mxsoft); color:var(--mxon)}
 :root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
@@ -866,8 +875,8 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div class="gsetbody" id="gsetBody"><div class="gsec" id="gsecProj" hidden></div><div class="gsec" id="gsecPatch" hidden></div></div>
   </div>
   </div>
-  <button type="button" class="tsong" id="tLoopTop" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L in KEYS mode)" hidden>Lp. Sel.</button>
-  <button type="button" class="tsong" id="tKeyTrans" aria-label="Key transpose" title="Key transpose: tap to arm, then ▲ up / ▼ down transposes the selection a semitone" hidden>Key Trans.</button>
+  <button type="button" class="tsong" id="tLoopTop" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L in KEYS mode)" hidden>Loop</button>
+  <button type="button" class="tsong" id="tKeyTrans" aria-label="Key transpose" title="Key transpose: tap to arm, then ▲ up / ▼ down transposes the selection a semitone" hidden>Transpose ▲▼</button>
   <button type="button" class="tsong" id="tSong" aria-label="Play or stop the song" title="Play the song from the tracker's cursor row, or stop it" hidden><span class="tl">▶ Song</span><span class="tl alt" aria-hidden="true">■ Stop</span></button>
   <button type="button" class="tcpu" id="tCpu" aria-label="Audio load"><span>CPU --</span><i></i></button>
   <button type="button" id="bHelp" aria-label="Help and keys (?)" title="Help and keys (? or F1)">?</button>
@@ -1037,7 +1046,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
       <span class="tclk" id="tClk" title="Tempo and lines per beat · double-click a number to type it (TPO changes the tempo as the song plays; ticks are in Settings)"><b id="tClkB" class="tce" data-k="bpm">120</b><small>BPM</small><b id="tClkT" class="tce" data-k="lpb">4</b><small>LPB</small><span class="tdots" id="tDots"></span></span>
       <span class="trows" role="group" aria-label="Rows in this phrase"><button type="button" id="tRowsDn" aria-label="Fewer rows">−</button><button type="button" id="tRowsV" class="rv" aria-label="Rows in this phrase"><small id="tRowsP">PH 00</small><b id="tRowsN">16</b></button><button type="button" id="tRowsUp" aria-label="More rows">+</button></span>
       <span class="trows toct" id="tOct" role="group" aria-label="Octave for note entry" hidden><button type="button" id="tOctDn" aria-label="Octave down">−</button><button type="button" id="tOctV" class="rv" aria-label="Octave, tap to reset to 4" title="Octave for typed and keypad notes (− and = on a keyboard) · tap for 4"><small>OCT</small><b id="tOctN">4</b></button><button type="button" id="tOctUp" aria-label="Octave up">+</button></span>
-      <span class="trows" id="tSelBar" role="group" aria-label="Loop and transpose the selection"><button type="button" id="tLoop" class="rv" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L)"><small>Lp. Sel.</small><b id="tLoopN">OFF</b></button><button type="button" id="tXposeDn" class="rv" aria-label="Transpose selection down a semitone" title="Transpose the selection down a semitone (Alt+,)"><small>TRANS.</small><b>−</b></button><button type="button" id="tXposeUp" class="rv" aria-label="Transpose selection up a semitone" title="Transpose the selection up a semitone (Alt+.)"><small>TRANS.</small><b>+</b></button></span>
+      <span class="trows" id="tSelBar" role="group" aria-label="Loop and transpose the selection"><button type="button" id="tLoop" class="rv" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L)"><small>LOOP</small><b id="tLoopN">OFF</b></button><button type="button" id="tXposeDn" class="rv" aria-label="Transpose selection down a semitone" title="Transpose the selection down a semitone (Alt+,)"><small>SEMI</small><b>−</b></button><button type="button" id="tXposeUp" class="rv" aria-label="Transpose selection up a semitone" title="Transpose the selection up a semitone (Alt+.)"><small>SEMI</small><b>+</b></button></span>
     </div></div>
   <div class="tbody">
     <div class="tscr" id="tScr">
@@ -1075,10 +1084,10 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
         <dt>OPTION + EDIT</dt><dd>clear</dd>
         <dt>SHIFT + OPTION</dt><dd>select, then OPTION copies</dd>
         <dt>SHIFT + EDIT</dt><dd>paste</dd>
-        <dt>PLAY</dt><dd>play this screen · SHIFT+PLAY the song · with LP. SEL on, PLAY loops the selected rows</dd>
+        <dt>PLAY</dt><dd>play this screen · SHIFT+PLAY the song · with LOOP on, PLAY loops the selected rows</dd>
         <dt>LP. SEL</dt><dd>loop the selection (sticky); PLAY then loops it</dd>
         <dt>OPTION + ▲▼</dt><dd>previous / next pattern (phrase; toggle in Settings)</dd>
-        <dt>TRANS. + −</dt><dd>transpose the phrase selection a semitone at once</dd>
+        <dt>SEMI + −</dt><dd>transpose the phrase selection a semitone at once</dd>
         <dt>◀ ▶ (FX screen)</dt><dd>open the slot's controls · back to the slot list (a sideways swipe too)</dd>
         <dt>Sticky keys</dt><dd>tap SHIFT or OPTION alone and it stays lit for the next button</dd>
         <dt>Command row</dt><dd>buttons for change, clear, select, copy (no selection: what is under the cursor; a note brings its instrument), cut, paste, undo, redo · CLN (clone) and CLN↓ (clone to the row below) on the song</dd>
@@ -1113,9 +1122,9 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
         <dt>[ ]</dt><dd>previous / next sect, phrase or instrument</dd>
         <dt>Ctrl/⌘ C X V A</dt><dd>copy, cut, paste over the cursor or selection, select all · Ctrl/⌘+B block select · Ctrl/⌘+D clone a song block · Ctrl/⌘+Shift+D clone it to the row below</dd>
         <dt>Esc</dt><dd>drop the selection</dd>
-        <dt>Space</dt><dd>play this screen · Shift+Space the song · with Lp. Sel. on, Space loops the selected rows</dd>
-        <dt>Alt+L</dt><dd>loop the selection on/off (also Lp. Sel. in the top bar)</dd>
-        <dt>KEY TRANS.</dt><dd>top bar: arm it, then ▲/▼ transposes the selection (Esc cancels)</dd>
+        <dt>Space</dt><dd>play this screen · Shift+Space the song · with Loop on, Space loops the selected rows</dd>
+        <dt>Alt+L</dt><dd>loop the selection on/off (also LOOP in the tab bar)</dd>
+        <dt>TRANSPOSE ▲▼</dt><dd>top bar: arm it, then ▲/▼ transposes the selection (Esc cancels)</dd>
         <dt>Alt+, Alt+.</dt><dd>transpose the phrase selection down / up a semitone (works on any cell)</dd>
         <dt>◀ ▶ on FX</dt><dd>open the slot's controls · back to the slot list</dd>
       </dl>
@@ -1136,8 +1145,8 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
           <div class="dkb"><div class="dkslots" id="dkFxSlots"></div><div class="dkrows" id="dkFxRows"></div></div></section>
         <section class="dks" id="dkStrip" data-s="strip"><div class="dkh"><button type="button" class="dkt" data-k="strip" id="dkStripT">TRACK</button></div>
           <div class="dkb dkstrip" id="dkStripB">
-            <div class="stm" id="stM"><i></i></div>
-            <div class="stfad" id="stVol" role="slider" tabindex="0" aria-label="Track volume" aria-valuemin="0" aria-valuemax="255" title="Volume: drag · double-click resets"><i class="stfill"></i><b class="stcap"></b><u class="st0" title="0 dB"></u></div>
+            <div class="stm" id="stM" title="Track level, left and right"><i></i><i></i></div>
+            <div class="stfad" id="stVol" role="slider" tabindex="0" aria-label="Track volume" aria-valuemin="0" aria-valuemax="255" title="Volume: drag · double-click for 0 dB · +6 dB at the top"><i class="stfill"></i><u class="st0"></u><b class="stcap"></b></div>
             <output class="stvv" id="stVolV"></output>
             <div class="stms"><button type="button" class="mu" id="stMute" aria-pressed="false" title="Mute this track">M</button><button type="button" class="so" id="stSolo" aria-pressed="false" title="Solo this track (the others go silent)">S</button></div>
             <div class="stpan"><span>PAN</span><input type="range" id="stPan" min="0" max="255" step="1" aria-label="Track pan" title="Pan · double-click centres"><output id="stPanV"></output></div>
@@ -1151,8 +1160,8 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
       <button type="button" class="k" data-b="left" aria-label="Left">◀</button><button type="button" class="k" data-b="down" aria-label="Down">▼</button><button type="button" class="k" data-b="right" aria-label="Right">▶</button>
     </div>
     <div class="keys wide">
-      <button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">TRANS. +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">TRANS. −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
-      <span></span><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L in KEYS mode)">LP. SEL</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
+      <button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
+      <span></span><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
     </div>
     </div>
   </div>
@@ -1175,7 +1184,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p><b>Arrange</b> (wide screens): the blue overview at the right shows the whole song, lined up with the Song screen (scroll either one and the other follows). <b>A tap on a block goes to it</b> (a second tap opens its phrase). <b>Holding a block mutes or unmutes just that one</b> — the phrase stays in place, silent, so you can drop parts in and out while arranging. Tap a row number to play from there; in KEYS mode M mutes the block under the Song cursor. Whole tracks are muted in the Mixer, never here, so a slip can’t silence a track.</p>
 <p>The screens are laid out as a map: Song ▶ Sect ▶ Phrase ▶ Inst left to right, Project above, Mixer below, FX to the right of the Mixer. You move between them with the screen keys below, the tabs, or the map in the side panel.</p>
 <h3>Settings</h3>
-<p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound and the current track’s effects, and a channel strip for the current track (meter, fader, pan, M and S). Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
+<p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound and the current track’s effects, and a channel strip for the current track (stereo meter, fader with 0 dB at E0 and +6 dB at the top, pan, M and S). Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots. <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song. <b>A voice per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chopping breaks</h3>
@@ -1186,8 +1195,8 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p><b>PAD</b> is a d-pad plus SHIFT, PLAY, OPTION and EDIT, good with a thumb. <b>KEYS</b> is direct entry: type notes, hex and effects, with an on-screen keypad on touch screens. The keyboard works in both — in PAD mode Z and X stay OPTION and EDIT and Alt+arrows page; everything else types as in KEYS. Switch with ⚙ Settings → Input (or Project → INPUT).</p>
 </section>
     <section id="hAll"><h2>Keys that work everywhere</h2><table><tr><td><kbd>?</kbd> or <kbd>F1</kbd></td><td>Open or close this help</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>S</kbd></td><td>Save the project (writes back to the same file where the browser allows)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Ctrl/⌘</kbd> <kbd>S</kbd></td><td>Save As: a new file</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>O</kbd></td><td>Open a project file</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Z</kbd> / <kbd>Ctrl/⌘</kbd> <kbd>Y</kbd></td><td>Undo / redo in the tracker (also <kbd>Shift</kbd> <kbd>Ctrl/⌘</kbd> <kbd>Z</kbd>). A paste or cut undoes in one step</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Song, Sect, Phrase, Inst, Mixer, FX, Project · <kbd>Alt</kbd> <kbd>0</kbd> back to the synth</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>arrows</kbd></td><td>Change screen (▲ Project, ▼ Mixer, ◀▶ along every screen: Song, Sect, Phrase, Inst, Mixer, FX, Project)</td></tr><tr><td><kbd>F2</kbd> <kbd>F3</kbd> <kbd>F4</kbd></td><td>Phrase, Mixer, Inst</td></tr><tr><td><kbd>F5</kbd> <kbd>F6</kbd> <kbd>F7</kbd> <kbd>F8</kbd></td><td>Play song from the top · play this screen · song from the cursor row · stop</td></tr></table></section>
-    <section id="hKeys"><h2>Tracker · KEYS mode</h2><h3>Moving</h3><table><tr><td><kbd>arrows</kbd></td><td>Move the cursor (drops a line selection)</td></tr><tr><td><kbd>Shift</kbd> <kbd>◀</kbd> <kbd>Shift</kbd> <kbd>▶</kbd></td><td>Previous / next screen, in tab order (Song → … → Inst → Mixer → FX → Project)</td></tr><tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd> <kbd>Tab</kbd></td><td>Next / previous column (phrase) or track</td></tr><tr><td><kbd>Home</kbd> <kbd>End</kbd> <kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>Top, bottom, 16 rows up or down</td></tr><tr><td><kbd>Shift</kbd> <kbd>Alt</kbd> <kbd>arrows</kbd></td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in PAD mode</td></tr><tr><td><kbd>[</kbd> <kbd>]</kbd> or <kbd>Ctrl/⌘</kbd> <kbd>▲▼</kbd></td><td>Previous / next sect, phrase, instrument or FX track</td></tr><tr><td><kbd>◀</kbd> <kbd>▶</kbd> on the FX screen</td><td>Open the slot's controls · back to the slot list</td></tr><tr><td>Mouse wheel</td><td>Scroll the screen a row at a time</td></tr></table><h3>Typing</h3><table><tr><td><kbd>Z</kbd> <kbd>S</kbd> <kbd>X</kbd> … <kbd>/</kbd></td><td>Notes, lower octave (S D G H J are the sharps); on tracks 9–16, Tab to N2–N4 to add chord notes</td></tr><tr><td><kbd>Q</kbd> <kbd>2</kbd> <kbd>W</kbd> … <kbd>P</kbd></td><td>Notes, upper octave</td></tr><tr><td><kbd>1</kbd> or <kbd>Caps Lock</kbd></td><td>Note off</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd> or numpad <kbd>/</kbd> <kbd>*</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>0</kbd>–<kbd>9</kbd> <kbd>A</kbd>–<kbd>F</kbd></td><td>Hex values: two digits, or one for an instrument</td></tr><tr><td>Letters</td><td>Commands in FX columns (press again to cycle: R gives RET, REP, RND, RNL)</td></tr><tr><td><kbd>{</kbd> <kbd>}</kbd></td><td>Edit step down / up: how far the cursor moves after you type</td></tr><tr><td><kbd>Alt</kbd> <kbd>arrows</kbd></td><td>Change the value (◀▶ by 1, ▲▼ by more); on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀), up to four</td></tr><tr><td><kbd>Enter</kbd></td><td>Add, open, or run a › row · twice for a new sect or phrase · in a phrase, on a filled note, stamps the current note and instrument over it (a note keeps its own instrument until you've chosen one; with none chosen, new notes take the highest instrument number already in the phrase); on an instrument, volume or effect, picks it up as the current value (shown after NOW on the hint line)</td></tr></table><h3>Rows</h3><table><tr><td><kbd>Delete</kbd> <kbd>Backspace</kbd></td><td>Clear the cell under the cursor, or the whole highlighted selection</td></tr><tr><td><kbd>Shift</kbd> <kbd>Delete</kbd> <kbd>Shift</kbd> <kbd>Backspace</kbd></td><td>Clear the whole row, then step down</td></tr><tr><td><kbd>Insert</kbd></td><td>Add a blank row (rows below move down)</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Backspace</kbd></td><td>Remove the row (rows below move up)</td></tr></table><h3>Selecting, copy and paste</h3><table><tr><td><kbd>Shift</kbd> <kbd>▲</kbd> <kbd>Shift</kbd> <kbd>▼</kbd></td><td>Select whole lines in Song, Sect and Phrase. The first press takes the cursor’s line, the next ones grow it</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>A</kbd></td><td>Select every line</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>B</kbd></td><td>Start a block selection; arrows grow it</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>C</kbd> <kbd>Ctrl/⌘</kbd> <kbd>X</kbd></td><td>Copy / cut the selection</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>V</kbd></td><td>Paste at the cursor row, or over a selection from its top. Lines paste into any phrase</td></tr><tr><td><kbd>Esc</kbd></td><td>Drop the selection</td></tr><tr><td>Row numbers</td><td>Tap or click one to select that line; another to grow the selection to it</td></tr></table><h3>Playing</h3><table><tr><td><kbd>Space</kbd></td><td>Play or stop this screen (phrase, sect or song)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the song from the cursor row</td></tr><tr><td><kbd>Alt</kbd> <kbd>L</kbd></td><td>Loop the selection (LP. SEL): PLAY then loops those rows</td></tr><tr><td><kbd>Alt</kbd> <kbd>,</kbd> <kbd>Alt</kbd> <kbd>.</kbd></td><td>Transpose the phrase selection down / up a semitone</td></tr></table></section>
-    <section id="hPad"><h2>Tracker · PAD mode</h2><table><tr><td>Arrows</td><td>Move</td></tr><tr><td>SHIFT + ◀▶</td><td>Change screen (through every screen in tab order)</td></tr><tr><td>SHIFT + ▲▼</td><td>In Song, Sect and Phrase: select the cursor's line, then grow the selection a line at a time (OPTION copies, OPTION+EDIT cuts). On the other screens: Project / Mixer</td></tr><tr><td>EDIT</td><td>Add, or run a › row · in a phrase, on a filled note stamps the current note and instrument over it; on an instrument, volume or effect, picks it up · tap twice for a new sect or phrase, or a note off</td></tr><tr><td>EDIT + arrows</td><td>Change the value (◀▶ by 1, ▲▼ by more)</td></tr><tr><td>OPTION + EDIT</td><td>Clear (with a selection: cut)</td></tr><tr><td>OPTION + arrows</td><td>Other sect, phrase, instrument or FX track · on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀) · in Song, page up/down</td></tr><tr><td>OPTION + ▲▼</td><td>In Phrase: previous / next pattern, one at a time (Settings → Input → PATTERN NAV; off jumps 16)</td></tr><tr><td>SHIFT + OPTION + arrows</td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in KEYS mode</td></tr><tr><td>SHIFT + OPTION</td><td>Start or cancel a selection; arrows grow it, OPTION copies</td></tr><tr><td>SHIFT + EDIT</td><td>Paste</td></tr><tr><td>PLAY · SHIFT + PLAY</td><td>Play this screen · play the song · with LP. SEL on, PLAY loops the selected rows</td><tr><td>LP. SEL · TRANS. +/−</td><td>Loop the selection (sticky) · transpose the phrase selection ±1 semitone at once</td></tr><tr><td>◀ ▶ on the FX screen</td><td>Open a slot's controls · back to the slot list (a sideways swipe does it too)</td></tr><tr><td>Row numbers</td><td>Tap to select whole lines, then COPY and PASTE</td></tr></table><p><b>One finger is enough.</b> With <b>Sticky keys</b> on, tap SHIFT or OPTION alone and it stays lit for the next button. The <b>command row</b> (Project → COMMANDS) gives every two-key command its own button: change, prev/next, clear, select, copy, cut, paste, play song, and on the SONG screen CLN↓ (clones the block, or the selected blocks, into new numbers on the row below) and CLN (clone): the block under the cursor is copied, phrases and all, to the next free number.</p><p>On a computer keyboard in PAD mode the keyboard is not disabled: arrows move, <kbd>Enter</kbd> opens, <kbd>Space</kbd> plays, typing letters and hex edits the cell, and <kbd>Shift</kbd> selects lines. <kbd>Z</kbd> stays OPTION (not a note), <kbd>X</kbd> stays EDIT, and <kbd>Alt</kbd>+arrows page (OPTION+arrow) rather than change the value.</p><h3>Touch</h3><p>Tap a cell to move there; tap it again to open or add. Drag up or down on the cursor’s cell to change its value; drag elsewhere to scroll.</p></section>
+    <section id="hKeys"><h2>Tracker · KEYS mode</h2><h3>Moving</h3><table><tr><td><kbd>arrows</kbd></td><td>Move the cursor (drops a line selection)</td></tr><tr><td><kbd>Shift</kbd> <kbd>◀</kbd> <kbd>Shift</kbd> <kbd>▶</kbd></td><td>Previous / next screen, in tab order (Song → … → Inst → Mixer → FX → Project)</td></tr><tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd> <kbd>Tab</kbd></td><td>Next / previous column (phrase) or track</td></tr><tr><td><kbd>Home</kbd> <kbd>End</kbd> <kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>Top, bottom, 16 rows up or down</td></tr><tr><td><kbd>Shift</kbd> <kbd>Alt</kbd> <kbd>arrows</kbd></td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in PAD mode</td></tr><tr><td><kbd>[</kbd> <kbd>]</kbd> or <kbd>Ctrl/⌘</kbd> <kbd>▲▼</kbd></td><td>Previous / next sect, phrase, instrument or FX track</td></tr><tr><td><kbd>◀</kbd> <kbd>▶</kbd> on the FX screen</td><td>Open the slot's controls · back to the slot list</td></tr><tr><td>Mouse wheel</td><td>Scroll the screen a row at a time</td></tr></table><h3>Typing</h3><table><tr><td><kbd>Z</kbd> <kbd>S</kbd> <kbd>X</kbd> … <kbd>/</kbd></td><td>Notes, lower octave (S D G H J are the sharps); on tracks 9–16, Tab to N2–N4 to add chord notes</td></tr><tr><td><kbd>Q</kbd> <kbd>2</kbd> <kbd>W</kbd> … <kbd>P</kbd></td><td>Notes, upper octave</td></tr><tr><td><kbd>1</kbd> or <kbd>Caps Lock</kbd></td><td>Note off</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd> or numpad <kbd>/</kbd> <kbd>*</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>0</kbd>–<kbd>9</kbd> <kbd>A</kbd>–<kbd>F</kbd></td><td>Hex values: two digits, or one for an instrument</td></tr><tr><td>Letters</td><td>Commands in FX columns (press again to cycle: R gives RET, REP, RND, RNL)</td></tr><tr><td><kbd>{</kbd> <kbd>}</kbd></td><td>Edit step down / up: how far the cursor moves after you type</td></tr><tr><td><kbd>Alt</kbd> <kbd>arrows</kbd></td><td>Change the value (◀▶ by 1, ▲▼ by more); on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀), up to four</td></tr><tr><td><kbd>Enter</kbd></td><td>Add, open, or run a › row · twice for a new sect or phrase · in a phrase, on a filled note, stamps the current note and instrument over it (a note keeps its own instrument until you've chosen one; with none chosen, new notes take the highest instrument number already in the phrase); on an instrument, volume or effect, picks it up as the current value (shown after NOW on the hint line)</td></tr></table><h3>Rows</h3><table><tr><td><kbd>Delete</kbd> <kbd>Backspace</kbd></td><td>Clear the cell under the cursor, or the whole highlighted selection</td></tr><tr><td><kbd>Shift</kbd> <kbd>Delete</kbd> <kbd>Shift</kbd> <kbd>Backspace</kbd></td><td>Clear the whole row, then step down</td></tr><tr><td><kbd>Insert</kbd></td><td>Add a blank row (rows below move down)</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Backspace</kbd></td><td>Remove the row (rows below move up)</td></tr></table><h3>Selecting, copy and paste</h3><table><tr><td><kbd>Shift</kbd> <kbd>▲</kbd> <kbd>Shift</kbd> <kbd>▼</kbd></td><td>Select whole lines in Song, Sect and Phrase. The first press takes the cursor’s line, the next ones grow it</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>A</kbd></td><td>Select every line</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>B</kbd></td><td>Start a block selection; arrows grow it</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>C</kbd> <kbd>Ctrl/⌘</kbd> <kbd>X</kbd></td><td>Copy / cut the selection</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>V</kbd></td><td>Paste at the cursor row, or over a selection from its top. Lines paste into any phrase</td></tr><tr><td><kbd>Esc</kbd></td><td>Drop the selection</td></tr><tr><td>Row numbers</td><td>Tap or click one to select that line; another to grow the selection to it</td></tr></table><h3>Playing</h3><table><tr><td><kbd>Space</kbd></td><td>Play or stop this screen (phrase, sect or song)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the song from the cursor row</td></tr><tr><td><kbd>Alt</kbd> <kbd>L</kbd></td><td>Loop the selection (LOOP): PLAY then loops those rows</td></tr><tr><td><kbd>Alt</kbd> <kbd>,</kbd> <kbd>Alt</kbd> <kbd>.</kbd></td><td>Transpose the phrase selection down / up a semitone</td></tr></table></section>
+    <section id="hPad"><h2>Tracker · PAD mode</h2><table><tr><td>Arrows</td><td>Move</td></tr><tr><td>SHIFT + ◀▶</td><td>Change screen (through every screen in tab order)</td></tr><tr><td>SHIFT + ▲▼</td><td>In Song, Sect and Phrase: select the cursor's line, then grow the selection a line at a time (OPTION copies, OPTION+EDIT cuts). On the other screens: Project / Mixer</td></tr><tr><td>EDIT</td><td>Add, or run a › row · in a phrase, on a filled note stamps the current note and instrument over it; on an instrument, volume or effect, picks it up · tap twice for a new sect or phrase, or a note off</td></tr><tr><td>EDIT + arrows</td><td>Change the value (◀▶ by 1, ▲▼ by more)</td></tr><tr><td>OPTION + EDIT</td><td>Clear (with a selection: cut)</td></tr><tr><td>OPTION + arrows</td><td>Other sect, phrase, instrument or FX track · on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀) · in Song, page up/down</td></tr><tr><td>OPTION + ▲▼</td><td>In Phrase: previous / next pattern, one at a time (Settings → Input → PATTERN NAV; off jumps 16)</td></tr><tr><td>SHIFT + OPTION + arrows</td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in KEYS mode</td></tr><tr><td>SHIFT + OPTION</td><td>Start or cancel a selection; arrows grow it, OPTION copies</td></tr><tr><td>SHIFT + EDIT</td><td>Paste</td></tr><tr><td>PLAY · SHIFT + PLAY</td><td>Play this screen · play the song · with LOOP on, PLAY loops the selected rows</td><tr><td>LOOP · SEMI +/−</td><td>Loop the selection (sticky) · transpose the phrase selection ±1 semitone at once</td></tr><tr><td>◀ ▶ on the FX screen</td><td>Open a slot's controls · back to the slot list (a sideways swipe does it too)</td></tr><tr><td>Row numbers</td><td>Tap to select whole lines, then COPY and PASTE</td></tr></table><p><b>One finger is enough.</b> With <b>Sticky keys</b> on, tap SHIFT or OPTION alone and it stays lit for the next button. The <b>command row</b> (Project → COMMANDS) gives every two-key command its own button: change, prev/next, clear, select, copy, cut, paste, play song, and on the SONG screen CLN↓ (clones the block, or the selected blocks, into new numbers on the row below) and CLN (clone): the block under the cursor is copied, phrases and all, to the next free number.</p><p>On a computer keyboard in PAD mode the keyboard is not disabled: arrows move, <kbd>Enter</kbd> opens, <kbd>Space</kbd> plays, typing letters and hex edits the cell, and <kbd>Shift</kbd> selects lines. <kbd>Z</kbd> stays OPTION (not a note), <kbd>X</kbd> stays EDIT, and <kbd>Alt</kbd>+arrows page (OPTION+arrow) rather than change the value.</p><h3>Touch</h3><p>Tap a cell to move there; tap it again to open or add. Drag up or down on the cursor’s cell to change its value; drag elsewhere to scroll.</p></section>
     <section id="hFx"><h2>FX column commands</h2>
 <p>Each phrase row has three effect columns: a command and a hex value. The info line at the bottom of the screen explains the one under the cursor.</p>
 <div class="fxg"><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row Y</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div></div>
@@ -3417,8 +3426,9 @@ const SKINS = [
   {id:'mincolorblack', name:'Minimal colors black', base:'minimal', dots:['#0b0b0d', '#26262b', '#1f3550', '#4a2232']},
   {id:'neon', name:'Neon', dots:['#05050a', '#00f0ff', '#ff2bd6', '#a8ff3d']},
   {id:'matrix', name:'Matrix', base:'term', dots:['#000000', '#00ff41', '#0a7a25', '#b6ffc9']},
-  {id:'bwterm', name:'Matrix black & white', base:'term', dots:['#000000', '#ffffff', '#5a5a5a', '#9a9a9a']},
-  {id:'mustard', name:'Matrix mustard', base:'term', dots:['#e3d9f6', '#a37800', '#f2cf63', '#6f55bf']},
+  {id:'bwterm', name:'Simple black', base:'term', dots:['#000000', '#ffffff', '#5a5a5a', '#9a9a9a']},
+  {id:'bwlight', name:'Simple white', base:'term', dots:['#ffffff', '#000000', '#a6a6a6', '#6b6b6b']},
+  {id:'mustard', name:'Simple mustard', base:'term', dots:['#e3d9f6', '#a37800', '#f2cf63', '#6f55bf']},
 ];
 const SKK = 'thunderplus-skin-v1';
 let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k => k.id === v)) return v; } catch(e){} return 'minimal'; })();
@@ -3723,7 +3733,7 @@ window.thunderChains = {
   reload(d){ if (CH.dropping) return; S.chainPatch = d; CH.doc = S.chainPatch; saveS(); chainsReload(); },
   close: () => closeChains(),
   /* Transport from the …chains screen: Space starts/stops the song from the tracker's cursor row. */
-  play(){ if (tp.on) tStop(); else tStart('song', {row:cs.song.y}); },
+  play(){ if (tp.on) tStop(); else tStart('song', {row:songRow()}); },
   playing: () => tp.on
 };
 const chApi = () => { try { return CH.frame && CH.frame.contentWindow && (CH.frame.contentWindow.chainsEmbed || CH.frame.contentWindow.wavesEmbed); } catch(e){ return null; } };
@@ -3791,6 +3801,10 @@ const h2 = v => v < 0 ? '--' : hx(v);
 const d2 = n => String(n).padStart(2, '0');
 const noteS = n => n < 0 ? '---' : n === OFF ? 'OFF' : NN[n % 12] + Math.floor(n / 12);
 const curve = v => Math.pow(Math.max(0, Math.min(255, v)) / 255, 2);
+// Track faders: E0 is unity (0 dB), FF is +6 dB of headroom (as in Ableton or Logic); below unity the same
+// squared law as everything else. Instrument, note and master volumes keep curve() (FF = 0 dB).
+const TRK_UNITY = 224;
+const trackGain = v => { v = Math.max(0, Math.min(255, v)); return v <= TRK_UNITY ? Math.pow(v / TRK_UNITY, 2) : Math.pow(10, (v - TRK_UNITY) / (255 - TRK_UNITY) * 6 / 20); };
 const dB = g => g <= 0.00001 ? '−∞ dB' : (20 * Math.log10(g)).toFixed(1) + ' dB';
 const sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -4674,7 +4688,7 @@ function makePlayer(ac, out, getBuf, live){
     const at = ac.currentTime;
     buses.forEach((b, t) => {
       if (t >= NT){ b.g.gain.value = 1; return; }
-      const m = S.mix[t], gv = (filter ? filter(t) : audible(t)) ? curve(m.vol) : 0, pv = clamp((m.pan - 128) / 127, -1, 1);
+      const m = S.mix[t], gv = (filter ? filter(t) : audible(t)) ? trackGain(m.vol) : 0, pv = clamp((m.pan - 128) / 127, -1, 1);
       const scv = m.sc ? 1 : 0;
       if (live){ b.g.gain.setTargetAtTime(gv, at, 0.012); b.p.pan.setTargetAtTime(pv, at, 0.012); b.scs.gain.setTargetAtTime(scv, at, 0.012); } else { b.g.gain.value = gv; b.p.pan.value = pv; b.scs.gain.value = scv; }
     });
@@ -4897,6 +4911,9 @@ const tp = {on:false, mode:'', seq:null, timer:0, q:[], pos:null, bpm:120, tks:T
 // Trance gates on track FX restart their pattern with the song: tStart bumps this and resends the effect
 // lists; the gate waits the 80 ms the sequencer starts ahead by, so step 1 lands on the first row.
 let fxRestartN = 0;
+// Where PLAY starts the song: from the cursor's row when the cell under the cursor holds a block (so it plays
+// from that phrase), otherwise from the top. A tap on a row number, and F7, still start exactly there.
+const songRow = () => { const r = S.song[cs.song.y]; return r && r[cs.song.x] >= 0 ? cs.song.y : 0; };
 function tStart(mode, o){
   tStop(true);
   const r = rtInit();
@@ -5798,10 +5815,11 @@ function keyTransArrow(dir){   // dir 'up' | 'down' | other; true when the arrow
   if (dir === 'up' || dir === 'down'){ transposeSel(dir === 'up' ? 1 : -1); return true; }
   return false;
 }
-// The top-bar Lp. Sel. and KEY TRANS. buttons exist only in the tracker's KEYS mode (the pad has its own).
+// The top bar's TRANSPOSE ▲▼ exists only in the tracker's KEYS mode (the pad has its own). Its old Loop twin is
+// gone: LOOP sits in the tab bar beside SEMI − +, so the top bar fits one row on the unfolded Fold.
 function topSelVis(){
   const on = view === 'tracker' && inMode === 'keys';
-  for (const id of ['tLoopTop', 'tKeyTrans']){ const b = $(id); if (b) b.hidden = !on; }
+  { const b = $('tKeyTrans'); if (b) b.hidden = !on; } { const b = $('tLoopTop'); if (b) b.hidden = true; }
   if (!on && xposeArm){ xposeArm = false; keyVis(); }
 }
 function loopFor(view){
@@ -6059,7 +6077,7 @@ function playCtx(){
   } else if (loopSel && GRIDV.has(tv)) toast('Loop is on but nothing to loop: select 2 or more rows first.');
   if (tv === 'sect') return tStart('sect', {sect:cSect, track:cTrack});
   if (tv === 'phrase') return tStart('phrase', {phrase:cPhrase, track:cTrack});
-  tStart('song', {row:cs.song.y});
+  tStart('song', {row:songRow()});
 }
 
 /* ---------- input: d-pad, four keys, touch and keyboard ---------- */
@@ -6100,7 +6118,7 @@ function press(b, fromKey){
     else if (b === 'edit' && mod('shift')){ used.shift = used.edit = true; takeLatch(); paste(); }
     keyVis(); return;
   }
-  if (b === 'play'){ if (mod('shift')){ used.shift = true; takeLatch(); if (tp.on) tStop(); else tStart('song', {row:cs.song.y}); } else playCtx(); return; }
+  if (b === 'play'){ if (mod('shift')){ used.shift = true; takeLatch(); if (tp.on) tStop(); else tStart('song', {row:songRow()}); } else playCtx(); return; }
   // LOOP SEL is a sticky toggle, not a held key: a tap flips it. TRANS buttons transpose at once.
   if (b === 'loop'){ toggleLoop(); clearTimeout(rep); return; }
   if (b === 'xposeUp'){ transposeSel(1); clearTimeout(rep); return; }
@@ -6157,7 +6175,7 @@ function cmdAction(a){
   if (c === 'undo' || c === 'redo') return undoStep(c === 'undo' ? -1 : 1);
   if (c === 'clone') return cloneHere();
   if (c === 'cldn') return cloneDown();
-  if (c === 'song'){ if (tp.on) tStop(); else tStart('song', {row:cs.song.y}); }
+  if (c === 'song'){ if (tp.on) tStop(); else tStart('song', {row:songRow()}); }
 }
 for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type = 'button'; b.dataset.c = a; b.setAttribute('aria-label', lbl); b.title = lbl; $('tCmd').append(b); }
 // In PAD mode CLEAR moves between PASTE and UNDO, so a thumb can reach it on a phone; KEYS mode keeps
@@ -6230,7 +6248,7 @@ function info(){
       return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · Sidechain Out ` + (on ? 'ON — this track feeds the sidechain bus (patch Sidechain In or a Sidechain Comp in …chains)' : 'off · EDIT toggles, to feed another track’s sidechain'); }
     if (c.y === 4){ const A = S.tfx[c.x], n = fxCount(A);
       return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ${n}/${FXSLOTS} active` + (A.some(Boolean) ? ' · ' + fxList(A) : '') + ' · OPTION+▲▶ turn effects on, OPTION+▼◀ off (settings kept) · EDIT opens FX'; }
-    const m = S.mix[c.x]; return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ${dB(curve(m.vol))} · ${panS(m.pan)}` + (m.mute ? ' · muted' : '') + (m.solo ? ' · solo' : '');
+    const m = S.mix[c.x]; return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ${dB(trackGain(m.vol))} · ${panS(m.pan)}` + (m.mute ? ' · muted' : '') + (m.solo ? ' · solo' : '');
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.info) return '';
   return typeof r.info === 'function' ? r.info(r.get ? r.get() : 0) : r.info;
@@ -6534,18 +6552,18 @@ function deckLayout(){
 const stVol = $('stVol'), stPan = $('stPan');
 // The fader: drag up and down (0–255, 224 is the default), arrows step it, double-click resets.
 const stSet = v => { const t = dkTrack(); S.mix[t].vol = clamp(Math.round(v), 0, 255); mixChanged(); deckStrip(); };
-const stPos = v => { const h = stVol.clientHeight - 12; return 6 + v / 255 * h; };
+const stPos = v => { const h = stVol.clientHeight - 16; return 8 + v / 255 * h; };
 stVol.addEventListener('pointerdown', e => { e.preventDefault(); try { stVol.setPointerCapture(e.pointerId); } catch(_){} stVol.focus();
-  const r = stVol.getBoundingClientRect(), h = r.height - 12, y0 = e.clientY, v0 = S.mix[dkTrack()].vol;
+  const r = stVol.getBoundingClientRect(), h = r.height - 16, y0 = e.clientY, v0 = S.mix[dkTrack()].vol;
   // A grab on the cap moves it relative (no jump); a press elsewhere on the track jumps there first.
-  const capY = r.bottom - stPos(v0); let base = Math.abs(e.clientY - capY) < 12 ? v0 : clamp((r.bottom - 6 - e.clientY) / h * 255, 0, 255), from = y0;
+  const capY = r.bottom - stPos(v0); let base = Math.abs(e.clientY - capY) < 12 ? v0 : clamp((r.bottom - 8 - e.clientY) / h * 255, 0, 255), from = y0;
   if (base !== v0) stSet(base);
   const mv = ev => { stSet(base + (from - ev.clientY) / h * 255 * (ev.shiftKey ? 0.25 : 1)); };
   const up = () => { stVol.removeEventListener('pointermove', mv); stVol.removeEventListener('pointerup', up); stVol.removeEventListener('pointercancel', up); };
   stVol.addEventListener('pointermove', mv); stVol.addEventListener('pointerup', up); stVol.addEventListener('pointercancel', up); });
 stVol.addEventListener('keydown', e => { const d = {ArrowUp:1, ArrowRight:1, ArrowDown:-1, ArrowLeft:-1, PageUp:16, PageDown:-16}[e.key]; if (!d) return; e.preventDefault(); e.stopPropagation(); stSet(S.mix[dkTrack()].vol + d * (e.shiftKey ? 16 : 4)); });
 stPan.addEventListener('input', () => { const t = dkTrack(); S.mix[t].pan = +stPan.value; mixChanged(); deckStrip(); });
-stVol.addEventListener('dblclick', () => { S.mix[dkTrack()].vol = 224; mixChanged(); deckStrip(); });
+stVol.addEventListener('dblclick', () => { S.mix[dkTrack()].vol = TRK_UNITY; mixChanged(); deckStrip(); });
 stPan.addEventListener('dblclick', () => { S.mix[dkTrack()].pan = 128; mixChanged(); deckStrip(); });
 $('stMute').addEventListener('click', () => { const m = S.mix[dkTrack()]; m.mute = !m.mute; mixChanged(); draw(); });
 $('stSolo').addEventListener('click', () => { const m = S.mix[dkTrack()]; m.solo = !m.solo; mixChanged(); draw(); });
@@ -6555,19 +6573,34 @@ function deckStrip(){
   const t = dkTrack(), m = S.mix[t], poly = t >= polyFrom();
   $('dkStripT').textContent = `TRACK ${d2(t + 1)} ${poly ? 'POLY' : 'MONO'}`;
   $('dkStripB').classList.toggle('gm', !poly); $('dkStripB').classList.toggle('gp', poly);
-  const fy = stPos(m.vol); stVol.querySelector('.stcap').style.bottom = fy + 'px'; stVol.querySelector('.stfill').style.height = Math.max(0, fy - 6) + 'px';
-  stVol.querySelector('.st0').style.bottom = stPos(224) + 'px'; stVol.setAttribute('aria-valuenow', m.vol); stVol.setAttribute('aria-valuetext', dB(curve(m.vol)));
+  const fy = stPos(m.vol); stVol.querySelector('.stcap').style.bottom = fy + 'px'; stVol.querySelector('.stfill').style.height = Math.max(0, fy - 8) + 'px';
+  stVol.querySelector('.st0').style.bottom = stPos(TRK_UNITY) + 'px'; stVol.setAttribute('aria-valuenow', m.vol); stVol.setAttribute('aria-valuetext', dB(trackGain(m.vol)));
   if (document.activeElement !== stPan) stPan.value = m.pan;
-  $('stVolV').textContent = dB(curve(m.vol));
+  $('stVolV').textContent = dB(trackGain(m.vol)).replace(/^(\d)/, '+$1');
   $('stPanV').textContent = m.pan === 128 ? 'C' : m.pan < 128 ? 'L' + Math.round((128 - m.pan) / 128 * 100) : 'R' + Math.round((m.pan - 128) / 127 * 100);
   const mu = $('stMute'), so = $('stSolo'); mu.classList.toggle('on', !!m.mute); so.classList.toggle('on', !!m.solo);
   mu.setAttribute('aria-pressed', String(!!m.mute)); so.setAttribute('aria-pressed', String(!!m.solo));
   $('stM').title = anySolo && !m.solo ? 'Silent: another track is soloed' : '';
 }
-function deckMetersPaint(){
-  if (!deckShown() || !deck.strip) return;
-  const bs = rt ? rt.pl.buses : null, t = dkTrack(), lv = bs && bs[t] ? bs[t].lv : 0, e = $('stM');
-  e.firstChild.style.height = (lvl(lv) * 100).toFixed(1) + '%'; e.classList.toggle('clip', lv >= 0.999); e.classList.toggle('hot', lv >= 0.5 && lv < 0.999);
+// The strip's meter is stereo: the shown track's bus (after its pan) is split into left and right, each with its
+// own analyser, re-attached when the shown track changes. Peaks fall back smoothly, like the other meters.
+let dkSt = null; const dkStBuf = new Float32Array(512); let dkStT = 0;
+function deckMetersPaint(){}
+function deckStripMeter(now){
+  if (!deckShown() || !deck.strip || now - dkStT < 33) return;
+  const dt = now - dkStT; dkStT = now;
+  const t = dkTrack(), bars = $('stM').children;
+  if (!rt || !ctx){ for (const b of bars) b.style.setProperty('--lv', '0%'); return; }
+  if (!dkSt || dkSt.t !== t){
+    try { if (dkSt){ rt.pl.buses[dkSt.t].p.disconnect(dkSt.sp); }
+      const sp = ctx.createChannelSplitter(2), a = [ctx.createAnalyser(), ctx.createAnalyser()]; a.forEach((x, i) => { x.fftSize = 512; sp.connect(x, i); });
+      rt.pl.buses[t].p.connect(sp); dkSt = {t, sp, a, lv:[0, 0]}; } catch(e){ dkSt = null; return; }
+  }
+  const dk = Math.pow(0.86, Math.max(0.5, dt) * 0.12), quiet = !(tp.on || now - audioWake < 1500);
+  dkSt.a.forEach((x, i) => { let p = 0;
+    if (!quiet){ x.getFloatTimeDomainData(dkStBuf); for (let k = 0; k < dkStBuf.length; k++){ const v = dkStBuf[k] < 0 ? -dkStBuf[k] : dkStBuf[k]; if (v > p) p = v; } }
+    const nl = Math.max(p, dkSt.lv[i] * dk); dkSt.lv[i] = nl < 0.0005 ? 0 : nl;
+    bars[i].style.setProperty('--lv', (lvl(dkSt.lv[i]) * 100).toFixed(1) + '%'); bars[i].classList.toggle('clip', dkSt.lv[i] >= 0.999); });
 }
 // Scope: the master's spectrum, drawn as Quite Noise draws its Shape graph — 20 Hz to 20 kHz across, faint
 // lines at 100, 1k and 10k, a dashed reference at −48 dB, and the spectrum filled in the section's colour.
@@ -6903,7 +6936,7 @@ function frame(){
         if (p >= rt.mpk[s] || now - rt.mpt[s] > 1500){ if (p !== rt.mpk[s]) any = true; rt.mpk[s] = p; rt.mpt[s] = now; } }); }
     if (any){ paintMeters(); deckMetersPaint(); }
   }
-  deckScope(mt);
+  deckScope(mt); deckStripMeter(mt);
 }
 
 /* ---------- building the screen ---------- */
@@ -7204,7 +7237,7 @@ function keysDown(e, pad){
     return true;
   }
   if (e.altKey) return false;
-  if (k === ' '){ if (!e.repeat){ if (e.shiftKey){ if (tp.on) tStop(); else tStart('song', {row:cs.song.y}); } else playCtx(); } return true; }
+  if (k === ' '){ if (!e.repeat){ if (e.shiftKey){ if (tp.on) tStop(); else tStart('song', {row:songRow()}); } else playCtx(); } return true; }
   if (k === 'Enter'){ if (!e.repeat) editTap(); return true; }
   // Delete and Backspace clear the cell under the cursor, or the whole highlighted selection. Shift+Delete/Backspace
   // clear the whole row and step down. Ctrl/⌘+Backspace removes the row (rows below move up); Insert adds a blank row.
@@ -7299,7 +7332,7 @@ $('tKp').addEventListener('pointerdown', e => {
   b.classList.add('dn'); setTimeout(() => b.classList.remove('dn'), 110); kpAction(b.dataset.a);
 });
 $('tKp').addEventListener('click', e => { const b = e.target.closest('button[data-a]'); if (b && !ptrJust() && !b.disabled) kpAction(b.dataset.a); });
-$('tSong').addEventListener('click', () => { if (tp.on) tStop(); else tStart('song', {row:cs.song.y}); songBtn(); });
+$('tSong').addEventListener('click', () => { if (tp.on) tStop(); else tStart('song', {row:songRow()}); songBtn(); });
 $('tLoopTop').addEventListener('click', () => toggleLoop());
 $('tKeyTrans').addEventListener('click', () => toggleKeyTrans());
 const HINTK = {
