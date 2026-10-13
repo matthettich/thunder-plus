@@ -1,7 +1,19 @@
-// Copies the web app (one folder up: page, manifest, icons, fonts) into ./app, so the desktop build always uses the same index.html as the site.
+// Copies the web app (one folder up) into ./app, so the desktop build always runs the same files as the site.
+// It then checks that every file the page loads at run time made it in, and stops the build if one didn't.
 const fs = require('fs'), path = require('path');
 const src = path.join(__dirname, '..'), dst = path.join(__dirname, 'app');
+const PARTS = ['index.html', 'manifest.webmanifest', 'master-worklet.js', 'icons', 'fonts', 'waves', 'chains', 'THIRD_PARTY_NOTICES.md'];
 fs.rmSync(dst, {recursive:true, force:true});
 fs.mkdirSync(dst, {recursive:true});
-for (const f of ['index.html', 'manifest.webmanifest', 'icons', 'fonts', 'waves', 'chains']) fs.cpSync(path.join(src, f), path.join(dst, f), {recursive:true});
-console.log('Copied the app into electron/app');
+for (const f of PARTS){
+  const from = path.join(src, f);
+  if (!fs.existsSync(from)){ console.error('Missing from the app: ' + f); process.exit(1); }
+  fs.cpSync(from, path.join(dst, f), {recursive:true});
+}
+// Files index.html fetches by name (worklets, fonts, icons): each must exist in ./app.
+const html = fs.readFileSync(path.join(dst, 'index.html'), 'utf8');
+const refs = new Set();
+for (const m of html.matchAll(/["'`(]((?:waves|chains|fonts|icons)\/[\w.\-\/]+|master-worklet\.js)(?:\?[^"'`)]*)?["'`)]/g)) refs.add(m[1]);
+const missing = [...refs].filter(r => !fs.existsSync(path.join(dst, r)));
+if (missing.length){ console.error('index.html loads files that are not in the app:\n  ' + missing.join('\n  ')); process.exit(1); }
+console.log('Copied the app into electron/app (' + refs.size + ' referenced files checked)');

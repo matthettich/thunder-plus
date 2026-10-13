@@ -352,3 +352,13 @@ caches.
   `renderBass()` (one held note).
 - **Tracker:** `WOB` command (last in `FXC`): 01–0D pick `BASS_DIV`, 00 = the voice's rate. Mixer's master row
   has a MASTERING cell (`cs.mixer.mx === 1`).
+
+## Desktop (Electron) build (13 Oct, afternoon)
+
+- `electron/`: `main.js` (app:// protocol, permissions, single instance), `copy-app.js` (copies the app and
+  fails if a file index.html loads is missing; add new runtime files to `PARTS`), `package.json` (Electron 44,
+  electron-builder 26, unsigned, `--publish never`; product name "Thunder Plus" without the dots so the .app
+  isn't a hidden file on macOS).
+- `.github/workflows/desktop.yml` builds Windows/Mac/Linux on demand or on a `v*` tag.
+- In the page, `DESKTOP_APP` (protocol `app:`) turns off the web update check and shows a note under App.
+- Not built or run in the cloud session (no npm registry access there): first real run is the owner's.

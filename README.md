@@ -199,14 +199,37 @@ Synthesis and effects come from Mutable Instruments (Plaits, Rings, Clouds, Elem
 
 ## Desktop app (Electron)
 
-The `electron` folder wraps the same `index.html` as a desktop app for Windows, macOS or Linux. You need [Node.js](https://nodejs.org) (the LTS version).
+The `electron` folder wraps the same app as a desktop program for Windows, macOS or Linux. It runs from its own
+`app://thunder/` address (not plain files), so the …waves and …chains editors, the mastering engine and the bass
+engine load their audio worklets as they do on the web. Songs and kits are saved inside the app (separately from
+the browser's copy); use File → Save to move work between them.
+
+**Option A: build on GitHub (no setup).** Push the repo, then on GitHub open **Actions → Desktop app → Run
+workflow**. When it finishes (about 10 minutes), the run's page has three downloads: the Windows installer and
+portable .exe, the Mac .dmg (Apple silicon and Intel in one), and a Linux AppImage. Pushing a tag such as
+`v1.1.0` (`git tag v1.1.0 && git push origin v1.1.0`) does the same and attaches them to a GitHub Release.
+
+**Option B: build on your computer.** Install [Node.js](https://nodejs.org) (the LTS version), then:
 
 ```
 cd electron
 npm install
-npm start            # run it
-npm run dist:win     # Windows installer + portable .exe  → electron/dist
-npm run dist:mac     # macOS .dmg (build this on a Mac)   → electron/dist
+npm start            # run it without building an installer
+npm run dist:win     # Windows installer + portable .exe  → electron/dist   (on Windows)
+npm run dist:mac     # macOS .dmg                         → electron/dist   (on a Mac)
+npm run dist:linux   # Linux AppImage                     → electron/dist
 ```
 
-`npm start` and the `dist` scripts copy the current `index.html`, manifest and icons into `electron/app` first, so the desktop app always matches the site. MIDI and the save/open dialogs are allowed; audio keeps playing when the window is in the background. The builds aren't code-signed: Windows SmartScreen asks once (More info → Run anyway), and on a Mac right-click the app → Open the first time.
+`npm start` and the `dist` scripts first copy the page, the worklets, fonts, icons and the two editors into
+`electron/app` (`copy-app.js`), and stop if a file the page loads is missing, so the desktop app always matches
+the site. To update the desktop app later, pull the latest code and build again (bump `version` in
+`electron/package.json` so the installer replaces the old one cleanly).
+
+The builds aren't code-signed:
+
+- **Windows:** SmartScreen asks the first time: More info → Run anyway.
+- **Mac:** right-click the app → Open the first time. If macOS says the app "is damaged" (it does that for
+  unsigned apps downloaded from the internet), run `xattr -cr "/Applications/Thunder Plus.app"` in Terminal once.
+
+MIDI, the save/open dialogs and the output-device list are allowed; audio keeps playing with the window in the
+background; opening the app twice brings the open window forward.
