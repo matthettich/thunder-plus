@@ -228,6 +228,19 @@ body:not(.mob) .wvMobNote{display:none}
 /* layer editor: a Seeds module card */
 .cardwrap{padding-block:12px; padding-inline:16px; flex:none}
 .layercard{border:3.5px solid var(--fam); background:var(--panel)}
+/* bass engine card (Synth → Engine: Bass) */
+.basscard{--fam:var(--smp)}
+.vengine{display:flex; align-items:center; gap:10px; padding:2px 0 4px; flex-wrap:wrap}
+.vengine .vel{font-size:var(--fs-3); color:var(--muted); min-width:64px}
+.vengine .lbl{font-size:var(--fs-3); color:var(--muted)}
+.bassviz{position:relative; height:150px; border-bottom:2px solid var(--fam); background:var(--panel)}
+.bassviz canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
+.bassvr{position:absolute; right:10px; top:6px; font:var(--fs-2)/1.2 var(--mono, monospace); color:var(--muted); pointer-events:none}
+.basscard .selrow{display:flex; align-items:center; gap:8px; margin:4px 0}
+.basscard .selrow>span{font-size:var(--fs-3); color:var(--muted); min-width:74px}
+.basscard .selrow select{flex:1; min-width:0}
+.basscard .note{font-size:var(--fs-3); color:var(--muted); margin:6px 0 0}
+@media (max-width:600px){ .bassviz{height:120px} }
 .layercard>header{display:flex; align-items:center; gap:8px; padding:8px 8px 8px 12px; border-bottom:2px solid var(--fam); flex-wrap:wrap}
 /* The layer card's action buttons are one group, so they never split across lines, and the family tag
    shrinks (ellipsis) instead of pushing them — the long "Mutable Instruments" tag used to force a wrap for
@@ -1136,14 +1149,32 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
   <section class="band voice">
     <div class="wmeta" id="wMeta"></div>
     <div class="vrows" id="vRows"></div>
+    <div class="vengine" id="vEngine" hidden><span class="vel">Engine</span><div class="seg" id="vEngSeg"></div><span class="lbl" id="vEngLbl"></span></div>
   </section>
 
-  <section class="band">
+  <div class="cardwrap" id="bassWrap" hidden>
+  <section class="layercard basscard" id="bassCard" aria-label="Bass engine">
+    <header>
+      <span class="ttl">Bass</span>
+      <select id="bassPre" aria-label="Bass preset"></select>
+      <span class="famtag">additive · mono · live in the tracker</span>
+      <div class="sp"></div>
+      <div class="acts">
+        <button class="sm" id="bassRand" type="button">Random</button>
+        <button class="sm" id="bassInit" type="button">Init</button>
+      </div>
+    </header>
+    <div class="bassviz"><canvas id="bassCv" aria-label="The bass's partials, moving with its wobble"></canvas><span class="bassvr" id="bassVr"></span></div>
+    <div class="secs" id="bassSecs"></div>
+  </section>
+  </div>
+
+  <section class="band" id="layersBand">
     <div class="bar" style="margin-bottom:8px"><span class="ttl">Layers</span><span class="lbl">tap to edit, tick to turn on</span></div>
     <div class="strip" id="strip"></div>
   </section>
 
-  <div class="cardwrap">
+  <div class="cardwrap" id="layerWrap">
   <section class="layercard" id="layerCard">
     <header>
       <span class="ttl" id="lTitle">Layer 1</span>
@@ -1163,7 +1194,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
   </section>
   </div>
 
-  <div class="cardwrap" style="padding-top:0">
+  <div class="cardwrap" style="padding-top:0" id="fxWrap">
   <section class="fxcard" id="fxCard">
     <header>
       <span class="ttl" id="fxTitle">Effects</span>
@@ -1179,7 +1210,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 
   <!-- The voice-wide filter/amp card: same Seeds card shape as the layer card above, but with the
        complementary color, like the layer card's own fam colour shifted to its opposite side. -->
-  <div class="cardwrap" style="padding-top:0">
+  <div class="cardwrap" style="padding-top:0" id="voiceWrap">
   <section class="voicecard" id="voiceCard">
     <header>
       <span class="ttl">Voice pitch, filter &amp; amp</span>
@@ -1423,6 +1454,8 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p><b>Sects are hidden by default</b> (⚙ Settings → Hide sect page, or Project → SECT): EDIT×2 on an empty song cell makes a block that already holds a phrase, SHIFT+▶ opens that phrase, and EDIT×2 on a filled block makes a unique copy. Set SECT to SHOWN for the sect screen; nothing is lost either way.</p>
 <p><b>Arrange</b> (wide screens): the blue overview at the right shows the whole song, lined up with the Song screen (scroll either one and the other follows). <b>A tap on a block goes to it</b> (a second tap opens its phrase). <b>Holding a block mutes or unmutes just that one</b> — the phrase stays in place, silent, so you can drop parts in and out while arranging. Tap a row number to play from there; in KEYS mode M mutes the block under the Song cursor. Whole tracks are muted in the Mixer, never here, so a slip can’t silence a track.</p>
 <p>The screens are laid out as a map: Song ▶ Sect ▶ Phrase ▶ Inst left to right, Project above, Mixer below, FX to the right of the Mixer. You move between them with the screen keys below, the tabs, or the map in the side panel.</p>
+<h3>Bass engine</h3>
+<p>Any synth slot (08 and up) can be a <b>bass</b> instead of layers: on the Synth page pick <b>Engine: Bass</b>. It is an additive mono bass in the spirit of Reaktor's Lazerbass, for dubstep and drum &amp; bass: up to 64 partials (Shape goes saw › square › triangle; Bright, Odd / even, Stretch), a sub oscillator, a resonant low-pass with its own envelope, vowel formants, a comb, Reese detune and stereo Width. The <b>Wobble</b> moves the cutoff, vowel, comb and level at a rate locked to the song's tempo (4 bars down to 1/32, triplets and dotted). In the tracker it plays live, so the wobble keeps time on every note however high you play, a held note wobbles for as long as it's held, and Glide and Legato slide between notes (PSL slides without restarting). The <b>WOB</b> command changes the rate from a row on (WOB 06 = 1/4, WOB 0B = 1/16, WOB 00 back to the voice's own). Presets get you started; the bottom panel's instrument section shows its level, cutoff, resonance and wobble. The voice's Level, Tune and Drive apply; pad effects don't (use the track's FX).</p>
 <h3>Mastering</h3>
 <p><b>Settings → Master → Open mastering…</b> (or › MASTERING on the FX screen's master) puts a chain on the master bus: <b>EQ → Suppress → Compress → Limit</b>. Each has its own switch; the readouts show short-term loudness in and out (LUFS) and the highest peak. <b>EQ</b>: drag a point (left/right is frequency, up/down is gain), shift-drag or scroll for width, double-click empty space to add a bell, double-click a point to switch it off; the band row sets exact values. <b>Suppress</b> turns down resonances that stick out of the spectrum (Depth, Sharpness, Selectivity, Speed; drag the lines to set its range; Delta plays only what it removes). <b>Compress</b> is a glue compressor (its sidechain high-pass keeps the bass from pumping it). <b>Limit</b> catches every peak at the Ceiling, between samples too. Renders of the song include the chain and keep its ceiling; stems don't.</p>
 <h3>Settings</h3>
@@ -1441,7 +1474,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <section id="hPad"><h2>Tracker · PAD mode</h2><table><tr><td>Arrows</td><td>Move</td></tr><tr><td>SHIFT + ◀▶</td><td>Change screen (through every screen in tab order)</td></tr><tr><td>SHIFT + ▲▼</td><td>In Song, Sect and Phrase: select the cursor's line, then grow the selection a line at a time (OPTION copies, OPTION+EDIT cuts). On the other screens: Project / Mixer</td></tr><tr><td>EDIT</td><td>Add, or run a › row · in a phrase, on a filled note stamps the current note and instrument over it; on an instrument, volume or effect, picks it up · tap twice for a new sect or phrase, or a note off</td></tr><tr><td>EDIT + arrows</td><td>Change the value (◀▶ by 1, ▲▼ by more)</td></tr><tr><td>OPTION + EDIT</td><td>Clear (with a selection: cut)</td></tr><tr><td>OPTION + arrows</td><td>Other sect, phrase, instrument or FX track · on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀) · in Song, page up/down</td></tr><tr><td>OPTION + ▲▼</td><td>In Phrase: previous / next pattern, one at a time (Settings → Input → PATTERN NAV; off jumps 16)</td></tr><tr><td>SHIFT + OPTION + arrows</td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in KEYS mode</td></tr><tr><td>SHIFT + OPTION</td><td>Start or cancel a selection; arrows grow it, OPTION copies</td></tr><tr><td>SHIFT + EDIT</td><td>Paste</td></tr><tr><td>PLAY · SHIFT + PLAY</td><td>Play this screen · play the song · with LOOP on, PLAY loops the selected rows</td><tr><td>LOOP · SEMI +/−</td><td>Loop the selection (sticky) · transpose the phrase selection ±1 semitone at once</td></tr><tr><td>◀ ▶ on the FX screen</td><td>Open a slot's controls · back to the slot list (a sideways swipe does it too)</td></tr><tr><td>Row numbers</td><td>Tap to select whole lines, then COPY and PASTE</td></tr></table><p><b>One finger is enough.</b> With <b>Sticky keys</b> on, tap SHIFT or OPTION alone and it stays lit for the next button. The <b>command row</b> (Project → COMMANDS) gives every two-key command its own button: change, prev/next, clear, select, copy, cut, paste, play song, and on the SONG screen CLN↓ (clones the block, or the selected blocks, into new numbers on the row below) and CLN (clone): the block under the cursor is copied, phrases and all, to the next free number.</p><p>On a computer keyboard in PAD mode the keyboard is not disabled: arrows move, <kbd>Enter</kbd> opens, <kbd>Space</kbd> plays, typing letters and hex edits the cell, and <kbd>Shift</kbd> selects lines. <kbd>Z</kbd> stays OPTION (not a note), <kbd>X</kbd> stays EDIT, and <kbd>Alt</kbd>+arrows page (OPTION+arrow) rather than change the value.</p><h3>Touch</h3><p>Tap a cell to move there; tap it again to open or add. Drag up or down on the cursor’s cell to change its value; drag elsewhere to scroll.</p></section>
     <section id="hFx"><h2>FX column commands</h2>
 <p>Each phrase row has three effect columns: a command and a hex value. The info line at the bottom of the screen explains the one under the cursor.</p>
-<div class="fxg"><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row Y</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div></div>
+<div class="fxg"><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row Y</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div></div>
 <h3>Track effects</h3>
 <p>Each track and the master have 4 effect slots (FX screen, or the Mixer’s FX row): EQ, compressor, reverb, tape delay, saturation, tape, chorus, bitcrush, Rings and Clouds. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to four, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
@@ -2200,6 +2233,7 @@ function voiceAmp(V, sr, out, N){
   for (let i = 0; i < N; i++) out[i] *= 1 + (env(i / sr) - 1) * amt;
 }
 function renderVoice(V, sr, stages, hold){
+  if (isBassV(V)) return renderBass(V, sr, hold);
   if (hold) V = Object.assign({}, V, {gate:hold * 1000, len:hold});
   // The voice-wide filter is open by default and the voice-wide amp is off, so a default voice renders
   // exactly as its layers alone would; turning either on only adds shaping across all the layers.
@@ -2343,6 +2377,188 @@ function factorySynths(){
     S('Sub', [{type:'sine', tune:-24, atk:2, dec:500, sus:0.85, rel:150, level:0.9},
       {type:'tri', tune:-12, atk:2, dec:300, sus:0.4, rel:150, level:0.2}]),
   ];
+}
+/* ---------- bass engine (additive, mono) ----------
+   A Lazerbass-style mono bass: up to 64 sine partials summed per sample, shaped in the frequency domain
+   (so nothing aliases, whatever the filter does): a saw → square → triangle source with tilt, odd/even and
+   stretch, a resonant 24 dB low-pass, two vowel formants, a comb, and a second detuned set for reese.
+   A tempo-synced wobble LFO moves the cutoff, the vowel, the comb and the level. The class is
+   self-contained (no outside names): the tracker's AudioWorklet is built from BassCore.toString(), and the
+   pad render below uses the same class, so live playing and rendered pads sound alike. */
+class BassCore {
+  constructor(sr){
+    this.sr = sr; this.N = 64; this.BLK = 32;
+    const T = new Float32Array(4097); for (let i = 0; i <= 4096; i++) T[i] = Math.sin(2 * Math.PI * i / 4096); this.tab = T;
+    const N = this.N;
+    this.base = new Float32Array(N + 1); this.panL = new Float32Array(N + 1); this.panR = new Float32Array(N + 1);
+    this.aA = new Float32Array(N + 1); this.aT = new Float32Array(N + 1);
+    this.phA = new Float64Array(N + 1); this.phB = new Float64Array(N + 1);
+    for (let k = 1; k <= N; k++) this.phB[k] = (k * 0.618034) % 1;
+    this.div = [16, 8, 4, 2, 4 / 3, 1, 2 / 3, 0.75, 0.5, 1 / 3, 0.25, 1 / 6, 0.125];
+    this.vow = [[730, 1090], [530, 1840], [270, 2290], [570, 840], [300, 870]];   // a e i o u
+    this.bpm = 120; this.wob = 0; this.rate = 1;
+    this.stage = 0; this.env = 0; this.fe = 0; this.lph = 0; this.lu = 0; this.lsm = 0; this.sh = 0.5; this.rnd = 22222;
+    this.f = 0; this.lf = 0; this.subPh = 0; this.cnt = 0; this.norm = 0.3; this.held = false;
+    this.p = null; this.set({});
+  }
+  static defaults(){
+    return {oct:0, shape:0, parts:48, tilt:0, oddeven:0, stretch:0, cut:400, res:0.35, fenv:2, fdec:250, key:0.5,
+      vowel:0, form:0, combF:0.5, comb:0, width:0.3, det:0, sub:0.5, subOct:1,
+      wRate:5, wShape:0, wRetrig:1, wPhase:0, wSmooth:0.15, wCut:0, wVowel:0, wComb:0, wAmp:0,
+      atk:2, dec:300, sus:1, rel:80, glide:0, legato:0, drive:0, level:0, tune:0};
+  }
+  set(o){
+    const p = Object.assign(BassCore.defaults(), this.p || {}, o || {});
+    p.parts = Math.max(1, Math.min(this.N, Math.round(p.parts)));
+    this.p = p;
+    // the source spectrum: saw (1/k) → square (odd 1/k) → triangle (odd 1/k², alternating sign)
+    const s = Math.max(0, Math.min(1, p.shape)), N = this.N; let e2 = 0;
+    for (let k = 1; k <= N; k++){
+      let a = 0;
+      if (k <= p.parts){
+        const odd = k & 1;
+        if (s <= 0.5) a = odd ? 1 / k : (1 - 2 * s) / k;
+        else { const t = (s - 0.5) * 2; a = odd ? ((1 - t) / k + t / (k * k)) * (t > 0.5 && ((k - 1) / 2) & 1 ? -1 : 1) : 0; }
+        a *= Math.pow(k, p.tilt);
+        if (p.oddeven > 0 && odd && k > 1) a *= 1 - p.oddeven; else if (p.oddeven < 0 && !odd) a *= 1 + p.oddeven;
+      }
+      this.base[k] = a; e2 += a * a;
+      // the low partials stay in the middle, the upper ones alternate left and right
+      const pan = (k & 1 ? -1 : 1) * p.width * Math.min(1, (k - 1) / 4);
+      this.panL[k] = Math.sqrt((1 - pan) / 2) * 1.4142; this.panR[k] = Math.sqrt((1 + pan) / 2) * 1.4142;
+    }
+    this.norm = 0.34 / Math.max(0.25, Math.sqrt(e2)) / (p.det > 0.5 ? 1.35 : 1);
+  }
+  on(leg){
+    const p = this.p, legato = (leg || p.legato) && this.held && this.stage && this.stage < 4;
+    this.held = true;
+    if (!legato){
+      if (this.env < 0.002){ this.phA.fill(0); this.subPh = 0; }
+      this.stage = 1; this.fe = 1;
+      if (p.wRetrig){ this.lph = p.wPhase; this.lsm = this.shape(p.wPhase); this.sh = this.rand(); }
+    }
+    this.go = true;   // the next block sets the pitch: glide from the last note, or jump to it
+  }
+  off(){ this.held = false; if (this.stage && this.stage < 4) this.stage = 4; }
+  rand(){ this.rnd = (this.rnd * 16807) % 2147483647; return this.rnd / 2147483647; }
+  shape(ph){
+    switch (this.p.wShape | 0){
+      case 1: return ph < 0.5 ? ph * 2 : 2 - ph * 2;
+      case 2: return 1 - ph;
+      case 3: return ph;
+      case 4: return ph < 0.5 ? 1 : 0;
+      case 5: return this.sh;
+      default: return 0.5 - 0.5 * Math.cos(2 * Math.PI * ph);
+    }
+  }
+  // Output for samples [a, b) of L and R (added to nothing: written).
+  render(L, R, a, b, rate){
+    for (let i = a; i < b; i += this.BLK) this.block(L, R, i, Math.min(b, i + this.BLK), rate);
+  }
+  block(L, R, a, b, rate){
+    const n = b - a, p = this.p, sr = this.sr, N = this.N;
+    if (!this.stage){ for (let i = a; i < b; i++){ L[i] = 0; R[i] = 0; } return; }
+    const dt = n / sr;
+    // pitch (with glide)
+    const target = 65.406 * Math.pow(2, p.oct + p.tune / 12) * rate, lt = Math.log2(Math.max(1, target));
+    if (this.go){ this.go = false; if (!(p.glide > 0.5) || this.lf <= 0) this.lf = lt; }
+    if (p.glide > 0.5) this.lf += (lt - this.lf) * (1 - Math.exp(-dt * 1000 / p.glide)); else this.lf = lt;
+    const f = Math.pow(2, this.lf); this.f = f;
+    // amp envelope over this block (linear inside it)
+    const e0 = this.env; let e1 = e0;
+    if (this.stage === 1){ e1 = e0 + dt * 1000 / Math.max(0.5, p.atk); if (e1 >= 1){ e1 = 1; this.stage = 2; } }
+    else if (this.stage === 2 || this.stage === 3){ e1 = p.sus + (e0 - p.sus) * Math.exp(-dt * 1000 * 4.6 / Math.max(1, p.dec)); this.stage = Math.abs(e1 - p.sus) < 1e-4 ? 3 : 2; }
+    else if (this.stage === 4){ e1 = e0 * Math.exp(-dt * 1000 * 4.6 / Math.max(1, p.rel)); if (e1 < 1e-5){ e1 = 0; this.stage = 0; } }
+    this.env = e1;
+    this.fe *= Math.exp(-dt * 1000 * 4.6 / Math.max(1, p.fdec));
+    // wobble
+    const beats = this.wob > 0 ? this.wob : this.div[Math.max(0, Math.min(this.div.length - 1, p.wRate | 0))];
+    this.lph += dt * this.bpm / 60 / beats;
+    if (this.lph >= 1){ this.lph -= Math.floor(this.lph); this.sh = this.rand(); }
+    const raw = this.shape(this.lph), sm = p.wSmooth > 0.001 ? 1 - Math.exp(-dt / (p.wSmooth * 0.04)) : 1;
+    this.lsm += (raw - this.lsm) * sm; const u = this.lsm;
+    // the spectrum for the end of this block
+    const nyq = sr * 0.5, fc = Math.min(nyq * 0.98, Math.max(20, p.cut * Math.pow(2, p.fenv * this.fe + p.wCut * u) * Math.pow(f / 65.406, p.key)));
+    const Q = 0.6 + p.res * p.res * 11, vp = Math.max(0, Math.min(1, p.vowel + p.wVowel * u)) * 4, vi = Math.min(3, Math.floor(vp)), vt = vp - vi;
+    const F1 = Math.log2(this.vow[vi][0] * (1 - vt) + this.vow[vi + 1][0] * vt), F2 = Math.log2(this.vow[vi][1] * (1 - vt) + this.vow[vi + 1][1] * vt);
+    const form = p.form, comb = p.comb, cHz = 60 * Math.pow(2, Math.max(0, Math.min(1, p.combF + p.wComb * u)) * 6);
+    const st = p.stretch * 0.0015, gain = this.norm * (1 - p.wAmp * (1 - u));
+    const aA = this.aA, aT = this.aT, base = this.base;
+    for (let k = 1; k <= N; k++){
+      const b0 = base[k]; if (b0 === 0){ aT[k] = 0; continue; }
+      const fk = f * k * (1 + st * k * k);
+      if (fk > nyq * 0.92){ aT[k] = 0; continue; }
+      const x = fk / fc, x2 = x * x, d1 = 1 - x2;
+      let g = 1 / Math.sqrt(d1 * d1 + x2 / (Q * Q)) / Math.sqrt(d1 * d1 + 2 * x2);
+      if (form > 0){ const lk = Math.log2(fk), g1 = (lk - F1) / 0.32, g2 = (lk - F2) / 0.32; g *= 1 - form + form * (0.1 + 2.6 * (Math.exp(-g1 * g1) + 0.6 * Math.exp(-g2 * g2))); }
+      if (comb > 0) g *= 1 - comb * (0.5 + 0.5 * Math.cos(2 * Math.PI * fk / cHz));
+      if (fk > nyq * 0.8) g *= (nyq * 0.92 - fk) / (nyq * 0.12);
+      aT[k] = b0 * g * gain;
+    }
+    // synthesis: each partial's amplitude slides from last block's to this block's
+    for (let i = a; i < b; i++){ L[i] = 0; R[i] = 0; }
+    const T = this.tab, inv = 1 / n, det = p.det > 0.5 ? Math.pow(2, p.det / 1200) : 0, phA = this.phA, phB = this.phB;
+    for (let k = 1; k <= N; k++){
+      const s0 = aA[k], s1 = aT[k]; aA[k] = s1;
+      if (s0 === 0 && s1 === 0) continue;
+      const fk = f * k * (1 + st * k * k), inc = fk / sr, dA = (s1 - s0) * inv, pl = this.panL[k], pr = this.panR[k];
+      let ph = phA[k], amp = s0;
+      if (det){
+        const incB = inc * det; let phb = phB[k];
+        for (let i = a; i < b; i++){
+          amp += dA;
+          let x = ph * 4096, j = x | 0; const s = T[j] + (x - j) * (T[j + 1] - T[j]);
+          x = phb * 4096; j = x | 0; const sb = T[j] + (x - j) * (T[j + 1] - T[j]);
+          L[i] += amp * (s * pl + sb * pr); R[i] += amp * (s * pr + sb * pl);
+          ph += inc; if (ph >= 1) ph -= 1; phb += incB; if (phb >= 1) phb -= 1;
+        }
+        phB[k] = phb;
+      } else {
+        for (let i = a; i < b; i++){
+          amp += dA;
+          const x = ph * 4096, j = x | 0, s = (T[j] + (x - j) * (T[j + 1] - T[j])) * amp;
+          L[i] += s * pl; R[i] += s * pr;
+          ph += inc; if (ph >= 1) ph -= 1;
+        }
+      }
+      phA[k] = ph;
+    }
+    // sub, envelope, drive, level
+    const subA = p.sub * 0.45, subInc = f / Math.pow(2, p.subOct | 0) / sr, de = (e1 - e0) * inv;
+    const dr = p.drive > 0.001 ? 1 + p.drive * p.drive * 12 : 0, dn = dr ? 0.5 / Math.tanh(dr * 0.5) : 1, lv = Math.pow(10, p.level / 20);
+    let env = e0, sp = this.subPh;
+    for (let i = a; i < b; i++){
+      env += de;
+      let l = L[i], r = R[i];
+      if (subA > 0){ const x = sp * 4096, j = x | 0, s = (T[j] + (x - j) * (T[j + 1] - T[j])) * subA; l += s; r += s; sp += subInc; if (sp >= 1) sp -= 1; }
+      l *= env; r *= env;
+      if (dr){ l = Math.tanh(l * dr) * dn; r = Math.tanh(r * dr) * dn; }
+      L[i] = l * lv; R[i] = r * lv;
+    }
+    this.subPh = sp;
+  }
+}
+
+// Wobble divisions (the WOB command picks one: 01 is the first) and their names.
+const BASS_DIV = [16, 8, 4, 2, 4 / 3, 1, 2 / 3, 0.75, 0.5, 1 / 3, 0.25, 1 / 6, 0.125];
+const BASS_DIVN = ['4 bars', '2 bars', '1 bar', '1/2', '1/2T', '1/4', '1/4T', '1/8D', '1/8', '1/8T', '1/16', '1/16T', '1/32'];
+const BASS_SHAPES = ['Sine', 'Triangle', 'Saw down', 'Saw up', 'Square', 'Steps'];
+const isBassV = v => !!(v && v.engine === 'bass');
+function normBass(b){ const d = BassCore.defaults(), o = {}; for (const k in d) o[k] = b && typeof b[k] === 'number' && isFinite(b[k]) ? b[k] : d[k]; delete o.tune; delete o.drive; delete o.level; return o; }
+// What the engine plays for voice V: its bass settings plus the voice's own Tune, Drive and Level.
+function bassParams(V){ return Object.assign(normBass(V.bass), {tune:V.tune || 0, drive:V.drive || 0, level:V.level || 0}); }
+// The pad's sound (what the pads, the waveform and anything without the live engine play): one note at the
+// pad's pitch, held for `hold` seconds, then released. Mono, like every pad.
+function renderBass(V, sr, hold){
+  const c = new BassCore(sr); c.set(bassParams(V)); c.bpm = songBpm();
+  const p = c.p, h = Math.max(0.05, hold || V.len || 2), N = Math.min(Math.ceil((h + p.rel / 1000 * 1.6 + 0.02) * sr), sr * 32), hN = Math.min(N, Math.round(h * sr));
+  const L = new Float32Array(N), R = new Float32Array(N);
+  c.on(false); c.render(L, R, 0, hN, 1); c.off(); c.render(L, R, hN, N, 1);
+  const out = new Float32Array(N); for (let i = 0; i < N; i++) out[i] = (L[i] + R[i]) * 0.5;
+  let end = N; while (end > 1 && Math.abs(out[end - 1]) < 1e-4) end--;
+  const res = out.slice(0, Math.max(end, 1)), fl = Math.min(res.length, Math.round(sr * 0.002));
+  for (let i = 0; i < fl; i++) res[res.length - 1 - i] *= i / fl;
+  return res;
 }
 /* ===ENGINE END=== */
 
@@ -2751,6 +2967,7 @@ function typing(e){ const t = e.target; return !!(t && t.matches && t.matches('i
 let rTimer = 0, sTimer = 0;
 function changed(i = cur, light){
   dirty[i] = true; kitSnap(i);
+  try { bassPush(i); } catch(e){}
   clearTimeout(rTimer); rTimer = setTimeout(showCur, 45);
   clearTimeout(sTimer); sTimer = setTimeout(save, 900);
   if (!light){ renderStrip(); renderPads(); }
@@ -2937,6 +3154,168 @@ const ampRows = section('Amp', [], s => {
 for (const k of ['atk','hold','dec','sus','rel']){ const r = makeRow(P[k], k, Lc, {idp:'l', on:() => changed()}); secs.lastChild.append(r.r); ampRows[k] = r; }
 const gateNote = el('div', 'readout', 'Sustain holds for the pad’s Gate time.'); secs.lastChild.append(gateNote);
 section('Filter', ['lpCut','lpRes','lpEnv','hpCut','hpRes','hpEnv','fAtk','fDec']);
+
+
+/* ---------- bass engine editor ----------
+   Synth slots can run the bass engine (BassCore) instead of layers: Synth → Engine: Bass. The tracker plays
+   it live (wobble locked to the tempo, held notes keep wobbling); the pads, the waveform and anything else
+   play its rendered note. Settings live in V().bass; the voice's Level, Tune and Drive apply too. */
+const BU = {
+  oct:{l:'Octave', min:-3, max:2, c:'int', d:0, f:v => v ? (v > 0 ? '+' : '−') + Math.abs(v) + ' oct' : 'C2 at C-4'},
+  shape:{l:'Shape', min:0, max:1, c:'lin', d:0, f:v => v <= 0.02 ? 'Saw' : v < 0.49 ? 'Saw › square' : v <= 0.51 ? 'Square' : v < 0.98 ? 'Square › tri' : 'Triangle'},
+  parts:{l:'Partials', min:1, max:64, c:'int', d:48, f:v => v === 1 ? '1 (sine)' : String(v)},
+  tilt:{l:'Bright', min:-1, max:1, c:'lin', d:0, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'},
+  oddeven:{l:'Odd / even', min:-1, max:1, c:'lin', d:0, f:v => v < -0.01 ? 'Odd ' + Math.round(-v * 100) + '%' : v > 0.01 ? 'Even ' + Math.round(v * 100) + '%' : 'Both'},
+  stretch:{l:'Stretch', min:0, max:1, c:'lin', d:0, f:pct},
+  sub:{l:'Sub', min:0, max:1, c:'lin', d:0.5, f:pct},
+  subOct:{l:'Sub octave', min:0, max:2, c:'int', d:1, f:v => v ? '−' + v + ' oct' : 'Same'},
+  cut:{l:'Cutoff', min:30, max:18000, c:'log', d:400, f:hz},
+  res:{l:'Resonance', min:0, max:1, c:'lin', d:0.35, f:pct},
+  fenv:{l:'Env amount', min:-6, max:6, c:'lin', d:2, f:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' oct'},
+  fdec:{l:'Env decay', min:5, max:3000, c:'log', d:250, f:ms},
+  key:{l:'Key track', min:0, max:1, c:'lin', d:0.5, f:pct},
+  vowel:{l:'Vowel', min:0, max:1, c:'lin', d:0, f:v => { const n = 'AEIOU', x = v * 4, i = Math.min(3, Math.floor(x)), t = x - i; return t < 0.08 ? n[i] : t > 0.92 ? n[i + 1] : n[i] + ' › ' + n[i + 1]; }},
+  form:{l:'Formant', min:0, max:1, c:'lin', d:0, f:pct},
+  combF:{l:'Comb freq', min:0, max:1, c:'lin', d:0.5, f:v => hz(60 * Math.pow(2, v * 6))},
+  comb:{l:'Comb', min:0, max:1, c:'lin', d:0, f:pct},
+  wCut:{l:'› Cutoff', min:-6, max:6, c:'lin', d:0, f:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' oct'},
+  wVowel:{l:'› Vowel', min:-1, max:1, c:'lin', d:0, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'},
+  wComb:{l:'› Comb', min:-1, max:1, c:'lin', d:0, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'},
+  wAmp:{l:'› Level', min:0, max:1, c:'lin', d:0, f:pct},
+  wPhase:{l:'Start', min:0, max:1, c:'lin', d:0, f:v => Math.round(v * 360) + '°'},
+  wSmooth:{l:'Smooth', min:0, max:1, c:'lin', d:0.15, f:pct},
+  atk:{l:'Attack', min:0.5, max:2000, c:'log', d:2, f:ms},
+  dec:{l:'Decay', min:5, max:4000, c:'log', d:300, f:ms},
+  sus:{l:'Sustain', min:0, max:1, c:'lin', d:1, f:pct},
+  rel:{l:'Release', min:5, max:4000, c:'log', d:80, f:ms},
+  glide:{l:'Glide', min:0, max:1000, c:'sq', d:0, f:v => v < 0.5 ? 'Off' : ms(v)},
+  width:{l:'Width', min:0, max:1, c:'lin', d:0.3, f:pct},
+  det:{l:'Reese', min:0, max:60, c:'lin', d:0, f:v => v < 0.5 ? 'Off' : v.toFixed(1) + ' ct'},
+};
+// Presets: changes from Init. vDrive sets the voice's Drive.
+const BASS_PRE = [
+  ['Init', {}],
+  ['Wobble 1/4', {shape:0.12, cut:95, res:0.55, fenv:0, wCut:5.4, wRate:5, wShape:0, sub:0.6, vDrive:0.3}],
+  ['Wobble 1/8 triplet', {shape:0.5, cut:110, res:0.45, fenv:0, wCut:4.8, wRate:9, wShape:0, sub:0.55, vDrive:0.35}],
+  ['Yoi talker', {shape:0, cut:2600, res:0.15, fenv:0, form:0.9, vowel:0.75, wVowel:-0.75, wCut:0.8, wRate:8, wShape:0, wSmooth:0.25, sub:0.5, vDrive:0.25}],
+  ['Growl', {shape:0.35, cut:700, res:0.5, fenv:0, form:0.65, vowel:0, wVowel:1, comb:0.55, combF:0.3, wComb:0.6, wCut:2.6, wRate:10, wShape:5, wSmooth:0.35, sub:0.45, vDrive:0.55}],
+  ['Reese (DnB)', {shape:0, parts:56, det:16, width:0.9, cut:1500, res:0.25, fenv:0, wCut:1.4, wRate:1, wShape:1, sub:0.6, glide:40, vDrive:0.3}],
+  ['Neuro', {shape:0.5, parts:64, tilt:0.3, cut:900, res:0.6, fenv:0, comb:0.8, combF:0.55, wComb:0.5, wCut:2.5, wRate:10, wShape:4, wSmooth:0.25, sub:0.4, vDrive:0.6}],
+  ['Square wub', {shape:0.5, cut:85, res:0.7, fenv:0, wCut:6, wRate:8, wShape:0, sub:0.6, vDrive:0.2}],
+  ['Pluck (DnB)', {shape:0, cut:170, res:0.4, fenv:4.5, fdec:180, dec:420, sus:0.55, rel:120, sub:0.55, vDrive:0.25}],
+  ['Laser', {shape:0, cut:280, res:0.85, fenv:6, fdec:90, glide:70, legato:1, sub:0.3, vDrive:0.2}],
+  ['Sub', {parts:1, sub:0.35, subOct:1, cut:18000, res:0, fenv:0, key:0, width:0, atk:3, rel:120}],
+];
+const BU_SECS = [
+  ['Source', ['oct', 'shape', 'parts', 'tilt', 'oddeven', 'stretch', 'sub', 'subOct']],
+  ['Filter', ['cut', 'res', 'fenv', 'fdec', 'key']],
+  ['Formant & comb', ['vowel', 'form', 'combF', 'comb']],
+  ['Wobble', ['wCut', 'wVowel', 'wComb', 'wAmp', 'wPhase', 'wSmooth']],
+  ['Amp & play', ['atk', 'dec', 'sus', 'rel', 'glide', 'width', 'det']],
+];
+const bassRows = [], bassSegs = []; let vEngUpd = null;
+const BV = () => { const v = V(); if (!v.bass) v.bass = normBass(null); return v.bass; };
+function bassEdit(){ changed(cur, true); bassVizKick(); }
+function setEngine(x){
+  const v = V(); if (!isSyn(cur)) return;
+  if (x === 'bass' && !isBassV(v)){
+    const first = !v.bass; v.engine = 'bass'; v.tuneL = v.tune; v.tune = 0; v.bass = normBass(v.bass);
+    if (first) bassPreset(1, true);
+  } else if (x !== 'bass' && isBassV(v)){ v.engine = 'layers'; if (typeof v.tuneL === 'number') v.tune = v.tuneL; }
+  changed(cur); refreshAll();
+}
+function bassPreset(i, quiet){
+  const pr = BASS_PRE[i]; if (!pr) return; const v = V(), o = Object.assign({}, pr[1]);
+  if ('vDrive' in o){ v.drive = o.vDrive; delete o.vDrive; } else v.drive = 0;
+  v.bass = normBass(Object.assign(BassCore.defaults(), o));
+  if (!quiet){ changed(cur); refreshAll(); toast('Bass: ' + pr[0]); }
+}
+function bassRandom(){
+  const r = Math.random, pick = a => a[Math.floor(r() * a.length)], b = BV();
+  Object.assign(b, {shape:pick([0, 0, 0.15, 0.5, 0.5, 0.75]), parts:pick([24, 40, 48, 64]), tilt:(r() - 0.5) * 0.6, oddeven:r() < 0.7 ? 0 : (r() - 0.5) * 1.4,
+    stretch:r() < 0.8 ? 0 : r() * 0.4, cut:60 + r() * r() * 900, res:0.2 + r() * 0.6, fenv:r() < 0.6 ? 0 : r() * 4, form:r() < 0.5 ? 0 : 0.4 + r() * 0.6, vowel:r(),
+    comb:r() < 0.6 ? 0 : 0.3 + r() * 0.6, combF:r(), wCut:2 + r() * 4, wVowel:r() < 0.5 ? 0 : (r() - 0.5) * 2, wComb:r() < 0.6 ? 0 : (r() - 0.5) * 2,
+    wRate:pick([3, 5, 5, 6, 8, 8, 9, 10]), wShape:pick([0, 0, 0, 1, 2, 4, 5]), wSmooth:r() * 0.4, det:r() < 0.7 ? 0 : 6 + r() * 20, width:r() * 0.8, sub:0.3 + r() * 0.4});
+  for (const k of ['tilt', 'oddeven', 'stretch', 'cut', 'res', 'fenv', 'form', 'vowel', 'comb', 'combF', 'wCut', 'wVowel', 'wComb', 'wSmooth', 'det', 'width', 'sub']) b[k] = Math.round(b[k] * 1000) / 1000;
+  changed(cur); refreshAll();
+}
+(function buildBass(){
+  const host = $('bassSecs');
+  const seg = (s, label, opts, key, num) => { const r = el('div', 'segrow'); r.append(el('span', null, label)); const g = el('div', 'seg'); r.append(g); s.append(r);
+    bassSegs.push(makeSeg(g, opts, () => BV()[key], x => { BV()[key] = x; bassEdit(); })); };
+  for (const [title, keys] of BU_SECS){
+    const s = el('div', 'sec'); s.append(el('h3', null, title)); host.append(s);
+    if (title === 'Wobble'){
+      const r = el('div', 'selrow'); r.append(el('span', null, 'Rate'));
+      const sel = document.createElement('select'); sel.id = 'bassRate'; sel.setAttribute('aria-label', 'Wobble rate');
+      BASS_DIVN.forEach((n, i) => { const o = document.createElement('option'); o.value = i; o.textContent = n; sel.append(o); });
+      sel.addEventListener('change', () => { BV().wRate = +sel.value; bassEdit(); }); r.append(sel); s.append(r);
+      bassSegs.push(() => { sel.value = BV().wRate | 0; });
+      const r2 = el('div', 'selrow'); r2.append(el('span', null, 'Shape'));
+      const sh = document.createElement('select'); sh.id = 'bassShape'; sh.setAttribute('aria-label', 'Wobble shape');
+      BASS_SHAPES.forEach((n, i) => { const o = document.createElement('option'); o.value = i; o.textContent = n; sh.append(o); });
+      sh.addEventListener('change', () => { BV().wShape = +sh.value; bassEdit(); }); r2.append(sh); s.append(r2);
+      bassSegs.push(() => { sh.value = BV().wShape | 0; });
+      seg(s, 'Restart', [[1, 'Each note'], [0, 'Free']], 'wRetrig');
+    }
+    for (const k of keys){ const r = makeRow(BU[k], k, BV, {idp:'bs', noTrack:true, on:bassEdit}); s.append(r.r); bassRows.push(r); }
+    if (title === 'Amp & play') seg(s, 'Legato', [[0, 'Off'], [1, 'On']], 'legato');
+    if (title === 'Wobble') s.append(el('p', 'note', 'The tracker’s WOB command changes the rate from a row on (WOB 06 = 1/4).'));
+  }
+  const pre = $('bassPre'); const o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'Presets…'; pre.append(o0);
+  BASS_PRE.forEach(([n], i) => { const o = document.createElement('option'); o.value = i; o.textContent = n; pre.append(o); });
+  pre.addEventListener('change', () => { if (pre.value !== '') bassPreset(+pre.value); pre.value = ''; });
+  $('bassRand').addEventListener('click', bassRandom);
+  $('bassInit').addEventListener('click', () => bassPreset(0));
+  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass']], () => isBassV(V()) ? 'bass' : 'layers', setEngine);
+})();
+// Shows the bass card or the layer cards for the pad on screen.
+function bassUI(){
+  const syn = isSyn(cur), on = syn && isBassV(V());
+  $('vEngine').hidden = !syn;
+  $('vEngLbl').textContent = on ? 'additive bass, played live by the tracker' : 'up to 8 layers, rendered';
+  if (vEngUpd) vEngUpd();
+  $('bassWrap').hidden = !on;
+  for (const id of ['layersBand', 'layerWrap', 'fxWrap', 'voiceWrap']) $(id).hidden = on;
+  if (on){ for (const r of bassRows) r.refresh(); for (const f of bassSegs) f(); bassVizKick(); }
+}
+// The picture: each partial as a bar at its frequency (C2 to 20 kHz), at the wobble's position right now.
+let bvRaf = 0, bvCore = null;
+function bassVizKick(){ if (!bvRaf) bvRaf = requestAnimationFrame(bassViz); }
+function bassViz(){
+  bvRaf = 0;
+  const cv = $('bassCv'); if (!cv || $('bassWrap').hidden || view === 'tracker' || !isBassV(V())) return;
+  const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+  if (cv.width !== Math.round(W * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const st = getComputedStyle(cv), ink = st.getPropertyValue('--ink').trim() || '#111', fam = st.getPropertyValue('--smp').trim() || '#d1456e', mut = st.getPropertyValue('--muted').trim() || '#666', trk = st.getPropertyValue('--track').trim() || '#e6e6e6';
+  const p = bassParams(V()), bpm = songBpm(), beats = BASS_DIV[p.wRate | 0] || 1, ph = ((performance.now() / 1000) * bpm / 60 / beats) % 1;
+  if (!bvCore) bvCore = new BassCore(48000);
+  const c = bvCore; c.p = null; c.set(Object.assign({}, p, {wSmooth:0})); c.bpm = bpm; c.wob = 0;
+  c.stage = 3; c.env = 1; c.held = true; c.fe = 0; c.go = true; c.lph = ph; c.lsm = c.shape(ph); c.lph = ph - 1e-9; c.sh = 0.3 + 0.4 * Math.abs(Math.sin(Math.floor((performance.now() / 1000) * bpm / 60 / beats) * 12.9898));
+  const L = new Float32Array(1), R = new Float32Array(1); c.block(L, R, 0, 1, 1);
+  const lo = Math.log2(30), hi = Math.log2(20000), X = f => (Math.log2(f) - lo) / (hi - lo) * W;
+  g.strokeStyle = trk; g.lineWidth = 1; g.font = '10px ' + (st.getPropertyValue('--mono').trim() || 'monospace'); g.fillStyle = mut;
+  for (const f of [100, 1000, 10000]){ const x = Math.round(X(f)) + 0.5; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); g.fillText(f >= 1000 ? f / 1000 + 'k' : String(f), x + 3, H - 4); }
+  // bars (dB from −60 to 0 relative to the loudest)
+  let mx = 1e-9; for (let k = 1; k <= c.N; k++) mx = Math.max(mx, Math.abs(c.aT[k]));
+  const f0 = c.f, sub = p.sub * 0.45;
+  g.fillStyle = fam;
+  const bw = Math.max(2, Math.min(7, W / 140));
+  for (let k = 1; k <= c.N; k++){ const a = Math.abs(c.aT[k]); if (a <= 0) continue; const f = f0 * k * (1 + p.stretch * 0.0015 * k * k); if (f > 20000) break;
+    const h = Math.max(0, (20 * Math.log10(a / mx) + 60) / 60) * (H - 22); g.fillRect(X(f) - bw / 2, H - 16 - h, bw, h); }
+  if (sub > 0){ const fs = f0 / Math.pow(2, p.subOct | 0), h = Math.max(0, (20 * Math.log10(sub * c.norm * 2 / mx) + 60) / 60) * (H - 22); g.fillStyle = ink; g.fillRect(X(Math.max(31, fs)) - bw / 2, H - 16 - Math.min(h, H - 22), bw, Math.min(h, H - 22)); }
+  // cutoff now
+  const fc = Math.min(20000, Math.max(30, p.cut * Math.pow(2, p.wCut * c.lsm) * Math.pow(f0 / 65.406, p.key)));
+  g.strokeStyle = ink; g.lineWidth = 2; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(X(fc), 4); g.lineTo(X(fc), H - 16); g.stroke(); g.setLineDash([]);
+  // the wobble shape, small, top left, with its position
+  const lw = Math.min(120, W * 0.25), lh = 26, lx = W - lw - 12, ly = 24; g.strokeStyle = mut; g.lineWidth = 1.5; g.beginPath();
+  for (let i = 0; i <= 60; i++){ const q = i / 60, u = (p.wShape | 0) === 5 ? (Math.floor(q * 4) % 2 ? 0.75 : 0.3) : c.shape(q); const x = lx + q * lw, y = ly + (1 - u) * lh; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+  g.fillStyle = ink; g.beginPath(); g.arc(lx + ph * lw, ly + (1 - ((p.wShape | 0) === 5 ? c.sh : c.shape(ph))) * lh, 3, 0, 7); g.fill();
+  const wobOn = Math.abs(p.wCut) > 0.01 || Math.abs(p.wVowel) > 0.01 || Math.abs(p.wComb) > 0.01 || p.wAmp > 0.01;
+  $('bassVr').textContent = 'WOBBLE ' + BASS_DIVN[p.wRate | 0] + ' · ' + BASS_SHAPES[p.wShape | 0].toUpperCase() + (wobOn ? '' : ' · NO DEPTH') + ' · ' + bpm + ' BPM · CUT ' + hz(fc);
+  bvRaf = requestAnimationFrame(bassViz);
+}
 
 /* ---------- voice-wide filter & amp ---------- */
 // These edit the voice object (V), not the selected layer, and renderVoice applies them to all the
@@ -3216,6 +3595,7 @@ function refreshAll(){
   vRows.forEach(r => r.refresh()); updChoke();
   refreshVoiceGlobals(); refreshTune();
   refreshLayer(); renderPads(); renderFx();
+  bassUI();
   showCur();
   try { ccBadges(); } catch(e){}   // sliders may have been rebuilt (another layer type or effect)
 }
@@ -3408,7 +3788,7 @@ function save(){
   catch(e){ try { localStorage.setItem(KEY, JSON.stringify(kitToJSON(true))); } catch(e2){} }
 }
 function loadSaved(){ try { const s = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY); return s ? kitFromJSON(JSON.parse(s)) : null; } catch(e){ console.warn('Couldn’t load the saved kit', e); return null; } }
-function setKit(k){ kit = k; setTimeout(kitUndoReset, 0); setTimeout(() => resolveSamples(), 0); WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0; for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
+function setKit(k){ kit = k; setTimeout(() => { for (let i = 0; i < kit.voices.length; i++) try { bassPush(i); } catch(e){} }, 0); setTimeout(kitUndoReset, 0); setTimeout(() => resolveSamples(), 0); WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0; for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
 
 /* ---------- files out ---------- */
 function wavBytes(data, sr, bits){
@@ -4076,7 +4456,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>
 const panS = v => v === 128 ? 'Pan centre' : v < 128 ? `Pan ${Math.round((128 - v) / 128 * 100)}% left` : `Pan ${Math.round((v - 128) / 127 * 100)}% right`;
 // The FX column: its sequencer commands, then the sampler-style
 // instrument commands that make sense for a pad (no tables, filters or MIDI here).
-const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC'];   // new commands go on the end, so saved songs keep their numbers
+const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB'];   // new commands go on the end, so saved songs keep their numbers
 const FXC_V1 = ['RET','DEL','CUT','CHA','PSL','RND','OFS','REV','PAN','TPO','HOP'];   // song files before v2
 const V1NAME = {CUT:'KIL', OFS:'STA', REV:'PLY'};
 const SIGNED = new Set(['PBN','TSP','PIT','FIN']);
@@ -4113,7 +4493,9 @@ const FXI = {
   PLY:v => (v & 1) ? 'Play this note reversed' : 'Play this note forwards',
   STA:v => `Start ${Math.round(v / 256 * 100)}% into the sound`,
   PAN:v => panS(v),
+  WOB:v => v ? `Bass wobble ${BASS_DIVN[Math.min(BASS_DIV.length, v) - 1]} from here on (01 = 4 bars … 0D = 1/32)` : 'WOB 00: back to the bass voice’s own wobble rate',
 };
+const wobOf = v => v ? BASS_DIV[Math.min(BASS_DIV.length, v) - 1] : 0;
 
 /* ---------- track effects ---------- */
 /* Realtime effects on each track and on the master, run in an AudioWorklet from tfx.wasm (one module
@@ -4891,7 +5273,7 @@ function makeSeq(S, mode, o){
             if (!q) firstRate = rate;
             const ev = {type:'note', t:at, track:t, poly, pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? at + fx.KIL * tick : null, rel:fx.OFF != null ? at + fx.OFF * tick : null,
-              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, ...mods};
+              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, wob:fx.WOB != null ? wobOf(fx.WOB) : null, ...mods};
             if ((I.slc | 0) > 1 || I.sync){ const c = ensure(ev.pad); applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; }
             evs.push(ev);
             if (every){ let k = 1;
@@ -4907,6 +5289,7 @@ function makeSeq(S, mode, o){
           let any = false;
           if (fx.VOL != null){ m.gain = curve(fx.VOL); any = true; }
           if (fx.PAN != null){ m.pan = fx.PAN; any = true; }
+          if (fx.WOB != null){ m.wob = wobOf(fx.WOB); any = true; }
           if (fx.PIT != null || fx.FIN != null){ m.mul = Math.pow(2, pit / 12); any = true; }
           if (fx.ARP){ m.arp = arpOf(fx.ARP, T, at, end, tick); any = true; }
           else if (fx.PBN){ m.bend = {mul:Math.pow(2, s8(fx.PBN) / 12), t1:end}; T.rate *= m.bend.mul; any = true; }
@@ -4961,8 +5344,48 @@ function makePlayer(ac, out, getBuf, live){
     let an = null; if (live && t < NT){ an = ac.createAnalyser(); an.fftSize = 512; p.connect(an); }
     buses.push({inp, g, p, an, scs, lv:0, pk:0, fx:null, chn:null});
   }
+  // Bass voices: one live node per track and voice (see bassReady), made when it first plays.
+  const bassN = new Map(); let bpmNow = (S && S.bpm) || 120;
+  function bassNode(t, pad){
+    if (!bassOK.has(ac)) return null;
+    const key = t + ':' + pad; let b = bassN.get(key); if (b) return b;
+    try {
+      const node = new AudioWorkletNode(ac, 'thunder-bass', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{p:bassParams(kit.voices[pad])}});
+      const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
+      node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
+      b = {node, g, pn, pad, rate:P('rate'), gate:P('gate'), trig:P('trig'), leg:P('leg'), bpm:P('bpm'), wob:P('wob'), n:0, lastOn:-1, cur:null};
+      b.bpm.value = bpmNow;
+    } catch(e){ return null; }
+    bassN.set(key, b); if (live) bassLive.add(b);
+    return b;
+  }
+  function bassNote(ev, b, T, ck){
+    const t = Math.max(ev.t, ac.currentTime), leg = ev.slide && ev.slide.dur > 0 ? 1 : 0;
+    for (const P of [b.gate, b.trig, b.leg]) P.cancelScheduledValues(t);
+    try { b.rate.cancelAndHoldAtTime(t); } catch(e){ b.rate.cancelScheduledValues(t); }
+    if (leg){ b.rate.setValueAtTime(ev.slide.from, t); b.rate.linearRampToValueAtTime(ev.rate, t + ev.slide.dur); } else b.rate.setValueAtTime(ev.rate, t);
+    b.leg.setValueAtTime(leg, t); b.gate.setValueAtTime(1, t); b.trig.setValueAtTime(++b.n, t);
+    b.g.gain.setValueAtTime(ev.gain, t); b.pn.pan.setValueAtTime(clamp((ev.pan - 128) / 127, -1, 1), t);
+    if (ev.wob != null) b.wob.setValueAtTime(ev.wob, t);
+    b.lastOn = t; if (b.cur) alive.delete(b.cur);
+    const v = {bass:b, src:{playbackRate:b.rate, stop(){}}, g:b.g, pn:b.pn, base:ev.rate, rate:ev.rate, choke:ck, ended:false, stopAt:null, syn:true, rel:0};
+    b.cur = v;
+    if (!leg) pitchMods(v, t, ev.rate, ev);
+    alive.add(v);
+    if (ev.cut != null) kill(v, ev.cut);
+    if (ev.rel != null) kill(v, ev.rel);
+    T.push(v);
+  }
   function kill(v, at, tc = 0.004){
     if (!v || v.ended || (v.stopAt != null && v.stopAt <= at)) return;
+    if (v.bass){
+      // the note lets go (its release is the voice's own); stopping before a note that is already
+      // scheduled takes that note back too
+      const b = v.bass, t = Math.max(at, ac.currentTime); v.stopAt = at;
+      if (t < b.lastOn - 1e-6){ b.gate.cancelScheduledValues(t); b.trig.cancelScheduledValues(t); }
+      try { b.gate.setValueAtTime(0, t); } catch(e){}
+      return;
+    }
     v.stopAt = at;
     try { v.f.gain.cancelScheduledValues(at); v.f.gain.setValueAtTime(1, at); v.f.gain.setTargetAtTime(0, at, tc); } catch(e){}
     try { v.src.stop(at + tc * 12); } catch(e){}
@@ -4984,6 +5407,8 @@ function makePlayer(ac, out, getBuf, live){
   // sequencer runs a little ahead), in an offline render by suspending the render at that moment.
   const tempoAt = new Map();
   function tempoTo(ev){
+    bpmNow = ev.bpm || bpmNow;
+    for (const b of bassN.values()) try { b.bpm.setValueAtTime(ev.bpm, Math.max(ev.t, ac.currentTime)); } catch(e){}
     const m = {target:'chains-host', op:'transport', value:{tempo:ev.bpm, ticks:ev.tks}};
     const send = () => { for (const b of buses) if (b && b.chn){ try { if (b.chn._send) b.chn._send(m); else b.chn.port.postMessage(m); } catch(e){} } };
     const O = window.OfflineAudioContext || window.webkitOfflineAudioContext;
@@ -5008,12 +5433,19 @@ function makePlayer(ac, out, getBuf, live){
         if (ev.gain != null) v.g.gain.setValueAtTime(ev.gain, ev.t);
         if (ev.pan != null) v.pn.pan.setValueAtTime(clamp((ev.pan - 128) / 127, -1, 1), ev.t);
         if (ev.mul != null){ v.rate = v.base * ev.mul; v.src.playbackRate.setValueAtTime(v.rate, ev.t); }
+        if (ev.wob != null && v.bass) v.bass.wob.setValueAtTime(ev.wob, ev.t);
       } catch(e){}
       pitchMods(v, ev.t, v.rate, ev);
       if (ev.cut != null) kill(v, ev.cut);
       if (ev.rel != null) kill(v, ev.rel, v.syn ? relTc(v) : 0.05);
   }
   function startNote(ev){
+    if (isBassPad(ev.pad)){ const bn = bassNode(ev.track, ev.pad); if (bn){
+      // bass is mono: it takes over from whatever the track was playing
+      const T = vs[ev.track]; for (const v of T) if (v.bass !== bn) kill(v, ev.t, v.syn ? Math.min(relTc(v), 0.05) : 0.004); T.length = 0;
+      const kv = kit.voices[ev.pad], ck = kv ? kv.choke : 0;
+      if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of vs[k]) if (v.choke === ck) kill(v, ev.t);
+      return bassNote(ev, bn, T, ck); } }
     const b = getBuf(ev.pad, ev.rev, ev.st); if (!b) return;
     const T = vs[ev.track];
     for (let k = T.length - 1; k >= 0; k--) if (!live1(T[k], ev.t)) T.splice(k, 1);
@@ -5195,7 +5627,7 @@ function rtInit(){
   audio();
   if (!rt){
     const out = ctx.createGain(), lim = mkLimiter(ctx); lim.connect(master);
-    rt = {out, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync();
+    rt = {out, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); bassReady(ctx);
     // the master meter listens to everything going out, synth pads included
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
     master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
@@ -5205,6 +5637,56 @@ function rtInit(){
   return rt;
 }
 
+
+/* ---------- bass engine, live ----------
+   The tracker plays bass voices (Synth → Engine: Bass) live, so the wobble keeps the song's tempo on every
+   note and a held note wobbles for as long as it is held. One AudioWorkletNode per track and voice, built
+   from the same BassCore the pads render with. Every note is AudioParam automation (rate, gate, a note
+   counter, legato, tempo, WOB), so it lands on its sample, live and in an offline render alike. */
+const BASS_PROC = `
+class BassProc extends AudioWorkletProcessor {
+  static get parameterDescriptors(){ return [
+    {name:'rate', defaultValue:1, minValue:0, maxValue:256, automationRate:'a-rate'},
+    {name:'gate', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
+    {name:'trig', defaultValue:0, automationRate:'a-rate'},
+    {name:'leg', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
+    {name:'bpm', defaultValue:120, minValue:10, maxValue:999, automationRate:'k-rate'},
+    {name:'wob', defaultValue:0, minValue:0, maxValue:64, automationRate:'k-rate'}]; }
+  constructor(o){ super(); this.c = new BassCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false;
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); }; }
+  process(ins, outs, P){
+    const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, rate = P.rate, gate = P.gate, trig = P.trig, leg = P.leg, c = this.c;
+    c.bpm = P.bpm[0]; c.wob = P.wob[0];
+    const rt = i => rate.length > 1 ? rate[i] : rate[0];
+    let s = 0;
+    for (let i = 0; i < n; i++){
+      const tg = trig.length > 1 ? trig[i] : trig[0], ga = (gate.length > 1 ? gate[i] : gate[0]) >= 0.5;
+      if (tg !== this.lt || ga !== this.lg){
+        if (i > s){ c.render(L, R, s, i, rt(s)); s = i; }
+        if (tg !== this.lt && ga) c.on((leg.length > 1 ? leg[i] : leg[0]) >= 0.5);
+        else if (ga && !this.lg) c.on(false);
+        else if (!ga && this.lg) c.off();
+        this.lt = tg; this.lg = ga;
+      }
+    }
+    c.render(L, R, s, n, rt(s));
+    return true;
+  }
+}
+registerProcessor('thunder-bass', BassProc);`;
+let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bassLive = new Set();
+function bassReady(ac){
+  if (!bassLoad.has(ac)){
+    let pr = Promise.resolve(false);
+    try { if (ac.audioWorklet){ if (!bassURL) bassURL = URL.createObjectURL(new Blob([BassCore.toString() + BASS_PROC], {type:'text/javascript'}));
+      pr = ac.audioWorklet.addModule(bassURL).then(() => { bassOK.add(ac); return true; }, () => false); } } catch(e){}
+    bassLoad.set(ac, pr);
+  }
+  return bassLoad.get(ac);
+}
+const isBassPad = i => isSyn(i) && isBassV(kit.voices[i]);
+// A bass voice was edited: the live nodes playing it hear the change at once.
+function bassPush(i){ const v = kit.voices[i]; if (!isBassV(v)) return; const p = bassParams(v); for (const b of bassLive) if (b.pad === i) try { b.node.port.postMessage({set:p}); } catch(e){} }
 const MW_URL = 'master-worklet.js?v=1', mwLoad = new WeakMap();
 function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
@@ -5400,6 +5882,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   let mLim = false;
   if (useM){ const wkOk = mstNeedsWk(M) ? await mwReady(oc) : true; const ch = mstChain(oc, M, false); head.connect(ch.input); head = ch.output; mLim = !!(ch.wk && M.lim.on); if (!wkOk && mstNeedsWk(M)) toast('Mastering effects couldn’t load for this render; EQ only.'); }
   if (lim && !mLim){ const c = mkLimiter(oc); head.connect(c); c.connect(oc.destination); } else head.connect(oc.destination);
+  if (evs.some(e => e.type === 'note' && isBassPad(e.pad))) await bassReady(oc);
   const pl = makePlayer(oc, out, getB, false);
   pl.applyMix(t => keep.has(t));       // every track plays (so chokes match the mix), only `keep` is heard
   for (const t of keep){
@@ -5968,7 +6451,7 @@ const FXB = {ARP:'Arpeggio: the note, +X and +Y semitones', ARC:'Arpeggio shape 
   RNL:'Like RND, as a random walk from the last value', PSL:'Slide the pitch from the last note over ticks', PBN:'Bend the pitch ± semitones over the step',
   PVB:'Vibrato: X speed, Y depth', SED:'Seed the randomness so it repeats the same way', TPO:'Set the tempo in BPM (hex)', TSP:'Transpose the track from here on',
   VOL:'Set the volume (also of a playing note)', PIT:'Pitch the note ± semitones', FIN:'Fine tune ± cents', PLY:'Play reversed (01) or forwards (00)',
-  STA:'Start part way into the sound', PAN:'Pan left or right (80 centre)', TIC:'Ticks a step from here on'};
+  STA:'Start part way into the sound', PAN:'Pan left or right (80 centre)', TIC:'Ticks a step from here on', WOB:'Bass wobble rate from here on (00 the voice’s own)'};
 const FXLIST = [-1, ...FXC.map((n, i) => i).sort((a, b) => FXC[a] < FXC[b] ? -1 : 1)];
 const fxp = {open:false, x:0, y:0, i:0, now:-1};
 function fxpOpen(x, y){
@@ -7451,12 +7934,21 @@ let dkInstSig = '', dkInstRows = [], dkFxSig = '', dkFxRows = [], dkFxSel = 0;
 function deckInst(){
   if (!deckShown() || !deck.inst) return;
   dkInst = dkInstNow();
-  const I = S.insts[dkInst], pad = I.pad, v = kit.voices[pad], sig = dkInst + ':' + pad + ':' + nslots();
+  const I = S.insts[dkInst], pad = I.pad, v = kit.voices[pad], sig = dkInst + ':' + pad + ':' + nslots() + (isBassV(v) && isSyn(pad) ? ':bass' : '');
   $('dkInstT').textContent = `INST ${hx(dkInst)} · ${hx(pad)} ${(v && v.name) || 'Pad ' + (pad + 1)}`;
   if (sig !== dkInstSig){
     dkInstSig = sig; const box = $('dkInstRows'); box.replaceChildren(); dkInstRows = [];
     if (!v){ box.append(el('p', 'note', 'This instrument’s pad is empty.')); return; }
     const getV = () => kit.voices[S.insts[dkInst].pad], on = () => changed(S.insts[dkInst].pad, true);
+    if (isBassV(v) && isSyn(pad)){
+      // a bass voice: its sound and wobble, changed live as it plays
+      const getB = () => { const w = getV(); if (!w.bass) w.bass = normBass(null); return w.bass; };
+      { const r = makeRow(VP.level, 'level', getV, {idp:'dki', on}); box.append(r.r); dkInstRows.push(r); }
+      for (const k of ['cut', 'res', 'wCut', 'wRate']){
+        const def = k === 'wRate' ? {l:'Wob rate', min:0, max:BASS_DIV.length - 1, c:'int', d:5, f:i => BASS_DIVN[i]} : k === 'wCut' ? Object.assign({}, BU.wCut, {l:'Wob depth'}) : BU[k];
+        const r = makeRow(def, k, getB, {idp:'dkb', on, noTrack:true}); box.append(r.r); dkInstRows.push(r); }
+      dkInstRows.forEach(r => r.refresh()); return;
+    }
     for (const [def, k] of [[VP.level, 'level'], [VP.tune, 'tune'], [VP.drive, 'drive'], [VP.gate, 'gate'], [VGP.gLpCut, 'gLpCut'], [VGP.gLpRes, 'gLpRes']]){
       const r = makeRow(def, k, getV, {idp:'dki', on}); box.append(r.r); dkInstRows.push(r); }
   }

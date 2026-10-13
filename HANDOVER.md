@@ -338,3 +338,17 @@ caches.
 - **Mobile vs Desktop:** anything that should differ uses `isMobile()` in the page; there is no second build.
 - **Engine block:** code that renders pads goes between the `===ENGINE===` markers, with no DOM, `window` or
   `localStorage` at top level, because the render Worker runs that block as-is.
+
+## Bass engine (13 Oct, afternoon)
+
+- **What:** synth slots can set `V.engine = 'bass'` (Synth → Engine). Settings are in `V.bass` (`normBass`); the
+  voice's `tune`, `drive` and `level` are folded in by `bassParams(V)`.
+- **DSP:** `class BassCore` in the ENGINE block: additive (≤64 partials, sine table), spectral 24 dB resonant
+  low-pass, two vowel formants, comb, Reese second set, sub, tempo-synced wobble (`BASS_DIV`), ADSR, glide.
+  Self-contained on purpose: the live AudioWorklet is a Blob built from `BassCore.toString() + BASS_PROC`.
+- **Live/offline:** `makePlayer` makes one `thunder-bass` node per track + pad (`bassNode`), and every note is
+  AudioParam automation (`rate`, `gate`, `trig` counter, `leg`, `bpm`, `wob`), so offline renders are exact.
+  `pass()` awaits `bassReady(oc)` when the song uses a bass pad. Pads, the waveform and the Worker use
+  `renderBass()` (one held note).
+- **Tracker:** `WOB` command (last in `FXC`): 01–0D pick `BASS_DIV`, 00 = the voice's rate. Mixer's master row
+  has a MASTERING cell (`cs.mixer.mx === 1`).
