@@ -715,7 +715,8 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
    pad and the current track's effects, and a channel strip for the current track on the right (meter, fader, pan,
    mute, solo). Each section has its own pastel and a thin grey header holding its button; the panel's height and
    the scope and FX widths can be dragged. The panel and each section can be shown or hidden. */
-.tctl:has(> .tdeck:not([hidden])){padding:0; display:block}
+.tctl:has(> .tdeck:not([hidden])){padding:0; display:block; border-top-width:1px!important; border-top-style:solid!important}
+.tcmd:not([hidden]) + .tctl:has(> .tdeck:not([hidden])){border-top-width:1px!important}
 .tctl:not(:has(> :not([hidden]))){padding:0; border-top-width:1px}
 .tdeck{position:relative; display:flex; flex-direction:column; background:var(--panel); color:var(--ink); touch-action:manipulation;
   --tk-mono:#eba3bd; --tk-poly:#86c99a; --scfill:#f4a9c4; --dkp:100%}
@@ -799,6 +800,7 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .stgph{flex:1; min-height:0; display:flex; flex-direction:column; gap:4px; font:var(--fs-2)/1.2 var(--mono); color:var(--ts-dim)}
 .stgph b{font-weight:600; letter-spacing:.06em}
 .stgph canvas{flex:1; min-height:0; width:100%; display:block}
+.tstage.piano .stgph b{text-align:right}
 .dogs{--dk-ink:var(--ink); --dk-fill:var(--panel); --dk-pink:#f4a9c4; width:100%; height:100%; overflow:visible}
 /* Line art like the rest of the app: 2px outlines with sharp joins, filled only with the background so lines behind
    are hidden. The bandana is the one filled shape. */
@@ -849,6 +851,16 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
   --mxsoft:#c78ab6; --mxpoly:#3e6e4c; --mxglowc:transparent; --mxscan:transparent; --mxred:#b73a2c; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
 :root[data-skin="night"]{--mx:#f0b43c; --mx2:#c9a35f; --mxdim:#3a3f5e; --mxbg:#14182b; --mxpanel:#191e35; --mxpanel2:#232945; --mxon:#14182b;
   --mxsoft:#ffd884; --mxpoly:#7fb6e6; --mxglowc:transparent; --mxscan:transparent; --mxred:#ff6b5a; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:dark}
+:root[data-skin="miami"]{--mx:#d6247e; --mx2:#8e4f73; --mxdim:#9fded2; --mxbg:#e6f8f3; --mxpanel:#effbf8; --mxpanel2:#cdeee6; --mxon:#fff7fb;
+  --mxsoft:#ff9ccb; --mxpoly:#13938a; --mxglowc:transparent; --mxscan:transparent; --mxred:#b0302a; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="winter"]{--mx:#23395b; --mx2:#5a6f8c; --mxdim:#c6d6e6; --mxbg:#eef4f9; --mxpanel:#f6f9fc; --mxpanel2:#dde8f1; --mxon:#ffffff;
+  --mxsoft:#9cc3e6; --mxpoly:#6d8fb3; --mxglowc:transparent; --mxscan:transparent; --mxred:#b73a2c; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="greywhite"]{--mx:#595959; --mx2:#8a8a8a; --mxdim:#d9d9d9; --mxbg:#ffffff; --mxpanel:#f7f7f7; --mxpanel2:#ececec; --mxon:#ffffff;
+  --mxsoft:#bdbdbd; --mxpoly:#9a9a9a; --mxglowc:transparent; --mxscan:transparent; --mxred:#c0392b; --font:"Helvetica Neue",Helvetica,Arial,"Nimbus Sans","Liberation Sans",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:light}
+:root[data-skin="contrast"]{--mx:#111111; --mx2:#3d3d3d; --mxdim:#c9b230; --mxbg:#ffe14d; --mxpanel:#fff0a0; --mxpanel2:#f5d630; --mxon:#ffe14d;
+  --mxsoft:#ffffff; --mxpoly:#1f4fd6; --mxglowc:transparent; --mxscan:transparent; --mxred:#c0221b; --font:"Helvetica Neue",Helvetica,Arial,"Nimbus Sans","Liberation Sans",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:light}
+:root[data-skin="complement"]{--mx:#d9622b; --mx2:#8f5a45; --mxdim:#b9c4ec; --mxbg:#dfe6fb; --mxpanel:#e9eefc; --mxpanel2:#cfd8f6; --mxon:#fff8f3;
+  --mxsoft:#f4a77f; --mxpoly:#3456b8; --mxglowc:transparent; --mxscan:transparent; --mxred:#b0302a; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
 :root[data-skin="mustard"]{--mx:#a37800; --mx2:#7d6a3c; --mxdim:#b5a2dc; --mxbg:#e3d9f6; --mxpanel:#eae2f9; --mxpanel2:#d8cbf1; --mxon:#fffaf0;
   --mxsoft:#f2cf63; --mxpoly:#6f55bf; --mxglowc:transparent; --mxscan:transparent; --mxred:#c0392b;
   --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
@@ -3566,6 +3578,11 @@ const SKINS = [
   {id:'ocean', name:'Simple ocean', base:'term', dots:['#ddf0ee', '#0f5d63', '#5fb7b0', '#c06a2b']},
   {id:'plum', name:'Simple plum', base:'term', dots:['#f3e5ef', '#6b2d5c', '#c78ab6', '#3e6e4c']},
   {id:'night', name:'Simple night', base:'term', dots:['#14182b', '#f0b43c', '#ffd884', '#7fb6e6']},
+  {id:'miami', name:'Simple Miami', base:'term', dots:['#e6f8f3', '#d6247e', '#ff9ccb', '#13938a']},
+  {id:'winter', name:'Simple winter', base:'term', dots:['#eef4f9', '#23395b', '#9cc3e6', '#6d8fb3']},
+  {id:'greywhite', name:'Simple grey', base:'term', dots:['#ffffff', '#595959', '#bdbdbd', '#9a9a9a']},
+  {id:'contrast', name:'Simple contrast', base:'term', dots:['#ffe14d', '#111111', '#ffffff', '#1f4fd6']},
+  {id:'complement', name:'Simple complement', base:'term', dots:['#dfe6fb', '#d9622b', '#f4a77f', '#3456b8']},
 ];
 const SKK = 'thunderplus-skin-v1';
 let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k => k.id === v)) return v; } catch(e){} return 'mustard'; })();   // Simple mustard for a first visit
@@ -5591,7 +5608,7 @@ function projRows(){
     {l:'BOTTOM PANEL', ck:'Show the bottom panel', get:() => deck.on ? 1 : 0, set:v => setDeck('on', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'KEYS mode with the keypad off: a panel at the bottom with a spectrum of the master, quick controls for the current instrument and the current track’s effects, and a channel strip for the current track. Its buttons hide each part'},
     {l:'STAGE', opts:true, get:() => STG.indexOf(stage), set:v => setStage(STG[v]), min:0, max:STG.length - 1, d:0, fmt:v => STG_NAMES[v],
-      info:() => 'Big screens: the space beside the grid. DOGS dance to the beat while the song plays; PHRASE shows the phrase under the cursor as a little piano roll; OFF leaves it empty (and saves a little power)'},
+      info:() => 'Big screens: the space beside the grid. BY SCREEN: the dogs dance on Song and Project; Sect previews the phrase; Phrase shows a piano lighting the notes playing; Inst its waveform; Mixer the master spectrum; FX the effects chain. DOGS: the dogs everywhere. OFF: empty'},
     {l:'SCREEN', sec:'Screen', gap:true, opts:true, get:() => SCREENS.findIndex(x => x[0] === tScreen), set:v => setScreen(SCREENS[v][0]), min:0, max:SCREENS.length - 1, fmt:v => SCREENS[v][1], info:() => 'Colour of the screen: BY SCREEN gives Song, Sect, Phrase and the rest their own pastel (the same as their tabs), or pick one pastel, or black'},
     {l:'SKIN', opts:true, get:() => SKINS.findIndex(k => k.id === skin), set:v => applySkin(SKINS[v].id), min:0, max:SKINS.length - 1, fmt:v => SKINS[v].name.toUpperCase(), info:() => 'The look of the whole app: the ...Seeds skins'},
     {l:'SECT', ck:'Hide sect page', inv:true, get:() => sectsOn ? 1 : 0, set:v => setSects(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
@@ -6672,23 +6689,30 @@ function paintMeters(){
   }
 }
 /* ---------- the stage beside the tracker grid (big screens) ---------- */
-const STK = 'thunderplus-stage-v1', STG = ['dogs', 'phrase', 'off'], STG_NAMES = ['DOGS', 'PHRASE', 'OFF'];
-let stage = (() => { try { const v = localStorage.getItem(STK); if (STG.includes(v)) return v; } catch(e){} return 'dogs'; })();
+// BY SCREEN (default): the dogs on Song and Project, and something useful on the others — Sect: the phrase under
+// the cursor; Phrase: a piano down the side lighting the notes sounding now; Inst: the instrument's sound as a
+// waveform; Mixer: the master's spectrum; FX: the track's effects chain. DOGS: the dogs everywhere. OFF: nothing.
+const STK = 'thunderplus-stage-v1', STG = ['screen', 'dogs', 'off'], STG_NAMES = ['BY SCREEN', 'DOGS', 'OFF'];
+let stage = (() => { try { const v = localStorage.getItem(STK); if (STG.includes(v)) return v; if (v === 'phrase') return 'screen'; } catch(e){} return 'screen'; })();
 function setStage(v){ stage = v; try { localStorage.setItem(STK, v); } catch(e){} stageLayout(); }
 $('tStageX').addEventListener('click', () => { setStage('off'); toast('Stage hidden. Settings → STAGE brings it back.'); });
+const stageKind = () => stage === 'dogs' ? 'dogs' : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
+let stgKindNow = '', stgSig = '';
 // It sits in the space to the right of the grid's text, the grid's height, when that space is big enough.
 function stageLayout(){
   const box = $('tStage');
-  if (view !== 'tracker' || stage === 'off'){ box.hidden = true; return; }
+  if (view !== 'tracker' || stage === 'off'){ box.hidden = true; stgKindNow = ''; return; }
   const sr = scr.getBoundingClientRect(), gr = grid.getBoundingClientRect(), rg = document.createRange();
   let right = 0; const lines = grid.querySelectorAll('.ln');
-  for (let i = 0; i < Math.min(lines.length, 8); i++){ rg.selectNodeContents(lines[i]); const r = rg.getBoundingClientRect(); if (r.width && r.right > right) right = r.right; }
+  for (let i = 0; i < Math.min(lines.length, 80); i++){ rg.selectNodeContents(lines[i]); const r = rg.getBoundingClientRect(); if (r.width && r.right > right) right = r.right; }
   grid.querySelectorAll('.tgbox').forEach(b => { const r = b.getBoundingClientRect(); if (r.right > right) right = r.right; });
-  const left = right - sr.left + 18, w = sr.width - left - 14, top = gr.top - sr.top, h = gr.height;
-  const show = right > 0 && w >= 150 && h >= 150; box.hidden = !show; if (!show) return;
+  const kind = stageKind(), left = right - sr.left + 18, w = sr.width - left - 14, top = gr.top - sr.top, h = gr.height;
+  const minW = kind === 'piano' ? 90 : 150, show = right > 0 && w >= minW && h >= 150; box.hidden = !show; if (!show){ stgKindNow = ''; return; }
   Object.assign(box.style, {left:left + 'px', top:top + 'px', width:w + 'px', height:h + 'px'});
-  $('tStageDogs').hidden = stage !== 'dogs'; $('tStagePh').hidden = stage !== 'phrase';
-  if (stage === 'phrase') stagePhrase(); else dogsState();
+  $('tStageDogs').hidden = kind !== 'dogs'; $('tStagePh').hidden = kind === 'dogs';
+  box.classList.toggle('piano', kind === 'piano');
+  stgKindNow = kind; stgSig = '';
+  if (kind === 'dogs') dogsState(); else stageCanvas(true);
 }
 // Dogs: arms up and dancing while the song plays, a slow breath and a lazy tail when it stops.
 function dogsState(){
@@ -6697,11 +6721,13 @@ function dogsState(){
 }
 // Beat clock: counted from the moment the song starts, at its tempo (re-anchored when TPO changes it),
 // against the output's latency so a hop lands with the sound.
-let stgT0 = 0, stgBeat = -1, stgBpm = 120, stgSide = 1, stgOn = false;
+let stgT0 = 0, stgBeat = -1, stgBpm = 120, stgSide = 1, stgOn = false, stgFrameT = 0;
 function stageStart(t0){ stgT0 = t0; stgBeat = -1; stgBpm = S.bpm; }
-function stageTick(){
-  if (stgOn !== !!tp.on){ stgOn = !!tp.on; if (stage === 'dogs' && !$('tStage').hidden) dogsState(); }
-  if (stage !== 'dogs' || !tp.on || !ctx || $('tStage').hidden) return;
+function stageTick(now){
+  if (stgOn !== !!tp.on){ stgOn = !!tp.on; if (stgKindNow === 'dogs') dogsState(); else if (stgKindNow) stageCanvas(true); }
+  if (!stgKindNow || $('tStage').hidden) return;
+  if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (now - stgFrameT > 45){ stgFrameT = now; stageCanvas(false); } return; }
+  if (stgKindNow !== 'dogs' || !tp.on || !ctx) return;
   const lat = ctx.outputLatency || ctx.baseLatency || 0, t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
   if (bpm !== stgBpm){ const b = (t - stgT0) * stgBpm / 60; stgBpm = bpm; stgT0 = t - b * 60 / bpm; }
   const per = 60 / bpm, b = Math.floor((t - stgT0) / per);
@@ -6719,31 +6745,106 @@ function dogsBeat(bar, ms){
     g.style.setProperty('--aL', (112 + sd * 22) + 'deg'); g.style.setProperty('--aR', (-112 + sd * 22) + 'deg');
   });
 }
-// Phrase preview: the phrase under the cursor as a little piano roll, time running down like the tracker.
+// The canvas views share one canvas and title, in the tracker screen's own colours.
+function stgCtx(){
+  const c = $('tStageC'), r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (!r.width || !r.height) return null;
+  const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr); if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
+  const st = getComputedStyle(scr), v = k => st.getPropertyValue(k).trim();
+  return {c, g:c.getContext('2d'), W, H, dpr, ink:v('--ts-ink') || '#111', dim:v('--ts-line') || '#ccc', mid:v('--ts-dim') || '#888', acc:v('--ts-vol') || '#888',
+    bg:v('--ts-bg') || '#fff', cur:v('--ts-cur-bg') || '#111', mono:v('--tk-mono') || '#eba3bd', poly:v('--tk-poly') || '#86c99a', font:st.getPropertyValue('--mono') || 'monospace'};
+}
+function stageCanvas(force){
+  const k = stgKindNow; if (!k || k === 'dogs') return;
+  if (k === 'preview') return stagePreview();
+  if (k === 'piano') return stagePiano(force);
+  if (k === 'wave') return stageWave();
+  if (k === 'spec') return stageSpec();
+  if (k === 'chain') return stageChain();
+}
+// Sect: the phrase under the cursor as a little piano roll, time running down like the tracker.
 function stagePhraseId(){
   if (tv === 'song'){ const r = S.song[cs.song.y], v = r ? r[cs.song.x] : -1; return v >= 0 ? firstPhrase(v) : -1; }
   if (tv === 'sect'){ const ch = S.chains[cSect], r = ch && ch[cs.sect.y]; return r && r[0] >= 0 ? r[0] : -1; }
   return cPhrase;
 }
-function stagePhrase(){
-  const pid = stagePhraseId(), c = $('tStageC'), p = pid >= 0 ? S.phrases[pid] : null;
-  const r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (!r.width || !r.height) return;
-  c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
-  const g = c.getContext('2d'), W = c.width, H = c.height, st = getComputedStyle(scr);
-  const ink = st.getPropertyValue('--ts-ink').trim() || '#111', dim = st.getPropertyValue('--ts-line').trim() || '#ccc', vol = st.getPropertyValue('--ts-vol').trim() || ink;
+function stagePreview(){
+  const pid = stagePhraseId(), X = stgCtx(); if (!X) return; const {g, W, H, dpr} = X, p = pid >= 0 ? S.phrases[pid] : null;
   g.clearRect(0, 0, W, H);
   if (pid < 0){ $('tStagePhT').textContent = 'NO PHRASE HERE'; return; }
   const L = plen(pid), notes = []; let lo = 999, hi = -1, inst = -1;
-  if (p) for (let y = 0; y < L && y < p.length; y++) for (let k = 0; k < NCOL; k++){ const n = p[y][k];
-    if (n >= 0 && n < OFF){ notes.push([y, n, k]); lo = Math.min(lo, n); hi = Math.max(hi, n); if (inst < 0 && p[y][IC] >= 0) inst = p[y][IC]; } }
+  if (p) for (let y = 0; y < L && y < p.length; y++) for (let c = 0; c < NCOL; c++){ const n = p[y][c];
+    if (n >= 0 && n < OFF){ notes.push([y, n, c]); lo = Math.min(lo, n); hi = Math.max(hi, n); if (inst < 0 && p[y][IC] >= 0) inst = p[y][IC]; } }
   $('tStagePhT').textContent = `PHRASE ${hx(pid)} · ${L} ROWS` + (inst >= 0 ? ` · INST ${hx(inst)}` : '') + (notes.length ? '' : ' · EMPTY');
   const lpb = S.plpb && S.plpb[pid] ? S.plpb[pid] : (S.lpb || 4), rh = H / L;
-  g.strokeStyle = dim; g.lineWidth = dpr;
+  g.strokeStyle = X.dim; g.lineWidth = dpr;
   for (let y = 0; y <= L; y += lpb){ const yy = Math.round(y * rh) + .5; g.beginPath(); g.moveTo(0, yy); g.lineTo(W, yy); g.stroke(); }
   g.strokeRect(.5, .5, W - 1, H - 1);
   if (!notes.length) return;
   lo -= 2; hi += 2; const cw = W / (hi - lo + 1);
-  for (const [y, n, k] of notes){ g.fillStyle = k ? vol : ink; g.fillRect(Math.round((n - lo) * cw + 1), Math.round(y * rh + rh * .12), Math.max(2, Math.round(cw - 2)), Math.max(2, Math.round(rh * .76))); }
+  for (const [y, n, c] of notes){ g.fillStyle = c ? X.acc : X.ink; g.fillRect(Math.round((n - lo) * cw + 1), Math.round(y * rh + rh * .12), Math.max(2, Math.round(cw - 2)), Math.max(2, Math.round(rh * .76))); }
+}
+// Phrase: a piano down the side. The notes sounding at the playhead (or, stopped, at the cursor's row) are lit:
+// each note column holds its last note until a newer one or an OFF, so a poly track's chord stays lit.
+function stagePiano(force){
+  const pid = cPhrase, p = S.phrases[pid], L = plen(pid);
+  let row = cs.phrase.y;
+  if (tp.on && tp.pos){ const q = tp.pos[cTrack]; if (q && q.phrase === pid && q.step >= 0) row = q.step; }
+  const on = new Map();   // note -> column
+  if (p) for (let c = 0; c < NCOL; c++){ for (let y = Math.min(row, L - 1); y >= 0; y--){ const n = p[y][c]; if (n === OFF) break; if (n >= 0 && n < OFF){ on.set(n, c); break; } } }
+  let lo = 999, hi = -1; if (p) for (let y = 0; y < L && y < p.length; y++) for (let c = 0; c < NCOL; c++){ const n = p[y][c]; if (n >= 0 && n < OFF){ lo = Math.min(lo, n); hi = Math.max(hi, n); } }
+  if (hi < 0){ lo = 48; hi = 71; }
+  lo = Math.floor(lo / 12) * 12; hi = Math.max(lo + 23, Math.ceil((hi + 1) / 12) * 12 - 1);   // whole octaves, two at least
+  const sig = [pid, row, lo, hi, [...on.keys()].join(','), isPolyT(cTrack)].join('|'); if (!force && sig === stgSig) return; stgSig = sig;
+  const X = stgCtx(); if (!X) return; const {g, W, H, dpr} = X; g.clearRect(0, 0, W, H);
+  const poly = isPolyT(cTrack), names = [...on.keys()].sort((a, b) => a - b).map(n => NN[n % 12].replace('-', '') + Math.floor(n / 12));
+  $('tStagePhT').textContent = (names.length ? names.join(' ') : '—') + (poly ? ' · POLY' : ' · MONO');
+  // Keys run bottom (low) to top (high); white keys full width, black keys two-thirds, in the tracker's colours.
+  const whites = []; for (let n = lo; n <= hi; n++) if (![1, 3, 6, 8, 10].includes(n % 12)) whites.push(n);
+  const kh = H / whites.length, kw = Math.min(W, 140 * dpr), x0 = W - kw, lit = poly ? X.poly : X.mono;
+  whites.forEach((n, i) => { const y = H - (i + 1) * kh; g.fillStyle = on.has(n) ? lit : X.bg; g.fillRect(x0, y, kw, kh); g.strokeStyle = X.ink; g.lineWidth = dpr; g.strokeRect(x0 + .5, Math.round(y) + .5, kw - 1, Math.round(kh));
+    if (n % 12 === 0){ g.fillStyle = X.mid; g.font = `${Math.max(8, Math.min(11, kh / dpr * .55)) * dpr}px ${X.font}`; g.textBaseline = 'middle'; g.fillText('C' + Math.floor(n / 12), x0 + kw * .72, y + kh / 2); } });
+  for (let n = lo; n <= hi; n++){ if (![1, 3, 6, 8, 10].includes(n % 12)) continue;
+    const wi = whites.indexOf(n - 1), y = H - (wi + 1) * kh - kh * .3; g.fillStyle = on.has(n) ? lit : X.ink; g.fillRect(x0, y, kw * .62, kh * .6); if (on.has(n)){ g.strokeStyle = X.ink; g.strokeRect(x0 + .5, y + .5, kw * .62 - 1, kh * .6 - 1); } }
+}
+// Inst: the instrument's pad as a waveform (its last render), with its name.
+function stageWave(){
+  const I = S.insts[cInst], pad = I.pad, v = kit.voices[pad], X = stgCtx(); if (!X) return; const {g, W, H, dpr} = X; g.clearRect(0, 0, W, H);
+  $('tStagePhT').textContent = `INST ${hx(cInst)} · PAD ${hx(pad)} ${(v && v.name) || ''}`.trim();
+  const c = cache[pad], d = c && c.data; g.strokeStyle = X.dim; g.lineWidth = dpr; g.strokeRect(.5, .5, W - 1, H - 1);
+  g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke();
+  if (!d || !d.length){ g.fillStyle = X.mid; g.font = `${11 * dpr}px ${X.font}`; g.fillText('Play it once to see its waveform', 8 * dpr, 18 * dpr); return; }
+  g.fillStyle = X.ink; const step = d.length / W;
+  for (let x = 0; x < W; x++){ let mn = 1, mx = -1; const a = Math.floor(x * step), b = Math.min(d.length, Math.floor((x + 1) * step) + 1);
+    for (let i = a; i < b; i++){ const s = d[i]; if (s < mn) mn = s; if (s > mx) mx = s; }
+    if (mx < mn) continue; g.fillRect(x, H / 2 - mx * H * .46, 1, Math.max(dpr, (mx - mn) * H * .46)); }
+}
+// Mixer: the master's spectrum, drawn like the bottom panel's scope.
+function stageSpec(){
+  const X = stgCtx(); if (!X) return; const {g, W, H, dpr} = X; $('tStagePhT').textContent = 'MASTER · 20 Hz – 20 kHz';
+  g.clearRect(0, 0, W, H); g.strokeStyle = X.dim; g.lineWidth = dpr; g.strokeRect(.5, .5, W - 1, H - 1);
+  const xOf = f => Math.log(f / 20) / Math.log(1000) * W, TOP = -12, BOT = -96, yOf = db => (TOP - db) / (TOP - BOT) * H;
+  [100, 1000, 10000].forEach(f => { const x = xOf(f); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); g.fillStyle = X.mid; g.font = `${10 * dpr}px ${X.font}`; g.fillText(f >= 1000 ? f / 1000 + 'k' : f, x + 3 * dpr, H - 5 * dpr); });
+  const an = specAnalyser(); if (!an || !(tp.on || performance.now() - audioWake < 1500)) return;
+  an.getFloatFrequencyData(dkSpec); const sr = ctx.sampleRate, N = dkSpec.length;
+  g.beginPath(); g.moveTo(0, H);
+  for (let x = 0; x <= W; x += 3 * dpr){ const f0 = 20 * Math.pow(1000, x / W), f1 = 20 * Math.pow(1000, Math.min(W, x + 3 * dpr) / W);
+    const b0 = Math.max(1, Math.floor(f0 / (sr / 2) * N)), b1 = Math.min(N - 1, Math.max(b0, Math.ceil(f1 / (sr / 2) * N)));
+    let db = -200; for (let b = b0; b <= b1; b++) if (dkSpec[b] > db) db = dkSpec[b]; g.lineTo(x, Math.min(H, yOf(Math.max(BOT - 6, Math.min(TOP, db))))); }
+  g.lineTo(W, H); g.closePath(); g.fillStyle = X.mono; g.fill();
+}
+// FX: the track's effects as a chain of boxes, in order, with ...chains first when it feeds the track.
+function stageChain(){
+  const t = cFxT >= NT ? -1 : Math.min(cFxT, ntr() - 1), A = t < 0 ? S.mfx : S.tfx[t] || [], X = stgCtx(); if (!X) return; const {g, W, H, dpr} = X; g.clearRect(0, 0, W, H);
+  $('tStagePhT').textContent = (t < 0 ? 'MASTER' : 'TRACK ' + d2(t + 1)) + ' · SIGNAL';
+  const items = [t < 0 ? 'ALL TRACKS' : 'TRACK ' + d2(t + 1) + ' IN']; if (t >= 0 && chainsFeed(t)) items.push('…CHAINS');
+  A.forEach((f, k) => { if (f) items.push((k + 1) + ' ' + TFX[f.type].long + (f.on ? '' : '  (off)')); });
+  items.push(t < 0 ? 'OUTPUT' : 'FADER · PAN → MASTER');
+  const bh = Math.min(34 * dpr, (H - 10 * dpr) / (items.length * 1.6)), gap = bh * .6, bw = Math.min(W - 4 * dpr, 260 * dpr), x = (W - bw) / 2; let y = Math.max(2 * dpr, (H - items.length * bh - (items.length - 1) * gap) / 2);
+  g.font = `${Math.max(9, Math.min(12, bh / dpr * .42)) * dpr}px ${X.font}`; g.textBaseline = 'middle'; g.lineWidth = 1.5 * dpr;
+  items.forEach((s, i) => { const off = /\(off\)$/.test(s); g.strokeStyle = off ? X.dim : X.ink; g.strokeRect(x + .5, y + .5, bw - 1, bh - 1); g.fillStyle = off ? X.mid : X.ink;
+    let txt = s; while (g.measureText(txt).width > bw - 16 * dpr && txt.length > 3) txt = txt.slice(0, -2) + '…'; g.fillText(txt, x + 8 * dpr, y + bh / 2);
+    if (i < items.length - 1){ g.strokeStyle = X.mid; g.beginPath(); g.moveTo(W / 2, y + bh); g.lineTo(W / 2, y + bh + gap); g.moveTo(W / 2 - 4 * dpr, y + bh + gap - 5 * dpr); g.lineTo(W / 2, y + bh + gap); g.lineTo(W / 2 + 4 * dpr, y + bh + gap - 5 * dpr); g.stroke(); }
+    y += bh + gap; });
 }
 /* ---------- bottom panel (KEYS mode with the keypad off) ---------- */
 const DKK = 'thunderplus-deck-v1';
@@ -6848,12 +6949,13 @@ function deckStripMeter(now){
 // Scope: the master's spectrum, drawn as Quite Noise draws its Shape graph — 20 Hz to 20 kHz across, faint
 // lines at 100, 1k and 10k, a dashed reference at −48 dB, and the spectrum filled in the section's colour.
 let dkAn = null, dkSpec = null, dkScopeT = 0, dkScopeIdle = false;
+function specAnalyser(){ if (!dkAn && rt && ctx){ try { dkAn = ctx.createAnalyser(); dkAn.fftSize = 4096; dkAn.smoothingTimeConstant = 0.8; master.connect(dkAn); dkSpec = new Float32Array(dkAn.frequencyBinCount); } catch(e){ dkAn = null; } } return dkAn; }
 function deckScope(now){
   if (!deckShown() || !deck.scope || now - dkScopeT < 50) return; dkScopeT = now;
   const c = $('dkScopeC'), r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (!r.width || !r.height) return;
   if (c.width !== Math.round(r.width * dpr) || c.height !== Math.round(r.height * dpr)){ c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr); dkScopeIdle = false; }
   const live = !!(rt && ctx && (tp.on || now - audioWake < 1500)); if (!live && dkScopeIdle) return; dkScopeIdle = !live;
-  if (live && !dkAn){ try { dkAn = ctx.createAnalyser(); dkAn.fftSize = 4096; dkAn.smoothingTimeConstant = 0.8; master.connect(dkAn); dkSpec = new Float32Array(dkAn.frequencyBinCount); } catch(e){ dkAn = null; } }
+  if (live) specAnalyser();
   const W = c.width, H = c.height, g = c.getContext('2d'), st = getComputedStyle($('tDeck'));
   const line = st.getPropertyValue('--track').trim() || '#e6e6e6', muted = st.getPropertyValue('--muted').trim() || '#555', fill = st.getPropertyValue('--scfill').trim() || '#f4a9c4';
   const pad = 4 * dpr, TOP = -12, BOT = -96, yOf = db => pad + (TOP - db) / (TOP - BOT) * (H - 2 * pad), xOf = f => Math.log(f / 20) / Math.log(1000) * W;
@@ -7179,7 +7281,7 @@ function frame(){
         if (p >= rt.mpk[s] || now - rt.mpt[s] > 1500){ if (p !== rt.mpk[s]) any = true; rt.mpk[s] = p; rt.mpt[s] = now; } }); }
     if (any){ paintMeters(); deckMetersPaint(); }
   }
-  deckScope(mt); deckStripMeter(mt); stageTick();
+  deckScope(mt); deckStripMeter(mt); stageTick(mt);
 }
 
 /* ---------- building the screen ---------- */
