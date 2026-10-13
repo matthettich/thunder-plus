@@ -734,7 +734,7 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 #dkScope{--dkc:#dbe6f8; flex:0 6 var(--dkws, 300px); min-width:90px}
 #dkInst{--dkc:#fbe2d2; flex:1 1 0; min-width:210px}
 #dkFx{--dkc:#f8dce8; flex:0 1 var(--dkwf, 320px); min-width:200px}
-#dkStrip{--dkc:#d8f0e2; flex:0 0 228px}
+#dkStrip{--dkc:#d8f0e2; flex:0 0 var(--dkstw, 228px)}
 /* the thin grey header: one cell per section, its button over it, a rule between sections */
 .dkh{flex:none; display:flex; align-items:center; gap:5px; height:22px; padding:0 6px; background:var(--side); border-bottom:1px solid var(--line); min-width:0}
 .dkh .dkt{min-height:0; height:17px; padding:0 7px; font-size:var(--fs-2); font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--ink); color:var(--inv);
@@ -761,16 +761,16 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .dkslots button{min-height:22px; padding:0 7px; font-size:var(--fs-2); border:1px solid var(--line); background:var(--panel)}
 .dkslots button.on{background:var(--ink); color:var(--inv)} .dkslots button.off{opacity:.5}
 /* channel strip: meter, fader, pan, mute and solo for the current track */
-.dkstrip{display:grid; grid-template-columns:minmax(4px,1fr) 34px 22px 30px minmax(8px,1fr) 46px; grid-template-rows:minmax(0,1fr) auto auto; gap:6px 6px; padding:10px 14px 10px}
+.dkstrip{display:grid; grid-template-columns:minmax(4px,1fr) 30px 34px 22px minmax(8px,1fr) 46px; grid-template-rows:minmax(0,1fr) auto auto; gap:6px 6px; padding:10px 14px 10px}
 /* stereo meter beside the fader: two wide pink bars (the skin's colour in the terminal skins), red at clip, with a dB scale */
-.stm{grid-row:1; grid-column:2; display:flex; gap:3px; position:relative}
+.stm{grid-row:1; grid-column:3; display:flex; gap:3px; position:relative}
 .stm i{flex:1; position:relative; border:1px solid var(--line); background:var(--panel2); overflow:hidden}
 .stm i::after{content:''; position:absolute; left:0; right:0; bottom:0; height:var(--lv, 0%); background:var(--stpink, #eba3bd)}
 .stm i.clip::after{background:var(--meter-clip)}
-.stsc{grid-row:1; grid-column:3; position:relative; margin:1px 0}
+.stsc{grid-row:1; grid-column:4; position:relative; margin:1px 0}
 .stsc i{position:absolute; left:0; right:0; transform:translateY(50%); font:var(--fs-1)/1 var(--mono); font-style:normal; color:var(--muted); text-align:center}
 /* the fader looks like the app's other sliders: a thin track filled in ink up to a round thumb */
-.stfad{grid-row:1; grid-column:4; justify-self:center; position:relative; width:30px; min-height:0; cursor:ns-resize; touch-action:none; outline-offset:2px; border-radius:3px}
+.stfad{grid-row:1; grid-column:2; justify-self:center; position:relative; width:30px; min-height:0; cursor:ns-resize; touch-action:none; outline-offset:2px; border-radius:3px}
 .stfad::before{content:''; position:absolute; left:50%; top:8px; bottom:8px; width:4px; margin-left:-2px; border-radius:2px; background:var(--track)}
 .stfill{position:absolute; left:50%; bottom:8px; width:4px; margin-left:-2px; border-radius:2px; background:var(--ink)}
 .stcap{position:absolute; left:50%; width:16px; height:16px; margin:0 0 -8px -8px; border-radius:50%; background:var(--ink)}
@@ -822,7 +822,7 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 @keyframes dkBreath{0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.025)}}
 @keyframes dkWag{0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-10deg)}}
 @media (prefers-reduced-motion: reduce){ .dogs .bob, .dogs .tail{animation:none!important} }
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"]) .dogs{--dk-pink:var(--mxsoft)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .dogs{--dk-pink:var(--mxsoft)}
 
 /* ---------- Terminal skins: Matrix (neon green on black) and the Simple set: black, white (both Helvetica) and mustard (on lavender) ----------
    One set of rules drawn from a few colours per skin: --mx (text, outlines, fills), --mx2 (secondary text),
@@ -861,6 +861,22 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
   --mxsoft:#ffffff; --mxpoly:#1f4fd6; --mxglowc:transparent; --mxscan:transparent; --mxred:#c0221b; --font:"Helvetica Neue",Helvetica,Arial,"Nimbus Sans","Liberation Sans",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:light}
 :root[data-skin="complement"]{--mx:#d9622b; --mx2:#8f5a45; --mxdim:#b9c4ec; --mxbg:#dfe6fb; --mxpanel:#e9eefc; --mxpanel2:#cfd8f6; --mxon:#fff8f3;
   --mxsoft:#f4a77f; --mxpoly:#3456b8; --mxglowc:transparent; --mxscan:transparent; --mxred:#b0302a; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="sunset"]{--mx:#c2452d; --mx2:#8f5b4b; --mxdim:#f1c3a8; --mxbg:#fde8da; --mxpanel:#fff1e7; --mxpanel2:#f8d6c1; --mxon:#fff8f2;
+  --mxsoft:#f7a072; --mxpoly:#7d4fb0; --mxglowc:transparent; --mxscan:transparent; --mxred:#8e1d12; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="forest"]{--mx:#1f5133; --mx2:#4f6d58; --mxdim:#c9d8b8; --mxbg:#f3f0e1; --mxpanel:#f8f6ec; --mxpanel2:#e5e4cc; --mxon:#fbfaf2;
+  --mxsoft:#9cc17e; --mxpoly:#9b5a2a; --mxglowc:transparent; --mxscan:transparent; --mxred:#b73a2c; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="desert"]{--mx:#a8502c; --mx2:#86664f; --mxdim:#e3cba8; --mxbg:#f5e8d2; --mxpanel:#faf2e4; --mxpanel2:#ecdcbe; --mxon:#fffaf2;
+  --mxsoft:#e8a96f; --mxpoly:#3f7a7a; --mxglowc:transparent; --mxscan:transparent; --mxred:#8e1d12; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="blossom"]{--mx:#b03a6b; --mx2:#8a5b70; --mxdim:#f2c8d8; --mxbg:#fdf0f4; --mxpanel:#fff7fa; --mxpanel2:#f8dde7; --mxon:#fffafc;
+  --mxsoft:#f59cbf; --mxpoly:#5b8a3a; --mxglowc:transparent; --mxscan:transparent; --mxred:#a5221b; --font:"Helvetica Neue",Helvetica,Arial,"Nimbus Sans","Liberation Sans",system-ui,sans-serif; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="slate"]{--mx:#33475b; --mx2:#5c6f80; --mxdim:#c4ced8; --mxbg:#e9eef2; --mxpanel:#f2f5f7; --mxpanel2:#dbe2e8; --mxon:#ffffff;
+  --mxsoft:#90a8bd; --mxpoly:#b0663a; --mxglowc:transparent; --mxscan:transparent; --mxred:#b73a2c; --font:"Helvetica Neue",Helvetica,Arial,"Nimbus Sans","Liberation Sans",system-ui,sans-serif; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="citrus"]{--mx:#c25e00; --mx2:#8a6a3a; --mxdim:#f2dc8f; --mxbg:#fff9d9; --mxpanel:#fffce9; --mxpanel2:#f8edb0; --mxon:#fffdf2;
+  --mxsoft:#ffc94d; --mxpoly:#2f8a4f; --mxglowc:transparent; --mxscan:transparent; --mxred:#a5221b; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="espresso"]{--mx:#f1dcc0; --mx2:#c8ab88; --mxdim:#5a4130; --mxbg:#2b1d14; --mxpanel:#33241a; --mxpanel2:#3f2d21; --mxon:#2b1d14;
+  --mxsoft:#ffb37a; --mxpoly:#9fd0b0; --mxglowc:transparent; --mxscan:transparent; --mxred:#ff7a66; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:dark}
+:root[data-skin="midnight"]{--mx:#d9c6ff; --mx2:#a99acb; --mxdim:#4a3a75; --mxbg:#1a1530; --mxpanel:#211a3c; --mxpanel2:#2c2350; --mxon:#1a1530;
+  --mxsoft:#ff9ad5; --mxpoly:#7ee0d0; --mxglowc:transparent; --mxscan:transparent; --mxred:#ff6b7a; --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:dark}
 :root[data-skin="mustard"]{--mx:#a37800; --mx2:#7d6a3c; --mxdim:#b5a2dc; --mxbg:#e3d9f6; --mxpanel:#eae2f9; --mxpanel2:#d8cbf1; --mxon:#fffaf0;
   --mxsoft:#f2cf63; --mxpoly:#6f55bf; --mxglowc:transparent; --mxscan:transparent; --mxred:#c0392b;
   --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
@@ -911,7 +927,7 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
   --ar-cur:var(--mx); --ar-mu:var(--mxred); --tk-mono:var(--mx); --tk-poly:var(--mxpoly)}
 :root[data-skinbase="term"] :is(.tagp b,.tgbox b){color:var(--mxon); text-shadow:none}
 :root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg))}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"]) .tdeck{--stpink:var(--mx)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .tdeck{--stpink:var(--mx)}
 :root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
 :root[data-skinbase="term"] .dkh .dksolo{background:var(--mxsoft); color:var(--mxon)} :root[data-skinbase="term"] .stms button.so.on{background:var(--mxsoft); color:var(--mxon)}
 :root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
@@ -3583,6 +3599,14 @@ const SKINS = [
   {id:'greywhite', name:'Simple grey', base:'term', dots:['#ffffff', '#595959', '#bdbdbd', '#9a9a9a']},
   {id:'contrast', name:'Simple contrast', base:'term', dots:['#ffe14d', '#111111', '#ffffff', '#1f4fd6']},
   {id:'complement', name:'Simple complement', base:'term', dots:['#dfe6fb', '#d9622b', '#f4a77f', '#3456b8']},
+  {id:'sunset', name:'Simple sunset', base:'term', dots:['#fde8da', '#c2452d', '#f7a072', '#7d4fb0']},
+  {id:'forest', name:'Simple forest', base:'term', dots:['#f3f0e1', '#1f5133', '#9cc17e', '#9b5a2a']},
+  {id:'desert', name:'Simple desert', base:'term', dots:['#f5e8d2', '#a8502c', '#e8a96f', '#3f7a7a']},
+  {id:'blossom', name:'Simple blossom', base:'term', dots:['#fdf0f4', '#b03a6b', '#f59cbf', '#5b8a3a']},
+  {id:'slate', name:'Simple slate', base:'term', dots:['#e9eef2', '#33475b', '#90a8bd', '#b0663a']},
+  {id:'citrus', name:'Simple citrus', base:'term', dots:['#fff9d9', '#c25e00', '#ffc94d', '#2f8a4f']},
+  {id:'espresso', name:'Simple espresso', base:'term', dots:['#2b1d14', '#f1dcc0', '#ffb37a', '#9fd0b0']},
+  {id:'midnight', name:'Simple midnight', base:'term', dots:['#1a1530', '#d9c6ff', '#ff9ad5', '#7ee0d0']},
 ];
 const SKK = 'thunderplus-skin-v1';
 let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k => k.id === v)) return v; } catch(e){} return 'mustard'; })();   // Simple mustard for a first visit
@@ -6908,6 +6932,9 @@ $('dkSolo').addEventListener('click', () => { S.mix.forEach(m => m.solo = false)
 function deckLayout(){
   const show = inMode === 'keys' && !kpOn && deck.on && view === 'tracker';
   $('tDeck').hidden = !show; if (!show) return;
+  // The strip lines up with what sits above it on the right: the side panel, or Arrange when that's hidden.
+  { const side = document.querySelector('.tside'), arr = $('tArr'), above = side && side.offsetWidth ? side : arr && arr.offsetWidth ? arr : null;
+    const w = above ? above.getBoundingClientRect().width : 0; $('tDeck').style.setProperty('--dkstw', (w >= 190 && w <= 420 ? Math.round(w) : 228) + 'px'); }
   $('tDeck').style.setProperty('--dkh', deck.h + 'px');
   $('tDeck').style.setProperty('--dkws', deck.ws + 'px'); $('tDeck').style.setProperty('--dkwf', deck.wf + 'px');
   const vis = DK_SECS.filter(([k]) => deck[k]).map(([k]) => k);
