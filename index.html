@@ -659,7 +659,8 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tagrid b.tm{opacity:.35}
 .tagrid b.c{outline:2px solid var(--ar-cur); outline-offset:0; position:relative; z-index:1}
 .tagrid b.c:not(.f):not(.m):not(.z):not(.p){color:var(--ar-dim)}
-.tafoot{flex:none; font-size:var(--fs-2); line-height:1.35; color:var(--ar-dim); padding:6px 10px 8px; border-top:1px solid var(--ts-line, var(--ar-line)); font-family:var(--font)}
+.tafx{display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden}
+.tafoot{flex:none; overflow:hidden; box-sizing:border-box; font-size:var(--fs-2); line-height:1.35; color:var(--ar-dim); padding:6px 10px 8px; border-top:1px solid var(--ts-line, var(--ar-line)); font-family:var(--font)}
 @media (max-width:480px){ .top{flex-wrap:wrap} .top .brand{display:none} .top .kitname{order:9; flex:1 1 100%} .top button{white-space:nowrap} .ttabs button{padding:0 10px; font-size:var(--fs-3)} .tmode .mx{display:none} .tmode{padding:0 10px} .tctl{padding-inline:10px} .tcmd{padding-inline:10px} }
 /* Colourful boxes at the bottom of every screen, the same as the tracker's PAD-mode nav pad: a darker grey
    panel, each button filled with one of the screens' pastels (Song, Sect, Phrase, Inst, Mixer, FX, Project in
@@ -1275,7 +1276,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
       <div class="tagp" id="tArrGp" aria-hidden="true"></div>
       <div class="tath" id="tArrTh"></div>
       <div class="tagrid" id="tArrGrid"></div>
-      <div class="tafoot">TAP: GO · a tap goes to a block, twice opens its phrase · HOLD · holding a block mutes or unmutes just that one (the phrase stays) · tap a row number to play from there</div>
+      <div class="tafoot"><span class="tafx">TAP: GO · a tap goes to a block, twice opens its phrase · HOLD · holding a block mutes or unmutes just that one (the phrase stays) · tap a row number to play from there</span></div>
     </aside>
     <aside class="tside" aria-label="Tracker status">
       <button type="button" class="tsidex" id="tSideX" title="Hide this side panel (Settings → SIDE PANEL brings it back)" aria-label="Hide the side panel"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
@@ -5705,7 +5706,7 @@ document.body.classList.toggle('noside', !sideOn);
 $('tSideX').addEventListener('click', () => { setSide(false); toast('Side panel hidden. Settings → SIDE PANEL brings it back.'); });
 function setStepDec(on){ stepDec = on; try { localStorage.setItem(SDK, on ? '1' : '0'); } catch(e){} arrSig = ''; draw(); }
 function setTScale(v){ tScale = clamp(Math.round(v / 10) * 10, 60, 200); try { localStorage.setItem(TSK, String(tScale)); } catch(e){} fit(); draw(); }
-function setArr(m){ arrMode = m; try { localStorage.setItem(ARK, String(m)); } catch(e){} arrBody(); arrSig = ''; draw(); fit(); }
+function setArr(m){ arrMode = m; try { localStorage.setItem(ARK, String(m)); } catch(e){} arrBody(); arrSig = ''; draw(); fit(); draw(); }
 const cs = {song:{x:0, y:0, top:0}, sect:{x:0, y:0}, phrase:{x:0, y:0, top:0}, inst:{x:0, y:0}, mixer:{x:0, y:0}, fx:{x:0, y:0}, project:{x:0, y:0}};
 let cSect = 0, cPhrase = 0, cInst = 0, cTrack = 0, cFxT = 0, cFxS = 0, lastFxType = 'eq', selA = null, clip = null;
 const last = {sect:0, phrase:0, note:ROOT, vol:255, inst:0, fxc:0, fxv:0};
@@ -6556,7 +6557,7 @@ function releaseAll(){ clearTimeout(rep); for (const k in held){ held[k] = false
 /* ---------- command row: one button for each two-key command ---------- */
 const CK = 'thunderplus-cmd-v1', coarse = matchMedia('(pointer:coarse)').matches;
 let cmdOn = (() => { try { const v = localStorage.getItem(CK); if (v === '1' || v === '0') return v === '1'; } catch(e){} return coarse; })();
-function setCmd(on){ cmdOn = on; try { localStorage.setItem(CK, on ? '1' : '0'); } catch(e){} draw(); fit(); }
+function setCmd(on){ cmdOn = on; try { localStorage.setItem(CK, on ? '1' : '0'); } catch(e){} draw(); fit(); draw(); }
 const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b:-1', '−', 'Change the value down (EDIT+◀)'], ['b:1', '+', 'Change the value up (EDIT+▶)'],
   ['b:16', '++', 'Change the value up a lot (EDIT+▲)'], ['prev', '‹', 'Previous: the block above in the song; the previous sect, phrase, instrument or FX track elsewhere (OPTION+◀)'], ['next', '›', 'Next: the block below in the song; the next sect, phrase, instrument or FX track elsewhere (OPTION+▶)'],
   ['clr', 'CLEAR', 'Clear (OPTION+EDIT)'], ['sel', 'SELECT', 'Start or cancel a selection (SHIFT+OPTION)'],
@@ -6668,6 +6669,7 @@ function measure(){
 }
 function fit(){
   if (view !== 'tracker') return;
+  fitTries = 0;
   const W = scr.clientWidth - 24, H = scr.clientHeight - 16; if (W <= 0 || H <= 0) return;
   // Height: the phrase's LEN line, its column header and 16 rows (18 lines) must fit in the grid, with the
   // title line and up to three info lines (0.8em each) around it: ~5.5em of extras. Then measure the grid
@@ -6685,7 +6687,20 @@ function fit(){
   if (tScale !== 100) scr.style.fontSize = Math.max(5, fs * tScale / 100).toFixed(2) + 'px';
 }
 // Song shows 16 rows, more when the screen is tall (unfolded in portrait).
-function songRows(){ const fs = parseFloat(scr.style.fontSize) || 14, h = grid.clientHeight - (grid.classList.contains('grp') ? fs * .9 : 0); return h > 0 ? clamp(Math.floor(h / (fs * 1.3) + 0.05) - 1, 8, 48) : 16; }
+function songRows(){ const fs = parseFloat(scr.style.fontSize) || 14, h = grid.clientHeight - (grid.classList.contains('grp') ? fs * 1.15 + fs * .12 + 3 : fs * .25); return h > 0 ? clamp(Math.floor(h / (fs * 1.3) + 0.02) - 1, 8, 48) : 16; }
+// After drawing: if the last line (or the MONO / POLY outline) pokes out of the bottom of the grid, take the
+// text down by just enough so it ends inside. A few tries at most, reset by every fit().
+let fitTries = 0;
+function fitCheck(){
+  if (tScale !== 100 || fitTries >= 3 || !(tv === 'song' || tv === 'phrase' || tv === 'mixer' || tv === 'sect')) return false;
+  const g = grid.getBoundingClientRect(), bottom = g.top + grid.clientTop + grid.clientHeight;
+  let end = 0; const lns = grid.querySelectorAll(':scope > .ln'); if (lns.length) end = lns[lns.length - 1].getBoundingClientRect().bottom;
+  grid.querySelectorAll('.tgbox').forEach(b => { end = Math.max(end, b.getBoundingClientRect().bottom); });
+  const over = end - bottom; if (!(over > 0.5)) return false;
+  const fs = parseFloat(scr.style.fontSize) || 14, used = end - g.top, nf = Math.max(7, fs * (used - over - 1.5) / used);
+  if (nf >= fs - 0.01) return false;
+  fitTries++; scr.style.fontSize = nf.toFixed(2) + 'px'; return true;
+}
 const BLK = ' ▁▂▃▄▅▆▇█';
 const lvl = p => p <= 0.0001 ? 0 : clamp((20 * Math.log10(p) + 48) / 48, 0, 1);
 let hKey = '';
@@ -6852,6 +6867,7 @@ function draw(){
     else { const g = grid.getBoundingClientRect(), r = cu.getBoundingClientRect(), m = r.width;
       if (r.right + m > g.right) grid.scrollLeft += r.right - g.right + m; else if (r.left - m < g.left) grid.scrollLeft -= g.left - r.left + m; } }
   groupBoxes();
+  if (fitCheck()){ draw(); return; }
   meterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mt')] : []; masterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mm')] : [];
   $('tTitle').textContent = title; $('tSub').textContent = sub;
   $('tInfo').textContent = info();
@@ -7512,12 +7528,23 @@ setInterval(() => { if (!document.hidden) arrLayout(); }, 1000);
 const tInfoBox = document.querySelector('.tinfo'), arrFoot = arrEl.querySelector('.tafoot');
 function footAlign(){
   if (!tInfoBox || !arrFoot) return;
-  tInfoBox.style.minHeight = arrFoot.style.minHeight = '';
-  if (!arrShown() || !tInfoBox.offsetHeight || !arrFoot.offsetHeight) return;
-  const a = tInfoBox.getBoundingClientRect(), b = arrFoot.getBoundingClientRect(), d = a.top - b.top;
-  if (Math.abs(d) < 0.5) return;
-  if (d > 0) tInfoBox.style.minHeight = (a.height + d) + 'px'; else arrFoot.style.minHeight = (b.height - d) + 'px';
+  const was = tInfoBox.style.minHeight;
+  const fx = arrFoot.firstElementChild;
+  tInfoBox.style.minHeight = arrFoot.style.height = ''; fx.style.webkitLineClamp = '';
+  if (arrShown() && tInfoBox.offsetHeight && arrFoot.offsetHeight){
+    const a = tInfoBox.getBoundingClientRect(), b = arrFoot.getBoundingClientRect(), d = a.top - b.top;
+    // ARRANGE's tips take the song info's height: longer tips are cut to the lines that fit (all of it is in
+    // the tooltip), so the song never loses rows to them. Only if the song info would end up shorter than one
+    // line of tips does the info grow instead.
+    const cs = getComputedStyle(arrFoot), lh = parseFloat(cs.lineHeight) || 14, pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + 1;
+    const h = b.bottom - a.top, n = Math.floor((h - pad) / lh + 0.05);
+    if (n >= 1){ if (Math.abs(d) > 0.5){ arrFoot.style.height = h + 'px'; fx.style.webkitLineClamp = String(n); } }
+    else tInfoBox.style.minHeight = (a.height + (lh + pad - h)).toFixed(1) + 'px';
+  }
+  // The song's grid just got taller or shorter: size its text again so nothing hangs off the bottom.
+  if (Math.abs((parseFloat(tInfoBox.style.minHeight) || 0) - (parseFloat(was) || 0)) > 0.5) requestAnimationFrame(() => { fit(); draw(); });
 }
+if (arrFoot) arrFoot.title = arrFoot.textContent;
 { const ro = new ResizeObserver(() => requestAnimationFrame(footAlign));
   ro.observe(arrEl); ro.observe($('tInfo')); ro.observe($('tHint')); if (tInfoBox) ro.observe(tInfoBox.parentElement); }
 let arrDrag = null, arrGripT = 0;
@@ -8005,7 +8032,7 @@ $('tOctV').addEventListener('click', () => setOct(4));
 function setOct(o){ kOct = clamp(o, 0, 8); toast('Octave ' + kOct + (view === 'synth' ? ' · Z plays C-' + kOct : '')); kpSig = ''; draw(); }
 function setInput(m){
   inMode = m === 'keys' ? 'keys' : 'pad'; try { localStorage.setItem(IK, inMode); } catch(e){}
-  releaseAll(); kpSig = ''; applyCmdOrder(); draw(); fit();
+  releaseAll(); kpSig = ''; applyCmdOrder(); draw(); fit(); draw();
 }
 // Keyboard in KEYS mode. Returns true when the key was used.
 function keysDown(e, pad){
