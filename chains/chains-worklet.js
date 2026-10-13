@@ -145,6 +145,45 @@ const Clouds = effect('clouds', 1, { mode:[0,0,3,1], lofi:[0,0,1,1], freeze:[0,0
 const Beads = effect('beads', 10, { media:[3,0,3,1], freeze:[0,0,1,1], time:[.2,0,1,.01], size:[.5,0,1,.01], pitch:[.5,0,1,.01], shape:[.5,0,1,.01],
     density:[.85,0,1,.01], fb:[.2,0,1,.01], blend:[1,0,1,.01], verb:[.25,0,1,.01] },
   p => [p.media | 0, 0, p.freeze >= .5 ? 1 : 0, u(p.time), u(p.size), u(p.pitch), u(p.shape), u(p.density), u(p.fb), u(p.blend), u(p.verb), 0], 5);
+/* Flanger, based on DaisySP Flanger (MIT). */
+const FlangerFx = effect('flanger', 11, { depth:[0.5,0,1,.01], rate:[0.3,0.05,5,.01], delay:[0.5,0,1,.01], fb:[0.5,0,0.95,.01], mix:[0.5,0,1,.01] },
+  p => [p.depth, p.rate, p.delay, p.fb, p.mix], 0.3);
+/* Tremolo, based on DaisySP Tremolo (MIT). */
+const TremoloFx = effect('tremolo', 13, { rate:[5,0.5,20,.01], depth:[0.7,0,1,.01], shape:[0,0,4,1] },
+  p => [p.rate, p.depth, p.shape | 0], 0.2);
+/* Overdrive, based on DaisySP Overdrive (MIT). */
+const OdriveFx = effect('odrive', 14, { drive:[0.5,0,1,.01], tone:[0.6,0,1,.01], out:[0.2,0,1,.01], mix:[1,0,1,.01] },
+  p => [p.drive, p.tone, p.out, p.mix], 0.3);
+/* Wavefolder, based on DaisySP Wavefolder (MIT). */
+const FolderFx = effect('folder', 15, { gain:[4,1,20,.01], offset:[0,-1,1,.01], out:[0.6,0,1,.01], mix:[1,0,1,.01] },
+  p => [p.gain, p.offset, p.out, p.mix], 0.2);
+/* Auto-wah, based on DaisySP Autowah (MIT). */
+const AutowahFx = effect('autowah', 16, { wah:[0.6,0,1,.01], level:[0.8,0,1,.01], mix:[1,0,1,.01] },
+  p => [p.wah, p.level, p.mix], 0.3);
+/* Pitch shifter, based on DaisySP PitchShifter (MIT). */
+const PshiftFx = effect('pshift', 17, { semis:[7,-24,24,1], win:[80,10,300,1], spray:[0,0,1,.01], mix:[1,0,1,.01] },
+  p => [p.semis | 0, p.win, p.spray, p.mix], 0.4);
+/* Ladder filter, based on DaisySP LadderFilter (MIT). */
+const LadderFx = effect('ladder', 18, { cut:[1200,30,16000,1], res:[0.6,0,1.8,.01], drive:[1,0,4,.01], mode:[0,0,5,1], mix:[1,0,1,.01] },
+  p => [p.cut, p.res, p.drive, p.mode | 0, p.mix], 0.6);
+/* Cross-mod, based on Mutable Instruments Warps (MIT). */
+const XmodFx = effect('xmod', 19, { alg:[0.3,0,1,.01], timbre:[0.5,0,1,.01], carrier:[3,0,3,1], note:[48,24,96,1], clvl:[0.8,0,1,.01], mlvl:[0.8,0,1,.01], mix:[1,0,1,.01] },
+  p => [p.alg, p.timbre, p.clvl, p.mlvl, p.carrier | 0, p.note | 0, p.mix], 1.2);
+/* Space reverb, based on Cloud Seed (Ghost Note Audio) (MIT). */
+const SpaceFx = effect('space', 20, { size:[0.5,0,1,.01], decay:[0.55,0,1,.01], diff:[0.7,0,1,.01], mod:[0.4,0,1,.01], tone:[0.6,0,1,.01], lowcut:[0.2,0,1,.01], pre:[0.1,0,1,.01], mix:[0.35,0,1,.01] },
+  p => [p.size, p.decay, p.diff, p.mod, p.tone, p.lowcut, p.pre, p.mix], 2);
+/* Lo-fi, based on Airwindows DeRez2 (MIT). */
+const LofiFx = effect('lofi', 21, { rate:[0.6,0,1,.01], rez:[0.6,0,1,.01], hard:[0.5,0,1,.01], mix:[1,0,1,.01] },
+  p => [p.rate, p.rez, p.hard, p.mix], 0.3);
+/* Drive, based on Airwindows PurestDrive (MIT). */
+const DriveFx = effect('drive', 22, { drive:[0.5,0,1,.01] },
+  p => [p.drive], 0.2);
+/* Air, based on Airwindows Air3 (MIT). */
+const AirFx = effect('air', 23, { air:[0.5,0,1,.01], gnd:[0.5,0,1,.01] },
+  p => [p.air, p.gnd], 0.3);
+/* Room reverb, based on Airwindows Verbity2 (MIT). */
+const RoomFx = effect('room', 24, { size:[0.5,0,1,.01], sustain:[0.5,0,1,.01], mulch:[0.5,0,1,.01], wet:[0.35,0,1,.01] },
+  p => [p.size, p.sustain, p.mulch, p.wet], 1);
 
 /* ── control ──────────────────────────────────────────────────────────────── */
 const LFO = {
@@ -393,6 +432,98 @@ const Phaser = {
 };
 
 /* Stereo width (mid/side) with a bass-mono control. In R is optional (mono up to stereo). */
+/* ── tempo-synced control and beat repeat (added Oct 2026, original code) ──────────────────────────────────
+   Note values in beats, shared by Steps, Clock and Repeat. They restart from the downbeat when the song starts
+   (the engine counts transport starts in transport.startN). */
+const DIV_BEATS = [.0625, .125, 1 / 6, .25, 1 / 3, .5, 1, 2, 4, 8];
+const divBeats = v => DIV_BEATS[clamp(v | 0, 0, DIV_BEATS.length - 1)];
+const restarted = (st, ctx) => { const n = ctx.transport.startN || 0; if (st.sn !== n){ st.sn = n; return true; } return false; };
+
+/* Steps: an 8-step CV sequence, one step per note value, with a gate out on every step and optional glide. */
+const Steps = {
+  type:'steps', scope:'mono', cost:.05,
+  inputs:{ clock:'gate', reset:'gate' }, outputs:{ out:'cv', gate:'gate' },
+  params:{ div:[3,0,9,1], len:[8,1,8,1], glide:[0,0,1,.01], depth:[1,0,1,.01],
+    s1:[0,-1,1,.01], s2:[0,-1,1,.01], s3:[0,-1,1,.01], s4:[0,-1,1,.01], s5:[0,-1,1,.01], s6:[0,-1,1,.01], s7:[0,-1,1,.01], s8:[0,-1,1,.01] },
+  create:() => ({ ph:0, step:0, y:0, c:0, r:0, sn:-1 }),
+  process(st, io, ctx){
+    const ext = linked(io, 'clock'), hz = ctx.transport.tempo / 60 / divBeats(io.p.div), n = io.p.len | 0 || 8;
+    const k = io.p.glide > 0 ? 1 - Math.exp(-1 / (ctx.sr * io.p.glide * .25 / hz)) : 1;
+    if (restarted(st, ctx)){ st.ph = 0; st.step = 0; }
+    for (let i = 0; i < ctx.block; i++){
+      const rs = io.in.reset[i] > .5; if (rs && !st.r){ st.ph = 0; st.step = 0; } st.r = rs;
+      if (ext){ const g = io.in.clock[i] > .5; if (g && !st.c){ st.step = (st.step + 1) % n; st.ph = 0; } st.c = g; }
+      else { st.ph += hz / ctx.sr; if (st.ph >= 1){ st.ph -= 1; st.step = (st.step + 1) % n; } }
+      if (st.step >= n) st.step = 0;
+      const tgt = io.p['s' + (st.step + 1)] * io.p.depth; st.y += (tgt - st.y) * k;
+      io.out.out[i] = st.y; io.out.gate[i] = ext ? (io.in.clock[i] > .5 ? 1 : 0) : (st.ph < .5 ? 1 : 0);
+    }
+  }
+};
+
+/* Clock: a gate every note value (with swing on every second one) and a ramp that rises 0→1 across each one.
+   The ramp, patched into a slider, scans it in time with the song: the tempo-synced ramp trick. */
+const Clock = {
+  type:'clock', scope:'mono', cost:.03,
+  inputs:{ reset:'gate' }, outputs:{ gate:'gate', ramp:'cv', bar:'cv' },
+  params:{ div:[3,0,9,1], swing:[0,0,.75,.01], width:[.5,.05,.95,.01], bars:[1,1,16,1] },
+  create:() => ({ ph:0, n:0, bp:0, r:0, sn:-1 }),
+  process(st, io, ctx){
+    const beats = divBeats(io.p.div), hz = ctx.transport.tempo / 60 / beats, sw = io.p.swing, w = io.p.width;
+    const barHz = ctx.transport.tempo / 60 / (4 * Math.max(1, io.p.bars | 0));
+    if (restarted(st, ctx)){ st.ph = 0; st.n = 0; st.bp = 0; }
+    for (let i = 0; i < ctx.block; i++){
+      const rs = io.in.reset[i] > .5; if (rs && !st.r){ st.ph = 0; st.n = 0; st.bp = 0; } st.r = rs;
+      st.ph += hz / ctx.sr; if (st.ph >= 1){ st.ph -= 1; st.n ^= 1; }
+      st.bp += barHz / ctx.sr; if (st.bp >= 1) st.bp -= 1;
+      // swing delays every second pulse by up to three quarters of a step
+      const off = st.n ? sw * .5 : 0, q = st.ph - off;
+      io.out.gate[i] = q >= 0 && q < w * (1 - off) ? 1 : 0;
+      io.out.ramp[i] = st.ph; io.out.bar[i] = st.bp;
+    }
+  }
+};
+
+/* Repeat: beat repeat, reverse and tape stop. It keeps the last 4 s; while Hold is on (or the Gate input is high)
+   it loops the note-value slice it caught, each pass Decay quieter and Pitch lower, or slows to a stop. */
+const Repeat = {
+  type:'repeat', scope:'mono', cost:.15,
+  inputs:{ in:'audio', inR:'audio', gate:'gate' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ hold:[0,0,1,1], mode:[0,0,2,1], div:[3,0,9,1], decay:[0,0,1,.01], pitch:[0,-12,0,.1], mix:[1,0,1,.01] },
+  create(sr){ const n = Math.round(sr * 4); return { L:new Float32Array(n), R:new Float32Array(n), w:0, on:false, at:0, len:1, pos:0, pass:0, sp:1, fade:0 }; },
+  process(st, io, ctx){
+    const N = st.L.length, inR = linked(io, 'inR') ? io.in.inR : io.in.in, gl = linked(io, 'gate');
+    const mode = io.p.mode | 0, mix = io.p.mix, dec = io.p.decay, pst = io.p.pitch;
+    for (let i = 0; i < ctx.block; i++){
+      const l = io.in.in[i], r = inR[i];
+      const want = io.p.hold >= .5 || (gl && io.in.gate[i] > .5);
+      if (want && !st.on){   // catch the slice that just played
+        st.on = true; st.len = Math.max(64, Math.min(N - 1, Math.round(divBeats(io.p.div) * 60 / Math.max(ctx.transport.tempo, 20) * ctx.sr)));
+        st.at = mode === 2 ? (st.w - 1 + N) % N : (st.w - st.len + N) % N; st.pos = 0; st.pass = 0; st.sp = 1;
+      } else if (!want && st.on) st.on = false;
+      // a repeat loops a frozen slice; a tape stop keeps recording and reads ever further behind it
+      if (!st.on || mode === 2){ st.L[st.w] = l; st.R[st.w] = r; st.w = (st.w + 1) % N; }
+      st.fade += ((st.on ? 1 : 0) - st.fade) * .004;   // ~5 ms crossfade in and out of the repeat
+      let ol = l, or = r;
+      if (st.fade > 1e-4){
+        let p;
+        if (mode === 2){ st.sp = Math.max(0, st.sp - 1 / st.len); p = st.pos; st.pos += st.sp; }   // tape stop: slows to a halt over one slice
+        else {
+          const g = Math.pow(2, pst * st.pass / 12); p = mode === 1 ? st.len - 1 - st.pos : st.pos; st.pos += g;
+          if (st.pos >= st.len){ st.pos -= st.len; st.pass++; }
+        }
+        const j = mode === 2 ? p : Math.min(st.len - 1, Math.max(0, p)), k = j | 0, f = j - k, a = (st.at + k) % N, b = (a + 1) % N;
+        const lv = mode === 2 ? 1 : Math.pow(1 - dec * .9, st.pass);
+        // a short fade at the slice edges keeps the loop point from clicking
+        const e = mode === 2 ? 1 : Math.min(1, Math.min(j, st.len - 1 - j) / 48);
+        const wl = (st.L[a] + (st.L[b] - st.L[a]) * f) * lv * e, wr = (st.R[a] + (st.R[b] - st.R[a]) * f) * lv * e;
+        const m = st.fade * mix; ol = l + (wl - l) * m; or = r + (wr - r) * m;
+      }
+      io.out.out[i] = ol; io.out.outR[i] = or;
+    }
+  }
+};
+
 const Width = {
   type:'width', scope:'mono', cost:.1,
   inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
@@ -601,8 +732,9 @@ const MODULES = { trackIn:TrackIn,
   vocoder:Vocoder,
   vcf:VCF, vca:VCA, mixer:Mixer,
   eq:EQ, comp:Comp, saturation:Saturation, tape:Tape, chorus:Chorus, crush:Crush, delay:Delay, reverb:Reverb, rings:Rings, clouds:Clouds, beads:Beads,
+  flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   scin:SidechainIn, sccomp:SidechainComp,
-  lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter,
+  lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter, steps:Steps, clock:Clock, repeat:Repeat,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant,
   blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong, chainOut:ChainOut };
 
@@ -680,7 +812,7 @@ class ChainsEngine {
     this._act = act; this._actKey = key; return act;
   }
   setParams(list){ for (const [id, name, v] of list) this.setParam(id, name, v); }
-  setTransport(t){ Object.assign(this.transport, t); }
+  setTransport(t){ const was = !!this.transport.playing; Object.assign(this.transport, t); if (!was && this.transport.playing) this.transport.startN = (this.transport.startN || 0) + 1; }
   /* Keep every module's state (filter memories, reverb tails) when the patch changes. */
   _sync(){
     for (const id of [...this._ios.keys()]) if (!this.graph.mods.has(id)) this._ios.delete(id);

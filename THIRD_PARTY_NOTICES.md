@@ -2,25 +2,34 @@
 
 ...Thunder's synthesis and effects module (`dsp/`) and the tracker's track-effects module (`dsp/tfx/`),
 both compiled to WebAssembly and embedded in `index.html`, are built from the following MIT-licensed projects. The wrappers and the build
-script, including two small patches, are in the `dsp` folder.
+script, including a few small patches, are in the `dsp` folder. Effects and oscillators that come from these projects are
+given generic names in the app (Cross-mod, Space reverb, Lo-fi…); each one's source is credited below and in the app.
 
-## Mutable Instruments: Plaits, Rings, Clouds, Beads, Elements (and stmlib)
+## Mutable Instruments: Plaits, Rings, Clouds, Beads, Elements, Warps (and stmlib)
 
 https://github.com/pichenettes/eurorack. Copyright Emilie Gillet.
-"Mutable Instruments", "Plaits", "Rings", "Clouds", "Beads" and "Elements" are names of Mutable Instruments'
-products; ...Thunder is not affiliated with or endorsed by Mutable Instruments.
+"Mutable Instruments", "Plaits", "Rings", "Clouds", "Beads", "Elements" and "Warps" are names of Mutable Instruments'
+products; ...Thunder is not affiliated with or endorsed by Mutable Instruments. Warps is the app's Cross-mod effect.
 
-## Airwindows: Density, ToTape6, EQ, Pressure4, Galactic and TapeDelay2
+## Airwindows: Density, ToTape6, EQ, Pressure4, Galactic, TapeDelay2, DeRez2, PurestDrive, Air3 and Verbity2
+
+In the app DeRez2 is Lo-fi, PurestDrive is Drive, Air3 is Air and Verbity2 is Room reverb.
 
 https://github.com/airwindows/airwindows. Copyright (c) 2018 Chris Johnson.
 
-## DaisySP: Chorus and Decimator
+## DaisySP: Chorus, Decimator, Flanger, Phaser, Tremolo, Overdrive, Wavefolder, Autowah, PitchShifter, LadderFilter
 
-https://github.com/electro-smith/DaisySP. Copyright (c) 2020 Electrosmith, Corp.
+https://github.com/electro-smith/DaisySP. Copyright (c) 2020 Electrosmith, Corp. Only the MIT-licensed main library is
+used (not the separate DaisySP-LGPL modules).
+
+## Cloud Seed (CloudSeedCore)
+
+https://github.com/GhostNoteAudio/CloudSeedCore. Copyright (c) 2024 Ghost Note Audio / Ghost Note Engineering Ltd.
+The app's Space reverb. Its delay buffers are shrunk at build time to fit phones (see `dsp/tfx/build.sh`).
 
 ---
 
-All three are released under the MIT License:
+All four are released under the MIT License:
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
