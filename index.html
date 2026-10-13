@@ -797,20 +797,25 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .stgph{flex:1; min-height:0; display:flex; flex-direction:column; gap:4px; font:var(--fs-2)/1.2 var(--mono); color:var(--ts-dim)}
 .stgph b{font-weight:600; letter-spacing:.06em}
 .stgph canvas{flex:1; min-height:0; width:100%; display:block}
-.dogs{--dk-ink:var(--ink); --dk-fill:var(--panel); --dk-pink:#f4a9c4; width:100%; height:100%; overflow:visible}
-.dogs .ln{fill:var(--dk-fill); stroke:var(--dk-ink); stroke-width:2.2; stroke-linejoin:round; stroke-linecap:round}
-.dogs .o{fill:none; stroke:var(--dk-ink); stroke-width:13; stroke-linecap:round}
-.dogs .f{fill:none; stroke:var(--dk-fill); stroke-width:8.6; stroke-linecap:round}
-.dogs .o.t{stroke-width:8} .dogs .f.t{stroke-width:3.6}
+.dogs{--dk-ink:var(--ink); --dk-fill:var(--panel); --dk-pink:#f4a9c4;
+  --dk-brown:color-mix(in srgb, #8a5a43 62%, var(--dk-fill)); --dk-muzzle:color-mix(in srgb, #8a5a43 48%, var(--dk-fill));
+  --dk-grey:color-mix(in srgb, #8c8276 52%, var(--dk-fill)); --dk-cream:color-mix(in srgb, #efe3cc 80%, var(--dk-fill)); --dk-white:color-mix(in srgb, #ffffff 88%, var(--dk-fill));
+  width:100%; height:100%; overflow:visible}
+.dogs .ln{fill:var(--dk-fill); stroke:var(--dk-ink); stroke-width:2; stroke-linejoin:round; stroke-linecap:round}
+.dogs .c-brown{fill:var(--dk-brown)} .dogs .c-muzzle{fill:var(--dk-muzzle)} .dogs .c-grey{fill:var(--dk-grey)} .dogs .c-cream{fill:var(--dk-cream)} .dogs .c-white{fill:var(--dk-white)}
+.dogs .o{fill:none; stroke:var(--dk-ink); stroke-width:7.5; stroke-linecap:round}
+.dogs .f{fill:none; stroke:var(--dk-brown); stroke-width:3.6; stroke-linecap:round}
 .dogs .ink{fill:var(--dk-ink); stroke:none}
-.dogs .eye{fill:none}
+.dogs .eye, .dogs .toe{fill:none; stroke-width:1.6}
 .dogs .band{fill:var(--dk-pink)}
-.dogs .blaze{stroke-dasharray:3 2.4}
 .dogs :is(.bob,.arm,.head,.tail){transform-box:fill-box}
 .dogs .bob{transform-origin:50% 100%}
-.dogs .al{transform-origin:100% 0%; transform:rotate(var(--aL, 0deg))} .dogs .ar{transform-origin:0% 0%; transform:rotate(var(--aR, 0deg))}
+.dogs .al{transform-origin:100% 0%; transform:rotate(var(--aL, 14deg))} .dogs .ar{transform-origin:0% 0%; transform:rotate(var(--aR, -14deg))}
 .dogs .head{transform-origin:50% 90%}
 .dogs .d1 .tail{transform-origin:0% 100%} .dogs .d2 .tail{transform-origin:0% 85%}
+/* On the dark terminal skins the coats are tints of the skin's colour, so the dogs stay part of the screen. */
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"]) .dogs{--dk-brown:color-mix(in srgb, var(--dk-ink) 32%, var(--dk-fill)); --dk-muzzle:color-mix(in srgb, var(--dk-ink) 22%, var(--dk-fill));
+  --dk-grey:color-mix(in srgb, var(--dk-ink) 26%, var(--dk-fill)); --dk-cream:color-mix(in srgb, var(--dk-ink) 12%, var(--dk-fill)); --dk-white:color-mix(in srgb, var(--dk-ink) 6%, var(--dk-fill))}
 .dogs.idle .bob{animation:dkBreath 3.4s ease-in-out infinite} .dogs.idle .d2 .bob{animation-delay:-1.7s}
 .dogs.idle .tail{animation:dkWag 2.6s ease-in-out infinite}
 .dogs.dance .dog{--aL:112deg; --aR:-112deg}
@@ -818,7 +823,7 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 @keyframes dkBreath{0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.025)}}
 @keyframes dkWag{0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-10deg)}}
 @media (prefers-reduced-motion: reduce){ .dogs .bob, .dogs .tail{animation:none!important} }
-:root[data-skinbase="term"] .dogs{--dk-pink:var(--mxsoft)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"]) .dogs{--dk-pink:var(--mxsoft)}
 
 /* ---------- Terminal skins: Matrix (neon green on black) and the Simple set: black, white (both Helvetica) and mustard (on lavender) ----------
    One set of rules drawn from a few colours per skin: --mx (text, outlines, fills), --mx2 (secondary text),
@@ -1119,49 +1124,55 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div class="tscr" id="tScr">
       <div class="tstage" id="tStage" hidden aria-hidden="true">
         <button type="button" class="stgx" id="tStageX" title="Hide (Settings → STAGE brings it back)" aria-label="Hide the stage"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
-        <div class="stgdogs" id="tStageDogs"><svg class="dogs" viewBox="0 0 270 210" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
-  <!-- Pittie-dachshund: chunky, short legs, one ear perked and flopped, white chest blaze, happy squint -->
-  <g class="dog d1" transform="translate(8 28)">
+        <div class="stgdogs" id="tStageDogs"><svg class="dogs" viewBox="0 0 280 222" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+  <!-- Pittie-dachshund (brown, stocky, short legs, broad head, short muzzle, folded left ear, sideways right ear,
+       white chest blaze and toes, happy squint, thin tail) -->
+  <g class="dog d1" transform="translate(6 46)">
     <g class="bob">
-      <g class="tail"><path class="o t" d="M84 132 Q108 128 114 104"/><path class="f t" d="M84 132 Q108 128 114 104"/></g>
-      <g class="leg"><path class="o" d="M48 134 L45 162"/><path class="f" d="M48 134 L45 162"/><path class="o" d="M72 134 L75 162"/><path class="f" d="M72 134 L75 162"/>
-        <path class="ln" d="M34 169 Q45 157 55 169 Z M65 169 Q75 157 86 169 Z"/></g>
-      <g class="arm al"><path class="o" d="M36 94 L24 120"/><path class="f" d="M36 94 L24 120"/></g>
-      <g class="arm ar"><path class="o" d="M84 94 L96 120"/><path class="f" d="M84 94 L96 120"/></g>
-      <path class="ln" d="M60 76 C90 76 96 100 94 118 C92 138 78 146 60 146 C42 146 28 138 26 118 C24 100 30 76 60 76 Z"/>
-      <path class="ln blaze" d="M50 86 Q60 92 70 86 L62 108 Q60 112 58 108 Z"/>
+      <g class="tail"><path class="o t" d="M90 140 C106 138 114 126 116 106"/><path class="f t c-brown-s" d="M90 140 C106 138 114 126 116 106"/></g>
+      <path class="ln c-brown" d="M44 132 C32 134 28 150 32 160 C33 165 30 168 26 170 C23 174 30 176 38 175 C44 175 46 172 45 168 C44 162 48 156 50 148 Z"/><path class="ln c-brown" d="M 86 132 C 98 134 102 150 98 160 C 97 165 100 168 104 170 C 107 174 100 176 92 175 C 86 175 84 172 85 168 C 86 162 82 156 80 148 Z"/>
+      <path class="ln toe" d="M27 171 l3 -3 M32 173 l2 -3 M103 171 l-3 -3 M98 173 l-2 -3"/>
+      <path class="ln c-brown" d="M65 70 C88 70 99 86 99 106 C99 128 93 146 79 150 C71 152 59 152 51 150 C37 146 31 128 31 106 C31 86 42 70 65 70 Z"/>
+      <path class="ln c-white" d="M57 84 C61 88 69 88 73 84 C72 93 69 101 65 110 C61 101 58 93 57 84 Z"/>
+      <g class="arm al"><path class="ln c-brown" d="M46 86 C38 90 33 100 31 112 C30 118 29 122 31 124 C35 127 39 124 39 120 C41 110 45 102 52 96 Z"/><path class="ln toe" d="M31 121 l3 -1"/></g>
+      <g class="arm ar"><path class="ln c-brown" d="M 84 86 C 92 90 97 100 99 112 C 100 118 101 122 99 124 C 95 127 91 124 91 120 C 89 110 85 102 78 96 Z"/><path class="ln toe" d="M99 121 l-3 -1"/></g>
       <g class="head">
-        <path class="ln" d="M36 36 Q26 36 24 52 Q32 54 40 46 Z"/>
-        <path class="ln" d="M80 34 Q84 14 98 18 Q104 22 96 28 Q88 32 82 44 Z"/>
-        <path class="ln" d="M60 24 C80 24 90 34 89 48 C88 62 80 70 60 70 C40 70 32 62 31 48 C30 34 40 24 60 24 Z"/>
-        <path class="ln" d="M60 52 C72 52 76 58 75 63 C74 70 68 73 60 73 C52 73 46 70 45 63 C44 58 48 52 60 52 Z"/>
-        <path class="ln eye" d="M45 46 Q50 41 55 46 M65 46 Q70 41 75 46"/>
-        <ellipse class="ink" cx="60" cy="57" rx="5" ry="3.4"/>
-        <path class="ln eye" d="M53 64 Q60 70 67 64"/>
+        <path class="ln c-brown" d="M42 32 C36 26 28 30 28 39 C28 44 33 46 37 43 C40 39 42 35 45 33 Z"/>
+        <path class="ln c-brown" d="M87 30 C95 22 106 22 111 28 C112 33 107 35 101 35 C96 37 92 39 89 42 Z"/>
+        <path class="ln c-brown" d="M65 18 C82 18 93 28 94 41 C95 49 93 56 91 60 C88 67 82 71 76 73 L54 73 C48 71 42 67 39 60 C37 56 35 49 36 41 C37 28 48 18 65 18 Z"/>
+        <path class="ln c-muzzle" d="M51 55 C51 48 57 45 65 45 C73 45 79 48 79 55 C79 63 74 69 65 69 C56 69 51 63 51 55 Z"/>
+        <path class="ln eye" d="M58 31 C61 29 69 29 72 31"/>
+        <path class="ln eye" d="M45 41 C49 45 54 45 58 41 M72 41 C76 45 81 45 85 41"/>
+        <path class="ink" d="M59 51 C59 47 71 47 71 51 C71 54 68 57 65 57 C62 57 59 54 59 51 Z"/>
+        <path class="ln eye" d="M65 57 L65 60 M57 61 C61 64 69 64 73 61"/>
       </g>
     </g>
   </g>
-  <!-- Husky mix: taller and fluffy, big ears, curled tail, pink bandana, long muzzle, tongue out -->
-  <g class="dog d2" transform="translate(138 4)">
+  <!-- Husky mix (grey back, cream chest and legs, dark cap with a widow's peak over a white mask, long muzzle,
+       upright ears, big curled tail, pink bandana with dots, tongue out) -->
+  <g class="dog d2" transform="translate(140 0)">
     <g class="bob">
-      <g class="tail"><path class="o" d="M82 156 Q120 156 114 120 Q110 100 94 110"/><path class="f" d="M82 156 Q120 156 114 120 Q110 100 94 110"/></g>
-      <g class="leg"><path class="o" d="M48 156 L44 190"/><path class="f" d="M48 156 L44 190"/><path class="o" d="M72 156 L76 190"/><path class="f" d="M72 156 L76 190"/>
-        <path class="ln" d="M33 197 Q44 185 54 197 Z M66 197 Q76 185 87 197 Z"/></g>
-      <g class="arm al"><path class="o" d="M38 104 L26 134"/><path class="f" d="M38 104 L26 134"/></g>
-      <g class="arm ar"><path class="o" d="M82 104 L94 134"/><path class="f" d="M82 104 L94 134"/></g>
-      <path class="ln" d="M60 84 C86 84 90 112 88 136 C86 162 72 170 60 170 C48 170 34 162 32 136 C30 112 34 84 60 84 Z"/>
-      <path class="ln eye" d="M48 128 l4 6 l4 -6 l4 6 l4 -6 l4 6 l4 -6"/>
-      <path class="ln band" d="M36 90 Q60 100 84 90 L67 114 Q60 119 53 114 Z"/>
+      <g class="tail"><path class="ln c-grey" d="M86 152 C112 152 124 134 120 110 C118 94 104 90 97 100 C106 103 109 116 103 127 C99 135 91 140 84 142 Z"/>
+        <path class="ln eye" d="M100 106 C108 108 112 118 108 128"/></g>
+      <path class="ln c-cream" d="M44 150 C30 154 26 172 32 184 C33 188 30 190 26 192 C23 196 30 198 38 197 C44 197 46 194 45 190 C44 182 48 174 52 164 Z"/><path class="ln c-cream" d="M 86 150 C 100 154 104 172 98 184 C 97 188 100 190 104 192 C 107 196 100 198 92 197 C 86 197 84 194 85 190 C 86 182 82 174 78 164 Z"/>
+      <path class="ln toe" d="M27 193 l3 -3 M32 195 l2 -3 M103 193 l-3 -3 M98 195 l-2 -3"/>
+      <path class="ln c-grey" d="M65 82 C88 82 97 100 97 122 C97 144 91 160 77 164 C71 166 59 166 53 164 C39 160 33 144 33 122 C33 100 42 82 65 82 Z"/>
+      <path class="ln c-cream" d="M65 96 C76 96 82 108 82 124 C82 142 76 156 65 158 C54 156 48 142 48 124 C48 108 54 96 65 96 Z"/>
+      <path class="ln band" d="M39 88 C55 99 75 99 91 88 L73 117 C69 121 61 121 57 117 Z"/>
+      <circle class="ink" cx="53" cy="97" r="1.6"/><circle class="ink" cx="65" cy="103" r="1.6"/><circle class="ink" cx="77" cy="97" r="1.6"/><circle class="ink" cx="61" cy="112" r="1.6"/><circle class="ink" cx="70" cy="111" r="1.6"/>
+      <g class="arm al"><path class="ln c-cream" d="M47 98 C39 102 34 116 32 130 C31 136 30 140 32 142 C36 145 40 142 40 138 C42 126 46 116 53 108 Z"/></g>
+      <g class="arm ar"><path class="ln c-cream" d="M 83 98 C 91 102 96 116 98 130 C 99 136 100 140 98 142 C 94 145 90 142 90 138 C 88 126 84 116 77 108 Z"/></g>
       <g class="head">
-        <path class="ln" d="M40 44 L32 8 L58 32 Z"/>
-        <path class="ln" d="M80 44 L88 8 L62 32 Z"/>
-        <path class="ln" d="M60 26 C78 26 86 36 86 48 L90 54 L84 58 L87 64 L80 66 C76 74 70 80 60 80 C50 80 44 74 40 66 L33 64 L36 58 L30 54 L34 48 C34 36 42 26 60 26 Z"/>
-        <path class="ln eye" d="M40 52 Q48 44 56 52 Q60 56 64 52 Q72 44 80 52"/>
-        <path class="ln" d="M60 56 C68 56 71 62 70 68 C69 76 64 80 60 80 C56 80 51 76 50 68 C49 62 52 56 60 56 Z"/>
-        <circle class="ink" cx="51" cy="49" r="2.6"/><circle class="ink" cx="69" cy="49" r="2.6"/>
-        <ellipse class="ink" cx="60" cy="62" rx="4.4" ry="3.1"/>
-        <path class="ln eye" d="M54 70 Q60 75 66 70"/>
-        <path class="ln band" d="M57 72 Q60 84 63 72 Z"/>
+        <path class="ln c-grey" d="M45 34 L41 7 C48 9 57 19 59 28 Z"/>
+        <path class="ln c-grey" d="M85 34 L89 7 C82 9 73 19 71 28 Z"/>
+        <path class="ln eye" d="M46 30 L44 14 M84 30 L86 14"/>
+        <path class="ln c-grey" d="M65 21 C82 21 92 31 92 45 C92 53 96 57 94 61 C90 63 88 67 84 71 C78 77 72 80 65 80 C58 80 52 77 46 71 C42 67 40 63 36 61 C34 57 38 53 38 45 C38 31 48 21 65 21 Z"/>
+        <path class="ln c-white" d="M65 35 C60 39 52 37 46 43 C42 49 42 59 46 65 C52 73 58 77 65 77 C72 77 78 73 84 65 C88 59 88 49 84 43 C78 37 70 39 65 35 Z"/>
+        <path class="ln c-white" d="M56 55 C56 49 60 47 65 47 C70 47 74 49 74 55 C74 65 70 73 65 73 C60 73 56 65 56 55 Z"/>
+        <path class="ink" d="M49 47 C52 44 56 44 58 47 C56 49.5 52 49.5 49 47 Z M72 47 C74 44 78 44 81 47 C78 49.5 74 49.5 72 47 Z"/>
+        <path class="ink" d="M60 55 C60 52 70 52 70 55 C70 58 67 60 65 60 C63 60 60 58 60 55 Z"/>
+        <path class="ln band" d="M61 65 C61 74 69 74 69 65 Z"/>
+        <path class="ln eye" d="M58 63 C60 67 70 67 72 63"/>
       </g>
     </g>
   </g>
