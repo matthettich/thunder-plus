@@ -129,6 +129,22 @@ If a link stops working, the server process was stopped — restart it with the 
    chains and waves pages and the rebuilt Thunder- page all rendered in headless Chrome with clean
    consoles; syntax/cache checks pass. A local Node benchmark on this machine measured 64-band full
    mode at ~1.3% of one CPU core. Live AudioWorklet playback still needs a real browser.
+7. **Mobile performance pass (uncommitted, no worklet change).** Aimed at Fold-class input lag / minor
+   hangs:
+   - **Tracker meters** (`index.html` `frame()`): the analyser scan ran every display frame for the whole
+     life of the tracker view (up to 2.2M sample reads/s at 120Hz with 32 tracks). It now runs ~30×/s and
+     stops entirely once nothing has sounded for 1.5 s (`audioWake`, bumped by `flash`/`pump`/`preview`),
+     with the decay made time-based so the fall-off is unchanged.
+   - **Graph editors** (`waves/index.html`, `chains/index.html` `loop()`): cables were re-measured at
+     60–120 fps forever. Now they redraw every frame only while a drag, auto-pan or pan/zoom is live
+     (`sceneHot`, marked by `applyPan`/`syncCableEls`/`setCollapsed`/drag) and otherwise on a slow
+     safety pass; the …chains host meter/CPU labels repaint at their telemetry rate, not per frame.
+   - **Drag redraws**: module drags (`place()`), the editor `pointermove` and the tracker grid
+     edit-drag + scroll now coalesce to one `requestAnimationFrame`, instead of one full `draw()` per
+     raw pointer event (120/s on a Fold). The edit-drag flushes its final step on pointerup.
+   - **Left as follow-ups (bigger/riskier):** moving `renderVoice` (up to 12 s of audio, runs on the UI
+     thread after a 45 ms debounce) to a Worker; incremental playhead painting so `draw()`/`drawArr()`
+     stop rebuilding the full grid/arrange strings each playback step.
 
 ## Checklist — adding another …chains module
 

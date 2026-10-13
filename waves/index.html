@@ -910,8 +910,9 @@ function buildNode(m){
       for (const [g, ox, oy] of start){ g.m.pos = [Math.round(ox + dx), Math.round(oy + dy)]; g.el.style.left = g.m.pos[0] + 'px'; g.el.style.top = g.m.pos[1] + 'px'; }
     };
     nodeDragging = v => { extra[0] -= v[0]; extra[1] -= v[1]; place(); };
-    const mv = ev => { lastEv = ev; autoPanAt(ev); place(); };
-    const up = () => { nodeDragging = null; autoPanV = [0, 0]; head.removeEventListener('pointermove', mv); head.removeEventListener('pointerup', up); head.removeEventListener('pointercancel', up); if (moved) store.touch(); };
+    let pend = 0;
+    const mv = ev => { lastEv = ev; autoPanAt(ev); markScene(); if (!pend) pend = requestAnimationFrame(() => { pend = 0; place(); }); };
+    const up = ev => { if (ev) lastEv = ev; if (pend){ cancelAnimationFrame(pend); pend = 0; } place(); nodeDragging = null; autoPanV = [0, 0]; head.removeEventListener('pointermove', mv); head.removeEventListener('pointerup', up); head.removeEventListener('pointercancel', up); if (moved) store.touch(); };
     head.addEventListener('pointermove', mv); head.addEventListener('pointerup', up); head.addEventListener('pointercancel', up);
   });
   if (m.collapsed) setCollapsed(n, true, true);
@@ -925,6 +926,7 @@ function setCollapsed(n, c, quiet){
   n.el.classList.toggle('collapsed', n.m.collapsed);
   n.foldBtn.setAttribute('aria-expanded', String(!n.m.collapsed));
   if (!quiet) store.touch();
+  markScene();
 }
 function renderAll(){
   for (const n of nodes.values()) n.el.remove();
@@ -1006,6 +1008,7 @@ function syncCableEls(){
     el.g.append(hit); el.hit = hit;
     svg.append(el.g); cableEls.set(c, el);
   }
+  markScene();
 }
 function jackPos(id, dir, port, wr){
   const n = nodes.get(id); if (!n) return null;
@@ -1186,7 +1189,10 @@ function autoPanStep(){
 /* ----- pan and zoom ----- */
 const zoomVal = document.getElementById('zoomval');
 const ZMIN = 0.25, ZMAX = 2.5;
+let sceneHot = 0, cableLast = 0;
+function markScene(){ sceneHot = performance.now() + 300; }
 function applyPan(){
+  markScene();
   const v = view();
   world.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.zoom})`;
   zoomVal.textContent = Math.round(v.zoom * 100) + '%';
@@ -1885,7 +1891,14 @@ learn = new MidiLearn((id, name) => { const n = nodes.get(id); return n && n.ctl
 renderAll();
 if (firstRun) requestAnimationFrame(() => fitAll());
 
-function loop(){ autoPanStep(); drawCables(); requestAnimationFrame(loop); }
+function loop(){
+  autoPanStep();
+  // Redraw the cables every frame while a drag, auto-pan or pan/zoom is live, then back off to a
+  // slow safety pass — an idle patch was re-measuring every jack 60–120×/s for nothing.
+  const now = performance.now();
+  if (drag || nodeDragging || autoPanV[0] || autoPanV[1] || now < sceneHot || now - cableLast > 200){ cableLast = now; drawCables(); }
+  requestAnimationFrame(loop);
+}
 requestAnimationFrame(loop);
 
 /* settings that talk to the engine */

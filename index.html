@@ -2420,7 +2420,7 @@ function renderPads(){
     p.setAttribute('aria-label', `${isSyn(i) ? 'Synth' : 'Pad'} ${hx(i)}, ${v.name}`);
   });
 }
-function flash(i){ const p = padEls[i].p; p.classList.add('hit'); setTimeout(() => p.classList.remove('hit'), 90); }
+function flash(i){ audioWake = performance.now(); const p = padEls[i].p; p.classList.add('hit'); setTimeout(() => p.classList.remove('hit'), 90); }
 function select(i){ if (i === cur) return; cur = i; refreshAll(); }
 const padHeld = [];
 function padPress(i, held){
@@ -4102,6 +4102,7 @@ function songBtn(){ const b = $('tSong'); if (!b) return; b.hidden = false; b.cl
 }
 function pump(){
   if (!tp.on) return;
+  audioWake = performance.now();
   if (view !== 'tracker' && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open
   const s = tp.seq; let n = 0;
   while (s.alive() && s.time < ctx.currentTime + 0.15 && n++ < 64){
@@ -4123,6 +4124,7 @@ function tStop(quiet){
   if (!quiet) draw();
 }
 function preview(ii, note, vol, poly){
+  audioWake = performance.now();
   const r = rtInit(), I = S.insts[ii] || S.insts[0], t = ctx.currentTime + 0.005;
   r.pl.play({type:'note', t, track:NT, poly:!!poly, pad:I.pad, rate:Math.pow(2, (note + I.tsp - ROOT) / 12),
     gain:curve(vol >= 0 ? vol : 255) * curve(I.vol), pan:I.pan, ofs:I.ofs, rev:!!I.rev, cut:null, slide:null, rel:isSyn(I.pad) ? t + 0.45 : null});
@@ -5684,7 +5686,7 @@ const arrUp = e => {
 arrGrid.addEventListener('pointerup', arrUp); arrGrid.addEventListener('pointercancel', arrUp);
 arrGrid.addEventListener('contextmenu', e => e.preventDefault());
 
-let raf = 0;
+let raf = 0, mScanT = 0, audioWake = 0;
 const mbuf = new Float32Array(512), mbuf2 = new Float32Array(1024);
 // CPU meter: the browser's own audio load where it reports one (Chrome's renderCapacity), otherwise
 // the time the track effects take, which is most of what the tracker adds.
@@ -5742,15 +5744,21 @@ function frame(){
   }
   tickDots();
   cpuMeter();
-  if (rt){
+  // Meters read the analysers ~30×/s instead of every display frame, and stop once nothing has
+  // sounded for a moment: this loop runs for the whole life of the tracker view, so scanning 32
+  // tracks + 2 masters at 120Hz was idle work that competed with touch on a phone.
+  const mt = performance.now();
+  if (rt && (tp.on || mt - audioWake < 1500) && mt - mScanT >= 33){
+    const dk = Math.pow(0.86, Math.max(0.5, mt - mScanT) * 0.12);   // 0.86 per 8.3ms frame, in real time
+    mScanT = mt;
     let any = false;
     for (let t = 0; t < ntr(); t++){ const b = rt.pl.buses[t]; b.an.getFloatTimeDomainData(mbuf);
       let p = 0; for (let i = 0; i < mbuf.length; i++){ const a = mbuf[i] < 0 ? -mbuf[i] : mbuf[i]; if (a > p) p = a; }
-      const nl = Math.max(p, b.lv * 0.86), v = nl < 0.002 ? 0 : nl; if (v !== b.lv){ any = true; b.lv = v; } }
-    if (rt.man){ const now = performance.now();
+      const nl = Math.max(p, b.lv * dk), v = nl < 0.002 ? 0 : nl; if (v !== b.lv){ any = true; b.lv = v; } }
+    if (rt.man){ const now = mt;
       rt.man.forEach((a, s) => { a.getFloatTimeDomainData(mbuf2);
         let p = 0; for (let i = 0; i < mbuf2.length; i++){ const v = mbuf2[i] < 0 ? -mbuf2[i] : mbuf2[i]; if (v > p) p = v; }
-        const nl = Math.max(p, rt.mlv[s] * 0.86), v = nl < 0.0002 ? 0 : nl; if (v !== rt.mlv[s]){ any = true; rt.mlv[s] = v; }
+        const nl = Math.max(p, rt.mlv[s] * dk), v = nl < 0.0002 ? 0 : nl; if (v !== rt.mlv[s]){ any = true; rt.mlv[s] = v; }
         if (p >= rt.mpk[s] || now - rt.mpt[s] > 1500){ if (p !== rt.mpk[s]) any = true; rt.mpk[s] = p; rt.mpt[s] = now; } }); }
     if (any) paintMeters();
   }
@@ -5793,7 +5801,7 @@ const gridDown = e => {
   c.x = x; c.y = y; if (!was) draw();
   // A drag that starts on the cursor's own cell changes its value; one that starts anywhere else scrolls.
   if (!was) return startScroll(e);
-  drag = {id:e.pointerId, y0:e.clientY, acc:0, edit:was, moved:false, sy:c.y};
+  drag = {id:e.pointerId, y0:e.clientY, lastY:e.clientY, acc:0, edit:was, moved:false, sy:c.y};
   try { grid.setPointerCapture(e.pointerId); } catch(_){}
 };
 grid.addEventListener('pointerdown', gridDown); $('tPset').addEventListener('pointerdown', gridDown);
@@ -5823,35 +5831,48 @@ scr.addEventListener('pointerdown', e => {
   if (sdrag || drag || (e.button && e.button > 0) || e.target.closest('[data-x],[data-r],#fxPick')) return;
   startScroll(e);
 });
+let sdragPend = 0;
 scr.addEventListener('pointermove', e => {
   if (!sdrag || e.pointerId !== sdrag.id) return;
-  const dy = sdrag.y0 - e.clientY, dx = sdrag.x0 - e.clientX;
+  sdrag.ev = e;
+  if (!sdragPend) sdragPend = requestAnimationFrame(() => { sdragPend = 0; scrDragMove(); });
+});
+// One redraw per animation frame, not per raw pointer event: a fast swipe fires these at 120Hz and
+// each one redraws the whole screen.
+function scrDragMove(){
+  const sd = sdrag, e = sd && sd.ev; if (!e) return;
+  const dy = sd.y0 - e.clientY, dx = sd.x0 - e.clientX;
   // FX: a sideways swipe opens the slot's controls (right) or goes back to the slots (left).
   if (tv === 'fx' && Math.abs(dx) > 34 && Math.abs(dx) > Math.abs(dy)){
-    if (!sdrag.fx){ sdrag.fx = true; if (dx < 0) fxOpen(); else fxExit(); }
+    if (!sd.fx){ sd.fx = true; if (dx < 0) fxOpen(); else fxExit(); }
     return;
   }
-  if (tv === 'mixer') grid.scrollTop = sdrag.st + dy;
-  else { const rh = (parseFloat(scr.style.fontSize) || 14) * 1.3, n = Math.trunc(dy / rh); if (n !== sdrag.n){ const d = n - sdrag.n; sdrag.n = n; scrollRows(d); } }
+  if (tv === 'mixer') grid.scrollTop = sd.st + dy;
+  else { const rh = (parseFloat(scr.style.fontSize) || 14) * 1.3, n = Math.trunc(dy / rh); if (n !== sd.n){ const d = n - sd.n; sd.n = n; scrollRows(d); } }
   if ((tv === 'song' || tv === 'mixer') && winTrk < ntr()){
     const cw3 = (parseFloat(scr.style.fontSize) || 14) * CW * 3, n = Math.trunc(dx / cw3);
-    if (n !== (sdrag.tn || 0)){ const d = n - (sdrag.tn || 0), c = cs[tv]; sdrag.tn = n;
+    if (n !== (sd.tn || 0)){ const d = n - (sd.tn || 0), c = cs[tv]; sd.tn = n;
       c.left = clamp((c.left || 0) + d, 0, ntr() - winTrk); c.x = clamp(c.x + d, 0, ntr() - 1); draw(); }
-  } else if (grid.scrollWidth > grid.clientWidth + 1) grid.scrollLeft = sdrag.sl + dx;
-});
-const sdragEnd = e => { if (sdrag && e.pointerId === sdrag.id) sdrag = null; };
+  } else if (grid.scrollWidth > grid.clientWidth + 1) grid.scrollLeft = sd.sl + dx;
+}
+const sdragEnd = e => { if (sdrag && e.pointerId === sdrag.id){ if (sdragPend){ cancelAnimationFrame(sdragPend); sdragPend = 0; } sdrag = null; } };
 scr.addEventListener('pointerup', sdragEnd); scr.addEventListener('pointercancel', sdragEnd);
+let gridPend = 0;
+function gridDragMove(){
+  const d = drag; if (!d || !d.edit) return;
+  const n = Math.trunc((d.y0 - d.lastY) / 16);
+  while (d.acc < n){ bump(1, false); d.acc++; d.moved = true; }
+  while (d.acc > n){ bump(-1, false); d.acc--; d.moved = true; }
+}
 grid.addEventListener('pointermove', e => {
   if (!drag || e.pointerId !== drag.id) return;
-  const dy = drag.y0 - e.clientY;
-  if (drag.edit){
-    const n = Math.trunc(dy / 16);
-    while (drag.acc < n){ bump(1, false); drag.acc++; drag.moved = true; }
-    while (drag.acc > n){ bump(-1, false); drag.acc--; drag.moved = true; }
-  }
+  drag.lastY = e.clientY;
+  if (!gridPend) gridPend = requestAnimationFrame(() => { gridPend = 0; gridDragMove(); });
 });
 const dragEnd = e => {
   if (!drag || e.pointerId !== drag.id) return;
+  if (e.clientY != null) drag.lastY = e.clientY;
+  if (gridPend){ cancelAnimationFrame(gridPend); gridPend = 0; gridDragMove(); }
   const d = drag; drag = null;
   if (d.edit && !d.moved && e.type === 'pointerup'){
     const c = cs[tv];
