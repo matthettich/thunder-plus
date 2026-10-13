@@ -55,4 +55,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 The `fonts` folder holds Jost (https://github.com/indestructible-type/Jost, Copyright Owen Earl, indestructible type*;
 subset to Latin and the symbols ...Thunder uses) and JetBrains Mono (https://github.com/JetBrains/JetBrainsMono,
 Copyright The JetBrains Mono Project Authors). Both are under the SIL Open Font License 1.1, included as
-`fonts/OFL-Jost.txt` and `fonts/OFL-JetBrainsMono.txt`.
+`fonts/OFL-Jost.txt` and `fonts/OFL-JetBrainsMono.txt`. The Matrix skin uses Share Tech Mono
+(https://github.com/google/fonts/tree/main/ofl/sharetechmono, Copyright Carrois Type Design), also under the
+SIL Open Font License 1.1, included as `fonts/OFL-ShareTechMono.txt`.

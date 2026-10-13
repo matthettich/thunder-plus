@@ -687,6 +687,55 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tgrid .ln span.gc.gt.gb{box-shadow:inset 0 0 0 2px var(--tk)}
 /* View neighbouring phrases: the tracks either side, faint and not editable. */
 .tscr .nb{opacity:.55; pointer-events:none} .tscr .nbl{color:#9b82d6} .tscr .nbr{color:#c9a227}
+
+/* ---------- Matrix skin: neon green on black, green outlines, terminal type with a phosphor glow ----------
+   Share Tech Mono (fonts/, SIL OFL) for everything. It comes last so it wins over the pastel boxes,
+   the tracker's own screen colours and the pads' per-pad shades. */
+@font-face{font-family:"Share Tech Mono"; src:url(fonts/ShareTechMono-400.woff) format("woff"); font-weight:100 900; font-display:swap}
+:root[data-skin="matrix"]{
+  --mx:#00ff41; --mx2:#00c834; --mxdim:#0a7a25; --mxbg:#000000; --mxpanel:#010d04; --mxpanel2:#03180a; --mxglow:0 0 6px rgba(0,255,65,.55);
+  --bench:var(--mxbg); --panel:var(--mxbg); --panel2:var(--mxpanel2); --side:var(--mxpanel); --ink:var(--mx); --muted:var(--mx2);
+  --track:#06260f; --inv:#000; --voice:var(--mxpanel); --line:var(--mx); --screen:#000; --screen-ink:var(--mx); --screen-line:var(--mxdim);
+  --std:#00ff41; --fm:#5dff8a; --add:#9dffb5; --noise:#00c834; --smp:#3dff7a; --pl:#b6ffc9; --fx:#00ff9c; --rec:#00ff41;
+  --stdc:#00a82b; --fmc:#00a82b; --addc:#00a82b; --noisec:#00a82b; --smpc:#00a82b; --plc:#00a82b; --wvc:#00a82b;
+  --meter-ok:#00ff41; --meter-hot:#b6ffc9; --meter-clip:#ff3b3b;
+  --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace;
+  color-scheme:dark}
+:root[data-skin="matrix"] body{background:#000; color:var(--mx); font-family:var(--font); text-shadow:var(--mxglow)}
+:root[data-skin="matrix"] :is(button,select,input,textarea,kbd,code,.tscr,.fxpick){font-family:var(--font)}
+:root[data-skin="matrix"] :is(button,select,input[type=text],input[type=number],textarea){background:#000; color:var(--mx); border-color:var(--mx)}
+:root[data-skin="matrix"] :is(button.on,.seg button.on,.ttabs button.on,.ttabs button[data-v].on,.tmap button[data-v].on,#bFile.on,.top #bSet.on){
+  background:var(--mx)!important; color:#000!important; border-color:var(--mx); text-shadow:none; box-shadow:0 0 12px rgba(0,255,65,.6)}
+:root[data-skin="matrix"] :is(.ttabs button[data-v],.tmap button[data-v]){background:#000; color:var(--mx)}
+:root[data-skin="matrix"] :is(.lcell,.layercard,.fxcard,.voicecard){background:var(--mxpanel); border-color:var(--mx); box-shadow:0 0 10px -4px rgba(0,255,65,.7)}
+:root[data-skin="matrix"] input[type=range]{accent-color:var(--mx)}
+:root[data-skin="matrix"] input[type=checkbox]{accent-color:var(--mx)}
+:root[data-skin="matrix"] :is(svg){color:var(--mx)}
+:root[data-skin="matrix"] button.on svg{color:#000}
+:root[data-skin="matrix"] .brand .plus{color:var(--mx)} :root[data-skin="matrix"] .brand .plus::before{color:var(--mxdim); -webkit-text-stroke:.05em #000}
+:root[data-skin="matrix"] .setmenu{background:#000; border-color:var(--mx); box-shadow:0 0 18px -4px rgba(0,255,65,.6)}
+:root[data-skin="matrix"] .gset .gsec + .gsec, :root[data-skin="matrix"] .gset h3{border-color:var(--mxdim)}
+/* pads, command row and keypad: black keys with green outlines and a green offset block; a hit fills green */
+:root[data-skin="matrix"] :is(.tcmd,.dock,.tctl){background:#000}
+:root[data-skin="matrix"] :is(.tcmd button,.tkp .kp,.pads .pad){background:#000; color:var(--mx); border-color:var(--mx);
+  box-shadow:4px 4px 0 0 #000, 4px 4px 0 1.5px var(--mxdim)}
+:root[data-skin="matrix"] :is(.tcmd button.dn,.tkp .kp.dn,.pads .pad.hit,.pads .pad.hit.hit){background:var(--mx)!important; color:#000!important; text-shadow:none;
+  box-shadow:1px 1px 0 0 #000, 1px 1px 0 1.5px var(--mxdim), 0 0 16px rgba(0,255,65,.8)}
+:root[data-skin="matrix"] :is(.tcmd button.on,.tkp .kp.on,.tkp .kp.blk){background:var(--mxpanel2); color:var(--mx)}
+:root[data-skin="matrix"] :is(.pads .pad .pm,.pads .pad.syn b::after){color:var(--mx2)}
+:root[data-skin="matrix"] .tcmd::before{color:var(--mx2)}
+:root[data-skin="matrix"] :is(.tcmd,.tctl,.tcmd:not([hidden]) + .tctl){border-top-color:var(--mx)}
+/* the tracker screen: black whatever its own colour setting, with green rows, a solid green cursor and faint scanlines */
+:root[data-skin="matrix"] :is(.tscr,.tscr[data-ts]){--ts-bg:#000; --ts-ink:#00ff41; --ts-dim:#0b5e20; --ts-rn:#0a8a2a; --ts-rn4:#5dff8a; --ts-th:#00c834;
+  --ts-vol:#9dffb5; --ts-inst:#5dff8a; --ts-fx:#00ff9c; --ts-mute:#ff3b3b; --ts-solo:#e8ff6a; --ts-pl-bg:#00ff41; --ts-pl:#000; --ts-sel:#0a3d18;
+  --ts-cur-bg:#00ff41; --ts-cur:#000; --ts-line:#0a5a1e; --ts-info:#00c834; --ts-hint:#0a8a2a; --ts-ok:#00ff41; --ts-hot:#b6ffc9; --ts-clip:#ff3b3b;
+  --tk-mono:#00ff41; --tk-poly:#9dffb5;
+  background-image:repeating-linear-gradient(to bottom, rgba(0,255,65,.045) 0 1px, transparent 1px 3px)}
+:root[data-skin="matrix"] .tarr, :root[data-skin="matrix"] .tarr.dk{--ar-bg:#000; --ar-ink:#00ff41; --ar-dim:#0a8a2a; --ar-blk:#00c834; --ar-blk-ink:#000;
+  --ar-empty:rgba(0,255,65,.08); --ar-line:rgba(0,255,65,.25); --ar-pl:#b6ffc9; --ar-pl-ink:#000; --ar-cur:#00ff41; --ar-mu:#ff3b3b; --tk-mono:#00ff41; --tk-poly:#9dffb5}
+:root[data-skin="matrix"] :is(.tagp b,.tgbox b){color:#000; text-shadow:none}
+:root[data-skin="matrix"] .tscr .nbl, :root[data-skin="matrix"] .tscr .nbr{color:#0a8a2a}
+:root[data-skin="matrix"] ::selection{background:var(--mx); color:#000}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <script>
@@ -751,7 +800,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
   </section>
 
   <section class="band grey" id="pSkin" hidden>
-    <div class="bar"><span class="ttl">Skin</span><span class="lbl">The same skins as ...Seeds</span></div>
+    <div class="bar"><span class="ttl">Skin</span><span class="lbl">The ...Seeds skins, plus Matrix</span></div>
     <div class="pbody"><div class="skins" id="skins" role="radiogroup" aria-label="Skin"></div></div>
   </section>
 
@@ -3240,6 +3289,7 @@ const SKINS = [
   {id:'minblack', name:'Minimal black', base:'minimal', dots:['#000000', '#1a1a1a', '#ffffff', '#5a8fe0']},
   {id:'mincolorblack', name:'Minimal colors black', base:'minimal', dots:['#0b0b0d', '#26262b', '#1f3550', '#4a2232']},
   {id:'neon', name:'Neon', dots:['#05050a', '#00f0ff', '#ff2bd6', '#a8ff3d']},
+  {id:'matrix', name:'Matrix', dots:['#000000', '#00ff41', '#0a7a25', '#b6ffc9']},
 ];
 const SKK = 'thunderplus-skin-v1';
 let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k => k.id === v)) return v; } catch(e){} return 'minimal'; })();
@@ -3251,7 +3301,31 @@ function applySkin(id){
   try { localStorage.setItem(SKK, sk.id); } catch(e){}
   document.querySelectorAll('#skins .skin').forEach(b => b.setAttribute('aria-checked', String(b.dataset.id === sk.id)));
   try { drawWave(); renderPads(); } catch(e){}
+  skinFrames();
 }
+// …waves and …chains are their own pages (white, Minimal) in frames. The Matrix skin is carried into them
+// with a stylesheet added to each frame's page; other skins leave them as they are.
+const MATRIX_FRAME_CSS = `@font-face{font-family:"Share Tech Mono"; src:url(../fonts/ShareTechMono-400.woff) format("woff"); font-weight:100 900}
+:root{--bench:#000; --panel:#000; --panel-2:#03180a; --edge:#00ff41; --ink:#00ff41; --muted:#00c834; --track:#06260f; --side:#010d04; --frame:#010d04;
+  --video:#b6ffc9; --audio:#00ff41; --audio-dark:#00a82b; --mod:#5dff8a; --mod-dark:#0a7a25; --gate:#9dffb5; --gate-dark:#0a7a25; --rec:#ff3b3b; --selc:#e8ff6a;
+  --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:dark}
+body{text-shadow:0 0 6px rgba(0,255,65,.5)}
+body,button,select,input,textarea{font-family:var(--font)!important}
+:is(.tb,.pgroup,.pitem,.pghost,.numsmall,select,.btn,.touchkeys button,button,input[type=text],input[type=number],textarea){background:#000!important; color:#00ff41; border-color:#00ff41!important}
+:is(.tb.on,.touchkeys button.on,button.on){background:#00ff41!important; color:#000!important; text-shadow:none; box-shadow:0 0 12px rgba(0,255,65,.6)}
+input[type=range],input[type=checkbox]{accent-color:#00ff41}
+.node{border-color:#00ff41!important; box-shadow:0 0 14px -5px rgba(0,255,65,.8)} .node > header, .node > .ports{border-bottom-color:#0a7a25!important}
+svg.cables .cln{stroke:#00ff41!important; filter:drop-shadow(0 0 3px rgba(0,255,65,.7))} svg.cables .cln.ctl{stroke:#9dffb5!important}
+::selection{background:#00ff41; color:#000}`;
+function skinFrame(f){
+  try {
+    const d = f && f.contentDocument; if (!d || !d.head) return;
+    let s = d.getElementById('tpSkin');
+    if (skin === 'matrix'){ if (!s){ s = d.createElement('style'); s.id = 'tpSkin'; d.head.append(s); } s.textContent = MATRIX_FRAME_CSS; }
+    else if (s) s.remove();
+  } catch(e){}
+}
+function skinFrames(){ try { skinFrame(WV.frame); skinFrame(CH.frame); } catch(e){} }
 for (const sk of SKINS){
   const b = el('button', 'skin'); b.type = 'button'; b.dataset.id = sk.id; b.setAttribute('role', 'radio');
   const d = el('span', 'dots'); for (const c of sk.dots){ const i = el('i'); i.style.background = c; d.append(i); }
@@ -3443,7 +3517,7 @@ window.thunderWaves = {
 };
 const wvApi = () => { try { return WV.frame && WV.frame.contentWindow && WV.frame.contentWindow.wavesEmbed; } catch(e){ return null; } };
 function showWaves(){
-  if (!WV.frame){ WV.frame = document.createElement('iframe'); WV.frame.title = '…waves'; WV.frame.allow = 'midi; autoplay'; WV.frame.src = 'waves/index.html'; $('wvView').append(WV.frame); }
+  if (!WV.frame){ WV.frame = document.createElement('iframe'); WV.frame.title = '…waves'; WV.frame.allow = 'midi; autoplay'; WV.frame.src = 'waves/index.html'; WV.frame.addEventListener('load', () => skinFrame(WV.frame)); $('wvView').append(WV.frame); }
   else { const a = wvApi(); if (a) a.resume(); }
   setTimeout(() => { try { WV.frame.contentWindow.focus(); } catch(e){} }, 0);   // keys go to …waves, not the pads
 }
@@ -3522,7 +3596,7 @@ const chApi = () => { try { return CH.frame && CH.frame.contentWindow && (CH.fra
 let chMeterWanted = false;
 function showChains(){
   chMeterWanted = true;
-  if (!CH.frame){ CH.frame = document.createElement('iframe'); CH.frame.title = '…chains'; CH.frame.allow = 'midi; autoplay'; CH.frame.src = 'chains/index.html'; $('chView').append(CH.frame); }
+  if (!CH.frame){ CH.frame = document.createElement('iframe'); CH.frame.title = '…chains'; CH.frame.allow = 'midi; autoplay'; CH.frame.src = 'chains/index.html'; CH.frame.addEventListener('load', () => skinFrame(CH.frame)); $('chView').append(CH.frame); }
   else { const a = chApi(); if (a) a.resume(); }
   setTimeout(() => { try { CH.frame.contentWindow.focus(); } catch(e){} }, 0);   // keys go to …chains, not the pads
 }
