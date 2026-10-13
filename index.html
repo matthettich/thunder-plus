@@ -797,14 +797,12 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .stgph{flex:1; min-height:0; display:flex; flex-direction:column; gap:4px; font:var(--fs-2)/1.2 var(--mono); color:var(--ts-dim)}
 .stgph b{font-weight:600; letter-spacing:.06em}
 .stgph canvas{flex:1; min-height:0; width:100%; display:block}
-.dogs{--dk-ink:var(--ink); --dk-fill:var(--panel); --dk-pink:#f4a9c4;
-  --dk-brown:color-mix(in srgb, #8a5a43 62%, var(--dk-fill)); --dk-muzzle:color-mix(in srgb, #8a5a43 48%, var(--dk-fill));
-  --dk-grey:color-mix(in srgb, #8c8276 52%, var(--dk-fill)); --dk-cream:color-mix(in srgb, #efe3cc 80%, var(--dk-fill)); --dk-white:color-mix(in srgb, #ffffff 88%, var(--dk-fill));
-  width:100%; height:100%; overflow:visible}
-.dogs .ln{fill:var(--dk-fill); stroke:var(--dk-ink); stroke-width:2; stroke-linejoin:round; stroke-linecap:round}
-.dogs .c-brown{fill:var(--dk-brown)} .dogs .c-muzzle{fill:var(--dk-muzzle)} .dogs .c-grey{fill:var(--dk-grey)} .dogs .c-cream{fill:var(--dk-cream)} .dogs .c-white{fill:var(--dk-white)}
-.dogs .o{fill:none; stroke:var(--dk-ink); stroke-width:7.5; stroke-linecap:round}
-.dogs .f{fill:none; stroke:var(--dk-brown); stroke-width:3.6; stroke-linecap:round}
+.dogs{--dk-ink:var(--ink); --dk-fill:var(--panel); --dk-pink:#f4a9c4; width:100%; height:100%; overflow:visible}
+/* Line art like the rest of the app: 2px outlines with sharp joins, filled only with the background so lines behind
+   are hidden. The bandana is the one filled shape. */
+.dogs .ln{fill:var(--dk-fill); stroke:var(--dk-ink); stroke-width:2; stroke-linejoin:miter; stroke-miterlimit:6; stroke-linecap:square}
+.dogs .o{fill:none; stroke:var(--dk-ink); stroke-width:7; stroke-linejoin:miter; stroke-linecap:square}
+.dogs .f{fill:none; stroke:var(--dk-fill); stroke-width:3; stroke-linejoin:miter; stroke-linecap:square}
 .dogs .ink{fill:var(--dk-ink); stroke:none}
 .dogs .eye, .dogs .toe{fill:none; stroke-width:1.6}
 .dogs .band{fill:var(--dk-pink)}
@@ -813,9 +811,6 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .dogs .al{transform-origin:100% 0%; transform:rotate(var(--aL, 14deg))} .dogs .ar{transform-origin:0% 0%; transform:rotate(var(--aR, -14deg))}
 .dogs .head{transform-origin:50% 90%}
 .dogs .d1 .tail{transform-origin:0% 100%} .dogs .d2 .tail{transform-origin:0% 85%}
-/* On the dark terminal skins the coats are tints of the skin's colour, so the dogs stay part of the screen. */
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"]) .dogs{--dk-brown:color-mix(in srgb, var(--dk-ink) 32%, var(--dk-fill)); --dk-muzzle:color-mix(in srgb, var(--dk-ink) 22%, var(--dk-fill));
-  --dk-grey:color-mix(in srgb, var(--dk-ink) 26%, var(--dk-fill)); --dk-cream:color-mix(in srgb, var(--dk-ink) 12%, var(--dk-fill)); --dk-white:color-mix(in srgb, var(--dk-ink) 6%, var(--dk-fill))}
 .dogs.idle .bob{animation:dkBreath 3.4s ease-in-out infinite} .dogs.idle .d2 .bob{animation-delay:-1.7s}
 .dogs.idle .tail{animation:dkWag 2.6s ease-in-out infinite}
 .dogs.dance .dog{--aL:112deg; --aR:-112deg}
@@ -1129,22 +1124,22 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
        white chest blaze and toes, happy squint, thin tail) -->
   <g class="dog d1" transform="translate(6 46)">
     <g class="bob">
-      <g class="tail"><path class="o t" d="M90 140 C106 138 114 126 116 106"/><path class="f t c-brown-s" d="M90 140 C106 138 114 126 116 106"/></g>
-      <path class="ln c-brown" d="M44 132 C32 134 28 150 32 160 C33 165 30 168 26 170 C23 174 30 176 38 175 C44 175 46 172 45 168 C44 162 48 156 50 148 Z"/><path class="ln c-brown" d="M 86 132 C 98 134 102 150 98 160 C 97 165 100 168 104 170 C 107 174 100 176 92 175 C 86 175 84 172 85 168 C 86 162 82 156 80 148 Z"/>
-      <path class="ln toe" d="M27 171 l3 -3 M32 173 l2 -3 M103 171 l-3 -3 M98 173 l-2 -3"/>
-      <path class="ln c-brown" d="M65 70 C88 70 99 86 99 106 C99 128 93 146 79 150 C71 152 59 152 51 150 C37 146 31 128 31 106 C31 86 42 70 65 70 Z"/>
-      <path class="ln c-white" d="M57 84 C61 88 69 88 73 84 C72 93 69 101 65 110 C61 101 58 93 57 84 Z"/>
-      <g class="arm al"><path class="ln c-brown" d="M46 86 C38 90 33 100 31 112 C30 118 29 122 31 124 C35 127 39 124 39 120 C41 110 45 102 52 96 Z"/><path class="ln toe" d="M31 121 l3 -1"/></g>
-      <g class="arm ar"><path class="ln c-brown" d="M 84 86 C 92 90 97 100 99 112 C 100 118 101 122 99 124 C 95 127 91 124 91 120 C 89 110 85 102 78 96 Z"/><path class="ln toe" d="M99 121 l-3 -1"/></g>
+      <g class="tail"><path class="o t" d="M90.0 140.0 L107.9 130.3 L116.0 106.0"></path><path class="f t c-brown-s" d="M90.0 140.0 L107.9 130.3 L116.0 106.0"></path></g>
+      <path class="ln c-brown" d="M44.0 132.0 L32.1 142.8 L32.1 163.2 L25.4 171.3 L27.5 174.2 L40.2 174.8 L44.9 171.7 L49.9 147.8 Z"></path><path class="ln c-brown" d="M86.0 132.0 L97.9 142.8 L97.9 163.2 L104.6 171.3 L102.5 174.2 L89.8 174.8 L85.1 171.7 L80.1 147.8 Z"></path>
+      <path class="ln toe" d="M27 171 l3 -3 M32 173 l2 -3 M103 171 l-3 -3 M98 173 l-2 -3"></path>
+      <path class="ln c-brown" d="M65.0 70.0 L78.7 72.3 L89.5 79.3 L96.7 91.2 L99.0 105.9 L96.8 126.7 L90.1 142.1 L80.8 149.4 L65.0 151.5 L49.2 149.4 L39.9 142.1 L33.2 126.7 L31.0 105.9 L33.3 91.2 L40.5 79.3 L51.3 72.3 Z"></path>
+      <path class="ln c-white" d="M57.0 84.0 L65.1 87.0 L73.0 84.3 L65.1 109.7 Z"></path>
+      <g class="arm al"><path class="ln c-brown" d="M46.0 86.0 L33.2 103.0 L29.8 120.5 L33.0 125.0 L38.1 123.0 L43.3 107.1 L51.8 96.2 Z"></path><path class="ln toe" d="M31 121 l3 -1"></path></g>
+      <g class="arm ar"><path class="ln c-brown" d="M84.0 86.0 L96.8 103.0 L100.2 120.5 L97.0 125.0 L91.9 123.0 L86.7 107.1 L78.2 96.2 Z"></path><path class="ln toe" d="M99 121 l-3 -1"></path></g>
       <g class="head">
-        <path class="ln c-brown" d="M42 32 C36 26 28 30 28 39 C28 44 33 46 37 43 C40 39 42 35 45 33 Z"/>
-        <path class="ln c-brown" d="M87 30 C95 22 106 22 111 28 C112 33 107 35 101 35 C96 37 92 39 89 42 Z"/>
-        <path class="ln c-brown" d="M65 18 C82 18 93 28 94 41 C95 49 93 56 91 60 C88 67 82 71 76 73 L54 73 C48 71 42 67 39 60 C37 56 35 49 36 41 C37 28 48 18 65 18 Z"/>
-        <path class="ln c-muzzle" d="M51 55 C51 48 57 45 65 45 C73 45 79 48 79 55 C79 63 74 69 65 69 C56 69 51 63 51 55 Z"/>
-        <path class="ln eye" d="M58 31 C61 29 69 29 72 31"/>
-        <path class="ln eye" d="M45 41 C49 45 54 45 58 41 M72 41 C76 45 81 45 85 41"/>
-        <path class="ink" d="M59 51 C59 47 71 47 71 51 C71 54 68 57 65 57 C62 57 59 54 59 51 Z"/>
-        <path class="ln eye" d="M65 57 L65 60 M57 61 C61 64 69 64 73 61"/>
+        <path class="ln c-brown" d="M42.0 32.0 L31.3 30.8 L29.1 42.6 L37.1 42.9 L44.8 32.9 Z"></path>
+        <path class="ln c-brown" d="M87.0 30.0 L100.1 23.8 L111.1 28.7 L108.3 33.6 L89.0 41.7 Z"></path>
+        <path class="ln c-brown" d="M65.0 18.0 L83.9 23.4 L93.6 38.0 L90.4 61.4 L76.0 73.0 L49.4 71.0 L41.2 63.9 L36.4 52.0 L36.4 38.0 L41.6 27.4 L51.3 20.5 Z"></path>
+        <path class="ln c-muzzle" d="M51.0 55.0 L54.1 48.0 L64.5 45.0 L75.0 47.4 L79.0 54.9 L75.4 65.0 L65.5 69.0 L54.7 65.0 Z"></path>
+        <path class="ln eye" d="M58.0 31.0 L64.5 29.5 L72.0 31.0"></path>
+        <path class="ln eye" d="M45.0 41.0 L51.0 44.0 L58.0 41.0 M72.0 41.0 L78.0 44.0 L85.0 41.0"></path>
+        <path class="ink" d="M59.0 51.0 L65.5 48.0 L71.0 51.0 L69.6 54.6 L65.5 57.0 L61.0 55.3 Z"></path>
+        <path class="ln eye" d="M65.0 57.0 L65.0 60.0 M57.0 61.0 L64.5 63.2 L73.0 61.0"></path>
       </g>
     </g>
   </g>
@@ -1152,27 +1147,27 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
        upright ears, big curled tail, pink bandana with dots, tongue out) -->
   <g class="dog d2" transform="translate(140 0)">
     <g class="bob">
-      <g class="tail"><path class="ln c-grey" d="M86 152 C112 152 124 134 120 110 C118 94 104 90 97 100 C106 103 109 116 103 127 C99 135 91 140 84 142 Z"/>
-        <path class="ln eye" d="M100 106 C108 108 112 118 108 128"/></g>
-      <path class="ln c-cream" d="M44 150 C30 154 26 172 32 184 C33 188 30 190 26 192 C23 196 30 198 38 197 C44 197 46 194 45 190 C44 182 48 174 52 164 Z"/><path class="ln c-cream" d="M 86 150 C 100 154 104 172 98 184 C 97 188 100 190 104 192 C 107 196 100 198 92 197 C 86 197 84 194 85 190 C 86 182 82 174 78 164 Z"/>
-      <path class="ln toe" d="M27 193 l3 -3 M32 195 l2 -3 M103 193 l-3 -3 M98 195 l-2 -3"/>
-      <path class="ln c-grey" d="M65 82 C88 82 97 100 97 122 C97 144 91 160 77 164 C71 166 59 166 53 164 C39 160 33 144 33 122 C33 100 42 82 65 82 Z"/>
-      <path class="ln c-cream" d="M65 96 C76 96 82 108 82 124 C82 142 76 156 65 158 C54 156 48 142 48 124 C48 108 54 96 65 96 Z"/>
-      <path class="ln band" d="M39 88 C55 99 75 99 91 88 L73 117 C69 121 61 121 57 117 Z"/>
-      <circle class="ink" cx="53" cy="97" r="1.6"/><circle class="ink" cx="65" cy="103" r="1.6"/><circle class="ink" cx="77" cy="97" r="1.6"/><circle class="ink" cx="61" cy="112" r="1.6"/><circle class="ink" cx="70" cy="111" r="1.6"/>
-      <g class="arm al"><path class="ln c-cream" d="M47 98 C39 102 34 116 32 130 C31 136 30 140 32 142 C36 145 40 142 40 138 C42 126 46 116 53 108 Z"/></g>
-      <g class="arm ar"><path class="ln c-cream" d="M 83 98 C 91 102 96 116 98 130 C 99 136 100 140 98 142 C 94 145 90 142 90 138 C 88 126 84 116 77 108 Z"/></g>
+      <g class="tail"><path class="ln c-grey" d="M86.0 152.0 L106.1 147.2 L117.8 133.9 L119.8 108.5 L111.3 95.7 L103.5 95.0 L97.2 99.7 L104.9 107.9 L105.7 119.7 L98.2 133.6 L84.0 142.2 Z"></path>
+        <path class="ln eye" d="M100.0 106.0 L105.1 108.8 L108.7 114.6 L108.0 128.0"></path></g>
+      <path class="ln c-cream" d="M44.0 150.0 L31.0 162.6 L32.2 185.9 L25.6 192.7 L27.8 196.4 L40.6 196.8 L45.1 193.3 L51.9 163.8 Z"></path><path class="ln c-cream" d="M86.0 150.0 L99.0 162.6 L97.8 185.9 L104.4 192.7 L102.2 196.4 L89.4 196.8 L84.9 193.3 L78.1 163.8 Z"></path>
+      <path class="ln toe" d="M27 193 l3 -3 M32 195 l2 -3 M103 193 l-3 -3 M98 195 l-2 -3"></path>
+      <path class="ln c-grey" d="M65.0 82.0 L78.6 84.6 L88.7 92.5 L94.8 105.0 L97.0 121.8 L95.0 141.6 L89.2 155.2 L80.1 162.9 L65.5 165.5 L50.8 163.2 L41.4 156.0 L35.3 142.5 L33.0 122.8 L34.9 106.0 L41.3 92.5 L51.4 84.6 Z"></path>
+      <path class="ln c-cream" d="M65.0 96.0 L77.3 103.4 L82.0 124.6 L77.2 147.8 L64.5 157.9 L52.3 146.9 L48.0 123.6 L52.7 103.4 Z"></path>
+      <path class="ln band" d="M39.0 88.0 L65.1 96.2 L90.9 88.2 L73.0 117.0 L64.9 120.0 L56.8 116.7 Z"></path>
+      <path class="ink" d="M53 95 L55 97 L53 99 L51 97 Z"></path><path class="ink" d="M65 101 L67 103 L65 105 L63 103 Z"></path><path class="ink" d="M77 95 L79 97 L77 99 L75 97 Z"></path><path class="ink" d="M61 110 L63 112 L61 114 L59 112 Z"></path><path class="ink" d="M70 109 L72 111 L70 113 L68 111 Z"></path>
+      <g class="arm al"><path class="ln c-cream" d="M47.0 98.0 L34.4 118.6 L30.9 138.0 L34.4 143.1 L39.4 140.7 L44.6 121.6 L52.9 108.2 Z"></path></g>
+      <g class="arm ar"><path class="ln c-cream" d="M83.0 98.0 L95.6 118.6 L99.1 138.0 L95.6 143.1 L90.6 140.7 L85.4 121.6 L77.1 108.2 Z"></path></g>
       <g class="head">
-        <path class="ln c-grey" d="M45 34 L41 7 C48 9 57 19 59 28 Z"/>
-        <path class="ln c-grey" d="M85 34 L89 7 C82 9 73 19 71 28 Z"/>
-        <path class="ln eye" d="M46 30 L44 14 M84 30 L86 14"/>
-        <path class="ln c-grey" d="M65 21 C82 21 92 31 92 45 C92 53 96 57 94 61 C90 63 88 67 84 71 C78 77 72 80 65 80 C58 80 52 77 46 71 C42 67 40 63 36 61 C34 57 38 53 38 45 C38 31 48 21 65 21 Z"/>
-        <path class="ln c-white" d="M65 35 C60 39 52 37 46 43 C42 49 42 59 46 65 C52 73 58 77 65 77 C72 77 78 73 84 65 C88 59 88 49 84 43 C78 37 70 39 65 35 Z"/>
-        <path class="ln c-white" d="M56 55 C56 49 60 47 65 47 C70 47 74 49 74 55 C74 65 70 73 65 73 C60 73 56 65 56 55 Z"/>
-        <path class="ink" d="M49 47 C52 44 56 44 58 47 C56 49.5 52 49.5 49 47 Z M72 47 C74 44 78 44 81 47 C78 49.5 74 49.5 72 47 Z"/>
-        <path class="ink" d="M60 55 C60 52 70 52 70 55 C70 58 67 60 65 60 C63 60 60 58 60 55 Z"/>
-        <path class="ln band" d="M61 65 C61 74 69 74 69 65 Z"/>
-        <path class="ln eye" d="M58 63 C60 67 70 67 72 63"/>
+        <path class="ln c-grey" d="M45.0 34.0 L41.4 7.1 L52.3 15.4 L58.9 27.4 Z"></path>
+        <path class="ln c-grey" d="M85.0 34.0 L88.6 7.1 L77.7 15.4 L71.1 27.4 Z"></path>
+        <path class="ln eye" d="M46 30 L44 14 M84 30 L86 14"></path>
+        <path class="ln c-grey" d="M65.0 21.0 L77.7 23.3 L87.2 30.3 L94.5 59.0 L79.0 75.3 L65.0 80.0 L51.0 75.3 L35.5 59.0 L42.8 30.3 L52.3 23.3 Z"></path>
+        <path class="ln c-white" d="M65.0 35.0 L46.7 42.4 L43.0 53.5 L49.1 68.8 L64.5 77.0 L79.5 70.2 L87.0 54.5 L83.3 42.4 Z"></path>
+        <path class="ln c-white" d="M56.0 55.0 L61.2 47.5 L72.9 50.4 L73.1 63.0 L67.7 72.2 L59.5 69.2 Z"></path>
+        <path class="ink" d="M49.0 47.0 L54.2 44.8 L57.8 47.2 L53.4 48.9 Z M72.0 47.0 L76.1 44.8 L80.8 47.2 L76.3 48.9 Z"></path>
+        <path class="ink" d="M60.0 55.0 L64.9 52.8 L70.0 54.8 L68.5 58.4 L65.1 60.0 L61.6 58.5 Z"></path>
+        <path class="ln" d="M61.0 65.0 L63.3 71.2 L67.6 70.3 L68.8 65.0 Z"></path>
+        <path class="ln eye" d="M58.0 63.0 L65.0 66.0 L72.0 63.0"></path>
       </g>
     </g>
   </g>
