@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -125,7 +125,7 @@ button{cursor:pointer}
 .pgrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:4px; padding:2px 0 8px}
 .pwrap{position:relative; display:grid}
 .pwrap .pitem{padding-right:30px}
-.pitem{display:flex; align-items:center; gap:9px; width:100%; text-align:left; padding:8px 10px; border:2.5px solid var(--edge); background:#fff; color:var(--ink); touch-action:none; cursor:grab}
+.pitem{display:flex; align-items:center; gap:9px; width:100%; text-align:left; padding:8px 10px; border:2.5px solid var(--edge); background:#fff; color:var(--ink); touch-action:pan-y; cursor:grab}
 .pitem:hover{background:var(--panel-2)}
 .pitem.big{padding:11px 30px 11px 12px; font-size:15px; font-weight:500}
 .pstar,.qx{position:absolute; right:4px; top:50%; transform:translateY(-50%); width:24px; height:24px; padding:0; border:0; background:none; color:var(--muted); font-size:15px; line-height:24px; text-align:center}
@@ -263,7 +263,17 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
 }
 @media (max-width: 1340px){ .bar .zoomctl #zoomfit, .bar .vsep{display:none} .bar h1{font-size:17px} .bar .pname{width:96px; font-size:14px} .bar .fps{font-size:12px; padding:5px 6px} }
 @media (max-width: 760px){ .bar .meters, #vcount{display:none} .hint{max-width:calc(100% - 24px)} }
+/* An instrument, not a web page: no text selection, no long-press callout and no browser pinch-zoom anywhere.
+   Chrome's tap-to-search sheet (the Google search that slid up from the bottom) only opens on selectable text,
+   so this stops it on every screen, not just the tracker grid. Fields stay editable. */
+html{-webkit-touch-callout:none; touch-action:pan-x pan-y; -webkit-text-size-adjust:100%; text-size-adjust:100%}
+body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
+:is(input:not([type=range]):not([type=checkbox]):not([type=radio]),textarea,[contenteditable]:not([contenteditable=false])){user-select:text; -webkit-user-select:text; -webkit-touch-callout:default}
 </style>
+<script>
+// No long-press menu outside text fields (it is how Chrome offers "Search Google for…").
+document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.closest && e.target.closest('input,textarea,[contenteditable]'))) e.preventDefault(); }, true);
+</script>
 </head><body>
 
 <div class="bar">
@@ -1250,18 +1260,21 @@ function fitAll(){
 const touches = new Map(); let pinch = null;
 // The first finger down (isPrimary) starts afresh: a touch whose lift was never seen (the screen hidden mid-touch, a module
 // rebuilt under the finger) used to stay in the map, so from then on every single touch counted as two fingers.
-ws.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') return; if (e.isPrimary){ touches.clear(); pinch = null; } touches.set(e.pointerId, [e.clientX, e.clientY]); }, true);
-addEventListener('blur', () => { touches.clear(); pinch = null; }); document.addEventListener('visibilitychange', () => { touches.clear(); pinch = null; });
+const ctlTouch = new Set();   // fingers that landed on a control: they work the control, never pinch the view
+ws.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') return; if (e.isPrimary){ touches.clear(); ctlTouch.clear(); pinch = null; }
+  touches.set(e.pointerId, [e.clientX, e.clientY]);
+  if (e.target.closest && e.target.closest('input, select, textarea, button, .jack, .row.sl, .hit')) ctlTouch.add(e.pointerId); }, true);
+addEventListener('blur', () => { touches.clear(); ctlTouch.clear(); pinch = null; }); document.addEventListener('visibilitychange', () => { touches.clear(); ctlTouch.clear(); pinch = null; });
 window.addEventListener('pointermove', e => {
   if (!touches.has(e.pointerId)) return;
   touches.set(e.pointerId, [e.clientX, e.clientY]);
-  if (touches.size !== 2 || drag || nodeDragging) { pinch = null; return; }
+  if (touches.size !== 2 || drag || nodeDragging || ctlTouch.size) { pinch = null; return; }
   const [[ax, ay], [bx, by]] = [...touches.values()], d = Math.hypot(bx - ax, by - ay), cx = (ax + bx) / 2, cy = (ay + by) / 2;
   if (!pinch){ pinch = { d, cx, cy }; return; }
   const v = view(); v.x += cx - pinch.cx; v.y += cy - pinch.cy;
   zoomAt(cx, cy, v.zoom * d / pinch.d); pinch = { d, cx, cy };
 }, true);
-const touchEnd = e => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; };
+const touchEnd = e => { touches.delete(e.pointerId); ctlTouch.delete(e.pointerId); if (touches.size < 2) pinch = null; };
 window.addEventListener('pointerup', touchEnd, true); window.addEventListener('pointercancel', touchEnd, true);
 
 ws.addEventListener('pointerdown', e => {
@@ -1284,8 +1297,14 @@ ws.addEventListener('pointerdown', e => {
   clearSel();
   if (touches.size > 1) return;
   ws.setPointerCapture(e.pointerId); ws.classList.add('panning');
-  const sx = e.clientX, sy = e.clientY, ox = view().x, oy = view().y;
-  const mv = ev => { if (pinch) return; view().x = ox + ev.clientX - sx; view().y = oy + ev.clientY - sy; applyPan(); };
+  // Pan by each step's movement, not from where the finger first landed: after a pinch (a second finger came and
+  // went) the old origin belonged to another zoom, and the view used to jump there as the last finger moved on.
+  let lx = e.clientX, ly = e.clientY;
+  const mv = ev => {
+    const dx = ev.clientX - lx, dy = ev.clientY - ly; lx = ev.clientX; ly = ev.clientY;
+    if (pinch || touches.size > 1) return;
+    view().x += dx; view().y += dy; applyPan();
+  };
   const up = () => { ws.removeEventListener('pointermove', mv); ws.removeEventListener('pointerup', up); ws.removeEventListener('pointercancel', up); ws.classList.remove('panning'); store.touch(); };
   ws.addEventListener('pointermove', mv); ws.addEventListener('pointerup', up); ws.addEventListener('pointercancel', up);
 });
@@ -1470,10 +1489,17 @@ function paletteItem(type, label, big){
   // Click adds to the middle of the view; dragging places it where you drop.
   b.addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
-    e.preventDefault(); b.setPointerCapture(e.pointerId);
+    // A finger leaves the list free to scroll (touch-action:pan-y): an up/down swipe scrolls it and the browser cancels
+    // this press, while a sideways pull towards the patch drags the module out. A mouse or pen drags straight away.
+    const touch = e.pointerType === 'touch';
+    if (!touch){ e.preventDefault(); b.setPointerCapture(e.pointerId); }
     const sx = e.clientX, sy = e.clientY; let ghost = null;
     const mv = ev => {
-      if (!ghost && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 6){ ghost = h('div', {class:'pghost' + famCls}, sw(), label); document.body.append(ghost); }
+      if (!ghost && Math.hypot(ev.clientX - sx, ev.clientY - sy) > (touch ? 10 : 6)){
+        if (touch && Math.abs(ev.clientY - sy) > Math.abs(ev.clientX - sx)) return;   // still a scroll, not a drag
+        if (touch){ try { b.setPointerCapture(ev.pointerId); } catch(_){} }
+        ghost = h('div', {class:'pghost' + famCls}, sw(), label); document.body.append(ghost);
+      }
       if (ghost){ ghost.style.left = (ev.clientX + 10) + 'px'; ghost.style.top = (ev.clientY + 8) + 'px'; }
     };
     const up = ev => {

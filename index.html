@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -23,6 +23,12 @@
 @font-face{font-family:"JetBrains Mono"; src:url(fonts/JetBrainsMono-400.woff2) format("woff2"); font-weight:400 500; font-display:swap}
 @font-face{font-family:"JetBrains Mono"; src:url(fonts/JetBrainsMono-700.woff2) format("woff2"); font-weight:600 900; font-display:swap}
 
+/* An instrument, not a web page: no text selection, no long-press callout and no browser pinch-zoom anywhere.
+   Chrome's tap-to-search sheet (the Google search that slid up from the bottom) only opens on selectable text,
+   so this stops it on every screen, not just the tracker grid. Fields stay editable. */
+html{-webkit-touch-callout:none; touch-action:pan-x pan-y; -webkit-text-size-adjust:100%; text-size-adjust:100%}
+body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
+:is(input:not([type=range]):not([type=checkbox]):not([type=radio]),textarea,[contenteditable]:not([contenteditable=false])){user-select:text; -webkit-user-select:text; -webkit-touch-callout:default}
 </style>
 <style>
 /* Layout: Seeds "Minimal" skin, light only (as in Seeds). Full-width bands split by 1px ink lines:
@@ -499,7 +505,7 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .tcmd .ca{font-size:.9em}
 @media (max-width:600px){ .tcmd button{flex-direction:column; gap:1px; line-height:1.1; letter-spacing:.02em} .tcmd button[data-c=next]{flex-direction:column-reverse} .tcmd .ca{font-size:10px} }
 .tcmd button.on{background:var(--pl); color:var(--inv)}
-.tcmd button[hidden]{display:none} .tcmd button[data-c=song]{font-size:17px} .tcmd :is([data-c=prev],[data-c=next]){font-size:24px; font-weight:500; line-height:1}
+.tcmd button[hidden]{display:none} .tcmd button[data-c=song]{font-size:17px} .tcmd.cpad :is([data-c=undo],[data-c=redo]){font-size:20px; font-weight:500; line-height:1} .tcmd :is([data-c=prev],[data-c=next]){font-size:24px; font-weight:500; line-height:1}
 /* One row on wide screens. */
 @media (min-width:700px){
   .tcmd, .tcmd.song{grid-template-columns:repeat(14,minmax(0,1fr))}
@@ -598,6 +604,15 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 .tahd button{min-height:24px; padding:0 8px; font-size:10.5px; font-weight:700; letter-spacing:.04em; background:transparent; color:var(--ar-ink); border:1px solid var(--ar-line); border-radius:4px}
 .tahd button.on{background:var(--ar-mu); border-color:var(--ar-mu); color:#fff}
 .tath,.tagrid .ar{display:grid; grid-template-columns:22px var(--arcols, repeat(8,minmax(0,1fr)) 4px repeat(8,minmax(0,1fr))); gap:2px; padding:0 8px}
+.tarr{--tk-mono:#eba3bd; --tk-poly:#86c99a}
+/* MONO / POLY over the track numbers, the same pink and green tabs as the Song screen's group boxes. */
+.tagp{flex:none; display:grid; grid-template-columns:22px var(--arcols, repeat(8,minmax(0,1fr)) 4px repeat(8,minmax(0,1fr))); gap:2px; padding:0 8px; margin-top:2px}
+.tagp b{--tk:var(--tk-mono); min-width:0; font:600 9px/1.5 var(--mono); letter-spacing:.08em; padding:0 5px; background:var(--tk); color:#1b2130;
+  border-radius:3px 3px 0 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 2px 0 var(--tk)}
+.tagp b.gp{--tk:var(--tk-poly); text-align:right}
+.tath i.gm{box-shadow:inset 0 -2px 0 var(--tk-mono)} .tath i.gp{box-shadow:inset 0 -2px 0 var(--tk-poly)}
+body.arrsmall .tagp{grid-template-columns:18px var(--arcols, repeat(8,minmax(0,1fr)) 4px repeat(8,minmax(0,1fr))); gap:1px; padding:0 6px}
+body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tath{flex:none; font-size:9px; color:var(--ar-dim); padding-bottom:3px; border-bottom:1px solid var(--ar-line)}
 .tath i{font-style:normal; text-align:center; line-height:16px}   /* a label now: tracks are muted in the Mixer, not here */
 .tath i.mu{color:var(--ar-mu); text-decoration:line-through}
@@ -671,6 +686,10 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 .tscr .nb{opacity:.55; pointer-events:none} .tscr .nbl{color:#9b82d6} .tscr .nbr{color:#c9a227}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<script>
+// No long-press menu outside text fields (it is how Chrome offers "Search Google for…").
+document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.closest && e.target.closest('input,textarea,[contenteditable]'))) e.preventDefault(); }, true);
+</script>
 </head>
 <body>
 
@@ -867,6 +886,7 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
     <aside class="tarr" id="tArr" aria-label="Song arrangement">
       <div class="tarrh" id="tArrH" role="separator" aria-orientation="vertical" aria-label="Drag to resize the arrange panel" title="Drag to resize · double-tap: big / normal"></div>
       <div class="tahd"><b>ARRANGE</b><span id="tArrSub"></span></div>
+      <div class="tagp" id="tArrGp" aria-hidden="true"></div>
       <div class="tath" id="tArrTh"></div>
       <div class="tagrid" id="tArrGrid"></div>
       <div class="tafoot">TAP: GO · a tap goes to a block, twice opens its phrase · HOLD · holding a block mutes or unmutes just that one (the phrase stays) · tap a row number to play from there</div>
@@ -5245,10 +5265,16 @@ for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type
 // In PAD mode CLEAR moves between PASTE and UNDO, so a thumb can reach it on a phone; KEYS mode keeps
 // the original order. The buttons are moved, not rebuilt, so the tap handlers stay attached.
 const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'clone', 'cldn', 'copy', 'cut', 'paste', 'clr', 'undo', 'redo', 'song'];
+const CMD_PAD_SHORT = {clr:'CLR', sel:'SEL', paste:'PST', undo:'↶', redo:'↷'};
 function applyCmdOrder(){
   const host = $('tCmd'), by = {};
   host.querySelectorAll('button[data-c]').forEach(b => by[b.dataset.c] = b);
   for (const a of inMode === 'pad' ? CMD_PAD_ORDER : CMDS.map(c => c[0])) if (by[a]) host.append(by[a]);
+  // PAD mode packs more into a phone-width row, so the long words get short forms that fit inside the buttons.
+  host.classList.toggle('cpad', inMode === 'pad');
+  const lab = Object.fromEntries(CMDS.map(c => [c[0], c[1]]));
+  for (const a in by) by[a].innerHTML = (inMode === 'pad' && CMD_PAD_SHORT[a]) || lab[a];
+  const sb = by.song; if (sb){ sb.textContent = tp.on ? '■' : '▶'; sb.classList.toggle('on', tp.on); }
 }
 // A tap fires pointerdown and then a click; the click only counts when no pointerdown just ran the
 // button (keyboard Enter/Space, accessibility tools), so SELECT, CLN, PASTE… never fire twice.
@@ -5618,10 +5644,16 @@ function drawArr(PH){
     }
     h += '</div>';
   }
-  const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (t && t % 8 === 0 ? '<span></span>' : '') + `<i class="${m.mute ? 'mu' : ''}">${t + 1}</i>`).join('');
-  const sig = h + th;
+  const PF = polyFrom();
+  const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (t && t % 8 === 0 ? '<span></span>' : '') + `<i class="${t < PF ? 'gm' : 'gp'}${m.mute ? ' mu' : ''}">${t + 1}</i>`).join('');
+  // MONO and POLY tabs spanning their tracks' columns (track t sits in grid column 2 + t + one per 8-track gap before it).
+  const col = t => 2 + t + Math.floor(t / 8), rng = (a, b) => d2(a) + (b > a ? '–' + d2(b) : '');
+  let gp = '';
+  if (PF > 0) gp += `<b class="gm" style="grid-column:${col(0)} / ${col(PF - 1) + 1}" title="Mono tracks ${rng(1, PF)}">MONO ${rng(1, PF)}</b>`;
+  if (NA > PF) gp += `<b class="gp" style="grid-column:${col(PF)} / ${col(NA - 1) + 1}" title="Poly tracks ${rng(PF + 1, NA)}">POLY ${rng(PF + 1, NA)}</b>`;
+  const sig = h + th + gp;
   if (sig !== arrSig){
-    arrSig = sig; arrGrid.innerHTML = h; $('tArrTh').innerHTML = th;
+    arrSig = sig; arrGrid.innerHTML = h; $('tArrTh').innerHTML = th; $('tArrGp').innerHTML = gp;
     arrLit = [];
   }
   // The playhead is lit in place, so the blocks are only rebuilt when the song changes, never under a finger mid-press.
