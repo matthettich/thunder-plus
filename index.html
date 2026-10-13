@@ -733,7 +733,7 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 #dkScope{--dkc:#dbe6f8; flex:0 6 var(--dkws, 300px); min-width:90px}
 #dkInst{--dkc:#fbe2d2; flex:1 1 0; min-width:210px}
 #dkFx{--dkc:#f8dce8; flex:0 1 var(--dkwf, 320px); min-width:200px}
-#dkStrip{--dkc:#d8f0e2; flex:0 0 176px}
+#dkStrip{--dkc:#d8f0e2; flex:0 0 228px}
 /* the thin grey header: one cell per section, its button over it, a rule between sections */
 .dkh{flex:none; display:flex; align-items:center; gap:5px; height:22px; padding:0 6px; background:var(--side); border-bottom:1px solid var(--line); min-width:0}
 .dkh .dkt{min-height:0; height:17px; padding:0 7px; font-size:var(--fs-2); font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--ink); color:var(--inv);
@@ -760,24 +760,26 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .dkslots button{min-height:22px; padding:0 7px; font-size:var(--fs-2); border:1px solid var(--line); background:var(--panel)}
 .dkslots button.on{background:var(--ink); color:var(--inv)} .dkslots button.off{opacity:.5}
 /* channel strip: meter, fader, pan, mute and solo for the current track */
-.dkstrip{display:grid; grid-template-columns:18px 26px minmax(0,1fr) 38px; grid-template-rows:minmax(0,1fr) auto auto; gap:4px 6px; padding:6px 10px 8px}
-/* stereo meter, right beside the fader: two pink bars (the skin's colour in the terminal skins), red at clip */
-.stm{grid-row:1; grid-column:1; display:flex; gap:2px; position:relative}
+.dkstrip{display:grid; grid-template-columns:minmax(4px,1fr) 34px 22px 30px minmax(8px,1fr) 46px; grid-template-rows:minmax(0,1fr) auto auto; gap:6px 6px; padding:10px 14px 10px}
+/* stereo meter beside the fader: two wide pink bars (the skin's colour in the terminal skins), red at clip, with a dB scale */
+.stm{grid-row:1; grid-column:2; display:flex; gap:3px; position:relative}
 .stm i{flex:1; position:relative; border:1px solid var(--line); background:var(--panel2); overflow:hidden}
 .stm i::after{content:''; position:absolute; left:0; right:0; bottom:0; height:var(--lv, 0%); background:var(--stpink, #eba3bd)}
 .stm i.clip::after{background:var(--meter-clip)}
+.stsc{grid-row:1; grid-column:3; position:relative; margin:1px 0}
+.stsc i{position:absolute; left:0; right:0; transform:translateY(50%); font:var(--fs-1)/1 var(--mono); font-style:normal; color:var(--muted); text-align:center}
 /* the fader looks like the app's other sliders: a thin track filled in ink up to a round thumb */
-.stfad{grid-row:1; grid-column:2; justify-self:center; position:relative; width:26px; min-height:0; cursor:ns-resize; touch-action:none; outline-offset:2px; border-radius:3px}
+.stfad{grid-row:1; grid-column:4; justify-self:center; position:relative; width:30px; min-height:0; cursor:ns-resize; touch-action:none; outline-offset:2px; border-radius:3px}
 .stfad::before{content:''; position:absolute; left:50%; top:8px; bottom:8px; width:4px; margin-left:-2px; border-radius:2px; background:var(--track)}
 .stfill{position:absolute; left:50%; bottom:8px; width:4px; margin-left:-2px; border-radius:2px; background:var(--ink)}
 .stcap{position:absolute; left:50%; width:16px; height:16px; margin:0 0 -8px -8px; border-radius:50%; background:var(--ink)}
 .st0{position:absolute; left:2px; right:2px; height:0; border-top:1px solid var(--muted); opacity:.6}
-.stvv{grid-row:2; grid-column:1 / 3; text-align:center; font-size:var(--fs-2); white-space:nowrap}
-.stms{grid-row:1 / 3; grid-column:4; display:flex; flex-direction:column; gap:5px}
-.stms button{min-height:0; height:28px; padding:0; font-weight:700; font-size:var(--fs-3); border:1px solid var(--line); background:var(--panel)}
+.stvv{grid-row:2; grid-column:2 / 5; text-align:center; font-size:var(--fs-2); white-space:nowrap}
+.stms{grid-row:1 / 3; grid-column:6; display:flex; flex-direction:column; gap:8px}
+.stms button{min-height:0; height:34px; padding:0; font-weight:700; font-size:var(--fs-3); border:1px solid var(--line); background:var(--panel)}
 .stms button.mu.on{background:var(--meter-clip); color:#fff; border-color:var(--meter-clip)}
 .stms button.so.on{background:var(--meter-hot); color:#1b2130; border-color:var(--meter-hot)}
-.stpan{grid-row:3; grid-column:1 / 5; display:grid; grid-template-columns:24px minmax(0,1fr) 34px; align-items:center; gap:6px; font-size:var(--fs-2)}
+.stpan{grid-row:3; grid-column:1 / 7; display:grid; grid-template-columns:24px minmax(0,1fr) 34px; align-items:center; gap:6px; font-size:var(--fs-2)}
 .stpan input{margin:0; height:18px; accent-color:var(--ink)} .stpan output{text-align:right; font-variant-numeric:tabular-nums}
 .stpan span{color:var(--muted); letter-spacing:.06em}
 /* Phones: one section at a time, swipe sideways between them, so the tracker keeps its room. */
@@ -896,7 +898,8 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
   --ar-empty:color-mix(in srgb, var(--mx) 8%, transparent); --ar-line:color-mix(in srgb, var(--mx) 25%, transparent); --ar-pl:var(--mxsoft); --ar-pl-ink:var(--mxon);
   --ar-cur:var(--mx); --ar-mu:var(--mxred); --tk-mono:var(--mx); --tk-poly:var(--mxpoly)}
 :root[data-skinbase="term"] :is(.tagp b,.tgbox b){color:var(--mxon); text-shadow:none}
-:root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg)); --stpink:var(--mx)}
+:root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg))}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"]) .tdeck{--stpink:var(--mx)}
 :root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
 :root[data-skinbase="term"] .dkh .dksolo{background:var(--mxsoft); color:var(--mxon)} :root[data-skinbase="term"] .stms button.so.on{background:var(--mxsoft); color:var(--mxon)}
 :root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
@@ -1270,6 +1273,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
         <section class="dks" id="dkStrip" data-s="strip"><div class="dkh"><button type="button" class="dkt" data-k="strip" id="dkStripT">TRACK</button></div>
           <div class="dkb dkstrip" id="dkStripB">
             <div class="stm" id="stM" title="Track level, left and right"><i></i><i></i></div>
+            <div class="stsc" aria-hidden="true"><i style="bottom:100%">0</i><i style="bottom:87.5%">6</i><i style="bottom:75%">12</i><i style="bottom:50%">24</i><i style="bottom:25%">36</i><i style="bottom:0%">48</i></div>
             <div class="stfad" id="stVol" role="slider" tabindex="0" aria-label="Track volume" aria-valuemin="0" aria-valuemax="255" title="Volume: drag · double-click for 0 dB · +6 dB at the top"><i class="stfill"></i><u class="st0"></u><b class="stcap"></b></div>
             <output class="stvv" id="stVolV"></output>
             <div class="stms"><button type="button" class="mu" id="stMute" aria-pressed="false" title="Mute this track">M</button><button type="button" class="so" id="stSolo" aria-pressed="false" title="Solo this track (the others go silent)">S</button></div>
