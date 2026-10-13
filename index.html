@@ -1563,7 +1563,7 @@ const FX = {
       shape:{l:'Shape', min:0, max:1, c:'lin', d:0.5}, density:{l:'Density', min:0, max:1, c:'lin', d:0.85}, feedback:{l:'Feedback', min:0, max:1, c:'lin', d:0.2},
       blend:{l:'Blend', min:0, max:1, c:'lin', d:1}, reverb:{l:'Reverb', min:0, max:1, c:'lin', d:0.25}},
     init:{media:3, freeze:false},
-    map:f => [f.media | 0, 0, f.freeze ? 1 : 0, f.time, f.size, f.pitch, f.shape, f.density, f.feedback, f.blend, f.reverb, 0]},
+    map:f => [f.media | 0, 0, f.freeze ? 1 : 0, f.time, Math.min(f.size, .995), f.pitch, f.shape, f.density, f.feedback, f.blend, f.reverb, 0]},
   // Added Oct 2026: DaisySP, Mutable Instruments Warps, Cloud Seed and more Airwindows (all MIT). Generic names; credits in FX_CREDIT.
   flanger:{name:'Flanger', tx:11, segs:[],
     rows:{depth:{l:'Depth', min:0, max:1, c:'lin', d:0.5, f:v => Math.round(v * 100) + '%'}, rate:{l:'Rate', min:0.05, max:5, c:'log', d:0.3, f:v => (v < 10 ? v.toFixed(2) : Math.round(v)) + ' Hz'}, delay:{l:'Delay', min:0, max:1, c:'lin', d:0.5, f:v => (0.1 + v * 6.9).toFixed(1) + ' ms'}, fb:{l:'Feedback', min:0, max:0.95, c:'lin', d:0.5, f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', min:0, max:1, c:'lin', d:0.5, f:v => Math.round(v * 100) + '%'}},
@@ -3530,7 +3530,7 @@ const TFX = {
       EN('media', 'MEDIA', 3, ['DIGITAL', 'VINTAGE', 'TAPE', 'DUSTY']), EN('freeze', 'FREEZE', 0, ['OFF', 'ON']),
       P_('time', 'TIME', 51, pc), P_('size', 'SIZE', 128, pc), P_('pitch', 'PITCH', 128, pc), P_('shape', 'SHAPE', 128, pc),
       P_('density', 'DENSITY', 217, pc), P_('fb', 'FEEDBACK', 51, pc), P_('blend', 'BLEND', 255, v => pc(v) + ' wet'), P_('verb', 'REVERB', 64, pc)],
-    map:f => [f.media | 0, 0, f.freeze >= .5 ? 1 : 0, u8(f.time), u8(f.size), u8(f.pitch), u8(f.shape), u8(f.density), u8(f.fb), u8(f.blend), u8(f.verb), 0]},
+    map:f => [f.media | 0, 0, f.freeze >= .5 ? 1 : 0, u8(f.time), Math.min(u8(f.size), .995), u8(f.pitch), u8(f.shape), u8(f.density), u8(f.fb), u8(f.blend), u8(f.verb), 0]},
   flanger:{n:'FLNG', long:'Flanger (DaisySP Flanger)', id:11, ps:[
       P_('depth', 'DEPTH', 128, B => { const v = 0 + 1 * u8(B); return Math.round(v * 100) + '%'; }), P_('rate', 'RATE', 99, B => { const v = 0.05 * Math.pow(100, u8(B)); return (v < 10 ? v.toFixed(2) : Math.round(v)) + ' Hz'; }), P_('delay', 'DELAY', 128, B => { const v = 0 + 1 * u8(B); return (0.1 + v * 6.9).toFixed(1) + ' ms'; }), P_('fb', 'FEEDBACK', 134, B => { const v = 0 + 0.95 * u8(B); return Math.round(v * 100) + '%'; }), P_('mix', 'MIX', 128, B => { const v = 0 + 1 * u8(B); return Math.round(v * 100) + '%'; })],
     map:f => [(0 + 1 * u8(f.depth)), (0.05 * Math.pow(100, u8(f.rate))), (0 + 1 * u8(f.delay)), (0 + 0.95 * u8(f.fb)), (0 + 1 * u8(f.mix))]},
@@ -3639,7 +3639,7 @@ class ThunderFx extends AudioWorkletProcessor {
     const x = this.x, old = this.slots.slice(), next = [];
     for (const c of chain){
       let i = old.findIndex(s => s.key === c.key), s;
-      if (i >= 0){ s = old[i]; old.splice(i, 1); } else { const h = x.tfx_new(c.t, sampleRate); if (h < 0) continue; s = {key:c.key, h}; }
+      if (i >= 0){ s = old[i]; old.splice(i, 1); if (s.h < 0){ s.h = x.tfx_new(c.t, sampleRate); if (s.h < 0) continue; } } else { const h = x.tfx_new(c.t, sampleRate); if (h < 0) continue; s = {key:c.key, h}; }
       new Float32Array(x.memory.buffer, x.tfx_params(s.h), 12).set(c.p);
       next.push(s);
     }
@@ -3653,11 +3653,20 @@ class ThunderFx extends AudioWorkletProcessor {
     const L = this.L, R = this.R;
     if (i && i.length){ L.set(i[0]); R.set(i[1] || i[0]); } else { L.fill(0); R.fill(0); }
     const t0 = Date.now();
-    for (const s of this.slots) x.tfx_process(s.h, n);
+    for (const s of this.slots){
+      if (s.h < 0) continue;
+      if (!this.cL){ this.cL = new Float32Array(128); this.cR = new Float32Array(128); }
+      this.cL.set(this.L); this.cR.set(this.R);
+      // An effect that crashes is bypassed (and remade when its settings change), so it can't take the track down with it.
+      try { x.tfx_process(s.h, n); }
+      catch (e){ try { x.tfx_free(s.h); } catch (e2){} s.h = -1; this.port.postMessage({failed:s.key});
+        if (this.buf !== x.memory.buffer){ this.buf = x.memory.buffer; this.L = new Float32Array(this.buf, x.tfx_l(), 128); this.R = new Float32Array(this.buf, x.tfx_r(), 128); }
+        this.L.set(this.cL); this.R.set(this.cR); }
+    }
     // Date.now() is coarse, but its average over many blocks is the real cost: report it as a share of real time.
     this.ms += Date.now() - t0; this.fr += n;
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
-    o[0].set(L.subarray(0, n)); if (o[1]) o[1].set(R.subarray(0, n));
+    o[0].set(this.L.subarray(0, n)); if (o[1]) o[1].set(this.R.subarray(0, n));
     return true;
   }
 }
@@ -3678,7 +3687,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=7')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=8')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -3775,7 +3784,9 @@ function tfxReady(ac){
 function tfxNode(ac, chain){
   const n = new AudioWorkletNode(ac, 'thunder-tfx', {numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
     channelCountMode:'explicit', channelInterpretation:'speakers', processorOptions:{bytes:tfxBin(), chain}});
-  n.load = 0; n.port.onmessage = e => { if (e.data && typeof e.data.load === 'number') n.load = n.load * 0.6 + e.data.load * 0.4; };
+  n.load = 0; n.port.onmessage = e => { const d = e.data; if (!d) return;
+    if (typeof d.load === 'number') n.load = n.load * 0.6 + d.load * 0.4;
+    if (d.failed){ const t = String(d.failed).split(':')[1], F = TFX[t]; toast((F ? F.long.replace(/^based on /, '') : 'An effect') + ' stopped working and was bypassed. Change its settings to restart it.'); } };
   return n;
 }
 

@@ -111,7 +111,8 @@ function effect(type, id, params, map, cost){
       const P = new Float32Array(buf, x.tfx_params(st.h), 12); P.fill(0); P.set(map(io.p, ctx));
       const L = new Float32Array(buf, x.tfx_l(), 128), R = new Float32Array(buf, x.tfx_r(), 128);
       L.set(L0); R.set(R0);
-      x.tfx_process(st.h, ctx.block);
+      try { x.tfx_process(st.h, ctx.block); }
+      catch (e){ try { x.tfx_free(st.h); } catch (e2){} st.h = -1; io.out.out.set(L0); io.out.outR.set(R0); return; }   // crashed: bypass it
       const L2 = new Float32Array(x.memory.buffer, x.tfx_l(), 128), R2 = new Float32Array(x.memory.buffer, x.tfx_r(), 128);
       io.out.out.set(L2.subarray(0, ctx.block)); io.out.outR.set(R2.subarray(0, ctx.block));
     }
@@ -142,9 +143,11 @@ const Clouds = effect('clouds', 1, { mode:[0,0,3,1], lofi:[0,0,1,1], freeze:[0,0
     texture:[.5,0,1,.01], blend:[.5,0,1,.01], fb:[.2,0,1,.01], verb:[.5,0,1,.01], spread:[.5,0,1,.01] },
   p => [p.mode | 0, p.lofi >= .5 ? 1 : 0, p.freeze >= .5 ? 1 : 0, u(p.pos), u(p.size), p.pitch, u(p.density), u(p.texture), u(p.blend), u(p.fb), u(p.verb), u(p.spread)], 4);
 /* Mutable Instruments Beads (MIT): time, size, pitch, shape, density, feedback, blend, reverb + media. */
+// Beads divides by zero with Freeze on and Size at exactly 1, which traps the whole wasm module. Cap it just under.
+const BEADS_SIZE_MAX = .995;
 const Beads = effect('beads', 10, { media:[3,0,3,1], freeze:[0,0,1,1], time:[.2,0,1,.01], size:[.5,0,1,.01], pitch:[.5,0,1,.01], shape:[.5,0,1,.01],
     density:[.85,0,1,.01], fb:[.2,0,1,.01], blend:[1,0,1,.01], verb:[.25,0,1,.01] },
-  p => [p.media | 0, 0, p.freeze >= .5 ? 1 : 0, u(p.time), u(p.size), u(p.pitch), u(p.shape), u(p.density), u(p.fb), u(p.blend), u(p.verb), 0], 5);
+  p => [p.media | 0, 0, p.freeze >= .5 ? 1 : 0, u(p.time), Math.min(u(p.size), BEADS_SIZE_MAX), u(p.pitch), u(p.shape), u(p.density), u(p.fb), u(p.blend), u(p.verb), 0], 5);
 /* Flanger, based on DaisySP Flanger (MIT). */
 const FlangerFx = effect('flanger', 11, { depth:[0.5,0,1,.01], rate:[0.3,0.05,5,.01], delay:[0.5,0,1,.01], fb:[0.5,0,0.95,.01], mix:[0.5,0,1,.01] },
   p => [p.depth, p.rate, p.delay, p.fb, p.mix], 0.3);

@@ -4,7 +4,7 @@ Pick-up notes for continuing this work in a later session. Read this together wi
 [`README.md`](README.md) (the app's own docs) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 Keep this file up to date at the end of a work session.
 
-## Where things stand (12 Oct 2026, evening)
+## Where things stand (13 Oct 2026, morning)
 
 - **Repos:** `matthettich/thunder-plus` (this one) and `matthettich/Thunder-` (built from this one), both
   branch `main`, both pushed. Nothing uncommitted.
@@ -14,10 +14,11 @@ Keep this file up to date at the end of a work session.
   - `eebb19e`: 9 more effects (comb, transient, trance gate, multiband, frequency shifter, vinyl, dub, cab, tube).
   - The **break-chopping** commit on top (slices, sync, stretch), plus this file.
   - Thunder- has a matching rebuild after each of them.
+  - 13 Oct: the **Beads crash fix** and effect crash guards (see below), with a Thunder- rebuild.
 - **App:** no build step. `index.html` is the whole tracker/synth app; `chains/index.html` and
   `waves/index.html` are the two modular patch editors loaded in frames.
-- **Cache-busters now:** `chains-worklet.js?v=7` (index.html, chains/index.html, sw.js). Caches are
-  `thunderplus-v36`; `build-thunder.py` bumps Thunder-'s `thunder-vNN` itself.
+- **Cache-busters now:** `chains-worklet.js?v=8` (index.html, chains/index.html, sw.js). Caches are
+  `thunderplus-v38`; `build-thunder.py` bumps Thunder-'s `thunder-vNN` itself.
 
 ## Licensing rule (the owner may sell the app later)
 
@@ -141,6 +142,21 @@ With sects hidden, typing 14 on the Song screen made sect 14. Phrase 14 already 
   the saved kit was read at start-up. It threw, so every reload started from the factory kit. It now uses
   `slotsNow()`. Verified: a renamed kit and a 25 s sample both survive a reload.
 
+### Fix (13 Oct): Beads crash, and effects that crash are bypassed
+
+- **Found by a stress test** of every effect through the real …chains param maps (defaults, min, max and
+  random settings): Beads with **Freeze on and Size at exactly 1** divides by zero after ~1.5 s. A wasm trap
+  stops the whole module, so on a Mixer track it silenced that track's effects until a reload, and in
+  …chains it silenced the track's chain.
+- **Fix:** Size is capped at 0.995 in all three Beads maps (`BEADS_SIZE_MAX` in the worklet, the `TFX` and
+  pad-FX `beads` maps in `index.html`). The wasm is unchanged.
+- **Guards** (so any future effect bug costs only that effect):
+  - …chains `effect()`: a throwing `tfx_process` frees the handle and passes the sound through.
+  - Mixer track FX (`TFX_SRC`): each slot's input is copied first; a throwing slot is bypassed, its handle
+    freed and `{failed:key}` posted (the page toasts). `set()` remakes it when its settings next change.
+- **Also seen, not changed:** Space reverb, Air, OTT and EQ reach the ±8 output clamp at extreme settings
+  (Air also at some random mid settings). Loud, not broken.
+
 ## Running it locally
 
 No build step; serve the repo root over HTTP (the editors load their worklet by `fetch`, which
@@ -182,7 +198,9 @@ caches and rebuild Thunder-.
    "mismatch" is `track`'s max, which the editor writes as `CHAN_COUNT`.
 3. **Effects in Node:** instantiate `tfx.wasm` with a stub WASI, `tfx_new(id, 48000)`, write 12 params at
    `tfx_params(h)`, fill `tfx_l()`/`tfx_r()` and call `tfx_process(h, 128)`. Check for sound, no NaNs, CPU
-   and `memory.buffer` growth.
+   and `memory.buffer` growth. Drive them through the worklet's own maps (`ChainsDSP.MODULES[k].process`
+   after `wasmInit({tfxBytes})`) at default, min, max and random settings: raw 0–1 params give false alarms
+   (Rings' voices, for one, must be 1/2/4).
 4. **In the page:** headless Chromium (Playwright is installed) with a copy of `index.html` that adds
    `window.__T = {…}` before the main script's closing `})();`. That gives you `S`, `FX`, `freshFx`,
    `applyFx`, `pass`, `makeSeq`, `applyChop` and so on. Never commit that copy.
