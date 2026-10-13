@@ -724,6 +724,12 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 :root[data-skin="matrix"] :is(.tcmd button.on,.tkp .kp.on,.tkp .kp.blk){background:var(--mxpanel2); color:var(--mx)}
 :root[data-skin="matrix"] :is(.pads .pad .pm,.pads .pad.syn b::after){color:var(--mx2)}
 :root[data-skin="matrix"] .tcmd::before{color:var(--mx2)}
+/* PAD-mode nav pad: the keys that are pastel in the other skins are solid neon green; pressed or on turns them black */
+:root[data-skin="matrix"] #tPad .k{background:var(--mx); color:#000; border-color:var(--mx); text-shadow:none;
+  box-shadow:4px 4px 0 0 #000, 4px 4px 0 1.5px var(--mxdim), 0 0 12px -2px rgba(0,255,65,.55)}
+:root[data-skin="matrix"] :is(#tPad .k.dn,#tPad .k.on){background:#000; color:var(--mx); text-shadow:var(--mxglow);
+  box-shadow:1px 1px 0 0 #000, 1px 1px 0 1.5px var(--mxdim), 0 0 16px rgba(0,255,65,.8)}
+:root[data-skin="matrix"] :is(#tPad .k.lt,#tPad #kPlay.on){background:#b6ffc9; color:#000}
 :root[data-skin="matrix"] :is(.tcmd,.tctl,.tcmd:not([hidden]) + .tctl){border-top-color:var(--mx)}
 /* the tracker screen: black whatever its own colour setting, with green rows, a solid green cursor and faint scanlines */
 :root[data-skin="matrix"] :is(.tscr,.tscr[data-ts]){--ts-bg:#000; --ts-ink:#00ff41; --ts-dim:#0b5e20; --ts-rn:#0a8a2a; --ts-rn4:#5dff8a; --ts-th:#00c834;
