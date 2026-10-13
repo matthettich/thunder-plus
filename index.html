@@ -659,7 +659,7 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tagrid b.tm{opacity:.35}
 .tagrid b.c{outline:2px solid var(--ar-cur); outline-offset:0; position:relative; z-index:1}
 .tagrid b.c:not(.f):not(.m):not(.z):not(.p){color:var(--ar-dim)}
-.tafoot{flex:none; font-size:var(--fs-2); line-height:1.35; color:var(--ar-dim); padding:6px 10px 8px; border-top:1px solid var(--ar-line); font-family:var(--font)}
+.tafoot{flex:none; font-size:var(--fs-2); line-height:1.35; color:var(--ar-dim); padding:6px 10px 8px; border-top:1px solid var(--ts-line, var(--ar-line)); font-family:var(--font)}
 @media (max-width:480px){ .top{flex-wrap:wrap} .top .brand{display:none} .top .kitname{order:9; flex:1 1 100%} .top button{white-space:nowrap} .ttabs button{padding:0 10px; font-size:var(--fs-3)} .tmode .mx{display:none} .tmode{padding:0 10px} .tctl{padding-inline:10px} .tcmd{padding-inline:10px} }
 /* Colourful boxes at the bottom of every screen, the same as the tracker's PAD-mode nav pad: a darker grey
    panel, each button filled with one of the screens' pastels (Song, Sect, Phrase, Inst, Mixer, FX, Project in
@@ -679,8 +679,8 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tcmd{background:color-mix(in srgb, var(--panel) 70%, var(--side)); border-top:2px solid var(--ink); border-bottom:0; position:relative; padding-top:18px}
 .lforow{display:flex; gap:6px; align-items:center; min-width:0} .lforow select{flex:1 1 0; min-width:0; width:auto}
 .tcmd::before{content:'COMMANDS'; position:absolute; left:16px; top:3px; font-size:var(--fs-1); font-weight:700; letter-spacing:.12em; color:var(--muted)}
-.tctl{background:color-mix(in srgb, var(--side) 62%, #000); border-top:4px solid var(--ink)}
-.tcmd:not([hidden]) + .tctl{border-top:4px solid var(--ink)}
+.tctl{background:color-mix(in srgb, var(--side) 62%, #000); border-top:1px solid var(--ink)}
+.tcmd:not([hidden]) + .tctl{border-top:1px solid var(--ink)}
 @media (max-width:480px){ .tcmd::before{left:10px} .tcmd button{font-size:var(--fs-2); letter-spacing:0} }
 .kpr{gap:10px 9px}
 .kpc{gap:10px; height:calc(var(--k) * 1.95 + 16px)}
@@ -7507,6 +7507,19 @@ if (screen.orientation) screen.orientation.addEventListener('change', () => setT
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(() => arrLayout(true), 150); });
 new ResizeObserver(() => arrLayout()).observe(document.documentElement);
 setInterval(() => { if (!document.hidden) arrLayout(); }, 1000);
+// The line over the song's info and the line over ARRANGE's footer meet in one straight line across: whichever
+// block is shorter grows upward to the other's line.
+const tInfoBox = document.querySelector('.tinfo'), arrFoot = arrEl.querySelector('.tafoot');
+function footAlign(){
+  if (!tInfoBox || !arrFoot) return;
+  tInfoBox.style.minHeight = arrFoot.style.minHeight = '';
+  if (!arrShown() || !tInfoBox.offsetHeight || !arrFoot.offsetHeight) return;
+  const a = tInfoBox.getBoundingClientRect(), b = arrFoot.getBoundingClientRect(), d = a.top - b.top;
+  if (Math.abs(d) < 0.5) return;
+  if (d > 0) tInfoBox.style.minHeight = (a.height + d) + 'px'; else arrFoot.style.minHeight = (b.height - d) + 'px';
+}
+{ const ro = new ResizeObserver(() => requestAnimationFrame(footAlign));
+  ro.observe(arrEl); ro.observe($('tInfo')); ro.observe($('tHint')); if (tInfoBox) ro.observe(tInfoBox.parentElement); }
 let arrDrag = null, arrGripT = 0;
 $('tArrH').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation();
   try { $('tArrH').setPointerCapture(e.pointerId); } catch(_){}
