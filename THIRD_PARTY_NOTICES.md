@@ -11,9 +11,10 @@ https://github.com/pichenettes/eurorack. Copyright Emilie Gillet.
 "Mutable Instruments", "Plaits", "Rings", "Clouds", "Beads", "Elements" and "Warps" are names of Mutable Instruments'
 products; ...Thunder is not affiliated with or endorsed by Mutable Instruments. Warps is the app's Cross-mod effect.
 
-## Airwindows: Density, ToTape6, EQ, Pressure4, Galactic, TapeDelay2, DeRez2, PurestDrive, Air3 and Verbity2
+## Airwindows: Density, ToTape6, EQ, Pressure4, Galactic, TapeDelay2, DeRez2, PurestDrive, Air3, Verbity2, ToVinyl4, Dubly, Cabs and Tube2
 
-In the app DeRez2 is Lo-fi, PurestDrive is Drive, Air3 is Air and Verbity2 is Room reverb.
+In the app DeRez2 is Lo-fi, PurestDrive is Drive, Air3 is Air, Verbity2 is Room reverb, ToVinyl4 is Vinyl, Dubly is Dub tape,
+Cabs is Speaker cab and Tube2 is Tube.
 
 https://github.com/airwindows/airwindows. Copyright (c) 2018 Chris Johnson.
 
@@ -29,7 +30,10 @@ The app's Space reverb. Its delay buffers are shrunk at build time to fit phones
 
 ---
 
-All four are released under the MIT License:
+The Comb resonator, Transient shaper, Trance gate, Multiband squash and Frequency shifter (`dsp/tfx/fx_extra.cc`), and the
+…chains Steps, Clock, Repeat and Vocoder modules, are ...Thunder's own code.
+
+All four projects above are released under the MIT License:
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,

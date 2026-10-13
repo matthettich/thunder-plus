@@ -185,6 +185,34 @@ const AirFx = effect('air', 23, { air:[0.5,0,1,.01], gnd:[0.5,0,1,.01] },
 const RoomFx = effect('room', 24, { size:[0.5,0,1,.01], sustain:[0.5,0,1,.01], mulch:[0.5,0,1,.01], wet:[0.35,0,1,.01] },
   p => [p.size, p.sustain, p.mulch, p.wet], 1);
 
+/* Comb resonator, original code. */
+const CombFx = effect('comb', 25, { note:[48,24,96,1], fb:[0.85,-0.99,0.99,.01], damp:[0.3,0,0.99,.01], spread:[8,0,50,1], mix:[0.6,0,1,.01] },
+  (p, ctx) => [(440 * Math.pow(2, ((p.note | 0) - 69) / 12)), p.fb, p.damp, p.spread, p.mix], 0.2);
+/* Transient shaper, original code. */
+const TransientFx = effect('transient', 26, { att:[0.5,-1,1,.01], sus:[0,-1,1,.01], out:[1,0,2,.01], mix:[1,0,1,.01] },
+  (p, ctx) => [p.att, p.sus, p.out, p.mix], 0.1);
+/* Trance gate, original code. */
+const TgateFx = effect('tgate', 27, { div:[2,0,5,1], pat:[4,0,8,1], len:[0.6,0.05,1,.01], depth:[1,0,1,.01], smooth:[3,0.5,30,.01] },
+  (p, ctx) => [(ctx.transport.tempo / 60 / [0.125,0.16666667,0.25,0.33333333,0.5,1][(p.div | 0)]), p.len, p.depth, p.smooth, [65535,21845,43690,18761,22235,54749,4879,4353,5193][(p.pat | 0)], 16, (ctx.transport.startN || 0), 0], 0.1);
+/* Multiband squash, original code. */
+const OttFx = effect('ott', 28, { depth:[0.5,0,1,.01], time:[0.4,0,1,.01], lo:[0,-12,12,.01], mid:[0,-12,12,.01], hi:[0,-12,12,.01], out:[0,-12,12,.01] },
+  (p, ctx) => [p.depth, p.time, p.lo, p.mid, p.hi, p.out], 1.2);
+/* Frequency shifter, original code. */
+const FshiftFx = effect('fshift', 29, { shift:[0.15,-1,1,.01], fb:[0,0,0.9,.01], mix:[1,0,1,.01] },
+  (p, ctx) => [(Math.sign(p.shift) * p.shift * p.shift * 2000), p.fb, p.mix], 0.2);
+/* Vinyl, based on Airwindows ToVinyl4 (MIT). */
+const VinylFx = effect('vinyl', 30, { mlow:[0.2,0,1,.01], slow:[0.34,0,1,.01], hlim:[0.32,0,1,.01], wear:[0.3,0,1,.01] },
+  (p, ctx) => [p.mlow, p.slow, p.hlim, p.wear], 0.4);
+/* Dub tape, based on Airwindows Dubly (MIT). */
+const DubFx = effect('dub', 31, { amt:[0.5,0,1,.01], mix:[1,0,1,.01] },
+  (p, ctx) => [p.amt, p.mix], 0.3);
+/* Speaker cab, based on Airwindows Cabs (MIT). */
+const CabFx = effect('cab', 32, { model:[0,0,5,1], int:[0.66,0,1,.01], room:[0.33,0,1,.01], size:[0.66,0,1,.01], axis:[0.33,0,1,.01], out:[0.8,0,1,.01] },
+  (p, ctx) => [(((p.model | 0) + 0.5) / 6), p.int, p.room, p.size, p.axis, p.out], 0.6);
+/* Tube, based on Airwindows Tube2 (MIT). */
+const TubeFx = effect('tube', 33, { input:[0.5,0,1,.01], tube:[0.5,0,1,.01] },
+  (p, ctx) => [p.input, p.tube], 0.3);
+
 /* ── control ──────────────────────────────────────────────────────────────── */
 const LFO = {
   type:'lfo', scope:'mono', cost:.3,
@@ -733,6 +761,7 @@ const MODULES = { trackIn:TrackIn,
   vcf:VCF, vca:VCA, mixer:Mixer,
   eq:EQ, comp:Comp, saturation:Saturation, tape:Tape, chorus:Chorus, crush:Crush, delay:Delay, reverb:Reverb, rings:Rings, clouds:Clouds, beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
+  comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   scin:SidechainIn, sccomp:SidechainComp,
   lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter, steps:Steps, clock:Clock, repeat:Repeat,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant,

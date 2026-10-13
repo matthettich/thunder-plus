@@ -7,7 +7,7 @@
 #   git clone https://github.com/pichenettes/eurorack && git -C eurorack submodule update --init stmlib
 #   git clone https://github.com/electro-smith/DaisySP
 #   git clone --filter=blob:none --sparse https://github.com/airwindows/airwindows && \
-#     git -C airwindows sparse-checkout set plugins/LinuxVST/src/{Density,ToTape6,EQ,Pressure4,Galactic,TapeDelay2,DeRez2,PurestDrive,Air3,Verbity2}
+#     git -C airwindows sparse-checkout set plugins/LinuxVST/src/{Density,ToTape6,EQ,Pressure4,Galactic,TapeDelay2,DeRez2,PurestDrive,Air3,Verbity2,ToVinyl4,Dubly,Cabs,Tube2}
 #   git clone https://github.com/GhostNoteAudio/CloudSeedCore   (C = its folder)
 # Toolchain: wasi-sdk 25 (https://github.com/WebAssembly/wasi-sdk/releases), WASI_SDK = its folder.
 # The Clouds window.h patch from ../build.sh is applied here too. Airwindows needs the same
@@ -23,7 +23,7 @@ import sys; p=sys.argv[1]; s=open(p).read()
 s=s.replace("    phase_ = 0;\n    regenerated_ = false;\n    envelope_phase_increment_","    phase_ = 0;\n    regenerated_ = false;\n    done_ = false;\n    half_ = false;\n    envelope_phase_increment_",1)
 open(p,'w').write(s)
 PY
-AW="Density ToTape6 EQ Pressure4 Galactic TapeDelay2 DeRez2 PurestDrive Air3 Verbity2"
+AW="Density ToTape6 EQ Pressure4 Galactic TapeDelay2 DeRez2 PurestDrive Air3 Verbity2 ToVinyl4 Dubly Cabs Tube2"
 # Cloud Seed's delay buffers are sized for 192 kHz (~67 MB an instance); shrink them for 48 kHz phones.
 # fx_cloudseed.cc keeps its ranges inside these sizes.
 cp -r "$C" "$W/cs"; C="$W/cs"
@@ -36,6 +36,7 @@ CXX="$WASI_SDK/bin/clang++ --target=wasm32-wasip1 --sysroot=$WASI_SDK/share/wasi
 O="$W/obj"; mkdir -p "$O"
 cc() { inc=$1; shift; for f in "$@"; do $CXX $inc -c "$f" -o "$O/$(echo "$f" | sed 's#[/.]#_#g').o"; done; }
 cc "-I$H" "$H/tfx.cc"
+cc "-I$H" "$H/fx_extra.cc"   # Thunder's own effects (original code)
 cc "-DTEST -include cstdio -I$H -I$E" "$H/fx_mi.cc" \
   $E/rings/dsp/part.cc $E/rings/dsp/resonator.cc $E/rings/dsp/string.cc $E/rings/dsp/fm_voice.cc $E/rings/resources.cc \
   $E/clouds/dsp/granular_processor.cc $E/clouds/dsp/correlator.cc $E/clouds/dsp/mu_law.cc $E/clouds/resources.cc \

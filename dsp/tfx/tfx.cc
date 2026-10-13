@@ -11,7 +11,8 @@ __attribute__((export_name("tfx_l"))) float* tfx_l() { return io_l; }
 __attribute__((export_name("tfx_r"))) float* tfx_r() { return io_r; }
 // type: 0 rings, 1 clouds, 2 density, 3 tape, 4 chorus, 5 crush, 6 eq, 7 comp, 8 reverb, 9 delay, 10 beads,
 // 11 flanger, 12 phaser, 13 tremolo, 14 overdrive, 15 wavefolder, 16 autowah, 17 pitch shifter, 18 ladder filter,
-// 19 warps, 20 cloud seed, 21 derez2, 22 purestdrive, 23 air3, 24 verbity2, 10 beads
+// 19 warps, 20 cloud seed, 21 derez2, 22 purestdrive, 23 air3, 24 verbity2, 25 comb, 26 transient, 27 gate,
+// 28 multiband (OTT-style), 29 frequency shifter, 30 tovinyl4, 31 dubly, 32 cabs, 33 tube2, 10 beads
 __attribute__((export_name("tfx_new"))) int tfx_new(int type, float sr) {
   int h = 0; while (h < 32 && slots[h]) h++;
   if (h == 32) return -1;
@@ -30,6 +31,11 @@ __attribute__((export_name("tfx_new"))) int tfx_new(int type, float sr) {
     case 19: f = make_warps(sr); break;     case 20: f = make_cloudseed(sr); break;
     case 21: f = make_derez2(sr); break;    case 22: f = make_purestdrive(sr); break;
     case 23: f = make_air3(sr); break;      case 24: f = make_verbity2(sr); break;
+    case 25: f = make_comb(sr); break;      case 26: f = make_transient(sr); break;
+    case 27: f = make_gate(sr); break;      case 28: f = make_ott(sr); break;
+    case 29: f = make_shift(sr); break;     case 30: f = make_tovinyl4(sr); break;
+    case 31: f = make_dubly(sr); break;     case 32: f = make_cabs(sr); break;
+    case 33: f = make_tube2(sr); break;
   }
   if (!f) return -1;
   f->sr = sr;

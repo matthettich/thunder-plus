@@ -416,6 +416,24 @@ const MODULES = {
     ui:{ media:{l:'Media', c:opts(['Dirty tape','Clean tape','Vintage','Digital'])}, freeze:{l:'Freeze', c:opts(['Off','On'])},
       time:{l:'Time', f:pct}, size:{l:'Size', f:pct}, pitch:{l:'Pitch', f:pct}, shape:{l:'Shape', f:pct}, density:{l:'Density', f:pct},
       fb:{l:'Feedback', f:pct}, blend:{l:'Blend', f:wet}, verb:{l:'Reverb', f:pct} } },
+  comb:{ label:'Comb resonator', fx:true, params:{ note:[48,24,96,1], fb:[0.85,-0.99,0.99,.01], damp:[0.3,0,0.99,.01], spread:[8,0,50,1], mix:[0.6,0,1,.01] },
+    ui:{ note:{l:'Note', f:v => ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((v % 12) + 12) % 12] + (Math.floor(v / 12) - 1)}, fb:{l:'Feedback', f:v => (v < 0 ? 'hollow ' : '') + Math.round(Math.abs(v) * 100) + '%'}, damp:{l:'Damping', f:v => Math.round(v * 100) + '%'}, spread:{l:'Spread', f:v => Math.round(v) + ' cents'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  transient:{ label:'Transient shaper', fx:true, params:{ att:[0.5,-1,1,.01], sus:[0,-1,1,.01], out:[1,0,2,.01], mix:[1,0,1,.01] },
+    ui:{ att:{l:'Attack', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, sus:{l:'Sustain', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, out:{l:'Output', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  tgate:{ label:'Trance gate', fx:true, params:{ div:[2,0,5,1], pat:[4,0,8,1], len:[0.6,0.05,1,.01], depth:[1,0,1,.01], smooth:[3,0.5,30,.01] },
+    ui:{ div:{l:'Step', c:opts(['1/32', '1/16T', '1/16', '1/8T', '1/8', '1/4'])}, pat:{l:'Pattern', c:opts(['All steps', 'Every other', 'Offbeats', '3-3-2', 'Trance 1', 'Trance 2', 'Stutter', 'Sparse', 'Clave'])}, len:{l:'Length', f:v => Math.round(v * 100) + '%'}, depth:{l:'Depth', f:v => Math.round(v * 100) + '%'}, smooth:{l:'Smoothing', f:v => Math.round(v) + ' ms'} } },
+  ott:{ label:'Multiband squash', fx:true, params:{ depth:[0.5,0,1,.01], time:[0.4,0,1,.01], lo:[0,-12,12,.01], mid:[0,-12,12,.01], hi:[0,-12,12,.01], out:[0,-12,12,.01] },
+    ui:{ depth:{l:'Depth', f:v => Math.round(v * 100) + '%'}, time:{l:'Time', f:v => Math.round(v * 100) + '%'}, lo:{l:'Low', f:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'}, mid:{l:'Mid', f:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'}, hi:{l:'High', f:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'}, out:{l:'Output', f:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'} } },
+  fshift:{ label:'Frequency shifter', fx:true, params:{ shift:[0.15,-1,1,.01], fb:[0,0,0.9,.01], mix:[1,0,1,.01] },
+    ui:{ shift:{l:'Shift', f:v => (v > 0 ? '+' : '') + Math.round(Math.sign(v) * v * v * 2000) + ' Hz'}, fb:{l:'Feedback', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  vinyl:{ label:'Vinyl', fx:true, params:{ mlow:[0.2,0,1,.01], slow:[0.34,0,1,.01], hlim:[0.32,0,1,.01], wear:[0.3,0,1,.01] },
+    ui:{ mlow:{l:'Mid low cut', f:v => Math.round(v * 100) + '%'}, slow:{l:'Side low cut', f:v => Math.round(v * 100) + '%'}, hlim:{l:'High limit', f:v => Math.round(v * 100) + '%'}, wear:{l:'Groove wear', f:v => Math.round(v * 100) + '%'} } },
+  dub:{ label:'Dub tape', fx:true, params:{ amt:[0.5,0,1,.01], mix:[1,0,1,.01] },
+    ui:{ amt:{l:'Amount', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  cab:{ label:'Speaker cab', fx:true, params:{ model:[0,0,5,1], int:[0.66,0,1,.01], room:[0.33,0,1,.01], size:[0.66,0,1,.01], axis:[0.33,0,1,.01], out:[0.8,0,1,.01] },
+    ui:{ model:{l:'Cab', c:opts(['Stack', 'Vintage', 'Boutique', 'Large closed', 'Small closed', 'Bass'])}, int:{l:'Intensity', f:v => Math.round(v * 100) + '%'}, room:{l:'Room', f:v => Math.round(v * 100) + '%'}, size:{l:'Size', f:v => Math.round(v * 100) + '%'}, axis:{l:'Off axis', f:v => Math.round(v * 100) + '%'}, out:{l:'Output', f:v => Math.round(v * 100) + '%'} } },
+  tube:{ label:'Tube', fx:true, params:{ input:[0.5,0,1,.01], tube:[0.5,0,1,.01] },
+    ui:{ input:{l:'Input', f:v => Math.round(v * 100) + '%'}, tube:{l:'Tube', f:v => Math.round(v * 100) + '%'} } },
   steps:{ label:'Steps', inputs:{ clock:'gate', reset:'gate' }, outputs:{ out:'cv', gate:'gate' },
     params:{ div:[3,0,9,1], len:[8,1,8,1], glide:[0,0,1,.01], depth:[1,0,1,.01], s1:[0,-1,1,.01], s2:[0,-1,1,.01], s3:[0,-1,1,.01], s4:[0,-1,1,.01], s5:[0,-1,1,.01], s6:[0,-1,1,.01], s7:[0,-1,1,.01], s8:[0,-1,1,.01] },
     ui:{ div:{l:'Step', c:opts(['1/64','1/32','1/16T','1/16','1/8T','1/8','1/4','1/2','1 bar','2 bars'])}, len:{l:'Length', f:v => v + ' steps'}, glide:{l:'Glide', f:v => Math.round(v * 100) + '%'}, depth:{l:'Depth', f:v => Math.round(v * 100) + '%'}, s1:{l:'Step 1', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s2:{l:'Step 2', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s3:{l:'Step 3', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s4:{l:'Step 4', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s5:{l:'Step 5', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s6:{l:'Step 6', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s7:{l:'Step 7', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s8:{l:'Step 8', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'} } },
@@ -731,7 +749,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=6';
+    const url = opts.url || './chains-worklet.js?v=7';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -1600,7 +1618,7 @@ const PALETTE = [
   ['Track I/O', [['trackIn','Track In'],['chainOut','Chain Out']]],
   ['Filters and amps', [['vcf','VCF'],['blades','Blades filter'],['vca','VCA'],['mixer','Mixer']]],
   ['Effects', [['eq','EQ'],['comp','Compressor'],['saturation','Saturation'],['tape','Tape'],['chorus','Chorus'],['crush','Bitcrush'],['delay','Tape delay'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['phaser','Phaser'],['reverb','Reverb'],['rings','Rings'],['clouds','Clouds'],['beads','Beads'],['vocoder','Vocoder']]],
-  ['More effects', [['repeat','Repeat (beat repeat)'],['flanger','Flanger'],['tremolo','Tremolo'],['odrive','Overdrive'],['folder','Wavefolder'],['autowah','Auto-wah'],['pshift','Pitch shifter'],['ladder','Ladder filter'],['xmod','Cross-mod'],['space','Space reverb'],['lofi','Lo-fi'],['drive','Drive'],['air','Air'],['room','Room reverb']]],
+  ['More effects', [['repeat','Repeat (beat repeat)'],['comb','Comb resonator'],['transient','Transient shaper'],['tgate','Trance gate'],['ott','Multiband squash'],['fshift','Frequency shifter'],['vinyl','Vinyl'],['dub','Dub tape'],['cab','Speaker cab'],['tube','Tube'],['flanger','Flanger'],['tremolo','Tremolo'],['odrive','Overdrive'],['folder','Wavefolder'],['autowah','Auto-wah'],['pshift','Pitch shifter'],['ladder','Ladder filter'],['xmod','Cross-mod'],['space','Space reverb'],['lofi','Lo-fi'],['drive','Drive'],['air','Air'],['room','Room reverb']]],
   ['Stereo', [['width','Width']]],
   ['Sidechain', [['scin','Sidechain In'],['sccomp','Sidechain Comp']]],
   ['§Control', []],
@@ -1904,6 +1922,15 @@ function helpDoc(){
     rings:'Mutable Instruments Rings: sound in excites a resonator tuned to Note (plus the Pitch input).',
     clouds:'Mutable Instruments Clouds: granular textures, time stretch, looping delay and spectral blur. Freeze holds what it heard.',
     beads:'Mutable Instruments Beads: a granular texture synthesizer — Time, Size, Shape, Pitch and Density grow the grains, Feedback and Reverb blend them, Freeze holds what it heard. Media picks Digital (clean), Vintage, or the tape characters.',
+    comb:'Comb resonator: a tuned comb filter that makes any sound ring at Note. Negative Feedback rings hollow (odd harmonics, an octave down); Damping darkens the ring.',
+    transient:'Transient shaper: Attack adds or removes the punch at the start of each hit, Sustain brings the tail up or down, whatever the level.',
+    tgate:'Trance gate: chops the sound in a rhythmic pattern in time with the song. Length is how long each open step lasts; Depth how far it closes.',
+    ott:'Multiband squash: splits the sound into low, mid and high and pushes each toward the same level, lifting quiet detail and pressing loud parts down, the hyped OTT sound. Depth sets how much.',
+    fshift:'Frequency shifter: moves every partial by the same number of Hz (unlike pitch shift), so sounds go inharmonic, metallic or barber-pole with Feedback.',
+    vinyl:'Vinyl (based on Airwindows ToVinyl4): the low end narrowed and filtered as a record lathe needs, the top limited, and groove wear.',
+    dub:'Dub tape (based on Airwindows Dubly): the encode/decode squash of an old tape noise reducer, for dense, colourful dub-style saturation.',
+    cab:'Speaker cab (based on Airwindows Cabs): guitar and bass cabinet models with room sound and off-axis tone.',
+    tube:'Tube (based on Airwindows Tube2): warm tube-style saturation; Tube adds the asymmetric character.',
     steps:'Steps: an 8-step sequence of CV, one step per note value at the song tempo (or advanced by Clock in). Gate fires on every step; Glide slides between them. Restarts from step 1 when the song starts.',
     clock:'Clock: a gate every note value at the song tempo, with Swing on every second one. Ramp rises from 0 to 1 across each step and Bar across 1–16 bars: patch either into a slider to sweep it in time (Clouds or Beads position, a filter, a Repeat’s Hold).',
     repeat:'Repeat: beat repeat. While Hold is on (or Gate is high) it loops the slice that just played, one note value long; Decay fades each pass and Pitch drops it. Reverse plays the slice backwards; Tape stop slows the sound to a halt.',
