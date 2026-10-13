@@ -455,6 +455,7 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .tscr .cv{color:var(--ts-vol)}
 .tscr .ci{color:var(--ts-inst)}
 .tscr .cf{color:var(--ts-fx)}
+.tscr .mstc{color:var(--ts-hint); box-shadow:inset 0 0 0 1px currentColor; padding:0 .3em} .tscr .mstc.on{color:var(--ts-fx)}
 .tscr .mu2{color:var(--ts-mute)}
 .tscr .so2{color:var(--ts-solo)}
 .tscr .lb{color:var(--ts-th)}
@@ -5943,6 +5944,7 @@ function bump(d, big){
     setCell(tv, c.x, c.y, v); after(k, tv, c.x, c.y, v); return;
   }
   if (tv === 'mixer'){
+    if (c.y === 7 && c.mx === 1){ S.mst.on = d > 0; mstChanged(); draw(); return; }
     if (c.y === 7) S.master = clamp(S.master + d * (big ? 16 : 1), 0, 255), rtRoute();
     else if (c.y === 4) return fxActiveStep(c.x, d > 0 ? 1 : -1);
     else if (c.y === 5){ setChainOn(c.x, d > 0); draw(); return; }
@@ -6044,7 +6046,7 @@ function editTap(){
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
   }
-  if (tv === 'mixer'){ if (c.y === 4) return go('fx'); if (c.y === 5){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (c.y === 6){ const m = S.mix[c.x]; m.sc = !m.sc; mixChanged(); draw(); return; } if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
+  if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 4) return go('fx'); if (c.y === 5){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (c.y === 6){ const m = S.mix[c.x]; m.sc = !m.sc; mixChanged(); draw(); return; } if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
   const r = rowsOf(tv)[c.y]; if (!r) return;
   if (r.act){ if (r.dbl) return toast('Tap EDIT again to ' + r.l.replace('› ', '').toLowerCase() + '.'); return r.act(); }
   if (r.tog){ r.set(r.get() ? 0 : 1); if (r.after) r.after(); saveS(); draw(); return; }
@@ -6150,7 +6152,7 @@ function del(){
     if (tv === 'phrase' && k === 'note'){ const r = S.phrases[cPhrase] && S.phrases[cPhrase][c.y]; if (r && r.slice(0, NCOL).every(n => n < 0)) r[IC] = -1; }
     return draw();
   }
-  if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ setChainOn(c.x, false); return draw(); } if (c.y === 7){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; else if (c.y === 6) m.sc = false; } mixChanged(); return draw(); }
+  if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ setChainOn(c.x, false); return draw(); } if (c.y === 7 && c.mx === 1) return toast('Mastering: EDIT opens it · EDIT+◀ turns it off, EDIT+▶ on'); if (c.y === 7){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; else if (c.y === 6) m.sc = false; } mixChanged(); return draw(); }
   const r = rowsOf(tv)[c.y]; if (r && r.get && r.d != null){ r.set(r.d); if (r.after) r.after(); saveS(); draw(); }
 }
 // Whole rows: clear a row, insert a blank one (rows below move down), or remove one (rows below move up).
@@ -6312,14 +6314,19 @@ function paste(){
 }
 // The phrase's LEN / LPB line sits above row 0 (y = -2): ▲ from row 0 reaches it, ▼ goes back.
 const onPset = () => tv === 'phrase' && cs.phrase.y === -2;
+// Mixer: the cursor is on the MASTERING cell (master row, second cell).
+const onMstCell = () => tv === 'mixer' && cs.mixer.y === 7 && cs.mixer.mx === 1;
 function move(dx, dy){
   const c = cs[tv], d = dims(tv);
   if (tv === 'fx') return moveFx(dx, dy, d.h);
   if (tv === 'phrase' && c.y === -2){ if (dy > 0){ c.y = 0; c.x = 0; } else c.x = clamp(c.x + dx, 0, 1); return draw(); }
   if (tv === 'phrase' && dy === -1 && c.y === 0){ c.y = -2; c.x = c.x > 0 ? 1 : 0; return draw(); }
   if (tv === 'phrase' && dx){ const C = pCols(), i = Math.max(0, C.indexOf(c.x)); c.x = C[clamp(i + dx, 0, C.length - 1)]; }
+  else if (tv === 'mixer' && c.y === 7 && dx){ c.mx = clamp((c.mx || 0) + dx, 0, 1); return draw(); }
   else c.x = clamp(c.x + dx, 0, d.w - 1);
-  c.y = clamp(c.y + dy, 0, d.h - 1); draw();
+  const wasY = c.y; c.y = clamp(c.y + dy, 0, d.h - 1);
+  if (tv === 'mixer' && c.y === 7 && wasY !== 7) c.mx = 0;
+  draw();
 }
 function psetGet(x){ return x === 0 ? plen(cPhrase) : (S.plpb[cPhrase] || 0); }
 function setDefLen(v){
@@ -6647,6 +6654,7 @@ function info(){
     return ci < 0 || !FXC[ci] ? 'No command. EDIT adds one; EDIT+▲▼ or letters pick from ' + FXC.join(' ') : `${FXC[ci]} ${h2(vv)} · ${FXI[FXC[ci]](Math.max(0, vv))}`;
   }
   if (tv === 'mixer'){
+    if (c.y === 7 && c.mx === 1) return 'Mastering ' + (S.mst.on ? 'on' : 'off') + ' · ' + mstChainTxt() + ' · EDIT opens it · EDIT+◀▶ off / on';
     if (c.y === 7) return 'Master ' + dB(curve(S.master)) + (fxCount(S.mfx) ? ' · FX ' + fxList(S.mfx) : '') + ' · SHIFT+▶ master effects';
     if (c.y === 5){
       const on = chainsFeed(c.x), flag = !!(S.chainOn && S.chainOn[c.x]);
@@ -6836,7 +6844,8 @@ function draw(){
       L.push(ml);
     }
     const mn = fxCount(S.mfx);
-    L.push([{t:'MASTER ', cls:'lb'}, {t:hx(S.master), cls:'v' + (c.y === 7 ? ' cur' : ''), x:0, y:7}, '  ', {t:dB(curve(S.master)), cls:'lb'}, '   ', {t:mn ? 'FX ' + fxList(S.mfx) : 'FX --', cls:mn ? 'cf' : 'e'}]);
+    L.push([{t:'MASTER ', cls:'lb'}, {t:hx(S.master), cls:'v' + (c.y === 7 && c.mx !== 1 ? ' cur' : ''), x:0, y:7}, '  ', {t:dB(curve(S.master)), cls:'lb'}, '   ', {t:mn ? 'FX ' + fxList(S.mfx) : 'FX --', cls:mn ? 'cf' : 'e'}, '   ',
+      {t:'MASTERING ' + (S.mst.on ? 'ON' : 'OFF'), cls:'mstc' + (S.mst.on ? ' on' : '') + (c.y === 7 && c.mx === 1 ? ' cur' : ''), x:1, y:7}]);
     for (const ch of ['L', 'R']) L.push([{t:ch + '   ', cls:'lb'}, {t:'', cls:'mm m1'}, {t:'', cls:'mm m2'}, {t:'', cls:'mm m3'}, {t:'', cls:'mm e'}, ' ', {t:'', cls:'mm lb'}]);
   } else {
     if (tv === 'inst'){ title = 'INST ' + hx(cInst); const I = S.insts[cInst]; sub = (isSyn(I.pad) ? 'SYNTH ' : 'PAD ') + hx(I.pad); }
@@ -7091,6 +7100,7 @@ let mwProto = null;   // an idle offline context whose biquads draw the EQ curve
 const mwP = () => mwProto || (mwProto = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 48000));
 const stageOn = k => k === 'eq' ? S.mst.eq.on : S.mst[k].on;
 function mstChanged(){ saveS(); clearTimeout(mwSyncT); mwSyncT = setTimeout(mstSync, 16); mwEqDirty = true; mwChain(); mstLabel(); }
+function mstChainTxt(){ const on = MW_STAGES.filter(([k]) => stageOn(k)).map(([, n]) => n); return on.length ? on.join(' → ') : 'nothing switched on'; }
 function mstLabel(){ const l = $('mstLbl'); if (l) l.textContent = S.mst.on ? 'On: ' + MW_STAGES.filter(([k]) => stageOn(k)).map(([, n]) => n.toLowerCase()).join(' → ') : 'Off'; }
 function openMst(stage){
   if (stage) mwSel = stage;
@@ -7100,7 +7110,7 @@ function openMst(stage){
   $('mstWin').hidden = false; mwOpenNow = true; mwBuild(); mwLoop();
   try { gsetToggle(false); } catch(e){}
 }
-function closeMst(){ $('mstWin').hidden = true; mwOpenNow = false; cancelAnimationFrame(mwRaf); }
+function closeMst(){ $('mstWin').hidden = true; mwOpenNow = false; cancelAnimationFrame(mwRaf); draw(); }
 $('mwX').addEventListener('click', closeMst);
 document.addEventListener('keydown', e => { if (mwOpenNow && e.key === 'Escape' && !typing(e)){ e.preventDefault(); e.stopPropagation(); closeMst(); } }, true);
 $('mwOn').addEventListener('click', () => { S.mst.on = !S.mst.on; if (S.mst.on && !S.mst.eq.on && !mstNeedsWk(S.mst)) S.mst.eq.on = true; mstChanged(); mwBuild();
@@ -7800,6 +7810,7 @@ const gridDown = e => {
   if (tv === 'song' && e.altKey && y >= 0){ e.preventDefault(); toggleBlockMute(y, x); return; }
   // While selecting, a tap only moves the selection's corner there: it never opens or edits the cell.
   if (selA && selA.v === tv && GRIDV.has(tv) && y >= 0){ c.x = x; c.y = y; draw(); return startScroll(e); }
+  if (tv === 'mixer' && y === 7){ if (x === 1){ c.y = 7; c.mx = 1; draw(); openMst(); return; } if (c.mx === 1){ c.mx = 0; c.y = 7; draw(); return startScroll(e); } }
   const was = GRIDV.has(tv) || tv === 'mixer' ? c.x === x && c.y === y : c.y === y;
   c.x = x; c.y = y; if (!was) draw();
   // A drag that starts on the cursor's own cell changes its value; one that starts anywhere else scrolls.
@@ -8011,6 +8022,7 @@ function typeHex(d){
     const y = c.y; setCell(tv, c.x, y, val); if (done){ down1(); hexBuf.key = ''; } after(k, tv, c.x, y, val); return;
   }
   if (tv === 'mixer'){
+    if (c.y === 7 && c.mx === 1) return;
     if (c.y === 7){ S.master = v; rtRoute(); } else if (c.y === 5){ setChainOn(c.x, !!v); return; } else if (c.y === 0) S.mix[c.x].vol = v; else if (c.y === 1) S.mix[c.x].pan = v; else return;
     if (done) hexBuf.key = ''; mixChanged(); draw(); return;
   }
