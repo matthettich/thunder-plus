@@ -991,6 +991,8 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD), and change the <b>Text size</b> of the tracker screen. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots. <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song. <b>A voice per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
+<h3>Chopping breaks</h3>
+<p>Load a drum loop into a pad (Synth → Load sample), then on its instrument (<b>INST</b>) set <b>SLICES</b> (GRID cuts equal parts, HITS cuts at each drum hit it finds). Each note now plays one slice: C-4 the first, C#4 the second and so on, so you can rearrange the break in a phrase. <b>SYNC</b> fits the loop to the song tempo: set <b>BEATS</b> to how long the loop is (or use › GUESS BEATS). REPITCH changes its speed and pitch together; STRETCH keeps the pitch with smooth grains; LOOP keeps the pitch with little tempo-synced loops for a gritty, stuttery sound (<b>GRAIN</b> sets their length). › PLAY SLICES auditions them in order.</p>
 <h3>Chords and polyphony</h3>
 <p><b>The second half of the tracks is polyphonic</b> (9–16 with 16 tracks, 17–32 with 32; Settings → Song → Tracks): the green POLY box on the right of Song and Mixer. The first half, in the pink MONO box on the left, plays one note at a time. Open a phrase from a polyphonic track and it shows four note columns, N1–N4, so a row can hold a chord. Notes on these tracks ring over each other, up to 4 at a time per track; a fifth steals the oldest. A note OFF in any note column releases everything on the track. The mono tracks stay one note at a time, and a phrase played there uses only N1.</p>
 <h3>Two input modes</h3>
@@ -3733,7 +3735,7 @@ const freshPhrase = () => Array.from({length:PROWS}, blankRow);
 const polyFrom = () => Math.ceil(ntr() / 2), isPolyT = t => t >= polyFrom() && t < NT;
 // freshInst needs the pad count, but nslots() (with the song state, below) isn't initialized yet when the
 // first song is made — the default instrument layout only needs the classic 16 anyway.
-const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0});   // instruments 08–0F play the synth slots
+const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0, slc:0, smode:0, sync:0, beats:4, grain:1});   // instruments 08–0F play the synth slots
 const freshMix = () => ({vol:224, pan:128, mute:false, solo:false, sc:false});
 function freshSong(){
   // MPC swing: the classic hardware's shuffle, applied on 8th, 16th or dotted-8th grid.
@@ -3785,7 +3787,8 @@ function normSong(j){
   const old8 = !(int(j.v, 1) >= 4);
   if (Array.isArray(j.insts)) j.insts.slice(0, NI).forEach((o, i) => { if (o && typeof o === 'object'){ const I = S.insts[i];
     I.pad = clamp(int(o.pad, I.pad), 0, nslots() - 1); if (old8 && i >= NPAD && I.pad === i - NPAD) I.pad = i; I.tsp = clamp(int(o.tsp, 0), -48, 48); I.vol = clamp(int(o.vol, 255), 0, 255);
-    I.pan = clamp(int(o.pan, 128), 0, 255); I.rev = o.rev ? 1 : 0; I.ofs = clamp(int(o.ofs, 0), 0, 255); } });
+    I.pan = clamp(int(o.pan, 128), 0, 255); I.rev = o.rev ? 1 : 0; I.ofs = clamp(int(o.ofs, 0), 0, 255);
+    I.slc = clamp(int(o.slc, 0), 0, 64); I.smode = o.smode ? 1 : 0; I.sync = clamp(int(o.sync, 0), 0, 3); I.beats = clamp(int(o.beats, 4), 1, 64); I.grain = clamp(int(o.grain, 1), 0, 4); } });
   if (Array.isArray(j.mix)) j.mix.slice(0, NT).forEach((o, i) => { if (o && typeof o === 'object'){ const m = S.mix[i];
     m.vol = clamp(int(o.vol, 224), 0, 255); m.pan = clamp(int(o.pan, 128), 0, 255); m.mute = !!o.mute; m.solo = !!o.solo; m.sc = !!o.sc; } });
   if (Array.isArray(j.tfx)) for (let t = 0; t < NT; t++) S.tfx[t] = normChainFx(j.tfx[t]);
@@ -4078,6 +4081,7 @@ function makeSeq(S, mode, o){
             const ev = {type:'note', t:at, track:t, poly, pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? at + fx.KIL * tick : null, rel:fx.OFF != null ? at + fx.OFF * tick : null,
               slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, ...mods};
+            if ((I.slc | 0) > 1 || I.sync){ const c = ensure(ev.pad); applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; }
             evs.push(ev);
             if (every){ let k = 1;
               for (let tt = at + every * tick; tt < end - 1e-6 && k < 64; tt += every * tick, k++)
@@ -4199,7 +4203,7 @@ function makePlayer(ac, out, getBuf, live){
       if (ev.rel != null) kill(v, ev.rel, v.syn ? relTc(v) : 0.05);
   }
   function startNote(ev){
-    const b = getBuf(ev.pad, ev.rev); if (!b) return;
+    const b = getBuf(ev.pad, ev.rev, ev.st); if (!b) return;
     const T = vs[ev.track];
     for (let k = T.length - 1; k >= 0; k--) if (!live1(T[k], ev.t)) T.splice(k, 1);
     // Mono tracks: the new note takes over (a synth note lets the old one release). Poly: up to 4 ring
@@ -4216,7 +4220,8 @@ function makePlayer(ac, out, getBuf, live){
     src.connect(g); g.connect(f); f.connect(pn); pn.connect(buses[ev.track].inp);
     const syn = isSyn(ev.pad), v = {src, f, g, pn, base:ev.rate, rate:ev.rate, choke:ck, ended:false, stopAt:null, syn, rel:syn && kv ? relOf(kv) : 0};
     if (!ev.slide) pitchMods(v, ev.t, ev.rate, ev);
-    src.start(Math.max(ev.t, ac.currentTime), clamp(ev.ofs, 0, 255) / 256 * b.duration);
+    const off = ev.ofsSec != null ? (ev.rev ? Math.max(0, b.duration - ev.ofsSec - ev.durSec) : ev.ofsSec) : clamp(ev.ofs, 0, 255) / 256 * b.duration;
+    src.start(Math.max(ev.t, ac.currentTime), Math.min(off, Math.max(0, b.duration - 0.001)));
     alive.add(v);
     src.onended = () => { v.ended = true; alive.delete(v); if (live) try { pn.disconnect(); } catch(e){} };
     if (ev.cut != null) kill(v, ev.cut);
@@ -4283,7 +4288,89 @@ function makePlayer(ac, out, getBuf, live){
 /* ---------- live playback ---------- */
 let rt = null;
 const rtB = new Map();
-function rtBuf(pad, rev){
+/* ---------- break chopping: slices, tempo sync and the synced stretch ----------
+   An instrument can cut its pad into SLICES (equal parts, or at the hits it finds); a note then picks a slice
+   (C-4 the first, C#4 the next…) and the note's own pitch is ignored (TRANSPOSE and pitch commands still move it).
+   SYNC fits the loop (the sample, BEATS long) to the song tempo:
+     REPITCH  plays it faster or slower, so the pitch moves with the tempo;
+     STRETCH  keeps the pitch: overlapping grains (GRAIN long, in beats) read the sound as a ramp sweeps through it;
+     LOOP     the same ramp, but each grain is a hard little loop: the stuttery, gritty ramp-LFO trick. */
+const SYNC_MODES = ['OFF', 'REPITCH', 'STRETCH', 'LOOP'];
+const GRAIN_BEATS = [1 / 64, 1 / 32, 1 / 16, 1 / 8, 1 / 4], GRAIN_NAMES = ['1/64', '1/32', '1/16', '1/8', '1/4'];
+// How long the pad's loop is: its sample (from the layer's start, at the layer's pitch) when it has one, else the pad.
+function loopSecs(pad, data, sr){
+  const v = kit.voices[pad], L = v && v.layers.find(l => l.on && l.type === 'sample' && l.sample && l.sample.data && l.sample.data.length);
+  const whole = data.length / sr;
+  if (!L) return whole;
+  const rate = Math.pow(2, ((L.tune || 0) + (v.tune || 0) + (L.fine || 0) / 100) / 12);
+  return Math.max(0.01, Math.min(whole, L.sample.data.length * (1 - (L.a || 0)) / L.sample.sr / rate + (L.delay || 0) / 1000));
+}
+// Hits in a sound: frames of rising energy, strongest first, kept apart by a fraction of a slice.
+function findHits(d, sr, loop, n){
+  const H = 256, N = Math.min(d.length, Math.round(loop * sr)), fr = Math.floor(N / H), e = new Float32Array(fr);
+  for (let k = 0; k < fr; k++){ let a = 0; for (let i = k * H; i < k * H + H; i++) a += d[i] * d[i]; e[k] = Math.log(1e-7 + a / H); }
+  const flux = []; for (let k = 2; k < fr; k++){ const r = e[k] - Math.max(e[k - 1], e[k - 2]); if (r > 0.6 && r >= (flux.length && flux[flux.length - 1].k === k - 1 ? flux[flux.length - 1].r : 0)) flux.push({k, r: r + e[k] * 0.05}); }
+  flux.sort((a, b) => b.r - a.r);
+  const gap = loop / n / 3, pts = [0];
+  for (const f of flux){ if (pts.length >= n) break; const t = f.k * H / sr; if (pts.every(p => Math.abs(p - t) > gap)) pts.push(t); }
+  for (let k = 1; pts.length < n && k < n * 4; k++){ const t = loop * k / n; if (pts.every(p => Math.abs(p - t) > gap / 2)) pts.push(t); }   // not enough hits: fill on the grid
+  return pts.sort((a, b) => a - b).slice(0, n);
+}
+const sliceMemo = new Map();
+function slicePoints(pad, I, data, sr){
+  const n = I.slc | 0, loop = loopSecs(pad, data, sr), key = pad + ':' + n + ':' + (I.smode ? 1 : 0);
+  const m = sliceMemo.get(key); if (m && m.d === data && m.loop === loop) return m.pts;
+  const pts = I.smode ? findHits(data, sr, loop, n) : Array.from({length:n}, (_, k) => loop * k / n);
+  sliceMemo.set(key, {d:data, loop, pts}); return pts;
+}
+// The synced stretch: an output exactly BEATS long at the tempo, read from the loop by grains that a ramp walks through it.
+function stretchData(d, sr, loop, st){
+  const inN = Math.min(d.length, Math.round(loop * sr)), outN = Math.max(64, Math.round(st.beats * 60 / st.bpm * sr)), o = new Float32Array(outN);
+  const W = Math.max(64, Math.round(GRAIN_BEATS[st.grain | 0] * 60 / st.bpm * sr)), k = inN / outN;
+  if (st.mode === 3){   // LOOP: back-to-back grains, each a hard loop of W samples, with 1.5 ms crossfades
+    const xf = Math.min(Math.round(sr * 0.0015), W >> 2);
+    for (let s0 = 0; s0 < outN; s0 += W){
+      const src = Math.min(inN - 1, Math.round(s0 * k));
+      for (let i = -xf; i < W + xf; i++){ const n = s0 + i; if (n < 0 || n >= outN) continue;
+        const g = i < xf ? (i + xf) / (2 * xf) : i >= W - xf ? (W + xf - i) / (2 * xf) : 1;
+        const j = src + ((i % W) + W) % W; o[n] += (j < inN ? d[j] : 0) * Math.min(1, Math.max(0, g)); }
+    }
+  } else {   // STRETCH: Hann grains at 50% overlap (they sum to one)
+    const hop = W >> 1;
+    for (let s0 = -hop; s0 < outN; s0 += hop){
+      const src = Math.round(Math.max(0, s0) * k);
+      for (let i = 0; i < W; i++){ const n = s0 + i; if (n < 0 || n >= outN) continue; const j = src + i;
+        if (j < inN) o[n] += d[j] * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / W)); }
+    }
+  }
+  return o;
+}
+const stKey = st => st ? ':' + st.mode + ':' + st.bpm + ':' + st.beats + ':' + st.grain : '';
+// Rewrites a note event for a chopped or synced instrument. n: the note typed; semis: the pitch offsets on top of it.
+function applyChop(ev, I, pad, n, semis, bpm, data, sr){
+  const slc = I.slc | 0, sy = I.sync | 0; if (slc < 2 && !sy) return ev;
+  const loop = loopSecs(pad, data, sr), target = (I.beats || 4) * 60 / bpm;
+  let rate = Math.pow(2, semis / 12), scale = 1;
+  if (sy === 1) rate *= loop / target;
+  if (sy >= 2){ ev.st = {mode:sy, bpm:Math.round(bpm * 100) / 100, beats:I.beats || 4, grain:I.grain == null ? 1 : I.grain | 0}; scale = target / loop; }
+  if (slc >= 2 || sy) ev.rate = rate;
+  let s0 = 0, s1 = loop;
+  if (slc >= 2){ const pts = slicePoints(pad, I, data, sr), k = ((n - ROOT) % slc + slc) % slc; s0 = pts[k]; s1 = k + 1 < pts.length ? pts[k + 1] : loop; }
+  ev.ofsSec = s0 * scale; ev.durSec = Math.max(0.005, (s1 - s0) * scale);
+  const end = ev.t + ev.durSec / ev.rate; ev.cut = ev.cut == null ? end : Math.min(ev.cut, end);
+  return ev;
+}
+function rtBuf(pad, rev, st){
+  if (st){
+    const c = ensure(pad), k = pad + (rev ? 'r' : 'f') + stKey(st); let e = rtB.get(k);
+    if (!e || e.d !== c.data){ let d = stretchData(c.data, c.sr, loopSecs(pad, c.data, c.sr), st); if (rev) d = d.reverse();
+      const b = ctx.createBuffer(1, d.length, c.sr); b.copyToChannel(d, 0); e = {d:c.data, b}; rtB.set(k, e);
+      if (rtB.size > 96) rtB.delete(rtB.keys().next().value); }
+    return e.b;
+  }
+  return rtBufPlain(pad, rev);
+}
+function rtBufPlain(pad, rev){
   const c = ensure(pad), k = pad + (rev ? 'r' : 'f');
   let e = rtB.get(k);
   if (!e || e.d !== c.data){
@@ -4409,11 +4496,25 @@ function tStop(quiet){
   chainsTempo();
   if (!quiet) draw();
 }
-function preview(ii, note, vol, poly){
+function preview(ii, note, vol, poly, when){
   audioWake = performance.now();
-  const r = rtInit(), I = S.insts[ii] || S.insts[0], t = ctx.currentTime + 0.005;
-  r.pl.play({type:'note', t, track:NT, poly:!!poly, pad:I.pad, rate:Math.pow(2, (note + I.tsp - ROOT) / 12),
-    gain:curve(vol >= 0 ? vol : 255) * curve(I.vol), pan:I.pan, ofs:I.ofs, rev:!!I.rev, cut:null, slide:null, rel:isSyn(I.pad) ? t + 0.45 : null});
+  const r = rtInit(), I = S.insts[ii] || S.insts[0], t = (when || ctx.currentTime) + 0.005;
+  const ev = {type:'note', t, track:NT, poly:!!poly, pad:I.pad, rate:Math.pow(2, (note + I.tsp - ROOT) / 12),
+    gain:curve(vol >= 0 ? vol : 255) * curve(I.vol), pan:I.pan, ofs:I.ofs, rev:!!I.rev, cut:null, slide:null, rel:isSyn(I.pad) ? t + 0.45 : null};
+  if ((I.slc | 0) > 1 || I.sync){ const c = ensure(I.pad); applyChop(ev, I, I.pad, note, I.tsp, S.bpm, c.data, c.sr); }
+  r.pl.play(ev);
+}
+// PLAY SLICES on INST: every slice once, in order, a sixteenth apart at the song tempo (or each at its own length).
+function playSlices(ii){
+  const I = S.insts[ii]; if (!I || (I.slc | 0) < 2) return toast('Set SLICES first (2 or more).');
+  rtInit(); const t0 = ctx.currentTime + 0.05, step = 60 / S.bpm / 4;
+  for (let k = 0; k < (I.slc | 0); k++) preview(ii, ROOT + k, -1, false, t0 + k * step * Math.max(1, Math.round(16 / I.slc)));
+}
+// GUESS BEATS: the loop's length at the song tempo, rounded to the nearest power of two (1, 2, 4 … 64 beats).
+function guessBeats(I){
+  const c = ensure(I.pad), loop = loopSecs(I.pad, c.data, c.sr), raw = loop * S.bpm / 60;
+  let best = 1; for (let b = 1; b <= 64; b *= 2) if (Math.abs(Math.log2(raw / b)) < Math.abs(Math.log2(raw / best))) best = b;
+  I.beats = best; toast(`${loop.toFixed(2)} s is ${raw.toFixed(1)} beats at ${S.bpm} BPM: BEATS set to ${best}` + (Math.abs(raw - best) / best > 0.12 ? ' (not a clean loop at this tempo?)' : ''));
 }
 
 /* ---------- rendering the song and stems ---------- */
@@ -4481,10 +4582,11 @@ async function renderOut(stems){
     const pads = new Map();
     for (const e of notes) if (!pads.has(e.pad)){ const v = kit.voices[e.pad]; pads.set(e.pad, renderVoice(v, sr, null, isSyn(e.pad) ? v.len : 0)); await idle(); }
     const bufs = new Map();
-    const getB = (pad, rev) => { const k = pad + (rev ? 'r' : 'f'); let b = bufs.get(k);
-      if (!b){ const d0 = pads.get(pad); if (!d0) return null; b = mkBuf(rev ? d0.slice().reverse() : d0, sr); bufs.set(k, b); } return b; };
+    const getB = (pad, rev, st) => { const k = pad + (rev ? 'r' : 'f') + stKey(st); let b = bufs.get(k);
+      if (!b){ const d0 = pads.get(pad); if (!d0) return null; let d = st ? stretchData(d0, sr, loopSecs(pad, d0, sr), st) : d0;
+        b = mkBuf(rev ? d.slice().reverse() : d, sr); bufs.set(k, b); } return b; };
     let end = seq.time;
-    for (const e of notes){ const len = pads.get(e.pad).length / sr / Math.min(e.rate, e.slide ? e.slide.from : e.rate); end = Math.max(end, e.cut != null ? Math.min(e.t + len, e.cut + 0.06) : e.t + len); }
+    for (const e of notes){ const len = (e.st ? e.st.beats * 60 / e.st.bpm : pads.get(e.pad).length / sr) / Math.min(e.rate, e.slide ? e.slide.from : e.rate); end = Math.max(end, e.cut != null ? Math.min(e.t + len, e.cut + 0.06) : e.t + len); }
     // Reverb, delay and resonator tails ring past the last note: render extra, then trim the silence.
     const tail = keepT.some(t => hasTail(S.tfx[t])) || hasTail(S.mfx) || keepT.some(t => chainsFeed(t)) ? 8 : 0;
     const N0 = Math.ceil((end + 0.05) * sr), N = N0 + Math.ceil(tail * sr), secs = (N0 / sr).toFixed(1);
@@ -4724,6 +4826,18 @@ function instRows(){
     {l:'PAN', get:() => I.pan, set:v => I.pan = v, min:0, max:255, big:16, d:128, info:panS},
     {l:'REVERSE', get:() => I.rev, set:v => I.rev = v ? 1 : 0, min:0, max:1, tog:true, d:0, fmt:v => v ? 'ON' : 'OFF', info:() => 'Play the pad backwards'},
     {l:'START', get:() => I.ofs, set:v => I.ofs = v, min:0, max:255, big:16, d:0, info:v => `Start ${Math.round(v / 256 * 100)}% into the sound`},
+    {l:'SLICES', get:() => I.slc | 0, set:v => I.slc = v === 1 ? ((I.slc | 0) > 1 ? 0 : 2) : v, min:0, max:64, big:4, d:0, gap:true,
+      fmt:v => v > 1 ? v + ' · C-4 plays slice 1' : 'OFF', info:() => (I.slc | 0) > 1 ? 'Each note plays one slice: C-4 the first, C#4 the second… (it wraps). TRANSPOSE and pitch commands still tune it' : 'Cut the pad into equal parts or at its hits; notes then pick a slice, for breakbeat chopping'},
+    {l:'SLICE BY', get:() => I.smode ? 1 : 0, set:v => I.smode = v ? 1 : 0, min:0, max:1, tog:true, d:0, fmt:v => v ? 'HITS' : 'GRID',
+      info:() => 'GRID: equal slices. HITS: a slice starts at each drum hit it finds (good for loose breaks)'},
+    {l:'SYNC', opts:true, get:() => I.sync | 0, set:v => I.sync = v, min:0, max:3, d:0, fmt:v => SYNC_MODES[v],
+      info:() => ['The sample plays at its own speed', 'Fits BEATS to the tempo by playing faster or slower (the pitch moves)', 'Fits BEATS to the tempo, pitch kept: smooth overlapping grains', 'Fits BEATS to the tempo, pitch kept: a ramp loops little GRAIN-long pieces, gritty and stuttery'][I.sync | 0]},
+    {l:'BEATS', get:() => I.beats || 4, set:v => I.beats = v, min:1, max:64, big:4, d:4, fmt:v => v + (v === 1 ? ' beat' : ' beats') + ' = ' + (v * 60 / S.bpm).toFixed(2) + ' s',
+      info:() => { const c = ensure(I.pad); return 'How many beats the loop lasts. The loop is ' + loopSecs(I.pad, c.data, c.sr).toFixed(2) + ' s; › GUESS BEATS works it out'; }},
+    {l:'GRAIN', opts:true, get:() => I.grain == null ? 1 : I.grain, set:v => I.grain = v, min:0, max:4, d:1, fmt:v => GRAIN_NAMES[v] + ' beat',
+      info:() => 'STRETCH and LOOP: how long each grain is. Short is smoother for STRETCH and buzzier for LOOP'},
+    {l:'› GUESS BEATS', act:() => { guessBeats(I); draw(); }, info:'Sets BEATS from the loop length and the song tempo'},
+    {l:'› PLAY SLICES', act:() => playSlices(cInst), info:'Plays every slice once, in order'},
     {l:'› PREVIEW', act:pre, gap:true, info:'Plays this instrument at C-4'},
     {l:'› EDIT PAD IN SYNTH', act:() => { tStop(); select(I.pad); setView('synth'); }, info:'Opens this pad in the synth so you can change its sound'},
   ];
