@@ -619,6 +619,44 @@ const TrackIn = {
   }
 };
 
+
+/* Resample: passes its input straight through, and when Record is set to Armed it waits for the next bar of the
+   playing song, records Bars bars, and hands the take to the host, which loads it into a pad as a sample, cut into
+   Slices for chopping like a breakbeat (and sets Record back to Off). Bars are 4 beats at the song tempo. */
+const RS_BARS = [1, 2, 4, 8], RS_SLICES = [0, 4, 8, 16, 32];
+const Resample = {
+  type:'resample', scope:'mono', cost:.03,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ rec:[0,0,1,1], bars:[1,0,3,1], pad:[7,0,31,1], slices:[3,0,4,1] },
+  create:() => ({ t:0, sn:-1, arm:false, done:false, L:null, R:null, n:0, len:0 }),
+  process(st, io, ctx){
+    const B = ctx.block, inL = io.in.in, inR = linked(io, 'inR') ? io.in.inR : io.in.in;
+    io.out.out.set(inL.subarray(0, B)); io.out.outR.set(inR.subarray(0, B));
+    const tr = ctx.transport;
+    if (restarted(st, ctx)) st.t = 0;
+    const rec = io.p.rec | 0;
+    if (!rec){ st.arm = false; st.done = false; st.L = st.R = null; st.n = 0; }
+    else if (!st.arm && !st.L && !st.done) st.arm = true;
+    if (!tr.playing){ if (st.L){ st.L = st.R = null; st.n = 0; st.arm = rec ? true : false; } return; }
+    const barLen = Math.max(1, Math.round(4 * 60 / Math.max(20, tr.tempo) * ctx.sr));
+    let from = 0;
+    if (st.arm){
+      const nb = Math.ceil(st.t / barLen) * barLen, off = nb - st.t;
+      if (off < B){ st.arm = false; st.len = Math.min(ctx.sr * 32, barLen * RS_BARS[io.p.bars | 0]); st.L = new Float32Array(st.len); st.R = new Float32Array(st.len); st.n = 0; from = off; }
+    }
+    if (st.L){
+      const k = Math.min(B - from, st.len - st.n);
+      st.L.set(inL.subarray(from, from + k), st.n); st.R.set(inR.subarray(from, from + k), st.n); st.n += k;
+      if (st.n >= st.len){
+        const cb = ctx.engine && ctx.engine.onResample;
+        if (cb) cb({ id:st._id, L:st.L, R:st.R, sr:ctx.sr, bars:RS_BARS[io.p.bars | 0], tempo:tr.tempo, pad:io.p.pad | 0, slices:RS_SLICES[io.p.slices | 0] });
+        st.L = st.R = null; st.n = 0; st.done = true;   // no more takes until Record goes back to Off
+      }
+    }
+    st.t += B;
+  }
+};
+
 /* Chain Out: hard-assigned return to the same tracker track (stereo, with level).
    With nothing in Right, In plays on both sides. */
 const ChainOut = {
@@ -768,7 +806,7 @@ const MODULES = { trackIn:TrackIn,
   scin:SidechainIn, sccomp:SidechainComp,
   lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter, steps:Steps, clock:Clock, repeat:Repeat,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant,
-  blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong, chainOut:ChainOut };
+  blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong, resample:Resample, chainOut:ChainOut };
 
 /* A cable into "p:name" modulates that parameter instead of feeding an input. */
 const isParamPort = p => typeof p === 'string' && p.startsWith('p:');
@@ -892,7 +930,7 @@ class ChainsEngine {
   }
   _state(m){
     let s = this._states.get(m.id);
-    if (!s){ s = { st:m.def.create(this.sr), def:m.def }; this._states.set(m.id, s); }
+    if (!s){ s = { st:m.def.create(this.sr), def:m.def }; if (s.st && typeof s.st === 'object') s.st._id = m.id; this._states.set(m.id, s); }
     return s.st;
   }
   /* Sum every cable into this module's inputs, and work out its modulated parameters. */
@@ -1047,6 +1085,7 @@ class ThunderChains extends AudioWorkletProcessor {
       try { this.engine.loadPatch(o.patch); } catch (err){}
     }
     this.engine.onShed = info => this.port.postMessage({ target:'chains-host', op:OP.shed, value:info });
+    this.engine.onResample = v => { try { this.port.postMessage({ target:'chains-host', op:'resample', value:Object.assign(v, { track:this.track }) }, [v.L.buffer, v.R.buffer]); } catch (e){} };
     this._tmpL = new Float32Array(CHAN_COUNT * BLOCK);
     this._tmpR = new Float32Array(CHAN_COUNT * BLOCK);
     this._blocks = 0;

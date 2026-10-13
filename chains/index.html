@@ -375,6 +375,12 @@ const MODULES = {
     params:{ track:[1,1,CHAN_COUNT,1] },
     ui:{ track:{l:'Track', c:Array.from({length:CHAN_COUNT}, (_, i) => [i + 1, 'Track ' + (i + 1)])} } },
 
+  resample:{ label:'Resample', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ rec:[0,0,1,1], bars:[1,0,3,1], pad:[7,0,31,1], slices:[3,0,4,1] },
+    ui:{ rec:{l:'Record', c:opts(['Off','Armed: next bar'])}, bars:{l:'Bars', c:opts(['1 bar','2 bars','4 bars','8 bars'])},
+      pad:{l:'Into pad', c:Array.from({length:32}, (_, i) => [i, 'Pad ' + i.toString(16).toUpperCase().padStart(2, '0')])},
+      slices:{l:'Slices', c:opts(['Off','4','8','16','32'])} } },
+
   vcf:{ label:'VCF', scope:'mono', inputs:{ in:'audio', cutoff:'cv' }, outputs:{ out:'audio' },
     params:{ cutoff:[.5,0,1,.001], res:[.3,0,1,.001], mode:[0,0,2,1] },
     ui:{ cutoff:{l:'Cutoff', f:pct}, res:{l:'Resonance', f:pct}, mode:{l:'Mode', c:opts(['Low-pass','Band-pass','High-pass'])} } },
@@ -543,7 +549,7 @@ const choicesOf = (t, k) => (MODULES[t].ui[k] || {}).c || null;
 
 /* Families give each module its edge color, as in ...Seeds. */
 const FAMILY = { trackIn:'aout',
-  vcf:'util', vca:'util', mixer:'util', lfo:'mod', adsr:'mod', random:'mod', atten:'mod', chainOut:'aout' };
+  resample:'util', vcf:'util', vca:'util', mixer:'util', lfo:'mod', adsr:'mod', random:'mod', atten:'mod', chainOut:'aout' };
 const famOf = t => FAMILY[t] || (MODULES[t] && MODULES[t].fx ? 'afx' : 'gen');
 /* Cable kinds: audio (teal), modulation (purple, dashed), gate (pink, dashed). */
 const KIND = { audio:'audio', cv:'mod', gate:'gate' };
@@ -749,7 +755,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=8';
+    const url = opts.url || './chains-worklet.js?v=9';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -1615,7 +1621,7 @@ const plist = document.getElementById('plist'), palette = document.getElementByI
 const drawer = document.getElementById('drawer'), dtoggle = document.getElementById('dtoggle');
 const PALETTE = [
   ['§Tracks', []],
-  ['Track I/O', [['trackIn','Track In'],['chainOut','Chain Out']]],
+  ['Track I/O', [['trackIn','Track In'],['chainOut','Chain Out'],['resample','Resample (record to a pad)']]],
   ['Filters and amps', [['vcf','VCF'],['blades','Blades filter'],['vca','VCA'],['mixer','Mixer']]],
   ['Effects', [['eq','EQ'],['comp','Compressor'],['saturation','Saturation'],['tape','Tape'],['chorus','Chorus'],['crush','Bitcrush'],['delay','Tape delay'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['phaser','Phaser'],['reverb','Reverb'],['rings','Rings'],['clouds','Clouds'],['beads','Beads'],['vocoder','Vocoder']]],
   ['More effects', [['repeat','Repeat (beat repeat)'],['comb','Comb resonator'],['transient','Transient shaper'],['tgate','Trance gate'],['ott','Multiband squash'],['fshift','Frequency shifter'],['vinyl','Vinyl'],['dub','Dub tape'],['cab','Speaker cab'],['tube','Tube'],['flanger','Flanger'],['tremolo','Tremolo'],['odrive','Overdrive'],['folder','Wavefolder'],['autowah','Auto-wah'],['pshift','Pitch shifter'],['ladder','Ladder filter'],['xmod','Cross-mod'],['space','Space reverb'],['lofi','Lo-fi'],['drive','Drive'],['air','Air'],['room','Room reverb']]],
@@ -1957,6 +1963,7 @@ function helpDoc(){
     envfol:'Turns sound into modulation: the louder the input, the higher the output. Attack and Release set how quickly it follows; Gate level sets where its gate output turns on. Patch the output into any slider’s modulation jack (a filter’s cutoff, say) and the sound drives it.',
     gateex:'Turns sound into a gate: on while the input stays above Threshold, off when it falls (Hysteresis stops it chattering). Env is a smoothed version. Use it to trigger envelopes, clocks or Sample & Hold from audio.',
     pitchfol:'Follows the pitch of a monophonic sound and outputs it as modulation (0.5 = A4, one octave = 0.125), plus a voiced Gate. Best on simple tones. Patch it into an oscillator’s pitch on …waves, or into a Quantizer here.',
+    resample:'Records what passes through it into a pad of the kit, so you can chop it like a breakbeat. Set Record to Armed while the song plays: it starts on the next bar, records Bars bars (4 beats each at the song tempo), loads the take into the chosen pad as a sample, cuts it into Slices on the instruments that play that pad, and sets Record back to Off. The sound passes through unchanged.',
     slew:'Slows a modulation signal down, with separate Rise and Fall times. Smooths stepped or jittery control voltages.',
     snh:'Sample & Hold: takes a snapshot of the input on a Trigger rising edge (or at Rate) and holds it; Noise outputs a matching random step. Patch a stepped sequence into a filter for classic sample-and-hold sweeps.',
     quant:'Snaps a pitch modulation signal to the nearest note of a Scale (pitch CV: 0.5 = A4). Transpose shifts it in semitones; Depth scales the output.',

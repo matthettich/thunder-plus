@@ -4222,7 +4222,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=8')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=9')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -4283,10 +4283,41 @@ function chainsNode(ac, track, patch, tempo){
       n._send({target:'chains-host', op:'telemetry', value:true});
     }
     if (d.op === 'shed' && d.value) toast('…chains is busy: dropped to draft quality.', 5000);
+    if (d.op === 'resample' && d.value) resampleIn(d.value);
     if (d.op === 'error' && d.value) toast('…chains: ' + (d.value.message || d.value.op), 5000);
   };
   n._sent = patch ? chnClone(patch) : null;   // the patch this node already has
   return n;   // the processorOptions above load the initial patch; later changes go as diffs
+}
+
+/* ---------- …chains Resample: a take arrives from the worklet and becomes a sample pad ----------
+   Every track's chains node may run the module, so takes of the same module that arrive together are gathered for
+   a moment and the loudest wins (the others hear silence on their Track In). The pad's other layers are turned off,
+   the take is its sample, the instruments that play that pad are cut into Slices with BEATS set to the take's
+   length, and the module's Record goes back to Off. It undoes like any sound edit. */
+const rsPend = new Map();
+function resampleIn(v){
+  if (!v || !v.L || !v.R) return;
+  const peak = a => { let p = 0; for (let i = 0; i < a.length; i += 7){ const x = Math.abs(a[i]); if (x > p) p = x; } return p; };
+  v.peak = Math.max(peak(v.L), peak(v.R));
+  let e = rsPend.get(v.id); if (!e){ e = {best:null}; rsPend.set(v.id, e); setTimeout(() => { rsPend.delete(v.id); resampleApply(e.best); }, 350); }
+  if (!e.best || v.peak > e.best.peak) e.best = v;
+}
+function resampleApply(v){
+  if (!v) return;
+  // Record back to Off, in the song's patch and on every running node, so a new take needs a new Armed.
+  try { const m = S.chainPatch && S.chainPatch.modules && S.chainPatch.modules.find(x => x.id === v.id);
+    if (m){ m.params = Object.assign({}, m.params, {rec:0}); saveS();
+      if (rt) rt.pl.buses.forEach(b => { if (b && b.chn && b.chn._send){ b.chn._send({target:'chains-host', op:'param', id:v.id, name:'rec', value:0}); if (b.chn._sent) b.chn._sent = chnClone(S.chainPatch); } }); } } catch(e){}
+  if (v.peak < 0.0005){ toast('Resample recorded silence. Is the track playing into it?', 5000); return; }
+  const pad = Math.min(v.pad | 0, kit.voices.length - 1), n = v.L.length, d = new Float32Array(n);
+  for (let i = 0; i < n; i++) d[i] = (v.L[i] + v.R[i]) * 0.5;
+  const vo = kit.voices[pad]; vo.layers.forEach(L => { L.on = false; }); vo.sel = 0; vo.name = 'Resample ' + v.bars + (v.bars === 1 ? ' bar' : ' bars');
+  assignSample(pad, d, v.sr, 'Resample');
+  const ins = []; S.insts.forEach((I, i) => { if (I.pad === pad){ I.slc = v.slices || 0; I.smode = 0; I.beats = v.bars * 4; ins.push(i); } });
+  saveS(); draw();
+  toast(`Resampled ${v.bars} bar${v.bars === 1 ? '' : 's'} into pad ${hx(pad)}` + (v.slices ? `, ${v.slices} slices` : '') +
+    (ins.length ? ` (instrument ${ins.map(i => hx(i)).join(', ')}): C-4 plays the first slice` : '. No instrument plays that pad yet: set one’s PAD to ' + hx(pad)), 6000);
 }
 /* Which tracks run through …chains: the Mixer CHN flag, AND a Chain Out wired to that track.
    With no Chain Out for the track the signal must pass through dry — never mute it. */
