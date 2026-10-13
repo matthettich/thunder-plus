@@ -207,7 +207,8 @@ the browser's copy); use File → Save to move work between them.
 **Updates.** Installed copies check GitHub Releases when they open (and every few hours): on Windows and Linux
 the new version downloads by itself and asks to restart; on a Mac (unsigned) it says a new version is out and opens
 https://github.com/matthettich/thunder-plus/releases/latest, which is also the link to give testers. To ship one,
-push a version tag: `git tag v1.1.1 && git push origin v1.1.1`. The workflow sets the app's version from the tag,
+open **Actions → Desktop app → Run workflow**, type a version (e.g. `1.1.1`) and run it, or push a tag:
+`git tag v1.1.1 && git push origin v1.1.1`. The workflow sets the app's version from the tag,
 builds everything and publishes the release.
 
 **Option A: build on GitHub (no setup).** Push the repo, then on GitHub open **Actions → Desktop app → Run
