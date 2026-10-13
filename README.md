@@ -10,7 +10,20 @@
 
 **Files.** `waves/` holds the …waves editor and engine (`waves/waves-worklet.js`, from the waves repo); Thunder Plus loads the same engine to render patches into the pads, using the Plaits, Elements and effects code already in `index.html`.
 
-**...Thunder opens Thunder Plus files.** ...Thunder (https://matthettich.github.io/Thunder-/) is built from this app with the …waves and …chains editors hidden: `python3 tools/build-thunder.py ../Thunder-` writes its `index.html` and desktop `electron/main.js` and copies the two sound engines, so ...Thunder behaves the same on the web, on the phone and as a desktop app. Songs and kits go both ways between the apps, and …waves layers and …chains effects play in ...Thunder too. After changing this app, rebuild ...Thunder so the two stay in step.
+**...Thunder opens Thunder Plus files.** ...Thunder (https://matthettich.github.io/Thunder-/) is built from this app with the …waves and …chains editors hidden: `python3 tools/build-thunder.py ../Thunder-` writes its `index.html` and desktop `electron/main.js` and copies the two sound engines, so ...Thunder behaves the same on the web, on the phone and as a desktop app. Songs and kits go both ways between the apps, and …waves layers and …chains effects play in ...Thunder too. After changing this app, rebuild ...Thunder so the two stay in step — and, since the build leaves its own `sw.js` alone, bump the chains worklet version there too.
+
+**Running it locally.** This is a plain web app with no build step. Serve the repo root over HTTP, then open the pages:
+
+```
+cd thunder-plus
+python3 -m http.server 8734 --bind 127.0.0.1
+```
+
+- **App:** http://127.0.0.1:8734/index.html
+- **…chains patch editor** (where the Vocoder and the other …chains modules live): http://127.0.0.1:8734/chains/index.html
+- **…waves patch editor:** http://127.0.0.1:8734/waves/index.html
+
+Open them over HTTP, not `file://` — the editors load their sound engine with `fetch`. Picking the work back up after a break? See [`HANDOVER.md`](HANDOVER.md) for the current state, how to validate (there is no test suite) and the open items.
 
 The rest of this README is ...Thunder's.
 
@@ -37,7 +50,7 @@ An 8-pad drum synth and 16-track tracker for the browser, built for a Galaxy Z F
 - **Microtuning (song).** A cents offset per pitch class, with Equal, Just, Pythagorean and Meantone presets or any custom values, applied to live playing and the tracker alike.
 - **Export.** Mono WAV, 44.1k or 48k, 16 or 24-bit, normalised and tail-trimmed. Save one pad or all 8 as a zip, or share straight to Koala on Android. Optionally add the note to the file name (for example `03 Pluck C3.wav`).
 - **Effects per pad.** Up to 6 in any order, with a tail length: Rings resonator, Clouds (granular, stretch, delay, spectral, with a hold-the-tail switch), Airwindows Density saturation and ToTape6, DaisySP chorus and bitcrush.
-- **…chains (modular effects).** A patch editor of modules — Track I/O, VCF/VCA/Mixer, a 2/4-pole driven **Blades** filter, a **Vocoder** (In is the carrier, In R the modulator: Talkbox, 4–64 band banks or a spectral cross-synthesis), ten effects plus a **Meta modulator** (crossfade/ring mod/wave fold/comparator), **Phaser**, tempo-synced **Ping-pong delay** and a stereo **Width** control, and LFO/ADSR/Random/Attenuverter — plus **audio→CV**: Envelope Follow, Gate Extract and Pitch Follow turn sound into modulation, and Slew, Sample & Hold and Quantizer shape it. Every slider has a modulation jack (the slider sets the centre, the signal swings it across its range), from the LFO, envelopes, an audio follower or any other signal.
+- **…chains (modular effects).** A patch editor of modules — Track I/O, VCF/VCA/Mixer, a 2/4-pole driven **Blades** filter, a **Vocoder** (In is the carrier, In R the modulator: Talkbox, 4–64 band banks or a spectral cross-synthesis), eleven effects plus a **Meta modulator** (crossfade/ring mod/wave fold/comparator), **Phaser**, tempo-synced **Ping-pong delay** and a stereo **Width** control, and LFO/ADSR/Random/Attenuverter — plus **audio→CV**: Envelope Follow, Gate Extract and Pitch Follow turn sound into modulation, and Slew, Sample & Hold and Quantizer shape it. Every slider has a modulation jack (the slider sets the centre, the signal swings it across its range), from the LFO, envelopes, an audio follower or any other signal.
 - **Sidechain.** Each mixer channel has a **SC** row: turn it on and that track feeds the sidechain bus. Every …chains patch gets a **Sidechain In** module (its sound and an envelope output, patch them anywhere) and a **Sidechain Comp** (Threshold/Ratio/Attack/Release/Makeup/Mix) that ducks by the bus, or by whatever is patched into its SC input — so a kick on one track pumps another. It falls back to compressing its own input when the sidechain is empty. Each track has its own **Track In** and **Chain Out** pair: turning a track's CHN on in the Mixer adds that track's pair (wired straight through, below the rest), so chains are per track and toggling one never disturbs another; the output follows its own input. If a track already has a chain, switching its CHN on (or picking that track in the editor) jumps to and highlights the existing chain. Control inputs aren't limited.
 - **MIDI.** Plug in a controller, tap ⚙ Settings → MIDI → Connect MIDI. Pads 00–07 answer notes 36–43 with velocity; other notes play the selected synth. **Learn**: tap any of the 16 pads and hit a key to give it that note (synth pads hold while the key is down), or touch any slider and turn a knob to put it on that CC. A learned knob works that slider for whichever pad, layer or effect is open, and shows its CC next to the slider's name. **Unlearn** clears the selected pad or slider; **Reset all** goes back to the defaults. Mappings are kept on the device.
 - **Kits.** Kits save in the browser automatically and can be saved or loaded as `.json`, recorded samples included.
