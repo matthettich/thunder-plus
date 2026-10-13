@@ -2,6 +2,38 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>
+/* ---------- deck mode (the deck branch only; used by ...Thunder Perform) ----------
+   Opened as index.html?deck=<id> inside ...Thunder Perform, this page is one deck. Nothing here runs without
+   ?deck=. A deck must never touch the owner's saved work, so before any other script runs it gets:
+   - localStorage kept in memory (starts empty, so the deck boots on the demo song and factory kit);
+   - its own sample database, emptied at start (renamed per deck, so one deck's sample tidy-up can't delete
+     anything of the owner's or of the other deck's);
+   - no service worker or update checks.
+   The host (window.parent.__thunderPerform) supplies the shared AudioContext and this deck's input node. */
+(function(){
+  let id = null; try { id = new URLSearchParams(location.search).get('deck'); } catch(e){}
+  if (id == null || !/^[a-z0-9]{1,8}$/i.test(id)) return;
+  let host = null; try { if (window.parent !== window && window.parent.__thunderPerform) host = window.parent.__thunderPerform; } catch(e){}
+  window.THUNDER_DECK = {id, host};
+  const m = new Map();
+  const ls = {getItem:k => m.has(String(k)) ? m.get(String(k)) : null, setItem:(k, v) => { m.set(String(k), String(v)); },
+    removeItem:k => { m.delete(String(k)); }, clear:() => m.clear(), key:i => [...m.keys()][i] ?? null, get length(){ return m.size; }};
+  try { Object.defineProperty(window, 'localStorage', {value:ls, configurable:true}); } catch(e){}
+  try { Object.defineProperty(window, 'sessionStorage', {value:ls, configurable:true}); } catch(e){}
+  const real = window.indexedDB;
+  if (real){
+    const seen = new Set(), nm = n => 'thunderdeck-' + id + '-' + n;
+    const idb = {
+      open(n, v){ const k = nm(n); if (!seen.has(k)){ seen.add(k); try { real.deleteDatabase(k); } catch(e){} } return v == null ? real.open(k) : real.open(k, v); },
+      deleteDatabase(n){ return real.deleteDatabase(nm(n)); },
+      cmp(a, b){ return real.cmp(a, b); }
+    };
+    try { Object.defineProperty(window, 'indexedDB', {value:idb, configurable:true}); } catch(e){}
+  }
+  try { Object.defineProperty(navigator, 'serviceWorker', {value:undefined, configurable:true}); } catch(e){}
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2729,18 +2761,30 @@ let aLive = null; // the latency and rate the running context was made with
 
 /* ---------- audio ---------- */
 let ctx = null, master = null;
+// Deck mode (?deck=, see the head script): the host's shared AudioContext and this deck's input on its mixer.
+const DECK = window.THUNDER_DECK || null, DHOST = DECK && DECK.host;
 /* The rate pads render at before audio starts. Audio can only start on a tap, so ask the browser now which
    rate it will use (a context made and closed straight away makes no sound). Before this, pads rendered at
    start-up at a guessed 48 kHz were all rendered again at the first sound, on the UI thread, which froze the
    first PLAY for about 2 s on a computer and several seconds on a phone. */
 let srGuess = 48000;
 try {
-  if (aset.rate) srGuess = aset.rate;
+  if (DHOST && DHOST.ctx) srGuess = DHOST.ctx.sampleRate;
+  else if (aset.rate) srGuess = aset.rate;
   else { const AC = window.AudioContext || window.webkitAudioContext, c = new AC({latencyHint:aset.lat || 'interactive'}); srGuess = c.sampleRate || 48000; if (c.close) c.close().catch(() => {}); }
 } catch(e){}
 const cpu = {cap:null, t:0};
 const playing = [];
+// Adds an AudioWorklet module. On the host's shared context each module is added once for all decks (a
+// second deck adding the same processor names would fail and lose its effects).
+function wkAdd(ac, key, url){ return DHOST && ac === DHOST.ctx && DHOST.once ? DHOST.once(key, () => ac.audioWorklet.addModule(url)) : ac.audioWorklet.addModule(url); }
 function audio(){
+  if (!ctx && DHOST && DHOST.ctx){
+    ctx = DHOST.ctx; aLive = {lat:'interactive', rate:0};
+    master = ctx.createGain(); master.gain.value = clamp(aset.vol, 0, 100) / 100; master.connect(DHOST.input(DECK.id));
+    ctx.addEventListener && ctx.addEventListener('statechange', () => audStatus());
+    prerender();
+  }
   if (!ctx){
     const AC = window.AudioContext || window.webkitAudioContext;
     const ao = {latencyHint:aset.lat || 'interactive'}; if (aset.rate) ao.sampleRate = aset.rate;
@@ -4014,10 +4058,11 @@ async function audRefresh(){
   updLat(); updARate(); audRestartRow(); audStatus();
 }
 function audLvlShow(){ const v = aset.vol; $('audLvlV').textContent = v <= 0 ? '−∞ dB' : (20 * Math.log10(v / 100)).toFixed(1) + ' dB'; }
-function audRestartRow(){ $('audRestartRow').hidden = !(ctx && aLive && (aLive.lat !== aset.lat || aLive.rate !== aset.rate)); }
+function audRestartRow(){ $('audRestartRow').hidden = !!DHOST || !(ctx && aLive && (aLive.lat !== aset.lat || aLive.rate !== aset.rate)); }
 $('audOut').addEventListener('change', async e => {
   const id = e.target.value, name = e.target.selectedOptions[0] ? e.target.selectedOptions[0].textContent : '';
   aset.sink = id; asetSave();
+  if (DHOST) return toast('This is a deck in ...Thunder Perform: choose the output there.');
   if (ctx && ctx.setSinkId){
     try { await ctx.setSinkId(id); toast('Playing through ' + (id ? name : 'the system default') + '.'); }
     catch(err){ toast('Couldn’t switch to that output' + (err && err.message ? ': ' + err.message : '.')); }
@@ -4721,7 +4766,7 @@ function chainsReady(ac){
         const src = await (await fetch('chains/chains-worklet.js?v=9')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
-      await ac.audioWorklet.addModule(chnURL);
+      await wkAdd(ac, 'chains', chnURL);
       return true;
     })().catch(() => false));
   }
@@ -4837,7 +4882,7 @@ function tfxReady(ac){
     tfxLoaded.set(ac, (async () => {
       if (!tfxBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!tfxURL) tfxURL = URL.createObjectURL(new Blob([TFX_SRC], {type:'application/javascript'}));
-      await ac.audioWorklet.addModule(tfxURL);
+      await wkAdd(ac, 'tfx', tfxURL);
       return true;
     })().catch(() => false));
   }
@@ -5683,7 +5728,7 @@ function bassReady(ac){
   if (!bassLoad.has(ac)){
     let pr = Promise.resolve(false);
     try { if (ac.audioWorklet){ if (!bassURL) bassURL = URL.createObjectURL(new Blob([BassCore.toString() + BASS_PROC], {type:'text/javascript'}));
-      pr = ac.audioWorklet.addModule(bassURL).then(() => { bassOK.add(ac); return true; }, () => false); } } catch(e){}
+      pr = wkAdd(ac, 'bass', bassURL).then(() => { bassOK.add(ac); return true; }, () => false); } } catch(e){}
     bassLoad.set(ac, pr);
   }
   return bassLoad.get(ac);
@@ -5692,7 +5737,7 @@ const isBassPad = i => isSyn(i) && isBassV(kit.voices[i]);
 // A bass voice was edited: the live nodes playing it hear the change at once.
 function bassPush(i){ const v = kit.voices[i]; if (!isBassV(v)) return; const p = bassParams(v); for (const b of bassLive) if (b.pad === i) try { b.node.port.postMessage({set:p}); } catch(e){} }
 const MW_URL = 'master-worklet.js?v=1', mwLoad = new WeakMap();
-function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
+function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet ? wkAdd(ac, 'master', MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
 const mstNeedsWk = M => M.sup.on || M.comp.on || M.lim.on;
 // Samples the chain delays the sound by (the suppressor's FFT and the limiter's lookahead); renders trim it off.
@@ -5809,7 +5854,7 @@ function tStart(mode, o){
   const seq = makeSeq(S, mode, o);
   if (!seq.alive()){ toast(mode === 'song' ? `Row ${rS(o.row, 3)} is empty. Put a sect on it, or move to a row that has some.` : 'Nothing to play here yet.'); draw(); return; }
   for (let i = 0; i < nslots(); i++) ensureLive(i);   // up to date, or the last render while the Worker finishes
-  seq.time = ctx.currentTime + 0.08; stageStart(seq.time);
+  seq.time = o && o.at > ctx.currentTime + 0.005 ? o.at : ctx.currentTime + 0.08; stageStart(seq.time);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : ''});
   tp.timer = setInterval(pump, 25); pump(); draw(); songBtn(); chainsTempo();
@@ -5843,6 +5888,44 @@ function tStop(quiet){
   chainsTempo();
   if (!quiet) draw();
 }
+/* Deck mode: what ...Thunder Perform calls (window.__deck). Times are on the host's shared AudioContext clock.
+   - ready(): audio is set up, the effect worklets are loaded and every pad is rendered.
+   - open(text): loads a project file's text (song and kit), as File → Open project does.
+   - play(at, row): plays the song from `row` with its first step exactly at `at`.
+   - stop(at): silences the deck at `at` (notes scheduled after it never sound).
+   - setBpm(bpm, at): the playing tempo from `at` on (the sequencer reads it every step).
+   - info(): name, tempo, lines per beat, whether it's playing and when it started. */
+if (DECK) window.__deck = {
+  async ready(){
+    rtInit();
+    await Promise.all([tfxReady(ctx), chainsReady(ctx), bassReady(ctx)]);
+    for (let i = 0; i < nslots(); i++){ ensure(i); await idle(); }
+    return true;
+  },
+  async open(text){
+    const ok = await loadProjFile(new File([text], 'project.json', {type:'application/json'}));
+    if (ok) await this.ready();
+    return ok;
+  },
+  play(at, row = 0){ tStart('song', {row, at}); return tp.on ? tp.seq.base != null ? tp.seq.base : tp.seq.time : null; },
+  stop(at){
+    if (!ctx) return; const seq = tp.seq;   // a play() started meanwhile isn't stopped by this
+    const t = Math.max(at || 0, ctx.currentTime), wait = Math.max(0, (t - ctx.currentTime - 0.06) * 1000);
+    setTimeout(() => {
+      if (tp.seq !== seq) return;
+      if (tp.timer) clearInterval(tp.timer);
+      tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null;
+      if (rt) rt.pl.stopAll(Math.max(t, ctx.currentTime));
+      songBtn(); chainsTempo(); draw();
+    }, wait);
+  },
+  setBpm(bpm, at){
+    bpm = clamp(+bpm || 120, 10, 999); S.bpm = bpm;
+    if (tp.on && tp.seq){ tp.seq.bpm = bpm; tp.bpm = bpm; rt.pl.play({type:'tempo', t:Math.max(at || 0, ctx.currentTime), bpm, tks:tp.seq.tks}); }
+    chainsTempo();
+  },
+  info(){ return {name:S.name || 'Song', bpm:tp.on && tp.seq ? tp.seq.bpm : S.bpm, lpb:S.lpb || 4, playing:tp.on, start:tp.on && tp.seq ? tp.seq.base : null}; }
+};
 function preview(ii, note, vol, poly, when){
   audioWake = performance.now();
   const r = rtInit(), I = S.insts[ii] || S.insts[0], t = (when || ctx.currentTime) + 0.005;
