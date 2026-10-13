@@ -406,6 +406,11 @@ const MODULES = {
     ui:{ media:{l:'Media', c:opts(['Dirty tape','Clean tape','Vintage','Digital'])}, freeze:{l:'Freeze', c:opts(['Off','On'])},
       time:{l:'Time', f:pct}, size:{l:'Size', f:pct}, pitch:{l:'Pitch', f:pct}, shape:{l:'Shape', f:pct}, density:{l:'Density', f:pct},
       fb:{l:'Feedback', f:pct}, blend:{l:'Blend', f:wet}, verb:{l:'Reverb', f:pct} } },
+  vocoder:{ label:'Vocoder', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ mode:[0,0,6,1], res:[.5,0,1,.01], atk:[2,.1,100,.1], rel:[60,5,1000,1], mix:[1,0,1,.01], level:[1,0,2,.01] },
+    ui:{ mode:{l:'Mode', c:opts(['Talkbox','4 bands','12 bands','16 bands','32 bands','64 bands','Spectral'])},
+      res:{l:'Resonance', f:pct}, atk:{l:'Attack', f:v => Math.round(v) + ' ms'}, rel:{l:'Release', f:v => Math.round(v) + ' ms'},
+      mix:{l:'Mix', f:wet}, level:{l:'Level', f:pct} } },
   scin:{ label:'Sidechain In', scope:'mono', inputs:{}, outputs:{ out:'audio', env:'cv' }, params:{ send:[1,0,1,.01] },
     ui:{ send:{l:'Level', f:pct} } },
   sccomp:{ label:'Sidechain Comp', scope:'mono', inputs:{ in:'audio', sc:'audio' }, outputs:{ out:'audio' }, params:{ threshold:[.3,0,1,.001], ratio:[4,1,20,.1], attack:[6,.1,200,.1], release:[140,5,2000,1], makeup:[1,1,4,.01], mix:[1,0,1,.01] },
@@ -680,7 +685,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=3';
+    const url = opts.url || './chains-worklet.js?v=4';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -1533,7 +1538,7 @@ const PALETTE = [
   ['§Tracks', []],
   ['Track I/O', [['trackIn','Track In'],['chainOut','Chain Out']]],
   ['Filters and amps', [['vcf','VCF'],['blades','Blades filter'],['vca','VCA'],['mixer','Mixer']]],
-  ['Effects', [['eq','EQ'],['comp','Compressor'],['saturation','Saturation'],['tape','Tape'],['chorus','Chorus'],['crush','Bitcrush'],['delay','Tape delay'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['phaser','Phaser'],['reverb','Reverb'],['rings','Rings'],['clouds','Clouds'],['beads','Beads']]],
+  ['Effects', [['eq','EQ'],['comp','Compressor'],['saturation','Saturation'],['tape','Tape'],['chorus','Chorus'],['crush','Bitcrush'],['delay','Tape delay'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['phaser','Phaser'],['reverb','Reverb'],['rings','Rings'],['clouds','Clouds'],['beads','Beads'],['vocoder','Vocoder']]],
   ['Stereo', [['width','Width']]],
   ['Sidechain', [['scin','Sidechain In'],['sccomp','Sidechain Comp']]],
   ['§Control', []],
@@ -1830,6 +1835,7 @@ function helpDoc(){
     rings:'Mutable Instruments Rings: sound in excites a resonator tuned to Note (plus the Pitch input).',
     clouds:'Mutable Instruments Clouds: granular textures, time stretch, looping delay and spectral blur. Freeze holds what it heard.',
     beads:'Mutable Instruments Beads: a granular texture synthesizer — Time, Size, Shape, Pitch and Density grow the grains, Feedback and Reverb blend them, Freeze holds what it heard. Media picks Digital (clean), Vintage, or the tape characters.',
+    vocoder:'A vocoder: the sound you patch into In (left) is the carrier, and In R is the modulator that shapes it (leave In R unpatched and it uses In for both). Mode picks the band count — Talkbox and the 4…64 band banks split the carrier into bands that the modulator’s levels open and close, or Spectral cross-synthesises them with an FFT. Resonance sharpens the bands, Attack and Release set how fast the levels follow, Mix blends the vocoded sound with the dry carrier, and Level sets the output.',
     scin:'Sidechain In: copies the sidechain bus here. Turn a track’s Sidechain Out on in the Mixer and it feeds this module in every track’s chain — Out is the sound, Env is its level as a control voltage. Patch them anywhere, or just drop a Sidechain Comp after this track’s sound.',
     sccomp:'Sidechain Comp: ducks its In by the sidechain — either the Mixer sidechain bus or whatever is patched into SC (so a kick on another track can pump this one). Threshold, Ratio, Attack, Release, Makeup and Mix. With nothing on the sidechain bus it falls back to compressing its own input.',
     lfo:'A slow oscillator for wobbles and sweeps. Depth sets how far it moves a slider; Sync to tempo follows the tempo. Reset restarts its cycle.',

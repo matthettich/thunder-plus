@@ -511,7 +511,89 @@ const SidechainComp = {
   }
 };
 
+/* ── Vocoder ────────────────────────────────────────────────────────────────
+   Carrier = In (left), Modulator = In R (right). Bands 4/12/16/32/64 use a bank of band-passes; Talkbox
+   is a small resonant bank with a little drive for the classic robot-mouth tone; Spectral is an FFT
+   cross-synthesis (the carrier's spectrum takes the modulator's magnitude). No synth engine — audio in. */
+const FFTN = 256, FFTH = FFTN >> 1;
+function fftInPlace(re, im, inv){
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++){ let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit;
+    if (i < j){ let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+  for (let len = 2; len <= n; len <<= 1){
+    const ang = (inv ? 2 : -2) * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+    for (let i = 0; i < n; i += len){ let cr = 1, ci = 0;
+      for (let j = 0; j < len >> 1; j++){
+        const ur = re[i + j], ui = im[i + j], vr = re[i + j + (len >> 1)] * cr - im[i + j + (len >> 1)] * ci, vi = re[i + j + (len >> 1)] * ci + im[i + j + (len >> 1)] * cr;
+        re[i + j] = ur + vr; im[i + j] = ui + vi; re[i + j + (len >> 1)] = ur - vr; im[i + j + (len >> 1)] = ui - vi;
+        const ncr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = ncr; } } }
+  if (inv) for (let i = 0; i < n; i++){ re[i] /= n; im[i] /= n; }
+}
+const VOC_BANDS = [6, 4, 12, 16, 32, 64, 0];
+const VOC_MODES = ['Talkbox', '4 bands', '12 bands', '16 bands', '32 bands', '64 bands', 'Spectral'];
+const Vocoder = {
+  type:'vocoder', scope:'mono', cost:8,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ mode:[0,0,6,1], res:[.5,0,1,.01], atk:[2,.1,100,.1], rel:[60,5,1000,1], mix:[1,0,1,.01], level:[1,0,2,.01] },
+  create(){ return {
+    mc1:new Float32Array(64), mc2:new Float32Array(64), cc1:new Float32Array(64), cc2:new Float32Array(64), env:new Float32Array(64), C:new Float32Array(192),
+    win:null, pcar:new Float32Array(FFTH), pmod:new Float32Array(FFTH), acc:new Float32Array(FFTH),
+    re:new Float32Array(FFTN), im:new Float32Array(FFTN), mre:new Float32Array(FFTN), mim:new Float32Array(FFTN), out:new Float32Array(FFTN) }; },
+  process(st, io, ctx){
+    const mode = clamp(io.p.mode | 0, 0, 6), mix = io.p.mix, lvl = io.p.level;
+    const car = io.in.in, mod = linked(io, 'inR') ? io.in.inR : io.in.in, out = io.out.out, outR = io.out.outR;
+    if (mode === 6) vocSpectral(st, ctx, car, mod, out, mix, lvl);
+    else vocBands(st, io, ctx, VOC_BANDS[mode], car, mod, out, mix, lvl, mode === 0);
+    for (let i = 0; i < ctx.block; i++) outR[i] = out[i];
+  }
+};
+// Bank of band-passes: the modulator's band envelope scales the carrier's band. Talkbox = 6 resonant bands + drive.
+function vocBands(st, io, ctx, N, car, mod, out, mix, lvl, talk){
+  const sr = ctx.sr, nb = Math.min(N, ctx.quality === 'draft' ? 16 : N), n = ctx.block;
+  const fmin = 90, fmax = talk ? 4200 : 6800, res = io.p.res;
+  const damp = talk ? Math.max(.12, 1.2 - res * 1.05) : Math.max(.28, 1.5 - res * 1.15);
+  const ka = 1 - Math.exp(-1 / (Math.max(.1, io.p.atk) / 1000 * sr)), kr = 1 - Math.exp(-1 / (Math.max(1, io.p.rel) / 1000 * sr));
+  for (let k = 0; k < nb; k++){
+    const fc = Math.min(fmin * Math.pow(fmax / fmin, nb > 1 ? k / (nb - 1) : .5), sr * 0.45);
+    const g = Math.tan(Math.PI * fc / sr), a1 = 1 / (1 + g * (g + damp));
+    st.C[k * 3] = a1; st.C[k * 3 + 1] = g * a1; st.C[k * 3 + 2] = g * g * a1;
+  }
+  const g2 = lvl * (talk ? 1.3 : 2.2 / Math.sqrt(nb));
+  for (let i = 0; i < n; i++){
+    const xm = mod[i], xc = car[i]; let acc = 0;
+    for (let k = 0; k < nb; k++){
+      const a1 = st.C[k * 3], a2 = st.C[k * 3 + 1], a3 = st.C[k * 3 + 2];
+      const m3 = xm - st.mc2[k], m1 = a1 * st.mc1[k] + a2 * m3, m2 = st.mc2[k] + a2 * st.mc1[k] + a3 * m3;
+      st.mc1[k] = 2 * m1 - st.mc1[k]; st.mc2[k] = 2 * m2 - st.mc2[k];
+      const a = Math.abs(m1); st.env[k] += (a - st.env[k]) * (a > st.env[k] ? ka : kr);
+      const c3 = xc - st.cc2[k], c1 = a1 * st.cc1[k] + a2 * c3, c2 = st.cc2[k] + a2 * st.cc1[k] + a3 * c3;
+      st.cc1[k] = 2 * c1 - st.cc1[k]; st.cc2[k] = 2 * c2 - st.cc2[k];
+      acc += c1 * st.env[k];
+    }
+    let y = acc * g2; if (talk) y = Math.tanh(y * 1.6) * .625;
+    out[i] = car[i] * (1 - mix) + y * mix;
+  }
+}
+// Spectral vocoder: 256-point FFT, 50% overlap. The carrier's bins take the modulator's magnitude.
+function vocSpectral(st, ctx, car, mod, out, mix, lvl){
+  if (!st.win){ st.win = new Float32Array(FFTN); for (let i = 0; i < FFTN; i++) st.win[i] = .5 - .5 * Math.cos(2 * Math.PI * i / FFTN); }
+  const re = st.re, im = st.im, mre = st.mre, mim = st.mim, y = st.out, w = st.win;
+  for (let i = 0; i < FFTN; i++){ const v = i < FFTH ? st.pcar[i] : car[i - FFTH]; re[i] = v * w[i]; im[i] = 0;
+    const u = i < FFTH ? st.pmod[i] : mod[i - FFTH]; mre[i] = u * w[i]; mim[i] = 0; }
+  fftInPlace(re, im, false); fftInPlace(mre, mim, false);
+  for (let b = 0; b < FFTN; b++){
+    const cmag = Math.hypot(re[b], im[b]), mmag = Math.hypot(mre[b], mim[b]), s = mmag / (cmag + 1e-6);
+    re[b] *= s; im[b] *= s;
+  }
+  fftInPlace(re, im, true);
+  const g = lvl * 1.34;
+  for (let i = 0; i < FFTH; i++) out[i] = car[i] * (1 - mix) + (st.acc[i] + re[i] * w[i]) * g * mix;
+  for (let i = 0; i < FFTH; i++) st.acc[i] = re[FFTH + i] * w[FFTH + i];
+  for (let i = 0; i < FFTH; i++){ st.pcar[i] = car[i]; st.pmod[i] = mod[i]; }
+}
+
 const MODULES = { trackIn:TrackIn,
+  vocoder:Vocoder,
   vcf:VCF, vca:VCA, mixer:Mixer,
   eq:EQ, comp:Comp, saturation:Saturation, tape:Tape, chorus:Chorus, crush:Crush, delay:Delay, reverb:Reverb, rings:Rings, clouds:Clouds, beads:Beads,
   scin:SidechainIn, sccomp:SidechainComp,
