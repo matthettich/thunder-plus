@@ -6339,7 +6339,11 @@ const arrShown = () => arrMode > 0 && arrEl.offsetWidth > 0;
 // The panel's width: 0 is the default for the screen size, otherwise what the grip was dragged to.
 const AWK = 'thunderplus-arrange-w-v1';
 let arrW = (() => { try { return Math.max(0, int(localStorage.getItem(AWK), 0)); } catch(e){ return 0; } })(), arrKey = '';
-const arrMax = () => Math.max(200, (arrEl.parentElement.clientWidth || innerWidth) - 240);
+// The song keeps room for all its tracks at a readable size (about 12px type: 52 columns of text), and the side
+// panel keeps its place when it is showing, so a wide ARRANGE never cuts the song off.
+const SONG_MIN = () => Math.round(BASEW * CW * 12 + 24);
+const arrMax = () => { const side = document.querySelector('.tside'), sw = side && side.offsetParent ? side.offsetWidth : 0;
+  return Math.max(200, (arrEl.parentElement.clientWidth || innerWidth) - sw - SONG_MIN()); };
 // Works out whether ARRANGE shows and how wide it is from the window's size right now. Called on every resize
 // (and once a second as a backstop), so it follows the Fold opening and closing with the app already running.
 function arrLayout(force){
@@ -6364,6 +6368,8 @@ $('tArrH').addEventListener('pointermove', e => {
   if (!arrDrag || e.pointerId !== arrDrag.id) return;
   const dx = arrDrag.x0 - e.clientX; if (Math.abs(dx) > 3) arrDrag.moved = true; if (!arrDrag.moved) return;
   arrW = clamp(Math.round(arrDrag.w0 + dx), 200, arrMax()); arrEl.style.width = arrW + 'px';
+  // Re-fit the song as the panel moves, not a second later.
+  if (!arrDrag.raf) arrDrag.raf = requestAnimationFrame(() => { if (arrDrag) arrDrag.raf = 0; arrSig = ''; fit(); draw(); });
 });
 const arrGripUp = e => {
   if (!arrDrag || e.pointerId !== arrDrag.id) return;
