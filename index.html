@@ -695,36 +695,46 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tscr .nb{opacity:.55; pointer-events:none} .tscr .nbl{color:#9b82d6} .tscr .nbr{color:#c9a227}
 
 /* ---------- bottom panel: where the keypad was, when it is hidden (KEYS mode, keypad off) ----------
-   Meters (tap mutes, hold solos), a scope of the master, and quick controls for the current instrument's
-   pad and the current track's effects. The panel and each section can be shown or hidden. */
+   Scope (the master's spectrum, drawn like Quite Noise's Shape graph), quick controls for the current instrument's
+   pad and the current track's effects, and a channel strip for the current track on the right (meter, fader, pan,
+   mute, solo). Each section has its own pastel and a thin grey header holding its button; the panel's height and
+   the scope and FX widths can be dragged. The panel and each section can be shown or hidden. */
 .tctl:has(> .tdeck:not([hidden])){padding:0; display:block}
 .tctl:not(:has(> :not([hidden]))){padding:0; border-top-width:1px}
-.tdeck{display:flex; flex-direction:column; background:var(--panel); color:var(--ink); touch-action:manipulation; --tk-mono:#eba3bd; --tk-poly:#86c99a}
-.dkhead{display:flex; align-items:center; gap:8px; padding:4px 10px; border-bottom:1px solid var(--line); background:var(--side); font-size:11px; letter-spacing:.08em}
-.dkhead b{font-weight:700}
-.dkchips{display:flex; gap:4px; flex:1; flex-wrap:wrap}
-.dkchips button{min-height:24px; padding:0 9px; font-size:11px; letter-spacing:.04em; border:1px solid var(--line); background:var(--panel)}
-.dkchips button.on{background:var(--ink); color:var(--inv)}
-.dkx{min-height:24px; min-width:28px; padding:0; border:1px solid var(--line); background:var(--panel); font-size:12px}
+.tdeck{position:relative; display:flex; flex-direction:column; background:var(--panel); color:var(--ink); touch-action:manipulation;
+  --tk-mono:#eba3bd; --tk-poly:#86c99a; --scfill:#f4a9c4; --dkp:100%}
+:root:is([data-skin="minblack"],[data-skin="mincolorblack"],[data-skin="neon"]) .tdeck{--dkp:16%}
+@media (prefers-color-scheme: dark){ :root[data-skin="auto"] .tdeck{--dkp:16%} }
+.dkgrip{position:absolute; left:0; right:0; top:-5px; height:10px; cursor:ns-resize; touch-action:none; z-index:4}
+.dkgrip::after{content:''; position:absolute; left:50%; top:3px; width:44px; height:4px; margin-left:-22px; border-radius:2px; background:var(--muted); opacity:.35}
+.dkgrip:hover::after, .dkgrip.dn::after{opacity:.8}
 .dkbody{display:flex; height:var(--dkh, 168px); overflow-x:auto; scrollbar-width:thin}
-.dkbody > .dks{flex:1 1 0; min-width:200px} .dkbody > #dkScope{min-width:140px}
-.dks{min-width:0; min-height:0; display:flex; flex-direction:column; padding:6px 10px 8px; border-left:1px solid var(--line)}
-.dks:first-child{border-left:0}
+.dkbody[hidden]{display:none}
+.dks{position:relative; flex:0 0 auto; min-width:0; display:flex; flex-direction:column; border-left:1px solid var(--line);
+  background:color-mix(in srgb, var(--dkc) var(--dkp), var(--panel))}
+.dks:first-child, .dks.first{border-left:0}
 .dks[hidden]{display:none!important}
-.dks h4{margin:0 0 4px; font-size:10.5px; font-weight:700; letter-spacing:.1em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-.dks h4 .dkn{font-weight:400; letter-spacing:.02em; color:var(--muted); margin-left:6px}
-.dkbody > #dkMeters{flex:0 0 auto; width:min(44%, calc(var(--nm, 18) * 16px + 34px)); min-width:0}
-.dkm{flex:1; min-height:0; display:flex; gap:2px; align-items:stretch}
-.dkm button{flex:1 1 0; min-width:0; max-width:22px; padding:0; border:1px solid var(--line); background:var(--panel2); display:flex; flex-direction:column; justify-content:flex-end; position:relative; min-height:0}
-.dkm button i{display:block; width:100%; background:var(--tk, var(--meter-ok)); height:0; transition:height .03s linear}
-.dkm button.gm{--tk:var(--tk-mono)} .dkm button.gp{--tk:var(--tk-poly)}
-.dkm button span{position:absolute; left:0; right:0; bottom:0; padding:2px 0 1px; font:600 8.5px/1 var(--mono); letter-spacing:-.04em; text-align:center; color:var(--ink); background:var(--panel); border-top:1px solid var(--line); pointer-events:none}
-.dkm button i{margin-bottom:13px}
-.dkm button.mu{background:repeating-linear-gradient(135deg, var(--panel2) 0 3px, var(--track) 3px 6px)} .dkm button.mu span{color:var(--muted); text-decoration:line-through}
-.dkm button.so{outline:2px solid var(--meter-hot); outline-offset:-2px}
-.dkm .gap{flex:0 0 6px}
-.dkm button.mst{max-width:18px; background:var(--panel2)} .dkm button.mst i{background:var(--meter-ok)} .dkm button.mst.hot i{background:var(--meter-hot)} .dkm button.mst.clip i{background:var(--meter-clip)}
-#dkScopeC{flex:1; min-height:0; width:100%; display:block; border:1px solid var(--line); background:var(--screen, #000)}
+#dkScope{--dkc:#dbe6f8; flex:0 1 var(--dkws, 300px); min-width:150px}
+#dkInst{--dkc:#fbe2d2; flex:1 1 0; min-width:210px}
+#dkFx{--dkc:#f8dce8; flex:0 1 var(--dkwf, 320px); min-width:200px}
+#dkStrip{--dkc:#d8f0e2; flex:0 0 176px}
+/* the thin grey header: one cell per section, its button over it, a rule between sections */
+.dkh{flex:none; display:flex; align-items:center; gap:5px; height:22px; padding:0 6px; background:var(--side); border-bottom:1px solid var(--line); min-width:0}
+.dkh .dkt{min-height:0; height:17px; padding:0 7px; font-size:10.5px; font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--ink); color:var(--inv);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; flex:0 1 auto; min-width:0}
+.dkh .dki{font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto}
+.dkh .dksp{flex:1 1 0}
+.dkh .dkoff{min-height:0; height:17px; padding:0 6px; font-size:10px; letter-spacing:.04em; border:1px dashed var(--line); background:transparent; color:var(--muted); flex:none}
+.dkh .dkx{min-height:0; height:17px; width:22px; padding:0; font-size:11px; border:1px solid var(--line); background:var(--panel); flex:none}
+.dkh .dksolo{min-height:0; height:17px; padding:0 6px; font-size:10px; font-weight:700; letter-spacing:.04em; border:0; background:var(--meter-hot); color:#1b2130; flex:none}
+.dkb{flex:1; min-height:0; display:flex; flex-direction:column; padding:6px 10px 8px}
+/* drag handles for the scope's and FX section's widths */
+.dkw{position:absolute; top:0; bottom:0; width:10px; cursor:ew-resize; touch-action:none; z-index:3}
+#dkScope .dkw{right:-5px} #dkFx .dkw{left:-5px}
+.dkw:hover, .dkw.dn{background:linear-gradient(to right, transparent 4px, var(--muted) 4px 6px, transparent 6px); opacity:.6}
+/* scope: Quite Noise's graph — white box, faint frequency lines with labels, a dashed reference, the spectrum filled */
+#dkScopeC{flex:1; min-height:0; width:100%; display:block; border:1px solid var(--line); background:var(--panel)}
+/* instrument and FX controls */
 .dkrows{flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; display:grid; align-content:start; gap:0}
 .dkrows .row{grid-template-columns:54px minmax(50px,1fr) 52px; min-height:21px; font-size:11.5px}
 .dkrows .row input[type=range]{height:18px; margin:0}
@@ -733,9 +743,28 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .dkslots{display:flex; gap:4px; margin-bottom:4px; flex-wrap:wrap}
 .dkslots button{min-height:22px; padding:0 7px; font-size:10.5px; border:1px solid var(--line); background:var(--panel)}
 .dkslots button.on{background:var(--ink); color:var(--inv)} .dkslots button.off{opacity:.5}
+/* channel strip: meter, fader, pan, mute and solo for the current track */
+.dkstrip{display:grid; grid-template-columns:16px minmax(0,1fr) 38px; grid-template-rows:minmax(0,1fr) auto auto; gap:4px 8px; padding:6px 10px 8px}
+.stm{grid-row:1 / 3; position:relative; border:1px solid var(--line); background:var(--panel2); overflow:hidden}
+.stm i{position:absolute; left:0; right:0; bottom:0; height:0; background:var(--tk, var(--meter-ok))}
+.stm.hot i{background:var(--meter-hot)} .stm.clip i{background:var(--meter-clip)}
+.dkstrip.gm{--tk:var(--tk-mono)} .dkstrip.gp{--tk:var(--tk-poly)}
+.stfad{grid-row:1; grid-column:2; justify-self:center; position:relative; width:30px; min-height:0; cursor:ns-resize; touch-action:none; outline-offset:2px}
+.stfad::before{content:''; position:absolute; left:50%; top:6px; bottom:6px; width:4px; margin-left:-2px; background:var(--track); border:1px solid var(--line)}
+.stfill{position:absolute; left:50%; bottom:6px; width:4px; margin-left:-2px; background:var(--ink)}
+.stcap{position:absolute; left:2px; right:2px; height:12px; margin-bottom:-6px; background:var(--panel); border:1.5px solid var(--ink); box-shadow:inset 0 -2px 0 var(--ink)}
+.st0{position:absolute; left:0; right:0; height:0; border-top:1px dashed var(--muted); opacity:.7}
+.stvv{grid-row:2; grid-column:2; text-align:center; font-size:10.5px; font-variant-numeric:tabular-nums; white-space:nowrap}
+.stms{grid-row:1 / 3; grid-column:3; display:flex; flex-direction:column; gap:5px}
+.stms button{min-height:0; height:28px; padding:0; font-weight:700; font-size:12px; border:1px solid var(--line); background:var(--panel)}
+.stms button.mu.on{background:var(--meter-clip); color:#fff; border-color:var(--meter-clip)}
+.stms button.so.on{background:var(--meter-hot); color:#1b2130; border-color:var(--meter-hot)}
+.stpan{grid-row:3; grid-column:1 / 4; display:grid; grid-template-columns:24px minmax(0,1fr) 34px; align-items:center; gap:6px; font-size:10.5px}
+.stpan input{margin:0; height:18px; accent-color:var(--ink)} .stpan output{text-align:right; font-variant-numeric:tabular-nums}
+.stpan span{color:var(--muted); letter-spacing:.06em}
 /* Phones: one section at a time, swipe sideways between them, so the tracker keeps its room. */
-@media (max-width:700px){ .dkbody{height:min(170px, 30vh); overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:none}
-  .dkbody > .dks, .dkbody > #dkMeters{flex:0 0 100%; width:auto; scroll-snap-align:start} .dkhead .dkchips button{padding:0 7px} }
+@media (max-width:700px){ .dkbody{overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:none}
+  .dkbody > .dks{flex:0 0 100%!important; width:auto!important; scroll-snap-align:start} .dkw{display:none} }
 
 /* ---------- Terminal skins: Matrix (neon green on black), Black & white (Helvetica) and Mustard (on lavender) ----------
    One set of rules drawn from a few colours per skin: --mx (text, outlines, fills), --mx2 (secondary text),
@@ -798,7 +827,9 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
   --ar-empty:color-mix(in srgb, var(--mx) 8%, transparent); --ar-line:color-mix(in srgb, var(--mx) 25%, transparent); --ar-pl:var(--mxsoft); --ar-pl-ink:var(--mxon);
   --ar-cur:var(--mx); --ar-mu:var(--mxred); --tk-mono:var(--mx); --tk-poly:var(--mxpoly)}
 :root[data-skinbase="term"] :is(.tagp b,.tgbox b){color:var(--mxon); text-shadow:none}
-:root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly)}
+:root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg))}
+:root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
+:root[data-skinbase="term"] .dkh .dksolo{background:var(--mxsoft); color:var(--mxon)} :root[data-skinbase="term"] .stms button.so.on{background:var(--mxsoft); color:var(--mxon)}
 :root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
 :root[data-skinbase="term"] .tagrid b.f[style]{background:color-mix(in srgb, var(--mx) var(--ibp, 100%), var(--mxsoft)); color:var(--mxon)} :root[data-skinbase="term"] .tagrid b.f{text-shadow:none; box-shadow:0 0 8px var(--mxglowc)}
 :root[data-skinbase="term"] .tscr .nbl, :root[data-skinbase="term"] .tscr .nbr{color:var(--mx2)}
@@ -1085,13 +1116,24 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
   <div class="tcmd" id="tCmd" hidden></div>
   <div class="tctl">
     <div class="tdeck" id="tDeck" hidden>
-      <div class="dkhead"><b>PANEL</b><div class="dkchips" id="dkChips" role="group" aria-label="Panel sections"></div>
-        <button type="button" class="dkx" id="dkHide" title="Hide the panel (⚙ Settings → BOTTOM PANEL brings it back)" aria-label="Hide the panel">✕</button></div>
+      <div class="dkgrip" id="dkGrip" role="separator" aria-orientation="horizontal" aria-label="Drag to resize the panel" title="Drag to resize · double-click: default height"></div>
+      <span class="dkoffs" id="dkOffs"></span>
+      <span class="dktail" id="dkTail"><button type="button" class="dksolo" id="dkSolo" hidden title="A track is soloed, so the others are silent. Tap to clear every solo">SOLO · CLEAR</button><button type="button" class="dkx" id="dkHide" title="Hide the panel (⚙ Settings → BOTTOM PANEL brings it back)" aria-label="Hide the panel">✕</button></span>
       <div class="dkbody" id="dkBody">
-        <section class="dks" id="dkMeters" data-s="meters"><h4>METERS <span class="dkn">tap mutes · hold solos</span></h4><div class="dkm" id="dkM"></div></section>
-        <section class="dks" id="dkScope" data-s="scope"><h4>SCOPE <span class="dkn" id="dkScopeN">master out</span></h4><canvas id="dkScopeC" aria-label="Master output scope"></canvas></section>
-        <section class="dks" id="dkInst" data-s="inst"><h4 id="dkInstT">INST</h4><div class="dkrows" id="dkInstRows"></div></section>
-        <section class="dks" id="dkFx" data-s="fx"><h4 id="dkFxT">FX</h4><div class="dkslots" id="dkFxSlots"></div><div class="dkrows" id="dkFxRows"></div></section>
+        <section class="dks" id="dkScope" data-s="scope"><div class="dkh"><button type="button" class="dkt" data-k="scope">SCOPE</button><span class="dki">master · 20 Hz – 20 kHz</span></div>
+          <div class="dkb"><canvas id="dkScopeC" aria-label="Spectrum of the master output"></canvas></div><div class="dkw" data-w="ws" title="Drag to resize"></div></section>
+        <section class="dks" id="dkInst" data-s="inst"><div class="dkh"><button type="button" class="dkt" data-k="inst" id="dkInstT">INST</button></div>
+          <div class="dkb"><div class="dkrows" id="dkInstRows"></div></div></section>
+        <section class="dks" id="dkFx" data-s="fx"><div class="dkw" data-w="wf" title="Drag to resize"></div><div class="dkh"><button type="button" class="dkt" data-k="fx" id="dkFxT">FX</button></div>
+          <div class="dkb"><div class="dkslots" id="dkFxSlots"></div><div class="dkrows" id="dkFxRows"></div></div></section>
+        <section class="dks" id="dkStrip" data-s="strip"><div class="dkh"><button type="button" class="dkt" data-k="strip" id="dkStripT">TRACK</button></div>
+          <div class="dkb dkstrip" id="dkStripB">
+            <div class="stm" id="stM"><i></i></div>
+            <div class="stfad" id="stVol" role="slider" tabindex="0" aria-label="Track volume" aria-valuemin="0" aria-valuemax="255" title="Volume: drag · double-click resets"><i class="stfill"></i><b class="stcap"></b><u class="st0" title="0 dB"></u></div>
+            <output class="stvv" id="stVolV"></output>
+            <div class="stms"><button type="button" class="mu" id="stMute" aria-pressed="false" title="Mute this track">M</button><button type="button" class="so" id="stSolo" aria-pressed="false" title="Solo this track (the others go silent)">S</button></div>
+            <div class="stpan"><span>PAN</span><input type="range" id="stPan" min="0" max="255" step="1" aria-label="Track pan" title="Pan · double-click centres"><output id="stPanV"></output></div>
+          </div></section>
       </div>
     </div>
     <div class="tkp" id="tKp" hidden></div>
@@ -1125,7 +1167,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p><b>Arrange</b> (wide screens): the blue overview at the right shows the whole song, lined up with the Song screen (scroll either one and the other follows). <b>A tap on a block goes to it</b> (a second tap opens its phrase). <b>Holding a block mutes or unmutes just that one</b> — the phrase stays in place, silent, so you can drop parts in and out while arranging. Tap a row number to play from there; in KEYS mode M mutes the block under the Song cursor. Whole tracks are muted in the Mixer, never here, so a slip can’t silence a track.</p>
 <p>The screens are laid out as a map: Song ▶ Sect ▶ Phrase ▶ Inst left to right, Project above, Mixer below, FX to the right of the Mixer. You move between them with the screen keys below, the tabs, or the map in the side panel.</p>
 <h3>Settings</h3>
-<p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: track meters (tap mutes, hold solos), a scope of the master, and quick controls for the current instrument’s sound and the current track’s effects. Its buttons show or hide each part; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
+<p><b>⚙ Settings</b> at the top: on the synth page it holds Kit, MIDI, Export, Skin and Audio (output device, level, latency, rate); in the tracker it opens every Project setting as a touch menu, plus Audio. There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound and the current track’s effects, and a channel strip for the current track (meter, fader, pan, M and S). Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots. <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song. <b>A voice per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chopping breaks</h3>
@@ -5354,7 +5396,7 @@ function projRows(){
     {l:'KEYS KEYPAD', ck:'Show on-screen keypad', get:() => kpOn ? 1 : 0, set:v => setKp(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'KEYS mode: show the on-screen keypad at the bottom for tapping in notes. Off hides it — the computer keyboard still types notes and hex, and the octave (OCT, top bar) stays. PAD mode is unchanged'},
     {l:'BOTTOM PANEL', ck:'Show the bottom panel', get:() => deck.on ? 1 : 0, set:v => setDeck('on', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
-      info:() => 'KEYS mode with the keypad off: a panel at the bottom with track meters (tap mutes, hold solos), a scope of the master, and quick controls for the current instrument and the current track’s effects. Its buttons show or hide each part'},
+      info:() => 'KEYS mode with the keypad off: a panel at the bottom with a spectrum of the master, quick controls for the current instrument and the current track’s effects, and a channel strip for the current track. Its buttons hide each part'},
     {l:'SCREEN', sec:'Screen', gap:true, opts:true, get:() => SCREENS.findIndex(x => x[0] === tScreen), set:v => setScreen(SCREENS[v][0]), min:0, max:SCREENS.length - 1, fmt:v => SCREENS[v][1], info:() => 'Colour of the screen: BY SCREEN gives Song, Sect, Phrase and the rest their own pastel (the same as their tabs), or pick one pastel, or black'},
     {l:'SKIN', opts:true, get:() => SKINS.findIndex(k => k.id === skin), set:v => applySkin(SKINS[v].id), min:0, max:SKINS.length - 1, fmt:v => SKINS[v].name.toUpperCase(), info:() => 'The look of the whole app: the ...Seeds skins'},
     {l:'SECT', ck:'Hide sect page', inv:true, get:() => sectsOn ? 1 : 0, set:v => setSects(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
@@ -6409,75 +6451,109 @@ function paintMeters(){
 }
 /* ---------- bottom panel (KEYS mode with the keypad off) ---------- */
 const DKK = 'thunderplus-deck-v1';
-const DK_SECS = [['meters', 'METERS'], ['scope', 'SCOPE'], ['inst', 'INST'], ['fx', 'FX']];
-let deck = (() => { const d = {on:true, meters:true, scope:true, inst:true, fx:true};
-  try { const o = JSON.parse(localStorage.getItem(DKK) || 'null'); if (o && typeof o === 'object') for (const k in d) if (typeof o[k] === 'boolean') d[k] = o[k]; } catch(e){}
+const DK_SECS = [['scope', 'SCOPE'], ['inst', 'INST'], ['fx', 'FX'], ['strip', 'TRACK']];
+let deck = (() => { const d = {on:true, scope:true, inst:true, fx:true, strip:true, h:168, ws:300, wf:320};
+  try { const o = JSON.parse(localStorage.getItem(DKK) || 'null');
+    if (o && typeof o === 'object'){ for (const k in d) if (typeof o[k] === typeof d[k]) d[k] = o[k]; if (o.meters === false && o.strip === undefined) d.strip = false; } } catch(e){}
   return d; })();
 const deckSave = () => { try { localStorage.setItem(DKK, JSON.stringify(deck)); } catch(e){} };
 const deckShown = () => !$('tDeck').hidden;
+const dkSec = k => $('dk' + k[0].toUpperCase() + k.slice(1));
+// The track the panel follows: the Mixer's or FX screen's track there, otherwise the current track.
+const dkTrack = () => Math.min(tv === 'mixer' ? cs.mixer.x : tv === 'fx' && cFxT < NT ? cFxT : cTrack, ntr() - 1);
 function setDeck(k, v){ deck[k] = !!v; deckSave(); deckLayout(); fit(); draw(); }
-for (const [k, l] of DK_SECS){ const b = el('button', null, l); b.type = 'button'; b.dataset.k = k; b.setAttribute('aria-pressed', 'false');
-  b.title = 'Show or hide ' + l.toLowerCase(); b.addEventListener('click', () => setDeck(k, !deck[k])); $('dkChips').append(b); }
+document.querySelectorAll('#tDeck .dkt').forEach(b => { b.title = 'Hide this section (it waits as a dashed button in the header)'; b.addEventListener('click', () => setDeck(b.dataset.k, false)); });
+for (const [k, l] of DK_SECS){ const b = el('button', 'dkoff', '+ ' + l); b.type = 'button'; b.dataset.k = k; b.title = 'Show ' + l.toLowerCase(); b.addEventListener('click', () => setDeck(k, true)); $('dkOffs').append(b); }
 $('dkHide').addEventListener('click', () => { setDeck('on', false); toast('Panel hidden. ⚙ Settings → BOTTOM PANEL brings it back.'); });
-// Shown in KEYS mode when the keypad is off and the panel is on; sections follow their chips.
+$('dkSolo').addEventListener('click', () => { S.mix.forEach(m => m.solo = false); mixChanged(); draw(); toast('Solo cleared: every track plays.'); });
+// Shown in KEYS mode when the keypad is off and the panel is on. The shown-sections' buttons sit in their own
+// headers; hidden sections wait as dashed "+" buttons in the first header, and ✕ (and SOLO) in the last.
 function deckLayout(){
   const show = inMode === 'keys' && !kpOn && deck.on && view === 'tracker';
   $('tDeck').hidden = !show; if (!show) return;
-  let any = false;
-  for (const [k] of DK_SECS){ const on = !!deck[k]; any = any || on;
-    $('dkChips').querySelector(`[data-k="${k}"]`).classList.toggle('on', on);
-    $('dkChips').querySelector(`[data-k="${k}"]`).setAttribute('aria-pressed', String(on));
-    $('dk' + k[0].toUpperCase() + k.slice(1)).hidden = !on; }
-  $('dkBody').hidden = !any;
-}
-// Meters: one per track in use, mono tracks pink and poly green as elsewhere, then the master L and R.
-let dkMeterSig = '', dkBars = [], dkMst = [];
-function deckMetersBuild(){
-  const n = ntr(), PF = polyFrom(), sig = n + ':' + PF; if (sig === dkMeterSig) return; dkMeterSig = sig;
-  const box = $('dkM'); box.replaceChildren(); dkBars = []; dkMst = [];
-  box.style.setProperty('--nm', n + 2);
-  for (let t = 0; t < n; t++){
-    if (t && t % 8 === 0) box.append(el('span', 'gap'));
-    const b = el('button', t < PF ? 'gm' : 'gp'); b.type = 'button'; b.setAttribute('aria-label', 'Track ' + (t + 1) + ': tap mutes, hold solos');
-    b.append(el('i'), el('span', null, String(t + 1)));
-    let hold = 0, held = false;
-    b.addEventListener('pointerdown', e => { held = false; clearTimeout(hold); hold = setTimeout(() => { held = true; S.mix[t].solo = !S.mix[t].solo; mixChanged(); draw(); }, 450); });
-    const cancel = () => clearTimeout(hold);
-    b.addEventListener('pointerleave', cancel); b.addEventListener('pointercancel', cancel);
-    b.addEventListener('pointerup', () => { cancel(); if (!held){ S.mix[t].mute = !S.mix[t].mute; mixChanged(); draw(); } });
-    box.append(b); dkBars.push(b);
+  $('tDeck').style.setProperty('--dkh', deck.h + 'px');
+  $('tDeck').style.setProperty('--dkws', deck.ws + 'px'); $('tDeck').style.setProperty('--dkwf', deck.wf + 'px');
+  const vis = DK_SECS.filter(([k]) => deck[k]).map(([k]) => k);
+  for (const [k] of DK_SECS){ const sct = dkSec(k); sct.hidden = !deck[k]; sct.classList.toggle('first', vis[0] === k);
+    $('dkOffs').querySelector(`[data-k="${k}"]`).hidden = !!deck[k]; }
+  $('dkBody').hidden = false;
+  if (!vis.length){   // everything hidden: one bare header row with the "+" buttons
+    let bare = $('dkBare'); if (!bare){ bare = el('div', 'dkh'); bare.id = 'dkBare'; $('tDeck').insertBefore(bare, $('dkBody')); }
+    bare.hidden = false; bare.replaceChildren(el('b', 'dki', 'PANEL'), $('dkOffs'), el('span', 'dksp'), $('dkTail')); $('dkBody').hidden = true; return;
   }
-  box.append(el('span', 'gap'));
-  for (const s of ['L', 'R']){ const b = el('button', 'mst'); b.type = 'button'; b.tabIndex = -1; b.setAttribute('aria-label', 'Master ' + s); b.append(el('i'), el('span', null, s)); box.append(b); dkMst.push(b); }
+  if ($('dkBare')) $('dkBare').hidden = true;
+  const h0 = dkSec(vis[0]).querySelector('.dkh'), h1 = dkSec(vis[vis.length - 1]).querySelector('.dkh');
+  const t0 = h0.querySelector('.dkt'); t0.after($('dkOffs'));
+  let sp = h1.querySelector('.dksp'); if (!sp){ sp = el('span', 'dksp'); } h1.append(sp, $('dkTail'));
+}
+// Channel strip: the current track's level, fader, pan, mute and solo.
+const stVol = $('stVol'), stPan = $('stPan');
+// The fader: drag up and down (0–255, 224 is the default), arrows step it, double-click resets.
+const stSet = v => { const t = dkTrack(); S.mix[t].vol = clamp(Math.round(v), 0, 255); mixChanged(); deckStrip(); };
+const stPos = v => { const h = stVol.clientHeight - 12; return 6 + v / 255 * h; };
+stVol.addEventListener('pointerdown', e => { e.preventDefault(); try { stVol.setPointerCapture(e.pointerId); } catch(_){} stVol.focus();
+  const r = stVol.getBoundingClientRect(), h = r.height - 12, y0 = e.clientY, v0 = S.mix[dkTrack()].vol;
+  // A grab on the cap moves it relative (no jump); a press elsewhere on the track jumps there first.
+  const capY = r.bottom - stPos(v0); let base = Math.abs(e.clientY - capY) < 12 ? v0 : clamp((r.bottom - 6 - e.clientY) / h * 255, 0, 255), from = y0;
+  if (base !== v0) stSet(base);
+  const mv = ev => { stSet(base + (from - ev.clientY) / h * 255 * (ev.shiftKey ? 0.25 : 1)); };
+  const up = () => { stVol.removeEventListener('pointermove', mv); stVol.removeEventListener('pointerup', up); stVol.removeEventListener('pointercancel', up); };
+  stVol.addEventListener('pointermove', mv); stVol.addEventListener('pointerup', up); stVol.addEventListener('pointercancel', up); });
+stVol.addEventListener('keydown', e => { const d = {ArrowUp:1, ArrowRight:1, ArrowDown:-1, ArrowLeft:-1, PageUp:16, PageDown:-16}[e.key]; if (!d) return; e.preventDefault(); e.stopPropagation(); stSet(S.mix[dkTrack()].vol + d * (e.shiftKey ? 16 : 4)); });
+stPan.addEventListener('input', () => { const t = dkTrack(); S.mix[t].pan = +stPan.value; mixChanged(); deckStrip(); });
+stVol.addEventListener('dblclick', () => { S.mix[dkTrack()].vol = 224; mixChanged(); deckStrip(); });
+stPan.addEventListener('dblclick', () => { S.mix[dkTrack()].pan = 128; mixChanged(); deckStrip(); });
+$('stMute').addEventListener('click', () => { const m = S.mix[dkTrack()]; m.mute = !m.mute; mixChanged(); draw(); });
+$('stSolo').addEventListener('click', () => { const m = S.mix[dkTrack()]; m.solo = !m.solo; mixChanged(); draw(); });
+function deckStrip(){
+  const anySolo = S.mix.some(m => m.solo); $('dkSolo').hidden = !anySolo || !deckShown();
+  if (!deckShown() || !deck.strip) return;
+  const t = dkTrack(), m = S.mix[t], poly = t >= polyFrom();
+  $('dkStripT').textContent = `TRACK ${d2(t + 1)} ${poly ? 'POLY' : 'MONO'}`;
+  $('dkStripB').classList.toggle('gm', !poly); $('dkStripB').classList.toggle('gp', poly);
+  const fy = stPos(m.vol); stVol.querySelector('.stcap').style.bottom = fy + 'px'; stVol.querySelector('.stfill').style.height = Math.max(0, fy - 6) + 'px';
+  stVol.querySelector('.st0').style.bottom = stPos(224) + 'px'; stVol.setAttribute('aria-valuenow', m.vol); stVol.setAttribute('aria-valuetext', dB(curve(m.vol)));
+  if (document.activeElement !== stPan) stPan.value = m.pan;
+  $('stVolV').textContent = dB(curve(m.vol));
+  $('stPanV').textContent = m.pan === 128 ? 'C' : m.pan < 128 ? 'L' + Math.round((128 - m.pan) / 128 * 100) : 'R' + Math.round((m.pan - 128) / 127 * 100);
+  const mu = $('stMute'), so = $('stSolo'); mu.classList.toggle('on', !!m.mute); so.classList.toggle('on', !!m.solo);
+  mu.setAttribute('aria-pressed', String(!!m.mute)); so.setAttribute('aria-pressed', String(!!m.solo));
+  $('stM').title = anySolo && !m.solo ? 'Silent: another track is soloed' : '';
 }
 function deckMetersPaint(){
-  if (!deckShown() || !deck.meters) return;
-  const bs = rt ? rt.pl.buses : null, anySolo = S.mix.some(m => m.solo);
-  dkBars.forEach((b, t) => { b.firstChild.style.height = (bs ? lvl(bs[t].lv) * 100 : 0).toFixed(1) + '%';
-    b.classList.toggle('mu', !!S.mix[t].mute || (anySolo && !S.mix[t].solo)); b.classList.toggle('so', !!S.mix[t].solo); });
-  dkMst.forEach((b, s) => { const m = rt && rt.mlv ? rt.mlv[s] : 0, pk = rt && rt.mpk ? rt.mpk[s] : 0;
-    b.firstChild.style.height = (lvl(m) * 100).toFixed(1) + '%'; b.classList.toggle('clip', pk >= 0.999); b.classList.toggle('hot', pk >= 0.5 && pk < 0.999); });
+  if (!deckShown() || !deck.strip) return;
+  const bs = rt ? rt.pl.buses : null, t = dkTrack(), lv = bs && bs[t] ? bs[t].lv : 0, e = $('stM');
+  e.firstChild.style.height = (lvl(lv) * 100).toFixed(1) + '%'; e.classList.toggle('clip', lv >= 0.999); e.classList.toggle('hot', lv >= 0.5 && lv < 0.999);
 }
-// Scope: the master's left and right, drawn about 30 times a second while the panel shows it.
-const dkScopeBuf = new Float32Array(1024); let dkScopeT = 0, dkScopeIdle = false;
+// Scope: the master's spectrum, drawn as Quite Noise draws its Shape graph — 20 Hz to 20 kHz across, faint
+// lines at 100, 1k and 10k, a dashed reference at −48 dB, and the spectrum filled in the section's colour.
+let dkAn = null, dkSpec = null, dkScopeT = 0, dkScopeIdle = false;
 function deckScope(now){
-  if (!deckShown() || !deck.scope || now - dkScopeT < 33) return; dkScopeT = now;
+  if (!deckShown() || !deck.scope || now - dkScopeT < 50) return; dkScopeT = now;
   const c = $('dkScopeC'), r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (!r.width || !r.height) return;
-  const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr); if (c.width !== W || c.height !== H){ c.width = W; c.height = H; dkScopeIdle = false; }
-  const live = !!(rt && rt.man && (tp.on || now - audioWake < 1500)); if (!live && dkScopeIdle) return; dkScopeIdle = !live;
-  const g = c.getContext('2d'), cs2 = getComputedStyle($('tDeck'));
-  const bg = cs2.getPropertyValue('--screen').trim() || '#000', ink = cs2.getPropertyValue('--screen-ink').trim() || '#fff', dim = cs2.getPropertyValue('--screen-line').trim() || '#3a3a3a';
-  g.fillStyle = bg; g.fillRect(0, 0, W, H);
-  g.strokeStyle = dim; g.lineWidth = dpr; g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke();
-  if (!live) return;
-  // Line up on a rising zero crossing so a steady tone stands still.
-  const cols = [ink, cs2.getPropertyValue('--tk-poly').trim() || ink];
-  rt.man.forEach((a, s) => { a.getFloatTimeDomainData(dkScopeBuf);
-    let st = 0; for (let i = 1; i < 512; i++) if (dkScopeBuf[i - 1] < 0 && dkScopeBuf[i] >= 0){ st = i; break; }
-    const N = 512; g.strokeStyle = cols[s]; g.globalAlpha = s ? .7 : 1; g.lineWidth = 1.5 * dpr; g.beginPath();
-    for (let i = 0; i < N; i++){ const x = i / (N - 1) * W, y = H / 2 - clamp(dkScopeBuf[st + i] || 0, -1, 1) * (H / 2 - 2 * dpr); i ? g.lineTo(x, y) : g.moveTo(x, y); }
-    g.stroke(); });
-  g.globalAlpha = 1;
+  if (c.width !== Math.round(r.width * dpr) || c.height !== Math.round(r.height * dpr)){ c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr); dkScopeIdle = false; }
+  const live = !!(rt && ctx && (tp.on || now - audioWake < 1500)); if (!live && dkScopeIdle) return; dkScopeIdle = !live;
+  if (live && !dkAn){ try { dkAn = ctx.createAnalyser(); dkAn.fftSize = 4096; dkAn.smoothingTimeConstant = 0.8; master.connect(dkAn); dkSpec = new Float32Array(dkAn.frequencyBinCount); } catch(e){ dkAn = null; } }
+  const W = c.width, H = c.height, g = c.getContext('2d'), st = getComputedStyle($('tDeck'));
+  const line = st.getPropertyValue('--track').trim() || '#e6e6e6', muted = st.getPropertyValue('--muted').trim() || '#555', fill = st.getPropertyValue('--scfill').trim() || '#f4a9c4';
+  const pad = 4 * dpr, TOP = -12, BOT = -96, yOf = db => pad + (TOP - db) / (TOP - BOT) * (H - 2 * pad), xOf = f => Math.log(f / 20) / Math.log(1000) * W;
+  g.clearRect(0, 0, W, H);
+  if (live && dkAn){
+    dkAn.getFloatFrequencyData(dkSpec); const sr = ctx.sampleRate, N = dkSpec.length;
+    g.beginPath(); g.moveTo(0, H);
+    for (let x = 0; x <= W; x += 3 * dpr){
+      // Each step takes the loudest bin it covers, so the top end (many bins per pixel) doesn't flicker.
+      const f0 = 20 * Math.pow(1000, x / W), f1 = 20 * Math.pow(1000, Math.min(W, x + 3 * dpr) / W);
+      const b0 = Math.max(1, Math.floor(f0 / (sr / 2) * N)), b1 = Math.min(N - 1, Math.max(b0, Math.ceil(f1 / (sr / 2) * N)));
+      let db = -200; for (let b = b0; b <= b1; b++) if (dkSpec[b] > db) db = dkSpec[b];
+      g.lineTo(x, Math.min(H, yOf(Math.max(BOT - 6, Math.min(TOP, db)))));
+    }
+    g.lineTo(W, H); g.closePath(); g.fillStyle = fill; g.fill();
+  }
+  g.lineWidth = dpr; g.strokeStyle = line; g.fillStyle = muted; g.font = `${10 * dpr}px ${st.getPropertyValue('--font') || 'sans-serif'}`;
+  [100, 1000, 10000].forEach(f => { const x = xOf(f); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); g.fillText(f >= 1000 ? f / 1000 + 'k' : f, x + 3 * dpr, H - 5 * dpr); });
+  g.setLineDash([3 * dpr, 3 * dpr]); g.beginPath(); g.moveTo(0, yOf(-48)); g.lineTo(W, yOf(-48)); g.stroke(); g.setLineDash([]);
+  g.fillText('−48 dB', 3 * dpr, yOf(-48) - 4 * dpr);
 }
 // Quick controls: the current instrument's pad (its sound, as on the synth screen) and the current track's effects.
 let dkInstSig = '', dkInstRows = [], dkFxSig = '', dkFxRows = [], dkFxSel = 0;
@@ -6496,7 +6572,7 @@ function deckInst(){
 }
 function deckFx(){
   if (!deckShown() || !deck.fx) return;
-  const t = Math.min(cTrack, ntr() - 1), A = S.tfx[t] || [];
+  const t = dkTrack(), A = S.tfx[t] || [];
   const sig = t + ':' + A.map(f => f ? f.type + (f.on ? 1 : 0) : '-').join(',') + ':' + dkFxSel;
   $('dkFxT').textContent = `FX · TRACK ${d2(t + 1)}`;
   if (sig !== dkFxSig){
@@ -6506,17 +6582,33 @@ function deckFx(){
       b.type = 'button'; b.title = TFX[f.type].long + (f.on ? '' : ' (off)'); b.addEventListener('click', () => { dkFxSel = k; deckFx(); }); sl.append(b); });
     const f = A[dkFxSel];
     if (!f){ box.append(el('p', 'note', 'No effects on this track. Add them on the FX screen (Mixer → FX row).')); return; }
-    const getF = () => (S.tfx[Math.min(cTrack, ntr() - 1)] || [])[dkFxSel], on = () => fxChanged(Math.min(cTrack, ntr() - 1));
+    const getF = () => (S.tfx[dkTrack()] || [])[dkFxSel], on = () => fxChanged(dkTrack());
     for (const q of TFX[f.type].ps){
       const def = {l:q.l.charAt(0) + q.l.slice(1).toLowerCase(), min:q.min, max:q.max, c:'int', d:q.d, f:q.fmt};
       const r = makeRow(def, q.k, getF, {idp:'dkf' + dkFxSel, on}); box.append(r.r); dkFxRows.push(r); }
   }
   dkFxRows.forEach(r => { if (r.getObj()) r.refresh(); });
 }
+// Resizing: drag the top edge for the panel's height, and the scope's right edge or the FX section's left edge for
+// their widths. Remembered on this device.
+function dkDrag(handle, onMove, onEnd){
+  handle.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); try { handle.setPointerCapture(e.pointerId); } catch(_){}
+    const st = {x:e.clientX, y:e.clientY, h:deck.h, ws:deck.ws, wf:deck.wf, id:e.pointerId}; handle.classList.add('dn');
+    const mv = ev => { if (ev.pointerId !== st.id) return; onMove(ev.clientX - st.x, ev.clientY - st.y, st); };
+    const up = ev => { if (ev.pointerId !== st.id) return; handle.classList.remove('dn'); handle.removeEventListener('pointermove', mv); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up); deckSave(); onEnd && onEnd(); };
+    handle.addEventListener('pointermove', mv); handle.addEventListener('pointerup', up); handle.addEventListener('pointercancel', up); });
+}
+let dkFitRaf = 0;
+const dkRefit = () => { if (!dkFitRaf) dkFitRaf = requestAnimationFrame(() => { dkFitRaf = 0; fit(); draw(); }); };
+dkDrag($('dkGrip'), (dx, dy, st) => { deck.h = clamp(Math.round(st.h - dy), 110, Math.max(140, Math.round(innerHeight * 0.6))); $('tDeck').style.setProperty('--dkh', deck.h + 'px'); dkRefit(); }, dkRefit);
+$('dkGrip').addEventListener('dblclick', () => { deck.h = 168; deckSave(); deckLayout(); dkRefit(); });
+const dkMaxW = () => Math.max(220, $('dkBody').clientWidth - 420);
+dkDrag($('dkScope').querySelector('.dkw'), (dx, dy, st) => { deck.ws = clamp(Math.round(st.ws + dx), 150, dkMaxW()); $('tDeck').style.setProperty('--dkws', deck.ws + 'px'); });
+dkDrag($('dkFx').querySelector('.dkw'), (dx, dy, st) => { deck.wf = clamp(Math.round(st.wf - dx), 200, dkMaxW()); $('tDeck').style.setProperty('--dkwf', deck.wf + 'px'); });
 // A skin's font can arrive after the screen was measured (Share Tech Mono in the terminal skins): fit and redraw
 // once it lands, so the MONO/POLY boxes and the type size match the real letters.
 if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { try { if (view === 'tracker'){ arrSig = ''; fit(); draw(); } } catch(e){} });
-function deckDraw(){ deckLayout(); if (!deckShown()) return; if (deck.meters){ deckMetersBuild(); deckMetersPaint(); } deckInst(); deckFx(); }
+function deckDraw(){ deckLayout(); deckStrip(); if (!deckShown()) return; deckMetersPaint(); deckInst(); deckFx(); }
 /* ---------- ARRANGE: the song overview beside the screen ---------- */
 // Every filled row of the song as blocks, one column per track. A block shows its phrase (or its sect with
 // SECT shown); muted blocks are hatched and keep their number, so the structure stays readable.
