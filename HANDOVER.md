@@ -122,6 +122,25 @@ With sects hidden, typing 14 on the Song screen made sect 14. Phrase 14 already 
 - An empty sect uses its own-numbered phrase whenever no other sect plays it (`phraseInSect`).
 - The owner's existing song still has one block pointing at phrase 03 (they were told to retype 14).
 
+### Samples up to 30 s, stored in IndexedDB (and a start-up kit bug)
+
+- **Limits raised to 30 s:** Load sample (`fileIn`), the sample layer's Hold (30000 ms), and the voice's Max len
+  (0.1–30 s, now a squared slider). The voice-amp render cap is 32 s.
+- **Why the limit existed:** the kit autosaved to localStorage (~5 MB) with samples inside as base64. A long
+  sample filled it, and `save()` then fell back to saving without samples, so they vanished on reload.
+- **Now** (`/* samples in IndexedDB */` block, near `save()`):
+  - Each sample has an `id` and its 16-bit PCM is stored once in IndexedDB (`thunderplus-samples`; Thunder:
+    `thunder-samples`).
+  - The localStorage kit holds `{ref:id}` (`kitToJSON('ref')`).
+  - On start-up and `setKit`, `resolveSamples()` fills them in, re-renders those pads and drops unused ones
+    (`smpTidy`).
+  - Old kits with base64 inside are moved over on start-up.
+  - Kit and project FILES still embed the audio (`kitToJSON(false)`).
+  - Those variables are `var`, because `save()` can run before that part of the script.
+- **Bug fixed (from `5c9aa79`, earlier on 12 Oct):** `kitFromJSON` called `nslots()` (a `const` defined later) while
+  the saved kit was read at start-up. It threw, so every reload started from the factory kit. It now uses
+  `slotsNow()`. Verified: a renamed kit and a 25 s sample both survive a reload.
+
 ## Running it locally
 
 No build step; serve the repo root over HTTP (the editors load their worklet by `fetch`, which
@@ -175,8 +194,8 @@ caches and rebuild Thunder-.
    - The trance gate landing on the downbeat.
    - STRETCH and LOOP on a real break.
    - Touch on the new INST rows.
-2. **Samples are capped at 8 s** on load (`fileIn` handler), so a break is at most two bars at 60 BPM.
-   Raise it if long loops are wanted; it costs memory per pad.
+2. **Long pads re-render on the UI thread:** a 30 s pad takes a moment after each edit on a phone. Moving
+   `renderVoice` to a Worker (item 6) would fix it.
 3. **…waves editor** doesn't list the new effects (the shared wasm already has them). Adding them means
    mirroring the …chains editor entries in `waves/index.html` and `waves/waves-worklet.js`, which come from
    the separate `matthettich/waves` repo.

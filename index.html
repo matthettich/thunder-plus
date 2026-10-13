@@ -1767,7 +1767,7 @@ function renderVoice(V, sr, stages, hold){
   // exactly as its layers alone would; turning either on only adds shaping across all the layers.
   const gFilt = V.gLpCut < 19900 || V.gLpEnv !== 0, gAmpOn = !!V.gAmpOn, gRel = Math.max(V.gRel || 1, 1) / 1000;
   let N = Math.max(1, Math.ceil(voiceLen(V) * sr));
-  if (gAmpOn) N = Math.min(Math.ceil(Math.max(voiceLen(V), V.gate / 1000 + gRel) * sr), sr * 12);   // room for the voice's release
+  if (gAmpOn) N = Math.min(Math.ceil(Math.max(voiceLen(V), V.gate / 1000 + gRel) * sr), sr * 32);   // room for the voice's release
   const out = new Float32Array(N);
   for (const L of V.layers) if (L.on && L.level > 0) renderLayer(L, V, sr, out, N);
   if (gFilt) voiceFilter(V, sr, out, N);
@@ -1927,7 +1927,7 @@ const P = {
   pAmt:{l:'Env amt', min:-48, max:48, c:'half', d:0, f:st},
   pDec:{l:'Env time', min:1, max:2000, c:'log', d:60, f:ms},
   atk:{l:'Attack', min:0.1, max:2000, c:'log', d:0.5, f:ms},
-  hold:{l:'Hold', min:0, max:8000, c:'sq', d:0, f:ms},
+  hold:{l:'Hold', min:0, max:30000, c:'sq', d:0, f:ms},
   dec:{l:'Decay', min:1, max:6000, c:'log', d:300, f:ms},
   sus:{l:'Sustain', min:0, max:1, c:'lin', d:0.6, f:pct},
   rel:{l:'Release', min:1, max:6000, c:'log', d:150, f:ms},
@@ -1970,7 +1970,7 @@ const VP = {
   tune:{l:'Tune', min:-24, max:24, c:'int', d:0, f:st},
   drive:{l:'Drive', min:0, max:1, c:'lin', d:0, f:pct},
   gate:{l:'Gate', min:5, max:4000, c:'log', d:200, f:ms},
-  len:{l:'Max len', min:0.1, max:8, c:'lin', d:4, f:v => v.toFixed(2) + ' s'},
+  len:{l:'Max len', min:0.1, max:30, c:'sq', d:4, f:v => v.toFixed(2) + ' s'},
 };
 // Voice-wide rows (the amp rows reuse P.atk…P.rel). These edit the whole voice, not one layer.
 // Each envelope has an Amount slider: how far its envelope is applied to pitch, filter or amp.
@@ -2014,6 +2014,7 @@ function fromPos(d, p){
 
 /* ---------- state ---------- */
 let kit = loadSaved() || factoryKit();
+setTimeout(() => resolveSamples(), 0);   // samples saved in IndexedDB arrive just after start-up
 WV.doc = kit.waves || null;
 let cur = 0;
 let view = 'synth';   // 'synth', 'tracker', 'waves' or 'chains'
@@ -2703,29 +2704,38 @@ function randVoice(v){
 
 /* ---------- serialisation ---------- */
 function smpToJSON(S){
+  if (!S.data) return {sr:S.sr, name:S.name || 'Sample', ref:S.id};   // still loading from IndexedDB: keep the reference
   const d = S.data, i16 = new Int16Array(d.length);
   for (let i = 0; i < d.length; i++) i16[i] = Math.max(-32768, Math.min(32767, Math.round(d[i] * 32767)));
   const u8 = new Uint8Array(i16.buffer); let s = '';
   for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
-  return {sr:S.sr, name:S.name || 'Sample', b64:btoa(s)};
+  return {sr:S.sr, name:S.name || 'Sample', id:S.id, b64:btoa(s)};
 }
+// Samples get an id when they arrive; the kit kept in localStorage refers to them by id, and the sound itself
+// lives in IndexedDB (see "samples in IndexedDB"). A {ref} sample starts with no data and is filled in when it loads.
+function smpId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 function smpFromJSON(j){
+  if (j && j.ref && !j.b64) return {sr:j.sr || 48000, name:j.name, id:j.ref, data:null};
   if (!j || !j.b64) return null;
   const s = atob(j.b64), u8 = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
   const i16 = new Int16Array(u8.buffer), d = new Float32Array(i16.length); for (let i = 0; i < i16.length; i++) d[i] = i16[i] / 32767;
-  return {sr:j.sr || 48000, name:j.name, data:d};
+  return {sr:j.sr || 48000, name:j.name, id:j.id || smpId(), data:d};
 }
 // Plain functions (not consts), so the saved kit can be read at start-up, before this part of the script has run.
-function layerToJSON(L, noSmp){ return Object.assign({}, L, {sample: L.sample && !noSmp ? smpToJSON(L.sample) : null}); }
+// noSmp: false = the sound inside (files), true = no samples, 'ref' = samples by id (the copy kept in localStorage).
+function layerToJSON(L, noSmp){ return Object.assign({}, L, {sample: !L.sample || noSmp === true ? null : noSmp === 'ref' ? {sr:L.sample.sr, name:L.sample.name || 'Sample', ref:L.sample.id || (L.sample.id = smpId())} : smpToJSON(L.sample)}); }
 function layerFromJSON(j){ const L = freshLayer(j); L.sample = smpFromJSON(j.sample); if (!TYPE[L.type]) L.type = 'sine'; return L; }
 function voiceToJSON(v, noSmp){ return Object.assign({}, v, {layers: v.layers.map(L => layerToJSON(L, noSmp))}); }
 function voiceFromJSON(j){ const v = mkVoice(j.name || 'Pad', []); Object.assign(v, j); v.layers = (j.layers || []).slice(0, 8).map(layerFromJSON); while (v.layers.length < 8) v.layers.push(freshLayer()); v.sel = Math.min(Math.max(v.sel | 0, 0), 7); return v; }
 function kitToJSON(noSmp){ return {app:'thunder', v:1, name:kit.name, voices:kit.voices.map(v => voiceToJSON(v, noSmp)), waves:kit.waves || undefined}; }
+// The saved kit is read at start-up, before nslots (a const further down) exists: calling it there threw, so the
+// saved kit was dropped for the factory one on every reload. Until it exists, count the kit's own voices.
+function slotsNow(){ try { return nslots(); } catch(e){ return NSLOT; } }
 function kitFromJSON(j){
   if (!j || !Array.isArray(j.voices) || j.voices.length < 1) throw new Error('This file isn’t a ...Thunder kit.');
-  const vs = j.voices.slice(0, Math.max(nslots(), 40)).map(voiceFromJSON); while (vs.length < NPAD) vs.push(mkVoice('Pad ' + (vs.length + 1), []));
+  const vs = j.voices.slice(0, Math.max(slotsNow(), 40)).map(voiceFromJSON); while (vs.length < NPAD) vs.push(mkVoice('Pad ' + (vs.length + 1), []));
   // Kits from before the synth slots get the factory synths in slots 9–16.
-  if (vs.length < Math.min(nslots(), NSLOT)){ const fs = factorySynths(); while (vs.length < Math.min(nslots(), NSLOT)) vs.push(fs[vs.length - NPAD]); }
+  if (vs.length < Math.min(slotsNow(), NSLOT)){ const fs = factorySynths(); while (vs.length < Math.min(slotsNow(), NSLOT)) vs.push(fs[vs.length - NPAD]); }
   return {name:j.name || 'Kit', voices:vs, waves:(j.waves && Array.isArray(j.waves.modules)) ? j.waves : undefined};
 }
 // Grow the kit to the slot count, keeping one-to-one parity between synth voices and tracks: creating a
@@ -2749,12 +2759,65 @@ function setVtrk(on){
   for (let i = 0; i < Math.max(nslots(), 40); i++){ dirty[i] = true; cache[i] = null; }
   growKit();
 }
+/* ---------- samples in IndexedDB ----------
+   localStorage only holds ~5 MB, which a long sample fills on its own (and then the kit was saved without its
+   samples). So each sample's sound is kept once in IndexedDB as 16-bit PCM, under its id, and the kit in
+   localStorage just names it. Kit and project FILES still carry the sound inside them. */
+var SDB = 'thunderplus-samples', SDB_ALSO = ['thunder-samples'];   // a first start may borrow ...Thunder's
+var sdbOk = typeof indexedDB !== 'undefined', sdbP = null, smpStored = new Set();   // var: save() can run before this line has
+function idbOpen(name){ return new Promise((res, rej) => { try { const r = indexedDB.open(name, 1); r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('smp')) r.result.createObjectStore('smp'); }; r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch(e){ rej(e); } }); }
+function smpDb(){ return sdbP || (sdbP = idbOpen(SDB)); }
+function smpPut(S){
+  if (!S.id) S.id = smpId();
+  if (smpStored.has(S.id) || !S.data) return Promise.resolve();
+  const d = S.data, pcm = new Int16Array(d.length); for (let i = 0; i < d.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, Math.round(d[i] * 32767)));
+  return smpDb().then(db => new Promise((res, rej) => { const tx = db.transaction('smp', 'readwrite'); tx.objectStore('smp').put({sr:S.sr, name:S.name, pcm:pcm.buffer}, S.id);
+    tx.oncomplete = () => { smpStored.add(S.id); res(); }; tx.onerror = tx.onabort = () => rej(tx.error); }));
+}
+function idbGet(name, id){ return idbOpen(name).then(db => new Promise(res => { const q = db.transaction('smp').objectStore('smp').get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); })).catch(() => null); }
+async function smpGet(id){
+  try { const db = await smpDb(); const r = await new Promise(res => { const q = db.transaction('smp').objectStore('smp').get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); if (r) return r; } catch(e){}
+  for (const n of SDB_ALSO) if (n !== SDB){ const r = await idbGet(n, id); if (r) return r; }
+  return null;
+}
+// Fills in the samples a kit names but doesn't hold yet (after start-up or loading a kit), then re-renders those pads.
+var smpResolving = false;
+async function resolveSamples(){
+  if (smpResolving) return; smpResolving = true;
+  try {
+    let missing = 0;
+    for (let i = 0; i < kit.voices.length; i++) for (const L of kit.voices[i].layers){
+      const S = L.sample; if (!S || S.data || !S.id) continue;
+      const r = await smpGet(S.id);
+      if (r && r.pcm){ const p = new Int16Array(r.pcm), d = new Float32Array(p.length); for (let k = 0; k < p.length; k++) d[k] = p[k] / 32767; S.data = d; S.sr = r.sr || S.sr; smpStored.add(S.id); dirty[i] = true; }
+      else missing++;
+    }
+    refreshAll();
+    if (missing) toast(missing + (missing > 1 ? ' samples' : ' sample') + ' couldn’t be found in this browser’s storage. Load the kit or project file to get them back.', 6000);
+    else smpTidy();
+    // A kit saved before samples moved to IndexedDB still has them inside localStorage: move them now.
+    try { if ((localStorage.getItem(KEY) || '').includes('"b64"')) save(); } catch(e){}
+  } finally { smpResolving = false; }
+}
+// Drops stored samples the kit no longer uses (only from this app's own store).
+function smpTidy(){
+  const used = new Set(); for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.id) used.add(L.sample.id);
+  smpDb().then(db => { const tx = db.transaction('smp', 'readwrite'), st = tx.objectStore('smp'), q = st.getAllKeys();
+    q.onsuccess = () => { for (const k of q.result) if (!used.has(k)){ st.delete(k); smpStored.delete(k); } }; }).catch(() => {});
+}
 function save(){
+  if (typeof sdbOk !== 'undefined' && sdbOk && smpStored){
+    const pend = [];
+    for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.data && !smpStored.has(L.sample.id)) pend.push(smpPut(L.sample));
+    const write = () => { try { localStorage.setItem(KEY, JSON.stringify(kitToJSON('ref'))); } catch(e){} };
+    if (pend.length) Promise.all(pend).then(write, () => { sdbOk = false; save(); }); else write();
+    return;
+  }
   try { localStorage.setItem(KEY, JSON.stringify(kitToJSON(false))); }
   catch(e){ try { localStorage.setItem(KEY, JSON.stringify(kitToJSON(true))); } catch(e2){} }
 }
 function loadSaved(){ try { const s = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY); return s ? kitFromJSON(JSON.parse(s)) : null; } catch(e){ console.warn('Couldn’t load the saved kit', e); return null; } }
-function setKit(k){ kit = k; WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0; for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
+function setKit(k){ kit = k; setTimeout(() => resolveSamples(), 0); WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0; for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
 
 /* ---------- files out ---------- */
 function wavBytes(data, sr, bits){
@@ -3057,10 +3120,10 @@ function assignSample(vi, data, sr, name){
   const lenMs = data.length / sr * 1000;
   // A PWM sampler layer keeps its clock and mode and just takes the new sound.
   if (v.layers[li] && (v.layers[li].type === 'pwm' || v.layers[li].type === 'grains')){ v.layers[li].sample = {data, sr, name}; v.layers[li].on = true;
-    v.len = Math.max(v.len, Math.min(8, data.length / sr + 0.1)); cur = vi; changed(vi); refreshAll(); return; }
-  v.layers[li] = freshLayer({on:true, type:'sample', level:0.9, mode:'AHD', atk:0.1, hold:Math.min(8000, Math.round(lenMs)), dec:40,
+    v.len = Math.max(v.len, Math.min(30, data.length / sr + 0.1)); cur = vi; changed(vi); refreshAll(); return; }
+  v.layers[li] = freshLayer({on:true, type:'sample', level:0.9, mode:'AHD', atk:0.1, hold:Math.min(30000, Math.round(lenMs)), dec:40,
     sample:{data, sr, name}});
-  v.len = Math.max(v.len, Math.min(8, data.length / sr + 0.1));
+  v.len = Math.max(v.len, Math.min(30, data.length / sr + 0.1));
   cur = vi; changed(vi); refreshAll();
 }
 $('bLoad').addEventListener('click', () => $('fileIn').click());
@@ -3069,7 +3132,7 @@ $('fileIn').addEventListener('change', async e => {
   try {
     audio();
     const ab = await f.arrayBuffer(), b = await new Promise((res, rej) => { const p = ctx.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
-    const n = Math.min(b.length, Math.round(b.sampleRate * 8)), d = new Float32Array(n);
+    const n = Math.min(b.length, Math.round(b.sampleRate * 30)), d = new Float32Array(n);   // up to 30 s (breaks, loops)
     for (let c = 0; c < b.numberOfChannels; c++){ const ch = b.getChannelData(c); for (let i = 0; i < n; i++) d[i] += ch[i] / b.numberOfChannels; }
     assignSample(cur, d, b.sampleRate, f.name.replace(/\.[^.]+$/, '').slice(0, 24));
     toast(`Loaded ${f.name} into pad ${hx(cur)}, layer ${V().sel + 1}` + (b.length > n ? ' (first 8 s)' : ''));
