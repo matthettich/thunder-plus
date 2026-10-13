@@ -9,6 +9,12 @@
   "orientation": "any",
   "background_color": "#0e0e10",
   "theme_color": "#ffffff",
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "manifest.webmanifest"
+    }
+  ],
   "icons": [
     {
       "src": "icons/plus-icon-192.png",
