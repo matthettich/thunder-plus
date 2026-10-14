@@ -563,7 +563,7 @@ Object.assign(SHARED_MODULES, {
     about:'Harmonizer: up to two pitch-shifted copies of the sound at fixed intervals (a third, fifth, octave…), each with its own level and pan. Voice 2 starts silent: turn up Level 2 for a three-part stack (a major triad with the defaults). Detune spreads the two voices apart (set both to Unison with a little Detune and Delay for a wide double). Window: longer is smoother, shorter is tighter on drums. Dry sets the original.' }, STEREO)
 });
 Object.assign(SHARED_FAMILY, { meter:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', ensemble:'afx',
-  dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
+  blipdrum:'gen', life:'mod', dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
   envfol:'mod', gateex:'mod', pitchfol:'mod', slew:'util', snh:'util', quant:'util' });
 const SHARED_PORT_LABEL = { car:'Carrier', freq:'Freq', a:'A', b:'B', sum:'A+B', diff:'A−B', mul:'A×B', min:'Min', max:'Max',
   and:'AND', or:'OR', xor:'XOR', not:'NOT A', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent', time:'Time' };
@@ -580,6 +580,118 @@ const SHARED_PALETTE = [
   ['CV utilities', [['slew','Slew limiter'],['snh','Sample & Hold'],['quant','Quantizer'],['math','Math']], 'control'],
   ['Rhythm and logic', [['euclid','Euclidean'],['divider','Clock divider'],['logic','Logic']], 'control']
 ];
+/* Blip drum and Life: their parameters match the worklet's exactly (same tables). */
+const BD_ROWS = ['p', 'k', 'f', 'm', 'n', 'd', 'a', 'x'];
+const BD_NAMES = ['Pitch', 'Kick', 'FM', 'Ring', 'Noise', 'Decay', 'Level', 'Filter'];
+const BD_DEF = { p:[[50, 120, 220, 400, 900, 1800, 3500, 6000], 20, 8000], k:[[0.8, 0.5, 0.3, 0.2, 0.1, 0, 0, 0], 0, 1], f:[[0, 0, 0.2, 0, 0.3, 0, 0.1, 0], 0, 1],
+  m:[[0, 0, 0, 0.3, 0, 0.5, 0, 0.6], 0, 1], n:[[0, 0.1, 0.3, 0, 0, 0.5, 0.8, 0.9], 0, 1], d:[[600, 250, 180, 300, 120, 90, 60, 40], 5, 3000], a:[[0.9, 0.8, 0.7, 0.6, 0.6, 0.55, 0.5, 0.45], 0, 1],
+  x:[[0, 0, 0, 0, 0, 0.3, 0.5, 0.6], -1, 1] };
+const BD_LOG = { p:true, d:true };
+const bdParams = () => {
+  const P = { edit:[0, 0, 7, 1], fmR:[1.5, .25, 12, .01], ringR:[2.3, .01, 16, .01], kickT:[35, 2, 400, 1], dec:[1, .1, 4, .01], drive:[.15, 0, 1, .01],
+    lfo:[.5, .05, 20, .01], lfoD:[0, 0, 1, .01], width:[.5, 0, 1, .01], dly:[0, 0, 1, .01], dfb:[.45, 0, .95, .01], ddiv:[4, 0, 9, 1], level:[.8, 0, 1.5, .01] };
+  for (const r of BD_ROWS) for (let i = 0; i < 8; i++){ const [d, mn, mx] = BD_DEF[r]; P[r + (i + 1)] = [d[i], mn, mx, r === 'p' || r === 'd' ? 1 : .01]; }
+  return P;
+};
+const lifeParams = () => {
+  const P = { w:[16, 4, 16, 1], div:[3, 0, 9, 1], gens:[8, 0, 32, 1], trig:[0, 0, 1, 1], rule:[0, 0, 4, 1], rot:[0, 0, 7, 1], len:[.5, .05, .95, .01] };
+  const glider = [0, 0, 0b10, 0b100, 0b111, 0, 0, 0];
+  for (let y = 0; y < 8; y++) P['b' + y] = [glider[y], 0, 65535, 1];
+  return P;
+};
+const hideKeys = keys => Object.fromEntries(keys.map(k => [k, {hide:true}]));
+const LIFE_COLORS = ['#e2574c', '#f0a030', '#d8c43a', '#5fb85a', '#34a6a0', '#4a8fe0', '#8a63d8', '#d055a8'];
+Object.assign(SHARED_MODULES, {
+  blipdrum:{ label:'Blip drum', scope:'mono', inputs:{ t1:'gate', t2:'gate', t3:'gate', t4:'gate', t5:'gate', t6:'gate', t7:'gate', t8:'gate' }, outputs:{ out:'audio', outR:'audio' },
+    params:bdParams(), display:'bars',
+    ui:Object.assign(hideKeys(BD_ROWS.flatMap(r => [1, 2, 3, 4, 5, 6, 7, 8].map(i => r + i))), {
+      edit:{l:'Edit', c:opts(BD_NAMES)}, fmR:{l:'FM ratio', f:v => '×' + v.toFixed(2)}, ringR:{l:'Ring ratio', f:v => '×' + v.toFixed(2)}, kickT:{l:'Kick time', f:v => Math.round(v) + ' ms'},
+      dec:{l:'Decay', f:times}, drive:{l:'Drive', f:pct}, lfo:{l:'LFO rate', f:hz}, lfoD:{l:'LFO → pitch', f:v => '±' + (v * 12).toFixed(1) + ' st'}, width:{l:'Width', f:pct},
+      dly:{l:'Delay', f:pct}, dfb:{l:'Feedback', f:pct}, ddiv:{l:'Delay time', c:opts(STEP_NAMES)}, level:{l:'Level', f:pct} }),
+    about:'Blip drum: eight minimal electronic drum voices, one per trigger input (1–8), in the spirit of the generative blip grooveboxes. Pick a row with Edit (Pitch, Kick, FM, Ring, Noise, Decay, Level, Filter) and drag the bars to set it for each voice; the bars light up as each voice plays. FM ratio, Ring ratio (low is a tremolo, high is metal) and Kick time apply to all, as do Drive, the LFO on pitch, stereo Width and a feedback Delay for washes. Patch a Life module’s outputs into the inputs.' },
+  life:{ label:'Life', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ g1:'gate', g2:'gate', g3:'gate', g4:'gate', g5:'gate', g6:'gate', g7:'gate', g8:'gate', any:'gate', count:'cv' },
+    params:lifeParams(), display:'life',
+    ui:Object.assign(hideKeys(['b0', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7']), {
+      w:{l:'Width', f:v => Math.round(v) + ' steps'}, div:{l:'Step', c:opts(STEP_NAMES)}, gens:{l:'Loop', f:v => v < 0.5 ? 'Evolve' : Math.round(v) + ' gens'},
+      trig:{l:'Fire on', c:opts(['Alive', 'Born'])}, rule:{l:'Rule', c:opts(['Life', 'HighLife', 'Seeds', 'Maze', 'Day & Night'])}, rot:{l:'Colours', f:v => '+' + Math.round(v)}, len:{l:'Gate length', f:pct} }),
+    about:'Life: a Game of Life sequencer. Draw cells on the grid (tap or drag; Clear, Random and Glider help). A playhead sweeps the columns, one per Step at the song tempo (or one per pulse on Clock), and every live cell in its column fires the gate of its row: patch the coloured outputs 1–8 into a Blip drum. After each sweep the cells live one generation, so the rhythm changes as patterns grow, move and die. Loop brings your drawing back every N generations (Evolve never does), Fire on Born plays only new cells, Rule picks the world, Colours turns which row feeds which output. Any fires on every hit; Count is how many cells are in the column.' }
+});
+Object.assign(SHARED_PORT_LABEL, { t1:'1', t2:'2', t3:'3', t4:'4', t5:'5', t6:'6', t7:'7', t8:'8', g1:'1', g2:'2', g3:'3', g4:'4', g5:'5', g6:'6', g7:'7', g8:'8', any:'Any', count:'Count' });
+SHARED_PALETTE.push(['Drums', [['blipdrum', 'Blip drum (8 voices)']], 'audio']);
+SHARED_PALETTE.find(g => g[0] === 'Rhythm and logic')[1].unshift(['life', 'Life (Game of Life)']);
+
+/* The bar editor (Blip drum) and the grid (Life). */
+const bdNorm = (r, v) => { const [, mn, mx] = BD_DEF[r]; return BD_LOG[r] ? Math.log(v / mn) / Math.log(mx / mn) : (v - mn) / (mx - mn); };
+const bdVal = (r, t) => { const [, mn, mx] = BD_DEF[r]; t = Math.max(0, Math.min(1, t)); const v = BD_LOG[r] ? mn * Math.pow(mx / mn, t) : mn + (mx - mn) * t; return r === 'p' || r === 'd' ? Math.round(v) : Math.round(v * 100) / 100; };
+function buildBars(n, box){
+  const cv = document.createElement('canvas'); cv.className = 'bdbars'; box.append(cv);
+  const S = n.show = { kind:'bars', cv, lit:new Float32Array(8), drag:null };
+  const at = e => { const r = cv.getBoundingClientRect(); return [Math.max(0, Math.min(7, Math.floor((e.clientX - r.left) / r.width * 8))), 1 - (e.clientY - r.top) / r.height]; };
+  const put = e => { const row = BD_ROWS[n.m.params.edit | 0], [i, t] = at(e); setParam(n, row + (i + 1), bdVal(row, t), true); drawBars(n); };
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); store.snapshot(); S.drag = e.pointerId; try { cv.setPointerCapture(e.pointerId); } catch(_){} put(e); });
+  cv.addEventListener('pointermove', e => { if (S.drag === e.pointerId) put(e); });
+  const up = e => { if (S.drag === e.pointerId) S.drag = null; };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  drawBars(n);
+}
+function drawBars(n){
+  const S = n.show, cv = S.cv, W = cv.clientWidth || 260, H = cv.clientHeight || 90, dpr = devicePixelRatio || 1;
+  if (cv.width !== Math.round(W * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const row = BD_ROWS[n.m.params.edit | 0], bw = W / 8, cs = getComputedStyle(cv);
+  for (let i = 0; i < 8; i++){
+    const t = bdNorm(row, n.m.params[row + (i + 1)]), x = i * bw + 2, w = bw - 4;
+    g.fillStyle = cs.getPropertyValue('--line') || '#ccc'; g.globalAlpha = .35; g.fillRect(x, 0, w, H); g.globalAlpha = 1;
+    g.fillStyle = LIFE_COLORS[i];
+    if (row === 'x'){ const m = H / 2, y = (1 - t) * H; g.fillRect(x, Math.min(m, y), w, Math.abs(y - m) || 1); }
+    else g.fillRect(x, (1 - t) * H, w, t * H);
+    const L = S.lit[i]; if (L > .02){ g.globalAlpha = L * .8; g.fillStyle = '#fff'; g.fillRect(x, H - 5, w, 5); g.globalAlpha = 1; }
+  }
+  g.fillStyle = cs.getPropertyValue('--muted') || '#888'; g.font = '11px sans-serif'; g.fillText(BD_NAMES[n.m.params.edit | 0], 4, 12);
+}
+function buildLife(n, box){
+  const cv = document.createElement('canvas'); cv.className = 'lifegrid'; box.append(cv);
+  const bar = document.createElement('div'); bar.className = 'lifebtns'; box.append(bar);
+  const S = n.show = { kind:'life', cv, live:null, x:-1, gen:0, seen:0, paint:null };
+  const W = () => Math.max(4, Math.min(16, n.m.params.w | 0));
+  const bits = () => Array.from({length:8}, (_, y) => n.m.params['b' + y] | 0);
+  const setBits = B => { B.forEach((v, y) => setParam(n, 'b' + y, v & 0xffff, true)); drawLife(n); };
+  const cell = e => { const r = cv.getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / r.width * 16), Math.floor((e.clientY - r.top) / r.height * 8)]; };
+  const paint = e => { const [x, y] = cell(e); if (x < 0 || x >= 16 || y < 0 || y >= 8) return; const B = bits(); const on = (B[y] >> x) & 1;
+    if (S.paint == null) S.paint = on ? 0 : 1; if (on !== S.paint){ B[y] ^= 1 << x; setBits(B); } };
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); store.snapshot(); S.paint = null; try { cv.setPointerCapture(e.pointerId); } catch(_){} S.pid = e.pointerId; paint(e); });
+  cv.addEventListener('pointermove', e => { if (S.pid === e.pointerId) paint(e); });
+  const up = e => { if (S.pid === e.pointerId){ S.pid = null; S.paint = null; } };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  const btn = (t, f) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'tb small'; b.textContent = t; b.addEventListener('click', e => { e.stopPropagation(); store.snapshot(); f(); }); bar.append(b); };
+  btn('Clear', () => setBits(new Array(8).fill(0)));
+  btn('Random', () => setBits(Array.from({length:8}, () => { let v = 0; for (let x = 0; x < W(); x++) if (Math.random() < .3) v |= 1 << x; return v; })));
+  btn('Glider', () => { const B = bits(); const x0 = Math.floor(Math.random() * (W() - 3)), y0 = Math.floor(Math.random() * 6); B[y0] |= 2 << x0; B[y0 + 1] |= 4 << x0; B[y0 + 2] |= 7 << x0; setBits(B); });
+  btn('Blinker', () => { const B = bits(); const x0 = Math.floor(Math.random() * (W() - 3)), y0 = Math.floor(Math.random() * 8); B[y0] |= 7 << x0; setBits(B); });
+  drawLife(n);
+}
+function drawLife(n){
+  const S = n.show, cv = S.cv, Wd = cv.clientWidth || 260, H = cv.clientHeight || 130, dpr = devicePixelRatio || 1;
+  if (cv.width !== Math.round(Wd * dpr)){ cv.width = Math.round(Wd * dpr); cv.height = Math.round(H * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, Wd, H);
+  const cw = Wd / 16, ch = H / 8, W = Math.max(4, Math.min(16, n.m.params.w | 0)), live = S.live && performance.now() - S.seen < 600 ? S.live : null, rot = n.m.params.rot | 0;
+  const cs = getComputedStyle(cv), line = cs.getPropertyValue('--line') || '#ccc';
+  for (let y = 0; y < 8; y++){
+    const drawn = n.m.params['b' + y] | 0, cur = live ? live[y] : drawn, col = LIFE_COLORS[(y + rot) % 8];
+    for (let x = 0; x < 16; x++){
+      const X = x * cw, Y = y * ch;
+      if (x >= W){ g.fillStyle = line; g.globalAlpha = .25; g.fillRect(X + 1, Y + 1, cw - 2, ch - 2); g.globalAlpha = 1; continue; }
+      if ((cur >> x) & 1){ g.fillStyle = col; g.fillRect(X + 1, Y + 1, cw - 2, ch - 2); }
+      else { g.strokeStyle = line; g.lineWidth = 1; g.strokeRect(X + 1.5, Y + 1.5, cw - 3, ch - 3); }
+      if (live && ((drawn >> x) & 1)){ g.strokeStyle = col; g.lineWidth = 1.5; g.strokeRect(X + 2, Y + 2, cw - 4, ch - 4); }   // your drawing, outlined
+    }
+  }
+  if (live && S.x >= 0 && S.x < W){ g.fillStyle = '#fff'; g.globalAlpha = .28; g.fillRect(S.x * cw, 0, cw, H); g.globalAlpha = 1; }
+  g.fillStyle = cs.getPropertyValue('--muted') || '#888'; g.font = '10px sans-serif'; if (live) g.fillText('gen ' + S.gen, Wd - 44, H - 3);
+}
+// Redraw the bars and grids a few times a second (edits from sliders, menus and undo show up too).
+setInterval(() => { for (const n of nodes.values()) if (n.show && (n.show.kind === 'bars' || n.show.kind === 'life') && n.el.isConnected){
+  if (n.show.kind === 'bars'){ for (let i = 0; i < 8; i++) n.show.lit[i] *= .8; drawBars(n); } else drawLife(n); } }, 90);
 function mergeShared(palette, groupFam, portLabel){
   const have = new Set(); for (const [, items] of palette) for (const [t] of items) have.add(t);
   for (const [g, items, where] of SHARED_PALETTE){
@@ -606,12 +718,17 @@ function mergeShared(palette, groupFam, portLabel){
 .shw .tr .z{position:absolute; top:0; bottom:0; width:1px; background:var(--rec); opacity:.7}
 .shw .ch span:last-child{text-align:right}
 .shw .ch.hot span:last-child{color:var(--rec); font-weight:600}
-.shw.gr .tr i{left:auto; right:0; transform-origin:right; background:var(--gate)}`;
+.shw.gr .tr i{left:auto; right:0; transform-origin:right; background:var(--gate)}
+.shw canvas.bdbars{width:100%; height:96px; display:block; touch-action:none; cursor:ns-resize}
+.shw canvas.lifegrid{width:100%; height:132px; display:block; touch-action:none; cursor:pointer}
+.shw .lifebtns{display:flex; gap:6px; flex-wrap:wrap}`;
   const el = document.createElement('style'); el.textContent = css; document.head.append(el);
 }
 const SHOW_LO = -48, SHOW_HI = 3, showPos = d => Math.max(0, Math.min(1, (d - SHOW_LO) / (SHOW_HI - SHOW_LO)));
 function buildShow(n){
-  const kind = MODULES[n.m.type].display, box = h('div', {class:'shw' + (kind === 'gr' ? ' gr' : '')}), rows = [];
+  const kind = MODULES[n.m.type].display;
+  if (kind === 'bars' || kind === 'life'){ const box = h('div', {class:'shw ' + kind}); (kind === 'bars' ? buildBars : buildLife)(n, box); return box; }
+  const box = h('div', {class:'shw' + (kind === 'gr' ? ' gr' : '')}), rows = [];
   const mk = lbl => { const i = h('i'), b = h('b'), v = h('span', {text:'—'}), tr = h('div', {class:'tr'}, i, b);
     if (kind === 'meter'){ const z = h('span', {class:'z'}); z.style.left = (showPos(0) * 100) + '%'; tr.append(z); }
     const r = h('div', {class:'ch'}, h('span', {text:lbl}), tr, v); box.append(r); rows.push({r, i, b, v, hold:-200, ht:0}); };
@@ -625,6 +742,8 @@ function paintShows(list){
   for (const [id, v] of list || []){
     const n = nodes.get(id); if (!n || !n.show || !Array.isArray(v)) continue;
     const S = n.show; S.seen = now;
+    if (S.kind === 'bars'){ for (let i = 0; i < 8; i++) S.lit[i] = Math.max(S.lit[i], v[i] || 0); continue; }
+    if (S.kind === 'life'){ S.x = v[0]; S.gen = v[1]; S.live = v.slice(2, 10); continue; }
     if (S.kind === 'meter') for (let c = 0; c < 2; c++){
       const R = S.rows[c], vu = v[c], pk = v[c + 2];
       R.i.style.transform = 'scaleX(' + showPos(vu) + ')';
@@ -947,7 +1066,7 @@ class WavesBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './waves-worklet.js?v=7';
+    const url = opts.url || './waves-worklet.js?v=8';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'waves', {
@@ -1154,6 +1273,7 @@ function buildNode(m){
   const kids = [];
   for (const k in def.params){
     if (m.params[k] == null) m.params[k] = def.params[k][0];
+    if ((def.ui[k] || {}).hide) continue;   // edited by the module's own display (bars, a grid)
     const ch = choicesOf(m.type, k);
     kids.push(ch ? choice(n, k, ch) : slider(n, k, def.params[k]));
   }

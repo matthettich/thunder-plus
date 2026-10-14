@@ -21,8 +21,8 @@ Keep this file up to date at the end of a work session.
   - 13 Oct: **pad rendering moved to a Worker** (see below), and the offer to open ...Thunder's saved work.
 - **App:** no build step. `index.html` is the whole tracker/synth app; `chains/index.html` and
   `waves/index.html` are the two modular patch editors loaded in frames.
-- **Cache-busters now:** `chains-worklet.js?v=12`, `waves-worklet.js?v=7`, `master-worklet.js?v=2` (index.html, the editor
-  pages, sw.js). Cache is `thunderplus-v75`.
+- **Cache-busters now:** `chains-worklet.js?v=13`, `waves-worklet.js?v=8`, `master-worklet.js?v=2` (index.html, the editor
+  pages, sw.js). Cache is `thunderplus-v76`.
 
 ## Licensing rule (the owner may sell the app later)
 
@@ -365,6 +365,33 @@ A cable into a slider's small purple jack (`p:<param>`) now always shows the ...
 - `vuHit()` called `slotAt(hits, i)`, which pads `hits` with `null`, then pushed into `hits[i]`: the first tap on any pad
   threw, so `padPress` never reached `select(i)` (and the VU loop's `hits[i].filter` could throw the same way). Now
   `hits[i]` is made an array first, and `padPress` selects the pad before sounding it, so a sound error can't stop it.
+
+## Blip engine, Blip drum and Life (13 Oct, evening): Newscool-style generative drums
+
+The owner asked for drums like Reaktor's Newscool (eight simple tone voices driven by a Game of Life sequencer).
+All original code; the name stays generic.
+
+- **`class BlipVoice`** (one copy in index.html's ENGINE block, one in the SHARED MODULES block; keep them identical):
+  parabolic tone, kick (pitch drop ×2^(kick·5·env), Kick time), FM (sine at fmR × pitch, phase mod), ring mod
+  (ringF Hz), noise, click, linear attack + exponential decay, drive, bipolar SVF (filt < 0 LP, > 0 HP, resonance
+  level-compensated), grain stutter (re-hits every grainT, ×0.72 each). `render(out, a, b, g)` ADDS into out.
+- **Blip engine on pads** (`V.engine = 'blip'`, settings `V.blip`, `normBlip`, `renderBlip`): any pad, drums too. The
+  Engine row now shows on every pad (Layers / Bass / Voice / Blip); on drum pads Bass and Voice render one-shots.
+  Card `#blipWrap` (`BLU` rows, `BLIP_PRE` presets, Random). Tracker side panel shows Level + six blip rows.
+- **Blip drum module** (`blipdrum`, shared): eight voices on gate inputs t1–t8, per-voice params `p k f m n d a x` + voice
+  number (pitch, kick, FM, ring, noise, decay, level, filter), hidden in the card and edited as bars (`display:'bars'`,
+  `Edit` picks the row); globals FM/ring ratio, kick time, decay scale, drive (on the mix), LFO → pitch, width,
+  feedback delay (tempo divisions), level. `show()` returns each voice's level, so the bars light as they play.
+- **Life module** (`life`, shared): 16 × 8 torus, board in hidden params b0–b7 (row bitmasks), edited on a canvas
+  (`display:'life'`; Clear / Random / Glider / Blinker). The playhead advances one column per Step (or per Clock pulse);
+  live cells in that column fire their row's gate (Fire on Born: only new ones); after each sweep, one generation
+  (rules Life, HighLife, Seeds, Maze, Day & Night). Loop N reloads the drawing every N generations (0 = evolve).
+  Changing the drawing reloads it. Outputs g1–g8, Any, Count. `show()` = [x, gen, rows…] for the live grid.
+- **Editors:** a param whose ui has `hide:true` gets no row (both editors' buildNode). `buildShow` routes 'bars' and
+  'life' to `buildBars`/`buildLife`; `paintShows` feeds them; a 90 ms timer redraws them.
+- **Checked:** the glider walks correctly; Life → Blip drum renders (no NaN), both editors add, cable, run live (grid
+  advances, bars light), tapping the grid toggles cells, dragging bars sets values; Blip on drum pad 0 renders.
+  CPU: Life ≈ 1–2%, Blip drum depends on how many voices ring (all eight constantly ≈ 20% of a desktop core worst case).
 
 ## Running it locally
 

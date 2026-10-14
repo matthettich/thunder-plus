@@ -1220,12 +1220,177 @@ const Harmonizer = {
   }
 };
 
+/* ---------- Blip voice (original code) ----------
+   A minimal electronic drum voice in the spirit of the classic generative "blip" grooveboxes: a parabolic tone with
+   a kick (a fast pitch drop), FM, ring mod, a little noise and click, an exponential decay, drive, a bipolar filter
+   (left of centre low-pass, right high-pass) and a grain stutter (the hit repeated, each quieter). Self-contained:
+   it is copied as text into the pads' engine and into the …chains/…waves worklets. Mono. */
+class BlipVoice {
+  constructor(sr){ this.sr = sr; this.p = BlipVoice.defaults(); this.reset(); }
+  static defaults(){
+    return {pitch:180, kick:0.4, kickT:35, fm:0, fmR:1.5, ring:0, ringF:300, noise:0, click:0.2, atk:0.5, decay:220, drive:0, filt:0, res:0.2, grain:0, grainT:60, vel:1};
+  }
+  reset(){ this.on = false; this.t = 0; this.ph = 0; this.mph = 0; this.rph = 0; this.lp = 0; this.bp = 0; this.rnd = 7777; this.g = 0; this.rep = 0; this.rg = 1; }
+  set(o){ this.p = Object.assign(BlipVoice.defaults(), o || {}); }
+  trig(vel){ this.on = true; this.t = 0; this.ph = 0; this.mph = 0; this.rep = 0; this.rg = vel == null ? 1 : vel; this.v0 = this.rg; }
+  // Adds (does not write) samples [a, b) of the voice into out, times gain g.
+  render(out, a, b, g){
+    if (!this.on) return;
+    const p = this.p, sr = this.sr, inv = 1 / sr, kd = Math.exp(-inv * 1000 / Math.max(1, p.kickT)), ad = Math.exp(-inv * 1000 * 6.9 / Math.max(2, p.decay));
+    const atk = Math.max(1, p.atk / 1000 * sr), fmI = p.fm * 8, dr = p.drive * 8, dn = dr ? 1 / Math.tanh(dr) : 1;
+    const filt = Math.max(-1, Math.min(1, p.filt)), fc = filt < 0 ? 20000 * Math.pow(0.004, -filt) : 20 * Math.pow(400, filt);
+    const f = 2 * Math.sin(Math.PI * Math.min(0.45, fc / sr)), q = 2 - 1.95 * Math.max(0, Math.min(1, p.res)), gT = Math.max(5, p.grainT) / 1000 * sr, rc = Math.sqrt(q / 2);   // rc: resonance doesn't jump the level
+    for (let i = a; i < b; i++){
+      const t = this.t;
+      // grain: the hit starts again every Grain time, each repeat quieter
+      if (p.grain >= 1 && this.rep < (p.grain | 0) && t >= gT * (this.rep + 1)){ this.rep++; this.rg = this.v0 * Math.pow(0.72, this.rep); this.ke = 1; this.env = 0; this.ph = 0; }
+      if (t === 0){ this.ke = 1; this.env = 0; }
+      const tl = t - this.rep * gT;
+      // envelope: linear attack, then exponential decay
+      this.env = tl < atk ? tl / atk : this.env * ad;
+      this.ke *= kd;
+      const kk = p.kick * 5 * this.ke, hz = kk > 1e-4 ? p.pitch * Math.exp(kk * 0.6931471805599453) : p.pitch;
+      // FM: a sine at fmR × pitch modulates the phase
+      this.ph += hz * inv; if (this.ph >= 1) this.ph -= Math.floor(this.ph);
+      let pm = this.ph;
+      if (fmI > 0){ this.mph += hz * p.fmR * inv; if (this.mph >= 1) this.mph -= Math.floor(this.mph); pm += fmI * Math.sin(2 * Math.PI * this.mph) * this.env * 0.159; }
+      const x0 = pm - Math.floor(pm), u = x0 < 0.5 ? 2 * x0 : 2 * x0 - 1;
+      let y = (x0 < 0.5 ? 4 : -4) * u * (1 - u);   // parabolic arcs: a sine with a little more edge
+      // ring mod: depth from tremolo to metal
+      if (p.ring > 0){ this.rph += p.ringF * inv; if (this.rph >= 1) this.rph -= Math.floor(this.rph); y *= 1 - p.ring + p.ring * Math.sin(2 * Math.PI * this.rph); }
+      // noise and click
+      this.rnd = (this.rnd * 1664525 + 1013904223) >>> 0; const nz = this.rnd / 2147483648 - 1;
+      y = y * (1 - p.noise * 0.7) + nz * p.noise;
+      if (tl < sr * 0.0015) y += p.click * (1 - tl / (sr * 0.0015)) * (nz * 0.5 + 0.8);
+      y *= this.env * this.rg;
+      if (dr) y = Math.tanh(y * dr) * dn;
+      // bipolar state-variable filter
+      if (filt !== 0){ const hp = y - this.lp - q * this.bp; this.bp += f * hp; this.lp += f * this.bp; if (!(Math.abs(this.lp) < 1e3)){ this.lp = this.bp = 0; } y = (filt < 0 ? this.lp : hp) * rc; }
+      out[i] += y * g * 0.8;
+      this.t++;
+      if (this.env < 1e-5 && tl > atk && (p.grain < 1 || this.rep >= (p.grain | 0))){ this.on = false; break; }
+    }
+  }
+}
+
+/* ── Blip drum and Life (added Oct 2026, original code) ──────────────────────────────────────────────────────
+   Blip drum: eight BlipVoices, one per trigger input, edited as bar charts (one bar per voice) in the editor.
+   Life: Conway's Game of Life (and four relatives) on a 16 × 8 grid that wraps at its edges. A playhead sweeps the
+   columns one step per note value; cells alive in its column fire the gate of their row (eight rows, eight gates).
+   After each sweep the grid lives one generation. Loop brings back the drawn grid every N generations. */
+const BD_ROWS = ['p', 'k', 'f', 'm', 'n', 'd', 'a', 'x'];   // pitch, kick, FM, ring, noise, decay, level, filter
+const BD_DEF = { p:[[50, 120, 220, 400, 900, 1800, 3500, 6000], 20, 8000], k:[[0.8, 0.5, 0.3, 0.2, 0.1, 0, 0, 0], 0, 1], f:[[0, 0, 0.2, 0, 0.3, 0, 0.1, 0], 0, 1],
+  m:[[0, 0, 0, 0.3, 0, 0.5, 0, 0.6], 0, 1], n:[[0, 0.1, 0.3, 0, 0, 0.5, 0.8, 0.9], 0, 1], d:[[600, 250, 180, 300, 120, 90, 60, 40], 5, 3000], a:[[0.9, 0.8, 0.7, 0.6, 0.6, 0.55, 0.5, 0.45], 0, 1],
+  x:[[0, 0, 0, 0, 0, 0.3, 0.5, 0.6], -1, 1] };
+const bdParams = () => {
+  const P = { edit:[0, 0, 7, 1], fmR:[1.5, .25, 12, .01], ringR:[2.3, .01, 16, .01], kickT:[35, 2, 400, 1], dec:[1, .1, 4, .01], drive:[.15, 0, 1, .01],
+    lfo:[.5, .05, 20, .01], lfoD:[0, 0, 1, .01], width:[.5, 0, 1, .01], dly:[0, 0, 1, .01], dfb:[.45, 0, .95, .01], ddiv:[4, 0, 9, 1], level:[.8, 0, 1.5, .01] };
+  for (const r of BD_ROWS) for (let i = 0; i < 8; i++){ const [d, mn, mx] = BD_DEF[r]; P[r + (i + 1)] = [d[i], mn, mx, r === 'p' || r === 'd' ? 1 : .01]; }
+  return P;
+};
+const BlipDrum = {
+  type:'blipdrum', scope:'mono', cost:.25,
+  inputs:{ t1:'gate', t2:'gate', t3:'gate', t4:'gate', t5:'gate', t6:'gate', t7:'gate', t8:'gate' }, outputs:{ out:'audio', outR:'audio' },
+  params:bdParams(),
+  create(sr){ return { v:Array.from({length:8}, () => new BlipVoice(sr)), lg:new Uint8Array(8), buf:new Float32Array(128), d:new Float32Array(Math.ceil(sr * 2.2) + 4), dw:0, lp:[0, 0], lph:0, hit:new Float32Array(8) }; },
+  process(st, io, ctx){
+    const p = io.p, n = ctx.block, sr = ctx.sr, oL = io.out.out, oR = io.out.outR, B = st.buf;
+    oL.fill(0); oR.fill(0);
+    st.lph += p.lfo * n / sr; st.lph -= Math.floor(st.lph);
+    for (let k = 0; k < 8; k++){
+      const g = io.in['t' + (k + 1)], v = st.v[k];
+      let at = -1; for (let i = 0; i < n; i++){ const on = g[i] >= .5; if (on && !st.lg[k]) at = i; st.lg[k] = on ? 1 : 0; if (at >= 0) break; }
+      if (at >= 0){
+        const j = k + 1, pitch = p['p' + j] * Math.pow(2, p.lfoD * Math.sin(2 * Math.PI * (st.lph + k * .125)));
+        v.set({ pitch, kick:p['k' + j], kickT:p.kickT, fm:p['f' + j], fmR:p.fmR, ring:p['m' + j], ringF:pitch * p.ringR, noise:p['n' + j], click:.15 + p['k' + j] * .3,
+          decay:p['d' + j] * p.dec, drive:0, filt:p['x' + j], res:.25 });
+        v.trig(1); st.hit[k] = 1;
+      }
+      if (!v.on) continue;
+      B.fill(0); v.render(B, 0, n, p['a' + (k + 1)]);
+      const pan = (k / 7 - .5) * p.width, gl = Math.cos((pan + .5) * Math.PI / 2), gr = Math.sin((pan + .5) * Math.PI / 2);
+      for (let i = 0; i < n; i++){ oL[i] += B[i] * gl; oR[i] += B[i] * gr; }
+    }
+    // a feedback delay at a note value, for washes (cross-fed, darkened, saturated)
+    if (p.dly > 0 || st.dOn){
+      st.dOn = p.dly > 0;
+      const D = st.d, N = D.length, dt = Math.min(N / 2 - 2, Math.round(60 / (ctx.transport.tempo || 120) * divBeats(p.ddiv) * sr)), fb = p.dfb, k = .35;
+      for (let i = 0; i < n; i++){
+        const r = st.dw - dt * 2, rl = ((r % N) + N) % N, rr = ((r + 1) % N + N) % N;
+        st.lp[0] += (D[rl] - st.lp[0]) * k; st.lp[1] += (D[rr] - st.lp[1]) * k;
+        const l = oL[i], rgt = oR[i];
+        D[st.dw] = Math.tanh(l + st.lp[1] * fb); D[(st.dw + 1) % N] = Math.tanh(rgt + st.lp[0] * fb);
+        oL[i] = l + st.lp[0] * p.dly; oR[i] = rgt + st.lp[1] * p.dly;
+        st.dw = (st.dw + 2) % N;
+      }
+    }
+    // drive on the mix (one saturator, not eight), then level
+    const lv = p.level, dr = p.drive * 6, dn = dr ? 1 / Math.tanh(dr) : 1;
+    if (dr) for (let i = 0; i < n; i++){ oL[i] = Math.tanh(oL[i] * dr) * dn * lv; oR[i] = Math.tanh(oR[i] * dr) * dn * lv; }
+    else for (let i = 0; i < n; i++){ oL[i] *= lv; oR[i] *= lv; }
+    for (let k = 0; k < 8; k++) st.hit[k] *= .9;
+  },
+  show(st){ return Array.from(st.v, (v, k) => Math.max(st.hit[k], v.on ? Math.min(1, v.env || 0) : 0)); }
+};
+
+const LIFE_RULES = [[[3], [2, 3]], [[3, 6], [2, 3]], [[2], []], [[3], [1, 2, 3, 4, 5]], [[3, 6, 7, 8], [3, 4, 6, 7, 8]]];   // Life, HighLife, Seeds, Maze, Day & Night
+const lifeParams = () => {
+  const P = { w:[16, 4, 16, 1], div:[3, 0, 9, 1], gens:[8, 0, 32, 1], trig:[0, 0, 1, 1], rule:[0, 0, 4, 1], rot:[0, 0, 7, 1], len:[.5, .05, .95, .01] };
+  const glider = [0, 0, 0b10, 0b100, 0b111, 0, 0, 0];   // a glider, top left
+  for (let y = 0; y < 8; y++) P['b' + y] = [glider[y], 0, 65535, 1];
+  return P;
+};
+const Life = {
+  type:'life', scope:'mono', cost:.02,
+  inputs:{ clock:'gate', reset:'gate' }, outputs:{ g1:'gate', g2:'gate', g3:'gate', g4:'gate', g5:'gate', g6:'gate', g7:'gate', g8:'gate', any:'gate', count:'cv' },
+  params:lifeParams(),
+  create:() => ({ cur:new Uint16Array(8), prev:new Uint16Array(8), x:-1, ph:1, gen:0, lc:0, lr:0, sn:undefined, sig:'', fire:0, cnt:0 }),
+  load(st, p){ for (let y = 0; y < 8; y++){ st.cur[y] = p['b' + y] & 0xffff; st.prev[y] = 0; } st.gen = 0; },
+  next(st, p){
+    const W = clamp(p.w | 0, 4, 16), m = (1 << W) - 1, [born, keep] = LIFE_RULES[clamp(p.rule | 0, 0, 4)], nx = new Uint16Array(8);
+    const at = (x, y) => (st.cur[(y + 8) % 8] >> ((x + W) % W)) & 1;
+    for (let y = 0; y < 8; y++) for (let x = 0; x < W; x++){
+      let c = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy) c += at(x + dx, y + dy);
+      const a = at(x, y); if (a ? keep.includes(c) : born.includes(c)) nx[y] |= 1 << x;
+    }
+    st.prev.set(st.cur); for (let y = 0; y < 8; y++) st.cur[y] = nx[y] & m;
+    st.gen++;
+  },
+  process(st, io, ctx){
+    const p = io.p, W = clamp(p.w | 0, 4, 16), ck = linked(io, 'clock');
+    const SG = st.sg || (st.sg = new Int32Array(8).fill(-1)); let ch = false;
+    for (let y = 0; y < 8; y++){ const v = p['b' + y] | 0; if (v !== SG[y]){ SG[y] = v; ch = true; } }
+    if (ch) Life.load(st, p);   // the drawn grid changed: start from it
+    if (restarted(st, ctx)){ Life.load(st, p); st.x = -1; st.ph = 1; }
+    const inc = (ctx.transport.tempo || 120) / 60 / divBeats(p.div) / ctx.sr, o = io.out, G = st.G || (st.G = []);
+    for (let k = 0; k < 8; k++) G[k] = o['g' + (k + 1)];
+    const ANY = o.any, CNT = o.count, RS = io.in.reset, CK = io.in.clock;
+    const step = () => {
+      st.x++;
+      if (st.x >= W){ st.x = 0; if ((p.gens | 0) > 0 && st.gen + 1 >= (p.gens | 0)) Life.load(st, p); else Life.next(st, p); }
+      let f = 0, c = 0;
+      for (let y = 0; y < 8; y++){ const a = (st.cur[y] >> st.x) & 1, b = (st.prev[y] >> st.x) & 1; c += a; if (p.trig >= .5 ? a && !b : a) f |= 1 << ((y + (p.rot | 0)) % 8); }
+      st.fire = f; st.cnt = c;
+    };
+    for (let i = 0; i < ctx.block; i++){
+      const r = RS[i] >= .5; if (r && !st.lr){ Life.load(st, p); st.x = -1; st.ph = 1; } st.lr = r;
+      let on;
+      if (ck){ const c = CK[i] >= .5; if (c && !st.lc) step(); st.lc = c; on = c; }
+      else { st.ph += inc; if (st.ph >= 1){ st.ph -= Math.floor(st.ph); step(); } on = st.ph < p.len; }
+      const f = on ? st.fire : 0;
+      for (let k = 0; k < 8; k++) G[k][i] = (f >> k) & 1;
+      ANY[i] = f ? 1 : 0; CNT[i] = st.cnt / 8;
+    }
+  },
+  show(st){ return [st.x, st.gen, ...st.cur]; }
+};
+
 const SHARED_MODULES = { beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
   meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
-  dimension:Dimension, bbd:BBD, harm:Harmonizer };
+  dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life };
 /* ===SHARED MODULES END=== */
 
 const MODULES = { ...SHARED_MODULES, hostIn:HostIn, vco:VCO, fm:FM, additive:Additive, noise:Noise, plaits:Plaits, elements:Elements,
