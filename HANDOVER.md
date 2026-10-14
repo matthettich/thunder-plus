@@ -469,6 +469,9 @@ Commits on `main`: 9ababb0 (fixes), e21c605 (presets + song-load fix), e8f2970 (
   with DEL and RET in the phrase. `swingNote()` toasts once ("now reads LPB 2, 12 ticks…"). New songs default to LPB 4
   (true 16ths; the owner's earlier "LPB 8 default" was compensating for this bug). Grooves with a 0 (= "ticks a
   step") digit in old songs would stretch with the new ticks; not converted.
+- **Settings → App → Show …waves and …chains on Mobile** (`mobEd`, `thunderplus-mobile-editors-v1`, off by default; the
+  row only shows in Mobile). `noEditors()` = Mobile and not ticked replaces `isMobile()` in every editor gate (tabs,
+  setView, openWaves/openChains, chains focus, File/Project chains rows); CSS uses `body.noed` for the waves-layer button.
 - **Master phrases are commands only** (`mstView()` = `cTrack === MT`): `pCols()` gives just the FX columns, the phrase draw
   skips notes/V/I and neighbours, the picker and EDIT+▲▼ use `FXLIST_MST` / `MST_FXC`, letters only match those, the hint
   and the stage (master FX chain) change. Same row format underneath, so a phrase can still be used anywhere. Also fixed:

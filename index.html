@@ -200,8 +200,8 @@ input[type=range]{width:100%; accent-color:var(--ink); height:30px; margin:0; to
 .brand{font-weight:600; font-size:22px; letter-spacing:.01em; white-space:nowrap; margin-right:6px}
 .brand .plus{position:relative; z-index:1; display:inline-block; margin-left:3px; font-weight:700; color:var(--wv);
   -webkit-text-stroke:.05em #111; paint-order:stroke fill}
-body.mob .brand .plus, body.mob .wvEdit{display:none !important}
-body:not(.mob) .wvMobNote{display:none}
+body.mob .brand .plus, body.noed .wvEdit{display:none !important}
+body:not(.noed) .wvMobNote{display:none}
 .brand .plus::before{content:'+'; position:absolute; left:0; top:0; z-index:-1; color:#ff1493; -webkit-text-stroke:.05em #111; paint-order:stroke fill; transform:translate(2px, 3px)}
 :root{--wv:#22958d}
 .wvview,.chview{flex:1; min-height:0; min-width:0; display:flex; background:var(--bench)}
@@ -1135,9 +1135,10 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div class="bar"><span class="ttl">App</span><span class="lbl">...Thunder or ...Thunder Plus</span></div>
     <div class="pbody">
       <div class="btnrow"><label class="cb"><input type="checkbox" id="ckMobile">Mobile (...Thunder)</label></div>
+      <div class="btnrow" id="mobEdRow"><label class="cb"><input type="checkbox" id="ckMobEd">Show …waves and …chains on Mobile</label></div>
       <div class="btnrow"><button type="button" id="updBtn">Check for update</button></div>
       <div class="btnrow" id="installRow" hidden><button type="button" id="installBtn" hidden>Install app</button><span class="lbl" id="installMsg"></span></div>
-      <p class="note">Mobile is ...Thunder: the <b>…waves</b> and <b>…chains</b> editors are hidden and the tracker switches to PAD input. Kits and songs keep their …waves layers and …chains effects, and they still play, so files open and sound the same either way. Turn it off for Desktop (...Thunder Plus) to edit those patches. This is saved for this browser.</p>
+      <p class="note">Mobile is ...Thunder: the <b>…waves</b> and <b>…chains</b> editors are hidden (tick <b>Show …waves and …chains on Mobile</b> to keep them) and the tracker switches to PAD input. Kits and songs keep their …waves layers and …chains effects, and they still play, so files open and sound the same either way. Turn it off for Desktop (...Thunder Plus) to edit those patches. This is saved for this browser.</p>
     </div>
   </section>
 
@@ -4060,6 +4061,12 @@ const PFK = 'thunderplus-platform-v1', DIK = 'thunderplus-desktop-input-v1';
 const PF_DEFAULT = matchMedia('(pointer:coarse)').matches ? 'mobile' : 'desktop';
 let platform = (() => { try { const p = localStorage.getItem(PFK); if (p === 'mobile' || p === 'desktop') return p; } catch(e){} return PF_DEFAULT; })();
 const isMobile = () => platform === 'mobile';
+// Settings → App: Mobile normally hides the …waves and …chains editors (they still play). This brings them back. Off by default.
+const MEK = 'thunderplus-mobile-editors-v1';
+let mobEd = (() => { try { return localStorage.getItem(MEK) === '1'; } catch(e){ return false; } })();
+const noEditors = () => isMobile() && !mobEd;
+function setMobEd(on){ mobEd = !!on; try { localStorage.setItem(MEK, mobEd ? '1' : '0'); } catch(e){} applyPlatform();
+  if (noEditors() && (view === 'waves' || view === 'chains')) setView('synth'); try { if (typeof gsetOpen === 'function' && gsetOpen()) showGset(); } catch(e){} }
 function setPlatform(p){
   p = p === 'mobile' ? 'mobile' : 'desktop';
   if (p === platform){ applyPlatform(); return; }
@@ -4083,10 +4090,13 @@ function applyPlatform(){
   document.title = m ? '...Thunder' : '...Thunder Plus';
   const br = document.querySelector('.brand'); if (br) br.setAttribute('aria-label', document.title);
   const ck = $('ckMobile'); if (ck) ck.checked = m;
-  updView = makeSeg($('segView'), m ? [['tracker', 'Tracker'], ['synth', 'Synth']]
+  const ne = noEditors(); document.body.classList.toggle('noed', ne);
+  const ce = $('ckMobEd'); if (ce) ce.checked = mobEd; const er = $('mobEdRow'); if (er) er.hidden = !m;
+  updView = makeSeg($('segView'), ne ? [['tracker', 'Tracker'], ['synth', 'Synth']]
     : [['tracker', 'Tracker'], ['synth', 'Synth'], ['waves', 'Waves'], ['chains', 'Chains']], () => view, setView);
 }
 $('ckMobile').addEventListener('change', e => setPlatform(e.target.checked ? 'mobile' : 'desktop'));
+$('ckMobEd').addEventListener('change', e => setMobEd(e.target.checked));
 // Per-slot render state follows the slot count (grows when a voice per track is on); slotAt pads or
 // trims so every index the UI touches has an entry.
 const cache = [], dirty = [], bufs = [];
@@ -4509,7 +4519,7 @@ section('…waves', [], s => {
   bs.addEventListener('change', () => { Lc().wBus = +bs.value; changed(); });
   br.append(bs); s.append(br);
   const b = el('button', 'wvEdit', 'Edit the …waves patch'); b.type = 'button'; b.addEventListener('click', openWaves); s.append(b);
-  s.append(el('p', 'note wvMobNote', 'Plays the kit’s …waves patch. To change the patch, turn off Settings → App → Mobile (or open the file in ...Thunder Plus).'));
+  s.append(el('p', 'note wvMobNote', 'Plays the kit’s …waves patch. To change the patch, tick Settings → App → Show …waves and …chains on Mobile.'));
   const st = el('div', 'readout'); st.id = 'wvStat'; st.style.paddingLeft = '0'; s.append(st);
 });
 const wvSec = secs.lastChild;
@@ -6369,7 +6379,7 @@ function fileItems(){
     null,
     ['Export this pad (WAV)', () => $('bExPad').click()], ['Export all 8 pads (.zip)', () => $('bExKit').click()],
     ...(canShare ? [['Share this pad…', () => $('bShPad').click()], ['Share all 8 pads…', () => $('bShKit').click()]] : []),
-    ...(isMobile() ? [] : [null, ['Export chains…', exportChains], ['Import chains…', () => $('chainsIn').click()]])
+    ...(noEditors() ? [] : [null, ['Export chains…', exportChains], ['Import chains…', () => $('chainsIn').click()]])
   ];
 }
 const MACK = /Mac|iPhone|iPad/.test(navigator.platform);
@@ -6727,7 +6737,7 @@ function leaveWaves(){
   const a = wvApi(); if (a) a.pause();
   for (let i = 0; i < nslots(); i++) if (kit.voices[i] && usesWaves(kit.voices[i])) dirty[i] = true;
 }
-function openWaves(){ if (!isMobile()) setView('waves'); }
+function openWaves(){ if (!noEditors()) setView('waves'); }
 function closeWaves(){ setView('synth'); }
 
 /* ---------- …chains editor: a full-screen frame; the patch is read from and saved into the song ---------- */
@@ -6806,7 +6816,7 @@ function leaveChains(){
   chMeterWanted = false;
   const a = chApi(); if (a) a.pause();
 }
-function openChains(){ if (!isMobile()) setView('chains'); }
+function openChains(){ if (!noEditors()) setView('chains'); }
 function closeChains(){ setView('synth'); }
 // Jump to the …chains screen and centre + highlight a track's chain (used when its CHN is switched on and
 // the track already has a chain, and when picking a track that is already used inside the editor).
@@ -8654,7 +8664,7 @@ function setChainOn(t, on){
   saveS();
   if (added && CH.frame) chainsDropFrame();   // the editor reloads with the new pair when it next opens
   chainsPush(); draw();
-  if (on && !added && !was && !isMobile()) focusChainHit(t);   // already had a chain: jump to and highlight it
+  if (on && !added && !was && !noEditors()) focusChainHit(t);   // already had a chain: jump to and highlight it
 }
 // Re-route every track that runs through …chains now, AND every track that did until this change (its Chain Out
 // was deleted or set to another track): without that, the old track kept a chains node with no way out and went silent.
@@ -9184,7 +9194,7 @@ function projRows(){
     {l:'› SAVE', sec:'Project file', act:() => saveProj(false), info:() => (projFile ? 'Saves over ' + projFile.name : 'Saves the song and kit as one .json file') + ' · Ctrl/⌘+S'},
     {l:'› SAVE AS', act:() => saveProj(true), info:() => 'Saves to a new file, keeping the old one · Shift+Ctrl/⌘+S'},
     {l:'› LOAD PROJECT', act:openProj, info:() => 'Load a project file (song and kit) · Ctrl/⌘+O'},
-    ...(isMobile() ? [] : [{l:'› EXPORT CHAINS', act:exportChains, info:() => 'Save the …chains patch (lives in the song) as its own .chains.json file'},
+    ...(noEditors() ? [] : [{l:'› EXPORT CHAINS', act:exportChains, info:() => 'Save the …chains patch (lives in the song) as its own .chains.json file'},
     {l:'› IMPORT CHAINS', act:() => $('chainsIn').click(), info:() => 'Load a .chains.json file into this song (…waves patches work too, keeping their effects)'}]),
     ...(canShareProj() ? [{l:'› SHARE PROJECT', act:shareProj, info:() => 'Send the project file (song and kit) to Drive, email, a chat or your other device, then open it there with LOAD PROJECT'}] : []),
     {l:'› NEW SONG', dbl:true, act:() => setSong(freshSong(), 'New song. The kit is unchanged.'), info:() => 'Clears the song, keeps the kit. Tap EDIT twice'},
@@ -11788,7 +11798,7 @@ let updView = () => {};
 function setView(v){
   fxpClose();
   const was = view;
-  if (isMobile() && (v === 'waves' || v === 'chains')) v = 'synth';   // Mobile: no editors (they still play)
+  if (noEditors() && (v === 'waves' || v === 'chains')) v = 'synth';   // Mobile: no editors unless Settings → App shows them (they still play)
   view = v === 'tracker' || v === 'waves' || v === 'chains' ? v : 'synth';
   const tr = view === 'tracker', wv = view === 'waves', ch = view === 'chains';
   $('main').hidden = $('dock').hidden = tr || wv || ch; $('trk').hidden = !tr; $('wvView').hidden = !wv; $('chView').hidden = !ch;
