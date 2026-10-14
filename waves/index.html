@@ -547,15 +547,30 @@ Object.assign(SHARED_MODULES, {
     ui:{ steps:{l:'Steps', f:whole}, hits:{l:'Hits', f:whole}, rot:{l:'Rotate', f:whole}, div:{l:'Step', c:opts(STEP_NAMES)}, len:{l:'Length', f:pct} },
     about:'Euclidean: spreads Hits as evenly as possible across Steps (the rhythm behind many world grooves), turned by Rotate. It steps once per Step at the song tempo, or on each pulse at Clock. Accent fires on the first hit of each cycle. Restarts when the song starts.' }
 });
+const INT_NAMES = ['−2 oct', '−10th', '−oct', '−5th', '−4th', '−maj 3rd', '−min 3rd', 'Unison', '+min 3rd', '+maj 3rd', '+4th', '+5th', '+6th', '+oct', '+10th', '+2 oct'];
+Object.assign(SHARED_MODULES, {
+  dimension:Object.assign({ label:'Dimension', scope:'mono', params:{ mode:[1,0,3,1], width:[.7,0,1,.01], tone:[.6,0,1,.01] },
+    ui:{ mode:{l:'Mode', c:opts(['1 (subtle)','2','3','4 (widest)'])}, width:{l:'Width', f:pct}, tone:{l:'Tone', f:pct} },
+    about:'Dimension: the subtle stereo widener of the classic 4-button “dimension” chorus boxes. Less swirl than a chorus: it spreads the sound across the stereo field and keeps the middle solid, and sums back to mono cleanly. Mode 1 is barely there, 4 the widest; Width sets how much, Tone darkens it like the old bucket-brigade chips.' }, STEREO),
+  bbd:{ label:'BBD delay', scope:'mono', inputs:{ in:'audio', inR:'audio', time:'cv' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ time:[.3,.02,.9,.001], sync:[0,0,1,1], div:[2,0,6,1], fb:[.45,0,1.1,.01], tone:[.5,0,1,.01], wow:[.25,0,1,.01], age:[.2,0,1,.01], mix:[.35,0,1,.01] },
+    ui:Object.assign({ time:{l:'Time', f:secs}, sync:{l:'Sync', c:opts(['Off (use Time)','To tempo'])}, div:{l:'Division', c:opts(PP_NAMES)}, fb:{l:'Repeats', f:pct},
+      tone:{l:'Tone', f:pct}, wow:{l:'Wow', f:pct}, age:{l:'Age', f:pct} }, MIXP),
+    about:'BBD delay: a bucket-brigade analog echo, like the classic analog delay pedals. Repeats get darker the longer the Time, and they saturate as they build: past 100% they run away into self-oscillation (the saturation keeps it in check). Wow wobbles the pitch, Age adds hiss and murk, and moving Time (or patching the Time input) bends the pitch like turning the knob. Sync locks it to the song tempo.' },
+  harm:Object.assign({ label:'Harmonizer', scope:'mono', params:{ v1:[9,0,15,1], v2:[11,0,15,1], lv1:[.7,0,1,.01], lv2:[0,0,1,.01], pan1:[-.4,-1,1,.01], pan2:[.4,-1,1,.01], detune:[0,0,30,.1], delay:[0,0,.15,.001], win:[.5,0,1,.01], dry:[1,0,1,.01] },
+    ui:{ v1:{l:'Voice 1', c:opts(INT_NAMES)}, v2:{l:'Voice 2', c:opts(INT_NAMES)}, lv1:{l:'Level 1', f:pct}, lv2:{l:'Level 2', f:pct}, pan1:{l:'Pan 1', f:spct}, pan2:{l:'Pan 2', f:spct},
+      detune:{l:'Detune', f:v => '±' + v.toFixed(1) + ' ct'}, delay:{l:'Delay', f:secs}, win:{l:'Window', f:pct}, dry:{l:'Dry', f:pct} },
+    about:'Harmonizer: up to two pitch-shifted copies of the sound at fixed intervals (a third, fifth, octave…), each with its own level and pan. Voice 2 starts silent: turn up Level 2 for a three-part stack (a major triad with the defaults). Detune spreads the two voices apart (set both to Unison with a little Detune and Delay for a wide double). Window: longer is smoother, shorter is tighter on drums. Dry sets the original.' }, STEREO)
+});
 Object.assign(SHARED_FAMILY, { meter:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', ensemble:'afx',
-  phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
+  dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
   envfol:'mod', gateex:'mod', pitchfol:'mod', slew:'util', snh:'util', quant:'util' });
 const SHARED_PORT_LABEL = { car:'Carrier', freq:'Freq', a:'A', b:'B', sum:'A+B', diff:'A−B', mul:'A×B', min:'Min', max:'Max',
-  and:'AND', or:'OR', xor:'XOR', not:'NOT A', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent' };
+  and:'AND', or:'OR', xor:'XOR', not:'NOT A', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent', time:'Time' };
 /* Palette groups: added to an existing group of the same name, or made (audio groups before Control, the rest at the end).
    A module already in the palette is left where it is. */
 const SHARED_PALETTE = [
-  ['Effects', [['ringmod','Ring mod'],['ensemble','Ensemble chorus'],['phaser','Phaser'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['beads','Beads']], 'audio'],
+  ['Effects', [['dimension','Dimension (stereo chorus)'],['bbd','BBD delay'],['harm','Harmonizer'],['ringmod','Ring mod'],['ensemble','Ensemble chorus'],['phaser','Phaser'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['beads','Beads']], 'audio'],
   ['Reverbs', [['spring','Spring reverb'],['plate','Plate reverb'],['room','Room reverb'],['space','Space reverb']], 'audio'],
   ['More effects', [['comb','Comb resonator'],['transient','Transient shaper'],['tgate','Trance gate'],['ott','Multiband squash'],['fshift','Frequency shifter'],['vinyl','Vinyl'],['dub','Dub tape'],['cab','Speaker cab'],['tube','Tube'],['flanger','Flanger'],['tremolo','Tremolo'],['odrive','Overdrive'],['folder','Wavefolder'],['autowah','Auto-wah'],['pshift','Pitch shifter'],['ladder','Ladder filter'],['xmod','Cross-mod'],['lofi','Lo-fi'],['drive','Drive'],['air','Air']], 'audio'],
   ['Filters and amps', [['blades','Blades filter']], 'audio'],
@@ -932,7 +947,7 @@ class WavesBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './waves-worklet.js?v=6';
+    const url = opts.url || './waves-worklet.js?v=7';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'waves', {

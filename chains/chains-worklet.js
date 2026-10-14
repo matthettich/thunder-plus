@@ -1121,11 +1121,127 @@ const Euclid = {
   }
 };
 
+/* Dimension: a stereo-widening bucket-brigade chorus in the spirit of the classic 4-button "dimension" units. Two
+   short delay lines swept in opposite directions by one slow LFO, each added to the dry sound on its side and
+   subtracted, a little, from the other: wide, but the middle stays put and it sums back to mono cleanly.
+   Mode 1 is barely there, 4 the widest; Width scales the wet, Tone darkens it like a bucket-brigade chip. */
+const DIM_MODES = [[.25, .45], [.25, .8], [.25, 1.25], [.45, 1.6]];   // [LFO Hz, sweep ms]
+const Dimension = {
+  type:'dimension', scope:'mono', cost:.12,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ mode:[1,0,3,1], width:[.7,0,1,.01], tone:[.6,0,1,.01] },
+  create(sr){ return { b:new Float32Array(Math.ceil(sr * .02) + 4), w:0, ph:0, l1:0, l2:0, m1:0, m2:0 }; },
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, B = st.b, N = B.length;
+    const [hz, ms] = DIM_MODES[clamp(p.mode | 0, 0, 3)], ctr = .0042 * sr, sw = ms * .001 * sr * .5, wd = p.width;
+    const kt = 1 - Math.exp(-2 * Math.PI * (2500 * Math.pow(4, p.tone)) / sr);
+    const rd = d => { const r = st.w - d, ri = Math.floor(r), fr = r - ri, a = B[((ri % N) + N) % N], b = B[(((ri + 1) % N) + N) % N]; return a + (b - a) * fr; };
+    for (let i = 0; i < ctx.block; i++){
+      const m = (L[i] + R[i]) * .5; B[st.w] = m;
+      st.ph += hz / sr; if (st.ph >= 1) st.ph -= 1;
+      const tri = 1 - 4 * Math.abs(st.ph - .5);
+      // two poles of filtering each, as the chips' clock filters round off the top
+      st.l1 += (rd(ctr + sw * tri) - st.l1) * kt; st.m1 += (st.l1 - st.m1) * kt;
+      st.l2 += (rd(ctr - sw * tri) - st.l2) * kt; st.m2 += (st.l2 - st.m2) * kt;
+      oL[i] = L[i] + (st.m1 - st.m2 * .4) * wd * .7; oR[i] = R[i] + (st.m2 - st.m1 * .4) * wd * .7;
+      st.w = st.w + 1 === N ? 0 : st.w + 1;
+    }
+  }
+};
+
+/* BBD delay: a bucket-brigade analog echo. The repeats get darker the longer the time (a BBD's bandwidth falls with
+   its clock), saturate as they build (Repeats past 100% runs away into self-oscillation, held by the saturation),
+   and wobble with Wow. Moving Time bends the pitch, as turning the knob on the pedal does. Age adds hiss and
+   murk. Sync locks the time to a note value at the song tempo. */
+const BBD = {
+  type:'bbd', scope:'mono', cost:.15,
+  inputs:{ in:'audio', inR:'audio', time:'cv' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ time:[.3,.02,.9,.001], sync:[0,0,1,1], div:[2,0,6,1], fb:[.45,0,1.1,.01], tone:[.5,0,1,.01], wow:[.25,0,1,.01], age:[.2,0,1,.01], mix:[.35,0,1,.01] },
+  create(sr){ return { b:new Float32Array(Math.ceil(sr * 1.3) + 4), w:0, d:-1, lp1:0, lp2:0, hp:0, ph:0, ph2:0, fb:0, r:rng(nextSeed()), nz:0 }; },
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, B = st.b, N = B.length;
+    let tt = p.sync >= .5 ? 60 / (ctx.transport.tempo || 120) * PP_DIVS[clamp(p.div | 0, 0, PP_DIVS.length - 1)][1] : p.time;
+    if (linked(io, 'time')) tt *= Math.pow(2, clamp(io.in.time[0], -1, 1));
+    tt = clamp(tt, .02, 1.2);
+    const target = tt * sr; if (st.d < 0) st.d = target;
+    const kd = 1 - Math.exp(-1 / (sr * .12));                                  // the time glides: pitch bends
+    // bandwidth of a 4096-stage chip at this time, then Tone and Age on top
+    const fc = clamp(4096 / (4 * tt) * .85 * Math.pow(2, (p.tone - .5) * 2) * (1 - p.age * .5), 300, 14000);
+    const k = 1 - Math.exp(-2 * Math.PI * fc / sr), kh = 1 - Math.exp(-2 * Math.PI * 60 / sr);
+    const fbk = p.fb, wow = p.wow, hiss = p.age * p.age * .004, mx = p.mix;
+    for (let i = 0; i < ctx.block; i++){
+      st.d += (target - st.d) * kd;
+      st.ph += .55 / sr; if (st.ph >= 1) st.ph -= 1; st.ph2 += 3.1 / sr; if (st.ph2 >= 1) st.ph2 -= 1;
+      const mod = 1 + wow * (sinT(st.ph) * .006 + sinT(st.ph2) * .0012);       // slow wow plus a little flutter
+      const r = st.w - st.d * mod, ri = Math.floor(r), fr = r - ri;
+      const a = B[((ri % N) + N) % N], c = B[(((ri + 1) % N) + N) % N];
+      let y = a + (c - a) * fr;
+      st.lp1 += (y - st.lp1) * k; st.lp2 += (st.lp1 - st.lp2) * k; y = st.lp2;  // two poles: the clock filters
+      st.hp += (y - st.hp) * kh; y -= st.hp;
+      if ((i & 7) === 0) st.nz = (st.r() * 2 - 1) * hiss;
+      y += st.nz;
+      const x = (L[i] + R[i]) * .5, v = Math.tanh((x + y * fbk) * 1.2) / 1.2;     // the feedback saturates, so it can't run away
+      B[st.w] = v; st.w = st.w + 1 === N ? 0 : st.w + 1;
+      oL[i] = L[i] * (1 - mx * .5) + y * mx; oR[i] = R[i] * (1 - mx * .5) + y * mx;
+    }
+  }
+};
+
+/* Harmonizer: two pitch-shifted voices at set intervals, each with its own level and pan, plus Detune (for a
+   thickening double) and Delay. Each voice reads the input through a delay that drifts at the new speed; when
+   it runs out of room it jumps, choosing the jump whose waveform lines up best with what is playing (so the
+   pitch stays true, not just the speed) and crossfading into it. Window trades smoothness (long) for tightness. */
+const HARM_INT = [-24, -19, -12, -7, -5, -4, -3, 0, 3, 4, 5, 7, 9, 12, 19, 24];
+const Harmonizer = {
+  type:'harm', scope:'mono', cost:.2,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ v1:[9,0,15,1], v2:[11,0,15,1], lv1:[.7,0,1,.01], lv2:[0,0,1,.01], pan1:[-.4,-1,1,.01], pan2:[.4,-1,1,.01], detune:[0,0,30,.1], delay:[0,0,.15,.001], win:[.5,0,1,.01], dry:[1,0,1,.01] },
+  create(sr){ return { b:new Float32Array(Math.ceil(sr * .5) + 4), w:0, v:[0, 1].map(() => ({ d:-1, o:0, f:1 })) }; },
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, B = st.b, N = B.length;
+    const W = (.02 + p.win * .08) * sr, pre = p.delay * sr + 2, dt = p.detune / 1200, F = Math.max(64, Math.min(W / 3, .012 * sr)), PER = Math.round(.02 * sr);
+    const rd = d => { const r = st.w - d, ri = Math.floor(r), fr = r - ri, a = B[((ri % N) + N) % N], b = B[(((ri + 1) % N) + N) % N]; return a + (b - a) * fr; };
+    const at = d => { let x = st.w - ((d + .5) | 0); if (x < 0) x += N; return B[x]; };
+    const vs = [[HARM_INT[clamp(p.v1 | 0, 0, 15)] / 12 + dt, p.lv1, p.pan1], [HARM_INT[clamp(p.v2 | 0, 0, 15)] / 12 - dt, p.lv2, p.pan2]].map(([oct, lv, pan]) => {
+      const a = (clamp(pan, -1, 1) + 1) * Math.PI / 4; return [Math.pow(2, oct), lv * Math.cos(a) * Math.SQRT2, lv * Math.sin(a) * Math.SQRT2]; });
+    // the jump (by about half a window, refined over one period's worth of lags) that best matches the recent waveform
+    const score = (d, dn, step) => { let c = 0, e = 1e-9; for (let j = 0; j < 384; j += step){ const y = at(dn + j); c += at(d + j) * y; e += y * y; } return c / Math.sqrt(e); };
+    const best = (d, dir) => {
+      const L0 = Math.round(W * .5); let bl = L0, bv = -Infinity;
+      for (let L = L0; L < L0 + PER; L += 6){ const v = score(d, d + dir * L, 12); if (v > bv){ bv = v; bl = L; } }   // coarse
+      const c0 = bl; bv = -Infinity;
+      for (let L = c0 - 5; L <= c0 + 5; L++){ const v = score(d, d + dir * L, 3); if (v > bv){ bv = v; bl = L; } }   // fine
+      return d + dir * bl;
+    };
+    for (let i = 0; i < ctx.block; i++){
+      B[st.w] = (L[i] + R[i]) * .5;
+      let yl = L[i] * p.dry, yr = R[i] * p.dry;
+      for (let k = 0; k < 2; k++){
+        const [ratio, gl, gr] = vs[k], v = st.v[k];
+        if (gl === 0 && gr === 0){ v.d = -1; continue; }
+        const lo = pre + 2 + F * Math.max(0, ratio - 1), hi = pre + W + PER;
+        if (v.d < 0){ v.d = (lo + hi) * .5; v.f = 1; }
+        v.d += 1 - ratio; if (v.f < 1) v.o += 1 - ratio;
+        if (v.f >= 1){
+          if (ratio > 1 && v.d < lo){ v.o = v.d; v.d = best(v.d, 1); v.f = 0; }
+          else if (ratio < 1 && v.d > hi){ v.o = v.d; v.d = best(v.d, -1); v.f = 0; }
+        }
+        let s = rd(v.d);
+        if (v.f < 1){ const q = v.f * Math.PI / 2; s = s * Math.sin(q) + rd(v.o) * Math.cos(q); v.f += 1 / F; }
+        yl += s * gl; yr += s * gr;
+      }
+      oL[i] = yl; oR[i] = yr;
+      st.w = st.w + 1 === N ? 0 : st.w + 1;
+    }
+  }
+};
+
 const SHARED_MODULES = { beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
-  meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid };
+  meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
+  dimension:Dimension, bbd:BBD, harm:Harmonizer };
 /* ===SHARED MODULES END=== */
 
 const MODULES = { ...SHARED_MODULES, trackIn:TrackIn,

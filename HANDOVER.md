@@ -21,8 +21,8 @@ Keep this file up to date at the end of a work session.
   - 13 Oct: **pad rendering moved to a Worker** (see below), and the offer to open ...Thunder's saved work.
 - **App:** no build step. `index.html` is the whole tracker/synth app; `chains/index.html` and
   `waves/index.html` are the two modular patch editors loaded in frames.
-- **Cache-busters now:** `chains-worklet.js?v=11`, `waves-worklet.js?v=6`, `master-worklet.js?v=2` (index.html, the editor
-  pages, sw.js). Cache is `thunderplus-v71`.
+- **Cache-busters now:** `chains-worklet.js?v=12`, `waves-worklet.js?v=7`, `master-worklet.js?v=2` (index.html, the editor
+  pages, sw.js). Cache is `thunderplus-v73`.
 
 ## Licensing rule (the owner may sell the app later)
 
@@ -314,6 +314,22 @@ A cable into a slider's small purple jack (`p:<param>`) now always shows the ...
   sets `cTrack`/`cSect` as opening it from Song would. At an edge it toasts and stays. A phrase not in the song
   steps by number as before; `[`/`]` and KEYS-mode Ctrl/⌘+▲▼ still step by number. Help, the PATTERN NAV caption
   and the phrase hint say so. Shift+Option+arrows (`shiftAltArrow`) is unchanged.
+
+## Mastering close on phones, master bus kept on FX, Dimension / BBD delay / Harmonizer (13 Oct, evening)
+
+- **Mastering window:** its × sat in the wrapping header and got lost on phones. Now `.mwx` is a labelled CLOSE
+  button pinned top-right of `.mwhead` (which reserves 120 px for it), and the phone's Back closes the window
+  (`popstate` → `closeMst()` before the other handlers).
+- **Master bus forgotten on FX:** `go()` pointed FX at `cTrack` whenever you came from any screen but the Mixer, so
+  Mixer master → FX → Project → FX landed on a track. It was a bug (the master is FX target `NT`, no master track
+  needed). Now only Song, Sect and Phrase (`fromTrack`) point FX/Mixer at the edited track; FX on the master → Mixer
+  goes to the master row (y 7), FX on a track leaves the master row.
+- **New shared modules (original code):** Dimension (two antiphase BBD lines cross-mixed for width, four modes),
+  BBD delay (bandwidth from a 4096-stage chip at that time, saturating feedback that self-oscillates boundedly,
+  wow/flutter, Age hiss, time glide = pitch bend, tempo sync, Time CV), Harmonizer (two voices, interval menus,
+  level/pan each, detune, delay, window; splice-aligned delay-line shifter: each jump picks the lag that best
+  correlates with the playing waveform, then crossfades). Checked: echo at 250.2 ms for 250 ms; harmonizer within
+  0.3% by autocorrelation (the plain two-head version was ~2% out); CPU 2.5% / 4% / 4.5% of a desktop core.
 
 ## Running it locally
 
