@@ -7,9 +7,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Thunder+">
-<link rel="manifest" href="manifest.webmanifest?v=6">
-<link rel="icon" type="image/png" href="icons/plus-icon-192.png">
-<link rel="apple-touch-icon" href="icons/plus-apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest?v=7">
+<link rel="icon" type="image/png" href="icons/plus-icon-192.png?v=2">
+<link rel="apple-touch-icon" href="icons/plus-apple-touch-icon.png?v=2">
 <title>...Thunder Plus</title>
 <link rel="preload" href="fonts/Jost-500.woff" as="font" type="font/woff" crossorigin>
 <link rel="preload" href="fonts/JetBrainsMono-400.woff2" as="font" type="font/woff2" crossorigin>
@@ -1234,6 +1234,21 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div class="secs" id="blipSecs"></div>
   </section>
   </div>
+  <div class="cardwrap" id="xWrap" hidden>
+  <section class="layercard basscard" id="xCard" aria-label="Engine">
+    <header>
+      <span class="ttl" id="xTtl">Engine</span>
+      <select id="xPre" aria-label="Engine preset"></select>
+      <span class="famtag" id="xTag"></span>
+      <div class="sp"></div>
+      <div class="acts">
+        <button class="sm" id="xRand" type="button">Random</button>
+        <button class="sm" id="xInit" type="button">Init</button>
+      </div>
+    </header>
+    <div class="secs" id="xSecs"></div>
+  </section>
+  </div>
   <div class="cardwrap" id="voxWrap" hidden>
   <section class="layercard basscard" id="voxCard" aria-label="Voice engine">
     <header>
@@ -1574,7 +1589,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p>Each track and the master have 4 effect slots (FX screen, or the Mixer’s FX row): 34 effects in all: EQ, compressor, three reverbs, tape delay, dub tape, saturation, drive, tube, tape, vinyl, lo-fi, bitcrush, chorus, flanger, phaser, tremolo, trance gate, auto-wah, ladder filter, comb resonator, wavefolder, overdrive, pitch and frequency shifters, cross-mod, transient shaper, multiband squash, speaker cab, air, and Rings, Clouds and Beads. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to four, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
 <p><b>…chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback. Its <b>Resample</b> module records what passes through it into a pad, starting on the next bar, and slices it so you can chop it like a breakbeat.</p></section>
-    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound (kicks, snares, hats, percussion, IDM and glitch hits, basses, pads, chords, keys and leads, including Bass and Blip engine sounds). <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once.</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). In <b>⚙ Settings</b>, <b>Kit</b> saves and loads kits, <b>Export</b> writes WAVs for Koala and SunVox, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and <b>Skin</b> changes the look (Pastel, Minimal, Neon, Matrix and the Simple colour pairs).</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
+    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound (kicks, snares, hats, percussion, IDM and glitch hits, basses, pads, chords, keys and leads, including Bass and Blip engine sounds). <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once.</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. In <b>⚙ Settings</b>, <b>Kit</b> saves and loads kits, <b>Export</b> writes WAVs for Koala and SunVox, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and <b>Skin</b> changes the look (Pastel, Minimal, Neon, Matrix and the Simple colour pairs).</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -2353,6 +2368,7 @@ function renderVoice(V, sr, stages, hold){
   if (isBassV(V)) return renderBass(V, sr, hold);
   if (isVoxV(V)) return renderVox(V, sr);
   if (isBlipV(V)) return renderBlip(V, sr);
+  if (isXEngV(V)) return renderX(V, sr, hold);
   if (hold) V = Object.assign({}, V, {gate:hold * 1000, len:hold});
   // The voice-wide filter is open by default and the voice-wide amp is off, so a default voice renders
   // exactly as its layers alone would; turning either on only adds shaping across all the layers.
@@ -3221,6 +3237,314 @@ class KSString {
     const o = y - this.dx + 0.995 * this.dc; this.dx = y; this.dc = o; return o;
   }
 }
+/* ---------- more engines (original code) ----------
+   Acid: a mono bass line synth in the spirit of the classic little silver box and the one-oscillator mono synths
+   (saw/square, sub, noise; a resonant 4-pole ladder with envelope, accent and slide).
+   Machine: a mono synth in the spirit of the 6-voice machine-based groovebox: pick a machine (Dual VCO, Chip, FM+,
+   Swarm, Ensemble, Noise, Additive) with three of its own controls (A, B, C), then high- and low-pass filters, an
+   amp envelope and an LFO.
+   Both play live in the tracker (an AudioWorklet node per track and pad, like the bass and voice engines); their
+   classes are self-contained so the worklet can be built from toString(). Pads render one held note.
+   Tone drum: a drum voice in the spirit of the classic red modelling drum: a tone with a pitch bend (or an
+   inharmonic spectrum), filtered noise with its own sweep, a click, distortion. Rendered.
+   Modal: a struck, plucked or bowed object made of resonating modes (bars, marimba, bells, plates, membranes,
+   glass, strings, tubes, wood). Rendered; on a synth slot it holds (bowed) for the note's length. */
+class AcidCore {
+  constructor(sr){
+    this.sr = sr; this.BLK = 16; this.ph = 0; this.subPh = 0; this.lf = 0; this.go = true; this.gate = false; this.leg = false;
+    this.env = 0; this.stage = 0; this.fe = 0; this.accE = 0; this.accC = 0; this.accOn = 0; this.s0 = 0; this.s1 = 0; this.s2 = 0; this.s3 = 0;
+    this.dc = 0; this.dcx = 0; this.rnd = 9137; this.p = null; this.set({});
+  }
+  static defaults(){ return {oct:1, wave:0, pw:0.5, sub:0, noise:0, cut:380, res:0.72, envAmt:0.6, dec:300, accent:0.6, slide:65,
+    ampDec:900, sus:0.8, rel:12, key:0.25, sat:0.25, tune:0, drive:0, level:0}; }
+  set(o){ const p = Object.assign(AcidCore.defaults(), this.p || {}, o || {}); for (const k in p) if (typeof p[k] !== 'number' || !isFinite(p[k])) p[k] = AcidCore.defaults()[k] || 0; this.p = p; }
+  on(leg, acc){
+    const fresh = !this.gate && this.env < 0.003; this.go = fresh;
+    this.leg = !!leg && !fresh; this.gate = true; this.accOn = acc ? 1 : 0;
+    if (!this.leg){ this.fe = 1; this.stage = 1; if (acc) this.accE = 1; }
+  }
+  off(){ this.gate = false; this.stage = 4; }
+  busy(){ return false; }
+  pblep(t, dt){ if (t < dt){ t /= dt; return t + t - t * t - 1; } if (t > 1 - dt){ t = (t - 1) / dt; return t * t + t + t + 1; } return 0; }
+  ft(x){ if (x > 3) return 1; if (x < -3) return -1; const x2 = x * x; return x * (27 + x2) / (27 + 9 * x2); }
+  render(L, R, a, b, rate){ for (let i = a; i < b; i += this.BLK) this.block(L, R, i, Math.min(b, i + this.BLK), rate); }
+  block(L, R, a, b, rate){
+    const p = this.p, sr = this.sr, n = b - a, dt = n / sr;
+    if (this.stage === 0 && this.env === 0){ for (let i = a; i < b; i++){ L[i] = 0; R[i] = 0; } return; }
+    const target = Math.log2(65.406 * Math.max(1e-3, rate)) + p.oct + p.tune / 12;
+    if (this.go || this.lf === 0){ this.lf = target; this.go = false; }
+    else if (this.leg && p.slide > 0.5) this.lf += (target - this.lf) * (1 - Math.exp(-dt * 1000 / p.slide));
+    else this.lf = target;
+    const f = Math.pow(2, this.lf), inc = Math.min(0.45, f / sr);
+    // amp: a quick attack, then down toward Sustain over Amp decay while held; Release after
+    const e0 = this.env; let e1 = e0;
+    if (this.stage === 1){ e1 = e0 + dt * 1000 / 2; if (e1 >= 1){ e1 = 1; this.stage = 2; } }
+    else if (this.stage === 2) e1 = p.sus + (e0 - p.sus) * Math.exp(-dt * 1000 * 4.6 / Math.max(5, p.ampDec));
+    else if (this.stage === 4){ e1 = e0 * Math.exp(-dt * 1000 * 4.6 / Math.max(2, p.rel)); if (e1 < 1e-5){ e1 = 0; this.stage = 0; } }
+    this.env = e1;
+    // filter envelope (accented notes decay faster), and the accent "sweep": repeated accents charge up and climb
+    const fd = this.accOn ? Math.min(p.dec, 200) : p.dec;
+    this.fe *= Math.exp(-dt * 1000 * 4.6 / Math.max(10, fd));
+    this.accE *= Math.exp(-dt * 1000 * 4.6 / 200);
+    this.accC += (this.accE - this.accC) * (1 - Math.exp(-dt / 0.05));
+    const acc = p.accent * this.accOn;
+    const fc = Math.min(sr * 0.42, Math.max(25, p.cut * Math.pow(2, p.envAmt * 5 * this.fe + acc * 3.2 * this.accC + p.key * (this.lf - 7.03))));
+    const g = 1 - Math.exp(-2 * Math.PI * fc / sr), k = p.res * 4.1, comp = 1 + p.res * 1.1;
+    const pw = 0.5 - Math.max(0, Math.min(0.45, (p.pw - 0.5) * 0.9 + 0)), wv = p.wave, sub = p.sub, nz = p.noise;
+    const sat = 1 + p.sat * 4, lv = Math.pow(10, (p.level || 0) / 20) * 1.1 * (1 + acc * 0.6), dr = p.drive > 0.001 ? 1 + p.drive * p.drive * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1;
+    const de = (e1 - e0) / n; let env = e0;
+    for (let i = a; i < b; i++){
+      env += de;
+      let t = this.ph; this.ph += inc; if (this.ph >= 1) this.ph -= 1;
+      let saw = 2 * t - 1 - this.pblep(t, inc);
+      let sq = (t < pw ? 1 : -1) + this.pblep(t, inc); { let t2 = t - pw; if (t2 < 0) t2 += 1; sq -= this.pblep(t2, inc); }
+      let x = saw * (1 - wv) + sq * wv;
+      if (sub > 0){ this.subPh += inc * 0.5; if (this.subPh >= 1) this.subPh -= 1; x += (this.subPh < 0.5 ? 1 : -1) * sub * 0.7; }
+      if (nz > 0){ this.rnd = (this.rnd * 1664525 + 1013904223) >>> 0; x += (this.rnd / 2147483648 - 1) * nz * 0.6; }
+      // the ladder: four one-pole stages with soft saturation, resonance fed back from the last
+      const u = this.ft((x - k * this.s3) * 0.8);
+      this.s0 += g * (u - this.s0); this.s1 += g * (this.s0 - this.s1); this.s2 += g * (this.s1 - this.s2); this.s3 += g * (this.ft(this.s2 * sat) / sat - this.s3);
+      let y = this.s3 * comp * env;
+      const o = y - this.dcx + 0.997 * this.dc; this.dcx = y; this.dc = o; y = o * lv;
+      if (dr) y = Math.tanh(y * dr) * dn;
+      L[i] = y; R[i] = y;
+    }
+  }
+}
+class MachCore {
+  constructor(sr){
+    this.sr = sr; this.BLK = 16; this.ph = new Float64Array(10); this.ph2 = 0; this.fbm = 0; this.lf = 0; this.go = true; this.gate = false; this.leg = false;
+    this.env = 0; this.stage = 0; this.fe = 0; this.lfo = 0; this.rnd = 4242; this.pk = 0;
+    this.h1 = 0; this.h2 = 0; this.l1 = 0; this.l2 = 0; this.n1 = 0; this.n2 = 0; this.bp1 = 0; this.bp2 = 0; this.cnt = 0; this.hold = 0;
+    for (let i = 0; i < 10; i++) this.ph[i] = (i * 0.618034) % 1;
+    this.p = null; this.set({});
+  }
+  static defaults(){ return {machine:0, oct:2, a:0.3, b:0.5, c:0.4, det:0.25, hp:30, lp:3500, res:0.25, fenv:0.35, fdec:350,
+    atk:3, dec:500, sus:0.7, rel:220, lfoRate:4, lfoDepth:0, lfoDest:0, glide:0, tune:0, drive:0, level:0}; }
+  static get MACHINES(){ return ['Dual VCO', 'Chip', 'FM+', 'Swarm', 'Ensemble', 'Noise', 'Additive']; }
+  static get CHORDS(){ return [[0, 12], [0, 7], [0, 4, 7], [0, 3, 7], [0, 5, 7], [0, 4, 7, 11], [0, 3, 7, 10], [0, 4, 7, 10], [0, 5, 10, 15], [0, 7, 12, 19]]; }
+  set(o){ const p = Object.assign(MachCore.defaults(), this.p || {}, o || {}); for (const k in p) if (typeof p[k] !== 'number' || !isFinite(p[k])) p[k] = MachCore.defaults()[k] || 0; this.p = p; }
+  on(leg){ const fresh = !this.gate && this.env < 0.003; this.go = fresh; this.leg = !!leg && !fresh; this.gate = true; if (!this.leg){ this.stage = 1; this.fe = 1; } }
+  off(){ this.gate = false; this.stage = 4; }
+  busy(){ return false; }
+  pblep(t, dt){ if (t < dt){ t /= dt; return t + t - t * t - 1; } if (t > 1 - dt){ t = (t - 1) / dt; return t * t + t + t + 1; } return 0; }
+  saw(j, inc){ const t = this.ph[j]; let v = 2 * t - 1 - this.pblep(t, inc); this.ph[j] = t + inc >= 1 ? t + inc - 1 : t + inc; return v; }
+  render(L, R, a, b, rate){ for (let i = a; i < b; i += this.BLK) this.block(L, R, i, Math.min(b, i + this.BLK), rate); }
+  gof(fc){ return Math.tan(Math.PI * Math.min(fc, this.sr * 0.45) / this.sr); }
+  svf(x, g, r, st){   // a state-variable filter step: returns the low-pass; this.oh / this.ob hold the high- and band-pass
+    const h = (x - (r + g) * st[0] - st[1]) / (1 + r * g + g * g), bp = g * h + st[0]; st[0] = g * h + bp;
+    const lp = g * bp + st[1]; st[1] = g * bp + lp; this.oh = h; this.ob = bp; return lp;
+  }
+  block(L, R, a, b, rate){
+    const p = this.p, sr = this.sr, n = b - a, dt = n / sr;
+    if (this.stage === 0 && this.env === 0){ for (let i = a; i < b; i++){ L[i] = 0; R[i] = 0; } return; }
+    // LFO (sine) and where it goes: 0 pitch, 1 low-pass, 2 the machine's A, 3 level
+    this.lfo += dt * p.lfoRate; if (this.lfo >= 1) this.lfo -= Math.floor(this.lfo);
+    const lv0 = Math.sin(2 * Math.PI * this.lfo) * p.lfoDepth, dst = p.lfoDest | 0;
+    const target = Math.log2(65.406 * Math.max(1e-3, rate)) + p.oct + p.tune / 12 + (dst === 0 ? lv0 * 0.5 : 0);
+    if (this.go || this.lf === 0){ this.lf = target; this.go = false; }
+    else if (p.glide > 0.5 && this.leg) this.lf += (target - this.lf) * (1 - Math.exp(-dt * 1000 / p.glide));
+    else if (p.glide > 0.5) this.lf += (target - this.lf) * (1 - Math.exp(-dt * 1000 / p.glide));
+    else this.lf = target;
+    const f = Math.pow(2, this.lf), inc = Math.min(0.45, f / sr);
+    const e0 = this.env; let e1 = e0;
+    if (this.stage === 1){ e1 = e0 + dt * 1000 / Math.max(0.5, p.atk); if (e1 >= 1){ e1 = 1; this.stage = 2; } }
+    else if (this.stage === 2) e1 = p.sus + (e0 - p.sus) * Math.exp(-dt * 1000 * 4.6 / Math.max(5, p.dec));
+    else if (this.stage === 4){ e1 = e0 * Math.exp(-dt * 1000 * 4.6 / Math.max(2, p.rel)); if (e1 < 1e-5){ e1 = 0; this.stage = 0; } }
+    this.env = e1; this.fe *= Math.exp(-dt * 1000 * 4.6 / Math.max(5, p.fdec));
+    const A = Math.max(0, Math.min(1, p.a + (dst === 2 ? lv0 * 0.5 : 0))), B = p.b, C = p.c, m = p.machine | 0;
+    const lpF = Math.max(30, Math.min(sr * 0.45, p.lp * Math.pow(2, p.fenv * 6 * this.fe + (dst === 1 ? lv0 * 3 : 0)))), q = 0.6 + p.res * p.res * 14;
+    const amp = Math.pow(10, (p.level || 0) / 20) * 0.35 * (dst === 3 ? 1 - Math.abs(lv0) * 0.9 : 1);
+    const dr = p.drive > 0.001 ? 1 + p.drive * p.drive * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1, de = (e1 - e0) / n;
+    if (!this.fh){ this.fh = [0, 0]; this.fl = [0, 0]; this.fn = [0, 0]; }
+    const gH = this.gof(p.hp), gL = this.gof(lpF), rL = 1 / q, gN = this.gof(f * 2), rN = 1 / (0.6 + (1 - A) * 30);
+    let env = e0;
+    for (let i = a; i < b; i++){
+      env += de; let x = 0;
+      switch (m){
+        case 0: {   // Dual VCO: A saw→pulse, B second oscillator mix, C its interval (0–24 st), Detune
+          const r2 = Math.pow(2, (Math.round(C * 24) + p.det * 0.5) / 12), inc2 = Math.min(0.45, inc * r2), pw = 0.5 - A * 0.45;
+          const t = this.ph[0]; let s1 = 2 * t - 1 - this.pblep(t, inc);
+          if (A > 0.02){ let sq = (t < pw ? 1 : -1) + this.pblep(t, inc), t2 = t - pw; if (t2 < 0) t2 += 1; sq -= this.pblep(t2, inc); s1 = s1 * (1 - A) + sq * A; }
+          this.ph[0] = t + inc >= 1 ? t + inc - 1 : t + inc;
+          x = s1 * (1 - B * 0.5) + this.saw(1, inc2) * B * 0.8; break; }
+        case 1: {   // Chip: A pulse width, B wave (pulse · saw · triangle · noise), C ring mod; 12-bit steps
+          const t = this.ph[0]; this.ph[0] = t + inc >= 1 ? t + inc - 1 : t + inc;
+          const zone = Math.min(3, Math.floor(B * 4)), pw = 0.08 + A * 0.84;
+          if (zone === 0) x = t < pw ? 1 : -1;
+          else if (zone === 1) x = 2 * t - 1;
+          else if (zone === 2) x = 4 * Math.abs(t - 0.5) - 1;
+          else { if (this.ph[0] < t){ this.rnd = (this.rnd * 1664525 + 1013904223) >>> 0; this.hold = this.rnd / 2147483648 - 1; } x = this.hold; }
+          if (C > 0.01){ const t2 = this.ph[1]; this.ph[1] = t2 + inc * 1.5 >= 1 ? t2 + inc * 1.5 - 1 : t2 + inc * 1.5; x *= 1 - C + C * (4 * Math.abs(t2 - 0.5) - 1); x *= 1 + C; }
+          x = Math.round(x * 2047) / 2047 * 0.8; break; }
+        case 2: {   // FM+: A ratio, B index (follows the filter envelope too), C feedback
+          const ratio = 0.5 + Math.round(A * 15) * 0.5, idx = B * 8 * (0.4 + 0.6 * this.fe);
+          const tm = this.ph[1]; this.ph[1] = tm + inc * ratio >= 1 ? (tm + inc * ratio) % 1 : tm + inc * ratio;
+          const mod = Math.sin(2 * Math.PI * tm + C * 2.5 * this.fbm); this.fbm = mod;
+          const tc = this.ph[0]; this.ph[0] = tc + inc >= 1 ? tc + inc - 1 : tc + inc;
+          x = Math.sin(2 * Math.PI * tc + idx * mod) * 0.9; break; }
+        case 3: {   // Swarm: A spread, B voices (2–7), C sub
+          const nv = 2 + Math.round(B * 5); let s = 0;
+          for (let j = 0; j < nv; j++){ const off = (j / (nv - 1) - 0.5) * 2 * A * 0.06; s += this.saw(j, Math.min(0.45, inc * (1 + off))); }
+          x = s / Math.sqrt(nv) * 0.75;
+          if (C > 0){ const t = this.ph[9]; this.ph[9] = t + inc * 0.5 >= 1 ? t + inc * 0.5 - 1 : t + inc * 0.5; x += Math.sin(2 * Math.PI * t) * C * 0.8; }
+          break; }
+        case 4: {   // Ensemble: A chord, B detune, C saw→square
+          const ch = MachCore.CHORDS[Math.min(9, Math.floor(A * 10))]; let s = 0;
+          for (let j = 0; j < ch.length; j++){
+            const r = Math.pow(2, ch[j] / 12) * (1 + (j % 2 ? 1 : -1) * B * 0.008 * (j + 1)), ij = Math.min(0.45, inc * r), t = this.ph[j];
+            let v = 2 * t - 1 - this.pblep(t, ij); if (C > 0.02){ let sq = (t < 0.5 ? 1 : -1) + this.pblep(t, ij), t2 = t - 0.5; if (t2 < 0) t2 += 1; sq -= this.pblep(t2, ij); v = v * (1 - C) + sq * C; }
+            this.ph[j] = t + ij >= 1 ? t + ij - 1 : t + ij; s += v; }
+          x = s / Math.sqrt(ch.length) * 0.7; break; }
+        case 5: {   // Noise: A band width, B colour (white → dark), C pitched resonance
+          this.rnd = (this.rnd * 1664525 + 1013904223) >>> 0; let w = this.rnd / 2147483648 - 1;
+          this.n1 += (w - this.n1) * (1 - B * 0.95); w = this.n1;
+          this.svf(w, gN, rN, this.fn); const bp = this.ob;
+          x = (w * A + bp * (1 - A) * 3) * (1 - C) + bp * C * 6; x *= 0.3; break; }
+        default: {   // Additive: A partials (1–16), B odd/even, C tilt (bright)
+          const np = 1 + Math.round(A * 15), t = this.ph[0]; this.ph[0] = t + inc >= 1 ? t + inc - 1 : t + inc;
+          let s = 0, norm = 0;
+          for (let k = 1; k <= np; k++){ if (f * k > sr * 0.45) break; const g = Math.pow(k, -1.6 + C * 1.4) * (k % 2 ? 1 : 1 - B); s += Math.sin(2 * Math.PI * t * k) * g; norm += g; }
+          x = norm ? s / Math.sqrt(norm) * 0.8 : 0; break; }
+      }
+      // high-pass, then the resonant low-pass
+      this.svf(x, gH, 1.4, this.fh); const hpo = this.oh;
+      const lpo = this.svf(hpo, gL, rL, this.fl);
+      let y = lpo * env * amp;
+      if (dr) y = Math.tanh(y * dr) * dn;
+      L[i] = y; R[i] = y;
+    }
+  }
+}
+// The live engines' pad render: one note, held for `hold` seconds, then released.
+function renderLiveCore(C, P, sr, hold, acc){
+  const c = new C(sr); c.set(P);
+  const p = c.p, h = Math.max(0.05, hold || 1.5), tail = ((p.rel || 20) / 1000) * 1.6 + 0.03, N = Math.min(Math.ceil((h + tail) * sr), sr * 32), hN = Math.min(N, Math.round(h * sr));
+  const L = new Float32Array(N), R = new Float32Array(N);
+  c.on(false, acc); c.render(L, R, 0, hN, 1); c.off(); c.render(L, R, hN, N, 1);
+  let end = N; while (end > 1 && Math.abs(L[end - 1]) < 1e-4) end--;
+  const res = L.slice(0, Math.max(end, 1)), fl = Math.min(res.length, Math.round(sr * 0.002));
+  for (let i = 0; i < fl; i++) res[res.length - 1 - i] *= i / fl;
+  return res;
+}
+/* Tone drum: rendered one-shot. */
+class ToneDrum {
+  static defaults(){ return {wave:0, pitch:160, bend:14, bendT:45, tdec:320, tLev:0.85, spectra:0, nType:1, nFreq:2400, nRes:0.25, nDec:160, nSweep:0, nLev:0.35, click:0.3, dist:0, tune:0, drive:0, level:0}; }
+  static get WAVES(){ return ['Sine', 'Triangle', 'Saw', 'Square', 'Spectra']; }
+  static get NOISE(){ return ['Low-pass', 'Band-pass', 'High-pass', 'Resonant']; }
+  static render(o, sr){
+    const p = Object.assign(ToneDrum.defaults(), o || {});
+    const len = Math.min(6, Math.max(p.tdec, p.nDec) / 1000 * 7 + 0.02), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N);
+    const f0 = p.pitch * Math.pow(2, (p.tune || 0) / 12), wv = p.wave | 0, MR = [1, 1.594, 2.136, 2.296, 2.653, 2.918, 3.156, 3.501];
+    const td = Math.max(5, p.tdec) / 1000, bt = Math.max(1, p.bendT) / 1000, nd = Math.max(5, p.nDec) / 1000;
+    let ph = 0, phs = new Float64Array(8), rnd = 1234, s0 = 0, s1 = 0, dcx = 0, dc = 0;
+    const nt = p.nType | 0, q = 0.5 + p.nRes * p.nRes * (nt === 3 ? 40 : 8);
+    for (let i = 0; i < N; i++){
+      const t = i / sr, fe = Math.exp(-t / bt), f = f0 * Math.pow(2, p.bend * fe / 12), inc = f / sr, aT = Math.exp(-t / td * 1.0);
+      ph += inc; if (ph >= 1) ph -= 1;
+      let tone;
+      if (wv === 0) tone = Math.sin(2 * Math.PI * ph);
+      else if (wv === 1) tone = 4 * Math.abs(ph - 0.5) - 1;
+      else if (wv === 2) tone = (2 * ph - 1) * 0.7;
+      else if (wv === 3) tone = (ph < 0.5 ? 1 : -1) * 0.6;
+      else { tone = 0; for (let k = 0; k < 8; k++){ phs[k] += inc * MR[k]; if (phs[k] >= 1) phs[k] -= 1; tone += Math.sin(2 * Math.PI * phs[k]) / (1 + k * (1.5 - p.spectra)); } tone *= 0.45; }
+      if (p.spectra > 0 && wv !== 4){ for (let k = 1; k < 4; k++){ phs[k] += inc * MR[k]; if (phs[k] >= 1) phs[k] -= 1; tone += Math.sin(2 * Math.PI * phs[k]) * p.spectra * 0.35 / k; } }
+      rnd = (rnd * 1664525 + 1013904223) >>> 0; const w = rnd / 2147483648 - 1;
+      const nf = Math.min(sr * 0.45, p.nFreq * Math.pow(2, p.nSweep * 4 * Math.exp(-t / 0.05))), g = Math.tan(Math.PI * nf / sr), r = 1 / q;
+      const hh = (w - (r + g) * s0 - s1) / (1 + r * g + g * g), bp = g * hh + s0; s0 = g * hh + bp; const lp = g * bp + s1; s1 = g * bp + lp;
+      const nz = nt === 0 ? lp : nt === 2 ? hh : nt === 3 ? bp * 2 / Math.sqrt(q) : bp * 1.5;
+      const cl = t < 0.004 ? (1 - t / 0.004) * (i % 2 ? -1 : 1) * 0.3 + (t < 0.0008 ? 1 : 0) : 0;
+      let y = tone * aT * p.tLev + nz * Math.exp(-t / nd) * p.nLev + cl * p.click;
+      if (p.dist > 0){ const d = 1 + p.dist * 12; y = Math.tanh(y * d) / Math.tanh(d) * 0.9; }
+      const o = y - dcx + 0.995 * dc; dcx = y; dc = o; out[i] = o;
+    }
+    const lv = Math.pow(10, (p.level || 0) / 20) * 0.8, dr = (p.drive || 0) > 0.001 ? 1 + p.drive * p.drive * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1;
+    for (let i = 0; i < N; i++){ let y = out[i] * lv; if (dr) y = Math.tanh(y * dr) * dn; out[i] = y; }
+    let end = N; while (end > 1 && Math.abs(out[end - 1]) < 1e-4) end--;
+    const res = out.slice(0, Math.max(end, 1)), fl = Math.min(res.length, Math.round(sr * 0.002)); for (let i = 0; i < fl; i++) res[res.length - 1 - i] *= i / fl;
+    return res;
+  }
+}
+/* Modal: a bank of decaying resonant modes, struck, plucked, rubbed or bowed. */
+class ModalCore {
+  static defaults(){ return {mat:0, oct:2, modes:16, bright:0.6, dec:1.2, dtilt:0.5, pos:0.28, inharm:0, exc:0, hard:0.55, bow:0.6, noise:0, width:0.3, tune:0, drive:0, level:0}; }
+  static get MATERIALS(){ return ['Bar', 'Marimba', 'Vibes', 'Glock', 'Bell', 'Gong', 'Membrane', 'Glass', 'String', 'Tube', 'Wood', 'Plate']; }
+  static get EXCITERS(){ return ['Mallet', 'Noise burst', 'Bow', 'Pluck', 'Breath']; }
+  static ratios(m){
+    const T = {
+      0:[1, 2.756, 5.404, 8.933, 13.344, 18.638, 24.81, 31.87, 39.81, 48.63, 58.34, 68.93],
+      1:[1, 3.99, 10.07, 18.9, 29.3, 41.4, 55.1, 70.6],
+      2:[1, 4.0, 10.0, 17.6, 27.2, 38.9, 52.5],
+      3:[1, 2.71, 5.15, 8.43, 12.5, 17.4, 23.1, 29.6],
+      4:[0.5, 1, 1.183, 1.506, 2, 2.514, 2.662, 3.011, 4.166, 5.433, 6.796, 8.215],
+      5:[1, 1.42, 1.78, 2.11, 2.27, 2.62, 2.84, 3.31, 3.48, 3.89, 4.25, 4.6, 5.03, 5.37, 5.91, 6.32],
+      6:[1, 1.594, 2.136, 2.296, 2.653, 2.918, 3.156, 3.501, 3.6, 3.652, 4.06, 4.154, 4.601, 4.832, 4.903, 5.131],
+      7:[1, 2.32, 4.25, 6.63, 9.38, 12.5, 16.0],
+      8:[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+      9:[1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23],
+      10:[1, 2.57, 4.1, 6.2, 8.6, 11.3],
+      11:[1, 1.68, 2.43, 2.73, 3.42, 4.05, 4.58, 5.11, 5.7, 6.29, 6.88, 7.5, 8.07, 8.71, 9.31, 9.87]
+    };
+    return T[m] || T[0];
+  }
+  // how long each material rings (× Decay), and how fast its upper modes die (× Damp tilt)
+  static get MAT(){ return [[1, 1], [0.8, 1.2], [3, 0.5], [2.2, 0.5], [3.5, 0.35], [4, 0.3], [0.6, 1.3], [2.8, 0.4], [1.6, 0.8], [1.2, 0.9], [0.18, 1.6], [2.5, 0.6]]; }
+  static render(o, sr, hold){
+    const p = Object.assign(ModalCore.defaults(), o || {}), m = Math.max(0, Math.min(11, p.mat | 0)), R0 = ModalCore.ratios(m), M = ModalCore.MAT[m];
+    const f0 = 65.406 * Math.pow(2, p.oct + (p.tune || 0) / 12), exc = p.exc | 0, sus = exc === 2 || exc === 4;
+    const h = sus ? Math.max(0.08, hold || 1) : 0, baseT = Math.max(0.02, p.dec) * M[0];
+    const nm = Math.max(1, Math.min(24, p.modes | 0)), modes = [];
+    for (let k = 0; k < nm; k++){
+      let r = k < R0.length ? R0[k] : R0[R0.length - 1] + (k - R0.length + 1) * (R0[R0.length - 1] - R0[R0.length - 2]);
+      r *= 1 + p.inharm * 0.004 * k * k;
+      const f = f0 * r; if (f > sr * 0.45 || f < 20) continue;
+      const shape = Math.abs(Math.sin(Math.PI * (k + 1) * Math.max(0.01, Math.min(0.99, p.pos)))) * 0.85 + 0.15;
+      const amp = Math.pow(k + 1, -1.8 + p.bright * 1.9) * shape * (m === 4 && k === 0 ? 0.6 : 1);
+      const tau = baseT / (1 + (r - 1) * p.dtilt * M[1] * 0.6);
+      const w = 2 * Math.PI * f / sr, rr = Math.exp(-1 / (tau * sr));
+      modes.push({c1:2 * rr * Math.cos(w), c2:-rr * rr, g:amp * Math.sin(w), y1:0, y2:0, tau, pan:(k % 2 ? 1 : -1) * p.width * Math.min(1, k / 4)});
+    }
+    const maxT = modes.reduce((x, q) => Math.max(x, q.tau), 0.05), len = Math.min(10, h + maxT * 6.9 + 0.05), N = Math.max(1, Math.ceil(len * sr));
+    const out = new Float32Array(N);
+    // the exciter: mallet = a raised-cosine pulse (shorter when harder), burst/pluck = decaying noise, bow/breath = noise while held
+    const pw = Math.max(2, Math.round(sr * (0.0002 + (1 - p.hard) * 0.006))); let rnd = 777, lpn = 0;
+    for (let i = 0; i < N; i++){
+      const t = i / sr; rnd = (rnd * 1664525 + 1013904223) >>> 0; const w = rnd / 2147483648 - 1;
+      lpn += (w - lpn) * (0.05 + p.hard * 0.9);
+      let x = 0;
+      if (exc === 0){ if (i < pw) x = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / pw); x += p.noise * lpn * Math.exp(-t / 0.01); }
+      else if (exc === 1) x = lpn * Math.exp(-t / (0.004 + (1 - p.hard) * 0.03)) * 1.5;
+      else if (exc === 3) x = (i < 3 ? 1 : 0) + lpn * Math.exp(-t / 0.006) * 0.8;
+      else { const g = t < 0.04 ? t / 0.04 : t < h ? 1 : Math.exp(-(t - h) / 0.03); x = lpn * g * p.bow * (exc === 4 ? 0.06 : 0.035) * (1 + p.noise * 2); }
+      let y = 0;
+      for (const q of modes){ const v = q.c1 * q.y1 + q.c2 * q.y2 + q.g * x; q.y2 = q.y1; q.y1 = v; y += v; }
+      out[i] = y + (exc === 4 ? lpn * p.noise * 0.05 * (t < h ? 1 : 0) : 0);
+    }
+    let pk = 0; for (let i = 0; i < N; i++) pk = Math.max(pk, Math.abs(out[i]));
+    const lv = Math.pow(10, (p.level || 0) / 20) * (pk > 0 ? 0.8 / pk : 1), dr = (p.drive || 0) > 0.001 ? 1 + p.drive * p.drive * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1;
+    for (let i = 0; i < N; i++){ let y = out[i] * lv; if (dr) y = Math.tanh(y * dr) * dn; out[i] = y; }
+    let end = N; while (end > 1 && Math.abs(out[end - 1]) < 1e-4) end--;
+    const res = out.slice(0, Math.max(end, 1)), fl = Math.min(res.length, Math.round(sr * 0.003)); for (let i = 0; i < fl; i++) res[res.length - 1 - i] *= i / fl;
+    return res;
+  }
+}
+// The new engines in one table: live ones have a Core class (played by a worklet in the tracker), rendered ones a render().
+const XENG = {
+  acid:{live:true, C:() => AcidCore, d:() => AcidCore.defaults()},
+  mach:{live:true, C:() => MachCore, d:() => MachCore.defaults()},
+  tone:{live:false, d:() => ToneDrum.defaults()},
+  modal:{live:false, d:() => ModalCore.defaults()},
+};
+const isXEngV = v => !!(v && XENG[v.engine]);
+function normX(kind, o){ const d = XENG[kind].d(), r = {}; for (const k in d) r[k] = o && typeof o[k] === 'number' && isFinite(o[k]) ? o[k] : d[k]; delete r.tune; delete r.drive; delete r.level; return r; }
+function xParams(V){ return Object.assign(normX(V.engine, V[V.engine]), {tune:V.tune || 0, drive:V.drive || 0, level:V.level || 0}); }
+function renderX(V, sr, hold){
+  const k = V.engine, P = xParams(V);
+  if (k === 'acid') return renderLiveCore(AcidCore, P, sr, hold || Math.min(V.len || 1, 1.2), false);
+  if (k === 'mach') return renderLiveCore(MachCore, P, sr, hold || Math.min(V.len || 2, 2));
+  if (k === 'tone') return ToneDrum.render(P, sr);
+  return ModalCore.render(P, sr, hold || (V.gate || 400) / 1000 * 2);
+}
 /* ===ENGINE END=== */
 
 (() => {
@@ -3881,11 +4205,12 @@ const BV = () => { const v = V(); if (!v.bass) v.bass = normBass(null); return v
 function bassEdit(){ changed(cur, true); bassVizKick(); }
 function setEngine(x){
   const v = V();
-  const was = v.engine === 'bass' || v.engine === 'vox' || v.engine === 'blip';
+  const was = v.engine === 'bass' || v.engine === 'vox' || v.engine === 'blip' || !!XENG[v.engine];
   if (x === (v.engine || 'layers')) return;
   if (!was) v.tuneL = v.tune;
   if (x === 'bass'){ const first = !v.bass; v.engine = 'bass'; v.tune = 0; v.bass = normBass(v.bass); if (first) bassPreset(1, true); }
   else if (x === 'vox'){ v.engine = 'vox'; v.tune = 0; v.vox = normVox(v.vox); }
+  else if (XENG[x]){ v.engine = x; v.tune = 0; v[x] = normX(x, v[x]); }
   else if (x === 'blip'){ const first = !v.blip; v.engine = 'blip'; v.tune = 0; v.blip = normBlip(v.blip); if (first) blipPreset(isSyn(cur) ? 0 : 3, true); }
   else { v.engine = 'layers'; if (typeof v.tuneL === 'number') v.tune = v.tuneL; }
   changed(cur); refreshAll();
@@ -3933,7 +4258,8 @@ function bassRandom(){
   pre.addEventListener('change', () => { if (pre.value !== '') bassPreset(+pre.value); pre.value = ''; });
   $('bassRand').addEventListener('click', bassRandom);
   $('bassInit').addEventListener('click', () => bassPreset(0));
-  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass'], ['vox', 'Voice'], ['blip', 'Blip']], () => isBassV(V()) ? 'bass' : isVoxV(V()) ? 'vox' : isBlipV(V()) ? 'blip' : 'layers', setEngine);
+  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass'], ['vox', 'Voice'], ['blip', 'Blip'], ['acid', 'Acid'], ['mach', 'Machine'], ['tone', 'Tone drum'], ['modal', 'Modal']],
+    () => isBassV(V()) ? 'bass' : isVoxV(V()) ? 'vox' : isBlipV(V()) ? 'blip' : isXEngV(V()) ? V().engine : 'layers', setEngine);
 })();
 
 /* ---------- blip engine editor ----------
@@ -4305,6 +4631,8 @@ function factoryVoicePresets(){
       {type:'bell', a:0.45, b:0.25, atk:0.5, dec:2400, sus:0.15, rel:1500, level:0.7},
       {type:'sine', tune:12, atk:0.5, dec:1200, sus:0, rel:900, level:0.25}], {len:8})],
   ]],
+  ...[['acid', 'Acid'], ['mach', 'Machine synth'], ['tone', 'Tone drums'], ['modal', 'Modal']].map(([k, gn]) => [gn, XUI[k].pre.slice(1).map(([n, o, x]) =>
+    [n, () => PE(n, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:k === 'modal' ? 6 : 4, gate:400}, x || {}))])]),
   ['Leads', [
     ['Square lead', () => PS('Square lead', [
       {type:'square', atk:3, dec:300, sus:0.75, rel:180, lpCut:3200, lpRes:0.25, level:0.6},
@@ -4452,16 +4780,118 @@ async function importPresetsFile(f){
   setTimeout(presetUI, 0);   // the song (S) is set up further down this script
   $('presetIn').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) importPresetsFile(f); });
 })();
+/* ---------- the Acid, Machine, Tone drum and Modal cards (one card, built for whichever engine the pad uses) ---------- */
+const nameOf = list => v => list[Math.max(0, Math.min(list.length - 1, Math.round(v)))];
+const XUI = {
+  acid:{title:'Acid', tag:'saw/square · ladder · accent · slide', rows:{
+      oct:{l:'Octave', min:-1, max:3, c:'int', d:1, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      wave:{l:'Wave', min:0, max:1, c:'lin', d:0, f:v => v < 0.03 ? 'Saw' : v > 0.97 ? 'Square' : 'Saw ' + Math.round((1 - v) * 100) + '%'},
+      pw:{l:'Pulse width', min:0, max:1, c:'lin', d:0.5, f:pct}, sub:{l:'Sub', min:0, max:1, c:'lin', d:0, f:pct}, noise:{l:'Noise', min:0, max:1, c:'lin', d:0, f:pct},
+      cut:{l:'Cutoff', min:40, max:6000, c:'log', d:380, f:hz}, res:{l:'Resonance', min:0, max:1.05, c:'lin', d:0.72, f:pct},
+      envAmt:{l:'Env mod', min:0, max:1, c:'lin', d:0.6, f:pct}, dec:{l:'Decay', min:30, max:3000, c:'log', d:300, f:ms},
+      accent:{l:'Accent', min:0, max:1, c:'lin', d:0.6, f:pct}, slide:{l:'Slide', min:0, max:400, c:'sq', d:65, f:v => v < 0.5 ? 'Off' : ms(v)},
+      key:{l:'Key follow', min:0, max:1, c:'lin', d:0.25, f:pct}, sat:{l:'Saturation', min:0, max:1, c:'lin', d:0.25, f:pct},
+      ampDec:{l:'Amp decay', min:20, max:4000, c:'log', d:900, f:ms}, sus:{l:'Sustain', min:0, max:1, c:'lin', d:0.8, f:pct}, rel:{l:'Release', min:2, max:1000, c:'log', d:12, f:ms}},
+    secs:[['Oscillator', ['oct', 'wave', 'pw', 'sub', 'noise']], ['Filter', ['cut', 'res', 'envAmt', 'dec', 'key', 'sat']], ['Accent & slide', ['accent', 'slide']], ['Amp', ['ampDec', 'sus', 'rel']]],
+    note:'Notes with a volume of C0 or more are accented (louder, brighter, a faster sweep that climbs on repeated accents). PSL slides into the next note.',
+    pre:[['Init', {}], ['Classic squelch', {cut:300, res:0.85, envAmt:0.75, dec:260, accent:0.8}], ['Rubber', {wave:0.2, cut:200, res:0.6, envAmt:0.5, dec:500, sat:0.5}],
+      ['Square acid', {wave:1, pw:0.5, cut:420, res:0.8, envAmt:0.65, dec:220}], ['Screamer', {cut:600, res:1.02, envAmt:0.9, dec:180, accent:1, sat:0.7}, {drive:0.4}],
+      ['Mono sub bass (101-ish)', {wave:1, pw:0.35, sub:0.8, cut:700, res:0.3, envAmt:0.35, dec:400, ampDec:1500, sus:0.9, rel:60, slide:0}],
+      ['Noise bass', {wave:0.5, noise:0.35, cut:500, res:0.5, envAmt:0.6, dec:200}], ['Bloop', {oct:2, wave:0, cut:150, res:0.95, envAmt:1, dec:120, ampDec:300, sus:0.2}]]},
+  mach:{title:'Machine', tag:'machines · HP/LP · LFO', rows:{
+      machine:{l:'Machine', min:0, max:6, c:'int', d:0, f:nameOf(MachCore.MACHINES)},
+      oct:{l:'Octave', min:-1, max:3, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      a:{l:'A', min:0, max:1, c:'lin', d:0.3, f:pct}, b:{l:'B', min:0, max:1, c:'lin', d:0.5, f:pct}, c:{l:'C', min:0, max:1, c:'lin', d:0.4, f:pct},
+      det:{l:'Detune', min:0, max:1, c:'lin', d:0.25, f:pct},
+      hp:{l:'High-pass', min:20, max:4000, c:'log', d:30, f:hz}, lp:{l:'Low-pass', min:60, max:16000, c:'log', d:3500, f:hz}, res:{l:'Resonance', min:0, max:1, c:'lin', d:0.25, f:pct},
+      fenv:{l:'Filter env', min:0, max:1, c:'lin', d:0.35, f:pct}, fdec:{l:'Filter decay', min:10, max:3000, c:'log', d:350, f:ms},
+      atk:{l:'Attack', min:0.5, max:2000, c:'log', d:3, f:ms}, dec:{l:'Decay', min:10, max:4000, c:'log', d:500, f:ms}, sus:{l:'Sustain', min:0, max:1, c:'lin', d:0.7, f:pct}, rel:{l:'Release', min:5, max:4000, c:'log', d:220, f:ms},
+      lfoRate:{l:'LFO rate', min:0.05, max:20, c:'log', d:4, f:v => v.toFixed(2) + ' Hz'}, lfoDepth:{l:'LFO depth', min:0, max:1, c:'lin', d:0, f:pct},
+      lfoDest:{l:'LFO to', min:0, max:3, c:'int', d:0, f:nameOf(['Pitch', 'Low-pass', 'A', 'Level'])}, glide:{l:'Glide', min:0, max:600, c:'sq', d:0, f:v => v < 0.5 ? 'Off' : ms(v)}},
+    secs:[['Machine', ['machine', 'oct', 'a', 'b', 'c', 'det']], ['Filters', ['hp', 'lp', 'res', 'fenv', 'fdec']], ['Amp', ['atk', 'dec', 'sus', 'rel', 'glide']], ['LFO', ['lfoRate', 'lfoDepth', 'lfoDest']]],
+    note:'A, B and C do something different on each machine. Dual VCO: A saw→pulse, B 2nd osc level, C its interval. Chip: A pulse width, B wave, C ring mod. FM+: A ratio, B index, C feedback. Swarm: A spread, B voices, C sub. Ensemble: A chord, B detune, C saw→square. Noise: A width, B colour, C pitched. Additive: A partials, B odd/even, C brightness.',
+    pre:[['Init', {}], ['Dual saw lead', {machine:0, a:0, b:0.8, c:0, det:0.6, lp:5000, res:0.2}], ['Sync-ish brass', {machine:0, a:0.4, b:0.7, c:0.5, lp:1800, fenv:0.6, fdec:250, res:0.35}],
+      ['Chip arp', {machine:1, a:0.25, b:0.1, c:0, lp:9000, dec:200, sus:0.5, rel:60}], ['Chip ring', {machine:1, a:0.5, b:0.6, c:0.8, lp:6000}],
+      ['FM bell', {machine:2, a:0.4, b:0.55, c:0.1, lp:12000, fenv:0.2, dec:1500, sus:0.1, rel:900}], ['FM bass', {machine:2, oct:1, a:0.06, b:0.5, c:0.3, lp:2500, dec:300, sus:0.6}],
+      ['Swarm pad', {machine:3, a:0.6, b:1, c:0.3, lp:3000, atk:400, dec:1500, sus:0.85, rel:1200, lfoRate:0.3, lfoDepth:0.3, lfoDest:1}],
+      ['Ensemble stab', {machine:4, a:0.65, b:0.4, c:0, lp:2200, fenv:0.5, fdec:200, dec:350, sus:0.2, rel:200}],
+      ['Noise wind', {machine:5, a:0.3, b:0.4, c:0.6, lp:6000, atk:300, rel:800}], ['Additive organ', {machine:6, a:0.5, b:0.2, c:0.5, lp:10000, atk:4, sus:0.95, rel:90}],
+      ['Wobble mono', {machine:0, oct:1, a:0.2, b:0.6, c:0, lp:600, res:0.6, lfoRate:3, lfoDepth:0.7, lfoDest:1}]]},
+  tone:{title:'Tone drum', tag:'tone · bend · noise · click', rows:{
+      wave:{l:'Tone wave', min:0, max:4, c:'int', d:0, f:nameOf(ToneDrum.WAVES)}, pitch:{l:'Pitch', min:20, max:4000, c:'log', d:160, f:hz},
+      bend:{l:'Bend', min:-24, max:48, c:'lin', d:14, f:st}, bendT:{l:'Bend time', min:1, max:800, c:'log', d:45, f:ms}, tdec:{l:'Tone decay', min:5, max:4000, c:'log', d:320, f:ms},
+      tLev:{l:'Tone level', min:0, max:1, c:'lin', d:0.85, f:pct}, spectra:{l:'Spectra', min:0, max:1, c:'lin', d:0, f:pct},
+      nType:{l:'Noise filter', min:0, max:3, c:'int', d:1, f:nameOf(ToneDrum.NOISE)}, nFreq:{l:'Noise freq', min:40, max:16000, c:'log', d:2400, f:hz}, nRes:{l:'Noise reso', min:0, max:1, c:'lin', d:0.25, f:pct},
+      nDec:{l:'Noise decay', min:5, max:3000, c:'log', d:160, f:ms}, nSweep:{l:'Noise sweep', min:-1, max:1, c:'lin', d:0, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, nLev:{l:'Noise level', min:0, max:1, c:'lin', d:0.35, f:pct},
+      click:{l:'Click', min:0, max:1, c:'lin', d:0.3, f:pct}, dist:{l:'Distortion', min:0, max:1, c:'lin', d:0, f:pct}},
+    secs:[['Tone', ['wave', 'pitch', 'bend', 'bendT', 'tdec', 'tLev', 'spectra']], ['Noise', ['nType', 'nFreq', 'nRes', 'nDec', 'nSweep', 'nLev']], ['Click & dirt', ['click', 'dist']]],
+    pre:[['Init', {}], ['Round kick', {wave:0, pitch:55, bend:24, bendT:30, tdec:450, nLev:0.1, nType:0, nFreq:300, click:0.4}], ['Tight snare', {wave:1, pitch:190, bend:8, bendT:20, tdec:120, nType:1, nFreq:3500, nRes:0.3, nDec:190, nLev:0.7}],
+      ['Electro tom', {wave:0, pitch:110, bend:12, bendT:120, tdec:420, nLev:0.08}], ['Spectra perc', {wave:4, pitch:320, spectra:0.6, bend:4, tdec:260, nLev:0.1}],
+      ['Noise hat', {tLev:0, nType:2, nFreq:8000, nRes:0.2, nDec:60, nLev:0.9, click:0.1}], ['Open hat', {tLev:0, nType:2, nFreq:7000, nRes:0.35, nDec:450, nLev:0.8, click:0.05}],
+      ['Clap-ish', {tLev:0, nType:1, nFreq:1300, nRes:0.4, nDec:240, nLev:0.9, nSweep:0.3}], ['Zap tom', {wave:3, pitch:300, bend:36, bendT:60, tdec:180, dist:0.3, nLev:0}],
+      ['Resonant ping', {tLev:0.3, nType:3, nFreq:900, nRes:0.95, nDec:400, nLev:0.6}], ['Dirty kick', {wave:0, pitch:48, bend:30, bendT:40, tdec:550, dist:0.6, click:0.5, nLev:0}]]},
+  modal:{title:'Modal', tag:'material · exciter · modes', rows:{
+      mat:{l:'Material', min:0, max:11, c:'int', d:0, f:nameOf(ModalCore.MATERIALS)}, oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      exc:{l:'Exciter', min:0, max:4, c:'int', d:0, f:nameOf(ModalCore.EXCITERS)}, hard:{l:'Hardness', min:0, max:1, c:'lin', d:0.55, f:pct},
+      bow:{l:'Bow / breath', min:0, max:1, c:'lin', d:0.6, f:pct}, noise:{l:'Noise', min:0, max:1, c:'lin', d:0, f:pct},
+      modes:{l:'Modes', min:1, max:24, c:'int', d:16, f:v => String(Math.round(v))}, bright:{l:'Brightness', min:0, max:1, c:'lin', d:0.6, f:pct},
+      dec:{l:'Decay', min:0.02, max:8, c:'log', d:1.2, f:v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s'}, dtilt:{l:'Damp highs', min:0, max:1, c:'lin', d:0.5, f:pct},
+      pos:{l:'Strike position', min:0.01, max:0.5, c:'lin', d:0.28, f:pct}, inharm:{l:'Inharmonicity', min:0, max:1, c:'lin', d:0, f:pct}},
+    secs:[['Object', ['mat', 'oct', 'modes', 'bright', 'dec', 'dtilt', 'pos', 'inharm']], ['Exciter', ['exc', 'hard', 'bow', 'noise']]],
+    note:'Bow and Breath hold for as long as the note in the tracker (or the pad’s Gate); the others ring out.',
+    pre:[['Init', {}], ['Marimba', {mat:1, exc:0, hard:0.45, dec:0.9, bright:0.45, pos:0.25}], ['Vibes', {mat:2, exc:0, hard:0.6, dec:2.2, bright:0.5}],
+      ['Glockenspiel', {mat:3, oct:3, exc:0, hard:0.85, dec:1.6, bright:0.75}], ['Tubular bell', {mat:4, exc:0, hard:0.7, dec:3, bright:0.6}],
+      ['Gong', {mat:5, oct:0, exc:0, hard:0.3, dec:5, bright:0.55, inharm:0.2}], ['Kalimba-ish', {mat:0, exc:3, hard:0.7, dec:0.8, bright:0.4, pos:0.12}],
+      ['Steel drum', {mat:11, exc:0, hard:0.5, dec:1.4, bright:0.55, pos:0.2}], ['Wood block', {mat:10, oct:3, exc:0, hard:0.9, dec:0.5, bright:0.6}],
+      ['Tabla-ish', {mat:6, oct:1, exc:0, hard:0.65, dec:0.7, bright:0.45, pos:0.15}], ['Frame drum', {mat:6, oct:0, exc:1, hard:0.4, dec:0.6, bright:0.4}],
+      ['Glass harmonica', {mat:7, exc:2, bow:0.7, dec:2.5, bright:0.6}], ['Bowed bar', {mat:0, exc:2, bow:0.8, dec:2, bright:0.5}],
+      ['Plucked string', {mat:8, exc:3, hard:0.6, dec:1.5, bright:0.55, pos:0.15}], ['Breathy pipe', {mat:9, exc:4, bow:0.6, noise:0.4, dec:0.6, bright:0.45}],
+      ['Metal plate hit', {mat:11, oct:1, exc:1, hard:0.7, dec:2.2, bright:0.7, inharm:0.3}], ['Struck membrane', {mat:6, oct:1, exc:0, hard:0.35, dec:0.5}]]},
+};
+const xRows = []; let xKind = '';
+const XEV = () => { const v = V(), k = v.engine; if (!v[k]) v[k] = normX(k, null); return v[k]; };
+function xPreset(i, quiet){
+  const v = V(), k = v.engine, pr = XUI[k] && XUI[k].pre[i]; if (!pr) return;
+  v[k] = normX(k, Object.assign(XENG[k].d(), pr[1])); v.drive = (pr[2] && pr[2].drive) || 0;
+  if (!quiet){ changed(cur); refreshAll(); toast(XUI[k].title + ': ' + pr[0]); try { play(cur); } catch(e){} }
+}
+function xRandom(){
+  const k = V().engine, U = XUI[k], o = XV(), r = Math.random;
+  for (const key in U.rows){ const d = U.rows[key]; if (key === 'oct') continue;
+    let x = d.c === 'log' ? d.min * Math.pow(d.max / d.min, r()) : d.min + (d.max - d.min) * r(); if (d.c === 'int') x = Math.round(x); o[key] = x; }
+  changed(cur); refreshAll(); try { play(cur); } catch(e){}
+}
+function xBuild(){
+  const k = V().engine; if (k === xKind) return; xKind = k;
+  const U = XUI[k], host = $('xSecs'); host.replaceChildren(); xRows.length = 0;
+  $('xTtl').textContent = U.title; $('xTag').textContent = U.tag;
+  for (const [title, keys] of U.secs){
+    const sc = el('div', 'sec'); sc.append(el('h3', null, title)); host.append(sc);
+    for (const key of keys){ const r = makeRow(U.rows[key], key, XEV, {idp:'x' + k, noTrack:true, on:() => changed(cur, true)}); sc.append(r.r); xRows.push(r); }
+  }
+  if (U.note) host.append(el('p', 'note', U.note));
+  const pre = $('xPre'); pre.replaceChildren(); const o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'Presets…'; pre.append(o0);
+  U.pre.forEach(([n], i) => { const o = document.createElement('option'); o.value = i; o.textContent = n; pre.append(o); });
+}
+(function xInit(){
+  const pre = $('xPre');
+  pre.addEventListener('change', () => { if (pre.value !== '') xPreset(+pre.value); pre.value = ''; });
+  $('xInit').addEventListener('click', () => xPreset(0));
+  $('xRand').addEventListener('click', xRandom);
+})();
 // Shows the bass card, the voice card or the layer cards for the pad on screen.
 function bassUI(){
-  const v = V(), on = isBassV(v), vx = isVoxV(v), bl = isBlipV(v);
+  const v = V(), on = isBassV(v), vx = isVoxV(v), bl = isBlipV(v), xe = isXEngV(v);
   $('vEngine').hidden = false;
   $('vEngLbl').textContent = on ? (isSyn(cur) ? 'additive bass, played live by the tracker' : 'additive bass, rendered as a one-shot')
     : vx ? (isSyn(cur) ? 'a singing voice, a syllable per note, live in the tracker' : 'a singing voice: the pad says the whole line')
-    : bl ? 'a minimal electronic drum, rendered' : 'up to 8 layers, rendered';
+    : bl ? 'a minimal electronic drum, rendered'
+    : xe ? (XENG[v.engine].live ? (isSyn(cur) ? XUI[v.engine].title.toLowerCase() + ' synth, played live by the tracker' : XUI[v.engine].title.toLowerCase() + ' synth, rendered as a one-shot') : XUI[v.engine].title.toLowerCase() + ', rendered')
+    : 'up to 8 layers, rendered';
   if (vEngUpd) vEngUpd();
-  $('bassWrap').hidden = !on; $('voxWrap').hidden = !vx; $('blipWrap').hidden = !bl;
-  for (const id of ['layersBand', 'layerWrap', 'fxWrap', 'voiceWrap']) $(id).hidden = on || vx || bl;
+  $('bassWrap').hidden = !on; $('voxWrap').hidden = !vx; $('blipWrap').hidden = !bl; $('xWrap').hidden = !xe;
+  for (const id of ['layersBand', 'layerWrap', 'fxWrap', 'voiceWrap']) $(id).hidden = on || vx || bl || xe;
+  if (xe){ xBuild(); for (const r of xRows) r.refresh(); }
   if (on){ for (const r of bassRows) r.refresh(); for (const f of bassSegs) f(); bassVizKick(); }
   if (vx){ for (const r of voxRows) r.refresh(); const ta = $('voxTxt'); if (document.activeElement !== ta) ta.value = XV().txt; voxSylShow(); }
   if (bl) for (const r of blipRows) r.refresh();
@@ -6504,7 +6934,7 @@ function makeSeq(S, mode, o){
             if (!q) firstRate = rate;
             const ev = {type:'note', t:at, track:t, poly, pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? at + fx.KIL * tick : null, rel:fx.OFF != null ? at + fx.OFF * tick : null,
-              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, wob:fx.WOB != null ? wobOf(fx.WOB) : null, ...mods};
+              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods};
             if ((I.slc | 0) > 1 || I.sync){ const c = ensure(ev.pad); applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; }
             evs.push(ev);
             if (every){ let k = 1;
@@ -6577,22 +7007,23 @@ function makePlayer(ac, out, getBuf, live){
   }
   // Bass voices: one live node per track and voice (see bassReady), made when it first plays.
   const bassN = new Map(); let bpmNow = (S && S.bpm) || 120;
-  function bassNode(t, pad){
+  function bassNode(t, pad, j){
     if (!bassOK.has(ac)) return null;
-    const vx = isVoxV(kit.voices[pad]), key = t + ':' + pad + (vx ? ':vox' : ''); let b = bassN.get(key); if (b) return b;
+    const V = kit.voices[pad], vx = isVoxV(V), lx = liveX(V), kind = vx ? 'vox' : lx ? V.engine : 'bass', key = t + ':' + pad + ':' + kind + (j ? ':' + j : ''); let b = bassN.get(key); if (b) return b;
     try {
-      const node = new AudioWorkletNode(ac, vx ? 'thunder-vox' : 'thunder-bass', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{p:vx ? voxParams(kit.voices[pad]) : bassParams(kit.voices[pad])}});
+      const node = new AudioWorkletNode(ac, 'thunder-' + kind, {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{p:vx ? voxParams(V) : lx ? xParams(V) : bassParams(V)}});
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
       node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
       node.load = 0; node.port.onmessage = e => { const d = e.data; if (d && typeof d.load === 'number') node.load = node.load * 0.6 + d.load * 0.4; };
-      b = vx ? {node, g, pn, pad, vox:true, rate:P('rate'), gate:P('gate'), trig:P('trig'), leg:P('leg'), syl:P('syl'), same:P('same'), n:0, sylN:0, lastOn:-1, cur:null}
-        : {node, g, pn, pad, rate:P('rate'), gate:P('gate'), trig:P('trig'), leg:P('leg'), bpm:P('bpm'), wob:P('wob'), n:0, lastOn:-1, cur:null};
+      b = vx ? {node, g, pn, pad, kind, vox:true, rate:P('rate'), gate:P('gate'), trig:P('trig'), leg:P('leg'), syl:P('syl'), same:P('same'), n:0, sylN:0, lastOn:-1, cur:null}
+        : lx ? {node, g, pn, pad, kind, rate:P('rate'), gate:P('gate'), trig:P('trig'), leg:P('leg'), acc:P('acc'), n:0, lastOn:-1, cur:null}
+        : {node, g, pn, pad, kind, rate:P('rate'), gate:P('gate'), trig:P('trig'), leg:P('leg'), bpm:P('bpm'), wob:P('wob'), n:0, lastOn:-1, cur:null};
       if (b.bpm) b.bpm.value = bpmNow;
     } catch(e){ return null; }
     bassN.set(key, b); if (live) bassLive.add(b);
     return b;
   }
-  function bassNote(ev, b, T, ck){
+  function bassNote(ev, b, T, ck, fk){
     const t = Math.max(ev.t, ac.currentTime), leg = ev.slide && ev.slide.dur > 0 ? 1 : 0;
     for (const P of [b.gate, b.trig, b.leg]) P.cancelScheduledValues(t);
     try { b.rate.cancelAndHoldAtTime(t); } catch(e){ b.rate.cancelScheduledValues(t); }
@@ -6600,9 +7031,10 @@ function makePlayer(ac, out, getBuf, live){
     if (b.vox){
       // each note sings the next syllable; a slide stays on the one it's on (a run over one vowel)
       for (const P of [b.syl, b.same]) P.cancelScheduledValues(t);
-      const k = leg ? Math.max(0, b.sylN - 1) : b.sylN++;
+      const k = fk != null ? fk : leg ? Math.max(0, b.sylN - 1) : b.sylN++;
       b.syl.setValueAtTime(k, t); b.same.setValueAtTime(leg, t);
     }
+    if (b.acc){ b.acc.cancelScheduledValues(t); b.acc.setValueAtTime(ev.acc ? 1 : 0, t); }
     b.leg.setValueAtTime(leg, t); b.gate.setValueAtTime(1, t); b.trig.setValueAtTime(++b.n, t);
     b.g.gain.setValueAtTime(ev.gain, t); b.pn.pan.setValueAtTime(clamp((ev.pan - 128) / 127, -1, 1), t);
     if (ev.wob != null && b.wob) b.wob.setValueAtTime(ev.wob, t);
@@ -6679,7 +7111,22 @@ function makePlayer(ac, out, getBuf, live){
       if (ev.cut != null) kill(v, ev.cut);
       if (ev.rel != null) kill(v, ev.rel, v.syn ? relTc(v) : 0.05);
   }
+  // Voice on a poly track: up to four singers per track, so chords sing in harmony. Notes that start together sing
+  // the same syllable; the next chord sings the next one. A new note takes the singer that has been quiet longest.
+  const voxG = new Map();
+  function polyVox(ev){
+    const key = ev.track + ':' + ev.pad; let G = voxG.get(key); if (!G){ G = {sylN:0, lastT:-9, lastK:0, nodes:[]}; voxG.set(key, G); }
+    const nodes = []; for (let j = 0; j < POLY; j++){ const b = bassNode(ev.track, ev.pad, j + 1); if (b) nodes.push(b); } if (!nodes.length) return false;
+    const leg = ev.slide && ev.slide.dur > 0;
+    let k; if (Math.abs(ev.t - G.lastT) < 0.004) k = G.lastK; else { k = leg ? Math.max(0, G.sylN - 1) : G.sylN++; G.lastT = ev.t; G.lastK = k; }
+    const free = nodes.filter(b => !b.cur || b.cur.stopAt != null || b.cur.ended), pick = (free.length ? free : nodes).reduce((x, y) => (x.lastOn <= y.lastOn ? x : y));
+    if (pick.lastOn >= ev.t - 1e-6 && Math.abs(pick.lastOn - ev.t) < 0.004 && free.length === 0) return true;   // more notes than singers at once
+    const T = vs[ev.track]; for (let q = T.length - 1; q >= 0; q--) if (T[q].bass === pick) T.splice(q, 1);
+    const kv = kit.voices[ev.pad], ck = kv ? kv.choke : 0;
+    bassNote(ev, pick, T, ck, k); return true;
+  }
   function startNote(ev){
+    if (ev.poly && isSyn(ev.pad) && isVoxV(kit.voices[ev.pad]) && polyVox(ev)) return;
     if (isLivePad(ev.pad)){ const bn = bassNode(ev.track, ev.pad); if (bn){
       // bass is mono: it takes over from whatever the track was playing
       const T = vs[ev.track]; for (const v of T) if (v.bass !== bn) kill(v, ev.t, v.syn ? Math.min(relTc(v), 0.05) : 0.004); T.length = 0;
@@ -6714,7 +7161,7 @@ function makePlayer(ac, out, getBuf, live){
     if (ev.rel != null) kill(v, ev.rel, syn ? relTc(v) : 0.05);
     T.push(v);
   }
-  function stopAll(at){ for (const v of alive) kill(v, at); for (const T of vs) T.length = 0; for (const b of bassN.values()) if (b.vox) b.sylN = 0; }   // lyrics start over
+  function stopAll(at){ for (const v of alive) kill(v, at); for (const T of vs) T.length = 0; for (const b of bassN.values()) if (b.vox) b.sylN = 0; voxG.clear(); }   // lyrics start over
   function applyMix(filter){
     const at = ac.currentTime;
     buses.forEach((b, t) => {
@@ -6953,11 +7400,42 @@ class VoxProc extends AudioWorkletProcessor {
   }
 }
 registerProcessor('thunder-vox', VoxProc);`;
+/* Acid and Machine, live: the same automation as the bass (rate, gate, trig, leg) plus acc, an accented note. */
+const XPROC = (name, core) => `
+class XP_${name} extends AudioWorkletProcessor {
+  static get parameterDescriptors(){ return [
+    {name:'rate', defaultValue:1, minValue:0, maxValue:256, automationRate:'a-rate'},
+    {name:'gate', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
+    {name:'trig', defaultValue:0, automationRate:'a-rate'},
+    {name:'leg', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
+    {name:'acc', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'}]; }
+  constructor(o){ super(); this.c = new ${core}(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0;
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); }; }
+  process(ins, outs, P){
+    const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, c = this.c, at = (A, i) => A.length > 1 ? A[i] : A[0], t0 = Date.now();
+    let s = 0;
+    for (let i = 0; i < n; i++){
+      const tg = at(P.trig, i), ga = at(P.gate, i) >= 0.5;
+      if (tg !== this.lt || ga !== this.lg){
+        if (i > s){ c.render(L, R, s, i, at(P.rate, s)); s = i; }
+        if (tg !== this.lt && ga) c.on(at(P.leg, i) >= 0.5, at(P.acc, i) >= 0.5);
+        else if (ga && !this.lg) c.on(false, at(P.acc, i) >= 0.5);
+        else if (!ga && this.lg) c.off();
+        this.lt = tg; this.lg = ga;
+      }
+    }
+    c.render(L, R, s, n, at(P.rate, s));
+    this.ms += Date.now() - t0; this.fr += n;
+    if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
+    return true;
+  }
+}
+registerProcessor('thunder-${name}', XP_${name});`;
 let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bassLive = new Set();
 function bassReady(ac){
   if (!bassLoad.has(ac)){
     let pr = Promise.resolve(false);
-    try { if (ac.audioWorklet){ if (!bassURL) bassURL = URL.createObjectURL(new Blob([BassCore.toString() + BASS_PROC + '\n' + VoxCore.toString() + VOX_PROC], {type:'text/javascript'}));
+    try { if (ac.audioWorklet){ if (!bassURL) bassURL = URL.createObjectURL(new Blob([BassCore.toString() + BASS_PROC + '\n' + VoxCore.toString() + VOX_PROC + '\n' + AcidCore.toString() + XPROC('acid', 'AcidCore') + '\n' + MachCore.toString() + XPROC('mach', 'MachCore')], {type:'text/javascript'}));
       pr = ac.audioWorklet.addModule(bassURL).then(() => { bassOK.add(ac); return true; }, () => false); } } catch(e){}
     bassLoad.set(ac, pr);
   }
@@ -6965,9 +7443,10 @@ function bassReady(ac){
 }
 const isBassPad = i => isSyn(i) && isBassV(kit.voices[i]);
 // Synth slots the tracker plays through a live engine node (bass or voice) rather than a rendered buffer.
-const isLivePad = i => isSyn(i) && (isBassV(kit.voices[i]) || isVoxV(kit.voices[i]));
+const isLivePad = i => isSyn(i) && (isBassV(kit.voices[i]) || isVoxV(kit.voices[i]) || liveX(kit.voices[i]));
+const liveX = v => !!(v && XENG[v.engine] && XENG[v.engine].live);
 // A bass voice was edited: the live nodes playing it hear the change at once.
-function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v); if (!isBassV(v) && !vx) return; const p = vx ? voxParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && !!b.vox === vx) try { b.node.port.postMessage({set:p}); } catch(e){} }
+function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v), lx = liveX(v); if (!isBassV(v) && !vx && !lx) return; const kind = vx ? 'vox' : lx ? v.engine : 'bass', p = vx ? voxParams(v) : lx ? xParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && b.kind === kind) try { b.node.port.postMessage({set:p}); } catch(e){} }
 const MW_URL = 'master-worklet.js?v=2', mwLoad = new WeakMap();
 function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
@@ -9262,12 +9741,18 @@ let dkInstSig = '', dkInstRows = [], dkFxSig = '', dkFxRows = [], dkFxSel = 0;
 function deckInst(){
   if (!deckShown() || !deck.inst) return;
   dkInst = dkInstNow();
-  const I = S.insts[dkInst], pad = I.pad, v = kit.voices[pad], sig = dkInst + ':' + pad + ':' + nslots() + (isBassV(v) && isSyn(pad) ? ':bass' : isVoxV(v) && isSyn(pad) ? ':vox' : isBlipV(v) ? ':blip' : '');
+  const I = S.insts[dkInst], pad = I.pad, v = kit.voices[pad], sig = dkInst + ':' + pad + ':' + nslots() + (isBassV(v) && isSyn(pad) ? ':bass' : isVoxV(v) && isSyn(pad) ? ':vox' : isBlipV(v) ? ':blip' : isXEngV(v) ? ':' + v.engine : '');
   $('dkInstT').textContent = `INST ${hx(dkInst)} · ${hx(pad)} ${(v && v.name) || 'Pad ' + (pad + 1)}`;
   if (sig !== dkInstSig){
     dkInstSig = sig; const box = $('dkInstRows'); box.replaceChildren(); dkInstRows = [];
     if (!v){ box.append(el('p', 'note', 'This instrument’s pad is empty.')); return; }
     const getV = () => kit.voices[S.insts[dkInst].pad], on = () => changed(S.insts[dkInst].pad, true);
+    if (isXEngV(v)){
+      const k = v.engine, U = XUI[k], getL = () => { const w = getV(); if (!w[k]) w[k] = normX(k, null); return w[k]; };
+      { const r = makeRow(VP.level, 'level', getV, {idp:'dki', on}); box.append(r.r); dkInstRows.push(r); }
+      for (const key of U.secs.flatMap(sc => sc[1]).filter(q => q !== 'oct').slice(0, 6)){ const r = makeRow(U.rows[key], key, getL, {idp:'dkx' + k, on, noTrack:true}); box.append(r.r); dkInstRows.push(r); }
+      dkInstRows.forEach(r => r.refresh()); return;
+    }
     if (isBlipV(v)){
       const getL = () => { const w = getV(); if (!w.blip) w.blip = normBlip(null); return w.blip; };
       { const r = makeRow(VP.level, 'level', getV, {idp:'dki', on}); box.append(r.r); dkInstRows.push(r); }
