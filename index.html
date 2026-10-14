@@ -2725,6 +2725,8 @@ const Lc = () => V().layers[V().sel];
 const AUK = 'thunderplus-audio-v1';
 const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90};
   try { const o = JSON.parse(localStorage.getItem(AUK) || '{}'); return Object.assign(d, o && typeof o === 'object' ? o : {}); } catch(e){ return d; } })();
+// Latency: what the person picked, else Balanced in the Mobile setup (phones click at Lowest when busy) and Lowest on desktop.
+const latOf = () => aset.latPick && aset.lat ? aset.lat : (typeof platform !== 'undefined' && platform === 'mobile' ? 'balanced' : 'interactive');
 function asetSave(){ try { localStorage.setItem(AUK, JSON.stringify(aset)); } catch(e){} }
 let aLive = null; // the latency and rate the running context was made with
 
@@ -2737,14 +2739,14 @@ let ctx = null, master = null;
 let srGuess = 48000;
 try {
   if (aset.rate) srGuess = aset.rate;
-  else { const AC = window.AudioContext || window.webkitAudioContext, c = new AC({latencyHint:aset.lat || 'interactive'}); srGuess = c.sampleRate || 48000; if (c.close) c.close().catch(() => {}); }
+  else { const AC = window.AudioContext || window.webkitAudioContext, c = new AC({latencyHint:latOf()}); srGuess = c.sampleRate || 48000; if (c.close) c.close().catch(() => {}); }
 } catch(e){}
 const cpu = {cap:null, t:0};
 const playing = [];
 function audio(){
   if (!ctx){
     const AC = window.AudioContext || window.webkitAudioContext;
-    const ao = {latencyHint:aset.lat || 'interactive'}; if (aset.rate) ao.sampleRate = aset.rate;
+    const ao = {latencyHint:latOf()}; if (aset.rate) ao.sampleRate = aset.rate;
     try { ctx = new AC(ao); } catch(e){ ctx = new AC({latencyHint:'interactive'}); }
     aLive = {lat:ao.latencyHint, rate:aset.rate};
     if (aset.sink && ctx.setSinkId) ctx.setSinkId(aset.sink).catch(() => { audStatus(); });
@@ -4015,7 +4017,7 @@ async function audRefresh(){
   updLat(); updARate(); audRestartRow(); audStatus();
 }
 function audLvlShow(){ const v = aset.vol; $('audLvlV').textContent = v <= 0 ? '−∞ dB' : (20 * Math.log10(v / 100)).toFixed(1) + ' dB'; }
-function audRestartRow(){ $('audRestartRow').hidden = !(ctx && aLive && (aLive.lat !== aset.lat || aLive.rate !== aset.rate)); }
+function audRestartRow(){ $('audRestartRow').hidden = !(ctx && aLive && (aLive.lat !== latOf() || aLive.rate !== aset.rate)); }
 $('audOut').addEventListener('change', async e => {
   const id = e.target.value, name = e.target.selectedOptions[0] ? e.target.selectedOptions[0].textContent : '';
   aset.sink = id; asetSave();
@@ -4041,7 +4043,7 @@ $('audLvl').addEventListener('input', e => {
   if (master) master.gain.setTargetAtTime(aset.vol / 100, ctx.currentTime, 0.02);
 });
 $('audLvl').addEventListener('change', asetSave);
-const updLat = makeSeg($('segLat'), [['interactive', 'Lowest'], ['balanced', 'Balanced'], ['playback', 'Safest']], () => aset.lat, v => { aset.lat = v; asetSave(); audRestartRow(); });
+const updLat = makeSeg($('segLat'), [['interactive', 'Lowest'], ['balanced', 'Balanced'], ['playback', 'Safest']], () => latOf(), v => { aset.lat = v; aset.latPick = true; asetSave(); audRestartRow(); });
 const updARate = makeSeg($('segARate'), [[0, 'Device'], [44100, '44.1k'], [48000, '48k']], () => aset.rate, v => { aset.rate = v; asetSave(); audRestartRow(); });
 $('audRestart').addEventListener('click', () => { try { save(); } catch(e){} applyUpdate(); });
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (!$('pAudio').hidden) audRefresh(); });
@@ -4663,7 +4665,7 @@ class ThunderFx extends AudioWorkletProcessor {
     const z = () => 0;
     this.x = new WebAssembly.Instance(globalThis.__tfxMod, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports;
     if (this.x._initialize) this.x._initialize();
-    this.slots = []; this.dead = false; this.buf = null; this.ms = 0; this.fr = 0;
+    this.slots = []; this.dead = false; this.buf = null; this.ms = 0; this.fr = 0; this.idle = 0;
     this.set(op.chain || []);
     this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.x.tfx_free(s.h); this.slots = []; } else this.set(e.data); };
   }
@@ -4676,13 +4678,17 @@ class ThunderFx extends AudioWorkletProcessor {
       next.push(s);
     }
     for (const s of old) x.tfx_free(s.h);
-    this.slots = next;
+    this.slots = next; this.idle = 0;
   }
   process(inputs, outputs){
     if (this.dead) return false;
     const x = this.x, i = inputs[0], o = outputs[0], n = o[0].length;
     if (this.buf !== x.memory.buffer){ this.buf = x.memory.buffer; this.L = new Float32Array(this.buf, x.tfx_l(), 128); this.R = new Float32Array(this.buf, x.tfx_r(), 128); }
     const L = this.L, R = this.R;
+    // Silence in, and the effects' tails have died away: sleep (output silence) until sound arrives again.
+    let ip = 0;
+    if (i && i.length){ const a = i[0], b = i[1] || a; for (let k = 0; k < n; k++){ const v = a[k] < 0 ? -a[k] : a[k], w = b[k] < 0 ? -b[k] : b[k]; if (v > ip) ip = v; if (w > ip) ip = w; } }
+    if (ip < 1e-7 && this.idle >= sampleRate){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
     if (i && i.length){ L.set(i[0]); R.set(i[1] || i[0]); } else { L.fill(0); R.fill(0); }
     const t0 = Date.now();
     for (const s of this.slots){
@@ -4699,6 +4705,8 @@ class ThunderFx extends AudioWorkletProcessor {
     this.ms += Date.now() - t0; this.fr += n;
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
     o[0].set(this.L.subarray(0, n)); if (o[1]) o[1].set(this.R.subarray(0, n));
+    let op = 0; for (let k = 0; k < n; k++){ const v = this.L[k] < 0 ? -this.L[k] : this.L[k], w = this.R[k] < 0 ? -this.R[k] : this.R[k]; if (v > op) op = v; if (w > op) op = w; }
+    this.idle = ip < 1e-7 && op < 1e-6 ? this.idle + n : 0;
     return true;
   }
 }
@@ -5358,6 +5366,7 @@ function makePlayer(ac, out, getBuf, live){
       const node = new AudioWorkletNode(ac, 'thunder-bass', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{p:bassParams(kit.voices[pad])}});
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
       node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
+      node.load = 0; node.port.onmessage = e => { const d = e.data; if (d && typeof d.load === 'number') node.load = node.load * 0.6 + d.load * 0.4; };
       b = {node, g, pn, pad, rate:P('rate'), gate:P('gate'), trig:P('trig'), leg:P('leg'), bpm:P('bpm'), wob:P('wob'), n:0, lastOn:-1, cur:null};
       b.bpm.value = bpmNow;
     } catch(e){ return null; }
@@ -5392,6 +5401,7 @@ function makePlayer(ac, out, getBuf, live){
       return;
     }
     v.stopAt = at;
+    if (live) at = Math.max(at, ac.currentTime);   // late (the UI thread stalled): fade from now, not from a moment already past
     try { v.f.gain.cancelScheduledValues(at); v.f.gain.setValueAtTime(1, at); v.f.gain.setTargetAtTime(0, at, tc); } catch(e){}
     try { v.src.stop(at + tc * 12); } catch(e){}
   }
@@ -5469,7 +5479,10 @@ function makePlayer(ac, out, getBuf, live){
     const syn = isSyn(ev.pad), v = {src, f, g, pn, base:ev.rate, rate:ev.rate, choke:ck, ended:false, stopAt:null, syn, rel:syn && kv ? relOf(kv) : 0};
     if (!ev.slide) pitchMods(v, ev.t, ev.rate, ev);
     const off = ev.ofsSec != null ? (ev.rev ? Math.max(0, b.duration - ev.ofsSec - ev.durSec) : ev.ofsSec) : clamp(ev.ofs, 0, 255) / 256 * b.duration;
-    src.start(Math.max(ev.t, ac.currentTime), Math.min(off, Math.max(0, b.duration - 0.001)));
+    const st0 = Math.max(ev.t, ac.currentTime);
+    // Starting part-way into a sample (slices, offsets) lands mid-waveform: a 1.5 ms fade-in keeps it from clicking.
+    if (off > 0.0005){ f.gain.setValueAtTime(0, st0); f.gain.linearRampToValueAtTime(1, st0 + 0.0015); }
+    src.start(st0, Math.min(off, Math.max(0, b.duration - 0.001)));
     alive.add(v);
     src.onended = () => { v.ended = true; alive.delete(v); if (live) try { pn.disconnect(); } catch(e){} };
     if (ev.cut != null) kill(v, ev.cut);
@@ -5657,12 +5670,12 @@ class BassProc extends AudioWorkletProcessor {
     {name:'leg', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
     {name:'bpm', defaultValue:120, minValue:10, maxValue:999, automationRate:'k-rate'},
     {name:'wob', defaultValue:0, minValue:0, maxValue:64, automationRate:'k-rate'}]; }
-  constructor(o){ super(); this.c = new BassCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false;
+  constructor(o){ super(); this.c = new BassCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0;
     this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); }; }
   process(ins, outs, P){
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, rate = P.rate, gate = P.gate, trig = P.trig, leg = P.leg, c = this.c;
     c.bpm = P.bpm[0]; c.wob = P.wob[0];
-    const rt = i => rate.length > 1 ? rate[i] : rate[0];
+    const rt = i => rate.length > 1 ? rate[i] : rate[0], t0 = Date.now();
     let s = 0;
     for (let i = 0; i < n; i++){
       const tg = trig.length > 1 ? trig[i] : trig[0], ga = (gate.length > 1 ? gate[i] : gate[0]) >= 0.5;
@@ -5675,6 +5688,8 @@ class BassProc extends AudioWorkletProcessor {
       }
     }
     c.render(L, R, s, n, rt(s));
+    this.ms += Date.now() - t0; this.fr += n;
+    if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
     return true;
   }
 }
@@ -5692,7 +5707,7 @@ function bassReady(ac){
 const isBassPad = i => isSyn(i) && isBassV(kit.voices[i]);
 // A bass voice was edited: the live nodes playing it hear the change at once.
 function bassPush(i){ const v = kit.voices[i]; if (!isBassV(v)) return; const p = bassParams(v); for (const b of bassLive) if (b.pad === i) try { b.node.port.postMessage({set:p}); } catch(e){} }
-const MW_URL = 'master-worklet.js?v=1', mwLoad = new WeakMap();
+const MW_URL = 'master-worklet.js?v=2', mwLoad = new WeakMap();
 function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
 const mstNeedsWk = M => M.sup.on || M.comp.on || M.lim.on;
@@ -5826,7 +5841,8 @@ function pump(){
   audioWake = performance.now();
   if (view !== 'tracker' && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open
   const s = tp.seq; let n = 0;
-  while (s.alive() && s.time < ctx.currentTime + 0.15 && n++ < 64){
+  // Schedule a little further ahead on a phone, so a busy moment on the UI thread can't make notes late.
+  while (s.alive() && s.time < ctx.currentTime + (isMobile() ? 0.25 : 0.15) && n++ < 64){
     const r = s.step(); for (const e of r.evs){ rt.pl.play(e); if (e.type === 'note') padBlink(e); } tp.q.push({t:r.t, pos:r.pos, bpm:s.bpm, tks:r.tks, line:r.line});
   }
 }
@@ -8205,6 +8221,9 @@ function fxLoads(){
   rt.pl.buses.forEach((b, t) => { if (t < NT && b.fx) L.push([d2(t + 1), b.fx.load || 0]); });
   rt.pl.buses.forEach((b, t) => { if (t < NT && b.chn) L.push([d2(t + 1) + ' chn', b.chn.load || 0]); });
   if (rt.mfx) L.push(['MST', rt.mfx.load || 0]);
+  if (rt.mst && rt.mst.wk && mstMeter && mstMeter.load) L.push(['MST dyn', mstMeter.load]);
+  let bl = 0; for (const b of bassLive) bl += (b.node && b.node.load) || 0;
+  if (bl) L.push(['Bass', bl]);
   return L;
 }
 function globalCpuValue(){
@@ -8212,6 +8231,28 @@ function globalCpuValue(){
   const cap = cpu.cap && performance.now() - cpu.cap.t < 3000 ? cpu.cap : null;
   return cap ? cap.avg : fxLoads().reduce((a, x) => a + x[1], 0);
 }
+/* Dropouts (the clicks you hear when the audio thread runs late). Where the browser counts them
+   (AudioContext.playbackStats) that count is used; otherwise the audio clock is compared with the page clock
+   (getOutputTimestamp): when the audio thread falls behind, the audio clock slips back against real time. */
+const glitch = {n:0, t:-1e9, off:null, base:null};
+function glitchScan(){
+  if (!ctx || ctx.state !== 'running' || document.hidden){ glitch.off = null; return; }
+  const ps = ctx.playbackStats;
+  if (ps && typeof ps.underrunEvents === 'number'){
+    if (glitch.base == null) glitch.base = ps.underrunEvents;
+    const k = ps.underrunEvents - glitch.base; if (k > glitch.n){ glitch.n = k; glitch.t = performance.now(); }
+    return;
+  }
+  if (!ctx.getOutputTimestamp) return;
+  const ts = ctx.getOutputTimestamp(); if (!ts || !(ts.contextTime > 0) || !(ts.performanceTime > 0)) return;
+  const off = ts.performanceTime - ts.contextTime * 1000;
+  if (glitch.off == null){ glitch.off = off; return; }
+  const d = off - glitch.off;
+  if (d > 12){ glitch.n++; glitch.t = performance.now(); glitch.off = off; }
+  else if (d < -12) glitch.off = off;          // a resume or a clock re-sync: start again from here
+  else glitch.off += d * 0.05;                 // follow the two clocks' slow drift
+}
+setInterval(glitchScan, 100);
 function cpuMeter(){
   const now = performance.now(); if (now - cpu.t < 500) return; cpu.t = now;
   const b = $('tCpu'); if (!b) return;
@@ -8219,8 +8260,10 @@ function cpuMeter(){
   const v = !ctx ? null : cap ? cap.avg : fx;
   b.querySelector('span').textContent = v == null ? 'CPU --' : 'CPU ' + Math.round(v * 100) + '%';
   b.querySelector('i').style.width = v == null ? '0' : Math.min(100, v * 100).toFixed(0) + '%';
-  b.classList.toggle('warn', v != null && v > 0.5); b.classList.toggle('hot', v != null && (v > 0.8 || (cap && cap.under > 0)));
-  b.title = cap ? 'Whole audio engine (Chrome’s render capacity), not just the effects.' : 'The time the track effects and …chains take (this browser doesn’t report the total audio load).';
+  const drop = now - glitch.t < 3000;   // a dropout in the last 3 s turns the meter red
+  b.classList.toggle('warn', v != null && v > 0.5); b.classList.toggle('hot', v != null && (v > 0.8 || (cap && cap.under > 0) || drop));
+  b.title = (cap ? 'Whole audio engine (Chrome’s render capacity), not just the effects.' : 'The time the audio engine’s own processing takes: track and master effects, …chains and bass voices (this browser doesn’t report the total audio load).')
+    + (glitch.n ? ' Dropouts since the sound started: ' + glitch.n + '.' : '');
 }
 setInterval(() => { if (view !== 'tracker' && !document.hidden) cpuMeter(); }, 500);
 // …chains screen meters: sample each routed track's chains return and push it into the frame.
@@ -8245,10 +8288,11 @@ setInterval(() => {
 }, 60);
 $('tCpu').addEventListener('click', () => {
   const cap = cpu.cap, L = fxLoads().filter(x => x[1] > 0.0005).sort((a, b) => b[1] - a[1]);
-  const fx = L.length ? 'Effects: ' + L.map(([n, v]) => `${n} ${(v * 100).toFixed(1)}%`).join(' · ') : 'No track effects running.';
+  const fx = L.length ? 'By part: ' + L.map(([n, v]) => `${n} ${(v * 100).toFixed(1)}%`).join(' · ') : 'No track effects running.';
   if (!ctx) return toast('Play something first; the meter starts with the sound.');
   toast((cap ? `Audio load ${Math.round(cap.avg * 100)}%, peak ${Math.round(cap.peak * 100)}%` + (cap.under > 0 ? `, ${(cap.under * 100).toFixed(1)}% dropouts` : '') + '. '
-    : `Track effects use ${Math.round(L.reduce((a, x) => a + x[1], 0) * 100)}% of real time (this browser doesn’t report the total audio load, so that’s what the meter shows). `) + fx);
+    : `The audio engine’s processing uses ${Math.round(L.reduce((a, x) => a + x[1], 0) * 100)}% of real time (this browser doesn’t report the total audio load, so that’s what the meter shows). `)
+    + fx + (glitch.n ? ` · ${glitch.n} dropout${glitch.n === 1 ? '' : 's'} since the sound started` + (latOf() === 'interactive' ? ' (Settings → Audio → Latency: Balanced gives more headroom).' : '.') : ' · No dropouts.'));
 });
 function frame(){
   raf = 0; if (view !== 'tracker') return;

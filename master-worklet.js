@@ -291,6 +291,7 @@ class MasterProcessor extends AudioWorkletProcessor {
     const inp = inputs[0], out = outputs[0]; if (!out || !out.length) return true;
     const n = out[0].length, L = this.L.length === n ? this.L : (this.L = new Float32Array(n)), R = this.R.length === n ? this.R : (this.R = new Float32Array(n));
     const a = inp && inp[0], b = inp && (inp[1] || inp[0]);
+    const t0 = Date.now();
     if (a){ L.set(a); R.set(b); } else { L.fill(0); R.fill(0); }
     let ip = 0; for (let i = 0; i < n; i++){ const v = Math.max(Math.abs(L[i]), Math.abs(R[i])); if (v > ip) ip = v; }
     if (this.meters) this.inLu.process(L, R, n);
@@ -299,6 +300,9 @@ class MasterProcessor extends AudioWorkletProcessor {
     if (this.on.lim) this.lim.process(L, R, n);
     let op = 0; for (let i = 0; i < n; i++){ const v = Math.max(Math.abs(L[i]), Math.abs(R[i])); if (v > op) op = v; }
     out[0].set(L); if (out[1]) out[1].set(R);
+    // Its share of real time, averaged over half a second (Date.now() is coarse), for the CPU meter.
+    this.ms = (this.ms || 0) + Date.now() - t0; this.fr = (this.fr || 0) + n;
+    if (this.fr >= sampleRate / 2){ this.load = this.ms / (this.fr / sampleRate * 1000); this.ms = 0; this.fr = 0; }
     if (this.meters){
       this.outLu.process(L, R, n);
       this.inPk = Math.max(this.inPk, ip); this.outPk = Math.max(this.outPk, op); this.tpMax = Math.max(this.tpMax, op);
@@ -306,7 +310,7 @@ class MasterProcessor extends AudioWorkletProcessor {
       if (++this.n >= Math.round(sampleRate / 128 / 20)){
         this.n = 0;
         this.port.postMessage({meter:{inPk:this.inPk, outPk:this.outPk, tp:this.tpMax, inLu:this.inLu.shortTerm(), outLu:this.outLu.shortTerm(),
-          comp:this.compGr, lim:this.on.lim ? linToDb(this.lim.grMin) : 0, sup:this.on.sup ? this.sup.bands(48) : null}});
+          load:this.load || 0, comp:this.compGr, lim:this.on.lim ? linToDb(this.lim.grMin) : 0, sup:this.on.sup ? this.sup.bands(48) : null}});
         this.inPk = 0; this.outPk = 0; this.compGr = 0; this.lim.grMin = 1;
       }
     }

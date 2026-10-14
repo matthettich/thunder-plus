@@ -21,8 +21,8 @@ Keep this file up to date at the end of a work session.
   - 13 Oct: **pad rendering moved to a Worker** (see below), and the offer to open ...Thunder's saved work.
 - **App:** no build step. `index.html` is the whole tracker/synth app; `chains/index.html` and
   `waves/index.html` are the two modular patch editors loaded in frames.
-- **Cache-busters now:** `chains-worklet.js?v=10`, `waves-worklet.js?v=5` (index.html, the editor pages, sw.js). Cache is
-  `thunderplus-v69`.
+- **Cache-busters now:** `chains-worklet.js?v=10`, `waves-worklet.js?v=5`, `master-worklet.js?v=2` (index.html, the editor
+  pages, sw.js). Cache is `thunderplus-v70`.
 
 ## Licensing rule (the owner may sell the app later)
 
@@ -261,6 +261,23 @@ A cable into a slider's small purple jack (`p:<param>`) now always shows the ...
 - **Cabled but no live data** (audio not started, no track routed through …chains): `paintMods` still marks the row,
   at the slider's own value; a 200 ms timer repaints when telemetry has been quiet for 400 ms (also clears unplugged).
 - Telemetry now posts every 12 blocks (~31 Hz) instead of 24, so the mark moves smoothly.
+
+## CPU meter, dropouts and clicks (13 Oct, evening)
+
+- **The meter read 0% on browsers without `renderCapacity`** (headless Chromium 141; likely the phone too) unless
+  track effects or …chains were on: pads, bass and the master never reported. Now the bass worklet and the master
+  worklet report a Date.now()-averaged load like track FX do; `fxLoads()` lists `MST dyn` and `Bass` too.
+- **Dropouts:** `glitchScan()` (every 100 ms) uses `ctx.playbackStats.underrunEvents` where it exists, else the slip
+  between `getOutputTimestamp()`'s audio and page clocks (> 12 ms = one dropout; it follows slow drift). A dropout
+  turns the meter red for 3 s; the tooltip and the click toast give the count. **Untested on a real device:**
+  headless Chromium's fake output waits for a stalled audio thread, so it never underruns (no false positives seen).
+- **Clicks:** a late `kill()` (UI thread stalled) fades from `currentTime`, not from a past time (which was an
+  instant cut). Notes started part-way into a sample (slices, offsets) get a 1.5 ms fade-in.
+- **Phone defaults:** latency is `latOf()`: the person's pick (`aset.latPick`), else Balanced in Mobile and Lowest on
+  desktop. The sequencer looks 0.25 s ahead in Mobile (0.15 s on desktop).
+- **Track FX sleep:** a `thunder-tfx` node whose input is silent (< 1e-7) and whose output has been below 1e-6 for
+  1 s outputs silence without running its effects; any input wakes it; settings changes reset it. Long reverbs
+  take ~10 s to get there. Measured: two reverb tracks 5–8% → 0% once tails die.
 
 ## Running it locally
 
