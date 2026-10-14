@@ -469,6 +469,10 @@ Commits on `main`: 9ababb0 (fixes), e21c605 (presets + song-load fix), e8f2970 (
   with DEL and RET in the phrase. `swingNote()` toasts once ("now reads LPB 2, 12 ticks…"). New songs default to LPB 4
   (true 16ths; the owner's earlier "LPB 8 default" was compensating for this bug). Grooves with a 0 (= "ticks a
   step") digit in old songs would stretch with the new ticks; not converted.
+- **Master phrases are commands only** (`mstView()` = `cTrack === MT`): `pCols()` gives just the FX columns, the phrase draw
+  skips notes/V/I and neighbours, the picker and EDIT+▲▼ use `FXLIST_MST` / `MST_FXC`, letters only match those, the hint
+  and the stage (master FX chain) change. Same row format underneath, so a phrase can still be used anywhere. Also fixed:
+  EDIT×2 on the LEN/LPB line (`c.y === -2`) threw in `editDouble`.
 - **Dogs:** legs are now groups (`.leg.ll/.lr`, `--lL/--lR`). `DOG_MOVES` up / down / legs / both; `dogsFollow()` (on each
   beat) advances the dance when the followed track (cursor's, else the first playing) starts a phrase: another block, or
   its step wrapping back (a repeat). Verified live: a new dance every 16 rows.

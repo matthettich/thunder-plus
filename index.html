@@ -1614,7 +1614,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p>Each phrase row has three effect columns: a command and a hex value. The info line at the bottom of the screen explains the one under the cursor.</p>
 <div class="fxg"><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FLX</code>Flex pattern: 00 off, 01–10</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>retrigger every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row Y</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div></div>
 <h3>The master column (MST)</h3>
-<p>On the Song screen, the amber <b>MST</b> column after the poly tracks plays phrases whose commands drive the <b>master bus</b>: <code>VOL</code> sets the master level from that row on, and <code>FXO</code>, <code>FLX</code>, <code>GAT</code> and <code>RTG</code> work on the master's effects (Mixer → master → FX). Notes in a master phrase are not played; other commands (TPO, GGR, TIC, HOP…) work as on any track. It plays alongside the tracks, block by block, and is not shown in Arrange. Stopping puts the master level and every switched effect back as set.</p>
+<p>On the Song screen, the amber <b>MST</b> column after the poly tracks plays phrases whose commands drive the <b>master bus</b>: <code>VOL</code> sets the master level from that row on, and <code>FXO</code>, <code>FLX</code>, <code>GAT</code> and <code>RTG</code> work on the master's effects (Mixer → master → FX). Master phrases are their own kind: just the three command columns (no notes, volume or instrument), and the command list offers only what works on the master: VOL, FXO, FLX, GAT, RTG, then TPO, TIC, GGR, HOP, DEL, CHA, NTH, REP, RND, RNL and SED. Beside the grid on a big screen, the master's effect chain shows instead of the piano. It plays alongside the tracks, block by block, and is not shown in Arrange. Stopping puts the master level and every switched effect back as set.</p>
 <p><b>Momentary effects:</b> put an effect in a slot and leave it off, then <code>FXO 21</code> switches slot 2 on, <code>FXO 20</code> off again, or <code>FXO 24</code> turns it on for four rows. It works on any track (that track's slots) and in the MST column (the master's). Switching fades over 5 ms; Flex keeps listening while it is off, so it always has the last bar ready.</p>
 <h3>Flex, Step gate and Retrigger</h3>
 <p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (16 patterns; <code>FLX</code> picks one from a row). <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT</code> picks. <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped).</p>
@@ -9084,7 +9084,9 @@ let instPicked = false;
 const PK = ['note', 'note', 'note', 'note', 'vol', 'inst', 'fxc', 'fxv', 'fxc', 'fxv', 'fxc', 'fxv'];
 // The phrase shows its chord columns (N2–N4) when it is open from one of the polyphonic tracks 9–16.
 const polyView = () => isPolyT(cTrack);
-const pCols = () => polyView() ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 4, 5, 6, 7, 8, 9, 10, 11];
+// Master phrases (the MST column's) are commands only: just the three FX columns.
+const mstView = () => cTrack === MT;
+const pCols = () => mstView() ? [6, 7, 8, 9, 10, 11] : polyView() ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 4, 5, 6, 7, 8, 9, 10, 11];
 const kindAt = (v, x) => v === 'song' ? 'sect' : v === 'sect' ? (x ? 'tsp' : 'phrase') : PK[x];
 function getCell(v, x, y){
   if (v === 'song') return S.song[y][x];
@@ -9307,7 +9309,8 @@ function bump(d, big){
       case 'note': v = v === OFF ? last.note : clamp(v + d * (big ? 12 : 1), 0, 119); break;
       // 16 instruments, 00–0F: the big step jumps between the drum ones (00–07) and the synth ones (08–0F).
       case 'inst': { const nv = clamp(v + d * (big ? 8 : 1), 0, NI - 1); if (nv === v) toast(`Instruments go 00–0F (16 of them, in hex: 0A is 10, 0F is 15). 00–07 play the drum pads, 08–0F the synths.`); v = nv; break; }
-      case 'fxc': v = ((v + d * (big ? 4 : 1)) % FXC.length + FXC.length) % FXC.length; break;
+      case 'fxc': if (mstView()){ const L = FXLIST_MST.slice(1), n = L.length, i = Math.max(0, L.indexOf(v)); v = L[((i + d * (big ? 4 : 1)) % n + n) % n]; }
+        else v = ((v + d * (big ? 4 : 1)) % FXC.length + FXC.length) % FXC.length; break;
     }
     setCell(tv, c.x, c.y, v); after(k, tv, c.x, c.y, v); return;
   }
@@ -9338,10 +9341,15 @@ const FXB = {ARP:'Arpeggio: the note, +X and +Y semitones', ARC:'Arpeggio shape 
   VOL:'Set the volume (also of a playing note)', PIT:'Pitch the note ± semitones', FIN:'Fine tune ± cents', PLY:'Play reversed (01) or forwards (00)',
   STA:'Start part way into the sound', PAN:'Pan left or right (80 centre)', TIC:'Ticks a step from here on', WOB:'Bass wobble rate from here on (00 the voice’s own)',
   FXO:'Effect slot X (0 = all) off (Y 0), on (1) or on for Y rows', FLX:'Flex pattern (00 off, 01–10)', GAT:'Step gate pattern (00 custom, 01–0F)', RTG:'Retrigger: X rate (1 = 1/4 … 8 = 1/32T), Y rows (0 = until RTG 00)'};
-const FXLIST = [-1, ...FXC.map((n, i) => i).sort((a, b) => FXC[a] < FXC[b] ? -1 : 1)];
+const FXLIST_ALL = [-1, ...FXC.map((n, i) => i).sort((a, b) => FXC[a] < FXC[b] ? -1 : 1)];
+// Master phrases offer only the commands that mean something on the master bus: its level and effects first, then timing.
+const MST_FXC = ['VOL', 'FXO', 'FLX', 'GAT', 'RTG', 'TPO', 'TIC', 'GGR', 'HOP', 'DEL', 'CHA', 'NTH', 'REP', 'RND', 'RNL', 'SED'];
+const FXLIST_MST = [-1, ...MST_FXC.map(n => FXC.indexOf(n)).filter(i => i >= 0)];
+let FXLIST = FXLIST_ALL;
+const fxListNow = () => (FXLIST = mstView() ? FXLIST_MST : FXLIST_ALL);
 const fxp = {open:false, x:0, y:0, i:0, now:-1};
 function fxpOpen(x, y){
-  const v = getCell('phrase', x, y); fxp.now = v;
+  fxListNow(); const v = getCell('phrase', x, y); fxp.now = v;
   Object.assign(fxp, {open:true, x, y, i:Math.max(0, FXLIST.indexOf(v >= 0 ? v : last.fxc))});
   const L = $('fxPickList'); L.innerHTML = '';
   FXLIST.forEach((f, k) => { const it = el('div', 'fpi'); it.dataset.k = k; it.setAttribute('role', 'option');
@@ -9436,7 +9444,7 @@ function editDouble(wasEmpty){
     setCell(tv, c.x, c.y, id); after(isS ? 'sect' : 'phrase', tv, c.x, c.y, id);
     return toast((fresh ? 'New ' : 'Cloned to ') + (isS ? 'sect ' : 'phrase ') + hx(id));
   }
-  if (tv === 'phrase' && PK[c.x] === 'note'){ setCell('phrase', c.x, c.y, OFF); return after('note', 'phrase', c.x, c.y, OFF); }
+  if (tv === 'phrase' && c.y >= 0 && PK[c.x] === 'note'){ setCell('phrase', c.x, c.y, OFF); return after('note', 'phrase', c.x, c.y, OFF); }
   const r = rowsOf(tv)[c.y]; if (r && r.act && r.dbl) r.act();
 }
 // EDIT×2 on the song with sects hidden: a new block is a sect with one new phrase (numbered alike when
@@ -9688,7 +9696,7 @@ const onMstCell = () => tv === 'mixer' && cs.mixer.y === 7 && cs.mixer.mx === 1;
 function move(dx, dy){
   const c = cs[tv], d = dims(tv);
   if (tv === 'fx') return moveFx(dx, dy, d.h);
-  if (tv === 'phrase' && c.y === -2){ if (dy > 0){ c.y = 0; c.x = 0; } else c.x = clamp(c.x + dx, 0, 1); return draw(); }
+  if (tv === 'phrase' && c.y === -2){ if (dy > 0){ c.y = 0; c.x = mstView() ? FX0 : 0; } else c.x = clamp(c.x + dx, 0, 1); return draw(); }
   if (tv === 'phrase' && dy === -1 && c.y === 0){ c.y = -2; c.x = c.x > 0 ? 1 : 0; return draw(); }
   if (tv === 'phrase' && dx){ const C = pCols(), i = Math.max(0, C.indexOf(c.x)); c.x = C[clamp(i + dx, 0, C.length - 1)]; }
   else if (tv === 'mixer' && c.y === 7 && dx){ c.mx = clamp((c.mx || 0) + dx, 0, 1); return draw(); }
@@ -10025,6 +10033,7 @@ const HINT = {
   song:'EDIT add · EDIT×2 new sect · OPT+EDIT clear · EDIT+◀▶ ±1 ▲▼ ±16 · SHIFT+▶ open · OPT+▲▼ page',
   songP:'EDIT add · EDIT×2 new phrase (on a block: unique copy) · OPT+EDIT clear · EDIT+◀▶ ±1 · SHIFT+▶ open phrase',
   sect:'EDIT add phrase · EDIT×2 new · EDIT+arrows change · SHIFT+▶ open · SHIFT+◀ song · OPT+◀▶ other sect',
+  phraseM:'Master phrase: commands only · EDIT add a command (VOL level, FXO effects on/off, FLX GAT RTG patterns) · EDIT+◀▶ ±1 ▲▼ ±more · OPT+EDIT clear',
   phrase:'EDIT add note · EDIT×2 note off · EDIT+◀▶ ±1 ▲▼ ±octave · OPT+EDIT clear · OPT+arrows go to phrase · SHIFT+▶ inst',
   inst:'EDIT+◀▶ ±1 ▲▼ ±more · EDIT on › runs it · OPT+◀▶ other instrument · SHIFT+◀ phrase',
   mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · FX row: OPT+▲▶ FX on (up to 4), OPT+▼◀ off · EDIT mutes, solos, toggles CHN or opens FX · SC row: EDIT sends this track to the sidechain bus · OPT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
@@ -10055,7 +10064,7 @@ function info(){
     if (k === 'vol') return v < 0 ? 'Volume: full' : `Volume ${hx(v)} · ${dB(curve(v))}`;
     if (k === 'inst'){ if (v < 0) return 'Instrument: same as the last note on this track'; const I = S.insts[v] || S.insts[0]; return `Instrument ${hx(v)} → ${isSyn(I.pad) ? 'synth' : 'pad'} ${hx(I.pad)} ${(kit.voices[I.pad] || {}).name || ''}`; }
     const ci = k === 'fxc' ? v : r[c.x - 1], vv = k === 'fxc' ? r[c.x + 1] : v;
-    return ci < 0 || !FXC[ci] ? 'No command. EDIT adds one; EDIT+▲▼ or letters pick from ' + FXC.join(' ') : `${FXC[ci]} ${h2(vv)} · ` + (cTrack === MT && FXC[ci] === 'VOL' ? `Master level ${dB(curve(Math.max(0, vv)))} from here on (back to the Mixer’s MASTER when it stops)` : cTrack === MT && /^(FXO|FLX|GAT|RTG)$/.test(FXC[ci]) ? FXI[FXC[ci]](Math.max(0, vv)).replace(/this track's/g, 'the master’s') + ' · on the master bus' : FXI[FXC[ci]](Math.max(0, vv)));
+    return ci < 0 || !FXC[ci] ? 'No command. EDIT adds one; EDIT+▲▼ or letters pick from ' + (mstView() ? MST_FXC : FXC).join(' ') : `${FXC[ci]} ${h2(vv)} · ` + (cTrack === MT && FXC[ci] === 'VOL' ? `Master level ${dB(curve(Math.max(0, vv)))} from here on (back to the Mixer’s MASTER when it stops)` : cTrack === MT && /^(FXO|FLX|GAT|RTG)$/.test(FXC[ci]) ? FXI[FXC[ci]](Math.max(0, vv)).replace(/this track's/g, 'the master’s') + ' · on the master bus' : FXI[FXC[ci]](Math.max(0, vv)));
   }
   if (tv === 'mixer'){
     if (c.y === 7 && c.mx === 1) return 'Mastering ' + (S.mst.on ? 'on' : 'off') + ' · ' + mstChainTxt() + ' · EDIT opens it · EDIT+◀▶ off / on';
@@ -10196,7 +10205,7 @@ function draw(){
       L.push([{t:stepDec ? d2(y) : hx(y, 1), cls:'rn' + (y % 4 ? '' : ' rn4') + (pr.has(y) ? ' pl' : '') + rsel(y), r:y}, ' ', {t:h2(r[0]), cls:cc(0, y, r[0] < 0 ? 'e' : 'v'), x:0, y}, ' ', {t:hx(r[1]), cls:cc(1, y, r[1] ? 'v' : 'e'), x:1, y}]); }
   } else if (tv === 'phrase'){
     title = 'PHRASE ' + hx(cPhrase); sub = cTrack === MT ? 'MASTER' : 'TRACK ' + d2(cTrack + 1) + (polyView() ? ' · POLY' : ' · MONO');
-    const poly = polyView(); if (!poly && c.x >= 1 && c.x < NCOL) c.x = 0;
+    const poly = polyView(), mst = mstView(); if (mst && c.y >= 0 && c.x < FX0) c.x = FX0; else if (!poly && c.x >= 1 && c.x < NCOL) c.x = 0;
     const p = S.phrases[cPhrase], pr = playRows(q => q.phrase === cPhrase ? q.step : null), len = plen(cPhrase), lpb = S.plpb[cPhrase] || 0, el2 = lpb || S.lpb;
     pset = [{t:'LEN ', cls:'lb'}, {t:d2(len), cls:cc(0, -2, 'v'), x:0, y:-2}, {t:' LPB ', cls:'lb'}, {t:lpb ? d2(lpb) : '--', cls:cc(1, -2, lpb ? 'v' : 'e'), x:1, y:-2},
       {t:' 1/' + (el2 * 4) + (el2 % 3 === 0 ? ' trip' : '') + (lpb ? '' : ' song'), cls:'lb'}];
@@ -10213,6 +10222,7 @@ function draw(){
     }
     const nbW = pl => pl ? (nbWide ? NCOL * 4 - 1 : NCOL) : 3;   // the cell's width, before its trailing space
     const nbHead = (has, t, pl) => (has ? d2(t + 1) : '  ').padEnd(nbW(pl) + 1);
+    if (mst) L.push(['   ', {t:'FX1   ', cls:'th'}, ' ', {t:'FX2   ', cls:'th'}, ' ', {t:'FX3', cls:'th'}]); else
     L.push(['   ', ...(nbOn ? [{t:nbHead(nbHasL, cTrack - 1, nbPL), cls:'nb nbl'}] : []), ...(poly ? [{t:'N1  N2  N3  N4 ', cls:'th'}] : [{t:'N  ', cls:'th'}]), ' ',
       ...(nbOn ? [{t:nbHead(nbHasR, cTrack + 1, nbPR), cls:'nb nbr'}] : []), {t:'V ', cls:'th'}, ' ', {t:'I ', cls:'th'}, ' ', {t:'FX1   ', cls:'th'}, ' ', {t:'FX2   ', cls:'th'}, ' ', {t:'FX3', cls:'th'}]);
     const VR = Math.max(4, songRows()); if (c.top == null) c.top = 0;
@@ -10229,6 +10239,9 @@ function draw(){
       const r = p ? p[y] : blankRow();
       const ln = [{t:rS(y), cls:'rn' + (y % 4 ? '' : ' rn4') + (pr.has(y) ? ' pl' : '') + rsel(y), r:y}, ' '];
       const yl = Math.min(len, c.top + VR) - 1;
+      if (mst){   // master phrase: the three command columns only
+        for (let k = FX0; k < RW; k += 2) ln.push(k > FX0 ? ' ' : '', {t:r[k] < 0 ? '---' : (FXC[r[k]] || '???'), cls:cc(k, y, r[k] < 0 ? 'e' : 'cf'), x:k, y}, ' ', {t:h2(r[k + 1]), cls:cc(k + 1, y, r[k + 1] < 0 ? 'e' : 'v'), x:k + 1, y});
+        L.push(ln); continue; }
       if (nbOn) ln.push(nbCell(nbL, y, 'nbl'), ' ');
       for (let q = 0; q < (poly ? NCOL : 1); q++) ln.push({t:noteS(r[q]), cls:cc(q, y, r[q] < 0 ? 'e' : 'cn') + tk(cTrack) + ' gc' + (y === c.top ? ' gt' : '') + (y === yl ? ' gb' : ''), x:q, y}, ' ');
       if (nbOn) ln.push(nbCell(nbR, y, 'nbr'), ' ');
@@ -10306,8 +10319,10 @@ function draw(){
   $('tInfo').textContent = info();
   let hintTxt = (tv === 'song' && !sectsOn) ? (inMode === 'keys' ? HINTK.songP : HINT.songP) : (inMode === 'keys' ? HINTK : HINT)[tv];
   if (tv === 'phrase' && inMode !== 'keys' && !patNavOn) hintTxt = hintTxt.replace('OPT+arrows go to phrase', 'OPT+▲▼ page');
+  const mstP = tv === 'phrase' && mstView();
+  if (mstP) hintTxt = inMode === 'keys' ? 'Master phrase: commands only · letters pick a command (V F G R T…) · type hex for its value · Del cell · Shift+↑↓ lines · Ctrl+C/V' : HINT.phraseM;
   if (tv === 'fx' && cs.fx.y > FXSLOTS) hintTxt = 'Slot ' + (cFxS + 1) + ' controls · ▲▼ pick one · ' + (inMode === 'keys' ? '← or Esc back to the slots' : '◀ back to the slots');
-  $('tHint').textContent = (tv === 'phrase' ? 'NOW ' + curS() + (inMode === 'keys' ? ' · oct ' + kOct + ' · step ' + kStep : '') + ' · ' : '') + hintTxt;
+  $('tHint').textContent = (tv === 'phrase' && !mstP ? 'NOW ' + curS() + (inMode === 'keys' ? ' · oct ' + kOct + ' · step ' + kStep : '') + ' · ' : '') + hintTxt;
   drawArr(PH);
   const km = inMode === 'keys'; $('tKp').hidden = !km || !kpOn; $('tPad').hidden = km; $('tLegKeys').hidden = !km; $('tLegPad').hidden = km;
   deckDraw(); stageLayout();
@@ -10367,7 +10382,7 @@ const STK = 'thunderplus-stage-v1', STG = ['screen', 'dogs', 'off'], STG_NAMES =
 let stage = (() => { try { const v = localStorage.getItem(STK); if (STG.includes(v)) return v; if (v === 'phrase') return 'screen'; } catch(e){} return 'screen'; })();
 function setStage(v){ stage = v; try { localStorage.setItem(STK, v); } catch(e){} stageLayout(); }
 $('tStageX').addEventListener('click', () => { setStage('off'); toast('Stage hidden. Settings → STAGE brings it back.'); });
-const stageKind = () => stage === 'dogs' ? 'dogs' : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
+const stageKind = () => stage === 'dogs' ? 'dogs' : tv === 'phrase' && mstView() ? 'chain' : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
 let stgKindNow = '', stgSig = '';
 // It sits in the space to the right of the grid's text, the grid's height, when that space is big enough.
 function stageLayout(){
@@ -11616,7 +11631,7 @@ function typeFx(i){
   setCell('phrase', c.x, c.y, i); after('fxc', 'phrase', c.x, c.y, i);
 }
 function fxLetter(ch){
-  const c = cs[tv], list = FXC.map((f, i) => [f, i]).filter(([f]) => f[0] === ch.toUpperCase()); if (!list.length) return false;
+  const c = cs[tv], list = FXC.map((f, i) => [f, i]).filter(([f]) => f[0] === ch.toUpperCase() && (!mstView() || MST_FXC.includes(f))); if (!list.length) return false;
   const curV = getCell(tv, c.x, c.y), at = list.findIndex(([, i]) => i === curV);
   typeFx(list[(at + 1) % list.length][1]); return true;
 }
