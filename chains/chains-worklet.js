@@ -1054,7 +1054,7 @@ class ChainsProcessor extends AudioWorkletProcessor {
       for (let i = 0; i < BLOCK; i++){ L[i] += e.busesL[o + i]; if (R !== L) R[i] += e.busesR[o + i]; }
     }
     for (let i = 0; i < BLOCK; i++){ L[i] = soft(L[i]); if (R !== L) R[i] = soft(R[i]); }
-    if (e.telemetryOn && (++this._blocks % 24) === 0) this.port.postMessage({ target:TARGET, op:OP.meter, value:e.telemetry() });
+    if (e.telemetryOn && (++this._blocks % 12) === 0) this.port.postMessage({ target:TARGET, op:OP.meter, value:e.telemetry() });
     else if (!e.telemetryOn) this._blocks++;
     return true;
   }
@@ -1119,7 +1119,7 @@ class ThunderChains extends AudioWorkletProcessor {
     const bL = e.busesL.subarray(this.track * BLOCK, this.track * BLOCK + n);
     const bR = e.busesR.subarray(this.track * BLOCK, this.track * BLOCK + n);
     L.set(bL); if (R !== L) R.set(bR);
-    if (e.telemetryOn && (++this._blocks % 24) === 0) this.port.postMessage({ target:'chains-host', op:OP.meter, value:e.telemetry() });
+    if (e.telemetryOn && (++this._blocks % 12) === 0) this.port.postMessage({ target:'chains-host', op:OP.meter, value:e.telemetry() });
     else if (!e.telemetryOn) this._blocks++;
     return true;
   }

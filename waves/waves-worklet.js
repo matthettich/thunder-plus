@@ -691,11 +691,30 @@ class WavesEngine {
       for (let i = 0; i < BLOCK; i++){ const a = Math.abs(this.busesL[k * BLOCK + i]), b = Math.abs(this.busesR[k * BLOCK + i]); if (a > peak) peak = a; if (b > peak) peak = b; }
       buses.push(peak);
     }
-    // The live value of every modulated parameter (first voice), so the page can show it.
+    // The live value of every modulated parameter, so the page can show it (as in ...Seeds). Poly modules show the
+    // newest playing voice; with no voice awake, mono sources (a free-running LFO) still move the slider's mark.
     const mods = [];
+    const rows = this.voices.rows, hold = this.sr * 12;
+    let v0 = -1;
+    for (let i = 0; i < rows.length; i++) if (rows[i].gate && (v0 < 0 || rows[i].age > rows[v0].age)) v0 = i;
+    if (v0 < 0) for (let i = 0; i < rows.length; i++) if (this.voices.awake(i, hold) && (v0 < 0 || rows[i].age > rows[v0].age)) v0 = i;
     for (const m of this.graph.mods.values()){
-      const io = this._ios.get(m.id + (m.poly ? '#0' : '')); if (!io || !io.mods) continue;
-      for (const k in io.mods) mods.push([m.id, k, io.pm[k]]);
+      let sums = null;
+      for (const c of this.graph.inc.get(m.id) || []){
+        if (!isParamPort(c.b[1])) continue;
+        const k = c.b[1].slice(2); if (!(k in m.def.params)) continue;
+        const src = this.graph.mods.get(c.a[0]); if (!src) continue;
+        sums = sums || {}; if (!(k in sums)) sums[k] = 0;
+        const io = src.poly ? (v0 >= 0 ? this._ios.get(src.id + '#' + v0) : null) : this._ios.get(src.id);
+        const b = io && !io.asleep && io.out[c.a[1]]; if (b) sums[k] += b[0];
+      }
+      if (!sums) continue;
+      for (const k in sums){
+        const [, mn, mx, st] = m.def.params[k];
+        let r = clamp(m.inst.params[k] + sums[k] * (mx - mn), mn, mx);
+        if (st >= 1) r = Math.round((r - mn) / st) * st + mn;
+        mods.push([m.id, k, r]);
+      }
     }
     return { load:this.load, active, quality:this.quality, buses, mods, wasm:{ dsp:!!WASM.dsp, tfx:!!WASM.tfxX } };
   }
@@ -759,7 +778,7 @@ class WavesProcessor extends AudioWorkletProcessor {
       for (let i = 0; i < BLOCK; i++){ L[i] += e.busesL[o + i]; if (R !== L) R[i] += e.busesR[o + i]; }
     }
     for (let i = 0; i < BLOCK; i++){ L[i] = soft(L[i]); if (R !== L) R[i] = soft(R[i]); }
-    if (e.telemetryOn && (++this._blocks % 24) === 0) this.port.postMessage({ target:TARGET, op:OP.meter, value:e.telemetry() });
+    if (e.telemetryOn && (++this._blocks % 12) === 0) this.port.postMessage({ target:TARGET, op:OP.meter, value:e.telemetry() });
     else if (!e.telemetryOn) this._blocks++;
     return true;
   }

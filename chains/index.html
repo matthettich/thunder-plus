@@ -191,7 +191,7 @@ body.alting svg.cables rect.bend{opacity:1; pointer-events:all}
 .row > span:first-child{color:var(--muted); line-height:1.15; overflow-wrap:anywhere; hyphens:auto}
 .row .val{text-align:right; font-variant-numeric:tabular-nums; cursor:text}
 .rng{position:relative; display:grid; align-items:center}
-.mark{position:absolute; bottom:-5px; width:3px; height:6px; margin-left:-1.5px; background:var(--mod); pointer-events:none}
+.mark{position:absolute; bottom:-5px; width:3px; height:6px; margin-left:-1.5px; border-radius:1px; background:var(--mod); pointer-events:none}
 .row.modded .val{color:var(--mod); font-weight:600}
 .cmval{position:absolute; right:24px; top:50%; transform:translateY(-50%); font-size:11px; font-weight:600; background:var(--mod); color:#fff; padding:1px 7px; pointer-events:none; max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .numsmall{width:90px; padding:4px 6px; border:1px solid #111; background:#fff; font-size:13px}
@@ -755,7 +755,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=9';
+    const url = opts.url || './chains-worklet.js?v=10';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -1851,6 +1851,7 @@ const pnameEl = document.getElementById('pname');
         hostCpu = payload && typeof payload.load === 'number' ? payload.load : null;
         hostSeen = Date.now();
         paintHostMeters(); paintHostCpu();
+        if (payload && Array.isArray(payload.mods)){ modSeen = Date.now(); paintMods(payload.mods); }
       }
     };
     window.wavesEmbed = window.chainsEmbed;   // back-compat alias
@@ -2034,6 +2035,7 @@ const meterBars = [];
   for (let k = 0; k < CHAN_COUNT; k++){ const b = h('span', {class:'b', title:'Chain ' + (k + 1) + ' / Track ' + (k + 1)}, h('i')); host.append(b); meterBars.push(b.firstChild); }
 }
 function onMeter(m){
+  modSeen = Date.now();
   const el = document.getElementById('cpuv'), p = Math.round(m.load * 100);
   el.textContent = 'CPU ' + p + '%' + (m.quality === 'draft' ? ' · draft' : '');
   el.className = 'fps ' + (m.load < .5 ? 'good' : m.load <= .8 ? 'ok' : 'low');
@@ -2053,21 +2055,30 @@ function onMeter(m){
   for (const n of nodes.values()) if (n.meter) n.meter.style.transform = 'scaleX(' + Math.min(1, busPeaks[((n.m.params.track | 0) || 1) - 1] || 0) + ')';
 }
 
-/* Modulated sliders show the live value in purple, with a mark on the track (as in ...Seeds). */
-let modded = new Map();
+/* Modulated sliders, as in ...Seeds: a cable in a slider's purple jack turns its value purple and bold, and a
+   purple mark under the slider shows the live position the LFO (or any control) is moving it to. A cabled slider
+   is marked straight away, at its own value, until the engine reports live values (audio not started yet, or
+   …chains in …Thunder Plus before a track runs through it). */
+let modded = new Map(), modSeen = 0;
 function paintMods(list){
   const now = new Map();
-  for (const [id, k, v] of list){
-    const n = nodes.get(id), c = n && n.ctl[k]; if (!c || !c.row) continue;
+  const paint = (id, k, v) => {
+    const n = nodes.get(id), c = n && n.ctl[k]; if (!c || !c.row) return;
     now.set(id + '\u0000' + k, c);
     c.row.classList.add('modded');
     if (c.out){
       const [, mn, mx] = MODULES[n.m.type].params[k];
       if (!c.out.querySelector('input')) c.out.textContent = c.fmt(v);
-      c.mark.hidden = false; c.mark.style.left = `calc(8px + (100% - 16px) * ${(v - mn) / (mx - mn)})`;
+      c.mark.hidden = false; c.mark.style.left = `calc(8px + (100% - 16px) * ${Math.max(0, Math.min(1, (v - mn) / (mx - mn)))})`;
     } else if (c.tag){
       const o = c.opts.find(q => q[0] === Math.round(v)); c.tag.textContent = o ? o[1] : ''; c.tag.hidden = !o || Math.round(v) === Math.round(n.m.params[k]);
     }
+  };
+  for (const [id, k, v] of list) paint(id, k, v);
+  for (const c of doc.cables){
+    const p = c.to && c.to[1]; if (typeof p !== 'string' || !p.startsWith('p:')) continue;
+    const id = c.to[0], k = p.slice(2), n = nodes.get(id);
+    if (n && !now.has(id + '\u0000' + k)) paint(id, k, +n.m.params[k]);
   }
   for (const [key, c] of modded) if (!now.has(key)){
     c.row.classList.remove('modded');
@@ -2076,6 +2087,9 @@ function paintMods(list){
   }
   modded = now;
 }
+
+// No live values for a moment (engine paused or not routed): keep cabled sliders marked, and unmark unplugged ones.
+setInterval(() => { if (doc && Date.now() - modSeen > 400) paintMods([]); }, 200);
 let hostPeaks = [], hostSeen = 0, hostCpu = null;
 /* Embedded, the CPU label shows the song's load (the same number as the Tracker meter),
    not a separate preview engine — so the two meters agree. */

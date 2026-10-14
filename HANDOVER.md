@@ -21,8 +21,8 @@ Keep this file up to date at the end of a work session.
   - 13 Oct: **pad rendering moved to a Worker** (see below), and the offer to open ...Thunder's saved work.
 - **App:** no build step. `index.html` is the whole tracker/synth app; `chains/index.html` and
   `waves/index.html` are the two modular patch editors loaded in frames.
-- **Cache-busters now:** `chains-worklet.js?v=8` (index.html, chains/index.html, sw.js). Caches are
-  `thunderplus-v40`.
+- **Cache-busters now:** `chains-worklet.js?v=10`, `waves-worklet.js?v=5` (index.html, the editor pages, sw.js). Cache is
+  `thunderplus-v69`.
 
 ## Licensing rule (the owner may sell the app later)
 
@@ -246,6 +246,21 @@ Headless Chromium with a phone-sized screen and CPU throttled 4× (Playwright + 
 
   On a real phone, rendering still takes as long, but in the background. A pad tapped before its first
   render lands still renders on the UI thread (`ensureLive` with no cache).
+
+## Modulation shown on sliders, as in ...Seeds (13 Oct, evening)
+
+A cable into a slider's small purple jack (`p:<param>`) now always shows the ...Seeds treatment in **…waves and
+…chains**: the value turns purple and bold, and a 3 px purple mark under the slider shows the live position.
+
+- **…chains in …Thunder Plus was blind before:** the page runs no engine there, and the host never passed the track
+  engines' `mods` telemetry on. Now each chains node keeps `n.mods`, and the …chains-screen meter timer in
+  `index.html` merges them (first track engine wins per id/param) into `chainsEmbed.meters({peaks, load, mods})`.
+- **…waves poly modules were blind with no note held:** telemetry read voice #0 only. `telemetry()` now rebuilds each
+  modulated value from the cables: newest gated voice (else newest awake one), and mono sources (a free-running LFO)
+  still count when every voice is asleep.
+- **Cabled but no live data** (audio not started, no track routed through …chains): `paintMods` still marks the row,
+  at the slider's own value; a 200 ms timer repaints when telemetry has been quiet for 400 ms (also clears unplugged).
+- Telemetry now posts every 12 blocks (~31 Hz) instead of 24, so the mark moves smoothly.
 
 ## Running it locally
 
