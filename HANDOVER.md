@@ -427,6 +427,38 @@ All original code; the name stays generic.
   sample with the layer's seeded random, so renders repeat. **…waves module `string`** (poly, Pitch + Gate in; Tune,
   Bright, Decay, Position, Mute = ring time cut while the gate is low, Level).
 
+## 13–14 Oct (night): fixes, presets, four engines, pitch FX, Pitch Track
+
+Commits on `main`: 9ababb0 (fixes), e21c605 (presets + song-load fix), e8f2970 (engines, poly voice, icon), e6b1f5c
+(vintage sampler, pitch FX, Pitch Track). Cache is `thunderplus-v83`; `chains-worklet.js?v=16`, `waves-worklet.js?v=12`.
+
+- **Big fix: the saved song was lost on every reload.** `normSong` called `nslots()` (a const declared later) while
+  `let S = …` ran at start-up; the throw fell into the catch and loaded `demoSong()`. Now `nslotsEarly()`.
+- **Layout:** `fitCheck()` also shrinks the text to the widest line (Song/Mixer have 16+ tracks, more than BASEW);
+  MONO/POLY `.tgbox` boxes are positioned in em; `fonts.ready` / `loadingdone` redraw. Settings (`.gset`) is a fixed
+  sheet on screens ≤ 600 px.
+- **Phrases list** (File ▾ → Phrases…, `phlOpen`/`phlDraw`/`phlPlace`): phrases with notes, filter "not on the song".
+  **`pendPlace`**: moving from an empty song block into Phrase opens a fresh phrase and `placePending()` (via `saveS`)
+  puts it in that block on its first note.
+- **Voice:** rests (`. , ; : ! ? _` → `{rest:true}` syllables, `on()` silences); `hiss` (Consonant noise) and `clar`
+  (Clarity: narrower bandwidths + presence) params; softer aspiration/burst; Breath default 0.3. **Poly tracks:**
+  `polyVox()` in `makePlayer` uses up to 4 vox nodes per track+pad (`bassNode(t, pad, j)`), chord notes share a syllable.
+- **Presets:** `factoryVoicePresets()` / `factoryLayerPresets()` (layer presets carry `vt`, the pad tune they were
+  written for, and are re-pitched), song presets in `S.presets` (`normPresets`; samples by ref; `smpTidy` keeps them),
+  File → Export song presets / Import presets (exports embed samples).
+- **Engines** (ENGINE block, table `XENG`, settings in `V[V.engine]`, `normX`/`xParams`/`renderX`):
+  `AcidCore` and `MachCore` are live (worklets from `XPROC(name, core)` in the bass Blob; AudioParam `acc` = accent;
+  the sequencer sets `ev.acc` when volume ≥ C0); `ToneDrum.render` and `ModalCore.render` are rendered. One shared card
+  `#xWrap` built from `XUI[kind]` (rows, sections, presets). Deck instrument rows are generic.
+- **Vintage sampler** (sample layers): `L.vint` / `L.vintF`, `VINT` table, `vintData` (cached per sample) + `vintOsc`.
+- **Pitch delay / Pitch reverb:** `PitchFxCore` (two-head granular shifter in/after a delay or a small reverb; loop gains
+  kept under 1 — the reverb is normalised by (1−fb) and the shifter by 0.75). Pad FX `pdelay`/`preverb` (js), track FX
+  ids 97/96 in the TFX worklet Blob.
+- **…chains Pitch Track** (`pitchtrk`, shared block, synced to …waves): YIN on a 4× decimated buffer, ~90 runs/s.
+- **Icon:** the two dogs' faces split down the middle, `icons/plus-*` (`?v=2` in manifest, page and sw).
+- **Not yet heard on the phone:** all of the above was checked headless (renders, no NaN, levels, live nodes through
+  `pass()`). Wavetable import (Serum-style 2048-sample frames) is deferred at the owner's request.
+
 ## Running it locally
 
 No build step; serve the repo root over HTTP (the editors load their worklet by `fetch`, which
