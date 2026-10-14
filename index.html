@@ -6559,8 +6559,8 @@ const SKINS = [
 ];
 const SKK = 'thunderplus-skin-v1';
 let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k => k.id === v)) return v; } catch(e){} return 'greywhite'; })();   // Simple grey (lavender cursor) for a first visit
-// Simple rainbow dynamic: a hue-rotate filter on the page goes once round the colour wheel every 4 minutes. Greys and
-// white stay put; only the colours move. It's set ten times a second in 0.15° steps, far below a visible step, so the
+// Simple rainbow dynamic: a hue-rotate filter on the page goes once round the colour wheel every 2 minutes. Greys and
+// white stay put; only the colours move. It's set ten times a second in 0.3° steps, far below a visible step, so the
 // drift looks continuous at a sixth of the repaints of a per-frame animation. Paused while the app is hidden; off
 // with reduced motion.
 let rbT = 0;
@@ -6569,7 +6569,7 @@ function rbWheel(){
   clearInterval(rbT); rbT = 0; de.style.removeProperty('filter');
   if (skin !== 'rainbowdyn' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const t0 = performance.now();
-  rbT = setInterval(() => { if (!document.hidden) de.style.filter = `hue-rotate(${((performance.now() - t0) * 0.0015 % 360).toFixed(2)}deg)`; }, 100);
+  rbT = setInterval(() => { if (!document.hidden) de.style.filter = `hue-rotate(${((performance.now() - t0) * 0.003 % 360).toFixed(2)}deg)`; }, 100);
 }
 function applySkin(id){
   const sk = SKINS.find(k => k.id === id) || SKINS[2]; skin = sk.id;
