@@ -1048,12 +1048,20 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 :root[data-skinbase="term"] :is(.tscr,.tscr[data-ts]){--ts-bg:var(--mxbg); --ts-ink:var(--mx); --ts-dim:var(--mxdim); --ts-rn:var(--mx2); --ts-rn4:var(--mx); --ts-th:var(--mx2);
   --ts-vol:var(--mxpoly); --ts-inst:var(--mx2); --ts-fx:var(--mx); --ts-mute:var(--mxred); --ts-solo:var(--mxsoft); --ts-pl-bg:var(--mx); --ts-pl:var(--mxon);
   --ts-sel:color-mix(in srgb, var(--mx) 22%, var(--mxbg)); --ts-cur-bg:var(--mxcur, var(--mxpoly)); --ts-cur:var(--mxcuron, var(--mxon)); --ts-line:var(--mxdim); --ts-info:var(--mx2); --ts-hint:var(--mx2);
-  --ts-ok:var(--mx); --ts-hot:var(--mxsoft); --ts-clip:var(--mxred); --tk-mono:var(--mx); --tk-poly:var(--mxpoly);
+  --ts-ok:var(--mx); --ts-hot:var(--mxsoft); --ts-clip:var(--mxred); --tk-mono:var(--mx); --tk-poly:var(--mxpoly); --tk-mst:var(--mxmst, var(--mxsoft));
   background-image:repeating-linear-gradient(to bottom, var(--mxscan) 0 1px, transparent 1px 3px)}
 :root[data-skinbase="term"] .tarr, :root[data-skinbase="term"] .tarr.dk{--ar-bg:var(--mxbg); --ar-ink:var(--mx); --ar-dim:var(--mx2); --ar-blk:var(--mx); --ar-blk-ink:var(--mxon);
   --ar-empty:color-mix(in srgb, var(--mx) 8%, transparent); --ar-line:color-mix(in srgb, var(--mx) 25%, transparent); --ar-pl:var(--mxsoft); --ar-pl-ink:var(--mxon);
   --ar-cur:var(--mx); --ar-mu:var(--mxred); --tk-mono:var(--mx); --tk-poly:var(--mxpoly)}
 :root[data-skinbase="term"] :is(.tagp b,.tgbox b){color:var(--mxon); text-shadow:none}
+/* The MST box takes the skin's third colour (its soft highlight), so mono, poly and master are told apart in every skin. Those
+   are light in most skins, so its tab text is dark; where the skin's highlight is dark or too close to its accent, --mxmst
+   picks another of the skin's tones. */
+:root[data-skinbase="term"] .tgbox.gx b{color:var(--mxmston, #1b2130)}
+:root[data-skin="bwlight"]{--mxmst:#8a8a8a; --mxmston:#ffffff}
+:root[data-skin="winter"]{--mxmst:#9cc3e6}
+:root[data-skin="greywhite"]{--mxmst:#c9b7f2}
+:root[data-skin="contrast"]{--mxmst:#d6331f; --mxmston:#ffffff}
 :root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg))}
 :root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .tdeck{--stpink:var(--mx)}
 :root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
