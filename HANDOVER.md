@@ -459,6 +459,44 @@ Commits on `main`: 9ababb0 (fixes), e21c605 (presets + song-load fix), e8f2970 (
 - **Not yet heard on the phone:** all of the above was checked headless (renders, no NaN, levels, live nodes through
   `pass()`). Wavetable import (Serum-style 2048-sample frames) is deferred at the owner's request.
 
+## 14 Oct (morning): master column, tempo-locked FX, swarm, skins, Settings
+
+Cache `thunderplus-v84`. Worklet versions unchanged.
+
+- **Master column (MST):** song column `MT` (= `NT`, index 32: `S.song` rows are now `NT + 1` long, `normSong` reads it).
+  Song screen only (after the poly tracks, amber `.tgbox.gx`, `--tk-mst`); not in Arrange. The song cursor sits on it
+  as `cs.song.x === MT` (`move()` steps from the last track to it; `draw()` doesn't clamp it); `cTrack = MT` when its
+  phrase is open (sub label MASTER, no neighbours). `trackWin(c, lab, extra)` reserves its room only when the tracks
+  overflow. `makeSeq` runs `tr[MT]` like a track but plays no notes; `toggleBlockMute` refuses it (smute is a 32-bit mask).
+- **Commands** (end of `FXC`): `FXO XY` (slot X 1–4, 0 = all; Y 0 off, 1 on, 2–F on for Y rows then back),
+  `FLX` (Flex pattern 0–16), `GAT` (Step gate pattern 0–15), `RTG XY` (X rate 1–8, Y rows). `fxEvs()` in `makeSeq`
+  turns them into `{type:'fxc', track, p, v}` events; in the MST column `VOL` becomes `{type:'mvol'}`. Rows for momentary
+  lengths are the average played row (`pair * line / 2`, see the swing note below).
+- **How they reach the audio, sample-accurately live and offline:** `thunder-tfx` now has AudioParams `bp` (a-rate:
+  the song position in beats) and k-rate `sw0`–`sw3`, `flx`, `gat`, `rtg` (−1 = as set). The player owns a
+  ConstantSource **beat clock** (`clock`, ramped by `{type:'beat'}` events that `makeSeq.step` emits every step, wraps
+  at 16 beats, −1 stopped) connected to every effect node's `bp` (`clockTo`, `setMfx` for the master node). `fxc`
+  events are `setValueAtTime` on the node's param; `stopAll` → `resetSeq` puts them all back to −1 and the master gain
+  to `S.master`. `tfxChain` now sends **off slots too** (`on:false, slot:k`) so FXO can switch them on; nodes exist
+  when `fxAny()`. Slot switching fades 5 ms (`s.g`); an off Flex is still fed (`feed`).
+- **Effects** (original, JS, in the TFX Blob: `clkSpb`, `FlexCore` id 95, `StepGateCore` 94, `RetrigCore` 93; TFX keys
+  `flex`, `sgate`, `retrig`; not in `tools/fxgen.py`, hand-added like `degrade`). Not on pads or in …chains yet.
+- **Swarm engine** (`SwarmCore`, ENGINE block, rendered like Modal; `XENG.swarm`, `XUI.swarm`, 12 presets): ≤48
+  polyBLEP voices, drift paths at control rate (32 samples), scatter intervals, bloom, shimmer, TPT low-pass. ~0.5 s for
+  a 48-voice 6 s note in Node.
+- **Pitch reverb fix:** shimmer loop gain was > 1 at large Size (the reverb is ~2.4× at its low resonances), so it
+  self-oscillated; now Size tops at fb 0.94 and the shimmer loop is scaled 0.38 (measured to decay at every setting),
+  plus a slow limiter on the loop.
+- **Skins:** terminal skins' cursor is `--mxcur` (default the accent `--mxpoly`), never the playhead's `--mx`; cool
+  cursors on the single-colour ones, lavender `#9a63ff` on Simple grey, which is now the first-run default. Monotone blue.
+- **Settings:** Audio (+ **Reset audio engine**, `resetAudio()` → `pl.dispose()` and a fresh graph), Project (Song,
+  Input, Render & export with the `pExport` panel, Mastering with `pMaster` + LIMITER/MASTER rows), Screen
+  (`buildScreen`: the Screen rows + `pSkin`), MIDI, Kit, App. `INNER_SECS` are re-parented on each open.
+- **FX target follows** the edited track (`draw()` sets `cFxT` on Song/Sect/Phrase). **LPB default 8** (new songs).
+- **Found, not changed (owner to decide):** with SWING NOTE 16ths (the default), each row lasts two lines
+  (`pair * line * sw` with `pair = 2 * swB`), so LPB 4 plays 8th-note rows. Fixing it doubles existing songs' speed.
+- **Queued by the owner:** synthesized piano and Rhodes, an M1-style house organ, a GM / SoundFont player.
+
 ## Running it locally
 
 No build step; serve the repo root over HTTP (the editors load their worklet by `fetch`, which

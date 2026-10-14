@@ -92,6 +92,9 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .gset .pbody{padding:0}
 .gset .note{font-size:var(--fs-3); color:var(--muted)}
 .gset .tsec{padding-top:2px}
+/* Panels moved inside Project and Screen (Mastering, Export, Skin): their own title bar gives way to the h3. */
+.gset .tsec .band{display:block} .gset .tsec .band > .bar{display:none}
+.gset .tsec .band[hidden]{display:block} .segrow[hidden]{display:none}
 .gset h3{font-size:var(--fs-3); font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:10px 0 2px; padding-bottom:4px; border-bottom:1px solid var(--track)}
 .gset .tsr{display:grid; grid-template-columns:minmax(90px,130px) minmax(0,1fr); gap:4px 10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--track)}
 .gset .tsr:last-child{border-bottom:0}
@@ -752,16 +755,18 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 @media (max-width:600px){ .pads{gap:9px 8px} }
 /* Mono and poly tracks: a gentle outline around each track's column in Song and Mixer (and the phrase's notes):
    pink for the one-note-at-a-time tracks, green for the polyphonic (chord) tracks. */
-.tscr{--tk-mono:#eba3bd; --tk-poly:#86c99a}
-.tgrid span.gm{--tk:var(--tk-mono)} .tgrid span.gp{--tk:var(--tk-poly)}
+.tscr{--tk-mono:#eba3bd; --tk-poly:#86c99a; --tk-mst:#f0bf5e}
+.tgrid span.gm{--tk:var(--tk-mono)} .tgrid span.gp{--tk:var(--tk-poly)} .tgrid span.gx{--tk:var(--tk-mst)}
 /* Song and Mixer: one box around all the mono tracks and one around all the poly tracks, each with its label. */
 .tgrid{position:relative}
 .tgrid.grp{padding-top:1.15em}
 .tgbox{position:absolute; pointer-events:none; border:2px solid var(--tk); border-radius:3px; z-index:0}
-.tgbox.gm{--tk:var(--tk-mono)} .tgbox.gp{--tk:var(--tk-poly)}
+.tgbox.gm{--tk:var(--tk-mono)} .tgbox.gp{--tk:var(--tk-poly)} .tgbox.gx{--tk:var(--tk-mst)}
 .tgbox b{position:absolute; left:6px; top:0; transform:translateY(-100%); font:600 .62em/1.35 var(--mono); letter-spacing:.08em;
   padding:0 .5em; background:var(--tk); color:#1b2130; border-radius:3px 3px 0 0; white-space:nowrap}
 .tgbox.gp b{left:auto; right:6px}
+/* The master column's box (Song): amber, its MST tab centred over the one column. */
+.tgbox.gx b{left:50%; transform:translate(-50%, -100%)}
 /* Phrase: the note column takes the open track's colour. */
 .tgrid .ln span.gc{display:inline-block; height:1.3em; vertical-align:top; margin:0 -.18em; padding:0 .18em; box-shadow:inset 2px 0 0 var(--tk), inset -2px 0 0 var(--tk)}
 .tgrid .ln span.gc.gt{box-shadow:inset 2px 0 0 var(--tk), inset -2px 0 0 var(--tk), inset 0 2px 0 var(--tk)}
@@ -992,6 +997,14 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 :root[data-skin="mustard"]{--mx:#a37800; --mx2:#7d6a3c; --mxdim:#b5a2dc; --mxbg:#e3d9f6; --mxpanel:#eae2f9; --mxpanel2:#d8cbf1; --mxon:#fffaf0;
   --mxsoft:#f2cf63; --mxpoly:#6f55bf; --mxglowc:transparent; --mxscan:transparent; --mxred:#c0392b;
   --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+/* The tracker cursor has its own colour (the skin's accent, or --mxcur), never the playhead's (--mx), so the cell under
+   the cursor stays visible while a phrase plays. Single-colour skins get a cool one: lavender on Simple grey. */
+:root[data-skin="greywhite"]{--mxcur:#9a63ff; --mxcuron:#ffffff}
+:root[data-skin="bwlight"]{--mxcur:#2f6fe0; --mxcuron:#ffffff}
+:root[data-skin="bwterm"]{--mxcur:#3ad1ff; --mxcuron:#000000}
+:root[data-skin="matrix"]{--mxcur:#00e5ff; --mxcuron:#000000}
+:root[data-skin="winter"]{--mxcur:#2f8fd8; --mxcuron:#ffffff}
+:root[data-skin="monotone"] .tscr{--ts-cur-bg:#2f6fe0; --ts-cur:#ffffff}
 :root[data-skinbase="term"]{
   --bench:var(--mxbg); --panel:var(--mxbg); --panel2:var(--mxpanel2); --side:var(--mxpanel); --ink:var(--mx); --muted:var(--mx2);
   --track:var(--mxpanel2); --inv:var(--mxon); --voice:var(--mxpanel); --line:var(--mx); --screen:var(--mxbg); --screen-ink:var(--mx); --screen-line:var(--mxdim);
@@ -1031,7 +1044,7 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 /* the tracker screen: the skin's background whatever its own colour setting, a solid cursor and (Matrix) faint scanlines */
 :root[data-skinbase="term"] :is(.tscr,.tscr[data-ts]){--ts-bg:var(--mxbg); --ts-ink:var(--mx); --ts-dim:var(--mxdim); --ts-rn:var(--mx2); --ts-rn4:var(--mx); --ts-th:var(--mx2);
   --ts-vol:var(--mxpoly); --ts-inst:var(--mx2); --ts-fx:var(--mx); --ts-mute:var(--mxred); --ts-solo:var(--mxsoft); --ts-pl-bg:var(--mx); --ts-pl:var(--mxon);
-  --ts-sel:color-mix(in srgb, var(--mx) 22%, var(--mxbg)); --ts-cur-bg:var(--mx); --ts-cur:var(--mxon); --ts-line:var(--mxdim); --ts-info:var(--mx2); --ts-hint:var(--mx2);
+  --ts-sel:color-mix(in srgb, var(--mx) 22%, var(--mxbg)); --ts-cur-bg:var(--mxcur, var(--mxpoly)); --ts-cur:var(--mxcuron, var(--mxon)); --ts-line:var(--mxdim); --ts-info:var(--mx2); --ts-hint:var(--mx2);
   --ts-ok:var(--mx); --ts-hot:var(--mxsoft); --ts-clip:var(--mxred); --tk-mono:var(--mx); --tk-poly:var(--mxpoly);
   background-image:repeating-linear-gradient(to bottom, var(--mxscan) 0 1px, transparent 1px 3px)}
 :root[data-skinbase="term"] .tarr, :root[data-skinbase="term"] .tarr.dk{--ar-bg:var(--mxbg); --ar-ink:var(--mx); --ar-dim:var(--mx2); --ar-blk:var(--mx); --ar-blk-ink:var(--mxon);
@@ -1088,7 +1101,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div class="phlbody" id="phlBody"></div>
   </div>
   <div class="setmenu gset" id="gset" hidden role="dialog" aria-label="Settings">
-    <div class="gsetbody" id="gsetBody"><div class="gsec" id="gsecProj" hidden></div><div class="gsec" id="gsecPatch" hidden></div></div>
+    <div class="gsetbody" id="gsetBody"><div class="gsec" id="gsecProj" hidden></div><div class="gsec" id="gsecScreen" hidden></div><div class="gsec" id="gsecPatch" hidden></div></div>
   </div>
   </div>
   <button type="button" class="tsong" id="tLoopTop" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L in KEYS mode)" hidden>Loop</button>
@@ -1180,6 +1193,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div class="pbody">
       <div class="audrow"><span>Output</span><select id="audOut" aria-label="Audio output device"><option value="">System default</option></select>
         <button class="sm" id="audNames" hidden>Show device names</button><button class="sm" id="audTest">Test sound</button></div>
+      <div class="btnrow"><button id="audReset" title="Stops playback and rebuilds every voice and effect from scratch (song and kit are untouched)">Reset audio engine</button><span class="lbl">Clears stuck notes and effects</span></div>
       <div class="audrow"><span>Level</span><input type="range" id="audLvl" min="0" max="100" step="1" aria-label="Output level"><output id="audLvlV"></output></div>
       <div class="segrow"><span>Latency</span><div class="seg" id="segLat"></div></div>
       <div class="segrow"><span>Rate</span><div class="seg" id="segARate"></div></div>
@@ -1589,12 +1603,17 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <section id="hPad"><h2>Tracker · PAD mode</h2><table><tr><td>Arrows</td><td>Move</td></tr><tr><td>SHIFT + ◀▶</td><td>Change screen (through every screen in tab order)</td></tr><tr><td>SHIFT + ▲▼</td><td>In Song, Sect and Phrase: select the cursor's line, then grow the selection a line at a time (OPTION copies, OPTION+EDIT cuts). On the other screens: Project / Mixer</td></tr><tr><td>EDIT</td><td>Add, or run a › row · in a phrase, on a filled note stamps the current note and instrument over it; on an instrument, volume or effect, picks it up · tap twice for a new sect or phrase, or a note off</td></tr><tr><td>EDIT + arrows</td><td>Change the value (◀▶ by 1, ▲▼ by more)</td></tr><tr><td>OPTION + EDIT</td><td>Clear (with a selection: cut)</td></tr><tr><td>OPTION + arrows</td><td>Other sect, phrase, instrument or FX track · on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀) · in Song, page up/down</td></tr><tr><td>OPTION + arrows in Phrase</td><td>Go to the phrase above / below on this track (▲▼) or to the left / right on this row (◀▶), as laid out on the Song grid. A phrase not in the song steps by number. (Settings → Input → PATTERN NAV; off: ▲▼ jump 16 phrases)</td></tr><tr><td>SHIFT + OPTION + arrows</td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in KEYS mode</td></tr><tr><td>SHIFT + OPTION</td><td>Start or cancel a selection; arrows grow it, OPTION copies</td></tr><tr><td>SHIFT + EDIT</td><td>Paste</td></tr><tr><td>PLAY · SHIFT + PLAY</td><td>Play this screen · play the song · with LOOP on, PLAY loops the selected rows</td><tr><td>LOOP · SEMI +/−</td><td>Loop the selection (sticky) · transpose the phrase selection ±1 semitone at once</td></tr><tr><td>◀ ▶ on the FX screen</td><td>Open a slot's controls · back to the slot list (a sideways swipe does it too)</td></tr><tr><td>Row numbers</td><td>Tap to select whole lines, then COPY and PASTE</td></tr></table><p><b>One finger is enough.</b> With <b>Sticky keys</b> on, tap SHIFT or OPTION alone and it stays lit for the next button. The <b>command row</b> (Project → COMMANDS) gives every two-key command its own button: change, prev/next, clear, select, copy, cut, paste, play song, and on the SONG screen CLN↓ (clones the block, or the selected blocks, into new numbers on the row below) and CLN (clone): the block under the cursor is copied, phrases and all, to the next free number.</p><p>On a computer keyboard in PAD mode the keyboard is not disabled: arrows move, <kbd>Enter</kbd> opens, <kbd>Space</kbd> plays, typing letters and hex edits the cell, and <kbd>Shift</kbd> selects lines. <kbd>Z</kbd> stays OPTION (not a note), <kbd>X</kbd> stays EDIT, and <kbd>Alt</kbd>+arrows page (OPTION+arrow) rather than change the value.</p><h3>Touch</h3><p>Tap a cell to move there; tap it again to open or add. Drag up or down on the cursor’s cell to change its value; drag elsewhere to scroll.</p></section>
     <section id="hFx"><h2>FX column commands</h2>
 <p>Each phrase row has three effect columns: a command and a hex value. The info line at the bottom of the screen explains the one under the cursor.</p>
-<div class="fxg"><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row Y</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div></div>
+<div class="fxg"><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FLX</code>Flex pattern: 00 off, 01–10</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>retrigger every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row Y</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div></div>
+<h3>The master column (MST)</h3>
+<p>On the Song screen, the amber <b>MST</b> column after the poly tracks plays phrases whose commands drive the <b>master bus</b>: <code>VOL</code> sets the master level from that row on, and <code>FXO</code>, <code>FLX</code>, <code>GAT</code> and <code>RTG</code> work on the master's effects (Mixer → master → FX). Notes in a master phrase are not played; other commands (TPO, GGR, TIC, HOP…) work as on any track. It plays alongside the tracks, block by block, and is not shown in Arrange. Stopping puts the master level and every switched effect back as set.</p>
+<p><b>Momentary effects:</b> put an effect in a slot and leave it off, then <code>FXO 21</code> switches slot 2 on, <code>FXO 20</code> off again, or <code>FXO 24</code> turns it on for four rows. It works on any track (that track's slots) and in the MST column (the master's). Switching fades over 5 ms; Flex keeps listening while it is off, so it always has the last bar ready.</p>
+<h3>Flex, Step gate and Retrigger</h3>
+<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (16 patterns; <code>FLX</code> picks one from a row). <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT</code> picks. <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped).</p>
 <h3>Track effects</h3>
-<p>Each track and the master have 4 effect slots (FX screen, or the Mixer’s FX row): 34 effects in all: EQ, compressor, three reverbs, tape delay, dub tape, saturation, drive, tube, tape, vinyl, lo-fi, bitcrush, chorus, flanger, phaser, tremolo, trance gate, auto-wah, ladder filter, comb resonator, wavefolder, overdrive, pitch and frequency shifters, cross-mod, transient shaper, multiband squash, speaker cab, air, and Rings, Clouds and Beads. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to four, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
+<p>Each track and the master have 4 effect slots (FX screen, or the Mixer’s FX row): 37 effects in all: Flex, Step gate, Retrigger, EQ, compressor, three reverbs, tape delay, dub tape, saturation, drive, tube, tape, vinyl, lo-fi, bitcrush, chorus, flanger, phaser, tremolo, trance gate, auto-wah, ladder filter, comb resonator, wavefolder, overdrive, pitch and frequency shifters, cross-mod, transient shaper, multiband squash, speaker cab, air, and Rings, Clouds and Beads. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to four, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
 <p><b>…chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback. Its <b>Resample</b> module records what passes through it into a pad, starting on the next bar, and slices it so you can chop it like a breakbeat.</p></section>
-    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound (kicks, snares, hats, percussion, IDM and glitch hits, basses, pads, chords, keys and leads, including Bass and Blip engine sounds). <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once.</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. In <b>⚙ Settings</b>, <b>Kit</b> saves and loads kits, <b>Export</b> writes WAVs for Koala and SunVox, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and <b>Skin</b> changes the look (Pastel, Minimal, Neon, Matrix and the Simple colour pairs).</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
+    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound (kicks, snares, hats, percussion, IDM and glitch hits, basses, pads, chords, keys and leads, including Bass and Blip engine sounds). <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once.</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -3577,12 +3596,83 @@ class ModalCore {
     return res;
   }
 }
+/* Swarm (original code): a cloud of up to 48 detuned oscillators, each drifting on its own smooth random path,
+   held together by Cohesion (a shared drift every voice follows), scattered onto intervals (octaves, fifths, chords),
+   fading in one after another (Bloom) and flickering in level (Shimmer). Morphing wave (saw → square → triangle →
+   sine), a resonant low-pass with its own envelope, ADSR. Rendered like Modal: one note at the pad's pitch. */
+class SwarmCore {
+  static defaults(){ return {oct:2, voices:16, wave:0, spread:0.35, drift:0.3, rate:0.4, cohes:0.3, scatter:0, ivl:0, bloom:0, shimmer:0, sub:0,
+    cut:4000, res:0.15, fenv:0.2, fdec:600, key:0.5, atk:30, dec:800, sus:0.8, rel:600, tune:0, drive:0, level:0}; }
+  static get WAVES(){ return ['Saw', 'Square', 'Triangle', 'Sine']; }
+  static get INTERVALS(){ return ['Octaves', 'Fifths', 'Major', 'Minor', 'Sus', 'Cluster', 'Harmonics']; }
+  static get IVL(){ return [[12, -12, 24], [7, 12, -5, 19], [4, 7, 12, 16], [3, 7, 12, 15], [5, 7, 12, 17], [1, 2, -1, -2, 3], [12, 19, 24, 28, 31]]; }
+  static render(o, sr, hold){
+    const p = Object.assign(SwarmCore.defaults(), o || {});
+    let seed = 0x5eed1234; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const nv = Math.max(1, Math.min(48, Math.round(p.voices))), f0 = 65.406 * Math.pow(2, p.oct + (p.tune || 0) / 12);
+    const atk = Math.max(0.5, p.atk) / 1000, dec = Math.max(5, p.dec) / 1000, rel = Math.max(5, p.rel) / 1000, sus = Math.max(0, Math.min(1, p.sus));
+    const h = Math.max(atk + 0.02, hold || 1), bloom = Math.max(0, p.bloom) / 1000;
+    const len = Math.min(32, h + rel * 1.1 + 0.05), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N);
+    const IV = SwarmCore.IVL[Math.max(0, Math.min(6, p.ivl | 0))], spreadC = p.spread * p.spread * 120, driftC = p.drift * p.drift * 80;
+    // A smooth random path: cosine-interpolated random points at about `hz` (each voice its own speed).
+    const path = hz => ({hz:hz * (0.6 + rnd() * 0.8), a:rnd() * 2 - 1, b:rnd() * 2 - 1, ph:rnd()});
+    const step = (q, dt) => { q.ph += q.hz * dt; while (q.ph >= 1){ q.ph -= 1; q.a = q.b; q.b = rnd() * 2 - 1; } const m = (1 - Math.cos(Math.PI * q.ph)) * 0.5; return q.a + (q.b - q.a) * m; };
+    const shared = path(Math.max(0.01, p.rate) * 0.7), V = [];
+    for (let j = 0; j < nv; j++){
+      const pos = nv > 1 ? j / (nv - 1) * 2 - 1 : 0, scat = rnd() < p.scatter ? IV[Math.floor(rnd() * IV.length)] : 0;
+      V.push({ph:rnd(), det:(pos + (rnd() - 0.5) * 0.3) * spreadC + scat * 100, dp:path(Math.max(0.01, p.rate)), sp:path(2 + p.rate * 3),
+        on:bloom ? rnd() * bloom : 0, tri:0, g:scat ? 0.7 : 1});
+    }
+    const w = Math.max(0, Math.min(3, p.wave)), wi = Math.min(2, Math.floor(w)), wf = w - wi;
+    const blep = (t, dt) => t < dt ? (t /= dt, t + t - t * t - 1) : t > 1 - dt ? (t = (t - 1) / dt, t * t + t + t + 1) : 0;
+    const shape = (k, ph, dt) => {
+      if (k === 0) return 2 * ph - 1 - blep(ph, dt);
+      if (k === 1) return (ph < 0.5 ? 1 : -1) + blep(ph, dt) - blep((ph + 0.5) % 1, dt);
+      if (k === 2) return ph < 0.5 ? 4 * ph - 1 : 3 - 4 * ph;
+      return Math.sin(2 * Math.PI * ph);
+    };
+    // Pitch drift, shimmer and the filter move at control rate (every CR samples); oscillators run per sample.
+    const kf = Math.pow(f0 / 261.6, p.key), CR = 32, cdt = CR / sr, sdt = 1 / sr, norm = 1 / Math.sqrt(nv);
+    const ah = h > atk ? sus + (1 - sus) * Math.exp(-6.9 * (h - atk) / dec) : 1;
+    let ic1 = 0, ic2 = 0, subPh = 0, a1 = 1, a2 = 0, a3 = 0;
+    for (let i0 = 0; i0 < N; i0 += CR){
+      const t0 = i0 * sdt, sh = step(shared, cdt) * driftC * p.cohes;
+      for (const v of V){
+        v.dt = f0 * Math.pow(2, (v.det + step(v.dp, cdt) * driftC * (1 - p.cohes) + sh) / 1200) * sdt;
+        v.lv = v.g * (p.shimmer ? 1 - p.shimmer * (0.5 + 0.5 * step(v.sp, cdt)) : 1);
+      }
+      const fe = Math.exp(-6.9 * t0 / Math.max(0.005, p.fdec / 1000)), fc = Math.max(30, Math.min(sr * 0.45, p.cut * kf * Math.pow(2, p.fenv * 5 * fe)));
+      { const g = Math.tan(Math.PI * fc / sr), k = 2 - 1.96 * Math.min(1, p.res); a1 = 1 / (1 + g * (g + k)); a2 = g * a1; a3 = g * a2; }
+      const i1 = Math.min(N, i0 + CR);
+      for (let i = i0; i < i1; i++){
+        const t = i * sdt; let mix = 0;
+        for (let j = 0; j < nv; j++){
+          const v = V[j]; if (t < v.on) continue;
+          const dt = v.dt; let ph = v.ph + dt; if (ph >= 1) ph -= 1; v.ph = ph;
+          let y = shape(wi, ph, dt); if (wf > 0.001) y += (shape(wi + 1, ph, dt) - y) * wf;
+          mix += y * v.lv * (bloom && t - v.on < atk ? (t - v.on) / atk : 1);
+        }
+        mix *= norm;
+        if (p.sub > 0.001){ subPh += f0 * 0.5 * sdt; if (subPh >= 1) subPh -= 1; mix += Math.sin(2 * Math.PI * subPh) * p.sub * 0.7; }
+        const v3 = mix - ic2, v1 = a1 * ic1 + a2 * v3, v2 = ic2 + a2 * ic1 + a3 * v3; ic1 = 2 * v1 - ic1; ic2 = 2 * v2 - ic2;
+        out[i] = v2 * (t < atk ? t / atk : t < h ? sus + (1 - sus) * Math.exp(-6.9 * (t - atk) / dec) : ah * Math.exp(-6.9 * (t - h) / rel));
+      }
+    }
+    let pk = 0; for (let i = 0; i < N; i++) pk = Math.max(pk, Math.abs(out[i]));
+    const lv = Math.pow(10, (p.level || 0) / 20) * (pk > 0 ? 0.8 / pk : 1), dr = (p.drive || 0) > 0.001 ? 1 + p.drive * p.drive * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1;
+    for (let i = 0; i < N; i++){ let y = out[i] * lv; if (dr) y = Math.tanh(y * dr) * dn; out[i] = y; }
+    let end = N; while (end > 1 && Math.abs(out[end - 1]) < 1e-4) end--;
+    const res = out.slice(0, Math.max(end, 1)), fl = Math.min(res.length, Math.round(sr * 0.003)); for (let i = 0; i < fl; i++) res[res.length - 1 - i] *= i / fl;
+    return res;
+  }
+}
 // The new engines in one table: live ones have a Core class (played by a worklet in the tracker), rendered ones a render().
 const XENG = {
   acid:{live:true, C:() => AcidCore, d:() => AcidCore.defaults()},
   mach:{live:true, C:() => MachCore, d:() => MachCore.defaults()},
   tone:{live:false, d:() => ToneDrum.defaults()},
   modal:{live:false, d:() => ModalCore.defaults()},
+  swarm:{live:false, d:() => SwarmCore.defaults()},
 };
 const isXEngV = v => !!(v && XENG[v.engine]);
 function normX(kind, o){ const d = XENG[kind].d(), r = {}; for (const k in d) r[k] = o && typeof o[k] === 'number' && isFinite(o[k]) ? o[k] : d[k]; delete r.tune; delete r.drive; delete r.level; return r; }
@@ -3592,6 +3682,7 @@ function renderX(V, sr, hold){
   if (k === 'acid') return renderLiveCore(AcidCore, P, sr, hold || Math.min(V.len || 1, 1.2), false);
   if (k === 'mach') return renderLiveCore(MachCore, P, sr, hold || Math.min(V.len || 2, 2));
   if (k === 'tone') return ToneDrum.render(P, sr);
+  if (k === 'swarm') return SwarmCore.render(P, sr, hold || Math.min(V.len || 3, 4));
   return ModalCore.render(P, sr, hold || (V.gate || 400) / 1000 * 2);
 }
 /* Pitch delay and Pitch reverb (original code), in the spirit of the pitch-shifting delay and reverb pedals.
@@ -3633,7 +3724,9 @@ class PitchFxCore {
     const sr = this.sr, mix = p.mix, dry = 1 - mix * 0.5, r1 = Math.pow(2, p.pitch / 12), r2 = Math.pow(2, p.pitch2 / 12), win = sr * 0.06;
     const tc = 1 - Math.exp(-2 * Math.PI * (500 + p.tone * p.tone * 12000) / sr), mode = p.mode | 0, D = this.D;
     if (p.kind | 0){   // reverb
-      const fb = 0.7 + p.size * 0.27, damp = 0.15 + (1 - p.tone) * 0.6, sfb = Math.min(0.9, p.fb);
+      // Size tops out at a ~7 s tail (it was 0.97, ~14 s), and the shimmer loop is scaled to stay under unity (measured: it rose at 0.45 of the old value, decays at 0.4): with large
+      // Size and Shimmer turned well up it used to sit in a permanent self-oscillation that the tanh only bounded.
+      const fb = 0.7 + p.size * 0.24, damp = 0.15 + (1 - p.tone) * 0.6, sfb = Math.min(0.9, p.fb) * 0.38;
       for (let i = 0; i < n; i++){
         for (let ch = 0; ch < 2; ch++){
           const x0 = ch ? Rb[i] : Lb[i]; let x = x0;
@@ -3642,7 +3735,10 @@ class PitchFxCore {
           let f = 0;
           if (mode === 0) f = this.shift(this.sh[ch], w, r1, win) * sfb;
           else if (mode === 2) f = (this.shift(this.sh[ch], w, r1, win) + this.shift(this.sh[ch + 2], w, r2, win)) * 0.5 * sfb;
-          this.lp[ch] += (f - this.lp[ch]) * tc; this.fbS[ch] = Math.tanh(this.lp[ch]);   // the loop stays under unity gain
+          this.lp[ch] += (f - this.lp[ch]) * tc;
+          // A slow limiter on the loop: if the shimmer builds past 0.35 it is turned down, so it always dies away.
+          const a = Math.abs(this.lp[ch]); this.fenv = this.fenv || [0, 0]; this.fenv[ch] += (a - this.fenv[ch]) * (a > this.fenv[ch] ? 0.002 : 0.00005);
+          this.fbS[ch] = Math.tanh(this.lp[ch] * (this.fenv[ch] > 0.35 ? 0.35 / this.fenv[ch] : 1));
           if (ch) Rb[i] = x0 * dry + w * mix * 1.8; else Lb[i] = x0 * dry + w * mix * 1.8;
         }
       }
@@ -4392,7 +4488,7 @@ function bassRandom(){
   pre.addEventListener('change', () => { if (pre.value !== '') bassPreset(+pre.value); pre.value = ''; });
   $('bassRand').addEventListener('click', bassRandom);
   $('bassInit').addEventListener('click', () => bassPreset(0));
-  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass'], ['vox', 'Voice'], ['blip', 'Blip'], ['acid', 'Acid'], ['mach', 'Machine'], ['tone', 'Tone drum'], ['modal', 'Modal']],
+  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass'], ['vox', 'Voice'], ['blip', 'Blip'], ['acid', 'Acid'], ['mach', 'Machine'], ['tone', 'Tone drum'], ['modal', 'Modal'], ['swarm', 'Swarm']],
     () => isBassV(V()) ? 'bass' : isVoxV(V()) ? 'vox' : isBlipV(V()) ? 'blip' : isXEngV(V()) ? V().engine : 'layers', setEngine);
 })();
 
@@ -4765,8 +4861,8 @@ function factoryVoicePresets(){
       {type:'bell', a:0.45, b:0.25, atk:0.5, dec:2400, sus:0.15, rel:1500, level:0.7},
       {type:'sine', tune:12, atk:0.5, dec:1200, sus:0, rel:900, level:0.25}], {len:8})],
   ]],
-  ...[['acid', 'Acid'], ['mach', 'Machine synth'], ['tone', 'Tone drums'], ['modal', 'Modal']].map(([k, gn]) => [gn, XUI[k].pre.slice(1).map(([n, o, x]) =>
-    [n, () => PE(n, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:k === 'modal' ? 6 : 4, gate:400}, x || {}))])]),
+  ...[['acid', 'Acid'], ['mach', 'Machine synth'], ['tone', 'Tone drums'], ['modal', 'Modal'], ['swarm', 'Swarm']].map(([k, gn]) => [gn, XUI[k].pre.slice(1).map(([n, o, x]) =>
+    [n, () => PE(n, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:k === 'modal' || k === 'swarm' ? 6 : 4, gate:400}, x || {}))])]),
   ['Leads', [
     ['Square lead', () => PS('Square lead', [
       {type:'square', atk:3, dec:300, sus:0.75, rel:180, lpCut:3200, lpRes:0.25, level:0.6},
@@ -4981,6 +5077,35 @@ const XUI = {
       ['Glass harmonica', {mat:7, exc:2, bow:0.7, dec:2.5, bright:0.6}], ['Bowed bar', {mat:0, exc:2, bow:0.8, dec:2, bright:0.5}],
       ['Plucked string', {mat:8, exc:3, hard:0.6, dec:1.5, bright:0.55, pos:0.15}], ['Breathy pipe', {mat:9, exc:4, bow:0.6, noise:0.4, dec:0.6, bright:0.45}],
       ['Metal plate hit', {mat:11, oct:1, exc:1, hard:0.7, dec:2.2, bright:0.7, inharm:0.3}], ['Struck membrane', {mat:6, oct:1, exc:0, hard:0.35, dec:0.5}]]},
+  swarm:{title:'Swarm', tag:'oscillator cloud · drift · bloom', rows:{
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      voices:{l:'Voices', min:1, max:48, c:'int', d:16, f:v => String(Math.round(v))},
+      wave:{l:'Wave', min:0, max:3, c:'lin', d:0, f:v => { const i = Math.min(2, Math.floor(v)), f = v - i; return f < 0.03 ? SwarmCore.WAVES[i] : f > 0.97 ? SwarmCore.WAVES[i + 1] : SwarmCore.WAVES[i] + '→' + SwarmCore.WAVES[i + 1] + ' ' + Math.round(f * 100) + '%'; }},
+      sub:{l:'Sub', min:0, max:1, c:'lin', d:0, f:pct},
+      spread:{l:'Spread', min:0, max:1, c:'lin', d:0.35, f:v => '±' + Math.round(v * v * 120) + ' cents'},
+      drift:{l:'Drift', min:0, max:1, c:'lin', d:0.3, f:v => '±' + Math.round(v * v * 80) + ' cents'},
+      rate:{l:'Drift rate', min:0.02, max:12, c:'log', d:0.4, f:v => v.toFixed(2) + ' Hz'},
+      cohes:{l:'Cohesion', min:0, max:1, c:'lin', d:0.3, f:pct},
+      scatter:{l:'Scatter', min:0, max:1, c:'lin', d:0, f:pct},
+      ivl:{l:'Scatter to', min:0, max:6, c:'int', d:0, f:nameOf(SwarmCore.INTERVALS)},
+      bloom:{l:'Bloom', min:0, max:4000, c:'sq', d:0, f:v => v < 1 ? 'Off' : ms(v)},
+      shimmer:{l:'Shimmer', min:0, max:1, c:'lin', d:0, f:pct},
+      cut:{l:'Cutoff', min:40, max:16000, c:'log', d:4000, f:hz}, res:{l:'Resonance', min:0, max:1, c:'lin', d:0.15, f:pct},
+      fenv:{l:'Filter env', min:-1, max:1, c:'lin', d:0.2, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, fdec:{l:'Filter decay', min:10, max:6000, c:'log', d:600, f:ms},
+      key:{l:'Key follow', min:0, max:1, c:'lin', d:0.5, f:pct},
+      atk:{l:'Attack', min:0.5, max:6000, c:'log', d:30, f:ms}, dec:{l:'Decay', min:10, max:8000, c:'log', d:800, f:ms}, sus:{l:'Sustain', min:0, max:1, c:'lin', d:0.8, f:pct}, rel:{l:'Release', min:5, max:8000, c:'log', d:600, f:ms}},
+    secs:[['Swarm', ['oct', 'voices', 'wave', 'sub', 'spread', 'drift', 'rate', 'cohes']], ['Scatter & motion', ['scatter', 'ivl', 'bloom', 'shimmer']], ['Filter', ['cut', 'res', 'fenv', 'fdec', 'key']], ['Amp', ['atk', 'dec', 'sus', 'rel']]],
+    note:'Each voice wanders on its own; Cohesion makes them wander together. Scatter moves that share of the voices onto the chosen intervals. Bloom fades the voices in one by one. Long notes hold for as long as the note in the tracker.',
+    pre:[['Init', {}], ['Supersaw swarm', {voices:24, spread:0.45, drift:0.2, rate:0.3, cut:7000, res:0.1}], ['Drifting pad', {voices:32, wave:0.4, spread:0.4, drift:0.55, rate:0.25, cohes:0.2, cut:2200, fenv:0.1, atk:900, dec:2000, sus:0.85, rel:2500, shimmer:0.2}],
+      ['Bloom choir', {voices:40, wave:2.6, spread:0.3, drift:0.4, rate:0.5, scatter:0.35, ivl:0, bloom:2500, cut:3500, atk:600, sus:0.9, rel:3000, shimmer:0.3}],
+      ['Insect cloud', {voices:48, wave:1, spread:0.8, drift:0.9, rate:6, cohes:0, cut:5000, res:0.3, shimmer:0.6, atk:300, rel:1200}],
+      ['Fifths swarm', {voices:20, spread:0.3, drift:0.3, scatter:0.5, ivl:1, cut:3000, fenv:0.3, fdec:900, atk:40, rel:900}],
+      ['Minor chord cloud', {voices:30, wave:0.6, spread:0.35, drift:0.35, scatter:0.7, ivl:3, cut:2600, atk:250, rel:1800, bloom:600}],
+      ['Swarm bass', {oct:1, voices:8, spread:0.25, drift:0.1, sub:0.6, cut:900, res:0.35, fenv:0.6, fdec:250, atk:3, dec:500, sus:0.6, rel:150, key:0.2}],
+      ['Detuned square lead', {oct:3, voices:6, wave:1, spread:0.3, drift:0.15, cut:3500, res:0.25, fenv:0.4, fdec:300, atk:5, sus:0.75, rel:250}],
+      ['Harmonic shimmer', {oct:3, voices:24, wave:3, spread:0.2, drift:0.3, scatter:0.6, ivl:6, cut:12000, shimmer:0.5, atk:400, rel:2500, bloom:1500}],
+      ['Tense cluster', {voices:28, wave:0.3, spread:0.6, drift:0.6, rate:1.5, scatter:0.5, ivl:5, cut:2000, res:0.4, atk:1500, rel:2000}],
+      ['Swelling brass swarm', {voices:12, spread:0.35, drift:0.25, cut:900, res:0.2, fenv:0.7, fdec:1200, atk:180, dec:1500, sus:0.7, rel:500}]]},
 };
 const xRows = []; let xKind = '';
 const XEV = () => { const v = V(), k = v.engine; if (!v[k]) v[k] = normX(k, null); return v[k]; };
@@ -5635,23 +5760,26 @@ makeSeg($('segNoteName'), [[false,'Pad name'],[true,'+ note']], () => ex.noteNam
 /* ---------- settings: one dropdown menu under the gear, on every screen ---------- */
 // Menu order: Audio first (the thing to fix when there's no sound), then this screen's own settings (Patch or
 // Project), then the master, the look, export, MIDI, the kit, and the app itself last.
-const GLOBAL_SECS = [['pAudio', 'Audio'], ['pMaster', 'Master'], ['pSkin', 'Skin'], ['pExport', 'Export'], ['pMidi', 'MIDI'], ['pKit', 'Kit'], ['pApp', 'App']];   // the Kit's save / load / reset are in File
+// Menu order: Audio, (the patch), Project (song, input, render & export, mastering), Screen (screen, arrange, skin),
+// then MIDI, the kit and the app. Master (mastering), Export and Skin live inside Project and Screen.
+const GLOBAL_SECS = [['pAudio', 'Audio'], ['pMidi', 'MIDI'], ['pKit', 'Kit'], ['pApp', 'App']];   // the Kit's save / load / reset are in File
+const INNER_SECS = ['pMaster', 'pExport', 'pSkin'];
 { const k = $('pKit'); if (k) k.hidden = true; }
 const gsetOpen = () => !$('gset').hidden;
 const gsetSecs = () => [
   GLOBAL_SECS[0],
   ...((view === 'waves' || view === 'chains') ? [['gsecPatch', 'Patch']] : []),
-  ...(view === 'tracker' ? [['gsecProj', 'Project']] : []),
+  ['gsecProj', 'Project'], ['gsecScreen', 'Screen'],
   ...GLOBAL_SECS.slice(1)
 ];
 // Every section is shown at once, one under the other with a rule between, as in ...Seeds' Settings menu.
 function showGset(){
   const secs = gsetSecs(), on = new Set(secs.map(([id]) => id));
-  for (const id of ['gsecProj', 'gsecPatch', ...GLOBAL_SECS.map(([x]) => x)]){ const b = $(id); if (b) b.hidden = !on.has(id); }
-  // Keep them in order: Audio, Patch / Project, Master, Skin, Export, MIDI, Kit, App.
+  for (const id of ['gsecProj', 'gsecScreen', 'gsecPatch', ...GLOBAL_SECS.map(([x]) => x)]){ const b = $(id); if (b) b.hidden = !on.has(id); }
+  // Keep them in order: Audio, Patch, Project, Screen, MIDI, Kit, App.
   for (const [id] of secs){ const b = $(id); if (b) $('gsetBody').append(b); }
-  for (const id of ['gsecProj', 'gsecPatch', ...GLOBAL_SECS.map(([x]) => x)]){ const b = $(id); if (b && b.hidden) $('gsetBody').append(b); }
-  if (on.has('gsecProj')) buildProj();
+  for (const id of ['gsecProj', 'gsecScreen', 'gsecPatch', ...GLOBAL_SECS.map(([x]) => x)]){ const b = $(id); if (b && b.hidden) $('gsetBody').append(b); }
+  buildProj(); buildScreen();
   if (on.has('gsecPatch')) buildPatch();
   audRefresh();
 }
@@ -5679,6 +5807,7 @@ function gsetToggle(open = !gsetOpen()){
 // The global sections sit in #main in the source for clarity; move them into the menu so the
 // same settings are reachable from every screen (synth, tracker, Waves, Chains).
 for (const [id] of GLOBAL_SECS){ const s = $(id); if (s){ s.hidden = true; s.classList.add('gsec'); $('gsetBody').append(s); } }
+for (const id of INNER_SECS){ const s = $(id); if (s) $('gsetBody').append(s); }   // parked here; buildProj / buildScreen place them
 $('bSet').addEventListener('click', () => gsetToggle());
 window.addEventListener('pointerdown', e => { if (gsetOpen() && !$('gset').contains(e.target) && !$('bSet').contains(e.target)) gsetToggle(false); }, true);
 
@@ -5799,6 +5928,7 @@ $('audLvl').addEventListener('change', asetSave);
 const updLat = makeSeg($('segLat'), [['interactive', 'Lowest'], ['balanced', 'Balanced'], ['playback', 'Safest']], () => latOf(), v => { aset.lat = v; aset.latPick = true; asetSave(); audRestartRow(); });
 const updARate = makeSeg($('segARate'), [[0, 'Device'], [44100, '44.1k'], [48000, '48k']], () => aset.rate, v => { aset.rate = v; asetSave(); audRestartRow(); });
 $('audRestart').addEventListener('click', () => { try { save(); } catch(e){} applyUpdate(); });
+$('audReset').addEventListener('click', () => resetAudio());
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (!$('pAudio').hidden) audRefresh(); });
 /* ---------- skins (the ...Seeds set) ---------- */
 const SKINS = [
@@ -5835,7 +5965,7 @@ const SKINS = [
   {id:'midnight', name:'Simple midnight', base:'term', dots:['#1a1530', '#d9c6ff', '#ff9ad5', '#7ee0d0']},
 ];
 const SKK = 'thunderplus-skin-v1';
-let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k => k.id === v)) return v; } catch(e){} return 'mustard'; })();   // Simple mustard for a first visit
+let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k => k.id === v)) return v; } catch(e){} return 'greywhite'; })();   // Simple grey (lavender cursor) for a first visit
 function applySkin(id){
   const sk = SKINS.find(k => k.id === id) || SKINS[2]; skin = sk.id;
   const de = document.documentElement;
@@ -6198,6 +6328,9 @@ function normalizeChainsImport(d){
    drives live playback and offline renders, so a render sounds like what you hear. */
 const TK = 'thunderplus-song-v1', VK = 'thunderplus-view-v1';
 const NT = 32, NI = 16, ROOT = 48, OFF = 200, TICKS = 6, BASEW = 52, FITROWS = 18;
+// The master column: song column MT (after the 32 track columns, S.song[row][MT]) plays phrases whose commands go to the
+// master bus (VOL = master level; FXO / FLX / GAT / RTG = the master effects). Its notes are not played.
+const MT = NT;
 const NN = ['C-','C#','D-','D#','E-','F-','F#','G-','G#','A-','A#','B-'];
 const NBL = 'CcDdEFfGgAaB';   // one letter per note for a neighbour's chord: capitals natural, small sharp (c = C#)
 const hx = (v, n = 2) => ((v & (n === 1 ? 15 : 255)) >>> 0).toString(16).toUpperCase().padStart(n, '0');
@@ -6216,7 +6349,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>
 const panS = v => v === 128 ? 'Pan centre' : v < 128 ? `Pan ${Math.round((128 - v) / 128 * 100)}% left` : `Pan ${Math.round((v - 128) / 127 * 100)}% right`;
 // The FX column: its sequencer commands, then the sampler-style
 // instrument commands that make sense for a pad (no tables, filters or MIDI here).
-const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB'];   // new commands go on the end, so saved songs keep their numbers
+const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG'];   // new commands go on the end, so saved songs keep their numbers
 const FXC_V1 = ['RET','DEL','CUT','CHA','PSL','RND','OFS','REV','PAN','TPO','HOP'];   // song files before v2
 const V1NAME = {CUT:'KIL', OFS:'STA', REV:'PLY'};
 const SIGNED = new Set(['PBN','TSP','PIT','FIN']);
@@ -6253,6 +6386,11 @@ const FXI = {
   PLY:v => (v & 1) ? 'Play this note reversed' : 'Play this note forwards',
   STA:v => `Start ${Math.round(v / 256 * 100)}% into the sound`,
   PAN:v => panS(v),
+  FXO:v => { const X = v >> 4, Y = v & 15, w = X >= 1 && X <= 4 ? `effect slot ${X}` : 'all effect slots';
+    return Y === 0 ? `Switch ${w} off` : Y === 1 ? `Switch ${w} on` : `Switch ${w} on for ${Y} rows, then back as set (momentary)`; },
+  FLX:v => `Flex pattern ${Math.min(16, v)}: ${FlexCore.NAMES[Math.min(16, v)]} (on this track's Flex effect; in the MST column, the master's)`,
+  GAT:v => `Step gate pattern ${Math.min(15, v)}: ${StepGateCore.NAMES[Math.min(15, v)]}`,
+  RTG:v => { const X = v >> 4, Y = v & 15; return !X ? 'Retrigger off' : `Retrigger every ${RetrigCore.NAMES[Math.min(8, X) - 1]}` + (Y ? ` for ${Y} rows` : ' until RTG 00') + ' (X: 1 = 1/4 … 5 = 1/64, 6–8 triplets)'; },
   WOB:v => v ? `Bass wobble ${BASS_DIVN[Math.min(BASS_DIV.length, v) - 1]} from here on (01 = 4 bars … 0D = 1/32)` : 'WOB 00: back to the bass voice’s own wobble rate',
 };
 const wobOf = v => v ? BASS_DIV[Math.min(BASS_DIV.length, v) - 1] : 0;
@@ -6268,6 +6406,117 @@ const khz = k => k.toFixed(1) + ' kHz';
 const P_ = (k, l, d, fmt, min = 0, max = 255) => ({k, l, d, fmt, min, max});
 const EN = (k, l, d, names) => ({k, l, d, min:0, max:names.length - 1, names});
 const dlySec = (steps, bpm) => steps * 15 / bpm;
+/* Three tempo-locked effects (original code) for track and master FX. They follow the song through the player's beat
+   clock (`tr.bp`: the song position in beats, wrapping every 16; below 0 or still = stopped), and the tracker commands
+   FLX / GAT / RTG reach them as `tr.flx`, `tr.gat`, `tr.rtg` (−1 = use the effect's own setting). Self-contained: the
+   track-FX worklet Blob is built from their toString(), like DegradeCore. */
+// The clock's slope gives the samples per beat; kept from the last good block when the clock stalls or wraps.
+function clkSpb(o, bp, n){
+  if (bp && bp.length > 16 && n > 16){ const a = bp[n - 17], b = bp[n - 1]; if (a >= 0 && b >= a){ const s = (b - a) / 16; if (s > 1e-7 && s < 0.01) o.spb = 1 / s; } }
+  return o.spb;
+}
+/* Flex: re-sequences the last bar or two in time with the song (a time-remap per pattern: repeats, reverses, half
+   speed, tape stops, scratches, gates, shuffles). Each pattern maps the bar position p (beats 0–4) to the position r it
+   plays from (r ≤ p, so it only reads the past). Jumps crossfade from the old read head to the new one. Always fed,
+   even while switched off, so switching it on mid-bar already has the bar to play from. */
+class FlexCore {
+  constructor(sr){ this.sr = sr; this.N = Math.ceil(sr * 13); this.bL = null; this.bR = null; this.w = 0; this.D = 0; this.xo = 0; this.xc = 0; this.xn = 1; this.g = 1; this.pg = 1; this.spb = sr / 2; }
+  static get NAMES(){ return ['OFF', 'REPEAT 1/4', 'REPEAT 1/8', 'FILL 1/16', 'STUTTER BUILD', 'HALF SPEED', 'TAPE STOP', 'REVERSE BEATS', 'REVERSE 1/8', 'BACKSPIN', 'SCRATCH',
+    'GATE 1/16', 'TRANCE CHOP', 'SHUFFLE', 'BEAT JUGGLE', 'OCTAVE UP', 'RANDOM SLICES']; }
+  pat(k, p, bar){
+    let r = p, g = 1, u;
+    switch (k){
+      case 1: r = p % 1; break;
+      case 2: r = Math.floor(p) + p % 0.5; break;
+      case 3: if (p >= 3) r = 3 + (p - 3) % 0.25; break;
+      case 4: if (p >= 3.5) r = 3.5 + (p - 3.5) % 0.125; else if (p >= 3) r = 3 + (p - 3) % 0.25; else if (p >= 2) r = 2 + (p - 2) % 0.5; break;
+      case 5: r = p / 2; break;
+      case 6: r = p - p * p / 8; if (p > 3.5) g = (4 - p) * 2; break;
+      case 7: r = Math.floor(p) - p % 1; break;
+      case 8: r = Math.floor(p * 2) / 2 - p % 0.5; break;
+      case 9: if (p >= 3){ u = p - 3; r = 3 - 2.5 * u * u; g = 1 - u * u; } break;
+      case 10: { const b = Math.floor(p * 2) / 2; u = (p - b) * 2; r = b + 0.125 * (1 - Math.cos(2 * Math.PI * u)); } break;
+      case 11: g = p % 0.25 < 0.125 ? 1 : 0; break;
+      case 12: g = (0xB6B6 >> (15 - Math.floor(p * 4))) & 1; break;
+      case 13: { const s = Math.floor(p * 4); r = [0, 1, 2, 3, 4, 5, 2, 7, 8, 9, 10, 11, 8, 13, 6, 15][s] * 0.25 + p % 0.25; } break;
+      case 14: if (p >= 2) r = p - 2; break;
+      case 15: r = Math.floor(p) - 1 + 2 * (p % 1); break;
+      case 16: { const s = Math.floor(p * 4); let h = Math.imul((bar & 3) * 31 + s * 17 + 7, 2654435761) >>> 0; h ^= h >>> 13; h = h % 11; r = (s - (h < 4 ? 0 : h - 3)) * 0.25 + p % 0.25; } break;
+    }
+    this.pg = g; return r;
+  }
+  rd(b, w, D){ let x = w - D; if (x < 0) x += this.N; const i = Math.floor(x), f = x - i, j = i + 1 >= this.N ? 0 : i + 1; return b[i] + (b[j] - b[i]) * f; }
+  feed(L, R, n, tr){ this.run(L, R, n, null, tr); }
+  process(L, R, n, dp, tr){ this.run(L, R, n, dp, tr); }
+  run(L, R, n, dp, tr){
+    if (!this.bL){ this.bL = new Float32Array(this.N); this.bR = new Float32Array(this.N); }
+    const N = this.N, bL = this.bL, bR = this.bR, bp = tr && tr.bp, spb = clkSpb(this, bp, n), live = !!(bp && bp.length > 1);
+    const k = !dp ? 0 : tr && tr.flx >= 0 ? Math.min(16, Math.round(tr.flx)) : dp.pat | 0, mix = dp ? dp.mix : 0;
+    const XF = Math.max(16, Math.round(this.sr * (dp ? dp.xf : 5) / 1000)), gk = 1 - Math.exp(-1 / (this.sr * 0.002));
+    for (let i = 0; i < n; i++){
+      const w = this.w; bL[w] = L[i]; bR[w] = R[i];
+      if (!dp){ this.D = 0; this.w = w + 1 >= N ? 0 : w + 1; continue; }
+      let D = 0, g = 1; const q = bp ? (live ? bp[i] : bp[0]) : -1;
+      if (k > 0 && live && q >= 0){ const p = q % 4, r = this.pat(k, p, Math.floor(q / 4)); g = this.pg; D = Math.max(0, Math.min(N - 4, (p - r) * spb)); }
+      if (Math.abs(D - this.D) > 8){ this.xo = this.D; this.xc = XF; this.xn = XF; }
+      this.D = D; this.g += (g - this.g) * gk;
+      let yl = this.rd(bL, w, D), yr = this.rd(bR, w, D);
+      if (this.xc > 0){ const f = this.xc / this.xn; yl += (this.rd(bL, w, this.xo) - yl) * f; yr += (this.rd(bR, w, this.xo) - yr) * f; this.xc--; }
+      L[i] += (yl * this.g - L[i]) * mix; R[i] += (yr * this.g - R[i]) * mix;
+      this.w = w + 1 >= N ? 0 : w + 1;
+    }
+  }
+}
+/* Step gate: a 16-step gate in time with the song. Pattern 0 is the custom one (two hex bytes, steps 1–8 and 9–16,
+   step 1 = the top bit); 1–15 are built in. */
+class StepGateCore {
+  constructor(sr){ this.sr = sr; this.g = 1; }
+  static get PATS(){ return ['', 'xxxxxxxxxxxxxxxx', 'x.x.x.x.x.x.x.x.', '.x.x.x.x.x.x.x.x', 'x..x..x.x..x..x.', 'xx.xx.x.xx.xx.x.', 'x.xxx.x.x.xxx.xx', 'xxx.xxx.xxx.x.x.',
+    'x...x...x...x...', '..x...x...x...x.', 'x.x..x.x.x..x.x.', 'xxxx....xxxx....', 'xxxxxxxx........', 'x.xx.x.xx.xx.x.x', 'xx..xx..xx..x.x.', 'x..x.x..x..x.xx.']; }
+  static get NAMES(){ return ['CUSTOM', 'EVERY STEP', '8THS', 'OFFBEATS', '3-3-2', 'GALLOP', 'BROKEN', 'TRIPLE', 'QUARTERS', 'OFF 8THS', 'SYNCOPATE', 'HALF ON', 'FIRST HALF', 'DENSE', 'PAIRS', 'TRESILLO']; }
+  static mask(s){ let m = 0; for (let j = 0; j < 16; j++) if (s[j] === 'x') m |= 1 << (15 - j); return m; }
+  process(L, R, n, dp, tr){
+    const bp = tr && tr.bp, live = !!(bp && bp.length > 1), pi = tr && tr.gat >= 0 ? Math.min(15, Math.round(tr.gat)) : dp.pat | 0;
+    const mask = pi === 0 ? ((dp.m1 & 255) << 8) | (dp.m2 & 255) : StepGateCore.mask(StepGateCore.PATS[pi]);
+    const sb = [0.5, 0.25, 0.125, 1 / 6, 1 / 3][dp.div | 0] || 0.25, len = dp.len, lo = 1 - dp.depth, tc = 1 - Math.exp(-1 / (this.sr * Math.max(0.0003, dp.smooth / 1000)));
+    for (let i = 0; i < n; i++){
+      const q = bp ? (live ? bp[i] : bp[0]) : -1; let tg = 1;
+      if (live && q >= 0){ const sp = q / sb, st = Math.floor(sp + 1e-6), fr = sp - st, idx = ((st % 16) + 16) % 16; tg = ((mask >> (15 - idx)) & 1) && fr < len ? 1 : lo; }
+      this.g += (tg - this.g) * tc; L[i] *= this.g; R[i] *= this.g;
+    }
+  }
+}
+/* Retrigger: catches a slice (1/4 … 1/32T at the song tempo) from the moment it is engaged and repeats it, each repeat
+   quieter (Decay) and/or pitched (Pitch, semitones a repeat), cut to Gate of the slice. Engaged by RTG, or always while
+   the slot is on in mode ALWAYS (so FXO on/off makes it momentary). The captured slice is frozen while it repeats. */
+class RetrigCore {
+  constructor(sr){ this.sr = sr; this.N = Math.ceil(sr * 3); this.bL = new Float32Array(this.N); this.bR = new Float32Array(this.N); this.w = 0; this.on = false; this.div = -1; this.st = 0; this.el = 0; this.Ls = 1; this.g = 0; this.spb = sr / 2; }
+  static get DIVS(){ return [1, 0.5, 0.25, 0.125, 0.0625, 1 / 3, 1 / 6, 1 / 12]; }
+  static get NAMES(){ return ['1/4', '1/8', '1/16', '1/32', '1/64', '1/8T', '1/16T', '1/32T']; }
+  process(L, R, n, dp, tr){
+    const N = this.N, bL = this.bL, bR = this.bR, spb = clkSpb(this, tr && tr.bp, n), o = tr ? tr.rtg : -1;
+    const eng = o > 0.5 ? true : o > -0.5 ? false : (dp.mode | 0) === 1, di = o > 0.5 ? Math.min(7, Math.round(o) - 1) : Math.min(7, dp.div | 0);
+    if (eng && (!this.on || di !== this.div)){ this.on = true; this.div = di; this.st = this.w; this.el = 0; this.Ls = Math.max(64, Math.min(N - 64, Math.round(RetrigCore.DIVS[di] * spb))); }
+    if (!eng) this.on = false;
+    const tgt = this.on ? 1 : 0, gk = 1 - Math.exp(-1 / (this.sr * 0.003)), fd = Math.max(8, Math.round(this.sr * 0.0015)), rs = Math.pow(2, dp.pitch / 12), dec = 1 - dp.decay;
+    const Ls = this.Ls, gl = Math.max(0.05, dp.gate) * Ls, mix = dp.mix;
+    for (let i = 0; i < n; i++){
+      const frozen = this.g > 1e-4 && this.el >= Ls;
+      if (!frozen){ bL[this.w] = L[i]; bR[this.w] = R[i]; this.w = this.w + 1 >= N ? 0 : this.w + 1; }
+      this.g += (tgt - this.g) * gk;
+      if (this.g < 1e-4 && !this.on){ this.g = 0; continue; }
+      const rep = Math.floor(this.el / Ls); let yl = L[i], yr = R[i];
+      if (rep > 0){
+        const pos = this.el - rep * Ls, rate = Math.max(0.25, Math.min(4, Math.pow(rs, rep))), rp = (pos * rate) % Ls;
+        let x = this.st + rp; if (x >= N) x -= N; const a = Math.floor(x), f = x - a, b = a + 1 >= N ? 0 : a + 1;
+        const env = Math.pow(dec, rep) * Math.max(0, Math.min(1, pos / fd, (gl - pos) / fd));
+        yl = (bL[a] + (bL[b] - bL[a]) * f) * env; yr = (bR[a] + (bR[b] - bR[a]) * f) * env;
+      }
+      this.el++;
+      const m = this.g * mix; L[i] += (yl - L[i]) * m; R[i] += (yr - R[i]) * m;
+    }
+  }
+}
 const TFX = {
   eq:{n:'EQ', long:'Airwindows EQ', id:6, ps:[
       P_('treble', 'TREBLE', 128, v => sdb(u8(v) * 24 - 12)), P_('mid', 'MID', 128, v => sdb(u8(v) * 24 - 12)), P_('bass', 'BASS', 128, v => sdb(u8(v) * 24 - 12)),
@@ -6314,6 +6563,18 @@ const TFX = {
       P_('pitch', 'PITCH', 36, v => (v - 24 > 0 ? '+' : '') + (v - 24) + ' st', 0, 48), P_('pitch2', 'PITCH 2', 12, v => (v - 24 > 0 ? '+' : '') + (v - 24) + ' st', 0, 48),
       P_('tone', 'TONE', 153, pc), P_('mix', 'MIX', 90, v => pc(v) + ' wet')],
     map:f => [1, f.mode, 400, u8(f.fb) * 0.9, f.pitch - 24, f.pitch2 - 24, u8(f.tone), u8(f.size), 0, u8(f.mix)]},
+  flex:{n:'FLEX', long:'Flex: re-sequences the last bar in time with the song: repeats, reverses, half speed, tape stops, gates (Thunder original). FLX in the tracker picks the pattern', id:95, ps:[
+      EN('pat', 'PATTERN', 1, FlexCore.NAMES), P_('mix', 'MIX', 255, v => pc(v) + ' wet'), P_('xf', 'SMOOTH', 40, v => (0.5 + u8(v) * 19.5).toFixed(1) + ' ms')],
+    map:f => [f.pat, u8(f.mix), 0.5 + u8(f.xf) * 19.5]},
+  sgate:{n:'SGAT', long:'Step gate: a 16-step gate in time with the song; CUSTOM uses STEPS 1-8 and 9-16 (Thunder original). GAT in the tracker picks the pattern', id:94, ps:[
+      EN('pat', 'PATTERN', 2, StepGateCore.NAMES), P_('m1', 'STEPS 1-8', 0xAA, v => [...Array(8)].map((_, j) => (v >> (7 - j)) & 1 ? 'x' : '.').join('')),
+      P_('m2', 'STEPS 9-16', 0xAA, v => [...Array(8)].map((_, j) => (v >> (7 - j)) & 1 ? 'x' : '.').join('')), EN('div', 'STEP', 1, ['1/8', '1/16', '1/32', '1/16T', '1/8T']),
+      P_('len', 'LENGTH', 191, pc), P_('depth', 'DEPTH', 255, pc), P_('smooth', 'SMOOTH', 40, v => (0.3 + u8(v) * 19.7).toFixed(1) + ' ms')],
+    map:f => [f.pat, f.m1, f.m2, f.div, Math.max(0.03, u8(f.len)), u8(f.depth), 0.3 + u8(f.smooth) * 19.7]},
+  retrig:{n:'RTRG', long:'Retrigger: repeats a slice in time with the song, each repeat quieter or pitched (Thunder original). RTG in the tracker plays it; ALWAYS repeats while the slot is on', id:93, ps:[
+      EN('mode', 'MODE', 0, ['RTG ONLY', 'ALWAYS']), EN('div', 'RATE', 2, RetrigCore.NAMES), P_('decay', 'DECAY', 38, pc),
+      P_('pitch', 'PITCH', 24, v => (v - 24 > 0 ? '+' : '') + (v - 24) + ' st a repeat', 0, 48), P_('gate', 'GATE', 255, pc), P_('mix', 'MIX', 255, v => pc(v) + ' wet')],
+    map:f => [f.mode, f.div, u8(f.decay), f.pitch - 24, u8(f.gate), u8(f.mix)]},
   degrade:{n:'LOFI', long:'Degrade: lo-fi crush and noise floor (Thunder original)', id:99, ps:[
       P_('bits', 'BITS', 24, v => v >= 24 ? 'OFF' : v + ' bit', 1, 24), P_('rate', 'RATE', 255, v => v >= 255 ? 'OFF' : (300 * Math.pow(160, u8(v)) / 1000).toFixed(1) + 'k'),
       P_('noise', 'NOISE', 70, v => v ? (20 * Math.log10(u8(v) * u8(v) * 0.25)).toFixed(0) + 'dB' : 'OFF'), P_('color', 'COLOUR', 77, pc), P_('follow', 'FOLLOW', 153, pc),
@@ -6407,7 +6668,7 @@ const TFX = {
       P_('input', 'INPUT', 128, B => { const v = 0 + 1 * u8(B); return Math.round(v * 100) + '%'; }), P_('tube', 'TUBE', 128, B => { const v = 0 + 1 * u8(B); return Math.round(v * 100) + '%'; })],
     map:(f, sr, bpm) => [(0 + 1 * u8(f.input)), (0 + 1 * u8(f.tube))]},
 };
-const FXT_LIST = ['eq', 'comp', 'reverb', 'delay', 'pdelay', 'preverb', 'density', 'tape', 'chorus', 'crush', 'degrade', 'reson', 'rings', 'clouds', 'beads', 'flanger', 'phaser', 'tremolo', 'odrive', 'folder', 'autowah', 'pshift', 'ladder', 'xmod', 'space', 'lofi', 'drive', 'air', 'room', 'comb', 'transient', 'tgate', 'ott', 'fshift', 'vinyl', 'dub', 'cab', 'tube'];
+const FXT_LIST = ['eq', 'comp', 'reverb', 'delay', 'pdelay', 'preverb', 'density', 'tape', 'chorus', 'crush', 'degrade', 'reson', 'rings', 'clouds', 'beads', 'flanger', 'phaser', 'tremolo', 'odrive', 'folder', 'autowah', 'pshift', 'ladder', 'xmod', 'space', 'lofi', 'drive', 'air', 'room', 'comb', 'transient', 'tgate', 'sgate', 'flex', 'retrig', 'ott', 'fshift', 'vinyl', 'dub', 'cab', 'tube'];
 const TAILS = new Set(['pdelay', 'preverb', 'reson', 'reverb', 'delay', 'rings', 'clouds', 'beads', 'space', 'room', 'pshift', 'comb']);
 const FXSLOTS = 4;
 function freshTfx(type){ const f = {type, on:true}; for (const p of TFX[type].ps) f[p.k] = p.d; return f; }
@@ -6422,14 +6683,21 @@ const normChainFx = a => Array.from({length:FXSLOTS}, (_, k) => Array.isArray(a)
 // The live list the worklet gets: on slots only, with each slot's parameters mapped for this rate and tempo.
 function tfxChain(A, sr, bpm){
   const out = [];
-  (A || []).forEach((f, k) => { if (f && f.on && TFX[f.type]){ const p = new Array(12).fill(0); TFX[f.type].map(f, sr, bpm).forEach((v, i) => p[i] = v); out.push({key:k + ':' + f.type, t:TFX[f.type].id, p}); } });
+  // Switched-off slots go too (on:false): the tracker's FXO can switch them on while the song plays.
+  (A || []).forEach((f, k) => { if (f && TFX[f.type]){ const p = new Array(12).fill(0); TFX[f.type].map(f, sr, bpm).forEach((v, i) => p[i] = v); out.push({key:k + ':' + f.type, t:TFX[f.type].id, p, on:!!f.on, slot:k}); } });
   return out;
 }
 const fxCount = A => (A || []).filter(f => f && f.on).length;
+const fxAny = A => (A || []).some(f => f && TFX[f.type]);   // any slot filled, on or off (FXO can switch it on)
 const hasTail = A => (A || []).some(f => f && f.on && TAILS.has(f.type));
+const hasTailAny = A => (A || []).some(f => f && TAILS.has(f.type));
 
 const TFX_SRC = `
 class ThunderFx extends AudioWorkletProcessor {
+  // bp: the song position in beats from the player's clock. sw0–sw3: tracker FXO switches per slot (−1 = the slot's
+  // own on/off). flx, gat, rtg: tracker FLX / GAT / RTG (−1 = the effect's own setting).
+  static get parameterDescriptors(){ const k = (name, d) => ({name, defaultValue:d, minValue:-1, maxValue:64, automationRate:'k-rate'});
+    return [{name:'bp', defaultValue:0, minValue:-2, maxValue:64, automationRate:'a-rate'}, k('sw0', -1), k('sw1', -1), k('sw2', -1), k('sw3', -1), k('flx', -1), k('gat', -1), k('rtg', -1)]; }
   constructor(o){
     super();
     const op = o.processorOptions || {};
@@ -6445,24 +6713,42 @@ class ThunderFx extends AudioWorkletProcessor {
     const x = this.x, old = this.slots.slice(), next = [];
     for (const c of chain){
       let i = old.findIndex(s => s.key === c.key), s;
+      const on = c.on !== false, slot = c.slot == null ? -1 : c.slot;
+      if (c.t >= 93 && c.t <= 95){   // Flex / Step gate / Retrigger: plain JS, tempo-locked to the player's clock
+        if (i >= 0 && old[i].js && old[i].jt === c.t){ s = old[i]; old.splice(i, 1); } else s = {key:c.key, h:-2, jt:c.t, js:c.t === 95 ? new FlexCore(sampleRate) : c.t === 94 ? new StepGateCore(sampleRate) : new RetrigCore(sampleRate)};
+        const q = c.p; s.dp = c.t === 95 ? {pat:q[0], mix:q[1], xf:q[2]} : c.t === 94 ? {pat:q[0], m1:q[1], m2:q[2], div:q[3], len:q[4], depth:q[5], smooth:q[6]} : {mode:q[0], div:q[1], decay:q[2], pitch:q[3], gate:q[4], mix:q[5]};
+        s.on = on; s.slot = slot; next.push(s); continue;
+      }
       if (c.t === 97 || c.t === 96){   // Pitch delay / reverb: plain JS
         if (i >= 0 && old[i].js && old[i].jt === c.t){ s = old[i]; old.splice(i, 1); } else s = {key:c.key, h:-2, jt:c.t, js:new PitchFxCore(sampleRate)};
         const q = c.p; s.dp = {kind:q[0], mode:q[1], time:q[2], fb:q[3], pitch:q[4], pitch2:q[5], tone:q[6], size:q[7], wow:q[8], mix:q[9]};
-        next.push(s); continue;
+        s.on = on; s.slot = slot; next.push(s); continue;
       }
       if (c.t === 99 || c.t === 98){   // Degrade / Resonator: plain JS, no wasm slot
         if (i >= 0 && old[i].js && old[i].jt === c.t){ s = old[i]; old.splice(i, 1); } else s = {key:c.key, h:-2, jt:c.t, js:c.t === 99 ? new DegradeCore(sampleRate) : new ResonCore(sampleRate)};
         const q = c.p; s.dp = c.t === 99 ? {bits:q[0], rate:q[1], noise:q[2], color:q[3], follow:q[4], dry:q[5], wet:q[6]} : {note:q[0], chord:q[1], mode:q[2], decay:q[3], bright:q[4], spread:q[5], mix:q[6]};
-        next.push(s); continue;
+        s.on = on; s.slot = slot; next.push(s); continue;
       }
       if (i >= 0){ s = old[i]; old.splice(i, 1); if (s.h < 0){ s.h = x.tfx_new(c.t, sampleRate); if (s.h < 0) continue; } } else { const h = x.tfx_new(c.t, sampleRate); if (h < 0) continue; s = {key:c.key, h}; }
       new Float32Array(x.memory.buffer, x.tfx_params(s.h), 12).set(c.p);
-      next.push(s);
+      s.on = on; s.slot = slot; next.push(s);
     }
     for (const s of old) if (!s.js) x.tfx_free(s.h);
     this.slots = next; this.idle = 0;
   }
-  process(inputs, outputs){
+  slotRun(s, n, tr){
+    const x = this.x;
+    if (s.js){ s.js.process(this.L, this.R, n, s.dp, tr); return; }
+    if (s.h < 0) return;
+    if (!this.cL){ this.cL = new Float32Array(128); this.cR = new Float32Array(128); }
+    this.cL.set(this.L); this.cR.set(this.R);
+    // An effect that crashes is bypassed (and remade when its settings change), so it can't take the track down with it.
+    try { x.tfx_process(s.h, n); }
+    catch (e){ try { x.tfx_free(s.h); } catch (e2){} s.h = -1; this.port.postMessage({failed:s.key});
+      if (this.buf !== x.memory.buffer){ this.buf = x.memory.buffer; this.L = new Float32Array(this.buf, x.tfx_l(), 128); this.R = new Float32Array(this.buf, x.tfx_r(), 128); }
+      this.L.set(this.cL); this.R.set(this.cR); }
+  }
+  process(inputs, outputs, params){
     if (this.dead) return false;
     const x = this.x, i = inputs[0], o = outputs[0], n = o[0].length;
     if (this.buf !== x.memory.buffer){ this.buf = x.memory.buffer; this.L = new Float32Array(this.buf, x.tfx_l(), 128); this.R = new Float32Array(this.buf, x.tfx_r(), 128); }
@@ -6470,19 +6756,22 @@ class ThunderFx extends AudioWorkletProcessor {
     // Silence in, and the effects' tails have died away: sleep (output silence) until sound arrives again.
     let ip = 0;
     if (i && i.length){ const a = i[0], b = i[1] || a; for (let k = 0; k < n; k++){ const v = a[k] < 0 ? -a[k] : a[k], w = b[k] < 0 ? -b[k] : b[k]; if (v > ip) ip = v; if (w > ip) ip = w; } }
-    if (ip < 1e-7 && this.idle >= sampleRate){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
+    // A switch (FXO) or a running clock wakes it: a slot just switched on must hear the moment it comes in.
+    const swv = [params.sw0[0], params.sw1[0], params.sw2[0], params.sw3[0]], bp = params.bp;
+    if (ip < 1e-7 && this.idle >= sampleRate && bp.length < 2){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
     if (i && i.length){ L.set(i[0]); R.set(i[1] || i[0]); } else { L.fill(0); R.fill(0); }
-    const t0 = Date.now();
+    const t0 = Date.now(), tr = {bp, flx:params.flx[0], gat:params.gat[0], rtg:params.rtg[0]};
+    if (!this.dL){ this.dL = new Float32Array(128); this.dR = new Float32Array(128); }
     for (const s of this.slots){
-      if (s.js){ s.js.process(this.L, this.R, n, s.dp); continue; }
-      if (s.h < 0) continue;
-      if (!this.cL){ this.cL = new Float32Array(128); this.cR = new Float32Array(128); }
-      this.cL.set(this.L); this.cR.set(this.R);
-      // An effect that crashes is bypassed (and remade when its settings change), so it can't take the track down with it.
-      try { x.tfx_process(s.h, n); }
-      catch (e){ try { x.tfx_free(s.h); } catch (e2){} s.h = -1; this.port.postMessage({failed:s.key});
-        if (this.buf !== x.memory.buffer){ this.buf = x.memory.buffer; this.L = new Float32Array(this.buf, x.tfx_l(), 128); this.R = new Float32Array(this.buf, x.tfx_r(), 128); }
-        this.L.set(this.cL); this.R.set(this.cR); }
+      // On or off: the slot's own setting, unless an FXO switch is holding it. Changes fade over 5 ms.
+      const sv = s.slot >= 0 && s.slot < 4 ? swv[s.slot] : -1, tg = (sv < -0.5 ? s.on : sv > 0.5) ? 1 : 0;
+      if (s.g === undefined) s.g = tg;
+      if (!tg && s.g <= 0){ if (s.js && s.js.feed) s.js.feed(this.L, this.R, n, tr); continue; }
+      const fade = s.g !== tg; if (fade){ this.dL.set(this.L); this.dR.set(this.R); }
+      this.slotRun(s, n, tr);
+      if (fade){ const L = this.L, R = this.R, d = 1 / (sampleRate * 0.005); let g = s.g;
+        for (let k = 0; k < n; k++){ g = tg ? Math.min(1, g + d) : Math.max(0, g - d); L[k] = this.dL[k] + (L[k] - this.dL[k]) * g; R[k] = this.dR[k] + (R[k] - this.dR[k]) * g; }
+        s.g = g; }
     }
     // Date.now() is coarse, but its average over many blocks is the real cost: report it as a share of real time.
     this.ms += Date.now() - t0; this.fr += n;
@@ -6628,7 +6917,7 @@ function tfxReady(ac){
   if (!tfxLoaded.has(ac)){
     tfxLoaded.set(ac, (async () => {
       if (!tfxBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
-      if (!tfxURL) tfxURL = URL.createObjectURL(new Blob([DegradeCore.toString() + '\n' + ResonCore.toString() + '\n' + PitchFxCore.toString() + '\n' + TFX_SRC], {type:'application/javascript'}));
+      if (!tfxURL) tfxURL = URL.createObjectURL(new Blob([DegradeCore.toString() + '\n' + ResonCore.toString() + '\n' + PitchFxCore.toString() + '\n' + clkSpb.toString() + '\n' + FlexCore.toString() + '\n' + StepGateCore.toString() + '\n' + RetrigCore.toString() + '\n' + TFX_SRC], {type:'application/javascript'}));
       await ac.audioWorklet.addModule(tfxURL);
       return true;
     })().catch(() => false));
@@ -6699,9 +6988,9 @@ function freshSong(){
   // MPC swing: the classic hardware's shuffle, applied on 8th, 16th or dotted-8th grid.
   // Voice-per-track parity: one synth voice per song track — ntr tracks need ntr + 8 pads, capped at 32.
   return {app:'thunder-song', v:5, name:'Song 1', bpm:120, swing:50, swingB:2, limiter:true, renderFrom:0, master:255, chainPatch:null,
-    song:Array.from({length:256}, () => new Array(NT).fill(-1)), chains:new Array(256).fill(null), phrases:new Array(256).fill(null),
+    song:Array.from({length:256}, () => new Array(NT + 1).fill(-1)), chains:new Array(256).fill(null), phrases:new Array(256).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
-    tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:4, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
+    tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:8, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
     ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0), mst:freshMst(), presets:{voices:[], layers:[]}};   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
 }
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;
@@ -6717,7 +7006,7 @@ function normSong(j){
   S.mst = normMst(j.mst);
   S.swing = clamp(int(j.swing, 50), 50, 75); S.swingB = clamp(int(j.swingB, 2), 1, 7); S.limiter = j.limiter !== false;
   S.renderFrom = clamp(int(j.renderFrom, 0), 0, 255); S.master = clamp(int(j.master, 255), 0, 255);
-  if (Array.isArray(j.song)) j.song.slice(0, 256).forEach((r, i) => { if (Array.isArray(r)) for (let t = 0; t < NT; t++) S.song[i][t] = clamp(int(r[t], -1), -1, 255); });
+  if (Array.isArray(j.song)) j.song.slice(0, 256).forEach((r, i) => { if (Array.isArray(r)) for (let t = 0; t <= MT; t++) S.song[i][t] = clamp(int(r[t], -1), -1, 255); });
   if (Array.isArray(j.chains)) j.chains.slice(0, 256).forEach((c, i) => { if (Array.isArray(c)) S.chains[i] = Array.from({length:16}, (_, k) => {
     const r = Array.isArray(c[k]) ? c[k] : []; return [clamp(int(r[0], -1), -1, 255), clamp(int(r[1], 0), -128, 127)]; }); });
   // Songs from before v2 used the first FX list (RET DEL CUT CHA PSL RND OFS REV PAN TPO HOP): move them to the current names.
@@ -6732,7 +7021,7 @@ function normSong(j){
     return [FXC.indexOf(nm), v];
   };
   // The MPC swing note value (which beat the swing lands on) follows the song; the hardware defaulted to 16ths.
-  S.lpb = clamp(int(j.lpb, 4), 1, 16); S.ticks = clamp(int(j.ticks, TICKS), 1, 32); S.dlen = clamp(int(j.dlen, 16), 1, PROWS);
+  S.lpb = clamp(int(j.lpb, 8), 1, 16); S.ticks = clamp(int(j.ticks, TICKS), 1, 32); S.dlen = clamp(int(j.dlen, 16), 1, PROWS);
   S.plen.fill(S.dlen);
   if (Array.isArray(j.plen)) j.plen.slice(0, 256).forEach((v, i) => S.plen[i] = clamp(int(v, S.dlen), 1, PROWS));
   if (Array.isArray(j.plpb)) j.plpb.slice(0, 256).forEach((v, i) => S.plpb[i] = clamp(int(v, 0), 0, 16));
@@ -6930,9 +7219,9 @@ const firstPhrase = cid => { const c = cid >= 0 ? S.chains[cid] : null, r = c ? 
 const SWINGB = ['8ths', '16ths', 'Triplet', 'Dotted-8th', 'Half', 'Wide-6', 'Wide-7'];
 function makeSeq(S, mode, o){
   const once = !!o.once, tr = []; let loop = o.loop || null;   // loop: {y0,y1} rows to cycle; api.setLoop swaps it while playing
-  for (let t = 0; t < NT; t++) tr.push({on:false, empty:false, row:0, cr:0, step:0, inst:0, rate:1, tsp:0, next:-1, last:null, rnl:{}, rnlNote:0, nth:new Map(), arc:{mode:0, spd:1},
+  for (let t = 0; t <= MT; t++) tr.push({on:false, empty:false, row:0, cr:0, step:0, inst:0, rate:1, tsp:0, next:-1, last:null, rnl:{}, rnlNote:0, nth:new Map(), arc:{mode:0, spd:1},
     rel:0, g:0, grv:null});
-  const api = {time:0, bpm:S.bpm, tks:clamp(S.ticks || TICKS, 1, 32), grv:null, base:null};
+  const api = {time:0, bpm:S.bpm, tks:clamp(S.ticks || TICKS, 1, 32), grv:null, base:null, bt:0, btT:null};
   const lenOf = id => id >= 0 && S.plen ? clamp(S.plen[id] || 16, 1, PROWS) : 16;
   // A numbered song cell whose sect has no phrases still plays one empty pattern; use the project's
   // pattern length so it lasts as long as a fresh phrase would.
@@ -6981,7 +7270,7 @@ function makeSeq(S, mode, o){
     }
     T.on = false;
   }
-  if (mode === 'song'){ for (let t = 0; t < NT; t++){ const T = tr[t]; T.row = loop ? clamp(o.row, loop.y0, loop.y1) : o.row; if (t < (S.ntr || 16) && S.song[T.row][t] >= 0){ T.on = true; settle(T, t); } } }
+  if (mode === 'song'){ for (let t = 0; t <= MT; t++){ const T = tr[t]; T.row = loop ? clamp(o.row, loop.y0, loop.y1) : o.row; if ((t < (S.ntr || 16) || t === MT) && S.song[T.row][t] >= 0){ T.on = true; settle(T, t); } } }
   else if (mode === 'sect'){ const T = tr[o.track]; T.on = true; if (loop) T.cr = loop.y0; settle(T, o.track); }
   else { const T = tr[o.track]; T.on = true; if (loop) T.step = loop.y0; settle(T, o.track); }
   api.alive = () => tr.some(T => T.on);
@@ -7009,9 +7298,23 @@ function makeSeq(S, mode, o){
     if (api.base == null) api.base = api.time;
     let rel0 = Infinity; for (const T of tr) if (T.on && T.rel < rel0) rel0 = T.rel;
     if (rel0 === Infinity) rel0 = api.time - api.base;
-    const t0 = api.base + rel0, evs = [], pos = new Array(NT).fill(null), {amt:sw, beat:swB} = swingOf();
+    const t0 = api.base + rel0, evs = [], pos = new Array(NT + 1).fill(null), {amt:sw, beat:swB} = swingOf();
     let nb = api.bpm, ngrv = api.grv; const tks0 = api.tks;
-    for (let t = 0; t < NT; t++){
+    // The song position in beats at this step, for the player's beat clock (tempo-locked effects).
+    if (api.btT == null){ api.btT = t0; api.bt = 0; } else { api.bt += (t0 - api.btT) * api.bpm / 60; api.btT = t0; }
+    evs.push({type:'beat', t:t0, b:api.bt});
+    // FXO / FLX / GAT / RTG (any track, and the master column) and the master column's VOL: automation for the player.
+    const fxEvs = (t, fx, at, line) => {
+      if (fx.FXO != null){ const X = fx.FXO >> 4, Y = fx.FXO & 15;
+        for (const k of X >= 1 && X <= 4 ? [X - 1] : [0, 1, 2, 3]){ evs.push({type:'fxc', t:at, track:t, p:'sw' + k, v:Y ? 1 : 0});
+          if (Y >= 2) evs.push({type:'fxc', t:at + Y * line, track:t, p:'sw' + k, v:-1}); } }
+      if (fx.FLX != null) evs.push({type:'fxc', t:at, track:t, p:'flx', v:Math.min(16, fx.FLX)});
+      if (fx.GAT != null) evs.push({type:'fxc', t:at, track:t, p:'gat', v:Math.min(15, fx.GAT)});
+      if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0});
+        if (X && Y) evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); }
+      if (t === MT && fx.VOL != null) evs.push({type:'mvol', t:at, v:fx.VOL});
+    };
+    for (let t = 0; t <= MT; t++){
       const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
       const cid = mode === 'phrase' ? -1 : sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null;
       const pid = mode === 'phrase' ? o.phrase : (!T.empty && chRow ? chRow[0] : -1);
@@ -7028,7 +7331,7 @@ function makeSeq(S, mode, o){
       const ctsp = !T.empty && chRow ? chRow[1] : 0;
       pos[t] = {row:T.row, cr:T.cr, step:T.step, sect:cid, phrase:pid};
       // A muted song block still runs its rows (so tempo and timing carry on) but its notes are dropped.
-      const muted = mode === 'song' && blockMuted(S, T.row, t), ev0 = evs.length;
+      const muted = mode === 'song' && t < MT && blockMuted(S, T.row, t), ev0 = evs.length;
       const ph = pid >= 0 ? S.phrases[pid] : null, r = ph ? ph[T.step] : null;
       let hop = -1;
       if (r){
@@ -7063,11 +7366,12 @@ function makeSeq(S, mode, o){
           T.nth.set(key, n + 1); play = n % X === (Y - 1) % X; }
         if (fx.CHA != null && rand() * 255 >= fx.CHA) play = false;
         const at = t0 + Math.min((fx.DEL || 0) * tick, dur * 0.98), end = t0 + dur;
+        if (play) fxEvs(t, fx, at, pair * line / 2);   // momentary lengths count rows as they actually play (the average row)
         const pit = (fx.PIT != null ? s8(fx.PIT) : 0) + (fx.FIN != null ? s8(fx.FIN) / 100 : 0);
         const mods = {arp:null, bend:null, vib:null};
         // Tracks 9–16 are polyphonic: all four note columns play, as a chord, over whatever is still ringing.
         const poly = isPolyT(t), ns = poly ? r.slice(0, NCOL) : [r[0]];
-        const offN = ns.includes(OFF), notes = ns.filter(x => x >= 0 && x < 120);
+        const offN = t < MT && ns.includes(OFF), notes = t < MT ? ns.filter(x => x >= 0 && x < 120) : [];
         if (offN) evs.push({type:'off', t:at, track:t});
         if (notes.length && play){
           const ii = fx.INS != null ? clamp(fx.INS, 0, NI - 1) : r[IC] >= 0 ? r[IC] : T.inst; T.inst = ii;
@@ -7093,7 +7397,7 @@ function makeSeq(S, mode, o){
             }
           });
           T.rate = firstRate * (mods.bend ? mods.bend.mul : 1);
-        } else if (!notes.length && !offN && play){
+        } else if (!notes.length && !offN && play && t < MT){
           // No note on this row: instrument commands change the note that is already playing.
           const m = {type:'mod', t:at, track:t};
           let any = false;
@@ -7147,6 +7451,15 @@ function makePlayer(ac, out, getBuf, live){
   // The sidechain detector bus: tracks send into it (Sidechain Out), every …chains node reads it as input 1.
   // It is never connected to the output, so it makes no sound on its own.
   const scBus = ac.createGain();
+  // The beat clock for tempo-locked track and master effects (Flex, Step gate, Retrigger): the song position in beats
+  // (wrapping every 16) as sample-accurate automation on a constant source, wired into every effect node's `bp`.
+  // −1 while stopped. The sequencer's 'beat' events ramp it from row to row, so it follows TPO exactly, live and offline.
+  const clock = ac.createConstantSource(), clk = {on:false, base:0}; clock.offset.value = -1; clock.start();
+  let mfx = null, mvol = null;
+  const clockTo = n => { try { if (n && n.parameters) clock.connect(n.parameters.get('bp')); } catch(e){} };
+  const setMfx = n => { mfx = n || null; clockTo(mfx); };
+  const fxNodeOf = t => t >= MT ? mfx : buses[t] && buses[t].fx;
+  const FXP = ['sw0', 'sw1', 'sw2', 'sw3', 'flx', 'gat', 'rtg'];
   for (let t = 0; t <= NT; t++){
     const inp = ac.createGain(), g = ac.createGain(), p = ac.createStereoPanner(), scs = ac.createGain();
     inp.connect(g); g.connect(p); p.connect(out);
@@ -7243,6 +7556,18 @@ function makePlayer(ac, out, getBuf, live){
   }
   function play(ev){
     if (ev.type === 'tempo'){ tempoTo(ev); return; }
+    if (ev.type === 'beat'){
+      const o = clock.offset, at = Math.max(ev.t, ac.currentTime);
+      if (!clk.on){ clk.on = true; clk.base = Math.floor(ev.b / 16) * 16; o.setValueAtTime(ev.b - clk.base, at); return; }
+      const v = ev.b - clk.base; o.linearRampToValueAtTime(v, at);
+      if (v >= 16){ clk.base += 16; o.setValueAtTime(v - 16, at); }
+      return;
+    }
+    // FXO / FLX / GAT / RTG: automation on the track's (or the master's) effect node.
+    if (ev.type === 'fxc'){ const n = fxNodeOf(ev.track), q = n && n.parameters && n.parameters.get(ev.p); if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} return; }
+    // The master column's VOL: the master level, with a 4 ms glide so it doesn't click.
+    if (ev.type === 'mvol'){ const g = out.gain, at = Math.max(ev.t, ac.currentTime), to = curve(ev.v);
+      try { g.setValueAtTime(mvol == null ? curve(S.master) : mvol, at); g.linearRampToValueAtTime(to, at + 0.004); } catch(e){} mvol = to; return; }
     const T = vs[ev.track];
     // OFF releases every note on the track: synth slots over their release, drum pads at once.
     if (ev.type === 'off'){ for (const v of T) kill(v, ev.t, relTc(v)); T.length = 0; return; }
@@ -7310,7 +7635,13 @@ function makePlayer(ac, out, getBuf, live){
     if (ev.rel != null) kill(v, ev.rel, syn ? relTc(v) : 0.05);
     T.push(v);
   }
-  function stopAll(at){ for (const v of alive) kill(v, at); for (const T of vs) T.length = 0; for (const b of bassN.values()) if (b.vox) b.sylN = 0; voxG.clear(); }   // lyrics start over
+  // Stopping puts every sequenced effect switch, pattern and the master level back to their settings.
+  function resetSeq(at){
+    clk.on = false; try { clock.offset.cancelScheduledValues(at); clock.offset.setValueAtTime(-1, at); } catch(e){}
+    for (const n of [...buses.map(b => b && b.fx), mfx]) if (n && n.parameters) for (const k of FXP){ const q = n.parameters.get(k); if (q) try { q.cancelScheduledValues(at); q.setValueAtTime(-1, at); } catch(e){} }
+    if (mvol != null){ try { out.gain.cancelScheduledValues(at); out.gain.setValueAtTime(curve(S.master), at); } catch(e){} mvol = null; }
+  }
+  function stopAll(at){ resetSeq(at); for (const v of alive) kill(v, at); for (const T of vs) T.length = 0; for (const b of bassN.values()) if (b.vox) b.sylN = 0; voxG.clear(); }   // lyrics start over
   function applyMix(filter){
     const at = ac.currentTime;
     buses.forEach((b, t) => {
@@ -7349,7 +7680,7 @@ function makePlayer(ac, out, getBuf, live){
       for (const op of chnDiff(b.chn._sent, S.chainPatch)) b.chn._send(Object.assign({target:'chains-host'}, op));
       b.chn._sent = chnClone(S.chainPatch);
     }
-    if (wantFx && !b.fx){ try { b.fx = tfxNode(ac, chain); } catch(e){ b.fx = null; } }
+    if (wantFx && !b.fx){ try { b.fx = tfxNode(ac, chain); clockTo(b.fx); } catch(e){ b.fx = null; } }
     else if (wantFx && b.fx){ try { b.fx.port.postMessage(chain); } catch(e){} }
     // Rewire only when which nodes sit in the slot changed: disconnecting/reconnecting a
     // running worklet every param change is its own little click.
@@ -7364,7 +7695,18 @@ function makePlayer(ac, out, getBuf, live){
       b._chnRef = b.chn; b._fxRef = b.fx;
     }
   }
-  return {play, stopAll, applyMix, setFx, routeTrack, buses};
+  // Reset audio engine: let go of every node this player made.
+  function dispose(){
+    try { clock.stop(); clock.disconnect(); } catch(e){}
+    for (const b of bassN.values()){ try { b.gate.value = 0; b.node.disconnect(); b.g.disconnect(); b.pn.disconnect(); } catch(e){} bassLive.delete(b); }
+    bassN.clear();
+    for (const b of buses){ if (!b) continue;
+      try { if (b.fx){ b.fx.port.postMessage(null); b.fx.disconnect(); } } catch(e){}
+      try { if (b.chn){ if (b.chn._send) b.chn._send({target:'chains-host', op:'dispose'}); b.chn.disconnect(); } } catch(e){}
+      try { b.inp.disconnect(); b.g.disconnect(); b.p.disconnect(); b.scs.disconnect(); } catch(e){} }
+    try { scBus.disconnect(); } catch(e){}
+  }
+  return {play, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose};
 }
 
 /* ---------- live playback ---------- */
@@ -7462,6 +7804,26 @@ function rtBufPlain(pad, rev){
   return e.b;
 }
 function mkLimiter(ac){ const c = ac.createDynamicsCompressor(); c.threshold.value = -2; c.knee.value = 0; c.ratio.value = 20; c.attack.value = 0.002; c.release.value = 0.1; return c; }
+// Reset audio engine (Settings → Audio): stop, tear the live graph down (every track's voices, live synth nodes, track
+// and master effects, …chains, mastering) and build it again from the song. Clears a stuck note, a runaway effect tail
+// or a frozen worklet without reloading the page; the song, kit and settings are untouched.
+function resetAudio(){
+  try { tStop(true); } catch(e){}
+  if (!ctx){ toast('Audio hasn’t started yet: nothing to reset.'); return; }
+  const now = ctx.currentTime;
+  if (rt){
+    try { rt.pl.stopAll(now); } catch(e){}
+    try { rt.pl.dispose(); } catch(e){}
+    try { if (rt.mfx){ rt.mfx.port.postMessage(null); rt.mfx.disconnect(); } } catch(e){}
+    try { if (rt.mst){ if (rt.mst.output) rt.mst.output.disconnect(); if (rt.mst.input) rt.mst.input.disconnect(); } } catch(e){}
+    try { rt.out.disconnect(); rt.lim.disconnect(); } catch(e){}
+    rt = null;
+  }
+  try { master.disconnect(); } catch(e){}
+  master = ctx.createGain(); master.gain.value = clamp(aset.vol, 0, 100) / 100; master.connect(ctx.destination);
+  rtInit(); if (ctx.state !== 'running' && ctx.resume) ctx.resume();
+  toast('Audio engine reset: every note and effect cleared.');
+}
 function rtInit(){
   audio();
   if (!rt){
@@ -7655,8 +8017,8 @@ function rtFx(t){
   if (t < NT) return rt.pl.setFx(t, tfxChain(S.tfx[t], ctx.sampleRate, S.bpm), rt.fxOk);
   // (setFx re-seats inp -> [chains?] -> [fx?] -> g, and retries when the chains module finishes loading.)
   const chain = rt.fxOk ? tfxChain(S.mfx, ctx.sampleRate, S.bpm) : [];
-  if (chain.length){ if (rt.mfx) rt.mfx.port.postMessage(chain); else { try { rt.mfx = tfxNode(ctx, chain); } catch(e){ rt.mfx = null; } rtRoute(); } }
-  else if (rt.mfx){ rt.mfx.port.postMessage(null); try { rt.mfx.disconnect(); } catch(e){} rt.mfx = null; rtRoute(); }
+  if (chain.length){ if (rt.mfx) rt.mfx.port.postMessage(chain); else { try { rt.mfx = tfxNode(ctx, chain); } catch(e){ rt.mfx = null; } rt.pl.setMfx(rt.mfx); rtRoute(); } }
+  else if (rt.mfx){ rt.mfx.port.postMessage(null); try { rt.mfx.disconnect(); } catch(e){} rt.mfx = null; rt.pl.setMfx(null); rtRoute(); }
 }
 function rtAllFx(){ for (let t = 0; t <= NT; t++) rtFx(t); }
 function fxChanged(t){ saveS(); rtFx(t); }
@@ -7783,17 +8145,19 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   const O = window.OfflineAudioContext || window.webkitOfflineAudioContext, oc = new O(2, N + lat, sr), out = oc.createGain();
   out.gain.value = curve(S.master);
   const wantChn = [...keep].some(t => chainsFeed(t)) && S.chainPatch && S.chainPatch.format === 'chains.patch';
-  const wantFx = [...keep].some(t => fxCount(S.tfx[t])) || (masterFx && fxCount(S.mfx));
+  const wantFx = [...keep].some(t => fxAny(S.tfx[t])) || (masterFx && fxAny(S.mfx));
   const ok = wantFx ? await tfxReady(oc) : false;
   const chnOk = wantChn ? await chainsReady(oc) : false;
   if (chnOk) chnSync.add(oc);
   let head = out;
-  if (ok && masterFx && fxCount(S.mfx)){ const m = tfxNode(oc, tfxChain(S.mfx, sr, S.bpm)); out.connect(m); head = m; }
+  let mNode = null;
+  if (ok && masterFx && fxAny(S.mfx)){ const m = mNode = tfxNode(oc, tfxChain(S.mfx, sr, S.bpm)); out.connect(m); head = m; }
   let mLim = false;
   if (useM){ const wkOk = mstNeedsWk(M) ? await mwReady(oc) : true; const ch = mstChain(oc, M, false); head.connect(ch.input); head = ch.output; mLim = !!(ch.wk && M.lim.on); if (!wkOk && mstNeedsWk(M)) toast('Mastering effects couldn’t load for this render; EQ only.'); }
   if (lim && !mLim){ const c = mkLimiter(oc); head.connect(c); c.connect(oc.destination); } else head.connect(oc.destination);
   if (evs.some(e => e.type === 'note' && isLivePad(e.pad))) await bassReady(oc);
   const pl = makePlayer(oc, out, getB, false);
+  pl.setMfx(mNode);
   pl.applyMix(t => keep.has(t));       // every track plays (so chokes match the mix), only `keep` is heard
   for (const t of keep){
     pl.setFx(t, tfxChain(S.tfx[t], sr, S.bpm), ok);
@@ -7848,7 +8212,7 @@ async function renderOut(stems){
     let end = seq.time;
     for (const e of notes){ const len = (e.st ? e.st.beats * 60 / e.st.bpm : pads.get(e.pad).length / sr) / Math.min(e.rate, e.slide ? e.slide.from : e.rate); end = Math.max(end, e.cut != null ? Math.min(e.t + len, e.cut + 0.06) : e.t + len); }
     // Reverb, delay and resonator tails ring past the last note: render extra, then trim the silence.
-    const tail = keepT.some(t => hasTail(S.tfx[t])) || hasTail(S.mfx) || keepT.some(t => chainsFeed(t)) ? 8 : 0;
+    const tail = keepT.some(t => hasTailAny(S.tfx[t])) || hasTailAny(S.mfx) || keepT.some(t => chainsFeed(t)) ? 8 : 0;
     const N0 = Math.ceil((end + 0.05) * sr), N = N0 + Math.ceil(tail * sr), secs = (N0 / sr).toFixed(1);
     toast(`Rendering mix (${secs} s${tail ? ' + effect tails' : ''})…`); await idle();
     let mix = await pass(evs, new Set(keepT), N, sr, getB, S.limiter, true);
@@ -7987,7 +8351,7 @@ function loadCur(){
   try { const o = JSON.parse(localStorage.getItem(CUK) || 'null'); if (!o) return;
     if (VIEWS.includes(o.tv)) tv = o.tv; if (MID.includes(o.midV)) midV = o.midV;
     cSect = clamp(int(o.cSect, 0), 0, 255); cPhrase = clamp(int(o.cPhrase, 0), 0, 255); cInst = clamp(int(o.cInst, 0), 0, NI - 1);
-    cTrack = clamp(int(o.cTrack, 0), 0, NT - 1); cFxT = clamp(int(o.cFxT, 0), 0, NT);
+    cTrack = clamp(int(o.cTrack, 0), 0, MT); cFxT = clamp(int(o.cFxT, 0), 0, NT);
     if (o.cs) for (const k in cs) if (o.cs[k]) Object.assign(cs[k], {x:int(o.cs[k].x, 0), y:int(o.cs[k].y, 0)});
   } catch(e){}
 }
@@ -8078,18 +8442,21 @@ const nslots = () => { try { return vtrk ? (ntr() || 16) + NPAD : NSLOT; } catch
 const voiceForTrack = t => vtrk ? NPAD + t : t % NSLOT;
 function setNtr(v){
   S.ntr = clamp(v, 8, vtrk ? 24 : NT); const n = S.ntr;
-  if (cTrack >= n) cTrack = n - 1; if (cs.song.x >= n) cs.song.x = n - 1; if (cs.mixer.x >= n) cs.mixer.x = n - 1;
+  if (cTrack >= n) cTrack = n - 1; if (cs.song.x >= n && cs.song.x !== MT) cs.song.x = n - 1; if (cs.mixer.x >= n) cs.mixer.x = n - 1;
   // A new track instantiates its voice before the redraw, so the kit keeps one-to-one voice/track parity.
   if (vtrk) growKit();
   if (cFxT < NT && cFxT >= n) cFxT = 0; arrSig = ''; saveS(); draw();
 }
 // The window of tracks a Song or Mixer line has room for (each track takes 3 characters after a lab-wide label).
 let mixL = 0, mixN = 16, winTrk = 16;
-function trackWin(c, lab){
+function trackWin(c, lab, extra = 0){
   const n = ntr(), fs = parseFloat(scr.style.fontSize) || 14, w = grid.clientWidth;
-  const vt = w > 0 ? clamp(Math.floor((Math.floor(w / (fs * CW) + 0.01) - lab + 1) / 3), 1, n) : n;
+  // extra: columns kept on screen after the window (Song's master column).
+  // When every track fits, the text shrinks a little to make room (fitCheck); otherwise the window gives up a column.
+  const fit = w > 0 ? Math.floor((Math.floor(w / (fs * CW) + 0.01) - lab + 1) / 3) : n, vt = clamp(fit >= n ? n : fit - extra, 1, n);
   if (c.left == null) c.left = 0;
-  if (c.x < c.left) c.left = c.x; if (c.x > c.left + vt - 1) c.left = c.x - vt + 1;
+  const cx = c.x >= n ? n - 1 : c.x;
+  if (cx < c.left) c.left = cx; if (cx > c.left + vt - 1) c.left = cx - vt + 1;
   c.left = clamp(c.left, 0, n - vt); winTrk = vt; return [c.left, c.left + vt];
 }
 const trkSub = (a, b) => b - a < ntr() ? `TRK ${d2(a + 1)}–${d2(b)} of ${ntr()} ◀▶` : '';
@@ -8247,7 +8614,7 @@ function projRows(){
     {l:'TRACKS', get:() => ntr(), set:v => setNtr(v), min:8, max:NT, big:8, d:16, fmt:v => v + ' tracks',
       info:() => `How many tracks this song uses, 8 to ${vtrk ? 24 : NT} with ${vtrk ? 'a voice per track (one voice each)' : 'the shared 16 voices'}. Song and Mixer show as many as fit and scroll sideways (arrows, or swipe left and right). Tracks past this number are hidden and silent; their notes are kept`},
     {l:'TEMPO', get:() => S.bpm, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; }, min:40, max:300, big:10, d:120, fmt:v => v + ' BPM', after:() => { rtAllFx(); chainsTempo(); }, info:() => 'Beats per minute, 4 steps to a beat. Track delays follow it'},
-    {l:'LPB', get:() => S.lpb, set:v => S.lpb = v, min:1, max:16, big:4, d:4, fmt:v => v + ' lines/beat · 1/' + (v * 4), info:() => 'Lines per beat: 4 makes each row a 16th, 8 a 32nd, 3 or 6 triplets. A phrase can set its own on its LEN line'},
+    {l:'LPB', get:() => S.lpb, set:v => S.lpb = v, min:1, max:16, big:4, d:8, fmt:v => v + ' lines/beat · 1/' + (v * 4), info:() => 'Lines per beat: 4 makes each row a 16th, 8 a 32nd, 3 or 6 triplets. A phrase can set its own on its LEN line'},
     {l:'TICKS', get:() => S.ticks || TICKS, set:v => { S.ticks = v; if (tp.on && tp.seq) tp.seq.tks = v; }, min:1, max:32, big:4, d:TICKS, fmt:v => v + ' ticks a step', after:chainsTempo, info:() => 'How many ticks each step is cut into for DEL, RET, KIL, OFF, ARC, PSL and GRV (6 by default). A TIC command in a phrase changes it from that row on'},
     {l:'PATTERN LEN', get:() => S.dlen || 16, set:v => setDefLen(v), min:1, max:PROWS, big:4, d:16, fmt:v => v + (v === 1 ? ' row' : ' rows') + ' · new phrases', info:() => 'How many rows a new phrase starts with (empty phrases follow it too). Change one phrase with ROWS at the right of the tab bar, or its LEN line'},
     {l:'› ALL PHRASES TO ' + (S.dlen || 16), dbl:true, act:() => { for (let i = 0; i < 256; i++) S.plen[i] = S.dlen || 16; saveS(); draw(); toast(`Every phrase now plays ${S.dlen || 16} rows. Notes past that are kept, just not played.`); },
@@ -8255,9 +8622,9 @@ function projRows(){
     {l:'SWING', get:() => S.swing, set:v => S.swing = v, min:50, max:75, big:5, d:50, fmt:v => v + '%', info:() => 'MPC swing amount: 50% is straight; higher pushes the off-beat of each pair later. 66–67% is the triplet feel'},
     {l:'SWING NOTE', opts:true, get:() => clamp(S.swingB || 2, 1, 7), set:v => S.swingB = v, tap:() => S.swingB = (S.swingB || 2) % 7 + 1, min:1, max:7, d:2, fmt:v => SWINGB[v - 1],
       info:() => 'MPC swing note value: the beat the swing lands on (the hardware’s 1/16, 1/16T, 1/8, 1/8T… settings). 16ths pairs steps 2 3, 6 7…; 8ths pairs 1 2, 3 4…'},
-    {l:'LIMITER', get:() => S.limiter ? 1 : 0, set:v => S.limiter = !!v, min:0, max:1, tog:true, d:1, fmt:onOff, after:rtRoute, info:() => 'Catches peaks on the master. Renders use it on the mix only, so stems stay clean'},
+    {l:'LIMITER', sec:'Mastering', gap:true, get:() => S.limiter ? 1 : 0, set:v => S.limiter = !!v, min:0, max:1, tog:true, d:1, fmt:onOff, after:rtRoute, info:() => 'Catches peaks on the master. Renders use it on the mix only, so stems stay clean'},
     {l:'MASTER', get:() => S.master, set:v => S.master = v, min:0, max:255, big:16, d:255, after:rtRoute, info:v => 'Master level ' + dB(curve(v))},
-    {l:'RENDER FROM', sec:'Render', get:() => S.renderFrom, set:v => S.renderFrom = v, min:0, max:255, big:16, d:0, fmt:v => 'ROW ' + rS(v, 3), gap:true, info:() => 'Renders play from this row until each track reaches an empty row'},
+    {l:'RENDER FROM', sec:'Render & export', get:() => S.renderFrom, set:v => S.renderFrom = v, min:0, max:255, big:16, d:0, fmt:v => 'ROW ' + rS(v, 3), gap:true, info:() => 'Renders play from this row until each track reaches an empty row'},
     {l:'RATE', get:() => ex.sr === 48000 ? 1 : 0, set:v => ex.sr = v ? 48000 : 44100, min:0, max:1, tog:true, d:1, fmt:v => v ? '48K' : '44.1K', info:() => 'Sample rate for renders (shared with the synth’s export)'},
     {l:'BITS', get:() => ex.bits === 24 ? 1 : 0, set:v => ex.bits = v ? 24 : 16, min:0, max:1, tog:true, d:1, fmt:v => v ? '24' : '16', info:() => 'Bit depth for renders'},
     {l:'NORMALISE', get:() => ex.norm ? 1 : 0, set:v => ex.norm = !!v, min:0, max:1, tog:true, d:1, fmt:onOff, info:() => 'Raise the mix to just under 0 dB. Stems get the same gain, so they still add up to the mix'},
@@ -8362,7 +8729,8 @@ const FXB = {ARP:'Arpeggio: the note, +X and +Y semitones', ARC:'Arpeggio shape 
   RNL:'Like RND, as a random walk from the last value', PSL:'Slide the pitch from the last note over ticks', PBN:'Bend the pitch ± semitones over the step',
   PVB:'Vibrato: X speed, Y depth', SED:'Seed the randomness so it repeats the same way', TPO:'Set the tempo in BPM (hex)', TSP:'Transpose the track from here on',
   VOL:'Set the volume (also of a playing note)', PIT:'Pitch the note ± semitones', FIN:'Fine tune ± cents', PLY:'Play reversed (01) or forwards (00)',
-  STA:'Start part way into the sound', PAN:'Pan left or right (80 centre)', TIC:'Ticks a step from here on', WOB:'Bass wobble rate from here on (00 the voice’s own)'};
+  STA:'Start part way into the sound', PAN:'Pan left or right (80 centre)', TIC:'Ticks a step from here on', WOB:'Bass wobble rate from here on (00 the voice’s own)',
+  FXO:'Effect slot X (0 = all) off (Y 0), on (1) or on for Y rows', FLX:'Flex pattern (00 off, 01–10)', GAT:'Step gate pattern (00 custom, 01–0F)', RTG:'Retrigger: X rate (1 = 1/4 … 8 = 1/32T), Y rows (0 = until RTG 00)'};
 const FXLIST = [-1, ...FXC.map((n, i) => i).sort((a, b) => FXC[a] < FXC[b] ? -1 : 1)];
 const fxp = {open:false, x:0, y:0, i:0, now:-1};
 function fxpOpen(x, y){
@@ -8717,6 +9085,7 @@ function move(dx, dy){
   if (tv === 'phrase' && dy === -1 && c.y === 0){ c.y = -2; c.x = c.x > 0 ? 1 : 0; return draw(); }
   if (tv === 'phrase' && dx){ const C = pCols(), i = Math.max(0, C.indexOf(c.x)); c.x = C[clamp(i + dx, 0, C.length - 1)]; }
   else if (tv === 'mixer' && c.y === 7 && dx){ c.mx = clamp((c.mx || 0) + dx, 0, 1); return draw(); }
+  else if (tv === 'song' && dx){ const ui = clamp((c.x === MT ? ntr() : c.x) + dx, 0, ntr()); c.x = ui === ntr() ? MT : ui; }   // the master column sits after the last track
   else c.x = clamp(c.x + dx, 0, d.w - 1);
   const wasY = c.y; c.y = clamp(c.y + dy, 0, d.h - 1);
   if (tv === 'mixer' && c.y === 7 && wasY !== 7) c.mx = 0;
@@ -8775,6 +9144,7 @@ function tickDots(){
 function psetSet(x, v){ if (x === 0) S.plen[cPhrase] = clamp(v, 1, PROWS); else S.plpb[cPhrase] = clamp(v, 0, 16); saveS(); draw(); }
 // Mutes or unmutes one song block (Alt-click, a long press in ARRANGE, or M on the song in KEYS mode).
 function toggleBlockMute(y, t){
+  if (t === MT) return toast('The master column can’t be muted.');
   if (y < 0 || y > 255 || S.song[y][t] < 0) return toast('Nothing there to mute.');
   S.smute[y] ^= 1 << t; saveS(); draw();
   toast((blockMuted(S, y, t) ? 'Muted' : 'Unmuted') + ` row ${rS(y, 3)} · track ${d2(t + 1)}`);
@@ -9061,6 +9431,8 @@ function info(){
     return inMode === 'keys' ? `${what} · Shift+▲▼ grow · Ctrl/⌘+C copy · Ctrl/⌘+X cut · Ctrl/⌘+V paste over · Esc cancel`
       : `${what} · arrows extend · OPTION copies · OPTION+EDIT cuts · SHIFT+OPTION cancels`;
   }
+  if (tv === 'song' && c.x === MT){ const v = S.song[c.y][MT];
+    return `MASTER · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty · EDIT×2 new master phrase (its commands drive the master bus: VOL, FXO, FLX, GAT, RTG)' : `phrase ${hx(songShown(v))}` + (isEmptySect(S.chains[v]) ? ' · empty' : '') + ' · commands only, notes are not played'); }
   if (tv === 'song'){ const v = S.song[c.y][c.x], mu = blockMuted(S, c.y, c.x) ? ' · MUTED' : '';
     if (!sectsOn) return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty · EDIT×2 new phrase' : isEmptySect(S.chains[v]) ? `block ${hx(v)} · no phrase yet (SHIFT+▶ makes one)` : `phrase ${hx(firstPhrase(v))}` + (isEmptyPhrase(S.phrases[firstPhrase(v)]) ? ' (empty)' : '') + (firstPhrase(v) !== v ? ` · block ${hx(v)}` : '')) + mu;
     return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty' : `sect ${hx(v)}` + (isEmptySect(S.chains[v]) ? ' (empty)' : '')) + mu; }
@@ -9076,7 +9448,7 @@ function info(){
     if (k === 'vol') return v < 0 ? 'Volume: full' : `Volume ${hx(v)} · ${dB(curve(v))}`;
     if (k === 'inst'){ if (v < 0) return 'Instrument: same as the last note on this track'; const I = S.insts[v] || S.insts[0]; return `Instrument ${hx(v)} → ${isSyn(I.pad) ? 'synth' : 'pad'} ${hx(I.pad)} ${(kit.voices[I.pad] || {}).name || ''}`; }
     const ci = k === 'fxc' ? v : r[c.x - 1], vv = k === 'fxc' ? r[c.x + 1] : v;
-    return ci < 0 || !FXC[ci] ? 'No command. EDIT adds one; EDIT+▲▼ or letters pick from ' + FXC.join(' ') : `${FXC[ci]} ${h2(vv)} · ${FXI[FXC[ci]](Math.max(0, vv))}`;
+    return ci < 0 || !FXC[ci] ? 'No command. EDIT adds one; EDIT+▲▼ or letters pick from ' + FXC.join(' ') : `${FXC[ci]} ${h2(vv)} · ` + (cTrack === MT && FXC[ci] === 'VOL' ? `Master level ${dB(curve(Math.max(0, vv)))} from here on (back to the Mixer’s MASTER when it stops)` : cTrack === MT && /^(FXO|FLX|GAT|RTG)$/.test(FXC[ci]) ? FXI[FXC[ci]](Math.max(0, vv)).replace(/this track's/g, 'the master’s') + ' · on the master bus' : FXI[FXC[ci]](Math.max(0, vv)));
   }
   if (tv === 'mixer'){
     if (c.y === 7 && c.mx === 1) return 'Mastering ' + (S.mst.on ? 'on' : 'off') + ' · ' + mstChainTxt() + ' · EDIT opens it · EDIT+◀▶ off / on';
@@ -9155,7 +9527,7 @@ function groupBoxes(){
   grid.querySelectorAll('.tgbox').forEach(b => b.remove());   // the grid is only rebuilt when its text changed
   if (!(tv === 'song' || tv === 'mixer')) return;
   const g = grid.getBoundingClientRect(), fs = parseFloat(getComputedStyle(grid).fontSize) || 14, padX = fs * .3, padY = fs * .12;
-  for (const k of ['gm', 'gp']){
+  for (const k of ['gm', 'gp', 'gx']){
     const top = grid.querySelectorAll('span.gt.' + k), bot = grid.querySelectorAll('span.gb.' + k); if (!top.length) continue;
     const a = top[0].getBoundingClientRect(), z = top[top.length - 1].getBoundingClientRect(), b = (bot.length ? bot[bot.length - 1] : top[0]).getBoundingClientRect();
     const box = el('div', 'tgbox ' + k), first = k === 'gm' ? 1 : polyFrom() + 1, last = k === 'gm' ? polyFrom() : ntr();
@@ -9163,7 +9535,7 @@ function groupBoxes(){
     const em = v => (v / fs).toFixed(4) + 'em';
     box.style.left = em(a.left - g.left + grid.scrollLeft - padX); box.style.top = em(a.top - g.top + grid.scrollTop - padY);
     box.style.width = em(z.right - a.left + padX * 2); box.style.height = em(b.bottom - a.top + padY * 2);
-    box.append(el('b', null, (k === 'gm' ? 'MONO ' : 'POLY ') + d2(first) + (last > first ? '–' + d2(last) : '')));
+    box.append(el('b', null, k === 'gx' ? 'MST' : (k === 'gm' ? 'MONO ' : 'POLY ') + d2(first) + (last > first ? '–' + d2(last) : '')));
     grid.append(box);
   }
 }
@@ -9175,49 +9547,55 @@ let gridHTML = '', psetHTML = '';
 // (-1 where a track is silent) shared by both, or null when nothing should be lit.
 function playhead(){
   if (!tp.on || tp.mode !== 'song' || !tp.pos) return null;
-  const rows = new Array(NT).fill(-1);
-  for (let t = 0; t < NT; t++){ const p = tp.pos[t]; if (p && p.row >= 0) rows[t] = p.row; }
+  const rows = new Array(NT + 1).fill(-1);
+  for (let t = 0; t <= MT; t++){ const p = tp.pos[t]; if (p && p.row >= 0) rows[t] = p.row; }
   return rows;
 }
 function draw(){
   if (view !== 'tracker') return;
   if (selA && selA.v !== tv) selA = null;
+  // The FX target follows the track being edited: moving to another phrase (or block) moves the FX panel and the FX
+  // screen with it. The master column's phrases point it at the master (MT is the FX screen's master, NT).
+  if (tv === 'phrase' || tv === 'sect') cFxT = Math.min(cTrack, NT); else if (tv === 'song') cFxT = cs.song.x === MT ? NT : Math.min(cs.song.x, ntr() - 1);
   scr.dataset.v = tv; grid.classList.toggle('grp', tv === 'song' || tv === 'mixer');   // room above the grid for the MONO / POLY labels
   const c = cs[tv], dm = dims(tv);
-  if (onPset()) c.x = clamp(c.x, 0, 1); else { c.x = clamp(c.x, 0, dm.w - 1); c.y = clamp(c.y, 0, dm.h - 1); }
+  if (onPset()) c.x = clamp(c.x, 0, 1); else { if (!(tv === 'song' && c.x === MT)) c.x = clamp(c.x, 0, dm.w - 1); c.y = clamp(c.y, 0, dm.h - 1); }
   const P = tp.on ? tp.pos : null, PH = playhead(), L = [];
   let title = VNAME[tv], sub = '', pset = null;
   const sr = selA ? selRect() : null;
   const rsel = y => sr && selA.line && y >= sr.y0 && y <= sr.y1 ? ' sel' : '';
   const cc = (x, y, base) => base + (sr && x >= sr.x0 && x <= sr.x1 && y >= sr.y0 && y <= sr.y1 ? ' sel' : '') + (c.x === x && c.y === y ? ' cur' : '');
   const mc = t => (S.mix[t].mute ? ' mu' : '') + (S.mix[t].solo ? ' so' : '');
-  const tk = t => isPolyT(t) ? ' gp' : ' gm';   // the track's group: pink mono, green poly
+  const tk = t => t === MT ? ' gx' : isPolyT(t) ? ' gp' : ' gm';   // the track's group: pink mono, green poly
   const playRows = test => { const s = new Set(); if (P) P.forEach(p => { const r = p && test(p); if (r != null) s.add(r); }); return s; };
   if (tv === 'song'){
-    const [T0, T1] = trackWin(c, stepDec ? 4 : 3), ts = trkSub(T0, T1); sub = ts ? ts + '  ' + S.name : S.name;
+    const [T0, T1] = trackWin(c, stepDec ? 4 : 3, 1), ts = trkSub(T0, T1); sub = ts ? ts + '  ' + S.name : S.name;
     const VR = songRows(); if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; c.top = clamp(c.top, 0, 256 - VR);
-    const hd = [stepDec ? '    ' : '   ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t) + tk(t) + ' gt', x:t, y:-1}, ' '); L.push(hd);
+    const hd = [stepDec ? '    ' : '   ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t) + tk(t) + ' gt', x:t, y:-1}, ' ');
+    hd.push(' ', {t:'MS', cls:'th gx gt', x:MT, y:-1}); L.push(hd);   // the master column, in its own box after the poly tracks
     for (let y = c.top; y < c.top + VR; y++){
       const ln = [{t:rS(y, 3), cls:'rn' + (y % 4 ? '' : ' rn4') + rsel(y), r:y}, ' '];
       for (let t = T0; t < T1; t++){ const v = S.song[y][t], pl = PH && PH[t] === y;
         ln.push({t:h2(songShown(v)), cls:cc(t, y, (v < 0 ? 'e' : 'v') + (pl ? ' pl' : '') + (v >= 0 && blockMuted(S, y, t) ? ' sm' : '')) + tk(t) + (y === c.top + VR - 1 ? ' gb' : ''), x:t, y}, ' '); }
+      { const v = S.song[y][MT], pl = PH && PH[MT] === y;
+        ln.push(' ', {t:h2(songShown(v)), cls:cc(MT, y, (v < 0 ? 'e' : 'v') + (pl ? ' pl' : '')) + ' gx' + (y === c.top + VR - 1 ? ' gb' : ''), x:MT, y}); }
       L.push(ln);
     }
   } else if (tv === 'sect'){
-    title = 'SECT ' + hx(cSect); sub = 'TRACK ' + d2(cTrack + 1);
+    title = 'SECT ' + hx(cSect); sub = cTrack === MT ? 'MASTER' : 'TRACK ' + d2(cTrack + 1);
     const ch = S.chains[cSect], pr = playRows(p => tp.mode !== 'phrase' && p.sect === cSect ? p.cr : null);
     L.push([stepDec ? '   ' : '  ', {t:'PH', cls:'th'}, ' ', {t:'TP', cls:'th'}]);
     for (let y = 0; y < 16; y++){ const r = sectRow(cSect, y) || [-1, 0];
       L.push([{t:stepDec ? d2(y) : hx(y, 1), cls:'rn' + (y % 4 ? '' : ' rn4') + (pr.has(y) ? ' pl' : '') + rsel(y), r:y}, ' ', {t:h2(r[0]), cls:cc(0, y, r[0] < 0 ? 'e' : 'v'), x:0, y}, ' ', {t:hx(r[1]), cls:cc(1, y, r[1] ? 'v' : 'e'), x:1, y}]); }
   } else if (tv === 'phrase'){
-    title = 'PHRASE ' + hx(cPhrase); sub = 'TRACK ' + d2(cTrack + 1) + (polyView() ? ' · POLY' : ' · MONO');
+    title = 'PHRASE ' + hx(cPhrase); sub = cTrack === MT ? 'MASTER' : 'TRACK ' + d2(cTrack + 1) + (polyView() ? ' · POLY' : ' · MONO');
     const poly = polyView(); if (!poly && c.x >= 1 && c.x < NCOL) c.x = 0;
     const p = S.phrases[cPhrase], pr = playRows(q => q.phrase === cPhrase ? q.step : null), len = plen(cPhrase), lpb = S.plpb[cPhrase] || 0, el2 = lpb || S.lpb;
     pset = [{t:'LEN ', cls:'lb'}, {t:d2(len), cls:cc(0, -2, 'v'), x:0, y:-2}, {t:' LPB ', cls:'lb'}, {t:lpb ? d2(lpb) : '--', cls:cc(1, -2, lpb ? 'v' : 'e'), x:1, y:-2},
       {t:' 1/' + (el2 * 4) + (el2 % 3 === 0 ? ' trip' : '') + (lpb ? '' : ' song'), cls:'lb'}];
     // Neighbours: a mono track shows its note (C-4). A poly track shows its whole chord: all four notes when the line still
     // fits the screen at this text size (unfolded, desktop), otherwise one letter per voice in a single cell (C E G A# → CEGa).
-    const nbHasL = nbOn && cTrack > 0, nbHasR = nbOn && cTrack + 1 < ntr();
+    const nbHasL = nbOn && cTrack > 0 && cTrack < MT, nbHasR = nbOn && cTrack + 1 < ntr();
     const nbPL = nbHasL && isPolyT(cTrack - 1), nbPR = nbHasR && isPolyT(cTrack + 1);
     let nbWide = false;
     if (nbPL || nbPR){
@@ -9233,7 +9611,7 @@ function draw(){
     const VR = Math.max(4, songRows()); if (c.top == null) c.top = 0;
     if (c.y >= 0){ if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; }
     c.top = clamp(c.top, 0, Math.max(0, len - VR));
-    const nbL = nbOn ? nbPhrase(cTrack - 1) : -1, nbR = nbOn ? nbPhrase(cTrack + 1) : -1;
+    const nbL = nbOn && cTrack < MT ? nbPhrase(cTrack - 1) : -1, nbR = nbOn && cTrack < MT ? nbPhrase(cTrack + 1) : -1;
     const nbCell = (pid, y, cls) => { const q = pid >= 0 && S.phrases[pid] && y < plen(pid) ? S.phrases[pid][y] : null;
       const pl = cls === 'nbl' ? nbPL : nbPR, w = nbW(pl);
       if (!pl){ const n = q ? q[0] : -1; return {t:n != null && n >= 0 ? noteS(n) : '   ', cls:'nb ' + cls}; }
@@ -9932,9 +10310,10 @@ function deckInst(){
 }
 function deckFx(){
   if (!deckShown() || !deck.fx) return;
-  const t = dkTrack(), A = S.tfx[t] || [];
+  // The master's effects when the FX target is the master (the MST column, or the FX screen on the master).
+  const mst = tv !== 'mixer' && cFxT >= NT, t = mst ? NT : dkTrack(), FA = () => (mst ? S.mfx : S.tfx[dkTrack()]) || [], A = FA();
   const sig = t + ':' + A.map(f => f ? f.type + (f.on ? 1 : 0) : '-').join(',') + ':' + dkFxSel;
-  $('dkFxT').textContent = `FX · TRACK ${d2(t + 1)}`;
+  $('dkFxT').textContent = mst ? 'FX · MASTER' : `FX · TRACK ${d2(t + 1)}`;
   if (sig !== dkFxSig){
     dkFxSig = sig; const sl = $('dkFxSlots'), box = $('dkFxRows'); sl.replaceChildren(); box.replaceChildren(); dkFxRows = [];
     if (!A[dkFxSel]) { const k = A.findIndex(Boolean); if (k >= 0){ dkFxSel = k; dkFxSig = ''; return deckFx(); } }
@@ -9942,7 +10321,7 @@ function deckFx(){
       b.type = 'button'; b.title = TFX[f.type].long + (f.on ? '' : ' (off)'); b.addEventListener('click', () => { dkFxSel = k; deckFx(); }); sl.append(b); });
     const f = A[dkFxSel];
     if (!f){ box.append(el('p', 'note', 'No effects on this track. Add them on the FX screen (Mixer → FX row).')); return; }
-    const getF = () => (S.tfx[dkTrack()] || [])[dkFxSel], on = () => fxChanged(dkTrack());
+    const getF = () => FA()[dkFxSel], on = () => fxChanged(mst ? NT : dkTrack());
     for (const q of TFX[f.type].ps){
       const def = {l:q.l.charAt(0) + q.l.slice(1).toLowerCase(), min:q.min, max:q.max, c:'int', d:q.d, f:q.fmt};
       const r = makeRow(def, q.k, getF, {idp:'dkf' + dkFxSel, on}); box.append(r.r); dkFxRows.push(r); }
@@ -10881,19 +11260,37 @@ function tsetRow(r){
 // The Project tab of the settings menu: the same rows as the Project screen (projRows).
 function buildProj(){
   const list = $('gsecProj'); if (!list) return;
-  const body = $('gset'), keep = body.scrollTop; list.innerHTML = ''; list.append(el('div', 'sethead', 'Project'));
-  let sec = null;
+  const body = $('gset'), keep = body.scrollTop; for (const id of INNER_SECS){ const x = $(id); if (x) $('gsetBody').append(x); }
+  list.innerHTML = ''; list.append(el('div', 'sethead', 'Project'));
+  const trk = view === 'tracker';
   const inFile = new Set(['› SAVE', '› SAVE AS', '› LOAD PROJECT', '› EXPORT CHAINS', '› IMPORT CHAINS', '› SHARE PROJECT', '› NEW SONG', '› LOAD DEMO', '› RENDER SONG', '› RENDER STEMS', '› SHARE LAST RENDER']);
   list.append(el('p', 'note', 'Saving, opening, rendering and exporting are in the File menu.'));
-  // In the menu: the song first, then how you play, the screen and rendering. (UPDATE APP is under App.)
+  // The song, how you play, then rendering & export and mastering. (Screen has its own section; UPDATE APP is under App.)
   const groups = new Map(); let g = 'Tracker';
-  for (const r of projRows()){ if (r.sec) g = r.sec; if (inFile.has(r.l) || g === 'App') continue; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(r); }
-  const order = ['Song', 'Input', 'Screen', 'Render'];
+  if (trk) for (const r of projRows()){ if (r.sec) g = r.sec; if (inFile.has(r.l) || g === 'App' || g === 'Screen') continue; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(r); }
+  if (!groups.has('Render & export')) groups.set('Render & export', []);
+  if (!groups.has('Mastering')) groups.set('Mastering', []);
+  const order = ['Song', 'Input', 'Render & export', 'Mastering'];
   for (const name of [...order.filter(n => groups.has(n)), ...[...groups.keys()].filter(n => !order.includes(n))]){
-    sec = el('section', 'tsec'); sec.append(el('h3', null, name)); list.append(sec);
+    const sec = el('section', 'tsec'); sec.append(el('h3', null, name)); list.append(sec);
     for (const r of groups.get(name)) sec.append(tsetRow(r));
+    // Export's pad settings join Render (its rate, bits and level are the same ones the tracker rows set), and the
+    // mastering window's button joins Mastering.
+    if (name === 'Render & export'){ const x = $('pExport'); if (x){ x.hidden = false; sec.append(x);
+      for (const id of ['segRate', 'segBits', 'segNorm']){ const r = $(id) && $(id).closest('.segrow'); if (r) r.hidden = trk; } } }
+    if (name === 'Mastering'){ const x = $('pMaster'); if (x){ x.hidden = false; sec.append(x); } }
   }
   body.scrollTop = keep;
+}
+// Screen: the tracker's screen and arrange settings, then the skin.
+function buildScreen(){
+  const list = $('gsecScreen'); if (!list) return;
+  const sk = $('pSkin'); if (sk) $('gsetBody').append(sk);
+  list.innerHTML = ''; list.append(el('div', 'sethead', 'Screen'));
+  let g = '', sec = el('section', 'tsec');
+  for (const r of projRows()){ if (r.sec) g = r.sec; if (g !== 'Screen' || r.l === 'SKIN') continue; sec.append(tsetRow(r)); }
+  if (sec.childNodes.length) list.append(sec);
+  if (sk){ const s2 = el('section', 'tsec'); s2.append(el('h3', null, 'Skin')); sk.hidden = false; s2.append(sk); list.append(s2); }
 }
 // The Patch tab of the settings menu: the Waves/Chains patch's own settings (quality, tempo, MIDI, backups).
 function fmtBak(t){ const d = new Date(t); return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
