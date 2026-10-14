@@ -111,6 +111,8 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .gset label.cb{display:flex; align-items:center; gap:10px; font-size:var(--fs-4); font-weight:600; cursor:pointer; min-height:30px}
 .gset label.cb input{width:16px; height:16px; margin:0; accent-color:var(--ink); flex:none}
 .gset .skins{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.presel{max-width:170px; min-height:30px; font-size:var(--fs-3)}
+@media (max-width:600px){ .presel{max-width:120px} }
 /* Phrases (File ▾ → Phrases…): every phrase with notes, with the ones not on the song first. */
 .phl{position:fixed; z-index:130; left:50%; top:56px; transform:translateX(-50%); width:min(560px, calc(100vw - 12px)); max-height:calc(100dvh - 70px);
   display:flex; flex-direction:column; background:var(--panel); color:var(--ink); border:1px solid var(--ink)}
@@ -1185,6 +1187,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div class="bar">
       <span class="ttl" id="vNum">Pad 1</span>
       <input id="vName" type="text" aria-label="Pad name" spellcheck="false">
+      <select id="vPre" class="presel" aria-label="Pad presets" title="Presets: factory sounds, and your own saved in this song"></select>
       <div class="sp"></div>
       <button class="sm" id="vPlay">Play</button>
       <button class="sm" id="vRand">Random</button>
@@ -1267,6 +1270,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
       <span class="famtag" id="lFam"></span>
       <div class="sp"></div>
       <div class="acts">
+        <select id="lPre" class="presel" aria-label="Layer presets" title="Layer presets: replace this layer"></select>
         <button class="sm" id="bLoad">Load sample</button>
         <button class="sm" id="lRand">Random</button>
         <button class="sm" id="lCopy">Copy</button>
@@ -1494,7 +1498,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     </div>
     </div>
   </div>
-  <input type="file" id="projIn" accept=".json,application/json,text/plain,application/octet-stream" hidden>
+  <input type="file" id="projIn" accept=".json,application/json,text/plain,application/octet-stream" hidden><input type="file" id="presetIn" accept=".json,application/json" hidden>
   <input type="file" id="chainsIn" accept=".json,application/json" hidden>
 </div>
 <input type="file" id="fileIn" accept="audio/*,.wav,.mp3,.ogg,.m4a,.flac" hidden>
@@ -1570,7 +1574,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p>Each track and the master have 4 effect slots (FX screen, or the Mixer’s FX row): 34 effects in all: EQ, compressor, three reverbs, tape delay, dub tape, saturation, drive, tube, tape, vinyl, lo-fi, bitcrush, chorus, flanger, phaser, tremolo, trance gate, auto-wah, ladder filter, comb resonator, wavefolder, overdrive, pitch and frequency shifters, cross-mod, transient shaper, multiband squash, speaker cab, air, and Rings, Clouds and Beads. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to four, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
 <p><b>…chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback. Its <b>Resample</b> module records what passes through it into a pad, starting on the next bar, and slices it so you can chop it like a breakbeat.</p></section>
-    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). In <b>⚙ Settings</b>, <b>Kit</b> saves and loads kits, <b>Export</b> writes WAVs for Koala and SunVox, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and <b>Skin</b> changes the look (Pastel, Minimal, Neon, Matrix and the Simple colour pairs).</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
+    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound (kicks, snares, hats, percussion, IDM and glitch hits, basses, pads, chords, keys and leads, including Bass and Blip engine sounds). <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once.</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). In <b>⚙ Settings</b>, <b>Kit</b> saves and loads kits, <b>Export</b> writes WAVs for Koala and SunVox, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and <b>Skin</b> changes the look (Pastel, Minimal, Neon, Matrix and the Simple colour pairs).</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -4067,6 +4071,387 @@ function voxSylShow(){
   ta.addEventListener('input', () => { XV().txt = ta.value.slice(0, 4000); voxSylShow(); clearTimeout(voxT); voxT = setTimeout(voxEdit, 350); });
   ta.addEventListener('keydown', e => e.stopPropagation());   // typing lyrics never plays notes
 })();
+/* ---------- Presets: whole voices and single layers ----------
+   Factory presets (original sounds, written in the spirit of classic drum machines and synths; no samples or
+   names of theirs) plus the song's own presets, kept in the song (S.presets), so they travel in the project
+   file. File ▾ exports and imports them as a presets file. A voice preset replaces the whole pad (engine, layers,
+   effects, modulation); a layer preset replaces just the selected layer and is re-pitched for the pad it lands on. */
+const PFX = (t, o) => Object.assign(freshFx(t), o || {});
+// Drum pads: one-shots (AHD), C2 at tune 0. Synth slots: ADSR, tuned up two octaves so C-4 plays middle C.
+const PD = (name, layers, o) => mkVoice(name, layers, o);
+const PS = (name, layers, o) => mkVoice(name, layers.map(l => Object.assign({mode:'ADSR'}, l)), Object.assign({tune:24, len:6, gate:400, tail:2}, o || {}));
+const PE = (name, engine, data, o) => { const v = mkVoice(name, [{type:'sine'}], Object.assign({tune:0}, o || {})); v.engine = engine; v[engine] = data; return v; };
+function factoryVoicePresets(){
+  const bass = o => { const p = Object.assign({}, o), dr = p.vDrive || 0; delete p.vDrive; return [normBass(Object.assign(BassCore.defaults(), p)), dr]; };
+  const BE = (name, o, x) => { const [b, dr] = bass(o); return PE(name, 'bass', b, Object.assign({drive:dr, len:6, gate:400}, x || {})); };
+  const BL = (name, o, x) => PE(name, 'blip', normBlip(Object.assign(BlipVoice.defaults(), o)), x);
+  return [
+  ['Kicks', [
+    ['Boom kick (808-ish)', () => PD('Boom kick', [
+      {type:'sine', tune:-5, pAmt:12, pDec:45, atk:0.1, dec:1100, level:0.95},
+      {type:'click', a:0.15, level:0.25, hpCut:900, atk:0.05, dec:10}], {drive:0.1, len:6})],
+    ['Punch kick (909-ish)', () => PD('Punch kick', [
+      {type:'sine', tune:-3, pAmt:30, pDec:28, atk:0.1, dec:420, level:0.9},
+      {type:'click', a:0.25, level:0.5, hpCut:700, atk:0.05, dec:14},
+      {type:'white', atk:0.1, dec:22, lpCut:6000, hpCut:900, level:0.25}], {drive:0.3})],
+    ['Thump kick (606-ish)', () => PD('Thump kick', [
+      {type:'sine', tune:0, pAmt:16, pDec:22, atk:0.1, dec:230, level:0.95},
+      {type:'tri', tune:12, pAmt:20, pDec:10, atk:0.1, dec:30, level:0.2}], {drive:0.15})],
+    ['FM kick', () => PD('FM kick', [
+      {type:'fm2', a:rA(1.5), b:0.45, tune:-2, pAmt:36, pDec:24, atk:0.1, dec:260, level:0.75},
+      {type:'sine', tune:-2, pAmt:24, pDec:30, atk:0.1, dec:300, level:0.6}], {drive:0.35})],
+    ['Tone kick (Nord-ish)', () => PD('Tone kick', [
+      {type:'membrane', a:0.15, b:0.6, tune:-1, pAmt:20, pDec:35, atk:0.1, dec:380, level:0.7},
+      {type:'sine', tune:-1, pAmt:14, pDec:40, atk:0.1, dec:450, level:0.6},
+      {type:'click', a:0.1, level:0.3, atk:0.05, dec:8}])],
+    ['Glitch kick', () => PD('Glitch kick', [
+      {type:'sine', tune:-2, pAmt:48, pDec:8, atk:0.1, dec:140, level:0.9},
+      {type:'lfsr', a:0.7, b:0.8, atk:0.05, dec:12, hpCut:2000, level:0.35}], {drive:0.45, fx:[PFX('crush', {down:0.25, bits:10, mix:0.5})]})],
+    ['Sub drop kick', () => PD('Sub drop', [
+      {type:'sine', tune:-7, pAmt:24, pDec:260, atk:0.1, dec:1500, level:0.95}], {len:6})],
+    ['Distorted kick', () => PD('Dist kick', [
+      {type:'sine', tune:-3, pAmt:28, pDec:35, atk:0.1, dec:520, level:0.9},
+      {type:'square', tune:-3, pAmt:28, pDec:35, atk:0.1, dec:140, lpCut:1800, level:0.2}], {drive:0.75})],
+    ['Kick (blip engine)', () => BL('Blip kick', {pitch:58, kick:0.8, kickT:28, click:0.5, decay:240, drive:0.2})],
+  ]],
+  ['Snares & claps', [
+    ['Tone snare (808-ish)', () => PD('Tone snare', [
+      {type:'tri', tune:20, pAmt:6, pDec:30, atk:0.1, dec:140, level:0.6},
+      {type:'tri', tune:27, pAmt:6, pDec:30, atk:0.1, dec:110, level:0.4},
+      {type:'white', atk:0.2, dec:190, hpCut:1800, lpCut:9000, level:0.6}])],
+    ['Crack snare (909-ish)', () => PD('Crack snare', [
+      {type:'tri', tune:17, pAmt:10, pDec:25, atk:0.1, dec:120, level:0.55},
+      {type:'white', atk:0.1, dec:260, hpCut:1200, lpCut:11000, level:0.75},
+      {type:'pink', atk:0.1, dec:70, hpCut:500, lpCut:4000, level:0.35}], {drive:0.2})],
+    ['Snap snare (606-ish)', () => PD('Snap snare', [
+      {type:'white', atk:0.1, dec:120, hpCut:2200, lpCut:8000, lpRes:0.2, level:0.8},
+      {type:'tri', tune:22, pAmt:4, pDec:20, atk:0.1, dec:60, level:0.4}])],
+    ['FM snare', () => PD('FM snare', [
+      {type:'fmmetal', a:0.4, b:0.5, tune:19, pAmt:8, pDec:20, atk:0.1, dec:150, level:0.5},
+      {type:'white', atk:0.1, dec:180, hpCut:1500, level:0.6}])],
+    ['Noise snare (Nord-ish)', () => PD('Noise snare', [
+      {type:'membrane', a:0.6, b:0.4, tune:21, pAmt:5, pDec:25, atk:0.1, dec:110, level:0.45},
+      {type:'pink', atk:0.1, dec:240, hpCut:900, lpCut:7000, lpRes:0.25, lpEnv:0.25, fDec:90, level:0.7}])],
+    ['Glitch snare', () => PD('Glitch snare', [
+      {type:'white', burst:3, spacing:5, atk:0.1, dec:90, hpCut:1500, level:0.8},
+      {type:'chip', a:0.6, b:0.4, tune:28, pAmt:-12, pDec:30, atk:0.1, dec:60, level:0.35}], {fx:[PFX('crush', {down:0.35, bits:8, mix:0.6})]})],
+    ['Rimshot', () => PD('Rimshot', [
+      {type:'click', a:0.2, level:0.6, atk:0.05, dec:8},
+      {type:'square', tune:41, atk:0.1, dec:28, hpCut:600, lpCut:5000, level:0.45},
+      {type:'tri', tune:34, atk:0.1, dec:22, level:0.35}], {level:5})],
+    ['Hand clap', () => PD('Clap', [
+      {type:'white', burst:4, spacing:9, atk:0.3, dec:260, hpCut:900, lpCut:2800, lpRes:0.35, level:1},
+      {type:'pink', delay:30, atk:0.3, dec:110, hpCut:1300, lpCut:6000, level:0.35}], {level:5})],
+    ['Room clap', () => PD('Room clap', [
+      {type:'white', burst:4, spacing:12, atk:0.3, dec:420, hpCut:700, lpCut:3200, lpRes:0.3, level:1}], {level:4, fx:[PFX('room', {size:0.35, wet:0.3})]})],
+    ['Snare (blip engine)', () => BL('Blip snap', {pitch:220, kick:0.35, kickT:12, noise:0.6, click:0.6, decay:150, filt:0.25, res:0.4})],
+  ]],
+  ['Hats & cymbals', [
+    ['Closed hat (808-ish)', () => PD('Closed hat', [
+      {type:'metal', a:0.5, atk:0.1, dec:45, hpCut:7500, hpRes:0.2, level:1}], {choke:1, level:6})],
+    ['Closed hat (909-ish)', () => PD('Closed hat 2', [
+      {type:'metal', a:0.7, b:0.3, atk:0.1, dec:60, hpCut:8000, level:0.8},
+      {type:'white', atk:0.1, dec:40, hpCut:9500, level:0.45}], {choke:1, level:6})],
+    ['Tick hat (606-ish)', () => PD('Tick hat', [
+      {type:'metal', a:0.3, atk:0.1, dec:28, hpCut:9000, hpRes:0.3, level:1}], {choke:1, level:7})],
+    ['Open hat (808-ish)', () => PD('Open hat', [
+      {type:'metal', a:0.5, atk:0.1, dec:520, hpCut:7200, hpRes:0.2, level:1},
+      {type:'white', atk:0.1, dec:300, hpCut:9500, level:0.3}], {choke:1, level:5})],
+    ['Open hat (909-ish)', () => PD('Open hat 2', [
+      {type:'metal', a:0.75, b:0.3, atk:0.1, dec:650, hpCut:7800, level:0.85},
+      {type:'white', atk:0.1, dec:450, hpCut:8500, lpCut:14000, level:0.5}], {choke:1, level:5})],
+    ['Digital hat', () => PD('Digital hat', [
+      {type:'lfsr', a:0.85, b:0.2, atk:0.1, dec:40, hpCut:6000, level:0.8}], {choke:1, level:4})],
+    ['Crackle hat', () => PD('Crackle hat', [
+      {type:'dust', a:0.85, b:0.8, atk:0.1, dec:70, hpCut:5000, level:1}], {choke:1, level:0})],
+    ['Ride', () => PD('Ride', [
+      {type:'metal', a:0.35, b:0.6, atk:0.1, dec:1400, hpCut:5000, level:0.7},
+      {type:'bell', a:0.6, b:0.5, tune:48, atk:0.1, dec:900, level:0.2}], {len:6, level:5})],
+    ['Crash', () => PD('Crash', [
+      {type:'metal', a:0.9, b:0.6, atk:0.2, dec:2200, hpCut:3500, level:0.8},
+      {type:'white', atk:0.2, dec:1800, hpCut:5000, lpCut:13000, level:0.5}], {len:8, tail:3})],
+    ['Hat (blip engine)', () => BL('Blip hat', {pitch:5000, kick:0, noise:0.95, click:0.4, decay:45, filt:0.62, res:0.35}, {choke:1})],
+  ]],
+  ['Toms & percussion', [
+    ['Low tom (808-ish)', () => PD('Low tom', [
+      {type:'sine', tune:2, pAmt:7, pDec:120, atk:0.1, dec:520, level:0.85},
+      {type:'pink', atk:0.1, dec:40, hpCut:1200, lpCut:5000, level:0.12}])],
+    ['Mid tom (808-ish)', () => PD('Mid tom', [
+      {type:'sine', tune:9, pAmt:7, pDec:110, atk:0.1, dec:420, level:0.85},
+      {type:'pink', atk:0.1, dec:35, hpCut:1500, lpCut:6000, level:0.12}])],
+    ['Tone tom (Nord-ish)', () => PD('Tone tom', [
+      {type:'membrane', a:0.5, b:0.45, tune:7, pAmt:6, pDec:140, atk:0.1, dec:420, level:0.8},
+      {type:'sine', tune:7, pAmt:9, pDec:90, atk:0.1, dec:320, level:0.5}])],
+    ['FM tom', () => PD('FM tom', [
+      {type:'fm2', a:rA(1.75), b:0.3, tune:10, pAmt:12, pDec:80, atk:0.1, dec:360, level:0.7}])],
+    ['Cowbell', () => PD('Cowbell', [
+      {type:'square', tune:36, fine:55, atk:0.2, dec:330, hpCut:450, lpCut:3800, lpRes:0.25, level:0.6},
+      {type:'square', tune:43, fine:36, atk:0.2, dec:330, hpCut:450, lpCut:3800, lpRes:0.25, level:0.6}])],
+    ['Clave', () => PD('Clave', [
+      {type:'sine', tune:51, atk:0.05, dec:30, level:0.9},
+      {type:'click', a:0.1, level:0.3, atk:0.05, dec:5}])],
+    ['Woodblock', () => PD('Woodblock', [
+      {type:'bar', a:0.6, b:0.7, tune:41, atk:0.05, dec:90, level:0.8}])],
+    ['Shaker', () => PD('Shaker', [
+      {type:'white', burst:2, spacing:18, atk:12, dec:70, hpCut:4500, lpCut:12000, level:0.8}], {level:3})],
+    ['Conga', () => PD('Conga', [
+      {type:'membrane', a:0.25, b:0.35, tune:19, pAmt:3, pDec:40, atk:0.1, dec:260, level:0.8},
+      {type:'click', a:0.1, level:0.2, atk:0.05, dec:6}])],
+    ['Metal ping', () => PD('Metal ping', [
+      {type:'bell', a:0.4, b:0.35, tune:36, atk:0.1, dec:700, level:0.7}])],
+  ]],
+  ['IDM & glitch', [
+    ['Clicky pitch sweep', () => PD('Click sweep', [
+      {type:'sine', tune:36, pAmt:-36, pDec:12, atk:0.05, dec:45, level:0.8},
+      {type:'click', a:0.05, level:0.4, atk:0.05, dec:4}])],
+    ['Zap', () => PD('Zap', [
+      {type:'sine', tune:24, pAmt:48, pDec:18, atk:0.05, dec:120, level:0.8}])],
+    ['Laser', () => PD('Laser', [
+      {type:'fmfb', a:0.6, b:0.5, tune:30, pAmt:-30, pDec:90, atk:0.1, dec:220, level:0.6}])],
+    ['Bit blip', () => PD('Bit blip', [
+      {type:'chip', a:0.3, b:0.5, tune:38, atk:0.05, dec:60, level:0.6}], {fx:[PFX('crush', {down:0.5, bits:5, mix:0.8})]})],
+    ['Granular tick', () => PD('Grain tick', [
+      {type:'white', burst:6, spacing:3, atk:0.05, dec:30, hpCut:3500, lpCut:9000, lpRes:0.5, level:0.8}], {level:3})],
+    ['Data burst', () => PD('Data burst', [
+      {type:'lfsr', a:0.4, b:0.9, atk:0.1, dec:110, lpCut:6000, lpRes:0.4, level:0.7},
+      {type:'square', tune:31, pAmt:12, pDec:15, atk:0.05, dec:40, level:0.25}])],
+    ['Ring metal', () => PD('Ring metal', [
+      {type:'fmmetal', a:0.7, b:0.7, tune:24, atk:0.1, dec:300, hpCut:800, level:0.6}])],
+    ['Bubble', () => PD('Bubble', [
+      {type:'sine', tune:31, pAmt:-14, pDec:50, atk:2, dec:90, level:0.7}])],
+    ['Crunch hit', () => PD('Crunch hit', [
+      {type:'white', atk:0.1, dec:140, lpCut:2500, lpRes:0.6, lpEnv:0.4, fDec:40, level:0.8},
+      {type:'sine', tune:0, pAmt:24, pDec:15, atk:0.1, dec:90, level:0.5}], {drive:0.7, fx:[PFX('crush', {down:0.4, bits:6, mix:0.5})]})],
+    ['Metal (blip engine)', () => BL('Blip metal', {pitch:420, fm:0.6, fmR:3.73, ring:0.8, ringF:1730, kick:0.1, decay:320})],
+    ['Glitch (blip engine)', () => BL('Blip glitch', {pitch:900, kick:0.3, kickT:10, decay:70, grain:6, grainT:28, fm:0.25, fmR:2})],
+  ]],
+  ['Bass', [
+    ['Saw bass', () => PS('Saw bass', [
+      {type:'saw', tune:-24, atk:1, dec:400, sus:0.6, rel:120, lpCut:900, lpRes:0.35, lpEnv:0.35, fDec:220, level:0.8},
+      {type:'sine', tune:-24, atk:1, dec:300, sus:0.9, rel:120, level:0.6}], {drive:0.2})],
+    ['Sub sine', () => PS('Sub sine', [
+      {type:'sine', tune:-24, atk:2, dec:500, sus:0.9, rel:150, level:0.9}])],
+    ['Square bass', () => PS('Square bass', [
+      {type:'square', tune:-24, atk:1, dec:250, sus:0.7, rel:100, lpCut:1200, lpRes:0.2, lpEnv:0.3, fDec:150, level:0.7},
+      {type:'sine', tune:-36, atk:1, dec:300, sus:0.9, rel:100, level:0.4}])],
+    ['FM bass', () => PS('FM bass', [
+      {type:'fm2', a:rA(1), b:0.55, tune:-24, atk:1, dec:350, sus:0.5, rel:120, level:0.8},
+      {type:'sine', tune:-24, atk:1, dec:300, sus:0.9, rel:120, level:0.4}])],
+    ['Reese', () => PS('Reese', [
+      {type:'saw', tune:-24, fine:-14, atk:2, dec:500, sus:0.9, rel:150, lpCut:1600, lpRes:0.2, level:0.6},
+      {type:'saw', tune:-24, fine:14, atk:2, dec:500, sus:0.9, rel:150, lpCut:1600, lpRes:0.2, level:0.6},
+      {type:'sine', tune:-36, atk:2, dec:500, sus:0.9, rel:150, level:0.5}], {drive:0.3})],
+    ['Pluck bass', () => PS('Pluck bass', [
+      {type:'pulse', a:0.25, tune:-24, atk:0.5, dec:220, sus:0.1, rel:100, lpCut:700, lpRes:0.4, lpEnv:0.5, fDec:120, level:0.8}], {drive:0.2})],
+    ['Chip bass', () => PS('Chip bass', [
+      {type:'chip', a:0.6, b:0.4, tune:-24, atk:1, dec:300, sus:0.8, rel:60, level:0.7}])],
+    ['Fuzz bass', () => PS('Fuzz bass', [
+      {type:'saw', tune:-24, atk:1, dec:300, sus:0.8, rel:90, lpCut:2200, lpRes:0.15, level:0.7}], {drive:0.85, fx:[PFX('drive', {drive:0.6})]})],
+    ['Wobble (bass engine)', () => BE('Wobble', {shape:0.5, cut:85, res:0.7, fenv:0, wCut:6, wRate:8, wShape:0, sub:0.6, vDrive:0.2})],
+    ['Reese DnB (bass engine)', () => BE('Reese DnB', {shape:0, parts:56, det:16, width:0.9, cut:1500, res:0.25, fenv:0, wCut:1.4, wRate:1, wShape:1, sub:0.6, glide:40, vDrive:0.3})],
+    ['Laser bass (bass engine)', () => BE('Laser bass', {shape:0, cut:280, res:0.85, fenv:6, fdec:90, glide:70, legato:1, sub:0.3, vDrive:0.2})],
+  ]],
+  ['Pads', [
+    ['Warm saw pad', () => PS('Warm pad', [
+      {type:'saw', fine:-9, atk:450, dec:1200, sus:0.8, rel:1200, lpCut:1800, lpRes:0.15, level:0.55},
+      {type:'saw', fine:9, atk:450, dec:1200, sus:0.8, rel:1200, lpCut:1800, lpRes:0.15, level:0.55},
+      {type:'tri', tune:12, atk:600, dec:1000, sus:0.7, rel:1200, level:0.3}], {len:8, tail:3})],
+    ['Super saw pad', () => PS('Super pad', [
+      {type:'supersaw', a:0.45, b:0.7, atk:300, dec:1500, sus:0.85, rel:1500, lpCut:3500, lpRes:0.1, level:0.6}], {len:8, tail:3, fx:[PFX('chorus', {depth:0.4, mix:0.35})]})],
+    ['Glass pad', () => PS('Glass pad', [
+      {type:'fm2', a:rA(3), b:0.25, atk:500, dec:1500, sus:0.7, rel:1600, level:0.5},
+      {type:'sine', tune:12, atk:700, dec:1500, sus:0.6, rel:1600, level:0.35}], {len:8, tail:3})],
+    ['Dark pad', () => PS('Dark pad', [
+      {type:'saw', fine:-6, atk:800, dec:1500, sus:0.9, rel:1800, lpCut:550, lpRes:0.3, level:0.6},
+      {type:'square', tune:-12, fine:6, atk:800, dec:1500, sus:0.9, rel:1800, lpCut:500, level:0.4}], {len:8, tail:3})],
+    ['PWM pad', () => PS('PWM pad', [
+      {type:'pulse', a:0.3, atk:400, dec:1200, sus:0.85, rel:1400, lpCut:2400, level:0.55},
+      {type:'pulse', a:0.6, fine:7, atk:400, dec:1200, sus:0.85, rel:1400, lpCut:2400, level:0.45}],
+      {len:8, tail:3, lfo1Rate:0.4, lfo1Depth:1, r1dst:3, r1amt:0.25})],
+    ['Choir pad', () => PS('Choir pad', [
+      {type:'formant', a:0.3, b:0.5, atk:500, dec:1500, sus:0.85, rel:1500, level:0.55},
+      {type:'formant', a:0.42, b:0.5, fine:8, atk:600, dec:1500, sus:0.85, rel:1500, level:0.45}], {len:8, tail:3, level:5})],
+    ['Noise sweep pad', () => PS('Noise pad', [
+      {type:'pink', atk:900, dec:2000, sus:0.8, rel:1800, lpCut:900, lpRes:0.6, level:0.5},
+      {type:'tri', atk:700, dec:1500, sus:0.8, rel:1800, level:0.35}], {len:8, tail:3, level:5, lfo1Rate:0.15, lfo1Depth:1, r1dst:3, r1amt:0.5})],
+    ['Shimmer pad', () => PS('Shimmer', [
+      {type:'bell', a:0.35, b:0.4, tune:12, atk:300, dec:2000, sus:0.5, rel:2000, level:0.35},
+      {type:'saw', fine:-5, atk:600, dec:1500, sus:0.8, rel:2000, lpCut:2000, level:0.4}], {len:8, tail:4, fx:[PFX('room', {size:0.8, wet:0.4})]})],
+  ]],
+  ['Chords & keys', [
+    ['Minor 9 stab', () => PS('Minor 9 stab', [
+      {type:'chord', a:cA('Minor 9'), b:0.3, atk:1, dec:500, sus:0.2, rel:300, lpCut:2200, lpRes:0.3, lpEnv:0.35, fDec:200, level:0.7}])],
+    ['Major 7 keys', () => PS('Major 7 keys', [
+      {type:'chord', a:cA('Major 7'), b:0.2, atk:2, dec:900, sus:0.4, rel:500, lpCut:3000, level:0.65},
+      {type:'fm2', a:rA(1), b:0.2, atk:1, dec:700, sus:0.2, rel:400, level:0.25}])],
+    ['Dub chord', () => PS('Dub chord', [
+      {type:'chord', a:cA('Minor 7'), b:0.4, atk:1, dec:300, sus:0, rel:200, lpCut:1400, lpRes:0.45, lpEnv:0.4, fDec:150, level:0.75}],
+      {fx:[PFX('delay', {time:375, regen:0.55, mix:0.35})]})],
+    ['Sus chord pad', () => PS('Sus pad', [
+      {type:'chord', a:cA('Sus2'), b:0.5, atk:600, dec:1500, sus:0.8, rel:1500, lpCut:2500, level:0.6}], {len:8, tail:3})],
+    ['Fourths stab', () => PS('Fourths stab', [
+      {type:'chord', a:cA('4ths'), b:0.5, atk:1, dec:400, sus:0.15, rel:250, lpCut:2600, lpRes:0.25, lpEnv:0.3, fDec:160, level:0.7}])],
+    ['Electric piano', () => PS('E piano', [
+      {type:'fm2', a:rA(1), b:0.3, atk:1, dec:1200, sus:0.3, rel:400, level:0.75},
+      {type:'fm2', a:rA(14), b:0.15, atk:0.5, dec:120, sus:0, rel:100, level:0.2}])],
+    ['Mallet', () => PS('Mallet', [
+      {type:'bar', a:0.5, b:0.5, atk:0.5, dec:900, sus:0, rel:500, level:0.8}])],
+    ['Pluck string', () => PS('String pluck', [
+      {type:'karplus', a:0.6, b:0.5, atk:0.5, dec:1500, sus:0.6, rel:400, level:0.8}])],
+    ['Organ', () => PS('Organ', [
+      {type:'addodd', a:0.35, b:0.4, atk:4, dec:200, sus:0.95, rel:90, level:0.7},
+      {type:'sine', tune:12, atk:4, dec:200, sus:0.9, rel:90, level:0.3}])],
+    ['Bell', () => PS('Bell', [
+      {type:'bell', a:0.45, b:0.25, atk:0.5, dec:2400, sus:0.15, rel:1500, level:0.7},
+      {type:'sine', tune:12, atk:0.5, dec:1200, sus:0, rel:900, level:0.25}], {len:8})],
+  ]],
+  ['Leads', [
+    ['Square lead', () => PS('Square lead', [
+      {type:'square', atk:3, dec:300, sus:0.75, rel:180, lpCut:3200, lpRes:0.25, level:0.6},
+      {type:'saw', fine:12, atk:3, dec:300, sus:0.75, rel:180, lpCut:4200, level:0.45}])],
+    ['Sync lead', () => PS('Sync lead', [
+      {type:'saw', a:0.45, atk:2, dec:400, sus:0.7, rel:200, lpCut:5000, level:0.6}], {glide:30})],
+    ['Chip lead', () => PS('Chip lead', [
+      {type:'chip', a:0.2, b:0.6, atk:1, dec:300, sus:0.8, rel:80, level:0.6}], {lfo1Rate:6, lfo1Depth:1, r1dst:1, r1amt:0.08})],
+    ['Whistle', () => PS('Whistle', [
+      {type:'sine', tune:12, atk:30, dec:300, sus:0.9, rel:200, level:0.7},
+      {type:'white', atk:30, dec:300, sus:0.3, rel:200, hpCut:2000, lpCut:5000, level:0.1}], {lfo1Rate:5.5, lfo1Depth:1, r1dst:1, r1amt:0.06})],
+  ]],
+  ];
+}
+// Layer presets: tagged with the pad pitch they were written for (vt: 0 = a drum pad, 24 = a synth slot), so a
+// layer keeps its pitch whichever pad it goes on.
+function factoryLayerPresets(){
+  return [
+  ['Drum layers', [
+    ['Kick body (long)', {type:'sine', tune:-5, pAmt:12, pDec:45, atk:0.1, dec:1100, level:0.95}],
+    ['Kick body (punchy)', {type:'sine', tune:-3, pAmt:30, pDec:28, atk:0.1, dec:420, level:0.9}],
+    ['Kick click', {type:'click', a:0.25, level:0.5, hpCut:700, atk:0.05, dec:14}],
+    ['Snare noise (bright)', {type:'white', atk:0.1, dec:240, hpCut:1500, lpCut:11000, level:0.7}],
+    ['Snare noise (tight)', {type:'white', atk:0.1, dec:110, hpCut:2200, lpCut:8000, lpRes:0.2, level:0.75}],
+    ['Snare noise (dark)', {type:'pink', atk:0.1, dec:260, hpCut:700, lpCut:4500, lpRes:0.25, level:0.7}],
+    ['Snare tone', {type:'tri', tune:20, pAmt:6, pDec:30, atk:0.1, dec:140, level:0.6}],
+    ['Clicky pitch sweep', {type:'sine', tune:36, pAmt:-36, pDec:12, atk:0.05, dec:45, level:0.8}],
+    ['Zap sweep', {type:'sine', tune:24, pAmt:48, pDec:18, atk:0.05, dec:120, level:0.8}],
+    ['Clap burst', {type:'white', burst:4, spacing:9, atk:0.3, dec:260, hpCut:900, lpCut:2800, lpRes:0.35, level:1}],
+    ['Hat metal', {type:'metal', a:0.5, atk:0.1, dec:45, hpCut:7500, hpRes:0.2, level:1}],
+    ['Hat noise', {type:'white', atk:0.1, dec:40, hpCut:9500, level:0.5}],
+    ['Tom membrane', {type:'membrane', a:0.5, b:0.45, tune:7, pAmt:6, pDec:140, atk:0.1, dec:420, level:0.8}],
+    ['Rim tick', {type:'square', tune:41, atk:0.1, dec:28, hpCut:600, lpCut:5000, level:0.45}],
+    ['Digital noise', {type:'lfsr', a:0.7, b:0.8, atk:0.05, dec:30, hpCut:2000, level:0.5}],
+    ['Crackle', {type:'dust', a:0.85, b:0.8, atk:0.1, dec:70, hpCut:5000, level:1}],
+  ].map(([n, l]) => [n, l, 0])],
+  ['Synth layers', [
+    ['Saw (filtered)', {mode:'ADSR', type:'saw', atk:1, dec:400, sus:0.6, rel:150, lpCut:1400, lpRes:0.3, lpEnv:0.35, fDec:220, level:0.7}],
+    ['Sub sine', {mode:'ADSR', type:'sine', tune:-24, atk:2, dec:500, sus:0.9, rel:150, level:0.8}],
+    ['Detuned saw', {mode:'ADSR', type:'saw', fine:12, atk:3, dec:500, sus:0.8, rel:300, lpCut:3000, level:0.5}],
+    ['Square', {mode:'ADSR', type:'square', atk:2, dec:300, sus:0.75, rel:180, lpCut:3200, lpRes:0.2, level:0.55}],
+    ['Pad saw (slow)', {mode:'ADSR', type:'saw', fine:-9, atk:450, dec:1200, sus:0.8, rel:1200, lpCut:1800, lpRes:0.15, level:0.55}],
+    ['FM bell', {mode:'ADSR', type:'fm2', a:rA(3.5), b:0.35, atk:0.5, dec:1500, sus:0.1, rel:900, level:0.5}],
+    ['FM keys', {mode:'ADSR', type:'fm2', a:rA(1), b:0.3, atk:1, dec:1200, sus:0.3, rel:400, level:0.7}],
+    ['Chord (minor 9)', {mode:'ADSR', type:'chord', a:cA('Minor 9'), b:0.3, atk:1, dec:600, sus:0.3, rel:300, lpCut:2200, level:0.7}],
+    ['Chord (major 7)', {mode:'ADSR', type:'chord', a:cA('Major 7'), b:0.2, atk:2, dec:900, sus:0.4, rel:500, lpCut:3000, level:0.65}],
+    ['Pluck string', {mode:'ADSR', type:'karplus', a:0.6, b:0.5, atk:0.5, dec:1500, sus:0.6, rel:400, level:0.8}],
+    ['Air noise', {mode:'ADSR', type:'pink', atk:300, dec:800, sus:0.5, rel:800, hpCut:2000, lpCut:9000, level:0.2}],
+  ].map(([n, l]) => [n, l, 24])],
+  ];
+}
+let fvpCache = null, flpCache = null;
+const fvp = () => fvpCache || (fvpCache = factoryVoicePresets());
+const flp = () => flpCache || (flpCache = factoryLayerPresets());
+function normPresets(j){
+  const o = {voices:[], layers:[]};
+  if (j && Array.isArray(j.voices)) for (const p of j.voices.slice(0, 500)) if (p && typeof p.name === 'string' && p.v && typeof p.v === 'object') o.voices.push({name:p.name.slice(0, 60), v:p.v});
+  if (j && Array.isArray(j.layers)) for (const p of j.layers.slice(0, 1000)) if (p && typeof p.name === 'string' && p.l && typeof p.l === 'object') o.layers.push({name:p.name.slice(0, 60), l:p.l, vt:+p.vt || 0});
+  return o;
+}
+const SP = () => S.presets || (S.presets = {voices:[], layers:[]});
+const uniqName = (list, n) => { let k = n, i = 2; while (list.some(p => p.name === k)) k = `${n} ${i++}`; return k; };
+// Fill a preset <select>: the song's own first, then the factory ones by group.
+function fillPresetSel(sel, mine, groups, lbl){
+  sel.replaceChildren(); const o0 = document.createElement('option'); o0.value = ''; o0.textContent = lbl; sel.append(o0);
+  const g0 = document.createElement('optgroup'); g0.label = 'This song (' + mine.length + ')';
+  mine.forEach((p, i) => { const o = document.createElement('option'); o.value = 'u' + i; o.textContent = p.name; g0.append(o); });
+  const sv = document.createElement('option'); sv.value = 'save'; sv.textContent = '＋ Save this as a preset…'; g0.append(sv);
+  if (mine.length){ const dl = document.createElement('option'); dl.value = 'del'; dl.textContent = '✕ Delete a song preset…'; g0.append(dl); }
+  sel.append(g0);
+  groups.forEach(([gn, list], gi) => { const g = document.createElement('optgroup'); g.label = gn;
+    list.forEach((it, i) => { const o = document.createElement('option'); o.value = 'f' + gi + ':' + i; o.textContent = it[0]; g.append(o); }); sel.append(g); });
+}
+function presetUI(){
+  const vs = $('vPre'), ls = $('lPre'); if (!vs || !ls) return;
+  fillPresetSel(vs, SP().voices, fvp(), 'Presets…');
+  fillPresetSel(ls, SP().layers, flp(), 'Layer presets…');
+}
+function pickDel(list, what){
+  const names = list.map((p, i) => `${i + 1}. ${p.name}`).join('\n');
+  const a = prompt(`Delete which ${what} preset? Type its number:\n\n${names}`); if (a == null) return -1;
+  const i = int(a, 0) - 1; return i >= 0 && i < list.length ? i : -1;
+}
+function applyVoicePreset(v){
+  const keepChoke = isSyn(cur) ? 0 : null;
+  kit.voices[cur] = v; if (keepChoke !== null) v.choke = v.choke || 0; afterVoiceSwap();
+  if (v.layers.some(L => L.sample && !L.sample.data)) resolveSamples();
+  try { play(cur); } catch(e){}
+}
+function onVoicePreset(val){
+  const mine = SP().voices;
+  if (val === 'save'){
+    const n = prompt('Name this preset (it is saved in the song)', V().name || 'Preset'); if (n == null) return;
+    mine.push({name:uniqName(mine, n.trim().slice(0, 60) || 'Preset'), v:voiceToJSON(V(), 'ref')}); saveS(); presetUI();
+    return toast('Saved preset “' + mine[mine.length - 1].name + '” in this song.');
+  }
+  if (val === 'del'){ const i = pickDel(mine, 'voice'); if (i < 0) return; const n = mine.splice(i, 1)[0].name; saveS(); presetUI(); return toast('Deleted preset “' + n + '”.'); }
+  if (val[0] === 'u'){ const p = mine[+val.slice(1)]; if (!p) return; const v = voiceFromJSON(JSON.parse(JSON.stringify(p.v))); v.name = p.name.slice(0, 24); applyVoicePreset(v); return toast('Preset: ' + p.name); }
+  if (val[0] === 'f'){ const [g, i] = val.slice(1).split(':').map(Number), it = fvp()[g] && fvp()[g][1][i]; if (!it) return; applyVoicePreset(it[1]()); return toast('Preset: ' + it[0]); }
+}
+// A layer lands on this pad at the pitch it was made for: shift by the difference between the pads' tunings.
+function applyLayerPreset(l, vt){
+  const v = V(), L = freshLayer(Object.assign({}, l, {on:true}));
+  if (v.engine && v.engine !== 'layers') return toast('Layer presets are for the Layers engine.');
+  L.tune = clamp((l.tune || 0) + (vt || 0) - (v.tune || 0), -48, 48);
+  if (!l.mode) L.mode = isSyn(cur) ? 'ADSR' : 'AHD';
+  if (l.sample) L.sample = smpFromJSON(l.sample);
+  v.layers[v.sel] = L; refreshLayer(); changed(); if (L.sample && !L.sample.data) resolveSamples(); try { play(cur); } catch(e){}
+}
+function onLayerPreset(val){
+  const mine = SP().layers;
+  if (val === 'save'){
+    const n = prompt('Name this layer preset (it is saved in the song)', (TYPE[Lc().type] || {name:'Layer'}).name); if (n == null) return;
+    mine.push({name:uniqName(mine, n.trim().slice(0, 60) || 'Layer'), l:layerToJSON(Lc(), 'ref'), vt:V().tune || 0}); saveS(); presetUI();
+    return toast('Saved layer preset “' + mine[mine.length - 1].name + '” in this song.');
+  }
+  if (val === 'del'){ const i = pickDel(mine, 'layer'); if (i < 0) return; const n = mine.splice(i, 1)[0].name; saveS(); presetUI(); return toast('Deleted layer preset “' + n + '”.'); }
+  if (val[0] === 'u'){ const p = mine[+val.slice(1)]; if (!p) return; applyLayerPreset(JSON.parse(JSON.stringify(p.l)), p.vt); return toast('Layer: ' + p.name); }
+  if (val[0] === 'f'){ const [g, i] = val.slice(1).split(':').map(Number), it = flp()[g] && flp()[g][1][i]; if (!it) return; applyLayerPreset(it[1], it[2]); return toast('Layer: ' + it[0]); }
+}
+// Exported presets carry their samples (looked up in the kit by id), so they work on another device.
+function smpById(id){ for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.id === id && L.sample.data) return L.sample; return null; }
+function fullSmp(l){ const s = l && l.sample; if (!s || !s.ref || s.b64) return l; const f = smpById(s.ref); return Object.assign({}, l, {sample:f ? smpToJSON(f) : null}); }
+async function exportPresets(){
+  const P = SP(); if (!P.voices.length && !P.layers.length) return toast('No song presets yet: pick “＋ Save this as a preset…” in a pad’s Presets list.');
+  const out = {app:'thunder-presets', v:1, voices:P.voices.map(p => ({name:p.name, v:Object.assign({}, p.v, {layers:(p.v.layers || []).map(fullSmp)})})), layers:P.layers.map(p => ({name:p.name, vt:p.vt, l:fullSmp(p.l)}))};
+  await deliver(`${safe(S.name || 'Song')} presets.json`, new Blob([JSON.stringify(out)], {type:'application/json'}));
+}
+async function importPresetsFile(f){
+  try {
+    const j = JSON.parse(await f.text()); if (!j || j.app !== 'thunder-presets') throw new Error('That isn’t a ...Thunder presets file.');
+    const n = normPresets(j), P = SP(); let a = 0, b = 0;
+    // Imported presets keep their samples inside them (this device has no copy of those yet).
+    for (const p of n.voices){ p.v = voiceToJSON(voiceFromJSON(p.v)); p.name = uniqName(P.voices, p.name); P.voices.push(p); a++; }
+    for (const p of n.layers){ p.l = layerToJSON(layerFromJSON(p.l)); p.name = uniqName(P.layers, p.name); P.layers.push(p); b++; }
+    saveS(); presetUI(); toast(`Imported ${a} pad preset${a === 1 ? '' : 's'} and ${b} layer preset${b === 1 ? '' : 's'} into this song.`);
+  } catch(e){ toast((e && e.message) || 'Couldn’t read that presets file.'); }
+}
+(function presetInit(){
+  const vs = $('vPre'), ls = $('lPre');
+  for (const [s, f] of [[vs, onVoicePreset], [ls, onLayerPreset]]){
+    s.addEventListener('pointerdown', presetUI); s.addEventListener('focus', presetUI);
+    s.addEventListener('change', () => { const v = s.value; s.value = ''; if (v) f(v); });
+  }
+  setTimeout(presetUI, 0);   // the song (S) is set up further down this script
+  $('presetIn').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) importPresetsFile(f); });
+})();
 // Shows the bass card, the voice card or the layer cards for the pad on screen.
 function bassUI(){
   const v = V(), on = isBassV(v), vx = isVoxV(v), bl = isBlipV(v);
@@ -4576,6 +4961,7 @@ async function resolveSamples(){
 // Drops stored samples the kit no longer uses (only from this app's own store).
 function smpTidy(){
   const used = new Set(); for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.id) used.add(L.sample.id);
+  try { const P = S.presets || {}; for (const p of P.voices || []) for (const l of (p.v && p.v.layers) || []) if (l.sample && l.sample.ref) used.add(l.sample.ref); for (const p of P.layers || []) if (p.l && p.l.sample && p.l.sample.ref) used.add(p.l.sample.ref); } catch(e){}
   smpDb().then(db => { const tx = db.transaction('smp', 'readwrite'), st = tx.objectStore('smp'), q = st.getAllKeys();
     q.onsuccess = () => { for (const k of q.result) if (!used.has(k)){ st.delete(k); smpStored.delete(k); } }; }).catch(() => {});
 }
@@ -4762,6 +5148,7 @@ function fileItems(){
     ...(canShare && lastR ? [['Share last render…', shareLast]] : []),
     null,
     ['Save kit…', () => $('bSaveKit').click()], ['Load kit…', () => $('kitIn').click()],
+    ['Export song presets…', exportPresets], ['Import presets…', () => $('presetIn').click()],
     ['Factory kit', () => setKit(factoryKit()), null, null, true], ['Clear all kit slots', clearKit, null, null, true],
     null,
     ['Export this pad (WAV)', () => $('bExPad').click()], ['Export all 8 pads (.zip)', () => $('bExKit').click()],
@@ -5736,9 +6123,13 @@ function freshSong(){
     song:Array.from({length:256}, () => new Array(NT).fill(-1)), chains:new Array(256).fill(null), phrases:new Array(256).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
     tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:4, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
-    ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0), mst:freshMst()};   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
+    ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0), mst:freshMst(), presets:{voices:[], layers:[]}};   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
 }
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;
+// The saved song is read at start-up, before nslots (a const further down) exists. Calling it there threw, and the
+// catch around the start-up load then replaced the saved song with the demo on every reload. Until it exists,
+// allow every pad an instrument can point at (32).
+function nslotsEarly(){ try { return nslots(); } catch(e){ return 32; } }
 function normSong(j){
   const S = freshSong(); if (!j || typeof j !== 'object') return S;
   if (typeof j.name === 'string') S.name = j.name.slice(0, 40);
@@ -5779,7 +6170,7 @@ function normSong(j){
   // (only the ones still on that old default) at the synth slots 08–0F they're numbered for.
   const old8 = !(int(j.v, 1) >= 4);
   if (Array.isArray(j.insts)) j.insts.slice(0, NI).forEach((o, i) => { if (o && typeof o === 'object'){ const I = S.insts[i];
-    I.pad = clamp(int(o.pad, I.pad), 0, nslots() - 1); if (old8 && i >= NPAD && I.pad === i - NPAD) I.pad = i; I.tsp = clamp(int(o.tsp, 0), -48, 48); I.vol = clamp(int(o.vol, 255), 0, 255);
+    I.pad = clamp(int(o.pad, I.pad), 0, nslotsEarly() - 1); if (old8 && i >= NPAD && I.pad === i - NPAD) I.pad = i; I.tsp = clamp(int(o.tsp, 0), -48, 48); I.vol = clamp(int(o.vol, 255), 0, 255);
     I.pan = clamp(int(o.pan, 128), 0, 255); I.rev = o.rev ? 1 : 0; I.ofs = clamp(int(o.ofs, 0), 0, 255);
     I.slc = clamp(int(o.slc, 0), 0, 64); I.smode = o.smode ? 1 : 0; I.sync = clamp(int(o.sync, 0), 0, 3); I.beats = clamp(int(o.beats, 4), 1, 64); I.grain = clamp(int(o.grain, 1), 0, 4); } });
   if (Array.isArray(j.mix)) j.mix.slice(0, NT).forEach((o, i) => { if (o && typeof o === 'object'){ const m = S.mix[i];
@@ -5794,6 +6185,7 @@ function normSong(j){
   S.ntr = clamp(int(j.ntr, 16), 8, 24);
   // Microtuning: cents per pitch class, clamped to ±100 (a semitone).
   S.tune = Array.from({length:12}, (_, k) => clamp(Number.isFinite(+((j.tune || [])[k])) ? +j.tune[k] : 0, -100, 100));
+  S.presets = normPresets(j.presets);
   // A voice per track is a synth-page setting, not a song setting — but if the saved kit needs track pads,
   // leave the checkbox on so the kit's voices stay visible.
   try { if (localStorage.getItem(VTRK) !== '1' && j.voices && j.voices.length > 16) { vtrk = true; localStorage.setItem(VTRK, '1'); } } catch(e){}
