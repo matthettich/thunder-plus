@@ -629,6 +629,52 @@ const PitchFol = {
   }
 };
 
+/* Pitch Track (monophonic, original code): a YIN pitch detector on a 4× decimated copy of the input, run about 90
+   times a second. Outputs the pitch as CV (0.5 = A4, one octave = 0.125, like Pitch Follow), the same rounded to the
+   nearest semitone (Note), a voiced Gate, a Trig on every new note, and the input's level (Env). Transpose shifts
+   both pitch outputs; Sensitivity is how sure it has to be (higher hears more, and more wrong notes). */
+const PitchTrk = {
+  type:'pitchtrk', scope:'mono', cost:.3,
+  inputs:{ in:'audio' }, outputs:{ out:'cv', note:'cv', gate:'gate', trig:'gate', env:'cv' },
+  params:{ sens:[.15,.03,.5,.01], thr:[.02,0,1,.001], glide:[.03,0,.5,.001], trans:[0,-24,24,1], min:[60,30,500,1], max:[1200,100,3000,1], depth:[1,0,1,.01] },
+  create:() => ({ buf:new Float32Array(1024), w:0, n:0, dec:0, acc:0, lp1:0, lp2:0, k:0, f:0, ph:.5, ver:0, note:-1, cand:-1, candN:0, trig:0, env:0, d:new Float32Array(400) }),
+  process(st, io, ctx){
+    const x = io.in.in, sr = ctx.sr, B = ctx.block, P = io.p, N = st.buf.length; let pk = 0;
+    // 4× decimation behind a two-pole low-pass at ~1/5 of the new rate
+    const c = 1 - Math.exp(-2 * Math.PI * (sr / 20) / sr);
+    for (let i = 0; i < B; i++){ const v = x[i]; st.lp1 += (v - st.lp1) * c; st.lp2 += (st.lp1 - st.lp2) * c;
+      if (++st.dec >= 4){ st.dec = 0; st.buf[st.w] = st.lp2; st.w = (st.w + 1) % N; if (st.n < N) st.n++; }
+      const a = v < 0 ? -v : v; if (a > pk) pk = a; }
+    st.env += (pk - st.env) * (pk > st.env ? .5 : .05);
+    if (++st.k >= 4 && st.n >= N){ st.k = 0;
+      const rs = sr / 4, W = 320, tMin = Math.max(2, Math.floor(rs / Math.max(P.max, P.min + 1))), tMax = Math.min(st.d.length - 2, Math.ceil(rs / Math.max(20, P.min)));
+      const o = (st.w - W - tMax - 1 + N * 2) % N, b = st.buf, d = st.d; let run = 0, best = -1;
+      d[0] = 1;
+      for (let t = 1; t <= tMax; t++){
+        let s = 0; for (let j = 0; j < W; j++){ const q = b[(o + j) % N] - b[(o + j + t) % N]; s += q * q; }
+        run += s; d[t] = run > 0 ? s * t / run : 1;
+        if (best < 0 && t > tMin && d[t - 1] < P.sens && d[t] >= d[t - 1]){ best = t - 1; break; }
+      }
+      let f = 0;
+      if (best > tMin){ const a = d[best - 1], m = d[best], z = d[best + 1] != null ? d[best + 1] : m, den = a - 2 * m + z;
+        const tt = best + (den > 1e-9 ? (a - z) / (2 * den) : 0); f = rs / tt; }
+      const voiced = st.env > P.thr && f >= P.min && f <= P.max;
+      if (voiced){ st.f = f;
+        const nn = Math.round(69 + 12 * Math.log2(f / 440));
+        if (nn === st.cand) st.candN++; else { st.cand = nn; st.candN = 1; }
+        if (st.candN >= 2 && nn !== st.note){ st.note = nn; st.trig = Math.ceil(.005 * sr / B) + 1; } }
+      else if (st.ver){ st.note = -1; st.cand = -1; }
+      st.ver = voiced ? 1 : 0;
+    }
+    const g = 1 - Math.exp(-B / (sr * Math.max(P.glide, 1e-4))), tr = P.trans / 96;
+    const target = st.ver && st.f > 0 ? Math.max(0, Math.min(1, 0.5 + Math.log2(st.f / 440) / 8 + tr)) : st.ph;
+    st.ph = Math.max(0, Math.min(1, st.ph + (target - st.ph) * g));
+    const nv = st.note >= 0 ? Math.max(0, Math.min(1, 0.5 + (st.note - 69) / 96 + tr)) : st.ph;
+    io.out.out.fill(st.ph * P.depth); io.out.note.fill(nv * P.depth); io.out.gate.fill(st.ver);
+    io.out.trig.fill(st.trig > 0 ? 1 : 0); if (st.trig > 0) st.trig--; io.out.env.fill(Math.min(1, st.env * 1.5));
+  }
+};
+
 /* Slew / lag: smooths a CV with separate rise and fall times. */
 const Slew = {
   type:'slew', scope:'mono', cost:.03,
@@ -1506,7 +1552,7 @@ const Degrade = {
 const SHARED_MODULES = { beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
-  envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
+  envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
   meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson };
 /* ===SHARED MODULES END=== */
@@ -1519,7 +1565,7 @@ const MODULES = { ...SHARED_MODULES, trackIn:TrackIn,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   scin:SidechainIn, sccomp:SidechainComp,
   lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter, steps:Steps, clock:Clock, repeat:Repeat,
-  envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant,
+  envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant,
   blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong, resample:Resample, chainOut:ChainOut };
 
 /* A cable into "p:name" modulates that parameter instead of feeding an input. */

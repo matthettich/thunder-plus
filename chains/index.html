@@ -437,6 +437,9 @@ const SHARED_MODULES = {
   pitchfol:{ label:'Pitch Follow', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
     params:{ thr:[.02,0,1,.001], glide:[.05,0,.5,.001], depth:[1,0,1,.01], min:[60,40,500,1], max:[1400,100,4000,1] },
     ui:{ thr:{l:'Threshold', f:pct}, glide:{l:'Glide', f:secs}, depth:{l:'Depth', f:pct}, min:{l:'Min', f:hz}, max:{l:'Max', f:hz} } },
+  pitchtrk:{ label:'Pitch Track', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'cv', note:'cv', gate:'gate', trig:'gate', env:'cv' },
+    params:{ sens:[.15,.03,.5,.01], thr:[.02,0,1,.001], glide:[.03,0,.5,.001], trans:[0,-24,24,1], min:[60,30,500,1], max:[1200,100,3000,1], depth:[1,0,1,.01] },
+    ui:{ sens:{l:'Sensitivity', f:pct}, thr:{l:'Threshold', f:pct}, glide:{l:'Glide', f:secs}, trans:{l:'Transpose', f:v => (v > 0 ? '+' : '') + Math.round(v) + ' st'}, min:{l:'Lowest', f:hz}, max:{l:'Highest', f:hz}, depth:{l:'Depth', f:pct} } },
   slew:{ label:'Slew limiter', scope:'mono', inputs:{ in:'cv' }, outputs:{ out:'cv' },
     params:{ up:[.05,0,1,.001], dn:[.05,0,1,.001] }, ui:{ up:{l:'Rise', f:secs}, dn:{l:'Fall', f:secs} } },
   snh:{ label:'Sample & Hold', scope:'mono', inputs:{ in:'cv', trig:'gate' }, outputs:{ out:'cv', noise:'cv' },
@@ -489,6 +492,7 @@ const SHARED_ABOUT = {
   room:'Room reverb (based on Airwindows Verbity2): a natural room or hall; Mulch darkens and thickens it.',
   envfol:'Turns sound into modulation: the louder the input, the higher the output. Attack and Release set how quickly it follows; Gate level sets where its gate output turns on. Patch the output into any slider’s modulation jack (a filter’s cutoff, say) and the sound drives it.',
   gateex:'Turns sound into a gate: on while the input stays above Threshold, off when it falls (Hysteresis stops it chattering). Env is a smoothed version. Use it to trigger envelopes, clocks or Sample & Hold from audio.',
+  pitchtrk:'Tracks the pitch of a monophonic sound (a voice, a bass line, a whistle) more steadily than Pitch Follow, and gives it as Pitch (glides) and Note (snapped to the nearest semitone), both 0.5 = A4 and one octave = 0.125, plus Gate while it hears a pitch, Trig on each new note and Env, the level. Patch Note into an oscillator\u2019s pitch to double a voice, Trig into an envelope, or Pitch into a filter so it follows the singer. Transpose shifts both.',
   pitchfol:'Follows the pitch of a monophonic sound and outputs it as modulation (0.5 = A4, one octave = 0.125), plus a voiced Gate. Best on simple tones. Patch it into an oscillator’s pitch on …waves, or into a Quantizer here.',
   slew:'Slows a modulation signal down, with separate Rise and Fall times. Smooths stepped or jittery control voltages.',
   snh:'Sample & Hold: takes a snapshot of the input on a Trigger rising edge (or at Rate) and holds it; Noise outputs a matching random step. Patch a stepped sequence into a filter for classic sample-and-hold sweeps.',
@@ -555,8 +559,8 @@ Object.assign(SHARED_MODULES, {
 });
 Object.assign(SHARED_FAMILY, { meter:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', ensemble:'afx',
   reson:'afx', degrade:'afx', blipdrum:'gen', life:'mod', dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
-  envfol:'mod', gateex:'mod', pitchfol:'mod', slew:'util', snh:'util', quant:'util' });
-const SHARED_PORT_LABEL = { car:'Carrier', freq:'Freq', a:'A', b:'B', sum:'A+B', diff:'A−B', mul:'A×B', min:'Min', max:'Max',
+  envfol:'mod', gateex:'mod', pitchfol:'mod', pitchtrk:'mod', slew:'util', snh:'util', quant:'util' });
+const SHARED_PORT_LABEL = { note:'Note', trig:'Trig', env:'Env', car:'Carrier', freq:'Freq', a:'A', b:'B', sum:'A+B', diff:'A−B', mul:'A×B', min:'Min', max:'Max',
   and:'AND', or:'OR', xor:'XOR', not:'NOT A', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent', time:'Time' };
 /* Palette groups: added to an existing group of the same name, or made (audio groups before Control, the rest at the end).
    A module already in the palette is left where it is. */
@@ -567,7 +571,7 @@ const SHARED_PALETTE = [
   ['Filters and amps', [['blades','Blades filter']], 'audio'],
   ['Utilities', [['meter','Meter (VU)'],['limiter','Limiter'],['utility','Utility (gain, pan)']], 'audio'],
   ['Stereo', [['width','Width']], 'audio'],
-  ['Audio followers', [['envfol','Envelope Follow'],['gateex','Gate Extract'],['pitchfol','Pitch Follow']], 'control'],
+  ['Audio followers', [['envfol','Envelope Follow'],['gateex','Gate Extract'],['pitchfol','Pitch Follow'],['pitchtrk','Pitch Track']], 'control'],
   ['CV utilities', [['slew','Slew limiter'],['snh','Sample & Hold'],['quant','Quantizer'],['math','Math']], 'control'],
   ['Rhythm and logic', [['euclid','Euclidean'],['divider','Clock divider'],['logic','Logic']], 'control']
 ];
@@ -1066,7 +1070,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=15';
+    const url = opts.url || './chains-worklet.js?v=16';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -1943,7 +1947,7 @@ const PALETTE = [
   ['§Control', []],
   ['Modulation sources', [['lfo','LFO'],['adsr','ADSR'],['random','Random'],['atten','Attenuverter'],['steps','Steps'],['clock','Clock']]],
   ['§Audio → CV', []],
-  ['Audio followers', [['envfol','Envelope Follow'],['gateex','Gate Extract'],['pitchfol','Pitch Follow']]],
+  ['Audio followers', [['envfol','Envelope Follow'],['gateex','Gate Extract'],['pitchfol','Pitch Follow'],['pitchtrk','Pitch Track']]],
   ['CV utilities', [['slew','Slew limiter'],['snh','Sample & Hold'],['quant','Quantizer']]]
 ];
 const GROUP_FAM = { 'Track I/O':'aout', 'Filters and amps':'util', 'Effects':'afx', 'More effects':'afx', 'Modulation sources':'mod',
