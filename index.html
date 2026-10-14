@@ -230,6 +230,14 @@ body:not(.mob) .wvMobNote{display:none}
 .layercard{border:3.5px solid var(--fam); background:var(--panel)}
 /* bass engine card (Synth → Engine: Bass) */
 .basscard{--fam:var(--smp)}
+/* voice engine card (Synth → Engine: Voice) */
+.voxtxt{display:grid; gap:6px; padding:10px 12px; border-bottom:2px solid var(--fam); background:var(--panel)}
+.voxtxt label{font-size:var(--fs-3); color:var(--muted)}
+.voxtxt textarea{width:100%; box-sizing:border-box; min-height:64px; resize:vertical; font:inherit; font-size:var(--fs-4); padding:8px; border:1px solid var(--line); background:var(--panel-2, var(--panel)); color:var(--ink)}
+.voxsyl{display:flex; flex-wrap:wrap; gap:4px; font:var(--fs-2)/1.3 var(--mono, monospace); color:var(--muted); max-height:96px; overflow:auto}
+.voxsyl span{border:1px solid var(--line); padding:1px 5px; white-space:nowrap}
+.voxsyl span b{color:var(--ink); font-weight:600; margin-right:4px}
+.voxsyl span.w{margin-left:6px}
 .vengine{display:flex; align-items:center; gap:10px; padding:2px 0 4px; flex-wrap:wrap}
 .vengine .vel{font-size:var(--fs-3); color:var(--muted); min-width:64px}
 .vengine .lbl{font-size:var(--fs-3); color:var(--muted)}
@@ -1172,6 +1180,27 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div class="secs" id="bassSecs"></div>
   </section>
   </div>
+  <div class="cardwrap" id="voxWrap" hidden>
+  <section class="layercard basscard" id="voxCard" aria-label="Voice engine">
+    <header>
+      <span class="ttl">Voice</span>
+      <select id="voxPre" aria-label="Voice preset"></select>
+      <span class="famtag">formant voice · mono · a syllable per note</span>
+      <div class="sp"></div>
+      <div class="acts">
+        <button class="sm" id="voxSay" type="button">Say it</button>
+        <button class="sm" id="voxInit" type="button">Init</button>
+      </div>
+    </header>
+    <div class="voxtxt">
+      <label for="voxTxt">Lyrics</label>
+      <textarea id="voxTxt" rows="3" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Type what it sings…"></textarea>
+      <div class="voxsyl" id="voxSyl" aria-live="polite"></div>
+      <p class="note">Each note in the tracker sings the next syllable, and PLAY starts the lyrics again. A slide keeps the syllable it's on, for runs. Split a word yourself with a hyphen (to-night), or spell sounds out in brackets: [HH EH L OW]. The pad sings the whole line.</p>
+    </div>
+    <div class="secs" id="voxSecs"></div>
+  </section>
+  </div>
 
   <section class="band" id="layersBand">
     <div class="bar" style="margin-bottom:8px"><span class="ttl">Layers</span><span class="lbl">tap to edit, tick to turn on</span></div>
@@ -1459,6 +1488,8 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p><b>PLAY in Song</b> starts from the block under the cursor, or from the top when the cell under the cursor is empty.</p>
 <p><b>Arrange</b> (wide screens): the overview at the right shows the whole song, lined up with the Song screen (scroll either one and the other follows). <b>A tap on a block goes to it</b> (a second tap opens its phrase). <b>Holding a block mutes or unmutes just that one</b> — the phrase stays in place, silent, so you can drop parts in and out while arranging. Tap a row number to play from there; in KEYS mode M mutes the block under the Song cursor. Whole tracks are muted in the Mixer, never here, so a slip can’t silence a track.</p>
 <p>The screens are laid out as a map: Song ▶ Sect ▶ Phrase ▶ Inst left to right, Project above, Mixer below, FX to the right of the Mixer. You move between them with the screen keys below, the tabs, or the map in the side panel.</p>
+<h3>Voice engine</h3>
+<p><b>Synth → Engine: Voice</b> turns a synth slot (9–16) into a singing robot. Type the <b>lyrics</b>: each note the tracker plays sings the next syllable (its consonants on the attack, the vowel held until the note ends), and PLAY starts the lyrics again from the top. A <b>slide</b> keeps the syllable it's on, for runs over one vowel. The chips under the lyrics show every syllable as the engine will say it. If a word comes out wrong, split it with a hyphen (<i>to-night</i>) or spell it in brackets with ARPAbet sounds: <i>[HH EH L OW]</i> (AA AE AH AO AW AY EH ER EY IH IY OW OY UH UW AX; B CH D DH F G HH JH K L M N NG P R S SH T TH V W Y Z ZH). <b>Robot</b> goes from a natural voice to a buzzy one, <b>Size</b> changes the voice's size (bigger is deeper), <b>Voice</b> at 0 whispers, <b>Diction</b> speeds the consonants up or slows them down. The pad (and exports) sing the whole line, one syllable every <b>Pad step</b>. One voice per track (mono).</p>
 <h3>Bass engine</h3>
 <p>Any synth slot (08 and up) can be a <b>bass</b> instead of layers: on the Synth page pick <b>Engine: Bass</b>. It is an additive mono bass in the spirit of Reaktor's Lazerbass, for dubstep and drum &amp; bass: up to 64 partials (Shape goes saw › square › triangle; Bright, Odd / even, Stretch), a sub oscillator, a resonant low-pass with its own envelope, vowel formants, a comb, Reese detune and stereo Width. The <b>Wobble</b> moves the cutoff, vowel, comb and level at a rate locked to the song's tempo (4 bars down to 1/32, triplets and dotted). In the tracker it plays live, so the wobble keeps time on every note however high you play, a held note wobbles for as long as it's held, and Glide and Legato slide between notes (PSL slides without restarting). The <b>WOB</b> command changes the rate from a row on (WOB 06 = 1/4, WOB 0B = 1/16, WOB 00 back to the voice's own). Presets get you started; the bottom panel's instrument section shows its level, cutoff, resonance and wobble. The voice's Level, Tune and Drive apply; pad effects don't (use the track's FX).</p>
 <h3>Mastering</h3>
@@ -1484,7 +1515,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p>Each track and the master have 4 effect slots (FX screen, or the Mixer’s FX row): 34 effects in all: EQ, compressor, three reverbs, tape delay, dub tape, saturation, drive, tube, tape, vinyl, lo-fi, bitcrush, chorus, flanger, phaser, tremolo, trance gate, auto-wah, ladder filter, comb resonator, wavefolder, overdrive, pitch and frequency shifters, cross-mod, transient shaper, multiband squash, speaker cab, air, and Rings, Clouds and Beads. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to four, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
 <p><b>…chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback. Its <b>Resample</b> module records what passes through it into a pad, starting on the next bar, and slices it so you can chop it like a breakbeat.</p></section>
-    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine (see Bass engine on the Start tab). In <b>⚙ Settings</b>, <b>Kit</b> saves and loads kits, <b>Export</b> writes WAVs for Koala and SunVox, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and <b>Skin</b> changes the look (Pastel, Minimal, Neon, Matrix and the Simple colour pairs).</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
+    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics (see Bass engine and Voice engine on the Start tab). In <b>⚙ Settings</b>, <b>Kit</b> saves and loads kits, <b>Export</b> writes WAVs for Koala and SunVox, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and <b>Skin</b> changes the look (Pastel, Minimal, Neon, Matrix and the Simple colour pairs).</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -2239,6 +2270,7 @@ function voiceAmp(V, sr, out, N){
 }
 function renderVoice(V, sr, stages, hold){
   if (isBassV(V)) return renderBass(V, sr, hold);
+  if (isVoxV(V)) return renderVox(V, sr);
   if (hold) V = Object.assign({}, V, {gate:hold * 1000, len:hold});
   // The voice-wide filter is open by default and the voice-wide amp is off, so a default voice renders
   // exactly as its layers alone would; turning either on only adds shaping across all the layers.
@@ -2561,6 +2593,368 @@ function renderBass(V, sr, hold){
   c.on(false); c.render(L, R, 0, hN, 1); c.off(); c.render(L, R, hN, N, 1);
   const out = new Float32Array(N); for (let i = 0; i < N; i++) out[i] = (L[i] + R[i]) * 0.5;
   let end = N; while (end > 1 && Math.abs(out[end - 1]) < 1e-4) end--;
+  const res = out.slice(0, Math.max(end, 1)), fl = Math.min(res.length, Math.round(sr * 0.002));
+  for (let i = 0; i < fl; i++) res[res.length - 1 - i] *= i / fl;
+  return res;
+}
+/* ---------- voice engine (VoxCore) ----------
+   A singing robot: lyrics → phonemes (letter-to-sound rules after the public-domain 1976 US Naval Research Lab
+   rules, a small dictionary of common words, and [ARPAbet] spelled out in brackets) → syllables → a formant voice
+   (a glottal pulse or a robot buzz through five resonators, with noise for the consonants), written from the
+   published Klatt-style design. Self-contained like BassCore: the tracker's AudioWorklet is built from
+   VoxCore.toString(). Each note sings the next syllable: its consonants on the attack, the vowel held until
+   note-off, then the closing consonants. */
+class VoxCore {
+  constructor(sr){
+    this.sr = sr; this.BLK = 16;
+    // the glottal pulse's derivative over one period (open phase 60%), as a table
+    const T = new Float32Array(2049), oq = 0.6;
+    for (let i = 0; i <= 2048; i++){ const x = i / 2048; T[i] = x < oq ? (2 * x / oq - 3 * (x / oq) * (x / oq)) : 0; }
+    let m = 0; for (let i = 0; i <= 2048; i++) m += T[i]; m /= 2049; let pk = 0; for (let i = 0; i <= 2048; i++){ T[i] -= m; pk = Math.max(pk, Math.abs(T[i])); }
+    for (let i = 0; i <= 2048; i++) T[i] /= pk; this.glot = T;
+    this.syl = []; this.txt = null;
+    this.segs = []; this.si = 0; this.st = 0; this.hold = false; this.coda = false; this.cur = null;
+    this.env = 0; this.envT = 0; this.ph = 0; this.lf = 0; this.go = true; this.vt = 0; this.rate = 1; this.sylN = 0;
+    this.k = { f1:500, f2:1500, f3:2500, av:0, an:0, ah:0, nf:4000, nb:3000 };   // smoothed controls
+    this.tg = Object.assign({}, this.k);                                            // their targets
+    this.r = new Float64Array(16); this.fz = new Float64Array(4); this.lp = 0; this.dc = 0; this.dcx = 0;
+    this.rnd = 12345; this.vph = 0;
+    this.p = null; this.set({});
+  }
+  static defaults(){
+    return {txt:'hello world, I am a robot', oct:0, form:0, robot:0.6, breath:0.12, bright:0.55, vib:0.25, vibRate:5.5, vibDelay:250,
+      glide:40, atk:12, rel:140, cons:1, bw:0.5, voice:1, sylLen:320, drive:0, level:0, tune:0};
+  }
+  set(o){
+    const p = Object.assign(VoxCore.defaults(), this.p || {}, o || {});
+    if (typeof p.txt !== 'string') p.txt = '';
+    this.p = p;
+    if (p.txt !== this.txt){ this.txt = p.txt; this.syl = VoxCore.parse(p.txt); }
+  }
+  /* ---- text → syllables ---- */
+  static parse(txt){
+    const out = [], P = VoxCore.PH, D = VoxCore.dict();
+    const toks = String(txt || '').toLowerCase().match(/\[[^\]]*\]|[a-z']+(?:-[a-z']+)*/g) || [];
+    let wi = 0;
+    for (const tk of toks){
+      let ph = [];
+      if (tk[0] === '['){ ph = tk.slice(1, -1).toUpperCase().split(/[\s,]+/).map(x => x.replace(/[0-9]/g, '')).filter(x => P[x] || x === '-'); }
+      else for (const part of tk.split('-')){ if (ph.length) ph.push('-'); const w = part.replace(/^'+|'+$/g, ''); if (w) ph.push(...(D[w] || VoxCore.rules(w))); }
+      // '-' is a forced syllable break (hel-lo, or [HH EH - L OW])
+      const groups = [[]]; for (const x of ph){ if (x === '-') groups.push([]); else groups[groups.length - 1].push(x); }
+      for (const g of groups){ if (!g.length) continue; for (const s of VoxCore.syllabify(g)) out.push(Object.assign(s, {w:wi, word:tk})); }
+      wi++;
+    }
+    return out;
+  }
+  static isV(x){ const p = VoxCore.PH[x]; return !!p && p.t === 'V'; }
+  static syllabify(ph){
+    const V = [], syl = []; ph.forEach((x, i) => { if (VoxCore.isV(x)) V.push(i); });
+    if (!V.length){   // no vowel (hmm, shh): the most sonorous sound is the nucleus
+      const rank = x => ({N:3, L:3, Z:2, F:1}[(VoxCore.PH[x] || {}).t] || 0); let bi = 0; ph.forEach((x, i) => { if (rank(x) > rank(ph[bi])) bi = i; });
+      return [{on:ph.slice(0, bi), nu:ph[bi], co:ph.slice(bi + 1)}];
+    }
+    let start = 0;
+    for (let k = 0; k < V.length; k++){
+      const v = V[k], next = V[k + 1];
+      let end;
+      if (next == null) end = ph.length;
+      else { const cs = next - v - 1; end = v + 1 + (cs <= 1 ? 0 : 1); if (cs >= 1 && ph[v + 1] === 'NG') end = Math.max(end, v + 2); }   // one consonant goes to the next syllable; of more, the first stays (NG never starts one)
+      syl.push({on:ph.slice(start, v), nu:ph[v], co:ph.slice(v + 1, end)}); start = end;
+    }
+    return syl;
+  }
+  /* letter-to-sound: rules are "left|MATCH|right|PHONEMES", tried in order. Contexts: # vowels, : any consonants,
+     ^ a consonant, . a voiced consonant, + E I Y, % a suffix (ER E ES ED ING ELY), & a sibilant, @ T S R D L Z N J
+     TH CH SH, _ the word's edge. */
+  static rules(word){
+    const R = VoxCore._rules || (VoxCore._rules = VoxCore.buildRules()), w = ' ' + word.toUpperCase() + ' ', out = [];
+    let i = 1;
+    while (i < w.length - 1){
+      const c = w[i], list = R[c];
+      if (!list){ i++; continue; }
+      let hit = false;
+      for (const r of list){
+        if (w.substr(i, r.m.length) !== r.m) continue;
+        if (!VoxCore.ctxL(w, i - 1, r.l) || !VoxCore.ctxR(w, i + r.m.length, r.r)) continue;
+        out.push(...r.p); i += r.m.length; hit = true; break;
+      }
+      if (!hit) i++;
+    }
+    return out.map(x => x === 'WH' ? 'W' : x);
+  }
+  static cls(ch, set){ return set.indexOf(ch) >= 0; }
+  static ctxL(w, j, pat){   // pattern matched right to left, ending at w[j]
+    const VOW = 'AEIOU', CON = 'BCDFGHJKLMNPQRSTVWXYZ';
+    for (let k = pat.length - 1; k >= 0; k--){
+      const s = pat[k];
+      if (s === '#'){ if (j < 0 || !VoxCore.cls(w[j], VOW)) return false; while (j >= 0 && VoxCore.cls(w[j], VOW)) j--; }
+      else if (s === ':'){ while (j >= 0 && VoxCore.cls(w[j], CON)) j--; }
+      else if (s === '^'){ if (j < 0 || !VoxCore.cls(w[j], CON)) return false; j--; }
+      else if (s === '.'){ if (j < 0 || !VoxCore.cls(w[j], 'BDVGJLMNRWZ')) return false; j--; }
+      else if (s === '+'){ if (j < 0 || !VoxCore.cls(w[j], 'EIY')) return false; j--; }
+      else if (s === '&'){ if (j >= 1 && (w.substr(j - 1, 2) === 'CH' || w.substr(j - 1, 2) === 'SH')) j -= 2; else if (j >= 0 && VoxCore.cls(w[j], 'SCGZXJ')) j--; else return false; }
+      else if (s === '@'){ if (j >= 1 && (w.substr(j - 1, 2) === 'TH' || w.substr(j - 1, 2) === 'CH' || w.substr(j - 1, 2) === 'SH')) j -= 2; else if (j >= 0 && VoxCore.cls(w[j], 'TSRDLZNJ')) j--; else return false; }
+      else if (s === '_'){ if (j >= 0 && w[j] !== ' ') return false; j--; }
+      else { if (j < 0 || w[j] !== s) return false; j--; }
+    }
+    return true;
+  }
+  static ctxR(w, j, pat){   // pattern matched left to right from w[j]
+    const VOW = 'AEIOU', CON = 'BCDFGHJKLMNPQRSTVWXYZ', n = w.length;
+    for (let k = 0; k < pat.length; k++){
+      const s = pat[k];
+      if (s === '#'){ if (j >= n || !VoxCore.cls(w[j], VOW)) return false; while (j < n && VoxCore.cls(w[j], VOW)) j++; }
+      else if (s === ':'){ while (j < n && VoxCore.cls(w[j], CON)) j++; }
+      else if (s === '^'){ if (j >= n || !VoxCore.cls(w[j], CON)) return false; j++; }
+      else if (s === '.'){ if (j >= n || !VoxCore.cls(w[j], 'BDVGJLMNRWZ')) return false; j++; }
+      else if (s === '+'){ if (j >= n || !VoxCore.cls(w[j], 'EIY')) return false; j++; }
+      else if (s === '%'){
+        const suf = ['ING', 'ELY', 'ER', 'ES', 'ED', 'E'].find(x => w.substr(j, x.length) === x && (w[j + x.length] === ' ' || x === 'ER' || x === 'ING' || x === 'ELY'));
+        if (!suf) return false; j += suf.length;
+      }
+      else if (s === '&'){ if (w.substr(j, 2) === 'CH' || w.substr(j, 2) === 'SH') j += 2; else if (j < n && VoxCore.cls(w[j], 'SCGZXJ')) j++; else return false; }
+      else if (s === '@'){ if (['TH', 'CH', 'SH'].includes(w.substr(j, 2))) j += 2; else if (j < n && VoxCore.cls(w[j], 'TSRDLZNJ')) j++; else return false; }
+      else if (s === '_'){ if (j < n && w[j] !== ' ') return false; j++; }
+      else { if (j >= n || w[j] !== s) return false; j++; }
+    }
+    return true;
+  }
+  static buildRules(){
+    const src = `
+A: |ATION||EY SH AX N; _|A|_|AX; _|ARE|_|AA R; _|AR|O|AX R; |AR|#|EH R; ^|AS|#|EY S; |A|WA|AX; |AW||AO; _:|ANY||EH N IY; |A|^+#|EY;
+ #:|ALLY||AX L IY; _|AL|#|AX L; |AGAIN||AX G EH N; #:|AG|E|IH JH; |A|^+:#|AE; _:|A|^+_|EY; |A|^%|EY; _|ARR||AX R; |ARR||AE R;
+ _:|AR|_|AA R; |AR|_|ER; |AR||AA R; |AIR||EH R; |AI||EY; |AY||EY; |AU||AO; #:|AL|_|AX L; #:|ALS|_|AX L Z; |ALK||AO K; |AL|^|AO L;
+ _:|ABLE||EY B AX L; |ABLE||AX B AX L; |ANG|+|EY N JH; |A||AE
+B: _|BE|^#|B IH; |BEING||B IY IH NG; _|BOTH|_|B OW TH; _|BUS|#|B IH Z; |BUIL||B IH L; |BB||B; |B||B
+C: _|CH|^|K; ^E|CH||K; |CH||CH; _S|CI|#|S AY; |CI|A|SH; |CI|O|SH; |CI|EN|SH; |C|+|S; |CK||K; |COM|%|K AH M; |CC|+|K S; |CC||K; |C||K
+D: #:|DED|_|D IH D; .E|D|_|D; #:^E|D|_|T; _|DE|^#|D IH; _|DO|_|D UW; _|DOES||D AH Z; _|DOING||D UW IH NG; _|DOW||D AW; |DU|A|JH UW;
+ |DGE||JH; |DD||D; |D||D
+E: #:|E|_|; _:|E|_|IY; #|ED|_|D; #:|E|D_|; |EV|ER|EH V; |E|^%|IY; |ERI|#|IY R IY; |ERI||EH R IH; #:|ER|#|ER; |ER|#|EH R; |ER||ER;
+ _|EVEN||IY V EH N; #:|E|W|; @|EW||UW; |EW||Y UW; |E|O|IY; #:&|ES|_|IH Z; #:|E|S_|; #:|ELY|_|L IY; #:|EMENT||M EH N T; |EFUL||F UH L;
+ |EE||IY; |EARN||ER N; _|EAR|^|ER; |EAD||EH D; #:|EA|_|IY AX; |EA|SU|EH; |EA||IY; |EIGH||EY; |EI||IY; _|EYE||AY; |EY||IY; |EU||Y UW;
+ |E||EH
+F: |FUL||F UH L; |FF||F; |F||F
+G: |GIV||G IH V; _|G|I^|G; |GE|T|G EH; SU|GGES||G JH EH S; |GG||G; _B#|G||G; |G|+|JH; |GREAT||G R EY T; #|GH||; |GH||G; |G||G
+H: _|HAV||HH AE V; _|HERE||HH IY R; _|HOUR||AW ER; |HOW||HH AW; |H|#|HH; |H||
+I: _|IN||IH N; _|I|_|AY; |IN|D|AY N; |IER||IY ER; #:R|IED||IY D; |IED|_|AY D; |IEN||IY EH N; |IE|T|AY EH; _:|I|%|AY; |I|%|IY; |IE||IY;
+ |I|^+:#|IH; |IR|#|AY R; |IZ|%|AY Z; |IS|%|AY Z; |I|D%|AY; +^|I|^+|IH; |I|T%|AY; #:^|I|^+|IH; |I|^+|AY; |IR||ER; |IGH||AY; |ILD||AY L D;
+ |IGN|_|AY N; |IGN|^|AY N; |IGN|%|AY N; |IQUE||IY K; |I||IH
+J: |J||JH
+K: _|K|N|; |K||K
+L: |LO|C#|L OW; L|L||; #:^|L|%|AX L; |LEAD||L IY D; |L||L
+M: |MOV||M UW V; |MM||M; |M||M
+N: E|NG|+|N JH; |NG|R|NG G; |NG|#|NG; |NGL|%|NG G AX L; |NG||NG; |NK||NG K; _|NOW|_|N AW; |NN||N; |N||N
+O: |OF|_|AX V; |OROUGH||ER OW; #:|OR|_|ER; #:|ORS|_|ER Z; |OR||AO R; _|ONE||W AH N; |OW||OW; _|OVER||OW V ER; |OV||AH V; |O|^%|OW;
+ |O|^EN|OW; |O|^I#|OW; |OL|D|OW L; |OUGHT||AO T; |OUGH||AH F; _|OU||AW; H|OU|S#|AW; |OUS||AX S; |OUR||AO R; |OULD||UH D;
+ ^|OU|^L|AH; |OUP||UW P; |OU||AW; |OY||OY; |OING||OW IH NG; |OI||OY; |OOR||AO R; |OOK||UH K; |OOD||UH D; |OO||UW; |O|E|OW;
+ |O|_|OW; |OA||OW; _|ONLY||OW N L IY; _|ONCE||W AH N S; |ON'T||OW N T; C|O|N|AA; |O|NG|AO; _:^|O|N|AH; I|ON||AX N; #:|ON|_|AX N;
+ #^|ON||AX N; |O|ST_|OW; |OF|^|AO F; |OTHER||AH DH ER; |OSS|_|AO S; #:^|OM||AH M; |O||AA
+P: |PH||F; |PEOP||P IY P; |POW||P AW; |PUT|_|P UH T; |PP||P; |P||P
+Q: |QUAR||K W AO R; |QU||K W; |Q||K
+R: _|RE|^#|R IY; |RR||R; |R||R
+S: |SH||SH; #|SION||ZH AX N; |SOME||S AH M; #|SUR|#|ZH ER; |SUR|#|SH ER; #|SU|#|ZH UW; #|SSU|#|SH UW; #|SED|_|Z D; #|S|#|Z; |SAID||S EH D;
+ ^|SION||SH AX N; |S|S|; .|S|_|Z; #:.E|S|_|Z; #:^#|S|_|S; U|S|_|S; _:#|S|_|Z; _|SCH||S K; |S|C+|; #|SM||Z M; #|SN|'|Z AX N; |S||S
+T: _|THE|_|DH AX; |TO|_|T UW; |THAT|_|DH AE T; _|THIS|_|DH IH S; _|THEY||DH EY; _|THERE||DH EH R; |THER||DH ER; |THEIR||DH EH R;
+ _|THAN|_|DH AE N; _|THEM|_|DH EH M; |THESE|_|DH IY Z; _|THEN||DH EH N; |THROUGH||TH R UW; |THOSE||DH OW Z; |THOUGH|_|DH OW;
+ _|THUS||DH AH S; |TH||TH; #:|TED|_|T IH D; S|TI|#N|CH; |TI|O|SH; |TI|A|SH; |TIEN||SH AX N; |TUR|#|CH ER; |TU|A|CH UW; _|TWO||T UW;
+ |TCH||CH; |TT||T; |T||T
+U: _|UN|I|Y UW N; _|UN||AH N; _|UPON||AX P AO N; @|UR|#|UH R; |UR|#|Y UH R; |UR||ER; |U|^_|AH; |U|^^|AH; |UY||AY; _G|U|#|;
+ G|U|%|; G|U|#|W; #N|U||Y UW; @|U||UW; |U||Y UW
+V: |VIEW||V Y UW; |V||V
+W: _|WERE||W ER; |WA|S|W AA; |WA|T|W AA; |WHERE||W EH R; |WHAT||W AA T; |WHOL||HH OW L; |WHO||HH UW; |WH||W; |WAR||W AO R;
+ |WOR|^|W ER; |WR||R; |W||W
+X: |X||K S
+Y: |YOUNG||Y AH NG; _|YOU||Y UW; _|YES||Y EH S; _|Y|#|Y; #:^|Y|_|IY; #:^|Y|I|IY; _:|Y|_|AY; _:|Y|#|AY; _:|Y|^+:#|IH; _:|Y|^#|AY; |Y||IH
+Z: |ZZ||Z; |Z||Z`;
+    const R = {};
+    for (const line of src.trim().split(/\n(?=[A-Z]:)/)){
+      R[line[0]] = line.slice(2).replace(/\n/g, ' ').split(';').map(x => x.trim()).filter(Boolean).map(x => {
+        const [l, m, r, p] = x.split('|').map(y => (y || '').trim());
+        return {l, m, r, p:p ? p.split(/\s+/) : []};
+      });
+    }
+    return R;
+  }
+  static dict(){
+    if (VoxCore._dict) return VoxCore._dict;
+    const s = `a:AX|the:DH AX|and:AE N D|to:T UW|of:AH V|you:Y UW|i:AY|is:IH Z|are:AA R|was:W AA Z|were:W ER|be:B IY|been:B IH N|
+have:HH AE V|has:HH AE Z|had:HH AE D|do:D UW|does:D AH Z|did:D IH D|done:D AH N|said:S EH D|says:S EH Z|one:W AH N|two:T UW|
+once:W AH N S|what:W AH T|who:HH UW|where:W EH R|there:DH EH R|their:DH EH R|they:DH EY|them:DH EH M|this:DH IH S|that:DH AE T|
+with:W IH TH|from:F R AH M|your:Y AO R|our:AW ER|my:M AY|by:B AY|why:W AY|me:M IY|we:W IY|he:HH IY|she:SH IY|it:IH T|in:IH N|
+on:AA N|at:AE T|so:S OW|no:N OW|go:G OW|oh:OW|ooh:UW|ah:AA|la:L AA|na:N AA|hey:HH EY|yeah:Y EH AX|love:L AH V|live:L IH V|
+give:G IH V|gone:G AO N|come:K AH M|some:S AH M|none:N AH N|very:V EH R IY|many:M EH N IY|any:EH N IY|eye:AY|eyes:AY Z|
+heart:HH AA R T|night:N AY T|light:L AY T|right:R AY T|bright:B R AY T|fly:F L AY|sky:S K AY|high:HH AY|tonight:T AX N AY T|
+today:T AX D EY|tomorrow:T AX M AA R OW|world:W ER L D|word:W ER D|work:W ER K|girl:G ER L|boy:B OY|baby:B EY B IY|
+want:W AA N T|wanna:W AA N AX|gonna:G AA N AX|into:IH N T UW|only:OW N L IY|own:OW N|know:N OW|known:N OW N|knew:N UW|
+new:N UW|through:TH R UW|though:DH OW|thought:TH AO T|brought:B R AO T|would:W UH D|could:K UH D|should:SH UH D|mind:M AY N D|
+kind:K AY N D|find:F AY N D|time:T AY M|fire:F AY ER|again:AX G EH N|people:P IY P AX L|woman:W UH M AX N|women:W IH M AX N|
+machine:M AX SH IY N|robot:R OW B AA T|robots:R OW B AA T S|sing:S IH NG|song:S AO NG|dance:D AE N S|music:M Y UW Z IH K|
+dream:D R IY M|dreams:D R IY M Z|feel:F IY L|real:R IY L|never:N EH V ER|ever:EH V ER|every:EH V R IY|forever:F ER EH V ER|
+together:T AX G EH DH ER|alone:AX L OW N|home:HH OW M|move:M UW V|above:AX B AH V|human:HH Y UW M AX N|computer:K AX M P Y UW T ER|
+hello:HH AX L OW|hi:HH AY|good:G UH D|bye:B AY|goodbye:G UH D B AY|am:AE M|an:AE N|or:AO R|for:F AO R|not:N AA T|but:B AH T|
+all:AO L|can:K AE N|will:W IH L|just:JH AH S T|like:L AY K|now:N AW|how:HH AW|out:AW T|up:AH P|down:D AW N|day:D EY|way:W EY|
+say:S EY|see:S IY|sea:S IY|look:L UH K|take:T EY K|make:M EY K|made:M EY D|walk:W AO K|talk:T AO K|call:K AO L|fall:F AO L|
+stay:S T EY|play:P L EY|electric:IH L EH K T R IH K|digital:D IH JH IH T AX L|future:F Y UW CH ER|star:S T AA R|stars:S T AA R Z|
+moon:M UW N|sun:S AH N|rain:R EY N|blue:B L UW|red:R EH D|gold:G OW L D|soul:S OW L|body:B AA D IY|voice:V OY S|
+i'm:AY M|you're:Y UH R|it's:IH T S|don't:D OW N T|can't:K AE N T|won't:W OW N T|i'll:AY L|we're:W IH R|that's:DH AE T S|
+let's:L EH T S|ain't:EY N T|there's:DH EH R Z|isn't:IH Z AX N T|didn't:D IH D AX N T|i've:AY V|you'll:Y UW L|nothing:N AH TH IH NG|
+something:S AH M TH IH NG|everything:EH V R IY TH IH NG|everybody:EH V R IY B AA D IY|sometimes:S AH M T AY M Z|
+because:B IH K AH Z|before:B IH F AO R|believe:B IH L IY V|beautiful:B Y UW T IH F AX L|friend:F R EH N D|friends:F R EH N D Z|
+cold:K OW L D|old:OW L D|warm:W AO R M|lost:L AO S T|last:L AE S T|first:F ER S T|space:S P EY S|wave:W EY V|waves:W EY V Z|
+thunder:TH AH N D ER|seeds:S IY D Z|yes:Y EH S|ok:OW K EY|okay:OW K EY`;
+    const d = {}; for (const e of s.replace(/\n/g, '').split('|')){ const k = e.indexOf(':'); if (k > 0) d[e.slice(0, k).trim()] = e.slice(k + 1).trim().split(/\s+/); }
+    return VoxCore._dict = d;
+  }
+  /* ---- note handling ---- */
+  // A note starts: syllable n (wraps around the lyrics). leg: the voice was already sounding; same: hold the same
+  // syllable (a slide continues the vowel, for runs over one word).
+  on(leg, n, same){
+    this.go = this.env < 0.01;
+    if (same && this.cur && this.hold){ return; }
+    const S = this.syl; if (!S.length) return;
+    const s = S[((n % S.length) + S.length) % S.length];
+    this.cur = s; this.segs = this.plan(s.on, 'on').concat([{ph:s.nu, k:'hold', d:-1}]); this.si = 0; this.st = 0; this.hold = false; this.coda = false;
+    this.envT = 1; this.vt = 0; this.enter();
+  }
+  off(){
+    const s = this.cur; if (!s){ this.envT = 0; return; }
+    const P = VoxCore.PH[s.nu], segs = [];
+    if (P && P.g) segs.push({ph:s.nu, k:'glide', d:this.ms(70)});
+    this.segs = segs.concat(this.plan(s.co, 'co'), [{ph:'', k:'end', d:0}]); this.si = 0; this.st = 0; this.hold = false; this.coda = true; this.enter();
+  }
+  busy(){ return this.coda && this.si < this.segs.length - 1; }
+  ms(x){ return Math.max(1, Math.round(x / 1000 * this.sr / Math.max(0.3, this.p.cons))); }
+  plan(list, where){
+    const out = [];
+    list.forEach((x, idx) => {
+      const P = VoxCore.PH[x]; if (!P) return;
+      const coda = where === 'co', d = P.d || 60;
+      if (P.t === 'P' || P.t === 'B' || P.t === 'C' || P.t === 'J'){
+        const first = where === 'on' && idx === 0;
+        out.push({ph:x, k:'clo', d:this.ms(first ? 25 : (P.t === 'P' || P.t === 'C' ? 55 : 45))});
+        out.push({ph:x, k:'burst', d:this.ms(P.t === 'P' ? 12 : 8)});
+        if (P.t === 'C' || P.t === 'J') out.push({ph:x, k:'fric', d:this.ms(P.t === 'C' ? 95 : 75)});
+        else if (P.t === 'P') out.push({ph:x, k:'asp', d:this.ms(coda ? 25 : 45)});
+      } else out.push({ph:x, k:P.t === 'F' || P.t === 'Z' ? 'fric' : P.t === 'H' ? 'asp' : 'son', d:this.ms(coda && P.t === 'N' ? d * 1.35 : d)});
+    });
+    return out;
+  }
+  // The targets for the segment being entered.
+  enter(){
+    const g = this.segs[this.si]; if (!g) return;
+    const PH = VoxCore.PH, P = PH[g.ph] || PH.AX, t = this.tg;
+    // the vowel this consonant leads into (or out of): aspiration takes its shape
+    let vow = this.cur ? PH[this.cur.nu] : PH.AX; if (!vow || vow.t !== 'V') vow = PH.AX;
+    const f = g.k === 'asp' || P.t === 'H' ? (g.k === 'asp' && this.coda ? PH.AX.f : vow.f) : g.k === 'glide' ? P.g : P.f;
+    t.f1 = f[0]; t.f2 = f[1]; t.f3 = f[2];
+    t.av = 0; t.an = 0; t.ah = 0; t.nf = P.nf || 3000; t.nb = P.nb || 3000;
+    switch (g.k){
+      case 'hold': case 'glide': case 'son': t.av = P.av == null ? 1 : P.av; break;
+      case 'clo': t.av = P.t === 'B' || P.t === 'J' ? 0.12 : 0; break;
+      case 'burst': t.an = P.t === 'P' || P.t === 'C' ? 0.9 : 0.55; t.av = P.t === 'B' || P.t === 'J' ? 0.25 : 0; t.nf = P.bf || 2000; t.nb = P.bb || 2500; break;
+      case 'fric': { const F = P.t === 'C' ? PH.SH : P.t === 'J' ? PH.ZH : P; t.an = F.fa || 0.4; t.av = F.av || 0; t.nf = F.nf || 4000; t.nb = F.nb || 3000; break; }
+      case 'asp': t.ah = 0.65; break;
+      case 'end': this.envT = 0; break;
+    }
+    if (this.go){ for (const k of ['f1', 'f2', 'f3', 'nf', 'nb']) this.k[k] = t[k]; this.go = false; }
+  }
+  /* ---- synthesis ---- */
+  render(L, R, a, b, rate){ for (let i = a; i < b; i += this.BLK) this.block(L, R, i, Math.min(b, i + this.BLK), rate); }
+  reso(j, x, F, B){   // two-pole resonator j (Klatt): y = A·x + B·y1 + C·y2
+    const T = 1 / this.sr, r = this.r, c = -Math.exp(-2 * Math.PI * B * T), bb = 2 * Math.exp(-Math.PI * B * T) * Math.cos(2 * Math.PI * Math.min(F, this.sr * 0.45) * T), aa = 1 - bb - c;
+    const y = aa * x + bb * r[j * 2] + c * r[j * 2 + 1]; r[j * 2 + 1] = r[j * 2]; r[j * 2] = y; return y;
+  }
+  block(L, R, a, b, rate){
+    const p = this.p, sr = this.sr, n = b - a, dt = n / sr;
+    // move through the plan
+    let g = this.segs[this.si];
+    while (g && g.d >= 0 && this.st >= g.d && this.si < this.segs.length - 1){ this.si++; this.st = 0; g = this.segs[this.si]; this.enter(); }
+    if (g && g.k === 'hold') this.hold = true;
+    this.st += n;
+    // controls glide toward their targets: formants ~12 ms (consonant speed scales it), levels ~4 ms
+    const kf = 1 - Math.exp(-dt * 1000 / (12 / Math.max(0.3, p.cons))), ka = 1 - Math.exp(-dt * 1000 / 4), K = this.k, T = this.tg;
+    K.f1 += (T.f1 - K.f1) * kf; K.f2 += (T.f2 - K.f2) * kf; K.f3 += (T.f3 - K.f3) * kf;
+    K.av += (T.av - K.av) * ka; K.an += (T.an - K.an) * ka; K.ah += (T.ah - K.ah) * ka; K.nf += (T.nf - K.nf) * ka; K.nb += (T.nb - K.nb) * ka;
+    // amplitude envelope
+    const er = this.envT > this.env ? 1 - Math.exp(-dt * 1000 / Math.max(0.5, p.atk)) : 1 - Math.exp(-dt * 1000 * 4.6 / Math.max(5, p.rel));
+    this.env += (this.envT - this.env) * er; if (this.envT === 0 && this.env < 1e-4) this.env = 0;
+    // pitch: C4 at C-4, with glide and vibrato (which fades in after Vibrato delay)
+    const target = 261.626 * Math.pow(2, p.oct + p.tune / 12) * rate, lt = Math.log2(Math.max(20, target));
+    if (this.go || this.lf <= 0){ this.lf = lt; }
+    if (p.glide > 0.5) this.lf += (lt - this.lf) * (1 - Math.exp(-dt * 1000 / p.glide)); else this.lf = lt;
+    this.vt += dt; const vd = Math.min(1, Math.max(0, (this.vt * 1000 - p.vibDelay) / 300));
+    const vc = Math.max(0, Math.min(1, p.voice)), fs = Math.pow(2, p.form * 0.35), bwm = 0.6 + p.bw * 0.9, rob = p.robot, br = p.breath, lv = Math.pow(10, (p.level || 0) / 20) * 0.32;
+    const kb = 1 - Math.exp(-2 * Math.PI * (1200 * Math.pow(10, p.bright)) / sr), dr = (p.drive || 0) * 6, dn = dr ? 1 / Math.tanh(dr) : 1;
+    const F1 = K.f1 * fs, F2 = K.f2 * fs, F3 = K.f3 * fs, F4 = 3350 * fs, F5 = 3850 * fs, B1 = 60 * bwm, B2 = 90 * bwm, B3 = 150 * bwm;
+    const nfz = K.nf * Math.sqrt(fs), nbz = K.nb;
+    if (this.env === 0 && this.envT === 0){ for (let i = a; i < b; i++){ L[i] = 0; R[i] = 0; } return; }
+    for (let i = a; i < b; i++){
+      this.vph += p.vibRate / sr; if (this.vph >= 1) this.vph -= 1;
+      const f0 = Math.pow(2, this.lf + vd * p.vib * 0.06 * Math.sin(2 * Math.PI * this.vph));
+      const inc = f0 / sr; this.ph += inc; if (this.ph >= 1) this.ph -= 1;
+      // the source: a smooth glottal pulse ↔ a buzzy saw (Robot), tilted by Bright
+      const x = this.ph * 2048, xi = x | 0, gl = this.glot[xi] + (this.glot[xi + 1] - this.glot[xi]) * (x - xi);
+      let saw = 2 * this.ph - 1; { let t = this.ph; if (t < inc){ t /= inc; saw -= t + t - t * t - 1; } else if (t > 1 - inc){ t = (t - 1) / inc; saw -= t * t + t + t + 1; } }
+      let src = gl * (1 - rob) + saw * rob * 0.8;
+      this.lp += (src - this.lp) * kb; src = this.lp;
+      this.rnd = (this.rnd * 1664525 + 1013904223) >>> 0; const nz = this.rnd / 2147483648 - 1;
+      const open = this.ph < 0.6 ? 1 : 0.35;   // breath is louder while the glottis is open
+      const voiced = src * K.av * vc + nz * (K.ah + br * K.av * (0.5 + (1 - vc)) * open) * 0.6;   // Voice 0 = a whisper
+      let y = this.reso(0, voiced, F1, B1); y = this.reso(1, y, F2, B2); y = this.reso(2, y, F3, B3); y = this.reso(3, y, F4, 250); y = this.reso(4, y, F5, 300);
+      // frication: noise through its own resonance, in parallel
+      const fr = this.reso(5, nz * K.an, nfz, nbz) * 1.6;
+      let out = y * 0.5 + fr;
+      // DC block
+      const o = out - this.dcx + 0.995 * this.dc; this.dcx = out; this.dc = o; out = o * this.env * lv;
+      if (dr) out = Math.tanh(out * dr) * dn;
+      L[i] = out; R[i] = out;
+    }
+  }
+  // The phonemes: t = V vowel (g = where a diphthong ends), L approximant, N nasal, F/Z unvoiced/voiced fricative,
+  // P/B unvoiced/voiced stop, C/J affricate, H aspiration. f = formants F1–F3 (Hz); av voicing; nf/nb/fa noise
+  // centre, width and level; bf/bb a stop's burst; d length in ms.
+  static get PH(){ return VoxCore._ph || (VoxCore._ph = {
+      IY:{t:'V', f:[270, 2290, 3010]}, IH:{t:'V', f:[390, 1990, 2550]}, EH:{t:'V', f:[530, 1840, 2480]}, AE:{t:'V', f:[660, 1720, 2410]},
+      AA:{t:'V', f:[730, 1090, 2440]}, AO:{t:'V', f:[570, 840, 2410]}, UH:{t:'V', f:[440, 1020, 2240]}, UW:{t:'V', f:[300, 870, 2240]},
+      AH:{t:'V', f:[640, 1190, 2390]}, ER:{t:'V', f:[490, 1350, 1690]}, AX:{t:'V', f:[500, 1500, 2500], av:0.85},
+      EY:{t:'V', f:[480, 1720, 2520], g:[330, 2200, 2800]}, AY:{t:'V', f:[710, 1150, 2450], g:[360, 2150, 2750]},
+      OW:{t:'V', f:[540, 900, 2350], g:[380, 800, 2300]}, AW:{t:'V', f:[700, 1250, 2450], g:[420, 900, 2300]}, OY:{t:'V', f:[560, 860, 2420], g:[360, 2100, 2700]},
+      L:{t:'L', f:[360, 1000, 2750], av:0.85, d:55}, R:{t:'L', f:[330, 1060, 1380], av:0.9, d:55}, W:{t:'L', f:[290, 610, 2150], av:0.85, d:55},
+      Y:{t:'L', f:[260, 2070, 3020], av:0.85, d:50},
+      M:{t:'N', f:[270, 1000, 2200], av:0.55, d:65}, N:{t:'N', f:[270, 1600, 2600], av:0.55, d:60}, NG:{t:'N', f:[270, 2000, 2600], av:0.55, d:65},
+      F:{t:'F', f:[300, 1100, 2100], nf:5000, nb:5000, fa:0.25, d:85}, TH:{t:'F', f:[300, 1400, 2600], nf:5500, nb:5000, fa:0.18, d:80},
+      S:{t:'F', f:[320, 1700, 2600], nf:5600, nb:2400, fa:0.55, d:100}, SH:{t:'F', f:[300, 1800, 2400], nf:2700, nb:1600, fa:0.6, d:100},
+      V:{t:'Z', f:[280, 1100, 2100], nf:5000, nb:5000, fa:0.12, av:0.55, d:55}, DH:{t:'Z', f:[280, 1400, 2600], nf:5500, nb:5000, fa:0.1, av:0.55, d:45},
+      Z:{t:'Z', f:[300, 1700, 2600], nf:5600, nb:2400, fa:0.35, av:0.45, d:75}, ZH:{t:'Z', f:[300, 1800, 2400], nf:2700, nb:1600, fa:0.4, av:0.45, d:75},
+      P:{t:'P', f:[220, 900, 2100], bf:1100, bb:2200}, B:{t:'B', f:[220, 900, 2100], bf:1100, bb:2200},
+      T:{t:'P', f:[250, 1700, 2600], bf:4200, bb:3000}, D:{t:'B', f:[250, 1700, 2600], bf:4200, bb:3000},
+      K:{t:'P', f:[280, 1900, 2300], bf:2100, bb:1500}, G:{t:'B', f:[280, 1900, 2300], bf:2100, bb:1500},
+      CH:{t:'C', f:[300, 1800, 2400], bf:2800, bb:2000}, JH:{t:'J', f:[300, 1800, 2400], bf:2800, bb:2000},
+      HH:{t:'H', f:[500, 1500, 2500], d:55}
+    }); }
+}
+
+const isVoxV = v => !!(v && v.engine === 'vox');
+function normVox(o){
+  const d = VoxCore.defaults(), r = {};
+  for (const k in d) r[k] = k === 'txt' ? (o && typeof o.txt === 'string' ? o.txt.slice(0, 4000) : d.txt) : (o && typeof o[k] === 'number' && isFinite(o[k]) ? o[k] : d[k]);
+  delete r.tune; delete r.drive; delete r.level; return r;
+}
+// What the engine sings for voice V: its voice settings plus the voice's own Tune, Drive and Level.
+function voxParams(V){ return Object.assign(normVox(V.vox), {tune:V.tune || 0, drive:V.drive || 0, level:V.level || 0}); }
+// The pad's sound (pads, the waveform, exports): the whole lyric sung at the pad's pitch, one syllable every
+// Syllable length, as a one-shot. Mono, like every pad.
+function renderVox(V, sr){
+  const c = new VoxCore(sr); c.set(voxParams(V)); const p = c.p, n = Math.max(1, c.syl.length), hold = Math.max(20, Math.round(p.sylLen / 1000 * sr));
+  const cap = sr * 30, L = new Float32Array(cap), R = new Float32Array(cap); let pos = 0;
+  for (let k = 0; k < n && pos < cap - sr; k++){
+    c.on(k > 0, k, false); c.render(L, R, pos, Math.min(cap, pos + hold), 1); pos = Math.min(cap, pos + hold);
+    c.off(); let g = 0; while (c.busy() && g < sr && pos < cap){ const e = Math.min(cap, pos + 64); c.render(L, R, pos, e, 1); pos = e; g += 64; }
+  }
+  const tail = Math.min(cap, pos + Math.round((p.rel / 1000 * 1.6 + 0.03) * sr)); c.render(L, R, pos, tail, 1); pos = tail;
+  const out = L.slice(0, Math.max(1, pos));
+  let end = out.length; while (end > 1 && Math.abs(out[end - 1]) < 1e-4) end--;
   const res = out.slice(0, Math.max(end, 1)), fl = Math.min(res.length, Math.round(sr * 0.002));
   for (let i = 0; i < fl; i++) res[res.length - 1 - i] *= i / fl;
   return res;
@@ -2969,7 +3363,7 @@ function vuFrame(){
 let lastPtrDown = -1e9;
 addEventListener('pointerdown', () => { lastPtrDown = performance.now(); }, true);
 const ptrJust = () => performance.now() - lastPtrDown < 800;
-function typing(e){ const t = e.target; return !!(t && t.matches && t.matches('input[type=text],select') && t.getClientRects().length); }
+function typing(e){ const t = e.target; return !!(t && t.matches && t.matches('input[type=text],textarea,select') && t.getClientRects().length); }
 /* ---------- change handling ---------- */
 let rTimer = 0, sTimer = 0;
 function changed(i = cur, light){
@@ -3225,10 +3619,12 @@ const BV = () => { const v = V(); if (!v.bass) v.bass = normBass(null); return v
 function bassEdit(){ changed(cur, true); bassVizKick(); }
 function setEngine(x){
   const v = V(); if (!isSyn(cur)) return;
-  if (x === 'bass' && !isBassV(v)){
-    const first = !v.bass; v.engine = 'bass'; v.tuneL = v.tune; v.tune = 0; v.bass = normBass(v.bass);
-    if (first) bassPreset(1, true);
-  } else if (x !== 'bass' && isBassV(v)){ v.engine = 'layers'; if (typeof v.tuneL === 'number') v.tune = v.tuneL; }
+  const was = v.engine === 'bass' || v.engine === 'vox';
+  if (x === (v.engine || 'layers')) return;
+  if (!was) v.tuneL = v.tune;
+  if (x === 'bass'){ const first = !v.bass; v.engine = 'bass'; v.tune = 0; v.bass = normBass(v.bass); if (first) bassPreset(1, true); }
+  else if (x === 'vox'){ v.engine = 'vox'; v.tune = 0; v.vox = normVox(v.vox); }
+  else { v.engine = 'layers'; if (typeof v.tuneL === 'number') v.tune = v.tuneL; }
   changed(cur); refreshAll();
 }
 function bassPreset(i, quiet){
@@ -3274,17 +3670,87 @@ function bassRandom(){
   pre.addEventListener('change', () => { if (pre.value !== '') bassPreset(+pre.value); pre.value = ''; });
   $('bassRand').addEventListener('click', bassRandom);
   $('bassInit').addEventListener('click', () => bassPreset(0));
-  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass']], () => isBassV(V()) ? 'bass' : 'layers', setEngine);
+  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass'], ['vox', 'Voice']], () => isBassV(V()) ? 'bass' : isVoxV(V()) ? 'vox' : 'layers', setEngine);
 })();
-// Shows the bass card or the layer cards for the pad on screen.
+
+/* ---------- voice engine editor ----------
+   Synth slots can run the voice engine (VoxCore): Synth → Engine: Voice. Type lyrics; the tracker sings a syllable
+   per note, live. The pads (and exports) sing the whole line. Settings live in V().vox; Level, Tune, Drive apply. */
+const VU = {
+  oct:{l:'Octave', min:-2, max:1, c:'int', d:0, f:v => v ? (v > 0 ? '+' : '−') + Math.abs(v) + ' oct' : 'C4 at C-4'},
+  form:{l:'Size', min:-1, max:1, c:'lin', d:0, f:v => Math.abs(v) < 0.02 ? 'Normal' : (v < 0 ? 'Bigger ' : 'Smaller ') + Math.round(Math.abs(v) * 100) + '%'},
+  robot:{l:'Robot', min:0, max:1, c:'lin', d:0.6, f:pct},
+  voice:{l:'Voice', min:0, max:1, c:'lin', d:1, f:v => v < 0.02 ? 'Whisper' : pct(v)},
+  breath:{l:'Breath', min:0, max:1, c:'lin', d:0.12, f:pct},
+  bright:{l:'Bright', min:0, max:1, c:'lin', d:0.55, f:pct},
+  bw:{l:'Soft', min:0, max:1, c:'lin', d:0.5, f:pct},
+  vib:{l:'Vibrato', min:0, max:1, c:'lin', d:0.25, f:pct},
+  vibRate:{l:'Vib rate', min:2, max:9, c:'lin', d:5.5, f:v => v.toFixed(1) + ' Hz'},
+  vibDelay:{l:'Vib delay', min:0, max:1500, c:'sq', d:250, f:ms},
+  glide:{l:'Glide', min:0, max:600, c:'sq', d:40, f:v => v < 0.5 ? 'Off' : ms(v)},
+  cons:{l:'Diction', min:0.5, max:2, c:'lin', d:1, f:v => v.toFixed(2) + '×'},
+  atk:{l:'Attack', min:0.5, max:400, c:'log', d:12, f:ms},
+  rel:{l:'Release', min:5, max:3000, c:'log', d:140, f:ms},
+  sylLen:{l:'Pad step', min:80, max:1200, c:'log', d:320, f:ms},
+};
+const VOX_PRE = [
+  ['Init', {}],
+  ['Robot choir', {robot:0.9, breath:0.05, vib:0.08, bright:0.7, bw:0.3, glide:30}],
+  ['Talking toy', {robot:1, breath:0, vib:0, glide:0, bright:0.4, bw:0.15, form:0.15, cons:1.25}],
+  ['Soft singer', {robot:0.12, breath:0.3, vib:0.45, vibDelay:300, bright:0.5, bw:0.75, glide:70, atk:30, rel:260}],
+  ['Deep bot', {oct:-1, form:-0.6, robot:0.8, vib:0.1, bright:0.45}],
+  ['Chipmunk', {oct:1, form:0.8, robot:0.35, vib:0.3, cons:1.3}],
+  ['Whisper', {voice:0, breath:1, robot:0, vib:0, bright:0.65, rel:200}],
+  ['Laser choir', {robot:1, bright:0.95, bw:0.1, vib:0, glide:25, form:0.2}],
+];
+const VOX_SECS = [
+  ['Voice', ['oct', 'form', 'robot', 'voice', 'breath', 'bright', 'bw']],
+  ['Expression', ['vib', 'vibRate', 'vibDelay', 'glide']],
+  ['Timing', ['cons', 'atk', 'rel', 'sylLen']],
+];
+const voxRows = [];
+const XV = () => { const v = V(); if (!v.vox) v.vox = normVox(null); return v.vox; };
+let voxT = 0;
+function voxEdit(){ changed(cur, true); }
+function voxPreset(i, quiet){
+  const pr = VOX_PRE[i]; if (!pr) return; const v = V(), txt = (v.vox && v.vox.txt) || VoxCore.defaults().txt;
+  v.vox = normVox(Object.assign(VoxCore.defaults(), pr[1], {txt}));
+  if (!quiet){ changed(cur); refreshAll(); toast('Voice: ' + pr[0]); }
+}
+// The lyrics as the engine will sing them: one chip per syllable, numbered, in phonemes.
+function voxSylShow(){
+  const box = $('voxSyl'); if (!box) return;
+  const syl = VoxCore.parse(XV().txt); box.replaceChildren();
+  if (!syl.length){ box.append(el('span', null, 'No syllables yet')); return; }
+  let w = -1;
+  syl.forEach((x, i) => { const c = el('span', x.w !== w && i ? 'w' : null); const b = document.createElement('b'); b.textContent = i + 1;
+    c.append(b, document.createTextNode([x.on.join(' '), x.nu, x.co.join(' ')].filter(Boolean).join(' '))); c.title = x.word; box.append(c); w = x.w; });
+}
+(function buildVox(){
+  const host = $('voxSecs');
+  for (const [title, keys] of VOX_SECS){
+    const sc = el('div', 'sec'); sc.append(el('h3', null, title)); host.append(sc);
+    for (const k of keys){ const r = makeRow(VU[k], k, XV, {idp:'vx', noTrack:true, on:voxEdit}); sc.append(r.r); voxRows.push(r); }
+  }
+  const pre = $('voxPre'); const o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'Presets…'; pre.append(o0);
+  VOX_PRE.forEach(([n], i) => { const o = document.createElement('option'); o.value = i; o.textContent = n; pre.append(o); });
+  pre.addEventListener('change', () => { if (pre.value !== '') voxPreset(+pre.value); pre.value = ''; });
+  $('voxInit').addEventListener('click', () => voxPreset(0));
+  $('voxSay').addEventListener('click', () => { try { play(cur); } catch(e){} });
+  const ta = $('voxTxt');
+  ta.addEventListener('input', () => { XV().txt = ta.value.slice(0, 4000); voxSylShow(); clearTimeout(voxT); voxT = setTimeout(voxEdit, 350); });
+  ta.addEventListener('keydown', e => e.stopPropagation());   // typing lyrics never plays notes
+})();
+// Shows the bass card, the voice card or the layer cards for the pad on screen.
 function bassUI(){
-  const syn = isSyn(cur), on = syn && isBassV(V());
+  const syn = isSyn(cur), on = syn && isBassV(V()), vx = syn && isVoxV(V());
   $('vEngine').hidden = !syn;
-  $('vEngLbl').textContent = on ? 'additive bass, played live by the tracker' : 'up to 8 layers, rendered';
+  $('vEngLbl').textContent = on ? 'additive bass, played live by the tracker' : vx ? 'a singing voice, a syllable per note, live in the tracker' : 'up to 8 layers, rendered';
   if (vEngUpd) vEngUpd();
-  $('bassWrap').hidden = !on;
-  for (const id of ['layersBand', 'layerWrap', 'fxWrap', 'voiceWrap']) $(id).hidden = on;
+  $('bassWrap').hidden = !on; $('voxWrap').hidden = !vx;
+  for (const id of ['layersBand', 'layerWrap', 'fxWrap', 'voiceWrap']) $(id).hidden = on || vx;
   if (on){ for (const r of bassRows) r.refresh(); for (const f of bassSegs) f(); bassVizKick(); }
+  if (vx){ for (const r of voxRows) r.refresh(); const ta = $('voxTxt'); if (document.activeElement !== ta) ta.value = XV().txt; voxSylShow(); }
 }
 // The picture: each partial as a bar at its frequency (C2 to 20 kHz), at the wobble's position right now.
 let bvRaf = 0, bvCore = null;
@@ -5364,14 +5830,15 @@ function makePlayer(ac, out, getBuf, live){
   const bassN = new Map(); let bpmNow = (S && S.bpm) || 120;
   function bassNode(t, pad){
     if (!bassOK.has(ac)) return null;
-    const key = t + ':' + pad; let b = bassN.get(key); if (b) return b;
+    const vx = isVoxV(kit.voices[pad]), key = t + ':' + pad + (vx ? ':vox' : ''); let b = bassN.get(key); if (b) return b;
     try {
-      const node = new AudioWorkletNode(ac, 'thunder-bass', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{p:bassParams(kit.voices[pad])}});
+      const node = new AudioWorkletNode(ac, vx ? 'thunder-vox' : 'thunder-bass', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{p:vx ? voxParams(kit.voices[pad]) : bassParams(kit.voices[pad])}});
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
       node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
       node.load = 0; node.port.onmessage = e => { const d = e.data; if (d && typeof d.load === 'number') node.load = node.load * 0.6 + d.load * 0.4; };
-      b = {node, g, pn, pad, rate:P('rate'), gate:P('gate'), trig:P('trig'), leg:P('leg'), bpm:P('bpm'), wob:P('wob'), n:0, lastOn:-1, cur:null};
-      b.bpm.value = bpmNow;
+      b = vx ? {node, g, pn, pad, vox:true, rate:P('rate'), gate:P('gate'), trig:P('trig'), leg:P('leg'), syl:P('syl'), same:P('same'), n:0, sylN:0, lastOn:-1, cur:null}
+        : {node, g, pn, pad, rate:P('rate'), gate:P('gate'), trig:P('trig'), leg:P('leg'), bpm:P('bpm'), wob:P('wob'), n:0, lastOn:-1, cur:null};
+      if (b.bpm) b.bpm.value = bpmNow;
     } catch(e){ return null; }
     bassN.set(key, b); if (live) bassLive.add(b);
     return b;
@@ -5381,9 +5848,15 @@ function makePlayer(ac, out, getBuf, live){
     for (const P of [b.gate, b.trig, b.leg]) P.cancelScheduledValues(t);
     try { b.rate.cancelAndHoldAtTime(t); } catch(e){ b.rate.cancelScheduledValues(t); }
     if (leg){ b.rate.setValueAtTime(ev.slide.from, t); b.rate.linearRampToValueAtTime(ev.rate, t + ev.slide.dur); } else b.rate.setValueAtTime(ev.rate, t);
+    if (b.vox){
+      // each note sings the next syllable; a slide stays on the one it's on (a run over one vowel)
+      for (const P of [b.syl, b.same]) P.cancelScheduledValues(t);
+      const k = leg ? Math.max(0, b.sylN - 1) : b.sylN++;
+      b.syl.setValueAtTime(k, t); b.same.setValueAtTime(leg, t);
+    }
     b.leg.setValueAtTime(leg, t); b.gate.setValueAtTime(1, t); b.trig.setValueAtTime(++b.n, t);
     b.g.gain.setValueAtTime(ev.gain, t); b.pn.pan.setValueAtTime(clamp((ev.pan - 128) / 127, -1, 1), t);
-    if (ev.wob != null) b.wob.setValueAtTime(ev.wob, t);
+    if (ev.wob != null && b.wob) b.wob.setValueAtTime(ev.wob, t);
     b.lastOn = t; if (b.cur) alive.delete(b.cur);
     const v = {bass:b, src:{playbackRate:b.rate, stop(){}}, g:b.g, pn:b.pn, base:ev.rate, rate:ev.rate, choke:ck, ended:false, stopAt:null, syn:true, rel:0};
     b.cur = v;
@@ -5426,7 +5899,7 @@ function makePlayer(ac, out, getBuf, live){
   const tempoAt = new Map();
   function tempoTo(ev){
     bpmNow = ev.bpm || bpmNow;
-    for (const b of bassN.values()) try { b.bpm.setValueAtTime(ev.bpm, Math.max(ev.t, ac.currentTime)); } catch(e){}
+    for (const b of bassN.values()) if (b.bpm) try { b.bpm.setValueAtTime(ev.bpm, Math.max(ev.t, ac.currentTime)); } catch(e){}
     const m = {target:'chains-host', op:'transport', value:{tempo:ev.bpm, ticks:ev.tks}};
     const send = () => { for (const b of buses) if (b && b.chn){ try { if (b.chn._send) b.chn._send(m); else b.chn.port.postMessage(m); } catch(e){} } };
     const O = window.OfflineAudioContext || window.webkitOfflineAudioContext;
@@ -5451,14 +5924,14 @@ function makePlayer(ac, out, getBuf, live){
         if (ev.gain != null) v.g.gain.setValueAtTime(ev.gain, ev.t);
         if (ev.pan != null) v.pn.pan.setValueAtTime(clamp((ev.pan - 128) / 127, -1, 1), ev.t);
         if (ev.mul != null){ v.rate = v.base * ev.mul; v.src.playbackRate.setValueAtTime(v.rate, ev.t); }
-        if (ev.wob != null && v.bass) v.bass.wob.setValueAtTime(ev.wob, ev.t);
+        if (ev.wob != null && v.bass && v.bass.wob) v.bass.wob.setValueAtTime(ev.wob, ev.t);
       } catch(e){}
       pitchMods(v, ev.t, v.rate, ev);
       if (ev.cut != null) kill(v, ev.cut);
       if (ev.rel != null) kill(v, ev.rel, v.syn ? relTc(v) : 0.05);
   }
   function startNote(ev){
-    if (isBassPad(ev.pad)){ const bn = bassNode(ev.track, ev.pad); if (bn){
+    if (isLivePad(ev.pad)){ const bn = bassNode(ev.track, ev.pad); if (bn){
       // bass is mono: it takes over from whatever the track was playing
       const T = vs[ev.track]; for (const v of T) if (v.bass !== bn) kill(v, ev.t, v.syn ? Math.min(relTc(v), 0.05) : 0.004); T.length = 0;
       const kv = kit.voices[ev.pad], ck = kv ? kv.choke : 0;
@@ -5492,7 +5965,7 @@ function makePlayer(ac, out, getBuf, live){
     if (ev.rel != null) kill(v, ev.rel, syn ? relTc(v) : 0.05);
     T.push(v);
   }
-  function stopAll(at){ for (const v of alive) kill(v, at); for (const T of vs) T.length = 0; }
+  function stopAll(at){ for (const v of alive) kill(v, at); for (const T of vs) T.length = 0; for (const b of bassN.values()) if (b.vox) b.sylN = 0; }   // lyrics start over
   function applyMix(filter){
     const at = ac.currentTime;
     buses.forEach((b, t) => {
@@ -5697,19 +6170,55 @@ class BassProc extends AudioWorkletProcessor {
   }
 }
 registerProcessor('thunder-bass', BassProc);`;
+/* The voice engine, live: like the bass, every note is AudioParam automation. syl is the syllable this note
+   sings (the player counts notes per track and voice); same = a slide, which keeps the syllable it's on. */
+const VOX_PROC = `
+class VoxProc extends AudioWorkletProcessor {
+  static get parameterDescriptors(){ return [
+    {name:'rate', defaultValue:1, minValue:0, maxValue:256, automationRate:'a-rate'},
+    {name:'gate', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
+    {name:'trig', defaultValue:0, automationRate:'a-rate'},
+    {name:'leg', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
+    {name:'syl', defaultValue:0, automationRate:'a-rate'},
+    {name:'same', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'}]; }
+  constructor(o){ super(); this.c = new VoxCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0;
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); }; }
+  process(ins, outs, P){
+    const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, c = this.c, rate = P.rate, gate = P.gate, trig = P.trig, leg = P.leg, syl = P.syl, same = P.same;
+    const at = (A, i) => A.length > 1 ? A[i] : A[0], t0 = Date.now();
+    let s = 0;
+    for (let i = 0; i < n; i++){
+      const tg = at(trig, i), ga = at(gate, i) >= 0.5;
+      if (tg !== this.lt || ga !== this.lg){
+        if (i > s){ c.render(L, R, s, i, at(rate, s)); s = i; }
+        if (tg !== this.lt && ga) c.on(at(leg, i) >= 0.5, Math.round(at(syl, i)), at(same, i) >= 0.5);
+        else if (ga && !this.lg) c.on(false, Math.round(at(syl, i)), false);
+        else if (!ga && this.lg) c.off();
+        this.lt = tg; this.lg = ga;
+      }
+    }
+    c.render(L, R, s, n, at(rate, s));
+    this.ms += Date.now() - t0; this.fr += n;
+    if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
+    return true;
+  }
+}
+registerProcessor('thunder-vox', VoxProc);`;
 let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bassLive = new Set();
 function bassReady(ac){
   if (!bassLoad.has(ac)){
     let pr = Promise.resolve(false);
-    try { if (ac.audioWorklet){ if (!bassURL) bassURL = URL.createObjectURL(new Blob([BassCore.toString() + BASS_PROC], {type:'text/javascript'}));
+    try { if (ac.audioWorklet){ if (!bassURL) bassURL = URL.createObjectURL(new Blob([BassCore.toString() + BASS_PROC + '\n' + VoxCore.toString() + VOX_PROC], {type:'text/javascript'}));
       pr = ac.audioWorklet.addModule(bassURL).then(() => { bassOK.add(ac); return true; }, () => false); } } catch(e){}
     bassLoad.set(ac, pr);
   }
   return bassLoad.get(ac);
 }
 const isBassPad = i => isSyn(i) && isBassV(kit.voices[i]);
+// Synth slots the tracker plays through a live engine node (bass or voice) rather than a rendered buffer.
+const isLivePad = i => isSyn(i) && (isBassV(kit.voices[i]) || isVoxV(kit.voices[i]));
 // A bass voice was edited: the live nodes playing it hear the change at once.
-function bassPush(i){ const v = kit.voices[i]; if (!isBassV(v)) return; const p = bassParams(v); for (const b of bassLive) if (b.pad === i) try { b.node.port.postMessage({set:p}); } catch(e){} }
+function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v); if (!isBassV(v) && !vx) return; const p = vx ? voxParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && !!b.vox === vx) try { b.node.port.postMessage({set:p}); } catch(e){} }
 const MW_URL = 'master-worklet.js?v=2', mwLoad = new WeakMap();
 function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
@@ -5906,7 +6415,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   let mLim = false;
   if (useM){ const wkOk = mstNeedsWk(M) ? await mwReady(oc) : true; const ch = mstChain(oc, M, false); head.connect(ch.input); head = ch.output; mLim = !!(ch.wk && M.lim.on); if (!wkOk && mstNeedsWk(M)) toast('Mastering effects couldn’t load for this render; EQ only.'); }
   if (lim && !mLim){ const c = mkLimiter(oc); head.connect(c); c.connect(oc.destination); } else head.connect(oc.destination);
-  if (evs.some(e => e.type === 'note' && isBassPad(e.pad))) await bassReady(oc);
+  if (evs.some(e => e.type === 'note' && isLivePad(e.pad))) await bassReady(oc);
   const pl = makePlayer(oc, out, getB, false);
   pl.applyMix(t => keep.has(t));       // every track plays (so chokes match the mix), only `keep` is heard
   for (const t of keep){
@@ -7985,12 +8494,20 @@ let dkInstSig = '', dkInstRows = [], dkFxSig = '', dkFxRows = [], dkFxSel = 0;
 function deckInst(){
   if (!deckShown() || !deck.inst) return;
   dkInst = dkInstNow();
-  const I = S.insts[dkInst], pad = I.pad, v = kit.voices[pad], sig = dkInst + ':' + pad + ':' + nslots() + (isBassV(v) && isSyn(pad) ? ':bass' : '');
+  const I = S.insts[dkInst], pad = I.pad, v = kit.voices[pad], sig = dkInst + ':' + pad + ':' + nslots() + (isBassV(v) && isSyn(pad) ? ':bass' : isVoxV(v) && isSyn(pad) ? ':vox' : '');
   $('dkInstT').textContent = `INST ${hx(dkInst)} · ${hx(pad)} ${(v && v.name) || 'Pad ' + (pad + 1)}`;
   if (sig !== dkInstSig){
     dkInstSig = sig; const box = $('dkInstRows'); box.replaceChildren(); dkInstRows = [];
     if (!v){ box.append(el('p', 'note', 'This instrument’s pad is empty.')); return; }
     const getV = () => kit.voices[S.insts[dkInst].pad], on = () => changed(S.insts[dkInst].pad, true);
+    if (isVoxV(v) && isSyn(pad)){
+      // a voice: its level and character, changed live as it sings; the lyrics are on the Synth page
+      const getX = () => { const w = getV(); if (!w.vox) w.vox = normVox(null); return w.vox; };
+      { const r = makeRow(VP.level, 'level', getV, {idp:'dki', on}); box.append(r.r); dkInstRows.push(r); }
+      for (const k of ['robot', 'form', 'vib', 'glide']){ const r = makeRow(VU[k], k, getX, {idp:'dkx', on, noTrack:true}); box.append(r.r); dkInstRows.push(r); }
+      box.append(el('p', 'note', 'Lyrics: Synth page → this pad. ' + VoxCore.parse(getX().txt).length + ' syllables.'));
+      dkInstRows.forEach(r => r.refresh()); return;
+    }
     if (isBassV(v) && isSyn(pad)){
       // a bass voice: its sound and wobble, changed live as it plays
       const getB = () => { const w = getV(); if (!w.bass) w.bass = normBass(null); return w.bass; };

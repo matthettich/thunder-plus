@@ -22,7 +22,7 @@ Keep this file up to date at the end of a work session.
 - **App:** no build step. `index.html` is the whole tracker/synth app; `chains/index.html` and
   `waves/index.html` are the two modular patch editors loaded in frames.
 - **Cache-busters now:** `chains-worklet.js?v=12`, `waves-worklet.js?v=7`, `master-worklet.js?v=2` (index.html, the editor
-  pages, sw.js). Cache is `thunderplus-v73`.
+  pages, sw.js). Cache is `thunderplus-v74`.
 
 ## Licensing rule (the owner may sell the app later)
 
@@ -330,6 +330,35 @@ A cable into a slider's small purple jack (`p:<param>`) now always shows the ...
   level/pan each, detune, delay, window; splice-aligned delay-line shifter: each jump picks the lag that best
   correlates with the playing waveform, then crossfades). Checked: echo at 250.2 ms for 250 ms; harmonizer within
   0.3% by autocorrelation (the plain two-head version was ~2% out); CPU 2.5% / 4% / 4.5% of a desktop core.
+
+## Voice engine: a singing robot (13 Oct, evening)
+
+- **What:** synth slots can set `V.engine = 'vox'` (Synth → Engine: Voice). Settings in `V.vox` (`normVox`; `txt` is the
+  lyrics, the rest numbers); `voxParams(V)` folds in the voice's Tune, Drive, Level. Original code, no third-party code.
+- **`class VoxCore`** (ENGINE block, self-contained like BassCore; tables are static getters so `toString()` carries
+  them into the worklet):
+  - `parse(txt)` → syllables `{on:[…], nu, co:[…], w, word}`. Words: the dictionary (`dict()`, ~250 common words incl.
+    contractions) else `rules()`: letter-to-sound rules written after the 1976 NRL rules (public domain), format
+    `left|MATCH|right|PH` with `_` for the word edge. `[ARPAbet]` in brackets is used as is; `-` forces a syllable break.
+    `syllabify`: one consonant between vowels starts the next syllable, of more the first closes this one; NG never
+    starts one.
+  - Synthesis: glottal-pulse table ↔ polyBLEP saw (Robot), tilt (Bright), breath noise (louder in the open phase;
+    Voice 0 = whisper), five cascade resonators (Klatt form; F4/F5 fixed, all × Size), frication noise through its own
+    resonator in parallel, DC block, envelope, glide, delayed vibrato. Controls glide to targets (~12 ms formants).
+  - Notes: `on(leg, n, same)` plans syllable n: onset consonants (stops = closure + burst + aspiration; affricates =
+    closure + burst + frication), then the vowel held (`hold`); `off()` plays a diphthong's offglide, the coda, then
+    releases. `busy()` is true while the coda plays.
+- **Live:** `thunder-vox` worklet (`VOX_PROC`, in the same Blob as the bass one) with AudioParams rate/gate/trig/leg plus
+  `syl` and `same`. `makePlayer`'s `bassNode` makes a `vox` node per track+pad (key `t:pad:vox`); `bassNote` counts
+  syllables per node (`sylN`, a slide keeps the current one) and `stopAll` resets them, so PLAY starts the lyrics over.
+  `isLivePad` = bass or voice; offline renders await `bassReady` for either. Load shows in the CPU meter's Bass entry.
+- **Pads/Worker/exports:** `renderVox` sings the whole line at the pad's pitch, one syllable per `sylLen` (Pad step).
+- **UI:** `#voxWrap` card (lyrics textarea with syllable chips, Voice / Expression / Timing rows `VU`, presets
+  `VOX_PRE`, Say it). `typing()` now counts textareas. Tracker side panel shows Level, Robot, Size, Vibrato, Glide.
+- **Checked:** phonemes for test sentences; vowel spectra peak at their formants; 3.9% of a desktop core; a 12-note
+  melody through `pass()` (the offline tracker path, same worklet) sings every note, no NaN; Worker pad render; live
+  node outputs (peak 0.54) and reports load. Not yet judged by ear on the owner's phone.
+- **Ideas next:** a tracker command to jump to syllable N; CMU-dictionary pronunciations; per-note vowel colour.
 
 ## Running it locally
 

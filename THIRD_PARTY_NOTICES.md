@@ -64,4 +64,8 @@ SIL Open Font License 1.1, included as `fonts/OFL-ShareTechMono.txt`.
 - **Plate reverb** (…chains/…waves): written from the topology published in Jon Dattorro, "Effect Design, Part 1:
   Reverberator and Other Filters", J. Audio Eng. Soc. 45(9), 1997. No code was copied.
 - **Spring reverb**, **Ensemble**, **Ring mod**, **Limiter**, **Meter** and the other Oct 2026 utilities are original code.
-
+- **Voice engine** (…Thunder Plus synth slots): original code. Its letter-to-sound rules are written after the English
+  rules in H. S. Elovitz et al., "Automatic Translation of English Text to Phonetics by Means of Letter-to-Sound
+  Rules", NRL Report 7948 (US Naval Research Laboratory, 1976), a US government work in the public domain; the
+  formant synthesizer follows the published design of D. H. Klatt, "Software for a cascade/parallel formant
+  synthesizer", JASA 67(3), 1980. No code was copied.
