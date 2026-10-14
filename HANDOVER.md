@@ -459,6 +459,20 @@ Commits on `main`: 9ababb0 (fixes), e21c605 (presets + song-load fix), e8f2970 (
 - **Not yet heard on the phone:** all of the above was checked headless (renders, no NaN, levels, live nodes through
   `pass()`). Wavetable import (Serum-style 2048-sample frames) is deferred at the owner's request.
 
+## 14 Oct (midday): swing timing fix, four dog dances
+
+- **Swing/row timing fixed** (song `v:6`). A row used to last `pair·line·(sw or 1−sw)` with `pair = 2·swB`, so every row
+  lasted SWING NOTE's number of lines (16ths, the default: 2) and LPB 4 played 8th-note rows. Now `2·line·(…)`: a row
+  averages one line whatever SWING NOTE says. **Old songs are converted in `normSong`** (v < 6): LPB ÷ swB (else BPM ÷
+  swB when LPB doesn't divide), phrase LPBs ÷ swB, TICKS × swB, TIC values × swB, so DEL/RET/KIL/OFF/PSL/ARC keep
+  their length. Verified against the previous build: identical note times for 50/66/58/60% swing, swB 1–3, LPB 3/4/6,
+  with DEL and RET in the phrase. `swingNote()` toasts once ("now reads LPB 2, 12 ticks…"). New songs default to LPB 4
+  (true 16ths; the owner's earlier "LPB 8 default" was compensating for this bug). Grooves with a 0 (= "ticks a
+  step") digit in old songs would stretch with the new ticks; not converted.
+- **Dogs:** legs are now groups (`.leg.ll/.lr`, `--lL/--lR`). `DOG_MOVES` up / down / legs / both; `dogsFollow()` (on each
+  beat) advances the dance when the followed track (cursor's, else the first playing) starts a phrase: another block, or
+  its step wrapping back (a repeat). Verified live: a new dance every 16 rows.
+
 ## 14 Oct (late morning): Piano, Tine EP, Organ, SoundFont / General MIDI
 
 Cache `thunderplus-v85` (sw.js no longer caches `sounds/`: the app keeps fonts in IndexedDB).
@@ -518,25 +532,6 @@ Cache `thunderplus-v84`. Worklet versions unchanged.
   Input, Render & export with the `pExport` panel, Mastering with `pMaster` + LIMITER/MASTER rows), Screen
   (`buildScreen`: the Screen rows + `pSkin`), MIDI, Kit, App. `INNER_SECS` are re-parented on each open.
 - **FX target follows** the edited track (`draw()` sets `cFxT` on Song/Sect/Phrase). **LPB default 8** (new songs).
-- **Found, not changed (owner to decide):** with SWING NOTE 16ths (the default), each row lasts two lines
-  (`pair * line * sw` with `pair = 2 * swB`), so LPB 4 plays 8th-note rows. Fixing it doubles existing songs' speed.
-
-## Running it locally
-
-No build step; serve the repo root over HTTP (the editors load their worklet by `fetch`, which
-`file://` blocks):
-
-```
-cd thunder-plus
-python3 -m http.server 8734 --bind 127.0.0.1
-```
-
-Then open `index.html`, `chains/index.html` and `waves/index.html`. On their own the two editors log a 404
-for a `sw.js` beside them; that is expected (the service worker is the app's, at the root).
-
-## Rebuilding the effects wasm (`dsp/tfx/build.sh`)
-
-Sources (all MIT):
 - **Mutable:** `git clone --depth 1 https://github.com/pichenettes/eurorack`, then
   `git -C eurorack submodule update --init stmlib`. Use the current upstream: older checkouts lack Beads.
 - **DaisySP:** `git clone https://github.com/electro-smith/DaisySP`.

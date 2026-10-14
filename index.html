@@ -875,7 +875,10 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .dogs .ink{fill:var(--dk-ink); stroke:none}
 .dogs .eye, .dogs .toe{fill:none; stroke-width:1.6}
 .dogs .band{fill:var(--dk-pink)}
-.dogs :is(.bob,.arm,.head,.tail){transform-box:fill-box}
+.dogs :is(.bob,.arm,.head,.tail,.leg){transform-box:fill-box}
+/* Legs kick from the hip (the top of each leg); like the arms they follow CSS variables set on each beat. */
+.dogs .ll{transform-origin:70% 0%; transform:rotate(var(--lL, 0deg))} .dogs .lr{transform-origin:30% 0%; transform:rotate(var(--lR, 0deg))}
+.dogs .leg{transition:transform .12s ease-out}
 .dogs .bob{transform-origin:50% 100%}
 .dogs .al{transform-origin:100% 0%; transform:rotate(var(--aL, 14deg))} .dogs .ar{transform-origin:0% 0%; transform:rotate(var(--aR, -14deg))}
 .dogs .head{transform-origin:50% 90%}
@@ -1367,8 +1370,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
   <g class="dog d1" transform="translate(6 46)">
     <g class="bob">
       <g class="tail"><path class="o t" d="M90.0 140.0 L107.9 130.3 L116.0 106.0"></path><path class="f t c-brown-s" d="M90.0 140.0 L107.9 130.3 L116.0 106.0"></path></g>
-      <path class="ln c-brown" d="M44.0 132.0 L32.1 142.8 L32.1 163.2 L25.4 171.3 L27.5 174.2 L40.2 174.8 L44.9 171.7 L49.9 147.8 Z"></path><path class="ln c-brown" d="M86.0 132.0 L97.9 142.8 L97.9 163.2 L104.6 171.3 L102.5 174.2 L89.8 174.8 L85.1 171.7 L80.1 147.8 Z"></path>
-      <path class="ln toe" d="M27 171 l3 -3 M32 173 l2 -3 M103 171 l-3 -3 M98 173 l-2 -3"></path>
+      <g class="leg ll"><path class="ln c-brown" d="M44.0 132.0 L32.1 142.8 L32.1 163.2 L25.4 171.3 L27.5 174.2 L40.2 174.8 L44.9 171.7 L49.9 147.8 Z"></path><path class="ln toe" d="M27 171 l3 -3 M32 173 l2 -3"></path></g><g class="leg lr"><path class="ln c-brown" d="M86.0 132.0 L97.9 142.8 L97.9 163.2 L104.6 171.3 L102.5 174.2 L89.8 174.8 L85.1 171.7 L80.1 147.8 Z"></path><path class="ln toe" d="M103 171 l-3 -3 M98 173 l-2 -3"></path></g>
       <path class="ln c-brown" d="M65.0 70.0 L78.7 72.3 L89.5 79.3 L96.7 91.2 L99.0 105.9 L96.8 126.7 L90.1 142.1 L80.8 149.4 L65.0 151.5 L49.2 149.4 L39.9 142.1 L33.2 126.7 L31.0 105.9 L33.3 91.2 L40.5 79.3 L51.3 72.3 Z"></path>
       <path class="ln c-white" d="M57.0 84.0 L65.1 87.0 L73.0 84.3 L65.1 109.7 Z"></path>
       <g class="arm al"><path class="ln c-brown" d="M46.0 86.0 L33.2 103.0 L29.8 120.5 L33.0 125.0 L38.1 123.0 L43.3 107.1 L51.8 96.2 Z"></path><path class="ln toe" d="M31 121 l3 -1"></path></g>
@@ -1391,8 +1393,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <g class="bob">
       <g class="tail"><path class="ln c-grey" d="M86.0 152.0 L106.1 147.2 L117.8 133.9 L119.8 108.5 L111.3 95.7 L103.5 95.0 L97.2 99.7 L104.9 107.9 L105.7 119.7 L98.2 133.6 L84.0 142.2 Z"></path>
         <path class="ln eye" d="M100.0 106.0 L105.1 108.8 L108.7 114.6 L108.0 128.0"></path></g>
-      <path class="ln c-cream" d="M44.0 150.0 L31.0 162.6 L32.2 185.9 L25.6 192.7 L27.8 196.4 L40.6 196.8 L45.1 193.3 L51.9 163.8 Z"></path><path class="ln c-cream" d="M86.0 150.0 L99.0 162.6 L97.8 185.9 L104.4 192.7 L102.2 196.4 L89.4 196.8 L84.9 193.3 L78.1 163.8 Z"></path>
-      <path class="ln toe" d="M27 193 l3 -3 M32 195 l2 -3 M103 193 l-3 -3 M98 195 l-2 -3"></path>
+      <g class="leg ll"><path class="ln c-cream" d="M44.0 150.0 L31.0 162.6 L32.2 185.9 L25.6 192.7 L27.8 196.4 L40.6 196.8 L45.1 193.3 L51.9 163.8 Z"></path><path class="ln toe" d="M27 193 l3 -3 M32 195 l2 -3"></path></g><g class="leg lr"><path class="ln c-cream" d="M86.0 150.0 L99.0 162.6 L97.8 185.9 L104.4 192.7 L102.2 196.4 L89.4 196.8 L84.9 193.3 L78.1 163.8 Z"></path><path class="ln toe" d="M103 193 l-3 -3 M98 195 l-2 -3"></path></g>
       <path class="ln c-grey" d="M65.0 82.0 L78.6 84.6 L88.7 92.5 L94.8 105.0 L97.0 121.8 L95.0 141.6 L89.2 155.2 L80.1 162.9 L65.5 165.5 L50.8 163.2 L41.4 156.0 L35.3 142.5 L33.0 122.8 L34.9 106.0 L41.3 92.5 L51.4 84.6 Z"></path>
       <path class="ln c-cream" d="M65.0 96.0 L77.3 103.4 L82.0 124.6 L77.2 147.8 L64.5 157.9 L52.3 146.9 L48.0 123.6 L52.7 103.4 Z"></path>
       <path class="ln band" d="M39.0 88.0 L65.1 96.2 L90.9 88.2 L73.0 117.0 L64.9 120.0 L56.8 116.7 Z"></path>
@@ -1588,7 +1589,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <h3>Mastering</h3>
 <p><b>Settings → Master → Open mastering…</b> (or the <b>MASTERING</b> cell on the Mixer's master row: ▶ from the master level, then EDIT; or › MASTERING on the FX screen's master) puts a chain on the master bus: <b>EQ → Suppress → Compress → Limit</b>. Each has its own switch; the readouts show short-term loudness in and out (LUFS) and the highest peak. <b>EQ</b>: drag a point (left/right is frequency, up/down is gain), shift-drag or scroll for width, double-click empty space to add a bell, double-click a point to switch it off; the band row sets exact values. <b>Suppress</b> turns down resonances that stick out of the spectrum (Depth, Sharpness, Selectivity, Speed; drag the lines to set its range; Delta plays only what it removes). <b>Compress</b> is a glue compressor (its sidechain high-pass keeps the bass from pumping it). <b>Limit</b> catches every peak at the Ceiling, between samples too. Renders of the song include the chain and keep its ceiling; stems don't.</p>
 <h3>Settings</h3>
-<p><b>⚙ Settings</b> at the top: it starts with Audio (output device, level, latency, rate), then this screen’s own settings (in the tracker every Project setting: Song, Input, Screen, Render), then Master, Skin, Export, MIDI, Kit and App (Mobile, install, check for update). There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), show or hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD; it starts hidden on a computer and shown in the Mobile setup), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound and the current track’s effects, and a channel strip for the current track (stereo meter, fader with 0 dB at E0 and +6 dB at the top, pan, M and S). Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. On a big screen the space beside the grid is the <b>stage</b> (Settings → STAGE): BY SCREEN shows something useful for each screen (the dogs dance to the beat on Song and Project, Sect previews the phrase, Phrase shows a piano lighting the notes as they play, Inst the waveform, Mixer the master spectrum, FX the effects chain), DOGS shows the dogs everywhere, OFF leaves it empty. In the bar above the grid, double-click the tempo or LPB to type a new one (ticks a step are in Settings). The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
+<p><b>⚙ Settings</b> at the top: it starts with Audio (output device, level, latency, rate), then this screen’s own settings (in the tracker every Project setting: Song, Input, Screen, Render), then Master, Skin, Export, MIDI, Kit and App (Mobile, install, check for update). There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), show or hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD; it starts hidden on a computer and shown in the Mobile setup), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound and the current track’s effects, and a channel strip for the current track (stereo meter, fader with 0 dB at E0 and +6 dB at the top, pan, M and S). Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. On a big screen the space beside the grid is the <b>stage</b> (Settings → STAGE): BY SCREEN shows something useful for each screen (the dogs dance to the beat on Song and Project — a hop every beat, a bigger one on the bar, and a new dance (arms up, arms down, leg kicks, jumping jacks) every time the cursor’s track starts a phrase, so they count beats and phrases for you — Sect previews the phrase, Phrase shows a piano lighting the notes as they play, Inst the waveform, Mixer the master spectrum, FX the effects chain), DOGS shows the dogs everywhere, OFF leaves it empty. In the bar above the grid, double-click the tempo or LPB to type a new one (ticks a step are in Settings). The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots. <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song. <b>A voice per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chopping breaks</h3>
@@ -7501,10 +7502,10 @@ function normMst(j){
 function freshSong(){
   // MPC swing: the classic hardware's shuffle, applied on 8th, 16th or dotted-8th grid.
   // Voice-per-track parity: one synth voice per song track — ntr tracks need ntr + 8 pads, capped at 32.
-  return {app:'thunder-song', v:5, name:'Song 1', bpm:120, swing:50, swingB:2, limiter:true, renderFrom:0, master:255, chainPatch:null,
+  return {app:'thunder-song', v:6, name:'Song 1', bpm:120, swing:50, swingB:2, limiter:true, renderFrom:0, master:255, chainPatch:null,
     song:Array.from({length:256}, () => new Array(NT + 1).fill(-1)), chains:new Array(256).fill(null), phrases:new Array(256).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
-    tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:8, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
+    tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:4, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
     ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0), mst:freshMst(), presets:{voices:[], layers:[]}};   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
 }
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;
@@ -7512,6 +7513,10 @@ const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round
 // catch around the start-up load then replaced the saved song with the demo on every reload. Until it exists,
 // allow every pad an instrument can point at (32).
 function nslotsEarly(){ try { return nslots(); } catch(e){ return 32; } }
+// Set by normSong when it converted an older song's timing (see the swing fix there); swingNote() tells the person once.
+var swingConv = null;
+function swingNote(){ if (!swingConv) return; const c = swingConv; swingConv = null;
+  setTimeout(() => toast(`Timing fix: this song now reads LPB ${c.lpb}, ${c.ticks} ticks a step, ${c.bpm} BPM, and plays exactly as before. LPB 4 is now true 16ths.`, 7000), 1200); }
 function normSong(j){
   const S = freshSong(); if (!j || typeof j !== 'object') return S;
   if (typeof j.name === 'string') S.name = j.name.slice(0, 40);
@@ -7535,7 +7540,7 @@ function normSong(j){
     return [FXC.indexOf(nm), v];
   };
   // The MPC swing note value (which beat the swing lands on) follows the song; the hardware defaulted to 16ths.
-  S.lpb = clamp(int(j.lpb, 8), 1, 16); S.ticks = clamp(int(j.ticks, TICKS), 1, 32); S.dlen = clamp(int(j.dlen, 16), 1, PROWS);
+  S.lpb = clamp(int(j.lpb, 4), 1, 16); S.ticks = clamp(int(j.ticks, TICKS), 1, 32); S.dlen = clamp(int(j.dlen, 16), 1, PROWS);
   S.plen.fill(S.dlen);
   if (Array.isArray(j.plen)) j.plen.slice(0, 256).forEach((v, i) => S.plen[i] = clamp(int(v, S.dlen), 1, PROWS));
   if (Array.isArray(j.plpb)) j.plpb.slice(0, 256).forEach((v, i) => S.plpb[i] = clamp(int(v, 0), 0, 16));
@@ -7568,6 +7573,20 @@ function normSong(j){
   // Microtuning: cents per pitch class, clamped to ±100 (a semitone).
   S.tune = Array.from({length:12}, (_, k) => clamp(Number.isFinite(+((j.tune || [])[k])) ? +j.tune[k] : 0, -100, 100));
   S.presets = normPresets(j.presets);
+  // Songs before v6 played every row for SWING NOTE's number of lines (16ths, the default: two). Keep them sounding the
+  // same under the fixed timing: lines a beat ÷ that number, ticks a step × it (so DEL, RET, KIL, OFF, PSL, ARC and
+  // grooves keep their length), and TIC values with them. Where LPB doesn't divide, the tempo carries the rest.
+  const swF = int(j.v, 1) < 6 ? clamp(S.swingB || 2, 1, 7) : 1;
+  if (swF > 1){
+    const lp = S.lpb / swF;
+    if (Number.isInteger(lp)) S.lpb = lp; else S.bpm = clamp(Math.round(S.bpm / swF), 40, 300);
+    const div = Number.isInteger(lp) ? swF : 1;
+    for (let i = 0; i < 256; i++) if (S.plpb[i]) S.plpb[i] = clamp(Math.round(S.plpb[i] / div), 1, 16);
+    S.ticks = clamp((S.ticks || TICKS) * swF, 1, 32);
+    const TICI = FXC.indexOf('TIC');
+    for (const ph of S.phrases) if (ph) for (const r of ph) for (let m = FX0; m < RW; m += 2) if (r[m] === TICI && r[m + 1] > 0) r[m + 1] = clamp(r[m + 1] * swF, 1, 32);
+    swingConv = {lpb:S.lpb, ticks:S.ticks, bpm:S.bpm};
+  }
   // A voice per track is a synth-page setting, not a song setting — but if the saved kit needs track pads,
   // leave the checkbox on so the kit's voices stay visible.
   try { if (localStorage.getItem(VTRK) !== '1' && j.voices && j.voices.length > 16) { vtrk = true; localStorage.setItem(VTRK, '1'); } } catch(e){}
@@ -7583,6 +7602,7 @@ function demoSong(){
   return S;
 }
 let S = (() => { try { const s = localStorage.getItem(TK) || localStorage.getItem('thunder-song-v1'); return s ? normSong(JSON.parse(s)) : demoSong(); } catch(e){ return demoSong(); } })();
+setTimeout(() => { if (swingConv) try { saveS(); } catch(e){} swingNote(); }, 0);   // an older saved song was converted: save the new numbers, say so
 let sT = 0;
 // Undo: every saved change keeps the state before it (up to 200 steps). Changes made by one key or tap
 // (a paste, a cut, a note plus its instrument) settle at the end of that event, so they undo as one step.
@@ -7841,7 +7861,9 @@ function makeSeq(S, mode, o){
     // Pair assignment follows the phrase, not a global count (T.g counts steps only while this track runs),
     // so a 2-row pattern still swings exactly like two rows of a longer one would.
     const pair = 2 * swB, slot = (T.step + (mode === 'song' ? offInSong(T, t) : 0)) % pair, offB = slot >= swB;
-    const dur = gv ? gv[(T.g || 0) % 2] * tick : pair * line * (offB ? 1 - sw : sw);
+    // Each row averages one line: the on-beat half of the swing window is stretched by 2·sw and the off-beat half squeezed
+    // by 2·(1 − sw). (Before song v6 this was pair·line·…, so every row lasted swB lines: SWING NOTE changed the speed.)
+    const dur = gv ? gv[(T.g || 0) % 2] * tick : 2 * line * (offB ? 1 - sw : sw);
       const ctsp = !T.empty && chRow ? chRow[1] : 0;
       pos[t] = {row:T.row, cr:T.cr, step:T.step, sect:cid, phrase:pid};
       // A muted song block still runs its rows (so tempo and timing carry on) but its notes are dropped.
@@ -7880,7 +7902,7 @@ function makeSeq(S, mode, o){
           T.nth.set(key, n + 1); play = n % X === (Y - 1) % X; }
         if (fx.CHA != null && rand() * 255 >= fx.CHA) play = false;
         const at = t0 + Math.min((fx.DEL || 0) * tick, dur * 0.98), end = t0 + dur;
-        if (play) fxEvs(t, fx, at, pair * line / 2);   // momentary lengths count rows as they actually play (the average row)
+        if (play) fxEvs(t, fx, at, line);   // momentary lengths count rows (a row averages one line)
         const pit = (fx.PIT != null ? s8(fx.PIT) : 0) + (fx.FIN != null ? s8(fx.FIN) / 100 : 0);
         const mods = {arp:null, bend:null, vib:null};
         // Tracks 9–16 are polyphonic: all four note columns play, as a chord, over whatever is still ringing.
@@ -8936,7 +8958,7 @@ function resetCursors(){ cSect = cPhrase = cInst = cTrack = cFxT = cFxS = 0; for
 // A song's pattern numbering starts at 00. last.sect/last.phrase are the last sect/phrase NUMBER placed, and
 // they seed the first empty cell you type into — so a new song used to inherit the old song's number (a new
 // song began at 06 after the last one ended at 05). They are song-scoped, so reset them with the song.
-function setSong(s, msg){ tStop(true); S = s; setTimeout(mstSync, 0); projFile = null; resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); }
+function setSong(s, msg){ tStop(true); S = s; swingNote(); setTimeout(mstSync, 0); projFile = null; resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -9191,7 +9213,7 @@ function projRows(){
     {l:'TRACKS', get:() => ntr(), set:v => setNtr(v), min:8, max:NT, big:8, d:16, fmt:v => v + ' tracks',
       info:() => `How many tracks this song uses, 8 to ${vtrk ? 24 : NT} with ${vtrk ? 'a voice per track (one voice each)' : 'the shared 16 voices'}. Song and Mixer show as many as fit and scroll sideways (arrows, or swipe left and right). Tracks past this number are hidden and silent; their notes are kept`},
     {l:'TEMPO', get:() => S.bpm, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; }, min:40, max:300, big:10, d:120, fmt:v => v + ' BPM', after:() => { rtAllFx(); chainsTempo(); }, info:() => 'Beats per minute, 4 steps to a beat. Track delays follow it'},
-    {l:'LPB', get:() => S.lpb, set:v => S.lpb = v, min:1, max:16, big:4, d:8, fmt:v => v + ' lines/beat · 1/' + (v * 4), info:() => 'Lines per beat: 4 makes each row a 16th, 8 a 32nd, 3 or 6 triplets. A phrase can set its own on its LEN line'},
+    {l:'LPB', get:() => S.lpb, set:v => S.lpb = v, min:1, max:16, big:4, d:4, fmt:v => v + ' lines/beat · 1/' + (v * 4), info:() => 'Lines per beat: 4 makes each row a 16th, 8 a 32nd, 3 or 6 triplets. A phrase can set its own on its LEN line'},
     {l:'TICKS', get:() => S.ticks || TICKS, set:v => { S.ticks = v; if (tp.on && tp.seq) tp.seq.tks = v; }, min:1, max:32, big:4, d:TICKS, fmt:v => v + ' ticks a step', after:chainsTempo, info:() => 'How many ticks each step is cut into for DEL, RET, KIL, OFF, ARC, PSL and GRV (6 by default). A TIC command in a phrase changes it from that row on'},
     {l:'PATTERN LEN', get:() => S.dlen || 16, set:v => setDefLen(v), min:1, max:PROWS, big:4, d:16, fmt:v => v + (v === 1 ? ' row' : ' rows') + ' · new phrases', info:() => 'How many rows a new phrase starts with (empty phrases follow it too). Change one phrase with ROWS at the right of the tab bar, or its LEN line'},
     {l:'› ALL PHRASES TO ' + (S.dlen || 16), dbl:true, act:() => { for (let i = 0; i < 256; i++) S.plen[i] = S.dlen || 16; saveS(); draw(); toast(`Every phrase now plays ${S.dlen || 16} rows. Notes past that are kept, just not played.`); },
@@ -10358,12 +10380,30 @@ function stageLayout(){
 // Dogs: arms up and dancing while the song plays, a slow breath and a lazy tail when it stops.
 function dogsState(){
   const d = $('tStageDogs').querySelector('.dogs'), on = !!tp.on; d.classList.toggle('dance', on); d.classList.toggle('idle', !on);
-  if (!on) d.querySelectorAll('.dog').forEach(g => { g.style.removeProperty('--aL'); g.style.removeProperty('--aR'); });
+  if (!on){ dogMove = 0; dogPh = null; d.querySelectorAll('.dog').forEach(g => { for (const k of ['--aL', '--aR', '--lL', '--lR']) g.style.removeProperty(k); }); }
+}
+/* Four dances, a new one each time a phrase starts (so the dogs count phrases while the hops count beats):
+   ARMS UP (the original), ARMS DOWN (arms pumping at their sides), LEGS (hands on hips, alternate kicks) and
+   ARMS + LEGS (jumping jacks: arms up and legs out on one beat, back in on the next). */
+const DOG_MOVES = ['up', 'down', 'legs', 'both'];
+let dogMove = 0, dogPh = null, dogN = 0;
+// Which phrase the dogs follow: the one the cursor's track is playing, else the first track that is playing.
+function dogsPhrase(){
+  const P = tp.pos; if (!P) return null;
+  const t = tv === 'song' ? (cs.song.x === MT ? MT : cs.song.x) : cTrack;
+  return (P[t] && P[t].phrase >= 0 ? P[t] : P.find(q => q && q.phrase >= 0)) || null;
+}
+// A phrase starts when the followed track moves to another block or its step wraps back to the top (a repeat).
+function dogsFollow(){
+  const q = dogsPhrase(); if (!q) return;
+  const key = q.row + ':' + q.cr + ':' + q.phrase;
+  if (dogPh && (dogPh.key !== key || q.step < dogPh.step)){ dogMove = (dogMove + 1) % DOG_MOVES.length; dogN = 0; }
+  dogPh = {key, step:q.step};
 }
 // Beat clock: counted from the moment the song starts, at its tempo (re-anchored when TPO changes it),
 // against the output's latency so a hop lands with the sound.
 let stgT0 = 0, stgBeat = -1, stgBpm = 120, stgSide = 1, stgOn = false, stgFrameT = 0;
-function stageStart(t0){ stgT0 = t0; stgBeat = -1; stgBpm = S.bpm; }
+function stageStart(t0){ stgT0 = t0; stgBeat = -1; stgBpm = S.bpm; dogMove = 0; dogPh = null; dogN = 0; }
 function stageTick(now){
   if (stgOn !== !!tp.on){ stgOn = !!tp.on; if (stgKindNow === 'dogs') dogsState(); else if (stgKindNow) stageCanvas(true); }
   if (!stgKindNow || $('tStage').hidden) return;
@@ -10374,16 +10414,21 @@ function stageTick(now){
   const per = 60 / bpm, b = Math.floor((t - stgT0) / per);
   if (b < 0 || b === stgBeat) return; stgBeat = b;
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  dogsBeat(b % 4 === 0, per * 1000);
+  dogsFollow(); dogsBeat(b % 4 === 0, per * 1000);
 }
 function dogsBeat(bar, ms){
-  stgSide = -stgSide; const d = Math.min(ms * 0.85, 650);
+  stgSide = -stgSide; const d = Math.min(ms * 0.85, 650), mv = DOG_MOVES[dogMove], odd = (dogN++ & 1) === 1;
   $('tStageDogs').querySelectorAll('.dog').forEach((g, i) => {
-    const sd = stgSide * (i ? -1 : 1), hop = bar ? 15 : 8;
-    g.querySelector('.bob').animate([{transform:'translateY(0) rotate(0deg)'}, {transform:`translateY(${-hop}px) rotate(${sd * 5}deg)`, offset:.35}, {transform:'translateY(0) rotate(0deg)'}], {duration:d, easing:'ease-out'});
+    const sd = stgSide * (i ? -1 : 1), hop = (bar ? 15 : 8) * (mv === 'legs' ? 0.5 : 1);
+    g.querySelector('.bob').animate([{transform:'translateY(0) rotate(0deg)'}, {transform:`translateY(${-hop}px) rotate(${sd * (mv === 'both' ? 2 : 5)}deg)`, offset:.35}, {transform:'translateY(0) rotate(0deg)'}], {duration:d, easing:'ease-out'});
     g.querySelector('.head').animate([{transform:'rotate(0deg)'}, {transform:`rotate(${sd * 9}deg)`, offset:.4}, {transform:'rotate(0deg)'}], {duration:d, easing:'ease-out'});
     g.querySelector('.tail').animate([{transform:'rotate(0deg)'}, {transform:'rotate(-20deg)'}, {transform:'rotate(10deg)'}, {transform:'rotate(0deg)'}], {duration:d});
-    g.style.setProperty('--aL', (112 + sd * 22) + 'deg'); g.style.setProperty('--aR', (-112 + sd * 22) + 'deg');
+    let aL, aR, lL = 0, lR = 0;
+    if (mv === 'up'){ aL = 112 + sd * 22; aR = -112 + sd * 22; }
+    else if (mv === 'down'){ aL = 8 + sd * 22; aR = -8 + sd * 22; }   // arms down, swinging together side to side
+    else if (mv === 'legs'){ aL = 30; aR = -30; lL = sd > 0 ? 34 : 0; lR = sd > 0 ? 0 : -34; }   // hands on hips, a kick a beat
+    else { aL = odd ? 18 : 122; aR = odd ? -18 : -122; lL = odd ? 0 : 20; lR = odd ? 0 : -20; }   // jumping jacks
+    g.style.setProperty('--aL', aL + 'deg'); g.style.setProperty('--aR', aR + 'deg'); g.style.setProperty('--lL', lL + 'deg'); g.style.setProperty('--lR', lR + 'deg');
   });
 }
 // The canvas views share one canvas and title, in the tracker screen's own colours.
