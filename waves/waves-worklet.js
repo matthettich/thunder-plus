@@ -1420,6 +1420,60 @@ class DegradeCore {
   }
 }
 
+/* ---------- Resonator (original code) ----------
+   Tuned resonators that ring at a note and a chord: up to five feedback delay lines (Karplus–Strong style), each
+   tuned to a chord tone above Note, with a damping filter in the loop (Bright) and a decay time (Decay). String rings
+   with every harmonic; Tube (negative feedback) only the odd ones, hollow like a pipe. Spread places the voices
+   across the stereo field. The input excites them all; Mix blends with the dry sound. Self-contained: one copy each
+   in the pads' engine, the track-FX worklet and the …chains/…waves worklets. In place, stereo. */
+class ResonCore {
+  constructor(sr){ this.sr = sr; this.v = []; for (let i = 0; i < 5; i++) this.v.push({ b:new Float32Array(Math.ceil(sr / 20) + 4), w:0, lp:0, dc:0, dx:0 }); this.sig = ''; }
+  static defaults(){ return {note:48, chord:3, decay:0.5, bright:0.6, mode:0, spread:0.5, mix:0.5}; }
+  static get CHORDS(){ return [[0], [0, 12, 24], [0, 7, 12, 19], [0, 4, 7, 12, 16], [0, 3, 7, 12, 15], [0, 5, 7, 12, 17], [0, 4, 7, 11, 14], [0, 3, 7, 10, 14], [0, 4, 7, 10, 12], [0, 5, 10, 15, 20], [0, 12, 19, 24, 28], [0, 1, 2, 3, 4]]; }
+  static get CHORD_NAMES(){ return ['Unison', 'Octaves', 'Fifths', 'Major', 'Minor', 'Sus4', 'Major 7', 'Minor 7', 'Dominant 7', 'Fourths', 'Harmonics', 'Cluster']; }
+  process(L, R, n, p){
+    const sr = this.sr, C = ResonCore.CHORDS[Math.max(0, Math.min(11, p.chord | 0))], nv = C.length, tube = p.mode >= 0.5;
+    const t60 = 0.05 * Math.pow(160, Math.max(0, Math.min(1, p.decay))), a = 0.08 + 0.9 * Math.max(0, Math.min(1, p.bright)), mix = p.mix, sp = p.spread;
+    const ing = 0.5 / Math.sqrt(nv);
+    for (let k = 0; k < nv; k++){
+      const V = this.v[k], f = 440 * Math.pow(2, (p.note + C[k] - 69) / 12);
+      // loop length: one period (half for Tube, whose sign flip doubles it), less the damping filter's own delay
+      const per = sr / f * (tube ? 0.5 : 1);
+      V.d = Math.max(2, Math.min(V.b.length - 3, per - (1 - a) / a));
+      V.g = Math.pow(10, -3 * (per / sr) / t60) * (tube ? -1 : 1);
+      const pan = nv > 1 ? (k / (nv - 1) - 0.5) * sp : 0; V.gl = Math.cos((pan + 0.5) * Math.PI / 2); V.gr = Math.sin((pan + 0.5) * Math.PI / 2);
+    }
+    for (let i = 0; i < n; i++){
+      const x = (L[i] + R[i]) * 0.5 * ing; let yl = 0, yr = 0;
+      for (let k = 0; k < nv; k++){
+        const V = this.v[k], B = V.b, N = B.length, r = V.w - V.d, ri = Math.floor(r), fr = r - ri;
+        const i0 = ri < 0 ? ri + N : ri, i1 = i0 + 1 >= N ? 0 : i0 + 1, d = B[i0] + (B[i1] - B[i0]) * fr;
+        V.lp += (d - V.lp) * a;
+        let y = x + V.lp * V.g;
+        y = y > 1.5 ? 1.5 : y < -1.5 ? -1.5 : y;
+        B[V.w] = y; V.w = V.w + 1 === N ? 0 : V.w + 1;
+        const o = V.lp - V.dx + 0.995 * V.dc; V.dx = V.lp; V.dc = o;   // DC block on the way out
+        yl += o * V.gl; yr += o * V.gr;
+      }
+      L[i] = L[i] * (1 - mix) + Math.tanh(yl) * mix; R[i] = R[i] * (1 - mix) + Math.tanh(yr) * mix;
+    }
+  }
+}
+
+/* Resonator: chord-tuned resonators (see ResonCore). */
+const Reson = {
+  type:'reson', scope:'mono', cost:.06,
+  inputs:{ in:'audio', inR:'audio', note:'cv' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ note:[48, 24, 96, 1], chord:[3, 0, 11, 1], mode:[0, 0, 1, 1], decay:[.5, 0, 1, .01], bright:[.6, 0, 1, .01], spread:[.5, 0, 1, .01], mix:[.5, 0, 1, .01] },
+  create:sr => ({ r:new ResonCore(sr), pp:{} }),
+  process(st, io, ctx){
+    const L = io.out.out, R = io.out.outR, p = io.p, q = st.pp; L.set(io.in.in); R.set(inR(io));
+    // Note CV (0.5 = A4, 0.125 per octave) sets the pitch; then the knob transposes it from C3
+    q.note = linked(io, 'note') ? 69 + (io.in.note[0] - .5) * 96 + (p.note - 48) : p.note; q.chord = p.chord; q.mode = p.mode; q.decay = p.decay; q.bright = p.bright; q.spread = p.spread; q.mix = p.mix;
+    st.r.process(L, R, ctx.block, q);
+  }
+};
+
 /* Degrade: lo-fi crush and a noise floor (see DegradeCore). Rate is 0–1 here: 300 Hz × 160^rate, the top is off. */
 const Degrade = {
   type:'degrade', scope:'mono', cost:.06,
@@ -1438,7 +1492,7 @@ const SHARED_MODULES = { beads:Beads,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
   meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
-  dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade };
+  dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson };
 /* ===SHARED MODULES END=== */
 
 const MODULES = { ...SHARED_MODULES, hostIn:HostIn, vco:VCO, fm:FM, additive:Additive, noise:Noise, plaits:Plaits, elements:Elements,

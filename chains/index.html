@@ -554,14 +554,14 @@ Object.assign(SHARED_MODULES, {
     about:'Harmonizer: up to two pitch-shifted copies of the sound at fixed intervals (a third, fifth, octave…), each with its own level and pan. Voice 2 starts silent: turn up Level 2 for a three-part stack (a major triad with the defaults). Detune spreads the two voices apart (set both to Unison with a little Detune and Delay for a wide double). Window: longer is smoother, shorter is tighter on drums. Dry sets the original.' }, STEREO)
 });
 Object.assign(SHARED_FAMILY, { meter:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', ensemble:'afx',
-  degrade:'afx', blipdrum:'gen', life:'mod', dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
+  reson:'afx', degrade:'afx', blipdrum:'gen', life:'mod', dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
   envfol:'mod', gateex:'mod', pitchfol:'mod', slew:'util', snh:'util', quant:'util' });
 const SHARED_PORT_LABEL = { car:'Carrier', freq:'Freq', a:'A', b:'B', sum:'A+B', diff:'A−B', mul:'A×B', min:'Min', max:'Max',
   and:'AND', or:'OR', xor:'XOR', not:'NOT A', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent', time:'Time' };
 /* Palette groups: added to an existing group of the same name, or made (audio groups before Control, the rest at the end).
    A module already in the palette is left where it is. */
 const SHARED_PALETTE = [
-  ['Effects', [['degrade','Degrade (lo-fi)'],['dimension','Dimension (stereo chorus)'],['bbd','BBD delay'],['harm','Harmonizer'],['ringmod','Ring mod'],['ensemble','Ensemble chorus'],['phaser','Phaser'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['beads','Beads']], 'audio'],
+  ['Effects', [['reson','Resonator (chord)'],['degrade','Degrade (lo-fi)'],['dimension','Dimension (stereo chorus)'],['bbd','BBD delay'],['harm','Harmonizer'],['ringmod','Ring mod'],['ensemble','Ensemble chorus'],['phaser','Phaser'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['beads','Beads']], 'audio'],
   ['Reverbs', [['spring','Spring reverb'],['plate','Plate reverb'],['room','Room reverb'],['space','Space reverb']], 'audio'],
   ['More effects', [['comb','Comb resonator'],['transient','Transient shaper'],['tgate','Trance gate'],['ott','Multiband squash'],['fshift','Frequency shifter'],['vinyl','Vinyl'],['dub','Dub tape'],['cab','Speaker cab'],['tube','Tube'],['flanger','Flanger'],['tremolo','Tremolo'],['odrive','Overdrive'],['folder','Wavefolder'],['autowah','Auto-wah'],['pshift','Pitch shifter'],['ladder','Ladder filter'],['xmod','Cross-mod'],['lofi','Lo-fi'],['drive','Drive'],['air','Air']], 'audio'],
   ['Filters and amps', [['blades','Blades filter']], 'audio'],
@@ -607,6 +607,12 @@ Object.assign(SHARED_MODULES, {
       trig:{l:'Fire on', c:opts(['Alive', 'Born'])}, rule:{l:'Rule', c:opts(['Life', 'HighLife', 'Seeds', 'Maze', 'Day & Night'])}, rot:{l:'Colours', f:v => '+' + Math.round(v)}, len:{l:'Gate length', f:pct} }),
     about:'Life: a Game of Life sequencer. Draw cells on the grid (tap or drag; Clear, Random and Glider help). A playhead sweeps the columns, one per Step at the song tempo (or one per pulse on Clock), and every live cell in its column fires the gate of its row: patch the coloured outputs 1–8 into a Blip drum. After each sweep the cells live one generation, so the rhythm changes as patterns grow, move and die. Loop brings your drawing back every N generations (Evolve never does), Fire on Born plays only new cells, Rule picks the world, Colours turns which row feeds which output. Any fires on every hit; Count is how many cells are in the column.' }
 });
+SHARED_MODULES.reson = { label:'Resonator', scope:'mono', inputs:{ in:'audio', inR:'audio', note:'cv' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ note:[48, 24, 96, 1], chord:[3, 0, 11, 1], mode:[0, 0, 1, 1], decay:[.5, 0, 1, .01], bright:[.6, 0, 1, .01], spread:[.5, 0, 1, .01], mix:[.5, 0, 1, .01] },
+  ui:{ note:{l:'Note', f:v => NOTE_NAMES[((Math.round(v) % 12) + 12) % 12] + (Math.floor(Math.round(v) / 12) - 1)},
+    chord:{l:'Chord', c:opts(['Unison', 'Octaves', 'Fifths', 'Major', 'Minor', 'Sus4', 'Major 7', 'Minor 7', 'Dominant 7', 'Fourths', 'Harmonics', 'Cluster'])},
+    mode:{l:'Type', c:opts(['String', 'Tube'])}, decay:{l:'Decay', f:pct}, bright:{l:'Bright', f:pct}, spread:{l:'Spread', f:pct}, mix:{l:'Mix', f:wet} },
+  about:'Resonator: up to five tuned resonators ringing at Note and a Chord above it (octaves, fifths, major, minor, sevenths, fourths, harmonics…), so drums, noise or a voice ring out in harmony. String rings with every harmonic, Tube only the odd ones (hollow, like a pipe). Decay sets how long they ring, Bright how much top end survives, Spread places the voices across the stereo field. Patch a pitch CV into Note to play it (a Sequencer, Steps, Pitch Follow…); the Note knob then transposes it (C3 = as played).' };
 SHARED_MODULES.degrade = Object.assign({ label:'Degrade', scope:'mono', params:{ bits:[24, 1, 24, .1], rate:[1, 0, 1, .001], noise:[.15, 0, 1, .01], color:[.3, 0, 1, .01], follow:[.6, 0, 1, .01], dry:[0, 0, 1, .01], wet:[1, 0, 1, .01] },
   ui:{ bits:{l:'Bits', f:v => v >= 23.5 ? 'Off' : v.toFixed(1) + ' bit'}, rate:{l:'Rate', f:v => v >= .999 ? 'Off' : khz(300 * Math.pow(160, v))},
     noise:{l:'Noise', f:v => v < .005 ? 'Off' : (20 * Math.log10(v * v * .25)).toFixed(1) + ' dB'}, color:{l:'Colour', f:v => v < .02 ? 'White' : v > .98 ? 'Dark' : pct(v) + ' dark'},
@@ -1060,7 +1066,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=14';
+    const url = opts.url || './chains-worklet.js?v=15';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {

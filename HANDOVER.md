@@ -21,8 +21,8 @@ Keep this file up to date at the end of a work session.
   - 13 Oct: **pad rendering moved to a Worker** (see below), and the offer to open ...Thunder's saved work.
 - **App:** no build step. `index.html` is the whole tracker/synth app; `chains/index.html` and
   `waves/index.html` are the two modular patch editors loaded in frames.
-- **Cache-busters now:** `chains-worklet.js?v=14`, `waves-worklet.js?v=9`, `master-worklet.js?v=2` (index.html, the editor
-  pages, sw.js). Cache is `thunderplus-v77`.
+- **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=10`, `master-worklet.js?v=2` (index.html, the editor
+  pages, sw.js). Cache is `thunderplus-v78`.
 
 ## Licensing rule (the owner may sell the app later)
 
@@ -404,6 +404,17 @@ All original code; the name stays generic.
   never `tfx_free`d. It is NOT in `tools/fxgen.py` (hand-added). **Module** `degrade` in …chains/…waves (rate 0–1 there).
 - **Checked:** noise RMS matches the formula at every Colour; Follow 100% drops the hiss to −47 dB 0.35 s after the
   sound; pad FX −24 dB floor at Noise 50%; track FX through the worklet −18 dB floor at NOISE 180 (vs −240 without).
+
+## Resonator (chord) (13 Oct, evening)
+
+- **`class ResonCore`** (original; three identical copies like DegradeCore; the track-FX Blob is now
+  `DegradeCore + ResonCore + TFX_SRC`): up to 5 Karplus–Strong loops tuned to Note + a chord (`CHORDS`, 12 shapes),
+  one-pole damping in the loop (Bright), feedback from a T60 (Decay: 0.05 × 160^decay s), Tube = negative feedback with
+  the loop halved (odd harmonics, same pitch), loop length minus the damping filter's delay, DC block, tanh out,
+  Spread pans the voices. Measured: in tune (110/220/440 Hz exact; String and Tube), < 1% of a core.
+- **Pad FX** `reson` (js), **track FX** `reson` (`RESO`, id 98, in `TAILS`), **module** `reson` (Note CV: 0.5 = A4,
+  0.125/oct, the knob transposes from C3). Rings and Comb resonator are still there; this is the chord one.
+- Test gotcha: `pass(evs, …, getB)` needs a real `getB` (a buffer per pad), or the notes are silent.
 
 ## Running it locally
 
