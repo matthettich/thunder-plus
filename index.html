@@ -1177,6 +1177,11 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
         <button id="bMidiReset">Reset all</button>
         <div class="segrow"><span>Velocity</span><div class="seg" id="segVel"></div></div>
       </div>
+      <div class="audrow"><span>Output</span><select id="midiOutSel" aria-label="MIDI output port"><option value="">None</option></select></div>
+      <div class="segrow"><span>Clock out</span><div class="seg" id="segClkOut"></div></div>
+      <div class="segrow"><span>Clock in</span><div class="seg" id="segClkIn"></div></div>
+      <div class="audrow"><span>Gear delay</span><input type="range" id="midiLat" min="-50" max="200" step="1" aria-label="How late your MIDI gear sounds, in milliseconds"><output id="midiLatV"></output></div>
+      <p class="note">Instruments set to <b>MIDI</b> (INST › OUTPUT) play the Output port on their own channel. <b>Clock out</b> sends tempo, Start and Stop while the song plays. <b>Clock in</b> follows another device's clock: its Start and Stop run PLAY, and its tempo sets ours. <b>Gear delay</b>: how long your hardware takes to sound after a MIDI note; raise it if the gear sounds late against ...Thunder, lower it if early.</p>
       <p class="note" id="midiNote">Plug a controller in (USB-C on the phone), tap Connect MIDI, and pads 00–07 answer notes 36–43; other notes play the selected synth. Tap <b>Learn</b>, then: tap any pad (drums or synths) and hit a key to give it that note, or touch any slider and turn a knob to put it on that knob. A knob works the slider for whichever pad, layer or effect is open. Select a pad or slider in Learn and tap <b>Unlearn</b> to clear it.</p>
     </div>
   </section>
@@ -6606,12 +6611,13 @@ $('fileIn').addEventListener('change', async e => {
 // A learned knob drives that control for whichever pad, layer or effect is open, like most hardware.
 const MKEY = 'thunderplus-midi-v1';
 const DEFNOTES = [36,37,38,39,40,41,42,43, -1,-1,-1,-1,-1,-1,-1,-1];
-const midi = {on:false, learn:false, target:-1, ccTarget:'', notes:DEFNOTES.slice(), cc:{}, vel:true, access:null};
+const midi = {on:false, learn:false, target:-1, ccTarget:'', notes:DEFNOTES.slice(), cc:{}, vel:true, access:null, outId:'', clkOut:false, clkIn:false, lat:0};
 try { const m = JSON.parse(localStorage.getItem(MKEY) || 'null');
   if (m && Array.isArray(m.notes)){ midi.notes = DEFNOTES.map((d, i) => Number.isInteger(m.notes[i]) ? m.notes[i] : d); midi.vel = m.vel !== false; midi.want = !!m.want; }
   if (m && m.cc && typeof m.cc === 'object') for (const k in m.cc) if (typeof m.cc[k] === 'string') midi.cc[k] = m.cc[k];
+  if (m){ midi.outId = typeof m.outId === 'string' ? m.outId : ''; midi.clkOut = !!m.clkOut; midi.clkIn = !!m.clkIn; midi.lat = Math.max(-50, Math.min(200, +m.lat || 0)); }
 } catch(e){}
-const saveMidi = () => { try { localStorage.setItem(MKEY, JSON.stringify({notes:midi.notes, cc:midi.cc, vel:midi.vel, want:midi.on})); } catch(e){} };
+const saveMidi = () => { try { localStorage.setItem(MKEY, JSON.stringify({notes:midi.notes, cc:midi.cc, vel:midi.vel, want:midi.on, outId:midi.outId, clkOut:midi.clkOut, clkIn:midi.clkIn, lat:midi.lat})); } catch(e){} };
 function midiStatus(msg){ $('midiStat').textContent = msg; }
 const ccName = k => { const [ch, n] = k.split(':'); return 'CC ' + n + (+ch ? ' ch ' + (+ch + 1) : ''); };
 const rowLabel = id => { const e = document.getElementById(id), r = e && e.closest('.row'), l = r && r.querySelector('label'); return l ? l.textContent : id; };
@@ -6632,6 +6638,7 @@ function ccMove(k, v){
 }
 function onMidi(e){
   const [st, d1, d2] = e.data; if (!st) return;
+  if (st >= 0xF8){ clkIn(st, e.timeStamp || performance.now()); return; }   // clock, Start, Continue, Stop
   const ty = st & 0xf0, ch = st & 0x0f;
   if (ty === 0xb0){
     const k = ch + ':' + d1;
@@ -6662,6 +6669,7 @@ function onMidi(e){
 const midiHeld = new Map();
 function hookInputs(){
   let n = 0; midi.access.inputs.forEach(inp => { inp.onmidimessage = onMidi; n++; });
+  moPorts();
   midiStatus(n ? `${n} controller${n > 1 ? 's' : ''} connected` : 'No controller found. Plug one in.');
 }
 async function connectMidi(){
@@ -6704,6 +6712,137 @@ $('bMidiReset').addEventListener('click', () => {
 });
 makeSeg($('segVel'), [[true,'On'],[false,'Off']], () => midi.vel, v => { midi.vel = v; saveMidi(); });
 if (midi.want && navigator.requestMIDIAccess) connectMidi();
+
+/* ---------- MIDI out and MIDI clock ---------- */
+// OUTPUT on the INST screen sends an instrument's notes to the port picked in Settings → MIDI, on the instrument's
+// channel, instead of (MIDI) or as well as (PAD+MIDI) its pad. Notes leave with timestamps from the sequencer's
+// look-ahead, mapped from the audio clock to performance.now() at the moment they're heard, so external gear lines
+// up with what ...Thunder plays; Gear delay sends them earlier for gear that sounds late.
+// Clock out: Start, then 24 clocks per beat, then Stop, from the same 'beat' events the tempo-locked effects use.
+// Clock in: another device's Start/Continue/Stop run PLAY. Its tempo (averaged over two beats) sets ours, and small
+// tempo nudges (at most ±8% while catching up, ±3% after) keep our beats in phase with its clocks.
+const MO_NAMES = ['PAD', 'MIDI', 'PAD+MIDI'];
+const mx = {held:[], used:new Set(), beat:null, clk:{on:false, k:0}, inT:[], inK:0, inRun:false, ext:0, slave:false};
+const midiOut = () => (midi.access && midi.outId && midi.access.outputs.get(midi.outId)) || null;
+// The audio clock → performance.now() mapping (in ms, for the moment a sound is heard). getOutputTimestamp() jitters by
+// a few ms from call to call, so the offset is smoothed (it still follows slow drift between the two clocks);
+// a jump of more than 50 ms (a new output device, a restart) takes the new value at once.
+const amap = {off:null};
+function mapUpd(){
+  if (!ctx) return 0;
+  let pt = 0, ct = 0;
+  try { const o = ctx.getOutputTimestamp(); pt = o.performanceTime; ct = o.contextTime; } catch(e){}
+  if (!pt){ pt = performance.now(); ct = ctx.currentTime - (ctx.outputLatency || ctx.baseLatency || 0); }
+  const o = pt - ct * 1000;
+  if (amap.off == null || Math.abs(o - amap.off) > 50) amap.off = o; else amap.off += (o - amap.off) * 0.02;
+  return amap.off;
+}
+// Audio-clock time t (when the sound is heard) → the performance.now() time that MIDI timestamps use, and back.
+const a2p = t => t * 1000 + (amap.off == null ? mapUpd() : amap.off);
+const p2a = p => (p - (amap.off == null ? mapUpd() : amap.off)) / 1000;
+function msend(bytes, t, early){
+  const o = midiOut(); if (!o || !ctx) return;
+  const at = t == null ? 0 : a2p(t) - (early ? midi.lat : 0);
+  try { o.send(bytes, Math.max(performance.now(), at)); } catch(e){}
+}
+const moEnd = e => Math.min(e.cut != null ? e.cut : Infinity, e.rel != null ? e.rel : Infinity);
+function offOne(h, at){ if (h.end <= at) return; msend([0x80 | h.ch, h.n, 0], Math.max(at, h.t + 0.001), true); h.end = at; }
+// End every MIDI note track t is holding, at audio time at (notes already ended by then are left alone).
+function moOff(t, at){ const H = mx.held[t]; if (!H || !H.length) return; for (const h of H) offOne(h, at); mx.held[t] = H.filter(h => h.end > at); }
+function moNote(e, I){
+  if (!((e.vel == null ? 1 : e.vel) > 0)) return;
+  const t = e.track, ch = (I.mch | 0) & 15, n = clamp(Math.round(e.mn), 0, 127), H = mx.held[t] || (mx.held[t] = []);
+  // A new note on a mono track ends the one before; a poly track keeps up to 4; the same key again is released first.
+  if (!e.poly) moOff(t, e.t);
+  else { for (const h of H) if (h.ch === ch && h.n === n) offOne(h, e.t); let live = H.filter(h => h.end > e.t); while (live.length >= 4) offOne(live.shift(), e.t); }
+  msend([0x90 | ch, n, clamp(Math.round((e.vel == null ? 1 : e.vel) * 127), 1, 127)], e.t, true); mx.used.add(ch);
+  const h = {ch, n, t:e.t, end:Infinity}, end = moEnd(e);
+  if (end < Infinity){ msend([0x80 | ch, n, 0], Math.max(e.t + 0.001, end), true); h.end = Math.max(e.t + 0.001, end); }
+  mx.held[t] = (mx.held[t] || []).filter(x => x.end > e.t).concat(h);
+}
+// One sequencer event. Returns true when it was for MIDI only (the pad must not play it).
+function moEv(e){
+  if (e.type === 'beat'){ mx.beat = e; if (midi.clkOut && !mx.clk.on && e.b === 0){ msend([0xFA], e.t); mx.clk = {on:true, k:0}; } return false; }
+  if (e.type === 'off'){ moOff(e.track, e.t); return false; }
+  if (e.type === 'mod'){ const end = moEnd(e); if (end < Infinity) moOff(e.track, end); return false; }
+  if (e.type !== 'note' || e.ii == null) return false;
+  const I = S.insts[e.ii], m = I ? I.mo | 0 : 0;
+  if (!m){ moOff(e.track, e.t); return false; }   // the column switched to a pad instrument
+  if (e.track >= S.mix.length || audible(e.track)) moNote(e, I);
+  return m === 1;
+}
+// Clocks up to the time the sequencer has booked so far (24 per beat, straight: swing moves notes, not the clock).
+function moClock(s){
+  mapUpd();
+  const c = mx.clk, b = mx.beat; if (!midi.clkOut || !c.on || !b) return;
+  const bpm = s.bpm, upto = b.b + (s.time - b.t) * bpm / 60;
+  for (let n = 0; c.k / 24 < upto - 1e-9 && n < 512; n++, c.k++) msend([0xF8], b.t + (c.k / 24 - b.b) * 60 / bpm);
+}
+function moStart(){ mx.beat = null; mx.clk = {on:false, k:0}; }
+// Every MIDI note out ends now, including ones booked ahead (OUTPUT, MIDI CH or the port changed, or STOP).
+function moRelease(){
+  const o = midiOut(), now = ctx ? ctx.currentTime : 0;
+  if (o){
+    if (!tp.on) try { if (typeof o.clear === 'function') o.clear(); } catch(e){}   // drop what was booked ahead (not every browser can)
+    for (const H of mx.held) if (H) for (const h of H) if (h.end > now){
+      msend([0x80 | h.ch, h.n, 0]); if (h.t > now) msend([0x80 | h.ch, h.n, 0], h.t + 0.001, true); }
+    for (const ch of mx.used) msend([0xB0 | ch, 123, 0]);   // All Notes Off
+  }
+  mx.held = [];
+}
+function moStop(){
+  const was = mx.clk.on; moRelease(); if (was) msend([0xFC]);
+  mx.clk = {on:false, k:0}; mx.beat = null;
+}
+// Clock in.
+function clkIn(st, ts){
+  if (!midi.clkIn) return;
+  if (st === 0xFA || st === 0xFB){
+    mx.inK = 0; mx.inRun = true;
+    if (tp.on) tStop(true);
+    if (mx.ext) setTempoLive(mx.ext);
+    mx.slave = true; playCtx(); return;
+  }
+  if (st === 0xFC){ mx.inRun = false; if (tp.on && mx.slave) tStop(); mx.slave = false; return; }
+  if (st !== 0xF8) return;
+  mapUpd();
+  const T = mx.inT; if (T.length && ts - T[T.length - 1] > 1000) T.length = 0;   // the clock stopped for a while: start over
+  T.push(ts); if (T.length > 49) T.shift();
+  if (mx.inRun) mx.inK++;
+  if (T.length < 25) return;
+  const bpm = 60000 / (24 * (T[T.length - 1] - T[0]) / (T.length - 1));
+  if (!(bpm >= 20 && bpm <= 400)) return;
+  mx.ext = bpm;
+  if (mx.inK % 6) return;   // act every sixteenth
+  let target = bpm;
+  // In phase: where the other device is (clocks since its Start; the first clock is beat 0) against where we are
+  // at the moment that clock is heard (plus Gear delay).
+  if (tp.on && mx.slave && mx.inRun && mx.beat && tp.seq && ctx){
+    const ta = p2a(ts + midi.lat), ours = mx.beat.b + (ta - mx.beat.t) * tp.seq.bpm / 60, err = (mx.inK - 1) / 24 - ours;
+    const lim = Math.abs(err) > 0.05 ? 0.08 : 0.03;   // catch up quickly after Start, then only small nudges
+    if (Math.abs(err) < 2) target = bpm * (1 + clamp(err / 2, -lim, lim));
+  }
+  setTempoLive(target);
+}
+// Tempo from the clock: exact while playing, rounded in the song (S.bpm is whole BPM).
+function setTempoLive(v){
+  if (tp.on && tp.seq) tp.seq.bpm = v;
+  const r = clamp(Math.round(v), 40, 300);
+  if (r !== S.bpm){ S.bpm = r; try { rtAllFx(); chainsTempo(); } catch(e){} if (!tp.on) draw(); }
+}
+function moPorts(){
+  const sel = $('midiOutSel'); if (!sel) return;
+  const opts = [['', 'None']]; if (midi.access) midi.access.outputs.forEach(o => opts.push([o.id, o.name || o.id]));
+  if (midi.outId && !opts.some(([id]) => id === midi.outId)) opts.push([midi.outId, '(not connected)']);
+  sel.innerHTML = ''; for (const [id, nm] of opts){ const op = document.createElement('option'); op.value = id; op.textContent = nm; sel.append(op); }
+  sel.value = midi.outId;
+}
+$('midiOutSel').addEventListener('change', e => { moStop(); midi.outId = e.target.value; saveMidi(); if (midi.outId && !midi.access) connectMidi(); });
+makeSeg($('segClkOut'), [[true,'On'],[false,'Off']], () => midi.clkOut, v => { midi.clkOut = v; saveMidi(); if (v && !midi.access) connectMidi(); });
+makeSeg($('segClkIn'), [[true,'On'],[false,'Off']], () => midi.clkIn, v => { midi.clkIn = v; mx.inT = []; mx.slave = false; saveMidi(); if (v && !midi.access) connectMidi(); });
+{ const r = $('midiLat'), o = $('midiLatV'), show = () => o.textContent = (midi.lat > 0 ? '+' : '') + midi.lat + ' ms';
+  r.value = midi.lat; show(); r.addEventListener('input', () => { midi.lat = +r.value; show(); saveMidi(); }); }
+moPorts();
 
 /* ---------- Plaits loader ---------- */
 // Each wasm is decoded and compiled once and shared: the synth here, the …waves engine and the render Worker.
@@ -7497,7 +7636,7 @@ const freshPhrase = () => Array.from({length:PROWS}, blankRow);
 const polyFrom = () => Math.ceil(ntr() / 2), isPolyT = t => t >= polyFrom() && t < NT;
 // freshInst needs the pad count, but nslots() (with the song state, below) isn't initialized yet when the
 // first song is made — the default instrument layout only needs the classic 16 anyway.
-const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0, slc:0, smode:0, sync:0, beats:4, grain:1});   // instruments 08–0F play the synth slots
+const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0, slc:0, smode:0, sync:0, beats:4, grain:1, mo:0, mch:0});   // instruments 08–0F play the synth slots
 const freshMix = () => ({vol:224, pan:128, mute:false, solo:false, sc:false});
 /* ---------- mastering on the master bus ----------
    S.mst, saved with the song:
@@ -7589,7 +7728,8 @@ function normSong(j){
   if (Array.isArray(j.insts)) j.insts.slice(0, NI).forEach((o, i) => { if (o && typeof o === 'object'){ const I = S.insts[i];
     I.pad = clamp(int(o.pad, I.pad), 0, nslotsEarly() - 1); if (old8 && i >= NPAD && I.pad === i - NPAD) I.pad = i; I.tsp = clamp(int(o.tsp, 0), -48, 48); I.vol = clamp(int(o.vol, 255), 0, 255);
     I.pan = clamp(int(o.pan, 128), 0, 255); I.rev = o.rev ? 1 : 0; I.ofs = clamp(int(o.ofs, 0), 0, 255);
-    I.slc = clamp(int(o.slc, 0), 0, 64); I.smode = o.smode ? 1 : 0; I.sync = clamp(int(o.sync, 0), 0, 3); I.beats = clamp(int(o.beats, 4), 1, 64); I.grain = clamp(int(o.grain, 1), 0, 4); } });
+    I.slc = clamp(int(o.slc, 0), 0, 64); I.smode = o.smode ? 1 : 0; I.sync = clamp(int(o.sync, 0), 0, 3); I.beats = clamp(int(o.beats, 4), 1, 64); I.grain = clamp(int(o.grain, 1), 0, 4);
+    I.mo = clamp(int(o.mo, 0), 0, 2); I.mch = clamp(int(o.mch, 0), 0, 15); } });
   if (Array.isArray(j.mix)) j.mix.slice(0, NT).forEach((o, i) => { if (o && typeof o === 'object'){ const m = S.mix[i];
     m.vol = clamp(int(o.vol, 224), 0, 255); m.pan = clamp(int(o.pan, 128), 0, 255); m.mute = !!o.mute; m.solo = !!o.solo; m.sc = !!o.sc; } });
   if (Array.isArray(j.tfx)) for (let t = 0; t < NT; t++) S.tfx[t] = normChainFx(j.tfx[t]);
@@ -7953,13 +8093,14 @@ function makeSeq(S, mode, o){
             if (!q) firstRate = rate;
             const ev = {type:'note', t:at, track:t, poly, pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? at + fx.KIL * tick : null, rel:fx.OFF != null ? at + fx.OFF * tick : null,
-              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods};
+              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
+              ii, mn:note + 12, vel:(fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out
             if ((I.slc | 0) > 1 || I.sync){ const c = o.live ? ensurePlay(ev.pad) : ensure(ev.pad); if (c){ applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; } }
             evs.push(ev);
             if (every){ let k = 1;
               for (let tt = at + every * tick; tt < end - 1e-6 && k < 64; tt += every * tick, k++)
                 evs.push(Object.assign({}, ev, {t:tt, slide:null, arp:null, bend:null, vib:null, cut:ev.cut != null ? tt + (ev.cut - at) : null,
-                  rel:ev.rel != null ? tt + (ev.rel - at) : null, gain:ev.gain * Math.max(0, 1 - fade * k / 16)}));
+                  rel:ev.rel != null ? tt + (ev.rel - at) : null, gain:ev.gain * Math.max(0, 1 - fade * k / 16), vel:ev.vel * Math.max(0, 1 - fade * k / 16)}));
             }
           });
           T.rate = firstRate * (mods.bend ? mods.bend.mul : 1);
@@ -8709,6 +8850,7 @@ function tStart(mode, o){
   seq.time = ctx.currentTime + 0.08; stageStart(seq.time);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : ''});
+  moStart();
   tp.timer = setInterval(pump, 25); pump(); draw(); songBtn(); chainsTempo();
   void r;
 }
@@ -8725,8 +8867,9 @@ function pump(){
   // Schedule 250 ms ahead, so a busy moment on the UI thread can't make notes late (it was 150 ms on a computer).
   // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate.
   while (s.alive() && s.time < ctx.currentTime + 0.25 && n++ < 64){
-    const r = s.step(); for (const e of r.evs){ rt.pl.play(e); if (e.type === 'note') padBlink(e); } tp.q.push({t:r.t, pos:r.pos, bpm:s.bpm, tks:r.tks, line:r.line});
+    const r = s.step(); for (const e of r.evs){ if (moEv(e)) continue; rt.pl.play(e); if (e.type === 'note') padBlink(e); } tp.q.push({t:r.t, pos:r.pos, bpm:s.bpm, tks:r.tks, line:r.line});
   }
+  moClock(s);
 }
 // With the synth open, light each pad as the tracker plays it (in time with the sound).
 function padBlink(e){
@@ -8738,6 +8881,7 @@ function tStop(quiet){
   if (tp.timer) clearInterval(tp.timer);
   tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null;
   if (rt) rt.pl.stopAll(ctx.currentTime);
+  moStop();
   songBtn();
   chainsTempo();
   if (!quiet) draw();
@@ -8747,6 +8891,7 @@ function preview(ii, note, vol, poly, when){
   const r = rtInit(), I = S.insts[ii] || S.insts[0], t = (when || ctx.currentTime) + 0.005;
   const ev = {type:'note', t, track:NT, poly:!!poly, pad:I.pad, rate:Math.pow(2, (note + I.tsp - ROOT) / 12),
     gain:curve(vol >= 0 ? vol : 255) * curve(I.vol), pan:I.pan, ofs:I.ofs, rev:!!I.rev, cut:null, slide:null, rel:isSyn(I.pad) ? t + 0.45 : null};
+  if (I.mo){ moNote(Object.assign({}, ev, {poly:true, mn:note + I.tsp + 12, vel:vol >= 0 ? vol / 255 : 1, rel:t + 0.3}), I); if (I.mo === 1) return; }   // a MIDI instrument previews on its gear
   if ((I.slc | 0) > 1 || I.sync){ const c = ensure(I.pad); applyChop(ev, I, I.pad, note, I.tsp, S.bpm, c.data, c.sr); }
   r.pl.play(ev);
 }
@@ -8797,7 +8942,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   }
   // …chains tempo follows the song, like the live engines.
   if (chnOk) for (const b of pl.buses) if (b && b.chn){ try { b.chn.port.postMessage({target:'chains-host', op:'transport', value:{tempo:S.bpm, lpb:S.lpb || 4, ticks:S.ticks || 6, playing:true}}); } catch(e){} }
-  for (const e of evs) pl.play(e);
+  for (const e of evs) if (!(e.type === 'note' && e.ii != null && (S.insts[e.ii] || {}).mo === 1)) pl.play(e);   // MIDI-only instruments are silent in renders
   const b = await oc.startRendering();
   return lat ? [b.getChannelData(0).slice(lat, lat + N), b.getChannelData(1).slice(lat, lat + N)] : [b.getChannelData(0), b.getChannelData(1)];
 }
@@ -9132,6 +9277,10 @@ function instRows(){
     {l:'TRANSPOSE', get:() => I.tsp, set:v => I.tsp = v, min:-48, max:48, big:12, d:0, info:v => sgn(v) + ' semitones on every note'},
     {l:'VOLUME', get:() => I.vol, set:v => I.vol = v, min:0, max:255, big:16, d:255, info:v => 'Instrument level ' + dB(curve(v))},
     {l:'PAN', get:() => I.pan, set:v => I.pan = v, min:0, max:255, big:16, d:128, info:panS},
+    {l:'OUTPUT', opts:true, get:() => I.mo | 0, set:v => { moRelease(); I.mo = v; }, min:0, max:2, d:0, gap:true, fmt:v => MO_NAMES[v] + (v && !midiOut() ? '  no port: Settings › MIDI' : ''),
+      info:v => ['Plays its pad', 'Sends its notes to the MIDI port (Settings › MIDI) on MIDI CH, and the pad stays quiet', 'Plays its pad and sends its notes to the MIDI port'][v]},
+    {l:'MIDI CH', get:() => (I.mch | 0) + 1, set:v => { moRelease(); I.mch = v - 1; }, min:1, max:16, big:4, d:1, fmt:v => d2(v),
+      info:() => 'The MIDI channel this instrument sends on. Notes keep TRANSPOSE, pitch commands and the volume column (as velocity); C-4 is MIDI note 60'},
     {l:'REVERSE', get:() => I.rev, set:v => I.rev = v ? 1 : 0, min:0, max:1, tog:true, d:0, fmt:v => v ? 'ON' : 'OFF', info:() => 'Play the pad backwards'},
     {l:'START', get:() => I.ofs, set:v => I.ofs = v, min:0, max:255, big:16, d:0, info:v => `Start ${Math.round(v / 256 * 100)}% into the sound`},
     {l:'SLICES', get:() => I.slc | 0, set:v => I.slc = v === 1 ? ((I.slc | 0) > 1 ? 0 : 2) : v, min:0, max:64, big:4, d:0, gap:true,

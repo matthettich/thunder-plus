@@ -574,6 +574,33 @@ caches.
   thread can delay a note. That is also the shape a native (C++) engine needs.
 - Cache `thunderplus-v90`.
 
+## 14 Oct (late afternoon): MIDI out, clock out, clock in
+
+- **Where:** the `/* ---------- MIDI out and MIDI clock ---------- */` block right after the MIDI input code.
+- **Instruments:** `I.mo` (0 PAD, 1 MIDI, 2 PAD+MIDI) and `I.mch` (0–15), on INST as OUTPUT and MIDI CH. Note events
+  from `makeSeq` now carry `ii`, `mn` (tracker note + 12, so C-4 = 60) and `vel` (volume column / 255; retrigs fade it).
+- **Sending:** `pump()` passes every event through `moEv()` first (it returns true for MIDI-only notes, which the
+  player then skips). Mono tracks end the previous MIDI note at the next note; poly tracks keep 4; OFF, KIL and
+  muted blocks end notes; a note with no end is held until one of those. `msend()` timestamps with `a2p()`: the audio
+  clock mapped to `performance.now()` at the moment of hearing (`getOutputTimestamp`, offset smoothed in `amap`,
+  since raw calls jitter ±2 ms). Gear delay (`midi.lat`) sends notes earlier, not the clock.
+- **Stop / changes:** `moStop()` (in `tStop`) = `moRelease()` (note-offs for everything, including notes booked
+  ahead; `clear()` where the browser has it; CC 123 on used channels) + MIDI Stop. Changing OUTPUT/MIDI CH while
+  playing only releases notes, so the clock keeps running.
+- **Clock out:** `moClock()` at the end of each `pump()` sends ticks up to `seq.time` from the last `'beat'` event,
+  at the current tempo (straight; swing moves notes only). Start goes out on the beat-0 event.
+- **Clock in:** `clkIn()`: Start/Continue restart PLAY via `playCtx()`, Stop stops it. Tempo is the mean over the
+  last 48 clocks; every sixteenth `setTempoLive()` sets `tp.seq.bpm` (exact) and `S.bpm` (rounded). Phase: the
+  device's beat (clocks since Start / 24) against ours at the moment that clock is heard; tempo is nudged by err/2,
+  at most ±8% while |err| > 0.05 beat, ±3% after. Song Position Pointer is ignored (Continue starts like Start).
+- **Exports:** `pass()` skips MIDI-only notes. Settings (port id, clock on/off, delay) live in `thunderplus-midi-v1`
+  on the device, not in the song; OUTPUT and MIDI CH are in the song.
+- **Verified headless with a fake Web MIDI device:** notes on the right channel and velocity, booked 100–390 ms ahead;
+  clock intervals 20.83–21.36 ms at 120 BPM (20.83 expected); Start first, Stop and All Notes Off at STOP. Clock in
+  at 100 BPM: tempo 100, phase error 0.17 beat at Start, under 0.01 beat after about 8 beats. Not yet tried with real
+  gear (MPC One, Force).
+- **Not sent yet:** pitch bend for slides/PBN, arps, CCs; Song Position Pointer.
+
 ## How to validate (there is no test suite)
 
 1. **Syntax:** `node --check` the worklets; for the single-file apps, extract each inline `<script>` and
