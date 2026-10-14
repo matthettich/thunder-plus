@@ -563,14 +563,14 @@ Object.assign(SHARED_MODULES, {
     about:'Harmonizer: up to two pitch-shifted copies of the sound at fixed intervals (a third, fifth, octave…), each with its own level and pan. Voice 2 starts silent: turn up Level 2 for a three-part stack (a major triad with the defaults). Detune spreads the two voices apart (set both to Unison with a little Detune and Delay for a wide double). Window: longer is smoother, shorter is tighter on drums. Dry sets the original.' }, STEREO)
 });
 Object.assign(SHARED_FAMILY, { meter:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', ensemble:'afx',
-  blipdrum:'gen', life:'mod', dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
+  degrade:'afx', blipdrum:'gen', life:'mod', dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
   envfol:'mod', gateex:'mod', pitchfol:'mod', slew:'util', snh:'util', quant:'util' });
 const SHARED_PORT_LABEL = { car:'Carrier', freq:'Freq', a:'A', b:'B', sum:'A+B', diff:'A−B', mul:'A×B', min:'Min', max:'Max',
   and:'AND', or:'OR', xor:'XOR', not:'NOT A', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent', time:'Time' };
 /* Palette groups: added to an existing group of the same name, or made (audio groups before Control, the rest at the end).
    A module already in the palette is left where it is. */
 const SHARED_PALETTE = [
-  ['Effects', [['dimension','Dimension (stereo chorus)'],['bbd','BBD delay'],['harm','Harmonizer'],['ringmod','Ring mod'],['ensemble','Ensemble chorus'],['phaser','Phaser'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['beads','Beads']], 'audio'],
+  ['Effects', [['degrade','Degrade (lo-fi)'],['dimension','Dimension (stereo chorus)'],['bbd','BBD delay'],['harm','Harmonizer'],['ringmod','Ring mod'],['ensemble','Ensemble chorus'],['phaser','Phaser'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['beads','Beads']], 'audio'],
   ['Reverbs', [['spring','Spring reverb'],['plate','Plate reverb'],['room','Room reverb'],['space','Space reverb']], 'audio'],
   ['More effects', [['comb','Comb resonator'],['transient','Transient shaper'],['tgate','Trance gate'],['ott','Multiband squash'],['fshift','Frequency shifter'],['vinyl','Vinyl'],['dub','Dub tape'],['cab','Speaker cab'],['tube','Tube'],['flanger','Flanger'],['tremolo','Tremolo'],['odrive','Overdrive'],['folder','Wavefolder'],['autowah','Auto-wah'],['pshift','Pitch shifter'],['ladder','Ladder filter'],['xmod','Cross-mod'],['lofi','Lo-fi'],['drive','Drive'],['air','Air']], 'audio'],
   ['Filters and amps', [['blades','Blades filter']], 'audio'],
@@ -616,6 +616,11 @@ Object.assign(SHARED_MODULES, {
       trig:{l:'Fire on', c:opts(['Alive', 'Born'])}, rule:{l:'Rule', c:opts(['Life', 'HighLife', 'Seeds', 'Maze', 'Day & Night'])}, rot:{l:'Colours', f:v => '+' + Math.round(v)}, len:{l:'Gate length', f:pct} }),
     about:'Life: a Game of Life sequencer. Draw cells on the grid (tap or drag; Clear, Random and Glider help). A playhead sweeps the columns, one per Step at the song tempo (or one per pulse on Clock), and every live cell in its column fires the gate of its row: patch the coloured outputs 1–8 into a Blip drum. After each sweep the cells live one generation, so the rhythm changes as patterns grow, move and die. Loop brings your drawing back every N generations (Evolve never does), Fire on Born plays only new cells, Rule picks the world, Colours turns which row feeds which output. Any fires on every hit; Count is how many cells are in the column.' }
 });
+SHARED_MODULES.degrade = Object.assign({ label:'Degrade', scope:'mono', params:{ bits:[24, 1, 24, .1], rate:[1, 0, 1, .001], noise:[.15, 0, 1, .01], color:[.3, 0, 1, .01], follow:[.6, 0, 1, .01], dry:[0, 0, 1, .01], wet:[1, 0, 1, .01] },
+  ui:{ bits:{l:'Bits', f:v => v >= 23.5 ? 'Off' : v.toFixed(1) + ' bit'}, rate:{l:'Rate', f:v => v >= .999 ? 'Off' : khz(300 * Math.pow(160, v))},
+    noise:{l:'Noise', f:v => v < .005 ? 'Off' : (20 * Math.log10(v * v * .25)).toFixed(1) + ' dB'}, color:{l:'Colour', f:v => v < .02 ? 'White' : v > .98 ? 'Dark' : pct(v) + ' dark'},
+    follow:{l:'Follow', f:pct}, dry:{l:'Dry', f:pct}, wet:{l:'Wet', f:pct} },
+  about:'Degrade: lo-fi in one box, after the classic tracker lofi plugins. Bits crushes (24 is off), Rate lowers the sample rate (the top is off), and Noise adds a floor of hiss, from a whisper up to −12 dB: Colour darkens it from white, and Follow makes it track the sound, so it breathes with the notes and silence stays clean. A little Noise on a soft sine helps it stand out in a mix. Dry and Wet are separate.' }, STEREO);
 Object.assign(SHARED_PORT_LABEL, { t1:'1', t2:'2', t3:'3', t4:'4', t5:'5', t6:'6', t7:'7', t8:'8', g1:'1', g2:'2', g3:'3', g4:'4', g5:'5', g6:'6', g7:'7', g8:'8', any:'Any', count:'Count' });
 SHARED_PALETTE.push(['Drums', [['blipdrum', 'Blip drum (8 voices)']], 'audio']);
 SHARED_PALETTE.find(g => g[0] === 'Rhythm and logic')[1].unshift(['life', 'Life (Game of Life)']);
@@ -1066,7 +1071,7 @@ class WavesBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './waves-worklet.js?v=8';
+    const url = opts.url || './waves-worklet.js?v=9';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'waves', {

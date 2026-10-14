@@ -1401,12 +1401,60 @@ const Life = {
   show(st){ return [st.x, st.gen, ...st.cur]; }
 };
 
+/* ---------- Degrade (original code) ----------
+   A lo-fi / degrade processor after the classic tracker "lofi" plugins: bit crush (Bits, continuous), sample-rate
+   reduction (Rate, sample and hold), and a noise floor (Noise, Colour from white to dark, Follow: how much the hiss
+   tracks the sound's level, so silence stays clean). Dry and Wet are separate. Self-contained: one copy each in the
+   pads' engine, the track-FX worklet and the …chains/…waves worklets. In place, stereo. */
+class DegradeCore {
+  constructor(sr){ this.sr = sr; this.ph = 1; this.hl = 0; this.hr = 0; this.nl = 0; this.nr = 0; this.env = 0; this.s = 0x2545f491; }
+  static defaults(){ return {bits:16, rate:48000, noise:0.15, color:0.3, follow:0.6, dry:0, wet:1}; }
+  // the noise level (RMS) for a Noise setting: squared, so the bottom of the range is a whisper (−∞ … −12 dBFS)
+  static level(n){ return n * n * 0.25; }
+  process(L, R, n, p){
+    const sr = this.sr, rate = Math.min(p.rate, sr), hold = rate < sr * 0.98, inc = rate / sr;
+    const bits = Math.max(1, Math.min(24, p.bits)), crush = bits < 23.5, q = Math.pow(2, bits - 1);
+    const lv = DegradeCore.level(Math.max(0, Math.min(1, p.noise))), col = Math.max(0, Math.min(1, p.color)), k = 1 - col * 0.96, comp = Math.sqrt((2 - k) / k) / 0.577;   // the same loudness (RMS) whatever the colour
+    const fol = Math.max(0, Math.min(1, p.follow)), ka = 1 - Math.exp(-1 / (sr * 0.004)), kr = 1 - Math.exp(-1 / (sr * 0.15)), dry = p.dry, wet = p.wet;
+    for (let i = 0; i < n; i++){
+      const xl = L[i], xr = R[i];
+      // envelope of the input, for Follow
+      const a = Math.max(Math.abs(xl), Math.abs(xr)); this.env += (a - this.env) * (a > this.env ? ka : kr);
+      // sample-rate reduction: hold a sample until the next tick of the slower clock
+      if (hold){ this.ph += inc; if (this.ph >= 1){ this.ph -= Math.floor(this.ph); this.hl = xl; this.hr = xr; } } else { this.hl = xl; this.hr = xr; }
+      let yl = this.hl, yr = this.hr;
+      if (crush){ yl = Math.round(yl * q) / q; yr = Math.round(yr * q) / q; }
+      // the noise floor: two white noises (stereo hiss), darkened by Colour, scaled by Follow
+      if (lv > 0){
+        let s = this.s; s ^= s << 13; s ^= s >>> 17; s ^= s << 5; const w1 = (s >>> 0) / 2147483648 - 1; s ^= s << 13; s ^= s >>> 17; s ^= s << 5; const w2 = (s >>> 0) / 2147483648 - 1; this.s = s;
+        this.nl += (w1 - this.nl) * k; this.nr += (w2 - this.nr) * k;
+        const g = lv * comp * ((1 - fol) + fol * Math.min(1, this.env * 6));
+        yl += this.nl * g; yr += this.nr * g;
+      }
+      L[i] = xl * dry + yl * wet; R[i] = xr * dry + yr * wet;
+    }
+  }
+}
+
+/* Degrade: lo-fi crush and a noise floor (see DegradeCore). Rate is 0–1 here: 300 Hz × 160^rate, the top is off. */
+const Degrade = {
+  type:'degrade', scope:'mono', cost:.06,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ bits:[24, 1, 24, .1], rate:[1, 0, 1, .001], noise:[.15, 0, 1, .01], color:[.3, 0, 1, .01], follow:[.6, 0, 1, .01], dry:[0, 0, 1, .01], wet:[1, 0, 1, .01] },
+  create:sr => ({ d:new DegradeCore(sr), pp:{} }),
+  process(st, io, ctx){
+    const L = io.out.out, R = io.out.outR, p = io.p, q = st.pp; L.set(io.in.in); R.set(inR(io));
+    q.bits = p.bits; q.rate = p.rate >= .999 ? 48000 : 300 * Math.pow(160, p.rate); q.noise = p.noise; q.color = p.color; q.follow = p.follow; q.dry = p.dry; q.wet = p.wet;
+    st.d.process(L, R, ctx.block, q);
+  }
+};
+
 const SHARED_MODULES = { beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
   meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
-  dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life };
+  dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade };
 /* ===SHARED MODULES END=== */
 
 const MODULES = { ...SHARED_MODULES, trackIn:TrackIn,

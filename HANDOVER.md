@@ -21,8 +21,8 @@ Keep this file up to date at the end of a work session.
   - 13 Oct: **pad rendering moved to a Worker** (see below), and the offer to open ...Thunder's saved work.
 - **App:** no build step. `index.html` is the whole tracker/synth app; `chains/index.html` and
   `waves/index.html` are the two modular patch editors loaded in frames.
-- **Cache-busters now:** `chains-worklet.js?v=13`, `waves-worklet.js?v=8`, `master-worklet.js?v=2` (index.html, the editor
-  pages, sw.js). Cache is `thunderplus-v76`.
+- **Cache-busters now:** `chains-worklet.js?v=14`, `waves-worklet.js?v=9`, `master-worklet.js?v=2` (index.html, the editor
+  pages, sw.js). Cache is `thunderplus-v77`.
 
 ## Licensing rule (the owner may sell the app later)
 
@@ -392,6 +392,18 @@ All original code; the name stays generic.
 - **Checked:** the glider walks correctly; Life → Blip drum renders (no NaN), both editors add, cable, run live (grid
   advances, bars light), tapping the grid toggles cells, dragging bars sets values; Blip on drum pad 0 renders.
   CPU: Life ≈ 1–2%, Blip drum depends on how many voices ring (all eight constantly ≈ 20% of a desktop core worst case).
+
+## Degrade (lo-fi) everywhere (13 Oct, evening)
+
+- **`class DegradeCore`** (original; three identical copies: index.html ENGINE block, the track-FX worklet Blob is built
+  as `DegradeCore.toString() + TFX_SRC`, and the SHARED MODULES block): bits (continuous, 24 = off), rate (sample and
+  hold), noise floor (RMS = noise² × 0.25, −∞…−12 dBFS, constant across Colour), Colour (one-pole darkening,
+  loudness-compensated), Follow (noise × input envelope, so silence stays clean), separate Dry/Wet. Stereo, in place.
+- **Pad FX** `degrade` (`js:true`: `fxReady` doesn't wait for wasm; `applyFx` runs it first). **Track FX** `degrade` (TFX id
+  99, `LOFI`): the worklet's `set()` makes a JS slot (`s.js`) instead of a wasm one and `process()` runs it; JS slots are
+  never `tfx_free`d. It is NOT in `tools/fxgen.py` (hand-added). **Module** `degrade` in …chains/…waves (rate 0–1 there).
+- **Checked:** noise RMS matches the formula at every Colour; Follow 100% drops the hiss to −47 dB 0.35 s after the
+  sound; pad FX −24 dB floor at Noise 50%; track FX through the worklet −18 dB floor at NOISE 180 (vs −240 without).
 
 ## Running it locally
 

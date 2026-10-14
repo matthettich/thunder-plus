@@ -69,3 +69,4 @@ SIL Open Font License 1.1, included as `fonts/OFL-ShareTechMono.txt`.
   Rules", NRL Report 7948 (US Naval Research Laboratory, 1976), a US government work in the public domain; the
   formant synthesizer follows the published design of D. H. Klatt, "Software for a cascade/parallel formant
   synthesizer", JASA 67(3), 1980. No code was copied.
+- **Degrade** (pad FX, track FX, …chains/…waves module): original code.
