@@ -645,6 +645,27 @@ caches.
 7. **On the phone:** the owner should install ...Thunder Plus from its page and remove the old ...Thunder icon
    (the old one now just forwards). Check that the offer to bring Thunder's work over appears there.
 
+### Standard DAW features still missing (suggested 14 Oct, in rough priority order)
+
+Already there, for reference: undo/redo, stem export, sidechain, FX automation from tracker commands, sample
+recording, resampling, MIDI in/out and clock.
+
+1. **Metronome and count-in.** No click exists yet. Also useful for checking clock-in lock against the MPC.
+   About half a day.
+2. **MIDI file export and import.** Export a song as `.mid` (to finish in a DAW or load on the MPC/Force);
+   import MIDI drum patterns or melodies into phrases. About a day each way.
+3. **The rest of MIDI out:** pitch bend for slides/PSL and PBN, arps sent as notes, CC automation for hardware
+   synth knobs, and Song Position Pointer (so Continue resumes where the MPC is instead of restarting). About a day.
+4. **Humanize.** Small random timing and velocity changes per track (GRV and swing exist; random variation
+   doesn't). A few hours.
+5. **Named song markers/sections**, to jump around a long arrangement. A few hours.
+
+Deliberately left for later:
+- **Audio tracks** (recording vocals or guitar across the song): turns Thunder into a different kind of app;
+  better with the native port.
+- **Time signatures other than 4/4:** a deep change for a tracker; odd meters already work through phrase length.
+- **Plugin delay compensation and an automation-lane editor:** only matter once VSTs exist.
+
 ## Conventions worth knowing
 
 - **Ports/cables:** audio = teal, `cv`/modulation = purple dashed, `gate` = pink dashed. Any slider
