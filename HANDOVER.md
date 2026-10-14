@@ -305,6 +305,16 @@ A cable into a slider's small purple jack (`p:<param>`) now always shows the ...
 - The Effects page's pad/track FX (`FX`/`TFX` in index.html) are separate and unchanged; the new reverbs aren't there
   yet (they're JS, not in the wasm).
 
+## PAD mode: OPTION+arrows in Phrase move around the Song grid (13 Oct, evening)
+
+- The owner expected OPTION+arrow on the phrase screen to go to the phrase above/below/left/right of it on the Song
+  grid, not phrase number ±1. `optDir(dir, grid)`: the PAD d-pad (`op` held) and Alt+arrows in PAD mode pass
+  `grid`; with PATTERN NAV on (default) `phraseGrid()` finds this phrase's block (`followPhraseBlock`), moves to the
+  nearest filled block that way (same track for ▲▼, same row for ◀▶, skipping empties), opens its first phrase and
+  sets `cTrack`/`cSect` as opening it from Song would. At an edge it toasts and stays. A phrase not in the song
+  steps by number as before; `[`/`]` and KEYS-mode Ctrl/⌘+▲▼ still step by number. Help, the PATTERN NAV caption
+  and the phrase hint say so. Shift+Option+arrows (`shiftAltArrow`) is unchanged.
+
 ## Running it locally
 
 No build step; serve the repo root over HTTP (the editors load their worklet by `fetch`, which
