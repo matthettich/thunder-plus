@@ -551,9 +551,14 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .trows .rv + .rv{border-left:0}
 .tctl{flex:none; background:var(--side); border-top:1px solid var(--line); padding-block:10px 12px; padding-inline:16px;
   display:flex; justify-content:space-between; align-items:center; gap:16px; touch-action:none}
-.dpad{display:grid; grid-template-columns:repeat(3,var(--k)); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
-.keys{display:grid; grid-template-columns:repeat(2,calc(var(--k) * 1.45)); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
-.keys.wide{grid-template-columns:repeat(4,calc(var(--k) * 1.02))}
+/* Button width: --k, but never wider than the bar allows. On narrow phones (the folded Z Fold's cover screen,
+   ~370px) 3 d-pad keys + 4 wide keys + gaps + padding came to ~380px and pushed PLAY/EDIT off the right edge.
+   7.08 = 3 + 4 × 1.02 key widths; 66px = the 5 column gaps (45) + the d-pad/keys gap (16) + the 4px offset shadow + 1. */
+.tctl{container-type:inline-size}
+.tpad{--kw:min(var(--k), calc((100cqw - 66px) / 7.08))}
+.dpad{display:grid; grid-template-columns:repeat(3,var(--kw, var(--k))); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
+.keys{display:grid; grid-template-columns:repeat(2,calc(var(--kw, var(--k)) * 1.45)); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
+.keys.wide{grid-template-columns:repeat(4,calc(var(--kw, var(--k)) * 1.02))}
 /* The nav/edit pad: the command row inverted. A darker grey panel; buttons in a screen's colour, on white outlined offset blocks. */
 .tctl{background:color-mix(in srgb, var(--side) 84%, #000)}
 #tPad .k{background:var(--sh, var(--voice)); color:#1b2130; box-shadow:4px 4px 0 0 #fff, 4px 4px 0 1.5px var(--line); transition:transform .06s, box-shadow .06s}
