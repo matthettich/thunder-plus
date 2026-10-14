@@ -459,6 +459,31 @@ Commits on `main`: 9ababb0 (fixes), e21c605 (presets + song-load fix), e8f2970 (
 - **Not yet heard on the phone:** all of the above was checked headless (renders, no NaN, levels, live nodes through
   `pass()`). Wavetable import (Serum-style 2048-sample frames) is deferred at the owner's request.
 
+## 14 Oct (late morning): Piano, Tine EP, Organ, SoundFont / General MIDI
+
+Cache `thunderplus-v85` (sw.js no longer caches `sounds/`: the app keeps fonts in IndexedDB).
+
+- **Keys engines** (ENGINE block, rendered like Modal; `XENG`/`XUI` `piano`, `ep`, `organ`): `KeysUtil` (rotating-phasor
+  partial banks, `finish()` = the usual normalise/drive/trim), `PianoCore` (stiff-string partials, hammer/strike-point
+  spectrum, two-stage decay, 1–3 detuned strings, thump, 3-mode soundboard, dampers/pedal; ≤12 s), `TineEPCore` (tine +
+  tone bar + bell pings through a 1/(1−kx)² pickup; tremolo), `OrganCore` (9 drawbars with foldback, percussion, click,
+  rotary with horn Doppler, Pluck = the M1 "Organ 2"-style house organ preset). Checked in Node: no NaN, 10–400 ms each.
+- **SoundFont engine** (`V.engine = 'sf'`, numbers in `V.sf` via XENG, font in `V.sfFont` / `V.sfFontName`). Code is in
+  the UI part of the script (before `XUI`): `parseSF` (SF2.04: zones with preset/instrument generator merging, modulators
+  merged by identity over `SF_DEFMODS`), `sfVoice` (generators + velocity/key-number modulators; velocity→attenuation is
+  skipped because the tracker volume already sets loudness), IndexedDB `thunderplus-fonts`, `sfLoad`, `sfSample` (SF3
+  Ogg via `decodeAudioData` on an OfflineAudioContext; SF3 loop points are relative to the sample start, SF2 absolute),
+  `sfPick` (linked stereo pairs → one stereo buffer; FluidR3's pairs are unlinked, so each half plays with its own pan).
+  **Player:** `startNote` hands SoundFont pads to `sfNote` (per-zone buffer source + volume-envelope gain + low-pass with
+  the mod envelope + zone pan, one voice with `srcs` for kill). `pass()` awaits `sfPrepare(evs)`; `tStart` starts it in
+  the background. **Pad render** (`renderX` → `globalThis.__sfRender`, because the ENGINE block can't see the UI code):
+  C-4 at velocity 100. `rwCan` keeps these pads off the Worker. **UI:** `sfPanel()` (font select, preset list, Load
+  .sf2/.sf3, Remove) at the top of the engine card; XUI presets are GM shortcuts.
+- **GM sounds:** `sounds/FluidR3Mono_GM.sf3` (MuseScore's MS_General v0.1 fork of FluidR3Mono, MIT, 23.7 MB) with its
+  licence beside it; fetched by `sfFetchGM()` on first use. Tested headless: loads in ~0.6 s, piano + drum kit decode in
+  ~1.9 s, offline and live playback, OFF releases, kits.
+- **Not done:** SoundFont LFOs (vibrato/tremolo), chorus/reverb sends, linked modulators, CC modulators.
+
 ## 14 Oct (morning): master column, tempo-locked FX, swarm, skins, Settings
 
 Cache `thunderplus-v84`. Worklet versions unchanged.
@@ -495,7 +520,6 @@ Cache `thunderplus-v84`. Worklet versions unchanged.
 - **FX target follows** the edited track (`draw()` sets `cFxT` on Song/Sect/Phrase). **LPB default 8** (new songs).
 - **Found, not changed (owner to decide):** with SWING NOTE 16ths (the default), each row lasts two lines
   (`pair * line * sw` with `pair = 2 * swB`), so LPB 4 plays 8th-note rows. Fixing it doubles existing songs' speed.
-- **Queued by the owner:** synthesized piano and Rhodes, an M1-style house organ, a GM / SoundFont player.
 
 ## Running it locally
 

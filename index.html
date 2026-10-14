@@ -1613,7 +1613,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <p>Each track and the master have 4 effect slots (FX screen, or the Mixer’s FX row): 37 effects in all: Flex, Step gate, Retrigger, EQ, compressor, three reverbs, tape delay, dub tape, saturation, drive, tube, tape, vinyl, lo-fi, bitcrush, chorus, flanger, phaser, tremolo, trance gate, auto-wah, ladder filter, comb resonator, wavefolder, overdrive, pitch and frequency shifters, cross-mod, transient shaper, multiband squash, speaker cab, air, and Rings, Clouds and Beads. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to four, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
 <p><b>…chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback. Its <b>Resample</b> module records what passes through it into a pad, starting on the next bar, and slices it so you can chop it like a breakbeat.</p></section>
-    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound (kicks, snares, hats, percussion, IDM and glitch hits, basses, pads, chords, keys and leads, including Bass and Blip engine sounds). <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once.</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
+    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound (kicks, snares, hats, percussion, IDM and glitch hits, basses, pads, chords, keys and leads, including Bass and Blip engine sounds). <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once.</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modelled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -3666,6 +3666,155 @@ class SwarmCore {
     return res;
   }
 }
+/* Keys (original code): three rendered keyboard engines. Each renders one note at the pad's pitch, held for `hold`
+   seconds (the tracker note, or the pad's Max len) and then released the way the instrument lets go. Oscillators are
+   rotating phasors (cos/sin pairs advanced by one complex multiply a sample), so dozens of partials stay cheap;
+   envelopes move at control rate. Shared helpers are static so each class stays self-contained. */
+class KeysUtil {
+  // A bank of rotating phasors: add(f, a) partials, then step() returns their weighted sum for this sample.
+  static bank(sr){ return {sr, c:[], s:[], wc:[], ws:[], a:[], n:0}; }
+  static add(b, f, phase){ const w = 2 * Math.PI * f / b.sr; b.c.push(Math.cos(phase)); b.s.push(Math.sin(phase)); b.wc.push(Math.cos(w)); b.ws.push(Math.sin(w)); b.a.push(0); return b.n++; }
+  static finish(out, p, sr, tailFade){
+    let pk = 0; for (let i = 0; i < out.length; i++) pk = Math.max(pk, Math.abs(out[i]));
+    const lv = Math.pow(10, (p.level || 0) / 20) * (pk > 0 ? 0.8 / pk : 1), dr = (p.drive || 0) > 0.001 ? 1 + p.drive * p.drive * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1;
+    for (let i = 0; i < out.length; i++){ let y = out[i] * lv; if (dr) y = Math.tanh(y * dr) * dn; out[i] = y; }
+    let end = out.length; while (end > 1 && Math.abs(out[end - 1]) < 1e-4) end--;
+    const res = out.slice(0, Math.max(end, 1)), fl = Math.min(res.length, Math.round(sr * (tailFade || 0.003))); for (let i = 0; i < fl; i++) res[res.length - 1 - i] *= i / fl;
+    return res;
+  }
+  static rnd(seed){ let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+}
+/* Piano: a struck stiff string. Partials stretch with the string's inharmonicity, are shaped by where the hammer hits
+   and how hard it is (a softer hammer has fewer highs), and decay in two stages (the prompt sound, then the long
+   aftersound), faster the higher they are. Two or three strings a note, slightly detuned, beat against each other.
+   A hammer thump, a soundboard of three resonances, dampers on release (or the sustain pedal). */
+class PianoCore {
+  static defaults(){ return {oct:2, hard:0.55, bright:0.55, dec:1, strings:3, det:0.35, inharm:0.4, pos:0.12, thump:0.35, body:0.4, rel:180, pedal:0, tune:0, drive:0, level:0}; }
+  static render(o, sr, hold){
+    const p = Object.assign(PianoCore.defaults(), o || {}), rnd = KeysUtil.rnd(0x91a2);
+    const f0 = 65.406 * Math.pow(2, p.oct + (p.tune || 0) / 12), h = Math.max(0.05, hold || 2), reg = Math.pow(261.6 / f0, 0.55);
+    const T0 = Math.max(0.15, 7 * p.dec * reg), rel = Math.max(0.02, p.rel / 1000), ped = (p.pedal | 0) === 1;
+    const len = Math.min(12, ped ? T0 * 2.5 : Math.min(h, T0 * 2.5) + rel * 7), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N);
+    const B = 0.00008 * (1 + p.inharm * 9) * Math.pow(f0 / 261.6, 0.6), S = Math.max(1, Math.min(3, Math.round(p.strings)));
+    const dets = [0, 1, -0.73].slice(0, S).map(d => d * p.det * p.det * 6), fc = 600 + p.hard * p.hard * 9000 + p.bright * 3000;
+    const bank = KeysUtil.bank(sr), parts = [];
+    for (let n = 1; n <= 64; n++){
+      const fn = n * f0 * Math.sqrt(1 + B * n * n); if (fn > sr * 0.45) break;
+      const shape = Math.abs(Math.sin(Math.PI * n * Math.max(0.03, p.pos))) * 0.8 + 0.2, roll = 1 / (1 + Math.pow(fn / fc, 2));
+      const a = Math.pow(n, -0.9 - (1 - p.bright) * 0.6) * shape * roll; if (a < 1e-4) continue;
+      const tau = T0 / (1 + (n - 1) * (0.12 + (1 - p.bright) * 0.18)), ids = [];
+      for (const d of dets) ids.push(KeysUtil.add(bank, fn * Math.pow(2, d / 1200), rnd() * 6.283));
+      parts.push({a: a / S, tau, ids});
+    }
+    // soundboard: three resonances excited by the string sum; the hammer thump into them too
+    const res = [[95, 0.04], [230, 0.025], [620, 0.012]].map(([f, t]) => { const w = 2 * Math.PI * f / sr, r = Math.exp(-1 / (t * sr)); return {c1:2 * r * Math.cos(w), c2:-r * r, y1:0, y2:0}; });
+    const CR = 32; let lpn = 0, dc = 0, dcy = 0;
+    for (let i0 = 0; i0 < N; i0 += CR){
+      const t = i0 / sr, damp = ped || t < h ? 1 : Math.exp(-(t - h) / rel);
+      for (const q of parts){ const e = q.a * (0.68 * Math.exp(-t / q.tau) + 0.32 * Math.exp(-t / (q.tau * 4.5))) * damp; for (const k of q.ids) bank.a[k] = e; }
+      const i1 = Math.min(N, i0 + CR), C = bank.c, Sn = bank.s, WC = bank.wc, WS = bank.ws, A = bank.a, nb = bank.n;
+      for (let i = i0; i < i1; i++){
+        let y = 0;
+        for (let k = 0; k < nb; k++){ const c = C[k], s = Sn[k]; C[k] = c * WC[k] - s * WS[k]; Sn[k] = s * WC[k] + c * WS[k]; y += s * A[k]; }
+        const tt = i / sr; lpn += ((rnd() * 2 - 1) - lpn) * 0.08;
+        const th = p.thump * (lpn * Math.exp(-tt / 0.006) * 0.6 + Math.sin(2 * Math.PI * 70 * tt) * Math.exp(-tt / 0.03) * 0.4);
+        let bd = 0; for (const r of res){ const v = r.c1 * r.y1 + r.c2 * r.y2 + (y * 0.02 + th * 0.2); r.y2 = r.y1; r.y1 = v; bd += v; }
+        let x = y + th * 0.15 + bd * p.body * 0.5;
+        dcy = x - dc + 0.995 * dcy; dc = x; out[i] = dcy;
+      }
+      // Renormalise the phasors now and then so rounding can't let them grow or shrink.
+      if ((i0 & 4095) === 0) for (let k = 0; k < nb; k++){ const m = 1 / Math.hypot(C[k], Sn[k]); C[k] *= m; Sn[k] *= m; }
+    }
+    return KeysUtil.finish(out, p, sr, 0.004);
+  }
+}
+/* Tine electric piano (in the spirit of the classic suitcase/stage pianos): a hammered tine and its tone bar ring at the
+   fundamental, with a short metallic ping on the hammer hit (the bell), read by an electromagnetic pickup whose
+   response is not linear: the closer the tine (Bark) and the harder the hit, the more growl. Tremolo, a tone control,
+   dampers on release. */
+class TineEPCore {
+  static defaults(){ return {oct:2, hard:0.5, bark:0.45, bell:0.4, dec:1, tone:0.6, trem:0, tremRate:4.5, rel:120, tune:0, drive:0, level:0}; }
+  static render(o, sr, hold){
+    const p = Object.assign(TineEPCore.defaults(), o || {}), rnd = KeysUtil.rnd(0x7e11);
+    const f0 = 65.406 * Math.pow(2, p.oct + (p.tune || 0) / 12), h = Math.max(0.05, hold || 2), reg = Math.pow(261.6 / f0, 0.5);
+    const tau = Math.max(0.2, 4.5 * p.dec * reg), rel = Math.max(0.02, p.rel / 1000);
+    const len = Math.min(20, Math.min(h, tau * 3) + rel * 7), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N);
+    const bank = KeysUtil.bank(sr), amp = 0.45 + p.hard * 0.55;
+    const fund = KeysUtil.add(bank, f0, 0), oct = KeysUtil.add(bank, f0 * 2.0, 0), bar = KeysUtil.add(bank, f0 * 0.5 * 1.0006, 0);
+    const pings = [[7.11, 1], [14.3, 0.5], [21.6, 0.25]].filter(([r]) => f0 * r < sr * 0.45).map(([r, a]) => ({k:KeysUtil.add(bank, f0 * r, rnd() * 6.28), a}));
+    const k = 0.15 + p.bark * 0.75, d = 1;   // pickup: closeness k of the tine to the pickup (x stays under ±1)
+    const lpw = 1 - Math.exp(-2 * Math.PI * (1200 + p.tone * p.tone * 9000) / sr);
+    const CR = 32; let lp = 0, lp2 = 0, dc = 0, dcy = 0, ph = 0;
+    for (let i0 = 0; i0 < N; i0 += CR){
+      const t = i0 / sr, damp = t < h ? 1 : Math.exp(-(t - h) / rel), e = amp * Math.exp(-t / tau) * damp;
+      bank.a[fund] = e * 0.9; bank.a[oct] = e * 0.06 * (1 + p.hard); bank.a[bar] = e * 0.08 * Math.exp(-t / (tau * 0.6));
+      for (const q of pings) bank.a[q.k] = q.a * p.bell * (0.25 + p.hard * 0.75) * Math.exp(-t / (0.012 + 0.02 * (1 - p.hard))) * 0.35;
+      const i1 = Math.min(N, i0 + CR), C = bank.c, Sn = bank.s, WC = bank.wc, WS = bank.ws, A = bank.a, nb = bank.n;
+      for (let i = i0; i < i1; i++){
+        let x = 0;
+        for (let j = 0; j < nb; j++){ const c = C[j], s = Sn[j]; C[j] = c * WC[j] - s * WS[j]; Sn[j] = s * WC[j] + c * WS[j]; x += s * A[j]; }
+        x = Math.max(-0.95, Math.min(0.95, x));
+        // the pickup: flux through the coil goes as 1/(gap − x)²; its change is the voltage. Normalised so the gain
+        // at small x is 1: y = (1/(1−kx)² − 1) / 2k
+        let y = (1 / ((d - k * x) * (d - k * x)) - 1) / (2 * k);
+        lp += (y - lp) * lpw; lp2 += (lp - lp2) * lpw;
+        dcy = lp2 - dc + 0.997 * dcy; dc = lp2;
+        let o2 = dcy;
+        if (p.trem > 0.001){ ph += p.tremRate / sr; o2 *= 1 - p.trem * 0.5 * (1 - Math.cos(2 * Math.PI * ph)); }
+        out[i] = o2;
+      }
+      if ((i0 & 4095) === 0) for (let j = 0; j < nb; j++){ const m = 1 / Math.hypot(C[j], Sn[j]); C[j] *= m; Sn[j] *= m; }
+    }
+    return KeysUtil.finish(out, p, sr, 0.004);
+  }
+}
+/* Tonewheel organ with drawbars, percussion, key click and a rotary speaker, plus Pluck: an envelope that falls from
+   the attack to a lower sustain, which with a bright drawbar set is the classic early-90s house organ (the sampled
+   "Organ 2" of the big workstation of the day). */
+class OrganCore {
+  static defaults(){ return {oct:2, d1:8, d2:8, d3:8, d4:0, d5:0, d6:0, d7:0, d8:0, d9:0, perc:0, percLv:0.5, percDec:250, click:0.3, pluck:0, pluckDec:300,
+    rotary:0, rotDepth:0.5, bright:0.7, atk:3, rel:40, tune:0, drive:0, level:0}; }
+  static get FEET(){ return ["16'", "5⅓'", "8'", "4'", "2⅔'", "2'", "1⅗'", "1⅓'", "1'"]; }
+  static get RATIOS(){ return [0.5, 1.5, 1, 2, 3, 4, 5, 6, 8]; }
+  static render(o, sr, hold){
+    const p = Object.assign(OrganCore.defaults(), o || {}), rnd = KeysUtil.rnd(0x0a9a);
+    const f0 = 65.406 * Math.pow(2, p.oct + (p.tune || 0) / 12), h = Math.max(0.03, hold || 1.5), rel = Math.max(0.005, p.rel / 1000), atk = Math.max(0.0005, p.atk / 1000);
+    const len = Math.min(30, h + rel * 7 + 0.02), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N);
+    const bank = KeysUtil.bank(sr), bars = [];
+    // a tonewheel is close to a sine; above the top wheel the real organ folds back an octave (foldback)
+    OrganCore.RATIOS.forEach((r, i) => { const lv = Math.round(p['d' + (i + 1)] || 0); if (lv <= 0) return;
+      let f = f0 * r; while (f > 5900 && f > f0) f /= 2; if (f > sr * 0.45) return;
+      bars.push({k:KeysUtil.add(bank, f, rnd() * 6.28), a:Math.pow(10, -3 * (8 - lv) / 20), hi:f > 800}); });
+    const pr = (p.perc | 0) === 1 ? 2 : (p.perc | 0) === 2 ? 3 : 0, perc = pr ? KeysUtil.add(bank, f0 * pr, 0) : -1;
+    const rot = p.rotary | 0, hornHz = rot === 2 ? 6.8 : rot === 1 ? 0.83 : 0, drumHz = rot === 2 ? 5.9 : rot === 1 ? 0.67 : 0;
+    const lpw = 1 - Math.exp(-2 * Math.PI * (1500 + p.bright * p.bright * 14000) / sr), nb0 = bars.length || 1;
+    const HI = new Uint8Array(bank.n); for (const b of bars) HI[b.k] = b.hi ? 1 : 0;
+    const CR = 16; let lp = 0, cl = 0, hp = 0, hph = rnd(), dph = rnd();
+    for (let i0 = 0; i0 < N; i0 += CR){
+      const t = i0 / sr, env = (t < atk ? t / atk : 1) * (t < h ? 1 : Math.exp(-(t - h) / rel));
+      const pl = p.pluck > 0 ? 1 - p.pluck * (1 - Math.exp(-t / Math.max(0.01, p.pluckDec / 1000))) : 1;
+      hph += hornHz * CR / sr; dph += drumHz * CR / sr;
+      const hornAm = rot ? 1 - p.rotDepth * 0.35 * (0.5 + 0.5 * Math.sin(2 * Math.PI * hph)) : 1, drumAm = rot ? 1 - p.rotDepth * 0.2 * (0.5 + 0.5 * Math.sin(2 * Math.PI * dph)) : 1;
+      // Doppler: the horn's partials wobble in pitch with its rotation (a tiny phase advance or lag)
+      const dop = rot ? p.rotDepth * 0.0025 * Math.cos(2 * Math.PI * hph) : 0;
+      for (const b of bars){ bank.a[b.k] = b.a * env * pl * (b.hi ? hornAm : drumAm) / Math.sqrt(nb0); }
+      if (perc >= 0) bank.a[perc] = p.percLv * Math.exp(-t / Math.max(0.02, p.percDec / 1000)) * (t < h ? 1 : Math.exp(-(t - h) / rel)) * 0.7;
+      const i1 = Math.min(N, i0 + CR), C = bank.c, Sn = bank.s, WC = bank.wc, WS = bank.ws, A = bank.a, nb = bank.n;
+      for (let i = i0; i < i1; i++){
+        let y = 0;
+        for (let k = 0; k < nb; k++){ const c = C[k], s = Sn[k]; let wc = WC[k], ws = WS[k];
+          if (dop && HI[k]){ const dw = dop * ws; wc -= ws * dw; ws += WC[k] * dw; }   // a slightly faster or slower turn: the horn's Doppler
+          C[k] = c * wc - s * ws; Sn[k] = s * wc + c * ws; y += s * A[k]; }
+        // key click: a few ms of bright noise at the key contact (and a smaller one on release)
+        const tt = i / sr; const ck = tt < 0.006 ? (1 - tt / 0.006) : tt >= h && tt < h + 0.004 ? 0.4 * (1 - (tt - h) / 0.004) : 0;
+        if (ck > 0){ const nz = rnd() * 2 - 1; hp = nz - cl; cl = nz; y += hp * ck * p.click * 0.6; }
+        lp += (y - lp) * lpw; out[i] = lp;
+      }
+      if ((i0 & 4095) === 0) for (let k = 0; k < nb; k++){ const m = 1 / Math.hypot(C[k], Sn[k]); C[k] *= m; Sn[k] *= m; }
+    }
+    return KeysUtil.finish(out, p, sr, 0.003);
+  }
+}
 // The new engines in one table: live ones have a Core class (played by a worklet in the tracker), rendered ones a render().
 const XENG = {
   acid:{live:true, C:() => AcidCore, d:() => AcidCore.defaults()},
@@ -3673,6 +3822,10 @@ const XENG = {
   tone:{live:false, d:() => ToneDrum.defaults()},
   modal:{live:false, d:() => ModalCore.defaults()},
   swarm:{live:false, d:() => SwarmCore.defaults()},
+  piano:{live:false, d:() => PianoCore.defaults()},
+  ep:{live:false, d:() => TineEPCore.defaults()},
+  organ:{live:false, d:() => OrganCore.defaults()},
+  sf:{live:false, d:() => ({bank:0, prog:0, trans:0, velo:0.7, atk:1, rel:1})},
 };
 const isXEngV = v => !!(v && XENG[v.engine]);
 function normX(kind, o){ const d = XENG[kind].d(), r = {}; for (const k in d) r[k] = o && typeof o[k] === 'number' && isFinite(o[k]) ? o[k] : d[k]; delete r.tune; delete r.drive; delete r.level; return r; }
@@ -3683,6 +3836,11 @@ function renderX(V, sr, hold){
   if (k === 'mach') return renderLiveCore(MachCore, P, sr, hold || Math.min(V.len || 2, 2));
   if (k === 'tone') return ToneDrum.render(P, sr);
   if (k === 'swarm') return SwarmCore.render(P, sr, hold || Math.min(V.len || 3, 4));
+  if (k === 'piano') return PianoCore.render(P, sr, hold || Math.min(V.len || 3, 4));
+  if (k === 'ep') return TineEPCore.render(P, sr, hold || Math.min(V.len || 3, 4));
+  if (k === 'organ') return OrganCore.render(P, sr, hold || Math.min(V.len || 2, 3));
+  // SoundFont pads render on the page (the SoundFont code lives in the UI part of the script; the Worker has no fonts)
+  if (k === 'sf') return typeof globalThis.__sfRender === 'function' ? globalThis.__sfRender(V, sr, hold || Math.min(V.len || 2, 3)) : new Float32Array(1);
   return ModalCore.render(P, sr, hold || (V.gate || 400) / 1000 * 2);
 }
 /* Pitch delay and Pitch reverb (original code), in the spirit of the pitch-shifting delay and reverb pedals.
@@ -4024,7 +4182,7 @@ self.onmessage = async e => {
 // The Worker stopped (or never started): pending jobs fall back to this thread.
 function rwDown(){ PW.ready = false; try { PW.w && PW.w.terminate(); } catch(e){} PW.w = null; for (const j of PW.jobs.values()) j.no(new Error('worker')); PW.jobs.clear(); }
 // Can the Worker render this voice? (It has no …waves engine if loading that failed.)
-const rwCan = v => PW.ready && PW.w && !(PW.wv === false && WV.doc && v.layers.some(l => l.on && l.type === 'waves'));
+const rwCan = v => PW.ready && PW.w && v.engine !== 'sf' && !(PW.wv === false && WV.doc && v.layers.some(l => l.on && l.type === 'waves'));
 // Renders a voice in the Worker: resolves to {data, st:[[fx index, peaks]…]}. Rejects when the Worker can't.
 function renderAsync(v, sr, hold, stages){
   if (!rwCan(v)) return Promise.reject(new Error('no worker'));
@@ -4440,7 +4598,7 @@ function setEngine(x){
   if (!was) v.tuneL = v.tune;
   if (x === 'bass'){ const first = !v.bass; v.engine = 'bass'; v.tune = 0; v.bass = normBass(v.bass); if (first) bassPreset(1, true); }
   else if (x === 'vox'){ v.engine = 'vox'; v.tune = 0; v.vox = normVox(v.vox); }
-  else if (XENG[x]){ v.engine = x; v.tune = 0; v[x] = normX(x, v[x]); }
+  else if (XENG[x]){ v.engine = x; v.tune = 0; v[x] = normX(x, v[x]); if (x === 'sf'){ if (!v.sfFont) v.sfFont = GM_FONT.id; setTimeout(() => sfPreparePad(cur), 0); } }
   else if (x === 'blip'){ const first = !v.blip; v.engine = 'blip'; v.tune = 0; v.blip = normBlip(v.blip); if (first) blipPreset(isSyn(cur) ? 0 : 3, true); }
   else { v.engine = 'layers'; if (typeof v.tuneL === 'number') v.tune = v.tuneL; }
   changed(cur); refreshAll();
@@ -4488,7 +4646,7 @@ function bassRandom(){
   pre.addEventListener('change', () => { if (pre.value !== '') bassPreset(+pre.value); pre.value = ''; });
   $('bassRand').addEventListener('click', bassRandom);
   $('bassInit').addEventListener('click', () => bassPreset(0));
-  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass'], ['vox', 'Voice'], ['blip', 'Blip'], ['acid', 'Acid'], ['mach', 'Machine'], ['tone', 'Tone drum'], ['modal', 'Modal'], ['swarm', 'Swarm']],
+  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass'], ['vox', 'Voice'], ['blip', 'Blip'], ['acid', 'Acid'], ['mach', 'Machine'], ['tone', 'Tone drum'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Tine EP'], ['organ', 'Organ'], ['sf', 'SoundFont']],
     () => isBassV(V()) ? 'bass' : isVoxV(V()) ? 'vox' : isBlipV(V()) ? 'blip' : isXEngV(V()) ? V().engine : 'layers', setEngine);
 })();
 
@@ -4861,8 +5019,8 @@ function factoryVoicePresets(){
       {type:'bell', a:0.45, b:0.25, atk:0.5, dec:2400, sus:0.15, rel:1500, level:0.7},
       {type:'sine', tune:12, atk:0.5, dec:1200, sus:0, rel:900, level:0.25}], {len:8})],
   ]],
-  ...[['acid', 'Acid'], ['mach', 'Machine synth'], ['tone', 'Tone drums'], ['modal', 'Modal'], ['swarm', 'Swarm']].map(([k, gn]) => [gn, XUI[k].pre.slice(1).map(([n, o, x]) =>
-    [n, () => PE(n, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:k === 'modal' || k === 'swarm' ? 6 : 4, gate:400}, x || {}))])]),
+  ...[['acid', 'Acid'], ['mach', 'Machine synth'], ['tone', 'Tone drums'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Electric piano'], ['organ', 'Organ']].map(([k, gn]) => [gn, XUI[k].pre.slice(1).map(([n, o, x]) =>
+    [n, () => PE(n, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:k === 'modal' || k === 'swarm' || k === 'piano' || k === 'ep' ? 6 : 4, gate:400}, x || {}))])]),
   ['Leads', [
     ['Square lead', () => PS('Square lead', [
       {type:'square', atk:3, dec:300, sus:0.75, rel:180, lpCut:3200, lpRes:0.25, level:0.6},
@@ -5012,6 +5170,251 @@ async function importPresetsFile(f){
 })();
 /* ---------- the Acid, Machine, Tone drum and Modal cards (one card, built for whichever engine the pad uses) ---------- */
 const nameOf = list => v => list[Math.max(0, Math.min(list.length - 1, Math.round(v)))];
+/* ---------- SoundFont player (original code, written from the SoundFont 2.04 spec) ----------
+   A pad with Engine: SoundFont plays a preset of a .sf2 / .sf3 file (SF3: Ogg Vorbis samples, as MuseScore makes them).
+   General MIDI comes from FluidR3 Mono GM (MIT, sounds/, fetched on first use). Fonts are kept in IndexedDB
+   (thunderplus-fonts); a pad keeps V.sfFont (font id), V.sfFontName, and its numbers in V.sf (bank, prog, trans, velo, …).
+   Unlike the other engines, the tracker plays these pads note by note from the font: each note picks its zones (key and
+   velocity ranges), loops them, runs the font's volume and filter envelopes and modulators (velocity and key number).
+   The pad's own render (waveform, pad export, the Synth page's keys) is one note at C-4. */
+const GM_FONT = {id:'gm-fluidr3', name:'General MIDI (FluidR3 Mono)', url:'sounds/FluidR3Mono_GM.sf3', mb:24};
+const SF = {fonts:new Map(), loading:new Map(), smp:new Map(), dec:new Map(), bufs:new Map(), list:null};
+// Generators by number (only the ones the player reads have names here).
+const SFG = {startOfs:0, endOfs:1, lsOfs:2, leOfs:3, startC:4, modEnvToPitch:7, fc:8, q:9, modEnvToFc:11, endC:12, pan:17,
+  mDelay:25, mAtk:26, mHold:27, mDec:28, mSus:29, mRel:30, mKeyHold:31, mKeyDec:32, vDelay:33, vAtk:34, vHold:35, vDec:36, vSus:37, vRel:38, vKeyHold:39, vKeyDec:40,
+  keynum:46, velocity:47, atten:48, lsC:45, coarse:51, fine:52, sampleID:53, modes:54, scale:56, excl:57, root:58};
+const SF_DEF = {8:13500, 25:-12000, 26:-12000, 27:-12000, 28:-12000, 30:-12000, 33:-12000, 34:-12000, 35:-12000, 36:-12000, 38:-12000, 46:-1, 47:-1, 56:100, 58:-1};
+// The spec's default modulators: velocity → attenuation (concave, 960 cB) and velocity → filter cutoff (−2400 cents, with
+// the 2.04 amount source: a negative velocity switch, so it only darkens soft notes). Fonts replace them by identity.
+const SF_DEFMODS = [{src:0x0502, dst:48, amt:960, as:0, tr:0}, {src:0x0102, dst:8, amt:-2400, as:0x0D02, tr:0}];
+function parseSF(buf){
+  const dv = new DataView(buf), u8 = new Uint8Array(buf), td = new TextDecoder('latin1');
+  const str = (o, n) => { let e = o; while (e < o + n && u8[e]) e++; return td.decode(u8.subarray(o, e)).trim(); };
+  const id = o => String.fromCharCode(u8[o], u8[o + 1], u8[o + 2], u8[o + 3]);
+  if (buf.byteLength < 12 || id(0) !== 'RIFF' || id(8) !== 'sfbk') throw new Error('That isn’t a SoundFont (.sf2 or .sf3) file.');
+  const ch = {};
+  const walk = (o, end) => { while (o + 8 <= end){ const k = id(o), n = dv.getUint32(o + 4, true);
+    if (k === 'LIST') walk(o + 12, Math.min(end, o + 8 + n)); else ch[k] = {o:o + 8, n}; o += 8 + n + (n & 1); } };
+  walk(12, Math.min(buf.byteLength, 8 + dv.getUint32(4, true)));
+  for (const k of ['phdr', 'pbag', 'pgen', 'inst', 'ibag', 'igen', 'shdr', 'smpl']) if (!ch[k]) throw new Error('This SoundFont is missing its ' + k + ' part.');
+  const rec = (k, sz, f) => { const c = ch[k], out = []; if (!c) return out; for (let o = c.o; o + sz <= c.o + c.n; o += sz) out.push(f(o)); return out; };
+  const phdr = rec('phdr', 38, o => ({name:str(o, 20), prog:dv.getUint16(o + 20, true), bank:dv.getUint16(o + 22, true), bag:dv.getUint16(o + 24, true)}));
+  const bag = o => ({g:dv.getUint16(o, true), m:dv.getUint16(o + 2, true)});
+  const pbag = rec('pbag', 4, bag), ibag = rec('ibag', 4, bag);
+  const gen = o => ({op:dv.getUint16(o, true), v:dv.getInt16(o + 2, true), lo:u8[o + 2], hi:u8[o + 3], u:dv.getUint16(o + 2, true)});
+  const pgen = rec('pgen', 4, gen), igen = rec('igen', 4, gen);
+  const mod = o => ({src:dv.getUint16(o, true), dst:dv.getUint16(o + 2, true), amt:dv.getInt16(o + 4, true), as:dv.getUint16(o + 6, true), tr:dv.getUint16(o + 8, true)});
+  const pmod = rec('pmod', 10, mod), imod = rec('imod', 10, mod);
+  const inst = rec('inst', 22, o => ({name:str(o, 20), bag:dv.getUint16(o + 20, true)}));
+  const samples = rec('shdr', 46, o => ({name:str(o, 20), start:dv.getUint32(o + 20, true), end:dv.getUint32(o + 24, true), ls:dv.getUint32(o + 28, true), le:dv.getUint32(o + 32, true),
+    sr:dv.getUint32(o + 36, true) || 44100, root:u8[o + 40], corr:dv.getInt8(o + 41), link:dv.getUint16(o + 42, true), type:dv.getUint16(o + 44, true)}));
+  samples.pop();   // the terminal EOS record
+  const smpl = u8.subarray(ch.smpl.o, ch.smpl.o + ch.smpl.n);
+  const name = ch.INAM ? str(ch.INAM.o, ch.INAM.n) : 'SoundFont';
+  // A bag list's zones: the first is global when it lacks the terminal generator (41 instrument / 53 sampleID).
+  const zones = (bags, gens, mods, from, to, term) => { const out = []; let glob = null, gm = null;
+    for (let b = from; b < to && b < bags.length; b++){
+      const g1 = b + 1 < bags.length ? bags[b + 1].g : gens.length, m1 = b + 1 < bags.length ? bags[b + 1].m : mods.length;
+      const gl = gens.slice(bags[b].g, g1), ml = mods.slice(bags[b].m, m1), t = gl.find(x => x.op === term);
+      if (t) out.push({gl, ml, t:t.u}); else if (b === from){ glob = gl; gm = ml; } }
+    return {glob:glob || [], gm:gm || [], out}; };
+  const ADDR = new Set([0, 1, 2, 3, 4, 12, 45, 50]), ABS = new Set([41, 43, 44, 46, 47, 53, 54, 57, 58]);
+  const same = (a, b) => a.src === b.src && a.dst === b.dst && a.as === b.as && a.tr === b.tr;
+  const merge = (base, over) => { const out = base.slice(); for (const m of over){ const i = out.findIndex(x => same(x, m)); if (i >= 0) out[i] = m; else out.push(m); } return out; };
+  const instZones = inst.slice(0, -1).map((I, i) => zones(ibag, igen, imod, I.bag, inst[i + 1].bag, 53));
+  const presets = [];
+  for (let p = 0; p < phdr.length - 1; p++){
+    const P = phdr[p], pz = zones(pbag, pgen, pmod, P.bag, phdr[p + 1].bag, 41), Z = [];
+    for (const z of pz.out){
+      const iz = instZones[z.t]; if (!iz) continue;
+      let pk = [0, 127], pv = [0, 127]; const padd = {};
+      for (const g of [...pz.glob, ...z.gl]){ if (g.op === 43) pk = [g.lo, g.hi]; else if (g.op === 44) pv = [g.lo, g.hi]; else if (!ABS.has(g.op) && !ADDR.has(g.op)) padd[g.op] = g.v; }
+      const pm = merge(pz.gm, z.ml);
+      for (const lz of iz.out){
+        const g = {}; let k = [0, 127], v = [0, 127];
+        for (const x of [...iz.glob, ...lz.gl]){ if (x.op === 43) k = [x.lo, x.hi]; else if (x.op === 44) v = [x.lo, x.hi]; else g[x.op] = x.op === 53 ? x.u : x.v; }
+        for (const op in padd) g[op] = (g[op] || 0) + padd[op];
+        const klo = Math.max(k[0], pk[0]), khi = Math.min(k[1], pk[1]), vlo = Math.max(v[0], pv[0]), vhi = Math.min(v[1], pv[1]);
+        if (klo > khi || vlo > vhi || !samples[lz.t]) continue;
+        // modulators: the defaults, replaced by the instrument's (global, then local); the preset's add on top
+        Z.push({klo, khi, vlo, vhi, s:lz.t, g, im:merge(merge(SF_DEFMODS, iz.gm), lz.ml), pm});
+      }
+    }
+    presets.push({name:P.name, bank:P.bank, prog:P.prog, zones:Z});
+  }
+  presets.sort((a, b) => a.bank - b.bank || a.prog - b.prog);
+  return {name, sf3:samples.some(s => s.type & 0x10), smpl, samples, presets};
+}
+// A modulator source (velocity and key number; every controller reads as 0; "no controller" is 0 as the primary source and
+// 1 as the amount source) through its curve: linear, concave, convex or switch, uni- or bipolar, either direction.
+function sfSrc(code, key, vel, amt){
+  const idx = code & 127, cc = code & 128, neg = code & 256, bip = code & 512, typ = code >> 10;
+  let x;
+  if (cc) x = 0; else if (idx === 0) return amt ? 1 : 0; else if (idx === 2) x = vel / 128; else if (idx === 3) x = key / 128; else x = 0;
+  if (neg) x = 1 - x;
+  if (bip) x = x * 2 - 1;
+  const cv = u => typ === 1 ? (u >= 1 ? 1 : u <= 0 ? 0 : Math.min(1, -20 / 96 * Math.log10((1 - u) * (1 - u)))) : typ === 2 ? (u <= 0 ? 0 : u >= 1 ? 1 : 1 - Math.min(1, -20 / 96 * Math.log10(u * u))) : typ === 3 ? (u >= 0.5 ? 1 : 0) : u;
+  return bip ? Math.sign(x) * cv(Math.abs(x)) : cv(x);
+}
+// The numbers one note of one zone plays with: generators + modulators at this key and velocity.
+function sfVoice(font, z, key, vel){
+  const G = op => (z.g[op] != null ? z.g[op] : SF_DEF[op] || 0);
+  const add = {};
+  for (const m of [...z.im, ...z.pm]){
+    if (m.dst & 0x8000) continue;   // linked modulators: not supported
+    // tracker volume already sets the loudness, so velocity → attenuation is left out (it would count twice)
+    if (m.dst === 48 && ((m.src & 127) === 2) && !(m.src & 128)) continue;
+    const v = m.amt * sfSrc(m.src, key, vel, false) * sfSrc(m.as || 0, key, vel, true); if (v) add[m.dst] = (add[m.dst] || 0) + v;
+  }
+  const g = op => G(op) + (add[op] || 0), s = font.samples[z.s], tc = v => Math.pow(2, v / 1200);
+  const root = G(58) >= 0 ? G(58) : s.root, kd = 60 - key;
+  return {s:z.s, root, excl:G(57), modes:G(54) & 3, scale:G(56), tune:g(51) + (g(52) + s.corr) / 100,
+    atten:Math.max(0, g(48)), pan:Math.max(-500, Math.min(500, g(17))), fc:g(8), q:Math.max(0, g(9)), modEnvToFc:g(11),
+    ofs:{start:G(0) + G(4) * 32768, end:G(1) + G(12) * 32768, ls:G(2) + G(45) * 32768, le:G(3) + G(50) * 32768},
+    v:{delay:tc(g(33)), atk:tc(g(34)), hold:tc(g(35) + g(39) * kd), dec:tc(g(36) + g(40) * kd), sus:Math.max(0, Math.min(1440, g(37))), rel:tc(g(38))},
+    m:{delay:tc(g(25)), atk:tc(g(26)), hold:tc(g(27) + g(31) * kd), dec:tc(g(28) + g(32) * kd), sus:Math.max(0, Math.min(1000, g(29))) / 1000, rel:tc(g(30))}};
+}
+const sfZonesFor = (pr, key, vel) => pr ? pr.zones.filter(z => key >= z.klo && key <= z.khi && vel >= z.vlo && vel <= z.vhi) : [];
+function sfPreset(font, bank, prog){
+  if (!font) return null;
+  return font.presets.find(p => p.bank === bank && p.prog === prog) || font.presets.find(p => p.bank === (bank >= 128 ? 128 : 0) && p.prog === prog)
+    || font.presets.find(p => p.bank === (bank >= 128 ? 128 : 0)) || font.presets[0] || null;
+}
+/* IndexedDB: the font files themselves (they can be tens of MB). */
+let sfDbP = null;
+function sfDb(){
+  if (!sfDbP) sfDbP = new Promise((res, rej) => { try { const r = indexedDB.open('thunderplus-fonts', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('fonts', {keyPath:'id'}); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch(e){ rej(e); } });
+  return sfDbP;
+}
+const sfTx = async (mode, f) => { const db = await sfDb(); return new Promise((res, rej) => { const t = db.transaction('fonts', mode), st = t.objectStore('fonts'), r = f(st); t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error); }); };
+async function sfList(){ try { const all = await sfTx('readonly', st => st.getAll()); SF.list = (all || []).map(f => ({id:f.id, name:f.name, size:f.bytes ? f.bytes.byteLength : 0})); } catch(e){ SF.list = []; } return SF.list; }
+async function sfPut(id, name, bytes){ await sfTx('readwrite', st => st.put({id, name, bytes})); await sfList(); }
+async function sfDelete(id){ await sfTx('readwrite', st => st.delete(id)); SF.fonts.delete(id); for (const k of [...SF.smp.keys()]) if (k.startsWith(id + ':')) SF.smp.delete(k); await sfList(); }
+// The GM font: fetched from the app's own folder the first time it is asked for, with progress, then kept.
+async function sfFetchGM(){
+  toast(`Downloading the General MIDI sounds (${GM_FONT.mb} MB, once)…`, 4000);
+  const r = await fetch(GM_FONT.url); if (!r.ok) throw new Error('Couldn’t download the General MIDI sounds (' + r.status + ').');
+  const total = +r.headers.get('content-length') || GM_FONT.mb * 1048576, rd = r.body && r.body.getReader ? r.body.getReader() : null;
+  let bytes;
+  if (rd){ const parts = []; let got = 0, last = 0;
+    for (;;){ const {done, value} = await rd.read(); if (done) break; parts.push(value); got += value.length;
+      if (got - last > total / 8){ last = got; toast(`General MIDI sounds: ${Math.round(got / total * 100)}%`, 3000); } }
+    bytes = new Uint8Array(got); let o = 0; for (const p of parts){ bytes.set(p, o); o += p.length; } bytes = bytes.buffer; }
+  else bytes = await r.arrayBuffer();
+  try { await sfPut(GM_FONT.id, GM_FONT.name, bytes); } catch(e){}
+  return bytes;
+}
+// Loads (and parses) a font by id: from memory, IndexedDB, or (GM) the network. Shared by everything that asks at once.
+function sfLoad(id){
+  if (!id) return Promise.resolve(null);
+  if (SF.fonts.has(id)) return Promise.resolve(SF.fonts.get(id));
+  if (!SF.loading.has(id)) SF.loading.set(id, (async () => {
+    let rec = null; try { rec = await sfTx('readonly', st => st.get(id)); } catch(e){}
+    let bytes = rec && rec.bytes;
+    if (!bytes && id === GM_FONT.id) bytes = await sfFetchGM();
+    if (!bytes) throw new Error('SoundFont “' + id + '” isn’t on this device. Load it on the Synth page (Engine: SoundFont).');
+    const f = parseSF(bytes); f.id = id; SF.fonts.set(id, f);
+    return f;
+  })().catch(e => { SF.loading.delete(id); toast(e.message || 'SoundFont failed to load.', 6000); return null; }));
+  return SF.loading.get(id);
+}
+// Sample data, decoded once per font and sample: {d:Float32Array, sr, ls, le} (loop in frames of d).
+const sfDecCtx = () => { const O = window.OfflineAudioContext || window.webkitOfflineAudioContext; return new O(1, 1, (ctx && ctx.sampleRate) || srGuess || 48000); };
+async function sfSample(font, i){
+  const key = font.id + ':' + i; if (SF.smp.has(key)) return SF.smp.get(key);
+  if (SF.dec.has(key)) return SF.dec.get(key);
+  const p = (async () => {
+    const s = font.samples[i]; let d, sr;
+    if (s.type & 0x10){   // SF3: an Ogg Vorbis stream at start…end (bytes); loops are frames from the sample's start
+      const ab = font.smpl.slice(s.start, s.end).buffer, dc = sfDecCtx();
+      const b = await new Promise((res, rej) => { try { const pr = dc.decodeAudioData(ab, res, rej); if (pr && pr.then) pr.then(res, rej); } catch(e){ rej(e); } });
+      d = b.getChannelData(0).slice(); sr = b.sampleRate;
+      const k = sr / s.sr, r = {d, sr, ls:Math.round(s.ls * k), le:Math.round(s.le * k), k};
+      SF.smp.set(key, r); return r;
+    }
+    // SF2: 16-bit PCM frames; loops are absolute frames
+    const n = Math.max(0, s.end - s.start), view = new DataView(font.smpl.buffer, font.smpl.byteOffset, font.smpl.byteLength); d = new Float32Array(n);
+    for (let j = 0; j < n && (s.start + j) * 2 + 1 < font.smpl.byteLength; j++) d[j] = view.getInt16((s.start + j) * 2, true) / 32768;
+    const r = {d, sr:s.sr, ls:s.ls - s.start, le:s.le - s.start, k:1}; SF.smp.set(key, r); return r;
+  })().catch(() => { const r = {d:new Float32Array(1), sr:48000, ls:0, le:0, k:1}; SF.smp.set(key, r); return r; });
+  SF.dec.set(key, p); return p;
+}
+// Everything one preset needs, decoded (with each stereo sample's partner).
+async function sfPreparePreset(font, pr){
+  if (!font || !pr) return;
+  const want = new Set(); for (const z of pr.zones){ want.add(z.s); const s = font.samples[z.s]; if ((s.type & 6) && s.link < font.samples.length) want.add(s.link); }
+  await Promise.all([...want].map(i => sfSample(font, i)));
+}
+// For a pad: load its font and decode its preset. Re-renders the pad when that finishes.
+const sfReadyPads = new Set();
+async function sfPreparePad(i){
+  const v = kit.voices[i]; if (!v || v.engine !== 'sf') return;
+  const P = xParams(v), font = await sfLoad(v.sfFont || GM_FONT.id); if (!font) return;
+  if (!v.sfFontName) v.sfFontName = font.name;
+  const pr = sfPreset(font, Math.round(P.bank), Math.round(P.prog)); await sfPreparePreset(font, pr);
+  const was = sfReadyPads.has(i + ':' + font.id + ':' + (pr && pr.bank) + ':' + (pr && pr.prog)); sfReadyPads.add(i + ':' + font.id + ':' + (pr && pr.bank) + ':' + (pr && pr.prog));
+  if (!was){ dirty[i] = true; if (i === cur && view === 'synth') try { showCur(); } catch(e){} }
+}
+// Every SoundFont pad an event list (or the whole kit) uses: before an offline render, and when PLAY starts.
+async function sfPrepare(evs){
+  const pads = new Set(); for (const e of evs || []) if (e.type === 'note' && kit.voices[e.pad] && kit.voices[e.pad].engine === 'sf') pads.add(e.pad);
+  if (!evs) kit.voices.forEach((v, i) => { if (v && v.engine === 'sf') pads.add(i); });
+  await Promise.all([...pads].map(sfPreparePad));
+}
+// An AudioBuffer for a zone's sample (stereo when it is half of a linked pair), cached per font and sample.
+function sfBuf(font, i, stereo){
+  const key = font.id + ':' + i + (stereo ? ':s' : ''); let b = SF.bufs.get(key); if (b) return b;
+  const a = SF.smp.get(font.id + ':' + i); if (!a) return null;
+  const s = font.samples[i], pi = stereo ? s.link : -1, bP = pi >= 0 ? SF.smp.get(font.id + ':' + pi) : null;
+  const n = Math.max(1, bP ? Math.min(a.d.length, bP.d.length) : a.d.length);
+  try { b = new AudioBuffer({length:n, sampleRate:a.sr, numberOfChannels:bP ? 2 : 1}); }
+  catch(e){ const O = window.OfflineAudioContext || window.webkitOfflineAudioContext; b = new O(bP ? 2 : 1, 1, a.sr).createBuffer(bP ? 2 : 1, n, a.sr); }
+  if (bP){ const left = s.type & 4; b.copyToChannel((left ? a : bP).d.subarray(0, n), 0); b.copyToChannel((left ? bP : a).d.subarray(0, n), 1); }
+  else b.copyToChannel(a.d.subarray(0, n), 0);
+  SF.bufs.set(key, b); return b;
+}
+// Which zones to sound for a note: stereo pairs become one zone (the left one, with its partner).
+function sfPick(font, pr, key, vel){
+  const zs = sfZonesFor(pr, key, vel), out = [], used = new Set();
+  for (const z of zs){ if (used.has(z.s)) continue; const s = font.samples[z.s];
+    const pair = (s.type & 6) && s.link < font.samples.length && zs.some(y => y.s === s.link);
+    if (pair){ used.add(z.s); used.add(s.link); out.push({z:(s.type & 4) ? z : zs.find(y => y.s === s.link), stereo:true}); }
+    else { used.add(z.s); out.push({z, stereo:false}); }
+    if (out.length >= 4) break; }
+  return out;
+}
+// The pad's own render: C-4 (MIDI 60) at velocity 100, held for `hold` s, then released. Mono.
+globalThis.__sfRender = (...a) => sfRender(...a);
+function sfRender(V, sr, hold){
+  const font = SF.fonts.get(V.sfFont || GM_FONT.id), P = xParams(V);
+  if (!font){ setTimeout(() => kit.voices.forEach((v, i) => { if (v === V) sfPreparePad(i); }), 0); return new Float32Array(1); }
+  const pr = sfPreset(font, Math.round(P.bank), Math.round(P.prog)), key = clamp(60 + Math.round(P.trans), 0, 127), picks = sfPick(font, pr, key, 100);
+  const h = Math.max(0.05, hold || 1.5);
+  let rlen = 0; const parts = [];
+  for (const {z} of picks){ const a = SF.smp.get(font.id + ':' + z.s); if (!a){ setTimeout(() => kit.voices.forEach((v, i) => { if (v === V) sfPreparePad(i); }), 0); continue; }
+    const vo = sfVoice(font, z, key, 100), rel = Math.min(4, vo.v.rel * P.rel); rlen = Math.max(rlen, rel); parts.push({a, vo, rel}); }
+  const N = Math.max(1, Math.ceil(Math.min(30, h + rlen + 0.05) * sr)), out = new Float32Array(N);
+  for (const {a, vo, rel} of parts){
+    const ratio = Math.pow(2, ((key - vo.root) * vo.scale / 100 + vo.tune) / 12) * a.sr / sr, loop = vo.modes === 1 || vo.modes === 3, ls = a.ls, le = a.le, d = a.d;
+    const lg = Math.pow(10, -vo.atten / 200), sus = Math.pow(10, -vo.v.sus / 200), E = vo.v;
+    let pos = 0;
+    for (let i = 0; i < N; i++){
+      const t = i / sr; let e;
+      const ta = t - E.delay; if (ta < 0) e = 0; else if (ta < E.atk * P.atk) e = ta / (E.atk * P.atk); else if (ta < E.atk * P.atk + E.hold) e = 1;
+      else { const td = ta - E.atk * P.atk - E.hold; e = Math.max(sus, Math.pow(10, -(td / Math.max(0.001, E.dec)) * 100 / 20)); }
+      if (t > h) e *= Math.exp(-(t - h) / Math.max(0.003, rel / 6.9));
+      const j = Math.floor(pos), f = pos - j; if (j + 1 >= d.length) break;
+      out[i] += (d[j] + (d[j + 1] - d[j]) * f) * e * lg;
+      pos += ratio; if (loop && le > ls + 4 && pos >= le) pos -= (le - ls);
+    }
+  }
+  let pk = 0; for (let i = 0; i < N; i++) pk = Math.max(pk, Math.abs(out[i]));
+  // like the other engines' renders: peaks at 0.8 (the font's own level only matters between its presets)
+  const lv = Math.pow(10, (V.level || 0) / 20) * (pk > 0 ? 0.8 / pk : 1); for (let i = 0; i < N; i++) out[i] *= lv;
+  return out;
+}
+
 const XUI = {
   acid:{title:'Acid', tag:'saw/square · ladder · accent · slide', rows:{
       oct:{l:'Octave', min:-1, max:3, c:'int', d:1, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
@@ -5077,6 +5480,66 @@ const XUI = {
       ['Glass harmonica', {mat:7, exc:2, bow:0.7, dec:2.5, bright:0.6}], ['Bowed bar', {mat:0, exc:2, bow:0.8, dec:2, bright:0.5}],
       ['Plucked string', {mat:8, exc:3, hard:0.6, dec:1.5, bright:0.55, pos:0.15}], ['Breathy pipe', {mat:9, exc:4, bow:0.6, noise:0.4, dec:0.6, bright:0.45}],
       ['Metal plate hit', {mat:11, oct:1, exc:1, hard:0.7, dec:2.2, bright:0.7, inharm:0.3}], ['Struck membrane', {mat:6, oct:1, exc:0, hard:0.35, dec:0.5}]]},
+  piano:{title:'Piano', tag:'struck strings · hammer · soundboard', rows:{
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      hard:{l:'Hammer', min:0, max:1, c:'lin', d:0.55, f:v => v < 0.33 ? 'Soft ' + pct(v) : v < 0.7 ? 'Medium ' + pct(v) : 'Hard ' + pct(v)},
+      bright:{l:'Brightness', min:0, max:1, c:'lin', d:0.55, f:pct}, pos:{l:'Strike point', min:0.03, max:0.3, c:'lin', d:0.12, f:pct},
+      dec:{l:'Sustain time', min:0.2, max:3, c:'log', d:1, f:v => '×' + v.toFixed(2)}, strings:{l:'Strings', min:1, max:3, c:'int', d:3, f:v => String(Math.round(v))},
+      det:{l:'Unison detune', min:0, max:1, c:'lin', d:0.35, f:v => Math.round(v * v * 6 * 10) / 10 + ' cents'}, inharm:{l:'String stiffness', min:0, max:1, c:'lin', d:0.4, f:pct},
+      thump:{l:'Hammer thump', min:0, max:1, c:'lin', d:0.35, f:pct}, body:{l:'Soundboard', min:0, max:1, c:'lin', d:0.4, f:pct},
+      rel:{l:'Dampers', min:20, max:2000, c:'log', d:180, f:ms}, pedal:{l:'Sustain pedal', min:0, max:1, c:'int', d:0, f:v => v ? 'Down' : 'Up'}},
+    secs:[['Piano', ['oct', 'hard', 'bright', 'pos', 'dec']], ['Strings', ['strings', 'det', 'inharm']], ['Body & dampers', ['thump', 'body', 'rel', 'pedal']]],
+    note:'Held notes ring for as long as the tracker note; the dampers stop them on release (unless the pedal is down). One note is rendered and pitched: for very wide ranges, put the low and high register on different pads.',
+    pre:[['Init', {}], ['Grand', {hard:0.6, bright:0.6, body:0.45}], ['Soft felt', {hard:0.15, bright:0.25, thump:0.5, det:0.2, rel:300}], ['Bright pop', {hard:0.85, bright:0.85, det:0.45, body:0.3}],
+      ['Honky-tonk', {det:0.95, strings:3, bright:0.65, hard:0.7}], ['Upright', {bright:0.4, dec:0.6, body:0.7, inharm:0.6, thump:0.5}], ['Pedal wash', {pedal:1, hard:0.45, bright:0.5}],
+      ['House piano stab', {hard:0.9, bright:0.9, dec:0.5, rel:90, body:0.25}, {drive:0.15}], ['Toy-ish', {oct:4, inharm:1, strings:1, bright:0.8, dec:0.4}], ['Low grand', {oct:0, hard:0.5, bright:0.45, body:0.6}]]},
+  ep:{title:'Tine EP', tag:'tine · pickup bark · bell · tremolo', rows:{
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      hard:{l:'Hammer', min:0, max:1, c:'lin', d:0.5, f:pct}, bark:{l:'Bark', min:0, max:1, c:'lin', d:0.45, f:pct}, bell:{l:'Bell', min:0, max:1, c:'lin', d:0.4, f:pct},
+      dec:{l:'Sustain time', min:0.2, max:3, c:'log', d:1, f:v => '×' + v.toFixed(2)}, tone:{l:'Tone', min:0, max:1, c:'lin', d:0.6, f:pct},
+      trem:{l:'Tremolo', min:0, max:1, c:'lin', d:0, f:pct}, tremRate:{l:'Tremolo rate', min:0.5, max:12, c:'log', d:4.5, f:v => v.toFixed(2) + ' Hz'},
+      rel:{l:'Dampers', min:20, max:1500, c:'log', d:120, f:ms}},
+    secs:[['Tine', ['oct', 'hard', 'bark', 'bell', 'dec']], ['Amp', ['tone', 'trem', 'tremRate', 'rel']]],
+    note:'Bark is how close the tine sits to its pickup: further is round and bell-like, closer growls on hard hits.',
+    pre:[['Init', {}], ['Classic stage', {hard:0.55, bark:0.5, bell:0.35}], ['Mellow ballad', {hard:0.25, bark:0.2, bell:0.25, tone:0.4}], ['Barky funk', {hard:0.9, bark:0.95, bell:0.5, tone:0.8}],
+      ['Suitcase tremolo', {hard:0.5, bark:0.45, trem:0.55, tremRate:5}], ['Glassy bell', {hard:0.6, bark:0.15, bell:0.9, tone:0.9}], ['Lo-fi keys', {hard:0.4, bark:0.6, tone:0.25, trem:0.2, tremRate:3}, {drive:0.25}],
+      ['Deep house chord', {hard:0.45, bark:0.35, bell:0.3, tone:0.5, rel:300}]]},
+  organ:{title:'Organ', tag:'drawbars · percussion · click · rotary', rows:{
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      d1:{l:"16′", min:0, max:8, c:'int', d:8, f:v => String(Math.round(v))},
+      d2:{l:"5⅓′", min:0, max:8, c:'int', d:8, f:v => String(Math.round(v))},
+      d3:{l:"8′", min:0, max:8, c:'int', d:8, f:v => String(Math.round(v))},
+      d4:{l:"4′", min:0, max:8, c:'int', d:0, f:v => String(Math.round(v))},
+      d5:{l:"2⅔′", min:0, max:8, c:'int', d:0, f:v => String(Math.round(v))},
+      d6:{l:"2′", min:0, max:8, c:'int', d:0, f:v => String(Math.round(v))},
+      d7:{l:"1⅗′", min:0, max:8, c:'int', d:0, f:v => String(Math.round(v))},
+      d8:{l:"1⅓′", min:0, max:8, c:'int', d:0, f:v => String(Math.round(v))},
+      d9:{l:"1′", min:0, max:8, c:'int', d:0, f:v => String(Math.round(v))},
+      perc:{l:'Percussion', min:0, max:2, c:'int', d:0, f:nameOf(['Off', '2nd', '3rd'])}, percLv:{l:'Perc level', min:0, max:1, c:'lin', d:0.5, f:pct},
+      percDec:{l:'Perc decay', min:40, max:2000, c:'log', d:250, f:ms}, click:{l:'Key click', min:0, max:1, c:'lin', d:0.3, f:pct},
+      pluck:{l:'Pluck', min:0, max:1, c:'lin', d:0, f:v => v < 0.01 ? 'Off' : pct(v)}, pluckDec:{l:'Pluck decay', min:40, max:3000, c:'log', d:300, f:ms},
+      rotary:{l:'Rotary', min:0, max:2, c:'int', d:0, f:nameOf(['Off', 'Slow', 'Fast'])}, rotDepth:{l:'Rotary depth', min:0, max:1, c:'lin', d:0.5, f:pct},
+      bright:{l:'Brightness', min:0, max:1, c:'lin', d:0.7, f:pct}, atk:{l:'Attack', min:0.5, max:500, c:'log', d:3, f:ms}, rel:{l:'Release', min:5, max:2000, c:'log', d:40, f:ms}},
+    secs:[['Drawbars', ['oct', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9']], ['Percussion & click', ['perc', 'percLv', 'percDec', 'click']], ['Pluck', ['pluck', 'pluckDec']], ['Rotary & amp', ['rotary', 'rotDepth', 'bright', 'atk', 'rel']]],
+    note:'Drawbars are in organ order (16′ … 1′), 0–8 each. Pluck makes the sound fall from the attack to a lower level: with a bright set of drawbars and plenty of click that is the classic 90s house organ.',
+    pre:[['Init', {}], ['House organ (M1 style)', {d1:0, d2:0, d3:8, d4:8, d5:5, d6:6, d7:0, d8:3, d9:5, click:0.75, pluck:0.62, pluckDec:230, bright:0.9, rel:60}, {drive:0.12}],
+      ['House organ bass', {oct:1, d1:6, d2:0, d3:8, d4:8, d5:4, d6:4, d7:0, d8:0, d9:2, click:0.6, pluck:0.55, pluckDec:200, bright:0.75}],
+      ['Jazz (888)', {d1:8, d2:8, d3:8, perc:2, percLv:0.55, percDec:220, click:0.4, rotary:1}], ['Gospel full', {d1:8, d2:8, d3:8, d4:8, d5:6, d6:6, d7:4, d8:4, d9:8, rotary:2, click:0.35}, {drive:0.3}],
+      ['Rock overdrive', {d1:8, d2:8, d3:8, d4:6, d5:0, d6:4, d7:0, d8:0, d9:4, rotary:2, click:0.5}, {drive:0.65}], ['Soft flutes', {d1:0, d2:0, d3:6, d4:4, d5:0, d6:0, d7:0, d8:0, d9:0, click:0.05, bright:0.4, atk:20, rel:150}],
+      ['Bright perc', {d1:0, d2:0, d3:8, d4:0, d5:0, d6:0, d7:0, d8:0, d9:0, perc:1, percLv:0.8, percDec:180, click:0.5}], ['Reggae bubble', {d1:8, d2:0, d3:8, d4:6, d5:0, d6:0, d7:0, d8:0, d9:0, click:0.6, pluck:0.8, pluckDec:120}],
+      ['Church principal', {d1:8, d2:4, d3:8, d4:6, d5:4, d6:4, d7:0, d8:2, d9:2, click:0, atk:60, rel:600, bright:0.6}]]},
+  sf:{title:'SoundFont', tag:'General MIDI · your .sf2 / .sf3', rows:{
+      bank:{l:'Bank', min:0, max:128, c:'int', d:0, f:v => Math.round(v) >= 128 ? '128 · drum kits' : String(Math.round(v))},
+      prog:{l:'Program', min:0, max:127, c:'int', d:0, f:v => sfPresetLabel(Math.round(v))},
+      trans:{l:'Transpose', min:-36, max:36, c:'int', d:0, f:v => (v > 0 ? '+' : '') + Math.round(v) + ' st'},
+      velo:{l:'Velocity', min:0, max:1, c:'lin', d:0.7, f:v => v < 0.01 ? 'Off (always loud)' : pct(v)},
+      atk:{l:'Attack', min:0.1, max:10, c:'log', d:1, f:v => '×' + v.toFixed(2)}, rel:{l:'Release', min:0.1, max:10, c:'log', d:1, f:v => '×' + v.toFixed(2)}},
+    secs:[['Sound', ['bank', 'prog', 'trans']], ['Playing', ['velo', 'atk', 'rel']]],
+    note:'Tracker notes play the font key by key (C-4 is middle C, MIDI 60; on a drum kit, C-2 is the kick). Velocity: how much the V column picks soft or hard samples. On a drum pad, looping sounds stop after the pad’s Max len.',
+    pre:[['Init', {}], ['Grand piano', {bank:0, prog:0}], ['Electric piano', {bank:0, prog:4}], ['Vibraphone', {bank:0, prog:11}], ['Organ', {bank:0, prog:16}], ['Nylon guitar', {bank:0, prog:24}],
+      ['Finger bass', {bank:0, prog:33}], ['Slap bass', {bank:0, prog:36}], ['Strings', {bank:0, prog:48}], ['Choir aahs', {bank:0, prog:52}], ['Orchestra hit', {bank:0, prog:55}], ['Brass section', {bank:0, prog:61}],
+      ['Alto sax', {bank:0, prog:65}], ['Flute', {bank:0, prog:73}], ['Square lead', {bank:0, prog:80}], ['Warm pad', {bank:0, prog:89}], ['Standard drum kit', {bank:128, prog:0}],
+      ['TR-808 kit', {bank:128, prog:25}], ['Electronic kit', {bank:128, prog:24}], ['Jazz kit', {bank:128, prog:32}]]},
   swarm:{title:'Swarm', tag:'oscillator cloud · drift · bloom', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
       voices:{l:'Voices', min:1, max:48, c:'int', d:16, f:v => String(Math.round(v))},
@@ -5112,17 +5575,67 @@ const XEV = () => { const v = V(), k = v.engine; if (!v[k]) v[k] = normX(k, null
 function xPreset(i, quiet){
   const v = V(), k = v.engine, pr = XUI[k] && XUI[k].pre[i]; if (!pr) return;
   v[k] = normX(k, Object.assign(XENG[k].d(), pr[1])); v.drive = (pr[2] && pr[2].drive) || 0;
+  if (k === 'sf'){ if (!v.sfFont) v.sfFont = GM_FONT.id; if (i > 0) v.name = pr[0]; sfPreparePad(cur).then(() => sfPanel(true)); }
   if (!quiet){ changed(cur); refreshAll(); toast(XUI[k].title + ': ' + pr[0]); try { play(cur); } catch(e){} }
 }
 function xRandom(){
   const k = V().engine, U = XUI[k], o = XV(), r = Math.random;
+  if (k === 'sf'){ const f = SF.fonts.get(V().sfFont || GM_FONT.id); if (!f || !f.presets.length) return; const pr = f.presets[Math.floor(r() * f.presets.length)];
+    o.bank = pr.bank; o.prog = pr.prog; V().name = pr.name.slice(0, 24); changed(cur); refreshAll(); sfPreparePad(cur).then(() => { sfPanel(true); try { play(cur); } catch(e){} }); return; }
   for (const key in U.rows){ const d = U.rows[key]; if (key === 'oct') continue;
     let x = d.c === 'log' ? d.min * Math.pow(d.max / d.min, r()) : d.min + (d.max - d.min) * r(); if (d.c === 'int') x = Math.round(x); o[key] = x; }
   changed(cur); refreshAll(); try { play(cur); } catch(e){}
 }
+
+// The preset name for a program number on the Synth page's pad (its font and bank), for the Program row.
+function sfPresetLabel(prog){
+  try { const v = V(); if (!v || v.engine !== 'sf') return String(prog); const f = SF.fonts.get(v.sfFont || GM_FONT.id); if (!f) return prog + ' (font loading…)';
+    const P = xParams(v), pr = f.presets.find(p => p.bank === Math.round(P.bank) && p.prog === prog); const nm = pr ? pr.name : '—'; return prog + ' ' + (nm.length > 13 ? nm.slice(0, 12) + '…' : nm); } catch(e){ return String(prog); }
+}
+// The font and preset pickers at the top of the SoundFont card.
+let sfPanelSig = '';
+async function sfPanel(force){
+  const host = $('xSecs'); if (!host) return;
+  const v = V(); if (!v || v.engine !== 'sf') return;
+  let box = $('sfBox'); if (!box){ box = el('div', 'sec'); box.id = 'sfBox'; host.prepend(box); }
+  const list = SF.list || await sfList(), font = SF.fonts.get(v.sfFont || GM_FONT.id), P = xParams(v);
+  const sig = [v.sfFont, list.map(x => x.id).join(','), font ? font.presets.length : -1, Math.round(P.bank), Math.round(P.prog), cur].join('|');
+  if (sig === sfPanelSig && !force && box.childNodes.length) return; sfPanelSig = sig;
+  box.replaceChildren(el('h3', null, 'Font'));
+  const fs = el('select'); fs.setAttribute('aria-label', 'SoundFont');
+  const haveGM = list.some(x => x.id === GM_FONT.id);
+  fs.append(new Option(GM_FONT.name + (haveGM ? '' : ` (downloads ${GM_FONT.mb} MB once)`), GM_FONT.id));
+  for (const x of list) if (x.id !== GM_FONT.id) fs.append(new Option(x.name + ' · ' + (x.size / 1048576).toFixed(1) + ' MB', x.id));
+  fs.value = v.sfFont || GM_FONT.id;
+  fs.addEventListener('change', () => { const w = V(); w.sfFont = fs.value; const x = (SF.list || []).find(q => q.id === fs.value); w.sfFontName = x ? x.name : GM_FONT.name;
+    changed(cur); sfPreparePad(cur).then(() => sfPanel(true)); });
+  const ps = el('select'); ps.setAttribute('aria-label', 'SoundFont preset');
+  if (font){ for (const pr of font.presets){ const o = new Option((pr.bank >= 128 ? 'Drums ' : pr.bank ? 'Bank ' + pr.bank + ' · ' : '') + d2(pr.prog) + ' ' + pr.name, pr.bank + ':' + pr.prog); ps.append(o); }
+    const cp = sfPreset(font, Math.round(P.bank), Math.round(P.prog)); if (cp) ps.value = cp.bank + ':' + cp.prog; }
+  else { ps.append(new Option('Loading the font…', '')); sfLoad(v.sfFont || GM_FONT.id).then(f => { if (f) sfPreparePad(cur).then(() => sfPanel(true)); }); }
+  ps.addEventListener('change', () => { const [b, pg] = ps.value.split(':').map(Number); if (!Number.isFinite(pg)) return; const o = XEV(); o.bank = b; o.prog = pg;
+    const pr = font && sfPreset(font, b, pg); if (pr) V().name = pr.name.slice(0, 24);
+    changed(cur); for (const r of xRows) r.refresh(); sfPreparePad(cur); });
+  const ld = el('button', 'sm', 'Load .sf2 / .sf3…'); ld.type = 'button';
+  ld.addEventListener('click', () => { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.sf2,.sf3,audio/x-soundfont';
+    inp.addEventListener('change', async () => { const file = inp.files && inp.files[0]; if (!file) return;
+      try { toast('Reading ' + file.name + '…'); const bytes = await file.arrayBuffer(), f = parseSF(bytes), id = 'u-' + file.name.replace(/\W+/g, '-') + '-' + bytes.byteLength;
+        await sfPut(id, (f.name && f.name !== 'SoundFont' ? f.name : file.name.replace(/\.sf[23]$/i, '')).slice(0, 40), bytes); f.id = id; SF.fonts.set(id, f);
+        const w = V(); w.sfFont = id; w.sfFontName = f.name; const o = XEV(), p0 = f.presets[0]; if (p0){ o.bank = p0.bank; o.prog = p0.prog; }
+        changed(cur); for (const r of xRows) r.refresh(); await sfPreparePad(cur); sfPanel(true); toast(`${f.name}: ${f.presets.length} presets`); }
+      catch(e){ toast(e.message || 'That file couldn’t be read as a SoundFont.', 6000); } });
+    inp.click(); });
+  const rm = el('button', 'sm', 'Remove font'); rm.type = 'button'; rm.hidden = (v.sfFont || GM_FONT.id) === GM_FONT.id && !haveGM;
+  rm.addEventListener('click', async () => { const id = V().sfFont || GM_FONT.id;
+    if (!confirm('Remove this SoundFont from this device? Pads that use it go silent until it is loaded again.')) return;
+    await sfDelete(id); if (id !== GM_FONT.id){ V().sfFont = GM_FONT.id; changed(cur); } sfPanel(true); });
+  const row1 = el('div', 'btnrow'); row1.append(fs); const row2 = el('div', 'btnrow'); row2.append(ps); const row3 = el('div', 'btnrow'); row3.append(ld, rm);
+  box.append(row1, row2, row3);
+  if (!font) box.append(el('p', 'note', 'Loading… General MIDI comes from FluidR3 Mono GM (MIT licence).'));
+}
 function xBuild(){
   const k = V().engine; if (k === xKind) return; xKind = k;
-  const U = XUI[k], host = $('xSecs'); host.replaceChildren(); xRows.length = 0;
+  const U = XUI[k], host = $('xSecs'); host.replaceChildren(); xRows.length = 0; sfPanelSig = '';
   $('xTtl').textContent = U.title; $('xTag').textContent = U.tag;
   for (const [title, keys] of U.secs){
     const sc = el('div', 'sec'); sc.append(el('h3', null, title)); host.append(sc);
@@ -5145,12 +5658,13 @@ function bassUI(){
   $('vEngLbl').textContent = on ? (isSyn(cur) ? 'additive bass, played live by the tracker' : 'additive bass, rendered as a one-shot')
     : vx ? (isSyn(cur) ? 'a singing voice, a syllable per note, live in the tracker' : 'a singing voice: the pad says the whole line')
     : bl ? 'a minimal electronic drum, rendered'
+    : xe && v.engine === 'sf' ? 'a SoundFont preset, played note by note from the font (' + (v.sfFontName || GM_FONT.name) + ')'
     : xe ? (XENG[v.engine].live ? (isSyn(cur) ? XUI[v.engine].title.toLowerCase() + ' synth, played live by the tracker' : XUI[v.engine].title.toLowerCase() + ' synth, rendered as a one-shot') : XUI[v.engine].title.toLowerCase() + ', rendered')
     : 'up to 8 layers, rendered';
   if (vEngUpd) vEngUpd();
   $('bassWrap').hidden = !on; $('voxWrap').hidden = !vx; $('blipWrap').hidden = !bl; $('xWrap').hidden = !xe;
   for (const id of ['layersBand', 'layerWrap', 'fxWrap', 'voiceWrap']) $(id).hidden = on || vx || bl || xe;
-  if (xe){ xBuild(); for (const r of xRows) r.refresh(); }
+  if (xe){ xBuild(); for (const r of xRows) r.refresh(); if (v.engine === 'sf') sfPanel(); }
   if (on){ for (const r of bassRows) r.refresh(); for (const f of bassSegs) f(); bassVizKick(); }
   if (vx){ for (const r of voxRows) r.refresh(); const ta = $('voxTxt'); if (document.activeElement !== ta) ta.value = XV().txt; voxSylShow(); }
   if (bl) for (const r of blipRows) r.refresh();
@@ -5666,7 +6180,7 @@ function save(){
   catch(e){ try { localStorage.setItem(KEY, JSON.stringify(kitToJSON(true))); } catch(e2){} }
 }
 function loadSaved(){ try { const s = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY); return s ? kitFromJSON(JSON.parse(s)) : null; } catch(e){ console.warn('Couldn’t load the saved kit', e); return null; } }
-function setKit(k){ kit = k; setTimeout(() => { for (let i = 0; i < kit.voices.length; i++) try { bassPush(i); } catch(e){} }, 0); setTimeout(kitUndoReset, 0); setTimeout(() => resolveSamples(), 0); WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0; for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
+function setKit(k){ setTimeout(() => sfPrepare(null), 0); kit = k; setTimeout(() => { for (let i = 0; i < kit.voices.length; i++) try { bassPush(i); } catch(e){} }, 0); setTimeout(kitUndoReset, 0); setTimeout(() => resolveSamples(), 0); WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0; for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
 
 /* ---------- files out ---------- */
 function wavBytes(data, sr, bits){
@@ -7523,6 +8037,7 @@ function makePlayer(ac, out, getBuf, live){
     if (live) at = Math.max(at, ac.currentTime);   // late (the UI thread stalled): fade from now, not from a moment already past
     try { v.f.gain.cancelScheduledValues(at); v.f.gain.setValueAtTime(1, at); v.f.gain.setTargetAtTime(0, at, tc); } catch(e){}
     try { v.src.stop(at + tc * 12); } catch(e){}
+    if (v.srcs) for (const s2 of v.srcs) if (s2 !== v.src) try { s2.stop(at + tc * 12); } catch(e){}
   }
   // Pitch movement on a voice from time t: arpeggio steps, a bend, or vibrato around `base`.
   function pitchMods(v, t, base, ev){
@@ -7607,6 +8122,7 @@ function makePlayer(ac, out, getBuf, live){
       const kv = kit.voices[ev.pad], ck = kv ? kv.choke : 0;
       if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of vs[k]) if (v.choke === ck) kill(v, ev.t);
       return bassNote(ev, bn, T, ck); } }
+    { const kv0 = kit.voices[ev.pad]; if (kv0 && kv0.engine === 'sf') return sfNote(ev, kv0); }
     const b = getBuf(ev.pad, ev.rev, ev.st); if (!b) return;
     const T = vs[ev.track];
     for (let k = T.length - 1; k >= 0; k--) if (!live1(T[k], ev.t)) T.splice(k, 1);
@@ -7633,6 +8149,65 @@ function makePlayer(ac, out, getBuf, live){
     src.onended = () => { v.ended = true; alive.delete(v); if (live) try { pn.disconnect(); } catch(e){} };
     if (ev.cut != null) kill(v, ev.cut);
     if (ev.rel != null) kill(v, ev.rel, syn ? relTc(v) : 0.05);
+    T.push(v);
+  }
+  // A SoundFont note: the zones for this key and velocity, each its own looping sample with the font's volume envelope
+  // (and filter with its mod envelope), into one voice the track treats like any other (mono takeover, poly, OFF,
+  // pitch commands on the first zone). Tracker note C-4 is MIDI 60.
+  function sfNote(ev, kv){
+    const font = SF.fonts.get(kv.sfFont || GM_FONT.id), P = xParams(kv);
+    if (!font){ sfPreparePad(ev.pad); return; }
+    const pr = sfPreset(font, Math.round(P.bank), Math.round(P.prog)), lr = Math.log2(Math.max(1e-4, ev.rate));
+    const key = clamp(Math.round(60 + 12 * lr + P.trans), 0, 127), vel = clamp(Math.round(127 * ((1 - P.velo) + P.velo * Math.sqrt(clamp(ev.gain, 0, 1)))), 1, 127);
+    const picks = sfPick(font, pr, key, vel); if (!picks.length) return;
+    const T = vs[ev.track];
+    for (let k = T.length - 1; k >= 0; k--) if (!live1(T[k], ev.t)) T.splice(k, 1);
+    if (!ev.poly){ for (const v of T) kill(v, ev.t, v.syn ? Math.min(relTc(v), 0.05) : 0.004); T.length = 0; }
+    else while (T.length >= POLY) kill(T.shift(), ev.t, 0.006);
+    const ck = kv.choke || 0;
+    if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of vs[k]) if (v.choke === ck) kill(v, ev.t);
+    const g = ac.createGain(), f = ac.createGain(), pn = ac.createStereoPanner(), st0 = Math.max(ev.t, ac.currentTime), sr = ac.sampleRate;
+    g.gain.value = ev.gain * Math.pow(10, ((kv.level || 0) + 6) / 20); g.connect(f);   // +6 dB: GM fonts are mixed for 16 parts at once f.connect(pn); pn.connect(buses[ev.track].inp);
+    const srcs = []; let relMax = 0.01, looped = false, base = ev.rate;
+    const hz = c => clamp(8.176 * Math.pow(2, c / 1200), 20, sr * 0.45);
+    for (const {z, stereo} of picks){
+      const vo = sfVoice(font, z, key, vel), a = SF.smp.get(font.id + ':' + z.s), buf = a && sfBuf(font, z.s, stereo); if (!buf) continue;
+      const F = Math.pow(2, ((60 + P.trans - vo.root) * vo.scale / 100 + vo.tune) / 12), rate = F * Math.pow(ev.rate, vo.scale / 100);
+      const src = ac.createBufferSource(), e = ac.createGain(); src.buffer = buf;
+      if (ev.slide && ev.slide.dur > 0 && vo.scale === 100){ src.playbackRate.setValueAtTime(ev.slide.from * F, ev.t); src.playbackRate.linearRampToValueAtTime(rate, ev.t + ev.slide.dur); }
+      else src.playbackRate.value = rate;
+      if (!srcs.length) base = rate;
+      if ((vo.modes === 1 || vo.modes === 3) && a.le > a.ls + 8 && a.le <= a.d.length){ src.loop = true; src.loopStart = a.ls / a.sr; src.loopEnd = a.le / a.sr; looped = true; }
+      // volume envelope: delay, attack (× the pad's Attack), hold, decay to sustain (centibels)
+      const E = vo.v, lg = Math.pow(10, -vo.atten / 200), sus = Math.max(1e-5, lg * Math.pow(10, -E.sus / 200)), atk = E.atk * P.atk;
+      const t1 = st0 + E.delay, t2 = t1 + Math.max(0.0015, atk), t3 = t2 + E.hold;
+      e.gain.setValueAtTime(0, st0); e.gain.setValueAtTime(0, t1); e.gain.linearRampToValueAtTime(lg, t2); e.gain.setValueAtTime(lg, t3);
+      if (E.sus > 0) e.gain.exponentialRampToValueAtTime(sus, t3 + Math.max(0.005, E.dec * Math.min(1, E.sus / 1000)));
+      let head = e; src.connect(e);
+      // the font's low-pass, swept by its mod envelope
+      if (vo.fc < 13490 || Math.abs(vo.modEnvToFc) > 1){
+        const lp = ac.createBiquadFilter(), M = vo.m; lp.type = 'lowpass'; lp.Q.value = vo.q / 10;
+        const f0 = hz(vo.fc), fp = hz(vo.fc + vo.modEnvToFc), fs = hz(vo.fc + vo.modEnvToFc * (1 - M.sus));
+        const m1 = st0 + M.delay, m2 = m1 + Math.max(0.001, M.atk), m3 = m2 + M.hold;
+        lp.frequency.setValueAtTime(f0, st0); lp.frequency.setValueAtTime(f0, m1); lp.frequency.exponentialRampToValueAtTime(fp, m2); lp.frequency.setValueAtTime(fp, m3);
+        lp.frequency.exponentialRampToValueAtTime(fs, m3 + Math.max(0.005, M.dec * Math.max(0.001, M.sus)));
+        e.connect(lp); head = lp;
+      }
+      // each zone keeps the font's own pan (unlinked left/right halves are two zones panned apart)
+      if (!stereo && vo.pan){ const zp = ac.createStereoPanner(); zp.pan.value = vo.pan / 500; head.connect(zp); zp.connect(g); } else head.connect(g);
+      src.start(st0); srcs.push(src); relMax = Math.max(relMax, Math.min(8, E.rel * P.rel));
+    }
+    if (!srcs.length){ try { g.disconnect(); } catch(e){} return; }
+    pn.pan.value = clamp((ev.pan - 128) / 127, -1, 1);
+    // SoundFont release is the time to fall 100 dB (11.5 time constants); kill() fades over rel / 4.6
+    const v = {src:srcs[0], srcs, f, g, pn, base, rate:base, choke:ck, ended:false, stopAt:null, syn:true, rel:relMax * 0.4};
+    if (!ev.slide) pitchMods(v, ev.t, base, ev);
+    alive.add(v); let left = srcs.length;
+    for (const s2 of srcs) s2.onended = () => { if (--left > 0) return; v.ended = true; alive.delete(v); if (live) try { pn.disconnect(); } catch(e){} };
+    if (ev.cut != null) kill(v, ev.cut);
+    if (ev.rel != null) kill(v, ev.rel, relTc(v));
+    // A drum pad gets no note-off: a looping zone there lets go after the pad's Max len
+    else if (!isSyn(ev.pad) && looped) kill(v, st0 + Math.max(0.1, kv.len || 2), relTc(v));
     T.push(v);
   }
   // Stopping puts every sequenced effect switch, pattern and the master level back to their settings.
@@ -8076,6 +8651,7 @@ function tStart(mode, o){
   const seq = makeSeq(S, mode, o);
   if (!seq.alive()){ toast(mode === 'song' ? `Row ${rS(o.row, 3)} is empty. Put a sect on it, or move to a row that has some.` : 'Nothing to play here yet.'); draw(); return; }
   for (let i = 0; i < nslots(); i++) ensureLive(i);   // up to date, or the last render while the Worker finishes
+  sfPrepare(null);   // SoundFont pads load in the background (notes before that are silent)
   seq.time = ctx.currentTime + 0.08; stageStart(seq.time);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : ''});
@@ -8156,6 +8732,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   if (useM){ const wkOk = mstNeedsWk(M) ? await mwReady(oc) : true; const ch = mstChain(oc, M, false); head.connect(ch.input); head = ch.output; mLim = !!(ch.wk && M.lim.on); if (!wkOk && mstNeedsWk(M)) toast('Mastering effects couldn’t load for this render; EQ only.'); }
   if (lim && !mLim){ const c = mkLimiter(oc); head.connect(c); c.connect(oc.destination); } else head.connect(oc.destination);
   if (evs.some(e => e.type === 'note' && isLivePad(e.pad))) await bassReady(oc);
+  await sfPrepare(evs);   // SoundFont pads: fonts loaded and their presets decoded before the render starts
   const pl = makePlayer(oc, out, getB, false);
   pl.setMfx(mNode);
   pl.applyMix(t => keep.has(t));       // every track plays (so chokes match the mix), only `keep` is heard
@@ -11360,6 +11937,7 @@ if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('controlle
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(false); });
 setTimeout(() => checkUpdate(false), 3000);
 setTimeout(thunderOffer, 2500);
+setTimeout(() => { if (kit.voices.some(v => v && v.engine === 'sf')) sfPrepare(null); }, 1800);   // SoundFont pads: load their fonts (from this device) after start-up
 
 /* ---------- install (Settings → App), as in Quite Noise ----------
    Offer Chrome's install prompt when the browser says the app can be installed, or say where the app

@@ -1,6 +1,6 @@
 // ...Thunder Plus offline support. The app page is fetched fresh when online (so updates show up)
 // and served from the cache when offline.
-const CACHE = 'thunderplus-v84';
+const CACHE = 'thunderplus-v85';
 const FILES = ['./', './index.html', './manifest.webmanifest?v=7', './master-worklet.js?v=2', './icons/plus-icon-192.png?v=2', './icons/plus-icon-512.png?v=2', './icons/plus-icon-maskable-512.png?v=2', './icons/plus-apple-touch-icon.png?v=2',
   './fonts/Jost-400.woff', './fonts/Jost-500.woff', './fonts/Jost-600.woff', './fonts/Jost-700.woff', './fonts/JetBrainsMono-400.woff2', './fonts/JetBrainsMono-700.woff2', './fonts/ShareTechMono-400.woff',
   './waves/index.html', './waves/waves-worklet.js?v=12', './waves/dsp/thunder-dsp.wasm', './waves/dsp/tfx.wasm', './waves/fonts/Jost-400.woff', './waves/fonts/Jost-500.woff', './waves/fonts/Jost-600.woff', './waves/fonts/Jost-700.woff',
@@ -20,7 +20,8 @@ self.addEventListener('fetch', e => {
   }
   // Everything else (icons, fonts): cache first, then the network.
   e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(res => {
-    if (res.ok && (url.origin === location.origin || /fonts\.(googleapis|gstatic)\.com/.test(url.host))){ const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+    // (SoundFonts in sounds/ are kept in IndexedDB by the app, so they aren't copied into this cache as well.)
+    if (res.ok && !url.pathname.includes('/sounds/') && (url.origin === location.origin || /fonts\.(googleapis|gstatic)\.com/.test(url.host))){ const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
     return res;
   })));
 });

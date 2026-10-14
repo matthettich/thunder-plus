@@ -72,3 +72,17 @@ SIL Open Font License 1.1, included as `fonts/OFL-ShareTechMono.txt`.
 - **Degrade** (pad FX, track FX, …chains/…waves module): original code.
 - **Resonator** (pad FX, track FX, …chains/…waves module): original code.
 - **Pluck string / String** (Karplus–Strong, after K. Karplus and A. Strong, "Digital Synthesis of Plucked-String and Drum Timbres", Computer Music Journal 7(2), 1983): original code.
+
+## Third-party sounds: FluidR3 Mono GM (General MIDI SoundFont)
+
+`sounds/FluidR3Mono_GM.sf3` is the General MIDI sound set used by Engine: SoundFont (downloaded by the app on first use).
+It is MuseScore's MS_General v0.1 fork of FluidR3Mono_GM, from https://github.com/musescore/MuseScore (`share/sound`),
+MIT-licensed; its full notice is in `sounds/FluidR3Mono_License.md`, which must travel with it.
+
+FluidR3 (original version) by Frank Wen, Copyright © 2000-2002, 2008. Mono conversion (FluidR3Mono) by Michael Cowgill,
+Copyright © 2014-17. Adaptation for MS_General.sf2 by S. Christian Collins, Copyright © 2018. Temple Blocks instrument
+provided by Ethan Winer, Copyright © 2002. Drumline Percussion provided by Michael Schorsch, Copyright © 2016.
+Released under the MIT license (see `sounds/FluidR3Mono_License.md`).
+
+The SoundFont player itself (the .sf2/.sf3 parser and voice code in `index.html`) is original code written from the
+SoundFont 2.04 specification. The Piano, Tine EP, Organ and Swarm engines are original code with no third-party sources.

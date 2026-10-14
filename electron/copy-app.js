@@ -2,7 +2,7 @@
 // It then checks that every file the page loads at run time made it in, and stops the build if one didn't.
 const fs = require('fs'), path = require('path');
 const src = path.join(__dirname, '..'), dst = path.join(__dirname, 'app');
-const PARTS = ['index.html', 'manifest.webmanifest', 'master-worklet.js', 'icons', 'fonts', 'waves', 'chains', 'THIRD_PARTY_NOTICES.md'];
+const PARTS = ['index.html', 'manifest.webmanifest', 'master-worklet.js', 'icons', 'fonts', 'waves', 'chains', 'sounds', 'THIRD_PARTY_NOTICES.md'];
 fs.rmSync(dst, {recursive:true, force:true});
 fs.mkdirSync(dst, {recursive:true});
 for (const f of PARTS){
