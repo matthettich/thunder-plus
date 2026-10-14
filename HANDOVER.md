@@ -610,6 +610,14 @@ caches.
 - Where: `#tInlSideW` in the side panel when the panel is showing; otherwise `#tInlPad` between the d-pad and the
   keys in PAD mode (hidden under 560 px wide, where there's no room). Never both at once.
 
+## 14 Oct (evening): Simple rainbow skin
+
+- `rainbow` in `SKINS`, base `term`, so it is Simple grey's look (white, outlined keys, solid PAD keys).
+- Colour by position: `--ci` = an element's place among its siblings (nth-child, 12 steps) for tracker spans,
+  buttons, pads, meters, keypad keys and Arrange blocks; `--ri` = the tracker line (12 steps). Hue
+  `(ci + ri) × 30°` in OKLCH at one lightness. Buttons get their own `--mx`/`--mxdim`/`--mxsoft`, which the term
+  rules already use, so outlines, text and solid fills all follow. Cursor and playhead cells keep their colours.
+
 ## How to validate (there is no test suite)
 
 1. **Syntax:** `node --check` the worklets; for the single-file apps, extract each inline `<script>` and
