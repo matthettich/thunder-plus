@@ -22,7 +22,7 @@ Keep this file up to date at the end of a work session.
 - **App:** no build step. `index.html` is the whole tracker/synth app; `chains/index.html` and
   `waves/index.html` are the two modular patch editors loaded in frames.
 - **Cache-busters now:** `chains-worklet.js?v=12`, `waves-worklet.js?v=7`, `master-worklet.js?v=2` (index.html, the editor
-  pages, sw.js). Cache is `thunderplus-v74`.
+  pages, sw.js). Cache is `thunderplus-v75`.
 
 ## Licensing rule (the owner may sell the app later)
 
@@ -359,6 +359,12 @@ A cable into a slider's small purple jack (`p:<param>`) now always shows the ...
   melody through `pass()` (the offline tracker path, same worklet) sings every note, no NaN; Worker pad render; live
   node outputs (peak 0.54) and reports load. Not yet judged by ear on the owner's phone.
 - **Ideas next:** a tracker command to jump to syllable N; CMU-dictionary pronunciations; per-note vowel colour.
+
+## Fix: tapping a pad didn't select it (13 Oct, evening)
+
+- `vuHit()` called `slotAt(hits, i)`, which pads `hits` with `null`, then pushed into `hits[i]`: the first tap on any pad
+  threw, so `padPress` never reached `select(i)` (and the VU loop's `hits[i].filter` could throw the same way). Now
+  `hits[i]` is made an array first, and `padPress` selects the pad before sounding it, so a sound error can't stop it.
 
 ## Running it locally
 

@@ -3336,11 +3336,11 @@ function play(i, vel = 1){
 // and the meters replay them in step with the sound.
 const hits = [];
 let vuRaf = 0, vuEls = [];
-function vuHit(i, rate, vel, mono){ const c = slotAt(cache, i); if (!c) return; slotAt(hits, i); if (mono) hits[i].length = 0; hits[i].push({t0:ctx.currentTime, rate, vel, c}); if (hits[i].length > 8) hits[i].shift(); if (!vuRaf) vuRaf = requestAnimationFrame(vuFrame); }
+function vuHit(i, rate, vel, mono){ const c = slotAt(cache, i); if (!c) return; slotAt(hits, i); if (!hits[i]) hits[i] = []; if (mono) hits[i].length = 0; hits[i].push({t0:ctx.currentTime, rate, vel, c}); if (hits[i].length > 8) hits[i].shift(); if (!vuRaf) vuRaf = requestAnimationFrame(vuFrame); }
 function vuFrame(){
   vuRaf = 0; if (!ctx) return;
   const now = ctx.currentTime, H = slotAt(hits, cur) || []; let live = false;
-  for (let i = 0; i < nslots(); i++){ slotAt(hits, i); hits[i] = hits[i].filter(h => (now - h.t0) * h.rate * h.c.sr < h.c.data.length + h.c.sr * 0.3); }
+  for (let i = 0; i < nslots(); i++){ slotAt(hits, i); hits[i] = (hits[i] || []).filter(h => (now - h.t0) * h.rate * h.c.sr < h.c.data.length + h.c.sr * 0.3); }
   for (const m of vuEls){
     let pk = 0;
     for (const h of H){ const env = h.c.st && h.c.st.get(m.f); if (!env) continue;
@@ -4058,9 +4058,10 @@ function flash(i){ audioWake = performance.now(); const p = padEls[i].p; p.class
 function select(i){ if (i === cur) return; cur = i; refreshAll(); }
 const padHeld = [];
 function padPress(i, held){
-  if (held && isSyn(i) && !midi.learn){ if (padHeld[i]) releaseNote(padHeld[i]); padHeld[i] = holdNote(i, 0, 1); select(i); return; }
+  // select first: a pad that fails to sound (no audio yet, a render error) is still picked for editing
+  if (held && isSyn(i) && !midi.learn){ select(i); if (padHeld[i]) releaseNote(padHeld[i]); padHeld[i] = holdNote(i, 0, 1); return; }
   if (midi.learn){ midi.target = i; midi.ccTarget = ''; select(i); renderPads(); ccBadges(); midiStatus(`Now hit a note on the controller for pad ${hx(i)}` + (midi.notes[i] >= 0 ? ` (now ${noteName(midi.notes[i])}; Unlearn removes it).` : '.')); return; }
-  play(i); select(i);
+  select(i); play(i);
 }
 function refreshAll(){
   $('vNum').textContent = (isSyn(cur) ? 'Synth ' : 'Pad ') + hx(cur);
