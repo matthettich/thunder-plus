@@ -4153,6 +4153,8 @@ function audio(){
    script, with its own copies of the wasm and the …waves engine) and the page installs each result when it lands.
    - ensure(i): the pad, up to date, now. Renders on this thread if it must (offline renders, chops, exports).
    - ensureLive(i): for playing. An up-to-date render, or the last one while the Worker makes the new one.
+   - ensurePlay(i): for notes while the song plays. Like ensureLive, but never renders on this thread when the Worker
+     can: a pad with no usable render returns null (that note is silent) until the Worker's render lands.
    - bgRender(i): ask the Worker. One job per pad at a time; an edit made meanwhile sends the newest state
      when the job lands, so a slider drag never queues a backlog. padRev[] makes sure an older result can never
      replace a newer one (whichever thread made it).
@@ -4259,6 +4261,16 @@ function ensure(i){
 function ensureLive(i){
   const c = slotAt(cache, i);
   if (c && c.sr === padSR() && PW.ready){ if (stale(i)) bgRender(i); return c; }
+  return ensure(i);
+}
+// While the song plays, a render here (0.2–0.4 s for a synth slot) would hold up the sequencer's timer past its
+// look-ahead and make notes late. So a pad with nothing usable yet stays silent until the Worker's render lands.
+// Voices the Worker can't render (SoundFont, …waves without the Worker's copy), or no Worker at all: as before.
+function ensurePlay(i){
+  const c = slotAt(cache, i);
+  if (c && c.sr === padSR() && PW.ready){ if (stale(i)) bgRender(i); return c; }
+  const v = kit.voices[i];
+  if (tp.on && v && rwCan(v)){ bgRender(i); return null; }
   return ensure(i);
 }
 function buffer(i){
@@ -7942,7 +7954,7 @@ function makeSeq(S, mode, o){
             const ev = {type:'note', t:at, track:t, poly, pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? at + fx.KIL * tick : null, rel:fx.OFF != null ? at + fx.OFF * tick : null,
               slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods};
-            if ((I.slc | 0) > 1 || I.sync){ const c = ensure(ev.pad); applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; }
+            if ((I.slc | 0) > 1 || I.sync){ const c = o.live ? ensurePlay(ev.pad) : ensure(ev.pad); if (c){ applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; } }
             evs.push(ev);
             if (every){ let k = 1;
               for (let tt = at + every * tick; tt < end - 1e-6 && k < 64; tt += every * tick, k++)
@@ -8401,7 +8413,8 @@ function applyChop(ev, I, pad, n, semis, bpm, data, sr){
 }
 function rtBuf(pad, rev, st){
   if (st){
-    const c = ensureLive(pad), k = pad + (rev ? 'r' : 'f') + stKey(st); let e = rtB.get(k);
+    const c = ensurePlay(pad); if (!c) return null;
+    const k = pad + (rev ? 'r' : 'f') + stKey(st); let e = rtB.get(k);
     if (!e || e.d !== c.data){ let d = stretchData(c.data, c.sr, loopSecs(pad, c.data, c.sr), st); if (rev) d = d.reverse();
       const b = ctx.createBuffer(1, d.length, c.sr); b.copyToChannel(d, 0); e = {d:c.data, b}; rtB.set(k, e);
       if (rtB.size > 96) rtB.delete(rtB.keys().next().value); }
@@ -8410,7 +8423,8 @@ function rtBuf(pad, rev, st){
   return rtBufPlain(pad, rev);
 }
 function rtBufPlain(pad, rev){
-  const c = ensureLive(pad), k = pad + (rev ? 'r' : 'f');
+  const c = ensurePlay(pad); if (!c) return null;
+  const k = pad + (rev ? 'r' : 'f');
   let e = rtB.get(k);
   if (!e || e.d !== c.data){
     const d = rev ? c.data.slice().reverse() : c.data, b = ctx.createBuffer(1, d.length, c.sr); b.copyToChannel(d, 0);
@@ -8688,7 +8702,7 @@ const songRow = () => { const r = S.song[cs.song.y]; return r && r[cs.song.x] >=
 function tStart(mode, o){
   tStop(true);
   const r = rtInit();
-  const seq = makeSeq(S, mode, o);
+  const seq = makeSeq(S, mode, Object.assign({}, o, {live:true}));   // live: chops never render on this thread (ensurePlay)
   if (!seq.alive()){ toast(mode === 'song' ? `Row ${rS(o.row, 3)} is empty. Put a sect on it, or move to a row that has some.` : 'Nothing to play here yet.'); draw(); return; }
   for (let i = 0; i < nslots(); i++) ensureLive(i);   // up to date, or the last render while the Worker finishes
   sfPrepare(null);   // SoundFont pads load in the background (notes before that are silent)
@@ -8708,8 +8722,9 @@ function pump(){
   audioWake = performance.now();
   if (view !== 'tracker' && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open
   const s = tp.seq; let n = 0;
-  // Schedule a little further ahead on a phone, so a busy moment on the UI thread can't make notes late.
-  while (s.alive() && s.time < ctx.currentTime + (isMobile() ? 0.25 : 0.15) && n++ < 64){
+  // Schedule 250 ms ahead, so a busy moment on the UI thread can't make notes late (it was 150 ms on a computer).
+  // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate.
+  while (s.alive() && s.time < ctx.currentTime + 0.25 && n++ < 64){
     const r = s.step(); for (const e of r.evs){ rt.pl.play(e); if (e.type === 'note') padBlink(e); } tp.q.push({t:r.t, pos:r.pos, bpm:s.bpm, tks:r.tks, line:r.line});
   }
 }

@@ -555,6 +555,25 @@ in `index.html`, and delete the build output from `dsp/tfx/`. **Check the old ef
 ids 0–10 with the old and new wasm and compare (this session they were bit-identical). Then bump the
 caches.
 
+## 14 Oct (afternoon): the sequencer never renders a pad mid-song
+
+- **Risk found:** `pump()` books notes from a 25 ms timer on the UI thread. A note on a pad with no usable
+  render (new pad, first moments after opening, sample-rate change) made `ensureLive()` fall back to `ensure()`,
+  rendering on the UI thread: measured 588 ms for a synth slot at 4× throttle, longer than the look-ahead, so
+  notes came late. Chopped/synced instruments did the same through `ensure()` inside `makeSeq`.
+- **Fix:** `ensurePlay(i)` (next to `ensureLive`): while `tp.on`, a pad the Worker can render returns `null` and
+  goes to `bgRender`; the note is silent until the render lands (the player already skips a null buffer).
+  `rtBuf`/`rtBufPlain` and the live `makeSeq` (`o.live`, set by `tStart`) use it. Offline renders, exports,
+  `tStart`'s own pass and previews while stopped still use `ensure`/`ensureLive`. SoundFont voices, …waves without
+  the Worker's copy, or no Worker at all: render here as before.
+- **Look-ahead** is now 250 ms on every device (was 150 ms on a computer). Tracker edits and mutes reach notes
+  up to ~100 ms later; pads, keys, previews and STOP are immediate.
+- **Verified headless (4× throttle):** `ensurePlay` on an unrendered synth slot returns at once (0 ms) and the
+  Worker's render lands in the background; the old path took 588 ms. Not yet heard on the PC or the Fold.
+- **Later (the proper fix):** move the sequencer and note playback into an AudioWorklet, so nothing on the UI
+  thread can delay a note. That is also the shape a native (C++) engine needs.
+- Cache `thunderplus-v90`.
+
 ## How to validate (there is no test suite)
 
 1. **Syntax:** `node --check` the worklets; for the single-file apps, extract each inline `<script>` and
