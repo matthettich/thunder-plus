@@ -781,6 +781,10 @@ const MODULES = {
       steps:{l:'Steps', f:v => String(Math.round(v))}, length:{l:'Gate', f:pct},
       s1:step(1), s2:step(2), s3:step(3), s4:step(4), s5:step(5), s6:step(6), s7:step(7), s8:step(8) } },
 
+  string:{ label:'String', scope:'poly', inputs:{ pitch:'cv', gate:'gate' }, outputs:{ out:'audio' },
+    params:{ tune:[0,-24,24,1], bright:[.6,0,1,.01], decay:[.55,0,1,.01], pos:[.13,0,.5,.01], mute:[.4,0,1,.01], level:[.8,0,1.5,.01] },
+    ui:{ tune:{l:'Tune', f:semis}, bright:{l:'Bright', f:pct}, decay:{l:'Decay', f:v => { const t = .08 * Math.pow(100, v); return t < 1 ? Math.round(t * 1000) + ' ms' : t.toFixed(1) + ' s'; }},
+      pos:{l:'Position', f:v => v < .01 ? 'Bridge' : Math.round(v * 100) + '%'}, mute:{l:'Mute', f:pct}, level:{l:'Level', f:pct} } },
   vco:{ label:'VCO', scope:'poly', inputs:{ pitch:'cv', fm:'cv' }, outputs:{ out:'audio' },
     params:{ wave:[1,0,3,1], tune:[0,-24,24,1], fine:[0,-100,100,1] },
     ui:{ wave:{l:'Wave', c:opts(['Saw','Square','Triangle','Sine'])}, tune:{l:'Tune', f:semis}, fine:{l:'Fine', f:cents} } },
@@ -866,7 +870,7 @@ const fmtOf = (t, k) => (MODULES[t].ui[k] || {}).f || (v => (+v).toFixed(2));
 const choicesOf = (t, k) => (MODULES[t].ui[k] || {}).c || null;
 
 /* Families give each module its edge color, as in ...Seeds. */
-const FAMILY = { hostIn:'midi', seq:'midi', vco:'gen', fm:'gen', additive:'gen', noise:'gen', plaits:'gen', elements:'gen',
+const FAMILY = { hostIn:'midi', seq:'midi', string:'gen', vco:'gen', fm:'gen', additive:'gen', noise:'gen', plaits:'gen', elements:'gen',
   vcf:'util', vca:'util', mixer:'util', lfo:'mod', adsr:'mod', random:'mod', atten:'mod', out:'aout' };
 Object.assign(FAMILY, SHARED_FAMILY);
 const famOf = t => FAMILY[t] || (MODULES[t] && MODULES[t].fx ? 'afx' : 'gen');
@@ -1077,7 +1081,7 @@ class WavesBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './waves-worklet.js?v=10';
+    const url = opts.url || './waves-worklet.js?v=11';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'waves', {
@@ -1859,7 +1863,7 @@ const plist = document.getElementById('plist'), palette = document.getElementByI
 const drawer = document.getElementById('drawer'), dtoggle = document.getElementById('dtoggle');
 const PALETTE = [
   ['§Sound', []],
-  ['Sound sources', [['vco','VCO'],['fm','FM'],['additive','Additive'],['noise','Noise'],['plaits','Plaits'],['elements','Elements']]],
+  ['Sound sources', [['string','String (pluck)'],['vco','VCO'],['fm','FM'],['additive','Additive'],['noise','Noise'],['plaits','Plaits'],['elements','Elements']]],
   ['Filters and amps', [['vcf','VCF'],['vca','VCA'],['mixer','Mixer']]],
   ['Effects', [['eq','EQ'],['comp','Compressor'],['saturation','Saturation'],['tape','Tape'],['chorus','Chorus'],['crush','Bitcrush'],['delay','Tape delay'],['reverb','Reverb'],['rings','Rings'],['clouds','Clouds']]],
   ['Output', [['out','Out']]],
@@ -2138,6 +2142,7 @@ function helpDoc(){
     reverb:'Airwindows Galactic: a huge, lush reverb.',
     rings:'Mutable Instruments Rings: sound in excites a resonator tuned to Note (plus the Pitch input).',
     clouds:'Mutable Instruments Clouds: granular textures, time stretch, looping delay and spectral blur. Freeze holds what it heard.',
+    string:'String: a Karplus–Strong plucked string, one per voice. Patch Host In’s Pitch and Gate in: each gate plucks it. Bright sets the pluck and how fast the highs fade, Decay how long it rings, Position where it is plucked (near the bridge is twangy, the middle is round and hollow), and Mute how much the string is damped once the gate is let go.',
     lfo:'A slow oscillator for wobbles and sweeps. Depth sets how far it moves a slider; Sync to tempo follows the tempo. Reset restarts its cycle.',
     adsr:'An envelope: Attack, Decay, Sustain and Release shape each note from its Gate.',
     random:'A new random value at Rate, or each time Clock fires. Smooth glides between values.',

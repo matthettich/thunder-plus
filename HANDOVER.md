@@ -21,8 +21,8 @@ Keep this file up to date at the end of a work session.
   - 13 Oct: **pad rendering moved to a Worker** (see below), and the offer to open ...Thunder's saved work.
 - **App:** no build step. `index.html` is the whole tracker/synth app; `chains/index.html` and
   `waves/index.html` are the two modular patch editors loaded in frames.
-- **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=10`, `master-worklet.js?v=2` (index.html, the editor
-  pages, sw.js). Cache is `thunderplus-v78`.
+- **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
+  pages, sw.js). Cache is `thunderplus-v79`.
 
 ## Licensing rule (the owner may sell the app later)
 
@@ -415,6 +415,17 @@ All original code; the name stays generic.
 - **Pad FX** `reson` (js), **track FX** `reson` (`RESO`, id 98, in `TAILS`), **module** `reson` (Note CV: 0.5 = A4,
   0.125/oct, the knob transposes from C3). Rings and Comb resonator are still there; this is the chord one.
 - Test gotcha: `pass(evs, …, getB)` needs a real `getB` (a buffer per pad), or the notes are silent.
+
+## Karplus–Strong: Pluck string layer and …waves String (13 Oct, evening)
+
+- **`class KSString`** (original; two identical copies: index.html ENGINE block and waves-worklet.js, outside the shared
+  block because String is …waves-only): `pluck(P, bright, pos, amp, rnd)` adds a noise burst (one-pole darkened,
+  circular comb for the pick position, zero-mean, normalised) to the loop; `tick(P, t60, a)` = linear-interpolated
+  read at P − (1−a)/a (damping filter delay), one-pole damping, loss per pass from T60 (cached), DC-blocked out.
+  Measured: within a few cents from 55 Hz to 1.76 kHz; 0.1% of a core per voice.
+- **Layer type `karplus`** ("Pluck string", Bright / Decay = 0.08 × 100^b s) in `TYPES` + `newOsc`; plucks on its first
+  sample with the layer's seeded random, so renders repeat. **…waves module `string`** (poly, Pitch + Gate in; Tune,
+  Bright, Decay, Position, Mute = ring time cut while the gate is low, Level).
 
 ## Running it locally
 

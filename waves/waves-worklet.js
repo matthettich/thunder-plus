@@ -1495,7 +1495,59 @@ const SHARED_MODULES = { beads:Beads,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson };
 /* ===SHARED MODULES END=== */
 
-const MODULES = { ...SHARED_MODULES, hostIn:HostIn, vco:VCO, fm:FM, additive:Additive, noise:Noise, plaits:Plaits, elements:Elements,
+/* ---------- Karplus–Strong string (original code) ----------
+   A plucked string: a burst of noise (darkened by Bright, notched by the pick Position) is fed round a delay line one
+   period long, losing a little each pass (Decay) and its top end faster (the damping filter, also Bright). The delay
+   is shortened by the filter's own delay so it stays in tune. A new pluck adds to a string that's still ringing.
+   Self-contained: one copy in the pads' engine (the "Pluck string" layer) and one in …waves (the String module). */
+class KSString {
+  constructor(sr){ this.sr = sr; this.N = 4096; this.b = new Float32Array(this.N); this.w = 0; this.lp = 0; this.dc = 0; this.dx = 0; this.on = false; }
+  // rnd: a function returning 0…1 (the caller's seeded random, so renders repeat exactly)
+  pluck(P, bright, pos, amp, rnd){
+    P = Math.max(2, Math.min(this.N - 4, P));
+    const n = Math.ceil(P) + 2, k = 0.04 + 0.96 * bright * bright, ex = new Float32Array(n); let lp = 0, pk = 1e-9;
+    for (let i = 0; i < n; i++){ lp += (rnd() * 2 - 1 - lp) * k; ex[i] = lp; }
+    // the pick position: less a copy delayed by pos × period, which notches the harmonics a pluck there wouldn't excite
+    const d = Math.max(1, Math.round(pos * P));
+    if (pos > 0.01){ const src = ex.slice(), L = Math.max(2, Math.round(P)); for (let i = 0; i < n; i++) ex[i] = src[i] - src[((i - d) % L + L) % L]; }   // round the period, as the string is
+    let m = 0; for (let i = 0; i < n; i++) m += ex[i]; m /= n;
+    for (let i = 0; i < n; i++){ ex[i] -= m; pk = Math.max(pk, Math.abs(ex[i])); }
+    const g = amp / pk, B = this.b, N = this.N;
+    for (let i = 0; i < n; i++){ const j = (this.w - n + i + N) % N; B[j] += ex[i] * g; }
+    this.on = true;
+  }
+  // one sample: P the period in samples, t60 the ring time in seconds, a the damping (0…1, 1 = bright)
+  tick(P, t60, a){
+    const B = this.b, N = this.N; P = Math.max(2, Math.min(N - 4, P));
+    const dd = Math.max(1.2, P - (1 - a) / a), r = this.w - dd, ri = Math.floor(r), fr = r - ri;
+    const i0 = ri < 0 ? ri + N : ri, i1 = i0 + 1 >= N ? 0 : i0 + 1, x = B[i0] + (B[i1] - B[i0]) * fr;
+    this.lp += (x - this.lp) * a;
+    if (P !== this.cP || t60 !== this.cT){ this.cP = P; this.cT = t60; this.g = Math.pow(10, -3 * (P / this.sr) / Math.max(0.01, t60)); }   // loss per pass
+    const y = this.lp * this.g;
+    B[this.w] = y; this.w = this.w + 1 === N ? 0 : this.w + 1;
+    const o = y - this.dx + 0.995 * this.dc; this.dx = y; this.dc = o; return o;
+  }
+}
+
+/* String: a Karplus–Strong plucked string per voice (see KSString). Gate plucks; while the gate is low the string is
+   muted by Mute (its ring time cut). Pitch in semitones like the VCO. */
+const KString = {
+  type:'string', scope:'poly', cost:.3,
+  inputs:{ pitch:'cv', gate:'gate' }, outputs:{ out:'audio' },
+  params:{ tune:[0, -24, 24, 1], bright:[.6, 0, 1, .01], decay:[.55, 0, 1, .01], pos:[.13, 0, .5, .01], mute:[.4, 0, 1, .01], level:[.8, 0, 1.5, .01] },
+  create:sr => ({ ks:new KSString(sr), lg:0, r:rng(nextSeed()) }),
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, a = .25 + .74 * p.bright, t60 = .08 * Math.pow(100, p.decay), tm = t60 * (1 - p.mute * .97), o = io.out.out, G = io.in.gate, ks = st.ks;
+    for (let i = 0; i < ctx.block; i++){
+      const P = sr / hzOf(io.in.pitch[i] + p.tune), on = G[i] >= .5;
+      if (on && !st.lg) ks.pluck(P, p.bright, p.pos, .9, st.r);
+      st.lg = on ? 1 : 0;
+      o[i] = ks.tick(P, on ? t60 : tm, a) * p.level;
+    }
+  }
+};
+
+const MODULES = { ...SHARED_MODULES, string:KString, hostIn:HostIn, vco:VCO, fm:FM, additive:Additive, noise:Noise, plaits:Plaits, elements:Elements,
   vcf:VCF, vca:VCA, mixer:Mixer,
   eq:EQ, comp:Comp, saturation:Saturation, tape:Tape, chorus:Chorus, crush:Crush, delay:Delay, reverb:Reverb, rings:Rings, clouds:Clouds,
   lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter, seq:Sequencer, out:Out };

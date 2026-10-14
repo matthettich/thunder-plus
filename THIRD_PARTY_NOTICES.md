@@ -71,3 +71,4 @@ SIL Open Font License 1.1, included as `fonts/OFL-ShareTechMono.txt`.
   synthesizer", JASA 67(3), 1980. No code was copied.
 - **Degrade** (pad FX, track FX, …chains/…waves module): original code.
 - **Resonator** (pad FX, track FX, …chains/…waves module): original code.
+- **Pluck string / String** (Karplus–Strong, after K. Karplus and A. Strong, "Digital Synthesis of Plucked-String and Drum Timbres", Computer Music Journal 7(2), 1983): original code.
