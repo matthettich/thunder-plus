@@ -601,6 +601,15 @@ caches.
   gear (MPC One, Force).
 - **Not sent yet:** pitch bend for slides/PBN, arps, CCs; Song Position Pointer.
 
+## 14 Oct (evening): instrument list
+
+- Settings → INST LIST (`ck: 'Show instrument list'`), **off by default**, stored in `thunderplus-instlist-v1`
+  (`inlOn`, `setInl`). `instList()` runs at the end of the tracker `draw()` and only rebuilds when the names change.
+- One row per instrument: its number and its pad's full name (`MIDI ch` for MIDI-only, `+MIDI` for PAD+MIDI),
+  current instrument highlighted, long names cut with an ellipsis. A tap sets `cInst` and opens INST.
+- Where: `#tInlSideW` in the side panel when the panel is showing; otherwise `#tInlPad` between the d-pad and the
+  keys in PAD mode (hidden under 560 px wide, where there's no room). Never both at once.
+
 ## How to validate (there is no test suite)
 
 1. **Syntax:** `node --check` the worklets; for the single-file apps, extract each inline `<script>` and

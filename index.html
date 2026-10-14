@@ -536,6 +536,18 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .tmap button.on{background:var(--ink); color:var(--inv)}
 .tstat{display:flex; flex-direction:column; gap:2px; font-size:var(--fs-4); font-variant-numeric:tabular-nums}
 .tmeters{display:grid; grid-template-columns:repeat(8,1fr); gap:4px}
+/* Instrument list (Settings → INST LIST): each instrument and the pad it plays. In the side panel, or in PAD mode
+   between the arrows and the buttons when the side panel isn't showing and there is room. */
+.tinlw{display:flex; flex-direction:column; gap:4px}
+.tinlw[hidden],.tinl[hidden]{display:none}
+.tinlh{font-size:var(--fs-4); font-weight:600; letter-spacing:.06em; color:var(--muted)}
+.tinl{display:grid; grid-auto-flow:column; grid-template-rows:repeat(8,auto); grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px 8px; font-size:var(--fs-4); font-variant-numeric:tabular-nums; min-width:0}
+.tinl button{display:block; justify-content:flex-start; border:0; background:none; color:inherit; font:inherit; min-height:0; padding:1px 4px; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; letter-spacing:0; cursor:pointer; border-radius:0}
+.tinl button i{font-style:normal; font-weight:600; opacity:.55; margin-right:6px}
+.tinl button.on{background:var(--ink); color:var(--inv)} .tinl button.on i{opacity:.8}
+.tinl button.mo i{opacity:1}
+.tinlp{flex:1 1 0; max-width:440px; align-self:stretch; align-content:center; overflow:hidden; padding:0 4px}
+@media (max-width:560px){ .tinlp{display:none!important} }
 .mtr{min-height:0; padding:0; border:1px solid var(--line); background:var(--panel); height:58px; display:flex; flex-direction:column; align-items:stretch; gap:0}
 .mtr .mb{flex:1; position:relative; display:block}
 .mtr .mb i{position:absolute; left:0; right:0; bottom:0; height:0; background:var(--ink)}
@@ -1456,6 +1468,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
       </div>
       <div class="tstat"><b id="tState"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>STOPPED</b><span id="tBpm"></span></div>
       <div class="tmeters" id="tMeters"></div>
+      <div class="tinlw" id="tInlSideW" hidden><span class="tinlh">INSTRUMENTS</span><div class="tinl" id="tInlSide" aria-label="Instruments and their pads"></div></div>
       <dl class="tlegend" id="tLegPad">
         <dt>?</dt><dd>help: every key and how it all works</dd>
         <dt>SHIFT + ◀▶</dt><dd>change screen</dd>
@@ -1541,6 +1554,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
       <span></span><button type="button" class="k" data-b="up" aria-label="Up"><svg class="ic ick" aria-hidden="true"><use href="#ic-up"/></svg></button><span></span>
       <button type="button" class="k" data-b="left" aria-label="Left"><svg class="ic ick" aria-hidden="true"><use href="#ic-left"/></svg></button><button type="button" class="k" data-b="down" aria-label="Down"><svg class="ic ick" aria-hidden="true"><use href="#ic-down"/></svg></button><button type="button" class="k" data-b="right" aria-label="Right"><svg class="ic ick" aria-hidden="true"><use href="#ic-right"/></svg></button>
     </div>
+    <div class="tinl tinlp" id="tInlPad" hidden aria-label="Instruments and their pads"></div>
     <div class="keys wide">
       <button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
       <span></span><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
@@ -9243,6 +9257,34 @@ let sideOn = (() => { try { return localStorage.getItem(SPK) !== '0'; } catch(e)
 function setSide(on){ sideOn = on; try { localStorage.setItem(SPK, on ? '1' : '0'); } catch(e){} document.body.classList.toggle('noside', !on); arrLayout(true); }
 document.body.classList.toggle('noside', !sideOn);
 $('tSideX').addEventListener('click', () => { setSide(false); toast('Side panel hidden. Settings → SIDE PANEL brings it back.'); });
+// INST LIST (Project): every instrument and the pad it plays, so it's easy to see what's where. Off by default.
+// It goes in the side panel; without one (phones, narrow windows, panel hidden) it goes
+// in PAD mode's control area between the arrows and the buttons, when that's wide enough. A tap opens it on INST.
+const INLK = 'thunderplus-instlist-v1';
+let inlOn = (() => { try { const v = localStorage.getItem(INLK); if (v === '1' || v === '0') return v === '1'; } catch(e){} return false; })();
+function setInl(on){ inlOn = on; try { localStorage.setItem(INLK, on ? '1' : '0'); } catch(e){} inlSig = ''; draw(); }
+let inlSig = '';
+function instList(){
+  const sw = $('tInlSideW'), pd = $('tInlPad');
+  sw.hidden = !inlOn;
+  const side = inlOn && sw.offsetWidth > 0;   // the side panel is showing it
+  pd.hidden = !inlOn || side;
+  if (!inlOn) return;
+  const rows = []; let sig = cInst + '|';
+  for (let i = 0; i < NI; i++){
+    const I = S.insts[i]; if (!I) continue;
+    const v = kit.voices[I.pad], pn = (v && v.name) || 'Pad ' + (I.pad + 1), mo = I.mo | 0;
+    const nm = mo === 1 ? 'MIDI ' + d2((I.mch | 0) + 1) : pn + (mo === 2 ? ' +MIDI' : '');
+    sig += nm + '/' + I.pad + ';';
+    rows.push(`<button type="button" data-i="${i}" class="${i === cInst ? 'on' : ''}${mo ? ' mo' : ''}" title="INST ${hx(i)} plays pad ${hx(I.pad)} ${esc(pn)}${mo ? ' · MIDI ch ' + ((I.mch | 0) + 1) : ''}"><i>${hx(i)}</i>${esc(nm)}</button>`);
+  }
+  if (sig === inlSig) return; inlSig = sig;
+  const h = rows.join(''); $('tInlSide').innerHTML = h; pd.innerHTML = h;
+}
+for (const id of ['tInlSide', 'tInlPad']) $(id).addEventListener('click', e => {
+  const b = e.target.closest('[data-i]'); if (!b) return;
+  cInst = +b.dataset.i; go('inst');
+});
 function setStepDec(on){ stepDec = on; try { localStorage.setItem(SDK, on ? '1' : '0'); } catch(e){} arrSig = ''; draw(); }
 function setTScale(v){ tScale = clamp(Math.round(v / 10) * 10, 60, 200); try { localStorage.setItem(TSK, String(tScale)); } catch(e){} fit(); draw(); }
 function setArr(m){ arrMode = m; try { localStorage.setItem(ARK, String(m)); } catch(e){} arrBody(); arrSig = ''; draw(); fit(); draw(); }
@@ -9385,6 +9427,8 @@ function projRows(){
       info:() => `Song overview at the right. AUTO shows it on wide screens (600 × 500 and up), ON at any size. This screen: ${innerWidth} × ${innerHeight}` + (arrMode === 1 && !arrEl.offsetWidth ? ' (too small for AUTO)' : '')},
     {l:'SIDE PANEL', ck:'Show side panel', get:() => sideOn ? 1 : 0, set:v => setSide(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'The grey column at the right on wide screens: the screen map, track meters and key reminders. Hide it to give the tracker and Arrange more room'},
+    {l:'INST LIST', ck:'Show instrument list', get:() => inlOn ? 1 : 0, set:v => setInl(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
+      info:() => 'Every instrument and the pad it plays (long names are cut short). In the side panel; without it, in PAD mode between the arrows and the buttons when there is room. Tap one to open it on INST'},
     {l:'STEP NUMBERS', ck:'Display steps as decimal', get:() => stepDec ? 1 : 0, set:v => setStepDec(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'DECIMAL' : 'HEX',
       info:() => 'Row numbers in Song, Sect, Phrase and Arrange: DECIMAL counts 0, 1, 2… (song rows 000–255, phrase rows 00–31); HEX is 00–FF. Phrase, sect and instrument numbers and the values stay hex'},
     {l:'TEXT SIZE', get:() => tScale, set:v => setTScale(v), min:60, max:200, step:10, big:20, d:100, fmt:v => v + '%',
@@ -10529,6 +10573,7 @@ function draw(){
   $('tBpm').textContent = (tp.on ? tp.bpm : S.bpm) + ' BPM · ' + (tp.on ? tp.tks : S.ticks || TICKS) + ' TICKS' + (S.swing > 50 ? ' · SWING ' + S.swing + '%' : '');
   document.querySelectorAll('#tMeters .mtr').forEach((m, t) => { m.classList.toggle('mu', !audible(t)); m.hidden = t >= ntr(); });
   paintMeters();
+  instList();
 }
 function paintMeters(){
   const bs = rt ? rt.pl.buses : null;
