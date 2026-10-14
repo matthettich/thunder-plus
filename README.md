@@ -91,7 +91,7 @@ The top bar has two menus that work like ...Seeds': **File ▾** and **⚙ Setti
 
 ## Skins
 
-**Settings → Skin** (or SKIN in the tracker's settings and Project screen) switches between the ...Seeds skins: Pastel (follows your system), Pastel light, Minimal, Minimal colors, Monotone, Minimal black, Minimal colors black and Neon. The choice is remembered. **Simple rainbow** looks like the other Simple skins, but every button, key, tab, pad and tracker entry has its own colour, shifting a step on each line.
+**Settings → Skin** (or SKIN in the tracker's settings and Project screen) switches between the ...Seeds skins: Pastel (follows your system), Pastel light, Minimal, Minimal colors, Monotone, Minimal black, Minimal colors black and Neon. The choice is remembered. **Simple rainbow** looks like the other Simple skins, but every button, key, tab, pad and tracker entry has its own colour, shifting a step on each line. **Simple rainbow dynamic** is the same with every colour drifting slowly round the colour wheel, once every 4 minutes (it stays still if your device asks for reduced motion).
 
 ## Synth slots
 

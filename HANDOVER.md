@@ -617,6 +617,10 @@ caches.
   buttons, pads, meters, keypad keys and Arrange blocks; `--ri` = the tracker line (12 steps). Hue
   `(ci + ri) × 30°` in OKLCH at one lightness. Buttons get their own `--mx`/`--mxdim`/`--mxsoft`, which the term
   rules already use, so outlines, text and solid fills all follow. Cursor and playhead cells keep their colours.
+- **Simple rainbow dynamic** (`rainbowdyn`): the same CSS, plus `rbWheel()` (called from `applySkin`) setting
+  `filter: hue-rotate()` on `<html>` ten times a second, 0.15° a step, once round every 240 s. Not a CSS animation:
+  on the root that recalculated and repainted every frame (60 recalcs/s); this is 10/s, about 8 ms of main thread a
+  second on a desktop. Paused while hidden, off with reduced motion. Fixed overlays (Help, toasts) are unaffected.
 
 ## How to validate (there is no test suite)
 
