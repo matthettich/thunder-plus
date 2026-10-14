@@ -379,6 +379,253 @@ const RATIOS = [0.25,0.5,0.75,1,1.25,1.5,1.75,2,2.5,3,3.5,4,4.5,5,6,7,8,9,10,11,
 const MIXP = { mix:{l:'Mix', f:wet} };
 const step = k => ({ l:'Step ' + k, f: v => v <= -25 ? 'Rest' : noteName(v) });
 
+/* ===SHARED EDITOR START===
+   The same in chains/index.html and waves/index.html: the editor side of the shared modules (see the SHARED MODULES
+   block in the worklets). Edit it here, in …chains, and run tools/sync-shared.py to copy it into …waves. */
+const SHARED_FAMILY = {};
+const PP_NAMES = ['1/16', '1/8T', '1/8', '1/4T', '1/4', '1/2', '1 bar'];
+const STEP_NAMES = ['1/64', '1/32', '1/16T', '1/16', '1/8T', '1/8', '1/4', '1/2', '1 bar', '2 bars'];
+const whole = v => String(Math.round(v));
+const STEREO = { inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' } };
+const SHARED_MODULES = {
+  beads:{ label:'Beads', fx:true, params:{ media:[3,0,3,1], freeze:[0,0,1,1], time:[.2,0,1,.01], size:[.5,0,1,.01], pitch:[.5,0,1,.01], shape:[.5,0,1,.01],
+      density:[.85,0,1,.01], fb:[.2,0,1,.01], blend:[1,0,1,.01], verb:[.25,0,1,.01] },
+    ui:{ media:{l:'Media', c:opts(['Dirty tape','Clean tape','Vintage','Digital'])}, freeze:{l:'Freeze', c:opts(['Off','On'])},
+      time:{l:'Time', f:pct}, size:{l:'Size', f:pct}, pitch:{l:'Pitch', f:pct}, shape:{l:'Shape', f:pct}, density:{l:'Density', f:pct},
+      fb:{l:'Feedback', f:pct}, blend:{l:'Blend', f:wet}, verb:{l:'Reverb', f:pct} } },
+  comb:{ label:'Comb resonator', fx:true, params:{ note:[48,24,96,1], fb:[0.85,-0.99,0.99,.01], damp:[0.3,0,0.99,.01], spread:[8,0,50,1], mix:[0.6,0,1,.01] },
+    ui:{ note:{l:'Note', f:v => ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((v % 12) + 12) % 12] + (Math.floor(v / 12) - 1)}, fb:{l:'Feedback', f:v => (v < 0 ? 'hollow ' : '') + Math.round(Math.abs(v) * 100) + '%'}, damp:{l:'Damping', f:v => Math.round(v * 100) + '%'}, spread:{l:'Spread', f:v => Math.round(v) + ' cents'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  transient:{ label:'Transient shaper', fx:true, params:{ att:[0.5,-1,1,.01], sus:[0,-1,1,.01], out:[1,0,2,.01], mix:[1,0,1,.01] },
+    ui:{ att:{l:'Attack', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, sus:{l:'Sustain', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, out:{l:'Output', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  tgate:{ label:'Trance gate', fx:true, params:{ div:[2,0,5,1], pat:[4,0,8,1], len:[0.6,0.05,1,.01], depth:[1,0,1,.01], smooth:[3,0.5,30,.01] },
+    ui:{ div:{l:'Step', c:opts(['1/32', '1/16T', '1/16', '1/8T', '1/8', '1/4'])}, pat:{l:'Pattern', c:opts(['All steps', 'Every other', 'Offbeats', '3-3-2', 'Trance 1', 'Trance 2', 'Stutter', 'Sparse', 'Clave'])}, len:{l:'Length', f:v => Math.round(v * 100) + '%'}, depth:{l:'Depth', f:v => Math.round(v * 100) + '%'}, smooth:{l:'Smoothing', f:v => Math.round(v) + ' ms'} } },
+  ott:{ label:'Multiband squash', fx:true, params:{ depth:[0.5,0,1,.01], time:[0.4,0,1,.01], lo:[0,-12,12,.01], mid:[0,-12,12,.01], hi:[0,-12,12,.01], out:[0,-12,12,.01] },
+    ui:{ depth:{l:'Depth', f:v => Math.round(v * 100) + '%'}, time:{l:'Time', f:v => Math.round(v * 100) + '%'}, lo:{l:'Low', f:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'}, mid:{l:'Mid', f:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'}, hi:{l:'High', f:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'}, out:{l:'Output', f:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'} } },
+  fshift:{ label:'Frequency shifter', fx:true, params:{ shift:[0.15,-1,1,.01], fb:[0,0,0.9,.01], mix:[1,0,1,.01] },
+    ui:{ shift:{l:'Shift', f:v => (v > 0 ? '+' : '') + Math.round(Math.sign(v) * v * v * 2000) + ' Hz'}, fb:{l:'Feedback', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  vinyl:{ label:'Vinyl', fx:true, params:{ mlow:[0.2,0,1,.01], slow:[0.34,0,1,.01], hlim:[0.32,0,1,.01], wear:[0.3,0,1,.01] },
+    ui:{ mlow:{l:'Mid low cut', f:v => Math.round(v * 100) + '%'}, slow:{l:'Side low cut', f:v => Math.round(v * 100) + '%'}, hlim:{l:'High limit', f:v => Math.round(v * 100) + '%'}, wear:{l:'Groove wear', f:v => Math.round(v * 100) + '%'} } },
+  dub:{ label:'Dub tape', fx:true, params:{ amt:[0.5,0,1,.01], mix:[1,0,1,.01] },
+    ui:{ amt:{l:'Amount', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  cab:{ label:'Speaker cab', fx:true, params:{ model:[0,0,5,1], int:[0.66,0,1,.01], room:[0.33,0,1,.01], size:[0.66,0,1,.01], axis:[0.33,0,1,.01], out:[0.8,0,1,.01] },
+    ui:{ model:{l:'Cab', c:opts(['Stack', 'Vintage', 'Boutique', 'Large closed', 'Small closed', 'Bass'])}, int:{l:'Intensity', f:v => Math.round(v * 100) + '%'}, room:{l:'Room', f:v => Math.round(v * 100) + '%'}, size:{l:'Size', f:v => Math.round(v * 100) + '%'}, axis:{l:'Off axis', f:v => Math.round(v * 100) + '%'}, out:{l:'Output', f:v => Math.round(v * 100) + '%'} } },
+  tube:{ label:'Tube', fx:true, params:{ input:[0.5,0,1,.01], tube:[0.5,0,1,.01] },
+    ui:{ input:{l:'Input', f:v => Math.round(v * 100) + '%'}, tube:{l:'Tube', f:v => Math.round(v * 100) + '%'} } },
+  flanger:{ label:'Flanger', fx:true, params:{ depth:[0.5,0,1,.01], rate:[0.3,0.05,5,.01], delay:[0.5,0,1,.01], fb:[0.5,0,0.95,.01], mix:[0.5,0,1,.01] },
+    ui:{ depth:{l:'Depth', f:v => Math.round(v * 100) + '%'}, rate:{l:'Rate', f:v => (v < 10 ? v.toFixed(2) : Math.round(v)) + ' Hz'}, delay:{l:'Delay', f:v => (0.1 + v * 6.9).toFixed(1) + ' ms'}, fb:{l:'Feedback', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  tremolo:{ label:'Tremolo', fx:true, params:{ rate:[5,0.5,20,.01], depth:[0.7,0,1,.01], shape:[0,0,4,1] },
+    ui:{ rate:{l:'Rate', f:v => (v < 10 ? v.toFixed(2) : Math.round(v)) + ' Hz'}, depth:{l:'Depth', f:v => Math.round(v * 100) + '%'}, shape:{l:'Shape', c:opts(['Sine', 'Triangle', 'Saw', 'Ramp', 'Square'])} } },
+  odrive:{ label:'Overdrive', fx:true, params:{ drive:[0.5,0,1,.01], tone:[0.6,0,1,.01], out:[0.2,0,1,.01], mix:[1,0,1,.01] },
+    ui:{ drive:{l:'Drive', f:v => Math.round(v * 100) + '%'}, tone:{l:'Tone', f:v => Math.round(v * 100) + '%'}, out:{l:'Output', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  folder:{ label:'Wavefolder', fx:true, params:{ gain:[4,1,20,.01], offset:[0,-1,1,.01], out:[0.6,0,1,.01], mix:[1,0,1,.01] },
+    ui:{ gain:{l:'Fold', f:v => v.toFixed(1) + '×'}, offset:{l:'Offset', f:v => v.toFixed(2)}, out:{l:'Output', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  autowah:{ label:'Auto-wah', fx:true, params:{ wah:[0.6,0,1,.01], level:[0.8,0,1,.01], mix:[1,0,1,.01] },
+    ui:{ wah:{l:'Wah', f:v => Math.round(v * 100) + '%'}, level:{l:'Level', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  pshift:{ label:'Pitch shifter', fx:true, params:{ semis:[7,-24,24,1], win:[80,10,300,1], spray:[0,0,1,.01], mix:[1,0,1,.01] },
+    ui:{ semis:{l:'Pitch', f:v => (v > 0 ? '+' : '') + v + ' st'}, win:{l:'Window', f:v => Math.round(v) + ' ms'}, spray:{l:'Spray', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  ladder:{ label:'Ladder filter', fx:true, params:{ cut:[1200,30,16000,1], res:[0.6,0,1.8,.01], drive:[1,0,4,.01], mode:[0,0,5,1], mix:[1,0,1,.01] },
+    ui:{ cut:{l:'Cutoff', f:v => (v < 10 ? v.toFixed(2) : Math.round(v)) + ' Hz'}, res:{l:'Resonance', f:v => v.toFixed(2)}, drive:{l:'Drive', f:v => v.toFixed(2)}, mode:{l:'Mode', c:opts(['LP 24', 'LP 12', 'BP 24', 'BP 12', 'HP 24', 'HP 12'])}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  xmod:{ label:'Cross-mod', fx:true, params:{ alg:[0.3,0,1,.01], timbre:[0.5,0,1,.01], carrier:[3,0,3,1], note:[48,24,96,1], clvl:[0.8,0,1,.01], mlvl:[0.8,0,1,.01], mix:[1,0,1,.01] },
+    ui:{ alg:{l:'Algorithm', f:v => ['Crossfade','Fold','Analog ring','Digital ring','XOR','Compare','Morph','Vocoder','Vocoder'][Math.min(8, Math.round(v * 8))]}, timbre:{l:'Timbre', f:v => Math.round(v * 100) + '%'}, carrier:{l:'Carrier', c:opts(['Input R', 'Sine', 'Triangle', 'Saw'])}, note:{l:'Note', f:v => ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((v % 12) + 12) % 12] + (Math.floor(v / 12) - 1)}, clvl:{l:'Carrier lvl', f:v => Math.round(v * 100) + '%'}, mlvl:{l:'Input lvl', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  space:{ label:'Space reverb', fx:true, params:{ size:[0.5,0,1,.01], decay:[0.55,0,1,.01], diff:[0.7,0,1,.01], mod:[0.4,0,1,.01], tone:[0.6,0,1,.01], lowcut:[0.2,0,1,.01], pre:[0.1,0,1,.01], mix:[0.35,0,1,.01] },
+    ui:{ size:{l:'Size', f:v => Math.round(v * 100) + '%'}, decay:{l:'Decay', f:v => Math.round(v * 100) + '%'}, diff:{l:'Diffusion', f:v => Math.round(v * 100) + '%'}, mod:{l:'Modulation', f:v => Math.round(v * 100) + '%'}, tone:{l:'Tone', f:v => Math.round(v * 100) + '%'}, lowcut:{l:'Low cut', f:v => Math.round(v * 100) + '%'}, pre:{l:'Pre-delay', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  lofi:{ label:'Lo-fi', fx:true, params:{ rate:[0.6,0,1,.01], rez:[0.6,0,1,.01], hard:[0.5,0,1,.01], mix:[1,0,1,.01] },
+    ui:{ rate:{l:'Rate', f:v => Math.round(v * 100) + '%'}, rez:{l:'Bits', f:v => Math.round(v * 100) + '%'}, hard:{l:'Hardness', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
+  drive:{ label:'Drive', fx:true, params:{ drive:[0.5,0,1,.01] },
+    ui:{ drive:{l:'Drive', f:v => Math.round(v * 100) + '%'} } },
+  air:{ label:'Air', fx:true, params:{ air:[0.5,0,1,.01], gnd:[0.5,0,1,.01] },
+    ui:{ air:{l:'Air', f:v => (v >= .5 ? '+' : '') + Math.round((v - .5) * 200) + '%'}, gnd:{l:'Ground', f:v => (v >= .5 ? '+' : '') + Math.round((v - .5) * 200) + '%'} } },
+  room:{ label:'Room reverb', fx:true, params:{ size:[0.5,0,1,.01], sustain:[0.5,0,1,.01], mulch:[0.5,0,1,.01], wet:[0.35,0,1,.01] },
+    ui:{ size:{l:'Size', f:v => Math.round(v * 100) + '%'}, sustain:{l:'Sustain', f:v => Math.round(v * 100) + '%'}, mulch:{l:'Mulch', f:v => Math.round(v * 100) + '%'}, wet:{l:'Wet', f:v => Math.round(v * 100) + '%'} } },
+  envfol:{ label:'Envelope Follow', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
+    params:{ atk:[.01,0,1,.001], rel:[.15,0,2,.001], gain:[2,0,16,.01], thr:[.3,0,1,.001], mode:[0,0,1,1] },
+    ui:{ atk:{l:'Attack', f:secs}, rel:{l:'Release', f:secs}, gain:{l:'Gain', f:times}, thr:{l:'Gate level', f:pct}, mode:{l:'Detect', c:opts(['Peak','Squared'])} } },
+  gateex:{ label:'Gate Extract', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'gate', env:'cv' },
+    params:{ thr:[.1,0,1,.001], hyst:[.25,0,1,.01], rel:[.05,0,1,.001] },
+    ui:{ thr:{l:'Threshold', f:pct}, hyst:{l:'Hysteresis', f:pct}, rel:{l:'Release', f:secs} } },
+  pitchfol:{ label:'Pitch Follow', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
+    params:{ thr:[.02,0,1,.001], glide:[.05,0,.5,.001], depth:[1,0,1,.01], min:[60,40,500,1], max:[1400,100,4000,1] },
+    ui:{ thr:{l:'Threshold', f:pct}, glide:{l:'Glide', f:secs}, depth:{l:'Depth', f:pct}, min:{l:'Min', f:hz}, max:{l:'Max', f:hz} } },
+  slew:{ label:'Slew limiter', scope:'mono', inputs:{ in:'cv' }, outputs:{ out:'cv' },
+    params:{ up:[.05,0,1,.001], dn:[.05,0,1,.001] }, ui:{ up:{l:'Rise', f:secs}, dn:{l:'Fall', f:secs} } },
+  snh:{ label:'Sample & Hold', scope:'mono', inputs:{ in:'cv', trig:'gate' }, outputs:{ out:'cv', noise:'cv' },
+    params:{ rate:[4,.05,40,.01], smooth:[0,0,1,.01], depth:[1,0,1,.01] },
+    ui:{ rate:{l:'Rate', f:hz}, smooth:{l:'Smooth', f:pct}, depth:{l:'Depth', f:pct} } },
+  quant:{ label:'Quantizer', scope:'mono', inputs:{ in:'cv' }, outputs:{ out:'cv' },
+    params:{ scale:[0,0,6,1], transpose:[0,-24,24,1], depth:[1,0,1,.01] },
+    ui:{ scale:{l:'Scale', c:opts(['Major','Natural minor','Harmonic minor','Minor pentatonic','Whole tone','Chromatic','Power'])}, transpose:{l:'Transpose', f:semis}, depth:{l:'Depth', f:pct} } },
+  blades:{ label:'Blades filter', scope:'mono', inputs:{ in:'audio', cutoff:'cv', res:'cv' }, outputs:{ out:'audio' },
+    params:{ cutoff:[.5,0,1,.001], res:[.3,0,1,.001], drive:[0,0,1,.01], mode:[0,0,3,1], slope:[2,2,4,2] },
+    ui:{ cutoff:{l:'Cutoff', f:pct}, res:{l:'Resonance', f:pct}, drive:{l:'Drive', f:pct},
+      mode:{l:'Mode', c:opts(['Low-pass','Band-pass','High-pass','Notch'])}, slope:{l:'Slope', c:opts(['2-pole','4-pole'])} } },
+  meta:{ label:'Meta modulator', scope:'mono', inputs:{ in:'audio', mod:'audio' }, outputs:{ out:'audio' },
+    params:{ mode:[0,0,3,1], amount:[.5,0,1,.01], mix:[1,0,1,.01] },
+    ui:{ mode:{l:'Mode', c:opts(['Crossfade','Ring mod','Wave fold','Comparator'])}, amount:{l:'Amount', f:pct}, mix:{l:'Mix', f:wet} } },
+  phaser:{ label:'Phaser', scope:'mono', inputs:{ in:'audio', cv:'cv' }, outputs:{ out:'audio' },
+    params:{ rate:[.3,0,1,.01], depth:[.5,0,1,.01], feedback:[.4,0,1,.01], stages:[4,2,8,2], mix:[.5,0,1,.01], sync:[0,0,1,1] },
+    ui:{ rate:{l:'Rate', f:v => hz(.05 * Math.pow(160, v))}, depth:{l:'Depth', f:pct}, feedback:{l:'Feedback', f:pct},
+      stages:{l:'Stages', c:opts(['2','4','6','8'])}, sync:{l:'Sync', c:opts(['Off (use Rate)','To tempo'])}, mix:{l:'Mix', f:wet} } },
+  width:{ label:'Width', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ width:[1,0,2,.01], bass:[0,0,1,.01], level:[1,0,2,.01] },
+    ui:{ width:{l:'Width', f:v => Math.round(v * 100) + '%'}, bass:{l:'Bass mono', f:pct}, level:{l:'Level', f:pct} } },
+  pingpong:{ label:'Ping-pong delay', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ div:[4,0,6,1], sync:[1,0,1,1], time:[.3,.02,1.5,.001], fb:[.4,0,1,.01], tone:[.5,0,1,.01], mix:[.3,0,1,.01] },
+    ui:Object.assign({ div:{l:'Division', c:opts(PP_NAMES)}, sync:{l:'Sync', c:opts(['Off (use Time)','To tempo'])}, time:{l:'Time', f:secs}, fb:{l:'Repeats', f:pct}, tone:{l:'Tone', f:pct} }, MIXP) },
+};
+const SHARED_ABOUT = {
+  beads:'Mutable Instruments Beads: a granular texture synthesizer — Time, Size, Shape, Pitch and Density grow the grains, Feedback and Reverb blend them, Freeze holds what it heard. Media picks Digital (clean), Vintage, or the tape characters.',
+  comb:'Comb resonator: a tuned comb filter that makes any sound ring at Note. Negative Feedback rings hollow (odd harmonics, an octave down); Damping darkens the ring.',
+  transient:'Transient shaper: Attack adds or removes the punch at the start of each hit, Sustain brings the tail up or down, whatever the level.',
+  tgate:'Trance gate: chops the sound in a rhythmic pattern in time with the song. Length is how long each open step lasts; Depth how far it closes.',
+  ott:'Multiband squash: splits the sound into low, mid and high and pushes each toward the same level, lifting quiet detail and pressing loud parts down, the hyped OTT sound. Depth sets how much.',
+  fshift:'Frequency shifter: moves every partial by the same number of Hz (unlike pitch shift), so sounds go inharmonic, metallic or barber-pole with Feedback.',
+  vinyl:'Vinyl (based on Airwindows ToVinyl4): the low end narrowed and filtered as a record lathe needs, the top limited, and groove wear.',
+  dub:'Dub tape (based on Airwindows Dubly): the encode/decode squash of an old tape noise reducer, for dense, colourful dub-style saturation.',
+  cab:'Speaker cab (based on Airwindows Cabs): guitar and bass cabinet models with room sound and off-axis tone.',
+  tube:'Tube (based on Airwindows Tube2): warm tube-style saturation; Tube adds the asymmetric character.',
+  flanger:'Flanger (based on DaisySP): a short modulated delay with feedback, from gentle jet sweeps to metallic swooshes.',
+  tremolo:'Tremolo (based on DaisySP): the level rises and falls at Rate, in the chosen Shape.',
+  odrive:'Overdrive (based on DaisySP): soft-clipping drive with a Tone control on the way out.',
+  folder:'Wavefolder (based on DaisySP): loud parts fold back on themselves, adding bright harmonics. Offset makes the folds lopsided.',
+  autowah:'Auto-wah (based on DaisySP): a filter that opens as the sound gets louder.',
+  pshift:'Pitch shifter (based on DaisySP): shifts the sound up or down in semitones without changing its speed. A longer Window is smoother, Spray adds grit.',
+  ladder:'Ladder filter (based on DaisySP): a four-pole transistor-ladder filter with drive, in low-, band- and high-pass. Resonance near the top squeals.',
+  xmod:'Cross-mod (based on Mutable Instruments Warps): In is the modulator; the carrier is In R or a built-in oscillator at Note. Algorithm sweeps crossfade, fold, ring modulation, XOR, compare and morph into a vocoder; Timbre shapes each one.',
+  space:'Space reverb (based on Cloud Seed by Ghost Note Audio): a big, modulated algorithmic reverb for long washes. Mix keeps the dry sound until half way.',
+  lofi:'Lo-fi (based on Airwindows DeRez2): lowers the sample rate (Rate) and bit depth (Bits); Hardness goes from smooth to gritty.',
+  drive:'Drive (based on Airwindows PurestDrive): subtle saturation that thickens without sounding distorted.',
+  air:'Air (based on Airwindows Air3): lifts (or cuts) the very top end with Air and the low body with Ground.',
+  room:'Room reverb (based on Airwindows Verbity2): a natural room or hall; Mulch darkens and thickens it.',
+  envfol:'Turns sound into modulation: the louder the input, the higher the output. Attack and Release set how quickly it follows; Gate level sets where its gate output turns on. Patch the output into any slider’s modulation jack (a filter’s cutoff, say) and the sound drives it.',
+  gateex:'Turns sound into a gate: on while the input stays above Threshold, off when it falls (Hysteresis stops it chattering). Env is a smoothed version. Use it to trigger envelopes, clocks or Sample & Hold from audio.',
+  pitchfol:'Follows the pitch of a monophonic sound and outputs it as modulation (0.5 = A4, one octave = 0.125), plus a voiced Gate. Best on simple tones. Patch it into an oscillator’s pitch on …waves, or into a Quantizer here.',
+  slew:'Slows a modulation signal down, with separate Rise and Fall times. Smooths stepped or jittery control voltages.',
+  snh:'Sample & Hold: takes a snapshot of the input on a Trigger rising edge (or at Rate) and holds it; Noise outputs a matching random step. Patch a stepped sequence into a filter for classic sample-and-hold sweeps.',
+  quant:'Snaps a pitch modulation signal to the nearest note of a Scale (pitch CV: 0.5 = A4). Transpose shifts it in semitones; Depth scales the output.',
+  blades:'A multimode filter that can be gentle or driven. Cutoff, Resonance and Drive, Mode picks low-pass, band-pass, high-pass or notch, and Slope picks 2-pole or 4-pole (steeper). Patch modulation into Cutoff for sweeps; a resonance CV jack is on the slider too.',
+  meta:'Takes two sounds and combines them. Crossfade blends In and Mod, Ring mod multiplies them (bell-like sums), Wave fold bends In through a sine shaper (Amount sets the folding), and Comparator flips In’s sign with Mod — audio-rate logic. Mix sets the dry/wet.',
+  phaser:'Sweeps notches through the sound: Stages sets how deep the notches are, Rate (or Sync to tempo) sweeps them, Depth and Feedback set how far and how sharp, and a CV input drives the sweep too.',
+  width:'Sets the stereo width from mono (0%) through normal (100%) to extra-wide (200%) with a mid/side control. Bass mono collapses the low end to the centre so wide sounds keep their punch. In R is optional.',
+  pingpong:'A stereo delay that bounces left to right. Sync to tempo picks a Division (1/16…1 bar), or turn Sync off and set Time. Repeats, Tone and Mix shape it. In R is optional.',
+};
+/* New modules (Oct 2026): utilities, reverbs, chorus, ring mod and rhythm. */
+Object.assign(SHARED_MODULES, {
+  meter:Object.assign({ label:'Meter', scope:'mono', params:{ trim:[0,-24,24,.1] }, ui:{ trim:{l:'Trim', f:db} }, display:'meter',
+    about:'Meter: a stereo level meter you can put between any two modules. The bars show the average (VU) level, the tick the peak, and the numbers the peak in dB (red past 0 dB). Trim raises or lowers the level on the way through.' }, STEREO),
+  limiter:Object.assign({ label:'Limiter', scope:'mono', params:{ input:[0,0,24,.1], ceil:[-.3,-24,0,.1], rel:[.15,.01,1,.001] },
+    ui:{ input:{l:'Input', f:db}, ceil:{l:'Ceiling', f:db}, rel:{l:'Release', f:secs} }, display:'gr',
+    about:'Limiter: a peak limiter with a 2 ms look-ahead, so nothing gets past Ceiling. Input pushes the sound into it for more loudness; Release sets how fast it lets go. The bar shows the gain reduction.' }, STEREO),
+  utility:Object.assign({ label:'Utility', scope:'mono', params:{ gain:[0,-60,24,.1], pan:[0,-1,1,.01], mono:[0,0,1,1], flip:[0,0,3,1], mute:[0,0,1,1] },
+    ui:{ gain:{l:'Gain', f:v => v <= -59.9 ? '−∞ dB' : db(v)}, pan:{l:'Pan', f:v => Math.abs(v) < .005 ? 'Centre' : (v < 0 ? 'L ' : 'R ') + Math.round(Math.abs(v) * 100)},
+      mono:{l:'Stereo', c:opts(['Stereo','Mono'])}, flip:{l:'Polarity', c:opts(['Normal','Flip left','Flip right','Flip both'])}, mute:{l:'Mute', c:opts(['Sound on','Muted'])} },
+    about:'Utility: gain (smoothed, so moving it never clicks), pan, mono, polarity flip and mute, for anywhere in a patch.' }, STEREO),
+  ringmod:{ label:'Ring mod', scope:'mono', inputs:{ in:'audio', inR:'audio', car:'audio', freq:'cv' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ freq:[.45,0,1,.001], fine:[0,-1,1,.01], wave:[0,0,3,1], spread:[0,0,1,.01], shape:[0,0,1,.01], mix:[1,0,1,.01] },
+    ui:Object.assign({ freq:{l:'Freq', f:v => hz(5 * Math.pow(1000, v))}, fine:{l:'Fine', f:v => cents(v * 100)}, wave:{l:'Carrier', c:opts(['Sine','Triangle','Square','Noise'])},
+      spread:{l:'Spread', f:pct}, shape:{l:'Shape', f:pct} }, MIXP),
+    about:'Ring mod: multiplies the sound by a carrier for metallic, bell-like and robotic tones. The carrier is its own oscillator at Freq (the Freq input adds up to ±4 octaves) or anything patched into Carrier. Spread offsets the right side for stereo; Shape squares the carrier up.' },
+  spring:Object.assign({ label:'Spring reverb', scope:'mono', params:{ decay:[.6,0,1,.01], tone:[.5,0,1,.01], chirp:[.6,0,1,.01], length:[.5,0,1,.01], drip:[.4,0,1,.01], mix:[.35,0,1,.01] },
+    ui:Object.assign({ decay:{l:'Decay', f:pct}, tone:{l:'Tone', f:pct}, chirp:{l:'Chirp', f:pct}, length:{l:'Length', f:pct}, drip:{l:'Drip', f:pct} }, MIXP),
+    about:'Spring reverb: the boingy, dripping sound of an amp or dub spring tank, two springs for stereo. Chirp sets how strong the spring’s falling “pew” is, Drip how hard the highs hit it, Length the tank size, Tone the darkness and Decay how long it rings.' }, STEREO),
+  plate:Object.assign({ label:'Plate reverb', scope:'mono', params:{ size:[.7,.2,1,.01], decay:[.6,0,.97,.01], damp:[.4,0,1,.01], pre:[.01,0,.25,.001], mod:[.3,0,1,.01], mix:[.3,0,1,.01] },
+    ui:Object.assign({ size:{l:'Size', f:pct}, decay:{l:'Decay', f:pct}, damp:{l:'Damping', f:pct}, pre:{l:'Pre-delay', f:secs}, mod:{l:'Motion', f:pct} }, MIXP),
+    about:'Plate reverb: the bright, dense studio plate (the classic figure-eight tank design). Size scales it, Decay sets its length, Damping darkens the tail, Pre-delay holds it back from the dry sound and Motion gently moves it.' }, STEREO),
+  ensemble:Object.assign({ label:'Ensemble', scope:'mono', params:{ mode:[0,0,3,1], rate:[.5,0,1,.01], depth:[.5,0,1,.01], tone:[.7,0,1,.01], mix:[.5,0,1,.01] },
+    ui:Object.assign({ mode:{l:'Mode', c:opts(['Ensemble','Classic I','Classic II','Classic I+II'])}, rate:{l:'Rate', f:spct}, depth:{l:'Depth', f:pct}, tone:{l:'Tone', f:pct} }, MIXP),
+    about:'Ensemble: a lush chorus. Ensemble spreads three voices around the stereo field with a little shimmer, like a string machine; Classic I, II and I+II are the wide two-speed chorus of 80s polysynths. Rate and Depth scale whichever you pick.' }, STEREO),
+  math:{ label:'Math', scope:'mono', inputs:{ a:'cv', b:'cv' }, outputs:{ sum:'cv', diff:'cv', mul:'cv', min:'cv', max:'cv' },
+    params:{ ka:[0,-1,1,.01], kb:[0,-1,1,.01] }, ui:{ ka:{l:'A', f:v => v.toFixed(2)}, kb:{l:'B', f:v => v.toFixed(2)} },
+    about:'Math: A and B (each input plus its knob, so a knob alone is a fixed value) give A+B, A−B, A×B, the smaller and the larger. Multiply an LFO by an envelope, offset a CV, or combine two modulators.' },
+  logic:{ label:'Logic', scope:'mono', inputs:{ a:'gate', b:'gate' }, outputs:{ and:'gate', or:'gate', xor:'gate', not:'gate' },
+    params:{ thr:[.5,.05,.95,.01] }, ui:{ thr:{l:'Threshold', f:pct} },
+    about:'Logic: two gates in, AND, OR, XOR and NOT A out. Combine rhythms: AND keeps the hits two patterns share, XOR the ones they don’t.' },
+  divider:{ label:'Clock divider', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ d2:'gate', d4:'gate', d8:'gate', n:'gate' },
+    params:{ n:[3,1,32,1] }, ui:{ n:{l:'N', f:v => '÷' + Math.round(v)} },
+    about:'Clock divider: counts the pulses on Clock and fires every 2nd, 4th, 8th and Nth one. Reset starts counting again.' },
+  euclid:{ label:'Euclidean', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ gate:'gate', accent:'gate' },
+    params:{ steps:[16,1,32,1], hits:[5,0,32,1], rot:[0,0,31,1], div:[3,0,9,1], len:[.5,.05,.95,.01] },
+    ui:{ steps:{l:'Steps', f:whole}, hits:{l:'Hits', f:whole}, rot:{l:'Rotate', f:whole}, div:{l:'Step', c:opts(STEP_NAMES)}, len:{l:'Length', f:pct} },
+    about:'Euclidean: spreads Hits as evenly as possible across Steps (the rhythm behind many world grooves), turned by Rotate. It steps once per Step at the song tempo, or on each pulse at Clock. Accent fires on the first hit of each cycle. Restarts when the song starts.' }
+});
+Object.assign(SHARED_FAMILY, { meter:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', ensemble:'afx',
+  phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
+  envfol:'mod', gateex:'mod', pitchfol:'mod', slew:'util', snh:'util', quant:'util' });
+const SHARED_PORT_LABEL = { car:'Carrier', freq:'Freq', a:'A', b:'B', sum:'A+B', diff:'A−B', mul:'A×B', min:'Min', max:'Max',
+  and:'AND', or:'OR', xor:'XOR', not:'NOT A', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent' };
+/* Palette groups: added to an existing group of the same name, or made (audio groups before Control, the rest at the end).
+   A module already in the palette is left where it is. */
+const SHARED_PALETTE = [
+  ['Effects', [['ringmod','Ring mod'],['ensemble','Ensemble chorus'],['phaser','Phaser'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['beads','Beads']], 'audio'],
+  ['Reverbs', [['spring','Spring reverb'],['plate','Plate reverb'],['room','Room reverb'],['space','Space reverb']], 'audio'],
+  ['More effects', [['comb','Comb resonator'],['transient','Transient shaper'],['tgate','Trance gate'],['ott','Multiband squash'],['fshift','Frequency shifter'],['vinyl','Vinyl'],['dub','Dub tape'],['cab','Speaker cab'],['tube','Tube'],['flanger','Flanger'],['tremolo','Tremolo'],['odrive','Overdrive'],['folder','Wavefolder'],['autowah','Auto-wah'],['pshift','Pitch shifter'],['ladder','Ladder filter'],['xmod','Cross-mod'],['lofi','Lo-fi'],['drive','Drive'],['air','Air']], 'audio'],
+  ['Filters and amps', [['blades','Blades filter']], 'audio'],
+  ['Utilities', [['meter','Meter (VU)'],['limiter','Limiter'],['utility','Utility (gain, pan)']], 'audio'],
+  ['Stereo', [['width','Width']], 'audio'],
+  ['Audio followers', [['envfol','Envelope Follow'],['gateex','Gate Extract'],['pitchfol','Pitch Follow']], 'control'],
+  ['CV utilities', [['slew','Slew limiter'],['snh','Sample & Hold'],['quant','Quantizer'],['math','Math']], 'control'],
+  ['Rhythm and logic', [['euclid','Euclidean'],['divider','Clock divider'],['logic','Logic']], 'control']
+];
+function mergeShared(palette, groupFam, portLabel){
+  const have = new Set(); for (const [, items] of palette) for (const [t] of items) have.add(t);
+  for (const [g, items, where] of SHARED_PALETTE){
+    const add = items.filter(([t]) => !have.has(t)); if (!add.length) continue;
+    add.forEach(([t]) => have.add(t));
+    let row = palette.find(r => r[0] === g);
+    if (!row){
+      row = [g, []];
+      const ctl = palette.findIndex(r => r[0] === '§Control');
+      if (where === 'audio' && ctl >= 0) palette.splice(ctl, 0, row); else palette.push(row);
+    }
+    row[1].push(...add);
+    if (groupFam && !groupFam[g]) groupFam[g] = { 'Reverbs':'afx', 'Utilities':'util', 'Rhythm and logic':'mod', 'More effects':'afx', 'Audio followers':'mod', 'CV utilities':'util', 'Stereo':'afx' }[g] || 'afx';
+  }
+  if (portLabel) for (const k in SHARED_PORT_LABEL) if (!(k in portLabel)) portLabel[k] = SHARED_PORT_LABEL[k];
+}
+/* Displays: a Meter's bars and a Limiter's gain reduction, drawn from the engine's telemetry (shows). */
+{
+  const css = `.shw{display:grid; gap:4px; padding:2px 0}
+.shw .ch{display:grid; grid-template-columns:12px 1fr 52px; align-items:center; gap:6px; font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums}
+.shw .tr{position:relative; height:8px; border-radius:2px; background:var(--glass, #111); overflow:hidden}
+.shw .tr i{position:absolute; left:0; top:0; bottom:0; width:100%; transform-origin:left; transform:scaleX(0); background:var(--audio)}
+.shw .tr b{position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:var(--ink, #fff); left:0}
+.shw .tr .z{position:absolute; top:0; bottom:0; width:1px; background:var(--rec); opacity:.7}
+.shw .ch span:last-child{text-align:right}
+.shw .ch.hot span:last-child{color:var(--rec); font-weight:600}
+.shw.gr .tr i{left:auto; right:0; transform-origin:right; background:var(--gate)}`;
+  const el = document.createElement('style'); el.textContent = css; document.head.append(el);
+}
+const SHOW_LO = -48, SHOW_HI = 3, showPos = d => Math.max(0, Math.min(1, (d - SHOW_LO) / (SHOW_HI - SHOW_LO)));
+function buildShow(n){
+  const kind = MODULES[n.m.type].display, box = h('div', {class:'shw' + (kind === 'gr' ? ' gr' : '')}), rows = [];
+  const mk = lbl => { const i = h('i'), b = h('b'), v = h('span', {text:'—'}), tr = h('div', {class:'tr'}, i, b);
+    if (kind === 'meter'){ const z = h('span', {class:'z'}); z.style.left = (showPos(0) * 100) + '%'; tr.append(z); }
+    const r = h('div', {class:'ch'}, h('span', {text:lbl}), tr, v); box.append(r); rows.push({r, i, b, v, hold:-200, ht:0}); };
+  if (kind === 'meter'){ mk('L'); mk('R'); box.title = 'Bars: average (VU) level. Tick: peak (held 1.5 s). Number: peak in dB. The red line is 0 dB.'; }
+  else { mk('GR'); rows[0].b.hidden = true; box.title = 'Gain reduction: how much the limiter is turning the sound down.'; }
+  n.show = { kind, rows, seen:0 };
+  return box;
+}
+function paintShows(list){
+  const now = performance.now();
+  for (const [id, v] of list || []){
+    const n = nodes.get(id); if (!n || !n.show || !Array.isArray(v)) continue;
+    const S = n.show; S.seen = now;
+    if (S.kind === 'meter') for (let c = 0; c < 2; c++){
+      const R = S.rows[c], vu = v[c], pk = v[c + 2];
+      R.i.style.transform = 'scaleX(' + showPos(vu) + ')';
+      if (pk >= R.hold || now - R.ht > 1500){ R.hold = pk; R.ht = now; }
+      R.b.style.left = (showPos(R.hold) * 100) + '%';
+      R.v.textContent = R.hold <= -90 ? '−∞' : (R.hold > 0 ? '+' : '') + R.hold.toFixed(1);
+      R.r.classList.toggle('hot', R.hold > 0);
+    } else {
+      const R = S.rows[0], gr = Math.max(-24, Math.min(0, v[0]));
+      R.i.style.transform = 'scaleX(' + (-gr / 24) + ')';
+      R.v.textContent = gr > -0.05 ? '0.0 dB' : gr.toFixed(1) + ' dB';
+    }
+  }
+}
+/* ===SHARED EDITOR END=== */
+
 const MODULES = {
   hostIn:{ label:'Host In', scope:'root', inputs:{}, outputs:{ pitch:'cv', gate:'gate', vel:'cv' },
     params:{ transpose:[0,-48,48,1] }, ui:{ transpose:{l:'Transpose', f:semis} } },
@@ -464,6 +711,7 @@ const MODULES = {
     params:{ slot:[1,1,BUS_COUNT,1], level:[1,0,2,.01] },
     ui:{ slot:{l:'Output', c:Array.from({length:BUS_COUNT}, (_, i) => [i + 1, 'Waves In ' + (i + 1)])}, level:{l:'Level', f:pct} } }
 };
+Object.assign(MODULES, SHARED_MODULES);
 for (const [t, d] of Object.entries(MODULES)){
   d.type = t;
   if (d.fx){ d.scope = 'mono'; d.inputs = Object.assign({ in:'audio', inR:'audio' }, d.extraIn || {}); d.outputs = { out:'audio', outR:'audio' }; }
@@ -475,6 +723,7 @@ const choicesOf = (t, k) => (MODULES[t].ui[k] || {}).c || null;
 /* Families give each module its edge color, as in ...Seeds. */
 const FAMILY = { hostIn:'midi', seq:'midi', vco:'gen', fm:'gen', additive:'gen', noise:'gen', plaits:'gen', elements:'gen',
   vcf:'util', vca:'util', mixer:'util', lfo:'mod', adsr:'mod', random:'mod', atten:'mod', out:'aout' };
+Object.assign(FAMILY, SHARED_FAMILY);
 const famOf = t => FAMILY[t] || (MODULES[t] && MODULES[t].fx ? 'afx' : 'gen');
 /* Cable kinds: audio (teal), modulation (purple, dashed), gate (pink, dashed). */
 const KIND = { audio:'audio', cv:'mod', gate:'gate' };
@@ -683,7 +932,7 @@ class WavesBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './waves-worklet.js?v=5';
+    const url = opts.url || './waves-worklet.js?v=6';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'waves', {
@@ -894,6 +1143,7 @@ function buildNode(m){
     kids.push(ch ? choice(n, k, ch) : slider(n, k, def.params[k]));
   }
   if (m.type === 'out'){ n.meter = h('span'); kids.push(h('div', {class:'prog', title:'Level'}, n.meter)); }
+  if (def.display) kids.push(buildShow(n));
   if (NOTES[m.type]){ n.note = h('div', {class:'status'}); kids.push(n.note); }
   const body = h('div', {class:'body'}, kids);
   n.el = h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id}, head, ports, body);
@@ -1472,6 +1722,7 @@ const PALETTE = [
   ['Modulation sources', [['lfo','LFO'],['adsr','ADSR'],['random','Random'],['atten','Attenuverter']]]
 ];
 const GROUP_FAM = { 'Sound sources':'gen', 'Filters and amps':'util', 'Effects':'afx', 'Output':'aout', 'Notes and MIDI':'midi', 'Modulation sources':'mod' };
+mergeShared(PALETTE, GROUP_FAM, PORT_LABEL);
 const isSection = g => g.startsWith('§');
 const PSTORE = KP + 'palette';
 let pstate = { open:{}, quick:['hostIn', 'vco', 'adsr', 'vca', 'out'] };
@@ -1761,7 +2012,7 @@ function helpDoc(){
   const groups = PALETTE.filter(([g]) => !isSection(g)).map(([g, items]) => '<div class="mgroup"><h3>' + esc(g) + '</h3><div class="mgrid">' + items.map(([t]) => {
     const d = MODULES[t], ed = EDGE[famOf(t)];
     const io = (lbl, o) => Object.keys(o).length ? '<div class="io"><b>' + lbl + '</b>' + Object.entries(o).map(([p, k]) => '<span class="pt"><i style="background:' + KC[KIND[k]] + '"></i>' + esc(PORT_LABEL[p] || p) + '</span>').join('') + '</div>' : '';
-    return '<div class="mcard" style="--ed:' + ed + '"><h4>' + esc(d.label) + '</h4><p>' + esc(ABOUT[t]) + '</p>' + io('Inputs', d.inputs) + io('Outputs', d.outputs) + '</div>';
+    return '<div class="mcard" style="--ed:' + ed + '"><h4>' + esc(d.label) + '</h4><p>' + esc(ABOUT[t] || SHARED_ABOUT[t] || d.about || '') + '</p>' + io('Inputs', d.inputs) + io('Outputs', d.outputs) + '</div>';
   }).join('') + '</div></div>').join('');
   return '<!doctype html><html><head><meta charset="utf-8"><style>' +
     "@font-face{font-family:Jost;src:url('./fonts/Jost-400.woff') format('woff');font-weight:400}@font-face{font-family:Jost;src:url('./fonts/Jost-600.woff') format('woff');font-weight:600}" +
@@ -1813,7 +2064,7 @@ function onMeter(m){
   el.title = m.load < .5 ? 'Plenty of room' : m.load <= .8 ? 'Getting busy' : 'Overloaded: voices will drop. Try Draft quality or fewer voices.';
   document.getElementById('vcount').textContent = m.active + ' voice' + (m.active === 1 ? '' : 's');
   for (let k = 0; k < BUS_COUNT; k++){ busPeaks[k] = m.buses[k] || 0; meterBars[k].style.transform = 'scaleX(' + Math.min(1, busPeaks[k]) + ')'; }
-  paintMods(m.mods || []);
+  paintMods(m.mods || []); paintShows(m.shows);
   if (m.wasm && (m.wasm.dsp !== WASM_OK.dsp || m.wasm.tfx !== WASM_OK.tfx)){ WASM_OK = m.wasm; for (const n of nodes.values()) paintNote(n); }
   for (const n of nodes.values()) if (n.meter) n.meter.style.transform = 'scaleX(' + Math.min(1, busPeaks[(n.m.params.slot | 0) - 1] || 0) + ')';
 }

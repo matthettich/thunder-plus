@@ -142,79 +142,6 @@ Rings.inputs = { in:'audio', inR:'audio', pitch:'cv' };
 const Clouds = effect('clouds', 1, { mode:[0,0,3,1], lofi:[0,0,1,1], freeze:[0,0,1,1], pos:[.1,0,1,.01], size:[.5,0,1,.01], pitch:[0,-24,24,1], density:[.6,0,1,.01],
     texture:[.5,0,1,.01], blend:[.5,0,1,.01], fb:[.2,0,1,.01], verb:[.5,0,1,.01], spread:[.5,0,1,.01] },
   p => [p.mode | 0, p.lofi >= .5 ? 1 : 0, p.freeze >= .5 ? 1 : 0, u(p.pos), u(p.size), p.pitch, u(p.density), u(p.texture), u(p.blend), u(p.fb), u(p.verb), u(p.spread)], 4);
-/* Mutable Instruments Beads (MIT): time, size, pitch, shape, density, feedback, blend, reverb + media. */
-// Beads divides by zero with Freeze on and Size at exactly 1, which traps the whole wasm module. Cap it just under.
-const BEADS_SIZE_MAX = .995;
-const Beads = effect('beads', 10, { media:[3,0,3,1], freeze:[0,0,1,1], time:[.2,0,1,.01], size:[.5,0,1,.01], pitch:[.5,0,1,.01], shape:[.5,0,1,.01],
-    density:[.85,0,1,.01], fb:[.2,0,1,.01], blend:[1,0,1,.01], verb:[.25,0,1,.01] },
-  p => [p.media | 0, 0, p.freeze >= .5 ? 1 : 0, u(p.time), Math.min(u(p.size), BEADS_SIZE_MAX), u(p.pitch), u(p.shape), u(p.density), u(p.fb), u(p.blend), u(p.verb), 0], 5);
-/* Flanger, based on DaisySP Flanger (MIT). */
-const FlangerFx = effect('flanger', 11, { depth:[0.5,0,1,.01], rate:[0.3,0.05,5,.01], delay:[0.5,0,1,.01], fb:[0.5,0,0.95,.01], mix:[0.5,0,1,.01] },
-  p => [p.depth, p.rate, p.delay, p.fb, p.mix], 0.3);
-/* Tremolo, based on DaisySP Tremolo (MIT). */
-const TremoloFx = effect('tremolo', 13, { rate:[5,0.5,20,.01], depth:[0.7,0,1,.01], shape:[0,0,4,1] },
-  p => [p.rate, p.depth, p.shape | 0], 0.2);
-/* Overdrive, based on DaisySP Overdrive (MIT). */
-const OdriveFx = effect('odrive', 14, { drive:[0.5,0,1,.01], tone:[0.6,0,1,.01], out:[0.2,0,1,.01], mix:[1,0,1,.01] },
-  p => [p.drive, p.tone, p.out, p.mix], 0.3);
-/* Wavefolder, based on DaisySP Wavefolder (MIT). */
-const FolderFx = effect('folder', 15, { gain:[4,1,20,.01], offset:[0,-1,1,.01], out:[0.6,0,1,.01], mix:[1,0,1,.01] },
-  p => [p.gain, p.offset, p.out, p.mix], 0.2);
-/* Auto-wah, based on DaisySP Autowah (MIT). */
-const AutowahFx = effect('autowah', 16, { wah:[0.6,0,1,.01], level:[0.8,0,1,.01], mix:[1,0,1,.01] },
-  p => [p.wah, p.level, p.mix], 0.3);
-/* Pitch shifter, based on DaisySP PitchShifter (MIT). */
-const PshiftFx = effect('pshift', 17, { semis:[7,-24,24,1], win:[80,10,300,1], spray:[0,0,1,.01], mix:[1,0,1,.01] },
-  p => [p.semis | 0, p.win, p.spray, p.mix], 0.4);
-/* Ladder filter, based on DaisySP LadderFilter (MIT). */
-const LadderFx = effect('ladder', 18, { cut:[1200,30,16000,1], res:[0.6,0,1.8,.01], drive:[1,0,4,.01], mode:[0,0,5,1], mix:[1,0,1,.01] },
-  p => [p.cut, p.res, p.drive, p.mode | 0, p.mix], 0.6);
-/* Cross-mod, based on Mutable Instruments Warps (MIT). */
-const XmodFx = effect('xmod', 19, { alg:[0.3,0,1,.01], timbre:[0.5,0,1,.01], carrier:[3,0,3,1], note:[48,24,96,1], clvl:[0.8,0,1,.01], mlvl:[0.8,0,1,.01], mix:[1,0,1,.01] },
-  p => [p.alg, p.timbre, p.clvl, p.mlvl, p.carrier | 0, p.note | 0, p.mix], 1.2);
-/* Space reverb, based on Cloud Seed (Ghost Note Audio) (MIT). */
-const SpaceFx = effect('space', 20, { size:[0.5,0,1,.01], decay:[0.55,0,1,.01], diff:[0.7,0,1,.01], mod:[0.4,0,1,.01], tone:[0.6,0,1,.01], lowcut:[0.2,0,1,.01], pre:[0.1,0,1,.01], mix:[0.35,0,1,.01] },
-  p => [p.size, p.decay, p.diff, p.mod, p.tone, p.lowcut, p.pre, p.mix], 2);
-/* Lo-fi, based on Airwindows DeRez2 (MIT). */
-const LofiFx = effect('lofi', 21, { rate:[0.6,0,1,.01], rez:[0.6,0,1,.01], hard:[0.5,0,1,.01], mix:[1,0,1,.01] },
-  p => [p.rate, p.rez, p.hard, p.mix], 0.3);
-/* Drive, based on Airwindows PurestDrive (MIT). */
-const DriveFx = effect('drive', 22, { drive:[0.5,0,1,.01] },
-  p => [p.drive], 0.2);
-/* Air, based on Airwindows Air3 (MIT). */
-const AirFx = effect('air', 23, { air:[0.5,0,1,.01], gnd:[0.5,0,1,.01] },
-  p => [p.air, p.gnd], 0.3);
-/* Room reverb, based on Airwindows Verbity2 (MIT). */
-const RoomFx = effect('room', 24, { size:[0.5,0,1,.01], sustain:[0.5,0,1,.01], mulch:[0.5,0,1,.01], wet:[0.35,0,1,.01] },
-  p => [p.size, p.sustain, p.mulch, p.wet], 1);
-
-/* Comb resonator, original code. */
-const CombFx = effect('comb', 25, { note:[48,24,96,1], fb:[0.85,-0.99,0.99,.01], damp:[0.3,0,0.99,.01], spread:[8,0,50,1], mix:[0.6,0,1,.01] },
-  (p, ctx) => [(440 * Math.pow(2, ((p.note | 0) - 69) / 12)), p.fb, p.damp, p.spread, p.mix], 0.2);
-/* Transient shaper, original code. */
-const TransientFx = effect('transient', 26, { att:[0.5,-1,1,.01], sus:[0,-1,1,.01], out:[1,0,2,.01], mix:[1,0,1,.01] },
-  (p, ctx) => [p.att, p.sus, p.out, p.mix], 0.1);
-/* Trance gate, original code. */
-const TgateFx = effect('tgate', 27, { div:[2,0,5,1], pat:[4,0,8,1], len:[0.6,0.05,1,.01], depth:[1,0,1,.01], smooth:[3,0.5,30,.01] },
-  (p, ctx) => [(ctx.transport.tempo / 60 / [0.125,0.16666667,0.25,0.33333333,0.5,1][(p.div | 0)]), p.len, p.depth, p.smooth, [65535,21845,43690,18761,22235,54749,4879,4353,5193][(p.pat | 0)], 16, (ctx.transport.startN || 0), 0], 0.1);
-/* Multiband squash, original code. */
-const OttFx = effect('ott', 28, { depth:[0.5,0,1,.01], time:[0.4,0,1,.01], lo:[0,-12,12,.01], mid:[0,-12,12,.01], hi:[0,-12,12,.01], out:[0,-12,12,.01] },
-  (p, ctx) => [p.depth, p.time, p.lo, p.mid, p.hi, p.out], 1.2);
-/* Frequency shifter, original code. */
-const FshiftFx = effect('fshift', 29, { shift:[0.15,-1,1,.01], fb:[0,0,0.9,.01], mix:[1,0,1,.01] },
-  (p, ctx) => [(Math.sign(p.shift) * p.shift * p.shift * 2000), p.fb, p.mix], 0.2);
-/* Vinyl, based on Airwindows ToVinyl4 (MIT). */
-const VinylFx = effect('vinyl', 30, { mlow:[0.2,0,1,.01], slow:[0.34,0,1,.01], hlim:[0.32,0,1,.01], wear:[0.3,0,1,.01] },
-  (p, ctx) => [p.mlow, p.slow, p.hlim, p.wear], 0.4);
-/* Dub tape, based on Airwindows Dubly (MIT). */
-const DubFx = effect('dub', 31, { amt:[0.5,0,1,.01], mix:[1,0,1,.01] },
-  (p, ctx) => [p.amt, p.mix], 0.3);
-/* Speaker cab, based on Airwindows Cabs (MIT). */
-const CabFx = effect('cab', 32, { model:[0,0,5,1], int:[0.66,0,1,.01], room:[0.33,0,1,.01], size:[0.66,0,1,.01], axis:[0.33,0,1,.01], out:[0.8,0,1,.01] },
-  (p, ctx) => [(((p.model | 0) + 0.5) / 6), p.int, p.room, p.size, p.axis, p.out], 0.6);
-/* Tube, based on Airwindows Tube2 (MIT). */
-const TubeFx = effect('tube', 33, { input:[0.5,0,1,.01], tube:[0.5,0,1,.01] },
-  (p, ctx) => [p.input, p.tube], 0.3);
 
 /* ── control ──────────────────────────────────────────────────────────────── */
 const LFO = {
@@ -281,194 +208,7 @@ const Attenuverter = {
   process(st, io, ctx){ const a = io.p.amount, o = io.p.offset; for (let i = 0; i < ctx.block; i++) io.out.out[i] = io.in.in[i] * a + o; }
 };
 
-/* ── audio → CV and CV utilities ──────────────────────────────────────────────
-   Pitch CV convention: 0.5 = A4 (440 Hz), one octave = 0.125. */
 
-/* Envelope follow: audio in, CV out (peak or squared), with a gate above Gate level. */
-const EnvFol = {
-  type:'envfol', scope:'mono', cost:.05,
-  inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
-  params:{ atk:[.01,0,1,.001], rel:[.15,0,2,.001], gain:[2,0,16,.01], thr:[.3,0,1,.001], mode:[0,0,1,1] },
-  create:() => ({ env:0 }),
-  process(st, io, ctx){
-    const dt = 1 / ctx.sr, ka = 1 - Math.exp(-dt / Math.max(io.p.atk, 1e-4)), kr = 1 - Math.exp(-dt / Math.max(io.p.rel, 1e-4));
-    const gain = io.p.gain, thr = io.p.thr, sq = io.p.mode >= .5;
-    for (let i = 0; i < ctx.block; i++){
-      const x = io.in.in[i] * gain, y = sq ? x * x : Math.abs(x);
-      st.env += (y - st.env) * (y > st.env ? ka : kr);
-      io.out.out[i] = st.env; io.out.gate[i] = st.env > thr ? 1 : 0;
-    }
-  }
-};
-
-/* Gate extract: audio in → gate while it stays above Threshold (with hysteresis), plus a smoothed env. */
-const GateEx = {
-  type:'gateex', scope:'mono', cost:.03,
-  inputs:{ in:'audio' }, outputs:{ out:'gate', env:'cv' },
-  params:{ thr:[.1,0,1,.001], hyst:[.25,0,1,.01], rel:[.05,0,1,.001] },
-  create:() => ({ on:0, env:0 }),
-  process(st, io, ctx){
-    const thr = io.p.thr, hy = thr * (1 - io.p.hyst), kr = 1 - Math.exp(-1 / (ctx.sr * Math.max(io.p.rel, 1e-4)));
-    for (let i = 0; i < ctx.block; i++){
-      const a = Math.abs(io.in.in[i]);
-      if (st.on){ if (a < hy) st.on = 0; } else if (a > thr) st.on = 1;
-      st.env += ((st.on ? 1 : 0) - st.env) * kr;
-      io.out.out[i] = st.on; io.out.env[i] = st.env;
-    }
-  }
-};
-
-/* Pitch follow (monophonic): zero-crossing estimate → CV (0.5 = A4) + a voiced gate. Best on simple tones.
-   Estimates over a rolling ~85 ms window (one 128-sample block is far too short for a stable reading). */
-const PitchFol = {
-  type:'pitchfol', scope:'mono', cost:.2,
-  inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
-  params:{ thr:[.02,0,1,.001], glide:[.05,0,.5,.001], depth:[1,0,1,.01], min:[60,40,500,1], max:[1400,100,4000,1] },
-  create:() => ({ buf:new Float32Array(4096), w:0, filled:0, ph:.5, voiced:0, f:0 }),
-  process(st, io, ctx){
-    const N = st.buf.length; let peak = 0;
-    for (let i = 0; i < ctx.block; i++){ const x = io.in.in[i]; st.buf[st.w] = x; st.w = (st.w + 1) % N; if (st.filled < N) st.filled++; const a = Math.abs(x); if (a > peak) peak = a; }
-    const M = st.filled;
-    let cross = 0, prev = st.buf[(st.w - M + N * 2) % N];
-    for (let i = 1; i < M; i++){ const s = st.buf[(st.w - M + i + N * 2) % N]; if ((s >= 0) !== (prev >= 0)) cross++; prev = s; }
-    const f = M > 1 ? cross * 0.5 * ctx.sr / M : 0;
-    st.voiced = peak > io.p.thr && f >= io.p.min && f <= io.p.max ? 1 : 0;
-    if (st.voiced) st.f = f;
-    const g = 1 - Math.exp(-ctx.block / (ctx.sr * Math.max(io.p.glide, 1e-4)));
-    const target = st.voiced ? clamp(0.5 + Math.log2(Math.max(st.f, 1) / 440) / 8, 0, 1) : st.ph;
-    st.ph = clamp(st.ph + (target - st.ph) * g, 0, 1);
-    io.out.out.fill(st.ph * io.p.depth); io.out.gate.fill(st.voiced);
-  }
-};
-
-/* Slew / lag: smooths a CV with separate rise and fall times. */
-const Slew = {
-  type:'slew', scope:'mono', cost:.03,
-  inputs:{ in:'cv' }, outputs:{ out:'cv' },
-  params:{ up:[.05,0,1,.001], dn:[.05,0,1,.001] },
-  create:() => ({ y:0 }),
-  process(st, io, ctx){
-    const ku = 1 - Math.exp(-1 / (ctx.sr * Math.max(io.p.up, 1e-4))), kd = 1 - Math.exp(-1 / (ctx.sr * Math.max(io.p.dn, 1e-4)));
-    for (let i = 0; i < ctx.block; i++){ const x = io.in.in[i]; st.y += (x - st.y) * (x > st.y ? ku : kd); io.out.out[i] = st.y; }
-  }
-};
-
-/* Sample & hold: samples CV on a Trigger rising edge (or at Rate) and holds it, with a stepped noise out. */
-const SampleHold = {
-  type:'snh', scope:'mono', cost:.08,
-  inputs:{ in:'cv', trig:'gate' }, outputs:{ out:'cv', noise:'cv' },
-  params:{ rate:[4,.05,40,.01], smooth:[0,0,1,.01], depth:[1,0,1,.01] },
-  create:() => ({ R:rng(nextSeed()), ph:0, t:0, held:0, noise:0, y:0, ny:0 }),
-  process(st, io, ctx){
-    const trig = linked(io, 'trig'), k = 1 - Math.pow(io.p.smooth, .15) * .9995, dep = io.p.depth;
-    for (let i = 0; i < ctx.block; i++){
-      let fire = false;
-      if (trig){ const g = io.in.trig[i] > .5; fire = g && !st.t; st.t = g; }
-      else { st.ph += io.p.rate / ctx.sr; if (st.ph >= 1){ st.ph -= 1; fire = true; } }
-      if (fire){ st.held = io.in.in[i]; st.noise = st.R() * 2 - 1; }
-      st.y += (st.held - st.y) * k; st.ny += (st.noise - st.ny) * k;
-      io.out.out[i] = st.y * dep; io.out.noise[i] = st.ny * dep;
-    }
-  }
-};
-
-/* Quantizer: snaps a pitch CV to the nearest note of a scale (pitch CV: 0.5 = A4, 0.125 per octave). */
-const SCALES = [[0,2,4,5,7,9,11],[0,2,3,5,7,8,10],[0,2,3,5,7,8,11],[0,3,5,7,10],[0,2,4,6,8,10],[0,1,2,3,4,5,6,7,8,9,10,11],[0,5,7]];
-const Quant = {
-  type:'quant', scope:'mono', cost:.03,
-  inputs:{ in:'cv' }, outputs:{ out:'cv' },
-  params:{ scale:[0,0,6,1], transpose:[0,-24,24,1], depth:[1,0,1,.01] },
-  create:() => ({}),
-  process(st, io, ctx){
-    const sc = SCALES[clamp(io.p.scale | 0, 0, SCALES.length - 1)], tr = io.p.transpose, dep = io.p.depth;
-    for (let i = 0; i < ctx.block; i++){
-      const semi = Math.round((io.in.in[i] - .5) * 96) + tr, oct = Math.floor(semi / 12), pc = ((semi % 12) + 12) % 12;
-      let best = sc[0], bd = 99;
-      for (const s of sc){ const d = Math.abs(s - pc); if (d < bd){ bd = d; best = s; } }
-      io.out.out[i] = ((oct * 12 + best) / 96 + .5) * dep;
-    }
-  }
-};
-
-
-
-
-/* ── Phase 2: filters, shapers and stereo effects (all original DSP) ────────── */
-
-/* Dual (2/4-pole) multimode filter with drive. Cutoff follows the VCF's mapping so the % reads the same. */
-const Blades = {
-  type:'blades', scope:'mono', cost:1.2,
-  inputs:{ in:'audio', cutoff:'cv', res:'cv' }, outputs:{ out:'audio' },
-  params:{ cutoff:[.5,0,1,.001], res:[.3,0,1,.001], drive:[0,0,1,.01], mode:[0,0,3,1], slope:[2,2,4,2] },
-  create:() => ({ ic1:0, ic2:0, jc1:0, jc2:0 }),
-  process(st, io, ctx){
-    const mode = io.p.mode | 0, four = (io.p.slope | 0) >= 4, dr = 1 + io.p.drive * 6, norm = Math.tanh(dr) || 1;
-    for (let i = 0; i < ctx.block; i++){
-      const fc = Math.min(.49, (.01 + Math.pow(10, (io.p.cutoff + io.in.cutoff[i]) * 3) * .004) * 44100 / ctx.sr);
-      const g = Math.tan(Math.PI * fc), k = 2 - 2 * Math.min(clamp(io.p.res + io.in.res[i], 0, 1), .98);
-      const a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2;
-      const x = Math.tanh(io.in.in[i] * dr) / norm;
-      // Stage 1 (TPT state-variable)
-      const v3 = x - st.ic2, v1 = a1 * st.ic1 + a2 * v3, v2 = st.ic2 + a2 * st.ic1 + a3 * v3;
-      st.ic1 = 2 * v1 - st.ic1; st.ic2 = 2 * v2 - st.ic2;
-      let y = mode === 0 ? v2 : mode === 1 ? v1 : mode === 2 ? (x - k * v1 - v2) : (x - k * v1);
-      if (four){
-        const x2 = mode === 1 ? v1 : v2;
-        const u3 = x2 - st.jc2, u1 = a1 * st.jc1 + a2 * u3, u2 = st.jc2 + a2 * st.jc1 + a3 * u3;
-        st.jc1 = 2 * u1 - st.jc1; st.jc2 = 2 * u2 - st.jc2;
-        y = mode === 0 ? u2 : mode === 1 ? u1 : mode === 2 ? (x2 - k * u1 - u2) : (x2 - k * u1);
-      }
-      io.out.out[i] = y;
-    }
-  }
-};
-
-/* Meta-modulator (Warps-style): crossfade, ring mod, wave fold or comparator between In and Mod. */
-const Meta = {
-  type:'meta', scope:'mono', cost:.3,
-  inputs:{ in:'audio', mod:'audio' }, outputs:{ out:'audio' },
-  params:{ mode:[0,0,3,1], amount:[.5,0,1,.01], mix:[1,0,1,.01] },
-  create:() => ({}),
-  process(st, io, ctx){
-    const mode = io.p.mode | 0, a = io.p.amount, mx = io.p.mix;
-    for (let i = 0; i < ctx.block; i++){
-      const x = io.in.in[i], m = io.in.mod[i]; let y;
-      if (mode === 0) y = x * (1 - a) + m * a;                       // crossfade
-      else if (mode === 1) y = x * ((1 - a) + a * m * 1.4142);       // ring mod
-      else if (mode === 2) y = Math.sin(x * (1 + a * 7) * Math.PI);  // wave fold (sine shaper)
-      else y = x * (m >= 0 ? 1 : -1);                                // comparator (mod flips sign)
-      io.out.out[i] = x + (y - x) * mx;
-    }
-  }
-};
-
-/* Phaser: swept all-pass stages through an LFO or the CV input. */
-const Phaser = {
-  type:'phaser', scope:'mono', cost:.4,
-  inputs:{ in:'audio', cv:'cv' }, outputs:{ out:'audio' },
-  params:{ rate:[.3,0,1,.01], depth:[.5,0,1,.01], feedback:[.4,0,1,.01], stages:[4,2,8,2], mix:[.5,0,1,.01], sync:[0,0,1,1] },
-  create:() => ({ ph:0, z:new Float32Array(8), fb:0 }),
-  process(st, io, ctx){
-    const hz = io.p.sync >= .5 ? (ctx.transport.tempo / 60) * io.p.rate : .05 * Math.pow(160, io.p.rate);
-    const n = clamp(io.p.stages | 0, 2, 8), dep = io.p.depth, fbk = io.p.feedback * .9, mx = io.p.mix, cv = linked(io, 'cv');
-    for (let i = 0; i < ctx.block; i++){
-      st.ph += hz / ctx.sr; st.ph -= Math.floor(st.ph);
-      const f = clamp(.5 + (sinT(st.ph) * dep + (cv ? io.in.cv[i] : 0)) * .5, 0, .999);
-      const a = (1 - f) / (1 + f);
-      let x = io.in.in[i] + st.fb * fbk;
-      for (let s = 0; s < n; s++){ const y = a * x + st.z[s]; st.z[s] = x - a * y; x = y; }
-      st.fb = x; io.out.out[i] = io.in.in[i] * (1 - mx) + x * mx;
-    }
-  }
-};
-
-/* Stereo width (mid/side) with a bass-mono control. In R is optional (mono up to stereo). */
-/* ── tempo-synced control and beat repeat (added Oct 2026, original code) ──────────────────────────────────
-   Note values in beats, shared by Steps, Clock and Repeat. They restart from the downbeat when the song starts
-   (the engine counts transport starts in transport.startN). */
-const DIV_BEATS = [.0625, .125, 1 / 6, .25, 1 / 3, .5, 1, 2, 4, 8];
-const divBeats = v => DIV_BEATS[clamp(v | 0, 0, DIV_BEATS.length - 1)];
-const restarted = (st, ctx) => { const n = ctx.transport.startN || 0; if (st.sn !== n){ st.sn = n; return true; } return false; };
 
 /* Steps: an 8-step CV sequence, one step per note value, with a gate out on every step and optional glide. */
 const Steps = {
@@ -555,52 +295,6 @@ const Repeat = {
   }
 };
 
-const Width = {
-  type:'width', scope:'mono', cost:.1,
-  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
-  params:{ width:[1,0,2,.01], bass:[0,0,1,.01], level:[1,0,2,.01] },
-  create:() => ({ lp:0 }),
-  process(st, io, ctx){
-    const R = linked(io, 'inR') ? io.in.inR : io.in.in, w = io.p.width, b = io.p.bass, g = io.p.level;
-    const k = 1 - Math.exp(-2 * Math.PI * 200 / ctx.sr);
-    for (let i = 0; i < ctx.block; i++){
-      const l = io.in.in[i], r = R[i], mid = (l + r) * .5, side = (l - r) * .5;
-      st.lp += (side - st.lp) * k;
-      const sOut = (side - st.lp * b) * w;
-      io.out.out[i] = (mid + sOut) * g; io.out.outR[i] = (mid - sOut) * g;
-    }
-  }
-};
-
-/* Tempo-synced ping-pong delay (or free time). In R is optional. */
-const PP_DIVS = [['1/16', .25], ['1/8T', 1 / 3], ['1/8', .5], ['1/4T', 2 / 3], ['1/4', 1], ['1/2', 2], ['1 bar', 4]];
-const PingPong = {
-  type:'pingpong', scope:'mono', cost:.7,
-  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
-  params:{ div:[4,0,PP_DIVS.length - 1,1], sync:[1,0,1,1], time:[.3,.02,1.5,.001], fb:[.4,0,1,.01], tone:[.5,0,1,.01], mix:[.3,0,1,.01] },
-  create(){
-    const N = 1 << 17;
-    return { bL:new Float32Array(N), bR:new Float32Array(N), mask:N - 1, w:0, lp:0, lpR:0 };
-  },
-  process(st, io, ctx){
-    const R = linked(io, 'inR') ? io.in.inR : io.in.in;
-    const beat = 60 / Math.max(ctx.transport.tempo, 20);
-    const tSec = io.p.sync >= .5 ? beat * PP_DIVS[clamp(io.p.div | 0, 0, PP_DIVS.length - 1)][1] : io.p.time;
-    const d = clamp(Math.round(tSec * ctx.sr), 1, 65536), fb = io.p.fb * .95, mx = io.p.mix, k = .05 + io.p.tone * .9;
-    const mask = st.mask;
-    for (let i = 0; i < ctx.block; i++){
-      const rd = (st.w - d) & mask;
-      let dl = st.bL[rd], dr = st.bR[rd];
-      st.lp += (dl - st.lp) * k; st.lpR += (dr - st.lpR) * k;
-      const wl = st.lp, wr = st.lpR;
-      st.bL[st.w] = io.in.in[i] + wr * fb;   // left takes the input and the right's tail
-      st.bR[st.w] = wl * fb;                 // right echoes the left (ping-pong)
-      st.w = (st.w + 1) & mask;
-      io.out.out[i] = io.in.in[i] * (1 - mx) + dl * mx;
-      io.out.outR[i] = R[i] * (1 - mx) + dr * mx;
-    }
-  }
-};
 
 
 /* Track In: hard-assigned tracker track input (stereo). Standalone it is silence;
@@ -797,7 +491,644 @@ function vocSpectral(st, ctx, car, mod, out, mix, lvl){
   for (let i = 0; i < FFTH; i++){ st.pcar[i] = car[i]; st.pmod[i] = mod[i]; }
 }
 
-const MODULES = { trackIn:TrackIn,
+/* ===SHARED MODULES START===
+   This block is the same in chains/chains-worklet.js and waves/waves-worklet.js. Edit it here (in …chains) and run
+   tools/sync-shared.py to copy it into …waves. It needs: clamp, sinT, soft, rng, nextSeed, linked, u and effect(). */
+
+/* Mutable Instruments Beads (MIT): time, size, pitch, shape, density, feedback, blend, reverb + media. */
+// Beads divides by zero with Freeze on and Size at exactly 1, which traps the whole wasm module. Cap it just under.
+const BEADS_SIZE_MAX = .995;
+const Beads = effect('beads', 10, { media:[3,0,3,1], freeze:[0,0,1,1], time:[.2,0,1,.01], size:[.5,0,1,.01], pitch:[.5,0,1,.01], shape:[.5,0,1,.01],
+    density:[.85,0,1,.01], fb:[.2,0,1,.01], blend:[1,0,1,.01], verb:[.25,0,1,.01] },
+  p => [p.media | 0, 0, p.freeze >= .5 ? 1 : 0, u(p.time), Math.min(u(p.size), BEADS_SIZE_MAX), u(p.pitch), u(p.shape), u(p.density), u(p.fb), u(p.blend), u(p.verb), 0], 5);
+/* Flanger, based on DaisySP Flanger (MIT). */
+const FlangerFx = effect('flanger', 11, { depth:[0.5,0,1,.01], rate:[0.3,0.05,5,.01], delay:[0.5,0,1,.01], fb:[0.5,0,0.95,.01], mix:[0.5,0,1,.01] },
+  p => [p.depth, p.rate, p.delay, p.fb, p.mix], 0.3);
+/* Tremolo, based on DaisySP Tremolo (MIT). */
+const TremoloFx = effect('tremolo', 13, { rate:[5,0.5,20,.01], depth:[0.7,0,1,.01], shape:[0,0,4,1] },
+  p => [p.rate, p.depth, p.shape | 0], 0.2);
+/* Overdrive, based on DaisySP Overdrive (MIT). */
+const OdriveFx = effect('odrive', 14, { drive:[0.5,0,1,.01], tone:[0.6,0,1,.01], out:[0.2,0,1,.01], mix:[1,0,1,.01] },
+  p => [p.drive, p.tone, p.out, p.mix], 0.3);
+/* Wavefolder, based on DaisySP Wavefolder (MIT). */
+const FolderFx = effect('folder', 15, { gain:[4,1,20,.01], offset:[0,-1,1,.01], out:[0.6,0,1,.01], mix:[1,0,1,.01] },
+  p => [p.gain, p.offset, p.out, p.mix], 0.2);
+/* Auto-wah, based on DaisySP Autowah (MIT). */
+const AutowahFx = effect('autowah', 16, { wah:[0.6,0,1,.01], level:[0.8,0,1,.01], mix:[1,0,1,.01] },
+  p => [p.wah, p.level, p.mix], 0.3);
+/* Pitch shifter, based on DaisySP PitchShifter (MIT). */
+const PshiftFx = effect('pshift', 17, { semis:[7,-24,24,1], win:[80,10,300,1], spray:[0,0,1,.01], mix:[1,0,1,.01] },
+  p => [p.semis | 0, p.win, p.spray, p.mix], 0.4);
+/* Ladder filter, based on DaisySP LadderFilter (MIT). */
+const LadderFx = effect('ladder', 18, { cut:[1200,30,16000,1], res:[0.6,0,1.8,.01], drive:[1,0,4,.01], mode:[0,0,5,1], mix:[1,0,1,.01] },
+  p => [p.cut, p.res, p.drive, p.mode | 0, p.mix], 0.6);
+/* Cross-mod, based on Mutable Instruments Warps (MIT). */
+const XmodFx = effect('xmod', 19, { alg:[0.3,0,1,.01], timbre:[0.5,0,1,.01], carrier:[3,0,3,1], note:[48,24,96,1], clvl:[0.8,0,1,.01], mlvl:[0.8,0,1,.01], mix:[1,0,1,.01] },
+  p => [p.alg, p.timbre, p.clvl, p.mlvl, p.carrier | 0, p.note | 0, p.mix], 1.2);
+/* Space reverb, based on Cloud Seed (Ghost Note Audio) (MIT). */
+const SpaceFx = effect('space', 20, { size:[0.5,0,1,.01], decay:[0.55,0,1,.01], diff:[0.7,0,1,.01], mod:[0.4,0,1,.01], tone:[0.6,0,1,.01], lowcut:[0.2,0,1,.01], pre:[0.1,0,1,.01], mix:[0.35,0,1,.01] },
+  p => [p.size, p.decay, p.diff, p.mod, p.tone, p.lowcut, p.pre, p.mix], 2);
+/* Lo-fi, based on Airwindows DeRez2 (MIT). */
+const LofiFx = effect('lofi', 21, { rate:[0.6,0,1,.01], rez:[0.6,0,1,.01], hard:[0.5,0,1,.01], mix:[1,0,1,.01] },
+  p => [p.rate, p.rez, p.hard, p.mix], 0.3);
+/* Drive, based on Airwindows PurestDrive (MIT). */
+const DriveFx = effect('drive', 22, { drive:[0.5,0,1,.01] },
+  p => [p.drive], 0.2);
+/* Air, based on Airwindows Air3 (MIT). */
+const AirFx = effect('air', 23, { air:[0.5,0,1,.01], gnd:[0.5,0,1,.01] },
+  p => [p.air, p.gnd], 0.3);
+/* Room reverb, based on Airwindows Verbity2 (MIT). */
+const RoomFx = effect('room', 24, { size:[0.5,0,1,.01], sustain:[0.5,0,1,.01], mulch:[0.5,0,1,.01], wet:[0.35,0,1,.01] },
+  p => [p.size, p.sustain, p.mulch, p.wet], 1);
+
+/* Comb resonator, original code. */
+const CombFx = effect('comb', 25, { note:[48,24,96,1], fb:[0.85,-0.99,0.99,.01], damp:[0.3,0,0.99,.01], spread:[8,0,50,1], mix:[0.6,0,1,.01] },
+  (p, ctx) => [(440 * Math.pow(2, ((p.note | 0) - 69) / 12)), p.fb, p.damp, p.spread, p.mix], 0.2);
+/* Transient shaper, original code. */
+const TransientFx = effect('transient', 26, { att:[0.5,-1,1,.01], sus:[0,-1,1,.01], out:[1,0,2,.01], mix:[1,0,1,.01] },
+  (p, ctx) => [p.att, p.sus, p.out, p.mix], 0.1);
+/* Trance gate, original code. */
+const TgateFx = effect('tgate', 27, { div:[2,0,5,1], pat:[4,0,8,1], len:[0.6,0.05,1,.01], depth:[1,0,1,.01], smooth:[3,0.5,30,.01] },
+  (p, ctx) => [(ctx.transport.tempo / 60 / [0.125,0.16666667,0.25,0.33333333,0.5,1][(p.div | 0)]), p.len, p.depth, p.smooth, [65535,21845,43690,18761,22235,54749,4879,4353,5193][(p.pat | 0)], 16, (ctx.transport.startN || 0), 0], 0.1);
+/* Multiband squash, original code. */
+const OttFx = effect('ott', 28, { depth:[0.5,0,1,.01], time:[0.4,0,1,.01], lo:[0,-12,12,.01], mid:[0,-12,12,.01], hi:[0,-12,12,.01], out:[0,-12,12,.01] },
+  (p, ctx) => [p.depth, p.time, p.lo, p.mid, p.hi, p.out], 1.2);
+/* Frequency shifter, original code. */
+const FshiftFx = effect('fshift', 29, { shift:[0.15,-1,1,.01], fb:[0,0,0.9,.01], mix:[1,0,1,.01] },
+  (p, ctx) => [(Math.sign(p.shift) * p.shift * p.shift * 2000), p.fb, p.mix], 0.2);
+/* Vinyl, based on Airwindows ToVinyl4 (MIT). */
+const VinylFx = effect('vinyl', 30, { mlow:[0.2,0,1,.01], slow:[0.34,0,1,.01], hlim:[0.32,0,1,.01], wear:[0.3,0,1,.01] },
+  (p, ctx) => [p.mlow, p.slow, p.hlim, p.wear], 0.4);
+/* Dub tape, based on Airwindows Dubly (MIT). */
+const DubFx = effect('dub', 31, { amt:[0.5,0,1,.01], mix:[1,0,1,.01] },
+  (p, ctx) => [p.amt, p.mix], 0.3);
+/* Speaker cab, based on Airwindows Cabs (MIT). */
+const CabFx = effect('cab', 32, { model:[0,0,5,1], int:[0.66,0,1,.01], room:[0.33,0,1,.01], size:[0.66,0,1,.01], axis:[0.33,0,1,.01], out:[0.8,0,1,.01] },
+  (p, ctx) => [(((p.model | 0) + 0.5) / 6), p.int, p.room, p.size, p.axis, p.out], 0.6);
+/* Tube, based on Airwindows Tube2 (MIT). */
+const TubeFx = effect('tube', 33, { input:[0.5,0,1,.01], tube:[0.5,0,1,.01] },
+  (p, ctx) => [p.input, p.tube], 0.3);
+
+/* ── audio → CV and CV utilities ──────────────────────────────────────────────
+   Pitch CV convention: 0.5 = A4 (440 Hz), one octave = 0.125. */
+
+/* Envelope follow: audio in, CV out (peak or squared), with a gate above Gate level. */
+const EnvFol = {
+  type:'envfol', scope:'mono', cost:.05,
+  inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
+  params:{ atk:[.01,0,1,.001], rel:[.15,0,2,.001], gain:[2,0,16,.01], thr:[.3,0,1,.001], mode:[0,0,1,1] },
+  create:() => ({ env:0 }),
+  process(st, io, ctx){
+    const dt = 1 / ctx.sr, ka = 1 - Math.exp(-dt / Math.max(io.p.atk, 1e-4)), kr = 1 - Math.exp(-dt / Math.max(io.p.rel, 1e-4));
+    const gain = io.p.gain, thr = io.p.thr, sq = io.p.mode >= .5;
+    for (let i = 0; i < ctx.block; i++){
+      const x = io.in.in[i] * gain, y = sq ? x * x : Math.abs(x);
+      st.env += (y - st.env) * (y > st.env ? ka : kr);
+      io.out.out[i] = st.env; io.out.gate[i] = st.env > thr ? 1 : 0;
+    }
+  }
+};
+
+/* Gate extract: audio in → gate while it stays above Threshold (with hysteresis), plus a smoothed env. */
+const GateEx = {
+  type:'gateex', scope:'mono', cost:.03,
+  inputs:{ in:'audio' }, outputs:{ out:'gate', env:'cv' },
+  params:{ thr:[.1,0,1,.001], hyst:[.25,0,1,.01], rel:[.05,0,1,.001] },
+  create:() => ({ on:0, env:0 }),
+  process(st, io, ctx){
+    const thr = io.p.thr, hy = thr * (1 - io.p.hyst), kr = 1 - Math.exp(-1 / (ctx.sr * Math.max(io.p.rel, 1e-4)));
+    for (let i = 0; i < ctx.block; i++){
+      const a = Math.abs(io.in.in[i]);
+      if (st.on){ if (a < hy) st.on = 0; } else if (a > thr) st.on = 1;
+      st.env += ((st.on ? 1 : 0) - st.env) * kr;
+      io.out.out[i] = st.on; io.out.env[i] = st.env;
+    }
+  }
+};
+
+/* Pitch follow (monophonic): zero-crossing estimate → CV (0.5 = A4) + a voiced gate. Best on simple tones.
+   Estimates over a rolling ~85 ms window (one 128-sample block is far too short for a stable reading). */
+const PitchFol = {
+  type:'pitchfol', scope:'mono', cost:.2,
+  inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
+  params:{ thr:[.02,0,1,.001], glide:[.05,0,.5,.001], depth:[1,0,1,.01], min:[60,40,500,1], max:[1400,100,4000,1] },
+  create:() => ({ buf:new Float32Array(4096), w:0, filled:0, ph:.5, voiced:0, f:0 }),
+  process(st, io, ctx){
+    const N = st.buf.length; let peak = 0;
+    for (let i = 0; i < ctx.block; i++){ const x = io.in.in[i]; st.buf[st.w] = x; st.w = (st.w + 1) % N; if (st.filled < N) st.filled++; const a = Math.abs(x); if (a > peak) peak = a; }
+    const M = st.filled;
+    let cross = 0, prev = st.buf[(st.w - M + N * 2) % N];
+    for (let i = 1; i < M; i++){ const s = st.buf[(st.w - M + i + N * 2) % N]; if ((s >= 0) !== (prev >= 0)) cross++; prev = s; }
+    const f = M > 1 ? cross * 0.5 * ctx.sr / M : 0;
+    st.voiced = peak > io.p.thr && f >= io.p.min && f <= io.p.max ? 1 : 0;
+    if (st.voiced) st.f = f;
+    const g = 1 - Math.exp(-ctx.block / (ctx.sr * Math.max(io.p.glide, 1e-4)));
+    const target = st.voiced ? clamp(0.5 + Math.log2(Math.max(st.f, 1) / 440) / 8, 0, 1) : st.ph;
+    st.ph = clamp(st.ph + (target - st.ph) * g, 0, 1);
+    io.out.out.fill(st.ph * io.p.depth); io.out.gate.fill(st.voiced);
+  }
+};
+
+/* Slew / lag: smooths a CV with separate rise and fall times. */
+const Slew = {
+  type:'slew', scope:'mono', cost:.03,
+  inputs:{ in:'cv' }, outputs:{ out:'cv' },
+  params:{ up:[.05,0,1,.001], dn:[.05,0,1,.001] },
+  create:() => ({ y:0 }),
+  process(st, io, ctx){
+    const ku = 1 - Math.exp(-1 / (ctx.sr * Math.max(io.p.up, 1e-4))), kd = 1 - Math.exp(-1 / (ctx.sr * Math.max(io.p.dn, 1e-4)));
+    for (let i = 0; i < ctx.block; i++){ const x = io.in.in[i]; st.y += (x - st.y) * (x > st.y ? ku : kd); io.out.out[i] = st.y; }
+  }
+};
+
+/* Sample & hold: samples CV on a Trigger rising edge (or at Rate) and holds it, with a stepped noise out. */
+const SampleHold = {
+  type:'snh', scope:'mono', cost:.08,
+  inputs:{ in:'cv', trig:'gate' }, outputs:{ out:'cv', noise:'cv' },
+  params:{ rate:[4,.05,40,.01], smooth:[0,0,1,.01], depth:[1,0,1,.01] },
+  create:() => ({ R:rng(nextSeed()), ph:0, t:0, held:0, noise:0, y:0, ny:0 }),
+  process(st, io, ctx){
+    const trig = linked(io, 'trig'), k = 1 - Math.pow(io.p.smooth, .15) * .9995, dep = io.p.depth;
+    for (let i = 0; i < ctx.block; i++){
+      let fire = false;
+      if (trig){ const g = io.in.trig[i] > .5; fire = g && !st.t; st.t = g; }
+      else { st.ph += io.p.rate / ctx.sr; if (st.ph >= 1){ st.ph -= 1; fire = true; } }
+      if (fire){ st.held = io.in.in[i]; st.noise = st.R() * 2 - 1; }
+      st.y += (st.held - st.y) * k; st.ny += (st.noise - st.ny) * k;
+      io.out.out[i] = st.y * dep; io.out.noise[i] = st.ny * dep;
+    }
+  }
+};
+
+/* Quantizer: snaps a pitch CV to the nearest note of a scale (pitch CV: 0.5 = A4, 0.125 per octave). */
+const SCALES = [[0,2,4,5,7,9,11],[0,2,3,5,7,8,10],[0,2,3,5,7,8,11],[0,3,5,7,10],[0,2,4,6,8,10],[0,1,2,3,4,5,6,7,8,9,10,11],[0,5,7]];
+const Quant = {
+  type:'quant', scope:'mono', cost:.03,
+  inputs:{ in:'cv' }, outputs:{ out:'cv' },
+  params:{ scale:[0,0,6,1], transpose:[0,-24,24,1], depth:[1,0,1,.01] },
+  create:() => ({}),
+  process(st, io, ctx){
+    const sc = SCALES[clamp(io.p.scale | 0, 0, SCALES.length - 1)], tr = io.p.transpose, dep = io.p.depth;
+    for (let i = 0; i < ctx.block; i++){
+      const semi = Math.round((io.in.in[i] - .5) * 96) + tr, oct = Math.floor(semi / 12), pc = ((semi % 12) + 12) % 12;
+      let best = sc[0], bd = 99;
+      for (const s of sc){ const d = Math.abs(s - pc); if (d < bd){ bd = d; best = s; } }
+      io.out.out[i] = ((oct * 12 + best) / 96 + .5) * dep;
+    }
+  }
+};
+
+
+
+
+/* ── Phase 2: filters, shapers and stereo effects (all original DSP) ────────── */
+
+/* Dual (2/4-pole) multimode filter with drive. Cutoff follows the VCF's mapping so the % reads the same. */
+const Blades = {
+  type:'blades', scope:'mono', cost:1.2,
+  inputs:{ in:'audio', cutoff:'cv', res:'cv' }, outputs:{ out:'audio' },
+  params:{ cutoff:[.5,0,1,.001], res:[.3,0,1,.001], drive:[0,0,1,.01], mode:[0,0,3,1], slope:[2,2,4,2] },
+  create:() => ({ ic1:0, ic2:0, jc1:0, jc2:0 }),
+  process(st, io, ctx){
+    const mode = io.p.mode | 0, four = (io.p.slope | 0) >= 4, dr = 1 + io.p.drive * 6, norm = Math.tanh(dr) || 1;
+    for (let i = 0; i < ctx.block; i++){
+      const fc = Math.min(.49, (.01 + Math.pow(10, (io.p.cutoff + io.in.cutoff[i]) * 3) * .004) * 44100 / ctx.sr);
+      const g = Math.tan(Math.PI * fc), k = 2 - 2 * Math.min(clamp(io.p.res + io.in.res[i], 0, 1), .98);
+      const a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2;
+      const x = Math.tanh(io.in.in[i] * dr) / norm;
+      // Stage 1 (TPT state-variable)
+      const v3 = x - st.ic2, v1 = a1 * st.ic1 + a2 * v3, v2 = st.ic2 + a2 * st.ic1 + a3 * v3;
+      st.ic1 = 2 * v1 - st.ic1; st.ic2 = 2 * v2 - st.ic2;
+      let y = mode === 0 ? v2 : mode === 1 ? v1 : mode === 2 ? (x - k * v1 - v2) : (x - k * v1);
+      if (four){
+        const x2 = mode === 1 ? v1 : v2;
+        const u3 = x2 - st.jc2, u1 = a1 * st.jc1 + a2 * u3, u2 = st.jc2 + a2 * st.jc1 + a3 * u3;
+        st.jc1 = 2 * u1 - st.jc1; st.jc2 = 2 * u2 - st.jc2;
+        y = mode === 0 ? u2 : mode === 1 ? u1 : mode === 2 ? (x2 - k * u1 - u2) : (x2 - k * u1);
+      }
+      io.out.out[i] = y;
+    }
+  }
+};
+
+/* Meta-modulator (Warps-style): crossfade, ring mod, wave fold or comparator between In and Mod. */
+const Meta = {
+  type:'meta', scope:'mono', cost:.3,
+  inputs:{ in:'audio', mod:'audio' }, outputs:{ out:'audio' },
+  params:{ mode:[0,0,3,1], amount:[.5,0,1,.01], mix:[1,0,1,.01] },
+  create:() => ({}),
+  process(st, io, ctx){
+    const mode = io.p.mode | 0, a = io.p.amount, mx = io.p.mix;
+    for (let i = 0; i < ctx.block; i++){
+      const x = io.in.in[i], m = io.in.mod[i]; let y;
+      if (mode === 0) y = x * (1 - a) + m * a;                       // crossfade
+      else if (mode === 1) y = x * ((1 - a) + a * m * 1.4142);       // ring mod
+      else if (mode === 2) y = Math.sin(x * (1 + a * 7) * Math.PI);  // wave fold (sine shaper)
+      else y = x * (m >= 0 ? 1 : -1);                                // comparator (mod flips sign)
+      io.out.out[i] = x + (y - x) * mx;
+    }
+  }
+};
+
+/* Phaser: swept all-pass stages through an LFO or the CV input. */
+const Phaser = {
+  type:'phaser', scope:'mono', cost:.4,
+  inputs:{ in:'audio', cv:'cv' }, outputs:{ out:'audio' },
+  params:{ rate:[.3,0,1,.01], depth:[.5,0,1,.01], feedback:[.4,0,1,.01], stages:[4,2,8,2], mix:[.5,0,1,.01], sync:[0,0,1,1] },
+  create:() => ({ ph:0, z:new Float32Array(8), fb:0 }),
+  process(st, io, ctx){
+    const hz = io.p.sync >= .5 ? (ctx.transport.tempo / 60) * io.p.rate : .05 * Math.pow(160, io.p.rate);
+    const n = clamp(io.p.stages | 0, 2, 8), dep = io.p.depth, fbk = io.p.feedback * .9, mx = io.p.mix, cv = linked(io, 'cv');
+    for (let i = 0; i < ctx.block; i++){
+      st.ph += hz / ctx.sr; st.ph -= Math.floor(st.ph);
+      const f = clamp(.5 + (sinT(st.ph) * dep + (cv ? io.in.cv[i] : 0)) * .5, 0, .999);
+      const a = (1 - f) / (1 + f);
+      let x = io.in.in[i] + st.fb * fbk;
+      for (let s = 0; s < n; s++){ const y = a * x + st.z[s]; st.z[s] = x - a * y; x = y; }
+      st.fb = x; io.out.out[i] = io.in.in[i] * (1 - mx) + x * mx;
+    }
+  }
+};
+
+/* ── tempo-synced control and beat repeat (added Oct 2026, original code) ──────────────────────────────────
+   Note values in beats, shared by Steps, Clock and Repeat. They restart from the downbeat when the song starts
+   (the engine counts transport starts in transport.startN). */
+const DIV_BEATS = [.0625, .125, 1 / 6, .25, 1 / 3, .5, 1, 2, 4, 8];
+const divBeats = v => DIV_BEATS[clamp(v | 0, 0, DIV_BEATS.length - 1)];
+const restarted = (st, ctx) => { const n = ctx.transport.startN || 0; if (st.sn !== n){ st.sn = n; return true; } return false; };
+
+/* Stereo width (mid/side) with a bass-mono control. In R is optional (mono up to stereo). */
+const Width = {
+  type:'width', scope:'mono', cost:.1,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ width:[1,0,2,.01], bass:[0,0,1,.01], level:[1,0,2,.01] },
+  create:() => ({ lp:0 }),
+  process(st, io, ctx){
+    const R = linked(io, 'inR') ? io.in.inR : io.in.in, w = io.p.width, b = io.p.bass, g = io.p.level;
+    const k = 1 - Math.exp(-2 * Math.PI * 200 / ctx.sr);
+    for (let i = 0; i < ctx.block; i++){
+      const l = io.in.in[i], r = R[i], mid = (l + r) * .5, side = (l - r) * .5;
+      st.lp += (side - st.lp) * k;
+      const sOut = (side - st.lp * b) * w;
+      io.out.out[i] = (mid + sOut) * g; io.out.outR[i] = (mid - sOut) * g;
+    }
+  }
+};
+
+/* Tempo-synced ping-pong delay (or free time). In R is optional. */
+const PP_DIVS = [['1/16', .25], ['1/8T', 1 / 3], ['1/8', .5], ['1/4T', 2 / 3], ['1/4', 1], ['1/2', 2], ['1 bar', 4]];
+const PingPong = {
+  type:'pingpong', scope:'mono', cost:.7,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ div:[4,0,PP_DIVS.length - 1,1], sync:[1,0,1,1], time:[.3,.02,1.5,.001], fb:[.4,0,1,.01], tone:[.5,0,1,.01], mix:[.3,0,1,.01] },
+  create(){
+    const N = 1 << 17;
+    return { bL:new Float32Array(N), bR:new Float32Array(N), mask:N - 1, w:0, lp:0, lpR:0 };
+  },
+  process(st, io, ctx){
+    const R = linked(io, 'inR') ? io.in.inR : io.in.in;
+    const beat = 60 / Math.max(ctx.transport.tempo, 20);
+    const tSec = io.p.sync >= .5 ? beat * PP_DIVS[clamp(io.p.div | 0, 0, PP_DIVS.length - 1)][1] : io.p.time;
+    const d = clamp(Math.round(tSec * ctx.sr), 1, 65536), fb = io.p.fb * .95, mx = io.p.mix, k = .05 + io.p.tone * .9;
+    const mask = st.mask;
+    for (let i = 0; i < ctx.block; i++){
+      const rd = (st.w - d) & mask;
+      let dl = st.bL[rd], dr = st.bR[rd];
+      st.lp += (dl - st.lp) * k; st.lpR += (dr - st.lpR) * k;
+      const wl = st.lp, wr = st.lpR;
+      st.bL[st.w] = io.in.in[i] + wr * fb;   // left takes the input and the right's tail
+      st.bR[st.w] = wl * fb;                 // right echoes the left (ping-pong)
+      st.w = (st.w + 1) & mask;
+      io.out.out[i] = io.in.in[i] * (1 - mx) + dl * mx;
+      io.out.outR[i] = R[i] * (1 - mx) + dr * mx;
+    }
+  }
+};
+
+/* ── utilities, reverbs, chorus and ring mod (added Oct 2026, original code) ─────────────────────────────────
+   Shared by …chains and …waves. Modules with show(st) report values the editor draws (a meter, gain reduction);
+   the engine's telemetry() collects them. */
+const dbLin = d => Math.pow(10, d / 20);
+const linDb = v => v > 1e-9 ? 20 * Math.log10(v) : -180;
+const inR = io => linked(io, 'inR') ? io.in.inR : io.in.in;
+
+/* Meter: passes stereo audio straight through and reports VU (300 ms average) and peak levels, so a meter can sit
+   anywhere between two modules. Trim sets the level on the way through. */
+const Meter = {
+  type:'meter', scope:'mono', cost:.05,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ trim:[0,-24,24,.1] },
+  create:() => ({ vl:0, vr:0, pl:0, pr:0, g:1 }),
+  process(st, io, ctx){
+    const L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, k = 1 - Math.exp(-1 / (ctx.sr * .3)), gt = dbLin(io.p.trim);
+    let vl = st.vl, vr = st.vr, pl = st.pl, pr = st.pr, g = st.g;
+    for (let i = 0; i < ctx.block; i++){
+      g += (gt - g) * .002;
+      const l = L[i] * g, r = R[i] * g; oL[i] = l; oR[i] = r;
+      vl += (l * l - vl) * k; vr += (r * r - vr) * k;
+      const al = l < 0 ? -l : l, ar = r < 0 ? -r : r; if (al > pl) pl = al; if (ar > pr) pr = ar;
+    }
+    st.vl = vl; st.vr = vr; st.pl = pl; st.pr = pr; st.g = g;
+  },
+  show(st){ const v = [linDb(Math.sqrt(st.vl * 2)), linDb(Math.sqrt(st.vr * 2)), linDb(st.pl), linDb(st.pr)]; st.pl = 0; st.pr = 0; return v; }
+};
+
+/* Limiter: a stereo peak limiter with 2 ms lookahead, so nothing gets past Ceiling. Input pushes into it;
+   Release sets how fast it lets go. Reports its gain reduction. */
+const Limiter = {
+  type:'limiter', scope:'mono', cost:.1,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ input:[0,0,24,.1], ceil:[-.3,-24,0,.1], rel:[.15,.01,1,.001] },
+  create(sr){ const n = Math.max(8, Math.round(sr * .002)); return { n, bl:new Float32Array(n), br:new Float32Array(n), pk:new Float32Array(n), w:0, peak:0, pi:0, env:1, gr:1 }; },
+  process(st, io, ctx){
+    const L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, n = st.n, pk = st.pk;
+    const gin = dbLin(io.p.input), ceil = dbLin(io.p.ceil), kr = 1 - Math.exp(-1 / (ctx.sr * io.p.rel)), ka = 1 - Math.exp(-5 / n);
+    let env = st.env, w = st.w, gr = st.gr, peak = st.peak, pi = st.pi;
+    for (let i = 0; i < ctx.block; i++){
+      const yl0 = st.bl[w], yr0 = st.br[w];   // the sample leaving the lookahead
+      const l = L[i] * gin, r = R[i] * gin, a = Math.max(l < 0 ? -l : l, r < 0 ? -r : r);
+      st.bl[w] = l; st.br[w] = r; pk[w] = a;
+      // the loudest sample still to come out: a running maximum, rescanned only when the old maximum leaves
+      if (a >= peak){ peak = a; pi = w; } else if (pi === w){ peak = 0; for (let j = 0; j < n; j++) if (pk[j] > peak){ peak = pk[j]; pi = j; } }
+      w = w + 1 === n ? 0 : w + 1;
+      const target = peak > ceil ? ceil / peak : 1;
+      env += (target - env) * (target < env ? ka : kr);
+      let yl = yl0 * env, yr = yr0 * env;
+      if (yl > ceil) yl = ceil; else if (yl < -ceil) yl = -ceil;   // the last word: a hard ceiling
+      if (yr > ceil) yr = ceil; else if (yr < -ceil) yr = -ceil;
+      oL[i] = yl; oR[i] = yr; if (env < gr) gr = env;
+    }
+    st.env = env; st.w = w; st.gr = gr; st.peak = peak; st.pi = pi;
+  },
+  show(st){ const v = [linDb(st.gr)]; st.gr = 1; return v; }
+};
+
+/* Utility: gain (smoothed, so moving it never clicks), pan, mono, polarity flip and mute. */
+const Utility = {
+  type:'utility', scope:'mono', cost:.03,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ gain:[0,-60,24,.1], pan:[0,-1,1,.01], mono:[0,0,1,1], flip:[0,0,3,1], mute:[0,0,1,1] },
+  create:() => ({ gl:1, gr:1 }),
+  process(st, io, ctx){
+    const L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, p = io.p;
+    const g = p.mute >= .5 ? 0 : (p.gain <= -59.9 ? 0 : dbLin(p.gain)), a = (clamp(p.pan, -1, 1) + 1) * Math.PI / 4;
+    const tl = g * Math.cos(a) * Math.SQRT2, tr = g * Math.sin(a) * Math.SQRT2, f = p.flip | 0, sl = f & 1 ? -1 : 1, sr = f & 2 ? -1 : 1, mono = p.mono >= .5;
+    let gl = st.gl, gr = st.gr;
+    for (let i = 0; i < ctx.block; i++){
+      gl += (tl - gl) * .003; gr += (tr - gr) * .003;
+      let l = L[i] * sl, r = R[i] * sr; if (mono){ const m = (l + r) * .5; l = m; r = m; }
+      oL[i] = l * gl; oR[i] = r * gr;
+    }
+    st.gl = gl; st.gr = gr;
+  }
+};
+
+/* Ring mod: multiplies the sound by a carrier, its own oscillator (Freq, 5 Hz–5 kHz; the Freq input adds ±4
+   octaves) or whatever is patched into Carrier. Spread offsets the right side's phase; Shape squares the carrier up. */
+const RingMod = {
+  type:'ringmod', scope:'mono', cost:.1,
+  inputs:{ in:'audio', inR:'audio', car:'audio', freq:'cv' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ freq:[.45,0,1,.001], fine:[0,-1,1,.01], wave:[0,0,3,1], spread:[0,0,1,.01], shape:[0,0,1,.01], mix:[1,0,1,.01] },
+  create:() => ({ ph:0, n1:0, n2:0, nr:rng(nextSeed()) }),
+  process(st, io, ctx){
+    const L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, ext = linked(io, 'car'), fcv = linked(io, 'freq'), p = io.p;
+    const base = 5 * Math.pow(1000, p.freq) * Math.pow(2, p.fine / 12), w = p.wave | 0, sp = p.spread * .25, mx = p.mix;
+    const dr = 1 + p.shape * 12, nd = Math.tanh(dr);
+    const osc = ph => w === 0 ? sinT(ph) : w === 1 ? 1 - 4 * Math.abs(ph - .5) : w === 2 ? (ph < .5 ? 1 : -1) : 0;
+    for (let i = 0; i < ctx.block; i++){
+      let c1, c2;
+      if (ext){ c1 = c2 = io.in.car[i]; }
+      else {
+        const f = base * (fcv ? Math.pow(2, clamp(io.in.freq[i], -1, 1) * 4) : 1);
+        const ph0 = st.ph; st.ph += f / ctx.sr; if (st.ph >= 1){ st.ph -= Math.floor(st.ph); if (w === 3){ st.n1 = st.nr() * 2 - 1; } }
+        if (w === 3){ if ((ph0 + sp) % 1 > (st.ph + sp) % 1) st.n2 = st.nr() * 2 - 1; c1 = st.n1; c2 = sp ? st.n2 : st.n1; }
+        else { c1 = osc(st.ph); const q = st.ph + sp; c2 = osc(q - Math.floor(q)); }
+        if (dr > 1){ c1 = Math.tanh(c1 * dr) / nd; c2 = Math.tanh(c2 * dr) / nd; }
+      }
+      oL[i] = L[i] * (1 - mx + c1 * mx); oR[i] = R[i] * (1 - mx + c2 * mx);
+    }
+  }
+};
+
+/* Spring reverb: two springs (the right one 13% longer). Each is a feedback loop through a delay and a chain of
+   stretched all-pass filters, which smear each sound into the falling "chirp" a real tank makes. Chirp sets how
+   strong that is, Length the tank size, Drip the splashy high end going in, Tone the darkness, Decay the length. */
+const SPR_N = 18;
+const Spring = {
+  type:'spring', scope:'mono', cost:.35,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ decay:[.6,0,1,.01], tone:[.5,0,1,.01], chirp:[.6,0,1,.01], length:[.5,0,1,.01], drip:[.4,0,1,.01], mix:[.35,0,1,.01] },
+  create(sr){
+    const one = () => ({ d:new Float32Array(Math.ceil(sr * .2) + 4), w:0, x:new Float32Array(SPR_N * 2), y:new Float32Array(SPR_N * 2), lp:0, hp:0, pre:0, fb:0, wob:0 });
+    return { s:[one(), one()], t:0, r:rng(nextSeed()) };
+  },
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
+    const g = .55 + p.decay * .43, a = .3 + p.chirp * .45, kl = 1 - Math.exp(-2 * Math.PI * (1500 * Math.pow(6, p.tone)) / sr);
+    const kh = 1 - Math.exp(-2 * Math.PI * 140 / sr), kp = 1 - Math.exp(-2 * Math.PI * 900 / sr), drip = p.drip * 3, mx = p.mix;
+    const base = (.028 + p.length * .05) * sr;
+    for (let c = 0; c < 2; c++){
+      const s = st.s[c], X = c ? R : L, O = c ? oR : oL, D = s.d, N = D.length, len = base * (c ? 1.13 : 1);
+      let t = st.t;
+      for (let i = 0; i < ctx.block; i++){
+        const x = X[i];
+        s.pre += (x - s.pre) * kp; const xin = x + (x - s.pre) * drip;            // Drip: the high end goes in harder
+        // a slow random wobble of the tank length, as a real spring never sits still
+        if ((t++ & 255) === 0) s.wob = st.r() * 2 - 1;
+        const rd = s.w - len * (1 + s.wob * .0015); const ri = Math.floor(rd), fr = rd - ri;
+        const d0 = D[((ri % N) + N) % N], d1 = D[((ri + 1) % N + N) % N], dl = d0 + (d1 - d0) * fr;
+        s.lp += (dl - s.lp) * kl; s.hp += (s.lp - s.hp) * kh;
+        let v = xin * .5 + (s.lp - s.hp) * g;
+        // dispersion: stretched all-passes (z^-2), y = a·x + x[n-2] − a·y[n-2]
+        const k = t & 1, X2 = s.x, Y2 = s.y;
+        for (let j = 0; j < SPR_N; j++){
+          const o = j * 2 + k, y = a * v + X2[o] - a * Y2[o];
+          X2[o] = v; Y2[o] = y; v = y;
+        }
+        if (!(v > -8 && v < 8)){ v = 0; X2.fill(0); Y2.fill(0); s.lp = s.hp = 0; }
+        D[s.w] = v; s.w = s.w + 1 === N ? 0 : s.w + 1;
+        O[i] = x * (1 - mx) + v * mx * 1.4;
+      }
+      if (c) st.t = t;
+    }
+  }
+};
+
+/* Plate reverb: the classic figure-eight plate tank (Dattorro's topology, written here from the 1997 paper).
+   Size scales the tank, Damping darkens the tail, Pre-delay holds it back, Motion moves the tank's delays. */
+const PL = { sr:29761, ind:[142, 107, 379, 277], ap1:[672, 908], dl1:[4453, 4217], ap2:[1800, 2656], dl2:[3720, 3163],
+  // taps: [sign, tank node, offset]; nodes 0–2 are the right half (delay 4217, all-pass 2656, delay 3163), 3–5 the left
+  tapsL:[[1, 0, 266], [1, 0, 2974], [-1, 1, 1913], [1, 2, 1996], [-1, 3, 1990], [-1, 4, 187], [-1, 5, 1066]],
+  tapsR:[[1, 3, 353], [1, 3, 3627], [-1, 4, 1228], [1, 5, 2673], [-1, 0, 2111], [-1, 1, 335], [-1, 2, 121]] };
+const plBuf = n => ({ b:new Float32Array(n), n, w:0 });
+// d.b[d.w] is the next slot to write; the sample written k samples ago is at d.w − k.
+const plAt = (d, k) => { let i = d.w - k; if (i < 0) i += d.n; return d.b[i]; };
+const plPush = (d, v) => { d.b[d.w] = v; if (++d.w === d.n) d.w = 0; };
+const Plate = {
+  type:'plate', scope:'mono', cost:.25,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ size:[.7,.2,1,.01], decay:[.6,0,.97,.01], damp:[.4,0,1,.01], pre:[.01,0,.25,.001], mod:[.3,0,1,.01], mix:[.3,0,1,.01] },
+  create(sr){
+    const s = sr / PL.sr, mk = n => plBuf(Math.ceil(n * s) + 40);
+    const st = { s, pre:plBuf(Math.ceil(sr * .26) + 2), bw:0, ind:PL.ind.map(mk), indK:PL.ind.map(n => Math.round(n * s)),
+      ap1:PL.ap1.map(n => mk(n + 32)), dl1:PL.dl1.map(mk), ap2:PL.ap2.map(mk), dl2:PL.dl2.map(mk), lp0:0, lp1:0, fb0:0, fb1:0, ph:0,
+      tl:new Int32Array(7), tr:new Int32Array(7) };
+    st.node = [st.dl1[1], st.ap2[1], st.dl2[1], st.dl1[0], st.ap2[0], st.dl2[0]];
+    st.nl = PL.tapsL.map(t => st.node[t[1]]); st.nr = PL.tapsR.map(t => st.node[t[1]]);
+    return st;
+  },
+  process(st, io, ctx){
+    const p = io.p, s = st.s, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, mx = p.mix;
+    const sz = p.size, dec = p.decay, dd2 = clamp(dec + .15, .25, .5), kd = 1 - p.damp * .9, sc = s * sz;
+    const pre = Math.min(st.pre.n - 1, Math.round(p.pre * ctx.sr) + 1), exc = p.mod * 16 * s;
+    const ind = st.ind, ik = st.indK, A1 = st.ap1, D1 = st.dl1, A2 = st.ap2, D2 = st.dl2;
+    const a1k0 = PL.ap1[0] * sc, a1k1 = PL.ap1[1] * sc, d1k0 = Math.round(PL.dl1[0] * sc), d1k1 = Math.round(PL.dl1[1] * sc);
+    const a2k0 = Math.round(PL.ap2[0] * sc), a2k1 = Math.round(PL.ap2[1] * sc), d2k0 = Math.round(PL.dl2[0] * sc), d2k1 = Math.round(PL.dl2[1] * sc);
+    const tl = st.tl, tr = st.tr, nl = st.nl, nr = st.nr;
+    for (let j = 0; j < 7; j++){ tl[j] = Math.max(1, Math.round(PL.tapsL[j][2] * sc)); tr[j] = Math.max(1, Math.round(PL.tapsR[j][2] * sc)); }
+    const dph = .9 / ctx.sr;
+    let lp0 = st.lp0, lp1 = st.lp1, fb0 = st.fb0, fb1 = st.fb1, bw = st.bw, ph = st.ph;
+    for (let i = 0; i < ctx.block; i++){
+      plPush(st.pre, (L[i] + R[i]) * .5);
+      bw += (plAt(st.pre, pre) - bw) * .9995;
+      let x = bw;
+      // input diffusion: four all-passes (y = −g·x + d; d ← x + g·y)
+      for (let j = 0; j < 4; j++){ const g = j < 2 ? .75 : .625, y = -g * x + plAt(ind[j], ik[j]); plPush(ind[j], x + g * y); x = y; }
+      ph += dph; if (ph >= 1) ph -= 1;
+      // left half of the tank, fed by the right half's output
+      let v = x + fb1 * dec;
+      { const k = a1k0 + exc * (1 + sinT(ph)), ki = k | 0, fr = k - ki, z = plAt(A1[0], ki) * (1 - fr) + plAt(A1[0], ki + 1) * fr, y = .7 * v + z; plPush(A1[0], v - .7 * y); v = y; }
+      plPush(D1[0], v); v = plAt(D1[0], d1k0);
+      lp0 += (v - lp0) * kd; v = lp0 * dec;
+      { const y = -dd2 * v + plAt(A2[0], a2k0); plPush(A2[0], v + dd2 * y); v = y; }
+      plPush(D2[0], v); v = plAt(D2[0], d2k0); if (!(v > -8 && v < 8)) v = 0;
+      const nf0 = v;
+      // right half, fed by the left
+      v = x + fb0 * dec;
+      { const k = a1k1 + exc * (1 + sinT(ph + .25)), ki = k | 0, fr = k - ki, z = plAt(A1[1], ki) * (1 - fr) + plAt(A1[1], ki + 1) * fr, y = .7 * v + z; plPush(A1[1], v - .7 * y); v = y; }
+      plPush(D1[1], v); v = plAt(D1[1], d1k1);
+      lp1 += (v - lp1) * kd; v = lp1 * dec;
+      { const y = -dd2 * v + plAt(A2[1], a2k1); plPush(A2[1], v + dd2 * y); v = y; }
+      plPush(D2[1], v); v = plAt(D2[1], d2k1); if (!(v > -8 && v < 8)) v = 0;
+      fb0 = nf0; fb1 = v;
+      // output taps across both halves
+      const yl = (plAt(nl[0], tl[0]) + plAt(nl[1], tl[1]) - plAt(nl[2], tl[2]) + plAt(nl[3], tl[3]) - plAt(nl[4], tl[4]) - plAt(nl[5], tl[5]) - plAt(nl[6], tl[6])) * .6;
+      const yr = (plAt(nr[0], tr[0]) + plAt(nr[1], tr[1]) - plAt(nr[2], tr[2]) + plAt(nr[3], tr[3]) - plAt(nr[4], tr[4]) - plAt(nr[5], tr[5]) - plAt(nr[6], tr[6])) * .6;
+      oL[i] = L[i] * (1 - mx) + yl * mx; oR[i] = R[i] * (1 - mx) + yr * mx;
+    }
+    st.lp0 = lp0; st.lp1 = lp1; st.fb0 = fb0; st.fb1 = fb1; st.bw = bw; st.ph = ph;
+  }
+};
+
+/* Ensemble: a lush chorus. Ensemble runs three voices around the stereo field with a little fast shimmer;
+   Classic I, II and I+II are the two-speed bucket-brigade chorus of 80s polysynths. Rate and Depth scale it. */
+const ENS = [[.6, .5, 3], [.513, .35, 2], [.863, .35, 2], [9.75, .12, 2]];
+const Ensemble = {
+  type:'ensemble', scope:'mono', cost:.2,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ mode:[0,0,3,1], rate:[.5,0,1,.01], depth:[.5,0,1,.01], tone:[.7,0,1,.01], mix:[.5,0,1,.01] },
+  create(sr){ return { b:new Float32Array(Math.ceil(sr * .05) + 4), w:0, ph:0, vib:0, lp:[0, 0] }; },
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, B = st.b, N = B.length;
+    const [hz0, dep0, voices] = ENS[clamp(p.mode | 0, 0, 3)], hz = hz0 * Math.pow(2, (p.rate - .5) * 4), dep = dep0 * p.depth * 2;
+    const ctr = (voices === 3 ? .012 : .0035) * sr, sw = (voices === 3 ? .004 : .0019) * sr * dep / .5;
+    const kt = 1 - Math.exp(-2 * Math.PI * (2000 * Math.pow(8, p.tone)) / sr), mx = p.mix;
+    const rd = d => { const r = st.w - d, ri = Math.floor(r), fr = r - ri, a = B[((ri % N) + N) % N], b = B[(((ri + 1) % N) + N) % N]; return a + (b - a) * fr; };
+    for (let i = 0; i < ctx.block; i++){
+      const m = (L[i] + R[i]) * .5; B[st.w] = m;
+      st.ph += hz / sr; if (st.ph >= 1) st.ph -= 1;
+      let wl, wr;
+      if (voices === 3){
+        st.vib += 6.3 / sr; if (st.vib >= 1) st.vib -= 1;
+        const v = sinT(st.vib) * .08;
+        const a = rd(ctr + sw * (sinT(st.ph) + v)), b = rd(ctr + sw * (sinT(st.ph + 1 / 3) + v)), c = rd(ctr + sw * (sinT(st.ph + 2 / 3) + v));
+        wl = a * .7 + b * .45 + c * .15; wr = c * .7 + b * .45 + a * .15;
+      } else {
+        const tri = 1 - 4 * Math.abs(st.ph - .5);   // triangle, as the originals
+        wl = rd(ctr + sw * tri); wr = rd(ctr - sw * tri);
+      }
+      st.lp[0] += (wl - st.lp[0]) * kt; st.lp[1] += (wr - st.lp[1]) * kt;
+      oL[i] = L[i] * (1 - mx * .5) + st.lp[0] * mx; oR[i] = R[i] * (1 - mx * .5) + st.lp[1] * mx;
+      st.w = st.w + 1 === N ? 0 : st.w + 1;
+    }
+  }
+};
+
+/* Math: A and B (each input plus its knob) → A+B, A−B, A×B, the smaller and the larger. */
+const MathM = {
+  type:'math', scope:'mono', cost:.02,
+  inputs:{ a:'cv', b:'cv' }, outputs:{ sum:'cv', diff:'cv', mul:'cv', min:'cv', max:'cv' },
+  params:{ ka:[0,-1,1,.01], kb:[0,-1,1,.01] },
+  create:() => ({}),
+  process(st, io, ctx){
+    const A = io.in.a, B = io.in.b, o = io.out, ka = io.p.ka, kb = io.p.kb;
+    for (let i = 0; i < ctx.block; i++){ const a = A[i] + ka, b = B[i] + kb; o.sum[i] = a + b; o.diff[i] = a - b; o.mul[i] = a * b; o.min[i] = a < b ? a : b; o.max[i] = a > b ? a : b; }
+  }
+};
+
+/* Logic: two gates in → AND, OR, XOR, and NOT A. */
+const Logic = {
+  type:'logic', scope:'mono', cost:.02,
+  inputs:{ a:'gate', b:'gate' }, outputs:{ and:'gate', or:'gate', xor:'gate', not:'gate' },
+  params:{ thr:[.5,.05,.95,.01] },
+  create:() => ({}),
+  process(st, io, ctx){
+    const A = io.in.a, B = io.in.b, o = io.out, t = io.p.thr;
+    for (let i = 0; i < ctx.block; i++){ const a = A[i] >= t, b = B[i] >= t; o.and[i] = a && b ? 1 : 0; o.or[i] = a || b ? 1 : 0; o.xor[i] = a !== b ? 1 : 0; o.not[i] = a ? 0 : 1; }
+  }
+};
+
+/* Divider: counts Clock in and gates every 2nd, 4th, 8th and Nth pulse (each output stays high for the length of
+   the pulse that fired it). Reset starts counting again. */
+const Divider = {
+  type:'divider', scope:'mono', cost:.02,
+  inputs:{ clock:'gate', reset:'gate' }, outputs:{ d2:'gate', d4:'gate', d8:'gate', n:'gate' },
+  params:{ n:[3,1,32,1] },
+  create:() => ({ c:-1, lc:0, lr:0 }),
+  process(st, io, ctx){
+    const C = io.in.clock, Rs = io.in.reset, o = io.out, N = Math.max(1, io.p.n | 0);
+    for (let i = 0; i < ctx.block; i++){
+      const r = Rs[i] >= .5; if (r && !st.lr) st.c = -1; st.lr = r;
+      const c = C[i] >= .5; if (c && !st.lc) st.c++; st.lc = c;
+      const k = st.c;
+      o.d2[i] = c && k % 2 === 0 ? 1 : 0; o.d4[i] = c && k % 4 === 0 ? 1 : 0; o.d8[i] = c && k % 8 === 0 ? 1 : 0; o.n[i] = c && k % N === 0 ? 1 : 0;
+    }
+  }
+};
+
+/* Euclidean: spreads Hits as evenly as possible over Steps (rotated by Rotate), one step per note value at the
+   song tempo, or per pulse on Clock in. Gate fires on the hits; Accent on the first hit of each cycle.
+   Restarts from step 1 when the song starts. */
+const Euclid = {
+  type:'euclid', scope:'mono', cost:.02,
+  inputs:{ clock:'gate', reset:'gate' }, outputs:{ gate:'gate', accent:'gate' },
+  params:{ steps:[16,1,32,1], hits:[5,0,32,1], rot:[0,0,31,1], div:[3,0,9,1], len:[.5,.05,.95,.01] },
+  create:() => ({ step:-1, ph:1, lc:0, lr:0, sn:undefined }),
+  process(st, io, ctx){
+    const p = io.p, S = Math.max(1, p.steps | 0), H = clamp(p.hits | 0, 0, S), rot = p.rot | 0, ck = linked(io, 'clock');
+    const hit = k => { const j = (((k - rot) % S) + S) % S; return H > 0 && ((j * H) % S) < H; };
+    const first = k => { for (let j = 0; j < S; j++) if (hit(j)) return j === ((k % S) + S) % S; return false; };
+    if (restarted(st, ctx)){ st.step = -1; st.ph = 1; }
+    const inc = (ctx.transport.tempo || 120) / 60 / divBeats(p.div) / ctx.sr;
+    for (let i = 0; i < ctx.block; i++){
+      const r = io.in.reset[i] >= .5; if (r && !st.lr){ st.step = -1; st.ph = 1; } st.lr = r;
+      let on;
+      if (ck){ const c = io.in.clock[i] >= .5; if (c && !st.lc) st.step = (st.step + 1) % S; st.lc = c; on = c; }
+      else { st.ph += inc; if (st.ph >= 1){ st.ph -= Math.floor(st.ph); st.step = (st.step + 1) % S; } on = st.ph < p.len; }
+      const h = st.step >= 0 && on && hit(st.step);
+      io.out.gate[i] = h ? 1 : 0; io.out.accent[i] = h && first(st.step) ? 1 : 0;
+    }
+  }
+};
+
+const SHARED_MODULES = { beads:Beads,
+  flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
+  comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
+  envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
+  meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid };
+/* ===SHARED MODULES END=== */
+
+const MODULES = { ...SHARED_MODULES, trackIn:TrackIn,
   vocoder:Vocoder,
   vcf:VCF, vca:VCA, mixer:Mixer,
   eq:EQ, comp:Comp, saturation:Saturation, tape:Tape, chorus:Chorus, crush:Crush, delay:Delay, reverb:Reverb, rings:Rings, clouds:Clouds, beads:Beads,
@@ -995,7 +1326,14 @@ class ChainsEngine {
       const io = this._ios.get(m.id); if (!io || !io.mods) continue;
       for (const k in io.mods) mods.push([m.id, k, io.pm[k]]);
     }
-    return { load:this.load, quality:this.quality, buses, mods, wasm:{ tfx:!!WASM.tfxX } };
+    // Modules that show something (a meter's levels, a limiter's gain reduction): their latest values.
+    const shows = [];
+    for (const m of this.graph.mods.values()){
+      if (!m.def.show) continue;
+      const s = this._states.get(m.id) || this._states.get(m.id + '#0');
+      if (s) try { shows.push([m.id, m.def.show(s.st)]); } catch (e) {}
+    }
+    return { load:this.load, quality:this.quality, buses, mods, shows, wasm:{ tfx:!!WASM.tfxX } };
   }
   handleMessage(m){
     switch (m.op){

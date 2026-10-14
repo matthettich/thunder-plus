@@ -21,8 +21,8 @@ Keep this file up to date at the end of a work session.
   - 13 Oct: **pad rendering moved to a Worker** (see below), and the offer to open ...Thunder's saved work.
 - **App:** no build step. `index.html` is the whole tracker/synth app; `chains/index.html` and
   `waves/index.html` are the two modular patch editors loaded in frames.
-- **Cache-busters now:** `chains-worklet.js?v=10`, `waves-worklet.js?v=5`, `master-worklet.js?v=2` (index.html, the editor
-  pages, sw.js). Cache is `thunderplus-v70`.
+- **Cache-busters now:** `chains-worklet.js?v=11`, `waves-worklet.js?v=6`, `master-worklet.js?v=2` (index.html, the editor
+  pages, sw.js). Cache is `thunderplus-v71`.
 
 ## Licensing rule (the owner may sell the app later)
 
@@ -278,6 +278,32 @@ A cable into a slider's small purple jack (`p:<param>`) now always shows the ...
 - **Track FX sleep:** a `thunder-tfx` node whose input is silent (< 1e-7) and whose output has been below 1e-6 for
   1 s outputs silence without running its effects; any input wakes it; settings changes reset it. Long reverbs
   take ~10 s to get there. Measured: two reverb tracks 5–8% → 0% once tails die.
+
+## Shared modules: …chains and …waves have the same effects and utilities (13 Oct, evening)
+
+- **One source, two copies.** `chains/chains-worklet.js` holds a `/* ===SHARED MODULES START=== … END=== */` block (the
+  DSP) and `chains/index.html` a `/* ===SHARED EDITOR START=== … END=== */` block (editor entries, help text, palette
+  groups, displays). **Edit them in …chains, then run `python3 tools/sync-shared.py`**, which copies both into …waves.
+  Each MODULES map spreads/assigns `SHARED_MODULES`; `mergeShared()` adds the palette groups (skipping a module the
+  palette already lists); help falls back to `SHARED_ABOUT[t]` then `d.about`.
+- **Moved into the blocks** (so …waves now has them): Beads, the 22 "More effects" (flanger, tremolo, overdrive,
+  wavefolder, auto-wah, pitch shifter, ladder, cross-mod, space, lo-fi, drive, air, room, comb, transient, trance gate,
+  multiband squash, frequency shifter, vinyl, dub, cab, tube), envelope/gate/pitch followers, slew (now labelled
+  "Slew limiter"), sample & hold, quantizer, Blades, meta modulator, phaser, width, ping-pong delay.
+- **New, original code:** Meter (VU + peak, pass-through, Trim), Limiter (2 ms look-ahead peak limiter, running-max
+  detector, hard ceiling), Utility (gain/pan/mono/polarity/mute), Ring mod (own carrier sine/tri/square/noise or the
+  Carrier input; Freq CV ±4 oct), Spring reverb (two springs: delay + 18 stretched z⁻² all-passes in feedback, drip
+  pre-emphasis), Plate reverb (Dattorro's 1997 figure-eight tank, written from the paper), Ensemble (3-voice string
+  ensemble or the two-speed 80s polysynth chorus), Math, Logic, Clock divider, Euclidean.
+- **Displays:** a module def with `show(st)` returns numbers; both engines' `telemetry()` sends them as `shows`. Editor
+  entries with `display:'meter'|'gr'` get `buildShow()`, painted by `paintShows()` from `onMeter` and, in …Thunder
+  Plus, from the host (`index.html` keeps each chains node's `shows` and forwards them with the meters, like `mods`).
+- **Checked:** every shared module run in Node on both worklets (no NaN, no runaway, tails decay; harness was a
+  scratch script, not committed); spring RT60 1–3.5 s, plate 1.75 s at default; limiter holds −0.3 dB with 10 dB GR;
+  plate costs ~4.6% of a desktop core (first version was 32%). Browser: all palette entries present in both editors,
+  every new module adds, Meter/Limiter displays live standalone (…waves) and embedded (…chains in Thunder Plus).
+- The Effects page's pad/track FX (`FX`/`TFX` in index.html) are separate and unchanged; the new reverbs aren't there
+  yet (they're JS, not in the wasm).
 
 ## Running it locally
 

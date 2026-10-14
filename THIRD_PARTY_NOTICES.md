@@ -58,3 +58,10 @@ Copyright The JetBrains Mono Project Authors). Both are under the SIL Open Font 
 `fonts/OFL-Jost.txt` and `fonts/OFL-JetBrainsMono.txt`. The Matrix skin uses Share Tech Mono
 (https://github.com/google/fonts/tree/main/ofl/sharetechmono, Copyright Carrois Type Design), also under the
 SIL Open Font License 1.1, included as `fonts/OFL-ShareTechMono.txt`.
+
+## Algorithms used in our own code (no third-party code)
+
+- **Plate reverb** (…chains/…waves): written from the topology published in Jon Dattorro, "Effect Design, Part 1:
+  Reverberator and Other Filters", J. Audio Eng. Soc. 45(9), 1997. No code was copied.
+- **Spring reverb**, **Ensemble**, **Ring mod**, **Limiter**, **Meter** and the other Oct 2026 utilities are original code.
+
