@@ -10647,6 +10647,7 @@ let gridHTML = '', psetHTML = '';
 // move the text changed: the grid itself, its font size, the window, the ARRANGE width. Measuring every redraw
 // (every playhead row) was ~90 % of draw() on a phone: forced-layout reads, even with nothing changed.
 let layoutSig = '';
+let gridLit = [];   // row-number spans lit as the playhead (Sect and Phrase), cleared in place
 // The one playhead the whole tracker reads: Song and Arrange both take their lit rows from here, so
 // their indicators can never drift apart. Positions live in tp.pos (filled by frame() as the song
 // plays). Song mode only: in phrase and sect playback the row fields are placeholders, so nothing is
@@ -10675,6 +10676,9 @@ function draw(){
   const mc = t => (S.mix[t].mute ? ' mu' : '') + (S.mix[t].solo ? ' so' : '');
   const tk = t => t === MT ? ' gx' : isPolyT(t) ? ' gp' : ' gm';   // the track's group: pink mono, green poly
   const playRows = test => { const s = new Set(); if (P) P.forEach(p => { const r = p && test(p); if (r != null) s.add(r); }); return s; };
+  // Sect and Phrase light the playing row in place after the grid is built (see below), so the grid's text does
+  // not change every row and is not rebuilt (innerHTML + layout, ~20 ms on a phone) 16 times a bar.
+  let prLit = null;
   if (tv === 'song'){
     const [T0, T1] = trackWin(c, stepDec ? 4 : 3, 1), ts = trkSub(T0, T1); sub = ts ? ts + '  ' + S.name : S.name;
     const VR = songRows(); if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; c.top = clamp(c.top, 0, 256 - VR);
@@ -10690,14 +10694,14 @@ function draw(){
     }
   } else if (tv === 'sect'){
     title = 'SECT ' + hx(cSect); sub = cTrack === MT ? 'MASTER' : 'TRACK ' + d2(cTrack + 1);
-    const ch = S.chains[cSect], pr = playRows(p => tp.mode !== 'phrase' && p.sect === cSect ? p.cr : null);
+    const ch = S.chains[cSect], pr = playRows(p => tp.mode !== 'phrase' && p.sect === cSect ? p.cr : null); prLit = pr;
     L.push([stepDec ? '   ' : '  ', {t:'PH', cls:'th'}, ' ', {t:'TP', cls:'th'}]);
     for (let y = 0; y < 16; y++){ const r = sectRow(cSect, y) || [-1, 0];
-      L.push([{t:stepDec ? d2(y) : hx(y, 1), cls:'rn' + (y % 4 ? '' : ' rn4') + (pr.has(y) ? ' pl' : '') + rsel(y), r:y}, ' ', {t:h2(r[0]), cls:cc(0, y, r[0] < 0 ? 'e' : 'v'), x:0, y}, ' ', {t:hx(r[1]), cls:cc(1, y, r[1] ? 'v' : 'e'), x:1, y}]); }
+      L.push([{t:stepDec ? d2(y) : hx(y, 1), cls:'rn' + (y % 4 ? '' : ' rn4') + rsel(y), r:y}, ' ', {t:h2(r[0]), cls:cc(0, y, r[0] < 0 ? 'e' : 'v'), x:0, y}, ' ', {t:hx(r[1]), cls:cc(1, y, r[1] ? 'v' : 'e'), x:1, y}]); }
   } else if (tv === 'phrase'){
     title = 'PHRASE ' + hx(cPhrase); sub = cTrack === MT ? 'MASTER' : 'TRACK ' + d2(cTrack + 1) + (polyView() ? ' · POLY' : ' · MONO');
     const poly = polyView(), mst = mstView(); if (mst && c.y >= 0 && c.x < FX0) c.x = FX0; else if (!poly && c.x >= 1 && c.x < NCOL) c.x = 0;
-    const p = S.phrases[cPhrase], pr = playRows(q => q.phrase === cPhrase ? q.step : null), len = plen(cPhrase), lpb = S.plpb[cPhrase] || 0, el2 = lpb || S.lpb;
+    const p = S.phrases[cPhrase], pr = playRows(q => q.phrase === cPhrase ? q.step : null), len = plen(cPhrase), lpb = S.plpb[cPhrase] || 0, el2 = lpb || S.lpb; prLit = pr;
     pset = [{t:'LEN ', cls:'lb'}, {t:d2(len), cls:cc(0, -2, 'v'), x:0, y:-2}, {t:' LPB ', cls:'lb'}, {t:lpb ? d2(lpb) : '--', cls:cc(1, -2, lpb ? 'v' : 'e'), x:1, y:-2},
       {t:' 1/' + (el2 * 4) + (el2 % 3 === 0 ? ' trip' : '') + (lpb ? '' : ' song'), cls:'lb'}];
     // Neighbours: a mono track shows its note (C-4). A poly track shows its whole chord: all four notes when the line still
@@ -10728,7 +10732,7 @@ function draw(){
       return {t:vs.map(v => v < 0 ? '·' : v === OFF ? '×' : NBL[v % 12]).join(''), cls:'nb ' + cls}; };
     for (let y = c.top; y < Math.min(len, c.top + VR); y++){
       const r = p ? p[y] : blankRow();
-      const ln = [{t:rS(y), cls:'rn' + (y % 4 ? '' : ' rn4') + (pr.has(y) ? ' pl' : '') + rsel(y), r:y}, ' '];
+      const ln = [{t:rS(y), cls:'rn' + (y % 4 ? '' : ' rn4') + rsel(y), r:y}, ' '];
       if (!(y % 4)) ln.b4 = true;   // every 4th line is shaded, so a bar of 4/4 reads at a glance
       const yl = Math.min(len, c.top + VR) - 1;
       if (mst){   // master phrase: the three command columns only
@@ -10789,7 +10793,9 @@ function draw(){
   }
   const spanH = s => typeof s === 'string' ? s : `<span class="${s.cls || ''}"${s.x != null ? ` data-x="${s.x}" data-y="${s.y}"` : ''}${s.r != null ? ` data-r="${s.r}"` : ''}${s.title ? ` title="${esc(s.title)}"` : ''}>${esc(s.t)}</span>`;
   const gh = L.map(ln => '<div class="ln' + (ln.b4 ? ' b4' : '') + '">' + ln.map(spanH).join('') + '</div>').join('');
-  const rebuilt = gh !== gridHTML; if (rebuilt){ gridHTML = gh; grid.innerHTML = gh; }   // unchanged screens (most redraws while playing) skip the rebuild
+  const rebuilt = gh !== gridHTML; if (rebuilt){ gridHTML = gh; grid.innerHTML = gh; gridLit = []; }   // unchanged screens (most redraws while playing) skip the rebuild
+  if (prLit || gridLit.length){ for (const e of gridLit) e.classList.remove('pl'); gridLit = [];
+    if (prLit) for (const y of prLit){ const e = grid.querySelector(`span.rn[data-r="${y}"]`); if (e){ e.classList.add('pl'); gridLit.push(e); } } }
   const ph = pset ? pset.map(spanH).join('') : ''; if (ph !== psetHTML){ psetHTML = ph; $('tPset').innerHTML = ph; }
   // Song and Phrase page their own rows; the list screens (Inst, FX, Project) can be taller than the
   // screen, so keep the cursor's line in view.
