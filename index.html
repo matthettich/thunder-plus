@@ -1690,7 +1690,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" hidden></div>
 
-<script src="waves/waves-worklet.js?v=15"></script>
+<script src="waves/waves-worklet.js?v=16"></script>
 <script>
 /* ===ENGINE START=== */
 const BASE = 65.40639; // C2
@@ -4261,7 +4261,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=15', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=16', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -7655,12 +7655,12 @@ class ThunderFx extends AudioWorkletProcessor {
     let bad = false;
     if (i && i.length){ const a = i[0], b = i[1] || a; for (let k = 0; k < n; k++){ const v = a[k] < 0 ? -a[k] : a[k], w = b[k] < 0 ? -b[k] : b[k]; if (v > ip) ip = v; if (w > ip) ip = w; if (!(v < 8 && w < 8)) bad = true; } }
     // A switch (FXO) or a running clock wakes it: a slot just switched on must hear the moment it comes in.
-    const swv = [params.sw0[0], params.sw1[0], params.sw2[0], params.sw3[0]], bp = params.bp;
+    const swv = this.swv || (this.swv = [0, 0, 0, 0]); swv[0] = params.sw0[0]; swv[1] = params.sw1[0]; swv[2] = params.sw2[0]; swv[3] = params.sw3[0]; const bp = params.bp;   // reused: no array per block
     if (ip < 1e-7 && this.idle >= sampleRate && bp.length < 2){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
     if (i && i.length){ L.set(i[0]); R.set(i[1] || i[0]); } else { L.fill(0); R.fill(0); }
     // A NaN or infinity reaching the wasm hangs the tape delay for good and leaves many effects silent: zero those samples.
     if (bad) for (let k = 0; k < n; k++){ const a = L[k], b = R[k]; if (!(a > -8 && a < 8)) L[k] = 0; if (!(b > -8 && b < 8)) R[k] = 0; }
-    const t0 = Date.now(), tr = {bp, flx:params.flx[0], gat:params.gat[0], rtg:params.rtg[0]};
+    const t0 = Date.now(), tr = this.tr || (this.tr = {bp:null, flx:0, gat:0, rtg:0}); tr.bp = bp; tr.flx = params.flx[0]; tr.gat = params.gat[0]; tr.rtg = params.rtg[0];
     if (!this.dL){ this.dL = new Float32Array(128); this.dR = new Float32Array(128); }
     for (const s of this.slots){
       // On or off: the slot's own setting, unless an FXO switch is holding it. Changes fade over 5 ms.
@@ -7700,7 +7700,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=20')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=21')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);

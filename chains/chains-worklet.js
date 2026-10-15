@@ -109,14 +109,17 @@ function effect(type, id, params, map, cost){
       const L0 = io.in.in, R0 = linked(io, 'inR') ? io.in.inR : io.in.in;
       if (!st.x || st.h < 0){ io.out.out.set(L0); io.out.outR.set(R0); return; }
       const x = st.x, buf = x.memory.buffer;
-      const P = new Float32Array(buf, x.tfx_params(st.h), 12); P.fill(0); P.set(map(io.p, ctx));
-      const L = new Float32Array(buf, x.tfx_l(), 128), R = new Float32Array(buf, x.tfx_r(), 128);
+      // Views into the wasm memory are kept on the state (remade only when the memory grew or the handle changed):
+      // five new typed arrays per effect per block were steady garbage on the audio thread.
+      if (st.buf !== buf || st.vh !== st.h){ st.buf = buf; st.vh = st.h; st.P = new Float32Array(buf, x.tfx_params(st.h), 12); st.L = new Float32Array(buf, x.tfx_l(), 128); st.R = new Float32Array(buf, x.tfx_r(), 128); }
+      const P = st.P, L = st.L, R = st.R; P.fill(0); P.set(map(io.p, ctx));
       // The wasm only checks its output. A NaN or infinity on the way IN hangs the tape delay for good and leaves
       // twenty other effects silent, so bad or absurd samples are zeroed here first.
       for (let i = 0; i < ctx.block; i++){ const a = L0[i], b = R0[i]; L[i] = a > -8 && a < 8 ? a : 0; R[i] = b > -8 && b < 8 ? b : 0; }
       try { x.tfx_process(st.h, ctx.block); }
       catch (e){ try { x.tfx_free(st.h); } catch (e2){} st.h = -1; io.out.out.set(L0); io.out.outR.set(R0); return; }   // crashed: bypass it
-      const L2 = new Float32Array(x.memory.buffer, x.tfx_l(), 128), R2 = new Float32Array(x.memory.buffer, x.tfx_r(), 128);
+      if (st.buf !== x.memory.buffer){ st.buf = x.memory.buffer; st.P = new Float32Array(st.buf, x.tfx_params(st.h), 12); st.L = new Float32Array(st.buf, x.tfx_l(), 128); st.R = new Float32Array(st.buf, x.tfx_r(), 128); }   // the memory grew inside process
+      const L2 = st.L, R2 = st.R;
       let bad = false; for (let i = 0; i < ctx.block; i++){ const a = L2[i], b = R2[i]; if (!(a > -1e4 && a < 1e4 && b > -1e4 && b < 1e4)){ bad = true; break; } }
       if (bad){ try { x.tfx_free(st.h); st.h = x.tfx_new(id, ctx.sr); } catch (e){ st.h = -1; } io.out.out.fill(0); io.out.outR.fill(0); return; }   // its state went bad: start it afresh
       io.out.out.set(L2.subarray(0, ctx.block)); io.out.outR.set(R2.subarray(0, ctx.block));
@@ -1619,7 +1622,7 @@ class ChainsEngine {
     this.scL = new Float32Array(BLOCK); this.scR = new Float32Array(BLOCK); this.scOn = false;
     /* focus: in Thunder each track's node only runs the modules that lead to a Chain Out for ITS track (and what
        modulates them). It used to run the whole patch, so 4 tracks on …chains did 4× every track's effects. -1 = all. */
-    this.focus = opts.focus == null ? -1 : opts.focus; this._act = null; this._actKey = '';
+    this.focus = opts.focus == null ? -1 : opts.focus; this._act = null; this._actKey = -1;
     this._ctx = { sr:sampleRate, block:BLOCK, quality:this.quality, transport:this.transport, engine:this,
       trackInL:k => this.trackInL ? this.trackInL.subarray(k * BLOCK, (k + 1) * BLOCK) : null,
       trackInR:k => this.trackInR ? this.trackInR.subarray(k * BLOCK, (k + 1) * BLOCK) : null,
@@ -1637,11 +1640,11 @@ class ChainsEngine {
   removeModule(id){ this._drop(id); this.graph.remove(id); this._sync(); }
   connect(a, b){ this.graph.connect(a, b); this._sync(); }
   disconnect(a, b){ this.graph.disconnect(a, b); this._sync(); }
-  setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number'){ m.inst.params[name] = v; if (name === 'track') this._actKey = ''; } }
+  setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number'){ m.inst.params[name] = v; if (name === 'track') this._actKey = -1; } }
   /* The modules this node has to run (null: all of them). */
   _active(){
     if (this.focus < 0) return null;
-    const g = this.graph, key = g.ver + ':' + g.mods.size;
+    const g = this.graph, key = g.ver * 4096 + g.mods.size;   // a number, not a string made every block
     if (this._act && this._actKey === key) return this._act;
     const act = new Set(), q = [];
     for (const m of g.mods.values()) if (m.def === ChainOut && clamp((m.inst.params.track | 0) - 1, 0, CHAN_COUNT - 1) === this.focus){ act.add(m.id); q.push(m.id); }
@@ -1705,13 +1708,18 @@ class ChainsEngine {
     for (const k in io.in) io.in[k].fill(0);
     io.linked.clear();
     let mods = null;
+    // Modulation buffers live on io (io.mb, one per parameter, kept; io.mo, the set in use), so no array or object is
+    // made per block: that garbage (one per modulated parameter per block) is what paused the audio thread on phones.
+    if (!io.mb){ io.mb = {}; io.mo = {}; io.moVer = -1; }
+    if (io.moVer !== this.graph.ver){ for (const k in io.mo) delete io.mo[k]; io.moVer = this.graph.ver; }   // the cables changed: start the set over
+    else for (const k in io.mo) io.mo[k].fill(0);
     for (const c of this.graph.inc.get(m.id) || []){
       const src = this.graph.mods.get(c.a[0]); if (!src) continue;
       const port = c.b[1], param = isParamPort(port);
       let dst;
       if (param){
         const k = port.slice(2); if (!(k in m.def.params)) continue;
-        mods = mods || {}; dst = mods[k] || (mods[k] = new Float32Array(BLOCK));
+        mods = mods || io.mo; dst = mods[k] || (mods[k] = io.mb[k] || (io.mb[k] = new Float32Array(BLOCK)));
       } else { dst = io.in[port]; if (!dst) continue; io.linked.add(port); }
       const b = this._bufs(src).out[c.a[1]];
       if (b) for (let i = 0; i < BLOCK; i++) dst[i] += b[i];
