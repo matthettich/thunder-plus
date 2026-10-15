@@ -26,7 +26,7 @@
 /* An instrument, not a web page: no text selection, no long-press callout and no browser pinch-zoom anywhere.
    Chrome's tap-to-search sheet (the Google search that slid up from the bottom) only opens on selectable text,
    so this stops it on every screen, not just the tracker grid. Fields stay editable. */
-html{-webkit-touch-callout:none; touch-action:pan-x pan-y; -webkit-text-size-adjust:100%; text-size-adjust:100%}
+html{-webkit-touch-callout:none; touch-action:pan-x pan-y; -webkit-text-size-adjust:100%; text-size-adjust:100%; overscroll-behavior:none}   /* no pull-to-refresh on a drag (a reload mid-session) */
 body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),textarea,[contenteditable]:not([contenteditable=false])){user-select:text; -webkit-user-select:text; -webkit-touch-callout:default}
 </style>
@@ -159,7 +159,7 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .audrow select{flex:1 1 220px; min-width:0}
 .audrow input[type=range]{flex:1 1 200px; width:auto; min-width:120px}
 .audrow output{min-width:64px; text-align:right; font-variant-numeric:tabular-nums}
-@media (max-width:480px){ body:not(.trkv) .top #bSet .setx{display:none} }
+@media (max-width:480px){ .top #bSet .setx{display:none} }   /* gear only on the cover screen (the tracker too: with the label the bar wrapped to two rows) */
 .help{position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; background:var(--bench); color:var(--ink)}
 .help .hhead{display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--side); flex:none}
 .help #helpNav{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; min-width:0; flex:0 1 auto}
@@ -214,7 +214,7 @@ body:not(.noed) .wvMobNote{display:none}
 .kitname{width:150px}
 
 /* scrolling editor made of bands */
-.main{flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column}
+.main{flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; display:flex; flex-direction:column}
 .band{flex:none; padding-block:9px; padding-inline:16px; border-bottom:1px solid var(--line); background:var(--bench)}
 .band.grey{background:var(--side)}
 .band.voice{background:var(--voice)}
@@ -459,6 +459,9 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .updb.storeb{background:#c0392b; color:#fff; white-space:normal; max-width:calc(100vw - 32px); z-index:21}
 @media (max-width:480px){ .top .tmode .mx{display:inline} .top .tmode,.top .tcpu{padding:0 8px} .top .tcpu{min-width:72px} }
 .top .tcpu{border:1px solid var(--line); min-height:34px; background:var(--panel); padding:0 10px; min-width:84px; overflow:hidden}
+/* The cover screen (412 px): "CPU --" and "?" wrapped the top bar onto a second row, costing two tracker lines. The meter
+   keeps only its number and bar, and Help lives in Settings → App there. */
+@media (max-width:480px){ .top .tcpu{min-width:48px; padding:0 6px} .top .tcpu span{font-size:var(--fs-3)} .top .tcpu .cpuw{display:none} .top #bHelp{display:none} }
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 
 /* tracker: tabs band, black monitor screen in a mono face, grey side panel, grey key dock */
@@ -1173,7 +1176,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <button type="button" class="tsong" id="tLoopTop" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L in KEYS mode)" hidden>Loop</button>
   <button type="button" class="tsong" id="tKeyTrans" aria-label="Key transpose" title="Key transpose: tap to arm, then ▲ up / ▼ down transposes the selection a semitone" hidden>Transpose ▲▼</button>
   <button type="button" class="tsong" id="tSong" aria-label="Play or stop the song" title="Play the song from the tracker's cursor row, or stop it" hidden><span class="tl"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Song</span><span class="tl alt" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>Stop</span></button>
-  <button type="button" class="tcpu" id="tCpu" aria-label="Audio load"><span>CPU --</span><i></i></button>
+  <button type="button" class="tcpu" id="tCpu" aria-label="Audio load"><span><em class="cpuw">CPU </em>--</span><i></i></button>
   <button type="button" id="bHelp" aria-label="Help and keys (?)" title="Help and keys (? or F1)">?</button>
 </div>
 
@@ -1191,7 +1194,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="pbody">
       <div class="btnrow"><label class="cb"><input type="checkbox" id="ckMobile">Mobile (...Thunder)</label></div>
       <div class="btnrow" id="mobEdRow"><label class="cb"><input type="checkbox" id="ckMobEd">Show …waves and …chains on Mobile</label></div>
-      <div class="btnrow"><button type="button" id="updBtn">Check for update</button></div>
+      <div class="btnrow"><button type="button" id="updBtn">Check for update</button><button type="button" id="helpBtn2">Help &amp; keys</button></div>
       <div class="btnrow" id="installRow" hidden><button type="button" id="installBtn" hidden>Install app</button><span class="lbl" id="installMsg"></span></div>
       <p class="note">Mobile is ...Thunder: the <b>…waves</b> and <b>…chains</b> editors are hidden (tick <b>Show …waves and …chains on Mobile</b> to keep them) and the tracker switches to PAD input. Kits and songs keep their …waves layers and …chains effects, and they still play, so files open and sound the same either way. Turn it off for Desktop (...Thunder Plus) to edit those patches. This is saved for this browser.</p>
     </div>
@@ -6489,7 +6492,9 @@ function placeMenu(menu){
 // Place it again whenever the window changes size while it is open (fold or unfold on a foldable,
 // rotation, the on-screen keyboard), or it keeps its old offset — measured for the previous width —
 // and is clipped at the right edge (the page itself never scrolls sideways).
-function placeOpenMenus(){ for (const m of [$('gfile'), $('gset')]) if (m && !m.hidden) placeMenu(m); }
+function placeOpenMenus(){ for (const m of [$('gfile'), $('gset')]) if (m && !m.hidden) placeMenu(m);
+  // The on-screen keyboard shrinks the visual viewport, not 100vh: size the Settings sheet to what is really visible.
+  try { const vv = window.visualViewport, g = $('gset'); if (vv && g){ const h = Math.round(vv.height - 80); g.style.maxHeight = h < innerHeight - 80 ? h + 'px' : ''; } } catch(e){} }
 addEventListener('resize', placeOpenMenus);
 addEventListener('orientationchange', placeOpenMenus);
 if (window.visualViewport) window.visualViewport.addEventListener('resize', placeOpenMenus);
@@ -11834,7 +11839,7 @@ function cpuMeter(){
   const b = $('tCpu'); if (!b) return;
   const fx = fxLoads().reduce((a, x) => a + x[1], 0), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null;
   const v = !ctx ? null : cap ? cap.avg : fx;
-  b.querySelector('span').textContent = v == null ? 'CPU --' : 'CPU ' + Math.round(v * 100) + '%';
+  { const sp = b.querySelector('span'); let w = sp.querySelector('.cpuw'); if (!w){ w = document.createElement('em'); w.className = 'cpuw'; w.textContent = 'CPU '; } sp.textContent = v == null ? '--' : Math.round(v * 100) + '%'; sp.prepend(w); }   // the "CPU " word hides on the cover screen
   b.querySelector('i').style.width = v == null ? '0' : Math.min(100, v * 100).toFixed(0) + '%';
   const drop = now - glitch.t < 3000;   // a dropout in the last 3 s turns the meter red
   b.classList.toggle('warn', v != null && v > 0.5); b.classList.toggle('hot', v != null && (v > 0.8 || (cap && cap.under > 0) || drop));
@@ -12378,6 +12383,7 @@ function helpNavOn(){
 $('helpBody').addEventListener('scroll', helpNavOn, {passive:true});
 $('helpNav').addEventListener('click', e => { const b = e.target.closest('[data-h]'); if (!b) return; const t = $(b.dataset.h), body = $('helpBody'); body.scrollTo({top:t.offsetTop - body.offsetTop, behavior:'smooth'}); });
 $('bHelp').addEventListener('click', () => helpOpen() ? hideHelp() : showHelp());
+$('helpBtn2').addEventListener('click', () => { gsetToggle(false); showHelp(); });
 $('helpX').addEventListener('click', hideHelp);
 // Runs before the synth and tracker key handlers: ? or F1 toggles help, and while it is open the keys
 // only scroll it (Esc closes).
