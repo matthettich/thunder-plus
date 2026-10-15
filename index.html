@@ -3966,6 +3966,189 @@ class OrganCore {
     return KeysUtil.finish(out, p, sr, 0.003);
   }
 }
+/* Table: a wavetable synth. Four tables of eight frames each (Basic: sine→triangle→saw→square→pulse; Harmonic: a
+   comb of partials that opens up; Formant: a voice saying its vowels; Digital: a folded, stepped sine). Every frame
+   is drawn in the time domain, taken apart into partials once and put back together band-limited for the note,
+   so moving through a table never aliases. Position moves through the frames (an envelope and an LFO can move it
+   too), Warp bends the phase the table is read with (a phase-distortion bend). Unison voices beat against each
+   other, a sub and noise go under, then a resonant two-pole low-pass with its own envelope and an ADSR. */
+class TableCore {
+  static defaults(){ return {oct:2, table:0, pos:0, warp:0, pmod:0, pdec:400, prate:0.5, pdepth:0, unison:1, det:0.25, sub:0, noise:0,
+    cut:8000, res:0.2, fenv:0.3, fdec:400, key:0.5, atk:5, dec:600, sus:0.7, rel:300, tune:0, drive:0, level:0}; }
+  static get TABLES(){ return ['Basic', 'Harmonic', 'Formant', 'Digital']; }
+  // one cycle of frame k (0..7) of table t at phase x (0..1), in the time domain
+  static shape(t, k, x){
+    const m = k / 7;
+    if (t === 0){ // sine → triangle → saw → square → pulse, two shapes at a time
+      const s = m * 4, i = Math.min(3, Math.floor(s)), f = s - i;
+      const w = [Math.sin(6.2832 * x), 1 - 4 * Math.abs(x - 0.5), 2 * x - 1, x < 0.5 ? 1 : -1, x < 0.12 ? 1 : -0.27];
+      return w[i] * (1 - f) + w[i + 1] * f;
+    }
+    if (t === 1){ // partials 1..24 with a comb that opens as the frame rises
+      let y = 0; for (let n = 1; n <= 24; n++){ const g = 0.5 + 0.5 * Math.cos(n * (1.2 - m) * 1.7), a = Math.pow(n, -0.8 - (1 - m) * 1.2) * g; y += a * Math.sin(6.2832 * n * x); } return y;
+    }
+    if (t === 2){ // two formants gliding through the vowels, on a 40-partial pulse
+      const F = [[730, 1090], [660, 1720], [530, 1840], [390, 1990], [270, 2290], [570, 840], [440, 1020], [300, 870]], s = m * 7, i = Math.min(6, Math.floor(s)), f = s - i;
+      const f1 = F[i][0] * (1 - f) + F[i + 1][0] * f, f2 = F[i][1] * (1 - f) + F[i + 1][1] * f; let y = 0;
+      for (let n = 1; n <= 40; n++){ const h = n * 110, a = Math.exp(-Math.pow((h - f1) / 160, 2)) + 0.6 * Math.exp(-Math.pow((h - f2) / 220, 2)) + 0.02 / n; y += a * Math.sin(6.2832 * n * x); } return y;
+    }
+    // Digital: a sine folded back on itself, then stepped
+    let y = Math.sin(6.2832 * x) * (1 + m * 5); y = Math.abs((((y + 1) % 4) + 4) % 4 - 2) - 1; const q = 2 + Math.round((1 - m) * 30); return Math.round(y * q) / q;
+  }
+  // the partials of every frame of a table, found once with a DFT; cached per table
+  static partials(t){
+    const c = TableCore._pc || (TableCore._pc = {}); if (c[t]) return c[t];
+    const M = 1024, H = 128, fr = [];
+    for (let k = 0; k < 8; k++){
+      const w = new Float32Array(M); let dc = 0; for (let i = 0; i < M; i++){ w[i] = TableCore.shape(t, k, i / M); dc += w[i]; } dc /= M;
+      const re = new Float32Array(H + 1), im = new Float32Array(H + 1);
+      for (let n = 1; n <= H; n++){ let a = 0, b = 0, c = 1, sn = 0; const wc = Math.cos(6.283185307 * n / M), ws = Math.sin(6.283185307 * n / M);
+        for (let i = 0; i < M; i++){ const x = w[i] - dc; a += x * c; b += x * sn; const c2 = c * wc - sn * ws; sn = sn * wc + c * ws; c = c2; } re[n] = a * 2 / M; im[n] = b * 2 / M; }
+      fr.push({re, im});
+    }
+    return c[t] = fr;
+  }
+  static render(o, sr, hold){
+    const p = Object.assign(TableCore.defaults(), o || {}), rnd = KeysUtil.rnd(0x7ab1e);
+    const f0 = 65.406 * Math.pow(2, p.oct + (p.tune || 0) / 12), h = Math.max(0.02, hold || 1), atk = Math.max(0.0005, p.atk / 1000), dec = Math.max(0.005, p.dec / 1000), rel = Math.max(0.005, p.rel / 1000);
+    const len = Math.min(12, h + rel * 6 + 0.05), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N);
+    // band-limited cycles of the eight frames for this note
+    const L = 2048, tb = Math.max(0, Math.min(3, Math.round(p.table))), fr = TableCore.partials(tb), nmax = Math.max(1, Math.min(128, Math.floor(sr * 0.45 / (f0 * 1.06))));
+    const cyc = fr.map(({re, im}) => { const w = new Float32Array(L + 1); let pk = 0;
+      for (let n = 1; n <= nmax; n++){ const wc = Math.cos(6.283185307 * n / L), ws = Math.sin(6.283185307 * n / L), rn = re[n], jn = im[n]; let c = 1, sn = 0; if (Math.abs(rn) + Math.abs(jn) < 1e-5) continue;
+        for (let i = 0; i < L; i++){ w[i] += rn * c + jn * sn; const c2 = c * wc - sn * ws; sn = sn * wc + c * ws; c = c2; } }
+      for (let i = 0; i < L; i++) pk = Math.max(pk, Math.abs(w[i]));
+      if (pk > 0) for (let i = 0; i < L; i++) w[i] /= pk; w[L] = w[0]; return w; });
+    const U = Math.max(1, Math.min(7, Math.round(p.unison))), ph = [], inc = [];
+    for (let u = 0; u < U; u++){ const d = U === 1 ? 0 : ((u / (U - 1)) * 2 - 1) * p.det * p.det * 40; ph.push(rnd()); inc.push(f0 * Math.pow(2, d / 1200) / sr); }
+    const ug = 1 / Math.sqrt(U), warp = Math.max(0, Math.min(1, p.warp)), wp = 0.5 - warp * 0.46;
+    let sph = 0, lp1 = 0, lp2 = 0, env = 0, fe = 0, st = 0, lfo = rnd() * 6.283;
+    const CR = 16; let cutNow = p.cut, resNow = p.res, posNow = p.pos;
+    for (let i0 = 0; i0 < N; i0 += CR){
+      const t = i0 / sr;
+      // envelopes, run per block
+      fe = Math.exp(-t / Math.max(0.005, p.fdec / 1000)); const pe = Math.exp(-t / Math.max(0.005, p.pdec / 1000));
+      posNow = Math.max(0, Math.min(1, p.pos + p.pmod * pe + p.pdepth * 0.5 * Math.sin(lfo + 6.2832 * p.prate * t)));
+      cutNow = Math.min(sr * 0.45, p.cut * Math.pow(2, p.fenv * 5 * fe) * Math.pow(f0 / 261.6, p.key)); resNow = p.res;
+      const g = Math.tan(Math.PI * Math.max(20, cutNow) / sr), k = 2 - 1.9 * resNow, a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2;
+      const fpos = posNow * 7, fi = Math.min(6, Math.floor(fpos)), ff = fpos - fi, A = cyc[fi], B = cyc[fi + 1];
+      const i1 = Math.min(N, i0 + CR);
+      for (let i = i0; i < i1; i++){
+        const tt = i / sr;
+        // amp ADSR
+        if (tt < h){ if (st === 0){ env += (1 / (atk * sr)); if (env >= 1){ env = 1; st = 1; } } else env += (p.sus - env) * (1 / (dec * sr)) * 2.2; }
+        else env -= env * (1 / (rel * sr)) * 3;
+        let y = 0;
+        for (let u = 0; u < U; u++){
+          let x = ph[u]; ph[u] += inc[u]; if (ph[u] >= 1) ph[u] -= 1;
+          if (warp > 0) x = x < wp ? x * 0.5 / wp : 0.5 + (x - wp) * 0.5 / (1 - wp);
+          const r = x * L, ri = r | 0, rf = r - ri, s = A[ri] + (A[ri + 1] - A[ri]) * rf, s2 = B[ri] + (B[ri + 1] - B[ri]) * rf;
+          y += s + (s2 - s) * ff;
+        }
+        y *= ug;
+        sph += inc[0] * 0.5; if (sph >= 1) sph -= 1; y += p.sub * 0.8 * Math.sin(6.2832 * sph) + p.noise * 0.5 * (rnd() * 2 - 1);
+        // two-pole SVF low-pass
+        const v1 = a1 * lp1 + a2 * (y - lp2), v2 = lp2 + g * v1; lp1 = 2 * v1 - lp1; lp2 = 2 * v2 - lp2; y = v2;
+        out[i] = y * env;
+      }
+    }
+    return KeysUtil.finish(out, p, sr, 0.003);
+  }
+}
+/* Breath: noise as an instrument. Coloured noise (brown to white to blue), grains cut into it (a shaker's beads, a
+   crackle), through a bank of resonant band-passes (their spacing from harmonic to metallic, with a Metal skew that
+   makes them inharmonic), a high-pass and a low-pass with an envelope, a sweep that lifts the bank over the note, and
+   a wind that wanders. Hats, shakers, cymbal washes, risers, wind, breath and static all live in here. */
+class BreathCore {
+  static defaults(){ return {color:0.5, grain:0, grate:40, bands:4, freq:3000, spread:0.3, metal:0.5, q:0.5, body:0.6, key:0, hp:200, lp:14000, fenv:0, fdec:200, sweep:0, wind:0,
+    atk:1, dec:200, sus:0, rel:80, tune:0, drive:0, level:0}; }
+  static render(o, sr, hold){
+    const p = Object.assign(BreathCore.defaults(), o || {}), rnd = KeysUtil.rnd(0xb4ea7), kf = Math.pow(2, (p.tune || 0) / 12);
+    const h = Math.max(0.01, hold || 0.3), atk = Math.max(0.0005, p.atk / 1000), dec = Math.max(0.003, p.dec / 1000), rel = Math.max(0.003, p.rel / 1000);
+    const len = Math.min(10, (p.sus > 0.01 ? h : Math.min(h, atk + dec * 6)) + rel * 6 + 0.02), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N);
+    const nb = Math.max(1, Math.min(8, Math.round(p.bands))), skew = [0, 0.27, -0.19, 0.41, -0.33, 0.52, -0.12, 0.61];
+    const bq = []; for (let b = 0; b < nb; b++) bq.push({r:Math.pow(1 + p.spread * 1.5, b) * (1 + p.metal * skew[b] * 0.9), b0:0, a1:0, a2:0, x1:0, x2:0, y1:0, y2:0});
+    const fkey = Math.pow(kf, p.key), Q = 0.7 + p.q * p.q * 60, wet = Math.max(0, Math.min(1, p.body));
+    let br = 0, bl = 0, hp1 = 0, lp1 = 0, lp2 = 0, env = 0, st = 0, gEnv = 0, nextG = 0, wind = 0, wtarget = 0, wn = 0;
+    const CR = 32, col = p.color;
+    for (let i0 = 0; i0 < N; i0 += CR){
+      const t = i0 / sr, fe = Math.exp(-t / Math.max(0.003, p.fdec / 1000));
+      // wind: a slow random walk
+      if (--wn <= 0){ wtarget = rnd() * 2 - 1; wn = Math.round(sr * (0.05 + rnd() * 0.25) / CR); } wind += (wtarget - wind) * 0.04;
+      const swp = Math.pow(2, p.sweep * 3 * Math.min(1, t / h)), fmul = fkey * swp * (1 + p.wind * 0.25 * wind);
+      for (const q of bq){ const f = Math.min(sr * 0.45, Math.max(20, p.freq * q.r * fmul)), w = 2 * Math.PI * f / sr, al = Math.sin(w) / (2 * Q), a0 = 1 + al; q.b0 = al / a0; q.a1 = -2 * Math.cos(w) / a0; q.a2 = (1 - al) / a0; }
+      const lpf = Math.min(sr * 0.45, Math.max(20, p.lp * Math.pow(2, p.fenv * 4 * fe) * (1 + p.wind * 0.4 * wind))), gl = Math.tan(Math.PI * lpf / sr), kl = 1.3, al1 = 1 / (1 + gl * (gl + kl)), al2 = gl * al1;
+      const hpc = Math.exp(-2 * Math.PI * Math.max(10, p.hp) / sr);
+      const i1 = Math.min(N, i0 + CR);
+      for (let i = i0; i < i1; i++){
+        const tt = i / sr;
+        if (tt < h){ if (st === 0){ env += 1 / (atk * sr); if (env >= 1){ env = 1; st = 1; } } else env += (p.sus - env) * (1 / (dec * sr)) * 2.2; }
+        else env -= env * (1 / (rel * sr)) * 3;
+        // coloured noise: brown (leaky integral) → white → blue (difference)
+        const w = rnd() * 2 - 1; br = br * 0.995 + w * 0.05; const blue = w - bl; bl = w;
+        let n = col < 0.5 ? br * (1 - col * 2) * 4 + w * col * 2 : w * (2 - col * 2) + blue * (col * 2 - 1) * 0.7;
+        // grains: bursts at a random rate, each dying away
+        if (p.grain > 0){ if (--nextG <= 0){ gEnv = 0.6 + rnd() * 0.8; nextG = Math.max(1, Math.round(sr / p.grate * (0.3 + rnd() * 1.4))); } gEnv *= 1 - 8 * p.grate / sr; n *= (1 - p.grain) + p.grain * gEnv * 2; }
+        // the resonant bank
+        let y = 0; for (const q of bq){ const v = q.b0 * (n - q.x2) - q.a1 * q.y1 - q.a2 * q.y2; q.x2 = q.x1; q.x1 = n; q.y2 = q.y1; q.y1 = v; y += v; }
+        y = n * (1 - wet) + y * wet * (1 + p.q * 4) / Math.sqrt(nb);
+        // high-pass then low-pass
+        hp1 = hp1 * hpc + y * (1 - hpc) ; y -= hp1;
+        const v1 = al1 * lp1 + al2 * (y - lp2), v2 = lp2 + gl * v1; lp1 = 2 * v1 - lp1; lp2 = 2 * v2 - lp2; y = v2;
+        out[i] = y * env * (1 + p.wind * 0.6 * wind);
+      }
+    }
+    return KeysUtil.finish(out, p, sr, 0.003);
+  }
+}
+/* Strings: a plucked string ensemble with a body. Each string is a loop of its own length (a delay line with a
+   damping low-pass and a fractional tap for tuning) set ringing by a burst of noise shaped by the pick and the point
+   where it strikes; the strings of a chord are strummed up or down, a little apart, a little out of tune with each
+   other, then rung through a body of four resonances sized from mandolin to cello. Release damps them. */
+class StringsCore {
+  static defaults(){ return {oct:2, voices:1, chord:0, strum:25, down:0, det:0.3, pick:0.6, pos:0.28, decay:1.6, damp:0.4, body:0.5, size:0.5, vib:0, vrate:5, rel:120, tune:0, drive:0, level:0}; }
+  static get CHORDS(){ return ['Unison', 'Octaves', 'Fifths', 'Major', 'Minor', 'Sus4', 'Major 7', 'Minor 7', 'Open']; }
+  static get IVL(){ return [[0, 0, 0, 0, 0, 0], [0, 12, 24, -12, 36, 7], [0, 7, 12, 19, 24, 31], [0, 4, 7, 12, 16, 19], [0, 3, 7, 12, 15, 19], [0, 5, 7, 12, 17, 19], [0, 4, 7, 11, 14, 19], [0, 3, 7, 10, 14, 17], [0, 7, 12, 16, 19, 24]]; }
+  static render(o, sr, hold){
+    const p = Object.assign(StringsCore.defaults(), o || {}), rnd = KeysUtil.rnd(0x57a1);
+    const f0 = 65.406 * Math.pow(2, p.oct + (p.tune || 0) / 12), h = Math.max(0.03, hold || 2), nv = Math.max(1, Math.min(6, Math.round(p.voices)));
+    const ivl = StringsCore.IVL[Math.max(0, Math.min(8, Math.round(p.chord)))], T = Math.max(0.05, p.decay), rel = Math.max(0.005, p.rel / 1000), strum = p.strum / 1000;
+    const len = Math.min(12, strum * (nv - 1) + Math.min(h, T * 3) + rel * 8 + 0.05), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N);
+    const strs = [];
+    for (let v = 0; v < nv; v++){
+      const order = p.down >= 0.5 ? nv - 1 - v : v, f = Math.min(sr / 4, f0 * Math.pow(2, (ivl[v] + (rnd() * 2 - 1) * p.det * p.det * 18 / 100) / 12)), D = sr / f;
+      const L = Math.ceil(D) + 2, buf = new Float32Array(L), ex = Math.ceil(D);
+      // the pluck: a noise burst the length of one period, darker the softer the pick, with the strike point's comb
+      const exc = new Float32Array(ex), pb = 0.08 + p.pick * p.pick * 0.9; let e1 = 0; for (let i = 0; i < ex; i++){ e1 += ((rnd() * 2 - 1) - e1) * pb; exc[i] = e1; }
+      const pd = Math.max(1, Math.round(p.pos * ex)); for (let i = ex - 1; i >= pd; i--) exc[i] -= exc[i - pd] * 0.9;
+      // per-pass gain for the decay time, a damping low-pass whose colour is Damp
+      const G = Math.exp(-D / (T * sr)), dc = 0.08 + (1 - p.damp) * (1 - p.damp) * 0.9;   // the loop's low-pass delays the loop too, so the tap is pulled in by that much
+      strs.push({f, D:Math.max(2, D - (1 - dc) / dc), buf, L, w:0, exc, start:Math.round(order * strum * sr), G, dc, lp:0, dcb:0});
+    }
+    // the body: four resonances, the bigger the body the lower
+    const sz = Math.pow(2, (0.5 - p.size) * 3), modes = [[105, 0.03, 1], [215, 0.022, 0.7], [420, 0.014, 0.5], [790, 0.009, 0.35]].map(([f, tau, a]) => {
+      const w = 2 * Math.PI * Math.min(sr * 0.4, f * sz) / sr, r = Math.exp(-1 / (tau * sr)); return {c1:2 * r * Math.cos(w), c2:-r * r, a:a * (1 - r), y1:0, y2:0}; });
+    const wet = Math.max(0, Math.min(1, p.body)), vibA = p.vib * p.vib * 0.012;
+    for (let i = 0; i < N; i++){
+      const t = i / sr, rl = t < h ? 1 : Math.exp(-(t - h) / rel), vib = vibA ? 1 + vibA * Math.sin(6.2832 * p.vrate * t) * Math.min(1, t * 2) : 1;
+      let y = 0;
+      for (const s of strs){
+        const k = i - s.start; if (k < 0) continue;
+        // read one period back (fractional, linear) and feed the loop
+        const Dn = s.D / vib, r = s.w - Dn, ri = Math.floor(r), rf = r - ri, i0 = ((ri % s.L) + s.L) % s.L, i1 = (i0 + 1) % s.L;
+        const back = s.buf[i0] + (s.buf[i1] - s.buf[i0]) * rf;
+        s.lp += (back - s.lp) * s.dc;
+        let x = s.lp * s.G * (t < h ? 1 : Math.pow(rl, 0.08)) + (k < s.exc.length ? s.exc[k] : 0);
+        s.dcb = s.dcb * 0.999 + x * 0.001; x -= s.dcb;
+        s.buf[s.w] = x; s.w = (s.w + 1) % s.L; y += x;
+      }
+      y /= Math.sqrt(nv);
+      let b = 0; for (const m of modes){ const v = m.a * y + m.c1 * m.y1 + m.c2 * m.y2; m.y2 = m.y1; m.y1 = v; b += v; }
+      out[i] = (y * (1 - wet * 0.6) + b * wet * 3) * (t < h ? 1 : rl);
+    }
+    return KeysUtil.finish(out, p, sr, 0.003);
+  }
+}
 // The new engines in one table: live ones have a Core class (played by a worklet in the tracker), rendered ones a render().
 const XENG = {
   acid:{live:true, C:() => AcidCore, d:() => AcidCore.defaults()},
@@ -3976,6 +4159,9 @@ const XENG = {
   piano:{live:false, d:() => PianoCore.defaults()},
   ep:{live:false, d:() => TineEPCore.defaults()},
   organ:{live:false, d:() => OrganCore.defaults()},
+  table:{live:false, d:() => TableCore.defaults()},
+  breath:{live:false, d:() => BreathCore.defaults()},
+  strings:{live:false, d:() => StringsCore.defaults()},
   sf:{live:false, d:() => ({bank:0, prog:0, trans:0, velo:0.7, atk:1, rel:1})},
 };
 const isXEngV = v => !!(v && XENG[v.engine]);
@@ -3990,6 +4176,9 @@ function renderX(V, sr, hold){
   if (k === 'piano') return PianoCore.render(P, sr, hold || Math.min(V.len || 3, 4));
   if (k === 'ep') return TineEPCore.render(P, sr, hold || Math.min(V.len || 3, 4));
   if (k === 'organ') return OrganCore.render(P, sr, hold || Math.min(V.len || 2, 3));
+  if (k === 'table') return TableCore.render(P, sr, hold || Math.min(V.len || 2, 4));
+  if (k === 'breath') return BreathCore.render(P, sr, hold || Math.min(V.len || 1, 4));
+  if (k === 'strings') return StringsCore.render(P, sr, hold || Math.min(V.len || 3, 4));
   // SoundFont pads render on the page (the SoundFont code lives in the UI part of the script; the Worker has no fonts)
   if (k === 'sf') return typeof globalThis.__sfRender === 'function' ? globalThis.__sfRender(V, sr, hold || Math.min(V.len || 2, 3)) : new Float32Array(1);
   return ModalCore.render(P, sr, hold || (V.gate || 400) / 1000 * 2);
@@ -4858,7 +5047,7 @@ function bassRandom(){
   pre.addEventListener('change', () => { if (pre.value !== '') bassPreset(+pre.value); pre.value = ''; });
   $('bassRand').addEventListener('click', bassRandom);
   $('bassInit').addEventListener('click', () => bassPreset(0));
-  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass'], ['vox', 'Voice'], ['blip', 'Blip'], ['acid', 'Acid'], ['mach', 'Machine'], ['tone', 'Tone drum'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Tine EP'], ['organ', 'Organ'], ['sf', 'SoundFont']],
+  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass'], ['vox', 'Voice'], ['blip', 'Blip'], ['acid', 'Acid'], ['mach', 'Machine'], ['tone', 'Tone drum'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Tine EP'], ['organ', 'Organ'], ['table', 'Table'], ['breath', 'Breath'], ['strings', 'Strings'], ['sf', 'SoundFont']],
     () => isBassV(V()) ? 'bass' : isVoxV(V()) ? 'vox' : isBlipV(V()) ? 'blip' : isXEngV(V()) ? V().engine : 'layers', setEngine);
 })();
 
@@ -5231,8 +5420,8 @@ function factoryVoicePresets(){
       {type:'bell', a:0.45, b:0.25, atk:0.5, dec:2400, sus:0.15, rel:1500, level:0.7},
       {type:'sine', tune:12, atk:0.5, dec:1200, sus:0, rel:900, level:0.25}], {len:8})],
   ]],
-  ...[['acid', 'Acid'], ['mach', 'Machine synth'], ['tone', 'Tone drums'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Electric piano'], ['organ', 'Organ']].map(([k, gn]) => [gn, XUI[k].pre.slice(1).map(([n, o, x]) =>
-    [n, () => PE(n, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:k === 'modal' || k === 'swarm' || k === 'piano' || k === 'ep' ? 6 : 4, gate:400}, x || {}))])]),
+  ...[['acid', 'Acid'], ['mach', 'Machine synth'], ['tone', 'Tone drums'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Electric piano'], ['organ', 'Organ'], ['table', 'Table'], ['breath', 'Breath'], ['strings', 'Strings']].map(([k, gn]) => [gn, XUI[k].pre.slice(1).map(([n, o, x]) =>
+    [n, () => PE(n, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:k === 'modal' || k === 'swarm' || k === 'piano' || k === 'ep' || k === 'strings' ? 6 : k === 'breath' ? 2 : 4, gate:400}, x || {}))])]),
   ['Leads', [
     ['Square lead', () => PS('Square lead', [
       {type:'square', atk:3, dec:300, sus:0.75, rel:180, lpCut:3200, lpRes:0.25, level:0.6},
@@ -5868,6 +6057,79 @@ const XUI = {
       ['Finger bass', {bank:0, prog:33}], ['Slap bass', {bank:0, prog:36}], ['Strings', {bank:0, prog:48}], ['Choir aahs', {bank:0, prog:52}], ['Orchestra hit', {bank:0, prog:55}], ['Brass section', {bank:0, prog:61}],
       ['Alto sax', {bank:0, prog:65}], ['Flute', {bank:0, prog:73}], ['Square lead', {bank:0, prog:80}], ['Warm pad', {bank:0, prog:89}], ['Standard drum kit', {bank:128, prog:0}],
       ['TR-808 kit', {bank:128, prog:25}], ['Electronic kit', {bank:128, prog:24}], ['Jazz kit', {bank:128, prog:32}]]},
+  table:{title:'Table', tag:'wavetables · warp · unison', rows:{
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      table:{l:'Table', min:0, max:3, c:'int', d:0, f:v => TableCore.TABLES[Math.max(0, Math.min(3, Math.round(v)))]},
+      pos:{l:'Position', min:0, max:1, c:'lin', d:0, f:pct}, warp:{l:'Warp', min:0, max:1, c:'lin', d:0, f:pct},
+      pmod:{l:'Position env', min:-1, max:1, c:'lin', d:0, f:pct}, pdec:{l:'Env decay', min:10, max:6000, c:'log', d:400, f:ms},
+      prate:{l:'LFO rate', min:0.05, max:20, c:'log', d:0.5, f:v => v.toFixed(2) + ' Hz'}, pdepth:{l:'LFO depth', min:0, max:1, c:'lin', d:0, f:pct},
+      unison:{l:'Unison', min:1, max:7, c:'int', d:1, f:v => String(Math.round(v))}, det:{l:'Detune', min:0, max:1, c:'lin', d:0.25, f:pct},
+      sub:{l:'Sub', min:0, max:1, c:'lin', d:0, f:pct}, noise:{l:'Noise', min:0, max:1, c:'lin', d:0, f:pct},
+      cut:{l:'Cutoff', min:40, max:20000, c:'log', d:8000, f:hz}, res:{l:'Resonance', min:0, max:1, c:'lin', d:0.2, f:pct},
+      fenv:{l:'Env amount', min:0, max:1, c:'lin', d:0.3, f:pct}, fdec:{l:'Env decay', min:10, max:6000, c:'log', d:400, f:ms},
+      key:{l:'Key follow', min:0, max:1, c:'lin', d:0.5, f:pct},
+      atk:{l:'Attack', min:0.5, max:6000, c:'log', d:5, f:ms}, dec:{l:'Decay', min:10, max:8000, c:'log', d:600, f:ms}, sus:{l:'Sustain', min:0, max:1, c:'lin', d:0.7, f:pct}, rel:{l:'Release', min:5, max:8000, c:'log', d:300, f:ms}},
+    secs:[['Table', ['oct', 'table', 'pos', 'warp']], ['Motion', ['pmod', 'pdec', 'prate', 'pdepth']], ['Unison & mix', ['unison', 'det', 'sub', 'noise']], ['Filter', ['cut', 'res', 'fenv', 'fdec', 'key']], ['Amp', ['atk', 'dec', 'sus', 'rel']]],
+    note:'Position moves through the eight frames of the table; the envelope and LFO move it for you. Warp bends the phase the table is read with. Basic runs sine → triangle → saw → square → pulse, Harmonic opens a comb of partials, Formant says its vowels, Digital folds and steps a sine.',
+    pre:[['Init', {}], ['Morph bass', {oct:1, table:0, pos:0.55, pmod:0.4, pdec:250, cut:900, res:0.3, fenv:0.6, fdec:200, dec:400, sus:0.5, rel:100, sub:0.5}],
+      ['Wide pulse', {table:0, pos:0.9, unison:5, det:0.4, cut:6000, atk:20, sus:0.8, rel:400, prate:0.3, pdepth:0.2}],
+      ['Vowel lead', {table:2, pos:0.2, pmod:0.6, pdec:900, oct:3, unison:2, det:0.2, cut:9000, fenv:0.1, atk:10, sus:0.9, rel:250}],
+      ['Vowel sweep pad', {table:2, pos:0, prate:0.12, pdepth:1, unison:5, det:0.35, cut:7000, atk:700, dec:1500, sus:0.9, rel:1800}],
+      ['Harmonic keys', {table:1, pos:0.3, pmod:0.5, pdec:600, cut:12000, fenv:0.2, atk:2, dec:900, sus:0.3, rel:400}],
+      ['Digital bite', {table:3, pos:0.6, warp:0.3, pmod:-0.5, pdec:150, cut:5000, res:0.3, fenv:0.5, fdec:120, dec:300, sus:0.4, rel:80}],
+      ['Fold pluck', {table:3, pos:0.9, pmod:-0.9, pdec:90, cut:4000, dec:250, sus:0, rel:120, oct:3}],
+      ['Warp wobble', {table:0, pos:0.6, warp:0.7, prate:4, pdepth:0.6, oct:1, cut:1500, res:0.4, sus:0.9, rel:150}],
+      ['Glass bells', {table:1, pos:0.9, oct:3, cut:14000, fenv:0, atk:1, dec:1800, sus:0, rel:900, unison:2, det:0.15}],
+      ['Choir table', {table:2, pos:0.7, prate:0.2, pdepth:0.4, unison:7, det:0.3, noise:0.05, cut:5000, atk:1200, sus:0.9, rel:2500}],
+      ['Sub sine', {table:0, pos:0, oct:0, sub:0.3, cut:2000, fenv:0, dec:800, sus:0.8, rel:60}]]},
+  breath:{title:'Breath', tag:'noise · resonators · wind', rows:{
+      color:{l:'Colour', min:0, max:1, c:'lin', d:0.5, f:v => v < 0.35 ? 'brown ' + Math.round((1 - v * 2) * 100) + '%' : v > 0.65 ? 'blue ' + Math.round((v * 2 - 1) * 100) + '%' : 'white'},
+      grain:{l:'Grain', min:0, max:1, c:'lin', d:0, f:pct}, grate:{l:'Grain rate', min:2, max:400, c:'log', d:40, f:v => Math.round(v) + ' /s'},
+      bands:{l:'Bands', min:1, max:8, c:'int', d:4, f:v => String(Math.round(v))}, freq:{l:'Frequency', min:60, max:16000, c:'log', d:3000, f:hz},
+      spread:{l:'Spacing', min:0, max:1, c:'lin', d:0.3, f:pct}, metal:{l:'Metal', min:0, max:1, c:'lin', d:0.5, f:pct}, q:{l:'Ring', min:0, max:1, c:'lin', d:0.5, f:pct},
+      body:{l:'Resonator mix', min:0, max:1, c:'lin', d:0.6, f:pct}, key:{l:'Key follow', min:0, max:1, c:'lin', d:0, f:pct},
+      hp:{l:'High-pass', min:10, max:8000, c:'log', d:200, f:hz}, lp:{l:'Low-pass', min:200, max:20000, c:'log', d:14000, f:hz},
+      fenv:{l:'Env amount', min:-1, max:1, c:'lin', d:0, f:pct}, fdec:{l:'Env decay', min:5, max:4000, c:'log', d:200, f:ms},
+      sweep:{l:'Sweep', min:-1, max:1, c:'lin', d:0, f:pct}, wind:{l:'Wind', min:0, max:1, c:'lin', d:0, f:pct},
+      atk:{l:'Attack', min:0.5, max:6000, c:'log', d:1, f:ms}, dec:{l:'Decay', min:5, max:8000, c:'log', d:200, f:ms}, sus:{l:'Sustain', min:0, max:1, c:'lin', d:0, f:pct}, rel:{l:'Release', min:5, max:8000, c:'log', d:80, f:ms}},
+    secs:[['Noise', ['color', 'grain', 'grate']], ['Resonators', ['bands', 'freq', 'spread', 'metal', 'q', 'body', 'key']], ['Filter', ['hp', 'lp', 'fenv', 'fdec']], ['Motion', ['sweep', 'wind']], ['Amp', ['atk', 'dec', 'sus', 'rel']]],
+    note:'Grain cuts the noise into beads. The bands sit at Frequency and climb by Spacing; Metal pushes them off the harmonic ladder, Ring makes them sing. Sweep lifts the bank over the note (a riser), Wind lets it wander. With Sustain up the sound holds as long as the note.',
+    pre:[['Init', {}], ['Closed hat', {bands:6, freq:6000, spread:0.35, metal:0.9, q:0.6, body:0.8, hp:3000, dec:60, rel:30}],
+      ['Open hat', {bands:6, freq:5500, spread:0.35, metal:0.9, q:0.7, body:0.8, hp:2500, dec:500, rel:200}],
+      ['Shaker', {grain:0.9, grate:70, bands:2, freq:4500, q:0.3, body:0.5, hp:1500, dec:110, rel:40}],
+      ['Brush snare', {color:0.6, bands:3, freq:900, spread:0.5, metal:0.3, q:0.3, body:0.5, hp:150, lp:9000, dec:160, rel:60}],
+      ['Cymbal wash', {bands:8, freq:4000, spread:0.3, metal:1, q:0.8, body:0.9, hp:1200, dec:1800, sus:0.2, rel:900}],
+      ['Riser', {color:0.5, bands:3, freq:400, spread:0.6, q:0.9, body:0.7, sweep:1, wind:0.3, atk:1500, sus:1, rel:400, hp:100}],
+      ['Fall', {bands:3, freq:6000, spread:0.6, q:0.8, body:0.7, sweep:-1, atk:200, sus:1, rel:600}],
+      ['Wind', {color:0.25, bands:1, freq:500, q:0.6, body:0.6, lp:3000, hp:60, wind:1, atk:900, sus:1, rel:1500}],
+      ['Breath', {color:0.45, bands:2, freq:1800, spread:0.4, q:0.5, body:0.7, key:1, lp:6000, atk:40, dec:300, sus:0.6, rel:120, wind:0.4}],
+      ['Crackle', {grain:1, grate:12, color:0.7, bands:1, freq:3000, q:0.1, body:0.3, hp:800, sus:1, rel:100}],
+      ['Static', {color:0.8, body:0, hp:2000, lp:12000, sus:1, rel:50, grain:0.3, grate:300}],
+      ['Noise kick', {color:0.1, bands:1, freq:70, q:0.9, body:1, hp:20, lp:2000, fenv:-1, fdec:80, dec:220, rel:40}]]},
+  strings:{title:'Strings', tag:'plucked ensemble · strum · body', rows:{
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      voices:{l:'Strings', min:1, max:6, c:'int', d:1, f:v => String(Math.round(v))},
+      chord:{l:'Voicing', min:0, max:8, c:'int', d:0, f:v => StringsCore.CHORDS[Math.max(0, Math.min(8, Math.round(v)))]},
+      strum:{l:'Strum', min:0, max:400, c:'sq', d:25, f:ms}, down:{l:'Direction', min:0, max:1, c:'int', d:0, f:v => v >= 0.5 ? 'down' : 'up'},
+      det:{l:'Detune', min:0, max:1, c:'lin', d:0.3, f:pct},
+      pick:{l:'Pick', min:0, max:1, c:'lin', d:0.6, f:v => v < 0.33 ? 'thumb' : v < 0.66 ? 'finger' : 'plectrum'}, pos:{l:'Strike point', min:0.03, max:0.5, c:'lin', d:0.28, f:pct},
+      decay:{l:'Decay', min:0.05, max:8, c:'log', d:1.6, f:v => v.toFixed(2) + ' s'}, damp:{l:'Damping', min:0, max:1, c:'lin', d:0.4, f:pct},
+      body:{l:'Body', min:0, max:1, c:'lin', d:0.5, f:pct}, size:{l:'Body size', min:0, max:1, c:'lin', d:0.5, f:v => v < 0.25 ? 'mandolin' : v < 0.5 ? 'guitar' : v < 0.75 ? 'bass' : 'cello'},
+      vib:{l:'Vibrato', min:0, max:1, c:'lin', d:0, f:pct}, vrate:{l:'Vibrato rate', min:0.5, max:12, c:'log', d:5, f:v => v.toFixed(1) + ' Hz'},
+      rel:{l:'Release', min:5, max:4000, c:'log', d:120, f:ms}},
+    secs:[['Strings', ['oct', 'voices', 'chord', 'strum', 'down', 'det']], ['Pluck', ['pick', 'pos', 'decay', 'damp']], ['Body', ['body', 'size']], ['Motion', ['vib', 'vrate', 'rel']]],
+    note:'Voicing picks the notes the strings play from the pad\'s pitch; Strum spaces them out, up or down. A short Decay with high Damping is a muted string, a long Decay with none rings like a harp. The note is released when the tracker lets go.',
+    pre:[['Init', {}], ['Nylon guitar', {voices:1, pick:0.45, pos:0.3, decay:1.8, damp:0.45, body:0.6, size:0.4}],
+      ['Steel strum', {voices:6, chord:8, strum:28, pick:0.8, pos:0.2, decay:2.5, damp:0.25, body:0.5, size:0.4, det:0.4}],
+      ['Minor strum down', {voices:5, chord:4, strum:35, down:1, pick:0.7, decay:2, damp:0.3, body:0.5, det:0.4}],
+      ['Harp', {voices:4, chord:1, strum:90, oct:3, pick:0.5, pos:0.12, decay:4, damp:0.1, body:0.4, size:0.6, det:0.2}],
+      ['Mandolin', {voices:2, chord:0, strum:8, oct:3, pick:0.9, pos:0.15, decay:0.9, damp:0.35, body:0.7, size:0.1, det:0.6}],
+      ['Muted bass', {voices:1, oct:1, pick:0.3, pos:0.4, decay:0.35, damp:0.85, body:0.3, size:0.75}],
+      ['Fingered bass', {voices:1, oct:1, pick:0.35, pos:0.25, decay:2.2, damp:0.5, body:0.5, size:0.8}],
+      ['Koto', {voices:1, oct:3, pick:0.85, pos:0.08, decay:1.4, damp:0.2, body:0.4, size:0.3, vib:0.35, vrate:4.5}],
+      ['Pizzicato cello', {voices:1, oct:1, pick:0.4, pos:0.35, decay:0.7, damp:0.6, body:0.9, size:1}],
+      ['Fifths drone', {voices:4, chord:2, strum:60, oct:1, pick:0.3, decay:6, damp:0.15, body:0.6, size:0.9, det:0.5, rel:1500}],
+      ['Twelve string', {voices:6, chord:3, strum:20, pick:0.9, pos:0.18, decay:3, damp:0.2, body:0.5, size:0.45, det:0.8}]]},
   swarm:{title:'Swarm', tag:'oscillator cloud · drift · bloom', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
       voices:{l:'Voices', min:1, max:48, c:'int', d:16, f:v => String(Math.round(v))},

@@ -688,6 +688,16 @@ After the eight bugs below were merged (PR #1), the review's risk items went in 
   `onVoiceCopy`). **To put the engine cards back on their native dropdowns set `ENGINE_PRESET_SHEET = false`** (one
   line next to `PRK`): the `<select>`s are still filled and wired, the sheet only intercepts the tap while it is
   true. `vPre` / `lPre` are buttons now; `fillPresetSel` is unused and can go once the sheet is settled.
+- **Three more rendered engines (15 Oct, night; cache v130):** `TableCore` (wavetable: four 8-frame tables drawn in
+  the time domain, taken apart once with a DFT and rebuilt band-limited per note; Position/Warp, position envelope +
+  LFO, unison, sub, noise, SVF low-pass with envelope, ADSR), `BreathCore` (coloured noise → grains → a bank of up to
+  8 resonant band-passes with Spacing/Metal/Ring → HP/LP with envelope, Sweep for risers, Wind random walk; hats,
+  shakers, cymbals, risers, wind, static) and `StringsCore` (plucked-string loops with a damping low-pass and a
+  fractional tap — the tap is pulled in by the low-pass's delay so tuning holds —, pick/strike-point excitation,
+  chord voicings strummed up or down, 4-mode body sized mandolin→cello, release damping). Same shape as the keys
+  engines: `XENG` / `renderX` / `XUI` (`table`, `breath`, `strings`), engine grid is now an exact 4×4, factory
+  voice groups "Table" / "Breath" / "Strings". All original code. Checked in Node (no NaN, pitch within ~1 %,
+  20–230 ms a render) and headless (cards build, every preset renders, sheet lists them). Not heard yet.
 - **Nothing from the review is left.** Next: hear it on the Fold and the PC (nothing has been checked by ear), then the
   feature list below.
 
