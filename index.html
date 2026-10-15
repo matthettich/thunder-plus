@@ -6948,8 +6948,10 @@ function moEv(e){
 function moClock(s){
   mapUpd();
   const c = mx.clk, b = mx.beat; if (!midi.clkOut || !c.on || !b) return;
-  const bpm = s.bpm, upto = b.b + (s.time - b.t) * bpm / 60;
-  for (let n = 0; c.k / 24 < upto - 1e-9 && n < 512; n++, c.k++) msend([0xF8], b.t + (c.k / 24 - b.b) * 60 / bpm);
+  // Ticks are booked only ~80 ms ahead (the pump runs every 25 ms), not the sequencer's whole 250 ms look-ahead:
+  // browsers can't take back a booked message, so ticks after STOP would reach the gear after its Stop.
+  const bpm = s.bpm, upto = b.b + (Math.min(s.time, ctx.currentTime + 0.08) - b.t) * bpm / 60;
+  for (let n = 0; c.k / 24 < upto - 1e-9 && n < 512; n++, c.k++){ const at = b.t + (c.k / 24 - b.b) * 60 / bpm; msend([0xF8], at); c.last = at; }
 }
 function moStart(){ mx.beat = null; mx.clk = {on:false, k:0}; }
 // Every MIDI note out ends now, including ones booked ahead (OUTPUT, MIDI CH or the port changed, or STOP).
@@ -6964,7 +6966,8 @@ function moRelease(){
   mx.held = [];
 }
 function moStop(){
-  const was = mx.clk.on; moRelease(); if (was) msend([0xFC]);
+  const was = mx.clk.on, last = mx.clk.last; moRelease();
+  if (was) msend([0xFC], last != null && ctx && last > ctx.currentTime ? last + 0.001 : null);   // after the last booked tick
   mx.clk = {on:false, k:0}; mx.beat = null;
 }
 // Clock in.
