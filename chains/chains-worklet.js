@@ -62,12 +62,13 @@ const VCF = {
     const mode = io.p.mode | 0, q = 1 - io.p.res * .95;
     for (let i = 0; i < ctx.block; i++){
       const fc = Math.min(.45, (.01 + Math.pow(10, io.p.cutoff * 3) * .004) * Math.pow(2, io.in.cutoff[i] * 3) * 44100 / ctx.sr);
-      const f = 2 * Math.sin(Math.PI * fc);
-      const hp = io.in.in[i] - st.ic2 - q * st.ic1;
-      const bp = f * hp + st.ic1; st.ic1 = f * hp + bp;
-      const lp = f * bp + st.ic2; st.ic2 = f * bp + lp;
-      if (!(Math.abs(st.ic1) < 1e4)) st.ic1 = st.ic2 = 0;
-      io.out.out[i] = mode === 0 ? lp : mode === 1 ? bp : hp;
+      // TPT state-variable (as Blades): stable at every cutoff and resonance. The old Chamberlin/TPT mix doubled the
+      // integrator step and ran away above cutoff ~0.45 at the default resonance.
+      const g = Math.tan(Math.PI * fc), a1 = 1 / (1 + g * (g + q)), a2 = g * a1, a3 = g * a2;
+      const x = io.in.in[i], v3 = x - st.ic2, bp = a1 * st.ic1 + a2 * v3, lp = st.ic2 + a2 * st.ic1 + a3 * v3;
+      st.ic1 = 2 * bp - st.ic1; st.ic2 = 2 * lp - st.ic2;
+      if (!(Math.abs(st.ic1) < 1e4 && Math.abs(st.ic2) < 1e4)) st.ic1 = st.ic2 = 0;
+      io.out.out[i] = mode === 0 ? lp : mode === 1 ? bp : x - q * bp - lp;
     }
   }
 };

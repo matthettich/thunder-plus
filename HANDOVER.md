@@ -622,6 +622,39 @@ caches.
   on the root that recalculated and repainted every frame (60 recalcs/s); this is 10/s, about 8 ms of main thread a
   second on a desktop. Paused while hidden, off with reduced motion. Fixed overlays (Help, toasts) are unaffected.
 
+## 15 Oct: review fixes (branch fix/review-bugs)
+
+A code review (audio, storage, UI, DSP) found these; all fixed and checked headless. Cache `thunderplus-v98`;
+`chains-worklet.js?v=17`, `waves-worklet.js?v=13`.
+
+- **SoundFont pads were silent:** in `sfNote` the `f.connect(pn); pn.connect(bus)` had been swallowed by the "+6 dB"
+  comment appended to the same line, so no SoundFont voice reached a track. One-line fix.
+- **VCF (…chains and …waves, outside the shared block, so edited in both worklets):** the old core mixed a Chamberlin
+  `hp` with the TPT `2·v − ic` update, doubling the integrator step; it ran away above cutoff ≈ 0.45 at the default
+  resonance (5 000× full scale, resetting 200×/s). Now the TPT SVF Blades uses, same `q = 1 − res·0.95` mapping; checked
+  at default, min and max cutoff/res in all three modes: peak ≤ 0.93 on a 0.5 input, no NaN.
+- **Storage full was silent:** `storeWrite()` (before `save()`) is the one path for the song and kit writes. A failed
+  write shows a red banner (`#storeB`, `.updb.storeb`) that exports the project on tap; it clears when a write succeeds.
+  `navigator.storage.persist()` is requested at start-up (next to `hadSW`) so Android doesn't evict IndexedDB.
+- **Imported presets kept base64 audio inside the song** (3.9 MB per 30 s sample in every autosave and undo step; two
+  imports filled localStorage). `presetsByRef()` stores the audio in IndexedDB and keeps `{ref}`, like in-app presets;
+  used by Import presets, by project files that carry preset audio, and once at start-up for songs saved before this.
+  `smpHeld` (Map id → sample, every sample seen this session) backs `smpById`, `fullSmp` and undo. `presetSmpFill()`
+  (awaited by Save/Share project and Export presets) fetches preset samples no longer on a pad, and `projBlob()` now
+  embeds preset audio (`fullPresets()`), so presets travel between devices.
+- **Kit undo by reference:** `vSnap(v)` = `voiceToJSON(v, 'ref')` with the sample objects parked in `smpHeld`; restore
+  refills from there (else `resolveSamples()`). Was 3.7 MB and ~100 ms per settled tweak with a 30 s sample.
+- **No more `prompt()`/`confirm()`:** `askText(msg, default, max)` and `askYes(msg, okLabel)` (`askSheet`, after
+  `toast()`, CSS `.ask`) are promise-based in-page sheets: Electron has no `prompt()` (six features did nothing in the
+  desktop build), and a native dialog froze the 25 ms pump so every missed note played at once when it closed. All ten
+  call sites are now async. `pump()` also re-anchors the sequencer (`s.base`, `s.time`, `s.btT`) when it finds itself
+  more than 0.5 s behind the audio clock (a frozen tab, a system dialog), so the song continues instead of bursting.
+- **…waves pads rendered cut off on slow devices:** `wavesPre` now passes `costCeiling: Infinity`; the engine's wall-clock
+  load shedding (cut voices → draft → all notes off) belongs to the live editor, not an offline render.
+- **A tap that closed Settings / File / Phrases also pressed what was under it** (d-pad, pads) on wide screens:
+  `swallowTap(e)` in the three capture-phase closers stops the pointerdown and the pointerup/click of that tap
+  (propagation only — cancelling touchend would cancel the click). Checked with real taps at 884×1104.
+
 ## How to validate (there is no test suite)
 
 1. **Syntax:** `node --check` the worklets; for the single-file apps, extract each inline `<script>` and
