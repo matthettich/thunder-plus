@@ -543,7 +543,11 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .kpc{display:flex; flex-direction:column; gap:5px; height:calc(var(--k) * 1.95 + 10px)}
 .kpc .kpr{flex:1; min-height:0}
 .kpc .kp{min-height:0; height:100%}
-.tinfo>.thint{-webkit-line-clamp:1; display:block; white-space:nowrap; text-overflow:ellipsis}
+/* The hint wraps to two lines rather than being cut with an ellipsis (it is how the PAD gestures are discovered); a
+   longer one shows "…" at the end and opens fully on a tap. */
+.tinfo>.thint{-webkit-line-clamp:2; cursor:default}
+.tinfo>.thint.open{-webkit-line-clamp:unset; display:block}
+.tinfo>.thint.more:not(.open){cursor:pointer}
 .thint{color:var(--ts-hint)}
 .tside{width:236px; flex:none; border-left:1px solid var(--line); background:var(--side); padding:12px; display:flex; flex-direction:column; gap:12px; overflow:auto}
 .tmap{display:grid; grid-template-columns:repeat(4,1fr); gap:4px}
@@ -10849,7 +10853,8 @@ function draw(){
   const mstP = tv === 'phrase' && mstView();
   if (mstP) hintTxt = inMode === 'keys' ? 'Master phrase: commands only · letters pick a command (V F G R T…) · type hex for its value · Del cell · Shift+↑↓ lines · Ctrl+C/V' : HINT.phraseM;
   if (tv === 'fx' && cs.fx.y > FXSLOTS) hintTxt = 'Slot ' + (cFxS + 1) + ' controls · ▲▼ pick one · ' + (inMode === 'keys' ? '← or Esc back to the slots' : '◀ back to the slots');
-  $('tHint').textContent = (tv === 'phrase' && !mstP ? 'NOW ' + curS() + (inMode === 'keys' ? ' · oct ' + kOct + ' · step ' + kStep : '') + ' · ' : '') + hintTxt;
+  { const h = $('tHint'), txt = (tv === 'phrase' && !mstP ? 'NOW ' + curS() + (inMode === 'keys' ? ' · oct ' + kOct + ' · step ' + kStep : '') + ' · ' : '') + hintTxt;
+    if (h.textContent !== txt){ h.textContent = txt; h.classList.remove('open'); h.classList.toggle('more', h.scrollHeight > h.clientHeight + 1); } }
   drawArr(PH);
   const km = inMode === 'keys'; $('tKp').hidden = !km || !kpOn; $('tPad').hidden = km; $('tLegKeys').hidden = !km; $('tLegPad').hidden = km;
   deckDraw(); if (relayout || stgReq !== (stage === 'off' ? '' : stageKind())) stageLayout();
@@ -12384,6 +12389,8 @@ $('helpBody').addEventListener('scroll', helpNavOn, {passive:true});
 $('helpNav').addEventListener('click', e => { const b = e.target.closest('[data-h]'); if (!b) return; const t = $(b.dataset.h), body = $('helpBody'); body.scrollTo({top:t.offsetTop - body.offsetTop, behavior:'smooth'}); });
 $('bHelp').addEventListener('click', () => helpOpen() ? hideHelp() : showHelp());
 $('helpBtn2').addEventListener('click', () => { gsetToggle(false); showHelp(); });
+// A hint longer than two lines opens fully on a tap (and folds again on the next).
+$('tHint').addEventListener('click', () => { const h = $('tHint'); if (h.classList.contains('more') || h.classList.contains('open')){ h.classList.toggle('open'); scheduleRefit(false); } });
 $('helpX').addEventListener('click', hideHelp);
 // Runs before the synth and tracker key handlers: ? or F1 toggles help, and while it is open the keys
 // only scroll it (Esc closes).

@@ -625,7 +625,7 @@ caches.
 ## 15 Oct (afternoon): review risk fixes, one commit each on main
 
 After the eight bugs below were merged (PR #1), the review's risk items went in as separate commits. Cache is now
-`thunderplus-v117`; `chains-worklet.js?v=20`, `waves-worklet.js?v=15`, `master-worklet.js?v=3`.
+`thunderplus-v118`; `chains-worklet.js?v=20`, `waves-worklet.js?v=15`, `master-worklet.js?v=3`.
 
 - **Effects can't be hung or silenced by a bad sample** (93d3ae3): the wasm only checks its output, and a NaN/∞ on the
   way in made the tape delay's `tfx_process` never return (frozen audio thread) and left twenty effects silent. The
@@ -673,6 +673,15 @@ After the eight bugs below were merged (PR #1), the review's risk items went in 
   before the editor had started; cover-screen top bar on one row, Settings sheet under the keyboard, overscroll off
   (847a1bb). Not done: creating module states "off the audio thread" — a worklet's message handler runs on the
   rendering thread, so there is nowhere else to do it.
+- **Hint line wraps** (15 Oct, evening): the tracker hint was one line with an ellipsis, cut off on every phone screen
+  (it is how the PAD gestures are discovered). Now two lines (`.thint`, `-webkit-line-clamp:2`); a longer one gets
+  `.more` and opens fully on a tap (`.open`, with a refit). Phone grid font and row count unchanged; desktop ~5 %
+  smaller text on a 900 px window.
+- **Owner's take on the UI suggestions (15 Oct):** the COMMANDS row and the two bottom play keys stay as they are — on
+  touch, single-tap CLN↓/CUT/PST and pattern-vs-song play under the thumb are the point. The top "▷ Song" button stays
+  too (the only play control when the key block is hidden; useful on desktop). Later, maybe: a PAD KEYS toggle in
+  Settings → Screen (COMMANDS/KEYPAD/BOTTOM/SIDE already have one; the d-pad block in PAD mode doesn't), and a
+  swipe-down to hide the lower block — with the caveat that it removes no-look navigation, so not a priority.
 - **Nothing from the review is left.** Next: hear it on the Fold and the PC (nothing has been checked by ear), then the
   feature list below.
 
