@@ -111,10 +111,14 @@ function effect(type, id, params, map, cost){
       const x = st.x, buf = x.memory.buffer;
       const P = new Float32Array(buf, x.tfx_params(st.h), 12); P.fill(0); P.set(map(io.p, ctx));
       const L = new Float32Array(buf, x.tfx_l(), 128), R = new Float32Array(buf, x.tfx_r(), 128);
-      L.set(L0); R.set(R0);
+      // The wasm only checks its output. A NaN or infinity on the way IN hangs the tape delay for good and leaves
+      // twenty other effects silent, so bad or absurd samples are zeroed here first.
+      for (let i = 0; i < ctx.block; i++){ const a = L0[i], b = R0[i]; L[i] = a > -8 && a < 8 ? a : 0; R[i] = b > -8 && b < 8 ? b : 0; }
       try { x.tfx_process(st.h, ctx.block); }
       catch (e){ try { x.tfx_free(st.h); } catch (e2){} st.h = -1; io.out.out.set(L0); io.out.outR.set(R0); return; }   // crashed: bypass it
       const L2 = new Float32Array(x.memory.buffer, x.tfx_l(), 128), R2 = new Float32Array(x.memory.buffer, x.tfx_r(), 128);
+      let bad = false; for (let i = 0; i < ctx.block; i++){ const a = L2[i], b = R2[i]; if (!(a > -1e4 && a < 1e4 && b > -1e4 && b < 1e4)){ bad = true; break; } }
+      if (bad){ try { x.tfx_free(st.h); st.h = x.tfx_new(id, ctx.sr); } catch (e){ st.h = -1; } io.out.out.fill(0); io.out.outR.fill(0); return; }   // its state went bad: start it afresh
       io.out.out.set(L2.subarray(0, ctx.block)); io.out.outR.set(R2.subarray(0, ctx.block));
     }
   };
