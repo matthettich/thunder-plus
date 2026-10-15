@@ -9076,7 +9076,7 @@ function tStart(mode, o){
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : ''});
   moStart();
-  tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo();
+  tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
   void r;
 }
 // The SONG button in the synth's top bar: play the song from the tracker's cursor row, or stop it.
@@ -11491,7 +11491,7 @@ dkDrag($('dkScope').querySelector('.dkw'), (dx, dy, st) => { deck.ws = clamp(Mat
 dkDrag($('dkFx').querySelector('.dkw'), (dx, dy, st) => { deck.wf = clamp(Math.round(st.wf - dx), 200, dkMaxW()); $('tDeck').style.setProperty('--dkwf', deck.wf + 'px'); });
 // A skin's font can arrive after the screen was measured (Share Tech Mono in the terminal skins): fit and redraw
 // once it lands, so the MONO/POLY boxes and the type size match the real letters.
-if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { try { if (view === 'tracker'){ arrSig = ''; fit(); draw(); } } catch(e){} });
+// (fonts arriving: scheduleRefit below, once for the whole page)
 function deckDraw(){ deckLayout(); deckStrip(); if (!deckShown()) return; deckMetersPaint(); deckInst(); deckFx(); }
 /* ---------- ARRANGE: the song overview beside the screen ---------- */
 // Every filled row of the song as blocks, one column per track. A block shows its phrase (or its sect with
@@ -11513,19 +11513,26 @@ const arrMax = () => { const side = document.querySelector('.tside'), sw = side 
 // (and once a second as a backstop), so it follows the Fold opening and closing with the app already running.
 function arrLayout(force){
   const de = document.documentElement, w = Math.max(innerWidth, de.clientWidth), h = Math.max(innerHeight, de.clientHeight);
-  const key = [w, h, arrMode, arrW, view].join(':'); if (!force && key === arrKey) return; arrKey = key;
+  const key = [w, h, arrMode, arrW, view].join(':'); if (!force && key === arrKey) return false; arrKey = key;
   const vis = arrMode === 2 || (arrMode === 1 && w >= 600 && h >= 500), B = document.body.classList;
   B.toggle('arrvis', vis); B.toggle('arrnarrow', vis && w < 1100); B.toggle('arrsmall', w < 900); B.toggle('arrtiny', w < 600);
   arrEl.style.width = arrW ? clamp(arrW, 200, arrMax()) + 'px' : '';
-  arrSig = ''; arrCurY = -1; fit(); draw();
+  arrSig = ''; arrCurY = -1; fit(); draw(); return true;
 }
-addEventListener('resize', () => arrLayout());
+// Every "the page changed shape" signal (window, visual viewport, the screen element, fonts arriving) lands here and
+// runs ONE layout pass in the next frame: a fold/unfold used to run fit()+draw() four times over (~0.5 s on the phone).
+let refitRaf = 0, refitForce = false;
+function scheduleRefit(force){
+  refitForce = refitForce || !!force; if (refitRaf) return;
+  refitRaf = requestAnimationFrame(() => { refitRaf = 0; const f = refitForce; refitForce = false; if (f) measure(); if (!arrLayout(f) && view === 'tracker'){ fit(); draw(); } });
+}
+addEventListener('resize', () => scheduleRefit(false));
 // Web fonts can arrive after the first draw: measure again so the text and the MONO / POLY boxes line up.
-if (document.fonts) document.fonts.addEventListener('loadingdone', () => { measure(); arrLayout(true); });
-if (window.visualViewport) visualViewport.addEventListener('resize', () => arrLayout());
+if (document.fonts) document.fonts.addEventListener('loadingdone', () => scheduleRefit(true));
+if (window.visualViewport) visualViewport.addEventListener('resize', () => scheduleRefit(false));
 if (screen.orientation) screen.orientation.addEventListener('change', () => setTimeout(() => arrLayout(true), 150));
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(() => arrLayout(true), 150); });
-new ResizeObserver(() => arrLayout()).observe(document.documentElement);
+new ResizeObserver(() => scheduleRefit(false)).observe(document.documentElement);
 setInterval(() => { if (!document.hidden) arrLayout(); }, 1000);
 // The line over the song's info and the line over ARRANGE's footer meet in one straight line across: whichever
 // block is shorter grows upward to the other's line.
@@ -11546,7 +11553,7 @@ function footAlign(){
     else tInfoBox.style.minHeight = (a.height + (lh + pad - h)).toFixed(1) + 'px';
   }
   // The song's grid just got taller or shorter: size its text again so nothing hangs off the bottom.
-  if (Math.abs((parseFloat(tInfoBox.style.minHeight) || 0) - (parseFloat(was) || 0)) > 0.5) requestAnimationFrame(() => { fit(); draw(); });
+  if (Math.abs((parseFloat(tInfoBox.style.minHeight) || 0) - (parseFloat(was) || 0)) > 0.5) scheduleRefit(false);
 }
 if (arrFoot) arrFoot.title = arrFoot.textContent;
 { const ro = new ResizeObserver(() => requestAnimationFrame(footAlign));
@@ -11559,8 +11566,9 @@ $('tArrH').addEventListener('pointermove', e => {
   if (!arrDrag || e.pointerId !== arrDrag.id) return;
   const dx = arrDrag.x0 - e.clientX; if (Math.abs(dx) > 3) arrDrag.moved = true; if (!arrDrag.moved) return;
   arrW = clamp(Math.round(arrDrag.w0 + dx), 200, arrMax()); arrEl.style.width = arrW + 'px';
-  // Re-fit the song as the panel moves, not a second later.
-  if (!arrDrag.raf) arrDrag.raf = requestAnimationFrame(() => { if (arrDrag) arrDrag.raf = 0; arrSig = ''; fit(); draw(); });
+  // The panel's width follows the finger every frame; the song's text is re-fitted at most ~8 times a second while
+  // dragging (fit()+draw() is ~150 ms on a phone, which made the drag crawl) and once more on release.
+  const now = performance.now(); if (!arrDrag.t || now - arrDrag.t > 120){ arrDrag.t = now; arrSig = ''; fit(); draw(); }
 });
 const arrGripUp = e => {
   if (!arrDrag || e.pointerId !== arrDrag.id) return;
@@ -11843,9 +11851,14 @@ $('tCpu').addEventListener('click', () => {
     : `The audio engine’s processing uses ${Math.round(L.reduce((a, x) => a + x[1], 0) * 100)}% of real time (this browser doesn’t report the total audio load, so that’s what the meter shows). `)
     + fx + (glitch.n ? ` · ${glitch.n} dropout${glitch.n === 1 ? '' : 's'} since the sound started` + (latOf() === 'interactive' ? ' (Settings → Audio → Latency: Balanced gives more headroom).' : '.') : ' · No dropouts.'));
 });
+// Stopped, nothing sounding and no live display (deck scope, meters): the loop drops to 10 Hz on a timer instead
+// of a callback every display frame (120 a second on the Fold, for nothing). tStart() and the pads wake it.
+let rafT = 0;
+const frameIdle = () => !tp.on && !rendering && performance.now() - audioWake > 1500 && !deckShown();
+function frameWake(){ if (raf === -1){ clearTimeout(rafT); raf = 0; } if (!raf && view === 'tracker') frame(); }
 function frame(){
   raf = 0; if (view !== 'tracker') return;
-  raf = requestAnimationFrame(frame);
+  if (frameIdle()){ raf = -1; rafT = setTimeout(() => { raf = 0; frame(); }, 100); } else raf = requestAnimationFrame(frame);
   if (tp.on && ctx){
     let ch = false;
     while (tp.q.length && tp.q[0].t <= ctx.currentTime + 0.01){ const e = tp.q.shift(); if (!tp.pos) tp.pos = new Array(NT).fill(null); e.pos.forEach((q, i) => { if (q) tp.pos[i] = q; }); tp.bpm = e.bpm; tp.tks = e.tks; tp.line = e.line; tp.st = e.t; ch = true; }
@@ -12076,8 +12089,8 @@ $('tRowsV').addEventListener('click', async () => { const id = rowsId(), n = awa
 $('tClk').addEventListener('click', () => toast(`${tp.on ? tp.bpm : S.bpm} BPM, ${tp.on ? tp.tks : S.ticks || TICKS} ticks a step. Set them in Project (TEMPO, TICKS); TPO and TIC change them as the song plays.`));
 $('projIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadProjFile(f); });
 $('chainsIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importChainsFile(f); });
-new ResizeObserver(() => { fit(); draw(); }).observe(scr);
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { measure(); fit(); draw(); });
+new ResizeObserver(() => scheduleRefit(false)).observe(scr);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => scheduleRefit(true));
 
 
 /* ---------- KEYS input mode: type notes, hex and effects directly (physical keyboard or on-screen keypad) ---------- */
@@ -12304,7 +12317,7 @@ function setView(v){
   document.body.classList.toggle('trkv', tr); songBtn(); topSelVis();
   try { localStorage.setItem(VK, view); } catch(e){}
   updView();
-  if (tr){ releaseAll(); measure(); fit(); draw(); if (!raf) raf = requestAnimationFrame(frame); }
+  if (tr){ releaseAll(); measure(); fit(); draw(); frameWake(); }
   else if (!wv){ releaseAll(); refreshAll(); }
   else releaseAll();
 }
