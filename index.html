@@ -104,6 +104,10 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .gset .tsr select{min-width:0; flex:1 1 140px; max-width:240px}
 .gset .tsr input[type=text]{flex:1 1 140px; max-width:240px}
 .gset .tsr input[type=range]{flex:1 1 100px; width:auto; min-width:80px}
+/* Sliders in Settings are locked: a finger scrolling the menu passes over them. Tap one to unlock it, then drag;
+   it locks again a few seconds after you stop. */
+#gset input[type=range]:not(.unl){pointer-events:none; opacity:.5}
+#gset input[type=range].unl{outline:2px solid var(--ink); outline-offset:3px; border-radius:4px}
 .gset .tsr output{min-width:70px; font-variant-numeric:tabular-nums; font-size:var(--fs-3)}
 .gset .tsr .stp{min-width:34px; padding-inline:0}
 /* checkbox rows: box, bold title, the explanation under it (Seeds' setrow) */
@@ -364,7 +368,7 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .pad.syn.hit b::after{color:var(--inv)}
 
 .toast{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(110px + env(safe-area-inset-bottom,0px));
-  background:var(--panel); color:var(--ink); border:2px solid var(--ink); box-shadow:4px 4px 0 0 var(--ink); padding:9px 15px; font-size:var(--fs-4); z-index:9; max-width:calc(100% - 32px)}
+  background:var(--panel); color:var(--ink); border:2px solid var(--ink); box-shadow:4px 4px 0 0 var(--ink); padding:9px 15px; font-size:var(--fs-4); z-index:130; max-width:calc(100% - 32px)}
 
 @media (max-width:600px){
   .strip{grid-template-columns:repeat(4,minmax(0,1fr))}
@@ -6392,7 +6396,7 @@ addEventListener('orientationchange', placeOpenMenus);
 if (window.visualViewport) window.visualViewport.addEventListener('resize', placeOpenMenus);
 function gsetToggle(open = !gsetOpen()){
   if (open && !$('gfile').hidden) gfileToggle(false);
-  $('gset').hidden = !open;
+  $('gset').hidden = !open; if (!open) rlLockAll();
   $('bSet').classList.toggle('on', open); $('bSet').setAttribute('aria-expanded', String(open));
   if (open){ showGset(); $('gset').scrollTop = 0; placeMenu($('gset'));
     $('gset').style.setProperty('--gsetTop', Math.round($('bSet').getBoundingClientRect().bottom + 6) + 'px'); }
@@ -6402,6 +6406,28 @@ function gsetToggle(open = !gsetOpen()){
 for (const [id] of GLOBAL_SECS){ const s = $(id); if (s){ s.hidden = true; s.classList.add('gsec'); $('gsetBody').append(s); } }
 for (const id of INNER_SECS){ const s = $(id); if (s) $('gsetBody').append(s); }   // parked here; buildProj / buildScreen place them
 $('bSet').addEventListener('click', () => gsetToggle());
+// Settings sliders are locked so scrolling the menu, or a stray tap on a slider's track, can't change a setting.
+// A tap (not a drag) on a locked slider unlocks just that one; it locks again 4 s after it was last moved, and
+// all of them lock when the menu closes. The − and + buttons, lists and switches work as before.
+const RLOCK_MS = 4000; let rlDown = null;
+function rlRanges(){ return $('gset').querySelectorAll('input[type=range]'); }
+function rlAt(x, y){ for (const r of rlRanges()){ if (r.disabled) continue; const b = r.getBoundingClientRect();
+  if (b.width && x >= b.left - 4 && x <= b.right + 4 && y >= b.top - 8 && y <= b.bottom + 8) return r; } return null; }
+function rlArm(r){ clearTimeout(r._lk); r._lk = setTimeout(() => { if (r._held) return rlArm(r); r.classList.remove('unl'); }, RLOCK_MS); }
+function rlLockAll(){ for (const r of rlRanges()){ clearTimeout(r._lk); r._held = false; r.classList.remove('unl'); } }
+$('gset').addEventListener('pointerdown', e => {
+  if (e.target.matches && e.target.matches('input[type=range].unl')){ e.target._held = true; rlArm(e.target); rlDown = null; return; }
+  rlDown = {x:e.clientX, y:e.clientY, id:e.pointerId};
+}, true);
+$('gset').addEventListener('pointercancel', () => { rlDown = null; }, true);
+addEventListener('pointerup', () => { for (const r of rlRanges()) if (r._held){ r._held = false; rlArm(r); } }, true);
+addEventListener('pointercancel', () => { for (const r of rlRanges()) r._held = false; }, true);
+$('gset').addEventListener('pointerup', e => {
+  const d = rlDown; rlDown = null; if (!d || d.id !== e.pointerId || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 10) return;
+  const r = rlAt(e.clientX, e.clientY); if (!r || r.classList.contains('unl')) return;
+  rlLockAll(); r.classList.add('unl'); rlArm(r); toast('Slider unlocked: drag it to change. It locks again after a few seconds.');
+}, true);
+$('gset').addEventListener('input', e => { if (e.target.matches && e.target.matches('input[type=range].unl')) rlArm(e.target); }, true);
 window.addEventListener('pointerdown', e => { if (gsetOpen() && !$('gset').contains(e.target) && !$('bSet').contains(e.target)) gsetToggle(false); }, true);
 
 /* ---------- File menu: a persistent dropdown in the top bar ----------
