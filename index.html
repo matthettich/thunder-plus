@@ -459,6 +459,15 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .ask input{width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid var(--line); background:var(--panel); min-height:38px}
 .ask .btnrow{justify-content:flex-end}
 .ask .ok{background:var(--pl); color:var(--inv); border-color:var(--pl); font-weight:600}
+/* First launch: the three gestures the whole app rests on, shown once over the tracker; any tap closes it. */
+.welcome{position:fixed; inset:0; z-index:65; display:flex; align-items:flex-end; justify-content:center; background:rgba(0,0,0,.42); padding:16px; padding-bottom:calc(130px + env(safe-area-inset-bottom,0px))}
+@media (min-width:700px){ .welcome{align-items:center; padding-bottom:16px} }
+.welcome .wbox{background:var(--bench); color:var(--ink); border:1px solid var(--line); box-shadow:0 8px 32px rgba(0,0,0,.35); width:min(460px, 100%); padding:18px 20px}
+.welcome h2{margin:0 0 10px; font-size:var(--fs-5)}
+.welcome ol{margin:0; padding-left:1.3em; line-height:1.5; font-size:var(--fs-4)} .welcome li+li{margin-top:6px}
+.welcome kbd{font:inherit; font-weight:600; padding:0 5px; border:1px solid var(--line); border-radius:3px; background:var(--panel)}
+.welcome .wfoot{margin-top:14px; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:var(--fs-3); color:var(--muted)}
+.welcome .wfoot button{min-height:34px; white-space:nowrap}
 .updb.storeb{background:#c0392b; color:#fff; white-space:normal; max-width:calc(100vw - 32px); z-index:21}
 @media (max-width:480px){ .top .tmode .mx{display:inline} .top .tmode,.top .tcpu{padding:0 8px} .top .tcpu{min-width:72px} }
 .top .tcpu{border:1px solid var(--line); min-height:34px; background:var(--panel); padding:0 10px; min-width:84px; overflow:hidden}
@@ -1651,6 +1660,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <div class="hbody" id="helpBody" tabindex="-1"><div class="hwrap">
     <section id="hStart">
 <h2>Getting started</h2>
+<p><button type="button" id="welcomeAgain">Show the first-launch tips again</button></p>
 <p>...Thunder has four screens: the <b>Synth</b>, where you build an 8-pad kit; the <b>Tracker</b>, a sequencer that plays that kit; <b>…waves</b>, a modular synth that plays as a layer oscillator; and <b>…chains</b>, where you design modular effects chains for the tracker’s tracks (Mixer → CHN). Switch at the top. <b>⚙ Settings → App → Mobile</b> turns the app into ...Thunder for phones: Synth and Tracker only, with PAD input. …waves layers and …chains effects still play there, so the same files work in both. Everything saves in the browser as you work; <b>File ▾</b> saves a project file (song and kit) you can keep or move to another device, and opens, renders and exports. There is also a <b>desktop app</b> for Windows, Mac and Linux (github.com/matthettich/thunder-plus/releases/latest) that keeps itself up to date; it keeps its own songs and kits, so use File to move work between it and the browser.</p>
 <h3>How a song fits together</h3>
 <p><b>Song</b> (256 rows × 16 tracks of sect numbers) → <b>Sect</b> (up to 16 phrases, each with a transpose) → <b>Phrase</b> (up to 32 rows of note, volume, instrument and three effects) → <b>Inst</b> (which pad a note plays, with transpose, volume, pan, reverse and start). <b>Mixer</b>, <b>FX</b> and <b>Project</b> sit around them.</p>
@@ -12396,6 +12406,25 @@ $('helpBody').addEventListener('scroll', helpNavOn, {passive:true});
 $('helpNav').addEventListener('click', e => { const b = e.target.closest('[data-h]'); if (!b) return; const t = $(b.dataset.h), body = $('helpBody'); body.scrollTo({top:t.offsetTop - body.offsetTop, behavior:'smooth'}); });
 $('bHelp').addEventListener('click', () => helpOpen() ? hideHelp() : showHelp());
 $('helpBtn2').addEventListener('click', () => { gsetToggle(false); showHelp(); });
+// First launch: three lines on the three gestures, over the tracker. Shown once (thunderplus-welcome-v1); Help's
+// "Start" section is the reference, and welcome() can be called again from there.
+const WLK = 'thunderplus-welcome-v1';
+function welcome(force){
+  try { if (!force && localStorage.getItem(WLK)) return; } catch(e){}
+  if (document.querySelector('.welcome')) return;
+  const pad = inMode !== 'keys', wrap = el('div', 'welcome'), box = el('div', 'wbox');
+  box.innerHTML = pad
+    ? `<h2>Three things to know</h2><ol><li><kbd>PLAY</kbd> plays the starter beat; <kbd>PLAY</kbd> again stops.</li><li>Move with the <kbd>▲▼◀▶</kbd> pad; <kbd>EDIT</kbd> on an empty cell adds a note or a block, <kbd>EDIT</kbd> twice makes a new phrase.</li><li>Hold <kbd>EDIT</kbd> and press <kbd>▲▼</kbd> to change a value; <kbd>SHIFT</kbd> + <kbd>▶</kbd> opens what the cursor is on.</li></ol>`
+    : `<h2>Three things to know</h2><ol><li><kbd>Space</kbd> plays this screen, <kbd>Shift</kbd>+<kbd>Space</kbd> the song.</li><li>Arrows move; type a note (<kbd>Z</kbd>–<kbd>/</kbd>, <kbd>Q</kbd>–<kbd>P</kbd>) or hex to edit the cell; <kbd>Enter</kbd> opens what the cursor is on.</li><li><kbd>Synth</kbd> at the top is where the sounds live; <kbd>?</kbd> opens Help from anywhere.</li></ol>`;
+  const foot = el('div', 'wfoot'), more = el('button', null, 'More in Help'), ok = el('button', 'ok', 'Got it'); more.type = ok.type = 'button';
+  foot.append(el('span', null, 'The hint line under the grid shows the keys for each screen.'), more, ok); box.append(foot); wrap.append(box);
+  const close = () => { wrap.remove(); try { localStorage.setItem(WLK, '1'); } catch(e){} };
+  ok.addEventListener('click', close); more.addEventListener('click', () => { close(); showHelp('hStart'); });
+  wrap.addEventListener('pointerdown', e => { if (e.target === wrap){ e.preventDefault(); close(); } });
+  document.body.append(wrap);
+}
+setTimeout(() => { if (view === 'tracker' && !helpOpen() && !inAI) welcome(false); }, 900);
+$('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); });
 // A hint longer than two lines opens fully on a tap (and folds again on the next).
 $('tHint').addEventListener('click', () => { const h = $('tHint'); if (h.classList.contains('more') || h.classList.contains('open')){ h.classList.toggle('open'); scheduleRefit(false); } });
 $('helpX').addEventListener('click', hideHelp);
