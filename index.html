@@ -1103,7 +1103,7 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]){--mx:#3b3b44; --mx2:#6d6d78; --mxdim:#dcdce3; --mxbg:#ffffff; --mxpanel:#f7f7fa; --mxpanel2:#ededf2; --mxon:#ffffff;
   --mxsoft:#ffc94d; --mxpoly:#1f8fd6; --mxglowc:transparent; --mxscan:transparent; --mxred:#d62a3a; --mxcur:#9a63ff; --mxcuron:#ffffff; --mxmst:#c9b7f2;
   --font:"Helvetica Neue",Helvetica,Arial,"Nimbus Sans","Liberation Sans",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:light;
-  --rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg)}
+  --rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg + var(--rbo, 0deg))}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) :is(.tgrid .ln>span,button,.pad,.mtr,.tagrid b,.kp):nth-child(12n+1){--ci:0} :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tgrid .ln:nth-child(12n+1){--ri:0}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) :is(.tgrid .ln>span,button,.pad,.mtr,.tagrid b,.kp):nth-child(12n+2){--ci:1} :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tgrid .ln:nth-child(12n+2){--ri:1}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) :is(.tgrid .ln>span,button,.pad,.mtr,.tagrid b,.kp):nth-child(12n+3){--ci:2} :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tgrid .ln:nth-child(12n+3){--ri:2}
@@ -1116,12 +1116,12 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) :is(.tgrid .ln>span,button,.pad,.mtr,.tagrid b,.kp):nth-child(12n+10){--ci:9} :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tgrid .ln:nth-child(12n+10){--ri:9}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) :is(.tgrid .ln>span,button,.pad,.mtr,.tagrid b,.kp):nth-child(12n+11){--ci:10} :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tgrid .ln:nth-child(12n+11){--ri:10}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) :is(.tgrid .ln>span,button,.pad,.mtr,.tagrid b,.kp):nth-child(12n+12){--ci:11} :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tgrid .ln:nth-child(12n+12){--ri:11}
-:root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) :is(button,.pad,.mtr,.kp,#tPad .k){--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg); --mx:oklch(.55 .17 var(--rbh)); --mxdim:oklch(.86 .07 var(--rbh)); --mxsoft:oklch(.72 .14 var(--rbh))}
-:root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tgrid .ln>span{--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg)}
+:root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) :is(button,.pad,.mtr,.kp,#tPad .k){--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg + var(--rbo, 0deg)); --mx:oklch(.55 .17 var(--rbh)); --mxdim:oklch(.86 .07 var(--rbh)); --mxsoft:oklch(.72 .14 var(--rbh))}
+:root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tgrid .ln>span{--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg + var(--rbo, 0deg))}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tscr .tgrid .ln>span:not(.cur):not(.pl){color:oklch(.53 .17 var(--rbh))}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tscr .tgrid .ln>span.e:not(.cur):not(.pl){color:oklch(.82 .08 var(--rbh))}
-:root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b.f{--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg); background:oklch(.62 .16 var(--rbh))!important; color:#fff}
-:root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b:not(.f){--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg); background:oklch(.94 .03 var(--rbh))}
+:root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b.f{--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg + var(--rbo, 0deg)); background:oklch(.62 .16 var(--rbh))!important; color:#fff}
+:root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b:not(.f){--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg + var(--rbo, 0deg)); background:oklch(.94 .03 var(--rbh))}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <script>
@@ -1690,7 +1690,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" hidden></div>
 
-<script src="waves/waves-worklet.js?v=17"></script>
+<script src="waves/waves-worklet.js?v=18"></script>
 <script>
 /* ===ENGINE START=== */
 const BASE = 65.40639; // C2
@@ -2405,7 +2405,7 @@ function txRun(f, a, sr){
     new Float32Array(x.memory.buffer, x.tfx_params(h), 12).set(p);
     for (let off = 0; off < a.length; off += 128){
       const n = Math.min(128, a.length - off), L = new Float32Array(x.memory.buffer, x.tfx_l(), 128), R = new Float32Array(x.memory.buffer, x.tfx_r(), 128);
-      L.fill(0); R.fill(0); for (let i = 0; i < n; i++){ const v = a[off + i]; L[i] = R[i] = v > -8 && v < 8 ? v : 0; }   // no NaN/infinity into the wasm (it can hang the delay)
+      L.fill(0); R.fill(0); for (let i = 0; i < n; i++){ const v = a[off + i]; L[i] = R[i] = (v > -8 && v < 8 ? v : 0) + (i & 1 ? 1e-18 : -1e-18); }   // no NaN/infinity into the wasm (it can hang the delay); ±1e-18 against denormals
       x.tfx_process(h, n);
       const L2 = new Float32Array(x.memory.buffer, x.tfx_l(), 128), R2 = new Float32Array(x.memory.buffer, x.tfx_r(), 128);
       for (let i = 0; i < n; i++) out[off + i] = (L2[i] + R2[i]) * 0.5;
@@ -4261,7 +4261,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=17', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=18', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -6704,12 +6704,15 @@ let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k 
 // below a visible step, so the drift looks continuous at a third of the repaints of a per-frame animation. Paused while
 // the app is hidden; off with reduced motion.
 let rbT = 0;
+// Simple rainbow dynamic turns the --rbo hue offset that every rainbow colour is built from (10×/s, 1.8° steps, once
+// round in 20 s). The earlier hue-rotate() filter on <html> made the browser re-rasterise the whole page at device
+// resolution on every step (frame gaps doubled on the phone); a property change only restyles the coloured elements.
 function rbWheel(){
   const de = document.documentElement;
-  clearInterval(rbT); rbT = 0; de.style.removeProperty('filter');
+  clearInterval(rbT); rbT = 0; de.style.removeProperty('filter'); de.style.removeProperty('--rbo');
   if (skin !== 'rainbowdyn' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const t0 = performance.now();
-  rbT = setInterval(() => { if (!document.hidden) de.style.filter = `hue-rotate(${((performance.now() - t0) * 0.018 % 360).toFixed(2)}deg)`; }, 50);
+  rbT = setInterval(() => { if (!document.hidden) de.style.setProperty('--rbo', ((performance.now() - t0) * 0.018 % 360).toFixed(1) + 'deg'); }, 100);
 }
 function applySkin(id){
   const sk = SKINS.find(k => k.id === id) || SKINS[2]; skin = sk.id;
@@ -7662,6 +7665,7 @@ class ThunderFx extends AudioWorkletProcessor {
     if (i && i.length){ L.set(i[0]); R.set(i[1] || i[0]); } else { L.fill(0); R.fill(0); }
     // A NaN or infinity reaching the wasm hangs the tape delay for good and leaves many effects silent: zero those samples.
     if (bad) for (let k = 0; k < n; k++){ const a = L[k], b = R[k]; if (!(a > -8 && a < 8)) L[k] = 0; if (!(b > -8 && b < 8)) R[k] = 0; }
+    for (let k = 0; k < n; k += 2){ L[k] += 1e-18; L[k + 1] -= 1e-18; R[k] += 1e-18; R[k + 1] -= 1e-18; }   // anti-denormal (−360 dB, no DC): silence made some effects up to 30× slower on x86
     const t0 = Date.now(), tr = this.tr || (this.tr = {bp:null, flx:0, gat:0, rtg:0}); tr.bp = bp; tr.flx = params.flx[0]; tr.gat = params.gat[0]; tr.rtg = params.rtg[0];
     if (!this.dL){ this.dL = new Float32Array(128); this.dR = new Float32Array(128); }
     for (const s of this.slots){
@@ -7702,7 +7706,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=21')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=22')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);

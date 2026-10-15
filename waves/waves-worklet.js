@@ -335,7 +335,9 @@ function effect(type, id, params, map, cost){
       const P = st.P, L = st.L, R = st.R; P.fill(0); P.set(map(io.p, ctx));
       // The wasm only checks its output. A NaN or infinity on the way IN hangs the tape delay for good and leaves
       // twenty other effects silent, so bad or absurd samples are zeroed here first.
-      for (let i = 0; i < ctx.block; i++){ const a = L0[i], b = R0[i]; L[i] = a > -8 && a < 8 ? a : 0; R[i] = b > -8 && b < 8 ? b : 0; }
+      // The ±1e-18 (−360 dB, alternating so it has no DC) keeps the effects' filters and delay lines out of denormal
+      // numbers on silence, where x86 (the Windows PC) runs some of them up to 30× slower.
+      for (let i = 0; i < ctx.block; i++){ const a = L0[i], b = R0[i], dn = i & 1 ? 1e-18 : -1e-18; L[i] = (a > -8 && a < 8 ? a : 0) + dn; R[i] = (b > -8 && b < 8 ? b : 0) + dn; }
       try { x.tfx_process(st.h, ctx.block); }
       catch (e){ try { x.tfx_free(st.h); } catch (e2){} st.h = -1; io.out.out.set(L0); io.out.outR.set(R0); return; }   // crashed: bypass it
       if (st.buf !== x.memory.buffer){ st.buf = x.memory.buffer; st.P = new Float32Array(st.buf, x.tfx_params(st.h), 12); st.L = new Float32Array(st.buf, x.tfx_l(), 128); st.R = new Float32Array(st.buf, x.tfx_r(), 128); }   // the memory grew inside process
