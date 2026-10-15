@@ -4326,7 +4326,14 @@ function bgRender(i){
   }, () => { pend[i] = false; if (kit.voices[i] === v){ dirty[i] = true; ensure(i); rendered(i); } });
 }
 // A fresh render arrived for pad i: show it if it's the one on screen.
-function rendered(i){ if (i === cur && view === 'synth'){ try { drawWave(); } catch(e){} } }
+function rendered(i){ if (i === cur && view === 'synth'){ try { drawWave(); } catch(e){} } if (playOnRender.delete(i)) try { play(i); } catch(e){} }
+// Play a pad once its render is current: after Random (or any edit) the cached render is still the old sound, so
+// playing at once played what you just replaced. If the Worker is on it, wait for it; otherwise render here and play.
+const playOnRender = new Set();
+function playFresh(i){
+  const v = kit.voices[i]; if (!v) return;
+  if (PW.ready && rwCan(v) && (stale(i) || slotAt(pend, i))){ playOnRender.add(i); bgRender(i); } else play(i);
+}
 // The pad on screen: drawn now from what there is, brought up to date in the background.
 function showCur(){ if (PW.ready && (stale(cur) || slotAt(pend, cur))){ bgRender(cur); drawWave(); } else { ensure(cur); drawWave(); } }   // bgRender does nothing while a job is out
 
@@ -4595,7 +4602,7 @@ $('vName').addEventListener('input', e => { V().name = e.target.value; renderPad
 $('kitName').addEventListener('input', e => { kit.name = e.target.value; clearTimeout(sTimer); sTimer = setTimeout(save, 900); });
 $('vPlay').addEventListener('click', () => play(cur));
 $('wave').addEventListener('pointerdown', () => play(cur));
-$('vRand').addEventListener('click', () => { randVoice(V()); afterVoiceSwap(); play(cur); });
+$('vRand').addEventListener('click', () => { randVoice(V()); afterVoiceSwap(); playFresh(cur); });
 $('vInit').addEventListener('click', () => { const n = V().name; kit.voices[cur] = mkVoice(n, [{type:'sine'}]); afterVoiceSwap(); });
 $('vCopy').addEventListener('click', () => { clipVoice = JSON.stringify(voiceToJSON(V())); toast('Copied pad ' + hx(cur)); });
 $('vPaste').addEventListener('click', () => { if (!clipVoice) return toast('Copy a pad first'); kit.voices[cur] = voiceFromJSON(JSON.parse(clipVoice)); afterVoiceSwap(); toast('Pasted into pad ' + hx(cur)); });
@@ -4614,7 +4621,7 @@ sel.addEventListener('change', () => { const L = Lc(), was = L.type; L.type = se
   if (L.type === 'plaits' && was !== 'plaits'){ Object.assign(L, {mode:'AHD', atk:0.5, hold:0, dec:Math.max(L.dec, 3000), pAmt:0}); if (L.tune === 0) L.tune = 12; }
   refreshLayer(); changed(); });
 $('lOn').addEventListener('click', () => { const L = Lc(); L.on = !L.on; refreshLayer(); changed(); });
-$('lRand').addEventListener('click', () => { randLayer(Lc()); refreshLayer(); changed(); play(cur); });
+$('lRand').addEventListener('click', () => { randLayer(Lc()); refreshLayer(); changed(); playFresh(cur); });
 $('lCopy').addEventListener('click', () => { clipLayer = JSON.stringify(layerToJSON(Lc())); toast('Copied layer ' + (V().sel + 1)); });
 $('lPaste').addEventListener('click', () => { if (!clipLayer) return toast('Copy a layer first'); V().layers[V().sel] = layerFromJSON(JSON.parse(clipLayer)); refreshLayer(); changed(); });
 $('lClear').addEventListener('click', () => { V().layers[V().sel] = freshLayer(); refreshLayer(); changed(); });
@@ -5263,7 +5270,8 @@ function applyVoicePreset(v){
   const keepChoke = isSyn(cur) ? 0 : null;
   kit.voices[cur] = v; if (keepChoke !== null) v.choke = v.choke || 0; afterVoiceSwap();
   if (v.layers.some(L => L.sample && !L.sample.data)) resolveSamples();
-  try { play(cur); } catch(e){}
+  // No sound here: the pad is heard when it is tapped. (It used to play at once, and since the new render was still
+  // being made in the background, what played was the OLD sound.)
 }
 async function onVoicePreset(val){
   const mine = SP().voices;
@@ -5283,7 +5291,7 @@ function applyLayerPreset(l, vt){
   L.tune = clamp((l.tune || 0) + (vt || 0) - (v.tune || 0), -48, 48);
   if (!l.mode) L.mode = isSyn(cur) ? 'ADSR' : 'AHD';
   if (l.sample) L.sample = smpFromJSON(l.sample);
-  v.layers[v.sel] = L; refreshLayer(); changed(); if (L.sample && !L.sample.data) resolveSamples(); try { play(cur); } catch(e){}
+  v.layers[v.sel] = L; refreshLayer(); changed(); if (L.sample && !L.sample.data) resolveSamples();
 }
 async function onLayerPreset(val){
   const mine = SP().layers;
@@ -5754,15 +5762,15 @@ function xPreset(i, quiet){
   const v = V(), k = v.engine, pr = XUI[k] && XUI[k].pre[i]; if (!pr) return;
   v[k] = normX(k, Object.assign(XENG[k].d(), pr[1])); v.drive = (pr[2] && pr[2].drive) || 0;
   if (k === 'sf'){ if (!v.sfFont) v.sfFont = GM_FONT.id; if (i > 0) v.name = pr[0]; sfPreparePad(cur).then(() => sfPanel(true)); }
-  if (!quiet){ changed(cur); refreshAll(); toast(XUI[k].title + ': ' + pr[0]); try { play(cur); } catch(e){} }
+  if (!quiet){ changed(cur); refreshAll(); toast(XUI[k].title + ': ' + pr[0]); }
 }
 function xRandom(){
   const k = V().engine, U = XUI[k], o = XV(), r = Math.random;
   if (k === 'sf'){ const f = SF.fonts.get(V().sfFont || GM_FONT.id); if (!f || !f.presets.length) return; const pr = f.presets[Math.floor(r() * f.presets.length)];
-    o.bank = pr.bank; o.prog = pr.prog; V().name = pr.name.slice(0, 24); changed(cur); refreshAll(); sfPreparePad(cur).then(() => { sfPanel(true); try { play(cur); } catch(e){} }); return; }
+    o.bank = pr.bank; o.prog = pr.prog; V().name = pr.name.slice(0, 24); changed(cur); refreshAll(); sfPreparePad(cur).then(() => sfPanel(true)); return; }
   for (const key in U.rows){ const d = U.rows[key]; if (key === 'oct') continue;
     let x = d.c === 'log' ? d.min * Math.pow(d.max / d.min, r()) : d.min + (d.max - d.min) * r(); if (d.c === 'int') x = Math.round(x); o[key] = x; }
-  changed(cur); refreshAll(); try { play(cur); } catch(e){}
+  changed(cur); refreshAll();
 }
 
 // The preset name for a program number on the Synth page's pad (its font and bank), for the Program row.
@@ -6850,8 +6858,8 @@ $('fileIn').addEventListener('change', async e => {
     const n = Math.min(b.length, Math.round(b.sampleRate * 30)), d = new Float32Array(n);   // up to 30 s (breaks, loops)
     for (let c = 0; c < b.numberOfChannels; c++){ const ch = b.getChannelData(c); for (let i = 0; i < n; i++) d[i] += ch[i] / b.numberOfChannels; }
     assignSample(cur, d, b.sampleRate, f.name.replace(/\.[^.]+$/, '').slice(0, 24));
-    toast(`Loaded ${f.name} into pad ${hx(cur)}, layer ${V().sel + 1}` + (b.length > n ? ' (first 8 s)' : ''));
-    play(cur);
+    toast(`Loaded ${f.name} into pad ${hx(cur)}, layer ${V().sel + 1}` + (b.length > n ? ' (first 30 s)' : ''));
+    playFresh(cur);
   } catch(err){ toast('Couldn’t read that audio file.'); }
 });
 
