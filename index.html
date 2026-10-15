@@ -4202,7 +4202,7 @@ function audio(){
     if (aset.sink && ctx.setSinkId) ctx.setSinkId(aset.sink).catch(() => { audStatus(); });
     try { if (ctx.renderCapacity){ ctx.renderCapacity.addEventListener('update', e => { cpu.cap = {avg:e.averageLoad, peak:e.peakLoad, under:e.underrunRatio, t:performance.now()}; }); ctx.renderCapacity.start({updateInterval:0.5}); } } catch(e){}
     master = ctx.createGain(); master.gain.value = clamp(aset.vol, 0, 100) / 100; master.connect(ctx.destination);
-    ctx.addEventListener && ctx.addEventListener('statechange', () => audStatus());
+    ctx.addEventListener && ctx.addEventListener('statechange', () => { audStatus(); if (typeof audioInterrupted === 'function') audioInterrupted(); });
     prerender();   // ensure() re-renders only the pads whose rate differs from this context's
   }
   if (ctx.state === 'suspended') ctx.resume();
@@ -9052,7 +9052,7 @@ function tStart(mode, o){
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : ''});
   moStart();
-  tp.timer = setInterval(pump, 25); pump(); draw(); songBtn(); chainsTempo();
+  tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo();
   void r;
 }
 // The SONG button in the synth's top bar: play the song from the tracker's cursor row, or stop it.
@@ -9060,6 +9060,27 @@ function tStart(mode, o){
 // change with the transport state.
 function songBtn(){ const b = $('tSong'); if (!b) return; b.hidden = false; b.classList.toggle('on', tp.on);
 }
+// The pump's 25 ms tick comes from a Worker: a page timer is slowed to once a second (or frozen) when the app is in
+// the background and nothing audible is playing (a MIDI-only song driving the MPC with the screen off, a muted
+// master), which stalled the sequencer and MIDI clock. A Worker's timer keeps its rate. Page timer as the fallback.
+let pumpW = null;
+function pumpTimer(){
+  try {
+    if (!pumpW) pumpW = new Worker(URL.createObjectURL(new Blob(["let t=0;onmessage=e=>{clearInterval(t);if(e.data>0)t=setInterval(()=>postMessage(0),e.data)}"], {type:'text/javascript'})));
+    pumpW.onmessage = () => pump(); pumpW.postMessage(25);
+    return {stop(){ try { pumpW.postMessage(0); pumpW.onmessage = null; } catch(e){} }};
+  } catch(e){ const h = setInterval(pump, 25); return {stop(){ clearInterval(h); }}; }
+}
+// Audio interrupted (a call, headphones switching, the system taking the output) while the song runs: resume
+// when the browser lets us; if it stays stopped, stop the transport rather than booking notes against a frozen clock.
+let intT = 0;
+function audioInterrupted(){
+  if (!ctx || !tp.on) return;
+  if (ctx.state === 'running'){ clearTimeout(intT); intT = 0; return; }
+  try { ctx.resume().catch(() => {}); } catch(e){}
+  if (!intT) intT = setTimeout(() => { intT = 0; if (tp.on && ctx && ctx.state !== 'running'){ tStop(); toast('Audio was interrupted: press PLAY to continue.', 4000); } }, 2500);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) audioInterrupted(); });
 function pump(){
   if (!tp.on) return;
   audioWake = performance.now();
@@ -9082,7 +9103,7 @@ function padBlink(e){
   setTimeout(() => { if (tp.on && view !== 'tracker' && audible(e.track)) flash(e.pad); }, ms);
 }
 function tStop(quiet){
-  if (tp.timer) clearInterval(tp.timer);
+  if (tp.timer) tp.timer.stop();
   tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null;
   if (rt) rt.pl.stopAll(ctx.currentTime);
   moStop();
