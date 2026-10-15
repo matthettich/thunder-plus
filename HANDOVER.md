@@ -625,7 +625,7 @@ caches.
 ## 15 Oct (afternoon): review risk fixes, one commit each on main
 
 After the eight bugs below were merged (PR #1), the review's risk items went in as separate commits. Cache is now
-`thunderplus-v105`; `chains-worklet.js?v=20`, `waves-worklet.js?v=15`, `master-worklet.js?v=3`.
+`thunderplus-v109`; `chains-worklet.js?v=20`, `waves-worklet.js?v=15`, `master-worklet.js?v=3`.
 
 - **Effects can't be hung or silenced by a bad sample** (93d3ae3): the wasm only checks its output, and a NaN/∞ on the
   way in made the tape delay's `tfx_process` never return (frozen audio thread) and left twenty effects silent. The
@@ -653,12 +653,12 @@ After the eight bugs below were merged (PR #1), the review's risk items went in 
   permission, page ignores drag/drop; workflow `contents: read` with `write` only on `release`; release notes explain
   SmartScreen / Gatekeeper; exact dependency versions. **Still to do for a real release:** commit a `package-lock.json`
   from the first real `npm install` and switch the workflow to `npm ci`; sign/notarise so electron-updater verifies.
-- **Not done from the review (performance, next):** `draw()` spends ~90 % in forced-layout reads even when the grid
-  is unchanged (skip `groupBoxes`/`fitCheck`/`stageLayout` on an unchanged signature); the Phrase view rebuilds the
-  grid every playhead row (toggle `.pl` like `drawArr`); four refits per fold/unfold and the ARRANGE grip at ~5 fps
-  (one rAF-coalesced refit); synth↔tracker ~0.5 s on the phone (`measure()` per switch, `drawWave` two passes); 2 MB of
-  wasm inlined in index.html that is also shipped as files; rainbow-dynamic `hue-rotate` on the root; the idle rAF loop;
-  per-block garbage in the worklets; …waves voices awake 12 s after release; the Suppressor's FFT bursts; denormals in
+- **Performance pass (15 Oct, afternoon), one commit each:** `draw()` measures layout only when a signature changed
+  (bd93010: Song 19.7 → 4.6 ms a draw on the phone at 4×); Sect/Phrase light the playhead in place (09fecf1: Phrase
+  22 → 5.2 ms); one `scheduleRefit()` for every shape change, grip drag ≤ 8 fps, frame loop at 10 Hz when idle
+  (ddd1354); the two wasm modules are fetched from `waves/dsp/` instead of base64 in the page (index.html 3 MB → 1 MB;
+  `tfxLoad` promise gates `tfxReady`/`chainsReady`; the service worker precaches with `cache:'reload'`).
+- **Still open from the review (performance):** synth↔tracker ~0.5 s on the phone (`measure()` per switch, `drawWave` two passes); rainbow-dynamic `hue-rotate` on the root; per-block garbage in the worklets; …waves voices awake 12 s after release; the Suppressor's FFT bursts; denormals in
   Ladder/OTT/Comb on x86 and the track-FX sleep that never engages while `bp` ramps.
 
 ## 15 Oct: review fixes (branch fix/review-bugs, merged as PR #1)
