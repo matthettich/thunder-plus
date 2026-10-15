@@ -682,6 +682,12 @@ After the eight bugs below were merged (PR #1), the review's risk items went in 
   too (the only play control when the key block is hidden; useful on desktop). Later, maybe: a PAD KEYS toggle in
   Settings → Screen (COMMANDS/KEYPAD/BOTTOM/SIDE already have one; the d-pad block in PAD mode doesn't), and a
   swipe-down to hide the lower block — with the caveat that it removes no-look navigation, so not a priority.
+- **Preset browser (15 Oct, evening):** `presetSheet(kind)` — kinds `voice`, `layer` (the song's presets + factory
+  groups, Recent, search, ▶ preview via `renderAsync` on a copy, ✕ delete, Save/Import) and `bass` / `blip` / `vox` /
+  `x` (the engine cards' own lists; preview runs the card's preset function on a throwaway copy of the pad,
+  `onVoiceCopy`). **To put the engine cards back on their native dropdowns set `ENGINE_PRESET_SHEET = false`** (one
+  line next to `PRK`): the `<select>`s are still filled and wired, the sheet only intercepts the tap while it is
+  true. `vPre` / `lPre` are buttons now; `fillPresetSel` is unused and can go once the sheet is settled.
 - **Nothing from the review is left.** Next: hear it on the Fold and the PC (nothing has been checked by ear), then the
   feature list below.
 

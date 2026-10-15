@@ -515,6 +515,7 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .pbs .pit .pp.busy{opacity:.5} .pbs .pit .px{color:var(--rec)}
 .pbs .pft{display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line); align-items:center} .pbs .pft .sp{flex:1}
 .pbs .pempty{padding:18px 14px; color:var(--muted)}
+select.assheet{appearance:none; -webkit-appearance:none; padding-right:26px; background-image:linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position:calc(100% - 14px) 55%, calc(100% - 9px) 55%; background-size:5px 5px; background-repeat:no-repeat}   /* a select that opens the sheet: looks the same, the browser's list never shows */
 .updb.storeb{background:#c0392b; color:#fff; white-space:normal; max-width:calc(100vw - 32px); z-index:21}
 @media (max-width:480px){ .top .tmode .mx{display:inline} .top .tmode,.top .tcpu{padding:0 8px} .top .tcpu{min-width:72px} }
 .top .tcpu{border:1px solid var(--line); min-height:34px; background:var(--panel); padding:0 10px; min-width:84px; overflow:hidden}
@@ -5380,10 +5381,28 @@ async function importPresetsFile(f){
 /* ---------- the preset browser ----------
    kind 'voice' (pad presets) or 'layer'. Entries carry an apply() and a make() (the preset as a voice, for the ▶
    preview, rendered in the background and played once without touching the pad). Recent picks are kept per kind. */
+// ENGINE_PRESET_SHEET: the engine cards' own preset lists (Bass, Blip, Voice, Acid/Machine/… via xPre) open the same
+// browser sheet as pad and layer presets. Set it to false to get their native <select> dropdowns back (the selects
+// are still filled and wired; the sheet just takes the tap when this is true).
+const ENGINE_PRESET_SHEET = true;
 const PRK = 'thunderplus-preset-recent-v1';
 const recentPresets = (() => { let r = null; const load = () => { if (!r){ try { r = JSON.parse(localStorage.getItem(PRK) || '{}'); } catch(e){ r = {}; } if (!r || typeof r !== 'object') r = {}; } return r; };
   return { list:k => (load()[k] || []).slice(0, 8), add:(k, key) => { const o = load(); o[k] = [key, ...(o[k] || []).filter(x => x !== key)].slice(0, 8); try { localStorage.setItem(PRK, JSON.stringify(o)); } catch(e){} } }; })();
+// Runs fn on a throwaway copy of the current pad (fn reads/writes V()), and returns that copy: the engine cards'
+// preset functions work on V(), so this is how the sheet makes a preview voice without touching the pad.
+function onVoiceCopy(fn){ const real = kit.voices[cur], tmp = voiceFromJSON(voiceToJSON(real, false)); kit.voices[cur] = tmp; try { fn(); } finally { kit.voices[cur] = real; } return tmp; }
+// The engine cards: one group, the card's own list. kind: 'bass' | 'blip' | 'vox' | 'x' (the current X engine).
+function enginePresetEntries(kind){
+  const v = V(), k = v.engine;
+  const spec = kind === 'bass' ? {title:'Bass presets', list:BASS_PRE, fn:bassPreset} : kind === 'blip' ? {title:'Blip presets', list:BLIP_PRE, fn:blipPreset}
+    : kind === 'vox' ? {title:'Voice presets', list:VOX_PRE, fn:voxPreset} : {title:(XUI[k] ? XUI[k].title : 'Engine') + ' presets', list:(XUI[k] && XUI[k].pre) || [], fn:xPreset};
+  const es = spec.list.map((pr, i) => ({key:'e' + i, name:pr[0], apply:() => spec.fn(i), make:() => onVoiceCopy(() => spec.fn(i, true))}));
+  const rk = kind === 'x' ? 'x:' + k : kind, rec = recentPresets.list(rk).map(key => es.find(e => e.key === key)).filter(Boolean);
+  const groups = [[spec.title.replace(/ presets$/, ''), es]]; if (rec.length) groups.unshift(['Recent', rec]);
+  return {title:spec.title, groups, rk};
+}
 function presetEntries(kind){
+  if (kind !== 'voice' && kind !== 'layer') return enginePresetEntries(kind).groups;
   const G = [], mine = kind === 'voice' ? SP().voices : SP().layers;
   const vt = V().tune || 0;
   const layerVoice = (l, lvt) => { const v = voiceFromJSON(voiceToJSON(V(), false)); const L = freshLayer(Object.assign({}, l, {on:true})); L.tune = clamp((l.tune || 0) + (lvt || 0) - vt, -48, 48); if (!l.mode) L.mode = isSyn(cur) ? 'ADSR' : 'AHD'; if (l.sample) L.sample = smpFromJSON(l.sample); v.layers[v.sel] = L; return v; };
@@ -5414,19 +5433,23 @@ async function previewVoice(v, btn){
 function presetSheet(kind){
   if (pbOpen) pbOpen();
   if (kind === 'layer' && V().engine && V().engine !== 'layers') return toast('Layer presets are for the Layers engine.');
-  const wrap = el('div', 'pbs'), box = el('div', 'pbox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true'); wrap.setAttribute('aria-label', kind === 'voice' ? 'Pad presets' : 'Layer presets');
-  const hd = el('div', 'phd'), ttl = el('b', null, kind === 'voice' ? 'Presets' : 'Layer presets'), q = el('input'), close = el('button', 'sm', 'Close'); close.type = 'button';
+  const song = kind === 'voice' || kind === 'layer', eng = song ? null : enginePresetEntries(kind), rkind = song ? kind : eng.rk;
+  const title = kind === 'voice' ? 'Presets' : kind === 'layer' ? 'Layer presets' : eng.title;
+  const wrap = el('div', 'pbs'), box = el('div', 'pbox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true'); wrap.setAttribute('aria-label', title);
+  const hd = el('div', 'phd'), ttl = el('b', null, title), q = el('input'), close = el('button', 'sm', 'Close'); close.type = 'button';
   q.type = 'search'; q.placeholder = 'Search…'; q.spellcheck = false; q.setAttribute('aria-label', 'Search presets'); hd.append(ttl, q, close);
   const list = el('div', 'plist'), ft = el('div', 'pft'), save = el('button', 'sm', kind === 'voice' ? '＋ Save this pad as a preset' : '＋ Save this layer as a preset'), imp = el('button', 'sm', 'Import…'); save.type = imp.type = 'button';
-  ft.append(save, el('span', 'sp'), imp); box.append(hd, list, ft); wrap.append(box);
+  // Engine cards' lists are the factory list only: their sounds are saved as pad presets (the pad's Presets… button).
+  if (song) ft.append(save, el('span', 'sp'), imp); else ft.append(el('span', 'lbl', 'To keep a sound of your own, save the pad as a preset.'), el('span', 'sp'));
+  box.append(hd, list, ft); wrap.append(box);
   const G = presetEntries(kind); let total = 0; for (const [, es] of G) total += es.length; q.placeholder = `Search ${total} presets…`;
-  let openCat = G[0] && G[0][1].length ? 0 : (G[1] ? 1 : 0);
+  let openCat = song ? (G[0] && G[0][1].length ? 0 : (G[1] ? 1 : 0)) : G.length - 1;
   const done = () => { if (pbOpen !== done) return; pbOpen = null; stopPreview(); wrap.remove(); document.removeEventListener('keydown', key, true); };
   const key = e => { if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); done(); } else if (e.target === q) e.stopPropagation(); };
   const row = e => {
     const it = el('div', 'pit'), pn = el('button', 'pn', e.name), pp = el('button', 'pp'); pn.type = pp.type = 'button'; pn.title = 'Take this preset';
     pp.innerHTML = '<svg class="ic" aria-hidden="true" style="width:12px;height:12px;fill:currentColor"><use href="#ic-play"/></svg>'; pp.title = 'Hear it'; pp.setAttribute('aria-label', 'Preview ' + e.name);
-    pn.addEventListener('click', () => { recentPresets.add(kind, e.key); done(); e.apply(); });
+    pn.addEventListener('click', () => { recentPresets.add(rkind, e.key); done(); e.apply(); });
     pp.addEventListener('click', () => { try { previewVoice(e.make(), pp); } catch(err){ toast('Couldn’t preview that preset.'); } });
     it.append(pn, pp);
     if (e.own != null){ const px = el('button', 'px', '✕'); px.type = 'button'; px.title = 'Delete this preset'; px.setAttribute('aria-label', 'Delete ' + e.name);
@@ -5456,6 +5479,10 @@ function presetSheet(kind){
 (function presetInit(){
   $('vPre').addEventListener('click', () => presetSheet('voice'));
   $('lPre').addEventListener('click', () => presetSheet('layer'));
+  if (ENGINE_PRESET_SHEET) for (const [id, kind] of [['bassPre', 'bass'], ['blipPre', 'blip'], ['voxPre', 'vox'], ['xPre', 'x']]){ const sel = $(id); if (!sel) continue;
+    sel.classList.add('assheet');
+    const open = e => { e.preventDefault(); presetSheet(kind); };
+    sel.addEventListener('pointerdown', open); sel.addEventListener('mousedown', open); sel.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown'){ open(e); } }); }
   $('presetIn').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) importPresetsFile(f); });
 })();
 /* ---------- the Acid, Machine, Tone drum and Modal cards (one card, built for whichever engine the pad uses) ---------- */
