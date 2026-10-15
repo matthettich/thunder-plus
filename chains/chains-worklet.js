@@ -1757,7 +1757,9 @@ class ChainsEngine {
     if (this._frames < this.sr / 4) return;
     const l = this._busy / (this._frames / this.sr * 1000); this._busy = 0; this._frames = 0;
     this.load = this.load * .5 + l * .5;
-    if (this.load > .95 && this.quality === 'full'){ this.quality = 'draft'; this.load = 0; if (this.onShed) this.onShed({ quality:this.quality }); }
+    if (this.load > .95 && this.quality === 'full'){ this.quality = 'draft'; this.load = 0; this._calm = 0; if (this.onShed) this.onShed({ quality:this.quality }); }
+    else if (this.quality === 'draft' && this.load < .5){ this._calm = (this._calm || 0) + .25; if (this._calm >= 8){ this._calm = 0; this.quality = 'full'; if (this.onShed) this.onShed({ quality:this.quality, recovered:true }); } }
+    else this._calm = 0;
   }
   telemetry(){
     const buses = [];

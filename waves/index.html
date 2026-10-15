@@ -1085,7 +1085,7 @@ class WavesBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './waves-worklet.js?v=18';
+    const url = opts.url || './waves-worklet.js?v=19';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'waves', {
@@ -2359,7 +2359,7 @@ function wireBridge(b){
   bridge = b;
   b.telemetry(true);
   b.on('meter', onMeter);
-  b.on('shed', s => toast('The CPU is busy: dropped to ' + s.voices + ' voices.'));
+  b.on('shed', s => toast(s.recovered ? 'CPU is free again: ' + s.voices + ' voices, ' + s.quality + ' quality.' : s.step === 3 ? 'The CPU is overloaded: notes were cut.' : 'The CPU is busy: dropped to ' + s.voices + ' voices' + (s.quality === 'draft' ? ', draft quality.' : '.')));
   b.on('error', e => toast(e.message));
   b.loadPatch(doc);
   if (doc.quality) b.setQuality(doc.quality);

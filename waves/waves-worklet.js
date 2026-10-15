@@ -1674,7 +1674,7 @@ class WavesEngine {
     this.transport = Object.assign({ tempo:120, lpb:4, ticks:6, ppq:0, playing:false }, opts.transport || {});
     this.quality = opts.quality || 'full';
     this.costCeiling = opts.costCeiling ?? .9;
-    this.voices = new VoicePool(opts.maxVoices ?? 8);
+    this.voices = new VoicePool(opts.maxVoices ?? 8); this.voicesMax0 = this.voices.max;
     this.graph = new Graph();
     this.busesL = new Float32Array(BUS_COUNT * BLOCK); this.busesR = new Float32Array(BUS_COUNT * BLOCK);
     this.load = 0; this.telemetryOn = false;
@@ -1824,15 +1824,29 @@ class WavesEngine {
     const l = this._busy / (this._frames / this.sr * 1000); this._busy = 0; this._frames = 0;
     this.load = this.load * .5 + l * .5;
     if (this.load > this.costCeiling) this._shed();
+    else this._recover(this.load);
   }
   _shed(){
     let step = 0;
-    if (this.voices.max > 4){ this.voices.allOff(); this.voices = new VoicePool(this.voices.max - 1); this._reset(); step = 1; }
+    if (this.voices.max > 4){ this.voices.allOff(); this.voices = new VoicePool(this.voices.max - 1); this._resetPoly(); step = 1; }
     else if (this.quality === 'full'){ this.quality = 'draft'; step = 2; }
-    else { this.allNotesOff(); step = 3; }
-    this.load = 0;
+    else { const t = this.voices.now; if (t - (this._shed3At || -1e12) < this.sr * 10) return; this._shed3At = t; this.allNotesOff(); step = 3; }   // once, not every half second
+    this.load = 0; this._calm = 0;
     if (this.onShed) this.onShed({ step, voices:this.voices.max, quality:this.quality });
   }
+  // Below half the ceiling for 8 s: step back up (draft → full first, then a voice at a time, only between notes),
+  // so a busy moment doesn't leave the patch degraded for the rest of the session.
+  _recover(load){
+    if (load > this.costCeiling * .5){ this._calm = 0; return; }
+    this._calm = (this._calm || 0) + .25; if (this._calm < 8) return; this._calm = 0;
+    const full = this.voicesMax0 || this.voices.max;
+    if (this.quality === 'draft') this.quality = 'full';
+    else if (this.voices.max < full && !this.voices.rows.some(r => r.gate)){ this.voices = new VoicePool(this.voices.max + 1); this._resetPoly(); }
+    else return;
+    if (this.onShed) this.onShed({ step:0, voices:this.voices.max, quality:this.quality, recovered:true });
+  }
+  // The voice count changed: only the per-voice states go (a mono reverb or delay keeps its tail).
+  _resetPoly(){ for (const [k, s] of [...this._states]) if (k.includes('#')){ this._destroy(s); this._states.delete(k); } for (const k of [...this._ios.keys()]) if (k.includes('#')) this._ios.delete(k); }
   telemetry(){
     let active = 0; for (const r of this.voices.rows) if (r.gate) active++;
     const buses = [];

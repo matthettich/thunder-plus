@@ -1070,7 +1070,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=22';
+    const url = opts.url || './chains-worklet.js?v=23';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -2479,7 +2479,7 @@ function wireBridge(b){
   bridge = b;
   b.telemetry(true);
   b.on('meter', onMeter);
-  b.on('shed', () => toast('The CPU is busy: switched to draft quality.'));
+  b.on('shed', s => toast(s && s.recovered ? 'CPU is free again: back to full quality.' : 'The CPU is busy: switched to draft quality.'));
   b.on('error', e => toast(e.message));
   b.loadPatch(doc);
   if (doc.quality) b.setQuality(doc.quality);
