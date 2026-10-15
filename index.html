@@ -8959,12 +8959,12 @@ const isLivePad = i => isSyn(i) && (isBassV(kit.voices[i]) || isVoxV(kit.voices[
 const liveX = v => !!(v && XENG[v.engine] && XENG[v.engine].live);
 // A bass voice was edited: the live nodes playing it hear the change at once.
 function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v), lx = liveX(v); if (!isBassV(v) && !vx && !lx) return; const kind = vx ? 'vox' : lx ? v.engine : 'bass', p = vx ? voxParams(v) : lx ? xParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && b.kind === kind) try { b.node.port.postMessage({set:p}); } catch(e){} }
-const MW_URL = 'master-worklet.js?v=3', mwLoad = new WeakMap();
+const MW_URL = 'master-worklet.js?v=4', mwLoad = new WeakMap();
 function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
 const mstNeedsWk = M => M.sup.on || M.comp.on || M.lim.on;
 // Samples the chain delays the sound by (the suppressor's FFT and the limiter's lookahead); renders trim it off.
-const mstLatency = (M, sr) => !M.on ? 0 : (M.sup.on ? 2048 : 0) + (M.lim.on ? Math.max(1, Math.round(sr * M.lim.look / 1000)) : 0);
+const mstLatency = (M, sr) => !M.on ? 0 : (M.sup.on ? 2560 : 0) + (M.lim.on ? Math.max(1, Math.round(sr * M.lim.look / 1000)) : 0);
 const BUTTER = {12:[0.7071], 24:[0.5412, 1.3066], 48:[0.5098, 0.6013, 0.9000, 2.5629]};
 // The EQ as native biquads: bells and shelves are one filter each; cuts are Butterworth stages for their slope.
 function eqBuild(ac, eq){

@@ -56,7 +56,13 @@ class Suppressor {
     const N = this.N; this.win = new Float32Array(N);
     for (let i = 0; i < N; i++) this.win[i] = Math.sqrt(0.5 - 0.5 * Math.cos(TAU * i / N));   // sqrt-Hann both ways: Hann overall
     this.inL = new Float32Array(N); this.inR = new Float32Array(N);     // the last N input samples (ring)
-    this.olaL = new Float32Array(N); this.olaR = new Float32Array(N);   // overlap-add output
+    // The frame's work (two forward FFTs, the analysis, two inverse FFTs, the overlap-add) used to run inside one render
+    // quantum every hop: ~1.4 ms bursts on a desktop, a dropout on a phone. It is now spread over the hop's blocks
+    // (stage 1 at the hop boundary, 2, 3 and 4 in the following blocks), and the output is read one hop (D) later so
+    // the overlap-add lands before it is needed. Latency N + D.
+    this.D = this.H; const M = N + this.D; this.M = M;
+    this.olaL = new Float32Array(M); this.olaR = new Float32Array(M);   // overlap-add output (one hop longer: written early)
+    this.stage = 0; this.rdSnap = 0;
     this.outL = new Float32Array(N); this.outR = new Float32Array(N);   // delayed dry for mix / delta
     this.w = 0; this.cnt = 0; this.rd = 0;
     this.reL = new Float64Array(N); this.imL = new Float64Array(N); this.reR = new Float64Array(N); this.imR = new Float64Array(N);
@@ -67,7 +73,7 @@ class Suppressor {
     this.p = {depth:.5, sharp:.5, sel:3, atk:8, rel:90, lo:150, hi:12000, mix:1, delta:false};
     this.setFocus();
     // the delayed dry signal lines up with the processed one: both are N samples late
-    this.dryL = new Float32Array(N); this.dryR = new Float32Array(N); this.dw = 0;
+    this.dryL = new Float32Array(this.M); this.dryR = new Float32Array(this.M); this.dw = 0;
   }
   set(p){ Object.assign(this.p, p); this.setFocus(); }
   setFocus(){
@@ -78,27 +84,35 @@ class Suppressor {
       this.fw[k] = clamp(a * 2 + 1, 0, 1) * clamp(b * 2 + 1, 0, 1);
     }
   }
-  latency(){ return this.N; }
+  latency(){ return this.N + this.D; }
   /* process one block in place */
   process(L, R, n){
-    const N = this.N, H = this.H, p = this.p;
+    const N = this.N, H = this.H, M = this.M, p = this.p;
+    if (this.stage) this.step();   // the rest of the last hop's frame, one stage per block
     for (let i = 0; i < n; i++){
-      // keep the input, and a copy delayed by N for the dry path
+      // keep the input, and a copy delayed by N + D for the dry path
       this.inL[this.w] = L[i]; this.inR[this.w] = R[i];
-      const dl = this.dryL[this.dw], dr = this.dryR[this.dw]; this.dryL[this.dw] = L[i]; this.dryR[this.dw] = R[i]; this.dw = (this.dw + 1) % N;
+      const dl = this.dryL[this.dw], dr = this.dryR[this.dw]; this.dryL[this.dw] = L[i]; this.dryR[this.dw] = R[i]; this.dw = (this.dw + 1) % M;
       this.w = (this.w + 1) % N;
       // output: the overlap-added wet signal, aligned with dry
-      const wl = this.olaL[this.rd], wr = this.olaR[this.rd]; this.olaL[this.rd] = 0; this.olaR[this.rd] = 0; this.rd = (this.rd + 1) % N;
+      const wl = this.olaL[this.rd], wr = this.olaR[this.rd]; this.olaL[this.rd] = 0; this.olaR[this.rd] = 0; this.rd = (this.rd + 1) % M;
       if (p.delta){ L[i] = dl - wl; R[i] = dr - wr; }
       else { L[i] = dl + (wl - dl) * p.mix; R[i] = dr + (wr - dr) * p.mix; }
-      if (++this.cnt >= H){ this.cnt = 0; this.frame(); }
+      if (++this.cnt >= H){ this.cnt = 0; if (this.stage) this.finish(); this.stage = 1; this.rdSnap = this.rd; this.step(); }
     }
   }
-  frame(){
-    const N = this.N, K = this.K, p = this.p, w = this.win;
+  finish(){ while (this.stage) this.step(); }   // a block longer than a hop: run what is left now
+  step(){
+    const st = this.stage, N = this.N, w = this.win, reL = this.reL, imL = this.imL, reR = this.reR, imR = this.imR;
+    if (st === 1){ for (let i = 0; i < N; i++){ const j = (this.w + i) % N; reL[i] = this.inL[j] * w[i]; imL[i] = 0; reR[i] = this.inR[j] * w[i]; imR[i] = 0; } this.fft.run(reL, imL, false); }
+    else if (st === 2){ this.fft.run(reR, imR, false); this.analyse(); }
+    else if (st === 3){ this.gain(); this.fft.run(reL, imL, true); }
+    else { this.fft.run(reR, imR, true); this.overlap(); this.stage = 0; return; }
+    this.stage = st + 1;
+  }
+  analyse(){
+    const N = this.N, K = this.K, p = this.p;
     const reL = this.reL, imL = this.imL, reR = this.reR, imR = this.imR;
-    for (let i = 0; i < N; i++){ const j = (this.w + i) % N; reL[i] = this.inL[j] * w[i]; imL[i] = 0; reR[i] = this.inR[j] * w[i]; imR[i] = 0; }
-    this.fft.run(reL, imL, false); this.fft.run(reR, imR, false);
     // linked magnitude in dB
     const db = this.db;
     const av = 1 - Math.exp(-(this.H / this.sr) / 0.06);
@@ -122,15 +136,21 @@ class Suppressor {
     // per-bin attack and release, in frames
     const fr = this.H / this.sr, ca = Math.exp(-fr / Math.max(0.001, p.atk / 1000)), cr = Math.exp(-fr / Math.max(0.005, p.rel / 1000));
     for (let k = 0; k < K; k++){ const t = this.red[k], c = t > this.redS[k] ? ca : cr; this.redS[k] = t + (this.redS[k] - t) * c; }
-    // apply the gain to both channels (mirror the negative frequencies), back to time, overlap-add
+  }
+  gain(){
+    // apply the gain to both channels (mirror the negative frequencies)
+    const N = this.N, K = this.K, reL = this.reL, imL = this.imL, reR = this.reR, imR = this.imR;
     for (let k = 0; k < K; k++){
       const g = Math.pow(10, -this.redS[k] / 20);
       reL[k] *= g; imL[k] *= g; reR[k] *= g; imR[k] *= g;
       if (k > 0 && k < N / 2){ const m = N - k; reL[m] *= g; imL[m] *= g; reR[m] *= g; imR[m] *= g; }
     }
-    this.fft.run(reL, imL, true); this.fft.run(reR, imR, true);
+  }
+  overlap(){
+    // back in time: overlap-add one hop (D) ahead of where the output is being read, from where the read was at the hop
+    const N = this.N, M = this.M, w = this.win, reL = this.reL, reR = this.reR;
     // sqrt-Hann² = Hann, which sums to 2 at 75% overlap: scale by 0.5
-    for (let i = 0; i < N; i++){ const j = (this.rd + i) % N; this.olaL[j] += reL[i] * w[i] * 0.5; this.olaR[j] += reR[i] * w[i] * 0.5; }
+    for (let i = 0; i < N; i++){ const j = (this.rdSnap + this.D + i) % M; this.olaL[j] += reL[i] * w[i] * 0.5; this.olaR[j] += reR[i] * w[i] * 0.5; }
   }
   // the reduction now, in dB, as `bands` log-spaced bands from 20 Hz to 20 kHz (for the display)
   bands(n){
