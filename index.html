@@ -243,7 +243,8 @@ body:not(.noed) .wvMobNote{display:none}
 /* monitor screen (Seeds' black main view) */
 .screen{flex:none; background:var(--screen); border-bottom:1px solid var(--line); position:relative}
 .wave{width:100%; height:150px; display:block; cursor:pointer}
-.wmeta{display:flex; gap:14px; flex-wrap:wrap; font-size:var(--fs-3); color:#4a4257; font-variant-numeric:tabular-nums}
+.wmeta{display:flex; gap:14px; flex-wrap:nowrap; overflow:hidden; white-space:nowrap; height:1.3em; line-height:1.3; font-size:var(--fs-3); color:#4a4257; font-variant-numeric:tabular-nums}   /* one line always: an extra note (a hot pad) used to wrap and shift the page when changing pads */
+.wmeta span{flex:none} .wmeta span.ov{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis}
 .vrows{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:0 22px; padding-top:4px}
 
 /* layer list, like the Seeds module palette items */
@@ -279,7 +280,7 @@ body:not(.noed) .wvMobNote{display:none}
 .voxsyl span.w{margin-left:6px}
 .vengine{display:flex; align-items:center; gap:10px; padding:2px 0 4px; flex-wrap:wrap}
 .vengine .vel{font-size:var(--fs-3); color:var(--muted); min-width:64px}
-.vengine .lbl{font-size:var(--fs-3); color:var(--muted)}
+.vengine .lbl{font-size:var(--fs-3); color:var(--muted); flex:1 1 100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; height:1.3em; line-height:1.3}   /* one line, whatever the engine says */
 /* Narrow screens: the engine buttons flowed by text width into three uneven rows (6 / 5 / 2 with a stub). An equal
    4-column grid keeps every engine one tap away, in a stable order, and a new engine just fills the next cell. */
 @media (max-width:600px){
@@ -6221,7 +6222,7 @@ function drawWave(){
   const db = pk > 0 ? 20 * Math.log10(pk) : -Infinity;
   const meta = $('wMeta'); meta.innerHTML = '';
   meta.append(el('span', null, (d.length / c.sr).toFixed(3) + ' s'), el('span', null, 'peak ' + (isFinite(db) ? db.toFixed(1) + ' dB' : 'silent')));
-  if (pk > 1) meta.append(el('span', null, 'over 0 dB, export normalises'));
+  if (pk > 1) meta.append(el('span', 'ov', 'over 0 dB, normalised on export'));
   meta.append(el('span', null, 'tap to play'));
 }
 window.addEventListener('resize', () => drawWave());
