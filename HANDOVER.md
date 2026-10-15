@@ -625,7 +625,7 @@ caches.
 ## 15 Oct (afternoon): review risk fixes, one commit each on main
 
 After the eight bugs below were merged (PR #1), the review's risk items went in as separate commits. Cache is now
-`thunderplus-v109`; `chains-worklet.js?v=20`, `waves-worklet.js?v=15`, `master-worklet.js?v=3`.
+`thunderplus-v113`; `chains-worklet.js?v=20`, `waves-worklet.js?v=15`, `master-worklet.js?v=3`.
 
 - **Effects can't be hung or silenced by a bad sample** (93d3ae3): the wasm only checks its output, and a NaN/∞ on the
   way in made the tape delay's `tfx_process` never return (frozen audio thread) and left twenty effects silent. The
@@ -658,8 +658,19 @@ After the eight bugs below were merged (PR #1), the review's risk items went in 
   22 → 5.2 ms); one `scheduleRefit()` for every shape change, grip drag ≤ 8 fps, frame loop at 10 Hz when idle
   (ddd1354); the two wasm modules are fetched from `waves/dsp/` instead of base64 in the page (index.html 3 MB → 1 MB;
   `tfxLoad` promise gates `tfxReady`/`chainsReady`; the service worker precaches with `cache:'reload'`).
-- **Still open from the review (performance):** synth↔tracker ~0.5 s on the phone (`measure()` per switch, `drawWave` two passes); rainbow-dynamic `hue-rotate` on the root; per-block garbage in the worklets; …waves voices awake 12 s after release; the Suppressor's FFT bursts; denormals in
-  Ladder/OTT/Comb on x86 and the track-FX sleep that never engages while `bp` ramps.
+- **Performance pass, part 2 (15 Oct, late afternoon), one commit each:** synth ↔ tracker is one layout pass with a
+  cached character width and a per-render waveform envelope (5887b1d: 807 → 559 ms of main thread per round trip at
+  4×, the rest is the browser laying out the shown page); no per-block garbage in the modular engines, the track-FX
+  worklet and the Plaits/Elements voices (6020c92: a Plaits patch 123 → 28 scavenges / 40 000 blocks); released …waves
+  voices sleep once their exit outputs (`m.exits`, set in `compile()`) have been under −100 dB for 0.25 s, and track-FX
+  nodes sleep during playback unless the chain has a tempo-locked slot (cc5e5d4); the dynamic rainbow turns `--rbo`
+  instead of filtering `<html>`, and ±1e-18 goes into every wasm effect against denormals (05cb255: Ladder on silence
+  710 → 40 µs a block on x86; Clouds keeps a 3× idle cost from its own buffers).
+- **Still open from the review (performance):** the Suppressor's four 2048-point FFTs in one render quantum (spread
+  them over the hop's four blocks); …waves live load shedding never recovers and its step 3 kills notes every ~0.5 s
+  (make it a one-off, step back up under low load); the …chains telemetry posting ~31 msgs/s per node whether or not
+  the screen is open; `Resample`/module `create()` allocating on the audio thread; the top bar wrapping to two rows
+  on the cover screen; the Settings sheet sized with `100vh` under the keyboard; `overscroll-behavior` on html/body.
 
 ## 15 Oct: review fixes (branch fix/review-bugs, merged as PR #1)
 
