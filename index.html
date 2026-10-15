@@ -452,7 +452,10 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .updb{position:fixed; left:50%; transform:translateX(-50%); top:calc(10px + env(safe-area-inset-top,0px)); z-index:20; background:var(--pl); color:var(--inv); border:0; padding:12px 18px; font-size:var(--fs-4); font-weight:600; box-shadow:0 4px 16px rgba(0,0,0,.25); white-space:nowrap}
 .ask{position:fixed; inset:0; z-index:70; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.45); padding:16px}
 .ask .askbox{background:var(--bench); color:var(--ink); border:1px solid var(--line); padding:16px 18px; width:min(440px, 100%); max-height:calc(100vh - 32px); overflow:auto; box-shadow:0 8px 32px rgba(0,0,0,.35); display:flex; flex-direction:column; gap:12px}
-.ask .askmsg{white-space:pre-wrap; line-height:1.4; font-size:var(--fs-4)}
+.ask .asktitle{font-weight:600; font-size:var(--fs-5); line-height:1.3}
+.ask .askmsg{white-space:pre-wrap; line-height:1.4; font-size:var(--fs-4); color:var(--muted)}
+.ask .asklist{display:flex; flex-direction:column; gap:4px; max-height:50vh; overflow-y:auto}
+.ask .askitem{text-align:left; padding:8px 10px; min-height:38px}
 .ask input{width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid var(--line); background:var(--panel); min-height:38px}
 .ask .btnrow{justify-content:flex-end}
 .ask .ok{background:var(--pl); color:var(--inv); border-color:var(--pl); font-weight:600}
@@ -4539,13 +4542,18 @@ function toast(msg){ const t = $('toast'); t.textContent = msg; t.hidden = false
    every missed note plays at once; and the desktop app (Electron) has no prompt() at all. These sheets do the same
    job without blocking: askText(message, default) → string or null, askYes(message) → true/false. */
 let askOpen = null;
+// msg: a string, or {title, body}. opts: text (an input with this value), max, ok / no (button labels), list (an array
+// of labels: tapping one resolves with its index, no OK button).
 function askSheet(msg, opts){
   return new Promise(res => {
     if (askOpen) askOpen(null);
     const wrap = el('div', 'ask'), box = el('div', 'askbox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true');
-    const m = el('div', 'askmsg', msg); box.append(m);
-    let inp = null; if (opts.text != null){ inp = el('input'); inp.type = 'text'; inp.value = opts.text; inp.spellcheck = false; inp.setAttribute('aria-label', msg.split('\n')[0]); if (opts.max) inp.maxLength = opts.max; box.append(inp); }
-    const row = el('div', 'btnrow'), no = el('button', null, opts.no || 'Cancel'), ok = el('button', 'ok', opts.ok || 'OK'); no.type = ok.type = 'button'; row.append(no, ok); box.append(row); wrap.append(box);
+    const title = typeof msg === 'string' ? msg : msg.title, body = typeof msg === 'string' ? '' : msg.body || '';
+    const t = el('div', 'asktitle', title); box.append(t); wrap.setAttribute('aria-label', title);
+    if (body){ const m = el('div', 'askmsg', body); box.append(m); }
+    let inp = null; if (opts.text != null){ inp = el('input'); inp.type = 'text'; inp.value = opts.text; inp.spellcheck = false; inp.setAttribute('aria-label', title); if (opts.max) inp.maxLength = opts.max; box.append(inp); }
+    if (opts.list){ const ul = el('div', 'asklist'); opts.list.forEach((label, i) => { const b = el('button', 'askitem', label); b.type = 'button'; b.addEventListener('click', () => done(i)); ul.append(b); }); box.append(ul); }
+    const row = el('div', 'btnrow'), no = el('button', null, opts.no || 'Cancel'), ok = el('button', 'ok', opts.ok || 'OK'); no.type = ok.type = 'button'; row.append(no); if (!opts.list) row.append(ok); box.append(row); wrap.append(box);
     const done = v => { if (askOpen !== done) return; askOpen = null; wrap.remove(); document.removeEventListener('keydown', key, true); res(v); };
     const key = e => { if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); done(null); } else if (e.key === 'Enter' && (inp ? e.target === inp : true)){ e.preventDefault(); e.stopPropagation(); done(inp ? inp.value : true); } else if (inp && e.target === inp) e.stopPropagation(); };
     askOpen = done;
@@ -4556,8 +4564,9 @@ function askSheet(msg, opts){
     setTimeout(() => { if (inp){ inp.focus(); inp.select(); } else ok.focus(); }, 0);
   });
 }
-const askText = (msg, def, max) => askSheet(msg, {text:def == null ? '' : String(def), max});
+const askText = (msg, def, max, ok) => askSheet(msg, {text:def == null ? '' : String(def), max, ok});
 const askYes = (msg, ok) => askSheet(msg, {ok}).then(v => v === true);
+const askPick = (msg, list) => askSheet(msg, {list}).then(v => typeof v === 'number' ? v : -1);
 
 /* ---------- voice card ---------- */
 const vRows = [];
@@ -5230,9 +5239,7 @@ function presetUI(){
   fillPresetSel(ls, SP().layers, flp(), 'Layer presets…');
 }
 async function pickDel(list, what){
-  const names = list.map((p, i) => `${i + 1}. ${p.name}`).join('\n');
-  const a = await askText(`Delete which ${what} preset? Type its number:\n\n${names}`, '', 4); if (a == null) return -1;
-  const i = int(a, 0) - 1; return i >= 0 && i < list.length ? i : -1;
+  return askPick({title:`Delete a ${what} preset`, body:'Tap the one to delete. It is removed from this song only.'}, list.map(p => p.name));
 }
 function applyVoicePreset(v){
   const keepChoke = isSyn(cur) ? 0 : null;
@@ -5243,7 +5250,7 @@ function applyVoicePreset(v){
 async function onVoicePreset(val){
   const mine = SP().voices;
   if (val === 'save'){
-    const n = await askText('Name this preset (it is saved in the song)', V().name || 'Preset', 60); if (n == null) return;
+    const n = await askText({title:'Save preset', body:'Saved in this song, with its samples.'}, V().name || 'Preset', 60, 'Save'); if (n == null) return;
     mine.push({name:uniqName(mine, n.trim().slice(0, 60) || 'Preset'), v:voiceToJSON(V(), 'ref')}); saveS(); presetUI();
     return toast('Saved preset “' + mine[mine.length - 1].name + '” in this song.');
   }
@@ -5263,7 +5270,7 @@ function applyLayerPreset(l, vt){
 async function onLayerPreset(val){
   const mine = SP().layers;
   if (val === 'save'){
-    const n = await askText('Name this layer preset (it is saved in the song)', (TYPE[Lc().type] || {name:'Layer'}).name, 60); if (n == null) return;
+    const n = await askText({title:'Save layer preset', body:'Saved in this song, with its sample.'}, (TYPE[Lc().type] || {name:'Layer'}).name, 60, 'Save'); if (n == null) return;
     mine.push({name:uniqName(mine, n.trim().slice(0, 60) || 'Layer'), l:layerToJSON(Lc(), 'ref'), vt:V().tune || 0}); saveS(); presetUI();
     return toast('Saved layer preset “' + mine[mine.length - 1].name + '” in this song.');
   }
@@ -5780,7 +5787,7 @@ async function sfPanel(force){
     inp.click(); });
   const rm = el('button', 'sm', 'Remove font'); rm.type = 'button'; rm.hidden = (v.sfFont || GM_FONT.id) === GM_FONT.id && !haveGM;
   rm.addEventListener('click', async () => { const id = V().sfFont || GM_FONT.id;
-    if (!await askYes('Remove this SoundFont from this device? Pads that use it go silent until it is loaded again.', 'Remove')) return;
+    if (!await askYes({title:'Remove this SoundFont?', body:'It is deleted from this device. Pads that use it go silent until it is loaded again.'}, 'Remove')) return;
     await sfDelete(id); if (id !== GM_FONT.id){ V().sfFont = GM_FONT.id; changed(cur); } sfPanel(true); });
   const row1 = el('div', 'btnrow'); row1.append(fs); const row2 = el('div', 'btnrow'); row2.append(ps); const row3 = el('div', 'btnrow'); row3.append(ld, rm);
   box.append(row1, row2, row3);
@@ -6915,7 +6922,7 @@ $('bUnlearn').addEventListener('click', () => {
   saveMidi(); renderPads(); ccBadges();
 });
 $('bMidiReset').addEventListener('click', async () => {
-  if (!await askYes('Reset every pad to notes 36–43 (synth pads off) and forget every learned knob?', 'Reset')) return;
+  if (!await askYes({title:'Reset MIDI mapping?', body:'Every pad goes back to notes 36–43 (synth pads off) and every learned knob is forgotten.'}, 'Reset')) return;
   midi.notes = DEFNOTES.slice(); midi.cc = {}; saveMidi(); renderPads(); ccBadges(); midiStatus('Pads reset to notes 36–43; knobs forgotten.');
 });
 makeSeg($('segVel'), [[true,'On'],[false,'Off']], () => midi.vel, v => { midi.vel = v; saveMidi(); });
@@ -9335,7 +9342,7 @@ async function saveProj(as){
       try { const h = await window.showSaveFilePicker({suggestedName:`${safe(S.name || 'Song')} project.json`, types:PJT}); await writeTo(h); projFile = h; return toast('Saved ' + h.name); }
       catch(e){ if (e && e.name === 'AbortError') return; toast('Couldn’t save there: ' + ((e && e.message) || e)); return; }
     }
-    if (as){ const n = await askText('Save project as', S.name, 40); if (n == null) return; S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); }
+    if (as){ const n = await askText({title:'Save project as', body:'The song is renamed and saved to your downloads.'}, S.name, 40, 'Save'); if (n == null) return; S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); }
     await deliver(`${safe(S.name || 'Song')} project.json`, projBlob());
   } finally { saving = false; }
 }
@@ -9373,7 +9380,7 @@ async function thunderImport(asked){
   catch(e){ return toast('Couldn’t read ...Thunder’s saved work: ' + ((e && e.message) || e)); }
   if (!asked){
     const what = [songJ && `song “${songJ.name || 'Song'}”`, kitJ && `kit “${kitJ.name || 'Kit'}”`].filter(Boolean).join(' and ');
-    if (!await askYes(`...Thunder is now part of ...Thunder Plus (Settings → App → Mobile).\n\nFound ...Thunder’s ${what} in this browser. Open them here?\n\nYour current song “${S.name || 'Song'}” and kit “${kit.name || 'Kit'}” are saved to a project file first. You can also do this later from File.`)){
+    if (!await askYes({title:'Open ...Thunder’s saved work?', body:`...Thunder is now part of ...Thunder Plus (Settings → App → Mobile), and its ${what} are still in this browser.\n\nYour current song “${S.name || 'Song'}” and kit “${kit.name || 'Kit'}” are saved to a project file first. You can also do this later from File.`}, 'Open')){
       try { localStorage.setItem(TIK, 'no'); } catch(e){} toast('Kept this song and kit. File → Open ...Thunder’s saved work brings Thunder’s over any time.', 5000); return;
     }
   }
@@ -9711,7 +9718,7 @@ function projRows(){
       info:() => 'While the song plays, Song and Phrase scroll with the playhead: the cursor rides along, and Phrase (and Sect) switch to what the cursor’s track is playing. Off leaves the screen where you put it'},
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. A poly track shows its whole chord: all four notes when there is room (unfolded, desktop), otherwise one letter per voice (capital = natural, small = sharp, so CEGa is C E G A#; · is an empty voice, × a note off). Only to look at; they can’t be edited'},
-    {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText('Song name', S.name, 40); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); } }, info:() => 'EDIT renames the song'},
+    {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText({title:'Rename the song'}, S.name, 40, 'Rename'); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); } }, info:() => 'EDIT renames the song'},
     {l:'TRACKS', get:() => ntr(), set:v => setNtr(v), min:8, max:NT, big:8, d:16, fmt:v => v + ' tracks',
       info:() => `How many tracks this song uses, 8 to ${vtrk ? 24 : NT} with ${vtrk ? 'a voice per track (one voice each)' : 'the shared 16 voices'}. Song and Mixer show as many as fit and scroll sideways (arrows, or swipe left and right). Tracks past this number are hidden and silent; their notes are kept`},
     {l:'TEMPO', get:() => S.bpm, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; }, min:40, max:300, big:10, d:120, fmt:v => v + ' BPM', after:() => { rtAllFx(); chainsTempo(); }, info:() => 'Beats per minute, 4 steps to a beat. Track delays follow it'},
@@ -12120,7 +12127,7 @@ $('tLoop').addEventListener('click', () => toggleLoop());
 $('tXposeDn').addEventListener('click', () => transposeSel(-1));
 $('tXposeUp').addEventListener('click', () => transposeSel(1));
 $('tRowsUp').addEventListener('click', () => setRows(plen(rowsId()) + 1));
-$('tRowsV').addEventListener('click', async () => { const id = rowsId(), n = await askText(`Rows for phrase ${hx(id)} (1–${PROWS})`, plen(id), 4); if (n != null && Number.isFinite(+n) && n.trim() !== '') setRows(Math.round(+n)); });
+$('tRowsV').addEventListener('click', async () => { const id = rowsId(), n = await askText({title:`Rows in phrase ${hx(id)}`, body:`1 to ${PROWS}. The − and + beside it step by one.`}, plen(id), 4, 'Set'); if (n != null && Number.isFinite(+n) && n.trim() !== '') setRows(Math.round(+n)); });
 $('tClk').addEventListener('click', () => toast(`${tp.on ? tp.bpm : S.bpm} BPM, ${tp.on ? tp.tks : S.ticks || TICKS} ticks a step. Set them in Project (TEMPO, TICKS); TPO and TIC change them as the song plays.`));
 $('projIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadProjFile(f); });
 $('chainsIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importChainsFile(f); });
@@ -12416,7 +12423,7 @@ function tsetRow(r){
   if (r.act){
     row.classList.add('act'); const b = el('button', null, tsetLabel(r.l)); b.type = 'button';
     b.addEventListener('click', async () => {
-      if (r.dbl && !await askYes(tsetLabel(r.l) + '?\n\n' + inf.textContent, tsetLabel(r.l))) return;
+      if (r.dbl && !await askYes({title:tsetLabel(r.l) + '?', body:inf.textContent}, tsetLabel(r.l))) return;
       r.act(); draw(); setTimeout(() => { if (gsetOpen() && view === 'tracker') buildProj(); }, 50);
     });
     row.append(b, inf); return row;
