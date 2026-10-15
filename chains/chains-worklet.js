@@ -531,8 +531,10 @@ const LadderFx = effect('ladder', 18, { cut:[1200,30,16000,1], res:[0.6,0,1.8,.0
 const XmodFx = effect('xmod', 19, { alg:[0.3,0,1,.01], timbre:[0.5,0,1,.01], carrier:[3,0,3,1], note:[48,24,96,1], clvl:[0.8,0,1,.01], mlvl:[0.8,0,1,.01], mix:[1,0,1,.01] },
   p => [p.alg, p.timbre, p.clvl, p.mlvl, p.carrier | 0, p.note | 0, p.mix], 1.2);
 /* Space reverb, based on Cloud Seed (Ghost Note Audio) (MIT). */
+// Size exactly 1 (the line at the end of its shrunk buffer) never decays: it sits at 5× the input for good.
+const SPACE_SIZE_MAX = 0.99;
 const SpaceFx = effect('space', 20, { size:[0.5,0,1,.01], decay:[0.55,0,1,.01], diff:[0.7,0,1,.01], mod:[0.4,0,1,.01], tone:[0.6,0,1,.01], lowcut:[0.2,0,1,.01], pre:[0.1,0,1,.01], mix:[0.35,0,1,.01] },
-  p => [p.size, p.decay, p.diff, p.mod, p.tone, p.lowcut, p.pre, p.mix], 2);
+  p => [Math.min(p.size, SPACE_SIZE_MAX), p.decay, p.diff, p.mod, p.tone, p.lowcut, p.pre, p.mix], 2);
 /* Lo-fi, based on Airwindows DeRez2 (MIT). */
 const LofiFx = effect('lofi', 21, { rate:[0.6,0,1,.01], rez:[0.6,0,1,.01], hard:[0.5,0,1,.01], mix:[1,0,1,.01] },
   p => [p.rate, p.rez, p.hard, p.mix], 0.3);
