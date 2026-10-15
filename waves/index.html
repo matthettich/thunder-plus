@@ -1085,7 +1085,7 @@ class WavesBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './waves-worklet.js?v=12';
+    const url = opts.url || './waves-worklet.js?v=13';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'waves', {
