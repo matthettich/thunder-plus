@@ -496,6 +496,25 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .welcome kbd{font:inherit; font-weight:600; padding:0 5px; border:1px solid var(--line); border-radius:3px; background:var(--panel)}
 .welcome .wfoot{margin-top:14px; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:var(--fs-3); color:var(--muted)}
 .welcome .wfoot button{min-height:34px; white-space:nowrap}
+/* The preset browser: a sheet with the categories as rows that open and close (one open at a time), This song and
+   Recent first, a search box, ▶ to hear a preset before taking it, Save and Import as buttons. The same sheet
+   serves pad presets and layer presets. */
+.pbs{position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.42); display:flex; align-items:flex-end; justify-content:center}
+@media (min-width:700px){ .pbs{align-items:center; padding:16px} }
+.pbs .pbox{background:var(--bench); color:var(--ink); border:1px solid var(--line); width:min(560px, 100%); max-height:88vh; display:flex; flex-direction:column; font-size:var(--fs-4); box-shadow:0 8px 32px rgba(0,0,0,.35)}
+@supports (height:1dvh){ .pbs .pbox{max-height:88dvh} }
+.pbs .phd{display:flex; gap:8px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line)} .pbs .phd b{font-size:var(--fs-5); white-space:nowrap}
+.pbs .phd input{flex:1; min-width:0; padding:7px 10px; border:1px solid var(--line); background:var(--panel); min-height:36px}
+.pbs .plist{overflow-y:auto; flex:1; overscroll-behavior:contain}
+.pbs .pcat{display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%; text-align:left; padding:11px 14px; border:0; border-bottom:1px solid var(--line); font-weight:600; background:var(--panel); color:var(--ink); min-height:44px}
+.pbs .pcat small{font-weight:400; color:var(--muted); margin-left:auto} .pbs .pcat::after{content:'▸'; color:var(--muted)} .pbs .pcat.open::after{content:'▾'}
+.pbs .pit{display:flex; align-items:center; gap:6px; padding:0 8px 0 24px; border-bottom:1px solid color-mix(in srgb, var(--line) 35%, transparent); min-height:44px}
+.pbs .pit .pn{flex:1; min-width:0; text-align:left !important; justify-content:flex-start; border:0; background:none; color:inherit; padding:10px 0; min-height:44px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pbs .pit.cur{background:var(--ink); color:var(--inv)} .pbs .pit.cur .pn{color:inherit}
+.pbs .pit .pp, .pbs .pit .px{flex:none; min-width:38px; min-height:34px; padding:0 8px; border:1px solid var(--line); background:var(--panel); color:var(--ink)}
+.pbs .pit .pp.busy{opacity:.5} .pbs .pit .px{color:var(--rec)}
+.pbs .pft{display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line); align-items:center} .pbs .pft .sp{flex:1}
+.pbs .pempty{padding:18px 14px; color:var(--muted)}
 .updb.storeb{background:#c0392b; color:#fff; white-space:normal; max-width:calc(100vw - 32px); z-index:21}
 @media (max-width:480px){ .top .tmode .mx{display:inline} .top .tmode,.top .tcpu{padding:0 8px} .top .tcpu{min-width:72px} }
 .top .tcpu{border:1px solid var(--line); min-height:34px; background:var(--panel); padding:0 10px; min-width:84px; overflow:hidden}
@@ -1325,7 +1344,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="bar vbar">
       <div class="vrow vid"><span class="ttl" id="vNum">Pad 1</span><input id="vName" type="text" aria-label="Pad name" spellcheck="false"><button class="sm play" id="vPlay" title="Play this pad (Space)"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</button></div>
       <div class="vrow vact">
-        <select id="vPre" class="presel" aria-label="Pad presets" title="Presets: factory sounds, and your own saved in this song"></select>
+        <button type="button" id="vPre" class="sm presel" title="Presets: factory sounds, and your own saved in this song">Presets…</button>
         <span class="grp" role="group" aria-label="Make"><button class="sm" id="vRand">Random</button><button class="sm" id="vInit">Init</button></span>
         <span class="grp" role="group" aria-label="Clipboard"><button class="sm" id="vCopy">Copy</button><button class="sm" id="vPaste">Paste</button></span>
       </div>
@@ -1420,7 +1439,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <span class="famtag" id="lFam"></span>
       <div class="sp"></div>
       <div class="acts">
-        <select id="lPre" class="presel" aria-label="Layer presets" title="Layer presets: replace this layer"></select>
+        <button type="button" id="lPre" class="sm presel" title="Layer presets: replace this layer">Layer presets…</button>
         <button class="sm" id="bLoad">Load sample</button>
         <button class="sm" id="lRand">Random</button>
         <button class="sm" id="lCopy">Copy</button>
@@ -5275,11 +5294,7 @@ function fillPresetSel(sel, mine, groups, lbl){
   groups.forEach(([gn, list], gi) => { const g = document.createElement('optgroup'); g.label = gn;
     list.forEach((it, i) => { const o = document.createElement('option'); o.value = 'f' + gi + ':' + i; o.textContent = it[0]; g.append(o); }); sel.append(g); });
 }
-function presetUI(){
-  const vs = $('vPre'), ls = $('lPre'); if (!vs || !ls) return;
-  fillPresetSel(vs, SP().voices, fvp(), 'Presets…');
-  fillPresetSel(ls, SP().layers, flp(), 'Layer presets…');
-}
+function presetUI(){ /* the preset browser (presetSheet) builds its list when it opens */ }
 async function pickDel(list, what){
   return askPick({title:`Delete a ${what} preset`, body:'Tap the one to delete. It is removed from this song only.'}, list.map(p => p.name));
 }
@@ -5362,13 +5377,85 @@ async function importPresetsFile(f){
     saveS(); presetUI(); toast(`Imported ${a} pad preset${a === 1 ? '' : 's'} and ${b} layer preset${b === 1 ? '' : 's'} into this song.`);
   } catch(e){ toast((e && e.message) || 'Couldn’t read that presets file.'); }
 }
+/* ---------- the preset browser ----------
+   kind 'voice' (pad presets) or 'layer'. Entries carry an apply() and a make() (the preset as a voice, for the ▶
+   preview, rendered in the background and played once without touching the pad). Recent picks are kept per kind. */
+const PRK = 'thunderplus-preset-recent-v1';
+const recentPresets = (() => { let r = null; const load = () => { if (!r){ try { r = JSON.parse(localStorage.getItem(PRK) || '{}'); } catch(e){ r = {}; } if (!r || typeof r !== 'object') r = {}; } return r; };
+  return { list:k => (load()[k] || []).slice(0, 8), add:(k, key) => { const o = load(); o[k] = [key, ...(o[k] || []).filter(x => x !== key)].slice(0, 8); try { localStorage.setItem(PRK, JSON.stringify(o)); } catch(e){} } }; })();
+function presetEntries(kind){
+  const G = [], mine = kind === 'voice' ? SP().voices : SP().layers;
+  const vt = V().tune || 0;
+  const layerVoice = (l, lvt) => { const v = voiceFromJSON(voiceToJSON(V(), false)); const L = freshLayer(Object.assign({}, l, {on:true})); L.tune = clamp((l.tune || 0) + (lvt || 0) - vt, -48, 48); if (!l.mode) L.mode = isSyn(cur) ? 'ADSR' : 'AHD'; if (l.sample) L.sample = smpFromJSON(l.sample); v.layers[v.sel] = L; return v; };
+  const own = mine.map((p, i) => kind === 'voice'
+    ? {key:'u:' + p.name, name:p.name, own:i, apply:() => onVoicePreset('u' + i), make:() => voiceFromJSON(JSON.parse(JSON.stringify(p.v)))}
+    : {key:'u:' + p.name, name:p.name, own:i, apply:() => onLayerPreset('u' + i), make:() => layerVoice(JSON.parse(JSON.stringify(p.l)), p.vt)});
+  G.push(['This song', own]);
+  const fac = kind === 'voice' ? fvp() : flp();
+  const all = new Map(); own.forEach(e => all.set(e.key, e));
+  fac.forEach(([gn, list], gi) => { const es = list.map((it, i) => { const key = 'f' + gi + ':' + i, e = kind === 'voice'
+      ? {key, name:it[0], apply:() => onVoicePreset(key), make:() => it[1]()}
+      : {key, name:it[0], apply:() => onLayerPreset(key), make:() => layerVoice(it[1], it[2])}; all.set(key, e); return e; }); G.push([gn, es]); });
+  const rec = recentPresets.list(kind).map(k => all.get(k)).filter(Boolean); if (rec.length) G.splice(1, 0, ['Recent', rec]);
+  return G;
+}
+let pbOpen = null, pbPreview = null;
+function stopPreview(){ if (pbPreview){ try { pbPreview.stop(); } catch(e){} pbPreview = null; } }
+async function previewVoice(v, btn){
+  audio(); stopPreview(); if (btn) btn.classList.add('busy');
+  try {
+    const sr = padSR(), hold = isSyn(cur) ? (v.len || 0) : 0; let data;
+    if (v.engine === 'sf'){ toast('SoundFont presets have no preview: take it and tap the pad.'); return; }
+    try { data = (await renderAsync(v, sr, hold, false)).data; } catch(e){ data = renderVoice(v, sr, null, hold); }
+    if (!data || !data.length) return;
+    stopPreview(); const b = ctx.createBuffer(1, data.length, sr); b.copyToChannel(data, 0); const src = ctx.createBufferSource(); src.buffer = b; src.connect(master); src.start(); pbPreview = src; src.onended = () => { if (pbPreview === src) pbPreview = null; };
+  } catch(e){ toast('Couldn’t preview that preset.'); } finally { if (btn) btn.classList.remove('busy'); }
+}
+function presetSheet(kind){
+  if (pbOpen) pbOpen();
+  if (kind === 'layer' && V().engine && V().engine !== 'layers') return toast('Layer presets are for the Layers engine.');
+  const wrap = el('div', 'pbs'), box = el('div', 'pbox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true'); wrap.setAttribute('aria-label', kind === 'voice' ? 'Pad presets' : 'Layer presets');
+  const hd = el('div', 'phd'), ttl = el('b', null, kind === 'voice' ? 'Presets' : 'Layer presets'), q = el('input'), close = el('button', 'sm', 'Close'); close.type = 'button';
+  q.type = 'search'; q.placeholder = 'Search…'; q.spellcheck = false; q.setAttribute('aria-label', 'Search presets'); hd.append(ttl, q, close);
+  const list = el('div', 'plist'), ft = el('div', 'pft'), save = el('button', 'sm', kind === 'voice' ? '＋ Save this pad as a preset' : '＋ Save this layer as a preset'), imp = el('button', 'sm', 'Import…'); save.type = imp.type = 'button';
+  ft.append(save, el('span', 'sp'), imp); box.append(hd, list, ft); wrap.append(box);
+  const G = presetEntries(kind); let total = 0; for (const [, es] of G) total += es.length; q.placeholder = `Search ${total} presets…`;
+  let openCat = G[0] && G[0][1].length ? 0 : (G[1] ? 1 : 0);
+  const done = () => { if (pbOpen !== done) return; pbOpen = null; stopPreview(); wrap.remove(); document.removeEventListener('keydown', key, true); };
+  const key = e => { if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); done(); } else if (e.target === q) e.stopPropagation(); };
+  const row = e => {
+    const it = el('div', 'pit'), pn = el('button', 'pn', e.name), pp = el('button', 'pp'); pn.type = pp.type = 'button'; pn.title = 'Take this preset';
+    pp.innerHTML = '<svg class="ic" aria-hidden="true" style="width:12px;height:12px;fill:currentColor"><use href="#ic-play"/></svg>'; pp.title = 'Hear it'; pp.setAttribute('aria-label', 'Preview ' + e.name);
+    pn.addEventListener('click', () => { recentPresets.add(kind, e.key); done(); e.apply(); });
+    pp.addEventListener('click', () => { try { previewVoice(e.make(), pp); } catch(err){ toast('Couldn’t preview that preset.'); } });
+    it.append(pn, pp);
+    if (e.own != null){ const px = el('button', 'px', '✕'); px.type = 'button'; px.title = 'Delete this preset'; px.setAttribute('aria-label', 'Delete ' + e.name);
+      px.addEventListener('click', async () => { if (!await askYes({title:'Delete “' + e.name + '”?', body:'It is removed from this song only.'}, 'Delete')) return; const mine = kind === 'voice' ? SP().voices : SP().layers; mine.splice(e.own, 1); saveS(); toast('Deleted “' + e.name + '”.'); render(); });
+      it.append(px); }
+    return it;
+  };
+  const render = () => {
+    list.replaceChildren(); const f = q.value.trim().toLowerCase(); const G2 = f ? presetEntries(kind) : (G.length ? G : presetEntries(kind));
+    if (f){ let n = 0; for (const [gn, es] of G2){ if (gn === 'Recent') continue; for (const e of es) if (e.name.toLowerCase().includes(f)){ const it = row(e); it.title = gn; list.append(it); n++; } }
+      if (!n) list.append(el('div', 'pempty', 'Nothing matches “' + q.value.trim() + '”.')); return; }
+    G2.forEach(([gn, es], gi) => {
+      const c = el('button', 'pcat' + (gi === openCat ? ' open' : '')); c.type = 'button'; c.append(document.createTextNode(gn), el('small', null, String(es.length))); c.setAttribute('aria-expanded', String(gi === openCat));
+      c.addEventListener('click', () => { openCat = openCat === gi ? -1 : gi; render(); if (openCat === gi) c.scrollIntoView({block:'nearest'}); });
+      list.append(c);
+      if (gi === openCat){ if (!es.length) list.append(el('div', 'pempty', kind === 'voice' ? 'No presets saved in this song yet. ＋ Save below keeps this pad.' : 'No layer presets saved in this song yet.')); for (const e of es) list.append(row(e)); }
+    });
+  };
+  q.addEventListener('input', render);
+  close.addEventListener('click', done);
+  save.addEventListener('click', async () => { done(); await (kind === 'voice' ? onVoicePreset('save') : onLayerPreset('save')); });
+  imp.addEventListener('click', () => { done(); $('presetIn').click(); });
+  wrap.addEventListener('pointerdown', e => { if (e.target === wrap){ e.preventDefault(); done(); } });
+  document.addEventListener('keydown', key, true);
+  pbOpen = done; render(); document.body.append(wrap);
+}
 (function presetInit(){
-  const vs = $('vPre'), ls = $('lPre');
-  for (const [s, f] of [[vs, onVoicePreset], [ls, onLayerPreset]]){
-    s.addEventListener('pointerdown', presetUI); s.addEventListener('focus', presetUI);
-    s.addEventListener('change', () => { const v = s.value; s.value = ''; if (v) f(v); });
-  }
-  setTimeout(presetUI, 0);   // the song (S) is set up further down this script
+  $('vPre').addEventListener('click', () => presetSheet('voice'));
+  $('lPre').addEventListener('click', () => presetSheet('layer'));
   $('presetIn').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) importPresetsFile(f); });
 })();
 /* ---------- the Acid, Machine, Tone drum and Modal cards (one card, built for whichever engine the pad uses) ---------- */
