@@ -359,6 +359,16 @@ body:not(.noed) .wvMobNote{display:none}
 .fxempty{padding:10px 12px 12px; margin:0}
 .secs{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:8px 22px; padding:10px 12px 12px}
 .sec{min-width:0}
+/* Narrow screens: the sections (Source, Pitch, Amp, Filter, and the layer type's own) are tabs, one showing at a
+   time, instead of one long column of sliders. Wide screens keep the grid with every section visible. */
+.sectabs{display:none}
+@media (max-width:600px){
+  .sectabs{display:flex; flex-wrap:wrap; gap:0; margin:8px 12px 0; border:1px solid var(--line); background:var(--panel)}
+  .sectabs button{flex:1 1 auto; border:0; border-right:1px solid var(--line); min-height:34px; padding:4px 8px; font-size:var(--fs-3); font-weight:600; background:none; display:inline-flex; align-items:center; justify-content:center; gap:6px}
+  .sectabs button::before{content:""; width:8px; height:8px; background:var(--fam); flex:none}
+  .sectabs button:last-child{border-right:0} .sectabs button.on{background:var(--ink); color:var(--inv)}
+  .secs.tabbed{display:block} .secs.tabbed .sec:not(.on){display:none} .secs.tabbed .sec h3{display:none}
+}
 .sec h3{font-size:var(--fs-4); font-weight:600; margin:2px 0 4px; color:var(--ink); display:flex; align-items:center; gap:7px}
 .sec h3::before{content:""; width:9px; height:9px; background:var(--fam); flex:none}
 .readout{font-size:var(--fs-3); color:var(--muted); font-variant-numeric:tabular-nums; min-height:18px; padding-left:76px}
@@ -1448,6 +1458,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <button class="sm" id="lClear">Clear</button>
       </div>
     </header>
+    <div class="sectabs" id="secTabs" role="tablist" aria-label="Layer sections" hidden></div>
     <div class="secs" id="secs"></div>
   </section>
   </div>
@@ -6181,7 +6192,20 @@ function refreshLayer(){
   for (const r of rows) if (r.getObj === Lc) r.refresh();
   pitchReadout();
   renderStrip();
+  secTabsUpd();
   try { ccBadges(); } catch(e){}
+}
+// The layer card's section tabs (narrow screens): built from the sections that are showing for this layer type.
+let secTab = 'Source';
+function secTabsUpd(){
+  const host = $('secTabs'); if (!host) return;
+  const vis = [...secs.children].filter(sc => !sc.hidden && sc.classList.contains('sec'));
+  const names = vis.map(sc => sc.querySelector('h3').textContent);
+  if (!names.includes(secTab)) secTab = names[0] || '';
+  const sig = names.join('|') + '#' + secTab; if (host.dataset.sig !== sig){ host.dataset.sig = sig; host.replaceChildren();
+    for (const n of names){ const b = el('button', n === secTab ? 'on' : '', n); b.type = 'button'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(n === secTab)); b.addEventListener('click', () => { secTab = n; secTabsUpd(); }); host.append(b); } }
+  host.hidden = names.length < 2; secs.classList.toggle('tabbed', names.length >= 2);
+  for (const sc of vis) sc.classList.toggle('on', sc.querySelector('h3').textContent === secTab);
 }
 srcRows.burst.inp.addEventListener('input', () => { srcRows.spacing.r.hidden = !(Lc().burst > 0); });
 
