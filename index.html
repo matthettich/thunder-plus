@@ -219,6 +219,17 @@ body:not(.noed) .wvMobNote{display:none}
 .band.grey{background:var(--side)}
 .band.voice{background:var(--voice)}
 .bar{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+/* The pad header: a fixed shape rather than one wrapping row (where it broke depended on the name and the screen).
+   Row 1 is the pad — number, name, Play; row 2 is what you do to it — presets, Random | Init, Copy | Paste. On wide
+   screens the two rows sit side by side. */
+.vbar{flex-wrap:nowrap; align-items:stretch; flex-direction:column; gap:8px}
+.vrow{display:flex; align-items:center; gap:8px; min-width:0}
+.vrow.vid input{flex:1 1 auto; min-width:0}
+.vrow.vid .play{display:inline-flex; align-items:center; gap:5px; background:var(--ink); color:var(--inv); border-color:var(--ink); font-weight:600; padding-inline:12px}
+.vrow.vid .play .ic{width:12px; height:12px; fill:currentColor}
+.vrow.vact .presel{flex:1 1 auto; min-width:0; max-width:none}
+.vrow .grp{display:inline-flex; flex:none} .vrow .grp button{margin:0} .vrow .grp button+button{border-left:0}
+@media (min-width:700px){ .vbar{flex-direction:row; align-items:center} .vrow.vid{flex:1 1 55%} .vrow.vact{flex:1 1 45%; justify-content:flex-end} .vrow.vact .presel{flex:0 1 220px} }
 .ttl{font-weight:600; font-size:var(--fs-5); white-space:nowrap}
 .lbl{color:var(--muted)}
 .pbody{display:flex; flex-direction:column; gap:10px; padding-top:8px}
@@ -1311,16 +1322,13 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   </section>
 
   <section class="band voice">
-    <div class="bar">
-      <span class="ttl" id="vNum">Pad 1</span>
-      <input id="vName" type="text" aria-label="Pad name" spellcheck="false">
-      <select id="vPre" class="presel" aria-label="Pad presets" title="Presets: factory sounds, and your own saved in this song"></select>
-      <div class="sp"></div>
-      <button class="sm" id="vPlay">Play</button>
-      <button class="sm" id="vRand">Random</button>
-      <button class="sm" id="vInit">Init</button>
-      <button class="sm" id="vCopy">Copy</button>
-      <button class="sm" id="vPaste">Paste</button>
+    <div class="bar vbar">
+      <div class="vrow vid"><span class="ttl" id="vNum">Pad 1</span><input id="vName" type="text" aria-label="Pad name" spellcheck="false"><button class="sm play" id="vPlay" title="Play this pad (Space)"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</button></div>
+      <div class="vrow vact">
+        <select id="vPre" class="presel" aria-label="Pad presets" title="Presets: factory sounds, and your own saved in this song"></select>
+        <span class="grp" role="group" aria-label="Make"><button class="sm" id="vRand">Random</button><button class="sm" id="vInit">Init</button></span>
+        <span class="grp" role="group" aria-label="Clipboard"><button class="sm" id="vCopy">Copy</button><button class="sm" id="vPaste">Paste</button></span>
+      </div>
     </div>
   </section>
   <div class="screen"><canvas class="wave" id="wave" aria-label="Rendered waveform, tap to play"></canvas></div>
