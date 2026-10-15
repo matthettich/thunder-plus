@@ -625,7 +625,7 @@ caches.
 ## 15 Oct (afternoon): review risk fixes, one commit each on main
 
 After the eight bugs below were merged (PR #1), the review's risk items went in as separate commits. Cache is now
-`thunderplus-v113`; `chains-worklet.js?v=20`, `waves-worklet.js?v=15`, `master-worklet.js?v=3`.
+`thunderplus-v117`; `chains-worklet.js?v=20`, `waves-worklet.js?v=15`, `master-worklet.js?v=3`.
 
 - **Effects can't be hung or silenced by a bad sample** (93d3ae3): the wasm only checks its output, and a NaN/∞ on the
   way in made the tape delay's `tfx_process` never return (frozen audio thread) and left twenty effects silent. The
@@ -666,11 +666,15 @@ After the eight bugs below were merged (PR #1), the review's risk items went in 
   nodes sleep during playback unless the chain has a tempo-locked slot (cc5e5d4); the dynamic rainbow turns `--rbo`
   instead of filtering `<html>`, and ±1e-18 goes into every wasm effect against denormals (05cb255: Ladder on silence
   710 → 40 µs a block on x86; Clouds keeps a 3× idle cost from its own buffers).
-- **Still open from the review (performance):** the Suppressor's four 2048-point FFTs in one render quantum (spread
-  them over the hop's four blocks); …waves live load shedding never recovers and its step 3 kills notes every ~0.5 s
-  (make it a one-off, step back up under low load); the …chains telemetry posting ~31 msgs/s per node whether or not
-  the screen is open; `Resample`/module `create()` allocating on the audio thread; the top bar wrapping to two rows
-  on the cover screen; the Settings sheet sized with `100vh` under the keyboard; `overscroll-behavior` on html/body.
+- **The last of the review (15 Oct, evening):** Suppressor frame staged over the hop's four blocks, latency 2560
+  (a9b4fc6: output bit-identical, p90 block cost 631 → 203 µs); load shedding steps back up after 8 s of calm and
+  …waves' all-notes-off fires at most once per 10 s (1a3c7c4); …chains full telemetry only while its screen shows,
+  'load' mode otherwise (12806cc, 28.5 → 3.5 msgs/s), which also found and fixed a crash when leaving …chains/…waves
+  before the editor had started; cover-screen top bar on one row, Settings sheet under the keyboard, overscroll off
+  (847a1bb). Not done: creating module states "off the audio thread" — a worklet's message handler runs on the
+  rendering thread, so there is nowhere else to do it.
+- **Nothing from the review is left.** Next: hear it on the Fold and the PC (nothing has been checked by ear), then the
+  feature list below.
 
 ## 15 Oct: review fixes (branch fix/review-bugs, merged as PR #1)
 
