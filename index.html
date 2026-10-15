@@ -280,6 +280,13 @@ body:not(.noed) .wvMobNote{display:none}
 .vengine{display:flex; align-items:center; gap:10px; padding:2px 0 4px; flex-wrap:wrap}
 .vengine .vel{font-size:var(--fs-3); color:var(--muted); min-width:64px}
 .vengine .lbl{font-size:var(--fs-3); color:var(--muted)}
+/* Narrow screens: the engine buttons flowed by text width into three uneven rows (6 / 5 / 2 with a stub). An equal
+   4-column grid keeps every engine one tap away, in a stable order, and a new engine just fills the next cell. */
+@media (max-width:600px){
+  #vEngSeg{display:grid; grid-template-columns:repeat(4, 1fr); width:100%}
+  #vEngSeg button{border-right:1px solid var(--line); border-bottom:1px solid var(--line); padding:6px 4px; text-align:center}
+  #vEngSeg{border-bottom:0} #vEngSeg button:nth-child(4n){border-right:0}   /* the cells' bottom borders draw the box's bottom edge */
+}
 .bassviz{position:relative; height:150px; border-bottom:2px solid var(--fam); background:var(--panel)}
 .bassviz canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
 .bassvr{position:absolute; right:10px; top:6px; font:var(--fs-2)/1.2 var(--mono, monospace); color:var(--muted); pointer-events:none}
@@ -1444,9 +1451,9 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <div class="ttabbar"><nav class="ttabs" id="tTabs" aria-label="Tracker screens"></nav>
     <div class="tpat" id="tPat">
       <span class="tclk" id="tClk" title="Tempo and lines per beat · double-click a number to type it (TPO changes the tempo as the song plays; ticks are in Settings)"><b id="tClkB" class="tce" data-k="bpm">120</b><small>BPM</small><b id="tClkT" class="tce" data-k="lpb">4</b><small>LPB</small><span class="tdots" id="tDots"></span></span>
-      <span class="trows" role="group" aria-label="Rows in this phrase"><button type="button" id="tRowsDn" aria-label="Fewer rows">−</button><button type="button" id="tRowsV" class="rv" aria-label="Rows in this phrase"><small id="tRowsP">PH 00</small><b id="tRowsN">16</b></button><button type="button" id="tRowsUp" aria-label="More rows">+</button></span>
+      <span class="trows" role="group" aria-label="Rows in this phrase"><button type="button" id="tRowsDn" aria-label="Fewer rows">−</button><button type="button" id="tRowsV" class="rv" aria-label="Rows in this phrase"><small id="tRowsP">ROWS</small><b id="tRowsN">16</b></button><button type="button" id="tRowsUp" aria-label="More rows">+</button></span>
       <span class="trows toct" id="tOct" role="group" aria-label="Octave for note entry" hidden><button type="button" id="tOctDn" aria-label="Octave down">−</button><button type="button" id="tOctV" class="rv" aria-label="Octave, tap to reset to 4" title="Octave for typed and keypad notes (− and = on a keyboard) · tap for 4"><small>OCT</small><b id="tOctN">4</b></button><button type="button" id="tOctUp" aria-label="Octave up">+</button></span>
-      <span class="trows" id="tSelBar" role="group" aria-label="Loop and transpose the selection"><button type="button" id="tLoop" class="rv" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L)"><small>LOOP</small><b id="tLoopN">OFF</b></button><button type="button" id="tXposeDn" class="rv" aria-label="Transpose selection down a semitone" title="Transpose the selection down a semitone (Alt+,)"><small>SEMI</small><b>−</b></button><button type="button" id="tXposeUp" class="rv" aria-label="Transpose selection up a semitone" title="Transpose the selection up a semitone (Alt+.)"><small>SEMI</small><b>+</b></button></span>
+      <span class="trows" id="tSelBar" role="group" aria-label="Loop and transpose the selection"><button type="button" id="tLoop" class="rv" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L)"><small>LOOP</small><b id="tLoopN">OFF</b></button><button type="button" id="tXposeDn" class="rv" aria-label="Transpose selection down a semitone" title="Transpose the selection down a semitone (Alt+,)"><small>TRANSP</small><b>−</b></button><button type="button" id="tXposeUp" class="rv" aria-label="Transpose selection up a semitone" title="Transpose the selection up a semitone (Alt+.)"><small>TRANSP</small><b>+</b></button></span>
     </div></div>
   <div class="tbody">
     <div class="tscr" id="tScr">
@@ -10273,7 +10280,7 @@ document.querySelectorAll('#tClk .tce').forEach(b => {
     if (last && now - last < 450){ last = null; clkEdit(b); } else last = now; });
 });
 function drawPat(){
-  const id = rowsId(); $('tRowsP').textContent = 'PH ' + hx(id); $('tRowsN').textContent = plen(id);
+  const id = rowsId(); $('tRowsP').textContent = 'ROWS'; $('tRowsV').title = 'Rows in phrase ' + hx(id) + ' · tap to type a number'; $('tRowsN').textContent = plen(id);
   const live = tp.on, tk = live ? tp.tks : (S.ticks || TICKS);
   if (!$('tClk').querySelector('input')){ $('tClkB').textContent = live ? tp.bpm : S.bpm; $('tClkT').textContent = S.lpb || 4; }
   $('tClk').classList.toggle('live', live);
