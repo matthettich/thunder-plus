@@ -1690,7 +1690,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" hidden></div>
 
-<script src="waves/waves-worklet.js?v=16"></script>
+<script src="waves/waves-worklet.js?v=17"></script>
 <script>
 /* ===ENGINE START=== */
 const BASE = 65.40639; // C2
@@ -4261,7 +4261,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=16', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=17', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -7625,7 +7625,7 @@ class ThunderFx extends AudioWorkletProcessor {
       s.on = on; s.slot = slot; next.push(s);
     }
     for (const s of old) if (!s.js) x.tfx_free(s.h);
-    this.slots = next; this.idle = 0;
+    this.slots = next; this.idle = 0; this.clocked = next.some(s => s.js && s.jt >= 93 && s.jt <= 95);
   }
   slotRun(s, n, tr){
     const x = this.x;
@@ -7656,7 +7656,9 @@ class ThunderFx extends AudioWorkletProcessor {
     if (i && i.length){ const a = i[0], b = i[1] || a; for (let k = 0; k < n; k++){ const v = a[k] < 0 ? -a[k] : a[k], w = b[k] < 0 ? -b[k] : b[k]; if (v > ip) ip = v; if (w > ip) ip = w; if (!(v < 8 && w < 8)) bad = true; } }
     // A switch (FXO) or a running clock wakes it: a slot just switched on must hear the moment it comes in.
     const swv = this.swv || (this.swv = [0, 0, 0, 0]); swv[0] = params.sw0[0]; swv[1] = params.sw1[0]; swv[2] = params.sw2[0]; swv[3] = params.sw3[0]; const bp = params.bp;   // reused: no array per block
-    if (ip < 1e-7 && this.idle >= sampleRate && bp.length < 2){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
+    // bp (the beat clock) is an a-rate ramp whenever the song plays, so "bp.length < 2" kept every track-FX node awake
+    // for the whole song. Only a tempo-locked slot (Flex / Step gate / Retrigger) needs to hear the clock while silent.
+    if (ip < 1e-7 && this.idle >= sampleRate && !this.clocked){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
     if (i && i.length){ L.set(i[0]); R.set(i[1] || i[0]); } else { L.fill(0); R.fill(0); }
     // A NaN or infinity reaching the wasm hangs the tape delay for good and leaves many effects silent: zero those samples.
     if (bad) for (let k = 0; k < n; k++){ const a = L[k], b = R[k]; if (!(a > -8 && a < 8)) L[k] = 0; if (!(b > -8 && b < 8)) R[k] = 0; }

@@ -1653,6 +1653,12 @@ class Graph {
       const m = this.mods.get(id), s = m.def.scope;
       m.poly = s === 'root' ? true : s === 'mono' ? false : this.inc.get(id).some(c => { const src = this.mods.get(c.a[0]); return src && src.poly; });
     }
+    // A poly module's "exit" outputs: audio that leaves the voice for a mono module (the bus, a mono effect). Those are
+    // what the engine listens to when deciding that a released voice has gone silent (its own oscillator never does).
+    for (const m of this.mods.values()) m.exits = null;
+    for (const c of this.cables){ const a = this.mods.get(c.a[0]), b = this.mods.get(c.b[0]); if (!a || !b || !a.poly || b.poly || isParamPort(c.b[1])) continue;
+      if (a.def.outputs[c.a[1]] !== 'audio') continue; (a.exits || (a.exits = [])).push(c.a[1]);
+    }
   }
 }
 
@@ -1782,10 +1788,11 @@ class WavesEngine {
     const ctx = this._ctx;
     ctx.block = frames; ctx.quality = this.quality; ctx.notes = this.voices.rows; ctx.transport = this.transport;
     this.voices.now += frames;
-    const hold = this.sr * 12;
+    const hold = this.sr * 12, quietFor = this.sr * 0.25;
     for (let v = 0; v < this.voices.max; v++){
       ctx.voice = v;
-      const awake = this.voices.awake(v, hold);
+      const row = this.voices.rows[v], awake = this.voices.awake(v, hold);
+      let peak = 0;
       for (const id of this.graph.order){
         const m = this.graph.mods.get(id); if (!m.poly) continue;
         const io = this._bufs(m, v);
@@ -1794,7 +1801,12 @@ class WavesEngine {
         io.asleep = false;
         this._gather(m, io, v);
         m.def.process(this._state(m, v), io, ctx);
+        // A released voice: watch its audio outputs, so it can sleep as soon as its envelope and tails have died
+        // rather than running (Plaits, Elements, reverbs) for the full 12 s hold after every note.
+        if (!row.gate && m.exits) for (const k of m.exits){ const b = io.out[k]; for (let i = 0; i < frames; i += 8){ const a = b[i] < 0 ? -b[i] : b[i]; if (a > peak) peak = a; } }
       }
+      if (awake && !row.gate){ if (peak < 1e-5){ row.quiet = (row.quiet || 0) + frames; if (row.quiet >= quietFor) row.offAt = this.voices.now - hold; } else row.quiet = 0; }
+      else row.quiet = 0;
     }
     ctx.voice = 0;
     for (const id of this.graph.order){
