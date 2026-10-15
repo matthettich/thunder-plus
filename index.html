@@ -309,6 +309,15 @@ body:not(.noed) .wvMobNote{display:none}
   .layercard>header select{max-width:34vw}
   .acts{gap:5px}
 }
+/* The cover screen (≤ 480 px) is narrower than the layer card's action group (presets + five buttons ≈ 470 px), which
+   pushed the page into sideways scrolling: there the header wraps and the group takes a full row of its own, wrapping
+   if it must. .main never scrolls sideways; anything too wide is clipped rather than moving the whole page. */
+@media (max-width:480px){
+  .layercard>header, .fxcard>header, section.band>header{flex-wrap:wrap}
+  .acts{flex:1 1 100%; flex-wrap:wrap; justify-content:flex-start; margin-left:0}
+  .layercard>header select{max-width:46vw}
+}
+.main{overflow-x:hidden}
 .fxcard{border:3.5px solid var(--fx); background:var(--panel)}
 .fxcard>header{display:flex; align-items:center; gap:8px; padding:8px 8px 8px 12px; border-bottom:2px solid var(--fx); flex-wrap:wrap}
 /* the voice pitch/filter/amp card: same Seeds card shape, opposite-side colour of the layer card's fam
