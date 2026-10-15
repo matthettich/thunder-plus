@@ -16,8 +16,8 @@
     "dist:linux": "npm run copy && electron-builder --linux --publish never"
   },
   "devDependencies": {
-    "electron": "^44.0.0",
-    "electron-builder": "^26.0.0"
+    "electron": "44.0.0",
+    "electron-builder": "26.0.12"
   },
   "build": {
     "appId": "com.matthettich.thunderplus",
@@ -92,6 +92,6 @@
     ]
   },
   "dependencies": {
-    "electron-updater": "^6.3.0"
+    "electron-updater": "6.6.2"
   }
 }

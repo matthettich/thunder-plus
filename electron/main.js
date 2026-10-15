@@ -14,11 +14,11 @@ protocol.registerSchemesAsPrivileged([{ scheme:'app', privileges:{ standard:true
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 // Web MIDI, the save/open dialogs, the output device list and audio are allowed; nothing else is asked for.
-const ALLOW = new Set(['midi', 'midiSysex', 'fileSystem', 'clipboard-sanitized-write', 'clipboard-read', 'media', 'speaker-selection']);
+const ALLOW = new Set(['midi', 'midiSysex', 'fileSystem', 'clipboard-sanitized-write', 'clipboard-read', 'speaker-selection']);   // no 'media': the app never uses the mic or camera
 
 // One copy at a time: opening it again brings the open window to the front (two copies would fight over
 // the same saved songs and kit).
-if (!app.requestSingleInstanceLock()) app.quit();
+if (!app.requestSingleInstanceLock()){ app.quit(); return; }   // return: or whenReady below would still open a second window
 let win = null;
 
 function createWindow(){
@@ -32,7 +32,8 @@ function createWindow(){
   win.loadURL('app://thunder/index.html');
   // Links (help, licences) open in the normal browser rather than inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
-  win.webContents.on('will-navigate', (e, url) => { if (/^https?:/.test(url)){ e.preventDefault(); shell.openExternal(url); } });
+  // The window only ever shows the app: a dropped file (file://) or anything else must not navigate it away.
+  win.webContents.on('will-navigate', (e, url) => { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); });
   win.on('closed', () => { win = null; });
 }
 

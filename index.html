@@ -1127,6 +1127,9 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 <script>
 // No long-press menu outside text fields (it is how Chrome offers "Search Google for…").
 document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.closest && e.target.closest('input,textarea,[contenteditable]'))) e.preventDefault(); }, true);
+// A file dropped on the window must not replace the app with that file (the browser's default; in the desktop app it
+// would leave a JSON or WAV viewer until relaunch). The app's own file buttons stay the way in.
+addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', e => e.preventDefault());
 </script>
 </head>
 <body>
