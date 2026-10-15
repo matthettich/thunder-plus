@@ -6280,8 +6280,8 @@ function smpPut(S){
 }
 function idbGet(name, id){ return idbOpen(name).then(db => new Promise(res => { const q = db.transaction('smp').objectStore('smp').get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); })).catch(() => null); }
 async function smpGet(id){
-  try { const db = await smpDb(); const r = await new Promise(res => { const q = db.transaction('smp').objectStore('smp').get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); if (r) return r; } catch(e){}
-  for (const n of SDB_ALSO) if (n !== SDB){ const r = await idbGet(n, id); if (r) return r; }
+  try { const db = await smpDb(); const r = await new Promise(res => { const q = db.transaction('smp').objectStore('smp').get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); if (r){ r.own = true; return r; } } catch(e){}
+  for (const n of SDB_ALSO) if (n !== SDB){ const r = await idbGet(n, id); if (r){ r.own = false; return r; } }   // borrowed from ...Thunder's store: save() copies it into ours
   return null;
 }
 // Fills in the samples a kit names but doesn't hold yet (after start-up or loading a kit), then re-renders those pads.
@@ -6289,28 +6289,36 @@ var smpResolving = false;
 async function resolveSamples(){
   if (smpResolving) return; smpResolving = true;
   try {
-    let missing = 0;
+    let missing = 0, borrowed = false;
     for (let i = 0; i < kit.voices.length; i++) for (const L of kit.voices[i].layers){
       const S = L.sample; if (!S || S.data || !S.id) continue;
       const r = await smpGet(S.id);
-      if (r && r.pcm){ const p = new Int16Array(r.pcm), d = new Float32Array(p.length); for (let k = 0; k < p.length; k++) d[k] = p[k] / 32767; S.data = d; S.sr = r.sr || S.sr; smpStored.add(S.id); dirty[i] = true; }
+      if (r && r.pcm){ const p = new Int16Array(r.pcm), d = new Float32Array(p.length); for (let k = 0; k < p.length; k++) d[k] = p[k] / 32767; S.data = d; S.sr = r.sr || S.sr; if (r.own) smpStored.add(S.id); else borrowed = true; dirty[i] = true; }
       else missing++;
     }
     refreshAll();
+    if (borrowed) save();   // samples read from ...Thunder's old store are copied into this app's own
     if (missing) toast(missing + (missing > 1 ? ' samples' : ' sample') + ' couldn’t be found in this browser’s storage. Load the kit or project file to get them back.', 6000);
-    else smpTidy();
+    else { smpTidy(); if (!borrowed && typeof thunderTidy === 'function') setTimeout(thunderTidy, 3000); }
     // A kit saved before samples moved to IndexedDB still has them inside localStorage: move them now.
     try { if ((localStorage.getItem(KEY) || '').includes('"b64"')) save(); } catch(e){}
     // Likewise song presets imported before samples-by-reference: move their audio out of the song.
     try { if (S && S.presets && JSON.stringify(S.presets).includes('"b64"')){ await Promise.all(presetsByRef(S.presets)); saveS(); } } catch(e){}
   } finally { smpResolving = false; }
 }
-// Drops stored samples the kit no longer uses (only from this app's own store).
+// Drops stored samples the kit no longer uses (only from this app's own store). Samples the saved kit and song still
+// name count as used (another tab may have saved them), and nothing is dropped while another tab of the app is open:
+// a second tab loading a kit used to delete the first tab's samples from under it.
+var tabCh = null, tabPeers = 0;
+try { tabCh = new BroadcastChannel('thunderplus-tabs'); tabCh.onmessage = e => { if (e.data === 'ping') tabCh.postMessage('pong'); else if (e.data === 'pong') tabPeers++; }; } catch(e){}
+function otherTabs(){ if (!tabCh) return Promise.resolve(false); tabPeers = 0; try { tabCh.postMessage('ping'); } catch(e){} return new Promise(r => setTimeout(() => r(tabPeers > 0), 200)); }
 function smpTidy(){
   const used = new Set(); for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.id) used.add(L.sample.id);
   try { const P = S.presets || {}; for (const p of P.voices || []) for (const l of (p.v && p.v.layers) || []) if (l.sample && l.sample.ref) used.add(l.sample.ref); for (const p of P.layers || []) if (p.l && p.l.sample && p.l.sample.ref) used.add(p.l.sample.ref); } catch(e){}
-  smpDb().then(db => { const tx = db.transaction('smp', 'readwrite'), st = tx.objectStore('smp'), q = st.getAllKeys();
-    q.onsuccess = () => { for (const k of q.result) if (!used.has(k)){ st.delete(k); smpStored.delete(k); } }; }).catch(() => {});
+  try { for (const k of [KEY, TK]){ const j = localStorage.getItem(k) || ''; for (const m of j.matchAll(/"ref":"([^"]+)"/g)) used.add(m[1]); } } catch(e){}
+  otherTabs().then(busy => { if (busy) return;
+    smpDb().then(db => { const tx = db.transaction('smp', 'readwrite'), st = tx.objectStore('smp'), q = st.getAllKeys();
+      q.onsuccess = () => { for (const k of q.result) if (!used.has(k)){ st.delete(k); smpStored.delete(k); } }; }).catch(() => {}); });
 }
 // Every autosave goes through here. localStorage is ~5 MB for the whole origin: when a write fails (storage full,
 // private mode, blocked) the app used to carry on silently and the next reload lost the work. Now a banner stays up
@@ -8021,6 +8029,9 @@ addEventListener('keydown', e => {
 });
 function flushS(){ clearTimeout(sT); storeWrite(TK, JSON.stringify(S)); }
 addEventListener('pagehide', () => { flushS(); saveCur(); });
+// Another tab of the app saved the song or kit: say so once (the last tab to save wins).
+let tabWarned = false;
+addEventListener('storage', e => { if (!tabWarned && (e.key === TK || e.key === KEY) && e.newValue !== null){ tabWarned = true; toast('...Thunder Plus is open in another tab too: the last tab to save wins. Best to use one.', 6000); } });
 document.addEventListener('visibilitychange', () => { if (document.hidden){ flushS(); saveCur(); } });
 // A phrase opened from an empty song block is placed in that block once it has a note (see nav()).
 let pendPlace = null;
@@ -9345,6 +9356,16 @@ async function thunderImport(asked){
 }
 // At start-up: offer once. Nothing to ask when Plus has no work of its own yet (it already opened Thunder's) or
 // when both hold the same.
+// Once ...Thunder's work has been brought over (or opened here from the start) and this app has its own saved copy
+// with every sample in its own store, the old app's kit (samples as base64, most of the ~5 MB localStorage budget
+// this origin shares with the owner's other apps) and song are removed.
+function thunderTidy(){
+  try {
+    const a = lsGet(TIK); if ((a !== 'yes' && a !== 'auto') || !hasThunderWork() || !lsGet(KEY) || !lsGet(TK)) return;
+    for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.id && !smpStored.has(L.sample.id)) return;
+    localStorage.removeItem(T_KIT); localStorage.removeItem(T_SONG); console.info('Removed ...Thunder’s old saved work (it is all in ...Thunder Plus now).');
+  } catch(e){}
+}
 function thunderOffer(){
   if (inAI || lsGet(TIK) || !hasThunderWork()) return;
   const same = (lsGet(T_KIT) || '') === (lsGet(KEY) || '') && (lsGet(T_SONG) || '') === (lsGet(TK) || '');
