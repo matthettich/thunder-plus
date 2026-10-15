@@ -1794,7 +1794,7 @@ class ChainsEngine {
       case 'params': return this.setParams(m.list);
       case 'quality': this.quality = m.value; return;
       case 'transport': return this.setTransport(m.value);
-      case 'telemetry': this.telemetryOn = !!m.value; return;
+      case 'telemetry': this.telemetryOn = m.value === 'load' ? 'load' : !!m.value; return;   // true: meters, mods and displays ~31×/s; 'load': the load number ~4×/s; false: nothing
     }
   }
 }
@@ -1906,8 +1906,9 @@ class ThunderChains extends AudioWorkletProcessor {
     const bL = e.busesL.subarray(this.track * BLOCK, this.track * BLOCK + n);
     const bR = e.busesR.subarray(this.track * BLOCK, this.track * BLOCK + n);
     L.set(bL); if (R !== L) R.set(bR);
-    if (e.telemetryOn && (++this._blocks % 12) === 0) this.port.postMessage({ target:'chains-host', op:OP.meter, value:e.telemetry() });
-    else if (!e.telemetryOn) this._blocks++;
+    ++this._blocks;
+    if (e.telemetryOn === true){ if (this._blocks % 12 === 0) this.port.postMessage({ target:'chains-host', op:OP.meter, value:e.telemetry() }); }
+    else if (e.telemetryOn === 'load'){ if (this._blocks % 96 === 0) this.port.postMessage({ target:'chains-host', op:OP.meter, value:{ load:e.load, light:true } }); }
     return true;
   }
 }

@@ -7095,7 +7095,7 @@ function showWaves(){
 }
 /* Leaving the …waves screen: pause its sound, save the patch into the kit and re-render the pads that use it. */
 function leaveWaves(){
-  const a = wvApi(); if (a) a.pause();
+  try { const a = wvApi(); if (a) a.pause(); } catch(e){ console.warn('…waves pause', e); }
   for (let i = 0; i < nslots(); i++) if (kit.voices[i] && usesWaves(kit.voices[i])) dirty[i] = true;
 }
 function openWaves(){ if (!noEditors()) setView('waves'); }
@@ -7166,16 +7166,17 @@ window.thunderChains = {
 };
 const chApi = () => { try { return CH.frame && CH.frame.contentWindow && (CH.frame.contentWindow.chainsEmbed || CH.frame.contentWindow.wavesEmbed); } catch(e){ return null; } };
 let chMeterWanted = false;
+function chainsTelemetry(full){ try { if (rt) for (const b of rt.pl.buses) if (b && b.chn && b.chn._send) b.chn._send({target:'chains-host', op:'telemetry', value:full ? true : 'load'}); } catch(e){} }
 function showChains(){
-  chMeterWanted = true;
+  chMeterWanted = true; chainsTelemetry(true);
   if (!CH.frame){ CH.frame = document.createElement('iframe'); CH.frame.title = '…chains'; CH.frame.allow = 'midi; autoplay'; CH.frame.src = 'chains/index.html'; CH.frame.addEventListener('load', () => skinFrame(CH.frame)); $('chView').append(CH.frame); }
   else { const a = chApi(); if (a) a.resume(); }
   setTimeout(() => { try { CH.frame.contentWindow.focus(); } catch(e){} }, 0);   // keys go to …chains, not the pads
 }
 /* Leaving the …chains screen: pause its sound and save the patch into the song. */
 function leaveChains(){
-  chMeterWanted = false;
-  const a = chApi(); if (a) a.pause();
+  chMeterWanted = false; chainsTelemetry(false);
+  try { const a = chApi(); if (a) a.pause(); } catch(e){ console.warn('…chains pause', e); }   // never let the editor stop the view switch
 }
 function openChains(){ if (!noEditors()) setView('chains'); }
 function closeChains(){ setView('synth'); }
@@ -7706,7 +7707,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=23')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=24')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -7758,13 +7759,14 @@ function chainsNode(ac, track, patch, tempo){
   n.port.onmessage = e => {
     const d = e.data;
     if (!d || d.target !== 'chains-host') return;
-    if (d.op === 'meter' && d.value){ n.load = d.value.load || 0; n.mods = d.value.mods || null; n.shows = d.value.shows || null; n.modsT = performance.now(); if (n.onMeter) n.onMeter(d.value); }
+    if (d.op === 'meter' && d.value){ n.load = d.value.load || 0; if (!d.value.light){ n.mods = d.value.mods || null; n.shows = d.value.shows || null; n.modsT = performance.now(); if (n.onMeter) n.onMeter(d.value); } }
     if (d.op === 'ready'){
       n._live = true;
       for (const m of n._q){ try { n.port.postMessage(m); } catch(e){} }
       n._q.length = 0;
-      // Start the engine's load/meter stream, same as the …chains screen does on its own engine.
-      n._send({target:'chains-host', op:'telemetry', value:true});
+      // The engine's load number a few times a second; the full meter/modulation stream (~31 msgs/s per node) only
+      // while the …chains screen is showing (showChains/leaveChains switch it).
+      n._send({target:'chains-host', op:'telemetry', value:chMeterWanted ? true : 'load'});
     }
     if (d.op === 'shed' && d.value) toast(d.value.recovered ? '…chains: CPU is free again, back to full quality.' : '…chains is busy: dropped to draft quality.', 5000);
     if (d.op === 'resample' && d.value) resampleIn(d.value);

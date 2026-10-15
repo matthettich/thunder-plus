@@ -2054,7 +2054,7 @@ const pnameEl = document.getElementById('pname');
   if (EMBED){
     // …Thunder Plus shows this page as its "…waves" screen: it pauses the sound when you switch away and saves into the kit.
     window.wavesEmbed = {
-      pause(){ clearTimeout(store._timer); if (store.dirty) store.save(); held.forEach(p => bridge && bridge.noteOff(p)); held.clear(); if (bridge) bridge.ctx.suspend().catch(() => {}); },
+      pause(){ if (store){ clearTimeout(store._timer); if (store.dirty) store.save(); } held.forEach(p => bridge && bridge.noteOff(p)); held.clear(); if (bridge) bridge.ctx.suspend().catch(() => {}); },
       resume(){ if (bridge) bridge.resume(); },
       /* The app's Settings gear opens this patch's settings menu. */
       settings(){ const b = document.getElementById('setbtn'); if (b) b.click(); },
