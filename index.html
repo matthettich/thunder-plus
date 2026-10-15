@@ -484,6 +484,8 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .tpset{font-size:.74em; font-weight:400} .tpset:empty{display:none} .tpset span[data-x]{padding:0 .15em}
 .tgrid{flex:1; min-height:0; overflow:hidden; padding-top:.25em}
 .tgrid .ln{white-space:pre; line-height:1.3; height:1.3em}
+/* Phrase: every 4th line a shade darker (on the black skins a shade lighter), in every skin, for 4/4. */
+.tscr .tgrid .ln.b4{background:color-mix(in srgb, var(--ts-ink) 9%, transparent)}
 .tgrid span[data-x],.tgrid span[data-r]{cursor:pointer}
 /* Screen colours. Dark is the black look; the pastel ones keep every colour at readable contrast (4.5:1 or more for text). */
 .tscr{--ts-bg:#000000; --ts-ink:#ffffff; --ts-dim:#4f4f4f; --ts-rn:#6f6f6f; --ts-rn4:#b5b5b5; --ts-th:#8a8a8a; --ts-vol:#7fd3cf; --ts-inst:#a6c2f0; --ts-fx:#e8a5de;
@@ -10498,6 +10500,7 @@ function draw(){
     for (let y = c.top; y < Math.min(len, c.top + VR); y++){
       const r = p ? p[y] : blankRow();
       const ln = [{t:rS(y), cls:'rn' + (y % 4 ? '' : ' rn4') + (pr.has(y) ? ' pl' : '') + rsel(y), r:y}, ' '];
+      if (!(y % 4)) ln.b4 = true;   // every 4th line is shaded, so a bar of 4/4 reads at a glance
       const yl = Math.min(len, c.top + VR) - 1;
       if (mst){   // master phrase: the three command columns only
         for (let k = FX0; k < RW; k += 2) ln.push(k > FX0 ? ' ' : '', {t:r[k] < 0 ? '---' : (FXC[r[k]] || '???'), cls:cc(k, y, r[k] < 0 ? 'e' : 'cf'), x:k, y}, ' ', {t:h2(r[k + 1]), cls:cc(k + 1, y, r[k + 1] < 0 ? 'e' : 'v'), x:k + 1, y});
@@ -10556,7 +10559,7 @@ function draw(){
     });
   }
   const spanH = s => typeof s === 'string' ? s : `<span class="${s.cls || ''}"${s.x != null ? ` data-x="${s.x}" data-y="${s.y}"` : ''}${s.r != null ? ` data-r="${s.r}"` : ''}${s.title ? ` title="${esc(s.title)}"` : ''}>${esc(s.t)}</span>`;
-  const gh = L.map(ln => '<div class="ln">' + ln.map(spanH).join('') + '</div>').join('');
+  const gh = L.map(ln => '<div class="ln' + (ln.b4 ? ' b4' : '') + '">' + ln.map(spanH).join('') + '</div>').join('');
   if (gh !== gridHTML){ gridHTML = gh; grid.innerHTML = gh; }   // unchanged screens (most redraws while playing) skip the rebuild
   const ph = pset ? pset.map(spanH).join('') : ''; if (ph !== psetHTML){ psetHTML = ph; $('tPset').innerHTML = ph; }
   // Song and Phrase page their own rows; the list screens (Inst, FX, Project) can be taller than the
