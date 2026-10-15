@@ -6160,23 +6160,33 @@ document.addEventListener('keyup', e => { const h = keyHeld.get(e.code); if (h){
 window.addEventListener('blur', () => { for (const h of keyHeld.values()) releaseNote(h); keyHeld.clear(); });
 /* ---------- waveform ---------- */
 function cssv(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+// The waveform's min/max envelope and peak are made once per render (one pass, kept on the render), not on every
+// paint: a 30 s sample was scanned twice per synth ↔ tracker switch and per resize (~200 ms on a phone).
+const WENV = 1024;
+function waveEnv(c){
+  if (c.env && c.env.d === c.data) return c.env;
+  const d = c.data, n = d.length, mn = new Float32Array(WENV), mx = new Float32Array(WENV); let pk = 0;
+  for (let k = 0; k < WENV; k++){ const s = Math.floor(k * n / WENV), e = Math.min(n, Math.floor((k + 1) * n / WENV) + 1); let a = 0, b = 0;
+    for (let i = s; i < e; i++){ const v = d[i]; if (v < a) a = v; if (v > b) b = v; } mn[k] = a; mx[k] = b; const q = Math.max(-a, b); if (q > pk) pk = q; }
+  return c.env = {d, mn, mx, pk};
+}
 function drawWave(){
-  const cv = $('wave'), dpr = window.devicePixelRatio || 1, w = Math.max(10, cv.clientWidth), h = cv.clientHeight || 150;
+  const cv = $('wave'); if (view !== 'synth' || !cv.clientWidth) return;   // hidden: painted when the synth page opens
+  const dpr = window.devicePixelRatio || 1, w = Math.max(10, cv.clientWidth), h = cv.clientHeight || 150;
   cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
   const c = cache[cur]; if (!c) return;
-  const d = c.data, mid = h / 2;
+  const d = c.data, mid = h / 2, E = waveEnv(c), pk = E.pk;
   g.fillStyle = cssv('--screen'); g.fillRect(0, 0, w, h);
   g.fillStyle = cssv('--screen-line'); g.fillRect(0, mid, w, 1);
   g.fillStyle = cssv('--screen-ink');
-  const per = d.length / w; let pk = 0;
+  const per = WENV / w;
   for (let x = 0; x < w; x++){
-    let mn = 0, mx = 0; const s = Math.floor(x * per), e = Math.min(d.length, Math.floor((x + 1) * per) + 1);
-    for (let i = s; i < e; i++){ const v = d[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
+    let mn = 0, mx = 0; const s = Math.floor(x * per), e = Math.min(WENV, Math.floor((x + 1) * per) + 1);
+    for (let k = s; k < e; k++){ if (E.mn[k] < mn) mn = E.mn[k]; if (E.mx[k] > mx) mx = E.mx[k]; }
     const y1 = mid - Math.min(1, mx) * (mid - 8), y2 = mid - Math.max(-1, mn) * (mid - 8);
     g.fillRect(x, y1, 1, Math.max(1, y2 - y1));
   }
-  for (let i = 0; i < d.length; i++){ const a = Math.abs(d[i]); if (a > pk) pk = a; }
   const db = pk > 0 ? 20 * Math.log10(pk) : -Infinity;
   const meta = $('wMeta'); meta.innerHTML = '';
   meta.append(el('span', null, (d.length / c.sr).toFixed(3) + ' s'), el('span', null, 'peak ' + (isFinite(db) ? db.toFixed(1) + ' dB' : 'silent')));
@@ -10571,7 +10581,11 @@ function info(){
   const r = rowsOf(tv)[c.y]; if (!r || !r.info) return '';
   return typeof r.info === 'function' ? r.info(r.get ? r.get() : 0) : r.info;
 }
-function measure(){
+let measureKey = '';
+function measure(force){
+  // One character width per font family: it never changes otherwise, and the measuring span forced a full-page layout
+  // on every synth ↔ tracker switch.
+  const key = (document.documentElement.dataset.skin || '') + '|' + (scr.style.fontFamily || ''); if (!force && key === measureKey && CW) return; measureKey = key;   // force: a web font just arrived
   const s = document.createElement('span');
   s.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;font-size:100px;font-family:' + getComputedStyle(scr).fontFamily;
   s.textContent = '0123456789'; document.body.append(s); CW = s.getBoundingClientRect().width / 1000 || 0.6; s.remove();
@@ -11522,10 +11536,12 @@ function arrLayout(force){
 }
 // Every "the page changed shape" signal (window, visual viewport, the screen element, fonts arriving) lands here and
 // runs ONE layout pass in the next frame: a fold/unfold used to run fit()+draw() four times over (~0.5 s on the phone).
-let refitRaf = 0, refitForce = false;
+let refitRaf = 0, refitForce = false, refitSize = '';
 function scheduleRefit(force){
   refitForce = refitForce || !!force; if (refitRaf) return;
-  refitRaf = requestAnimationFrame(() => { refitRaf = 0; const f = refitForce; refitForce = false; if (f) measure(); if (!arrLayout(f) && view === 'tracker'){ fit(); draw(); } });
+  refitRaf = requestAnimationFrame(() => { refitRaf = 0; const f = refitForce; refitForce = false; if (f) measure(true);
+    const did = arrLayout(f), sz = scr.clientWidth + 'x' + scr.clientHeight;   // the screen element itself changed size (a panel, the keyboard): re-fit
+    if (!did && view === 'tracker' && sz !== refitSize){ fit(); draw(); } refitSize = sz; });
 }
 addEventListener('resize', () => scheduleRefit(false));
 // Web fonts can arrive after the first draw: measure again so the text and the MONO / POLY boxes line up.
@@ -12318,7 +12334,7 @@ function setView(v){
   document.body.classList.toggle('trkv', tr); songBtn(); topSelVis();
   try { localStorage.setItem(VK, view); } catch(e){}
   updView();
-  if (tr){ releaseAll(); measure(); fit(); draw(); frameWake(); }
+  if (tr){ releaseAll(); measure(); arrLayout(true); refitSize = scr.clientWidth + 'x' + scr.clientHeight; frameWake(); }   // one fit+draw; the observers that fire next find nothing changed
   else if (!wv){ releaseAll(); refreshAll(); }
   else releaseAll();
 }
