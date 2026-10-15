@@ -280,7 +280,7 @@ class MasterProcessor extends AudioWorkletProcessor {
     this.L = new Float32Array(128); this.R = new Float32Array(128);
     this.inPk = 0; this.outPk = 0; this.tpMax = 0; this.compGr = 0; this.n = 0;
     if (o.set) this.apply(o.set);
-    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.apply(d.set); if (d.resetPeak) this.tpMax = 0; };
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.apply(d.set); if (d.resetPeak) this.tpMax = 0; if (d.dispose) this.dead = true; };
   }
   apply(s){
     if (s.sup){ this.on.sup = !!s.sup.on; this.sup.set(s.sup); }
@@ -288,6 +288,7 @@ class MasterProcessor extends AudioWorkletProcessor {
     if (s.lim){ this.on.lim = !!s.lim.on; this.lim.set(s.lim); }
   }
   process(inputs, outputs){
+    if (this.dead) return false;   // replaced by a new chain: let the browser collect this node
     const inp = inputs[0], out = outputs[0]; if (!out || !out.length) return true;
     const n = out[0].length, L = this.L.length === n ? this.L : (this.L = new Float32Array(n)), R = this.R.length === n ? this.R : (this.R = new Float32Array(n));
     const a = inp && inp[0], b = inp && (inp[1] || inp[0]);

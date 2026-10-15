@@ -7665,7 +7665,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=18')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=19')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -8363,9 +8363,12 @@ function makePlayer(ac, out, getBuf, live){
   }
   // Bass voices: one live node per track and voice (see bassReady), made when it first plays.
   const bassN = new Map(); let bpmNow = (S && S.bpm) || 120;
+  function bassDrop(k, b){ try { b.gate.value = 0; b.node.port.postMessage({dispose:true}); b.node.port.onmessage = null; b.node.disconnect(); b.g.disconnect(); b.pn.disconnect(); } catch(e){} bassLive.delete(b); bassN.delete(k); }
   function bassNode(t, pad, j){
     if (!bassOK.has(ac)) return null;
     const V = kit.voices[pad], vx = isVoxV(V), lx = liveX(V), kind = vx ? 'vox' : lx ? V.engine : 'bass', key = t + ':' + pad + ':' + kind + (j ? ':' + j : ''); let b = bassN.get(key); if (b) return b;
+    // The pad's engine changed: drop this track's nodes of the old kind, or every engine switch would leave one running.
+    for (const [k, o] of bassN) if (k.startsWith(t + ':' + pad + ':') && o.kind !== kind) bassDrop(k, o);
     try {
       const node = new AudioWorkletNode(ac, 'thunder-' + kind, {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{p:vx ? voxParams(V) : lx ? xParams(V) : bassParams(V)}});
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
@@ -8620,7 +8623,7 @@ function makePlayer(ac, out, getBuf, live){
     // ride on the native-FX flag: a browser without the fx worklet should still run chains.
     const wantChn = chainsFeed(t) && !!S.chainPatch && S.chainPatch.format === 'chains.patch';
     const wantFx = !!fxOk && chain.length > 0;
-    if (!wantChn && b.chn){ try { if (b.chn._send) b.chn._send({target:'chains-host', op:'dispose'}); } catch(e){} b.chn = null; }
+    if (!wantChn && b.chn){ try { if (b.chn._send) b.chn._send({target:'chains-host', op:'dispose'}); b.chn.disconnect(); } catch(e){} b.chn = null; }
     if (!wantFx && b.fx){ try { b.fx.port.postMessage(null); } catch(e){} b.fx = null; }
     if (!wantChn && !wantFx){ try { b.inp.disconnect(); } catch(e){} b.inp.connect(b.g); return; }
     if (wantChn && !b.chn){
@@ -8653,7 +8656,7 @@ function makePlayer(ac, out, getBuf, live){
   // Reset audio engine: let go of every node this player made.
   function dispose(){
     try { clock.stop(); clock.disconnect(); } catch(e){}
-    for (const b of bassN.values()){ try { b.gate.value = 0; b.node.disconnect(); b.g.disconnect(); b.pn.disconnect(); } catch(e){} bassLive.delete(b); }
+    for (const [k, b] of bassN) bassDrop(k, b);
     bassN.clear();
     for (const b of buses){ if (!b) continue;
       try { if (b.fx){ b.fx.port.postMessage(null); b.fx.disconnect(); } } catch(e){}
@@ -8811,8 +8814,9 @@ class BassProc extends AudioWorkletProcessor {
     {name:'bpm', defaultValue:120, minValue:10, maxValue:999, automationRate:'k-rate'},
     {name:'wob', defaultValue:0, minValue:0, maxValue:64, automationRate:'k-rate'}]; }
   constructor(o){ super(); this.c = new BassCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0;
-    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); }; }
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose) this.dead = true; }; }
   process(ins, outs, P){
+    if (this.dead) return false;
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, rate = P.rate, gate = P.gate, trig = P.trig, leg = P.leg, c = this.c;
     c.bpm = P.bpm[0]; c.wob = P.wob[0];
     const rt = i => rate.length > 1 ? rate[i] : rate[0], t0 = Date.now();
@@ -8846,8 +8850,9 @@ class VoxProc extends AudioWorkletProcessor {
     {name:'syl', defaultValue:0, automationRate:'a-rate'},
     {name:'same', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'}]; }
   constructor(o){ super(); this.c = new VoxCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0;
-    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); }; }
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose) this.dead = true; }; }
   process(ins, outs, P){
+    if (this.dead) return false;
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, c = this.c, rate = P.rate, gate = P.gate, trig = P.trig, leg = P.leg, syl = P.syl, same = P.same;
     const at = (A, i) => A.length > 1 ? A[i] : A[0], t0 = Date.now();
     let s = 0;
@@ -8878,8 +8883,9 @@ class XP_${name} extends AudioWorkletProcessor {
     {name:'leg', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
     {name:'acc', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'}]; }
   constructor(o){ super(); this.c = new ${core}(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0;
-    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); }; }
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose) this.dead = true; }; }
   process(ins, outs, P){
+    if (this.dead) return false;
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, c = this.c, at = (A, i) => A.length > 1 ? A[i] : A[0], t0 = Date.now();
     let s = 0;
     for (let i = 0; i < n; i++){
@@ -8915,7 +8921,7 @@ const isLivePad = i => isSyn(i) && (isBassV(kit.voices[i]) || isVoxV(kit.voices[
 const liveX = v => !!(v && XENG[v.engine] && XENG[v.engine].live);
 // A bass voice was edited: the live nodes playing it hear the change at once.
 function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v), lx = liveX(v); if (!isBassV(v) && !vx && !lx) return; const kind = vx ? 'vox' : lx ? v.engine : 'bass', p = vx ? voxParams(v) : lx ? xParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && b.kind === kind) try { b.node.port.postMessage({set:p}); } catch(e){} }
-const MW_URL = 'master-worklet.js?v=2', mwLoad = new WeakMap();
+const MW_URL = 'master-worklet.js?v=3', mwLoad = new WeakMap();
 function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
 const mstNeedsWk = M => M.sup.on || M.comp.on || M.lim.on;
@@ -8939,6 +8945,14 @@ function mstChain(ac, M, live){
   let h = input; for (const n of eq){ h.connect(n); h = n; } if (wk){ h.connect(wk); h = wk; } h.connect(output);
   return {input, output, eq, wk, shape:eqShape(M.eq) + '|' + !!wk};
 }
+// A chain that is being replaced: every node disconnected and the worklet told to stop, or it would keep running
+// (and posting its meters over the new one's) for the rest of the session. Each EQ-band change leaked one before.
+function mstDrop(m){
+  try { m.input.disconnect(); } catch(e){}
+  for (const n of m.eq || []) try { n.disconnect(); } catch(e){}
+  if (m.wk){ try { m.wk.port.onmessage = null; m.wk.port.postMessage({dispose:true}); m.wk.disconnect(); } catch(e){} }
+  try { m.output.disconnect(); } catch(e){}
+}
 // Live: rebuilt when the EQ's shape or the worklet's presence changes; otherwise values glide into place.
 let mstMeter = null;
 async function mstSync(){
@@ -8946,9 +8960,9 @@ async function mstSync(){
   const M = S.mst; let ok = true;
   if (M.on && mstNeedsWk(M)) ok = await mwReady(ctx);
   const shape = eqShape(M.eq) + '|' + !!(M.on && mstNeedsWk(M) && ok);
-  if (!M.on){ if (rt.mst){ try { rt.mst.output.disconnect(); } catch(e){} rt.mst = null; rtRoute(); } return; }
+  if (!M.on){ if (rt.mst){ mstDrop(rt.mst); rt.mst = null; rtRoute(); } return; }
   if (!rt.mst || rt.mst.shape !== shape){
-    if (rt.mst){ try { rt.mst.output.disconnect(); } catch(e){} }
+    if (rt.mst) mstDrop(rt.mst);
     rt.mst = mstChain(ctx, M, true);
     if (rt.mst.wk) rt.mst.wk.port.onmessage = e => { if (e.data && e.data.meter) mstMeter = e.data.meter; };
     rtRoute(); return;

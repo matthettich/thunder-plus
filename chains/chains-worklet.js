@@ -1869,7 +1869,7 @@ class ThunderChains extends AudioWorkletProcessor {
     if (!m || (m.target && m.target !== 'chains-host')) return;
     try {
       if (m.op === 'dispose'){
-        this.engine.dispose();
+        this.engine.dispose(); this._dead = true;   // process() returns false from now on, so the node can be collected
         this.port.postMessage({ target:'chains-host', op:'disposed', value:{ track:this.track } });
         return;
       }
@@ -1878,6 +1878,7 @@ class ThunderChains extends AudioWorkletProcessor {
     catch (err){ this.port.postMessage({ target:'chains-host', op:OP.error, value:{ op:m.op, message:String(err?.message || err) } }); }
   }
   process(ins, outs){
+    if (this._dead) return false;
     const e = this.engine, i = ins[0], o = outs[0], n = o[0].length;
     const L = o[0], R = o[1] || o[0];
     // Feed this track's input into the engine's per-track buffers.
