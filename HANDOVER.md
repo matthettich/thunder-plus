@@ -622,7 +622,46 @@ caches.
   on the root that recalculated and repainted every frame (60 recalcs/s); this is 10/s, about 8 ms of main thread a
   second on a desktop. Paused while hidden, off with reduced motion. Fixed overlays (Help, toasts) are unaffected.
 
-## 15 Oct: review fixes (branch fix/review-bugs)
+## 15 Oct (afternoon): review risk fixes, one commit each on main
+
+After the eight bugs below were merged (PR #1), the review's risk items went in as separate commits. Cache is now
+`thunderplus-v105`; `chains-worklet.js?v=20`, `waves-worklet.js?v=15`, `master-worklet.js?v=3`.
+
+- **Effects can't be hung or silenced by a bad sample** (93d3ae3): the wasm only checks its output, and a NaN/∞ on the
+  way in made the tape delay's `tfx_process` never return (frozen audio thread) and left twenty effects silent. The
+  three JS call paths (track-FX worklet, …chains/…waves `effect()`, pad-FX `applyFx`) zero non-finite or |x| ≥ 8 input
+  samples, and when an effect's output is no longer finite it is freed and made again with its settings (`s.t`/`s.p`
+  kept on the slot). Checked in Node against the real wasm.
+- **Replaced worklet nodes are released** (6ee130b): a processor that keeps returning `true` can never be collected, so
+  each EQ-band/mastering change leaked a master chain (its stale meters flickered over the new one's), each chains
+  on/off an engine node, each engine switch a bass/vox/acid/mach node. `{dispose:true}` / `op:'dispose'` make
+  `process()` return `false`; `mstDrop()`, the chains rewire and `bassDrop()` disconnect the old nodes.
+- **Transport** (837caca): the 25 ms pump ticks from a Worker (`pumpTimer`), so a MIDI-only song with the screen off or
+  a muted master no longer stalls when the page timer is throttled; `audioInterrupted()` resumes a suspended/interrupted
+  context on `statechange` and when the app returns, and stops the transport with a toast if it stays stopped 2.5 s.
+  `pump()` already re-anchors the timeline when more than 0.5 s behind (from the dialog fix).
+- **MIDI clock** (020b76b): ticks are booked ≤ 80 ms ahead (not the 250 ms look-ahead) and Stop is timestamped after the
+  last booked tick (`mx.clk.last`), since Chrome can't take booked messages back. Fake-port test: none after Stop.
+- **Samples and tabs** (67be903): `smpTidy` counts refs in the saved kit/song and skips entirely while another tab answers
+  on `BroadcastChannel('thunderplus-tabs')`; a `storage` event from another tab toasts once. `smpGet` marks `own`, so
+  samples borrowed from ...Thunder's store are copied into ours by `save()`; `thunderTidy()` removes `thunder-kit-v1` /
+  `thunder-song-v1` once the import answer is yes/auto and everything is saved here with every sample in our store.
+- **First PLAY and Space** (646904e): `tStart` sends un-cached Worker-capable pads to `bgRender` (3.7 s → 82 ms at 4×);
+  `ensureLive` keeps a render at another sample rate while the Worker re-renders. Space reverb's Size is capped at 0.99
+  (`SPACE_SIZE_MAX`, in the ENGINE block): at exactly 1 it never decays (5× the input, every Decay); 0.99 is fine.
+- **Desktop/CI** (2ce6a3b): `will-navigate` blocks all navigation (dropped files), single-instance `return`, no `media`
+  permission, page ignores drag/drop; workflow `contents: read` with `write` only on `release`; release notes explain
+  SmartScreen / Gatekeeper; exact dependency versions. **Still to do for a real release:** commit a `package-lock.json`
+  from the first real `npm install` and switch the workflow to `npm ci`; sign/notarise so electron-updater verifies.
+- **Not done from the review (performance, next):** `draw()` spends ~90 % in forced-layout reads even when the grid
+  is unchanged (skip `groupBoxes`/`fitCheck`/`stageLayout` on an unchanged signature); the Phrase view rebuilds the
+  grid every playhead row (toggle `.pl` like `drawArr`); four refits per fold/unfold and the ARRANGE grip at ~5 fps
+  (one rAF-coalesced refit); synth↔tracker ~0.5 s on the phone (`measure()` per switch, `drawWave` two passes); 2 MB of
+  wasm inlined in index.html that is also shipped as files; rainbow-dynamic `hue-rotate` on the root; the idle rAF loop;
+  per-block garbage in the worklets; …waves voices awake 12 s after release; the Suppressor's FFT bursts; denormals in
+  Ladder/OTT/Comb on x86 and the track-FX sleep that never engages while `bp` ramps.
+
+## 15 Oct: review fixes (branch fix/review-bugs, merged as PR #1)
 
 A code review (audio, storage, UI, DSP) found these; all fixed and checked headless. Cache `thunderplus-v98`;
 `chains-worklet.js?v=17`, `waves-worklet.js?v=13`.
