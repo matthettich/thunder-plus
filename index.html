@@ -10577,7 +10577,7 @@ function measure(){
 }
 function fit(){
   if (view !== 'tracker') return;
-  fitTries = 0;
+  fitTries = 0; layoutSig = '';   // the next draw measures again
   const W = scr.clientWidth - 24, H = scr.clientHeight - 16; if (W <= 0 || H <= 0) return;
   // Height: the phrase's LEN line, its column header and 16 rows (18 lines) must fit in the grid, with the
   // title line and up to three info lines (0.8em each) around it: ~5.5em of extras. Then measure the grid
@@ -10643,6 +10643,10 @@ function groupBoxes(){
   }
 }
 let gridHTML = '', psetHTML = '';
+// The grid's measured layout (group boxes, fit check, the stage beside it) is only redone when something that can
+// move the text changed: the grid itself, its font size, the window, the ARRANGE width. Measuring every redraw
+// (every playhead row) was ~90 % of draw() on a phone: forced-layout reads, even with nothing changed.
+let layoutSig = '';
 // The one playhead the whole tracker reads: Song and Arrange both take their lit rows from here, so
 // their indicators can never drift apart. Positions live in tp.pos (filled by frame() as the song
 // plays). Song mode only: in phrase and sect playback the row fields are placeholders, so nothing is
@@ -10785,7 +10789,7 @@ function draw(){
   }
   const spanH = s => typeof s === 'string' ? s : `<span class="${s.cls || ''}"${s.x != null ? ` data-x="${s.x}" data-y="${s.y}"` : ''}${s.r != null ? ` data-r="${s.r}"` : ''}${s.title ? ` title="${esc(s.title)}"` : ''}>${esc(s.t)}</span>`;
   const gh = L.map(ln => '<div class="ln' + (ln.b4 ? ' b4' : '') + '">' + ln.map(spanH).join('') + '</div>').join('');
-  if (gh !== gridHTML){ gridHTML = gh; grid.innerHTML = gh; }   // unchanged screens (most redraws while playing) skip the rebuild
+  const rebuilt = gh !== gridHTML; if (rebuilt){ gridHTML = gh; grid.innerHTML = gh; }   // unchanged screens (most redraws while playing) skip the rebuild
   const ph = pset ? pset.map(spanH).join('') : ''; if (ph !== psetHTML){ psetHTML = ph; $('tPset').innerHTML = ph; }
   // Song and Phrase page their own rows; the list screens (Inst, FX, Project) can be taller than the
   // screen, so keep the cursor's line in view.
@@ -10800,8 +10804,9 @@ function draw(){
     if (!cu || grid.scrollWidth <= grid.clientWidth + 1) grid.scrollLeft = 0;
     else { const g = grid.getBoundingClientRect(), r = cu.getBoundingClientRect(), m = r.width;
       if (r.right + m > g.right) grid.scrollLeft += r.right - g.right + m; else if (r.left - m < g.left) grid.scrollLeft -= g.left - r.left + m; } }
-  groupBoxes();
-  if (fitCheck()){ draw(); return; }
+  const lsig = [tv, gh.length, scr.style.fontSize, tScale, innerWidth, innerHeight, arrW, sideOn, inlOn, stage].join('|');
+  const relayout = rebuilt || lsig !== layoutSig; layoutSig = lsig;
+  if (relayout){ groupBoxes(); if (fitCheck()){ draw(); return; } }
   meterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mt')] : []; masterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mm')] : [];
   $('tTitle').textContent = title; $('tSub').textContent = sub;
   $('tInfo').textContent = info();
@@ -10813,7 +10818,7 @@ function draw(){
   $('tHint').textContent = (tv === 'phrase' && !mstP ? 'NOW ' + curS() + (inMode === 'keys' ? ' · oct ' + kOct + ' · step ' + kStep : '') + ' · ' : '') + hintTxt;
   drawArr(PH);
   const km = inMode === 'keys'; $('tKp').hidden = !km || !kpOn; $('tPad').hidden = km; $('tLegKeys').hidden = !km; $('tLegPad').hidden = km;
-  deckDraw(); stageLayout();
+  deckDraw(); if (relayout || stgReq !== (stage === 'off' ? '' : stageKind())) stageLayout();
   drawPat();
   $('tOct').hidden = !km; $('tOctN').textContent = kOct;
   if (km) drawKeypad();
@@ -10872,10 +10877,10 @@ let stage = (() => { try { const v = localStorage.getItem(STK); if (STG.includes
 function setStage(v){ stage = v; try { localStorage.setItem(STK, v); } catch(e){} stageLayout(); }
 $('tStageX').addEventListener('click', () => { setStage('off'); toast('Stage hidden. Settings → STAGE brings it back.'); });
 const stageKind = () => stage === 'dogs' ? 'dogs' : tv === 'phrase' && mstView() ? 'chain' : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
-let stgKindNow = '', stgSig = '';
+let stgKindNow = '', stgSig = '', stgReq = '';   // stgReq: what the last layout was asked for
 // It sits in the space to the right of the grid's text, the grid's height, when that space is big enough.
 function stageLayout(){
-  const box = $('tStage');
+  const box = $('tStage'); stgReq = view !== 'tracker' || stage === 'off' ? '' : stageKind();
   if (view !== 'tracker' || stage === 'off'){ box.hidden = true; stgKindNow = ''; return; }
   const sr = scr.getBoundingClientRect(), gr = grid.getBoundingClientRect(), rg = document.createRange();
   let right = 0; const lines = grid.querySelectorAll('.ln');
