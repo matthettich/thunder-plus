@@ -1015,7 +1015,8 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; flex:0 1 auto; min-width:0}
 .dkh .dki{font-size:var(--fs-2); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto}
 .dkh .dksp{flex:1 1 0}
-.dkh .dkoff{min-height:0; height:17px; padding:0 6px; font-size:var(--fs-2); letter-spacing:.04em; border:1px dashed var(--line); background:transparent; color:var(--muted); flex:none}
+.dkh .dkoff{min-height:0; height:17px; padding:0 6px; font-size:var(--fs-2); font-weight:700; letter-spacing:.04em; border:1px solid var(--ink); background:var(--panel); color:var(--ink); flex:none}
+.dkh .dkoffs{display:flex; gap:4px; flex:none}
 .dkh .dkx{min-height:0; height:17px; width:22px; padding:0; font-size:var(--fs-2); border:1px solid var(--line); background:var(--panel); flex:none}
 .dkh .dksolo{min-height:0; height:17px; padding:0 6px; font-size:var(--fs-2); font-weight:700; letter-spacing:.04em; border:0; background:var(--meter-hot); color:#1b2130; flex:none}
 .dkb{flex:1; min-height:0; display:flex; flex-direction:column; padding:6px 10px 8px}
@@ -1274,7 +1275,7 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
 :root[data-skin="contrast"]{--mxmst:#d6331f; --mxmston:#ffffff}
 :root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg))}
 :root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .tdeck{--stpink:var(--mx)}
-:root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
+:root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkChn,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkChn{--dkp:9%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
 :root[data-skinbase="term"] .dkh .dksolo{background:var(--mxsoft); color:var(--mxon)} :root[data-skinbase="term"] .stms button.so.on{background:var(--mxsoft); color:var(--mxon)}
 :root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
 :root[data-skinbase="term"] .tagrid b.f[style]{background:color-mix(in srgb, var(--mx) var(--ibp, 100%), var(--mxsoft)); color:var(--mxon)} :root[data-skinbase="term"] .tagrid b.f{text-shadow:none; box-shadow:0 0 8px var(--mxglowc)}
@@ -12474,6 +12475,8 @@ function projRows(){
       info:() => 'KEYS mode: show the on-screen keypad at the bottom for tapping in notes. Off hides it — the computer keyboard still types notes and hex, and the octave (OCT, top bar) stays. PAD mode is unchanged'},
     {l:'BOTTOM PANEL', ck:'Show the bottom panel', get:() => deck.on ? 1 : 0, set:v => setDeck('on', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'KEYS mode with the keypad off: a panel at the bottom with a spectrum of the master, quick controls for the current instrument and the current track’s effects, and a channel strip for the current track. Its buttons hide each part'},
+    {l:'› SHOW ALL PANEL PARTS', act:() => { for (const [k] of DK_SECS) deck[k] = true; deck.on = true; deckSave(); deckLayout(); fit(); draw(); toast('Every part of the bottom panel is back.'); },
+      info:() => { const off = DK_SECS.filter(([k]) => !deck[k]).map(([, l]) => l); return 'Brings back any part of the bottom panel you hid (scope, inst, …chains, FX, track)' + (off.length ? '. Hidden now: ' + off.join(', ') : '. Nothing is hidden'); }},
     {l:'STAGE', opts:true, get:() => STG.indexOf(stage), set:v => setStage(STG[v]), min:0, max:STG.length - 1, d:0, fmt:v => STG_NAMES[v],
       info:() => 'Big screens: the space beside the grid. BY SCREEN: the dogs dance on Song and Project; Sect previews the phrase; Phrase shows a piano lighting the notes playing; Inst its waveform; Mixer the master spectrum; FX the effects chain. DOGS: the dogs everywhere. OFF: empty'},
     {l:'SCREEN', sec:'Screen', gap:true, opts:true, get:() => SCREENS.findIndex(x => x[0] === tScreen), set:v => setScreen(SCREENS[v][0]), min:0, max:SCREENS.length - 1, fmt:v => SCREENS[v][1], info:() => 'Colour of the screen: BY SCREEN gives Song, Sect, Phrase and the rest their own pastel (the same as their tabs), or pick one pastel, or black'},
@@ -14121,7 +14124,9 @@ function dkInstNow(){
 }
 let dkInst = 0;
 function setDeck(k, v){ deck[k] = !!v; deckSave(); deckLayout(); fit(); draw(); }
-document.querySelectorAll('#tDeck .dkt').forEach(b => { b.title = 'Hide this section (it waits as a dashed button in the header)'; b.addEventListener('click', () => setDeck(b.dataset.k, false)); });
+document.querySelectorAll('#tDeck .dkt').forEach(b => { b.title = 'Hide this section (a + button in the panel’s header brings it back)'; b.addEventListener('click', () => {
+  const l = (DK_SECS.find(([k]) => k === b.dataset.k) || [, b.dataset.k])[1];
+  setDeck(b.dataset.k, false); toast(`${l} hidden. + ${l} in the panel’s header brings it back (or Settings → SHOW ALL PANEL PARTS).`, 5000); }); });
 for (const [k, l] of DK_SECS){ const b = el('button', 'dkoff', '+ ' + l); b.type = 'button'; b.dataset.k = k; b.title = 'Show ' + l.toLowerCase(); b.addEventListener('click', () => setDeck(k, true)); $('dkOffs').append(b); }
 $('dkHide').addEventListener('click', () => { setDeck('on', false); toast('Panel hidden. Settings → BOTTOM PANEL brings it back.'); });
 $('dkSolo').addEventListener('click', () => { S.mix.forEach(m => m.solo = false); mixChanged(); draw(); toast('Solo cleared: every track plays.'); });
@@ -14144,9 +14149,12 @@ function deckLayout(){
     bare.hidden = false; bare.replaceChildren(el('b', 'dki', 'PANEL'), $('dkOffs'), el('span', 'dksp'), $('dkTail')); $('dkBody').hidden = true; return;
   }
   if ($('dkBare')) $('dkBare').hidden = true;
-  const h0 = dkSec(vis[0]).querySelector('.dkh'), h1 = dkSec(vis[vis.length - 1]).querySelector('.dkh');
-  const t0 = h0.querySelector('.dkt'); t0.after($('dkOffs'));
-  let sp = h1.querySelector('.dksp'); if (!sp){ sp = el('span', 'dksp'); } h1.append(sp, $('dkTail'));
+  const h1 = dkSec(vis[vis.length - 1]).querySelector('.dkh');
+  // Hidden parts wait as "+" buttons at the right of the INST header (the widest), or beside ✕ when INST is hidden too.
+  const hOff = deck.inst ? dkSec('inst').querySelector('.dkh') : h1;
+  let sp = h1.querySelector('.dksp.t'); if (!sp) sp = el('span', 'dksp t');
+  if (hOff === h1) h1.append(sp, $('dkOffs'), $('dkTail'));
+  else { let so = hOff.querySelector('.dksp.o'); if (!so) so = el('span', 'dksp o'); hOff.append(so, $('dkOffs')); h1.append(sp, $('dkTail')); }
 }
 // Channel strip: the current track's level, fader, pan, mute and solo.
 const stVol = $('stVol'), stPan = $('stPan');
@@ -15141,7 +15149,10 @@ function typeHex(d){
   const fresh = hexBuf.key !== key || now - hexBuf.t > 1500 || hexBuf.n >= 2;
   const v = fresh ? d : ((hexBuf.v << 4) | d) & 255;
   hexBuf = {key, n:fresh ? 1 : hexBuf.n + 1, v, t:now};
-  const done = hexBuf.n >= 2 || k === 'inst';
+  // Two digits finish an entry. An instrument number (00–0F) also finishes on a first digit that no second digit could
+  // follow (1–F), so "3" and "03" both give 03; a first 0 waits for its second digit instead of moving on (typing "03"
+  // used to write 00 here and 03 on the next row).
+  const done = hexBuf.n >= 2 || (k === 'inst' && hexBuf.n === 1 && v * 16 > NI - 1);
   if (onPset()){ psetSet(c.x, v); if (done) hexBuf.key = ''; return; }
   if (GRIDV.has(tv)){
     if (k === 'note' || k === 'fxc') return;

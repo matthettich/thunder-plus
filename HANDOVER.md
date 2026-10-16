@@ -24,6 +24,16 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 16 Oct (late evening): bottom panel parts, …chains colour, typing instrument numbers
+
+- **Hidden bottom-panel parts were easy to lose:** their "+" buttons were faint dashed chips after the first title.
+  Now solid `.dkoff` buttons at the right of the INST header (beside ✕ if INST is hidden too), a toast says where
+  on hiding, and **Settings → › SHOW ALL PANEL PARTS** brings everything back (after BOTTOM PANEL in the rows).
+- **…chains part ignored the Simple skins' colour** (kept its lavender): `#dkChn` added to the term-skin `--dkc`
+  rule, `--dkp:9%` between INST and FX.
+- **Typing "03" on an instrument cell wrote 00 here and 03 on the next row:** `typeHex` finished an instrument
+  entry on its first digit. Now a first 0 waits for the second digit; 1–F still finish at once.
+
 ## 16 Oct (late evening): desktop synth page in three columns
 
 `body.sdesk` (CSS by `.dock{padding-block:10px 14px}`) and `synDesk()` (beside `setView`, called from `setView`,
