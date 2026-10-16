@@ -112,7 +112,7 @@ The kit has 16 slots. 1–8 are the drum pads (one-shots). 9–16 are synths for
 
 ## Playing pads from the computer keyboard
 
-On the synth page the keyboard plays the selected pad chromatically: Z to / is the lower octave (S D G H J for sharps), Q to P the upper (2 3 5 6 7 9 0 for sharps). C-4 is the pad at its own pitch; − and = (or numpad / and *) change the octave. Shift+1–8 or ◀ ▶ pick a pad (◀ ▶ go through all 16 slots), Space plays it as it is. On a synth slot, notes hold while the keys are down.
+On the synth page the keyboard plays the selected pad chromatically: Z to / is the lower octave (S D G H J for sharps), Q to P the upper (2 3 5 6 7 9 0 for sharps). C-4 is the pad at its own pitch; − and = (or numpad / and *) change the octave. Shift+1–8 or ◀ ▶ pick a pad (◀ ▶ go through all 16 slots; on a computer, where they're a list down the left, ▲ ▼ do too), Space plays it as it is. On a synth slot, notes hold while the keys are down.
 
 ## Tracker
 
