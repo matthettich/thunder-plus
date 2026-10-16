@@ -698,6 +698,22 @@ After the eight bugs below were merged (PR #1), the review's risk items went in 
   engines: `XENG` / `renderX` / `XUI` (`table`, `breath`, `strings`), engine grid is now an exact 4×4, factory
   voice groups "Table" / "Breath" / "Strings". All original code. Checked in Node (no NaN, pitch within ~1 %,
   20–230 ms a render) and headless (cards build, every preset renders, sheet lists them). Not heard yet.
+- **Six more engines (15 Oct, late; cache v131):** `FmDrumCore` (3-op FM percussion, three algorithms, pitch/index
+  envelopes, feedback, noise, click, curve), `WindCore` (blown/bowed waveguides: Reed = single reed on a half-length
+  bore with the reed curve 0.7 − slope·Δp; Jet = jet delay + bore with the x(x²−1) jet curve, bore at the full period
+  and a dark bore so it sits on its fundamental; Bow = bridge/neck delays with the (|Δv·slope|+0.75)⁻⁴ friction curve.
+  Each model's controls are mapped into the narrow region where it oscillates (reed: pressure·slope ≈ 0.22–0.29;
+  jet: pressure·gain ≈ 1.05–1.15 with jet ratio 0.38–0.48; bow: velocity·slope ≈ 0.48–0.58) — found by sweeping in
+  Node, see the matrix test — and a self-trim runs the loop for 0.5 s, autocorrelates near the asked period (±16 %
+  only, so an octave jump is left alone) and scales the delays), `PhaseCore` (CZ-style phase distortion, 8 waves incl.
+  three windowed-resonance ones, DCW ADSR, two oscillators, ring, 2× oversampled), `PartialsCore` (up to 256
+  harmonics on the KeysUtil bank; tilt/odd-even/formant/stretch, spectrum B morph, per-partial decay tilt, brightness
+  envelope, drift), `SkinCore` (circular-membrane modes at the Bessel zeros, weighted by J_m(z·r) at the strike point,
+  mallet hardness roll-off, tension pitch bend, damping/muffle, a shell resonance), `ChipCore` (frame-rate 60 fps
+  8-bit voice: pulse duties + sweep, 4-bit triangle, 15-bit LFSR long/short, arp chords, slide, stepped vibrato,
+  NES-style period quantisation). Engine grid is 22 cells now (room for two more makes 6×4). Same checks as the
+  previous three. Original code throughout (the physical models follow the textbook waveguide structures, written
+  from scratch).
 - **Nothing from the review is left.** Next: hear it on the Fold and the PC (nothing has been checked by ear), then the
   feature list below.
 

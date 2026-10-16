@@ -4149,6 +4149,290 @@ class StringsCore {
     return KeysUtil.finish(out, p, sr, 0.003);
   }
 }
+/* FM Drum: three-operator FM percussion. A carrier with a pitch envelope, two modulators with their own ratios and
+   index envelopes (Serial: 2→1→C; Parallel: 1+2→C; Branch: 2→1→C and 2→C), feedback on modulator 2, a noise layer
+   through its own low-pass and decay, a click, and a tone control on the carrier. Toms, FM kicks, laser snares,
+   cowbells, metallic hits, the 80s digital drum machines. */
+class FmDrumCore {
+  static defaults(){ return {pitch:110, bend:18, bendT:60, alg:0, r1:1, i1:0.4, idec1:120, r2:3.5, i2:0.3, idec2:60, fb:0, noise:0, ndec:120, ncut:6000, click:0.2, tone:1, dec:400, curve:0.5, tune:0, drive:0, level:0}; }
+  static get ALGS(){ return ['Serial 2→1→C', 'Parallel 1+2→C', 'Branch 2→1, 2→C']; }
+  static render(o, sr){
+    const p = Object.assign(FmDrumCore.defaults(), o || {}), rnd = KeysUtil.rnd(0xfd0d);
+    const f0 = p.pitch * Math.pow(2, (p.tune || 0) / 12), dec = Math.max(0.005, p.dec / 1000), nd = Math.max(0.003, p.ndec / 1000);
+    const len = Math.min(6, Math.max(dec * (4 + p.curve * 4), p.noise > 0 ? nd * 7 : 0) + 0.01), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N);
+    const alg = Math.max(0, Math.min(2, Math.round(p.alg))), I1 = p.i1 * p.i1 * 14, I2 = p.i2 * p.i2 * 14, bT = Math.max(0.002, p.bendT / 1000);
+    const d1 = Math.max(0.002, p.idec1 / 1000), d2 = Math.max(0.002, p.idec2 / 1000), fbk = p.fb * p.fb * 2.5;
+    let pc = 0, p1 = 0, p2 = 0, m2p = 0, lp = 0, lpn = 0, lpn2 = 0;
+    const nk = 1 - Math.exp(-2 * Math.PI * Math.min(sr * 0.45, p.ncut) / sr), tk = 1 - Math.exp(-2 * Math.PI * Math.min(sr * 0.45, 400 + p.tone * p.tone * 18000) / sr);
+    for (let i = 0; i < N; i++){
+      const t = i / sr, f = Math.min(sr * 0.4, f0 * Math.pow(2, p.bend / 12 * Math.exp(-t / bT))), w = 6.283185307 * f / sr;
+      // the amp curve: Curve 0 is a straight exponential, 1 lingers then falls (a gated, 'analog' feel)
+      const env = Math.exp(-t / dec) * (1 - p.curve) + p.curve * (t < dec ? 1 - Math.pow(t / dec, 2) * 0.5 : 0.5 * Math.exp(-(t - dec) / (dec * 0.4)));
+      const e1 = I1 * Math.exp(-t / d1), e2 = I2 * Math.exp(-t / d2);
+      p2 += w * p.r2; p1 += w * p.r1; pc += w;
+      const m2 = Math.sin(p2 + fbk * m2p); m2p = m2;
+      let m1, c;
+      if (alg === 0){ m1 = Math.sin(p1 + e2 * m2); c = Math.sin(pc + e1 * m1); }
+      else if (alg === 1){ m1 = Math.sin(p1); c = Math.sin(pc + e1 * m1 + e2 * m2); }
+      else { m1 = Math.sin(p1 + e2 * m2); c = Math.sin(pc + e1 * m1 + e2 * 0.5 * m2); }
+      lp += (c - lp) * tk; let y = lp * env;
+      if (p.noise > 0){ const wn = rnd() * 2 - 1; lpn += (wn - lpn) * nk; lpn2 += (lpn - lpn2) * nk; y += lpn2 * p.noise * 1.6 * Math.exp(-t / nd); }
+      if (p.click > 0 && t < 0.004) y += p.click * (rnd() * 2 - 1) * (1 - t / 0.004) * 0.8;
+      out[i] = y;
+    }
+    return KeysUtil.finish(out, p, sr, 0.003);
+  }
+}
+/* Wind: blown and bowed physical models — a tube or string that oscillates on its own. Reed: a single reed on a
+   cylindrical bore (clarinet family). Jet: an air jet across a hole, a jet delay feeding the bore (flute, pipe,
+   bottle). Bow: a bow on a string between nut and bridge, with a friction curve that grabs and slips. Breath or bow
+   pressure, its noise, stiffness / bow force, the jet or bow position, bore damping, vibrato, growl, and a body.
+   Tube and string lengths are trimmed by measuring the loop's real period once. */
+class WindCore {
+  static defaults(){ return {model:0, oct:2, breath:0.6, noise:0.15, stiff:0.5, pos:0.3, damp:0.5, body:0.3, vib:0.2, vrate:5.5, growl:0, atk:60, rel:120, tune:0, drive:0, level:0}; }
+  static get MODELS(){ return ['Reed', 'Jet', 'Bow']; }
+  static render(o, sr, hold){
+    const p = Object.assign(WindCore.defaults(), o || {}), model = Math.max(0, Math.min(2, Math.round(p.model)));
+    const f0 = 65.406 * Math.pow(2, p.oct + (p.tune || 0) / 12), h = Math.max(0.03, hold || 1), atk = Math.max(0.002, p.atk / 1000), rel = Math.max(0.005, p.rel / 1000);
+    // the working region of each excitation is narrow: breath sets the pressure, stiffness shifts where in the region it sits
+    const pres = 0.9 + p.breath * (model === 1 ? 0.45 : 0.6), slope = (0.22 + p.stiff * 0.07) / pres, jetG = (1.05 + p.stiff * 0.1) / pres, bowV = 0.08 + p.breath * 0.25, bowS = (0.48 + p.stiff * 0.1) / bowV;
+    const vibA = p.vib * p.vib * 0.02, lpk = 1 - Math.exp(-2 * Math.PI * (model === 1 ? 500 + (1 - p.damp) * (1 - p.damp) * 3000 : 800 + (1 - p.damp) * (1 - p.damp) * 9000) / sr), wet = p.body;
+    const run = (N, scale, quiet) => {
+      const rnd = KeysUtil.rnd(0x3b0e), out = new Float32Array(N);
+      const mk = (n) => ({b:new Float32Array(Math.ceil(n * 2.6) + 8), w:0, L:Math.ceil(n * 2.6) + 8, d:n});
+      const rd = (D) => { const r = D.w - D.d, ri = Math.floor(r), f = r - ri, i0 = ((ri % D.L) + D.L) % D.L, i1 = (i0 + 1) % D.L; return D.b[i0] + (D.b[i1] - D.b[i0]) * f; };
+      const wr = (D, v) => { D.b[D.w] = v; D.w = (D.w + 1) % D.L; };
+      const modes = (model === 2 ? [[190, 0.02, 1], [380, 0.015, 0.6], [620, 0.01, 0.4]] : [[f0 * 0.5, 0.004, 0.5], [900, 0.006, 0.5], [2400, 0.004, 0.3]]).map(([f, tau, a]) => {
+        const w = 2 * Math.PI * Math.min(sr * 0.4, f) / sr, r = Math.exp(-1 / (tau * sr)); return {c1:2 * r * Math.cos(w), c2:-r * r, a:a * (1 - r), y1:0, y2:0}; });
+      const base = sr / f0, D1 = mk(base), D2 = mk(base);
+      let lp = 0, dcx = 0, dcy = 0, nlp = 0, odx = 0, ody = 0, prs = 0;
+      const CR = 16;
+      for (let i0 = 0; i0 < N; i0 += CR){
+        const t = i0 / sr, env = quiet ? Math.min(1, t / 0.02) : t < h ? Math.min(1, t / atk) : Math.exp(-(t - h) / rel);
+        const vib = quiet ? 1 : 1 + vibA * Math.sin(6.2832 * p.vrate * t) * Math.min(1, t * 3), grw = !quiet && p.growl > 0 ? 1 + p.growl * 0.5 * Math.sin(6.2832 * (28 + p.growl * 20) * t) : 1;
+        // tube / string length for this pitch (the reed loop runs a round trip, the others a full period)
+        const per = base * scale / vib, nfix = model === 0 ? per * 0.5 - 1.5 : model === 1 ? per - 2 : per - 4;
+        if (model === 2){ D1.d = Math.max(2, nfix * (0.1 + p.pos * 0.3)); D2.d = Math.max(2, nfix * (0.9 - p.pos * 0.3)); }
+        else if (model === 1){ D1.d = Math.max(2, nfix * (0.38 + p.pos * 0.1)); D2.d = Math.max(2, nfix); }
+        else D1.d = Math.max(2, nfix);
+        const i1 = Math.min(N, i0 + CR);
+        for (let i = i0; i < i1; i++){
+          prs += (pres * env * grw - prs) * 0.002;
+          nlp += ((rnd() * 2 - 1) - nlp) * 0.3; const nq = quiet ? 0 : p.noise, pr = prs * (1 + nq * (model === 1 ? 0.12 : 0.6) * nlp), nz = nq * 0.02 * nlp * env;
+          let y;
+          if (model === 0){
+            // reed: the bore's return, low-passed and inverted; the reed closes as the pressure difference grows
+            const back = rd(D1); lp += (back - lp) * lpk; const refl = -0.95 * lp;
+            const diff = refl - pr, rt = Math.max(-1, Math.min(1, 0.7 - slope * diff));
+            wr(D1, pr + diff * rt + nz); y = back;
+          } else if (model === 1){
+            // jet: breath minus the bore's reflection goes down the jet delay, through the jet curve, into the bore
+            const bore = rd(D2); lp += (bore - lp) * lpk; const dcb = lp - dcx + 0.995 * dcy; dcx = lp; dcy = dcb;
+            wr(D1, pr - 0.5 * dcb);
+            const j = rd(D1) * jetG, jet = Math.max(-1, Math.min(1, j * (j * j - 1)));
+            wr(D2, jet + 0.5 * dcb + nz); y = bore * 0.5;
+          } else {
+            // bow: velocity difference through the friction curve feeds both halves of the string
+            const bridge = rd(D1), nut = rd(D2); lp += (bridge - lp) * lpk; const br = -lp, nr = -nut;
+            const sv = br + nr, bv = bowV * env * grw, vd = bv - sv;
+            let fr = Math.abs(vd * bowS) + 0.75; fr = Math.pow(fr, -4); fr = Math.max(0, Math.min(1, fr));
+            const nv = vd * fr; wr(D2, br + nv); wr(D1, nr + nv + nz); y = bridge;
+          }
+          const od = y - odx + 0.995 * ody; odx = y; ody = od; y = od;
+          if (quiet){ out[i] = y; continue; }
+          let b = 0; for (const m of modes){ const v = m.a * y + m.c1 * m.y1 + m.c2 * m.y2; m.y2 = m.y1; m.y1 = v; b += v; }
+          out[i] = (y * (1 - wet * 0.5) + b * wet * 2.5) * (t < h ? 1 : env);
+        }
+      }
+      return out;
+    };
+    // trim: run the loop for a moment, find its real period (the best-matching lag near the one asked for), and
+    // scale the delays to match; the lag is refined between samples with a parabola
+    let scale = 1;
+    { const M = Math.round(sr * 0.5), tst = run(M, 1, true), s0 = Math.round(M * 0.6), W = M - s0 - Math.ceil(sr / f0 * 2.3) - 2, P = sr / f0;
+      if (W > 64){ let e0 = 1e-9; for (let i = 0; i < W; i++) e0 += tst[s0 + i] * tst[s0 + i];
+        let best = -1, bl = 0; const lo = Math.max(2, Math.floor(P * 0.84)), hi = Math.ceil(P * 1.19), cs = new Float64Array(hi + 2);
+        for (let L = lo; L <= hi; L++){ let c = 0; for (let i = 0; i < W; i++) c += tst[s0 + i] * tst[s0 + i + L]; cs[L] = c / e0; }
+        for (let L = lo + 1; L < hi; L++) if (cs[L] > best && cs[L] >= cs[L - 1] && cs[L] >= cs[L + 1]){ best = cs[L]; bl = L; }   // only a lag near the one asked for: an octave jump is left alone
+        if (best > 0.5 && bl){ const d = cs[bl - 1] - cs[bl + 1], dd = cs[bl - 1] - 2 * cs[bl] + cs[bl + 1], fl = bl + (dd !== 0 ? 0.5 * d / dd : 0), r = P / fl;
+          if (r > 0.84 && r < 1.19 && Math.abs(r - 1) > 0.002) scale = r; } } }
+    const len = Math.min(12, h + rel * 6 + 0.1), N = Math.max(1, Math.ceil(len * sr));
+    return KeysUtil.finish(run(N, scale, false), p, sr, 0.003);
+  }
+}
+/* Phase: phase distortion, the way the mid-80s digital synths with the resonant waveforms did it. The oscillator is a
+   cosine read through a bent phase: Saw, Square, Pulse, Double sine and Saw-pulse bend the phase more as the DCW
+   envelope opens; Res saw, Res triangle and Res trapezoid run the cosine faster than the cycle and window it, a
+   resonance sweep without a filter. Two oscillators stack, detune and ring-modulate. Rendered at twice the rate. */
+class PhaseCore {
+  static defaults(){ return {oct:2, wave:0, wave2:1, mix:0, det:0.1, ring:0, dcw:0.7, datk:2, ddec:500, dsus:0.3, drel:300, key:0.3, noise:0, atk:3, dec:800, sus:0.7, rel:250, tune:0, drive:0, level:0}; }
+  static get WAVES(){ return ['Saw', 'Square', 'Pulse', 'Double sine', 'Saw-pulse', 'Res saw', 'Res triangle', 'Res trapezoid']; }
+  static osc(wv, x, d){
+    const TAU = 6.283185307, bend = (u, k) => u < k ? u * 0.5 / k : 0.5 + (u - k) * 0.5 / (1 - k);
+    switch (wv){
+      case 0: return Math.cos(TAU * bend(x, 0.5 - d * 0.49));
+      case 1: { const hh = x < 0.5 ? 0 : 0.5, u = (x - hh) * 2, k = 1 - d * 0.97, ph = u < k ? u * 0.5 / k : 0.5; return Math.cos(TAU * (hh + ph)); }
+      case 2: { const k = 1 - d * 0.9; return x < k ? Math.cos(TAU * x / k) : 1; }
+      case 3: return Math.cos(2 * TAU * bend(x, 0.5 - d * 0.49));
+      case 4: { if (x < 0.5) return Math.cos(TAU * bend(x * 2, 0.5 - d * 0.49)); const u = (x - 0.5) * 2, k = 1 - d * 0.9; return u < k ? Math.cos(TAU * u / k) : 1; }
+      case 5: return 1 - (1 - x) * (1 - Math.cos(TAU * x * (1 + d * 15)));
+      case 6: return 1 - (1 - Math.abs(2 * x - 1)) * (1 - Math.cos(TAU * x * (1 + d * 15)));
+      default: return 1 - Math.min(1, 2 * (1 - x)) * (1 - Math.cos(TAU * x * (1 + d * 15)));
+    }
+  }
+  static render(o, sr, hold){
+    const p = Object.assign(PhaseCore.defaults(), o || {}), rnd = KeysUtil.rnd(0x9d15);
+    const f0 = 65.406 * Math.pow(2, p.oct + (p.tune || 0) / 12), h = Math.max(0.02, hold || 1);
+    const atk = Math.max(0.0005, p.atk / 1000), dec = Math.max(0.005, p.dec / 1000), rel = Math.max(0.005, p.rel / 1000);
+    const da = Math.max(0.0005, p.datk / 1000), dd = Math.max(0.005, p.ddec / 1000), dr = Math.max(0.005, p.drel / 1000);
+    const len = Math.min(12, h + Math.max(rel, dr) * 6 + 0.05), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N), OS = 2, sr2 = sr * OS;
+    const w1 = Math.max(0, Math.min(7, Math.round(p.wave))), w2 = Math.max(0, Math.min(7, Math.round(p.wave2))), mix = p.mix;
+    const inc1 = f0 / sr2, inc2 = f0 * Math.pow(2, p.det * p.det * 50 / 1200) / sr2, kf = Math.pow(261.6 / f0, p.key * 0.7);
+    let x1 = 0, x2 = 0.25, env = 0, denv = 0, st = 0, dst = 0;
+    for (let i = 0; i < N; i++){
+      const t = i / sr;
+      if (t < h){ if (st === 0){ env += 1 / (atk * sr); if (env >= 1){ env = 1; st = 1; } } else env += (p.sus - env) * 2.2 / (dec * sr);
+        if (dst === 0){ denv += 1 / (da * sr); if (denv >= 1){ denv = 1; dst = 1; } } else denv += (p.dsus - denv) * 2.2 / (dd * sr); }
+      else { env -= env * 3 / (rel * sr); denv -= denv * 3 / (dr * sr); }
+      const d = Math.max(0, Math.min(1, p.dcw * denv * kf));
+      let y = 0;
+      for (let k = 0; k < OS; k++){
+        x1 += inc1; if (x1 >= 1) x1 -= 1; x2 += inc2; if (x2 >= 1) x2 -= 1;
+        const a = PhaseCore.osc(w1, x1, d), b = PhaseCore.osc(w2, x2, d);
+        y += a * (1 - mix) + b * mix + p.ring * a * b;
+      }
+      y /= OS;
+      if (p.noise > 0) y += p.noise * 0.5 * (rnd() * 2 - 1);
+      out[i] = y * env;
+    }
+    return KeysUtil.finish(out, p, sr, 0.003);
+  }
+}
+/* Partials: one note built from up to 256 harmonics. A spectrum is a tilt, an odd/even comb, a formant bump and a
+   stretch toward the inharmonic; a second spectrum is morphed into over the note. Each partial decays faster the
+   higher it is, a brightness envelope opens and closes the top, and Drift lets every partial breathe on its own.
+   Bells, organs, pads, drones, strings-without-strings. */
+class PartialsCore {
+  static defaults(){ return {oct:2, count:64, tilt:0.5, comb:0, fmt:1200, fwidth:0.4, famt:0, stretch:0, tilt2:0.5, comb2:0, morph:0, mtime:1500, decay:3, dtilt:0.5, bright:0.5, batk:10, bdec:800, drift:0.1, drate:0.5, atk:10, sus:1, rel:400, tune:0, drive:0, level:0}; }
+  static spectrum(n, f, tilt, comb, fmt, fw, famt){
+    // amplitude of partial n (1-based) at f Hz: a 1/n^tilt roll-off, an odd/even comb, a formant bump
+    let a = Math.pow(n, -(0.3 + tilt * 2.2));
+    if (comb > 0) a *= n % 2 === 1 ? 1 : 1 - comb; else if (comb < 0) a *= n % 2 === 0 || n === 1 ? 1 : 1 + comb;
+    if (famt > 0){ const lf = Math.log2(f / fmt), g = Math.exp(-lf * lf / (0.05 + fw * fw * 2)); a *= 1 - famt + famt * (0.15 + g * 6); }
+    return a;
+  }
+  static render(o, sr, hold){
+    const p = Object.assign(PartialsCore.defaults(), o || {}), rnd = KeysUtil.rnd(0x9a27);
+    const f0 = 65.406 * Math.pow(2, p.oct + (p.tune || 0) / 12), h = Math.max(0.03, hold || 2), T = Math.max(0.05, p.decay), rel = Math.max(0.005, p.rel / 1000), atk = Math.max(0.0005, p.atk / 1000);
+    const len = Math.min(12, (p.sus > 0.01 ? Math.min(h, T * 3) : Math.min(h, T * 3)) + rel * 6 + 0.05), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N);
+    const cnt = Math.max(1, Math.min(256, Math.round(p.count))), bank = KeysUtil.bank(sr), parts = [];
+    for (let n = 1; n <= cnt; n++){
+      const f = n * f0 * Math.pow(1 + p.stretch * p.stretch * 0.08 * (n - 1), 0.5); if (f > sr * 0.45) break;
+      const a1 = PartialsCore.spectrum(n, f, p.tilt, p.comb, p.fmt, p.fwidth, p.famt), a2 = PartialsCore.spectrum(n, f, p.tilt2, p.comb2, p.fmt, p.fwidth, p.famt);
+      const tau = T / (1 + (n - 1) * p.dtilt * p.dtilt * 0.6), id = KeysUtil.add(bank, f, rnd() * 6.283);
+      parts.push({n, f, a1, a2, tau, id, ph:rnd() * 6.283, rt:0.5 + rnd()});
+    }
+    const CR = 32, mt = Math.max(0.01, p.mtime / 1000), ba = Math.max(0.0005, p.batk / 1000), bd = Math.max(0.005, p.bdec / 1000);
+    for (let i0 = 0; i0 < N; i0 += CR){
+      const t = i0 / sr, env = (t < h ? Math.min(1, t / atk) * (p.sus + (1 - p.sus) * Math.exp(-t / T)) : Math.exp(-(t - h) / rel));
+      const m = p.morph * Math.min(1, t / mt), be = Math.min(1, t / ba) * Math.exp(-t / bd);
+      // brightness: the partial above which the spectrum is held down, opened by its envelope
+      const top = f0 * (2 + Math.pow(2, (p.bright + be * 0.6) * 8));
+      for (const q of parts){
+        const d = p.drift > 0 ? 1 + p.drift * 0.8 * Math.sin(q.ph + 6.2832 * p.drate * q.rt * t) : 1;
+        const roll = q.f > top ? Math.exp(-(q.f - top) / top) : 1;
+        bank.a[q.id] = (q.a1 * (1 - m) + q.a2 * m) * Math.exp(-t / q.tau) * roll * d * env;
+      }
+      const i1 = Math.min(N, i0 + CR), C = bank.c, S = bank.s, WC = bank.wc, WS = bank.ws, A = bank.a, nb = bank.n;
+      for (let i = i0; i < i1; i++){
+        let y = 0;
+        for (let k = 0; k < nb; k++){ const c = C[k], s = S[k]; C[k] = c * WC[k] - s * WS[k]; S[k] = s * WC[k] + c * WS[k]; y += s * A[k]; }
+        out[i] = y;
+      }
+    }
+    return KeysUtil.finish(out, p, sr, 0.003);
+  }
+}
+/* Skin: a drum head. The modes of a circular membrane (their frequencies the Bessel zeros, their weights where the
+   mallet lands), each a resonator with its own decay, hit by a mallet of a given hardness; the head's tension lets
+   the pitch drop as the hit settles; a shell resonance under it, a muffle on the head, a little noise at the strike.
+   Toms, congas, bongos, tabla-ish, timpani, floor toms. */
+class SkinCore {
+  static get MODES(){ return [[0, 1, 1], [1, 1, 1.594], [2, 1, 2.136], [0, 2, 2.296], [3, 1, 2.653], [1, 2, 2.918], [4, 1, 3.156], [2, 2, 3.501], [0, 3, 3.600], [5, 1, 3.652], [3, 2, 4.060], [6, 1, 4.154], [1, 3, 4.230], [4, 2, 4.601], [7, 1, 4.651], [2, 3, 4.832], [0, 4, 4.903], [8, 1, 5.144], [5, 2, 5.131], [3, 3, 5.412], [6, 2, 5.654], [1, 4, 5.540], [9, 1, 5.634], [4, 3, 5.976]]; }
+  static defaults(){ return {pitch:110, size:0.5, tension:0.3, tenT:80, pos:0.3, hard:0.5, dec:600, damp:0.5, muffle:0.2, shell:0.4, shellF:0.5, noise:0.1, tune:0, drive:0, level:0}; }
+  static bessel(m, x){ let s = 0, term = Math.pow(x / 2, m) / SkinCore.fact(m); for (let k = 0; k < 24; k++){ s += term; term *= -(x * x / 4) / ((k + 1) * (k + 1 + m)); if (Math.abs(term) < 1e-12) break; } return s; }
+  static fact(n){ let f = 1; for (let i = 2; i <= n; i++) f *= i; return f; }
+  static render(o, sr){
+    const p = Object.assign(SkinCore.defaults(), o || {}), rnd = KeysUtil.rnd(0x5c1a);
+    const f0 = p.pitch * Math.pow(2, (p.tune || 0) / 12), dec = Math.max(0.01, p.dec / 1000);
+    const len = Math.min(8, dec * 5 + 0.05), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N);
+    const r = Math.max(0.02, Math.min(0.98, p.pos)), modes = [], nm = Math.round(6 + p.size * 18), hard = 0.15 + p.hard * p.hard * 0.85;
+    // the Bessel zeros j_mn: J_m(j_mn) = 0; weight of mode (m,n) under the mallet is J_m(j_mn · r)
+    const J0z = [2.405, 5.520, 8.654, 11.792], zeros = {0:[2.405, 5.520, 8.654, 11.792], 1:[3.832, 7.016, 10.173, 13.324], 2:[5.136, 8.417, 11.620], 3:[6.380, 9.761, 13.015], 4:[7.588, 11.065], 5:[8.771, 12.339], 6:[9.936], 7:[11.086], 8:[12.225], 9:[13.354]};
+    for (let k = 0; k < Math.min(nm, SkinCore.MODES.length); k++){
+      const [m, n, ratio] = SkinCore.MODES[k], z = (zeros[m] || [J0z[n - 1]])[n - 1] || 3; let w = Math.abs(SkinCore.bessel(m, z * r)) * (m === 0 ? 1 : 1.4);
+      w *= 1 / (1 + Math.pow(ratio / (1 + hard * 6), 2));   // a soft mallet reaches fewer modes
+      const tau = dec / (1 + (ratio - 1) * (0.3 + p.damp * 2)) / (1 + p.muffle * 3 * ratio * ratio * 0.3);
+      modes.push({ratio, w, tau, y1:0, y2:0});
+    }
+    // shell: one resonance under the head
+    const sf = f0 * (0.5 + p.shellF * 1.5), sw = 2 * Math.PI * Math.min(sr * 0.4, sf) / sr, srr = Math.exp(-1 / (0.15 * sr)), sh = {c1:2 * srr * Math.cos(sw), c2:-srr * srr, y1:0, y2:0};
+    const tT = Math.max(0.005, p.tenT / 1000), bend = p.tension * p.tension * 24, CR = 16, hitLen = Math.max(2, Math.round(sr * (0.0003 + (1 - hard) * 0.004)));
+    for (let i0 = 0; i0 < N; i0 += CR){
+      const t = i0 / sr, fm = Math.pow(2, bend / 12 * Math.exp(-t / tT));
+      for (const q of modes){ const f = Math.min(sr * 0.45, f0 * q.ratio * fm), w = 2 * Math.PI * f / sr, rr = Math.exp(-1 / (q.tau * sr)); q.c1 = 2 * rr * Math.cos(w); q.c2 = -rr * rr; q.g = q.w * (1 - rr) * 2; }
+      const i1 = Math.min(N, i0 + CR);
+      for (let i = i0; i < i1; i++){
+        // the mallet: a raised-cosine push, a touch of noise with it
+        const x = i < hitLen ? 0.5 - 0.5 * Math.cos(2 * Math.PI * i / hitLen) + p.noise * (rnd() * 2 - 1) * 0.5 : (i < hitLen * 6 ? p.noise * (rnd() * 2 - 1) * 0.15 * (1 - i / (hitLen * 6)) : 0);
+        let y = 0; for (const q of modes){ const v = q.g * x + q.c1 * q.y1 + q.c2 * q.y2; q.y2 = q.y1; q.y1 = v; y += v; }
+        const sv = 0.02 * y + sh.c1 * sh.y1 + sh.c2 * sh.y2; sh.y2 = sh.y1; sh.y1 = sv;
+        out[i] = y + sv * p.shell * 3;
+      }
+    }
+    return KeysUtil.finish(out, p, sr, 0.003);
+  }
+}
+/* Chip: an 8-bit console voice. A pulse (four duties, a duty sweep), a 4-bit triangle or a shift-register noise (the
+   long and the short, metallic mode), run at frame rate: 16-step volume envelope, arpeggio chords stepping every
+   few frames, a pitch slide, stepped vibrato, period-quantised pitch like the real timer. Round-off is the point. */
+class ChipCore {
+  static defaults(){ return {oct:3, wave:0, duty:1, sweep:0, chord:0, arp:1, slide:0, vib:0, vrate:6, quant:1, atk:0, dec:12, sus:0.6, rel:4, nfreq:0.7, nshort:0, tune:0, drive:0, level:0}; }
+  static get WAVES(){ return ['Pulse', 'Triangle', 'Noise']; }
+  static get CHORDS(){ return ['Off', 'Octave', 'Fifth', 'Major', 'Minor', 'Major 7', 'Minor 7', 'Sus4', 'Dim']; }
+  static get IVL(){ return [[0], [0, 12], [0, 7], [0, 4, 7], [0, 3, 7], [0, 4, 7, 11], [0, 3, 7, 10], [0, 5, 7], [0, 3, 6]]; }
+  static render(o, sr, hold){
+    const p = Object.assign(ChipCore.defaults(), o || {}), h = Math.max(0.02, hold || 0.5), FR = 60, fl = sr / FR;
+    const atkF = Math.round(p.atk), decF = Math.max(1, Math.round(p.dec)), relF = Math.max(1, Math.round(p.rel)), sus = Math.round(p.sus * 15) / 15;
+    const holdF = Math.round(h * FR), len = Math.min(10, (holdF + relF + 1) / FR), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N);
+    const wv = Math.max(0, Math.min(2, Math.round(p.wave))), ivl = ChipCore.IVL[Math.max(0, Math.min(8, Math.round(p.chord)))], arpF = Math.max(1, Math.round(p.arp));
+    const f0 = 65.406 * Math.pow(2, p.oct + (p.tune || 0) / 12), duties = [0.125, 0.25, 0.5, 0.75];
+    let ph = 0, lfsr = 1, lastN = 1, nacc = 0, vol = 0, frame = -1, f = f0, dut = duties[1], inc = 0, ninc = 0;
+    for (let i = 0; i < N; i++){
+      const fr = Math.floor(i / fl);
+      if (fr !== frame){
+        frame = fr;
+        // volume in 16 steps
+        if (fr < holdF){ vol = atkF > 0 && fr < atkF ? fr / atkF : fr - atkF < decF ? 1 - (1 - sus) * (fr - atkF) / decF : sus; }
+        else vol = Math.max(0, sus * (1 - (fr - holdF) / relF));
+        vol = Math.round(vol * 15) / 15;
+        const st = ivl[Math.floor(fr / arpF) % ivl.length], vb = p.vib > 0 ? Math.round(Math.sin(6.2832 * p.vrate * fr / FR) * 4) / 4 * p.vib * 0.5 : 0;
+        let ff = f0 * Math.pow(2, (st + p.slide * 12 * Math.min(1, fr / Math.max(1, holdF)) + vb) / 12);
+        if (p.quant >= 0.5){ const per = Math.max(8, Math.round(1789773 / (16 * ff) - 1)); ff = 1789773 / (16 * (per + 1)); }
+        f = ff; inc = f / sr;
+        dut = duties[Math.max(0, Math.min(3, Math.round(p.duty) + (p.sweep > 0 ? Math.floor(fr / Math.max(1, Math.round(8 / p.sweep))) : 0))) % 4];
+        ninc = Math.pow(2, p.nfreq * 11) * 4 / sr;
+      }
+      let y;
+      if (wv === 0) y = ((ph % 1) < dut ? 1 : -1);
+      else if (wv === 1) y = Math.round((1 - Math.abs(2 * (ph % 1) - 1)) * 15) / 7.5 - 1;
+      else { nacc += ninc; while (nacc >= 1){ nacc -= 1; const fb = (lfsr & 1) ^ ((lfsr >> (p.nshort >= 0.5 ? 6 : 1)) & 1); lfsr = (lfsr >> 1) | (fb << 14); lastN = (lfsr & 1) ? 1 : -1; } y = lastN; }
+      ph += inc;
+      out[i] = y * vol * (wv === 1 ? 1 : 0.8);
+    }
+    return KeysUtil.finish(out, p, sr, 0.002);
+  }
+}
 // The new engines in one table: live ones have a Core class (played by a worklet in the tracker), rendered ones a render().
 const XENG = {
   acid:{live:true, C:() => AcidCore, d:() => AcidCore.defaults()},
@@ -4162,6 +4446,12 @@ const XENG = {
   table:{live:false, d:() => TableCore.defaults()},
   breath:{live:false, d:() => BreathCore.defaults()},
   strings:{live:false, d:() => StringsCore.defaults()},
+  fmdrum:{live:false, d:() => FmDrumCore.defaults()},
+  wind:{live:false, d:() => WindCore.defaults()},
+  phase:{live:false, d:() => PhaseCore.defaults()},
+  partials:{live:false, d:() => PartialsCore.defaults()},
+  skin:{live:false, d:() => SkinCore.defaults()},
+  chip:{live:false, d:() => ChipCore.defaults()},
   sf:{live:false, d:() => ({bank:0, prog:0, trans:0, velo:0.7, atk:1, rel:1})},
 };
 const isXEngV = v => !!(v && XENG[v.engine]);
@@ -4179,6 +4469,12 @@ function renderX(V, sr, hold){
   if (k === 'table') return TableCore.render(P, sr, hold || Math.min(V.len || 2, 4));
   if (k === 'breath') return BreathCore.render(P, sr, hold || Math.min(V.len || 1, 4));
   if (k === 'strings') return StringsCore.render(P, sr, hold || Math.min(V.len || 3, 4));
+  if (k === 'fmdrum') return FmDrumCore.render(P, sr);
+  if (k === 'wind') return WindCore.render(P, sr, hold || Math.min(V.len || 2, 4));
+  if (k === 'phase') return PhaseCore.render(P, sr, hold || Math.min(V.len || 2, 4));
+  if (k === 'partials') return PartialsCore.render(P, sr, hold || Math.min(V.len || 3, 4));
+  if (k === 'skin') return SkinCore.render(P, sr);
+  if (k === 'chip') return ChipCore.render(P, sr, hold || Math.min(V.len || 1, 4));
   // SoundFont pads render on the page (the SoundFont code lives in the UI part of the script; the Worker has no fonts)
   if (k === 'sf') return typeof globalThis.__sfRender === 'function' ? globalThis.__sfRender(V, sr, hold || Math.min(V.len || 2, 3)) : new Float32Array(1);
   return ModalCore.render(P, sr, hold || (V.gate || 400) / 1000 * 2);
@@ -5047,7 +5343,7 @@ function bassRandom(){
   pre.addEventListener('change', () => { if (pre.value !== '') bassPreset(+pre.value); pre.value = ''; });
   $('bassRand').addEventListener('click', bassRandom);
   $('bassInit').addEventListener('click', () => bassPreset(0));
-  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass'], ['vox', 'Voice'], ['blip', 'Blip'], ['acid', 'Acid'], ['mach', 'Machine'], ['tone', 'Tone drum'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Tine EP'], ['organ', 'Organ'], ['table', 'Table'], ['breath', 'Breath'], ['strings', 'Strings'], ['sf', 'SoundFont']],
+  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass'], ['vox', 'Voice'], ['blip', 'Blip'], ['acid', 'Acid'], ['mach', 'Machine'], ['tone', 'Tone drum'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Tine EP'], ['organ', 'Organ'], ['table', 'Table'], ['breath', 'Breath'], ['strings', 'Strings'], ['fmdrum', 'FM Drum'], ['wind', 'Wind'], ['phase', 'Phase'], ['partials', 'Partials'], ['skin', 'Skin'], ['chip', 'Chip'], ['sf', 'SoundFont']],
     () => isBassV(V()) ? 'bass' : isVoxV(V()) ? 'vox' : isBlipV(V()) ? 'blip' : isXEngV(V()) ? V().engine : 'layers', setEngine);
 })();
 
@@ -5420,8 +5716,8 @@ function factoryVoicePresets(){
       {type:'bell', a:0.45, b:0.25, atk:0.5, dec:2400, sus:0.15, rel:1500, level:0.7},
       {type:'sine', tune:12, atk:0.5, dec:1200, sus:0, rel:900, level:0.25}], {len:8})],
   ]],
-  ...[['acid', 'Acid'], ['mach', 'Machine synth'], ['tone', 'Tone drums'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Electric piano'], ['organ', 'Organ'], ['table', 'Table'], ['breath', 'Breath'], ['strings', 'Strings']].map(([k, gn]) => [gn, XUI[k].pre.slice(1).map(([n, o, x]) =>
-    [n, () => PE(n, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:k === 'modal' || k === 'swarm' || k === 'piano' || k === 'ep' || k === 'strings' ? 6 : k === 'breath' ? 2 : 4, gate:400}, x || {}))])]),
+  ...[['acid', 'Acid'], ['mach', 'Machine synth'], ['tone', 'Tone drums'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Electric piano'], ['organ', 'Organ'], ['table', 'Table'], ['breath', 'Breath'], ['strings', 'Strings'], ['fmdrum', 'FM Drum'], ['wind', 'Wind'], ['phase', 'Phase'], ['partials', 'Partials'], ['skin', 'Skin'], ['chip', 'Chip']].map(([k, gn]) => [gn, XUI[k].pre.slice(1).map(([n, o, x]) =>
+    [n, () => PE(n, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:k === 'modal' || k === 'swarm' || k === 'piano' || k === 'ep' || k === 'strings' || k === 'partials' ? 6 : k === 'breath' || k === 'fmdrum' || k === 'skin' || k === 'chip' ? 2 : 4, gate:400}, x || {}))])]),
   ['Leads', [
     ['Square lead', () => PS('Square lead', [
       {type:'square', atk:3, dec:300, sus:0.75, rel:180, lpCut:3200, lpRes:0.25, level:0.6},
@@ -6130,6 +6426,131 @@ const XUI = {
       ['Pizzicato cello', {voices:1, oct:1, pick:0.4, pos:0.35, decay:0.7, damp:0.6, body:0.9, size:1}],
       ['Fifths drone', {voices:4, chord:2, strum:60, oct:1, pick:0.3, decay:6, damp:0.15, body:0.6, size:0.9, det:0.5, rel:1500}],
       ['Twelve string', {voices:6, chord:3, strum:20, pick:0.9, pos:0.18, decay:3, damp:0.2, body:0.5, size:0.45, det:0.8}]]},
+  fmdrum:{title:'FM Drum', tag:'3-op FM · pitch env · noise', rows:{
+      pitch:{l:'Pitch', min:30, max:2000, c:'log', d:110, f:hz}, bend:{l:'Pitch bend', min:0, max:48, c:'lin', d:18, f:st}, bendT:{l:'Bend time', min:2, max:1000, c:'log', d:60, f:ms},
+      alg:{l:'Algorithm', min:0, max:2, c:'int', d:0, f:v => FmDrumCore.ALGS[Math.max(0, Math.min(2, Math.round(v)))]},
+      r1:{l:'Op 1 ratio', min:0.25, max:16, c:'log', d:1, f:v => v.toFixed(2) + '×'}, i1:{l:'Op 1 index', min:0, max:1, c:'lin', d:0.4, f:pct}, idec1:{l:'Op 1 decay', min:2, max:3000, c:'log', d:120, f:ms},
+      r2:{l:'Op 2 ratio', min:0.25, max:16, c:'log', d:3.5, f:v => v.toFixed(2) + '×'}, i2:{l:'Op 2 index', min:0, max:1, c:'lin', d:0.3, f:pct}, idec2:{l:'Op 2 decay', min:2, max:3000, c:'log', d:60, f:ms},
+      fb:{l:'Feedback', min:0, max:1, c:'lin', d:0, f:pct},
+      noise:{l:'Noise', min:0, max:1, c:'lin', d:0, f:pct}, ndec:{l:'Noise decay', min:3, max:2000, c:'log', d:120, f:ms}, ncut:{l:'Noise cutoff', min:100, max:20000, c:'log', d:6000, f:hz},
+      click:{l:'Click', min:0, max:1, c:'lin', d:0.2, f:pct}, tone:{l:'Tone', min:0, max:1, c:'lin', d:1, f:pct},
+      dec:{l:'Decay', min:5, max:4000, c:'log', d:400, f:ms}, curve:{l:'Curve', min:0, max:1, c:'lin', d:0.5, f:v => v < 0.33 ? 'exponential' : v < 0.66 ? 'rounded' : 'gated'}},
+    secs:[['Carrier', ['pitch', 'bend', 'bendT', 'alg']], ['Operators', ['r1', 'i1', 'idec1', 'r2', 'i2', 'idec2', 'fb']], ['Noise & click', ['noise', 'ndec', 'ncut', 'click']], ['Amp', ['tone', 'dec', 'curve']]],
+    note:'Serial runs op 2 into op 1 into the carrier; Parallel puts both on the carrier; Branch does both. Each index has its own decay, so the hit can be bright and the ring clean. Curve gated is the straight-then-drop of the old digital drum machines.',
+    pre:[['Init', {}], ['FM kick', {pitch:52, bend:30, bendT:40, r1:1, i1:0.5, idec1:40, r2:2, i2:0.2, idec2:20, dec:450, curve:0.6, click:0.4, tone:0.6}],
+      ['Syn tom', {pitch:95, bend:14, bendT:90, alg:1, r1:1, i1:0.35, idec1:200, r2:2.01, i2:0.3, idec2:150, fb:0.2, dec:600, curve:0.9}],
+      ['Laser snare', {pitch:300, bend:36, bendT:25, r1:1.5, i1:0.7, idec1:60, r2:5, i2:0.4, idec2:30, noise:0.6, ndec:140, ncut:9000, dec:220, click:0.5}],
+      ['Cowbell', {pitch:560, bend:0, alg:1, r1:1.48, i1:0.6, idec1:600, r2:2.37, i2:0.1, idec2:300, dec:350, curve:0.2, tone:0.8, click:0}],
+      ['Metal hit', {pitch:800, bend:0, alg:2, r1:1.41, i1:0.9, idec1:1500, r2:3.57, i2:0.8, idec2:1500, dec:1200, tone:0.5, noise:0.4, ndec:40}],
+      ['Rim', {pitch:420, bend:6, bendT:10, alg:1, r1:2.3, i1:0.5, idec1:15, r2:7.1, i2:0.3, idec2:10, dec:70, click:0.7, tone:0.9}],
+      ['Bass drum 80s', {pitch:60, bend:12, bendT:120, r1:1, i1:0.2, idec1:300, r2:0.5, i2:0.4, idec2:100, dec:700, curve:1, tone:0.5}],
+      ['Bongo', {pitch:330, bend:10, bendT:20, alg:1, r1:1, i1:0.2, idec1:60, r2:2.9, i2:0.25, idec2:40, dec:180, curve:0.3}],
+      ['Clank', {pitch:1200, bend:-0, alg:0, r1:0.5, i1:0.8, idec1:200, r2:6.3, i2:0.9, idec2:80, fb:0.5, dec:400, tone:0.7, click:0.3}],
+      ['Noise snap', {pitch:200, bend:24, bendT:8, i1:0.2, idec1:20, noise:1, ndec:60, ncut:12000, dec:60, click:1}],
+      ['Sub boom', {pitch:40, bend:20, bendT:200, r1:1, i1:0.15, idec1:400, i2:0, dec:1500, curve:0.4, tone:0.3, click:0.1}]]},
+  wind:{title:'Wind', tag:'reed · jet · bow · physical', rows:{
+      model:{l:'Model', min:0, max:2, c:'int', d:0, f:v => WindCore.MODELS[Math.max(0, Math.min(2, Math.round(v)))]},
+      oct:{l:'Octave', min:0, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      breath:{l:'Breath', min:0, max:1, c:'lin', d:0.6, f:pct}, noise:{l:'Breath noise', min:0, max:1, c:'lin', d:0.15, f:pct},
+      stiff:{l:'Stiffness', min:0, max:1, c:'lin', d:0.5, f:pct}, pos:{l:'Position', min:0, max:1, c:'lin', d:0.3, f:pct}, damp:{l:'Damping', min:0, max:1, c:'lin', d:0.5, f:pct},
+      body:{l:'Body', min:0, max:1, c:'lin', d:0.3, f:pct},
+      vib:{l:'Vibrato', min:0, max:1, c:'lin', d:0.2, f:pct}, vrate:{l:'Vibrato rate', min:0.5, max:12, c:'log', d:5.5, f:v => v.toFixed(1) + ' Hz'}, growl:{l:'Growl', min:0, max:1, c:'lin', d:0, f:pct},
+      atk:{l:'Attack', min:2, max:3000, c:'log', d:60, f:ms}, rel:{l:'Release', min:5, max:4000, c:'log', d:120, f:ms}},
+    secs:[['Model', ['model', 'oct', 'breath', 'noise']], ['Excitation', ['stiff', 'pos', 'damp', 'body']], ['Motion', ['vib', 'vrate', 'growl']], ['Amp', ['atk', 'rel']]],
+    note:'Reed is a single reed on a tube (clarinet family), Jet an air jet across a hole (flute, pipe, bottle), Bow a bow on a string. Stiffness is the reed, the jet\'s edge or the bow\'s force; Position the jet length or where the bow sits. Each model is kept in the region where it sings and trimmed to pitch by measuring itself.',
+    pre:[['Init', {}], ['Clarinet', {model:0, breath:0.6, stiff:0.5, damp:0.5, noise:0.1, vib:0.15, atk:40}],
+      ['Bass clarinet', {model:0, oct:1, breath:0.7, stiff:0.3, damp:0.7, noise:0.2, vib:0.1, atk:80, body:0.5}],
+      ['Flute', {model:1, oct:3, breath:0.6, noise:0.3, stiff:0.5, pos:0.3, damp:0.4, vib:0.35, vrate:5, atk:50}],
+      ['Pan pipe', {model:1, oct:3, breath:0.4, noise:0.7, stiff:0.2, pos:0.6, damp:0.8, vib:0.1, atk:30, rel:80}],
+      ['Bottle', {model:1, oct:2, breath:0.3, noise:0.9, stiff:0.1, damp:1, vib:0, atk:120, rel:200}],
+      ['Cello', {model:2, oct:1, breath:0.6, stiff:0.5, pos:0.3, damp:0.6, body:0.8, vib:0.3, vrate:5.5, atk:120, rel:200}],
+      ['Violin', {model:2, oct:3, breath:0.7, stiff:0.6, pos:0.2, damp:0.3, body:0.5, vib:0.4, vrate:6, atk:60}],
+      ['Scratchy bow', {model:2, oct:2, breath:0.3, stiff:1, pos:0.8, damp:0.2, body:0.4, noise:0.5, vib:0, atk:20}],
+      ['Growl sax-ish', {model:0, oct:2, breath:0.9, stiff:0.8, damp:0.2, growl:0.7, noise:0.3, vib:0.2, body:0.6, atk:30}],
+      ['Breathy lead', {model:1, oct:3, breath:0.8, noise:0.6, stiff:0.8, damp:0.2, vib:0.5, vrate:4.5, atk:15, rel:60}],
+      ['Didgeridoo-ish', {model:0, oct:0, breath:1, stiff:0.2, damp:0.6, growl:1, noise:0.2, vib:0, atk:200, rel:400, body:0.7}]]},
+  phase:{title:'Phase', tag:'phase distortion · DCW · resonance', rows:{
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      wave:{l:'Wave 1', min:0, max:7, c:'int', d:0, f:v => PhaseCore.WAVES[Math.max(0, Math.min(7, Math.round(v)))]},
+      wave2:{l:'Wave 2', min:0, max:7, c:'int', d:1, f:v => PhaseCore.WAVES[Math.max(0, Math.min(7, Math.round(v)))]},
+      mix:{l:'Mix 1↔2', min:0, max:1, c:'lin', d:0, f:pct}, det:{l:'Detune', min:0, max:1, c:'lin', d:0.1, f:pct}, ring:{l:'Ring mod', min:0, max:1, c:'lin', d:0, f:pct},
+      dcw:{l:'DCW amount', min:0, max:1, c:'lin', d:0.7, f:pct}, datk:{l:'DCW attack', min:0.5, max:6000, c:'log', d:2, f:ms}, ddec:{l:'DCW decay', min:5, max:8000, c:'log', d:500, f:ms},
+      dsus:{l:'DCW sustain', min:0, max:1, c:'lin', d:0.3, f:pct}, drel:{l:'DCW release', min:5, max:8000, c:'log', d:300, f:ms}, key:{l:'Key follow', min:0, max:1, c:'lin', d:0.3, f:pct},
+      noise:{l:'Noise', min:0, max:1, c:'lin', d:0, f:pct},
+      atk:{l:'Attack', min:0.5, max:6000, c:'log', d:3, f:ms}, dec:{l:'Decay', min:5, max:8000, c:'log', d:800, f:ms}, sus:{l:'Sustain', min:0, max:1, c:'lin', d:0.7, f:pct}, rel:{l:'Release', min:5, max:8000, c:'log', d:250, f:ms}},
+    secs:[['Oscillators', ['oct', 'wave', 'wave2', 'mix', 'det', 'ring']], ['DCW', ['dcw', 'datk', 'ddec', 'dsus', 'drel', 'key']], ['Amp', ['noise', 'atk', 'dec', 'sus', 'rel']]],
+    note:'DCW is the distortion envelope: at zero every wave is a plain cosine, as it opens the phase bends into the wave. The Res waves run the cosine faster than the cycle inside a window, which sweeps like a resonant filter without one.',
+    pre:[['Init', {}], ['CZ bass', {oct:1, wave:0, wave2:2, mix:0.3, dcw:0.9, ddec:250, dsus:0.1, dec:500, sus:0.5, rel:80}],
+      ['Res sweep', {wave:5, wave2:5, dcw:1, datk:1, ddec:900, dsus:0, dec:1200, sus:0.6, rel:300}],
+      ['Glassy keys', {oct:3, wave:3, wave2:0, mix:0.4, det:0.2, dcw:0.6, ddec:700, dsus:0.2, dec:1200, sus:0.3, rel:500}],
+      ['Brass', {wave:0, wave2:1, mix:0.5, det:0.3, dcw:0.7, datk:60, ddec:400, dsus:0.6, atk:40, sus:0.9, rel:200}],
+      ['Pulse stab', {oct:2, wave:2, wave2:4, mix:0.5, det:0.4, dcw:0.8, ddec:150, dsus:0, dec:300, sus:0, rel:120}],
+      ['Trapezoid lead', {oct:3, wave:7, wave2:7, det:0.15, dcw:0.8, datk:5, ddec:600, dsus:0.5, sus:0.8, rel:200}],
+      ['Bell', {oct:3, wave:3, wave2:5, mix:0.5, ring:0.6, dcw:0.5, ddec:1500, dsus:0, dec:2000, sus:0, rel:800}],
+      ['Slow pad', {wave:6, wave2:0, mix:0.5, det:0.5, dcw:0.6, datk:1500, ddec:3000, dsus:0.4, atk:800, sus:0.9, rel:1500}],
+      ['Square organ', {wave:1, wave2:1, det:0.05, dcw:1, datk:1, ddec:50, dsus:1, atk:3, sus:1, rel:50}],
+      ['Digital pluck', {oct:3, wave:4, wave2:3, mix:0.3, dcw:1, ddec:120, dsus:0, dec:400, sus:0, rel:150, key:0.6}],
+      ['Noise sweep', {wave:5, noise:0.3, dcw:1, datk:400, ddec:1200, dsus:0, atk:300, sus:0.8, rel:400}]]},
+  partials:{title:'Partials', tag:'additive · 256 harmonics · morph', rows:{
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      count:{l:'Partials', min:1, max:256, c:'sq', d:64, f:v => String(Math.round(v))},
+      tilt:{l:'Tilt', min:0, max:1, c:'lin', d:0.5, f:v => 'dark ' + Math.round(v * 100) + '%'}, comb:{l:'Odd / even', min:-1, max:1, c:'lin', d:0, f:v => v > 0.02 ? 'odd ' + Math.round(v * 100) + '%' : v < -0.02 ? 'even ' + Math.round(-v * 100) + '%' : 'all'},
+      fmt:{l:'Formant', min:100, max:8000, c:'log', d:1200, f:hz}, fwidth:{l:'Formant width', min:0, max:1, c:'lin', d:0.4, f:pct}, famt:{l:'Formant amount', min:0, max:1, c:'lin', d:0, f:pct},
+      stretch:{l:'Stretch', min:0, max:1, c:'lin', d:0, f:pct},
+      tilt2:{l:'Tilt B', min:0, max:1, c:'lin', d:0.5, f:v => 'dark ' + Math.round(v * 100) + '%'}, comb2:{l:'Odd / even B', min:-1, max:1, c:'lin', d:0, f:v => v > 0.02 ? 'odd ' + Math.round(v * 100) + '%' : v < -0.02 ? 'even ' + Math.round(-v * 100) + '%' : 'all'},
+      morph:{l:'Morph to B', min:0, max:1, c:'lin', d:0, f:pct}, mtime:{l:'Morph time', min:10, max:8000, c:'log', d:1500, f:ms},
+      decay:{l:'Decay', min:0.05, max:12, c:'log', d:3, f:v => v.toFixed(2) + ' s'}, dtilt:{l:'Decay tilt', min:0, max:1, c:'lin', d:0.5, f:pct},
+      bright:{l:'Brightness', min:0, max:1, c:'lin', d:0.5, f:pct}, batk:{l:'Bright attack', min:0.5, max:4000, c:'log', d:10, f:ms}, bdec:{l:'Bright decay', min:10, max:8000, c:'log', d:800, f:ms},
+      drift:{l:'Drift', min:0, max:1, c:'lin', d:0.1, f:pct}, drate:{l:'Drift rate', min:0.05, max:10, c:'log', d:0.5, f:v => v.toFixed(2) + ' Hz'},
+      atk:{l:'Attack', min:0.5, max:6000, c:'log', d:10, f:ms}, sus:{l:'Sustain', min:0, max:1, c:'lin', d:1, f:pct}, rel:{l:'Release', min:5, max:8000, c:'log', d:400, f:ms}},
+    secs:[['Spectrum', ['oct', 'count', 'tilt', 'comb', 'stretch']], ['Formant', ['fmt', 'fwidth', 'famt']], ['Spectrum B', ['tilt2', 'comb2', 'morph', 'mtime']], ['Decay & brightness', ['decay', 'dtilt', 'bright', 'batk', 'bdec']], ['Motion', ['drift', 'drate']], ['Amp', ['atk', 'sus', 'rel']]],
+    note:'Every partial is its own sine. Tilt is how fast they fall off, Odd/even thins one set, Stretch pushes them off the harmonic ladder (bells). Spectrum B is a second shape the note morphs into. Sustain 0 lets the partials die by Decay; Decay tilt makes the high ones go first.',
+    pre:[['Init', {}], ['Glass pad', {count:96, tilt:0.6, atk:900, rel:2500, drift:0.4, drate:0.3, bright:0.6, batk:1500}],
+      ['Bell', {oct:3, count:24, tilt:0.4, stretch:0.6, sus:0, decay:5, dtilt:0.9, atk:1, rel:1500, comb:0.3}],
+      ['Pipe organ', {count:48, tilt:0.55, comb:0.5, atk:20, rel:120, drift:0, bright:0.7, bdec:50}],
+      ['Vowel morph', {count:128, famt:1, fmt:700, fwidth:0.3, morph:1, mtime:2000, tilt2:0.3, comb2:-0.5, atk:300, rel:800}],
+      ['Bright saw', {count:200, tilt:0.3, bright:1, bdec:3000, drift:0.05, atk:5, rel:300}],
+      ['Hollow square', {count:128, tilt:0.35, comb:1, bright:0.8, atk:5, rel:200}],
+      ['Plucked harmonic', {oct:3, count:40, tilt:0.5, sus:0, decay:1.2, dtilt:1, bright:1, bdec:200, atk:1, rel:300}],
+      ['Inharmonic drone', {oct:0, count:256, tilt:0.6, stretch:0.4, drift:0.6, drate:0.15, atk:2000, rel:4000, morph:0.7, mtime:6000, tilt2:0.2}],
+      ['Choir', {count:160, famt:0.8, fmt:900, fwidth:0.6, tilt:0.55, drift:0.3, drate:0.8, atk:600, rel:1200}],
+      ['Dark ebow', {count:64, tilt:0.8, bright:0.3, batk:3000, bdec:5000, atk:1500, rel:2000, drift:0.2}],
+      ['Tine', {oct:3, count:16, tilt:0.7, comb:-0.8, stretch:0.15, sus:0, decay:2.5, dtilt:0.8, atk:1, rel:400}]]},
+  skin:{title:'Skin', tag:'membrane · modes · shell', rows:{
+      pitch:{l:'Pitch', min:30, max:1200, c:'log', d:110, f:hz}, size:{l:'Size', min:0, max:1, c:'lin', d:0.5, f:v => v < 0.25 ? 'bongo' : v < 0.5 ? 'tom' : v < 0.75 ? 'floor tom' : 'timpani'},
+      tension:{l:'Tension bend', min:0, max:1, c:'lin', d:0.3, f:pct}, tenT:{l:'Bend time', min:5, max:600, c:'log', d:80, f:ms},
+      pos:{l:'Strike point', min:0.02, max:0.98, c:'lin', d:0.3, f:v => v < 0.2 ? 'centre' : v < 0.6 ? 'off-centre' : 'edge'}, hard:{l:'Mallet', min:0, max:1, c:'lin', d:0.5, f:v => v < 0.33 ? 'felt' : v < 0.66 ? 'hand' : 'stick'},
+      dec:{l:'Decay', min:20, max:4000, c:'log', d:600, f:ms}, damp:{l:'Damping', min:0, max:1, c:'lin', d:0.5, f:pct}, muffle:{l:'Muffle', min:0, max:1, c:'lin', d:0.2, f:pct},
+      shell:{l:'Shell', min:0, max:1, c:'lin', d:0.4, f:pct}, shellF:{l:'Shell tune', min:0, max:1, c:'lin', d:0.5, f:pct}, noise:{l:'Strike noise', min:0, max:1, c:'lin', d:0.1, f:pct}},
+    secs:[['Head', ['pitch', 'size', 'tension', 'tenT']], ['Strike', ['pos', 'hard', 'noise']], ['Decay', ['dec', 'damp', 'muffle']], ['Shell', ['shell', 'shellF']]],
+    note:'The modes of a round drum head, weighted by where the mallet lands (the centre rings the fundamental, the edge the overtones). Tension bend is the pitch drop as the hit settles. Damping takes the high modes first, Muffle is a hand on the head.',
+    pre:[['Init', {}], ['Rack tom', {pitch:160, size:0.4, tension:0.3, tenT:60, dec:450, damp:0.5, shell:0.5}],
+      ['Floor tom', {pitch:85, size:0.65, tension:0.35, tenT:90, dec:800, damp:0.4, shell:0.6, hard:0.6}],
+      ['Timpani', {pitch:65, size:1, tension:0.5, tenT:200, dec:2500, damp:0.2, hard:0.25, pos:0.5, shell:0.8}],
+      ['Conga open', {pitch:190, size:0.3, tension:0.2, tenT:40, dec:500, damp:0.6, hard:0.5, pos:0.4, shell:0.3}],
+      ['Conga slap', {pitch:260, size:0.25, tension:0.4, tenT:15, dec:120, damp:0.8, muffle:0.7, hard:0.9, pos:0.8, noise:0.4}],
+      ['Bongo', {pitch:420, size:0.15, tension:0.6, tenT:25, dec:180, damp:0.6, hard:0.8, pos:0.7}],
+      ['Tabla-ish', {pitch:300, size:0.3, tension:0.9, tenT:120, dec:400, damp:0.3, muffle:0.1, hard:0.7, pos:0.15, shell:0.2}],
+      ['Taiko', {pitch:70, size:0.9, tension:0.2, tenT:100, dec:1500, damp:0.3, hard:0.8, pos:0.3, shell:1, noise:0.3}],
+      ['Muffled kick', {pitch:55, size:0.7, tension:0.6, tenT:50, dec:300, damp:0.7, muffle:0.6, hard:0.5, shell:0.5}],
+      ['Frame drum', {pitch:120, size:0.6, tension:0.1, dec:1200, damp:0.2, hard:0.3, pos:0.6, shell:0.2}],
+      ['Snare-less snare', {pitch:200, size:0.35, tension:0.4, tenT:20, dec:250, damp:0.8, hard:1, pos:0.5, noise:0.6, shell:0.7, shellF:0.8}]]},
+  chip:{title:'Chip', tag:'8-bit · duty · arp · LFSR', rows:{
+      oct:{l:'Octave', min:0, max:5, c:'int', d:3, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      wave:{l:'Wave', min:0, max:2, c:'int', d:0, f:v => ChipCore.WAVES[Math.max(0, Math.min(2, Math.round(v)))]},
+      duty:{l:'Duty', min:0, max:3, c:'int', d:1, f:v => ['12.5%', '25%', '50%', '75%'][Math.max(0, Math.min(3, Math.round(v)))]}, sweep:{l:'Duty sweep', min:0, max:1, c:'lin', d:0, f:pct},
+      chord:{l:'Arp chord', min:0, max:8, c:'int', d:0, f:v => ChipCore.CHORDS[Math.max(0, Math.min(8, Math.round(v)))]}, arp:{l:'Arp speed', min:1, max:8, c:'int', d:1, f:v => Math.round(v) + ' fr'},
+      slide:{l:'Slide', min:-1, max:1, c:'lin', d:0, f:v => (v * 12).toFixed(1) + ' st'}, vib:{l:'Vibrato', min:0, max:1, c:'lin', d:0, f:pct}, vrate:{l:'Vibrato rate', min:1, max:15, c:'lin', d:6, f:v => v.toFixed(1) + ' Hz'},
+      quant:{l:'Period quantise', min:0, max:1, c:'int', d:1, f:v => v >= 0.5 ? 'on' : 'off'},
+      nfreq:{l:'Noise pitch', min:0, max:1, c:'lin', d:0.7, f:pct}, nshort:{l:'Noise mode', min:0, max:1, c:'int', d:0, f:v => v >= 0.5 ? 'short (metal)' : 'long'},
+      atk:{l:'Attack', min:0, max:30, c:'int', d:0, f:v => Math.round(v) + ' fr'}, dec:{l:'Decay', min:1, max:120, c:'int', d:12, f:v => Math.round(v) + ' fr'}, sus:{l:'Sustain', min:0, max:1, c:'lin', d:0.6, f:pct}, rel:{l:'Release', min:1, max:120, c:'int', d:4, f:v => Math.round(v) + ' fr'}},
+    secs:[['Voice', ['oct', 'wave', 'duty', 'sweep', 'quant']], ['Arp & pitch', ['chord', 'arp', 'slide', 'vib', 'vrate']], ['Noise', ['nfreq', 'nshort']], ['Envelope (60 fps)', ['atk', 'dec', 'sus', 'rel']]],
+    note:'Everything moves in frames (60 a second): the 16-step volume envelope, the arpeggio that plays a chord on one channel, the stepped vibrato. Period quantise rounds the pitch to the timer the real chip had, so high notes go out of tune the way they did.',
+    pre:[['Init', {}], ['Lead 25%', {duty:1, dec:10, sus:0.7, rel:3, vib:0.3}], ['Hollow 12.5%', {duty:0, dec:20, sus:0.5, vib:0.2, vrate:7}],
+      ['Arp major', {chord:3, arp:1, dec:30, sus:0.5, duty:2}], ['Arp minor 7', {chord:6, arp:2, dec:40, sus:0.6, duty:1}], ['Octave arp bass', {oct:1, chord:1, arp:1, duty:2, dec:15, sus:0.8}],
+      ['Duty sweep', {sweep:1, dec:40, sus:0.5, duty:0}], ['Triangle bass', {wave:1, oct:1, atk:0, dec:60, sus:0.9, rel:2}],
+      ['Noise hat', {wave:2, nfreq:1, atk:0, dec:4, sus:0, rel:1}], ['Metal noise', {wave:2, nshort:1, nfreq:0.8, dec:10, sus:0}], ['Noise snare', {wave:2, nfreq:0.6, dec:8, sus:0, rel:2}],
+      ['Laser', {slide:-1, duty:2, dec:12, sus:0.3, rel:2, oct:4}], ['Power-up', {slide:1, chord:2, arp:1, duty:1, dec:20, sus:0.6, oct:3}]]},
   swarm:{title:'Swarm', tag:'oscillator cloud · drift · bloom', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
       voices:{l:'Voices', min:1, max:48, c:'int', d:16, f:v => String(Math.round(v))},
