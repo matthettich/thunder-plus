@@ -24,6 +24,45 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 16 Oct (late evening): Arrange is the Song screen (how to revert is below)
+
+Commit `a4841c0` on `main`, cache `thunderplus-v142`. The owner wanted Song and Arrange to stop being two views of
+the same thing, and Arrange to work on small screens too.
+
+- **What it does:** with **Settings → Show classic Song screen** unticked (the default), the Song screen draws the
+  song as Arrange's blocks, full width, at every size (cover screen included), with the amber MST column after the
+  poly tracks. On every other screen Arrange goes back to its side panel as before (AUTO / ON / OFF still apply there).
+- **Why nothing else changed:** the screen is still `tv === 'song'` with `cs.song` as its cursor, so keys, PAD
+  buttons, the command row, hex typing, EDIT×2, CLN / CLN↓, selection, copy/paste, M mute, follow playhead and
+  SHIFT+◀▶ screen changes all run the same code. Only the drawing differs. The song file format is untouched.
+- **Code (all in `index.html`):**
+  - `songGrid`, `asongOn()`, `setSongGrid()` beside `arrMode` (key `thunderplus-songgrid-v1`, `1` = classic).
+  - `arrPlace()` (beside `arrShown`) moves `#tArr` into `#tScr` before `.tinfo`, and back to its home in `.tbody`.
+    draw() calls it first; body class `asong` drives the CSS (`body.asong …` rules next to `body.arrtiny`).
+  - draw()'s Song branch: when `asongOn()`, no text lines are built; it only keeps `cs.song.top` in view using
+    `arrRows()` instead of `songRows()`. `fitCheck()` skips the Song screen then (it used to shrink the title to 7px).
+  - `drawArr()`: the master column (`ms`), and the cursor (`c`) and selection (`sl`) are now marked in place
+    (`arrMark`), so moving the cursor no longer rebuilds the panel's HTML (in the side panel too).
+  - `arrSize()`: one more column for MST; row height capped so about 12 rows show; width capped (~44 px blocks)
+    when STAGE isn't off, so `stageLayout()` (which now measures `#tArr` instead of the text grid) keeps the dancing
+    dogs beside it on wide screens. Narrow screens give Arrange the full width and have no dogs on Song, as before.
+  - Touch: `scr`'s swipe handler ignores `#tArr` (Arrange scrolls itself); Ctrl+wheel over it zooms instead of moving
+    the cursor. Hint line adds "tap twice opens · hold mutes".
+- **Checked headless** at 373×830 (folded, PAD), 707×823 (unfolded, PAD) and 1440×900 (desktop, KEYS): taps,
+  double-tap to open, hold to mute, PAD SHIFT+◀▶, Ctrl+Shift+arrows to Mixer and back, hex typing, line select,
+  copy/paste, EDIT×2 on an empty cell and on the MST column, the checkbox both ways (and kept after a reload), no
+  page errors. **Not yet tried on the Fold by hand.**
+
+**How to revert**
+
+1. **Instantly, no code:** tick **Settings → Show classic Song screen**. The text grid and the side panel are back
+   exactly as before (saved per device).
+2. **Make classic the default for everyone:** in `index.html` change `localStorage.getItem(SGK) === '1'` to
+   `localStorage.getItem(SGK) !== '0'` in the `songGrid` line. Arrange-as-Song then becomes the opt-in.
+3. **Take it out completely:** `git revert a4841c0`, then bump the `sw.js` cache once more so phones fetch the
+   reverted page. Only that commit carries code; this note can stay or go. If later commits touch the same lines,
+   the conflicts are all in the places listed above.
+
 ## 16 Oct (evening): 15 new effects, 4 engines, Marbles/Tides, …chains controls in the bottom panel, song IRs
 
 Commits on `main`: 71e94c0 (effects), dff828c (engines), c6fa6b7 (bottom panel + song IRs), then docs. Cache
