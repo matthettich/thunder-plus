@@ -24,6 +24,93 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 16 Oct (evening): 15 new effects, 4 engines, Marbles/Tides, …chains controls in the bottom panel, song IRs
+
+Commits on `main`: 71e94c0 (effects), dff828c (engines), c6fa6b7 (bottom panel + song IRs), then docs. Cache
+`thunderplus-v141`; `chains-worklet.js?v=25`, `waves-worklet.js?v=20`. All checked headless (Node and Chromium); **none
+of it has been heard by ear yet.**
+
+### One effect, three places: shared modules as pad and track effects (MODFX)
+
+- **The DSP lives once**, as a shared module in `chains/chains-worklet.js` (SHARED MODULES block → `tools/sync-shared.py`
+  copies it to …waves). New ones: `spectral`, `stretch`, `convolve` (+ the `FFTR` real-FFT helper), `autotune`, `vowel`,
+  `rotary`, `gdelay`, `reverse`, `envfilt`, `bytebeat`, `chaos`, `marbles`, `tides`; and module wrappers `flex`, `sgate`,
+  `retrig`, `pdelay`, `preverb` around copies of index.html's FlexCore/StepGateCore/RetrigCore/clkSpb/PitchFxCore (keep
+  the copies identical; the wrappers count beats from `restarted()` at the song tempo).
+- **Pads** run the module through `WavesDSP` (the …waves engine the page loads with a script tag and the Worker imports):
+  `modFxRun()` in the ENGINE block feeds the one-shot 128 samples at a time, both sides the same, and averages the output;
+  a module's `latency` (Spectral: 2048) is pulled back when Mix is 100%. `rwCan` keeps such pads off a Worker that
+  couldn't load …waves.
+- **Track FX** run it in the `thunder-tfx` worklet through `ChainsDSP`, which chains-worklet.js now publishes on
+  `globalThis` inside the audio thread too; `tfxReady()` awaits `chainsReady()` first so it is there. A module slot is
+  `{key, mod, mp, bpm, on, slot}` in the chain (`tfxChain`), `modRun()` in the worklet; its transport comes from the beat
+  clock (`bp`: playing while ≥ 0, tempo from `clkSpb`), its sidechain from the node's **input 1** (track FX nodes now have
+  two inputs; `routeTrack` connects `scBus` to it), for the Envelope filter.
+- **The tables**: `tools/modfx-spec.mjs` (names, rows, formats, groups) + `node tools/modfx.mjs` → writes `MODFX` into
+  index.html between the ===MODFX=== markers, with each module's own ranges/defaults, and checks every param has a row.
+  At load, `MODFX` becomes `FX[k]` (pad: choices are segments, menus when there are more than 6; `log` → the new `logf`
+  slider curve, 4 significant figures, so small times never round to 0) and `TFX[k]` (bytes: a choice is its index, a
+  small-range int itself, anything else 00–FF along its curve). `FXT_LIST`/`TAILS` include them.
+- **Gotcha (again): a module param named `type` or `on`** would clobber the effect object's own `type`/`on`. `fxKey()`
+  stores them as `type_`/`on_` (Convolution reverb's Type is `type_` in pad and track effect objects).
+- The Synth page's **Add effect** menu is grouped (`FX_GROUP` for the old ones, `MODFX.group` for the new).
+- Agents' notes worth keeping: Spectral's wet path is 43 ms late; Convolution reverb uses ~17.6 MB per instance (two 6 s
+  stereo IRs for the crossfade; lower `cap` in its create() if phones struggle), its IR level `CNV_E` was lowered to .09
+  so its tail sits with Plate/Spring; Extreme stretch ~5.7 MB; Pitch correct is mono, 65–1100 Hz; Rotary and Granular
+  delay don't idle on silence; Feedback "100%" is 0.9 a pass in Granular delay and Reverse echo.
+
+### Engines (ENGINE block, XENG/XUI/renderX/ENGINE_GROUPS, factory voices)
+
+- `VectorCore` (tempo in `P.bpm` from `songBpm()`; `padBpm` re-renders a note-value wave sequence when the tempo changes),
+  `ScannedCore`, `ResynthCore` (+ `SpecUtil`: FFT and base64), `BytebeatCore` (+ `BBExpr`, the safe formula compiler: never
+  `eval`; limits 512 chars / 400 parts / 40 brackets), `ChaosCore` (also the layer type `chaos`, `CHAOS_OSC`/`chaosOscName`
+  above TYPES). `BBExpr` and `ChaosCore` are also in the shared block (keep identical).
+- Non-number engine data lives on the voice: `V.rsData` (Resynth's analysis, ≤ ~46 KB, made by `ResynthCore.analyse` on
+  the page from **Load sample…** in `rsPanel()`; `demoRs()` is the built-in pluck, used by presets and on first pick) and
+  `V.bbExpr` (the formula; `bbPanel()` is its box with a live error line). XUI presets for Bytebeat are
+  `[name, params, extra, formula]`.
+- Analysis of a 10 s sample takes ~0.5 s in Node, so several seconds on a phone, on the UI thread (could move to the
+  Worker later).
+
+### Random generator and Function generator (Marbles, Tides 2; MIT)
+
+`dsp/mods/` (wrappers + `build.sh`, wasi-sdk 25). The 185 KB wasm is base64 in the shared block (`MODS_WASM_B64`), so
+each worklet file grew ~250 KB; one instance per thread holds up to 64 modules. The page's main thread won't compile it
+synchronously, so `WavesDSP.modsPrepare()` is called after `wasmInit` there. Marbles' X outputs are centred on C4
+(0.40625 in the pitch-CV convention; A4 is still 0.5).
+
+### …chains controls in the bottom panel
+
+- **Editor** (chains/index.html, outside the shared block): right-click a control or a module (only when embedded) →
+  Add / Remove … the bottom panel. The list is `doc.deck` in the patch: `{id, p, ml, l, r:[min,max,step], dv, o?|fk?|ft?}`
+  (choices, a named format, or the text at 33 points for a format of the module's own), so the app can draw the controls
+  without the editor. `markDeck()` dots the mapped rows; `removeModule` drops its entries. `chainsEmbed` gained
+  `setParam`, `deckSet`, `fmt` (exact text while the editor is open) and `reveal`. `thunderChains.deck()` tells the app.
+- **App**: section `#dkChn` (`chn` in `DK_SECS`, between INST and FX = the signal flow: instrument → …chains → track FX →
+  fader). `deckChains()` shows the entries whose module leads to the followed track's Chain Out (`chainMods(t)`: the same
+  walk back from Chain Out as the engine's `_active()`), grouped under the module's name (click = show it in …chains),
+  laid out in columns (`grid-auto-flow:column`) that widen the section. Moves go through `dkcSet` → `thunderChains.param`
+  (live) + the editor's `setParam` (so its next save keeps them) + a debounced `saveS`. Right-click a row: `dkcMenu`.
+- The panel's sections no longer shrink (`flex-shrink:0`, INST still takes the spare room): the panel scrolls sideways.
+
+### Song impulse responses (Convolution reverb → Song IR 1–4)
+
+`S.irs` = 4 × `{name, sr, len, L:{ref}, R:{ref}|null}`; the sound is two mono samples in the samples IndexedDB (the
+`"ref"` strings keep `smpTidy` off them) and in `IRDATA` (id → Float32Array). Settings → Song → Load…/Clear
+(`irsUI`, `irsLoad`). `irsPublish()` sets `globalThis.__thunderIR`, posts `{op:'irs'}` to the Worker and `{irs}` to the
+live audio thread; new `thunder-tfx`/`thunder-chains` nodes get them in `processorOptions.irs` (there before the first
+block, so offline renders have them). Project files embed them (`irsFull`), and loading converts them back (`irsAdopt`
+in `setSong`, `irsResolve` after).
+
+### Checked
+
+Every new module in Node through both worklets (no NaN, bounded, CPU per block); both editors load a patch holding all
+of them; every new pad effect and track effect renders in Chromium (track effects in an OfflineAudioContext); every new
+engine preset renders on the page and in the Worker; the mapping flow end to end (right-click in the embedded editor →
+the panel section → a slider moves the patch, the engine and the editor's value; remove; hide/show); song IRs on a pad
+and a track effect; the demo song playing live with four new effects on each of two tracks (no errors, 10–12% load
+each in the headless VM).
+
 ## Licensing rule (the owner may sell the app later)
 
 Only **MIT / BSD / ISC / zlib / Apache** code goes in. **Never GPL/LGPL**: no Surge, Vital, Dexed, Helm,
@@ -817,11 +904,9 @@ A code review (audio, storage, UI, DSP) found these; all fixed and checked headl
    the separate `matthettich/waves` repo.
 4. **Naming:** the older effects/oscillators still use product names (Plaits, Clouds, Rings, Elements, Beads,
    FM Genesis, SoundBlaster). Rename them before any commercial release, keeping "based on" credits.
-5. **More effect ideas** (permissive only):
-   - More Airwindows (hundreds, all MIT).
-   - A spectral freeze.
-   - A granular delay.
-   - An envelope filter with sidechain.
+5. **More effect ideas** (permissive only): more Airwindows (hundreds, all MIT). (Spectral freeze, granular delay and the
+   sidechain envelope filter are in since 16 Oct.) A Load IR… right on the Convolution reverb's card (today: Settings →
+   Song) and running Resynth's analysis in the Worker are the obvious next steps for the 16 Oct additions.
 6. **Still left from the earlier mobile pass:** incremental playhead painting in `draw()`/`drawArr()`
    (`draw()` costs ~13 ms at 4× even when nothing changed, because it rebuilds the grid string to compare).
 7. **On the phone:** the owner should install ...Thunder Plus from its page and remove the old ...Thunder icon

@@ -1,15 +1,20 @@
 # Third-party code
 
-...Thunder's synthesis and effects module (`dsp/`) and the tracker's track-effects module (`dsp/tfx/`),
-both compiled to WebAssembly and embedded in `index.html`, are built from the following MIT-licensed projects. The wrappers and the build
-script, including a few small patches, are in the `dsp` folder. Effects and oscillators that come from these projects are
-given generic names in the app (Cross-mod, Space reverb, Lo-fi…); each one's source is credited below and in the app.
+...Thunder's synthesis and effects module (`dsp/`), the tracker's track-effects module (`dsp/tfx/`) and the modular
+modules' module (`dsp/mods/`), all compiled to WebAssembly (the first two loaded by `index.html`, the third embedded in
+`chains/chains-worklet.js` and `waves/waves-worklet.js`), are built from the following MIT-licensed projects. The wrappers
+and the build scripts, including a few small patches, are in the `dsp` folder. Effects, oscillators and modules that come
+from these projects are given generic names in the app (Cross-mod, Space reverb, Lo-fi, Random generator, Function
+generator…); each one's source is credited below and in the app.
 
-## Mutable Instruments: Plaits, Rings, Clouds, Beads, Elements, Warps (and stmlib)
+## Mutable Instruments: Plaits, Rings, Clouds, Beads, Elements, Warps, Marbles, Tides (and stmlib)
 
 https://github.com/pichenettes/eurorack. Copyright Emilie Gillet.
-"Mutable Instruments", "Plaits", "Rings", "Clouds", "Beads", "Elements" and "Warps" are names of Mutable Instruments'
-products; ...Thunder is not affiliated with or endorsed by Mutable Instruments. Warps is the app's Cross-mod effect.
+"Mutable Instruments", "Plaits", "Rings", "Clouds", "Beads", "Elements", "Warps", "Marbles" and "Tides" are names of
+Mutable Instruments' products; ...Thunder is not affiliated with or endorsed by Mutable Instruments. Warps is the app's
+Cross-mod effect. Marbles is the …chains/…waves Random generator and Tides (2) the Function generator (`dsp/mods/`); the
+build script makes two small patches to them (sample-rate-independent time constants in Marbles' clock follower, and a
+restart for Tides' clock follower).
 
 ## Airwindows: Density, ToTape6, EQ, Pressure4, Galactic, TapeDelay2, DeRez2, PurestDrive, Air3, Verbity2, ToVinyl4, Dubly, Cabs and Tube2
 
@@ -72,6 +77,24 @@ SIL Open Font License 1.1, included as `fonts/OFL-ShareTechMono.txt`.
 - **Degrade** (pad FX, track FX, …chains/…waves module): original code.
 - **Resonator** (pad FX, track FX, …chains/…waves module): original code.
 - **Pluck string / String** (Karplus–Strong, after K. Karplus and A. Strong, "Digital Synthesis of Plucked-String and Drum Timbres", Computer Music Journal 7(2), 1983): original code.
+- **Effects added Oct 2026 (pads, track FX and …chains/…waves modules), all original code written from published descriptions:**
+  - Spectral and Extreme stretch: the short-time Fourier transform and phase vocoder (Crochiere 1980; Flanagan & Golden
+    1966); the stretch follows Nasca's published description of phase-randomised extreme stretching. No Paulstretch code
+    (it is GPL) was used or translated.
+  - Convolution reverb: partitioned FFT convolution (Gardner 1995; Wefers 2015); its built-in impulse responses use the
+    image method for early reflections (Allen & Berkley 1979) and velvet noise (Karjalainen & Järveläinen 2007), and RBJ
+    "Audio EQ Cookbook" filters for the cab and telephone types.
+  - Pitch correct: YIN pitch detection (de Cheveigné & Kawahara 2002) and pitch-synchronous splicing (PSOLA).
+  - Vowel filter: formant frequencies after Peterson & Barney (1952).
+  - Reverse echo's Swell: a feedback delay network (Jot & Chaigne 1991).
+  - Rotary speaker, Granular delay, Envelope filter, and the module versions of Flex, Step gate, Retrigger, Pitch delay
+    and Pitch reverb.
+- **Synth engines added Oct 2026, original code:** Vector (vector synthesis and wave sequencing), Scanned (after
+  Verplank, Mathews & Shaw, "Scanned Synthesis", ICMC 2000), Resynth (sinusoidal analysis and resynthesis after McAulay &
+  Quatieri 1986 and Serra's spectral modelling; YIN for the pitch; Grandke 1983 for the frequency estimates), Bytebeat
+  (a formula compiler of our own; the classic formulas among its presets are the short one-liners shared by viznut and
+  others in 2011), and Chaos (the Lorenz, Rössler, Chua, Thomas and Duffing systems and the logistic and Hénon maps,
+  integrated from their published equations).
 
 ## Third-party sounds: FluidR3 Mono GM (General MIDI SoundFont)
 
