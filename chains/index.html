@@ -205,6 +205,8 @@ select{width:100%; padding:4px 6px; background:#fff; border:1px solid #111; font
 .status{font-size:12.5px; color:var(--muted); white-space:pre-line; min-height:1.2em; overflow-wrap:anywhere}
 .prog{height:6px; background:var(--panel-2); overflow:hidden; border:1px solid var(--track)}
 .prog span{display:block; height:100%; width:100%; background:var(--audio); transform-origin:left; transform:scaleX(0)}
+/* Track In / Chain Out level: IN or OUT, then the bar. */
+.iom{display:flex; align-items:center; gap:6px} .iom b{font-size:9px; font-weight:700; letter-spacing:.08em; color:var(--muted, inherit); flex:none; width:24px} .iom .prog{flex:1}
 
 /* MIDI learn */
 body.learning .ws{background-color:#ffd9e6 !important}
@@ -1442,14 +1444,15 @@ function chainTrackLists(){ const ins = [], outs = []; for (const x of nodes.val
 function routeTrackChange(n, v){
   const N = Math.max(1, Math.min(CHAN_COUNT, Math.round(+v) || 1)), { ins, outs } = chainTrackLists(), old = n.m.params.track | 0;
   if (n.m.type === 'trackIn'){
-    if (ins.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain — showing it.'); focusChainTrack(N); return { reject:true }; }
+    // A track that already has a chain: stay here (no jump to the other chain, which was disorienting) and say so.
+    if (ins.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain, so this one stays on track ' + old + '. Pick a free track (the list marks the used ones).'); return { reject:true }; }
     for (const o of outs) if ((o.params.track | 0) === old) applyChainTrack(o, N);   // this pair's Chain Out follows
     return { v:N };
   }
   // The Chain Out always follows its Track In, so a lone output snaps back rather than moving the input.
   const mate = ins.find(m => (m.params.track | 0) === old);
   if (mate){ const it = mate.params.track | 0; if (N !== it){ toast('Chain Out follows its Track In — track ' + it + '.'); return { v:it }; } }
-  if (outs.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain — showing it.'); focusChainTrack(N); return { reject:true }; }
+  if (outs.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain, so this one stays on track ' + old + '.'); return { reject:true }; }
   return { v:N };
 }
 function alignChainTracks(quiet){
@@ -1532,6 +1535,11 @@ function choice(n, key, options){
   const show = () => { sel.value = String(Math.round(n.m.params[key])); };
   n.ctl[key] = { show, range:{min: options[0][0], max: options[options.length - 1][0], step:1} };
   sel.addEventListener('pointerdown', () => store.snapshot());
+  // A Track In's track list marks (and greys out) the tracks other Track Ins already use, refreshed as it opens.
+  if (key === 'track' && n.m.type === 'trackIn'){
+    const mark = () => { const used = new Set(); for (const x of nodes.values()) if (x !== n && x.m.type === 'trackIn') used.add(x.m.params.track | 0);
+      for (const o of sel.options){ const v = +o.value, u = used.has(v); o.textContent = 'Track ' + v + (u ? ' · has a chain' : ''); o.disabled = u; } };
+    sel.addEventListener('pointerdown', mark); sel.addEventListener('focus', mark); }
   sel.addEventListener('keydown', e => e.stopPropagation());
   sel.addEventListener('change', () => setParam(n, key, +sel.value, true));
   const r = h('label', {class:'row wide sl', 'data-jackhost':'', 'data-id': n.m.id, 'data-key': key},
@@ -1571,7 +1579,10 @@ function buildNode(m){
     const ch = choicesOf(m.type, k);
     kids.push(ch ? choice(n, k, ch) : slider(n, k, def.params[k]));
   }
-  if (m.type === 'chainOut' || m.type === 'trackIn'){ n.meter = h('span'); kids.push(h('div', {class:'prog', title:'Level of track ' + ((m.params.track | 0) || 1)}, n.meter)); }
+  // Track In: what the track sends into the chain. Chain Out: what comes back out of it (in …Thunder Plus, from the song).
+  if (m.type === 'chainOut' || m.type === 'trackIn'){ n.meter = h('span'); const io = m.type === 'trackIn' ? 'IN' : 'OUT';
+    kids.push(h('div', {class:'iom', title:(io === 'IN' ? 'Level the track sends into this chain' : 'Level coming out of this chain') + ' (track ' + ((m.params.track | 0) || 1) + ')'},
+      h('b', {text:io}), h('div', {class:'prog'}, n.meter))); }
   if (def.display) kids.push(buildShow(n));
   if (NOTES[m.type]){ n.note = h('div', {class:'status'}); kids.push(n.note); }
   const body = h('div', {class:'body'}, kids);
@@ -2416,7 +2427,7 @@ const pnameEl = document.getElementById('pname');
          modules show the level of the track they're set to, so patching is visible live. */
       meters(payload){
         const peaks = Array.isArray(payload) ? payload : (payload && payload.peaks) || [];
-        hostPeaks = peaks;
+        hostPeaks = peaks; hostPeaksIn = payload && Array.isArray(payload.peaksIn) ? payload.peaksIn : null;
         hostCpu = payload && typeof payload.load === 'number' ? payload.load : null;
         hostSeen = Date.now();
         paintHostMeters(); paintHostCpu();
@@ -2626,7 +2637,7 @@ function paintMods(list){
 
 // No live values for a moment (engine paused or not routed): keep cabled sliders marked, and unmark unplugged ones.
 setInterval(() => { if (doc && Date.now() - modSeen > 400) paintMods([]); }, 200);
-let hostPeaks = [], hostSeen = 0, hostCpu = null;
+let hostPeaks = [], hostPeaksIn = null, hostSeen = 0, hostCpu = null;
 /* Embedded, the CPU label shows the song's load (the same number as the Tracker meter),
    not a separate preview engine — so the two meters agree. */
 function paintHostCpu(){
@@ -2641,12 +2652,12 @@ function paintHostMeters(){
   // The host pushes peaks while the song plays. When it goes quiet (stopped, or this
   // screen is gone), decay to zero so the meters don't freeze at their last value.
   const fresh = Date.now() - hostSeen < 400;
-  if (!fresh) for (let k = 0; k < hostPeaks.length; k++) hostPeaks[k] *= .82;
+  if (!fresh){ for (let k = 0; k < hostPeaks.length; k++) hostPeaks[k] *= .82; if (hostPeaksIn) for (let k = 0; k < hostPeaksIn.length; k++) hostPeaksIn[k] *= .82; }
   // Module meters: the tracker audio level of the track each Track In / Chain Out is set to.
   for (const n of nodes.values()){
     if (!n.meter) continue;
-    const k = clamp((n.m.params.track | 0) - 1, 0, CHAN_COUNT - 1);
-    n.meter.style.transform = 'scaleX(' + Math.min(1, hostPeaks[k] || 0) + ')';
+    const k = clamp((n.m.params.track | 0) - 1, 0, CHAN_COUNT - 1), src = n.m.type === 'trackIn' && hostPeaksIn ? hostPeaksIn : hostPeaks;
+    n.meter.style.transform = 'scaleX(' + Math.min(1, src[k] || 0) + ')';
   }
   // The bus strip: the tracker audio wins over the preview engine's own buses.
   for (let k = 0; k < CHAN_COUNT; k++){

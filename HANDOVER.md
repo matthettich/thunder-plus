@@ -24,6 +24,27 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 16 Oct (night): Song-screen Arrange polish, …chains in/out meters and track picking, boxed sections
+
+- **Song screen (Arrange):** one header line (`.thd` hidden; Arrange's own header reads SONG · name · rows with − ○ +);
+  spacers only at the MONO | POLY break and before MST (12 px) so `arrBoxes()` can draw a box per group (`.agboxes`
+  overlay, re-measured only when sizes/scroll change); the grid is sized to whole rows (`arrGrid.style.height` in
+  `drawArr`) and snaps to rows, so it never ends on half a row; row-number column 30 px.
+- **…chains meters were silent:** `routeTrack` disconnects `b.chn` before rewiring, which also dropped the analyser
+  tap (`n.an`), so the Track In / Chain Out meters read 0 after the first rewire. Now both taps are re-made there:
+  `n.anIn` (what the track sends in, from `b.inp`) and `n.an` (what comes out), 2048-sample windows so short hits
+  register. The host sends `peaksIn` beside `peaks`; in the editor Track In shows IN and Chain Out shows OUT (`.iom`).
+- **Picking a track that already has a chain** (Track In's list) no longer jumps to the other chain: the change is
+  refused with a toast, and the list marks and disables used tracks (refreshed as it opens). Opening …chains from the
+  tracker now centres and selects the chain of the track you were on (`chainFocusTry`, which retries until the frame
+  has its patch and shows it again at +0.5 s and +1.3 s, since a fresh frame rebuilds its modules).
+- **Bottom panel "+" buttons sometimes ignored a click:** `deckLayout()` runs on every redraw and re-appended them each
+  time, so a redraw between press and release lost the click. It now moves them only when they are out of place.
+- **Layer / voice / engine sections:** each `.sec` has its own 1px box with 10 px gaps (the shared hairlines left a
+  section alone on its row half-boxed).
+- Checked headless: Song screen at 373 / 707 / 1440 wide, two chains playing (IN/OUT move), focus on entry, the taken
+  track case, six slow clicks on + FX while playing, the classic toggle, menus. Not heard on the Fold yet.
+
 ## 16 Oct (late evening): View and Audio & MIDI menus on Desktop
 
 `#bView` and `#bAud` (class `deskmenu`, hidden on Mobile by `body.mob .deskmenu`) share the one `#gset` dropdown:

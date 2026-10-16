@@ -379,16 +379,15 @@ body:not(.noed) .wvMobNote{display:none}
 .fxdb{font:500 11px/1 var(--mono, "JetBrains Mono", monospace); color:var(--muted); min-width:4ch; text-align:right; flex:none}
 .fxgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:0 22px}
 .fxempty{padding:10px 12px 12px; margin:0}
-.secs{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:0; padding:0 0 10px; overflow:hidden}
-.sec{min-width:0; position:relative; padding:9px 12px 8px}
-/* hairlines between the sections: each cell draws one above and one to its left; the ones on the outer edge land
-   just outside the box and are clipped */
-.sec::before{content:""; position:absolute; left:-1px; top:0; bottom:0; width:1px; background:var(--line)}
-.sec::after{content:""; position:absolute; left:0; right:0; top:-1px; height:1px; background:var(--line)}
+/* Every section (Source, Pitch, Amp, Filter, the voice's and the engines') sits in its own box with a gap around it, so
+   they all match however many fit on a row. (They used to share hairlines, which left a section alone on its row
+   half-boxed.) */
+.secs{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; padding:10px; overflow:hidden}
+.sec{min-width:0; position:relative; padding:9px 12px 8px; border:1px solid var(--line)}
 /* the voice card's sections come in named groups (Voice, Envelopes, LFOs & modulation, Tuning), ruled off from each other */
 .secgrp+.secgrp{border-top:1px solid var(--line)}
 .secgh{font-size:var(--fs-3); font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); padding:9px 12px 0}
-.secgrp .secs{padding-bottom:8px}
+.secgrp .secs{padding-top:8px}
 /* Narrow screens: the sections (Source, Pitch, Amp, Filter, and the layer type's own) are tabs, one showing at a
    time, instead of one long column of sliders. Wide screens keep the grid with every section visible. */
 .sectabs{display:none}
@@ -814,7 +813,20 @@ body.arrtiny .tarr{width:200px} body.arrtiny:not(.asong) .tagrid b{color:transpa
 /* ARRANGE as the Song screen (CLASSIC SONG off): the panel sits in the screen in the text grid's place, full width at any
    size, without its grip, its ARRANGE label or its tips (the screen's own title, info and hint lines do those jobs). */
 body.asong .tarr{display:flex; width:auto !important; flex:1 1 auto; min-height:0; border-left:0; margin-top:.3em; font-size:14px}
-body.asong .tgrid, body.asong .tarrh, body.asong .tafoot, body.asong .tahd .tahl b{display:none}
+body.asong .tgrid, body.asong .tarrh, body.asong .tafoot, body.asong .thd{display:none}
+/* One header line (SONG, the song's name and rows, − ○ +), then the MONO / POLY / MST boxes with the rows scrolling inside
+   them: the grid is sized to whole rows and snaps to them, so the bottom never shows half a row. */
+body.asong .tahd{font-size:var(--fs-4); padding:0 2px 6px}
+body.asong .tagrid{flex:none; padding-bottom:0; scroll-snap-type:y mandatory; scroll-padding-top:3px}
+body.asong .tagrid .ar{scroll-snap-align:start}
+/* A wider row-number column, so the MONO box's edge never sits on the numbers. */
+body.asong :is(.tath, .tagrid .ar, .tagp){grid-template-columns:30px var(--arcols)}
+body.asong .tagrid .rn{text-align:right; padding-right:7px}
+body.asong .tagp b.gx{font-size:8px; letter-spacing:0}
+.agboxes{position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:2}
+.agboxes[hidden]{display:none}
+.agbox{position:absolute; box-sizing:border-box; border:2px solid var(--tk); border-radius:4px}
+.agbox.gm{--tk:var(--tk-mono)} .agbox.gp{--tk:var(--tk-poly)} .agbox.gx{--tk:var(--tk-mst)}
 body.asong .tagrid .rn, body.asong .tath{font-size:var(--fs-2)}
 .tarr .tagrid b.sl{box-shadow:inset 0 0 0 2px var(--ar-cur); background-image:linear-gradient(color-mix(in srgb, var(--ar-cur) 22%, transparent), color-mix(in srgb, var(--ar-cur) 22%, transparent))}
 /* Drag the grip on its left edge to make it wider (the blocks grow with it); double-tap the grip to jump big and back. */
@@ -9867,10 +9879,14 @@ function closeChains(){ setView('synth'); }
 // Jump to the …chains screen and centre + highlight a track's chain (used when its CHN is switched on and
 // the track already has a chain, and when picking a track that is already used inside the editor).
 let chainFocusT = null;
-function focusChainHit(t){
-  chainFocusT = t; openChains();
-  const go = () => { const a = chApi(); if (a && a.focusTrack && chainFocusT != null){ a.focusTrack(chainFocusT + 1); chainFocusT = null; return true; } return false; };
-  if (!go()){ setTimeout(go, 150); setTimeout(go, 450); }   // a freshly made frame needs its patch before it can focus
+function focusChainHit(t){ chainFocusT = t; openChains(); chainFocusTry(); }
+function chainFocusTry(){
+  // Done once the editor really found that track's modules (a frame still loading its patch finds none yet).
+  // A fresh frame can still rebuild its modules just after (dropping the highlight), so the found track is shown again twice.
+  const go = () => { const a = chApi(), t = chainFocusT; if (a && a.focusTrack && t != null && a.focusTrack(t + 1)){ chainFocusT = null;
+    for (const ms of [500, 1300]) setTimeout(() => { const b = chApi(); if (b && b.focusTrack && chainFocusT == null && view === 'chains') b.focusTrack(t + 1); }, ms); return true; } return false; };
+  // A freshly made frame needs its patch (and its effects module) before it can focus: keep trying for a few seconds.
+  if (!go()){ let n = 0; const iv = setInterval(() => { if (go() || ++n > 24 || chainFocusT == null) clearInterval(iv); }, 150); }
 }
 /* The chains patch lives in the song file, but can be saved/loaded on its own as a .chains.json file. */
 function exportChains(){
@@ -10488,7 +10504,9 @@ function chainsNode(ac, track, patch, tempo){
     channelCountMode:'explicit', channelInterpretation:'speakers',
     processorOptions:{bytes:chnBin(), track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac)}});
   n.load = 0;
-  n.an = ac.createAnalyser(); n.an.fftSize = 256;   // hears the chains return: the chain screen's meters
+  // 2048 samples (~45 ms) per look, read every 60 ms, so short hits (hats, clicks) still show on the meters.
+  n.an = ac.createAnalyser(); n.an.fftSize = 2048;   // hears the chains return: the chain screen's Chain Out meters
+  n.anIn = ac.createAnalyser(); n.anIn.fftSize = 2048;   // hears what the track sends in: the Track In meters (wired in rtRoute)
   n.connect(n.an);
   n._mBuf = new Float32Array(n.an.fftSize);
   n._live = false; n._q = [];   // messages queued until the processor is ready
@@ -11431,7 +11449,8 @@ function makePlayer(ac, out, getBuf, live){
       try { if (b.fx) b.fx.disconnect(); } catch(e){}
       try { if (b.chn) b.chn.disconnect(); } catch(e){}
       let head = b.inp;
-      if (b.chn){ head.connect(b.chn); head = b.chn; }
+      // disconnect() above also dropped the meter taps: put them back (they used to stay silent after the first rewire).
+      if (b.chn){ head.connect(b.chn); try { b.inp.connect(b.chn.anIn); b.chn.connect(b.chn.an); } catch(e){} head = b.chn; }
       if (b.fx){ head.connect(b.fx); head = b.fx; }
       head.connect(b.g);
       b._chnRef = b.chn; b._fxRef = b.fx;
@@ -14163,15 +14182,19 @@ function deckLayout(){
   $('dkBody').hidden = false;
   if (!vis.length){   // everything hidden: one bare header row with the "+" buttons
     let bare = $('dkBare'); if (!bare){ bare = el('div', 'dkh'); bare.id = 'dkBare'; $('tDeck').insertBefore(bare, $('dkBody')); }
-    bare.hidden = false; bare.replaceChildren(el('b', 'dki', 'PANEL'), $('dkOffs'), el('span', 'dksp'), $('dkTail')); $('dkBody').hidden = true; return;
+    bare.hidden = false; if ($('dkOffs').parentElement !== bare) bare.replaceChildren(el('b', 'dki', 'PANEL'), $('dkOffs'), el('span', 'dksp'), $('dkTail')); $('dkBody').hidden = true; return;
   }
   if ($('dkBare')) $('dkBare').hidden = true;
   const h1 = dkSec(vis[vis.length - 1]).querySelector('.dkh');
   // Hidden parts wait as "+" buttons at the right of the INST header (the widest), or beside ✕ when INST is hidden too.
   const hOff = deck.inst ? dkSec('inst').querySelector('.dkh') : h1;
-  let sp = h1.querySelector('.dksp.t'); if (!sp) sp = el('span', 'dksp t');
-  if (hOff === h1) h1.append(sp, $('dkOffs'), $('dkTail'));
-  else { let so = hOff.querySelector('.dksp.o'); if (!so) so = el('span', 'dksp o'); hOff.append(so, $('dkOffs')); h1.append(sp, $('dkTail')); }
+  // Only move them when they are not already there: deckDraw runs this on every redraw (every row while playing), and
+  // moving a button between press and release swallowed the click ("+ FX doesn't always open it").
+  const offs = $('dkOffs'), tail = $('dkTail');
+  if (offs.parentElement !== hOff || tail.parentElement !== h1 || h1.lastElementChild !== tail){
+    let sp = h1.querySelector('.dksp.t'); if (!sp) sp = el('span', 'dksp t');
+    if (hOff === h1) h1.append(sp, offs, tail);
+    else { let so = hOff.querySelector('.dksp.o'); if (!so) so = el('span', 'dksp o'); hOff.append(so, offs); h1.append(sp, tail); } }
 }
 // Channel strip: the current track's level, fader, pan, mute and solo.
 const stVol = $('stVol'), stPan = $('stPan');
@@ -14451,7 +14474,7 @@ function arrPlace(){
   arrSig = ''; arrCurY = -1; return true;
 }
 // How many song rows Arrange shows at once, for keeping the cursor's row in view when it is the Song screen.
-function arrRows(){ const rh = arrRowH(); return rh > 0 ? clamp(Math.floor((arrGrid.clientHeight - 11) / rh), 2, 96) : 16; }
+function arrRows(){ const rh = arrRowH(); return rh > 0 ? clamp(Math.floor((arrGrid.clientHeight - 3) / rh + 0.01), 2, 96) : 16; }
 // The panel's width: 0 is the default for the screen size, otherwise what the grip was dragged to.
 const AWK = 'thunderplus-arrange-w-v1';
 let arrW = (() => { try { return Math.max(0, int(localStorage.getItem(AWK), 0)); } catch(e){ return 0; } })(), arrKey = '';
@@ -14619,10 +14642,11 @@ function drawArr(PH){
   const anySolo = S.mix.some(m => m.solo);
   let h = '';
   const PFg = polyFrom();   // each block carries its track's group, so the mono and poly sections take their colours
+  const spAt = t => ms ? t > 0 && t === PFg : t > 0 && t % 8 === 0;   // where a spacer column sits before track t
   for (let y = 0; y < N; y++){
     h += `<div class="ar"><span class="rn${y % 4 ? '' : ' r4'}" data-ry="${y}">${rS(y, 3)}</span>`;
     for (let t = 0; t < NA; t++){
-      if (t && t % 8 === 0) h += '<span></span>';
+      if (spAt(t)) h += '<span></span>';
       const v = S.song[y][t];
       let cls = t < PFg ? 'gm ' : 'gp ', lab = '', sty = '';
       if (v >= 0){
@@ -14641,9 +14665,9 @@ function drawArr(PH){
     h += '</div>';
   }
   const PF = polyFrom();
-  const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (t && t % 8 === 0 ? '<span></span>' : '') + `<i class="${t < PF ? 'gm' : 'gp'}${m.mute ? ' mu' : ''}">${t + 1}</i>`).join('') + (ms ? '<span></span><i class="gx">MS</i>' : '');
+  const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (spAt(t) ? '<span></span>' : '') + `<i class="${t < PF ? 'gm' : 'gp'}${m.mute ? ' mu' : ''}">${t + 1}</i>`).join('') + (ms ? '<span></span><i class="gx">MS</i>' : '');
   // MONO and POLY tabs spanning their tracks' columns (track t sits in grid column 2 + t + one per 8-track gap before it).
-  const col = t => 2 + t + Math.floor(t / 8), rng = (a, b) => d2(a) + (b > a ? '–' + d2(b) : '');
+  const col = t => 2 + t + (ms ? (t >= PF && PF > 0 ? 1 : 0) : Math.floor(t / 8)), rng = (a, b) => d2(a) + (b > a ? '–' + d2(b) : '');
   let gp = '';
   if (PF > 0) gp += `<b class="gm" style="grid-column:${col(0)} / ${col(PF - 1) + 1}" title="Mono tracks ${rng(1, PF)}">MONO ${rng(1, PF)}</b>`;
   if (NA > PF) gp += `<b class="gp" style="grid-column:${col(PF)} / ${col(NA - 1) + 1}" title="Poly tracks ${rng(PF + 1, NA)}">POLY ${rng(PF + 1, NA)}</b>`;
@@ -14664,8 +14688,31 @@ function drawArr(PH){
   mark(cs.song.y, cs.song.x, 'c');
   if (ms && selA && selA.v === 'song'){ const r = selRect(); for (let y = r.y0; y <= r.y1; y++) for (let t = r.x0; t <= r.x1; t++) mark(y, t, 'sl'); }
   const nm = S.smute.reduce((a, m) => { for (; m; m &= m - 1) a++; return a; }, 0);
-  $('tArrSub').textContent = (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : '');
-  arrAlign(); arrFollowX();
+  $('tArrSub').textContent = (ms ? S.name + ' · ' : '') + (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : '');
+  { const lb = arrEl.querySelector('.tahl b'); if (lb && lb.textContent !== (ms ? 'SONG' : 'ARRANGE')) lb.textContent = ms ? 'SONG' : 'ARRANGE'; }
+  // As the Song screen the grid holds whole rows only (the space left over sits under the boxes), so it never ends on half a row.
+  if (ms){ const pitch = arrRowH() || arRH + 2, avail = arrEl.clientHeight - arrGrid.offsetTop - 2, rows = Math.max(2, Math.floor((avail - 3) / pitch)), hg = (3 + rows * pitch) + 'px';
+    if (arrGrid.style.height !== hg) arrGrid.style.height = hg; }
+  else if (arrGrid.style.height) arrGrid.style.height = '';
+  arrAlign(); arrFollowX(); arrBoxes();
+}
+// The MONO / POLY / MST boxes around Arrange's columns when it is the Song screen: drawn over the panel from the group
+// tabs down to the last whole row, measured from the track-number cells (only when something that moves them changed).
+let arrBoxKey = '';
+function arrBoxes(){
+  let host = arrEl.querySelector('.agboxes');
+  if (!asongOn()){ if (host) host.hidden = true; arrBoxKey = ''; return; }
+  if (!host){ host = el('div', 'agboxes'); host.setAttribute('aria-hidden', 'true'); arrEl.append(host); }
+  host.hidden = false;
+  const key = [arrSig.length, arrGrid.clientWidth, arrGrid.clientHeight, arrGrid.scrollLeft, arrEl.clientWidth, arrEl.clientHeight].join(':');
+  if (key === arrBoxKey) return; arrBoxKey = key;
+  const a = arrEl.getBoundingClientRect(), gp = $('tArrGp').getBoundingClientRect(), g = arrGrid.getBoundingClientRect(), G = {gm:[], gp:[], gx:[]};
+  for (const i of $('tArrTh').querySelectorAll('i')) G[i.classList.contains('gx') ? 'gx' : i.classList.contains('gp') ? 'gp' : 'gm'].push(i.getBoundingClientRect());
+  const top = gp.top - a.top - 1, bot = g.bottom - a.top + 3; let html = '';
+  for (const k of ['gm', 'gp', 'gx']){ const L = G[k]; if (!L.length) continue;
+    const l = L[0].left - a.left - 4, r = L[L.length - 1].right - a.left + 4;
+    html += `<div class="agbox ${k}" style="left:${l.toFixed(1)}px;top:${top.toFixed(1)}px;width:${(r - l).toFixed(1)}px;height:${(bot - top).toFixed(1)}px"></div>`; }
+  host.innerHTML = html;
 }
 // ARRANGE and the Song screen show the same rows: the panel's top row is always the Song screen's top row, and
 // scrolling the panel scrolls the Song screen with it (they used to scroll apart, e.g. the panel at row 000, Song at 002).
@@ -14708,24 +14755,29 @@ function arrSize(){
   const ms = asongOn() ? 1 : 0;   // as the Song screen: one more column (the master) after one more 4px spacer
   // As the Song screen, blocks stop growing at about 44px wide, so on a wide screen the stage (the dancing dogs) keeps the
   // space beside it, as it had beside the text grid. A narrow screen (or STAGE off) still gives Arrange the whole width.
-  if (ms) arrEl.style.maxWidth = stage !== 'off' ? Math.round((sm ? 12 : 16) + (sm ? 18 : 22) + (NA + 1) * 46 + G * 6 + 4) + 'px' : '';
+  if (ms) arrEl.style.maxWidth = stage !== 'off' ? Math.round((sm ? 12 : 16) + (sm ? 18 : 22) + (NA + 1) * 46 + 3 * 12 + 4) + 'px' : '';
   else if (arrEl.style.maxWidth) arrEl.style.maxWidth = '';
-  const W = arrGrid.clientWidth, cwFit = (W - (sm ? 12 : 16) - (sm ? 18 : 22) - (G - 1 + ms) * 4 - (NA + G - 1 + 2 * ms) * (sm ? 1 : 2)) / (NA + ms);
+  // Spacers: every 8 tracks in the side panel; as the Song screen only at the MONO | POLY break and before MST (12px),
+  // so each group gets its own box.
+  const PFs = polyFrom(), SP = ms ? 12 : 4, nSp = ms ? (PFs > 0 && PFs < NA ? 1 : 0) + 1 : G - 1;
+  const RNW = ms ? 30 : sm ? 18 : 22;   // the row-number column (wider as the Song screen: see body.asong in the CSS)
+  const W = arrGrid.clientWidth, cwFit = (W - (sm ? 12 : 16) - RNW - nSp * SP - (NA + ms + nSp) * (sm ? 1 : 2)) / (NA + ms);
   const col = z > 1 ? Math.max(6, cwFit * z).toFixed(1) + 'px' : 'minmax(0,1fr)', grp = [];
-  for (let g = 0; g < NA; g += 8) grp.push(`repeat(${Math.min(8, NA - g)},${col})`);
-  arrEl.style.setProperty('--arcols', grp.join(' 4px ') + (ms ? ' 4px ' + col : ''));
+  if (ms){ if (PFs > 0) grp.push(`repeat(${PFs},${col})`); if (NA > PFs) grp.push(`repeat(${NA - PFs},${col})`); grp.push(col); }
+  else for (let g = 0; g < NA; g += 8) grp.push(`repeat(${Math.min(8, NA - g)},${col})`);
+  arrEl.style.setProperty('--arcols', grp.join(` ${SP}px `));
   const cw = (W - 34) / (NA + ms + 0.3 + (G + ms) * 0.2) * z, rh = clamp(Math.round(cw * 0.8), 16, z > 1 ? 44 : ms ? clamp(Math.floor(arrGrid.clientHeight / 12) - 3, 16, 30) : 40);   // as the Song screen: at least about 12 rows, as the text grid showed
   arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', clamp(Math.round(rh * 0.5), 8, 16) + 'px');
   // Where the MONO | POLY break sits when every track fits (track PF's column starts after a spacer every 8 tracks):
   // the header's ○ is centred over it, and stays there while zoomed so it is always in the same place.
-  { const p = sm ? 6 : 8, rnw = sm ? 18 : 22, g = sm ? 1 : 2, PF = polyFrom(), colL = t => p + rnw + g + t * (cwFit + g) + Math.floor(t / 8) * (4 + g);
+  { const p = sm ? 6 : 8, rnw = RNW, g = sm ? 1 : 2, PF = polyFrom(), colL = t => p + rnw + g + t * (cwFit + g) + (ms ? (t >= PF ? 1 : 0) : Math.floor(t / 8)) * (SP + g);
     const bx = PF > 0 && PF < NA ? (colL(PF - 1) + cwFit + colL(PF)) / 2 : W / 2;
     arrEl.style.setProperty('--azfx', Math.max(120, Math.min(W - 70, bx)).toFixed(1) + 'px'); }
   arrEl.classList.toggle('zoomed', z > 1);
   if (ARR_ZOOM_BTNS){ $('tArrZo').disabled = $('tArrZf').disabled = z <= 1; $('tArrZi').disabled = z >= AZ_MAX - 0.01; }
   return rh;
 }
-function arrHSync(){ const x = arrGrid.scrollLeft; $('tArrTh').scrollLeft = x; $('tArrGp').scrollLeft = x; }
+function arrHSync(){ const x = arrGrid.scrollLeft; $('tArrTh').scrollLeft = x; $('tArrGp').scrollLeft = x; if (asongOn()) arrBoxes(); }
 // fx: the point to keep still, as a fraction of the content's width; cx: where it sits in the panel (px).
 function arrSetZoom(z, fx, cx){
   z = clamp(z, 1, AZ_MAX); if (z < 1.05) z = 1;
@@ -14859,13 +14911,13 @@ setInterval(() => { if (view !== 'tracker' && !document.hidden) cpuMeter(); }, 5
 // Runs on its own timer (the tracker frame loop is off while the …chains screen is open).
 setInterval(() => {
   if (view !== 'chains' || document.hidden || !rt || !CH.frame) return;
-  const out = new Array(NT).fill(0);
+  const out = new Array(NT).fill(0), inp = new Array(NT).fill(0);
   let any = false;
+  const peak = (an, buf) => { an.getFloatTimeDomainData(buf); let p = 0; for (let i = 0; i < buf.length; i++){ const a = Math.abs(buf[i]); if (a > p) p = a; } return p; };
   for (let t = 0; t < ntr(); t++){
     const b = rt.pl.buses[t]; if (!b.chn || !b.chn.an) continue;
-    b.chn.an.getFloatTimeDomainData(b.chn._mBuf);
-    let p = 0; for (let i = 0; i < b.chn._mBuf.length; i++){ const a = Math.abs(b.chn._mBuf[i]); if (a > p) p = a; }
-    out[t] = p; if (p > 0.002) any = true;
+    out[t] = peak(b.chn.an, b.chn._mBuf); if (b.chn.anIn) inp[t] = peak(b.chn.anIn, b.chn._mBuf);   // what goes in, what comes out
+    if (out[t] > 0.002 || inp[t] > 0.002) any = true;
   }
   // Live values of modulated sliders (an LFO into a slider's jack), from the first track engine that has each one.
   const mods = [], seen = new Set(), fresh = performance.now() - 500;
@@ -14879,7 +14931,7 @@ setInterval(() => {
     const c = rt.pl.buses[t] && rt.pl.buses[t].chn; if (!c || !c.shows || !(c.modsT > fresh)) continue;
     for (const x of c.shows) if (!seenS.has(x[0])){ seenS.add(x[0]); shows.push(x); }
   }
-  if (any || chMeterWanted){ const api = chApi(); if (api && api.meters) api.meters({ peaks:out, load:globalCpuValue(), mods, shows }); }
+  if (any || chMeterWanted){ const api = chApi(); if (api && api.meters) api.meters({ peaks:out, peaksIn:inp, load:globalCpuValue(), mods, shows }); }
 }, 60);
 $('tCpu').addEventListener('click', () => {
   const cap = cpu.cap, L = fxLoads().filter(x => x[1] > 0.0005).sort((a, b) => b[1] - a[1]);
@@ -15362,6 +15414,7 @@ function setView(v){
   document.body.classList.toggle('chv', ch);
   if (wv) showWaves(); else if (was === 'waves') leaveWaves();
   if (ch) showChains(); else if (was === 'chains') leaveChains();
+  if (ch && was === 'tracker'){ chainFocusT = dkTrack(); chainFocusTry(); }   // open on the chain of the track you were on, if it has one
   if (ch || was === 'chains') CH.doc = S.chainPatch || null;
   $('bSet').title = tr ? 'Settings: the Project rows plus kit, MIDI, export, skin and audio'
     : 'Settings: kit, MIDI, export, skin and audio';
