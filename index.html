@@ -307,6 +307,9 @@ body:not(.noed) .wvMobNote{display:none}
 .basscard .selrow>span{font-size:var(--fs-3); color:var(--muted); min-width:74px}
 .basscard .selrow select{flex:1; min-width:0}
 .basscard .note{font-size:var(--fs-3); color:var(--muted); margin:6px 0 0}
+/* The engine card's footnote sits in the grid after the sections: give it a full row, their inset (the text lines up
+   with the slider labels instead of touching the card's border) and a hairline like theirs above it. */
+.basscard .secs>.note{grid-column:1 / -1; margin:0; max-width:none; padding:10px max(12px, calc(100% - 68ch - 12px)) 2px 12px; border-top:1px solid var(--line); line-height:1.45}   /* the hairline spans the card; the text keeps .note's 68ch measure */
 @media (max-width:600px){ .bassviz{height:120px} }
 .layercard>header{display:flex; align-items:center; gap:8px; padding:8px 8px 8px 12px; border-bottom:2px solid var(--fam); flex-wrap:wrap}
 /* The layer card's action buttons are one group, so they never split across lines, and the family tag
@@ -328,6 +331,20 @@ body:not(.noed) .wvMobNote{display:none}
   .layercard>header, .fxcard>header, section.band>header{flex-wrap:wrap}
   .acts{flex:1 1 100%; flex-wrap:wrap; justify-content:flex-start; margin-left:0}
   .layercard>header select{max-width:46vw}
+}
+/* The engine cards' Presets button (it stands in for their hidden <select>) reads as a picker: chevron at the right. */
+.engpre{justify-content:space-between; text-align:left}
+.engpre::after{content:'▾'; color:var(--muted); font-size:.9em}
+/* Engine cards on the cover screen: a deliberate header instead of whatever the wrap left over (name and Presets on one
+   line, a clipped description, then Random / Init alone on a third). The name with its whole description under it,
+   Random / Init beside them, and the Presets picker as a full row underneath. */
+@media (max-width:480px){
+  .basscard>header{display:grid; grid-template-columns:minmax(0, 1fr) auto; grid-template-areas:"ttl acts" "tag acts" "pre pre"; column-gap:10px; row-gap:2px; align-items:center; padding:10px 10px 10px 12px}
+  .basscard>header .ttl{grid-area:ttl; align-self:end; min-width:0; overflow:hidden; text-overflow:ellipsis}
+  .basscard>header .famtag{grid-area:tag; align-self:start; max-width:none; white-space:normal; line-height:1.3}
+  .basscard>header .sp{display:none}
+  .basscard>header .acts{grid-area:acts; flex:none; flex-wrap:nowrap; margin-left:0; justify-content:flex-end}
+  .basscard>header .engpre, .basscard>header select{grid-area:pre; max-width:none; width:100%; min-height:36px; margin-top:8px}
 }
 .main{overflow-x:hidden}
 .fxcard{border:3.5px solid var(--fx); background:var(--panel)}
@@ -536,7 +553,6 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .pbs .pit .pn.eng{display:flex; flex-direction:column; align-items:flex-start; gap:1px; white-space:normal; line-height:1.25; padding:8px 0}
 .pbs .pit .pn small{display:block; max-width:100%; font-weight:400; color:var(--muted); font-size:var(--fs-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis} .pbs .pit.cur .pn small{color:inherit; opacity:.8}
 .vengine .engbtn{min-height:36px; padding:6px 12px; font-weight:600}
-select.assheet{appearance:none; -webkit-appearance:none; padding-right:26px; background-image:linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position:calc(100% - 14px) 55%, calc(100% - 9px) 55%; background-size:5px 5px; background-repeat:no-repeat}   /* a select that opens the sheet: looks the same, the browser's list never shows */
 .updb.storeb{background:#c0392b; color:#fff; white-space:normal; max-width:calc(100vw - 32px); z-index:21}
 @media (max-width:480px){ .top .tmode .mx{display:inline} .top .tmode,.top .tcpu{padding:0 8px} .top .tcpu{min-width:72px} }
 .top .tcpu{border:1px solid var(--line); min-height:34px; background:var(--panel); padding:0 10px; min-width:84px; overflow:hidden}
@@ -5926,10 +5942,11 @@ function engineSheet(){
   const list = el('div', 'plist'); box.append(hd, list); wrap.append(box);
   let openCat = ENGINE_GROUPS.findIndex(([, es]) => es.some(e => e[0] === curK));
   const done = () => { if (pbOpen !== done) return; pbOpen = null; wrap.remove(); document.removeEventListener('keydown', key, true); };
+  const born = performance.now(), early = () => performance.now() - born < 350;   // the opening tap, as in presetSheet
   const key = e => { if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); done(); } else if (e.target === q) e.stopPropagation(); };
   const row = ([k, name, about]) => {
     const it = el('div', 'pit' + (k === curK ? ' cur' : '')), pn = el('button', 'pn eng'); pn.type = 'button'; pn.append(document.createTextNode(name), el('small', null, about));
-    pn.addEventListener('click', () => { done(); if (k !== curK) setEngine(k); });
+    pn.addEventListener('click', () => { if (early()) return; done(); if (k !== curK) setEngine(k); });
     it.append(pn); return it;
   };
   const render = () => {
@@ -5938,7 +5955,7 @@ function engineSheet(){
       if (!n) list.append(el('div', 'pempty', 'Nothing matches “' + q.value.trim() + '”.')); return; }
     ENGINE_GROUPS.forEach(([gn, es], gi) => {
       const c = el('button', 'pcat' + (gi === openCat ? ' open' : '')); c.type = 'button'; c.append(document.createTextNode(gn), el('small', null, String(es.length))); c.setAttribute('aria-expanded', String(gi === openCat));
-      c.addEventListener('click', () => { openCat = openCat === gi ? -1 : gi; render(); if (openCat === gi) c.scrollIntoView({block:'nearest'}); });
+      c.addEventListener('click', () => { if (early()) return; openCat = openCat === gi ? -1 : gi; render(); if (openCat === gi) c.scrollIntoView({block:'nearest'}); });
       list.append(c); if (gi === openCat) for (const e of es) list.append(row(e));
     });
   };
@@ -6007,11 +6024,14 @@ function presetSheet(kind){
   const G = presetEntries(kind); let total = 0; for (const [, es] of G) total += es.length; q.placeholder = `Search ${total} presets…`;
   let openCat = song ? (G[0] && G[0][1].length ? 0 : (G[1] ? 1 : 0)) : G.length - 1;
   const done = () => { if (pbOpen !== done) return; pbOpen = null; stopPreview(); wrap.remove(); document.removeEventListener('keydown', key, true); };
+  // A tap that lands in the first moments after the sheet opens is the tap that opened it (or a double tap): ignore it,
+  // so the sheet stays open until a preset is chosen on purpose.
+  const born = performance.now(), early = () => performance.now() - born < 350;
   const key = e => { if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); done(); } else if (e.target === q) e.stopPropagation(); };
   const row = e => {
     const it = el('div', 'pit'), pn = el('button', 'pn', e.name), pp = el('button', 'pp'); pn.type = pp.type = 'button'; pn.title = 'Take this preset';
     pp.innerHTML = '<svg class="ic" aria-hidden="true" style="width:12px;height:12px;fill:currentColor"><use href="#ic-play"/></svg>'; pp.title = 'Hear it'; pp.setAttribute('aria-label', 'Preview ' + e.name);
-    pn.addEventListener('click', () => { recentPresets.add(rkind, e.key); done(); e.apply(); });
+    pn.addEventListener('click', () => { if (early()) return; recentPresets.add(rkind, e.key); done(); e.apply(); });
     pp.addEventListener('click', () => { try { previewVoice(e.make(), pp); } catch(err){ toast('Couldn’t preview that preset.'); } });
     it.append(pn, pp);
     if (e.own != null){ const px = el('button', 'px', '✕'); px.type = 'button'; px.title = 'Delete this preset'; px.setAttribute('aria-label', 'Delete ' + e.name);
@@ -6025,7 +6045,7 @@ function presetSheet(kind){
       if (!n) list.append(el('div', 'pempty', 'Nothing matches “' + q.value.trim() + '”.')); return; }
     G2.forEach(([gn, es], gi) => {
       const c = el('button', 'pcat' + (gi === openCat ? ' open' : '')); c.type = 'button'; c.append(document.createTextNode(gn), el('small', null, String(es.length))); c.setAttribute('aria-expanded', String(gi === openCat));
-      c.addEventListener('click', () => { openCat = openCat === gi ? -1 : gi; render(); if (openCat === gi) c.scrollIntoView({block:'nearest'}); });
+      c.addEventListener('click', () => { if (early()) return; openCat = openCat === gi ? -1 : gi; render(); if (openCat === gi) c.scrollIntoView({block:'nearest'}); });
       list.append(c);
       if (gi === openCat){ if (!es.length) list.append(el('div', 'pempty', kind === 'voice' ? 'No presets saved in this song yet. ＋ Save below keeps this pad.' : 'No layer presets saved in this song yet.')); for (const e of es) list.append(row(e)); }
     });
@@ -6041,10 +6061,13 @@ function presetSheet(kind){
 (function presetInit(){
   $('vPre').addEventListener('click', () => presetSheet('voice'));
   $('lPre').addEventListener('click', () => presetSheet('layer'));
+  // Each engine card's <select> is hidden behind a button that opens the sheet on click, like vPre / lPre. (It used to
+  // open on pointerdown over the select: on touch the tap's click then landed on whichever row of the new sheet was
+  // under the finger, so the sheet took a preset and closed at once — the Piano / EP / Organ lists are tall enough to
+  // reach the card header.)
   if (ENGINE_PRESET_SHEET) for (const [id, kind] of [['bassPre', 'bass'], ['blipPre', 'blip'], ['voxPre', 'vox'], ['xPre', 'x']]){ const sel = $(id); if (!sel) continue;
-    sel.classList.add('assheet');
-    const open = e => { e.preventDefault(); presetSheet(kind); };
-    sel.addEventListener('pointerdown', open); sel.addEventListener('mousedown', open); sel.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown'){ open(e); } }); }
+    const b = el('button', 'sm presel engpre', 'Presets…'); b.type = 'button'; b.id = id + 'Btn'; b.title = 'Presets for this engine'; b.setAttribute('aria-haspopup', 'dialog');
+    sel.hidden = true; sel.after(b); b.addEventListener('click', () => presetSheet(kind)); }
   $('presetIn').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) importPresetsFile(f); });
 })();
 /* ---------- the Acid, Machine, Tone drum and Modal cards (one card, built for whichever engine the pad uses) ---------- */

@@ -686,8 +686,15 @@ After the eight bugs below were merged (PR #1), the review's risk items went in 
   groups, Recent, search, ▶ preview via `renderAsync` on a copy, ✕ delete, Save/Import) and `bass` / `blip` / `vox` /
   `x` (the engine cards' own lists; preview runs the card's preset function on a throwaway copy of the pad,
   `onVoiceCopy`). **To put the engine cards back on their native dropdowns set `ENGINE_PRESET_SHEET = false`** (one
-  line next to `PRK`): the `<select>`s are still filled and wired, the sheet only intercepts the tap while it is
-  true. `vPre` / `lPre` are buttons now; `fillPresetSel` is unused and can go once the sheet is settled.
+  line next to `PRK`): the `<select>`s are still filled and wired; while it is true each one is hidden behind a
+  `#…PreBtn` button (`.engpre`) that opens the sheet on click. `vPre` / `lPre` are buttons too; `fillPresetSel` is
+  unused and can go once the sheet is settled.
+- **Engine preset menus closed at once on touch (16 Oct; cache v136):** they opened on pointerdown over the select, so
+  the tap's click landed on whichever preset row of the new sheet was under the finger (Piano / EP / Organ / Table
+  lists reach the card header): it took that preset and closed. Now buttons that open on click, and both sheets
+  ignore taps in their first 350 ms (`early()`). Checked with real taps at 412 and 884 wide. Cover-screen (≤480 px)
+  engine card headers are a grid: name + full description, Random / Init beside them, Presets full width below.
+  The engine card's footnote (`#xSecs>.note`) spans the grid with the sections' 12 px inset and a hairline above.
 - **Three more rendered engines (15 Oct, night; cache v130):** `TableCore` (wavetable: four 8-frame tables drawn in
   the time domain, taken apart once with a DFT and rebuilt band-limited per note; Position/Warp, position envelope +
   LFO, unison, sub, noise, SVF low-pass with envelope, ADSR), `BreathCore` (coloured noise → grains → a bank of up to
