@@ -699,6 +699,14 @@ After the eight bugs below were merged (PR #1), the review's risk items went in 
   419 px on a 369 px screen (TRANSP + off the edge). `patFit()` (ResizeObserver on `.ttabbar`, and on input-mode
   change) measures it: if it doesn't fit, PAD mode hides `#tSelBar` (the LOOP and SEMI −/+ keys do the same) and KEYS
   mode hides TRANSP −/+ (top bar's TRANSPOSE ▲▼). ≤600 px the strip is its own line and scrolls if still too wide.
+- **ARRANGE zoom (16 Oct; cache v138):** blocks were ~12×16 px on the unfolded Fold (25×22 at the grip's maximum),
+  too small to hold on purpose. `arrZoom` 1–3 (`thunderplus-arrange-zoom-v1`); `arrSize()` (called by `drawArr`) sets
+  `--arcols` to fixed px columns when zoomed, so `.ar` rows run wide and `#tArrGrid` scrolls sideways; `arrHSync()`
+  keeps `#tArrTh` / `#tArrGp` (overflow hidden) at the same scrollLeft; row numbers and the header corner are sticky
+  (in the self-scrolling header rows sticky sits inside their padding, hence `left:0` there). Pinch = touch events
+  (2 touches; a second finger cancels the hold-to-mute press, `arrPtrs`), Ctrl+wheel on desktop, and the header's
+  − ○ + (`ARR_ZOOM_BTNS = true`; false removes them, the owner may not keep them). `arrFollowX()` keeps the cursor's
+  block in view when the cursor changes track while zoomed; a pinch leaves the view where it was.
 - **Three more rendered engines (15 Oct, night; cache v130):** `TableCore` (wavetable: four 8-frame tables drawn in
   the time domain, taken apart once with a DFT and rebuilt band-limited per note; Position/Warp, position envelope +
   LFO, unison, sub, noise, SVF low-pass with envelope, ADSR), `BreathCore` (coloured noise → grains → a bank of up to

@@ -855,6 +855,21 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tagrid b.c{outline:2px solid var(--ar-cur); outline-offset:0; position:relative; z-index:1}
 .tagrid b.c:not(.f):not(.m):not(.z):not(.p){color:var(--ar-dim)}
 .tafx{display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden}
+/* Zoom (pinch, Ctrl+wheel, or the − + in the header): the blocks get up to 3× bigger and the grid scrolls sideways; the
+   track numbers and MONO / POLY labels follow it (scrollLeft kept in step), the row numbers stay at the left. */
+.tahd .azb{min-width:30px; min-height:28px; padding:0; font-size:16px; line-height:1; font-family:var(--font); flex:none}
+.tahd .azb:disabled{opacity:.35}
+.tarr.zoomed .tagrid{touch-action:pan-x pan-y}
+.tarr.zoomed .tagrid .ar{width:max-content; min-width:100%; box-sizing:border-box}   /* full width, so the row number can stick */
+/* The row numbers (and the corner above them) stay at their usual inset; shadows paint over the gutter and the gap so
+   blocks and labels slide under them cleanly. */
+.tarr.zoomed :is(.tagrid .rn, .tath>:first-child), .tarr.zoomed .tagp::before{position:sticky; left:8px; z-index:2; box-shadow:-8px 0 0 var(--ar-bg), 2px 0 0 var(--ar-bg)}
+.tarr.zoomed :is(.tagrid .rn:not(.pl), .tath>:first-child), .tarr.zoomed .tagp::before{background:var(--ar-bg)}
+.tarr.zoomed .tagp::before{content:''; grid-column:1; grid-row:1}
+body.arrsmall .tarr.zoomed :is(.tagrid .rn, .tath>:first-child), body.arrsmall .tarr.zoomed .tagp::before{left:6px; box-shadow:-6px 0 0 var(--ar-bg), 1px 0 0 var(--ar-bg)}
+/* .tath and .tagp scroll themselves, and a sticky child there is placed inside their padding: left 0 is the same spot. */
+.tarr.zoomed .tath>:first-child, .tarr.zoomed .tagp::before, body.arrsmall .tarr.zoomed .tath>:first-child, body.arrsmall .tarr.zoomed .tagp::before{left:0}
+.tarr.zoomed .tath, .tarr.zoomed .tagp{overflow:hidden}
 .tafoot{flex:none; overflow:hidden; box-sizing:border-box; font-size:var(--fs-2); line-height:1.35; color:var(--ar-dim); padding:6px 10px 8px; border-top:1px solid var(--ts-line, var(--ar-line)); font-family:var(--font)}
 @media (max-width:480px){ .top{flex-wrap:wrap} .top .brand{display:none} .top .kitname{order:9; flex:1 1 100%} .top button{white-space:nowrap} .ttabs button{padding:0 10px; font-size:var(--fs-3)} .tmode .mx{display:none} .tmode{padding:0 10px} .tctl{padding-inline:10px} .tcmd{padding-inline:10px} }
 /* Colourful boxes at the bottom of every screen, the same as the tracker's PAD-mode nav pad: a darker grey
@@ -1606,11 +1621,11 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     </div>
     <aside class="tarr" id="tArr" aria-label="Song arrangement">
       <div class="tarrh" id="tArrH" role="separator" aria-orientation="vertical" aria-label="Drag to resize the arrange panel" title="Drag to resize · double-tap: big / normal"></div>
-      <div class="tahd"><b>ARRANGE</b><span id="tArrSub"></span></div>
+      <div class="tahd"><button type="button" class="azb" id="tArrZo" aria-label="Zoom out" title="Zoom out (or pinch)">−</button><b>ARRANGE</b><span id="tArrSub"></span><button type="button" class="azb" id="tArrZf" aria-label="Zoom to fit" title="Fit every track in the panel"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/></svg></button><button type="button" class="azb" id="tArrZi" aria-label="Zoom in" title="Zoom in: bigger blocks (or pinch)">+</button></div>
       <div class="tagp" id="tArrGp" aria-hidden="true"></div>
       <div class="tath" id="tArrTh"></div>
       <div class="tagrid" id="tArrGrid"></div>
-      <div class="tafoot"><span class="tafx">TAP: GO · a tap goes to a block, twice opens its phrase · HOLD · holding a block mutes or unmutes just that one (the phrase stays) · tap a row number to play from there</span></div>
+      <div class="tafoot"><span class="tafx">TAP: GO · a tap goes to a block, twice opens its phrase · HOLD · holding a block mutes or unmutes just that one (the phrase stays) · PINCH or + − · bigger blocks, swipe sideways across tracks, ○ fits them all again · tap a row number to play from there</span></div>
     </aside>
     <aside class="tside" aria-label="Tracker status">
       <button type="button" class="tsidex" id="tSideX" title="Hide this side panel (Settings → SIDE PANEL brings it back)" aria-label="Hide the side panel"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button>
@@ -12513,6 +12528,13 @@ function deckDraw(){ deckLayout(); deckStrip(); if (!deckShown()) return; deckMe
 // A tap on an ARRANGE block goes to it (a second tap opens its phrase); holding one mutes or unmutes just
 // that block. A tap can never mute, and the track-number row is a label, so a slip cannot silence a track.
 let arrLit = [], arrSig = '', arrTap = {t:0, k:''}, arrCurY = -1;
+// ARRANGE zoom (see "ARRANGE zoom" below).
+// ARR_ZOOM_BTNS: the − ○ + in the arrange header (○ = fit). Set it to false to take them away (pinch and Ctrl+wheel stay).
+const ARR_ZOOM_BTNS = true;
+const AZK = 'thunderplus-arrange-zoom-v1', AZ_MAX = 3, AZ_STEPS = [1, 1.5, 2, 2.5, 3];
+let arrZoom = (() => { try { const z = parseFloat(localStorage.getItem(AZK)); return z >= 1 && z <= AZ_MAX ? z : 1; } catch(e){ return 1; } })();
+let arrPinch = null, arrCurX = -1, arrWheelT = 0;
+const arrPtrs = new Set();
 const arrEl = $('tArr'), arrGrid = $('tArrGrid');
 const arrShown = () => arrMode > 0 && arrEl.offsetWidth > 0;
 // The panel's width: 0 is the default for the screen size, otherwise what the grip was dragged to.
@@ -12674,11 +12696,8 @@ function drawArr(PH){
   if (!arrShown()) return;
   arrEl.classList.toggle('dk', tScreen === 'dark');
   // Blocks grow with the panel: row height follows the column width (16–40px).
-  const NA = ntr(), grp = []; for (let g = 0; g < NA; g += 8) grp.push(`repeat(${Math.min(8, NA - g)},minmax(0,1fr))`);
-  arrEl.style.setProperty('--arcols', grp.join(' 4px '));
-  let arRH = 16;
-  { const cw = (arrGrid.clientWidth - 34) / (NA + 0.3 + Math.ceil(NA / 8) * 0.2), rh = clamp(Math.round(cw * 0.8), 16, 40); arRH = rh;
-    arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', clamp(Math.round(rh * 0.5), 8, 16) + 'px'); }
+  const NA = ntr();
+  const arRH = arrSize();
   let lastR = -1; for (let y = 255; y >= 0; y--) if (S.song[y].some(v => v >= 0)){ lastR = y; break; }
   const N = clamp(Math.max(lastR + 2, 16, cs.song.y + 1, (cs.song.top || 0) + 40), 1, 256);   // room to line up with the Song screen's top row
   const play = PH || new Array(NT).fill(-1);   // the shared playhead, so Arrange lights the same rows as Song
@@ -12723,8 +12742,8 @@ function drawArr(PH){
     const rn = row.firstElementChild; if (!rn.classList.contains('pl')){ rn.classList.add('pl'); arrLit.push(rn); }
     const b = row.querySelector(`b[data-t="${t}"]`); if (b && S.song[y][t] >= 0){ b.classList.add('p'); arrLit.push(b); } });
   const nm = S.smute.reduce((a, m) => { for (; m; m &= m - 1) a++; return a; }, 0);
-  $('tArrSub').textContent = (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '');
-  arrAlign();
+  $('tArrSub').textContent = (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : '');
+  arrAlign(); arrFollowX();
 }
 // ARRANGE and the Song screen show the same rows: the panel's top row is always the Song screen's top row, and
 // scrolling the panel scrolls the Song screen with it (they used to scroll apart, e.g. the panel at row 000, Song at 002).
@@ -12736,6 +12755,7 @@ function arrAlign(){
   if (Math.abs(arrGrid.scrollTop - st) > 1){ arrIgnore = st; arrGrid.scrollTop = st; }
 }
 arrGrid.addEventListener('scroll', () => {
+  arrHSync();
   if (arrIgnore >= 0 && Math.abs(arrGrid.scrollTop - arrIgnore) <= 1){ arrIgnore = -1; return; }
   arrIgnore = -1;
   const rh = arrRowH(); if (!(rh > 0)) return;
@@ -12755,8 +12775,78 @@ function arrGo(y, t){
   if (filled && (dbl || tv === 'phrase')){ tv = 'song'; go('phrase'); return; }
   if (tv !== 'song') go('song'); else draw();
 }
+/* ---------- ARRANGE zoom ----------
+   With every track in the panel the blocks are ~12 px wide on the unfolded Fold: too small to hold one on purpose.
+   Pinch (or Ctrl+wheel, or the header's − +) makes them up to 3× bigger; the grid then scrolls sideways. The zoom is
+   kept between sessions; pinching all the way out snaps back to "fit". */
+// Column widths and block height for the panel's width and the zoom. At 1× the columns share the row (as before);
+// zoomed they are fixed px, so the rows run past the panel and scroll. Returns the block height.
+function arrSize(){
+  const NA = ntr(), G = Math.ceil(NA / 8), z = arrZoom > 1 ? arrZoom : 1, sm = document.body.classList.contains('arrsmall');
+  const W = arrGrid.clientWidth, cwFit = (W - (sm ? 12 : 16) - (sm ? 18 : 22) - (G - 1) * 4 - (NA + G - 1) * (sm ? 1 : 2)) / NA;
+  const col = z > 1 ? Math.max(6, cwFit * z).toFixed(1) + 'px' : 'minmax(0,1fr)', grp = [];
+  for (let g = 0; g < NA; g += 8) grp.push(`repeat(${Math.min(8, NA - g)},${col})`);
+  arrEl.style.setProperty('--arcols', grp.join(' 4px '));
+  const cw = (W - 34) / (NA + 0.3 + G * 0.2) * z, rh = clamp(Math.round(cw * 0.8), 16, z > 1 ? 44 : 40);
+  arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', clamp(Math.round(rh * 0.5), 8, 16) + 'px');
+  arrEl.classList.toggle('zoomed', z > 1);
+  if (ARR_ZOOM_BTNS){ $('tArrZo').disabled = $('tArrZf').disabled = z <= 1; $('tArrZi').disabled = z >= AZ_MAX - 0.01; }
+  return rh;
+}
+function arrHSync(){ const x = arrGrid.scrollLeft; $('tArrTh').scrollLeft = x; $('tArrGp').scrollLeft = x; }
+// fx: the point to keep still, as a fraction of the content's width; cx: where it sits in the panel (px).
+function arrSetZoom(z, fx, cx){
+  z = clamp(z, 1, AZ_MAX); if (z < 1.05) z = 1;
+  if (Math.abs(z - arrZoom) < 0.005) return;
+  if (fx == null){ cx = arrGrid.clientWidth / 2; fx = (arrGrid.scrollLeft + cx) / Math.max(1, arrGrid.scrollWidth); }
+  arrZoom = z; arrSize();
+  arrGrid.scrollLeft = Math.max(0, fx * arrGrid.scrollWidth - cx); arrHSync(); arrAlign();
+}
+// The view stays where the pinch left it: following the cursor only resumes when the cursor changes track.
+function arrZoomDone(){ try { localStorage.setItem(AZK, String(arrZoom)); } catch(_){} arrSig = ''; arrCurX = cs.song.x; draw(); }
+// Zoomed, the song cursor's block is kept in view when the cursor changes track (Song screen, keys, a tap).
+function arrFollowX(){
+  if (arrZoom <= 1 || cs.song.x === arrCurX) return; arrCurX = cs.song.x;
+  const b = arrGrid.querySelector('b.c'); if (!b) return;
+  const g = arrGrid.getBoundingClientRect(), r = b.getBoundingClientRect(), rn = arrGrid.querySelector('.rn'), lw = rn ? rn.getBoundingClientRect().width + 4 : 26;
+  if (r.left < g.left + lw) arrGrid.scrollLeft -= g.left + lw - r.left; else if (r.right > g.right) arrGrid.scrollLeft += r.right - g.right;
+  arrHSync();
+}
+function arrCancelPress(){ if (arrPress){ clearTimeout(arrPress.tm); if (arrPress.el) arrPress.el.classList.remove('charge'); arrPress = null; } }
+// Fingers on the grid, counted before the press handler sees them (a new gesture starts with the primary pointer).
+arrGrid.addEventListener('pointerdown', e => { if (e.isPrimary) arrPtrs.clear(); arrPtrs.add(e.pointerId); }, true);
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) arrGrid.addEventListener(ev, e => arrPtrs.delete(e.pointerId), true);
+const tDist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1;
+arrGrid.addEventListener('touchstart', e => {
+  if (e.touches.length !== 2) return;
+  arrCancelPress();
+  const [a, b] = e.touches, cx = (a.clientX + b.clientX) / 2 - arrGrid.getBoundingClientRect().left;
+  arrPinch = {d0:tDist(a, b), z0:arrZoom, fx:(arrGrid.scrollLeft + cx) / Math.max(1, arrGrid.scrollWidth)};
+}, {passive:true});
+arrGrid.addEventListener('touchmove', e => {
+  if (!arrPinch || e.touches.length !== 2) return;
+  if (e.cancelable) e.preventDefault();
+  const [a, b] = e.touches, cx = (a.clientX + b.clientX) / 2 - arrGrid.getBoundingClientRect().left;
+  arrSetZoom(arrPinch.z0 * tDist(a, b) / arrPinch.d0, arrPinch.fx, cx);
+}, {passive:false});
+const arrPinchEnd = e => { if (arrPinch && e.touches.length < 2){ arrPinch = null; arrZoomDone(); } };
+arrGrid.addEventListener('touchend', arrPinchEnd); arrGrid.addEventListener('touchcancel', arrPinchEnd);
+// Ctrl+wheel (and a trackpad pinch, which arrives as one) zooms on a computer.
+arrGrid.addEventListener('wheel', e => {
+  if (!e.ctrlKey) return; e.preventDefault();
+  const cx = e.clientX - arrGrid.getBoundingClientRect().left;
+  arrSetZoom(arrZoom * Math.exp(-e.deltaY * 0.004), (arrGrid.scrollLeft + cx) / Math.max(1, arrGrid.scrollWidth), cx);
+  clearTimeout(arrWheelT); arrWheelT = setTimeout(arrZoomDone, 200);
+}, {passive:false});
+if (ARR_ZOOM_BTNS){
+  const step = d => { const z = d > 0 ? AZ_STEPS.find(s => s > arrZoom + 0.01) : [...AZ_STEPS].reverse().find(s => s < arrZoom - 0.01);
+    if (z == null) return; arrSetZoom(z); arrZoomDone(); };
+  $('tArrZo').addEventListener('click', () => step(-1)); $('tArrZi').addEventListener('click', () => step(1));
+  $('tArrZf').addEventListener('click', () => { arrSetZoom(1); arrZoomDone(); });   // ○: back to every track in the panel
+} else { $('tArrZo').hidden = $('tArrZf').hidden = $('tArrZi').hidden = true; }
 let arrPress = null;
 arrGrid.addEventListener('pointerdown', e => {
+  if (arrPinch || arrPtrs.size > 1){ arrCancelPress(); return; }   // two fingers: a pinch, never a press or a mute
   const rn = e.target.closest('[data-ry]');
   if (rn){ const y = +rn.dataset.ry; cs.song.y = y; if (tp.on && tp.mode === 'song') tStart('song', {row:y}); else draw(); return; }
   const b = e.target.closest('b[data-y]'); if (!b) return;
