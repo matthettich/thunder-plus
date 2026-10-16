@@ -808,7 +808,13 @@ body.noside .tside{display:none}
 body.arrvis .tarr{display:flex}
 body.arrvis.arrnarrow .tside{display:none}
 body.arrsmall .tarr{width:240px} body.arrsmall .tath, body.arrsmall .tagrid .ar{grid-template-columns:18px var(--arcols, repeat(8,minmax(0,1fr)) 4px repeat(8,minmax(0,1fr))); gap:1px; padding:0 6px}
-body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
+body.arrtiny .tarr{width:200px} body.arrtiny:not(.asong) .tagrid b{color:transparent}
+/* ARRANGE as the Song screen (CLASSIC SONG off): the panel sits in the screen in the text grid's place, full width at any
+   size, without its grip, its ARRANGE label or its tips (the screen's own title, info and hint lines do those jobs). */
+body.asong .tarr{display:flex; width:auto !important; flex:1 1 auto; min-height:0; border-left:0; margin-top:.3em; font-size:14px}
+body.asong .tgrid, body.asong .tarrh, body.asong .tafoot, body.asong .tahd .tahl b{display:none}
+body.asong .tagrid .rn, body.asong .tath{font-size:var(--fs-2)}
+.tarr .tagrid b.sl{box-shadow:inset 0 0 0 2px var(--ar-cur); background-image:linear-gradient(color-mix(in srgb, var(--ar-cur) 22%, transparent), color-mix(in srgb, var(--ar-cur) 22%, transparent))}
 /* Drag the grip on its left edge to make it wider (the blocks grow with it); double-tap the grip to jump big and back. */
 .tarr{position:relative}
 .tarrh{position:absolute; left:-10px; top:0; bottom:0; width:20px; cursor:ew-resize; touch-action:none; z-index:3}
@@ -822,7 +828,11 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 .tahd button{min-height:24px; padding:0 8px; font-size:var(--fs-2); font-weight:700; letter-spacing:.04em; background:transparent; color:var(--ar-ink); border:1px solid var(--ar-line); border-radius:4px}
 .tahd button.on{background:var(--ar-mu); border-color:var(--ar-mu); color:#fff}
 .tath,.tagrid .ar{display:grid; grid-template-columns:22px var(--arcols, repeat(8,minmax(0,1fr)) 4px repeat(8,minmax(0,1fr))); gap:2px; padding:0 8px}
-.tarr{--tk-mono:#eba3bd; --tk-poly:#86c99a}
+.tarr{--tk-mono:#eba3bd; --tk-poly:#86c99a; --tk-mst:#f0bf5e}
+/* The master column (only when Arrange is the Song screen) in the Song screen's MST colour. */
+.tagp b.gx{--tk:var(--tk-mst); text-align:center; padding:0; letter-spacing:0; text-overflow:clip} .tath i.gx{box-shadow:inset 0 -2px 0 var(--tk-mst)}
+.tagrid b.gx{--ar-empty:color-mix(in srgb, var(--tk-mst) 40%, transparent)} .tarr.dk .tagrid b.gx{--ar-empty:color-mix(in srgb, var(--tk-mst) 25%, transparent)}
+.tagrid b.gx.f{background:var(--tk-mst); color:#1b2130} .tagrid b.gx.p{background:var(--ar-pl); color:var(--ar-pl-ink)} .tagrid b.gx.z{background:transparent; box-shadow:inset 0 0 0 1px var(--tk-mst); color:var(--ar-ink)}
 /* MONO / POLY over the track numbers, the same pink and green tabs as the Song screen's group boxes. */
 .tagp{flex:none; display:grid; grid-template-columns:22px var(--arcols, repeat(8,minmax(0,1fr)) 4px repeat(8,minmax(0,1fr))); gap:2px; padding:0 8px; margin-top:2px}
 .tagp b{--tk:var(--tk-mono); min-width:0; font:600 9px/1.5 var(--mono); letter-spacing:.08em; padding:0 5px; background:var(--tk); color:#1b2130;
@@ -1226,7 +1236,8 @@ body.arrsmall .tarr.zoomed :is(.tagrid .rn, .tath>:first-child), body.arrsmall .
   background-image:repeating-linear-gradient(to bottom, var(--mxscan) 0 1px, transparent 1px 3px)}
 :root[data-skinbase="term"] .tarr, :root[data-skinbase="term"] .tarr.dk{--ar-bg:var(--mxbg); --ar-ink:var(--mx); --ar-dim:var(--mx2); --ar-blk:var(--mx); --ar-blk-ink:var(--mxon);
   --ar-empty:color-mix(in srgb, var(--mx) 8%, transparent); --ar-line:color-mix(in srgb, var(--mx) 25%, transparent); --ar-pl:var(--mxsoft); --ar-pl-ink:var(--mxon);
-  --ar-cur:var(--mx); --ar-mu:var(--mxred); --tk-mono:var(--mx); --tk-poly:var(--mxpoly)}
+  --ar-cur:var(--mx); --ar-mu:var(--mxred); --tk-mono:var(--mx); --tk-poly:var(--mxpoly); --tk-mst:var(--mxmst, var(--mxsoft))}
+:root[data-skinbase="term"] .tagrid b.gx.f, :root[data-skinbase="term"] .tagp b.gx{color:var(--mxmston, #1b2130)}
 :root[data-skinbase="term"] :is(.tagp b,.tgbox b){color:var(--mxon); text-shadow:none}
 /* The MST box takes the skin's third colour (its soft highlight), so mono, poly and master are told apart in every skin. Those
    are light in most skins, so its tab text is dark; where the skin's highlight is dark or too close to its accent, --mxmst
@@ -1801,6 +1812,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p><b>Starting a new song resets the pattern numbering to 00.</b> Project → › NEW SONG (EDIT×2) or › LOAD DEMO begins with its first block at 00; the numbers never carry over from the previous song.</p>
 <p><b>Sects are hidden by default</b> (⚙ Settings → Hide sect page, or Project → SECT): EDIT×2 on an empty song cell makes a block that already holds a phrase, SHIFT+▶ opens that phrase, and EDIT×2 on a filled block makes a unique copy. Set SECT to SHOWN for the sect screen; nothing is lost either way.</p>
 <p><b>PLAY in Song</b> starts from the block under the cursor, or from the top when the cell under the cursor is empty.</p>
+<p><b>The Song screen is Arrange.</b> Every song row is a row of blocks, one column per track, with the amber MST column at the right. Everything the Song screen does works the same: the keys, the pad and command buttons, typing hex, EDIT×2, selecting, copy and paste. On the other screens Arrange moves to its place at the right when there is room (wide screens). To go back to the text grid, tick <b>Settings → Show classic Song screen</b>.</p>
 <p><b>Arrange</b> (wide screens): the overview at the right shows the whole song, lined up with the Song screen (scroll either one and the other follows). <b>A tap on a block goes to it</b> (a second tap opens its phrase). <b>Holding a block mutes or unmutes just that one</b> — the phrase stays in place, silent, so you can drop parts in and out while arranging. Tap a row number to play from there; in KEYS mode M mutes the block under the Song cursor. Whole tracks are muted in the Mixer, never here, so a slip can’t silence a track.</p>
 <p>The screens are laid out as a map: Song ▶ Sect ▶ Phrase ▶ Inst left to right, Project above, Mixer below, FX to the right of the Mixer. You move between them with the screen keys below, the tabs, or the map in the side panel.</p>
 <h3>Pluck string</h3>
@@ -12175,6 +12187,14 @@ let sectsOn = (() => { try { return localStorage.getItem(CHK) === '1'; } catch(e
 // 0 off, 1 auto (wide screens), 2 on at any size.
 let arrMode = (() => { try { const v = localStorage.getItem(ARK); return v === '0' ? 0 : v === '2' ? 2 : 1; } catch(e){ return 1; } })();
 const arrBody = () => arrLayout(true);
+// CLASSIC SONG (Project → Screen, off by default): off, the Song screen IS Arrange — the panel moves into the screen in
+// the text grid's place, full width at any size (the cover screen too), with the master column. Every Song key, pad and
+// command is unchanged: tv is still 'song' and the cursor is still cs.song; only the drawing differs. On brings back the
+// text grid with Arrange beside it, exactly as before. To take it out for good: HANDOVER.md, "Arrange is the Song screen".
+const SGK = 'thunderplus-songgrid-v1';
+let songGrid = (() => { try { return localStorage.getItem(SGK) === '1'; } catch(e){ return false; } })();
+const asongOn = () => !songGrid && view === 'tracker' && tv === 'song';
+function setSongGrid(on){ songGrid = !!on; try { localStorage.setItem(SGK, songGrid ? '1' : '0'); } catch(e){} arrSig = ''; gridHTML = null; layoutSig = ''; arrLayout(true); }   // null: the text grid is rebuilt (or emptied) on the next draw
 const midList = () => sectsOn ? MID : MID.filter(v => v !== 'sect');
 function sectVis(){
   document.querySelectorAll('#tTabs [data-v="sect"], #tMap [data-v="sect"]').forEach(b => b.hidden = !sectsOn);
@@ -12435,7 +12455,9 @@ function projRows(){
     {l:'SECT', ck:'Hide sect page', inv:true, get:() => sectsOn ? 1 : 0, set:v => setSects(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'HIDDEN: the song opens straight into phrases, like patterns (each new song block gets its own sect with one phrase). SHOWN brings back the sect screen. Nothing is deleted either way'},
     {l:'ARRANGE', opts:true, get:() => arrMode, set:v => setArr(v), tap:() => setArr((arrMode + 1) % 3), min:0, max:2, d:1, fmt:v => ['OFF', 'AUTO', 'ON'][v],
-      info:() => `Song overview at the right. AUTO shows it on wide screens (600 × 500 and up), ON at any size. This screen: ${innerWidth} × ${innerHeight}` + (arrMode === 1 && !arrEl.offsetWidth ? ' (too small for AUTO)' : '')},
+      info:() => `Song overview at the right of the other screens. AUTO shows it on wide screens (600 × 500 and up), ON at any size. This screen: ${innerWidth} × ${innerHeight}` + (arrMode === 1 && !arrEl.offsetWidth && !asongOn() ? ' (too small for AUTO)' : '') + (songGrid ? '' : '. The Song screen is Arrange whatever this says')},
+    {l:'CLASSIC SONG', ck:'Show classic Song screen', get:() => songGrid ? 1 : 0, set:v => setSongGrid(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
+      info:() => 'HIDDEN (the default): the Song screen is Arrange, full width on any screen, with every Song key, pad command and the master column. SHOWN brings back the text grid, with Arrange beside it as before. The song is the same either way'},
     {l:'SIDE PANEL', ck:'Show side panel', get:() => sideOn ? 1 : 0, set:v => setSide(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'The grey column at the right on wide screens: the screen map, track meters and key reminders. Hide it to give the tracker and Arrange more room'},
     {l:'INST LIST', ck:'Show instrument list', get:() => inlOn ? 1 : 0, set:v => setInl(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
@@ -13369,7 +13391,7 @@ function songRows(){ const fs = parseFloat(scr.style.fontSize) || 14, h = grid.c
 // text down by just enough so it ends inside. A few tries at most, reset by every fit().
 let fitTries = 0;
 function fitCheck(){
-  if (tScale !== 100 || fitTries >= 3 || !(tv === 'song' || tv === 'phrase' || tv === 'mixer' || tv === 'sect')) return false;
+  if (tScale !== 100 || fitTries >= 3 || !(tv === 'song' || tv === 'phrase' || tv === 'mixer' || tv === 'sect') || asongOn()) return false;   // Arrange as Song: no text grid to fit
   const g = grid.getBoundingClientRect(), bottom = g.top + grid.clientTop + grid.clientHeight;
   let end = 0; const lns = grid.querySelectorAll(':scope > .ln'); if (lns.length) end = lns[lns.length - 1].getBoundingClientRect().bottom;
   grid.querySelectorAll('.tgbox').forEach(b => { end = Math.max(end, b.getBoundingClientRect().bottom); });
@@ -13430,6 +13452,7 @@ function playhead(){
 }
 function draw(){
   if (view !== 'tracker') return;
+  if (arrPlace()) scheduleRefit(false);   // Arrange moved into (or out of) the Song screen: size the text again next frame
   if (selA && selA.v !== tv) selA = null;
   // The FX target follows the track being edited: moving to another phrase (or block) moves the FX panel and the FX
   // screen with it. The master column's phrases point it at the master (MT is the FX screen's master, NT).
@@ -13448,7 +13471,11 @@ function draw(){
   // Sect and Phrase light the playing row in place after the grid is built (see below), so the grid's text does
   // not change every row and is not rebuilt (innerHTML + layout, ~20 ms on a phone) 16 times a bar.
   let prLit = null;
-  if (tv === 'song'){
+  if (tv === 'song' && asongOn()){
+    // Arrange is the Song screen: no text to build, just keep the cursor's row in Arrange's view (drawArr draws it).
+    sub = S.name;
+    const VR = arrRows(); if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; c.top = clamp(c.top, 0, 256 - VR);
+  } else if (tv === 'song'){
     const [T0, T1] = trackWin(c, stepDec ? 4 : 3, 1), ts = trkSub(T0, T1); sub = ts ? ts + '  ' + S.name : S.name;
     const VR = songRows(); if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; c.top = clamp(c.top, 0, 256 - VR);
     const hd = [stepDec ? '    ' : '   ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t) + tk(t) + ' gt', x:t, y:-1}, ' ');
@@ -13587,6 +13614,7 @@ function draw(){
   $('tInfo').textContent = info();
   let hintTxt = (tv === 'song' && !sectsOn) ? (inMode === 'keys' ? HINTK.songP : HINT.songP) : (inMode === 'keys' ? HINTK : HINT)[tv];
   if (tv === 'phrase' && inMode !== 'keys' && !patNavOn) hintTxt = hintTxt.replace('OPT+arrows go to phrase', 'OPT+▲▼ page');
+  if (asongOn()) hintTxt += inMode === 'keys' ? ' · double-click opens · Alt-click mutes' : ' · tap twice opens · hold mutes';
   const mstP = tv === 'phrase' && mstView();
   if (mstP) hintTxt = inMode === 'keys' ? 'Master phrase: commands only · letters pick a command (V F G R T…) · type hex for its value · Del cell · Shift+↑↓ lines · Ctrl+C/V' : HINT.phraseM;
   if (tv === 'fx' && cs.fx.y > FXSLOTS) hintTxt = 'Slot ' + (cFxS + 1) + ' controls · ▲▼ pick one · ' + (inMode === 'keys' ? '← or Esc back to the slots' : '◀ back to the slots');
@@ -13658,10 +13686,10 @@ let stgKindNow = '', stgSig = '', stgReq = '';   // stgReq: what the last layout
 function stageLayout(){
   const box = $('tStage'); stgReq = view !== 'tracker' || stage === 'off' ? '' : stageKind();
   if (view !== 'tracker' || stage === 'off'){ box.hidden = true; stgKindNow = ''; return; }
-  const sr = scr.getBoundingClientRect(), gr = grid.getBoundingClientRect(), rg = document.createRange();
-  let right = 0; const lines = grid.querySelectorAll('.ln');
+  const asg = asongOn(), sr = scr.getBoundingClientRect(), gr = (asg ? arrEl : grid).getBoundingClientRect(), rg = document.createRange();
+  let right = asg ? gr.right : 0; const lines = asg ? [] : grid.querySelectorAll('.ln');   // Arrange as the Song screen: the dogs dance beside it
   for (let i = 0; i < Math.min(lines.length, 80); i++){ rg.selectNodeContents(lines[i]); const r = rg.getBoundingClientRect(); if (r.width && r.right > right) right = r.right; }
-  grid.querySelectorAll('.tgbox').forEach(b => { const r = b.getBoundingClientRect(); if (r.right > right) right = r.right; });
+  if (!asg) grid.querySelectorAll('.tgbox').forEach(b => { const r = b.getBoundingClientRect(); if (r.right > right) right = r.right; });
   const kind = stageKind(), left = right - sr.left + 18, w = sr.width - left - 14, top = gr.top - sr.top, h = gr.height;
   const minW = kind === 'piano' ? 90 : 150, show = right > 0 && w >= minW && h >= 150; box.hidden = !show; if (!show){ stgKindNow = ''; return; }
   Object.assign(box.style, {left:left + 'px', top:top + 'px', width:w + 'px', height:h + 'px'});
@@ -14361,7 +14389,18 @@ let arrZoom = (() => { try { const z = parseFloat(localStorage.getItem(AZK)); re
 let arrPinch = null, arrCurX = -1, arrWheelT = 0;
 const arrPtrs = new Set();
 const arrEl = $('tArr'), arrGrid = $('tArrGrid');
-const arrShown = () => arrMode > 0 && arrEl.offsetWidth > 0;
+const arrShown = () => (arrMode > 0 || asongOn()) && arrEl.offsetWidth > 0;
+// Arrange as the Song screen (CLASSIC SONG off): the panel itself moves into the screen, in the text grid's place, and back
+// out to the side for every other screen. Returns true when it moved, so the caller can size things again.
+const arrHome = arrEl.parentElement, arrHomeNext = arrEl.nextElementSibling, scrInfo = scr.querySelector('.tinfo');
+function arrPlace(){
+  const on = asongOn(); document.body.classList.toggle('asong', on);
+  if (arrEl.parentElement === (on ? scr : arrHome)) return false;
+  if (on) scr.insertBefore(arrEl, scrInfo); else arrHome.insertBefore(arrEl, arrHomeNext);
+  arrSig = ''; arrCurY = -1; return true;
+}
+// How many song rows Arrange shows at once, for keeping the cursor's row in view when it is the Song screen.
+function arrRows(){ const rh = arrRowH(); return rh > 0 ? clamp(Math.floor((arrGrid.clientHeight - 11) / rh), 2, 96) : 16; }
 // The panel's width: 0 is the default for the screen size, otherwise what the grip was dragged to.
 const AWK = 'thunderplus-arrange-w-v1';
 let arrW = (() => { try { return Math.max(0, int(localStorage.getItem(AWK), 0)); } catch(e){ return 0; } })(), arrKey = '';
@@ -14521,7 +14560,7 @@ function drawArr(PH){
   if (!arrShown()) return;
   arrEl.classList.toggle('dk', tScreen === 'dark');
   // Blocks grow with the panel: row height follows the column width (16–40px).
-  const NA = ntr();
+  const NA = ntr(), ms = asongOn();   // ms: Arrange is the Song screen, so it gets the master column too
   const arRH = arrSize();
   let lastR = -1; for (let y = 255; y >= 0; y--) if (S.song[y].some(v => v >= 0)){ lastR = y; break; }
   const N = clamp(Math.max(lastR + 2, 16, cs.song.y + 1, (cs.song.top || 0) + 40), 1, 256);   // room to line up with the Song screen's top row
@@ -14544,18 +14583,20 @@ function drawArr(PH){
           if (arRH >= 26 && pi.hits) lab += pi.hits; }
       }
       if (S.mix[t].mute || (anySolo && !S.mix[t].solo)) cls += ' tm';
-      if (cs.song.x === t && cs.song.y === y) cls += ' c';
       h += `<b class="${cls.trim()}"${sty} data-y="${y}" data-t="${t}">${lab}</b>`;
     }
+    if (ms){ const v = S.song[y][MT];   // the master column: commands only, never muted
+      h += `<span></span><b class="gx${v < 0 ? '' : isEmptySect(S.chains[v]) ? ' z' : ' f'}" data-y="${y}" data-t="${MT}">${v < 0 ? '' : hx(songShown(v))}</b>`; }
     h += '</div>';
   }
   const PF = polyFrom();
-  const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (t && t % 8 === 0 ? '<span></span>' : '') + `<i class="${t < PF ? 'gm' : 'gp'}${m.mute ? ' mu' : ''}">${t + 1}</i>`).join('');
+  const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (t && t % 8 === 0 ? '<span></span>' : '') + `<i class="${t < PF ? 'gm' : 'gp'}${m.mute ? ' mu' : ''}">${t + 1}</i>`).join('') + (ms ? '<span></span><i class="gx">MS</i>' : '');
   // MONO and POLY tabs spanning their tracks' columns (track t sits in grid column 2 + t + one per 8-track gap before it).
   const col = t => 2 + t + Math.floor(t / 8), rng = (a, b) => d2(a) + (b > a ? '–' + d2(b) : '');
   let gp = '';
   if (PF > 0) gp += `<b class="gm" style="grid-column:${col(0)} / ${col(PF - 1) + 1}" title="Mono tracks ${rng(1, PF)}">MONO ${rng(1, PF)}</b>`;
   if (NA > PF) gp += `<b class="gp" style="grid-column:${col(PF)} / ${col(NA - 1) + 1}" title="Poly tracks ${rng(PF + 1, NA)}">POLY ${rng(PF + 1, NA)}</b>`;
+  if (ms) gp += `<b class="gx" style="grid-column:${col(NA - 1) + 2}" title="Master column: commands for the master bus">MST</b>`;
   const sig = h + th + gp;
   if (sig !== arrSig){
     arrSig = sig; arrGrid.innerHTML = h; $('tArrTh').innerHTML = th; $('tArrGp').innerHTML = gp;
@@ -14566,13 +14607,18 @@ function drawArr(PH){
   play.forEach((y, t) => { if (y < 0) return; const row = arrGrid.children[y]; if (!row) return;
     const rn = row.firstElementChild; if (!rn.classList.contains('pl')){ rn.classList.add('pl'); arrLit.push(rn); }
     const b = row.querySelector(`b[data-t="${t}"]`); if (b && S.song[y][t] >= 0){ b.classList.add('p'); arrLit.push(b); } });
+  // The cursor (and, on the Song screen, the selection) are marked in place too, so moving them never rebuilds the grid.
+  for (const e of arrMark) e.classList.remove('c', 'sl'); arrMark = [];
+  const mark = (y, t, k) => { const row = arrGrid.children[y], b = row && row.querySelector(`b[data-t="${t}"]`); if (b){ b.classList.add(k); arrMark.push(b); } };
+  mark(cs.song.y, cs.song.x, 'c');
+  if (ms && selA && selA.v === 'song'){ const r = selRect(); for (let y = r.y0; y <= r.y1; y++) for (let t = r.x0; t <= r.x1; t++) mark(y, t, 'sl'); }
   const nm = S.smute.reduce((a, m) => { for (; m; m &= m - 1) a++; return a; }, 0);
   $('tArrSub').textContent = (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : '');
   arrAlign(); arrFollowX();
 }
 // ARRANGE and the Song screen show the same rows: the panel's top row is always the Song screen's top row, and
 // scrolling the panel scrolls the Song screen with it (they used to scroll apart, e.g. the panel at row 000, Song at 002).
-let arrIgnore = -1;
+let arrIgnore = -1, arrMark = [];
 const arrRowH = () => { const r = arrGrid.children; return r.length > 1 ? r[1].getBoundingClientRect().top - r[0].getBoundingClientRect().top : 0; };
 function arrAlign(){
   const rh = arrRowH(); if (!(rh > 0)) return;
@@ -14587,7 +14633,7 @@ arrGrid.addEventListener('scroll', () => {
   const c = cs.song, top = clamp(Math.round(arrGrid.scrollTop / rh), 0, 255);
   if (top === c.top) return;
   c.top = top;
-  if (tv === 'song'){ const VR = songRows(); if (c.y < top) c.y = top; else if (c.y > top + VR - 1) c.y = Math.min(255, top + VR - 1); }
+  if (tv === 'song'){ const VR = asongOn() ? arrRows() : songRows(); if (c.y < top) c.y = top; else if (c.y > top + VR - 1) c.y = Math.min(255, top + VR - 1); }
   draw();
 }, {passive:true});
 // A tap moves the song cursor there (from the phrase screen it opens that block's phrase); a second tap on the
@@ -14608,11 +14654,16 @@ function arrGo(y, t){
 // zoomed they are fixed px, so the rows run past the panel and scroll. Returns the block height.
 function arrSize(){
   const NA = ntr(), G = Math.ceil(NA / 8), z = arrZoom > 1 ? arrZoom : 1, sm = document.body.classList.contains('arrsmall');
-  const W = arrGrid.clientWidth, cwFit = (W - (sm ? 12 : 16) - (sm ? 18 : 22) - (G - 1) * 4 - (NA + G - 1) * (sm ? 1 : 2)) / NA;
+  const ms = asongOn() ? 1 : 0;   // as the Song screen: one more column (the master) after one more 4px spacer
+  // As the Song screen, blocks stop growing at about 44px wide, so on a wide screen the stage (the dancing dogs) keeps the
+  // space beside it, as it had beside the text grid. A narrow screen (or STAGE off) still gives Arrange the whole width.
+  if (ms) arrEl.style.maxWidth = stage !== 'off' ? Math.round((sm ? 12 : 16) + (sm ? 18 : 22) + (NA + 1) * 46 + G * 6 + 4) + 'px' : '';
+  else if (arrEl.style.maxWidth) arrEl.style.maxWidth = '';
+  const W = arrGrid.clientWidth, cwFit = (W - (sm ? 12 : 16) - (sm ? 18 : 22) - (G - 1 + ms) * 4 - (NA + G - 1 + 2 * ms) * (sm ? 1 : 2)) / (NA + ms);
   const col = z > 1 ? Math.max(6, cwFit * z).toFixed(1) + 'px' : 'minmax(0,1fr)', grp = [];
   for (let g = 0; g < NA; g += 8) grp.push(`repeat(${Math.min(8, NA - g)},${col})`);
-  arrEl.style.setProperty('--arcols', grp.join(' 4px '));
-  const cw = (W - 34) / (NA + 0.3 + G * 0.2) * z, rh = clamp(Math.round(cw * 0.8), 16, z > 1 ? 44 : 40);
+  arrEl.style.setProperty('--arcols', grp.join(' 4px ') + (ms ? ' 4px ' + col : ''));
+  const cw = (W - 34) / (NA + ms + 0.3 + (G + ms) * 0.2) * z, rh = clamp(Math.round(cw * 0.8), 16, z > 1 ? 44 : ms ? clamp(Math.floor(arrGrid.clientHeight / 12) - 3, 16, 30) : 40);   // as the Song screen: at least about 12 rows, as the text grid showed
   arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', clamp(Math.round(rh * 0.5), 8, 16) + 'px');
   // Where the MONO | POLY break sits when every track fits (track PF's column starts after a spacer every 8 tracks):
   // the header's ○ is centred over it, and stays there while zoomed so it is always in the same place.
@@ -14888,7 +14939,7 @@ for (const t of [scr, arrGrid]) for (const ev of ['touchend', 'contextmenu']) t.
   if (!e.target.closest('input,textarea,select,button,[contenteditable]') && e.cancelable) e.preventDefault();
 }, {passive:false});
 scr.addEventListener('pointerdown', e => {
-  if (sdrag || drag || (e.button && e.button > 0) || e.target.closest('[data-x],[data-r],#fxPick')) return;
+  if (sdrag || drag || (e.button && e.button > 0) || e.target.closest('[data-x],[data-r],#fxPick,#tArr')) return;   // #tArr: Arrange as the Song screen has its own touch
   startScroll(e);
 });
 let sdragPend = 0;
@@ -14945,7 +14996,7 @@ grid.addEventListener('pointerup', dragEnd); grid.addEventListener('pointercance
 // Mouse wheel moves the cursor a row per notch, so long screens scroll.
 let wAcc = 0;
 scr.addEventListener('wheel', e => {
-  if (fxp.open) return;
+  if (fxp.open || (e.ctrlKey && e.target.closest && e.target.closest('#tArr'))) return;   // Ctrl+wheel over Arrange zooms it
   if (tv === 'mixer' || onPset()) return; e.preventDefault();
   wAcc += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
   const n = Math.trunc(wAcc / 40); if (!n) return; wAcc -= n * 40;
