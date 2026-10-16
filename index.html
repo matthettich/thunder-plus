@@ -247,6 +247,7 @@ body:not(.noed) .wvMobNote{display:none}
 .segrow>span{color:var(--muted); width:70px; flex:none}
 .segrow{min-width:0}
 .fxgrid .segrow{grid-column:1 / -1}
+.segrow select.fxsel{flex:1 1 auto; min-width:0; max-width:100%; min-height:30px; font:inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line); padding:0 6px}
 .seg{display:inline-flex; flex-wrap:wrap; border:1px solid var(--line); background:var(--panel); max-width:100%; min-width:0}
 .seg button{border:0; border-right:1px solid var(--line); min-height:30px; padding:3px 12px; font-weight:500; font-size:var(--fs-3); background:none}
 .seg button.on{background:var(--ink); color:var(--inv)}
@@ -1827,7 +1828,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" hidden></div>
 
-<script src="waves/waves-worklet.js?v=19"></script>
+<script src="waves/waves-worklet.js?v=20"></script>
 <script>
 /* ===ENGINE START=== */
 const BASE = 65.40639; // C2
@@ -2514,6 +2515,192 @@ const FX = {
       dry:{l:'Dry', min:0, max:1, c:'lin', d:0, f:v => Math.round(v * 100) + '%'}, wet:{l:'Wet', min:0, max:1, c:'lin', d:1, f:v => Math.round(v * 100) + '%'}}},
 };
 const FX_CREDIT = {degrade:'Thunder original', reson:'Thunder original', eq:'Airwindows EQ', comp:'Airwindows Pressure4', reverb:'Airwindows Galactic', delay:'Airwindows TapeDelay2', rings:'Mutable Instruments Rings', clouds:'Mutable Instruments Clouds', beads:'Mutable Instruments Beads', density:'Airwindows Density', tape:'Airwindows ToTape6', chorus:'DaisySP Chorus', crush:'DaisySP Decimator', flanger:'based on DaisySP Flanger', phaser:'based on DaisySP Phaser', tremolo:'based on DaisySP Tremolo', odrive:'based on DaisySP Overdrive', folder:'based on DaisySP Wavefolder', autowah:'based on DaisySP Autowah', pshift:'based on DaisySP PitchShifter', ladder:'based on DaisySP LadderFilter', xmod:'based on Mutable Instruments Warps', space:'based on Cloud Seed by Ghost Note Audio', lofi:'based on Airwindows DeRez2', drive:'based on Airwindows PurestDrive', air:'based on Airwindows Air3', room:'based on Airwindows Verbity2', comb:'Thunder original', transient:'Thunder original', tgate:'Thunder original', ott:'Thunder original', fshift:'Thunder original', vinyl:'based on Airwindows ToVinyl4', dub:'based on Airwindows Dubly', cab:'based on Airwindows Cabs', tube:'based on Airwindows Tube2'};
+/* ===MODFX START=== (written by tools/modfx.mjs from tools/modfx-spec.mjs — edit those, not this)
+   Shared …chains/…waves modules that are also pad and track effects. ps rows: [param, label, curve ('lin' | 'log' | 'int'
+   | 'opt' for a choice), min, max, default, format (or the choice's names)]. */
+const MODFX = {
+  spring:{name:'Spring reverb', short:'SPRG', long:'Spring reverb: the boingy, dripping spring tank of amps and dub, two springs for stereo (Thunder original)', tail:true, pad:true, track:true, group:'Reverbs', credit:'Thunder original', ps:[
+    ['decay', 'Decay', 'lin', 0, 1, 0.6, v => Math.round(v * 100) + '%'],
+    ['tone', 'Tone', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['chirp', 'Chirp', 'lin', 0, 1, 0.6, v => Math.round(v * 100) + '%'],
+    ['length', 'Length', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['drip', 'Drip', 'lin', 0, 1, 0.4, v => Math.round(v * 100) + '%'],
+    ['mix', 'Mix', 'lin', 0, 1, 0.35, v => Math.round(v * 100) + '% wet']]},
+  plate:{name:'Plate reverb', short:'PLAT', long:'Plate reverb: the bright, dense studio plate, a figure-eight tank written from Dattorro\'s 1997 paper (Thunder original)', tail:true, pad:true, track:true, group:'Reverbs', credit:'Thunder original', ps:[
+    ['size', 'Size', 'lin', 0.2, 1, 0.7, v => Math.round(v * 100) + '%'],
+    ['decay', 'Decay', 'lin', 0, 0.97, 0.6, v => Math.round(v * 100) + '%'],
+    ['damp', 'Damping', 'lin', 0, 1, 0.4, v => Math.round(v * 100) + '%'],
+    ['pre', 'Pre-delay', 'lin', 0, 0.25, 0.01, v => Math.round(v * 1000) + ' ms'],
+    ['mod', 'Motion', 'lin', 0, 1, 0.3, v => Math.round(v * 100) + '%'],
+    ['mix', 'Mix', 'lin', 0, 1, 0.3, v => Math.round(v * 100) + '% wet']]},
+  ensemble:{name:'Ensemble chorus', short:'ENSM', long:'Ensemble: a lush three-voice string-machine chorus, or the wide two-speed chorus of 80s polysynths (Thunder original)', tail:false, pad:true, track:true, group:'Modulation', credit:'Thunder original', ps:[
+    ['mode', 'Mode', 'opt', 0, 3, 0, ['Ensemble', 'Classic I', 'Classic II', 'Classic I+II']],
+    ['rate', 'Rate', 'lin', 0, 1, 0.5, v => (v > .5 ? '+' : '') + Math.round((v - .5) * 200) + '%'],
+    ['depth', 'Depth', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['tone', 'Tone', 'lin', 0, 1, 0.7, v => Math.round(v * 100) + '%'],
+    ['mix', 'Mix', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '% wet']]},
+  dimension:{name:'Dimension (stereo chorus)', short:'DIMN', long:'Dimension: the subtle stereo widener of the 4-button dimension chorus boxes; keeps the middle solid (Thunder original)', tail:false, pad:true, track:true, group:'Modulation', credit:'Thunder original', ps:[
+    ['mode', 'Mode', 'opt', 0, 3, 1, ['1 (subtle)', '2', '3', '4 (widest)']],
+    ['width', 'Width', 'lin', 0, 1, 0.7, v => Math.round(v * 100) + '%'],
+    ['tone', 'Tone', 'lin', 0, 1, 0.6, v => Math.round(v * 100) + '%']]},
+  bbd:{name:'BBD delay', short:'BBD', long:'BBD delay: a bucket-brigade analog echo that darkens, saturates, wobbles and self-oscillates (Thunder original)', tail:true, pad:true, track:true, group:'Delays', credit:'Thunder original', ps:[
+    ['time', 'Time', 'log', 0.02, 0.9, 0.3, v => Math.round(v * 1000) + ' ms'],
+    ['sync', 'Sync', 'opt', 0, 1, 0, ['Off', 'To tempo']],
+    ['div', 'Division', 'opt', 0, 6, 2, ['1/16', '1/8T', '1/8', '1/4T', '1/4', '1/2', '1 bar']],
+    ['fb', 'Repeats', 'lin', 0, 1.1, 0.45, v => Math.round(v * 100) + '%'],
+    ['tone', 'Tone', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['wow', 'Wow', 'lin', 0, 1, 0.25, v => Math.round(v * 100) + '%'],
+    ['age', 'Age', 'lin', 0, 1, 0.2, v => Math.round(v * 100) + '%'],
+    ['mix', 'Mix', 'lin', 0, 1, 0.35, v => Math.round(v * 100) + '% wet']]},
+  harm:{name:'Harmonizer', short:'HARM', long:'Harmonizer: two pitch-shifted voices at set intervals, each with its own level and pan (Thunder original)', tail:false, pad:true, track:true, group:'Pitch and voice', credit:'Thunder original', ps:[
+    ['v1', 'Voice 1', 'opt', 0, 15, 9, ['−2 oct', '−10th', '−oct', '−5th', '−4th', '−maj 3rd', '−min 3rd', 'Unison', '+min 3rd', '+maj 3rd', '+4th', '+5th', '+6th', '+oct', '+10th', '+2 oct']],
+    ['v2', 'Voice 2', 'opt', 0, 15, 11, ['−2 oct', '−10th', '−oct', '−5th', '−4th', '−maj 3rd', '−min 3rd', 'Unison', '+min 3rd', '+maj 3rd', '+4th', '+5th', '+6th', '+oct', '+10th', '+2 oct']],
+    ['lv1', 'Level 1', 'lin', 0, 1, 0.7, v => Math.round(v * 100) + '%'],
+    ['lv2', 'Level 2', 'lin', 0, 1, 0, v => Math.round(v * 100) + '%'],
+    ['pan1', 'Pan 1', 'lin', -1, 1, -0.4, v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'],
+    ['pan2', 'Pan 2', 'lin', -1, 1, 0.4, v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'],
+    ['detune', 'Detune', 'lin', 0, 30, 0, v => '±' + v.toFixed(1) + ' ct'],
+    ['delay', 'Delay', 'lin', 0, 0.15, 0, v => Math.round(v * 1000) + ' ms'],
+    ['win', 'Window', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['dry', 'Dry', 'lin', 0, 1, 1, v => Math.round(v * 100) + '%']]},
+  flex:{name:'Flex (beat re-sequencer)', short:'FLEX', long:'Flex: re-sequences the sound in time with the song: repeats, reverses, half speed, tape stops, scratches (Thunder original)', tail:false, pad:true, track:false, group:'Rhythmic', credit:'Thunder original', ps:[
+    ['pat', 'Pattern', 'opt', 0, 16, 1, ['Off', 'Repeat 1/4', 'Repeat 1/8', 'Fill 1/16', 'Stutter build', 'Half speed', 'Tape stop', 'Reverse beats', 'Reverse 1/8', 'Backspin', 'Scratch', 'Gate 1/16', 'Trance chop', 'Shuffle', 'Beat juggle', 'Octave up', 'Random slices']],
+    ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet'],
+    ['xf', 'Smooth', 'lin', 0.5, 20, 5, v => v.toFixed(1) + ' ms']]},
+  sgate:{name:'Step gate', short:'SGAT', long:'Step gate: a 16-step on/off pattern in time with the song (Thunder original)', tail:false, pad:true, track:false, group:'Rhythmic', credit:'Thunder original', ps:[
+    ['pat', 'Pattern', 'opt', 0, 15, 2, ['Custom', 'Every step', '8ths', 'Offbeats', '3-3-2', 'Gallop', 'Broken', 'Triple', 'Quarters', 'Off 8ths', 'Syncopate', 'Half on', 'First half', 'Dense', 'Pairs', 'Tresillo']],
+    ['m1', 'Steps 1–8', 'int', 0, 255, 170, v => [...Array(8)].map((_, j) => ((Math.round(v) >> (7 - j)) & 1) ? 'x' : '·').join('')],
+    ['m2', 'Steps 9–16', 'int', 0, 255, 170, v => [...Array(8)].map((_, j) => ((Math.round(v) >> (7 - j)) & 1) ? 'x' : '·').join('')],
+    ['div', 'Step', 'opt', 0, 4, 1, ['1/8', '1/16', '1/32', '1/16T', '1/8T']],
+    ['len', 'Length', 'lin', 0.03, 1, 0.75, v => Math.round(v * 100) + '%'],
+    ['depth', 'Depth', 'lin', 0, 1, 1, v => Math.round(v * 100) + '%'],
+    ['smooth', 'Smooth', 'lin', 0.3, 20, 2, v => v.toFixed(1) + ' ms']]},
+  retrig:{name:'Retrigger (stutter)', short:'RTRG', long:'Retrigger: repeats a slice in time with the song, each repeat quieter or pitched (Thunder original)', tail:false, pad:true, track:false, group:'Rhythmic', credit:'Thunder original', ps:[
+    ['mode', 'Mode', 'opt', 0, 1, 1, ['While Trig is high', 'Always']],
+    ['div', 'Rate', 'opt', 0, 7, 2, ['1/4', '1/8', '1/16', '1/32', '1/64', '1/8T', '1/16T', '1/32T']],
+    ['decay', 'Decay', 'lin', 0, 1, 0.15, v => Math.round(v * 100) + '%'],
+    ['pitch', 'Pitch', 'int', -24, 24, 0, v => (v > 0 ? '+' : '') + Math.round(v) + ' st a repeat'],
+    ['gate', 'Gate', 'lin', 0.05, 1, 1, v => Math.round(v * 100) + '%'],
+    ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet']]},
+  spectral:{name:'Spectral', short:'SPEC', long:'Spectral: FFT blur, freeze, de-noise gate, robot, whisper and frequency shift (Thunder original)', tail:true, pad:true, track:true, group:'Spectral and granular', credit:'Thunder original', ps:[
+    ['mode', 'Mode', 'opt', 0, 5, 0, ['Blur', 'Freeze', 'Gate', 'Robot', 'Whisper', 'Shift']],
+    ['amt', 'Amount', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['shift', 'Shift', 'lin', -1, 1, 0.15, v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.round(v * v * 2000) + ' Hz'],
+    ['tone', 'Tone', 'lin', -1, 1, 0, v => Math.abs(v) < .005 ? 'Flat' : (v < 0 ? 'Darker ' : 'Brighter ') + Math.round(Math.abs(v) * 100) + '%'],
+    ['freeze', 'Freeze', 'opt', 0, 1, 0, ['Off', 'Hold']],
+    ['mix', 'Mix', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '% wet']]},
+  stretch:{name:'Extreme stretch', short:'XSTR', long:'Extreme stretch: smears the last 12 s into an ambient wash up to 50× slower, or freezes a moment into a drone (Thunder original)', tail:true, pad:true, track:true, group:'Spectral and granular', credit:'Thunder original', ps:[
+    ['amt', 'Stretch', 'lin', 0, 1, 0.5, v => '×' + (1.5 * Math.pow(50 / 1.5, v)).toFixed(1)],
+    ['win', 'Window', 'opt', 0, 4, 2, ['~45 ms (grainy)', '~90 ms', '~0.18 s', '~0.35 s', '~0.7 s (smoothest)']],
+    ['freeze', 'Freeze', 'opt', 0, 1, 0, ['Off', 'Hold']],
+    ['tone', 'Tone', 'lin', -1, 1, 0, v => Math.abs(v) < .005 ? 'Flat' : (v < 0 ? 'Darker ' : 'Brighter ') + Math.round(Math.abs(v) * 100) + '%'],
+    ['mix', 'Mix', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '% wet']]},
+  convolve:{name:'Convolution reverb', short:'CONV', long:'Convolution reverb: rooms, halls, plate, spring, gated, reverse, cab and telephone impulse responses, or the song\'s own IRs (Thunder original)', tail:true, pad:true, track:true, group:'Reverbs', credit:'Thunder original', ps:[
+    ['type', 'Type', 'opt', 0, 13, 1, ['Room', 'Hall', 'Chamber', 'Plate', 'Cathedral', 'Spring', 'Gated (80s)', 'Reverse (rising)', 'Speaker cab', 'Telephone / lo-fi', 'Song IR 1', 'Song IR 2', 'Song IR 3', 'Song IR 4']],
+    ['size', 'Size', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['decay', 'Decay', 'log', 0.1, 10, 2, v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s'],
+    ['pre', 'Pre-delay', 'lin', 0, 0.25, 0.01, v => Math.round(v * 1000) + ' ms'],
+    ['tone', 'Tone', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['early', 'Early', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['width', 'Width', 'lin', 0, 1.5, 1, v => Math.round(v * 100) + '%'],
+    ['mix', 'Mix', 'lin', 0, 1, 0.3, v => Math.round(v * 100) + '% wet']]},
+  autotune:{name:'Pitch correct', short:'TUNE', long:'Pitch correct: snaps a solo voice or instrument to the nearest note of a key and scale, from robot-hard to natural (Thunder original)', tail:false, pad:true, track:true, group:'Pitch and voice', credit:'Thunder original', ps:[
+    ['key', 'Key', 'opt', 0, 11, 0, ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']],
+    ['scale', 'Scale', 'opt', 0, 8, 0, ['Chromatic', 'Major', 'Minor', 'Harmonic minor', 'Major pentatonic', 'Minor pentatonic', 'Blues', 'Dorian', 'Mixolydian']],
+    ['speed', 'Speed', 'lin', 0, 0.4, 0.025, v => v < 0.0005 ? 'Snap' : Math.round(v * 1000) + ' ms'],
+    ['humanize', 'Humanize', 'lin', 0, 1, 0, v => Math.round(v * 100) + '%'],
+    ['trans', 'Transpose', 'int', -12, 12, 0, v => (v > 0 ? '+' : '') + Math.round(v) + ' st'],
+    ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet']]},
+  vowel:{name:'Vowel filter', short:'VOWL', long:'Vowel filter: formant peaks that make any sound say A, E, I, O, U, morphing, with an LFO and envelope (Thunder original)', tail:false, pad:true, track:true, group:'Filters', credit:'Thunder original', ps:[
+    ['vowel', 'Vowel', 'lin', 0, 4, 0, v => Math.abs(v - Math.round(v)) < 0.08 ? 'AEIOU'[Math.round(v)] : 'AEIOU'[Math.floor(v)] + '>' + 'AEIOU'[Math.min(4, Math.floor(v) + 1)]],
+    ['voice', 'Voice', 'lin', 0, 2, 0, v => v < 0.15 ? 'Man' : v > 1.85 ? 'Child' : Math.abs(v - 1) < 0.15 ? 'Woman' : v.toFixed(2)],
+    ['shift', 'Shift', 'lin', -1, 1, 0, v => (v > 0 ? '+' : '') + Math.round(v * 12) + ' st'],
+    ['res', 'Resonance', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['rate', 'LFO rate', 'log', 0.05, 10, 0.5, v => (v < 10 ? v.toFixed(2) : v.toFixed(1)) + ' Hz'],
+    ['depth', 'LFO depth', 'lin', 0, 1, 0, v => Math.round(v * 100) + '%'],
+    ['env', 'Env', 'lin', -1, 1, 0, v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'],
+    ['drive', 'Drive', 'lin', 0, 1, 0, v => Math.round(v * 100) + '%'],
+    ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet']]},
+  rotary:{name:'Rotary speaker', short:'ROTR', long:'Rotary speaker: spinning horn and drum cabinet, slow/fast with motor inertia, Doppler and tube drive (Thunder original)', tail:false, pad:true, track:true, group:'Modulation', credit:'Thunder original', ps:[
+    ['speed', 'Speed', 'opt', 0, 2, 1, ['Stop', 'Slow', 'Fast']],
+    ['accel', 'Accel', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['drive', 'Drive', 'lin', 0, 1, 0.2, v => Math.round(v * 100) + '%'],
+    ['balance', 'Balance', 'lin', -1, 1, 0, v => Math.abs(v) < 0.02 ? 'Even' : (v < 0 ? 'Drum ' : 'Horn ') + Math.round(Math.abs(v) * 100) + '%'],
+    ['spread', 'Mic spread', 'lin', 0, 1, 0.8, v => Math.round(v * 100) + '%'],
+    ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet']]},
+  gdelay:{name:'Granular delay', short:'GRDL', long:'Granular delay: an echo made of grains, with pitch, spray, reverse, stereo spread, feedback and freeze (Thunder original)', tail:true, pad:true, track:true, group:'Delays', credit:'Thunder original', ps:[
+    ['time', 'Time', 'log', 0.02, 2, 0.3, v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s'],
+    ['sync', 'Sync', 'opt', 0, 1, 0, ['Off', 'To tempo']],
+    ['div', 'Division', 'opt', 0, 6, 4, ['1/16', '1/8T', '1/8', '1/4T', '1/4', '1/2', '1 bar']],
+    ['size', 'Grain size', 'log', 0.01, 0.5, 0.12, v => Math.round(v * 1000) + ' ms'],
+    ['density', 'Density', 'log', 1, 60, 10, v => v.toFixed(v < 10 ? 1 : 0) + ' /s'],
+    ['pitch', 'Pitch', 'int', -24, 24, 0, v => (v > 0 ? '+' : '') + Math.round(v) + ' st'],
+    ['jitter', 'Pitch jitter', 'lin', 0, 1, 0, v => v < 0.005 ? 'Off' : '±' + (v * v * 12).toFixed(1) + ' st'],
+    ['spray', 'Spray', 'lin', 0, 1, 0.15, v => '+' + Math.round(v * 500) + ' ms'],
+    ['reverse', 'Reverse', 'lin', 0, 1, 0, v => Math.round(v * 100) + '%'],
+    ['spread', 'Spread', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['fb', 'Feedback', 'lin', 0, 1, 0.3, v => Math.round(v * 100) + '%'],
+    ['freeze', 'Freeze', 'opt', 0, 1, 0, ['Off', 'On']],
+    ['mix', 'Mix', 'lin', 0, 1, 0.4, v => Math.round(v * 100) + '% wet']]},
+  reverse:{name:'Reverse echo', short:'RVRS', long:'Reverse echo: echoes played backwards, or a reverse-reverb swell after every note (Thunder original)', tail:true, pad:true, track:true, group:'Delays', credit:'Thunder original', ps:[
+    ['mode', 'Mode', 'opt', 0, 1, 0, ['Reverse delay', 'Swell']],
+    ['time', 'Time', 'log', 0.05, 2, 0.4, v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s'],
+    ['sync', 'Sync', 'opt', 0, 1, 0, ['Off', 'To tempo']],
+    ['div', 'Division', 'opt', 0, 6, 4, ['1/16', '1/8T', '1/8', '1/4T', '1/4', '1/2', '1 bar']],
+    ['fb', 'Feedback', 'lin', 0, 1, 0.3, v => Math.round(v * 100) + '%'],
+    ['size', 'Size', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['tone', 'Tone', 'lin', 0, 1, 0.6, v => Math.round(v * 100) + '%'],
+    ['mix', 'Mix', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '% wet']]},
+  envfilt:{name:'Envelope filter', short:'ENVF', long:'Envelope filter: auto-wah whose resonant filter follows the playing, or the sidechain bus (Thunder original)', tail:false, pad:true, track:true, group:'Filters', credit:'Thunder original', ps:[
+    ['mode', 'Filter', 'opt', 0, 2, 1, ['Low-pass', 'Band-pass', 'High-pass']],
+    ['source', 'Source', 'opt', 0, 1, 0, ['Self', 'Sidechain']],
+    ['freq', 'Freq', 'lin', 0, 1, 0.35, v => (f => f >= 1000 ? (f / 1000).toFixed(1) + ' kHz' : Math.round(f) + ' Hz')(40 * Math.pow(400, v))],
+    ['depth', 'Depth', 'lin', -1, 1, 0.7, v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'],
+    ['range', 'Range', 'lin', 1, 8, 4, v => v.toFixed(1) + ' oct'],
+    ['res', 'Resonance', 'lin', 0, 1, 0.6, v => Math.round(v * 100) + '%'],
+    ['attack', 'Attack', 'log', 0.0005, 0.2, 0.005, v => v < 0.01 ? (v * 1000).toFixed(1) + ' ms' : Math.round(v * 1000) + ' ms'],
+    ['release', 'Release', 'log', 0.01, 2, 0.15, v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s'],
+    ['sens', 'Sensitivity', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['drive', 'Drive', 'lin', 0, 1, 0, v => Math.round(v * 100) + '%'],
+    ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet']]}
+};
+/* ===MODFX END=== */
+/* The MODFX effects on pads: run through the shared module itself (WavesDSP: the …waves engine, which this page and the
+   render Worker both load), so a pad hears exactly what the module does in …chains. Choices become segments. */
+// An effect object keeps its own key in .type and its switch in .on, so a module param with either name is kept as type_ / on_.
+const fxKey = p => p === 'type' || p === 'on' ? p + '_' : p;
+for (const k in MODFX){ const M = MODFX[k]; if (!M.pad) continue;
+  const F = FX[k] = {name:M.name, mod:k, segs:[], rows:{}, init:{}, group:M.group};
+  for (const [p, l, c, min, max, d, x] of M.ps){
+    if (c === 'opt'){ F.segs.push([fxKey(p), l, x.map((n, i) => [i, n])]); F.init[fxKey(p)] = d; }
+    else F.rows[fxKey(p)] = {l, min, max, c:c === 'log' ? 'logf' : c, d, f:x};
+  }
+  FX_CREDIT[k] = M.credit;
+}
+const modDef = k => { const D = globalThis.WavesDSP; return D && D.MODULES ? D.MODULES[k] || null : null; };
+/* A one-shot through a module, 128 samples at a time (in mono, both sides fed the same and averaged out). The song plays
+   from the hit, at the song's tempo, so tempo-locked modules (Flex, Step gate, Retrigger, synced delays) line up. A module
+   whose wet path is late (latency) is pulled back by that much when it runs fully wet. */
+function modFxRun(f, a, sr){
+  const def = modDef(FX[f.type].mod); if (!def) return a;
+  const B = 128, N = a.length, lat = def.latency | 0, shift = lat && (f.mix == null || f.mix >= 0.999) ? lat : 0, n0 = Math.ceil((N + shift) / B) * B;
+  const io = {in:{}, out:{}, p:{}, linked:new Set(['inR'])};
+  for (const k in def.inputs) io.in[k] = new Float32Array(B);
+  for (const k in def.outputs) io.out[k] = new Float32Array(B);
+  for (const k in def.params){ const v = f[fxKey(k)]; io.p[k] = typeof v === 'number' && isFinite(v) ? v : def.params[k][0]; }
+  const ctx = {sr, block:B, transport:{tempo:songBpm(), playing:true, startN:1, lpb:4, ticks:6}, quality:'full', scL:new Float32Array(B), scR:new Float32Array(B), scOn:() => false};
+  let st; try { st = def.create(sr); } catch(e){ return a; }
+  const out = new Float32Array(N), L = io.in.in, R = io.in.inR, oL = io.out.out, oR = io.out.outR || oL;
+  try {
+    for (let o = 0; o < n0; o += B){
+      for (let i = 0; i < B; i++){ const v = o + i < N ? a[o + i] : 0; L[i] = v; if (R) R[i] = v; }
+      def.process(st, io, ctx);
+      for (let i = 0; i < B; i++){ const j = o + i - shift; if (j >= 0 && j < N){ const y = (oL[i] + oR[i]) * 0.5; out[j] = y > -8 && y < 8 ? y : 0; } }
+    }
+  } catch(e){ return a; }
+  finally { try { if (def.destroy) def.destroy(st); } catch(e){} }
+  return out;
+}
 function freshFx(type){ const d = FX[type], f = Object.assign({type, on:true}, d.init); for (const k in d.rows) f[k] = d.rows[k].d; return f; }
 function resample(a, from, to){
   if (from === to) return a;
@@ -2551,9 +2738,10 @@ function txRun(f, a, sr){
   if (d.blend){ const w = Math.min(1, f.mix * 2), dr = Math.min(1, 2 - f.mix * 2); for (let i = 0; i < out.length; i++) out[i] = a[i] * dr + out[i] * w; }
   return out;
 }
-const fxReady = f => FX[f.type] && (FX[f.type].js || (FX[f.type].tx != null ? !!TX : !!PL));
+const fxReady = f => FX[f.type] && (FX[f.type].mod ? !!modDef(FX[f.type].mod) : FX[f.type].js || (FX[f.type].tx != null ? !!TX : !!PL));
 function applyFx(f, a, sr){
   if (!fxReady(f)) return a;
+  if (FX[f.type].mod) return modFxRun(f, a, sr);
   if (f.type === 'pdelay' || f.type === 'preverb'){   // plain JS: PitchFxCore, with room for its tail
     const rv = f.type === 'preverb', tail = Math.round(sr * (rv ? 3 + f.size * 4 : Math.min(8, f.time / 1000 * (1 + 6 * f.fb)))), N = a.length + tail;
     const L = new Float32Array(N), R = new Float32Array(N); L.set(a); R.set(a); const d = new PitchFxCore(sr);
@@ -4724,11 +4912,12 @@ const VM = {
 };
 const MOD_DESTS = ['Off', 'Pitch', 'Level', 'LP cutoff', 'HP cutoff'];
 const MOD_SRC = [['r1', 'LFO 1'], ['r2', 'LFO 2'], ['r3', 'LFO 3'], ['r4', 'Env 1'], ['r5', 'Env 2'], ['r6', 'Env 3'], ['r7', 'Seq']];
-const toPos = (d, v) => d.c === 'log' ? Math.log(v / d.min) / Math.log(d.max / d.min)
+const toPos = (d, v) => d.c === 'log' || d.c === 'logf' ? Math.log(v / d.min) / Math.log(d.max / d.min)
   : d.c === 'sq' ? Math.sqrt(Math.max(0, (v - d.min) / (d.max - d.min))) : (v - d.min) / (d.max - d.min);
 function fromPos(d, p){
-  let v = d.c === 'log' ? d.min * Math.pow(d.max / d.min, p) : d.c === 'sq' ? d.min + (d.max - d.min) * p * p : d.min + (d.max - d.min) * p;
+  let v = d.c === 'log' || d.c === 'logf' ? d.min * Math.pow(d.max / d.min, p) : d.c === 'sq' ? d.min + (d.max - d.min) * p * p : d.min + (d.max - d.min) * p;
   if (d.c === 'int') v = Math.round(v); else if (d.c === 'half') v = Math.round(v * 2) / 2;
+  else if (d.c === 'logf') v = +v.toPrecision(4);   // a fine log curve (the module effects' small times): four figures, never rounded to 0
   else if (d.c === 'log' || d.c === 'sq') v = v < 10 ? Math.round(v * 10) / 10 : Math.round(v);
   else v = Math.round(v * 1000) / 1000;
   return v;
@@ -4883,14 +5072,15 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=19', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=20', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
 // The Worker stopped (or never started): pending jobs fall back to this thread.
 function rwDown(){ PW.ready = false; try { PW.w && PW.w.terminate(); } catch(e){} PW.w = null; for (const j of PW.jobs.values()) j.no(new Error('worker')); PW.jobs.clear(); }
 // Can the Worker render this voice? (It has no …waves engine if loading that failed.)
-const rwCan = v => PW.ready && PW.w && v.engine !== 'sf' && !(PW.wv === false && WV.doc && v.layers.some(l => l.on && l.type === 'waves'));
+// The Worker needs the …waves engine for …waves layers and for the module effects (MODFX); without it, those pads render here.
+const rwCan = v => PW.ready && PW.w && v.engine !== 'sf' && !(PW.wv === false && ((WV.doc && v.layers.some(l => l.on && l.type === 'waves')) || (v.fx || []).some(f => f && f.on && FX[f.type] && FX[f.type].mod)));
 // Renders a voice in the Worker: resolves to {data, st:[[fx index, peaks]…]}. Rejects when the Worker can't.
 function renderAsync(v, sr, hold, stages){
   if (!rwCan(v)) return Promise.reject(new Error('no worker'));
@@ -7013,7 +7203,23 @@ srcRows.burst.inp.addEventListener('input', () => { srcRows.spacing.r.hidden = !
 
 /* ---------- effects card ---------- */
 const FXFMT = {note:noteName, pitch:v => (v > 0 ? '+' : '') + v + ' st', delay:v => v.toFixed(1) + ' ms', rate:v => v.toFixed(2) + ' Hz', bits:v => String(v), input:v => Math.round(v * 100) + '%'};
-Object.keys(FX).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = FX[k].name; $('fxAdd').append(o); });
+// The Add effect menu, grouped (the module effects carry their group; the rest are placed here).
+const FX_GROUP = {eq:'Dynamics and EQ', comp:'Dynamics and EQ', transient:'Dynamics and EQ', ott:'Dynamics and EQ', air:'Dynamics and EQ',
+  density:'Drive and lo-fi', tape:'Drive and lo-fi', odrive:'Drive and lo-fi', folder:'Drive and lo-fi', drive:'Drive and lo-fi', tube:'Drive and lo-fi', cab:'Drive and lo-fi',
+  lofi:'Drive and lo-fi', crush:'Drive and lo-fi', degrade:'Drive and lo-fi', vinyl:'Drive and lo-fi', dub:'Drive and lo-fi',
+  chorus:'Modulation', flanger:'Modulation', phaser:'Modulation', tremolo:'Modulation', xmod:'Modulation',
+  delay:'Delays', pdelay:'Delays', reverb:'Reverbs', space:'Reverbs', room:'Reverbs', preverb:'Reverbs',
+  ladder:'Filters', autowah:'Filters', rings:'Resonators', comb:'Resonators', reson:'Resonators', pshift:'Pitch and voice',
+  clouds:'Spectral and granular', beads:'Spectral and granular', tgate:'Rhythmic'};
+{ const groups = new Map();
+  for (const k of Object.keys(FX)){ const g = FX[k].group || FX_GROUP[k] || 'More'; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(k); }
+  for (const g of ['Dynamics and EQ', 'Drive and lo-fi', 'Filters', 'Modulation', 'Delays', 'Reverbs', 'Pitch and voice', 'Resonators', 'Spectral and granular', 'Rhythmic', 'More']){
+    const ks = groups.get(g); if (!ks) continue; groups.delete(g);
+    const og = document.createElement('optgroup'); og.label = g;
+    for (const k of ks.sort((a, b) => FX[a].name.localeCompare(FX[b].name))){ const o = document.createElement('option'); o.value = k; o.textContent = FX[k].name; og.append(o); }
+    $('fxAdd').append(og);
+  }
+  for (const ks of groups.values()) for (const k of ks){ const o = document.createElement('option'); o.value = k; o.textContent = FX[k].name; $('fxAdd').append(o); } }
 $('fxAdd').addEventListener('change', e => {
   const t = e.target.value; e.target.value = ''; if (!t) return;
   const v = V(); v.fx = v.fx || []; if (v.fx.length >= 6) return toast('Up to 6 effects per pad.');
@@ -7040,8 +7246,12 @@ function renderFx(){
     txt.className = 'fxdb'; vuEls.push({f, bar, txt, lv:0, pk:0, pt:0});
     const grid = el('div', 'fxgrid');
     for (const [key, label, opts] of d.segs){
-      const sr = el('div', 'segrow'); sr.append(el('span', null, label)); const sg = el('div', 'seg'); sr.append(sg); grid.append(sr);
-      makeSeg(sg, opts, () => f[key], val => { f[key] = val; changed(); });
+      const sr = el('div', 'segrow'); sr.append(el('span', null, label)); grid.append(sr);
+      if (opts.length > 6){   // a long list (types, patterns, keys) is a menu, not a row of buttons
+        const se = document.createElement('select'); se.className = 'fxsel'; se.setAttribute('aria-label', label);
+        for (const [v, t] of opts){ const o = document.createElement('option'); o.value = String(v); o.textContent = t; se.append(o); }
+        se.value = String(f[key]); se.addEventListener('change', () => { f[key] = +se.value; changed(); }); sr.append(se);
+      } else { const sg = el('div', 'seg'); sr.append(sg); makeSeg(sg, opts, () => f[key], val => { f[key] = val; changed(); }); }
     }
     for (const key in d.rows){
       const def = Object.assign({f:FXFMT[key] || pct}, d.rows[key]);
@@ -8087,6 +8297,7 @@ let plFailed = false;
   } catch(e){ txMod = null; }
   try {
     if (globalThis.WavesDSP && plMod && txMod){ WavesDSP.wasmInit({dspModule:plMod, tfxModule:txMod}); WV.ready = true; }
+    try { if (globalThis.WavesDSP && WavesDSP.modsPrepare) WavesDSP.modsPrepare(); } catch(e){}   // the Random/Function generators' wasm: compiled in the background here (the page's thread won't compile it on the spot)
   } catch(e){ console.warn('…waves WebAssembly', e); }
   if (typeof Worker !== 'undefined') rwStart(plMod, txMod);
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; if (v && v.layers.some(l => l.on && (l.type === 'plaits' || l.type === 'elements' || l.type === 'waves')) || (v.fx || []).some(f => f.on)) dirty[i] = true; }
@@ -8579,8 +8790,24 @@ const TFX = {
       P_('input', 'INPUT', 128, B => { const v = 0 + 1 * u8(B); return Math.round(v * 100) + '%'; }), P_('tube', 'TUBE', 128, B => { const v = 0 + 1 * u8(B); return Math.round(v * 100) + '%'; })],
     map:(f, sr, bpm) => [(0 + 1 * u8(f.input)), (0 + 1 * u8(f.tube))]},
 };
-const FXT_LIST = ['eq', 'comp', 'reverb', 'delay', 'pdelay', 'preverb', 'density', 'tape', 'chorus', 'crush', 'degrade', 'reson', 'rings', 'clouds', 'beads', 'flanger', 'phaser', 'tremolo', 'odrive', 'folder', 'autowah', 'pshift', 'ladder', 'xmod', 'space', 'lofi', 'drive', 'air', 'room', 'comb', 'transient', 'tgate', 'sgate', 'flex', 'retrig', 'ott', 'fshift', 'vinyl', 'dub', 'cab', 'tube'];
-const TAILS = new Set(['pdelay', 'preverb', 'reson', 'reverb', 'delay', 'rings', 'clouds', 'beads', 'space', 'room', 'pshift', 'comb']);
+/* The MODFX effects as track effects: each value a byte like the rest (a choice is its number; a whole-number param with a
+   small range is the number itself; anything else 00–FF across its range, on its own curve). They run in the track-effect
+   worklet through the shared module itself (ChainsDSP, published in the audio thread by the …chains engine). */
+for (const k in MODFX){ const M = MODFX[k]; if (!M.track) continue;
+  const ps = [], conv = {};
+  for (const [p, l, c, min, max, d, x] of M.ps){
+    const L = l.toUpperCase(), q = fxKey(p);   // stored as q in the slot (type → type_), sent to the module as p
+    if (c === 'opt'){ ps.push(EN(q, L, d, x.map(n => n.toUpperCase()))); conv[p] = [q, b => b]; continue; }
+    if (c === 'int' && max - min <= 255){ ps.push(P_(q, L, Math.round(d), v => x(v), min, max)); conv[p] = [q, b => b]; continue; }
+    const to = c === 'log' ? b => min * Math.pow(max / min, u8(b)) : b => min + (max - min) * u8(b);
+    const pos = c === 'log' ? Math.log(d / min) / Math.log(max / min) : (d - min) / (max - min);
+    ps.push(P_(q, L, Math.abs(pos - 0.5) < 1e-6 ? 128 : clamp(Math.round(pos * 255), 0, 255), b => x(to(b)))); conv[p] = [q, to];
+  }
+  TFX[k] = {n:M.short, long:M.long, mod:k, tail:M.tail, ps, map:f => { const o = {}; for (const p in conv) o[p] = conv[p][1](f[conv[p][0]]); return o; }};
+}
+const FXT_LIST = ['eq', 'comp', 'reverb', 'delay', 'pdelay', 'preverb', 'density', 'tape', 'chorus', 'crush', 'degrade', 'reson', 'rings', 'clouds', 'beads', 'flanger', 'phaser', 'tremolo', 'odrive', 'folder', 'autowah', 'pshift', 'ladder', 'xmod', 'space', 'lofi', 'drive', 'air', 'room', 'comb', 'transient', 'tgate', 'sgate', 'flex', 'retrig', 'ott', 'fshift', 'vinyl', 'dub', 'cab', 'tube',
+  ...Object.keys(MODFX).filter(k => MODFX[k].track)];
+const TAILS = new Set(['pdelay', 'preverb', 'reson', 'reverb', 'delay', 'rings', 'clouds', 'beads', 'space', 'room', 'pshift', 'comb', ...Object.keys(MODFX).filter(k => MODFX[k].track && MODFX[k].tail)]);
 const FXSLOTS = 4;
 function freshTfx(type){ const f = {type, on:true}; for (const p of TFX[type].ps) f[p.k] = p.d; return f; }
 function normTfx(o){
@@ -8595,7 +8822,9 @@ const normChainFx = a => Array.from({length:FXSLOTS}, (_, k) => Array.isArray(a)
 function tfxChain(A, sr, bpm){
   const out = [];
   // Switched-off slots go too (on:false): the tracker's FXO can switch them on while the song plays.
-  (A || []).forEach((f, k) => { if (f && TFX[f.type]){ const p = new Array(12).fill(0); TFX[f.type].map(f, sr, bpm).forEach((v, i) => p[i] = v); out.push({key:k + ':' + f.type, t:TFX[f.type].id, p, on:!!f.on, slot:k}); } });
+  (A || []).forEach((f, k) => { if (!f || !TFX[f.type]) return;
+    if (TFX[f.type].mod){ out.push({key:k + ':' + f.type, mod:TFX[f.type].mod, mp:TFX[f.type].map(f, sr, bpm), bpm, on:!!f.on, slot:k}); return; }   // a shared module (MODFX)
+    const p = new Array(12).fill(0); TFX[f.type].map(f, sr, bpm).forEach((v, i) => p[i] = v); out.push({key:k + ':' + f.type, t:TFX[f.type].id, p, on:!!f.on, slot:k}); });
   return out;
 }
 const fxCount = A => (A || []).filter(f => f && f.on).length;
@@ -8617,14 +8846,34 @@ class ThunderFx extends AudioWorkletProcessor {
     this.x = new WebAssembly.Instance(globalThis.__tfxMod, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports;
     if (this.x._initialize) this.x._initialize();
     this.slots = []; this.dead = false; this.buf = null; this.ms = 0; this.fr = 0; this.idle = 0;
+    // for the shared-module slots (MODFX): their transport (the song tempo, from the beat clock while it plays) and the sidechain bus (input 1)
+    this.spb = sampleRate / 2; this.bpm = 120; this.wasOn = false; this.startN = 0;
+    this.scL = new Float32Array(128); this.scR = new Float32Array(128); this.scOn = false;
+    this.mctx = {sr:sampleRate, block:128, transport:{tempo:120, playing:false, startN:0, lpb:4, ticks:6}, quality:'full', scL:this.scL, scR:this.scR, scOn:() => this.scOn};
     this.set(op.chain || []);
-    this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) if (!s.js) this.x.tfx_free(s.h); this.slots = []; } else this.set(e.data); };
+    this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else this.set(e.data); };
   }
+  drop(s){ try { if (s.def){ if (s.def.destroy) s.def.destroy(s.st); } else if (!s.js && s.h >= 0) this.x.tfx_free(s.h); } catch (e){} }
   set(chain){
     const x = this.x, old = this.slots.slice(), next = [];
     for (const c of chain){
       let i = old.findIndex(s => s.key === c.key), s;
       const on = c.on !== false, slot = c.slot == null ? -1 : c.slot;
+      if (c.mod){   // a shared …chains/…waves module (MODFX), run as it runs in …chains
+        const D = globalThis.ChainsDSP, def = D && D.MODULES ? D.MODULES[c.mod] : null;
+        if (!def) continue;   // the …chains engine isn't in this audio thread: no slot, the sound passes
+        if (i >= 0 && old[i].def === def){ s = old[i]; old.splice(i, 1); }
+        else {
+          let st; try { st = def.create(sampleRate); } catch (e){ continue; }
+          const io = {in:{}, out:{}, p:{}, linked:new Set(['inR'])};
+          for (const k in def.inputs) io.in[k] = new Float32Array(128);
+          for (const k in def.outputs) io.out[k] = new Float32Array(128);
+          s = {key:c.key, h:-2, def, st, io};
+        }
+        for (const k in s.def.params){ const v = c.mp && c.mp[k]; s.io.p[k] = typeof v === 'number' && v === v ? v : s.def.params[k][0]; }
+        if (c.bpm) this.bpm = c.bpm;
+        s.on = on; s.slot = slot; next.push(s); continue;
+      }
       if (c.t >= 93 && c.t <= 95){   // Flex / Step gate / Retrigger: plain JS, tempo-locked to the player's clock
         if (i >= 0 && old[i].js && old[i].jt === c.t){ s = old[i]; old.splice(i, 1); } else s = {key:c.key, h:-2, jt:c.t, js:c.t === 95 ? new FlexCore(sampleRate) : c.t === 94 ? new StepGateCore(sampleRate) : new RetrigCore(sampleRate)};
         const q = c.p; s.dp = c.t === 95 ? {pat:q[0], mix:q[1], xf:q[2]} : c.t === 94 ? {pat:q[0], m1:q[1], m2:q[2], div:q[3], len:q[4], depth:q[5], smooth:q[6]} : {mode:q[0], div:q[1], decay:q[2], pitch:q[3], gate:q[4], mix:q[5]};
@@ -8644,11 +8893,23 @@ class ThunderFx extends AudioWorkletProcessor {
       s.t = c.t; s.p = c.p; new Float32Array(x.memory.buffer, x.tfx_params(s.h), 12).set(c.p);
       s.on = on; s.slot = slot; next.push(s);
     }
-    for (const s of old) if (!s.js) x.tfx_free(s.h);
+    for (const s of old) this.drop(s);
     this.slots = next; this.idle = 0; this.clocked = next.some(s => s.js && s.jt >= 93 && s.jt <= 95);
+  }
+  modRun(s, n){
+    if (s.dead) return;
+    const io = s.io, L = this.L, R = this.R;
+    io.in.in.set(L); if (io.in.inR) io.in.inR.set(R);
+    try { s.def.process(s.st, io, this.mctx); }
+    catch (e){ s.dead = true; this.port.postMessage({failed:s.key}); return; }   // crashed: bypassed from now on
+    const oL = io.out.out, oR = io.out.outR || oL; let bad = false;
+    for (let k = 0; k < n; k++){ const a = oL[k], b = oR[k]; if (!(a > -8 && a < 8 && b > -8 && b < 8)){ bad = true; break; } }
+    if (bad){ try { if (s.def.destroy) s.def.destroy(s.st); s.st = s.def.create(sampleRate); } catch (e){ s.dead = true; } return; }   // went bad: start it afresh, pass this block
+    L.set(oL.subarray(0, n)); R.set(oR.subarray(0, n));
   }
   slotRun(s, n, tr){
     const x = this.x;
+    if (s.def){ this.modRun(s, n); return; }
     if (s.js){ s.js.process(this.L, this.R, n, s.dp, tr); return; }
     if (s.h < 0) return;
     if (!this.cL){ this.cL = new Float32Array(128); this.cR = new Float32Array(128); }
@@ -8684,6 +8945,12 @@ class ThunderFx extends AudioWorkletProcessor {
     if (bad) for (let k = 0; k < n; k++){ const a = L[k], b = R[k]; if (!(a > -8 && a < 8)) L[k] = 0; if (!(b > -8 && b < 8)) R[k] = 0; }
     for (let k = 0; k < n; k += 2){ L[k] += 1e-18; L[k + 1] -= 1e-18; R[k] += 1e-18; R[k + 1] -= 1e-18; }   // anti-denormal (−360 dB, no DC): silence made some effects up to 30× slower on x86
     const t0 = Date.now(), tr = this.tr || (this.tr = {bp:null, flx:0, gat:0, rtg:0}); tr.bp = bp; tr.flx = params.flx[0]; tr.gat = params.gat[0]; tr.rtg = params.rtg[0];
+    { // the modules' transport and sidechain: playing while the beat clock runs (−1 = stopped), at its tempo
+      const T = this.mctx.transport, on = bp[0] >= 0 && bp[bp.length - 1] >= 0;
+      if (on){ clkSpb(this, bp, n); if (!this.wasOn) this.startN++; } this.wasOn = on;
+      T.playing = on; T.startN = this.startN; T.tempo = on ? Math.max(20, Math.min(999, 60 * sampleRate / this.spb)) : this.bpm;
+      const sc = inputs[1]; this.scOn = !!(sc && sc.length);
+      if (this.scOn){ this.scL.set(sc[0].subarray(0, n)); this.scR.set((sc[1] || sc[0]).subarray(0, n)); } else { this.scL.fill(0); this.scR.fill(0); } }
     if (!this.dL){ this.dL = new Float32Array(128); this.dR = new Float32Array(128); }
     for (const s of this.slots){
       // On or off: the slot's own setting, unless an FXO switch is holding it. Changes fade over 5 ms.
@@ -8723,7 +8990,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=24')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=25')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -8836,6 +9103,7 @@ function tfxReady(ac){
   if (!tfxLoaded.has(ac)){
     tfxLoaded.set(ac, (async () => {
       await tfxLoad; if (!tfxBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
+      await chainsReady(ac);   // the …chains engine publishes the shared modules (ChainsDSP) in the audio thread, for the MODFX slots
       if (!tfxURL) tfxURL = URL.createObjectURL(new Blob([DegradeCore.toString() + '\n' + ResonCore.toString() + '\n' + PitchFxCore.toString() + '\n' + clkSpb.toString() + '\n' + FlexCore.toString() + '\n' + StepGateCore.toString() + '\n' + RetrigCore.toString() + '\n' + TFX_SRC], {type:'application/javascript'}));
       await ac.audioWorklet.addModule(tfxURL);
       return true;
@@ -8844,7 +9112,7 @@ function tfxReady(ac){
   return tfxLoaded.get(ac);
 }
 function tfxNode(ac, chain){
-  const n = new AudioWorkletNode(ac, 'thunder-tfx', {numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
+  const n = new AudioWorkletNode(ac, 'thunder-tfx', {numberOfInputs:2, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
     channelCountMode:'explicit', channelInterpretation:'speakers', processorOptions:{bytes:tfxBin(), chain}});
   n.load = 0; n.port.onmessage = e => { const d = e.data; if (!d) return;
     if (typeof d.load === 'number') n.load = n.load * 0.6 + d.load * 0.4;
@@ -9694,7 +9962,7 @@ function makePlayer(ac, out, getBuf, live){
       for (const op of chnDiff(b.chn._sent, S.chainPatch)) b.chn._send(Object.assign({target:'chains-host'}, op));
       b.chn._sent = chnClone(S.chainPatch);
     }
-    if (wantFx && !b.fx){ try { b.fx = tfxNode(ac, chain); clockTo(b.fx); } catch(e){ b.fx = null; } }
+    if (wantFx && !b.fx){ try { b.fx = tfxNode(ac, chain); clockTo(b.fx); try { scBus.connect(b.fx, 0, 1); } catch(e){} } catch(e){ b.fx = null; } }   // input 1: the sidechain bus (Envelope filter)
     else if (wantFx && b.fx){ try { b.fx.port.postMessage(chain); } catch(e){} }
     // Rewire only when which nodes sit in the slot changed: disconnecting/reconnecting a
     // running worklet every param change is its own little click.

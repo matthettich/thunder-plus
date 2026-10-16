@@ -707,6 +707,211 @@ function drawLife(n){
 // Redraw the bars and grids a few times a second (edits from sliders, menus and undo show up too).
 setInterval(() => { for (const n of nodes.values()) if (n.show && (n.show.kind === 'bars' || n.show.kind === 'life') && n.el.isConnected){
   if (n.show.kind === 'bars'){ for (let i = 0; i < 8; i++) n.show.lit[i] *= .8; drawBars(n); } else drawLife(n); } }, 90);
+/* ── For chains/index.html, inside the SHARED EDITOR block (after the existing Object.assign(SHARED_MODULES, …)
+   calls, before "The bar editor (Blip drum) and the grid (Life)"). Uses only helpers already in that block or just
+   above it: pct, spct, secs, wet (via MIXP), opts, STEREO. Params are identical to the worklet's. ── */
+
+/* Spectral, Extreme stretch and Convolution reverb (Oct 2026, original code). */
+const SPX_MODE_NAMES = ['Blur', 'Freeze', 'Gate', 'Robot', 'Whisper', 'Shift'];
+const XST_WIN_NAMES = ['~45 ms (grainy)', '~90 ms', '~0.18 s', '~0.35 s', '~0.7 s (smoothest)'];   // 2048 … 32768 samples
+const CNV_TYPE_NAMES = ['Room', 'Hall', 'Chamber', 'Plate', 'Cathedral', 'Spring', 'Gated (80s)', 'Reverse (rising)', 'Speaker cab', 'Telephone / lo-fi', 'Song IR 1', 'Song IR 2', 'Song IR 3', 'Song IR 4'];
+const tilt = v => Math.abs(v) < .005 ? 'Flat' : (v < 0 ? 'Darker ' : 'Brighter ') + Math.round(Math.abs(v) * 100) + '%';
+Object.assign(SHARED_MODULES, {
+  spectral:Object.assign({ label:'Spectral', scope:'mono',
+    params:{ mode:[0,0,5,1], amt:[.5,0,1,.01], shift:[.15,-1,1,.01], tone:[0,-1,1,.01], freeze:[0,0,1,1], mix:[.5,0,1,.01] },
+    ui:Object.assign({ mode:{l:'Mode', c:opts(SPX_MODE_NAMES)}, amt:{l:'Amount', f:pct},
+      shift:{l:'Shift', f:v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.round(v * v * 2000) + ' Hz'},
+      tone:{l:'Tone', f:tilt}, freeze:{l:'Freeze', c:opts(['Off', 'Hold'])} }, MIXP),
+    about:'Spectral: takes the sound apart into its frequencies (an FFT, 2048 points), changes them and puts it back. Blur smears it over time into a soft wash (Amount: from a short smear to 12 s). Freeze lets the sound through until you switch Freeze to Hold, then holds that moment as an endless, slowly breathing drone (Amount: how much it moves). Gate keeps only the loudest frequencies (a little: de-noise; a lot: glassy, whistly). Robot flattens the phases into a monotone robot voice; Whisper scrambles them into a breathy whisper. Shift moves every frequency up or down by the same number of Hz (Shift), so nothing stays in tune: bells and metal; Amount feeds it back so it spirals. Hold works in every mode. Tone tilts it darker or brighter. The effect is 43 ms late (the dry sound is not).' }, STEREO),
+  stretch:Object.assign({ label:'Extreme stretch', scope:'mono',
+    params:{ amt:[.5,0,1,.01], win:[2,0,4,1], freeze:[0,0,1,1], tone:[0,-1,1,.01], mix:[.5,0,1,.01] },
+    ui:Object.assign({ amt:{l:'Stretch', f:v => '×' + (1.5 * Math.pow(50 / 1.5, v)).toFixed(1)}, win:{l:'Window', c:opts(XST_WIN_NAMES)},
+      freeze:{l:'Freeze', c:opts(['Off', 'Hold'])}, tone:{l:'Tone', f:tilt} }, MIXP),
+    about:'Extreme stretch: smears whatever plays into a long ambient wash, playing the last 12 seconds back up to 50 times slower without changing the pitch, by keeping the loudness of every frequency and scrambling the rest. Stretch sets how slow (×1.5 … ×50). Window: short keeps some rhythm and grit, long is smooth and dreamy (and starts later). Freeze holds the moment it is on as an endless drone. When it falls too far behind, or the song starts again, it moves on to the newest sound with a crossfade. Tone darkens or brightens it. Try it on a pad or a vocal with Mix near 100%.' }, STEREO),
+  convolve:Object.assign({ label:'Convolution reverb', scope:'mono',
+    params:{ type:[1,0,13,1], size:[.5,0,1,.01], decay:[2,.1,10,.01], pre:[.01,0,.25,.001], tone:[.5,0,1,.01], early:[.5,0,1,.01], width:[1,0,1.5,.01], mix:[.3,0,1,.01] },
+    ui:Object.assign({ type:{l:'Type', c:opts(CNV_TYPE_NAMES)}, size:{l:'Size', f:pct}, decay:{l:'Decay', f:secs},
+      pre:{l:'Pre-delay', f:secs}, tone:{l:'Tone', f:pct}, early:{l:'Early', f:pct}, width:{l:'Width', f:pct} }, MIXP),
+    about:'Convolution reverb: real convolution with an impulse response the module builds from its controls (the same settings always give the same sound). Room, Hall, Chamber and Cathedral are rooms from small and lively to vast and dark; Plate is the dense, bright studio plate; Spring is a chirping spring tank; Gated is the 80s drum room cut off dead; Reverse swells up into the sound; Speaker cab and Telephone are short tone-shaping responses (with a little room). Song IR 1–4 use impulse responses loaded into the song (silent until one is). Size scales the space (half to twice; 50% is natural), Decay is the reverb time (Gated: the gate; Reverse: the swell), Pre-delay holds it back, Tone goes from dull to bright, Early sets the early reflections (50% natural, 100% twice as loud; Spring: the drip), Width the stereo spread. Changes apply about half a second after you stop moving a control, with a smooth crossfade.' }, STEREO)
+});
+Object.assign(SHARED_FAMILY, { spectral:'afx', stretch:'afx', convolve:'afx' });
+// Palette: Spectral and Extreme stretch join "Effects"; Convolution reverb joins "Reverbs".
+SHARED_PALETTE.find(g => g[0] === 'Effects')[1].push(['spectral', 'Spectral (FFT)'], ['stretch', 'Extreme stretch']);
+SHARED_PALETTE.find(g => g[0] === 'Reverbs')[1].push(['convolve', 'Convolution reverb']);
+
+/* Editor entries for chains/index.html, to paste inside the SHARED EDITOR block (after the existing
+   `SHARED_PALETTE.find(g => g[0] === 'Rhythm and logic')…` line is a good place). Uses only names that block (or the
+   page above it, in both …chains and …waves) already defines: opts, pct, spct, secs, hz, cents, whole, wet, MIXP,
+   STEREO, PP_NAMES, NOTE_NAMES. Params are identical to the worklet's. (Then run tools/sync-shared.py.) */
+
+/* Pitch correct, vowel filter, rotary speaker, granular delay, reverse echo and envelope filter (Oct 2026). */
+const PC_SCALE_NAMES = ['Chromatic', 'Major', 'Minor', 'Harmonic minor', 'Major pentatonic', 'Minor pentatonic', 'Blues', 'Dorian', 'Mixolydian'];
+Object.assign(SHARED_MODULES, {
+  autotune:{ label:'Pitch correct', scope:'mono', inputs:{ in:'audio', inR:'audio', note:'cv' }, outputs:{ out:'audio', outR:'audio', pitch:'cv', gate:'gate' },
+    params:{ key:[0,0,11,1], scale:[0,0,8,1], speed:[.025,0,.4,.001], humanize:[0,0,1,.01], trans:[0,-12,12,1], mix:[1,0,1,.01] },
+    ui:Object.assign({ key:{l:'Key', c:opts(NOTE_NAMES)}, scale:{l:'Scale', c:opts(PC_SCALE_NAMES)},
+      speed:{l:'Speed', f:v => v < .0005 ? 'Snap (0 ms)' : secs(v)}, humanize:{l:'Humanize', f:pct}, trans:{l:'Transpose', f:semis} }, MIXP),
+    about:'Pitch correct: tunes a solo voice or instrument (one note at a time) to the nearest note of Key and Scale. Speed is how fast it pulls each note in tune: Snap (0 ms) jumps straight there for the hard, stepped robot-voice effect; 20–50 ms is a tight modern vocal; a few hundred ms only nudges, for a natural sound. Humanize leaves held notes more freedom, so vibrato and natural drift survive while the note still lands in tune. Transpose moves the tuned voice up or down. Breaths, consonants and quiet passages go through untouched. Patch a pitch CV (a sequencer, Steps, a keyboard) into Note to set the notes yourself: the voice then sings whatever you play. Pitch outputs the pitch it hears as CV (0.5 = A4) and Gate is high while it hears a note.' },
+  vowel:{ label:'Vowel filter', scope:'mono', inputs:{ in:'audio', inR:'audio', vowel:'cv' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ vowel:[0,0,4,.01], voice:[0,0,2,.01], shift:[0,-1,1,.01], res:[.5,0,1,.01], rate:[.5,.05,10,.01], depth:[0,0,1,.01], env:[0,-1,1,.01], drive:[0,0,1,.01], mix:[1,0,1,.01] },
+    ui:Object.assign({ vowel:{l:'Vowel', f:v => { const i = Math.round(v); return Math.abs(v - i) < .08 ? 'AEIOU'[i] : 'AEIOU'[Math.floor(v)] + '→' + 'AEIOU'[Math.min(4, Math.floor(v) + 1)]; }},
+      voice:{l:'Voice', f:v => v < .15 ? 'Man' : v > 1.85 ? 'Child' : Math.abs(v - 1) < .15 ? 'Woman' : v.toFixed(2)},
+      shift:{l:'Shift', f:v => (v > 0 ? '+' : '') + Math.round(v * 12) + ' st'}, res:{l:'Resonance', f:pct}, rate:{l:'LFO rate', f:hz}, depth:{l:'LFO depth', f:pct},
+      env:{l:'Env', f:spct}, drive:{l:'Drive', f:pct} }, MIXP),
+    about:'Vowel filter: makes any sound “talk”. Three resonant peaks sit where a voice’s formants are for the vowel A, E, I, O or U (from the classic Peterson & Barney measurements), and Vowel morphs smoothly between them. Voice picks a man’s, a woman’s or a child’s mouth, Shift moves every formant up or down, and Resonance makes the peaks sharper and more vocal. The LFO sweeps the vowel by itself (“wah-yah-yow”), Env moves it with how loud you play (negative goes the other way) and the Vowel input adds a CV on top. Drive gives thin sounds more harmonics to shape. Rich sounds work best: saws, pads, noise, drums.' },
+  rotary:{ label:'Rotary speaker', scope:'mono', inputs:{ in:'audio', inR:'audio', fast:'gate' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ speed:[1,0,2,1], accel:[.5,0,1,.01], drive:[.2,0,1,.01], balance:[0,-1,1,.01], spread:[.8,0,1,.01], mix:[1,0,1,.01] },
+    ui:Object.assign({ speed:{l:'Speed', c:opts(['Stop', 'Slow', 'Fast'])}, accel:{l:'Accel', f:pct}, drive:{l:'Drive', f:pct},
+      balance:{l:'Balance', f:v => Math.abs(v) < .02 ? 'Even' : v < 0 ? 'Drum ' + Math.round(-v * 100) + '%' : 'Horn ' + Math.round(v * 100) + '%'}, spread:{l:'Mic spread', f:pct} }, MIXP),
+    about:'Rotary speaker: the spinning-speaker organ cabinet. The highs go to a spinning horn and the lows to a spinning drum, each at its own speed, giving the swirl of volume, pitch (Doppler) and tone. Speed picks Stop, Slow (chorale) or Fast (tremolo); the switch ramps like the real motors, the light horn in about a second and the heavy drum much more slowly, and Accel makes both quicker. Patch a gate into Fast to flip to fast while it’s high (a sequencer, an LFO, or an envelope from the sidechain). Drive is the tube preamp in front, Balance trades horn against drum and Mic spread sets how wide the two microphones are. Great on organs, electric pianos, guitars and pads.' },
+  gdelay:{ label:'Granular delay', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ time:[.3,.02,2,.001], sync:[0,0,1,1], div:[4,0,6,1], size:[.12,.01,.5,.001], density:[10,1,60,.1], pitch:[0,-24,24,1], jitter:[0,0,1,.01],
+      spray:[.15,0,1,.01], reverse:[0,0,1,.01], spread:[.5,0,1,.01], fb:[.3,0,1,.01], freeze:[0,0,1,1], mix:[.4,0,1,.01] },
+    ui:Object.assign({ time:{l:'Time', f:secs}, sync:{l:'Sync', c:opts(['Off (use Time)', 'To tempo'])}, div:{l:'Division', c:opts(PP_NAMES)},
+      size:{l:'Grain size', f:secs}, density:{l:'Density', f:v => v.toFixed(v < 10 ? 1 : 0) + ' /s'}, pitch:{l:'Pitch', f:semis},
+      jitter:{l:'Pitch jitter', f:v => v < .005 ? 'Off' : '±' + (v * v * 12).toFixed(1) + ' st'}, spray:{l:'Spray', f:v => '+' + secs(v * .5)}, reverse:{l:'Reverse', f:pct},
+      spread:{l:'Spread', f:pct}, fb:{l:'Feedback', f:pct}, freeze:{l:'Freeze', c:opts(['Off', 'On'])} }, MIXP),
+    about:'Granular delay: an echo made of many tiny slices (grains) of what you played. Density grains a second start Time back (or a note value at the song tempo with Sync), each Grain size long; Spray scatters where they start, so the echo smears into a cloud. Pitch shifts every grain (±2 octaves), Pitch jitter detunes each at random, Reverse plays that share of them backwards and Spread throws them across the stereo field. Feedback sends the cloud back in, so with Pitch it climbs (or falls) with every pass. Freeze stops recording and keeps playing over what is held: a pad from a single note.' },
+  reverse:{ label:'Reverse echo', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ mode:[0,0,1,1], time:[.4,.05,2,.001], sync:[0,0,1,1], div:[4,0,6,1], fb:[.3,0,1,.01], size:[.5,0,1,.01], tone:[.6,0,1,.01], mix:[.5,0,1,.01] },
+    ui:Object.assign({ mode:{l:'Mode', c:opts(['Reverse delay', 'Swell (reverse reverb)'])}, time:{l:'Time', f:secs}, sync:{l:'Sync', c:opts(['Off (use Time)', 'To tempo'])},
+      div:{l:'Division', c:opts(PP_NAMES)}, fb:{l:'Feedback', f:pct}, size:{l:'Size', f:pct}, tone:{l:'Tone', f:pct} }, MIXP),
+    about:'Reverse echo. Reverse delay: everything comes back played backwards, a Time later (or in note values at the song tempo with Sync), each phrase swelling in instead of fading out; Feedback brings it round again, reversed again each time. Swell: the sound goes into a small reverb first and the reverb comes back reversed, so every note is answered by a rising, sucked-in wash: the classic reverse-reverb build. Size sets the reverb, Time how long each swell is. Tone darkens the echoes.' },
+  envfilt:{ label:'Envelope filter', scope:'mono', inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio', env:'cv' },
+    params:{ mode:[1,0,2,1], source:[0,0,1,1], freq:[.35,0,1,.001], depth:[.7,-1,1,.01], range:[4,1,8,.1], res:[.6,0,1,.01],
+      attack:[.005,.0005,.2,.0001], release:[.15,.01,2,.001], sens:[.5,0,1,.01], drive:[0,0,1,.01], mix:[1,0,1,.01] },
+    ui:Object.assign({ mode:{l:'Filter', c:opts(['Low-pass', 'Band-pass', 'High-pass'])}, source:{l:'Source', c:opts(['Self', 'Sidechain'])},
+      freq:{l:'Freq', f:v => { const f = 40 * Math.pow(400, v); return f >= 1000 ? (f / 1000).toFixed(1) + ' kHz' : Math.round(f) + ' Hz'; }},
+      depth:{l:'Depth', f:spct}, range:{l:'Range', f:v => v.toFixed(1) + ' oct'}, res:{l:'Resonance', f:pct}, attack:{l:'Attack', f:v => v < .01 ? (v * 1000).toFixed(1) + ' ms' : secs(v)}, release:{l:'Release', f:secs},
+      sens:{l:'Sensitivity', f:pct}, drive:{l:'Drive', f:pct} }, MIXP),
+    about:'Envelope filter: the funky auto-wah (“touch wah”). A resonant filter opens as you play harder and closes as the note dies: Freq is where it rests, Depth how far it moves (up to Range octaves; negative sweeps it down, so set Freq high for that), Sensitivity how hard you must play, Attack and Release how fast it follows. Source Sidechain makes it follow the mixer’s sidechain bus (the kick opening the filter on a bass); a cable into SC always wins. Drive adds grit going in. The envelope itself comes out at Env, to move anything else.' }
+});
+Object.assign(SHARED_FAMILY, { autotune:'afx', vowel:'afx', rotary:'afx', gdelay:'afx', reverse:'afx', envfilt:'afx' });
+Object.assign(SHARED_PORT_LABEL, { vowel:'Vowel', fast:'Fast', pitch:'Pitch', gate:'Gate', sc:'SC' });
+SHARED_PALETTE.push(['Voice and filters', [['autotune', 'Pitch correct'], ['vowel', 'Vowel filter'], ['envfilt', 'Envelope filter (auto-wah)']], 'audio']);
+SHARED_PALETTE.find(g => g[0] === 'Effects')[1].push(['rotary', 'Rotary speaker'], ['gdelay', 'Granular delay'], ['reverse', 'Reverse echo']);
+
+/* ═══ Bytebeat + Chaos: editor entries for …chains / …waves (Oct 2026) ═══
+   Paste into chains/index.html inside the ===SHARED EDITOR=== block, after the Blip drum / Life additions (anywhere
+   after SHARED_FAMILY, SHARED_PORT_LABEL and SHARED_PALETTE exist; before `function mergeShared`), then run
+   tools/sync-shared.py. Parameters, inputs and outputs match modules.js exactly. BB_NAMES must list the formulas in
+   the same order as BB_LIST in the worklet; CHAOS_MODELS the same order as ChaosCore.MODELS. */
+const BB_NAMES = ['Sierpinski', 'Forty-two', 'Viznut 1', 'Viznut 2', 'Crowd', 'Arp machine', 'Bit stairs', 'Pulse chord', 'Buzz melody', 'Modulo bass',
+  'Pipe drone', 'Hiss beat', 'Sine tune', 'Triangle bass', 'Glitch shuffle', 'Hash noise'];
+const CHAOS_MODELS = ['Lorenz', 'Rössler', 'Chua', 'Thomas', 'Duffing', 'Logistic', 'Hénon'];
+const chaosHz = v => { const f = .05 * Math.pow(2, v * 16); return f < 10 ? f.toFixed(2) + ' Hz' : f < 1000 ? Math.round(f) + ' Hz' : (f / 1000).toFixed(2) + ' kHz'; };
+Object.assign(SHARED_MODULES, {
+  bytebeat:{ label:'Bytebeat', scope:'mono', inputs:{ pitch:'cv', reset:'gate' }, outputs:{ out:'audio' },
+    params:{ formula:[0,0,15,1], rate:[8000,1000,32000,1], a:[128,0,255,1], b:[128,0,255,1], c:[128,0,255,1], mode:[0,0,2,1], smooth:[0,0,1,.01], level:[.7,0,1,.01] },
+    ui:{ formula:{l:'Formula', c:opts(BB_NAMES)}, rate:{l:'Rate', f:khz}, a:{l:'a', f:whole}, b:{l:'b', f:whole}, c:{l:'c', f:whole},
+      mode:{l:'Mode', c:opts(['8-bit', 'Signed 8-bit', 'Linear'])}, smooth:{l:'Smooth', f:v => v < .005 ? 'Off' : pct(v)}, level:{l:'Level', f:pct} },
+    about:'Bytebeat: music from one line of integer maths, the 2011 discovery that a formula of a counter t (like t*(t>>5|t>>8)), played as 8-bit samples, makes melodies and rhythms. Pick one of sixteen formulas; Rate is its clock (8 kHz is the classic sound), and a cable in Pitch plays it from a sequencer (0.5 = A4). The knobs a, b and c are numbers the formula reads (0–255): on Arp machine, Pulse chord, Modulo bass, Pipe drone, Hiss beat, Sine tune, Triangle bass and Hash noise they change the tune or the texture. Mode: 8-bit is the classic, Signed 8-bit is harsher, Linear suits the sine and triangle ones. Smooth takes the edge off the steps. Reset (and PLAY) starts the formula from the beginning. Write your own formulas on a pad in …Thunder Plus (the Bytebeat engine).' },
+  chaos:{ label:'Chaos', scope:'mono', inputs:{ rate:'cv', reset:'gate' }, outputs:{ x:'cv', y:'cv', z:'cv', out:'audio', trig:'gate' },
+    params:{ model:[0,0,6,1], rate:[.35,0,1,.001], chaos:[.6,0,1,.01], smooth:[0,0,1,.01], level:[.8,0,1,.01] },
+    ui:{ model:{l:'Model', c:opts(CHAOS_MODELS)}, rate:{l:'Rate', f:chaosHz}, chaos:{l:'Chaos', f:pct}, smooth:{l:'Smooth', f:v => v < .005 ? 'Off' : pct(v)}, level:{l:'Level', f:pct} },
+    about:'Chaos: a chaotic system (the Lorenz butterfly, Rössler, Chua’s double scroll, Thomas, a forced Duffing spring, and the Logistic and Hénon maps) that never quite repeats. Slow (Rate below a few Hz) it is a modulation source that wanders but stays in its shape: patch X, Y and Z (about ±1 each) into anything. Fast (Rate in the hundreds of Hz) Out is a gritty, unstable oscillator with a pitch near Rate (X, or Z for Lorenz, whose X flips from lobe to lobe). Chaos goes from an orderly loop (low) to full chaos (high); some models jump between lobes, so X swings from side to side. Trig fires each time X crosses zero going up: a rhythm that drifts. Smooth rounds everything off. Rate CV adds ±4 octaves; Reset starts it again from the same point.' }
+});
+Object.assign(SHARED_FAMILY, { bytebeat:'gen', chaos:'mod' });
+Object.assign(SHARED_PORT_LABEL, { x:'X', y:'Y', z:'Z', rate:'Rate' });
+// Sound sources: …waves has this group (its own VCO, FM…); …chains gets it made (an audio group, before Control).
+SHARED_PALETTE.push(['Sound sources', [['bytebeat', 'Bytebeat']], 'audio']);
+// Chaos: with the modulation sources (both editors already have the group; GROUP_FAM marks it 'mod').
+SHARED_PALETTE.push(['Modulation sources', [['chaos', 'Chaos (Lorenz, Rössler…)']], 'control']);
+/* Notes for the integrator:
+   - …chains has no 'Sound sources' group: mergeShared makes it before §Control, and its family falls back to 'afx'
+     for the group colour unless 'Sound sources':'gen' is added to the fallback map inside mergeShared
+     ({ 'Reverbs':'afx', … , 'Sound sources':'gen' }); the module's own colour comes from SHARED_FAMILY (gen) either way.
+   - PORT_LABEL in each editor already has pitch, reset, out; mergeShared copies x/y/z/rate in (it never overrides). */
+
+/* Random generator and Function generator (based on Mutable Instruments Marbles and Tides 2, MIT). Goes in the SHARED
+   EDITOR block of chains/index.html, anywhere after SHARED_PALETTE and SHARED_PORT_LABEL are made (e.g. just after the
+   Life / Blip drum lines), then tools/sync-shared.py copies it into …waves. Parameters match MarblesM and TidesM in the
+   worklet exactly. */
+const MARBLES_RATES = ['÷4', '÷3', '÷2', '×2/3', '×1', '×3/2', '×2', '×3', '×4'];
+const TIDES_RATIO_NAMES = ['÷16', '÷8', '÷6', '÷4', '÷3', '÷2', '×2/3', '×3/4', '×4/5', '×1', '×5/4', '×4/3', '×3/2', '×2', '×3', '×4', '×6', '×8', '×16'];
+const mbSteps = v => v < .48 ? 'Glide ' + pct((.5 - v) * 2) : v > .52 ? 'Snap ' + pct((v - .5) * 2) : 'Raw';
+const tdHz = v => { const f = 440 * Math.pow(2, v / 12); return f >= 1000 ? (f / 1000).toFixed(2) + ' kHz' : f < .1 ? Math.round(1 / f) + ' s cycle' : hz(f); };
+Object.assign(SHARED_MODULES, {
+  marbles:{ label:'Random generator', scope:'mono', inputs:{ clock:'gate', reset:'gate', xclock:'gate', dejavu:'cv' },
+    outputs:{ t1:'gate', t2:'gate', t3:'gate', x1:'cv', x2:'cv', x3:'cv', y:'cv' },
+    params:{ div:[3,0,9,1], rate:[4,0,8,1], model:[0,0,6,1], bias:[.5,0,1,.01], jitter:[0,0,1,.01], dejavu:[0,0,1,.01], length:[8,1,16,1],
+      spread:[.5,0,1,.01], xbias:[.5,0,1,.01], steps:[.75,0,1,.01], scale:[0,0,5,1], xrange:[0,0,2,1], oct:[0,-4,3,1],
+      glen:[.5,0,1,.01], grand:[0,0,1,.01], tdv:[1,0,2,1], xdv:[1,0,2,1], xmode:[0,0,2,1], xclk:[0,0,3,1], xout:[0,0,1,1],
+      ydiv:[6,0,11,1], yspread:[.5,0,1,.01], ybias:[.5,0,1,.01], ysteps:[0,0,1,.01], yrange:[2,0,2,1] },
+    ui:{ div:{l:'Step', c:opts(STEP_NAMES)}, rate:{l:'Rate', c:opts(MARBLES_RATES)},
+      model:{l:'Model', c:opts(['Coin toss', 'Clusters', 'Drums', 'Independent', 'Divider', 'Three states', 'Markov'])},
+      bias:{l:'Bias', f:pct}, jitter:{l:'Jitter', f:pct}, dejavu:{l:'Déjà vu', f:v => v < .01 ? 'Off' : Math.abs(v - .5) < .03 ? 'Loop' : pct(v)},
+      length:{l:'Loop length', f:v => Math.round(v) + (Math.round(v) === 1 ? ' step' : ' steps')},
+      spread:{l:'Spread', f:pct}, xbias:{l:'X bias', f:pct}, steps:{l:'Steps', f:mbSteps},
+      scale:{l:'Scale', c:opts(['Major', 'Minor', 'Pentatonic', 'Pelog', 'Raag Bhairav That', 'Raag Shri'])},
+      xrange:{l:'X range', c:opts(['0…+2 V (2 oct)', '0…+5 V (5 oct)', '±5 V (10 oct)'])}, oct:{l:'X octave', f:v => (v > 0 ? '+' : '') + Math.round(v) + ' oct'},
+      glen:{l:'Gate length', f:pct}, grand:{l:'Length random', f:pct},
+      tdv:{l:'T déjà vu', c:opts(['Off', 'On', 'Locked'])}, xdv:{l:'X déjà vu', c:opts(['Off', 'On', 'Locked'])},
+      xmode:{l:'X mode', c:opts(['Identical', 'Bump', 'Tilt'])}, xclk:{l:'X clock', c:opts(['t1, t2, t3', 'All on t1', 'All on t2', 'All on t3'])},
+      xout:{l:'X out', c:opts(['Pitch', 'CV'])},
+      ydiv:{l:'Y rate', c:opts(['÷64', '÷48', '÷32', '÷24', '÷16', '÷12', '÷8', '÷6', '÷4', '÷3', '÷2', '÷1'])},
+      yspread:{l:'Y spread', f:pct}, ybias:{l:'Y bias', f:pct}, ysteps:{l:'Y steps', f:mbSteps},
+      yrange:{l:'Y range', c:opts(['0…+2 V', '0…+5 V', '±5 V'])} },
+    about:'Random generator (based on Mutable Instruments Marbles): random gates and random voltages that can repeat. It ticks once per Step at the song tempo, times Rate (or on each pulse at Clock, which Rate then divides or multiplies), and starts over when the song starts and on Reset. t2 fires on every tick; Model and Bias decide how t1 and t3 share the ticks (a coin toss, clusters, drum patterns, a divider, Markov…), Jitter pushes them off the grid and Gate length sets their length. X1–X3 take a new value on t1, t2 and t3 (X clock or the X clock input changes that): Spread and X bias shape the odds, Steps glides between values to the left and snaps them to Scale to the right (further right, only the strongest notes). Déjà vu at 0 is always new; at the middle it loops the last Loop length values, rhythm and notes; above it shuffles the loop. X out as Pitch: 1 V per octave, 0.125 an octave with 0 V = C4 (A4 is 0.5), shifted by X octave; as CV: −1…1. Y is a slower random voltage, every Y-rate ticks of t2.' },
+  tides:{ label:'Function generator', scope:'mono', inputs:{ trig:'gate', clock:'gate', pitch:'cv' },
+    outputs:{ out1:'cv', out2:'cv', out3:'cv', out4:'cv' },
+    params:{ mode:[1,0,2,1], output:[0,0,3,1], range:[0,0,1,1], freq:[-105.38,-192,36,.01], shape:[.5,0,1,.01], slope:[.5,0,1,.01],
+      smooth:[.5,0,1,.01], shift:[.75,0,1,.01], sync:[0,0,1,1], div:[6,0,9,1], ratio:[9,0,18,1] },
+    ui:{ mode:{l:'Mode', c:opts(['AD (on Trig)', 'Looping', 'AR (while Trig)'])}, output:{l:'Outputs', c:opts(['Gates', 'Amplitudes', 'Slope phases', 'Frequencies'])},
+      range:{l:'Range', c:opts(['Control', 'Audio'])}, freq:{l:'Frequency', f:tdHz},
+      shape:{l:'Shape', f:pct}, slope:{l:'Slope', f:pct}, smooth:{l:'Smoothness', f:v => v < .48 ? 'Smooth ' + pct((.5 - v) * 2) : v > .52 ? 'Fold ' + pct((v - .5) * 2) : 'Clean'},
+      shift:{l:'Shift / level', f:pct}, sync:{l:'Sync', c:opts(['Off (use Frequency)', 'To tempo'])}, div:{l:'Division', c:opts(STEP_NAMES)},
+      ratio:{l:'Clock ratio', c:opts(TIDES_RATIO_NAMES)} },
+    about:'Function generator (based on Mutable Instruments Tides 2): four related slopes from one generator. Looping is an LFO or, in the Audio range, an oscillator; AD plays an attack and decay on each Trig; AR rises while Trig is held and falls when it lets go. Slope moves the peak (a ramp, a triangle, a saw), Shape bends the curves, Smoothness rounds them off to the left and folds them to the right. Outputs sets what the four jacks carry: Gates (1 the slope at Shift / level, 2 the plain slope, 3 a gate at the end of the attack, 4 at the end of the release), Amplitudes (Shift moves the slope across 1 to 4), Slope phases (four copies, Shift spreads them apart) or Frequencies (four copies at ratios picked by Shift, chords in the Audio range). Pitch adds to Frequency, 0.125 an octave (at 440 Hz it plays in tune, 0.5 = A4). A cable into Clock, or Sync to tempo, locks it to the pulses or the song at Division, times Clock ratio. Looping outputs are −1…1, AD and AR 0…1.' }
+});
+Object.assign(SHARED_FAMILY, { marbles:'mod', tides:'mod' });
+Object.assign(SHARED_PORT_LABEL, { xclock:'X clock', dejavu:'Déjà vu', x1:'X1', x2:'X2', x3:'X3', y:'Y', out1:'Out 1', out2:'Out 2', out3:'Out 3', out4:'Out 4' });
+SHARED_PALETTE.push(['Modulation sources', [['marbles', 'Random generator'], ['tides', 'Function generator']], 'control']);
+
+/* Optional, …chains only (outside the shared block, in PORT_TIP): t1–t3 share their labels with Blip drum's inputs
+   ('1', '2', '3' in SHARED_PORT_LABEL), so give the Random generator's gates their own names and tips there:
+  marbles:{ t1:{ l:'t1', t:'Random gate 1 (Model and Bias decide when it fires)' }, t2:{ l:'t2', t:'The clock: a gate on every tick' },
+            t3:{ l:'t3', t:'Random gate 3 (the other side of the coin toss)' } },
+*/
+
+/* Flex, Step gate and Retrigger (the track effects' tempo-locked trio) and Pitch delay / Pitch reverb, as modules (Oct 2026). */
+const FLEX_NAMES = ['Off', 'Repeat 1/4', 'Repeat 1/8', 'Fill 1/16', 'Stutter build', 'Half speed', 'Tape stop', 'Reverse beats', 'Reverse 1/8', 'Backspin', 'Scratch',
+  'Gate 1/16', 'Trance chop', 'Shuffle', 'Beat juggle', 'Octave up', 'Random slices'];
+const SGATE_NAMES = ['Custom (Steps 1–16)', 'Every step', '8ths', 'Offbeats', '3-3-2', 'Gallop', 'Broken', 'Triple', 'Quarters', 'Off 8ths', 'Syncopate', 'Half on', 'First half', 'Dense', 'Pairs', 'Tresillo'];
+const RTG_NAMES = ['1/4', '1/8', '1/16', '1/32', '1/64', '1/8T', '1/16T', '1/32T'];
+const bits8 = v => [...Array(8)].map((_, j) => ((Math.round(v) >> (7 - j)) & 1) ? 'x' : '·').join('');
+const ms1 = v => (v < 10 ? v.toFixed(1) : Math.round(v)) + ' ms';
+Object.assign(SHARED_MODULES, {
+  flex:{ label:'Flex', scope:'mono', inputs:{ in:'audio', inR:'audio', pat:'cv' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ pat:[1,0,16,1], mix:[1,0,1,.01], xf:[5,.5,20,.1] },
+    ui:Object.assign({ pat:{l:'Pattern', c:opts(FLEX_NAMES)}, xf:{l:'Smooth', f:ms1} }, MIXP),
+    about:'Flex: re-sequences the last bar in time with the song: repeats, reverses, half speed, tape stops, a backspin, scratches, gates, shuffles and beat juggles, each a different way of playing back what just played. It follows the song from PLAY (stopped, it passes the sound). A cable in Pattern (0–1 across the list) switches pattern from a sequencer. Smooth is the crossfade at each jump.' },
+  sgate:{ label:'Step gate', scope:'mono', inputs:{ in:'audio', inR:'audio', pat:'cv' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ pat:[2,0,15,1], m1:[170,0,255,1], m2:[170,0,255,1], div:[1,0,4,1], len:[.75,.03,1,.01], depth:[1,0,1,.01], smooth:[2,.3,20,.1] },
+    ui:{ pat:{l:'Pattern', c:opts(SGATE_NAMES)}, m1:{l:'Steps 1–8', f:bits8}, m2:{l:'Steps 9–16', f:bits8}, div:{l:'Step', c:opts(['1/8', '1/16', '1/32', '1/16T', '1/8T'])},
+      len:{l:'Length', f:pct}, depth:{l:'Depth', f:pct}, smooth:{l:'Smooth', f:ms1} },
+    about:'Step gate: chops the sound with a 16-step on/off pattern in time with the song. Pick a pattern, or Custom and draw it with Steps 1–8 and 9–16 (x = open). Length is how much of each open step sounds, Depth how far a closed step goes down, Smooth the fade in and out. A cable in Pattern switches pattern.' },
+  retrig:{ label:'Retrigger', scope:'mono', inputs:{ in:'audio', inR:'audio', trig:'gate' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ mode:[1,0,1,1], div:[2,0,7,1], decay:[.15,0,1,.01], pitch:[0,-24,24,1], gate:[1,.05,1,.01], mix:[1,0,1,.01] },
+    ui:Object.assign({ mode:{l:'Mode', c:opts(['While Trig is high', 'Always'])}, div:{l:'Rate', c:opts(RTG_NAMES)}, decay:{l:'Decay', f:pct},
+      pitch:{l:'Pitch', f:v => semis(v) + ' a repeat'}, gate:{l:'Gate', f:pct} }, MIXP),
+    about:'Retrigger: catches a slice (a 1/4 down to a 1/32 triplet at the song tempo) and repeats it: the stutter and roll of a beat repeat. Each repeat can get quieter (Decay) and climb or fall (Pitch), and Gate cuts each one short. Always repeats all the time; While Trig is high only while a gate is patched and high (an LFO, Steps, a Euclidean pattern).' },
+  pdelay:{ label:'Pitch delay', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ mode:[0,0,4,1], time:[380,20,2000,1], fb:[.45,0,.95,.01], pitch:[12,-24,24,1], tone:[.6,0,1,.01], wow:[.2,0,1,.01], mix:[.4,0,1,.01] },
+    ui:Object.assign({ mode:{l:'Mode', c:opts(['Climb', 'Shifted', 'Arp', 'Tape', 'Reverse'])}, time:{l:'Time', f:v => secs(v / 1000)}, fb:{l:'Feedback', f:pct},
+      pitch:{l:'Pitch', f:semis}, tone:{l:'Tone', f:pct}, wow:{l:'Wobble', f:pct} }, MIXP),
+    about:'Pitch delay: echoes that change pitch. Climb shifts every repeat again, so they climb or fall; Shifted plays every repeat at the one interval; Arp steps the repeats through a chord; Tape wobbles and bends like a worn tape echo; Reverse plays them backwards.' },
+  preverb:{ label:'Pitch reverb', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ mode:[0,0,2,1], size:[.6,0,1,.01], fb:[.45,0,.9,.01], pitch:[12,-24,24,1], pitch2:[-12,-24,24,1], tone:[.6,0,1,.01], mix:[.35,0,1,.01] },
+    ui:Object.assign({ mode:{l:'Mode', c:opts(['Shimmer', 'Pitched', 'Dual'])}, size:{l:'Size', f:pct}, fb:{l:'Shimmer', f:pct},
+      pitch:{l:'Pitch', f:semis}, pitch2:{l:'Pitch 2', f:semis}, tone:{l:'Tone', f:pct} }, MIXP),
+    about:'Pitch reverb: Shimmer feeds the tail back through a pitch shifter so it climbs into a glowing wash; Pitched is the reverb of the shifted sound; Dual adds two intervals to the tail (Pitch and Pitch 2).' }
+});
+Object.assign(SHARED_FAMILY, { flex:'afx', sgate:'afx', retrig:'afx', pdelay:'afx', preverb:'afx' });
+SHARED_PALETTE.push(['Rhythmic effects', [['flex', 'Flex (beat re-sequencer)'], ['sgate', 'Step gate'], ['retrig', 'Retrigger (stutter)']], 'audio']);
+SHARED_PALETTE.find(g => g[0] === 'Effects')[1].push(['pdelay', 'Pitch delay']);
+SHARED_PALETTE.find(g => g[0] === 'Reverbs')[1].push(['preverb', 'Pitch reverb (shimmer)']);
+
 function mergeShared(palette, groupFam, portLabel){
   const have = new Set(); for (const [, items] of palette) for (const [t] of items) have.add(t);
   for (const [g, items, where] of SHARED_PALETTE){
@@ -719,7 +924,8 @@ function mergeShared(palette, groupFam, portLabel){
       if (where === 'audio' && ctl >= 0) palette.splice(ctl, 0, row); else palette.push(row);
     }
     row[1].push(...add);
-    if (groupFam && !groupFam[g]) groupFam[g] = { 'Reverbs':'afx', 'Utilities':'util', 'Rhythm and logic':'mod', 'More effects':'afx', 'Audio followers':'mod', 'CV utilities':'util', 'Stereo':'afx' }[g] || 'afx';
+    if (groupFam && !groupFam[g]) groupFam[g] = { 'Reverbs':'afx', 'Utilities':'util', 'Rhythm and logic':'mod', 'More effects':'afx', 'Audio followers':'mod', 'CV utilities':'util', 'Stereo':'afx',
+      'Sound sources':'gen', 'Voice and filters':'afx', 'Rhythmic effects':'afx', 'Modulation sources':'mod' }[g] || 'afx';
   }
   if (portLabel) for (const k in SHARED_PORT_LABEL) if (!(k in portLabel)) portLabel[k] = SHARED_PORT_LABEL[k];
 }
@@ -1085,7 +1291,7 @@ class WavesBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './waves-worklet.js?v=19';
+    const url = opts.url || './waves-worklet.js?v=20';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'waves', {
