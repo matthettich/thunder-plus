@@ -720,6 +720,11 @@ After the eight bugs below were merged (PR #1), the review's risk items went in 
   grid of engine buttons back** (the `makeSeg` code is still there). A new engine goes in `ENGINE_GROUPS` as well as
   `XENG`/`XUI`. The preset and engine sheets are now centred on every screen size (same gap above and below) instead
   of a bottom sheet on phones.
+- **Voice card in groups (15 Oct, late; cache v135):** `#voiceCard` has four `.secgrp` blocks with a small caps
+  heading — Voice (pitch, low-pass, amp, play), Envelopes (Envelope 1/2/3, each its own section), LFOs & modulation
+  (LFOs, Sequence, Matrix), Tuning (song, two columns C–F / F♯–B) — hosts `voiceSecs`, `voiceEnvSecs`,
+  `voiceModSecs`, `voiceTuneSecs`. Hairlines rule the sections off inside each group. Tuning is song-wide, not per
+  pad; it lives at the bottom for now, Settings → Song would be its proper home if the card gets crowded.
 - **Nothing from the review is left.** Next: hear it on the Fold and the PC (nothing has been checked by ear), then the
   feature list below.
 

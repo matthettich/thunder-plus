@@ -364,6 +364,10 @@ body:not(.noed) .wvMobNote{display:none}
    just outside the box and are clipped */
 .sec::before{content:""; position:absolute; left:-1px; top:0; bottom:0; width:1px; background:var(--line)}
 .sec::after{content:""; position:absolute; left:0; right:0; top:-1px; height:1px; background:var(--line)}
+/* the voice card's sections come in named groups (Voice, Envelopes, LFOs & modulation, Tuning), ruled off from each other */
+.secgrp+.secgrp{border-top:1px solid var(--line)}
+.secgh{font-size:var(--fs-3); font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); padding:9px 12px 0}
+.secgrp .secs{padding-bottom:8px}
 /* Narrow screens: the sections (Source, Pitch, Amp, Filter, and the layer type's own) are tabs, one showing at a
    time, instead of one long column of sliders. Wide screens keep the grid with every section visible. */
 .sectabs{display:none}
@@ -1493,7 +1497,10 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <span class="ttl">Voice pitch, filter &amp; amp</span>
       <span class="lbl">shapes every layer at once</span>
     </header>
-    <div class="secs" id="voiceSecs"></div>
+    <div class="secgrp"><div class="secgh">Voice</div><div class="secs" id="voiceSecs"></div></div>
+    <div class="secgrp"><div class="secgh">Envelopes</div><div class="secs" id="voiceEnvSecs"></div></div>
+    <div class="secgrp"><div class="secgh">LFOs &amp; modulation</div><div class="secs" id="voiceModSecs"></div></div>
+    <div class="secgrp"><div class="secgh">Tuning</div><div class="secs" id="voiceTuneSecs"></div></div>
   </section>
   </div>
 </div>
@@ -6828,16 +6835,17 @@ const tuneUI = [];
 function applyTune(name){ const t = TUNE_SETS[name]; if (!t) return; S.tune = t.slice(); refreshTune(); saveS(); changed(); }
 function refreshTune(){ if (!S.tune) S.tune = new Array(12).fill(0); for (const u of tuneUI){ const c = S.tune[u.pc] || 0; u.inp.value = String(c); u.out.textContent = (c > 0 ? '+' : '') + c.toFixed(0) + ' ct'; } }
 (function buildTuning(){
-  const host = $('voiceSecs'), s = el('div', 'sec'); s.append(el('h3', null, 'Tuning (song)')); host.append(s);
+  const host = $('voiceTuneSecs'), s = el('div', 'sec'); s.append(el('h3', null, 'Tuning (song) · C – F')); host.append(s);
   const pr = el('div', 'segrow'); pr.append(el('span', null, 'Preset')); const pg = document.createElement('select'); pg.setAttribute('aria-label', 'Tuning preset');
   Object.keys(TUNE_SETS).forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; pg.append(o); });
   pg.addEventListener('change', () => applyTune(pg.value)); pr.append(pg); s.append(pr);
+  const s2 = el('div', 'sec'); s2.append(el('h3', null, 'F♯ – B')); host.append(s2);   // two columns of six, side by side when there is room
   for (let pc = 0; pc < 12; pc++){
     const row = el('div', 'row'); row.append(el('label', null, NOTE[pc]));
     const inp = document.createElement('input'); inp.type = 'range'; inp.min = '-100'; inp.max = '100'; inp.step = '1'; inp.setAttribute('aria-label', NOTE[pc] + ' tuning');
     const out = el('output');
     inp.addEventListener('input', () => { S.tune[pc] = +inp.value; out.textContent = (+inp.value > 0 ? '+' : '') + (+inp.value).toFixed(0) + ' ct'; saveS(); changed(); });
-    row.append(inp, out); s.append(row); tuneUI.push({ inp, out, pc });
+    row.append(inp, out); (pc < 6 ? s : s2).append(row); tuneUI.push({ inp, out, pc });
   }
 })();
 
@@ -6859,9 +6867,8 @@ function modSelect(host, label, key){
   vmSelUpd.push(() => { s.value = String(V()[key + 'dst'] | 0); });
 }
 (function buildVoiceMod(){
-  const host = $('voiceSecs');
-  const vsec = t => { const s = el('div', 'sec'); s.append(el('h3', null, t)); host.append(s); return s; };
-  const ls = vsec('Mod LFOs');
+  const vsec = (t, host) => { const s = el('div', 'sec'); s.append(el('h3', null, t)); $(host).append(s); return s; };
+  const ls = vsec('LFOs', 'voiceModSecs');
   for (let i = 1; i <= 3; i++){
     const r = el('div', 'segrow'); r.append(el('span', null, 'LFO ' + i));
     const s = document.createElement('select'); s.setAttribute('aria-label', 'LFO ' + i + ' shape');
@@ -6873,11 +6880,11 @@ function modSelect(host, label, key){
     r.classList.add('lforow'); r.append(s, sy); ls.append(r); vmSelUpd.push(() => { s.value = String(V()['lfo' + i + 'Shape'] | 0); sy.value = String(V()['lfo' + i + 'Sync'] | 0); });
     for (const k of ['lfo' + i + 'Rate', 'lfo' + i + 'Depth']){ const rr = makeRow(VM[k], k, V, {idp:'vg'}); ls.append(rr.r); vgRows.push(rr); }
   }
-  const es = vsec('Mod envelopes');
-  for (let i = 1; i <= 3; i++) for (const k of ['env' + i + 'A', 'env' + i + 'D', 'env' + i + 'S', 'env' + i + 'R']){ const rr = makeRow(VM[k], k, V, {idp:'vg'}); es.append(rr.r); vgRows.push(rr); }
+  let es;
+  for (let i = 1; i <= 3; i++){ es = vsec('Envelope ' + i, 'voiceEnvSecs'); for (const k of ['env' + i + 'A', 'env' + i + 'D', 'env' + i + 'S', 'env' + i + 'R']){ const rr = makeRow(VM[k], k, V, {idp:'vg'}); es.append(rr.r); vgRows.push(rr); } }
   { const row = el('div', 'segrow'); const b = el('button', 'sm', 'Reset to defaults'); b.type = 'button'; b.title = 'Put every voice envelope (pitch, amp and the three mod envelopes) back to its factory values';
     b.setAttribute('aria-label', 'Reset envelopes to defaults'); b.addEventListener('click', () => resetVoiceEnvelopes()); row.append(b); es.append(row); }
-  const ss = vsec('Mod sequence');
+  const ss = vsec('Sequence', 'voiceModSecs');
   { const r = el('div', 'segrow'); r.append(el('span', null, 'Step length')); const sy = document.createElement('select'); sy.setAttribute('aria-label', 'Sequence sync');
     SYNC_NAMES.slice(0, 6).forEach((n, k) => { const o = document.createElement('option'); o.value = k; o.textContent = k ? n + ' (tempo)' : 'Free (Seq rate)'; sy.append(o); });
     sy.addEventListener('change', () => { V().seqSync = +sy.value; changed(); }); r.append(sy); ss.append(r); vmSelUpd.push(() => { sy.value = String(V().seqSync | 0); }); }
@@ -6890,7 +6897,7 @@ function modSelect(host, label, key){
   }
   ss.append(grid);
   const st = el('div', 'readout', '32 steps, played at Seq rate and scaled by Seq depth.'); st.style.paddingLeft = '0'; ss.append(st);
-  const ms = vsec('Mod matrix');
+  const ms = vsec('Matrix', 'voiceModSecs');
   for (const [key, label] of MOD_SRC){ modSelect(ms, label, key); const rr = makeRow(VM[key + 'amt'], key + 'amt', V, {idp:'vg'}); ms.append(rr.r); vgRows.push(rr); }
   vmSelUpd.push(() => { const v = V(), steps = Array.isArray(v.seq) ? v.seq : []; for (let i = 0; i < 32; i++) stepEls[i].value = String(steps[i] || 0); });
 })();
