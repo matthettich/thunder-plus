@@ -714,6 +714,12 @@ After the eight bugs below were merged (PR #1), the review's risk items went in 
   NES-style period quantisation). Engine grid is 22 cells now (room for two more makes 6×4). Same checks as the
   previous three. Original code throughout (the physical models follow the textbook waveguide structures, written
   from scratch).
+- **Engine picker is a sheet (15 Oct, late; cache v133):** `engineSheet()` — groups (`ENGINE_GROUPS`: Layers, Drums,
+  Keys, Synths, Strings & wind, Voice & bass, Fonts) with a line about each engine, search, the current one marked;
+  the pad's engine row shows one button (`#vEngBtn`, "Strings ▾"). **Set `ENGINE_SHEET = false` to get the 4-column
+  grid of engine buttons back** (the `makeSeg` code is still there). A new engine goes in `ENGINE_GROUPS` as well as
+  `XENG`/`XUI`. The preset and engine sheets are now centred on every screen size (same gap above and below) instead
+  of a bottom sheet on phones.
 - **Nothing from the review is left.** Next: hear it on the Fold and the PC (nothing has been checked by ear), then the
   feature list below.
 
