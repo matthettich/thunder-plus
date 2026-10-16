@@ -812,8 +812,10 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 .tarrh{position:absolute; left:-10px; top:0; bottom:0; width:20px; cursor:ew-resize; touch-action:none; z-index:3}
 .tarrh::after{content:''; position:absolute; left:8px; top:50%; width:4px; height:48px; margin-top:-24px; border-radius:2px; background:var(--ar-dim); opacity:.6}
 .tarrh:hover::after,.tarrh.dn::after{opacity:1; background:var(--ar-ink)}
-.tahd{display:flex; align-items:center; gap:8px; padding:8px 10px 6px; font-size:var(--fs-3); font-weight:700; letter-spacing:.05em; flex:none}
-.tahd span{flex:1; min-width:0; font-weight:400; color:var(--ar-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:0}
+.tahd{display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:6px; padding:8px 10px 6px; font-size:var(--fs-3); font-weight:700; letter-spacing:.05em; flex:none}
+/* ARRANGE at the left, ○ in the middle, the rows / muted line and + at the right (that half has the room). */
+.tahd .tahl{display:flex; align-items:center; gap:6px; min-width:0} .tahd .tahr{display:flex; align-items:center; justify-content:flex-end; gap:4px; min-width:0}
+#tArrSub{flex:0 1 auto; text-align:right; min-width:0; font-weight:400; color:var(--ar-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:0}
 .tahd button{min-height:24px; padding:0 8px; font-size:var(--fs-2); font-weight:700; letter-spacing:.04em; background:transparent; color:var(--ar-ink); border:1px solid var(--ar-line); border-radius:4px}
 .tahd button.on{background:var(--ar-mu); border-color:var(--ar-mu); color:#fff}
 .tath,.tagrid .ar{display:grid; grid-template-columns:22px var(--arcols, repeat(8,minmax(0,1fr)) 4px repeat(8,minmax(0,1fr))); gap:2px; padding:0 8px}
@@ -857,8 +859,13 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tafx{display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden}
 /* Zoom (pinch, Ctrl+wheel, or the − + in the header): the blocks get up to 3× bigger and the grid scrolls sideways; the
    track numbers and MONO / POLY labels follow it (scrollLeft kept in step), the row numbers stay at the left. */
-.tahd .azb{min-width:30px; min-height:28px; padding:0; font-size:16px; line-height:1; font-family:var(--font); flex:none}
-.tahd .azb:disabled{opacity:.35}
+/* − ○ + are quiet: no box, a small dim glyph on a 24 px target (findable, tapped on purpose). An ID beats the skins'
+   button rules. A press shows a soft round highlight. */
+#tArr .tahd .azb{min-width:24px; min-height:24px; width:24px; height:24px; padding:0; border:0; border-radius:50%; background:transparent; box-shadow:none;
+  color:var(--ar-dim); font:400 15px/1 var(--font); letter-spacing:0; flex:none}
+#tArr .tahd .azb svg{width:11px; height:11px; display:block}
+#tArr .tahd .azb:active:not(:disabled){background:var(--ar-line); color:var(--ar-ink)}
+#tArr .tahd .azb:disabled{opacity:.3; cursor:default}
 .tarr.zoomed .tagrid{touch-action:pan-x pan-y}
 .tarr.zoomed .tagrid .ar{width:max-content; min-width:100%; box-sizing:border-box}   /* full width, so the row number can stick */
 /* The row numbers (and the corner above them) stay at their usual inset; shadows paint over the gutter and the gap so
@@ -1621,7 +1628,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     </div>
     <aside class="tarr" id="tArr" aria-label="Song arrangement">
       <div class="tarrh" id="tArrH" role="separator" aria-orientation="vertical" aria-label="Drag to resize the arrange panel" title="Drag to resize · double-tap: big / normal"></div>
-      <div class="tahd"><button type="button" class="azb" id="tArrZo" aria-label="Zoom out" title="Zoom out (or pinch)">−</button><b>ARRANGE</b><span id="tArrSub"></span><button type="button" class="azb" id="tArrZf" aria-label="Zoom to fit" title="Fit every track in the panel"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/></svg></button><button type="button" class="azb" id="tArrZi" aria-label="Zoom in" title="Zoom in: bigger blocks (or pinch)">+</button></div>
+      <div class="tahd"><span class="tahl"><button type="button" class="azb" id="tArrZo" aria-label="Zoom out" title="Zoom out (or pinch)">−</button><b>ARRANGE</b></span><button type="button" class="azb" id="tArrZf" aria-label="Zoom to fit" title="Fit every track in the panel"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button><span class="tahr"><span id="tArrSub"></span><button type="button" class="azb" id="tArrZi" aria-label="Zoom in" title="Zoom in: bigger blocks (or pinch)">+</button></span></div>
       <div class="tagp" id="tArrGp" aria-hidden="true"></div>
       <div class="tath" id="tArrTh"></div>
       <div class="tagrid" id="tArrGrid"></div>
