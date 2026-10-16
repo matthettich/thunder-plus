@@ -747,7 +747,11 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
   .tpat{flex:1; border-left:0} .tclk{flex:1}
   .trows button{min-height:40px; min-width:44px}
   .ttabbar .ttabs button{flex:1 0 auto; padding:0 6px; font-size:var(--fs-3); letter-spacing:.02em}
+  .tpat{flex:1 1 100%; min-width:0; overflow-x:auto; scrollbar-width:none} .tpat::-webkit-scrollbar{display:none}   /* its own line; still too wide: it scrolls, never clips */
 }
+/* patFit(): when the strip can't fit its line, it drops what is on screen elsewhere — in PAD mode LOOP and TRANSP (the
+   LOOP and SEMI −/+ keys below do the same), in KEYS mode TRANSP (the top bar's TRANSPOSE ▲▼, Alt+, / Alt+.). */
+.tpat.fitsel #tSelBar, .tpat.fitxp #tXposeDn, .tpat.fitxp #tXposeUp{display:none}
 .tsong{border:1px solid var(--line); min-height:34px; padding:0 14px; margin:0 4px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; flex:none; white-space:nowrap; background:var(--panel)}
 .tsong:hover{border-color:var(--ink)}
 .tsong.on{background:var(--pl); color:var(--inv); border-color:var(--pl)}
@@ -11836,7 +11840,7 @@ function draw(){
   const km = inMode === 'keys'; $('tKp').hidden = !km || !kpOn; $('tPad').hidden = km; $('tLegKeys').hidden = !km; $('tLegPad').hidden = km;
   deckDraw(); if (relayout || stgReq !== (stage === 'off' ? '' : stageKind())) stageLayout();
   drawPat();
-  $('tOct').hidden = !km; $('tOctN').textContent = kOct;
+  $('tOct').hidden = !km; $('tOctN').textContent = kOct; if (patMode !== km){ patMode = km; patFit(); }
   if (km) drawKeypad();
   document.querySelectorAll('#tTabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tv));
   document.querySelectorAll('#tMap [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === tv));
@@ -13096,6 +13100,15 @@ $('tRowsDn').addEventListener('click', () => setRows(plen(rowsId()) - 1));
 $('tLoop').addEventListener('click', () => toggleLoop());
 $('tXposeDn').addEventListener('click', () => transposeSel(-1));
 $('tXposeUp').addEventListener('click', () => transposeSel(1));
+// The strip under the tabs is one line. On a screen too narrow for all of it (the Fold's cover screen in PAD mode:
+// TRANSP + fell off the edge), hide what has a twin elsewhere; measured, so it only happens when it doesn't fit.
+let patMode = null;
+function patFit(){
+  const bar = $('tPat'); if (!bar || !bar.offsetParent) return;
+  bar.classList.remove('fitsel', 'fitxp'); if (bar.scrollWidth <= bar.clientWidth + 1) return;
+  bar.classList.add(inMode === 'keys' ? 'fitxp' : 'fitsel');
+}
+try { new ResizeObserver(() => patFit()).observe(document.querySelector('.ttabbar')); } catch(e){ addEventListener('resize', patFit); }
 $('tRowsUp').addEventListener('click', () => setRows(plen(rowsId()) + 1));
 $('tRowsV').addEventListener('click', async () => { const id = rowsId(), n = await askText({title:`Rows in phrase ${hx(id)}`, body:`1 to ${PROWS}. The − and + beside it step by one.`}, plen(id), 4, 'Set'); if (n != null && Number.isFinite(+n) && n.trim() !== '') setRows(Math.round(+n)); });
 $('tClk').addEventListener('click', () => toast(`${tp.on ? tp.bpm : S.bpm} BPM, ${tp.on ? tp.tks : S.ticks || TICKS} ticks a step. Set them in Project (TEMPO, TICKS); TPO and TIC change them as the song plays.`));

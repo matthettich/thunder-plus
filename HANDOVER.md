@@ -695,6 +695,10 @@ After the eight bugs below were merged (PR #1), the review's risk items went in 
   ignore taps in their first 350 ms (`early()`). Checked with real taps at 412 and 884 wide. Cover-screen (≤480 px)
   engine card headers are a grid: name + full description, Random / Init beside them, Presets full width below.
   The engine card's footnote (`#xSecs>.note`) spans the grid with the sections' 12 px inset and a hairline above.
+- **Tracker strip on the cover screen (16 Oct; cache v137):** the tempo / ROWS / LOOP / TRANSP strip under the tabs was
+  419 px on a 369 px screen (TRANSP + off the edge). `patFit()` (ResizeObserver on `.ttabbar`, and on input-mode
+  change) measures it: if it doesn't fit, PAD mode hides `#tSelBar` (the LOOP and SEMI −/+ keys do the same) and KEYS
+  mode hides TRANSP −/+ (top bar's TRANSPOSE ▲▼). ≤600 px the strip is its own line and scrolls if still too wide.
 - **Three more rendered engines (15 Oct, night; cache v130):** `TableCore` (wavetable: four 8-frame tables drawn in
   the time domain, taken apart once with a DFT and rebuilt band-limited per note; Position/Warp, position envelope +
   LFO, unison, sub, noise, SVF low-pass with envelope, ADSR), `BreathCore` (coloured noise → grains → a bank of up to
