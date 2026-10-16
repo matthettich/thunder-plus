@@ -357,8 +357,12 @@ body:not(.noed) .wvMobNote{display:none}
 .fxdb{font:500 11px/1 var(--mono, "JetBrains Mono", monospace); color:var(--muted); min-width:4ch; text-align:right; flex:none}
 .fxgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:0 22px}
 .fxempty{padding:10px 12px 12px; margin:0}
-.secs{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:8px 22px; padding:10px 12px 12px}
-.sec{min-width:0}
+.secs{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:0; padding:0 0 10px; overflow:hidden}
+.sec{min-width:0; position:relative; padding:9px 12px 8px}
+/* hairlines between the sections: each cell draws one above and one to its left; the ones on the outer edge land
+   just outside the box and are clipped */
+.sec::before{content:""; position:absolute; left:-1px; top:0; bottom:0; width:1px; background:var(--line)}
+.sec::after{content:""; position:absolute; left:0; right:0; top:-1px; height:1px; background:var(--line)}
 /* Narrow screens: the sections (Source, Pitch, Amp, Filter, and the layer type's own) are tabs, one showing at a
    time, instead of one long column of sliders. Wide screens keep the grid with every section visible. */
 .sectabs{display:none}
