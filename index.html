@@ -1022,15 +1022,21 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
   cursor:pointer; border:0; border-bottom:1px solid var(--line); border-radius:0; box-shadow:none; background:none; padding:0; margin:0; text-align:left; width:100%}
 #dkChnRows .dkcm:hover{color:var(--ink)}
 .dkcg .note{grid-row:span 4; width:210px; white-space:normal; font-size:var(--fs-3); color:var(--muted); margin:2px 0}
-#dkStrip{--dkc:#d8f0e2; flex:0 0 var(--dkstw, 228px)}
+#dkStrip{--dkc:#d8f0e2; flex:0 0 var(--dkstw, 228px); margin-left:auto}   /* stays at the right edge when parts fold */
+/* A folded part (INST, …CHAINS, FX), like a folded device in Ableton: a narrow strip with its title running up it.
+   Click the strip to open it again. SCOPE and TRACK never fold. */
+#tDeck .dks.col{flex:0 0 26px; min-width:26px; width:26px; cursor:pointer}
+#tDeck .dks.col .dkb, #tDeck .dks.col .dki, #tDeck .dks.col .dkw, #tDeck .dks.col .dksp{display:none}
+#tDeck .dks.col .dkh{flex:1 1 auto; height:auto; padding:6px 0; justify-content:center; align-items:flex-start; border-bottom:0}
+#tDeck .dks.col .dkt{writing-mode:vertical-rl; transform:rotate(180deg); height:auto; max-height:100%; padding:7px 0; width:18px; flex:0 1 auto}
+.dkh .dkt.fixed{cursor:default}
 /* the thin grey header: one cell per section, its button over it, a rule between sections */
 .dkh{flex:none; display:flex; align-items:center; gap:5px; height:22px; padding:0 6px; background:var(--side); border-bottom:1px solid var(--line); min-width:0}
 .dkh .dkt{min-height:0; height:17px; padding:0 7px; font-size:var(--fs-2); font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--ink); color:var(--inv);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; flex:0 1 auto; min-width:0}
 .dkh .dki{font-size:var(--fs-2); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto}
 .dkh .dksp{flex:1 1 0}
-.dkh .dkoff{min-height:0; height:17px; padding:0 6px; font-size:var(--fs-2); font-weight:700; letter-spacing:.04em; border:1px solid var(--ink); background:var(--panel); color:var(--ink); flex:none}
-.dkh .dkoffs{display:flex; gap:4px; flex:none}
+.dkoffs{display:none}   /* the old + buttons for hidden parts: parts fold now instead */
 .dkh .dkx{min-height:0; height:17px; width:22px; padding:0; font-size:var(--fs-2); border:1px solid var(--line); background:var(--panel); flex:none}
 .dkh .dksolo{min-height:0; height:17px; padding:0 6px; font-size:var(--fs-2); font-weight:700; letter-spacing:.04em; border:0; background:var(--meter-hot); color:#1b2130; flex:none}
 .dkb{flex:1; min-height:0; display:flex; flex-direction:column; padding:6px 10px 8px}
@@ -12510,9 +12516,7 @@ function projRows(){
     {l:'KEYS KEYPAD', ck:'Show on-screen keypad', get:() => kpOn ? 1 : 0, set:v => setKp(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'KEYS mode: show the on-screen keypad at the bottom for tapping in notes. Off hides it — the computer keyboard still types notes and hex, and the octave (OCT, top bar) stays. PAD mode is unchanged'},
     {l:'BOTTOM PANEL', ck:'Show the bottom panel', get:() => deck.on ? 1 : 0, set:v => setDeck('on', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
-      info:() => 'KEYS mode with the keypad off: a panel at the bottom with a spectrum of the master, quick controls for the current instrument and the current track’s effects, and a channel strip for the current track. Its buttons hide each part'},
-    {l:'› SHOW ALL PANEL PARTS', act:() => { for (const [k] of DK_SECS) deck[k] = true; deck.on = true; deckSave(); deckLayout(); fit(); draw(); toast('Every part of the bottom panel is back.'); },
-      info:() => { const off = DK_SECS.filter(([k]) => !deck[k]).map(([, l]) => l); return 'Brings back any part of the bottom panel you hid (scope, inst, …chains, FX, track)' + (off.length ? '. Hidden now: ' + off.join(', ') : '. Nothing is hidden'); }},
+      info:() => 'KEYS mode with the keypad off: a panel at the bottom with a spectrum of the master, quick controls for the current instrument, its …chains and the current track’s effects, and a channel strip for the current track. Click INST, …CHAINS or FX to fold that part to a narrow strip; click the strip to open it again'},
     {l:'STAGE', opts:true, get:() => STG.indexOf(stage), set:v => setStage(STG[v]), min:0, max:STG.length - 1, d:0, fmt:v => STG_NAMES[v],
       info:() => 'Big screens: the space beside the grid. BY SCREEN: the dogs dance on Song and Project; Sect previews the phrase; Phrase shows a piano lighting the notes playing; Inst its waveform; Mixer the master spectrum; FX the effects chain. DOGS: the dogs everywhere. OFF: empty'},
     {l:'SCREEN', sec:'Screen', gap:true, opts:true, get:() => SCREENS.findIndex(x => x[0] === tScreen), set:v => setScreen(SCREENS[v][0]), min:0, max:SCREENS.length - 1, fmt:v => SCREENS[v][1], info:() => 'Colour of the screen: BY SCREEN gives Song, Sect, Phrase and the rest their own pastel (the same as their tabs), or pick one pastel, or black'},
@@ -14143,7 +14147,8 @@ const DKK = 'thunderplus-deck-v1';
 const DK_SECS = [['scope', 'SCOPE'], ['inst', 'INST'], ['chn', '…CHAINS'], ['fx', 'FX'], ['strip', 'TRACK']];
 let deck = (() => { const d = {on:true, scope:true, inst:true, chn:true, fx:true, strip:true, h:168, ws:300, wf:320};
   try { const o = JSON.parse(localStorage.getItem(DKK) || 'null');
-    if (o && typeof o === 'object'){ for (const k in d) if (typeof o[k] === typeof d[k]) d[k] = o[k]; if (o.meters === false && o.strip === undefined) d.strip = false; } } catch(e){}
+    if (o && typeof o === 'object'){ for (const k in d) if (typeof o[k] === typeof d[k]) d[k] = o[k]; } } catch(e){}
+  d.scope = d.strip = true;   // SCOPE and TRACK can't be hidden or folded (older saves could hide them)
   return d; })();
 const deckSave = () => { try { localStorage.setItem(DKK, JSON.stringify(deck)); } catch(e){} };
 const deckShown = () => !$('tDeck').hidden;
@@ -14160,10 +14165,13 @@ function dkInstNow(){
 }
 let dkInst = 0;
 function setDeck(k, v){ deck[k] = !!v; deckSave(); deckLayout(); fit(); draw(); }
-document.querySelectorAll('#tDeck .dkt').forEach(b => { b.title = 'Hide this section (a + button in the panel’s header brings it back)'; b.addEventListener('click', () => {
-  const l = (DK_SECS.find(([k]) => k === b.dataset.k) || [, b.dataset.k])[1];
-  setDeck(b.dataset.k, false); toast(`${l} hidden. + ${l} in the panel’s header brings it back (or Settings → SHOW ALL PANEL PARTS).`, 5000); }); });
-for (const [k, l] of DK_SECS){ const b = el('button', 'dkoff', '+ ' + l); b.type = 'button'; b.dataset.k = k; b.title = 'Show ' + l.toLowerCase(); b.addEventListener('click', () => setDeck(k, true)); $('dkOffs').append(b); }
+// INST, …CHAINS and FX fold to a narrow strip when their title is clicked (a click anywhere on the strip opens it
+// again), like a folded device in Ableton. SCOPE and TRACK always stay, at the left and the right.
+const DK_FOLD = new Set(['inst', 'chn', 'fx']);
+document.querySelectorAll('#tDeck .dkt').forEach(b => { const k = b.dataset.k;
+  if (!DK_FOLD.has(k)){ b.classList.add('fixed'); b.tabIndex = -1; b.removeAttribute('title'); return; }
+  b.addEventListener('click', e => { e.stopPropagation(); setDeck(k, !deck[k]); }); });
+for (const k of DK_FOLD) dkSec(k).addEventListener('click', e => { if (!deck[k] && !e.target.closest('.dkt')) setDeck(k, true); });
 $('dkHide').addEventListener('click', () => { setDeck('on', false); toast('Panel hidden. Settings → BOTTOM PANEL brings it back.'); });
 $('dkSolo').addEventListener('click', () => { S.mix.forEach(m => m.solo = false); mixChanged(); draw(); toast('Solo cleared: every track plays.'); });
 // Shown in KEYS mode when the keypad is off and the panel is on. The shown-sections' buttons sit in their own
@@ -14176,25 +14184,13 @@ function deckLayout(){
     const w = above ? above.getBoundingClientRect().width : 0; $('tDeck').style.setProperty('--dkstw', (w >= 190 && w <= 420 ? Math.round(w) : 228) + 'px'); }
   $('tDeck').style.setProperty('--dkh', deck.h + 'px');
   $('tDeck').style.setProperty('--dkws', deck.ws + 'px'); $('tDeck').style.setProperty('--dkwf', deck.wf + 'px');
-  const vis = DK_SECS.filter(([k]) => deck[k]).map(([k]) => k);
-  for (const [k] of DK_SECS){ const sct = dkSec(k); sct.hidden = !deck[k]; sct.classList.toggle('first', vis[0] === k);
-    $('dkOffs').querySelector(`[data-k="${k}"]`).hidden = !!deck[k]; }
-  $('dkBody').hidden = false;
-  if (!vis.length){   // everything hidden: one bare header row with the "+" buttons
-    let bare = $('dkBare'); if (!bare){ bare = el('div', 'dkh'); bare.id = 'dkBare'; $('tDeck').insertBefore(bare, $('dkBody')); }
-    bare.hidden = false; if ($('dkOffs').parentElement !== bare) bare.replaceChildren(el('b', 'dki', 'PANEL'), $('dkOffs'), el('span', 'dksp'), $('dkTail')); $('dkBody').hidden = true; return;
-  }
-  if ($('dkBare')) $('dkBare').hidden = true;
-  const h1 = dkSec(vis[vis.length - 1]).querySelector('.dkh');
-  // Hidden parts wait as "+" buttons at the right of the INST header (the widest), or beside ✕ when INST is hidden too.
-  const hOff = deck.inst ? dkSec('inst').querySelector('.dkh') : h1;
-  // Only move them when they are not already there: deckDraw runs this on every redraw (every row while playing), and
-  // moving a button between press and release swallowed the click ("+ FX doesn't always open it").
-  const offs = $('dkOffs'), tail = $('dkTail');
-  if (offs.parentElement !== hOff || tail.parentElement !== h1 || h1.lastElementChild !== tail){
-    let sp = h1.querySelector('.dksp.t'); if (!sp) sp = el('span', 'dksp t');
-    if (hOff === h1) h1.append(sp, offs, tail);
-    else { let so = hOff.querySelector('.dksp.o'); if (!so) so = el('span', 'dksp o'); hOff.append(so, offs); h1.append(sp, tail); } }
+  for (const [k, l] of DK_SECS){ const sct = dkSec(k), col = DK_FOLD.has(k) && !deck[k]; sct.hidden = false; sct.classList.toggle('col', col); sct.classList.toggle('first', k === 'scope');
+    const t = sct.querySelector('.dkt'); if (t && DK_FOLD.has(k)){ t.setAttribute('aria-expanded', String(!col)); t.title = col ? 'Open ' + l : 'Fold ' + l + ' to a narrow strip'; } }
+  $('dkBody').hidden = false; if ($('dkBare')) $('dkBare').hidden = true; $('dkOffs').hidden = true;
+  // ✕ (and SOLO) at the end of TRACK's header. Only moved when out of place: this runs on every redraw, and moving a
+  // button between press and release swallows the click.
+  const h1 = dkSec('strip').querySelector('.dkh'), tail = $('dkTail');
+  if (tail.parentElement !== h1 || h1.lastElementChild !== tail){ let sp = h1.querySelector('.dksp.t'); if (!sp) sp = el('span', 'dksp t'); h1.append(sp, tail); }
 }
 // Channel strip: the current track's level, fader, pan, mute and solo.
 const stVol = $('stVol'), stPan = $('stPan');
@@ -15582,7 +15578,7 @@ function buildProj(){
 }
 // On Desktop the panel switches (keypad, bottom panel, stage) are under View with the rest of the screen; on Mobile
 // they stay in Project → Input.
-const PANEL_ROWS = new Set(['KEYS KEYPAD', 'BOTTOM PANEL', '› SHOW ALL PANEL PARTS', 'STAGE']);
+const PANEL_ROWS = new Set(['KEYS KEYPAD', 'BOTTOM PANEL', 'STAGE']);
 // Screen: the tracker's screen and arrange settings, then the skin.
 function buildScreen(){
   const list = $('gsecScreen'); if (!list) return;

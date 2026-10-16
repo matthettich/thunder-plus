@@ -24,6 +24,15 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 16 Oct (night): bottom panel parts fold instead of hiding
+
+The owner didn't want hide-and-restore at all: INST, …CHAINS and FX now **fold** (`DK_FOLD`; `deck.inst/chn/fx` false =
+folded) to a 26 px strip (`#tDeck .dks.col`, title vertical) on a title click, and a click anywhere on the strip opens
+it. SCOPE and TRACK can't fold or hide (`d.scope = d.strip = true` on load; their titles get `.fixed`); TRACK keeps to
+the right edge (`margin-left:auto`), so folding leaves empty space in the middle, to fill later. Gone: the hide toast,
+the + buttons (`#dkOffs` stays in the markup, hidden), the bare-header case, and Settings → SHOW ALL PANEL PARTS.
+This replaces the "+ buttons" item in the earlier bottom-panel note below.
+
 ## 16 Oct (night): Song-screen Arrange polish, …chains in/out meters and track picking, boxed sections
 
 - **Song screen (Arrange):** one header line (`.thd` hidden; Arrange's own header reads SONG · name · rows with − ○ +);

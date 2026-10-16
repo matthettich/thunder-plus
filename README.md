@@ -94,7 +94,7 @@ The top bar has two menus that work like ...Seeds': **File ▾** and **⚙ Setti
 - **View neighboring phrases** (off by default): on the Phrase screen, a faint, read-only copy of the notes the tracks either side play at the same song row, the left track's in violet before the note column and the right track's in mustard after it, so you can see the parts around the one you're editing.
 - **Follow playhead** (off by default) scrolls Song and Phrase with the playhead while the song plays; the cursor rides along and Phrase switches to whatever the cursor's track is playing.
 - **Show side panel** (on by default): the grey column at the right on wide screens. Turn it off for more room.
-- **Bottom panel parts:** hiding a part (its title button) leaves a **+** button for it in the panel's header; **› SHOW ALL PANEL PARTS** brings every part back.
+- **Bottom panel parts:** click INST, …CHAINS or FX in the bottom panel to fold that part to a narrow strip with its name running up it (like folding a device in Ableton); click the strip to open it again. SCOPE stays at the left and TRACK at the right; they can't be folded or hidden.
 - **Show classic Song screen** (off by default): the Song screen as the text grid, with Arrange beside it on wide screens, the way it was before 16 Oct. Off, the Song screen is Arrange (see Tracker below).
 - **Text size** (60–200%) makes the tracker's text and lines bigger or smaller. Bigger shows fewer rows; when a line gets wider than the screen it scrolls sideways to follow the cursor.
 
