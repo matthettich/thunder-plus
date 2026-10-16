@@ -707,7 +707,8 @@ After the eight bugs below were merged (PR #1), the review's risk items went in 
   (2 touches; a second finger cancels the hold-to-mute press, `arrPtrs`), Ctrl+wheel on desktop, and the header's
   − ○ + (`ARR_ZOOM_BTNS = true`; false removes them, the owner may not keep them). `arrFollowX()` keeps the cursor's
   block in view when the cursor changes track while zoomed; a pinch leaves the view where it was.
-  Header (cache v139): a 3-column grid — `.tahl` (− ARRANGE), ○ centred, `.tahr` (rows / muted / zoom line, +).
+  Header (cache v140): a 3-column grid — `.tahl` (− ARRANGE), ○, `.tahr` (rows / muted / zoom line, +). ○ is centred
+  on `--azfx`, the MONO | POLY break at fit size (`arrSize`), so it stays put while zoomed; it has a 44×32 target.
   The − ○ + are boxless 24 px dim glyphs (`#tArr .tahd .azb`, the ID beats the skins' button rules).
 - **Three more rendered engines (15 Oct, night; cache v130):** `TableCore` (wavetable: four 8-frame tables drawn in
   the time domain, taken apart once with a DFT and rebuilt band-limited per note; Position/Warp, position envelope +

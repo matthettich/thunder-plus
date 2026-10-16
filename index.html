@@ -812,9 +812,10 @@ body.arrtiny .tarr{width:200px} body.arrtiny .tagrid b{color:transparent}
 .tarrh{position:absolute; left:-10px; top:0; bottom:0; width:20px; cursor:ew-resize; touch-action:none; z-index:3}
 .tarrh::after{content:''; position:absolute; left:8px; top:50%; width:4px; height:48px; margin-top:-24px; border-radius:2px; background:var(--ar-dim); opacity:.6}
 .tarrh:hover::after,.tarrh.dn::after{opacity:1; background:var(--ar-ink)}
-.tahd{display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:6px; padding:8px 10px 6px; font-size:var(--fs-3); font-weight:700; letter-spacing:.05em; flex:none}
-/* ARRANGE at the left, ○ in the middle, the rows / muted line and + at the right (that half has the room). */
-.tahd .tahl{display:flex; align-items:center; gap:6px; min-width:0} .tahd .tahr{display:flex; align-items:center; justify-content:flex-end; gap:4px; min-width:0}
+.tahd{display:grid; grid-template-columns:minmax(0, calc(var(--azfx, 50%) - 32px)) 44px minmax(0,1fr); align-items:center; gap:0; padding:8px 10px 6px; font-size:var(--fs-3); font-weight:700; letter-spacing:.05em; flex:none}
+/* ARRANGE at the left, ○ over the MONO | POLY break (--azfx, from arrSize: where the break is when every track fits,
+   so it stays put while zoomed), the rows / muted line and + at the right. */
+.tahd .tahl{display:flex; align-items:center; gap:6px; min-width:0} .tahd .tahr{display:flex; align-items:center; justify-content:flex-end; gap:4px; min-width:0; padding-left:4px}
 #tArrSub{flex:0 1 auto; text-align:right; min-width:0; font-weight:400; color:var(--ar-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:0}
 .tahd button{min-height:24px; padding:0 8px; font-size:var(--fs-2); font-weight:700; letter-spacing:.04em; background:transparent; color:var(--ar-ink); border:1px solid var(--ar-line); border-radius:4px}
 .tahd button.on{background:var(--ar-mu); border-color:var(--ar-mu); color:#fff}
@@ -866,6 +867,9 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 #tArr .tahd .azb svg{width:11px; height:11px; display:block}
 #tArr .tahd .azb:active:not(:disabled){background:var(--ar-line); color:var(--ar-ink)}
 #tArr .tahd .azb:disabled{opacity:.3; cursor:default}
+/* ○ is the one to find without looking: a wider target (44 × 32, the header keeps its height) and a bigger ring. */
+#tArr .tahd #tArrZf{width:44px; min-width:44px; height:32px; margin:-4px 0; border-radius:16px; justify-self:center}
+#tArr .tahd #tArrZf svg{width:14px; height:14px}
 .tarr.zoomed .tagrid{touch-action:pan-x pan-y}
 .tarr.zoomed .tagrid .ar{width:max-content; min-width:100%; box-sizing:border-box}   /* full width, so the row number can stick */
 /* The row numbers (and the corner above them) stay at their usual inset; shadows paint over the gutter and the gap so
@@ -12796,6 +12800,11 @@ function arrSize(){
   arrEl.style.setProperty('--arcols', grp.join(' 4px '));
   const cw = (W - 34) / (NA + 0.3 + G * 0.2) * z, rh = clamp(Math.round(cw * 0.8), 16, z > 1 ? 44 : 40);
   arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', clamp(Math.round(rh * 0.5), 8, 16) + 'px');
+  // Where the MONO | POLY break sits when every track fits (track PF's column starts after a spacer every 8 tracks):
+  // the header's ○ is centred over it, and stays there while zoomed so it is always in the same place.
+  { const p = sm ? 6 : 8, rnw = sm ? 18 : 22, g = sm ? 1 : 2, PF = polyFrom(), colL = t => p + rnw + g + t * (cwFit + g) + Math.floor(t / 8) * (4 + g);
+    const bx = PF > 0 && PF < NA ? (colL(PF - 1) + cwFit + colL(PF)) / 2 : W / 2;
+    arrEl.style.setProperty('--azfx', Math.max(120, Math.min(W - 70, bx)).toFixed(1) + 'px'); }
   arrEl.classList.toggle('zoomed', z > 1);
   if (ARR_ZOOM_BTNS){ $('tArrZo').disabled = $('tArrZf').disabled = z <= 1; $('tArrZi').disabled = z >= AZ_MAX - 0.01; }
   return rh;
