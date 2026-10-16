@@ -229,7 +229,8 @@ body:not(.noed) .wvMobNote{display:none}
 .vrow.vid .play .ic{width:12px; height:12px; fill:currentColor}
 .vrow.vact .presel{flex:1 1 auto; min-width:0; max-width:none}
 .vrow .grp{display:inline-flex; flex:none} .vrow .grp button{margin:0} .vrow .grp button+button{border-left:0}
-@media (min-width:700px){ .vbar{flex-direction:row; align-items:center} .vrow.vid{flex:1 1 55%} .vrow.vact{flex:1 1 45%; justify-content:flex-end} .vrow.vact .presel{flex:0 1 220px} }
+.vrow.vttl{margin-bottom:-2px}   /* the pad's number and kind on a line of its own, over the name and the buttons */
+@media (min-width:700px){ .vbar{flex-direction:row; flex-wrap:wrap; align-items:center} .vrow.vttl{flex:1 1 100%} .vrow.vid{flex:1 1 0; min-width:260px} .vrow.vact{flex:0 1 auto; justify-content:flex-end} .vrow.vact .presel{flex:0 1 220px} }
 .ttl{font-weight:600; font-size:var(--fs-5); white-space:nowrap}
 .lbl{color:var(--muted)}
 .pbody{display:flex; flex-direction:column; gap:10px; padding-top:8px}
@@ -1359,7 +1360,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 
   <section class="band voice">
     <div class="bar vbar">
-      <div class="vrow vid"><span class="ttl" id="vNum">Pad 1</span><input id="vName" type="text" aria-label="Pad name" spellcheck="false"><button class="sm play" id="vPlay" title="Play this pad (Space)"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</button></div>
+      <div class="vrow vttl"><span class="ttl" id="vNum">Pad 1</span></div>
+      <div class="vrow vid"><input id="vName" type="text" aria-label="Pad name" spellcheck="false"><button class="sm play" id="vPlay" title="Play this pad (Space)"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</button></div>
       <div class="vrow vact">
         <button type="button" id="vPre" class="sm presel" title="Presets: factory sounds, and your own saved in this song">Presets…</button>
         <span class="grp" role="group" aria-label="Make"><button class="sm" id="vRand">Random</button><button class="sm" id="vInit">Init</button></span>
