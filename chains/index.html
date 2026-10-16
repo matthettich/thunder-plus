@@ -41,6 +41,8 @@ button{cursor:pointer}
 .bar h1{font-size:19px; font-weight:600; margin:0 6px 0 0; letter-spacing:-.01em}
 .bar .spacer{flex:1}
 .embed .bar h1{display:none}
+/* a control that is in …Thunder Plus's bottom panel: a small dot before its name */
+.row.indeck > .lbl::before{content:''; display:inline-block; width:6px; height:6px; margin:0 5px 1px 0; border-radius:50%; background:var(--mod, #8a63d8); vertical-align:middle}
 .embed .setwrap{display:none}   /* File/Settings live in the app's top bar when embedded */
 .embed #cpuv{display:none}   /* the app's top bar owns the CPU readout */
 .pname{width:140px; padding:5px 8px; border:1px solid transparent; background:transparent; font-size:15px; font-weight:500}
@@ -1066,6 +1068,26 @@ for (const [t, d] of Object.entries(MODULES)){
 const plabel = (t, k) => (MODULES[t].ui[k] || {}).l || k;
 const fmtOf = (t, k) => (MODULES[t].ui[k] || {}).f || (v => (+v).toFixed(2));
 const choicesOf = (t, k) => (MODULES[t].ui[k] || {}).c || null;
+/* ---------- the bottom panel (…Thunder Plus): controls mapped out of this patch ----------
+   Right-click a control (or a module) → Add to the bottom panel. The list lives in the patch (doc.deck), so it saves with
+   the song; each entry carries what the app needs to draw the control without this editor open: the module's and the
+   control's names, the range, the choices, and how the value reads (a named format, or the text at 33 points across the
+   range for a format of its own). */
+const DECK_FMT = new Map([[pct, 'pct'], [spct, 'spct'], [secs, 'secs'], [hz, 'hz'], [khz, 'khz'], [cents, 'cents'], [semis, 'semis'], [wet, 'wet'], [whole, 'whole'], [db, 'db'], [times, 'times']]);
+function deckDesc(m, key){
+  const def = MODULES[m.type], sp = def.params[key], ch = choicesOf(m.type, key), f = fmtOf(m.type, key);
+  const d = { id:m.id, p:key, ml:m.label || def.label, l:plabel(m.type, key), r:[sp[1], sp[2], sp[3]], dv:sp[0] };
+  if (ch) d.o = ch.map(([v, t]) => [v, t]);
+  else { const k = DECK_FMT.get(f); if (k) d.fk = k; else d.ft = Array.from({ length:33 }, (_, i) => { try { return String(f(sp[1] + (sp[2] - sp[1]) * i / 32)); } catch (e){ return ''; } }); }
+  return d;
+}
+const deckHas = (id, key) => (doc.deck || []).some(d => d.id === id && d.p === key);
+const deckKeys = m => Object.keys(MODULES[m.type].params).filter(k => !(MODULES[m.type].ui[k] || {}).hide && !(k === 'track' && (m.type === 'trackIn' || m.type === 'chainOut')));
+function deckChange(fn){
+  store.snapshot(); doc.deck = (doc.deck || []).slice(); fn(doc.deck); store.touch(); store.save();
+  markDeck(); if (EMBED && TW && TW.deck) TW.deck();
+}
+function markDeck(){ for (const n of nodes.values()) for (const k in n.ctl){ const r = n.ctl[k].row; if (r) r.classList.toggle('indeck', deckHas(n.m.id, k)); } }
 
 /* Families give each module its edge color, as in ...Seeds. */
 const FAMILY = { trackIn:'aout',
@@ -1601,7 +1623,7 @@ function renderAll(){
   for (const m of doc.modules) buildNode(m);
   selected = new Set([...selected].filter(id => nodes.has(id)));
   alignChainTracks(true);   // keep each track's input and output in step on load, undo and redo
-  renderGroups(); syncCableEls(); markMapped(); applyPan(); renderCustom();
+  renderGroups(); syncCableEls(); markMapped(); markDeck(); applyPan(); renderCustom();
   document.getElementById('pname').value = doc.meta.name || 'Untitled';
   ws.style.backgroundColor = (doc.view && doc.view.bg) || '';
 }
@@ -1624,6 +1646,7 @@ function addModule(type, x, y, params){
 }
 function removeModule(id){
   const n = nodes.get(id);
+  if (doc.deck && doc.deck.some(d => d.id === id)){ doc.deck = doc.deck.filter(d => d.id !== id); if (EMBED && TW && TW.deck) setTimeout(() => TW.deck(), 0); }   // its controls leave the bottom panel too
   for (const c of doc.cables.filter(c => c.from[0] === id || c.to[0] === id)) if (bridge) bridge.disconnect(c.from, c.to);
   doc.cables = doc.cables.filter(c => c.from[0] !== id && c.to[0] !== id);
   doc.modules = doc.modules.filter(m => m.id !== id);
@@ -2115,6 +2138,18 @@ ws.addEventListener('contextmenu', e => {
   const el = e.target.closest('.node'), id = el && el.dataset.id;
   if (id && !selected.has(id)){ clearSel(); setSel(id, true); }
   const sel = [...selected], n = sel.length, items = [];
+  // Inside …Thunder Plus: put a control, or all of a module's, in the bottom panel (it shows them for the track whose chain they're in).
+  if (EMBED && id && nodes.has(id)){
+    const nd = nodes.get(id), m = nd.m, row = e.target.closest('.row[data-key]'), key = row && row.dataset.id === id ? row.dataset.key : null, title = m.label || MODULES[m.type].label;
+    if (key && m.params[key] != null){
+      const lab = plabel(m.type, key);
+      if (deckHas(id, key)) items.push(['Remove “' + lab + '” from the bottom panel', () => deckChange(L => { const i = L.findIndex(d => d.id === id && d.p === key); if (i >= 0) L.splice(i, 1); })]);
+      else items.push(['Add “' + lab + '” to the bottom panel', () => { deckChange(L => L.push(deckDesc(m, key))); toast('“' + lab + '” is in the bottom panel’s …chains section.'); }]);
+    }
+    const ks = deckKeys(m), missing = ks.filter(k => !deckHas(id, k));
+    if (missing.length) items.push(['Add all of ' + title + '’s controls to the bottom panel', () => { deckChange(L => { for (const k of missing) L.push(deckDesc(m, k)); }); toast(title + ': ' + missing.length + ' controls in the bottom panel.'); }]);
+    if (ks.some(k => deckHas(id, k))) items.push(['Remove ' + title + ' from the bottom panel', () => deckChange(L => { for (let i = L.length - 1; i >= 0; i--) if (L[i].id === id) L.splice(i, 1); })]);
+  }
   const these = n === 1 ? 'this module' : 'these ' + n + ' modules';
   if (n) items.push(['Make custom module from ' + these + '…', async () => {
     const nm = await askDialog('Name the new custom module:', { input:'My voice', ok:'Make it' }); if (!nm || !nm.trim()) return;
@@ -2367,6 +2402,16 @@ const pnameEl = document.getElementById('pname');
       playing(){ return !!(TW && TW.playing && TW.playing()); },
       /* The app jumps to a track's chain (e.g. from the Mixer) by centring and highlighting its pair. */
       focusTrack(N){ return focusChainTrack(Math.max(1, Math.min(CHAN_COUNT, N | 0))); },
+      /* The bottom panel moved a control (the app has already sent it to the sound): show it here, and keep it in this
+         patch so this editor's next save doesn't put the old value back. */
+      setParam(id, key, v){ const n = nodes.get(id); if (!n || typeof v !== 'number') return; n.m.params[key] = v; const c = n.ctl[key]; if (c) c.show(); },
+      /* The bottom panel removed some of its controls: the patch's list, as the app now has it. */
+      deckSet(list){ doc.deck = Array.isArray(list) ? list.slice() : []; markDeck(); store.touch(); },
+      /* Exact value text for the panel while this editor is open. */
+      fmt(id, key, v){ const n = nodes.get(id); if (!n) return null; try { return String(fmtOf(n.m.type, key)(v)); } catch (e){ return null; } },
+      /* Show (centre and select) a module, from the panel's "Show in …chains". */
+      reveal(id){ const n = nodes.get(id); if (!n) return false; clearSel(); setSel(id, true);
+        const v = view(), r = ws.getBoundingClientRect(), m = n.m; v.x = r.width / 2 - (m.pos[0] + 105) * v.zoom; v.y = r.height / 2 - (m.pos[1] + 55) * v.zoom; applyPan(); return true; },
       /* Host meters: one peak per tracker track (the chains return). Track In and Chain Out
          modules show the level of the track they're set to, so patching is visible live. */
       meters(payload){

@@ -247,6 +247,7 @@ body:not(.noed) .wvMobNote{display:none}
 .segrow>span{color:var(--muted); width:70px; flex:none}
 .segrow{min-width:0}
 .fxgrid .segrow{grid-column:1 / -1}
+.irbox{margin-top:6px} .irrow{align-items:center; flex-wrap:nowrap} .irrow .irn{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-3)}
 .segrow select.fxsel{flex:1 1 auto; min-width:0; max-width:100%; min-height:30px; font:inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line); padding:0 6px}
 .seg{display:inline-flex; flex-wrap:wrap; border:1px solid var(--line); background:var(--panel); max-width:100%; min-width:0}
 .seg button{border:0; border-right:1px solid var(--line); min-height:30px; padding:3px 12px; font-weight:500; font-size:var(--fs-3); background:none}
@@ -956,9 +957,22 @@ body.arrsmall .tarr.zoomed :is(.tagrid .rn, .tath>:first-child), body.arrsmall .
   background:color-mix(in srgb, var(--dkc) var(--dkp), var(--panel))}
 .dks:first-child, .dks.first{border-left:0}
 .dks[hidden]{display:none!important}
-#dkScope{--dkc:#dbe6f8; flex:0 6 var(--dkws, 300px); min-width:90px}
+#dkScope{--dkc:#dbe6f8; flex:0 0 var(--dkws, 300px); min-width:90px}
 #dkInst{--dkc:#fbe2d2; flex:1 1 0; min-width:210px}
-#dkFx{--dkc:#f8dce8; flex:0 1 var(--dkwf, 320px); min-width:200px}
+#dkFx{--dkc:#f8dce8; flex:0 0 var(--dkwf, 320px); min-width:200px}
+/* Sections keep their widths: when they don't all fit, the panel scrolls sideways instead of squeezing them (only the
+   instrument section gives up its spare room). */
+/* …chains controls mapped into the panel: columns of rows that grow sideways (the panel scrolls), a module's name above its controls */
+#dkChn{--dkc:#e9e0f8; flex:0 0 auto; min-width:190px; max-width:none}
+.dkcg{flex:1; min-height:0; display:grid; grid-auto-flow:column; grid-template-rows:repeat(auto-fill, 21px); grid-auto-columns:minmax(210px, 240px); column-gap:16px; align-content:start; overflow:hidden}
+.dkcg .row{grid-template-columns:62px minmax(50px,1fr) 58px; min-height:21px; height:21px; font-size:var(--fs-3)}
+.dkcg .row input[type=range]{height:18px; margin:0}
+.dkcg .row output{overflow:hidden; text-overflow:ellipsis}
+#dkChnRows .row select{min-width:0; height:19px; min-height:0; font:inherit; font-size:var(--fs-2); color:var(--ink); background:var(--panel); border:1px solid var(--line); padding:0 2px; margin:0; grid-column:2 / 4}
+#dkChnRows .dkcm{display:block; height:21px; min-height:0; line-height:24px; font-size:var(--fs-2); font-weight:700; letter-spacing:.04em; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  cursor:pointer; border:0; border-bottom:1px solid var(--line); border-radius:0; box-shadow:none; background:none; padding:0; margin:0; text-align:left; width:100%}
+#dkChnRows .dkcm:hover{color:var(--ink)}
+.dkcg .note{grid-row:span 4; width:210px; white-space:normal; font-size:var(--fs-3); color:var(--muted); margin:2px 0}
 #dkStrip{--dkc:#d8f0e2; flex:0 0 var(--dkstw, 228px)}
 /* the thin grey header: one cell per section, its button over it, a rule between sections */
 .dkh{flex:none; display:flex; align-items:center; gap:5px; height:22px; padding:0 6px; background:var(--side); border-bottom:1px solid var(--line); min-width:0}
@@ -1715,6 +1729,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
           <div class="dkb"><canvas id="dkScopeC" aria-label="Spectrum of the master output"></canvas></div><div class="dkw" data-w="ws" title="Drag to resize"></div></section>
         <section class="dks" id="dkInst" data-s="inst"><div class="dkh"><button type="button" class="dkt" data-k="inst" id="dkInstT">INST</button></div>
           <div class="dkb"><div class="dkrows" id="dkInstRows"></div></div></section>
+        <section class="dks" id="dkChn" data-s="chn"><div class="dkh"><button type="button" class="dkt" data-k="chn" id="dkChnT">…CHAINS</button><span class="dki" id="dkChnI"></span></div>
+          <div class="dkb"><div class="dkcg" id="dkChnRows"></div></div></section>
         <section class="dks" id="dkFx" data-s="fx"><div class="dkw" data-w="wf" title="Drag to resize"></div><div class="dkh"><button type="button" class="dkt" data-k="fx" id="dkFxT">FX</button></div>
           <div class="dkb"><div class="dkslots" id="dkFxSlots"></div><div class="dkrows" id="dkFxRows"></div></div></section>
         <section class="dks" id="dkStrip" data-s="strip"><div class="dkh"><button type="button" class="dkt" data-k="strip" id="dkStripT">TRACK</button></div>
@@ -6237,6 +6253,7 @@ self.onmessage = async e => {
     try { if (m.wv && m.pl && m.tx){ importScripts(m.wv); if (self.WavesDSP){ WavesDSP.wasmInit({dspModule:m.pl, tfxModule:m.tx}); WV.ready = true; WVOK = true; } } } catch(err){}
     postMessage({op:'ready', wv:WVOK, pl:!!PL, tx:!!TX}); return;
   }
+  if (m.op === 'irs'){ self.__thunderIR = m.v; return; }   // the song's impulse responses (Convolution reverb)
   if (m.op === 'render'){
     try {
       S = {bpm:m.bpm || 120}; WV.doc = m.waves || null;
@@ -6250,7 +6267,7 @@ self.onmessage = async e => {
     const w = new Worker(url); URL.revokeObjectURL(url);
     w.onmessage = e => {
       const m = e.data;
-      if (m.op === 'ready'){ PW.ready = !!(m.pl || !plMod) && !!(m.tx || !txMod); PW.wv = !!m.wv; if (PW.ready) prerender(); return; }
+      if (m.op === 'ready'){ PW.ready = !!(m.pl || !plMod) && !!(m.tx || !txMod); PW.wv = !!m.wv; try { if ((S.irs || []).some(Boolean)) w.postMessage({op:'irs', v:irsLive()}); } catch(e){} if (PW.ready) prerender(); return; }
       const j = PW.jobs.get(m.id); if (!j) return; PW.jobs.delete(m.id);
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
@@ -9767,7 +9784,9 @@ window.thunderChains = {
     }
   },
   /* A whole patch at once (undo, redo, new, import): replace it and reload the live engines. */
-  reload(d){ if (CH.dropping) return; S.chainPatch = d; CH.doc = S.chainPatch; saveS(); chainsReload(); },
+  reload(d){ if (CH.dropping) return; S.chainPatch = d; CH.doc = S.chainPatch; saveS(); chainsReload(); dkChnSig = ''; },
+  /* The editor added or removed bottom-panel controls (they are in the patch it just saved). */
+  deck(){ dkChnSig = ''; try { deckChains(); } catch(e){} },
   close: () => closeChains(),
   /* Transport from the …chains screen: Space starts/stops the song from the tracker's cursor row. */
   play(){ if (tp.on) tStop(); else tStart('song', {row:songRow()}); },
@@ -10223,6 +10242,7 @@ class ThunderFx extends AudioWorkletProcessor {
   constructor(o){
     super();
     const op = o.processorOptions || {};
+    if (op.irs !== undefined) globalThis.__thunderIR = op.irs;   // the song's impulse responses (Convolution reverb), for this whole audio thread
     if (!globalThis.__tfxMod) globalThis.__tfxMod = new WebAssembly.Module(op.bytes);
     const z = () => 0;
     this.x = new WebAssembly.Instance(globalThis.__tfxMod, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports;
@@ -10233,7 +10253,7 @@ class ThunderFx extends AudioWorkletProcessor {
     this.scL = new Float32Array(128); this.scR = new Float32Array(128); this.scOn = false;
     this.mctx = {sr:sampleRate, block:128, transport:{tempo:120, playing:false, startN:0, lpb:4, ticks:6}, quality:'full', scL:this.scL, scR:this.scR, scOn:() => this.scOn};
     this.set(op.chain || []);
-    this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else this.set(e.data); };
+    this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else if (e.data && e.data.irs !== undefined) globalThis.__thunderIR = e.data.irs; else this.set(e.data); };
   }
   drop(s){ try { if (s.def){ if (s.def.destroy) s.def.destroy(s.st); } else if (!s.js && s.h >= 0) this.x.tfx_free(s.h); } catch (e){} }
   set(chain){
@@ -10410,7 +10430,7 @@ function chainsNode(ac, track, patch, tempo){
   if (!chnSync.has(ac)) return null;   // module not loaded yet: caller re-routes when ready
   const n = new AudioWorkletNode(ac, 'thunder-chains', {numberOfInputs:2, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
     channelCountMode:'explicit', channelInterpretation:'speakers',
-    processorOptions:{bytes:chnBin(), track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}}});
+    processorOptions:{bytes:chnBin(), track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac)}});
   n.load = 0;
   n.an = ac.createAnalyser(); n.an.fftSize = 256;   // hears the chains return: the chain screen's meters
   n.connect(n.an);
@@ -10495,7 +10515,7 @@ function tfxReady(ac){
 }
 function tfxNode(ac, chain){
   const n = new AudioWorkletNode(ac, 'thunder-tfx', {numberOfInputs:2, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
-    channelCountMode:'explicit', channelInterpretation:'speakers', processorOptions:{bytes:tfxBin(), chain}});
+    channelCountMode:'explicit', channelInterpretation:'speakers', processorOptions:{bytes:tfxBin(), chain, irs:irsOpt(ac)}});   // irs: this audio thread's copy of the song's impulse responses
   n.load = 0; n.port.onmessage = e => { const d = e.data; if (!d) return;
     if (typeof d.load === 'number') n.load = n.load * 0.6 + d.load * 0.4;
     if (d.failed){ const t = String(d.failed).split(':')[1], F = TFX[t]; toast((F ? F.long.replace(/^based on /, '') : 'An effect') + ' stopped working and was bypassed. Change its settings to restart it.'); } };
@@ -10621,6 +10641,7 @@ function normSong(j){
   S.mfx = normChainFx(j.mfx);
   if (Array.isArray(j.chainOn)) for (let t = 0; t < NT; t++) S.chainOn[t] = !!j.chainOn[t];
   if (j.chainPatch && typeof j.chainPatch === 'object' && (j.chainPatch.format === 'chains.patch' || j.chainPatch.format === 'waves.patch')) S.chainPatch = j.chainPatch;
+  if (Array.isArray(j.irs)) S.irs = j.irs.slice(0, 4).map(e => e && typeof e === 'object' && e.L && typeof e.L === 'object' ? {name:String(e.name || 'IR').slice(0, 40), sr:clamp(int(e.sr, 48000), 8000, 192000), len:+e.len || 0, L:e.L, R:e.R && typeof e.R === 'object' ? e.R : null} : null);
   if (Array.isArray(j.smute)) j.smute.slice(0, 256).forEach((v, i) => S.smute[i] = int(v, 0) | 0);
 // Voice-per-track parity: one synth voice per song track. ntr caps at 24, because 24 tracks need pads
 // 8–31: exactly 32 voices.
@@ -10657,6 +10678,7 @@ function demoSong(){
   return S;
 }
 let S = (() => { try { const s = localStorage.getItem(TK) || localStorage.getItem('thunder-song-v1'); return s ? normSong(JSON.parse(s)) : demoSong(); } catch(e){ return demoSong(); } })();
+setTimeout(() => { try { irsResolve(); } catch(e){} }, 0);   // the song's impulse responses (Convolution reverb), from IndexedDB
 setTimeout(() => { if (swingConv) try { saveS(); } catch(e){} swingNote(); }, 0);   // an older saved song was converted: save the new numbers, say so
 let sT = 0;
 // Undo: every saved change keeps the state before it (up to 200 steps). Changes made by one key or tap
@@ -11968,7 +11990,7 @@ async function shareLast(){
 let projFile = null;
 const canFS = !inAI && typeof window.showSaveFilePicker === 'function';
 const PJT = [{description:'...Thunder project', accept:{'application/json':['.json']}}];
-const projBlob = () => new Blob([JSON.stringify({app:'thunder-project', v:1, song:Object.assign({}, S, {presets:fullPresets()}), kit:kitToJSON(false)})], {type:'application/json'});
+const projBlob = () => new Blob([JSON.stringify({app:'thunder-project', v:1, song:Object.assign({}, S, {presets:fullPresets(), irs:irsFull()}), kit:kitToJSON(false)})], {type:'application/json'});
 const projName = () => `${safe(S.name || 'Song')} project.json`;
 // Sharing the project file: the share sheet on phones (Drive, Gmail, Quick Share, Nearby…), so a song started on the
 // phone can be opened on the computer with LOAD PROJECT, and the other way round.
@@ -12081,7 +12103,65 @@ function resetCursors(){ cSect = cPhrase = cInst = cTrack = cFxT = cFxS = 0; for
 // A song's pattern numbering starts at 00. last.sect/last.phrase are the last sect/phrase NUMBER placed, and
 // they seed the first empty cell you type into — so a new song used to inherit the old song's number (a new
 // song began at 06 after the last one ended at 05). They are song-scoped, so reset them with the song.
-function setSong(s, msg){ tStop(true); S = s; swingNote(); setTimeout(mstSync, 0); projFile = null; resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); }
+/* ---------- the song's impulse responses (Convolution reverb → Type: Song IR 1–4) ----------
+   Up to four IRs, loaded in Settings → Song. Like samples, their sound is kept in IndexedDB (as two mono samples, left and
+   right) and the song names them ({ref}); project files carry the sound inside. They reach every place a Convolution
+   reverb runs as globalThis.__thunderIR = [{L, R, sr, id} | null, …]: this page, the pad-render Worker and each audio
+   thread (through its first track-effect or …chains node). */
+var IRDATA = new Map();   // sample id → its sound (Float32Array)
+let irsVer = 1; const irsSent = new WeakMap();
+const irsLive = () => (S.irs || []).slice(0, 4).map(e => e && e.L && IRDATA.get(e.L.ref) ? {L:IRDATA.get(e.L.ref), R:e.R && IRDATA.get(e.R.ref) || null, sr:e.sr || 48000, id:e.L.ref + (e.R ? '/' + e.R.ref : '')} : null);
+function irsToCtx(ac, send){ if (!(S.irs || []).some(Boolean) && !irsSent.has(ac)) return; if (irsSent.get(ac) === irsVer) return; try { send(irsLive()); irsSent.set(ac, irsVer); } catch(e){} }
+// For a node being made: the IRs go in its processorOptions (there at once, even in an offline render), when its thread hasn't had them.
+function irsOpt(ac){ let v; irsToCtx(ac, x => { v = x; }); return v; }
+function irsPublish(){
+  irsVer++; const v = irsLive(); globalThis.__thunderIR = v;
+  try { if (PW.w) PW.w.postMessage({op:'irs', v}); } catch(e){}
+  try { if (rt && rt.pl){ const n = rt.pl.buses.find(b => b && b.fx) || null, c = rt.pl.buses.find(b => b && b.chn && b.chn._live) || null;
+    if (n) irsToCtx(n.fx.context, x => n.fx.port.postMessage({irs:x})); else if (rt.mfx) irsToCtx(rt.mfx.context, x => rt.mfx.port.postMessage({irs:x}));
+    else if (c) irsToCtx(c.chn.context, x => c.chn.port.postMessage({target:'chains-host', op:'irs', value:x})); } } catch(e){}
+  for (let i = 0; i < nslots(); i++){ const w = kit.voices[i]; if (w && (w.fx || []).some(f => f && f.type === 'convolve' && (f.type_ | 0) >= 10)){ dirty[i] = true; cache[i] = null; } }   // pads using a Song IR re-render
+}
+// A song arriving with IRs inside (a project file): their sound goes to IndexedDB and the song keeps {ref}s.
+function irsAdopt(song){
+  for (const e of song.irs || []) if (e) for (const c of ['L', 'R']){ const j = e[c]; if (!j || !j.b64) continue;
+    const smp = smpFromJSON(j); if (!smp || !smp.data){ e[c] = null; continue; } smp.id = smpId(); IRDATA.set(smp.id, smp.data); smpHeld.set(smp.id, smp);
+    if (sdbOk) smpPut(smp).catch(() => {}); e[c] = {ref:smp.id}; }
+  if (song.irs) song.irs = song.irs.map(e => e && e.L ? e : null);
+}
+async function irsResolve(){
+  let any = false;
+  for (const e of S.irs || []) if (e) for (const c of ['L', 'R']){ const j = e[c]; if (!j || !j.ref || IRDATA.has(j.ref)) continue;
+    const r = await smpGet(j.ref); if (r && r.pcm){ const q = new Int16Array(r.pcm), d = new Float32Array(q.length); for (let k = 0; k < q.length; k++) d[k] = q[k] / 32767; IRDATA.set(j.ref, d); if (r.own) smpStored.add(j.ref); any = true; } }
+  if (any || (S.irs || []).some(Boolean)) irsPublish();
+}
+const irsFull = () => (S.irs || []).map(e => e ? Object.assign({}, e, {L:e.L && IRDATA.get(e.L.ref) ? smpToJSON({id:e.L.ref, name:e.name, sr:e.sr, data:IRDATA.get(e.L.ref)}) : e.L,
+  R:e.R && IRDATA.get(e.R.ref) ? smpToJSON({id:e.R.ref, name:e.name, sr:e.sr, data:IRDATA.get(e.R.ref)}) : e.R}) : null);
+async function irsLoad(k){
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'audio/*,.wav,.aif,.aiff,.flac,.mp3,.ogg';
+  inp.addEventListener('change', async () => { const file = inp.files && inp.files[0]; if (!file) return;
+    try {
+      const ac = new OfflineAudioContext(1, 1, 48000), buf = await ac.decodeAudioData(await file.arrayBuffer());
+      const n = Math.min(buf.length, Math.round(buf.sampleRate * 8)), sr = buf.sampleRate, name = file.name.replace(/\.[^.]+$/, '').slice(0, 40);
+      const mk = ch => { const id = smpId(), data = buf.getChannelData(ch).slice(0, n), smp = {id, name, sr, data}; IRDATA.set(id, data); smpHeld.set(id, smp); if (sdbOk) smpPut(smp).catch(() => {}); return {ref:id}; };
+      S.irs = (S.irs || []).slice(0, 4); while (S.irs.length < 4) S.irs.push(null);
+      S.irs[k] = {name, sr, len:+(n / sr).toFixed(2), L:mk(0), R:buf.numberOfChannels > 1 ? mk(1) : null};
+      saveS(); irsPublish(); buildProj(); toast('Song IR ' + (k + 1) + ': ' + name + ' (' + S.irs[k].len + ' s' + (S.irs[k].R ? ', stereo' : '') + '). Pick Type: Song IR ' + (k + 1) + ' on a Convolution reverb.');
+    } catch(e){ toast('That file couldn’t be read as audio.', 5000); } });
+  inp.click();
+}
+function irsUI(sec){
+  const box = el('div', 'irbox'); box.append(el('p', 'note', 'Impulse responses for the Convolution reverb (Type: Song IR 1–4). Up to 8 s each, kept with the song.'));
+  for (let k = 0; k < 4; k++){
+    const e = (S.irs || [])[k], row = el('div', 'btnrow irrow');
+    row.append(el('span', 'irn', 'IR ' + (k + 1) + ' · ' + (e ? e.name + ' (' + (e.len || '?') + ' s' + (e.R ? ', stereo' : '') + ')' : 'empty')));
+    const ld = el('button', 'sm', e ? 'Replace…' : 'Load…'); ld.type = 'button'; ld.addEventListener('click', () => irsLoad(k)); row.append(ld);
+    if (e){ const cl = el('button', 'sm', 'Clear'); cl.type = 'button'; cl.addEventListener('click', () => { S.irs[k] = null; saveS(); irsPublish(); buildProj(); }); row.append(cl); }
+    box.append(row);
+  }
+  sec.append(box);
+}
+function setSong(s, msg){ tStop(true); irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){} }, 0); swingNote(); setTimeout(mstSync, 0); projFile = null; resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -13966,8 +14046,9 @@ $('bMst').addEventListener('click', () => openMst());
 mstLabel();
 /* ---------- bottom panel (KEYS mode with the keypad off) ---------- */
 const DKK = 'thunderplus-deck-v1';
-const DK_SECS = [['scope', 'SCOPE'], ['inst', 'INST'], ['fx', 'FX'], ['strip', 'TRACK']];
-let deck = (() => { const d = {on:true, scope:true, inst:true, fx:true, strip:true, h:168, ws:300, wf:320};
+// In signal-flow order: the instrument, its …chains (they come before the track effects), the track effects, the strip.
+const DK_SECS = [['scope', 'SCOPE'], ['inst', 'INST'], ['chn', '…CHAINS'], ['fx', 'FX'], ['strip', 'TRACK']];
+let deck = (() => { const d = {on:true, scope:true, inst:true, chn:true, fx:true, strip:true, h:168, ws:300, wf:320};
   try { const o = JSON.parse(localStorage.getItem(DKK) || 'null');
     if (o && typeof o === 'object'){ for (const k in d) if (typeof o[k] === typeof d[k]) d[k] = o[k]; if (o.meters === false && o.strip === undefined) d.strip = false; } } catch(e){}
   return d; })();
@@ -14182,7 +14263,90 @@ dkDrag($('dkFx').querySelector('.dkw'), (dx, dy, st) => { deck.wf = clamp(Math.r
 // A skin's font can arrive after the screen was measured (Share Tech Mono in the terminal skins): fit and redraw
 // once it lands, so the MONO/POLY boxes and the type size match the real letters.
 // (fonts arriving: scheduleRefit below, once for the whole page)
-function deckDraw(){ deckLayout(); deckStrip(); if (!deckShown()) return; deckMetersPaint(); deckInst(); deckFx(); }
+/* …chains controls in the panel: the ones mapped from the …chains editor (right-click a control or a module → Add to the
+   bottom panel; the list is the patch's deck), for the track the panel follows: a module counts when it leads to that
+   track's Chain Out (or modulates something that does). Sliders change the patch and the sound live, as in the editor. */
+let dkChnSig = '', dkChnRows = [], dkChnT = 0;
+function chainMods(t){
+  const d = S.chainPatch, act = new Set(); if (!d || !Array.isArray(d.modules)) return act;
+  const q = [], inc = new Map();
+  for (const c of d.cables || []) if (c && c.from && c.to){ if (!inc.has(c.to[0])) inc.set(c.to[0], []); inc.get(c.to[0]).push(c.from[0]); }
+  for (const m of d.modules) if (m && m.type === 'chainOut' && clamp(int(m.params && m.params.track, 1), 1, NT) - 1 === t){ act.add(m.id); q.push(m.id); }
+  while (q.length) for (const a of inc.get(q.pop()) || []) if (!act.has(a)){ act.add(a); q.push(a); }
+  return act;
+}
+// The editor's value formats, by name (deck entries made with a format of the module's own carry its text at 33 points).
+const DKC_FMT = {pct:v => Math.round(v * 100) + '%', spct:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%', semis:v => (v > 0 ? '+' : '') + Math.round(v) + ' st',
+  cents:v => (v > 0 ? '+' : '') + Math.round(v) + ' ct', secs:v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s', hz:v => (v < 10 ? v.toFixed(2) : v.toFixed(1)) + ' Hz',
+  db:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB', khz:v => v >= 1000 ? (v / 1000).toFixed(1) + ' kHz' : Math.round(v) + ' Hz', wet:v => Math.round(v * 100) + '% wet',
+  times:v => '×' + v.toFixed(2), whole:v => String(Math.round(v))};
+function dkcFmt(d){
+  return v => {
+    const a = chApi(); if (a && a.fmt){ const t = a.fmt(d.id, d.p, v); if (t != null) return t; }   // exact, while the editor is open
+    if (d.fk && DKC_FMT[d.fk]) return DKC_FMT[d.fk](v);
+    if (Array.isArray(d.ft) && d.ft.length > 1){ const [mn, mx] = d.r; return d.ft[clamp(Math.round((v - mn) / ((mx - mn) || 1) * (d.ft.length - 1)), 0, d.ft.length - 1)]; }
+    return Math.abs(v) >= 100 ? String(Math.round(v)) : (+v).toFixed(2);
+  };
+}
+let dkcSave = 0;
+function dkcSet(id, p, v){   // one control moved: the song's patch, the live engines and the editor, as a slider in …chains would
+  window.thunderChains.param(id, p, v);
+  try { const a = chApi(); if (a && a.setParam) a.setParam(id, p, v); } catch(e){}
+  clearTimeout(dkcSave); dkcSave = setTimeout(saveS, 400);
+}
+function dkcDeckSet(list){   // the panel removed some controls: the patch's list, here and in the editor
+  if (!S.chainPatch) return; S.chainPatch.deck = list; saveS();
+  try { const a = chApi(); if (a && a.deckSet) a.deckSet(list); } catch(e){}
+  dkChnSig = ''; deckChains();
+}
+async function dkcMenu(d){
+  const L = (S.chainPatch && S.chainPatch.deck) || [], items = ['Remove “' + d.l + '” from the panel', 'Remove all of ' + d.ml + ' from the panel'];
+  if (!noEditors()) items.push('Show ' + d.ml + ' in …chains');
+  const i = await askPick(d.ml + ' · ' + d.l, items);
+  if (i === 0) dkcDeckSet(L.filter(x => !(x.id === d.id && x.p === d.p)));
+  else if (i === 1) dkcDeckSet(L.filter(x => x.id !== d.id));
+  else if (i === 2){ openChains(); const go = () => { const a = chApi(); return !!(a && a.reveal && a.reveal(d.id)); }; if (!go()){ setTimeout(go, 200); setTimeout(go, 600); } }
+}
+function deckChains(){
+  if (!deckShown() || !deck.chn) return;
+  const t = dkTrack(), d = S.chainPatch, L = (d && Array.isArray(d.deck)) ? d.deck : [], act = chainMods(t);
+  const byId = new Map(((d && d.modules) || []).map(m => [m.id, m]));
+  const live = L.filter(x => x && byId.has(x.id) && byId.get(x.id).params && typeof byId.get(x.id).params[x.p] === 'number');
+  const here = live.filter(x => act.has(x.id)), elsewhere = live.length - here.length;
+  $('dkChnT').textContent = '…CHAINS · TRACK ' + d2(t + 1);
+  $('dkChnI').textContent = here.length ? here.length + ' control' + (here.length === 1 ? '' : 's') + (elsewhere ? ' · ' + elsewhere + ' on other tracks' : '') : '';
+  const sig = t + '|' + (act.size ? [...act].join(',') : '-') + '|' + here.map(x => x.id + '.' + x.p).join(',') + '|' + live.length;
+  if (sig !== dkChnSig){
+    dkChnSig = sig; dkChnT = t; const box = $('dkChnRows'); box.replaceChildren(); dkChnRows = [];
+    if (!here.length){
+      box.append(el('p', 'note', !act.size ? 'Track ' + (t + 1) + ' has no …chains. In …chains, right-click a control or a module → Add to the bottom panel, and it shows here for the track whose chain it is in.'
+        : 'Right-click any control or module in this track’s …chains → Add to the bottom panel.' + (elsewhere ? ' (' + elsewhere + ' mapped on other tracks.)' : '')));
+      return;
+    }
+    let lastId = null;
+    for (const x of here){
+      if (x.id !== lastId){ lastId = x.id; const h = el('button', 'dkcm', x.ml); h.type = 'button'; h.title = noEditors() ? x.ml : 'Show ' + x.ml + ' in …chains';
+        h.addEventListener('click', () => { if (noEditors()) return; openChains(); const go = () => { const a = chApi(); return !!(a && a.reveal && a.reveal(x.id)); }; if (!go()){ setTimeout(go, 200); setTimeout(go, 600); } });
+        box.append(h); }
+      const getObj = () => { const m = S.chainPatch && (S.chainPatch.modules || []).find(q => q.id === x.id); return (m && m.params) || {}; };
+      let r;
+      if (Array.isArray(x.o) && x.o.length){
+        r = el('div', 'row'); const lab = el('label', null, x.l), se = document.createElement('select'); se.setAttribute('aria-label', x.ml + ' ' + x.l);
+        for (const [v, n] of x.o){ const o = document.createElement('option'); o.value = String(v); o.textContent = n; se.append(o); }
+        se.addEventListener('change', () => dkcSet(x.id, x.p, +se.value)); r.append(lab, se);
+        dkChnRows.push({refresh(){ const v = getObj()[x.p]; se.value = String(Math.round(v)); }});
+      } else {
+        const [mn, mx, step] = x.r, def = {l:x.l, min:mn, max:mx, c:step >= 1 ? 'int' : 'lin', d:typeof x.dv === 'number' ? x.dv : mn, f:dkcFmt(x)};
+        const row = makeRow(def, x.p, getObj, {idp:'dkc' + x.id + '_', noTrack:true, on:() => dkcSet(x.id, x.p, getObj()[x.p])});
+        row.r.title = x.ml + ' · ' + x.l + ' — right-click for options'; r = row.r; dkChnRows.push(row);
+      }
+      r.addEventListener('contextmenu', e => { e.preventDefault(); dkcMenu(x); });
+      box.append(r);
+    }
+  }
+  dkChnRows.forEach(r => r.refresh());
+}
+function deckDraw(){ deckLayout(); deckStrip(); if (!deckShown()) return; deckMetersPaint(); deckInst(); deckChains(); deckFx(); }
 /* ---------- ARRANGE: the song overview beside the screen ---------- */
 // Every filled row of the song as blocks, one column per track. A block shows its phrase (or its sect with
 // SECT shown); muted blocks are hatched and keep their number, so the structure stays readable.
@@ -15240,6 +15404,7 @@ function buildProj(){
     if (name === 'Render & export'){ const x = $('pExport'); if (x){ x.hidden = false; sec.append(x);
       for (const id of ['segRate', 'segBits', 'segNorm']){ const r = $(id) && $(id).closest('.segrow'); if (r) r.hidden = trk; } } }
     if (name === 'Mastering'){ const x = $('pMaster'); if (x){ x.hidden = false; sec.append(x); } }
+    if (name === 'Song') irsUI(sec);
   }
   body.scrollTop = keep;
 }

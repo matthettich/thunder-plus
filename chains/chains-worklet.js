@@ -4308,6 +4308,7 @@ class ThunderChains extends AudioWorkletProcessor {
   constructor(options){
     super();
     const o = options.processorOptions || {};
+    if (o.irs !== undefined) globalThis.__thunderIR = o.irs;   // the song's impulse responses (Convolution reverb), for this whole audio thread
     // The host hands the tfx bytes over as `bytes` (same convention as native thunder-tfx).
     wasmInit({ tfxBytes:o.bytes || o.tfxBytes, tfxModule:o.tfxModule });
     this.track = Math.max(0, Math.min(CHAN_COUNT - 1, (o.track | 0) || 0));
@@ -4331,6 +4332,7 @@ class ThunderChains extends AudioWorkletProcessor {
   _recv(m){
     if (!m || (m.target && m.target !== 'chains-host')) return;
     try {
+      if (m.op === 'irs'){ globalThis.__thunderIR = m.value; return; }   // the song's impulse responses (Convolution reverb), for every node in this thread
       if (m.op === 'dispose'){
         this.engine.dispose(); this._dead = true;   // process() returns false from now on, so the node can be collected
         this.port.postMessage({ target:'chains-host', op:'disposed', value:{ track:this.track } });
