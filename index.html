@@ -62,9 +62,11 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .setwrap{position:relative; display:flex}
 .setmenu{position:absolute; top:calc(100% + 6px); left:0; z-index:120; background:var(--panel); color:var(--ink); border:1px solid var(--ink); box-shadow:none; padding:6px; white-space:normal}
 .setmenu[hidden]{display:none}
-#bFile, .top #bSet{min-height:34px; padding:0 12px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; border:1px solid var(--line); background:var(--panel); white-space:nowrap}
-#bFile:hover, .top #bSet:hover{border-color:var(--ink)}
-#bFile.on, .top #bSet.on{background:var(--ink); color:var(--inv); border-color:var(--ink)}
+#bFile, #bView, #bAud, .top #bSet{min-height:34px; padding:0 12px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; border:1px solid var(--line); background:var(--panel); white-space:nowrap}
+#bFile:hover, #bView:hover, #bAud:hover, .top #bSet:hover{border-color:var(--ink)}
+/* View and Audio & MIDI split the Settings menu on Desktop; on Mobile everything stays under the one gear. */
+body.mob .deskmenu{display:none}
+#bFile.on, #bView.on, #bAud.on, .top #bSet.on{background:var(--ink); color:var(--inv); border-color:var(--ink)}
 .top #bSet .setg{width:18px; height:18px}
 .top #bSet .setx{font-size:var(--fs-3)}
 /* File */
@@ -1344,6 +1346,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <button id="bFile" aria-haspopup="true" aria-expanded="false" title="File: new, open, save, share, render and export (on Waves / Chains: that patch)">File ▾</button>
     <div class="setmenu gfile" id="gfile" hidden role="menu"></div>
   </div>
+  <div class="setwrap deskmenu"><button id="bView" aria-haspopup="true" aria-expanded="false" title="View: screen, Arrange, panels, text size, stage and skin">View ▾</button></div>
+  <div class="setwrap deskmenu"><button id="bAud" aria-haspopup="true" aria-expanded="false" title="Audio & MIDI: output, latency, rate, MIDI in and out, clock">Audio &amp; MIDI ▾</button></div>
   <div class="setwrap">
   <button id="bSet" aria-haspopup="true" aria-expanded="false" aria-label="Settings" title="Settings: kit, MIDI, export, skin and audio (in the tracker: the Project settings)"><svg class="setg ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-gear"/></svg><span class="setx">Settings ▾</span></button>
   <div class="phl" id="phl" hidden role="dialog" aria-label="Phrases">
@@ -9107,11 +9111,16 @@ const GLOBAL_SECS = [['pAudio', 'Audio'], ['pMidi', 'MIDI'], ['pKit', 'Kit'], ['
 const INNER_SECS = ['pMaster', 'pExport', 'pSkin'];
 { const k = $('pKit'); if (k) k.hidden = true; }
 const gsetOpen = () => !$('gset').hidden;
-const gsetSecs = () => [
-  GLOBAL_SECS[0],
+// On Desktop the one long menu is three: View (Screen and skin), Audio & MIDI, and Settings (the patch, Project, Kit,
+// App). On Mobile, or with gsetMode 'all', it is the one menu under the gear, as before.
+let gsetMode = 'all', gsetBtn = null;
+const gsetSecs = () => gsetMode === 'view' ? [['gsecScreen', 'Screen']]
+  : gsetMode === 'aud' ? [GLOBAL_SECS[0], ['pMidi', 'MIDI']]
+  : [
+  ...(gsetMode === 'set' ? [] : [GLOBAL_SECS[0]]),
   ...((view === 'waves' || view === 'chains') ? [['gsecPatch', 'Patch']] : []),
-  ['gsecProj', 'Project'], ['gsecScreen', 'Screen'],
-  ...GLOBAL_SECS.slice(1)
+  ['gsecProj', 'Project'], ...(gsetMode === 'set' ? [] : [['gsecScreen', 'Screen']]),
+  ...GLOBAL_SECS.slice(1).filter(([id]) => gsetMode !== 'set' || id !== 'pMidi')
 ];
 // Every section is shown at once, one under the other with a rule between, as in ...Seeds' Settings menu.
 function showGset(){
@@ -9157,18 +9166,26 @@ function placeOpenMenus(){ for (const m of [$('gfile'), $('gset')]) if (m && !m.
 addEventListener('resize', placeOpenMenus);
 addEventListener('orientationchange', placeOpenMenus);
 if (window.visualViewport) window.visualViewport.addEventListener('resize', placeOpenMenus);
-function gsetToggle(open = !gsetOpen()){
+function gsetToggle(open = !gsetOpen(), mode, btn){
   if (open && !$('gfile').hidden) gfileToggle(false);
+  if (open){ gsetMode = isMobile() ? 'all' : mode || (gsetOpen() ? gsetMode : 'set'); gsetBtn = btn || (gsetMode === 'view' ? $('bView') : gsetMode === 'aud' ? $('bAud') : $('bSet')); }
+  const b = gsetBtn || $('bSet');
   $('gset').hidden = !open; if (!open) rlLockAll();
-  $('bSet').classList.toggle('on', open); $('bSet').setAttribute('aria-expanded', String(open));
-  if (open){ showGset(); $('gset').scrollTop = 0; placeMenu($('gset'));
-    $('gset').style.setProperty('--gsetTop', Math.round($('bSet').getBoundingClientRect().bottom + 6) + 'px'); }
+  for (const x of [$('bSet'), $('bView'), $('bAud')]){ const on = open && x === b; x.classList.toggle('on', on); x.setAttribute('aria-expanded', String(on)); }
+  if (open){ if ($('gset').parentElement !== b.parentElement) b.parentElement.append($('gset'));   // drop down under the button pressed
+    $('gset').setAttribute('aria-label', gsetMode === 'view' ? 'View' : gsetMode === 'aud' ? 'Audio and MIDI' : 'Settings');
+    showGset(); $('gset').scrollTop = 0; placeMenu($('gset'));
+    $('gset').style.setProperty('--gsetTop', Math.round(b.getBoundingClientRect().bottom + 6) + 'px'); }
 }
+// A menu button closes its own menu, or switches the open dropdown over to its sections.
+const gsetPress = (mode, btn) => gsetOpen() && gsetBtn === btn ? gsetToggle(false) : gsetToggle(true, mode, btn);
 // The global sections sit in #main in the source for clarity; move them into the menu so the
 // same settings are reachable from every screen (synth, tracker, Waves, Chains).
 for (const [id] of GLOBAL_SECS){ const s = $(id); if (s){ s.hidden = true; s.classList.add('gsec'); $('gsetBody').append(s); } }
 for (const id of INNER_SECS){ const s = $(id); if (s) $('gsetBody').append(s); }   // parked here; buildProj / buildScreen place them
-$('bSet').addEventListener('click', () => gsetToggle());
+$('bSet').addEventListener('click', () => gsetPress('set', $('bSet')));
+$('bView').addEventListener('click', () => gsetPress('view', $('bView')));
+$('bAud').addEventListener('click', () => gsetPress('aud', $('bAud')));
 // Settings sliders are locked so scrolling the menu, or a stray tap on a slider's track, can't change a setting.
 // A tap (not a drag) on a locked slider unlocks just that one; it locks again 4 s after it was last moved, and
 // all of them lock when the menu closes. The − and + buttons, lists and switches work as before.
@@ -9204,7 +9221,7 @@ function swallowTap(e){
   for (const t of types) window.addEventListener(t, eat, true);
   timer = setTimeout(off, 500);
 }
-window.addEventListener('pointerdown', e => { if (gsetOpen() && !$('gset').contains(e.target) && !$('bSet').contains(e.target)){ gsetToggle(false); swallowTap(e); } }, true);
+window.addEventListener('pointerdown', e => { if (gsetOpen() && !$('gset').contains(e.target) && ![$('bSet'), $('bView'), $('bAud')].some(x => x.contains(e.target))){ gsetToggle(false); swallowTap(e); } }, true);
 
 /* ---------- File menu: a persistent dropdown in the top bar ----------
    On the Waves and Chains screens it drives that patch (New, Open, Save, Undo, custom modules);
@@ -15494,7 +15511,7 @@ function buildProj(){
   list.append(el('p', 'note', 'Saving, opening, rendering and exporting are in the File menu.'));
   // The song, how you play, then rendering & export and mastering. (Screen has its own section; UPDATE APP is under App.)
   const groups = new Map(); let g = 'Tracker';
-  if (trk) for (const r of projRows()){ if (r.sec) g = r.sec; if (inFile.has(r.l) || g === 'App' || g === 'Screen') continue; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(r); }
+  if (trk) for (const r of projRows()){ if (r.sec) g = r.sec; if (inFile.has(r.l) || g === 'App' || g === 'Screen' || (gsetMode !== 'all' && PANEL_ROWS.has(r.l))) continue; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(r); }
   if (!groups.has('Render & export')) groups.set('Render & export', []);
   if (!groups.has('Mastering')) groups.set('Mastering', []);
   const order = ['Song', 'Input', 'Render & export', 'Mastering'];
@@ -15510,6 +15527,9 @@ function buildProj(){
   }
   body.scrollTop = keep;
 }
+// On Desktop the panel switches (keypad, bottom panel, stage) are under View with the rest of the screen; on Mobile
+// they stay in Project → Input.
+const PANEL_ROWS = new Set(['KEYS KEYPAD', 'BOTTOM PANEL', '› SHOW ALL PANEL PARTS', 'STAGE']);
 // Screen: the tracker's screen and arrange settings, then the skin.
 function buildScreen(){
   const list = $('gsecScreen'); if (!list) return;
@@ -15518,6 +15538,9 @@ function buildScreen(){
   let g = '', sec = el('section', 'tsec');
   for (const r of projRows()){ if (r.sec) g = r.sec; if (g !== 'Screen' || r.l === 'SKIN') continue; sec.append(tsetRow(r)); }
   if (sec.childNodes.length) list.append(sec);
+  if (gsetMode !== 'all'){ const pn = el('section', 'tsec'); pn.append(el('h3', null, 'Panels'));
+    for (const r of projRows()) if (PANEL_ROWS.has(r.l)) pn.append(tsetRow(r));
+    if (pn.childNodes.length > 1) list.append(pn); }
   if (sk){ const s2 = el('section', 'tsec'); s2.append(el('h3', null, 'Skin')); sk.hidden = false; s2.append(sk); list.append(s2); }
 }
 // The Patch tab of the settings menu: the Waves/Chains patch's own settings (quality, tempo, MIDI, backups).

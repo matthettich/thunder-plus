@@ -24,6 +24,14 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 16 Oct (late evening): View and Audio & MIDI menus on Desktop
+
+`#bView` and `#bAud` (class `deskmenu`, hidden on Mobile by `body.mob .deskmenu`) share the one `#gset` dropdown:
+`gsetToggle(open, mode, btn)` sets `gsetMode` ('view' | 'aud' | 'set', always 'all' on Mobile), moves `#gset` into the
+pressed button's `.setwrap` and `gsetSecs()` picks the sections. `PANEL_ROWS` (keypad, bottom panel, show-all, stage)
+leave Project → Input for View → Panels on Desktop. Outside-tap close ignores all three buttons so one can switch to
+another.
+
 ## 16 Oct (late evening): bottom panel parts, …chains colour, typing instrument numbers
 
 - **Hidden bottom-panel parts were easy to lose:** their "+" buttons were faint dashed chips after the first title.
