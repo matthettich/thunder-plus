@@ -24,6 +24,16 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 16 Oct (late evening): desktop synth page in three columns
+
+`body.sdesk` (CSS by `.dock{padding-block:10px 14px}`) and `synDesk()` (beside `setView`, called from `setView`,
+`applyPlatform` and on resize). On Desktop with a window ≥ 1100 px and the synth view: body becomes a grid
+(top bar across; `#dock` left as a vertical list with Drums / Synths / Track pads headings from CSS `::before`;
+`#main` centre; `#synRight` right). `synDesk()` moves `#fxWrap` and `#voiceWrap` into `#synRight` and back into
+`#main` otherwise, and redraws the waveform when the layout flips. Pad clicks, keys and everything else are
+unchanged. Checked headless at 1280, 1440 and 1920 wide, 1000 wide (falls back), and Tracker ↔ Synth switches.
+To revert: `git revert` that commit (CSS block + `synDesk` + its three calls), or raise the 1100 in `synDesk()`.
+
 ## 16 Oct (late evening): Arrange is the Song screen (how to revert is below)
 
 Commit `a4841c0` on `main`, cache `thunderplus-v142`. The owner wanted Song and Arrange to stop being two views of

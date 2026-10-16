@@ -923,6 +923,31 @@ body.arrsmall .tarr.zoomed :is(.tagrid .rn, .tath>:first-child), body.arrsmall .
 .pads .pad.syn b::after{color:rgba(27,33,48,.6)}
 .pads .pad.hit .pm, .pads .pad.syn.hit b::after{color:var(--inv)}
 .dock{padding-block:10px 14px}
+/* DESKTOP SYNTH LAYOUT (Settings → App: Desktop, window 1100px or wider): three columns. The pads become a list at the
+   left (like a DAW's instrument list, still played and picked with a click), the sound (waveform, layers) stays in the
+   middle, and the effects and voice controls get their own scrolling column at the right (synDesk() moves them there).
+   Same elements and keys as before; only where they sit changes. Below 1100px or on Mobile it is the usual page. */
+body.sdesk{display:grid; grid-template-columns:210px minmax(0,1fr) clamp(340px, 30vw, 460px); grid-template-rows:auto minmax(0,1fr)}
+body.sdesk>.top{grid-column:1 / -1; grid-row:1}
+body.sdesk>#dock{grid-column:1; grid-row:2; height:auto; min-height:0; border-top:0; border-right:1px solid var(--line); padding:10px 12px 18px 10px; display:block; overflow-y:auto}
+body.sdesk>#main{grid-column:2; grid-row:2}
+body.sdesk>#synRight{grid-column:3; grid-row:2; min-height:0; overflow-y:auto; overscroll-behavior:contain; border-left:1px solid var(--line); background:var(--bench)}
+#synRight[hidden]{display:none}
+body.sdesk #synRight .cardwrap{padding:12px 12px 0 !important} body.sdesk #synRight .cardwrap:last-child{padding-bottom:16px !important}
+body.sdesk .wave{height:120px}
+body.sdesk .pads{grid-template-columns:minmax(0,1fr); gap:7px; padding-right:4px}
+body.sdesk .pads .pad{height:auto; min-height:36px; flex-direction:row; align-items:center; justify-content:flex-start; gap:10px; padding:5px 10px;
+  box-shadow:3px 3px 0 0 #fff, 3px 3px 0 1.5px var(--line)}
+body.sdesk .pads .pad.hit{box-shadow:1px 1px 0 0 #fff, 1px 1px 0 1.5px var(--line)}
+body.sdesk .pad.sel, body.sdesk .pad.learning{padding:2.5px 7.5px}
+body.sdesk .pad .p1{width:auto; flex:none; gap:8px}
+body.sdesk .pad .pn{flex:1 1 auto; min-width:0}
+body.sdesk .pads::before, body.sdesk .pads .pad:nth-child(9)::before, body.sdesk .pads .pad:nth-child(17)::before{font-size:var(--fs-2); font-weight:600;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+body.sdesk .pads::before{content:'Drums'; padding:0 2px}
+body.sdesk .pads .pad:nth-child(9), body.sdesk .pads .pad:nth-child(17){margin-top:22px; position:relative; overflow:visible}
+body.sdesk .pads .pad:nth-child(9)::before{content:'Synths'; position:absolute; left:2px; top:-22px}
+body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absolute; left:2px; top:-22px}
 @media (max-width:600px){ .pads{gap:9px 8px} }
 /* Mono and poly tracks: a gentle outline around each track's column in Song and Mixer (and the phrase's notes):
    pink for the one-note-at-a-time tracks, green for the polyphonic (chord) tracks. */
@@ -6181,6 +6206,7 @@ function applyPlatform(){
   const ce = $('ckMobEd'); if (ce) ce.checked = mobEd; const er = $('mobEdRow'); if (er) er.hidden = !m;
   updView = makeSeg($('segView'), ne ? [['tracker', 'Tracker'], ['synth', 'Synth']]
     : [['tracker', 'Tracker'], ['synth', 'Synth'], ['waves', 'Waves'], ['chains', 'Chains']], () => view, setView);
+  synDesk();   // Desktop's three-column synth page, or the usual one on Mobile
 }
 $('ckMobile').addEventListener('change', e => setPlatform(e.target.checked ? 'mobile' : 'desktop'));
 $('ckMobEd').addEventListener('change', e => setMobEd(e.target.checked));
@@ -15301,6 +15327,7 @@ function setView(v){
   view = v === 'tracker' || v === 'waves' || v === 'chains' ? v : 'synth';
   const tr = view === 'tracker', wv = view === 'waves', ch = view === 'chains';
   $('main').hidden = $('dock').hidden = tr || wv || ch; $('trk').hidden = !tr; $('wvView').hidden = !wv; $('chView').hidden = !ch;
+  synDesk();
   $('kitName').hidden = tr || wv || ch;
   if (tr || wv || ch){ gsetToggle(false); gfileToggle(false); }
   document.body.classList.toggle('wvv', wv);
@@ -15317,6 +15344,19 @@ function setView(v){
   else if (!wv){ releaseAll(); refreshAll(); }
   else releaseAll();
 }
+// DESKTOP SYNTH LAYOUT (CSS: body.sdesk): on Desktop with a window 1100px or wider, the synth page's effects and voice
+// cards move into their own column at the right (#synRight), and back into the page otherwise. Called on every view
+// change, platform change and resize; it only moves anything when the answer changes.
+function synDesk(){
+  const on = !isMobile() && view === 'synth' && innerWidth >= 1100, B = document.body.classList, was = B.contains('sdesk');
+  let r = $('synRight');
+  if (on && !r){ r = el('div', 'synright'); r.id = 'synRight'; r.setAttribute('aria-label', 'Effects and voice controls'); document.body.insertBefore(r, $('dock')); }
+  B.toggle('sdesk', on); if (r) r.hidden = !on;
+  const fx = $('fxWrap'), vc = $('voiceWrap');
+  if (r && fx && vc){ if (on && fx.parentElement !== r) r.append(fx, vc); else if (!on && fx.parentElement === r) $('main').append(fx, vc); }
+  if (on !== was) drawWave();
+}
+addEventListener('resize', synDesk);
 const trap = () => { try { history.pushState({thunder:1}, ''); } catch(e){} };
 trap();
 addEventListener('popstate', () => {
