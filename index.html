@@ -836,6 +836,46 @@ body.asong .tagp b.gx{font-size:8px; letter-spacing:0}
 .agbox.gm{--tk:var(--tk-mono)} .agbox.gp{--tk:var(--tk-poly)} .agbox.gx{--tk:var(--tk-mst)}
 body.asong .tagrid .rn, body.asong .tath{font-size:var(--fs-2)}
 .tarr .tagrid b.sl{box-shadow:inset 0 0 0 2px var(--ar-cur); background-image:linear-gradient(color-mix(in srgb, var(--ar-cur) 22%, transparent), color-mix(in srgb, var(--ar-cur) 22%, transparent))}
+/* ===== SONG EXTRAS (see the JS block of the same name): drop targets, the drag tag, the right-click menu, the section
+   lane, the loop's row numbers, the phrase peek and its DOGS | PEEK switch ===== */
+.tarr .tagrid b.dt{outline:2px dashed var(--ar-cur); outline-offset:-2px; background-image:linear-gradient(color-mix(in srgb, var(--ar-cur) 30%, transparent), color-mix(in srgb, var(--ar-cur) 30%, transparent))}
+.tagrid.sxdrag, .tagrid.sxdrag b{cursor:grabbing}
+.sxtag{position:fixed; z-index:1000; pointer-events:none; padding:3px 8px; font:600 var(--fs-2)/1.4 var(--mono); background:var(--ink); color:var(--inv); white-space:nowrap}
+.sxtag.err{background:#a3261e; color:#fff}
+.sxmenu{position:fixed; z-index:1001; min-width:240px; padding:5px 0; background:var(--panel); color:var(--ink); border:1.5px solid var(--line); box-shadow:5px 5px 0 color-mix(in srgb, var(--ink) 14%, transparent); display:flex; flex-direction:column}
+.sxmenu .sxmt{font:700 var(--fs-1)/1.6 var(--mono); letter-spacing:.06em; color:var(--muted); padding:2px 12px 4px; white-space:nowrap}
+.sxmenu button{display:flex; justify-content:space-between; gap:18px; align-items:center; min-height:30px; margin:0; padding:0 12px; border:0; border-radius:0; background:transparent; color:var(--ink); font:inherit; font-size:var(--fs-3); text-align:left; box-shadow:none}
+.sxmenu button:hover:not(:disabled), .sxmenu button:focus-visible{background:color-mix(in srgb, var(--ar-cur, #9a63ff) 24%, transparent); outline:none}
+.sxmenu button:disabled{opacity:.4}
+.sxmenu kbd{font:500 var(--fs-1) var(--mono); color:var(--muted)}
+.sxmenu hr{border:0; border-top:1px solid color-mix(in srgb, var(--line) 30%, transparent); margin:4px 0; width:100%}
+body.asong.sxsecs .tarr{padding-left:92px}
+.sxlane{position:absolute; left:0; top:0; bottom:0; width:88px; z-index:3}
+.sxlane[hidden]{display:none}
+.sxlane .sxlh{position:absolute; left:4px; font:700 var(--fs-1)/16px var(--mono); letter-spacing:.06em; color:var(--ar-dim)}
+.sxsec{position:absolute; left:2px; width:84px; box-sizing:border-box; min-height:0; margin:0; padding:3px 4px 0 7px; border:0; border-left:4px solid hsl(var(--sxh) 55% 45%); border-top:1px solid hsl(var(--sxh) 55% 45%); border-radius:0;
+  background:color-mix(in srgb, hsl(var(--sxh) 55% 45%) 13%, transparent); color:var(--ar-ink); font:700 var(--fs-2)/1.2 var(--mono); letter-spacing:.04em; text-align:left;
+  display:flex; align-items:flex-start; justify-content:flex-start; overflow:hidden; cursor:pointer; box-shadow:none}
+.sxsec span{display:block; max-width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis}
+.sxsec.cont{border-top:1px dashed color-mix(in srgb, hsl(var(--sxh) 55% 45%) 60%, transparent); color:var(--ar-dim)}
+.sxsec:hover{background:color-mix(in srgb, hsl(var(--sxh) 55% 45%) 24%, transparent)}
+.tarr .tagrid .rn.lp{background:color-mix(in srgb, var(--ar-cur) 26%, transparent); color:var(--ar-ink); box-shadow:inset 3px 0 0 var(--ar-cur)}
+.tarr .tagrid .rn.sxlp{background:color-mix(in srgb, var(--ar-cur) 50%, transparent); color:var(--ar-ink)}
+.tstage.peek{pointer-events:auto}
+.sxsw{position:absolute; top:0; left:0; display:flex; pointer-events:auto; z-index:3}
+.sxsw[hidden]{display:none}
+.sxsw button{min-height:22px; margin:0; padding:0 8px; font:600 var(--fs-1)/1 var(--mono); letter-spacing:.06em; border:1px solid var(--ts-dim, var(--muted)); border-radius:0; background:transparent; color:var(--ts-dim, var(--muted)); box-shadow:none}
+.sxsw button + button{border-left:0}
+.sxsw button.on{background:var(--ts-ink, var(--ink)); border-color:var(--ts-ink, var(--ink)); color:var(--ts-bg, var(--panel))}
+.sxpk{flex:1; min-height:0; display:flex; flex-direction:column; gap:3px; padding-top:30px; font:var(--fs-3)/1.35 var(--mono); color:var(--ts-ink, var(--ink)); overflow:hidden}
+@media (max-width:899px){ body.asong.sxsecs .tarr{padding-left:64px} .sxlane{width:60px} .sxsec{width:56px; padding-left:5px} }
+.sxpk[hidden]{display:none}
+.sxpkt{font-weight:700; letter-spacing:.04em} .sxpkt i{font-style:normal; font-size:var(--fs-1); border:1px solid currentColor; padding:0 4px; margin-left:6px; opacity:.7}
+.sxpki, .sxpkn{color:var(--ts-dim, var(--muted)); margin:0}
+.sxpkr{flex:1 1 auto; min-height:0; overflow:auto; white-space:pre}
+.sxpkr div{padding:0 2px} .sxpkr div.bd{background:color-mix(in srgb, var(--ts-ink, var(--ink)) 7%, transparent)} .sxpkr div.pl{background:color-mix(in srgb, var(--ar-cur, #9a63ff) 35%, transparent)}
+.sxpkr i{font-style:normal; color:var(--ts-dim, var(--muted))}
+.sxpke{flex:none; min-height:36px; margin:4px 0 2px; font-size:var(--fs-2)}
 /* Drag the grip on its left edge to make it wider (the blocks grow with it); double-tap the grip to jump big and back. */
 .tarr{position:relative}
 .tarrh{position:absolute; left:-10px; top:0; bottom:0; width:20px; cursor:ew-resize; touch-action:none; z-index:3}
@@ -1715,6 +1755,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   </g>
 </svg></div>
         <div class="stgph" id="tStagePh" hidden><b id="tStagePhT"></b><canvas id="tStageC"></canvas></div>
+        <div class="sxpk" id="tStagePk" hidden></div><!-- SONG EXTRAS: the phrase peek, and its DOGS | PEEK switch -->
+        <div class="sxsw" id="tStageSw" role="group" aria-label="Beside the song" hidden><button type="button" data-k="dogs">DOGS</button><button type="button" data-k="peek">PEEK</button></div>
       </div>
       <div class="thd"><span class="thl"><span id="tTitle">SONG</span><span class="tpset" id="tPset"></span></span><span class="tsub" id="tSub"></span></div>
       <div class="tgrid" id="tGrid"></div>
@@ -10780,7 +10822,7 @@ function freshSong(){
     song:Array.from({length:256}, () => new Array(NT + 1).fill(-1)), chains:new Array(256).fill(null), phrases:new Array(256).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
     tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:4, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
-    ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0), mst:freshMst(), presets:{voices:[], layers:[]}};   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
+    ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0), mst:freshMst(), presets:{voices:[], layers:[]}, secs:[]};   // secs: SONG EXTRAS section names [{y, n}]   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
 }
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;
 // The saved song is read at start-up, before nslots (a const further down) exists. Calling it there threw, and the
@@ -10799,6 +10841,7 @@ function normSong(j){
   S.mst = normMst(j.mst);
   S.swing = clamp(int(j.swing, 50), 50, 75); S.swingB = clamp(int(j.swingB, 2), 1, 7); S.limiter = j.limiter !== false;
   S.renderFrom = clamp(int(j.renderFrom, 0), 0, 255); S.master = clamp(int(j.master, 255), 0, 255);
+  if (Array.isArray(j.secs)){ const seen = new Set(); S.secs = j.secs.filter(q => q && typeof q.n === 'string' && q.n.trim()).map(q => ({y:clamp(int(q.y, 0), 0, 255), n:q.n.trim().slice(0, 16)})).filter(q => !seen.has(q.y) && seen.add(q.y)); }   // SONG EXTRAS
   if (Array.isArray(j.song)) j.song.slice(0, 256).forEach((r, i) => { if (Array.isArray(r)) for (let t = 0; t <= MT; t++) S.song[i][t] = clamp(int(r[t], -1), -1, 255); });
   if (Array.isArray(j.chains)) j.chains.slice(0, 256).forEach((c, i) => { if (Array.isArray(c)) S.chains[i] = Array.from({length:16}, (_, k) => {
     const r = Array.isArray(c[k]) ? c[k] : []; return [clamp(int(r[0], -1), -1, 255), clamp(int(r[1], 0), -128, 127)]; }); });
@@ -12674,6 +12717,15 @@ function projRows(){
       info:() => `Song overview at the right of the other screens. AUTO shows it on wide screens (600 × 500 and up), ON at any size. This screen: ${innerWidth} × ${innerHeight}` + (arrMode === 1 && !arrEl.offsetWidth && !asongOn() ? ' (too small for AUTO)' : '') + (songGrid ? '' : '. The Song screen is Arrange whatever this says')},
     {l:'CLASSIC SONG', ck:'Show classic Song screen', get:() => songGrid ? 1 : 0, set:v => setSongGrid(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'HIDDEN (the default): the Song screen is Arrange, full width on any screen, with every Song key, pad command and the master column. SHOWN brings back the text grid, with Arrange beside it as before. The song is the same either way'},
+    // SONG EXTRAS (each one off = the Song screen as it was before them)
+    {l:'SONG MOUSE', ck:'Song: drag to select, move, copy; right-click menu', get:() => SX.mouse ? 1 : 0, set:v => sxSet('mouse', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'With a mouse on the Song screen: drag across empty cells to select, drag a block or the selection to move it, Alt-drag to copy it, right-click for a menu (copy, paste, clone, mute, loop, open, name a section, clear). Off: clicks only, as before'},
+    {l:'SECTIONS', ck:'Song: section names beside the rows', get:() => SX.secs ? 1 : 0, set:v => sxSet('secs', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'A lane left of the row numbers names runs of rows (INTRO, DROP…): double-click it (or right-click a block) to name the section from that row, click a name to go there. Needs a wide screen. Off hides the lane; the names stay in the song'},
+    {l:'LOOP DRAG', ck:'Song: drag the row numbers to loop', get:() => SX.loop ? 1 : 0, set:v => sxSet('loop', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'Drag down the Song screen’s row numbers to loop those rows (PLAY on this screen loops them; LOOP turns it off). A tap still plays from that row'},
+    {l:'SONG PEEK', ck:'Song: the phrase under the cursor beside it (not the dogs)', get:() => SX.peek ? 1 : 0, set:v => sxSet('peek', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
+      info:() => 'Wide screens with STAGE on BY SCREEN: beside the Song screen, the phrase under the cursor instead of the dancing dogs. The DOGS | PEEK switch there does the same'},
     {l:'SIDE PANEL', ck:'Show side panel', get:() => sideOn ? 1 : 0, set:v => setSide(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'The grey column at the right on wide screens: the screen map, track meters and key reminders. Hide it to give the tracker and Arrange more room'},
     {l:'INST LIST', ck:'Show instrument list', get:() => inlOn ? 1 : 0, set:v => setInl(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
@@ -13839,6 +13891,7 @@ function draw(){
   drawArr(PH);
   const km = inMode === 'keys'; $('tKp').hidden = !km || !kpOn; $('tPad').hidden = km; $('tLegKeys').hidden = !km; $('tLegPad').hidden = km;
   deckDraw(); if (relayout || stgReq !== (stage === 'off' ? '' : stageKind())) stageLayout();
+  if (stgKindNow === 'peek') stagePeek();   // SONG EXTRAS: the peek follows the cursor
   drawPat();
   $('tOct').hidden = !km; $('tOctN').textContent = kOct; if (patMode !== km){ patMode = km; patFit(); }
   if (km) drawKeypad();
@@ -13896,7 +13949,7 @@ const STK = 'thunderplus-stage-v1', STG = ['screen', 'dogs', 'off'], STG_NAMES =
 let stage = (() => { try { const v = localStorage.getItem(STK); if (STG.includes(v)) return v; if (v === 'phrase') return 'screen'; } catch(e){} return 'screen'; })();
 function setStage(v){ stage = v; try { localStorage.setItem(STK, v); } catch(e){} stageLayout(); }
 $('tStageX').addEventListener('click', () => { setStage('off'); toast('Stage hidden. Settings → STAGE brings it back.'); });
-const stageKind = () => stage === 'dogs' ? 'dogs' : tv === 'phrase' && mstView() ? 'chain' : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
+const stageKind = () => stage === 'dogs' ? 'dogs' : tv === 'song' && SX.peek && asongOn() ? 'peek' /* SONG EXTRAS */ : tv === 'phrase' && mstView() ? 'chain' : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
 let stgKindNow = '', stgSig = '', stgReq = '';   // stgReq: what the last layout was asked for
 // It sits in the space to the right of the grid's text, the grid's height, when that space is big enough.
 function stageLayout(){
@@ -13907,9 +13960,10 @@ function stageLayout(){
   for (let i = 0; i < Math.min(lines.length, 80); i++){ rg.selectNodeContents(lines[i]); const r = rg.getBoundingClientRect(); if (r.width && r.right > right) right = r.right; }
   if (!asg) grid.querySelectorAll('.tgbox').forEach(b => { const r = b.getBoundingClientRect(); if (r.right > right) right = r.right; });
   const kind = stageKind(), left = right - sr.left + 18, w = sr.width - left - 14, top = gr.top - sr.top, h = gr.height;
-  const minW = kind === 'piano' ? 90 : 150, show = right > 0 && w >= minW && h >= 150; box.hidden = !show; if (!show){ stgKindNow = ''; return; }
+  const minW = kind === 'piano' ? 90 : kind === 'peek' ? 220 : 150, show = right > 0 && w >= minW && h >= 150; box.hidden = !show; if (!show){ stgKindNow = ''; return; }
   Object.assign(box.style, {left:left + 'px', top:top + 'px', width:w + 'px', height:h + 'px'});
-  $('tStageDogs').hidden = kind !== 'dogs'; $('tStagePh').hidden = kind === 'dogs';
+  $('tStageDogs').hidden = kind !== 'dogs'; $('tStagePh').hidden = kind === 'dogs' || kind === 'peek';
+  $('tStagePk').hidden = kind !== 'peek'; box.classList.toggle('peek', kind === 'peek'); box.setAttribute('aria-hidden', String(kind !== 'peek')); sxStageSwitch(kind); sxPkSig = '';   // SONG EXTRAS
   box.classList.toggle('piano', kind === 'piano');
   stgKindNow = kind; stgSig = '';
   if (kind === 'dogs') dogsState(); else stageCanvas(true);
@@ -13978,6 +14032,7 @@ function stgCtx(){
 }
 function stageCanvas(force){
   const k = stgKindNow; if (!k || k === 'dogs') return;
+  if (k === 'peek') return stagePeek();   // SONG EXTRAS
   if (k === 'preview') return stagePreview();
   if (k === 'piano') return stagePiano(force);
   if (k === 'wave') return stageWave();
@@ -14842,6 +14897,7 @@ function drawArr(PH){
     if (arrGrid.style.height !== hg) arrGrid.style.height = hg; }
   else if (arrGrid.style.height) arrGrid.style.height = '';
   arrAlign(); arrFollowX(); arrBoxes();
+  sxAfterArr();   // SONG EXTRAS: the loop's row numbers and the section lane
 }
 // The MONO / POLY / MST boxes around Arrange's columns when it is the Song screen: drawn over the panel from the group
 // tabs down to the last whole row, measured from the track-number cells (only when something that moves them changed).
@@ -14992,6 +15048,7 @@ if (ARR_ZOOM_BTNS){
 let arrPress = null;
 arrGrid.addEventListener('pointerdown', e => {
   if (arrPinch || arrPtrs.size > 1){ arrCancelPress(); return; }   // two fingers: a pinch, never a press or a mute
+  if (sxDown(e)) return;   // SONG EXTRAS: drag to select / move / copy, drag the row numbers to loop
   const rn = e.target.closest('[data-ry]');
   if (rn){ const y = +rn.dataset.ry; cs.song.y = y; if (tp.on && tp.mode === 'song') tStart('song', {row:y}); else draw(); return; }
   const b = e.target.closest('b[data-y]'); if (!b) return;
@@ -15013,6 +15070,326 @@ const arrUp = e => {
 };
 arrGrid.addEventListener('pointerup', arrUp); arrGrid.addEventListener('pointercancel', arrUp);
 arrGrid.addEventListener('contextmenu', e => e.preventDefault());
+
+/* ===== SONG EXTRAS (16 Oct): mouse editing, section names, drag-to-loop and the phrase peek on the Song screen =====
+   Settings → SONG MOUSE / SECTIONS / LOOP DRAG / SONG PEEK (each in its own localStorage key, below). Everything here
+   only acts when Arrange is the Song screen (asongOn()). To take it out: delete this block, the SONG EXTRAS CSS, the
+   four settings rows after CLASSIC SONG and the hook lines marked "SONG EXTRAS" (arrGrid pointerdown, drawArr,
+   stageKind / stageLayout / stageCanvas, draw's peek refresh, the peek markup in #tStage, freshSong / normSong's
+   `secs`, startScroll's skip). info() is wrapped inside this block.
+   A song's sections (S.secs) stay in its file either way, and older versions just ignore them. */
+const SXK = {mouse:'thunderplus-songmouse-v1', secs:'thunderplus-songsecs-v1', loop:'thunderplus-loopdrag-v1', peek:'thunderplus-songpeek-v1'};
+const sxGet = (k, d) => { try { const v = localStorage.getItem(SXK[k]); return v == null ? d : v === '1'; } catch(e){ return d; } };
+const SX = {mouse:sxGet('mouse', true), secs:sxGet('secs', true), loop:sxGet('loop', true), peek:sxGet('peek', false)};
+function sxSet(k, on){ SX[k] = !!on; try { localStorage.setItem(SXK[k], on ? '1' : '0'); } catch(e){} arrSig = ''; arrBoxKey = ''; layoutSig = ''; arrLayout(true); draw(); stageLayout(); }
+const sxRect = () => selA && selA.v === 'song' ? selRect() : null;
+const sxIn = (r, y, t) => !!r && y >= r.y0 && y <= r.y1 && t >= r.x0 && t <= r.x1;
+// The columns a song rectangle covers that exist on screen: the tracks in use, and the master column when it reaches it.
+function sxCols(r){ const NA = ntr(), c = []; for (let t = r.x0; t <= Math.min(r.x1, NA - 1); t++) c.push(t); if (r.x1 >= MT && r.x0 <= MT) c.push(MT); return c; }
+const sxU = t => t === MT ? ntr() : t;           // a column's place on screen (the master column sits after the last track)
+const sxT = u => u === ntr() ? MT : u;
+
+/* ---- mouse: drag on empty cells selects, drag a block (or the selection) moves it, Alt-drag copies,
+   a click without moving still goes there, Alt-click still mutes, holding still mutes ---- */
+let sxDrag = null, sxMarks = [], sxTag = null, sxRaf = 0;
+function sxCellAt(x, y){
+  const e = document.elementFromPoint(x, y), b = e && e.closest && e.closest('#tArrGrid b[data-y]');
+  return b ? {y:+b.dataset.y, t:+b.dataset.t} : null;
+}
+// arrGrid's pointerdown calls this first; true = handled here (the old press must not start).
+function sxDown(e){
+  if (!asongOn()) return false;
+  const rn = e.target.closest('[data-ry]');
+  if (rn) return SX.loop ? sxLoopDown(e, rn) : false;
+  if (!SX.mouse || e.pointerType === 'touch') return false;
+  if (e.button === 2) return true;   // a right-click is the menu (below), not a press that moves or mutes
+  if (e.button !== 0) return false;
+  const b = e.target.closest('b[data-y]'); if (!b) return false;
+  const y = +b.dataset.y, t = +b.dataset.t, r = sxRect(), filled = S.song[y][t] >= 0;
+  sxDrag = {id:e.pointerId, x0:e.clientX, y0:e.clientY, y, t, mode:null, alt:e.altKey, sel:sxIn(r, y, t), filled, last:{y, t}, ev:e};
+  // Alt on a block waits to see whether it's a click (mute, as before) or the start of an Alt-drag copy.
+  if (e.altKey){ e.preventDefault(); try { arrGrid.setPointerCapture(e.pointerId); } catch(_){} return true; }
+  return false;   // the normal press starts as well: a click goes to the block, holding mutes; a drag cancels it
+}
+function sxStart(e){
+  const d = sxDrag;
+  if (d.sel || d.filled){
+    d.mode = 'move';
+    if (!d.sel){ selA = {x:d.t, y:d.y, v:'song'}; cs.song.x = d.t; cs.song.y = d.y; }   // a block outside the selection moves on its own
+    d.r = selRect();
+  } else { d.mode = 'select'; selA = {x:d.t, y:d.y, v:'song'}; cs.song.x = d.t; cs.song.y = d.y; }
+  arrGrid.classList.add('sxdrag');
+  draw();
+}
+function sxMove(e){
+  const d = sxDrag; if (!d || e.pointerId !== d.id) return;
+  d.ev = e;
+  if (!d.mode){ if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 6) return; sxStart(e); }
+  if (!sxRaf) sxRaf = requestAnimationFrame(sxFrame);
+}
+function sxFrame(){
+  sxRaf = 0; const d = sxDrag; if (!d || !d.mode) return;
+  const e = d.ev, g = arrGrid.getBoundingClientRect(), rh = arrRowH() || 20;
+  // near the top or bottom edge the rows scroll under the mouse
+  if (e.clientY > g.bottom - 6 && arrGrid.scrollTop + arrGrid.clientHeight < arrGrid.scrollHeight - 1){ arrGrid.scrollTop += rh; setTimeout(() => { if (sxDrag === d && !sxRaf) sxRaf = requestAnimationFrame(sxFrame); }, 90); }
+  else if (e.clientY < g.top + 6 && arrGrid.scrollTop > 0){ arrGrid.scrollTop -= rh; setTimeout(() => { if (sxDrag === d && !sxRaf) sxRaf = requestAnimationFrame(sxFrame); }, 90); }
+  const c = sxAim(d, e);
+  if (d.mode === 'select'){ if (cs.song.x !== c.t || cs.song.y !== c.y){ cs.song.x = c.t; cs.song.y = c.y; draw(); } return; }
+  sxShowDrop(d, e);   // move / copy: where the selection would land, outlined, and a tag saying so
+}
+// The cell under the mouse (kept inside the grid), and for a move how far it is from where the drag started.
+function sxAim(d, e){
+  const g = arrGrid.getBoundingClientRect(), c = sxCellAt(clamp(e.clientX, g.left + 2, g.right - 2), clamp(e.clientY, g.top + 2, g.bottom - 2)) || d.last;
+  d.last = c; d.du = sxU(c.t) - sxU(d.t); d.dy = c.y - d.y; d.copy = !!e.altKey;
+  return c;
+}
+function sxDrop(d){
+  const r = d.r, cols = sxCols(r), NA = ntr();
+  if (cols.includes(MT) && cols.length > 1) return {err:'Move the master column on its own.'};
+  if (cols.includes(MT) && d.du) return {err:'The master column stays the master column.'};
+  const u0 = sxU(cols[0]) + d.du, u1 = sxU(cols[cols.length - 1]) + d.du;
+  if (!cols.includes(MT) && (u0 < 0 || u1 > NA - 1)) return {err:'That would go past the last track.'};
+  if (r.y0 + d.dy < 0 || r.y1 + d.dy > 255) return {err:'That would go past the end of the song.'};
+  return {cols, u0, u1};
+}
+function sxShowDrop(d, e){
+  for (const b of sxMarks) b.classList.remove('dt', 'dtx'); sxMarks = [];
+  const p = sxDrop(d), r = d.r;
+  if (!p.err) for (let y = r.y0 + d.dy; y <= r.y1 + d.dy; y++){ const row = arrGrid.children[y]; if (!row) continue;
+    for (const t of p.cols){ const b = row.querySelector(`b[data-t="${sxT(sxU(t) + d.du)}"]`); if (b){ b.classList.add('dt'); sxMarks.push(b); } } }
+  if (!sxTag){ sxTag = el('div', 'sxtag'); document.body.append(sxTag); }
+  const moved = d.du || d.dy;
+  sxTag.textContent = p.err ? p.err : !moved ? (d.copy ? 'ALT · COPY: drag to a new place' : 'MOVE: drag to a new place')
+    : (d.copy ? 'COPY → ' : 'MOVE → ') + (p.cols.includes(MT) ? 'MST' : d2(p.u0 + 1) + (p.u1 > p.u0 ? '–' + d2(p.u1 + 1) : '')) + ' · ' + rS(r.y0 + d.dy, 3);
+  sxTag.classList.toggle('err', !!p.err);
+  sxTag.style.left = (e.clientX + 14) + 'px'; sxTag.style.top = (e.clientY + 16) + 'px';
+}
+function sxEnd(e){
+  const d = sxDrag; if (!d || e.pointerId !== d.id) return;
+  sxDrag = null; if (sxRaf){ cancelAnimationFrame(sxRaf); sxRaf = 0; }
+  arrGrid.classList.remove('sxdrag');
+  for (const b of sxMarks) b.classList.remove('dt', 'dtx'); sxMarks = [];
+  if (sxTag){ sxTag.remove(); sxTag = null; }
+  if (e.type === 'pointercancel') return;
+  if (!d.mode){ if (d.alt){ toggleBlockMute(d.y, d.t); } return; }   // Alt-click without a drag: mute, as before
+  if (d.mode === 'select'){ const r = selRect(), n = sxCols(r).length * (r.y1 - r.y0 + 1); toast(`${n} cell${n > 1 ? 's' : ''} selected · drag them to move, Alt-drag to copy, right-click for more`); return; }
+  sxAim(d, e); sxApply(d);
+}
+// Blocks land where they were dropped: a move takes them away from where they were, a copy leaves them (copies use the
+// same phrases, like paste; Clone in the menu makes new ones). Empty cells in the selection don't wipe what's there.
+function sxApply(d){
+  if (!d.du && !d.dy) return;
+  const p = sxDrop(d); if (p.err) return toast(p.err);
+  const r = d.r, src = [];
+  for (let y = r.y0; y <= r.y1; y++) for (const t of p.cols){ const v = S.song[y][t]; if (v >= 0) src.push([t, y, v, t !== MT && blockMuted(S, y, t)]); }
+  if (!src.length) return toast('Nothing to move: the selection is empty.');
+  if (!d.copy) for (const [t, y] of src){ S.song[y][t] = -1; if (t !== MT) S.smute[y] &= ~(1 << t); }
+  for (const [t, y, v, mu] of src){ const nt = sxT(sxU(t) + d.du), ny = y + d.dy; S.song[ny][nt] = v; if (nt !== MT){ if (mu) S.smute[ny] |= 1 << nt; else S.smute[ny] &= ~(1 << nt); } }
+  const x0 = sxT(p.u0), x1 = sxT(p.u1);
+  selA = {x:x0, y:r.y0 + d.dy, v:'song'}; cs.song.x = x1; cs.song.y = r.y1 + d.dy; cTrack = x1 === MT ? cTrack : x1;
+  saveS(); draw();
+  toast(`${d.copy ? 'Copied' : 'Moved'} ${src.length} block${src.length > 1 ? 's' : ''} to ${x0 === MT ? 'MST' : 'track ' + d2(sxU(x0) + 1)} · row ${rS(r.y0 + d.dy, 3)}`);
+}
+arrGrid.addEventListener('pointermove', sxMove);
+arrGrid.addEventListener('pointerup', sxEnd); arrGrid.addEventListener('pointercancel', sxEnd);
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && sxDrag && sxDrag.mode){ sxDrag.mode = null; sxDrag.alt = false; sxEnd({pointerId:sxDrag.id, type:'pointercancel'}); } });
+
+/* ---- right-click: a menu for the selection, or for the block under the mouse ---- */
+let sxMenuEl = null;
+function sxMenuClose(){ if (sxMenuEl){ sxMenuEl.remove(); sxMenuEl = null; } }
+function sxMenu(x, y, title, items){
+  sxMenuClose();
+  const m = sxMenuEl = el('div', 'sxmenu'); m.setAttribute('role', 'menu'); m.setAttribute('aria-label', title);
+  m.append(el('div', 'sxmt', title));
+  for (const it of items){
+    if (!it){ m.append(el('hr')); continue; }
+    const b = el('button'); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.append(el('span', null, it.l)); if (it.k) b.append(el('kbd', null, it.k));
+    if (it.off) b.disabled = true;
+    b.addEventListener('click', () => { sxMenuClose(); it.f(); });
+    m.append(b);
+  }
+  document.body.append(m);
+  const r = m.getBoundingClientRect();
+  m.style.left = Math.max(4, Math.min(x, innerWidth - r.width - 6)) + 'px'; m.style.top = Math.max(4, Math.min(y, innerHeight - r.height - 6)) + 'px';
+  const first = m.querySelector('button:not(:disabled)'); if (first) first.focus({preventScroll:true});
+}
+window.addEventListener('pointerdown', e => { if (sxMenuEl && !sxMenuEl.contains(e.target)) sxMenuClose(); }, true);
+window.addEventListener('keydown', e => {
+  if (!sxMenuEl) return;
+  if (e.key === 'Escape'){ e.preventDefault(); e.stopImmediatePropagation(); sxMenuClose(); return; }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); e.stopImmediatePropagation();
+    const L = [...sxMenuEl.querySelectorAll('button:not(:disabled)')], i = L.indexOf(document.activeElement); const n = L[(i + (e.key === 'ArrowDown' ? 1 : -1) + L.length) % L.length]; if (n) n.focus(); return; }
+  if (e.key === 'Enter' || e.key === ' '){ e.stopImmediatePropagation(); return; }   // the focused item's own click
+  e.stopImmediatePropagation();
+}, true);
+addEventListener('resize', sxMenuClose); arrGrid.addEventListener('scroll', sxMenuClose, {passive:true});
+function sxMuteRect(r){
+  const cols = sxCols(r).filter(t => t !== MT), cells = [];
+  for (let y = r.y0; y <= r.y1; y++) for (const t of cols) if (S.song[y][t] >= 0) cells.push([y, t]);
+  if (!cells.length) return toast('Nothing to mute here.');
+  const mute = cells.some(([y, t]) => !blockMuted(S, y, t));
+  for (const [y, t] of cells){ if (mute) S.smute[y] |= 1 << t; else S.smute[y] &= ~(1 << t); }
+  saveS(); draw(); toast(`${mute ? 'Muted' : 'Unmuted'} ${cells.length} block${cells.length > 1 ? 's' : ''}`);
+}
+function sxClearRect(r){
+  let n = 0; for (let y = r.y0; y <= r.y1; y++) for (const t of sxCols(r)) if (S.song[y][t] >= 0){ setCell('song', t, y, -1); n++; }
+  selA = null; saveS(); draw(); toast(n ? `Cleared ${n} block${n > 1 ? 's' : ''}` : 'Nothing to clear.');
+}
+function sxLoopRows(y0, y1){
+  if (y1 <= y0) return toast('Loop needs two rows or more.');
+  loopSel = true; loopArm = {v:'song', y0, y1}; draw();
+  toast(`Looping rows ${rS(y0, 3)}–${rS(y1, 3)} · PLAY (this screen) loops them · LOOP turns it off`);
+}
+function sxOpen(){ const v = S.song[cs.song.y][cs.song.x]; if (v < 0) return toast('Nothing to open here.'); selA = null; tv = 'song'; go('phrase'); }
+arrGrid.addEventListener('contextmenu', e => {
+  if (!asongOn() || !SX.mouse || (e.pointerType && e.pointerType === 'touch')) return;
+  const b = e.target.closest('b[data-y]'); if (!b) return;
+  e.preventDefault();
+  const y = +b.dataset.y, t = +b.dataset.t;
+  if (!sxIn(sxRect(), y, t)){ selA = null; cs.song.x = t; cs.song.y = y; if (t !== MT) cTrack = t; draw(); }
+  const r = sxRect() || {x0:t, x1:t, y0:y, y1:y}, multi = !!sxRect() && (r.y1 > r.y0 || sxCols(r).length > 1);
+  const filled = S.song[cs.song.y][cs.song.x] >= 0, ks = inMode === 'keys';
+  const n = multi ? (() => { let k = 0; for (let yy = r.y0; yy <= r.y1; yy++) for (const tt of sxCols(r)) if (S.song[yy][tt] >= 0) k++; return k; })() : (filled ? 1 : 0);
+  const title = multi ? `${n} BLOCK${n === 1 ? '' : 'S'} · ${sxCols(r).map(c => c === MT ? 'MST' : d2(c + 1)).filter((c, i, a) => i === 0 || i === a.length - 1).join('–')} · ${rS(r.y0, 3)}–${rS(r.y1, 3)}`
+    : `${t === MT ? 'MST' : 'TRACK ' + d2(t + 1)} · ROW ${rS(y, 3)}` + (filled ? ` · ${hx(songShown(S.song[y][t]))}` : '');
+  const items = [
+    {l:'Copy', k:ks ? 'Ctrl+C' : '', f:() => copyHere(false), off:!n},
+    {l:'Cut', k:ks ? 'Ctrl+X' : '', f:() => copyHere(true), off:!n},
+    {l:'Paste here', k:ks ? 'Ctrl+V' : '', f:() => { if (multi){ cs.song.x = r.x0; cs.song.y = r.y0; } selA = null; paste(); }, off:!(clip && clip.v === 'song')},
+    null,
+    {l:'Clone (new phrases)', k:ks ? 'Ctrl+D' : '', f:() => { selA = null; cloneHere(); }, off:multi || !filled},
+    {l:'Clone down', k:ks ? 'Ctrl+Shift+D' : '', f:() => cloneDown(), off:!n},
+    null,
+    {l:'Mute / unmute', k:ks ? 'M' : '', f:() => sxMuteRect(r), off:!n || (t === MT && !multi)},
+    {l:'Loop these rows', f:() => sxLoopRows(r.y0, r.y1), off:r.y1 <= r.y0},
+    {l:'Open the phrase', k:ks ? 'Shift+→' : '', f:sxOpen, off:multi || !filled},
+  ];
+  if (SX.secs) items.push({l:songSecAt(r.y0) && songSecAt(r.y0).y === r.y0 ? 'Rename the section here…' : 'Name a section from row ' + rS(r.y0, 3) + '…', f:() => sxSecEdit(r.y0)});
+  items.push(null, {l:'Clear', k:ks ? 'Del' : '', f:() => sxClearRect(r), off:!n});
+  sxMenu(e.clientX, e.clientY, title, items);
+});
+
+/* ---- sections: names for runs of rows (INTRO, VERSE, DROP…), in a lane left of the row numbers. A section runs from
+   its row to the next section's. Click a name to go there; double-click the lane to name or rename; right-click for
+   more. Stored in the song (S.secs: [{y, n}]). ---- */
+const sxSecs = () => (S.secs || []).slice().sort((a, b) => a.y - b.y);
+function songSecAt(y){ let s = null; for (const q of S.secs || []) if (q.y <= y && (!s || q.y > s.y)) s = q; return s; }
+function songSecName(y){ const s = songSecAt(y); return s ? s.n : ''; }   // also used by the Pattern view
+async function sxSecEdit(y){
+  const s = (S.secs || []).find(q => q.y === y);
+  const n = await askText(s ? `Rename the section at row ${rS(y, 3)} (empty removes it)` : `Name a section starting at row ${rS(y, 3)}`, s ? s.n : '', 16, s ? 'Rename' : 'Name it');
+  if (n == null) return;
+  const name = String(n).trim().slice(0, 16);
+  S.secs = (S.secs || []).filter(q => q.y !== y); if (name) S.secs.push({y, n:name});
+  saveS(); draw(); toast(name ? `Section ${name} starts at row ${rS(y, 3)}` : 'Section removed');
+}
+function sxSecRemove(y){ S.secs = (S.secs || []).filter(q => q.y !== y); saveS(); draw(); toast('Section removed'); }
+let sxLane = null, sxLaneKey = '';
+const sxLaneOn = () => asongOn() && SX.secs && arrEl.clientWidth >= 560;
+function sxLaneDraw(){
+  const on = sxLaneOn(); document.body.classList.toggle('sxsecs', on);
+  if (!on){ if (sxLane) sxLane.hidden = true; sxLaneKey = ''; return; }
+  if (!sxLane){ sxLane = el('div', 'sxlane'); sxLane.setAttribute('aria-label', 'Song sections'); arrEl.append(sxLane); sxLaneWire(); }
+  sxLane.hidden = false;
+  const a = arrEl.getBoundingClientRect(), g = arrGrid.getBoundingClientRect(), th = $('tArrTh').getBoundingClientRect(), rh = arrRowH() || 22, top = cs.song.top || 0, VR = arrRows();
+  const L = sxSecs(), key = [JSON.stringify(L), top, VR, rh, g.top - a.top, g.height, th.top - a.top].join('|');
+  if (key === sxLaneKey) return; sxLaneKey = key;
+  let h = `<span class="sxlh" style="top:${(th.top - a.top).toFixed(1)}px">SECTIONS</span>`;
+  L.forEach((s, i) => {
+    const end = i + 1 < L.length ? L[i + 1].y - 1 : 255, a0 = Math.max(s.y, top), a1 = Math.min(end, top + VR - 1); if (a1 < a0) return;
+    const y = g.top - a.top + 3 + (a0 - top) * rh, hh = (a1 - a0 + 1) * rh - 3;
+    h += `<button type="button" class="sxsec${a0 > s.y ? ' cont' : ''}" data-sy="${s.y}" style="top:${y.toFixed(1)}px;height:${hh.toFixed(1)}px;--sxh:${Math.round((i * 67 + 200) % 360)}" title="${s.n.replace(/[<>&"]/g, '')}: rows ${rS(s.y, 3)}–${rS(end, 3)} · click to go there, double-click its first row to rename, another row to start a new section, right-click for more"><span>${s.n.replace(/[<>&"]/g, '')}</span></button>`;
+  });
+  sxLane.innerHTML = h;
+}
+function sxLaneRow(clientY){ const g = arrGrid.getBoundingClientRect(), rh = arrRowH() || 22; return clamp((cs.song.top || 0) + Math.floor((clientY - g.top - 2) / rh), 0, 255); }
+function sxLaneWire(){
+  sxLane.addEventListener('click', e => {
+    const b = e.target.closest('.sxsec'); if (!b) return;
+    const y = +b.dataset.sy; cs.song.y = y; if (y < (cs.song.top || 0) || y >= (cs.song.top || 0) + arrRows()) cs.song.top = y; if (tv !== 'song') go('song'); else draw();
+  });
+  // double-click on a section's first row renames it; anywhere else starts a new section at that row
+  sxLane.addEventListener('dblclick', e => { e.preventDefault(); sxSecEdit(sxLaneRow(e.clientY)); });
+  sxLane.addEventListener('contextmenu', e => {
+    e.preventDefault(); const y = sxLaneRow(e.clientY), s = songSecAt(y);
+    const items = [{l:'Name a section from row ' + rS(y, 3) + '…', f:() => sxSecEdit(y), off:!!(s && s.y === y)}];
+    if (s) items.push({l:`Rename ${s.n}…`, f:() => sxSecEdit(s.y)}, {l:`Go to ${s.n}`, f:() => { cs.song.y = s.y; cs.song.top = s.y; draw(); }}, {l:`Loop ${s.n}`, f:() => { const L = sxSecs(), i = L.indexOf(L.find(q => q.y === s.y)), end = i + 1 < L.length ? L[i + 1].y - 1 : lastSongRow(); sxLoopRows(s.y, Math.max(end, s.y + 1)); }}, null, {l:`Remove ${s.n}`, f:() => sxSecRemove(s.y)});
+    sxMenu(e.clientX, e.clientY, s ? s.n + ' · FROM ' + rS(s.y, 3) : 'ROW ' + rS(y, 3), items);
+  });
+  // touch: a long press opens the same menu
+  let lp = null;
+  sxLane.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') return; const x = e.clientX, y = e.clientY;
+    lp = setTimeout(() => { lp = null; sxLane.dispatchEvent(new MouseEvent('contextmenu', {clientX:x, clientY:y, bubbles:true, cancelable:true})); }, 500); });
+  for (const ev of ['pointerup', 'pointercancel', 'pointermove']) sxLane.addEventListener(ev, e => { if (lp && (ev !== 'pointermove' || Math.abs(e.movementY) > 4)){ clearTimeout(lp); lp = null; } });
+}
+function lastSongRow(){ for (let y = 255; y >= 0; y--) if (S.song[y].some(v => v >= 0)) return y; return 0; }
+
+/* ---- drag down (or up) the row numbers to set the loop; a tap still plays from that row ---- */
+let sxLoopD = null;
+function sxLoopDown(e, rn){
+  if (e.button && e.button > 0) return false;
+  const y = +rn.dataset.ry; sxLoopD = {id:e.pointerId, y0:y, y1:y, moved:false, x:e.clientX, yy:e.clientY};
+  try { arrGrid.setPointerCapture(e.pointerId); } catch(_){}
+  return true;
+}
+arrGrid.addEventListener('pointermove', e => {
+  const d = sxLoopD; if (!d || e.pointerId !== d.id) return;
+  if (!d.moved && Math.abs(e.clientY - d.yy) < 8) return;
+  d.moved = true; const y = sxLaneRow(e.clientY); if (y === d.y1) return; d.y1 = y;
+  for (const rn of arrGrid.querySelectorAll('.rn.sxlp')) rn.classList.remove('sxlp');
+  const a = Math.min(d.y0, d.y1), b = Math.max(d.y0, d.y1);
+  for (let k = a; k <= b; k++){ const row = arrGrid.children[k]; if (row) row.firstElementChild.classList.add('sxlp'); }
+});
+const sxLoopUp = e => {
+  const d = sxLoopD; if (!d || e.pointerId !== d.id) return; sxLoopD = null;
+  for (const rn of arrGrid.querySelectorAll('.rn.sxlp')) rn.classList.remove('sxlp');
+  if (e.type === 'pointercancel') return;
+  if (!d.moved || d.y0 === d.y1){ const y = d.y0; cs.song.y = y; if (tp.on && tp.mode === 'song') tStart('song', {row:y}); else draw(); return; }   // a tap, as before
+  sxLoopRows(Math.min(d.y0, d.y1), Math.max(d.y0, d.y1));
+};
+arrGrid.addEventListener('pointerup', sxLoopUp); arrGrid.addEventListener('pointercancel', sxLoopUp);
+
+/* ---- after Arrange draws: the loop's row numbers, and the section lane ---- */
+let sxLp = [];
+function sxAfterArr(){
+  for (const e of sxLp) e.classList.remove('lp'); sxLp = [];
+  if (asongOn() && loopSel && loopArm && loopArm.v === 'song') for (let y = loopArm.y0; y <= loopArm.y1; y++){ const row = arrGrid.children[y]; if (row){ row.firstElementChild.classList.add('lp'); sxLp.push(row.firstElementChild); } }
+  sxLaneDraw();
+}
+// The Song screen's info line names the section the cursor is in (info() is wrapped here rather than edited in place).
+function sxInfo(s){ if (tv !== 'song' || !SX.secs || selA) return s; const n = songSecName(cs.song.y); return n ? s + ' · ' + n : s; }
+{ const base = info; info = function(){ return sxInfo(base()); }; }
+
+/* ---- the phrase peek: on the Song screen the stage can show the phrase under the cursor instead of the dogs ---- */
+let sxPkSig = '';
+function stagePeek(){
+  const box = $('tStagePk'); if (!box) return;
+  const v = S.song[cs.song.y] ? S.song[cs.song.y][cs.song.x] : -1, pid = v >= 0 ? firstPhrase(v) : -1, t = cs.song.x;
+  const p = pid >= 0 ? S.phrases[pid] : null, L = pid >= 0 ? plen(pid) : 0;
+  let play = -1; if (tp.on && tp.pos && pid >= 0){ const q = tp.pos[t]; if (q && q.phrase === pid) play = q.step; }
+  const sig = [pid, t, play, L, pid >= 0 ? JSON.stringify(p || []) : ''].join('|'); if (sig === sxPkSig) return; sxPkSig = sig;
+  if (pid < 0){ box.innerHTML = `<b class="sxpkt">${v >= 0 ? 'NO PHRASE IN THIS BLOCK' : 'EMPTY BLOCK'}</b><p class="sxpkn">Move onto a block to see its phrase here.</p>`; return; }
+  let uses = 0; for (let y = 0; y < 256; y++) for (let k = 0; k < ntr(); k++){ const b = S.song[y][k]; if (b >= 0 && firstPhrase(b) === pid) uses++; }
+  let inst = -1; if (p) for (const r of p) if (r && r[IC] >= 0){ inst = r[IC]; break; }
+  const lpb = S.plpb && S.plpb[pid] ? S.plpb[pid] : (S.lpb || 4);
+  let h = `<b class="sxpkt">PHRASE ${hx(pid)} <i>PEEK</i></b><span class="sxpki">${t === MT ? 'Master' : 'Track ' + d2(t + 1)}${inst >= 0 ? ' · inst ' + hx(inst) : ''} · ${L} rows · on the song ${uses}×</span><div class="sxpkr">`;
+  for (let y = 0; y < L; y++){
+    const r = (p && p[y]) || [], n = r[0], more = r.slice(1, NCOL).filter(x => x >= 0).length, fc = r[FX0], fv = r[FX0 + 1];
+    const cell = (s, on) => on ? s : `<i>${s}</i>`;
+    h += `<div class="${y % lpb ? '' : 'bd '}${y === play ? 'pl' : ''}"><i>${hx(y)}</i> ${cell(noteS(n >= 0 ? n : -1), n >= 0)}${more ? '+' + more : '  '} ${cell(r[IC] >= 0 ? hx(r[IC]) : '--', r[IC] >= 0)} ${cell(fc >= 0 ? FXC[fc] || '???' : '---', fc >= 0)} ${cell(fc >= 0 && fv >= 0 ? hx(fv) : '--', fc >= 0 && fv >= 0)}</div>`;
+  }
+  h += `</div><button type="button" class="sxpke">Edit this phrase${inMode === 'keys' ? ' (Shift+→)' : ''}</button>`;
+  box.innerHTML = h;
+  box.querySelector('.sxpke').addEventListener('click', sxOpen);
+}
+function sxStageSwitch(kind){
+  const sw = $('tStageSw'); if (!sw) return;
+  const show = tv === 'song' && stage === 'screen' && (kind === 'dogs' || kind === 'peek') && asongOn();
+  sw.hidden = !show; if (!show) return;
+  sw.querySelectorAll('button').forEach(b => { const on = (b.dataset.k === 'peek') === SX.peek; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+}
+$('tStageSw').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; sxSet('peek', b.dataset.k === 'peek'); sxPkSig = ''; });
+/* ===== SONG EXTRAS end ===== */
 
 let raf = 0, mScanT = 0, audioWake = 0;
 const mbuf = new Float32Array(512), mbuf2 = new Float32Array(1024);
@@ -15211,7 +15588,7 @@ for (const t of [scr, arrGrid]) for (const ev of ['touchend', 'contextmenu']) t.
   if (!e.target.closest('input,textarea,select,button,[contenteditable]') && e.cancelable) e.preventDefault();
 }, {passive:false});
 scr.addEventListener('pointerdown', e => {
-  if (sdrag || drag || (e.button && e.button > 0) || e.target.closest('[data-x],[data-r],#fxPick,#tArr')) return;   // #tArr: Arrange as the Song screen has its own touch
+  if (sdrag || drag || (e.button && e.button > 0) || e.target.closest('[data-x],[data-r],#fxPick,#tArr,.sxsw,.sxpk')) return;   // #tArr: Arrange as the Song screen has its own touch; .sxsw/.sxpk: SONG EXTRAS' buttons in the stage
   startScroll(e);
 });
 let sdragPend = 0;
