@@ -24,6 +24,14 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 16 Oct (late night): gentler Arrange zoom on a computer
+
+`arrDeskZ()` (not `body.mob` and not a coarse pointer): `arrZMax()` = blocks about 84 px wide at most (`84 / arrFitW`,
+1.25…3; `arrFitW` is the 1× column width from `arrSize`, which also clamps a saved zoom), − / + step ×1.25, Ctrl+wheel
+`exp(−dy·0.0014)` (≈1.15× a notch; `deltaMode` lines converted), zoomed row height capped at 34 (Song screen) / 40.
+`arrSetZoom` keeps the song cursor's block (`b.c`) still on screen (or centres it if it was out of view) by measuring it
+after `arrSize()`. Touch (pinch, AZ_STEPS) is unchanged.
+
 ## 16 Oct (late night): Synth page reset, meter, live-note limiter
 
 - `makeRow()` sliders reset to `def.d` on double-click of the slider itself (not only the label); mod-sequence steps

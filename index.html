@@ -14515,7 +14515,11 @@ let arrLit = [], arrSig = '', arrTap = {t:0, k:''}, arrCurY = -1;
 const ARR_ZOOM_BTNS = true;
 const AZK = 'thunderplus-arrange-zoom-v1', AZ_MAX = 3, AZ_STEPS = [1, 1.5, 2, 2.5, 3];
 let arrZoom = (() => { try { const z = parseFloat(localStorage.getItem(AZK)); return z >= 1 && z <= AZ_MAX ? z : 1; } catch(e){ return 1; } })();
-let arrPinch = null, arrCurX = -1, arrWheelT = 0;
+let arrPinch = null, arrCurX = -1, arrWheelT = 0, arrFitW = 30;
+// On a computer (Desktop, a mouse) zoom is gentler and stops sooner: blocks grow to about 84 px wide at most, in 1.25×
+// steps (Ctrl+wheel about 1.15× a notch), and the song cursor's block stays where it is on screen while zooming.
+const arrDeskZ = () => !document.body.classList.contains('mob') && !matchMedia('(pointer: coarse)').matches;
+const arrZMax = () => arrDeskZ() ? clamp(84 / Math.max(6, arrFitW), 1.25, AZ_MAX) : AZ_MAX;
 const arrPtrs = new Set();
 const arrEl = $('tArr'), arrGrid = $('tArrGrid');
 const arrShown = () => (arrMode > 0 || asongOn()) && arrEl.offsetWidth > 0;
@@ -14806,7 +14810,7 @@ function arrGo(y, t){
 // Column widths and block height for the panel's width and the zoom. At 1× the columns share the row (as before);
 // zoomed they are fixed px, so the rows run past the panel and scroll. Returns the block height.
 function arrSize(){
-  const NA = ntr(), G = Math.ceil(NA / 8), z = arrZoom > 1 ? arrZoom : 1, sm = document.body.classList.contains('arrsmall');
+  const NA = ntr(), G = Math.ceil(NA / 8), sm = document.body.classList.contains('arrsmall');
   const ms = asongOn() ? 1 : 0;   // as the Song screen: one more column (the master) after one more 4px spacer
   // As the Song screen, blocks stop growing at about 44px wide, so on a wide screen the stage (the dancing dogs) keeps the
   // space beside it, as it had beside the text grid. A narrow screen (or STAGE off) still gives Arrange the whole width.
@@ -14817,11 +14821,13 @@ function arrSize(){
   const PFs = polyFrom(), SP = ms ? 12 : 4, nSp = ms ? (PFs > 0 && PFs < NA ? 1 : 0) + 1 : G - 1;
   const RNW = ms ? 30 : sm ? 18 : 22;   // the row-number column (wider as the Song screen: see body.asong in the CSS)
   const W = arrGrid.clientWidth, cwFit = (W - (sm ? 12 : 16) - RNW - nSp * SP - (NA + ms + nSp) * (sm ? 1 : 2)) / (NA + ms);
+  arrFitW = cwFit; if (arrZoom > arrZMax()) arrZoom = arrZMax();   // a zoom saved on a smaller screen
+  const z = arrZoom > 1 ? arrZoom : 1;
   const col = z > 1 ? Math.max(6, cwFit * z).toFixed(1) + 'px' : 'minmax(0,1fr)', grp = [];
   if (ms){ if (PFs > 0) grp.push(`repeat(${PFs},${col})`); if (NA > PFs) grp.push(`repeat(${NA - PFs},${col})`); grp.push(col); }
   else for (let g = 0; g < NA; g += 8) grp.push(`repeat(${Math.min(8, NA - g)},${col})`);
   arrEl.style.setProperty('--arcols', grp.join(` ${SP}px `));
-  const cw = (W - 34) / (NA + ms + 0.3 + (G + ms) * 0.2) * z, rh = clamp(Math.round(cw * 0.8), 16, z > 1 ? 44 : ms ? clamp(Math.floor(arrGrid.clientHeight / 12) - 3, 16, 30) : 40);   // as the Song screen: at least about 12 rows, as the text grid showed
+  const cw = (W - 34) / (NA + ms + 0.3 + (G + ms) * 0.2) * z, rh = clamp(Math.round(cw * 0.8), 16, z > 1 ? (arrDeskZ() ? (ms ? 34 : 40) : 44) : ms ? clamp(Math.floor(arrGrid.clientHeight / 12) - 3, 16, 30) : 40);   // as the Song screen: at least about 12 rows, as the text grid showed
   arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', clamp(Math.round(rh * 0.5), 8, 16) + 'px');
   // Where the MONO | POLY break sits when every track fits (track PF's column starts after a spacer every 8 tracks):
   // the header's ○ is centred over it, and stays there while zoomed so it is always in the same place.
@@ -14829,17 +14835,26 @@ function arrSize(){
     const bx = PF > 0 && PF < NA ? (colL(PF - 1) + cwFit + colL(PF)) / 2 : W / 2;
     arrEl.style.setProperty('--azfx', Math.max(120, Math.min(W - 70, bx)).toFixed(1) + 'px'); }
   arrEl.classList.toggle('zoomed', z > 1);
-  if (ARR_ZOOM_BTNS){ $('tArrZo').disabled = $('tArrZf').disabled = z <= 1; $('tArrZi').disabled = z >= AZ_MAX - 0.01; }
+  if (ARR_ZOOM_BTNS){ $('tArrZo').disabled = $('tArrZf').disabled = z <= 1; $('tArrZi').disabled = z >= arrZMax() - 0.01; }
   return rh;
 }
 function arrHSync(){ const x = arrGrid.scrollLeft; $('tArrTh').scrollLeft = x; $('tArrGp').scrollLeft = x; if (asongOn()) arrBoxes(); }
-// fx: the point to keep still, as a fraction of the content's width; cx: where it sits in the panel (px).
+// fx: the point to keep still, as a fraction of the content's width; cx: where it sits in the panel (px). On a computer
+// the song cursor's block is the point kept still instead (or brought to the middle if it was out of view).
 function arrSetZoom(z, fx, cx){
-  z = clamp(z, 1, AZ_MAX); if (z < 1.05) z = 1;
+  z = clamp(z, 1, arrZMax()); if (z < 1.05) z = 1;
   if (Math.abs(z - arrZoom) < 0.005) return;
-  if (fx == null){ cx = arrGrid.clientWidth / 2; fx = (arrGrid.scrollLeft + cx) / Math.max(1, arrGrid.scrollWidth); }
+  let el = null;
+  if (arrDeskZ() && !arrPinch){
+    el = arrGrid.querySelector('b.c');
+    if (el){ const g = arrGrid.getBoundingClientRect(), r = el.getBoundingClientRect(), rn = arrGrid.querySelector('.rn'), lw = rn ? rn.getBoundingClientRect().width : 24;
+      cx = r.left + r.width / 2 - g.left; if (cx < lw || cx > g.width) cx = (lw + g.width) / 2; }
+  }
+  if (fx == null && !el){ cx = arrGrid.clientWidth / 2; fx = (arrGrid.scrollLeft + cx) / Math.max(1, arrGrid.scrollWidth); }
   arrZoom = z; arrSize();
-  arrGrid.scrollLeft = Math.max(0, fx * arrGrid.scrollWidth - cx); arrHSync(); arrAlign();
+  if (el && el.isConnected){ const g = arrGrid.getBoundingClientRect(), r = el.getBoundingClientRect(); arrGrid.scrollLeft = Math.max(0, arrGrid.scrollLeft + r.left + r.width / 2 - g.left - cx); }
+  else arrGrid.scrollLeft = Math.max(0, fx * arrGrid.scrollWidth - cx);
+  arrHSync(); arrAlign();
 }
 // The view stays where the pinch left it: following the cursor only resumes when the cursor changes track.
 function arrZoomDone(){ try { localStorage.setItem(AZK, String(arrZoom)); } catch(_){} arrSig = ''; arrCurX = cs.song.x; draw(); }
@@ -14873,12 +14888,15 @@ arrGrid.addEventListener('touchend', arrPinchEnd); arrGrid.addEventListener('tou
 // Ctrl+wheel (and a trackpad pinch, which arrives as one) zooms on a computer.
 arrGrid.addEventListener('wheel', e => {
   if (!e.ctrlKey) return; e.preventDefault();
-  const cx = e.clientX - arrGrid.getBoundingClientRect().left;
-  arrSetZoom(arrZoom * Math.exp(-e.deltaY * 0.004), (arrGrid.scrollLeft + cx) / Math.max(1, arrGrid.scrollWidth), cx);
+  const cx = e.clientX - arrGrid.getBoundingClientRect().left, dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;   // lines → px
+  arrSetZoom(arrZoom * Math.exp(-dy * (arrDeskZ() ? 0.0014 : 0.004)), (arrGrid.scrollLeft + cx) / Math.max(1, arrGrid.scrollWidth), cx);
   clearTimeout(arrWheelT); arrWheelT = setTimeout(arrZoomDone, 200);
 }, {passive:false});
 if (ARR_ZOOM_BTNS){
-  const step = d => { const z = d > 0 ? AZ_STEPS.find(s => s > arrZoom + 0.01) : [...AZ_STEPS].reverse().find(s => s < arrZoom - 0.01);
+  const step = d => {
+    let z;
+    if (arrDeskZ()){ const m = arrZMax(); z = d > 0 ? (arrZoom >= m - 0.01 ? null : Math.min(m, arrZoom * 1.25)) : (arrZoom <= 1 ? null : arrZoom / 1.25); }
+    else z = d > 0 ? AZ_STEPS.find(s => s > arrZoom + 0.01) : [...AZ_STEPS].reverse().find(s => s < arrZoom - 0.01);
     if (z == null) return; arrSetZoom(z); arrZoomDone(); };
   $('tArrZo').addEventListener('click', () => step(-1)); $('tArrZi').addEventListener('click', () => step(1));
   $('tArrZf').addEventListener('click', () => { arrSetZoom(1); arrZoomDone(); });   // ○: back to every track in the panel
