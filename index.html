@@ -1037,6 +1037,51 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
 .tgrid .ln span.gc.gt.gb{box-shadow:inset 0 0 0 2px var(--tk)}
 /* View neighbouring phrases: the tracks either side, faint and not editable. */
 .tscr .nb{opacity:.55; pointer-events:none} .tscr .nbl{color:#9b82d6} .tscr .nbr{color:#c9a227}
+/* ===== PATTERN VIEW (setting PATTERN VIEW; to remove: delete this CSS block, the JS block of the same name and the
+   lines marked "PATTERN VIEW" in the script) =====
+   The Phrase screen as a pattern: every track's phrase for one song row side by side (Renoise-style), a column group per
+   track with its MONO / POLY / MST band on top. Only the open track's cells are the phrase editor's; the rest are drawn. */
+.tscr{--pv-on:#1b2130}
+:root[data-skinbase="term"] .tscr{--pv-on:var(--mxon)}
+.tscr .pvseg{display:inline-flex; align-self:center; font:600 .7em/1 var(--mono); letter-spacing:.04em}
+.tscr .pvseg[hidden]{display:none}
+.tscr .pvseg button,.tscr .pvbar button{min-height:0; padding:.32em .6em; border:1px solid var(--ts-ink); border-radius:0; background:transparent;
+  color:var(--ts-ink); font:inherit; letter-spacing:inherit; gap:0}
+.tscr .pvseg button + button{border-left:0}
+.tscr .pvseg button.on,.tscr .pvbar button.on{background:var(--ts-ink); color:var(--ts-bg)}
+.tscr .pvbar{display:flex; align-items:center; gap:.7em; flex:none; min-width:0; overflow:hidden; white-space:nowrap; padding:.15em 0 .35em;
+  font:600 .74em/1.25 var(--mono); color:var(--ts-ink)}
+.tscr .pvbar[hidden]{display:none}
+.tscr .pvbar .pvrow{font-size:1.2em; font-weight:700; letter-spacing:.02em}
+.tscr .pvbar .pvtag{border:1px solid var(--ts-dim); color:var(--ts-th); padding:.18em .55em; letter-spacing:.08em}
+.tscr .pvbar .pvlen{color:var(--ts-th); font-weight:400}
+.tscr .pvbar .pvwarn{color:var(--ts-mute); border:1px solid currentColor; padding:.18em .55em; min-width:0; overflow:hidden; text-overflow:ellipsis}
+.tscr .pvbar :is(.pvtag,.pvwarn)[hidden]{display:none}
+.tscr .pvbar .pvsp{flex:1 1 auto; min-width:0}
+.tscr .pvbar button{flex:none}
+/* The grid: lines as wide as their text (so the 4/4 shading runs on when it scrolls sideways), every cell a full-height
+   block so the bands, the hatching and the column rules join up from line to line. */
+.tgrid.pvon .ln{width:max-content; min-width:100%; padding-right:35%}   /* room past the last track, so any track can be first after the row numbers */
+.tgrid.pvon .ln>span{display:inline-block; height:1.3em; vertical-align:top; cursor:pointer}
+.tgrid .pvrn{position:sticky; left:0; z-index:1; box-shadow:inset -1px 0 0 var(--ts-line)}
+.tgrid .pvrn:not(.pl):not(.sel){background-color:var(--ts-bg)}
+.tgrid .ln.b4>.pvrn:not(.sel):not(.pl){background-image:linear-gradient(color-mix(in srgb, var(--ts-ink) 9%, transparent), color-mix(in srgb, var(--ts-ink) 9%, transparent))}
+.tgrid span.pvg{background:linear-gradient(var(--ts-line), var(--ts-line)) 50% 0 / 1px 100% no-repeat}
+.tgrid span.pvh{background:var(--tk); color:var(--pv-on); font-weight:700}
+.tgrid span.pvh.gx,.tgrid span.pvh2.gx{color:color-mix(in srgb, var(--tk) 22%, #000)}
+.tgrid span.pvh2{background:color-mix(in srgb, var(--tk) 45%, var(--ts-bg)); color:var(--ts-ink)}
+.tgrid span.pvh.pvmu{text-decoration:line-through}
+.tgrid span.pvhc{box-shadow:inset 0 -.16em 0 var(--ts-cur-bg)}
+.tgrid span.pvsh{font-weight:700}
+.tgrid span.pvf{background-color:color-mix(in srgb, var(--ts-ink) 7%, transparent)}
+.tgrid span.pvfh{background-color:color-mix(in srgb, var(--ts-ink) 12%, transparent); color:var(--ts-th)}
+.tgrid span.pvz{background:repeating-linear-gradient(135deg, transparent 0 .32em, color-mix(in srgb, var(--ts-ink) 15%, transparent) .32em .46em);
+  color:var(--ts-mute); font-weight:700}
+.tgrid span.pvc:not(.cur):not(.sel):not(.pl){background-color:color-mix(in srgb, var(--tk) 15%, transparent)}
+.tgrid span.pvnow:not(.cur):not(.sel):not(.pl){background-image:linear-gradient(color-mix(in srgb, var(--ts-cur-bg) 13%, transparent), color-mix(in srgb, var(--ts-cur-bg) 13%, transparent))}
+.tgrid span.pvdim{opacity:.45}
+.tgrid span.pvmore{text-decoration:underline dotted; text-underline-offset:.2em}
+/* ===== end PATTERN VIEW ===== */
 
 /* ---------- bottom panel: where the keypad was, when it is hidden (KEYS mode, keypad off) ----------
    Scope (the master's spectrum, drawn like Quite Noise's Shape graph), quick controls for the current instrument's
@@ -12561,6 +12606,7 @@ function followPlay(){
   if (tv === 'song'){ if (tp.mode === 'song') cs.song.y = own.row; }
   else if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0){ cSect = own.sect; cs.sect.y = own.cr; } }
   else if (tv === 'phrase'){ if (own.phrase >= 0){ cPhrase = own.phrase; cs.phrase.y = own.step; } }
+  if (tv === 'phrase' && tp.mode === 'song' && own.row >= 0 && pvActive()) pvFollow(P, own);   // PATTERN VIEW: the song row follows too
 }
 // TRACKS (Song): how many tracks this song uses (8–32, but 24 at most with a voice per track, so every
 // track keeps its own voice within 40 kit voices). Song and Mixer show as many as fit and scroll sideways.
@@ -12786,6 +12832,8 @@ function projRows(){
       info:() => 'Phones (the folded Fold), where Arrange doesn’t fit beside the phrase: the song row of the block being edited and the rows above and below, over the phrase. Tap it and the arrows move through the song with the phrase following; tap the phrase to edit it again'},
     {l:'INST LIST', ck:'Show instrument list', get:() => inlOn ? 1 : 0, set:v => setInl(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'Every instrument and the pad it plays (long names are cut short). In the side panel; without it, in PAD mode between the arrows and the buttons when there is room. Tap one to open it on INST'},
+    {l:'PATTERN VIEW', ck:'Pattern view on the Phrase screen', get:() => pvOn ? 1 : 0, set:v => setPv(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'ON' : 'OFF',   // PATTERN VIEW
+      info:() => 'ON: the Phrase screen gets PHRASE | PATTERN buttons (Shift+◀ from Phrase): PATTERN shows every track’s phrase for one song row side by side, and the open track is edited in place. Wide screens only (computer, unfolded Fold). OFF: the Phrase screen as before'},
     {l:'STEP NUMBERS', ck:'Display steps as decimal', get:() => stepDec ? 1 : 0, set:v => setStepDec(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'DECIMAL' : 'HEX',
       info:() => 'Row numbers in Song, Sect, Phrase and Arrange: DECIMAL counts 0, 1, 2… (song rows 000–255, phrase rows 00–31); HEX is 00–FF. Phrase, sect and instrument numbers and the values stay hex'},
     {l:'TEXT SIZE', get:() => tScale, set:v => setTScale(v), min:60, max:200, step:10, big:20, d:100, fmt:v => v + '%',
@@ -13296,6 +13344,7 @@ function move(dx, dy){
   if (tv === 'fx') return moveFx(dx, dy, d.h);
   if (tv === 'phrase' && c.y === -2){ if (dy > 0){ c.y = 0; c.x = mstView() ? FX0 : 0; } else c.x = clamp(c.x + dx, 0, 1); return draw(); }
   if (tv === 'phrase' && dy === -1 && c.y === 0){ c.y = -2; c.x = c.x > 0 ? 1 : 0; return draw(); }
+  if (tv === 'phrase' && dx && pvActive()) return pvMoveX(dx);   // PATTERN VIEW: past the track's first or last column, on to the next track
   if (tv === 'phrase' && dx){ const C = pCols(), i = Math.max(0, C.indexOf(c.x)); c.x = C[clamp(i + dx, 0, C.length - 1)]; }
   else if (tv === 'mixer' && c.y === 7 && dx){ c.mx = clamp((c.mx || 0) + dx, 0, 1); return draw(); }
   else if (tv === 'song' && dx){ const ui = clamp((c.x === MT ? ntr() : c.x) + dx, 0, ntr()); c.x = ui === ntr() ? MT : ui; }   // the master column sits after the last track
@@ -13390,6 +13439,7 @@ function go(v){
 function nav(dir){
   if (dir === 'up') return tv === 'mixer' ? go(midV) : tv !== 'project' ? go('project') : null;
   if (dir === 'down') return tv === 'project' ? go(midV) : tv !== 'mixer' ? go('mixer') : null;
+  if (pvNav(dir)) return;   // PATTERN VIEW: Shift+▶ from the pattern goes back to the plain phrase
   // ◀▶ run along every screen in tab order: Song, Sect, Phrase, Inst, Mixer, FX, Project.
   if (dir === 'right' && (tv === 'inst' || tv === 'mixer' || tv === 'fx')) return go(VIEWS[VIEWS.indexOf(tv) + 1]);
   if (dir === 'left' && (tv === 'mixer' || tv === 'fx' || tv === 'project')) return tv === 'mixer' ? go('inst') : go(VIEWS[VIEWS.indexOf(tv) - 1]);
@@ -13415,6 +13465,7 @@ function songJump(d){
 }
 function optDir(dir, grid){
   const d = dir === 'right' || dir === 'up' ? 1 : -1, big = dir === 'up' || dir === 'down';
+  if (tv === 'phrase' && !(grid && patNavOn) && pvActive()) return pvRow(dir === 'up' ? -1 : dir === 'down' ? 1 : d);   // PATTERN VIEW: Ctrl+▲▼, [ ], ‹ › step song rows
   // Mixer FX row: OPTION+▲▶ turn effects on in order (up to four), OPTION+▼◀ turn the last one back off.
   if (tv === 'mixer'){ if (cs.mixer.y === 4) fxActiveStep(cs.mixer.x, d); return; }
   if (tv === 'song'){ if (big) move(0, -d * 16); else songJump(d); return; }
@@ -13706,6 +13757,7 @@ function fit(){
     if (!gh || fit >= ROWS + 0.2 || fs <= 7) break;
     fs = Math.max(7, fs * fit / (ROWS + 0.3));
   }
+  fs = pvFit(fs, W);   // PATTERN VIEW: smaller text so more tracks fit, and room for its header lines
   // TEXT SIZE (Project): scale what fits. Bigger shows fewer rows and the lines can scroll sideways.
   if (tScale !== 100) scr.style.fontSize = Math.max(5, fs * tScale / 100).toFixed(2) + 'px';
 }
@@ -13778,6 +13830,7 @@ function draw(){
   if (view !== 'tracker') return;
   if (apHold){ apDirty = true; return; }   // ARRANGE PAGING: a song command run for Arrange draws once, at its end
   if (arrPlace()) scheduleRefit(false);   // Arrange moved into (or out of) the Song screen: size the text again next frame
+  pvSync();   // PATTERN VIEW: its buttons and bar, and the text size when it turns on or off
   if (selA && selA.v !== tv) selA = null;
   // The FX target follows the track being edited: moving to another phrase (or block) moves the FX panel and the FX
   // screen with it. The master column's phrases point it at the master (MT is the FX screen's master, NT).
@@ -13819,6 +13872,7 @@ function draw(){
     L.push([stepDec ? '   ' : '  ', {t:'PH', cls:'th'}, ' ', {t:'TP', cls:'th'}]);
     for (let y = 0; y < 16; y++){ const r = sectRow(cSect, y) || [-1, 0];
       L.push([{t:stepDec ? d2(y) : hx(y, 1), cls:'rn' + (y % 4 ? '' : ' rn4') + rsel(y), r:y}, ' ', {t:h2(r[0]), cls:cc(0, y, r[0] < 0 ? 'e' : 'v'), x:0, y}, ' ', {t:hx(r[1]), cls:cc(1, y, r[1] ? 'v' : 'e'), x:1, y}]); }
+  } else if (tv === 'phrase' && pvActive()){ ({title, sub, pset, prLit} = pvLines(c, L, cc, rsel, playRows));   // PATTERN VIEW
   } else if (tv === 'phrase'){
     title = 'PHRASE ' + hx(cPhrase); sub = cTrack === MT ? 'MASTER' : 'TRACK ' + d2(cTrack + 1) + (polyView() ? ' · POLY' : ' · MONO');
     const poly = polyView(), mst = mstView(); if (mst && c.y >= 0 && c.x < FX0) c.x = FX0; else if (!poly && c.x >= 1 && c.x < NCOL) c.x = 0;
@@ -13937,12 +13991,14 @@ function draw(){
   meterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mt')] : []; masterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mm')] : [];
   $('tTitle').textContent = title; $('tSub').textContent = sub;
   $('tInfo').textContent = info();
+  if (tv === 'phrase' && pvActive()) $('tInfo').textContent = pvInfo();   // PATTERN VIEW: the track and phrase first
   let hintTxt = (tv === 'song' && !sectsOn) ? (inMode === 'keys' ? HINTK.songP : HINT.songP) : (inMode === 'keys' ? HINTK : HINT)[tv];
   if (tv === 'phrase' && inMode !== 'keys' && !patNavOn) hintTxt = hintTxt.replace('OPT+arrows go to phrase', 'OPT+▲▼ page');
   if (asongOn()) hintTxt += inMode === 'keys' ? ' · double-click opens · Alt-click mutes' : ' · tap twice opens · hold mutes';
   const mstP = tv === 'phrase' && mstView();
   if (mstP) hintTxt = inMode === 'keys' ? 'Master phrase: commands only · letters pick a command (V F G R T…) · type hex for its value · Del cell · Shift+↑↓ lines · Ctrl+C/V' : HINT.phraseM;
   if (tv === 'fx' && cs.fx.y > FXSLOTS) hintTxt = 'Slot ' + (cFxS + 1) + ' controls · ▲▼ pick one · ' + (inMode === 'keys' ? '← or Esc back to the slots' : '◀ back to the slots');
+  if (tv === 'phrase' && pvActive()) hintTxt = pvHint();   // PATTERN VIEW
   { const h = $('tHint'), txt = (tv === 'phrase' && !mstP ? 'NOW ' + curS() + (inMode === 'keys' ? ' · oct ' + kOct + ' · step ' + kStep : '') + ' · ' : '') + hintTxt;
     if (h.textContent !== txt){ h.textContent = txt; h.classList.remove('open'); h.classList.toggle('more', h.scrollHeight > h.clientHeight + 1); } }
   drawArr(PH);
@@ -15912,6 +15968,7 @@ function keysDown(e, pad){
   }
   if (k === 'Tab'){
     const c = cs[tv], d = dims(tv), dir = e.shiftKey ? -1 : 1;
+    if (tv === 'phrase' && pvActive()){ pvTab(dir); return true; }   // PATTERN VIEW: Tab / Shift+Tab next or previous track
     if (tv === 'phrase'){ const G = polyView() ? [0, 1, 2, 3, VC, IC, FX0, FX0 + 2, FX0 + 4] : [0, VC, IC, FX0, FX0 + 2, FX0 + 4], i = G.findIndex(g => g > c.x); const cur = i < 0 ? G.length - 1 : i - 1;
       c.x = G[(cur + dir + G.length) % G.length]; draw(); }
     else move(dir, 0);
@@ -16457,6 +16514,338 @@ addEventListener('keydown', e => {
   e.stopImmediatePropagation();
   if (e.key === 'Escape'){ e.preventDefault(); gsetToggle(false); }
 }, true);
+
+/* ===== PATTERN VIEW (setting PATTERN VIEW, localStorage thunderplus-patternview-v1; to remove: delete this block, the
+   CSS block of the same name, the PATTERN VIEW row in projRows() and the one-line hooks marked "PATTERN VIEW" in fit(),
+   draw() (four), move(), nav(), optDir(), followPlay() and keysDown()) =====
+   A Renoise-style pattern on the Phrase screen: every track's phrase for ONE song row (cs.song.y), side by side. It is a
+   mode of the Phrase screen, not a screen of its own: the open track's column IS the phrase editor (cPhrase, cs.phrase,
+   every key, tap and command exactly as in Phrase); the other tracks are drawn from the song and can't be typed into.
+   Moving past the open track's first or last column, or tapping another track, opens that track's phrase at the same
+   song row, as Song → Phrase does (an empty block gets a new phrase that goes on the song once it has a note).
+   Tracks walk the song on their own (M8-style), so a phrase of another length or LPB drifts against the rest: the bar
+   says by how much, and the rows a shorter phrase doesn't have are hatched. */
+const PVK = 'thunderplus-patternview-v1', PVUK = 'thunderplus-patternview-ui-v1';
+let pvOn = (() => { try { return localStorage.getItem(PVK) !== '0'; } catch(e){ return true; } })();
+// The view's own state, kept between sessions: pattern or phrase, FX2/FX3 shown, empty tracks folded.
+let pvMode = false, pvFx = false, pvFold = true;
+try { const o = JSON.parse(localStorage.getItem(PVUK) || '{}') || {}; pvMode = !!o.m; pvFx = !!o.fx; pvFold = o.fold !== false; } catch(e){}
+function pvSave(){ try { localStorage.setItem(PVUK, JSON.stringify({m:pvMode, fx:pvFx, fold:pvFold})); } catch(e){} }
+function setPv(on){ pvOn = !!on; try { localStorage.setItem(PVK, pvOn ? '1' : '0'); } catch(e){} draw(); }
+// It needs width: the computer and the unfolded Fold. On the folded phone the buttons are hidden and Phrase is as before.
+const pvRoom = () => innerWidth >= 600;
+const pvActive = () => pvOn && pvMode && view === 'tracker' && tv === 'phrase' && pvRoom() && (cTrack < ntr() || cTrack === MT);
+// Text size: sized to show about PVW characters across (the phrase is sized for 52), but no smaller than 11px, and tall
+// enough for its three header lines and 16 rows.
+const PVW = 112, PVLINES = 19;
+let pvFitWas = false;
+function pvFit(fs, W){
+  pvFitWas = pvActive(); if (!pvFitWas) return fs;
+  let f = Math.min(fs, Math.max(11, W / (PVW * CW)));
+  for (let i = 0; i < 6; i++){
+    scr.style.fontSize = f.toFixed(2) + 'px';
+    const gh = grid.clientHeight, n = gh / (f * 1.3);
+    if (!gh || n >= PVLINES + 0.4 || f <= 7) break;
+    f = Math.max(7, f * n / (PVLINES + 0.5));
+  }
+  return f;
+}
+// PHRASE | PATTERN on the title line, and the pattern's bar under it.
+const pvSeg = el('span', 'pvseg'); pvSeg.hidden = true; pvSeg.setAttribute('role', 'group'); pvSeg.setAttribute('aria-label', 'Phrase or pattern');
+const pvSegB = [['ph', 'PHRASE', 'This phrase on its own (Shift+→ from the pattern)'], ['pt', 'PATTERN', 'Every track’s phrase for this song row, side by side (Shift+← from the phrase)']]
+  .map(([k, t, ti]) => { const b = el('button', null, t); b.type = 'button'; b.dataset.pv = k; b.title = ti; pvSeg.append(b); return b; });
+$('tPset').after(pvSeg);
+const pvBar = el('div', 'pvbar'); pvBar.hidden = true; pvBar.setAttribute('role', 'toolbar'); pvBar.setAttribute('aria-label', 'Pattern');
+pvBar.innerHTML = '<button type="button" data-pv="prev" aria-label="Previous song row" title="Previous song row (Ctrl+↑)">◀</button><span class="pvrow"></span>'
+  + '<button type="button" data-pv="next" aria-label="Next song row" title="Next song row (Ctrl+↓)">▶</button><span class="pvtag" hidden></span><span class="pvlen"></span>'
+  + '<span class="pvwarn" hidden></span><span class="pvsp"></span><button type="button" data-pv="fx"></button><button type="button" data-pv="fold"></button>';
+grid.before(pvBar);
+const pvB = {row:pvBar.querySelector('.pvrow'), tag:pvBar.querySelector('.pvtag'), len:pvBar.querySelector('.pvlen'), warn:pvBar.querySelector('.pvwarn'),
+  fx:pvBar.querySelector('[data-pv=fx]'), fold:pvBar.querySelector('[data-pv=fold]')};
+for (const box of [pvSeg, pvBar]){
+  box.addEventListener('pointerdown', e => e.stopPropagation());   // a tap here is a button, not the start of a scroll (which would take the click)
+  box.addEventListener('click', e => { const b = e.target.closest('button[data-pv]'); if (!b) return; b.blur(); pvCmd(b.dataset.pv); });
+}
+function pvCmd(k){
+  if (k === 'ph' || k === 'pt') return pvSetMode(k === 'pt');
+  if (k === 'prev' || k === 'next') return pvRow(k === 'next' ? 1 : -1);
+  if (k === 'fx') pvFx = !pvFx; else if (k === 'fold') pvFold = !pvFold; else return;
+  pvSave(); hKey = ''; draw();
+}
+const pvTxt = (e, t) => { if (e.textContent !== t) e.textContent = t; };
+// Called at the top of every draw: the buttons, the bar, and the text size when the view turns on or off.
+function pvSync(){
+  const avail = tv === 'phrase' && pvOn && pvRoom(), on = pvActive();
+  pvSeg.hidden = !avail;
+  pvSegB.forEach((b, i) => { const o = i ? on : !on; b.classList.toggle('on', o); b.setAttribute('aria-pressed', String(o)); });
+  pvBar.hidden = !on; grid.classList.toggle('pvon', on);
+  if (on !== pvFitWas){ pvFitWas = on; fit(); }
+}
+function pvSetMode(on){
+  if (on && !(pvOn && pvRoom())) return;
+  pvMode = !!on; pvSave(); selA = null;
+  if (pvMode && tv === 'phrase') pvAlign();
+  hKey = ''; draw();
+}
+function pvNav(dir){
+  if (tv !== 'phrase' || !pvOn || !pvRoom()) return false;
+  if (dir === 'right' && pvMode){ pvSetMode(false); return true; }
+  // Shift+◀ from the phrase keeps its old job (the Arrange panel's focus, or the Song screen): the pattern is a button away.
+  return false;
+}
+// Song row y, track t plays phrase p (on any row of its sect).
+const pvHas = (y, t, p) => { const cid = S.song[y] ? S.song[y][t] : -1; return cid >= 0 && !!S.chains[cid] && S.chains[cid].some(q => q[0] === p); };
+const pvPend = () => !!pendPlace && pendPlace.p === cPhrase && pendPlace.x === cTrack && pendPlace.y === cs.song.y;
+// The song row shown is the one whose block plays the open phrase: find it (the open track first) when it isn't.
+function pvAlign(){
+  if (pvHas(cs.song.y, cTrack, cPhrase)){ cs.song.x = cTrack; return; }
+  if (pendPlace && pendPlace.p === cPhrase){ cs.song.x = cTrack = pendPlace.x; cs.song.y = pendPlace.y; return; }
+  followPhraseBlock();
+  if (pvHas(cs.song.y, cs.song.x, cPhrase)) cTrack = cs.song.x;
+}
+// With sects shown a block can hold several phrases: the other tracks show the one on the open phrase's sect row.
+function pvSectRow(){ const cid = S.song[cs.song.y] ? S.song[cs.song.y][cTrack] : -1, ch = cid >= 0 ? S.chains[cid] : null; return ch ? Math.max(0, ch.findIndex(q => q[0] === cPhrase)) : 0; }
+function pvPhraseIn(cid, k){ const ch = S.chains[cid]; if (!ch) return -1; return ch[k] && ch[k][0] >= 0 ? ch[k][0] : firstPhrase(cid); }
+// How long a block plays: its sect's phrases up to the first empty row (an empty sect plays one empty pattern).
+function pvBlock(cid){
+  const ch = S.chains[cid]; let beats = 0, rows = 0, lpb = 0;
+  if (ch) for (const q of ch){ if (q[0] < 0) break; const n = plen(q[0]), b = plpbOf(S, q[0]); rows += n; beats += n / b; if (!lpb) lpb = b; }
+  if (!rows){ rows = S.dlen || 16; lpb = S.lpb || 4; beats = rows / lpb; }
+  return {beats, rows, lpb};
+}
+// How many song blocks play each phrase (a shared phrase: an edit changes every copy).
+function pvUses(){
+  const n = new Array(256).fill(0);
+  for (const r of S.song) for (let t = 0; t <= MT; t++){ const cid = r[t]; if (cid < 0) continue; const ch = S.chains[cid]; if (!ch) continue;
+    const seen = []; for (const q of ch){ const p = q[0]; if (p >= 0 && !seen.includes(p)){ seen.push(p); n[p]++; } } }
+  return n;
+}
+function pvNotes(p, len){ let m = 0; if (p) for (let y = 0; y < len && y < p.length; y++) for (let q = NCOL - 1; q >= m; q--) if (p[y][q] >= 0){ m = q + 1; break; } return m; }
+// A track's columns: its notes (the open poly track all four, other poly tracks the ones in use), V, I, FX1 (+FX2, FX3).
+function pvColsOf(t, p, len, cur){
+  const fx = pvFx ? [FX0, FX0 + 1, FX0 + 2, FX0 + 3, FX0 + 4, FX0 + 5] : [FX0, FX0 + 1];
+  if (t === MT) return fx;
+  const nn = !isPolyT(t) ? 1 : cur ? NCOL : Math.max(1, pvNotes(p, len));
+  return [...Array.from({length:nn}, (_, i) => i), VC, IC, ...fx];
+}
+const pvW = x => PK[x] === 'note' || PK[x] === 'fxc' ? 3 : 2;
+const pvNear = (C, x) => C.reduce((a, b) => Math.abs(b - x) < Math.abs(a - x) ? b : a, C[0]);
+const pvOrder = () => [...Array.from({length:ntr()}, (_, i) => i), MT];
+// The next track left or right that shows (folded empty tracks are stepped over).
+function pvNextTrack(dx){
+  const O = pvOrder(), y = cs.song.y; let i = O.indexOf(cTrack); if (i < 0) return null;
+  for (i += dx; i >= 0 && i < O.length; i += dx){ const t = O[i]; if (!pvFold || (S.song[y] && S.song[y][t] >= 0)) return t; }
+  return null;
+}
+function pvMoveX(dx){
+  const c = cs.phrase, C = pvColsOf(cTrack, S.phrases[cPhrase], plen(cPhrase), true), i = C.indexOf(c.x);
+  if (i < 0){ c.x = pvNear(C, c.x); return draw(); }
+  if (i + dx >= 0 && i + dx < C.length){ c.x = C[i + dx]; return draw(); }
+  const t = pvNextTrack(dx); if (t == null) return draw();
+  pvGo(t, cs.song.y, dx > 0 ? 'first' : 'last', null);
+}
+// Tab / Shift+Tab: the next or previous track's first column (Renoise-style).
+function pvTab(dir){ const t = pvNextTrack(dir); if (t == null) return draw(); pvGo(t, cs.song.y, 'first', null); }
+// Opens track t's phrase at song row y, as Song → Phrase would: an empty block gets its phrase made; an empty cell a
+// new phrase that goes on the song when it has a note. x: a column, 'first' or 'last'; prow: the phrase row (null keeps it).
+function pvGo(t, y, x, prow){
+  const k = pvSectRow(), cid = S.song[y] ? S.song[y][t] : -1, c = cs.phrase;
+  let p = -1;
+  if (cid >= 0){ ensureSectPhrase(cid); p = pvPhraseIn(cid, k); }
+  if (p >= 0){ cSect = cid; pendPlace = null; }
+  else { const fp = freePhrase(); if (fp < 0){ toast('No free phrases left.'); return false; } p = fp; pendPlace = {x:t, y, p:fp}; }
+  cTrack = t; cPhrase = p; cs.song.x = t; cs.song.y = y; selA = null;
+  const VR = Math.max(4, songRows()), top = cs.song.top || 0;   // ARRANGE keeps the row in view
+  if (y < top) cs.song.top = y; else if (y > top + VR - 1) cs.song.top = y - VR + 1;
+  cs.song.top = clamp(cs.song.top, 0, 256 - VR);
+  if (prow != null) c.y = clamp(prow, 0, plen(p) - 1); else if (c.y >= 0) c.y = clamp(c.y, 0, plen(p) - 1);
+  const C = pvColsOf(t, S.phrases[p], plen(p), true);
+  c.x = x === 'first' ? C[0] : x === 'last' ? C[C.length - 1] : pvNear(C, x == null ? c.x : x);
+  hKey = ''; draw(); return true;
+}
+// Ctrl+▲▼ (and [ ], ‹ ›, the bar's ◀ ▶): the song row above or below, same track, same phrase row.
+function pvRow(d){
+  const y = clamp(cs.song.y + d, 0, 255);
+  if (y === cs.song.y) return toast(d > 0 ? 'That’s the last song row.' : 'That’s the first song row.');
+  pvGo(cTrack, y, null, null);
+}
+// FOLLOW while the song plays: the song row (and the track, when the open one is silent) ride along.
+function pvFollow(P, own){ const t = P.indexOf(own); if (t >= 0 && t !== cTrack && (t < ntr() || t === MT)) cTrack = t; cs.song.y = own.row; cs.song.x = cTrack; }
+// A tap on another track opens its phrase there; on the open track it moves the cursor (only the cursor's own cell, and
+// the row numbers, are left to gridDown: dragging the cursor's cell changes its value, a row number selects lines).
+let pvMap = [];
+grid.addEventListener('pointerdown', e => {
+  if (!pvActive() || (e.button && e.button > 0)) return;
+  const s = e.target.closest('.ln > span'); if (!s || !grid.contains(s) || s.hasAttribute('data-x') || s.hasAttribute('data-r')) return;
+  const li = [...grid.querySelectorAll(':scope > .ln')].indexOf(s.parentElement), si = [...s.parentElement.children].indexOf(s);
+  const m = pvMap[li] && pvMap[li][si]; if (!m || (m.t === cTrack && (!m.g || m.y == null))) return;   // the open track's band and names: nothing
+  e.stopPropagation(); e.preventDefault();
+  let x = m.x;
+  if (m.g){ const r = s.getBoundingClientRect(), n = s.textContent.length, i = clamp(Math.floor((e.clientX - r.left) / (r.width / n)), 0, n - 1); x = pvColAt(m.g, m.c0 + i); }
+  // The open track: the cursor goes there, as gridDown does for a cell that isn't the cursor's (a drag from it scrolls).
+  if (m.t === cTrack){ const c = cs.phrase; c.x = x; c.y = m.y; draw(); return startScroll(e); }
+  if (pvGo(m.t, cs.song.y, x == null ? 'first' : x, m.y)) startScroll(e);
+}, true);
+// The column under character ch of a track group's row (a column's leading space counts as that column).
+function pvColAt(g, ch){ let pos = 0; for (let j = 0; j < g.C.length; j++){ const x = g.C[j], end = pos + (j ? 1 : 0) + pvW(x); if (ch < end) return x; pos = end; } return g.C[g.C.length - 1]; }
+let pvUsesLast = null, pvSig = '';
+const pvTk = t => t === MT ? ' gx' : isPolyT(t) ? ' gp' : ' gm';
+const pvFitS = (s, w) => s.length > w ? s.slice(0, w) : s.padEnd(w);
+function pvBarDraw(y, rows, lpb, warn, warnT){
+  let nm = ''; try { nm = typeof songSecName === 'function' ? String(songSecName(y) || '') : ''; } catch(e){}
+  pvTxt(pvB.row, 'SONG ROW ' + rS(y, 3));
+  pvB.tag.hidden = !nm; pvTxt(pvB.tag, nm.toUpperCase());
+  pvTxt(pvB.len, rows + ' ROWS · LPB ' + lpb);
+  pvB.warn.hidden = !warn; pvTxt(pvB.warn, warn); pvB.warn.title = warnT || warn;
+  pvTxt(pvB.fx, pvFx ? 'FX2/3 SHOWN' : 'FX2/3 HIDDEN'); pvB.fx.title = pvFx ? 'Hide the FX2 and FX3 columns' : 'Show the FX2 and FX3 columns (a dotted FX1 value has more on its row)';
+  pvTxt(pvB.fold, pvFold ? 'EMPTY TRACKS FOLDED' : 'EMPTY TRACKS SHOWN'); pvB.fold.title = pvFold ? 'Show the tracks with nothing on this row at full width' : 'Fold the tracks with nothing on this row to narrow strips';
+}
+// The pattern's lines for draw(): header bands, column names, then the rows. Returns what draw() shows around them.
+function pvLines(c, L, cc, rsel, playRows){
+  if (!pvHas(cs.song.y, cTrack, cPhrase) && !pvPend()) pvAlign();
+  const Y = cs.song.y, row = S.song[Y] || [], uses = pvUsesLast = pvUses(), k = pvSectRow();
+  const onRow = pvHas(Y, cTrack, cPhrase), pend = !onRow && pvPend();
+  if (onRow) cs.song.x = cTrack;
+  // The groups, left to right: tracks 1… then the master. Runs of empty tracks fold into one narrow strip.
+  const G = [];
+  for (const t of pvOrder()){
+    const cid = row[t] != null ? row[t] : -1, cur = t === cTrack;
+    if (!cur && cid < 0 && pvFold){
+      const g = G[G.length - 1];
+      if (g && g.fold && t !== MT && g.t1 === t - 1) g.t1 = t; else G.push({fold:true, t, t1:t});
+      continue;
+    }
+    const ph = cur ? cPhrase : cid >= 0 ? pvPhraseIn(cid, k) : -1, p = ph >= 0 ? S.phrases[ph] : null, len = ph >= 0 ? plen(ph) : 0;
+    const C = pvColsOf(t, p, len, cur), w = C.reduce((a, x) => a + pvW(x), 0) + C.length - 1;
+    let inst = -1, more = false;
+    if (p) for (let r = 0; r < len; r++){ const q = p[r]; if (inst < 0 && q[IC] >= 0) inst = q[IC]; if (!pvFx && !more) for (let m = FX0 + 2; m < RW; m++) if (q[m] >= 0){ more = true; break; } }
+    G.push({t, cid, cur, ph, p, len, C, w, inst, more, dim:!cur && ((t < NT && !!(S.mix[t] && S.mix[t].mute)) || blockMuted(S, Y, t))});
+  }
+  let rowsN = 0; for (const g of G) if (!g.fold && g.ph >= 0) rowsN = Math.max(rowsN, g.len);
+  // Drift: every block on this row should last as long as the rest; one that doesn't runs ahead of them (or falls behind).
+  const D = []; for (const t of pvOrder()){ const cid = row[t]; if (cid >= 0) D.push(Object.assign({t}, pvBlock(cid))); }
+  let warn = '', warnT = '', lpbRef = plpbOf(S, cPhrase);
+  if (D.length > 1){
+    const key = d => d.beats.toFixed(4), cnt = new Map(); for (const d of D) cnt.set(key(d), (cnt.get(key(d)) || 0) + 1);
+    const own = D.find(d => d.t === cTrack); let ref = null, best = -1;
+    for (const [kk, v] of cnt) if (v > best || (v === best && own && key(own) === kk)){ best = v; ref = kk; }
+    const R = D.find(d => key(d) === ref), off = D.filter(d => key(d) !== ref); lpbRef = R.lpb;
+    const nm = t => t === MT ? 'MASTER' : 'TRACK ' + d2(t + 1);
+    const say = d => { const dr = Math.round((R.beats - d.beats) * R.lpb * 10) / 10, a = Math.abs(dr);
+      return `${nm(d.t)} IS ${d.rows} ROWS` + (d.lpb !== R.lpb ? ` AT LPB ${d.lpb}` : '') + `: ${dr > 0 ? 'RUNS' : 'FALLS'} ${a} ROW${a === 1 ? '' : 'S'} ${dr > 0 ? 'AHEAD' : 'BEHIND'} FROM HERE`; };
+    if (off.length === 1) warn = say(off[0]);
+    else if (off.length > 1){ warn = `TRACKS ${off.map(d => d.t === MT ? 'MST' : d2(d.t + 1)).join(' ')} ARE OTHER LENGTHS: THEY DRIFT FROM HERE`; warnT = off.map(say).join('\n'); }
+  }
+  pvBarDraw(Y, rowsN, lpbRef, warn, warnT);   // first: the bar's height decides how many rows fit
+  const fs = parseFloat(scr.style.fontSize) || 14, VR = Math.max(4, Math.floor((grid.clientHeight - fs * .25) / (fs * 1.3) + 0.02) - 3);
+  if (c.top == null) c.top = 0;
+  if (c.y >= 0){ if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; }
+  c.top = clamp(c.top, 0, Math.max(0, rowsN - VR));
+  const CG = G.find(g => g.cur); if (c.y >= 0 && !CG.C.includes(c.x)) c.x = pvNear(CG.C, c.x);
+  // Lines are made of spans only, so a tap finds its track by position: pvMap[line][span] = {t, x, y} (null: not another track).
+  const map = pvMap = [], rnW = rS(0).length, curLen = plen(cPhrase);
+  let ln = null, lm = null;
+  const start = () => { ln = []; lm = []; };
+  const put = (t, cls, m, extra) => { ln.push(Object.assign({t, cls}, extra || null)); lm.push(m || null); };
+  const end = () => { L.push(ln); map.push(lm); };
+  const each = (f, rule) => G.forEach((g, i) => { if (i) put('  ', rule ? 'pvg' : ''); f(g); });
+  const stripW = g => g.t1 > g.t ? 3 : 2, to = (g, x, y) => g.cur ? null : {t:g.t, x, y};
+  // The row numbers stay put (sticky) when the tracks scroll sideways: rnW characters and a space, then a space.
+  const lead = () => { put(' '.repeat(rnW + 1), 'pvrn'); put(' ', ''); };
+  // 1: the track bands (number, MONO / POLY / MST)
+  start(); lead();
+  each(g => { if (g.fold) return put(pvFitS(g.t === MT ? 'MS' : d2(g.t + 1), stripW(g)), 'pvfh', to(g, null, null), {title:g.t === MT ? 'Master: nothing on this row' : 'Track' + (g.t1 > g.t ? 's ' + d2(g.t + 1) + '–' + d2(g.t1 + 1) : ' ' + d2(g.t + 1)) + ': nothing on this row'});
+    put(pvFitS(g.t === MT ? 'MST' : d2(g.t + 1) + (isPolyT(g.t) ? ' POLY' : ' MONO'), g.w), 'pvh' + pvTk(g.t) + (g.t < NT && S.mix[g.t] && S.mix[g.t].mute ? ' pvmu' : '') + (g.cur ? ' pvhc' : ''), to(g, null, null)); });
+  end();
+  // 2: the phrase (×N: on the song N times, so an edit changes every copy) and its instrument
+  start(); lead();
+  each(g => { if (g.fold) return put(pvFitS(g.t1 > g.t ? '–' + d2(g.t1 + 1) : '', stripW(g)), 'pvfh', to(g, null, null));
+    const u = g.ph >= 0 ? uses[g.ph] : 0;
+    let s = g.cur && pend ? 'NEW PH ' + hx(g.ph) : g.ph < 0 ? (g.cid >= 0 ? 'BLOCK ' + hx(g.cid) : 'EMPTY') : 'PH ' + hx(g.ph) + (u > 1 ? ' ×' + u : '') + (g.cur && !onRow ? ' OFF SONG' : '');
+    if (g.inst >= 0 && s.length + 4 <= g.w) s = s.padEnd(g.w - 3) + 'I' + hx(g.inst);
+    put(pvFitS(s, g.w), 'pvh2' + pvTk(g.t) + (u > 1 ? ' pvsh' : '') + (g.cur ? ' pvhc' : ''), to(g, null, null), u > 1 ? {title:`Phrase ${hx(g.ph)} is on the song ${u} times: an edit changes every copy`} : null); });
+  end();
+  // A run of cells in the same colour is one span: a span costs ~20 µs of layout on every redraw, and one per cell made the
+  // pattern three times slower than the phrase. A tap finds its column from where it lands in the run (pvMap entry
+  // {t, y, g, c0}: the run starts c0 characters into track group g). The cursor's cell stays a span of its own, the phrase
+  // editor's data-x / data-y cell, so dragging it still changes its value (gridDown).
+  const cells = (g, y, C) => {   // C: [[x, text, cls], …] in column order; the space between two columns joins the run before it
+    const tint = g.cur ? ' pvc' + pvTk(g.t) : '';
+    let run = null, pos = 0;
+    const flush = () => { if (run) put(run.t, run.cls || 'pvsp' + tint, {t:g.t, y:y >= 0 ? y : null, g, c0:run.c0}); run = null; };
+    C.forEach(([x, s, cls], j) => {
+      if (j){ if (run) run.t += ' '; else run = {t:' ', cls:null, c0:pos}; pos++; }
+      if (g.cur && y >= 0 && / cur\b/.test(cls)){ flush(); put(s, cls + tint, null, {x, y}); pos += s.length; return; }
+      const k = cls + tint;
+      if (run && run.cls !== null && run.cls !== k) flush();
+      if (run){ run.cls = k; run.t += s; } else run = {t:s, cls:k, c0:pos};
+      pos += s.length; });
+    flush();
+  };
+  // 3: the column names (N1+: more note columns than shown; + after FX1: FX2 or FX3 in use, hidden)
+  start(); lead();
+  each(g => { if (g.fold) return put(' '.repeat(stripW(g)), 'pvf', to(g, null, null));
+    const nn = g.C.filter(x => x < NCOL).length;
+    cells(g, -1, g.C.map(x => { const kd = PK[x];
+      const s = kd === 'note' ? (isPolyT(g.t) ? 'N' + (x + 1) + (x === nn - 1 && nn < NCOL && g.ph >= 0 ? '+' : '') : 'N') : kd === 'vol' ? 'V' : kd === 'inst' ? 'I' : kd === 'fxc' ? 'FX' + ((x - FX0) / 2 + 1) : (x === FX0 + 1 && g.more ? '+' : '');
+      return [x, pvFitS(s, pvW(x)), 'th']; })); }, 'rule');
+  end();
+  // the rows
+  for (let r = c.top; r < Math.min(rowsN, c.top + VR); r++){
+    start();
+    put(rS(r) + ' ', 'rn pvrn' + (r % 4 ? '' : ' rn4') + (r < curLen ? rsel(r) : ''), null, r < curLen ? {r} : null); put(' ', '');
+    G.forEach((g, i) => { if (i) put('  ', 'pvg');
+      if (g.fold) return put(' '.repeat(stripW(g)), 'pvf', to(g, null, r));
+      if (g.ph >= 0 && r >= g.len) return put(pvFitS(r === g.len ? (g.w >= 9 ? 'ENDS HERE' : 'END') : '', g.w), 'pvz', to(g, null, r));
+      const q = g.p ? g.p[r] : null;
+      cells(g, r, g.C.map(x => {
+        const v = q ? q[x] : -1, kd = PK[x];
+        let s, base;
+        if (kd === 'note'){ s = noteS(v); base = v < 0 ? 'e' : 'cn'; }
+        else if (kd === 'fxc'){ s = v < 0 ? '---' : (FXC[v] || '???'); base = v < 0 ? 'e' : 'cf'; }
+        else { s = h2(v); base = v < 0 ? 'e' : kd === 'vol' ? 'cv' : kd === 'inst' ? 'ci' : 'v'; }
+        if (x === FX0 + 1 && g.more && q && q.slice(FX0 + 2).some(m => m >= 0)) base += ' pvmore';
+        return [x, s, g.cur ? cc(x, r, base) : base + (g.dim ? ' pvdim' : '')]; })); });
+    if (r === c.y) for (const s of ln) s.cls += ' pvnow';
+    if (!(r % 4)) ln.b4 = true;
+    end();
+  }
+  // Another track, row, layout or cursor place: once the grid is built, scroll sideways so the open track shows whole.
+  const sig = cTrack + ':' + Y + ':' + G.map(g => g.fold ? 'f' + g.t1 : g.w).join(',') + ':' + c.x + ':' + c.y + ':' + scr.style.fontSize;
+  if (sig !== pvSig){ pvSig = sig; requestAnimationFrame(pvScroll); }
+  const lpb = S.plpb[cPhrase] || 0, el2 = lpb || S.lpb;
+  return {title:'PATTERN', sub:cTrack === MT ? 'MASTER' : 'TRACK ' + d2(cTrack + 1) + (isPolyT(cTrack) ? ' · POLY' : ' · MONO'), prLit:playRows(q => q.phrase === cPhrase ? q.step : null),
+    pset:[{t:'PH ' + hx(cPhrase) + ' ', cls:'lb'}, {t:'LEN ', cls:'lb'}, {t:d2(curLen), cls:cc(0, -2, 'v'), x:0, y:-2}, {t:' LPB ', cls:'lb'}, {t:lpb ? d2(lpb) : '--', cls:cc(1, -2, lpb ? 'v' : 'e'), x:1, y:-2},
+      {t:' 1/' + (el2 * 4) + (el2 % 3 === 0 ? ' trip' : '') + (lpb ? '' : ' song'), cls:'lb'}]};
+}
+// After draw(): the open track's whole column group in view when it fits (its start when it doesn't), the cursor always,
+// and a track's group (not half of one) first after the row numbers.
+function pvScroll(){
+  if (!pvActive()) return;
+  const A = grid.querySelector(':scope > .ln'), rn = A && A.children[0], hd = A && A.querySelector('.pvhc'); if (!hd || !rn || !A.children[1]) return;
+  const g = grid.getBoundingClientRect(), h = hd.getBoundingClientRect(), cu = grid.querySelector('.cur'), C = cu ? cu.getBoundingClientRect() : null;
+  const left = rn.getBoundingClientRect().right + A.children[1].getBoundingClientRect().width, right = g.left + grid.clientLeft + grid.clientWidth - 1, room = right - left;
+  let d = 0;
+  if (h.right > right) d = h.right - right;
+  if (h.left - d < left) d = h.left - left;
+  if (C){ if (C.right - d > right) d = C.right - right; if (C.left - d < left) d = C.left - left; }
+  const fine = e => (!C || (C.left - e >= left - .5 && C.right - e <= right + .5)) && (h.right - h.left > room || (h.left - e >= left - .5 && h.right - e <= right + .5));
+  const max = grid.scrollWidth - grid.clientWidth - grid.scrollLeft, min = -grid.scrollLeft;
+  const S = [...A.children].filter(s => /\bpvf?h\b/.test(s.className)).map(s => s.getBoundingClientRect().left - left).filter(e => e >= min - .5 && e <= max + .5 && fine(e));
+  const up = S.filter(e => e >= d - .5).sort((a, b) => a - b)[0], dn = S.filter(e => e <= d + .5).sort((a, b) => b - a)[0];
+  const e = d >= 0 ? (up != null ? up : dn != null ? dn : d) : (dn != null ? dn : up != null ? up : d);
+  if (Math.abs(e) >= 1) grid.scrollLeft += e;
+}
+function pvInfo(){
+  const base = info(); if (selA) return base;
+  const c = cs.phrase, t = cTrack, u = (pvUsesLast || [])[cPhrase] || 0;
+  return (t === MT ? 'MASTER' : `TRACK ${d2(t + 1)} ${isPolyT(t) ? 'POLY' : 'MONO'}`) + ` · PH ${hx(cPhrase)}` + (c.y >= 0 ? ` · ROW ${rS(c.y)}` : '') + ' · ' + base
+    + (pvPend() ? ' · a new phrase: it goes on the song at this row when it has a note' : u > 1 ? ` · this phrase is on the song ${u} times, so edits change every copy` : '');
+}
+const pvHint = () => inMode === 'keys'
+  ? 'Arrows move across tracks · Tab next track · Ctrl+↑↓ other song row · type notes as in Phrase · Shift+→ opens Phrase · Shift+← song · click a track to edit it'
+  : 'EDIT add note · ◀▶ across tracks · OPT+▲▼ other song row · SHIFT+▶ opens Phrase · SHIFT+◀ song · tap a track to edit it';
+/* ===== end PATTERN VIEW ===== */
 applyPlatform();
 /* ===TRACKER END=== */
 
