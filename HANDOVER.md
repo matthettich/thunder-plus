@@ -24,6 +24,18 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 16 Oct (late night): the safety limiter is a real limiter now
+
+Measured: `mkLimiter` (a DynamicsCompressorNode at −2 dB, 20:1) let a two-note Organ chord through at 1.06 and an
+eight-note one at 1.33, so chords still clipped, on the Synth page and in the song. `safeLim(ac, dest)` now runs the
+mastering worklet's brickwall `Limiter` alone (`thunder-master` with `SAFE_LIM` = lim on, −1 dBFS, 3 ms, true-peak,
+120 ms release, meters off). Until `mwReady(ac)` resolves (the first notes of a session) a stand-in carries the sound:
+the old compressor into `softClip()` (a WaveShaper that can't pass −1 dBFS). Used by `rtInit` (`rt.lim`, `_drop()` on
+audio reset), `padOut()` (Synth page) and `pass()` (renders: the worklet's 3 ms lookahead is trimmed with the mastering
+latency; the old compressor's own 6 ms delay used to be left in, so renders started 288 samples late). After: chords of
+1–8 notes on Piano, Tine EP, Organ and Strings peak at exactly 0.891 with no clipped samples. `mkLimiter` remains only
+inside the stand-in and as the fallback where AudioWorklet is missing.
+
 ## 16 Oct (late night): gentler Arrange zoom on a computer
 
 `arrDeskZ()` (not `body.mob` and not a coarse pointer): `arrZMax()` = blocks about 84 px wide at most (`84 / arrFitW`,

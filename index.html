@@ -6309,6 +6309,7 @@ function audio(){
     if (aset.sink && ctx.setSinkId) ctx.setSinkId(aset.sink).catch(() => { audStatus(); });
     try { if (ctx.renderCapacity){ ctx.renderCapacity.addEventListener('update', e => { cpu.cap = {avg:e.averageLoad, peak:e.peakLoad, under:e.underrunRatio, t:performance.now()}; }); ctx.renderCapacity.start({updateInterval:0.5}); } } catch(e){}
     master = ctx.createGain(); master.gain.value = clamp(aset.vol, 0, 100) / 100; master.connect(ctx.destination);
+    try { mwReady(ctx); } catch(e){}   // the safety limiter's worklet, loading before the first note needs it
     ctx.addEventListener && ctx.addEventListener('statechange', () => { audStatus(); if (typeof audioInterrupted === 'function') audioInterrupted(); });
     prerender();   // ensure() re-renders only the pads whose rate differs from this context's
   }
@@ -6466,8 +6467,9 @@ function buffer(i){
 let padBus = null;
 function padOut(){
   if (padBus && padBus.ctx === ctx && padBus.master === master){ padRoute(); return padBus.in; }
-  const inp = ctx.createGain(), lim = mkLimiter(ctx), an = ctx.createAnalyser(); an.fftSize = 1024;
-  inp.connect(an); lim.connect(master);
+  if (padBus && padBus.lim._drop) padBus.lim._drop();   // a rebuilt context or master: the old limiter goes
+  const inp = ctx.createGain(), lim = safeLim(ctx, master), an = ctx.createAnalyser(); an.fftSize = 1024;
+  inp.connect(an);
   padBus = {ctx, master, in:inp, lim, an, buf:new Float32Array(an.fftSize), to:null};
   padRoute(); return inp;
 }
@@ -11691,6 +11693,28 @@ function rtBufPlain(pad, rev){
   return e.b;
 }
 function mkLimiter(ac){ const c = ac.createDynamicsCompressor(); c.threshold.value = -2; c.knee.value = 0; c.ratio.value = 20; c.attack.value = 0.002; c.release.value = 0.1; return c; }
+/* The safety limiter (Project → LIMITER, and everything played live on the Synth page): the mastering worklet's brickwall
+   limiter on its own — 3 ms lookahead, true-peak, nothing past −1 dBFS. The Web Audio compressor above isn't a limiter:
+   measured, a two-note Organ chord came out of it at 1.06 and clipped, eight notes at 1.33. It stays only as the stand-in
+   until the worklet has loaded (or where it can't). safeLim returns the input to connect to; ._drop() takes it apart. */
+const SAFE_LIM = {lim:{on:true, drive:0, ceil:-1, rel:120, look:3, tp:true}};
+const safeLatency = sr => Math.max(1, Math.round(sr * SAFE_LIM.lim.look / 1000));
+function safeWk(ac){ return new AudioWorkletNode(ac, 'thunder-master', {numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2], channelCount:2, channelCountMode:'explicit', processorOptions:{set:SAFE_LIM, meters:false}}); }
+// The stand-in (the first notes of a session, before the worklet loads): the compressor, then a soft clip that can't
+// pass −1 dBFS, so even those never clip at the output.
+let softCurve = null;
+function softClip(ac){
+  if (!softCurve){ const n = 2049, c = softCurve = new Float32Array(n), ceil = 0.891, k = 0.6;
+    for (let i = 0; i < n; i++){ const x = i / (n - 1) * 2 - 1, a = Math.abs(x); c[i] = Math.sign(x) * (a <= k * ceil ? a : k * ceil + (ceil - k * ceil) * Math.tanh((a - k * ceil) / (ceil - k * ceil))); } }
+  const w = ac.createWaveShaper(); w.curve = softCurve; return w;
+}
+function safeLim(ac, dest){
+  const inp = ac.createGain(), stand = mkLimiter(ac), sc = softClip(ac); inp.connect(stand); stand.connect(sc); sc.connect(dest);
+  let wk = null, dead = false;
+  mwReady(ac).then(ok => { if (!ok || dead) return; try { wk = safeWk(ac); inp.disconnect(); sc.disconnect(); inp.connect(wk); wk.connect(dest); } catch(e){ wk = null; } });
+  inp._drop = () => { dead = true; try { inp.disconnect(); sc.disconnect(); } catch(e){} if (wk){ try { wk.port.postMessage({dispose:true}); wk.disconnect(); } catch(e){} } };
+  return inp;
+}
 // Reset audio engine (Settings → Audio): stop, tear the live graph down (every track's voices, live synth nodes, track
 // and master effects, …chains, mastering) and build it again from the song. Clears a stuck note, a runaway effect tail
 // or a frozen worklet without reloading the page; the song, kit and settings are untouched.
@@ -11703,7 +11727,7 @@ function resetAudio(){
     try { rt.pl.dispose(); } catch(e){}
     try { if (rt.mfx){ rt.mfx.port.postMessage(null); rt.mfx.disconnect(); } } catch(e){}
     try { if (rt.mst){ if (rt.mst.output) rt.mst.output.disconnect(); if (rt.mst.input) rt.mst.input.disconnect(); } } catch(e){}
-    try { rt.out.disconnect(); rt.lim.disconnect(); } catch(e){}
+    try { rt.out.disconnect(); if (rt.lim._drop) rt.lim._drop(); else rt.lim.disconnect(); } catch(e){}
     rt = null;
   }
   try { master.disconnect(); } catch(e){}
@@ -11714,7 +11738,7 @@ function resetAudio(){
 function rtInit(){
   audio();
   if (!rt){
-    const out = ctx.createGain(), lim = mkLimiter(ctx); lim.connect(master);
+    const out = ctx.createGain(), lim = safeLim(ctx, master);
     rt = {out, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); bassReady(ctx);
     // the master meter listens to everything going out, synth pads included
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
@@ -12072,8 +12096,9 @@ function mkBuf(d, sr){
   b.copyToChannel(d, 0); return b;
 }
 async function pass(evs, keep, N, sr, getB, lim, masterFx){
-  const M = S.mst, useM = !!(masterFx && M && M.on), lat = useM ? mstLatency(M, sr) : 0;
-  const O = window.OfflineAudioContext || window.webkitOfflineAudioContext, oc = new O(2, N + lat, sr), out = oc.createGain();
+  const M = S.mst, useM = !!(masterFx && M && M.on);
+  let lat = useM ? mstLatency(M, sr) : 0;
+  const O = window.OfflineAudioContext || window.webkitOfflineAudioContext, oc = new O(2, N + lat + (lim ? safeLatency(sr) : 0), sr), out = oc.createGain();
   out.gain.value = curve(S.master);
   const wantChn = [...keep].some(t => chainsFeed(t)) && S.chainPatch && S.chainPatch.format === 'chains.patch';
   const wantFx = [...keep].some(t => fxAny(S.tfx[t])) || (masterFx && fxAny(S.mfx));
@@ -12085,7 +12110,11 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   if (ok && masterFx && fxAny(S.mfx)){ const m = mNode = tfxNode(oc, tfxChain(S.mfx, sr, S.bpm)); out.connect(m); head = m; }
   let mLim = false;
   if (useM){ const wkOk = mstNeedsWk(M) ? await mwReady(oc) : true; const ch = mstChain(oc, M, false); head.connect(ch.input); head = ch.output; mLim = !!(ch.wk && M.lim.on); if (!wkOk && mstNeedsWk(M)) toast('Mastering effects couldn’t load for this render; EQ only.'); }
-  if (lim && !mLim){ const c = mkLimiter(oc); head.connect(c); c.connect(oc.destination); } else head.connect(oc.destination);
+  if (lim && !mLim){
+    let wk = null; if (await mwReady(oc)) try { wk = safeWk(oc); } catch(e){ wk = null; }
+    if (wk){ head.connect(wk); wk.connect(oc.destination); lat += safeLatency(sr); }   // its lookahead delays the mix: trimmed below
+    else { const c = mkLimiter(oc); head.connect(c); c.connect(oc.destination); }
+  } else head.connect(oc.destination);
   if (evs.some(e => e.type === 'note' && isLivePad(e.pad))) await bassReady(oc);
   await sfPrepare(evs);   // SoundFont pads: fonts loaded and their presets decoded before the render starts
   const pl = makePlayer(oc, out, getB, false);
@@ -12099,7 +12128,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   if (chnOk) for (const b of pl.buses) if (b && b.chn){ try { b.chn.port.postMessage({target:'chains-host', op:'transport', value:{tempo:S.bpm, lpb:S.lpb || 4, ticks:S.ticks || 6, playing:true}}); } catch(e){} }
   for (const e of evs) if (!(e.type === 'note' && e.ii != null && (S.insts[e.ii] || {}).mo === 1)) pl.play(e);   // MIDI-only instruments are silent in renders
   const b = await oc.startRendering();
-  return lat ? [b.getChannelData(0).slice(lat, lat + N), b.getChannelData(1).slice(lat, lat + N)] : [b.getChannelData(0), b.getChannelData(1)];
+  return [b.getChannelData(0).slice(lat, lat + N), b.getChannelData(1).slice(lat, lat + N)];   // the latency (mastering, the limiter's lookahead) trimmed off
 }
 function wavN(chs, sr, bits){
   const nc = chs.length, n = chs[0].length, bps = bits / 8, buf = new ArrayBuffer(44 + n * nc * bps), dv = new DataView(buf), u8 = new Uint8Array(buf);
