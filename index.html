@@ -1619,7 +1619,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <section class="fxcard" id="fxCard">
     <header>
       <span class="ttl" id="fxTitle">Effects</span>
-      <span class="lbl">run top to bottom, after the layers</span>
+      <span class="lbl" id="fxAfter">run top to bottom, after the layers</span>
       <div class="sp"></div>
       <select id="fxAdd" aria-label="Add an effect"><option value="">+ Add effect</option></select>
     </header>
@@ -2942,11 +2942,24 @@ function voiceAmp(V, sr, out, N){
     if (t < atk) return t / atk; if (t < atk + hold) return 1; return Math.exp(-6.9 * (t - atk - hold) / dec); };
   for (let i = 0; i < N; i++) out[i] *= 1 + (env(i / sr) - 1) * amt;
 }
+// Pad effects run on Layers and on every engine that always plays its render (Blip and the engines that aren't live).
+// Bass, Voice, Acid and Machine play live in the song, where pad effects couldn't follow, so they stay dry.
+const engFx = V => isBlipV(V) || (isXEngV(V) && !(XENG[V.engine] && XENG[V.engine].live));
+function padFx(V, out, sr, stages){
+  if (!(V.fx || []).some(f => f.on && fxReady(f)) || !out || !out.length) return out;
+  const N = out.length, tailN = Math.round((V.tail || 0) * sr), ext = new Float32Array(Math.min(N + tailN, sr * 12)); ext.set(out.subarray(0, Math.min(N, ext.length)));
+  let buf = ext;
+  for (const f of V.fx) if (f.on && FX[f.type]){ buf = applyFx(f, buf, sr); if (stages) stages.set(f, blockPeaks(buf)); }
+  let end = buf.length; while (end > 1 && Math.abs(buf[end-1]) < 1e-4) end--;
+  const res = buf.slice(0, Math.max(end, 1)), fl = Math.min(res.length, Math.round(sr * 0.002));
+  for (let i = 0; i < fl; i++) res[res.length - 1 - i] *= i / fl;
+  return res;
+}
 function renderVoice(V, sr, stages, hold){
   if (isBassV(V)) return renderBass(V, sr, hold);
   if (isVoxV(V)) return renderVox(V, sr);
-  if (isBlipV(V)) return renderBlip(V, sr);
-  if (isXEngV(V)) return renderX(V, sr, hold);
+  if (isBlipV(V)) return padFx(V, renderBlip(V, sr), sr, stages);
+  if (isXEngV(V)){ const d = renderX(V, sr, hold); return engFx(V) ? padFx(V, d, sr, stages) : d; }
   if (hold) V = Object.assign({}, V, {gate:hold * 1000, len:hold});
   // The voice-wide filter is open by default and the voice-wide amp is off, so a default voice renders
   // exactly as its layers alone would; turning either on only adds shaping across all the layers.
@@ -8525,7 +8538,10 @@ function bassUI(){
   if (vEngUpd) vEngUpd();
   if (engFitDue && $('vEngBtn') && $('vEngBtn').offsetParent){ engFitDue = false; engFit(); }
   $('bassWrap').hidden = !on; $('voxWrap').hidden = !vx; $('blipWrap').hidden = !bl; $('xWrap').hidden = !xe;
-  for (const id of ['layersBand', 'layerWrap', 'fxWrap', 'voiceWrap']) $(id).hidden = on || vx || bl || xe;
+  for (const id of ['layersBand', 'layerWrap', 'voiceWrap']) $(id).hidden = on || vx || bl || xe;
+  // Effects: Layers, and the engines whose render is what plays (engFx); live engines stay dry.
+  const fxe = (bl || xe) && engFx(v); $('fxWrap').hidden = on || vx || ((bl || xe) && !fxe);
+  $('fxAfter').textContent = fxe ? 'run top to bottom, after the engine' : 'run top to bottom, after the layers';
   if (xe){ xBuild(); for (const r of xRows) r.refresh(); if (v.engine === 'sf') sfPanel(); if (v.engine === 'bytebeat') bbPanel(); if (v.engine === 'resynth') rsPanel(); }
   if (on){ for (const r of bassRows) r.refresh(); for (const f of bassSegs) f(); bassVizKick(); }
   if (vx){ for (const r of voxRows) r.refresh(); const ta = $('voxTxt'); if (document.activeElement !== ta) ta.value = XV().txt; voxSylShow(); }

@@ -38,6 +38,10 @@ after `arrSize()`. Touch (pinch, AZ_STEPS) is unchanged.
 - `#vEngBtn` is one width for every engine (`--engw`, measured from the longest name in the current font by `engFit`,
   again on skin change). `setEngine` calls `hushPad(cur)` first: `padTrack()` records every live source per pad
   (`padSrcs`), and `hushPad` fades them in ~10 ms and clears `synHeld`/`playing`.
+- **Pad effects on engines:** `renderVoice` runs `padFx()` (the same fx loop + Tail + trim as Layers, with the per-effect
+  meter stages) after Blip and every non-live XENG engine (`engFx(V)`); Bass, Voice and live engines (Acid, Machine) stay
+  dry because the song plays them live. `bassUI` shows `#fxWrap` for those engines (below the engine card) and the
+  card's note (`#fxAfter`) says "after the engine". A pad's existing fx list now applies when it switches to such an engine.
 - Desktop synth layout: `synDesk()` also moves `bassWrap/blipWrap/xWrap/voxWrap` into `#synRight` (back before
   `#layersBand` when off), so a non-Layers engine's card fills the right column and scrolls there; the middle's `.wave`
   grows (`body.sdesk:has(#synRight > :is(...):not([hidden])) .wave`, ResizeObserver redraws it). A right column with
