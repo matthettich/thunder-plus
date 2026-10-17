@@ -35,6 +35,13 @@ after `arrSize()`. Touch (pinch, AZ_STEPS) is unchanged.
 ## 16 Oct (late night): Synth page reset, meter, live-note limiter
 
 - Engine ◀ ▶ (`.enggrp` around `#vEngBtn`, `engineStep(d)`): cycles `ENGINE_GROUPS` flattened, wrapping, via `setEngine`.
+- `#vEngBtn` is one width for every engine (`--engw`, measured from the longest name in the current font by `engFit`,
+  again on skin change). `setEngine` calls `hushPad(cur)` first: `padTrack()` records every live source per pad
+  (`padSrcs`), and `hushPad` fades them in ~10 ms and clears `synHeld`/`playing`.
+- Desktop synth layout: `synDesk()` also moves `bassWrap/blipWrap/xWrap/voxWrap` into `#synRight` (back before
+  `#layersBand` when off), so a non-Layers engine's card fills the right column and scrolls there; the middle's `.wave`
+  grows (`body.sdesk:has(#synRight > :is(...):not([hidden])) .wave`, ResizeObserver redraws it). A right column with
+  nothing visible folds away (`grid-template-columns:… 0`), as a fallback.
 - `makeRow()` sliders reset to `def.d` on double-click of the slider itself (not only the label); mod-sequence steps
   reset to 0.
 - **Live notes bus:** `playNote`, `holdNote` and `play` now go `g → padOut()` instead of straight to `master`. `padOut()`

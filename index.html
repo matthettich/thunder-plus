@@ -562,6 +562,7 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .vengine .engbtn{min-height:36px; padding:6px 12px; font-weight:600}
 .vengine .enggrp{display:inline-flex; flex:none} .vengine .enggrp > button{margin:0} .vengine .enggrp > button + button{border-left:0}
 .vengine .engstep{min-height:36px; min-width:36px; padding:0 8px; font-size:var(--fs-3)}
+.vengine .enggrp .engbtn{width:var(--engw, 9.5em); padding-inline:6px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}   /* one width for every engine, so ◀ ▶ stay put */
 .updb.storeb{background:#c0392b; color:#fff; white-space:normal; max-width:calc(100vw - 32px); z-index:21}
 @media (max-width:480px){ .top .tmode .mx{display:inline} .top .tmode,.top .tcpu{padding:0 8px} .top .tcpu{min-width:72px} }
 .top .tcpu{border:1px solid var(--line); min-height:34px; background:var(--panel); padding:0 10px; min-width:84px; overflow:hidden}
@@ -951,10 +952,16 @@ body.sdesk{display:grid; grid-template-columns:210px minmax(0,1fr) clamp(340px, 
 body.sdesk>.top{grid-column:1 / -1; grid-row:1}
 body.sdesk>#dock{grid-column:1; grid-row:2; height:auto; min-height:0; border-top:0; border-right:1px solid var(--line); padding:10px 12px 18px 10px; display:block; overflow-y:auto}
 body.sdesk>#main{grid-column:2; grid-row:2}
+/* An engine with no effects or voice controls (anything but Layers) leaves the right column empty: it folds away and
+   the sound's controls take the width. */
+body.sdesk:not(:has(#synRight > :not([hidden]))){grid-template-columns:210px minmax(0,1fr) 0}
+body.sdesk:not(:has(#synRight > :not([hidden]))) > #synRight{display:none}
 body.sdesk>#synRight{grid-column:3; grid-row:2; min-height:0; overflow-y:auto; overscroll-behavior:contain; border-left:1px solid var(--line); background:var(--bench)}
 #synRight[hidden]{display:none}
 body.sdesk #synRight .cardwrap{padding:12px 12px 0 !important} body.sdesk #synRight .cardwrap:last-child{padding-bottom:16px !important}
 body.sdesk .wave{height:120px}
+/* With an engine's controls in the right column the middle keeps the pad: the waveform grows into the room left. */
+body.sdesk:has(#synRight > :is(#bassWrap,#blipWrap,#xWrap,#voxWrap):not([hidden])) .wave{height:clamp(150px, calc(100vh - 345px), 560px)}
 body.sdesk .pads{grid-template-columns:minmax(0,1fr); gap:7px; padding-right:4px}
 body.sdesk .pads .pad{height:auto; min-height:36px; flex-direction:row; align-items:center; justify-content:flex-start; gap:10px; padding:5px 10px;
   box-shadow:3px 3px 0 0 #fff, 3px 3px 0 1.5px var(--line)}
@@ -6472,6 +6479,14 @@ function synMeterFrame(){
   if (smLv > 0.0005 || now - smPkT < 1500) smRaf = requestAnimationFrame(synMeterFrame);
   else { m.firstElementChild.style.transform = 'scaleX(0)'; m.lastElementChild.style.left = '0'; m.classList.remove('over'); smLv = smPk = 0; }
 }
+// Every source a pad has sounding (taps, keys, MIDI), so an engine change can silence them at once.
+const padSrcs = [];
+function padTrack(i, src, g){ let s = padSrcs[i]; if (!s) s = padSrcs[i] = new Set(); const o = {src, g}; s.add(o); src.addEventListener('ended', () => s.delete(o)); }
+function hushPad(i){
+  const s = padSrcs[i]; if (!s || !ctx) return; const t = ctx.currentTime;
+  for (const o of s){ try { o.g.gain.cancelScheduledValues(t); o.g.gain.setValueAtTime(o.g.gain.value, t); o.g.gain.setTargetAtTime(0, t, 0.008); o.src.stop(t + 0.06); } catch(e){} }
+  s.clear(); if (synHeld[i]){ synHeld[i].done = true; synHeld[i] = null; } if (playing[i]) playing[i] = null;
+}
 function stopVoice(i){
   const p = playing[i]; if (!p) return; playing[i] = null;
   const t = ctx.currentTime; try { p.g.gain.cancelScheduledValues(t); p.g.gain.setTargetAtTime(0, t, 0.004); p.src.stop(t + 0.04); } catch(e){}
@@ -6481,7 +6496,7 @@ function playNote(i, semis, vel = 1){
   audio();
   const src = ctx.createBufferSource(), g = ctx.createGain();
   src.buffer = buffer(i); src.playbackRate.value = noteRate(semis); g.gain.value = vel;
-  src.connect(g); g.connect(padOut()); src.start(); flash(i); vuHit(i, noteRate(semis), vel); synMeterOn();
+  src.connect(g); g.connect(padOut()); src.start(); padTrack(i, src, g); flash(i); vuHit(i, noteRate(semis), vel); synMeterOn();
 }
 // The sounding note per synth pad, for glide and legato (one per pad; poly notes just create new sources).
 const synHeld = [];
@@ -6507,7 +6522,7 @@ function holdNote(i, semis, vel = 1){
   const from = (mono && gl > 0 && prev && !prev.done) ? (prev.rate || r) : null;
   if (from != null){ src.playbackRate.setValueAtTime(from, t); src.playbackRate.linearRampToValueAtTime(r, t + gl); } else src.playbackRate.value = r;
   g.gain.value = vel;
-  src.connect(g); g.connect(padOut()); src.start(); flash(i); vuHit(i, r, vel); synMeterOn();
+  src.connect(g); g.connect(padOut()); src.start(); padTrack(i, src, g); flash(i); vuHit(i, r, vel); synMeterOn();
   const h = {src, g, i, rate:r, vel, done:false}; synHeld[i] = h; return h;
 }
 function releaseNote(h, at){
@@ -6524,7 +6539,7 @@ function play(i, vel = 1){
   if (v.choke) for (let j = 0; j < nslots(); j++) if (j !== i && kit.voices[j].choke === v.choke) stopVoice(j);
   const src = ctx.createBufferSource(), g = ctx.createGain();
   g.gain.value = vel;
-  src.buffer = buffer(i); src.connect(g); g.connect(padOut()); src.start(); synMeterOn();
+  src.buffer = buffer(i); src.connect(g); g.connect(padOut()); src.start(); padTrack(i, src, g); synMeterOn();
   const rec = {src, g}; playing[i] = rec; src.onended = () => { if (playing[i] === rec) playing[i] = null; };
   flash(i); vuHit(i, 1, vel, true);
 }
@@ -6864,6 +6879,7 @@ const ENGINE_GROUPS = [
   ['Voice & bass', [['bass', 'Bass', 'additive bass, live in the tracker'], ['vox', 'Voice', 'a singing voice, a syllable per note']]],
   ['Fonts', [['sf', 'SoundFont', 'a preset of a .sf2 / .sf3 file, General MIDI built in']]],
 ];
+let engFit = () => {}, engFitDue = true;
 const engineName = k => { for (const [, es] of ENGINE_GROUPS) for (const e of es) if (e[0] === k) return e[1]; return k; };
 function engineStep(d){
   const all = ENGINE_GROUPS.flatMap(([, es]) => es.map(e => e[0]));
@@ -6878,6 +6894,7 @@ function setEngine(x){
   const v = V();
   const was = v.engine === 'bass' || v.engine === 'vox' || v.engine === 'blip' || !!XENG[v.engine];
   if (x === (v.engine || 'layers')) return;
+  hushPad(cur);   // the old engine's notes stop now instead of ringing out under the new one
   if (!was) v.tuneL = v.tune;
   if (x === 'bass'){ const first = !v.bass; v.engine = 'bass'; v.tune = 0; v.bass = normBass(v.bass); if (first) bassPreset(1, true); }
   else if (x === 'vox'){ v.engine = 'vox'; v.tune = 0; v.vox = normVox(v.vox); }
@@ -6936,6 +6953,12 @@ function bassRandom(){
     const arr = (d, t, lab) => { const a = el('button', 'sm engstep', t); a.type = 'button'; a.title = lab; a.setAttribute('aria-label', lab); a.addEventListener('click', () => engineStep(d)); return a; };
     const grp = el('span', 'enggrp'); grp.append(arr(-1, '◀', 'Previous engine'), b, arr(1, '▶', 'Next engine')); seg.after(grp);
     b.addEventListener('click', engineSheet);
+    // The button is as wide as the longest engine name, measured in this skin's font (again when fonts or skins change).
+    const fit = () => { const t = b.textContent; let w = 0; b.style.width = 'auto';
+      for (const [, es] of ENGINE_GROUPS) for (const e of es){ b.textContent = e[1] + ' ▾'; w = Math.max(w, b.scrollWidth); }
+      b.textContent = t; b.style.width = ''; if (w) grp.style.setProperty('--engw', Math.ceil(w + 2) + 'px'); };
+    engFit = () => { if (b.offsetParent) fit(); else engFitDue = true; };
+    try { document.fonts.ready.then(engFit); } catch(e){}
     vEngUpd = () => { b.textContent = engineName(isBassV(V()) ? 'bass' : isVoxV(V()) ? 'vox' : isBlipV(V()) ? 'blip' : isXEngV(V()) ? V().engine : 'layers') + ' ▾'; }; vEngUpd();
   } else
   vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass'], ['vox', 'Voice'], ['blip', 'Blip'], ['acid', 'Acid'], ['mach', 'Machine'], ['tone', 'Tone drum'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Tine EP'], ['organ', 'Organ'], ['table', 'Table'], ['breath', 'Breath'], ['strings', 'Strings'], ['fmdrum', 'FM Drum'], ['wind', 'Wind'], ['phase', 'Phase'], ['partials', 'Partials'], ['skin', 'Skin'], ['chip', 'Chip'], ['vector', 'Vector'], ['scanned', 'Scanned'], ['resynth', 'Resynth'], ['bytebeat', 'Bytebeat'], ['sf', 'SoundFont']],
@@ -8500,6 +8523,7 @@ function bassUI(){
     : xe ? (XENG[v.engine].live ? (isSyn(cur) ? XUI[v.engine].title.toLowerCase() + ' synth, played live by the tracker' : XUI[v.engine].title.toLowerCase() + ' synth, rendered as a one-shot') : XUI[v.engine].title.toLowerCase() + ', rendered')
     : 'up to 8 layers, rendered';
   if (vEngUpd) vEngUpd();
+  if (engFitDue && $('vEngBtn') && $('vEngBtn').offsetParent){ engFitDue = false; engFit(); }
   $('bassWrap').hidden = !on; $('voxWrap').hidden = !vx; $('blipWrap').hidden = !bl; $('xWrap').hidden = !xe;
   for (const id of ['layersBand', 'layerWrap', 'fxWrap', 'voiceWrap']) $(id).hidden = on || vx || bl || xe;
   if (xe){ xBuild(); for (const r of xRows) r.refresh(); if (v.engine === 'sf') sfPanel(); if (v.engine === 'bytebeat') bbPanel(); if (v.engine === 'resynth') rsPanel(); }
@@ -9484,6 +9508,7 @@ function applySkin(id){
   try { drawWave(); renderPads(); } catch(e){}
   rbWheel();
   skinFrames();
+  try { engFitDue = true; engFit(); } catch(e){}   // the engine button's width follows the skin's font
 }
 // …waves and …chains are their own pages (white, Minimal) in frames. The Matrix skin is carried into them
 // with a stylesheet added to each frame's page; other skins leave them as they are.
@@ -15534,9 +15559,14 @@ function synDesk(){
   B.toggle('sdesk', on); if (r) r.hidden = !on;
   const fx = $('fxWrap'), vc = $('voiceWrap');
   if (r && fx && vc){ if (on && fx.parentElement !== r) r.append(fx, vc); else if (!on && fx.parentElement === r) $('main').append(fx, vc); }
+  // An engine other than Layers has no effects or voice cards, so its own controls (Bass, Blip, Voice, or the engine's
+  // card) take the right column instead, scrolling on their own beside the pad and its waveform.
+  const ew = ['bassWrap', 'blipWrap', 'xWrap', 'voxWrap'].map(id => $(id)).filter(Boolean);
+  if (r && ew.length){ if (on && ew[0].parentElement !== r) r.prepend(...ew); else if (!on && ew[0].parentElement === r) $('layersBand').before(...ew); }
   if (on !== was) drawWave();
 }
 addEventListener('resize', synDesk);
+try { new ResizeObserver(() => drawWave()).observe($('wave')); } catch(e){}   // its height changes with the layout (engine cards on the right)
 const trap = () => { try { history.pushState({thunder:1}, ''); } catch(e){} };
 trap();
 addEventListener('popstate', () => {
