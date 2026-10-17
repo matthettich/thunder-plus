@@ -24,6 +24,26 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 17 Oct: Drift engine (tape pads, for Boards of Canada-style pads)
+
+- **What:** a rendered synth-slot engine, `drift` (`class DriftCore` in the ENGINE block, right after `SwarmCore`;
+  `XENG.drift`, `renderX`, `ENGINE_GROUPS` → Synths, the engine segment list, `XUI.drift` with 13 presets). Its
+  presets are also a pad Presets group, "Drift (tape pads)", added last through the new `engGroup()` helper (the
+  engine groups' mapping, which was inline in `factoryVoicePresets`, now uses it too; same output).
+- **Design:** laid out like the big 1970s Yamaha CS-series polysynths (the owner's reference for those pads): two
+  oscillator lines per voice (I: saw, pulse; II: saw, pulse, an interval and a detune; shared PWM; sub, noise, ring mod
+  of I's saw by II's pulse), then a 12 dB high-pass and a 12 dB low-pass (TPT state-variable) with a filter ADSR, the
+  amp ADSR, delayed vibrato, 1–4 unison voices each with its own slow pitch and cutoff drift. Then the tape stage, which
+  is where most of the sound is: wow (a 0.05–3 Hz sine plus a slower random sway, up to ±35 cents) and flutter
+  (7.3 + 11.9 Hz plus jitter, up to ±9 cents) as pitch modulation shared by every voice, tanh tape saturation, a
+  BBD-style chorus (8 ms ± 2.5 ms, two LFOs), Age (two one-pole low-passes from 18 kHz down to ~2.6 kHz, a low cut up
+  to 135 Hz, and occasional 40–120 ms dropouts) and Hiss (−62 to −28 dB, following the note). Seeded, normalised to
+  0.8 then Level/Drive as Swarm. Original code, generic name; the CS series is credited as the layout's inspiration.
+- **Checked** headless: every preset renders (no NaN), the Worker render is identical to the page's, the card builds
+  and presets apply; wow/flutter rates and depths measured from the output's pitch. Not heard by ear yet. A 6 s pad
+  takes ~0.6 s to render in Node, so a few seconds on the phone (in the Worker).
+- **Cache:** `thunderplus-v160`.
+
 ## 17 Oct: classic drum machine kits (CR-78, 808, 606, 909, 707, 727, 505)
 
 - **What:** 97 new pad voices, one Presets group per machine ("808-style drums" and so on, appended after the other

@@ -2058,7 +2058,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p>Each track and the master have 4 effect slots (FX screen, or the Mixer’s FX row): 37 effects in all: Flex, Step gate, Retrigger, EQ, compressor, three reverbs, tape delay, dub tape, saturation, drive, tube, tape, vinyl, lo-fi, bitcrush, chorus, flanger, phaser, tremolo, trance gate, auto-wah, ladder filter, comb resonator, wavefolder, overdrive, pitch and frequency shifters, cross-mod, transient shaper, multiband squash, speaker cab, air, and Rings, Clouds and Beads. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to four, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
 <p><b>…chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback. Its <b>Resample</b> module records what passes through it into a pad, starting on the next bar, and slices it so you can chop it like a breakbeat.</p></section>
-    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots; on a computer, where they are a list down the left, ▲▼ do too)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound (kicks, snares, hats, percussion, IDM and glitch hits, basses, pads, chords, keys and leads, including Bass and Blip engine sounds). <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once. <b>Classic drum kits…</b> (File ▾, or ⚙ Settings → Kit) puts a CR-78-, 808-, 606-, 909-, 707-, 727- or 505-style kit on pads 1–8 and keeps the synth slots; every sound of each machine is also in the Presets list, in its own group.</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modelled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
+    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots; on a computer, where they are a list down the left, ▲▼ do too)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound (kicks, snares, hats, percussion, IDM and glitch hits, basses, pads, chords, keys and leads, including Bass and Blip engine sounds). <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once. <b>Classic drum kits…</b> (File ▾, or ⚙ Settings → Kit) puts a CR-78-, 808-, 606-, 909-, 707-, 727- or 505-style kit on pads 1–8 and keeps the synth slots; every sound of each machine is also in the Presets list, in its own group.</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modelled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. <b>Drift</b> is a two-line analog pad synth laid out like the big 1970s CS-series polysynths (two oscillator lines per voice, a high-pass and a low-pass with their own envelope, up to four drifting unison voices) followed by a tape stage — <b>Wow</b> and <b>Flutter</b> on the pitch, chorus, saturation, <b>Age</b> (worn top and bottom, the odd dropout) and hiss — for warm, wobbly, faded pads; its presets are in the pad Presets list under Drift (tape pads). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -4328,6 +4328,121 @@ class SwarmCore {
     return res;
   }
 }
+/* Drift (original code): warm, wobbly analog pads. A two-line polysynth after the layout of the big 1970s Yamaha
+   CS-series machines — two oscillator lines per voice (saw and pulse with PWM, line II detuned or set to an interval,
+   a sub and noise), then a 12 dB high-pass and a 12 dB low-pass in series with their own envelope, then the amp — and
+   after it a tape stage, which is where most of the hazy, nostalgic pad sound lives: wow (slow, uneven pitch sway)
+   and flutter (fast shimmer) on the pitch, tape saturation, a BBD-style chorus, age (the top and bottom worn off, and
+   the odd dropout) and hiss. Up to four unison voices, each drifting on its own. Rendered like Swarm: one note at the
+   pad's pitch, held for `hold` seconds, then released; seeded, so a pad renders the same every time. */
+class DriftCore {
+  static defaults(){ return {oct:2, aSaw:0.8, aPulse:0, bSaw:0, bPulse:0.6, bSemi:0, detune:7, pw:0.5, pwm:0.35, pwmRate:0.7,
+    sub:0, noise:0, ring:0, voices:2, spread:0.3, drift:0.35,
+    hp:40, hpRes:0, cut:1800, res:0.15, fenv:0.25, fatk:400, fdec:1500, fsus:0.4, key:0.5,
+    atk:600, dec:1500, sus:0.85, rel:1800, vib:0, vibRate:5, vibDelay:600,
+    wow:0.35, wowRate:0.55, flutter:0.25, chorus:0.35, sat:0.3, age:0.3, hiss:0.15, tune:0, drive:0, level:0}; }
+  static render(o, sr, hold){
+    const p = Object.assign(DriftCore.defaults(), o || {}), c01 = v => Math.max(0, Math.min(1, v));
+    let seed = 0x0d21f7e5; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const f0 = 65.406 * Math.pow(2, Math.round(p.oct) + (p.tune || 0) / 12);
+    const atk = Math.max(0.5, p.atk) / 1000, dec = Math.max(5, p.dec) / 1000, rel = Math.max(5, p.rel) / 1000, sus = c01(p.sus);
+    const fat = Math.max(0.5, p.fatk) / 1000, fdc = Math.max(5, p.fdec) / 1000, fsu = c01(p.fsus);
+    const h = Math.max(atk + 0.02, hold || 1);
+    const len = Math.min(32, h + rel * 1.1 + 0.08), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N);
+    const nv = Math.max(1, Math.min(4, Math.round(p.voices))), spreadC = p.spread * p.spread * 25, driftC = p.drift * p.drift * 30;
+    // A smooth random path: cosine-interpolated random points at about `hz`.
+    const path = hz => ({hz:hz * (0.6 + rnd() * 0.8), a:rnd() * 2 - 1, b:rnd() * 2 - 1, ph:rnd()});
+    const step = (q, dt) => { q.ph += q.hz * dt; while (q.ph >= 1){ q.ph -= 1; q.a = q.b; q.b = rnd() * 2 - 1; } const m = (1 - Math.cos(Math.PI * q.ph)) * 0.5; return q.a + (q.b - q.a) * m; };
+    const blep = (t, dt) => t < dt ? (t /= dt, t + t - t * t - 1) : t > 1 - dt ? (t = (t - 1) / dt, t * t + t + t + 1) : 0;
+    const pulse = (ph, w, dt) => { let q = ph - w; if (q < 0) q += 1; return (ph < w ? 1 : -1) + blep(ph, dt) - blep(q, dt) - (2 * w - 1); };
+    const V = [];
+    for (let j = 0; j < nv; j++){
+      const pos = nv > 1 ? j / (nv - 1) * 2 - 1 : 0;
+      V.push({pa:rnd(), pb:rnd(), ps:rnd(), det:pos * spreadC + (rnd() - 0.5) * spreadC * 0.3, dp:path(0.22), fd:path(0.1), pwmPh:rnd(), pwmK:0.85 + rnd() * 0.3,
+        l1:0, l2:0, h1:0, h2:0, la1:0, la2:0, la3:0, lk:2, ha1:0, ha2:0, ha3:0, hk:2, dtA:0, dtB:0, w:0.5});
+    }
+    // The tape's motion, shared by every voice: wow = a slow sine plus a slower random sway; flutter = two fast sines and a jitter.
+    const wowP = path(Math.max(0.02, p.wowRate) * 0.45), wowC = p.wow * p.wow * 35, flutC = p.flutter * p.flutter * 9, fpath = path(9);
+    let wph = rnd(), fph1 = rnd(), fph2 = rnd();
+    const bRatio = Math.pow(2, (Math.round(p.bSemi) + p.detune / 100) / 12), kf = Math.pow(f0 / 261.6, p.key);
+    const ah = h > atk ? sus + (1 - sus) * Math.exp(-6.9 * (h - atk) / dec) : h / atk;
+    const env = t => t < atk ? t / atk : t < h ? sus + (1 - sus) * Math.exp(-6.9 * (t - atk) / dec) : ah * Math.exp(-6.9 * (t - h) / rel);
+    const fv = t => t < fat ? t / fat : fsu + (1 - fsu) * Math.exp(-6.9 * (t - fat) / fdc), fh = fv(h);
+    const fenv = t => t < h ? fv(t) : fh * Math.exp(-6.9 * (t - h) / rel);
+    const vd = Math.max(0, p.vibDelay) / 1000, vibC = Math.max(0, p.vib);
+    const svf = (fc, res) => { const g = Math.tan(Math.PI * Math.max(20, Math.min(sr * 0.45, fc)) / sr), k = 2 - 1.96 * c01(res), a1 = 1 / (1 + g * (g + k)); return [a1, g * a1, g * g * a1, k]; };
+    const CR = 32, cdt = CR / sr, sdt = 1 / sr, norm = 1 / Math.sqrt(nv);
+    const aSaw = p.aSaw, aPul = p.aPulse, bSaw = p.bSaw, bPul = p.bPulse, sub = p.sub * 0.6, nz = p.noise * 0.5, ring = p.ring * 0.8;
+    for (let i0 = 0; i0 < N; i0 += CR){
+      const t0 = i0 * sdt;
+      const wow = (0.6 * Math.sin(2 * Math.PI * wph) + 0.4 * step(wowP, cdt)) * wowC; wph += p.wowRate * cdt;
+      const flut = (0.5 * Math.sin(2 * Math.PI * fph1) + 0.3 * Math.sin(2 * Math.PI * fph2) + 0.2 * step(fpath, cdt)) * flutC; fph1 += 7.3 * cdt; fph2 += 11.9 * cdt;
+      const vib = vibC ? vibC * Math.min(1, Math.max(0, (t0 - vd) / 0.5)) * Math.sin(2 * Math.PI * p.vibRate * t0) : 0;
+      const common = wow + flut + vib, fc = p.cut * kf * Math.pow(2, p.fenv * 5 * fenv(t0));
+      for (const v of V){
+        v.dtA = f0 * Math.pow(2, (v.det + step(v.dp, cdt) * driftC + common) / 1200) * sdt; v.dtB = v.dtA * bRatio;
+        v.pwmPh += p.pwmRate * v.pwmK * cdt; v.w = Math.max(0.04, Math.min(0.96, p.pw + p.pwm * 0.45 * Math.sin(2 * Math.PI * v.pwmPh)));
+        const L = svf(fc * Math.pow(2, step(v.fd, cdt) * 0.3 * p.drift), p.res), H = svf(p.hp, p.hpRes);
+        v.la1 = L[0]; v.la2 = L[1]; v.la3 = L[2]; v.lk = L[3]; v.ha1 = H[0]; v.ha2 = H[1]; v.ha3 = H[2]; v.hk = H[3];
+      }
+      const i1 = Math.min(N, i0 + CR);
+      for (let i = i0; i < i1; i++){
+        let s = 0;
+        for (let j = 0; j < nv; j++){
+          const v = V[j], dA = v.dtA, dB = v.dtB;
+          let pa = v.pa + dA; if (pa >= 1) pa -= 1; v.pa = pa;
+          let pb = v.pb + dB; if (pb >= 1) pb -= 1; v.pb = pb;
+          const sA = 2 * pa - 1 - blep(pa, dA), sB = 2 * pb - 1 - blep(pb, dB), qB = pulse(pb, v.w, dB);
+          let x = aSaw * sA + bSaw * sB + bPul * qB;
+          if (aPul) x += aPul * pulse(pa, v.w, dA);
+          if (sub){ let ps = v.ps + dA * 0.5; if (ps >= 1) ps -= 1; v.ps = ps; x += sub * pulse(ps, 0.5, dA * 0.5); }
+          if (ring) x += ring * sA * qB;
+          if (nz) x += nz * (rnd() * 2 - 1);
+          // high-pass, then low-pass (both 12 dB state-variable)
+          { const v3 = x - v.h2, v1 = v.ha1 * v.h1 + v.ha2 * v3, v2 = v.h2 + v.ha2 * v.h1 + v.ha3 * v3; v.h1 = 2 * v1 - v.h1; v.h2 = 2 * v2 - v.h2; x = x - v.hk * v1 - v2; }
+          { const v3 = x - v.l2, v1 = v.la1 * v.l1 + v.la2 * v3, v2 = v.l2 + v.la2 * v.l1 + v.la3 * v3; v.l1 = 2 * v1 - v.l1; v.l2 = 2 * v2 - v.l2; x = v2; }
+          s += x;
+        }
+        out[i] = s * norm * env(i * sdt);
+      }
+    }
+    // ---- the tape stage ----
+    let pk = 0; for (let i = 0; i < N; i++) pk = Math.max(pk, Math.abs(out[i]));
+    const pre = pk > 0 ? 0.9 / pk : 1, sg = 1 + p.sat * 3, sn = 1 / Math.tanh(sg), satOn = p.sat > 0.001;
+    const lpA = 1 - Math.exp(-2 * Math.PI * 18000 * Math.pow(2, -p.age * 2.8) / sr), hpA = 1 - Math.exp(-2 * Math.PI * (15 + p.age * 120) / sr);
+    // dropouts: now and then the level dips for a moment, deeper with age
+    const dips = []; if (p.age > 0.05) for (let t = 0.5 + rnd() * 2; t < len; t += 1.2 + rnd() * 3) dips.push([t, 0.04 + rnd() * 0.08, p.age * (0.25 + rnd() * 0.25)]);
+    const cw = c01(p.chorus) * 0.5, dl = new Float32Array(Math.ceil(sr * 0.03) + 4), dlN = dl.length, cBase = 0.008 * sr, cDep = 0.0025 * sr;
+    let l1 = 0, l2 = 0, hpS = 0, w = 0, c1 = rnd(), c2 = rnd(), di = 0;
+    for (let i = 0; i < N; i++){
+      const t = i * sdt; let x = out[i] * pre;
+      if (satOn) x = Math.tanh(x * sg) * sn;
+      l1 += (x - l1) * lpA; l2 += (l1 - l2) * lpA; hpS += (l2 - hpS) * hpA; x = l2 - hpS;
+      while (di < dips.length && t > dips[di][0] + dips[di][1]) di++;
+      if (di < dips.length && t > dips[di][0]){ const d = dips[di], q = (t - d[0]) / d[1]; x *= 1 - d[2] * 0.5 * (1 - Math.cos(2 * Math.PI * q)); }
+      if (cw){
+        dl[w] = x; c1 += 0.45 * sdt; c2 += 0.17 * sdt; if (c1 >= 1) c1 -= 1; if (c2 >= 1) c2 -= 1;
+        const m = (c1 < 0.5 ? 4 * c1 - 1 : 3 - 4 * c1) * 0.7 + Math.sin(2 * Math.PI * c2) * 0.3;
+        let rp = w - (cBase + cDep * m); if (rp < 0) rp += dlN; const r0 = rp | 0, fr = rp - r0, r1 = r0 + 1 < dlN ? r0 + 1 : 0;
+        x = x * (1 - cw * 0.4) + (dl[r0] + (dl[r1] - dl[r0]) * fr) * cw;
+        if (++w >= dlN) w = 0;
+      }
+      out[i] = x;
+    }
+    pk = 0; for (let i = 0; i < N; i++) pk = Math.max(pk, Math.abs(out[i]));
+    const lv = Math.pow(10, (p.level || 0) / 20) * (pk > 0 ? 0.8 / pk : 1), dr = (p.drive || 0) > 0.001 ? 1 + p.drive * p.drive * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1;
+    // hiss: soft, a little dark, riding the note so it fades out with it
+    const hz = p.hiss > 0.001 ? 0.8 * Math.pow(10, (-62 + p.hiss * 34) / 20) * 3 : 0; let hn = 0;
+    for (let i = 0; i < N; i++){
+      let y = out[i] * lv; if (dr) y = Math.tanh(y * dr) * dn;
+      if (hz){ hn += ((rnd() * 2 - 1) - hn) * 0.35; y += hn * hz * Math.sqrt(Math.max(0, env(i * sdt))); }
+      out[i] = y;
+    }
+    let end = N; while (end > 1 && Math.abs(out[end - 1]) < 1e-4) end--;
+    const res = out.slice(0, Math.max(end, 1)), fl = Math.min(res.length, Math.round(sr * 0.003)); for (let i = 0; i < fl; i++) res[res.length - 1 - i] *= i / fl;
+    return res;
+  }
+}
 /* Keys (original code): three rendered keyboard engines. Each renders one note at the pad's pitch, held for `hold`
    seconds (the tracker note, or the pad's Max len) and then released the way the instrument lets go. Oscillators are
    rotating phasors (cos/sin pairs advanced by one complex multiply a sample), so dozens of partials stay cheap;
@@ -6112,6 +6227,7 @@ const XENG = {
   tone:{live:false, d:() => ToneDrum.defaults()},
   modal:{live:false, d:() => ModalCore.defaults()},
   swarm:{live:false, d:() => SwarmCore.defaults()},
+  drift:{live:false, d:() => DriftCore.defaults()},
   piano:{live:false, d:() => PianoCore.defaults()},
   ep:{live:false, d:() => TineEPCore.defaults()},
   organ:{live:false, d:() => OrganCore.defaults()},
@@ -6139,6 +6255,7 @@ function renderX(V, sr, hold){
   if (k === 'mach') return renderLiveCore(MachCore, P, sr, hold || Math.min(V.len || 2, 2));
   if (k === 'tone') return ToneDrum.render(P, sr);
   if (k === 'swarm') return SwarmCore.render(P, sr, hold || Math.min(V.len || 3, 4));
+  if (k === 'drift') return DriftCore.render(P, sr, hold || Math.min(V.len || 3, 6));
   if (k === 'piano') return PianoCore.render(P, sr, hold || Math.min(V.len || 3, 4));
   if (k === 'ep') return TineEPCore.render(P, sr, hold || Math.min(V.len || 3, 4));
   if (k === 'organ') return OrganCore.render(P, sr, hold || Math.min(V.len || 2, 3));
@@ -7025,7 +7142,7 @@ const ENGINE_GROUPS = [
     ['skin', 'Skin', 'a drum head: membrane modes, mallet, shell'], ['breath', 'Breath', 'noise through resonators: hats, shakers, risers, wind']]],
   ['Keys', [['piano', 'Piano', 'struck stiff strings, hammer, soundboard'], ['ep', 'Tine EP', 'tine · pickup bark · bell · tremolo'], ['organ', 'Organ', 'drawbars, percussion, click, rotary']]],
   ['Synths', [['acid', 'Acid', 'the squelchy mono bass line, live'], ['mach', 'Machine', 'machine oscillators · HP/LP · LFO, live'], ['modal', 'Modal', 'resonant modes struck, plucked, rubbed or bowed'],
-    ['swarm', 'Swarm', 'oscillator cloud · drift · bloom'], ['table', 'Table', 'wavetables · warp · unison'], ['phase', 'Phase', 'phase distortion · DCW · resonance'],
+    ['swarm', 'Swarm', 'oscillator cloud · drift · bloom'], ['drift', 'Drift', 'two-line analog poly · tape wow & flutter · haze'], ['table', 'Table', 'wavetables · warp · unison'], ['phase', 'Phase', 'phase distortion · DCW · resonance'],
     ['partials', 'Partials', 'additive · 256 harmonics · morph'], ['chip', 'Chip', '8-bit · duty · arp · LFSR'],
     ['vector', 'Vector', 'four waves on a joystick · wave sequence'], ['scanned', 'Scanned', 'a ring of masses, scanned as a wave'],
     ['resynth', 'Resynth', 'a sample rebuilt from its partials'], ['bytebeat', 'Bytebeat', 'one-line formulas of t · 8-bit · a b c knobs']]],
@@ -7115,7 +7232,7 @@ function bassRandom(){
     try { document.fonts.ready.then(engFit); } catch(e){}
     vEngUpd = () => { b.textContent = engineName(isBassV(V()) ? 'bass' : isVoxV(V()) ? 'vox' : isBlipV(V()) ? 'blip' : isXEngV(V()) ? V().engine : 'layers') + ' ▾'; }; vEngUpd();
   } else
-  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass'], ['vox', 'Voice'], ['blip', 'Blip'], ['acid', 'Acid'], ['mach', 'Machine'], ['tone', 'Tone drum'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Tine EP'], ['organ', 'Organ'], ['table', 'Table'], ['breath', 'Breath'], ['strings', 'Strings'], ['fmdrum', 'FM Drum'], ['wind', 'Wind'], ['phase', 'Phase'], ['partials', 'Partials'], ['skin', 'Skin'], ['chip', 'Chip'], ['vector', 'Vector'], ['scanned', 'Scanned'], ['resynth', 'Resynth'], ['bytebeat', 'Bytebeat'], ['sf', 'SoundFont']],
+  vEngUpd = makeSeg($('vEngSeg'), [['layers', 'Layers'], ['bass', 'Bass'], ['vox', 'Voice'], ['blip', 'Blip'], ['acid', 'Acid'], ['mach', 'Machine'], ['tone', 'Tone drum'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['drift', 'Drift'], ['piano', 'Piano'], ['ep', 'Tine EP'], ['organ', 'Organ'], ['table', 'Table'], ['breath', 'Breath'], ['strings', 'Strings'], ['fmdrum', 'FM Drum'], ['wind', 'Wind'], ['phase', 'Phase'], ['partials', 'Partials'], ['skin', 'Skin'], ['chip', 'Chip'], ['vector', 'Vector'], ['scanned', 'Scanned'], ['resynth', 'Resynth'], ['bytebeat', 'Bytebeat'], ['sf', 'SoundFont']],
     () => isBassV(V()) ? 'bass' : isVoxV(V()) ? 'vox' : isBlipV(V()) ? 'blip' : isXEngV(V()) ? V().engine : 'layers', setEngine);
 })();
 
@@ -7695,6 +7812,10 @@ async function pickClassicKit(){
   const i = await askPick({title:'Classic drum kits', body:'Puts eight sounds from one machine on pads 1–8, in the factory kit’s order. The synth slots stay as they are. Every sound of each machine is also in a pad’s Presets list.'}, list);
   if (i >= 0) loadClassicKit(i);
 }
+// An engine's presets (its card's list, less Init) as one group of the pad Presets list.
+const engGroup = ([k, gn]) => [gn, XUI[k].pre.slice(1).map(([n, o, x, e]) =>
+    [n, () => PE(n, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:k === 'modal' || k === 'swarm' || k === 'drift' || k === 'piano' || k === 'ep' || k === 'strings' || k === 'partials' || k === 'vector' || k === 'scanned' || k === 'resynth' ? 6 : k === 'breath' || k === 'fmdrum' || k === 'skin' || k === 'chip' || k === 'bytebeat' ? 2 : 4, gate:400}, x || {},
+      typeof e === 'string' ? {bbExpr:e} : {}, k === 'resynth' ? {rsData:ResynthCore.demoRs(48000)} : {}))])];
 function factoryVoicePresets(){
   const bass = o => { const p = Object.assign({}, o), dr = p.vDrive || 0; delete p.vDrive; return [normBass(Object.assign(BassCore.defaults(), p)), dr]; };
   const BE = (name, o, x) => { const [b, dr] = bass(o); return PE(name, 'bass', b, Object.assign({drive:dr, len:6, gate:400}, x || {})); };
@@ -7919,9 +8040,7 @@ function factoryVoicePresets(){
       {type:'bell', a:0.45, b:0.25, atk:0.5, dec:2400, sus:0.15, rel:1500, level:0.7},
       {type:'sine', tune:12, atk:0.5, dec:1200, sus:0, rel:900, level:0.25}], {len:8})],
   ]],
-  ...[['acid', 'Acid'], ['mach', 'Machine synth'], ['tone', 'Tone drums'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Electric piano'], ['organ', 'Organ'], ['table', 'Table'], ['breath', 'Breath'], ['strings', 'Strings'], ['fmdrum', 'FM Drum'], ['wind', 'Wind'], ['phase', 'Phase'], ['partials', 'Partials'], ['skin', 'Skin'], ['chip', 'Chip'], ['vector', 'Vector'], ['scanned', 'Scanned'], ['resynth', 'Resynth'], ['bytebeat', 'Bytebeat']].map(([k, gn]) => [gn, XUI[k].pre.slice(1).map(([n, o, x, e]) =>
-    [n, () => PE(n, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:k === 'modal' || k === 'swarm' || k === 'piano' || k === 'ep' || k === 'strings' || k === 'partials' || k === 'vector' || k === 'scanned' || k === 'resynth' ? 6 : k === 'breath' || k === 'fmdrum' || k === 'skin' || k === 'chip' || k === 'bytebeat' ? 2 : 4, gate:400}, x || {},
-      typeof e === 'string' ? {bbExpr:e} : {}, k === 'resynth' ? {rsData:ResynthCore.demoRs(48000)} : {}))])]),
+  ...[['acid', 'Acid'], ['mach', 'Machine synth'], ['tone', 'Tone drums'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Electric piano'], ['organ', 'Organ'], ['table', 'Table'], ['breath', 'Breath'], ['strings', 'Strings'], ['fmdrum', 'FM Drum'], ['wind', 'Wind'], ['phase', 'Phase'], ['partials', 'Partials'], ['skin', 'Skin'], ['chip', 'Chip'], ['vector', 'Vector'], ['scanned', 'Scanned'], ['resynth', 'Resynth'], ['bytebeat', 'Bytebeat']].map(engGroup),
   ['Leads', [
     ['Square lead', () => PS('Square lead', [
       {type:'square', atk:3, dec:300, sus:0.75, rel:180, lpCut:3200, lpRes:0.25, level:0.6},
@@ -7936,6 +8055,7 @@ function factoryVoicePresets(){
   ]],
   // the classic drum machines, one group each (after the others, so saved Recent picks keep their places)
   ...x0xMachines().map(([g, list]) => [g, list.map(([n, make]) => [x0xTag(g) + ' ' + n, make])]),
+  engGroup(['drift', 'Drift (tape pads)']),
   ];
 }
 // Layer presets: tagged with the pad pitch they were written for (vt: 0 = a drum pad, 24 = a synth slot), so a
@@ -8965,6 +9085,50 @@ const XUI = {
       ['Harmonic shimmer', {oct:3, voices:24, wave:3, spread:0.2, drift:0.3, scatter:0.6, ivl:6, cut:12000, shimmer:0.5, atk:400, rel:2500, bloom:1500}],
       ['Tense cluster', {voices:28, wave:0.3, spread:0.6, drift:0.6, rate:1.5, scatter:0.5, ivl:5, cut:2000, res:0.4, atk:1500, rel:2000}],
       ['Swelling brass swarm', {voices:12, spread:0.35, drift:0.25, cut:900, res:0.2, fenv:0.7, fdec:1200, atk:180, dec:1500, sus:0.7, rel:500}]]},
+  drift:{title:'Drift', tag:'two-line analog poly · tape wow & flutter · haze', rows:{
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      aSaw:{l:'I saw', min:0, max:1, c:'lin', d:0.8, f:pct}, aPulse:{l:'I pulse', min:0, max:1, c:'lin', d:0, f:pct},
+      sub:{l:'Sub', min:0, max:1, c:'lin', d:0, f:pct}, noise:{l:'Noise', min:0, max:1, c:'lin', d:0, f:pct},
+      bSaw:{l:'II saw', min:0, max:1, c:'lin', d:0, f:pct}, bPulse:{l:'II pulse', min:0, max:1, c:'lin', d:0.6, f:pct},
+      bSemi:{l:'II interval', min:-24, max:24, c:'int', d:0, f:v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(Math.round(v)) + ' st'},
+      detune:{l:'II detune', min:0, max:50, c:'lin', d:7, f:v => '+' + Math.round(v) + ' cents'},
+      ring:{l:'Ring mod', min:0, max:1, c:'lin', d:0, f:pct},
+      pw:{l:'Pulse width', min:0.05, max:0.5, c:'lin', d:0.5, f:pct}, pwm:{l:'PWM', min:0, max:1, c:'lin', d:0.35, f:pct},
+      pwmRate:{l:'PWM rate', min:0.05, max:10, c:'log', d:0.7, f:v => v.toFixed(2) + ' Hz'},
+      voices:{l:'Voices', min:1, max:4, c:'int', d:2, f:v => String(Math.round(v))},
+      spread:{l:'Spread', min:0, max:1, c:'lin', d:0.3, f:v => '±' + Math.round(v * v * 25) + ' cents'},
+      drift:{l:'Drift', min:0, max:1, c:'lin', d:0.35, f:v => '±' + Math.round(v * v * 30) + ' cents'},
+      hp:{l:'High-pass', min:20, max:2000, c:'log', d:40, f:hz}, hpRes:{l:'HP res', min:0, max:1, c:'lin', d:0, f:pct},
+      cut:{l:'Low-pass', min:40, max:16000, c:'log', d:1800, f:hz}, res:{l:'LP res', min:0, max:1, c:'lin', d:0.15, f:pct},
+      fenv:{l:'Filter env', min:-1, max:1, c:'lin', d:0.25, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'},
+      fatk:{l:'Filter attack', min:0.5, max:6000, c:'log', d:400, f:ms}, fdec:{l:'Filter decay', min:10, max:8000, c:'log', d:1500, f:ms},
+      fsus:{l:'Filter sustain', min:0, max:1, c:'lin', d:0.4, f:pct}, key:{l:'Key follow', min:0, max:1, c:'lin', d:0.5, f:pct},
+      atk:{l:'Attack', min:0.5, max:6000, c:'log', d:600, f:ms}, dec:{l:'Decay', min:10, max:8000, c:'log', d:1500, f:ms}, sus:{l:'Sustain', min:0, max:1, c:'lin', d:0.85, f:pct}, rel:{l:'Release', min:5, max:8000, c:'log', d:1800, f:ms},
+      vib:{l:'Vibrato', min:0, max:60, c:'lin', d:0, f:v => v < 0.5 ? 'Off' : '±' + Math.round(v) + ' cents'},
+      vibRate:{l:'Vib rate', min:0.5, max:10, c:'log', d:5, f:v => v.toFixed(2) + ' Hz'}, vibDelay:{l:'Vib delay', min:0, max:3000, c:'sq', d:600, f:ms},
+      wow:{l:'Wow', min:0, max:1, c:'lin', d:0.35, f:v => v < 0.01 ? 'Off' : '±' + (v * v * 35).toFixed(1) + ' cents'},
+      wowRate:{l:'Wow rate', min:0.05, max:3, c:'log', d:0.55, f:v => v.toFixed(2) + ' Hz'},
+      flutter:{l:'Flutter', min:0, max:1, c:'lin', d:0.25, f:v => v < 0.01 ? 'Off' : '±' + (v * v * 9).toFixed(1) + ' cents'},
+      chorus:{l:'Chorus', min:0, max:1, c:'lin', d:0.35, f:pct}, sat:{l:'Saturation', min:0, max:1, c:'lin', d:0.3, f:pct},
+      age:{l:'Age', min:0, max:1, c:'lin', d:0.3, f:pct}, hiss:{l:'Hiss', min:0, max:1, c:'lin', d:0.15, f:v => v < 0.002 ? 'Off' : Math.round(-62 + v * 34) + ' dB'}},
+    secs:[['Line I', ['oct', 'aSaw', 'aPulse', 'sub', 'noise']], ['Line II', ['bSaw', 'bPulse', 'bSemi', 'detune', 'ring']], ['Pulse & voices', ['pw', 'pwm', 'pwmRate', 'voices', 'spread', 'drift']],
+      ['Filter', ['hp', 'hpRes', 'cut', 'res', 'fenv', 'fatk', 'fdec', 'fsus', 'key']], ['Amp', ['atk', 'dec', 'sus', 'rel']], ['Vibrato', ['vib', 'vibRate', 'vibDelay']],
+      ['Tape', ['wow', 'wowRate', 'flutter', 'chorus', 'sat', 'age', 'hiss']]],
+    note:'Two oscillator lines per voice through a high-pass and a low-pass, then a tape stage: Wow sways the pitch slowly and unevenly, Flutter shimmers it, Age wears off the top and bottom and adds the odd dropout, Hiss rides the note. Slow attacks, a bit of wow and some age give the faded, nostalgic pad sound. Long notes hold for as long as the note in the tracker.',
+    pre:[['Init', {}],
+      ['Faded home movie', {aSaw:0.8, bPulse:0.55, detune:9, pwm:0.4, pwmRate:0.5, voices:2, spread:0.35, drift:0.45, cut:1500, res:0.12, fenv:0.2, fatk:900, fdec:2500, fsus:0.5, atk:700, dec:2000, sus:0.85, rel:2200, wow:0.55, wowRate:0.5, flutter:0.3, chorus:0.45, sat:0.35, age:0.45, hiss:0.25}],
+      ['Warm strings', {aSaw:0.8, bSaw:0.7, bPulse:0, detune:12, voices:3, spread:0.4, drift:0.3, cut:2600, res:0.08, fenv:0.15, fatk:600, fdec:2000, fsus:0.6, atk:450, dec:1500, sus:0.9, rel:2000, wow:0.3, flutter:0.2, chorus:0.55, sat:0.25, age:0.25, hiss:0.1}],
+      ['Seasick tape', {aSaw:0.7, bPulse:0.6, detune:6, cut:1300, atk:500, rel:2500, wow:0.85, wowRate:0.35, flutter:0.45, chorus:0.4, sat:0.4, age:0.6, hiss:0.35}],
+      ['Brass swell', {aSaw:0.9, bSaw:0.6, bPulse:0, detune:5, voices:2, spread:0.25, cut:700, res:0.2, fenv:0.55, fatk:350, fdec:1200, fsus:0.45, atk:150, dec:1200, sus:0.8, rel:600, vib:8, vibRate:5.5, vibDelay:700, wow:0.2, flutter:0.2, chorus:0.25, sat:0.4, age:0.2, hiss:0.1}],
+      ['Hollow pulse', {aSaw:0, aPulse:0.7, bPulse:0.6, detune:10, pw:0.3, pwm:0.65, pwmRate:0.35, cut:2200, res:0.3, atk:400, rel:1800, wow:0.35, chorus:0.4, age:0.3}],
+      ['Sunlit fifths', {aSaw:0.7, bSaw:0.5, bPulse:0, bSemi:7, detune:4, cut:1900, fenv:0.2, atk:800, rel:2500, wow:0.45, flutter:0.25, chorus:0.5, age:0.4, hiss:0.2}],
+      ['Dusty choir', {aSaw:0, aPulse:0.6, bPulse:0.5, pw:0.15, pwm:0.3, detune:8, noise:0.15, hp:350, hpRes:0.3, cut:2400, res:0.35, atk:900, rel:2500, vib:6, vibRate:4.5, vibDelay:900, wow:0.4, chorus:0.6, age:0.5, hiss:0.3}],
+      ['Cold glow', {aSaw:0.6, bPulse:0.5, bSemi:12, detune:3, hp:500, cut:3200, res:0.1, fenv:-0.2, fatk:2000, fdec:4000, atk:1500, dec:3000, sus:0.9, rel:3500, wow:0.3, flutter:0.15, chorus:0.5, age:0.7, hiss:0.3}],
+      ['Music box ring', {aSaw:0.4, bPulse:0.5, bSemi:19, ring:0.7, detune:0, cut:5000, fenv:-0.1, atk:3, dec:1800, sus:0, rel:1600, voices:1, wow:0.35, flutter:0.3, chorus:0.3, age:0.35, hiss:0.2}],
+      ['Detuned dawn', {aSaw:0.8, bSaw:0.8, bPulse:0, detune:18, voices:4, spread:0.55, drift:0.6, cut:2000, fenv:0.25, fatk:1500, fdec:3000, atk:1200, dec:3000, sus:0.9, rel:3000, wow:0.4, chorus:0.35, age:0.35, hiss:0.2}],
+      ['Nostalgic lead', {voices:1, aSaw:0.7, bPulse:0.5, detune:6, cut:2800, res:0.2, fenv:0.3, fatk:20, fdec:600, fsus:0.5, atk:25, dec:800, sus:0.8, rel:400, vib:14, vibRate:5, vibDelay:350, wow:0.45, flutter:0.3, chorus:0.25, sat:0.4, age:0.35, hiss:0.15}],
+      ['Wobbly bass', {oct:0, voices:1, aSaw:0.8, bPulse:0, sub:0.6, cut:520, res:0.3, fenv:0.45, fatk:3, fdec:320, fsus:0.25, atk:4, dec:600, sus:0.75, rel:220, wow:0.3, flutter:0.15, chorus:0, sat:0.5, age:0.25, hiss:0.1}],
+      ['Lost broadcast', {aSaw:0.5, bPulse:0.6, detune:11, noise:0.1, hp:600, hpRes:0.2, cut:2000, atk:600, rel:2000, wow:0.6, wowRate:0.8, flutter:0.6, chorus:0.3, sat:0.5, age:0.9, hiss:0.6}]]},
 };
 const xRows = []; let xKind = '';
 const XEV = () => { const v = V(), k = v.engine; if (!v[k]) v[k] = normX(k, null); return v[k]; };
