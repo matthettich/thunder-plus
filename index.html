@@ -1030,6 +1030,13 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
 /* A folded part (INST, …CHAINS, FX), like a folded device in Ableton: a narrow strip with its title running up it.
    Click the strip to open it again. SCOPE and TRACK never fold. */
 #tDeck .dks.col{flex:0 0 26px; min-width:26px; width:26px; cursor:pointer}
+/* Rules between parts when some are folded: each strip is ruled off on both sides (the part after it drops its own left
+   rule so lines never double), and with INST folded the space before TRACK opens up, so the last open part gets a
+   rule on its right too. With INST open nothing opens up, so a strip next to TRACK leaves the rule to TRACK. */
+#tDeck .dks.col{border-right:1px solid var(--line)}
+#tDeck .dks.col + .dks:not(#dkStrip), #tDeck .dks.col + .dks[hidden] + .dks:not(#dkStrip){border-left-color:transparent}
+#tDeck .dkbody:has(> #dkInst.col) > .dks:not(.col):not(#dkStrip):not([hidden]):has(~ #dkStrip):not(:has(~ .dks:not([hidden]):not(#dkStrip))){border-right:1px solid var(--line)}
+#tDeck .dkbody:has(> #dkInst:not(.col):not([hidden])) > .dks.col:has(+ #dkStrip){border-right:0}
 #tDeck .dks.col .dkb, #tDeck .dks.col .dki, #tDeck .dks.col .dkw, #tDeck .dks.col .dksp{display:none}
 #tDeck .dks.col .dkh{flex:1 1 auto; height:auto; padding:6px 0; justify-content:center; align-items:flex-start; border-bottom:0}
 #tDeck .dks.col .dkt{writing-mode:vertical-rl; transform:rotate(180deg); height:auto; max-height:100%; padding:7px 0; width:18px; flex:0 1 auto}

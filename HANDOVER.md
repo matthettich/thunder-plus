@@ -80,6 +80,9 @@ it. SCOPE and TRACK can't fold or hide (`d.scope = d.strip = true` on load; thei
 the right edge (`margin-left:auto`), so folding leaves empty space in the middle, to fill later. Gone: the hide toast,
 the + buttons (`#dkOffs` stays in the markup, hidden), the bare-header case, and Settings → SHOW ALL PANEL PARTS.
 This replaces the "+ buttons" item in the earlier bottom-panel note below.
+Rules: a folded strip has a rule on both sides (the open part after it hides its own left rule so lines don't double);
+with INST folded the last open part gets a right rule over the empty space; with INST open a strip next to TRACK drops
+its right rule (TRACK has one). All in CSS after `#tDeck .dks.col` (uses `:has`).
 
 ## 16 Oct (night): Song-screen Arrange polish, …chains in/out meters and track picking, boxed sections
 
