@@ -24,6 +24,33 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 17 Oct: classic drum machine kits (CR-78, 808, 606, 909, 707, 727, 505)
+
+- **What:** 97 new pad voices, one Presets group per machine ("808-style drums" and so on, appended after the other
+  groups so saved Recent picks keep their keys), and **File ▾ → Classic drum kits…** / **Settings → Kit → Classic
+  kits…**, which puts eight of one machine's sounds on pads 1–8 (synth slots and any extra drum pads untouched; each
+  pad is its own undo step). Kit pads follow the factory kit's order (kick, snare, clap, closed hat, open hat, tom,
+  percussion, extra) so a pattern plays sensibly on any kit; hats keep choke group 1 (the CR-78 has none).
+- **Code:** one block before `factoryVoicePresets()` in `index.html`: `x0xMachines()` (the voices), `x0xKits()` (the
+  eight per kit), `x0xTag`, `loadClassicKit(i)`, `pickClassicKit()`. All plain Layers voices — no new DSP, no samples.
+  Helpers inside: `hz(f, vt)` turns Hz into tune/fine (voices above C6 sit on a voice tuned +12/+24 so layers stay in
+  ±48), `cut(hold, dec)` is the voice amp used as a gate (808/606 open hats, sampled tails), `clap(...)` builds a clap,
+  `grain()` is 8-bit Degrade plus a voice low-pass on the 707/505 (sample-ROM) voices. `D(name, layers, opts, level,
+  drive)`: level puts each pad's loudest peak at the factory kit's (kicks −1 dB, toms −2, hits −3, hats/cymbals −7);
+  drive is only used as extra gain on the quiet filtered-noise pads (claps, hats, cymbals).
+- **How they were tuned:** rendered offline in Node with the app's own ENGINE block and measured against recordings
+  of the real machines (pitch and pitch sweep from zero crossings, decay in dB at set times, spectrum bands and peaks).
+  Tools in `tools/drums/` (`render.mjs` renders and range-checks, `compare.py` prints reference vs ours); the reference
+  recordings come from the `ritchse/tidal-drum-machines` collection and are only ever measured — not in the repo, not
+  in the app. Headline numbers: 808 kick 50 Hz from a ~85 Hz start, snare 172 + 338 Hz, toms 89/133/181, congas
+  201/281/412, clave 2.42 kHz, cowbell 557 + 824 Hz; 909 kick sweeps ~250 → 56 Hz (layer env 40 st / 38 ms with the
+  voice env −14 st / 15 ms, which gives the 909's slow-then-fast curve), snare tone 345 → 212 Hz; 606 kick 55 Hz.
+- **Names:** model numbers only, as style descriptors ("808-style", "909 Kick"), like the existing "(808-ish)"
+  presets; no "Roland", "TR-" or "CompuRhythm". Before a commercial release, decide whether to keep the numbers.
+- **Not heard by ear yet** (headless only): worth a listen on the Fold, especially the 727 star chime and quijada,
+  the CR-78 guiro and the 909 ride, which are the loosest matches.
+- **Cache:** `thunderplus-v159`.
+
 ## 16 Oct (late night): the Arrange mockups built — and how to take each back out
 
 The owner approved the "not built yet" boards on the Arrange design canvas and asked for them with an easy way back.
