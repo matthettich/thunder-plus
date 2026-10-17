@@ -560,6 +560,8 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .pbs .pit .pn.eng{display:flex; flex-direction:column; align-items:flex-start; gap:1px; white-space:normal; line-height:1.25; padding:8px 0}
 .pbs .pit .pn small{display:block; max-width:100%; font-weight:400; color:var(--muted); font-size:var(--fs-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis} .pbs .pit.cur .pn small{color:inherit; opacity:.8}
 .vengine .engbtn{min-height:36px; padding:6px 12px; font-weight:600}
+.vengine .enggrp{display:inline-flex; flex:none} .vengine .enggrp > button{margin:0} .vengine .enggrp > button + button{border-left:0}
+.vengine .engstep{min-height:36px; min-width:36px; padding:0 8px; font-size:var(--fs-3)}
 .updb.storeb{background:#c0392b; color:#fff; white-space:normal; max-width:calc(100vw - 32px); z-index:21}
 @media (max-width:480px){ .top .tmode .mx{display:inline} .top .tmode,.top .tcpu{padding:0 8px} .top .tcpu{min-width:72px} }
 .top .tcpu{border:1px solid var(--line); min-height:34px; background:var(--panel); padding:0 10px; min-width:84px; overflow:hidden}
@@ -6863,6 +6865,12 @@ const ENGINE_GROUPS = [
   ['Fonts', [['sf', 'SoundFont', 'a preset of a .sf2 / .sf3 file, General MIDI built in']]],
 ];
 const engineName = k => { for (const [, es] of ENGINE_GROUPS) for (const e of es) if (e[0] === k) return e[1]; return k; };
+function engineStep(d){
+  const all = ENGINE_GROUPS.flatMap(([, es]) => es.map(e => e[0]));
+  const curK = isBassV(V()) ? 'bass' : isVoxV(V()) ? 'vox' : isBlipV(V()) ? 'blip' : isXEngV(V()) ? V().engine : 'layers';
+  const i = all.indexOf(curK), n = all.length;
+  setEngine(all[((i < 0 ? 0 : i + d) % n + n) % n]);
+}
 const bassRows = [], bassSegs = []; let vEngUpd = null;
 const BV = () => { const v = V(); if (!v.bass) v.bass = normBass(null); return v.bass; };
 function bassEdit(){ changed(cur, true); bassVizKick(); }
@@ -6923,7 +6931,10 @@ function bassRandom(){
   $('bassRand').addEventListener('click', bassRandom);
   $('bassInit').addEventListener('click', () => bassPreset(0));
   if (ENGINE_SHEET){
-    const seg = $('vEngSeg'), b = el('button', 'sm engbtn'); b.type = 'button'; b.id = 'vEngBtn'; b.title = 'Choose the engine this pad runs'; seg.hidden = true; seg.after(b);
+    const seg = $('vEngSeg'), b = el('button', 'sm engbtn'); b.type = 'button'; b.id = 'vEngBtn'; b.title = 'Choose the engine this pad runs'; seg.hidden = true;
+    // ◀ ▶ either side step through the engines in the sheet's order (and wrap round), to audition them one after another.
+    const arr = (d, t, lab) => { const a = el('button', 'sm engstep', t); a.type = 'button'; a.title = lab; a.setAttribute('aria-label', lab); a.addEventListener('click', () => engineStep(d)); return a; };
+    const grp = el('span', 'enggrp'); grp.append(arr(-1, '◀', 'Previous engine'), b, arr(1, '▶', 'Next engine')); seg.after(grp);
     b.addEventListener('click', engineSheet);
     vEngUpd = () => { b.textContent = engineName(isBassV(V()) ? 'bass' : isVoxV(V()) ? 'vox' : isBlipV(V()) ? 'blip' : isXEngV(V()) ? V().engine : 'layers') + ' ▾'; }; vEngUpd();
   } else

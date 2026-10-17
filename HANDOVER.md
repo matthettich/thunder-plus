@@ -34,6 +34,7 @@ after `arrSize()`. Touch (pinch, AZ_STEPS) is unchanged.
 
 ## 16 Oct (late night): Synth page reset, meter, live-note limiter
 
+- Engine ◀ ▶ (`.enggrp` around `#vEngBtn`, `engineStep(d)`): cycles `ENGINE_GROUPS` flattened, wrapping, via `setEngine`.
 - `makeRow()` sliders reset to `def.d` on double-click of the slider itself (not only the label); mod-sequence steps
   reset to 0.
 - **Live notes bus:** `playNote`, `holdNote` and `play` now go `g → padOut()` instead of straight to `master`. `padOut()`

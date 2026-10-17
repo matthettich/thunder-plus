@@ -105,7 +105,7 @@ The top bar has two menus that work like ...Seeds': **File ▾** and **⚙ Setti
 
 ## Synth page on a computer
 
-Double-click any slider (or its name) to put it back to its default. The meter at the top right of the pad header shows the level of what you play on this page (pads, the keys, MIDI); past the 0 dB line it turns red. Everything played live goes through the same safety limiter as the song (Project → LIMITER), so a big chord on the Piano, Tine EP, Organ or any other engine is held down instead of clipping.
+Double-click any slider (or its name) to put it back to its default. The **◀ ▶** either side of the Engine button step through the engines in the list's order, so you can audition them one after another (each engine keeps its own settings on the pad). The meter at the top right of the pad header shows the level of what you play on this page (pads, the keys, MIDI); past the 0 dB line it turns red. Everything played live goes through the same safety limiter as the song (Project → LIMITER), so a big chord on the Piano, Tine EP, Organ or any other engine is held down instead of clipping.
 
 With Settings → App on Desktop and a window at least 1100 px wide, the synth page splits into three columns: the 16 slots as a list at the left (Drums, then Synths; click one to pick and hear it, as with the pads), the sound in the middle (name, waveform, voice controls, layers and the layer editor), and the pad's effects and the voice pitch, filter and amp controls in their own scrolling column at the right, so they stay in view while you edit layers. The keyboard works as before. A narrower window, or Mobile, shows the usual single column with the pads at the bottom.
 
