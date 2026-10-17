@@ -929,6 +929,62 @@ function mergeShared(palette, groupFam, portLabel){
   }
   if (portLabel) for (const k in SHARED_PORT_LABEL) if (!(k in portLabel)) portLabel[k] = SHARED_PORT_LABEL[k];
 }
+/* The module list, one layout for both editors. Each group names its modules in order; a module an editor doesn't
+   have is skipped, an empty group or section is left out, and a module not named here lands in "More" at the end, so
+   nothing new goes missing. Each group has a colour: its list items, and its modules on the patch (border and a light
+   tint), so what's what reads at a glance, zoomed out. */
+const PAL_LAYOUT = [
+  ['§In and out'],
+  ['In and out', '#0f8f8f', ['trackIn', 'chainOut', 'scin', 'resample', 'out']],
+  ['§Sound'],
+  ['Sound sources', '#b8792a', ['string', 'vco', 'fm', 'additive', 'noise', 'plaits', 'elements', 'bytebeat', 'blipdrum']],
+  ['§Mix and dynamics'],
+  ['Mix and level', '#7b8794', ['mixer', 'smixer', 'vca', 'utility', 'width', 'meter']],
+  ['Dynamics', '#e07a2e', ['comp', 'sccomp', 'limiter', 'ott', 'transient']],
+  ['§Effects'],
+  ['Filters and EQ', '#2e9e4f', ['eq', 'air', 'vcf', 'ladder', 'blades', 'autowah', 'envfilt', 'vowel']],
+  ['Drive and lo-fi', '#d23c3c', ['saturation', 'odrive', 'drive', 'tube', 'folder', 'cab', 'crush', 'lofi', 'degrade', 'tape', 'vinyl', 'dub']],
+  ['Modulation effects', '#c04ab8', ['chorus', 'ensemble', 'dimension', 'flanger', 'phaser', 'tremolo', 'rotary', 'ringmod', 'xmod', 'fshift', 'meta']],
+  ['Delays', '#3a8ee0', ['delay', 'pingpong', 'bbd', 'gdelay', 'pdelay', 'reverse']],
+  ['Reverbs', '#4a55c8', ['reverb', 'room', 'plate', 'spring', 'space', 'preverb', 'convolve']],
+  ['Resonators', '#8a9a1a', ['comb', 'reson', 'rings']],
+  ['Pitch and voice', '#e0609a', ['pshift', 'harm', 'autotune', 'vocoder']],
+  ['Granular and spectral', '#9a6ad6', ['clouds', 'beads', 'spectral', 'stretch']],
+  ['Rhythmic effects', '#d9b30f', ['tgate', 'sgate', 'repeat', 'retrig', 'flex']],
+  ['§Control'],
+  ['Notes and MIDI', '#a0703a', ['hostIn', 'seq']],
+  ['Modulation sources', '#6e4fc0', ['lfo', 'adsr', 'tides', 'random', 'marbles', 'chaos', 'steps']],
+  ['Clocks and rhythm', '#8c5a8c', ['clock', 'divider', 'euclid', 'logic', 'life']],
+  ['Audio → CV', '#4f6f9f', ['envfol', 'gateex', 'pitchfol', 'pitchtrk']],
+  ['CV utilities', '#9a8fb8', ['atten', 'math', 'slew', 'snh', 'quant']]
+];
+const PAL_COLOR = { More:'#888888' }, CAT_COLOR = {};
+// Rebuild the merged palette (in place) in PAL_LAYOUT's order; group families too, for anything still keyed on them.
+function organizePalette(palette, groupFam){
+  const label = new Map(); for (const [, items] of palette) for (const [t, l] of items || []) if (!label.has(t)) label.set(t, l);
+  const out = [], used = new Set(); let sec = null;
+  for (const [g, col, types] of PAL_LAYOUT){
+    if (g.startsWith('§')){ sec = [g, []]; continue; }
+    const items = types.filter(t => label.has(t) && !used.has(t)).map(t => [t, label.get(t)]);
+    if (!items.length) continue;
+    if (sec){ out.push(sec); sec = null; }
+    items.forEach(([t]) => { used.add(t); CAT_COLOR[t] = col; });
+    PAL_COLOR[g] = col; out.push([g, items]);
+    if (groupFam) groupFam[g] = /^(Notes|Modulation sources|Clocks|Audio →|CV)/.test(g) ? 'mod' : 'afx';
+  }
+  const rest = [...label].filter(([t]) => !used.has(t));
+  if (rest.length){ rest.forEach(([t]) => CAT_COLOR[t] = PAL_COLOR.More); out.push(['More', rest]); if (groupFam) groupFam.More = 'util'; }
+  palette.splice(0, palette.length, ...out);
+}
+// The colour styling: list items and group headers carry --cat; modules on the patch take it as their edge and tint.
+{
+  const css = `.pgroup.cat{--edge:var(--cat); box-shadow:inset 6px 0 0 var(--cat)}
+.pitem.cat{--edge:var(--cat)} .pitem.cat .sw{background:var(--cat)} .pghost.cat{--edge:var(--cat)} .pghost.cat .sw{background:var(--cat)}
+.node.cat{--edge:var(--cat); background:color-mix(in srgb, var(--panel) 87%, var(--cat) 13%)}
+.node.cat > header{background:color-mix(in srgb, var(--panel) 70%, var(--cat) 30%)}`;
+  const st = document.createElement('style'); st.textContent = css; document.head.append(st);
+}
+const catStyle = (el, type) => { const c = CAT_COLOR[type]; if (c){ el.classList.add('cat'); el.style.setProperty('--cat', c); } return el; };
 /* Displays: a Meter's bars and a Limiter's gain reduction, drawn from the engine's telemetry (shows). */
 {
   const css = `.shw{display:grid; gap:4px; padding:2px 0}
@@ -981,6 +1037,18 @@ function paintShows(list){
 }
 /* ===SHARED EDITOR END=== */
 
+/* Mixer: Inputs picks how many channels show, 1 to 16 (old patches open with 4). The rest hide, with their cables. */
+const MIXN = 16, MIXT = new Set(['mixer']);
+function mixDef(label, scope){
+  const inputs = {}, params = { chans:[4,1,MIXN,1] };
+  const ui = { chans:{ l:'Inputs', c:Array.from({ length:MIXN }, (_, i) => [i + 1, String(i + 1)]), fixed:true } };
+  for (let k = 1; k <= MIXN; k++){ inputs['in' + k] = 'audio'; params['l' + k] = [.8,0,1.5,.01]; ui['l' + k] = { l:'Level ' + k, f:pct }; }
+  params.level = [1,0,2,.01]; ui.level = { l:'Master', f:pct };
+  return { label, scope, inputs, outputs:{ out:'audio' }, params, ui };
+}
+// Which channel a port or control belongs to (In 5, Level 5, and its modulation jack), 0 for none.
+const mixChan = k => { const r = /^(?:p:)?(?:in|l)(\d+)$/.exec(k); return r ? +r[1] : 0; };
+const mixShown = (m, k) => !MIXT.has(m.type) || mixChan(k) <= (Math.round(m.params.chans) || 4);
 const MODULES = {
   hostIn:{ label:'Host In', scope:'root', inputs:{}, outputs:{ pitch:'cv', gate:'gate', vel:'cv' },
     params:{ transpose:[0,-48,48,1] }, ui:{ transpose:{l:'Transpose', f:semis} } },
@@ -1023,9 +1091,7 @@ const MODULES = {
     ui:{ cutoff:{l:'Cutoff', f:pct}, res:{l:'Resonance', f:pct}, mode:{l:'Mode', c:opts(['Low-pass','Band-pass','High-pass'])} } },
   vca:{ label:'VCA', scope:'poly', inputs:{ in:'audio', cv:'cv' }, outputs:{ out:'audio' },
     params:{ gain:[1,0,4,.01] }, ui:{ gain:{l:'Gain', f:times} } },
-  mixer:{ label:'Mixer', scope:'poly', inputs:{ in1:'audio', in2:'audio', in3:'audio', in4:'audio' }, outputs:{ out:'audio' },
-    params:{ l1:[.8,0,1.5,.01], l2:[.8,0,1.5,.01], l3:[.8,0,1.5,.01], l4:[.8,0,1.5,.01], level:[1,0,2,.01] },
-    ui:{ l1:{l:'Level 1', f:pct}, l2:{l:'Level 2', f:pct}, l3:{l:'Level 3', f:pct}, l4:{l:'Level 4', f:pct}, level:{l:'Master', f:pct} } },
+  mixer:mixDef('Mixer', 'poly'),
 
   eq:{ label:'EQ', fx:true, params:{ treble:[.5,0,1,.01], mid:[.5,0,1,.01], bass:[.5,0,1,.01], tfreq:[.4,0,1,.01], bfreq:[.4,0,1,.01], lowpass:[1,0,1,.01], hipass:[0,0,1,.01], out:[.5,0,1,.01] },
     ui:{ treble:{l:'Treble', f:v => db(v * 24 - 12)}, mid:{l:'Mid', f:v => db(v * 24 - 12)}, bass:{l:'Bass', f:v => db(v * 24 - 12)},
@@ -1091,7 +1157,8 @@ const CABLE = { audio:['#22958d','#16625d'], mod:['#7a58c8','#4b318e'], gate:['#
 const isCtl = k => k === 'mod' || k === 'gate';
 const PORT_LABEL = { pitch:'Pitch', gate:'Gate', vel:'Velocity', fm:'FM', out:'Out', outR:'Out R', reset:'Reset', in:'In', inR:'In R', cv:'CV',
   cutoff:'Cutoff', timbre:'Timbre', morph:'Morph', harmonics:'Harmonics', aux:'Aux', index:'Index', strength:'Strength', clock:'Clock',
-  in1:'In 1', in2:'In 2', in3:'In 3', in4:'In 4' };
+};
+for (let k = 1; k <= MIXN; k++) PORT_LABEL['in' + k] = 'In ' + k;
 const NOTES = {
   hostIn:'Notes from your computer keyboard, MIDI, the on-screen keys and Sequencers.',
   seq:'Plays its steps through Host In, like a keyboard. Set the tempo in Settings.',
@@ -1291,7 +1358,7 @@ class WavesBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './waves-worklet.js?v=20';
+    const url = opts.url || './waves-worklet.js?v=21';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'waves', {
@@ -1411,9 +1478,24 @@ function portEl(n, port, kind, dir){
 function setParam(n, key, v, fromUser){
   n.m.params[key] = v;
   if (bridge) bridge.setParam(n.m.id, key, v);
+  if (key === 'chans' && MIXT.has(n.m.type)){ mixResize(n); return; }
   const c = n.ctl[key]; if (c && !fromUser) c.show();
   if (n.m.type === 'out' && key === 'slot') paintNote(n);
   store.touch();
+}
+// The Mixer's Inputs changed: cables into channels that are now hidden come out, and it's drawn again.
+function mixResize(n){
+  const m = n.m, gone = doc.cables.filter(c => c.to[0] === m.id && !mixShown(m, c.to[1]));
+  for (const c of gone) disconnect(c, true);
+  rebuildNode(m.id);
+  store.touch();
+  if (gone.length) toast(gone.length === 1 ? 'Removed the cable from a hidden input.' : 'Removed ' + gone.length + ' cables from hidden inputs.');
+}
+function rebuildNode(id){
+  const o = nodes.get(id); if (!o) return;
+  o.el.remove(); nodes.delete(id);
+  buildNode(o.m);
+  syncCableEls(); markMapped(); markScene();
 }
 function slider(n, key, spec){
   const [def, min, max, step] = spec, fmt = fmtOf(n.m.type, key), label = plabel(n.m.type, key);
@@ -1465,8 +1547,9 @@ function choice(n, key, options){
   sel.addEventListener('pointerdown', () => store.snapshot());
   sel.addEventListener('keydown', e => e.stopPropagation());
   sel.addEventListener('change', () => setParam(n, key, +sel.value, true));
+  const fixed = (MODULES[n.m.type].ui[key] || {}).fixed;   // a setting, not a sound: nothing to modulate
   const r = h('label', {class:'row wide sl', 'data-jackhost':'', 'data-id': n.m.id, 'data-key': key},
-    makeJack(n, 'p:' + key, 'mod', 'in', true), h('span', {class:'lbl', text: label}), sel);
+    fixed ? h('span', {class:'jack small', style:'visibility:hidden', 'aria-hidden':'true'}) : makeJack(n, 'p:' + key, 'mod', 'in', true), h('span', {class:'lbl', text: label}), sel);
   n.ctl[key].row = r; n.ctl[key].sel = sel; n.ctl[key].opts = options;
   n.ctl[key].tag = h('span', {class:'cmval', hidden:true}); r.append(n.ctl[key].tag);
   r.addEventListener('pointerdown', e => { if (learn && learn.on && !e.target.closest('.jack')){ e.preventDefault(); armLearn(n, key, r); } });
@@ -1491,7 +1574,8 @@ function buildNode(m){
   n.foldBtn = fold;
   const head = h('header', {title:'Double-click to collapse or expand'}, fold, h('span', {class:'t', text: title}),
     h('button', {class:'x', 'aria-label':'Remove ' + title, title:'Remove', text:'×', onclick: () => { store.snapshot(); removeModule(m.id); }}));
-  const ins = Object.keys(def.inputs), outs = Object.keys(def.outputs);
+  for (const k in def.params) if (m.params[k] == null) m.params[k] = def.params[k][0];
+  const ins = Object.keys(def.inputs).filter(p => mixShown(m, p)), outs = Object.keys(def.outputs);
   const ports = (ins.length || outs.length) ? h('div', {class:'ports'},
     h('div', {class:'ins'}, ins.map(p => portEl(n, p, def.inputs[p], 'in'))),
     h('div', {class:'outs'}, outs.map(p => portEl(n, p, def.outputs[p], 'out')))) : null;
@@ -1499,6 +1583,7 @@ function buildNode(m){
   for (const k in def.params){
     if (m.params[k] == null) m.params[k] = def.params[k][0];
     if ((def.ui[k] || {}).hide) continue;   // edited by the module's own display (bars, a grid)
+    if (!mixShown(m, k)) continue;          // a mixer channel above its Inputs
     const ch = choicesOf(m.type, k);
     kids.push(ch ? choice(n, k, ch) : slider(n, k, def.params[k]));
   }
@@ -1506,7 +1591,7 @@ function buildNode(m){
   if (def.display) kids.push(buildShow(n));
   if (NOTES[m.type]){ n.note = h('div', {class:'status'}); kids.push(n.note); }
   const body = h('div', {class:'body'}, kids);
-  n.el = h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id}, head, ports, body);
+  n.el = catStyle(h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id}, head, ports, body), m.type);
   n.head = head;
   n.el.style.left = m.pos[0] + 'px'; n.el.style.top = m.pos[1] + 'px';
   n.el.style.zIndex = ++zTop;
@@ -1521,11 +1606,13 @@ function buildNode(m){
     head.setPointerCapture(e.pointerId);
     // Dragging a selected module moves the whole selection.
     const group = [...selected].map(id => nodes.get(id)).filter(Boolean);
-    const sx = e.clientX, sy = e.clientY, start = group.map(g => [g, g.m.pos[0], g.m.pos[1]]);
+    // Alt/Option-drag carries a copy instead (made once the mouse really moves), leaving the originals where they are.
+    const sx = e.clientX, sy = e.clientY, dup = e.altKey;
+    let start = group.map(g => [g, g.m.pos[0], g.m.pos[1]]);
     let extra = [0, 0], lastEv = e, moved = false;
     const place = () => {
       const z = view().zoom, dx = (lastEv.clientX - sx - extra[0]) / z, dy = (lastEv.clientY - sy - extra[1]) / z;
-      if (!moved && Math.hypot(dx, dy) > 1){ moved = true; store.snapshot(); }
+      if (!moved && Math.hypot(dx, dy) > (dup ? 4 : 1)){ moved = true; store.snapshot(); if (dup) start = dupForDrag(group); }
       if (!moved) return;
       for (const [g, ox, oy] of start){ g.m.pos = [Math.round(ox + dx), Math.round(oy + dy)]; g.el.style.left = g.m.pos[0] + 'px'; g.el.style.top = g.m.pos[1] + 'px'; }
     };
@@ -1988,7 +2075,7 @@ function pasteGraph(graph, pos){
   const idmap = new Map(), ids = [];
   for (const cm of graph.modules){
     if (!MODULES[cm.type]) continue;
-    const m = { id:newId(), type:cm.type, scope:cm.scope || MODULES[cm.type].scope, pos:[pos[0] + cm.pos[0], pos[1] + cm.pos[1]], collapsed:!!cm.collapsed, params:Object.assign({}, cm.params) };
+    const m = Object.assign(JSON.parse(JSON.stringify(cm)), { id:newId(), scope:cm.scope || MODULES[cm.type].scope, pos:[pos[0] + cm.pos[0], pos[1] + cm.pos[1]], collapsed:!!cm.collapsed, params:Object.assign({}, cm.params) });
     idmap.set(cm.id, m.id); doc.modules.push(m);
     if (bridge) bridge.addModule(m.id, m.type, { params:m.params, pos:m.pos });
     buildNode(m); ids.push(m.id);
@@ -2001,6 +2088,16 @@ function pasteGraph(graph, pos){
   }
   syncCableEls(); store.touch();
   return ids;
+}
+// Alt/Option-drag: copy the dragged modules where they stand (with the cables between them, as Duplicate does), select
+// the copies and hand them back to be carried, so the copy lands where the mouse lets go.
+function dupForDrag(group){
+  const ids = new Set(group.map(g => g.m.id));
+  const graph = { modules: doc.modules.filter(m => ids.has(m.id)).map(m => JSON.parse(JSON.stringify(m))),
+    cables: doc.cables.filter(c => ids.has(c.from[0]) && ids.has(c.to[0])).map(c => ({ from:c.from.slice(), to:c.to.slice(), pts:c.pts && c.pts.map(q => q.slice()) })) };
+  const made = pasteGraph(graph, [0, 0]);
+  clearSel(); made.forEach(id => setSel(id, true));
+  return made.map(id => nodes.get(id)).filter(Boolean).map(g => [g, g.m.pos[0], g.m.pos[1]]);
 }
 function addCustom(defId, pos){ const def = doc.custom.find(c => c.id === defId); return def ? pasteGraph(def.graph, pos) : []; }
 
@@ -2083,6 +2180,7 @@ const PALETTE = [
 ];
 const GROUP_FAM = { 'Sound sources':'gen', 'Filters and amps':'util', 'Effects':'afx', 'Output':'aout', 'Notes and MIDI':'midi', 'Modulation sources':'mod' };
 mergeShared(PALETTE, GROUP_FAM, PORT_LABEL);
+organizePalette(PALETTE, GROUP_FAM);
 const isSection = g => g.startsWith('§');
 const PSTORE = KP + 'palette';
 let pstate = { open:{}, quick:['hostIn', 'vco', 'adsr', 'vca', 'out'] };
@@ -2091,40 +2189,52 @@ const psave = () => { try { localStorage.setItem(PSTORE, JSON.stringify(pstate))
 const LABELS = {};
 for (const [, items] of PALETTE) for (const [t, l] of items) LABELS[t] = l;
 const quickEl = document.getElementById('quick'), stars = {};
+let paletteDrag = null;
 function paletteItem(type, label, big){
   const custom = type.startsWith('c:');
   const kind = custom ? 'mod' : DOT(type);
   const sw = () => h('span', {class:'sw', style:'--k:var(--' + kind + ')'});
   const famCls = custom ? ' fam-grp' : ' fam-' + famOf(type);
-  const b = h('button', {class:'pitem' + famCls + (big ? ' big' : ''), title:'Click to add, or drag onto the patch'}, sw(), label);
+  const b = catStyle(h('button', {class:'pitem' + famCls + (big ? ' big' : ''), 'data-type': type, title:'Click to add, or drag onto the patch'}, sw(), label), type);
   // Click adds to the middle of the view; dragging places it where you drop.
   b.addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
+    if (paletteDrag) paletteDrag(null);   // a drag that never heard its release ends before the next one starts
     // A finger leaves the list free to scroll (touch-action:pan-y): an up/down swipe scrolls it and the browser cancels
     // this press, while a sideways pull towards the patch drags the module out. A mouse or pen drags straight away.
-    const touch = e.pointerType === 'touch';
-    if (!touch){ e.preventDefault(); b.setPointerCapture(e.pointerId); }
-    const sx = e.clientX, sy = e.clientY; let ghost = null;
+    const touch = e.pointerType === 'touch', pid = e.pointerId;
+    if (!touch){ e.preventDefault(); try { b.setPointerCapture(pid); } catch(_){} }
+    const sx = e.clientX, sy = e.clientY; let ghost = null, done = false;
+    // Listened for on the window, not the button, so the release still arrives if the button loses its pointer capture.
     const mv = ev => {
+      if (ev.pointerId !== pid) return;
+      // The release went missing (let go outside the frame, a system menu took it…): a mouse that moves with no button
+      // down finishes the drag right there, instead of leaving the ghost stuck on the patch.
+      if (!touch && ev.buttons === 0){ end(ghost ? ev : null); return; }
       if (!ghost && Math.hypot(ev.clientX - sx, ev.clientY - sy) > (touch ? 10 : 6)){
         if (touch && Math.abs(ev.clientY - sy) > Math.abs(ev.clientX - sx)) return;   // still a scroll, not a drag
-        if (touch){ try { b.setPointerCapture(ev.pointerId); } catch(_){} }
-        ghost = h('div', {class:'pghost' + famCls}, sw(), label); document.body.append(ghost);
+        if (touch){ try { b.setPointerCapture(pid); } catch(_){} }
+        ghost = catStyle(h('div', {class:'pghost' + famCls}, sw(), label), type); document.body.append(ghost);
       }
       if (ghost){ ghost.style.left = (ev.clientX + 10) + 'px'; ghost.style.top = (ev.clientY + 8) + 'px'; }
     };
-    const up = ev => {
-      b.removeEventListener('pointermove', mv); b.removeEventListener('pointerup', up); b.removeEventListener('pointercancel', up);
+    const up = ev => { if (ev.pointerId === pid) end(ev); };
+    const end = ev => {
+      if (done) return; done = true; paletteDrag = null;
+      window.removeEventListener('pointermove', mv, true); window.removeEventListener('pointerup', up, true);
+      window.removeEventListener('pointercancel', up, true);
+      if (ghost) ghost.remove();
+      if (!ev || ev.type === 'pointercancel') return;
       const r = ws.getBoundingClientRect(), v = view();
       if (ghost){
-        ghost.remove();
-        if (ev.type === 'pointercancel') return;
         const inside = ev.clientX > r.left && ev.clientX < r.right && ev.clientY > r.top && ev.clientY < r.bottom && !palette.contains(document.elementFromPoint(ev.clientX, ev.clientY));
         if (!inside) return;
         addItem(type, Math.round((ev.clientX - r.left - v.x) / v.zoom - 20), Math.round((ev.clientY - r.top - v.y) / v.zoom - 16));
-      } else if (ev.type !== 'pointercancel') addAtCenter(type);
+      } else addAtCenter(type);
     };
-    b.addEventListener('pointermove', mv); b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+    paletteDrag = end;
+    window.addEventListener('pointermove', mv, true); window.addEventListener('pointerup', up, true);
+    window.addEventListener('pointercancel', up, true);
   });
   b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); addAtCenter(type); } });
   return b;
@@ -2156,6 +2266,7 @@ function groupHeader(name, count, cls, onOpen){
   const grid = h('div', {class:'pgrid', hidden: !open});
   const cnt = h('span', {class:'pcount', text: count == null ? '' : String(count)});
   const hdr = h('button', {class:'pgroup ' + cls, 'aria-expanded': String(open)}, h('span', {class:'chev', 'aria-hidden':'true'}), h('span', {text: name}), cnt);
+  if (PAL_COLOR[name] && cls.includes('tinted')){ hdr.classList.add('cat'); hdr.style.setProperty('--cat', PAL_COLOR[name]); }
   const setOpen = o => { grid.hidden = !o; hdr.setAttribute('aria-expanded', String(o)); hdr.classList.toggle('open', o); pstate.open[name] = o; };
   setOpen(open);
   hdr.addEventListener('click', () => { setOpen(grid.hidden); psave(); updateAllBtn(); });
@@ -2341,7 +2452,7 @@ function helpDoc(){
     elements:'Mutable Instruments Elements: a modal voice where a bow, a breath and a mallet excite a resonator. Patch Pitch and Gate from Host In.',
     vcf:'A filter. Low-pass softens, band-pass keeps the middle, high-pass thins. Patch an envelope into Cutoff for classic sweeps.',
     vca:'An amplifier. Patch an envelope into CV so notes start and stop (with nothing in CV it stays open); Gain sets the loudness.',
-    mixer:'Mixes up to four sounds, each with its own level, plus a master level.',
+    mixer:'Mixes up to 16 sounds, each with its own level, plus a master level. Inputs sets how many channels it shows (4 to start).',
     eq:'Airwindows EQ: treble, mid and bass with their frequencies, plus low-pass and high-pass filters.',
     comp:'Airwindows Pressure4: a compressor. Pressure sets how hard it works; Mix blends in the dry sound for parallel compression.',
     saturation:'Airwindows Density: warm saturation and drive.',
@@ -2365,7 +2476,7 @@ function helpDoc(){
     ['Polyphony', 'Host In runs once for every voice, and so does anything it feeds; everything else (effects, LFOs, Out) runs once. Put effects after the voices, before Out.'],
     ['Moving around', 'Drag the background or scroll with two fingers to pan. Pinch, Ctrl-scroll or a mouse wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
-    ['Selecting and the right-click menu', 'Shift-click or Shift-drag to select modules. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
+    ['Selecting and the right-click menu', 'Shift-click or Shift-drag to select modules. Hold Option (Alt on Windows) and drag a module’s title bar to copy it (or the selection) and drop the copy where you let go. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
     ['Playing', 'Your computer keyboard plays notes: Z to M is the lower octave, Q to P the upper one, and - and = change octave. MIDI keyboards work too, and on touch screens the Keys bar in the corner of the patch plays notes.'],
     ['MIDI learn', 'Press MIDI learn, click a slider, then move a knob on your controller. Press Delete to clear the slider’s mapping, and Done when you’re finished.'],
     ['Saving', 'Your patch saves itself as you work. File → Save downloads it as a file; Open loads one. Settings → Backups holds earlier versions.']

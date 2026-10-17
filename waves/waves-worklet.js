@@ -305,16 +305,28 @@ const VCA = {
   }
 };
 
-const Mixer = {
-  type:'mixer', scope:'poly', cost:.1,
-  inputs:{ in1:'audio', in2:'audio', in3:'audio', in4:'audio' }, outputs:{ out:'audio' },
-  params:{ l1:[.8,0,1.5,.01], l2:[.8,0,1.5,.01], l3:[.8,0,1.5,.01], l4:[.8,0,1.5,.01], level:[1,0,2,.01] },
-  create:() => ({}),
-  process(st, io, ctx){
-    const p = io.p, a = io.in.in1, b = io.in.in2, c = io.in.in3, d = io.in.in4, o = io.out.out;
-    for (let i = 0; i < ctx.block; i++) o[i] = (a[i] * p.l1 + b[i] * p.l2 + c[i] * p.l3 + d[i] * p.l4) * p.level;
-  }
-};
+/* Mixer: Inputs (chans) picks how many channels are in use, 1 to 16 (old patches load with 4). Channels above it are
+   skipped, and only patched inputs cost anything. Names are made once here, so nothing is built per block. */
+const MIXN = 16;
+const MXI = Array.from({ length:MIXN }, (_, i) => 'in' + (i + 1)), MXL = MXI.map((_, i) => 'l' + (i + 1));
+const Mixer = (() => {
+  const inputs = {}, params = { chans:[4,1,MIXN,1] };
+  for (let i = 0; i < MIXN; i++){ inputs[MXI[i]] = 'audio'; params[MXL[i]] = [.8,0,1.5,.01]; }
+  params.level = [1,0,2,.01];
+  return {
+    type:'mixer', scope:'poly', cost:.1, inputs, outputs:{ out:'audio' }, params,
+    create:() => ({}),
+    process(st, io, ctx){
+      const p = io.p, o = io.out.out, n = ctx.block, N = clamp(Math.round(p.chans) || 4, 1, MIXN);
+      o.fill(0);
+      for (let k = 0; k < N; k++){
+        if (!linked(io, MXI[k])) continue;
+        const x = io.in[MXI[k]], g = p[MXL[k]] * p.level;
+        for (let i = 0; i < n; i++) o[i] += x[i] * g;
+      }
+    }
+  };
+})();
 
 /* ── effects: ...Thunder's track effects (Airwindows, DaisySP, Mutable Instruments) ──
    Stereo: Right in is optional (the left/mono input feeds both sides when it's empty). */

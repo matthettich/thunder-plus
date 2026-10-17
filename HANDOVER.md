@@ -24,6 +24,35 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 16 Oct (late night): …chains/…waves mixers, Alt-drag copies, jack meters, module list and colours
+
+- **Mixers:** `mixer` (both editors) and `smixer` (…chains) have **Inputs** (`chans`, 1–16, default 4 so old patches
+  load unchanged). Defs are built by `mixDef()` in each editor and each worklet (params/inputs must stay identical:
+  `chans, l1(,p1)…l16(,p16), level`). The worklet only sums `k < chans` and only patched inputs. Editor: `mixShown(m, k)`
+  hides ports/sliders above Inputs; changing it runs `mixResize()` (drops cables into hidden inputs and their
+  bottom-panel controls, then `rebuildNode()`). `ui.fixed` = a choice without a modulation jack and kept out of the panel.
+- **Stereo mixer** (`smixer`, …chains only): pairs In N / In N R with Level and Pan each (balance: centre is unity on
+  both sides), a lone side feeds both. **CHN follows the patch:** `chainsAutoOn(before)` in the app compares
+  `chainsTracks()` before and after an edit (save, `param('track')`, `mod`) once things settle (`setTimeout 0`) and turns
+  `S.chainOn[t]` on for any track that newly has a Track In + Chain Out, with a toast.
+- **Alt/Option-drag a title bar** copies the module (or the selection) once the mouse moves (`dupForDrag` → `pasteGraph`
+  at the same spot, then the drag carries the copies). `pasteGraph` now keeps every module field, and in …chains
+  `pasteTracks()` moves pasted Track In / Chain Out to free tracks (a pasted pair stays a pair; the app then turns CHN on).
+- **Palette drag fix:** the drag listens on `window` (pointerId-filtered) and a mouse move with no button down finishes it
+  (`paletteDrag`), so a lost release can't leave the ghost stuck on the patch.
+- **Jack meters (…chains):** the engine keeps per-jack peaks while telemetry is on (`_jackPeaks`, `io.pko/pki`) and
+  sends `jacks:[id,'in'|'out',port,peak]`; the app merges them across track engines (max) into `api.meters({jacks})`;
+  `paintJacks()` draws the thin `.pm` bar beside every port. Standalone uses the editor's own telemetry.
+- **Sidechain In:** new **Duck** output (1 − envelope: into a VCA's CV to pump), **Sensitivity** (dB, detector only) and
+  **Release**; the envelope is now smoothed (2 ms attack) instead of following the waveform. Level only sets Audio out.
+  The Env output was never inverted (it rises with the hit, like any envelope follower); Sidechain Comp ducks as before.
+- **Module list and colours (shared block):** `PAL_LAYOUT` (in the SHARED EDITOR block, synced to …waves with
+  `tools/sync-shared.py`) sets the groups, their order and a colour each; `organizePalette()` rebuilds the merged palette
+  after `mergeShared()`, anything not named lands in "More". `catStyle(el, type)` gives list items, group headers and
+  modules `--cat`: border + light tint (`.node.cat`), so groups read at a glance zoomed out (term skins keep their
+  border colour; the tint and the list dots still show). Add a new module type to a `PAL_LAYOUT` group.
+- Cache-busters: `chains-worklet.js?v=26`, `waves-worklet.js?v=21`; cache `thunderplus-v149`.
+
 ## 16 Oct (night): bottom panel parts fold instead of hiding
 
 The owner didn't want hide-and-restore at all: INST, …CHAINS and FX now **fold** (`DK_FOLD`; `deck.inst/chn/fx` false =

@@ -85,16 +85,55 @@ const VCA = {
   }
 };
 
-const Mixer = {
+/* Mixers: Inputs (chans) picks how many channels are in use, 1 to 16 (old patches load with 4). Channels above it are
+   skipped, and only patched inputs cost anything. Names are made once here, so nothing is built per block. */
+const MIXN = 16;
+const MXI = Array.from({ length:MIXN }, (_, i) => 'in' + (i + 1)), MXR = MXI.map(n => n + 'R');
+const MXL = MXI.map((_, i) => 'l' + (i + 1)), MXP = MXI.map((_, i) => 'p' + (i + 1));
+function mixDef(stereo){
+  const inputs = {}, params = { chans:[4,1,MIXN,1] };
+  for (let i = 0; i < MIXN; i++){
+    inputs[MXI[i]] = 'audio'; if (stereo) inputs[MXR[i]] = 'audio';
+    params[MXL[i]] = [.8,0,1.5,.01]; if (stereo) params[MXP[i]] = [0,-1,1,.01];
+  }
+  params.level = [1,0,2,.01];
+  return { inputs, params };
+}
+const mixCount = p => clamp(Math.round(p.chans) || 4, 1, MIXN);
+
+const Mixer = Object.assign({
   type:'mixer', scope:'mono', cost:.1,
-  inputs:{ in1:'audio', in2:'audio', in3:'audio', in4:'audio' }, outputs:{ out:'audio' },
-  params:{ l1:[.8,0,1.5,.01], l2:[.8,0,1.5,.01], l3:[.8,0,1.5,.01], l4:[.8,0,1.5,.01], level:[1,0,2,.01] },
+  outputs:{ out:'audio' },
   create:() => ({}),
   process(st, io, ctx){
-    const p = io.p, a = io.in.in1, b = io.in.in2, c = io.in.in3, d = io.in.in4, o = io.out.out;
-    for (let i = 0; i < ctx.block; i++) o[i] = (a[i] * p.l1 + b[i] * p.l2 + c[i] * p.l3 + d[i] * p.l4) * p.level;
+    const p = io.p, o = io.out.out, n = ctx.block, N = mixCount(p);
+    o.fill(0);
+    for (let k = 0; k < N; k++){
+      if (!linked(io, MXI[k])) continue;
+      const x = io.in[MXI[k]], g = p[MXL[k]] * p.level;
+      for (let i = 0; i < n; i++) o[i] += x[i] * g;
+    }
   }
-};
+}, mixDef(false));
+
+/* Stereo mixer: up to sixteen stereo inputs (a pair each: In 1 and In 1 R…), each with a level and a pan (balance),
+   into a stereo out with a master level. A pair with only one side patched feeds that side to both. Centre pan is unity
+   on both sides, so a stereo source passes through untouched; panning turns the other side down. */
+const StereoMixer = Object.assign({
+  type:'smixer', scope:'mono', cost:.15,
+  outputs:{ out:'audio', outR:'audio' },
+  create:() => ({}),
+  process(st, io, ctx){
+    const p = io.p, oL = io.out.out, oR = io.out.outR, n = ctx.block, N = mixCount(p);
+    oL.fill(0); oR.fill(0);
+    for (let k = 0; k < N; k++){
+      const a = MXI[k], b = MXR[k], la = linked(io, a), lb = linked(io, b); if (!la && !lb) continue;
+      const L = la ? io.in[a] : io.in[b], R = lb ? io.in[b] : io.in[a];
+      const g = p[MXL[k]] * p.level, pn = p[MXP[k]], gL = g * (pn > 0 ? 1 - pn : 1), gR = g * (pn < 0 ? 1 + pn : 1);
+      for (let i = 0; i < n; i++){ oL[i] += L[i] * gL; oR[i] += R[i] * gR; }
+    }
+  }
+}, mixDef(true));
 
 /* ── effects: ...Thunder's track effects (Airwindows, DaisySP, Mutable Instruments) ──
    Stereo: Right in is optional (the left/mono input feeds both sides when it's empty). */
@@ -381,15 +420,20 @@ const ChainOut = {
    Sidechain Comp ducks its own input by that bus (or by whatever is patched into its SC input). */
 const SidechainIn = {
   type:'scin', scope:'mono', cost:.05,
-  inputs:{}, outputs:{ out:'audio', env:'cv' },
-  params:{ send:[1,0,1,.01] },
+  inputs:{}, outputs:{ out:'audio', env:'cv', duck:'cv' },
+  params:{ send:[1,0,1,.01], sens:[6,-12,24,.5], release:[150,10,1000,1] },
   create:()=>({ env:0 }),
+  // Env rises as the sidechain hits (to open a filter, say); Duck is its mirror, 1 while the sidechain is quiet and
+  // dipping on each hit, ready for a VCA's CV to pump a sound. Sensitivity (dB) sets how hard the hits push them (a
+  // quiet kick needs more); Level only sets the audio Out. A 2 ms attack and the Release make a smooth envelope.
   process(st, io, ctx){
-    const L = ctx.scL, R = ctx.scR, g = io.p.send;
+    const L = ctx.scL, R = ctx.scR, g = io.p.send, oE = io.out.env, oD = io.out.duck, sg = Math.pow(10, io.p.sens / 20);
+    const ka = 1 - Math.exp(-1 / (.002 * ctx.sr)), kr = 1 - Math.exp(-1 / Math.max(1, io.p.release / 1000 * ctx.sr));
     for (let i = 0; i < ctx.block; i++){
-      const x = (L[i] + R[i]) * .5 * g, a = Math.abs(x);
-      st.env += (a - st.env) * (a > st.env ? .5 : .02);
-      io.out.out[i] = x; io.out.env[i] = st.env;
+      const x = (L[i] + R[i]) * .5, a = (x < 0 ? -x : x) * sg;
+      st.env += (a - st.env) * (a > st.env ? ka : kr);
+      const e = st.env > 1 ? 1 : st.env;
+      io.out.out[i] = x * g; oE[i] = e; oD[i] = 1 - e;
     }
   }
 };
@@ -4020,7 +4064,7 @@ const SHARED_MODULES = { beads:Beads,
 
 const MODULES = { ...SHARED_MODULES, trackIn:TrackIn,
   vocoder:Vocoder,
-  vcf:VCF, vca:VCA, mixer:Mixer,
+  vcf:VCF, vca:VCA, mixer:Mixer, smixer:StereoMixer,
   eq:EQ, comp:Comp, saturation:Saturation, tape:Tape, chorus:Chorus, crush:Crush, delay:Delay, reverb:Reverb, rings:Rings, clouds:Clouds, beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
@@ -4192,13 +4236,21 @@ class ChainsEngine {
     const ctx = this._ctx;
     ctx.block = frames; ctx.quality = this.quality; ctx.transport = this.transport;
     ctx._inL = this.trackInL; ctx._inR = this.trackInR;
-    const act = this._active();
+    const act = this._active(), meter = this.telemetryOn === true;
     for (const id of this.graph.order){
       if (act && !act.has(id)) continue;
       const m = this.graph.mods.get(id);
       const io = this._bufs(m); this._gather(m, io);
       m.def.process(this._state(m), io, ctx);
+      if (meter) this._jackPeaks(io, frames);
     }
+  }
+  /* Jack meters (only while the editor shows them): the loudest sample on each output, and on each patched input,
+     since the last telemetry. Plain loops over what io already holds, so nothing is made per block. */
+  _jackPeaks(io, n){
+    const po = io.pko || (io.pko = {}), pi = io.pki || (io.pki = {});
+    for (const k in io.out){ const b = io.out[k]; let x = po[k] || 0; for (let i = 0; i < n; i++){ const a = b[i] < 0 ? -b[i] : b[i]; if (a > x) x = a; } po[k] = x; }
+    for (const k in io.in){ if (!io.linked.has(k)) continue; const b = io.in[k]; let x = pi[k] || 0; for (let i = 0; i < n; i++){ const a = b[i] < 0 ? -b[i] : b[i]; if (a > x) x = a; } pi[k] = x; }
   }
   /* Date.now() is coarse, but its average over many blocks is the real cost. */
   _tickLoad(ms, frames){
@@ -4230,7 +4282,14 @@ class ChainsEngine {
       const s = this._states.get(m.id) || this._states.get(m.id + '#0');
       if (s) try { shows.push([m.id, m.def.show(s.st)]); } catch (e) {}
     }
-    return { load:this.load, quality:this.quality, buses, mods, shows, wasm:{ tfx:!!WASM.tfxX } };
+    // Jack meters: [module id, 'in' or 'out', port, peak] for every jack that carried anything, then start over.
+    const jacks = [];
+    for (const m of this.graph.mods.values()){
+      const io = this._ios.get(m.id); if (!io) continue;
+      if (io.pko) for (const k in io.pko){ const v = io.pko[k]; if (v > 1e-4) jacks.push([m.id, 'out', k, Math.round(Math.min(v, 4) * 1000) / 1000]); io.pko[k] = 0; }
+      if (io.pki) for (const k in io.pki){ const v = io.pki[k]; if (v > 1e-4) jacks.push([m.id, 'in', k, Math.round(Math.min(v, 4) * 1000) / 1000]); io.pki[k] = 0; }
+    }
+    return { load:this.load, quality:this.quality, buses, mods, shows, jacks, wasm:{ tfx:!!WASM.tfxX } };
   }
   handleMessage(m){
     switch (m.op){
