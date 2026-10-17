@@ -86,6 +86,9 @@ after `arrSize()`. Touch (pinch, AZ_STEPS) is unchanged.
 - **Jack meters (…chains):** the engine keeps per-jack peaks while telemetry is on (`_jackPeaks`, `io.pko/pki`) and
   sends `jacks:[id,'in'|'out',port,peak]`; the app merges them across track engines (max) into `api.meters({jacks})`;
   `paintJacks()` draws the thin `.pm` bar beside every port. Standalone uses the editor's own telemetry.
+- **Jack meters in …waves too:** the waves engine keeps one peak record per module (`_jp`, across all its voices) in
+  `_jackPeaks` while telemetry is on, and sends `jacks` the same way; the editor's `portEl`/`paintJacks` match …chains.
+  The meters show the editor's own engine (what you play in …waves). `waves-worklet.js?v=22`.
 - **Sidechain In:** new **Duck** output (1 − envelope: into a VCA's CV to pump), **Sensitivity** (dB, detector only) and
   **Release**; the envelope is now smoothed (2 ms attack) instead of following the waveform. Level only sets Audio out.
   The Env output was never inverted (it rises with the hit, like any envelope follower); Sidechain Comp ducks as before.

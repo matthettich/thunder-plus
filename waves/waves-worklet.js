@@ -4248,7 +4248,7 @@ class WavesEngine {
     } else { io.p = io.base; io.mods = null; }
   }
   _render(frames){
-    const ctx = this._ctx;
+    const ctx = this._ctx, meter = this.telemetryOn === true;
     ctx.block = frames; ctx.quality = this.quality; ctx.notes = this.voices.rows; ctx.transport = this.transport;
     this.voices.now += frames;
     const hold = this.sr * 12, quietFor = this.sr * 0.25;
@@ -4264,6 +4264,7 @@ class WavesEngine {
         io.asleep = false;
         this._gather(m, io, v);
         m.def.process(this._state(m, v), io, ctx);
+        if (meter) this._jackPeaks(m.id, io, frames);
         // A released voice: watch its audio outputs, so it can sleep as soon as its envelope and tails have died
         // rather than running (Plaits, Elements, reverbs) for the full 12 s hold after every note.
         if (!row.gate && m.exits) for (const k of m.exits){ const b = io.out[k]; for (let i = 0; i < frames; i += 8){ const a = b[i] < 0 ? -b[i] : b[i]; if (a > peak) peak = a; } }
@@ -4276,7 +4277,16 @@ class WavesEngine {
       const m = this.graph.mods.get(id); if (m.poly) continue;
       const io = this._bufs(m, -1); this._gather(m, io, -1);
       m.def.process(this._state(m, -1), io, ctx);
+      if (meter) this._jackPeaks(m.id, io, frames);
     }
+  }
+  /* Jack meters (only while the editor shows them): per module, the loudest sample on each output and on each patched
+     input since the last telemetry, across all its voices. One record per module, kept, so nothing is made per block. */
+  _jackPeaks(id, io, n){
+    const jp = this._jp || (this._jp = new Map());
+    let r = jp.get(id); if (!r){ r = { o:{}, i:{} }; jp.set(id, r); }
+    for (const k in io.out){ const b = io.out[k]; let x = r.o[k] || 0; for (let i = 0; i < n; i++){ const a = b[i] < 0 ? -b[i] : b[i]; if (a > x) x = a; } r.o[k] = x; }
+    for (const k in io.in){ if (!io.linked.has(k)) continue; const b = io.in[k]; let x = r.i[k] || 0; for (let i = 0; i < n; i++){ const a = b[i] < 0 ? -b[i] : b[i]; if (a > x) x = a; } r.i[k] = x; }
   }
   /* Date.now() is coarse, but its average over many blocks is the real cost. */
   _tickLoad(ms, frames){
@@ -4348,7 +4358,14 @@ class WavesEngine {
       const s = this._states.get(m.id) || this._states.get(m.id + '#0');
       if (s) try { shows.push([m.id, m.def.show(s.st)]); } catch (e) {}
     }
-    return { load:this.load, active, quality:this.quality, buses, mods, shows, wasm:{ dsp:!!WASM.dsp, tfx:!!WASM.tfxX } };
+    // Jack meters: [module id, 'in' or 'out', port, peak] for every jack that carried anything, then start over.
+    const jacks = [];
+    if (this._jp) for (const [id, r] of this._jp){
+      if (!this.graph.mods.has(id)){ this._jp.delete(id); continue; }
+      for (const k in r.o){ const v = r.o[k]; if (v > 1e-4) jacks.push([id, 'out', k, Math.round(Math.min(v, 4) * 1000) / 1000]); r.o[k] = 0; }
+      for (const k in r.i){ const v = r.i[k]; if (v > 1e-4) jacks.push([id, 'in', k, Math.round(Math.min(v, 4) * 1000) / 1000]); r.i[k] = 0; }
+    }
+    return { load:this.load, active, quality:this.quality, buses, mods, shows, jacks, wasm:{ dsp:!!WASM.dsp, tfx:!!WASM.tfxX } };
   }
   handleMessage(m){
     switch (m.op){
