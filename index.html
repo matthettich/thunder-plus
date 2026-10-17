@@ -1390,6 +1390,57 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b:not(.f){--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg + var(--rbo, 0deg)); background:oklch(.94 .03 var(--rbh))}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<style>
+/* ===== ARRANGE PAGING (settings ARRANGE FOCUS and SONG STRIP; to remove: delete this <style> block, the JS block of the
+   same name before "switching between the synth and the tracker", the two settings rows after SIDE PANEL and the three
+   hook lines marked "ARRANGE PAGING" in draw() and arrGo()) ===== */
+/* Arrange has the keys (on Phrase): a dark header and outline, its song cursor solid lavender... */
+body.apfa #tArr{outline:2px solid var(--ar-ink); outline-offset:-2px}
+body.apfa #tArr .tahd{background:var(--ar-ink); color:var(--ar-bg)}
+body.apfa #tArr .tahd .azb, body.apfa #tArrSub{color:var(--ar-bg)} body.apfa #tArr .tahd .azb:disabled{opacity:.45} body.apfa #tArr .tahd .azb svg{color:inherit}
+body.apfa #tArr .tagrid b.c{outline:2px solid #9a63ff; background:#9a63ff !important; color:#fff !important; box-shadow:none}
+/* ...and the phrase's cursor goes hollow and its title dim, with a tag: it follows the song cursor, or is pinned. */
+body.apf .tscr .cur{background:transparent; color:var(--ts-ink); outline:2px solid var(--ts-cur-bg); outline-offset:-2px}
+body.apf #tTitle{opacity:.55}
+.aptag{align-self:center; font:700 .62em/1 var(--mono); font-size:max(8px, .62em); letter-spacing:.08em; padding:.3em .55em; border-radius:3px; background:#9a63ff; color:#fff}
+.aptag[hidden]{display:none}
+/* PIN, in Arrange's header and the strip's: the phrase stays up while the song cursor moves. */
+#tArr .tahd .appin, #apStrip .appin{flex:none; min-height:20px; height:20px; padding:0 7px; font:700 10px/1 var(--mono); letter-spacing:.08em;
+  border:1px solid currentColor; border-radius:4px; background:transparent; color:inherit; box-shadow:none}
+#tArr .tahd .appin{margin-right:2px}
+#apStrip .appin{height:18px; min-height:18px; min-width:40px; padding:0 9px; font-size:9px; border:0; border-left:1px solid var(--ts-line); border-radius:0}
+#tArr .tahd .appin.on, #apStrip .appin.on{background:#9a63ff; border-color:#9a63ff; color:#fff}
+#tArr .tahd .appin[hidden]{display:none}
+#tArr.appinv #tArrSub{display:none}   /* on Phrase PIN takes the row count's place (the Song screen still shows it) */
+/* The song strip (Phrase on a phone, where Arrange doesn't fit): the song cursor's row and the rows above and below. */
+#apStrip{flex:none; margin:3px 0; border:1px solid var(--ts-line); border-radius:4px; font:400 9px/1 var(--mono); color:var(--ts-ink); cursor:pointer; overflow:hidden}
+#apStrip[hidden]{display:none}
+#apStrip .apsh{display:flex; align-items:center; gap:7px; height:18px; padding:0 0 0 6px; font-weight:700; letter-spacing:.06em; border-bottom:1px solid var(--ts-line)}
+#apStrip .apsh span{flex:1 1 auto; min-width:0; font-weight:400; letter-spacing:0; color:var(--ts-th); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+#apStrip .apsh i{flex:none; font-style:normal; font-size:7.5px; padding:1px 4px; border:1px solid var(--ts-line); border-radius:3px}
+#apStrip .apsb{padding:2px 3px 0}
+#apStrip .apsr{display:grid; gap:2px; height:13px; margin-bottom:2px; border-radius:2px}
+#apStrip .apsr.now{background:color-mix(in srgb, #9a63ff 16%, transparent)}
+#apStrip .apsr u{text-decoration:none; text-align:right; padding-right:4px; font-size:8.5px; line-height:13px; color:var(--ts-rn)}
+#apStrip .apsr.now u{color:var(--ts-ink); font-weight:700}
+#apStrip .apsr b{--tk:var(--tk-mono); display:block; min-width:0; border-radius:2px; background:color-mix(in srgb, var(--tk) 45%, transparent);
+  font-size:8px; font-weight:700; line-height:13px; text-align:center; overflow:hidden; color:transparent}
+#apStrip .apsr b.gp{--tk:var(--tk-poly)} #apStrip .apsr b.gx{--tk:var(--tk-mst)}
+#apStrip .apsr b.f{background:var(--ts-ink); color:var(--ts-bg)}
+#apStrip .apsr b.gx.f{background:var(--tk-mst); color:#1b2130}
+#apStrip .apsr b.m{background:transparent; box-shadow:inset 0 0 0 1px var(--ts-dim); color:var(--ts-dim); text-decoration:line-through}
+#apStrip .apsr b.p{background:var(--ts-pl-bg); color:var(--ts-pl)}
+#apStrip .apsr b.sl{box-shadow:inset 0 0 0 2px #9a63ff}
+#apStrip .apsr b.c{outline:2px solid #9a63ff; outline-offset:0; position:relative; z-index:1}
+#apStrip.nolab .apsr b{color:transparent}
+/* The strip has the keys: dark header, solid cursor. */
+body.apfs #apStrip{border:2px solid var(--ts-ink)}
+body.apfs #apStrip .apsh{background:var(--ts-ink); color:var(--ts-bg); border-bottom-color:var(--ts-ink)}
+body.apfs #apStrip .apsh span{color:var(--ts-bg)}
+body.apfs #apStrip .apsh i{background:#9a63ff; border-color:#9a63ff; color:#fff}
+body.apfs #apStrip .apsr b.c{background:#9a63ff; color:#fff}
+/* ===== END ARRANGE PAGING ===== */
+</style>
 <script>
 // No long-press menu outside text fields (it is how Chrome offers "Search Google for…").
 document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.closest && e.target.closest('input,textarea,[contenteditable]'))) e.preventDefault(); }, true);
@@ -12728,6 +12779,11 @@ function projRows(){
       info:() => 'Wide screens with STAGE on BY SCREEN: beside the Song screen, the phrase under the cursor instead of the dancing dogs. The DOGS | PEEK switch there does the same'},
     {l:'SIDE PANEL', ck:'Show side panel', get:() => sideOn ? 1 : 0, set:v => setSide(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'The grey column at the right on wide screens: the screen map, track meters and key reminders. Hide it to give the tracker and Arrange more room'},
+    // ARRANGE PAGING: its two settings (see the ARRANGE PAGING block)
+    {l:'ARRANGE FOCUS', ck:'Page into Arrange from Phrase', get:() => apOn ? 1 : 0, set:v => setApOn(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'ON' : 'OFF',
+      info:() => 'On Phrase with Arrange beside it: tap or click Arrange (or SHIFT+◀) and the keys, pad and command row work on the song there, as on the Song screen, while the phrase follows the block under the song cursor (PIN keeps it). Tap the phrase (or SHIFT+▶) to edit it again. OFF: a tap on a block opens its phrase, as before'},
+    {l:'SONG STRIP', ck:'Song strip over the phrase (folded)', get:() => ssOn ? 1 : 0, set:v => setSsOn(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'SHOWN' : 'HIDDEN',
+      info:() => 'Phones (the folded Fold), where Arrange doesn’t fit beside the phrase: the song row of the block being edited and the rows above and below, over the phrase. Tap it and the arrows move through the song with the phrase following; tap the phrase to edit it again'},
     {l:'INST LIST', ck:'Show instrument list', get:() => inlOn ? 1 : 0, set:v => setInl(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'Every instrument and the pad it plays (long names are cut short). In the side panel; without it, in PAD mode between the arrows and the buttons when there is room. Tap one to open it on INST'},
     {l:'STEP NUMBERS', ck:'Display steps as decimal', get:() => stepDec ? 1 : 0, set:v => setStepDec(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'DECIMAL' : 'HEX',
@@ -13720,6 +13776,7 @@ function playhead(){
 }
 function draw(){
   if (view !== 'tracker') return;
+  if (apHold){ apDirty = true; return; }   // ARRANGE PAGING: a song command run for Arrange draws once, at its end
   if (arrPlace()) scheduleRefit(false);   // Arrange moved into (or out of) the Song screen: size the text again next frame
   if (selA && selA.v !== tv) selA = null;
   // The FX target follows the track being edited: moving to another phrase (or block) moves the FX panel and the FX
@@ -13922,6 +13979,7 @@ function draw(){
   document.querySelectorAll('#tMeters .mtr').forEach((m, t) => { m.classList.toggle('mu', !audible(t)); m.hidden = t >= ntr(); });
   paintMeters();
   instList();
+  apAfterDraw();   // ARRANGE PAGING: focus look, phrase follow, song strip
 }
 function paintMeters(){
   const bs = rt ? rt.pl.buses : null;
@@ -14940,6 +14998,7 @@ arrGrid.addEventListener('scroll', () => {
 // A tap moves the song cursor there (from the phrase screen it opens that block's phrase); a second tap on the
 // same block opens its phrase. Holding a block, or Alt-clicking it, mutes just that block.
 function arrGo(y, t){
+  if (!asongOn() && apArrGo(y, t)) return;   // ARRANGE PAGING: on Phrase a tap pages into Arrange instead
   cs.song.x = t; cs.song.y = y; cTrack = t;
   const k = y + ':' + t, now = performance.now(), dbl = arrTap.k === k && now - arrTap.t < 380;
   arrTap = {t:dbl ? 0 : now, k:dbl ? '' : k};
@@ -15943,6 +16002,217 @@ const HINTK = {
   fx:'Type hex · Alt+arrows change · Enter adds · → opens its controls · Del removes or resets · [ ] other track · Shift+← mixer',
   project:'Alt+arrows change · Enter runs › rows · Del resets · Ctrl+S save · Shift+Ctrl+S save as · Ctrl+O open',
 };
+
+/* ===== ARRANGE PAGING (settings ARRANGE FOCUS and SONG STRIP) =====
+   Paging into Arrange from Phrase. With Arrange beside the phrase (computer, unfolded Fold) a tap or click on the panel,
+   or SHIFT+◀, gives it the keys: arrows, EDIT, hex, Del, M, copy/paste, the command row and the pad then work on the
+   song cursor exactly as on the Song screen, and the phrase follows the block under the cursor (PIN keeps it put).
+   A tap on the phrase, SHIFT+▶ or Esc gives the keys back. On a phone-sized screen (the folded Fold) where Arrange
+   doesn't fit, a three-row song strip over the phrase does the same.
+   How: the input dispatchers (press, release, dirPress, globalKeys, keysDown, cmdAction, kpAction) are wrapped by apRun.
+   While Arrange or the strip has the keys it runs them with tv = 'song' and draw() held (draw's first hook line), then
+   sets tv back to 'phrase', lets the phrase follow and draws once. A command that opens a screen (go()) drops the focus
+   and that screen stays. nav() is wrapped for SHIFT+◀ / SHIFT+▶; arrGo() asks apArrGo first.
+   To remove: delete this block, the <style> block of the same name after the main stylesheet, the two settings rows
+   after SIDE PANEL and the three hook lines marked "ARRANGE PAGING" (two in draw(), one in arrGo()). */
+const APK = 'thunderplus-arrfocus-v1', SSK = 'thunderplus-songstrip-v1';
+let apOn = (() => { try { return localStorage.getItem(APK) !== '0'; } catch(e){ return true; } })();
+let ssOn = (() => { try { return localStorage.getItem(SSK) !== '0'; } catch(e){ return true; } })();
+let apF = null;        // who has the keys instead of the phrase: 'arr' (the side panel), 'strip' (the song strip) or null
+let apPin = false;     // PIN: the phrase stays up while the song cursor moves
+let apSel = null;      // the song selection made while Arrange has the keys (selA always belongs to the screen drawn)
+let apSong = false, apIn = 0, apWent = false, apLastKey = '', apTap = {t:0, k:''}, apStripVis = false, apStripSig = '', apRefit = 0;
+// Read by the hook lines in draw() and arrGo(): var, so a draw() before this block has run finds them unset, not in the TDZ.
+var apHold = false, apDirty = false, apReady = false;
+function setApOn(on){ apOn = !!on; try { localStorage.setItem(APK, apOn ? '1' : '0'); } catch(e){} if (!apOn && apF === 'arr') apFocus(null); draw(); }
+function setSsOn(on){ ssOn = !!on; try { localStorage.setItem(SSK, ssOn ? '1' : '0'); } catch(e){} if (!ssOn && apF === 'strip') apFocus(null); draw(); }
+const apPanel = () => arrMode > 0 && arrEl.offsetWidth > 0;
+const apArrOk = () => apOn && view === 'tracker' && tv === 'phrase' && !asongOn() && apPanel();
+const apStripOk = () => ssOn && view === 'tracker' && tv === 'phrase' && !apPanel() && (isMobile() || innerWidth < 600);
+const apOk = f => f === 'arr' ? apArrOk() : f === 'strip' ? apStripOk() : false;
+const apKey = () => { const r = S.song[cs.song.y]; return cs.song.x + ':' + cs.song.y + ':' + (r ? r[cs.song.x] : -1); };
+// Keep the song cursor's row in the panel's view (Arrange shows the rows from cs.song.top down).
+function apTop(){
+  const c = cs.song, VR = Math.max(2, arrRows()); c.top = c.top || 0;
+  if (c.y < c.top) c.top = c.y; else if (c.y > c.top + VR - 1) c.top = c.y - VR + 1;
+  c.top = clamp(c.top, 0, 256 - VR);
+}
+// f: 'arr', 'strip' or null (the phrase has the keys). sync: start on the block that plays the phrase being edited
+// (SHIFT+◀, a tap on the strip); a tap in the panel puts the cursor where the finger is instead.
+function apFocus(f, sync){
+  if (f === apF) return;
+  const from = apF; apF = f; selA = null; apSel = null; fxpClose();
+  if (!f) return;
+  if (!from && sync) followPhraseBlock();
+  if (f === 'arr'){ if (cs.song.x === MT) cs.song.x = Math.min(cTrack, ntr() - 1); apTop(); }   // the side panel has no master column
+  apLastKey = apKey();
+}
+// The phrase follows the block under the song cursor (its first phrase, on its track); on an empty block the phrase
+// stays. True when the phrase changed.
+function apFollow(){
+  const k = apKey(); if (k === apLastKey) return false; apLastKey = k;
+  if (apPin) return false;
+  const r = S.song[cs.song.y], cid = r ? r[cs.song.x] : -1, p = cid >= 0 ? firstPhrase(cid) : -1;
+  if (p < 0 || (p === cPhrase && cTrack === cs.song.x)) return false;
+  cPhrase = p; cTrack = cs.song.x; cSect = cid; return true;
+}
+function apAsSong(fn){ const t0 = tv, s0 = selA; tv = 'song'; selA = apSel; try { return fn(); } finally { tv = t0; selA = s0; } }
+// Every input handler goes through here; with Arrange (or the strip) holding the keys it runs as on the Song screen.
+function apRun(fn, args){
+  apIn++;
+  try {
+    if (apSong || !apF) return fn(...args);
+    if (!apOk(apF)){ apF = null; apSel = null; return fn(...args); }
+    apSong = apHold = true; apDirty = apWent = false; tv = 'song'; selA = apSel;
+    try { return fn(...args); }
+    finally { apSong = apHold = false; apBack(); }
+  } finally { apIn--; }
+}
+function apBack(){
+  const sel = selA && selA.v === 'song' ? selA : null; selA = null;
+  if (apWent || tv !== 'song'){ apF = null; apSel = null; draw(); return; }   // the command opened a screen: stay there
+  tv = 'phrase'; apSel = apF ? sel : null;
+  if (apF === 'arr'){ if (cs.song.x === MT) cs.song.x = ntr() - 1; apTop(); }
+  const s0 = cSect, p0 = cPhrase, moved = !!apF && apFollow();
+  // EDIT×2 and two-digit hex know a second press by a key ending in cSect:cPhrase (editTap, typeHex): the phrase that
+  // just followed the cursor must not make the second press look like a new one.
+  if (moved){ const a = ':' + s0 + ':' + p0, b = ':' + cSect + ':' + cPhrase;
+    const rk = k => typeof k === 'string' && k.startsWith('song') && k.endsWith(a) ? k.slice(0, -a.length) + b : k;
+    lastTap.key = rk(lastTap.key); hexBuf.key = rk(hexBuf.key); }
+  if (apDirty || moved || !apF) draw();
+}
+{ const f = press; press = (...a) => apRun(f, a); }
+{ const f = release; release = (...a) => apRun(f, a); }
+{ const f = dirPress; dirPress = (...a) => apRun(f, a); }
+{ const f = globalKeys; globalKeys = (...a) => apRun(f, a); }
+{ const f = cmdAction; cmdAction = (...a) => apRun(f, a); }
+{ const f = kpAction; kpAction = (...a) => apRun(f, a); }
+// Esc with nothing selected gives the keys back to the phrase.
+{ const f = keysDown; keysDown = (e, pad) => {
+  if (e.key === 'Escape' && apF && !apSel && !xposeArm && !e.ctrlKey && !e.metaKey && !e.altKey){ apFocus(null); draw(); return true; }
+  return apRun(f, [e, pad]); }; }
+// A screen opened by a command run for Arrange ends the focus (apBack). SHIFT+◀ on Phrase pages into Arrange; with
+// Arrange holding the keys SHIFT+▶ goes back into the phrase and SHIFT+◀ does nothing (Song is the first screen).
+{ const f = go; go = v => { if (apSong) apWent = true; return f(v); }; }
+{ const f = nav; nav = dir => {
+  if (apSong){ if (dir === 'right'){ apF = null; apSel = null; return; } if (dir === 'left') return; return f(dir); }
+  if (apIn && dir === 'left' && apArrOk()){ apFocus('arr', true); draw(); return; }
+  return f(dir);
+}; }
+// The song strip, between the phrase's title line and its grid.
+const apStripEl = el('div'); apStripEl.id = 'apStrip'; apStripEl.hidden = true; apStripEl.setAttribute('aria-label', 'Song strip');
+scr.insertBefore(apStripEl, grid);
+apStripEl.addEventListener('pointerdown', e => {
+  e.stopPropagation();   // not the phrase's tap (scr scrolls the rows and takes the keys back)
+  if ((e.button && e.button > 0) || e.target.closest('.appin')) return;
+  if (apF !== 'strip'){ apFocus('strip', true); draw(); return; }
+  const b = e.target.closest('b[data-y]'); if (!b) return;
+  cs.song.x = +b.dataset.t; cs.song.y = +b.dataset.y; apFollow(); draw();
+});
+apStripEl.addEventListener('click', e => { const b = e.target.closest('.appin'); if (b) apPinToggle(b); });
+// PIN in Arrange's header, the tag beside the phrase's title.
+const apPinB = el('button', 'appin', 'PIN'); apPinB.type = 'button'; apPinB.hidden = true; apPinB.setAttribute('aria-pressed', 'false');
+apPinB.title = 'PIN: keep this phrase up while you move around the song';
+{ const r = arrEl.querySelector('.tahr'); if (r) r.prepend(apPinB); }
+apPinB.addEventListener('click', () => apPinToggle(apPinB));
+function apPinToggle(b){
+  apPin = !apPin; if (b) b.blur();
+  if (!apPin && apF){ apLastKey = ''; apFollow(); }
+  draw(); toast(apPin ? `Pinned: phrase ${hx(cPhrase)} stays up while you move around the song.` : 'Unpinned: the phrase follows the song cursor.');
+}
+const apTagEl = el('span', 'aptag'); apTagEl.hidden = true;
+{ const h = scr.querySelector('.thl'); if (h) h.append(apTagEl); }
+const apFootEl = arrEl.querySelector('.tafx'), apFoot0 = apFootEl ? apFootEl.textContent : '';
+// A tap or click anywhere in the panel (not its resize grip) gives Arrange the keys. The block or row number under the
+// finger then moves the song cursor as usual: a block through arrGo → apArrGo, a row number in the grid's own handler.
+arrEl.addEventListener('pointerdown', e => { if (apF !== 'arr' && apReady && apArrOk() && !e.target.closest('#tArrH')){ apFocus('arr', false); draw(); } }, true);
+// A tap on the phrase (anywhere on the screen but the strip) gives the keys back to it.
+scr.addEventListener('pointerdown', e => { if (apF && !apStripEl.contains(e.target)){ apFocus(null); draw(); } }, true);
+// arrGo's hook: on Phrase a tap on a block moves the song cursor there and the phrase follows; a second tap on the same
+// block edits its phrase (the keys go back to the phrase). False when the setting is off or it doesn't apply.
+function apArrGo(y, t){
+  if (!apReady || !apArrOk()) return false;
+  const k = y + ':' + t, now = performance.now(), dbl = apF === 'arr' && apTap.k === k && now - apTap.t < 380;
+  apTap = {t:dbl ? 0 : now, k:dbl ? '' : k};
+  apFocus('arr', false); cs.song.x = t; cs.song.y = y; apTop();
+  if (dbl){ const cid = S.song[y][t];
+    if (cid >= 0){ ensureSectPhrase(cid); const p = firstPhrase(cid); if (p >= 0){ cPhrase = p; cTrack = t; cSect = cid; } }
+    apFocus(null); }
+  else apFollow();
+  draw(); return true;
+}
+// draw()'s last hook: the focus look, the phrase following a cursor moved some other way (a row number, an undo), the
+// lines under the screen while the song has the keys, Arrange's footer and the strip.
+function apAfterDraw(){
+  if (!apReady || apHold) return;
+  if (apF && !apOk(apF)){ apF = null; apSel = null; }
+  if (apF && apFollow()){ draw(); return; }
+  const B = document.body.classList, arrOk = apArrOk();
+  B.toggle('apf', !!apF); B.toggle('apfa', apF === 'arr'); B.toggle('apfs', apF === 'strip');
+  apPinB.hidden = !arrOk; arrEl.classList.toggle('appinv', arrOk); apPinB.classList.toggle('on', apPin); apPinB.setAttribute('aria-pressed', String(apPin));
+  apTagEl.hidden = !apF; if (apF) apTagEl.textContent = apPin ? 'PINNED' : 'FOLLOWS';
+  if (apF === 'arr' && apSel) apMarkSel();
+  if (apF) apSongLines();
+  apFoot(arrOk);
+  apStrip(apStripOk());
+}
+function apMarkSel(){   // the song selection in the panel (drawArr marks it only on the Song screen; arrMark clears it)
+  const r = apAsSong(selRect);
+  for (let y = r.y0; y <= r.y1; y++){ const row = arrGrid.children[y]; if (!row) continue;
+    for (let t = r.x0; t <= r.x1; t++){ const b = row.querySelector(`b[data-t="${t}"]`); if (b){ b.classList.add('sl'); arrMark.push(b); } } }
+}
+function apHint(txt){ const h = $('tHint'); if (h.textContent !== txt){ h.textContent = txt; h.classList.remove('open'); h.classList.toggle('more', h.scrollHeight > h.clientHeight + 1); } }
+// While the song has the keys: the Song screen's info and hint lines, its command row (CLN and CLN↓ instead of − − / + +)
+// and, in KEYS mode, its keypad (hex).
+function apSongLines(){
+  const keys = inMode === 'keys';
+  $('tInfo').textContent = (apF === 'arr' ? 'ARRANGE · ' : 'SONG STRIP · ') + apAsSong(info);
+  apHint((keys ? HINTK : HINT)[sectsOn ? 'song' : 'songP'].replace(/(SHIFT|Shift)\+(▶|→) open( phrase)?/, keys ? 'Shift+→ back to the phrase' : 'SHIFT+▶ back to the phrase')
+    + (apPin ? ' · PINNED: the phrase stays' : ' · the phrase follows the song cursor'));
+  const cmd = $('tCmd');
+  cmd.querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = true);
+  cmd.querySelectorAll('[data-c=clone],[data-c=cldn]').forEach(b => b.hidden = false); cmd.classList.add('song');
+  const sb = cmd.querySelector('[data-c=sel]'); if (sb) sb.classList.toggle('on', !!apSel);
+  if (keys && kpOn) apAsSong(drawKeypad);
+}
+// Arrange's footer says what a tap does there now (its own text everywhere else, and with the setting off).
+function apFoot(arrOk){
+  if (!apFootEl) return;
+  const k = inMode === 'keys', tap = coarse ? 'tap' : 'click';
+  const t = apF === 'arr' ? `THE KEYS ARE ON THE SONG · ${k ? 'arrows' : '▲▼◀▶'} move the song cursor and the phrase follows (PIN keeps it) · ${k ? 'hex, Enter, Del, M, Ctrl+D' : 'EDIT, EDIT×2, OPTION+EDIT, CLN'} as on the Song screen · ${k ? 'Shift+→' : 'SHIFT+▶'} or a ${tap} on the phrase: back to it`
+    : arrOk ? `${tap.toUpperCase()} (or ${k ? 'Shift+←' : 'SHIFT+◀'}) · the keys move here: the song cursor moves and the phrase follows · twice: edit that block's phrase · HOLD a block to mute it · PIN keeps this phrase up`
+    : apFoot0;
+  if (apFootEl.textContent !== t){ apFootEl.textContent = t; if (arrFoot) arrFoot.title = t; }
+}
+// The strip: the song cursor's row with the rows above and below, every track and the master, the cursor's block outlined.
+function apStrip(want){
+  if (want !== apStripVis){ apStripVis = want; apStripEl.hidden = !want; apStripSig = '';
+    // The phrase's grid got shorter (or taller again): size the text again so its rows still fit.
+    if (!apRefit) apRefit = requestAnimationFrame(() => { apRefit = 0; fit(); draw(); }); }
+  if (!want) return;
+  const NA = ntr(), PF = polyFrom(), c = cs.song, PH = playhead(), on = apF === 'strip', sr = on && apSel ? apAsSong(selRect) : null;
+  const cols = `2.6em repeat(${PF},minmax(0,1fr)) 3px repeat(${NA - PF},minmax(0,1fr)) 3px minmax(0,1fr)`;
+  const cell = (y, t) => {
+    const v = S.song[y][t]; let cls = t === MT ? 'gx' : t < PF ? 'gm' : 'gp', lab = '';
+    if (v >= 0){ const ph = firstPhrase(v); lab = t === MT ? hx(songShown(v)) : sectsOn || ph < 0 ? hx(v) : hx(ph);
+      cls += t !== MT && blockMuted(S, y, t) ? ' m' : ' f'; if (PH && PH[t] === y) cls += ' p'; }
+    if (sr && y >= sr.y0 && y <= sr.y1 && t >= sr.x0 && t <= sr.x1) cls += ' sl';
+    if (t === c.x && y === c.y) cls += ' c';
+    return `<b class="${cls}" data-y="${y}" data-t="${t}">${lab}</b>`;
+  };
+  let h = `<div class="apsh"><b>SONG</b><span>ROW ${rS(c.y, 3)} · ${c.x === MT ? 'MASTER' : 'TRACK ' + d2(c.x + 1)}</span><i>${on ? (apPin ? 'PINNED' : 'MOVING') : 'TAP'}</i>`
+    + `<button type="button" class="appin${apPin ? ' on' : ''}" aria-pressed="${apPin}" title="PIN: keep this phrase up while you move around the song">PIN</button></div><div class="apsb">`;
+  for (let y = c.y - 1; y <= c.y + 1; y++){
+    h += `<div class="apsr${y === c.y ? ' now' : ''}" style="grid-template-columns:${cols}">`;
+    if (y >= 0 && y < 256){ h += `<u>${rS(y, 3)}</u>`; for (let t = 0; t < NA; t++){ if (t === PF) h += '<i></i>'; h += cell(y, t); } h += '<i></i>' + cell(y, MT); }
+    h += '</div>';
+  }
+  h += '</div>';
+  if (h !== apStripSig){ apStripSig = h; apStripEl.innerHTML = h; }
+  apStripEl.classList.toggle('nolab', NA > 20);
+}
+apReady = true;
+/* ===== END ARRANGE PAGING ===== */
 
 /* ---------- switching between the synth and the tracker ---------- */
 let updView = () => {};
