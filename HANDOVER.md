@@ -24,6 +24,52 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 16 Oct (late night): the Arrange mockups built — and how to take each back out
+
+The owner approved the "not built yet" boards on the Arrange design canvas and asked for them with an easy way back.
+Three commits, each one `git revert`-able on its own (checked: each reverts cleanly with the others in place), and
+every feature behind its own Settings row (on by default unless noted). Unticking a setting gives exactly the old
+behaviour. Paging and Pattern view were built in parallel by helper agents on worktree branches and cherry-picked.
+
+1. **Song screen extras** — `b40576d`. Settings rows right after CLASSIC SONG: SONG MOUSE (`thunderplus-songmouse-v1`),
+   SECTIONS (`thunderplus-songsecs-v1`), LOOP DRAG (`thunderplus-loopdrag-v1`), SONG PEEK (`thunderplus-songpeek-v1`,
+   **off** by default: the dogs stay). Code: the JS block `SONG EXTRAS` right after the `arrGrid` handlers, the CSS block
+   of the same name after `.tarr .tagrid b.sl`, and one-line hooks marked `SONG EXTRAS` (arrGrid pointerdown → `sxDown`,
+   end of `drawArr` → `sxAfterArr`, `stageKind` / `stageLayout` / `stageCanvas` / draw's peek refresh, the `#tStagePk` /
+   `#tStageSw` markup, `startScroll`'s skip list, `freshSong` / `normSong`'s `secs`). `info()` is wrapped inside the block.
+   - Mouse (mouse/pen only; touch unchanged): `sxDown` starts a drag record; past 6 px `sxStart` picks *select* (from an
+     empty cell: `selA` + cursor, so every Song command sees the selection) or *move* (from a block or the selection);
+     `sxAim` / `sxShowDrop` outline the drop (`b.dt`) with a tag; `sxApply` moves or copies filled blocks and their mute
+     bits (empty cells don't wipe), via `saveS()` so undo has it. Alt+press defers the old Alt-click mute to release.
+     Right-click → `sxMenu` (a small popup, arrow keys + Esc) reusing `copyHere`, `paste`, `cloneHere`, `cloneDown`.
+   - Sections: `S.secs = [{y, n}]` in the song file (old versions ignore it). `songSecAt(y)`, `songSecName(y)` (Pattern view
+     uses it). The lane (`.sxlane`, absolutely placed in `#tArr`, `body.sxsecs` pads Arrange) draws only the visible rows
+     and needs Arrange ≥ 560 px wide (`sxLaneOn`), so not on the folded phone; the info line names the section anyway.
+   - Loop drag: `sxLoopDown` on a row number defers the old tap to pointerup; a drag sets `loopSel` + `loopArm`
+     (`sxLoopRows`), and `sxAfterArr` lights those row numbers (`.rn.lp`).
+   - Peek: `stageKind()` returns `'peek'` on the Song screen when SONG PEEK is on; `stagePeek()` writes the rows as text.
+2. **Paging into Arrange + the folded song strip** — `b10761d`. Settings after SIDE PANEL: ARRANGE FOCUS
+   (`thunderplus-arrfocus-v1`), SONG STRIP (`thunderplus-songstrip-v1`). Code: a CSS `<style>` block right after the main
+   stylesheet and the JS block `ARRANGE PAGING` before "switching between the synth and the tracker"; hooks: top of
+   `draw()` (`apHold`), end of `draw()` (`apAfterDraw()`), first line of `arrGo()` (side panel only). The block
+   **wraps** `press`, `release`, `dirPress`, `globalKeys`, `keysDown`, `cmdAction`, `kpAction`, `nav` and `go` (listed in
+   its banner): while Arrange (or the strip) has focus they run with `tv = 'song'` and drawing held, then `tv` goes back to
+   'phrase', the phrase follows the block (unless PIN) and it draws once; a handler that changes screen drops the focus.
+   Esc / a phrase tap / SHIFT+▶ give the keys back. The strip shows on Phrase when no Arrange panel is visible on the phone
+   or under 600 px, and shrinks the phrase text (≈9.3 px) to keep 16 rows.
+3. **Pattern view** — `1ce5cc3`. Setting PATTERN VIEW after INST LIST (`thunderplus-patternview-v1`; its own UI state in
+   `thunderplus-patternview-ui-v1`). A mode of the Phrase screen (PHRASE | PATTERN on the title line, ≥ 600 px wide): the
+   open track's column is the real `cPhrase` editor, the others are drawn read-only and a click or an arrow past the edge
+   moves to them (`pvMoveX`, `pvTab`), Ctrl+↑↓ / [ ] / ‹ › step song rows (`pvRow`). Blocks `PATTERN VIEW` (CSS and JS)
+   plus one-line hooks marked `PATTERN VIEW` in `followPlay`, `move`, `nav`, `optDir`, `fit`, `draw` (×4) and `keysDown`.
+   Changed on merge: SHIFT+◀ from Phrase no longer opens the pattern (it keeps its job: Arrange focus, or the Song screen);
+   SHIFT+▶ from the pattern still returns to the plain phrase. Not done: playing "this pattern", other tracks' playheads,
+   Enter×2 on a header to make a phrase unique; with SECT shown, other tracks show the same sect row as the open one.
+
+Tests (Playwright, headless): `scratchpad/t2/sx1.py`, `sx2.py` (Song extras at 1440/707/373 and settings off),
+`scratchpad/merged/t2_desk.py`, `t4_unfold.py`, `t5_fold.py`, `t6_off.py`, `t7_misc.py` (paging and strip, incl. a
+settings-off comparison with the old build), `scratchpad/mergedB/inter.py`, `mob.py` (Pattern view). All pass on `main`.
+
 ## 16 Oct (late night): the safety limiter is a real limiter now
 
 Measured: `mkLimiter` (a DynamicsCompressorNode at −2 dB, 20:1) let a two-note Organ chord through at 1.06 and an
