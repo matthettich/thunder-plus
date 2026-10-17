@@ -24,6 +24,17 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 16 Oct (late night): Synth page reset, meter, live-note limiter
+
+- `makeRow()` sliders reset to `def.d` on double-click of the slider itself (not only the label); mod-sequence steps
+  reset to 0.
+- **Live notes bus:** `playNote`, `holdNote` and `play` now go `g → padOut()` instead of straight to `master`. `padOut()`
+  builds (per audio context) `in → mkLimiter → master` (or straight to master when `S.limiter` is off, `padRoute()`), plus
+  an analyser on `in`. Cause of the distortion: every rendered note is normalised to 0.8 peak (`KeysUtil.finish` and the
+  others), so three or more keys summed past 1.0 and clipped at the output; the song path already had the limiter.
+- **Meter:** `#vMeter` in the pad header (`.vmeter`, −48…+6 dB, 0 dB line, red past 0 dB before the limiter), drawn by
+  `synMeterFrame()` only while something sounds (`synMeterOn()` from the three play functions).
+
 ## 16 Oct (late night): …chains/…waves mixers, Alt-drag copies, jack meters, module list and colours
 
 - **Mixers:** `mixer` (both editors) and `smixer` (…chains) have **Inputs** (`chans`, 1–16, default 4 so old patches

@@ -373,6 +373,10 @@ body:not(.noed) .wvMobNote{display:none}
 .fxhead .n{font-weight:600; font-size:var(--fs-4); display:flex; align-items:center; gap:7px}
 .fxhead .n::before{content:""; width:9px; height:9px; background:var(--fx); flex:none}
 .fxhead .cr{font-size:var(--fs-3); color:var(--muted)}
+.vmeter{position:relative; flex:0 0 140px; height:10px; margin-left:auto; border:1px solid var(--line); background:linear-gradient(90deg, transparent calc(88.9% - 1px), var(--ink) calc(88.9% - 1px) 88.9%, transparent 88.9%), var(--panel2); overflow:hidden}
+.vmeter i{position:absolute; inset:0; background:var(--meter-ok); transform:scaleX(0); transform-origin:0 50%}
+.vmeter b{position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; left:0; background:var(--ink); opacity:.7}
+.vmeter.over i, .vmeter.over b{background:var(--meter-clip)}
 .fxvu{width:90px; height:10px; border:1px solid var(--line); background:var(--panel2); position:relative; overflow:hidden; flex:none; margin-left:6px}
 .fxvu i{position:absolute; left:0; top:0; bottom:0; width:0; background:var(--meter-ok)}
 .fxvu i.warm{background:var(--meter-ok)} .fxvu i.hot{background:var(--meter-hot)} .fxvu i.clip{background:var(--meter-clip)}
@@ -1484,7 +1488,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 
   <section class="band voice">
     <div class="bar vbar">
-      <div class="vrow vttl"><span class="ttl" id="vNum">Pad 1</span></div>
+      <div class="vrow vttl"><span class="ttl" id="vNum">Pad 1</span><span class="vmeter" id="vMeter" title="Level of what you play here (pads, keys, MIDI), −48 to +6 dB. The line is 0 dB: past it the bar turns red and the safety limiter (Project → LIMITER) is holding the peaks down." aria-hidden="true"><i></i><b></b></span></div>
       <div class="vrow vid"><input id="vName" type="text" aria-label="Pad name" spellcheck="false"><button class="sm play" id="vPlay" title="Play this pad (Space)"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</button></div>
       <div class="vrow vact">
         <button type="button" id="vPre" class="sm presel" title="Presets: factory sounds, and your own saved in this song">Presets…</button>
@@ -6426,6 +6430,39 @@ function buffer(i){
   if (!slotAt(bufs, i) || bufs[i]._d !== c.data){ const b = ctx.createBuffer(1, c.data.length, c.sr); b.copyToChannel(c.data, 0); b._d = c.data; bufs[i] = b; }
   return bufs[i];
 }
+/* Pads and notes played live (the Synth page, the keys, MIDI, pad taps) meet on one bus before the output: it runs
+   through the same safety limiter as the song (Project → LIMITER), so a chord of loud notes is caught instead of
+   clipping at the output, and the Synth page's level meter reads it (before the limiter, so it shows when you're
+   pushing it). Rebuilt if the audio context is. */
+let padBus = null;
+function padOut(){
+  if (padBus && padBus.ctx === ctx && padBus.master === master){ padRoute(); return padBus.in; }
+  const inp = ctx.createGain(), lim = mkLimiter(ctx), an = ctx.createAnalyser(); an.fftSize = 1024;
+  inp.connect(an); lim.connect(master);
+  padBus = {ctx, master, in:inp, lim, an, buf:new Float32Array(an.fftSize), to:null};
+  padRoute(); return inp;
+}
+function padRoute(){
+  const b = padBus, to = S.limiter !== false ? b.lim : b.master; if (b.to === to) return;
+  try { b.in.disconnect(); } catch(e){} b.in.connect(b.an); b.in.connect(to); b.to = to;
+}
+function padLevel(){
+  if (!padBus || padBus.ctx !== ctx) return 0;
+  const b = padBus.buf; padBus.an.getFloatTimeDomainData(b); let p = 0; for (let i = 0; i < b.length; i++){ const a = b[i] < 0 ? -b[i] : b[i]; if (a > p) p = a; } return p;
+}
+// The Synth page's output meter: runs while something sounds (and a moment after), then stops.
+let smRaf = 0, smLv = 0, smPk = 0, smPkT = 0;
+const smPos = a => a <= 0 ? 0 : Math.max(0, Math.min(1, (20 * Math.log10(a) + 48) / 54));
+function synMeterOn(){ if (!smRaf) smRaf = requestAnimationFrame(synMeterFrame); }
+function synMeterFrame(){
+  smRaf = 0; const m = $('vMeter'); if (!m) return;
+  const a = padLevel(), now = performance.now();
+  smLv = Math.max(a, smLv * 0.86);
+  if (a >= smPk || now - smPkT > 1500){ smPk = a; smPkT = now; }
+  if (m.offsetWidth){ m.firstElementChild.style.transform = 'scaleX(' + smPos(smLv).toFixed(3) + ')'; m.lastElementChild.style.left = (smPos(smPk) * 100).toFixed(1) + '%'; m.classList.toggle('over', smPk > 1); }
+  if (smLv > 0.0005 || now - smPkT < 1500) smRaf = requestAnimationFrame(synMeterFrame);
+  else { m.firstElementChild.style.transform = 'scaleX(0)'; m.lastElementChild.style.left = '0'; m.classList.remove('over'); smLv = smPk = 0; }
+}
 function stopVoice(i){
   const p = playing[i]; if (!p) return; playing[i] = null;
   const t = ctx.currentTime; try { p.g.gain.cancelScheduledValues(t); p.g.gain.setTargetAtTime(0, t, 0.004); p.src.stop(t + 0.04); } catch(e){}
@@ -6435,7 +6472,7 @@ function playNote(i, semis, vel = 1){
   audio();
   const src = ctx.createBufferSource(), g = ctx.createGain();
   src.buffer = buffer(i); src.playbackRate.value = noteRate(semis); g.gain.value = vel;
-  src.connect(g); g.connect(master); src.start(); flash(i); vuHit(i, noteRate(semis), vel);
+  src.connect(g); g.connect(padOut()); src.start(); flash(i); vuHit(i, noteRate(semis), vel); synMeterOn();
 }
 // The sounding note per synth pad, for glide and legato (one per pad; poly notes just create new sources).
 const synHeld = [];
@@ -6461,7 +6498,7 @@ function holdNote(i, semis, vel = 1){
   const from = (mono && gl > 0 && prev && !prev.done) ? (prev.rate || r) : null;
   if (from != null){ src.playbackRate.setValueAtTime(from, t); src.playbackRate.linearRampToValueAtTime(r, t + gl); } else src.playbackRate.value = r;
   g.gain.value = vel;
-  src.connect(g); g.connect(master); src.start(); flash(i); vuHit(i, r, vel);
+  src.connect(g); g.connect(padOut()); src.start(); flash(i); vuHit(i, r, vel); synMeterOn();
   const h = {src, g, i, rate:r, vel, done:false}; synHeld[i] = h; return h;
 }
 function releaseNote(h, at){
@@ -6478,7 +6515,7 @@ function play(i, vel = 1){
   if (v.choke) for (let j = 0; j < nslots(); j++) if (j !== i && kit.voices[j].choke === v.choke) stopVoice(j);
   const src = ctx.createBufferSource(), g = ctx.createGain();
   g.gain.value = vel;
-  src.buffer = buffer(i); src.connect(g); g.connect(master); src.start();
+  src.buffer = buffer(i); src.connect(g); g.connect(padOut()); src.start(); synMeterOn();
   const rec = {src, g}; playing[i] = rec; src.onended = () => { if (playing[i] === rec) playing[i] = null; };
   flash(i); vuHit(i, 1, vel, true);
 }
@@ -6591,7 +6628,10 @@ function makeRow(def, key, getObj, opts = {}){
       else lastValTap = {t:now, x:cx, y:cy};
     }
   });
-  lab.addEventListener('dblclick', () => { getObj()[key] = row.def.d; row.refresh(); (opts.on || (() => changed(cur, true)))(); });
+  const reset = () => { if (row.def.d == null) return; getObj()[key] = row.def.d; row.refresh(); (opts.on || (() => changed(cur, true)))(); };
+  lab.addEventListener('dblclick', reset);
+  inp.addEventListener('dblclick', reset);   // the slider itself too (its default, as on the label)
+  inp.title = 'Double-click to reset';
   if (!opts.noTrack) rows.push(row);
   return row;
 }
@@ -8596,6 +8636,7 @@ function modSelect(host, label, key){
   for (let i = 0; i < 32; i++){
     const inp = document.createElement('input'); inp.type = 'range'; inp.min = '-1'; inp.max = '1'; inp.step = '0.01'; inp.value = '0'; inp.setAttribute('aria-label', 'Step ' + (i + 1));
     inp.addEventListener('input', () => { const v = V(); if (!Array.isArray(v.seq)) v.seq = new Array(32).fill(0); v.seq[i] = +inp.value; changed(); });
+    inp.addEventListener('dblclick', () => { const v = V(); if (!Array.isArray(v.seq)) v.seq = new Array(32).fill(0); v.seq[i] = 0; inp.value = '0'; changed(); });
     grid.append(inp); stepEls.push(inp);
   }
   ss.append(grid);
