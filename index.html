@@ -1569,7 +1569,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <button id="bLoadKit">Load kit…</button>
         <input type="file" id="kitIn" accept=".json,application/json" hidden>
         <button id="bFactory">Factory kit</button>
-        <button id="bClassic">Classic kits…</button>
+        <button id="bClassic">Drum kits…</button>
         <button id="bClearKit">Clear all slots</button>
       </div>
       <div class="btnrow">
@@ -2058,7 +2058,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p>Each track and the master have 4 effect slots (FX screen, or the Mixer’s FX row): 37 effects in all: Flex, Step gate, Retrigger, EQ, compressor, three reverbs, tape delay, dub tape, saturation, drive, tube, tape, vinyl, lo-fi, bitcrush, chorus, flanger, phaser, tremolo, trance gate, auto-wah, ladder filter, comb resonator, wavefolder, overdrive, pitch and frequency shifters, cross-mod, transient shaper, multiband squash, speaker cab, air, and Rings, Clouds and Beads. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to four, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
 <p><b>…chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback. Its <b>Resample</b> module records what passes through it into a pad, starting on the next bar, and slices it so you can chop it like a breakbeat.</p></section>
-    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots; on a computer, where they are a list down the left, ▲▼ do too)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound (kicks, snares, hats, percussion, IDM and glitch hits, basses, pads, chords, keys and leads, including Bass and Blip engine sounds). <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once. <b>Classic drum kits…</b> (File ▾, or ⚙ Settings → Kit) puts a CR-78-, 808-, 606-, 909-, 707-, 727- or 505-style kit on pads 1–8 and keeps the synth slots; every sound of each machine is also in the Presets list, in its own group.</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modelled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. <b>Drift</b> is a two-line analog pad synth laid out like the big 1970s CS-series polysynths (two oscillator lines per voice, a high-pass and a low-pass with their own envelope, up to four drifting unison voices) followed by a tape stage — <b>Wow</b> and <b>Flutter</b> on the pitch, chorus, saturation, <b>Age</b> (worn top and bottom, the odd dropout) and hiss — for warm, wobbly, faded pads; its presets are in the pad Presets list under Drift (tape pads). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
+    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots; on a computer, where they are a list down the left, ▲▼ do too)</td></tr><tr><td><kbd>Space</kbd></td><td>Play the pad as it is</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound (kicks, snares, hats, percussion, IDM and glitch hits, basses, pads, chords, keys and leads, including Bass and Blip engine sounds). <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once. <b>Drum kits…</b> (File ▾, or ⚙ Settings → Kit) puts a CR-78-, 808-, 606-, 909-, 707-, 727- or 505-style kit, or a clean acoustic kit (Funk, Studio, Jazz), on pads 1–8 and keeps the synth slots; every sound of each kit is also in the Presets list, in its own group. <b>Funk breaks…</b> (File ▾) loads one of twelve original breaks, with swing, ghost notes and a laid-back snare, as a new song with its acoustic kit, or adds its four bars to this song.</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modelled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. <b>Drift</b> is a two-line analog pad synth laid out like the big 1970s CS-series polysynths (two oscillator lines per voice, a high-pass and a low-pass with their own envelope, up to four drifting unison voices) followed by a tape stage — <b>Wow</b> and <b>Flutter</b> on the pitch, chorus, saturation, <b>Age</b> (worn top and bottom, the odd dropout) and hiss — for warm, wobbly, faded pads; its presets are in the pad Presets list under Drift (tape pads). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -7381,16 +7381,20 @@ const PFX = (t, o) => Object.assign(freshFx(t), o || {});
 const PD = (name, layers, o) => mkVoice(name, layers, o);
 const PS = (name, layers, o) => mkVoice(name, layers.map(l => Object.assign({mode:'ADSR'}, l)), Object.assign({tune:24, len:6, gate:400, tail:2}, o || {}));
 const PE = (name, engine, data, o) => { const v = mkVoice(name, [{type:'sine'}], Object.assign({tune:0}, o || {})); v.engine = engine; v[engine] = data; return v; };
-/* ---------- Classic drum machine kits (Oct 2026) ----------
+/* ---------- Drum kits: classic machines and acoustic kits (Oct 2026) ----------
    Seven classic Roland machines rebuilt as layer voices: the CR-78, 808 and 606 (analog), the 909 (analog drums with
    sampled cymbals), and the 707, 727 and 505 (sample ROMs). Every sound is synthesized here; no samples are used.
    Each voice was tuned by measuring hits from the machines (pitch and pitch sweep, decay shape, spectrum) and
    matching them, so the numbers below are measurements, not guesses: the 808 kick settles at 50 Hz from a short
    sweep, its snare rings at 172 and 338 Hz, the 909 kick falls from about 250 Hz to 56 Hz, and so on. The UI names
    them by model number only ("808-style"), as the other presets do.
-   x0xMachines() is the full set, one Presets group per machine; x0xKits() picks eight of them per machine for
-   pads 1–8 (File ▾ → Classic drum kits…, or Settings → Kit). */
-function x0xMachines(){
+   After them, three clean acoustic kits (Funk, Studio, Jazz), shaped against measurements of sampled acoustic
+   drums: kicks with a real beater slap, snares with head modes and wires, toms with stick noise, hats, rides and
+   crashes. They share one pad layout (kick, snare, ghost snare, closed hat, open hat, floor tom, high tom,
+   crash/ride) so the funk breaks below play on any of them.
+   drumKitGroups() is the full set, one Presets group per kit; drumKits() picks eight of them per kit for pads 1–8
+   (File ▾ → Drum kits…, or Settings → Kit). */
+function drumKitGroups(){
   // Pitch in Hz → a layer's tune (semitones from C2) and fine (cents). vt is the voice's own tune: sounds above C6
   // (1046 Hz) sit on a voice tuned up 12 or 24 so every layer stays inside its ±48 range.
   const hz = (f, vt) => { const s = 12 * Math.log2(f / 65.40639) - (vt || 0), t = Math.round(s); return {tune:t, fine:Math.round((s - t) * 100)}; };
@@ -7782,11 +7786,189 @@ function x0xMachines(){
       {type:'sine', ...hz(1040), atk:0.05, dec:300, level:0.4},
       {type:'white', atk:0.05, dec:80, hpCut:1500, lpCut:8000, level:0.7}], Object.assign(cut(310, 20), S505), -5.5)],
   ]],
+  ['Funk kit (acoustic)', [
+    ['Kick', () => D('Funk Kick', [
+      {type:'sine', ...hz(62), pAmt:9, pDec:60, atk:0.1, hold:20, dec:230, level:0.75},
+      {type:'sine', ...hz(900), pAmt:-8, pDec:30, atk:0.05, dec:20, level:0.55},
+      {type:'membrane', a:0.3, b:0.6, ...hz(64), pAmt:6, pDec:40, atk:0.1, dec:90, level:0.45},
+      {type:'click', a:0.25, level:0.6, hpCut:800, atk:0.05, dec:6},
+      {type:'white', atk:0.1, dec:28, hpCut:1200, lpCut:7000, level:0.95},
+      {type:'white', atk:0.1, dec:20, hpCut:1500, hpRes:0.4, lpCut:3000, lpRes:0.4, level:0.6}], {drive:0.12}, -1.5)],
+    ['Snare', () => D('Funk Snare', [
+      {type:'membrane', a:0.35, b:0.5, ...hz(238), pAmt:3, pDec:25, atk:0.1, dec:220, level:0.7},
+      {type:'sine', ...hz(338), pAmt:2, pDec:20, atk:0.1, dec:110, level:0.3},
+      {type:'white', atk:0.2, dec:420, hpCut:2000, lpCut:8000, level:0.75},
+      {type:'white', atk:0.1, dec:14, hpCut:3500, lpCut:10000, level:0.6},
+      {type:'click', a:0.2, level:0.45, hpCut:1000, atk:0.05, dec:4}], {drive:0.1}, -3)],
+    ['Snare (ghost)', () => D('Funk Ghost', [
+      {type:'membrane', a:0.3, b:0.55, ...hz(236), pAmt:2, pDec:20, atk:0.3, dec:140, level:0.6},
+      {type:'white', atk:0.4, dec:170, hpCut:1800, lpCut:6000, level:0.7}],null, -1)],
+    ['Cross stick', () => D('Funk Cross stick', [
+      {type:'sine', ...hz(717, 12), atk:0.05, dec:100, level:0.75},
+      {type:'sine', ...hz(1284, 12), atk:0.05, dec:80, level:0.7},
+      {type:'sine', ...hz(925, 12), atk:0.05, dec:45, level:0.5},
+      {type:'white', atk:0.05, dec:30, hpCut:1500, lpCut:9000, level:0.9},
+      {type:'click', a:0.15, level:0.5, hpCut:600, atk:0.05, dec:4}], {tune:12}, -4.5)],
+    ['Closed hat', () => D('Funk Closed hat', [
+      {type:'metal', a:0.9, b:0.4, atk:0.1, dec:220, hpCut:3500, hpRes:0.15, lpCut:12000, level:0.7},
+      {type:'white', atk:0.1, dec:180, hpCut:5000, lpCut:12000, level:0.55},
+      {type:'white', atk:0.1, dec:45, hpCut:300, lpCut:4000, level:0.6}], {choke:1}, 4)],
+    ['Pedal hat', () => D('Funk Pedal hat', [
+      {type:'metal', a:0.9, b:0.4, atk:2, dec:200, hpCut:4000, hpRes:0.15, lpCut:11000, level:0.65},
+      {type:'white', atk:2, dec:160, hpCut:5500, lpCut:11000, level:0.45},
+      {type:'white', atk:2, dec:50, hpCut:300, lpCut:4000, level:0.5}], {choke:1}, 6, 0.08)],
+    ['Open hat', () => D('Funk Open hat', [
+      {type:'metal', a:0.9, b:0.4, atk:0.5, dec:1500, hpCut:3500, hpRes:0.15, lpCut:12000, level:0.7},
+      {type:'white', atk:0.5, dec:1300, hpCut:5000, lpCut:12000, level:0.5},
+      {type:'white', atk:0.5, dec:500, hpCut:300, lpCut:4000, level:0.5}], {choke:1, len:2.5}, 4.5)],
+    ['Floor tom', () => D('Funk Floor tom', [
+      {type:'membrane', a:0.4, b:0.35, ...hz(98), pAmt:2.5, pDec:400, atk:0.1, dec:800, level:0.85},
+      {type:'sine', ...hz(98), pAmt:2.5, pDec:400, atk:0.1, dec:650, level:0.5},
+      {type:'white', atk:0.1, dec:60, hpCut:1000, lpCut:9000, level:0.75}], {len:2}, -4.5)],
+    ['High tom', () => D('Funk High tom', [
+      {type:'membrane', a:0.4, b:0.35, ...hz(158), pAmt:2.5, pDec:300, atk:0.1, dec:650, level:0.85},
+      {type:'sine', ...hz(158), pAmt:2.5, pDec:300, atk:0.1, dec:520, level:0.45},
+      {type:'white', atk:0.1, dec:55, hpCut:1200, lpCut:9000, level:0.75}],null, -4)],
+    ['Crash', () => D('Funk Crash', [
+      {type:'metal', a:1, b:0.5, atk:2, dec:1700, hpCut:3000, hpRes:0.1, lpCut:10000, level:0.7},
+      {type:'white', atk:2, dec:1500, hpCut:3500, lpCut:9500, level:0.5},
+      {type:'pink', atk:2, dec:500, hpCut:500, lpCut:3000, level:0.3},
+      {type:'fmmetal', a:0.8, b:0.6, ...hz(420), atk:1, dec:900, hpCut:2500, level:0.3}], {len:3}, 5)],
+    ['Ride', () => D('Funk Ride', [
+      {type:'bell', a:0.7, b:0.35, ...hz(513), atk:0.1, dec:1400, hpCut:400, level:0.3},
+      {type:'metal', a:0.95, b:0.5, atk:0.2, dec:2400, hpCut:3000, hpRes:0.1, lpCut:13000, level:0.75},
+      {type:'white', atk:0.1, dec:300, hpCut:3500, hpRes:0.6, lpCut:4500, lpRes:0.6, level:0.5},
+      {type:'white', atk:0.1, dec:1500, hpCut:7000, lpCut:15000, level:0.3},
+      {type:'white', atk:0.05, dec:10, hpCut:3000, level:0.5}], {len:3}, 1)],
+    ['Tambourine', () => D('Funk Tambourine', [
+      {type:'metal', a:1, b:0.2, ...hz(260), atk:0.5, dec:260, hpCut:5500, hpRes:0.3, lpCut:12000, level:0.75},
+      {type:'white', atk:0.5, dec:200, hpCut:6000, lpCut:12000, level:0.45}], {lfo1Rate:32, lfo1Shape:2, lfo1Depth:1, r1dst:2, r1amt:-0.5}, 4)],
+  ]],
+  ['Studio kit (acoustic)', [
+    ['Kick', () => D('Studio Kick', [
+      {type:'sine', ...hz(58), pAmt:26, pDec:110, atk:0.1, hold:30, dec:380, level:0.75},
+      {type:'sine', ...hz(1000), pAmt:-8, pDec:30, atk:0.05, dec:22, level:0.6},
+      {type:'membrane', a:0.35, b:0.5, ...hz(60), pAmt:10, pDec:40, atk:0.1, dec:120, level:0.4},
+      {type:'click', a:0.3, level:0.7, hpCut:1500, atk:0.05, dec:6},
+      {type:'white', atk:0.1, dec:30, hpCut:1500, lpCut:9000, level:1},
+      {type:'white', atk:0.1, dec:22, hpCut:2500, hpRes:0.4, lpCut:5000, lpRes:0.4, level:0.6}], {drive:0.1}, -2)],
+    ['Snare', () => D('Studio Snare', [
+      {type:'membrane', a:0.4, b:0.4, ...hz(190), pAmt:3, pDec:30, atk:0.1, dec:260, level:0.7},
+      {type:'sine', ...hz(465), pAmt:2, pDec:20, atk:0.1, dec:180, level:0.4},
+      {type:'white', atk:0.2, dec:460, hpCut:1800, lpCut:8500, level:0.75},
+      {type:'white', atk:0.1, dec:14, hpCut:3500, lpCut:10000, level:0.6},
+      {type:'click', a:0.2, level:0.5, hpCut:1000, atk:0.05, dec:4}], {drive:0.12}, -3)],
+    ['Snare (ghost)', () => D('Studio Ghost', [
+      {type:'membrane', a:0.35, b:0.45, ...hz(190), pAmt:2, pDec:20, atk:0.3, dec:180, level:0.6},
+      {type:'white', atk:0.4, dec:220, hpCut:1600, lpCut:6500, level:0.7}],null, -3)],
+    ['Cross stick', () => D('Studio Cross stick', [
+      {type:'sine', ...hz(690), atk:0.05, dec:70, level:0.75},
+      {type:'sine', ...hz(1040), atk:0.05, dec:55, level:0.6},
+      {type:'sine', ...hz(470), atk:0.05, dec:45, level:0.45},
+      {type:'white', atk:0.05, dec:30, hpCut:1500, lpCut:9000, level:0.9},
+      {type:'click', a:0.15, level:0.5, hpCut:600, atk:0.05, dec:4}],null, -4.5)],
+    ['Closed hat', () => D('Studio Closed hat', [
+      {type:'metal', a:0.95, b:0.45, atk:0.1, dec:130, hpCut:4500, hpRes:0.2, lpCut:13000, level:0.75},
+      {type:'white', atk:0.1, dec:110, hpCut:6000, lpCut:13000, level:0.55},
+      {type:'white', atk:0.1, dec:40, hpCut:300, lpCut:4500, level:0.5}], {choke:1}, 5.5)],
+    ['Pedal hat', () => D('Studio Pedal hat', [
+      {type:'metal', a:0.95, b:0.45, atk:2, dec:200, hpCut:5000, hpRes:0.2, lpCut:12000, level:0.65},
+      {type:'white', atk:2, dec:160, hpCut:6000, lpCut:12000, level:0.45},
+      {type:'white', atk:2, dec:50, hpCut:300, lpCut:4500, level:0.45}], {choke:1}, 6)],
+    ['Open hat', () => D('Studio Open hat', [
+      {type:'metal', a:0.95, b:0.45, atk:0.5, dec:1700, hpCut:4500, hpRes:0.2, lpCut:12000, level:0.7},
+      {type:'white', atk:0.5, dec:1500, hpCut:6000, lpCut:12000, level:0.5},
+      {type:'white', atk:0.5, dec:500, hpCut:300, lpCut:4500, level:0.5}], {choke:1, len:2.5}, 5)],
+    ['Floor tom', () => D('Studio Floor tom', [
+      {type:'membrane', a:0.45, b:0.3, ...hz(92), pAmt:3, pDec:500, atk:0.1, dec:1300, level:0.85},
+      {type:'sine', ...hz(92), pAmt:3, pDec:500, atk:0.1, dec:1000, level:0.55},
+      {type:'white', atk:0.1, dec:60, hpCut:1000, lpCut:9000, level:0.8}], {len:2.5}, -5)],
+    ['Mid tom', () => D('Studio Mid tom', [
+      {type:'membrane', a:0.45, b:0.3, ...hz(140), pAmt:3, pDec:400, atk:0.1, dec:1100, level:0.85},
+      {type:'sine', ...hz(140), pAmt:3, pDec:400, atk:0.1, dec:850, level:0.5},
+      {type:'white', atk:0.1, dec:60, hpCut:1100, lpCut:9000, level:0.8}], {len:2}, -4.5)],
+    ['High tom', () => D('Studio High tom', [
+      {type:'membrane', a:0.45, b:0.3, ...hz(174), pAmt:3, pDec:350, atk:0.1, dec:800, level:0.85},
+      {type:'sine', ...hz(174), pAmt:3, pDec:350, atk:0.1, dec:650, level:0.45},
+      {type:'white', atk:0.1, dec:55, hpCut:1200, lpCut:9000, level:0.8}], {len:2}, -4.5)],
+    ['Crash', () => D('Studio Crash', [
+      {type:'metal', a:1, b:0.5, atk:2, dec:1900, hpCut:3500, hpRes:0.1, lpCut:10000, level:0.7},
+      {type:'white', atk:2, dec:1700, hpCut:4000, lpCut:10000, level:0.5},
+      {type:'pink', atk:2, dec:600, hpCut:500, lpCut:3000, level:0.3},
+      {type:'fmmetal', a:0.8, b:0.6, ...hz(480), atk:1, dec:1100, hpCut:3000, level:0.3}], {len:3.5}, 5.5)],
+    ['Ride', () => D('Studio Ride', [
+      {type:'metal', a:0.95, b:0.5, atk:0.2, dec:2600, hpCut:3500, hpRes:0.15, lpCut:13000, level:0.75},
+      {type:'white', atk:0.1, dec:400, hpCut:3600, hpRes:0.7, lpCut:4300, lpRes:0.7, level:0.55},
+      {type:'bell', a:0.6, b:0.35, ...hz(640), atk:0.1, dec:1500, hpCut:1500, level:0.2},
+      {type:'white', atk:0.1, dec:1800, hpCut:7000, lpCut:15000, level:0.3},
+      {type:'white', atk:0.05, dec:8, hpCut:4000, level:0.5}], {len:4}, 0)],
+    ['Ride bell', () => D('Studio Ride bell', [
+      {type:'bell', a:0.6, b:0.2, ...hz(780), atk:0.05, dec:2200, level:0.75},
+      {type:'metal', a:0.95, b:0.5, atk:0.2, dec:1800, hpCut:4500, lpCut:13000, level:0.4},
+      {type:'click', a:0.1, level:0.35, hpCut:2000, atk:0.05, dec:3}], {len:4}, -3.5)],
+  ]],
+  ['Jazz kit (acoustic)', [
+    ['Kick', () => D('Jazz Kick', [
+      {type:'sine', ...hz(74), pAmt:4, pDec:60, atk:0.5, dec:650, level:0.9},
+      {type:'membrane', a:0.4, b:0.3, ...hz(76), pAmt:3, pDec:60, atk:0.5, dec:400, level:0.5},
+      {type:'white', atk:0.5, dec:20, hpCut:600, lpCut:3500, level:0.55}], {len:2}, -1.5)],
+    ['Snare', () => D('Jazz Snare', [
+      {type:'membrane', a:0.45, b:0.3, ...hz(318), pAmt:2, pDec:30, atk:0.1, dec:320, level:0.65},
+      {type:'sine', ...hz(569), atk:0.1, dec:260, level:0.3},
+      {type:'white', atk:0.2, dec:260, hpCut:1500, lpCut:8000, level:0.65},
+      {type:'click', a:0.15, level:0.4, hpCut:1000, atk:0.05, dec:4}],null, 0)],
+    ['Snare (ghost)', () => D('Jazz Ghost', [
+      {type:'membrane', a:0.4, b:0.35, ...hz(318), pAmt:1, pDec:20, atk:0.4, dec:200, level:0.55},
+      {type:'white', atk:0.5, dec:160, hpCut:1500, lpCut:6000, level:0.55}],null, 2)],
+    ['Brush sweep', () => D('Jazz Brush sweep', [
+      {type:'pink', atk:180, hold:120, dec:260, hpCut:1500, lpCut:7000, level:0.6},
+      {type:'white', atk:150, hold:120, dec:220, hpCut:4000, lpCut:9000, level:0.3}], {len:1}, 6, 0.27)],
+    ['Brush tap', () => D('Jazz Brush tap', [
+      {type:'white', atk:2, dec:90, hpCut:1500, lpCut:8000, level:0.75},
+      {type:'membrane', a:0.3, b:0.5, ...hz(318), atk:1, dec:60, level:0.3}],null, 3)],
+    ['Cross stick', () => D('Jazz Cross stick', [
+      {type:'sine', ...hz(760), atk:0.05, dec:70, level:0.75},
+      {type:'sine', ...hz(1010), atk:0.05, dec:55, level:0.55},
+      {type:'sine', ...hz(520), atk:0.05, dec:45, level:0.45},
+      {type:'white', atk:0.05, dec:30, hpCut:1500, lpCut:9000, level:0.9},
+      {type:'click', a:0.15, level:0.45, hpCut:600, atk:0.05, dec:4}],null, -5)],
+    ['Closed hat', () => D('Jazz Closed hat', [
+      {type:'metal', a:0.85, b:0.5, atk:0.3, dec:160, hpCut:3000, hpRes:0.1, lpCut:11000, level:0.7},
+      {type:'white', atk:0.3, dec:120, hpCut:4500, lpCut:11000, level:0.45},
+      {type:'white', atk:0.3, dec:50, hpCut:300, lpCut:3500, level:0.5}], {choke:1}, 6)],
+    ['Pedal hat', () => D('Jazz Pedal hat', [
+      {type:'metal', a:0.85, b:0.5, atk:3, dec:220, hpCut:3500, hpRes:0.1, lpCut:10000, level:0.65},
+      {type:'white', atk:3, dec:170, hpCut:5000, lpCut:10000, level:0.4},
+      {type:'white', atk:3, dec:60, hpCut:300, lpCut:3500, level:0.5}], {choke:1}, 6)],
+    ['Open hat', () => D('Jazz Open hat', [
+      {type:'metal', a:0.85, b:0.5, atk:0.5, dec:1800, hpCut:3000, hpRes:0.1, lpCut:11000, level:0.7},
+      {type:'white', atk:0.5, dec:1400, hpCut:4500, lpCut:11000, level:0.45},
+      {type:'white', atk:0.5, dec:500, hpCut:300, lpCut:3500, level:0.45}], {choke:1, len:3}, 6)],
+    ['Floor tom', () => D('Jazz Floor tom', [
+      {type:'membrane', a:0.5, b:0.25, ...hz(110), pAmt:2, pDec:500, atk:0.2, dec:1500, level:0.85},
+      {type:'sine', ...hz(110), pAmt:2, pDec:500, atk:0.2, dec:1200, level:0.5},
+      {type:'white', atk:0.1, dec:50, hpCut:1000, lpCut:8000, level:0.6}], {len:3}, -4)],
+    ['High tom', () => D('Jazz High tom', [
+      {type:'membrane', a:0.5, b:0.25, ...hz(210), pAmt:2, pDec:350, atk:0.2, dec:1000, level:0.85},
+      {type:'sine', ...hz(210), pAmt:2, pDec:350, atk:0.2, dec:800, level:0.45},
+      {type:'white', atk:0.1, dec:45, hpCut:1200, lpCut:8000, level:0.6}], {len:2}, -4)],
+    ['Ride', () => D('Jazz Ride', [
+      {type:'metal', a:1, b:0.55, atk:0.3, dec:3800, hpCut:3500, hpRes:0.15, lpCut:13000, level:0.75},
+      {type:'fmmetal', a:0.9, b:0.4, ...hz(300), atk:0.3, dec:2500, hpCut:3000, lpCut:11000, level:0.35},
+      {type:'white', atk:0.1, dec:350, hpCut:8500, hpRes:0.6, lpCut:10500, lpRes:0.6, level:0.5},
+      {type:'bell', a:0.8, b:0.25, ...hz(470), atk:0.1, dec:2600, hpCut:1500, level:0.2},
+      {type:'white', atk:0.05, dec:8, hpCut:3500, level:0.45}], {len:5}, 0.5)],
+    ['Crash', () => D('Jazz Crash', [
+      {type:'metal', a:1, b:0.55, atk:3, dec:2600, hpCut:2500, hpRes:0.1, lpCut:10000, level:0.7},
+      {type:'white', atk:3, dec:2200, hpCut:3000, lpCut:9500, level:0.45},
+      {type:'pink', atk:3, dec:700, hpCut:500, lpCut:3000, level:0.3},
+      {type:'fmmetal', a:0.85, b:0.6, ...hz(360), atk:1, dec:1600, hpCut:2000, level:0.3}], {len:4}, 6)],
+  ]],
   ];
 }
 // The kits: eight sounds from one machine, in the factory kit's pad order (kick, snare, clap, closed hat, open hat,
 // tom, percussion, extra), so a pattern written for one kit plays sensibly on another. [group, pads 1–8, list line]
-function x0xKits(){
+function drumKits(){
   return [
     ['CR-78-style drums', ['Kick', 'Snare', 'Rim shot', 'Hi-hat', 'Cymbal', 'Low conga', 'Guiro', 'Tambourine']],
     ['808-style drums', ['Kick', 'Snare', 'Clap', 'Closed hat', 'Open hat', 'Low tom', 'Cowbell', 'Rimshot']],
@@ -7795,22 +7977,177 @@ function x0xKits(){
     ['707-style drums', ['Kick', 'Snare', 'Clap', 'Closed hat', 'Open hat', 'Mid tom', 'Cowbell', 'Tambourine']],
     ['727-style percussion', ['Low conga', 'High timbale', 'Quijada', 'Cabasa', 'Maracas', 'Open high conga', 'High agogo', 'Long whistle']],
     ['505-style drums', ['Kick', 'Snare', 'Clap', 'Closed hat', 'Open hat', 'Mid tom', 'High cowbell', 'Timbale']],
+    // the acoustic kits share one layout, so every funk break plays on any of them
+    ['Funk kit (acoustic)', ['Kick', 'Snare', 'Snare (ghost)', 'Closed hat', 'Open hat', 'Floor tom', 'High tom', 'Crash']],
+    ['Studio kit (acoustic)', ['Kick', 'Snare', 'Snare (ghost)', 'Closed hat', 'Open hat', 'Floor tom', 'High tom', 'Crash']],
+    ['Jazz kit (acoustic)', ['Kick', 'Snare', 'Snare (ghost)', 'Closed hat', 'Open hat', 'Floor tom', 'High tom', 'Ride']],
   ];
 }
-// "808" from "808-style drums": the prefix a machine's sounds carry in the Presets list.
-const x0xTag = g => g.replace(/-style.*$/, '');
+// "808" from "808-style drums", "Funk" from "Funk kit (acoustic)": the prefix a kit's sounds carry in the Presets list.
+const kitTag = g => g.replace(/-style.*$| kit \(.*$/, '');
 // Pads 1–8 get the kit; the synth slots (and any further drum pads) stay as they are. Each pad is its own undo step.
 function loadClassicKit(i){
-  const K = x0xKits()[i], G = K && x0xMachines().find(g => g[0] === K[0]); if (!G) return;
+  const K = drumKits()[i], G = K && drumKitGroups().find(g => g[0] === K[0]); if (!G) return;
   K[1].forEach((n, p) => { const it = G[1].find(e => e[0] === n); if (!it || !kit.voices[p]) return; kit.voices[p] = it[1](); changed(p, true); });
-  kit.name = x0xTag(K[0]) + '-style kit';
+  kit.name = kitTag(K[0]) + '-style kit';
   refreshAll(); save();
-  toast(`${x0xTag(K[0])}-style kit on pads 1–8. Undo puts a pad back.`);
+  toast(`${kitTag(K[0])}-style kit on pads 1–8. Undo puts a pad back.`);
 }
 async function pickClassicKit(){
-  const K = x0xKits(), list = K.map(([g, pads]) => x0xTag(g) + ' — ' + pads.filter(n => n !== 'Open hat').map(n => n === 'Closed hat' ? 'hats' : n.toLowerCase()).join(', '));
-  const i = await askPick({title:'Classic drum kits', body:'Puts eight sounds from one machine on pads 1–8, in the factory kit’s order. The synth slots stay as they are. Every sound of each machine is also in a pad’s Presets list.'}, list);
+  const K = drumKits(), list = K.map(([g, pads]) => (g.includes('acoustic') ? kitTag(g) + ' kit (acoustic)' : kitTag(g)) + ' — ' + pads.filter(n => n !== 'Open hat').map(n => n === 'Closed hat' ? 'hats' : n === 'Snare (ghost)' ? 'ghost snare' : n.toLowerCase()).join(', '));
+  const i = await askPick({title:'Drum kits', body:'Puts eight sounds from one kit on pads 1–8, in the factory kit’s order. The synth slots stay as they are. Every sound of each kit is also in a pad’s Presets list.'}, list);
   if (i >= 0) loadClassicKit(i);
+}
+/* ---------- Funk breaks (Oct 2026) ----------
+   Twelve original breaks in the classic funk-break vocabulary: syncopated kicks, ghost notes around the backbeat,
+   accented hats and open-hat lifts, and a fill or variation in the fourth bar. They are written for this app, not
+   transcribed from records. Each is [name, BPM, swing (the song's MPC swing on 16ths), kit, feel, bars]:
+     feel  [snare, ghost, hats, kick]: how late each part sits, in ms. The snare and ghosts lie back by that much
+           (± a little); hats and kick are nudged 0…n ms. The nudges come from a fixed hash, so a break plays the
+           same every time. They are written as DEL on the note, so the song runs at 24 ticks a step.
+     bars  16 steps a bar (LPB 4). K kick (X accent, x hit, . soft), S snare (X accent, x hit, f flam, g ghost),
+           G ghost snare (G medium, g soft), H hats (X accent, x closed, o open), T toms (h high, f floor),
+           C crash.
+   The kits are the acoustic ones in drumKits(), which share a pad layout: 1 kick, 2 snare, 3 ghost snare,
+   4 closed hat, 5 open hat, 6 floor tom, 7 high tom, 8 crash (or ride). Each part has its own track (1 kick,
+   2 snare, 3 ghosts, 4 hats, 5 toms, 6 crash), so a ghost never cuts the snare and the closed hat chokes the open. */
+const FUNK_BREAKS = [
+  ['Corner store', 94, 54, 'Funk kit (acoustic)', [14, 8, 6, 3], [
+    {K:'x-----x---x-----', S:'----x-------x---', G:'-------g-g----g-', H:'X-x-X-x-X-x-X-x-'},
+    {K:'x-----x--x---x--', S:'----x-------x---', G:'--g----g-g------', H:'X-x-X-x-X-x-X-o-'},
+    {K:'x-x---x---x-----', S:'----x-------x---', G:'-------g-g----g-', H:'X-x-X-x-X-x-X-x-'},
+    {K:'x-----x--x------', S:'----x-------x--x', G:'--g----g-g---g--', H:'X-x-X-x-X-x-o---'}]],
+  ['Brick stoop', 100, 53, 'Funk kit (acoustic)', [10, 6, 5, 2], [
+    {K:'x--x---x--x-----', S:'----x--g----x---', G:'-g-------g----g-', H:'XxxxXxxxXxxxXxxx'},
+    {K:'x--x------x--x--', S:'----x-------x---', G:'-g-----g-g----g-', H:'XxxxXxxxXxxxXxox'},
+    {K:'x--x---x--x-----', S:'----x--g----x---', G:'-g-------g----g-', H:'XxxxXxxxXxxxXxxx'},
+    {K:'x--x------x-x---', S:'----x-------x-x-', G:'-g-----g-g------', H:'XxxxXxxxXxxxo---', T:'--------------ff'}]],
+  ['Sunday plate', 88, 58, 'Funk kit (acoustic)', [18, 10, 7, 3], [
+    {K:'x------xx-------', S:'--------X-------', G:'---g--g----g-g--', H:'X-x-X-x-X-x-X-x-'},
+    {K:'x--x------x-----', S:'--------X-------', G:'---g--g--g---g-g', H:'X-x-X-x-X-x-X-o-'},
+    {K:'x------xx-------', S:'--------X-------', G:'---g--g----g-g--', H:'X-x-X-x-X-x-X-x-'},
+    {K:'x--x----x--x----', S:'--------X-----x-', G:'---g--g--g-g----', H:'X-x-X-x-X-x-o---', T:'------------h-f-'}]],
+  ['Hot pavement', 108, 52, 'Studio kit (acoustic)', [8, 5, 4, 2], [
+    {K:'x-x---x-x-x---x-', S:'----x-------x---', G:'---------g------', H:'X-o-X-o-X-o-X-o-', C:'c---------------'},
+    {K:'x-x---x-x-x---x-', S:'----x-------x---', G:'---------g---g--', H:'X-o-X-o-X-o-X-o-'},
+    {K:'x-x---x-x-x---x-', S:'----x-------x---', G:'---------g------', H:'X-o-X-o-X-o-X-o-'},
+    {K:'x-x---x-x-x-----', S:'----x-------x-xx', G:'---------g------', H:'X-o-X-o-X-o-x---'}]],
+  ['Low rider', 86, 56, 'Funk kit (acoustic)', [16, 9, 7, 3], [
+    {K:'x---------x-----', S:'----x-------x---', G:'-g-g--g-gg--g-g-', H:'x-x-x-x-x-x-x-x-'},
+    {K:'x------x--x-----', S:'----x-------x---', G:'-g-g--g--g----gg', H:'x-x-x-x-x-x-x-o-'},
+    {K:'x---------x-----', S:'----x-------x---', G:'-g-g--g-gg--g-g-', H:'x-x-x-x-x-x-x-x-'},
+    {K:'x------x--x--x--', S:'----x-------f---', G:'-g-g--g--g------', H:'x-x-x-x-x-x-o---', T:'--------------hf'}]],
+  ['Dust jacket', 98, 50, 'Studio kit (acoustic)', [9, 6, 4, 2], [
+    {K:'x---x---x---x---', S:'----x-------x---', G:'-------g-------g', H:'x-o-x-o-x-o-x-o-'},
+    {K:'x---x---x---x-x-', S:'----x-------x---', G:'--g----g-------g', H:'x-o-x-o-x-o-x-o-'},
+    {K:'x---x---x---x---', S:'----x-------x---', G:'-------g-------g', H:'x-o-x-o-x-o-x-o-'},
+    {K:'x---x---x--x--x-', S:'----x--x----x-x-', G:'--g-------g-----', H:'x-o-x-o-x-o-x---'}]],
+  ['Pocket change', 104, 54, 'Funk kit (acoustic)', [11, 6, 5, 2], [
+    {K:'x--x----x-x-----', S:'----x-------x--g', G:'--g---g-------g-', H:'-x---x-x-x---x--'},
+    {K:'x--x----x--x----', S:'----x-------x---', G:'--g---g--g----g-', H:'-x---x-x-x-x-x-o'},
+    {K:'x--x----x-x-----', S:'----x-------x--g', G:'--g---g-------g-', H:'-x---x-x-x---x--'},
+    {K:'x--x----x--x--x-', S:'----x-------x-x-', G:'--g---g--g------', H:'-x---x-x-x-x----', T:'-------------h-f'}]],
+  ['Smoke break', 92, 62, 'Jazz kit (acoustic)', [15, 9, 6, 3], [
+    {K:'x-----x-x-------', S:'----x-------x---', G:'---g---g-g-g---g', H:'X-x-X-x-X-x-X-x-'},
+    {K:'x-----x---x-x---', S:'----x-------x---', G:'---g---g---g--g-', H:'X-x-X-x-X-x-X-o-'},
+    {K:'x-----x-x-------', S:'----x-------x---', G:'---g---g-g-g---g', H:'X-x-X-x-X-x-X-x-'},
+    {K:'x-----x---x-----', S:'----x-------x-x-', G:'---g---g---g----', H:'X-x-X-x-X-x-o---', T:'-------------f-f'}]],
+  ['Parade float', 112, 51, 'Studio kit (acoustic)', [7, 5, 4, 2], [
+    {K:'x-------x-x-----', S:'----x--x-x--x---', G:'-g-g--g---g---gg', H:'X-x-X-x-X-x-X-x-'},
+    {K:'x-------x--x----', S:'----x-------x--x', G:'-g-gg-g-g---g---', H:'X-x-X-x-X-x-X-o-'},
+    {K:'x-------x-x-----', S:'----x--x-x--x---', G:'-g-g--g---g---gg', H:'X-x-X-x-X-x-X-x-'},
+    {K:'x-------x-------', S:'----x-x-x-xxxxXX', G:'-g-g------------', H:'X-x-X-x---------'}]],
+  ['Fire escape', 102, 55, 'Funk kit (acoustic)', [12, 7, 5, 3], [
+    {K:'x-----x---x---x-', S:'----x-------x---', G:'--g----g----g---', H:'X-x-X-x-X-x-X-x-'},
+    {K:'--x---x---x---x-', S:'----x-------x---', G:'-------g-g------', H:'X-x-X-x-X-x-X-o-'},
+    {K:'x-----x---x---x-', S:'----x-------x---', G:'--g----g----g---', H:'X-x-X-x-X-x-X-x-'},
+    {K:'--x---x---------', S:'----x-----------', G:'-------g--------', H:'X-x-X-x-x-------', T:'--------hh-hf-ff'}]],
+  ['Tape hiss', 96, 55, 'Studio kit (acoustic)', [13, 7, 6, 3], [
+    {K:'x--x---x--x-----', S:'----x-------x---', G:'---g--g-------g-', H:'XxxxXxxxXxxxXxxx'},
+    {K:'x---------x--x--', S:'----x-------x---', G:'---g--g--g----g-', H:'XxxxXxxxXxxxXxox'},
+    {K:'x--x---x--x-----', S:'----x-------x---', G:'---g--g-------g-', H:'XxxxXxxxXxxxXxxx'},
+    {K:'x---------x-----', S:'----x-------x--X', G:'---g--g--g---g--', H:'XxxxXxxxXxxxXo--'}]],
+  ['Slow burn', 84, 57, 'Funk kit (acoustic)', [20, 11, 8, 4], [
+    {K:'x-------x-x-----', S:'----X-------X---', G:'--g----g-g----g-', H:'x---x-o-x---x-o-'},
+    {K:'x--x----x-------', S:'----X-------X---', G:'--g----g--g---gg', H:'x---x-o-x---x-o-'},
+    {K:'x-------x-x-----', S:'----X-------X---', G:'--g----g-g----g-', H:'x---x-o-x---x-o-'},
+    {K:'x--x----x--x----', S:'----X-------X---', G:'--g----g--g-----', H:'x---x-o-x---x---', T:'--------------hf'}]],
+];
+// One break as hits per track per bar: [step, pad, volume (−1 = full), DEL ticks].
+function breakParts(i, bpm, ticks, lpb){
+  const [, , , , feel, bars] = FUNK_BREAKS[i], [sn, gh, hh, kk] = feel;
+  const tick = 60000 / bpm / (lpb || 4) / (ticks || TICKS), del = ms => Math.max(0, Math.min(255, Math.round(ms / tick)));
+  const hash = (a, b, c) => { let x = Math.imul(a + 1, 73856093) ^ Math.imul(b + 1, 19349663) ^ Math.imul(c + 1, 83492791);
+    x = Math.imul(x ^ (x >>> 13), 1274126177); return ((x ^ (x >>> 16)) >>> 0) / 4294967296; };
+  const T = Array.from({length:6}, () => bars.map(() => []));
+  bars.forEach((b, bi) => {
+    for (let s = 0; s < 16; s++){
+      const r = k => hash(i * 16 + bi, s, k), at = (t, pad, vol, ms) => T[t][bi].push([s, pad, vol, del(ms)]);
+      const kc = (b.K || '')[s]; if (kc === 'X' || kc === 'x' || kc === '.') at(0, 0, kc === 'X' ? -1 : kc === 'x' ? 0xE8 : 0xA8, r(1) * kk);
+      const sc = (b.S || '')[s];
+      if (sc === 'X' || sc === 'x') at(1, 1, sc === 'X' ? -1 : 0xE8, sn + (r(2) - 0.5) * 6);
+      if (sc === 'f'){ at(2, 2, 0x98, Math.max(0, sn - 28)); at(1, 1, 0xF0, sn + 2); }   // a flam: a grace note just before the hit
+      const gc = sc === 'g' ? 'g' : (b.G || '')[s];
+      if (gc === 'g' || gc === 'G') at(2, 2, gc === 'G' ? 0xA8 : 0x80 + Math.round((r(3) - 0.5) * 20), gh + (r(4) - 0.5) * 8);
+      const hc = (b.H || '')[s];
+      if (hc === 'X' || hc === 'x') at(3, 3, hc === 'X' ? 0xF0 : 0xB8 + Math.round((r(5) - 0.5) * 24), r(6) * hh);
+      if (hc === 'o' || hc === 'O') at(3, 4, hc === 'O' ? -1 : 0xD8, r(6) * hh);
+      const tc = (b.T || '')[s]; if (tc === 'h' || tc === 'f') at(4, tc === 'h' ? 6 : 5, 0xE0 + Math.round((r(7) - 0.5) * 20), sn * 0.5);
+      if ((b.C || '')[s] === 'c') at(5, 7, -1, 0);
+    }
+  });
+  return T;
+}
+// Writes break i into song s at song row y (one sect per track, a phrase per bar, identical bars shared), with the
+// instruments that play pads 1–8. Uses only free sects and phrases; returns false if there aren't enough.
+function placeBreak(s, i, y){
+  const parts = breakParts(i, s.bpm, s.ticks, s.lpb), DEL = FXC.indexOf('DEL');
+  const insOf = pad => { const k = s.insts.findIndex((n, j) => j < NI && n && n.pad === pad); return k >= 0 ? k : pad; };
+  const usedC = new Set(), usedP = new Set();
+  for (let r = 0; r < 256; r++) for (let t = 0; t <= NT; t++) if (s.song[r][t] >= 0) usedC.add(s.song[r][t]);
+  s.chains.forEach((c, k) => { if (!isEmptySect(c)) usedC.add(k); });
+  for (const k of usedC) (s.chains[k] || []).forEach(row => { if (row && row[0] >= 0) usedP.add(row[0]); });
+  s.phrases.forEach((p, k) => { if (!isEmptyPhrase(p)) usedP.add(k); });
+  const freeC = [], freeP = []; for (let k = 0; k < 256; k++){ if (!usedC.has(k)) freeC.push(k); if (!usedP.has(k)) freeP.push(k); }
+  const tracks = parts.map((bars, t) => [t, bars]).filter(([, bars]) => bars.some(h => h.length));
+  const keys = new Set(); for (const [, bars] of tracks) for (const h of bars) keys.add(JSON.stringify(h));
+  if (freeC.length < tracks.length || freeP.length < keys.size || tracks.some(([t]) => s.song[y][t] >= 0)) return false;
+  const made = new Map();
+  const phraseFor = hits => { const k = JSON.stringify(hits); if (made.has(k)) return made.get(k);
+    const id = freeP.shift(), p = freshPhrase();
+    for (const [st, pad, vol, d] of hits){ const row = p[st]; row[0] = ROOT; row[VC] = vol; row[IC] = insOf(pad); if (d > 0){ row[FX0] = DEL; row[FX0 + 1] = d; } }
+    s.phrases[id] = p; s.plen[id] = 16; s.plpb[id] = 0; made.set(k, id); return id; };
+  for (const [t, bars] of tracks){ const cid = freeC.shift(), sect = freshSect(); bars.forEach((hits, b) => { sect[b][0] = phraseFor(hits); }); s.chains[cid] = sect; s.song[y][t] = cid; }
+  return true;
+}
+// A new song holding break i at its own tempo and swing, through a light "record" chain on the master: a little
+// compression, a small room and tape (with less head bump, so the kick doesn't swamp the hats). The kick track sits
+// 2 dB down and the snare and hats a little up, a drummer's balance rather than four pads at the same peak.
+function breakSong(i){
+  const [name, bpm, swing] = FUNK_BREAKS[i], s = freshSong();
+  Object.assign(s, {name, bpm, swing, swingB:2, ticks:24});
+  s.mfx = [Object.assign(freshTfx('comp'), {press:80}), Object.assign(freshTfx('room'), {size:90, sustain:100, wet:60}), Object.assign(freshTfx('tape'), {bump:60, flutter:30}), null];
+  s.mix[0].vol = 200; s.mix[1].vol = 232; s.mix[3].vol = 236;
+  placeBreak(s, i, 0);
+  return s;
+}
+// The first song row after everything in the song, with one empty row between, so an added break is its own block.
+function breakRow(){ let last = -1; for (let r = 0; r < 256; r++) if (S.song[r].some((c, t) => t < NT && c >= 0)) last = r; return last < 0 ? 0 : Math.min(255, last + 2); }
+async function pickBreak(){
+  const i = await askPick({title:'Funk breaks', body:'Original breaks in the classic funk style, with swing, ghost notes and a laid-back snare built in. They play on pads 1–8 of an acoustic kit.'},
+    FUNK_BREAKS.map(b => `${b[0]} — ${b[1]} BPM, ${kitTag(b[3]).toLowerCase()} kit`));
+  if (i < 0) return;
+  const b = FUNK_BREAKS[i], y = breakRow();
+  const how = await askPick({title:b[0], body:`A new song plays it at ${b[1]} BPM with its swing, and puts the ${kitTag(b[3]).toLowerCase()} kit on pads 1–8 (the synth slots stay); Undo brings your song back. Adding it puts its four bars in this song at row ${rS(y, 3)}, at this song's tempo and swing, on the pads you have.`},
+    ['New song with this break', 'Add to this song']);
+  if (how === 0){
+    setSong(breakSong(i), '');
+    const k = drumKits().findIndex(K => K[0] === b[3]); if (k >= 0) loadClassicKit(k);
+    toast(`${b[0]}: ${b[1]} BPM, ${kitTag(b[3]).toLowerCase()} kit on pads 1–8. Press play.`);
+  } else if (how === 1){
+    if (y >= 255 || !placeBreak(S, i, y)) return toast('No room for it: the song needs six free sects and up to sixteen free phrases.');
+    saveS(); draw(); toast(`${b[0]} added at row ${rS(y, 3)} on tracks 1–6.`);
+  }
 }
 // An engine's presets (its card's list, less Init) as one group of the pad Presets list.
 const engGroup = ([k, gn]) => [gn, XUI[k].pre.slice(1).map(([n, o, x, e]) =>
@@ -8054,8 +8391,9 @@ function factoryVoicePresets(){
       {type:'white', atk:30, dec:300, sus:0.3, rel:200, hpCut:2000, lpCut:5000, level:0.1}], {lfo1Rate:5.5, lfo1Depth:1, r1dst:1, r1amt:0.06})],
   ]],
   // the classic drum machines, one group each (after the others, so saved Recent picks keep their places)
-  ...x0xMachines().map(([g, list]) => [g, list.map(([n, make]) => [x0xTag(g) + ' ' + n, make])]),
+  ...drumKitGroups().filter(([g]) => !g.includes('acoustic')).map(([g, list]) => [g, list.map(([n, make]) => [kitTag(g) + ' ' + n, make])]),
   engGroup(['drift', 'Drift (tape pads)']),
+  ...drumKitGroups().filter(([g]) => g.includes('acoustic')).map(([g, list]) => [g, list.map(([n, make]) => [kitTag(g) + ' ' + n, make])]),
   ];
 }
 // Layer presets: tagged with the pad pitch they were written for (vt: 0 = a drum pad, 24 = a synth slot), so a
@@ -10104,6 +10442,7 @@ function fileItems(){
     ['Open project…', openProj, null, 'O'], ['Save project', () => saveProj(false), null, 'S'], ['Save as…', () => saveProj(true), null, '⇧S'],
     ...(canShareProj() ? [['Share project…', shareProj]] : []),
     ['Load demo song', () => setSong(demoSong(), 'Loaded the starter beat.'), null, null, true],
+    ['Funk breaks…', pickBreak],
     ...(hasThunderWork() ? [['Open ...Thunder’s saved work…', () => thunderImport(false)]] : []),
     null,
     ['Render song (WAV)', () => renderOut(false)], ['Render stems (.zip)', () => renderOut(true)],
@@ -10111,7 +10450,7 @@ function fileItems(){
     null,
     ['Save kit…', () => $('bSaveKit').click()], ['Load kit…', () => $('kitIn').click()],
     ['Export song presets…', exportPresets], ['Import presets…', () => $('presetIn').click()],
-    ['Factory kit', () => setKit(factoryKit()), null, null, true], ['Classic drum kits…', pickClassicKit], ['Clear all kit slots', clearKit, null, null, true],
+    ['Factory kit', () => setKit(factoryKit()), null, null, true], ['Drum kits…', pickClassicKit], ['Clear all kit slots', clearKit, null, null, true],
     null,
     ['Export this pad (WAV)', () => $('bExPad').click()], ['Export all 8 pads (.zip)', () => $('bExKit').click()],
     ...(canShare ? [['Share this pad…', () => $('bShPad').click()], ['Share all 8 pads…', () => $('bShKit').click()]] : []),

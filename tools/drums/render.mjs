@@ -1,6 +1,6 @@
 // Render pad voices offline in Node with the app's own ENGINE block, as 16-bit WAVs, and check them.
-// usage: node tools/drums/render.mjs index.html x0x|<voices.js> <outdir> [filter]
-//   x0x       the classic drum machine voices (x0xMachines() in index.html)
+// usage: node tools/drums/render.mjs index.html kits|<voices.js> <outdir> [filter]
+//   kits      every drum kit voice (drumKitGroups() in index.html: the classic machines and the acoustic kits)
 //   voices.js a file holding one function that returns [[group, [[name, () => voice], ...]], ...]
 //             (mkVoice, rA, cA, PD, PFX and factoryKit are in scope)
 // Prints each voice's length, peak, RMS over the first 100 ms and render time, and flags NaNs and any
@@ -23,9 +23,9 @@ ctx.globalThis = ctx; ctx.self = ctx;
 vm.runInContext(engine + helpers + `\n;globalThis.__E = {renderVoice, mkVoice, freshFx, FX, rA, cA, PD, PFX, voiceLen, factoryKit};`, ctx, {filename: 'engine.js'});
 const E = ctx.__E;
 let src;
-if (voicesPath === 'x0x'){
-  const a = html.indexOf('function x0xMachines(){'), b = html.indexOf('// The kits: eight sounds', a);
-  if (a < 0 || b < 0) throw new Error('x0xMachines not found');
+if (voicesPath === 'kits' || voicesPath === 'x0x'){
+  const a = html.indexOf('function drumKitGroups(){'), b = html.indexOf('// The kits: eight sounds', a);
+  if (a < 0 || b < 0) throw new Error('drumKitGroups not found');
   src = html.slice(a, b);
 } else src = fs.readFileSync(voicesPath, 'utf8');
 const groups = vm.runInContext(`(() => { const {mkVoice, rA, cA, PD, PFX, factoryKit} = __E; return (${src})(); })()`, ctx);

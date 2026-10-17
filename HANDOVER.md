@@ -24,6 +24,49 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 17 Oct: acoustic kits and Funk breaks
+
+- **What:** three clean acoustic kits (38 more pad voices) and twelve original funk-style breaks you can load as
+  patterns. The kits picker is now **File ▾ → Drum kits…** (and Settings → Kit → **Drum kits…**). It lists the
+  classic machines first, then **Funk kit**, **Studio kit** and **Jazz kit**. **File ▾ → Funk breaks…** loads a break
+  as a new song (its tempo, swing and acoustic kit on pads 1–8; Undo brings the old song back), or adds its four bars
+  to the current song two rows after the last content row.
+- **Kits:** plain Layers voices like the classic ones. The kick, snare and tom bodies are membrane and sine layers,
+  with strong filtered-noise beater and stick layers on top. Cymbals are `metal` plus noise. Every kit has a quieter
+  **Snare (ghost)** voice, softer and shorter, for ghost notes. Funk: 12 voices (dry, tight, deadened). Studio: 13
+  (bigger and brighter, mid tom, ride bell). Jazz: 13 (tuned-up small kit, ride, brush sweep and brush tap). They were
+  tuned against measurements of acoustic hits in drum machine ROMs (R-8, SR-16, LinnDrum, from the same
+  `tidal-drum-machines` set, measured only). Peak targets match the classic kits (kicks −1 dB, toms −2, hits −3,
+  hats and cymbals −7), with ghosts and brushes at −6. Each peak is the loudest of six renders, because the noise
+  seed moves a peak by up to 3 dB.
+- **Code renames:** `x0xMachines()` → `drumKitGroups()` (now classic and acoustic groups), `x0xKits()` →
+  `drumKits()`, `x0xTag` → `kitTag`. `kitTag` strips "-style…" or " kit (…)" for the short names. In the pad Presets
+  list the classic groups come first, then Drift (tape pads), then the three acoustic groups, so existing Recent
+  picks keep their keys. Kit pad order for the acoustic kits: 1 kick, 2 snare, 3 ghost snare, 4 closed hat, 5 open
+  hat, 6 floor tom, 7 high tom, 8 crash (the Jazz kit has a ride on 8).
+- **Breaks:** `FUNK_BREAKS` (right before the `engGroup` comment in `index.html`) holds 12 breaks:
+  `[name, BPM, swing, kit group, feel, bars]`. Each bar is a set of 16-step strings: K kick, S snare (f = flam),
+  G ghost, H hats (o = open), T toms, C crash. They are written for this app in the classic vocabulary
+  (syncopated kicks, ghosts around the backbeat, open-hat lifts, a fill or variation in bar 4) and not transcribed
+  from records. `feel` is how late each part sits, in ms: snare, ghosts, hats 0…n, kick 0…n. A fixed hash nudges
+  each hit, so a break plays the same every time.
+  - `breakParts(i, bpm, ticks, lpb)` turns a break into hits per track: `[step, pad, volume, DEL ticks]`. Feel is
+    written as DEL, so break songs run at 24 ticks a step. Swing is the song's own (`swing`, 16ths).
+  - `placeBreak(s, i, y)` writes one sect per track at song row y and a phrase per bar. Identical bars share a
+    phrase. It uses only free sects and phrases (not referenced by the song, not used by a used sect, not empty),
+    picks the instruments that play pads 1–8, and returns false if there isn't room.
+  - Tracks: 1 kick, 2 snare, 3 ghosts and flam graces, 4 hats (closed chokes open through choke group 1), 5 toms,
+    6 crash.
+  - `breakSong(i)` builds the new song. It puts a light record chain on the master (comp press 80, small room, tape
+    with less head bump), and mixes the kick track 2 dB down with the snare and hats a little up.
+  - `breakRow()` and `pickBreak()` are the menu flow.
+- **WAV loops:** the same twelve breaks were rendered through the app's own renderer (a headless page calling
+  `makeSeq` + `pass`, with the master FX) as 4-bar 44.1 kHz 16-bit loops normalised to −1 dBFS and sent to the owner.
+  They are not in the repo. Each loop is the middle pass of a three-pass render, so it starts with the previous
+  pass's tails, and its first 256 samples crossfade in from the third pass, so the loop point is seamless.
+- **Not heard by ear yet** (headless only). The brush sweep and the jazz ride are the loosest sounds.
+- **Cache:** `thunderplus-v161`.
+
 ## 17 Oct: Drift engine (tape pads, for Boards of Canada-style pads)
 
 - **What:** a rendered synth-slot engine, `drift` (`class DriftCore` in the ENGINE block, right after `SwarmCore`;
@@ -47,12 +90,12 @@ Keep this file up to date at the end of a work session.
 ## 17 Oct: classic drum machine kits (CR-78, 808, 606, 909, 707, 727, 505)
 
 - **What:** 97 new pad voices, one Presets group per machine ("808-style drums" and so on, appended after the other
-  groups so saved Recent picks keep their keys), and **File ▾ → Classic drum kits…** / **Settings → Kit → Classic
-  kits…**, which puts eight of one machine's sounds on pads 1–8 (synth slots and any extra drum pads untouched; each
+  groups so saved Recent picks keep their keys), and **File ▾ → Drum kits…** / **Settings → Kit → Drum kits…** (named
+  Classic drum kits… until the acoustic kits joined), which puts eight of one machine's sounds on pads 1–8 (synth slots and any extra drum pads untouched; each
   pad is its own undo step). Kit pads follow the factory kit's order (kick, snare, clap, closed hat, open hat, tom,
   percussion, extra) so a pattern plays sensibly on any kit; hats keep choke group 1 (the CR-78 has none).
-- **Code:** one block before `factoryVoicePresets()` in `index.html`: `x0xMachines()` (the voices), `x0xKits()` (the
-  eight per kit), `x0xTag`, `loadClassicKit(i)`, `pickClassicKit()`. All plain Layers voices — no new DSP, no samples.
+- **Code:** one block before `factoryVoicePresets()` in `index.html`: `drumKitGroups()` (the voices; was
+  `x0xMachines`), `drumKits()` (the eight per kit; was `x0xKits`), `kitTag`, `loadClassicKit(i)`, `pickClassicKit()`. All plain Layers voices — no new DSP, no samples.
   Helpers inside: `hz(f, vt)` turns Hz into tune/fine (voices above C6 sit on a voice tuned +12/+24 so layers stay in
   ±48), `cut(hold, dec)` is the voice amp used as a gate (808/606 open hats, sampled tails), `clap(...)` builds a clap,
   `grain()` is 8-bit Degrade plus a voice low-pass on the 707/505 (sample-ROM) voices. `D(name, layers, opts, level,
