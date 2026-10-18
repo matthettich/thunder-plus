@@ -2080,7 +2080,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <section id="hFx"><h2>FX column commands</h2>
 <p>Each phrase row has three effect columns: a command and a hex value. The info line at the bottom of the screen explains the one under the cursor.</p>
 <div class="fxg"><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FLX</code>Flex pattern: 00 off, 01–10</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>retrigger every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row Y</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div><div><code>CCA</code>–<code>CCD</code>MIDI CC: 00–7F to the instrument’s CC slot A–D (the CC numbers are on INST)</div><div><code>PGM</code>MIDI program change 00–7F, just before the row’s note</div></div>
-<p><b>MIDI instruments</b> (INST › OUTPUT MIDI or PAD+MIDI) send to their <b>PORT</b> A–D: ⚙ Settings → MIDI says which cable each letter is on this device, so a song plays the same on the phone and the computer. <code>CCA</code>–<code>CCD</code> and <code>PGM</code> work on rows without a note too (on the track’s last instrument), and <code>RND</code>, <code>RNL</code> and <code>REP</code> change them like any command. <code>PSL</code>, <code>PBN</code>, <code>PVB</code>, <code>PIT</code>/<code>FIN</code> on a held note and fractions of a semitone are sent as pitch bend: set INST › <b>BEND RANGE</b> to the range your gear bends. <code>ARP</code> plays its steps as notes, then the note itself again if nothing comes next.</p>
+<p><b>MIDI instruments</b> (INST › OUTPUT MIDI or PAD+MIDI) send to their <b>PORT</b> A–D: ⚙ Settings → MIDI says which cable each letter is on this device, so a song plays the same on the phone and the computer. <code>CCA</code>–<code>CCD</code> and <code>PGM</code> work on rows without a note too (on the track’s last instrument), and <code>RND</code>, <code>RNL</code> and <code>REP</code> change them like any command. <code>PSL</code>, <code>PBN</code>, <code>PVB</code>, <code>PIT</code>/<code>FIN</code> on a held note and fractions of a semitone are sent as pitch bend: set INST › <b>BEND RANGE</b> to the range your gear bends. <code>ARP</code> plays its steps as notes, then the note itself again (unless the next row retunes it or plays another note).</p>
 <p><b>LFO → CC:</b> INST › <b>LFO CC</b> (set a CC number) runs an LFO on that CC while the song plays: SHAPE, RATE in time with the song (T triplet, D dotted), DEPTH (127 is the whole range), CENTRE, and RESTART (FREE from PLAY, NOTE at each of the instrument’s notes). <b>Song position:</b> with clock out on, playing the song from a row partway into a block sends Song Position Pointer and Continue, so the gear starts at the same place; with clock in on, the other device’s Continue after a Song Position Pointer plays the song from there.</p>
 <h3>The master column (MST)</h3>
 <p>On the Song screen, the amber <b>MST</b> column after the poly tracks plays phrases whose commands drive the <b>master bus</b>: <code>VOL</code> sets the master level from that row on, and <code>FXO</code>, <code>FLX</code>, <code>GAT</code> and <code>RTG</code> work on the master's effects (Mixer → master → FX). Master phrases are their own kind: just the three command columns (no notes, volume or instrument), and the command list offers only what works on the master: VOL, FXO, FLX, GAT, RTG, then TPO, TIC, GGR, HOP, DEL, CHA, NTH, REP, RND, RNL and SED. Beside the grid on a big screen, the master's effect chain shows instead of the piano. It plays alongside the tracks, block by block, and is not shown in Arrange. Stopping puts the master level and every switched effect back as set.</p>
@@ -10860,7 +10860,7 @@ const MIDI_ONLY_EV = new Set(['mcc', 'mpg']);
 // held[track]: the MIDI notes a track has sounding ({p, ch, n, base, vel, rng, fine, t, end}). pend[track]: ARP
 // notes waiting to come back to their pitch (see arpBack). used: port*16+channel pairs that got anything (All Notes
 // Off goes to these at STOP). bend: port*16+channel → the 14-bit bend last sent.
-const mx = {held:[], pend:[], used:new Set(), bend:new Map(), beat:null, t0:null, lfo:[], spp:0, clk:{on:false, k:0}, inT:[], inK:0, inRun:false, ext:0,
+const mx = {held:[], pend:[], used:new Set(), bend:new Map(), ramp:new Set(), beat:null, t0:null, lfo:[], spp:0, clk:{on:false, k:0}, inT:[], inK:0, inRun:false, ext:0,
   slave:false, inSpp:0, inOff:0};
 const midiOut = p => { const id = midi.outIds[p | 0]; return (midi.access && id && midi.access.outputs.get(id)) || null; };
 const portOf = I => clamp(I.mpt | 0, 0, NPORT - 1);
@@ -10902,13 +10902,19 @@ function moOff(t, at){ pendAt(t, at); const H = mx.held[t]; if (!H || !H.length)
 // Pitch bend, `st` semitones on a channel whose gear bends `rng` semitones at full throw (the whole channel bends).
 // A channel never bent counts as centred, and a value already sent isn't sent again, so gear only sees bends when a
 // song uses them.
+// mx.bend[k] = {v, t}: the last value booked and its time. A value is skipped only when it repeats the latest one in
+// time (a message booked for earlier than one already sent can't undo it, so it is sent, and the later one stands).
 function bendTo(p, ch, st, rng, t){
-  const k = p * 16 + ch, v = clamp(Math.round(8192 + st / rng * 8192), 0, 16383);
-  if ((mx.bend.has(k) ? mx.bend.get(k) : 8192) === v) return;
-  mx.bend.set(k, v); mx.used.add(k);
+  const k = p * 16 + ch, v = clamp(Math.round(8192 + st / rng * 8192), 0, 16383), L = mx.bend.get(k), tt = t == null ? Infinity : t;
+  if (L && L.v === v && tt >= L.t) return;
+  if (!L && v === 8192) return;
+  if (!L || tt >= L.t) mx.bend.set(k, {v, t:tt});
+  mx.used.add(k);
   msend([0xE0 | ch, v & 127, v >> 7], t, true, p);
 }
-const bendNow = (p, ch, rng) => { const k = p * 16 + ch; return ((mx.bend.has(k) ? mx.bend.get(k) : 8192) - 8192) / 8192 * rng; };
+const bendNow = (p, ch, rng) => { const k = p * 16 + ch, L = mx.bend.get(k); return ((L ? L.v : 8192) - 8192) / 8192 * rng; };
+// Chord notes on one row share one PBN / PVB ramp per channel (mx.ramp: 'p:ch:t0' of the ramps already booked).
+const rampOnce = (p, ch, t0) => { const k = p + ':' + ch + ':' + t0.toFixed(4); if (mx.ramp.has(k)) return false; mx.ramp.add(k); return true; };
 // A glide from a to b semitones between t0 and t1: a message about every 10 ms (at most 48).
 function bendRamp(p, ch, a, b, rng, t0, t1){
   bendTo(p, ch, a, rng, t0);
@@ -10931,8 +10937,8 @@ function arpSegs(arp, t, end){
 // row takes over instead (no one-millisecond blip), otherwise it sounds at its time, booked at the next step.
 const arpBack = arp => arp && arp.length ? arp[arp.length - 1][0] + (arp.length > 1 ? arp[1][0] - arp[0][0] : 0.02) : null;
 function pendPlay(t, x){
-  for (const h of mx.held[t] || []) if (h.p === x.p && h.ch === x.ch && h.base === x.n && h.end === Infinity) offOne(h, x.t);
-  moPlay(t, x.p, x.ch, x.n, x.vel, x.rng, x.fine, [[x.t, 0]], x.end);
+  for (const h of mx.held[t] || []) if (h.nid === x.nid && h.end === Infinity) offOne(h, x.t);
+  moPlay(t, x.p, x.ch, x.n, x.vel, x.rng, x.fine, [[x.t, 0]], x.end, x.nid);
 }
 // Something happens on track t at `at`: a return still waiting plays first if it was due before, else it's dropped.
 function pendAt(t, at){
@@ -10940,19 +10946,32 @@ function pendAt(t, at){
   mx.pend[t] = [];
   if (at > P[0].t + 1e-4) for (const x of P) pendPlay(t, x);
 }
+// Returns due by `at` play (the rest keep waiting).
+function pendFlush(t, at){
+  const P = mx.pend[t]; if (!P || !P.length) return;
+  mx.pend[t] = P.filter(x => x.t > at + 1e-4);
+  for (const x of P) if (x.t <= at + 1e-4) pendPlay(t, x);
+}
 // Sounds note n on track t as segs (above) and books the ends: each step's at the next step, the last at `end`
 // (Infinity: held until the track's next note, OFF, KIL or STOP).
-function moPlay(t, p, ch, n, vel, rng, fine, segs, end){
-  const out = [];
+let nidN = 0;
+function moPlay(t, p, ch, n, vel, rng, fine, segs, end, nid){
+  const out = []; if (nid == null) nid = ++nidN;
   segs.forEach(([tt, d], i) => {
     const nn = clamp(n + d, 0, 127), off = i < segs.length - 1 ? segs[i + 1][0] : end;
-    const h = {p, ch, n:nn, base:n, vel, rng, fine, t:tt, end:Infinity};
+    const h = {p, ch, n:nn, base:n, vel, rng, fine, t:tt, end:Infinity, nid};
     msend([0x90 | ch, nn, vel], tt, true, p);
     if (off < Infinity){ h.end = Math.max(tt + 0.001, off); msend([0x80 | ch, nn, 0], h.end, true, p); }
     out.push(h);
   });
   mx.used.add(p * 16 + ch);
   mx.held[t] = (mx.held[t] || []).filter(x => x.end > segs[0][0]).concat(out);
+  return nid;
+}
+// End a whole note (every ARP segment of it, and its waiting return) at `at`.
+function offNote(t, nid, at){
+  for (const h of mx.held[t] || []) if (h.nid === nid) offOne(h, at);
+  if (mx.pend[t]) mx.pend[t] = mx.pend[t].filter(x => x.nid !== nid);
 }
 function moNote(e, I){
   if (!((e.vel == null ? 1 : e.vel) > 0)) return;
@@ -10961,34 +10980,47 @@ function moNote(e, I){
   const vel = clamp(Math.round((e.vel == null ? 1 : e.vel) * 127), 1, 127);
   pendAt(t, e.t);
   if (e.ii != null && I.lrg && lfoCC(I) >= 0) lfoTrig(e.ii, e.t);
-  // A new note on a mono track ends the one before; a poly track keeps up to 4; the same key again is released first.
+  // A new note on a mono track ends the one before; a poly track keeps up to 4 notes (an ARP's steps are one note);
+  // the same key again is released first.
   if (!e.poly) moOff(t, e.t);
-  else { for (const h of H) if (h.p === p && h.ch === ch && h.base === n) offOne(h, e.t); let live = H.filter(h => h.end > e.t); while (live.length >= 4) offOne(live.shift(), e.t); }
+  else {
+    const HH = mx.held[t] || [], ids = [];
+    for (const h of HH) if (h.p === p && h.ch === ch && h.base === n && h.end > e.t) offNote(t, h.nid, e.t);
+    for (const h of HH) if (h.end > e.t && h.t <= e.t + 1e-6 && !ids.includes(h.nid)) ids.push(h.nid);
+    while (ids.length >= 4) offNote(t, ids.shift(), e.t);
+  }
   // The pitch the note starts at: its own (plus its fraction of a semitone), or with PSL the track's last pitch.
   const sl = e.slide && e.slide.from > 0 && e.rate > 0 ? e.slide : null;
   const b0 = sl ? clamp(12 * Math.log2(sl.from / e.rate), -rng, rng) + fine : fine;
   bendTo(p, ch, b0, rng, e.t);
   const back = arpBack(e.arp), pend = back != null && back < end - 1e-6;
-  moPlay(t, p, ch, n, vel, rng, fine, arpSegs(e.arp, e.t, end), pend ? Infinity : end);
-  if (pend) (mx.pend[t] || (mx.pend[t] = [])).push({p, ch, n, vel, rng, fine, t:back, end});
-  // Then it moves: PSL glides to the note, then PBN bends on from there, or PVB wobbles around it.
+  const nid = moPlay(t, p, ch, n, vel, rng, fine, arpSegs(e.arp, e.t, end), pend ? Infinity : end);
+  if (pend) (mx.pend[t] || (mx.pend[t] = [])).push({p, ch, n, vel, rng, fine, t:back, end, nid});
+  // Then it moves: PSL glides to the note, then PBN bends on from there, or PVB wobbles around it (one ramp per
+  // channel and row, shared by the notes of a chord).
   let t0 = e.t;
-  if (sl){ t0 = e.t + Math.max(0.001, sl.dur); bendRamp(p, ch, b0, fine, rng, e.t, t0); }
-  if (e.bend && e.bend.t1 > t0) bendRamp(p, ch, fine, fine + 12 * Math.log2(e.bend.mul), rng, t0, e.bend.t1);
-  else if (e.vib && e.vib.dep && e.vib.t1 > t0) bendVib(p, ch, fine, e.vib, rng, t0, e.vib.t1);
+  if (sl){ t0 = e.t + Math.max(0.001, sl.dur); if (rampOnce(p, ch, e.t)) bendRamp(p, ch, b0, fine, rng, e.t, t0); }
+  if (e.bend && e.bend.t1 > t0){ if (rampOnce(p, ch, t0)) bendRamp(p, ch, fine, fine + 12 * Math.log2(e.bend.mul), rng, t0, e.bend.t1); }
+  else if (e.vib && e.vib.dep && e.vib.t1 > t0){ if (rampOnce(p, ch, t0)) bendVib(p, ch, fine, e.vib, rng, t0, e.vib.t1); }
 }
 // A row with commands but no note changes the MIDI notes the track is holding, as it does a pad: PIT/FIN retune them
 // (a bend from their own pitch), ARP steps through from them, PBN bends on from where they are, PVB wobbles there.
 function moMod(e){
-  pendAt(e.track, e.t);
+  // Only a retune takes over from a waiting ARP return; VOL, PAN, KIL and OFF let it play first (as the pad does).
+  if (e.mul != null || (e.arp && e.arp.length) || e.bend || (e.vib && e.vib.dep)) pendAt(e.track, e.t); else pendFlush(e.track, e.t);
   const H = (mx.held[e.track] || []).filter(h => h.end > e.t && h.t <= e.t); if (!H.length) return;
   const {p, ch, rng, fine} = H[H.length - 1];
   let cur = bendNow(p, ch, rng);
   if (e.mul != null){ cur = clamp(12 * Math.log2(e.mul), -rng, rng) + fine; bendTo(p, ch, cur, rng, e.t); }
   if (e.arp && e.arp.length){
     const back = arpBack(e.arp), P = mx.pend[e.track] || (mx.pend[e.track] = []);
-    for (const h of H){ offOne(h, e.t); moPlay(e.track, h.p, h.ch, h.base, h.vel, h.rng, h.fine, arpSegs(e.arp, e.t, Infinity), Infinity);
-      P.push({p:h.p, ch:h.ch, n:h.base, vel:h.vel, rng:h.rng, fine:h.fine, t:back, end:Infinity}); }
+    for (const h of H){
+      // The first step is the note itself: keep it sounding, start the steps from the second.
+      const segs = arpSegs(e.arp, e.t, Infinity), keep = segs.length && segs[0][1] === 0;
+      if (keep){ if (segs.length < 2) continue; h.end = Math.max(h.t + 0.001, segs[1][0]); msend([0x80 | h.ch, h.n, 0], h.end, true, h.p); segs.shift(); }
+      else offOne(h, e.t);
+      const nid = moPlay(e.track, h.p, h.ch, h.base, h.vel, h.rng, h.fine, segs, Infinity);
+      P.push({p:h.p, ch:h.ch, n:h.base, vel:h.vel, rng:h.rng, fine:h.fine, t:back, end:Infinity, nid}); }
   } else if (e.bend) bendRamp(p, ch, cur, cur + 12 * Math.log2(e.bend.mul), rng, e.t, e.bend.t1);
   else if (e.vib && e.vib.dep) bendVib(p, ch, cur, e.vib, rng, e.t, e.vib.t1);
 }
@@ -11010,16 +11042,15 @@ function moEv(e){
       if (mx.spp > 0){ msendClk([0xF2, mx.spp & 127, mx.spp >> 7], e.t - 0.05); msendClk([0xFB], e.t); } else msendClk([0xFA], e.t);
       mx.clk = {on:true, k:0};
     }
-    mx.pend.forEach((P, t) => { if (P && P.length && P[0].t < e.t - 1e-4) pendAt(t, e.t); });   // ARP returns the tracks let pass
     return false;
   }
   if (e.type === 'off'){ moOff(e.track, e.t); return false; }
-  if (e.type === 'mod'){ moMod(e); const end = moEnd(e); if (end < Infinity) moOff(e.track, end); return false; }
+  if (e.type === 'mod'){ if (e.track < S.mix.length && !audible(e.track)) moOff(e.track, e.t); else { moMod(e); const end = moEnd(e); if (end < Infinity) moOff(e.track, end); } return false; }
   if (MIDI_ONLY_EV.has(e.type)){ moCmd(e); return true; }
   if (e.type !== 'note' || e.ii == null) return false;
   const I = S.insts[e.ii], m = I ? I.mo | 0 : 0;
   if (!m){ moOff(e.track, e.t); return false; }   // the column switched to a pad instrument
-  if (e.track >= S.mix.length || audible(e.track)) moNote(e, I);
+  if (e.track >= S.mix.length || audible(e.track)) moNote(e, I); else moOff(e.track, e.t);   // a muted track lets its gear go quiet
   return m === 1;
 }
 // Clocks up to the time the sequencer has booked so far (24 per beat, straight: swing moves notes, not the clock).
@@ -11034,7 +11065,7 @@ function moClock(s){
 // PLAY: `row` is the song row a song starts from (-1 for a sect or phrase), for the Song Position Pointer.
 function moStart(row){
   mx.beat = null; mx.t0 = null; mx.lfo = []; mx.clk = {on:false, k:0};
-  mx.spp = row != null && row >= 0 && clkWanted() ? sppFor(row) : 0;
+  mx.spp = 0; if (row != null && row >= 0 && clkWanted()) try { mx.spp = sppFor(row); } catch(e){}
 }
 
 /* ---------- song position (SPP) ----------
@@ -11049,12 +11080,15 @@ function songBlockTop(row){ let r = row; while (songFilled(r - 1)) r--; return r
 function songRowBeats(r0, stopRow, stopBeat){
   const m = new Map(); let seq;
   try { seq = makeSeq(S, 'song', {row:r0, once:true, sim:true}); } catch(e){ return m; }
-  for (let g = 0; seq.alive() && g < 60000; g++){
-    const r = seq.step(), e0 = r.evs[0], b = e0 && e0.type === 'beat' ? e0.b : null; if (b == null) continue;
-    if (stopBeat != null && b > stopBeat + 1e-6) break;
-    for (const q of r.pos) if (q && !m.has(q.row)) m.set(q.row, b);
-    if ((stopRow != null && m.has(stopRow)) || b > 4096) break;
-  }
+  let last = r0; while (songFilled(last + 1)) last++;   // the block's last row: once every row is reached, done
+  try {
+    for (let g = 0; seq.alive() && g < 20000; g++){
+      const r = seq.step(), e0 = r.evs[0], b = e0 && e0.type === 'beat' ? e0.b : null; if (b == null) continue;
+      if (stopBeat != null && b > stopBeat + 1e-6) break;
+      for (const q of r.pos) if (q && !m.has(q.row)) m.set(q.row, b);
+      if ((stopRow != null && m.has(stopRow)) || m.size > last - r0 || b > 1024) break;
+    }
+  } catch(e){}
   return m;
 }
 // A block's row beats, kept until the song changes (songVer goes up on every edit, and a loaded song is a new S).
@@ -11142,12 +11176,13 @@ function moRelease(){
     msend([0x80 | h.ch, h.n, 0], null, false, h.p); if (h.t > now) msend([0x80 | h.ch, h.n, 0], h.t + 0.001, true, h.p); }
   for (const k of mx.used){ const p = k >> 4, ch = k & 15;
     msend([0xB0 | ch, 123, 0], null, false, p);   // All Notes Off
-    if (mx.bend.has(k) && mx.bend.get(k) !== 8192) msend([0xE0 | ch, 0, 64], null, false, p); }
-  mx.held = []; mx.pend = []; mx.bend.clear();
+    if (mx.bend.has(k) && mx.bend.get(k).v !== 8192) msend([0xE0 | ch, 0, 64], null, false, p); }
+  mx.held = []; mx.pend = []; mx.bend.clear(); mx.ramp.clear();
 }
 function moStop(){
   const was = mx.clk.on, last = mx.clk.last; moRelease();
-  if (was) msendClk([0xFC], last != null && ctx && last > ctx.currentTime ? last + 0.001 : null);   // after the last booked tick
+  if (was){ const at = last != null && ctx && last > ctx.currentTime ? last + 0.001 : null, ps = clkPorts();
+    for (const p of ps.length ? ps : [...Array(NPORT).keys()].filter(p => midiOut(p))) msend([0xFC], at, false, p); }   // after the last booked tick
   mx.clk = {on:false, k:0}; mx.beat = null;
 }
 // Clock in.
@@ -11159,10 +11194,12 @@ function clkIn(st, ts){
     if (mx.ext) setTempoLive(mx.ext);
     mx.slave = true;
     // Continue after a Song Position Pointer: play the song from where the other device is. Start is the top.
-    const P = st === 0xFB ? mx.inSpp / 4 : 0; if (st === 0xFA) mx.inSpp = 0;
+    // Continue after a position plays the song from there (the position counts once; a Continue with none is a Start).
+    const P = st === 0xFB ? mx.inSpp / 4 : 0; mx.inSpp = 0;
     const at = P > 0 ? songRowAt(P) : null;
     if (at){ tStart('song', {row:at.row}); mx.inOff = P - at.b; mx.slave = true; return; }
-    playCtx(); return;
+    if (GRIDV.has(tv) && tv !== 'song') tStart('song', {row:songRow()}); else playCtx();
+    mx.slave = true; return;
   }
   if (st === 0xFC){ mx.inRun = false; if (tp.on && mx.slave) tStop(); mx.slave = false; return; }
   if (st !== 0xF8) return;
@@ -11201,13 +11238,33 @@ function moPorts(){
     sel.value = id;
   }
 }
-for (let p = 0; p < NPORT; p++) $('midiOutSel' + p).addEventListener('change', e => { moStop(); midi.outIds[p] = e.target.value; saveMidi(); if (e.target.value && !midi.access) connectMidi(); });
+for (let p = 0; p < NPORT; p++) $('midiOutSel' + p).addEventListener('change', e => {
+  // Notes off on the old cable; while playing, the new cable joins the clock from here (a Stop goes to the old one).
+  const was = midiOut(p); moRelease(); if (was && mx.clk.on && midi.clk[p]) try { was.send([0xFC]); } catch(err){}
+  midi.outIds[p] = e.target.value; saveMidi(); if (e.target.value && !midi.access) connectMidi();
+  if (mx.clk.on && midi.clk[p]) clkJoin(p); if ($('segClkOut').__hint) $('segClkOut').__hint(); });
+// A port's clock switched while the song plays: a port switched off gets Stop; one switched on gets the position and
+// Continue, then ticks with the others; the first port lit mid-song starts the clock.
+function clkPortToggled(p){
+  if (!tp.on || !ctx) return;
+  if (!midi.clk[p]){ if (mx.clk.on){ const l = mx.clk.last; msend([0xFC], l != null && l > ctx.currentTime ? l + 0.001 : null, false, p); } if (!clkWanted()) mx.clk.on = false; return; }
+  if (mx.clk.on) clkJoin(p); else if (mx.beat){ mx.clk = {on:true, k:Math.ceil((mx.beat.b + (ctx.currentTime + 0.05 - mx.beat.t) * tp.seq.bpm / 60) * 24)}; clkJoin(p, true); }
+}
+function clkJoin(p, all){
+  if (!mx.beat || !midiOut(p)) return;
+  const at = ctx.currentTime + 0.05, pos = clamp(Math.round((mx.spp / 4 + mx.beat.b + (at - mx.beat.t) * tp.seq.bpm / 60) * 4), 0, 16383);
+  const ps = all ? clkPorts() : [p];
+  for (const q of ps){ msend([0xF2, pos & 127, pos >> 7], at - 0.03, false, q); msend([0xFB], at, false, q); }
+}
 { const host = $('segClkOut'); host.innerHTML = '';
   const bs = [...PORTL].map((L, p) => { const b = el('button', null, L); b.type = 'button'; b.title = 'Send clock, Start and Stop to port ' + L;
-    b.addEventListener('click', () => { midi.clk[p] = !midi.clk[p]; saveMidi(); upd(); if (midi.clk[p] && !midi.access) connectMidi(); });
+    b.addEventListener('click', () => { midi.clk[p] = !midi.clk[p]; saveMidi(); upd(); if (midi.clk[p] && !midi.access) connectMidi(); clkPortToggled(p); hint(); });
     host.append(b); return b; });
   const upd = () => bs.forEach((b, p) => { b.classList.toggle('on', midi.clk[p]); b.setAttribute('aria-pressed', midi.clk[p]); });
-  upd(); }
+  // A lit letter with no cable sends nothing: say so beside the buttons.
+  const note = el('span', 'lbl'); note.style.marginLeft = '8px'; host.parentNode.append(note);
+  const hint = () => { const q = [...PORTL].filter((L, p) => midi.clk[p] && !midi.outIds[p]); note.textContent = q.length ? `${q.join(', ')}: no cable` : ''; };
+  hint(); host.__hint = hint; upd(); }
 makeSeg($('segClkIn'), [[true,'On'],[false,'Off']], () => midi.clkIn, v => { midi.clkIn = v; mx.inT = []; mx.slave = false; saveMidi(); if (v && !midi.access) connectMidi(); });
 { const r = $('midiLat'), o = $('midiLatV'), show = () => o.textContent = (midi.lat > 0 ? '+' : '') + midi.lat + ' ms';
   r.value = midi.lat; show(); r.addEventListener('input', () => { midi.lat = +r.value; show(); saveMidi(); }); }
@@ -12643,7 +12700,7 @@ function makeSeq(S, mode, o){
             const ev = {type:'note', t:at, track:t, poly, pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? at + fx.KIL * tick : null, rel:fx.OFF != null ? at + fx.OFF * tick : null,
               slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
-              ii, mn:note + 12, vel:(fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out
+              ii, mn:note + 12 + ntc / 100, vel:(fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out
             if (!o.sim && ((I.slc | 0) > 1 || I.sync)){ const c = o.live ? ensurePlay(ev.pad) : ensure(ev.pad); if (c){ applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; } }
             evs.push(ev);
             if (every){ let k = 1;
@@ -13482,6 +13539,7 @@ function pump(){
   // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate.
   while (s.alive() && s.time < ctx.currentTime + 0.25 && n++ < 64){
     const r = s.step(); for (const e of r.evs){ if (moEv(e)) continue; rt.pl.play(e); if (e.type === 'note') padBlink(e); } tp.q.push({t:r.t, pos:r.pos, bpm:s.bpm, tks:r.tks, line:r.line});
+    mx.pend.forEach((P, t) => { if (P && P.length) pendFlush(t, r.t); });   // ARP returns due by this row, on tracks the row left alone
   }
   moClock(s); moLfo(s);
 }
@@ -13968,7 +14026,7 @@ function instList(){
   for (let i = 0; i < NI; i++){
     const I = S.insts[i]; if (!I) continue;
     const v = kit.voices[I.pad], pn = (v && v.name) || 'Pad ' + (I.pad + 1), mo = I.mo | 0;
-    const nm = mo === 1 ? 'MIDI ' + PORTL[portOf(I)] + d2((I.mch | 0) + 1) : pn + (mo === 2 ? ' +MIDI' : '');
+    const nm = mo === 1 ? 'MIDI ' + PORTL[portOf(I)] + ' ch ' + d2((I.mch | 0) + 1) : pn + (mo === 2 ? ' +MIDI' : '');
     sig += nm + '/' + I.pad + ';';
     rows.push(`<button type="button" data-i="${i}" class="${i === cInst ? 'on' : ''}${mo ? ' mo' : ''}" title="INST ${hx(i)} plays pad ${hx(I.pad)} ${esc(pn)}${mo ? ' · MIDI port ' + PORTL[portOf(I)] + ' ch ' + ((I.mch | 0) + 1) : ''}"><i>${hx(i)}</i>${esc(nm)}</button>`);
   }
@@ -14027,7 +14085,7 @@ function instRows(){
       ...CC_CMDS.map((c, k) => ({l:'CC ' + c[2], get:() => ccNum(I, k), set:v => { if (!Array.isArray(I.cc)) I.cc = CC_DEF.slice(); I.cc[k] = v; }, min:0, max:127, big:16, d:CC_DEF[k],
         fmt:v => String(v).padStart(3, '0') + (CC_NAMES[v] ? '  ' + CC_NAMES[v] : ''),
         info:v => `${c} in a phrase sends 00–7F to CC ${v} on this instrument’s port and channel`})),
-      {l:'LFO CC', get:() => lfoCC(I), set:v => I.lcc = v, min:-1, max:127, big:16, d:-1, gap:true,
+      {l:'LFO CC', get:() => lfoCC(I), set:v => I.lcc = v < 0 ? -1 : v, min:-1, max:127, big:16, d:-1, gap:true,
         fmt:v => v < 0 ? 'OFF' : String(v).padStart(3, '0') + (CC_NAMES[v] ? '  ' + CC_NAMES[v] : ''),
         info:v => v < 0 ? 'An LFO that moves a CC while the song plays: set the CC number to switch it on' : `The LFO moves CC ${v} on this instrument’s port and channel while the song plays`},
       ...(lfoCC(I) >= 0 ? [

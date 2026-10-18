@@ -24,6 +24,32 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 18 Oct (night): MIDI review fixes (v1.2.1)
+
+Cache `thunderplus-v166`. A fresh-eyes code review of the two MIDI merges found these; all fixed and covered by the session's
+headless checks (poly chord + ARP, ARP then VOL/KIL/PIT, PBN + RET, chord + PBN, microtuning, mute mid-play, clock toggles
+mid-play, clock-in Continue twice, HOP loop in a block).
+
+- **Poly + ARP:** the 4-note limit counted ARP segments, so a chord with ARP chopped notes to 1 ms. Held entries carry a
+  note id (`nid`, from `moPlay`); the limit and the same-key release work per note (`offNote`).
+- **ARP return vs. commands:** `moMod` dropped the waiting return on *any* command row (VOL left the note on the arp
+  pitch). Now only a retune (PIT/FIN, ARP, PBN, PVB) takes it over; VOL/PAN/KIL/OFF play it first (`pendFlush`).
+  Returns are flushed from `pump()` at each row's own time (not the next beat event), so they're never booked late.
+  `moMod` + ARP keeps the held note as the first step instead of retriggering it.
+- **Bend dedupe by time:** `mx.bend[k] = {v, t}`; a value only skips when it repeats the latest *in time* (PBN + RET
+  used to leave the channel bent for every later note). Chord notes share one PBN/PVB ramp per channel and row
+  (`mx.ramp`, `rampOnce`). Microtuning (`S.tune`) now reaches gear as bend (`mn` carries the cents).
+- **Muted track:** its held note ends at the next row, no bends/returns go out (`moEv` note/mod branches).
+- **Clock toggles while playing** (`clkPortToggled`, `clkJoin`): a port switched off gets Stop (after its booked
+  ticks); one switched on gets SPP + Continue and joins the ticks; the first port lit mid-song starts the clock from
+  the current position. Changing a port's cable mid-play: Stop to the old cable, SPP + Continue to the new. STOP's Stop
+  reaches ports that were running even if none is lit any more. A lit letter with no cable shows "X: no cable".
+- **Clock in:** the Song Position Pointer counts once (a Continue without a new one starts from the top); Start and
+  Continue both play the *song* (not the open phrase).
+- **Song position lookup:** bounded (stops once every row of the block is reached, or 1024 beats / 20000 steps), in
+  try/catch, so a HOP loop can't stall PLAY.
+- Instrument list reads "MIDI A ch 01".
+
 ## 18 Oct (evening): MIDI phase 2 — LFO → CC, Song Position Pointer
 
 Cache `thunderplus-v165`. Same MIDI block, after `moStart`.
