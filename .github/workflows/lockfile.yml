@@ -1,0 +1,29 @@
+# Makes (or updates) electron/package-lock.json on GitHub's machines and commits it, so the desktop build installs
+# exactly the same packages every time. Run it after changing a version in electron/package.json:
+#   Actions → Desktop lockfile → Run workflow.
+name: Desktop lockfile
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Make the lockfile
+        working-directory: electron
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Commit it if it changed
+        run: |
+          git add electron/package-lock.json
+          if git diff --cached --quiet; then echo "The lockfile is already up to date."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Desktop build: package-lock.json (made by the Desktop lockfile workflow)"
+          git push
