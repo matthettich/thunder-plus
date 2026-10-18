@@ -55,8 +55,9 @@ triggered headless before the fix and checked after (session scratchpad scripts)
 - **Phrase loops** past ROWS are clamped to the phrase's last row (`loopFor`).
 - **README:** Thunder's data is removed after import (not "never changed"); 16 slots not 8 pads; TIC is in; GRV is
   per track; up to 32 tracks (24 with a voice per track); the Chain screen is called Sect.
-- **Not done:** a `package-lock.json` for `electron/` (the session can't reach the npm registry). Run
-  `npm install --package-lock-only` in `electron/` on a computer and commit it, so release builds can't drift.
+- **Lockfile (done the same evening):** `.github/workflows/lockfile.yml` (Actions → Desktop lockfile → Run workflow) makes
+  `electron/package-lock.json` on GitHub and commits it; `desktop.yml` installs with `npm ci` when it exists. Test build
+  on Windows, Mac and Linux passed with it. After changing a version in `electron/package.json`, run that workflow.
 
 ## 18 Oct (night): MIDI review fixes (v1.2.1)
 
