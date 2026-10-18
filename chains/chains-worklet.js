@@ -1697,17 +1697,37 @@ class PitchFxCore {
    clock (`tr.bp`: the song position in beats, wrapping every 16; below 0 or still = stopped), and the tracker commands
    FLX / GAT / RTG reach them as `tr.flx`, `tr.gat`, `tr.rtg` (−1 = use the effect's own setting). Self-contained: the
    track-FX worklet Blob is built from their toString(), like DegradeCore. */
-// The clock's slope gives the samples per beat; kept from the last good block when the clock stalls or wraps.
+// The clock's slope gives the samples per beat. The clock is a float32 AudioParam (it moves in ~1e-6-beat steps), so one
+// block's slope is off by up to ~0.3%, enough to shove a replayed beat ~100 samples every block (Flex clicked and buzzed).
+// So the slope is measured over a run of blocks (used from 4096 samples, restarted every ~32768); a real tempo change
+// (> 2%, the same in two blocks running, so a half-stalled block can't fake one) snaps, and a stopped, stalled or
+// jumping clock keeps the last good value.
 function clkSpb(o, bp, n){
-  if (bp && bp.length > 16 && n > 16){ const a = bp[n - 17], b = bp[n - 1]; if (a >= 0 && b >= a){ const s = (b - a) / 16; if (s > 1e-7 && s < 0.01) o.spb = 1 / s; } }
-  return o.spb;
+  if (!bp || bp.length < 2 || n < 2) return o.spb;
+  const a = bp[0], b = bp[n - 1];
+  if (a < 0 || b < 0){ o.cn = 0; return o.spb; }
+  if (!(o.cn > 0)){ o.cu = 0; o.cl = a; }
+  if (a < o.cl - 8) o.cu += 16;                                          // the clock wrapped (every 16 beats) since the last block…
+  const A = a + o.cu; if (b < a - 8) o.cu += 16;                         // …or inside this one
+  const B = b + o.cu, s = (B - A) / (n - 1); o.cl = b;
+  if (!(s > 1e-7 && s < 0.01)){ o.cn = 0; o.ps = 0; return o.spb; }
+  if (!o.sm){ o.spb = 1 / s; o.sm = true; o.cn = 0; }
+  else if (Math.abs(s * o.spb - 1) > 0.02){
+    if (o.ps && Math.abs(s / o.ps - 1) < 0.005){ o.spb = 1 / s; o.cn = 0; } else { o.ps = s; o.cn = 0; return o.spb; }
+  }
+  o.ps = 0;
+  if (!(o.cn > 0) || o.cn > 32768){ o.cn = 0; o.ca = A; }
+  const len = o.cn + n - 1; if (len >= 4096) o.spb = len / (B - o.ca);
+  o.cn += n; return o.spb;
 }
 /* Flex: re-sequences the last bar or two in time with the song (a time-remap per pattern: repeats, reverses, half
    speed, tape stops, scratches, gates, shuffles). Each pattern maps the bar position p (beats 0–4) to the position r it
    plays from (r ≤ p, so it only reads the past). Jumps crossfade from the old read head to the new one. Always fed,
-   even while switched off, so switching it on mid-bar already has the bar to play from. */
+   even while switched off, so switching it on mid-bar already has the bar to play from. It keeps its own song position
+   (`ph`, float64, a sample at a time, locked to the clock each block) and a glided samples-per-beat (`sp`), so the read
+   head moves smoothly: reading the float32 clock directly made the moving patterns gritty. */
 class FlexCore {
-  constructor(sr){ this.sr = sr; this.N = Math.ceil(sr * 13); this.bL = null; this.bR = null; this.w = 0; this.D = 0; this.xo = 0; this.xc = 0; this.xn = 1; this.g = 1; this.pg = 1; this.spb = sr / 2; }
+  constructor(sr){ this.sr = sr; this.N = Math.ceil(sr * 13); this.bL = null; this.bR = null; this.w = 0; this.D = 0; this.xo = 0; this.xc = 0; this.xn = 1; this.g = 1; this.pg = 1; this.spb = sr / 2; this.sp = sr / 2; this.ph = -1; }
   static get NAMES(){ return ['OFF', 'REPEAT 1/4', 'REPEAT 1/8', 'FILL 1/16', 'STUTTER BUILD', 'HALF SPEED', 'TAPE STOP', 'REVERSE BEATS', 'REVERSE 1/8', 'BACKSPIN', 'SCRATCH',
     'GATE 1/16', 'TRANCE CHOP', 'SHUFFLE', 'BEAT JUGGLE', 'OCTAVE UP', 'RANDOM SLICES']; }
   pat(k, p, bar){
@@ -1732,7 +1752,14 @@ class FlexCore {
     }
     this.pg = g; return r;
   }
-  rd(b, w, D){ let x = w - D; if (x < 0) x += this.N; const i = Math.floor(x), f = x - i, j = i + 1 >= this.N ? 0 : i + 1; return b[i] + (b[j] - b[i]) * f; }
+  // 4-point Hermite read (half speed, tape stops and scratches stay clean on cymbals); linear within 2 samples of now,
+  // where the Hermite's far point would still be unwritten.
+  rd(b, w, D){
+    const N = this.N; let x = w - D; if (x < 0) x += N; const i = Math.floor(x), f = x - i, j = i + 1 >= N ? 0 : i + 1;
+    if (D < 2) return b[i] + (b[j] - b[i]) * f;
+    const y0 = b[i ? i - 1 : N - 1], y1 = b[i], y2 = b[j], y3 = b[j + 1 >= N ? 0 : j + 1];
+    return ((((y3 - y0) * 0.5 + (y1 - y2) * 1.5) * f + (y0 - 2.5 * y1 + 2 * y2 - 0.5 * y3)) * f + (y2 - y0) * 0.5) * f + y1;
+  }
   feed(L, R, n, tr){ this.run(L, R, n, null, tr); }
   process(L, R, n, dp, tr){ this.run(L, R, n, dp, tr); }
   run(L, R, n, dp, tr){
@@ -1740,11 +1767,20 @@ class FlexCore {
     const N = this.N, bL = this.bL, bR = this.bR, bp = tr && tr.bp, spb = clkSpb(this, bp, n), live = !!(bp && bp.length > 1);
     const k = !dp ? 0 : tr && tr.flx >= 0 ? Math.min(16, Math.round(tr.flx)) : dp.pat | 0, mix = dp ? dp.mix : 0;
     const XF = Math.max(16, Math.round(this.sr * (dp ? dp.xf : 5) / 1000)), gk = 1 - Math.exp(-1 / (this.sr * 0.002));
+    // Lock our position to the clock: gently while close (the clock's own float32 steps stay out), at once when it jumps.
+    const q0 = live ? bp[0] : -1;
+    if (q0 < 0) this.ph = -1;
+    else if (this.ph < 0) this.ph = q0;
+    else { let e = q0 - this.ph; e -= 16 * Math.round(e / 16); if (Math.abs(e) > 0.004) this.ph = q0; else this.ph += e * 0.1; }
+    if (Math.abs(spb / this.sp - 1) > 0.02) this.sp = spb;               // a real tempo change: follow at once (that jump crossfades)
+    const sk = 1 - Math.exp(-1 / (this.sr * 0.1));
     for (let i = 0; i < n; i++){
       const w = this.w; bL[w] = L[i]; bR[w] = R[i];
+      this.sp += (spb - this.sp) * sk;
+      const q = this.ph; if (q >= 0){ this.ph += 1 / this.sp; if (this.ph >= 16) this.ph -= 16; }
       if (!dp){ this.D = 0; this.w = w + 1 >= N ? 0 : w + 1; continue; }
-      let D = 0, g = 1; const q = bp ? (live ? bp[i] : bp[0]) : -1;
-      if (k > 0 && live && q >= 0){ const p = q % 4, r = this.pat(k, p, Math.floor(q / 4)); g = this.pg; D = Math.max(0, Math.min(N - 4, (p - r) * spb)); }
+      let D = 0, g = 1;
+      if (k > 0 && q >= 0){ const p = q % 4, r = this.pat(k, p, Math.floor(q / 4)); g = this.pg; D = Math.max(0, Math.min(N - 4, (p - r) * this.sp)); }
       if (Math.abs(D - this.D) > 8){ this.xo = this.D; this.xc = XF; this.xn = XF; }
       this.D = D; this.g += (g - this.g) * gk;
       let yl = this.rd(bL, w, D), yr = this.rd(bR, w, D);
