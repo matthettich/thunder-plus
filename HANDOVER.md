@@ -24,6 +24,34 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 17 Oct (night): Flex fixed (clicks and buzz), simple phrase screen
+
+Cache `thunderplus-v162`, `chains-worklet.js?v=27`, `waves-worklet.js?v=23`.
+
+- **Flex clicked and sounded distorted.** Cause: the beat clock is a float32 AudioParam, and `clkSpb` re-measured the
+  tempo from 16 samples of it every block, so samples-per-beat wobbled by up to ~0.3% block to block. A replayed beat
+  sits up to 4 beats back, so its read head was shoved 10–200 samples every 128 (hard jumps under 8 samples clicked,
+  bigger ones crossfaded every block and buzzed). Measured on a steady sine: REPEAT 1/4 jumped ~99 times a bar
+  instead of 4 (287 at 90 BPM / 44.1k), glitches around −35 dB.
+- **Fix** (in `index.html`, copied identically into `chains/chains-worklet.js` and synced to …waves):
+  - `clkSpb` measures the slope over a run of blocks (used from 4096 samples, restarted every ~32768, unwrapping the
+    16-beat wrap); a tempo change > 2% snaps, but only when two blocks running agree (a half-stalled block can't fake
+    one); stopped/stalled/jumping clocks keep the last good value. RetrigCore uses it too (only at engage).
+  - `FlexCore` keeps its own float64 song position `ph` (advanced a sample at a time, locked to the clock each block:
+    gently within 0.004 beat, at once beyond) and a glided samples-per-beat `sp` (100 ms), so the read head is smooth.
+  - `FlexCore.rd` is 4-point Hermite (linear within 2 samples of now, where the far point isn't written yet): half
+    speed, tape stop, backspin and scratch were gritty on cymbals with linear reads.
+  - Result, real Chromium OfflineAudioContext with the player's ramped ConstantSource clock (dry baseline −124 dB):
+    REPEAT 1/4 −52 → −115 dB, HALF SPEED −47 → −81 dB, REVERSE BEATS −43 → −87 dB, REPEAT 1/4 @ 93 BPM −45 → −108 dB;
+    exactly the intended jumps per bar. Also checked: tempo snaps and glides, stop/restart, a stalled clock.
+- **Simple phrase screen** (Settings → Screen → SIMPLE PHRASE, "Show simple phrase screen", key
+  `thunderplus-simplephrase-v1`, **off** by default). On Phrase only: no Arrange (`body.simpleph .tarr` hidden), no
+  song strip (`apStripOk`), no stage piano (`stageWant()`), no Pattern view (`pvRoom`), and `fit()` sizes the text to
+  the phrase's own width (`spCols()`) with only 12 lines (LEN, header, 10 rows) required, so it grows (cover screen
+  9.3 → 16.3 px, desktop 20.6 → 27.5 px) and the rest scroll with the cursor. `spSync()` in `draw()` toggles the body
+  class and re-fits on entering or leaving Phrase. All hooks are marked `SIMPLE PHRASE`. To take it out: delete the
+  block after `arrBody` and the marked lines.
+
 ## 17 Oct: acoustic kits and Funk breaks
 
 - **What:** three clean acoustic kits (38 more pad voices) and twelve original funk-style breaks you can load as
