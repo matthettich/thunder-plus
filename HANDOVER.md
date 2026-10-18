@@ -4,7 +4,7 @@ Pick-up notes for continuing this work in a later session. Read this together wi
 [`README.md`](README.md) (the app's own docs) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 Keep this file up to date at the end of a work session.
 
-## Where things stand (13 Oct 2026, morning)
+## Where things stand (13 Oct 2026, morning; newest work is in the dated entries below)
 
 - **One repo now:** `matthettich/thunder-plus` (this one), branch `main`, pushed, nothing uncommitted.
   `matthettich/Thunder-` is **retired** (13 Oct): its page forwards to this app and its service worker removes
@@ -23,6 +23,40 @@ Keep this file up to date at the end of a work session.
   `waves/index.html` are the two modular patch editors loaded in frames.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
+
+## 18 Oct (night): whole-app review fixes (v1.2.2)
+
+Cache `thunderplus-v167`. A fresh-eyes review of the whole app (MIDI excluded, done before) found these; each was
+triggered headless before the fix and checked after (session scratchpad scripts).
+
+- **Kit replace is undoable, and warns:** `setKit(k, noUndo)` pushes a whole-kit undo step (`{k:'K', j}`, samples by id,
+  audio kept in `smpHeld`); `undoStep` handles `'K'`. Earlier sound edits ('V') stay in the history (`kitUndoBase()`
+  re-baselines the pads instead of `kitUndoReset()` dropping them). `kitReplaceOk(next, title)` asks before Load kit /
+  Open project when the current kit has samples the new one lacks. `smpTidy` keeps every id in `smpHeld` and the live
+  song IRs, so nothing replaced this session is deleted from IndexedDB; a minute timer lets go of `smpHeld` audio that
+  no pad, undo step, preset or IR names (memory on long recording sessions).
+- **Factory kit** is now **Factory drums (pads 1–8)** (`factoryPads()`): the synth slots stay, like the classic kits.
+  "Export all 8 pads" labels say "all pads".
+- **Short kits:** `setKit` grows the kit to `nslots()` (voice per track at 24 tracks with an older 16-voice kit threw
+  in `ensure` and killed PLAY). `ensure()` returns null for a missing voice; `buffer()` too. `pump()` is now a
+  try/catch around `pumpRun()`: an error stops the transport with a toast instead of repeating every 25 ms.
+- **TRACKS 25–32** survive a reload: `normSong` clamps to `vtrk ? 24 : NT`; turning voice-per-track on clamps to 24.
+- **Master column mute bits:** `1 << 32 === 1` hit track 1. `blockMuted` is false for `t >= MT`; `setCell` and `rowOp`
+  skip the bit for the MST column.
+- **Dialogs:** `askSheet`'s key handler stops every key (Space started playback, letters typed notes behind it).
+  `typing()` matches every text-like input (number, search, untyped), not only `type=text`.
+- **Saving on hide/close:** `flushKit()` (in `pagehide`, `visibilitychange` and `applyUpdate`) saves a pending kit
+  edit at once and first asks the …waves frame to save its own (`window.__wavesFlush` in `waves/index.html`, outside
+  the synced SHARED EDITOR block; the frame also saves on its own `visibilitychange`).
+- **Focus:** a pointer click on a button lets go of focus (not in dialogs, menus or sheets), so Enter/Space don't
+  press it again on top of the tracker action.
+- **Cover screen (373 px):** tighter top bar at ≤ 400 px (gap 5, edges 8, smaller CPU meter) so it stays one row; the
+  meter hides below 340 px. **PROJECT/INST/FX** labels pad to the longest label on the screen.
+- **Phrase loops** past ROWS are clamped to the phrase's last row (`loopFor`).
+- **README:** Thunder's data is removed after import (not "never changed"); 16 slots not 8 pads; TIC is in; GRV is
+  per track; up to 32 tracks (24 with a voice per track); the Chain screen is called Sect.
+- **Not done:** a `package-lock.json` for `electron/` (the session can't reach the npm registry). Run
+  `npm install --package-lock-only` in `electron/` on a computer and commit it, so release builds can't drift.
 
 ## 18 Oct (night): MIDI review fixes (v1.2.1)
 
