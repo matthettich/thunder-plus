@@ -24,6 +24,31 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 17 Oct (late night): settings sheets — Screen…, Skin…, Song…, Input…
+
+Cache `thunderplus-v163`. Block `SETTINGS SHEETS` (JS, just before `tsetLabel`; CSS after `.pbs .pempty`), hooks marked
+`SETTINGS SHEETS` in `buildProj` and `buildScreen`.
+
+- **What:** the long Settings lists open in pop-out sheets built on the preset sheet's shell (`.pbs/.pbox/.phd/.pcat`):
+  `setSheet('screen' | 'input' | 'song')` and `skinSheet()`. `SHEETS` lists each sheet's groups by row label; the rows
+  are the same `projRows()` entries drawn by `tsetRow()` (the sheet's list carries class `gset` for the row styles,
+  with `.ssh .plist.gset` undoing the dropdown's 400 px width). Search filters by label, checkbox text and info.
+  `sheetGrp` remembers the open group per sheet. `sheetShell()` is the frame: Done / Escape / tap outside close it,
+  taps in the first 350 ms are swallowed (the opening tap), keys typed in it never reach the tracker.
+- **Menus now:** Screen part (gear on Mobile, View on Desktop) = `SHEET_QUICK` rows (TEXT SIZE, SIMPLE PHRASE, FOLLOW),
+  any Screen row no sheet lists, then **Screen settings…** and **Skin…** (`sheetBtn`). Project = **Song & input**
+  (Song settings…, Input settings…), Render & export, Mastering. Panels (keypad, bottom panel, stage) are in the
+  Screen sheet's Layout & panels group on every device now. Phone menu 7,792 → 3,048 px tall; desktop View
+  3,535 → 570 px.
+- **Skin sheet:** groups (`SKIN_GROUPS` + the other Simple skins split light/dark by background luminance), each skin a
+  tiny tracker in its `dots` colours (`skinMock`: text = the most contrasting dot). A tap applies it live; Done keeps it,
+  **Back to …** restores the skin the sheet opened with. The old `#skins` chips stay built (hidden) for `applySkin`.
+- Sliders in sheets are locked like the menu's: the lock's listeners are `rlWire(node)` now (menu + each sheet,
+  class `rlock`); `rlRanges()` covers both. `buildProj()` calls `sheetRefresh` so the Song sheet's IR list updates.
+- **Back to the old menus:** `SET_SHEETS = false` (one line). Every row is back where it was.
+- Checked headless at 373, 707 and 1440 wide: each sheet opens, groups, search, Simple phrase toggled from the sheet,
+  tempo +, Groove and IR groups, Input rows, skin tap / Back / Done, Escape clears search then closes, Simple night skin.
+
 ## 17 Oct (night): Flex fixed (clicks and buzz), simple phrase screen
 
 Cache `thunderplus-v162`, `chains-worklet.js?v=27`, `waves-worklet.js?v=23`.

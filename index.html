@@ -108,8 +108,8 @@ body.mob .deskmenu{display:none}
 .gset .tsr input[type=range]{flex:1 1 100px; width:auto; min-width:80px}
 /* Sliders in Settings are locked: a finger scrolling the menu passes over them. Tap one to unlock it, then drag;
    it locks again a few seconds after you stop. */
-#gset input[type=range]:not(.unl){pointer-events:none; opacity:.5}
-#gset input[type=range].unl{outline:2px solid var(--ink); outline-offset:3px; border-radius:4px}
+:is(#gset,.rlock) input[type=range]:not(.unl){pointer-events:none; opacity:.5}
+:is(#gset,.rlock) input[type=range].unl{outline:2px solid var(--ink); outline-offset:3px; border-radius:4px}
 .gset .tsr output{min-width:70px; font-variant-numeric:tabular-nums; font-size:var(--fs-3)}
 .gset .tsr .stp{min-width:34px; padding-inline:0}
 /* checkbox rows: box, bold title, the explanation under it (Seeds' setrow) */
@@ -557,6 +557,33 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .pbs .pit .pp.busy{opacity:.5} .pbs .pit .px{color:var(--rec)}
 .pbs .pft{display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line); align-items:center} .pbs .pft .sp{flex:1}
 .pbs .pempty{padding:18px 14px; color:var(--muted)}
+
+/* SETTINGS SHEETS: Screen…, Input…, Song… (settings rows in groups) and Skin… (a gallery). The rows inside carry the
+   menu's own .gset styles. */
+.ssh .pbox{width:min(640px, 100%); outline:none}
+.ssh .plist.gset{width:auto; max-height:none; overflow-x:hidden}   /* .gset's own 400 px width and height cap are for the dropdown */
+.ssh .ssg{padding:2px 14px 12px; border-bottom:1px solid var(--line); display:grid; gap:0}
+.ssh .ssg h3{margin-top:12px}
+.ssh .ssg .irbox{padding-top:8px}
+.gset .tsr.sbtn{grid-template-columns:minmax(0,auto) minmax(0,1fr)}
+.gset .tsr.sbtn button{font-weight:600; min-height:38px; padding-inline:14px; white-space:nowrap}
+.gset .tsr.sbtn .tsi{grid-column:auto}
+@media (max-width:560px){ .gset .tsr.sbtn{grid-template-columns:minmax(0,1fr)} .gset .tsr.sbtn button{justify-self:start} }
+.sksh{background:rgba(0,0,0,.14)}
+.sksh .pbox{width:min(760px, 100%)}
+.sksh .skgrp{padding:0 12px 10px}
+.sksh .skg{display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:8px}
+.sksh .skc{display:flex; flex-direction:column; align-items:stretch; gap:6px; padding:6px; min-height:0; height:auto; text-align:left;
+  border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer}
+.sksh .skc[aria-checked="true"]{outline:3px solid var(--ink); outline-offset:1px}
+.sksh .skp{display:flex; flex-direction:column; gap:2px; padding:6px 7px; height:72px; overflow:hidden; background:var(--b)!important; color:var(--t)!important;
+  font:600 10px/1.2 var(--mono, monospace); border:1px solid color-mix(in srgb, var(--t) 30%, transparent); text-shadow:none!important}
+.sksh .skp .tb{display:flex; gap:3px; margin-bottom:3px} .sksh .skp .tb i{flex:1; height:7px; border:1px solid var(--t)} .sksh .skp .tb i:first-child{background:var(--t)}
+.sksh .skp .sl{white-space:pre} .sksh .skp b{background:var(--a)!important; color:var(--b)!important; font-weight:700}
+.sksh .skp .bk{display:flex; gap:3px; margin-top:auto} .sksh .skp .bk i{width:16px; height:6px; background:var(--s)}
+.sksh .skn{font-size:var(--fs-3); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.sksh .pft .lbl{color:var(--muted); font-size:var(--fs-3)}
+@media (max-width:420px){ .sksh .skg{grid-template-columns:repeat(2,minmax(0,1fr))} .sksh .skgrp{padding:0 8px 8px} }
 .pbs .pit .pn.eng{display:flex; flex-direction:column; align-items:flex-start; gap:1px; white-space:normal; line-height:1.25; padding:8px 0}
 .pbs .pit .pn small{display:block; max-width:100%; font-weight:400; color:var(--muted); font-size:var(--fs-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis} .pbs .pit.cur .pn small{color:inherit; opacity:.8}
 .vengine .engbtn{min-height:36px; padding:6px 12px; font-weight:600}
@@ -10386,24 +10413,28 @@ $('bAud').addEventListener('click', () => gsetPress('aud', $('bAud')));
 // A tap (not a drag) on a locked slider unlocks just that one; it locks again 4 s after it was last moved, and
 // all of them lock when the menu closes. The − and + buttons, lists and switches work as before.
 const RLOCK_MS = 4000; let rlDown = null;
-function rlRanges(){ return $('gset').querySelectorAll('input[type=range]'); }
+function rlRanges(){ return document.querySelectorAll('#gset input[type=range], .rlock input[type=range]'); }   // the menu and the settings sheets
 function rlAt(x, y){ for (const r of rlRanges()){ if (r.disabled) continue; const b = r.getBoundingClientRect();
   if (b.width && x >= b.left - 4 && x <= b.right + 4 && y >= b.top - 8 && y <= b.bottom + 8) return r; } return null; }
 function rlArm(r){ clearTimeout(r._lk); r._lk = setTimeout(() => { if (r._held) return rlArm(r); r.classList.remove('unl'); }, RLOCK_MS); }
 function rlLockAll(){ for (const r of rlRanges()){ clearTimeout(r._lk); r._held = false; r.classList.remove('unl'); } }
-$('gset').addEventListener('pointerdown', e => {
-  if (e.target.matches && e.target.matches('input[type=range].unl')){ e.target._held = true; rlArm(e.target); rlDown = null; return; }
-  rlDown = {x:e.clientX, y:e.clientY, id:e.pointerId};
-}, true);
-$('gset').addEventListener('pointercancel', () => { rlDown = null; }, true);
+// The lock's listeners, on the Settings menu and on each settings sheet (SETTINGS SHEETS) as it opens.
+function rlWire(n){
+  n.addEventListener('pointerdown', e => {
+    if (e.target.matches && e.target.matches('input[type=range].unl')){ e.target._held = true; rlArm(e.target); rlDown = null; return; }
+    rlDown = {x:e.clientX, y:e.clientY, id:e.pointerId};
+  }, true);
+  n.addEventListener('pointercancel', () => { rlDown = null; }, true);
+  n.addEventListener('pointerup', e => {
+    const d = rlDown; rlDown = null; if (!d || d.id !== e.pointerId || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 10) return;
+    const r = rlAt(e.clientX, e.clientY); if (!r || r.classList.contains('unl')) return;
+    rlLockAll(); r.classList.add('unl'); rlArm(r); toast('Slider unlocked: drag it to change. It locks again after a few seconds.');
+  }, true);
+  n.addEventListener('input', e => { if (e.target.matches && e.target.matches('input[type=range].unl')) rlArm(e.target); }, true);
+}
+rlWire($('gset'));
 addEventListener('pointerup', () => { for (const r of rlRanges()) if (r._held){ r._held = false; rlArm(r); } }, true);
 addEventListener('pointercancel', () => { for (const r of rlRanges()) r._held = false; }, true);
-$('gset').addEventListener('pointerup', e => {
-  const d = rlDown; rlDown = null; if (!d || d.id !== e.pointerId || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 10) return;
-  const r = rlAt(e.clientX, e.clientY); if (!r || r.classList.contains('unl')) return;
-  rlLockAll(); r.classList.add('unl'); rlArm(r); toast('Slider unlocked: drag it to change. It locks again after a few seconds.');
-}, true);
-$('gset').addEventListener('input', e => { if (e.target.matches && e.target.matches('input[type=range].unl')) rlArm(e.target); }, true);
 // A tap outside an open menu closes it and does nothing else: the pointerdown is stopped here (capture phase) and
 // the pointerup/click of the same tap is swallowed too, so the d-pad, a pad or a button under the menu isn't pressed.
 function swallowTap(e){
@@ -17377,6 +17408,131 @@ addEventListener('keydown', e => {
 // Built from the same rows as the Project screen (projRows), so the two always match: on/off rows become
 // checkboxes, choices dropdowns, numbers a slider with − and +, and › rows buttons. Audio settings (from
 // the synth's Settings) are lent to it while it is open.
+/* ===== SETTINGS SHEETS (Screen…, Input…, Song…, Skin…) =====
+   The long settings live in pop-out sheets like the preset browser, so the Settings and View menus keep only what you
+   change mid-session (SHEET_QUICK) plus a button per sheet. A sheet's rows are the same projRows() entries drawn by
+   tsetRow(), so each one works exactly as it did in the menu. A row not listed in SHEETS stays in its menu, so a new
+   setting is never lost. To put everything back in the menus: set SET_SHEETS = false. */
+const SET_SHEETS = true;
+const SHEETS = {
+  screen:{title:'Screen', about:'Layout and panels, the Phrase and Song screens, text size and colour', groups:[
+    ['Text & colour', ['TEXT SIZE', 'STEP NUMBERS', 'SCREEN']],
+    ['Layout & panels', ['ARRANGE', 'SIDE PANEL', 'INST LIST', 'SECT', 'KEYS KEYPAD', 'BOTTOM PANEL', 'STAGE']],
+    ['Phrase screen', ['SIMPLE PHRASE', 'FOLLOW', 'NEIGHBORS', 'PATTERN VIEW', 'ARRANGE FOCUS', 'SONG STRIP']],
+    ['Song screen', ['CLASSIC SONG', 'SONG MOUSE', 'SECTIONS', 'LOOP DRAG', 'SONG PEEK']]]},
+  input:{title:'Input', about:'PAD or KEYS, notes as you type, edit step, sticky keys, the command row', groups:[
+    ['Playing', ['INPUT', 'PLAY NOTE ON ENTRY']],
+    ['Editing', ['EDIT STEP', 'STICKY KEYS', 'COMMANDS', 'PATTERN NAV']]]},
+  song:{title:'Song', about:'Name, tracks, tempo, swing, ticks, pattern length and the song’s impulse responses', groups:[
+    ['Song', ['NAME', 'TRACKS', 'TEMPO', 'LPB']],
+    ['Groove', ['SWING', 'SWING NOTE', 'TICKS']],
+    ['Patterns', ['PATTERN LEN', '› ALL PHRASES TO']],
+    ['Impulse responses', 'irs']]},
+};
+const SHEET_QUICK = ['TEXT SIZE', 'SIMPLE PHRASE', 'FOLLOW'];   // kept in the menus' Screen part too
+const rowKey = r => r.l.replace(/\s+\d+$/, '');                    // '› ALL PHRASES TO 16' → '› ALL PHRASES TO'
+const sheetKeys = new Set(Object.values(SHEETS).flatMap(K => K.groups.flatMap(([, ks]) => Array.isArray(ks) ? ks : [])));
+const inSheet = r => SET_SHEETS && sheetKeys.has(rowKey(r));
+const rowsByKey = () => { const m = new Map(); for (const r of projRows()) m.set(rowKey(r), r); return m; };
+const sheetGrp = {};        // the group each sheet had open last
+var sheetRefresh = null;    // the open sheet's redraw: buildProj runs it (a song IR loaded or cleared)
+// The sheet's frame: header with title, search and Done; a tap in its first moments (the tap that opened it) is ignored;
+// Escape, Done or a tap outside closes it; keys typed in it never reach the tracker.
+function sheetShell(cls, title, label, ph){
+  if (pbOpen) pbOpen(); if (gsetOpen()) gsetToggle(false);
+  const wrap = el('div', 'pbs rlock ' + cls), box = el('div', 'pbox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true'); wrap.setAttribute('aria-label', label);
+  box.tabIndex = -1;
+  const hd = el('div', 'phd'), q = el('input'), close = el('button', 'sm', 'Done'); close.type = 'button';
+  q.type = 'search'; q.placeholder = ph; q.spellcheck = false; q.setAttribute('aria-label', ph.replace('…', ''));
+  hd.append(el('b', null, title), q, close);
+  const list = el('div', 'plist gset'); box.append(hd, list); wrap.append(box);
+  const born = performance.now(), early = () => performance.now() - born < 350;
+  const sh = {wrap, box, list, q, early, onClose:null};
+  const key = e => { if (e.key === 'Escape' && !(e.target === q && q.value)){ e.preventDefault(); e.stopPropagation(); sh.done(); } else if (wrap.contains(e.target)) e.stopPropagation(); };
+  sh.done = () => { if (pbOpen !== sh.done) return; pbOpen = null; sheetRefresh = null; rlLockAll(); wrap.remove(); document.removeEventListener('keydown', key, true); if (sh.onClose) sh.onClose(); };
+  close.addEventListener('click', () => sh.done());
+  wrap.addEventListener('click', e => { if (early() && e.target !== close){ e.preventDefault(); e.stopPropagation(); } }, true);
+  wrap.addEventListener('pointerdown', e => { if (e.target === wrap){ e.preventDefault(); sh.done(); } });
+  document.addEventListener('keydown', key, true); rlWire(wrap);
+  pbOpen = sh.done; document.body.append(wrap); try { box.focus({preventScroll:true}); } catch(e){}
+  return sh;
+}
+function setSheet(kind){
+  const K = SHEETS[kind]; if (!K) return;
+  const sh = sheetShell('ssh', K.title, K.title + ' settings', 'Search ' + K.title.toLowerCase() + ' settings…'), {list, q, early} = sh;
+  if (sheetGrp[kind] == null) sheetGrp[kind] = 0;
+  const body = (keys, R) => { const g = el('div', 'ssg'); if (keys === 'irs') irsUI(g); else for (const k of keys){ const r = R.get(k); if (r) g.append(tsetRow(r)); } return g; };
+  const render = () => {
+    const keep = list.scrollTop; list.replaceChildren(); const R = rowsByKey(), f = q.value.trim().toLowerCase();
+    if (f){ let n = 0;
+      for (const [gn, keys] of K.groups){ if (!Array.isArray(keys)) continue;
+        const hits = keys.map(k => R.get(k)).filter(r => r && (tsetLabel(r.l) + ' ' + (r.ck || '') + ' ' + tsetInfo(r)).toLowerCase().includes(f));
+        if (!hits.length) continue; const g = el('div', 'ssg'); g.append(el('h3', null, gn)); for (const r of hits) g.append(tsetRow(r)); list.append(g); n += hits.length; }
+      if (!n) list.append(el('div', 'pempty', 'Nothing matches “' + q.value.trim() + '”.'));
+      return; }
+    K.groups.forEach(([gn, keys], gi) => {
+      const open = gi === sheetGrp[kind], c = el('button', 'pcat' + (open ? ' open' : '')); c.type = 'button';
+      c.append(document.createTextNode(gn), el('small', null, Array.isArray(keys) ? String(keys.filter(k => R.has(k)).length) : 'IR 1–4'));
+      c.setAttribute('aria-expanded', String(open));
+      c.addEventListener('click', () => { if (early()) return; sheetGrp[kind] = open ? -1 : gi; render(); const o = list.querySelector('.pcat.open'); if (o) o.scrollIntoView({block:'nearest'}); });
+      list.append(c); if (open) list.append(body(keys, R));
+    });
+    list.scrollTop = keep;
+  };
+  q.addEventListener('input', render);
+  sheetRefresh = render; render();
+}
+// Skin: every skin as a little tracker in its own colours, grouped. A tap puts it on the app at once (the app behind
+// the sheet is the preview); Done keeps it, "Back to …" returns to the skin you opened the sheet with.
+const SKIN_GROUPS = [['Pastel', ['auto', 'light']], ['Minimal', ['minimal', 'mincolor', 'monotone', 'minblack', 'mincolorblack']], ['Neon & Matrix', ['neon', 'matrix']], ['Rainbow', ['rainbow', 'rainbowdyn']]];
+const hexLum = h => { const n = parseInt(h.slice(1), 16), c = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * c(n >> 16 & 255) + 0.7152 * c(n >> 8 & 255) + 0.0722 * c(n & 255); };
+const hexCon = (a, b) => { const x = hexLum(a), y = hexLum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+function skinGroups(){
+  const used = new Set(SKIN_GROUPS.flatMap(([, ids]) => ids)), light = [], dark = [];
+  for (const k of SKINS) if (!used.has(k.id)) (hexLum(k.dots[0]) > 0.3 ? light : dark).push(k.id);
+  return [SKIN_GROUPS[0], SKIN_GROUPS[1], ['Simple', light], ['Simple dark', dark], SKIN_GROUPS[2], SKIN_GROUPS[3]]
+    .map(([n, ids]) => [n, ids.map(id => SKINS.find(k => k.id === id)).filter(Boolean)]).filter(([, ks]) => ks.length);
+}
+// A tiny tracker in the skin's four colours: the background, the most readable of the others for the text, then the
+// cursor and the blocks.
+function skinMock(sk){
+  const bg = sk.dots[0], rest = sk.dots.slice(1), ink = rest.slice().sort((a, b) => hexCon(b, bg) - hexCon(a, bg))[0];
+  const acc = [sk.dots[3], sk.dots[2], sk.dots[1]].find(c => c && c !== ink) || ink, blk = rest.find(c => c !== ink && c !== acc) || acc;
+  const m = el('span', 'skp'); m.style.cssText = `--b:${bg};--t:${ink};--a:${acc};--s:${blk}`; m.setAttribute('aria-hidden', 'true');
+  const tb = el('span', 'tb'); for (let i = 0; i < 3; i++) tb.append(el('i'));
+  const l0 = el('span', 'sl'); l0.append('00 ', el('b', null, 'C-4'), ' 01');
+  const bk = el('span', 'bk'); for (let i = 0; i < 4; i++) bk.append(el('i'));
+  m.append(tb, l0, el('span', 'sl', '01 --- --'), el('span', 'sl', '02 E-4 01'), bk); return m;
+}
+function skinSheet(){
+  const was = skin, sh = sheetShell('ssh sksh', 'Skin', 'Skin', 'Search ' + SKINS.length + ' skins…'), {list, q, early, box} = sh;
+  const ft = el('div', 'pft'), back = el('button', 'sm'); back.type = 'button';
+  ft.append(el('span', 'lbl', 'Tap a skin to try it on the app.'), el('span', 'sp'), back); box.append(ft);
+  const sync = () => { list.querySelectorAll('.skc').forEach(b => b.setAttribute('aria-checked', String(b.dataset.id === skin)));
+    const w = SKINS.find(k => k.id === was); back.textContent = 'Back to ' + (w ? w.name : 'the last skin'); back.hidden = skin === was; };
+  back.addEventListener('click', () => { applySkin(was); sync(); });
+  const card = sk => { const b = el('button', 'skc'); b.type = 'button'; b.dataset.id = sk.id; b.setAttribute('role', 'radio');
+    b.append(skinMock(sk), el('span', 'skn', sk.name)); b.addEventListener('click', () => { if (early()) return; applySkin(sk.id); sync(); }); return b; };
+  const render = () => {
+    list.replaceChildren(); const f = q.value.trim().toLowerCase(); let n = 0;
+    for (const [gn, ks] of skinGroups()){
+      const hits = ks.filter(k => !f || (k.name + ' ' + gn).toLowerCase().includes(f)); if (!hits.length) continue;
+      const g = el('div', 'skgrp'); g.append(el('h3', null, gn)); const grid = el('div', 'skg'); grid.setAttribute('role', 'radiogroup'); grid.setAttribute('aria-label', gn + ' skins');
+      for (const k of hits) grid.append(card(k)); g.append(grid); list.append(g); n += hits.length;
+    }
+    if (!n) list.append(el('div', 'pempty', 'No skin matches “' + q.value.trim() + '”.'));
+    sync();
+  };
+  q.addEventListener('input', render); render();
+  const cur = list.querySelector('.skc[aria-checked="true"]'); if (cur) cur.scrollIntoView({block:'center'});
+}
+// A menu row that opens a sheet: the button, and a line saying what is in it.
+function sheetBtn(kind){
+  const skinRow = kind === 'skin', K = SHEETS[kind], row = el('div', 'tsr act sbtn'), b = el('button', null, skinRow ? 'Skin…' : K.title + ' settings…'); b.type = 'button';
+  b.setAttribute('aria-haspopup', 'dialog'); b.addEventListener('click', () => skinRow ? skinSheet() : setSheet(kind));
+  const cur = SKINS.find(k => k.id === skin);
+  row.append(b, el('div', 'tsi', skinRow ? (cur ? cur.name : '') + ' · ' + SKINS.length + ' skins to pick from' : K.about)); return row;
+}
 const tsetLabel = l => { const t = l.replace(/^›\s*/, '').toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
 const tsetInfo = r => { try { return typeof r.info === 'function' ? r.info(r.get ? r.get() : 0) : (r.info || ''); } catch(e){ return ''; } };
 function tsetSet(r, v){ r.set(clamp(v, r.min, r.max)); if (r.after) r.after(); saveS(); draw(); }
@@ -17426,6 +17582,7 @@ function tsetRow(r){
 }
 // The Project tab of the settings menu: the same rows as the Project screen (projRows).
 function buildProj(){
+  if (sheetRefresh) sheetRefresh();   // SETTINGS SHEETS: an open sheet shows the change too (song IRs)
   const list = $('gsecProj'); if (!list) return;
   const body = $('gset'), keep = body.scrollTop; for (const id of INNER_SECS){ const x = $(id); if (x) $('gsetBody').append(x); }
   list.innerHTML = ''; list.append(el('div', 'sethead', 'Project'));
@@ -17434,11 +17591,13 @@ function buildProj(){
   list.append(el('p', 'note', 'Saving, opening, rendering and exporting are in the File menu.'));
   // The song, how you play, then rendering & export and mastering. (Screen has its own section; UPDATE APP is under App.)
   const groups = new Map(); let g = 'Tracker';
-  if (trk) for (const r of projRows()){ if (r.sec) g = r.sec; if (inFile.has(r.l) || g === 'App' || g === 'Screen' || (gsetMode !== 'all' && PANEL_ROWS.has(r.l))) continue; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(r); }
+  if (trk) for (const r of projRows()){ if (r.sec) g = r.sec; if (inFile.has(r.l) || g === 'App' || g === 'Screen' || inSheet(r) /* SETTINGS SHEETS */ || (gsetMode !== 'all' && PANEL_ROWS.has(r.l))) continue; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(r); }
   if (!groups.has('Render & export')) groups.set('Render & export', []);
   if (!groups.has('Mastering')) groups.set('Mastering', []);
   const order = ['Song', 'Input', 'Render & export', 'Mastering'];
+  if (SET_SHEETS && trk){ const sec = el('section', 'tsec'); sec.append(el('h3', null, 'Song & input'), sheetBtn('song'), sheetBtn('input')); list.append(sec); }   // SETTINGS SHEETS
   for (const name of [...order.filter(n => groups.has(n)), ...[...groups.keys()].filter(n => !order.includes(n))]){
+    if (SET_SHEETS && !groups.get(name).length && name !== 'Render & export' && name !== 'Mastering') continue;
     const sec = el('section', 'tsec'); sec.append(el('h3', null, name)); list.append(sec);
     for (const r of groups.get(name)) sec.append(tsetRow(r));
     // Export's pad settings join Render (its rate, bits and level are the same ones the tracker rows set), and the
@@ -17457,6 +17616,13 @@ const PANEL_ROWS = new Set(['KEYS KEYPAD', 'BOTTOM PANEL', 'STAGE']);
 function buildScreen(){
   const list = $('gsecScreen'); if (!list) return;
   const sk = $('pSkin'); if (sk) $('gsetBody').append(sk);
+  if (SET_SHEETS){   // SETTINGS SHEETS: the quick rows, any row no sheet lists, then the Screen and Skin buttons
+    const R = rowsByKey(), qs = el('section', 'tsec');
+    for (const k of SHEET_QUICK){ const r = R.get(k); if (r) qs.append(tsetRow(r)); }
+    let g2 = ''; for (const r of projRows()){ if (r.sec) g2 = r.sec; if (g2 === 'Screen' && r.l !== 'SKIN' && !inSheet(r)) qs.append(tsetRow(r)); }
+    qs.append(sheetBtn('screen'), sheetBtn('skin'));
+    list.replaceChildren(el('div', 'sethead', 'Screen'), qs); if (sk) sk.hidden = true; return;
+  }
   list.innerHTML = ''; list.append(el('div', 'sethead', 'Screen'));
   let g = '', sec = el('section', 'tsec');
   for (const r of projRows()){ if (r.sec) g = r.sec; if (g !== 'Screen' || r.l === 'SKIN') continue; sec.append(tsetRow(r)); }
