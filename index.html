@@ -1632,7 +1632,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="segrow"><span>Clock out</span><div class="seg" id="segClkOut" role="group" aria-label="Send clock to ports"></div></div>
       <div class="segrow"><span>Clock in</span><div class="seg" id="segClkIn"></div></div>
       <div class="audrow"><span>Gear delay</span><input type="range" id="midiLat" min="-50" max="200" step="1" aria-label="How late your MIDI gear sounds, in milliseconds"><output id="midiLatV"></output></div>
-      <p class="note">Instruments set to <b>MIDI</b> (INST › OUTPUT) play on their <b>PORT</b> (A–D) and channel. Pick which cable each port is here: the song keeps only the letter, so it plays the same on the phone and the computer with each one's own gear. <b>Clock out</b> sends tempo, Start and Stop to the ports lit (A–D) while the song plays. <b>Clock in</b> follows another device's clock: its Start and Stop run PLAY, and its tempo sets ours. <b>Gear delay</b>: how long your hardware takes to sound after a MIDI note; raise it if the gear sounds late against ...Thunder, lower it if early.</p>
+      <p class="note">Instruments set to <b>MIDI</b> (INST › OUTPUT) play on their <b>PORT</b> (A–D) and channel. Pick which cable each port is here: the song keeps only the letter, so it plays the same on the phone and the computer with each one's own gear. <b>Clock out</b> sends tempo, Start and Stop to the ports lit (A–D) while the song plays (from partway into the song: Song Position Pointer and Continue). <b>Clock in</b> follows another device's clock: its Start and Stop run PLAY (Continue after a Song Position Pointer plays from there), and its tempo sets ours. <b>Gear delay</b>: how long your hardware takes to sound after a MIDI note; raise it if the gear sounds late against ...Thunder, lower it if early.</p>
       <p class="note" id="midiNote">Plug a controller in (USB-C on the phone), tap Connect MIDI, and pads 00–07 answer notes 36–43; other notes play the selected synth. Tap <b>Learn</b>, then: tap any pad (drums or synths) and hit a key to give it that note, or touch any slider and turn a knob to put it on that knob. A knob works the slider for whichever pad, layer or effect is open. Select a pad or slider in Learn and tap <b>Unlearn</b> to clear it.</p>
     </div>
   </section>
@@ -2081,6 +2081,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p>Each phrase row has three effect columns: a command and a hex value. The info line at the bottom of the screen explains the one under the cursor.</p>
 <div class="fxg"><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FLX</code>Flex pattern: 00 off, 01–10</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>retrigger every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row Y</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div><div><code>CCA</code>–<code>CCD</code>MIDI CC: 00–7F to the instrument’s CC slot A–D (the CC numbers are on INST)</div><div><code>PGM</code>MIDI program change 00–7F, just before the row’s note</div></div>
 <p><b>MIDI instruments</b> (INST › OUTPUT MIDI or PAD+MIDI) send to their <b>PORT</b> A–D: ⚙ Settings → MIDI says which cable each letter is on this device, so a song plays the same on the phone and the computer. <code>CCA</code>–<code>CCD</code> and <code>PGM</code> work on rows without a note too (on the track’s last instrument), and <code>RND</code>, <code>RNL</code> and <code>REP</code> change them like any command. <code>PSL</code>, <code>PBN</code>, <code>PVB</code>, <code>PIT</code>/<code>FIN</code> on a held note and fractions of a semitone are sent as pitch bend: set INST › <b>BEND RANGE</b> to the range your gear bends. <code>ARP</code> plays its steps as notes, then the note itself again if nothing comes next.</p>
+<p><b>LFO → CC:</b> INST › <b>LFO CC</b> (set a CC number) runs an LFO on that CC while the song plays: SHAPE, RATE in time with the song (T triplet, D dotted), DEPTH (127 is the whole range), CENTRE, and RESTART (FREE from PLAY, NOTE at each of the instrument’s notes). <b>Song position:</b> with clock out on, playing the song from a row partway into a block sends Song Position Pointer and Continue, so the gear starts at the same place; with clock in on, the other device’s Continue after a Song Position Pointer plays the song from there.</p>
 <h3>The master column (MST)</h3>
 <p>On the Song screen, the amber <b>MST</b> column after the poly tracks plays phrases whose commands drive the <b>master bus</b>: <code>VOL</code> sets the master level from that row on, and <code>FXO</code>, <code>FLX</code>, <code>GAT</code> and <code>RTG</code> work on the master's effects (Mixer → master → FX). Master phrases are their own kind: just the three command columns (no notes, volume or instrument), and the command list offers only what works on the master: VOL, FXO, FLX, GAT, RTG, then TPO, TIC, GGR, HOP, DEL, CHA, NTH, REP, RND, RNL and SED. Beside the grid on a big screen, the master's effect chain shows instead of the piano. It plays alongside the tracks, block by block, and is not shown in Arrange. Stopping puts the master level and every switched effect back as set.</p>
 <p><b>Momentary effects:</b> put an effect in a slot and leave it off, then <code>FXO 21</code> switches slot 2 on, <code>FXO 20</code> off again, or <code>FXO 24</code> turns it on for four rows. It works on any track (that track's slots) and in the MST column (the master's). Switching fades over 5 ms; Flex keeps listening while it is off, so it always has the last bar ready.</p>
@@ -10765,6 +10766,7 @@ function ccMove(k, v){
 function onMidi(e){
   const [st, d1, d2] = e.data; if (!st) return;
   if (st >= 0xF8){ clkIn(st, e.timeStamp || performance.now()); return; }   // clock, Start, Continue, Stop
+  if (st === 0xF2){ mx.inSpp = (d1 & 127) | ((d2 & 127) << 7); return; }   // Song Position Pointer (16ths), for Continue
   const ty = st & 0xf0, ch = st & 0x0f;
   if (ty === 0xb0){
     const k = ch + ':' + d1;
@@ -10838,6 +10840,7 @@ $('bMidiReset').addEventListener('click', async () => {
 });
 makeSeg($('segVel'), [[true,'On'],[false,'Off']], () => midi.vel, v => { midi.vel = v; saveMidi(); });
 if (midi.want && navigator.requestMIDIAccess) connectMidi();
+setTimeout(() => { try { songBeatsSoon(1); } catch(e){} }, 4000);   // song positions ready before the first PLAY, with clock on
 
 /* ---------- MIDI out and MIDI clock ---------- */
 // OUTPUT on the INST screen sends an instrument's notes to its PORT (A–D; Settings → MIDI says which cable each
@@ -10857,7 +10860,8 @@ const MIDI_ONLY_EV = new Set(['mcc', 'mpg']);
 // held[track]: the MIDI notes a track has sounding ({p, ch, n, base, vel, rng, fine, t, end}). pend[track]: ARP
 // notes waiting to come back to their pitch (see arpBack). used: port*16+channel pairs that got anything (All Notes
 // Off goes to these at STOP). bend: port*16+channel → the 14-bit bend last sent.
-const mx = {held:[], pend:[], used:new Set(), bend:new Map(), beat:null, clk:{on:false, k:0}, inT:[], inK:0, inRun:false, ext:0, slave:false};
+const mx = {held:[], pend:[], used:new Set(), bend:new Map(), beat:null, t0:null, lfo:[], spp:0, clk:{on:false, k:0}, inT:[], inK:0, inRun:false, ext:0,
+  slave:false, inSpp:0, inOff:0};
 const midiOut = p => { const id = midi.outIds[p | 0]; return (midi.access && id && midi.access.outputs.get(id)) || null; };
 const portOf = I => clamp(I.mpt | 0, 0, NPORT - 1);
 const pbrOf = I => clamp((I.pbr | 0) || 2, 1, 48);
@@ -10956,6 +10960,7 @@ function moNote(e, I){
   const n = clamp(Math.round(e.mn), 0, 127), fine = e.mn - Math.round(e.mn), end = moEnd(e);
   const vel = clamp(Math.round((e.vel == null ? 1 : e.vel) * 127), 1, 127);
   pendAt(t, e.t);
+  if (e.ii != null && I.lrg && lfoCC(I) >= 0) lfoTrig(e.ii, e.t);
   // A new note on a mono track ends the one before; a poly track keeps up to 4; the same key again is released first.
   if (!e.poly) moOff(t, e.t);
   else { for (const h of H) if (h.p === p && h.ch === ch && h.base === n) offOne(h, e.t); let live = H.filter(h => h.end > e.t); while (live.length >= 4) offOne(live.shift(), e.t); }
@@ -10999,7 +11004,12 @@ function moCmd(e){
 // One sequencer event. Returns true when it was for MIDI only (the pad must not play it).
 function moEv(e){
   if (e.type === 'beat'){
-    mx.beat = e; if (clkWanted() && !mx.clk.on && e.b === 0){ msendClk([0xFA], e.t); mx.clk = {on:true, k:0}; }
+    mx.beat = e; if (mx.t0 == null) mx.t0 = e.t;
+    if (clkWanted() && !mx.clk.on && e.b === 0){
+      // Partway into a song: where we are (Song Position Pointer, a little ahead so the gear can find it), then Continue.
+      if (mx.spp > 0){ msendClk([0xF2, mx.spp & 127, mx.spp >> 7], e.t - 0.05); msendClk([0xFB], e.t); } else msendClk([0xFA], e.t);
+      mx.clk = {on:true, k:0};
+    }
     mx.pend.forEach((P, t) => { if (P && P.length && P[0].t < e.t - 1e-4) pendAt(t, e.t); });   // ARP returns the tracks let pass
     return false;
   }
@@ -11021,7 +11031,107 @@ function moClock(s){
   const bpm = s.bpm, upto = b.b + (Math.min(s.time, ctx.currentTime + 0.08) - b.t) * bpm / 60;
   for (let n = 0; c.k / 24 < upto - 1e-9 && n < 512; n++, c.k++){ const at = b.t + (c.k / 24 - b.b) * 60 / bpm; msendClk([0xF8], at); c.last = at; }
 }
-function moStart(){ mx.beat = null; mx.clk = {on:false, k:0}; }
+// PLAY: `row` is the song row a song starts from (-1 for a sect or phrase), for the Song Position Pointer.
+function moStart(row){
+  mx.beat = null; mx.t0 = null; mx.lfo = []; mx.clk = {on:false, k:0};
+  mx.spp = row != null && row >= 0 && clkWanted() ? sppFor(row) : 0;
+}
+
+/* ---------- song position (SPP) ----------
+   Clock out: a song started partway through a block of song rows (a section) sends Song Position Pointer (16ths from
+   the block's top row, as the sequencer plays it: phrase lengths, LPB and TPO all count) and Continue instead of
+   Start, so the gear jumps to the same place. Clock in: Continue after a Song Position Pointer starts our song at the
+   row at or before that place, in the block the cursor is in, and the phase lock counts the rest of the gap. */
+const songFilled = r => r >= 0 && r < 256 && S.song[r].some((v, t) => v >= 0 && (t < (S.ntr || 16) || t === MT));
+function songBlockTop(row){ let r = row; while (songFilled(r - 1)) r--; return r; }
+// The beat (from r0's start) at which the song, played from row r0, first reaches each row: a Map row → beats.
+// Stops at the end of the block, at stopRow, or past stopBeat.
+function songRowBeats(r0, stopRow, stopBeat){
+  const m = new Map(); let seq;
+  try { seq = makeSeq(S, 'song', {row:r0, once:true, sim:true}); } catch(e){ return m; }
+  for (let g = 0; seq.alive() && g < 60000; g++){
+    const r = seq.step(), e0 = r.evs[0], b = e0 && e0.type === 'beat' ? e0.b : null; if (b == null) continue;
+    if (stopBeat != null && b > stopBeat + 1e-6) break;
+    for (const q of r.pos) if (q && !m.has(q.row)) m.set(q.row, b);
+    if ((stopRow != null && m.has(stopRow)) || b > 4096) break;
+  }
+  return m;
+}
+// A block's row beats, kept until the song changes (songVer goes up on every edit, and a loaded song is a new S).
+// Working them out takes a moment on a long song, so with clock out or in on they're also worked out shortly after
+// an edit (songBeatsSoon), and PLAY doesn't wait.
+let songVer = 0, sposT = 0;
+const rbCache = new Map();
+function blockBeats(r0){
+  const c = rbCache.get(r0); if (c && c.ver === songVer && c.S === S) return c.m;
+  const m = songRowBeats(r0, null, null); rbCache.set(r0, {ver:songVer, S, m}); return m;
+}
+function songBeatsSoon(ms){
+  clearTimeout(sposT);
+  sposT = setTimeout(() => { sposT = 0; if (tp.on || !(clkWanted() || midi.clkIn)) return; try { blockBeats(songBlockTop(songRow())); } catch(e){} }, ms || 1500);
+}
+function sppFor(row){
+  const r0 = songBlockTop(row); if (r0 >= row) return 0;
+  const m = blockBeats(r0); return m.has(row) ? clamp(Math.round(m.get(row) * 4), 0, 16383) : 0;
+}
+// Clock in: the row to start from for a position P beats into the cursor's block, and that row's own beat.
+function songRowAt(P){
+  const r0 = songBlockTop(songRow()); if (!songFilled(r0)) return null;
+  let best = null;
+  for (const [row, b] of blockBeats(r0)) if (b <= P + 1e-6 && (!best || b > best.b || (b === best.b && row > best.row))) best = {row, b};
+  return best;
+}
+
+/* ---------- LFO → CC ----------
+   A MIDI instrument can run one LFO into a CC while the song plays (INST › LFO CC and the rows under it). Its rate is
+   in beats on the song's clock; FREE runs from PLAY, NOTE starts again at each of the instrument's notes. Values are
+   booked ~80 ms ahead from the pump (like the clock, so nothing lands after STOP), about every 10 ms, and only sent
+   when the value changes. Songs keep the rate in beats (I.lrb), not as a place in this list. */
+const LFO_SHAPES = ['SINE', 'TRIANGLE', 'SAW UP', 'SAW DOWN', 'SQUARE', 'RANDOM'];
+const LFO_RATES = [['1/16T', 1/6], ['1/16', 1/4], ['1/8T', 1/3], ['1/8', 1/2], ['1/4T', 2/3], ['1/8D', 3/4], ['1/4', 1], ['1/2T', 4/3],
+  ['1/4D', 3/2], ['1/2', 2], ['1 bar', 4], ['2 bars', 8], ['4 bars', 16], ['8 bars', 32]];
+const LFO_DT = 0.01;
+const lfoCC = I => I && Number.isInteger(I.lcc) && I.lcc >= 0 ? clamp(I.lcc, 0, 127) : -1;
+// The rate's place in LFO_RATES (the nearest to the song's beats; 1 bar when unset).
+const lfoRateI = I => { const b = I && +I.lrb > 0 ? +I.lrb : 4; let k = 0;
+  LFO_RATES.forEach(([, v], i) => { if (Math.abs(Math.log(v / b)) < Math.abs(Math.log(LFO_RATES[k][1] / b))) k = i; }); return k; };
+// The shape at phase ph (0–1) as −1…1. RANDOM holds one value a cycle (the same for the same cycle and seed).
+function lfoWave(sh, ph, seed){
+  switch (sh){
+    case 0: return Math.sin(2 * Math.PI * ph);
+    case 1: return ph < 0.25 ? 4 * ph : ph < 0.75 ? 2 - 4 * ph : 4 * ph - 4;
+    case 2: return 2 * ph - 1;
+    case 3: return 1 - 2 * ph;
+    case 4: return ph < 0.5 ? 1 : -1;
+    default: { let x = Math.imul(seed | 0, 374761393) ^ 0x5bd1e995; x = Math.imul(x ^ x >>> 13, 1274126177); x ^= x >>> 16; return (x >>> 0) / 2147483648 - 1; }
+  }
+}
+// A note of instrument ii at audio time t restarts its LFO (NOTE) from then.
+function lfoTrig(ii, t){
+  const L = mx.lfo[ii] || (mx.lfo[ii] = {v:-1, t:null, trig:[]});
+  if (!L.trig.length || t > L.trig[L.trig.length - 1]) L.trig.push(t);
+  if (L.trig.length > 64) L.trig.splice(0, L.trig.length - 64);
+}
+function moLfo(s){
+  if (!mx.beat || mx.t0 == null || !ctx) return;
+  const upto = Math.min(s.time, ctx.currentTime + 0.08), bpm = s.bpm, b = mx.beat;
+  for (let ii = 0; ii < NI; ii++){
+    const I = S.insts[ii], cc = lfoCC(I); if (cc < 0 || !(I.mo | 0)) continue;
+    const L = mx.lfo[ii] || (mx.lfo[ii] = {v:-1, t:null, trig:[]});
+    const p = portOf(I), ch = (I.mch | 0) & 15, rate = LFO_RATES[lfoRateI(I)][1], sh = clamp(I.lsh | 0, 0, LFO_SHAPES.length - 1);
+    // DEPTH 127 swings the whole range (0–127 around 64); 0 holds the centre.
+    const dep = clamp(I.ldp == null ? 64 : I.ldp | 0, 0, 127), mid = clamp(I.lct == null ? 64 : I.lct | 0, 0, 127);
+    for (let n = 0, t = Math.max(L.t == null ? mx.t0 : L.t + LFO_DT, ctx.currentTime); t <= upto && n < 40; n++, t += LFO_DT){
+      while (L.trig.length > 1 && L.trig[1] <= t) L.trig.shift();
+      const tr = I.lrg && L.trig.length && L.trig[0] <= t ? L.trig[0] : null;
+      // FREE: beats from PLAY on the song's clock; NOTE: beats since the instrument's last note at the tempo now.
+      const pos = (tr == null ? b.b + (t - b.t) * bpm / 60 : (t - tr) * bpm / 60) / rate, cyc = Math.floor(pos);
+      const v = clamp(Math.round(mid + lfoWave(sh, pos - cyc, cyc * 7919 + ii * 104729 + (tr == null ? 0 : Math.round(tr * 1000))) * dep * 64 / 127), 0, 127);
+      if (v !== L.v){ msend([0xB0 | ch, cc, v], t, true, p); L.v = v; mx.used.add(p * 16 + ch); }
+      L.t = t;
+    }
+  }
+}
 // Every MIDI note out ends now, including ones booked ahead (OUTPUT, PORT, MIDI CH or a port's cable changed, or
 // STOP), and bent channels go back to the middle.
 function moRelease(){
@@ -11044,10 +11154,15 @@ function moStop(){
 function clkIn(st, ts){
   if (!midi.clkIn) return;
   if (st === 0xFA || st === 0xFB){
-    mx.inK = 0; mx.inRun = true;
+    mx.inK = 0; mx.inRun = true; mx.inOff = 0;
     if (tp.on) tStop(true);
     if (mx.ext) setTempoLive(mx.ext);
-    mx.slave = true; playCtx(); return;
+    mx.slave = true;
+    // Continue after a Song Position Pointer: play the song from where the other device is. Start is the top.
+    const P = st === 0xFB ? mx.inSpp / 4 : 0; if (st === 0xFA) mx.inSpp = 0;
+    const at = P > 0 ? songRowAt(P) : null;
+    if (at){ tStart('song', {row:at.row}); mx.inOff = P - at.b; mx.slave = true; return; }
+    playCtx(); return;
   }
   if (st === 0xFC){ mx.inRun = false; if (tp.on && mx.slave) tStop(); mx.slave = false; return; }
   if (st !== 0xF8) return;
@@ -11064,7 +11179,7 @@ function clkIn(st, ts){
   // In phase: where the other device is (clocks since its Start; the first clock is beat 0) against where we are
   // at the moment that clock is heard (plus Gear delay).
   if (tp.on && mx.slave && mx.inRun && mx.beat && tp.seq && ctx){
-    const ta = p2a(ts + midi.lat), ours = mx.beat.b + (ta - mx.beat.t) * tp.seq.bpm / 60, err = (mx.inK - 1) / 24 - ours;
+    const ta = p2a(ts + midi.lat), ours = mx.beat.b + (ta - mx.beat.t) * tp.seq.bpm / 60, err = (mx.inK - 1) / 24 + mx.inOff - ours;
     const lim = Math.abs(err) > 0.05 ? 0.08 : 0.03;   // catch up quickly after Start, then only small nudges
     if (Math.abs(err) < 2) target = bpm * (1 + clamp(err / 2, -lim, lim));
   }
@@ -12044,7 +12159,7 @@ const freshPhrase = () => Array.from({length:PROWS}, blankRow);
 const polyFrom = () => Math.ceil(ntr() / 2), isPolyT = t => t >= polyFrom() && t < NT;
 // freshInst needs the pad count, but nslots() (with the song state, below) isn't initialized yet when the
 // first song is made — the default instrument layout only needs the classic 16 anyway.
-const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0, slc:0, smode:0, sync:0, beats:4, grain:1, mo:0, mch:0, mpt:0, pbr:2, cc:CC_DEF.slice()});   // instruments 08–0F play the synth slots
+const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0, slc:0, smode:0, sync:0, beats:4, grain:1, mo:0, mch:0, mpt:0, pbr:2, cc:CC_DEF.slice(), lcc:-1, lsh:0, lrb:4, ldp:64, lct:64, lrg:0});   // instruments 08–0F play the synth slots
 const freshMix = () => ({vol:224, pan:128, mute:false, solo:false, sc:false});
 /* ---------- mastering on the master bus ----------
    S.mst, saved with the song:
@@ -12141,7 +12256,11 @@ function normSong(j){
     I.mo = clamp(int(o.mo, 0), 0, 2); I.mch = clamp(int(o.mch, 0), 0, 15);
     // MIDI port letter (A = 0), bend range and CC slots: older songs have none (port A, ±2, the default CCs).
     I.mpt = clamp(int(o.mpt, 0), 0, NPORT - 1); I.pbr = clamp(int(o.pbr, 2), 1, 48);
-    I.cc = CC_DEF.map((d, k) => clamp(int((Array.isArray(o.cc) ? o.cc : [])[k], d), 0, 127)); } });
+    I.cc = CC_DEF.map((d, k) => clamp(int((Array.isArray(o.cc) ? o.cc : [])[k], d), 0, 127));
+    // LFO → CC (off in older songs): CC number or -1, shape, rate in beats, depth, centre, restart on notes.
+    I.lcc = clamp(int(o.lcc, -1), -1, 127); I.lsh = clamp(int(o.lsh, 0), 0, LFO_SHAPES.length - 1);
+    I.lrb = LFO_RATES.some(([, v]) => Math.abs(v - +o.lrb) < 1e-9) ? +o.lrb : 4;
+    I.ldp = clamp(int(o.ldp, 64), 0, 127); I.lct = clamp(int(o.lct, 64), 0, 127); I.lrg = o.lrg ? 1 : 0; } });
   if (Array.isArray(j.mix)) j.mix.slice(0, NT).forEach((o, i) => { if (o && typeof o === 'object'){ const m = S.mix[i];
     m.vol = clamp(int(o.vol, 224), 0, 255); m.pan = clamp(int(o.pan, 128), 0, 255); m.mute = !!o.mute; m.solo = !!o.solo; m.sc = !!o.sc; } });
   if (Array.isArray(j.tfx)) for (let t = 0; t < NT; t++) S.tfx[t] = normChainFx(j.tfx[t]);
@@ -12263,7 +12382,8 @@ function placePending(){
   pendPlace = null; setSongPhrase(q.x, q.y, q.p);
   toast(`Phrase ${hx(q.p)} is on the song: row ${rS(q.y, 3)}, track ${d2(q.x + 1)}.`);
 }
-function saveS(){ if (pendPlace) queueMicrotask(placePending); snap(); clearTimeout(sT); sT = setTimeout(() => storeWrite(TK, JSON.stringify(S)), 600); }
+function saveS(){ if (pendPlace) queueMicrotask(placePending); snap(); clearTimeout(sT); sT = setTimeout(() => storeWrite(TK, JSON.stringify(S)), 600);
+  try { songVer++; songBeatsSoon(); } catch(e){} }   // the song changed: MIDI song positions are worked out again (just after, with clock on)
 const isEmptySect = c => !c || c.every(r => r[0] < 0);
 const isEmptyPhrase = p => !p || p.every(r => r.every(v => v < 0));
 const plen = id => id >= 0 && S.plen ? clamp(S.plen[id] || S.dlen || 16, 1, PROWS) : (S.dlen || 16);
@@ -12524,7 +12644,7 @@ function makeSeq(S, mode, o){
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? at + fx.KIL * tick : null, rel:fx.OFF != null ? at + fx.OFF * tick : null,
               slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
               ii, mn:note + 12, vel:(fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out
-            if ((I.slc | 0) > 1 || I.sync){ const c = o.live ? ensurePlay(ev.pad) : ensure(ev.pad); if (c){ applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; } }
+            if (!o.sim && ((I.slc | 0) > 1 || I.sync)){ const c = o.live ? ensurePlay(ev.pad) : ensure(ev.pad); if (c){ applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; } }
             evs.push(ev);
             if (every){ let k = 1;
               for (let tt = at + every * tick; tt < end - 1e-6 && k < 64; tt += every * tick, k++)
@@ -13317,10 +13437,10 @@ function tStart(mode, o){
   // synth slots here froze the UI for seconds and made the first notes late.
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; if (!slotAt(cache, i) && v && PW.ready && rwCan(v)) bgRender(i); else ensureLive(i); }
   sfPrepare(null);   // SoundFont pads load in the background (notes before that are silent)
+  moStart(mode === 'song' ? o.row : -1);   // before the start time is set: the song position takes a moment to work out
   seq.time = ctx.currentTime + 0.08; stageStart(seq.time);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : ''});
-  moStart();
   tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
   void r;
 }
@@ -13363,7 +13483,7 @@ function pump(){
   while (s.alive() && s.time < ctx.currentTime + 0.25 && n++ < 64){
     const r = s.step(); for (const e of r.evs){ if (moEv(e)) continue; rt.pl.play(e); if (e.type === 'note') padBlink(e); } tp.q.push({t:r.t, pos:r.pos, bpm:s.bpm, tks:r.tks, line:r.line});
   }
-  moClock(s);
+  moClock(s); moLfo(s);
 }
 // With the synth open, light each pad as the tracker plays it (in time with the sound).
 function padBlink(e){
@@ -13907,8 +14027,23 @@ function instRows(){
       ...CC_CMDS.map((c, k) => ({l:'CC ' + c[2], get:() => ccNum(I, k), set:v => { if (!Array.isArray(I.cc)) I.cc = CC_DEF.slice(); I.cc[k] = v; }, min:0, max:127, big:16, d:CC_DEF[k],
         fmt:v => String(v).padStart(3, '0') + (CC_NAMES[v] ? '  ' + CC_NAMES[v] : ''),
         info:v => `${c} in a phrase sends 00–7F to CC ${v} on this instrument’s port and channel`})),
+      {l:'LFO CC', get:() => lfoCC(I), set:v => I.lcc = v, min:-1, max:127, big:16, d:-1, gap:true,
+        fmt:v => v < 0 ? 'OFF' : String(v).padStart(3, '0') + (CC_NAMES[v] ? '  ' + CC_NAMES[v] : ''),
+        info:v => v < 0 ? 'An LFO that moves a CC while the song plays: set the CC number to switch it on' : `The LFO moves CC ${v} on this instrument’s port and channel while the song plays`},
+      ...(lfoCC(I) >= 0 ? [
+        {l:'LFO SHAPE', opts:true, get:() => clamp(I.lsh | 0, 0, LFO_SHAPES.length - 1), set:v => I.lsh = v, min:0, max:LFO_SHAPES.length - 1, d:0, fmt:v => LFO_SHAPES[v],
+          info:v => v === LFO_SHAPES.length - 1 ? 'A new random value each cycle' : 'The LFO’s shape'},
+        {l:'LFO RATE', opts:true, get:() => lfoRateI(I), set:v => I.lrb = LFO_RATES[v][1], min:0, max:LFO_RATES.length - 1, d:LFO_RATES.findIndex(([n]) => n === '1 bar'),
+          fmt:v => LFO_RATES[v][0], info:v => `One cycle every ${LFO_RATES[v][0]}, in time with the song (T triplet, D dotted)`},
+        {l:'LFO DEPTH', get:() => clamp(I.ldp == null ? 64 : I.ldp | 0, 0, 127), set:v => I.ldp = v, min:0, max:127, big:16, d:64, fmt:v => String(v).padStart(3, '0'),
+          info:() => 'How far it swings, top to bottom: 127 is the whole CC range'},
+        {l:'LFO CENTRE', get:() => clamp(I.lct == null ? 64 : I.lct | 0, 0, 127), set:v => I.lct = v, min:0, max:127, big:16, d:64, fmt:v => String(v).padStart(3, '0'),
+          info:() => 'The value it swings around'},
+        {l:'LFO RESTART', tog:true, get:() => I.lrg ? 1 : 0, set:v => I.lrg = v ? 1 : 0, min:0, max:1, d:0, fmt:v => v ? 'NOTE' : 'FREE',
+          info:v => v ? 'Starts again from the top at each note this instrument plays' : 'Runs from PLAY, in time with the song'},
+      ] : []),
     ] : []),
-    {l:'REVERSE', get:() => I.rev, set:v => I.rev = v ? 1 : 0, min:0, max:1, tog:true, d:0, fmt:v => v ? 'ON' : 'OFF', info:() => 'Play the pad backwards'},
+    {l:'REVERSE', get:() => I.rev, set:v => I.rev = v ? 1 : 0, min:0, max:1, tog:true, d:0, gap:!!(I.mo | 0), fmt:v => v ? 'ON' : 'OFF', info:() => 'Play the pad backwards'},
     {l:'START', get:() => I.ofs, set:v => I.ofs = v, min:0, max:255, big:16, d:0, info:v => `Start ${Math.round(v / 256 * 100)}% into the sound`},
     {l:'SLICES', get:() => I.slc | 0, set:v => I.slc = v === 1 ? ((I.slc | 0) > 1 ? 0 : 2) : v, min:0, max:64, big:4, d:0, gap:true,
       fmt:v => v > 1 ? v + ' · C-4 plays slice 1' : 'OFF', info:() => (I.slc | 0) > 1 ? 'Each note plays one slice: C-4 the first, C#4 the second… (it wraps). TRANSPOSE and pitch commands still tune it' : 'Cut the pad into equal parts or at its hits; notes then pick a slice, for breakbeat chopping'},

@@ -24,10 +24,38 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 18 Oct (evening): MIDI phase 2 — LFO → CC, Song Position Pointer
+
+Cache `thunderplus-v165`. Same MIDI block, after `moStart`.
+
+- **LFO → CC:** instrument fields `lcc` (CC number, −1 off), `lsh` (`LFO_SHAPES` index), `lrb` (rate **in beats**, one of
+  `LFO_RATES`' values; `lfoRateI` finds its row, so the list can change without breaking songs), `ldp`, `lct`, `lrg`
+  (0 FREE, 1 NOTE). `moLfo(s)` runs from `pump()` after `moClock`: books ~80 ms ahead like the clock, a value every
+  `LFO_DT` (10 ms) only when it changes (`mx.lfo[ii].v`), amplitude `dep * 64 / 127` around the centre. FREE phase =
+  the song's beats from PLAY (`mx.beat`); NOTE = beats since the instrument's last note (`lfoTrig` from `moNote`, a
+  short list so notes booked ahead don't restart it early). RANDOM is a hash of the cycle (and the note's time for
+  NOTE). INST shows LFO CC for MIDI instruments and the other five rows once it has a CC.
+- **SPP out:** `moStart(row)` (called in `tStart` before the start time is set) → `mx.spp = sppFor(row)` when a clock
+  port is lit and the song starts below the top of its block (`songBlockTop`: rows with anything in them, upward).
+  The beat 0 event sends `F2` (50 ms early) + `FB` instead of `FA`. Positions come from `songRowBeats(r0)`: `makeSeq`
+  run with `{once:true, sim:true}` (`sim` skips chop renders) noting the beat each row is first reached, so phrase
+  lengths, LPB, HOP and TIC all count. Cached per block (`blockBeats`, `rbCache`), dropped when `songVer` changes
+  (`saveS()` bumps it) or `S` is a new object; with clock out or in on, `songBeatsSoon()` works the cursor's block
+  out 1.5 s after an edit (and 4 s after start-up), so PLAY doesn't wait (128 rows × 16 tracks: ~100 ms headless).
+- **SPP in:** `onMidi` keeps `F2` in `mx.inSpp` (16ths); `clkIn` on Continue with a position plays `tStart('song',
+  {row})` from `songRowAt(P)` (the row at or before P in the cursor's block) and puts the remainder in `mx.inOff`, which
+  the phase lock adds to the other device's beat. Start clears both.
+- **Checked headless** (session scratchpad, fake Web MIDI): SPP 0 / 16 / 24 for a 16-, 8-, 16-row song; position →
+  row; SPP 24 + Continue from row 2, Start from row 0 and from a phrase; clock in SPP 20 + Continue plays row 1 with
+  1 beat to catch up, Stop stops, Start clears it; LFO sine 0–127 a cycle every 500 ms at 1/4, ~10 ms apart, changes
+  only; square two values; depth 0 one message; random new values per cycle; NOTE restart drops to the bottom at each
+  note; off / pad instruments send nothing; old songs load with the LFO off; phase 1 tests still pass. **Not tried with
+  real gear yet.**
+
 ## 18 Oct: MIDI control — ports A–D, CC slots, PGM, pitch bend, ARP as notes
 
 Cache `thunderplus-v164`. All in the `/* ---------- MIDI out and MIDI clock ---------- */` block unless named. Phase 1 of
-the owner's MIDI plan (phase 2: an LFO → CC per MIDI instrument, and Song Position Pointer + Continue on clock out).
+the owner's MIDI plan (phase 2, the LFO → CC and Song Position Pointer, is the entry above).
 
 - **Ports:** `NPORT = 4`, `PORTL = 'ABCD'`. Device settings (`thunderplus-midi-v1`): `midi.outIds[4]` (Web MIDI port
   ids) and `midi.clk[4]` (clock per port); the old `outId`/`clkOut` load as port A and are still written (= port A) for
@@ -1321,8 +1349,8 @@ recording, resampling, MIDI in/out and clock.
 2. **MIDI file export and import.** Export a song as `.mid` (to finish in a DAW or load on the MPC/Force);
    import MIDI drum patterns or melodies into phrases. About a day each way.
 3. **The rest of MIDI out:** pitch bend, arps as notes, CC commands, program change and ports A–D are in (18 Oct).
-   Left: an LFO → CC per MIDI instrument, and Song Position Pointer (so Continue resumes where the MPC is instead of
-   restarting).
+   The LFO → CC and Song Position Pointer (both ways) followed the same evening. Ideas after real-gear tests: recording
+   MIDI in into phrases, live transpose from a keyboard, force-to-scale, play direction, Euclidean fill, MIDI echo.
 4. **Humanize.** Small random timing and velocity changes per track (GRV and swing exist; random variation
    doesn't). A few hours.
 5. **Named song markers/sections**, to jump around a long arrangement. A few hours.
