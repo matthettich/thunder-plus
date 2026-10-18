@@ -596,6 +596,10 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 /* The cover screen (412 px): "CPU --" and "?" wrapped the top bar onto a second row, costing two tracker lines. The meter
    keeps only its number and bar, and Help lives in Settings → App there. */
 @media (max-width:480px){ .top .tcpu{min-width:48px; padding:0 6px} .top .tcpu span{font-size:var(--fs-3)} .top .tcpu .cpuw{display:none} .top #bHelp{display:none} }
+/* The Fold 6 cover screen is 373 px: the bar still needed ~400 and wrapped the CPU meter onto a second row (41 px of
+   tracker). Tighter gaps and edges there; below that, the meter goes (Settings → Audio shows the load too). */
+@media (max-width:400px){ .top{gap:5px; padding-inline:8px} .top .tcpu{min-width:40px; padding:0 3px} .top #tSong{padding-inline:8px} }
+@media (max-width:340px){ .top .tcpu{display:none} }
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 
 /* tracker: tabs band, black monitor screen in a mono face, grey side panel, grey key dock */
@@ -1648,11 +1652,11 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       </div>
       <div class="btnrow" hidden>
         <button id="bExPad">Save this pad</button>
-        <button id="bExKit">Save all 8 pads (.zip)</button>
+        <button id="bExKit">Save all pads (.zip)</button>
         <button id="bShPad" hidden>Share pad…</button>
         <button id="bShKit" hidden>Share all 8…</button>
       </div>
-      <p class="note" id="exNote">How pads export (File → Export this pad / all 8 pads): mono WAV one-shots, trimmed at the tail. In Koala, import them from Files into a sample pad; in SunVox, load them into a Sampler module.</p>
+      <p class="note" id="exNote">How pads export (File → Export this pad / all pads): mono WAV one-shots, trimmed at the tail. In Koala, import them from Files into a sample pad; in SunVox, load them into a Sampler module.</p>
     </div>
   </section>
 
@@ -6721,6 +6725,7 @@ function prerender(){
   preT = setTimeout(() => idle(step), 30);
 }
 function ensure(i){
+  if (!kit.voices[i]) return null;   // a pad the kit doesn't have (yet): silent rather than throwing in the sequencer
   if (stale(i) || slotAt(pend, i)){
     const v = kit.voices[i], st = new Map();
     install(i, {sr:padSR(), bpm:padBpm(i), data:renderVoice(v, padSR(), st, isSyn(i) ? v.len : 0), st});
@@ -6745,7 +6750,7 @@ function ensurePlay(i){
   return ensure(i);
 }
 function buffer(i){
-  const c = ensureLive(i);
+  const c = ensureLive(i); if (!c) return null;
   if (!slotAt(bufs, i) || bufs[i]._d !== c.data){ const b = ctx.createBuffer(1, c.data.length, c.sr); b.copyToChannel(c.data, 0); b._d = c.data; bufs[i] = b; }
   return bufs[i];
 }
@@ -6879,7 +6884,14 @@ function vuFrame(){
 let lastPtrDown = -1e9;
 addEventListener('pointerdown', () => { lastPtrDown = performance.now(); }, true);
 const ptrJust = () => performance.now() - lastPtrDown < 800;
-function typing(e){ const t = e.target; return !!(t && t.matches && t.matches('input[type=text],textarea,select') && t.getClientRects().length); }
+// A button clicked or tapped keeps keyboard focus, so the next Enter or Space pressed it again as well as doing the
+// tracker's own thing. Pointer clicks (detail > 0) let go of focus; keyboard use, dialogs and menus keep it.
+document.addEventListener('click', e => {
+  const b = e.target && e.target.closest && e.target.closest('button'); if (!b || !e.detail) return;
+  if (b.closest('.ask, [role=dialog], [role=menu], [role=listbox], .pbs, .ssh, #gset, #gfile') || b.hasAttribute('aria-haspopup')) return;
+  setTimeout(() => { if (document.activeElement === b) b.blur(); }, 0);
+}, true);
+function typing(e){ const t = e.target; return !!(t && t.matches && t.matches('input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=file]),textarea,select,[contenteditable]') && t.getClientRects().length); }
 /* ---------- change handling ---------- */
 let rTimer = 0, sTimer = 0;
 function changed(i = cur, light){
@@ -6994,7 +7006,14 @@ function askSheet(msg, opts){
     if (opts.list){ const ul = el('div', 'asklist'); opts.list.forEach((label, i) => { const b = el('button', 'askitem', label); b.type = 'button'; b.addEventListener('click', () => done(i)); ul.append(b); }); box.append(ul); }
     const row = el('div', 'btnrow'), no = el('button', null, opts.no || 'Cancel'), ok = el('button', 'ok', opts.ok || 'OK'); no.type = ok.type = 'button'; row.append(no); if (!opts.list) row.append(ok); box.append(row); wrap.append(box);
     const done = v => { if (askOpen !== done) return; askOpen = null; wrap.remove(); document.removeEventListener('keydown', key, true); res(v); };
-    const key = e => { if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); done(null); } else if (e.key === 'Enter' && (inp ? e.target === inp : true)){ e.preventDefault(); e.stopPropagation(); done(inp ? inp.value : true); } else if (inp && e.target === inp) e.stopPropagation(); };
+    // Every key stays in the dialog (Space, letters and Delete used to reach the tracker behind it: play, notes, clear).
+    // Tab, Space and Enter still work its own buttons and text box.
+    const key = e => {
+      e.stopPropagation();
+      if (e.key === 'Escape'){ e.preventDefault(); done(null); }
+      else if (e.key === 'Enter' && (inp ? e.target === inp : !(e.target && e.target.closest && e.target.closest('.askitem, .askbox button')))){ e.preventDefault(); done(inp ? inp.value : true); }
+      else if (!(e.target && e.target.closest && e.target.closest('.ask'))) e.preventDefault();   // focus left the dialog: nothing happens
+    };
     askOpen = done;
     no.addEventListener('click', () => done(null)); ok.addEventListener('click', () => done(inp ? inp.value : true));
     wrap.addEventListener('pointerdown', e => { if (e.target === wrap){ e.preventDefault(); done(null); } });
@@ -10151,6 +10170,7 @@ function growKit(){
 }
 function setVtrk(on){
   vtrk = !!on; try { localStorage.setItem(VTRK, vtrk ? '1' : '0'); } catch(e){}
+  try { if (vtrk && S.ntr > 24){ S.ntr = 24; saveS(); toast('A voice per track allows up to 24 tracks: TRACKS is 24 now (tracks 25–32 are kept, not played).', 5000); } } catch(e){}
   for (let i = 0; i < Math.max(nslots(), 40); i++){ dirty[i] = true; cache[i] = null; }
   growKit();
 }
@@ -10161,6 +10181,19 @@ function setVtrk(on){
 var SDB = 'thunderplus-samples', SDB_ALSO = ['thunder-samples'];   // a first start may borrow ...Thunder's
 var sdbOk = typeof indexedDB !== 'undefined', sdbP = null, smpStored = new Set();
 var smpHeld = new Map();   // every sample seen this session, by id: undo and file export find a sample no longer on a pad here   // var: save() can run before this line has
+// A long recording session filled memory with every take ever made (a 30 s sample is ~6 MB). Once a minute, while the
+// song isn't playing, audio that no pad, undo step, preset or song IR names any more is let go.
+setInterval(() => {
+  try {
+    if ((typeof tp !== 'undefined' && tp.on) || smpHeld.size < 8) return;
+    const keep = new Set();
+    for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.id) keep.add(L.sample.id);
+    for (const e of undo.past.concat(undo.future)) if (e && e.j) for (const m of e.j.matchAll(/"ref":"([^"]+)"/g)) keep.add(m[1]);
+    for (const m of JSON.stringify(S.presets || {}).matchAll(/"ref":"([^"]+)"/g)) keep.add(m[1]);
+    for (const e of S.irs || []) if (e) for (const c of [e.L, e.R]) if (c && c.ref) keep.add(c.ref);
+    for (const id of [...smpHeld.keys()]) if (!keep.has(id)) smpHeld.delete(id);
+  } catch(e){}
+}, 60000);
 function idbOpen(name){ return new Promise((res, rej) => { try { const r = indexedDB.open(name, 1); r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('smp')) r.result.createObjectStore('smp'); }; r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch(e){ rej(e); } }); }
 function smpDb(){ return sdbP || (sdbP = idbOpen(SDB)); }
 function smpPut(S){
@@ -10206,6 +10239,10 @@ try { tabCh = new BroadcastChannel('thunderplus-tabs'); tabCh.onmessage = e => {
 function otherTabs(){ if (!tabCh) return Promise.resolve(false); tabPeers = 0; try { tabCh.postMessage('ping'); } catch(e){} return new Promise(r => setTimeout(() => r(tabPeers > 0), 200)); }
 function smpTidy(){
   const used = new Set(); for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.id) used.add(L.sample.id);
+  // Samples seen this session (a kit just replaced, undo steps) and the song's impulse responses are kept too: Undo
+  // brings a replaced kit back with its audio while the app is open. They go at the first tidy after a restart.
+  for (const id of smpHeld.keys()) used.add(id);
+  try { for (const e of S.irs || []) if (e) for (const c of [e.L, e.R]) if (c && c.ref) used.add(c.ref); } catch(e){}
   try { const P = S.presets || {}; for (const p of P.voices || []) for (const l of (p.v && p.v.layers) || []) if (l.sample && l.sample.ref) used.add(l.sample.ref); for (const p of P.layers || []) if (p.l && p.l.sample && p.l.sample.ref) used.add(p.l.sample.ref); } catch(e){}
   try { for (const k of [KEY, TK]){ const j = localStorage.getItem(k) || ''; for (const m of j.matchAll(/"ref":"([^"]+)"/g)) used.add(m[1]); } } catch(e){}
   otherTabs().then(busy => { if (busy) return;
@@ -10239,7 +10276,30 @@ function save(){
   }
 }
 function loadSaved(){ try { const s = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY); return s ? kitFromJSON(JSON.parse(s)) : null; } catch(e){ console.warn('Couldn’t load the saved kit', e); return null; } }
-function setKit(k){ setTimeout(() => sfPrepare(null), 0); kit = k; setTimeout(() => { for (let i = 0; i < kit.voices.length; i++) try { bassPush(i); } catch(e){} }, 0); setTimeout(kitUndoReset, 0); setTimeout(() => resolveSamples(), 0); WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0; for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
+// The whole kit as undo keeps it: settings as JSON, samples by id (their audio stays in smpHeld for the session).
+function kitUndoJSON(){ for (const v of kit.voices) try { vSnap(v); } catch(e){} return JSON.stringify(kitToJSON('ref')); }
+// Replaces the kit. Undo puts the previous kit back (one step), samples and all, until the app is closed.
+// noUndo: undo/redo itself. A kit with fewer voices than the song's slots (an older file with voice-per-track on)
+// grows to fit, so every pad the song plays exists.
+function setKit(k, noUndo){
+  if (!noUndo) try { kitFlush(); undo.past.push({k:'K', j:kitUndoJSON()}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; } catch(e){}
+  setTimeout(() => sfPrepare(null), 0); kit = k; setTimeout(() => { for (let i = 0; i < kit.voices.length; i++) try { bassPush(i); } catch(e){} }, 0);
+  setTimeout(kitUndoBase, 0); setTimeout(() => resolveSamples(), 0); WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0;
+  if (kit.voices.length < nslots()) growKit();
+  for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
+// Before replacing the kit: when the current one has samples (recorded or imported) the new one doesn't, say so.
+async function kitReplaceOk(next, what){
+  const keep = new Set(); for (const v of (next && next.voices) || []) for (const L of v.layers || []) if (L.sample && L.sample.id) keep.add(L.sample.id);
+  let n = 0; for (const v of kit.voices) for (const L of v.layers) if (L.sample && (L.sample.data || L.sample.id) && !keep.has(L.sample.id)) n++;
+  if (!n) return true;
+  return askYes({title:what || 'Replace the kit?', body:`The kit “${kit.name || 'Kit'}” has ${n} sample${n > 1 ? 's' : ''} (recorded or imported) that the new one doesn’t. Undo brings ${n > 1 ? 'them' : 'it'} back while the app is open. To keep ${n > 1 ? 'them' : 'it'} for good, save the kit first (File → Save kit…).`}, 'Replace');
+}
+// The drum pads 1–8 from the factory kit; the synth slots stay as they are. Undo puts the kit back.
+function factoryPads(){
+  const f = factoryKit(), k = {name:'Factory kit', voices:kit.voices.slice(), waves:kit.waves};
+  for (let p = 0; p < NPAD && p < f.voices.length; p++) k.voices[p] = f.voices[p];
+  setKit(k); toast('Factory drums on pads 1–8. The synth slots stay as they are; Undo puts the kit back.', 4000);
+}
 
 /* ---------- files out ---------- */
 function wavBytes(data, sr, bits){
@@ -10487,10 +10547,10 @@ function fileItems(){
     null,
     ['Save kit…', () => $('bSaveKit').click()], ['Load kit…', () => $('kitIn').click()],
     ['Export song presets…', exportPresets], ['Import presets…', () => $('presetIn').click()],
-    ['Factory kit', () => setKit(factoryKit()), null, null, true], ['Drum kits…', pickClassicKit], ['Clear all kit slots', clearKit, null, null, true],
+    ['Factory drums (pads 1–8)', factoryPads, null, null, true], ['Drum kits…', pickClassicKit], ['Clear all kit slots', clearKit, null, null, true],
     null,
-    ['Export this pad (WAV)', () => $('bExPad').click()], ['Export all 8 pads (.zip)', () => $('bExKit').click()],
-    ...(canShare ? [['Share this pad…', () => $('bShPad').click()], ['Share all 8 pads…', () => $('bShKit').click()]] : []),
+    ['Export this pad (WAV)', () => $('bExPad').click()], ['Export all pads (.zip)', () => $('bExKit').click()],
+    ...(canShare ? [['Share this pad…', () => $('bShPad').click()], ['Share all pads…', () => $('bShKit').click()]] : []),
     ...(noEditors() ? [] : [null, ['Export chains…', exportChains], ['Import chains…', () => $('chainsIn').click()]])
   ];
 }
@@ -10681,13 +10741,14 @@ $('ckVtrk').checked = vtrk;
 $('ckVtrk').addEventListener('change', e => setVtrk(e.target.checked));
 $('kitIn').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  try { setKit(kitFromJSON(JSON.parse(await f.text()))); toast('Loaded ' + kit.name); } catch(err){ toast(err.message || 'Couldn’t read that kit file.'); }
+  try { const k = kitFromJSON(JSON.parse(await f.text())); if (!await kitReplaceOk(k, 'Load kit “' + (k.name || 'Kit') + '”?')) return;
+    setKit(k); toast('Loaded ' + kit.name + '. Undo puts the previous kit back.'); } catch(err){ toast(err.message || 'Couldn’t read that kit file.'); }
 });
 let pending = null;
 function ask(msg, fn){ pending = fn; $('confirmMsg').textContent = msg; $('confirmRow').hidden = false; }
 $('bYes').addEventListener('click', () => { $('confirmRow').hidden = true; if (pending) pending(); pending = null; });
 $('bNo').addEventListener('click', () => { $('confirmRow').hidden = true; pending = null; });
-$('bFactory').addEventListener('click', () => ask('Replace all 8 pads with the factory kit?', () => setKit(factoryKit())));
+$('bFactory').addEventListener('click', () => ask('Put the factory drums on pads 1–8? The synth slots stay as they are.', factoryPads));
 $('bClassic').addEventListener('click', pickClassicKit);
 function clearKit(){ setKit({name:'New kit', voices:Array.from({length:nslots()}, (_, i) => isSyn(i)
   ? mkVoice('Synth ' + (i + 1), [{type:'saw', mode:'ADSR', atk:2, dec:400, sus:0.7, rel:200, lpCut:3000, level:0.7}], {tune:24, len:6, gate:400})
@@ -12328,7 +12389,7 @@ function normSong(j){
   if (Array.isArray(j.smute)) j.smute.slice(0, 256).forEach((v, i) => S.smute[i] = int(v, 0) | 0);
 // Voice-per-track parity: one synth voice per song track. ntr caps at 24, because 24 tracks need pads
 // 8–31: exactly 32 voices.
-  S.ntr = clamp(int(j.ntr, 16), 8, 24);
+  S.ntr = clamp(int(j.ntr, 16), 8, vtrk ? 24 : NT);   // 32 with the shared voices; 24 with a voice per track (32 voices)
   // Microtuning: cents per pitch class, clamped to ±100 (a semitone).
   S.tune = Array.from({length:12}, (_, k) => clamp(Number.isFinite(+((j.tune || [])[k])) ? +j.tune[k] : 0, -100, 100));
   S.presets = normPresets(j.presets);
@@ -12381,8 +12442,12 @@ function snap(){
 // settled state is kept, and a change settles 350 ms after the last move, so a slider drag undoes as one step.
 const vUndo = {cur:[], t:[]};
 function kitUndoReset(){
-  try { vUndo.t.forEach(clearTimeout); vUndo.t = []; vUndo.cur = kit.voices.map(v => { try { return vSnap(v); } catch(e){ return null; } });
-    undo.past = undo.past.filter(e => e.k !== 'V'); undo.future = undo.future.filter(e => e.k !== 'V'); } catch(e){}
+  try { kitUndoBase(); undo.past = undo.past.filter(e => e.k !== 'V'); undo.future = undo.future.filter(e => e.k !== 'V'); } catch(e){}
+}
+// The pads' settled states after the whole kit changed. Earlier sound edits stay in the history: a kit step ('K')
+// sits between them and the new kit's edits, so undo reaches them only after putting their kit back.
+function kitUndoBase(){
+  try { vUndo.t.forEach(clearTimeout); vUndo.t = []; vUndo.cur = kit.voices.map(v => { try { return vSnap(v); } catch(e){ return null; } }); } catch(e){}
 }
 // Undo keeps samples by id (the audio itself stays in smpHeld), not as base64: a 30 s sample made every undo step
 // 3.7 MB and ~100 ms of work.
@@ -12401,6 +12466,13 @@ function undoStep(dir){
   const from = dir < 0 ? undo.past : undo.future, to = dir < 0 ? undo.future : undo.past;
   if (!from.length) return toast(dir < 0 ? 'Nothing to undo' : 'Nothing to redo');
   const e = from.pop();
+  if (e.k === 'K'){   // a whole kit replaced (loaded, factory, cleared): put the other kit back, samples from this session
+    to.push({k:'K', j:kitUndoJSON()});
+    undo.busy = true; try { const k = kitFromJSON(JSON.parse(e.j));
+      for (const v of k.voices) for (const L of v.layers) if (L.sample && !L.sample.data){ const h = smpHeld.get(L.sample.id); if (h && h.data) L.sample = h; }
+      setKit(k, true); } catch(err){ toast('Couldn’t put the kit back.'); } finally { undo.busy = false; }
+    draw(); return toast(`${dir < 0 ? 'Undo' : 'Redo'}: kit ${kit.name || ''}`.trim());
+  }
   if (e.k === 'V'){   // a sound edit: put the pad back as it was
     to.push({k:'V', i:e.i, j:vUndo.cur[e.i]}); vUndo.cur[e.i] = e.j;
     undo.busy = true; try { const v = voiceFromJSON(JSON.parse(e.j)); let miss = false;
@@ -12425,11 +12497,16 @@ addEventListener('keydown', e => {
   e.preventDefault(); undoStep(k === 'y' || e.shiftKey ? 1 : -1);
 });
 function flushS(){ clearTimeout(sT); storeWrite(TK, JSON.stringify(S)); }
-addEventListener('pagehide', () => { flushS(); saveCur(); });
+// A kit edit waits 900 ms (a …waves edit longer) before it's saved: closing or hiding the app saves it now.
+function flushKit(){
+  try { const w = WV.frame && WV.frame.contentWindow; if (w && typeof w.__wavesFlush === 'function') w.__wavesFlush(); } catch(e){}   // its edit lands in sTimer
+  try { if (sTimer){ clearTimeout(sTimer); sTimer = 0; save(); } } catch(e){}
+}
+addEventListener('pagehide', () => { flushS(); flushKit(); saveCur(); });
 // Another tab of the app saved the song or kit: say so once (the last tab to save wins).
 let tabWarned = false;
 addEventListener('storage', e => { if (!tabWarned && (e.key === TK || e.key === KEY) && e.newValue !== null){ tabWarned = true; toast('...Thunder Plus is open in another tab too: the last tab to save wins. Best to use one.', 6000); } });
-document.addEventListener('visibilitychange', () => { if (document.hidden){ flushS(); saveCur(); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden){ flushS(); flushKit(); saveCur(); } });
 // A phrase opened from an empty song block is placed in that block once it has a note (see nav()).
 let pendPlace = null;
 function placePending(){
@@ -12458,7 +12535,8 @@ function freePhrase(){
 }
 const audible = t => { const any = S.mix.some(m => m.solo); return !S.mix[t].mute && (!any || S.mix[t].solo); };
 // A muted song block: the sect stays on the song, it just plays silently (a pattern-matrix mute).
-const blockMuted = (Sx, y, t) => !!(Sx.smute && y >= 0 && y < 256 && (Sx.smute[y] >> t) & 1);
+// Track t's mute bit for song row y. The master column (MT) has none: 1 << 32 is 1 in JS, which is track 1's bit.
+const blockMuted = (Sx, y, t) => !!(Sx.smute && y >= 0 && y < 256 && t >= 0 && t < MT && (Sx.smute[y] >> t) & 1);
 // Sects and phrases with the same number, when both are free, so the song's numbers match the phrases they open.
 function freePair(){
   const uc = new Set(), up = new Set();
@@ -13528,6 +13606,11 @@ function audioInterrupted(){
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) audioInterrupted(); });
 function pump(){
+  try { pumpRun(); }
+  catch(e){ console.error(e); try { tStop(); } catch(e2){} toast('Playback stopped: ' + ((e && e.message) || 'something went wrong') + '.', 5000); }
+}
+// One pump tick. An error here used to repeat every 25 ms with the screen showing PLAYING over silence; pump() stops.
+function pumpRun(){
   if (!tp.on) return;
   audioWake = performance.now();
   if (view !== 'tracker' && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open
@@ -13743,7 +13826,7 @@ async function loadProjFile(f){
   try {
     const j = JSON.parse(await f.text());
     if (!j || (!j.song && j.app !== 'thunder-song')) throw new Error('This file isn’t a ...Thunder project.');
-    if (j.kit) setKit(kitFromJSON(j.kit));
+    if (j.kit){ const k = kitFromJSON(j.kit); if (!await kitReplaceOk(k, 'Open this project?')) return false; setKit(k); }
     const ns = normSong(j.app === 'thunder-song' ? j : j.song); if (ns.presets) try { presetsByRef(ns.presets); } catch(e){}
     setSong(ns, 'Loaded ' + (j.song && j.song.name || f.name));
     return true;
@@ -13762,7 +13845,7 @@ async function openProj(){
    Both lived at the same address, so Plus can read what Thunder saved in this browser (thunder-kit-v1,
    thunder-song-v1, samples in IndexedDB thunder-samples). The first time Plus opens where Thunder left work, it
    offers to open it, saving Plus's own song and kit to a project file first. File → Open ...Thunder's saved work
-   does the same any time. Thunder's data is only read, never changed. */
+   does the same any time. Thunder's data is only read, and removed (thunderTidy, below) once Plus holds its own copy. */
 const TIK = 'thunderplus-thunder-import-v1', T_KIT = 'thunder-kit-v1', T_SONG = 'thunder-song-v1';
 const lsGet = k => { try { return localStorage.getItem(k); } catch(e){ return null; } };
 const hasThunderWork = () => !!(lsGet(T_KIT) || lsGet(T_SONG));
@@ -14058,7 +14141,7 @@ function getCell(v, x, y){
   const p = S.phrases[cPhrase]; return p ? p[y][x] : -1;
 }
 function setCell(v, x, y, val){
-  if (v === 'song'){ S.song[y][x] = val; if (val < 0) S.smute[y] &= ~(1 << x); }
+  if (v === 'song'){ S.song[y][x] = val; if (val < 0 && x < MT) S.smute[y] &= ~(1 << x); }
   else if (v === 'sect'){ sectRowEdit(cSect, y)[x] = val; }
   else { if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase(); S.phrases[cPhrase][y][x] = val; }
   saveS();
@@ -14591,12 +14674,14 @@ function rowOp(op){
     else if (op === 'insert'){ col.splice(c.y, 0, -1); col.length = 256; }
     else { col.splice(c.y, 1); col.push(-1); }
     col.forEach((v, y) => S.song[y][c.x] = v);
-    // block mutes move with their blocks
-    const mb = S.smute.map(m => (m >> c.x) & 1);
-    if (op === 'clear') mb[c.y] = 0;
-    else if (op === 'insert'){ mb.splice(c.y, 0, 0); mb.length = 256; }
-    else { mb.splice(c.y, 1); mb.push(0); }
-    mb.forEach((b, y) => S.smute[y] = (S.smute[y] & ~(1 << c.x)) | (b << c.x));
+    // block mutes move with their blocks (the master column has no mute bits)
+    if (c.x < MT){
+      const mb = S.smute.map(m => (m >> c.x) & 1);
+      if (op === 'clear') mb[c.y] = 0;
+      else if (op === 'insert'){ mb.splice(c.y, 0, 0); mb.length = 256; }
+      else { mb.splice(c.y, 1); mb.push(0); }
+      mb.forEach((b, y) => S.smute[y] = (S.smute[y] & ~(1 << c.x)) | (b << c.x));
+    }
   } else if (tv === 'sect' || tv === 'phrase'){
     const A = rowsArr(tv);
     if (op === 'clear') A[c.y] = rowBlank(tv);
@@ -14656,6 +14741,9 @@ function loopFor(view){
   if (selA && selA.v === view && !onPset()){ const r = selRect(); loopArm = {v:view, y0:r.y0, y1:r.y1}; }
   else if (!loopArm || loopArm.v !== view) return null;
   if (loopArm.y1 <= loopArm.y0) return null;
+  // A phrase plays only its ROWS: a loop past them would play row 0 over and over. Keep it inside.
+  if (view === 'phrase'){ const L = clamp((S.plen && S.plen[cPhrase]) || 16, 1, PROWS);
+    if (loopArm.y0 >= L - 1) return null; if (loopArm.y1 > L - 1) return Object.assign({}, loopArm, {y1:L - 1}); }
   return loopArm;
 }
 // Transpose the selected phrase rows by a semitone. Notes only (00–77); OFF and empty cells stay.
@@ -15356,11 +15444,12 @@ function draw(){
     if (tv === 'inst'){ title = 'INST ' + hx(cInst); const I = S.insts[cInst]; sub = (isSyn(I.pad) ? 'SYNTH ' : 'PAD ') + hx(I.pad); }
     if (tv === 'project') sub = S.name;
     if (tv === 'fx'){ title = 'FX ' + fxWho(cFxT); const A = cFxT >= NT ? S.mfx : S.tfx[cFxT]; sub = fxList(A) || 'no effects'; }
-    rowsOf(tv).forEach((r, y) => {
+    const RR = rowsOf(tv), lw = Math.max(12, ...RR.filter(r => !r.act).map(r => r.l.length + 1));   // labels like PLAY NOTE ON ENTRY ran into their values
+    RR.forEach((r, y) => {
       if (r.gap) L.push([]);
       if (r.act){ L.push([{t:r.l, cls:cc(0, y, 'act'), x:0, y}]); return; }
       const val = r.show ? r.show() : r.fmt ? r.fmt(r.get()) : (r.min < 0 ? sgn(r.get()) : hx(r.get()));
-      L.push([{t:r.l.padEnd(12), cls:'lb', x:0, y}, {t:val, cls:cc(0, y, 'v'), x:0, y}]);
+      L.push([{t:r.l.padEnd(lw), cls:'lb', x:0, y}, {t:val, cls:cc(0, y, 'v'), x:0, y}]);
     });
   }
   const spanH = s => typeof s === 'string' ? s : `<span class="${s.cls || ''}"${s.x != null ? ` data-x="${s.x}" data-y="${s.y}"` : ''}${s.r != null ? ` data-r="${s.r}"` : ''}${s.title ? ` title="${esc(s.title)}"` : ''}>${esc(s.t)}</span>`;
@@ -18391,7 +18480,7 @@ const hadSW = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
 // Samples, SoundFonts and the song live in this origin's storage; ask the browser to keep it when the device runs low
 // on space (Chrome grants this silently to an installed app) instead of evicting it like a visited site's cache.
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch(e){}
-function applyUpdate(){ try { flushS(); saveCur(); } catch(e){} location.reload(); }
+function applyUpdate(){ try { flushS(); flushKit(); saveCur(); } catch(e){} location.reload(); }
 function updBanner(){
   if ($('updB')) return;
   const b = el('button', 'updb', 'New version ready · tap to update'); b.id = 'updB'; b.type = 'button';

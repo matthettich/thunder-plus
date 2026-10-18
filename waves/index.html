@@ -2405,6 +2405,10 @@ const pnameEl = document.getElementById('pname');
       restoreBackup(i){ const all = PatchStore.backups(), b = all[all.length - 1 - i]; if (!b) return; store.snapshot(); store._restore(JSON.stringify(normalize(JSON.parse(b.p)))); toast('Restored a backup.'); }
     };
     window.addEventListener('pagehide', () => { if (store.dirty) store.save(); });
+    // The host app saves its kit when it is hidden or closed: it calls this first, so a patch edit of the last 1.2 s
+    // reaches the kit too (swiping the app away on the phone may never fire pagehide).
+    window.__wavesFlush = () => { if (store.dirty) store.save(); };
+    document.addEventListener('visibilitychange', () => { if (document.hidden && store.dirty) store.save(); });
   }
 }
 pnameEl.addEventListener('change', () => { store.snapshot(); doc.meta.name = pnameEl.value.trim() || 'Untitled'; pnameEl.value = doc.meta.name; });
