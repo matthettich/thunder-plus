@@ -24,6 +24,41 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 18 Oct: MIDI control — ports A–D, CC slots, PGM, pitch bend, ARP as notes
+
+Cache `thunderplus-v164`. All in the `/* ---------- MIDI out and MIDI clock ---------- */` block unless named. Phase 1 of
+the owner's MIDI plan (phase 2: an LFO → CC per MIDI instrument, and Song Position Pointer + Continue on clock out).
+
+- **Ports:** `NPORT = 4`, `PORTL = 'ABCD'`. Device settings (`thunderplus-midi-v1`): `midi.outIds[4]` (Web MIDI port
+  ids) and `midi.clk[4]` (clock per port); the old `outId`/`clkOut` load as port A and are still written (= port A) for
+  an older copy of the app. Songs: `I.mpt` (0–3), so a song names a letter and each device maps it to its own cable.
+  `midiOut(p)`, `msend(bytes, t, early, p)`, `msendClk` (each lit port's cable once: two letters can name the same
+  cable). Settings → MIDI: `#midiOutSel0–3` + `#segClkOut` (four toggles).
+- **CC slots:** `CC_CMDS = ['CCA'..'CCD']`, `CC_DEF = [74, 71, 1, 7]`, `NCC`, `ccNum(I, k)`, `CC_NAMES` (labels on
+  INST). Songs: `I.cc` (one CC number per slot; fewer saved slots fill from `CC_DEF`). **To add slots:** append to
+  `CC_CMDS` and `CC_DEF`, and append the same names at the **end** of `FXC` (never in the middle: saved songs store
+  command numbers). INST rows, help strings and `makeSeq` all loop over `CC_CMDS`.
+- **Commands** (end of `FXC`): `CCA`–`CCD` (value > 7F sends 7F; RND step 8), `PGM` (00–7F). `makeSeq` pushes
+  `{type:'mcc', ii, k, v}` / `{type:'mpg', ii, v}` ahead of the row's notes (only when the row plays: CHA/NTH, muted
+  blocks drop them), instrument = INS / the I column / the track's last. `MIDI_ONLY_EV`: `moEv` sends them (`moCmd`,
+  PGM 1 ms before the note) and returns true; the player's `play()` ignores them, so renders never sound them.
+- **Pitch bend:** `I.pbr` (BEND RANGE, ±1–48, default 2). `bendTo` (dedupes against `mx.bend`, the last 14-bit value per
+  port×channel, so gear never sees bends unless a song uses them), `bendRamp` (~10 ms steps, ≤ 48), `bendVib` (PVB at the
+  pad's speed/depth). `moNote`: starts at the note's fraction of a semitone (FIN, microtuned PIT) or, with PSL, at the
+  track's last pitch (clamped to the range), then glides; PBN/PVB after. `moMod` (rows with no note): PIT/FIN retune the
+  held note, PBN bends on from where it is, PVB, ARP. STOP sends bend centre on bent channels.
+- **ARP as notes:** `arpSegs` (a note a step, each to the next). The return to the note's own pitch after the steps sits in
+  `mx.pend[track]` until the sequencer is past it (`pendAt` from `moOff`/`moNote`/`moMod`, flushed on the next step's
+  `beat` event): a note, OFF or command on that row cancels it, so no 1 ms blip at the next note.
+- **Held notes** carry `p`, `base`, `vel`, `rng`, `fine`; `moPlay(t, p, ch, n, vel, rng, fine, segs, end)` sounds and books.
+- **Checked headless** (session scratchpad scripts, not in the repo: a fake Web MIDI with two cables, and screenshots at 707, 373 and
+  1440 wide): old settings → port A with clock; old songs load with port A / ±2 / default CCs; new fields round-trip;
+  PGM then CC then note on A ch 1; CC on a note-less row; CCC FF → 7F; instrument 01 on port B ch 3; PBN ramps to the
+  right value and ends at the step's end; PIT on a held note; PSL starts bent and returns to centre; PVB both ways; FIN
+  50 → C#4 bent down a half; ARP steps a tick apart, no return before a next note, return and hold before empty rows;
+  no note under 2 ms (exact audio-time run feeding `makeSeq` straight into `moEv`); clock to both cables, one Start and
+  one Stop each; All Notes Off and bend centre at STOP; pad instruments send nothing. **Not tried with real gear yet.**
+
 ## 17 Oct (late night): settings sheets — Screen…, Skin…, Song…, Input…
 
 Cache `thunderplus-v163`. Block `SETTINGS SHEETS` (JS, just before `tsetLabel`; CSS after `.pbs .pempty`), hooks marked
@@ -1285,8 +1320,9 @@ recording, resampling, MIDI in/out and clock.
    About half a day.
 2. **MIDI file export and import.** Export a song as `.mid` (to finish in a DAW or load on the MPC/Force);
    import MIDI drum patterns or melodies into phrases. About a day each way.
-3. **The rest of MIDI out:** pitch bend for slides/PSL and PBN, arps sent as notes, CC automation for hardware
-   synth knobs, and Song Position Pointer (so Continue resumes where the MPC is instead of restarting). About a day.
+3. **The rest of MIDI out:** pitch bend, arps as notes, CC commands, program change and ports A–D are in (18 Oct).
+   Left: an LFO → CC per MIDI instrument, and Song Position Pointer (so Continue resumes where the MPC is instead of
+   restarting).
 4. **Humanize.** Small random timing and velocity changes per track (GRV and swing exist; random variation
    doesn't). A few hours.
 5. **Named song markers/sections**, to jump around a long arrangement. A few hours.
