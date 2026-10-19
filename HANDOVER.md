@@ -24,6 +24,22 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (16): presets for …chains modules; Blades/Phaser choice fix — desktop v1.2.6
+
+Cache `thunderplus-v191`. Desktop **v1.2.6** (19 Oct) has everything up to here.
+- **Presets** (chains/index.html, outside the shared block, so …waves has none yet): `PRESETS` (263 factory presets for
+  72 modules, `{type: [[name, params]]}`; choice values are the parameter's own numbers) and a **Preset** row
+  (`presetRow`, first in the body) on every module with factory presets, every effect (`bypOk`), the sound sources and
+  any type with a saved preset. The menu (`preMenu`, `showMenu` with `§` section headings): Default, Factory, Yours,
+  Save as a preset… (`askDialog`; localStorage `chains.presets`, per device, for every patch), Delete one of yours….
+  `applyPreset` snapshots (one undo), sets every param but `PRE_SKIP` (track, chans, _byp, _bn, src, edit): named ones
+  clamped, the rest to defaults. `m.pre` (saved with the patch) names it; `setParam` sets `m.preEd` ("edited").
+  A table test checks every preset's params exist, are in range and are real choices. Help (both) describes it.
+- **Fix**: Blades' Slope and Phaser's Stages lists had values 0–3 for parameters that take 2/4 and 2–8, so the list
+  showed blank and 4-pole never took; the choices now carry the real values (shared block, both editors). A check over
+  every choice list in both editors finds no other mismatch.
+- Sidechain In's Source has no modulation jack (`fixed`).
+
 ## 19 Oct (15): Sidechain In picks its source; its meter; SC lights
 
 Cache `thunderplus-v190`; `chains-worklet.js?v=31`.

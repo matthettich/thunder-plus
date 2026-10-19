@@ -463,14 +463,14 @@ const SHARED_MODULES = {
   blades:{ label:'Blades filter', scope:'mono', inputs:{ in:'audio', inR:'audio', cutoff:'cv', res:'cv' }, outputs:{ out:'audio', outR:'audio' },
     params:{ cutoff:[.5,0,1,.001], res:[.3,0,1,.001], drive:[0,0,1,.01], mode:[0,0,3,1], slope:[2,2,4,2] },
     ui:{ cutoff:{l:'Cutoff', f:pct}, res:{l:'Resonance', f:pct}, drive:{l:'Drive', f:pct},
-      mode:{l:'Mode', c:opts(['Low-pass','Band-pass','High-pass','Notch'])}, slope:{l:'Slope', c:opts(['2-pole','4-pole'])} } },
+      mode:{l:'Mode', c:opts(['Low-pass','Band-pass','High-pass','Notch'])}, slope:{l:'Slope', c:[[2, '2-pole'], [4, '4-pole']]} } },   // the values are the poles (was 0/1: 4-pole never took)
   meta:{ label:'Meta modulator', scope:'mono', inputs:{ in:'audio', inR:'audio', mod:'audio' }, outputs:{ out:'audio', outR:'audio' },
     params:{ mode:[0,0,3,1], amount:[.5,0,1,.01], mix:[1,0,1,.01] },
     ui:{ mode:{l:'Mode', c:opts(['Crossfade','Ring mod','Wave fold','Comparator'])}, amount:{l:'Amount', f:pct}, mix:{l:'Mix', f:wet} } },
   phaser:{ label:'Phaser', scope:'mono', inputs:{ in:'audio', inR:'audio', cv:'cv' }, outputs:{ out:'audio', outR:'audio' },
     params:{ rate:[.3,0,1,.01], depth:[.5,0,1,.01], feedback:[.4,0,1,.01], stages:[4,2,8,2], mix:[.5,0,1,.01], sync:[0,0,1,1] },
     ui:{ rate:{l:'Rate', f:v => hz(.05 * Math.pow(160, v))}, depth:{l:'Depth', f:pct}, feedback:{l:'Feedback', f:pct},
-      stages:{l:'Stages', c:opts(['2','4','6','8'])}, sync:{l:'Sync', c:opts(['Off (use Rate)','To tempo'])}, mix:{l:'Mix', f:wet} } },
+      stages:{l:'Stages', c:[[2, '2'], [4, '4'], [6, '6'], [8, '8']]}, sync:{l:'Sync', c:opts(['Off (use Rate)','To tempo'])}, mix:{l:'Mix', f:wet} } },   // stages: the values are the stages (was 0–3)
   width:{ label:'Width', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
     params:{ width:[1,0,2,.01], bass:[0,0,1,.01], level:[1,0,2,.01] },
     ui:{ width:{l:'Width', f:v => Math.round(v * 100) + '%'}, bass:{l:'Bass mono', f:pct}, level:{l:'Level', f:pct} } },

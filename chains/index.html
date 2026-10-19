@@ -83,7 +83,7 @@ button{cursor:pointer}
 .bklist{display:grid; gap:5px}
 .bkrow{display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; font-size:12.5px}
 .bkrow .btn{padding:3px 9px; font-size:12.5px}
-.ctxmenu{position:fixed; z-index:2000000; min-width:220px; padding:4px; background:var(--panel); border:1px solid #111; display:grid}
+.ctxmenu{position:fixed; z-index:2000000; min-width:220px; padding:4px; background:var(--panel); border:1px solid #111; display:grid; max-height:calc(100vh - 16px); overflow:auto}
 .ctxitem{border:0; background:none; text-align:left; padding:7px 12px; font-size:14px}
 .ctxitem:hover{background:var(--panel-2)}
 .ctxitem:disabled{opacity:.4}
@@ -200,6 +200,10 @@ body.alting svg.cables rect.bend{opacity:1; pointer-events:all}
 .body{display:grid; gap:9px; padding:10px 12px 12px}
 .row{display:grid; grid-template-columns:70px 1fr 64px; align-items:center; gap:8px; font-size:12.5px; letter-spacing:-.01em; min-height:24px; position:relative}
 .row.wide{grid-template-columns:70px 1fr}
+.presel{display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%; padding:4px 6px; background:#fff; border:1px solid #111; font-size:13px; min-width:0; text-align:left; cursor:pointer}
+.presel span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap} .presel i{font-style:normal; font-size:10px; opacity:.7}
+.row.pre{padding-bottom:4px; margin-bottom:2px; border-bottom:1px dashed color-mix(in srgb, var(--edge) 30%, transparent)}
+.ctxhead{padding:8px 12px 3px; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted)}
 .row > span:first-child{color:var(--muted); line-height:1.15; overflow-wrap:anywhere; hyphens:auto}
 .row .val{text-align:right; font-variant-numeric:tabular-nums; cursor:text}
 .rng{position:relative; display:grid; align-items:center}
@@ -465,14 +469,14 @@ const SHARED_MODULES = {
   blades:{ label:'Blades filter', scope:'mono', inputs:{ in:'audio', inR:'audio', cutoff:'cv', res:'cv' }, outputs:{ out:'audio', outR:'audio' },
     params:{ cutoff:[.5,0,1,.001], res:[.3,0,1,.001], drive:[0,0,1,.01], mode:[0,0,3,1], slope:[2,2,4,2] },
     ui:{ cutoff:{l:'Cutoff', f:pct}, res:{l:'Resonance', f:pct}, drive:{l:'Drive', f:pct},
-      mode:{l:'Mode', c:opts(['Low-pass','Band-pass','High-pass','Notch'])}, slope:{l:'Slope', c:opts(['2-pole','4-pole'])} } },
+      mode:{l:'Mode', c:opts(['Low-pass','Band-pass','High-pass','Notch'])}, slope:{l:'Slope', c:[[2, '2-pole'], [4, '4-pole']]} } },   // the values are the poles (was 0/1: 4-pole never took)
   meta:{ label:'Meta modulator', scope:'mono', inputs:{ in:'audio', inR:'audio', mod:'audio' }, outputs:{ out:'audio', outR:'audio' },
     params:{ mode:[0,0,3,1], amount:[.5,0,1,.01], mix:[1,0,1,.01] },
     ui:{ mode:{l:'Mode', c:opts(['Crossfade','Ring mod','Wave fold','Comparator'])}, amount:{l:'Amount', f:pct}, mix:{l:'Mix', f:wet} } },
   phaser:{ label:'Phaser', scope:'mono', inputs:{ in:'audio', inR:'audio', cv:'cv' }, outputs:{ out:'audio', outR:'audio' },
     params:{ rate:[.3,0,1,.01], depth:[.5,0,1,.01], feedback:[.4,0,1,.01], stages:[4,2,8,2], mix:[.5,0,1,.01], sync:[0,0,1,1] },
     ui:{ rate:{l:'Rate', f:v => hz(.05 * Math.pow(160, v))}, depth:{l:'Depth', f:pct}, feedback:{l:'Feedback', f:pct},
-      stages:{l:'Stages', c:opts(['2','4','6','8'])}, sync:{l:'Sync', c:opts(['Off (use Rate)','To tempo'])}, mix:{l:'Mix', f:wet} } },
+      stages:{l:'Stages', c:[[2, '2'], [4, '4'], [6, '6'], [8, '8']]}, sync:{l:'Sync', c:opts(['Off (use Rate)','To tempo'])}, mix:{l:'Mix', f:wet} } },   // stages: the values are the stages (was 0–3)
   width:{ label:'Width', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
     params:{ width:[1,0,2,.01], bass:[0,0,1,.01], level:[1,0,2,.01] },
     ui:{ width:{l:'Width', f:v => Math.round(v * 100) + '%'}, bass:{l:'Bass mono', f:pct}, level:{l:'Level', f:pct} } },
@@ -1194,7 +1198,7 @@ const MODULES = {
       mix:{l:'Mix', f:wet}, level:{l:'Level', f:pct} } },
   // SOURCE (owner, 19 Oct): the bus (the Mixer's SC row) or one track's own sound; a meter shows what it hears.
   scin:{ label:'Sidechain In', scope:'mono', inputs:{}, outputs:{ out:'audio', env:'cv', duck:'cv' }, params:{ src:[0,0,CHAN_COUNT,1], send:[1,0,1,.01], sens:[6,-12,24,.5], release:[150,10,1000,1] },
-    ui:{ src:{l:'Source', c:[[0, 'Sidechain bus (Mixer SC)'], ...Array.from({length:CHAN_COUNT}, (_, i) => [i + 1, 'Track ' + (i + 1)])]},
+    ui:{ src:{l:'Source', fixed:true, c:[[0, 'Sidechain bus (Mixer SC)'], ...Array.from({length:CHAN_COUNT}, (_, i) => [i + 1, 'Track ' + (i + 1)])]},
       send:{l:'Level', f:pct}, sens:{l:'Sensitivity', f:db}, release:{l:'Release', f:v => Math.round(v) + ' ms'} }, display:'scin' },
   sccomp:{ label:'Sidechain Comp', scope:'mono', inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' }, params:{ threshold:[.3,0,1,.001], ratio:[4,1,20,.1], attack:[6,.1,200,.1], release:[140,5,2000,1], makeup:[1,1,4,.01], mix:[1,0,1,.01] },
     ui:{ threshold:{l:'Threshold', f:pct}, ratio:{l:'Ratio', f:v => v.toFixed(1) + ':1'}, attack:{l:'Attack', f:v => Math.round(v) + ' ms'}, release:{l:'Release', f:v => Math.round(v) + ' ms'}, makeup:{l:'Makeup', f:pct}, mix:{l:'Mix', f:wet} } },
@@ -1640,6 +1644,7 @@ function setParam(n, key, v, fromUser){
   n.m.params[key] = v;
   if (bridge) bridge.setParam(n.m.id, key, v);
   else if (EMBED && TW && TW.param) TW.param(n.m.id, key, v);   // live, granular — no full reload
+  if (n.m.pre && !preApplying && !PRE_SKIP.has(key) && !n.m.preEd){ n.m.preEd = 1; paintPre(n); }   // PRESETS: moved since
   if (key === 'chans' && MIXT.has(n.m.type)){ mixResize(n); return; }
   const c = n.ctl[key]; if (c && !fromUser) c.show();
   store.touch();
@@ -1742,6 +1747,143 @@ function paintNote(n){
   n.note.textContent = t || ''; n.note.hidden = !t;
 }
 
+/* ----- PRESETS (owner, 19 Oct) -----
+   A Preset row at the top of every effect and sound module: the factory presets below, the owner's own (saved on this
+   device: localStorage 'chains.presets', {type: [[name, params]]}), Default, and Save / Delete. A preset sets every
+   sound parameter: the ones it names, the rest back to their defaults (routing and structure are left: PRE_SKIP).
+   The module keeps the name (m.pre, saved with the patch) and shows "edited" once a control moves (m.preEd).
+   Choice values are the parameter's own numbers (e.g. sdelay div 6 = 1/8D). */
+const PRESETS = {
+  compressor:[['Gentle glue', {thresh:-20, ratio:2, attack:.03, release:.2, knee:10, makeup:2}], ['Drum punch', {thresh:-24, ratio:4, attack:.02, release:.1, knee:4, makeup:5}],
+    ['Vocal leveller', {thresh:-24, ratio:3, attack:.005, release:.15, knee:8, makeup:5}], ['Parallel smash', {thresh:-36, ratio:10, attack:.001, release:.08, knee:2, makeup:12, mix:.4}],
+    ['Sidechain duck', {source:1, thresh:-30, ratio:8, attack:.002, release:.18, knee:4}]],
+  comp:[['Light touch', {press:.25, speed:.3}], ['Bus glue', {press:.4, speed:.2, mix:.8}], ['Squash', {press:.85, speed:.6, out:.9}], ['Parallel crush', {press:1, speed:.5, mix:.4}]],
+  sccomp:[['Classic pump', {threshold:.2, ratio:8, attack:2, release:180}], ['Subtle duck', {threshold:.35, ratio:3, attack:8, release:120}],
+    ['Bass tuck', {threshold:.25, ratio:4, attack:5, release:80}], ['Hard duck', {threshold:.1, ratio:20, attack:1, release:300}]],
+  limiter:[['Safety', {input:0, ceil:-.3, rel:.15}], ['Transparent', {input:3, ceil:-1, rel:.3}], ['Loud', {input:6, ceil:-.3, rel:.08}], ['Brickwall smash', {input:14, ceil:-1, rel:.05}]],
+  ngate:[['Drum tidy', {thresh:-40, range:30, attack:.0005, hold:.03, release:.1}], ['Tight gate', {thresh:-30, range:90, attack:.0002, hold:.01, release:.04}],
+    ['Hiss remover', {thresh:-55, range:20, attack:.002, hold:.08, release:.25}], ['Sidechain gate', {source:1, thresh:-35, range:90, attack:.0005, hold:.02, release:.08}]],
+  ott:[['Light', {depth:.25}], ['Classic', {depth:.6}], ['Full', {depth:1}], ['Bright crush', {depth:.8, hi:4, lo:-2}], ['Slow and thick', {depth:.7, time:.8, lo:3}]],
+  transient:[['Snappy', {att:.6, sus:-.2}], ['Tighten', {att:.2, sus:-.7}], ['Soften', {att:-.6, sus:.2}], ['More room', {att:0, sus:.7}]],
+  filter:[['Warm low-pass', {mode:0, slope:1, cutoff:1200, res:.2}], ['Thin high-pass', {mode:1, slope:1, cutoff:400, res:.1}],
+    ['Telephone band', {mode:2, slope:1, cutoff:1500, res:.4, drive:.3}], ['Wobble 1/4', {mode:0, slope:1, cutoff:800, res:.6, lfo:.7, rate:2, shape:0}],
+    ['Slow sweep 4 bars', {mode:0, slope:1, cutoff:600, res:.5, lfo:.8, rate:6, shape:1}], ['Random steps', {mode:0, slope:1, cutoff:1000, res:.55, lfo:.6, rate:0, shape:5}]],
+  cut:[['Rumble cut', {low:40, slope:2}], ['Mid focus', {low:250, high:6000, slope:1}], ['Radio', {low:400, high:3500, slope:2}], ['Dark', {high:4000, slope:1}]],
+  eq:[['Bright', {treble:.7, bass:.45}], ['Warm', {treble:.4, bass:.65}], ['Scooped', {mid:.3, treble:.6, bass:.6}], ['Telephone', {lowpass:.35, hipass:.5, mid:.7}]],
+  air:[['Shine', {air:.75}], ['Open', {air:.65, gnd:.55}], ['Dark earth', {air:.3, gnd:.7}]],
+  vcf:[['Muffled', {cutoff:.3, res:.2}], ['Resonant low-pass', {cutoff:.45, res:.75}], ['Band', {cutoff:.5, res:.5, mode:1}], ['Thin high-pass', {cutoff:.4, res:.2, mode:2}]],
+  ladder:[['Fat 24', {cut:900, res:.5, drive:1.5, mode:0}], ['Squelch', {cut:600, res:1.4, drive:2, mode:0}], ['Smooth 12', {cut:2000, res:.3, drive:1, mode:1}],
+    ['Band growl', {cut:1000, res:1, drive:3, mode:2}], ['High-pass sizzle', {cut:1500, res:.8, drive:1, mode:4}]],
+  blades:[['Soft low-pass', {cutoff:.4, res:.2}], ['Screaming 4-pole', {cutoff:.45, res:.85, drive:.4, slope:4}], ['Notch', {mode:3, cutoff:.5, res:.4}],
+    ['Driven band', {mode:1, cutoff:.55, res:.6, drive:.6, slope:4}]],
+  autowah:[['Funky', {wah:.8}], ['Subtle', {wah:.4, mix:.6}], ['Deep', {wah:1, level:.7}]],
+  envfilt:[['Funk quack', {mode:1, freq:.25, depth:.8, range:5, res:.7, attack:.003, release:.12, sens:.6}], ['Bass auto-filter', {mode:0, freq:.2, depth:.7, range:4, res:.5, release:.2}],
+    ['Kick opens it (sidechain)', {mode:0, source:1, freq:.15, depth:.9, range:6, res:.4, release:.25}], ['Down sweep', {mode:0, freq:.7, depth:-.7, range:4, res:.5}]],
+  vowel:[['Talking', {depth:.6, rate:.5}], ['Slow morph', {depth:1, rate:.2}], ['Wah on the playing', {env:.7, res:.6}], ['Robot E', {vowel:1, res:.75, drive:.3}]],
+  saturation:[['Warmth', {drive:.25, out:.85}], ['Crunch', {drive:.65, out:.7}], ['Thick parallel', {drive:.8, out:.7, mix:.5}]],
+  odrive:[['Edge', {drive:.3, tone:.6, out:.3}], ['Crunch', {drive:.6, tone:.55}], ['Fuzzy', {drive:.95, tone:.4, out:.15}]],
+  drive:[['Light', {drive:.25}], ['Medium', {drive:.5}], ['Heavy', {drive:.85}]],
+  tube:[['Glow', {input:.55, tube:.3}], ['Warm', {input:.4, tube:.4}], ['Hot', {input:.7, tube:.7}]],
+  folder:[['Gentle fold', {gain:2, out:.7}], ['Metallic', {gain:8, offset:.2, out:.5}], ['Chaos', {gain:16, offset:.5, out:.45}], ['Parallel grit', {gain:6, mix:.4}]],
+  cab:[['Stack 4×12', {model:0}], ['Vintage combo', {model:1, room:.4}], ['Small box', {model:4, int:.7}], ['Bass cab', {model:5}]],
+  crush:[['Retro 8-bit', {down:.3, bits:8}], ['Old sampler', {down:.45, bits:12, smooth:1}], ['Destroyed', {down:.8, bits:4}], ['Subtle grit', {down:.15, bits:10, mix:.5}]],
+  lofi:[['Sampler', {rate:.6, rez:.6}], ['Cheap toy', {rate:.3, rez:.3, hard:.8}], ['Gentle', {rate:.8, rez:.8, mix:.6}]],
+  degrade:[['Old sampler', {bits:12, rate:.5, noise:.1}], ['Walkie-talkie', {bits:6, rate:.3, noise:.4, color:.6}], ['Clean with hiss', {noise:.3}]],
+  tape:[['Warm tape', {input:.55, flutter:.2}], ['Worn cassette', {input:.6, soften:.75, bump:.4, flutter:.7}], ['Hot master', {input:.75, soften:.3, bump:.6, flutter:.1}]],
+  vinyl:[['Fresh record', {wear:.1}], ['Dusty', {wear:.6, hlim:.5}], ['Old 78', {wear:.9, hlim:.7, mlow:.5}]],
+  dub:[['Light', {amt:.3}], ['Heavy', {amt:.8}]],
+  chorus:[['Subtle', {depth:.3, rate:.3, mix:.3}], ['Lush', {depth:.8, rate:.25, fb:.3, mix:.6}], ['Vibrato', {depth:.6, rate:.5, mix:1}]],
+  ensemble:[['Ensemble', {mode:0}], ['Classic I', {mode:1}], ['Classic II', {mode:2}], ['I + II wide', {mode:3, mix:.6}]],
+  dimension:[['Subtle', {mode:0}], ['Widest', {mode:3, width:.9}]],
+  flanger:[['Jet', {depth:.8, rate:.15, fb:.8}], ['Subtle', {depth:.4, fb:.3, mix:.35}], ['Metallic', {depth:.5, rate:1.5, delay:.2, fb:.9}]],
+  phaser:[['Slow swirl', {rate:.2, depth:.7}], ['Funky 8-stage', {rate:.45, depth:.8, feedback:.6, stages:8}], ['To the tempo', {sync:1, depth:.7, stages:6}], ['Subtle', {depth:.4, stages:2, mix:.4}]],
+  tremolo:[['Vintage amp', {rate:5, depth:.5}], ['Chop', {rate:8, depth:1, shape:4}], ['Slow pulse', {rate:1.5, depth:.6, shape:1}]],
+  autopan:[['Quarter sway', {div:2, depth:.7}], ['Fast 1/16', {div:0, depth:.6, shape:1}], ['Slow bar', {div:4, depth:.9}], ['Hard hop 1/8', {div:1, depth:1, shape:2}]],
+  rotary:[['Slow', {speed:1}], ['Fast', {speed:2}], ['Driven fast', {speed:2, drive:.6}], ['Stopped', {speed:0}]],
+  ringmod:[['Bell', {freq:.55, mix:.5}], ['Robot', {freq:.35}], ['Square grit', {wave:2, freq:.45, mix:.4}]],
+  fshift:[['Subtle detune', {shift:.03, mix:.5}], ['Barber pole', {shift:.12, fb:.6, mix:.6}], ['Down spiral', {shift:-.15, fb:.7, mix:.6}]],
+  sdelay:[['Slapback', {sync:0, time:.09, fb:.1, highcut:6000}], ['Quarter echo', {div:8, fb:.35}], ['Dotted 1/8 ping-pong', {div:6, fb:.45, mode:1}],
+    ['Dub 1/4, dark', {div:8, fb:.65, lowcut:200, highcut:2500, mix:.35}], ['Long wash', {div:10, fb:.7, highcut:4000, mix:.25}]],
+  delay:[['Slapback', {time:.1, regen:.1, mix:.3}], ['Space echo', {time:.35, regen:.55, tone:.4, flutter:.4, mix:.3}], ['Runaway', {time:.45, regen:.9, tone:.45, flutter:.3, mix:.3}]],
+  pingpong:[['1/8 bounce', {div:2}], ['Triplet bounce', {div:3, fb:.45}], ['Quarter, dark', {div:4, fb:.5, tone:.35}]],
+  bbd:[['Analog slap', {time:.1, fb:.2, mix:.3}], ['Warm echo', {sync:1, div:4, fb:.5, tone:.4, wow:.3}], ['Self-oscillating', {time:.3, fb:1.05, age:.5, mix:.4}]],
+  gdelay:[['Octave grains', {pitch:12, size:.15, density:20, spray:.3, fb:.4}], ['Reverse grains', {reverse:1, size:.2}], ['Wide scatter', {jitter:.6, spray:.6, spread:1}]],
+  pdelay:[['Octave climb', {mode:0, pitch:12}], ['Fifth shift', {mode:1, pitch:7}], ['Arp', {mode:2}], ['Tape down', {mode:3, pitch:-12}], ['Reverse', {mode:4}]],
+  reverse:[['Reverse 1/4', {mode:0, sync:1, div:4}], ['Swell', {mode:1, size:.7}]],
+  reverb:[['Small room', {big:.3, mix:.2}], ['Hall', {mix:.3}], ['Dark wash', {bright:.2, mix:.4}], ['Bright and big', {bright:.8, mix:.3}]],
+  room:[['Small', {size:.3, sustain:.3, wet:.25}], ['Studio', {size:.5, sustain:.45, wet:.3}], ['Big room', {size:.8, sustain:.65}]],
+  plate:[['Vocal plate', {pre:.03, mix:.25}], ['Short and bright', {size:.5, decay:.35, damp:.2, mix:.2}], ['Long and dark', {size:.9, decay:.85, damp:.7, pre:.04, mix:.35}]],
+  spring:[['Surf', {decay:.7, chirp:.7, drip:.8, mix:.45}], ['Amp spring', {decay:.5, mix:.3}], ['Dub spring', {decay:.8, tone:.4, mix:.5}]],
+  space:[['Short space', {size:.3, decay:.35, mix:.25}], ['Hall', {size:.6, decay:.6}], ['Cathedral', {size:.9, decay:.85, pre:.2}], ['Ambient pad', {size:1, decay:.95, mod:.7, mix:.5}]],
+  preverb:[['Shimmer octave', {mode:0, pitch:12}], ['Fifths', {mode:1, pitch:7}], ['Octaves up and down', {mode:2, pitch:12, pitch2:-12}]],
+  convolve:[['Room', {type:0, decay:.8, mix:.25}], ['Hall', {type:1, decay:2.2}], ['Chamber', {type:2, decay:1.4}], ['Plate', {type:3, decay:1.8}],
+    ['Cathedral', {type:4, decay:5, pre:.05, mix:.35}], ['Gated (80s)', {type:6, decay:1, mix:.35}], ['Telephone', {type:9, mix:.8}]],
+  comb:[['Metallic', {fb:.9, damp:.1}], ['Flute', {fb:.8, damp:.5}], ['Hollow', {fb:-.85}]],
+  reson:[['Major strings', {chord:3}], ['Minor pad', {chord:4, decay:.7}], ['Fifths drone', {chord:2, decay:.8}], ['Tube chord', {mode:1, chord:6}]],
+  rings:[['Modal', {model:0}], ['Sympathetic', {model:1, mix:.6}], ['String', {model:2}], ['String and reverb', {model:5}]],
+  pshift:[['Octave up', {semis:12}], ['Octave down', {semis:-12}], ['Fifth up, blended', {semis:7, mix:.5}], ['Chipmunk', {semis:12, win:40}]],
+  harm:[['Third above', {v1:9, lv1:.7}], ['Power chord', {v1:11, v2:2, lv1:.6, lv2:.5}], ['Octaves', {v1:13, v2:2, lv1:.5, lv2:.5}], ['Wide double', {v1:7, lv1:.7, detune:12, delay:.02}]],
+  autotune:[['Hard tune', {scale:1, speed:0}], ['Natural', {scale:1, speed:.1, humanize:.3}], ['Minor key', {scale:2, speed:.02}]],
+  vocoder:[['Talkbox', {mode:0}], ['16 bands', {mode:3}], ['Spectral', {mode:6}]],
+  clouds:[['Texture cloud', {density:.7, texture:.6}], ['Stretch', {mode:1}], ['Loop delay', {mode:2}], ['Spectral', {mode:3}], ['Octave shimmer', {pitch:12, verb:.7}]],
+  beads:[['Dirty tape', {media:0}], ['Clean tape', {media:1}], ['Vintage', {media:2}], ['Digital', {media:3}]],
+  spectral:[['Blur', {mode:0}], ['Robot', {mode:3, mix:.8}], ['Whisper', {mode:4, mix:.8}], ['Shift up', {mode:5, shift:.3}]],
+  stretch:[['Grainy', {win:0}], ['Smooth', {win:4, amt:.7}]],
+  pump:[['Quarter pump', {div:1, depth:.8}], ['Eighth pump', {div:0, depth:.6}], ['Half-time', {div:2, depth:.9, release:.8}], ['Subtle', {div:1, depth:.4}]],
+  tgate:[['Trance 1', {pat:4}], ['Trance 2', {pat:5}], ['Offbeats', {pat:2}], ['Stutter', {pat:6, div:0}], ['Clave', {pat:8}], ['Soft gate', {pat:1, smooth:12, depth:.7}]],
+  sgate:[['8ths', {pat:2}], ['Offbeats', {pat:3}], ['Gallop', {pat:5}], ['Tresillo', {pat:15}], ['Syncopated', {pat:10}]],
+  repeat:[['Stutter 1/16', {div:3}], ['Reverse 1/8', {mode:1, div:5}], ['Tape stop', {mode:2, div:6}]],
+  retrig:[['Roll 1/32', {div:3}], ['Triplet roll', {div:6}], ['Falling roll', {div:3, pitch:-12, decay:.3}]],
+  flex:[['Repeat 1/8', {pat:2}], ['Backspin', {pat:9}], ['Trance chop', {pat:12}], ['Random slices', {pat:16}]],
+  width:[['Wide', {width:1.5}], ['Narrow', {width:.5}], ['Mono bass', {bass:.6}]],
+  utility:[['Mono check', {mono:1}], ['Flip polarity', {flip:3}]]
+};
+const PRE_SKIP = new Set(['track', 'chans', '_byp', '_bn', 'src', 'edit']);   // routing and structure: a preset leaves them
+const PRE_KEY = 'chains.presets';
+const preUser = () => { try { const o = JSON.parse(localStorage.getItem(PRE_KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch(e){ return {}; } };
+const preUserOf = t => { const L = preUser()[t]; return Array.isArray(L) ? L.filter(x => Array.isArray(x) && typeof x[0] === 'string' && x[1] && typeof x[1] === 'object') : []; };
+function preUserSet(t, list){ try { const o = preUser(); if (list.length) o[t] = list; else delete o[t]; localStorage.setItem(PRE_KEY, JSON.stringify(o)); } catch(e){ toast('Couldn’t save presets on this device.'); } }
+const PRE_SRC = new Set((PAL_LAYOUT.find(g => g[0] === 'Sound sources') || [0, 0, []])[2]);
+// Which modules get the row: those with factory presets, every effect (an audio In and Out), the sound sources, and
+// any module the owner has saved one for.
+const presetable = t => !!(PRESETS[t] || bypOk(MODULES[t]) || PRE_SRC.has(t) || preUserOf(t).length);
+let preApplying = false;
+function applyPreset(n, name, vals){
+  const def = MODULES[n.m.type]; store.snapshot(); preApplying = true;
+  try { for (const k in def.params){ if (PRE_SKIP.has(k) || !mixShown(n.m, k)) continue; const s = def.params[k];
+    const v = k in vals ? Math.max(s[1], Math.min(s[2], +vals[k])) : s[0]; if (n.m.params[k] !== v) setParam(n, k, v); } }
+  finally { preApplying = false; }
+  n.m.pre = name; delete n.m.preEd; paintPre(n); store.touch();
+}
+function paintPre(n){
+  if (!n.preBtn) return; const nm = n.m.pre;
+  n.preBtn.firstChild.textContent = nm ? nm + (n.m.preEd ? ' (edited)' : '') : '—';
+  n.preBtn.title = nm ? 'Preset: ' + nm + (n.m.preEd ? ', changed since' : '') + '. Click for presets, Default, or to save yours.' : 'Presets: pick one, go back to Default, or save this module’s settings as yours';
+}
+function preMenu(n, btn){
+  const t = n.m.type, def = MODULES[t], r = btn.getBoundingClientRect(), fac = PRESETS[t] || [], mine = preUserOf(t), cur = n.m.pre, mark = s => (s === cur && !n.m.preEd ? '✓ ' : '') + s;
+  const items = [[mark('Default'), () => applyPreset(n, 'Default', {})]];
+  if (fac.length){ items.push(['§Factory']); for (const [nm, v] of fac) items.push([mark(nm), () => applyPreset(n, nm, v)]); }
+  if (mine.length){ items.push(['§Yours']); for (const [nm, v] of mine) items.push([mark(nm), () => applyPreset(n, nm, v)]); }
+  items.push(['Save as a preset…', async () => {
+    const nm0 = await askDialog('Name this ' + (n.m.label || def.label) + ' preset (it’s kept on this device, for every patch):', { input:cur && !PRESETS[t]?.some(p => p[0] === cur) && cur !== 'Default' ? cur : '', ok:'Save' });
+    const nm = nm0 && nm0.trim().slice(0, 40); if (!nm) return;
+    const vals = {}; for (const k in def.params) if (!PRE_SKIP.has(k)) vals[k] = n.m.params[k];
+    const list = preUserOf(t).filter(x => x[0] !== nm); list.push([nm, vals]); list.sort((a, b) => a[0].localeCompare(b[0])); preUserSet(t, list);
+    n.m.pre = nm; delete n.m.preEd; paintPre(n); store.touch(); toast('Saved “' + nm + '”: it’s in every ' + def.label + '’s Preset list.');
+  }]);
+  if (mine.length) items.push(['Delete one of yours…', () => showMenu(r.left, r.bottom + 2, mine.map(([nm]) => ['Delete “' + nm + '”', () => {
+    preUserSet(t, preUserOf(t).filter(x => x[0] !== nm)); for (const x of nodes.values()) if (x.m.type === t && x.m.pre === nm) paintPre(x); toast('Deleted the preset “' + nm + '”.'); }]))]);
+  showMenu(r.left, r.bottom + 2, items);
+}
+function presetRow(n){
+  if (!presetable(n.m.type)) return null;
+  const btn = h('button', {type:'button', class:'presel', 'aria-haspopup':'menu'}, h('span', {text:'—'}), h('i', {text:'▾', 'aria-hidden':'true'}));
+  btn.addEventListener('click', e => { e.stopPropagation(); preMenu(n, btn); });
+  n.preBtn = btn; paintPre(n);
+  return h('div', {class:'row wide pre'}, h('span', {class:'jack small', style:'visibility:hidden', 'aria-hidden':'true'}), h('span', {class:'lbl', text:'Preset'}), btn);
+}
+
 /* ----- modules ----- */
 const FOLD_SVG = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 /* BYPASS (owner, 19 Oct): an effect module (an audio In and an audio Out) has a BYP button on its title bar: it passes
@@ -1792,7 +1934,7 @@ function buildNode(m){
   const ports = (ins.length || outs.length) ? h('div', {class:'ports'},
     h('div', {class:'ins'}, ins.map(p => portEl(n, p, def.inputs[p], 'in'))),
     h('div', {class:'outs'}, outs.map(p => portEl(n, p, def.outputs[p], 'out')))) : null;
-  const kids = [];
+  const kids = [], pre = presetRow(n); if (pre) kids.push(pre);   // PRESETS
   for (const k in def.params){
     if (m.params[k] == null) m.params[k] = def.params[k][0];
     if ((def.ui[k] || {}).hide) continue;   // edited by the module's own display (bars, a grid)
@@ -2386,7 +2528,8 @@ function pasteClip(){
 /* ----- the right-click menu ----- */
 const ctx = document.getElementById('ctxmenu');
 function showMenu(x, y, items){
-  ctx.replaceChildren(...items.map(([label, fn, dis]) => { const b = h('button', {class:'ctxitem', text: label}); if (dis) b.disabled = true; b.addEventListener('click', () => { hideMenu(); fn(); }); return b; }));
+  ctx.replaceChildren(...items.map(([label, fn, dis]) => { if (label[0] === '§') return h('div', {class:'ctxhead', text: label.slice(1)});   // a section heading
+    const b = h('button', {class:'ctxitem', text: label}); if (dis) b.disabled = true; b.addEventListener('click', () => { hideMenu(); fn(); }); return b; }));
   ctx.hidden = false;
   const r = ctx.getBoundingClientRect();
   ctx.style.left = Math.min(x, window.innerWidth - r.width - 8) + 'px'; ctx.style.top = Math.min(y, window.innerHeight - r.height - 8) + 'px';
@@ -2802,6 +2945,8 @@ function helpDoc(){
     ['Moving around', 'Drag the background or scroll with two fingers to pan. Pinch, Ctrl-scroll or a mouse wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
     ['Selecting and the right-click menu', 'Shift-click or Shift-drag to select modules. Hold Option (Alt on Windows) and drag a module’s title bar to copy it (or the selection) and drop the copy where you let go. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
+    ['Presets', 'Effects and sound sources have a Preset row at the top. Pick a factory preset (it sets every control: the ones it names, the rest back to their defaults), Default, or one of yours; Undo takes it back. Save as a preset keeps the module’s settings on this device under a name, for every patch; Delete one of yours removes one. The row keeps the preset’s name and says “edited” once you move a control.'],
+    ['Bypass', 'BYP on an effect’s title bar passes its dry sound (its number, 1–F, is what the tracker’s BYP command switches from a phrase: BYP 31 bypasses module 3 on that track, BYP 20 brings module 2 back).'],
     ['MIDI learn', 'Press MIDI learn, click a slider, then move a knob on your controller. Press Delete to clear the slider’s mapping, and Done when you’re finished.'],
     ['Saving', 'Your patch saves itself as you work. File → Save downloads it as a .chains.json file; Open loads one (…waves patches open too, keeping their effects). Settings → Backups holds earlier versions.']
   ];
