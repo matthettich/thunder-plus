@@ -24,6 +24,21 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (8): LOOP = the pattern, LOOP SEL = the selection
+
+Cache `thunderplus-v179`.
+- **LOOP** (tab bar `#tLoop`, the keypad's LOOP `#kLoop`, Alt+L, plain L off a note cell): `loopPat`. Any song play
+  (`tStart` adds `{v:'pat', y0:row, y1:row}` when no other loop is given) repeats its row, i.e. the pattern (each track
+  goes round its block there). `syncLoop` keeps it on `patLoopRow()`: the row it started on, or the row the song cursor
+  moves to (`patCur` vs `cs.song.y`: the Song cursor, or opening another phrase / pattern), so the tracks move there as
+  their phrases end; turned on mid-play it takes the playing row (`patPlayRow`), off releases it (`loopV` ''). A phrase
+  played alone repeats anyway, so on the Phrase screen LOOP matters for Shift+Space (and PATTERN view's Shift+Space). The
+  button shows ON, or the looped row while it plays.
+- **LOOP SEL** (`#tLoopSel` beside it, Shift+Alt+L, Shift+L off a note cell): the old selection loop (`loopSel`,
+  `loopArm`, drag-to-loop on the Song row numbers); where it applies it wins. Hidden on the phone setup (`body.mob`).
+- Tested headless at 480 BPM: holds row 0, follows the cursor to row 1, releases when off; pattern view Shift+Space
+  loops its row; Space still plays the phrase alone.
+
 ## 19 Oct (7): top bar mock-up D, DANCE · DRUM · KEYS · HIDE on the title line, command bar in columns
 
 Cache `thunderplus-v178`.

@@ -825,6 +825,7 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 /* patFit(): when the strip can't fit its line, it drops what is on screen elsewhere — in PAD mode LOOP and TRANSP (the
    LOOP and SEMI −/+ keys below do the same), in KEYS mode TRANSP (the top bar's TRANSPOSE ▲▼, Alt+, / Alt+.). */
 .tpat.fitsel #tSelBar, .tpat.fitxp #tXposeDn, .tpat.fitxp #tXposeUp{display:none}
+body.mob #tLoopSel{display:none}   /* the phone has LOOP (the pattern) only; LOOP SEL is for the computer */
 .tsong{border:1px solid var(--line); min-height:34px; padding:0 14px; margin:0 4px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; flex:none; white-space:nowrap; background:var(--panel)}
 .tsong:hover{border-color:var(--ink)}
 .tsong.on{background:var(--pl); color:var(--inv); border-color:var(--pl)}
@@ -1924,7 +1925,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <span class="tclk" id="tClk" title="Tempo and lines per beat · double-click a number to type it (TPO changes the tempo as the song plays; ticks are in Settings)"><b id="tClkB" class="tce" data-k="bpm">120</b><small>BPM</small><b id="tClkT" class="tce" data-k="lpb">4</b><small>LPB</small><span class="tdots" id="tDots"></span></span>
       <span class="trows" role="group" aria-label="Rows in this phrase"><button type="button" id="tRowsDn" aria-label="Fewer rows">−</button><button type="button" id="tRowsV" class="rv" aria-label="Rows in this phrase"><small id="tRowsP">ROWS</small><b id="tRowsN">16</b></button><button type="button" id="tRowsUp" aria-label="More rows">+</button></span>
       <span class="trows toct" id="tOct" role="group" aria-label="Octave for note entry" hidden><button type="button" id="tOctDn" aria-label="Octave down">−</button><button type="button" id="tOctV" class="rv" aria-label="Octave, tap to reset to 4" title="Octave for typed and keypad notes (− and = on a keyboard) · tap for 4"><small>OCT</small><b id="tOctN">4</b></button><button type="button" id="tOctUp" aria-label="Octave up">+</button></span>
-      <span class="trows" id="tSelBar" role="group" aria-label="Loop and transpose the selection"><button type="button" id="tLoop" class="rv" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L)"><small>LOOP</small><b id="tLoopN">OFF</b></button><button type="button" id="tXposeDn" class="rv" aria-label="Transpose selection down a semitone" title="Transpose the selection down a semitone (Alt+,)"><small>TRANSP</small><b>−</b></button><button type="button" id="tXposeUp" class="rv" aria-label="Transpose selection up a semitone" title="Transpose the selection up a semitone (Alt+.)"><small>TRANSP</small><b>+</b></button></span>
+      <span class="trows" id="tSelBar" role="group" aria-label="Loop, and transpose the selection"><button type="button" id="tLoop" class="rv" aria-label="Loop the pattern" title="Loop the pattern: the song repeats the row it is on (the pattern you are looking at) until you turn it off or move to another row; a phrase played on its own repeats anyway (Alt+L)"><small>LOOP</small><b id="tLoopN">OFF</b></button><button type="button" id="tLoopSel" class="rv" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Shift+Alt+L)"><small>LOOP SEL</small><b id="tLoopSelN">OFF</b></button><button type="button" id="tXposeDn" class="rv" aria-label="Transpose selection down a semitone" title="Transpose the selection down a semitone (Alt+,)"><small>TRANSP</small><b>−</b></button><button type="button" id="tXposeUp" class="rv" aria-label="Transpose selection up a semitone" title="Transpose the selection up a semitone (Alt+.)"><small>TRANSP</small><b>+</b></button></span>
     </div></div>
   <div class="tbody">
     <div class="tscr" id="tScr">
@@ -2077,7 +2078,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Ctrl/⌘ C X V A</dt><dd>copy, cut, paste over the cursor or selection, select all · Ctrl/⌘+B block select · Ctrl/⌘+D clone a song block (then paste puts a unique copy at the cursor) · Ctrl/⌘+Shift+D clone it to the row below</dd>
         <dt>Esc</dt><dd>drop the selection</dd>
         <dt>Space</dt><dd>play this screen · Shift+Space the song · with Loop on, Space loops the selected rows</dd>
-        <dt>Alt+L</dt><dd>loop the selection on/off (also LOOP in the tab bar)</dd>
+        <dt>Alt+L</dt><dd>loop the pattern on/off: the song repeats the row it is on (LOOP in the tab bar)</dd>
+        <dt>Shift+Alt+L</dt><dd>loop the selection on/off (LOOP SEL beside it, on a computer)</dd>
         <dt>TRANSPOSE ▲▼</dt><dd>top bar: arm it, then ▲/▼ transposes the selection (Esc cancels)</dd>
         <dt>Alt+, Alt+.</dt><dd>transpose the phrase selection down / up a semitone (works on any cell)</dd>
         <dt>◀ ▶ on FX</dt><dd>open the slot's controls · back to the slot list</dd>
@@ -2119,7 +2121,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="tinl tinlp" id="tInlPad" hidden aria-label="Instruments and their pads"></div>
     <div class="keys wide">
       <button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
-      <span></span><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
+      <span></span><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
     </div>
     </div>
   </div>
@@ -13892,6 +13894,7 @@ let fxRestartN = 0;
 // The song row SHIFT+PLAY starts from: the cursor's, when its block is filled (PATTERN view: when any track's is).
 const songRow = () => { const r = S.song[cs.song.y]; return r && (r[cs.song.x] >= 0 || (tv === 'phrase' && pvActive() && r.some(v => v >= 0))) ? cs.song.y : 0; };
 function tStart(mode, o){
+  if (mode === 'song' && loopPat && !(o && o.loop)){ o = Object.assign({}, o, {loop:{v:'pat', y0:o.row, y1:o.row}}); patRow = o.row; patCur = cs.song.y; }   // LOOP: the pattern
   tStop(true);
   const r = rtInit();
   const seq = makeSeq(S, mode, Object.assign({}, o, {live:true}));   // live: chops never render on this thread (ensurePlay)
@@ -14668,7 +14671,7 @@ function projRows(){
     {l:'SECTIONS', ck:'Song: section names beside the rows', get:() => SX.secs ? 1 : 0, set:v => sxSet('secs', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'A lane left of the row numbers names runs of rows (INTRO, DROP…): double-click it (or right-click a block) to name the section from that row, click a name to go there. Needs a wide screen. Off hides the lane; the names stay in the song'},
     {l:'LOOP DRAG', ck:'Song: drag the row numbers to loop', get:() => SX.loop ? 1 : 0, set:v => sxSet('loop', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
-      info:() => 'Drag down the Song screen’s row numbers to loop those rows (PLAY on this screen loops them; LOOP turns it off). A tap still plays from that row'},
+      info:() => 'Drag down the Song screen’s row numbers to loop those rows (PLAY on this screen loops them; LOOP SEL turns it off). A tap still plays from that row'},
     {l:'SONG PEEK', ck:'Song: the phrase under the cursor beside it (not the dogs)', get:() => SX.peek ? 1 : 0, set:v => sxSet('peek', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'Wide screens with STAGE on BY SCREEN: beside the Song screen, the phrase under the cursor instead of the dancing dogs. The DOGS | PEEK switch there does the same'},
     {l:'SIDE PANEL', ck:'Show side panel', get:() => sideOn ? 1 : 0, set:v => setSide(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'SHOWN' : 'HIDDEN',
@@ -15106,6 +15109,19 @@ function toggleSel(){
 // whichever grid is open. The loop is captured at press time, so editing the selection mid-play
 // does not disturb it; changing selection while stopped re-arms from the new selection.
 let loopSel = false, loopArm = null, xposeArm = false;
+// LOOP (owner, 19 Oct: the loop button's default): the song repeats the row it is on, i.e. the pattern; each track goes
+// round its own block on that row. It is put on any song play (tStart), or on the one playing when LOOP turns on, and it
+// moves when you go to another row (the Song cursor, or the phrase / pattern you open): the tracks get there as their
+// phrases end. A phrase played on its own repeats anyway. LOOP SEL (the selection loop below) wins where it applies.
+let loopPat = false, patRow = -1, patCur = -1;
+function patPlayRow(){ const P = tp.pos; if (P){ const q = P[cTrack] && P[cTrack].phrase >= 0 ? P[cTrack] : P.find(x => x && x.phrase >= 0); if (q && q.row >= 0) return q.row; } return cs.song.y; }
+function patLoopRow(){ if (patCur !== cs.song.y){ patCur = cs.song.y; if (patRow >= 0) patRow = cs.song.y; } if (patRow < 0) patRow = patPlayRow(); return patRow; }
+function toggleLoopPat(){
+  loopPat = !loopPat;
+  if (loopPat){ patRow = tp.on && tp.mode === 'song' ? patPlayRow() : -1; patCur = cs.song.y; }
+  draw();
+  toast(loopPat ? (tp.on && tp.mode === 'song' ? `Looping song row ${rS(patRow, 3)}: move to another row to loop that one` : 'Loop on: the song repeats the row (pattern) it is on') : 'Loop off');
+}
 function toggleLoop(){
   loopSel = !loopSel;
   if (!loopSel) loopArm = null;
@@ -15113,14 +15129,18 @@ function toggleLoop(){
     const r = selRect(); loopArm = {v:tv, y0:r.y0, y1:r.y1};
   }
   draw();
-  toast(loopSel ? (loopArm ? `Looping rows ${hx(loopArm.y0)}–${hx(loopArm.y1)} in ${VNAME[loopArm.v]} · PLAY loops them` : 'Loop on: select rows, then PLAY loops them') : 'Loop off');
+  toast(loopSel ? (loopArm ? `Looping rows ${hx(loopArm.y0)}–${hx(loopArm.y1)} in ${VNAME[loopArm.v]} · PLAY loops them` : 'LOOP SEL on: select rows, then PLAY loops them') : 'LOOP SEL off');
 }
 // While a selection loop plays, follow the selection: growing or shortening it (or turning LP. SEL off)
 // changes the running loop at once, no restart. Called from draw(), which runs after every such change.
 function syncLoop(){
-  if (!tp.on || !tp.seq || !tp.seq.setLoop || !tp.loopV) return;
-  // PATTERN VIEW's loop is the song row on screen, not a selection: it follows the pattern to another row (each track
-  // moves there when its phrase ends) and LOOP doesn't touch it.
+  if (!tp.on || !tp.seq || !tp.seq.setLoop) return;
+  // LOOP (the pattern): on a song play without a selection loop, the row it is on (and the row you move to)
+  if (tp.mode === 'song' && (tp.loopV === 'pat' || (!tp.loopV && loopPat))){
+    if (!loopPat){ tp.seq.setLoop(null); tp.loopV = ''; return; }
+    tp.loopV = 'pat'; const y = patLoopRow(); tp.seq.setLoop({v:'pat', y0:y, y1:y}); return;
+  }
+  if (!tp.loopV) return;
   if (!loopSel){ tp.seq.setLoop(null); return; }
   if (tv === tp.loopV && selA && selA.v === tv && !onPset()){ const r = selRect(); loopArm = {v:tv, y0:r.y0, y1:r.y1}; }
   tp.seq.setLoop(loopArm && loopArm.v === tp.loopV ? loopArm : null);
@@ -15476,7 +15496,7 @@ function playCtx(){
     if (tv === 'song') return tStart('song', {row:lp.y0, loop:lp});
     if (tv === 'sect') return tStart('sect', {sect:cSect, track:cTrack, loop:lp});
     if (tv === 'phrase') return tStart('phrase', {phrase:cPhrase, track:cTrack, loop:lp});
-  } else if (loopSel && GRIDV.has(tv)) toast('Loop is on but nothing to loop: select 2 or more rows first.');
+  } else if (loopSel && GRIDV.has(tv)) toast('LOOP SEL is on but nothing to loop: select 2 or more rows first.');
   if (tv === 'sect') return tStart('sect', {sect:cSect, track:cTrack});
   // PATTERN VIEW: like the phrase, PLAY plays the open track's phrase; SHIFT+PLAY (Shift+Space) plays every track from the
   // pattern's song row on (owner, 19 Oct: back to this after trying PLAY = the whole pattern).
@@ -15495,7 +15515,7 @@ function takeLatch(){ const l = {shift:latch.shift, opt:latch.opt}; latch.shift 
 function setLatch(on){ latchOn = on; try { localStorage.setItem(LK, on ? '1' : '0'); } catch(e){} takeLatch(); }
 let rep = 0;
 function keyVis(){ document.querySelectorAll('#trk .k[data-b]').forEach(k => { const b = k.dataset.b; if (b in held){ k.classList.toggle('dn', held[b]); k.classList.toggle('lt', !held[b] && !!latch[b]); } });
-  const lp = $('kLoop'); if (lp) lp.classList.toggle('on', loopSel);
+  const lp = $('kLoop'); if (lp) lp.classList.toggle('on', loopPat);
   const xp = $('tKeyTrans'); if (xp) xp.classList.toggle('on', xposeArm); }
 function dirPress(b, l = {}){
   for (const k in held) if (held[k]) used[k] = true;
@@ -15523,8 +15543,8 @@ function press(b, fromKey){
     keyVis(); return;
   }
   if (b === 'play'){ if (mod('shift')){ used.shift = true; takeLatch(); if (tp.on) tStop(); else tStart('song', {row:songRow()}); } else playCtx(); return; }
-  // LOOP SEL is a sticky toggle, not a held key: a tap flips it. TRANS buttons transpose at once.
-  if (b === 'loop'){ toggleLoop(); clearTimeout(rep); return; }
+  // LOOP is a sticky toggle, not a held key: a tap flips it (the pattern loop; LOOP SEL is in the tab bar on a computer).
+  if (b === 'loop'){ toggleLoopPat(); clearTimeout(rep); return; }
   if (b === 'xposeUp'){ transposeSel(1); clearTimeout(rep); return; }
   if (b === 'xposeDn'){ transposeSel(-1); clearTimeout(rep); return; }
   const l = takeLatch();
@@ -16045,7 +16065,8 @@ function draw(){
   syncLoop();   // before the labels below, so they show the range that is actually looping
   const tLoopTop = $('tLoopTop'); if (tLoopTop) tLoopTop.classList.toggle('on', loopSel);
   topSelVis();
-  const tLoop = $('tLoop'); if (tLoop){ tLoop.classList.toggle('on', loopSel); const n = $('tLoopN'); if (n) n.textContent = loopSel ? (loopArm ? hx(loopArm.y0) + '–' + hx(loopArm.y1) : 'ARM') : 'OFF'; }
+  const tLoop = $('tLoop'); if (tLoop){ tLoop.classList.toggle('on', loopPat); const n = $('tLoopN'); if (n) n.textContent = loopPat ? (tp.on && tp.loopV === 'pat' && patRow >= 0 ? rS(patRow, 3) : 'ON') : 'OFF'; }
+  const tLs = $('tLoopSel'); if (tLs){ tLs.classList.toggle('on', loopSel); const n = $('tLoopSelN'); if (n) n.textContent = loopSel ? (loopArm ? hx(loopArm.y0) + '–' + hx(loopArm.y1) : 'ARM') : 'OFF'; }
   // KEYS mode with the COMMAND BAR on: the thin bar; otherwise the COMMANDS row (both modes) as before.
   { const mini = cmdMini(), show = mini || cmdOn; if ($('tCmd').classList.contains('cmini') !== mini) applyCmdOrder();
     $('tCmd').hidden = !show; document.body.classList.toggle('cmdv', show && !mini); cmdTips(); }
@@ -17999,11 +18020,12 @@ function globalKeys(e){
   const mod = e.ctrlKey || e.metaKey;
   if (e.altKey && !mod && /^Digit[1-7]$/.test(e.code)){ go(VIEWS[+e.code.slice(5) - 1]); return true; }
   if (e.altKey && !mod && e.code === 'Digit0'){ setView('synth'); return true; }
-  // Alt+L loops the selection; Alt+, / Alt+. transpose it down / up a semitone. They work on every
-  // cell (plain L , . are piano keys on a note cell). e.code, since Alt changes e.key on a Mac.
+  // Alt+L loops the pattern, Shift+Alt+L the selection; Alt+, / Alt+. transpose the selection down / up a semitone. They
+  // work on every cell (plain L , . are piano keys on a note cell). e.code, since Alt changes e.key on a Mac.
+  if (e.altKey && !mod && e.shiftKey && e.code === 'KeyL'){ if (!e.repeat) toggleLoop(); return true; }
   if (e.altKey && !mod && !e.shiftKey && (e.code === 'KeyL' || e.code === 'Comma' || e.code === 'Period')){
     if (e.repeat && e.code === 'KeyL') return true;
-    if (e.code === 'KeyL') toggleLoop(); else transposeSel(e.code === 'Period' ? 1 : -1);
+    if (e.code === 'KeyL') toggleLoopPat(); else transposeSel(e.code === 'Period' ? 1 : -1);
     return true;
   }
   if (!e.altKey && !mod && !e.shiftKey && PAGEK[e.key]){ go(PAGEK[e.key]); return true; }
@@ -18072,7 +18094,8 @@ document.addEventListener('keyup', e => {
 });
 window.addEventListener('blur', releaseAll);
 $('tRowsDn').addEventListener('click', () => setRows(plen(rowsId()) - 1));
-$('tLoop').addEventListener('click', () => toggleLoop());
+$('tLoop').addEventListener('click', () => toggleLoopPat());
+$('tLoopSel').addEventListener('click', () => toggleLoop());
 $('tXposeDn').addEventListener('click', () => transposeSel(-1));
 $('tXposeUp').addEventListener('click', () => transposeSel(1));
 // The strip under the tabs is one line. On a screen too narrow for all of it (the Fold's cover screen in PAD mode:
@@ -18207,7 +18230,7 @@ function keysDown(e, pad){
   // L and ,/. double as piano keys, so on a note cell they play notes — use the top-bar
   // Lp. Sel. / − / + buttons there instead.
   if (kind !== 'note'){
-    if (lo === 'l' && !e.repeat){ toggleLoop(); return true; }
+    if (lo === 'l' && !e.repeat){ if (e.shiftKey) toggleLoop(); else toggleLoopPat(); return true; }
     if (k === ',' || k === '<'){ transposeSel(-1); return true; }
     if (k === '.' || k === '>'){ transposeSel(1); return true; }
   }
