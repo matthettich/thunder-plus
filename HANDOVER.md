@@ -26,13 +26,16 @@ Keep this file up to date at the end of a work session.
 
 ## 19 Oct (11): Option moves, Command edits
 
-Cache `thunderplus-v183`.
+Cache `thunderplus-v184`.
 - **KEYS mode modifiers swapped** (owner, the same afternoon as the (4) remap): **⌥/Alt + arrows change screen** (`nav`:
   ◀▶ tab order, ▲ Project / back, ▼ Mixer; from Phrase ◀ gives Arrange the keys), **Ctrl/⌘ + arrows change the value**
   (`bump`: ◀▶ ±1, ▲▼ more), in PAD mode with a keyboard too (Ctrl/⌘ + arrows = EDIT + arrows; Alt + arrows still page
   there, OPTION + arrows). Ctrl/⌘ + Shift + arrows no longer change screen (globalKeys); they fall through to the value.
   Shift + ⌥ + arrows (other phrase / block) and Shift + arrows (select) unchanged. Menu key labels (`cmdItems` val →
   'mod+'), HINTK, Arrange's lines, the Pattern hint, the legend and the KEYS help tables all say so.
+- **A phrase playing on its own lights its block** (owner): `playhead()` now also answers in phrase / sect playback:
+  the playing track's block on the song cursor's row when it holds that phrase (sect), else the first block on that
+  track that does. Arrange (side panel and Song screen), the Song grid and the strip light it as in song playback.
 
 ## 19 Oct (10): the COMMAND BAR is the editor's toolbar
 

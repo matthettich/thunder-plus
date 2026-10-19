@@ -15886,10 +15886,15 @@ let gridLit = [];   // row-number spans lit as the playhead (Sect and Phrase), c
 // lit — the same gate both views used to apply on their own. Returns an NT-length array of song rows
 // (-1 where a track is silent) shared by both, or null when nothing should be lit.
 function playhead(){
-  if (!tp.on || tp.mode !== 'song' || !tp.pos) return null;
+  if (!tp.on || !tp.pos) return null;
   const rows = new Array(NT + 1).fill(-1);
-  for (let t = 0; t <= MT; t++){ const p = tp.pos[t]; if (p && p.row >= 0) rows[t] = p.row; }
-  return rows;
+  if (tp.mode === 'song'){ for (let t = 0; t <= MT; t++){ const p = tp.pos[t]; if (p && p.row >= 0) rows[t] = p.row; } return rows; }
+  // A phrase (or sect) playing on its own (owner, 19 Oct): its block lights up as in song playback: the one on the song
+  // cursor's row when it holds it, else the first block on that track that does.
+  for (let t = 0; t <= MT; t++){ const p = tp.pos[t]; if (!p || p.phrase < 0) continue;
+    const has = y => { const cid = S.song[y] ? S.song[y][t] : -1; return cid >= 0 && (tp.mode === 'sect' ? cid === cSect : !!S.chains[cid] && S.chains[cid].some(q => q[0] === p.phrase)); };
+    if (has(cs.song.y)) rows[t] = cs.song.y; else for (let y = 0; y < 256; y++) if (has(y)){ rows[t] = y; break; } }
+  return rows.some(y => y >= 0) ? rows : null;
 }
 function draw(){
   if (view !== 'tracker') return;
