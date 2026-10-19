@@ -24,9 +24,9 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
-## 19 Oct (5): inverted top bar on light Simple skins, scroll arrows in the bottom panel
+## 19 Oct (5): inverted top bar, bottom panel scroll arrows, pattern view scrolling and play keys
 
-Cache `thunderplus-v173`.
+Cache `thunderplus-v174`. Desktop **v1.2.4** has everything up to here.
 - **Top bar inverted** (owner chose mock-up B): on the light Simple (term) skins `.top` takes `--mx` as its background,
   its own buttons (`.top >`, `.top > .seg >`, `.top > .setwrap >`) go transparent with `--mxon` text and a 40% mix
   border (`--tb-ln`); `.on` is filled `--mxon` with `--mx` text. The menus inside `.top` (#gfile, #gedit, #gset, #phl)
@@ -37,6 +37,17 @@ Cache `thunderplus-v173`.
   its top right when scrolled down; a click scrolls a screenful, a wheel over them scrolls the list. While a list
   overflows it has a 24px right gutter (`.mov`) so the arrows never cover a value, and the cut edge fades (mask).
   Updated on scroll, ResizeObserver, a MutationObserver on the rows, and window resize.
+- **Pattern view SONG ROW ▲ ▼**: the bar's row stepper is "SONG ROW 000 ▲▼" (`.pvud`), not ◀ ▶ around the label
+  (song rows run down the song; the owner found sideways arrows for that awkward).
+- **Pattern view scrolls sideways with the mouse**: `.tgrid.pvon{overflow-x:auto}` with a thin skin-coloured scrollbar
+  (::-webkit-scrollbar; Firefox scrollbar-color), and the screen's wheel handler sends a sideways swipe / tilt wheel /
+  Shift+wheel to `grid.scrollLeft`. draw()'s generic cursor follow is skipped in the pattern view (pvScroll alone, from
+  where the view is), so a click on a track scrolled into view only snaps to a track edge; a plain wheel (which moves
+  the cursor's row) sets `pvHoldX` so the view stays where it was scrolled. Arrow keys still bring the cursor back.
+  Headless Chromium hides scrollbars: launch with `ignore_default_args=['--hide-scrollbars']` to see it.
+- **Pattern view play back to before** (owner): Space plays the open phrase (as in Phrase); Shift+Space plays every
+  track from the song row on. `songRow()` in the pattern view takes the pattern's row when any track on it is filled.
+  The 'pattern' loop kind (`loopV`) is gone.
 
 ## 19 Oct (4): drumming dogs, Arrange on every screen, pattern play, poly OFF per column, clone-then-paste
 
@@ -51,8 +62,7 @@ Cache `thunderplus-v172` (not yet in a desktop build: v1.2.3 is the one before t
 - **FX sideways shift**: draw()'s horizontal follow now sets the least scroll from 0 that shows the cursor, counting
   only the first half-screen of a long value (an FX slot's full effect name), so the labels stay on screen.
 - **PHRASE | PATTERN persists**: `pvNav` is no longer called; Shift+▶ from the pattern goes on to Inst.
-- **Pattern view PLAY** (`playCtx`): plays the song row on screen, looping (`tStart('song', {loop:{v:'pattern'}})`);
-  `syncLoop` keeps that loop on the pattern's row (follows it to another row) and LOOP doesn't touch it.
+- ~~Pattern view PLAY = the whole pattern, looping~~: undone in 19 Oct (5), the owner preferred Space = this phrase.
 - **Arrange beside every screen** (`apArrOk`: any screen but Song; `apHost` remembers it; `apBack` returns to it):
   a click gives Arrange the keys (Shift+◀ and the SONG tab only on Phrase, so screen navigation is unchanged), the
   screen follows the block (`apFollow`: FX → cFxT, Mixer → its track, Inst → the block's instrument), a double click

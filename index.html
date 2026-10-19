@@ -1122,8 +1122,17 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
 .tscr .pvbar :is(.pvtag,.pvwarn)[hidden]{display:none}
 .tscr .pvbar .pvsp{flex:1 1 auto; min-width:0}
 .tscr .pvbar button{flex:none}
+.tscr .pvbar .pvud{display:flex; flex:none; margin-left:-.3em}   /* ▲ ▼ after SONG ROW: song rows run down the song */
+.tscr .pvbar .pvud button{padding:.32em .5em; line-height:1}
+.tscr .pvbar .pvud button + button{border-left:0}
 /* The grid: lines as wide as their text (so the 4/4 shading runs on when it scrolls sideways), every cell a full-height
    block so the bands, the hatching and the column rules join up from line to line. */
+.tgrid.pvon{overflow-x:auto; overflow-y:hidden}   /* the tracks scroll sideways: a scrollbar to drag, a sideways wheel or swipe */
+.tgrid.pvon::-webkit-scrollbar{height:10px; background:transparent}
+.tgrid.pvon::-webkit-scrollbar-track{background:transparent; border-top:1px solid var(--ts-line)}
+.tgrid.pvon::-webkit-scrollbar-thumb{background:var(--ts-dim); border:2px solid var(--ts-bg); border-radius:0}
+.tgrid.pvon::-webkit-scrollbar-thumb:hover{background:var(--ts-ink)}
+@supports not selector(::-webkit-scrollbar){ .tgrid.pvon{scrollbar-width:thin; scrollbar-color:var(--ts-dim) transparent} }
 .tgrid.pvon .ln{width:max-content; min-width:100%; padding-right:35%}   /* room past the last track, so any track can be first after the row numbers */
 .tgrid.pvon .ln>span{display:inline-block; height:1.3em; vertical-align:top; cursor:pointer}
 .tgrid .pvrn{position:sticky; left:0; z-index:1; box-shadow:inset -1px 0 0 var(--ts-line)}
@@ -13796,7 +13805,8 @@ const tp = {on:false, mode:'', seq:null, timer:0, q:[], pos:null, bpm:120, tks:T
 let fxRestartN = 0;
 // Where PLAY starts the song: from the cursor's row when the cell under the cursor holds a block (so it plays
 // from that phrase), otherwise from the top. A tap on a row number, and F7, still start exactly there.
-const songRow = () => { const r = S.song[cs.song.y]; return r && r[cs.song.x] >= 0 ? cs.song.y : 0; };
+// The song row SHIFT+PLAY starts from: the cursor's, when its block is filled (PATTERN view: when any track's is).
+const songRow = () => { const r = S.song[cs.song.y]; return r && (r[cs.song.x] >= 0 || (tv === 'phrase' && pvActive() && r.some(v => v >= 0))) ? cs.song.y : 0; };
 function tStart(mode, o){
   tStop(true);
   const r = rtInit();
@@ -15024,7 +15034,6 @@ function syncLoop(){
   if (!tp.on || !tp.seq || !tp.seq.setLoop || !tp.loopV) return;
   // PATTERN VIEW's loop is the song row on screen, not a selection: it follows the pattern to another row (each track
   // moves there when its phrase ends) and LOOP doesn't touch it.
-  if (tp.loopV === 'pattern'){ if (tv === 'phrase' && pvActive()) tp.seq.setLoop({v:'pattern', y0:cs.song.y, y1:cs.song.y}); return; }
   if (!loopSel){ tp.seq.setLoop(null); return; }
   if (tv === tp.loopV && selA && selA.v === tv && !onPset()){ const r = selRect(); loopArm = {v:tv, y0:r.y0, y1:r.y1}; }
   tp.seq.setLoop(loopArm && loopArm.v === tp.loopV ? loopArm : null);
@@ -15382,8 +15391,8 @@ function playCtx(){
     if (tv === 'phrase') return tStart('phrase', {phrase:cPhrase, track:cTrack, loop:lp});
   } else if (loopSel && GRIDV.has(tv)) toast('Loop is on but nothing to loop: select 2 or more rows first.');
   if (tv === 'sect') return tStart('sect', {sect:cSect, track:cTrack});
-  // PATTERN VIEW (owner, 19 Oct): PLAY plays every phrase shown: the song row from its start, looping, all tracks.
-  if (tv === 'phrase' && pvActive()){ const y = cs.song.y; return tStart('song', {row:y, loop:{v:'pattern', y0:y, y1:y}}); }
+  // PATTERN VIEW: like the phrase, PLAY plays the open track's phrase; SHIFT+PLAY (Shift+Space) plays every track from the
+  // pattern's song row on (owner, 19 Oct: back to this after trying PLAY = the whole pattern).
   if (tv === 'phrase') return tStart('phrase', {phrase:cPhrase, track:cTrack});
   tStart('song', {row:songRow()});
 }
@@ -15876,8 +15885,10 @@ function draw(){
       else if (r.bottom + m > g.bottom) grid.scrollTop += r.bottom - g.bottom + m; } }
   // With big text a line can be wider than the screen: when the cursor moves, scroll sideways to keep it in view.
   const hk = tv + ':' + c.x + ':' + c.y + ':' + tScale;
+  // PATTERN view does its own (pvScroll, from where the view is now), so a click on a track scrolled into view doesn't jump.
   if (hk !== hKey){ hKey = hk; const cu = grid.querySelector('.cur');
-    if (!cu || grid.scrollWidth <= grid.clientWidth + 1) grid.scrollLeft = 0;
+    if (pvActive()){}
+    else if (!cu || grid.scrollWidth <= grid.clientWidth + 1) grid.scrollLeft = 0;
     // The least sideways scroll (from none) that shows the cursor with a little room. A long value (an FX slot's full
     // effect name) counts only its start, so the labels at the left stay on screen (owner, 19 Oct: they slid off).
     else { const g = grid.getBoundingClientRect(), r = cu.getBoundingClientRect(), V = grid.clientWidth;
@@ -17835,9 +17846,16 @@ let wAcc = 0;
 scr.addEventListener('wheel', e => {
   if (fxp.open || (e.ctrlKey && e.target.closest && e.target.closest('#tArr'))) return;   // Ctrl+wheel over Arrange zooms it
   if (tv === 'mixer' || onPset()) return; e.preventDefault();
+  // PATTERN view: a sideways swipe, a tilt wheel or Shift+wheel scrolls across the tracks (the cursor stays put).
+  if (pvActive() && grid.contains(e.target)){
+    const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY || e.deltaX : 0;
+    if (dx){ grid.scrollLeft += e.deltaMode === 1 ? dx * 40 : dx; return; }
+  }
   wAcc += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
   const n = Math.trunc(wAcc / 40); if (!n) return; wAcc -= n * 40;
-  const c = cs[tv]; c.y = clamp(c.y + n, 0, dims(tv).h - 1); draw();
+  const c = cs[tv]; c.y = clamp(c.y + n, 0, dims(tv).h - 1);
+  if (pvActive()) pvHoldX = true;   // the pattern stays where it was scrolled to
+  draw();
 }, {passive:false});
 const KEYB = {ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right', ' ':'play', Shift:'shift', z:'opt', Z:'opt', x:'edit', X:'edit'};
 // Keys that work in both input modes: screens, transport and undo.
@@ -18813,8 +18831,8 @@ const pvSegB = [['ph', 'PHRASE', 'This phrase on its own (stays chosen until you
   .map(([k, t, ti]) => { const b = el('button', null, t); b.type = 'button'; b.dataset.pv = k; b.title = ti; pvSeg.append(b); return b; });
 $('tPset').after(pvSeg);
 const pvBar = el('div', 'pvbar'); pvBar.hidden = true; pvBar.setAttribute('role', 'toolbar'); pvBar.setAttribute('aria-label', 'Pattern');
-pvBar.innerHTML = '<button type="button" data-pv="prev" aria-label="Previous song row" title="Previous song row (Shift+Alt+↑)">◀</button><span class="pvrow"></span>'
-  + '<button type="button" data-pv="next" aria-label="Next song row" title="Next song row (Shift+Alt+↓)">▶</button><span class="pvtag" hidden></span><span class="pvlen"></span>'
+pvBar.innerHTML = '<span class="pvrow"></span><span class="pvud"><button type="button" data-pv="prev" aria-label="Song row above" title="The song row above (Shift+Alt+↑)">▲</button>'
+  + '<button type="button" data-pv="next" aria-label="Song row below" title="The song row below (Shift+Alt+↓)">▼</button></span><span class="pvtag" hidden></span><span class="pvlen"></span>'
   + '<span class="pvwarn" hidden></span><span class="pvsp"></span><button type="button" data-pv="fx"></button><button type="button" data-pv="fold"></button>';
 grid.before(pvBar);
 const pvB = {row:pvBar.querySelector('.pvrow'), tag:pvBar.querySelector('.pvtag'), len:pvBar.querySelector('.pvlen'), warn:pvBar.querySelector('.pvwarn'),
@@ -18840,7 +18858,7 @@ function pvSync(){
 }
 function pvSetMode(on){
   if (on && !(pvOn && pvRoom())) return;
-  pvMode = !!on; pvSave(); selA = null;
+  pvMode = !!on; pvSave(); selA = null; pvSig = '';
   if (pvMode && tv === 'phrase') pvAlign();
   hKey = ''; draw();
 }
@@ -18920,7 +18938,7 @@ function pvGo(t, y, x, prow){
   c.x = x === 'first' ? C[0] : x === 'last' ? C[C.length - 1] : pvNear(C, x == null ? c.x : x);
   hKey = ''; draw(); return true;
 }
-// Ctrl+▲▼ (and [ ], ‹ ›, the bar's ◀ ▶): the song row above or below, same track, same phrase row.
+// Shift+Alt+▲▼ (and [ ], ‹ ›, the bar's ▲ ▼ after SONG ROW): the song row above or below, same track, same phrase row.
 function pvRow(d){
   const y = clamp(cs.song.y + d, 0, 255);
   if (y === cs.song.y) return toast(d > 0 ? 'That’s the last song row.' : 'That’s the first song row.');
@@ -18945,7 +18963,7 @@ grid.addEventListener('pointerdown', e => {
 }, true);
 // The column under character ch of a track group's row (a column's leading space counts as that column).
 function pvColAt(g, ch){ let pos = 0; for (let j = 0; j < g.C.length; j++){ const x = g.C[j], end = pos + (j ? 1 : 0) + pvW(x); if (ch < end) return x; pos = end; } return g.C[g.C.length - 1]; }
-let pvUsesLast = null, pvSig = '';
+let pvUsesLast = null, pvSig = '', pvHoldX = false;   // pvHoldX: this draw keeps the sideways scroll (the wheel moved the row)
 const pvTk = t => t === MT ? ' gx' : isPolyT(t) ? ' gp' : ' gm';
 const pvFitS = (s, w) => s.length > w ? s.slice(0, w) : s.padEnd(w);
 function pvBarDraw(y, rows, lpb, warn, warnT){
@@ -19069,7 +19087,8 @@ function pvLines(c, L, cc, rsel, playRows){
   }
   // Another track, row, layout or cursor place: once the grid is built, scroll sideways so the open track shows whole.
   const sig = cTrack + ':' + Y + ':' + G.map(g => g.fold ? 'f' + g.t1 : g.w).join(',') + ':' + c.x + ':' + c.y + ':' + scr.style.fontSize;
-  if (sig !== pvSig){ pvSig = sig; requestAnimationFrame(pvScroll); }
+  if (sig !== pvSig){ pvSig = sig; if (!pvHoldX) requestAnimationFrame(pvScroll); }
+  pvHoldX = false;
   const lpb = S.plpb[cPhrase] || 0, el2 = lpb || S.lpb;
   return {title:'PATTERN', sub:cTrack === MT ? 'MASTER' : 'TRACK ' + d2(cTrack + 1) + (isPolyT(cTrack) ? ' · POLY' : ' · MONO'), prLit:playRows(q => q.phrase === cPhrase ? q.step : null),
     pset:[{t:'PH ' + hx(cPhrase) + ' ', cls:'lb'}, {t:'LEN ', cls:'lb'}, {t:d2(curLen), cls:cc(0, -2, 'v'), x:0, y:-2}, {t:' LPB ', cls:'lb'}, {t:lpb ? d2(lpb) : '--', cls:cc(1, -2, lpb ? 'v' : 'e'), x:1, y:-2},
@@ -19100,7 +19119,7 @@ function pvInfo(){
     + (pvPend() ? ' · a new phrase: it goes on the song at this row when it has a note' : u > 1 ? ` · this phrase is on the song ${u} times, so edits change every copy` : '');
 }
 const pvHint = () => inMode === 'keys'
-  ? 'Arrows move across tracks · Tab next track · Shift+Alt+↑↓ other song row · type notes as in Phrase · Shift+arrows select · Ctrl+←→ other screens · PHRASE | PATTERN switches · click a track to edit it'
+  ? 'Arrows move across tracks · Tab next track · Shift+Alt+↑↓ other song row · type notes as in Phrase · Shift+arrows select · Ctrl+←→ other screens · Shift+wheel scrolls across · PHRASE | PATTERN switches · click a track to edit it'
   : 'EDIT add note · ◀▶ across tracks · OPT+▲▼ other song row · SHIFT+◀▶ other screens · PHRASE | PATTERN switches · tap a track to edit it';
 /* ===== end PATTERN VIEW ===== */
 applyPlatform();
