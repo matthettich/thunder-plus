@@ -24,6 +24,20 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (5): inverted top bar on light Simple skins, scroll arrows in the bottom panel
+
+Cache `thunderplus-v173`.
+- **Top bar inverted** (owner chose mock-up B): on the light Simple (term) skins `.top` takes `--mx` as its background,
+  its own buttons (`.top >`, `.top > .seg >`, `.top > .setwrap >`) go transparent with `--mxon` text and a 40% mix
+  border (`--tb-ln`); `.on` is filled `--mxon` with `--mx` text. The menus inside `.top` (#gfile, #gedit, #gset, #phl)
+  keep the skin's colours (`.top`'s own colour is untouched). #bUpd stays filled. Dark Simple skins (matrix, bwterm,
+  night, espresso, midnight), Pastel and Minimal are unchanged. Specificity: `:not(#zz)` beats the term `.on` list.
+- **Bottom panel ▼ / ▲** (`DKMORE`, `dkMore`, `dkMoreDue`): INST and FX lists (`#dkInstRows`, `#dkFxRows`; the …chains
+  list wraps into columns and doesn't scroll) show a small ▼ at the list's bottom right when more is below and a ▲ at
+  its top right when scrolled down; a click scrolls a screenful, a wheel over them scrolls the list. While a list
+  overflows it has a 24px right gutter (`.mov`) so the arrows never cover a value, and the cut edge fades (mask).
+  Updated on scroll, ResizeObserver, a MutationObserver on the rows, and window resize.
+
 ## 19 Oct (4): drumming dogs, Arrange on every screen, pattern play, poly OFF per column, clone-then-paste
 
 Cache `thunderplus-v172` (not yet in a desktop build: v1.2.3 is the one before this entry).

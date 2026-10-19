@@ -1220,6 +1220,17 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
 .dkrows .row input[type=range]{height:18px; margin:0}
 .dkrows .row output{overflow:hidden; text-overflow:ellipsis}
 .dkrows .note{font-size:var(--fs-3); color:var(--muted); margin:2px 0}
+/* more controls below / above (dkMore): a small arrow at the right edge of the list, and the cut-off edge fades */
+#dkInst .dkb, #dkFx .dkb{position:relative}
+.dkrows.mov{padding-right:24px}   /* the arrows' own column, so they never cover a value */
+.dkmore{position:absolute; right:12px; top:0; z-index:2; width:20px; height:15px; min-height:0; padding:0; display:grid; place-items:center;
+  border:1px solid var(--line); background:var(--panel); color:var(--ink); line-height:1; cursor:pointer; opacity:.92}
+.dkmore:hover{background:var(--ink); color:var(--inv); opacity:1}
+.dkmore[hidden]{display:none}
+.dkmore .ic{width:10px; height:10px}
+.dkrows.mdn{-webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 14px), rgba(0,0,0,.35)); mask-image:linear-gradient(to bottom, #000 calc(100% - 14px), rgba(0,0,0,.35))}
+.dkrows.mup{-webkit-mask-image:linear-gradient(to top, #000 calc(100% - 14px), rgba(0,0,0,.35)); mask-image:linear-gradient(to top, #000 calc(100% - 14px), rgba(0,0,0,.35))}
+.dkrows.mdn.mup{-webkit-mask-image:linear-gradient(to bottom, rgba(0,0,0,.35), #000 14px calc(100% - 14px), rgba(0,0,0,.35)); mask-image:linear-gradient(to bottom, rgba(0,0,0,.35), #000 14px calc(100% - 14px), rgba(0,0,0,.35))}
 .dkslots{display:flex; gap:4px; margin-bottom:4px; flex-wrap:wrap}
 .dkslots button{min-height:22px; padding:0 7px; font-size:var(--fs-2); border:1px solid var(--line); background:var(--panel)}
 .dkslots button.on{background:var(--ink); color:var(--inv)} .dkslots button.off{opacity:.5}
@@ -1434,6 +1445,23 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
 :root[data-skinbase="term"] .brand .plus{color:var(--mx)} :root[data-skinbase="term"] .brand .plus::before{color:var(--mxdim); -webkit-text-stroke:.05em var(--mxbg)}
 :root[data-skinbase="term"] .setmenu{background:var(--mxbg); border-color:var(--mx); box-shadow:0 0 18px -4px var(--mxglowc)}
 :root[data-skinbase="term"] .gset .gsec + .gsec, :root[data-skinbase="term"] .gset h3{border-color:var(--mxdim)}
+/* Light Simple skins: the top bar is inverted (the skin's ink is the bar, its paper the text), so the app's menus read apart
+   from the SONG / PHRASE… row under it. Only the bar's own buttons change: the menus that open from it keep the skin's
+   colours. The Update button stays filled so it still stands out. Dark Simple skins keep the plain bar. */
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .top{
+  --tb-ln:color-mix(in srgb, var(--mxon) 40%, var(--mx)); background:var(--mx); border-bottom-color:var(--mx)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .top > .brand{color:var(--mxon); text-shadow:none}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .top > .brand .plus{color:var(--mxon)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .top > .brand .plus::before{color:var(--tb-ln); -webkit-text-stroke:.05em var(--mx)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .top > .seg:not(#zz){background:transparent; border-color:var(--tb-ln); box-shadow:none}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd), .kitname):not(#zz){
+  background:transparent!important; color:var(--mxon)!important; border-color:var(--tb-ln)!important; box-shadow:none!important; text-shadow:none}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) :is(.top, .top > .seg, .top > .setwrap) > button:not(#bUpd):hover:not(#zz){
+  background:color-mix(in srgb, var(--mxon) 14%, transparent)!important}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) :is(.top, .top > .seg, .top > .setwrap) > button:not(#bUpd).on:not(#zz){
+  background:var(--mxon)!important; color:var(--mx)!important; border-color:var(--mxon)!important}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) :is(.top, .top > .seg, .top > .setwrap) > button svg:not(#zz){color:inherit}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .top > .tcpu i{background:var(--mxon)}
 /* pads, command row and keypad: plain keys with outlines and an offset block; a hit fills */
 :root[data-skinbase="term"] :is(.tcmd,.dock,.tctl){background:var(--mxbg)}
 :root[data-skinbase="term"] :is(.tcmd button,.tkp .kp,.pads .pad){background:var(--mxbg); color:var(--mx); border-color:var(--mx);
@@ -16715,6 +16743,47 @@ function deckChains(){
   dkChnRows.forEach(r => r.refresh());
 }
 function deckDraw(){ deckLayout(); deckStrip(); if (!deckShown()) return; deckMetersPaint(); deckInst(); deckChains(); deckFx(); }
+// More below / above: when the INST or FX section's controls don't fit, a small ▼ sits at the bottom right of the list and
+// its last line fades out; scrolled down, a ▲ shows at the top right too. Tapping one scrolls a screenful; at either end
+// its arrow goes. While the list overflows it keeps a narrow column on its right for the arrows, so they never cover a value. Watched on scroll, on a resize, and whenever the rows are rebuilt.
+const DKMORE = ['dkInstRows', 'dkFxRows'].map(id => {
+  const sc = $(id), b = sc.parentElement, mk = (dir, lab) => {
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'dkmore ' + dir; x.hidden = true; x.tabIndex = -1;
+    x.setAttribute('aria-label', lab); x.title = lab;
+    x.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#ic-' + (dir === 'dn' ? 'down' : 'up') + '"/></svg>';
+    x.addEventListener('click', () => sc.scrollBy({top:(dir === 'dn' ? 1 : -1) * Math.max(21, sc.clientHeight - 21), behavior:'smooth'}));
+    x.addEventListener('wheel', e => { sc.scrollTop += e.deltaY; e.preventDefault(); }, {passive:false});
+    b.append(x); return x;
+  };
+  return {sc, dn:mk('dn', 'More controls below: scroll down'), up:mk('up', 'Back to the top controls: scroll up')};
+});
+let dkMoreRaf = 0;
+function dkMore(){
+  dkMoreRaf = 0;
+  for (const m of DKMORE){
+    const sc = m.sc, over = sc.clientHeight > 0 && sc.scrollHeight > sc.clientHeight + 2;
+    const dn = over && sc.scrollTop + sc.clientHeight < sc.scrollHeight - 2, up = over && sc.scrollTop > 2;
+    if (m.dn.hidden === dn) m.dn.hidden = !dn;
+    if (m.up.hidden === up){ m.up.hidden = !up; }
+    if (dn || up){   // just inside the list's right edge, clear of its scrollbar
+      const r = Math.max(0, sc.parentElement.clientWidth - sc.offsetLeft - sc.clientWidth) + 2 + 'px';
+      m.dn.style.right = r; m.up.style.right = r;
+      if (up) m.up.style.top = (sc.offsetTop + 1) + 'px';
+      if (dn) m.dn.style.top = (sc.offsetTop + sc.clientHeight - 16) + 'px';
+    }
+    sc.classList.toggle('mdn', dn); sc.classList.toggle('mup', up); sc.classList.toggle('mov', over);
+  }
+}
+function dkMoreDue(){ if (!dkMoreRaf) dkMoreRaf = requestAnimationFrame(dkMore); }
+{
+  const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(dkMoreDue) : null;
+  for (const m of DKMORE){
+    m.sc.addEventListener('scroll', dkMoreDue, {passive:true});
+    if (ro) ro.observe(m.sc);
+    new MutationObserver(dkMoreDue).observe(m.sc, {childList:true});
+  }
+  addEventListener('resize', dkMoreDue);
+}
 /* ---------- ARRANGE: the song overview beside the screen ---------- */
 // Every filled row of the song as blocks, one column per track. A block shows its phrase (or its sect with
 // SECT shown); muted blocks are hatched and keep their number, so the structure stays readable.
