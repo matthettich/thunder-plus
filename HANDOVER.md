@@ -54,6 +54,8 @@ Cache `thunderplus-v172` (not yet in a desktop build: v1.2.3 is the one before t
 - **CLONE = copy a unique clone** (Ctrl/⌘+D, CLN, Edit ▾, right-click): `cloneHere` puts the block (or selection) on
   the clipboard with `uniq`; `paste` → `pasteClone` makes a fresh unique copy (newBlock) at the cursor each time; the
   original stays. EDIT×2 / Enter twice still makes a unique copy in place.
+- **⌥/Alt (or EDIT) + arrows on an EMPTY song block** start a new pattern on the next free number (`bump` → `newBlock(c,
+  -1)`, sects hidden), not the last number used (00 on a fresh song). With Arrange holding the keys it opens in the editor.
 - Checked headless: all of the above, no console errors (FX scroll 0 on a long name, pattern persists Inst↔Phrase,
   pattern play rows 0/0 0/1 0/2, plum poly cell #bbccc0-ish, poly OFF `note@0 note@1 off:0`, clone ids 3 and 4 with
   the original 0 untouched).

@@ -14656,6 +14656,9 @@ function bump(d, big){
   if (onPset()) return psetSet(c.x, psetGet(c.x) + d * (big ? (c.x ? 4 : 8) : 1));
   if (GRIDV.has(tv)){
     const k = kindAt(tv, c.x); let v = getCell(tv, c.x, c.y);
+    // An EMPTY song block (Arrange, the Song screen): changing its value (⌥/Alt + arrows, EDIT + arrows) starts a new
+    // pattern on the next free number, as EDIT×2 does, not the last number used (00 on a fresh song). (owner, 19 Oct)
+    if (k !== 'tsp' && v < 0 && tv === 'song' && !sectsOn) return newBlock(c, -1);
     if (k !== 'tsp' && v < 0) return insertAt(c.x, c.y, k);
     if (k === 'fxv' && getCell(tv, c.x - 1, c.y) < 0) return;
     if (tv === 'song' && !sectsOn){ setSongPhrase(c.x, c.y, clamp(songShown(v) + d * (big ? 16 : 1), 0, 255)); return; }
