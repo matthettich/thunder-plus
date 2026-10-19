@@ -4377,6 +4377,13 @@ class Graph {
 }
 
 /* ── the engine ───────────────────────────────────────────────────────────── */
+/* BYPASS (owner, 19 Oct): an effect module (an audio In and an audio Out) can be bypassed: its input passes straight
+   to Out / Out R, with a one-block crossfade at each switch. While bypassed it keeps running on silence, so a gate or
+   an LFO stays on the beat and a delay or reverb comes back empty, not with old echoes. The patch's own setting is the
+   module's _byp param; each such module also has a number 1–15 (_bn, else the lowest free one in patch order: the
+   editor shows the same) that the tracker's BYP command switches: bsw[n] −1 the patch's own, 0 in, 1 bypassed, 2 the
+   opposite of the patch's own. */
+const bypOk = def => !!(def && def.inputs && def.inputs.in === 'audio' && def.outputs && def.outputs.out === 'audio');
 class ChainsEngine {
   constructor(sampleRate, opts = {}){
     this.sr = sampleRate;
@@ -4395,6 +4402,7 @@ class ChainsEngine {
     /* focus: in Thunder each track's node only runs the modules that lead to a Chain Out for ITS track (and what
        modulates them). It used to run the whole patch, so 4 tracks on …chains did 4× every track's effects. -1 = all. */
     this.focus = opts.focus == null ? -1 : opts.focus; this._act = null; this._actKey = -1;
+    this.bsw = new Float32Array(16).fill(-1); this._bn = null; this._bnKey = -1;   // BYPASS: the tracker's switches, the module numbers
     this._ctx = { sr:sampleRate, block:BLOCK, quality:this.quality, transport:this.transport, engine:this,
       trackInL:k => this.trackInL ? this.trackInL.subarray(k * BLOCK, (k + 1) * BLOCK) : null,
       trackInR:k => this.trackInR ? this.trackInR.subarray(k * BLOCK, (k + 1) * BLOCK) : null,
@@ -4406,13 +4414,35 @@ class ChainsEngine {
     if (this.graph.mods.has(id)) this.removeModule(id);
     const params = {};
     for (const [k, v] of Object.entries(def.params)) params[k] = (o.params && typeof o.params[k] === 'number') ? o.params[k] : v[0];
+    for (const k of ['_byp', '_bn']) if (o.params && typeof o.params[k] === 'number') params[k] = o.params[k];   // BYPASS
     this.graph.add(id, def, { scope:def.scope, pos:o.pos || [0, 0], params });
     this._sync();
   }
   removeModule(id){ this._drop(id); this.graph.remove(id); this._sync(); }
   connect(a, b){ this.graph.connect(a, b); this._sync(); }
   disconnect(a, b){ this.graph.disconnect(a, b); this._sync(); }
-  setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number'){ m.inst.params[name] = v; if (name === 'track') this._actKey = -1; } }
+  setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number'){ m.inst.params[name] = v; if (name === 'track') this._actKey = -1; if (name === '_bn') this._bnKey = -1; } }
+  /* BYPASS: module id → its number (1–15): its own _bn, else the lowest free one, in patch order. */
+  _bnMap(){
+    const g = this.graph, key = g.ver * 4096 + g.mods.size;
+    if (this._bn && this._bnKey === key) return this._bn;
+    const map = new Map(), used = new Set(), rest = [];
+    for (const m of g.mods.values()){ if (!bypOk(m.def)) continue; const n = m.inst.params._bn | 0;
+      if (n >= 1 && n <= 15 && !used.has(n)){ used.add(n); map.set(m.id, n); } else rest.push(m.id); }
+    let k = 1; for (const id of rest){ while (k <= 15 && used.has(k)) k++; if (k > 15) break; used.add(k); map.set(id, k); }
+    this._bn = map; this._bnKey = key; return map;
+  }
+  /* A bypassed module (or one switching): the dry input out, crossfaded over this block when it switches. */
+  _bypRun(m, io, ctx, want){
+    const was = !!io.byp, dL = io.dL || (io.dL = new Float32Array(BLOCK)), dR = io.dR || (io.dR = new Float32Array(BLOCK));
+    dL.set(io.in.in); dR.set(io.linked.has('inR') && io.in.inR ? io.in.inR : io.in.in);
+    if (want && was){ io.in.in.fill(0); if (io.in.inR) io.in.inR.fill(0); }   // settled in bypass: it runs on silence
+    m.def.process(this._state(m), io, ctx);
+    const oL = io.out.out, oR = io.out.outR || null;
+    if (want !== was) for (let i = 0; i < BLOCK; i++){ const g = want ? (i + 1) / BLOCK : 1 - (i + 1) / BLOCK; oL[i] += (dL[i] - oL[i]) * g; if (oR) oR[i] += (dR[i] - oR[i]) * g; }
+    else { oL.set(dL); if (oR) oR.set(dR); }
+    io.byp = want;
+  }
   /* The modules this node has to run (null: all of them). */
   _active(){
     if (this.focus < 0) return null;
@@ -4518,6 +4548,11 @@ class ChainsEngine {
       if (act && !act.has(id)) continue;
       const m = this.graph.mods.get(id);
       const io = this._bufs(m); this._gather(m, io);
+      if (bypOk(m.def)){   // BYPASS: the patch's own setting, or the tracker's switch for this module's number
+        const n = this._bnMap().get(id) || 0, sw = n ? this.bsw[n] : -1, own = (m.inst.params._byp || 0) >= .5;
+        const want = sw < -.5 ? own : sw >= 1.5 ? !own : sw >= .5;
+        if (want || io.byp){ this._bypRun(m, io, ctx, want); if (meter) this._jackPeaks(io, frames); continue; }
+      }
       m.def.process(this._state(m), io, ctx);
       if (meter) this._jackPeaks(io, frames);
     }
@@ -4566,7 +4601,9 @@ class ChainsEngine {
       if (io.pko) for (const k in io.pko){ const v = io.pko[k]; if (v > 1e-4) jacks.push([m.id, 'out', k, Math.round(Math.min(v, 4) * 1000) / 1000]); io.pko[k] = 0; }
       if (io.pki) for (const k in io.pki){ const v = io.pki[k]; if (v > 1e-4) jacks.push([m.id, 'in', k, Math.round(Math.min(v, 4) * 1000) / 1000]); io.pki[k] = 0; }
     }
-    return { load:this.load, quality:this.quality, buses, mods, shows, jacks, wasm:{ tfx:!!WASM.tfxX } };
+    // BYPASS: the modules passing their dry sound now (the editor lights their buttons, the tracker's switches included)
+    const byp = []; for (const [id, io] of this._ios) if (io.byp) byp.push(id);
+    return { load:this.load, quality:this.quality, buses, mods, shows, jacks, byp, wasm:{ tfx:!!WASM.tfxX } };
   }
   handleMessage(m){
     switch (m.op){
@@ -4641,6 +4678,8 @@ registerProcessor('chains', ChainsProcessor);
    Anything after the track in the chain (native track FX, fader, mute/solo,
    pan, master) is untouched Thunder code downstream of this node. */
 class ThunderChains extends AudioWorkletProcessor {
+  // b1–b15: the tracker's BYP switches for the modules numbered 1–15 (−1 the patch's own, 0 in, 1 bypassed, 2 flipped)
+  static get parameterDescriptors(){ return Array.from({length:15}, (_, i) => ({name:'b' + (i + 1), defaultValue:-1, minValue:-1, maxValue:2, automationRate:'k-rate'})); }
   constructor(options){
     super();
     const o = options.processorOptions || {};
@@ -4678,9 +4717,10 @@ class ThunderChains extends AudioWorkletProcessor {
     }
     catch (err){ this.port.postMessage({ target:'chains-host', op:OP.error, value:{ op:m.op, message:String(err?.message || err) } }); }
   }
-  process(ins, outs){
+  process(ins, outs, params){
     if (this._dead) return false;
     const e = this.engine, i = ins[0], o = outs[0], n = o[0].length;
+    if (params) for (let k = 1; k <= 15; k++){ const a = params['b' + k]; e.bsw[k] = a ? a[0] : -1; }   // BYPASS: the tracker's switches
     const L = o[0], R = o[1] || o[0];
     // Feed this track's input into the engine's per-track buffers.
     this._tmpL.fill(0); this._tmpR.fill(0);

@@ -24,6 +24,26 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (12): …chains module bypass, sequenced with BYP
+
+Cache `thunderplus-v186`; `chains-worklet.js?v=29`.
+- **Engine** (chains-worklet.js, `ChainsEngine`, not the shared block): an effect module (`bypOk`: audio `in` and `out`)
+  is bypassed when its `_byp` param is set, or when the tracker says so: `bsw[n]` for its number n (−1 the patch's
+  own, 0 in, 1 bypassed, 2 the opposite of the patch's own). `_bypRun` passes `in`/`inR` to `out`/`outR`, crossfading
+  over the switching block; once settled it runs the module on silence (gates and LFOs stay on the beat, delays and
+  reverbs come back empty). Numbers: `_bn` (1–15), else the lowest free one in patch order (`_bnMap`, cached on the
+  graph version; `setParam('_bn')` clears it). `addModule` keeps `_byp`/`_bn`. Telemetry reports `byp` (ids bypassed
+  now). `ThunderChains` has k-rate AudioParams `b1`–`b15` copied into `bsw` each block. Node test: 0.0 dB through vs
+  −52 dB filtered, every switch value, no step larger than the signal's own slope at a switch.
+- **Editor** (chains/index.html, outside the shared block, so …waves has none): `buildNode` puts a **BYP n** button on
+  the title bar of bypassable modules (`setParam(n, '_byp')`, undoable), `bnMap` mirrors the engine's numbering,
+  `bnFree` gives new and pasted modules a free number, `paintByp` (renderAll, add, remove, paste, telemetry) labels
+  and lights them; `.seq` (dashed outline) when the tracker bypassed it, `.node.bypassed` dims the module.
+  The host forwards `byp` from the track engines in `meters()`.
+- **Tracker: BYP XY** (appended to `FXC`, index 38; FXB/FXI/help): X the module number (0 = all numbered), Y 0 in,
+  1 bypassed, 2–F the other way from the patch for Y rows then back. The sequencer emits `chc` events (`b1`–`b15` on
+  that track's …chains node), the player sets them sample-timed like FXO's `fxc`; `resetSeq` puts them back to −1.
+
 ## 19 Oct (11): Option moves, Command edits
 
 Cache `thunderplus-v185`.

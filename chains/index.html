@@ -161,6 +161,11 @@ body.alting svg.cables rect.bend{opacity:1; pointer-events:all}
 .node > header .t{flex:1; font-weight:600; font-size:17px; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .node > header .x{border:0; background:none; color:var(--muted); font-size:19px; line-height:1; width:26px; height:26px; flex:none}
 .node > header .x:hover{background:var(--panel-2); color:var(--ink)}
+.node > header .byp{flex:none; height:22px; padding:0 7px; border:1px solid var(--muted); border-radius:4px; background:none; color:var(--muted); font-size:11px; font-weight:700; letter-spacing:.06em; line-height:1}
+.node > header .byp:hover{color:var(--ink); border-color:var(--ink)}
+.node > header .byp.on{background:var(--ink); border-color:var(--ink); color:var(--panel)}
+.node > header .byp.seq{outline:2px dashed var(--ink); outline-offset:1px}   /* bypassed by the tracker, not the patch */
+.node.bypassed > :is(.ports, .body){opacity:.42}
 .node > header .fold{border:0; background:none; color:var(--muted); width:20px; height:22px; margin-left:-6px; padding:0; display:grid; place-items:center; flex:none}
 .node > header .fold:hover{background:var(--panel-2); color:var(--ink)}
 .node > header .fold svg{transition:transform .15s}
@@ -1419,7 +1424,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=28';
+    const url = opts.url || './chains-worklet.js?v=29';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -1702,6 +1707,38 @@ function paintNote(n){
 
 /* ----- modules ----- */
 const FOLD_SVG = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+/* BYPASS (owner, 19 Oct): an effect module (an audio In and an audio Out) has a BYP button on its title bar: it passes
+   the module's dry sound (the engine crossfades, and keeps the module running on silence). Its number (1–F) is what the
+   tracker's BYP command switches from a phrase (BYP 31 bypasses module 3 on that track's chain). The number is the
+   module's _bn, else the lowest free one in patch order, the same rule as the engine; a new or pasted module gets a free
+   one of its own. The button also lights while the tracker has a module bypassed (the engines report it). */
+const bypOk = def => !!(def && def.inputs && def.inputs.in === 'audio' && def.outputs && def.outputs.out === 'audio');
+function bnMap(){
+  const map = new Map(), used = new Set(), rest = [];
+  for (const m of doc.modules){ if (!bypOk(MODULES[m.type])) continue; const n = (m.params && m.params._bn) | 0;
+    if (n >= 1 && n <= 15 && !used.has(n)){ used.add(n); map.set(m.id, n); } else rest.push(m.id); }
+  let k = 1; for (const id of rest){ while (k <= 15 && used.has(k)) k++; if (k > 15) break; used.add(k); map.set(id, k); }
+  return map;
+}
+function bnFree(m){   // before m joins doc.modules: keep its number if it is free, else the lowest free one
+  if (!bypOk(MODULES[m.type])) return;
+  const used = new Set(bnMap().values()), own = m.params._bn | 0;
+  if (own >= 1 && own <= 15 && !used.has(own)) return;
+  let k = 1; while (k <= 15 && used.has(k)) k++; if (k <= 15) m.params._bn = k; else delete m.params._bn;
+}
+let liveByp = new Set(), liveBypT = 0;
+function paintByp(){
+  const map = bnMap(), live = performance.now() - liveBypT < 900 ? liveByp : null;
+  for (const n of nodes.values()){ if (!n.byp) continue;
+    const k = map.get(n.m.id), own = ((n.m.params._byp) || 0) >= .5, on = own || !!(live && live.has(n.m.id));
+    const t = 'BYP' + (k ? ' ' + k.toString(16).toUpperCase() : '');
+    if (n.byp.textContent !== t) n.byp.textContent = t;
+    n.byp.classList.toggle('on', on); n.byp.classList.toggle('seq', on && !own); n.el.classList.toggle('bypassed', on);
+    n.byp.setAttribute('aria-pressed', String(own));
+    n.byp.title = (own ? 'Bypassed: its dry sound passes. Click to put it back in.' : 'Bypass: pass the dry sound.') + (k ? ` From a phrase: BYP ${k.toString(16).toUpperCase()}1 bypasses it, BYP ${k.toString(16).toUpperCase()}0 puts it back, BYP ${k.toString(16).toUpperCase()}4 switches it the other way for four rows.` : ' (Only the first fifteen effect modules get a number for the tracker.)');
+  }
+}
+function setLiveByp(list){ liveByp = new Set(Array.isArray(list) ? list : []); liveBypT = performance.now(); paintByp(); }
 function buildNode(m){
   const def = MODULES[m.type]; if (!def) return null;
   const n = { m, jacks:{}, ctl:{} };
@@ -1710,7 +1747,8 @@ function buildNode(m){
   fold.innerHTML = FOLD_SVG;
   fold.addEventListener('click', () => { store.snapshot(); setCollapsed(n, !m.collapsed); });
   n.foldBtn = fold;
-  const head = h('header', {title:'Double-click to collapse or expand'}, fold, h('span', {class:'t', text: title}),
+  if (bypOk(def)) n.byp = h('button', {class:'byp', 'aria-label':'Bypass ' + title, text:'BYP', onclick: () => { store.snapshot(); setParam(n, '_byp', ((m.params._byp) || 0) >= .5 ? 0 : 1); paintByp(); }});
+  const head = h('header', {title:'Double-click to collapse or expand'}, fold, h('span', {class:'t', text: title}), n.byp || null,
     h('button', {class:'x', 'aria-label':'Remove ' + title, title:'Remove', text:'×', onclick: () => { store.snapshot(); removeModule(m.id); }}));
   for (const k in def.params) if (m.params[k] == null) m.params[k] = def.params[k][0];
   const ins = Object.keys(def.inputs).filter(p => mixShown(m, p)), outs = Object.keys(def.outputs);
@@ -1782,7 +1820,7 @@ function renderAll(){
   for (const m of doc.modules) buildNode(m);
   selected = new Set([...selected].filter(id => nodes.has(id)));
   alignChainTracks(true);   // keep each track's input and output in step on load, undo and redo
-  renderGroups(); syncCableEls(); markMapped(); markDeck(); applyPan(); renderCustom();
+  renderGroups(); syncCableEls(); markMapped(); markDeck(); applyPan(); renderCustom(); paintByp();
   document.getElementById('pname').value = doc.meta.name || 'Untitled';
   ws.style.backgroundColor = (doc.view && doc.view.bg) || '';
 }
@@ -1790,6 +1828,7 @@ function addModule(type, x, y, params){
   const def = MODULES[type]; if (!def) return null;
   const p = {}; for (const k in def.params) p[k] = def.params[k][0];
   const m = { id:newId(), type, scope:def.scope, pos:[x, y], collapsed:false, params:Object.assign(p, params || {}) };
+  bnFree(m);   // BYPASS: a tracker number of its own
   // A new Track In / Chain Out takes a free track (or a lone Track In), so two never share a track by accident.
   if (type === 'trackIn' || type === 'chainOut'){
     const same = doc.modules.filter(x => x.type === type), used = new Set(same.map(x => x.params.track | 0));
@@ -1799,7 +1838,7 @@ function addModule(type, x, y, params){
   doc.modules.push(m);
   if (bridge) bridge.addModule(m.id, type, { params:m.params, pos:m.pos });
   else if (EMBED && TW && TW.mod) TW.mod({ op:'add', id:m.id, type, params:m.params, pos:m.pos });
-  buildNode(m); store.touch();
+  buildNode(m); store.touch(); paintByp();
   if (type === 'trackIn' || type === 'chainOut') alignChainTracks(true);
   return m;
 }
@@ -1813,7 +1852,7 @@ function removeModule(id){
   if (bridge) bridge.removeModule(id);
   else if (EMBED && TW && TW.mod) TW.mod({ op:'remove', id });   // the remove op also drops its cables
   if (n) n.el.remove(); nodes.delete(id); selected.delete(id);
-  syncCableEls(); store.touch();
+  syncCableEls(); store.touch(); paintByp();
 }
 function addAtCenter(type){
   const v = view();
@@ -2261,6 +2300,7 @@ function pasteGraph(graph, pos){
     if (!MODULES[cm.type]) continue;
     const m = Object.assign(JSON.parse(JSON.stringify(cm)), { id:newId(), scope:cm.scope || MODULES[cm.type].scope, pos:[pos[0] + cm.pos[0], pos[1] + cm.pos[1]], collapsed:!!cm.collapsed, params:Object.assign({}, cm.params) });
     if (tracks.has(cm.id)) m.params.track = tracks.get(cm.id);
+    bnFree(m);   // BYPASS: a pasted copy doesn't share the original's tracker number
     idmap.set(cm.id, m.id); doc.modules.push(m);
     if (bridge) bridge.addModule(m.id, m.type, { params:m.params, pos:m.pos });
     buildNode(m); ids.push(m.id);
@@ -2271,7 +2311,7 @@ function pasteGraph(graph, pos){
     const c = { from, to, bend:0 }; if (cc.pts) c.pts = cc.pts.map(p => [p[0] + pos[0], p[1] + pos[1]]);
     doc.cables.push(c); if (bridge) bridge.connect(from, to);
   }
-  syncCableEls(); store.touch();
+  syncCableEls(); store.touch(); paintByp();
   return ids;
 }
 // Alt/Option-drag: copy the dragged modules where they stand (with the cables between them, as Duplicate does), select
@@ -2625,6 +2665,7 @@ const pnameEl = document.getElementById('pname');
         if (payload && Array.isArray(payload.mods)){ modSeen = Date.now(); paintMods(payload.mods); }
         if (payload && payload.shows) paintShows(payload.shows);
         if (payload && Array.isArray(payload.jacks)) paintJacks(payload.jacks);
+        if (payload && Array.isArray(payload.byp)) setLiveByp(payload.byp);   // BYPASS: the song's engines (the tracker's BYP included)
       }
     };
     window.wavesEmbed = window.chainsEmbed;   // back-compat alias
@@ -2790,7 +2831,7 @@ function onMeter(m){
     return;   // module meters belong to the host audio (paintHostMeters)
   }
   for (let k = 0; k < CHAN_COUNT; k++){ busPeaks[k] = m.buses[k] || 0; if (meterBars[k]) meterBars[k].style.transform = 'scaleX(' + Math.min(1, busPeaks[k]) + ')'; }
-  paintMods(m.mods || []); paintShows(m.shows); if (m.jacks) paintJacks(m.jacks);
+  paintMods(m.mods || []); paintShows(m.shows); if (m.jacks) paintJacks(m.jacks); if (Array.isArray(m.byp)) setLiveByp(m.byp);
   if (m.wasm && (m.wasm.tfx !== WASM_OK.tfx)){ WASM_OK = m.wasm; for (const n of nodes.values()) paintNote(n); }
   for (const n of nodes.values()) if (n.meter) n.meter.style.transform = 'scaleX(' + Math.min(1, busPeaks[((n.m.params.track | 0) || 1) - 1] || 0) + ')';
 }
