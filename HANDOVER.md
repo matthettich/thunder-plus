@@ -33,7 +33,8 @@ Cache `thunderplus-v192`. Not in a desktop build yet (v1.2.6 still opens the dow
   goes to the page (`state.dl` 0–1) and the Dock / taskbar (`setProgressBar`). Done: the Mac opens the .dmg (its
   drag-to-Applications window), the portable .exe is shown in its folder, and a box offers **Quit …Thunder Plus** (the
   Finder won't replace an open app). Any failure: a box with **Open download page**. Clicking again after it's
-  downloaded opens it again. Files the app writes itself carry no quarantine flag, so Gatekeeper doesn't stop the copy.
+  downloaded opens it again. Files the app writes itself should carry no quarantine flag (it doesn't set
+  LSFileQuarantineEnabled), so Gatekeeper may not stop the new copy: not yet checked on a real Mac.
 - The page (`deskUpdShow`): the Update button reads **Update 42%** while downloading, then **Install**.
 - Tested in node with Electron stubbed and a local server (progress, rename, reopen, and a failed download).
 
