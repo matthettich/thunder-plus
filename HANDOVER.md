@@ -24,6 +24,26 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 18 Oct (late night, 3): fast envelopes on every engine
+
+Cache `thunderplus-v170`. The owner wanted every engine able to move very fast.
+
+- **Note-off release (the main one):** `relOf(V)` (ENGINE block, used by the tracker player's `v.rel` and the synth
+  page's `releaseNote`) was the longest ADSR *layer* release with a 30 ms floor, for every voice: an engine voice
+  faded over its hidden layers' release (often 150 ms) whatever its own Release said. Now: Bass, Voice and every
+  engine with a `rel` param use their own (Piano/EP Dampers; Chip frames × 1000/60), floor 1 ms; Layers use the
+  Voice amp's release when it is on as ADSR, else the longest ADSR layer release, floor 1 ms (30 ms with no ADSR
+  layer). Engines without a release (Tone, Modal, FM Drum, Skin, Blip, SoundFont) keep the old rule exactly.
+- **Floors lowered** (slider `min` and the matching `Math.max` in each core): amp Decay and Release 1 ms on Bass,
+  Voice (release), Acid (Amp decay 20 → 1, release 2 → 1), Machine, Swarm, Drift, Organ (release), Table, Breath,
+  Phase, Vector, Scanned, Resynth, Bytebeat, Strings/Wind/Partials (release); Wind attack 2 → 0.5 ms; Piano/EP
+  Dampers 20 → 2 ms; Tone decays and FM Drum decays 1 ms; Blip decay 1 ms; Modal decay 20 → 5 ms; Skin 20 → 3 ms;
+  Strings/Partials decay 0.05 → 0.01 s; Chip decay and release 0 frames (at once); SoundFont attack/release × 0.01.
+  Attacks were already 0.1–0.5 ms (Acid's is a fixed 2 ms). Saved values are absolute, so songs sound the same;
+  only slider positions shift a little.
+- Checked headless: every engine renders at its minimums with no NaN and the expected short tail; `relOf` returns
+  each engine's own release (`scratchpad/t_env.py`).
+
 ## 18 Oct (late night, 2): voice clarity, lyrics box focus
 
 Cache `thunderplus-v169`.
