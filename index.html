@@ -680,6 +680,13 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .tscr .pl{background:var(--ts-pl-bg); color:var(--ts-pl)}
 .tscr .sel{background:var(--ts-sel)}
 .tscr .cur{background:var(--ts-cur-bg); color:var(--ts-cur)}
+/* The playing line (Phrase, Sect, Pattern view) inverted, as Arrange's playing blocks are: the line takes the text
+   colour and everything on it the screen's colour. The cursor on it flips back so it still shows; a selection keeps its
+   own background with dark text; the row number stays lit. */
+.tscr .tgrid .ln.plr{background:var(--ts-ink)}
+.tscr .tgrid .ln.plr span:not(.pl){color:var(--ts-bg)}
+.tscr .tgrid .ln.plr span.cur{background:var(--ts-bg); color:var(--ts-ink)}
+.tscr .tgrid .ln.plr span.sel{color:var(--ts-ink)}
 .tinfo{flex:none; font-size:.8em; line-height:1.35; color:var(--ts-info); border-top:1px solid var(--ts-line); padding-top:.45em; margin-top:.3em}
 .tinfo>div{overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2}
 #tInfo{height:2.7em}
@@ -15748,8 +15755,10 @@ function draw(){
   const spanH = s => typeof s === 'string' ? s : `<span class="${s.cls || ''}"${s.x != null ? ` data-x="${s.x}" data-y="${s.y}"` : ''}${s.r != null ? ` data-r="${s.r}"` : ''}${s.title ? ` title="${esc(s.title)}"` : ''}>${esc(s.t)}</span>`;
   const gh = L.map(ln => '<div class="ln' + (ln.b4 ? ' b4' : '') + '">' + ln.map(spanH).join('') + '</div>').join('');
   const rebuilt = gh !== gridHTML; if (rebuilt){ gridHTML = gh; grid.innerHTML = gh; gridLit = []; }   // unchanged screens (most redraws while playing) skip the rebuild
-  if (prLit || gridLit.length){ for (const e of gridLit) e.classList.remove('pl'); gridLit = [];
-    if (prLit) for (const y of prLit){ const e = grid.querySelector(`span.rn[data-r="${y}"]`); if (e){ e.classList.add('pl'); gridLit.push(e); } } }
+  // The playing line: its row number lit, and the whole line inverted, like Arrange's playing blocks (owner, 19 Oct).
+  if (prLit || gridLit.length){ for (const e of gridLit) e.classList.remove('pl', 'plr'); gridLit = [];
+    if (prLit) for (const y of prLit){ const e = grid.querySelector(`span.rn[data-r="${y}"]`); if (e){ e.classList.add('pl'); gridLit.push(e);
+      const ln = e.closest('.ln'); if (ln){ ln.classList.add('plr'); gridLit.push(ln); } } } }
   const ph = pset ? pset.map(spanH).join('') : ''; if (ph !== psetHTML){ psetHTML = ph; $('tPset').innerHTML = ph; }
   // Song and Phrase page their own rows; the list screens (Inst, FX, Project) can be taller than the
   // screen, so keep the cursor's line in view.

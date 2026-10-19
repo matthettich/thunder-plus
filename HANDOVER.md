@@ -52,6 +52,9 @@ Same cache (`thunderplus-v172`). Desktop release v1.2.3.
   have x)". Only builds from v1.2.3 on have the button; older ones still get the box ~8 s after opening.
 - **Top bar** under 1440px: gap 6px and 8px button padding so Edit ▾ / Update don't wrap it (checked 1100–1440, KEYS
   and PAD: never taller than before).
+- **Phrase playing line inverted** (owner: match Arrange): draw() marks the playing row's `.ln` with `plr` next to the
+  row number's `pl`; CSS inverts the line (`--ts-ink` background, text `--ts-bg`), the cursor on it flips back, a
+  selection keeps dark text. Phrase, Sect and Pattern view.
 - **Mixer size jump** (owner: Shift into the Mixer, then moving the cursor resized it): draw()'s relayout check
   (`groupBoxes` + `fitCheck`) ran before the title / info / hint lines got the new screen's text, so on entering a
   screen it measured with the old lines; the Mixer's longer hint then overflowed ~6px and the next draw (the first
