@@ -26,7 +26,7 @@ Keep this file up to date at the end of a work session.
 
 ## 19 Oct (12): …chains module bypass, sequenced with BYP
 
-Cache `thunderplus-v186`; `chains-worklet.js?v=29`.
+Cache `thunderplus-v187`; `chains-worklet.js?v=29`.
 - **Engine** (chains-worklet.js, `ChainsEngine`, not the shared block): an effect module (`bypOk`: audio `in` and `out`)
   is bypassed when its `_byp` param is set, or when the tracker says so: `bsw[n]` for its number n (−1 the patch's
   own, 0 in, 1 bypassed, 2 the opposite of the patch's own). `_bypRun` passes `in`/`inR` to `out`/`outR`, crossfading
@@ -43,6 +43,8 @@ Cache `thunderplus-v186`; `chains-worklet.js?v=29`.
 - **Tracker: BYP XY** (appended to `FXC`, index 38; FXB/FXI/help): X the module number (0 = all numbered), Y 0 in,
   1 bypassed, 2–F the other way from the patch for Y rows then back. The sequencer emits `chc` events (`b1`–`b15` on
   that track's …chains node), the player sets them sample-timed like FXO's `fxc`; `resetSeq` puts them back to −1.
+- **Shift+arrows never change screen** (owner: walking the screens with Shift got stuck on Phrase, where Shift selects):
+  on screens with nothing to select (Inst, Mixer, FX, Project, a phrase's settings line) they move like plain arrows.
 
 ## 19 Oct (11): Option moves, Command edits
 
