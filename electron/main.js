@@ -1,5 +1,5 @@
 // ...Thunder Plus as a desktop app: one window running the same index.html as the website.
-const { app, BrowserWindow, session, shell, Menu, protocol, net } = require('electron');
+const { app, BrowserWindow, session, shell, Menu, protocol, net, ipcMain } = require('electron');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { setupUpdates } = require('./updater');
@@ -27,7 +27,8 @@ function createWindow(){
     backgroundColor: '#f0e6f4', title: '...Thunder Plus',
     icon: path.join(ROOT, 'icons', 'plus-icon-512.png'),
     autoHideMenuBar: true,
-    webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false }   // keep playing when the window is in the back
+    // preload.js: the page's only bridge to the shell (the updater: version, check now, get it).
+    webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false, preload: path.join(__dirname, 'preload.js') }   // keep playing when the window is in the back
   });
   win.loadURL('app://thunder/index.html');
   // Links (help, licences) open in the normal browser rather than inside the app.
@@ -51,8 +52,11 @@ app.whenReady().then(() => {
   session.defaultSession.setPermissionCheckHandler((wc, perm) => ALLOW.has(perm));
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null);   // the Mac keeps its menu so ⌘C / ⌘V / ⌘Q work
   createWindow();
-  // New versions come from the GitHub Releases page (see updater.js).
-  setupUpdates({ name: '...Thunder Plus', page: 'https://github.com/matthettich/thunder-plus/releases/latest' });
+  // New versions come from the GitHub Releases page (see updater.js). The page asks through preload.js.
+  const updates = setupUpdates({ name: '...Thunder Plus', page: 'https://github.com/matthettich/thunder-plus/releases/latest', repo: 'matthettich/thunder-plus' });
+  ipcMain.handle('thunder:upd-state', () => updates.state());
+  ipcMain.handle('thunder:upd-check', () => updates.check());
+  ipcMain.handle('thunder:upd-act', () => updates.act());
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

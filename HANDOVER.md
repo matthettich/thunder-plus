@@ -24,6 +24,36 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (3): keys = pad controls, COMMAND BAR, playing piano, Arrange playhead, MST in Arrange, update notice
+
+Same cache (`thunderplus-v172`). Desktop release v1.2.3.
+- **Key audit (KEYS vs PAD):** every PAD control already had a key except two: **Ctrl/⌘+arrows now = OPTION+arrows**
+  (all four, `optDir(dir, true)`: in a phrase the phrase above/below/left/right on the Song grid, on the Song the nearest
+  block; it used to be ⌘▲▼ = previous/next by number, which `[` `]` still do) and **Shift+Enter = EDIT** (stamps over a
+  filled note; Enter picks up). The KEYS help starts with a "From PAD mode" table; the quick help and comments updated.
+- **COMMAND BAR** (View ▾ → "Show the command bar (KEYS mode)", also Screen sheet → Layout & panels; `cmdBar`,
+  `thunderplus-cmdbar-v1`, off by default): in KEYS mode `#tCmd` gets `.cmini`, one 29px line above the bottom panel,
+  ordered like Edit ▾ (`CMD_MINI_ORDER`, words in `CMD_MINI_LAB`), tooltips from `cmdItems()` with their keys
+  (`cmdTips`). PAD mode keeps COMMANDS as before; in KEYS mode COMMANDS still shows the big row when the bar is off.
+- **Phrase piano plays what you hear:** the sequencer step puts `pos[t].sc` (pitches a row starts, by note column, with
+  sect/inst/TSP/PIT/random transposes) and `pos[t].off` (OFF or a muted block); `frame()` keeps them per track
+  (`sndKeep` → `tp.snd`, dropped on start/stop). `stagePiano` lights `tp.snd[cTrack]` while playing, whatever phrase
+  or row is on screen, and widens its key range to fit; stopped, the cursor's row as before.
+- **Arrange playhead:** playing blocks are inverted (`.tagrid b.f.p`): before, an instrument-coloured block
+  (`b.f[style]`) didn't change at all while playing (a stronger rule). Term and rainbow skins have their own rules.
+- **MST in the side Arrange** (`arrSideMst()`, return false to undo): the master column shows beside Phrase / Inst /
+  FX… too, so a master phrase can be tapped open and reached with Arrange's keys; `phraseGrid` (OPTION/⌘+◀▶ in a
+  phrase) and `songGridDir` step onto it; apFocus/apBack no longer push the cursor off it. drawArr/arrSize: `mx`.
+- **Desktop updates:** `electron/preload.js` (new, in build.files) exposes `window.thunderDesktop.updates` (state,
+  check, act, on); main.js answers on `thunder:upd-*`. updater.js tracks `{version, avail, ready, notifyOnly}`, sends it
+  to the page, and if electron-updater errors it reads `api.github.com/repos/<repo>/releases/latest` (net.fetch) so an
+  unsigned Mac build still hears about new versions. The page: `#bUpd` "Update" in the top bar (stays until used;
+  Mac/portable open the download page, Windows/Linux restart into it) + a toast; File ▾ → "Check for updates… (you
+  have x)". Only builds from v1.2.3 on have the button; older ones still get the box ~8 s after opening.
+- **Top bar** under 1440px: gap 6px and 8px button padding so Edit ▾ / Update don't wrap it (checked 1100–1440, KEYS
+  and PAD: never taller than before).
+- Checked headless (Playwright, debug-hook copy, a mocked `thunderDesktop`): all of the above, no console errors.
+
 ## 19 Oct (2): Edit ▾ menu, right-click commands, phrase mouse clicks, Enter picks up
 
 Same cache (`thunderplus-v172`), same session as the entry below.

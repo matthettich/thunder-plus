@@ -66,6 +66,11 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 #bFile:hover, #bEdit:hover, #bView:hover, #bAud:hover, .top #bSet:hover{border-color:var(--ink)}
 /* View and Audio & MIDI split the Settings menu on Desktop; on Mobile everything stays under the one gear. */
 body.mob .deskmenu{display:none}
+/* Desktop app only: a newer build is out (DESKTOP APP UPDATES). It stays until it is used. */
+#bUpd{min-height:34px; padding:0 12px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; white-space:nowrap; background:var(--pl); color:var(--inv); border:1px solid var(--ink)}
+#bUpd[hidden]{display:none}
+/* Desktop widths under 1440px: the top bar's buttons sit a little closer, so Edit ▾ (and Update) keep it on one line. */
+@media (min-width:900px) and (max-width:1440px){ body .top{gap:6px} #bFile, #bEdit, #bView, #bAud, .top #bSet, #bUpd, .top #tKeyTrans{padding:0 8px} }
 #bFile.on, #bEdit.on, #bView.on, #bAud.on, .top #bSet.on{background:var(--ink); color:var(--inv); border-color:var(--ink)}
 .top #bSet .setg{width:18px; height:18px}
 .top #bSet .setx{font-size:var(--fs-3)}
@@ -754,6 +759,17 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .tcmd .ca{font-size:.9em}
 @media (max-width:600px){ .tcmd button{flex-direction:column; gap:1px; line-height:1.1; letter-spacing:.02em} .tcmd button[data-c=next]{flex-direction:column-reverse} .tcmd .ca{font-size:var(--fs-2)} }
 .tcmd button.on{background:var(--pl); color:var(--inv)}
+/* COMMAND BAR (KEYS mode, View ▾): the command row as one thin line, about as tall as the bottom panel's headers. */
+.tcmd.cmini{display:flex; flex-wrap:nowrap; align-items:center; gap:3px; padding:3px 10px; background:var(--side); overflow-x:auto; scrollbar-width:none; border-bottom:1px solid var(--line)}
+.tcmd.cmini::-webkit-scrollbar{display:none}
+.tcmd.cmini::before{content:none; display:none}   /* no COMMANDS caption over the first button */
+.tcmd.cmini button, :root .tcmd.cmini button{flex:none; min-height:0; height:20px; padding:0 8px; font-size:var(--fs-1); font-weight:600; letter-spacing:.06em; line-height:1;
+  background:var(--panel); color:var(--ink); border:1px solid var(--line); box-shadow:none; transform:none; transition:none}
+.tcmd.cmini button:hover{border-color:var(--ink)}
+.tcmd.cmini button.dn, :root .tcmd.cmini button.dn{background:var(--ink)!important; color:var(--inv); transform:none; box-shadow:none}
+.tcmd.cmini button.on{background:var(--pl); color:var(--inv)}
+.tcmd.cmini :is([data-c=cut],[data-c=sel],[data-c=clone],[data-c="b:-16"],[data-c=prev]), .tcmd.cmini.song [data-c="b:-1"]{margin-left:10px}
+.tcmd.cmini [data-c=song]{margin-left:auto}
 .tcmd button[hidden]{display:none} .tcmd button[data-c=song]{font-size:var(--fs-5)} .tcmd.cpad :is([data-c=undo],[data-c=redo]){font-size:20px; font-weight:500; line-height:1} .tcmd :is([data-c=prev],[data-c=next]){font-size:24px; font-weight:500; line-height:1}
 /* One row on wide screens. */
 @media (min-width:700px){
@@ -861,7 +877,7 @@ body.asong .tagrid .ar{scroll-snap-align:start}
 /* A wider row-number column, so the MONO box's edge never sits on the numbers. */
 body.asong :is(.tath, .tagrid .ar, .tagp){grid-template-columns:30px var(--arcols)}
 body.asong .tagrid .rn{text-align:right; padding-right:7px}
-body.asong .tagp b.gx{font-size:8px; letter-spacing:0}
+.tagp b.gx{font-size:8px; letter-spacing:0}   /* also in the side panel (MASTER IN ARRANGE) */
 .agboxes{position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:2}
 .agboxes[hidden]{display:none}
 .agbox{position:absolute; box-sizing:border-box; border:2px solid var(--tk); border-radius:4px}
@@ -962,6 +978,10 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tagrid b.m{background:transparent; box-shadow:inset 0 0 0 1px var(--ar-dim); color:var(--ar-dim); text-decoration:line-through;
   background-image:repeating-linear-gradient(135deg, transparent 0 3px, var(--ar-empty) 3px 5px)}
 .tagrid b.p{background:var(--ar-pl); color:var(--ar-pl-ink); box-shadow:none}
+/* PLAYING blocks are inverted (owner, 19 Oct: the yellow was too subtle, and a block in its instrument colour, b.f[style],
+   didn't change at all): the block's colour becomes its text and outline, on the colour its text had. */
+.tagrid b.f.p, .tagrid b.f.p[style]{background:var(--ar-blk-ink); color:var(--ib, var(--ar-blk)); box-shadow:inset 0 0 0 2px var(--ib, var(--ar-blk))}
+.tagrid b.gx.f.p{background:#1b2130; color:var(--tk-mst); box-shadow:inset 0 0 0 2px var(--tk-mst)}
 .tagrid b.p.m{background:transparent; box-shadow:inset 0 0 0 2px var(--ar-pl); color:var(--ar-dim)}
 .tagrid b.tm{opacity:.35}
 .tagrid b.c{outline:2px solid var(--ar-cur); outline-offset:0; position:relative; z-index:1}
@@ -1468,6 +1488,9 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tscr .tgrid .ln>span:not(.cur):not(.pl){color:oklch(.53 .17 var(--rbh))}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tscr .tgrid .ln>span.e:not(.cur):not(.pl){color:oklch(.82 .08 var(--rbh))}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b.f{--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg + var(--rbo, 0deg)); background:oklch(.62 .16 var(--rbh))!important; color:#fff}
+/* ARRANGE: playing blocks inverted in these skins too (they colour the blocks with stronger rules). */
+:root[data-skinbase="term"] .tagrid b.f.p, :root[data-skinbase="term"] .tagrid b.f.p[style]{background:transparent; color:var(--mx); box-shadow:inset 0 0 0 2px var(--mx)}
+:root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b.f.p{background:#fff!important; color:oklch(.45 .16 var(--rbh)); box-shadow:inset 0 0 0 2px oklch(.62 .16 var(--rbh))}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b:not(.f){--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg + var(--rbo, 0deg)); background:oklch(.94 .03 var(--rbh))}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
@@ -1555,6 +1578,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <div class="seg" id="segView" role="group" aria-label="Screen"></div>
   <input id="kitName" class="kitname" type="text" aria-label="Kit name" spellcheck="false">
   <div class="sp"></div>
+  <button type="button" id="bUpd" hidden title="A newer desktop build is out">Update</button>
   <div class="setwrap">
     <button id="bFile" aria-haspopup="true" aria-expanded="false" title="File: new, open, save, share, render and export (on Waves / Chains: that patch)">File ▾</button>
     <div class="setmenu gfile" id="gfile" hidden role="menu"></div>
@@ -1970,8 +1994,9 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Insert · Ctrl/⌘+Backspace</dt><dd>add a row · remove a row (rows below move up)</dd>
         <dt>Ctrl/⌘ S</dt><dd>save · Shift+Ctrl/⌘+S save as · Ctrl/⌘+O open</dd>
         <dt>Ctrl/⌘ Z Y</dt><dd>undo, redo (Shift+Ctrl/⌘+Z redo too)</dd>
-        <dt>Ctrl/⌘ ▲▼</dt><dd>previous / next sect or phrase</dd>
-        <dt>[ ]</dt><dd>previous / next sect, phrase or instrument</dd>
+        <dt>Ctrl/⌘ arrows</dt><dd>as PAD mode's OPTION+arrows: in a phrase, the phrase above / below / left / right on the Song grid; on the Song, the nearest block that way; elsewhere previous / next</dd>
+        <dt>[ ]</dt><dd>previous / next sect, phrase or instrument, by number</dd>
+        <dt>Shift+Enter</dt><dd>as the pad's EDIT: on a filled phrase note, stamps the current note and instrument over it</dd>
         <dt>Ctrl/⌘ C X V A</dt><dd>copy, cut, paste over the cursor or selection, select all · Ctrl/⌘+B block select · Ctrl/⌘+D clone a song block · Ctrl/⌘+Shift+D clone it to the row below</dd>
         <dt>Esc</dt><dd>drop the selection</dd>
         <dt>Space</dt><dd>play this screen · Shift+Space the song · with Loop on, Space loops the selected rows</dd>
@@ -2090,7 +2115,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p><b>PAD</b> is a d-pad plus SHIFT, PLAY, OPTION and EDIT, good with a thumb. <b>KEYS</b> is direct entry: type notes, hex and effects, with an on-screen keypad on touch screens. The keyboard works in both — in PAD mode Z and X stay OPTION and EDIT and Alt+arrows page; everything else types as in KEYS. Switch with ⚙ Settings → Input (or Project → INPUT).</p>
 </section>
     <section id="hAll"><h2>Keys that work everywhere</h2><table><tr><td><kbd>?</kbd> or <kbd>F1</kbd></td><td>Open or close this help</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>S</kbd></td><td>Save the project (writes back to the same file where the browser allows)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Ctrl/⌘</kbd> <kbd>S</kbd></td><td>Save As: a new file</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>O</kbd></td><td>Open a project file</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Z</kbd> / <kbd>Ctrl/⌘</kbd> <kbd>Y</kbd></td><td>Undo / redo, for tracker edits and for sound edits on the Synth page (also <kbd>Shift</kbd> <kbd>Ctrl/⌘</kbd> <kbd>Z</kbd>, or File ▾ → Undo). A paste or cut undoes in one step</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Song, Sect, Phrase, Inst, Mixer, FX, Project · <kbd>Alt</kbd> <kbd>0</kbd> back to the synth</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>arrows</kbd></td><td>Change screen (▲ Project, ▼ Mixer, ◀▶ along every screen: Song, Sect, Phrase, Inst, Mixer, FX, Project)</td></tr><tr><td><kbd>F2</kbd> <kbd>F3</kbd> <kbd>F4</kbd></td><td>Phrase, Mixer, Inst</td></tr><tr><td><kbd>F5</kbd> <kbd>F6</kbd> <kbd>F7</kbd> <kbd>F8</kbd></td><td>Play song from the top · play this screen · song from the cursor row · stop</td></tr></table></section>
-    <section id="hKeys"><h2>Tracker · KEYS mode</h2><h3>Moving</h3><table><tr><td><kbd>arrows</kbd></td><td>Move the cursor (drops a line selection)</td></tr><tr><td><kbd>Shift</kbd> <kbd>◀</kbd> <kbd>Shift</kbd> <kbd>▶</kbd></td><td>Previous / next screen, in tab order (Song → … → Inst → Mixer → FX → Project)</td></tr><tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd> <kbd>Tab</kbd></td><td>Next / previous column (phrase) or track</td></tr><tr><td><kbd>Home</kbd> <kbd>End</kbd> <kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>Top, bottom, 16 rows up or down</td></tr><tr><td><kbd>Shift</kbd> <kbd>Alt</kbd> <kbd>arrows</kbd></td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in PAD mode</td></tr><tr><td><kbd>[</kbd> <kbd>]</kbd> or <kbd>Ctrl/⌘</kbd> <kbd>▲▼</kbd></td><td>Previous / next sect, phrase, instrument or FX track</td></tr><tr><td><kbd>◀</kbd> <kbd>▶</kbd> on the FX screen</td><td>Open the slot's controls · back to the slot list</td></tr><tr><td>Mouse wheel</td><td>Scroll the screen a row at a time</td></tr></table><h3>Typing</h3><table><tr><td><kbd>Z</kbd> <kbd>S</kbd> <kbd>X</kbd> … <kbd>/</kbd></td><td>Notes, lower octave (S D G H J are the sharps); on tracks 9–16, Tab to N2–N4 to add chord notes</td></tr><tr><td><kbd>Q</kbd> <kbd>2</kbd> <kbd>W</kbd> … <kbd>P</kbd></td><td>Notes, upper octave</td></tr><tr><td><kbd>1</kbd> or <kbd>Caps Lock</kbd></td><td>Note off</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd> or numpad <kbd>/</kbd> <kbd>*</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>0</kbd>–<kbd>9</kbd> <kbd>A</kbd>–<kbd>F</kbd></td><td>Hex values: two digits, or one for an instrument</td></tr><tr><td>Letters</td><td>Commands in FX columns (press again to cycle: R gives RET, REP, RND, RNL)</td></tr><tr><td><kbd>{</kbd> <kbd>}</kbd></td><td>Edit step down / up: how far the cursor moves after you type</td></tr><tr><td><kbd>Alt</kbd> <kbd>arrows</kbd></td><td>Change the value (◀▶ by 1, ▲▼ by more); on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀), up to four</td></tr><tr><td><kbd>Enter</kbd></td><td>Add, open, or run a › row · twice for a new sect or phrase · in a phrase, on a filled note, picks up that note and its instrument as the current ones, so Enter on an empty note adds them (until you've chosen an instrument, new notes take the highest instrument number already in the phrase); on an instrument, volume or effect, picks it up as the current value (shown after NOW on the hint line)</td></tr></table><h3>Rows</h3><table><tr><td><kbd>Delete</kbd> <kbd>Backspace</kbd></td><td>Clear the cell under the cursor, or the whole highlighted selection</td></tr><tr><td><kbd>Shift</kbd> <kbd>Delete</kbd> <kbd>Shift</kbd> <kbd>Backspace</kbd></td><td>Clear the whole row, then step down</td></tr><tr><td><kbd>Insert</kbd></td><td>Add a blank row (rows below move down)</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Backspace</kbd></td><td>Remove the row (rows below move up)</td></tr></table><h3>Selecting, copy and paste</h3><table><tr><td><kbd>Shift</kbd> <kbd>▲</kbd> <kbd>Shift</kbd> <kbd>▼</kbd></td><td>Select whole lines in Song, Sect and Phrase. The first press takes the cursor’s line, the next ones grow it</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>A</kbd></td><td>Select every line</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>B</kbd></td><td>Start a block selection; arrows grow it</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>C</kbd> <kbd>Ctrl/⌘</kbd> <kbd>X</kbd></td><td>Copy / cut the selection</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>V</kbd></td><td>Paste at the cursor row, or over a selection from its top. Lines paste into any phrase</td></tr><tr><td><kbd>Esc</kbd></td><td>Drop the selection</td></tr><tr><td>Row numbers</td><td>Tap or click one to select that line; another to grow the selection to it</td></tr></table><h3>Playing</h3><table><tr><td><kbd>Space</kbd></td><td>Play or stop this screen (phrase, sect or song)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the song from the cursor row</td></tr><tr><td><kbd>Alt</kbd> <kbd>L</kbd></td><td>Loop the selection (LOOP): PLAY then loops those rows</td></tr><tr><td><kbd>Alt</kbd> <kbd>,</kbd> <kbd>Alt</kbd> <kbd>.</kbd></td><td>Transpose the phrase selection down / up a semitone</td></tr></table></section>
+    <section id="hKeys"><h2>Tracker · KEYS mode</h2><h3>From PAD mode</h3><table><tr><td>SHIFT</td><td><kbd>Shift</kbd> (Shift+◀▶ change screen, Shift+▲▼ select lines)</td></tr><tr><td>EDIT</td><td><kbd>Enter</kbd> (on a filled note it picks it up) · <kbd>Shift</kbd> <kbd>Enter</kbd> stamps over it, as EDIT does</td></tr><tr><td>EDIT + arrows</td><td><kbd>Alt</kbd> <kbd>arrows</kbd>: change the value</td></tr><tr><td>OPTION + arrows</td><td><kbd>Ctrl/⌘</kbd> <kbd>arrows</kbd>: the same moves · <kbd>[</kbd> <kbd>]</kbd> step by number</td></tr><tr><td>OPTION · OPTION + EDIT</td><td><kbd>Ctrl/⌘</kbd> <kbd>C</kbd> copy · <kbd>Ctrl/⌘</kbd> <kbd>X</kbd> cut · <kbd>Delete</kbd> clear</td></tr><tr><td>SHIFT + OPTION</td><td><kbd>Ctrl/⌘</kbd> <kbd>B</kbd>: start a selection</td></tr><tr><td>SHIFT + EDIT</td><td><kbd>Ctrl/⌘</kbd> <kbd>V</kbd>: paste</td></tr><tr><td>SHIFT + OPTION + arrows</td><td><kbd>Shift</kbd> <kbd>Alt</kbd> <kbd>arrows</kbd>: the same</td></tr><tr><td>PLAY · SHIFT + PLAY</td><td><kbd>Space</kbd> · <kbd>Shift</kbd> <kbd>Space</kbd></td></tr><tr><td>LOOP · SEMI − +</td><td><kbd>Alt</kbd> <kbd>L</kbd> · <kbd>Alt</kbd> <kbd>,</kbd> <kbd>Alt</kbd> <kbd>.</kbd></td></tr><tr><td>CLN · CLN↓ (Song)</td><td><kbd>Ctrl/⌘</kbd> <kbd>D</kbd> · <kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>D</kbd></td></tr><tr><td>UNDO · REDO</td><td><kbd>Ctrl/⌘</kbd> <kbd>Z</kbd> · <kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>Z</kbd> (or <kbd>Ctrl/⌘</kbd> <kbd>Y</kbd>)</td></tr><tr><td>The command row</td><td>Edit ▾ in the top bar, a right-click on the screen, or View ▾ → COMMAND BAR (buttons; hover one for its key)</td></tr></table><h3>Moving</h3><table><tr><td><kbd>arrows</kbd></td><td>Move the cursor (drops a line selection)</td></tr><tr><td><kbd>Shift</kbd> <kbd>◀</kbd> <kbd>Shift</kbd> <kbd>▶</kbd></td><td>Previous / next screen, in tab order (Song → … → Inst → Mixer → FX → Project)</td></tr><tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd> <kbd>Tab</kbd></td><td>Next / previous column (phrase) or track</td></tr><tr><td><kbd>Home</kbd> <kbd>End</kbd> <kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>Top, bottom, 16 rows up or down</td></tr><tr><td><kbd>Shift</kbd> <kbd>Alt</kbd> <kbd>arrows</kbd></td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in PAD mode</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>arrows</kbd></td><td>The same as PAD mode's OPTION+arrows: in a phrase, the phrase above / below on this track (▲▼) or left / right on this row (◀▶) as laid out on the Song grid; on the Song, the nearest block that way; elsewhere previous / next sect, instrument or FX track</td></tr><tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Previous / next sect, phrase, instrument or FX track, by number</td></tr><tr><td><kbd>◀</kbd> <kbd>▶</kbd> on the FX screen</td><td>Open the slot's controls · back to the slot list</td></tr><tr><td>Mouse wheel</td><td>Scroll the screen a row at a time</td></tr></table><h3>Typing</h3><table><tr><td><kbd>Z</kbd> <kbd>S</kbd> <kbd>X</kbd> … <kbd>/</kbd></td><td>Notes, lower octave (S D G H J are the sharps); on tracks 9–16, Tab to N2–N4 to add chord notes</td></tr><tr><td><kbd>Q</kbd> <kbd>2</kbd> <kbd>W</kbd> … <kbd>P</kbd></td><td>Notes, upper octave</td></tr><tr><td><kbd>1</kbd> or <kbd>Caps Lock</kbd></td><td>Note off</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd> or numpad <kbd>/</kbd> <kbd>*</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>0</kbd>–<kbd>9</kbd> <kbd>A</kbd>–<kbd>F</kbd></td><td>Hex values: two digits, or one for an instrument</td></tr><tr><td>Letters</td><td>Commands in FX columns (press again to cycle: R gives RET, REP, RND, RNL)</td></tr><tr><td><kbd>{</kbd> <kbd>}</kbd></td><td>Edit step down / up: how far the cursor moves after you type</td></tr><tr><td><kbd>Alt</kbd> <kbd>arrows</kbd></td><td>Change the value (◀▶ by 1, ▲▼ by more); on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀), up to four</td></tr><tr><td><kbd>Enter</kbd></td><td>Add, open, or run a › row · twice for a new sect or phrase · in a phrase, on a filled note, picks up that note and its instrument as the current ones, so Enter on an empty note adds them (until you've chosen an instrument, new notes take the highest instrument number already in the phrase); on an instrument, volume or effect, picks it up as the current value (shown after NOW on the hint line)</td></tr></table><h3>Rows</h3><table><tr><td><kbd>Delete</kbd> <kbd>Backspace</kbd></td><td>Clear the cell under the cursor, or the whole highlighted selection</td></tr><tr><td><kbd>Shift</kbd> <kbd>Delete</kbd> <kbd>Shift</kbd> <kbd>Backspace</kbd></td><td>Clear the whole row, then step down</td></tr><tr><td><kbd>Insert</kbd></td><td>Add a blank row (rows below move down)</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Backspace</kbd></td><td>Remove the row (rows below move up)</td></tr></table><h3>Selecting, copy and paste</h3><table><tr><td><kbd>Shift</kbd> <kbd>▲</kbd> <kbd>Shift</kbd> <kbd>▼</kbd></td><td>Select whole lines in Song, Sect and Phrase. The first press takes the cursor’s line, the next ones grow it</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>A</kbd></td><td>Select every line</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>B</kbd></td><td>Start a block selection; arrows grow it</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>C</kbd> <kbd>Ctrl/⌘</kbd> <kbd>X</kbd></td><td>Copy / cut the selection</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>V</kbd></td><td>Paste at the cursor row, or over a selection from its top. Lines paste into any phrase</td></tr><tr><td><kbd>Esc</kbd></td><td>Drop the selection</td></tr><tr><td>Row numbers</td><td>Tap or click one to select that line; another to grow the selection to it</td></tr></table><h3>Playing</h3><table><tr><td><kbd>Space</kbd></td><td>Play or stop this screen (phrase, sect or song)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the song from the cursor row</td></tr><tr><td><kbd>Alt</kbd> <kbd>L</kbd></td><td>Loop the selection (LOOP): PLAY then loops those rows</td></tr><tr><td><kbd>Alt</kbd> <kbd>,</kbd> <kbd>Alt</kbd> <kbd>.</kbd></td><td>Transpose the phrase selection down / up a semitone</td></tr></table></section>
     <section id="hPad"><h2>Tracker · PAD mode</h2><table><tr><td>Arrows</td><td>Move</td></tr><tr><td>SHIFT + ◀▶</td><td>Change screen (through every screen in tab order)</td></tr><tr><td>SHIFT + ▲▼</td><td>In Song, Sect and Phrase: select the cursor's line, then grow the selection a line at a time (OPTION copies, OPTION+EDIT cuts). On the other screens: Project / Mixer</td></tr><tr><td>EDIT</td><td>Add, or run a › row · in a phrase, on a filled note stamps the current note and instrument over it; on an instrument, volume or effect, picks it up · tap twice for a new sect or phrase, or a note off</td></tr><tr><td>EDIT + arrows</td><td>Change the value (◀▶ by 1, ▲▼ by more)</td></tr><tr><td>OPTION + EDIT</td><td>Clear (with a selection: cut)</td></tr><tr><td>OPTION + arrows</td><td>Other sect, phrase, instrument or FX track · on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀) · in Song, page up/down</td></tr><tr><td>OPTION + arrows in Phrase</td><td>Go to the phrase above / below on this track (▲▼) or to the left / right on this row (◀▶), as laid out on the Song grid. A phrase not in the song steps by number. (Settings → Input → PATTERN NAV; off: ▲▼ jump 16 phrases)</td></tr><tr><td>SHIFT + OPTION + arrows</td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in KEYS mode</td></tr><tr><td>SHIFT + OPTION</td><td>Start or cancel a selection; arrows grow it, OPTION copies</td></tr><tr><td>SHIFT + EDIT</td><td>Paste</td></tr><tr><td>PLAY · SHIFT + PLAY</td><td>Play this screen · play the song · with LOOP on, PLAY loops the selected rows</td><tr><td>LOOP · SEMI +/−</td><td>Loop the selection (sticky) · transpose the phrase selection ±1 semitone at once</td></tr><tr><td>◀ ▶ on the FX screen</td><td>Open a slot's controls · back to the slot list (a sideways swipe does it too)</td></tr><tr><td>EDIT on an FX slot</td><td>A list of every effect (like the FX command list): pick one and its controls open; its own effect, marked NOW, keeps its settings; --- empties the slot</td></tr><tr><td>Row numbers</td><td>Tap to select whole lines, then COPY and PASTE</td></tr></table><p><b>One finger is enough.</b> With <b>Sticky keys</b> on, tap SHIFT or OPTION alone and it stays lit for the next button. The <b>command row</b> (Project → COMMANDS) gives every two-key command its own button: change, prev/next, clear, select, copy, cut, paste, play song, and on the SONG screen CLN↓ (clones the block, or the selected blocks, into new numbers on the row below) and CLN (clone): the block under the cursor is copied, phrases and all, to the next free number.</p><p>On a computer keyboard in PAD mode the keyboard is not disabled: arrows move, <kbd>Enter</kbd> opens, <kbd>Space</kbd> plays, typing letters and hex edits the cell, and <kbd>Shift</kbd> selects lines. <kbd>Z</kbd> stays OPTION (not a note), <kbd>X</kbd> stays EDIT, and <kbd>Alt</kbd>+arrows page (OPTION+arrow) rather than change the value.</p><h3>Touch</h3><p>Tap a cell to move there; tap it again to open or add. Drag up or down on the cursor’s cell to change its value; drag elsewhere to scroll.</p></section>
     <section id="hFx"><h2>FX column commands</h2>
 <p>Each phrase row has three effect columns: a command and a hex value. The info line at the bottom of the screen explains the one under the cursor.</p>
@@ -10637,8 +10662,28 @@ function fileItems(){
     null,
     ['Export this pad (WAV)', () => $('bExPad').click()], ['Export all pads (.zip)', () => $('bExKit').click()],
     ...(canShare ? [['Share this pad…', () => $('bShPad').click()], ['Share all pads…', () => $('bShKit').click()]] : []),
-    ...(noEditors() ? [] : [null, ['Export chains…', exportChains], ['Import chains…', () => $('chainsIn').click()]])
+    ...(noEditors() ? [] : [null, ['Export chains…', exportChains], ['Import chains…', () => $('chainsIn').click()]]),
+    ...(deskUpdApi ? [null, ['Check for updates…' + (deskUpd && deskUpd.version ? ' (you have ' + deskUpd.version + ')' : ''), () => deskUpdApi.check()]] : [])
   ];
+}
+/* ---------- DESKTOP APP UPDATES (electron/preload.js → window.thunderDesktop) ----------
+   Only in the desktop app: File ▾ → Check for updates…, and when a newer build is out an UPDATE button in the top bar
+   (it stays until used) plus a toast. Mac and the portable .exe: the button opens the download page; Windows and Linux:
+   it restarts into the downloaded version. The website has no window.thunderDesktop, so none of this shows there. */
+const deskUpdApi = (window.thunderDesktop && window.thunderDesktop.updates) || null;
+let deskUpd = null;
+function deskUpdShow(s){
+  const was = deskUpd && deskUpd.avail; deskUpd = s || null;
+  const b = $('bUpd'), on = !!(s && s.avail); b.hidden = !on;
+  if (!on) return;
+  b.textContent = 'Update';   // the version is in the tooltip and the toast, so the top bar stays on one line
+  b.title = s.ready ? `...Thunder Plus ${s.avail} is downloaded: restart to use it (or it installs when you quit)`
+    : s.notifyOnly ? `...Thunder Plus ${s.avail} is out (you have ${s.version}): open the download page` : `...Thunder Plus ${s.avail} is downloading (you have ${s.version})`;
+  if (s.avail !== was) toast(`...Thunder Plus ${s.avail} is out: the Update button at the top gets it.`);
+}
+if (deskUpdApi){
+  try { deskUpdApi.on(deskUpdShow); deskUpdApi.state().then(deskUpdShow, () => {}); } catch(e){}
+  $('bUpd').addEventListener('click', () => { try { deskUpdApi.act(); } catch(e){} });
 }
 const MACK = /Mac|iPhone|iPad/.test(navigator.platform);
 function gfileToggle(open = $('gfile').hidden){
@@ -12875,7 +12920,7 @@ function makeSeq(S, mode, o){
         // Tracks 9–16 are polyphonic: all four note columns play, as a chord, over whatever is still ringing.
         const poly = isPolyT(t), ns = poly ? r.slice(0, NCOL) : [r[0]];
         const offN = t < MT && ns.includes(OFF), notes = t < MT ? ns.filter(x => x >= 0 && x < 120) : [];
-        if (offN) evs.push({type:'off', t:at, track:t});
+        if (offN){ evs.push({type:'off', t:at, track:t}); pos[t].off = true; }
         if (notes.length && play){
           const ii = fx.INS != null ? clamp(fx.INS, 0, NI - 1) : r[IC] >= 0 ? r[IC] : T.inst; T.inst = ii;
           const I = S.insts[ii] || S.insts[0];
@@ -12901,6 +12946,9 @@ function makeSeq(S, mode, o){
             }
           });
           T.rate = firstRate * (mods.bend ? mods.bend.mul : 1);
+          // SOUNDING NOTES (the phrase screen's piano): the pitches this row really starts, by note column, with every
+          // transpose (sect, instrument, TSP, PIT, random) applied.
+          { const tr = ctsp + I.tsp + T.tsp + pit + nrnd; pos[t].sc = ns.map((x, c) => x >= 0 && x < 120 ? [c, Math.round(x + tr)] : null).filter(Boolean); }
         } else if (!notes.length && !offN && play && t < MT){
           // No note on this row: instrument commands change the note that is already playing.
           const m = {type:'mod', t:at, track:t};
@@ -12917,7 +12965,7 @@ function makeSeq(S, mode, o){
           if (any) evs.push(m);
         }
       }
-      if (muted){ evs.length = ev0; if (!T.mut) evs.push({type:'off', t:t0, track:t}); }   // entering a muted block silences what is ringing
+      if (muted){ evs.length = ev0; if (!T.mut) evs.push({type:'off', t:t0, track:t}); delete pos[t].sc; pos[t].off = true; }   // entering a muted block silences what is ringing
       T.mut = muted;
       const L = (mode === 'song' && pid < 0) ? emptyLen() : lenOf(pid);
       if (hop >= 0){ T.step = L; T.next = hop; } else T.step++;
@@ -13688,7 +13736,7 @@ function tStart(mode, o){
   moStart(mode === 'song' ? o.row : -1);   // before the start time is set: the song position takes a moment to work out
   seq.time = ctx.currentTime + 0.08; stageStart(seq.time);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
-  Object.assign(tp, {on:true, mode, seq, q:[], pos:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : ''});
+  Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : ''});
   tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
   bgPlay(true);   // BACKGROUND PLAY
   void r;
@@ -13748,7 +13796,7 @@ function padBlink(e){
 }
 function tStop(quiet){
   if (tp.timer) tp.timer.stop();
-  tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null;
+  tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null;
   if (rt) rt.pl.stopAll(ctx.currentTime);
   moStop();
   songBtn();
@@ -14184,8 +14232,8 @@ const FLK = 'thunderplus-follow-v1';
 let followOn = (() => { try { return localStorage.getItem(FLK) === '1'; } catch(e){ return false; } })();
 function setFollow(on){ followOn = on; try { localStorage.setItem(FLK, on ? '1' : '0'); } catch(e){} if (on) followPlay(); draw(); }
 // Pads mode: OPTION + arrows move around the Song grid, in the phrase editor (phraseGrid) and on the Song screen (songGridDir).
-// On by default; off restores the old OPTION+arrow behaviour (phrase: jump 16 patterns; Song: ◀▶ prev/next block, ▲▼ 16 rows). KEYS mode is not affected
-// (Ctrl/⌘+▲▼ changes pattern there, and Alt+▲▼ keeps changing values).
+// On by default; off restores the old OPTION+arrow behaviour (phrase: jump 16 patterns; Song: ◀▶ prev/next block, ▲▼ 16 rows). KEYS mode's
+// Ctrl/⌘+arrows are OPTION+arrows (19 Oct), so this applies there too; [ ] step by number and Alt+arrows change values.
 const PNK = 'thunderplus-patnav-v1';
 let patNavOn = (() => { try { const v = localStorage.getItem(PNK); if (v === '0' || v === '1') return v === '1'; } catch(e){} return true; })();
 function setPatNav(on){ patNavOn = on; try { localStorage.setItem(PNK, on ? '1' : '0'); } catch(e){} draw(); }
@@ -14422,6 +14470,8 @@ function projRows(){
     {l:'› LOAD DEMO', dbl:true, act:() => setSong(demoSong(), 'Loaded the starter beat.'), info:() => 'Replaces the song with the starter beat. Tap EDIT twice'},
     {l:'INPUT', sec:'Input', gap:true, get:() => inMode === 'keys' ? 1 : 0, set:v => setInput(v ? 'keys' : 'pad'), min:0, max:1, tog:true, d:0, fmt:v => v ? 'KEYS' : 'PAD', info:() => 'PAD: on-screen d-pad and four keys; the keyboard still types notes and hex (Z = OPTION, X = EDIT, Alt+arrows page). KEYS: type notes and hex, with an on-screen keypad on touch screens'},
     {l:'COMMANDS', get:() => cmdOn ? 1 : 0, set:v => setCmd(!!v), min:0, max:1, tog:true, d:+coarse, fmt:onOff, info:() => 'A row of buttons for the two-key commands: change value, clear, select, copy, cut, paste, other sect or phrase, play the song'},
+    {l:'COMMAND BAR', ck:'Show the command bar (KEYS mode)', get:() => cmdBar ? 1 : 0, set:v => setCmdBar(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // COMMAND BAR
+      info:() => 'KEYS mode: one thin line of buttons above the bottom panel for the command row’s commands (undo, cut, copy, paste, clear, select, clone, change the value, previous / next, play the song). Hover a button for its key. OFF: hidden'},
     {l:'STICKY KEYS', get:() => latchOn ? 1 : 0, set:v => setLatch(!!v), min:0, max:1, tog:true, d:1, fmt:onOff, info:() => 'Tap SHIFT or OPTION on its own and it stays lit for the next button, so no command needs two fingers. Tap it again to cancel'},
     {l:'EDIT STEP', get:() => kStep, set:v => kStep = v, min:0, max:16, big:4, fmt:v => v + (v === 1 ? ' row' : ' rows'), info:() => 'How far the cursor moves after you type a note or value or delete a row (the edit step). Keyboard: { and }'},
     {l:'PATTERN NAV', ck:'Option + arrows move around the Song grid', get:() => patNavOn ? 1 : 0, set:v => setPatNav(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
@@ -15138,7 +15188,8 @@ function phraseGrid(dir){
   const x0 = cs.song.x, y0 = cs.song.y, here = S.song[y0] && S.song[y0][x0];
   if (!(here >= 0) || !(S.chains[here] || []).some(r => r[0] === cPhrase)) return false;
   let x = x0, y = y0, hit = false;
-  if (dir === 'left' || dir === 'right'){ const d = dir === 'right' ? 1 : -1; for (x = x0 + d; x >= 0 && x < ntr(); x += d) if (S.song[y0] && S.song[y0][x] >= 0){ hit = true; break; } }
+  if (dir === 'left' || dir === 'right'){ const d = dir === 'right' ? 1 : -1, n = ntr(), last = arrSideMst() ? n : n - 1;   // u = n is the master column
+    for (let u = (x0 === MT ? n : x0) + d; u >= 0 && u <= last; u += d){ const t = u === n ? MT : u; if (S.song[y0] && S.song[y0][t] >= 0){ x = t; hit = true; break; } } }
   else { const d = dir === 'down' ? 1 : -1; for (y = y0 + d; y >= 0 && y < 256; y += d) if (S.song[y] && S.song[y][x0] >= 0){ hit = true; break; } }
   if (!hit){ toast({up:'No phrase above on this track.', down:'No phrase below on this track.', left:'No phrase to the left on this row.', right:'No phrase to the right on this row.'}[dir]); return true; }
   const cid = S.song[y][x], p = firstPhrase(cid);
@@ -15176,7 +15227,7 @@ function shiftAltArrow(dir){
 // shown; Arrange's side panel has none), ▲▼ to the nearest filled block in this column. Empty cells are skipped; at an
 // edge the cursor stays and a toast says so. Like songJump (the old OPTION+◀▶) it leaves the selection alone.
 function songGridDir(dir){
-  const c = cs.song, n = ntr(), mst = apF !== 'arr', has = (y, t) => !!S.song[y] && S.song[y][t] >= 0;
+  const c = cs.song, n = ntr(), mst = apF !== 'arr' || arrSideMst(), has = (y, t) => !!S.song[y] && S.song[y][t] >= 0;
   let x = c.x, y = c.y, hit = false;
   if (dir === 'left' || dir === 'right'){
     const d = dir === 'right' ? 1 : -1, last = mst ? n : n - 1;
@@ -15292,6 +15343,13 @@ function releaseAll(){ clearTimeout(rep); for (const k in held){ held[k] = false
 const CK = 'thunderplus-cmd-v1', coarse = matchMedia('(pointer:coarse)').matches;
 let cmdOn = (() => { try { const v = localStorage.getItem(CK); if (v === '1' || v === '0') return v === '1'; } catch(e){} return coarse; })();
 function setCmd(on){ cmdOn = on; try { localStorage.setItem(CK, on ? '1' : '0'); } catch(e){} draw(); fit(); draw(); }
+// COMMAND BAR (View ▾ → COMMAND BAR, KEYS mode, off by default): the command row's buttons as one thin line above the
+// bottom panel, about as tall as the panel's headers, each with its key in the tooltip. It takes the place of the big
+// COMMANDS row in KEYS mode; PAD mode keeps COMMANDS as it was.
+const CBK = 'thunderplus-cmdbar-v1';
+let cmdBar = (() => { try { return localStorage.getItem(CBK) === '1'; } catch(e){ return false; } })();
+function setCmdBar(on){ cmdBar = !!on; try { localStorage.setItem(CBK, cmdBar ? '1' : '0'); } catch(e){} applyCmdOrder(); draw(); fit(); draw(); }
+const cmdMini = () => inMode === 'keys' && cmdBar;
 const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b:-1', '−', 'Change the value down (EDIT+◀)'], ['b:1', '+', 'Change the value up (EDIT+▶)'],
   ['b:16', '++', 'Change the value up a lot (EDIT+▲)'], ['prev', '‹', 'Previous: the block above in the song; the previous sect, phrase, instrument or FX track elsewhere (OPTION+▲ on the song, OPTION+◀ elsewhere)'], ['next', '›', 'Next: the block below in the song; the next sect, phrase, instrument or FX track elsewhere (OPTION+▼ on the song, OPTION+▶ elsewhere)'],
   ['clr', 'CLEAR', 'Clear (OPTION+EDIT)'], ['sel', 'SELECT', 'Start or cancel a selection (SHIFT+OPTION)'],
@@ -15325,15 +15383,27 @@ for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type
 // the original order. The buttons are moved, not rebuilt, so the tap handlers stay attached.
 const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'clone', 'cldn', 'copy', 'cut', 'paste', 'clr', 'undo', 'redo', 'song'];
 const CMD_PAD_SHORT = {clr:'CLR', sel:'SEL', paste:'PST', undo:'↶', redo:'↷'};
+// COMMAND BAR: the Edit menu's order (undo · clipboard · select · clones · value · previous / next · play) and words.
+const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'sel', 'clone', 'cldn', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
+const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
+const cmdSongLab = () => cmdMini() ? (tp.on ? '■ STOP' : '▶ SONG') : tp.on ? '■' : '▶';
 function applyCmdOrder(){
-  const host = $('tCmd'), by = {};
+  const host = $('tCmd'), by = {}, mini = cmdMini();
   host.querySelectorAll('button[data-c]').forEach(b => by[b.dataset.c] = b);
-  for (const a of inMode === 'pad' ? CMD_PAD_ORDER : CMDS.map(c => c[0])) if (by[a]) host.append(by[a]);
+  for (const a of mini ? CMD_MINI_ORDER : inMode === 'pad' ? CMD_PAD_ORDER : CMDS.map(c => c[0])) if (by[a]) host.append(by[a]);
   // PAD mode packs more into a phone-width row, so the long words get short forms that fit inside the buttons.
-  host.classList.toggle('cpad', inMode === 'pad');
-  const lab = Object.fromEntries(CMDS.map(c => [c[0], c[1]]));
-  for (const a in by) by[a].innerHTML = (inMode === 'pad' && CMD_PAD_SHORT[a]) || lab[a];
-  const sb = by.song; if (sb){ sb.textContent = tp.on ? '■' : '▶'; sb.classList.toggle('on', tp.on); }
+  host.classList.toggle('cpad', inMode === 'pad'); host.classList.toggle('cmini', mini);
+  const lab = Object.fromEntries(CMDS.map(c => [c[0], c[1]])), tip = Object.fromEntries(CMDS.map(c => [c[0], c[2]]));
+  for (const a in by){ by[a].innerHTML = (mini && CMD_MINI_LAB[a]) || (inMode === 'pad' && CMD_PAD_SHORT[a]) || lab[a]; if (!mini) by[a].title = tip[a]; }
+  cmdTipKey = '';
+  const sb = by.song; if (sb){ sb.textContent = cmdSongLab(); sb.classList.toggle('on', tp.on); }
+}
+// The bar's tooltips say what each button does here and its key (from cmdItems), so the keys are easy to learn.
+var cmdTipKey = '';   // var: applyCmdOrder can run before this line
+function cmdTips(){
+  if (!cmdMini()) return;
+  const key = tv + ':' + !!selA + ':' + tp.on + ':' + inMode; if (key === cmdTipKey) return; cmdTipKey = key;
+  for (const it of cmdItems()){ if (!it || !it.a) continue; const b = $('tCmd').querySelector(`button[data-c="${it.a}"]`); if (b) b.title = it.l + (it.k ? ' · ' + it.k : ''); }
 }
 // A tap fires pointerdown and then a click; the click only counts when no pointerdown just ran the
 // button (keyboard Enter/Space, accessibility tools), so SELECT, CLN, PASTE… never fire twice.
@@ -15726,8 +15796,10 @@ function draw(){
   const tLoopTop = $('tLoopTop'); if (tLoopTop) tLoopTop.classList.toggle('on', loopSel);
   topSelVis();
   const tLoop = $('tLoop'); if (tLoop){ tLoop.classList.toggle('on', loopSel); const n = $('tLoopN'); if (n) n.textContent = loopSel ? (loopArm ? hx(loopArm.y0) + '–' + hx(loopArm.y1) : 'ARM') : 'OFF'; }
-  $('tCmd').hidden = !cmdOn; document.body.classList.toggle('cmdv', cmdOn);
-  const sb = $('tCmd').querySelector('[data-c=song]'); if (sb){ sb.textContent = tp.on ? '■' : '▶'; sb.classList.toggle('on', tp.on); }
+  // KEYS mode with the COMMAND BAR on: the thin bar; otherwise the COMMANDS row (both modes) as before.
+  { const mini = cmdMini(), show = mini || cmdOn; if ($('tCmd').classList.contains('cmini') !== mini) applyCmdOrder();
+    $('tCmd').hidden = !show; document.body.classList.toggle('cmdv', show && !mini); cmdTips(); }
+  const sb = $('tCmd').querySelector('[data-c=song]'); if (sb){ sb.textContent = cmdSongLab(); sb.classList.toggle('on', tp.on); }
   const onSong = tv === 'song';
   { const seq = ['song', ...(sectsOn ? ['sect'] : []), 'phrase', 'inst', 'mixer', 'fx', 'project'];
     const TCV = {song:'#dbe6f8', sect:'#e9e0f8', phrase:'#d8f0e2', inst:'#fbe2d2', mixer:'#f6edc8', fx:'#f8dce8', project:'#d5eef2'};
@@ -15887,15 +15959,26 @@ function stagePreview(){
   lo -= 2; hi += 2; const cw = W / (hi - lo + 1);
   for (const [y, n, c] of notes){ g.fillStyle = c ? X.acc : X.ink; g.fillRect(Math.round((n - lo) * cw + 1), Math.round(y * rh + rh * .12), Math.max(2, Math.round(cw - 2)), Math.max(2, Math.round(rh * .76))); }
 }
-// Phrase: a piano down the side. The notes sounding at the playhead (or, stopped, at the cursor's row) are lit:
-// each note column holds its last note until a newer one or an OFF, so a poly track's chord stays lit.
+// SOUNDING NOTES: what each track is really playing, kept from the sequencer's steps as they are heard (pos[t].sc: the
+// pitches a row starts by note column, transposes applied; pos[t].off: an OFF or a muted block). A mono track's new note
+// replaces the old; a poly track's column replaces that column's. tStart / tStop drop them (tp.snd = null).
+function sndKeep(i, q){
+  if (!q.off && !q.sc) return;
+  if (!tp.snd) tp.snd = [];
+  let m = tp.snd[i]; if (!m || q.off || !isPolyT(i)) m = tp.snd[i] = new Map();
+  if (q.sc) for (const [c, n] of q.sc) m.set(c, n);
+}
+// Phrase: a piano down the side. Playing: the notes this track is really sounding now (sndKeep), whichever phrase or
+// row the editor shows, transposes and all (owner, 19 Oct: it showed the phrase in the window). Stopped: the cursor's
+// row, each note column holding its last note until a newer one or an OFF, so a poly track's chord stays lit.
 function stagePiano(force){
   const pid = cPhrase, p = S.phrases[pid], L = plen(pid);
-  let row = cs.phrase.y;
-  if (tp.on && tp.pos){ const q = tp.pos[cTrack]; if (q && q.phrase === pid && q.step >= 0) row = q.step; }
+  const row = cs.phrase.y;
   const on = new Map();   // note -> column
-  if (p) for (let c = 0; c < NCOL; c++){ for (let y = Math.min(row, L - 1); y >= 0; y--){ const n = p[y][c]; if (n === OFF) break; if (n >= 0 && n < OFF){ on.set(n, c); break; } } }
+  if (tp.on){ const m = tp.snd && tp.snd[cTrack]; if (m) for (const [c, n] of m) on.set(n, c); }
+  else if (p) for (let c = 0; c < NCOL; c++){ for (let y = Math.min(row, L - 1); y >= 0; y--){ const n = p[y][c]; if (n === OFF) break; if (n >= 0 && n < OFF){ on.set(n, c); break; } } }
   let lo = 999, hi = -1; if (p) for (let y = 0; y < L && y < p.length; y++) for (let c = 0; c < NCOL; c++){ const n = p[y][c]; if (n >= 0 && n < OFF){ lo = Math.min(lo, n); hi = Math.max(hi, n); } }
+  for (const n of on.keys()){ lo = Math.min(lo, n); hi = Math.max(hi, n); }   // a transposed or other phrase's note still fits on the keys
   if (hi < 0){ lo = 48; hi = 71; }
   lo = Math.floor(lo / 12) * 12; hi = Math.max(lo + 23, Math.ceil((hi + 1) / 12) * 12 - 1);   // whole octaves, two at least
   const sig = [pid, row, lo, hi, [...on.keys()].join(','), isPolyT(cTrack)].join('|'); if (!force && sig === stgSig) return; stgSig = sig;
@@ -16501,6 +16584,10 @@ function arrPlace(){
   if (on) scr.insertBefore(arrEl, scrInfo); else arrHome.insertBefore(arrEl, arrHomeNext);
   arrSig = ''; arrCurY = -1; return true;
 }
+// MASTER IN ARRANGE (owner, 19 Oct: "a master track so that we can navigate to it and edit the master phrase"): the
+// side panel beside the Phrase screen shows the MST column too, so a master phrase can be opened and reached from the
+// phrase editor (a tap, Arrange's keys, OPTION / Ctrl / ⌘ + arrows). Return false to keep MST to the Song screen only.
+function arrSideMst(){ return true; }
 // How many song rows Arrange shows at once, for keeping the cursor's row in view when it is the Song screen.
 function arrRows(){ const rh = arrRowH(); return rh > 0 ? clamp(Math.floor((arrGrid.clientHeight - 3) / rh + 0.01), 2, 96) : 16; }
 // The panel's width: 0 is the default for the screen size, otherwise what the grip was dragged to.
@@ -16669,7 +16756,7 @@ function drawArr(PH){
   if (!arrShown()) return;
   arrEl.classList.toggle('dk', tScreen === 'dark');
   // Blocks grow with the panel: row height follows the column width (16–40px).
-  const NA = ntr(), ms = asongOn();   // ms: Arrange is the Song screen, so it gets the master column too
+  const NA = ntr(), ms = asongOn(), mx = ms || arrSideMst();   // ms: Arrange is the Song screen; mx: it shows the master column
   const arRH = arrSize();
   let lastR = -1; for (let y = 255; y >= 0; y--) if (S.song[y].some(v => v >= 0)){ lastR = y; break; }
   const N = clamp(Math.max(lastR + 2, 16, cs.song.y + 1, (cs.song.top || 0) + 40), 1, 256);   // room to line up with the Song screen's top row
@@ -16695,18 +16782,18 @@ function drawArr(PH){
       if (S.mix[t].mute || (anySolo && !S.mix[t].solo)) cls += ' tm';
       h += `<b class="${cls.trim()}"${sty} data-y="${y}" data-t="${t}">${lab}</b>`;
     }
-    if (ms){ const v = S.song[y][MT];   // the master column: commands only, never muted
+    if (mx){ const v = S.song[y][MT];   // the master column: commands only, never muted
       h += `<span></span><b class="gx${v < 0 ? '' : isEmptySect(S.chains[v]) ? ' z' : ' f'}" data-y="${y}" data-t="${MT}">${v < 0 ? '' : hx(songShown(v))}</b>`; }
     h += '</div>';
   }
   const PF = polyFrom();
-  const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (spAt(t) ? '<span></span>' : '') + `<i class="${t < PF ? 'gm' : 'gp'}${m.mute ? ' mu' : ''}">${t + 1}</i>`).join('') + (ms ? '<span></span><i class="gx">MS</i>' : '');
+  const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (spAt(t) ? '<span></span>' : '') + `<i class="${t < PF ? 'gm' : 'gp'}${m.mute ? ' mu' : ''}">${t + 1}</i>`).join('') + (mx ? '<span></span><i class="gx">MS</i>' : '');
   // MONO and POLY tabs spanning their tracks' columns (track t sits in grid column 2 + t + one per 8-track gap before it).
   const col = t => 2 + t + (ms ? (t >= PF && PF > 0 ? 1 : 0) : Math.floor(t / 8)), rng = (a, b) => d2(a) + (b > a ? '–' + d2(b) : '');
   let gp = '';
   if (PF > 0) gp += `<b class="gm" style="grid-column:${col(0)} / ${col(PF - 1) + 1}" title="Mono tracks ${rng(1, PF)}">MONO ${rng(1, PF)}</b>`;
   if (NA > PF) gp += `<b class="gp" style="grid-column:${col(PF)} / ${col(NA - 1) + 1}" title="Poly tracks ${rng(PF + 1, NA)}">POLY ${rng(PF + 1, NA)}</b>`;
-  if (ms) gp += `<b class="gx" style="grid-column:${col(NA - 1) + 2}" title="Master column: commands for the master bus">MST</b>`;
+  if (mx) gp += `<b class="gx" style="grid-column:${col(NA - 1) + 2}" title="Master column: commands for the master bus">MST</b>`;
   const sig = h + th + gp;
   if (sig !== arrSig){
     arrSig = sig; arrGrid.innerHTML = h; $('tArrTh').innerHTML = th; $('tArrGp').innerHTML = gp;
@@ -16791,25 +16878,25 @@ function arrGo(y, t){
 // zoomed they are fixed px, so the rows run past the panel and scroll. Returns the block height.
 function arrSize(){
   const NA = ntr(), G = Math.ceil(NA / 8), sm = document.body.classList.contains('arrsmall');
-  const ms = asongOn() ? 1 : 0;   // as the Song screen: one more column (the master) after one more 4px spacer
+  const ms = asongOn() ? 1 : 0, mx = ms || arrSideMst() ? 1 : 0;   // mx: one more column (the master) after one more spacer
   // As the Song screen, blocks stop growing at about 44px wide, so on a wide screen the stage (the dancing dogs) keeps the
   // space beside it, as it had beside the text grid. A narrow screen (or STAGE off) still gives Arrange the whole width.
   if (ms) arrEl.style.maxWidth = stage !== 'off' ? Math.round((sm ? 12 : 16) + (sm ? 18 : 22) + (NA + 1) * 46 + 3 * 12 + 4) + 'px' : '';
   else if (arrEl.style.maxWidth) arrEl.style.maxWidth = '';
   // Spacers: every 8 tracks in the side panel; as the Song screen only at the MONO | POLY break and before MST (12px),
   // so each group gets its own box.
-  const PFs = polyFrom(), SP = ms ? 12 : 4, nSp = ms ? (PFs > 0 && PFs < NA ? 1 : 0) + 1 : G - 1;
+  const PFs = polyFrom(), SP = ms ? 12 : 4, nSp = ms ? (PFs > 0 && PFs < NA ? 1 : 0) + 1 : G - 1 + mx;
   const RNW = ms ? 30 : sm ? 18 : 22;   // the row-number column (wider as the Song screen: see body.asong in the CSS)
-  const W = arrGrid.clientWidth, cwFit = (W - (sm ? 12 : 16) - RNW - nSp * SP - (NA + ms + nSp) * (sm ? 1 : 2)) / (NA + ms);
+  const W = arrGrid.clientWidth, cwFit = (W - (sm ? 12 : 16) - RNW - nSp * SP - (NA + mx + nSp) * (sm ? 1 : 2)) / (NA + mx);
   arrFitW = cwFit; if (arrZoom > arrZMax()) arrZoom = arrZMax();   // a zoom saved on a smaller screen
   const z = arrZoom > 1 ? arrZoom : 1;
   const col = z > 1 ? Math.max(6, cwFit * z).toFixed(1) + 'px' : 'minmax(0,1fr)', grp = [];
   if (ms){ if (PFs > 0) grp.push(`repeat(${PFs},${col})`); if (NA > PFs) grp.push(`repeat(${NA - PFs},${col})`); grp.push(col); }
-  else for (let g = 0; g < NA; g += 8) grp.push(`repeat(${Math.min(8, NA - g)},${col})`);
+  else { for (let g = 0; g < NA; g += 8) grp.push(`repeat(${Math.min(8, NA - g)},${col})`); if (mx) grp.push(col); }
   arrEl.style.setProperty('--arcols', grp.join(` ${SP}px `));
   // As the Song screen the row height comes from the space the grid HAS (arrAvail), not the grid's own height: drawArr
   // snaps that height to whole rows, so reading it back here flipped 12 rows ↔ 13 rows on every redraw during playback.
-  const cw = (W - 34) / (NA + ms + 0.3 + (G + ms) * 0.2) * z, rh = clamp(Math.round(cw * 0.8), 16, z > 1 ? (arrDeskZ() ? (ms ? 34 : 40) : 44) : ms ? clamp(Math.floor(arrAvail() / 12) - 3, 16, 30) : 40);   // as the Song screen: at least about 12 rows, as the text grid showed
+  const cw = (W - 34) / (NA + mx + 0.3 + (G + mx) * 0.2) * z, rh = clamp(Math.round(cw * 0.8), 16, z > 1 ? (arrDeskZ() ? (ms ? 34 : 40) : 44) : ms ? clamp(Math.floor(arrAvail() / 12) - 3, 16, 30) : 40);   // as the Song screen: at least about 12 rows, as the text grid showed
   arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', clamp(Math.round(rh * 0.5), 8, 16) + 'px');
   // Where the MONO | POLY break sits when every track fits (track PF's column starts after a spacer every 8 tracks):
   // the header's ○ is centred over it, and stays there while zoomed so it is always in the same place.
@@ -17339,7 +17426,7 @@ function frame(){
   if (frameIdle()){ raf = -1; rafT = setTimeout(() => { raf = 0; frame(); }, 100); } else raf = requestAnimationFrame(frame);
   if (tp.on && ctx){
     let ch = false;
-    while (tp.q.length && tp.q[0].t <= ctx.currentTime + 0.01){ const e = tp.q.shift(); if (!tp.pos) tp.pos = new Array(NT).fill(null); e.pos.forEach((q, i) => { if (q) tp.pos[i] = q; }); tp.bpm = e.bpm; tp.tks = e.tks; tp.line = e.line; tp.st = e.t; ch = true; }
+    while (tp.q.length && tp.q[0].t <= ctx.currentTime + 0.01){ const e = tp.q.shift(); if (!tp.pos) tp.pos = new Array(NT).fill(null); e.pos.forEach((q, i) => { if (q){ tp.pos[i] = q; sndKeep(i, q); } }); tp.bpm = e.bpm; tp.tks = e.tks; tp.line = e.line; tp.st = e.t; ch = true; }
     if (!tp.seq.alive() && !tp.q.length && ctx.currentTime > tp.seq.time + 0.3) tStop(); else if (ch){ followPlay(); draw(); }
   }
   tickDots();
@@ -17690,7 +17777,9 @@ function keysDown(e, pad){
   if (mod){
     if (lo === 'b'){ toggleSel(); return true; }
     if (k === 'Backspace' || k === 'Delete'){ rowOp('remove'); return true; }
-    if (k === 'ArrowUp' || k === 'ArrowDown'){ optDir(k === 'ArrowDown' ? 'right' : 'left'); return true; }
+    // Ctrl/⌘ + arrows = PAD mode's OPTION + arrows, all four, the same moves (in a phrase: the phrase above, below,
+    // left or right on the Song grid; on the Song: the nearest block that way). [ ] still step by number. (19 Oct)
+    { const a = {ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right'}[k]; if (a){ optDir(a, true); return true; } }
     return false;
   }
   const arrow = {ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right'}[k];
@@ -17705,7 +17794,7 @@ function keysDown(e, pad){
   }
   if (e.altKey) return false;
   if (k === ' '){ if (!e.repeat){ if (e.shiftKey){ if (tp.on) tStop(); else tStart('song', {row:songRow()}); } else playCtx(); } return true; }
-  if (k === 'Enter'){ if (!e.repeat) editTap(true); return true; }
+  if (k === 'Enter'){ if (!e.repeat) editTap(!e.shiftKey); return true; }   // Shift+Enter = the pad's EDIT (stamps over a filled note)
   // Delete and Backspace clear the cell under the cursor, or the whole highlighted selection. Shift+Delete/Backspace
   // clear the whole row and step down. Ctrl/⌘+Backspace removes the row (rows below move up); Insert adds a blank row.
   if (k === 'Delete'){ if (e.shiftKey) rowOp('clear'); else del(); return true; }
@@ -17855,7 +17944,7 @@ function apFocus(f, sync){
   const from = apF; apF = f; selA = null; apSel = null; fxpClose();
   if (!f) return;
   if (!from && sync) followPhraseBlock();
-  if (f === 'arr'){ if (cs.song.x === MT) cs.song.x = Math.min(cTrack, ntr() - 1); apTop(); }   // the side panel has no master column
+  if (f === 'arr'){ if (cs.song.x === MT && !arrSideMst()) cs.song.x = Math.min(cTrack, ntr() - 1); apTop(); }   // only when the side panel has no master column
   apLastKey = apKey();
 }
 // The phrase follows the block under the song cursor (its first phrase, on its track); on an empty block the phrase
@@ -17883,7 +17972,7 @@ function apBack(){
   const sel = selA && selA.v === 'song' ? selA : null; selA = null;
   if (apWent || tv !== 'song'){ apF = null; apSel = null; draw(); return; }   // the command opened a screen: stay there
   tv = 'phrase'; apSel = apF ? sel : null;
-  if (apF === 'arr'){ if (cs.song.x === MT) cs.song.x = ntr() - 1; apTop(); }
+  if (apF === 'arr'){ if (cs.song.x === MT && !arrSideMst()) cs.song.x = ntr() - 1; apTop(); }
   const s0 = cSect, p0 = cPhrase, moved = !!apF && apFollow();
   // EDIT×2 and two-digit hex know a second press by a key ending in cSect:cPhrase (editTap, typeHex): the phrase that
   // just followed the cursor must not make the second press look like a new one.
@@ -18158,7 +18247,7 @@ const SET_SHEETS = true;
 const SHEETS = {
   screen:{title:'Screen', about:'Layout and panels, the Phrase and Song screens, text size and colour', groups:[
     ['Text & colour', ['TEXT SIZE', 'STEP NUMBERS', 'SCREEN']],
-    ['Layout & panels', ['ARRANGE', 'ARRANGE SIDE', 'SIDE PANEL', 'INST LIST', 'SECT', 'KEYS KEYPAD', 'BOTTOM PANEL', 'STAGE']],
+    ['Layout & panels', ['ARRANGE', 'ARRANGE SIDE', 'SIDE PANEL', 'INST LIST', 'SECT', 'KEYS KEYPAD', 'COMMAND BAR', 'BOTTOM PANEL', 'STAGE']],
     ['Phrase screen', ['SIMPLE PHRASE', 'FOLLOW', 'NEIGHBORS', 'PATTERN VIEW', 'ARRANGE FOCUS', 'SONG STRIP']],
     ['Song screen', ['CLASSIC SONG', 'SONG MOUSE', 'SECTIONS', 'LOOP DRAG', 'SONG PEEK']]]},
   input:{title:'Input', about:'PAD or KEYS, notes as you type, edit step, sticky keys, the command row', groups:[
@@ -18170,7 +18259,7 @@ const SHEETS = {
     ['Patterns', ['PATTERN LEN', '› ALL PHRASES TO']],
     ['Impulse responses', 'irs']]},
 };
-const SHEET_QUICK = ['TEXT SIZE', 'SIMPLE PHRASE', 'FOLLOW'];   // kept in the menus' Screen part too
+const SHEET_QUICK = ['TEXT SIZE', 'SIMPLE PHRASE', 'FOLLOW', 'COMMAND BAR'];   // kept in the menus' Screen part too
 const rowKey = r => r.l.replace(/\s+\d+$/, '');                    // '› ALL PHRASES TO 16' → '› ALL PHRASES TO'
 const sheetKeys = new Set(Object.values(SHEETS).flatMap(K => K.groups.flatMap(([, ks]) => Array.isArray(ks) ? ks : [])));
 const inSheet = r => SET_SHEETS && sheetKeys.has(rowKey(r));
