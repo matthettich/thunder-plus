@@ -24,6 +24,16 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (11): Option moves, Command edits
+
+Cache `thunderplus-v183`.
+- **KEYS mode modifiers swapped** (owner, the same afternoon as the (4) remap): **⌥/Alt + arrows change screen** (`nav`:
+  ◀▶ tab order, ▲ Project / back, ▼ Mixer; from Phrase ◀ gives Arrange the keys), **Ctrl/⌘ + arrows change the value**
+  (`bump`: ◀▶ ±1, ▲▼ more), in PAD mode with a keyboard too (Ctrl/⌘ + arrows = EDIT + arrows; Alt + arrows still page
+  there, OPTION + arrows). Ctrl/⌘ + Shift + arrows no longer change screen (globalKeys); they fall through to the value.
+  Shift + ⌥ + arrows (other phrase / block) and Shift + arrows (select) unchanged. Menu key labels (`cmdItems` val →
+  'mod+'), HINTK, Arrange's lines, the Pattern hint, the legend and the KEYS help tables all say so.
+
 ## 19 Oct (10): the COMMAND BAR is the editor's toolbar
 
 Cache `thunderplus-v182`.
@@ -179,7 +189,7 @@ Cache `thunderplus-v172` (not yet in a desktop build: v1.2.3 is the one before t
   original stays. EDIT×2 / Enter twice still makes a unique copy in place.
 - **⌥/Alt (or EDIT) + arrows on an EMPTY song block** start a new pattern on the next free number (`bump` → `newBlock(c,
   -1)`, sects hidden), not the last number used (00 on a fresh song). With Arrange holding the keys it opens in the editor.
-- **KEYS mode: Ctrl/⌘+arrows change screen, Shift+arrows select** (owner): keysDown's mod branch calls `nav(dir)` in
+- **KEYS mode: Ctrl/⌘+arrows change screen, Shift+arrows select** (owner; the modifiers were swapped in (11): ⌥ moves, ⌘ edits): keysDown's mod branch calls `nav(dir)` in
   KEYS mode (PAD mode with a keyboard keeps Ctrl/⌘+arrows = OPTION+arrows), so ⌘◀▶ walk the tabs, ⌘▲ Project, ⌘▼
   Mixer, ⌘▶ on Song opens the phrase, ⌘◀ on Phrase gives Arrange the keys (the nav wrapper). Shift+arrows go through
   `shiftSel`: ▲▼ whole lines as before, ◀▶ a block selection from the cursor (a line selection becomes a block), then ▲▼
