@@ -3487,10 +3487,10 @@ class VoxCore {
     this.syl = []; this.txt = null;
     this.segs = []; this.si = 0; this.st = 0; this.hold = false; this.coda = false; this.cur = null;
     this.env = 0; this.envT = 0; this.ph = 0; this.lf = 0; this.go = true; this.vt = 0; this.rate = 1; this.sylN = 0;
-    this.k = { f1:500, f2:1500, f3:2500, av:0, an:0, ah:0, nf:4000, nb:3000 };   // smoothed controls
+    this.k = { f1:500, f2:1500, f3:2500, av:0, an:0, ah:0, nf:4000, nb:3000, nz:0 };   // smoothed controls (nz: nasal murmur)
     this.tg = Object.assign({}, this.k);                                            // their targets
     this.r = new Float64Array(16); this.fz = new Float64Array(4); this.lp = 0; this.dc = 0; this.dcx = 0;
-    this.rnd = 12345; this.vph = 0; this.an1 = 0; this.yp = 0;
+    this.rnd = 12345; this.vph = 0; this.an1 = 0; this.yp = 0; this.nl = 0; this.nl2 = 0;
     this.p = null; this.set({});
   }
   static defaults(){
@@ -3723,13 +3723,13 @@ thunder:TH AH N D ER|seeds:S IY D Z|yes:Y EH S|ok:OW K EY|okay:OW K EY`;
     let vow = this.cur ? PH[this.cur.nu] : PH.AX; if (!vow || vow.t !== 'V') vow = PH.AX;
     const f = g.k === 'asp' || P.t === 'H' ? (g.k === 'asp' && this.coda ? PH.AX.f : vow.f) : g.k === 'glide' ? P.g : P.f;
     t.f1 = f[0]; t.f2 = f[1]; t.f3 = f[2];
-    t.av = 0; t.an = 0; t.ah = 0; t.nf = P.nf || 3000; t.nb = P.nb || 3000;
+    t.av = 0; t.an = 0; t.ah = 0; t.nf = P.nf || 3000; t.nb = P.nb || 3000; t.nz = g.k === 'son' && P.t === 'N' ? 1 : 0;
     switch (g.k){
       case 'hold': case 'glide': case 'son': t.av = P.av == null ? 1 : P.av; break;
       case 'clo': t.av = P.t === 'B' || P.t === 'J' ? 0.12 : 0; break;
-      case 'burst': t.an = P.t === 'P' || P.t === 'C' ? 0.7 : 0.45; t.av = P.t === 'B' || P.t === 'J' ? 0.25 : 0; t.nf = P.bf || 2000; t.nb = P.bb || 2500; break;
+      case 'burst': t.an = P.ba != null ? P.ba : P.t === 'P' || P.t === 'C' ? 0.7 : 0.45; t.av = P.t === 'B' || P.t === 'J' ? 0.25 : 0; t.nf = P.bf || 2000; t.nb = P.bb || 2500; break;
       case 'fric': { const F = P.t === 'C' ? PH.SH : P.t === 'J' ? PH.ZH : P; t.an = F.fa || 0.4; t.av = F.av || 0; t.nf = F.nf || 4000; t.nb = F.nb || 3000; break; }
-      case 'asp': t.ah = 0.42; break;
+      case 'asp': t.ah = 0.26; break;   // 0.42 before 18 Oct: the puff after P, T, K and the H were as loud as the vowel
       case 'end': this.envT = 0; break;
     }
     if (this.go){ for (const k of ['f1', 'f2', 'f3', 'nf', 'nb']) this.k[k] = t[k]; this.go = false; }
@@ -3747,10 +3747,13 @@ thunder:TH AH N D ER|seeds:S IY D Z|yes:Y EH S|ok:OW K EY|okay:OW K EY`;
     while (g && g.d >= 0 && this.st >= g.d && this.si < this.segs.length - 1){ this.si++; this.st = 0; g = this.segs[this.si]; this.enter(); }
     if (g && g.k === 'hold') this.hold = true;
     this.st += n;
-    // controls glide toward their targets: formants ~12 ms (consonant speed scales it), levels ~4 ms
-    const kf = 1 - Math.exp(-dt * 1000 / (12 / Math.max(0.3, p.cons))), ka = 1 - Math.exp(-dt * 1000 / 4), K = this.k, T = this.tg;
+    // controls glide toward their targets, levels in ~4 ms. Formants: ~10 ms into a consonant, ~16 ms through L, R, W, Y
+    // and the nasals, and ~24 ms into a vowel, so a vowel opens out of the consonant's shape as in speech: those
+    // transitions are much of what tells B from D from G (18 Oct; one 12 ms speed for everything before). Diction scales it.
+    const tfm = g && (g.k === 'hold' || g.k === 'glide') ? 24 : g && g.k === 'son' ? 16 : 10;
+    const kf = 1 - Math.exp(-dt * 1000 / (tfm / Math.max(0.3, p.cons))), ka = 1 - Math.exp(-dt * 1000 / 4), K = this.k, T = this.tg;
     K.f1 += (T.f1 - K.f1) * kf; K.f2 += (T.f2 - K.f2) * kf; K.f3 += (T.f3 - K.f3) * kf;
-    K.av += (T.av - K.av) * ka; K.an += (T.an - K.an) * ka; K.ah += (T.ah - K.ah) * ka; K.nf += (T.nf - K.nf) * ka; K.nb += (T.nb - K.nb) * ka;
+    K.av += (T.av - K.av) * ka; K.an += (T.an - K.an) * ka; K.ah += (T.ah - K.ah) * ka; K.nf += (T.nf - K.nf) * ka; K.nb += (T.nb - K.nb) * ka; K.nz += (T.nz - K.nz) * ka;
     // amplitude envelope
     const er = this.envT > this.env ? 1 - Math.exp(-dt * 1000 / Math.max(0.5, p.atk)) : 1 - Math.exp(-dt * 1000 * 4.6 / Math.max(5, p.rel));
     this.env += (this.envT - this.env) * er; if (this.envT === 0 && this.env < 1e-4) this.env = 0;
@@ -3763,7 +3766,7 @@ thunder:TH AH N D ER|seeds:S IY D Z|yes:Y EH S|ok:OW K EY|okay:OW K EY`;
     const vc = Math.max(0, Math.min(1, p.voice)), fs = Math.pow(2, p.form * 0.35), bwm = (0.6 + p.bw * 0.9) * (1.3 - cl * 0.6), rob = p.robot, br = p.breath, lv = Math.pow(10, (p.level || 0) / 20) * 0.32;
     const kb = 1 - Math.exp(-2 * Math.PI * (1200 * Math.pow(10, p.bright)) / sr), dr = (p.drive || 0) * 6, dn = dr ? 1 / Math.tanh(dr) : 1;
     const F1 = K.f1 * fs, F2 = K.f2 * fs, F3 = K.f3 * fs, F4 = 3350 * fs, F5 = 3850 * fs, B1 = 60 * bwm, B2 = 90 * bwm, B3 = 150 * bwm;
-    const nfz = K.nf * Math.sqrt(fs), nbz = K.nb;
+    const nfz = K.nf * Math.sqrt(fs), nbz = K.nb, nas = K.nz, knl = 1 - Math.exp(-2 * Math.PI * 650 * Math.sqrt(fs) / sr);
     if (this.env === 0 && this.envT === 0){ for (let i = a; i < b; i++){ L[i] = 0; R[i] = 0; } return; }
     for (let i = a; i < b; i++){
       this.vph += p.vibRate / sr; if (this.vph >= 1) this.vph -= 1;
@@ -3780,6 +3783,8 @@ thunder:TH AH N D ER|seeds:S IY D Z|yes:Y EH S|ok:OW K EY|okay:OW K EY`;
       this.an1 += (nz - this.an1) * 0.45; const anz = this.an1 * 1.3;
       const voiced = src * K.av * vc + (anz * K.ah * hs + nz * br * K.av * (0.5 + (1 - vc)) * open) * 0.6;   // Voice 0 = a whisper
       let y = this.reso(0, voiced, F1, B1); y = this.reso(1, y, F2, B2); y = this.reso(2, y, F3, B3); y = this.reso(3, y, F4, 250); y = this.reso(4, y, F5, 300);
+      // M, N, NG: the mouth is closed and the sound comes out of the nose, a low hum with little above ~650 Hz
+      this.nl += (y - this.nl) * knl; this.nl2 += (this.nl - this.nl2) * knl; if (nas > 0.001) y += (this.nl2 * 1.6 - y) * nas;
       // frication: noise through its own resonance, in parallel
       const fr = this.reso(5, nz * K.an * hs, nfz, nbz) * 1.6;
       // Clarity: a presence lift (the slope of the voiced sound) brings out the formants that tell vowels apart.
@@ -3793,7 +3798,10 @@ thunder:TH AH N D ER|seeds:S IY D Z|yes:Y EH S|ok:OW K EY|okay:OW K EY`;
   }
   // The phonemes: t = V vowel (g = where a diphthong ends), L approximant, N nasal, F/Z unvoiced/voiced fricative,
   // P/B unvoiced/voiced stop, C/J affricate, H aspiration. f = formants F1–F3 (Hz); av voicing; nf/nb/fa noise
-  // centre, width and level; bf/bb a stop's burst; d length in ms.
+  // centre, width and level; bf/bb/ba a stop's burst (centre, width, level); d length in ms.
+  // Noise levels (fa, ba) were set on 18 Oct by measuring each consonant before AA against the vowel, aiming at
+  // speech's balance: S −9 dB, SH −7, Z −13, F/TH about −20, V/DH −18, bursts −12 (T, K) to −18 (B), aspiration −16.
+  // They were 6–10 dB louder before, which is what made the voice sound hissy and full of noise bursts.
   static get PH(){ return VoxCore._ph || (VoxCore._ph = {
       IY:{t:'V', f:[270, 2290, 3010]}, IH:{t:'V', f:[390, 1990, 2550]}, EH:{t:'V', f:[530, 1840, 2480]}, AE:{t:'V', f:[660, 1720, 2410]},
       AA:{t:'V', f:[730, 1090, 2440]}, AO:{t:'V', f:[570, 840, 2410]}, UH:{t:'V', f:[440, 1020, 2240]}, UW:{t:'V', f:[300, 870, 2240]},
@@ -3803,14 +3811,14 @@ thunder:TH AH N D ER|seeds:S IY D Z|yes:Y EH S|ok:OW K EY|okay:OW K EY`;
       L:{t:'L', f:[360, 1000, 2750], av:0.85, d:55}, R:{t:'L', f:[330, 1060, 1380], av:0.9, d:55}, W:{t:'L', f:[290, 610, 2150], av:0.85, d:55},
       Y:{t:'L', f:[260, 2070, 3020], av:0.85, d:50},
       M:{t:'N', f:[270, 1000, 2200], av:0.55, d:65}, N:{t:'N', f:[270, 1600, 2600], av:0.55, d:60}, NG:{t:'N', f:[270, 2000, 2600], av:0.55, d:65},
-      F:{t:'F', f:[300, 1100, 2100], nf:5000, nb:5000, fa:0.25, d:85}, TH:{t:'F', f:[300, 1400, 2600], nf:5500, nb:5000, fa:0.18, d:80},
-      S:{t:'F', f:[320, 1700, 2600], nf:5600, nb:2400, fa:0.55, d:100}, SH:{t:'F', f:[300, 1800, 2400], nf:2700, nb:1600, fa:0.6, d:100},
-      V:{t:'Z', f:[280, 1100, 2100], nf:5000, nb:5000, fa:0.12, av:0.55, d:55}, DH:{t:'Z', f:[280, 1400, 2600], nf:5500, nb:5000, fa:0.1, av:0.55, d:45},
-      Z:{t:'Z', f:[300, 1700, 2600], nf:5600, nb:2400, fa:0.35, av:0.45, d:75}, ZH:{t:'Z', f:[300, 1800, 2400], nf:2700, nb:1600, fa:0.4, av:0.45, d:75},
-      P:{t:'P', f:[220, 900, 2100], bf:1100, bb:2200}, B:{t:'B', f:[220, 900, 2100], bf:1100, bb:2200},
-      T:{t:'P', f:[250, 1700, 2600], bf:4200, bb:3000}, D:{t:'B', f:[250, 1700, 2600], bf:4200, bb:3000},
-      K:{t:'P', f:[280, 1900, 2300], bf:2100, bb:1500}, G:{t:'B', f:[280, 1900, 2300], bf:2100, bb:1500},
-      CH:{t:'C', f:[300, 1800, 2400], bf:2800, bb:2000}, JH:{t:'J', f:[300, 1800, 2400], bf:2800, bb:2000},
+      F:{t:'F', f:[300, 1100, 2100], nf:5000, nb:5000, fa:0.1, d:85}, TH:{t:'F', f:[300, 1400, 2600], nf:5500, nb:5000, fa:0.072, d:80},
+      S:{t:'F', f:[320, 1700, 2600], nf:5600, nb:2400, fa:0.22, d:100}, SH:{t:'F', f:[300, 1800, 2400], nf:2700, nb:1600, fa:0.48, d:100},
+      V:{t:'Z', f:[280, 1100, 2100], nf:5000, nb:5000, fa:0.045, av:0.3, d:55}, DH:{t:'Z', f:[280, 1400, 2600], nf:5500, nb:5000, fa:0.035, av:0.3, d:45},
+      Z:{t:'Z', f:[300, 1700, 2600], nf:5600, nb:2400, fa:0.14, av:0.35, d:75}, ZH:{t:'Z', f:[300, 1800, 2400], nf:2700, nb:1600, fa:0.28, av:0.35, d:75},
+      P:{t:'P', f:[220, 900, 2100], bf:1100, bb:2200, ba:0.7}, B:{t:'B', f:[220, 900, 2100], bf:1100, bb:2200, ba:0.36},
+      T:{t:'P', f:[250, 1700, 2600], bf:4200, bb:3000, ba:0.35}, D:{t:'B', f:[250, 1700, 2600], bf:4200, bb:3000, ba:0.22},
+      K:{t:'P', f:[280, 1900, 2300], bf:2100, bb:1500, ba:0.5}, G:{t:'B', f:[280, 1900, 2300], bf:2100, bb:1500, ba:0.28},
+      CH:{t:'C', f:[300, 1800, 2400], bf:2800, bb:2000, ba:0.39}, JH:{t:'J', f:[300, 1800, 2400], bf:2800, bb:2000, ba:0.28},
       HH:{t:'H', f:[500, 1500, 2500], d:55}
     }); }
 }
@@ -6898,6 +6906,14 @@ document.addEventListener('click', e => {
   if (b.closest('.ask, [role=dialog], [role=menu], [role=listbox], .pbs, .ssh, #gset, #gfile') || b.hasAttribute('aria-haspopup')) return;
   setTimeout(() => { if (document.activeElement === b) b.blur(); }, 0);
 }, true);
+// A slider touched on a phone doesn't take focus (touch-action: pan-y), so a text box typed in just before (the voice's
+// lyrics, a search box) kept it: the keyboard stayed up and every change scrolled the page back to that box (18 Oct).
+// Touching or clicking a slider lets go of the text box. A tap on anything else already did.
+addEventListener('pointerdown', e => {
+  const a = document.activeElement, t = e.target;
+  if (!a || a === t || !t || !t.matches || !t.matches('input[type=range]')) return;
+  if (a.matches && a.matches('textarea, [contenteditable], input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button])')) a.blur();
+}, true);
 function typing(e){ const t = e.target; return !!(t && t.matches && t.matches('input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=file]),textarea,select,[contenteditable]') && t.getClientRects().length); }
 /* ---------- change handling ---------- */
 let rTimer = 0, sTimer = 0;
@@ -7383,6 +7399,7 @@ const VU = {
 };
 const VOX_PRE = [
   ['Init', {}],
+  ['Clear singer', {robot:0.22, breath:0.08, bright:0.62, bw:0.3, clar:0.8, vib:0.3, vibDelay:280, glide:45, cons:1.1}],   // the easiest to understand
   ['Robot choir', {robot:0.9, breath:0.05, vib:0.08, bright:0.7, bw:0.3, glide:30}],
   ['Talking toy', {robot:1, breath:0, vib:0, glide:0, bright:0.4, bw:0.15, form:0.15, cons:1.25}],
   ['Soft singer', {robot:0.12, breath:0.3, vib:0.45, vibDelay:300, bright:0.5, bw:0.75, glide:70, atk:30, rel:260}],

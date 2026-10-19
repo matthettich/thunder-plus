@@ -24,6 +24,24 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 18 Oct (late night, 2): voice clarity, lyrics box focus
+
+Cache `thunderplus-v169`.
+
+- **Lyrics box kept focus** (owner: changing a voice setting kept jumping back up to the text box): a slider touched on
+  a phone doesn't take focus (`touch-action: pan-y`), so the textarea kept it, the keyboard stayed up and the page
+  scrolled back to it on every change. A capture `pointerdown` next to `typing()` blurs a focused text field when a
+  range input is pressed. Global, but only for sliders (taps on anything else already moved focus).
+- **VoxCore clarity** (owner: breathy, bursts of noise). Measured each consonant before AA against the vowel
+  (`scratchpad/vox/phon.js`): S was −1 dB, Z −5, T burst −6, aspiration −12, all 6–10 dB louder than speech. Now:
+  per-phoneme `fa` lowered, new `ba` (burst level) per stop, aspiration `ah` 0.42 → 0.26, V/DH voicing 0.55 → 0.3 and
+  Z/ZH 0.45 → 0.35 (results: S −10, SH −8, Z −11, F −21, TH −23, V −14, DH −15, bursts −13…−18, asp −15…−17,
+  HH −14). Formant smoothing by segment: 10 ms consonants, 16 ms sonorants, 24 ms into vowels (was 12 ms for all),
+  so CV transitions carry place. Nasals (M N NG) get a murmur: the output crossfades to a two-pole 650 Hz low-pass
+  (`K.nz`, `this.nl/nl2`). The vowel itself is bit-identical to before (held [AA] measures the same). New preset
+  **Clear singer** (index 1; presets are only referenced by index at click time). Consonant noise (`hiss`) still
+  gives up to +6 dB for anyone who wants the old hiss.
+
 ## 18 Oct (late night): Arrange at the left, OPTION+arrows on Song, SONG tab, background play
 
 Cache `thunderplus-v168`. The owner, playing on the Fold, found SHIFT+◀ into Arrange confusing (Arrange sat at the right,
