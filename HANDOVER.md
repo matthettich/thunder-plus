@@ -26,7 +26,7 @@ Keep this file up to date at the end of a work session.
 
 ## 19 Oct (7): top bar mock-up D, DANCE · DRUM · KEYS · HIDE on the title line, command bar in columns
 
-Cache `thunderplus-v177`.
+Cache `thunderplus-v178`.
 - **Top bar = mock-up D** (owner: the inverted bar of (5) felt too heavy): light Simple skins give `.top` and its own
   buttons `--mxpanel2`; the screen tabs (`.ttabs button[data-v]`) are borderless words, the open one bold with a 4px
   underline (`inset 0 -4px 0 var(--mx)`). The (5) inverted-bar rules are gone.
@@ -41,6 +41,7 @@ Cache `thunderplus-v177`.
   right) by adding margin-left; a hidden or folded part leaves its group in the flow; if the result would overflow, all
   margins are dropped. Re-run (rAF, skipped when its signature is unchanged) from a ResizeObserver on the bar and the deck
   parts, draw() (song/phrase changes the visible buttons), applyCmdOrder and font loads; PAD mode clears the margins.
+- **Caps Lock fixed again** (see the Caps Lock line in (4)); tested with synthetic Mac and Windows event patterns.
 
 ## 19 Oct (6): basic effects (simple delay, filter, cut, compressor, gate, auto-pan, pump) and grouped FX picker
 
@@ -121,7 +122,9 @@ Cache `thunderplus-v172` (not yet in a desktop build: v1.2.3 is the one before t
   an empty cell (with ARRANGE FOCUS off) just moves the cursor. Checked beside FX, Mixer and Inst.
 - **POLY cells per skin**: light term skins mix `--tk-poly` 35% with white (plum went grey mixing green into pink);
   the dark ones keep mixing with their background.
-- **Caps Lock**: a keyup without a keydown (a Mac turning Caps Lock off) types an OFF too (`capsDn`).
+- **Caps Lock**: on a Mac a keyup types an OFF too (`MACK`; Chromium there sends keydown only when it turns on and keyup
+  only when it turns off). Fixed again in (7): the first version (`capsDn`, a keyup with no keydown before it) still lost every
+  other press because the turning-on keydown was always there. A keydown/keyup pair (<400 ms, same `getModifierState`) counts once.
 - **Poly OFF per column**: a poly row's OFF becomes `{type:'off', cols}`; voices carry `col` (all three voice makers);
   the player and MIDI out (`moOffCols`, held notes tagged with `col`) stop only those columns; the piano drops only
   those columns (`pos[t].offc`). Mono tracks unchanged.

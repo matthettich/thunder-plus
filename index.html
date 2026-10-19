@@ -18056,15 +18056,18 @@ document.addEventListener('keydown', e => {
   press(b, true);
 });
 document.addEventListener('keyup', e => { if (view !== 'tracker' || inMode === 'keys' || typing(e)) return; const b = KEYB[e.key]; if (b){ e.preventDefault(); release(b, true); } });
-// CAPS LOCK types a note off on EVERY press (owner, 19 Oct). A Mac sends keydown only when Caps Lock turns on and just a
-// keyup when it turns off, so every other press was lost: a keyup with no keydown before it counts as a press too
-// (Windows sends both each time, which stays one press).
-let capsDn = false;
-document.addEventListener('keydown', e => { if (e.key === 'CapsLock') capsDn = true; }, true);
+// CAPS LOCK types a note off on EVERY press (owner, 19 Oct). Windows and Linux send a keydown (and keyup) each press: the
+// keydown types it (keysDown). A Mac sends only the change: keydown when Caps Lock turns on, just a keyup when it turns
+// off, so on a Mac a keyup is a press too. (The first fix counted a keyup only with no keydown before it, but the
+// turning-on keydown of the press before was always there, so every other press was still lost.) If a Chromium on a Mac
+// ever sends both for one press, the pair (close together, the same Caps Lock state) counts once.
+let capsDnT = -1e9, capsDnS = null;
+const capsState = e => typeof e.getModifierState === 'function' ? e.getModifierState('CapsLock') : null;
+document.addEventListener('keydown', e => { if (e.key === 'CapsLock'){ capsDnT = performance.now(); capsDnS = capsState(e); } }, true);
 document.addEventListener('keyup', e => {
-  if (e.key !== 'CapsLock') return;
-  const was = capsDn; capsDn = false;
-  if (was || view !== 'tracker' || typing(e) || fxp.open || apF) return;   // apF: Arrange has the keys, not the phrase
+  if (e.key !== 'CapsLock' || !MACK) return;
+  const paired = performance.now() - capsDnT < 400 && capsState(e) === capsDnS; capsDnT = -1e9;
+  if (paired || view !== 'tracker' || typing(e) || fxp.open || apF) return;   // apF: Arrange has the keys, not the phrase
   if (curKind() === 'note'){ e.preventDefault(); typeOff(); }
 });
 window.addEventListener('blur', releaseAll);
