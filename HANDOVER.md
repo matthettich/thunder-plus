@@ -56,6 +56,13 @@ Cache `thunderplus-v172` (not yet in a desktop build: v1.2.3 is the one before t
   original stays. EDIT×2 / Enter twice still makes a unique copy in place.
 - **⌥/Alt (or EDIT) + arrows on an EMPTY song block** start a new pattern on the next free number (`bump` → `newBlock(c,
   -1)`, sects hidden), not the last number used (00 on a fresh song). With Arrange holding the keys it opens in the editor.
+- **KEYS mode: Ctrl/⌘+arrows change screen, Shift+arrows select** (owner): keysDown's mod branch calls `nav(dir)` in
+  KEYS mode (PAD mode with a keyboard keeps Ctrl/⌘+arrows = OPTION+arrows), so ⌘◀▶ walk the tabs, ⌘▲ Project, ⌘▼
+  Mixer, ⌘▶ on Song opens the phrase, ⌘◀ on Phrase gives Arrange the keys (the nav wrapper). Shift+arrows go through
+  `shiftSel`: ▲▼ whole lines as before, ◀▶ a block selection from the cursor (a line selection becomes a block), then ▲▼
+  grow the block; screens with nothing to select still change screen. Phrase navigation moved to Shift+Alt+arrows (in
+  a phrase `optDir(dir, true)`, elsewhere `shiftAltArrow` as before). Ctrl/⌘+Shift+arrows still change screen too.
+  Hints (HINTK, Arrange's lines, Pattern view's) and help (quick list, KEYS table, From PAD mode) updated.
 - Checked headless: all of the above, no console errors (FX scroll 0 on a long name, pattern persists Inst↔Phrase,
   pattern play rows 0/0 0/1 0/2, plum poly cell #bbccc0-ish, poly OFF `note@0 note@1 off:0`, clone ids 3 and 4 with
   the original 0 untouched).
