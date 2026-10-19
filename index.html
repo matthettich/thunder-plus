@@ -16193,15 +16193,27 @@ let stgKindNow = '', stgSig = '', stgReq = '';   // stgReq: what the last layout
 // It sits in the space to the right of the grid's text, the grid's height, when that space is big enough.
 // What the stage should show now ('' = nothing). SIMPLE PHRASE: no piano beside the phrase.
 const stageWant = () => view !== 'tracker' || stage === 'off' || spActive() ? '' : stageKind();
-function stageLayout(){
-  phStageSwitch();
-  const box = $('tStage'); stgReq = stageWant();
-  if (!stgReq){ box.hidden = true; stgKindNow = ''; return; }
+// The room beside the grid (or beside Arrange when it is the Song screen): where the stage goes.
+function stageRoom(){
   const asg = asongOn(), sr = scr.getBoundingClientRect(), gr = (asg ? arrEl : grid).getBoundingClientRect(), rg = document.createRange();
   let right = asg ? gr.right : 0; const lines = asg ? [] : grid.querySelectorAll('.ln');   // Arrange as the Song screen: the dogs dance beside it
   for (let i = 0; i < Math.min(lines.length, 80); i++){ rg.selectNodeContents(lines[i]); const r = rg.getBoundingClientRect(); if (r.width && r.right > right) right = r.right; }
   if (!asg) grid.querySelectorAll('.tgbox').forEach(b => { const r = b.getBoundingClientRect(); if (r.right > right) right = r.right; });
-  const left = right - sr.left + 18, w = sr.width - left - 14, top = gr.top - sr.top, h = gr.height;
+  const left = right - sr.left + 18;
+  return {right, left, w:sr.width - left - 14, top:gr.top - sr.top, h:gr.height};
+}
+/* DANCE / DRUM / KEYS / HIDE (owner, 19 Oct): when there's no room for the dogs beside the phrase (narrower than
+   150 px), DANCE and DRUM are hidden and KEYS shows lit (the keys stand in); with no room even for the keys
+   (90 px, or under 150 px tall), the whole switch goes. The room is measured on every layout, HIDE included. */
+let stgRoomPh = 2;   // 2 the dogs fit, 1 only the keys, 0 nothing
+function stageLayout(){
+  const box = $('tStage'); stgReq = stageWant();
+  const phOn = view === 'tracker' && tv === 'phrase' && stage === 'screen' && !mstView() && !spActive();
+  const R = stgReq || phOn ? stageRoom() : null;
+  if (phOn) stgRoomPh = !(R.right > 0 && R.h >= 150) ? 0 : R.w >= 150 ? 2 : R.w >= 90 ? 1 : 0;
+  phStageSwitch();
+  if (!stgReq){ box.hidden = true; stgKindNow = ''; return; }
+  const {right, left, w, top, h} = R;
   let kind = stageKind(); if (tv === 'phrase' && (kind === 'dogs' || kind === 'drum') && w < 150) kind = 'piano';   // too narrow for the dogs: the keys
   const minW = kind === 'piano' ? 90 : kind === 'peek' ? 220 : 150, show = right > 0 && w >= minW && h >= 150; box.hidden = !show; if (!show){ stgKindNow = ''; return; }
   Object.assign(box.style, {left:left + 'px', top:top + 'px', width:w + 'px', height:h + 'px'});
@@ -16321,9 +16333,11 @@ function drumsBeat(bar, ms){
 // SCREEN); not on the master's phrase (its stage is the effects chain) or in SIMPLE PHRASE.
 function phStageSwitch(){
   const sw = $('tStagePs'); if (!sw) return;
-  const show = view === 'tracker' && tv === 'phrase' && stage === 'screen' && !mstView() && !spActive() && innerWidth >= 600;
+  const show = view === 'tracker' && tv === 'phrase' && stage === 'screen' && !mstView() && !spActive() && innerWidth >= 600 && stgRoomPh > 0;
   sw.hidden = !show; if (!show) return;
-  sw.querySelectorAll('button').forEach(b => { const on = b.dataset.k === phStage; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+  const dogs = stgRoomPh >= 2, now = !dogs && (phStage === 'dance' || phStage === 'drum') ? 'keys' : phStage;   // no room: the keys stand in
+  sw.querySelectorAll('button').forEach(b => { const k = b.dataset.k, on = k === now; b.hidden = !dogs && (k === 'dance' || k === 'drum');
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
 }
 $('tStagePs').addEventListener('pointerdown', e => e.stopPropagation());   // a button, not the start of a scroll (which would take the click)
 $('tStagePs').addEventListener('click', e => { const b = e.target.closest('button'); if (b){ b.blur(); setPhStage(b.dataset.k); } });
@@ -16665,11 +16679,16 @@ mstLabel();
 const DKK = 'thunderplus-deck-v1';
 // In signal-flow order: the instrument, its …chains (they come before the track effects), the track effects, the strip.
 const DK_SECS = [['scope', 'SCOPE'], ['inst', 'INST'], ['chn', '…CHAINS'], ['fx', 'FX'], ['strip', 'TRACK']];
-let deck = (() => { const d = {on:true, scope:true, inst:true, chn:true, fx:true, strip:true, h:168, ws:300, wf:320};
+let deck = (() => { const d = {on:true, scope:true, inst:true, chn:true, fx:true, strip:true, h:0, ws:300, wf:320};
   try { const o = JSON.parse(localStorage.getItem(DKK) || 'null');
     if (o && typeof o === 'object'){ for (const k in d) if (typeof o[k] === typeof d[k]) d[k] = o[k]; } } catch(e){}
   d.scope = d.strip = true;   // SCOPE and TRACK can't be hidden or folded (older saves could hide them)
+  if (d.h === 168) d.h = 0;   // the old fixed default: never dragged, so it follows the window now
   return d; })();
+/* The panel's height: deck.h once its top edge is dragged, else (0, the default, and after a double-click on the edge)
+   a quarter of the window, 168–240 px (owner, 19 Oct: a taller panel looked better, and the phrase's text sizes to
+   the height left, so a taller panel leaves room beside it for the dogs). */
+const deckH = () => deck.h || clamp(Math.round(innerHeight * 0.25), 168, 240);
 const deckSave = () => { try { localStorage.setItem(DKK, JSON.stringify(deck)); } catch(e){} };
 const deckShown = () => !$('tDeck').hidden;
 const dkSec = k => $('dk' + k[0].toUpperCase() + k.slice(1));
@@ -16702,7 +16721,7 @@ function deckLayout(){
   // The strip lines up with what sits above it on the right: the side panel, or Arrange when that's hidden.
   { const side = document.querySelector('.tside'), arr = $('tArr'), above = side && side.offsetWidth ? side : arr && arr.offsetWidth ? arr : null;
     const w = above ? above.getBoundingClientRect().width : 0; $('tDeck').style.setProperty('--dkstw', (w >= 190 && w <= 420 ? Math.round(w) : 228) + 'px'); }
-  $('tDeck').style.setProperty('--dkh', deck.h + 'px');
+  $('tDeck').style.setProperty('--dkh', deckH() + 'px');
   $('tDeck').style.setProperty('--dkws', deck.ws + 'px'); $('tDeck').style.setProperty('--dkwf', deck.wf + 'px');
   for (const [k, l] of DK_SECS){ const sct = dkSec(k), col = DK_FOLD.has(k) && !deck[k]; sct.hidden = false; sct.classList.toggle('col', col); sct.classList.toggle('first', k === 'scope');
     const t = sct.querySelector('.dkt'); if (t && DK_FOLD.has(k)){ t.setAttribute('aria-expanded', String(!col)); t.title = col ? 'Open ' + l : 'Fold ' + l + ' to a narrow strip'; } }
@@ -16866,7 +16885,7 @@ function deckFx(){
 // their widths. Remembered on this device.
 function dkDrag(handle, onMove, onEnd){
   handle.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); try { handle.setPointerCapture(e.pointerId); } catch(_){}
-    const st = {x:e.clientX, y:e.clientY, h:deck.h, ws:deck.ws, wf:deck.wf, id:e.pointerId}; handle.classList.add('dn');
+    const st = {x:e.clientX, y:e.clientY, h:deckH(), ws:deck.ws, wf:deck.wf, id:e.pointerId}; handle.classList.add('dn');
     const mv = ev => { if (ev.pointerId !== st.id) return; onMove(ev.clientX - st.x, ev.clientY - st.y, st); };
     const up = ev => { if (ev.pointerId !== st.id) return; handle.classList.remove('dn'); handle.removeEventListener('pointermove', mv); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up); deckSave(); onEnd && onEnd(); };
     handle.addEventListener('pointermove', mv); handle.addEventListener('pointerup', up); handle.addEventListener('pointercancel', up); });
@@ -16874,7 +16893,8 @@ function dkDrag(handle, onMove, onEnd){
 let dkFitRaf = 0;
 const dkRefit = () => { if (!dkFitRaf) dkFitRaf = requestAnimationFrame(() => { dkFitRaf = 0; fit(); draw(); }); };
 dkDrag($('dkGrip'), (dx, dy, st) => { deck.h = clamp(Math.round(st.h - dy), 110, Math.max(140, Math.round(innerHeight * 0.6))); $('tDeck').style.setProperty('--dkh', deck.h + 'px'); dkRefit(); }, dkRefit);
-$('dkGrip').addEventListener('dblclick', () => { deck.h = 168; deckSave(); deckLayout(); dkRefit(); });
+$('dkGrip').addEventListener('dblclick', () => { deck.h = 0; deckSave(); deckLayout(); dkRefit(); });   // back to following the window
+addEventListener('resize', () => { if (!deck.h) $('tDeck').style.setProperty('--dkh', deckH() + 'px'); });   // before the refit measures the grid
 const dkMaxW = () => Math.max(220, $('dkBody').clientWidth - 420);
 dkDrag($('dkScope').querySelector('.dkw'), (dx, dy, st) => { deck.ws = clamp(Math.round(st.ws + dx), 90, dkMaxW()); $('tDeck').style.setProperty('--dkws', deck.ws + 'px'); });
 dkDrag($('dkFx').querySelector('.dkw'), (dx, dy, st) => { deck.wf = clamp(Math.round(st.wf - dx), 200, dkMaxW()); $('tDeck').style.setProperty('--dkwf', deck.wf + 'px'); });

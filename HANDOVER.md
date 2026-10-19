@@ -24,6 +24,18 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (14): a taller bottom panel by default; DANCE/DRUM only when the dogs fit
+
+Cache `thunderplus-v189`.
+- **Bottom panel height** (owner: dragging it taller looked better and made room for the dogs, since the phrase's text
+  sizes to the height left): `deck.h` is now 0 = follow the window (`deckH()`: a quarter of `innerHeight`, 168–240 px),
+  a number once the top edge is dragged; a double-click on the edge goes back to following. Saved `168` (the old fixed
+  default, so never dragged) reads as 0. A resize listener updates `--dkh` before the refit measures.
+- **DANCE · DRUM · KEYS · HIDE**: `stageRoom()` (split out of `stageLayout`) measures the room beside the grid on every
+  layout, HIDE included; `stgRoomPh` 2 the dogs fit (150 px), 1 only the keys (90 px), 0 nothing (or under 150 px tall).
+  `phStageSwitch` hides DANCE and DRUM at 1 (KEYS shows lit, since the keys stand in; the choice is kept, so the dogs
+  come back when there's room) and the whole switch at 0. Tested 1100×700 to 1680×1000, phrase and pattern view.
+
 ## 19 Oct (13): every …chains effect is stereo
 
 Cache `thunderplus-v188`; `chains-worklet.js?v=30`, `waves-worklet.js?v=25`.
