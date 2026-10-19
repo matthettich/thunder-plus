@@ -24,6 +24,27 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (15): Sidechain In picks its source; its meter; SC lights
+
+Cache `thunderplus-v190`; `chains-worklet.js?v=31`.
+- **Source** on Sidechain In (`src`, first control): 0 the sidechain bus (the Mixer's SC row, as before), 1–32 one
+  track's own sound: mono, taken at the track's input node (before its …chains, FX and fader), so a muted ghost kick
+  still drives it and nothing can loop back into a chain. Host (`makePlayer`): a 32-input `ChannelMerger` (`taps`,
+  made when first needed) fed by every `buses[t].inp`; `tapSync(b)` connects it to input 2 of a track's …chains node
+  while `chnTaps(S.chainPatch)` (a Sidechain In with src > 0); called from `routeTrack` and, via the player's
+  `tapsSync`, from the bridge's `param('src')` and `mod`. `routeTrack`'s `b.inp.disconnect()` drops the tap, so
+  `inpTap(t)` reconnects it. `chainsNode` now has 3 inputs with `channelCountMode:'max'` (input 2 arrives with 32
+  channels; a mono track input reads as both sides, as before). Engine: `ThunderChains.process` puts `ins[2]` in
+  `e.taps`; `ctx.tap(k)` is a channel or silence.
+- **Meter** on Sidechain In (`display:'scin'`, `show`: peak dB and envelope): IN with a 1.5 s peak tick, ENV 0–100%,
+  falling back when telemetry stops. `_active` runs an unpatched Sidechain In while the editor watches
+  (`telemetryOn === true`), so it can be checked before it's patched.
+- **SC lights**: every SC input (Sidechain Comp, Compressor, Noise gate, Envelope filter) has an LED (`.scled`) that
+  flashes with the sidechain it hears: the SC cable's jack meter, or `scbus` (`ChainsEngine._scPeak`: the bus's peak,
+  reported when the module listens to the bus: Sidechain Comp always, the others with Source on Sidechain).
+- Tested in the app (headless, playing): Track 1 source unpatched −45 dB / env .17; bus without SC Out silent; bus with
+  SC Out −38 dB; a silent track silent; Track 1 muted still drives it; the LED flickers with the hits.
+
 ## 19 Oct (14): a taller bottom panel by default; DANCE/DRUM only when the dogs fit
 
 Cache `thunderplus-v189`.

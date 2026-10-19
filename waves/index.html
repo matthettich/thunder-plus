@@ -1041,6 +1041,7 @@ const catStyle = (el, type) => { const c = CAT_COLOR[type]; if (c){ el.classList
 .shw .tr .z{position:absolute; top:0; bottom:0; width:1px; background:var(--rec); opacity:.7}
 .shw .ch span:last-child{text-align:right}
 .shw .ch.hot span:last-child{color:var(--rec); font-weight:600}
+.shw.sci .ch{grid-template-columns:28px 1fr 52px} .shw.sci .ch:last-child .tr i{background:var(--mod)}
 .shw.gr .tr i{left:auto; right:0; transform-origin:right; background:var(--gate)}
 .shw canvas.bdbars{width:100%; height:96px; display:block; touch-action:none; cursor:ns-resize}
 .shw canvas.lifegrid{width:100%; height:132px; display:block; touch-action:none; cursor:pointer}
@@ -1056,9 +1057,18 @@ function buildShow(n){
     if (kind === 'meter'){ const z = h('span', {class:'z'}); z.style.left = (showPos(0) * 100) + '%'; tr.append(z); }
     const r = h('div', {class:'ch'}, h('span', {text:lbl}), tr, v); box.append(r); rows.push({r, i, b, v, hold:-200, ht:0}); };
   if (kind === 'meter'){ mk('L'); mk('R'); box.title = 'Bars: average (VU) level. Tick: peak (held 1.5 s). Number: peak in dB. The red line is 0 dB.'; }
+  else if (kind === 'scin'){ mk('IN'); mk('ENV'); rows[1].b.hidden = true; box.classList.add('sci'); box.title = 'IN: the level of what Source picks (peak, dB). ENV: the envelope its hits make (what Env and Duck send out).'; }
   else { mk('GR'); rows[0].b.hidden = true; box.title = 'Gain reduction: how much the limiter is turning the sound down.'; }
   n.show = { kind, rows, seen:0 };
   return box;
+}
+// Sidechain In's meter: IN the peak (held 1.5 s at the tick), ENV the envelope (0–1); both fall back when it goes quiet.
+function scinPaint(S, pk, env, now){
+  const A = S.rows[0], E = S.rows[1];
+  A.i.style.transform = 'scaleX(' + showPos(pk) + ')';
+  if (pk >= A.hold || now - A.ht > 1500){ A.hold = pk; A.ht = now; }
+  A.b.style.left = (showPos(A.hold) * 100) + '%'; A.v.textContent = A.hold <= -90 ? '−∞' : (A.hold > 0 ? '+' : '') + A.hold.toFixed(1);
+  E.i.style.transform = 'scaleX(' + Math.max(0, Math.min(1, env)) + ')'; E.v.textContent = Math.round(Math.max(0, Math.min(1, env)) * 100) + '%';
 }
 function paintShows(list){
   const now = performance.now();
@@ -1067,6 +1077,7 @@ function paintShows(list){
     const S = n.show; S.seen = now;
     if (S.kind === 'bars'){ for (let i = 0; i < 8; i++) S.lit[i] = Math.max(S.lit[i], v[i] || 0); continue; }
     if (S.kind === 'life'){ S.x = v[0]; S.gen = v[1]; S.live = v.slice(2, 10); continue; }
+    if (S.kind === 'scin'){ scinPaint(S, v[0], v[1], now); continue; }
     if (S.kind === 'meter') for (let c = 0; c < 2; c++){
       const R = S.rows[c], vu = v[c], pk = v[c + 2];
       R.i.style.transform = 'scaleX(' + showPos(vu) + ')';

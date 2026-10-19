@@ -11753,6 +11753,7 @@ window.thunderChains = {
     const m = d.modules.find(x => x.id === id); if (m) (m.params = m.params || {})[name] = value;
     if (before){ chainsAutoOn(before); chainsPush(); }   // a Track In / Chain Out moved: re-route the tracks either way
     if (!rt || !rt.pl) return;
+    if (name === 'src' && rt.pl.tapsSync) rt.pl.tapsSync();   // a Sidechain In switched between the bus and a track
     const msg = { target:'chains-host', op:'param', id, name, value };
     for (const b of rt.pl.buses){
       if (!b || !b.chn || !b.chn._send) continue;
@@ -11776,6 +11777,7 @@ window.thunderChains = {
         b.chn._send(msg);
         patchOp(b.chn._sent, op);
       }
+      if (rt.pl.tapsSync) rt.pl.tapsSync();   // a Sidechain In set to a track came or went
     }
     chainsAutoOn(before);   // a new Chain Out (or a pair added with ⌘V / the palette) turns its track's CHN on
   },
@@ -12458,7 +12460,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=30')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=31')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -12472,6 +12474,8 @@ const chnClone = o => o == null ? o : JSON.parse(JSON.stringify(o));
 /* What changed between two chains patches, as engine ops. Params become `param` (the engine
    reads them every block, so sliders move the sound smoothly); only real structure becomes
    add/remove/connect/disconnect. A missing/short previous patch forces a full reload. */
+// SOURCE: does the patch have a Sidechain In listening to a track (so the …chains nodes need every track's own sound)?
+const chnTaps = d => !!(d && Array.isArray(d.modules) && d.modules.some(m => m && m.type === 'scin' && m.params && Math.round(+m.params.src || 0) > 0));
 function chnDiff(prev, next){
   if (!next) return [];
   // STEREO: the engine patched an older (no st2) patch's right sides itself; once the editor saves them (st2), reload
@@ -12496,8 +12500,10 @@ function chnDiff(prev, next){
 }
 function chainsNode(ac, track, patch, tempo){
   if (!chnSync.has(ac)) return null;   // module not loaded yet: caller re-routes when ready
-  const n = new AudioWorkletNode(ac, 'thunder-chains', {numberOfInputs:2, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
-    channelCountMode:'explicit', channelInterpretation:'speakers',
+  // Inputs: 0 the track, 1 the sidechain bus, 2 (SOURCE) every track's own sound, one channel each, when the patch has a
+  // Sidechain In set to a track. 'max' so input 2 arrives with all 32 channels (a mono track input is read as both sides).
+  const n = new AudioWorkletNode(ac, 'thunder-chains', {numberOfInputs:3, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
+    channelCountMode:'max', channelInterpretation:'speakers',
     processorOptions:{bytes:chnBin(), track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac)}});
   n.load = 0;
   // 2048 samples (~45 ms) per look, read every 60 ms, so short hits (hats, clicks) still show on the meters.
@@ -13187,6 +13193,19 @@ function makePlayer(ac, out, getBuf, live){
   // The sidechain detector bus: tracks send into it (Sidechain Out), every …chains node reads it as input 1.
   // It is never connected to the output, so it makes no sound on its own.
   const scBus = ac.createGain();
+  // SIDECHAIN IN by track (owner, 19 Oct): every track's own sound, mono, before its effects and fader (so a muted
+  // ghost kick still drives it, and nothing can loop back into a chain), one channel per track on a 32-channel merger
+  // that goes to input 2 of the …chains nodes while the patch has a Sidechain In set to a track. Made when first needed.
+  let taps = null;
+  const tapNode = () => { if (!taps){ taps = ac.createChannelMerger(NT); for (let t = 0; t < NT; t++) try { buses[t].inp.connect(taps, 0, t); } catch(e){} } return taps; };
+  function tapSync(b){
+    if (!b) return;
+    const want = !!b.chn && chnTaps(S.chainPatch);
+    if (b._tapTo && (b._tapTo !== b.chn || !want)){ try { taps.disconnect(b._tapTo, 0, 2); } catch(e){} b._tapTo = null; }
+    if (want && !b._tapTo){ try { tapNode().connect(b.chn, 0, 2); b._tapTo = b.chn; } catch(e){} }
+  }
+  const tapsSync = () => { for (let t = 0; t < NT; t++) tapSync(buses[t]); };
+  const inpTap = t => { if (taps && t < NT) try { buses[t].inp.connect(taps, 0, t); } catch(e){} };   // rewiring a track disconnects its input from everything
   // The beat clock for tempo-locked track and master effects (Flex, Step gate, Retrigger): the song position in beats
   // (wrapping every 16) as sample-accurate automation on a constant source, wired into every effect node's `bp`.
   // −1 while stopped. The sequencer's 'beat' events ramp it from row to row, so it follows TPO exactly, live and offline.
@@ -13469,9 +13488,9 @@ function makePlayer(ac, out, getBuf, live){
     // ride on the native-FX flag: a browser without the fx worklet should still run chains.
     const wantChn = chainsFeed(t) && !!S.chainPatch && S.chainPatch.format === 'chains.patch';
     const wantFx = !!fxOk && chain.length > 0;
-    if (!wantChn && b.chn){ try { if (b.chn._send) b.chn._send({target:'chains-host', op:'dispose'}); b.chn.disconnect(); } catch(e){} b.chn = null; }
+    if (!wantChn && b.chn){ try { if (b.chn._send) b.chn._send({target:'chains-host', op:'dispose'}); b.chn.disconnect(); } catch(e){} b.chn = null; tapSync(b); }
     if (!wantFx && b.fx){ try { b.fx.port.postMessage(null); } catch(e){} b.fx = null; }
-    if (!wantChn && !wantFx){ try { b.inp.disconnect(); } catch(e){} b.inp.connect(b.g); return; }
+    if (!wantChn && !wantFx){ try { b.inp.disconnect(); } catch(e){} b.inp.connect(b.g); inpTap(t); return; }
     if (wantChn && !b.chn){
       try {
         b.chn = chainsNode(ac, t, S.chainPatch, S.bpm);
@@ -13484,12 +13503,13 @@ function makePlayer(ac, out, getBuf, live){
       for (const op of chnDiff(b.chn._sent, S.chainPatch)) b.chn._send(Object.assign({target:'chains-host'}, op));
       b.chn._sent = chnClone(S.chainPatch);
     }
+    tapSync(b);   // SOURCE: the tracks' own sounds into input 2, while a Sidechain In listens to a track
     if (wantFx && !b.fx){ try { b.fx = tfxNode(ac, chain); clockTo(b.fx); try { scBus.connect(b.fx, 0, 1); } catch(e){} } catch(e){ b.fx = null; } }   // input 1: the sidechain bus (Envelope filter)
     else if (wantFx && b.fx){ try { b.fx.port.postMessage(chain); } catch(e){} }
     // Rewire only when which nodes sit in the slot changed: disconnecting/reconnecting a
     // running worklet every param change is its own little click.
     if (b._chnRef !== b.chn || b._fxRef !== b.fx){
-      try { b.inp.disconnect(); } catch(e){}
+      try { b.inp.disconnect(); } catch(e){} inpTap(t);
       try { if (b.fx) b.fx.disconnect(); } catch(e){}
       try { if (b.chn) b.chn.disconnect(); } catch(e){}
       let head = b.inp;
@@ -13510,8 +13530,9 @@ function makePlayer(ac, out, getBuf, live){
       try { if (b.chn){ if (b.chn._send) b.chn._send({target:'chains-host', op:'dispose'}); b.chn.disconnect(); } } catch(e){}
       try { b.inp.disconnect(); b.g.disconnect(); b.p.disconnect(); b.scs.disconnect(); } catch(e){} }
     try { scBus.disconnect(); } catch(e){}
+    try { if (taps) taps.disconnect(); } catch(e){}
   }
-  return {play, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose};
+  return {play, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync};
 }
 
 /* ---------- live playback ---------- */

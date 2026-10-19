@@ -421,24 +421,33 @@ const ChainOut = {
 /* ── Sidechain ──────────────────────────────────────────────────────────────
    The Mixer's Sidechain Out sends a track's audio to a detector bus every chain node receives.
    Sidechain In copies that bus out (audio) and as an envelope (cv), so it can be patched anywhere;
-   Sidechain Comp ducks its own input by that bus (or by whatever is patched into its SC input). */
+   Sidechain Comp ducks its own input by that bus (or by whatever is patched into its SC input).
+   SOURCE (owner, 19 Oct): Sidechain In can listen to one track instead of the bus: src 0 the bus, 1–32 that track's
+   own sound (mono, before its effects and fader, so a muted "ghost" kick still drives it), which the host sends on
+   the node's input 2 (ctx.tap). Its meter (show: the peak in dB and the envelope) is drawn on the module, and it runs
+   while the editor watches even before it's patched (ChainsEngine._active), so it can be checked first. */
 const SidechainIn = {
   type:'scin', scope:'mono', cost:.05,
   inputs:{}, outputs:{ out:'audio', env:'cv', duck:'cv' },
-  params:{ send:[1,0,1,.01], sens:[6,-12,24,.5], release:[150,10,1000,1] },
-  create:()=>({ env:0 }),
+  params:{ send:[1,0,1,.01], sens:[6,-12,24,.5], release:[150,10,1000,1], src:[0,0,CHAN_COUNT,1] },
+  create:()=>({ env:0, pk:0, em:0 }),
+  show(st){ const v = [st.pk > 1e-5 ? 20 * Math.log10(st.pk) : -120, st.em]; st.pk = 0; st.em = 0; return v; },
   // Env rises as the sidechain hits (to open a filter, say); Duck is its mirror, 1 while the sidechain is quiet and
   // dipping on each hit, ready for a VCA's CV to pump a sound. Sensitivity (dB) sets how hard the hits push them (a
   // quiet kick needs more); Level only sets the audio Out. A 2 ms attack and the Release make a smooth envelope.
   process(st, io, ctx){
-    const L = ctx.scL, R = ctx.scR, g = io.p.send, oE = io.out.env, oD = io.out.duck, sg = Math.pow(10, io.p.sens / 20);
+    const k = Math.round(io.p.src || 0), tk = k > 0 && ctx.tap ? ctx.tap(k - 1) : null;   // a track's own sound, or the bus
+    const L = tk || ctx.scL, R = tk || ctx.scR, g = io.p.send, oE = io.out.env, oD = io.out.duck, sg = Math.pow(10, io.p.sens / 20);
     const ka = 1 - Math.exp(-1 / (.002 * ctx.sr)), kr = 1 - Math.exp(-1 / Math.max(1, io.p.release / 1000 * ctx.sr));
+    let pk = st.pk;
     for (let i = 0; i < ctx.block; i++){
-      const x = (L[i] + R[i]) * .5, a = (x < 0 ? -x : x) * sg;
+      const x = (L[i] + R[i]) * .5, ax = x < 0 ? -x : x, a = ax * sg;
+      if (ax > pk) pk = ax;
       st.env += (a - st.env) * (a > st.env ? ka : kr);
       const e = st.env > 1 ? 1 : st.env;
       io.out.out[i] = x * g; oE[i] = e; oD[i] = 1 - e;
     }
+    st.pk = pk < 8 ? pk : 8; if (!(st.env < 1e3)) st.env = 0; const e = st.env > 1 ? 1 : st.env; if (e > st.em) st.em = e;
   }
 };
 const SidechainComp = {
@@ -4430,6 +4439,7 @@ class ChainsEngine {
     /* Sidechain: a stereo detector bus the host feeds from the tracks' Sidechain Outs. Modules read it
        through ctx (Sidechain In copies it out; Sidechain Comp uses it when nothing is patched). */
     this.scL = new Float32Array(BLOCK); this.scR = new Float32Array(BLOCK); this.scOn = false;
+    this.taps = null; this._zero = new Float32Array(BLOCK);   // SOURCE: the tracks' own sounds, one channel each (Sidechain In)
     /* focus: in Thunder each track's node only runs the modules that lead to a Chain Out for ITS track (and what
        modulates them). It used to run the whole patch, so 4 tracks on …chains did 4× every track's effects. -1 = all. */
     this.focus = opts.focus == null ? -1 : opts.focus; this._act = null; this._actKey = -1;
@@ -4438,7 +4448,8 @@ class ChainsEngine {
       trackInL:k => this.trackInL ? this.trackInL.subarray(k * BLOCK, (k + 1) * BLOCK) : null,
       trackInR:k => this.trackInR ? this.trackInR.subarray(k * BLOCK, (k + 1) * BLOCK) : null,
       busL:k => this.busesL.subarray(k * BLOCK, (k + 1) * BLOCK), busR:k => this.busesR.subarray(k * BLOCK, (k + 1) * BLOCK),
-      scL:this.scL, scR:this.scR, scOn:() => this.scOn };
+      scL:this.scL, scR:this.scR, scOn:() => this.scOn,
+      tap:k => (this.taps && this.taps[k]) || this._zero };   // SOURCE: track k's own sound (input 2), silence when not sent
   }
   addModule(id, type, o = {}){
     const def = MODULES[type]; if (!def) return;
@@ -4477,10 +4488,11 @@ class ChainsEngine {
   /* The modules this node has to run (null: all of them). */
   _active(){
     if (this.focus < 0) return null;
-    const g = this.graph, key = g.ver * 4096 + g.mods.size;   // a number, not a string made every block
+    const tel = this.telemetryOn === true, g = this.graph, key = g.ver * 4096 + g.mods.size + (tel ? .5 : 0);   // a number, not a string made every block
     if (this._act && this._actKey === key) return this._act;
     const act = new Set(), q = [];
     for (const m of g.mods.values()) if (m.def === ChainOut && clamp((m.inst.params.track | 0) - 1, 0, CHAN_COUNT - 1) === this.focus){ act.add(m.id); q.push(m.id); }
+    if (tel) for (const m of g.mods.values()) if (m.def === SidechainIn && !act.has(m.id)){ act.add(m.id); q.push(m.id); }   // its meter shows before it's patched
     while (q.length){ for (const c of g.inc.get(q.pop()) || []) if (!act.has(c.a[0])){ act.add(c.a[0]); q.push(c.a[0]); } }
     this._act = act; this._actKey = key; return act;
   }
@@ -4586,7 +4598,7 @@ class ChainsEngine {
         if (want || io.byp){ this._bypRun(m, io, ctx, want); if (meter) this._jackPeaks(io, frames); continue; }
       }
       m.def.process(this._state(m), io, ctx);
-      if (meter) this._jackPeaks(io, frames);
+      if (meter){ this._jackPeaks(io, frames); if (m.def.inputs && m.def.inputs.sc) this._scPeak(m, io, frames); }
     }
   }
   /* Jack meters (only while the editor shows them): the loudest sample on each output, and on each patched input,
@@ -4595,6 +4607,15 @@ class ChainsEngine {
     const po = io.pko || (io.pko = {}), pi = io.pki || (io.pki = {});
     for (const k in io.out){ const b = io.out[k]; let x = po[k] || 0; for (let i = 0; i < n; i++){ const a = b[i] < 0 ? -b[i] : b[i]; if (a > x) x = a; } po[k] = x; }
     for (const k in io.in){ if (!io.linked.has(k)) continue; const b = io.in[k]; let x = pi[k] || 0; for (let i = 0; i < n; i++){ const a = b[i] < 0 ? -b[i] : b[i]; if (a > x) x = a; } pi[k] = x; }
+  }
+  /* SC LEDs: a module with an SC input that listens to the mixer's sidechain bus (Sidechain Comp always, the others
+     with Source on Sidechain) reports the bus's peak as its 'scbus' jack, so its LED shows the bus at work; a cable in
+     SC is metered as the 'sc' jack already. */
+  _scPeak(m, io, n){
+    if (io.linked.has('sc') || !this.scOn || !(m.def === SidechainComp || (io.p.source || 0) >= .5)) return;
+    const pi = io.pki || (io.pki = {}), L = this.scL, R = this.scR; let x = pi.scbus || 0;
+    for (let i = 0; i < n; i++){ const a = Math.abs(L[i] + R[i]) * .5; if (a > x) x = a; }
+    pi.scbus = x;
   }
   /* Date.now() is coarse, but its average over many blocks is the real cost. */
   _tickLoad(ms, frames){
@@ -4759,6 +4780,7 @@ class ThunderChains extends AudioWorkletProcessor {
     if (i && i.length){ this._tmpL.set(i[0].subarray(0, n), this.track * BLOCK); this._tmpR.set((i[1] || i[0]).subarray(0, n), this.track * BLOCK); }
     e.setTrackInputs(this._tmpL, this._tmpR);
     { const sc = ins[1]; e.setSidechain(sc && sc[0], sc && (sc[1] || sc[0]), n); }
+    { const tk = ins[2]; e.taps = tk && tk.length ? tk : null; }   // SOURCE: the tracks' own sounds (Sidechain In set to a track)
     try { e.process(BLOCK); }
     catch (err){ e.busesL.fill(0); e.busesR.fill(0); if ((this._blocks & 255) === 0) this.port.postMessage({ target:'chains-host', op:OP.error, value:{ op:'process', message:String(err?.message || err) } }); }
     // Return this track's bus (the sum of its Chain Out modules) downstream.
