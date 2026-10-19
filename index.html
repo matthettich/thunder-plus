@@ -774,14 +774,16 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 @media (max-width:600px){ .tcmd button{flex-direction:column; gap:1px; line-height:1.1; letter-spacing:.02em} .tcmd button[data-c=next]{flex-direction:column-reverse} .tcmd .ca{font-size:var(--fs-2)} }
 .tcmd button.on{background:var(--pl); color:var(--inv)}
 /* COMMAND BAR (KEYS mode, View ▾): the command row as one thin line, about as tall as the bottom panel's headers. */
-.tcmd.cmini{display:flex; flex-wrap:nowrap; align-items:center; gap:3px; padding:3px 10px; background:var(--side); overflow-x:auto; scrollbar-width:none; border-bottom:1px solid var(--line)}
+/* The COMMAND BAR looks like the bottom panel's header strip under it (owner, 19 Oct): 22px, the same flat chips (as
+   .dkh .dkt), no keypad shadow, and each group starts above a panel part's title (cmdAlign). */
+.tcmd.cmini{display:flex; flex-wrap:nowrap; align-items:center; gap:3px; height:22px; padding:0 6px; background:var(--side); overflow-x:auto; scrollbar-width:none; border-bottom:1px solid var(--line)}
 .tcmd.cmini::-webkit-scrollbar{display:none}
 .tcmd.cmini::before{content:none; display:none}   /* no COMMANDS caption over the first button */
-.tcmd.cmini button, :root .tcmd.cmini button{flex:none; min-height:0; height:20px; padding:0 8px; font-size:var(--fs-1); font-weight:600; letter-spacing:.06em; line-height:1;
+.tcmd.cmini button, :root .tcmd.cmini button, :root[data-skinbase] .tcmd.cmini button:not(#zz){flex:none; min-height:0; height:17px; padding:0 7px; font-size:var(--fs-2); font-weight:700; letter-spacing:.06em; line-height:1;
   background:var(--panel); color:var(--ink); border:1px solid var(--line); box-shadow:none; transform:none; transition:none}
 .tcmd.cmini button:hover{border-color:var(--ink)}
-.tcmd.cmini button.dn, :root .tcmd.cmini button.dn{background:var(--ink)!important; color:var(--inv); transform:none; box-shadow:none}
-.tcmd.cmini button.on{background:var(--pl); color:var(--inv)}
+.tcmd.cmini button.dn, :root .tcmd.cmini button.dn, :root[data-skinbase] .tcmd.cmini button.dn:not(#zz){background:var(--ink)!important; color:var(--inv); transform:none; box-shadow:none}
+.tcmd.cmini button.on, :root[data-skinbase] .tcmd.cmini button.on:not(#zz){background:var(--ink); color:var(--inv); border-color:var(--ink)}
 .tcmd.cmini :is([data-c=cut],[data-c=sel],[data-c=clone],[data-c="b:-16"],[data-c=prev]), .tcmd.cmini.song [data-c="b:-1"]{margin-left:10px}
 .tcmd.cmini [data-c=song]{margin-left:auto}
 .tcmd button[hidden]{display:none} .tcmd button[data-c=song]{font-size:var(--fs-5)} .tcmd.cpad :is([data-c=undo],[data-c=redo]){font-size:20px; font-weight:500; line-height:1} .tcmd :is([data-c=prev],[data-c=next]){font-size:24px; font-weight:500; line-height:1}
@@ -1118,6 +1120,9 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
 .tscr .pvseg button,.tscr .pvbar button{min-height:0; padding:.32em .6em; border:1px solid var(--ts-ink); border-radius:0; background:transparent;
   color:var(--ts-ink); font:inherit; letter-spacing:inherit; gap:0}
 .tscr .pvseg button + button{border-left:0}
+/* DANCE · DRUM · KEYS · HIDE: the Phrase stage's switch, at the right of the title line, in PHRASE | PATTERN's look */
+.thd > .tsub{margin-left:auto}
+.tscr .thd > .phsw{flex:none; margin-left:.9em}
 .tscr .pvseg button.on,.tscr .pvbar button.on{background:var(--ts-ink); color:var(--ts-bg)}
 .tscr .pvbar{display:flex; align-items:center; gap:.7em; flex:none; min-width:0; overflow:hidden; white-space:nowrap; padding:.15em 0 .35em;
   font:600 .74em/1.25 var(--mono); color:var(--ts-ink)}
@@ -1461,23 +1466,14 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
 :root[data-skinbase="term"] .brand .plus{color:var(--mx)} :root[data-skinbase="term"] .brand .plus::before{color:var(--mxdim); -webkit-text-stroke:.05em var(--mxbg)}
 :root[data-skinbase="term"] .setmenu{background:var(--mxbg); border-color:var(--mx); box-shadow:0 0 18px -4px var(--mxglowc)}
 :root[data-skinbase="term"] .gset .gsec + .gsec, :root[data-skinbase="term"] .gset h3{border-color:var(--mxdim)}
-/* Light Simple skins: the top bar is inverted (the skin's ink is the bar, its paper the text), so the app's menus read apart
-   from the SONG / PHRASE… row under it. Only the bar's own buttons change: the menus that open from it keep the skin's
-   colours. The Update button stays filled so it still stands out. Dark Simple skins keep the plain bar. */
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .top{
-  --tb-ln:color-mix(in srgb, var(--mxon) 40%, var(--mx)); background:var(--mx); border-bottom-color:var(--mx)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .top > .brand{color:var(--mxon); text-shadow:none}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .top > .brand .plus{color:var(--mxon)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .top > .brand .plus::before{color:var(--tb-ln); -webkit-text-stroke:.05em var(--mx)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .top > .seg:not(#zz){background:transparent; border-color:var(--tb-ln); box-shadow:none}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd), .kitname):not(#zz){
-  background:transparent!important; color:var(--mxon)!important; border-color:var(--tb-ln)!important; box-shadow:none!important; text-shadow:none}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) :is(.top, .top > .seg, .top > .setwrap) > button:not(#bUpd):hover:not(#zz){
-  background:color-mix(in srgb, var(--mxon) 14%, transparent)!important}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) :is(.top, .top > .seg, .top > .setwrap) > button:not(#bUpd).on:not(#zz){
-  background:var(--mxon)!important; color:var(--mx)!important; border-color:var(--mxon)!important}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) :is(.top, .top > .seg, .top > .setwrap) > button svg:not(#zz){color:inherit}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .top > .tcpu i{background:var(--mxon)}
+/* Light Simple skins (owner chose mock-up D, 19 Oct; the inverted dark bar was too heavy): the top bar takes the skin's
+   second panel tone, so the app's menus read as their own strip above the SONG / PHRASE… row, and the screen tabs are
+   plain words with the open one underlined. Only the bar's own buttons change (the menus that open from it keep the skin's
+   colours); a pressed button stays filled. Dark Simple skins, Pastel and Minimal are unchanged. */
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .top{background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
 /* pads, command row and keypad: plain keys with outlines and an offset block; a hit fills */
 :root[data-skinbase="term"] :is(.tcmd,.dock,.tctl){background:var(--mxbg)}
 :root[data-skinbase="term"] :is(.tcmd button,.tkp .kp,.pads .pad){background:var(--mxbg); color:var(--mx); border-color:var(--mx);
@@ -2005,9 +2001,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <div class="stgph" id="tStagePh" hidden><b id="tStagePhT"></b><canvas id="tStageC"></canvas></div>
         <div class="sxpk" id="tStagePk" hidden></div><!-- SONG EXTRAS: the phrase peek, and its DOGS | PEEK switch -->
         <div class="sxsw" id="tStageSw" role="group" aria-label="Beside the song" hidden><button type="button" data-k="dogs">DOGS</button><button type="button" data-k="peek">PEEK</button></div>
-        <div class="sxsw" id="tStagePs" role="group" aria-label="Beside the phrase" hidden><button type="button" data-k="dance">DANCE</button><button type="button" data-k="drum">DRUM</button><button type="button" data-k="keys">KEYS</button></div>
       </div>
-      <div class="thd"><span class="thl"><span id="tTitle">SONG</span><span class="tpset" id="tPset"></span></span><span class="tsub" id="tSub"></span></div>
+      <div class="thd"><span class="thl"><span id="tTitle">SONG</span><span class="tpset" id="tPset"></span></span><span class="tsub" id="tSub"></span><span class="pvseg phsw" id="tStagePs" role="group" aria-label="Beside the phrase" hidden><button type="button" data-k="dance" title="The dogs dance beside the phrase">DANCE</button><button type="button" data-k="drum" title="The dogs play drums and bongos to the phrase">DRUM</button><button type="button" data-k="keys" title="A piano lights the notes sounding now">KEYS</button><button type="button" data-k="hide" title="Nothing beside the phrase">HIDE</button></span></div>
       <div class="tgrid" id="tGrid"></div>
       <div class="tinfo"><div id="tInfo"></div><div class="thint" id="tHint"></div></div>
       <div class="fxpick" id="fxPick" hidden role="dialog" aria-label="Pick an effect command">
@@ -15612,7 +15607,36 @@ function applyCmdOrder(){
   for (const a in by){ by[a].innerHTML = (mini && CMD_MINI_LAB[a]) || (inMode === 'pad' && CMD_PAD_SHORT[a]) || lab[a]; if (!mini) by[a].title = tip[a]; }
   cmdTipKey = '';
   const sb = by.song; if (sb){ sb.textContent = cmdSongLab(); sb.classList.toggle('on', tp.on); }
+  if (typeof cmdAlignDue === 'function') cmdAlignDue();
 }
+// COMMAND BAR columns (owner, 19 Oct: line it up with the bottom panel's titles under it): each group starts straight
+// above a panel part's title chip — undo over SCOPE, the clipboard over INST, select (and the clones) over …CHAINS, the
+// value steps over FX; previous / next follow, PLAY stays at the right. A group whose part is hidden or folded, or that
+// would start before the group ahead of it ends, just follows on; if the lined-up bar wouldn't fit, none of it is moved.
+const CMD_GROUPS = [['undo', 'redo'], ['cut', 'copy', 'paste', 'clr'], ['sel', 'clone', 'cldn'], ['b:-16', 'b:-1', 'b:1', 'b:16'], ['prev', 'next']];
+const CMD_ANCHOR = ['dkScope', 'dkInst', 'dkChn', 'dkFx', null];
+let cmdAlignSig = '', cmdAlignRaf = 0;
+function cmdAlignDue(){ if (!cmdAlignRaf) cmdAlignRaf = requestAnimationFrame(cmdAlign); }
+function cmdAlign(){
+  cmdAlignRaf = 0;
+  const bar = $('tCmd'); if (!bar) return;
+  if (!bar.classList.contains('cmini')){ if (cmdAlignSig){ cmdAlignSig = ''; bar.querySelectorAll('button[data-c]').forEach(b => b.style.marginLeft = ''); } return; }   // PAD mode's grid: no columns
+  if (bar.hidden) return;
+  const heads = CMD_GROUPS.map(g => g.map(a => bar.querySelector('button[data-c="' + a + '"]')).find(b => b && !b.hidden) || null);
+  const deckOn = !$('tDeck').hidden;
+  const secs = CMD_ANCHOR.map(id => { if (!id || !deckOn) return null; const e = $(id); if (!e || e.hidden || e.classList.contains('col')) return null;
+    const r = (e.querySelector('.dkt') || e).getBoundingClientRect(); return r.width ? Math.round(r.left * 10) / 10 : null; });
+  const br = bar.getBoundingClientRect();
+  const sig = [Math.round(br.left), Math.round(br.width), tScale, ...secs, [...bar.querySelectorAll('button:not([hidden])')].map(b => b.dataset.c + b.textContent.length).join()].join('|');
+  if (sig === cmdAlignSig) return; cmdAlignSig = sig;
+  heads.forEach(h => { if (h) h.style.marginLeft = ''; });
+  heads.forEach((h, i) => { if (!h || secs[i] == null) return;
+    const L = h.getBoundingClientRect().left, d = secs[i] - L;
+    if (d > .5) h.style.marginLeft = (parseFloat(getComputedStyle(h).marginLeft) || 0) + d + 'px'; });
+  if (bar.scrollWidth > bar.clientWidth + 1) heads.forEach(h => { if (h) h.style.marginLeft = ''; });
+}
+if (typeof ResizeObserver === 'function'){ const ro = new ResizeObserver(cmdAlignDue); ro.observe($('tCmd')); $('tDeck').querySelectorAll('.dks').forEach(e => ro.observe(e)); }
+try { document.fonts.addEventListener('loadingdone', () => { cmdAlignSig = ''; cmdAlignDue(); }); } catch(e){}
 // The bar's tooltips say what each button does here and its key (from cmdItems), so the keys are easy to learn.
 var cmdTipKey = '';   // var: applyCmdOrder can run before this line
 function cmdTips(){
@@ -15824,6 +15848,7 @@ function draw(){
   if (arrPlace()) scheduleRefit(false);   // Arrange moved into (or out of) the Song screen: size the text again next frame
   if (spSync()) fit();   // SIMPLE PHRASE: on or off for this screen, so the phrase is sized again (and Arrange hides)
   pvSync();   // PATTERN VIEW: its buttons and bar, and the text size when it turns on or off
+  phStageSwitch();   // DANCE · DRUM · KEYS · HIDE on the title line
   if (selA && selA.v !== tv) selA = null;
   // The FX target follows the track being edited: moving to another phrase (or block) moves the FX panel and the FX
   // screen with it. The master column's phrases point it at the master (MT is the FX screen's master, NT).
@@ -16035,7 +16060,7 @@ function draw(){
     const g = Object.keys(pc).reverse().find(k => pc[k] === TCV.phrase && k !== 'play'); if (g && pc.play !== TCV.phrase){ pc[g] = pc.play; pc.play = TCV.phrase; }
     for (const k in pc){ const b = $('tPad').querySelector(`.k[data-b=${k}]`); if (b) b.style.setProperty('--sh', pc[k]); } }
   $('tCmd').querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = onSong);
-  $('tCmd').querySelectorAll('[data-c=clone],[data-c=cldn]').forEach(b => b.hidden = !onSong); $('tCmd').classList.toggle('song', onSong);
+  $('tCmd').querySelectorAll('[data-c=clone],[data-c=cldn]').forEach(b => b.hidden = !onSong); $('tCmd').classList.toggle('song', onSong); cmdAlignDue();
   const selB = $('tCmd').querySelector('[data-c=sel]'); if (selB) selB.classList.toggle('on', !!selA);
   $('tState').innerHTML = tp.on ? ico('play') + 'PLAYING ' + VNAME[tp.mode] : rendering ? ico('render') + 'RENDERING' : ico('stop') + 'STOPPED';
   $('tBpm').textContent = (tp.on ? tp.bpm : S.bpm) + ' BPM · ' + (tp.on ? tp.tks : S.ticks || TICKS) + ' TICKS' + (S.swing > 50 ? ' · SWING ' + S.swing + '%' : '');
@@ -16082,16 +16107,18 @@ const STK = 'thunderplus-stage-v1', STG = ['screen', 'dogs', 'off'], STG_NAMES =
 let stage = (() => { try { const v = localStorage.getItem(STK); if (STG.includes(v)) return v; if (v === 'phrase') return 'screen'; } catch(e){} return 'screen'; })();
 function setStage(v){ stage = v; try { localStorage.setItem(STK, v); } catch(e){} stageLayout(); }
 $('tStageX').addEventListener('click', () => { setStage('off'); toast('Stage hidden. Settings → STAGE brings it back.'); });
-// The Phrase screen's stage: DANCE (the dogs), DRUM (the dogs on a kit and bongos) or KEYS (the piano, the default).
-const PHSK = 'thunderplus-phstage-v1', PHS = ['dance', 'drum', 'keys'];
+// The Phrase screen's stage: DANCE (the dogs), DRUM (the dogs on a kit and bongos), KEYS (the piano, the default) or
+// HIDE (nothing beside the phrase).
+const PHSK = 'thunderplus-phstage-v1', PHS = ['dance', 'drum', 'keys', 'hide'];
 let phStage = (() => { try { const v = localStorage.getItem(PHSK); return PHS.includes(v) ? v : 'keys'; } catch(e){ return 'keys'; } })();
 function setPhStage(v){ phStage = PHS.includes(v) ? v : 'keys'; try { localStorage.setItem(PHSK, phStage); } catch(e){} stageLayout(); }
-const stageKind = () => stage === 'dogs' ? 'dogs' : tv === 'song' && SX.peek && asongOn() ? 'peek' /* SONG EXTRAS */ : tv === 'phrase' && mstView() ? 'chain' : tv === 'phrase' ? ({dance:'dogs', drum:'drum', keys:'piano'})[phStage] : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
+const stageKind = () => stage === 'dogs' ? 'dogs' : tv === 'song' && SX.peek && asongOn() ? 'peek' /* SONG EXTRAS */ : tv === 'phrase' && mstView() ? 'chain' : tv === 'phrase' ? ({dance:'dogs', drum:'drum', keys:'piano', hide:''})[phStage] : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
 let stgKindNow = '', stgSig = '', stgReq = '';   // stgReq: what the last layout was asked for
 // It sits in the space to the right of the grid's text, the grid's height, when that space is big enough.
 // What the stage should show now ('' = nothing). SIMPLE PHRASE: no piano beside the phrase.
 const stageWant = () => view !== 'tracker' || stage === 'off' || spActive() ? '' : stageKind();
 function stageLayout(){
+  phStageSwitch();
   const box = $('tStage'); stgReq = stageWant();
   if (!stgReq){ box.hidden = true; stgKindNow = ''; return; }
   const asg = asongOn(), sr = scr.getBoundingClientRect(), gr = (asg ? arrEl : grid).getBoundingClientRect(), rg = document.createRange();
@@ -16105,7 +16132,7 @@ function stageLayout(){
   const dg = kind === 'dogs' || kind === 'drum'; $('tStageDogs').hidden = !dg; $('tStagePh').hidden = dg || kind === 'peek';
   $('tStagePk').hidden = kind !== 'peek'; box.classList.toggle('peek', kind === 'peek'); box.setAttribute('aria-hidden', String(kind !== 'peek')); sxStageSwitch(kind); sxPkSig = '';   // SONG EXTRAS
   box.classList.toggle('piano', kind === 'piano');
-  stgKindNow = kind; stgSig = ''; phStageSwitch(kind, w);
+  stgKindNow = kind; stgSig = '';
   if (dg) dogsState(); else stageCanvas(true);
 }
 // Dogs: arms up and dancing while the song plays, a slow breath and a lazy tail when it stops.
@@ -16213,14 +16240,17 @@ function drumsBeat(bar, ms){
   if (now - dkKitT > ms * 0.9) dkKit(3, true);   // nothing on the kit this beat: tick the hat
   if (now - dkBongoT > ms * 0.9) dkBongo(bar);   // and a bongo (both on the bar)
 }
-// DANCE · DRUM · KEYS over the Phrase stage, like the Song screen's DOGS | PEEK.
-function phStageSwitch(kind, w){
+// DANCE · DRUM · KEYS · HIDE on the Phrase screen's title line (owner, 19 Oct: beside PHRASE | PATTERN, not over the
+// stage, so HIDE can bring it back). Shown on a wide screen whenever the stage follows the screen (Settings → STAGE BY
+// SCREEN); not on the master's phrase (its stage is the effects chain) or in SIMPLE PHRASE.
+function phStageSwitch(){
   const sw = $('tStagePs'); if (!sw) return;
-  const show = tv === 'phrase' && stage === 'screen' && !mstView() && (kind === 'dogs' || kind === 'drum' || kind === 'piano') && w >= 170;
+  const show = view === 'tracker' && tv === 'phrase' && stage === 'screen' && !mstView() && !spActive() && innerWidth >= 600;
   sw.hidden = !show; if (!show) return;
   sw.querySelectorAll('button').forEach(b => { const on = b.dataset.k === phStage; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
 }
-$('tStagePs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setPhStage(b.dataset.k); });
+$('tStagePs').addEventListener('pointerdown', e => e.stopPropagation());   // a button, not the start of a scroll (which would take the click)
+$('tStagePs').addEventListener('click', e => { const b = e.target.closest('button'); if (b){ b.blur(); setPhStage(b.dataset.k); } });
 // The canvas views share one canvas and title, in the tracker screen's own colours.
 function stgCtx(){
   const c = $('tStageC'), r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (!r.width || !r.height) return null;

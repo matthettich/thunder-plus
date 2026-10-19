@@ -24,6 +24,24 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (7): top bar mock-up D, DANCE · DRUM · KEYS · HIDE on the title line, command bar in columns
+
+Cache `thunderplus-v177`.
+- **Top bar = mock-up D** (owner: the inverted bar of (5) felt too heavy): light Simple skins give `.top` and its own
+  buttons `--mxpanel2`; the screen tabs (`.ttabs button[data-v]`) are borderless words, the open one bold with a 4px
+  underline (`inset 0 -4px 0 var(--mx)`). The (5) inverted-bar rules are gone.
+- **Phrase stage switch moved to the title line** (`#tStagePs`, now `.pvseg.phsw` inside `.thd`, after `#tSub`): the same
+  look and line as PHRASE | PATTERN, at the right; `.tsub` has `margin-left:auto`. **HIDE** added (`PHS` has 'hide',
+  stageKind gives '' so the stage hides). `phStageSwitch()` (no args) runs from draw() and stageLayout(): shown on Phrase
+  when Settings → STAGE is BY SCREEN, not on the master's phrase, not in SIMPLE PHRASE, ≥600px wide. Its pointerdown
+  stops propagation (the screen's drag-scroll took the click, as for PHRASE | PATTERN).
+- **COMMAND BAR (desktop) like the panel header under it**: 22px strip, `.dkt`-style chips (17px, fs-2, bold, flat; the
+  term keypad shadow is beaten with `:not(#zz)`), padding 6px. `cmdAlign()` starts each group (`CMD_GROUPS`) above a part's
+  title chip (`CMD_ANCHOR`: undo → SCOPE, cut → INST, select → …CHAINS, the value steps → FX; prev/next follow; SONG at the
+  right) by adding margin-left; a hidden or folded part leaves its group in the flow; if the result would overflow, all
+  margins are dropped. Re-run (rAF, skipped when its signature is unchanged) from a ResizeObserver on the bar and the deck
+  parts, draw() (song/phrase changes the visible buttons), applyCmdOrder and font loads; PAD mode clears the margins.
+
 ## 19 Oct (6): basic effects (simple delay, filter, cut, compressor, gate, auto-pan, pump) and grouped FX picker
 
 Cache `thunderplus-v176`; `chains-worklet.js?v=28`, `waves-worklet.js?v=24`.
@@ -54,7 +72,7 @@ Cache `thunderplus-v176`; `chains-worklet.js?v=28`, `waves-worklet.js?v=24`.
 ## 19 Oct (5): inverted top bar, bottom panel scroll arrows, pattern view scrolling and play keys
 
 Cache `thunderplus-v175`. Desktop **v1.2.4** has everything above the meter fix.
-- **Top bar inverted** (owner chose mock-up B): on the light Simple (term) skins `.top` takes `--mx` as its background,
+- ~~Top bar inverted~~ (replaced by mock-up D in (7)) (owner chose mock-up B): on the light Simple (term) skins `.top` takes `--mx` as its background,
   its own buttons (`.top >`, `.top > .seg >`, `.top > .setwrap >`) go transparent with `--mxon` text and a 40% mix
   border (`--tb-ln`); `.on` is filled `--mxon` with `--mx` text. The menus inside `.top` (#gfile, #gedit, #gset, #phl)
   keep the skin's colours (`.top`'s own colour is untouched). #bUpd stays filled. Dark Simple skins (matrix, bwterm,
