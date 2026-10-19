@@ -10828,17 +10828,21 @@ function fileItems(){
 }
 /* ---------- DESKTOP APP UPDATES (electron/preload.js → window.thunderDesktop) ----------
    Only in the desktop app: File ▾ → Check for updates…, and when a newer build is out an UPDATE button in the top bar
-   (it stays until used) plus a toast. Mac and the portable .exe: the button opens the download page; Windows and Linux:
-   it restarts into the downloaded version. The website has no window.thunderDesktop, so none of this shows there. */
+   (it stays until used) plus a toast. Mac and the portable .exe: it downloads the new .dmg / .exe into Downloads (the
+   button counts the percent, then says Install) and opens it; Windows and Linux: it restarts into the downloaded version. The website has no window.thunderDesktop, so none of this shows there. */
 const deskUpdApi = (window.thunderDesktop && window.thunderDesktop.updates) || null;
 let deskUpd = null;
 function deskUpdShow(s){
   const was = deskUpd && deskUpd.avail; deskUpd = s || null;
   const b = $('bUpd'), on = !!(s && s.avail); b.hidden = !on;
   if (!on) return;
-  b.textContent = 'Update';   // the version is in the tooltip and the toast, so the top bar stays on one line
+  // Mac and the portable .exe download it themselves (dl: 0–1, then 1 when it's in Downloads): the button shows how far.
+  const pc = s.dl != null && s.dl < 1 ? Math.round(s.dl * 100) : -1;
+  b.textContent = pc >= 0 ? 'Update ' + pc + '%' : s.dl === 1 ? 'Install' : 'Update';   // the version is in the tooltip and the toast, so the top bar stays on one line
   b.title = s.ready ? `...Thunder Plus ${s.avail} is downloaded: restart to use it (or it installs when you quit)`
-    : s.notifyOnly ? `...Thunder Plus ${s.avail} is out (you have ${s.version}): open the download page` : `...Thunder Plus ${s.avail} is downloading (you have ${s.version})`;
+    : s.dl === 1 ? `...Thunder Plus ${s.avail} is in your Downloads folder: open it to install`
+    : pc >= 0 ? `Downloading ...Thunder Plus ${s.avail}: ${pc}%`
+    : s.notifyOnly ? `...Thunder Plus ${s.avail} is out (you have ${s.version}): download it` : `...Thunder Plus ${s.avail} is downloading (you have ${s.version})`;
   if (s.avail !== was) toast(`...Thunder Plus ${s.avail} is out: the Update button at the top gets it.`);
 }
 if (deskUpdApi){
