@@ -6619,7 +6619,43 @@ try {
   if (aset.rate) srGuess = aset.rate;
   else { const AC = window.AudioContext || window.webkitAudioContext, c = new AC({latencyHint:latOf()}); srGuess = c.sampleRate || 48000; if (c.close) c.close().catch(() => {}); }
 } catch(e){}
-const cpu = {cap:null, t:0};
+const cpu = {cap:null, t:0, probe:null};
+/* CPU probe (18 Oct). Chrome (desktop and the Fold) doesn't offer renderCapacity, so the meter only timed the app's own
+   worklets (effects, …chains, live voices): a song of pads and rendered synths read 0%. A tiny AudioWorklet node, run
+   every 128-frame quantum like everything else, notes the wall time of each call. The audio thread renders a burst of
+   quanta per device callback and then waits, so the gap between two calls inside a burst is how long one quantum of
+   the WHOLE graph took (native nodes included) and the long gaps are the waits: load = that time ÷ the quantum's
+   length, averaged over half a second. Date.now() counts whole ms, but the mean of many gaps is unbiased. When the
+   thread can't keep up (the mean gap is longer than a quantum), load = mean gap ÷ quantum, over 100%. A device that
+   asks for one quantum per callback leaves no burst to measure: the probe sends nothing usable and the meter falls
+   back to the worklet timings. Checked headless against added work: 0, 17, 30, 53, 85% as the graph grew. */
+const CPU_PROBE = `registerProcessor('thunder-cpu', class extends AudioWorkletProcessor {
+  constructor(){ super(); this.g = []; this.last = 0; this.t0 = 0; }
+  process(){
+    const n = Date.now();
+    if (this.last){ const d = n - this.last; if (d < 200) this.g.push(d); } else this.t0 = n;   // a long gap: suspended, not busy
+    this.last = n;
+    if (n - this.t0 >= 500 && this.g.length > 20){
+      const q = 128000 / sampleRate, g = this.g, N = g.length; let W = 0, sm = 0, ns = 0, nb = 0;
+      for (const d of g){ W += d; if (d > 1.5 * q) nb++; else { sm += d; ns++; } }
+      const m = W / N; let load = null;
+      if (m > 1.15 * q) load = m / q;                       // can't keep up: busy all the time, and late
+      else if (nb >= N * 0.05 && ns) load = sm / ns / q;    // bursts with waits between: the busy share
+      this.port.postMessage({load}); this.g = []; this.t0 = n;
+    }
+    return true;
+  }
+});`;
+function cpuProbe(ac){
+  if (!ac.audioWorklet || !window.AudioWorkletNode) return;
+  const url = URL.createObjectURL(new Blob([CPU_PROBE], {type:'text/javascript'}));
+  ac.audioWorklet.addModule(url).then(() => {
+    if (ac !== ctx) return;
+    const n = new AudioWorkletNode(ac, 'thunder-cpu', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[1]});
+    n.port.onmessage = e => { const l = e.data && e.data.load; cpu.probe = typeof l === 'number' && isFinite(l) ? {load:l, t:performance.now()} : null; };
+    n.connect(ac.destination);   // silent: it only has to run
+  }).catch(() => {});
+}
 const playing = [];
 function audio(){
   if (!ctx){
@@ -6628,7 +6664,7 @@ function audio(){
     try { ctx = new AC(ao); } catch(e){ ctx = new AC({latencyHint:'interactive'}); }
     aLive = {lat:ao.latencyHint, rate:aset.rate};
     if (aset.sink && ctx.setSinkId) ctx.setSinkId(aset.sink).catch(() => { audStatus(); });
-    try { if (ctx.renderCapacity){ ctx.renderCapacity.addEventListener('update', e => { cpu.cap = {avg:e.averageLoad, peak:e.peakLoad, under:e.underrunRatio, t:performance.now()}; }); ctx.renderCapacity.start({updateInterval:0.5}); } } catch(e){}
+    try { if (ctx.renderCapacity){ ctx.renderCapacity.addEventListener('update', e => { cpu.cap = {avg:e.averageLoad, peak:e.peakLoad, under:e.underrunRatio, t:performance.now()}; }); ctx.renderCapacity.start({updateInterval:0.5}); } else cpuProbe(ctx); } catch(e){}   // no renderCapacity: time the audio thread
     master = ctx.createGain(); master.gain.value = clamp(aset.vol, 0, 100) / 100; master.connect(ctx.destination);
     try { mwReady(ctx); } catch(e){}   // the safety limiter's worklet, loading before the first note needs it
     ctx.addEventListener && ctx.addEventListener('statechange', () => { audStatus(); if (typeof audioInterrupted === 'function') audioInterrupted(); });
@@ -17123,8 +17159,8 @@ function fxLoads(){
 }
 function globalCpuValue(){
   if (!ctx) return null;
-  const cap = cpu.cap && performance.now() - cpu.cap.t < 3000 ? cpu.cap : null;
-  return cap ? cap.avg : fxLoads().reduce((a, x) => a + x[1], 0);
+  const cap = cpu.cap && performance.now() - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && performance.now() - cpu.probe.t < 1500 ? cpu.probe : null;
+  return cap ? cap.avg : pr ? pr.load : fxLoads().reduce((a, x) => a + x[1], 0);
 }
 /* Dropouts (the clicks you hear when the audio thread runs late). Where the browser counts them
    (AudioContext.playbackStats) that count is used; otherwise the audio clock is compared with the page clock
@@ -17151,13 +17187,13 @@ setInterval(glitchScan, 100);
 function cpuMeter(){
   const now = performance.now(); if (now - cpu.t < 500) return; cpu.t = now;
   const b = $('tCpu'); if (!b) return;
-  const fx = fxLoads().reduce((a, x) => a + x[1], 0), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null;
-  const v = !ctx ? null : cap ? cap.avg : fx;
+  const fx = fxLoads().reduce((a, x) => a + x[1], 0), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
+  const v = !ctx ? null : cap ? cap.avg : pr ? pr.load : fx;
   { const sp = b.querySelector('span'); let w = sp.querySelector('.cpuw'); if (!w){ w = document.createElement('em'); w.className = 'cpuw'; w.textContent = 'CPU '; } sp.textContent = v == null ? '--' : Math.round(v * 100) + '%'; sp.prepend(w); }   // the "CPU " word hides on the cover screen
   b.querySelector('i').style.width = v == null ? '0' : Math.min(100, v * 100).toFixed(0) + '%';
   const drop = now - glitch.t < 3000;   // a dropout in the last 3 s turns the meter red
   b.classList.toggle('warn', v != null && v > 0.5); b.classList.toggle('hot', v != null && (v > 0.8 || (cap && cap.under > 0) || drop));
-  b.title = (cap ? 'Whole audio engine (Chrome’s render capacity), not just the effects.' : 'The time the audio engine’s own processing takes: track and master effects, …chains and bass voices (this browser doesn’t report the total audio load).')
+  b.title = (cap ? 'Whole audio engine (Chrome’s render capacity), not just the effects.' : pr ? 'Whole audio engine: how much of each audio block the audio thread spends working (every sound, effect and voice). Over 100% means it can’t keep up.' : 'The time the audio engine’s own processing takes: track and master effects, …chains and bass voices (this browser doesn’t report the total audio load).')
     + (glitch.n ? ' Dropouts since the sound started: ' + glitch.n + '.' : '');
 }
 setInterval(() => { if (view !== 'tracker' && !document.hidden) cpuMeter(); }, 500);

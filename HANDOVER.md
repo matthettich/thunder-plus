@@ -24,6 +24,19 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 18 Oct (late night, 4): the CPU meter measures the whole audio thread
+
+Cache `thunderplus-v171`. Owner: no load on the CPU meter. Without `renderCapacity` (not in Chrome, desktop or Android)
+the meter only summed the app's own worklet timings (track FX, …chains, live voices, mastering), so a song of pads read
+0% (the safety limiter's worklet doesn't even report: meters off). Now `audio()` starts `cpuProbe(ctx)` when there is
+no renderCapacity: `thunder-cpu`, a silent AudioWorklet node on the destination that logs `Date.now()` per quantum and
+every 0.5 s posts the busy share (mean in-burst gap ÷ quantum length; mean gap ÷ quantum when it can't keep up; nothing
+when callbacks are one quantum long, so there's no burst to see). `cpuMeter` / `globalCpuValue` use renderCapacity,
+else the probe (fresh within 1.5 s), else the old worklet sum; the tooltip says which. Checked headless with a
+standalone harness (`scratchpad/probe/`): 0/17/30/53/85% as oscillator+convolver chains were added, >100% when
+overloaded; in the app a plain song reads 12–14%. **Not seen on the Fold yet**: if it shows 0% or `--` there, the
+device is probably asking for one quantum per callback.
+
 ## 18 Oct (late night, 3): fast envelopes on every engine
 
 Cache `thunderplus-v170`. The owner wanted every engine able to move very fast.
