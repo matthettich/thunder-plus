@@ -24,6 +24,19 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (10): the COMMAND BAR is the editor's toolbar
+
+Cache `thunderplus-v182`.
+- **Mock-up A** (owner): in KEYS mode with the COMMAND BAR on, `#tCmd` lives in `#tScr` just above `.tinfo` (the middle
+  column, under the phrase, the pattern, Arrange as the Song screen, the mixer…), in PHRASE | PATTERN's look: `.7em` mono,
+  joined groups in `--ts-ink` (UNDO|REDO · CUT|COPY|PASTE|CLEAR · SELECT(|CLONE|CLONE↓ on Song) · −−|−|+|++ · ‹PREV|NEXT›,
+  ▶ SONG at the right). `cmdBarState()` (end of draw(), and applyCmdOrder) re-places it before `.tinfo` (Arrange as Song
+  is inserted there too), sets the tag `.cmtag` (PHRASE / PATTERN / ARRANGE when Arrange has the keys or is the Song
+  screen / SONG / MIXER…) and greys (`.off`, pointer-events none) what can't act: cut/copy/select off the grid screens,
+  paste without a clip for that screen, undo/redo with nothing to undo (`undo.pend` counts). ±16 are shown on every screen
+  now. PAD mode or the bar off: it goes home (`cmdHome`). The stage (piano/dogs) is laid out from the grid, so it ends at
+  the toolbar. The (7) column alignment (`cmdAlign`, `CMD_GROUPS`, `CMD_ANCHOR`) is gone.
+
 ## 19 Oct (9): Delete on the song deletes the phrase; Remove from song keeps it
 
 Cache `thunderplus-v181`. Desktop **v1.2.5** (19 Oct, from 542183e) has everything up to here.
