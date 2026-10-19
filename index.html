@@ -643,6 +643,8 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .tpset{font-size:.74em; font-weight:400} .tpset:empty{display:none} .tpset span[data-x]{padding:0 .15em}
 .tgrid{flex:1; min-height:0; overflow:hidden; padding-top:.25em}
 .tgrid .ln{white-space:pre; line-height:1.3; height:1.3em}
+.tgrid .ln.wrap{white-space:normal; height:auto; max-width:68ch}   /* a text line that wraps (the FX screen's description) */
+.tgrid .fxdesc{display:block; color:var(--ts-info); font-family:var(--font); font-size:.85em; line-height:1.4; padding-bottom:.35em}
 /* Phrase: every 4th line a shade darker (on the black skins a shade lighter), in every skin, for 4/4. */
 .tscr .tgrid .ln.b4{background:color-mix(in srgb, var(--ts-ink) 9%, transparent)}
 .tgrid span[data-x],.tgrid span[data-r]{cursor:pointer}
@@ -14601,6 +14603,10 @@ function fxActiveStep(t, d){
   A[k].on = false; fxChanged(t); draw();
   return toast(`${where}: FX ${fxCount(A)}/${FXSLOTS} on — slot ${k + 1} off, ${TFX[A[k].type].long} kept (turn back up to recall)`);
 }
+// An effect's short readable name for the slot lines ("Filter", "Tape delay"): the pad list's name, the module's, or
+// the description up to its colon. The full description goes under the slot's controls (owner, 19 Oct: it ran off
+// the screen on the slot lines).
+const fxNameOf = k => (FX[k] && FX[k].name) || (MODFX[k] && MODFX[k].name) || String(TFX[k].long).split(':')[0];
 // FX screen: which track, its four slots, then the settings of the slot the cursor was last on.
 function fxRows(){
   const t = cFxT, A = t >= NT ? S.mfx : S.tfx[t], cy = cs.fx.y;
@@ -14610,12 +14616,12 @@ function fxRows(){
     info:() => 'Which track these effects are on (MST is the master). OPTION+◀▶ also changes it'}];
   for (let k = 0; k < FXSLOTS; k++) rows.push({l:(A[k] ? (open && k === cFxS ? '▪ ' : '› ') : '') + 'SLOT ' + (k + 1), gap:k === 0, get:() => A[k] ? FXT_LIST.indexOf(A[k].type) + 1 : 0,
     set:v => { A[k] = v ? freshTfx(FXT_LIST[v - 1]) : null; if (v) lastFxType = FXT_LIST[v - 1]; cFxS = k; fxChanged(t); }, min:0, max:FXT_LIST.length, big:1, d:0,
-    fmt:v => v ? TFX[FXT_LIST[v - 1]].n.padEnd(5) + (A[k] && !A[k].on ? 'OFF  ' : '') + TFX[FXT_LIST[v - 1]].long : '---',
+    fmt:v => v ? TFX[FXT_LIST[v - 1]].n.padEnd(5) + (A[k] && !A[k].on ? 'OFF  ' : '') + fxNameOf(FXT_LIST[v - 1]) : '---',
     tap:() => { cFxS = k; fxsOpen(k); },
     info:v => v ? `Slot ${k + 1} runs ${TFX[FXT_LIST[v - 1]].long}. EDIT lists the effects, EDIT+arrows steps through them, ▶ opens its controls, OPTION+EDIT removes it` : `Empty. EDIT lists the effects to pick one; EDIT+arrows steps through them. Slots run top to bottom`});
   const k = cFxS, f = A[k];
   if (!f){ rows.push({l:'› ADD TO SLOT ' + (k + 1), gap:true, act:() => { A[k] = freshTfx(lastFxType); fxChanged(t); draw(); }, info:() => `Puts ${TFX[lastFxType].long} in slot ${k + 1}`}); return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows); }
-  rows.push({l:'ACTIVE', gap:true, tog:true, get:() => f.on ? 1 : 0, set:v => { f.on = !!v; fxChanged(t); }, min:0, max:1, d:1, fmt:v => onOff(v) + `  slot ${k + 1} ` + TFX[f.type].n,
+  rows.push({l:'ACTIVE', gap:true, desc:TFX[f.type].long, tog:true, get:() => f.on ? 1 : 0, set:v => { f.on = !!v; fxChanged(t); }, min:0, max:1, d:1, fmt:v => onOff(v) + `  slot ${k + 1} ` + TFX[f.type].n,
     info:() => `Slot ${k + 1}: ${TFX[f.type].long}. OFF bypasses it`});
   for (const q of TFX[f.type].ps) rows.push({l:q.l, get:() => f[q.k], set:v => { f[q.k] = v; fxChanged(t); }, min:q.min, max:q.max, big:q.names ? 1 : 16, d:q.d, tog:q.names && q.names.length === 2,
     fmt:v => q.names ? q.names[v] : (q.min < 0 ? sgn(v) : q.max > 99 ? hx(v) : d2(v)) + '  ' + q.fmt(v), info:() => TFX[f.type].long + ' · ' + q.l.toLowerCase()});
@@ -16033,14 +16039,17 @@ function draw(){
     if (tv === 'fx'){ title = 'FX ' + fxWho(cFxT); const A = cFxT >= NT ? S.mfx : S.tfx[cFxT]; sub = fxList(A) || 'no effects'; }
     const RR = rowsOf(tv), lw = Math.max(12, ...RR.filter(r => !r.act).map(r => r.l.length + 1));   // labels like PLAY NOTE ON ENTRY ran into their values
     RR.forEach((r, y) => {
-      if (r.gap) L.push([]);
+      // r.desc (the FX screen's ACTIVE row): the effect's description, wrapped, above its controls; not a row of its own,
+      // so the cursor never lands on it
+      if (r.desc){ const ln = [{t:r.desc, cls:'fxdesc'}]; ln.wrap = true; L.push([], ln); }
+      else if (r.gap) L.push([]);
       if (r.act){ L.push([{t:r.l, cls:cc(0, y, 'act'), x:0, y}]); return; }
       const val = r.show ? r.show() : r.fmt ? r.fmt(r.get()) : (r.min < 0 ? sgn(r.get()) : hx(r.get()));
       L.push([{t:r.l.padEnd(lw), cls:'lb', x:0, y}, {t:val, cls:cc(0, y, 'v'), x:0, y}]);
     });
   }
   const spanH = s => typeof s === 'string' ? s : `<span class="${s.cls || ''}"${s.x != null ? ` data-x="${s.x}" data-y="${s.y}"` : ''}${s.r != null ? ` data-r="${s.r}"` : ''}${s.title ? ` title="${esc(s.title)}"` : ''}>${esc(s.t)}</span>`;
-  const gh = L.map(ln => '<div class="ln' + (ln.b4 ? ' b4' : '') + '">' + ln.map(spanH).join('') + '</div>').join('');
+  const gh = L.map(ln => '<div class="ln' + (ln.b4 ? ' b4' : '') + (ln.wrap ? ' wrap' : '') + '">' + ln.map(spanH).join('') + '</div>').join('');
   const rebuilt = gh !== gridHTML; if (rebuilt){ gridHTML = gh; grid.innerHTML = gh; gridLit = []; }   // unchanged screens (most redraws while playing) skip the rebuild
   // The playing line: its row number lit, and the whole line inverted, like Arrange's playing blocks (owner, 19 Oct).
   if (prLit || gridLit.length){ for (const e of gridLit) e.classList.remove('pl', 'plr'); gridLit = [];
@@ -16413,7 +16422,7 @@ function stageChain(){
   const t = cFxT >= NT ? -1 : Math.min(cFxT, ntr() - 1), A = t < 0 ? S.mfx : S.tfx[t] || [], X = stgCtx(); if (!X) return; const {g, W, H, dpr} = X; g.clearRect(0, 0, W, H);
   $('tStagePhT').textContent = (t < 0 ? 'MASTER' : 'TRACK ' + d2(t + 1)) + ' · SIGNAL';
   const items = [t < 0 ? 'ALL TRACKS' : 'TRACK ' + d2(t + 1) + ' IN']; if (t >= 0 && chainsFeed(t)) items.push('…CHAINS');
-  A.forEach((f, k) => { if (f) items.push((k + 1) + ' ' + TFX[f.type].long + (f.on ? '' : '  (off)')); });
+  A.forEach((f, k) => { if (f) items.push((k + 1) + ' ' + TFX[f.type].n + ' ' + fxNameOf(f.type) + (f.on ? '' : '  (off)')); });
   items.push(t < 0 ? 'OUTPUT' : 'FADER · PAN → MASTER');
   const bh = Math.min(34 * dpr, (H - 10 * dpr) / (items.length * 1.6)), gap = bh * .6, bw = Math.min(W - 4 * dpr, 260 * dpr), x = (W - bw) / 2; let y = Math.max(2 * dpr, (H - items.length * bh - (items.length - 1) * gap) / 2);
   g.font = `${Math.max(9, Math.min(12, bh / dpr * .42)) * dpr}px ${X.font}`; g.textBaseline = 'middle'; g.lineWidth = 1.5 * dpr;

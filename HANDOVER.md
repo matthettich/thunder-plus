@@ -26,7 +26,7 @@ Keep this file up to date at the end of a work session.
 
 ## 19 Oct (11): Option moves, Command edits
 
-Cache `thunderplus-v184`.
+Cache `thunderplus-v185`.
 - **KEYS mode modifiers swapped** (owner, the same afternoon as the (4) remap): **⌥/Alt + arrows change screen** (`nav`:
   ◀▶ tab order, ▲ Project / back, ▼ Mixer; from Phrase ◀ gives Arrange the keys), **Ctrl/⌘ + arrows change the value**
   (`bump`: ◀▶ ±1, ▲▼ more), in PAD mode with a keyboard too (Ctrl/⌘ + arrows = EDIT + arrows; Alt + arrows still page
@@ -36,6 +36,11 @@ Cache `thunderplus-v184`.
 - **A phrase playing on its own lights its block** (owner): `playhead()` now also answers in phrase / sect playback:
   the playing track's block on the song cursor's row when it holds that phrase (sect), else the first block on that
   track that does. Arrange (side panel and Song screen), the Song grid and the strip light it as in song playback.
+- **FX screen: short names on the slot lines, the description above the controls** (owner: long descriptions ran off
+  the screen): slot lines are `n + fxNameOf(type)` (the pad list's name, the module's, or the description up to its
+  colon: "FILT Filter", "DLY Tape delay"); the ACTIVE row carries `desc` and draw() puts it, wrapped (`.ln.wrap`,
+  `.fxdesc`, max 68ch), in the gap above ACTIVE, not as a row, so the cursor never lands on it. The stage's signal
+  boxes use the short names too.
 
 ## 19 Oct (10): the COMMAND BAR is the editor's toolbar
 
