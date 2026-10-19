@@ -26,7 +26,7 @@ Keep this file up to date at the end of a work session.
 
 ## 19 Oct (9): Delete on the song deletes the phrase; Remove from song keeps it
 
-Cache `thunderplus-v181`.
+Cache `thunderplus-v181`. Desktop **v1.2.5** (19 Oct, from 542183e) has everything up to here.
 - **Delete / Clear on the song** (Delete or Backspace, Edit ▾ "Delete (the phrase too)", right-click, PAD OPT+EDIT; with
   Arrange holding the keys it runs as the Song screen): `songDelete(cells)` takes the blocks off and then, for each sect
   no longer on the song anywhere, empties it (`freshSect`) and erases its phrases (`freshPhrase`, plen = dlen, plpb 0)
