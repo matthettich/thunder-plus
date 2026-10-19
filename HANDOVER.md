@@ -1848,6 +1848,11 @@ A code review (audio, storage, UI, DSP) found these; all fixed and checked headl
    (`draw()` costs ~13 ms at 4× even when nothing changed, because it rebuilds the grid string to compare).
 7. **On the phone:** the owner should install ...Thunder Plus from its page and remove the old ...Thunder icon
    (the old one now just forwards). Check that the offer to bring Thunder's work over appears there.
+8. **The synth engine as a VST / AU / CLAP plugin, then Android and iOS apps** (owner, 19 Oct: for making an album
+   in Live while Thunder Plus is still being tuned; to start once Thunder Plus is in good shape). The plan, with
+   the parity approach (one C++ engine compiled to wasm for the app and natively for the plugin, held in step by a
+   render-comparison test in CI), the inventory of what to port, milestones, stores and licensing:
+   [`docs/ENGINE-PLUGIN-PLAN.md`](docs/ENGINE-PLUGIN-PLAN.md).
 
 ### Standard DAW features still missing (suggested 14 Oct, in rough priority order)
 
