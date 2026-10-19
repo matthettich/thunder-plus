@@ -26,7 +26,7 @@ Keep this file up to date at the end of a work session.
 
 ## 19 Oct (8): LOOP = the pattern, LOOP SEL = the selection
 
-Cache `thunderplus-v179`.
+Cache `thunderplus-v180`.
 - **LOOP** (tab bar `#tLoop`, the keypad's LOOP `#kLoop`, Alt+L, plain L off a note cell): `loopPat`. Any song play
   (`tStart` adds `{v:'pat', y0:row, y1:row}` when no other loop is given) repeats its row, i.e. the pattern (each track
   goes round its block there). `syncLoop` keeps it on `patLoopRow()`: the row it started on, or the row the song cursor
@@ -50,6 +50,8 @@ Cache `thunderplus-v178`.
   stageKind gives '' so the stage hides). `phStageSwitch()` (no args) runs from draw() and stageLayout(): shown on Phrase
   when Settings → STAGE is BY SCREEN, not on the master's phrase, not in SIMPLE PHRASE, ≥600px wide. Its pointerdown
   stops propagation (the screen's drag-scroll took the click, as for PHRASE | PATTERN).
+- **Pattern bar buttons the same size** as PHRASE | PATTERN and the stage switch (`.tscr .pvbar button`: .7em of the
+  screen like `.pvseg`, line-height 1): ▲▼, FX2/3 and EMPTY TRACKS; the bar's right edge already meets the switch's.
 - **COMMAND BAR (desktop) like the panel header under it**: 22px strip, `.dkt`-style chips (17px, fs-2, bold, flat; the
   term keypad shadow is beaten with `:not(#zz)`), padding 6px. `cmdAlign()` starts each group (`CMD_GROUPS`) above a part's
   title chip (`CMD_ANCHOR`: undo → SCOPE, cut → INST, select → …CHAINS, the value steps → FX; prev/next follow; SONG at the
