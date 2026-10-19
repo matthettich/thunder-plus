@@ -52,6 +52,11 @@ Same cache (`thunderplus-v172`). Desktop release v1.2.3.
   have x)". Only builds from v1.2.3 on have the button; older ones still get the box ~8 s after opening.
 - **Top bar** under 1440px: gap 6px and 8px button padding so Edit ▾ / Update don't wrap it (checked 1100–1440, KEYS
   and PAD: never taller than before).
+- **Mixer size jump** (owner: Shift into the Mixer, then moving the cursor resized it): draw()'s relayout check
+  (`groupBoxes` + `fitCheck`) ran before the title / info / hint lines got the new screen's text, so on entering a
+  screen it measured with the old lines; the Mixer's longer hint then overflowed ~6px and the next draw (the first
+  cursor move) shrank it. The check now runs after those lines. Checked: every tracker screen keeps one text size
+  while the cursor moves (1177×610, 1400×860).
 - Checked headless (Playwright, debug-hook copy, a mocked `thunderDesktop`): all of the above, no console errors.
 
 ## 19 Oct (2): Edit ▾ menu, right-click commands, phrase mouse clicks, Enter picks up
