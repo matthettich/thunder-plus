@@ -24,6 +24,22 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (9): Delete on the song deletes the phrase; Remove from song keeps it
+
+Cache `thunderplus-v181`.
+- **Delete / Clear on the song** (Delete or Backspace, Edit ▾ "Delete (the phrase too)", right-click, PAD OPT+EDIT; with
+  Arrange holding the keys it runs as the Song screen): `songDelete(cells)` takes the blocks off and then, for each sect
+  no longer on the song anywhere, empties it (`freshSect`) and erases its phrases (`freshPhrase`, plen = dlen, plpb 0)
+  unless another sect still plays them. A phrase shared with another block (a clone that shares) is kept and the toast
+  says how many copies remain. One undo step (the whole-song snapshot) brings it back. With blocks selected on the song,
+  Delete now deletes them (it used to cut them to the clipboard); Ctrl/⌘+X still cuts and keeps the phrases.
+- **Remove from song (keep the phrase)** (`cmdAction('rmv')`, in `cmdItems` on the Song screen, so Edit ▾, the Song grid's
+  right-click and the side Arrange panel's menu; Arrange-as-Song's own menu via `sxClearRect(r, true)`): the old
+  behaviour, the block goes and its phrase stays under its number (Phrases… lists it as not on the song). Shift+Delete
+  (clear the cell and step down) also keeps the phrase.
+- Tested headless: shared block kept, last use erased, undo, Remove keeps, selection delete (3 blocks, 3 phrases, the
+  clipboard untouched), both right-click menus.
+
 ## 19 Oct (8): LOOP = the pattern, LOOP SEL = the selection
 
 Cache `thunderplus-v180`.

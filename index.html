@@ -15051,8 +15051,37 @@ function cloneDown(){
   const ph = firstPhrase(lastId);
   return toast(made === 1 ? 'Cloned down: phrase ' + hx(ph) + (ph !== lastId ? ' (block ' + hx(lastId) + ')' : '') : `Cloned ${made} blocks down`);
 }
+// DELETE on the song (owner, 19 Oct): the block goes, and so does what it plays: its sect and phrase are emptied (their
+// numbers free again) unless another block on the song still plays them, so a shared phrase keeps playing for its other
+// copies. One undo step brings it all back. REMOVE FROM SONG (right-click, Edit ▾) is the old Delete: only the block goes
+// and the phrase stays under its number. CUT keeps the phrase too (it is on the clipboard to be pasted).
+function songCells(){ const c = cs.song; if (!(selA && selA.v === 'song')) return [[c.y, c.x]]; const r = selRect(), out = []; for (let y = r.y0; y <= r.y1; y++) for (const t of sxCols(r)) out.push([y, t]); return out; }
+function songDelete(cells, keep){
+  const gone = new Map(); let n = 0;
+  for (const [y, t] of cells){ const v = S.song[y] ? S.song[y][t] : -1; if (v < 0) continue; if (!gone.has(v)) gone.set(v, songShown(v)); setCell('song', t, y, -1); n++; }
+  selA = null;
+  if (!n){ draw(); return toast('Nothing to delete here.'); }
+  const undoK = keyHint('mod+Z') || 'Undo';
+  if (keep){ saveS(); draw(); return toast(n > 1 ? `Removed ${n} blocks from the song; their phrases are kept` : `Removed block ${hx([...gone.values()][0])} from the song; its phrase is kept`); }
+  const uses = new Map(); for (const r of S.song) for (const v of r) if (v >= 0) uses.set(v, (uses.get(v) || 0) + 1);
+  const erased = [], kept = [];
+  for (const [cid, shown] of gone){
+    if (uses.has(cid)){ kept.push([shown, uses.get(cid)]); continue; }
+    const ps = [...new Set((S.chains[cid] || []).map(r => r[0]).filter(p => p >= 0))];
+    S.chains[cid] = freshSect();
+    for (const p of ps){
+      if (S.chains.some(c => c && c.some(r => r[0] === p))) continue;   // another sect still plays it
+      S.phrases[p] = freshPhrase(); S.plen[p] = S.dlen || 16; S.plpb[p] = 0; erased.push(p);
+    }
+  }
+  saveS(); draw();
+  const kp = kept.length === 1 ? `phrase ${hx(kept[0][0])} is still on the song ${kept[0][1]} more time${kept[0][1] > 1 ? 's' : ''}, so it stays` : kept.length ? `${kept.length} phrases still on the song elsewhere stay` : '';
+  if (n === 1 && erased.length <= 1) return toast(erased.length ? `Deleted block ${hx([...gone.values()][0])} and its phrase · ${undoK} brings it back` : `Removed the block: ${kp}`);
+  toast(`Deleted ${n} block${n > 1 ? 's' : ''} and ${erased.length} phrase${erased.length === 1 ? '' : 's'}` + (kp ? ` (${kp})` : '') + ` · ${undoK} brings ${n > 1 ? 'them' : 'it'} back`);
+}
 function del(){
   if (onPset()) return psetSet(cs.phrase.x, cs.phrase.x ? 0 : 16);
+  if (tv === 'song') return songDelete(songCells(), false);
   if (selA) return copySel(true);
   const c = cs[tv];
   if (GRIDV.has(tv)){
@@ -15601,6 +15630,7 @@ function cmdAction(a){
     return optDir(d > 0 ? 'right' : 'left');
   }
   if (c === 'clr') return del();
+  if (c === 'rmv') return tv === 'song' ? songDelete(songCells(), true) : undefined;
   if (c === 'sel') return toggleSel();
   if (c === 'copy' || c === 'cut') return copyHere(c === 'cut');
   if (c === 'paste') return paste();
@@ -15692,10 +15722,11 @@ function cmdItems(){
   return [
     it('undo', 'Undo', 'mod+Z', {off:!undo.past.length && !vUndo.t.some(Boolean)}), it('redo', 'Redo', 'mod+shift+Z', {off:!undo.future.length}),
     null,
-    it('cut', 'Cut', 'mod+X'), it('copy', 'Copy', 'mod+C'), it('paste', 'Paste', 'mod+V', {off:!clip}), it('clr', 'Clear', 'Del'),
+    it('cut', 'Cut', 'mod+X'), it('copy', 'Copy', 'mod+C'), it('paste', 'Paste', 'mod+V', {off:!clip}), it('clr', onSong ? 'Delete (the phrase too)' : 'Clear', 'Del'),
     null,
     it('sel', selA ? 'Cancel the selection' : 'Start a selection', 'mod+B'),
     {a:'all', l:'Select all', k:keyHint('mod+A'), f:selectAll, off:!GRIDV.has(tv) || onPset()},
+    ...(onSong ? [it('rmv', 'Remove from song (keep the phrase)', '')] : []),
     ...(onSong ? [null, it('clone', 'Clone (paste puts a unique copy)', 'mod+D'), it('cldn', 'Clone down (onto the row below)', 'mod+shift+D')] : []),
     null,
     ...(onSong ? [] : [val('b:16', 'Value up a lot', '▲')]), val('b:1', 'Value up', '▶'), val('b:-1', 'Value down', '◀'), ...(onSong ? [] : [val('b:-16', 'Value down a lot', '▼')]),
@@ -17556,14 +17587,11 @@ function sxMuteRect(r){
   for (const [y, t] of cells){ if (mute) S.smute[y] |= 1 << t; else S.smute[y] &= ~(1 << t); }
   saveS(); draw(); toast(`${mute ? 'Muted' : 'Unmuted'} ${cells.length} block${cells.length > 1 ? 's' : ''}`);
 }
-function sxClearRect(r){
-  let n = 0; for (let y = r.y0; y <= r.y1; y++) for (const t of sxCols(r)) if (S.song[y][t] >= 0){ setCell('song', t, y, -1); n++; }
-  selA = null; saveS(); draw(); toast(n ? `Cleared ${n} block${n > 1 ? 's' : ''}` : 'Nothing to clear.');
-}
+function sxClearRect(r, keep){ const cells = []; for (let y = r.y0; y <= r.y1; y++) for (const t of sxCols(r)) cells.push([y, t]); songDelete(cells, keep); }
 function sxLoopRows(y0, y1){
   if (y1 <= y0) return toast('Loop needs two rows or more.');
   loopSel = true; loopArm = {v:'song', y0, y1}; draw();
-  toast(`Looping rows ${rS(y0, 3)}–${rS(y1, 3)} · PLAY (this screen) loops them · LOOP turns it off`);
+  toast(`Looping rows ${rS(y0, 3)}–${rS(y1, 3)} · PLAY (this screen) loops them · LOOP SEL turns it off`);
 }
 function sxOpen(){ const v = S.song[cs.song.y][cs.song.x]; if (v < 0) return toast('Nothing to open here.'); selA = null; tv = 'song'; go('phrase'); }
 arrGrid.addEventListener('contextmenu', e => {
@@ -17590,9 +17618,9 @@ arrGrid.addEventListener('contextmenu', e => {
     {l:'Open the phrase', k:ks ? 'Shift+→' : '', f:sxOpen, off:multi || !filled},
   ];
   if (SX.secs) items.push({l:songSecAt(r.y0) && songSecAt(r.y0).y === r.y0 ? 'Rename the section here…' : 'Name a section from row ' + rS(r.y0, 3) + '…', f:() => sxSecEdit(r.y0)});
-  items.push(null, {l:'Clear', k:ks ? 'Del' : '', f:() => sxClearRect(r), off:!n});
+  items.push(null, {l:'Remove from song (keep the phrase)', f:() => sxClearRect(r, true), off:!n}, {l:'Delete (the phrase too)', k:ks ? 'Del' : '', f:() => sxClearRect(r, false), off:!n});
   // EDIT MENU / RIGHT-CLICK: Undo / Redo first, then the rest of the COMMANDS row this menu doesn't already have.
-  const C = cmdItems(), have = new Set(['cut', 'copy', 'paste', 'clr', 'clone', 'cldn', 'undo', 'redo']);
+  const C = cmdItems(), have = new Set(['cut', 'copy', 'paste', 'clr', 'rmv', 'clone', 'cldn', 'undo', 'redo']);
   items.unshift(...C.filter(x => x && (x.a === 'undo' || x.a === 'redo')), null);
   items.push(null, ...C.filter(x => !x || !have.has(x.a)));
   sxMenu(e.clientX, e.clientY, title, menuTidy(items));
