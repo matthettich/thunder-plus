@@ -24,6 +24,54 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (2): Edit ▾ menu, right-click commands, phrase mouse clicks, Enter picks up
+
+Same cache (`thunderplus-v172`), same session as the entry below.
+- **Edit ▾** (Desktop, `deskmenu`, next to File ▾; `#bEdit` / `#gedit`, styled as `.gfile`): `geditToggle` /
+  `editItems`, after the File menu's JS. In the tracker it lists `cmdItems()`; Waves / Chains: that patch's Undo / Redo;
+  Synth: Undo / Redo. Opening it closes File / Settings and the reverse; Esc closes it.
+- **`cmdItems()`** (after the COMMANDS row's handlers): the `CMDS` row's commands as `{a, l, k, f, off}` menu items in
+  words, with `keyHint()` keys (⌘/⇧/⌥ on a Mac, Ctrl+/Shift+/Alt+ elsewhere): Ctrl/⌘ ones and Del work in both input
+  modes; the value is Alt+arrows in KEYS mode, X (EDIT) + arrows in PAD mode; Shift+Space plays from the cursor row.
+  Song screen: clones instead of ±16, as on the row. Also Select all. `menuTidy()` drops stray rules.
+- **Right-click** (mouse; Ctrl+click on a Mac): `gridDown` moves the cursor to the clicked cell (a selection stays when
+  the click is inside it), then `cmdCtx` (scr `contextmenu`) opens `cmdItems()` with `sxMenu`. Arrange as the Song
+  screen keeps its own SONG EXTRAS menu, now with Undo / Redo on top and the rest of the row's commands at the bottom.
+  `.sxmenu` scrolls if taller than the window.
+- **Phrase + mouse** (owner): a click on the cursor's cell no longer adds or stamps a note (it only moves the cursor);
+  a drag on an empty cell adds nothing (`drag.hold`); a drag on a filled cell still changes it; a click on an effect
+  cell still opens the picker. Touch unchanged (a tap on the cursor's cell is EDIT).
+- **Enter picks up** (owner: Enter on a hihat, inst 03, then Enter elsewhere dropped a snare, inst 01): `editTap(enter)`;
+  the Enter key and the KEYS keypad's ENT on a filled phrase note now make its note and instrument current
+  (`pickUp(x, y, true)`, auditions the row, a quick second Enter doesn't make a note off). The EDIT button still stamps.
+  `pickUp` now always sets `instPicked` when the row has an instrument, even if it was already `last.inst`. Help texts
+  updated.
+- **Synth waveform one size** (Desktop synth layout, `body.sdesk`): the rule that grew `.wave` to
+  `clamp(150px, 100vh − 345px, 560px)` for any engine but Layers is gone; it is 120px for all 27 engines (checked at
+  1150/1400/1920 px wide), so the Engine ◀ ▶ buttons stay put while stepping through engines (they used to drop ~400px).
+- **Bass wobble delay** (owner: an LFO delay): `BassCore` params `wDelay` / `wFade` (ms, 0 = off, default 0 so old
+  sounds are unchanged; Wobble section: Delay, Fade in). `this.wt` counts ms from each new (non-legato) note; the
+  wobble's depth `wd` is 0 until wDelay, then rises to 1 over wFade. Cutoff / vowel / comb take `lsm * wd`; the level
+  takes `1 − wAmp · wd · (1 − lsm)` (depth 0 = full level). The live worklet is built from BassCore, so the tracker gets
+  it too; `bassViz` sets `wt` huge so the picture shows full depth. Checked by rendering in Node (level wobble swing
+  per 250 ms: flat until 500 ms, then rising over the fade) and in the app (rows, saved values, no errors).
+- Checked headless (Playwright, debug-hook copy): the owner's case (Enter on 03 then on an empty row → 03), clicks and a
+  drag on empty / filled phrase cells (nothing added), both right-click menus, Edit ▾ in Phrase / Song / Synth, Undo
+  from the menu, Esc; no console errors.
+
+## 19 Oct: Arrange as the Song screen no longer jumps 12 ↔ 13 rows during playback
+
+Cache `thunderplus-v172`. Owner's screen recording (desktop app): while playing, the Song screen (Arrange in the text
+grid's place) flickered between 13 rows and 12 slightly taller ones, several times a second. A feedback loop in
+`drawArr` (runs on every `draw()`, so every playhead step): `arrSize()` took the row height from
+`arrGrid.clientHeight` (`floor(h / 12) - 3`), then the end of `drawArr` snapped the grid's height to whole rows of
+that row height; the next draw read the snapped height back and got a row height 1 px different, so it flipped
+(e.g. 21 px × 13 rows = 302 px → 22 px × 12 = 291 px → 21 px × 13 …). Now both use `arrAvail()` (the panel's height
+below the headers, which doesn't depend on the grid), so the row height and row count are fixed for a window size.
+Checked headless at window heights 560–895 px: before, 31 of 68 heights flipped every draw; now none.
+Note: desktop v1.2.2 was built from `bc8d6ed`, before "Arrange at the left" (`5c68098`): it needs a new release
+to get both.
+
 ## 18 Oct (late night, 4): the CPU meter measures the whole audio thread
 
 Cache `thunderplus-v171`. Owner: no load on the CPU meter. Without `renderCapacity` (not in Chrome, desktop or Android)
