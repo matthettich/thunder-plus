@@ -24,6 +24,36 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 18 Oct (late night): Arrange at the left, OPTION+arrows on Song, SONG tab, background play
+
+Cache `thunderplus-v168`. The owner, playing on the Fold, found SHIFT+◀ into Arrange confusing (Arrange sat at the right,
+so ◀ moved the keys rightwards), OPTION+◀▶ on Song moving the cursor up/down, and songs cutting off when switching apps.
+Each part has a setting that gives the old behaviour.
+
+- **ARRANGE SIDE** (Settings → Screen → Layout & panels; `thunderplus-arrleft-v1`, LEFT by default): `body.arrleft`
+  puts `.tbody > .tarr` first with CSS `order:-1` (DOM untouched, so `arrPlace` and the Song screen are unaffected) and
+  moves the grip to its right edge; the grip's drag sign flips (`arrLeft` in the `tArrH` pointermove). `setArrLeft()`
+  beside `arrW`. Untick for the old right-hand layout.
+- **OPTION+arrows on Song (PAD mode)**: `optDir` calls `songGridDir(dir)` when `grid && patNavOn`: ◀▶ to the nearest
+  filled block on the row (master column included where shown; not in Arrange's side panel, which has none), ▲▼ to
+  the nearest filled block in the column; toast at an edge; selection untouched (as `songJump` did). Arrange holding
+  the keys on Phrase runs the same code (tv = 'song'). PATTERN NAV off = the old keys (◀▶ `songJump`, ▲▼ 16 rows);
+  the hint follows (`songHintOld`). Lost with it on: the 16-row page jump (owner OK'd; ‹ › and held arrows remain).
+  Plain arrows, EDIT/SHIFT combos and KEYS mode unchanged.
+- **Arrange focus look**: the phrase grid fades to .45 (`body.apf .tscr .tgrid`), Arrange's outline and the strip's
+  border are lavender (#9a63ff) instead of ink, and the **SONG tab** (and SONG in the side panel's map) lights instead
+  of PHRASE (`apAfterDraw`). **SONG tab tap** on Phrase with Arrange beside it (`apTabSong`, capture listener on
+  `#tTabs`/`#tMap`): first tap gives Arrange the keys, a second opens the Song screen; elsewhere it opens Song as before.
+- **BACKGROUND PLAY** (Settings → App; `thunderplus-bgplay-v1`, on): block `BACKGROUND PLAY` after `tStop()`, hooks
+  `bgPlay(true)` at the end of `tStart()` and `bgPlay(false)` in `tStop()`. Media Session metadata + play/pause/stop
+  handlers everywhere; on Android a hidden looping `<audio>` of an 8 s, ±1-bit, 8 kHz clip (made in `bgClip()`), because
+  Chrome only gives the media notification (and its foreground service) to media elements, not Web Audio. **Not tried
+  on the Fold yet**: check the notification appears, the song survives switching apps, and whether another app taking
+  audio focus calls our pause handler (it would stop the song; if that's unwanted, drop the 'pause' handler).
+- Tests: `scratchpad/t_song.py` (headless, 1440×900, 707×823, 373×830, all pass). The app is one strict IIFE, so tests
+  serve a copy with `window.__T = c => eval(c);` added before its closing `})();` (`scratchpad/mksrv.sh`) and drive it
+  with `page.evaluate('c => __T(c)', code)`. Remove `.welcome` first on phone sizes.
+
 ## 18 Oct (night): whole-app review fixes (v1.2.2)
 
 Cache `thunderplus-v167`. A fresh-eyes review of the whole app (MIDI excluded, done before) found these; each was

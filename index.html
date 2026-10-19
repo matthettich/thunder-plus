@@ -908,11 +908,15 @@ body.asong.sxsecs .tarr{padding-left:92px}
 .sxpkr div{padding:0 2px} .sxpkr div.bd{background:color-mix(in srgb, var(--ts-ink, var(--ink)) 7%, transparent)} .sxpkr div.pl{background:color-mix(in srgb, var(--ar-cur, #9a63ff) 35%, transparent)}
 .sxpkr i{font-style:normal; color:var(--ts-dim, var(--muted))}
 .sxpke{flex:none; min-height:36px; margin:4px 0 2px; font-size:var(--fs-2)}
-/* Drag the grip on its left edge to make it wider (the blocks grow with it); double-tap the grip to jump big and back. */
+/* Drag the grip on its inner edge (left, or right with ARRANGE SIDE at LEFT) to make it wider (the blocks grow with it); double-tap the grip to jump big and back. */
 .tarr{position:relative}
 .tarrh{position:absolute; left:-10px; top:0; bottom:0; width:20px; cursor:ew-resize; touch-action:none; z-index:3}
 .tarrh::after{content:''; position:absolute; left:8px; top:50%; width:4px; height:48px; margin-top:-24px; border-radius:2px; background:var(--ar-dim); opacity:.6}
 .tarrh:hover::after,.tarrh.dn::after{opacity:1; background:var(--ar-ink)}
+/* ARRANGE SIDE (18 Oct): LEFT, the default, puts the side panel before the screen, so SHIFT+◀ goes left to the song and
+   SHIFT+▶ right to the phrase, as the keys say; the grip moves to its right edge. RIGHT is the old layout. */
+body.arrleft .tbody > .tarr{order:-1; border-left:0; border-right:1px solid var(--line)}
+body.arrleft .tbody > .tarr .tarrh{left:auto; right:-10px}
 .tahd{display:grid; grid-template-columns:minmax(0, calc(var(--azfx, 50%) - 32px)) 44px minmax(0,1fr); align-items:center; gap:0; padding:8px 10px 6px; font-size:var(--fs-3); font-weight:700; letter-spacing:.05em; flex:none}
 /* ARRANGE at the left, ○ over the MONO | POLY break (--azfx, from arrSize: where the break is when every track fits,
    so it stays put while zoomed), the rows / muted line and + at the right. */
@@ -1472,13 +1476,16 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
    same name before "switching between the synth and the tracker", the two settings rows after SIDE PANEL and the three
    hook lines marked "ARRANGE PAGING" in draw() and arrGo()) ===== */
 /* Arrange has the keys (on Phrase): a dark header and outline, its song cursor solid lavender... */
-body.apfa #tArr{outline:2px solid var(--ar-ink); outline-offset:-2px}
+body.apfa #tArr{outline:2px solid #9a63ff; outline-offset:-2px}
 body.apfa #tArr .tahd{background:var(--ar-ink); color:var(--ar-bg)}
 body.apfa #tArr .tahd .azb, body.apfa #tArrSub{color:var(--ar-bg)} body.apfa #tArr .tahd .azb:disabled{opacity:.45} body.apfa #tArr .tahd .azb svg{color:inherit}
 body.apfa #tArr .tagrid b.c{outline:2px solid #9a63ff; background:#9a63ff !important; color:#fff !important; box-shadow:none}
 /* ...and the phrase's cursor goes hollow and its title dim, with a tag: it follows the song cursor, or is pinned. */
 body.apf .tscr .cur{background:transparent; color:var(--ts-ink); outline:2px solid var(--ts-cur-bg); outline-offset:-2px}
 body.apf #tTitle{opacity:.55}
+/* The phrase is only on show while the song has the keys: it fades back so the eye goes to the song (18 Oct). */
+.tscr .tgrid{transition:opacity .15s}
+body.apf .tscr .tgrid{opacity:.45}
 .aptag{align-self:center; font:700 .62em/1 var(--mono); font-size:max(8px, .62em); letter-spacing:.08em; padding:.3em .55em; border-radius:3px; background:#9a63ff; color:#fff}
 .aptag[hidden]{display:none}
 /* PIN, in Arrange's header and the strip's: the phrase stays up while the song cursor moves. */
@@ -1511,7 +1518,7 @@ body.apf #tTitle{opacity:.55}
 #apStrip .apsr b.c{outline:2px solid #9a63ff; outline-offset:0; position:relative; z-index:1}
 #apStrip.nolab .apsr b{color:transparent}
 /* The strip has the keys: dark header, solid cursor. */
-body.apfs #apStrip{border:2px solid var(--ts-ink)}
+body.apfs #apStrip{border:2px solid #9a63ff}
 body.apfs #apStrip .apsh{background:var(--ts-ink); color:var(--ts-bg); border-bottom-color:var(--ts-ink)}
 body.apfs #apStrip .apsh span{color:var(--ts-bg)}
 body.apfs #apStrip .apsh i{background:#9a63ff; border-color:#9a63ff; color:#fff}
@@ -1927,7 +1934,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>SHIFT + EDIT</dt><dd>paste</dd>
         <dt>PLAY</dt><dd>play this screen · SHIFT+PLAY the song · with LOOP on, PLAY loops the selected rows</dd>
         <dt>LP. SEL</dt><dd>loop the selection (sticky); PLAY then loops it</dd>
-        <dt>OPTION + ▲▼</dt><dd>previous / next pattern (phrase; toggle in Settings)</dd>
+        <dt>OPTION + arrows</dt><dd>go to the nearest block that way: up / down the track, left / right along the row (Song and Phrase; PATTERN NAV in Settings)</dd>
         <dt>SEMI + −</dt><dd>transpose the phrase selection a semitone at once</dd>
         <dt>◀ ▶ (FX screen)</dt><dd>open the slot's controls · back to the slot list (a sideways swipe too)</dd>
         <dt>Sticky keys</dt><dd>tap SHIFT or OPTION alone and it stays lit for the next button</dd>
@@ -13577,6 +13584,7 @@ function tStart(mode, o){
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : ''});
   tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
+  bgPlay(true);   // BACKGROUND PLAY
   void r;
 }
 // The SONG button in the synth's top bar: play the song from the tracker's cursor row, or stop it.
@@ -13639,8 +13647,48 @@ function tStop(quiet){
   moStop();
   songBtn();
   chainsTempo();
+  bgPlay(false);   // BACKGROUND PLAY
   if (!quiet) draw();
 }
+/* ===== BACKGROUND PLAY (setting BACKGROUND PLAY, App section; 18 Oct) =====
+   Chrome on Android only treats a page as a media player, with a playback notification and the foreground service
+   behind it that keeps the system from freezing or killing it in the background, while an <audio> or <video> element
+   plays. The Web Audio output doesn't count, so opening another app could cut the song off. While the transport runs,
+   a hidden <audio> element loops an inaudible clip (8 kHz, ±1 bit, about −96 dBFS) and the Media Session API names it
+   and points the notification's play / pause / stop at the transport. The sound itself still comes from Web Audio;
+   nothing is routed through the element. Elsewhere only the Media Session part runs (system media keys work).
+   To remove: delete this block, the BACKGROUND PLAY settings row and the two bgPlay() lines in tStart() and tStop(). */
+var bgOn = (() => { try { return localStorage.getItem('thunderplus-bgplay-v1') !== '0'; } catch(e){ return true; } })();
+var bgEl = null, bgHandlers = false;
+var bgAndroid = /Android/i.test(navigator.userAgent);   // var: tStop() may run before this line
+function setBgOn(on){ bgOn = !!on; try { localStorage.setItem('thunderplus-bgplay-v1', bgOn ? '1' : '0'); } catch(e){} bgPlay(bgOn && tp.on); }
+function bgClip(){
+  const sr = 8000, n = sr * 8, b = new ArrayBuffer(44 + n * 2), v = new DataView(b);
+  const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, i & 1, true);   // not pure zeros, in case a browser skips "silent" media
+  return URL.createObjectURL(new Blob([b], {type:'audio/wav'}));
+}
+function bgPlay(on){
+  const ms = navigator.mediaSession;
+  if (on && !bgOn) on = false;
+  if (ms) try {
+    if (on && !bgHandlers){ bgHandlers = true;
+      const stop = () => { if (tp.on) tStop(); };
+      ms.setActionHandler('play', () => { if (!tp.on) playCtx(); });
+      ms.setActionHandler('pause', stop); ms.setActionHandler('stop', stop); }
+    if (on) ms.metadata = new MediaMetadata({title:S.name || 'Song', artist:'...Thunder Plus',
+      artwork:[{src:'icons/plus-icon-192.png?v=2', sizes:'192x192', type:'image/png'}, {src:'icons/plus-icon-512.png?v=2', sizes:'512x512', type:'image/png'}]});
+    if (on || bgHandlers) ms.playbackState = on ? 'playing' : 'paused';
+  } catch(e){}
+  if (!bgAndroid) return;
+  if (on){
+    if (!bgEl){ bgEl = new Audio(bgClip()); bgEl.loop = true; bgEl.preload = 'auto'; }
+    try { const p = bgEl.play(); if (p && p.catch) p.catch(() => {}); } catch(e){}
+  } else if (bgEl && !bgEl.paused) bgEl.pause();
+}
+/* ===== END BACKGROUND PLAY ===== */
 function preview(ii, note, vol, poly, when){
   audioWake = performance.now();
   const r = rtInit(), I = S.insts[ii] || S.insts[0], t = (when || ctx.currentTime) + 0.005;
@@ -14029,8 +14077,8 @@ function nbPhrase(t){
 const FLK = 'thunderplus-follow-v1';
 let followOn = (() => { try { return localStorage.getItem(FLK) === '1'; } catch(e){ return false; } })();
 function setFollow(on){ followOn = on; try { localStorage.setItem(FLK, on ? '1' : '0'); } catch(e){} if (on) followPlay(); draw(); }
-// Pads mode: OPTION + ▲▼ in the phrase editor opens the previous or next pattern, one step at a time.
-// On by default; off restores the old OPTION+▲▼ behaviour (jump 16 patterns). KEYS mode is not affected
+// Pads mode: OPTION + arrows move around the Song grid, in the phrase editor (phraseGrid) and on the Song screen (songGridDir).
+// On by default; off restores the old OPTION+arrow behaviour (phrase: jump 16 patterns; Song: ◀▶ prev/next block, ▲▼ 16 rows). KEYS mode is not affected
 // (Ctrl/⌘+▲▼ changes pattern there, and Alt+▲▼ keeps changing values).
 const PNK = 'thunderplus-patnav-v1';
 let patNavOn = (() => { try { const v = localStorage.getItem(PNK); if (v === '0' || v === '1') return v === '1'; } catch(e){} return true; })();
@@ -14271,7 +14319,7 @@ function projRows(){
     {l:'STICKY KEYS', get:() => latchOn ? 1 : 0, set:v => setLatch(!!v), min:0, max:1, tog:true, d:1, fmt:onOff, info:() => 'Tap SHIFT or OPTION on its own and it stays lit for the next button, so no command needs two fingers. Tap it again to cancel'},
     {l:'EDIT STEP', get:() => kStep, set:v => kStep = v, min:0, max:16, big:4, fmt:v => v + (v === 1 ? ' row' : ' rows'), info:() => 'How far the cursor moves after you type a note or value or delete a row (the edit step). Keyboard: { and }'},
     {l:'PATTERN NAV', ck:'Option + arrows move around the Song grid', get:() => patNavOn ? 1 : 0, set:v => setPatNav(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
-      info:() => 'Pads: in the phrase editor, hold OPTION and press ▲ or ▼ to open the previous or next pattern, one at a time. OFF jumps 16 patterns, as before. KEYS mode is not affected (it uses Ctrl/⌘+▲▼)'},
+      info:() => 'Pads: hold OPTION and press an arrow to go to the nearest block that way on the Song grid (▲▼ up and down the track, ◀▶ along the row). Works on the Song screen, in Arrange and in the phrase editor (which opens that block’s phrase). OFF: as before (phrase ▲▼ jumps 16 patterns; Song ◀▶ previous/next block, ▲▼ 16 rows). KEYS mode is not affected'},
     {l:'PLAY NOTE ON ENTRY', ck:'Play note on entry', get:() => pnoeOn ? 1 : 0, set:v => setPnoe(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Typing a note into the phrase editor plays that instrument’s sound on the spot, so you hear what you enter. Off makes note entry silent'},
     {l:'KEYS KEYPAD', ck:'Show on-screen keypad', get:() => kpOn ? 1 : 0, set:v => setKp(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
@@ -14285,7 +14333,9 @@ function projRows(){
     {l:'SECT', ck:'Hide sect page', inv:true, get:() => sectsOn ? 1 : 0, set:v => setSects(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'HIDDEN: the song opens straight into phrases, like patterns (each new song block gets its own sect with one phrase). SHOWN brings back the sect screen. Nothing is deleted either way'},
     {l:'ARRANGE', opts:true, get:() => arrMode, set:v => setArr(v), tap:() => setArr((arrMode + 1) % 3), min:0, max:2, d:1, fmt:v => ['OFF', 'AUTO', 'ON'][v],
-      info:() => `Song overview at the right of the other screens. AUTO shows it on wide screens (600 × 500 and up), ON at any size. This screen: ${innerWidth} × ${innerHeight}` + (arrMode === 1 && !arrEl.offsetWidth && !asongOn() ? ' (too small for AUTO)' : '') + (songGrid ? '' : '. The Song screen is Arrange whatever this says')},
+      info:() => `Song overview beside the other screens (ARRANGE SIDE: left or right). AUTO shows it on wide screens (600 × 500 and up), ON at any size. This screen: ${innerWidth} × ${innerHeight}` + (arrMode === 1 && !arrEl.offsetWidth && !asongOn() ? ' (too small for AUTO)' : '') + (songGrid ? '' : '. The Song screen is Arrange whatever this says')},
+    {l:'ARRANGE SIDE', ck:'Arrange at the left', get:() => arrLeft ? 1 : 0, set:v => setArrLeft(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'LEFT' : 'RIGHT',
+      info:() => 'Which side of the screen Arrange sits on when it shows beside it. LEFT: SHIFT+◀ goes left to the song and SHIFT+▶ back right to the phrase. RIGHT: as before'},
     {l:'CLASSIC SONG', ck:'Show classic Song screen', get:() => songGrid ? 1 : 0, set:v => setSongGrid(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'HIDDEN (the default): the Song screen is Arrange, full width on any screen, with every Song key, pad command and the master column. SHOWN brings back the text grid, with Arrange beside it as before. The song is the same either way'},
     // SONG EXTRAS (each one off = the Song screen as it was before them)
@@ -14340,6 +14390,8 @@ function projRows(){
     {l:'› RENDER STEMS', act:() => renderOut(true), info:() => 'A zip with the mix plus one stereo WAV per track, all the same length'},
     ...(canShare && lastR ? [{l:'› SHARE LAST RENDER', act:shareLast, info:() => 'Send the last render to Koala, SunVox or another app'}] : []),
     {l:'› UPDATE APP', sec:'App', gap:true, act:() => checkUpdate(true), info:() => 'Reloads with the newest version (your song and kit are kept). The app also checks by itself when it opens'},
+    {l:'BACKGROUND PLAY', ck:'Keep playing when you switch apps', get:() => bgOn ? 1 : 0, set:v => setBgOn(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'While the song plays, Android shows a playback notification (play / stop) so the song keeps going when you switch apps. OFF: no notification, as before'},
   ];
 }
 const rowsOf = v => v === 'inst' ? instRows() : v === 'project' ? projRows() : v === 'fx' ? fxRows() : [];
@@ -14951,7 +15003,10 @@ function optDir(dir, grid){
   if (tv === 'phrase' && !(grid && patNavOn) && pvActive()) return pvRow(dir === 'up' ? -1 : dir === 'down' ? 1 : d);   // PATTERN VIEW: Ctrl+▲▼, [ ], ‹ › step song rows
   // Mixer FX row: OPTION+▲▶ turn effects on in order (up to four), OPTION+▼◀ turn the last one back off.
   if (tv === 'mixer'){ if (cs.mixer.y === 4) fxActiveStep(cs.mixer.x, d); return; }
-  if (tv === 'song'){ if (big) move(0, -d * 16); else songJump(d); return; }
+  // The Song screen (and Arrange holding the keys on Phrase): PAD mode's OPTION+arrows move like the phrase editor's,
+  // to the nearest filled block that way (songGridDir). With PATTERN NAV off: ◀▶ previous/next block in the track,
+  // ▲▼ 16 rows, as before.
+  if (tv === 'song'){ if (grid && patNavOn) return songGridDir(dir); if (big) move(0, -d * 16); else songJump(d); return; }
   if (tv === 'sect'){ cSect = clamp(cSect + d * (big ? 16 : 1), 0, 255); selA = null; return draw(); }
   // The phrase editor: OPTION+▲▼ steps one pattern at a time (PATTERN NAV, on by default); with it off
   // they jump 16 patterns, as before. OPTION+◀▶ and KEYS-mode Ctrl/⌘+▲▼ always step one.
@@ -15003,6 +15058,24 @@ function shiftAltArrow(dir){
   if (y < top) cs.song.top = y; else if (y > top + VR - 1) cs.song.top = y - VR + 1;
   cs.song.top = clamp(cs.song.top, 0, 256 - VR);
   return draw();
+}
+// PAD mode's OPTION+arrows on the Song screen (PATTERN NAV on), and in Arrange when it has the keys on Phrase: the
+// phrase editor's spatial move. ◀▶ go to the nearest filled block on this row (the master column counts where it's
+// shown; Arrange's side panel has none), ▲▼ to the nearest filled block in this column. Empty cells are skipped; at an
+// edge the cursor stays and a toast says so. Like songJump (the old OPTION+◀▶) it leaves the selection alone.
+function songGridDir(dir){
+  const c = cs.song, n = ntr(), mst = apF !== 'arr', has = (y, t) => !!S.song[y] && S.song[y][t] >= 0;
+  let x = c.x, y = c.y, hit = false;
+  if (dir === 'left' || dir === 'right'){
+    const d = dir === 'right' ? 1 : -1, last = mst ? n : n - 1;
+    for (let u = (c.x === MT ? n : c.x) + d; u >= 0 && u <= last; u += d){ const t = u === n ? MT : u; if (has(c.y, t)){ x = t; hit = true; break; } }
+  } else {
+    const d = dir === 'down' ? 1 : -1;
+    for (let v = c.y + d; v >= 0 && v < 256; v += d) if (has(v, c.x)){ y = v; hit = true; break; }
+  }
+  if (!hit) return void toast({up:'No more blocks above in this track.', down:'No more blocks below in this track.',
+    left:'No block to the left on this row.', right:'No block to the right on this row.'}[dir]);
+  c.x = x; c.y = y; draw();
 }
 // While the phrase editor is open the Song cursor keeps up with the phrase being edited: it moves to a
 // block that plays it (the phrase's own track first, then any track), so the Song screen and the Arrange
@@ -15108,7 +15181,7 @@ const CK = 'thunderplus-cmd-v1', coarse = matchMedia('(pointer:coarse)').matches
 let cmdOn = (() => { try { const v = localStorage.getItem(CK); if (v === '1' || v === '0') return v === '1'; } catch(e){} return coarse; })();
 function setCmd(on){ cmdOn = on; try { localStorage.setItem(CK, on ? '1' : '0'); } catch(e){} draw(); fit(); draw(); }
 const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b:-1', '−', 'Change the value down (EDIT+◀)'], ['b:1', '+', 'Change the value up (EDIT+▶)'],
-  ['b:16', '++', 'Change the value up a lot (EDIT+▲)'], ['prev', '‹', 'Previous: the block above in the song; the previous sect, phrase, instrument or FX track elsewhere (OPTION+◀)'], ['next', '›', 'Next: the block below in the song; the next sect, phrase, instrument or FX track elsewhere (OPTION+▶)'],
+  ['b:16', '++', 'Change the value up a lot (EDIT+▲)'], ['prev', '‹', 'Previous: the block above in the song; the previous sect, phrase, instrument or FX track elsewhere (OPTION+▲ on the song, OPTION+◀ elsewhere)'], ['next', '›', 'Next: the block below in the song; the next sect, phrase, instrument or FX track elsewhere (OPTION+▼ on the song, OPTION+▶ elsewhere)'],
   ['clr', 'CLEAR', 'Clear (OPTION+EDIT)'], ['sel', 'SELECT', 'Start or cancel a selection (SHIFT+OPTION)'],
   ['clone', 'CLN', 'Clone the block under the cursor into a new, unique number (Ctrl/⌘+D)'],
   ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on the row below (Ctrl/⌘+Shift+D)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (OPTION)'],
@@ -15162,8 +15235,8 @@ const scr = $('tScr'), grid = $('tGrid');
 let CW = 0.6, meterEls = [], masterEls = [];
 const MH = 8, MW = 36;
 const HINT = {
-  song:'EDIT add · EDIT×2 new sect · OPT+EDIT clear · EDIT+◀▶ ±1 ▲▼ ±16 · SHIFT+▶ open · OPT+▲▼ page',
-  songP:'EDIT add · EDIT×2 new phrase (on a block: unique copy) · OPT+EDIT clear · EDIT+◀▶ ±1 · SHIFT+▶ open phrase',
+  song:'EDIT add · EDIT×2 new sect · OPT+EDIT clear · EDIT+◀▶ ±1 ▲▼ ±16 · SHIFT+▶ open · OPT+arrows next block',
+  songP:'EDIT add · EDIT×2 new phrase (on a block: unique copy) · OPT+EDIT clear · EDIT+◀▶ ±1 · SHIFT+▶ open phrase · OPT+arrows next block',
   sect:'EDIT add phrase · EDIT×2 new · EDIT+arrows change · SHIFT+▶ open · SHIFT+◀ song · OPT+◀▶ other sect',
   phraseM:'Master phrase: commands only · EDIT add a command (VOL level, FXO effects on/off, FLX GAT RTG patterns) · EDIT+◀▶ ±1 ▲▼ ±more · OPT+EDIT clear',
   phrase:'EDIT add note · EDIT×2 note off · EDIT+◀▶ ±1 ▲▼ ±octave · OPT+EDIT clear · OPT+arrows go to phrase · SHIFT+▶ inst',
@@ -15172,6 +15245,8 @@ const HINT = {
   fx:'EDIT adds · ▶ opens its controls · EDIT+◀▶ change · OPT+EDIT remove or reset · OPT+◀▶ other track · SHIFT+◀ mixer',
   project:'EDIT on › runs it · EDIT+◀▶ change · OPT+EDIT reset · SHIFT+▼ back',
 };
+// PATTERN NAV off: the Song hint names the old OPTION keys (◀▶ previous/next block, ▲▼ page 16 rows).
+const songHintOld = t => t.replace('OPT+arrows next block', 'OPT+◀▶ next block ▲▼ page');
 function info(){
   const c = cs[tv];
   if (selA){
@@ -15480,6 +15555,7 @@ function draw(){
   if (tv === 'phrase' && pvActive()) $('tInfo').textContent = pvInfo();   // PATTERN VIEW: the track and phrase first
   let hintTxt = (tv === 'song' && !sectsOn) ? (inMode === 'keys' ? HINTK.songP : HINT.songP) : (inMode === 'keys' ? HINTK : HINT)[tv];
   if (tv === 'phrase' && inMode !== 'keys' && !patNavOn) hintTxt = hintTxt.replace('OPT+arrows go to phrase', 'OPT+▲▼ page');
+  if (tv === 'song' && inMode !== 'keys' && !patNavOn) hintTxt = songHintOld(hintTxt);   // PATTERN NAV off: the old OPTION keys
   if (asongOn()) hintTxt += inMode === 'keys' ? ' · double-click opens · Alt-click mutes' : ' · tap twice opens · hold mutes';
   const mstP = tv === 'phrase' && mstView();
   if (mstP) hintTxt = inMode === 'keys' ? 'Master phrase: commands only · letters pick a command (V F G R T…) · type hex for its value · Del cell · Shift+↑↓ lines · Ctrl+C/V' : HINT.phraseM;
@@ -16282,6 +16358,12 @@ function arrRows(){ const rh = arrRowH(); return rh > 0 ? clamp(Math.floor((arrG
 // The panel's width: 0 is the default for the screen size, otherwise what the grip was dragged to.
 const AWK = 'thunderplus-arrange-w-v1';
 let arrW = (() => { try { return Math.max(0, int(localStorage.getItem(AWK), 0)); } catch(e){ return 0; } })(), arrKey = '';
+// ARRANGE SIDE: the side panel at the left of the screen (default) or the right (as before 18 Oct). var: the settings rows
+// can be built before this line runs.
+var arrLeft = (() => { try { return localStorage.getItem('thunderplus-arrleft-v1') !== '0'; } catch(e){ return true; } })();
+document.body.classList.toggle('arrleft', arrLeft);
+function setArrLeft(on){ arrLeft = !!on; try { localStorage.setItem('thunderplus-arrleft-v1', arrLeft ? '1' : '0'); } catch(e){}
+  document.body.classList.toggle('arrleft', arrLeft); arrLayout(true); }
 // The song keeps room for all its tracks at a readable size (about 12px type: 52 columns of text), and the side
 // panel keeps its place when it is showing, so a wide ARRANGE never cuts the song off.
 const SONG_MIN = () => Math.round(BASEW * CW * 12 + 24);
@@ -16344,7 +16426,8 @@ $('tArrH').addEventListener('pointerdown', e => { e.preventDefault(); e.stopProp
   arrDrag = {id:e.pointerId, x0:e.clientX, w0:arrEl.offsetWidth, moved:false}; $('tArrH').classList.add('dn'); });
 $('tArrH').addEventListener('pointermove', e => {
   if (!arrDrag || e.pointerId !== arrDrag.id) return;
-  const dx = arrDrag.x0 - e.clientX; if (Math.abs(dx) > 3) arrDrag.moved = true; if (!arrDrag.moved) return;
+  const dx = (arrLeft ? e.clientX - arrDrag.x0 : arrDrag.x0 - e.clientX);   // the grip is on the edge facing the screen
+  if (Math.abs(dx) > 3) arrDrag.moved = true; if (!arrDrag.moved) return;
   arrW = clamp(Math.round(arrDrag.w0 + dx), 200, arrMax()); arrEl.style.width = arrW + 'px';
   // The panel's width follows the finger every frame; the song's text is re-fitted at most ~8 times a second while
   // dragging (fit()+draw() is ~150 ms on a phone, which made the drag crawl) and once more on release.
@@ -17550,7 +17633,7 @@ const HINTK = {
 
 /* ===== ARRANGE PAGING (settings ARRANGE FOCUS and SONG STRIP) =====
    Paging into Arrange from Phrase. With Arrange beside the phrase (computer, unfolded Fold) a tap or click on the panel,
-   or SHIFT+◀, gives it the keys: arrows, EDIT, hex, Del, M, copy/paste, the command row and the pad then work on the
+   SHIFT+◀ or the SONG tab (apTabSong; a second tap opens the Song screen) gives it the keys, and the SONG tab lights: arrows, EDIT, hex, Del, M, copy/paste, the command row and the pad then work on the
    song cursor exactly as on the Song screen, and the phrase follows the block under the cursor (PIN keeps it put).
    A tap on the phrase, SHIFT+▶ or Esc gives the keys back. On a phone-sized screen (the folded Fold) where Arrange
    doesn't fit, a three-row song strip over the phrase does the same.
@@ -17644,6 +17727,14 @@ function apBack(){
   if (apIn && dir === 'left' && apArrOk()){ apFocus('arr', true); draw(); return; }
   return f(dir);
 }; }
+// The SONG tab (and SONG on the side panel's screen map) on Phrase with Arrange beside it: the first tap gives Arrange the
+// keys, as SHIFT+◀ does; a tap while Arrange has them opens the Song screen as before. Without the panel (the folded phone,
+// the setting off) it opens the Song screen straight away.
+function apTabSong(e){
+  if (!e.target.closest('[data-v="song"]') || !apReady || apF === 'arr' || !apArrOk()) return;
+  e.stopPropagation(); e.preventDefault(); apFocus('arr', true); draw();
+}
+$('tTabs').addEventListener('click', apTabSong, true); $('tMap').addEventListener('click', apTabSong, true);
 // The song strip, between the phrase's title line and its grid.
 const apStripEl = el('div'); apStripEl.id = 'apStrip'; apStripEl.hidden = true; apStripEl.setAttribute('aria-label', 'Song strip');
 scr.insertBefore(apStripEl, grid);
@@ -17696,6 +17787,8 @@ function apAfterDraw(){
   B.toggle('apf', !!apF); B.toggle('apfa', apF === 'arr'); B.toggle('apfs', apF === 'strip');
   apPinB.hidden = !arrOk; arrEl.classList.toggle('appinv', arrOk); apPinB.classList.toggle('on', apPin); apPinB.setAttribute('aria-pressed', String(apPin));
   apTagEl.hidden = !apF; if (apF) apTagEl.textContent = apPin ? 'PINNED' : 'FOLLOWS';
+  // The song has the keys: its tab is the lit one (draw() lit PHRASE, the screen underneath).
+  if (apF) document.querySelectorAll('#tTabs [data-v], #tMap [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === 'song'));
   if (apF === 'arr' && apSel) apMarkSel();
   if (apF) apSongLines();
   apFoot(arrOk);
@@ -17712,7 +17805,7 @@ function apHint(txt){ const h = $('tHint'); if (h.textContent !== txt){ h.textCo
 function apSongLines(){
   const keys = inMode === 'keys';
   $('tInfo').textContent = (apF === 'arr' ? 'ARRANGE · ' : 'SONG STRIP · ') + apAsSong(info);
-  apHint((keys ? HINTK : HINT)[sectsOn ? 'song' : 'songP'].replace(/(SHIFT|Shift)\+(▶|→) open( phrase)?/, keys ? 'Shift+→ back to the phrase' : 'SHIFT+▶ back to the phrase')
+  apHint(((t => keys || patNavOn ? t : songHintOld(t))((keys ? HINTK : HINT)[sectsOn ? 'song' : 'songP'])).replace(/(SHIFT|Shift)\+(▶|→) open( phrase)?/, keys ? 'Shift+→ back to the phrase' : 'SHIFT+▶ back to the phrase')
     + (apPin ? ' · PINNED: the phrase stays' : ' · the phrase follows the song cursor'));
   const cmd = $('tCmd');
   cmd.querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = true);
@@ -17725,7 +17818,7 @@ function apFoot(arrOk){
   if (!apFootEl) return;
   const k = inMode === 'keys', tap = coarse ? 'tap' : 'click';
   const t = apF === 'arr' ? `THE KEYS ARE ON THE SONG · ${k ? 'arrows' : '▲▼◀▶'} move the song cursor and the phrase follows (PIN keeps it) · ${k ? 'hex, Enter, Del, M, Ctrl+D' : 'EDIT, EDIT×2, OPTION+EDIT, CLN'} as on the Song screen · ${k ? 'Shift+→' : 'SHIFT+▶'} or a ${tap} on the phrase: back to it`
-    : arrOk ? `${tap.toUpperCase()} (or ${k ? 'Shift+←' : 'SHIFT+◀'}) · the keys move here: the song cursor moves and the phrase follows · twice: edit that block's phrase · HOLD a block to mute it · PIN keeps this phrase up`
+    : arrOk ? `${tap.toUpperCase()} (or ${k ? 'Shift+←' : 'SHIFT+◀'}, or the SONG tab) · the keys move here: the song cursor moves and the phrase follows · twice: edit that block's phrase · HOLD a block to mute it · PIN keeps this phrase up`
     : apFoot0;
   if (apFootEl.textContent !== t){ apFootEl.textContent = t; if (arrFoot) arrFoot.title = t; }
 }
@@ -17882,7 +17975,7 @@ const SET_SHEETS = true;
 const SHEETS = {
   screen:{title:'Screen', about:'Layout and panels, the Phrase and Song screens, text size and colour', groups:[
     ['Text & colour', ['TEXT SIZE', 'STEP NUMBERS', 'SCREEN']],
-    ['Layout & panels', ['ARRANGE', 'SIDE PANEL', 'INST LIST', 'SECT', 'KEYS KEYPAD', 'BOTTOM PANEL', 'STAGE']],
+    ['Layout & panels', ['ARRANGE', 'ARRANGE SIDE', 'SIDE PANEL', 'INST LIST', 'SECT', 'KEYS KEYPAD', 'BOTTOM PANEL', 'STAGE']],
     ['Phrase screen', ['SIMPLE PHRASE', 'FOLLOW', 'NEIGHBORS', 'PATTERN VIEW', 'ARRANGE FOCUS', 'SONG STRIP']],
     ['Song screen', ['CLASSIC SONG', 'SONG MOUSE', 'SECTIONS', 'LOOP DRAG', 'SONG PEEK']]]},
   input:{title:'Input', about:'PAD or KEYS, notes as you type, edit step, sticky keys, the command row', groups:[
