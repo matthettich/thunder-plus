@@ -24,6 +24,40 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (4): drumming dogs, Arrange on every screen, pattern play, poly OFF per column, clone-then-paste
+
+Cache `thunderplus-v172` (not yet in a desktop build: v1.2.3 is the one before this entry).
+- **DRUM dogs** (Phrase stage switch DANCE · DRUM · KEYS, `#tStagePs` styled `.sxsw`; `phStage`,
+  `thunderplus-phstage-v1`, default KEYS; stage kind 'drum', too narrow for the dogs → keys): SVG `.kit` groups in
+  each dog's `.bob` (pittie: hi-hat, crash, kick with pink head, snare, rack tom, sticks in the arms; husky: bongos on
+  a stand), shown by `.dogs.drum`. The sequencer step adds `pos[t].pd` (the pad); `sndKeep` → `dogsHit`: pad 00 kick,
+  01–02 snare, 03–04 hat (04 rings), 05 tom, 06–07 crash, any other pad the bongos (a chord both hands). `drumsBeat`
+  nods heads and ticks the hat / taps a bongo on a beat with nothing to hit. Strikes are WAAPI on the arm group
+  (`rotate translateY`), arms rest over their drums via `--aL/--aR`.
+- **FX sideways shift**: draw()'s horizontal follow now sets the least scroll from 0 that shows the cursor, counting
+  only the first half-screen of a long value (an FX slot's full effect name), so the labels stay on screen.
+- **PHRASE | PATTERN persists**: `pvNav` is no longer called; Shift+▶ from the pattern goes on to Inst.
+- **Pattern view PLAY** (`playCtx`): plays the song row on screen, looping (`tStart('song', {loop:{v:'pattern'}})`);
+  `syncLoop` keeps that loop on the pattern's row (follows it to another row) and LOOP doesn't touch it.
+- **Arrange beside every screen** (`apArrOk`: any screen but Song; `apHost` remembers it; `apBack` returns to it):
+  a click gives Arrange the keys (Shift+◀ and the SONG tab only on Phrase, so screen navigation is unchanged), the
+  screen follows the block (`apFollow`: FX → cFxT, Mixer → its track, Inst → the block's instrument), a double click
+  opens the phrase, Esc / a click on the screen gives the keys back. Right-click in the side panel: Open the phrase,
+  Mute, then `cmdItems()` run through `apRun`. Right-clicks no longer count as taps or hold-to-mute there. A click on
+  an empty cell (with ARRANGE FOCUS off) just moves the cursor. Checked beside FX, Mixer and Inst.
+- **POLY cells per skin**: light term skins mix `--tk-poly` 35% with white (plum went grey mixing green into pink);
+  the dark ones keep mixing with their background.
+- **Caps Lock**: a keyup without a keydown (a Mac turning Caps Lock off) types an OFF too (`capsDn`).
+- **Poly OFF per column**: a poly row's OFF becomes `{type:'off', cols}`; voices carry `col` (all three voice makers);
+  the player and MIDI out (`moOffCols`, held notes tagged with `col`) stop only those columns; the piano drops only
+  those columns (`pos[t].offc`). Mono tracks unchanged.
+- **CLONE = copy a unique clone** (Ctrl/⌘+D, CLN, Edit ▾, right-click): `cloneHere` puts the block (or selection) on
+  the clipboard with `uniq`; `paste` → `pasteClone` makes a fresh unique copy (newBlock) at the cursor each time; the
+  original stays. EDIT×2 / Enter twice still makes a unique copy in place.
+- Checked headless: all of the above, no console errors (FX scroll 0 on a long name, pattern persists Inst↔Phrase,
+  pattern play rows 0/0 0/1 0/2, plum poly cell #bbccc0-ish, poly OFF `note@0 note@1 off:0`, clone ids 3 and 4 with
+  the original 0 untouched).
+
 ## 19 Oct (3): keys = pad controls, COMMAND BAR, playing piano, Arrange playhead, MST in Arrange, update notice
 
 Same cache (`thunderplus-v172`). Desktop release v1.2.3.

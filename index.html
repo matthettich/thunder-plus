@@ -1289,6 +1289,14 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
 @keyframes dkWag{0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-10deg)}}
 @media (prefers-reduced-motion: reduce){ .dogs .bob, .dogs .tail{animation:none!important} }
 :root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .dogs{--dk-pink:var(--mxsoft)}
+/* DRUM (the phrase stage's DANCE · DRUM · KEYS): the pittie behind a drum kit with sticks, the husky on bongos. The kit
+   only shows in .drum; arms rest over their drums (CSS variables) and strike with dogsHit(); no hops or breathing. */
+.dogs .kit{display:none}
+.dogs.drum .kit{display:inline}
+.dogs.drum .d1{--aL:26deg; --aR:40deg} .dogs.drum .d2{--aL:-20deg; --aR:20deg}
+.dogs.drum.idle .bob{animation:none}
+.dogs .stk{fill:none; stroke:var(--dk-ink); stroke-width:2.6; stroke-linecap:round}
+.dogs :is(.dr,.cym){transform-box:fill-box; transform-origin:50% 50%}
 
 /* ---------- mastering window ----------
    A sheet over the app in its own colours: header with the on switch, the chain (EQ → SUPPRESS → COMPRESS → LIMIT,
@@ -1466,6 +1474,11 @@ body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absol
 :root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkChn,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkChn{--dkp:9%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
 :root[data-skinbase="term"] .dkh .dksolo{background:var(--mxsoft); color:var(--mxon)} :root[data-skinbase="term"] .stms button.so.on{background:var(--mxsoft); color:var(--mxon)}
 :root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
+/* POLY cells in the POLY colour in every term skin (owner, 19 Oct): mixed into a tinted background the poly colour
+   could go grey (plum: green into pink gave #d2d0d2). Light skins mix it with white so the hue stays; the dark skins
+   (near-neutral backgrounds) keep mixing with theirs. */
+:root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 35%, #ffffff)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
 :root[data-skinbase="term"] .tagrid b.f[style]{background:color-mix(in srgb, var(--mx) var(--ibp, 100%), var(--mxsoft)); color:var(--mxon)} :root[data-skinbase="term"] .tagrid b.f{text-shadow:none; box-shadow:0 0 8px var(--mxglowc)}
 :root[data-skinbase="term"] .tscr .nbl, :root[data-skinbase="term"] .tscr .nbr{color:var(--mx2)}
 :root[data-skinbase="term"] ::selection{background:var(--mx); color:var(--mxon)}
@@ -1886,8 +1899,18 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <g class="leg ll"><path class="ln c-brown" d="M44.0 132.0 L32.1 142.8 L32.1 163.2 L25.4 171.3 L27.5 174.2 L40.2 174.8 L44.9 171.7 L49.9 147.8 Z"></path><path class="ln toe" d="M27 171 l3 -3 M32 173 l2 -3"></path></g><g class="leg lr"><path class="ln c-brown" d="M86.0 132.0 L97.9 142.8 L97.9 163.2 L104.6 171.3 L102.5 174.2 L89.8 174.8 L85.1 171.7 L80.1 147.8 Z"></path><path class="ln toe" d="M103 171 l-3 -3 M98 173 l-2 -3"></path></g>
       <path class="ln c-brown" d="M65.0 70.0 L78.7 72.3 L89.5 79.3 L96.7 91.2 L99.0 105.9 L96.8 126.7 L90.1 142.1 L80.8 149.4 L65.0 151.5 L49.2 149.4 L39.9 142.1 L33.2 126.7 L31.0 105.9 L33.3 91.2 L40.5 79.3 L51.3 72.3 Z"></path>
       <path class="ln c-white" d="M57.0 84.0 L65.1 87.0 L73.0 84.3 L65.1 109.7 Z"></path>
-      <g class="arm al"><path class="ln c-brown" d="M46.0 86.0 L33.2 103.0 L29.8 120.5 L33.0 125.0 L38.1 123.0 L43.3 107.1 L51.8 96.2 Z"></path><path class="ln toe" d="M31 121 l3 -1"></path></g>
-      <g class="arm ar"><path class="ln c-brown" d="M84.0 86.0 L96.8 103.0 L100.2 120.5 L97.0 125.0 L91.9 123.0 L86.7 107.1 L78.2 96.2 Z"></path><path class="ln toe" d="M99 121 l-3 -1"></path></g>
+      <!-- DRUM: the kit (hi-hat at the left, crash at the right, kick with a pink head, snare, rack tom) -->
+      <g class="kit">
+        <path class="ln" d="M113 106 L113 174 M106 175 L113 168 L120 175"></path>
+        <g class="cym ck"><path class="ln" d="M100 104 L113 99.5 L126 104 L113 106.5 Z"></path></g>
+        <path class="ln" d="M16 117 L16 174 M9 175 L16 168 L23 175"></path>
+        <g class="cym hh"><path class="ln" d="M5 112 L16 109 L27 112 L16 114 Z"></path><path class="ln" d="M5 116 L16 114.5 L27 116 L16 118 Z"></path></g>
+        <g class="dr kk"><circle class="ln" cx="65" cy="153" r="21"></circle><circle class="ln band" cx="65" cy="153" r="13"></circle></g>
+        <g class="dr sn"><path class="ln" d="M49 127 L49 134 L75 134 L75 127 Z"></path><ellipse class="ln" cx="62" cy="127" rx="13" ry="3"></ellipse></g>
+        <g class="dr tm"><path class="ln" d="M79 121 L79 128 L97 128 L97 121 Z"></path><ellipse class="ln" cx="88" cy="121" rx="9" ry="2.6"></ellipse></g>
+      </g>
+      <g class="arm al"><path class="ln c-brown" d="M46.0 86.0 L33.2 103.0 L29.8 120.5 L33.0 125.0 L38.1 123.0 L43.3 107.1 L51.8 96.2 Z"></path><path class="ln toe" d="M31 121 l3 -1"></path><path class="stk kit" d="M31 121 L40 133"></path></g>
+      <g class="arm ar"><path class="ln c-brown" d="M84.0 86.0 L96.8 103.0 L100.2 120.5 L97.0 125.0 L91.9 123.0 L86.7 107.1 L78.2 96.2 Z"></path><path class="ln toe" d="M99 121 l-3 -1"></path><path class="stk kit" d="M99 121 L90 133"></path></g>
       <g class="head">
         <path class="ln c-brown" d="M42.0 32.0 L31.3 30.8 L29.1 42.6 L37.1 42.9 L44.8 32.9 Z"></path>
         <path class="ln c-brown" d="M87.0 30.0 L100.1 23.8 L111.1 28.7 L108.3 33.6 L89.0 41.7 Z"></path>
@@ -1911,6 +1934,13 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <path class="ln c-cream" d="M65.0 96.0 L77.3 103.4 L82.0 124.6 L77.2 147.8 L64.5 157.9 L52.3 146.9 L48.0 123.6 L52.7 103.4 Z"></path>
       <path class="ln band" d="M39.0 88.0 L65.1 96.2 L90.9 88.2 L73.0 117.0 L64.9 120.0 L56.8 116.7 Z"></path>
       <path class="ink" d="M53 95 L55 97 L53 99 L51 97 Z"></path><path class="ink" d="M65 101 L67 103 L65 105 L63 103 Z"></path><path class="ink" d="M77 95 L79 97 L77 99 L75 97 Z"></path><path class="ink" d="M61 110 L63 112 L61 114 L59 112 Z"></path><path class="ink" d="M70 109 L72 111 L70 113 L68 111 Z"></path>
+      <!-- DRUM: bongos on a stand, pink heads like the bandana -->
+      <g class="kit">
+        <path class="ln" d="M65 166 L65 196 M57 197 L65 190 L73 197"></path>
+        <path class="ln" d="M60 152 L71 152 L71 158 L60 158 Z"></path>
+        <g class="dr bl"><path class="ln" d="M41 147 L45 168 L59 168 L63 147 Z"></path><ellipse class="ln band" cx="52" cy="147" rx="11" ry="3"></ellipse></g>
+        <g class="dr br"><path class="ln" d="M69 147 L72 165 L84 165 L87 147 Z"></path><ellipse class="ln band" cx="78" cy="147" rx="9" ry="2.6"></ellipse></g>
+      </g>
       <g class="arm al"><path class="ln c-cream" d="M47.0 98.0 L34.4 118.6 L30.9 138.0 L34.4 143.1 L39.4 140.7 L44.6 121.6 L52.9 108.2 Z"></path></g>
       <g class="arm ar"><path class="ln c-cream" d="M83.0 98.0 L95.6 118.6 L99.1 138.0 L95.6 143.1 L90.6 140.7 L85.4 121.6 L77.1 108.2 Z"></path></g>
       <g class="head">
@@ -1931,6 +1961,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <div class="stgph" id="tStagePh" hidden><b id="tStagePhT"></b><canvas id="tStageC"></canvas></div>
         <div class="sxpk" id="tStagePk" hidden></div><!-- SONG EXTRAS: the phrase peek, and its DOGS | PEEK switch -->
         <div class="sxsw" id="tStageSw" role="group" aria-label="Beside the song" hidden><button type="button" data-k="dogs">DOGS</button><button type="button" data-k="peek">PEEK</button></div>
+        <div class="sxsw" id="tStagePs" role="group" aria-label="Beside the phrase" hidden><button type="button" data-k="dance">DANCE</button><button type="button" data-k="drum">DRUM</button><button type="button" data-k="keys">KEYS</button></div>
       </div>
       <div class="thd"><span class="thl"><span id="tTitle">SONG</span><span class="tpset" id="tPset"></span></span><span class="tsub" id="tSub"></span></div>
       <div class="tgrid" id="tGrid"></div>
@@ -2004,7 +2035,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Ctrl/⌘ arrows</dt><dd>as PAD mode's OPTION+arrows: in a phrase, the phrase above / below / left / right on the Song grid; on the Song, the nearest block that way; elsewhere previous / next</dd>
         <dt>[ ]</dt><dd>previous / next sect, phrase or instrument, by number</dd>
         <dt>Shift+Enter</dt><dd>as the pad's EDIT: on a filled phrase note, stamps the current note and instrument over it</dd>
-        <dt>Ctrl/⌘ C X V A</dt><dd>copy, cut, paste over the cursor or selection, select all · Ctrl/⌘+B block select · Ctrl/⌘+D clone a song block · Ctrl/⌘+Shift+D clone it to the row below</dd>
+        <dt>Ctrl/⌘ C X V A</dt><dd>copy, cut, paste over the cursor or selection, select all · Ctrl/⌘+B block select · Ctrl/⌘+D clone a song block (then paste puts a unique copy at the cursor) · Ctrl/⌘+Shift+D clone it to the row below</dd>
         <dt>Esc</dt><dd>drop the selection</dd>
         <dt>Space</dt><dd>play this screen · Shift+Space the song · with Loop on, Space loops the selected rows</dd>
         <dt>Alt+L</dt><dd>loop the selection on/off (also LOOP in the tab bar)</dd>
@@ -11124,6 +11155,8 @@ const msendClk = (bytes, t) => { for (const p of clkPorts()) msend(bytes, t, fal
 const moEnd = e => Math.min(e.cut != null ? e.cut : Infinity, e.rel != null ? e.rel : Infinity);
 function offOne(h, at){ if (h.end <= at) return; msend([0x80 | h.ch, h.n, 0], Math.max(at, h.t + 0.001), true, h.p); h.end = at; }
 // End every MIDI note track t is holding, at audio time at (notes already ended by then are left alone).
+// A poly column's OFF: only the notes started from those columns (moNote tags each held note with its column).
+function moOffCols(t, cols, at){ pendAt(t, at); const H = mx.held[t]; if (!H) return; for (const h of [...H]) if (cols.includes(h.col) && h.end > at) offNote(t, h.nid, at); }
 function moOff(t, at){ pendAt(t, at); const H = mx.held[t]; if (!H || !H.length) return; for (const h of H) offOne(h, at); mx.held[t] = H.filter(h => h.end > at); }
 // Pitch bend, `st` semitones on a channel whose gear bends `rng` semitones at full throw (the whole channel bends).
 // A channel never bent counts as centred, and a value already sent isn't sent again, so gear only sees bends when a
@@ -11221,6 +11254,7 @@ function moNote(e, I){
   bendTo(p, ch, b0, rng, e.t);
   const back = arpBack(e.arp), pend = back != null && back < end - 1e-6;
   const nid = moPlay(t, p, ch, n, vel, rng, fine, arpSegs(e.arp, e.t, end), pend ? Infinity : end);
+  { const hh = (mx.held[t] || []).find(h => h.nid === nid); if (hh) hh.col = e.col; }   // POLY OFF per column
   if (pend) (mx.pend[t] || (mx.pend[t] = [])).push({p, ch, n, vel, rng, fine, t:back, end, nid});
   // Then it moves: PSL glides to the note, then PBN bends on from there, or PVB wobbles around it (one ramp per
   // channel and row, shared by the notes of a chord).
@@ -11270,7 +11304,7 @@ function moEv(e){
     }
     return false;
   }
-  if (e.type === 'off'){ moOff(e.track, e.t); return false; }
+  if (e.type === 'off'){ if (e.cols) moOffCols(e.track, e.cols, e.t); else moOff(e.track, e.t); return false; }
   if (e.type === 'mod'){ if (e.track < S.mix.length && !audible(e.track)) moOff(e.track, e.t); else { moMod(e); const end = moEnd(e); if (end < Infinity) moOff(e.track, end); } return false; }
   if (MIDI_ONLY_EV.has(e.type)){ moCmd(e); return true; }
   if (e.type !== 'note' || e.ii == null) return false;
@@ -12927,7 +12961,10 @@ function makeSeq(S, mode, o){
         // Tracks 9–16 are polyphonic: all four note columns play, as a chord, over whatever is still ringing.
         const poly = isPolyT(t), ns = poly ? r.slice(0, NCOL) : [r[0]];
         const offN = t < MT && ns.includes(OFF), notes = t < MT ? ns.filter(x => x >= 0 && x < 120) : [];
-        if (offN){ evs.push({type:'off', t:at, track:t}); pos[t].off = true; }
+        // POLY OFF per column (owner, 19 Oct): an OFF in a note column stops only the note started from that column; a
+        // mono track's OFF stops the track as before. ncol: the column of each of `notes`.
+        const ncol = ns.map((x, c) => x >= 0 && x < 120 ? c : -1).filter(c => c >= 0), offC = poly && offN ? ns.map((x, c) => x === OFF ? c : -1).filter(c => c >= 0) : null;
+        if (offN){ evs.push(offC ? {type:'off', t:at, track:t, cols:offC} : {type:'off', t:at, track:t}); if (offC) pos[t].offc = offC; else pos[t].off = true; }
         if (notes.length && play){
           const ii = fx.INS != null ? clamp(fx.INS, 0, NI - 1) : r[IC] >= 0 ? r[IC] : T.inst; T.inst = ii;
           const I = S.insts[ii] || S.insts[0];
@@ -12940,7 +12977,7 @@ function makeSeq(S, mode, o){
           notes.forEach((n, q) => {
             const note = n + ctsp + I.tsp + T.tsp + pit + nrnd, rel = note - ROOT, npc = ((rel % 12) + 12) % 12, ntc = (S.tune && S.tune[npc]) || 0, rate = Math.pow(2, rel / 12) * Math.pow(2, ntc / 1200);
             if (!q) firstRate = rate;
-            const ev = {type:'note', t:at, track:t, poly, pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
+            const ev = {type:'note', t:at, track:t, poly, col:ncol[q], pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? at + fx.KIL * tick : null, rel:fx.OFF != null ? at + fx.OFF * tick : null,
               slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
               ii, mn:note + 12 + ntc / 100, vel:(fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out
@@ -12956,6 +12993,7 @@ function makeSeq(S, mode, o){
           // SOUNDING NOTES (the phrase screen's piano): the pitches this row really starts, by note column, with every
           // transpose (sect, instrument, TSP, PIT, random) applied.
           { const tr = ctsp + I.tsp + T.tsp + pit + nrnd; pos[t].sc = ns.map((x, c) => x >= 0 && x < 120 ? [c, Math.round(x + tr)] : null).filter(Boolean); }
+          pos[t].pd = vtrk ? voiceForTrack(t) : I.pad;   // the pad it plays (the drumming dogs: 00–07 the kit, the rest bongos)
         } else if (!notes.length && !offN && play && t < MT){
           // No note on this row: instrument commands change the note that is already playing.
           const m = {type:'mod', t:at, track:t};
@@ -13063,7 +13101,7 @@ function makePlayer(ac, out, getBuf, live){
     b.g.gain.setValueAtTime(ev.gain, t); b.pn.pan.setValueAtTime(clamp((ev.pan - 128) / 127, -1, 1), t);
     if (ev.wob != null && b.wob) b.wob.setValueAtTime(ev.wob, t);
     b.lastOn = t; if (b.cur) alive.delete(b.cur);
-    const v = {bass:b, src:{playbackRate:b.rate, stop(){}}, g:b.g, pn:b.pn, base:ev.rate, rate:ev.rate, choke:ck, ended:false, stopAt:null, syn:true, rel:0};
+    const v = {bass:b, src:{playbackRate:b.rate, stop(){}}, g:b.g, pn:b.pn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn:true, rel:0};
     b.cur = v;
     if (!leg) pitchMods(v, t, ev.rate, ev);
     alive.add(v);
@@ -13134,6 +13172,7 @@ function makePlayer(ac, out, getBuf, live){
       try { g.setValueAtTime(mvol == null ? curve(S.master) : mvol, at); g.linearRampToValueAtTime(to, at + 0.004); } catch(e){} mvol = to; return; }
     const T = vs[ev.track];
     // OFF releases every note on the track: synth slots over their release, drum pads at once.
+    if (ev.type === 'off' && ev.cols){ for (let k = T.length - 1; k >= 0; k--) if (ev.cols.includes(T[k].col)){ kill(T[k], ev.t, relTc(T[k])); T.splice(k, 1); } return; }   // a poly column's OFF
     if (ev.type === 'off'){ for (const v of T) kill(v, ev.t, relTc(v)); T.length = 0; return; }
     if (ev.type === 'mod'){ for (const v of T) if (live1(v, ev.t)) modVoice(v, ev); return; }
     startNote(ev);
@@ -13187,7 +13226,7 @@ function makePlayer(ac, out, getBuf, live){
     else src.playbackRate.value = ev.rate;
     g.gain.value = ev.gain; pn.pan.value = clamp((ev.pan - 128) / 127, -1, 1);
     src.connect(g); g.connect(f); f.connect(pn); pn.connect(buses[ev.track].inp);
-    const syn = isSyn(ev.pad), v = {src, f, g, pn, base:ev.rate, rate:ev.rate, choke:ck, ended:false, stopAt:null, syn, rel:syn && kv ? relOf(kv) : 0};
+    const syn = isSyn(ev.pad), v = {src, f, g, pn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn && kv ? relOf(kv) : 0};
     if (!ev.slide) pitchMods(v, ev.t, ev.rate, ev);
     const off = ev.ofsSec != null ? (ev.rev ? Math.max(0, b.duration - ev.ofsSec - ev.durSec) : ev.ofsSec) : clamp(ev.ofs, 0, 255) / 256 * b.duration;
     const st0 = Math.max(ev.t, ac.currentTime);
@@ -13249,7 +13288,7 @@ function makePlayer(ac, out, getBuf, live){
     if (!srcs.length){ try { g.disconnect(); } catch(e){} return; }
     pn.pan.value = clamp((ev.pan - 128) / 127, -1, 1);
     // SoundFont release is the time to fall 100 dB (11.5 time constants); kill() fades over rel / 4.6
-    const v = {src:srcs[0], srcs, f, g, pn, base, rate:base, choke:ck, ended:false, stopAt:null, syn:true, rel:relMax * 0.4};
+    const v = {src:srcs[0], srcs, f, g, pn, base, rate:base, choke:ck, col:ev.col, ended:false, stopAt:null, syn:true, rel:relMax * 0.4};
     if (!ev.slide) pitchMods(v, ev.t, base, ev);
     alive.add(v); let left = srcs.length;
     for (const s2 of srcs) s2.onended = () => { if (--left > 0) return; v.ended = true; alive.delete(v); if (live) try { pn.disconnect(); } catch(e){} };
@@ -14520,7 +14559,7 @@ function projRows(){
     {l:'INST LIST', ck:'Show instrument list', get:() => inlOn ? 1 : 0, set:v => setInl(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'Every instrument and the pad it plays (long names are cut short). In the side panel; without it, in PAD mode between the arrows and the buttons when there is room. Tap one to open it on INST'},
     {l:'PATTERN VIEW', ck:'Pattern view on the Phrase screen', get:() => pvOn ? 1 : 0, set:v => setPv(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'ON' : 'OFF',   // PATTERN VIEW
-      info:() => 'ON: the Phrase screen gets PHRASE | PATTERN buttons (Shift+◀ from Phrase): PATTERN shows every track’s phrase for one song row side by side, and the open track is edited in place. Wide screens only (computer, unfolded Fold). OFF: the Phrase screen as before'},
+      info:() => 'ON: the Phrase screen gets PHRASE | PATTERN buttons (the choice stays until you switch): PATTERN shows every track’s phrase for one song row side by side, and the open track is edited in place. Wide screens only (computer, unfolded Fold). OFF: the Phrase screen as before'},
     {l:'SIMPLE PHRASE', ck:'Show simple phrase screen', get:() => spOn ? 1 : 0, set:v => setSp(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // SIMPLE PHRASE
       info:() => 'ON: the Phrase screen on its own, as big as it fits, for easier reading: no Arrange beside it, no song strip over it, no piano down the side, no PATTERN view. TEXT SIZE still makes it bigger or smaller. Other screens are unchanged. OFF: the Phrase screen as before'},
     {l:'STEP NUMBERS', ck:'Display steps as decimal', get:() => stepDec ? 1 : 0, set:v => setStepDec(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'DECIMAL' : 'HEX',
@@ -14834,13 +14873,30 @@ function newBlock(c, src){
   const ph = firstPhrase(cid);
   return toast((src < 0 ? 'New phrase ' : 'Unique copy: phrase ') + hx(ph) + (ph !== cid ? ' (block ' + hx(cid) + ')' : '') + ' · SHIFT+▶ opens it');
 }
-// CLONE (command row, Ctrl/⌘+D) on the song: copy the block under the cursor into the next free
-// number, phrases and all, so the copy can be edited without touching the original.
+// CLONE (Ctrl/⌘+D, the command row's CLN, Edit ▾, right-click) on the song (owner, 19 Oct: "Cmd+D then paste drops
+// the clone on the cell that was copied"): it COPIES the block under the cursor (or the selected blocks) as a unique
+// clone. The original stays as it is; PASTE then puts a new copy, phrases and all with new numbers, where the cursor is,
+// and every paste makes another (pasteClone). EDIT×2 / Enter twice on a block still makes a unique copy in place.
 function cloneHere(){
   if (tv !== 'song') return toast('CLONE works on the SONG screen.');
-  const c = cs.song, src = getCell('song', c.x, c.y);
-  if (src < 0) return toast('Move onto a filled block to clone it.');
-  return newBlock(c, src);
+  const c = cs.song, sel = selA && selA.v === 'song', r = sel ? selRect() : {x0:c.x, x1:c.x, y0:c.y, y1:c.y}, d = [];
+  for (let y = r.y0; y <= r.y1; y++){ const row = []; for (let x = r.x0; x <= r.x1; x++) row.push(getCell('song', x, y)); d.push(row); }
+  const n = d.flat().filter(v => v >= 0).length;
+  if (!n) return toast(sel ? 'Nothing to clone in the selection.' : 'Move onto a filled block to clone it.');
+  clip = {v:'song', x0:r.x0, d, line:false, uniq:true}; selA = null; draw();
+  toast(`Clone copied (${n} block${n > 1 ? 's' : ''}): ${pasteKey()} puts a unique copy, with new numbers, where the cursor is`);
+}
+function pasteClone(){
+  const c = cs.song, r = selA ? selRect() : null, y0 = r ? r.y0 : c.y, x0 = r ? r.x0 : c.x; selA = null;
+  let want = 0, made = 0, last = -1;
+  clip.d.forEach((row, j) => row.forEach((v, i) => {
+    const x = x0 + i, y = y0 + j; if (v < 0 || y > 255 || (x >= ntr() && x !== MT)) return;
+    want++; newBlock({x, y}, v); const id = getCell('song', x, y); if (id >= 0 && id !== v){ made++; last = id; } }));
+  saveS(); draw();
+  if (!want) return toast('Nothing to paste here.');
+  if (made < want) return toast(`Pasted ${made} of ${want} clones: no free sects or phrases left.`);
+  const ph = firstPhrase(last);
+  toast(made === 1 ? 'Unique copy: phrase ' + hx(ph) + (ph !== last ? ' (block ' + hx(last) + ')' : '') + ' · paste again for another' : `Pasted ${made} unique copies`);
 }
 // CLN↓ (command row, Ctrl/⌘+Shift+D) on the song: the block under the cursor, or every block in the
 // selection, is cloned into new, unique numbers on the row(s) just below; the cursor follows.
@@ -14935,6 +14991,9 @@ function toggleLoop(){
 // changes the running loop at once, no restart. Called from draw(), which runs after every such change.
 function syncLoop(){
   if (!tp.on || !tp.seq || !tp.seq.setLoop || !tp.loopV) return;
+  // PATTERN VIEW's loop is the song row on screen, not a selection: it follows the pattern to another row (each track
+  // moves there when its phrase ends) and LOOP doesn't touch it.
+  if (tp.loopV === 'pattern'){ if (tv === 'phrase' && pvActive()) tp.seq.setLoop({v:'pattern', y0:cs.song.y, y1:cs.song.y}); return; }
   if (!loopSel){ tp.seq.setLoop(null); return; }
   if (tv === tp.loopV && selA && selA.v === tv && !onPset()){ const r = selRect(); loopArm = {v:tv, y0:r.y0, y1:r.y1}; }
   tp.seq.setLoop(loopArm && loopArm.v === tp.loopV ? loopArm : null);
@@ -15031,6 +15090,7 @@ function copyHere(cut){
 function paste(){
   if (!clip) return toast('Nothing copied yet. ' + (inMode === 'keys' ? 'Shift+▲▼ selects lines, Ctrl/⌘+B a block.' : 'SHIFT+OPTION starts a selection.'));
   if (clip.v !== tv) return toast('That was copied in ' + VNAME[clip.v] + '. Paste it there.');
+  if (clip.uniq && tv === 'song') return pasteClone();   // CLONE: a unique copy at the cursor
   const c = cs[tv], dm = dims(tv), x0 = clip.line ? 0 : tv === 'song' ? c.x : clip.x0;
   // Pasting over a selection starts at its top row.
   const y0 = selA ? selRect().y0 : c.y; selA = null;
@@ -15143,7 +15203,8 @@ function go(v){
 function nav(dir){
   if (dir === 'up') return tv === 'mixer' ? go(midV) : tv !== 'project' ? go('project') : null;
   if (dir === 'down') return tv === 'project' ? go(midV) : tv !== 'mixer' ? go('mixer') : null;
-  if (pvNav(dir)) return;   // PATTERN VIEW: Shift+▶ from the pattern goes back to the plain phrase
+  // PATTERN VIEW: PHRASE | PATTERN stays as chosen (owner, 19 Oct); Shift+▶ from the pattern goes on to Inst like the
+  // phrase does (it used to switch back to the plain phrase, so walking the screens turned PATTERN off).
   // ◀▶ run along every screen in tab order: Song, Sect, Phrase, Inst, Mixer, FX, Project.
   if (dir === 'right' && (tv === 'inst' || tv === 'mixer' || tv === 'fx')) return go(VIEWS[VIEWS.indexOf(tv) + 1]);
   if (dir === 'left' && (tv === 'mixer' || tv === 'fx' || tv === 'project')) return tv === 'mixer' ? go('inst') : go(VIEWS[VIEWS.indexOf(tv) - 1]);
@@ -15277,6 +15338,8 @@ function playCtx(){
     if (tv === 'phrase') return tStart('phrase', {phrase:cPhrase, track:cTrack, loop:lp});
   } else if (loopSel && GRIDV.has(tv)) toast('Loop is on but nothing to loop: select 2 or more rows first.');
   if (tv === 'sect') return tStart('sect', {sect:cSect, track:cTrack});
+  // PATTERN VIEW (owner, 19 Oct): PLAY plays every phrase shown: the song row from its start, looping, all tracks.
+  if (tv === 'phrase' && pvActive()){ const y = cs.song.y; return tStart('song', {row:y, loop:{v:'pattern', y0:y, y1:y}}); }
   if (tv === 'phrase') return tStart('phrase', {phrase:cPhrase, track:cTrack});
   tStart('song', {row:songRow()});
 }
@@ -15360,7 +15423,7 @@ const cmdMini = () => inMode === 'keys' && cmdBar;
 const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b:-1', '−', 'Change the value down (EDIT+◀)'], ['b:1', '+', 'Change the value up (EDIT+▶)'],
   ['b:16', '++', 'Change the value up a lot (EDIT+▲)'], ['prev', '‹', 'Previous: the block above in the song; the previous sect, phrase, instrument or FX track elsewhere (OPTION+▲ on the song, OPTION+◀ elsewhere)'], ['next', '›', 'Next: the block below in the song; the next sect, phrase, instrument or FX track elsewhere (OPTION+▼ on the song, OPTION+▶ elsewhere)'],
   ['clr', 'CLEAR', 'Clear (OPTION+EDIT)'], ['sel', 'SELECT', 'Start or cancel a selection (SHIFT+OPTION)'],
-  ['clone', 'CLN', 'Clone the block under the cursor into a new, unique number (Ctrl/⌘+D)'],
+  ['clone', 'CLN', 'Clone: copies the block (or the selected blocks); PASTE then puts a unique copy with new numbers at the cursor (Ctrl/⌘+D)'],
   ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on the row below (Ctrl/⌘+Shift+D)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (OPTION)'],
   ['cut', 'CUT', 'Cut the selection, or what is under the cursor (OPTION+EDIT)'], ['paste', 'PASTE', 'Paste (SHIFT+EDIT)'],
   ['undo', 'UNDO', 'Undo the last change to the song (Ctrl/⌘+Z)'], ['redo', 'REDO', 'Redo (Ctrl/⌘+Y)'], ['song', '▶', 'Play the song from the cursor row, or stop it (SHIFT+PLAY)']];
@@ -15443,7 +15506,7 @@ function cmdItems(){
     null,
     it('sel', selA ? 'Cancel the selection' : 'Start a selection', 'mod+B'),
     {a:'all', l:'Select all', k:keyHint('mod+A'), f:selectAll, off:!GRIDV.has(tv) || onPset()},
-    ...(onSong ? [null, it('clone', 'Clone (a new phrase number)', 'mod+D'), it('cldn', 'Clone down (onto the row below)', 'mod+shift+D')] : []),
+    ...(onSong ? [null, it('clone', 'Clone (paste puts a unique copy)', 'mod+D'), it('cldn', 'Clone down (onto the row below)', 'mod+shift+D')] : []),
     null,
     ...(onSong ? [] : [val('b:16', 'Value up a lot', '▲')]), val('b:1', 'Value up', '▶'), val('b:-1', 'Value down', '◀'), ...(onSong ? [] : [val('b:-16', 'Value down a lot', '▼')]),
     null,
@@ -15771,8 +15834,11 @@ function draw(){
   const hk = tv + ':' + c.x + ':' + c.y + ':' + tScale;
   if (hk !== hKey){ hKey = hk; const cu = grid.querySelector('.cur');
     if (!cu || grid.scrollWidth <= grid.clientWidth + 1) grid.scrollLeft = 0;
-    else { const g = grid.getBoundingClientRect(), r = cu.getBoundingClientRect(), m = r.width;
-      if (r.right + m > g.right) grid.scrollLeft += r.right - g.right + m; else if (r.left - m < g.left) grid.scrollLeft -= g.left - r.left + m; } }
+    // The least sideways scroll (from none) that shows the cursor with a little room. A long value (an FX slot's full
+    // effect name) counts only its start, so the labels at the left stay on screen (owner, 19 Oct: they slid off).
+    else { const g = grid.getBoundingClientRect(), r = cu.getBoundingClientRect(), V = grid.clientWidth;
+      const left = r.left - g.left - grid.clientLeft + grid.scrollLeft, w = Math.min(r.width, V * 0.5), m = Math.min(r.width, 40);
+      grid.scrollLeft = Math.max(0, Math.min(left + w + m - V, left - 6)); } }
   meterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mt')] : []; masterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mm')] : [];
   $('tTitle').textContent = title; $('tSub').textContent = sub;
   $('tInfo').textContent = info();
@@ -15856,7 +15922,11 @@ const STK = 'thunderplus-stage-v1', STG = ['screen', 'dogs', 'off'], STG_NAMES =
 let stage = (() => { try { const v = localStorage.getItem(STK); if (STG.includes(v)) return v; if (v === 'phrase') return 'screen'; } catch(e){} return 'screen'; })();
 function setStage(v){ stage = v; try { localStorage.setItem(STK, v); } catch(e){} stageLayout(); }
 $('tStageX').addEventListener('click', () => { setStage('off'); toast('Stage hidden. Settings → STAGE brings it back.'); });
-const stageKind = () => stage === 'dogs' ? 'dogs' : tv === 'song' && SX.peek && asongOn() ? 'peek' /* SONG EXTRAS */ : tv === 'phrase' && mstView() ? 'chain' : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
+// The Phrase screen's stage: DANCE (the dogs), DRUM (the dogs on a kit and bongos) or KEYS (the piano, the default).
+const PHSK = 'thunderplus-phstage-v1', PHS = ['dance', 'drum', 'keys'];
+let phStage = (() => { try { const v = localStorage.getItem(PHSK); return PHS.includes(v) ? v : 'keys'; } catch(e){ return 'keys'; } })();
+function setPhStage(v){ phStage = PHS.includes(v) ? v : 'keys'; try { localStorage.setItem(PHSK, phStage); } catch(e){} stageLayout(); }
+const stageKind = () => stage === 'dogs' ? 'dogs' : tv === 'song' && SX.peek && asongOn() ? 'peek' /* SONG EXTRAS */ : tv === 'phrase' && mstView() ? 'chain' : tv === 'phrase' ? ({dance:'dogs', drum:'drum', keys:'piano'})[phStage] : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
 let stgKindNow = '', stgSig = '', stgReq = '';   // stgReq: what the last layout was asked for
 // It sits in the space to the right of the grid's text, the grid's height, when that space is big enough.
 // What the stage should show now ('' = nothing). SIMPLE PHRASE: no piano beside the phrase.
@@ -15868,19 +15938,21 @@ function stageLayout(){
   let right = asg ? gr.right : 0; const lines = asg ? [] : grid.querySelectorAll('.ln');   // Arrange as the Song screen: the dogs dance beside it
   for (let i = 0; i < Math.min(lines.length, 80); i++){ rg.selectNodeContents(lines[i]); const r = rg.getBoundingClientRect(); if (r.width && r.right > right) right = r.right; }
   if (!asg) grid.querySelectorAll('.tgbox').forEach(b => { const r = b.getBoundingClientRect(); if (r.right > right) right = r.right; });
-  const kind = stageKind(), left = right - sr.left + 18, w = sr.width - left - 14, top = gr.top - sr.top, h = gr.height;
+  const left = right - sr.left + 18, w = sr.width - left - 14, top = gr.top - sr.top, h = gr.height;
+  let kind = stageKind(); if (tv === 'phrase' && (kind === 'dogs' || kind === 'drum') && w < 150) kind = 'piano';   // too narrow for the dogs: the keys
   const minW = kind === 'piano' ? 90 : kind === 'peek' ? 220 : 150, show = right > 0 && w >= minW && h >= 150; box.hidden = !show; if (!show){ stgKindNow = ''; return; }
   Object.assign(box.style, {left:left + 'px', top:top + 'px', width:w + 'px', height:h + 'px'});
-  $('tStageDogs').hidden = kind !== 'dogs'; $('tStagePh').hidden = kind === 'dogs' || kind === 'peek';
+  const dg = kind === 'dogs' || kind === 'drum'; $('tStageDogs').hidden = !dg; $('tStagePh').hidden = dg || kind === 'peek';
   $('tStagePk').hidden = kind !== 'peek'; box.classList.toggle('peek', kind === 'peek'); box.setAttribute('aria-hidden', String(kind !== 'peek')); sxStageSwitch(kind); sxPkSig = '';   // SONG EXTRAS
   box.classList.toggle('piano', kind === 'piano');
-  stgKindNow = kind; stgSig = '';
-  if (kind === 'dogs') dogsState(); else stageCanvas(true);
+  stgKindNow = kind; stgSig = ''; phStageSwitch(kind, w);
+  if (dg) dogsState(); else stageCanvas(true);
 }
 // Dogs: arms up and dancing while the song plays, a slow breath and a lazy tail when it stops.
 function dogsState(){
-  const d = $('tStageDogs').querySelector('.dogs'), on = !!tp.on; d.classList.toggle('dance', on); d.classList.toggle('idle', !on);
-  if (!on){ dogMove = 0; dogPh = null; d.querySelectorAll('.dog').forEach(g => { for (const k of ['--aL', '--aR', '--lL', '--lR']) g.style.removeProperty(k); }); }
+  const d = $('tStageDogs').querySelector('.dogs'), on = !!tp.on, dr = stgKindNow === 'drum';
+  d.classList.toggle('drum', dr); d.classList.toggle('dance', on && !dr); d.classList.toggle('idle', !on);
+  if (!on || dr){ dogMove = 0; dogPh = null; d.querySelectorAll('.dog').forEach(g => { for (const k of ['--aL', '--aR', '--lL', '--lR']) g.style.removeProperty(k); }); }
 }
 /* Four dances, a new one each time a phrase starts (so the dogs count phrases while the hops count beats):
    ARMS UP (the original), ARMS DOWN (arms pumping at their sides), LEGS (hands on hips, alternate kicks) and
@@ -15905,15 +15977,16 @@ function dogsFollow(){
 let stgT0 = 0, stgBeat = -1, stgBpm = 120, stgSide = 1, stgOn = false, stgFrameT = 0;
 function stageStart(t0){ stgT0 = t0; stgBeat = -1; stgBpm = S.bpm; dogMove = 0; dogPh = null; dogN = 0; }
 function stageTick(now){
-  if (stgOn !== !!tp.on){ stgOn = !!tp.on; if (stgKindNow === 'dogs') dogsState(); else if (stgKindNow) stageCanvas(true); }
+  if (stgOn !== !!tp.on){ stgOn = !!tp.on; if (stgKindNow === 'dogs' || stgKindNow === 'drum') dogsState(); else if (stgKindNow) stageCanvas(true); }
   if (!stgKindNow || $('tStage').hidden) return;
   if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (now - stgFrameT > 45){ stgFrameT = now; stageCanvas(false); } return; }
-  if (stgKindNow !== 'dogs' || !tp.on || !ctx) return;
+  if ((stgKindNow !== 'dogs' && stgKindNow !== 'drum') || !tp.on || !ctx) return;
   const lat = ctx.outputLatency || ctx.baseLatency || 0, t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
   if (bpm !== stgBpm){ const b = (t - stgT0) * stgBpm / 60; stgBpm = bpm; stgT0 = t - b * 60 / bpm; }
   const per = 60 / bpm, b = Math.floor((t - stgT0) / per);
   if (b < 0 || b === stgBeat) return; stgBeat = b;
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (stgKindNow === 'drum') return drumsBeat(b % 4 === 0, per * 1000);
   dogsFollow(); dogsBeat(b % 4 === 0, per * 1000);
 }
 function dogsBeat(bar, ms){
@@ -15931,6 +16004,63 @@ function dogsBeat(bar, ms){
     g.style.setProperty('--aL', aL + 'deg'); g.style.setProperty('--aR', aR + 'deg'); g.style.setProperty('--lL', lL + 'deg'); g.style.setProperty('--lR', lR + 'deg');
   });
 }
+/* ---- DRUM (the Phrase stage's DANCE · DRUM · KEYS, owner 19 Oct): the pittie on a drum kit, the husky on bongos ----
+   Hits follow what is heard: sndKeep calls dogsHit for each track's new notes, by the pad they play — 00 kick, 01–02
+   snare, 03–04 hi-hat (04 rings longer), 05 tom, 06–07 crash; any other pad (the synths) is the husky's bongos (a chord
+   both hands). The hi-hat is the pittie's left paw, snare / tom / crash the right, the kick a thump. On a beat with
+   nothing to hit, the pittie ticks the hat and the husky taps a bongo, so they keep time; heads nod on every beat. */
+const DRUM_HIT = {hat:['al', 24], snare:['ar', 44], tom:['ar', 22], crash:['ar', -24]};   // [arm, angle over that drum]
+let dkKitT = 0, dkBongoT = 0, dkHand = 0;
+const dkDogs = () => $('tStageDogs').querySelector('.dogs');
+function dkOk(){ return stgKindNow === 'drum' && !$('tStage').hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches; }
+// A strike: the paw pulls back along the arm, comes down on the drum and stays hovering over it.
+function dkArm(g, cls, ang){
+  const a = g && g.querySelector('.arm.' + cls); if (!a) return;
+  g.style.setProperty(cls === 'al' ? '--aL' : '--aR', ang + 'deg');
+  const s = cls === 'al' ? -4 : 4;
+  a.animate([{transform:`rotate(${ang}deg) translateY(-6px)`}, {transform:`rotate(${ang + s}deg) translateY(1.5px)`, offset:.45}, {transform:`rotate(${ang}deg)`}], {duration:170, easing:'ease-out'});
+}
+function dkPart(g, sel, kind){
+  const e = g && g.querySelector(sel); if (!e) return;
+  if (kind === 'cym' || kind === 'open') e.animate([{transform:'rotate(0deg)'}, {transform:'rotate(9deg)', offset:.18}, {transform:'rotate(-5deg)', offset:.5}, {transform:'rotate(2deg)', offset:.75}, {transform:'rotate(0deg)'}], {duration:kind === 'open' ? 620 : 380, easing:'ease-out'});
+  else if (kind === 'kick') e.animate([{transform:'scale(1)'}, {transform:'scale(1.08)', offset:.25}, {transform:'scale(1)'}], {duration:180, easing:'ease-out'});
+  else e.animate([{transform:'translateY(0) scaleY(1)'}, {transform:'translateY(1.5px) scaleY(.9)', offset:.3}, {transform:'translateY(0) scaleY(1)'}], {duration:150, easing:'ease-out'});
+}
+function dkKit(pad, soft){
+  const d = dkDogs(), g = d && d.querySelector('.d1'); if (!g) return; dkKitT = performance.now();
+  if (pad === 0){ dkPart(g, '.kk', 'kick'); g.querySelector('.bob').animate([{transform:'translateY(0)'}, {transform:'translateY(2px)', offset:.3}, {transform:'translateY(0)'}], {duration:160}); return; }
+  const k = pad === 1 || pad === 2 ? 'snare' : pad === 3 || pad === 4 ? 'hat' : pad === 5 ? 'tom' : 'crash';
+  const [arm, ang] = DRUM_HIT[k]; dkArm(g, arm, ang);
+  dkPart(g, {hat:'.hh', snare:'.sn', tom:'.tm', crash:'.ck'}[k], k === 'hat' ? (pad === 4 && !soft ? 'open' : 'cym') : k === 'crash' ? 'cym' : 'drum');
+}
+function dkBongo(both){
+  const d = dkDogs(), g = d && d.querySelector('.d2'); if (!g) return; dkBongoT = performance.now();
+  const hands = both ? ['al', 'ar'] : [(dkHand ^= 1) ? 'al' : 'ar'];
+  for (const h of hands){ dkArm(g, h, h === 'al' ? -20 : 20); dkPart(g, h === 'al' ? '.bl' : '.br', 'drum'); }
+}
+function dogsHit(t, q){
+  if (!dkOk() || q.pd == null) return;
+  if (q.pd < 8) dkKit(q.pd); else dkBongo(q.sc.length > 1);
+}
+function drumsBeat(bar, ms){
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  stgSide = -stgSide; const now = performance.now(), d = Math.min(ms * 0.8, 600);
+  $('tStageDogs').querySelectorAll('.dog').forEach((g, i) => {
+    const sd = stgSide * (i ? -1 : 1);
+    g.querySelector('.head').animate([{transform:'rotate(0deg) translateY(0)'}, {transform:`rotate(${sd * 5}deg) translateY(${bar ? 3 : 2}px)`, offset:.35}, {transform:'rotate(0deg) translateY(0)'}], {duration:d, easing:'ease-out'});
+    g.querySelector('.tail').animate([{transform:'rotate(0deg)'}, {transform:'rotate(-16deg)'}, {transform:'rotate(8deg)'}, {transform:'rotate(0deg)'}], {duration:d});
+  });
+  if (now - dkKitT > ms * 0.9) dkKit(3, true);   // nothing on the kit this beat: tick the hat
+  if (now - dkBongoT > ms * 0.9) dkBongo(bar);   // and a bongo (both on the bar)
+}
+// DANCE · DRUM · KEYS over the Phrase stage, like the Song screen's DOGS | PEEK.
+function phStageSwitch(kind, w){
+  const sw = $('tStagePs'); if (!sw) return;
+  const show = tv === 'phrase' && stage === 'screen' && !mstView() && (kind === 'dogs' || kind === 'drum' || kind === 'piano') && w >= 170;
+  sw.hidden = !show; if (!show) return;
+  sw.querySelectorAll('button').forEach(b => { const on = b.dataset.k === phStage; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+}
+$('tStagePs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setPhStage(b.dataset.k); });
 // The canvas views share one canvas and title, in the tracker screen's own colours.
 function stgCtx(){
   const c = $('tStageC'), r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (!r.width || !r.height) return null;
@@ -15940,7 +16070,7 @@ function stgCtx(){
     bg:v('--ts-bg') || '#fff', cur:v('--ts-cur-bg') || '#111', mono:v('--tk-mono') || '#eba3bd', poly:v('--tk-poly') || '#86c99a', font:st.getPropertyValue('--mono') || 'monospace'};
 }
 function stageCanvas(force){
-  const k = stgKindNow; if (!k || k === 'dogs') return;
+  const k = stgKindNow; if (!k || k === 'dogs' || k === 'drum') return;
   if (k === 'peek') return stagePeek();   // SONG EXTRAS
   if (k === 'preview') return stagePreview();
   if (k === 'piano') return stagePiano(force);
@@ -15974,10 +16104,12 @@ function stagePreview(){
 // pitches a row starts by note column, transposes applied; pos[t].off: an OFF or a muted block). A mono track's new note
 // replaces the old; a poly track's column replaces that column's. tStart / tStop drop them (tp.snd = null).
 function sndKeep(i, q){
-  if (!q.off && !q.sc) return;
+  if (!q.off && !q.sc && !q.offc) return;
   if (!tp.snd) tp.snd = [];
   let m = tp.snd[i]; if (!m || q.off || !isPolyT(i)) m = tp.snd[i] = new Map();
+  if (q.offc) for (const c of q.offc) m.delete(c);
   if (q.sc) for (const [c, n] of q.sc) m.set(c, n);
+  if (q.sc && q.sc.length) dogsHit(i, q);   // DRUM: the dogs hit what is heard
 }
 // Phrase: a piano down the side. Playing: the notes this track is really sounding now (sndKeep), whichever phrase or
 // row the editor shows, transposes and all (owner, 19 Oct: it showed the phrase in the window). Stopped: the cursor's
@@ -16874,6 +17006,9 @@ arrGrid.addEventListener('scroll', () => {
 // same block opens its phrase. Holding a block, or Alt-clicking it, mutes just that block.
 function arrGo(y, t){
   if (!asongOn() && apArrGo(y, t)) return;   // ARRANGE PAGING: on Phrase a tap pages into Arrange instead
+  // Beside any other screen a tap on an EMPTY cell just puts the song cursor there, highlighted, and the screen stays
+  // (owner, 19 Oct: it used to open the Song screen). A block still goes to the Song screen, twice opens its phrase.
+  if (!asongOn() && tv !== 'song' && !(S.song[y] && S.song[y][t] >= 0)){ cs.song.x = t; cs.song.y = y; arrTap = {t:0, k:''}; draw(); return; }
   cs.song.x = t; cs.song.y = y; cTrack = t;
   const k = y + ':' + t, now = performance.now(), dbl = arrTap.k === k && now - arrTap.t < 380;
   arrTap = {t:dbl ? 0 : now, k:dbl ? '' : k};
@@ -16985,6 +17120,7 @@ let arrPress = null;
 arrGrid.addEventListener('pointerdown', e => {
   if (arrPinch || arrPtrs.size > 1){ arrCancelPress(); return; }   // two fingers: a pinch, never a press or a mute
   if (sxDown(e)) return;   // SONG EXTRAS: drag to select / move / copy, drag the row numbers to loop
+  if ((e.button && e.button > 0) || (MACK && e.ctrlKey)) return;   // a right-click (Ctrl+click on a Mac) is the menu, never a tap or a hold-to-mute
   const rn = e.target.closest('[data-ry]');
   if (rn){ const y = +rn.dataset.ry; cs.song.y = y; if (tp.on && tp.mode === 'song') tStart('song', {row:y}); else draw(); return; }
   const b = e.target.closest('b[data-y]'); if (!b) return;
@@ -17193,7 +17329,7 @@ arrGrid.addEventListener('contextmenu', e => {
     {l:'Cut', k:ks ? 'Ctrl+X' : '', f:() => copyHere(true), off:!n},
     {l:'Paste here', k:ks ? 'Ctrl+V' : '', f:() => { if (multi){ cs.song.x = r.x0; cs.song.y = r.y0; } selA = null; paste(); }, off:!(clip && clip.v === 'song')},
     null,
-    {l:'Clone (new phrases)', k:ks ? 'Ctrl+D' : '', f:() => { selA = null; cloneHere(); }, off:multi || !filled},
+    {l:'Clone (paste puts a unique copy)', k:ks ? 'Ctrl+D' : '', f:() => cloneHere(), off:!n},
     {l:'Clone down', k:ks ? 'Ctrl+Shift+D' : '', f:() => cloneDown(), off:!n},
     null,
     {l:'Mute / unmute', k:ks ? 'M' : '', f:() => sxMuteRect(r), off:!n || (t === MT && !multi)},
@@ -17682,6 +17818,17 @@ document.addEventListener('keydown', e => {
   press(b, true);
 });
 document.addEventListener('keyup', e => { if (view !== 'tracker' || inMode === 'keys' || typing(e)) return; const b = KEYB[e.key]; if (b){ e.preventDefault(); release(b, true); } });
+// CAPS LOCK types a note off on EVERY press (owner, 19 Oct). A Mac sends keydown only when Caps Lock turns on and just a
+// keyup when it turns off, so every other press was lost: a keyup with no keydown before it counts as a press too
+// (Windows sends both each time, which stays one press).
+let capsDn = false;
+document.addEventListener('keydown', e => { if (e.key === 'CapsLock') capsDn = true; }, true);
+document.addEventListener('keyup', e => {
+  if (e.key !== 'CapsLock') return;
+  const was = capsDn; capsDn = false;
+  if (was || view !== 'tracker' || typing(e) || fxp.open || apF) return;   // apF: Arrange has the keys, not the phrase
+  if (curKind() === 'note'){ e.preventDefault(); typeOff(); }
+});
 window.addEventListener('blur', releaseAll);
 $('tRowsDn').addEventListener('click', () => setRows(plen(rowsId()) - 1));
 $('tLoop').addEventListener('click', () => toggleLoop());
@@ -17930,6 +18077,7 @@ const APK = 'thunderplus-arrfocus-v1', SSK = 'thunderplus-songstrip-v1';
 let apOn = (() => { try { return localStorage.getItem(APK) !== '0'; } catch(e){ return true; } })();
 let ssOn = (() => { try { return localStorage.getItem(SSK) !== '0'; } catch(e){ return true; } })();
 let apF = null;        // who has the keys instead of the phrase: 'arr' (the side panel), 'strip' (the song strip) or null
+let apHost = 'phrase'; // the screen Arrange is beside while it has the keys (owner, 19 Oct: every screen, not only Phrase)
 let apPin = false;     // PIN: the phrase stays up while the song cursor moves
 let apSel = null;      // the song selection made while Arrange has the keys (selA always belongs to the screen drawn)
 let apSong = false, apIn = 0, apWent = false, apLastKey = '', apTap = {t:0, k:''}, apStripVis = false, apStripSig = '', apRefit = 0;
@@ -17938,7 +18086,7 @@ var apHold = false, apDirty = false, apReady = false;
 function setApOn(on){ apOn = !!on; try { localStorage.setItem(APK, apOn ? '1' : '0'); } catch(e){} if (!apOn && apF === 'arr') apFocus(null); draw(); }
 function setSsOn(on){ ssOn = !!on; try { localStorage.setItem(SSK, ssOn ? '1' : '0'); } catch(e){} if (!ssOn && apF === 'strip') apFocus(null); draw(); }
 const apPanel = () => arrMode > 0 && arrEl.offsetWidth > 0;
-const apArrOk = () => apOn && view === 'tracker' && tv === 'phrase' && !asongOn() && apPanel();
+const apArrOk = () => apOn && view === 'tracker' && tv !== 'song' && !asongOn() && apPanel();
 const apStripOk = () => ssOn && !spOn /* SIMPLE PHRASE */ && view === 'tracker' && tv === 'phrase' && !apPanel() && (isMobile() || innerWidth < 600);
 const apOk = f => f === 'arr' ? apArrOk() : f === 'strip' ? apStripOk() : false;
 const apKey = () => { const r = S.song[cs.song.y]; return cs.song.x + ':' + cs.song.y + ':' + (r ? r[cs.song.x] : -1); };
@@ -17954,6 +18102,7 @@ function apFocus(f, sync){
   if (f === apF) return;
   const from = apF; apF = f; selA = null; apSel = null; fxpClose();
   if (!f) return;
+  if (tv !== 'song') apHost = tv;
   if (!from && sync) followPhraseBlock();
   if (f === 'arr'){ if (cs.song.x === MT && !arrSideMst()) cs.song.x = Math.min(cTrack, ntr() - 1); apTop(); }   // only when the side panel has no master column
   apLastKey = apKey();
@@ -17965,7 +18114,12 @@ function apFollow(){
   if (apPin) return false;
   const r = S.song[cs.song.y], cid = r ? r[cs.song.x] : -1, p = cid >= 0 ? firstPhrase(cid) : -1;
   if (p < 0 || (p === cPhrase && cTrack === cs.song.x)) return false;
-  cPhrase = p; cTrack = cs.song.x; cSect = cid; return true;
+  cPhrase = p; cTrack = cs.song.x; cSect = cid;
+  // Beside another screen that screen follows the block: FX its track's effects, Mixer its track, Inst its instrument.
+  if (apHost === 'fx') cFxT = cTrack === MT ? NT : cTrack;
+  else if (apHost === 'mixer' && cTrack < ntr()){ cs.mixer.x = cTrack; if (cs.mixer.y === 7) cs.mixer.y = 0; }
+  else if (apHost === 'inst'){ const ii = phraseInfo(p).inst; if (ii >= 0) cInst = ii; }
+  return true;
 }
 function apAsSong(fn){ const t0 = tv, s0 = selA; tv = 'song'; selA = apSel; try { return fn(); } finally { tv = t0; selA = s0; } }
 // Every input handler goes through here; with Arrange (or the strip) holding the keys it runs as on the Song screen.
@@ -17982,7 +18136,7 @@ function apRun(fn, args){
 function apBack(){
   const sel = selA && selA.v === 'song' ? selA : null; selA = null;
   if (apWent || tv !== 'song'){ apF = null; apSel = null; draw(); return; }   // the command opened a screen: stay there
-  tv = 'phrase'; apSel = apF ? sel : null;
+  tv = apHost || 'phrase'; apSel = apF ? sel : null;
   if (apF === 'arr'){ if (cs.song.x === MT && !arrSideMst()) cs.song.x = ntr() - 1; apTop(); }
   const s0 = cSect, p0 = cPhrase, moved = !!apF && apFollow();
   // EDIT×2 and two-digit hex know a second press by a key ending in cSect:cPhrase (editTap, typeHex): the phrase that
@@ -18007,14 +18161,14 @@ function apBack(){
 { const f = go; go = v => { if (apSong) apWent = true; return f(v); }; }
 { const f = nav; nav = dir => {
   if (apSong){ if (dir === 'right'){ apF = null; apSel = null; return; } if (dir === 'left') return; return f(dir); }
-  if (apIn && dir === 'left' && apArrOk()){ apFocus('arr', true); draw(); return; }
+  if (apIn && dir === 'left' && tv === 'phrase' && apArrOk()){ apFocus('arr', true); draw(); return; }
   return f(dir);
 }; }
 // The SONG tab (and SONG on the side panel's screen map) on Phrase with Arrange beside it: the first tap gives Arrange the
 // keys, as SHIFT+◀ does; a tap while Arrange has them opens the Song screen as before. Without the panel (the folded phone,
 // the setting off) it opens the Song screen straight away.
 function apTabSong(e){
-  if (!e.target.closest('[data-v="song"]') || !apReady || apF === 'arr' || !apArrOk()) return;
+  if (!e.target.closest('[data-v="song"]') || !apReady || apF === 'arr' || tv !== 'phrase' || !apArrOk()) return;
   e.stopPropagation(); e.preventDefault(); apFocus('arr', true); draw();
 }
 $('tTabs').addEventListener('click', apTabSong, true); $('tMap').addEventListener('click', apTabSong, true);
@@ -18045,6 +18199,19 @@ const apFootEl = arrEl.querySelector('.tafx'), apFoot0 = apFootEl ? apFootEl.tex
 // A tap or click anywhere in the panel (not its resize grip) gives Arrange the keys. The block or row number under the
 // finger then moves the song cursor as usual: a block through arrGo → apArrGo, a row number in the grid's own handler.
 arrEl.addEventListener('pointerdown', e => { if (apF !== 'arr' && apReady && apArrOk() && !e.target.closest('#tArrH')){ apFocus('arr', false); draw(); } }, true);
+// Right-click on the side panel (a mouse): Arrange takes the keys, the song cursor goes to that cell, and the Song screen's
+// commands open there (cmdItems, run as on the Song screen through apRun), with mute and open-its-phrase on top. (19 Oct)
+arrGrid.addEventListener('contextmenu', e => {
+  if (asongOn() || !apReady || !apArrOk() || (e.pointerType && e.pointerType === 'touch')) return;
+  const b = e.target.closest('b[data-y]'); if (!b) return;
+  e.preventDefault();
+  const y = +b.dataset.y, t = +b.dataset.t, cid = S.song[y] ? S.song[y][t] : -1, run = f => () => apRun(f, []);
+  apFocus('arr', false); cs.song.x = t; cs.song.y = y; apTop(); apFollow(); draw();
+  const open = () => { ensureSectPhrase(cid); const p = firstPhrase(cid); if (p >= 0){ cPhrase = p; cTrack = t; cSect = cid; } apFocus(null); if (tv !== 'phrase') go('phrase'); else draw(); };
+  const items = apAsSong(cmdItems).map(it => it && Object.assign({}, it, {f:run(it.f)}));
+  items.unshift({l:'Open the phrase', f:open, off:cid < 0}, {l:'Mute / unmute', k:inMode === 'keys' ? 'M' : '', f:run(() => toggleBlockMute(y, t)), off:cid < 0 || t === MT}, null);
+  sxMenu(e.clientX, e.clientY, `${t === MT ? 'MST' : 'TRACK ' + d2(t + 1)} · ROW ${rS(y, 3)}`, menuTidy(items));
+});
 // A tap on the phrase (anywhere on the screen but the strip) gives the keys back to it.
 scr.addEventListener('pointerdown', e => { if (apF && !apStripEl.contains(e.target)){ apFocus(null); draw(); } }, true);
 // arrGo's hook: on Phrase a tap on a block moves the song cursor there and the phrase follows; a second tap on the same
@@ -18056,7 +18223,7 @@ function apArrGo(y, t){
   apFocus('arr', false); cs.song.x = t; cs.song.y = y; apTop();
   if (dbl){ const cid = S.song[y][t];
     if (cid >= 0){ ensureSectPhrase(cid); const p = firstPhrase(cid); if (p >= 0){ cPhrase = p; cTrack = t; cSect = cid; } }
-    apFocus(null); }
+    apFocus(null); if (cid >= 0 && tv !== 'phrase'){ go('phrase'); return true; } }
   else apFollow();
   draw(); return true;
 }
@@ -18088,8 +18255,8 @@ function apHint(txt){ const h = $('tHint'); if (h.textContent !== txt){ h.textCo
 function apSongLines(){
   const keys = inMode === 'keys';
   $('tInfo').textContent = (apF === 'arr' ? 'ARRANGE · ' : 'SONG STRIP · ') + apAsSong(info);
-  apHint(((t => keys || patNavOn ? t : songHintOld(t))((keys ? HINTK : HINT)[sectsOn ? 'song' : 'songP'])).replace(/(SHIFT|Shift)\+(▶|→) open( phrase)?/, keys ? 'Shift+→ back to the phrase' : 'SHIFT+▶ back to the phrase')
-    + (apPin ? ' · PINNED: the phrase stays' : ' · the phrase follows the song cursor'));
+  apHint(((t => keys || patNavOn ? t : songHintOld(t))((keys ? HINTK : HINT)[sectsOn ? 'song' : 'songP'])).replace(/(SHIFT|Shift)\+(▶|→) open( phrase)?/, (keys ? 'Shift+→' : 'SHIFT+▶') + ' back to ' + (apHost === 'phrase' ? 'the phrase' : VNAME[apHost]))
+    + (apHost !== 'phrase' ? ' · Esc or a ' + (coarse ? 'tap' : 'click') + ' on the screen: back to ' + VNAME[apHost] : apPin ? ' · PINNED: the phrase stays' : ' · the phrase follows the song cursor'));
   const cmd = $('tCmd');
   cmd.querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = true);
   cmd.querySelectorAll('[data-c=clone],[data-c=cldn]').forEach(b => b.hidden = false); cmd.classList.add('song');
@@ -18100,7 +18267,9 @@ function apSongLines(){
 function apFoot(arrOk){
   if (!apFootEl) return;
   const k = inMode === 'keys', tap = coarse ? 'tap' : 'click';
-  const t = apF === 'arr' ? `THE KEYS ARE ON THE SONG · ${k ? 'arrows' : '▲▼◀▶'} move the song cursor and the phrase follows (PIN keeps it) · ${k ? 'hex, Enter, Del, M, Ctrl+D' : 'EDIT, EDIT×2, OPTION+EDIT, CLN'} as on the Song screen · ${k ? 'Shift+→' : 'SHIFT+▶'} or a ${tap} on the phrase: back to it`
+  const ph = apHost === 'phrase', fol = {phrase:'the phrase follows (PIN keeps it)', fx:'FX follows its track', mixer:'the Mixer follows its track', inst:'INST follows its instrument', sect:'the sect follows'}[apHost] || 'nothing else moves';
+  const t = apF === 'arr' ? `THE KEYS ARE ON THE SONG · ${k ? 'arrows' : '▲▼◀▶'} move the song cursor and ${fol} · ${k ? 'hex, Enter, Del, M, Ctrl+D, right-click' : 'EDIT, EDIT×2, OPTION+EDIT, CLN'} as on the Song screen · ${k ? 'Shift+→, Esc' : 'SHIFT+▶'} or a ${tap} on the ${ph ? 'phrase' : 'screen'}: back to it`
+    : arrOk && tv !== 'phrase' ? `${tap.toUpperCase()} · the keys move here and work as on the Song screen · twice on a block: edit its phrase · Esc gives them back`
     : arrOk ? `${tap.toUpperCase()} (or ${k ? 'Shift+←' : 'SHIFT+◀'}, or the SONG tab) · the keys move here: the song cursor moves and the phrase follows · twice: edit that block's phrase · HOLD a block to mute it · PIN keeps this phrase up`
     : apFoot0;
   if (apFootEl.textContent !== t){ apFootEl.textContent = t; if (arrFoot) arrFoot.title = t; }
@@ -18552,7 +18721,7 @@ function pvFit(fs, W){
 }
 // PHRASE | PATTERN on the title line, and the pattern's bar under it.
 const pvSeg = el('span', 'pvseg'); pvSeg.hidden = true; pvSeg.setAttribute('role', 'group'); pvSeg.setAttribute('aria-label', 'Phrase or pattern');
-const pvSegB = [['ph', 'PHRASE', 'This phrase on its own (Shift+→ from the pattern)'], ['pt', 'PATTERN', 'Every track’s phrase for this song row, side by side (Shift+← from the phrase)']]
+const pvSegB = [['ph', 'PHRASE', 'This phrase on its own (stays chosen until you switch)'], ['pt', 'PATTERN', 'Every track’s phrase for this song row, side by side (stays chosen until you switch)']]
   .map(([k, t, ti]) => { const b = el('button', null, t); b.type = 'button'; b.dataset.pv = k; b.title = ti; pvSeg.append(b); return b; });
 $('tPset').after(pvSeg);
 const pvBar = el('div', 'pvbar'); pvBar.hidden = true; pvBar.setAttribute('role', 'toolbar'); pvBar.setAttribute('aria-label', 'Pattern');
