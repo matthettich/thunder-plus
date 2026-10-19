@@ -24,6 +24,19 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (13): every …chains effect is stereo
+
+Cache `thunderplus-v188`; `chains-worklet.js?v=30`, `waves-worklet.js?v=25`.
+- **VCF, VCA, Sidechain Comp** (chains only) and **Blades, Meta, Phaser** (shared, so …waves too) got **In R / Out R**
+  with their own right-side state (`inR(io)`: In R falls back to In, so a mono feed gives L = R). Everything else that
+  passes audio was already stereo.
+- **Older patches** (no `st2`) get their right sides patched once, wherever the left side is: a cable X.Out → one of the
+  six adds X.Out R → In R; one from their Out → a module with an In R adds Out R → In R (only if that In R is free).
+  The editors' `normalize` runs `chainsStereoUp` (shared editor block) and saves it with `st2:1`; the engines'
+  `loadPatch` runs `stereoUpCables` (shared modules block) so a song that's never reopened in the editor still plays in
+  stereo. The host's `chnDiff` sends a full reload when `st2` changes, so a right-side cable deleted in the editor goes.
+- Tested: node (both engines: cables added without st2, none with it) and both editors (normalize adds them once).
+
 ## 19 Oct (12): …chains module bypass, sequenced with BYP
 
 Cache `thunderplus-v187`; `chains-worklet.js?v=29`.

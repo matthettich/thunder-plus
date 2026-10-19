@@ -55,11 +55,11 @@ function wasmInit(o){
 
 const VCF = {
   type:'vcf', scope:'mono', cost:1,
-  inputs:{ in:'audio', cutoff:'cv' }, outputs:{ out:'audio' },
+  inputs:{ in:'audio', inR:'audio', cutoff:'cv' }, outputs:{ out:'audio', outR:'audio' },   // stereo (owner, 19 Oct): In R optional
   params:{ cutoff:[.5,0,1,.001], res:[.3,0,1,.001], mode:[0,0,2,1] },
-  create:() => ({ ic1:0, ic2:0 }),
+  create:() => ({ ic1:0, ic2:0, jc1:0, jc2:0 }),
   process(st, io, ctx){
-    const mode = io.p.mode | 0, q = 1 - io.p.res * .95;
+    const mode = io.p.mode | 0, q = 1 - io.p.res * .95, XR = inR(io), oR = io.out.outR;
     for (let i = 0; i < ctx.block; i++){
       const fc = Math.min(.45, (.01 + Math.pow(10, io.p.cutoff * 3) * .004) * Math.pow(2, io.in.cutoff[i] * 3) * 44100 / ctx.sr);
       // TPT state-variable (as Blades): stable at every cutoff and resonance. The old Chamberlin/TPT mix doubled the
@@ -69,6 +69,10 @@ const VCF = {
       st.ic1 = 2 * bp - st.ic1; st.ic2 = 2 * lp - st.ic2;
       if (!(Math.abs(st.ic1) < 1e4 && Math.abs(st.ic2) < 1e4)) st.ic1 = st.ic2 = 0;
       io.out.out[i] = mode === 0 ? lp : mode === 1 ? bp : x - q * bp - lp;
+      const xr = XR[i], w3 = xr - st.jc2, bq = a1 * st.jc1 + a2 * w3, lq = st.jc2 + a2 * st.jc1 + a3 * w3;
+      st.jc1 = 2 * bq - st.jc1; st.jc2 = 2 * lq - st.jc2;
+      if (!(Math.abs(st.jc1) < 1e4 && Math.abs(st.jc2) < 1e4)) st.jc1 = st.jc2 = 0;
+      oR[i] = mode === 0 ? lq : mode === 1 ? bq : xr - q * bq - lq;
     }
   }
 };
@@ -76,12 +80,12 @@ const VCF = {
 /* CV unpatched = fully open, so a VCA can also be a plain volume control. */
 const VCA = {
   type:'vca', scope:'mono', cost:.2,
-  inputs:{ in:'audio', cv:'cv' }, outputs:{ out:'audio' },
+  inputs:{ in:'audio', inR:'audio', cv:'cv' }, outputs:{ out:'audio', outR:'audio' },   // stereo (owner, 19 Oct): In R optional
   params:{ gain:[1,0,4,.01] },
   create:() => ({}),
   process(st, io, ctx){
-    const g = io.p.gain, cv = linked(io, 'cv');
-    for (let i = 0; i < ctx.block; i++) io.out.out[i] = io.in.in[i] * (cv ? io.in.cv[i] : 1) * g;
+    const g = io.p.gain, cv = linked(io, 'cv'), XR = inR(io), oR = io.out.outR;
+    for (let i = 0; i < ctx.block; i++){ const k = (cv ? io.in.cv[i] : 1) * g; io.out.out[i] = io.in.in[i] * k; oR[i] = XR[i] * k; }
   }
 };
 
@@ -439,22 +443,22 @@ const SidechainIn = {
 };
 const SidechainComp = {
   type:'sccomp', scope:'mono', cost:.2,
-  inputs:{ in:'audio', sc:'audio' }, outputs:{ out:'audio' },
+  inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },   // stereo, one gain for both sides (owner, 19 Oct)
   params:{ threshold:[.3,0,1,.001], ratio:[4,1,20,.1], attack:[6,.1,200,.1], release:[140,5,2000,1], makeup:[1,1,4,.01], mix:[1,0,1,.01] },
   create:()=>({ env:0 }),
   process(st, io, ctx){
     const patched = linked(io, 'sc'), busOn = ctx.scOn();
     const thr = -60 + io.p.threshold * 60, rat = Math.max(1, io.p.ratio);
     const ka = 1 - Math.exp(-1 / Math.max(1, io.p.attack / 1000 * ctx.sr)), kr = 1 - Math.exp(-1 / Math.max(1, io.p.release / 1000 * ctx.sr));
-    const mk = io.p.makeup, mx = io.p.mix, L = ctx.scL, R = ctx.scR;
+    const mk = io.p.makeup, mx = io.p.mix, L = ctx.scL, R = ctx.scR, XR = inR(io), oR = io.out.outR;
     for (let i = 0; i < ctx.block; i++){
-      // Detector: the SC input if patched, else the Mixer sidechain bus, else the input itself (plain comp).
-      const det = patched ? io.in.sc[i] : (busOn ? (L[i] + R[i]) * .5 : io.in.in[i]);
+      // Detector: the SC input if patched, else the Mixer sidechain bus, else the input itself (plain comp, both sides).
+      const det = patched ? io.in.sc[i] : (busOn ? (L[i] + R[i]) * .5 : Math.max(Math.abs(io.in.in[i]), Math.abs(XR[i])));
       const a = Math.abs(det);
       st.env += (a - st.env) * (a > st.env ? ka : kr);
       const over = 20 * Math.log10(st.env + 1e-9) - thr;
       const g = over > 0 ? Math.pow(10, -over * (1 - 1 / rat) / 20) : 1;
-      io.out.out[i] = io.in.in[i] * (1 - mx) + io.in.in[i] * g * mk * mx;
+      const gg = 1 - mx + g * mk * mx; io.out.out[i] = io.in.in[i] * gg; oR[i] = XR[i] * gg;
     }
   }
 };
@@ -788,46 +792,51 @@ const Quant = {
 /* Dual (2/4-pole) multimode filter with drive. Cutoff follows the VCF's mapping so the % reads the same. */
 const Blades = {
   type:'blades', scope:'mono', cost:1.2,
-  inputs:{ in:'audio', cutoff:'cv', res:'cv' }, outputs:{ out:'audio' },
+  inputs:{ in:'audio', inR:'audio', cutoff:'cv', res:'cv' }, outputs:{ out:'audio', outR:'audio' },   // stereo (owner, 19 Oct): In R optional
   params:{ cutoff:[.5,0,1,.001], res:[.3,0,1,.001], drive:[0,0,1,.01], mode:[0,0,3,1], slope:[2,2,4,2] },
-  create:() => ({ ic1:0, ic2:0, jc1:0, jc2:0 }),
+  create:() => ({ ic1:0, ic2:0, jc1:0, jc2:0, R:{ ic1:0, ic2:0, jc1:0, jc2:0 } }),
   process(st, io, ctx){
-    const mode = io.p.mode | 0, four = (io.p.slope | 0) >= 4, dr = 1 + io.p.drive * 6, norm = Math.tanh(dr) || 1;
+    const mode = io.p.mode | 0, four = (io.p.slope | 0) >= 4, dr = 1 + io.p.drive * 6, norm = Math.tanh(dr) || 1, XR = inR(io), oR = io.out.outR;
+    // one side through one pair of stages (state z); the cutoff and resonance are worked out once a sample for both
+    const side = (z, xin, a1, a2, a3, k) => {
+      const x = Math.tanh(xin * dr) / norm;
+      const v3 = x - z.ic2, v1 = a1 * z.ic1 + a2 * v3, v2 = z.ic2 + a2 * z.ic1 + a3 * v3;
+      z.ic1 = 2 * v1 - z.ic1; z.ic2 = 2 * v2 - z.ic2;
+      let y = mode === 0 ? v2 : mode === 1 ? v1 : mode === 2 ? (x - k * v1 - v2) : (x - k * v1);
+      if (four){
+        const x2 = mode === 1 ? v1 : v2;
+        const u3 = x2 - z.jc2, u1 = a1 * z.jc1 + a2 * u3, u2 = z.jc2 + a2 * z.jc1 + a3 * u3;
+        z.jc1 = 2 * u1 - z.jc1; z.jc2 = 2 * u2 - z.jc2;
+        y = mode === 0 ? u2 : mode === 1 ? u1 : mode === 2 ? (x2 - k * u1 - u2) : (x2 - k * u1);
+      }
+      return y;
+    };
     for (let i = 0; i < ctx.block; i++){
       const fc = Math.min(.49, (.01 + Math.pow(10, (io.p.cutoff + io.in.cutoff[i]) * 3) * .004) * 44100 / ctx.sr);
       const g = Math.tan(Math.PI * fc), k = 2 - 2 * Math.min(clamp(io.p.res + io.in.res[i], 0, 1), .98);
       const a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2;
-      const x = Math.tanh(io.in.in[i] * dr) / norm;
-      // Stage 1 (TPT state-variable)
-      const v3 = x - st.ic2, v1 = a1 * st.ic1 + a2 * v3, v2 = st.ic2 + a2 * st.ic1 + a3 * v3;
-      st.ic1 = 2 * v1 - st.ic1; st.ic2 = 2 * v2 - st.ic2;
-      let y = mode === 0 ? v2 : mode === 1 ? v1 : mode === 2 ? (x - k * v1 - v2) : (x - k * v1);
-      if (four){
-        const x2 = mode === 1 ? v1 : v2;
-        const u3 = x2 - st.jc2, u1 = a1 * st.jc1 + a2 * u3, u2 = st.jc2 + a2 * st.jc1 + a3 * u3;
-        st.jc1 = 2 * u1 - st.jc1; st.jc2 = 2 * u2 - st.jc2;
-        y = mode === 0 ? u2 : mode === 1 ? u1 : mode === 2 ? (x2 - k * u1 - u2) : (x2 - k * u1);
-      }
-      io.out.out[i] = y;
+      io.out.out[i] = side(st, io.in.in[i], a1, a2, a3, k);   // TPT state-variable stages
+      oR[i] = side(st.R, XR[i], a1, a2, a3, k);
     }
+    for (const z of [st, st.R]) if (!(Math.abs(z.ic1) < 1e4 && Math.abs(z.ic2) < 1e4 && Math.abs(z.jc1) < 1e4 && Math.abs(z.jc2) < 1e4)){ z.ic1 = z.ic2 = z.jc1 = z.jc2 = 0; }
   }
 };
 
 /* Meta-modulator (Warps-style): crossfade, ring mod, wave fold or comparator between In and Mod. */
 const Meta = {
   type:'meta', scope:'mono', cost:.3,
-  inputs:{ in:'audio', mod:'audio' }, outputs:{ out:'audio' },
+  inputs:{ in:'audio', inR:'audio', mod:'audio' }, outputs:{ out:'audio', outR:'audio' },   // stereo (owner, 19 Oct): In R optional, one Mod
   params:{ mode:[0,0,3,1], amount:[.5,0,1,.01], mix:[1,0,1,.01] },
   create:() => ({}),
   process(st, io, ctx){
-    const mode = io.p.mode | 0, a = io.p.amount, mx = io.p.mix;
+    const mode = io.p.mode | 0, a = io.p.amount, mx = io.p.mix, XR = inR(io), oR = io.out.outR;
+    const f = (x, m) => mode === 0 ? x * (1 - a) + m * a              // crossfade
+      : mode === 1 ? x * ((1 - a) + a * m * 1.4142)                    // ring mod
+      : mode === 2 ? Math.sin(x * (1 + a * 7) * Math.PI)               // wave fold (sine shaper)
+      : x * (m >= 0 ? 1 : -1);                                         // comparator (mod flips sign)
     for (let i = 0; i < ctx.block; i++){
-      const x = io.in.in[i], m = io.in.mod[i]; let y;
-      if (mode === 0) y = x * (1 - a) + m * a;                       // crossfade
-      else if (mode === 1) y = x * ((1 - a) + a * m * 1.4142);       // ring mod
-      else if (mode === 2) y = Math.sin(x * (1 + a * 7) * Math.PI);  // wave fold (sine shaper)
-      else y = x * (m >= 0 ? 1 : -1);                                // comparator (mod flips sign)
-      io.out.out[i] = x + (y - x) * mx;
+      const m = io.in.mod[i], x = io.in.in[i], xr = XR[i];
+      io.out.out[i] = x + (f(x, m) - x) * mx; oR[i] = xr + (f(xr, m) - xr) * mx;
     }
   }
 };
@@ -835,12 +844,12 @@ const Meta = {
 /* Phaser: swept all-pass stages through an LFO or the CV input. */
 const Phaser = {
   type:'phaser', scope:'mono', cost:.4,
-  inputs:{ in:'audio', cv:'cv' }, outputs:{ out:'audio' },
+  inputs:{ in:'audio', inR:'audio', cv:'cv' }, outputs:{ out:'audio', outR:'audio' },   // stereo (owner, 19 Oct): In R optional, one sweep
   params:{ rate:[.3,0,1,.01], depth:[.5,0,1,.01], feedback:[.4,0,1,.01], stages:[4,2,8,2], mix:[.5,0,1,.01], sync:[0,0,1,1] },
-  create:() => ({ ph:0, z:new Float32Array(8), fb:0 }),
+  create:() => ({ ph:0, z:new Float32Array(8), fb:0, zR:new Float32Array(8), fbR:0 }),
   process(st, io, ctx){
     const hz = io.p.sync >= .5 ? (ctx.transport.tempo / 60) * io.p.rate : .05 * Math.pow(160, io.p.rate);
-    const n = clamp(io.p.stages | 0, 2, 8), dep = io.p.depth, fbk = io.p.feedback * .9, mx = io.p.mix, cv = linked(io, 'cv');
+    const n = clamp(io.p.stages | 0, 2, 8), dep = io.p.depth, fbk = io.p.feedback * .9, mx = io.p.mix, cv = linked(io, 'cv'), XR = inR(io), oR = io.out.outR;
     for (let i = 0; i < ctx.block; i++){
       st.ph += hz / ctx.sr; st.ph -= Math.floor(st.ph);
       const f = clamp(.5 + (sinT(st.ph) * dep + (cv ? io.in.cv[i] : 0)) * .5, 0, .999);
@@ -848,7 +857,11 @@ const Phaser = {
       let x = io.in.in[i] + st.fb * fbk;
       for (let s = 0; s < n; s++){ const y = a * x + st.z[s]; st.z[s] = x - a * y; x = y; }
       st.fb = x; io.out.out[i] = io.in.in[i] * (1 - mx) + x * mx;
+      const xr0 = XR[i]; let xr = xr0 + st.fbR * fbk;
+      for (let s = 0; s < n; s++){ const y = a * xr + st.zR[s]; st.zR[s] = xr - a * y; xr = y; }
+      st.fbR = xr; oR[i] = xr0 * (1 - mx) + xr * mx;
     }
+    if (!(Math.abs(st.fb) < 1e4 && Math.abs(st.fbR) < 1e4)){ st.fb = st.fbR = 0; st.z.fill(0); st.zR.fill(0); }
   }
 };
 
@@ -4326,6 +4339,24 @@ const Pump = {
   }
 };
 
+/* STEREO (owner, 19 Oct): VCF, VCA, Sidechain Comp, Blades, Meta and Phaser got In R / Out R. In a patch made before
+   (st2 not set) their right sides are patched wherever the left side is: a cable X.Out → one of them adds X.Out R →
+   In R, one from their Out → a module with an In R adds Out R → In R (when that In R is free). The editor's normalize
+   does the same and saves it (st2); here it only makes an unopened song play in stereo. Shared: …waves's Blades,
+   Meta and Phaser got them too (in waves the six-name set only matches those three: its VCF/VCA have no In R). */
+function stereoUpCables(d){
+  if (!d || d.st2 || !Array.isArray(d.modules) || !Array.isArray(d.cables)) return [];
+  const NEW = new Set(['vcf', 'vca', 'sccomp', 'blades', 'meta', 'phaser']), type = new Map(d.modules.map(m => [m && m.id, m && m.type]));
+  const port = (id, side, p) => { const M = MODULES[type.get(id)]; return !!(M && M[side] && M[side][p]); };
+  const taken = new Set(d.cables.map(c => c && c.to && c.to[0] + '.' + c.to[1])), add = [];
+  for (const c of d.cables){
+    if (!c || !c.from || !c.to || c.from[1] !== 'out' || c.to[1] !== 'in') continue;
+    const a = c.from[0], b = c.to[0];
+    if (!NEW.has(type.get(a)) && !NEW.has(type.get(b))) continue;
+    if (port(a, 'outputs', 'outR') && port(b, 'inputs', 'inR') && !taken.has(b + '.inR')){ taken.add(b + '.inR'); add.push({from:[a, 'outR'], to:[b, 'inR']}); }
+  }
+  return add;
+}
 const SHARED_MODULES = { beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
@@ -4469,6 +4500,7 @@ class ChainsEngine {
     this._reset(); this.graph = new Graph();
     for (const m of doc.modules || []) this.addModule(m.id, m.type, m);
     for (const c of doc.cables || []) this.connect(c.from, c.to);
+    for (const c of stereoUpCables(doc)) this.connect(c.from, c.to);   // STEREO: an older patch's right sides (the editor saves them)
     if (doc.transport) this.setTransport(doc.transport);
     return { modules:(doc.modules || []).length, cables:(doc.cables || []).length };
   }
