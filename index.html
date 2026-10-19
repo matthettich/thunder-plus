@@ -634,6 +634,8 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .fpi span{color:var(--ts-info); font-family:var(--font); font-size:.92em}
 .fpi i{margin-left:auto; flex:none; font-style:normal; font-size:.75em; color:var(--ts-hint)}
 .fpi.on{background:var(--ts-cur-bg)} .fpi.on :is(b,span,i){color:var(--ts-cur)}
+.fxpick .fpi{scroll-margin-top:2.4em}   /* keyboard moves keep the item clear of a pinned heading */
+.fph{position:sticky; top:0; z-index:1; padding:.8em 10px .3em; font-size:.75em; font-weight:700; letter-spacing:.1em; color:var(--ts-th); background:var(--ts-bg); border-bottom:1px solid var(--ts-ink)}   /* an effect group's heading */
 .thd{display:flex; justify-content:space-between; gap:12px; font-weight:700; line-height:1.3; flex:none}
 .tsub{color:var(--ts-th); font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 /* The phrase's LEN / LPB sit on the title line (smaller), so the grid keeps one more row of steps. */
@@ -2216,7 +2218,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" hidden></div>
 
-<script src="waves/waves-worklet.js?v=23"></script>
+<script src="waves/waves-worklet.js?v=24"></script>
 <script>
 /* ===ENGINE START=== */
 const BASE = 65.40639; // C2
@@ -3053,6 +3055,77 @@ const MODFX = {
     ['size', 'Size', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
     ['tone', 'Tone', 'lin', 0, 1, 0.6, v => Math.round(v * 100) + '%'],
     ['mix', 'Mix', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '% wet']]},
+  sdelay:{name:'Simple delay', short:'SDLY', long:'Simple delay: a clean digital echo in note values or ms, with feedback, ping-pong and low/high cut on the repeats (Thunder original)', tail:true, pad:true, track:true, group:'Delays', credit:'Thunder original', ps:[
+    ['sync', 'Sync', 'opt', 0, 1, 1, ['Off', 'To tempo']],
+    ['div', 'Division', 'opt', 0, 11, 8, ['1/32', '1/16T', '1/16', '1/16D', '1/8T', '1/8', '1/8D', '1/4T', '1/4', '1/4D', '1/2', '1 bar']],
+    ['time', 'Time', 'log', 0.01, 2, 0.375, v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s'],
+    ['fb', 'Feedback', 'lin', 0, 1, 0.35, v => Math.round(v * 100) + '%'],
+    ['mode', 'Mode', 'opt', 0, 1, 0, ['Stereo', 'Ping-pong']],
+    ['lowcut', 'Low cut', 'log', 20, 2000, 80, v => v >= 1000 ? (v / 1000).toFixed(1) + ' kHz' : Math.round(v) + ' Hz'],
+    ['highcut', 'High cut', 'log', 1000, 20000, 9000, v => v >= 1000 ? (v / 1000).toFixed(1) + ' kHz' : Math.round(v) + ' Hz'],
+    ['mix', 'Mix', 'lin', 0, 1, 0.3, v => Math.round(v * 100) + '% wet']]},
+  filter:{name:'Filter', short:'FILT', long:'Filter: low-pass, high-pass, band-pass or notch, 12 or 24 dB, resonance, drive and a tempo-synced LFO (Thunder original)', tail:false, pad:true, track:true, group:'Filters', credit:'Thunder original', ps:[
+    ['mode', 'Type', 'opt', 0, 3, 0, ['Low-pass', 'High-pass', 'Band-pass', 'Notch']],
+    ['slope', 'Slope', 'opt', 0, 1, 0, ['12 dB', '24 dB']],
+    ['cutoff', 'Cutoff', 'log', 20, 20000, 2000, v => v >= 1000 ? (v / 1000).toFixed(1) + ' kHz' : Math.round(v) + ' Hz'],
+    ['res', 'Resonance', 'lin', 0, 1, 0.2, v => Math.round(v * 100) + '%'],
+    ['drive', 'Drive', 'lin', 0, 1, 0, v => Math.round(v * 100) + '%'],
+    ['lfo', 'LFO depth', 'lin', 0, 1, 0, v => v < .005 ? 'Off' : '±' + (v * 4).toFixed(1) + ' oct'],
+    ['rate', 'LFO rate', 'opt', 0, 6, 4, ['1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars']],
+    ['shape', 'LFO shape', 'opt', 0, 5, 0, ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random']],
+    ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet']]},
+  cut:{name:'Low and high cut', short:'CUT', long:'Low and high cut: the clean-up filter, rumble out below and hiss out above, 6, 12 or 24 dB (Thunder original)', tail:false, pad:true, track:true, group:'Filters', credit:'Thunder original', ps:[
+    ['low', 'Low cut', 'log', 20, 2000, 20, v => v <= 20.5 ? 'Off' : v >= 1000 ? (v / 1000).toFixed(1) + ' kHz' : Math.round(v) + ' Hz'],
+    ['high', 'High cut', 'log', 1000, 20000, 20000, v => v >= 19900 ? 'Off' : v >= 1000 ? (v / 1000).toFixed(1) + ' kHz' : Math.round(v) + ' Hz'],
+    ['slope', 'Slope', 'opt', 0, 2, 1, ['6 dB', '12 dB', '24 dB']]]},
+  compressor:{name:'Compressor (classic)', short:'CMPR', long:'Compressor: threshold, ratio, attack, release, knee and makeup, with sidechain and parallel mix (Thunder original)', tail:false, pad:true, track:true, group:'Dynamics and EQ', credit:'Thunder original', ps:[
+    ['thresh', 'Threshold', 'lin', -60, 0, -18, v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'],
+    ['ratio', 'Ratio', 'log', 1, 20, 4, v => v >= 19.95 ? '20:1' : v.toFixed(1) + ':1'],
+    ['attack', 'Attack', 'log', 0.0001, 0.25, 0.01, v => v < 0.01 ? (v * 1000).toFixed(1) + ' ms' : Math.round(v * 1000) + ' ms'],
+    ['release', 'Release', 'log', 0.01, 2, 0.15, v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s'],
+    ['knee', 'Knee', 'lin', 0, 24, 6, v => v.toFixed(1) + ' dB'],
+    ['makeup', 'Makeup', 'lin', 0, 24, 0, v => '+' + v.toFixed(1) + ' dB'],
+    ['source', 'Source', 'opt', 0, 1, 0, ['Self', 'Sidechain']],
+    ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet']]},
+  ngate:{name:'Noise gate', short:'NGAT', long:'Noise gate: silences the sound below a threshold, with hold, release, range and sidechain (Thunder original)', tail:false, pad:true, track:true, group:'Dynamics and EQ', credit:'Thunder original', ps:[
+    ['thresh', 'Threshold', 'lin', -80, 0, -45, v => v.toFixed(1) + ' dB'],
+    ['range', 'Range', 'lin', 0, 90, 90, v => v >= 89.5 ? 'Silence' : '−' + Math.round(v) + ' dB'],
+    ['attack', 'Attack', 'log', 0.0001, 0.05, 0.0005, v => v < 0.01 ? (v * 1000).toFixed(1) + ' ms' : Math.round(v * 1000) + ' ms'],
+    ['hold', 'Hold', 'lin', 0, 0.5, 0.03, v => Math.round(v * 1000) + ' ms'],
+    ['release', 'Release', 'log', 0.005, 2, 0.12, v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s'],
+    ['source', 'Source', 'opt', 0, 1, 0, ['Self', 'Sidechain']]]},
+  autopan:{name:'Auto-pan', short:'APAN', long:'Auto-pan: moves the sound side to side in time with the song, sine, triangle or square (Thunder original)', tail:false, pad:false, track:true, group:'Modulation', credit:'Thunder original', ps:[
+    ['sync', 'Sync', 'opt', 0, 1, 1, ['Off', 'To tempo']],
+    ['div', 'Division', 'opt', 0, 6, 2, ['1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars']],
+    ['rate', 'Rate', 'log', 0.05, 20, 2, v => (v < 10 ? v.toFixed(2) : v.toFixed(1)) + ' Hz'],
+    ['depth', 'Depth', 'lin', 0, 1, 0.8, v => Math.round(v * 100) + '%'],
+    ['shape', 'Shape', 'opt', 0, 2, 0, ['Sine', 'Triangle', 'Square']]]},
+  pump:{name:'Pump (ducking)', short:'PUMP', long:'Pump: the sidechain duck without a sidechain, on every note value of the song (Thunder original)', tail:false, pad:false, track:true, group:'Rhythmic', credit:'Thunder original', ps:[
+    ['div', 'Every', 'opt', 0, 3, 1, ['1/8', '1/4', '1/2', '1 bar']],
+    ['depth', 'Depth', 'lin', 0, 1, 0.8, v => v >= .995 ? '−∞ dB' : (20 * Math.log10(1 - v)).toFixed(1) + ' dB'],
+    ['release', 'Release', 'lin', 0.05, 1, 0.7, v => Math.round(v * 100) + '% of the step'],
+    ['curve', 'Curve', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%']]},
+  limiter:{name:'Limiter', short:'LIMT', long:'Limiter: a peak limiter with 2 ms lookahead, so nothing gets past Ceiling (Thunder original)', tail:false, pad:true, track:true, group:'Dynamics and EQ', credit:'Thunder original', ps:[
+    ['input', 'Input', 'lin', 0, 24, 0, v => '+' + v.toFixed(1) + ' dB'],
+    ['ceil', 'Ceiling', 'lin', -24, 0, -0.3, v => v.toFixed(1) + ' dB'],
+    ['rel', 'Release', 'log', 0.01, 1, 0.15, v => Math.round(v * 1000) + ' ms']]},
+  ringmod:{name:'Ring mod', short:'RMOD', long:'Ring mod: multiplies the sound by a carrier for metallic, bell-like and robotic tones (Thunder original)', tail:false, pad:true, track:true, group:'Modulation', credit:'Thunder original', ps:[
+    ['freq', 'Freq', 'lin', 0, 1, 0.45, v => (f => f >= 1000 ? (f / 1000).toFixed(2) + ' kHz' : (f < 10 ? f.toFixed(2) : f.toFixed(1)) + ' Hz')(5 * Math.pow(1000, v))],
+    ['fine', 'Fine', 'lin', -1, 1, 0, v => (v > 0 ? '+' : '') + Math.round(v * 100) + ' ct'],
+    ['wave', 'Carrier', 'opt', 0, 3, 0, ['Sine', 'Triangle', 'Square', 'Noise']],
+    ['spread', 'Spread', 'lin', 0, 1, 0, v => Math.round(v * 100) + '%'],
+    ['shape', 'Shape', 'lin', 0, 1, 0, v => Math.round(v * 100) + '%'],
+    ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet']]},
+  width:{name:'Stereo width', short:'WIDE', long:'Stereo width: narrows to mono or widens past the original, with the bass kept in the middle (Thunder original)', tail:false, pad:false, track:true, group:'Utility', credit:'Thunder original', ps:[
+    ['width', 'Width', 'lin', 0, 2, 1, v => Math.round(v * 100) + '%'],
+    ['bass', 'Bass mono', 'lin', 0, 1, 0, v => Math.round(v * 100) + '%'],
+    ['level', 'Level', 'lin', 0, 2, 1, v => Math.round(v * 100) + '%']]},
+  utility:{name:'Utility (gain, pan)', short:'UTIL', long:'Utility: gain, pan, mono, polarity flip and mute (Thunder original)', tail:false, pad:false, track:true, group:'Utility', credit:'Thunder original', ps:[
+    ['gain', 'Gain', 'lin', -60, 24, 0, v => v <= -59.9 ? '−∞ dB' : (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'],
+    ['pan', 'Pan', 'lin', -1, 1, 0, v => Math.abs(v) < .005 ? 'Centre' : (v < 0 ? 'L ' : 'R ') + Math.round(Math.abs(v) * 100)],
+    ['mono', 'Stereo', 'opt', 0, 1, 0, ['Stereo', 'Mono']],
+    ['flip', 'Polarity', 'opt', 0, 3, 0, ['Normal', 'Flip left', 'Flip right', 'Flip both']],
+    ['mute', 'Mute', 'opt', 0, 1, 0, ['Sound on', 'Muted']]]},
   envfilt:{name:'Envelope filter', short:'ENVF', long:'Envelope filter: auto-wah whose resonant filter follows the playing, or the sidechain bus (Thunder original)', tail:false, pad:true, track:true, group:'Filters', credit:'Thunder original', ps:[
     ['mode', 'Filter', 'opt', 0, 2, 1, ['Low-pass', 'Band-pass', 'High-pass']],
     ['source', 'Source', 'opt', 0, 1, 0, ['Self', 'Sidechain']],
@@ -6838,7 +6911,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=23', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=24', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -10084,13 +10157,14 @@ const FXFMT = {note:noteName, pitch:v => (v > 0 ? '+' : '') + v + ' st', delay:v
 const FX_GROUP = {eq:'Dynamics and EQ', comp:'Dynamics and EQ', transient:'Dynamics and EQ', ott:'Dynamics and EQ', air:'Dynamics and EQ',
   density:'Drive and lo-fi', tape:'Drive and lo-fi', odrive:'Drive and lo-fi', folder:'Drive and lo-fi', drive:'Drive and lo-fi', tube:'Drive and lo-fi', cab:'Drive and lo-fi',
   lofi:'Drive and lo-fi', crush:'Drive and lo-fi', degrade:'Drive and lo-fi', vinyl:'Drive and lo-fi', dub:'Drive and lo-fi',
-  chorus:'Modulation', flanger:'Modulation', phaser:'Modulation', tremolo:'Modulation', xmod:'Modulation',
+  chorus:'Modulation', flanger:'Modulation', phaser:'Modulation', tremolo:'Modulation', xmod:'Modulation', fshift:'Modulation',
   delay:'Delays', pdelay:'Delays', reverb:'Reverbs', space:'Reverbs', room:'Reverbs', preverb:'Reverbs',
   ladder:'Filters', autowah:'Filters', rings:'Resonators', comb:'Resonators', reson:'Resonators', pshift:'Pitch and voice',
   clouds:'Spectral and granular', beads:'Spectral and granular', tgate:'Rhythmic'};
+const FX_GROUPS = ['Dynamics and EQ', 'Filters', 'Drive and lo-fi', 'Modulation', 'Delays', 'Reverbs', 'Pitch and voice', 'Resonators', 'Spectral and granular', 'Rhythmic', 'Utility', 'More'];
 { const groups = new Map();
   for (const k of Object.keys(FX)){ const g = FX[k].group || FX_GROUP[k] || 'More'; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(k); }
-  for (const g of ['Dynamics and EQ', 'Drive and lo-fi', 'Filters', 'Modulation', 'Delays', 'Reverbs', 'Pitch and voice', 'Resonators', 'Spectral and granular', 'Rhythmic', 'More']){
+  for (const g of FX_GROUPS){
     const ks = groups.get(g); if (!ks) continue; groups.delete(g);
     const og = document.createElement('optgroup'); og.label = g;
     for (const k of ks.sort((a, b) => FX[a].name.localeCompare(FX[b].name))){ const o = document.createElement('option'); o.value = k; o.textContent = FX[k].name; og.append(o); }
@@ -12181,8 +12255,18 @@ for (const k in MODFX){ const M = MODFX[k]; if (!M.track) continue;
   }
   TFX[k] = {n:M.short, long:M.long, mod:k, tail:M.tail, ps, map:f => { const o = {}; for (const p in conv) o[p] = conv[p][1](f[conv[p][0]]); return o; }};
 }
-const FXT_LIST = ['eq', 'comp', 'reverb', 'delay', 'pdelay', 'preverb', 'density', 'tape', 'chorus', 'crush', 'degrade', 'reson', 'rings', 'clouds', 'beads', 'flanger', 'phaser', 'tremolo', 'odrive', 'folder', 'autowah', 'pshift', 'ladder', 'xmod', 'space', 'lofi', 'drive', 'air', 'room', 'comb', 'transient', 'tgate', 'sgate', 'flex', 'retrig', 'ott', 'fshift', 'vinyl', 'dub', 'cab', 'tube',
-  ...Object.keys(MODFX).filter(k => MODFX[k].track)];
+// The track effects in their groups (the pad list's: FX_GROUPS, MODFX.group or FX_GROUP), the everyday ones first in
+// each group (FXT_FIRST), then the rest in the old order. The slot picker shows the group names as headings; a slot
+// keeps its effect by name, so the order can change freely.
+const FXT_FIRST = ['compressor', 'limiter', 'ngate', 'eq', 'filter', 'cut', 'drive', 'odrive', 'density', 'chorus', 'flanger', 'phaser', 'tremolo', 'autopan',
+  'sdelay', 'delay', 'room', 'plate', 'reverb', 'pshift', 'pump', 'utility', 'width'];
+const fxtGroup = k => (MODFX[k] && MODFX[k].group) || FX_GROUP[k] || 'More';
+const FXT_LIST = (() => {
+  const all = ['eq', 'comp', 'reverb', 'delay', 'pdelay', 'preverb', 'density', 'tape', 'chorus', 'crush', 'degrade', 'reson', 'rings', 'clouds', 'beads', 'flanger', 'phaser', 'tremolo', 'odrive', 'folder', 'autowah', 'pshift', 'ladder', 'xmod', 'space', 'lofi', 'drive', 'air', 'room', 'comb', 'transient', 'tgate', 'sgate', 'flex', 'retrig', 'ott', 'fshift', 'vinyl', 'dub', 'cab', 'tube',
+    ...Object.keys(MODFX).filter(k => MODFX[k].track)];
+  const gi = k => { const i = FX_GROUPS.indexOf(fxtGroup(k)); return i < 0 ? FX_GROUPS.length : i; }, fi = k => { const i = FXT_FIRST.indexOf(k); return i < 0 ? 999 : i; };
+  return all.map((k, i) => [k, i]).sort((a, b) => gi(a[0]) - gi(b[0]) || fi(a[0]) - fi(b[0]) || a[1] - b[1]).map(e => e[0]);
+})();
 const TAILS = new Set(['pdelay', 'preverb', 'reson', 'reverb', 'delay', 'rings', 'clouds', 'beads', 'space', 'room', 'pshift', 'comb', ...Object.keys(MODFX).filter(k => MODFX[k].track && MODFX[k].tail)]);
 const FXSLOTS = 4;
 function freshTfx(type){ const f = {type, on:true}; for (const p of TFX[type].ps) f[p.k] = p.d; return f; }
@@ -12367,7 +12451,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=27')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=28')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -14755,9 +14839,11 @@ const fxp = {open:false, x:0, y:0, i:0, now:-1, slot:-1};
 // The picker's items now: the phrase commands, or (from an FX slot) the effects.
 const fxpN = () => fxp.slot >= 0 ? FXT_LIST.length + 1 : FXLIST.length;
 const fxpTag = k => fxp.slot >= 0 ? (k ? TFX[FXT_LIST[k - 1]].n : '---') : (FXLIST[k] < 0 ? '---' : FXC[FXLIST[k]]);
-function fxpFill(items, now, title, wide){
+// heads: {item index: a heading shown above it} (the effects' groups); headings aren't items, so the keys skip them.
+function fxpFill(items, now, title, wide, heads){
   const L = $('fxPickList'); L.innerHTML = '';
-  items.forEach(([b, t, isNow], k) => { const it = el('div', 'fpi'); it.dataset.k = k; it.setAttribute('role', 'option');
+  items.forEach(([b, t, isNow], k) => { if (heads && heads[k]){ const h = el('div', 'fph', heads[k]); h.setAttribute('role', 'presentation'); L.append(h); }
+    const it = el('div', 'fpi'); it.dataset.k = k; it.setAttribute('role', 'option');
     it.append(el('b', null, b), el('span', null, t)); if (isNow) it.append(el('i', null, 'NOW')); L.append(it); });
   $('fxPickT').textContent = title; $('fxPick').classList.toggle('wide', !!wide);
   $('fxPick').setAttribute('aria-label', wide ? 'Pick an effect' : 'Pick an effect command');
@@ -14773,8 +14859,9 @@ function fxpOpen(x, y){
 function fxsOpen(k){
   const A = cFxT >= NT ? S.mfx : S.tfx[cFxT], f = A[k], cur = f ? f.type : null;
   Object.assign(fxp, {open:true, slot:k, i:cur ? FXT_LIST.indexOf(cur) + 1 : FXT_LIST.indexOf(lastFxType) + 1});
+  const heads = {}; FXT_LIST.forEach((t, j) => { const g = fxtGroup(t); if (!j || g !== fxtGroup(FXT_LIST[j - 1])) heads[j + 1] = g.toUpperCase(); });
   fxpFill([['---', f ? 'Empty this slot (remove the effect)' : 'Leave this slot empty', !f],
-    ...FXT_LIST.map(t => [TFX[t].n, TFX[t].long, t === cur])], cur, 'EFFECT · ' + fxWho(cFxT) + ' SLOT ' + (k + 1), true);
+    ...FXT_LIST.map(t => [TFX[t].n, TFX[t].long, t === cur])], cur, 'EFFECT · ' + fxWho(cFxT) + ' SLOT ' + (k + 1), true, heads);
 }
 function fxpClose(){ if (!fxp.open) return; fxp.open = false; $('fxPick').hidden = true; }
 function fxpShow(jump){

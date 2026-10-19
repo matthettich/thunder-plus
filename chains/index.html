@@ -910,6 +910,49 @@ SHARED_PALETTE.push(['Rhythmic effects', [['flex', 'Flex (beat re-sequencer)'], 
 SHARED_PALETTE.find(g => g[0] === 'Effects')[1].push(['pdelay', 'Pitch delay']);
 SHARED_PALETTE.find(g => g[0] === 'Reverbs')[1].push(['preverb', 'Pitch reverb (shimmer)']);
 
+/* Basic studio effects (Oct 2026): Simple delay, Filter, Low and high cut, Classic compressor, Noise gate, Auto-pan, Pump */
+const SD_NAMES = ['1/32', '1/16T', '1/16', '1/16D', '1/8T', '1/8', '1/8D', '1/4T', '1/4', '1/4D', '1/2', '1 bar'];
+const LFO_NAMES = ['1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars'];
+const SC_IO = { inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' } };
+Object.assign(SHARED_MODULES, {
+  sdelay:Object.assign({ label:'Simple delay', scope:'mono',
+    params:{ sync:[1,0,1,1], div:[8,0,11,1], time:[.375,.01,2,.001], fb:[.35,0,1,.01], mode:[0,0,1,1], lowcut:[80,20,2000,1], highcut:[9000,1000,20000,1], mix:[.3,0,1,.01] },
+    ui:Object.assign({ sync:{l:'Sync', c:opts(['Off (use Time)', 'To tempo'])}, div:{l:'Division', c:opts(SD_NAMES)}, time:{l:'Time', f:secs}, fb:{l:'Feedback', f:pct},
+      mode:{l:'Mode', c:opts(['Stereo', 'Ping-pong'])}, lowcut:{l:'Low cut', f:khz}, highcut:{l:'High cut', f:khz} }, MIXP),
+    about:'Simple delay: a clean digital echo. Time in note values at the song tempo (Sync) or in ms, Feedback for more repeats, Ping-pong to bounce them left and right, Low cut and High cut to thin and darken them so they sit behind the dry sound. Mix keeps the dry sound at full level up to 50%; 100% is echoes only.' }, STEREO),
+  filter:Object.assign({ label:'Filter', scope:'mono',
+    params:{ mode:[0,0,3,1], slope:[0,0,1,1], cutoff:[2000,20,20000,1], res:[.2,0,1,.01], drive:[0,0,1,.01], lfo:[0,0,1,.01], rate:[4,0,6,1], shape:[0,0,5,1], mix:[1,0,1,.01] },
+    ui:Object.assign({ mode:{l:'Type', c:opts(['Low-pass', 'High-pass', 'Band-pass', 'Notch'])}, slope:{l:'Slope', c:opts(['12 dB', '24 dB'])}, cutoff:{l:'Cutoff', f:khz},
+      res:{l:'Resonance', f:pct}, drive:{l:'Drive', f:pct}, lfo:{l:'LFO depth', f:v => v < .005 ? 'Off' : '±' + (v * 4).toFixed(1) + ' oct'}, rate:{l:'LFO rate', c:opts(LFO_NAMES)},
+      shape:{l:'LFO shape', c:opts(['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'])} }, MIXP),
+    about:'Filter: the plain resonant filter. Low-pass keeps the lows, high-pass the highs, band-pass a band around Cutoff, notch takes one out; 12 or 24 dB an octave. Resonance adds a peak at Cutoff (up to a whistle), Drive warms the input. The LFO sweeps the cutoff up to ±4 octaves at a note value of the song tempo, restarting with the song: a slow sine for a sweep, a square or random for rhythmic steps.' }, STEREO),
+  cut:Object.assign({ label:'Low and high cut', scope:'mono',
+    params:{ low:[20,20,2000,1], high:[20000,1000,20000,1], slope:[1,0,2,1] },
+    ui:{ low:{l:'Low cut', f:v => v <= 20.5 ? 'Off' : khz(v)}, high:{l:'High cut', f:v => v >= 19900 ? 'Off' : khz(v)}, slope:{l:'Slope', c:opts(['6 dB', '12 dB', '24 dB'])} },
+    about:'Low and high cut: the clean-up filter for any track. Low cut takes away rumble and mud below its frequency, High cut hiss and fizz above it; each is off at its end of the range. 6, 12 or 24 dB an octave, with no bump at the corner.' }, STEREO),
+  compressor:Object.assign({ label:'Compressor', scope:'mono',
+    params:{ thresh:[-18,-60,0,.1], ratio:[4,1,20,.1], attack:[.01,.0001,.25,.0001], release:[.15,.01,2,.001], knee:[6,0,24,.1], makeup:[0,0,24,.1], source:[0,0,1,1], mix:[1,0,1,.01] },
+    ui:Object.assign({ thresh:{l:'Threshold', f:db}, ratio:{l:'Ratio', f:v => v >= 19.95 ? '20:1 (limit)' : v.toFixed(1) + ':1'}, attack:{l:'Attack', f:v => v < .01 ? (v * 1000).toFixed(1) + ' ms' : secs(v)},
+      release:{l:'Release', f:secs}, knee:{l:'Knee', f:v => v.toFixed(1) + ' dB'}, makeup:{l:'Makeup', f:db}, source:{l:'Source', c:opts(['Self', 'Sidechain'])} }, MIXP),
+    about:'Compressor: the classic one. Above Threshold the level is turned down by Ratio (4:1: 4 dB over comes out 1 dB over), Attack and Release set how fast, Knee how gently it starts, Makeup brings the level back up. Source Sidechain listens to the mixer’s sidechain bus (a kick ducking a bass); a cable into SC always wins. Mix blends the dry sound back in (parallel compression).' }, SC_IO),
+  ngate:Object.assign({ label:'Noise gate', scope:'mono',
+    params:{ thresh:[-45,-80,0,.1], range:[90,0,90,1], attack:[.0005,.0001,.05,.0001], hold:[.03,0,.5,.001], release:[.12,.005,2,.001], source:[0,0,1,1] },
+    ui:{ thresh:{l:'Threshold', f:db}, range:{l:'Range', f:v => v >= 89.5 ? 'Silence' : '−' + Math.round(v) + ' dB'}, attack:{l:'Attack', f:v => v < .01 ? (v * 1000).toFixed(1) + ' ms' : secs(v)},
+      hold:{l:'Hold', f:secs}, release:{l:'Release', f:secs}, source:{l:'Source', c:opts(['Self', 'Sidechain'])} },
+    about:'Noise gate: silences the sound (or turns it down by Range) when it falls below Threshold, so hiss, hum and spill between hits go away. It opens again a few dB higher than it closes, so it doesn’t chatter; Hold keeps it open a moment after the sound drops. Source Sidechain lets the mixer’s sidechain bus open it (a pad chopped in time with the drums); a cable into SC always wins.' }, SC_IO),
+  autopan:Object.assign({ label:'Auto-pan', scope:'mono',
+    params:{ sync:[1,0,1,1], div:[2,0,6,1], rate:[2,.05,20,.01], depth:[.8,0,1,.01], shape:[0,0,2,1] },
+    ui:{ sync:{l:'Sync', c:opts(['Off (use Rate)', 'To tempo'])}, div:{l:'Division', c:opts(LFO_NAMES)}, rate:{l:'Rate', f:hz}, depth:{l:'Depth', f:pct},
+      shape:{l:'Shape', c:opts(['Sine', 'Triangle', 'Square'])} },
+    about:'Auto-pan: moves the sound from side to side, once every Division at the song tempo (or at Rate with Sync off). Depth is how far, Shape a smooth sine, a triangle or a rounded square that hops between the sides. Each side is only ever turned down, so a stereo sound keeps its image.' }, STEREO),
+  pump:Object.assign({ label:'Pump (ducking)', scope:'mono',
+    params:{ div:[1,0,3,1], depth:[.8,0,1,.01], release:[.7,.05,1,.01], curve:[.5,0,1,.01] },
+    ui:{ div:{l:'Every', c:opts(['1/8', '1/4', '1/2', '1 bar'])}, depth:{l:'Depth', f:v => v >= .995 ? '−∞ dB' : (20 * Math.log10(1 - v)).toFixed(1) + ' dB'},
+      release:{l:'Release', f:v => Math.round(v * 100) + '% of the step'}, curve:{l:'Curve', f:pct} },
+    about:'Pump: the “sidechain” duck without a sidechain. On every quarter note (or Every) the level drops by Depth and comes back over Release, a share of the step; Curve goes from a straight line to a fast early recovery. The pumping of a kick-ducked pad or bass, locked to the song.' }, STEREO)
+});
+Object.assign(SHARED_FAMILY, { sdelay:'afx', filter:'afx', cut:'afx', compressor:'util', ngate:'util', autopan:'afx', pump:'afx' });
+SHARED_PALETTE.push(['Basic effects', [['sdelay', 'Simple delay'], ['filter', 'Filter'], ['cut', 'Low and high cut'], ['compressor', 'Compressor'], ['ngate', 'Noise gate'], ['autopan', 'Auto-pan'], ['pump', 'Pump (ducking)']], 'audio']);
 function mergeShared(palette, groupFam, portLabel){
   const have = new Set(); for (const [, items] of palette) for (const [t] of items) have.add(t);
   for (const [g, items, where] of SHARED_PALETTE){
@@ -938,17 +981,17 @@ const PAL_LAYOUT = [
   ['Sound sources', '#b8792a', ['string', 'vco', 'fm', 'additive', 'noise', 'plaits', 'elements', 'bytebeat', 'blipdrum']],
   ['§Mix and dynamics'],
   ['Mix and level', '#7b8794', ['mixer', 'smixer', 'vca', 'utility', 'width', 'meter']],
-  ['Dynamics', '#e07a2e', ['comp', 'sccomp', 'limiter', 'ott', 'transient']],
+  ['Dynamics', '#e07a2e', ['compressor', 'comp', 'sccomp', 'limiter', 'ngate', 'ott', 'transient']],
   ['§Effects'],
-  ['Filters and EQ', '#2e9e4f', ['eq', 'air', 'vcf', 'ladder', 'blades', 'autowah', 'envfilt', 'vowel']],
+  ['Filters and EQ', '#2e9e4f', ['filter', 'cut', 'eq', 'air', 'vcf', 'ladder', 'blades', 'autowah', 'envfilt', 'vowel']],
   ['Drive and lo-fi', '#d23c3c', ['saturation', 'odrive', 'drive', 'tube', 'folder', 'cab', 'crush', 'lofi', 'degrade', 'tape', 'vinyl', 'dub']],
-  ['Modulation effects', '#c04ab8', ['chorus', 'ensemble', 'dimension', 'flanger', 'phaser', 'tremolo', 'rotary', 'ringmod', 'xmod', 'fshift', 'meta']],
-  ['Delays', '#3a8ee0', ['delay', 'pingpong', 'bbd', 'gdelay', 'pdelay', 'reverse']],
+  ['Modulation effects', '#c04ab8', ['chorus', 'ensemble', 'dimension', 'flanger', 'phaser', 'tremolo', 'autopan', 'rotary', 'ringmod', 'xmod', 'fshift', 'meta']],
+  ['Delays', '#3a8ee0', ['sdelay', 'delay', 'pingpong', 'bbd', 'gdelay', 'pdelay', 'reverse']],
   ['Reverbs', '#4a55c8', ['reverb', 'room', 'plate', 'spring', 'space', 'preverb', 'convolve']],
   ['Resonators', '#8a9a1a', ['comb', 'reson', 'rings']],
   ['Pitch and voice', '#e0609a', ['pshift', 'harm', 'autotune', 'vocoder']],
   ['Granular and spectral', '#9a6ad6', ['clouds', 'beads', 'spectral', 'stretch']],
-  ['Rhythmic effects', '#d9b30f', ['tgate', 'sgate', 'repeat', 'retrig', 'flex']],
+  ['Rhythmic effects', '#d9b30f', ['pump', 'tgate', 'sgate', 'repeat', 'retrig', 'flex']],
   ['§Control'],
   ['Notes and MIDI', '#a0703a', ['hostIn', 'seq']],
   ['Modulation sources', '#6e4fc0', ['lfo', 'adsr', 'tides', 'random', 'marbles', 'chaos', 'steps']],
@@ -1376,7 +1419,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=27';
+    const url = opts.url || './chains-worklet.js?v=28';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {

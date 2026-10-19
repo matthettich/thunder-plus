@@ -24,6 +24,33 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 19 Oct (6): basic effects (simple delay, filter, cut, compressor, gate, auto-pan, pump) and grouped FX picker
+
+Cache `thunderplus-v176`; `chains-worklet.js?v=28`, `waves-worklet.js?v=24`.
+- **Seven new shared modules** (chains-worklet.js SHARED MODULES block, "Basic studio effects"; synced to …waves):
+  `sdelay` Simple delay (sync divisions with dotted/triplets `SD_DIVS`, ms, feedback ×.95, Stereo/Ping-pong, one-pole low
+  and high cut on the repeats, mix keeps dry at 100% to 50%; a new time glides 60 ms), `filter` Filter (TPT SVF LP/HP/BP/
+  notch, 12/24 dB, resonance, drive, tempo-synced LFO ±4 oct in six shapes, cutoff smoothed 5 ms), `cut` Low and high cut
+  (Butterworth 6/12/24 dB, each off at its end), `compressor` (threshold/ratio/attack/release/soft knee/makeup, stereo-linked
+  peak, Self or Sidechain bus or SC cable, parallel mix), `ngate` Noise gate (hysteresis, hold, range, sidechain), `autopan`
+  (sync/rate, depth, sine/triangle/rounded square, sides only turned down), `pump` (LFO-tool duck every 1/8–1 bar, depth,
+  release share, curve). Helpers `bfSvf/bfStep/bfTidy/bfK/bfTempo`. Editor entries + help + palette ('Basic effects';
+  PAL_LAYOUT places them in Dynamics / Filters and EQ / Modulation / Delays / Rhythmic) in the SHARED EDITOR block.
+- **Also exposed as pad/track effects** (modules that already existed): `limiter` LIMT, `ringmod` RMOD, `width` WIDE
+  ("Stereo width"), `utility` UTIL. Pads render mono (L+R averaged), so autopan, pump, width and utility are track-only
+  (`pad:false` in tools/modfx-spec.mjs). Old pad "Compressor" (Pressure4) keeps its name; the new one is "Compressor
+  (classic)" on pads, CMPR on tracks.
+- Checked in Node (scratch test, 30 checks): delay lands on 24000 samples at 1/4 120 BPM, ping-pong alternates, 100%
+  feedback stays bounded over 20 s; LP12 −3.0/−12.4 dB and LP24 −3.0/−24.2 at fc/2fc, HP mirrored, BP unity, notch −150
+  dB; cut −3 dB at the corner; compressor −6 dBFS sine at −18/4:1 → −8.7 dB; sidechain ducks; gate passes/silences and
+  Range 20 dB; auto-pan never louder; pump silent on the beat; 280 random settings finite; 120–690× real time each.
+  In the app: every one builds a track chain, a song plays with four chained, the pad ones render. **Not heard by ear.**
+- **FX slot picker grouped** (owner): `FXT_LIST` is now sorted by group (`FX_GROUPS`, shared with the pad Add effect
+  list: Dynamics and EQ, Filters, Drive and lo-fi, Modulation, Delays, Reverbs, Pitch and voice, Resonators, Spectral and
+  granular, Rhythmic, Utility, More), the everyday ones first (`FXT_FIRST`), and `fxsOpen` passes `heads` so `fxpFill`
+  shows sticky `.fph` headings (not items: keys and clicks skip them; `.fpi` has scroll-margin for them). Slots keep their
+  effect by name, so reordering is safe. Frequency shifter moved from More to Modulation (pads too).
+
 ## 19 Oct (5): inverted top bar, bottom panel scroll arrows, pattern view scrolling and play keys
 
 Cache `thunderplus-v175`. Desktop **v1.2.4** has everything above the meter fix.

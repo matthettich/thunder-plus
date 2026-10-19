@@ -4040,6 +4040,246 @@ const TidesM = {
   }
 };
 
+/* ── Basic studio effects (Oct 2026, original code): the plain everyday tools a DAW has as stock effects, for pads,
+   tracks and patches: Simple delay, Filter, Low and high cut, Classic compressor, Noise gate, Auto-pan and Pump.
+   Filters are TPT state-variable filters (Zavalishin, "The Art of VA Filter Design"), as in the Envelope filter.
+   Tempo-synced ones count from the song's start (restarted) at the song tempo, so they land on the beat. */
+const SD_DIVS = [['1/32', .125], ['1/16T', 1 / 6], ['1/16', .25], ['1/16D', .375], ['1/8T', 1 / 3], ['1/8', .5], ['1/8D', .75], ['1/4T', 2 / 3], ['1/4', 1], ['1/4D', 1.5], ['1/2', 2], ['1 bar', 4]];
+const LFO_DIVS = [['1/16', .25], ['1/8', .5], ['1/4', 1], ['1/2', 2], ['1 bar', 4], ['2 bars', 8], ['4 bars', 16]];
+const PUMP_DIVS = [['1/8', .5], ['1/4', 1], ['1/2', 2], ['1 bar', 4]];
+const bfTempo = ctx => Math.max((ctx.transport && ctx.transport.tempo) || 120, 20);
+const bfK = (t, sr) => 1 - Math.exp(-1 / (sr * Math.max(t, 1e-5)));   // one-pole coefficient for a time constant in seconds
+const bfSvf = () => ({ z1:0, z2:0, lp:0, bp:0, hp:0 });
+// One TPT state-variable filter step: g = tan(π fc / sr), k = 1/Q (2: no peak, 1.414: Butterworth, → 0: self-oscillating).
+function bfStep(s, x, g, k){
+  const a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2, v3 = x - s.z2, v1 = a1 * s.z1 + a2 * v3, v2 = s.z2 + a2 * s.z1 + a3 * v3;
+  s.z1 = 2 * v1 - s.z1; s.z2 = 2 * v2 - s.z2; s.lp = v2; s.bp = v1; s.hp = x - k * v1 - v2;
+}
+const bfTidy = s => { if (!(s.z1 > -1e4 && s.z1 < 1e4 && s.z2 > -1e4 && s.z2 < 1e4)){ s.z1 = s.z2 = 0; } s.z1 = fxClean(s.z1); s.z2 = fxClean(s.z2); };
+
+/* Simple delay: a clean digital echo. Time in note values at the song tempo (Sync) or in ms; Feedback brings it round
+   again (up to 95% a pass); Ping-pong bounces the echoes left, right, left from a mono sum; Low cut and High cut thin
+   and darken the echoes (and so each repeat more than the last). Mix keeps the dry sound at full level up to 50%, then
+   fades it, so 100% is echoes only. A new time glides over ~60 ms rather than clicking. */
+const SimpleDelay = {
+  type:'sdelay', scope:'mono', cost:.2,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ sync:[1,0,1,1], div:[8,0,SD_DIVS.length - 1,1], time:[.375,.01,2,.001], fb:[.35,0,1,.01], mode:[0,0,1,1], lowcut:[80,20,2000,1], highcut:[9000,1000,20000,1], mix:[.3,0,1,.01] },
+  create(sr){ const N = 1 << Math.ceil(Math.log2(sr * 4.2)); return { L:new Float32Array(N), R:new Float32Array(N), M:N - 1, w:0, d:-1, ll:0, lr:0, hl:0, hr:0 }; },
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, BL = st.L, BR = st.R, M = st.M;
+    const sec = p.sync >= .5 ? 60 / bfTempo(ctx) * SD_DIVS[clamp(Math.round(p.div), 0, SD_DIVS.length - 1)][1] : p.time;
+    const D = clamp(sec * sr, 4, M - 4), kd = bfK(.06, sr), fb = u(p.fb) * .95, ping = p.mode >= .5, mx = u(p.mix);
+    const dryG = mx <= .5 ? 1 : 2 - 2 * mx, wetG = mx >= .5 ? 1 : 2 * mx;
+    const kh = 1 - Math.exp(-2 * Math.PI * clamp(p.lowcut, 5, sr * .2) / sr), kl = 1 - Math.exp(-2 * Math.PI * clamp(p.highcut, 200, sr * .45) / sr);
+    let d = st.d < 0 ? D : st.d, w = st.w, ll = st.ll, lr = st.lr, hl = st.hl, hr = st.hr;
+    for (let i = 0; i < B; i++){
+      d += (D - d) * kd;
+      const pos = w - d + M + 1, i0 = Math.floor(pos), f = pos - i0, a = i0 & M, b = (i0 + 1) & M;
+      const yl = BL[a] + (BL[b] - BL[a]) * f, yr = BR[a] + (BR[b] - BR[a]) * f;
+      ll += (yl - ll) * kl; lr += (yr - lr) * kl;   // High cut
+      hl += (ll - hl) * kh; hr += (lr - hr) * kh;   // Low cut: the echo less its own low end
+      const el = ll - hl, er = lr - hr;
+      let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
+      if (ping){ BL[w] = fxClean(fxSat((xl + xr) * .5 + er * fb)); BR[w] = fxClean(fxSat(el * fb)); }
+      else { BL[w] = fxClean(fxSat(xl + el * fb)); BR[w] = fxClean(fxSat(xr + er * fb)); }
+      w = (w + 1) & M;
+      oL[i] = xl * dryG + el * wetG; oR[i] = xr * dryG + er * wetG;
+    }
+    st.d = d; st.w = w; st.ll = fxClean(ll); st.lr = fxClean(lr); st.hl = fxClean(hl); st.hr = fxClean(hr);
+  }
+};
+
+/* Filter: the plain resonant filter. Low-pass, high-pass, band-pass or notch, 12 or 24 dB an octave, Cutoff 20 Hz–20 kHz,
+   Resonance up to a whistle (at 0 a 12 dB filter is flat, Butterworth), Drive saturates the input. The LFO sweeps the
+   cutoff up to ±4 octaves (Mod depth) at a note value of the song tempo, in one of six shapes; it restarts with the song.
+   The cutoff moves smoothly (5 ms), so a square or random LFO never clicks. */
+const Filter = {
+  type:'filter', scope:'mono', cost:.25,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ mode:[0,0,3,1], slope:[0,0,1,1], cutoff:[2000,20,20000,1], res:[.2,0,1,.01], drive:[0,0,1,.01], lfo:[0,0,1,.01], rate:[4,0,LFO_DIVS.length - 1,1], shape:[0,0,5,1], mix:[1,0,1,.01] },
+  create:() => ({ a:bfSvf(), b:bfSvf(), c:bfSvf(), d:bfSvf(), lc:-1, ph:0, rv:0, sn:undefined, nr:rng(nextSeed()) }),
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
+    if (ctx.transport && restarted(st, ctx)) st.ph = 0;   // the LFO starts on the downbeat with the song
+    const mode = clamp(Math.round(p.mode), 0, 3), s24 = p.slope >= .5, r = u(p.res), dep = u(p.lfo) * 4, shape = clamp(Math.round(p.shape), 0, 5);
+    // k: 12 dB, or the resonant 2nd stage of 24 dB (the 1st is a fixed Butterworth stage, k 1.848); band-pass and notch
+    // use the 12 dB k for both stages
+    const k12 = 1.414 - 1.38 * r, k2 = mode < 2 ? .765 - .73 * r : k12, k1 = mode < 2 ? 1.848 : k12;
+    const inc = bfTempo(ctx) / 60 / LFO_DIVS[clamp(Math.round(p.rate), 0, LFO_DIVS.length - 1)][1] / sr;
+    const base = Math.log2(clamp(p.cutoff, 10, sr * .45)), top = Math.log2(sr * .45), ks = bfK(.005, sr);
+    const drv = u(p.drive), dr = .25 + drv * 8, dn = 1 / Math.tanh(dr), mx = u(p.mix), A = st.a, Bq = st.b, C = st.c, D = st.d;
+    let lc = st.lc < 0 ? base : st.lc, ph = st.ph;
+    for (let i = 0; i < B; i++){
+      ph += inc; if (ph >= 1){ ph -= Math.floor(ph); st.rv = st.nr() * 2 - 1; }   // runs at depth 0 too, so it stays on the beat
+      let lv = 0;
+      if (dep > 0){
+        lv = shape === 0 ? Math.sin(2 * Math.PI * ph) : shape === 1 ? (ph < .5 ? 4 * ph - 1 : 3 - 4 * ph) : shape === 2 ? 2 * ph - 1 : shape === 3 ? 1 - 2 * ph : shape === 4 ? (ph < .5 ? 1 : -1) : st.rv;
+      }
+      lc += (Math.min(top, Math.max(3.4, base + lv * dep)) - lc) * ks;
+      const g = Math.tan(Math.PI * Math.pow(2, lc) / sr);
+      let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
+      const il = drv > .001 ? Math.tanh(xl * dr) * dn : xl, ir = drv > .001 ? Math.tanh(xr * dr) * dn : xr;
+      let yl, yr;
+      if (!s24){
+        bfStep(A, il, g, k12); bfStep(C, ir, g, k12);
+        yl = mode === 0 ? A.lp : mode === 1 ? A.hp : mode === 2 ? k12 * A.bp : il - k12 * A.bp;
+        yr = mode === 0 ? C.lp : mode === 1 ? C.hp : mode === 2 ? k12 * C.bp : ir - k12 * C.bp;
+      } else {
+        bfStep(A, il, g, k1); bfStep(C, ir, g, k1);
+        const ml = mode === 0 ? A.lp : mode === 1 ? A.hp : mode === 2 ? k1 * A.bp : il - k1 * A.bp, mr = mode === 0 ? C.lp : mode === 1 ? C.hp : mode === 2 ? k1 * C.bp : ir - k1 * C.bp;
+        bfStep(Bq, ml, g, k2); bfStep(D, mr, g, k2);
+        yl = mode === 0 ? Bq.lp : mode === 1 ? Bq.hp : mode === 2 ? k2 * Bq.bp : ml - k2 * Bq.bp;
+        yr = mode === 0 ? D.lp : mode === 1 ? D.hp : mode === 2 ? k2 * D.bp : mr - k2 * D.bp;
+      }
+      oL[i] = xl + (fxGuard(yl) - xl) * mx; oR[i] = xr + (fxGuard(yr) - xr) * mx;
+    }
+    st.lc = lc; st.ph = ph; bfTidy(A); bfTidy(Bq); bfTidy(C); bfTidy(D);
+  }
+};
+
+/* Low and high cut: the clean-up filter. Low cut (a high-pass) takes away rumble and mud below its frequency, High cut
+   (a low-pass) hiss and fizz above it; each is off at its end of the range. 6, 12 or 24 dB an octave, Butterworth
+   (no bump at the corner). */
+const LoHiCut = {
+  type:'cut', scope:'mono', cost:.15,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ low:[20,20,2000,1], high:[20000,1000,20000,1], slope:[1,0,2,1] },
+  create:() => ({ h:[bfSvf(), bfSvf(), bfSvf(), bfSvf()], l:[bfSvf(), bfSvf(), bfSvf(), bfSvf()], lo:-1, hi:-1, p1:[0, 0, 0, 0] }),
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, sl = clamp(Math.round(p.slope), 0, 2);
+    const loOn = p.low > 20.5, hiOn = p.high < 19900;
+    // the corners glide a little each block (about 7 ms), so turning a knob doesn't zipper
+    const lt = Math.log2(clamp(p.low, 10, sr * .45)), ht = Math.log2(clamp(p.high, 10, sr * .45));
+    st.lo = st.lo < 0 ? lt : st.lo + (lt - st.lo) * .3; st.hi = st.hi < 0 ? ht : st.hi + (ht - st.hi) * .3;
+    const flo = Math.pow(2, st.lo), fhi = Math.pow(2, st.hi), gl = Math.tan(Math.PI * flo / sr), gh = Math.tan(Math.PI * fhi / sr);
+    const cl = 1 - Math.exp(-2 * Math.PI * flo / sr), ch = 1 - Math.exp(-2 * Math.PI * fhi / sr), H = st.h, Lw = st.l, P = st.p1;
+    for (let i = 0; i < B; i++){
+      let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
+      if (loOn){
+        if (sl === 0){ P[0] += (xl - P[0]) * cl; P[1] += (xr - P[1]) * cl; xl -= P[0]; xr -= P[1]; }
+        else if (sl === 1){ bfStep(H[0], xl, gl, 1.414); bfStep(H[1], xr, gl, 1.414); xl = H[0].hp; xr = H[1].hp; }
+        else { bfStep(H[0], xl, gl, 1.848); bfStep(H[1], xr, gl, 1.848); bfStep(H[2], H[0].hp, gl, .765); bfStep(H[3], H[1].hp, gl, .765); xl = H[2].hp; xr = H[3].hp; }
+      }
+      if (hiOn){
+        if (sl === 0){ P[2] += (xl - P[2]) * ch; P[3] += (xr - P[3]) * ch; xl = P[2]; xr = P[3]; }
+        else if (sl === 1){ bfStep(Lw[0], xl, gh, 1.414); bfStep(Lw[1], xr, gh, 1.414); xl = Lw[0].lp; xr = Lw[1].lp; }
+        else { bfStep(Lw[0], xl, gh, 1.848); bfStep(Lw[1], xr, gh, 1.848); bfStep(Lw[2], Lw[0].lp, gh, .765); bfStep(Lw[3], Lw[1].lp, gh, .765); xl = Lw[2].lp; xr = Lw[3].lp; }
+      }
+      oL[i] = xl; oR[i] = xr;
+    }
+    for (const s of H) bfTidy(s); for (const s of Lw) bfTidy(s); for (let j = 0; j < 4; j++) P[j] = fxClean(P[j]);
+  }
+};
+
+/* Classic compressor: Threshold, Ratio, Attack, Release, Knee and Makeup, the controls every DAW's compressor has.
+   Both sides are turned down together (stereo-linked, peak detection). Source Sidechain listens to the mixer's
+   sidechain bus instead (a kick ducking a bass), and a cable into SC always wins; Mix blends in the dry sound
+   (parallel, "New York" compression). */
+const ClassicComp = {
+  type:'compressor', scope:'mono', cost:.15,
+  inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ thresh:[-18,-60,0,.1], ratio:[4,1,20,.1], attack:[.01,.0001,.25,.0001], release:[.15,.01,2,.001], knee:[6,0,24,.1], makeup:[0,0,24,.1], source:[0,0,1,1], mix:[1,0,1,.01] },
+  create:() => ({ g:0, gr:0 }),
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
+    const scP = linked(io, 'sc'), bus = !scP && p.source >= .5 && !!ctx.scL && typeof ctx.scOn === 'function' && !!ctx.scOn();
+    const SL = bus ? ctx.scL : L, SR = bus ? (ctx.scR || ctx.scL) : R, SC = io.in.sc;
+    const thr = p.thresh, sl = 1 - 1 / Math.max(1, p.ratio), kn = Math.max(0, p.knee), mk = p.makeup, ka = bfK(p.attack, sr), kr = bfK(p.release, sr), mx = u(p.mix);
+    let g = st.g, most = 0;
+    for (let i = 0; i < B; i++){
+      let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
+      let det; if (scP) det = Math.abs(SC[i]); else { const a = Math.abs(SL[i]), b = Math.abs(SR[i]); det = a > b ? a : b; }
+      const xdB = det > 1e-6 ? 8.685889638 * Math.log(det) : -120, over = xdB - thr;
+      const t = over <= -kn / 2 ? 0 : over < kn / 2 ? sl * (over + kn / 2) * (over + kn / 2) / (2 * kn) : sl * over;   // gain reduction wanted, dB (soft knee)
+      g += (t - g) * (t > g ? ka : kr);
+      if (g > most) most = g;
+      const gain = Math.exp((mk - g) * .1151292546);
+      oL[i] = xl + (fxGuard(xl * gain) - xl) * mx; oR[i] = xr + (fxGuard(xr * gain) - xr) * mx;
+    }
+    st.g = g > 1e-6 && g < 200 ? g : 0; st.gr = Math.max(st.gr, most);
+  },
+  show(st){ const v = [-st.gr]; st.gr = 0; return v; }
+};
+
+/* Noise gate: closes (turns the sound down by Range) when it falls below Threshold, so hiss, hum and spill between
+   hits disappear; it opens again a few dB higher than it closes, so it doesn't chatter. Attack is how fast it opens,
+   Hold how long it stays open after the sound drops, Release how fast it closes. Source Sidechain lets the mixer's
+   sidechain bus open it (a gated pad following the drums); a cable into SC always wins. */
+const NoiseGate = {
+  type:'ngate', scope:'mono', cost:.1,
+  inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ thresh:[-45,-80,0,.1], range:[90,0,90,1], attack:[.0005,.0001,.05,.0001], hold:[.03,0,.5,.001], release:[.12,.005,2,.001], source:[0,0,1,1] },
+  create:() => ({ e:0, open:false, hold:0, g:0 }),
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
+    const scP = linked(io, 'sc'), bus = !scP && p.source >= .5 && !!ctx.scL && typeof ctx.scOn === 'function' && !!ctx.scOn();
+    const SL = bus ? ctx.scL : L, SR = bus ? (ctx.scR || ctx.scL) : R, SC = io.in.sc;
+    const on = Math.pow(10, p.thresh / 20), off = on * .6, floor = p.range >= 89.5 ? 0 : Math.pow(10, -p.range / 20);
+    const ka = bfK(p.attack, sr), kr = bfK(p.release, sr), ke = bfK(.005, sr), hn = Math.round(p.hold * sr);
+    let e = st.e, open = st.open, hold = st.hold, g = st.g;
+    for (let i = 0; i < B; i++){
+      let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
+      let a; if (scP) a = Math.abs(SC[i]); else { const x = Math.abs(SL[i]), y = Math.abs(SR[i]); a = x > y ? x : y; }
+      e = a > e ? a : e + (a - e) * ke;   // peak follower: instant up, ~5 ms down
+      if (e > on){ open = true; hold = hn; } else if (open && e < off){ if (hold > 0) hold--; else open = false; }
+      const t = open ? 1 : floor; g += (t - g) * (t > g ? ka : kr);
+      oL[i] = xl * g; oR[i] = xr * g;
+    }
+    st.e = fxClean(e); st.open = open; st.hold = hold; st.g = g > 1e-7 ? g : 0;
+  }
+};
+
+/* Auto-pan: moves the sound from side to side, at a note value of the song tempo (Sync) or a rate in Hz; Depth is how
+   far, Shape a sine, a triangle or a (rounded) square. A stereo sound keeps its own image: each side is only ever
+   turned down, never up. Synced, it restarts with the song. */
+const AutoPan = {
+  type:'autopan', scope:'mono', cost:.05,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ sync:[1,0,1,1], div:[2,0,LFO_DIVS.length - 1,1], rate:[2,.05,20,.01], depth:[.8,0,1,.01], shape:[0,0,2,1] },
+  create:() => ({ ph:0, sn:undefined }),
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, sync = p.sync >= .5;
+    if (ctx.transport && restarted(st, ctx) && sync) st.ph = 0;
+    const hz = sync ? bfTempo(ctx) / 60 / LFO_DIVS[clamp(Math.round(p.div), 0, LFO_DIVS.length - 1)][1] : clamp(p.rate, .01, 40);
+    const inc = hz / sr, dep = u(p.depth), shape = clamp(Math.round(p.shape), 0, 2), sq = 1 / Math.tanh(4);
+    let ph = st.ph;
+    for (let i = 0; i < B; i++){
+      ph += inc; if (ph >= 1) ph -= Math.floor(ph);
+      const s = Math.sin(2 * Math.PI * ph), v = shape === 0 ? s : shape === 1 ? (ph < .25 ? 4 * ph : ph < .75 ? 2 - 4 * ph : 4 * ph - 4) : Math.tanh(4 * s) * sq;
+      const th = (v * dep + 1) * Math.PI / 4, gl = Math.min(1, Math.SQRT2 * Math.cos(th)), gr = Math.min(1, Math.SQRT2 * Math.sin(th));
+      let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
+      oL[i] = xl * gl; oR[i] = xr * gr;
+    }
+    st.ph = ph;
+  }
+};
+
+/* Pump: the "sidechain" duck without a sidechain. On every note value (a quarter by default) the level drops by Depth
+   and comes back over Release (a share of the note), Curve from a straight line to a fast early recovery: the pumping
+   of a kick-ducked pad or bass, locked to the song. A 2 ms fade into each dip keeps it click-free. */
+const Pump = {
+  type:'pump', scope:'mono', cost:.03,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ div:[1,0,PUMP_DIVS.length - 1,1], depth:[.8,0,1,.01], release:[.7,.05,1,.01], curve:[.5,0,1,.01] },
+  create:() => ({ ph:0, g:1, sn:undefined }),
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
+    if (ctx.transport && restarted(st, ctx)) st.ph = 0;
+    const inc = bfTempo(ctx) / 60 / PUMP_DIVS[clamp(Math.round(p.div), 0, PUMP_DIVS.length - 1)][1] / sr;
+    const dep = u(p.depth), rel = clamp(p.release, .02, 1), ex = 1 + u(p.curve) * 3, kg = bfK(.002, sr);
+    let ph = st.ph, g = st.g;
+    for (let i = 0; i < B; i++){
+      ph += inc; if (ph >= 1) ph -= Math.floor(ph);
+      const x = ph / rel, env = x >= 1 ? 0 : Math.pow(1 - x, ex), t = 1 - dep * env;
+      g += (t - g) * (t < g ? kg : 1);   // into the dip over ~2 ms; out of it along the curve itself
+      let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
+      oL[i] = xl * g; oR[i] = xr * g;
+    }
+    st.ph = ph; st.g = g;
+  }
+};
+
 const SHARED_MODULES = { beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
@@ -4049,7 +4289,8 @@ const SHARED_MODULES = { beads:Beads,
   flex:FlexM, sgate:StepGateM, retrig:RetrigM, pdelay:PDelayM, preverb:PReverbM,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,
   autotune:PitchCorrect, vowel:VowelFilter, rotary:RotarySpk, gdelay:GrainDelay, reverse:ReverseEcho, envfilt:EnvFilter,
-  bytebeat:Bytebeat, chaos:Chaos, marbles:MarblesM, tides:TidesM };
+  bytebeat:Bytebeat, chaos:Chaos, marbles:MarblesM, tides:TidesM,
+  sdelay:SimpleDelay, filter:Filter, cut:LoHiCut, compressor:ClassicComp, ngate:NoiseGate, autopan:AutoPan, pump:Pump };
 /* ===SHARED MODULES END=== */
 
 /* ---------- Karplus–Strong string (original code) ----------
