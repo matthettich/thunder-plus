@@ -676,6 +676,11 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .tscr .lb{color:var(--ts-th)}
 .tscr .act{color:var(--ts-ink)}
 .tscr .mt{color:var(--ts-vol)}
+/* The meters are block characters (█ ▆ ▏…). Share Tech Mono (the Simple skins) has none, so they come from the next font,
+   JetBrains Mono, about 10% wider: a lit cell pushed the rest of its line right (owner, 19 Oct: the mixer's meters
+   looked torn). Each meter cell is exactly its characters' width in the line's own font (ch), the glyph clipped to it at the sides. */
+.tgrid .mt, .tgrid .mm:is(.m1,.m2,.m3){display:inline-block; vertical-align:top; height:1.3em; clip-path:inset(-1em 0 -1em 0)}   /* sides clipped; up and down the block still overlaps its neighbours, so a bar has no seams */
+.tgrid .mt{width:calc(2 * var(--chw, 1ch))}   /* --chw: a character's advance in the grid (chwSet), letter-spacing included */
 .tscr .m1{color:var(--ts-ok)} .tscr .m2{color:var(--ts-hot)} .tscr .m3{color:var(--ts-clip)}
 .tscr .pl{background:var(--ts-pl-bg); color:var(--ts-pl)}
 .tscr .sel{background:var(--ts-sel)}
@@ -15895,6 +15900,7 @@ function draw(){
       const left = r.left - g.left - grid.clientLeft + grid.scrollLeft, w = Math.min(r.width, V * 0.5), m = Math.min(r.width, 40);
       grid.scrollLeft = Math.max(0, Math.min(left + w + m - V, left - 6)); } }
   meterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mt')] : []; masterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mm')] : [];
+  if (tv === 'mixer') chwSet();
   $('tTitle').textContent = title; $('tSub').textContent = sub;
   $('tInfo').textContent = info();
   if (tv === 'phrase' && pvActive()) $('tInfo').textContent = pvInfo();   // PATTERN VIEW: the track and phrase first
@@ -15951,6 +15957,17 @@ function draw(){
   instList();
   apAfterDraw();   // ARRANGE PAGING: focus look, phrase follow, song strip
 }
+// A character's real advance in the grid (its font, size and the letter-spacing it inherits; 1ch leaves the spacing out),
+// for the meter cells' widths. Measured when the text size, skin or fonts change.
+let chwKey = '';
+function chwSet(){
+  const k = scr.style.fontSize + '|' + skin + '|' + tScale; if (k === chwKey) return;
+  const ln = grid.querySelector(':scope > .ln'); if (!ln) return;
+  const s = document.createElement('span'); s.textContent = '0000000000'; ln.append(s);
+  const w = s.getBoundingClientRect().width / 10; s.remove();
+  if (w > 0){ grid.style.setProperty('--chw', w.toFixed(3) + 'px'); chwKey = k; }
+}
+try { document.fonts.addEventListener('loadingdone', () => { chwKey = ''; if (tv === 'mixer') chwSet(); }); } catch(e){}
 function paintMeters(){
   const bs = rt ? rt.pl.buses : null;
   document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { e.style.height = (bs ? lvl(bs[t].lv) * 100 : 0).toFixed(1) + '%'; });
@@ -15962,7 +15979,8 @@ function paintMeters(){
     const HB = ' ▏▎▍▌▋▊▉█', zones = [[0, 27], [27, 34], [34, MW]];
     [0, 1].forEach(s => {
       const m = rt && rt.mlv ? rt.mlv[s] : 0, f = lvl(m) * MW, base = s * 5;
-      zones.forEach(([a, b], z) => { let t = ''; for (let i = a; i < b; i++){ const x = f - i; t += x >= 1 ? '█' : x > 0 ? HB[Math.round(x * 8)] : ''; } masterEls[base + z].textContent = t; });
+      zones.forEach(([a, b], z) => { let t = ''; for (let i = a; i < b; i++){ const x = f - i; t += x >= 1 ? '█' : x > 0 ? HB[Math.round(x * 8)] : ''; }
+        const e = masterEls[base + z]; if (e.textContent !== t){ e.textContent = t; e.style.width = 'calc(' + t.length + ' * var(--chw, 1ch))'; } });   // as wide as its cells (see .mt)
       masterEls[base + 3].textContent = '·'.repeat(Math.max(0, MW - Math.ceil(f)));
       const pk = rt && rt.mpk ? rt.mpk[s] : 0;
       masterEls[base + 4].textContent = pk > 0.00002 ? (20 * Math.log10(pk)).toFixed(1).padStart(5) + (pk >= 0.999 ? ' CLIP' : '') : '  −∞';

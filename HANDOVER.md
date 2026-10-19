@@ -26,7 +26,7 @@ Keep this file up to date at the end of a work session.
 
 ## 19 Oct (5): inverted top bar, bottom panel scroll arrows, pattern view scrolling and play keys
 
-Cache `thunderplus-v174`. Desktop **v1.2.4** has everything up to here.
+Cache `thunderplus-v175`. Desktop **v1.2.4** has everything above the meter fix.
 - **Top bar inverted** (owner chose mock-up B): on the light Simple (term) skins `.top` takes `--mx` as its background,
   its own buttons (`.top >`, `.top > .seg >`, `.top > .setwrap >`) go transparent with `--mxon` text and a 40% mix
   border (`--tb-ln`); `.on` is filled `--mxon` with `--mx` text. The menus inside `.top` (#gfile, #gedit, #gset, #phl)
@@ -45,6 +45,11 @@ Cache `thunderplus-v174`. Desktop **v1.2.4** has everything up to here.
   where the view is), so a click on a track scrolled into view only snaps to a track edge; a plain wheel (which moves
   the cursor's row) sets `pvHoldX` so the view stays where it was scrolled. Arrow keys still bring the cursor back.
   Headless Chromium hides scrollbars: launch with `ignore_default_args=['--hide-scrollbars']` to see it.
+- **Mixer meters torn on the Simple skins** (owner's screenshot): the meters are block characters (`BLK`, the master's
+  `HB`); Share Tech Mono has none, so they came from JetBrains Mono, ~10% wider, and a lit cell pushed the rest of its
+  line right. `.mt` and the master's `.mm.m1–m3` are inline-blocks `calc(N * var(--chw))` wide, clipped at the sides only
+  (`clip-path`, so rows still overlap without seams). `--chw` is the measured advance of a character in the grid
+  (`chwSet`, per text size / skin / font load): `1ch` alone misses the body's inherited −.01em letter-spacing.
 - **Pattern view play back to before** (owner): Space plays the open phrase (as in Phrase); Shift+Space plays every
   track from the song row on. `songRow()` in the pattern view takes the pattern's row when any track on it is filled.
   The 'pattern' loop kind (`loopV`) is gone.
