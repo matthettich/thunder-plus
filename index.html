@@ -166,6 +166,10 @@ body.mob .deskmenu{display:none}
 .audrow select{flex:1 1 220px; min-width:0}
 .audrow input[type=range]{flex:1 1 200px; width:auto; min-width:120px}
 .audrow output{min-width:64px; text-align:right; font-variant-numeric:tabular-nums}
+.audrow select.mch{flex:0 0 auto; min-width:90px}
+.audrow:has(.mlat) select, .audrow:has(.mch) select:not(.mch){flex-basis:110px}   /* the port and its delay, the input and its channel, on one line */
+.audrow .mlat{display:inline-flex; align-items:center; gap:4px; color:var(--muted); flex:none}
+.audrow .mlat input{width:62px; font:inherit; font-variant-numeric:tabular-nums}
 @media (max-width:480px){ .top #bSet .setx{display:none} }   /* gear only on the cover screen (the tracker too: with the label the bar wrapped to two rows) */
 .help{position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; background:var(--bench); color:var(--ink)}
 .help .hhead{display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--side); flex:none}
@@ -237,7 +241,11 @@ body:not(.noed) .wvMobNote{display:none}
 .vrow.vact .presel{flex:1 1 auto; min-width:0; max-width:none}
 .vrow .grp{display:inline-flex; flex:none} .vrow .grp button{margin:0} .vrow .grp button+button{border-left:0}
 .vrow.vttl{margin-bottom:-2px}   /* the pad's number and kind on a line of its own, over the name and the buttons */
-@media (min-width:700px){ .vbar{flex-direction:row; flex-wrap:wrap; align-items:center} .vrow.vttl{flex:1 1 100%} .vrow.vid{flex:1 1 0; min-width:260px} .vrow.vact{flex:0 1 auto; justify-content:flex-end} .vrow.vact .presel{flex:0 1 220px} }
+.vrow.vkit{flex-wrap:wrap; row-gap:6px}   /* SLOTS and this slot's kind, at the top */
+.vrow.vkit .vel{color:var(--muted); font-size:var(--fs-2); letter-spacing:.04em; text-transform:uppercase}
+.vrow.vkit .kslotn{min-width:44px; font-variant-numeric:tabular-nums; font-weight:600}
+.vrow.vkit .lbl{color:var(--muted); font-size:var(--fs-2)}
+@media (min-width:700px){ .vbar{flex-direction:row; flex-wrap:wrap; align-items:center} .vrow.vttl, .vrow.vkit{flex:1 1 100%} .vrow.vid{flex:1 1 0; min-width:260px} .vrow.vact{flex:0 1 auto; justify-content:flex-end} .vrow.vact .presel{flex:0 1 220px} }
 .ttl{font-weight:600; font-size:var(--fs-5); white-space:nowrap}
 .lbl{color:var(--muted)}
 .pbody{display:flex; flex-direction:column; gap:10px; padding-top:8px}
@@ -818,6 +826,9 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 .trows .rv small{font-size:var(--fs-1); letter-spacing:.06em; color:var(--muted)} .trows .rv b{font-size:var(--fs-4)}
 .trows button:active{background:var(--ink); color:var(--inv)}
 .trows button.on{background:var(--pl); color:var(--inv)}
+.trows button.rec.on{background:#d8324a; color:#fff}   /* REC armed */
+.trows button.rec.cnt{animation:recblink .5s steps(2) infinite}   /* counting in */
+@keyframes recblink{50%{opacity:.35}}
 .trows button.on .rv small, .trows button.on small{color:var(--inv)}
 .toct{border-left:1px solid var(--line)}
 /* On a phone the tabs take the first line; tempo, ticks, rows and INPUT share the second. */
@@ -831,6 +842,7 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 /* patFit(): when the strip can't fit its line, it drops what is on screen elsewhere — in PAD mode LOOP and TRANSP (the
    LOOP and SEMI −/+ keys below do the same), in KEYS mode TRANSP (the top bar's TRANSPOSE ▲▼, Alt+, / Alt+.). */
 .tpat.fitsel #tSelBar, .tpat.fitxp #tXposeDn, .tpat.fitxp #tXposeUp{display:none}
+.tpat.fitsel #tMet, .tpat.fitxp #tMet{display:none}   /* no room: CLICK is in Settings → Record & play too */
 body.mob #tLoopSel{display:none}   /* the phone has LOOP (the pattern) only; LOOP SEL is for the computer */
 .tsong{border:1px solid var(--line); min-height:34px; padding:0 14px; margin:0 4px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; flex:none; white-space:nowrap; background:var(--panel)}
 .tsong:hover{border-color:var(--ink)}
@@ -1094,6 +1106,7 @@ body.sdesk .pads::before{content:'Drums'; padding:0 2px}
 body.sdesk .pads .pad:nth-child(9), body.sdesk .pads .pad:nth-child(17){margin-top:22px; position:relative; overflow:visible}
 body.sdesk .pads .pad:nth-child(9)::before{content:'Synths'; position:absolute; left:2px; top:-22px}
 body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absolute; left:2px; top:-22px}
+body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots'}   /* SLOTS past 16 (the drums / synths split above is by position; each slot's own kind shows as SYN) */
 @media (max-width:600px){ .pads{gap:9px 8px} }
 /* Mono and poly tracks: a gentle outline around each track's column in Song and Mixer (and the phrase's notes):
    pink for the one-note-at-a-time tracks, green for the polyphonic (chord) tracks. */
@@ -1732,14 +1745,16 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <button id="bMidiReset">Reset all</button>
         <div class="segrow"><span>Velocity</span><div class="seg" id="segVel"></div></div>
       </div>
-      <div class="audrow"><span>Port A</span><select id="midiOutSel0" aria-label="MIDI output port A"><option value="">None</option></select></div>
-      <div class="audrow"><span>Port B</span><select id="midiOutSel1" aria-label="MIDI output port B"><option value="">None</option></select></div>
-      <div class="audrow"><span>Port C</span><select id="midiOutSel2" aria-label="MIDI output port C"><option value="">None</option></select></div>
-      <div class="audrow"><span>Port D</span><select id="midiOutSel3" aria-label="MIDI output port D"><option value="">None</option></select></div>
+      <div class="audrow"><span>Notes in</span><select id="midiInSel" aria-label="Which MIDI input plays notes"><option value="">Every input</option></select><select id="midiInCh" class="mch" aria-label="Which channel plays notes"></select></div>
+      <div class="audrow"><span>Keys play</span><select id="midiKeysSel" aria-label="What a MIDI keyboard plays in the tracker"><option value="1">The current instrument (its pad or its MIDI gear)</option><option value="0">The pads (notes 36–43) and the selected synth</option></select></div>
+      <div class="audrow"><span>Port A</span><select id="midiOutSel0" aria-label="MIDI output port A"><option value="">None</option></select><label class="mlat" title="Gear delay for port A: how late this gear sounds after a note, in ms. Raise it if the gear sounds late against ...Thunder, lower it if early">delay <input type="number" class="numsmall" id="midiLat0" min="-50" max="200" step="1" aria-label="Gear delay for port A, in milliseconds"> ms</label></div>
+      <div class="audrow"><span>Port B</span><select id="midiOutSel1" aria-label="MIDI output port B"><option value="">None</option></select><label class="mlat" title="Gear delay for port B, in ms">delay <input type="number" class="numsmall" id="midiLat1" min="-50" max="200" step="1" aria-label="Gear delay for port B, in milliseconds"> ms</label></div>
+      <div class="audrow"><span>Port C</span><select id="midiOutSel2" aria-label="MIDI output port C"><option value="">None</option></select><label class="mlat" title="Gear delay for port C, in ms">delay <input type="number" class="numsmall" id="midiLat2" min="-50" max="200" step="1" aria-label="Gear delay for port C, in milliseconds"> ms</label></div>
+      <div class="audrow"><span>Port D</span><select id="midiOutSel3" aria-label="MIDI output port D"><option value="">None</option></select><label class="mlat" title="Gear delay for port D, in ms">delay <input type="number" class="numsmall" id="midiLat3" min="-50" max="200" step="1" aria-label="Gear delay for port D, in milliseconds"> ms</label></div>
       <div class="segrow"><span>Clock out</span><div class="seg" id="segClkOut" role="group" aria-label="Send clock to ports"></div></div>
       <div class="segrow"><span>Clock in</span><div class="seg" id="segClkIn"></div></div>
-      <div class="audrow"><span>Gear delay</span><input type="range" id="midiLat" min="-50" max="200" step="1" aria-label="How late your MIDI gear sounds, in milliseconds"><output id="midiLatV"></output></div>
-      <p class="note">Instruments set to <b>MIDI</b> (INST › OUTPUT) play on their <b>PORT</b> (A–D) and channel. Pick which cable each port is here: the song keeps only the letter, so it plays the same on the phone and the computer with each one's own gear. <b>Clock out</b> sends tempo, Start and Stop to the ports lit (A–D) while the song plays (from partway into the song: Song Position Pointer and Continue). <b>Clock in</b> follows another device's clock: its Start and Stop run PLAY (Continue after a Song Position Pointer plays from there), and its tempo sets ours. <b>Gear delay</b>: how long your hardware takes to sound after a MIDI note; raise it if the gear sounds late against ...Thunder, lower it if early.</p>
+      <div class="audrow"><span>Clock from</span><select id="midiClkSel" aria-label="Which MIDI input Clock in follows"><option value="">The first input that sends clock</option></select></div>
+      <p class="note"><b>Notes in</b>: which input and channel play notes and knobs (the others are ignored, so gear that sends its own notes or echoes ours can't play the pads). <b>Keys play</b>: in the tracker a keyboard plays the instrument you're on (a MIDI instrument plays its gear, with bend, mod wheel, aftertouch and sustain passed through); or the pads, as on the Synth page. Instruments set to <b>MIDI</b> (INST › OUTPUT) play on their <b>PORT</b> (A–D) and channel. Pick which cable each port is here: the song keeps only the letter, so it plays the same on the phone and the computer with each one's own gear. <b>Delay</b> (per port): how long that gear takes to sound after a note; raise it if the gear sounds late against ...Thunder, lower it if early. <b>Clock out</b> sends tempo, Start and Stop to the ports lit (A–D) while the song plays (from partway into the song: Song Position Pointer and Continue). <b>Clock in</b> follows another device's clock: its Start and Stop run PLAY (Continue after a Song Position Pointer plays from there), and its tempo sets ours. <b>Clock from</b>: the input to follow; the first one keeps it until it goes quiet, so two devices sending clock can't double the tempo.</p>
       <p class="note" id="midiNote">Plug a controller in (USB-C on the phone), tap Connect MIDI, and pads 00–07 answer notes 36–43; other notes play the selected synth. Tap <b>Learn</b>, then: tap any pad (drums or synths) and hit a key to give it that note, or touch any slider and turn a knob to put it on that knob. A knob works the slider for whichever pad, layer or effect is open. Select a pad or slider in Learn and tap <b>Unlearn</b> to clear it.</p>
     </div>
   </section>
@@ -1779,6 +1794,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 
   <section class="band voice">
     <div class="bar vbar">
+      <div class="vrow vkit" id="vKit"><span class="vel">Slots</span><span class="grp" role="group" aria-label="How many slots the kit has"><button type="button" class="sm" id="kSlotDn" aria-label="Fewer slots" title="8 fewer slots (the ones taken away keep their sound: more slots bring it back)">−</button><button type="button" class="sm kslotn" id="kSlotN" title="How many slots (pads) the kit has, 16 to 64. Tap to type a number">16</button><button type="button" class="sm" id="kSlotUp" aria-label="More slots" title="8 more slots">+</button></span><span class="vel">This slot</span><div class="seg" id="vKindSeg" role="group" aria-label="How this slot plays"></div><span class="lbl" id="vKindLbl"></span></div>
       <div class="vrow vttl"><span class="ttl" id="vNum">Pad 1</span><span class="vmeter" id="vMeter" title="Level of what you play here (pads, keys, MIDI), −48 to +6 dB. The line is 0 dB: past it the bar turns red and the safety limiter (Project → LIMITER) is holding the peaks down." aria-hidden="true"><i></i><b></b></span></div>
       <div class="vrow vid"><input id="vName" type="text" aria-label="Pad name" spellcheck="false"><button class="sm play" id="vPlay" title="Play this pad (Space)"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</button></div>
       <div class="vrow vact">
@@ -1931,6 +1947,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="tpat" id="tPat">
       <span class="tclk" id="tClk" title="Tempo and lines per beat · double-click a number to type it (TPO changes the tempo as the song plays; ticks are in Settings)"><b id="tClkB" class="tce" data-k="bpm">120</b><small>BPM</small><b id="tClkT" class="tce" data-k="lpb">4</b><small>LPB</small><span class="tdots" id="tDots"></span></span>
       <span class="trows" role="group" aria-label="Rows in this phrase"><button type="button" id="tRowsDn" aria-label="Fewer rows">−</button><button type="button" id="tRowsV" class="rv" aria-label="Rows in this phrase"><small id="tRowsP">ROWS</small><b id="tRowsN">16</b></button><button type="button" id="tRowsUp" aria-label="More rows">+</button></span>
+      <span class="trows" id="tRecBar" role="group" aria-label="Record and metronome"><button type="button" id="tRec" class="rv rec" aria-pressed="false" aria-label="Record" title="REC: a MIDI keyboard (or, while playing, the computer keys) writes notes into the phrase. Stopped: each note or chord goes at the cursor, which moves down when you let go. Playing: notes land on the step they were played on, in the track under the cursor (F9 or Alt+R)"><small>REC</small><b id="tRecN">OFF</b></button><button type="button" id="tMet" class="rv" aria-pressed="false" aria-label="Metronome" title="Metronome: a click on every beat, higher on the bar. Settings → Record &amp; play: on while recording only, or always, its level, and the count-in (Alt+M)"><small>CLICK</small><b id="tMetN">REC</b></button></span>
       <span class="trows toct" id="tOct" role="group" aria-label="Octave for note entry" hidden><button type="button" id="tOctDn" aria-label="Octave down">−</button><button type="button" id="tOctV" class="rv" aria-label="Octave, tap to reset to 4" title="Octave for typed and keypad notes (− and = on a keyboard) · tap for 4"><small>OCT</small><b id="tOctN">4</b></button><button type="button" id="tOctUp" aria-label="Octave up">+</button></span>
       <span class="trows" id="tSelBar" role="group" aria-label="Loop, and transpose the selection"><button type="button" id="tLoop" class="rv" aria-label="Loop the pattern" title="Loop the pattern: the song repeats the row it is on (the pattern you are looking at) until you turn it off or move to another row; a phrase played on its own repeats anyway (Alt+L)"><small>LOOP</small><b id="tLoopN">OFF</b></button><button type="button" id="tLoopSel" class="rv" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Shift+Alt+L)"><small>LOOP SEL</small><b id="tLoopSelN">OFF</b></button><button type="button" id="tXposeDn" class="rv" aria-label="Transpose selection down a semitone" title="Transpose the selection down a semitone (Alt+,)"><small>TRANSP</small><b>−</b></button><button type="button" id="tXposeUp" class="rv" aria-label="Transpose selection up a semitone" title="Transpose the selection up a semitone (Alt+.)"><small>TRANSP</small><b>+</b></button></span>
     </div></div>
@@ -2134,6 +2151,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   </div>
   <input type="file" id="projIn" accept=".json,application/json,text/plain,application/octet-stream" hidden><input type="file" id="presetIn" accept=".json,application/json" hidden>
   <input type="file" id="chainsIn" accept=".json,application/json" hidden>
+  <input type="file" id="midIn" accept=".mid,.midi,.smf,audio/midi,audio/x-midi" hidden>
 </div>
 <input type="file" id="fileIn" accept="audio/*,.wav,.mp3,.ogg,.m4a,.flac" hidden>
 <div class="mstwin" id="mstWin" hidden role="dialog" aria-modal="true" aria-label="Mastering">
@@ -2192,7 +2210,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <h3>Settings</h3>
 <p><b>⚙ Settings</b> at the top: it starts with Audio (output device, level, latency, rate), then this screen’s own settings (in the tracker every Project setting: Song, Input, Screen, Render), then Master, Skin, Export, MIDI, Kit and App (Mobile, install, check for update). There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), show or hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD; it starts hidden on a computer and shown in the Mobile setup), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound, the <b>…chains</b> controls you have added for the current track (in …chains, right-click a control or a module → Add to the bottom panel; right-click one in the panel to remove it), the current track’s effects, and a channel strip for the current track (stereo meter, fader with 0 dB at E0 and +6 dB at the top, pan, M and S). When it holds more than fits, the panel scrolls sideways. Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. On a big screen the space beside the grid is the <b>stage</b> (Settings → STAGE): BY SCREEN shows something useful for each screen (the dogs dance to the beat on Song and Project — a hop every beat, a bigger one on the bar, and a new dance (arms up, arms down, leg kicks, jumping jacks) every time the cursor’s track starts a phrase, so they count beats and phrases for you — Sect previews the phrase, Phrase shows a piano lighting the notes as they play, Inst the waveform, Mixer the master spectrum, FX the effects chain), DOGS shows the dogs everywhere, OFF leaves it empty. In the bar above the grid, double-click the tempo or LPB to type a new one (ticks a step are in Settings). The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value.</p>
 <h3>Drum pads and synths</h3>
-<p>The kit has 16 slots. <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song. <b>A voice per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
+<p>The kit has 16 slots to start, up to 64: <b>SLOTS</b> at the top of the Synth page (− and + step by 8, tap the number to type one; fewer slots only hide the last ones, and their sounds come back). <b>THIS SLOT</b> sets how the selected slot plays: <b>ONE-SHOT</b> plays its whole sound, like a drum; <b>HELD</b> sounds until note-off, like a synth. By default: <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song. <b>A voice per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chopping breaks</h3>
 <p>Load a drum loop into a pad (Synth → Load sample), then on its instrument (<b>INST</b>) set <b>SLICES</b> (GRID cuts equal parts, HITS cuts at each drum hit it finds). Each note now plays one slice: C-4 the first, C#4 the second and so on, so you can rearrange the break in a phrase. <b>SYNC</b> fits the loop to the song tempo: set <b>BEATS</b> to how long the loop is (or use › GUESS BEATS). REPITCH changes its speed and pitch together; STRETCH keeps the pitch with smooth grains; LOOP keeps the pitch with little tempo-synced loops for a gritty, stuttery sound (<b>GRAIN</b> sets their length). › PLAY SLICES auditions them in order.</p>
 <h3>Chords and polyphony</h3>
@@ -2200,14 +2218,16 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <h3>Two input modes</h3>
 <p><b>PAD</b> is a d-pad plus SHIFT, PLAY, OPTION and EDIT, good with a thumb. <b>KEYS</b> is direct entry: type notes, hex and effects, with an on-screen keypad on touch screens. The keyboard works in both — in PAD mode Z and X stay OPTION and EDIT and Alt+arrows page; everything else types as in KEYS. Switch with ⚙ Settings → Input (or Project → INPUT).</p>
 </section>
-    <section id="hAll"><h2>Keys that work everywhere</h2><table><tr><td><kbd>?</kbd> or <kbd>F1</kbd></td><td>Open or close this help</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>S</kbd></td><td>Save the project (writes back to the same file where the browser allows)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Ctrl/⌘</kbd> <kbd>S</kbd></td><td>Save As: a new file</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>O</kbd></td><td>Open a project file</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Z</kbd> / <kbd>Ctrl/⌘</kbd> <kbd>Y</kbd></td><td>Undo / redo, for tracker edits and for sound edits on the Synth page (also <kbd>Shift</kbd> <kbd>Ctrl/⌘</kbd> <kbd>Z</kbd>, or File ▾ → Undo). A paste or cut undoes in one step</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Song, Sect, Phrase, Inst, Mixer, FX, Project · <kbd>Alt</kbd> <kbd>0</kbd> back to the synth</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>arrows</kbd></td><td>Change screen (▲ Project, ▼ Mixer, ◀▶ along every screen: Song, Sect, Phrase, Inst, Mixer, FX, Project)</td></tr><tr><td><kbd>F2</kbd> <kbd>F3</kbd> <kbd>F4</kbd></td><td>Phrase, Mixer, Inst</td></tr><tr><td><kbd>F5</kbd> <kbd>F6</kbd> <kbd>F7</kbd> <kbd>F8</kbd></td><td>Play song from the top · play this screen · song from the cursor row · stop</td></tr></table></section>
+    <section id="hAll"><h2>Keys that work everywhere</h2><table><tr><td><kbd>?</kbd> or <kbd>F1</kbd></td><td>Open or close this help</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>S</kbd></td><td>Save the project (writes back to the same file where the browser allows)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Ctrl/⌘</kbd> <kbd>S</kbd></td><td>Save As: a new file</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>O</kbd></td><td>Open a project file</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Z</kbd> / <kbd>Ctrl/⌘</kbd> <kbd>Y</kbd></td><td>Undo / redo, for tracker edits and for sound edits on the Synth page (also <kbd>Shift</kbd> <kbd>Ctrl/⌘</kbd> <kbd>Z</kbd>, or File ▾ → Undo). A paste or cut undoes in one step</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Song, Sect, Phrase, Inst, Mixer, FX, Project · <kbd>Alt</kbd> <kbd>0</kbd> back to the synth</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>arrows</kbd></td><td>Change screen (▲ Project, ▼ Mixer, ◀▶ along every screen: Song, Sect, Phrase, Inst, Mixer, FX, Project)</td></tr><tr><td><kbd>F2</kbd> <kbd>F3</kbd> <kbd>F4</kbd></td><td>Phrase, Mixer, Inst</td></tr><tr><td><kbd>F5</kbd> <kbd>F6</kbd> <kbd>F7</kbd> <kbd>F8</kbd></td><td>Play song from the top · play this screen · song from the cursor row · stop</td></tr><tr><td><kbd>F9</kbd> or <kbd>Alt</kbd> <kbd>R</kbd></td><td>REC on or off (record from a MIDI keyboard, or the keys as it plays)</td></tr><tr><td><kbd>Alt</kbd> <kbd>M</kbd></td><td>Metronome: while recording, always, off</td></tr></table></section>
     <section id="hKeys"><h2>Tracker · KEYS mode</h2><h3>From PAD mode</h3><table><tr><td>SHIFT + ◀▶ / ▲▼ (screens)</td><td><kbd>Alt/⌥</kbd> <kbd>arrows</kbd></td></tr><tr><td>SHIFT + ▲▼ (select)</td><td><kbd>Shift</kbd> <kbd>arrows</kbd>: ▲▼ lines, ◀▶ cells</td></tr><tr><td>EDIT</td><td><kbd>Enter</kbd> (on a filled note it picks it up) · <kbd>Shift</kbd> <kbd>Enter</kbd> stamps over it, as EDIT does</td></tr><tr><td>EDIT + arrows</td><td><kbd>Ctrl/⌘</kbd> <kbd>arrows</kbd>: change the value</td></tr><tr><td>OPTION + arrows</td><td><kbd>Shift</kbd> <kbd>Alt</kbd> <kbd>arrows</kbd>: the same moves · <kbd>[</kbd> <kbd>]</kbd> step by number</td></tr><tr><td>OPTION · OPTION + EDIT</td><td><kbd>Ctrl/⌘</kbd> <kbd>C</kbd> copy · <kbd>Ctrl/⌘</kbd> <kbd>X</kbd> cut · <kbd>Delete</kbd> clear</td></tr><tr><td>SHIFT + OPTION</td><td><kbd>Ctrl/⌘</kbd> <kbd>B</kbd>: start a selection</td></tr><tr><td>SHIFT + EDIT</td><td><kbd>Ctrl/⌘</kbd> <kbd>V</kbd>: paste</td></tr><tr><td>PLAY · SHIFT + PLAY</td><td><kbd>Space</kbd> · <kbd>Shift</kbd> <kbd>Space</kbd></td></tr><tr><td>LOOP · SEMI − +</td><td><kbd>Alt</kbd> <kbd>L</kbd> · <kbd>Alt</kbd> <kbd>,</kbd> <kbd>Alt</kbd> <kbd>.</kbd></td></tr><tr><td>CLN · CLN↓ (Song)</td><td><kbd>Ctrl/⌘</kbd> <kbd>D</kbd> · <kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>D</kbd></td></tr><tr><td>UNDO · REDO</td><td><kbd>Ctrl/⌘</kbd> <kbd>Z</kbd> · <kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>Z</kbd> (or <kbd>Ctrl/⌘</kbd> <kbd>Y</kbd>)</td></tr><tr><td>The command row</td><td>Edit ▾ in the top bar, a right-click on the screen, or View ▾ → COMMAND BAR (buttons; hover one for its key)</td></tr></table><h3>Moving</h3><table><tr><td><kbd>arrows</kbd></td><td>Move the cursor (drops a line selection)</td></tr><tr><td><kbd>Alt/⌥</kbd> <kbd>◀</kbd> <kbd>▶</kbd></td><td>Previous / next screen, in tab order (Song → … → Inst → Mixer → FX → Project); <kbd>Alt/⌥</kbd> <kbd>▲</kbd> Project, <kbd>▼</kbd> Mixer. From Phrase, Alt/⌥+◀ gives Arrange the keys. Option moves, Command edits</td></tr><tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd> <kbd>Tab</kbd></td><td>Next / previous column (phrase) or track</td></tr><tr><td><kbd>Home</kbd> <kbd>End</kbd> <kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>Top, bottom, 16 rows up or down</td></tr><tr><td><kbd>Shift</kbd> <kbd>Alt</kbd> <kbd>arrows</kbd></td><td>In a phrase: the phrase above / below on this track (▲▼) or left / right on this row (◀▶), as laid out on the Song grid (PAD mode's OPTION+arrows). On the Song: jump to the next block that way</td></tr><tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Previous / next sect, phrase, instrument or FX track, by number</td></tr><tr><td><kbd>◀</kbd> <kbd>▶</kbd> on the FX screen</td><td>Open the slot's controls · back to the slot list</td></tr><tr><td>Mouse wheel</td><td>Scroll the screen a row at a time</td></tr></table><h3>Typing</h3><table><tr><td><kbd>Z</kbd> <kbd>S</kbd> <kbd>X</kbd> … <kbd>/</kbd></td><td>Notes, lower octave (S D G H J are the sharps); on tracks 9–16, Tab to N2–N4 to add chord notes</td></tr><tr><td><kbd>Q</kbd> <kbd>2</kbd> <kbd>W</kbd> … <kbd>P</kbd></td><td>Notes, upper octave</td></tr><tr><td><kbd>1</kbd> or <kbd>Caps Lock</kbd></td><td>Note off</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd> or numpad <kbd>/</kbd> <kbd>*</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>0</kbd>–<kbd>9</kbd> <kbd>A</kbd>–<kbd>F</kbd></td><td>Hex values: two digits, or one for an instrument</td></tr><tr><td>Letters</td><td>Commands in FX columns (press again to cycle: R gives RET, REP, RND, RNL)</td></tr><tr><td><kbd>{</kbd> <kbd>}</kbd></td><td>Edit step down / up: how far the cursor moves after you type</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>arrows</kbd></td><td>Change the value (◀▶ by 1, ▲▼ by more); on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀), up to four</td></tr><tr><td><kbd>Enter</kbd></td><td>Add, open, or run a › row · twice for a new sect or phrase · in a phrase, on a filled note, picks up that note and its instrument as the current ones, so Enter on an empty note adds them (until you've chosen an instrument, new notes take the highest instrument number already in the phrase); on an instrument, volume or effect, picks it up as the current value (shown after NOW on the hint line)</td></tr></table><h3>Rows</h3><table><tr><td><kbd>Delete</kbd> <kbd>Backspace</kbd></td><td>Clear the cell under the cursor, or the whole highlighted selection</td></tr><tr><td><kbd>Shift</kbd> <kbd>Delete</kbd> <kbd>Shift</kbd> <kbd>Backspace</kbd></td><td>Clear the whole row, then step down</td></tr><tr><td><kbd>Insert</kbd></td><td>Add a blank row (rows below move down)</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>Backspace</kbd></td><td>Remove the row (rows below move up)</td></tr></table><h3>Selecting, copy and paste</h3><table><tr><td><kbd>Shift</kbd> <kbd>▲</kbd> <kbd>Shift</kbd> <kbd>▼</kbd></td><td>Select whole lines in Song, Sect and Phrase. The first press takes the cursor’s line, the next ones grow it</td></tr><tr><td><kbd>Shift</kbd> <kbd>◀</kbd> <kbd>Shift</kbd> <kbd>▶</kbd></td><td>Select cells sideways from the cursor; then Shift+▲▼ grows that block up and down (on screens with nothing to select they move like plain arrows; Alt/⌥ arrows change screen)</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>A</kbd></td><td>Select every line</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>B</kbd></td><td>Start a block selection; arrows grow it</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>C</kbd> <kbd>Ctrl/⌘</kbd> <kbd>X</kbd></td><td>Copy / cut the selection</td></tr><tr><td><kbd>Ctrl/⌘</kbd> <kbd>V</kbd></td><td>Paste at the cursor row, or over a selection from its top. Lines paste into any phrase</td></tr><tr><td><kbd>Esc</kbd></td><td>Drop the selection</td></tr><tr><td>Row numbers</td><td>Tap or click one to select that line; another to grow the selection to it</td></tr></table><h3>Playing</h3><table><tr><td><kbd>Space</kbd></td><td>Play or stop this screen (phrase, sect or song)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the song from the cursor row</td></tr><tr><td><kbd>Alt</kbd> <kbd>L</kbd></td><td>Loop the pattern (LOOP): the song repeats the row it is on. <kbd>Shift</kbd> <kbd>Alt</kbd> <kbd>L</kbd> loops the selection (LOOP SEL): PLAY then loops those rows</td></tr><tr><td><kbd>Alt</kbd> <kbd>,</kbd> <kbd>Alt</kbd> <kbd>.</kbd></td><td>Transpose the phrase selection down / up a semitone</td></tr></table></section>
     <section id="hPad"><h2>Tracker · PAD mode</h2><table><tr><td>Arrows</td><td>Move</td></tr><tr><td>SHIFT + ◀▶</td><td>Change screen (through every screen in tab order)</td></tr><tr><td>SHIFT + ▲▼</td><td>In Song, Sect and Phrase: select the cursor's line, then grow the selection a line at a time (OPTION copies, OPTION+EDIT cuts). On the other screens: Project / Mixer</td></tr><tr><td>EDIT</td><td>Add, or run a › row · in a phrase, on a filled note stamps the current note and instrument over it; on an instrument, volume or effect, picks it up · tap twice for a new sect or phrase, or a note off</td></tr><tr><td>EDIT + arrows</td><td>Change the value (◀▶ by 1, ▲▼ by more)</td></tr><tr><td>OPTION + EDIT</td><td>Clear (with a selection: cut)</td></tr><tr><td>OPTION + arrows</td><td>Other sect, phrase, instrument or FX track · on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀) · in Song, page up/down</td></tr><tr><td>OPTION + arrows in Phrase</td><td>Go to the phrase above / below on this track (▲▼) or to the left / right on this row (◀▶), as laid out on the Song grid. A phrase not in the song steps by number. (Settings → Input → PATTERN NAV; off: ▲▼ jump 16 phrases)</td></tr><tr><td>SHIFT + OPTION + arrows</td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in KEYS mode</td></tr><tr><td>SHIFT + OPTION</td><td>Start or cancel a selection; arrows grow it, OPTION copies</td></tr><tr><td>SHIFT + EDIT</td><td>Paste</td></tr><tr><td>PLAY · SHIFT + PLAY</td><td>Play this screen · play the song · with LOOP on, PLAY loops the selected rows</td><tr><td>LOOP · SEMI +/−</td><td>Loop the selection (sticky) · transpose the phrase selection ±1 semitone at once</td></tr><tr><td>◀ ▶ on the FX screen</td><td>Open a slot's controls · back to the slot list (a sideways swipe does it too)</td></tr><tr><td>EDIT on an FX slot</td><td>A list of every effect (like the FX command list): pick one and its controls open; its own effect, marked NOW, keeps its settings; --- empties the slot</td></tr><tr><td>Row numbers</td><td>Tap to select whole lines, then COPY and PASTE</td></tr></table><p><b>One finger is enough.</b> With <b>Sticky keys</b> on, tap SHIFT or OPTION alone and it stays lit for the next button. The <b>command row</b> (Project → COMMANDS) gives every two-key command its own button: change, prev/next, clear, select, copy, cut, paste, play song, and on the SONG screen CLN↓ (clones the block, or the selected blocks, into new numbers on the row below) and CLN (clone): the block under the cursor is copied, phrases and all, to the next free number.</p><p>On a computer keyboard in PAD mode the keyboard is not disabled: arrows move, <kbd>Enter</kbd> opens, <kbd>Space</kbd> plays, typing letters and hex edits the cell, and <kbd>Shift</kbd> selects lines. <kbd>Z</kbd> stays OPTION (not a note), <kbd>X</kbd> stays EDIT, and <kbd>Alt</kbd>+arrows page (OPTION+arrow) rather than change the value.</p><h3>Touch</h3><p>Tap a cell to move there; tap it again to open or add. Drag up or down on the cursor’s cell to change its value; drag elsewhere to scroll.</p></section>
     <section id="hFx"><h2>FX column commands</h2>
 <p>Each phrase row has three effect columns: a command and a hex value. The info line at the bottom of the screen explains the one under the cursor.</p>
-<div class="fxg"><div><code>BYP</code>…chains module X (the number on its BYP button; 0 = all) in (Y 0), bypassed (Y 1), or the other way from the patch for Y rows then back</div><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FLX</code>Flex pattern: 00 off, 01–10</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>retrigger every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row Y</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div><div><code>CCA</code>–<code>CCD</code>MIDI CC: 00–7F to the instrument’s CC slot A–D (the CC numbers are on INST)</div><div><code>PGM</code>MIDI program change 00–7F, just before the row’s note</div></div>
+<div class="fxg"><div><code>CSL</code>MIDI CC glide: the <code>CCA</code>–<code>CCD</code> commands on the same row move to their value over XY ticks instead of jumping (00: across the step), from the value sent before</div><div><code>DIR</code>play direction for this track from the next row on: 00 forward, 01 backwards, 02 ping-pong, 03 a random row each step (a phrase still lasts as many steps as it has rows)</div><div><code>BYP</code>…chains module X (the number on its BYP button; 0 = all) in (Y 0), bypassed (Y 1), or the other way from the patch for Y rows then back</div><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FLX</code>Flex pattern: 00 off, 01–10</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>retrigger every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row Y</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div><div><code>CCA</code>–<code>CCD</code>MIDI CC: 00–7F to the instrument’s CC slot A–D (the CC numbers are on INST)</div><div><code>PGM</code>MIDI program change 00–7F, just before the row’s note</div></div>
 <p><b>MIDI instruments</b> (INST › OUTPUT MIDI or PAD+MIDI) send to their <b>PORT</b> A–D: ⚙ Settings → MIDI says which cable each letter is on this device, so a song plays the same on the phone and the computer. <code>CCA</code>–<code>CCD</code> and <code>PGM</code> work on rows without a note too (on the track’s last instrument), and <code>RND</code>, <code>RNL</code> and <code>REP</code> change them like any command. <code>PSL</code>, <code>PBN</code>, <code>PVB</code>, <code>PIT</code>/<code>FIN</code> on a held note and fractions of a semitone are sent as pitch bend: set INST › <b>BEND RANGE</b> to the range your gear bends. <code>ARP</code> plays its steps as notes, then the note itself again (unless the next row retunes it or plays another note).</p>
 <p><b>LFO → CC:</b> INST › <b>LFO CC</b> (set a CC number) runs an LFO on that CC while the song plays: SHAPE, RATE in time with the song (T triplet, D dotted), DEPTH (127 is the whole range), CENTRE, and RESTART (FREE from PLAY, NOTE at each of the instrument’s notes). <b>Song position:</b> with clock out on, playing the song from a row partway into a block sends Song Position Pointer and Continue, so the gear starts at the same place; with clock in on, the other device’s Continue after a Song Position Pointer plays the song from there.</p>
+<p><b>Playing and recording from a MIDI keyboard:</b> ⚙ Settings → MIDI → <b>Keys play</b>: in the tracker the keyboard plays the instrument you're on (the INST screen's, or the cursor row's in a phrase) and holds it while the key is down; a MIDI instrument plays its gear, with bend, aftertouch, sustain and every unlearned knob passed through. <b>Notes in</b> picks the input and channel, <b>Clock from</b> the input Clock in follows, and each port has its own <b>delay</b>. <b>REC</b> on the top strip (F9): stopped, a note or chord goes in at the cursor and the cursor moves on when you let go; playing, notes land on the step they were played on in the track under the cursor, with velocity and OFFs (a take is one undo step). <b>CLICK</b> is the metronome; Settings → <b>Record &amp; play</b> has its level, the count-in, REC TIMING (STEP, or TICKS: the step plus a <code>DEL</code>) and LIVE TRANSPOSE (a key transposes the KEY FOLLOW instruments as the song plays).</p>
+<p><b>More for sequencing:</b> on a poly track each note column is its own MIDI voice. INST › <b>NOTE LEN</b> ends a MIDI instrument's notes after some ticks; <b>ECHO</b> repeats them on the gear (time, fade, pitch per repeat); <b>KEY FOLLOW</b> instruments follow the song's <b>SCALE</b> (Project → Song) and live transpose; <b>HUMAN TIME</b> and <b>HUMAN VEL</b> vary each note. <code>CSL</code> makes a row's CC commands glide; <code>DIR</code> plays a track backwards, ping-pong or at random. Edit ▾ → <b>Euclidean fill…</b> spreads hits evenly over steps. File ▾ → <b>Export MIDI file</b> writes the song as a .mid (drum pads on channel 10) and <b>Import MIDI file…</b> brings one in as phrases. There are 64 instruments (00–3F).</p>
 <h3>The master column (MST)</h3>
 <p>On the Song screen, the amber <b>MST</b> column after the poly tracks plays phrases whose commands drive the <b>master bus</b>: <code>VOL</code> sets the master level from that row on, and <code>FXO</code>, <code>FLX</code>, <code>GAT</code> and <code>RTG</code> work on the master's effects (Mixer → master → FX). Master phrases are their own kind: just the three command columns (no notes, volume or instrument), and the command list offers only what works on the master: VOL, FXO, FLX, GAT, RTG, then TPO, TIC, GGR, HOP, DEL, CHA, NTH, REP, RND, RNL and SED. Beside the grid on a big screen, the master's effect chain shows instead of the piano. It plays alongside the tracks, block by block, and is not shown in Arrange. Stopping puts the master level and every switched effect back as set.</p>
 <p><b>Momentary effects:</b> put an effect in a slot and leave it off, then <code>FXO 21</code> switches slot 2 on, <code>FXO 20</code> off again, or <code>FXO 24</code> turns it on for four rows. It works on any track (that track's slots) and in the MST column (the master's). Switching fades over 5 ms; Flex keeps listening while it is off, so it always has the last bar ready.</p>
@@ -3283,10 +3303,15 @@ function blockPeaks(a){ const n = Math.ceil(a.length / VUB), e = new Float32Arra
 // With a voice per track (vtrk, the settings checkbox), every song track gets its own pad: mono tracks
 // 1–16 drum pads, poly tracks 17–32 synth pads. Off, the kit stays at the classic 16 slots.
 // (The slot helpers live with the song state below, next to ntr(), because they read it.)
-const NPAD = 8; let NSLOT = 16;
+// SLOTS (20 Oct): the kit has NSLOT slots, 16 to MAXSLOT (Synth page, top: SLOTS), kept in the kit (kit.slots); a voice per
+// track still sizes it from the tracks instead. Each slot plays as a ONE-SHOT (a drum: the whole sound) or HELD (a synth:
+// until note-off): kit.held[i] when it has been set, else slots 1–8 one-shot and the rest held, as before.
+const NPAD = 8, MAXSLOT = 64; let NSLOT = 16;
 const VTRK = 'thunderplus-vtrk-v1';
 let vtrk = (() => { try { return localStorage.getItem(VTRK) === '1'; } catch(e){ return false; } })();
-const isSyn = i => i >= NPAD;
+// slotHeld: the kit's kinds (kit.held), kept in step by the page (syncHeld), since this block can't see the kit.
+let slotHeld = null;
+const isSyn = i => slotHeld && typeof slotHeld[i] === 'boolean' ? slotHeld[i] : i >= NPAD;
 // How long a held synth note fades when it is let go (a tracker note-off, a pad or key let go), in seconds. Layers: the
 // Voice amp's release when it is on as an ADSR, else the longest ADSR layer's release. Bass, Voice and the engines with
 // a Release (Dampers on Piano and Tine EP; frames on Chip): their own. Before 18 Oct every engine faded over its hidden
@@ -6731,6 +6756,9 @@ function fromPos(d, p){
 
 /* ---------- state ---------- */
 let kit = loadSaved() || factoryKit();
+NSLOT = kit.slots = kitSlots(kit);   // SLOTS
+function syncHeld(){ slotHeld = Array.isArray(kit.held) ? kit.held : null; }
+syncHeld();
 setTimeout(() => resolveSamples(), 0);   // samples saved in IndexedDB arrive just after start-up
 WV.doc = kit.waves || null;
 let cur = 0;
@@ -7305,6 +7333,66 @@ $('vInit').addEventListener('click', () => { const n = V().name; kit.voices[cur]
 $('vCopy').addEventListener('click', () => { clipVoice = JSON.stringify(voiceToJSON(V())); toast('Copied pad ' + hx(cur)); });
 $('vPaste').addEventListener('click', () => { if (!clipVoice) return toast('Copy a pad first'); kit.voices[cur] = voiceFromJSON(JSON.parse(clipVoice)); afterVoiceSwap(); toast('Pasted into pad ' + hx(cur)); });
 function afterVoiceSwap(){ changed(cur); refreshAll(); }
+
+/* ---------- SLOTS and slot kind (20 Oct; the top of the Synth page) ----------
+   SLOTS: 16 to 64 slots in steps of 8 (tap the number to type one). More slots add simple synths (or bring back the
+   sounds of slots taken away earlier: fewer slots only hide them); the tracker's instruments 10–3F that nothing uses yet
+   follow, so instrument N plays slot N. THIS SLOT: ONE-SHOT plays the whole sound (a drum), HELD sounds until note-off,
+   up to Max len (a synth). Both are undoable kit changes. With a voice per track on, the tracks set the slots. */
+function slotVoice(i){
+  return isSyn(i) ? mkVoice('Synth ' + (i + 1), [{type:'saw', mode:'ADSR', atk:2, dec:400, sus:0.7, rel:200, lpCut:3000, level:0.7}], {tune:24, len:6, gate:400})
+    : mkVoice('Pad ' + (i + 1), [{type:'sine', b:0.25, pAmt:24, pDec:50, atk:0.1, dec:400}]);
+}
+function kitStep(){ try { kitFlush(); undo.past.push({k:'K', j:kitUndoJSON()}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; } catch(e){} }
+function setSlots(n){
+  if (vtrk) return toast('A voice per track is on (Settings → Kit): the kit has a slot for every track. Turn it off to set SLOTS.', 5000);
+  n = clamp(Math.round(n), 16, MAXSLOT); if (n === NSLOT){ slotsUI(); return; }
+  kitStep();
+  const was = NSLOT; NSLOT = kit.slots = n;
+  for (let i = Math.min(was, n); i < Math.max(was, n); i++){ dirty[i] = true; cache[i] = null; }
+  try { instFit(); } catch(e){}
+  if (n > was){ growKit(); toast(`${n} slots: ${hx(was)}–${hx(n - 1)} are new synths (THIS SLOT makes one a one-shot drum).`, 4000); }
+  else { if (cur >= n) cur = n - 1; buildPads(); refreshAll(); save();
+    let far = []; try { far = S.insts.map((I, k) => I.pad >= n ? hx(k) : null).filter(Boolean); } catch(e){}
+    toast(`${n} slots. The sounds of ${hx(n)}–${hx(was - 1)} are kept: more slots bring them back.` + (far.length ? ` Instrument${far.length > 1 ? 's' : ''} ${far.slice(0, 6).join(', ')}${far.length > 6 ? '…' : ''} play past the last slot and stay silent until then.` : ''), 6000); }
+  slotsUI(); try { draw(); } catch(e){}
+}
+// Instruments 10 and up that nothing uses yet, still as they were made, follow the slot count: instrument k plays slot k
+// while there is one, else slot k % SLOTS (as a new song makes them). Not an undo step: nothing anyone set changes.
+function instFit(){
+  if (typeof S === 'undefined' || !S || !S.insts) return;
+  const used = new Set(); for (const ph of S.phrases) if (ph) for (const r of ph){ if (r[IC] >= 0) used.add(r[IC]); for (let m = FX0; m < RW; m += 2) if (FXC[r[m]] === 'INS') used.add(r[m + 1]); }
+  const plain = (I, k) => { const a = Object.assign({}, I), b = freshInst(k); delete a.pad; delete b.pad; delete a.kf; delete b.kf; return JSON.stringify(a) === JSON.stringify(b); };
+  const n = nslots(); let ch = false;
+  for (let k = 16; k < NI; k++){ const I = S.insts[k], want = k < n ? k : k % n; if (!I || I.pad === want || used.has(k) || !plain(I, k)) continue;
+    if (I.pad !== k && I.pad !== k % 16 && I.pad < n) continue;   // pointed somewhere on purpose
+    I.pad = want; I.kf = isSyn(want) ? 1 : 0; ch = true; }
+  if (!ch) return;
+  if (!undo.pend) undo.cur = JSON.stringify(S);   // part of the kit change, not a song edit of its own
+  clearTimeout(sT); sT = setTimeout(() => storeWrite(TK, JSON.stringify(S)), 600); songVer++;
+}
+function setSlotKind(i, held){
+  if (isSyn(i) === !!held) return;
+  kitStep();
+  if (!Array.isArray(kit.held)) kit.held = [];
+  while (kit.held.length <= i) kit.held.push(null);
+  kit.held[i] = !!held; syncHeld(); dirty[i] = true; cache[i] = null;
+  changed(i); buildPads(); refreshAll(); slotsUI();
+  toast(`Slot ${hx(i)} is ${held ? 'HELD now: it sounds until a note-off (up to Max len), like a synth' : 'ONE-SHOT now: it plays its whole sound, like a drum'}.`, 4000);
+}
+const updKind = makeSeg($('vKindSeg'), [[false, 'One-shot'], [true, 'Held']], () => isSyn(cur), v => setSlotKind(cur, v));
+function slotsUI(){
+  const b = $('kSlotN'); if (!b) return;
+  b.textContent = vtrk ? nslots() : NSLOT; b.disabled = $('kSlotDn').disabled = $('kSlotUp').disabled = vtrk;
+  $('kSlotDn').disabled = vtrk || NSLOT <= 16; $('kSlotUp').disabled = vtrk || NSLOT >= MAXSLOT;
+  b.title = vtrk ? 'A voice per track is on (Settings → Kit): a slot for every track' : `The kit has ${NSLOT} slots (16 to ${MAXSLOT}). Tap to type a number`;
+  updKind(); $('vKindLbl').textContent = isSyn(cur) ? 'sounds until note-off' : 'plays its whole sound';
+}
+$('kSlotDn').addEventListener('click', () => setSlots(Math.ceil(NSLOT / 8) * 8 - 8));
+$('kSlotUp').addEventListener('click', () => setSlots(Math.floor(NSLOT / 8) * 8 + 8));
+$('kSlotN').addEventListener('click', async () => { if (vtrk) return setSlots(0);
+  const v = await askText({title:'Slots in the kit', body:`16 to ${MAXSLOT}. Fewer slots only hide the last ones: their sounds come back with more.`}, NSLOT, 3, 'Set');
+  if (v != null && Number.isFinite(+v) && v.trim() !== '') setSlots(+v); });
 
 /* ---------- layer editor ---------- */
 const sel = $('lType');
@@ -10291,6 +10379,7 @@ function padPress(i, held){
   select(i); play(i);
 }
 function refreshAll(){
+  try { slotsUI(); } catch(e){}   // SLOTS and this slot's kind
   $('vNum').textContent = (isSyn(cur) ? 'Synth ' : 'Pad ') + hx(cur);
   $('vName').value = V().name; $('kitName').value = kit.name;
   vRows.forEach(r => r.refresh()); updChoke();
@@ -10411,16 +10500,20 @@ function layerToJSON(L, noSmp){ return Object.assign({}, L, {sample: !L.sample |
 function layerFromJSON(j){ const L = freshLayer(j); L.sample = smpFromJSON(j.sample); if (!TYPE[L.type]) L.type = 'sine'; return L; }
 function voiceToJSON(v, noSmp){ return Object.assign({}, v, {layers: v.layers.map(L => layerToJSON(L, noSmp))}); }
 function voiceFromJSON(j){ const v = mkVoice(j.name || 'Pad', []); Object.assign(v, j); v.layers = (j.layers || []).slice(0, 8).map(layerFromJSON); while (v.layers.length < 8) v.layers.push(freshLayer()); v.sel = Math.min(Math.max(v.sel | 0, 0), 7); return v; }
-function kitToJSON(noSmp){ return {app:'thunder', v:1, name:kit.name, voices:kit.voices.map(v => voiceToJSON(v, noSmp)), waves:kit.waves || undefined}; }
+function kitToJSON(noSmp){ return {app:'thunder', v:1, name:kit.name, slots:kit.slots || 16, held:kit.held && kit.held.some(x => typeof x === 'boolean') ? kit.held.map(x => typeof x === 'boolean' ? x : null) : undefined,
+  voices:kit.voices.map(v => voiceToJSON(v, noSmp)), waves:kit.waves || undefined}; }
+// SLOTS: the kit's slot count (16 when the kit doesn't say: every kit before 20 Oct). Plain function, for start-up.
+function kitSlots(k){ const n = Math.round(+(k && k.slots) || 16); return Math.max(16, Math.min(MAXSLOT, n)); }
 // The saved kit is read at start-up, before nslots (a const further down) exists: calling it there threw, so the
 // saved kit was dropped for the factory one on every reload. Until it exists, count the kit's own voices.
 function slotsNow(){ try { return nslots(); } catch(e){ return NSLOT; } }
 function kitFromJSON(j){
   if (!j || !Array.isArray(j.voices) || j.voices.length < 1) throw new Error('This file isn’t a ...Thunder kit.');
-  const vs = j.voices.slice(0, Math.max(slotsNow(), 40)).map(voiceFromJSON); while (vs.length < NPAD) vs.push(mkVoice('Pad ' + (vs.length + 1), []));
+  const vs = j.voices.slice(0, MAXSLOT).map(voiceFromJSON); while (vs.length < NPAD) vs.push(mkVoice('Pad ' + (vs.length + 1), []));
   // Kits from before the synth slots get the factory synths in slots 9–16.
-  if (vs.length < Math.min(slotsNow(), NSLOT)){ const fs = factorySynths(); while (vs.length < Math.min(slotsNow(), NSLOT)) vs.push(fs[vs.length - NPAD]); }
-  return {name:j.name || 'Kit', voices:vs, waves:(j.waves && Array.isArray(j.waves.modules)) ? j.waves : undefined};
+  if (vs.length < 16){ const fs = factorySynths(); while (vs.length < 16) vs.push(fs[vs.length - NPAD]); }
+  const held = Array.isArray(j.held) ? j.held.slice(0, MAXSLOT).map(x => typeof x === 'boolean' ? x : null) : undefined;
+  return {name:j.name || 'Kit', slots:kitSlots(j), held, voices:vs, waves:(j.waves && Array.isArray(j.waves.modules)) ? j.waves : undefined};
 }
 // Grow the kit to the slot count, keeping one-to-one parity between synth voices and tracks: creating a
 // new track instantiates its voice (a drum one-shot on mono tracks, a simple synth on poly ones).
@@ -10429,7 +10522,8 @@ function growKit(){
   const n = nslots();
   while (kit.voices.length < n){
     const i = kit.voices.length;
-    if (!vtrk || i < NPAD) kit.voices.push(mkVoice('Pad ' + (i + 1), []));
+    if (!vtrk && i >= 16) kit.voices.push(slotVoice(i));   // SLOTS: a new slot is a simple synth (or a drum, by its kind)
+    else if (!vtrk || i < NPAD) kit.voices.push(mkVoice('Pad ' + (i + 1), []));
     else { const t = trackOfPad(i);
       // Mono tracks get a drum one-shot (a copy of the factory Kick's voice, renamed for the track),
       // poly tracks a simple held saw synth.
@@ -10553,10 +10647,12 @@ function kitUndoJSON(){ for (const v of kit.voices) try { vSnap(v); } catch(e){}
 // grows to fit, so every pad the song plays exists.
 function setKit(k, noUndo){
   if (!noUndo) try { kitFlush(); undo.past.push({k:'K', j:kitUndoJSON()}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; } catch(e){}
-  setTimeout(() => sfPrepare(null), 0); kit = k; setTimeout(() => { for (let i = 0; i < kit.voices.length; i++) try { bassPush(i); } catch(e){} }, 0);
+  NSLOT = k.slots = kitSlots(k);   // SLOTS: the new kit's count
+  setTimeout(() => sfPrepare(null), 0); kit = k; syncHeld(); setTimeout(() => { for (let i = 0; i < kit.voices.length; i++) try { bassPush(i); } catch(e){} }, 0);
   setTimeout(kitUndoBase, 0); setTimeout(() => resolveSamples(), 0); WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0;
   if (kit.voices.length < nslots()) growKit();
-  for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } refreshAll(); save(); }
+  try { instFit(); } catch(e){}
+  for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } buildPads(); refreshAll(); save(); try { slotsUI(); } catch(e){} }
 // Before replacing the kit: when the current one has samples (recorded or imported) the new one doesn't, say so.
 async function kitReplaceOk(next, what){
   const keep = new Set(); for (const v of (next && next.voices) || []) for (const L of v.layers || []) if (L.sample && L.sample.id) keep.add(L.sample.id);
@@ -10566,7 +10662,7 @@ async function kitReplaceOk(next, what){
 }
 // The drum pads 1–8 from the factory kit; the synth slots stay as they are. Undo puts the kit back.
 function factoryPads(){
-  const f = factoryKit(), k = {name:'Factory kit', voices:kit.voices.slice(), waves:kit.waves};
+  const f = factoryKit(), k = {name:'Factory kit', slots:kit.slots, held:kit.held, voices:kit.voices.slice(), waves:kit.waves};
   for (let p = 0; p < NPAD && p < f.voices.length; p++) k.voices[p] = f.voices[p];
   setKit(k); toast('Factory drums on pads 1–8. The synth slots stay as they are; Undo puts the kit back.', 4000);
 }
@@ -10815,6 +10911,7 @@ function fileItems(){
     null,
     ['Render song (WAV)', () => renderOut(false)], ['Render stems (.zip)', () => renderOut(true)],
     ...(canShare && lastR ? [['Share last render…', shareLast]] : []),
+    ['Export MIDI file (.mid)', exportMidiFile], ['Import MIDI file…', () => $('midIn').click()],
     null,
     ['Save kit…', () => $('bSaveKit').click()], ['Load kit…', () => $('kitIn').click()],
     ['Export song presets…', exportPresets], ['Import presets…', () => $('presetIn').click()],
@@ -11072,7 +11169,7 @@ $('bYes').addEventListener('click', () => { $('confirmRow').hidden = true; if (p
 $('bNo').addEventListener('click', () => { $('confirmRow').hidden = true; pending = null; });
 $('bFactory').addEventListener('click', () => ask('Put the factory drums on pads 1–8? The synth slots stay as they are.', factoryPads));
 $('bClassic').addEventListener('click', pickClassicKit);
-function clearKit(){ setKit({name:'New kit', voices:Array.from({length:nslots()}, (_, i) => isSyn(i)
+function clearKit(){ setKit({name:'New kit', slots:kit.slots, held:kit.held, voices:Array.from({length:nslots()}, (_, i) => isSyn(i)
   ? mkVoice('Synth ' + (i + 1), [{type:'saw', mode:'ADSR', atk:2, dec:400, sus:0.7, rel:200, lpCut:3000, level:0.7}], {tune:24, len:6, gate:400})
   : mkVoice('Pad ' + (i + 1), [{type:'sine', b:0.25, pAmt:24, pDec:50, atk:0.1, dec:400}]))}); }
 $('bClearKit').addEventListener('click', () => ask(`Clear all ${nslots()} slots?`, clearKit));
@@ -11113,21 +11210,29 @@ const DEFNOTES = [36,37,38,39,40,41,42,43, -1,-1,-1,-1,-1,-1,-1,-1];
 // (outIds, by Web MIDI port id) and which letters get clock (clk). Settings from before ports had one outId and
 // clkOut: they become port A.
 const NPORT = 4, PORTL = 'ABCD';
+// MIDI IN ROUTING (20 Oct): inId / inCh say which input and channel play notes and knobs ('' / -1: all of them); clkId the
+// input Clock in follows ('' = the first one heard, kept until it goes quiet); keys: what a keyboard plays in the tracker
+// (1 the current instrument, 0 the pads as before); lats: Gear delay per output port (ms; lat was one for all of them).
 const midi = {on:false, learn:false, target:-1, ccTarget:'', notes:DEFNOTES.slice(), cc:{}, vel:true, access:null,
-  outIds:new Array(NPORT).fill(''), clk:new Array(NPORT).fill(false), clkIn:false, lat:0};
+  outIds:new Array(NPORT).fill(''), clk:new Array(NPORT).fill(false), clkIn:false, lat:0, lats:new Array(NPORT).fill(0), inId:'', inCh:-1, clkId:'', keys:1};
+const mLatOf = p => midi.lats[p | 0] || 0;
 try { const m = JSON.parse(localStorage.getItem(MKEY) || 'null');
-  if (m && Array.isArray(m.notes)){ midi.notes = DEFNOTES.map((d, i) => Number.isInteger(m.notes[i]) ? m.notes[i] : d); midi.vel = m.vel !== false; midi.want = !!m.want; }
+  if (m && Array.isArray(m.notes)){ midi.notes = Array.from({length:Math.min(MAXSLOT, Math.max(16, m.notes.length))}, (_, i) => Number.isInteger(m.notes[i]) ? m.notes[i] : i < 16 ? DEFNOTES[i] : -1); midi.vel = m.vel !== false; midi.want = !!m.want; }
   if (m && m.cc && typeof m.cc === 'object') for (const k in m.cc) if (typeof m.cc[k] === 'string') midi.cc[k] = m.cc[k];
   if (m){
     if (Array.isArray(m.outIds)) midi.outIds = midi.outIds.map((_, p) => typeof m.outIds[p] === 'string' ? m.outIds[p] : '');
     else if (typeof m.outId === 'string') midi.outIds[0] = m.outId;
     if (Array.isArray(m.clk)) midi.clk = midi.clk.map((_, p) => !!m.clk[p]); else midi.clk[0] = !!m.clkOut;
     midi.clkIn = !!m.clkIn; midi.lat = Math.max(-50, Math.min(200, +m.lat || 0));
+    // One Gear delay for every port before 20 Oct: each port starts from it.
+    midi.lats = midi.lats.map((_, p) => Math.max(-50, Math.min(200, Array.isArray(m.lats) && Number.isFinite(+m.lats[p]) ? +m.lats[p] : midi.lat)));
+    if (typeof m.inId === 'string') midi.inId = m.inId; if (Number.isInteger(m.inCh)) midi.inCh = Math.max(-1, Math.min(15, m.inCh));
+    if (typeof m.clkId === 'string') midi.clkId = m.clkId; if (m.keys === 0 || m.keys === 1) midi.keys = m.keys;
   }
 } catch(e){}
-// outId / clkOut (port A) are still written for an older copy of the app on this device.
+// outId / clkOut (port A) and lat (port A's delay) are still written for an older copy of the app on this device.
 const saveMidi = () => { try { localStorage.setItem(MKEY, JSON.stringify({notes:midi.notes, cc:midi.cc, vel:midi.vel, want:midi.on, outIds:midi.outIds, clk:midi.clk,
-  outId:midi.outIds[0], clkOut:midi.clk[0], clkIn:midi.clkIn, lat:midi.lat})); } catch(e){} };
+  outId:midi.outIds[0], clkOut:midi.clk[0], clkIn:midi.clkIn, lat:midi.lats[0], lats:midi.lats, inId:midi.inId, inCh:midi.inCh, clkId:midi.clkId, keys:midi.keys})); } catch(e){} };
 function midiStatus(msg){ $('midiStat').textContent = msg; }
 const ccName = k => { const [ch, n] = k.split(':'); return 'CC ' + n + (+ch ? ' ch ' + (+ch + 1) : ''); };
 const rowLabel = id => { const e = document.getElementById(id), r = e && e.closest('.row'), l = r && r.querySelector('label'); return l ? l.textContent : id; };
@@ -11146,11 +11251,25 @@ function ccMove(k, v){
   e.value = Math.round(v / 127 * (+e.max - +e.min) + +e.min);
   e.dispatchEvent(new Event('input', {bubbles:true})); return true;
 }
-function onMidi(e){
+// Clock in follows one input: the one picked in Clock from, or the first that sends clock, kept until it has been quiet
+// for 2 s. Two devices sending clock at once (a controller with its own clock, gear echoing ours) used to interleave their
+// ticks and double the tempo.
+function clkFrom(src){
+  if (midi.clkId) return src === midi.clkId;
+  const now = performance.now();
+  if (!mx.clkSrc || mx.clkSrc === src || now - mx.clkSeen > 2000){ mx.clkSrc = src; mx.clkSeen = now; return true; }
+  return false;
+}
+function onMidi(e, src){
   const [st, d1, d2] = e.data; if (!st) return;
-  if (st >= 0xF8){ clkIn(st, e.timeStamp || performance.now()); return; }   // clock, Start, Continue, Stop
-  if (st === 0xF2){ mx.inSpp = (d1 & 127) | ((d2 & 127) << 7); return; }   // Song Position Pointer (16ths), for Continue
+  src = src || '';
+  if (st >= 0xF8){ if (st !== 0xFE && st !== 0xFF && clkFrom(src)) clkIn(st, e.timeStamp || performance.now()); return; }   // clock, Start, Continue, Stop
+  if (st === 0xF2){ if (clkFrom(src)) mx.inSpp = (d1 & 127) | ((d2 & 127) << 7); return; }   // Song Position Pointer (16ths), for Continue
+  if (st >= 0xF0) return;   // system exclusive and the rest: nothing here uses them
+  // NOTES IN: only the input and channel picked in Settings → MIDI play notes and move knobs.
+  if (midi.inId && src !== midi.inId) return;
   const ty = st & 0xf0, ch = st & 0x0f;
+  if (midi.inCh >= 0 && ch !== midi.inCh) return;
   if (ty === 0xb0){
     const k = ch + ':' + d1;
     if (midi.learn && midi.ccTarget){
@@ -11158,30 +11277,120 @@ function onMidi(e){
       midi.cc[k] = midi.ccTarget; const nm = rowLabel(midi.ccTarget); midi.ccTarget = ''; saveMidi(); ccBadges(); ccMove(k, d2);
       const m = `${nm} now follows ${ccName(k)}. Touch another slider or tap a pad, or Done.`; midiStatus(m); toast(m); return;
     }
-    if (!ccMove(k, d2) && midi.learn) toast('Touch a slider first, then turn the knob.');
+    if (ccMove(k, d2)) return;   // a learned knob works its slider
+    if (midi.learn){ toast('Touch a slider first, then turn the knob.'); return; }
+    if (kbActive()) kbCC(d1, d2);   // KEYS PLAY: sustain, and the rest to a MIDI instrument's gear
     return;
   }
   const on = ty === 0x90 && d2 > 0, off = ty === 0x80 || (ty === 0x90 && !d2);
-  if (off){ const h = midiHeld.get(d1); if (h){ midiHeld.delete(d1); [].concat(h).forEach(x => releaseNote(x)); } return; }
-  if (!on) return;
+  // LIVE TRANSPOSE: the transposing keys only transpose (latched; their note-offs do nothing).
+  if ((on || off) && lxp.mode && !midi.learn && lxpIs(d1)){ if (on) lxpKey(d1); return; }
+  if (off){ if (kb.held.has(d1)){ kbOff(d1); return; } const h = midiHeld.get(d1); if (h){ midiHeld.delete(d1); [].concat(h).forEach(x => releaseNote(x)); } return; }
+  if (!on){ if (kbActive()) kbPass(ty, d1, d2); return; }   // bend, aftertouch, program change: through to a MIDI instrument
+  if (kbActive()){ kbOn(d1, d2, e.timeStamp || performance.now()); return; }
   if (midi.learn && midi.target >= 0){
-    const t = midi.target; midi.notes = midi.notes.map((n, i) => i === t ? d1 : (n === d1 ? -1 : n));
+    const t = midi.target; while (midi.notes.length <= t) midi.notes.push(-1);   // slots past 16 (SLOTS, a voice per track) learn too
+    midi.notes = midi.notes.map((n, i) => i === t ? d1 : (n === d1 ? -1 : n));
     midi.target = -1; saveMidi(); renderPads();
     const m = `Pad ${hx(t)} now plays ${noteName(d1)} (${d1}). Tap another pad, touch a slider, or Done.`; midiStatus(m); toast(m); flash(t); return;
   }
   const vel = midi.vel ? Math.max(0.05, d2 / 127) : 1, held = [];
   let hit = false;
-  midi.notes.forEach((n, i) => { if (n !== d1) return; hit = true;
+  midi.notes.forEach((n, i) => { if (n !== d1 || i >= nslots()) return; hit = true;
     if (isSyn(i)) held.push(holdNote(i, 0, vel)); else play(i, vel); });   // synth pads sound until the key is let go
   // Notes that aren't mapped to a pad play the selected synth slot, middle C (60) at its own pitch.
   if (!hit && isSyn(cur)) held.push(holdNote(cur, d1 - 60, vel));
   if (held.length){ const old = midiHeld.get(d1); if (old) [].concat(old).forEach(x => releaseNote(x)); midiHeld.set(d1, held); }
 }
 const midiHeld = new Map();
+/* ---------- KEYS PLAY (20 Oct): a MIDI keyboard plays the tracker's current instrument ----------
+   Settings → MIDI → Keys play. In the tracker the keyboard plays the instrument you are on (the INST screen's, the cursor
+   row's in a phrase, else the one a new note would get): its pad, pitched (C-4 = MIDI 60, TRANSPOSE added), held while the
+   key is down; or, for a MIDI instrument, its gear on its port and channel, with pitch bend, aftertouch, program change
+   and every CC that isn't learned to a slider passed through (mod wheel, sustain…). Sustain (CC 64) also holds the pads'
+   notes. With Keys play on the pads, or on the Synth page, notes play the pads as before. REC writes these notes into the
+   phrase (see recNote). */
+const kb = {held:new Map(), sus:false, susd:new Set()};
+const kbActive = () => midi.keys === 1 && view === 'tracker' && !midi.learn;
+/* ---------- KEY (20 Oct): live transpose from a keyboard, and the song's scale ----------
+   LIVE TRANSPOSE (Settings → Record & play, kept on this device): a key on the MIDI keyboard transposes every instrument
+   with KEY FOLLOW on (INST) as the song plays, and the transposition stays until another key (latched). WHOLE KEYBOARD:
+   every key transposes from C-4 (MIDI 60 = none, the keyboard plays nothing); BELOW C-4: the keys below C-4 transpose from
+   C-3 (MIDI 48 = none), the keys from C-4 up play as usual. It changes notes the sequencer hasn't booked yet (up to a
+   quarter of a second ahead), only while playing live: renders and MIDI files use the song as written.
+   SCALE / SCALE ROOT (Project → Song, saved with the song): KEY FOLLOW instruments' notes go to the nearest note of the
+   scale (a tie goes down), after every transpose but before PIT and FIN. */
+const LXK = 'thunderplus-livexp-v1';
+const lxp = {mode:(() => { try { return clamp(+localStorage.getItem(LXK) || 0, 0, 2); } catch(e){ return 0; } })(), st:0};
+const LX_NAMES = ['OFF', 'WHOLE KEYBOARD', 'KEYS BELOW C-4'];
+function setLxp(m){ lxp.mode = clamp(m | 0, 0, 2); lxp.st = 0; try { localStorage.setItem(LXK, String(lxp.mode)); } catch(e){} }
+const lxpIs = n => lxp.mode === 1 || (lxp.mode === 2 && n < 60);
+function lxpKey(n){ const st = lxp.mode === 1 ? n - 60 : n - 48; if (st !== lxp.st){ lxp.st = st; toast('Live transpose ' + sgn(st) + (tp.on ? '' : ' (the next PLAY)')); } }
+const SCALES = [['OFF', null], ['MAJOR', [0, 2, 4, 5, 7, 9, 11]], ['MINOR', [0, 2, 3, 5, 7, 8, 10]], ['HARMONIC MINOR', [0, 2, 3, 5, 7, 8, 11]],
+  ['MELODIC MINOR', [0, 2, 3, 5, 7, 9, 11]], ['DORIAN', [0, 2, 3, 5, 7, 9, 10]], ['PHRYGIAN', [0, 1, 3, 5, 7, 8, 10]], ['LYDIAN', [0, 2, 4, 6, 7, 9, 11]],
+  ['MIXOLYDIAN', [0, 2, 4, 5, 7, 9, 10]], ['LOCRIAN', [0, 1, 3, 5, 6, 8, 10]], ['MAJOR PENTATONIC', [0, 2, 4, 7, 9]], ['MINOR PENTATONIC', [0, 3, 5, 7, 10]],
+  ['BLUES', [0, 3, 5, 6, 7, 10]], ['WHOLE TONE', [0, 2, 4, 6, 8, 10]], ['DIMINISHED', [0, 2, 3, 5, 6, 8, 9, 11]]];
+const ROOTS = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+// Note n moved to the nearest note of song Sx's scale (ties go down); unchanged with no scale.
+function scaleSnap(Sx, n){
+  const sc = SCALES[Sx.scale | 0]; if (!sc || !sc[1]) return n;
+  const pc = ((n - (Sx.sroot | 0)) % 12 + 12) % 12; if (sc[1].includes(pc)) return n;
+  for (let d = 1; d < 7; d++){ if (sc[1].includes((pc - d + 12) % 12)) return n - d; if (sc[1].includes((pc + d) % 12)) return n + d; }
+  return n;
+}
+// The instrument a keyboard note plays and records with.
+function kbInst(){
+  try {
+    if (tv === 'inst') return cInst;
+    if (tv === 'phrase' && cTrack !== MT){ const p = S.phrases[cPhrase], r = p && p[cs.phrase.y]; if (r && r[IC] >= 0 && r[IC] < NI) return r[IC]; return clamp(defInst(), 0, NI - 1); }
+    return clamp(last.inst, 0, NI - 1);
+  } catch(e){ return 0; }
+}
+function kbOn(n, v, ts){
+  const vel = midi.vel ? Math.max(1, v) / 127 : 1, vol = Math.round(vel * 255), ii = kbInst();
+  kbOff(n, true);   // the same key again: the old note goes first
+  let h = null; try { h = preview(ii, n - 12, vol, true, null, true); } catch(e){}
+  if (h) kb.held.set(n, h);
+  try { recNote(n - 12, vol, ii, h, ts); } catch(e){ console.warn(e); }   // REC
+}
+function kbOff(n, now){
+  const h = kb.held.get(n); if (!h) return; kb.held.delete(n);
+  try { recOff(h); } catch(e){}
+  if (kb.sus && !now) kb.susd.add(h); else previewOff(h);
+}
+// Every key held by the keyboard (and the sustain pedal's) lets go: Notes in or Keys play changed, the view changed.
+function releaseKeys(){ for (const h of kb.held.values()) previewOff(h); for (const h of kb.susd) previewOff(h); kb.held.clear(); kb.susd.clear(); kb.sus = false; }
+// The current instrument's gear, when it is a MIDI instrument: [port, channel, instrument] or null.
+function kbGear(){ const I = S.insts[kbInst()]; return I && (I.mo | 0) ? [portOf(I), (I.mch | 0) & 15, I] : null; }
+function kbCC(cc, v){
+  if (cc === 64){ kb.sus = v >= 64; if (!kb.sus){ for (const h of kb.susd) previewOff(h); kb.susd.clear(); } }
+  const g = kbGear(); if (!g) return; if (!ctx) audio();
+  msend([0xB0 | g[1], cc & 127, v & 127], null, false, g[0]); mx.used.add(g[0] * 16 + g[1]);
+}
+function kbPass(ty, d1, d2){
+  const g = kbGear(); if (!g) return; if (!ctx) audio();
+  const [p, ch, I] = g, k = p * 16 + ch;
+  if (ty === 0xE0){ msend([0xE0 | ch, d1 & 127, d2 & 127], null, false, p); mx.bend.set(k, {v:(d1 & 127) | ((d2 & 127) << 7), t:ctx.currentTime}); }   // so a later song bend isn't skipped as "already there"
+  else if (ty === 0xD0 || ty === 0xC0) msend([ty | ch, d1 & 127], null, false, p);
+  else if (ty === 0xA0) msend([0xA0 | ch, clamp(d1 + (I.tsp | 0), 0, 127), d2 & 127], null, false, p);
+  else return;
+  mx.used.add(k);
+}
 function hookInputs(){
-  let n = 0; midi.access.inputs.forEach(inp => { inp.onmidimessage = onMidi; n++; });
-  moPorts();
+  let n = 0; midi.access.inputs.forEach(inp => { inp.onmidimessage = e => onMidi(e, inp.id); n++; });
+  moPorts(); miPorts();
   midiStatus(n ? `${n} controller${n > 1 ? 's' : ''} connected` : 'No controller found. Plug one in.');
+}
+// Settings → MIDI: Notes in (input and channel) and Clock from. A saved input that isn't plugged in now stays picked.
+function miPorts(){
+  const ins = [['', 'Every input']]; if (midi.access) midi.access.inputs.forEach(i => ins.push([i.id, i.name || i.id]));
+  const fill = (sel, opts, v, none) => { if (!sel) return; const os = v && !opts.some(([q]) => q === v) ? opts.concat([[v, '(not connected)']]) : opts;
+    sel.innerHTML = ''; os.forEach(([q, nm], k) => sel.append(new Option(k === 0 ? none : nm, q))); sel.value = v; };
+  fill($('midiInSel'), ins, midi.inId, 'Every input');
+  fill($('midiClkSel'), ins, midi.clkId, 'The first input that sends clock');
+  const ch = $('midiInCh'); if (ch && !ch.options.length){ ch.append(new Option('All channels', '-1')); for (let c = 0; c < 16; c++) ch.append(new Option('Channel ' + (c + 1), String(c))); }
+  if (ch) ch.value = String(midi.inCh);
+  const ks = $('midiKeysSel'); if (ks) ks.value = String(midi.keys);
 }
 async function connectMidi(){
   if (midi.access){ hookInputs(); return; }
@@ -11244,7 +11453,14 @@ const MIDI_ONLY_EV = new Set(['mcc', 'mpg']);
 // notes waiting to come back to their pitch (see arpBack). used: port*16+channel pairs that got anything (All Notes
 // Off goes to these at STOP). bend: port*16+channel → the 14-bit bend last sent.
 const mx = {held:[], pend:[], used:new Set(), bend:new Map(), ramp:new Set(), beat:null, t0:null, lfo:[], spp:0, clk:{on:false, k:0}, inT:[], inK:0, inRun:false, ext:0,
-  slave:false, inSpp:0, inOff:0};
+  slave:false, inSpp:0, inOff:0, clkSrc:'', clkSeen:0, ccr:[], ccv:new Map(), echo:[]};   // ccr: CC glides (CSL); ccv: the last value per port/channel/CC; echo: ECHO notes waiting
+// Clock in lines our beats up with the moment the other device's clock is heard, plus the Gear delay of the port its own
+// cable is on (the output with the same name as the input clock comes from), else port A's.
+function clkLat(){
+  try { const src = midi.access && midi.access.inputs.get(midi.clkId || mx.clkSrc), nm = src && src.name;
+    if (nm) for (let p = 0; p < NPORT; p++){ const o = midiOut(p); if (o && o.name === nm) return mLatOf(p); } } catch(e){}
+  return mLatOf(0);
+}
 const midiOut = p => { const id = midi.outIds[p | 0]; return (midi.access && id && midi.access.outputs.get(id)) || null; };
 const portOf = I => clamp(I.mpt | 0, 0, NPORT - 1);
 const pbrOf = I => clamp((I.pbr | 0) || 2, 1, 48);
@@ -11274,7 +11490,7 @@ const p2a = p => (p - (amap.off == null ? mapUpd() : amap.off)) / 1000;
 // One message to port p (A = 0) at audio time t (null: now); early: less the Gear delay (notes and what goes with them).
 function msend(bytes, t, early, p){
   const o = midiOut(p); if (!o || !ctx) return;
-  const at = t == null ? 0 : a2p(t) - (early ? midi.lat : 0);
+  const at = t == null ? 0 : a2p(t) - (early ? mLatOf(p) : 0);
   try { o.send(bytes, Math.max(performance.now(), at)); } catch(e){}
 }
 const msendClk = (bytes, t) => { for (const p of clkPorts()) msend(bytes, t, false, p); };
@@ -11324,6 +11540,7 @@ const arpBack = arp => arp && arp.length ? arp[arp.length - 1][0] + (arp.length 
 function pendPlay(t, x){
   for (const h of mx.held[t] || []) if (h.nid === x.nid && h.end === Infinity) offOne(h, x.t);
   moPlay(t, x.p, x.ch, x.n, x.vel, x.rng, x.fine, [[x.t, 0]], x.end, x.nid);
+  if (x.col != null) for (const h of mx.held[t] || []) if (h.nid === x.nid) h.col = x.col;   // the return keeps its column
 }
 // Something happens on track t at `at`: a return still waiting plays first if it was due before, else it's dropped.
 function pendAt(t, at){
@@ -11361,18 +11578,24 @@ function offNote(t, nid, at){
 function moNote(e, I){
   if (!((e.vel == null ? 1 : e.vel) > 0)) return;
   const t = e.track, p = portOf(I), ch = (I.mch | 0) & 15, rng = pbrOf(I), H = mx.held[t] || (mx.held[t] = []);
-  const n = clamp(Math.round(e.mn), 0, 127), fine = e.mn - Math.round(e.mn), end = moEnd(e);
+  const n = clamp(Math.round(e.mn), 0, 127), fine = e.mn - Math.round(e.mn);
+  // NOTE LEN (20 Oct): a MIDI instrument's notes end after that many ticks unless OFF, KIL or the next note ends them first.
+  const end = Math.min(moEnd(e), (I.mlen | 0) > 0 && e.tick > 0 ? e.t + I.mlen * e.tick : Infinity);
   const vel = clamp(Math.round((e.vel == null ? 1 : e.vel) * 127), 1, 127);
   pendAt(t, e.t);
   if (e.ii != null && I.lrg && lfoCC(I) >= 0) lfoTrig(e.ii, e.t);
   // A new note on a mono track ends the one before; a poly track keeps up to 4 notes (an ARP's steps are one note);
   // the same key again is released first.
+  // POLY COLUMNS (20 Oct): on a poly track each note column is its own voice, as in a tracker: a new note in a column ends
+  // the note that column was holding. Before, a chord rang until an OFF, the same key or the 4-note cap, so two chords
+  // in a row sounded together as six notes on a hardware poly synth. (Pads are unchanged: they ring over each other.)
   if (!e.poly) moOff(t, e.t);
   else {
     const HH = mx.held[t] || [], ids = [];
+    if (e.col != null) for (const h of HH) if (h.col === e.col && h.end > e.t) offNote(t, h.nid, e.t);
     for (const h of HH) if (h.p === p && h.ch === ch && h.base === n && h.end > e.t) offNote(t, h.nid, e.t);
     for (const h of HH) if (h.end > e.t && h.t <= e.t + 1e-6 && !ids.includes(h.nid)) ids.push(h.nid);
-    while (ids.length >= 4) offNote(t, ids.shift(), e.t);
+    while (ids.length >= (e.cap || 4)) offNote(t, ids.shift(), e.t);   // cap: a keyboard played through (16 keys) has more than a column's 4
   }
   // The pitch the note starts at: its own (plus its fraction of a semitone), or with PSL the track's last pitch.
   const sl = e.slide && e.slide.from > 0 && e.rate > 0 ? e.slide : null;
@@ -11380,14 +11603,22 @@ function moNote(e, I){
   bendTo(p, ch, b0, rng, e.t);
   const back = arpBack(e.arp), pend = back != null && back < end - 1e-6;
   const nid = moPlay(t, p, ch, n, vel, rng, fine, arpSegs(e.arp, e.t, end), pend ? Infinity : end);
-  { const hh = (mx.held[t] || []).find(h => h.nid === nid); if (hh) hh.col = e.col; }   // POLY OFF per column
-  if (pend) (mx.pend[t] || (mx.pend[t] = [])).push({p, ch, n, vel, rng, fine, t:back, end, nid});
+  for (const hh of mx.held[t] || []) if (hh.nid === nid) hh.col = e.col;   // POLY OFF and POLY COLUMNS: every ARP step of it
+  if (pend) (mx.pend[t] || (mx.pend[t] = [])).push({p, ch, n, vel, rng, fine, t:back, end, nid, col:e.col});
   // Then it moves: PSL glides to the note, then PBN bends on from there, or PVB wobbles around it (one ramp per
   // channel and row, shared by the notes of a chord).
   let t0 = e.t;
   if (sl){ t0 = e.t + Math.max(0.001, sl.dur); if (rampOnce(p, ch, e.t)) bendRamp(p, ch, b0, fine, rng, e.t, t0); }
   if (e.bend && e.bend.t1 > t0){ if (rampOnce(p, ch, t0)) bendRamp(p, ch, fine, fine + 12 * Math.log2(e.bend.mul), rng, t0, e.bend.t1); }
   else if (e.vib && e.vib.dep && e.vib.t1 > t0){ if (rampOnce(p, ch, t0)) bendVib(p, ch, fine, e.vib, rng, t0, e.vib.t1); }
+  // ECHO (20 Oct): the note again ECHO times, ECHO TIME apart, each ECHO FADE softer and ECHO PITCH higher (sequenced notes
+  // only, not previews). They wait in mx.echo and are booked a moment ahead by moEcho, so none sound after STOP.
+  if ((I.eco | 0) > 0 && t < NT){
+    const dt = (+I.ecr > 0 ? +I.ecr : 0.5) * 60 / (tp.seq ? tp.seq.bpm : S.bpm), len = Math.max(0.005, Math.min(dt * 0.9, end < Infinity ? end - e.t : dt * 0.9)), fd = 1 - clamp(I.ecf | 0, 0, 100) / 100;
+    for (let k = 1; k <= Math.min(16, I.eco | 0); k++){ const v2 = Math.round(vel * Math.pow(fd, k)); if (v2 < 1) break;
+      mx.echo.push({t:e.t + k * dt, p, ch, n:clamp(n + k * (I.ecp | 0), 0, 127), vel:v2, len}); }
+  }
+  return nid;
 }
 // A row with commands but no note changes the MIDI notes the track is holding, as it does a pad: PIT/FIN retune them
 // (a bend from their own pitch), ARP steps through from them, PBN bends on from where they are, PVB wobbles there.
@@ -11406,7 +11637,8 @@ function moMod(e){
       if (keep){ if (segs.length < 2) continue; h.end = Math.max(h.t + 0.001, segs[1][0]); msend([0x80 | h.ch, h.n, 0], h.end, true, h.p); segs.shift(); }
       else offOne(h, e.t);
       const nid = moPlay(e.track, h.p, h.ch, h.base, h.vel, h.rng, h.fine, segs, Infinity);
-      P.push({p:h.p, ch:h.ch, n:h.base, vel:h.vel, rng:h.rng, fine:h.fine, t:back, end:Infinity, nid}); }
+      for (const q of mx.held[e.track] || []) if (q.nid === nid) q.col = h.col;
+      P.push({p:h.p, ch:h.ch, n:h.base, vel:h.vel, rng:h.rng, fine:h.fine, t:back, end:Infinity, nid, col:h.col}); }
   } else if (e.bend) bendRamp(p, ch, cur, cur + 12 * Math.log2(e.bend.mul), rng, e.t, e.bend.t1);
   else if (e.vib && e.vib.dep) bendVib(p, ch, cur, e.vib, rng, e.t, e.vib.t1);
 }
@@ -11416,7 +11648,14 @@ function moCmd(e){
   const I = S.insts[e.ii]; if (!I || !(I.mo | 0) || !(e.track >= S.mix.length || audible(e.track))) return;
   const p = portOf(I), ch = (I.mch | 0) & 15;
   if (e.type === 'mpg') msend([0xC0 | ch, e.v & 127], e.t - 0.001, true, p);
-  else msend([0xB0 | ch, ccNum(I, e.k), clamp(e.v, 0, 127)], e.t, true, p);
+  else {
+    const cc = ccNum(I, e.k), v = clamp(e.v, 0, 127), key = (p * 16 + ch) * 128 + cc, was = mx.ccv.get(key);
+    for (const r of mx.ccr) if (r.key === key && r.t1 > e.t){ r.t1 = e.t; r.cut = true; }   // a new value ends a glide still going
+    // CSL: glide from the value sent before (a CC never sent here just jumps)
+    if (e.ramp > 0 && was != null && was !== v) mx.ccr.push({key, p, ch, cc, a:was, b:v, t0:e.t, t1:e.t + e.ramp, at:e.t, last:was, cut:false});
+    else msend([0xB0 | ch, cc, v], e.t, true, p);
+    mx.ccv.set(key, v);
+  }
   mx.used.add(p * 16 + ch);
 }
 // One sequencer event. Returns true when it was for MIDI only (the pad must not play it).
@@ -11438,6 +11677,26 @@ function moEv(e){
   if (!m){ moOff(e.track, e.t); return false; }   // the column switched to a pad instrument
   if (e.track >= S.mix.length || audible(e.track)) moNote(e, I); else moOff(e.track, e.t);   // a muted track lets its gear go quiet
   return m === 1;
+}
+// CSL glides: a value about every 10 ms, only when it changes, booked at most 80 ms ahead (like the LFO), so STOP ends them.
+function moRamp(){
+  if (!mx.ccr.length || !ctx) return;
+  const upto = ctx.currentTime + 0.08;
+  mx.ccr = mx.ccr.filter(r => {
+    for (let n = 0; r.at <= Math.min(upto, r.t1) && n < 40; n++, r.at += LFO_DT){
+      const v = Math.round(r.a + (r.b - r.a) * clamp((r.at - r.t0) / Math.max(1e-6, r.t1 - r.t0), 0, 1));
+      if (v !== r.last){ msend([0xB0 | r.ch, r.cc, v], r.at, true, r.p); r.last = v; }
+    }
+    if (r.at > r.t1){ if (!r.cut && r.last !== r.b) msend([0xB0 | r.ch, r.cc, r.b], r.t1, true, r.p); return false; }
+    return true;
+  });
+}
+// ECHO notes due within 100 ms: their note-on and its note-off.
+function moEcho(){
+  if (!mx.echo.length || !ctx) return;
+  const upto = ctx.currentTime + 0.1;
+  mx.echo = mx.echo.filter(x => { if (x.t > upto) return true;
+    msend([0x90 | x.ch, x.n, x.vel], x.t, true, x.p); msend([0x80 | x.ch, x.n, 0], x.t + x.len, true, x.p); mx.used.add(x.p * 16 + x.ch); return false; });
 }
 // Clocks up to the time the sequencer has booked so far (24 per beat, straight: swing moves notes, not the clock).
 function moClock(s){
@@ -11563,7 +11822,7 @@ function moRelease(){
   for (const k of mx.used){ const p = k >> 4, ch = k & 15;
     msend([0xB0 | ch, 123, 0], null, false, p);   // All Notes Off
     if (mx.bend.has(k) && mx.bend.get(k).v !== 8192) msend([0xE0 | ch, 0, 64], null, false, p); }
-  mx.held = []; mx.pend = []; mx.bend.clear(); mx.ramp.clear();
+  mx.held = []; mx.pend = []; mx.bend.clear(); mx.ramp.clear(); mx.ccr = []; mx.echo = [];
 }
 function moStop(){
   const was = mx.clk.on, last = mx.clk.last; moRelease();
@@ -11602,7 +11861,7 @@ function clkIn(st, ts){
   // In phase: where the other device is (clocks since its Start; the first clock is beat 0) against where we are
   // at the moment that clock is heard (plus Gear delay).
   if (tp.on && mx.slave && mx.inRun && mx.beat && tp.seq && ctx){
-    const ta = p2a(ts + midi.lat), ours = mx.beat.b + (ta - mx.beat.t) * tp.seq.bpm / 60, err = (mx.inK - 1) / 24 + mx.inOff - ours;
+    const ta = p2a(ts + clkLat()), ours = mx.beat.b + (ta - mx.beat.t) * tp.seq.bpm / 60, err = (mx.inK - 1) / 24 + mx.inOff - ours;
     const lim = Math.abs(err) > 0.05 ? 0.08 : 0.03;   // catch up quickly after Start, then only small nudges
     if (Math.abs(err) < 2) target = bpm * (1 + clamp(err / 2, -lim, lim));
   }
@@ -11652,9 +11911,14 @@ function clkJoin(p, all){
   const hint = () => { const q = [...PORTL].filter((L, p) => midi.clk[p] && !midi.outIds[p]); note.textContent = q.length ? `${q.join(', ')}: no cable` : ''; };
   hint(); host.__hint = hint; upd(); }
 makeSeg($('segClkIn'), [[true,'On'],[false,'Off']], () => midi.clkIn, v => { midi.clkIn = v; mx.inT = []; mx.slave = false; saveMidi(); if (v && !midi.access) connectMidi(); });
-{ const r = $('midiLat'), o = $('midiLatV'), show = () => o.textContent = (midi.lat > 0 ? '+' : '') + midi.lat + ' ms';
-  r.value = midi.lat; show(); r.addEventListener('input', () => { midi.lat = +r.value; show(); saveMidi(); }); }
-moPorts();
+// Gear delay, one per port (20 Oct: it was one for every port; MPC over USB and a synth on a DIN cable lag differently).
+for (let p = 0; p < NPORT; p++){ const r = $('midiLat' + p); if (!r) continue; r.value = mLatOf(p);
+  r.addEventListener('change', () => { midi.lats[p] = clamp(Math.round(+r.value || 0), -50, 200); r.value = midi.lats[p]; saveMidi(); }); }
+$('midiInSel').addEventListener('change', e => { midi.inId = e.target.value; releaseKeys(); saveMidi(); });
+$('midiInCh').addEventListener('change', e => { midi.inCh = clamp(+e.target.value, -1, 15); releaseKeys(); saveMidi(); });
+$('midiClkSel').addEventListener('change', e => { midi.clkId = e.target.value; mx.clkSrc = ''; mx.inT = []; saveMidi(); });
+$('midiKeysSel').addEventListener('change', e => { releaseKeys(); midi.keys = +e.target.value ? 1 : 0; saveMidi(); });
+moPorts(); miPorts();
 
 /* ---------- Plaits loader ---------- */
 const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm';
@@ -11857,7 +12121,9 @@ function normalizeChainsImport(d){
    buffers, so the sequencer only triggers buffers, which keeps 16 tracks cheap on a phone. The same event list
    drives live playback and offline renders, so a render sounds like what you hear. */
 const TK = 'thunderplus-song-v1', VK = 'thunderplus-view-v1';
-const NT = 32, NI = 16, ROOT = 48, OFF = 200, TICKS = 6, BASEW = 52, FITROWS = 18;
+// NI: instruments in a song (00–3F; 16 before 20 Oct). To give songs more, raise it: the I column, INS, the INST screen, the
+// instrument list and song files all follow it (songs keep up to NI; up to 256 fit the hex column).
+const NT = 32, NI = 64, ROOT = 48, OFF = 200, TICKS = 6, BASEW = 52, FITROWS = 18;
 // The master column: song column MT (after the 32 track columns, S.song[row][MT]) plays phrases whose commands go to the
 // master bus (VOL = master level; FXO / FLX / GAT / RTG = the master effects). Its notes are not played.
 const MT = NT;
@@ -11893,12 +12159,12 @@ const CC_NAMES = {0:'bank select', 1:'mod wheel', 2:'breath', 4:'foot', 5:'glide
 // A port letter's cable on this device, for INST.
 const portName = p => { const o = midiOut(p); return o ? (o.name || 'connected') : midi.outIds[p] ? 'not connected now' : 'no cable: Settings › MIDI'; };
 const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
-  'CCA','CCB','CCC','CCD','PGM','BYP'];   // new commands go on the end, so saved songs keep their numbers
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR'];   // new commands go on the end, so saved songs keep their numbers
 const FXC_V1 = ['RET','DEL','CUT','CHA','PSL','RND','OFS','REV','PAN','TPO','HOP'];   // song files before v2
 const V1NAME = {CUT:'KIL', OFS:'STA', REV:'PLY'};
 const SIGNED = new Set(['PBN','TSP','PIT','FIN']);
 const s8 = v => v > 127 ? v - 256 : v;
-const RSTEP = {TIC:1, DEL:1, KIL:1, OFF:1, PSL:1, RET:1, PBN:1, TSP:1, PIT:1, FIN:4, ARP:1, HOP:1, INS:1, PGM:1};   // RND/RNL step per digit (else 17, so F = full range)
+const RSTEP = {TIC:1, DEL:1, KIL:1, OFF:1, PSL:1, RET:1, PBN:1, TSP:1, PIT:1, FIN:4, ARP:1, HOP:1, INS:1, PGM:1, CSL:1, DIR:1};   // RND/RNL step per digit (else 17, so F = full range)
 for (const c of CC_CMDS) RSTEP[c] = 8;   // CC values run 00–7F: F is nearly the whole range
 const ARCM = ['up', 'down', 'up-down', 'random'];
 const ticksS = v => `${v} tick${v === 1 ? '' : 's'}`;
@@ -11940,6 +12206,9 @@ const FXI = {
   RTG:v => { const X = v >> 4, Y = v & 15; return !X ? 'Retrigger off' : `Retrigger every ${RetrigCore.NAMES[Math.min(8, X) - 1]}` + (Y ? ` for ${Y} rows` : ' until RTG 00') + ' (X: 1 = 1/4 … 5 = 1/64, 6–8 triplets)'; },
   WOB:v => v ? `Bass wobble ${BASS_DIVN[Math.min(BASS_DIV.length, v) - 1]} from here on (01 = 4 bars … 0D = 1/32)` : 'WOB 00: back to the bass voice’s own wobble rate',
   PGM:v => `MIDI program change to ${Math.min(127, v)} (00–7F; most gear shows it as ${Math.min(127, v) + 1}), sent just before this row’s note`,
+  CSL:v => v ? `The CCA–CCD commands on this row glide to their value over ${ticksS(v)} (from the value sent before)` : 'CSL 00: the CCA–CCD commands on this row glide to their value across the step',
+  DIR:v => ['Play direction: forward again from the next row on', 'Play direction: backwards from the next row on (each pass after this one starts at the bottom)',
+    'Play direction: ping-pong from the next row on (back and forth, the ends once)', 'Play direction: a random row each step from the next row on'][Math.min(3, v)] + '. Lasts on this track until DIR 00; a phrase still plays as many steps as it has rows',
 };
 CC_CMDS.forEach((c, k) => { const L = c[2];
   FXI[c] = v => `MIDI CC slot ${L}: send ${Math.min(127, v)} of 127 (00–7F) to the CC number set on INST › CC ${L}` + (v > 127 ? '; above 7F sends 7F' : ''); });
@@ -12622,7 +12891,12 @@ const freshPhrase = () => Array.from({length:PROWS}, blankRow);
 const polyFrom = () => Math.ceil(ntr() / 2), isPolyT = t => t >= polyFrom() && t < NT;
 // freshInst needs the pad count, but nslots() (with the song state, below) isn't initialized yet when the
 // first song is made — the default instrument layout only needs the classic 16 anyway.
-const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0, slc:0, smode:0, sync:0, beats:4, grain:1, mo:0, mch:0, mpt:0, pbr:2, cc:CC_DEF.slice(), lcc:-1, lsh:0, lrb:4, ldp:64, lct:64, lrg:0});   // instruments 08–0F play the synth slots
+// 20 Oct: kf KEY FOLLOW (live transpose and scale; on from 08 up, the synths), hut/huv HUMAN TIME (± ms) / VEL (−%), and for MIDI
+// instruments mlen NOTE LEN (ticks, 0 = hold) and eco/ecr/ecf/ecp ECHO repeats / time in beats / fade % / pitch per repeat.
+const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0, slc:0, smode:0, sync:0, beats:4, grain:1, mo:0, mch:0, mpt:0, pbr:2, cc:CC_DEF.slice(), lcc:-1, lsh:0, lrb:4, ldp:64, lct:64, lrg:0,
+  kf:i % NSLOT >= NPAD ? 1 : 0, hut:0, huv:0, mlen:0, eco:0, ecr:0.5, ecf:30, ecp:0});   // instruments 08–0F play the synth slots
+const ECHO_RATES = [['1/32', 1/8], ['1/16T', 1/6], ['1/16', 1/4], ['1/8T', 1/3], ['1/8', 1/2], ['1/4T', 2/3], ['1/8D', 3/4], ['1/4', 1], ['1/4D', 3/2], ['1/2', 2], ['1 BAR', 4]];
+const echoRateI = I => { const b = +I.ecr > 0 ? +I.ecr : 0.5; let k = 0; ECHO_RATES.forEach(([, v], i) => { if (Math.abs(Math.log(v / b)) < Math.abs(Math.log(ECHO_RATES[k][1] / b))) k = i; }); return k; };
 const freshMix = () => ({vol:224, pan:128, mute:false, solo:false, sc:false});
 /* ---------- mastering on the master bus ----------
    S.mst, saved with the song:
@@ -12661,7 +12935,7 @@ function freshSong(){
     song:Array.from({length:256}, () => new Array(NT + 1).fill(-1)), chains:new Array(256).fill(null), phrases:new Array(256).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
     tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:4, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
-    ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0), mst:freshMst(), presets:{voices:[], layers:[]}, secs:[]};   // secs: SONG EXTRAS section names [{y, n}]   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
+    ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0), mst:freshMst(), presets:{voices:[], layers:[]}, secs:[], scale:0, sroot:0};   // secs: SONG EXTRAS section names [{y, n}]   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
 }
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;
 // The saved song is read at start-up, before nslots (a const further down) exists. Calling it there threw, and the
@@ -12723,7 +12997,11 @@ function normSong(j){
     // LFO → CC (off in older songs): CC number or -1, shape, rate in beats, depth, centre, restart on notes.
     I.lcc = clamp(int(o.lcc, -1), -1, 127); I.lsh = clamp(int(o.lsh, 0), 0, LFO_SHAPES.length - 1);
     I.lrb = LFO_RATES.some(([, v]) => Math.abs(v - +o.lrb) < 1e-9) ? +o.lrb : 4;
-    I.ldp = clamp(int(o.ldp, 64), 0, 127); I.lct = clamp(int(o.lct, 64), 0, 127); I.lrg = o.lrg ? 1 : 0; } });
+    I.ldp = clamp(int(o.ldp, 64), 0, 127); I.lct = clamp(int(o.lct, 64), 0, 127); I.lrg = o.lrg ? 1 : 0;
+    // 20 Oct (older songs: KEY FOLLOW on for synth slots and MIDI instruments, the rest off and empty)
+    I.kf = o.kf != null ? (o.kf ? 1 : 0) : ((I.mo | 0) || I.pad >= NPAD ? 1 : 0); I.hut = clamp(int(o.hut, 0), 0, 50); I.huv = clamp(int(o.huv, 0), 0, 90);
+    I.mlen = clamp(int(o.mlen, 0), 0, 255); I.eco = clamp(int(o.eco, 0), 0, 16); I.ecr = ECHO_RATES.some(([, v]) => Math.abs(v - +o.ecr) < 1e-9) ? +o.ecr : 0.5;
+    I.ecf = clamp(int(o.ecf, 30), 0, 100); I.ecp = clamp(int(o.ecp, 0), -12, 12); } });
   if (Array.isArray(j.mix)) j.mix.slice(0, NT).forEach((o, i) => { if (o && typeof o === 'object'){ const m = S.mix[i];
     m.vol = clamp(int(o.vol, 224), 0, 255); m.pan = clamp(int(o.pan, 128), 0, 255); m.mute = !!o.mute; m.solo = !!o.solo; m.sc = !!o.sc; } });
   if (Array.isArray(j.tfx)) for (let t = 0; t < NT; t++) S.tfx[t] = normChainFx(j.tfx[t]);
@@ -12738,6 +13016,7 @@ function normSong(j){
   // Microtuning: cents per pitch class, clamped to ±100 (a semitone).
   S.tune = Array.from({length:12}, (_, k) => clamp(Number.isFinite(+((j.tune || [])[k])) ? +j.tune[k] : 0, -100, 100));
   S.presets = normPresets(j.presets);
+  S.scale = clamp(int(j.scale, 0), 0, SCALES.length - 1); S.sroot = clamp(int(j.sroot, 0), 0, 11);   // SCALE / SCALE ROOT (20 Oct)
   // Songs before v6 played every row for SWING NOTE's number of lines (16ths, the default: two). Keep them sounding the
   // same under the fixed timing: lines a beat ÷ that number, ticks a step × it (so DEL, RET, KIL, OFF, PSL, ARC and
   // grooves keep their length), and TIC values with them. Where LPB doesn't divide, the tempo carries the rest.
@@ -12773,8 +13052,9 @@ let sT = 0;
 // Undo: every saved change keeps the state before it (up to 200 steps). Changes made by one key or tap
 // (a paste, a cut, a note plus its instrument) settle at the end of that event, so they undo as one step.
 const undo = {past:[], future:[], cur:JSON.stringify(S), busy:false, pend:false};
+var recTake = false;   // REC: a live take is under way; its notes become one undo step when it ends (recEndTake)
 function snap(){
-  if (undo.busy || undo.pend) return;
+  if (undo.busy || undo.pend || recTake) return;
   undo.pend = true;
   queueMicrotask(() => {
     undo.pend = false;
@@ -12946,7 +13226,7 @@ const SWINGB = ['8ths', '16ths', 'Triplet', 'Dotted-8th', 'Half', 'Wide-6', 'Wid
 function makeSeq(S, mode, o){
   const once = !!o.once, tr = []; let loop = o.loop || null;   // loop: {y0,y1} rows to cycle; api.setLoop swaps it while playing
   for (let t = 0; t <= MT; t++) tr.push({on:false, empty:false, row:0, cr:0, step:0, inst:0, rate:1, tsp:0, next:-1, last:null, rnl:{}, rnlNote:0, nth:new Map(), arc:{mode:0, spd:1},
-    rel:0, g:0, grv:null});
+    rel:0, g:0, grv:null, dir:0, pp:1, cnt:0});   // dir/pp/cnt: DIR's play direction, ping-pong heading, steps played this pass
   const api = {time:0, bpm:S.bpm, tks:clamp(S.ticks || TICKS, 1, 32), grv:null, base:null, bt:0, btT:null};
   const lenOf = id => id >= 0 && S.plen ? clamp(S.plen[id] || 16, 1, PROWS) : 16;
   // A numbered song cell whose sect has no phrases still plays one empty pattern; use the project's
@@ -13010,6 +13290,13 @@ function makeSeq(S, mode, o){
     for (let k = 0, tt = at; tt < end - 1e-6 && k < 96; k++, tt += spd * tick)
       out.push([tt, Math.pow(2, (m === 3 ? pat[Math.floor(rand() * 3)] : pat[k % pat.length]) / 12)]);
     return out;
+  }
+  // DIR: the row after y in a phrase of L rows, going backwards, ping-pong (the ends once) or at random.
+  function dirNext(T, y, L){
+    if (T.dir === 1) return y > 0 ? y - 1 : L - 1;
+    if (T.dir === 3) return Math.floor(rand() * L);
+    let n = y + T.pp; if (n >= L){ T.pp = -1; n = Math.max(0, L - 2); } else if (n < 0){ T.pp = 1; n = Math.min(L - 1, 1); }
+    return n;
   }
   // The row a track is about to play, and the value of a TIC command on it (null when there is none).
   const r0 = (T, pid) => { const ph = pid >= 0 ? S.phrases[pid] : null; return ph ? ph[T.step] : null; };
@@ -13092,6 +13379,7 @@ function makeSeq(S, mode, o){
         if (fx.SED != null) seeded = fx.SED ? {s:fx.SED * 2654435761 >>> 0} : null;
         if (fx.TSP != null) T.tsp = s8(fx.TSP);
         if (fx.ARC != null) T.arc = {mode:fx.ARC >> 4, spd:(fx.ARC & 15) || 1};
+        if (fx.DIR != null){ T.dir = Math.min(3, fx.DIR); T.pp = T.dir === 1 ? -1 : 1; }   // DIR: from the next row on
         if (fx.HOP != null) hop = Math.min(fx.HOP, PROWS - 1);
         let play = true;
         if (fx.NTH != null){ const X = (fx.NTH >> 4) || 1, Y = (fx.NTH & 15) || 1, key = pid + ':' + T.step, n = T.nth.get(key) || 0;
@@ -13104,7 +13392,9 @@ function makeSeq(S, mode, o){
           let mi = -1;
           const miOf = () => mi >= 0 ? mi : (mi = fx.INS != null ? clamp(fx.INS, 0, NI - 1) : r[IC] >= 0 ? r[IC] : T.inst);
           if (fx.PGM != null) evs.push({type:'mpg', t:at, track:t, ii:miOf(), v:Math.min(127, fx.PGM)});
-          for (let k = 0; k < NCC; k++){ const v = fx[CC_CMDS[k]]; if (v != null) evs.push({type:'mcc', t:at, track:t, ii:miOf(), k, v:Math.min(127, v)}); }
+          // CSL: the CC commands on this row glide to their value (over its ticks; 00 across the step) instead of jumping.
+          const ramp = fx.CSL != null ? (fx.CSL ? fx.CSL * tick : Math.max(0, end - at)) : 0;
+          for (let k = 0; k < NCC; k++){ const v = fx[CC_CMDS[k]]; if (v != null) evs.push({type:'mcc', t:at, track:t, ii:miOf(), k, v:Math.min(127, v), ramp}); }
         }
         const pit = (fx.PIT != null ? s8(fx.PIT) : 0) + (fx.FIN != null ? s8(fx.FIN) / 100 : 0);
         const mods = {arp:null, bend:null, vib:null};
@@ -13124,25 +13414,30 @@ function makeSeq(S, mode, o){
           else if (fx.PVB) mods.vib = {spd:fx.PVB >> 4, dep:fx.PVB & 15, t1:end};
           const every = (fx.RET || 0) & 15, fade = (fx.RET || 0) >> 4;
           let firstRate = 0;
+          // KEY FOLLOW instruments: live transpose (live only) and the song's scale, before PIT/FIN. HUMAN TIME / HUMAN VEL:
+          // each note a little early or late (± ms) and a little softer (up to %), on the song's random numbers (SED repeats them).
+          const kf = !!I.kf, lx = kf && o.live ? lxp.st : 0, nOf = x => { const b = x + ctsp + I.tsp + T.tsp + nrnd + lx; return (kf ? scaleSnap(S, b) : b) + pit; };
+          const hut = clamp(I.hut | 0, 0, 50) / 1000, huv = clamp(I.huv | 0, 0, 90) / 100;
           notes.forEach((n, q) => {
-            const note = n + ctsp + I.tsp + T.tsp + pit + nrnd, rel = note - ROOT, npc = ((rel % 12) + 12) % 12, ntc = (S.tune && S.tune[npc]) || 0, rate = Math.pow(2, rel / 12) * Math.pow(2, ntc / 1200);
+            const nat = hut ? Math.max(t0 - hut, at + (rand() * 2 - 1) * hut) : at, hg = huv ? 1 - rand() * huv : 1;
+            const note = nOf(n), rel = note - ROOT, npc = ((rel % 12) + 12) % 12, ntc = (S.tune && S.tune[npc]) || 0, rate = Math.pow(2, rel / 12) * Math.pow(2, ntc / 1200);
             if (!q) firstRate = rate;
-            const ev = {type:'note', t:at, track:t, poly, col:ncol[q], pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
-              rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? at + fx.KIL * tick : null, rel:fx.OFF != null ? at + fx.OFF * tick : null,
+            const ev = {type:'note', t:nat, track:t, poly, col:ncol[q], pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain:gain * hg, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
+              rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? nat + fx.KIL * tick : null, rel:fx.OFF != null ? nat + fx.OFF * tick : null,
               slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
-              ii, mn:note + 12 + ntc / 100, vel:(fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out
+              ii, mn:note + 12 + ntc / 100, vel:hg * (fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255, tick};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out; tick: NOTE LEN
             if (!o.sim && ((I.slc | 0) > 1 || I.sync)){ const c = o.live ? ensurePlay(ev.pad) : ensure(ev.pad); if (c){ applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; } }
             evs.push(ev);
             if (every){ let k = 1;
-              for (let tt = at + every * tick; tt < end - 1e-6 && k < 64; tt += every * tick, k++)
-                evs.push(Object.assign({}, ev, {t:tt, slide:null, arp:null, bend:null, vib:null, cut:ev.cut != null ? tt + (ev.cut - at) : null,
-                  rel:ev.rel != null ? tt + (ev.rel - at) : null, gain:ev.gain * Math.max(0, 1 - fade * k / 16), vel:ev.vel * Math.max(0, 1 - fade * k / 16)}));
+              for (let tt = nat + every * tick; tt < end - 1e-6 && k < 64; tt += every * tick, k++)
+                evs.push(Object.assign({}, ev, {t:tt, slide:null, arp:null, bend:null, vib:null, cut:ev.cut != null ? tt + (ev.cut - nat) : null,
+                  rel:ev.rel != null ? tt + (ev.rel - nat) : null, gain:ev.gain * Math.max(0, 1 - fade * k / 16), vel:ev.vel * Math.max(0, 1 - fade * k / 16)}));
             }
           });
           T.rate = firstRate * (mods.bend ? mods.bend.mul : 1);
           // SOUNDING NOTES (the phrase screen's piano): the pitches this row really starts, by note column, with every
           // transpose (sect, instrument, TSP, PIT, random) applied.
-          { const tr = ctsp + I.tsp + T.tsp + pit + nrnd; pos[t].sc = ns.map((x, c) => x >= 0 && x < 120 ? [c, Math.round(x + tr)] : null).filter(Boolean); }
+          pos[t].sc = ns.map((x, c) => x >= 0 && x < 120 ? [c, Math.round(nOf(x))] : null).filter(Boolean);
           pos[t].pd = vtrk ? voiceForTrack(t) : I.pad;   // the pad it plays (the drumming dogs: 00–07 the kit, the rest bongos)
         } else if (!notes.length && !offN && play && t < MT){
           // No note on this row: instrument commands change the note that is already playing.
@@ -13163,10 +13458,17 @@ function makeSeq(S, mode, o){
       if (muted){ evs.length = ev0; if (!T.mut) evs.push({type:'off', t:t0, track:t}); delete pos[t].sc; pos[t].off = true; }   // entering a muted block silences what is ringing
       T.mut = muted;
       const L = (mode === 'song' && pid < 0) ? emptyLen() : lenOf(pid);
-      if (hop >= 0){ T.step = L; T.next = hop; } else T.step++;
+      // DIR: backwards, ping-pong or random steps; a pass still lasts L steps (T.cnt), so the song keeps its timing. dirGo:
+      // where the next pass starts (-1 the top, Infinity the bottom, -2 a random row, else a row).
+      let dirGo = -1; T.cnt++;
+      if (hop >= 0){ T.step = L; T.next = hop; }
+      else if (!T.dir || loop) T.step++;
+      else if (T.cnt >= L){ dirGo = T.dir === 1 ? Infinity : T.dir === 3 ? -2 : dirNext(T, T.step, L); T.step = L; }
+      else T.step = dirNext(T, T.step, L);
       // A phrase selection loops mid-phrase: wrap as soon as the step passes the loop's last row.
       if (mode === 'phrase' && loop && T.next < 0 && (T.step > loop.y1 || T.step < loop.y0)) T.step = loop.y0;
       if (T.step >= L){
+        T.cnt = 0;
         T.step = T.next >= 0 ? T.next : 0; T.next = -1;
         if (mode === 'phrase'){ if (loop && T.step >= loop.y1 + 1) T.step = loop.y0; }
         else { T.cr++;
@@ -13175,8 +13477,9 @@ function makeSeq(S, mode, o){
       }
       // The row just moved to: an empty numbered song cell counts as an empty pattern, so its steps
       // run to emptyLen() rather than the plain default.
-      { const np = mode === 'phrase' ? o.phrase : T.on && !T.empty ? ((S.chains[sectId(T, t)] || [])[T.cr] || [-1])[0] : -1;
-        if (T.step >= ((mode === 'song' && np < 0) ? emptyLen() : lenOf(np))) T.step = 0; }
+      { const np = mode === 'phrase' ? o.phrase : T.on && !T.empty ? ((S.chains[sectId(T, t)] || [])[T.cr] || [-1])[0] : -1, L2 = (mode === 'song' && np < 0) ? emptyLen() : lenOf(np);
+        if (dirGo !== -1) T.step = dirGo === Infinity ? L2 - 1 : dirGo === -2 ? Math.floor(rand() * L2) : clamp(dirGo, 0, L2 - 1);
+        if (T.step >= L2) T.step = 0; }
       T.rel += dur; T.g++;
     }
     // TPO or TIC on this row: tell the player, so tempo-synced …chains modules follow (live and in renders).
@@ -13949,7 +14252,10 @@ function tStart(mode, o){
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; if (!slotAt(cache, i) && v && PW.ready && rwCan(v)) bgRender(i); else ensureLive(i); }
   sfPrepare(null);   // SoundFont pads load in the background (notes before that are silent)
   moStart(mode === 'song' ? o.row : -1);   // before the start time is set: the song position takes a moment to work out
-  seq.time = ctx.currentTime + 0.08; stageStart(seq.time);
+  // REC: a count-in plays its bars of clicks first (not when another device's clock starts us: it has its own timing).
+  const ci = rec.on && recS.cnt > 0 && !mx.slave ? recS.cnt * 4 * 60 / seq.bpm : 0;
+  seq.time = ctx.currentTime + 0.08 + ci; stageStart(seq.time);
+  met.next = 0; rec.hist = []; if (ci) countIn(ctx.currentTime + 0.08, recS.cnt, seq.bpm);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : ''});
   tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
@@ -14000,8 +14306,9 @@ function pumpRun(){
   while (s.alive() && s.time < ctx.currentTime + 0.25 && n++ < 64){
     const r = s.step(); for (const e of r.evs){ if (moEv(e)) continue; rt.pl.play(e); if (e.type === 'note') padBlink(e); } tp.q.push({t:r.t, pos:r.pos, bpm:s.bpm, tks:r.tks, line:r.line});
     mx.pend.forEach((P, t) => { if (P && P.length) pendFlush(t, r.t); });   // ARP returns due by this row, on tracks the row left alone
+    if (rec.on) recHist(r);   // REC: when each of the recording track's steps is heard
   }
-  moClock(s); moLfo(s);
+  moClock(s); moLfo(s); moRamp(); moEcho(); metRun(s);
 }
 // With the synth open, light each pad as the tracker plays it (in time with the sound).
 function padBlink(e){
@@ -14014,10 +14321,151 @@ function tStop(quiet){
   tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null;
   if (rt) rt.pl.stopAll(ctx.currentTime);
   moStop();
+  try { metStop(); recEndTake(); clearTimeout(rec.cntT); rec.cnt = 0; recBtn(); } catch(e){}   // REC: clicks booked ahead stop, the take is one undo step
   songBtn();
   chainsTempo();
   bgPlay(false);   // BACKGROUND PLAY
   if (!quiet) draw();
+}
+/* ===== REC, METRONOME AND COUNT-IN (20 Oct) =====
+   REC (the tracker's top strip, F9 or Alt+R) records a MIDI keyboard (Settings → MIDI → Keys play) and, while playing, the
+   computer keys and the keypad:
+   - Stopped (step record): a note, or the notes of a chord held together, go into the open phrase at the cursor (a poly
+     track's chord fills its note columns); the cursor moves down by EDIT STEP once every key is up.
+   - Playing (live record): each note lands on the step it was played on, in the phrase the track under the cursor is
+     playing (rec.hist: when each of that track's steps was heard, from the pump). REC TIMING: STEP, the nearest step;
+     TICKS keeps the timing as a DEL in an empty effect column. Velocity goes in the volume column (REC VELOCITY); letting
+     a key go writes an OFF on the step it was let go on (REC NOTE OFFS; MIDI instruments and synth slots only, a drum
+     pad rings out). A whole take is one undo step (recTake holds snap() until STOP or REC off).
+   METRONOME: a click on every beat (higher on the bar) while recording, always, or never; COUNT-IN: one or two bars of
+   clicks before a recording starts (not when Clock in starts us). Clicks go to the output, never into renders.
+   To take it out: this block, the REC/CLICK buttons (tRecBar), the hooks marked REC in tStart, tStop, pumpRun, snap,
+   typeNote, keysDown, globalKeys and kbOn/kbOff, and the Record & play rows and sheet. */
+const RECK = 'thunderplus-rec-v1';
+const recS = (() => { const d = {met:1, lvl:60, cnt:1, q:1, vel:1, offs:1};
+  try { const j = JSON.parse(localStorage.getItem(RECK) || 'null'); if (j) for (const k in d) if (Number.isFinite(+j[k])) d[k] = +j[k]; } catch(e){} return d; })();
+const recSave = () => { try { localStorage.setItem(RECK, JSON.stringify(recS)); } catch(e){} };
+const rec = {on:false, hist:[], cnt:0, cntT:0, chord:null, said:0, rot:0};
+const MET_NAMES = ['OFF', 'REC', 'ON'];
+const metOn = () => recS.met === 2 || (recS.met === 1 && rec.on);
+function recBtn(){
+  const b = $('tRec'); if (b){ b.classList.toggle('on', rec.on); b.classList.toggle('cnt', rec.cnt > 0); b.setAttribute('aria-pressed', String(rec.on)); $('tRecN').textContent = rec.cnt > 0 ? 'COUNT' : rec.on ? 'ON' : 'OFF'; }
+  const m = $('tMet'); if (m){ m.classList.toggle('on', metOn()); m.setAttribute('aria-pressed', String(metOn())); $('tMetN').textContent = MET_NAMES[recS.met]; }
+}
+function recSay(m){ const now = performance.now(); if (now - rec.said < 3000) return; rec.said = now; toast(m, 4000); }
+function setRec(on){
+  rec.on = !!on; rec.chord = null;
+  if (!rec.on) recEndTake();
+  recBtn();
+  toast(!rec.on ? 'REC off' : tp.on ? 'REC: notes go into the track under the cursor as it plays.'
+    : 'REC: a note or chord on the MIDI keyboard goes at the cursor. PLAY records as it plays' + (recS.cnt ? ` (after a ${recS.cnt}-bar count-in).` : '.'), 4000);
+}
+function setMet(v){ recS.met = clamp(v | 0, 0, 2); recSave(); recBtn(); toast('Metronome ' + ['off', 'on while recording', 'on'][recS.met]); }
+$('tRec').addEventListener('click', () => setRec(!rec.on));
+$('tMet').addEventListener('click', () => setMet((recS.met + 1) % 3));
+// A take ends (STOP, REC off): everything it wrote becomes one undo step.
+function recEndTake(){ if (!recTake) return; recTake = false; try { snap(); } catch(e){} }
+// The track REC writes into: the one under the cursor (the Song screen's column, else the open phrase's track).
+const recTrack = () => tv === 'song' ? (cs.song.x < MT ? cs.song.x : -1) : (cTrack < MT ? cTrack : -1);
+// The pump notes when each step of the recording track is heard, so a note can find the step it was played on.
+function recHist(r){
+  const t = recTrack(); if (t < 0) return; const P = r.pos[t]; if (!P) return;
+  rec.hist.push({t:r.t, ph:P.phrase, y:P.step, tr:t, tks:r.tks || TICKS, bpm:tp.seq ? tp.seq.bpm : S.bpm});
+  while (rec.hist.length > 4 && rec.hist[0].t < r.t - 8) rec.hist.shift();
+}
+// The step heard at audio time ta on track tr: {ph, y, del} (del: ticks late, in TICKS timing), or null.
+function recStep(ta, tr){
+  const H = rec.hist.filter(e => e.tr === tr); if (!H.length) return null;
+  let i = -1; for (let k = 0; k < H.length; k++){ if (H[k].t <= ta + 1e-6) i = k; else break; }
+  const lineOf = e => 60 / e.bpm / plpbOf(S, e.ph);
+  if (i < 0){ const f = H[0], d = H.length > 1 ? H[1].t - f.t : lineOf(f); return f.t - ta <= d / 2 ? {ph:f.ph, y:f.y, del:0} : null; }   // a little early for the first step
+  const e = H[i], n = H[i + 1], dur = n ? n.t - e.t : lineOf(e), off = ta - e.t;
+  if (recS.q){ if (n && off > dur / 2) return {ph:n.ph, y:n.y, del:0}; return {ph:e.ph, y:e.y, del:0}; }
+  const k = Math.round(off / (lineOf(e) / e.tks));
+  if (n && k >= e.tks) return {ph:n.ph, y:n.y, del:0};
+  return {ph:e.ph, y:e.y, del:clamp(k, 0, 255)};
+}
+const DELI = FXC.indexOf('DEL');
+// A note to record: note (tracker number, C-4 = 48), vol (00–FF, or -1: none), ii the instrument, h the held preview
+// (its note-off records the OFF), ts the moment it was played (performance.now() time).
+function recNote(note, vol, ii, h, ts){
+  if (!rec.on || view !== 'tracker') return;
+  note = clamp(Math.round(note), 0, 119);
+  if (tp.on) return recLive(note, vol, ii, h, ts);
+  if (tv !== 'phrase' || cTrack === MT) return recSay('REC writes notes into a phrase: open one (or press PLAY to record as the song plays).');
+  if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase();
+  const y = cs.phrase.y, row = S.phrases[cPhrase][y], poly = polyView();
+  // A chord: the keys held together go in one row. The first key of it starts the row afresh.
+  if (!rec.chord || rec.chord.y !== y || rec.chord.ph !== cPhrase){ rec.chord = {ph:cPhrase, y, n:0}; if (poly) for (let c = 0; c < NCOL; c++) row[c] = -1; }
+  if (h) h.recStep = true;
+  if (rec.chord.n >= (poly ? NCOL : 1)) return;   // a mono track keeps the first key; a poly row has four columns
+  const c = rec.chord.n++;
+  row[c] = note; row[IC] = ii;
+  if (vol >= 0 && recS.vel) row[VC] = c && row[VC] >= 0 ? Math.max(row[VC], vol) : vol;
+  last.note = note; last.inst = ii;
+  saveS(); draw();
+}
+function recLive(note, vol, ii, h, ts){
+  const tr = recTrack(); if (tr < 0) return recSay('REC: put the cursor on the track to record into.');
+  const at = recStep(p2a(ts || performance.now()), tr);
+  if (!at) return;   // the track hasn't started yet (counting in)
+  if (at.ph < 0) return recSay(`Track ${d2(tr + 1)} has no phrase here to record into: put a block on the song first.`);
+  if (!S.phrases[at.ph]) S.phrases[at.ph] = freshPhrase();
+  const row = S.phrases[at.ph][at.y], poly = isPolyT(tr);
+  let c = 0;
+  if (poly){ c = -1; for (let k = 0; k < NCOL; k++) if (row[k] < 0 || row[k] === OFF){ c = k; break; } if (c < 0) c = rec.rot = (rec.rot + 1) % NCOL; }
+  row[c] = note; row[IC] = ii; if (vol >= 0 && recS.vel) row[VC] = vol;
+  if (!recS.q){   // TICKS: the note's lateness as DEL (in an empty effect column, or the row's DEL)
+    let m = -1; for (let k = FX0; k < RW; k += 2) if (row[k] === DELI){ m = k; break; }
+    if (m < 0 && at.del > 0) for (let k = FX0; k < RW; k += 2) if (row[k] < 0){ m = k; break; }
+    if (m >= 0){ if (at.del > 0){ row[m] = DELI; row[m + 1] = at.del; } else { row[m] = -1; row[m + 1] = -1; } }
+  }
+  if (h) h.rec = {ph:at.ph, y:at.y, col:c, tr, ii};
+  recTake = true; saveS(); draw();
+}
+function recOff(h){
+  if (!rec.on || !h) return;
+  if (h.recStep){ if (!kb.held.size && !compHeld.size){ rec.chord = null; if (view === 'tracker' && tv === 'phrase'){ down1(); draw(); } } return; }
+  if (!h.rec || !tp.on || !recS.offs) return;
+  const r0 = h.rec, I = S.insts[r0.ii]; if (!I || (!(I.mo | 0) && !isSyn(I.pad))) return;   // a drum pad rings out
+  const at = recStep(p2a(performance.now()), r0.tr); if (!at || at.ph < 0 || (at.ph === r0.ph && at.y === r0.y)) return;   // shorter than a step
+  const p = S.phrases[at.ph] || (S.phrases[at.ph] = freshPhrase()), row = p[at.y];
+  if (row[r0.col] >= 0) return;   // a note already starts there (played legato): it ends this one
+  row[r0.col] = OFF; recTake = true; saveS(); draw();
+}
+// The computer keys and the keypad while REC plays along: the note is heard and recorded at the playhead, not the cursor.
+const compHeld = new Map();
+function recKey(note, code){
+  const ii = kbInst(); let h = null; try { h = preview(ii, note, -1, true, null, true); } catch(e){}
+  recNote(note, -1, ii, h, performance.now());
+  if (code && h){ const o = compHeld.get(code); if (o) previewOff(o); compHeld.set(code, h); } else if (h) setTimeout(() => previewOff(h), 180);
+}
+document.addEventListener('keyup', e => { const h = compHeld.get(e.code); if (h){ compHeld.delete(e.code); try { recOff(h); } catch(err){} previewOff(h); } });
+// METRONOME: clicks booked like the MIDI clock, on the song's beat clock (mx.beat, the last beat event) up to what the
+// sequencer has booked and at most 100 ms ahead, so none sound after STOP. met.next: the next beat to click.
+const met = {next:0, nodes:[]};
+function click(t, acc){
+  if (!ctx || !master) return;
+  const o = ctx.createOscillator(), g = ctx.createGain(), lv = clamp(recS.lvl, 0, 100) / 100 * (acc ? 0.55 : 0.35), t0 = Math.max(t, ctx.currentTime);
+  o.type = 'triangle'; o.frequency.value = acc ? 1568 : 1046;
+  g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(lv, t0 + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.06);
+  o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + 0.08); met.nodes.push(o);
+  o.onended = () => { try { g.disconnect(); } catch(e){} const i = met.nodes.indexOf(o); if (i >= 0) met.nodes.splice(i, 1); };
+}
+function metRun(s){
+  const b = mx.beat; if (!b || !ctx) return;
+  const upto = Math.min(s.time, ctx.currentTime + 0.1);
+  for (let n = 0; n < 32; n++){
+    const tk = b.t + (met.next - b.b) * 60 / s.bpm; if (tk > upto + 1e-6) break;
+    if (metOn() && tk >= ctx.currentTime - 0.02) click(tk, met.next % 4 === 0);
+    met.next++;   // counted even while off, so switching it on mid-song stays on the beat
+  }
+}
+function metStop(){ for (const o of met.nodes) try { o.stop(); } catch(e){} met.nodes = []; }
+// COUNT-IN: bars of clicks before the song starts; tStart moves the song's start after them.
+function countIn(t0, bars, bpm){
+  const n = bars * 4, d = 60 / bpm; for (let k = 0; k < n; k++) click(t0 + k * d, k % 4 === 0);
+  rec.cnt = n; recBtn(); clearTimeout(rec.cntT); rec.cntT = setTimeout(() => { rec.cnt = 0; recBtn(); }, (t0 - ctx.currentTime + n * d) * 1000);
 }
 /* ===== BACKGROUND PLAY (setting BACKGROUND PLAY, App section; 18 Oct) =====
    Chrome on Android only treats a page as a media player, with a playback notification and the foreground service
@@ -14058,14 +14506,28 @@ function bgPlay(on){
   } else if (bgEl && !bgEl.paused) bgEl.pause();
 }
 /* ===== END BACKGROUND PLAY ===== */
-function preview(ii, note, vol, poly, when){
+// hold (20 Oct): the note sounds until previewOff(handle) instead of a fixed moment, for keys held down (a MIDI keyboard
+// playing the current instrument, a computer key typing a note). Each held note is its own column on the preview bus,
+// so letting one key go leaves the others sounding. Drum pads ring out as before.
+let pvHoldN = 0;
+function preview(ii, note, vol, poly, when, hold){
   audioWake = performance.now();
-  const r = rtInit(), I = S.insts[ii] || S.insts[0], t = (when || ctx.currentTime) + 0.005;
-  const ev = {type:'note', t, track:NT, poly:!!poly, pad:I.pad, rate:Math.pow(2, (note + I.tsp - ROOT) / 12),
-    gain:curve(vol >= 0 ? vol : 255) * curve(I.vol), pan:I.pan, ofs:I.ofs, rev:!!I.rev, cut:null, slide:null, rel:isSyn(I.pad) ? t + 0.45 : null};
-  if (I.mo){ moNote(Object.assign({}, ev, {poly:true, mn:note + I.tsp + 12, vel:vol >= 0 ? vol / 255 : 1, rel:t + 0.3}), I); if (I.mo === 1) return; }   // a MIDI instrument previews on its gear
+  const r = rtInit(), I = S.insts[ii] || S.insts[0], t = (when || ctx.currentTime) + 0.005, col = hold ? 'h' + (++pvHoldN) : undefined;
+  const ev = {type:'note', t, track:NT, poly:!!poly, col, pad:I.pad, rate:Math.pow(2, (note + I.tsp - ROOT) / 12),
+    gain:curve(vol >= 0 ? vol : 255) * curve(I.vol), pan:I.pan, ofs:I.ofs, rev:!!I.rev, cut:null, slide:null, rel:hold ? null : isSyn(I.pad) ? t + 0.45 : null};
+  const h = hold ? {ii, col, syn:isSyn(I.pad) && (I.mo | 0) !== 1, nid:null, done:false} : null;
+  if (I.mo){   // a MIDI instrument previews on its gear
+    const nid = moNote(Object.assign({}, ev, {poly:true, cap:hold ? 16 : 4, mn:note + I.tsp + 12, vel:vol >= 0 ? vol / 255 : 1, rel:hold ? null : t + 0.3}), I);
+    if (h) h.nid = nid; if (I.mo === 1) return h; }
   if ((I.slc | 0) > 1 || I.sync){ const c = ensure(I.pad); applyChop(ev, I, I.pad, note, I.tsp, S.bpm, c.data, c.sr); }
-  r.pl.play(ev);
+  r.pl.play(ev); return h;
+}
+// Let a held preview go: its MIDI note ends, a synth pad fades over its release (a drum pad was left to ring).
+function previewOff(h, at){
+  if (!h || h.done) return; h.done = true;
+  const t = Math.max(at || 0, ctx ? ctx.currentTime : 0);
+  if (h.nid != null) offNote(NT, h.nid, t);
+  if (h.syn && rt) try { rt.pl.play({type:'off', t, track:NT, cols:[h.col]}); } catch(e){}
 }
 // PLAY SLICES on INST: every slice once, in order, a sixteenth apart at the song tempo (or each at its own length).
 function playSlices(ii){
@@ -14257,6 +14719,177 @@ async function openProj(){
   }
   $('projIn').click();
 }
+/* ---------- MIDI FILES (20 Oct): export the song as .mid, import a .mid into phrases ----------
+   EXPORT (File ▾ → Export MIDI file, Project → › EXPORT MIDI FILE): the song from RENDER FROM, as a render plays it (the
+   same sequencer: transposes, TPO, HOP, CHA, RET, ARP and grooves included; muted tracks left out), as a Standard MIDI
+   File, type 1, 480 ticks a beat: a tempo track, then one track per tracker track. A MIDI instrument keeps its channel
+   and note; a synth slot's note is its pitch (C-4 = 60); a drum pad (one-shot) is one note per pad, the pad's MIDI note
+   (36–43 for pads 00–07 by default), on channel 10, so a DAW or the MPC can map it to a drum. Notes end where the tracker
+   ends them (OFF, KIL, the next note on a mono track or in the same column of a poly one, an instrument's NOTE LEN);
+   drum hits last a 16th. CCA–CCD and PGM go in as CC and program change; pitch bends (PSL, PBN, PVB) are left out.
+   IMPORT (File ▾ → Import MIDI file…): each MIDI track with notes (a type 0 file: each channel) goes into the tracker
+   track under the cursor and the ones after it, from the song cursor's row down, a phrase per PATTERN LEN steps at the
+   song's LPB (identical phrases shared, one empty phrase for the silent ones). Velocity goes in the volume column, an
+   OFF where a note ends before the next (not on channel 10), a chord in a poly track's note columns (a mono track keeps
+   the top note); REC TIMING TICKS keeps how late a note was as DEL. Instruments: the current one, the next for the next
+   track, and so on. */
+const MID_PPQ = 480;
+// A drum pad's note in a MIDI file: the note it answers to in Settings → MIDI, else 36 up from pad 00.
+const drumNote = pad => clamp(midi.notes[pad] >= 0 ? midi.notes[pad] : 36 + pad, 0, 127);
+function songMidiEvents(){
+  const seq = makeSeq(S, 'song', {row:S.renderFrom, once:true, sim:true});
+  if (!seq.alive()) return null;
+  const tempo = [], tr = Array.from({length:NT}, () => []), open = Array.from({length:NT}, () => []);
+  let lb = {t:seq.time, b:0, bpm:seq.bpm}, guard = 0, lastB = 0;
+  const bOf = t => lb.b + (t - lb.t) * lb.bpm / 60, tk = b => Math.max(0, Math.round(b * MID_PPQ));
+  const close = (t, o, b) => { const end = Math.min(b, o.max); tr[t].push({k:tk(Math.max(end, o.b + 1 / MID_PPQ)), o:0, d:[0x80 | o.ch, o.n, 0]}); };
+  const closeIf = (t, b, f) => { const keep = []; for (const o of open[t]) if (f(o)) close(t, o, b); else keep.push(o); open[t] = keep; };
+  tempo.push({k:0, bpm:seq.bpm});
+  while (seq.alive() && seq.time < 1200 && guard++ < 200000){
+    const bpm0 = seq.bpm, r = seq.step();
+    for (const e of r.evs){
+      if (e.type === 'beat'){ lb = {t:e.t, b:e.b, bpm:bpm0}; continue; }
+      if (e.type === 'tempo'){ tempo.push({k:tk(bOf(e.t)), bpm:e.bpm}); continue; }
+      const t = e.track; if (!(t >= 0 && t < NT) || !audible(t)) continue;
+      const b = bOf(e.t); lastB = Math.max(lastB, b);
+      if (e.type === 'off'){ closeIf(t, b, o => !e.cols || e.cols.includes(o.col)); continue; }
+      if (e.type === 'mod'){ const end = Math.min(e.cut != null ? e.cut : Infinity, e.rel != null ? e.rel : Infinity); if (end < Infinity) for (const o of open[t]) o.max = Math.min(o.max, bOf(end)); continue; }
+      if (e.type === 'mcc' || e.type === 'mpg'){ const I = S.insts[e.ii]; if (!I) continue; const ch = midCh(I, t);
+        tr[t].push(e.type === 'mpg' ? {k:tk(b), o:1, d:[0xC0 | ch, e.v & 127]} : {k:tk(b), o:1, d:[0xB0 | ch, ccNum(I, e.k), clamp(e.v, 0, 127)]}); continue; }
+      if (e.type !== 'note' || !(e.vel > 0)) continue;
+      const I = S.insts[e.ii] || S.insts[0], drum = !(I.mo | 0) && !isSyn(I.pad), ch = midCh(I, t);
+      const n = drum ? drumNote(I.pad) : clamp(Math.round(e.mn), 0, 127), vel = clamp(Math.round(e.vel * 127), 1, 127);
+      // what this note ends: the track's last note (mono), its column's (poly), the same key on the channel
+      closeIf(t, b, o => !e.poly || (e.col != null && o.col === e.col) || (o.n === n && o.ch === ch));
+      let max = Math.min(e.cut != null ? bOf(e.cut) : Infinity, e.rel != null ? bOf(e.rel) : Infinity);
+      if (drum) max = Math.min(max, b + 0.25);
+      if ((I.mo | 0) && I.mlen > 0 && e.tick > 0) max = Math.min(max, bOf(e.t + I.mlen * e.tick));   // NOTE LEN
+      if (e.arp && e.arp.length > 1){   // ARP: a note a step
+        const segs = arpSegs(e.arp, e.t, Infinity);
+        segs.forEach(([tt, d], i) => { const b0 = bOf(tt), b1 = i < segs.length - 1 ? bOf(segs[i + 1][0]) : b0 + (bOf(segs[1][0]) - bOf(segs[0][0]));
+          const nn = clamp(n + d, 0, 127); tr[t].push({k:tk(b0), o:2, d:[0x90 | ch, nn, vel]}); tr[t].push({k:tk(Math.min(b1, max)), o:0, d:[0x80 | ch, nn, 0]}); });
+        continue;
+      }
+      tr[t].push({k:tk(b), o:2, d:[0x90 | ch, n, vel]});
+      open[t].push({n, ch, col:e.col, b, max});
+    }
+    lastB = Math.max(lastB, bOf(r.t + r.line), seq.alive() ? bOf(seq.time) : 0);   // the last row's end (the sequencer's time stops at its start)
+  }
+  for (let t = 0; t < NT; t++) closeIf(t, lastB, () => true);
+  return {tempo, tr, lastB};
+}
+// A track's channel in the file: a MIDI instrument's own, drum pads 10, the rest one per track (skipping 10).
+function midCh(I, t){ if (I.mo | 0) return (I.mch | 0) & 15; if (!isSyn(I.pad)) return 9; const c = t % 15; return c >= 9 ? c + 1 : c; }
+function smfBytes(tracks){
+  const out = [], u32 = v => [v >>> 24 & 255, v >>> 16 & 255, v >>> 8 & 255, v & 255];
+  const vlq = v => { const b = [v & 127]; while ((v >>>= 7)) b.unshift((v & 127) | 128); return b; };
+  out.push(...[77, 84, 104, 100], ...u32(6), 0, 1, tracks.length >> 8, tracks.length & 255, MID_PPQ >> 8, MID_PPQ & 255);
+  for (const evs of tracks){
+    evs.sort((a, b) => a.k - b.k || a.o - b.o);   // note-offs before CC before note-ons at the same tick
+    const body = []; let last = 0;
+    for (const e of evs){ body.push(...vlq(Math.max(0, e.k - last)), ...e.d); last = Math.max(last, e.k); }
+    body.push(0, 0xFF, 0x2F, 0);
+    out.push(77, 84, 114, 107, ...u32(body.length), ...body);
+  }
+  return new Uint8Array(out);
+}
+const metaText = (k, type, s) => { const b = [...new TextEncoder().encode(s)].slice(0, 120); return {k, o:-1, d:[0xFF, type, b.length, ...b]}; };
+function exportMidiFile(){
+  tStop();
+  const m = songMidiEvents();
+  if (!m) return toast(`Nothing to export: row ${rS(S.renderFrom, 3)} is empty. Set RENDER FROM to the first row of the song.`);
+  const t0 = [metaText(0, 3, S.name || 'Song'), {k:0, o:-1, d:[0xFF, 0x58, 4, 4, 2, 24, 8]}];
+  for (const q of m.tempo){ const us = Math.round(60000000 / q.bpm); t0.push({k:q.k, o:-1, d:[0xFF, 0x51, 3, us >> 16 & 255, us >> 8 & 255, us & 255]}); }
+  const tracks = [t0]; let n = 0;
+  for (let t = 0; t < NT; t++){ const evs = m.tr[t]; if (!evs.length) continue; n++; tracks.push([metaText(0, 3, 'Track ' + d2(t + 1)), ...evs]); }
+  if (!n) return toast('Nothing to export: no notes play (or every track with notes is muted).');
+  deliver(safe(S.name || 'Song') + '.mid', new Blob([smfBytes(tracks)], {type:'audio/midi'}));
+}
+// Reading a .mid: {ppq, tempo (first, BPM), tracks:[{name, notes:[{k, n, v, ch, end}]}]}; type 0 files split by channel.
+function parseSmf(buf){
+  const d = new Uint8Array(buf), s4 = i => String.fromCharCode(d[i], d[i + 1], d[i + 2], d[i + 3]), u32 = i => (d[i] << 24 | d[i + 1] << 16 | d[i + 2] << 8 | d[i + 3]) >>> 0, u16 = i => d[i] << 8 | d[i + 1];
+  if (s4(0) !== 'MThd') throw new Error('not a MIDI file');
+  const fmt = u16(8), ntr = u16(10), div = u16(12); if (div & 0x8000) throw new Error('SMPTE timing isn’t supported');
+  let p = 8 + u32(4), tempo = 0; const out = [];
+  for (let n = 0; n < ntr && p + 8 <= d.length; n++){
+    if (s4(p) !== 'MTrk'){ p += 8 + u32(p + 4); n--; if (p >= d.length) break; continue; }
+    const end = Math.min(d.length, p + 8 + u32(p + 4)); let i = p + 8, k = 0, rs = 0, name = '';
+    const notes = [], on = new Map();
+    const vlq = () => { let v = 0, b; do { b = d[i++]; v = (v << 7) | (b & 127); } while (b & 128 && i < end); return v; };
+    while (i < end){
+      k += vlq(); let st = d[i];
+      if (st === 0xFF){ const ty = d[i + 1]; i += 2; const len = vlq();
+        if (ty === 0x51 && len === 3 && !tempo) tempo = 60000000 / (d[i] << 16 | d[i + 1] << 8 | d[i + 2]);
+        if (ty === 0x03 && !name) name = new TextDecoder().decode(d.slice(i, i + len));
+        i += len; continue; }
+      if (st === 0xF0 || st === 0xF7){ i++; const len = vlq(); i += len; continue; }
+      if (st & 0x80){ rs = st; i++; } else st = rs;
+      const ty = st & 0xF0, ch = st & 15, a = d[i], b = ty === 0xC0 || ty === 0xD0 ? 0 : d[i + 1]; i += ty === 0xC0 || ty === 0xD0 ? 1 : 2;
+      if (ty === 0x90 && b > 0){ const key = ch * 128 + a, x = {k, n:a, v:b, ch, end:-1}; notes.push(x); (on.get(key) || on.set(key, []).get(key)).push(x); }
+      else if (ty === 0x80 || (ty === 0x90 && b === 0)){ const q = on.get(ch * 128 + a); if (q && q.length) q.shift().end = k; }
+    }
+    for (const x of notes) if (x.end < 0) x.end = x.k + div / 4;
+    if (fmt === 0){ for (let c = 0; c < 16; c++){ const ns = notes.filter(x => x.ch === c); if (ns.length) out.push({name:name ? name + ' ch ' + (c + 1) : 'Channel ' + (c + 1), notes:ns}); } }
+    else if (notes.length) out.push({name, notes});
+    p = end;
+  }
+  return {ppq:div, tempo, tracks:out};
+}
+async function importMidiFile(f){
+  let m; try { m = parseSmf(await f.arrayBuffer()); } catch(e){ return toast('Couldn’t read that MIDI file' + (e && e.message ? ': ' + e.message : '') + '.', 5000); }
+  if (!m.tracks.length) return toast('That MIDI file has no notes.');
+  const t0 = tv === 'song' ? Math.min(cs.song.x, ntr() - 1) : Math.min(cTrack, ntr() - 1), y0 = cs.song.y;
+  const L = clamp(S.dlen || 16, 1, PROWS), lpb = S.lpb || 4, stepK = m.ppq / lpb, tks = S.ticks || TICKS;
+  const tracks = m.tracks.slice(0, Math.max(0, ntr() - t0));
+  const lastK = Math.max(...tracks.flatMap(x => x.notes.map(n => n.end)));
+  const nPh = Math.max(1, Math.min(256 - y0, Math.ceil((lastK / stepK + 0.5) / L)));
+  const busy = tracks.reduce((a, _, k) => a + S.song.slice(y0, y0 + nPh).filter(r => r[t0 + k] >= 0).length, 0);
+  if (busy && !await askYes({title:'Import over the song?', body:`${busy} song block${busy === 1 ? '' : 's'} on tracks ${d2(t0 + 1)}–${d2(t0 + tracks.length)} from row ${rS(y0, 3)} will be replaced. Their phrases are kept.`}, 'Import')) return;
+  const songEmpty = S.song.every(r => r.every(v => v < 0));
+  const made = new Map(); let empty = -1, placed = 0, out = false;
+  tracks.forEach((src, k) => {
+    if (out) return;
+    const t = t0 + k, poly = isPolyT(t), ii = clamp(last.inst + k, 0, NI - 1), drum = src.notes.every(n => n.ch === 9);
+    // Steps: [step, delay ticks] for a note starting at tick x
+    const stepOf = x => { const s = x / stepK; if (recS.q) return [Math.round(s), 0]; const f = Math.floor(s), dl = Math.round((s - f) * tks); return dl >= tks ? [f + 1, 0] : [f, dl]; };
+    const rows = new Map();   // step → notes starting there
+    for (const n of src.notes){ const [st, dl] = stepOf(n.k); if (!rows.has(st)) rows.set(st, []); rows.get(st).push({n, dl}); }
+    const total = nPh * L, ends = new Map();   // ends: step * 4 + column → the step that note ends on
+    const ph = Array.from({length:nPh}, () => freshPhrase()), cell = st => ph[Math.floor(st / L)][st % L];
+    for (let st = 0; st < total; st++){
+      const here = rows.get(st); if (!here) continue;
+      here.sort((a, b) => b.n.n - a.n.n || b.n.v - a.n.v);   // the top note first (a mono track keeps it)
+      const use = poly ? here.slice(0, NCOL) : here.slice(0, 1), r = cell(st);
+      use.forEach(({n, dl}, c) => { r[c] = clamp(n.n - 12, 0, 119); if (!drum) ends.set(st * 4 + c, Math.max(st + 1, stepOf(n.end)[0]));
+        if (dl && r[FX0] < 0){ r[FX0] = DELI; r[FX0 + 1] = dl; } });
+      r[VC] = Math.round(use[0].n.v / 127 * 255); r[IC] = ii;
+    }
+    // An OFF where a column's note ends before that column's next note.
+    for (let c = 0; c < (poly ? NCOL : 1); c++){
+      let endAt = -1;
+      for (let st = 0; st < total; st++){
+        const r = cell(st);
+        if (r[c] >= 0){ endAt = ends.has(st * 4 + c) ? ends.get(st * 4 + c) : -1; continue; }
+        if (st === endAt){ r[c] = OFF; endAt = -1; }
+      }
+    }
+    // Phrases: identical ones shared, the silent ones one empty phrase; then the song blocks.
+    for (let q = 0; q < nPh; q++){
+      const p = ph[q], isE = p.every(r => r.every(v => v < 0)), key = JSON.stringify(p);
+      let id = isE ? empty : (made.get(key) ?? -1);
+      if (id < 0){ id = freePhrase(); if (id < 0){ out = true; break; } S.phrases[id] = p; S.plen[id] = L; S.plpb[id] = 0; if (isE) empty = id; else made.set(key, id); }
+      setSongPhrase(t, y0 + q, id); placed++;
+      if (S.song[y0 + q][t] < 0){ out = true; break; }   // no sect left
+    }
+  });
+  if (songEmpty && m.tempo > 0){ S.bpm = clamp(Math.round(m.tempo), 40, 300); rtAllFx(); chainsTempo(); }
+  saveS(); draw();
+  const tempoNote = m.tempo > 0 ? (songEmpty ? ` Tempo ${S.bpm} BPM from the file.` : ` (the file is at ${Math.round(m.tempo)} BPM; the song stays at ${S.bpm})`) : '';
+  toast(`Imported ${tracks.length} MIDI track${tracks.length === 1 ? '' : 's'} into tracks ${d2(t0 + 1)}–${d2(t0 + tracks.length)} from row ${rS(y0, 3)}: ${placed} blocks, instrument ${hx(clamp(last.inst, 0, NI - 1))}${tracks.length > 1 ? ' and up' : ''}.` + tempoNote
+    + (m.tracks.length > tracks.length ? ` ${m.tracks.length - tracks.length} more didn’t fit (TRACKS).` : '') + (out ? ' Ran out of phrases or sects: the rest was left out.' : ''), 8000);
+}
+$('midIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importMidiFile(f); });
+
 /* ---------- bringing over ...Thunder's saved work ----------
    ...Thunder (the separate phone install) is retired: ...Thunder Plus is the one app, with Settings → App → Mobile.
    Both lived at the same address, so Plus can read what Thunder saved in this browser (thunder-kit-v1,
@@ -14523,8 +15156,9 @@ function instList(){
   pd.hidden = !inlOn || side;
   if (!inlOn) return;
   const rows = []; let sig = cInst + '|';
+  const shown = instShown();
   for (let i = 0; i < NI; i++){
-    const I = S.insts[i]; if (!I) continue;
+    const I = S.insts[i]; if (!I || (i >= 16 && i !== cInst && !shown.has(i))) continue;   // 10–3F only once used or set up
     const v = kit.voices[I.pad], pn = (v && v.name) || 'Pad ' + (I.pad + 1), mo = I.mo | 0;
     const nm = mo === 1 ? 'MIDI ' + PORTL[portOf(I)] + ' ch ' + d2((I.mch | 0) + 1) : pn + (mo === 2 ? ' +MIDI' : '');
     sig += nm + '/' + I.pad + ';';
@@ -14532,6 +15166,15 @@ function instList(){
   }
   if (sig === inlSig) return; inlSig = sig;
   const h = rows.join(''); $('tInlSide').innerHTML = h; pd.innerHTML = h;
+}
+// INST LIST with 64 instruments: 00–0F always, the rest once a phrase uses them or they've been changed (kept until the song changes).
+let instShownC = {v:-1, S:null, set:null};
+function instShown(){
+  if (instShownC.v === songVer && instShownC.S === S) return instShownC.set;
+  const set = new Set();
+  for (const ph of S.phrases) if (ph) for (const r of ph){ if (r[IC] >= 0) set.add(r[IC]); for (let m = FX0; m < RW; m += 2) if (FXC[r[m]] === 'INS') set.add(r[m + 1]); }
+  S.insts.forEach((I, k) => { if (k < 16 || set.has(k)) return; if (I.pad !== k && I.pad !== k % NSLOT){ set.add(k); return; } const a = Object.assign({}, I), b = freshInst(k); delete a.pad; delete b.pad; delete a.kf; delete b.kf; if (JSON.stringify(a) !== JSON.stringify(b)) set.add(k); });
+  instShownC = {v:songVer, S, set}; return set;
 }
 for (const id of ['tInlSide', 'tInlPad']) $(id).addEventListener('click', e => {
   const b = e.target.closest('[data-i]'); if (!b) return;
@@ -14567,10 +15210,16 @@ function instRows(){
   const I = S.insts[cInst], pre = () => preview(cInst, ROOT, -1);
   return [
     {l:'PAD', get:() => I.pad, set:v => I.pad = v, min:0, max:nslots() - 1, big:NPAD, d:cInst % nslots(), fmt:v => hx(v) + '  ' + (isSyn(v) ? 'SYNTH ' : '') + ((kit.voices[v] && kit.voices[v].name) || 'Pad ' + (v + 1)),
-      info:() => 'Which ...Thunder slot this instrument plays: 00–07 drum pads, 08–0F synths (they hold until a note OFF). EDIT plays it.', after:pre, tap:pre},
+      info:() => `Which ...Thunder slot this instrument plays (00–${hx(nslots() - 1)}): a ONE-SHOT slot (a drum) plays its whole sound, a HELD one (a synth) holds until a note OFF. Synth page › SLOTS sets how many. EDIT plays it.`, after:pre, tap:pre},
     {l:'TRANSPOSE', get:() => I.tsp, set:v => I.tsp = v, min:-48, max:48, big:12, d:0, info:v => sgn(v) + ' semitones on every note'},
     {l:'VOLUME', get:() => I.vol, set:v => I.vol = v, min:0, max:255, big:16, d:255, info:v => 'Instrument level ' + dB(curve(v))},
     {l:'PAN', get:() => I.pan, set:v => I.pan = v, min:0, max:255, big:16, d:128, info:panS},
+    {l:'KEY FOLLOW', tog:true, get:() => I.kf ? 1 : 0, set:v => I.kf = v ? 1 : 0, min:0, max:1, d:I.pad >= NPAD ? 1 : 0, fmt:v => v ? 'ON' : 'OFF',
+      info:v => v ? 'Follows LIVE TRANSPOSE (Settings → Record & play) and the song’s SCALE: for melodic parts' : 'Ignores LIVE TRANSPOSE and the song’s SCALE: for drums'},
+    {l:'HUMAN TIME', get:() => I.hut | 0, set:v => I.hut = v, min:0, max:50, big:5, d:0, fmt:v => v ? '±' + v + ' ms' : 'OFF',
+      info:() => 'Each note a little early or late at random, by up to this much (SED makes it repeat the same way)'},
+    {l:'HUMAN VEL', get:() => I.huv | 0, set:v => I.huv = v, min:0, max:90, big:10, d:0, fmt:v => v ? 'up to −' + v + '%' : 'OFF',
+      info:() => 'Each note a little softer at random, by up to this much (its volume, and the velocity it sends)'},
     {l:'OUTPUT', opts:true, get:() => I.mo | 0, set:v => { moRelease(); I.mo = v; }, min:0, max:2, d:0, gap:true,
       fmt:v => MO_NAMES[v] + (v && !midiOut(portOf(I)) ? `  port ${PORTL[portOf(I)]} has no cable: Settings › MIDI` : ''),
       info:v => ['Plays its pad', 'Sends its notes to its MIDI PORT on MIDI CH, and the pad stays quiet', 'Plays its pad and sends its notes to its MIDI PORT'][v]},
@@ -14582,6 +15231,8 @@ function instRows(){
         info:v => `Port ${PORTL[v]}: Settings › MIDI says which cable it is on this device, so the song plays the same on the phone and the computer`},
       {l:'BEND RANGE', get:() => pbrOf(I), set:v => I.pbr = v, min:1, max:48, big:12, d:2, fmt:v => '±' + v + ' semitones',
         info:() => 'Set it to the pitch bend range of the gear on this channel (often ±2, or ±12 / ±24), so PBN, PSL, PVB and fine tuning land in tune'},
+      {l:'NOTE LEN', get:() => I.mlen | 0, set:v => I.mlen = v, min:0, max:255, big:6, d:0, fmt:v => v ? v + ' ticks · ' + +(v / (S.ticks || TICKS)).toFixed(2) + ' steps' : 'HOLD',
+        info:v => v ? `Each note ends after ${v} ticks, unless OFF, KIL or the next note ends it sooner` : 'HOLD: a note lasts until OFF, KIL or the next note on its track (in its column on a poly track)'},
       ...CC_CMDS.map((c, k) => ({l:'CC ' + c[2], get:() => ccNum(I, k), set:v => { if (!Array.isArray(I.cc)) I.cc = CC_DEF.slice(); I.cc[k] = v; }, min:0, max:127, big:16, d:CC_DEF[k],
         fmt:v => String(v).padStart(3, '0') + (CC_NAMES[v] ? '  ' + CC_NAMES[v] : ''),
         info:v => `${c} in a phrase sends 00–7F to CC ${v} on this instrument’s port and channel`})),
@@ -14599,6 +15250,14 @@ function instRows(){
           info:() => 'The value it swings around'},
         {l:'LFO RESTART', tog:true, get:() => I.lrg ? 1 : 0, set:v => I.lrg = v ? 1 : 0, min:0, max:1, d:0, fmt:v => v ? 'NOTE' : 'FREE',
           info:v => v ? 'Starts again from the top at each note this instrument plays' : 'Runs from PLAY, in time with the song'},
+      ] : []),
+      {l:'ECHO', get:() => I.eco | 0, set:v => I.eco = v, min:0, max:16, big:4, d:0, gap:true, fmt:v => v ? v + (v === 1 ? ' REPEAT' : ' REPEATS') : 'OFF',
+        info:v => v ? `Each note sounds ${v} more time${v === 1 ? '' : 's'} on the gear, ECHO TIME apart` : 'MIDI echo: each note repeated on the gear, fading, in time with the song'},
+      ...(I.eco | 0 ? [
+        {l:'ECHO TIME', opts:true, get:() => echoRateI(I), set:v => I.ecr = ECHO_RATES[v][1], min:0, max:ECHO_RATES.length - 1, d:4, fmt:v => ECHO_RATES[v][0],
+          info:v => `A repeat every ${ECHO_RATES[v][0]} (T triplet, D dotted)`},
+        {l:'ECHO FADE', get:() => I.ecf == null ? 30 : I.ecf | 0, set:v => I.ecf = v, min:0, max:100, big:10, d:30, fmt:v => v + '%', info:() => 'How much softer each repeat is'},
+        {l:'ECHO PITCH', get:() => I.ecp | 0, set:v => I.ecp = v, min:-12, max:12, big:12, d:0, fmt:v => v ? sgn(v) + ' semitones' : 'SAME', info:() => 'Each repeat this many semitones higher (or lower) than the one before'},
       ] : []),
     ] : []),
     {l:'REVERSE', get:() => I.rev, set:v => I.rev = v ? 1 : 0, min:0, max:1, tog:true, d:0, gap:!!(I.mo | 0), fmt:v => v ? 'ON' : 'OFF', info:() => 'Play the pad backwards'},
@@ -14703,6 +15362,20 @@ function projRows(){
       info:() => 'KEYS mode with the keypad off: a panel at the bottom with a spectrum of the master, quick controls for the current instrument, its …chains and the current track’s effects, and a channel strip for the current track. Click INST, …CHAINS or FX to fold that part to a narrow strip; click the strip to open it again'},
     {l:'STAGE', opts:true, get:() => STG.indexOf(stage), set:v => setStage(STG[v]), min:0, max:STG.length - 1, d:0, fmt:v => STG_NAMES[v],
       info:() => 'Big screens: the space beside the grid. BY SCREEN: the dogs dance on Song and Project; Sect previews the phrase; Phrase shows a piano lighting the notes playing; Inst its waveform; Mixer the master spectrum; FX the effects chain. DOGS: the dogs everywhere. OFF: empty'},
+    // REC, METRONOME AND COUNT-IN (kept on this device, like the rows above)
+    {l:'METRONOME', sec:'Record & play', gap:true, opts:true, get:() => recS.met, set:v => setMet(v), min:0, max:2, d:1, fmt:v => ['OFF', 'WHILE RECORDING', 'ALWAYS'][v],
+      info:() => 'A click on every beat, higher on the first of the bar (CLICK on the top strip, Alt+M). WHILE RECORDING: only with REC on'},
+    {l:'CLICK LEVEL', get:() => recS.lvl, set:v => { recS.lvl = v; recSave(); }, min:0, max:100, step:5, big:10, d:60, fmt:v => v + '%', info:() => 'How loud the metronome is. It goes straight to the output, never into renders'},
+    {l:'COUNT-IN', opts:true, get:() => recS.cnt, set:v => { recS.cnt = v; recSave(); }, min:0, max:2, d:1, fmt:v => ['OFF', '1 BAR', '2 BARS'][v],
+      info:() => 'With REC on, PLAY clicks this many bars before the song starts, so you can come in on the first beat'},
+    {l:'LIVE TRANSPOSE', opts:true, get:() => lxp.mode, set:v => setLxp(v), min:0, max:2, d:0, fmt:v => LX_NAMES[v],
+      info:() => 'A key on the MIDI keyboard transposes the KEY FOLLOW instruments as the song plays, until the next one (now ' + sgn(lxp.st) + '). WHOLE KEYBOARD: every key, from C-4. KEYS BELOW C-4: those keys, from C-3; the rest play'},
+    {l:'REC TIMING', tog:true, get:() => recS.q ? 1 : 0, set:v => { recS.q = v ? 1 : 0; recSave(); }, min:0, max:1, d:1, fmt:v => v ? 'STEP' : 'TICKS',
+      info:() => recS.q ? 'STEP: a recorded note goes on the nearest step' : 'TICKS: a recorded note goes on the step it was played in, with a DEL for how late it was (in ticks), so the feel is kept'},
+    {l:'REC VELOCITY', ck:'Record velocity into the volume column', get:() => recS.vel ? 1 : 0, set:v => { recS.vel = v ? 1 : 0; recSave(); }, min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'How hard a MIDI key was played goes into the volume column (it is also the velocity a MIDI instrument sends). Off leaves the volume column empty'},
+    {l:'REC NOTE OFFS', ck:'Record note-offs for synths and MIDI', get:() => recS.offs ? 1 : 0, set:v => { recS.offs = v ? 1 : 0; recSave(); }, min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'While recording as it plays, letting a key go writes OFF on the step you let go on, so held notes keep their length. Only for MIDI instruments and synth slots: a drum pad rings out'},
     {l:'SCREEN', sec:'Screen', gap:true, opts:true, get:() => SCREENS.findIndex(x => x[0] === tScreen), set:v => setScreen(SCREENS[v][0]), min:0, max:SCREENS.length - 1, fmt:v => SCREENS[v][1], info:() => 'Colour of the screen: BY SCREEN gives Song, Sect, Phrase and the rest their own pastel (the same as their tabs), or pick one pastel, or black'},
     {l:'SKIN', opts:true, get:() => SKINS.findIndex(k => k.id === skin), set:v => applySkin(SKINS[v].id), min:0, max:SKINS.length - 1, fmt:v => SKINS[v].name.toUpperCase(), info:() => 'The look of the whole app: the ...Seeds skins'},
     {l:'SECT', ck:'Hide sect page', inv:true, get:() => sectsOn ? 1 : 0, set:v => setSects(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
@@ -14753,6 +15426,9 @@ function projRows(){
     {l:'› ALL PHRASES TO ' + (S.dlen || 16), dbl:true, act:() => { for (let i = 0; i < 256; i++) S.plen[i] = S.dlen || 16; saveS(); draw(); toast(`Every phrase now plays ${S.dlen || 16} rows. Notes past that are kept, just not played.`); },
       info:() => `Sets every phrase, used or not, to ${S.dlen || 16} rows. Rows past the end keep their notes. Tap EDIT twice`},
     {l:'SWING', get:() => S.swing, set:v => S.swing = v, min:50, max:75, big:5, d:50, fmt:v => v + '%', info:() => 'MPC swing amount: 50% is straight; higher pushes the off-beat of each pair later. 66–67% is the triplet feel'},
+    {l:'SCALE', opts:true, get:() => S.scale | 0, set:v => S.scale = v, min:0, max:SCALES.length - 1, d:0, fmt:v => SCALES[v][0],
+      info:() => 'KEY FOLLOW instruments (INST) play in this scale: a note outside it goes to the nearest note of it (the phrase keeps what you wrote). OFF: every note as written'},
+    {l:'SCALE ROOT', opts:true, get:() => S.sroot | 0, set:v => S.sroot = v, min:0, max:11, d:0, fmt:v => ROOTS[v], info:() => 'The note the SCALE starts on'},
     {l:'SWING NOTE', opts:true, get:() => clamp(S.swingB || 2, 1, 7), set:v => S.swingB = v, tap:() => S.swingB = (S.swingB || 2) % 7 + 1, min:1, max:7, d:2, fmt:v => SWINGB[v - 1],
       info:() => 'MPC swing note value: the beat the swing lands on (the hardware’s 1/16, 1/16T, 1/8, 1/8T… settings). 16ths pairs steps 2 3, 6 7…; 8ths pairs 1 2, 3 4…'},
     {l:'LIMITER', sec:'Mastering', gap:true, get:() => S.limiter ? 1 : 0, set:v => S.limiter = !!v, min:0, max:1, tog:true, d:1, fmt:onOff, after:rtRoute, info:() => 'Catches peaks on the master. Renders use it on the mix only, so stems stay clean'},
@@ -14763,6 +15439,8 @@ function projRows(){
     {l:'NORMALISE', get:() => ex.norm ? 1 : 0, set:v => ex.norm = !!v, min:0, max:1, tog:true, d:1, fmt:onOff, info:() => 'Raise the mix to just under 0 dB. Stems get the same gain, so they still add up to the mix'},
     {l:'› RENDER SONG', act:() => renderOut(false), gap:true, info:() => 'Stereo WAV of the song, from RENDER FROM to the end'},
     {l:'› RENDER STEMS', act:() => renderOut(true), info:() => 'A zip with the mix plus one stereo WAV per track, all the same length'},
+    {l:'› EXPORT MIDI FILE', act:exportMidiFile, info:() => 'The song from RENDER FROM as a .mid file, a track per tracker track (drum pads on channel 10), to finish in a DAW or load on the MPC'},
+    {l:'› IMPORT MIDI FILE', act:() => $('midIn').click(), info:() => 'Puts a .mid file’s tracks into the track under the cursor and the next ones, from the song cursor’s row down, as phrases'},
     ...(canShare && lastR ? [{l:'› SHARE LAST RENDER', act:shareLast, info:() => 'Send the last render to Koala, SunVox or another app'}] : []),
     {l:'› UPDATE APP', sec:'App', gap:true, act:() => checkUpdate(true), info:() => 'Reloads with the newest version (your song and kit are kept). The app also checks by itself when it opens'},
     {l:'BACKGROUND PLAY', ck:'Keep playing when you switch apps', get:() => bgOn ? 1 : 0, set:v => setBgOn(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
@@ -14817,8 +15495,16 @@ function pickUp(x, y, say){
 }
 const curS = () => `inst ${hx(last.inst)} · ${FXC[last.fxc]} ${hx(last.fxv)}`;
 // Hear a phrase row: the whole chord when the phrase is open from a polyphonic track.
-function aud(r){ const ii = r[IC] >= 0 ? r[IC] : defInst(), poly = polyView();
-  for (const n of poly ? r.slice(0, NCOL) : [r[0]]) if (n >= 0 && n < 120) preview(ii, n, r[VC], poly); }
+// A computer key typing the note (audKey, set by keysDown) holds the preview until that key is let go (20 Oct), so a MIDI
+// instrument or a synth pad sounds as long as you hold it; a tap, a click or the keypad still plays a short note.
+let audKey = null;
+const audHeld = new Map();
+function aud(r){ const ii = r[IC] >= 0 ? r[IC] : defInst(), poly = polyView(), hs = [];
+  for (const n of poly ? r.slice(0, NCOL) : [r[0]]) if (n >= 0 && n < 120){ const h = preview(ii, n, r[VC], poly, null, !!audKey); if (h) hs.push(h); }
+  if (audKey && hs.length){ const old = audHeld.get(audKey); if (old) old.forEach(h => previewOff(h)); audHeld.set(audKey, hs); } }
+const audRelease = code => { const hs = audHeld.get(code); if (hs){ audHeld.delete(code); hs.forEach(h => previewOff(h)); } };
+document.addEventListener('keyup', e => audRelease(e.code));
+window.addEventListener('blur', () => { for (const k of [...audHeld.keys()]) audRelease(k); try { releaseKeys(); } catch(e){} });
 function insertAt(x, y, k){
   if (k === 'tsp') return;
   if (k === 'fxv' && getCell(tv, x - 1, y) < 0) return toast('Pick an effect in the column to the left first.');
@@ -14839,8 +15525,8 @@ function bump(d, big){
       case 'sect': case 'phrase': case 'vol': case 'fxv': v = clamp(v + d * (big ? 16 : 1), 0, 255); break;
       case 'tsp': v = clamp(v + d * (big ? 12 : 1), -128, 127); break;
       case 'note': v = v === OFF ? last.note : clamp(v + d * (big ? 12 : 1), 0, 119); break;
-      // 16 instruments, 00–0F: the big step jumps between the drum ones (00–07) and the synth ones (08–0F).
-      case 'inst': { const nv = clamp(v + d * (big ? 8 : 1), 0, NI - 1); if (nv === v) toast(`Instruments go 00–0F (16 of them, in hex: 0A is 10, 0F is 15). 00–07 play the drum pads, 08–0F the synths.`); v = nv; break; }
+      // NI instruments (00–3F): the big step jumps 8 at a time (00–07 the drum pads, 08–0F the synths, and on).
+      case 'inst': { const nv = clamp(v + d * (big ? 8 : 1), 0, NI - 1); if (nv === v) toast(`Instruments go 00–${hx(NI - 1)} (${NI} of them, in hex: 0F is 15, 10 is 16). Each plays the slot set on INST › PAD.`); v = nv; break; }
       case 'fxc': if (mstView()){ const L = FXLIST_MST.slice(1), n = L.length, i = Math.max(0, L.indexOf(v)); v = L[((i + d * (big ? 4 : 1)) % n + n) % n]; }
         else v = ((v + d * (big ? 4 : 1)) % FXC.length + FXC.length) % FXC.length; break;
     }
@@ -14873,7 +15559,8 @@ const FXB = {ARP:'Arpeggio: the note, +X and +Y semitones', ARC:'Arpeggio shape 
   VOL:'Set the volume (also of a playing note)', PIT:'Pitch the note ± semitones', FIN:'Fine tune ± cents', PLY:'Play reversed (01) or forwards (00)',
   STA:'Start part way into the sound', PAN:'Pan left or right (80 centre)', TIC:'Ticks a step from here on', WOB:'Bass wobble rate from here on (00 the voice’s own)',
   FXO:'Effect slot X (0 = all) off (Y 0), on (1) or on for Y rows', BYP:'…chains module X (its number on BYP, 0 = all) in (Y 0), bypassed (1), or the other way from the patch for Y rows', FLX:'Flex pattern (00 off, 01–10)', GAT:'Step gate pattern (00 custom, 01–0F)', RTG:'Retrigger: X rate (1 = 1/4 … 8 = 1/32T), Y rows (0 = until RTG 00)',
-  PGM:'MIDI program change (00–7F)'};
+  PGM:'MIDI program change (00–7F)', CSL:'MIDI CC glide: this row’s CCA–CCD move to their value over XY ticks (00 the step)',
+  DIR:'Play direction from here on: 00 forward, 01 backwards, 02 ping-pong, 03 random'};
 for (const c of CC_CMDS) FXB[c] = `MIDI CC: send 00–7F to the instrument’s CC ${c[2]}`;
 const FXLIST_ALL = [-1, ...FXC.map((n, i) => i).sort((a, b) => FXC[a] < FXC[b] ? -1 : 1)];
 // Master phrases offer only the commands that mean something on the master bus: its level and effects first, then timing.
@@ -15770,6 +16457,7 @@ function cmdItems(){
     ...(onSong ? [null, it('clone', 'Clone (paste puts a unique copy)', 'mod+D'), it('cldn', 'Clone down (onto the row below)', 'mod+shift+D')] : []),
     null,
     ...(onSong ? [] : [val('b:16', 'Value up a lot', '▲')]), val('b:1', 'Value up', '▶'), val('b:-1', 'Value down', '◀'), ...(onSong ? [] : [val('b:-16', 'Value down a lot', '▼')]),
+    ...(tv === 'phrase' && !mstView() ? [null, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill}] : []),
     null,
     it('prev', 'Previous ' + (CMD_NOUN[tv] || ''), onSong ? '' : '['), it('next', 'Next ' + (CMD_NOUN[tv] || ''), onSong ? '' : ']'),
     null,
@@ -15778,6 +16466,30 @@ function cmdItems(){
 }
 // No rule at the start or end, and never two in a row (after items are left out).
 const menuTidy = L => L.filter((x, i, a) => x || (i > 0 && i < a.length - 1 && a[i - 1] && a.slice(i + 1).some(Boolean)));
+/* EUCLIDEAN FILL (20 Oct; Edit ▾ and the right-click menu on a phrase): HITS spread as evenly as they go over STEPS, turned
+   by ROTATE, written into the note column under the cursor (column 1 from the volume and effect columns) over the selected
+   rows, or from the cursor to the end of the phrase; the pattern repeats if the rows are more than STEPS. A hit is the note
+   under the cursor (else the last note) with its instrument; the other rows of that column are cleared. One undo step. */
+// Bjorklund's spreading (the usual Euclidean rhythms: 3 in 8 is x..x..x., 5 in 16 x..x..x..x..x...), turned left by r.
+function euclid(k, n, r){
+  let a = Array.from({length:k}, () => [true]), b = Array.from({length:n - k}, () => [false]);
+  if (k > 0 && k < n) while (b.length > 1){ const m = Math.min(a.length, b.length), na = []; for (let i = 0; i < m; i++) na.push(a[i].concat(b[i])); b = a.length > m ? a.slice(m) : b.slice(m); a = na; }
+  const p = a.concat(b).flat(); return Array.from({length:n}, (_, i) => p[((i + r) % n + n) % n]);
+}
+let eucLast = '5 16 0';
+async function euclidFill(){
+  if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Euclidean fill writes notes into it.');
+  const a = await askText({title:'Euclidean fill', body:'HITS STEPS ROTATE, e.g. 5 16 or 3 8 2. Fills the note column under the cursor over the selected rows (or from the cursor down), with the note there (or the last one).'}, eucLast, 12, 'Fill');
+  if (a == null) return;
+  const v = a.trim().split(/[\s,/:]+/).map(x => parseInt(x, 10)); if (!(v[0] >= 0 && v[1] >= 1)) return toast('Type the hits and steps, like 5 16.');
+  const n = clamp(v[1], 1, PROWS), k = clamp(v[0], 0, n), rot = Number.isFinite(v[2]) ? v[2] : 0; eucLast = `${k} ${n} ${rot}`;
+  if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase();
+  const P = S.phrases[cPhrase], c = cs.phrase, col = PK[c.x] === 'note' ? c.x : 0, L = plen(cPhrase);
+  let y0 = c.y, y1 = L - 1; if (selA){ const R = selRect(); y0 = R.y0; y1 = Math.min(R.y1, L - 1); selA = null; }
+  const src = P[c.y], note = src[col] >= 0 && src[col] < 120 ? src[col] : last.note, ins = src[IC] >= 0 ? src[IC] : defInst(), pat = euclid(k, n, rot);
+  for (let y = y0; y <= y1; y++){ const r = P[y]; if (pat[(y - y0) % n]){ r[col] = note; if (r[IC] < 0) r[IC] = ins; } else r[col] = -1; }
+  saveS(); draw(); toast(`Euclidean ${k} in ${n}${rot ? ', rotated ' + rot : ''}: rows ${rS(y0)}–${rS(y1)}, ${noteS(note)}`);
+}
 
 /* ---------- drawing ---------- */
 const scr = $('tScr'), grid = $('tGrid');
@@ -18128,6 +18840,9 @@ function globalKeys(e){
     if (e.code === 'KeyL') toggleLoopPat(); else transposeSel(e.code === 'Period' ? 1 : -1);
     return true;
   }
+  // REC: F9 or Alt+R arms recording; Alt+M steps the metronome (off, while recording, always).
+  if (!mod && ((!e.altKey && e.key === 'F9') || (e.altKey && !e.shiftKey && e.code === 'KeyR'))){ if (!e.repeat) setRec(!rec.on); return true; }
+  if (!mod && e.altKey && !e.shiftKey && e.code === 'KeyM'){ if (!e.repeat) setMet((recS.met + 1) % 3); return true; }
   if (!e.altKey && !mod && !e.shiftKey && PAGEK[e.key]){ go(PAGEK[e.key]); return true; }
   if (!mod && !e.altKey && /^F[5-8]$/.test(e.key)){
     if (e.repeat) return true;
@@ -18231,6 +18946,7 @@ const HEXK = '0123456789abcdef';
 function curKind(){ const c = cs[tv]; if (onPset()) return 'param'; if (GRIDV.has(tv)) return kindAt(tv, c.x); if (tv === 'mixer') return 'mix'; return 'param'; }
 function down1(){ const c = cs[tv], d = dims(tv); c.y = clamp(c.y + (GRIDV.has(tv) ? kStep : 1), 0, d.h - 1); }
 function typeNote(semi){
+  if (rec.on && tp.on){ recKey(clamp(kOct * 12 + semi, 0, 119), audKey); return; }   // REC while playing: at the playhead, not the cursor
   const c = cs[tv]; if (tv !== 'phrase' || PK[c.x] !== 'note' || c.y < 0) return;
   const n = clamp(kOct * 12 + semi, 0, 119), x = c.x;
   setCell('phrase', x, c.y, n); const y = c.y; down1(); after('note', 'phrase', x, y, n);
@@ -18354,7 +19070,7 @@ function keysDown(e, pad){
   if (k === '=' || k === '+'){ setOct(kOct + 1); return true; }
   if (e.repeat) return false;
   if (kind === 'note'){
-    if (lo in PIANO){ typeNote(PIANO[lo]); return true; }
+    if (lo in PIANO){ audKey = e.code; try { typeNote(PIANO[lo]); } finally { audKey = null; } return true; }
     if (k === '1' || k === '`'){ typeOff(); return true; }
     return false;
   }
@@ -18678,6 +19394,7 @@ let updView = () => {};
 function setView(v){
   fxpClose();
   const was = view;
+  if (v !== was) try { releaseKeys(); } catch(e){}   // KEYS PLAY: keys held on one screen don't hang on the next
   if (noEditors() && (v === 'waves' || v === 'chains')) v = 'synth';   // Mobile: no editors unless Settings → App shows them (they still play)
   view = v === 'tracker' || v === 'waves' || v === 'chains' ? v : 'synth';
   const tr = view === 'tracker', wv = view === 'waves', ch = view === 'chains';
@@ -18802,9 +19519,14 @@ const SHEETS = {
   input:{title:'Input', about:'PAD or KEYS, notes as you type, edit step, sticky keys, the command row', groups:[
     ['Playing', ['INPUT', 'PLAY NOTE ON ENTRY']],
     ['Editing', ['EDIT STEP', 'STICKY KEYS', 'COMMANDS', 'PATTERN NAV']]]},
-  song:{title:'Song', about:'Name, tracks, tempo, swing, ticks, pattern length and the song’s impulse responses', groups:[
+  seq:{title:'Record & play', about:'Recording from a MIDI keyboard, the metronome and count-in, live transpose', groups:[
+    ['Recording', ['REC TIMING', 'REC VELOCITY', 'REC NOTE OFFS']],
+    ['Metronome', ['METRONOME', 'CLICK LEVEL', 'COUNT-IN']],
+    ['Live transpose', ['LIVE TRANSPOSE']]]},
+  song:{title:'Song', about:'Name, tracks, tempo, swing, ticks, the scale, pattern length and the song’s impulse responses', groups:[
     ['Song', ['NAME', 'TRACKS', 'TEMPO', 'LPB']],
     ['Groove', ['SWING', 'SWING NOTE', 'TICKS']],
+    ['Key', ['SCALE', 'SCALE ROOT']],
     ['Patterns', ['PATTERN LEN', '› ALL PHRASES TO']],
     ['Impulse responses', 'irs']]},
 };
@@ -18966,7 +19688,7 @@ function buildProj(){
   const body = $('gset'), keep = body.scrollTop; for (const id of INNER_SECS){ const x = $(id); if (x) $('gsetBody').append(x); }
   list.innerHTML = ''; list.append(el('div', 'sethead', 'Project'));
   const trk = view === 'tracker';
-  const inFile = new Set(['› SAVE', '› SAVE AS', '› LOAD PROJECT', '› EXPORT CHAINS', '› IMPORT CHAINS', '› SHARE PROJECT', '› NEW SONG', '› LOAD DEMO', '› RENDER SONG', '› RENDER STEMS', '› SHARE LAST RENDER']);
+  const inFile = new Set(['› SAVE', '› SAVE AS', '› LOAD PROJECT', '› EXPORT CHAINS', '› IMPORT CHAINS', '› SHARE PROJECT', '› NEW SONG', '› LOAD DEMO', '› RENDER SONG', '› RENDER STEMS', '› SHARE LAST RENDER', '› EXPORT MIDI FILE', '› IMPORT MIDI FILE']);
   list.append(el('p', 'note', 'Saving, opening, rendering and exporting are in the File menu.'));
   // The song, how you play, then rendering & export and mastering. (Screen has its own section; UPDATE APP is under App.)
   const groups = new Map(); let g = 'Tracker';
@@ -18974,7 +19696,7 @@ function buildProj(){
   if (!groups.has('Render & export')) groups.set('Render & export', []);
   if (!groups.has('Mastering')) groups.set('Mastering', []);
   const order = ['Song', 'Input', 'Render & export', 'Mastering'];
-  if (SET_SHEETS && trk){ const sec = el('section', 'tsec'); sec.append(el('h3', null, 'Song & input'), sheetBtn('song'), sheetBtn('input')); list.append(sec); }   // SETTINGS SHEETS
+  if (SET_SHEETS && trk){ const sec = el('section', 'tsec'); sec.append(el('h3', null, 'Song & input'), sheetBtn('song'), sheetBtn('input'), sheetBtn('seq')); list.append(sec); }   // SETTINGS SHEETS
   for (const name of [...order.filter(n => groups.has(n)), ...[...groups.keys()].filter(n => !order.includes(n))]){
     if (SET_SHEETS && !groups.get(name).length && name !== 'Render & export' && name !== 'Mastering') continue;
     const sec = el('section', 'tsec'); sec.append(el('h3', null, name)); list.append(sec);
@@ -19441,6 +20163,7 @@ if (vtrk) growKit();
 loadCur();
 if (!sectsOn){ if (tv === 'sect') tv = 'phrase'; if (midV === 'sect') midV = 'phrase'; }
 sectVis(); arrBody(); applyCmdOrder();
+try { recBtn(); } catch(e){}   // REC / CLICK labels
 try { const v = localStorage.getItem(VK); if (v !== 'synth') setView(v === 'chains' ? 'chains' : v === 'waves' ? 'waves' : 'tracker'); } catch(e){ setView('tracker'); }
 })();
 </script>

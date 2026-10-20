@@ -24,6 +24,82 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 20 Oct: Thunder Plus as a MIDI sequencer (owner: "Thunder Plus could take it" instead of a separate sequencer app)
+
+Cache `thunderplus-v193`. One commit; everything below is in `index.html` unless named. Checked headless (session
+scratchpad: a debug-hook copy of the page, `window.__T(code)` evaluated inside the app's scope, and a fake Web MIDI with
+two inputs and two outputs); not tried with real gear yet.
+
+- **Poly tracks and MIDI (moNote):** each note column is its own voice: a new note in a column ends the note that column
+  was holding (`h.col`, carried through ARP returns: `pend` entries and `pendPlay`). Before, a chord rang until an OFF,
+  the same key or the 4-note cap, so two chords in a row sounded as six notes on a hardware poly synth. The pad side is
+  unchanged (pads still ring over each other, as README says).
+- **MIDI in routing** (Settings → MIDI; `midi` settings `inId`, `inCh`, `clkId`, `keys`, `lats`, all in
+  `thunderplus-midi-v1`): **Notes in** (input + channel; `onMidi(e, src)`, hooked per input), **Clock from**
+  (`clkFrom`: the picked input, or the first that sends clock, kept until 2 s quiet; two clock sources used to interleave
+  and double the tempo), **Delay** per output port (`mLatOf(p)`, used by `msend`; Clock in's phase lock uses `clkLat()`:
+  the port whose cable has the clock input's name, else A). Old settings: `lat` fills every port, and `lat` is still
+  written (= port A). Active sensing (FE) and system messages are ignored.
+- **KEYS PLAY** (Settings → MIDI → Keys play, default the current instrument): in the tracker a keyboard plays
+  `kbInst()` (INST screen: cInst; a phrase: the cursor row's instrument, else `defInst()`; else `last.inst`).
+  `preview(ii, note, vol, poly, when, hold)` has a held mode: its own column on the preview bus (`'h' + n`), MIDI
+  instruments through `moNote` with `cap:16` (more keys than a column's 4); `previewOff(h)` ends it (MIDI note-off, a
+  synth pad's release; drum pads ring). Bend (kept in `mx.bend` so a later song bend isn't skipped), aftertouch, poly
+  aftertouch (+TRANSPOSE), program change and unlearned CCs go to a MIDI instrument's port/channel (`kbPass`, `kbCC`);
+  CC 64 also holds pad notes (`kb.sus`, `kb.susd`). `releaseKeys()` on view change, window blur and the input settings.
+  Computer keys typing a note hold its preview until keyup (`audKey` set by keysDown, `aud`, `audHeld`).
+- **REC, metronome, count-in** (block "REC, METRONOME AND COUNT-IN" after `tStop`; settings `thunderplus-rec-v1`:
+  `met` 0 off / 1 while recording / 2 always, `lvl`, `cnt` bars, `q` 1 STEP / 0 TICKS, `vel`, `offs`). REC/CLICK buttons
+  in the top strip (`tRecBar`; CLICK hides with the TRANSP buttons when the strip doesn't fit), F9 / Alt+R, Alt+M.
+  Step record: `recNote` (stopped) writes at the cursor; keys held together are one row (a poly track's columns, a mono
+  track keeps the first); `recOff` moves the cursor by EDIT STEP once every key is up. Live record: the pump records
+  when each step of `recTrack()` is heard (`recHist` → `rec.hist`); `recStep(ta, tr)` finds the nearest step (or, TICKS,
+  the step it was in plus a DEL), `ta = p2a(MIDI timestamp)`. Note-offs write OFF only for MIDI instruments and synth
+  slots, only on a later step whose cell is empty. The computer keys and the keypad record at the playhead while
+  playing (`typeNote` → `recKey`). A take is one undo step: `var recTake` stops `snap()` until `recEndTake()` (STOP, REC
+  off). Clicks: `click(t, acc)` into `master` (never renders), booked by `metRun` from `mx.beat` up to 100 ms ahead
+  (`met.next` counts on while off, so switching on mid-song stays on the beat); `metStop` stops booked ones. Count-in:
+  `tStart` puts the song's start `recS.cnt` bars later and `countIn` clicks them (not when Clock in starts us).
+- **MIDI files** (block "MIDI FILES" before "bringing over ...Thunder's saved work"): `songMidiEvents()` runs `makeSeq`
+  from RENDER FROM like a render (`once`, `sim`), times → beats through the beat events, note ends from OFF/KIL/the
+  next note/the column/NOTE LEN, drum pads (one-shot slots, not MIDI) as `drumNote(pad)` on channel 10, a 16th long;
+  `smfBytes` writes type 1 at 480 PPQ (offs before CCs before ons at a tick). `parseSmf` reads type 0/1 (running status,
+  meta, sysex; a note with no note-off lasts a 16th); `importMidiFile` writes phrases of PATTERN LEN at the song LPB from
+  the cursor's track and song row (asks before replacing blocks), sharing identical phrases and one empty one. File ▾,
+  Project → Render & export (both in `inFile`), hidden input `#midIn`.
+- **Key** (block "KEY" in the MIDI section): `lxp` (`thunderplus-livexp-v1`: 0 off, 1 whole keyboard from C-4,
+  2 keys below C-4 from C-3; latched `lxp.st`), applied in `makeSeq` only when `o.live`; `SCALES`/`scaleSnap(S, n)`
+  (nearest, ties down) with `S.scale`/`S.sroot` (song, normSong). Both only for instruments with `I.kf` (KEY FOLLOW).
+- **makeSeq**: `nOf(x)` is the note with every transpose, live transpose and the scale (before PIT/FIN), also used for
+  the piano's SOUNDING NOTES. HUMAN TIME/VEL (`I.hut` ms, `I.huv` %) move each note's time (`nat`) and gain/vel with
+  `rand()` (so SED repeats them). Note events carry `tick` (NOTE LEN). `mcc` events carry `ramp` (CSL). **DIR**: `T.dir`
+  (0–3), `T.pp` (ping-pong heading), `T.cnt` (steps played this pass, reset when a pass ends); with a direction a pass
+  still lasts the phrase's LEN steps, and `dirGo` says where the next pass starts (bottom for backwards, ping-pong goes
+  on from where it was, random anywhere). A selection loop plays forward.
+- **MIDI out extras:** NOTE LEN (`I.mlen` ticks) in `moNote`'s `end`; ECHO (`I.eco` repeats, `I.ecr` beats,
+  `I.ecf` %, `I.ecp` semitones) queued in `mx.echo` and booked by `moEcho` ≤ 100 ms ahead; CSL glides in `mx.ccr`
+  (from `mx.ccv`, the last value per port/channel/CC; a CC never sent jumps), booked by `moRamp` ≤ 80 ms ahead, a new
+  value on the same CC cuts a glide. `moRelease` clears both queues.
+- **New commands** (appended to `FXC`, so saved songs keep their numbers): `CSL` (index 39), `DIR` (40); FXI, FXB,
+  RSTEP and the help's command list have them.
+- **Instruments:** `NI = 64` (one constant; the I column, INS, INST, the list and song files follow it). New fields in
+  `freshInst`/`normSong`: `kf` (older songs: on for MIDI instruments and pads ≥ 08), `hut`, `huv`, `mlen`, `eco`, `ecr`,
+  `ecf`, `ecp`. INST rows: KEY FOLLOW, HUMAN TIME, HUMAN VEL; for MIDI instruments NOTE LEN and ECHO (+ TIME, FADE,
+  PITCH). The instrument list shows 00–0F plus instruments used in a phrase or changed (`instShown`, cached on songVer).
+- **SLOTS** (top of the Synth page, `#vKit`): `NSLOT` = `kit.slots` (16–`MAXSLOT` 64, saved in the kit; kits without it
+  are 16). `setSlots(n)`: more slots grow the kit with `slotVoice(i)` (a simple synth, or a drum if the slot's kind
+  says so); fewer only hide the last ones (their voices stay in `kit.voices` and come back). **THIS SLOT** ONE-SHOT /
+  HELD: `kit.held[i]` (saved; null = by position as before). `isSyn` lives in the ENGINE block, which can't see `kit`,
+  so it reads `slotHeld`, kept in step by `syncHeld()` (boot, `setKit`, `setSlotKind`). Both are kit undo steps
+  (`kitStep`). `instFit()` points instruments 10+ that nothing uses and nobody changed at slot k (or k % slots) when the
+  count changes, without an undo step. A voice per track still overrides SLOTS (the control is disabled). MIDI learn
+  works for slots past 16 (`midi.notes` grows; saved up to 64). The desktop pad column's third heading reads MORE SLOTS
+  without a voice per track.
+- **Euclidean fill** (Edit ▾ and the right-click menu, phrase only): `euclid(k, n, r)` is Bjorklund's algorithm;
+  `euclidFill()` writes the column under the cursor over the selection or from the cursor down.
+- **Settings sheets:** a new **Record & play** sheet (`SHEETS.seq`, button in Settings → Song & input) with Recording,
+  Metronome and Live transpose; SCALE and SCALE ROOT are in the Song sheet's new Key group.
+
 ## 19 Oct (17): desktop updates download directly on the Mac (and the portable .exe)
 
 Cache `thunderplus-v192`. Not in a desktop build yet (v1.2.6 still opens the download page; the next build has this).
