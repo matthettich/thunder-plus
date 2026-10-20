@@ -26,7 +26,7 @@ Keep this file up to date at the end of a work session.
 
 ## 20 Oct (3): the Phrase title line never overlaps
 
-Cache `thunderplus-v195`. Owner: with the side panel open (and bigger text), PHRASE | PATTERN ran over the track name.
+Cache `thunderplus-v195`. Desktop **v1.2.10** (20 Oct) has everything up to here. Owner: with the side panel open (and bigger text), PHRASE | PATTERN ran over the track name.
 - `.thl` (title, LEN / LPB, PHRASE | PATTERN) no longer shrinks under its contents; `.tsub` (the track name) takes what is
   left. `thdFit()` (after `draw()` sets the title, and from a ResizeObserver on `.thd`; measured only when its signature
   changes) then steps through classes on `.thd` while the line overflows or the name is cut: f1 drops the "1/16 song"
