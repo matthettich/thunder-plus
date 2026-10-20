@@ -99,6 +99,30 @@ two inputs and two outputs); not tried with real gear yet.
   `euclidFill()` writes the column under the cursor over the selection or from the cursor down.
 - **Settings sheets:** a new **Record & play** sheet (`SHEETS.seq`, button in Settings → Song & input) with Recording,
   Metronome and Live transpose; SCALE and SCALE ROOT are in the Song sheet's new Key group.
+- **After an independent review (same day, before merging):**
+  - `S.ni` (song file): the instruments a song was made with. Older songs load as 16, and `makeSeq` clamps `INS` to
+    `ni − 1` (`NIs`), so an INS above 0F (typed, RND, RNL, REP) still plays 0F there. `niUp` makes it 64 once an
+    instrument past 0F goes into a phrase: `niScan` (the I column, from `saveS`) or `after()` (a typed INS value).
+  - `normSong` keeps any slot up to `MAXSLOT − 1` (it used to clamp to the slot count at load, 32 at start-up, which
+    rewrote instruments on bigger kits). A note on a slot the kit doesn't have is silent (`startNote`, `renderOut`).
+  - KEYS PLAY: held MIDI previews go out now (`p2a(performance.now() + delay)`), not after the audio output's latency;
+    the sustain pedal's port/channel is kept (`kb.susTo`) and `susUp()` lets it up on pedal-up anywhere, `releaseKeys`
+    (view change, blur, input settings) and `moRelease` (STOP). `releaseKeys` also lets go of REC's computer keys
+    (`compHeld`) and the pads' held notes (`midiHeld`). Keys play defaults to the pads for someone with learned notes.
+  - Live transpose keys only in the tracker, and note-offs are handled before them. `lxp`'s initializer can't use
+    `clamp` (declared later): it was silently always OFF after a reload.
+  - REC: count-in only when PLAY starts from stopped (`wasOn` in `tStart`); `recEndTake` settles the take at once,
+    and `undoStep`/`importMidiFile` (and `setSong` via `tStop`) end it first, so undo mid-take undoes the take.
+  - DIR: with a direction the swing pair counts `T.cnt` (steps played), so a pass lasts as a forward one; it works
+    with song and sect loops (only a phrase-row loop plays forward).
+  - ECHO: note-offs booked lazily; an echo is left out while a real note holds its key and ends before one starts.
+    `moRelease` ends echoes already sounding.
+  - MIDI files: ARP steps after KIL/OFF/NOTE LEN are left out, every off after its on; drums go by the pad that plays
+    (`e.pad`, so a voice per track works); `smfBytes` writes into a growing Uint8Array (spreading a big body into
+    push() threw); the reader skips system common bytes and rejects a zero division.
+  - `instFit` recognises an instrument a slot count put anywhere (k % m for any m); `syncHeld` ignores `kit.held`
+    with a voice per track (and THIS SLOT is disabled there).
+  - Tests for every finding: session scratchpad (`t1`–`t10`), all passing.
 
 ## 19 Oct (17): desktop updates download directly on the Mac (and the portable .exe)
 
