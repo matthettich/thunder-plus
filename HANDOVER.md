@@ -26,7 +26,7 @@ Keep this file up to date at the end of a work session.
 
 ## 20 Oct (2): …chains starter patch takes both sides of the track
 
-Cache `thunderplus-v194`; `chains-worklet.js?v=32`. Not in a desktop build yet (v1.2.8 has the one-cable starter).
+Cache `thunderplus-v194`; `chains-worklet.js?v=32`. Desktop **v1.2.9** (20 Oct) has everything up to here.
 - The starter patch (`starterDoc`, chains/index.html) had only Track In Out → Tape delay In, so the track reached the chain
   as its left channel, played as mono (an effect with no In R takes In for both sides). It now has Out R → In R too.
 - Existing patches (no `ti2`): a Track In whose Out R goes nowhere gets Out R → In R of every module its Out feeds where
