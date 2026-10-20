@@ -12762,7 +12762,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=31')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=32')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -12782,7 +12782,8 @@ function chnDiff(prev, next){
   if (!next) return [];
   // STEREO: the engine patched an older (no st2) patch's right sides itself; once the editor saves them (st2), reload
   // so a right-side cable the owner removed in the editor goes too.
-  if (!prev || prev.format !== 'chains.patch' || !Array.isArray(prev.modules) || !prev.st2 !== !next.st2) return [{ op:'patch', value:next }];
+  // (TRACK IN STEREO: the same for ti2.)
+  if (!prev || prev.format !== 'chains.patch' || !Array.isArray(prev.modules) || !prev.st2 !== !next.st2 || !prev.ti2 !== !next.ti2) return [{ op:'patch', value:next }];
   const ops = [];
   const pm = new Map((prev.modules || []).map(m => [m.id, m]));
   const nm = new Map((next.modules || []).map(m => [m.id, m]));

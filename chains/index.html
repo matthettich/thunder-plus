@@ -1117,6 +1117,22 @@ function chainsStereoUp(d){
   return d;
 }
 /* ===SHARED EDITOR END=== */
+/* TRACK IN STEREO (owner, 20 Oct): the starter patch sent only Track In's left side into its first effect, so the track
+   reached the chain as its left channel, played as mono. A patch made before (ti2 not set) gets, once, for each Track In
+   whose Out R goes nowhere: Out R → In R of every module its Out feeds, where that In R is free. The engine does the same
+   for a song that is never opened here (trackInStereoCables in chains-worklet.js). */
+function trackInStereoUp(d){
+  if (!d || d.ti2 || !Array.isArray(d.modules) || !Array.isArray(d.cables)) return d;
+  const type = new Map(d.modules.map(m => [m && m.id, m && m.type]));
+  const hasIn = id => { const M = MODULES[type.get(id)]; return !!(M && M.inputs && M.inputs.inR); };
+  const taken = new Set(d.cables.map(c => c && c.to && c.to[0] + '.' + c.to[1])), usedR = new Set(d.cables.map(c => c && c.from && c.from[1] === 'outR' ? c.from[0] : null)), add = [];
+  for (const c of d.cables){
+    if (!c || !c.from || !c.to || c.from[1] !== 'out' || c.to[1] !== 'in' || type.get(c.from[0]) !== 'trackIn' || usedR.has(c.from[0])) continue;
+    const b = c.to[0]; if (hasIn(b) && !taken.has(b + '.inR')){ taken.add(b + '.inR'); add.push({from:[c.from[0], 'outR'], to:[b, 'inR'], bend:0}); }
+  }
+  d.cables.push(...add); d.ti2 = 1;
+  return d;
+}
 
 /* Mixers: Inputs picks how many channels show, 1 to 16 (old patches open with 4). The rest hide, with their cables. */
 const MIXN = 16, MIXT = new Set(['mixer', 'smixer']);
@@ -1461,7 +1477,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=31';
+    const url = opts.url || './chains-worklet.js?v=32';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -1528,6 +1544,7 @@ function starterDoc(){
   ];
   d.cables = [
     { from:['m1','out'],  to:['m2','in'], bend:0 },
+    { from:['m1','outR'], to:['m2','inR'], bend:0 },   // both sides of the track (owner, 20 Oct: only the left one was patched)
     { from:['m2','out'],  to:['m3','in'], bend:0 },
     { from:['m2','outR'], to:['m3','inR'], bend:0 },
     { from:['m3','out'],  to:['m4','in'], bend:0 },
@@ -1556,6 +1573,7 @@ function normalize(d){
   // Patches made before the wider modules: spread them out so they don't overlap.
   if (!d.view.ui){ for (const m of d.modules) m.pos = [Math.round(m.pos[0] * 1.32), m.pos[1]]; d.view.ui = 2; }
   chainsStereoUp(d);   // STEREO: an older patch's right sides, once (st2)
+  trackInStereoUp(d);   // TRACK IN STEREO: a Track In's right side, once (ti2)
   return d;
 }
 

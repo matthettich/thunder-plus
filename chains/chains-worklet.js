@@ -4378,6 +4378,21 @@ const SHARED_MODULES = { beads:Beads,
   bytebeat:Bytebeat, chaos:Chaos, marbles:MarblesM, tides:TidesM,
   sdelay:SimpleDelay, filter:Filter, cut:LoHiCut, compressor:ClassicComp, ngate:NoiseGate, autopan:AutoPan, pump:Pump };
 /* ===SHARED MODULES END=== */
+/* TRACK IN STEREO (owner, 20 Oct): the starter patch sent only Track In's left side into its first effect. In a patch
+   made before (ti2 not set), a Track In whose Out R goes nowhere gets Out R → In R of every module its Out feeds, where
+   that In R is free. The editor's normalize does the same and saves it (ti2); here it only makes an unopened song play
+   in stereo. Chains only (…waves has no Track In). */
+function trackInStereoCables(d){
+  if (!d || d.ti2 || !Array.isArray(d.modules) || !Array.isArray(d.cables)) return [];
+  const type = new Map(d.modules.map(m => [m && m.id, m && m.type]));
+  const hasIn = id => { const M = MODULES[type.get(id)]; return !!(M && M.inputs && M.inputs.inR); };
+  const taken = new Set(d.cables.map(c => c && c.to && c.to[0] + '.' + c.to[1])), usedR = new Set(d.cables.map(c => c && c.from && c.from[1] === 'outR' ? c.from[0] : null)), add = [];
+  for (const c of d.cables){
+    if (!c || !c.from || !c.to || c.from[1] !== 'out' || c.to[1] !== 'in' || type.get(c.from[0]) !== 'trackIn' || usedR.has(c.from[0])) continue;
+    const b = c.to[0]; if (hasIn(b) && !taken.has(b + '.inR')){ taken.add(b + '.inR'); add.push({from:[c.from[0], 'outR'], to:[b, 'inR']}); }
+  }
+  return add;
+}
 
 const MODULES = { ...SHARED_MODULES, trackIn:TrackIn,
   vocoder:Vocoder,
@@ -4513,6 +4528,7 @@ class ChainsEngine {
     for (const m of doc.modules || []) this.addModule(m.id, m.type, m);
     for (const c of doc.cables || []) this.connect(c.from, c.to);
     for (const c of stereoUpCables(doc)) this.connect(c.from, c.to);   // STEREO: an older patch's right sides (the editor saves them)
+    for (const c of trackInStereoCables(doc)) this.connect(c.from, c.to);   // TRACK IN STEREO: the same for a Track In's right side
     if (doc.transport) this.setTransport(doc.transport);
     return { modules:(doc.modules || []).length, cables:(doc.cables || []).length };
   }

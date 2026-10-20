@@ -24,6 +24,18 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 20 Oct (2): …chains starter patch takes both sides of the track
+
+Cache `thunderplus-v194`; `chains-worklet.js?v=32`. Not in a desktop build yet (v1.2.8 has the one-cable starter).
+- The starter patch (`starterDoc`, chains/index.html) had only Track In Out → Tape delay In, so the track reached the chain
+  as its left channel, played as mono (an effect with no In R takes In for both sides). It now has Out R → In R too.
+- Existing patches (no `ti2`): a Track In whose Out R goes nowhere gets Out R → In R of every module its Out feeds where
+  that In R is free, once. Editor: `trackInStereoUp` from `normalize` (outside the shared editor block; …waves has no
+  Track In), saved with `ti2`. Engine: `trackInStereoCables` in `ChainsEngine.loadPatch` (after the shared modules block),
+  for songs never opened in the editor. The host's `chnDiff` reloads the whole patch when `ti2` changes, as for `st2`.
+- Checked: node (engine: the old starter gains the cable; with ti2, or Out R already used, nothing) and the app (a new
+  song's starter has both; an old song's one-cable patch gains it on opening, once).
+
 ## 20 Oct: Thunder Plus as a MIDI sequencer (owner: "Thunder Plus could take it" instead of a separate sequencer app) — desktop v1.2.8
 
 Cache `thunderplus-v193`. Desktop **v1.2.8** (20 Oct) has everything up to here. (Releasing from a Claude session: tag pushes
