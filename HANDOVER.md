@@ -24,9 +24,11 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
-## 20 Oct: Thunder Plus as a MIDI sequencer (owner: "Thunder Plus could take it" instead of a separate sequencer app)
+## 20 Oct: Thunder Plus as a MIDI sequencer (owner: "Thunder Plus could take it" instead of a separate sequencer app) — desktop v1.2.8
 
-Cache `thunderplus-v193`. One commit; everything below is in `index.html` unless named. Checked headless (session
+Cache `thunderplus-v193`. Desktop **v1.2.8** (20 Oct) has everything up to here. (Releasing from a Claude session: tag pushes
+are refused, so start Actions → Desktop app with the version through the REST API: `gh api -X POST
+repos/matthettich/thunder-plus/actions/workflows/desktop.yml/dispatches -f ref=main -f 'inputs[version]=X.Y.Z'`.) One commit; everything below is in `index.html` unless named. Checked headless (session
 scratchpad: a debug-hook copy of the page, `window.__T(code)` evaluated inside the app's scope, and a fake Web MIDI with
 two inputs and two outputs); not tried with real gear yet.
 
