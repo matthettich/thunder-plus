@@ -1142,6 +1142,19 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .tscr .pvseg button + button{border-left:0}
 /* DANCE · DRUM · KEYS · HIDE: the Phrase stage's switch, at the right of the title line, in PHRASE | PATTERN's look */
 .thd > .tsub{margin-left:auto}
+/* TITLE LINE FIT (owner, 20 Oct: with the side panel open, PHRASE | PATTERN ran over the track name). The left group
+   (title, LEN / LPB, PHRASE | PATTERN) keeps its width and the track name takes what is left, cut short with …; thdFit()
+   then gives way a step at a time while that isn't enough: f1 the "1/16 song" note goes, f2 PHR | PAT, f3 the track
+   name without MONO / POLY, f4 as T02, f5 the track name goes, f6 LEN / LPB (ROWS and LPB are on the top strip too),
+   and f7, last, lets the line wrap rather than overlap. */
+.thd > .thl{flex:none}
+.thd > .tsub{flex:1 1 0; min-width:0; text-align:right}
+.tscr .pvseg .lshort, .thd.f2 .pvseg .lfull{display:none} .thd.f2 .pvseg .lshort{display:inline}
+.thd > .tsub :is(.lmid, .lshort), .thd.f3 > .tsub .lfull, .thd.f4 > .tsub .lmid{display:none}
+.thd.f3:not(.f4) > .tsub .lmid, .thd.f4 > .tsub .lshort{display:inline}
+.thd.f2, .thd.f2 > .thl{gap:.5em} .tscr .thd.f2 > .phsw{margin-left:.2em}   /* tight: the parts closer together too */
+.thd.f1 .pstail, .thd.f5 > .tsub, .thd.f6 .tpset{display:none}
+.thd.f7{flex-wrap:wrap; row-gap:.3em}
 .tscr .thd > .phsw{flex:none; margin-left:.9em}
 .tscr .pvseg button.on,.tscr .pvbar button.on{background:var(--ts-ink); color:var(--ts-bg)}
 .tscr .pvbar{display:flex; align-items:center; gap:.7em; flex:none; min-width:0; overflow:hidden; white-space:nowrap; padding:.15em 0 .35em;
@@ -16760,7 +16773,7 @@ function draw(){
     const poly = polyView(), mst = mstView(); if (mst && c.y >= 0 && c.x < FX0) c.x = FX0; else if (!poly && c.x >= 1 && c.x < NCOL) c.x = 0;
     const p = S.phrases[cPhrase], pr = playRows(q => q.phrase === cPhrase ? q.step : null), len = plen(cPhrase), lpb = S.plpb[cPhrase] || 0, el2 = lpb || S.lpb; prLit = pr;
     pset = [{t:'LEN ', cls:'lb'}, {t:d2(len), cls:cc(0, -2, 'v'), x:0, y:-2}, {t:' LPB ', cls:'lb'}, {t:lpb ? d2(lpb) : '--', cls:cc(1, -2, lpb ? 'v' : 'e'), x:1, y:-2},
-      {t:' 1/' + (el2 * 4) + (el2 % 3 === 0 ? ' trip' : '') + (lpb ? '' : ' song'), cls:'lb'}];
+      {t:' 1/' + (el2 * 4) + (el2 % 3 === 0 ? ' trip' : '') + (lpb ? '' : ' song'), cls:'lb pstail'}];
     // Neighbours: a mono track shows its note (C-4). A poly track shows its whole chord: all four notes when the line still
     // fits the screen at this text size (unfolded, desktop), otherwise one letter per voice in a single cell (C E G A# → CEGa).
     const nbHasL = nbOn && cTrack > 0 && cTrack < MT, nbHasR = nbOn && cTrack + 1 < ntr();
@@ -16880,7 +16893,13 @@ function draw(){
       grid.scrollLeft = Math.max(0, Math.min(left + w + m - V, left - 6)); } }
   meterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mt')] : []; masterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mm')] : [];
   if (tv === 'mixer') chwSet();
-  $('tTitle').textContent = title; $('tSub').textContent = sub;
+  $('tTitle').textContent = title;
+  // TITLE LINE FIT: "TRACK 02 · MONO" gets shorter when the line is tight: TRACK 02 (f3; the phrase's note columns show
+  // mono or poly anyway, owner 20 Oct), then T02 (f4).
+  { const m = /^TRACK (\d+)(?: · (MONO|POLY))?$/.exec(sub), E = $('tSub');
+    if (E.dataset.t !== sub){ E.dataset.t = sub; E.title = m ? sub : '';
+      if (m) E.replaceChildren(el('span', 'lfull', sub), el('span', 'lmid', 'TRACK ' + m[1]), el('span', 'lshort', 'T' + m[1])); else E.textContent = sub; } }
+  queueMicrotask(thdFit);   // TITLE LINE FIT (after the switches beside it are set)
   $('tInfo').textContent = info();
   if (tv === 'phrase' && pvActive()) $('tInfo').textContent = pvInfo();   // PATTERN VIEW: the track and phrase first
   let hintTxt = (tv === 'song' && !sectsOn) ? (inMode === 'keys' ? HINTK.songP : HINT.songP) : (inMode === 'keys' ? HINTK : HINT)[tv];
@@ -17121,6 +17140,27 @@ function drumsBeat(bar, ms){
   if (now - dkKitT > ms * 0.9) dkKit(3, true);   // nothing on the kit this beat: tick the hat
   if (now - dkBongoT > ms * 0.9) dkBongo(bar);   // and a bongo (both on the bar)
 }
+// TITLE LINE FIT (see the CSS): measured only when something on the line or its width changed, so a redraw while
+// playing doesn't force a layout.
+let thdSig = '', thdW = 0;
+function thdFit(){
+  const hd = scr.querySelector('.thd'); if (!hd || !hd.offsetParent) return;
+  const sw = $('tStagePs'), sub = $('tSub');
+  const sig = [thdW, tScale, $('tTitle').textContent, psetHTML, sub.textContent, pvSeg.hidden, sw.hidden, [...sw.querySelectorAll('button')].map(b => b.hidden ? 0 : 1).join(''), [...scr.querySelector('.thl').children].map(e => e.hidden ? 0 : e.textContent.length).join(',')].join('|');   // (Arrange's FOLLOWS / PINNED tag too)
+  if (sig === thdSig) return; thdSig = sig;
+  const F = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7']; hd.classList.remove(...F);
+  const over = () => hd.scrollWidth > hd.clientWidth + 1, cut = () => !!sub.textContent && sub.scrollWidth > sub.clientWidth + 1;
+  const em = parseFloat(getComputedStyle(hd).fontSize) || 14, add = c => hd.classList.add(c);
+  if (over() || cut()) add('f1');                     // the "1/16 song" note goes first
+  if (over() || cut()) add('f2');                     // then PHR | PAT
+  const short = !!sub.querySelector('.lshort');
+  if (cut() && short) add('f3');   // then TRACK 02 (no MONO / POLY)
+  if (cut() && short) add('f4');   // then T02
+  if (cut() && (short || sub.clientWidth < em * 4.5)) add('f5');   // a track name cut to a few letters says nothing
+  if (over()) add('f6');
+  if (over()) add('f7');
+}
+try { new ResizeObserver(es => { const w = Math.round(es[0].contentRect.width); if (w !== thdW){ thdW = w; thdFit(); } }).observe(scr.querySelector('.thd')); } catch(e){}
 // DANCE · DRUM · KEYS · HIDE on the Phrase screen's title line (owner, 19 Oct: beside PHRASE | PATTERN, not over the
 // stage, so HIDE can bring it back). Shown on a wide screen whenever the stage follows the screen (Settings → STAGE BY
 // SCREEN); not on the master's phrase (its stage is the effects chain) or in SIMPLE PHRASE.
@@ -19377,6 +19417,7 @@ function apAfterDraw(){
   B.toggle('apf', !!apF); B.toggle('apfa', apF === 'arr'); B.toggle('apfs', apF === 'strip');
   apPinB.hidden = !arrOk; arrEl.classList.toggle('appinv', arrOk); apPinB.classList.toggle('on', apPin); apPinB.setAttribute('aria-pressed', String(apPin));
   apTagEl.hidden = !apF; if (apF) apTagEl.textContent = apPin ? 'PINNED' : 'FOLLOWS';
+  queueMicrotask(thdFit);   // TITLE LINE FIT: the tag takes room on the line
   // The song has the keys: its tab is the lit one (draw() lit PHRASE, the screen underneath).
   if (apF) document.querySelectorAll('#tTabs [data-v], #tMap [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === 'song'));
   if (apF === 'arr' && apSel) apMarkSel();
@@ -19867,8 +19908,9 @@ function pvFit(fs, W){
 }
 // PHRASE | PATTERN on the title line, and the pattern's bar under it.
 const pvSeg = el('span', 'pvseg'); pvSeg.hidden = true; pvSeg.setAttribute('role', 'group'); pvSeg.setAttribute('aria-label', 'Phrase or pattern');
-const pvSegB = [['ph', 'PHRASE', 'This phrase on its own (stays chosen until you switch)'], ['pt', 'PATTERN', 'Every track’s phrase for this song row, side by side (stays chosen until you switch)']]
-  .map(([k, t, ti]) => { const b = el('button', null, t); b.type = 'button'; b.dataset.pv = k; b.title = ti; pvSeg.append(b); return b; });
+// The full words, or PHR | PAT when the title line is tight (TITLE LINE FIT; owner, 20 Oct: PATTERN ran into the track name).
+const pvSegB = [['ph', 'PHRASE', 'PHR', 'This phrase on its own (stays chosen until you switch)'], ['pt', 'PATTERN', 'PAT', 'Pattern: every track’s phrase for this song row, side by side (stays chosen until you switch)']]
+  .map(([k, t, sh, ti]) => { const b = el('button'); b.append(el('span', 'lfull', t), el('span', 'lshort', sh)); b.type = 'button'; b.dataset.pv = k; b.title = ti; b.setAttribute('aria-label', t); pvSeg.append(b); return b; });
 $('tPset').after(pvSeg);
 const pvBar = el('div', 'pvbar'); pvBar.hidden = true; pvBar.setAttribute('role', 'toolbar'); pvBar.setAttribute('aria-label', 'Pattern');
 pvBar.innerHTML = '<span class="pvrow"></span><span class="pvud"><button type="button" data-pv="prev" aria-label="Song row above" title="The song row above (Shift+Alt+↑)">▲</button>'

@@ -24,6 +24,16 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 20 Oct (3): the Phrase title line never overlaps
+
+Cache `thunderplus-v195`. Owner: with the side panel open (and bigger text), PHRASE | PATTERN ran over the track name.
+- `.thl` (title, LEN / LPB, PHRASE | PATTERN) no longer shrinks under its contents; `.tsub` (the track name) takes what is
+  left. `thdFit()` (after `draw()` sets the title, and from a ResizeObserver on `.thd`; measured only when its signature
+  changes) then steps through classes on `.thd` while the line overflows or the name is cut: f1 drops the "1/16 song"
+  note (`.pstail`), f2 PHR | PAT (owner's suggestion; the buttons hold `.lfull` / `.lshort`) with tighter spacing, f3
+  TRACK 02 (owner: MONO / POLY can go, the note columns show it), f4 T02, f5 no track name, f6 no LEN / LPB, f7 wrap.
+- Checked at 1000 px with the side panel, text 100–170%, and the other screens' title lines (unchanged).
+
 ## 20 Oct (2): …chains starter patch takes both sides of the track
 
 Cache `thunderplus-v194`; `chains-worklet.js?v=32`. Desktop **v1.2.9** (20 Oct) has everything up to here.
