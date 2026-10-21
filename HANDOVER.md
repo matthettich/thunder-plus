@@ -27,7 +27,7 @@ Keep this file up to date at the end of a work session.
 ## 20 Oct (6): Arrange beside Phrase IS the Song screen; pattern selection colour; Ctrl+/ solo
 
 Cache `thunderplus-v198`. Owner: CLN↓ in the command bar said it only works on the Song screen; "the arrange window is
-basically a nested song mode": everything the Song screen does should work there. (Desktop v1.2.11 has 20 Oct (5) and before.)
+basically a nested song mode": everything the Song screen does should work there. Desktop **v1.2.12** (20 Oct) has everything up to here.
 - **Audit:** a differential headless test (session scratchpad `diff.py`) runs 47 Song-screen key sequences on the Song screen
   and with Arrange holding the keys beside Phrase (pattern view off and on) and compares song, mutes, cursor, selection,
   loop, play state and clipboard. All keyboard paths already matched (they run through `apRun`) except Alt+→ / SHIFT+▶.
