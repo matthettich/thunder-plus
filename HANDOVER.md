@@ -24,6 +24,24 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 21 Oct (4): a ? on every …waves and …chains module
+
+Cache `thunderplus-v206`. Owner: "a small ? on every module in waves and chains that displays a tooltip about what the
+module does and possibly a short use case example".
+- Each module's title bar has a **?** before the × (`mhelpBtn(type, title)` in both pages' `buildNode()`). A mouse hover
+  (250 ms) shows a popover; a click or tap pins it; a second click, a click elsewhere, Escape, a wheel (pan / zoom) or
+  dragging a module closes it. Buttons in the title bar never start a drag, so nothing else changed there.
+- The popover (`#mhelp`, `.mhelp`, position:fixed above the context menu, the module's palette colour as its border):
+  the name, the description the Help page shows (`modAbout`: the page's `PAGE_ABOUT`, then `SHARED_ABOUT`, then the
+  module's `about`) and a **Try** line (`modUse`: `PAGE_USE` if a page defines one, else `MODULE_USE`).
+- `ABOUT` moved out of `helpDoc()` to top level as `PAGE_ABOUT` in both pages (helpDoc uses it as before).
+- `MODULE_USE` (one concrete patch or setting per type, all 118 types across both pages) and the popover code and CSS
+  live in the SHARED EDITOR block: edit them in `chains/index.html`, then run `python3 tools/sync-shared.py`.
+- In …Thunder Plus's frame skin the ? is bordered like the ×, so long effect names with BYP cut off a little sooner
+  ("Tape del…"); the popover always shows the full name.
+- Checked headless: both editors standalone (hover, pin, switch module, Escape, drag still moves a module) and inside
+  …Thunder Plus on a touch screen (tap opens, tap again closes); no errors.
+
 ## 21 Oct (3): engine controls in the middle; the sound view in the right column
 
 Cache `thunderplus-v205`. Owner (screenshot of Tone drum on the Desktop synth layout): the space under the Engine row
@@ -2260,7 +2278,8 @@ Deliberately left for later:
 - **Adding a …chains module:**
   1. Define it in the worklet and register it in `MODULES`.
   2. Mirror it in the editor's `MODULES` table with identical `params`, plus `ui`.
-  3. Add a `PALETTE` entry and help text in `ABOUT`.
+  3. Add a `PALETTE` entry and help text in `PAGE_ABOUT` (top level since 21 Oct; shared modules use `SHARED_ABOUT` or
+     their `about`), and a one-line example in `MODULE_USE` (the shared block, then `python3 tools/sync-shared.py`).
   4. Bump `chains-worklet.js?v=` and the `sw.js` cache.
   5. Use `fx:true` only for `tfx.wasm` effects.
 - **`README.md`:** the top part is Thunder Plus's; the rest is …Thunder's (the base app).

@@ -1052,6 +1052,195 @@ function organizePalette(palette, groupFam){
   const st = document.createElement('style'); st.textContent = css; document.head.append(st);
 }
 const catStyle = (el, type) => { const c = CAT_COLOR[type]; if (c){ el.classList.add('cat'); el.style.setProperty('--cat', c); } return el; };
+/* The ? on each module's title bar (owner, 21 Oct): what the module does (the Help page's text: the page's PAGE_ABOUT,
+   SHARED_ABOUT, or the module's own about) and a short example of using it (MODULE_USE, every type on both pages; a
+   page can override one in PAGE_USE). With a mouse it shows on hover; a click or tap keeps it open; a second click,
+   a click elsewhere, Escape, panning or zooming close it. buildNode() in each page adds the button (mhelpBtn). */
+const MODULE_USE = {
+  // in and out, sources
+  trackIn:'Set Track to your drums’ track, patch Out and Out R through a Room reverb into a Chain Out on the same track, and the drums play through that reverb.',
+  chainOut:'For a drum group: Track Ins for the kick, snare and hats → a Mixer → a Glue Comp → a Chain Out on a free track. That track’s fader now turns the whole kit up and down.',
+  scin:'Set Source to the kick’s track, then patch Duck into a VCA’s CV on a pad for a pump, or Envelope into a filter’s Cutoff jack so the filter opens on every kick.',
+  scout:'In the drum chain, patch the drums into a Sidechain Out on Send 1. In the pad’s chain, a Sidechain In on Send 1 → the SC of a compressor makes the drums duck the pad.',
+  resample:'Put it after a chain you like, set Bars to 2 and Record to Armed while the song plays: the next two bars land in a pad, sliced and ready to chop.',
+  out:'The last module of every patch: patch your VCA (or its effects) into In and In R. In …Thunder, Output picks which Waves In it plays on.',
+  hostIn:'Start each voice here: Pitch → an oscillator’s Pitch, Gate → an ADSR’s Gate, and Velocity into a VCA’s Gain jack so harder notes play louder.',
+  seq:'Set eight notes, turn Run on and you hear a bass line without a keyboard (it plays through Host In). Set a step to Rest for space.',
+  string:'Host In Pitch and Gate in, Decay long and Position near the bridge for a twangy pluck; raise Mute for palm-muted chugs.',
+  vco:'Wave saw, Host In Pitch into Pitch, then a VCF and a VCA with an ADSR on its CV: the classic subtractive synth voice.',
+  fm:'Model 2-operator, Ratio 2, and an envelope into the Index jack: each note starts bright and metallic and mellows, for FM bells and basses.',
+  additive:'Model bell, Host In Pitch and Gate in, into a VCA with a short envelope: struck bell and mallet tones.',
+  noise:'White noise through a band-pass VCF and a VCA with a short envelope makes hi-hats and snares; pink noise through a slowly swept filter makes wind or surf.',
+  plaits:'Patch Host In Pitch and Gate, pick an Engine, then turn Harmonics, Timbre and Morph: 24 different instruments from one module.',
+  elements:'Patch Host In Pitch and Gate and play: raise Strike for a mallet, Bow for a bowed string or Blow for a breathy pipe.',
+  bytebeat:'Pick a formula with Rate at 8 kHz, then turn a, b and c slowly while it plays to find new melodies. A sequencer’s pitch into Pitch plays it in tune.',
+  blipdrum:'Patch a Euclidean’s Gate into 1 (a kick) and a Clock into 3 (a hat), then set each voice with Edit and the bars. Life’s outputs 1–8 make a groove that changes by itself.',
+  // mix and level
+  mixer:'Combine two oscillators or a few effect returns into one cable before a filter. Set Inputs to the number you need.',
+  smixer:'Mix a stereo dry sound and a stereo reverb or delay return, pan them, and send the result on to Chain Out.',
+  vca:'Patch an ADSR’s Out into CV and the sound starts and stops with each note. With no cable in CV it stays open.',
+  utility:'Flip Polarity when two layered samples cancel each other, set Stereo to mono to check a mix, or Mute a branch while you patch.',
+  width:'On a pad: Width 150% with Bass mono on, so it spreads wide while the low end stays solid in the middle.',
+  meter:'Put one before and one after an effect to check it isn’t changing the level or clipping, and use Trim to match them.',
+  // dynamics
+  compressor:'To duck a bass under the kick: Source on the kick’s track, Ratio 4:1, a fast Attack and Release around 120 ms.',
+  buscomp:'On a drum group: Ratio 4:1, Auto release, Threshold down until it turns down 2–3 dB, then Makeup to match. The drums glue and punch together.',
+  glue:'On the mix or a group: Ratio 2:1, Attack around 10 ms, Auto release, Threshold for 1–2 dB of reduction, so it sounds like one performance.',
+  comp:'Parallel squash on drums: Pressure high and Mix around 30%, so the hits stay punchy while the room and tails come up.',
+  sccomp:'On a pad or bass, set Source to the kick’s track: Ratio 4:1 and Release around 150 ms give the classic sidechain pump.',
+  limiter:'Last on the mix or a loud group: Ceiling −1 dB, then raise Input until the bar shows a few dB of reduction for more loudness without clipping.',
+  ngate:'On a noisy sample: Threshold just above the hiss, Hold 20 ms. Or set Source to the drums to chop a pad in their rhythm.',
+  ott:'On a pad, vocal or drum bus: Depth around 30% brings up detail and air; turn it up for the hyped, crunchy EDM sound.',
+  transient:'On a drum loop: Attack up for snappier hits, Sustain down to dry up a roomy sample.',
+  // filters and EQ
+  filter:'For a build-up: Type low-pass, Cutoff low, LFO depth up with a slow sine. A square LFO at 1/8 gives rhythmic steps instead.',
+  cut:'On anything that isn’t bass or kick, Low cut around 100 Hz clears room for the low end; High cut around 12 kHz tames hiss on old samples.',
+  eq:'Bass down a little to clear mud, Treble up for presence, and High-pass around 80 Hz on anything that isn’t a bass.',
+  air:'On a dull vocal or pad, a little Air adds sparkle without harshness; pull Ground down to thin a muddy low end.',
+  vcf:'Mode low-pass, Cutoff low, and an envelope into the Cutoff jack: every note opens with the classic synth “wow”.',
+  ladder:'On a saw bass: Mode low-pass, Cutoff low, Resonance around 70% and some Drive, with an envelope on Cutoff’s jack for an acid-style squelch.',
+  blades:'Mode low-pass, Slope 4-pole, a little Drive, and an LFO or envelope into the Cutoff jack for a fat, squelchy sweep.',
+  autowah:'On a funky bass or clav: Wah around 60% so harder notes open the filter, Mix 100%.',
+  envfilt:'On a clav, bass or guitar: Filter band-pass, Depth up, Resonance around 60%, then set Sensitivity so harder notes quack open.',
+  vowel:'On a pad or drum loop: a slow LFO rate, LFO depth up and Resonance around 60%, and the sound “talks” between the vowels.',
+  // drive and lo-fi
+  saturation:'On drums or bass: Drive around 30% with High-pass up a little, so it warms and fattens without muddying the low end.',
+  odrive:'On a bass or lead: Drive around 40%, Tone a little down and Mix 70% for warm crunch that keeps the low end.',
+  drive:'On a bass or the whole mix: Drive around 30% to thicken it without it sounding distorted.',
+  tube:'On vocals, keys or the mix: Input up slightly and some Tube for warm, uneven harmonics.',
+  folder:'On a sine or triangle: raise Fold slowly (or patch an envelope into its jack) for a bright, West Coast-style tone that changes with each note.',
+  cab:'After Overdrive or Tube on a synth or guitar, pick a guitar Cab and raise Off axis to darken it: an amp in a room.',
+  crush:'On drums: Downsample around 40%, Bits 8 and Mix 50% add crunchy grit while keeping the punch.',
+  lofi:'On a drum break: Rate down a bit and Bits around 10 for gritty, old-sampler crunch; raise Hardness for more bite.',
+  degrade:'On a clean synth: Bits 12, Rate a little down, and some Noise with Follow on, for a sampled-from-tape tracker feel.',
+  tape:'On a drum bus or the mix: Input a little up, some Head bump and gentle Flutter for warm, analog-sounding tape colour.',
+  vinyl:'On a clean sample or mix: Groove wear a little up and High limit down for an old-record feel.',
+  dub:'On a drum or dub bus: Amount around 50% for dense, saturated tape squash.',
+  // modulation effects
+  chorus:'On a dry synth or electric piano: a slow Rate, Depth around 40% and Mix 50% thicken and widen it.',
+  ensemble:'On a string pad or chord: Mode Ensemble for the lush string-machine shimmer, or Classic I+II for an 80s polysynth chorus.',
+  dimension:'On a pad or bass you want wider without any wobble: Mode 2 and Width up. It still sums to mono cleanly.',
+  flanger:'On drums or a break: a slow Rate, Feedback high and Mix 50% for the classic jet sweep.',
+  phaser:'On a pad or electric piano: Stages up, a slow Rate and Feedback around 50% for a swirling 70s phase.',
+  tremolo:'On an electric piano or guitar: Rate around 5 Hz, Depth 50%, Shape sine for the classic amp tremolo.',
+  autopan:'On hi-hats or a pad: Sync on, Division 1/8, Depth 60%, so the sound sways across the stereo field in time.',
+  rotary:'On an organ or electric piano: Speed Slow, then switch to Fast (or patch a gate into Fast) for the spinning speaker speeding up.',
+  ringmod:'On a vocal, Freq around 30 Hz makes a classic robot voice; a higher Freq on drums makes clangy, metallic hits.',
+  xmod:'Patch a drum loop into In and a pad into In R, then move Algorithm toward the vocoder end: the drums play the pad’s harmony.',
+  fshift:'On a vocal or drum loop: a few Hz of Shift for a subtle phasing shimmer, or 300 Hz with Feedback up for metallic, spiralling sounds.',
+  meta:'A drum loop into In and a synth into Mod, Mode Ring mod, Mix 50%: metallic, bell-like hits that follow the synth’s notes.',
+  // delays
+  sdelay:'On a vocal or lead: Sync on, Division 1/4, Feedback 30%, Low cut and High cut in, Mix 20%, for clean echoes that sit behind it.',
+  delay:'On a vocal or lead: Time around 350 ms, Repeats 35%, a little Flutter and Mix 25% for a warm tape echo.',
+  pingpong:'On a pluck, snare or vocal: Sync on, Division 1/8, Repeats 40%, Mix 25%: echoes that bounce left and right in time.',
+  bbd:'On a synth lead: Sync on, Division 1/8, Repeats 50%, a touch of Wow and Age for a warm, dark analog echo. Push Repeats past 100% for dub feedback.',
+  gdelay:'On a pluck or vocal: Sync on, a small Grain size, Spray up and Pitch +12 for a sparkling echo cloud. Freeze holds it.',
+  pdelay:'On a pluck: Mode Climb, Pitch +7 and Feedback 50%, so each echo rises a fifth into a cascading arpeggio.',
+  reverse:'On a vocal or guitar: Mode Swell, Mix 40%, so each phrase is introduced by a rising reverse-reverb whoosh.',
+  // reverbs
+  reverb:'On a pad: Size large, Mix around 30% for a huge, lush wash; lower Brightness so it sits behind the dry sound.',
+  room:'On drums or an instrument that sounds too dry: Size small, Wet around 15% to place it in a believable room.',
+  plate:'On a snare or vocal: Decay around 1.5 s, Pre-delay 20 ms, a little Damping and Mix 20% for the classic bright studio plate.',
+  spring:'On a guitar or a dub snare: Chirp up, Decay around 2 s, Mix 30% for the boingy surf and dub spring sound.',
+  space:'On a pad, pluck or ambient lead: Size and Decay high, Modulation up, Low cut on, Mix 35% for a vast, shimmering hall.',
+  preverb:'On a pad or guitar: Mode Shimmer, Pitch +12, Mix 40% for a glowing tail that keeps rising.',
+  convolve:'On a snare: Type Gated, a small Size and short Decay for the 80s gated drum. Type Reverse on a vocal swells up into each word.',
+  // resonators
+  comb:'On drums or noise: Note in the song’s key and Feedback around 80%, so every hit rings as a pitched tone. Negative Feedback sounds hollow.',
+  reson:'On a drum loop or noise: Note in the key, Chord minor, a long Decay and Mix 50%, and the beat rings out in harmony.',
+  rings:'Feed it a short click or rimshot and tune Note to the key: it rings like a plucked string or a struck bell.',
+  // pitch and voice
+  pshift:'Pitch −12 on a vocal for a deep, monstrous double; Pitch +12 with Mix 30% adds a sparkly octave on top.',
+  harm:'On a vocal or lead: Voice 1 a third up, then Level 2 up with Voice 2 a fifth up, for an instant three-part harmony.',
+  autotune:'On a vocal: Key and Scale to match the song, Speed Snap for the hard robotic effect, or around 30 ms with some Humanize for a natural tightening.',
+  vocoder:'A synth pad into In and a vocal or drum loop into In R, Mode 16 bands: the pad speaks with the voice’s rhythm and words.',
+  // granular and spectral
+  clouds:'On a piano or pad: Position half way, Size large, Density and Texture up, Blend mostly wet. Flip Freeze for an instant ambient bed.',
+  beads:'Feed it a short vocal or guitar phrase: Density around 60%, a large Size, Feedback and some Reverb for an evolving cloud. Freeze holds it as a pad.',
+  spectral:'On a pad or vocal: Mode Freeze, then switch Freeze to Hold on a chord you like, and it becomes an endless drone to play over.',
+  stretch:'Stretch ×8, a long Window and Mix 100%: a one-bar loop becomes a slow ambient wash. Freeze holds the moment.',
+  // rhythmic effects
+  pump:'On a pad or bass with no kick to listen to: Every 1/4 and Depth 80% for the four-on-the-floor house pump.',
+  tgate:'On a long pad or chord: Step 1/16, Depth 100% and a short Length for the classic trance chop.',
+  sgate:'On a held pad: pick a Pattern (or Custom and draw it with x’s), Length 70%, Depth 100% for a rhythmic chop.',
+  repeat:'Patch a gate into Gate (or map Hold to a controller button), Slice 1/16, a little Decay: live beat-repeat stutters on your drums.',
+  retrig:'Patch a gate (Steps, a Euclidean or a square LFO) into Trig with Mode While Trig is high, Rate 1/16 and Pitch falling, for stuttered rolls.',
+  flex:'On a drum loop with the song playing: pick a Pattern (a stutter, a reverse, a tape stop) for a one-bar fill, or patch a sequencer into Pattern to change it every bar.',
+  // modulation sources
+  lfo:'Sync on, a slow Rate and Shape sine into a filter’s Cutoff jack for a sweep, or a square into a VCA’s CV for a choppy tremolo.',
+  adsr:'Patch a gate (a Clock, a Euclidean or Host In) into Gate and Out into a slider’s jack: on a VCA’s CV it shapes each note’s level, on a filter’s Cutoff each note’s sweep.',
+  tides:'Mode AD with a gate into Trig and Out 1 into a VCA or filter for a snappy envelope. Mode Looping is an LFO with four related outputs.',
+  random:'A clock into Clock (or set Rate), Smooth off and Out into a filter’s Cutoff jack for random steps; turn Smooth up for a slow, drifting wander.',
+  marbles:'Patch t1 and t3 into two drum voices and x1 through a Quantizer into a pitch, for a melody and rhythm that write themselves. Raise Déjà vu to make them repeat.',
+  chaos:'Model Lorenz with Rate around 0.2 Hz: X into a filter’s Cutoff jack and Y into a pan or delay Time, for movement that never quite repeats.',
+  steps:'Out into a filter’s Cutoff jack with Step 1/16 and a little Glide, for a sequenced filter riff in time with the song.',
+  // clocks and rhythm
+  clock:'Every 1/16 with a little Swing into a Blip drum or an ADSR. Patch Bar (4 bars) into Clouds’ Position for a sweep that lasts the phrase.',
+  divider:'Patch a clock (a Clock, a Sequencer’s Clock or a square LFO) into Clock and use /2 and /4 to fire slower envelopes or drum voices from one tempo.',
+  euclid:'Steps 16, Hits 5, Rotate 2: Gate into a drum voice (a Blip drum input) for an off-kilter groove, and Accent into a second voice to mark the cycle.',
+  logic:'Patch two Euclidean gates into A and B: AND fires only where both hit (accents), XOR where only one does (a third pattern).',
+  life:'Draw a Glider, set Step to 1/16 and patch outputs 1–8 into a Blip drum’s triggers: a drum pattern that grows and dies by itself.',
+  // audio → CV
+  envfol:'Patch a drum loop into In and Out into a pad filter’s Cutoff jack: the pad opens on every hit.',
+  gateex:'Patch a drum loop into In and Out into an ADSR’s Gate: every hit fires the envelope, so a synth or filter follows the beat.',
+  pitchfol:'Patch a whistle or a simple melody into In, then Out through a Quantizer into an oscillator’s pitch to double it with a synth.',
+  pitchtrk:'Patch a sung line into In, Note into an oscillator’s pitch and Trig into an envelope: a synth that plays along with the voice.',
+  // CV utilities
+  atten:'Between an LFO and a filter’s Cutoff jack: Amount 30% for a gentle wobble, or negative so the LFO sweeps the other way.',
+  math:'Multiply an LFO (A) by an envelope (B) and use the × output: the wobble only happens while the note is held.',
+  slew:'After Steps or a Random going to a pitch or cutoff: Rise and Fall around 100 ms turn hard jumps into smooth glides.',
+  snh:'Noise or an LFO into In, a clock into Trig, and Out into a filter’s Cutoff jack: the classic stepped “computer” filter.',
+  quant:'After a Random or LFO going to an oscillator’s pitch, Scale minor pentatonic: random melodies that always stay in key.',
+};
+const modAbout = t => (typeof PAGE_ABOUT !== 'undefined' && PAGE_ABOUT[t]) || SHARED_ABOUT[t] || (MODULES[t] && MODULES[t].about) || '';
+const modUse = t => (typeof PAGE_USE !== 'undefined' && PAGE_USE[t]) || MODULE_USE[t] || '';
+{
+  const css = `.node > header .mq{border:0; background:none; color:var(--muted); font-size:15px; font-weight:700; line-height:1; width:20px; height:24px; padding:0; flex:none; margin-right:-4px}
+.node > header .mq:hover, .node > header .mq[aria-expanded="true"]{background:var(--panel-2); color:var(--ink)}
+.mhelp{position:fixed; z-index:2000001; width:min(320px, calc(100vw - 16px)); max-height:min(60vh, 420px); overflow:auto; box-sizing:border-box; padding:10px 12px 12px;
+  background:var(--panel); color:var(--ink); border:3px solid var(--cat, var(--edge)); box-shadow:0 6px 24px rgba(0,0,0,.25); font-size:13.5px; line-height:1.42; user-select:text; -webkit-user-select:text}
+.mhelp h4{margin:0 0 5px; font-size:15px; font-weight:600}
+.mhelp p{margin:0}
+.mhelp .use{margin-top:8px; padding-top:8px; border-top:1px solid color-mix(in srgb, var(--ink) 18%, transparent)}
+.mhelp .use b{display:block; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:2px}`;
+  const st = document.createElement('style'); st.textContent = css; document.head.append(st);
+}
+let mhelpEl = null, mhelpBtnOn = null, mhelpPinned = false, mhelpT = 0;
+function mhelpHide(){
+  clearTimeout(mhelpT);
+  if (mhelpEl) mhelpEl.hidden = true;
+  if (mhelpBtnOn){ mhelpBtnOn.setAttribute('aria-expanded', 'false'); mhelpBtnOn.removeAttribute('aria-describedby'); }
+  mhelpBtnOn = null; mhelpPinned = false;
+}
+function mhelpShow(btn, type, title, pin){
+  clearTimeout(mhelpT);
+  if (!mhelpEl){
+    mhelpEl = h('div', {class:'mhelp', id:'mhelp', role:'tooltip'}); mhelpEl.hidden = true; document.body.append(mhelpEl);
+    mhelpEl.addEventListener('pointerenter', () => clearTimeout(mhelpT));
+    mhelpEl.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && !mhelpPinned) mhelpT = setTimeout(mhelpHide, 200); });
+  }
+  if (mhelpBtnOn && mhelpBtnOn !== btn){ mhelpBtnOn.setAttribute('aria-expanded', 'false'); mhelpBtnOn.removeAttribute('aria-describedby'); }
+  const about = modAbout(type), use = modUse(type);
+  mhelpEl.replaceChildren(h('h4', {text:title}), h('p', {text:about || 'No description yet.'}), use ? h('div', {class:'use'}, h('b', {text:'Try'}), h('p', {text:use})) : null);
+  const c = CAT_COLOR[type]; if (c) mhelpEl.style.setProperty('--cat', c); else mhelpEl.style.removeProperty('--cat');
+  mhelpEl.hidden = false; mhelpBtnOn = btn; mhelpPinned = !!pin;
+  btn.setAttribute('aria-expanded', 'true'); btn.setAttribute('aria-describedby', 'mhelp');
+  // under the ?, right edges lined up, kept on screen; above it when there is no room below
+  const r = btn.getBoundingClientRect(), W = mhelpEl.offsetWidth, H = mhelpEl.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
+  let top = r.bottom + 6; if (top + H > vh - 8) top = Math.max(8, r.top - 6 - H);
+  mhelpEl.style.left = Math.max(8, Math.min(vw - W - 8, r.right - W)) + 'px'; mhelpEl.style.top = top + 'px';
+}
+// The title bar's ?: buildNode() puts it before the ×. Buttons in the title bar never start a drag or a collapse.
+function mhelpBtn(type, title){
+  const b = h('button', {class:'mq', 'aria-label':'About ' + title, 'aria-expanded':'false', text:'?'});
+  b.addEventListener('pointerenter', e => { if (e.pointerType !== 'mouse' || mhelpPinned) return; clearTimeout(mhelpT); mhelpT = setTimeout(() => mhelpShow(b, type, title, false), 250); });
+  b.addEventListener('pointerleave', e => { if (e.pointerType !== 'mouse' || mhelpPinned) return; clearTimeout(mhelpT); if (mhelpBtnOn === b) mhelpT = setTimeout(mhelpHide, 200); });
+  b.addEventListener('click', e => { e.stopPropagation(); if (mhelpBtnOn === b && mhelpPinned) mhelpHide(); else mhelpShow(b, type, title, true); });
+  return b;
+}
+window.addEventListener('pointerdown', e => { if (mhelpBtnOn && !(mhelpEl && mhelpEl.contains(e.target)) && !e.target.closest('.mq')) mhelpHide(); }, true);
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && mhelpBtnOn) mhelpHide(); });
+window.addEventListener('wheel', e => { if (mhelpBtnOn && !(mhelpEl && mhelpEl.contains(e.target))) mhelpHide(); }, {passive:true, capture:true});   // the patch is panning or zooming under it
 /* Displays: a Meter's bars and a Limiter's gain reduction, drawn from the engine's telemetry (shows). */
 {
   const css = `.shw{display:grid; gap:4px; padding:2px 0}
@@ -1676,7 +1865,7 @@ function buildNode(m){
   fold.innerHTML = FOLD_SVG;
   fold.addEventListener('click', () => { store.snapshot(); setCollapsed(n, !m.collapsed); });
   n.foldBtn = fold;
-  const head = h('header', {title:'Double-click to collapse or expand'}, fold, h('span', {class:'t', text: title}),
+  const head = h('header', {title:'Double-click to collapse or expand'}, fold, h('span', {class:'t', text: title}), mhelpBtn(m.type, title),
     h('button', {class:'x', 'aria-label':'Remove ' + title, title:'Remove', text:'×', onclick: () => { store.snapshot(); removeModule(m.id); }}));
   for (const k in def.params) if (m.params[k] == null) m.params[k] = def.params[k][0];
   const ins = Object.keys(def.inputs).filter(p => mixShown(m, p)), outs = Object.keys(def.outputs);
@@ -2545,39 +2734,42 @@ const keysBox = document.getElementById('setkeys');
 keysBox.addEventListener('change', () => { settings.keys = keysBox.checked; saveSettings(); paintKeys(); });
 
 /* help */
+// Each module type's description: the Help page's cards and the ? on each module's title bar (with SHARED_ABOUT and the
+// modules' own about for the shared ones).
+const PAGE_ABOUT = {
+  hostIn:'Turns the notes you play into control signals: Pitch, Gate (held while a key is down) and Velocity. One copy runs for every voice, so anything it feeds becomes polyphonic.',
+  seq:'An 8-step sequencer. It plays its steps through Host In, like a keyboard, at the tempo in Settings (or from a Clock cable). Set a step to Rest for silence. Clock, Pitch and Gate come out for driving other modules.',
+  vco:'A simple oscillator: saw, square, triangle or sine. Patch Pitch from Host In; FM bends the pitch for vibrato or harsher sounds.',
+  fm:'FM oscillators from …Thunder: 2-operator, feedback, 808-style metal and cross-modulation. Ratio picks the modulator’s pitch, Index how much it bends the sound.',
+  additive:'Additive oscillators from …Thunder: harmonic and odd-harmonic stacks, membrane, bell and bar partials, and chords. A Gate restarts the partials’ decay, for struck sounds.',
+  noise:'Noise from …Thunder: white, pink, brown and blue (Shape lowers the rate, Color the bit depth), 808 metal, digital, crackle and sample-and-hold. Pitch moves the metal, digital and S&H noises.',
+  plaits:'A macro oscillator with 24 sound engines (Mutable Instruments Plaits, as in …Thunder). Patch a Gate to strike its built-in envelope and low-pass gate; without one it drones. Harmonics, Timbre and Morph change the sound.',
+  elements:'Mutable Instruments Elements: a modal voice where a bow, a breath and a mallet excite a resonator. Patch Pitch and Gate from Host In.',
+  vcf:'A filter. Low-pass softens, band-pass keeps the middle, high-pass thins. Patch an envelope into Cutoff for classic sweeps.',
+  vca:'An amplifier. Patch an envelope into CV so notes start and stop (with nothing in CV it stays open); Gain sets the loudness.',
+  mixer:'Mixes up to 16 sounds, each with its own level, plus a master level. Inputs sets how many channels it shows (4 to start).',
+  eq:'Airwindows EQ: treble, mid and bass with their frequencies, plus low-pass and high-pass filters.',
+  comp:'Airwindows Pressure4: a compressor. Pressure sets how hard it works; Mix blends in the dry sound for parallel compression.',
+  saturation:'Airwindows Density: warm saturation and drive.',
+  tape:'Airwindows ToTape6: the sound of tape, with soft highs, head bump and flutter.',
+  chorus:'DaisySP chorus, in stereo.',
+  crush:'DaisySP decimator: lower sample rate and fewer bits.',
+  delay:'Airwindows TapeDelay2: a tape echo up to 1.8 seconds, with repeats, tone and flutter.',
+  reverb:'Airwindows Galactic: a huge, lush reverb.',
+  rings:'Mutable Instruments Rings: sound in excites a resonator tuned to Note (plus the Pitch input).',
+  clouds:'Mutable Instruments Clouds: granular textures, time stretch, looping delay and spectral blur. Freeze holds what it heard.',
+  string:'String: a Karplus–Strong plucked string, one per voice. Patch Host In’s Pitch and Gate in: each gate plucks it. Bright sets the pluck and how fast the highs fade, Decay how long it rings, Position where it is plucked (near the bridge is twangy, the middle is round and hollow), and Mute how much the string is damped once the gate is let go.',
+  lfo:'A slow oscillator for wobbles and sweeps. Depth sets how far it moves a slider; Sync to tempo follows the tempo. Reset restarts its cycle.',
+  adsr:'An envelope: Attack, Decay, Sustain and Release shape each note from its Gate.',
+  random:'A new random value at Rate, or each time Clock fires. Smooth glides between values.',
+  atten:'Scales a modulation signal (negative turns it upside down) and adds an offset.',
+  out:'Sends sound out, in stereo if you patch In R. Output picks which Waves In bus it plays on (in …Thunder each is its own input); on its own …waves plays them all.'
+};
 function helpDoc(){
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   const EDGE = { midi:'#b8865a', gen:'#139a9a', afx:'#b24fb0', mod:'#c99a00', aout:'#3f6fb5', util:'#e07a2e' };
   const KC = { audio:'#22958d', mod:'#7a58c8', gate:'#c93d78' };
-  const ABOUT = {
-    hostIn:'Turns the notes you play into control signals: Pitch, Gate (held while a key is down) and Velocity. One copy runs for every voice, so anything it feeds becomes polyphonic.',
-    seq:'An 8-step sequencer. It plays its steps through Host In, like a keyboard, at the tempo in Settings (or from a Clock cable). Set a step to Rest for silence. Clock, Pitch and Gate come out for driving other modules.',
-    vco:'A simple oscillator: saw, square, triangle or sine. Patch Pitch from Host In; FM bends the pitch for vibrato or harsher sounds.',
-    fm:'FM oscillators from …Thunder: 2-operator, feedback, 808-style metal and cross-modulation. Ratio picks the modulator’s pitch, Index how much it bends the sound.',
-    additive:'Additive oscillators from …Thunder: harmonic and odd-harmonic stacks, membrane, bell and bar partials, and chords. A Gate restarts the partials’ decay, for struck sounds.',
-    noise:'Noise from …Thunder: white, pink, brown and blue (Shape lowers the rate, Color the bit depth), 808 metal, digital, crackle and sample-and-hold. Pitch moves the metal, digital and S&H noises.',
-    plaits:'A macro oscillator with 24 sound engines (Mutable Instruments Plaits, as in …Thunder). Patch a Gate to strike its built-in envelope and low-pass gate; without one it drones. Harmonics, Timbre and Morph change the sound.',
-    elements:'Mutable Instruments Elements: a modal voice where a bow, a breath and a mallet excite a resonator. Patch Pitch and Gate from Host In.',
-    vcf:'A filter. Low-pass softens, band-pass keeps the middle, high-pass thins. Patch an envelope into Cutoff for classic sweeps.',
-    vca:'An amplifier. Patch an envelope into CV so notes start and stop (with nothing in CV it stays open); Gain sets the loudness.',
-    mixer:'Mixes up to 16 sounds, each with its own level, plus a master level. Inputs sets how many channels it shows (4 to start).',
-    eq:'Airwindows EQ: treble, mid and bass with their frequencies, plus low-pass and high-pass filters.',
-    comp:'Airwindows Pressure4: a compressor. Pressure sets how hard it works; Mix blends in the dry sound for parallel compression.',
-    saturation:'Airwindows Density: warm saturation and drive.',
-    tape:'Airwindows ToTape6: the sound of tape, with soft highs, head bump and flutter.',
-    chorus:'DaisySP chorus, in stereo.',
-    crush:'DaisySP decimator: lower sample rate and fewer bits.',
-    delay:'Airwindows TapeDelay2: a tape echo up to 1.8 seconds, with repeats, tone and flutter.',
-    reverb:'Airwindows Galactic: a huge, lush reverb.',
-    rings:'Mutable Instruments Rings: sound in excites a resonator tuned to Note (plus the Pitch input).',
-    clouds:'Mutable Instruments Clouds: granular textures, time stretch, looping delay and spectral blur. Freeze holds what it heard.',
-    string:'String: a Karplus–Strong plucked string, one per voice. Patch Host In’s Pitch and Gate in: each gate plucks it. Bright sets the pluck and how fast the highs fade, Decay how long it rings, Position where it is plucked (near the bridge is twangy, the middle is round and hollow), and Mute how much the string is damped once the gate is let go.',
-    lfo:'A slow oscillator for wobbles and sweeps. Depth sets how far it moves a slider; Sync to tempo follows the tempo. Reset restarts its cycle.',
-    adsr:'An envelope: Attack, Decay, Sustain and Release shape each note from its Gate.',
-    random:'A new random value at Rate, or each time Clock fires. Smooth glides between values.',
-    atten:'Scales a modulation signal (negative turns it upside down) and adds an offset.',
-    out:'Sends sound out, in stereo if you patch In R. Output picks which Waves In bus it plays on (in …Thunder each is its own input); on its own …waves plays them all.'
-  };
+  const ABOUT = PAGE_ABOUT;
   const guide = [
     ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal cables carry sound, purple dashed cables carry modulation and pink dashed cables carry gates. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the centre, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
