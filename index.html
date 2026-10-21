@@ -1196,6 +1196,12 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .tgrid span.pvz{background:repeating-linear-gradient(135deg, transparent 0 .32em, color-mix(in srgb, var(--ts-ink) 15%, transparent) .32em .46em);
   color:var(--ts-mute); font-weight:700}
 .tgrid span.pvc:not(.cur):not(.sel):not(.pl){background-color:color-mix(in srgb, var(--tk) 15%, transparent)}
+/* The selection in its own colour (owner, 20 Oct, plum skin): --ts-sel is the skin's own tint, the same family as the open
+   track's tint and the MONO band, so a selection on the open track hardly showed. Amber stands apart on every skin. */
+.tscr{--pv-sel:color-mix(in srgb, #f0b429 55%, var(--ts-bg))}
+/* skins whose own colours are amber or orange get a sky blue instead */
+:root:is([data-skin="night"],[data-skin="mustard"],[data-skin="citrus"],[data-skin="contrast"],[data-skin="sunset"],[data-skin="desert"],[data-skin="complement"],[data-skin="espresso"]) .tscr{--pv-sel:color-mix(in srgb, #3fa7e0 50%, var(--ts-bg))}
+.tgrid.pvon span.sel{background:var(--pv-sel); color:var(--ts-ink)}
 .tgrid span.pvnow:not(.cur):not(.sel):not(.pl){background-image:linear-gradient(color-mix(in srgb, var(--ts-cur-bg) 13%, transparent), color-mix(in srgb, var(--ts-cur-bg) 13%, transparent))}
 .tgrid span.pvdim{opacity:.45}
 .tgrid span.pvmore{text-decoration:underline dotted; text-underline-offset:.2em}
@@ -2115,6 +2121,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Ctrl/⌘ C X V A</dt><dd>copy, cut, paste over the cursor or selection, select all · Ctrl/⌘+B block select · Ctrl/⌘+D clone a song block (then paste puts a unique copy at the cursor) · Ctrl/⌘+Shift+D clone it to the row below</dd>
         <dt>Esc</dt><dd>drop the selection</dd>
         <dt>Space</dt><dd>play this screen · Shift+Space the song · with Loop on, Space loops the selected rows</dd>
+        <dt>Ctrl/⌘ /</dt><dd>solo the track you're on (again: unsolo it) · Ctrl/⌘+Shift+/ clears every solo</dd>
         <dt>Ctrl+Space</dt><dd>play just this pattern (the song row, every track), looped: turns LOOP on and plays; again stops (⌘+Space works too if Spotlight isn't on it) · Alt+L turns LOOP off</dd>
         <dt>Alt+L</dt><dd>loop the pattern on/off: the song repeats the row it is on (LOOP in the tab bar)</dd>
         <dt>Shift+Alt+L</dt><dd>loop the selection on/off (LOOP SEL beside it, on a computer)</dd>
@@ -10990,7 +10997,7 @@ window.addEventListener('pointerdown', e => { if (!$('gfile').hidden && !$('gfil
 /* ---------- Edit menu (Desktop): the COMMANDS row's commands in the top bar (cmdItems, by the command row) ----------
    In the tracker: all of them, for where the cursor is. On Waves / Chains: that patch's Undo / Redo; on Synth: Undo / Redo. */
 function editItems(){
-  if (view === 'tracker') return cmdItems();
+  if (view === 'tracker') return apReady && apF ? apSongItems() : cmdItems();   // ARRANGE PAGING: Arrange holding the keys is the Song screen
   const a = frameApi(), f = a && a.file;
   if (f) return [{l:'Undo', f:() => f.undo(), off:!f.canUndo()}, {l:'Redo', f:() => f.redo(), off:!f.canRedo()}];
   return [{l:'Undo', f:() => undoStep(-1), off:!undo.past.length && !vUndo.t.some(Boolean)}, {l:'Redo', f:() => undoStep(1), off:!undo.future.length}];
@@ -15964,6 +15971,18 @@ function playPatLoop(){
   const r = S.song[cs.song.y];
   tStart('song', {row:r && r.some(v => v >= 0) ? cs.song.y : songRow()});
 }
+// Ctrl/⌘+/ (owner, 20 Oct: Renoise's solo key): the track being worked on, as the bottom panel's track strip picks it (dkTrack:
+// the song cursor's track on Song and with Arrange holding the keys, the mixer's, FX's, else the phrase's). Solo adds up, as
+// the mixer's S does; all: clear every solo (as the deck's SOLO button).
+function soloKey(all){
+  if (all){ if (!S.mix.some(m => m.solo)) return toast('Nothing is soloed.'); S.mix.forEach(m => m.solo = false); mixChanged(); draw(); return toast('Solo cleared: every track plays.'); }
+  const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
+  if (mst) return toast('The master can’t be soloed.');
+  const t = dkTrack(), m = S.mix[t]; if (!m) return;
+  m.solo = !m.solo; mixChanged(); draw();
+  const n = S.mix.filter(q => q.solo).length;
+  toast(m.solo ? `Solo on: track ${d2(t + 1)}` + (n > 1 ? ` (${n} soloed)` : '') + ' · ' + keyHint('mod+shift+/') + ' clears every solo' : `Solo off: track ${d2(t + 1)}` + (n ? ` (${n} still soloed)` : ''));
+}
 function toggleLoop(){
   loopSel = !loopSel;
   if (!loopSel) loopArm = null;
@@ -16497,8 +16516,8 @@ function cmdBarState(){
 var cmdTipKey = '';   // var: applyCmdOrder can run before this line
 function cmdTips(){
   if (!cmdMini()) return;
-  const key = tv + ':' + !!selA + ':' + tp.on + ':' + inMode; if (key === cmdTipKey) return; cmdTipKey = key;
-  for (const it of cmdItems()){ if (!it || !it.a) continue; const b = $('tCmd').querySelector(`button[data-c="${it.a}"]`); if (b) b.title = it.l + (it.k ? ' · ' + it.k : ''); }
+  const ap = !!(apReady && apF), key = tv + ':' + !!selA + ':' + tp.on + ':' + inMode + ':' + ap; if (key === cmdTipKey) return; cmdTipKey = key;
+  for (const it of ap ? apAsSong(cmdItems) : cmdItems()){ if (!it || !it.a) continue; const b = $('tCmd').querySelector(`button[data-c="${it.a}"]`); if (b) b.title = it.l + (it.k ? ' · ' + it.k : ''); }
 }
 // A tap fires pointerdown and then a click; the click only counts when no pointerdown just ran the
 // button (keyboard Enter/Space, accessibility tools), so SELECT, CLN, PASTE… never fire twice.
@@ -18338,8 +18357,13 @@ function sxCellAt(x, y){
   const e = document.elementFromPoint(x, y), b = e && e.closest && e.closest('#tArrGrid b[data-y]');
   return b ? {y:+b.dataset.y, t:+b.dataset.t} : null;
 }
+// The side Arrange panel holding the keys is the Song screen nested beside another screen (owner, 20 Oct): the mouse
+// works there as on the Song screen too, each step run as the Song screen (apRun: tv = 'song', the song selection).
+// apReady first: apF / apSong live in the ARRANGE PAGING block further down.
+function sxSide(){ return !!(apReady && apF === 'arr' && !apSong && apArrOk()); }
 // arrGrid's pointerdown calls this first; true = handled here (the old press must not start).
 function sxDown(e){
+  if (sxSide()) return apRun(sxDown, [e]);
   if (!asongOn()) return false;
   const rn = e.target.closest('[data-ry]');
   if (rn) return SX.loop ? sxLoopDown(e, rn) : false;
@@ -18354,6 +18378,7 @@ function sxDown(e){
   return false;   // the normal press starts as well: a click goes to the block, holding mutes; a drag cancels it
 }
 function sxStart(e){
+  if (sxSide()) return apRun(sxStart, [e]);
   const d = sxDrag;
   if (d.sel || d.filled){
     d.mode = 'move';
@@ -18370,6 +18395,7 @@ function sxMove(e){
   if (!sxRaf) sxRaf = requestAnimationFrame(sxFrame);
 }
 function sxFrame(){
+  if (sxSide()) return apRun(sxFrame, []);
   sxRaf = 0; const d = sxDrag; if (!d || !d.mode) return;
   const e = d.ev, g = arrGrid.getBoundingClientRect(), rh = arrRowH() || 20;
   // near the top or bottom edge the rows scroll under the mouse
@@ -18408,6 +18434,7 @@ function sxShowDrop(d, e){
 }
 function sxEnd(e){
   const d = sxDrag; if (!d || e.pointerId !== d.id) return;
+  if (sxSide()) return apRun(sxEnd, [e]);
   sxDrag = null; if (sxRaf){ cancelAnimationFrame(sxRaf); sxRaf = 0; }
   arrGrid.classList.remove('sxdrag');
   for (const b of sxMarks) b.classList.remove('dt', 'dtx'); sxMarks = [];
@@ -18484,8 +18511,12 @@ arrGrid.addEventListener('contextmenu', e => {
   if (!asongOn() || !SX.mouse || (e.pointerType && e.pointerType === 'touch')) return;
   const b = e.target.closest('b[data-y]'); if (!b) return;
   e.preventDefault();
-  const y = +b.dataset.y, t = +b.dataset.t;
-  if (!sxIn(sxRect(), y, t)){ selA = null; cs.song.x = t; cs.song.y = y; if (t !== MT) cTrack = t; draw(); }
+  const m = sxCtx(+b.dataset.y, +b.dataset.t); sxMenu(e.clientX, e.clientY, m.title, m.items);
+});
+// The Song screen's menu for the block (or the selection) at y, t: {title, items}. The side Arrange panel uses it too, run
+// as the Song screen (its contextmenu handler in ARRANGE PAGING), so the two menus are the same.
+function sxCtx(y, t){
+  if (!sxIn(sxRect(), y, t)){ selA = null; cs.song.x = t; cs.song.y = y; if (t !== MT && !(apReady && apF)) cTrack = t; draw(); }
   const r = sxRect() || {x0:t, x1:t, y0:y, y1:y}, multi = !!sxRect() && (r.y1 > r.y0 || sxCols(r).length > 1);
   const filled = S.song[cs.song.y][cs.song.x] >= 0, ks = inMode === 'keys';
   const n = multi ? (() => { let k = 0; for (let yy = r.y0; yy <= r.y1; yy++) for (const tt of sxCols(r)) if (S.song[yy][tt] >= 0) k++; return k; })() : (filled ? 1 : 0);
@@ -18509,8 +18540,8 @@ arrGrid.addEventListener('contextmenu', e => {
   const C = cmdItems(), have = new Set(['cut', 'copy', 'paste', 'clr', 'rmv', 'clone', 'cldn', 'undo', 'redo']);
   items.unshift(...C.filter(x => x && (x.a === 'undo' || x.a === 'redo')), null);
   items.push(null, ...C.filter(x => !x || !have.has(x.a)));
-  sxMenu(e.clientX, e.clientY, title, menuTidy(items));
-});
+  return {title, items:menuTidy(items)};
+}
 
 /* ---- sections: names for runs of rows (INTRO, VERSE, DROP…), in a lane left of the row numbers. A section runs from
    its row to the next section's. Click a name to go there; double-click the lane to name or rename; right-click for
@@ -18596,7 +18627,7 @@ arrGrid.addEventListener('pointerup', sxLoopUp); arrGrid.addEventListener('point
 let sxLp = [];
 function sxAfterArr(){
   for (const e of sxLp) e.classList.remove('lp'); sxLp = [];
-  if (asongOn() && loopSel && loopArm && loopArm.v === 'song') for (let y = loopArm.y0; y <= loopArm.y1; y++){ const row = arrGrid.children[y]; if (row){ row.firstElementChild.classList.add('lp'); sxLp.push(row.firstElementChild); } }
+  if ((asongOn() || (apReady && apArrOk())) && loopSel && loopArm && loopArm.v === 'song') for (let y = loopArm.y0; y <= loopArm.y1; y++){ const row = arrGrid.children[y]; if (row){ row.firstElementChild.classList.add('lp'); sxLp.push(row.firstElementChild); } }
   sxLaneDraw();
 }
 // The Song screen's info line names the section the cursor is in (info() is wrapped here rather than edited in place).
@@ -18938,6 +18969,8 @@ function globalKeys(e){
   if (e.altKey && !mod && /^Digit[1-7]$/.test(e.code)){ go(VIEWS[+e.code.slice(5) - 1]); return true; }
   if (e.altKey && !mod && e.code === 'Digit0'){ setView('synth'); return true; }
   if (mod && !e.altKey && !e.shiftKey && (e.code === 'Space' || e.key === ' ')){ if (!e.repeat) playPatLoop(); return true; }   // play this pattern, looped
+  // Ctrl/⌘+/ solos the track you're on (Renoise's key), again un-solos it; Ctrl/⌘+Shift+/ clears every solo.
+  if (mod && !e.altKey && (e.code === 'Slash' || e.key === '/' || e.key === '?')){ if (!e.repeat) soloKey(e.shiftKey); return true; }
   // Alt+L loops the pattern, Shift+Alt+L the selection; Alt+, / Alt+. transpose the selection down / up a semitone. They
   // work on every cell (plain L , . are piano keys on a note cell). e.code, since Alt changes e.key on a Mac.
   if (e.altKey && !mod && e.shiftKey && e.code === 'KeyL'){ if (!e.repeat) toggleLoop(); return true; }
@@ -19238,7 +19271,7 @@ $('tKp').addEventListener('pointerdown', e => {
   b.classList.add('dn'); setTimeout(() => b.classList.remove('dn'), 110); kpAction(b.dataset.a);
 });
 $('tKp').addEventListener('click', e => { const b = e.target.closest('button[data-a]'); if (b && !ptrJust() && !b.disabled) kpAction(b.dataset.a); });
-$('tSong').addEventListener('click', () => { if (tp.on) tStop(); else tStart('song', {row:songRow()}); songBtn(); });
+$('tSong').addEventListener('click', () => { apRun(() => { if (tp.on) tStop(); else tStart('song', {row:songRow()}); }, []); songBtn(); });
 $('tLoopTop').addEventListener('click', () => toggleLoop());
 $('tKeyTrans').addEventListener('click', () => toggleKeyTrans());
 const HINTK = {
@@ -19256,7 +19289,10 @@ const HINTK = {
    Paging into Arrange from Phrase. With Arrange beside the phrase (computer, unfolded Fold) a tap or click on the panel,
    SHIFT+◀ or the SONG tab (apTabSong; a second tap opens the Song screen) gives it the keys, and the SONG tab lights: arrows, EDIT, hex, Del, M, copy/paste, the command row and the pad then work on the
    song cursor exactly as on the Song screen, and the phrase follows the block under the cursor (PIN keeps it put).
-   A tap on the phrase, SHIFT+▶ or Esc gives the keys back. On a phone-sized screen (the folded Fold) where Arrange
+   A tap on the phrase or Esc gives the keys back; SHIFT+▶ (Alt+→) opens the block's phrase, as on the Song screen.
+   Arrange holding the keys IS the Song screen nested beside the phrase (owner, 20 Oct): its mouse (SONG EXTRAS: drag to
+   select / move / copy, row numbers to loop), its right-click menu (sxCtx), the Edit menu, the command bar and the top
+   bar's LOOP SEL and SONG all run as the Song screen too. On a phone-sized screen (the folded Fold) where Arrange
    doesn't fit, a three-row song strip over the phrase does the same.
    How: the input dispatchers (press, release, dirPress, globalKeys, keysDown, cmdAction, kpAction) are wrapped by apRun.
    While Arrange or the strip has the keys it runs them with tv = 'song' and draw() held (draw's first hook line), then
@@ -19343,6 +19379,7 @@ function apBack(){
 { const f = globalKeys; globalKeys = (...a) => apRun(f, a); }
 { const f = cmdAction; cmdAction = (...a) => apRun(f, a); }
 { const f = kpAction; kpAction = (...a) => apRun(f, a); }
+{ const f = toggleLoop; toggleLoop = (...a) => apRun(f, a); }   // LOOP SEL (top bar): Arrange's song selection, as on the Song screen
 // Esc with nothing selected gives the keys back to the phrase.
 { const f = keysDown; keysDown = (e, pad) => {
   if (e.key === 'Escape' && apF && !apSel && !xposeArm && !e.ctrlKey && !e.metaKey && !e.altKey){ apFocus(null); draw(); return true; }
@@ -19351,7 +19388,9 @@ function apBack(){
 // Arrange holding the keys SHIFT+▶ goes back into the phrase and SHIFT+◀ does nothing (Song is the first screen).
 { const f = go; go = v => { if (apSong) apWent = true; return f(v); }; }
 { const f = nav; nav = dir => {
-  if (apSong){ if (dir === 'right'){ apF = null; apSel = null; return; } if (dir === 'left') return; return f(dir); }
+  // Beside Phrase, ▶ (Alt+→ / SHIFT+▶) does what it does on the Song screen: opens the cursor's block (its phrase, or SECT
+  // with sects shown), and the keys go back to the screen (go() ends the focus). Beside another screen it goes back to it.
+  if (apSong){ if (dir === 'right'){ if (apHost === 'phrase') return f(dir); apF = null; apSel = null; return; } if (dir === 'left') return; return f(dir); }
   if (apIn && dir === 'left' && tv === 'phrase' && apArrOk()){ apFocus('arr', true); draw(); return; }
   return f(dir);
 }; }
@@ -19396,15 +19435,18 @@ arrGrid.addEventListener('contextmenu', e => {
   if (asongOn() || !apReady || !apArrOk() || (e.pointerType && e.pointerType === 'touch')) return;
   const b = e.target.closest('b[data-y]'); if (!b) return;
   e.preventDefault();
-  const y = +b.dataset.y, t = +b.dataset.t, cid = S.song[y] ? S.song[y][t] : -1, run = f => () => apRun(f, []);
-  apFocus('arr', false); cs.song.x = t; cs.song.y = y; apTop(); apFollow(); draw();
-  const open = () => { ensureSectPhrase(cid); const p = firstPhrase(cid); if (p >= 0){ cPhrase = p; cTrack = t; cSect = cid; } apFocus(null); if (tv !== 'phrase') go('phrase'); else draw(); };
-  const items = apAsSong(cmdItems).map(it => it && Object.assign({}, it, {f:run(it.f)}));
-  items.unshift({l:'Open the phrase', f:open, off:cid < 0}, {l:'Mute / unmute', k:inMode === 'keys' ? 'M' : '', f:run(() => toggleBlockMute(y, t)), off:cid < 0 || t === MT}, null);
-  sxMenu(e.clientX, e.clientY, `${t === MT ? 'MST' : 'TRACK ' + d2(t + 1)} · ROW ${rS(y, 3)}`, menuTidy(items));
+  const y = +b.dataset.y, t = +b.dataset.t;
+  apFocus('arr', false);
+  // The Song screen's own menu (owner, 20 Oct: Arrange is the Song screen nested here): inside the song selection it acts
+  // on the selection; elsewhere the cursor goes to the block first. Each item runs as the Song screen.
+  const m = apRun(sxCtx, [y, t]), items = m.items.map(it => it && Object.assign({}, it, {f:() => apRun(it.f, [])}));
+  sxMenu(e.clientX, e.clientY, m.title, items);
 });
+// Arrange holding the keys: the Edit menu's items and the command bar's tooltips are the Song screen's, and run as it.
+function apSongItems(){ return apAsSong(cmdItems).map(it => it && Object.assign({}, it, {f:() => apRun(it.f, [])})); }
 // A tap on the phrase (anywhere on the screen but the strip) gives the keys back to it.
-scr.addEventListener('pointerdown', e => { if (apF && !apStripEl.contains(e.target)){ apFocus(null); draw(); } }, true);
+// Not the command bar (it acts on whatever has the keys: its tag says ARRANGE), the info and hint lines, or the stage.
+scr.addEventListener('pointerdown', e => { if (apF && !apStripEl.contains(e.target) && !e.target.closest('#tCmd, .tinfo, #tStage, #tStagePs')){ apFocus(null); draw(); } }, true);
 // arrGo's hook: on Phrase a tap on a block moves the song cursor there and the phrase follows; a second tap on the same
 // block edits its phrase (the keys go back to the phrase). False when the setting is off or it doesn't apply.
 function apArrGo(y, t){
@@ -19447,7 +19489,8 @@ function apHint(txt){ const h = $('tHint'); if (h.textContent !== txt){ h.textCo
 function apSongLines(){
   const keys = inMode === 'keys';
   $('tInfo').textContent = (apF === 'arr' ? 'ARRANGE · ' : 'SONG STRIP · ') + apAsSong(info);
-  apHint(((t => keys || patNavOn ? t : songHintOld(t))((keys ? HINTK : HINT)[sectsOn ? 'song' : 'songP'])).replace(/(SHIFT|Shift|Ctrl|Alt)\+(▶|→) open( phrase)?/, (keys ? 'Alt+→' : 'SHIFT+▶') + ' back to ' + (apHost === 'phrase' ? 'the phrase' : VNAME[apHost]))
+  // Beside Phrase, ▶ opens the block as on the Song screen (the nav wrapper), so the Song screen's words stand.
+  apHint(((t => keys || patNavOn ? t : songHintOld(t))((keys ? HINTK : HINT)[sectsOn ? 'song' : 'songP'])).replace(/(SHIFT|Shift|Ctrl|Alt)\+(▶|→) open( phrase)?/, m => apHost === 'phrase' ? m : (keys ? 'Alt+→' : 'SHIFT+▶') + ' back to ' + VNAME[apHost])
     + (apHost !== 'phrase' ? ' · Esc or a ' + (coarse ? 'tap' : 'click') + ' on the screen: back to ' + VNAME[apHost] : apPin ? ' · PINNED: the phrase stays' : ' · the phrase follows the song cursor'));
   const cmd = $('tCmd');
   cmd.querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = true);
@@ -19460,7 +19503,7 @@ function apFoot(arrOk){
   if (!apFootEl) return;
   const k = inMode === 'keys', tap = coarse ? 'tap' : 'click';
   const ph = apHost === 'phrase', fol = {phrase:'the phrase follows (PIN keeps it)', fx:'FX follows its track', mixer:'the Mixer follows its track', inst:'INST follows its instrument', sect:'the sect follows'}[apHost] || 'nothing else moves';
-  const t = apF === 'arr' ? `THE KEYS ARE ON THE SONG · ${k ? 'arrows' : '▲▼◀▶'} move the song cursor and ${fol} · ${k ? 'hex, Enter, Del, M, Ctrl+D, right-click' : 'EDIT, EDIT×2, OPTION+EDIT, CLN'} as on the Song screen · ${k ? 'Ctrl+→, Esc' : 'SHIFT+▶'} or a ${tap} on the ${ph ? 'phrase' : 'screen'}: back to it`
+  const t = apF === 'arr' ? `THE KEYS ARE ON THE SONG · ${k ? 'arrows' : '▲▼◀▶'} move the song cursor and ${fol} · everything works as on the Song screen (${k ? 'hex, Enter, Del, M, Ctrl+D, drag, right-click' : 'EDIT, EDIT×2, OPTION+EDIT, CLN'}) · ${ph ? `${k ? 'Alt+→' : 'SHIFT+▶'} opens the block · Esc` : k ? 'Alt+→, Esc' : 'SHIFT+▶'} or a ${tap} on the ${ph ? 'phrase' : 'screen'}: back to it`
     : arrOk && tv !== 'phrase' ? `${tap.toUpperCase()} · the keys move here and work as on the Song screen · twice on a block: edit its phrase · Esc gives them back`
     : arrOk ? `${tap.toUpperCase()} (or ${k ? 'Alt+←' : 'SHIFT+◀'}, or the SONG tab) · the keys move here: the song cursor moves and the phrase follows · twice: edit that block's phrase · HOLD a block to mute it · PIN keeps this phrase up`
     : apFoot0;

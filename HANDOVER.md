@@ -24,6 +24,40 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 20 Oct (6): Arrange beside Phrase IS the Song screen; pattern selection colour; Ctrl+/ solo
+
+Cache `thunderplus-v198`. Owner: CLN↓ in the command bar said it only works on the Song screen; "the arrange window is
+basically a nested song mode": everything the Song screen does should work there. (Desktop v1.2.11 has 20 Oct (5) and before.)
+- **Audit:** a differential headless test (session scratchpad `diff.py`) runs 47 Song-screen key sequences on the Song screen
+  and with Arrange holding the keys beside Phrase (pattern view off and on) and compares song, mutes, cursor, selection,
+  loop, play state and clipboard. All keyboard paths already matched (they run through `apRun`) except Alt+→ / SHIFT+▶.
+- **Alt+→ / SHIFT+▶** with Arrange beside Phrase now does what it does on the Song screen (`nav` wrapper: `f(dir)`): opens
+  the cursor's block (an empty cell gets a fresh phrase that goes on the song at its first note; SECT with sects shown),
+  and the keys go back to the screen. Beside other screens it still goes back to that screen. Hint and footer say so.
+- **Command bar** (KEYS + COMMAND BAR, it sits in `#tScr`): a click on it no longer hands the keys back to the phrase
+  (`scr`'s capture pointerdown skips `#tCmd`, `.tinfo`, `#tStage`, `#tStagePs`), so its buttons act on Arrange as its
+  ARRANGE tag says (that was the CLN↓ error: the click gave the keys back first, then CLN↓ ran on Phrase).
+- **Edit ▾**: `editItems()` → `apSongItems()` (the Song screen's `cmdItems`, each run through `apRun`) while Arrange or
+  the strip has the keys; the command bar's tooltips (`cmdTips`) likewise.
+- **Right-click on the side panel** = the Song screen's menu: its builder is now `sxCtx(y, t)` → `{title, items}` (used
+  by both; run through `apRun` for the side panel), so selection-aware Copy / Cut / Paste here / Clone / Clone down / Mute
+  the selection / Loop these rows / Open / Name a section / Remove / Delete, then the rest of `cmdItems`.
+- **Song mouse in the side panel** (SONG EXTRAS, when SONG MOUSE / LOOP DRAG are on): drag on empty cells selects, drag
+  a block or the selection moves it, Alt-drag copies, drag the row numbers to loop rows (marked on the row numbers too,
+  `sxAfterArr`). `sxSide()` (Arrange beside a screen holding the keys) makes `sxDown`, `sxStart`, `sxFrame` and `sxEnd`
+  re-run themselves through `apRun`. The section lane still needs the Song screen's width.
+- **Top bar**: LOOP SEL (`toggleLoop` wrapped by `apRun`) loops Arrange's song selection; ▶ SONG plays from `songRow()`
+  as the Song screen does.
+- **PATTERN view selection colour** (owner, plum skin: a selection looked like the open track's tint): `.tgrid.pvon
+  span.sel` uses `--pv-sel`, amber mixed with the screen colour; the warm skins (night, mustard, citrus, contrast,
+  sunset, desert, complement, espresso) get sky blue. The plain phrase view keeps `--ts-sel`.
+- **Ctrl/⌘+/** solos the track you're on (Renoise's key; `soloKey` in `globalKeys`): `dkTrack()` (song cursor's track
+  on Song and with Arrange holding the keys, the mixer's, FX's, else the phrase's); again un-solos it; solos add up as
+  the mixer's S does. **Ctrl/⌘+Shift+/** clears every solo. The master can't be soloed. Help KEYS table and README.
+- Checked headless: the differential test (all same), the command bar CLN↓, Edit ▾ items and Clone down, the side
+  panel menu, drag select / move / undo, row-number loop drag, LOOP SEL, Alt+→ on an empty cell, solo on Song / Phrase /
+  Arrange / Mixer / master, pattern selection in plum, night and the default skin.
+
 ## 20 Oct (5): Arrange's arrows reach empty cells with PATTERN view on
 
 Cache `thunderplus-v197`. Owner (desktop, Phrase in PATTERN view, Arrange beside it holding the keys, KEYS mode): the
