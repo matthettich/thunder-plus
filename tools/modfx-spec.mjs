@@ -5,6 +5,9 @@
    stops), pad / track (which lists it joins: both unless false), credit (FX_CREDIT, default 'Thunder original'),
    group (the pad list's heading), rows in display order: { l, c:'lin'|'log'|'int', f:'JS expression of v' } or a choice
    { l, opts:[...] }. Every param of the module should have a row. */
+// SOURCE (21 Oct): what a compressor, gate or envelope filter listens to: Self, Send 1–8 (a …chains Sidechain Out) or one
+// track's own sound (Track 1–128; the app lists the tracks the song has). No mixer sidechain bus any more.
+const SCK_OPTS = ['Self', ...Array.from({length:8}, (_, i) => 'Send ' + (i + 1)), ...Array.from({length:128}, (_, i) => 'Track ' + (i + 1))];
 export const SPEC = {
   /* Already in …chains and …waves (Oct 2026), now on pads and tracks too */
   spring:{ name:'Spring reverb', short:'SPRG', tail:true, group:'Reverbs',
@@ -166,7 +169,7 @@ export const SPEC = {
       release:{l:'Release', c:'log', f:"v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s'"},
       knee:{l:'Knee', c:'lin', f:"v.toFixed(1) + ' dB'"},
       makeup:{l:'Makeup', c:'lin', f:"'+' + v.toFixed(1) + ' dB'"},
-      source:{l:'Source', opts:['Self', 'Sidechain']},
+      sck:{l:'Source', opts:SCK_OPTS},
       mix:{l:'Mix', c:'lin', f:"Math.round(v * 100) + '% wet'"} } },
   buscomp:{ name:'Bus Comp', short:'BUSC', tail:false, group:'Dynamics and EQ',
     long:'Bus Comp: the punchy console bus compressor: stepped ratio, attack and release with Auto, sidechain high-pass (Thunder original)',
@@ -176,7 +179,7 @@ export const SPEC = {
       release:{l:'Release', opts:['0.1 s', '0.3 s', '0.6 s', '1.2 s', 'Auto']},
       makeup:{l:'Makeup', c:'lin', f:"'+' + v.toFixed(1) + ' dB'"},
       schpf:{l:'SC high-pass', opts:['Off', '60 Hz', '90 Hz', '150 Hz', '250 Hz']},
-      source:{l:'Source', opts:['Self', 'Sidechain']},
+      sck:{l:'Source', opts:SCK_OPTS},
       mix:{l:'Mix', c:'lin', f:"Math.round(v * 100) + '% wet'"} } },
   glue:{ name:'Glue Comp', short:'GLUE', tail:false, group:'Dynamics and EQ',
     long:'Glue Comp: the smooth bus compressor: RMS, wide knee, Range, Auto release and soft clip, for groups and the master (Thunder original)',
@@ -190,7 +193,7 @@ export const SPEC = {
       makeup:{l:'Makeup', c:'lin', f:"'+' + v.toFixed(1) + ' dB'"},
       clip:{l:'Soft clip', opts:['Off', 'On']},
       schpf:{l:'SC high-pass', opts:['Off', '60 Hz', '90 Hz', '150 Hz', '250 Hz']},
-      source:{l:'Source', opts:['Self', 'Sidechain']},
+      sck:{l:'Source', opts:SCK_OPTS},
       mix:{l:'Mix', c:'lin', f:"Math.round(v * 100) + '% wet'"} } },
   ngate:{ name:'Noise gate', short:'NGAT', tail:false, group:'Dynamics and EQ',
     long:'Noise gate: silences the sound below a threshold, with hold, release, range and sidechain (Thunder original)',
@@ -199,7 +202,7 @@ export const SPEC = {
       attack:{l:'Attack', c:'log', f:"v < 0.01 ? (v * 1000).toFixed(1) + ' ms' : Math.round(v * 1000) + ' ms'"},
       hold:{l:'Hold', c:'lin', f:"Math.round(v * 1000) + ' ms'"},
       release:{l:'Release', c:'log', f:"v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s'"},
-      source:{l:'Source', opts:['Self', 'Sidechain']} } },
+      sck:{l:'Source', opts:SCK_OPTS} } },
   autopan:{ name:'Auto-pan', short:'APAN', tail:false, pad:false, group:'Modulation',
     long:'Auto-pan: moves the sound side to side in time with the song, sine, triangle or square (Thunder original)',
     rows:{ sync:{l:'Sync', opts:['Off', 'To tempo']},
@@ -240,9 +243,9 @@ export const SPEC = {
       flip:{l:'Polarity', opts:['Normal', 'Flip left', 'Flip right', 'Flip both']},
       mute:{l:'Mute', opts:['Sound on', 'Muted']} } },
   envfilt:{ name:'Envelope filter', short:'ENVF', tail:false, group:'Filters',
-    long:'Envelope filter: auto-wah whose resonant filter follows the playing, or the sidechain bus (Thunder original)',
+    long:'Envelope filter: auto-wah whose resonant filter follows the playing, or another track or a send (Source) (Thunder original)',
     rows:{ mode:{l:'Filter', opts:['Low-pass', 'Band-pass', 'High-pass']},
-      source:{l:'Source', opts:['Self', 'Sidechain']},
+      sck:{l:'Source', opts:SCK_OPTS},
       freq:{l:'Freq', c:'lin', f:"(f => f >= 1000 ? (f / 1000).toFixed(1) + ' kHz' : Math.round(f) + ' Hz')(40 * Math.pow(400, v))"},
       depth:{l:'Depth', c:'lin', f:"(v > 0 ? '+' : '') + Math.round(v * 100) + '%'"},
       range:{l:'Range', c:'lin', f:"v.toFixed(1) + ' oct'"},

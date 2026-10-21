@@ -502,6 +502,9 @@ const Out = {
 /* ===SHARED MODULES START===
    This block is the same in chains/chains-worklet.js and waves/waves-worklet.js. Edit it here (in …chains) and run
    tools/sync-shared.py to copy it into …waves. It needs: clamp, sinT, soft, rng, nextSeed, linked, u and effect(). */
+// SOURCE (21 Oct): the top of a Source (sck) param: 0 Self, 1–8 Send 1–8, 9–136 Track 1–128 (ctx.key resolves it; …waves
+// has no ctx.key, so there every Source is Self).
+const SCK_TOP = 136;
 
 /* Mutable Instruments Beads (MIT): time, size, pitch, shape, density, feedback, blend, reverb + media. */
 // Beads divides by zero with Freeze on and Size at exactly 1, which traps the whole wasm module. Cap it just under.
@@ -3322,13 +3325,13 @@ const ReverseEcho = {
 const EnvFilter = {
   type:'envfilt', scope:'mono', cost:.3,
   inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio', env:'cv' },
-  params:{ mode:[1,0,2,1], source:[0,0,1,1], freq:[.35,0,1,.001], depth:[.7,-1,1,.01], range:[4,1,8,.1], res:[.6,0,1,.01],
+  params:{ mode:[1,0,2,1], sck:[0,0,SCK_TOP,1], freq:[.35,0,1,.001], depth:[.7,-1,1,.01], range:[4,1,8,.1], res:[.6,0,1,.01],
     attack:[.005,.0005,.2,.0001], release:[.15,.01,2,.001], sens:[.5,0,1,.01], drive:[0,0,1,.01], mix:[1,0,1,.01] },
   create:() => ({ e:0, l1:0, l2:0, r1:0, r2:0 }),
   process(st, io, ctx){
     const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, oE = io.out.env;
-    const scP = linked(io, 'sc'), bus = !scP && p.source >= .5 && !!ctx.scL && typeof ctx.scOn === 'function' && !!ctx.scOn();
-    const SL = bus ? ctx.scL : L, SR = bus ? (ctx.scR || ctx.scL) : R, SC = io.in.sc;
+    const scP = linked(io, 'sc'), K = !scP && p.sck > 0 && ctx.key ? ctx.key(p.sck) : null;   // SOURCE: a track or a send (Self: null)
+    const SL = K || L, SR = K || R, SC = io.in.sc;
     const mode = clamp(Math.round(p.mode), 0, 2), base = 40 * Math.pow(400, u(p.freq)), oct = clamp(p.depth, -1, 1) * clamp(p.range, 0, 10) * Math.LN2;
     const k = 2 - 1.92 * u(p.res), comp = mode === 1 ? Math.pow(k, .6) * 1.32 : Math.pow(k / 2, .3);
     const ka = 1 - Math.exp(-1 / (sr * Math.max(p.attack, 1e-4))), kr = 1 - Math.exp(-1 / (sr * Math.max(p.release, 1e-3)));
@@ -4188,12 +4191,12 @@ const LoHiCut = {
 const ClassicComp = {
   type:'compressor', scope:'mono', cost:.15,
   inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },
-  params:{ thresh:[-18,-60,0,.1], ratio:[4,1,20,.1], attack:[.01,.0001,.25,.0001], release:[.15,.01,2,.001], knee:[6,0,24,.1], makeup:[0,0,24,.1], source:[0,0,1,1], mix:[1,0,1,.01] },
+  params:{ thresh:[-18,-60,0,.1], ratio:[4,1,20,.1], attack:[.01,.0001,.25,.0001], release:[.15,.01,2,.001], knee:[6,0,24,.1], makeup:[0,0,24,.1], sck:[0,0,SCK_TOP,1], mix:[1,0,1,.01] },
   create:() => ({ g:0, gr:0 }),
   process(st, io, ctx){
     const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
-    const scP = linked(io, 'sc'), bus = !scP && p.source >= .5 && !!ctx.scL && typeof ctx.scOn === 'function' && !!ctx.scOn();
-    const SL = bus ? ctx.scL : L, SR = bus ? (ctx.scR || ctx.scL) : R, SC = io.in.sc;
+    const scP = linked(io, 'sc'), K = !scP && p.sck > 0 && ctx.key ? ctx.key(p.sck) : null;   // SOURCE: a track or a send (Self: null)
+    const SL = K || L, SR = K || R, SC = io.in.sc;
     const thr = p.thresh, sl = 1 - 1 / Math.max(1, p.ratio), kn = Math.max(0, p.knee), mk = p.makeup, ka = bfK(p.attack, sr), kr = bfK(p.release, sr), mx = u(p.mix);
     let g = st.g, most = 0;
     for (let i = 0; i < B; i++){
@@ -4224,10 +4227,10 @@ const BC_RATIO = [2, 4, 10], BC_ATT = [.0001, .0003, .001, .003, .01, .03], BC_R
 function bcHp(z, x, g, k){ const hp = (x - (k + g) * z[0] - z[1]) / (1 + k * g + g * g), bp = g * hp + z[0]; z[0] = g * hp + bp; const lp = g * bp + z[1]; z[1] = g * bp + lp; return hp; }
 // The key: what the compressor listens to, per sample (absolute value, after the high-pass), and how loud it is.
 function bcKey(st, io, ctx, p){
-  const scP = linked(io, 'sc'), bus = !scP && p.source >= .5 && !!ctx.scL && typeof ctx.scOn === 'function' && !!ctx.scOn();
+  const scP = linked(io, 'sc'), K = !scP && p.sck > 0 && ctx.key ? ctx.key(p.sck) : null;   // SOURCE: a track or a send (Self: null)
   const hz = BC_HPF[clamp(Math.round(p.schpf || 0), 0, BC_HPF.length - 1)];
   if (hz !== st.hz){ st.hz = hz; st.hg = hz ? Math.tan(Math.PI * Math.min(hz, ctx.sr * .45) / ctx.sr) : 0; }
-  return { scP, SL:bus ? ctx.scL : io.in.in, SR:bus ? (ctx.scR || ctx.scL) : inR(io), SC:io.in.sc };
+  return { scP, SL:K || io.in.in, SR:K || inR(io), SC:io.in.sc };
 }
 // Auto release: the reduction held for a while (sus → 1) slows the release from 0.1 s towards 1.2 s.
 function bcRel(st, g, sr, rel){
@@ -4238,7 +4241,7 @@ function bcRel(st, g, sr, rel){
 const BusComp = {
   type:'buscomp', scope:'mono', cost:.15,
   inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },
-  params:{ thresh:[-12,-40,0,.1], ratio:[1,0,2,1], attack:[4,0,5,1], release:[4,0,4,1], makeup:[0,0,20,.1], schpf:[0,0,4,1], source:[0,0,1,1], mix:[1,0,1,.01] },
+  params:{ thresh:[-12,-40,0,.1], ratio:[1,0,2,1], attack:[4,0,5,1], release:[4,0,4,1], makeup:[0,0,20,.1], schpf:[0,0,4,1], sck:[0,0,SCK_TOP,1], mix:[1,0,1,.01] },
   create:() => ({ g:0, gr:0, sus:0, hz:-1, hg:0, zl:[0, 0], zr:[0, 0] }),
   process(st, io, ctx){
     const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
@@ -4268,7 +4271,7 @@ const GlueComp = {
   type:'glue', scope:'mono', cost:.15,
   inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },
   params:{ thresh:[-15,-40,0,.1], ratio:[2,1,10,.1], attack:[.01,.0001,.03,.0001], release:[.3,.05,1.5,.01], auto:[1,0,1,1], knee:[8,0,18,.1],
-    range:[20,1,40,.5], makeup:[0,0,20,.1], clip:[0,0,1,1], schpf:[0,0,4,1], source:[0,0,1,1], mix:[1,0,1,.01] },
+    range:[20,1,40,.5], makeup:[0,0,20,.1], clip:[0,0,1,1], schpf:[0,0,4,1], sck:[0,0,SCK_TOP,1], mix:[1,0,1,.01] },
   create:() => ({ g:0, gr:0, sus:0, ms:0, hz:-1, hg:0, zl:[0, 0], zr:[0, 0] }),
   process(st, io, ctx){
     const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
@@ -4305,12 +4308,12 @@ const GlueComp = {
 const NoiseGate = {
   type:'ngate', scope:'mono', cost:.1,
   inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },
-  params:{ thresh:[-45,-80,0,.1], range:[90,0,90,1], attack:[.0005,.0001,.05,.0001], hold:[.03,0,.5,.001], release:[.12,.005,2,.001], source:[0,0,1,1] },
+  params:{ thresh:[-45,-80,0,.1], range:[90,0,90,1], attack:[.0005,.0001,.05,.0001], hold:[.03,0,.5,.001], release:[.12,.005,2,.001], sck:[0,0,SCK_TOP,1] },
   create:() => ({ e:0, open:false, hold:0, g:0 }),
   process(st, io, ctx){
     const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
-    const scP = linked(io, 'sc'), bus = !scP && p.source >= .5 && !!ctx.scL && typeof ctx.scOn === 'function' && !!ctx.scOn();
-    const SL = bus ? ctx.scL : L, SR = bus ? (ctx.scR || ctx.scL) : R, SC = io.in.sc;
+    const scP = linked(io, 'sc'), K = !scP && p.sck > 0 && ctx.key ? ctx.key(p.sck) : null;   // SOURCE: a track or a send (Self: null)
+    const SL = K || L, SR = K || R, SC = io.in.sc;
     const on = Math.pow(10, p.thresh / 20), off = on * .6, floor = p.range >= 89.5 ? 0 : Math.pow(10, -p.range / 20);
     const ka = bfK(p.attack, sr), kr = bfK(p.release, sr), ke = bfK(.005, sr), hn = Math.round(p.hold * sr);
     let e = st.e, open = st.open, hold = st.hold, g = st.g;

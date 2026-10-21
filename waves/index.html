@@ -385,6 +385,10 @@ const step = k => ({ l:'Step ' + k, f: v => v <= -25 ? 'Rest' : noteName(v) });
 /* ===SHARED EDITOR START===
    The same in chains/index.html and waves/index.html: the editor side of the shared modules (see the SHARED MODULES
    block in the worklets). Edit it here, in …chains, and run tools/sync-shared.py to copy it into …waves. */
+// SOURCE (21 Oct): what a compressor, gate or envelope filter listens to (sck): Self, Send 1–8 (a Sidechain Out) or a
+// track's own sound. …waves has no tracks or sends (TRK_N isn't defined there), so it lists only Self.
+const SCK_OPTS = self => [[0, self], ...(typeof TRK_N === 'number' ? [...Array.from({length:8}, (_, k) => [k + 1, 'Send ' + (k + 1)]), ...Array.from({length:TRK_N}, (_, k) => [k + 9, 'Track ' + (k + 1)])] : [])];
+const SCK_P = [0,0,136,1];
 const SHARED_FAMILY = {};
 const PP_NAMES = ['1/16', '1/8T', '1/8', '1/4T', '1/4', '1/2', '1 bar'];
 const STEP_NAMES = ['1/64', '1/32', '1/16T', '1/16', '1/8T', '1/8', '1/4', '1/2', '1 bar', '2 bars'];
@@ -781,13 +785,13 @@ Object.assign(SHARED_MODULES, {
       div:{l:'Division', c:opts(PP_NAMES)}, fb:{l:'Feedback', f:pct}, size:{l:'Size', f:pct}, tone:{l:'Tone', f:pct} }, MIXP),
     about:'Reverse echo. Reverse delay: everything comes back played backwards, a Time later (or in note values at the song tempo with Sync), each phrase swelling in instead of fading out; Feedback brings it round again, reversed again each time. Swell: the sound goes into a small reverb first and the reverb comes back reversed, so every note is answered by a rising, sucked-in wash: the classic reverse-reverb build. Size sets the reverb, Time how long each swell is. Tone darkens the echoes.' },
   envfilt:{ label:'Envelope filter', scope:'mono', inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio', env:'cv' },
-    params:{ mode:[1,0,2,1], source:[0,0,1,1], freq:[.35,0,1,.001], depth:[.7,-1,1,.01], range:[4,1,8,.1], res:[.6,0,1,.01],
+    params:{ mode:[1,0,2,1], sck:SCK_P, freq:[.35,0,1,.001], depth:[.7,-1,1,.01], range:[4,1,8,.1], res:[.6,0,1,.01],
       attack:[.005,.0005,.2,.0001], release:[.15,.01,2,.001], sens:[.5,0,1,.01], drive:[0,0,1,.01], mix:[1,0,1,.01] },
-    ui:Object.assign({ mode:{l:'Filter', c:opts(['Low-pass', 'Band-pass', 'High-pass'])}, source:{l:'Source', c:opts(['Self', 'Sidechain'])},
+    ui:Object.assign({ mode:{l:'Filter', c:opts(['Low-pass', 'Band-pass', 'High-pass'])}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')},
       freq:{l:'Freq', f:v => { const f = 40 * Math.pow(400, v); return f >= 1000 ? (f / 1000).toFixed(1) + ' kHz' : Math.round(f) + ' Hz'; }},
       depth:{l:'Depth', f:spct}, range:{l:'Range', f:v => v.toFixed(1) + ' oct'}, res:{l:'Resonance', f:pct}, attack:{l:'Attack', f:v => v < .01 ? (v * 1000).toFixed(1) + ' ms' : secs(v)}, release:{l:'Release', f:secs},
       sens:{l:'Sensitivity', f:pct}, drive:{l:'Drive', f:pct} }, MIXP),
-    about:'Envelope filter: the funky auto-wah (“touch wah”). A resonant filter opens as you play harder and closes as the note dies: Freq is where it rests, Depth how far it moves (up to Range octaves; negative sweeps it down, so set Freq high for that), Sensitivity how hard you must play, Attack and Release how fast it follows. Source Sidechain makes it follow the mixer’s sidechain bus (the kick opening the filter on a bass); a cable into SC always wins. Drive adds grit going in. The envelope itself comes out at Env, to move anything else.' }
+    about:'Envelope filter: the funky auto-wah (“touch wah”). A resonant filter opens as you play harder and closes as the note dies: Freq is where it rests, Depth how far it moves (up to Range octaves; negative sweeps it down, so set Freq high for that), Sensitivity how hard you must play, Attack and Release how fast it follows. Source makes it follow another track’s own sound or a send instead (the kick opening the filter on a bass). Drive adds grit going in. The envelope itself comes out at Env, to move anything else.' }
 });
 Object.assign(SHARED_FAMILY, { autotune:'afx', vowel:'afx', rotary:'afx', gdelay:'afx', reverse:'afx', envfilt:'afx' });
 Object.assign(SHARED_PORT_LABEL, { vowel:'Vowel', fast:'Fast', pitch:'Pitch', gate:'Gate', sc:'SC' });
@@ -936,15 +940,15 @@ Object.assign(SHARED_MODULES, {
     ui:{ low:{l:'Low cut', f:v => v <= 20.5 ? 'Off' : khz(v)}, high:{l:'High cut', f:v => v >= 19900 ? 'Off' : khz(v)}, slope:{l:'Slope', c:opts(['6 dB', '12 dB', '24 dB'])} },
     about:'Low and high cut: the clean-up filter for any track. Low cut takes away rumble and mud below its frequency, High cut hiss and fizz above it; each is off at its end of the range. 6, 12 or 24 dB an octave, with no bump at the corner.' }, STEREO),
   compressor:Object.assign({ label:'Compressor', scope:'mono',
-    params:{ thresh:[-18,-60,0,.1], ratio:[4,1,20,.1], attack:[.01,.0001,.25,.0001], release:[.15,.01,2,.001], knee:[6,0,24,.1], makeup:[0,0,24,.1], source:[0,0,1,1], mix:[1,0,1,.01] },
+    params:{ thresh:[-18,-60,0,.1], ratio:[4,1,20,.1], attack:[.01,.0001,.25,.0001], release:[.15,.01,2,.001], knee:[6,0,24,.1], makeup:[0,0,24,.1], sck:SCK_P, mix:[1,0,1,.01] },
     ui:Object.assign({ thresh:{l:'Threshold', f:db}, ratio:{l:'Ratio', f:v => v >= 19.95 ? '20:1 (limit)' : v.toFixed(1) + ':1'}, attack:{l:'Attack', f:v => v < .01 ? (v * 1000).toFixed(1) + ' ms' : secs(v)},
-      release:{l:'Release', f:secs}, knee:{l:'Knee', f:v => v.toFixed(1) + ' dB'}, makeup:{l:'Makeup', f:db}, source:{l:'Source', c:opts(['Self', 'Sidechain'])} }, MIXP),
-    about:'Compressor: the classic one. Above Threshold the level is turned down by Ratio (4:1: 4 dB over comes out 1 dB over), Attack and Release set how fast, Knee how gently it starts, Makeup brings the level back up. Source Sidechain listens to the mixer’s sidechain bus (a kick ducking a bass); a cable into SC always wins. Mix blends the dry sound back in (parallel compression).' }, SC_IO),
+      release:{l:'Release', f:secs}, knee:{l:'Knee', f:v => v.toFixed(1) + ' dB'}, makeup:{l:'Makeup', f:db}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')} }, MIXP),
+    about:'Compressor: the classic one. Above Threshold the level is turned down by Ratio (4:1: 4 dB over comes out 1 dB over), Attack and Release set how fast, Knee how gently it starts, Makeup brings the level back up. Source listens to another track’s own sound or a send instead (a kick ducking a bass); a cable into SC always wins. Mix blends the dry sound back in (parallel compression).' }, SC_IO),
   ngate:Object.assign({ label:'Noise gate', scope:'mono',
-    params:{ thresh:[-45,-80,0,.1], range:[90,0,90,1], attack:[.0005,.0001,.05,.0001], hold:[.03,0,.5,.001], release:[.12,.005,2,.001], source:[0,0,1,1] },
+    params:{ thresh:[-45,-80,0,.1], range:[90,0,90,1], attack:[.0005,.0001,.05,.0001], hold:[.03,0,.5,.001], release:[.12,.005,2,.001], sck:SCK_P },
     ui:{ thresh:{l:'Threshold', f:db}, range:{l:'Range', f:v => v >= 89.5 ? 'Silence' : '−' + Math.round(v) + ' dB'}, attack:{l:'Attack', f:v => v < .01 ? (v * 1000).toFixed(1) + ' ms' : secs(v)},
-      hold:{l:'Hold', f:secs}, release:{l:'Release', f:secs}, source:{l:'Source', c:opts(['Self', 'Sidechain'])} },
-    about:'Noise gate: silences the sound (or turns it down by Range) when it falls below Threshold, so hiss, hum and spill between hits go away. It opens again a few dB higher than it closes, so it doesn’t chatter; Hold keeps it open a moment after the sound drops. Source Sidechain lets the mixer’s sidechain bus open it (a pad chopped in time with the drums); a cable into SC always wins.' }, SC_IO),
+      hold:{l:'Hold', f:secs}, release:{l:'Release', f:secs}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')} },
+    about:'Noise gate: silences the sound (or turns it down by Range) when it falls below Threshold, so hiss, hum and spill between hits go away. It opens again a few dB higher than it closes, so it doesn’t chatter; Hold keeps it open a moment after the sound drops. Source lets another track or a send open it (a pad chopped in time with the drums); a cable into SC always wins.' }, SC_IO),
   autopan:Object.assign({ label:'Auto-pan', scope:'mono',
     params:{ sync:[1,0,1,1], div:[2,0,6,1], rate:[2,.05,20,.01], depth:[.8,0,1,.01], shape:[0,0,2,1] },
     ui:{ sync:{l:'Sync', c:opts(['Off (use Rate)', 'To tempo'])}, div:{l:'Division', c:opts(LFO_NAMES)}, rate:{l:'Rate', f:hz}, depth:{l:'Depth', f:pct},
@@ -960,17 +964,17 @@ Object.assign(SHARED_MODULES, {
 const BC_RELN = ['0.1 s', '0.3 s', '0.6 s', '1.2 s', 'Auto'], BC_HPFN = ['Off', '60 Hz', '90 Hz', '150 Hz', '250 Hz'];
 Object.assign(SHARED_MODULES, {
   buscomp:Object.assign({ label:'Bus Comp', scope:'mono',
-    params:{ thresh:[-12,-40,0,.1], ratio:[1,0,2,1], attack:[4,0,5,1], release:[4,0,4,1], makeup:[0,0,20,.1], schpf:[0,0,4,1], source:[0,0,1,1], mix:[1,0,1,.01] },
+    params:{ thresh:[-12,-40,0,.1], ratio:[1,0,2,1], attack:[4,0,5,1], release:[4,0,4,1], makeup:[0,0,20,.1], schpf:[0,0,4,1], sck:SCK_P, mix:[1,0,1,.01] },
     ui:Object.assign({ thresh:{l:'Threshold', f:db}, ratio:{l:'Ratio', c:opts(['2:1', '4:1', '10:1'])}, attack:{l:'Attack', c:opts(['0.1 ms', '0.3 ms', '1 ms', '3 ms', '10 ms', '30 ms'])},
-      release:{l:'Release', c:opts(BC_RELN)}, makeup:{l:'Makeup', f:db}, schpf:{l:'SC high-pass', c:opts(BC_HPFN)}, source:{l:'Source', c:opts(['Self', 'Sidechain'])} }, MIXP), display:'gr',
-    about:'Bus Comp: the punchy console bus compressor for a group or the mix, both sides together. Ratio 2, 4 or 10:1, Attack and Release in the classic steps (Auto release follows the music: quick after a hit, slower while it holds), Makeup to bring the level back. SC high-pass keeps the lows out of what it listens to, so a kick or bass doesn’t pump everything. It listens to its own sound, the Mixer’s sidechain bus (Source Sidechain), or a cable into SC (a Sidechain In set to a track or a send: one bus ducking another). Mix for parallel compression; the meter shows the gain reduction.' }, SC_IO),
+      release:{l:'Release', c:opts(BC_RELN)}, makeup:{l:'Makeup', f:db}, schpf:{l:'SC high-pass', c:opts(BC_HPFN)}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')} }, MIXP), display:'gr',
+    about:'Bus Comp: the punchy console bus compressor for a group or the mix, both sides together. Ratio 2, 4 or 10:1, Attack and Release in the classic steps (Auto release follows the music: quick after a hit, slower while it holds), Makeup to bring the level back. SC high-pass keeps the lows out of what it listens to, so a kick or bass doesn’t pump everything. It listens to its own sound, or Source: another track’s own sound or a send (one bus ducking another); a cable into SC always wins. Mix for parallel compression; the meter shows the gain reduction.' }, SC_IO),
   glue:Object.assign({ label:'Glue Comp', scope:'mono',
     params:{ thresh:[-15,-40,0,.1], ratio:[2,1,10,.1], attack:[.01,.0001,.03,.0001], release:[.3,.05,1.5,.01], auto:[1,0,1,1], knee:[8,0,18,.1],
-      range:[20,1,40,.5], makeup:[0,0,20,.1], clip:[0,0,1,1], schpf:[0,0,4,1], source:[0,0,1,1], mix:[1,0,1,.01] },
+      range:[20,1,40,.5], makeup:[0,0,20,.1], clip:[0,0,1,1], schpf:[0,0,4,1], sck:SCK_P, mix:[1,0,1,.01] },
     ui:Object.assign({ thresh:{l:'Threshold', f:db}, ratio:{l:'Ratio', f:v => v.toFixed(1) + ':1'}, attack:{l:'Attack', f:v => v < .01 ? (v * 1000).toFixed(1) + ' ms' : secs(v)},
       release:{l:'Release', f:secs}, auto:{l:'Auto release', c:opts(['Off (use Release)', 'On'])}, knee:{l:'Knee', f:v => v.toFixed(1) + ' dB'},
       range:{l:'Range', f:v => '−' + v.toFixed(1) + ' dB at most'}, makeup:{l:'Makeup', f:db}, clip:{l:'Soft clip', c:opts(['Off', 'On'])},
-      schpf:{l:'SC high-pass', c:opts(BC_HPFN)}, source:{l:'Source', c:opts(['Self', 'Sidechain'])} }, MIXP), display:'gr',
+      schpf:{l:'SC high-pass', c:opts(BC_HPFN)}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')} }, MIXP), display:'gr',
     about:'Glue Comp: the smooth bus compressor that makes a group sound like one performance. It listens to the average level (not each peak), with a wide Knee, so it eases in; Range caps how far it ever turns down, Auto release follows the music, and Soft clip rounds off the loudest peaks after Makeup. SC high-pass, Source and the SC input work as on the Bus Comp. Mix blends in the dry sound.' }, SC_IO)
 });
 Object.assign(SHARED_FAMILY, { sdelay:'afx', filter:'afx', cut:'afx', compressor:'util', ngate:'util', autopan:'afx', pump:'afx', buscomp:'util', glue:'util' });
@@ -1453,7 +1457,7 @@ class WavesBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './waves-worklet.js?v=26';
+    const url = opts.url || './waves-worklet.js?v=27';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'waves', {

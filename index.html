@@ -1129,6 +1129,12 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .tgrid .ln span.gc.gt.gb{box-shadow:inset 0 0 0 2px var(--tk)}
 /* View neighbouring phrases: the tracks either side, faint and not editable. */
 .tscr .nb{opacity:.55; pointer-events:none} .tscr .nbl{color:#9b82d6} .tscr .nbr{color:#c9a227}
+/* BUS (owner, 21 Oct): a track other tracks play through looks a little darker everywhere it shows (Arrange and its
+   numbers, the song strip, the Song and Mixer text grids, the pattern view) and its labels say BUS. */
+.tagrid b.bus, #apStrip .apsr b.bus, .tgrid span.bus{filter:brightness(.78) saturate(1.15)}
+.tgrid span.mbus:not(.cur):not(.sel){background-color:color-mix(in srgb, var(--tk) 22%, transparent)}
+.tgrid span.th.bus{font-weight:800; text-decoration:underline; text-underline-offset:2px}
+#tArrTh i.bus{filter:brightness(.7); font-weight:800; text-decoration:underline; text-underline-offset:2px}
 /* ===== PATTERN VIEW (setting PATTERN VIEW; to remove: delete this CSS block, the JS block of the same name and the
    lines marked "PATTERN VIEW" in the script) =====
    The Phrase screen as a pattern: every track's phrase for one song row side by side (Renoise-style), a column group per
@@ -2255,7 +2261,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p>On the Song screen, the amber <b>MST</b> column after the poly tracks plays phrases whose commands drive the <b>master bus</b>: <code>VOL</code> sets the master level from that row on, and <code>FXO</code>, <code>FLX</code>, <code>GAT</code> and <code>RTG</code> work on the master's effects (Mixer → master → FX). Master phrases are their own kind: just the three command columns (no notes, volume or instrument), and the command list offers only what works on the master: VOL, FXO, FLX, GAT, RTG, then TPO, TIC, GGR, HOP, DEL, CHA, NTH, REP, RND, RNL and SED. Beside the grid on a big screen, the master's effect chain shows instead of the piano. It plays alongside the tracks, block by block, and is not shown in Arrange. Stopping puts the master level and every switched effect back as set.</p>
 <p><b>Momentary effects:</b> put an effect in a slot and leave it off, then <code>FXO 21</code> switches slot 2 on, <code>FXO 20</code> off again, or <code>FXO 24</code> turns it on for four rows. It works on any track (that track's slots) and in the MST column (the master's). Switching fades over 5 ms; Flex keeps listening while it is off, so it always has the last bar ready.</p>
 <p><b>…chains modules:</b> every effect module in a …chains patch has a <b>BYP</b> button on its title bar with a number: it bypasses the module (its dry sound passes). From a phrase, <code>BYP 31</code> bypasses module 3 on that track's chain, <code>BYP 30</code> puts it back, and <code>BYP 34</code> switches it the other way from the patch for four rows, so a trance gate left bypassed plays for four rows. <code>BYP 0Y</code> does every numbered module. Stopping the song puts them back as the patch has them.</p>
-<p><b>Presets and sidechains in …chains:</b> effects and sound sources have a <b>Preset</b> row: factory presets, Default, and your own (Save as a preset keeps them on this device, for every patch). <b>Sidechain In</b>'s <b>Source</b> listens to the sidechain bus (the Mixer's SC row) or to one track's own sound, before its effects and fader, so a muted ghost kick still drives it; its meter shows what it hears before you patch it. The light beside a module's <b>SC</b> input flashes with the sidechain it hears.</p>
+<p><b>Presets and sidechains in …chains:</b> effects and sound sources have a <b>Preset</b> row: factory presets, Default, and your own (Save as a preset keeps them on this device, for every patch). Every sidechain user has a <b>Source</b>: <b>Self</b>, <b>Send 1–8</b> (what a <b>Sidechain Out</b> in any chain sends) or one <b>track</b>'s own sound, before its effects and fader, so a muted ghost kick still drives it. That goes for <b>Sidechain In</b> (its meter shows what it hears before you patch it), Sidechain Comp, the compressors, the noise gate and the envelope filter, in …chains and as track or master effects. The Mixer's <b>SC</b> row lights when a track is a source for something. The light beside a module's <b>SC</b> input flashes with the sidechain it hears.</p>
 <h3>Flex, Step gate and Retrigger</h3>
 <p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (16 patterns; <code>FLX</code> picks one from a row). <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT</code> picks. <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped).</p>
 <h3>Track effects</h3>
@@ -2267,7 +2273,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" hidden></div>
 
-<script src="waves/waves-worklet.js?v=26"></script>
+<script src="waves/waves-worklet.js?v=27"></script>
 <script>
 /* ===ENGINE START=== */
 const BASE = 65.40639; // C2
@@ -3134,7 +3140,7 @@ const MODFX = {
     ['release', 'Release', 'log', 0.01, 2, 0.15, v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s'],
     ['knee', 'Knee', 'lin', 0, 24, 6, v => v.toFixed(1) + ' dB'],
     ['makeup', 'Makeup', 'lin', 0, 24, 0, v => '+' + v.toFixed(1) + ' dB'],
-    ['source', 'Source', 'opt', 0, 1, 0, ['Self', 'Sidechain']],
+    ['sck', 'Source', 'opt', 0, 136, 0, ['Self', 'Send 1', 'Send 2', 'Send 3', 'Send 4', 'Send 5', 'Send 6', 'Send 7', 'Send 8', 'Track 1', 'Track 2', 'Track 3', 'Track 4', 'Track 5', 'Track 6', 'Track 7', 'Track 8', 'Track 9', 'Track 10', 'Track 11', 'Track 12', 'Track 13', 'Track 14', 'Track 15', 'Track 16', 'Track 17', 'Track 18', 'Track 19', 'Track 20', 'Track 21', 'Track 22', 'Track 23', 'Track 24', 'Track 25', 'Track 26', 'Track 27', 'Track 28', 'Track 29', 'Track 30', 'Track 31', 'Track 32', 'Track 33', 'Track 34', 'Track 35', 'Track 36', 'Track 37', 'Track 38', 'Track 39', 'Track 40', 'Track 41', 'Track 42', 'Track 43', 'Track 44', 'Track 45', 'Track 46', 'Track 47', 'Track 48', 'Track 49', 'Track 50', 'Track 51', 'Track 52', 'Track 53', 'Track 54', 'Track 55', 'Track 56', 'Track 57', 'Track 58', 'Track 59', 'Track 60', 'Track 61', 'Track 62', 'Track 63', 'Track 64', 'Track 65', 'Track 66', 'Track 67', 'Track 68', 'Track 69', 'Track 70', 'Track 71', 'Track 72', 'Track 73', 'Track 74', 'Track 75', 'Track 76', 'Track 77', 'Track 78', 'Track 79', 'Track 80', 'Track 81', 'Track 82', 'Track 83', 'Track 84', 'Track 85', 'Track 86', 'Track 87', 'Track 88', 'Track 89', 'Track 90', 'Track 91', 'Track 92', 'Track 93', 'Track 94', 'Track 95', 'Track 96', 'Track 97', 'Track 98', 'Track 99', 'Track 100', 'Track 101', 'Track 102', 'Track 103', 'Track 104', 'Track 105', 'Track 106', 'Track 107', 'Track 108', 'Track 109', 'Track 110', 'Track 111', 'Track 112', 'Track 113', 'Track 114', 'Track 115', 'Track 116', 'Track 117', 'Track 118', 'Track 119', 'Track 120', 'Track 121', 'Track 122', 'Track 123', 'Track 124', 'Track 125', 'Track 126', 'Track 127', 'Track 128']],
     ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet']]},
   buscomp:{name:'Bus Comp', short:'BUSC', long:'Bus Comp: the punchy console bus compressor: stepped ratio, attack and release with Auto, sidechain high-pass (Thunder original)', tail:false, pad:true, track:true, group:'Dynamics and EQ', credit:'Thunder original', ps:[
     ['thresh', 'Threshold', 'lin', -40, 0, -12, v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'],
@@ -3143,7 +3149,7 @@ const MODFX = {
     ['release', 'Release', 'opt', 0, 4, 4, ['0.1 s', '0.3 s', '0.6 s', '1.2 s', 'Auto']],
     ['makeup', 'Makeup', 'lin', 0, 20, 0, v => '+' + v.toFixed(1) + ' dB'],
     ['schpf', 'SC high-pass', 'opt', 0, 4, 0, ['Off', '60 Hz', '90 Hz', '150 Hz', '250 Hz']],
-    ['source', 'Source', 'opt', 0, 1, 0, ['Self', 'Sidechain']],
+    ['sck', 'Source', 'opt', 0, 136, 0, ['Self', 'Send 1', 'Send 2', 'Send 3', 'Send 4', 'Send 5', 'Send 6', 'Send 7', 'Send 8', 'Track 1', 'Track 2', 'Track 3', 'Track 4', 'Track 5', 'Track 6', 'Track 7', 'Track 8', 'Track 9', 'Track 10', 'Track 11', 'Track 12', 'Track 13', 'Track 14', 'Track 15', 'Track 16', 'Track 17', 'Track 18', 'Track 19', 'Track 20', 'Track 21', 'Track 22', 'Track 23', 'Track 24', 'Track 25', 'Track 26', 'Track 27', 'Track 28', 'Track 29', 'Track 30', 'Track 31', 'Track 32', 'Track 33', 'Track 34', 'Track 35', 'Track 36', 'Track 37', 'Track 38', 'Track 39', 'Track 40', 'Track 41', 'Track 42', 'Track 43', 'Track 44', 'Track 45', 'Track 46', 'Track 47', 'Track 48', 'Track 49', 'Track 50', 'Track 51', 'Track 52', 'Track 53', 'Track 54', 'Track 55', 'Track 56', 'Track 57', 'Track 58', 'Track 59', 'Track 60', 'Track 61', 'Track 62', 'Track 63', 'Track 64', 'Track 65', 'Track 66', 'Track 67', 'Track 68', 'Track 69', 'Track 70', 'Track 71', 'Track 72', 'Track 73', 'Track 74', 'Track 75', 'Track 76', 'Track 77', 'Track 78', 'Track 79', 'Track 80', 'Track 81', 'Track 82', 'Track 83', 'Track 84', 'Track 85', 'Track 86', 'Track 87', 'Track 88', 'Track 89', 'Track 90', 'Track 91', 'Track 92', 'Track 93', 'Track 94', 'Track 95', 'Track 96', 'Track 97', 'Track 98', 'Track 99', 'Track 100', 'Track 101', 'Track 102', 'Track 103', 'Track 104', 'Track 105', 'Track 106', 'Track 107', 'Track 108', 'Track 109', 'Track 110', 'Track 111', 'Track 112', 'Track 113', 'Track 114', 'Track 115', 'Track 116', 'Track 117', 'Track 118', 'Track 119', 'Track 120', 'Track 121', 'Track 122', 'Track 123', 'Track 124', 'Track 125', 'Track 126', 'Track 127', 'Track 128']],
     ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet']]},
   glue:{name:'Glue Comp', short:'GLUE', long:'Glue Comp: the smooth bus compressor: RMS, wide knee, Range, Auto release and soft clip, for groups and the master (Thunder original)', tail:false, pad:true, track:true, group:'Dynamics and EQ', credit:'Thunder original', ps:[
     ['thresh', 'Threshold', 'lin', -40, 0, -15, v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'],
@@ -3156,7 +3162,7 @@ const MODFX = {
     ['makeup', 'Makeup', 'lin', 0, 20, 0, v => '+' + v.toFixed(1) + ' dB'],
     ['clip', 'Soft clip', 'opt', 0, 1, 0, ['Off', 'On']],
     ['schpf', 'SC high-pass', 'opt', 0, 4, 0, ['Off', '60 Hz', '90 Hz', '150 Hz', '250 Hz']],
-    ['source', 'Source', 'opt', 0, 1, 0, ['Self', 'Sidechain']],
+    ['sck', 'Source', 'opt', 0, 136, 0, ['Self', 'Send 1', 'Send 2', 'Send 3', 'Send 4', 'Send 5', 'Send 6', 'Send 7', 'Send 8', 'Track 1', 'Track 2', 'Track 3', 'Track 4', 'Track 5', 'Track 6', 'Track 7', 'Track 8', 'Track 9', 'Track 10', 'Track 11', 'Track 12', 'Track 13', 'Track 14', 'Track 15', 'Track 16', 'Track 17', 'Track 18', 'Track 19', 'Track 20', 'Track 21', 'Track 22', 'Track 23', 'Track 24', 'Track 25', 'Track 26', 'Track 27', 'Track 28', 'Track 29', 'Track 30', 'Track 31', 'Track 32', 'Track 33', 'Track 34', 'Track 35', 'Track 36', 'Track 37', 'Track 38', 'Track 39', 'Track 40', 'Track 41', 'Track 42', 'Track 43', 'Track 44', 'Track 45', 'Track 46', 'Track 47', 'Track 48', 'Track 49', 'Track 50', 'Track 51', 'Track 52', 'Track 53', 'Track 54', 'Track 55', 'Track 56', 'Track 57', 'Track 58', 'Track 59', 'Track 60', 'Track 61', 'Track 62', 'Track 63', 'Track 64', 'Track 65', 'Track 66', 'Track 67', 'Track 68', 'Track 69', 'Track 70', 'Track 71', 'Track 72', 'Track 73', 'Track 74', 'Track 75', 'Track 76', 'Track 77', 'Track 78', 'Track 79', 'Track 80', 'Track 81', 'Track 82', 'Track 83', 'Track 84', 'Track 85', 'Track 86', 'Track 87', 'Track 88', 'Track 89', 'Track 90', 'Track 91', 'Track 92', 'Track 93', 'Track 94', 'Track 95', 'Track 96', 'Track 97', 'Track 98', 'Track 99', 'Track 100', 'Track 101', 'Track 102', 'Track 103', 'Track 104', 'Track 105', 'Track 106', 'Track 107', 'Track 108', 'Track 109', 'Track 110', 'Track 111', 'Track 112', 'Track 113', 'Track 114', 'Track 115', 'Track 116', 'Track 117', 'Track 118', 'Track 119', 'Track 120', 'Track 121', 'Track 122', 'Track 123', 'Track 124', 'Track 125', 'Track 126', 'Track 127', 'Track 128']],
     ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet']]},
   ngate:{name:'Noise gate', short:'NGAT', long:'Noise gate: silences the sound below a threshold, with hold, release, range and sidechain (Thunder original)', tail:false, pad:true, track:true, group:'Dynamics and EQ', credit:'Thunder original', ps:[
     ['thresh', 'Threshold', 'lin', -80, 0, -45, v => v.toFixed(1) + ' dB'],
@@ -3164,7 +3170,7 @@ const MODFX = {
     ['attack', 'Attack', 'log', 0.0001, 0.05, 0.0005, v => v < 0.01 ? (v * 1000).toFixed(1) + ' ms' : Math.round(v * 1000) + ' ms'],
     ['hold', 'Hold', 'lin', 0, 0.5, 0.03, v => Math.round(v * 1000) + ' ms'],
     ['release', 'Release', 'log', 0.005, 2, 0.12, v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s'],
-    ['source', 'Source', 'opt', 0, 1, 0, ['Self', 'Sidechain']]]},
+    ['sck', 'Source', 'opt', 0, 136, 0, ['Self', 'Send 1', 'Send 2', 'Send 3', 'Send 4', 'Send 5', 'Send 6', 'Send 7', 'Send 8', 'Track 1', 'Track 2', 'Track 3', 'Track 4', 'Track 5', 'Track 6', 'Track 7', 'Track 8', 'Track 9', 'Track 10', 'Track 11', 'Track 12', 'Track 13', 'Track 14', 'Track 15', 'Track 16', 'Track 17', 'Track 18', 'Track 19', 'Track 20', 'Track 21', 'Track 22', 'Track 23', 'Track 24', 'Track 25', 'Track 26', 'Track 27', 'Track 28', 'Track 29', 'Track 30', 'Track 31', 'Track 32', 'Track 33', 'Track 34', 'Track 35', 'Track 36', 'Track 37', 'Track 38', 'Track 39', 'Track 40', 'Track 41', 'Track 42', 'Track 43', 'Track 44', 'Track 45', 'Track 46', 'Track 47', 'Track 48', 'Track 49', 'Track 50', 'Track 51', 'Track 52', 'Track 53', 'Track 54', 'Track 55', 'Track 56', 'Track 57', 'Track 58', 'Track 59', 'Track 60', 'Track 61', 'Track 62', 'Track 63', 'Track 64', 'Track 65', 'Track 66', 'Track 67', 'Track 68', 'Track 69', 'Track 70', 'Track 71', 'Track 72', 'Track 73', 'Track 74', 'Track 75', 'Track 76', 'Track 77', 'Track 78', 'Track 79', 'Track 80', 'Track 81', 'Track 82', 'Track 83', 'Track 84', 'Track 85', 'Track 86', 'Track 87', 'Track 88', 'Track 89', 'Track 90', 'Track 91', 'Track 92', 'Track 93', 'Track 94', 'Track 95', 'Track 96', 'Track 97', 'Track 98', 'Track 99', 'Track 100', 'Track 101', 'Track 102', 'Track 103', 'Track 104', 'Track 105', 'Track 106', 'Track 107', 'Track 108', 'Track 109', 'Track 110', 'Track 111', 'Track 112', 'Track 113', 'Track 114', 'Track 115', 'Track 116', 'Track 117', 'Track 118', 'Track 119', 'Track 120', 'Track 121', 'Track 122', 'Track 123', 'Track 124', 'Track 125', 'Track 126', 'Track 127', 'Track 128']]]},
   autopan:{name:'Auto-pan', short:'APAN', long:'Auto-pan: moves the sound side to side in time with the song, sine, triangle or square (Thunder original)', tail:false, pad:false, track:true, group:'Modulation', credit:'Thunder original', ps:[
     ['sync', 'Sync', 'opt', 0, 1, 1, ['Off', 'To tempo']],
     ['div', 'Division', 'opt', 0, 6, 2, ['1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars']],
@@ -3197,9 +3203,9 @@ const MODFX = {
     ['mono', 'Stereo', 'opt', 0, 1, 0, ['Stereo', 'Mono']],
     ['flip', 'Polarity', 'opt', 0, 3, 0, ['Normal', 'Flip left', 'Flip right', 'Flip both']],
     ['mute', 'Mute', 'opt', 0, 1, 0, ['Sound on', 'Muted']]]},
-  envfilt:{name:'Envelope filter', short:'ENVF', long:'Envelope filter: auto-wah whose resonant filter follows the playing, or the sidechain bus (Thunder original)', tail:false, pad:true, track:true, group:'Filters', credit:'Thunder original', ps:[
+  envfilt:{name:'Envelope filter', short:'ENVF', long:'Envelope filter: auto-wah whose resonant filter follows the playing, or another track or a send (Source) (Thunder original)', tail:false, pad:true, track:true, group:'Filters', credit:'Thunder original', ps:[
     ['mode', 'Filter', 'opt', 0, 2, 1, ['Low-pass', 'Band-pass', 'High-pass']],
-    ['source', 'Source', 'opt', 0, 1, 0, ['Self', 'Sidechain']],
+    ['sck', 'Source', 'opt', 0, 136, 0, ['Self', 'Send 1', 'Send 2', 'Send 3', 'Send 4', 'Send 5', 'Send 6', 'Send 7', 'Send 8', 'Track 1', 'Track 2', 'Track 3', 'Track 4', 'Track 5', 'Track 6', 'Track 7', 'Track 8', 'Track 9', 'Track 10', 'Track 11', 'Track 12', 'Track 13', 'Track 14', 'Track 15', 'Track 16', 'Track 17', 'Track 18', 'Track 19', 'Track 20', 'Track 21', 'Track 22', 'Track 23', 'Track 24', 'Track 25', 'Track 26', 'Track 27', 'Track 28', 'Track 29', 'Track 30', 'Track 31', 'Track 32', 'Track 33', 'Track 34', 'Track 35', 'Track 36', 'Track 37', 'Track 38', 'Track 39', 'Track 40', 'Track 41', 'Track 42', 'Track 43', 'Track 44', 'Track 45', 'Track 46', 'Track 47', 'Track 48', 'Track 49', 'Track 50', 'Track 51', 'Track 52', 'Track 53', 'Track 54', 'Track 55', 'Track 56', 'Track 57', 'Track 58', 'Track 59', 'Track 60', 'Track 61', 'Track 62', 'Track 63', 'Track 64', 'Track 65', 'Track 66', 'Track 67', 'Track 68', 'Track 69', 'Track 70', 'Track 71', 'Track 72', 'Track 73', 'Track 74', 'Track 75', 'Track 76', 'Track 77', 'Track 78', 'Track 79', 'Track 80', 'Track 81', 'Track 82', 'Track 83', 'Track 84', 'Track 85', 'Track 86', 'Track 87', 'Track 88', 'Track 89', 'Track 90', 'Track 91', 'Track 92', 'Track 93', 'Track 94', 'Track 95', 'Track 96', 'Track 97', 'Track 98', 'Track 99', 'Track 100', 'Track 101', 'Track 102', 'Track 103', 'Track 104', 'Track 105', 'Track 106', 'Track 107', 'Track 108', 'Track 109', 'Track 110', 'Track 111', 'Track 112', 'Track 113', 'Track 114', 'Track 115', 'Track 116', 'Track 117', 'Track 118', 'Track 119', 'Track 120', 'Track 121', 'Track 122', 'Track 123', 'Track 124', 'Track 125', 'Track 126', 'Track 127', 'Track 128']],
     ['freq', 'Freq', 'lin', 0, 1, 0.35, v => (f => f >= 1000 ? (f / 1000).toFixed(1) + ' kHz' : Math.round(f) + ' Hz')(40 * Math.pow(400, v))],
     ['depth', 'Depth', 'lin', -1, 1, 0.7, v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'],
     ['range', 'Range', 'lin', 1, 8, 4, v => v.toFixed(1) + ' oct'],
@@ -3218,6 +3224,7 @@ const fxKey = p => p === 'type' || p === 'on' ? p + '_' : p;
 for (const k in MODFX){ const M = MODFX[k]; if (!M.pad) continue;
   const F = FX[k] = {name:M.name, mod:k, segs:[], rows:{}, init:{}, group:M.group};
   for (const [p, l, c, min, max, d, x] of M.ps){
+    if (p === 'sck') continue;   // SOURCE: a pad has no tracks or sends to listen to (it is always Self)
     if (c === 'opt'){ F.segs.push([fxKey(p), l, x.map((n, i) => [i, n])]); F.init[fxKey(p)] = d; }
     else F.rows[fxKey(p)] = {l, min, max, c:c === 'log' ? 'logf' : c, d, f:x};
   }
@@ -6990,7 +6997,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=26', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=27', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -7320,11 +7327,13 @@ function makeSeg(host, options, get, set){
   const upd = () => { const c = get(); bs.forEach(([v, b]) => { b.classList.toggle('on', v === c); b.setAttribute('aria-pressed', v === c); }); };
   upd(); return upd;
 }
-let tt = 0;
-function toast(msg){ const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(tt);
+let tt = 0, busNote = '';   // busNote: BUS, the one-time note on a bus track (busHint)
+function toast(msg){ const t = $('toast'); let top = 2000;
+  if (busNote){ msg = msg ? msg + ' · ' + busNote : busNote; busNote = ''; top = 4500; }   // BUS: the one-time note rides along
+  t.textContent = msg; t.hidden = false; clearTimeout(tt);
   // Dismiss quickly so it doesn't distract, but long enough to read: short confirmations clear in ~1.3s,
   // longer messages get more time, capped at 2.0s.
-  tt = setTimeout(() => t.hidden = true, clamp(1000 + msg.length * 20, 1300, 2000)); }
+  tt = setTimeout(() => t.hidden = true, clamp(1000 + msg.length * 20, 1300, top)); }
 
 /* ---------- in-page prompt / confirm ----------
    The browser's prompt() and confirm() stop the whole page: the 25 ms sequencer pump can't run, so after the dialog
@@ -12604,7 +12613,8 @@ for (const k in MODFX){ const M = MODFX[k]; if (!M.track) continue;
   const ps = [], conv = {};
   for (const [p, l, c, min, max, d, x] of M.ps){
     const L = l.toUpperCase(), q = fxKey(p);   // stored as q in the slot (type → type_), sent to the module as p
-    if (c === 'opt'){ ps.push(EN(q, L, d, x.map(n => n.toUpperCase()))); conv[p] = [q, b => b]; continue; }
+    if (c === 'opt'){ const nm = p === 'sck' ? x.slice(0, 9 + NT) : x;   // SOURCE: Self, the sends, the tracks the app has
+      ps.push(EN(q, L, d, nm.map(n => n.toUpperCase()))); conv[p] = [q, b => b]; continue; }
     if (c === 'int' && max - min <= 255){ ps.push(P_(q, L, Math.round(d), v => x(v), min, max)); conv[p] = [q, b => b]; continue; }
     const to = c === 'log' ? b => min * Math.pow(max / min, u8(b)) : b => min + (max - min) * u8(b);
     const pos = c === 'log' ? Math.log(d / min) / Math.log(max / min) : (d - min) / (max - min);
@@ -12667,10 +12677,16 @@ class ThunderFx extends AudioWorkletProcessor {
     // for the shared-module slots (MODFX): their transport (the song tempo, from the beat clock while it plays) and the sidechain bus (input 1)
     this.spb = sampleRate / 2; this.bpm = 120; this.wasOn = false; this.startN = 0;
     this.scL = new Float32Array(128); this.scR = new Float32Array(128); this.scOn = false;
-    this.mctx = {sr:sampleRate, block:128, transport:{tempo:120, playing:false, startN:0, lpb:4, ticks:6}, quality:'full', scL:this.scL, scR:this.scR, scOn:() => this.scOn};
+    // SOURCE (21 Oct): a module slot's Source (sck: 1–8 a send, on input 2; 9 + t track t's own sound, on input 1 through
+    // tapIdx). No mixer sidechain bus any more.
+    this.zero = new Float32Array(128); this.taps = null; this.sends = null; this.tapIdx = new Int16Array(128).fill(-1); this.setTap(op.tapMap);
+    this.mctx = {sr:sampleRate, block:128, transport:{tempo:120, playing:false, startN:0, lpb:4, ticks:6}, quality:'full', scL:this.scL, scR:this.scR, scOn:() => false,
+      key:v => { v = Math.round(v) || 0; if (v <= 0) return null; if (v <= 8) return (this.sends && this.sends[v - 1]) || this.zero;
+        const c = this.tapIdx[v - 9]; return (c >= 0 && this.taps && this.taps[c]) || this.zero; }};
     this.set(op.chain || []);
-    this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else if (e.data && e.data.irs !== undefined) globalThis.__thunderIR = e.data.irs; else this.set(e.data); };
+    this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else if (e.data && e.data.irs !== undefined) globalThis.__thunderIR = e.data.irs; else if (e.data && e.data.tapmap) this.setTap(e.data.tapmap); else this.set(e.data); };
   }
+  setTap(list){ this.tapIdx.fill(-1); (Array.isArray(list) ? list : []).forEach((t, i) => { if (t >= 0 && t < 128) this.tapIdx[t] = i; }); }
   drop(s){ try { if (s.def){ if (s.def.destroy) s.def.destroy(s.st); } else if (!s.js && s.h >= 0) this.x.tfx_free(s.h); } catch (e){} }
   set(chain){
     const x = this.x, old = this.slots.slice(), next = [];
@@ -12767,8 +12783,7 @@ class ThunderFx extends AudioWorkletProcessor {
       const T = this.mctx.transport, on = bp[0] >= 0 && bp[bp.length - 1] >= 0;
       if (on){ clkSpb(this, bp, n); if (!this.wasOn) this.startN++; } this.wasOn = on;
       T.playing = on; T.startN = this.startN; T.tempo = on ? Math.max(20, Math.min(999, 60 * sampleRate / this.spb)) : this.bpm;
-      const sc = inputs[1]; this.scOn = !!(sc && sc.length);
-      if (this.scOn){ this.scL.set(sc[0].subarray(0, n)); this.scR.set((sc[1] || sc[0]).subarray(0, n)); } else { this.scL.fill(0); this.scR.fill(0); } }
+      const tk = inputs[1], sd = inputs[2]; this.taps = tk && tk.length ? tk : null; this.sends = sd && sd.length ? sd : null; }   // SOURCE
     if (!this.dL){ this.dL = new Float32Array(128); this.dR = new Float32Array(128); }
     for (const s of this.slots){
       // On or off: the slot's own setting, unless an FXO switch is holding it. Changes fade over 5 ms.
@@ -12808,7 +12823,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=33')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=34')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -12823,17 +12838,42 @@ const chnClone = o => o == null ? o : JSON.parse(JSON.stringify(o));
    reads them every block, so sliders move the sound smoothly); only real structure becomes
    add/remove/connect/disconnect. A missing/short previous patch forces a full reload. */
 // SOURCE: does the patch have a Sidechain In listening to a track (so the …chains nodes need every track's own sound)?
-// SOURCE: the tracks the patch's Sidechain In modules listen to (Source set to a track, no Send picked), sorted, at most 32
-// (Web Audio's channel limit for the one connection that carries them; owner, 20 Oct: 32 different source tracks is plenty).
-function chnTapList(d){
-  const set = new Set();
-  if (d && Array.isArray(d.modules)) for (const m of d.modules) if (m && m.type === 'scin' && m.params){
-    const k = Math.round(+m.params.src || 0), sn = Math.round(+m.params.snd || 0); if (k > 0 && !(sn > 0) && k <= NT) set.add(k - 1); }
-  return [...set].sort((a, b) => a - b).slice(0, 32);
+/* SOURCE (owner, 21 Oct): every sidechain user picks its own Source: sck 0 Self (Off on a Sidechain In), 1–8 Send 1–8 (a
+   Sidechain Out in …chains), 9 + t track t's own sound, before its effects and fader. There is no mixer sidechain bus any
+   more; the Mixer's SC row lights when a track is a source for something. The users: …chains modules with an sck param,
+   and the track and master effect slots of the MODFX modules that have one (their slot field sck). */
+const SCK_SEND = 8, sckTrack = v => { v = Math.round(+v) || 0; return v > SCK_SEND ? v - SCK_SEND - 1 : -1; };
+const SCK_TYPES = new Set(['scin', 'sccomp', 'compressor', 'ngate', 'buscomp', 'glue', 'envfilt']);
+const SCK_NAME = {scin:'Sidechain In', sccomp:'Sidechain Comp', compressor:'Compressor', ngate:'Noise gate', buscomp:'Bus Comp', glue:'Glue Comp', envfilt:'Envelope filter'};
+// Every Source picked anywhere in the song: [{v, where, t}] (t: the track the user sits on, NT the master, -1 …chains).
+function sckUses(){
+  const out = [], d = S.chainPatch;
+  if (d && Array.isArray(d.modules)) for (const m of d.modules) if (m && SCK_TYPES.has(m.type) && m.params && +m.params.sck > 0)
+    out.push({v:+m.params.sck, where:'…chains ' + (SCK_NAME[m.type] || m.type), t:-1});
+  const slots = (A, t) => (A || []).forEach((f, k) => { if (f && MODFX[f.type] && +f.sck > 0) out.push({v:+f.sck, where:(t === NT ? 'master' : 'track ' + d2(t + 1)) + ' FX ' + (k + 1) + ' ' + (MODFX[f.type].short || f.type), t}); });
+  for (let t = 0; t < NT; t++) slots(S.tfx && S.tfx[t], t);
+  slots(S.mfx, NT);
+  return out;
 }
-const chnTaps = d => chnTapList(d).length > 0;
-// SENDS: the patch has a Sidechain Out, or a Sidechain In listening to a send.
-const chnSends = d => !!(d && Array.isArray(d.modules) && d.modules.some(m => m && (m.type === 'scout' || (m.type === 'scin' && m.params && Math.round(+m.params.snd || 0) > 0))));
+// The tracks picked as sources, sorted, at most 32 (Web Audio's channel limit for the one connection that carries them to
+// every user). keyTrackList caches on the song's shape so the audio code can ask often.
+let keyListH = null, keyListV = [];
+function keyTrackList(){
+  const set = new Set(); for (const u of sckUses()){ const t = sckTrack(u.v); if (t >= 0 && t < NT) set.add(t); }
+  const list = [...set].sort((a, b) => a - b).slice(0, 32), h = list.join(',');
+  if (h !== keyListH){ keyListH = h; keyListV = list; }
+  return keyListV;
+}
+const chnTapList = () => keyTrackList();   // (the old name: …chains nodes get the same list)
+const sckHasTrack = A => A.some(v => sckTrack(v) >= 0), sckHasSend = A => A.some(v => v >= 1 && v <= SCK_SEND);
+const patchScks = d => d && Array.isArray(d.modules) ? d.modules.filter(m => m && SCK_TYPES.has(m.type) && m.params).map(m => +m.params.sck || 0) : [];
+const slotScks = A => (A || []).filter(f => f && MODFX[f.type]).map(f => +f.sck || 0);
+const chnTaps = d => sckHasTrack(patchScks(d));
+// SENDS: the patch has a Sidechain Out, or something listening to a send.
+const chnSends = d => !!(d && Array.isArray(d.modules) && (d.modules.some(m => m && m.type === 'scout') || sckHasSend(patchScks(d))));
+// What a track is a source for (the Mixer's SC light and its Enter).
+const sckUsesOf = t => sckUses().filter(u => sckTrack(u.v) === t);
+function scSay(t){ const U = sckUsesOf(t); toast(U.length ? `Track ${d2(t + 1)} is the sidechain source for ${U.map(u => u.where).join(', ')}.` : `Nothing listens to track ${d2(t + 1)} as a sidechain. Pick it as Source on a compressor, gate, envelope filter or Sidechain In.`, 5000); }
 /* BUS (owner, 20 Oct): a chain whose Track In is on one track and whose Chain Out goes to another is a bus: tracks 1, 2, 3
    → a mixer → a compressor → Chain Out 4. busPlan() says which tracks feed which: for every Track In (track t), the Chain
    Out tracks its sound reaches through the patch's cables. A Chain Out on another track b makes t a source of bus b, heard
@@ -12999,8 +13039,9 @@ function tfxReady(ac){
   return tfxLoaded.get(ac);
 }
 function tfxNode(ac, chain){
-  const n = new AudioWorkletNode(ac, 'thunder-tfx', {numberOfInputs:2, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
-    channelCountMode:'explicit', channelInterpretation:'speakers', processorOptions:{bytes:tfxBin(), chain, irs:irsOpt(ac)}});   // irs: this audio thread's copy of the song's impulse responses
+  // Inputs: 0 the track, 1 (SOURCE) the picked tracks' own sounds, one channel each ('tapmap'), 2 (SENDS) the Sidechain Out sends.
+  const n = new AudioWorkletNode(ac, 'thunder-tfx', {numberOfInputs:3, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
+    channelCountMode:'max', channelInterpretation:'speakers', processorOptions:{bytes:tfxBin(), chain, irs:irsOpt(ac), tapMap:keyTrackList()}});   // irs: this audio thread's copy of the song's impulse responses
   n.load = 0; n.port.onmessage = e => { const d = e.data; if (!d) return;
     if (typeof d.load === 'number') n.load = n.load * 0.6 + d.load * 0.4;
     if (d.failed){ const t = String(d.failed).split(':')[1], F = TFX[t]; toast((F ? F.long.replace(/^based on /, '') : 'An effect') + ' stopped working and was bypassed. Change its settings to restart it.'); } };
@@ -13024,6 +13065,11 @@ const freshPhrase = () => Array.from({length:PROWS}, blankRow);
 // count the mono half gets the extra track. 16 tracks: 1–8 mono, 9–16 poly; 32 tracks: 1–16 mono, 17–32 poly.
 // (ntr() lives with the song state below; these arrows only call it after everything is initialized.)
 const polyFrom = () => Math.ceil(ntr() / 2), isPolyT = t => t >= polyFrom() && t < NT;
+// BUS (owner, 21 Oct): a track other tracks play through (a …chains Chain Out set to it) looks a little darker on every
+// screen and says BUS, so it isn't mistaken for a track to program (its own notes still play).
+const isBusT = t => t >= 0 && t < NT && busPlan().feeds.has(t);
+const trkKind = t => isBusT(t) ? ' BUS' : isPolyT(t) ? ' POLY' : ' MONO';
+const busOf = t => { const f = busPlan().feeds.get(t) || []; return f.length ? 'bus of ' + (f.length > 1 ? 'tracks ' : 'track ') + f.map(u => d2(u + 1)).join(', ') : ''; };
 // freshInst needs the pad count, but nslots() (with the song state, below) isn't initialized yet when the
 // first song is made — the default instrument layout only needs the classic 16 anyway.
 // 20 Oct: kf KEY FOLLOW (live transpose and scale; on from 08 up, the synths), hut/huv HUMAN TIME (± ms) / VEL (−%), and for MIDI
@@ -13070,7 +13116,7 @@ function freshSong(){
     song:Array.from({length:256}, () => new Array(NT + 1).fill(-1)), chains:new Array(256).fill(null), phrases:new Array(256).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
     tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:4, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
-    ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0), mst:freshMst(), presets:{voices:[], layers:[]}, secs:[], scale:0, sroot:0, ni:NI};   // secs: SONG EXTRAS section names [{y, n}]   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
+    ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0), mst:freshMst(), presets:{voices:[], layers:[]}, secs:[], scale:0, sroot:0, ni:NI, sc2:1};   // secs: SONG EXTRAS section names [{y, n}]   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
 }
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;
 // The saved song is read at start-up, before nslots (a const further down) exists. Calling it there threw, and the
@@ -13081,8 +13127,32 @@ function nslotsEarly(){ try { return nslots(); } catch(e){ return 32; } }
 var swingConv = null;
 function swingNote(){ if (!swingConv) return; const c = swingConv; swingConv = null;
   setTimeout(() => toast(`Timing fix: this song now reads LPB ${c.lpb}, ${c.ticks} ticks a step, ${c.bpm} BPM, and plays exactly as before. LPB 4 is now true 16ths.`, 7000), 1200); }
+// SOURCE (21 Oct): set by normSong when it moved an older song off the mixer's sidechain bus; scNote() says so once.
+var scConv = null;
+function scNote(){ if (!scConv) return; const c = scConv; scConv = null;
+  setTimeout(() => toast(c.n > 1 ? `Sidechains now pick their own Source. ${c.n} tracks fed this song's sidechain bus; what listened to it now listens to track ${d2(c.t + 1)}. Change Source on each to pick another.`
+    : `Sidechains now pick their own Source: what listened to this song's sidechain bus now listens to track ${d2(c.t + 1)}.`, 8000), 1600); }
+// Older songs (no sc2): every Source picked from what it used. The bus (the Mixer's SC row) becomes the lowest track that
+// fed it (Self, or Off on a Sidechain In, when none did); Sidechain In's track or send becomes its Source. In place on j,
+// before the rest of normSong reads it.
+function scMigrate(j){
+  if (j.sc2) return;
+  const scT = Array.isArray(j.mix) ? j.mix.map((o, t) => o && o.sc && t < NT ? t : -1).filter(t => t >= 0) : [], key = scT.length ? SCK_SEND + 1 + scT[0] : 0;
+  let used = false;
+  const d = j.chainPatch;
+  if (d && Array.isArray(d.modules)) for (const m of d.modules){
+    if (!m || !SCK_TYPES.has(m.type)) continue; const p = m.params = m.params || {}; if (typeof p.sck === 'number') continue;
+    if (m.type === 'scin'){ const sn = Math.round(+p.snd || 0), k = Math.round(+p.src || 0); p.sck = sn > 0 ? Math.min(sn, SCK_SEND) : k > 0 ? SCK_SEND + k : key; if (!(sn > 0) && !(k > 0)) used = true; }
+    else if (m.type === 'sccomp'){ p.sck = key; used = true; }
+    else { p.sck = +p.source >= .5 ? key : 0; if (+p.source >= .5) used = true; }
+    delete p.src; delete p.snd; delete p.source; }
+  const slots = A => { if (Array.isArray(A)) for (const f of A) if (f && typeof f === 'object' && MODFX[f.type] && f.sck == null){ if (+f.source >= .5){ f.sck = key; used = true; } else f.sck = 0; delete f.source; } };
+  if (Array.isArray(j.tfx)) j.tfx.forEach(slots); slots(j.mfx);
+  if (used && scT.length) scConv = {t:scT[0], n:scT.length};
+}
 function normSong(j){
   const S = freshSong(); if (!j || typeof j !== 'object') return S;
+  try { scMigrate(j); } catch(e){}
   if (typeof j.name === 'string') S.name = j.name.slice(0, 40);
   S.bpm = clamp(int(j.bpm, 120), 40, 300);
   // MPC swing: the classic hardware's 50–75% range, where 50% is straight and 66–67% is the triplet feel.
@@ -13147,7 +13217,7 @@ function normSong(j){
     I.mlen = clamp(int(o.mlen, 0), 0, 255); I.eco = clamp(int(o.eco, 0), 0, 16); I.ecr = ECHO_RATES.some(([, v]) => Math.abs(v - +o.ecr) < 1e-9) ? +o.ecr : 0.5;
     I.ecf = clamp(int(o.ecf, 30), 0, 100); I.ecp = clamp(int(o.ecp, 0), -12, 12); } });
   if (Array.isArray(j.mix)) j.mix.slice(0, NT).forEach((o, i) => { if (o && typeof o === 'object'){ const m = S.mix[i];
-    m.vol = clamp(int(o.vol, 224), 0, 255); m.pan = clamp(int(o.pan, 128), 0, 255); m.mute = !!o.mute; m.solo = !!o.solo; m.sc = !!o.sc; } });
+    m.vol = clamp(int(o.vol, 224), 0, 255); m.pan = clamp(int(o.pan, 128), 0, 255); m.mute = !!o.mute; m.solo = !!o.solo; m.sc = false; } });   // sc: the old mixer sidechain bus (gone 21 Oct)
   if (Array.isArray(j.tfx)) for (let t = 0; t < NT; t++) S.tfx[t] = normChainFx(j.tfx[t]);
   S.mfx = normChainFx(j.mfx);
   if (Array.isArray(j.chainOn)) for (let t = 0; t < NT; t++) S.chainOn[t] = !!j.chainOn[t];
@@ -13199,7 +13269,7 @@ function demoSong(){
 }
 let S = (() => { try { const s = localStorage.getItem(TK) || localStorage.getItem('thunder-song-v1'); return s ? normSong(JSON.parse(s)) : demoSong(); } catch(e){ return demoSong(); } })();
 setTimeout(() => { try { irsResolve(); } catch(e){} }, 0);   // the song's impulse responses (Convolution reverb), from IndexedDB
-setTimeout(() => { if (swingConv) try { saveS(); } catch(e){} swingNote(); }, 0);   // an older saved song was converted: save the new numbers, say so
+setTimeout(() => { if (swingConv || scConv) try { saveS(); } catch(e){} swingNote(); scNote(); }, 0);   // an older saved song was converted: save the new numbers, say so
 let sT = 0;
 // Undo: every saved change keeps the state before it (up to 200 steps). Changes made by one key or tap
 // (a paste, a cut, a note plus its instrument) settle at the end of that event, so they undo as one step.
@@ -13703,7 +13773,7 @@ function makePlayer(ac, out, getBuf, live){
   const live1 = (v, at) => v && !v.ended && !(v.stopAt != null && v.stopAt <= at);
   // The sidechain detector bus: tracks send into it (Sidechain Out), every …chains node reads it as input 1.
   // It is never connected to the output, so it makes no sound on its own.
-  const scBus = ac.createGain();
+  const scBus = ac.createGain();   // SOURCE (21 Oct): nothing sends to it any more (no mixer sidechain bus); kept so old wiring has a target
   // SIDECHAIN IN by track (owner, 19 Oct): every track's own sound, mono, before its effects and fader (so a muted
   // ghost kick still drives it, and nothing can loop back into a chain), one channel per track on a 32-channel merger
   // that goes to input 2 of the …chains nodes while the patch has a Sidechain In set to a track. Made when first needed.
@@ -13719,7 +13789,19 @@ function makePlayer(ac, out, getBuf, live){
     list.forEach((t, i) => { try { buses[t].inp.connect(taps, 0, i); } catch(e){} });
     const want = chnTaps(S.chainPatch);
     for (const b of buses) if (b && b.chn && want){ try { taps.connect(b.chn, 0, 2); b._tapTo = b.chn; if (b.chn._send) b.chn._send({target:'chains-host', op:'tapmap', value:tapList}); } catch(e){} }
+    for (let t = 0; t < buses.length; t++){ const b = buses[t]; if (b && b.fx){ b.fx._tapTo = false; fxKeySync(b.fx, S.tfx[t]); } }
+    if (mfx){ mfx._tapTo = false; fxKeySync(mfx, S.mfx); }
     return taps;
+  }
+  // An effect node (a track's or the master's) hears the Sources its module slots pick: the picked tracks on input 1, the
+  // sends on input 2; told the track map ('tapmap'). Connections stay once made (a repeat is ignored).
+  function fxKeySync(n, slots){
+    if (!n) return;
+    const v = slotScks(slots), wt = sckHasTrack(v), ws = sckHasSend(v);
+    if (wt){ const tn = tapNode(); if (n._tapTo !== tn){ try { tn.connect(n, 0, 1); n._tapTo = tn; n.port.postMessage({tapmap:tapList}); } catch(e){} } }
+    else if (n._tapTo){ try { n._tapTo.disconnect(n, 0, 1); } catch(e){} n._tapTo = false; }
+    if (ws && !n._sendTo){ try { sendDly.connect(n, 0, 2); n._sendTo = true; } catch(e){} }
+    else if (!ws && n._sendTo){ try { sendDly.disconnect(n, 0, 2); } catch(e){} n._sendTo = false; }
   }
   function tapSync(b){
     if (!b) return;
@@ -13775,13 +13857,13 @@ function makePlayer(ac, out, getBuf, live){
   const clock = ac.createConstantSource(), clk = {on:false, base:0}; clock.offset.value = -1; clock.start();
   let mfx = null, mvol = null;
   const clockTo = n => { try { if (n && n.parameters) clock.connect(n.parameters.get('bp')); } catch(e){} };
-  const setMfx = n => { mfx = n || null; clockTo(mfx); };
+  const setMfx = n => { mfx = n || null; clockTo(mfx); if (mfx) fxKeySync(mfx, S.mfx); };   // SOURCE: the master's effect slots
   const fxNodeOf = t => t >= MT ? mfx : buses[t] && buses[t].fx;
   const FXP = ['sw0', 'sw1', 'sw2', 'sw3', 'flx', 'gat', 'rtg'];
   for (let t = 0; t <= NT; t++){
     const inp = ac.createGain(), g = ac.createGain(), p = ac.createStereoPanner(), scs = ac.createGain();
     inp.connect(g); g.connect(p); p.connect(out);
-    scs.gain.value = 0; g.connect(scs); scs.connect(scBus);   // post-fader Sidechain Out send
+    scs.gain.value = 0;   // (the old post-fader Sidechain Out send: gone with the mixer bus, 21 Oct)
     let an = null; if (live && t < NT){ an = ac.createAnalyser(); an.fftSize = 512; p.connect(an); }
     buses.push({inp, g, p, an, scs, lv:0, pk:0, fx:null, chn:null});
   }
@@ -14034,7 +14116,7 @@ function makePlayer(ac, out, getBuf, live){
     buses.forEach((b, t) => {
       if (t >= NT){ b.g.gain.value = 1; return; }
       const m = S.mix[t], gv = (filter ? filter(t) : audible(t)) ? trackGain(m.vol) : 0, pv = clamp((m.pan - 128) / 127, -1, 1);
-      const scv = m.sc ? 1 : 0;
+      const scv = 0;   // SOURCE: no mixer sidechain bus
       if (live){ b.g.gain.setTargetAtTime(gv, at, 0.012); b.p.pan.setTargetAtTime(pv, at, 0.012); b.scs.gain.setTargetAtTime(scv, at, 0.012); } else { b.g.gain.value = gv; b.p.pan.value = pv; b.scs.gain.value = scv; }
     });
   }
@@ -14058,7 +14140,7 @@ function makePlayer(ac, out, getBuf, live){
     if (wantChn && !b.chn){
       try {
         b.chn = chainsNode(ac, t, S.chainPatch, S.bpm);
-        if (b.chn) try { scBus.connect(b.chn, 0, 1); } catch(e){}   // input 1 = the sidechain detector bus
+
         if (!b.chn) chainsReady(ac).then(ok => { if (ok){ chnSync.add(ac); if (typeof rt !== 'undefined' && rt) rtFx(t); } });
       } catch(e){ b.chn = null; }
     } else if (wantChn && b.chn && b.chn._send){
@@ -14068,8 +14150,9 @@ function makePlayer(ac, out, getBuf, live){
       b.chn._sent = chnClone(S.chainPatch);
     }
     tapSync(b);   // SOURCE: the tracks' own sounds into input 2, while a Sidechain In listens to a track
-    if (wantFx && !b.fx){ try { b.fx = tfxNode(ac, chain); clockTo(b.fx); try { scBus.connect(b.fx, 0, 1); } catch(e){} } catch(e){ b.fx = null; } }   // input 1: the sidechain bus (Envelope filter)
+    if (wantFx && !b.fx){ try { b.fx = tfxNode(ac, chain); clockTo(b.fx); } catch(e){ b.fx = null; } }
     else if (wantFx && b.fx){ try { b.fx.port.postMessage(chain); } catch(e){} }
+    fxKeySync(b.fx, S.tfx[t]);   // SOURCE: the picked tracks and the sends, as this track's effect slots ask
     // Rewire only when which nodes sit in the slot changed: disconnecting/reconnecting a
     // running worklet every param change is its own little click.
     if (b._chnRef !== b.chn || b._fxRef !== b.fx){
@@ -14099,7 +14182,7 @@ function makePlayer(ac, out, getBuf, live){
     try { if (taps) taps.disconnect(); } catch(e){}
     try { sendBus.disconnect(); sendDly.disconnect(); } catch(e){}
   }
-  return {play, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff};
+  return {play, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, mfxKeys:() => fxKeySync(mfx, S.mfx)};
 }
 
 /* ---------- live playback ---------- */
@@ -14445,7 +14528,7 @@ function rtFx(t){
   if (t < NT) return rt.pl.setFx(t, tfxChain(S.tfx[t], ctx.sampleRate, S.bpm), rt.fxOk);
   // (setFx re-seats inp -> [chains?] -> [fx?] -> g, and retries when the chains module finishes loading.)
   const chain = rt.fxOk ? tfxChain(S.mfx, ctx.sampleRate, S.bpm) : [];
-  if (chain.length){ if (rt.mfx) rt.mfx.port.postMessage(chain); else { try { rt.mfx = tfxNode(ctx, chain); } catch(e){ rt.mfx = null; } rt.pl.setMfx(rt.mfx); rtRoute(); } }
+  if (chain.length){ if (rt.mfx){ rt.mfx.port.postMessage(chain); rt.pl.mfxKeys(); } else { try { rt.mfx = tfxNode(ctx, chain); } catch(e){ rt.mfx = null; } rt.pl.setMfx(rt.mfx); rtRoute(); } }
   else if (rt.mfx){ rt.mfx.port.postMessage(null); try { rt.mfx.disconnect(); } catch(e){} rt.mfx = null; rt.pl.setMfx(null); rtRoute(); }
 }
 function rtAllFx(){ for (let t = 0; t <= NT; t++) rtFx(t); }
@@ -15300,7 +15383,7 @@ function irsUI(sec){
   }
   sec.append(box);
 }
-function setSong(s, msg){ tStop(true); irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){} }, 0); swingNote(); setTimeout(mstSync, 0); projFile = null; resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); }
+function setSong(s, msg){ tStop(true); irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){} }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); projFile = null; resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -15826,7 +15909,7 @@ function bump(d, big){
     else { const m = S.mix[c.x];
       if (c.y === 0) m.vol = clamp(m.vol + d * (big ? 16 : 1), 0, 255);
       else if (c.y === 1) m.pan = clamp(m.pan + d * (big ? 16 : 1), 0, 255);
-      else if (c.y === 2) m.mute = d > 0; else if (c.y === 3) m.solo = d > 0; else if (c.y === 6) m.sc = d > 0; }
+      else if (c.y === 2) m.mute = d > 0; else if (c.y === 3) m.solo = d > 0; }   // (SC row: a light now, nothing to change)
     mixChanged(); draw(); return;
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.get) return;
@@ -15959,7 +16042,7 @@ function editTap(enter){
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
   }
-  if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 4) return go('fx'); if (c.y === 5){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (c.y === 6){ const m = S.mix[c.x]; m.sc = !m.sc; mixChanged(); draw(); return; } if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
+  if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 4) return go('fx'); if (c.y === 5){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (c.y === 6){ scSay(c.x); return; } /* SOURCE: the SC row only shows; Enter / EDIT says what listens to the track */ if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
   const r = rowsOf(tv)[c.y]; if (!r) return;
   if (r.act){ if (r.dbl) return toast('Tap EDIT again to ' + r.l.replace('› ', '').toLowerCase() + '.'); return r.act(); }
   if (r.tog){ r.set(r.get() ? 0 : 1); if (r.after) r.after(); saveS(); draw(); return; }
@@ -15986,7 +16069,13 @@ function editDouble(wasEmpty){
 // EDIT×2 on the song with sects hidden: a new block is a sect with one new phrase (numbered alike when
 // they're free). On a filled block it makes a unique copy: the sect and its phrases are all cloned.
 // Clones stay in the source's hex row when possible (0x10 → 0x11); a full row falls back to next free.
+// BUS: programming on a bus track is allowed (its notes play through its own chain too), but said once per track per session.
+const busHinted = new Set();
+// The note joins whatever the key says next (New phrase 03 …), or shows alone once the key is done.
+function busHint(t){ if (busHinted.has(t) || !isBusT(t)) return; busHinted.add(t);
+  busNote = `track ${d2(t + 1)} is a ${busOf(t)}: notes here play through its chain too`; queueMicrotask(() => { if (busNote) toast(''); }); }
 function newBlock(c, src){
+  if (c && c.x < NT) busHint(c.x);
   let cid, pid;
   if (src >= 0){
     cid = freeSectNear(src); if (cid < 0) cid = freeSect();
@@ -16166,7 +16255,7 @@ function del(){
     if (tv === 'phrase' && k === 'note'){ const r = S.phrases[cPhrase] && S.phrases[cPhrase][c.y]; if (r && r.slice(0, NCOL).every(n => n < 0)) r[IC] = -1; }
     return draw();
   }
-  if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ setChainOn(c.x, false); return draw(); } if (c.y === 7 && c.mx === 1) return toast('Mastering: EDIT opens it · EDIT+◀ turns it off, EDIT+▶ on'); if (c.y === 7){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; else if (c.y === 6) m.sc = false; } mixChanged(); return draw(); }
+  if (tv === 'mixer'){ if (c.y === 4) return toast('Open FX (EDIT) to change or remove effects.'); if (c.y === 5){ setChainOn(c.x, false); return draw(); } if (c.y === 7 && c.mx === 1) return toast('Mastering: EDIT opens it · EDIT+◀ turns it off, EDIT+▶ on'); if (c.y === 7){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; } mixChanged(); return draw(); }
   const r = rowsOf(tv)[c.y]; if (r && r.get && r.d != null){ r.set(r.d); if (r.after) r.after(); saveS(); draw(); }
 }
 // Whole rows: clear a row, insert a blank one (rows below move down), or remove one (rows below move up).
@@ -16876,7 +16965,7 @@ const HINT = {
   phraseM:'Master phrase: commands only · EDIT add a command (VOL level, FXO effects on/off, FLX GAT RTG patterns) · EDIT+◀▶ ±1 ▲▼ ±more · OPT+EDIT clear',
   phrase:'EDIT add note · EDIT×2 note off · EDIT+◀▶ ±1 ▲▼ ±octave · OPT+EDIT clear · OPT+arrows go to phrase · SHIFT+▶ inst',
   inst:'EDIT+◀▶ ±1 ▲▼ ±more · EDIT on › runs it · OPT+◀▶ other instrument · SHIFT+◀ phrase',
-  mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · FX row: OPT+▲▶ FX on (up to 4), OPT+▼◀ off · EDIT mutes, solos, toggles CHN or opens FX · SC row: EDIT sends this track to the sidechain bus · OPT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
+  mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · FX row: OPT+▲▶ FX on (up to 4), OPT+▼◀ off · EDIT mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (EDIT says for what) · OPT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
   fx:'EDIT adds · ▶ opens its controls · EDIT+◀▶ change · OPT+EDIT remove or reset · OPT+◀▶ other track · SHIFT+◀ mixer',
   project:'EDIT on › runs it · EDIT+◀▶ change · OPT+EDIT reset · SHIFT+▼ back',
 };
@@ -16892,8 +16981,8 @@ function info(){
   if (tv === 'song' && c.x === MT){ const v = S.song[c.y][MT];
     return `MASTER · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty · EDIT×2 new master phrase (its commands drive the master bus: VOL, FXO, FLX, GAT, RTG)' : `phrase ${hx(songShown(v))}` + (isEmptySect(S.chains[v]) ? ' · empty' : '') + ' · commands only, notes are not played'); }
   if (tv === 'song'){ const v = S.song[c.y][c.x], mu = blockMuted(S, c.y, c.x) ? ' · MUTED' : '';
-    if (!sectsOn) return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty · EDIT×2 new phrase' : isEmptySect(S.chains[v]) ? `block ${hx(v)} · no phrase yet (SHIFT+▶ makes one)` : `phrase ${hx(firstPhrase(v))}` + (isEmptyPhrase(S.phrases[firstPhrase(v)]) ? ' (empty)' : '') + (firstPhrase(v) !== v ? ` · block ${hx(v)}` : '')) + mu;
-    return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty' : `sect ${hx(v)}` + (isEmptySect(S.chains[v]) ? ' (empty)' : '')) + mu; }
+    if (!sectsOn) return `TRACK ${d2(c.x + 1)}${trkKind(c.x)} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty · EDIT×2 new phrase' : isEmptySect(S.chains[v]) ? `block ${hx(v)} · no phrase yet (SHIFT+▶ makes one)` : `phrase ${hx(firstPhrase(v))}` + (isEmptyPhrase(S.phrases[firstPhrase(v)]) ? ' (empty)' : '') + (firstPhrase(v) !== v ? ` · block ${hx(v)}` : '')) + mu;
+    return `TRACK ${d2(c.x + 1)}${trkKind(c.x)} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty' : `sect ${hx(v)}` + (isEmptySect(S.chains[v]) ? ' (empty)' : '')) + mu; }
   if (tv === 'sect'){ const r = sectRow(cSect, c.y) || [-1, 0];
     return c.x === 0 ? (r[0] < 0 ? 'No phrase. The sect ends at the first empty row.' : `Phrase ${hx(r[0])}` + (isEmptyPhrase(S.phrases[r[0]]) ? ' (empty)' : '')) : `Transpose ${sgn(r[1])} semitones for this row`; }
   if (onPset()){ const len = plen(cPhrase), lpb = S.plpb[cPhrase] || 0, e2 = lpb || S.lpb;
@@ -16913,14 +17002,16 @@ function info(){
     if (c.y === 7) return 'Master ' + dB(curve(S.master)) + (fxCount(S.mfx) ? ' · FX ' + fxList(S.mfx) : '') + ' · SHIFT+▶ master effects';
     if (c.y === 5){
       const on = chainsFeed(c.x), flag = !!(S.chainOn && S.chainOn[c.x]);
-      return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · …chains ` + (on ? 'ON (track runs through the chains patch)'
+      const tg = !on && flag && busPlan().targets.get(c.x);
+      return `TRACK ${d2(c.x + 1)}${trkKind(c.x)} · …chains ` + (on ? 'ON (track runs through the chains patch)'
+        : tg ? 'BS: feeds the bus on ' + (tg.length > 1 ? 'tracks ' : 'track ') + tg.map(u => d2(u + 1)).join(', ') + ' (heard there, not on its own) · EDIT toggles'
         : flag ? 'MISS: patch needs a Chain Out set to track ' + d2(c.x + 1) + ' · EDIT toggles' : 'off · EDIT toggles');
     }
-    if (c.y === 6){ const on = !!(S.mix[c.x] && S.mix[c.x].sc);
-      return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · Sidechain Out ` + (on ? 'ON — this track feeds the sidechain bus (patch Sidechain In or a Sidechain Comp in …chains)' : 'off · EDIT toggles, to feed another track’s sidechain'); }
+    if (c.y === 6){ const U = sckUsesOf(c.x);
+      return `TRACK ${d2(c.x + 1)}${trkKind(c.x)} · SIDECHAIN SOURCE ` + (U.length ? 'for ' + U.map(u => u.where).join(', ') : 'for nothing yet · pick this track as Source on a compressor, gate, envelope filter or Sidechain In'); }
     if (c.y === 4){ const A = S.tfx[c.x], n = fxCount(A);
-      return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ${n}/${FXSLOTS} active` + (A.some(Boolean) ? ' · ' + fxList(A) : '') + ' · OPTION+▲▶ turn effects on, OPTION+▼◀ off (settings kept) · EDIT opens FX'; }
-    const m = S.mix[c.x]; return `TRACK ${d2(c.x + 1)}${isPolyT(c.x) ? ' POLY' : ' MONO'} · ${dB(trackGain(m.vol))} · ${panS(m.pan)}` + (m.mute ? ' · muted' : '') + (m.solo ? ' · solo' : '');
+      return `TRACK ${d2(c.x + 1)}${trkKind(c.x)} · ${n}/${FXSLOTS} active` + (A.some(Boolean) ? ' · ' + fxList(A) : '') + ' · OPTION+▲▶ turn effects on, OPTION+▼◀ off (settings kept) · EDIT opens FX'; }
+    const m = S.mix[c.x]; return `TRACK ${d2(c.x + 1)}${trkKind(c.x)} · ${dB(trackGain(m.vol))} · ${panS(m.pan)}` + (m.mute ? ' · muted' : '') + (m.solo ? ' · solo' : '');
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.info) return '';
   return typeof r.info === 'function' ? r.info(r.get ? r.get() : 0) : r.info;
@@ -17045,7 +17136,8 @@ function draw(){
   const rsel = y => sr && selA.line && y >= sr.y0 && y <= sr.y1 ? ' sel' : '';
   const cc = (x, y, base) => base + (sr && x >= sr.x0 && x <= sr.x1 && y >= sr.y0 && y <= sr.y1 ? ' sel' : '') + (c.x === x && c.y === y ? ' cur' : '');
   const mc = t => (S.mix[t].mute ? ' mu' : '') + (S.mix[t].solo ? ' so' : '');
-  const tk = t => t === MT ? ' gx' : isPolyT(t) ? ' gp' : ' gm';   // the track's group: pink mono, green poly
+  const tk = t => t === MT ? ' gx' : (isPolyT(t) ? ' gp' : ' gm') + (isBusT(t) ? ' bus' : '');   // the track's group: pink mono, green poly; BUS darker
+  const tkm = t => tk(t) + (t !== MT && isBusT(t) ? ' mbus' : '');   // the mixer's cells are bare text: a bus column gets a tint
   const playRows = test => { const s = new Set(); if (P) P.forEach(p => { const r = p && test(p); if (r != null) s.add(r); }); return s; };
   // Sect and Phrase light the playing row in place after the grid is built (see below), so the grid's text does
   // not change every row and is not rebuilt (innerHTML + layout, ~20 ms on a phone) 16 times a bar.
@@ -17075,7 +17167,7 @@ function draw(){
       L.push([{t:stepDec ? d2(y) : hx(y, 1), cls:'rn' + (y % 4 ? '' : ' rn4') + rsel(y), r:y}, ' ', {t:h2(r[0]), cls:cc(0, y, r[0] < 0 ? 'e' : 'v'), x:0, y}, ' ', {t:hx(r[1]), cls:cc(1, y, r[1] ? 'v' : 'e'), x:1, y}]); }
   } else if (tv === 'phrase' && pvActive()){ ({title, sub, pset, prLit} = pvLines(c, L, cc, rsel, playRows));   // PATTERN VIEW
   } else if (tv === 'phrase'){
-    title = 'PHRASE ' + hx(cPhrase); sub = cTrack === MT ? 'MASTER' : 'TRACK ' + d2(cTrack + 1) + (polyView() ? ' · POLY' : ' · MONO');
+    title = 'PHRASE ' + hx(cPhrase); sub = cTrack === MT ? 'MASTER' : 'TRACK ' + d2(cTrack + 1) + ' ·' + trkKind(cTrack);
     const poly = polyView(), mst = mstView(); if (mst && c.y >= 0 && c.x < FX0) c.x = FX0; else if (!poly && c.x >= 1 && c.x < NCOL) c.x = 0;
     const p = S.phrases[cPhrase], pr = playRows(q => q.phrase === cPhrase ? q.step : null), len = plen(cPhrase), lpb = S.plpb[cPhrase] || 0, el2 = lpb || S.lpb; prLit = pr;
     pset = [{t:'LEN ', cls:'lb'}, {t:d2(len), cls:cc(0, -2, 'v'), x:0, y:-2}, {t:' LPB ', cls:'lb'}, {t:lpb ? d2(lpb) : '--', cls:cc(1, -2, lpb ? 'v' : 'e'), x:1, y:-2},
@@ -17123,33 +17215,33 @@ function draw(){
     }
   } else if (tv === 'mixer'){
     const [T0, T1] = trackWin(c, 4); mixL = T0; mixN = T1 - T0; sub = trkSub(T0, T1);
-    const hd = ['    ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t) + tk(t) + ' gt', x:t, y:-1}, ' '); L.push(hd);
+    const hd = ['    ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t) + tkm(t) + ' gt', x:t, y:-1}, ' '); L.push(hd);
     ['VOL ', 'PAN ', 'MUT ', 'SOL '].forEach((n, y) => {
       const ln = [{t:n, cls:'lb'}];
       for (let t = T0; t < T1; t++){ const m = S.mix[t];
         const tx = y === 0 ? hx(m.vol) : y === 1 ? hx(m.pan) : y === 2 ? (m.mute ? 'MU' : '--') : (m.solo ? 'SO' : '--');
         const on = y < 2 || (y === 2 ? m.mute : m.solo);
-        ln.push({t:tx, cls:cc(t, y, on ? (y === 2 ? 'v mu2' : y === 3 ? 'v so2' : 'v') : 'e') + tk(t), x:t, y}, ' '); }
+        ln.push({t:tx, cls:cc(t, y, on ? (y === 2 ? 'v mu2' : y === 3 ? 'v so2' : 'v') : 'e') + tkm(t), x:t, y}, ' '); }
       L.push(ln);
     });
     const fl = [{t:'FX  ', cls:'lb'}];
-    for (let t = T0; t < T1; t++){ const n = fxCount(S.tfx[t]); fl.push({t:n ? d2(n) : '--', cls:cc(t, 4, n ? 'cf' : 'e') + tk(t), x:t, y:4}, ' '); }
+    for (let t = T0; t < T1; t++){ const n = fxCount(S.tfx[t]); fl.push({t:n ? d2(n) : '--', cls:cc(t, 4, n ? 'cf' : 'e') + tkm(t), x:t, y:4}, ' '); }
     L.push(fl);
     const cl = [{t:'CHN ', cls:'lb'}];
-    const ct = chainsTracks();
+    const ct = chainsTracks(), BT = busPlan().targets;
     for (let t = T0; t < T1; t++){
-      const on = chainsFeed(t), flag = !!(S.chainOn && S.chainOn[t]), tx = on ? 'ON' : flag && !ct.has(t) ? 'MISS' : '--';
-      cl.push({t:tx, cls:cc(t, 5, on ? 'cf' : flag ? 'v' : 'e') + tk(t), x:t, y:5}, ' ');
+      const on = chainsFeed(t), flag = !!(S.chainOn && S.chainOn[t]), bs = !on && flag && BT.has(t), tx = on ? 'ON' : bs ? 'BS' : flag && !ct.has(t) ? 'MISS' : '--';
+      cl.push({t:tx, cls:cc(t, 5, on || bs ? 'cf' : flag ? 'v' : 'e') + tkm(t), x:t, y:5, title:bs ? 'Track ' + d2(t + 1) + ' feeds the bus on track ' + BT.get(t).map(u => d2(u + 1)).join(', ') : undefined}, ' ');
     }
     L.push(cl);
-    const sl = [{t:'SC  ', cls:'lb', title:'Sidechain Out: send this track to the sidechain bus, which …chains modules (Sidechain In / Sidechain Comp) read as their sidechain'}];
-    for (let t = T0; t < T1; t++){ const on = !!(S.mix[t] && S.mix[t].sc); sl.push({t:on ? 'ON' : '--', cls:cc(t, 6, on ? 'cf' : 'e') + tk(t), x:t, y:6,
-      title:'Track ' + d2(t + 1) + ' Sidechain Out ' + (on ? 'on — this track feeds the sidechain bus' : 'off — EDIT/Enter sends this track to the sidechain bus (a Sidechain Comp ducks by it)')}, ' '); }
+    const sl = [{t:'SC  ', cls:'lb', title:'Sidechain source: lit when something listens to this track (a compressor, gate, envelope filter or Sidechain In with its Source on it)'}];
+    for (let t = T0; t < T1; t++){ const U = sckUsesOf(t), on = U.length > 0; sl.push({t:on ? 'ON' : '--', cls:cc(t, 6, on ? 'cf' : 'e') + tkm(t), x:t, y:6,
+      title:'Track ' + d2(t + 1) + (on ? ' is the sidechain source for ' + U.map(u => u.where).join(', ') : ': nothing listens to it as a sidechain')}, ' '); }
     L.push(sl);
     // Level meters, 8 lines of 6 dB each: red above −6 dB, yellow above −12.
     for (let k = 0; k < MH; k++){
       const ml = [{t:(k ? String(-6 * k) : '0').padStart(3) + ' ', cls:'lb'}];
-      for (let t = T0; t < T1; t++) ml.push({t:'  ', cls:'mt ' + (k === 0 ? 'm3' : k === 1 ? 'm2' : 'm1') + tk(t) + (k === MH - 1 ? ' gb' : '')}, ' ');
+      for (let t = T0; t < T1; t++) ml.push({t:'  ', cls:'mt ' + (k === 0 ? 'm3' : k === 1 ? 'm2' : 'm1') + tkm(t) + (k === MH - 1 ? ' gb' : '')}, ' ');
       L.push(ml);
     }
     const mn = fxCount(S.mfx);
@@ -17202,7 +17294,7 @@ function draw(){
   $('tTitle').textContent = title;
   // TITLE LINE FIT: "TRACK 02 · MONO" gets shorter when the line is tight: TRACK 02 (f3; the phrase's note columns show
   // mono or poly anyway, owner 20 Oct), then T02 (f4).
-  { const m = /^TRACK (\d+)(?: · (MONO|POLY))?$/.exec(sub), E = $('tSub');
+  { const m = /^TRACK (\d+)(?: · (MONO|POLY|BUS))?$/.exec(sub), E = $('tSub');
     if (E.dataset.t !== sub){ E.dataset.t = sub; E.title = m ? sub : '';
       if (m) E.replaceChildren(el('span', 'lfull', sub), el('span', 'lmid', 'TRACK ' + m[1]), el('span', 'lshort', 'T' + m[1])); else E.textContent = sub; } }
   queueMicrotask(thdFit);   // TITLE LINE FIT (after the switches beside it are set)
@@ -17893,7 +17985,7 @@ function deckStrip(){
   const anySolo = S.mix.some(m => m.solo); $('dkSolo').hidden = !anySolo || !deckShown();
   if (!deckShown() || !deck.strip) return;
   const t = dkTrack(), m = S.mix[t], poly = t >= polyFrom();
-  $('dkStripT').textContent = `TRACK ${d2(t + 1)} ${poly ? 'POLY' : 'MONO'}`;
+  $('dkStripT').textContent = `TRACK ${d2(t + 1)}${trkKind(t)}`;
   $('dkStripB').classList.toggle('gm', !poly); $('dkStripB').classList.toggle('gp', poly);
   const fy = stPos(m.vol); stVol.querySelector('.stcap').style.bottom = fy + 'px'; stVol.querySelector('.stfill').style.height = Math.max(0, fy - 8) + 'px';
   stVol.querySelector('.st0').style.bottom = stPos(TRK_UNITY) + 'px'; stVol.setAttribute('aria-valuenow', m.vol); stVol.setAttribute('aria-valuetext', dB(trackGain(m.vol)));
@@ -18373,13 +18465,14 @@ function drawArr(PH){
   const anySolo = S.mix.some(m => m.solo);
   let h = '';
   const PFg = polyFrom();   // each block carries its track's group, so the mono and poly sections take their colours
+  const BUS = busPlan().feeds;   // BUS: a bus track's column is a little darker
   const spAt = t => ms ? t > 0 && t === PFg : t > 0 && t % 8 === 0;   // where a spacer column sits before track t
   for (let y = 0; y < N; y++){
     h += `<div class="ar"><span class="rn${y % 4 ? '' : ' r4'}" data-ry="${y}">${rS(y, 3)}</span>`;
     for (let t = 0; t < NA; t++){
       if (spAt(t)) h += '<span></span>';
       const v = S.song[y][t];
-      let cls = t < PFg ? 'gm ' : 'gp ', lab = '', sty = '';
+      let cls = (t < PFg ? 'gm ' : 'gp ') + (BUS.has(t) ? 'bus ' : ''), lab = '', sty = '';
       if (v >= 0){
         const empty = isEmptySect(S.chains[v]), ph = firstPhrase(v);
         cls += empty ? 'z' : 'f'; lab = sectsOn || ph < 0 ? hx(v) : hx(ph);
@@ -18396,7 +18489,7 @@ function drawArr(PH){
     h += '</div>';
   }
   const PF = polyFrom();
-  const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (spAt(t) ? '<span></span>' : '') + `<i class="${t < PF ? 'gm' : 'gp'}${m.mute ? ' mu' : ''}">${t + 1}</i>`).join('') + (mx ? '<span></span><i class="gx">MS</i>' : '');
+  const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (spAt(t) ? '<span></span>' : '') + `<i class="${t < PF ? 'gm' : 'gp'}${m.mute ? ' mu' : ''}${isBusT(t) ? ' bus' : ''}"${isBusT(t) ? ` title="Track ${t + 1}: ${busOf(t)}"` : ''}>${t + 1}</i>`).join('') + (mx ? '<span></span><i class="gx">MS</i>' : '');
   // MONO and POLY tabs spanning their tracks' columns (track t sits in grid column 2 + t + one per 8-track gap before it).
   const col = t => 2 + t + (ms ? (t >= PF && PF > 0 ? 1 : 0) : Math.floor(t / 8)), rng = (a, b) => d2(a) + (b > a ? '–' + d2(b) : '');
   let gp = '';
@@ -19369,6 +19462,7 @@ const HEXK = '0123456789abcdef';
 function curKind(){ const c = cs[tv]; if (onPset()) return 'param'; if (GRIDV.has(tv)) return kindAt(tv, c.x); if (tv === 'mixer') return 'mix'; return 'param'; }
 function down1(){ const c = cs[tv], d = dims(tv); c.y = clamp(c.y + (GRIDV.has(tv) ? kStep : 1), 0, d.h - 1); }
 function typeNote(semi){
+  if (tv === 'phrase' && cTrack < NT) busHint(cTrack);
   if (rec.on && tp.on){ recKey(clamp(kOct * 12 + semi, 0, 119), audKey); return; }   // REC while playing: at the playhead, not the cursor
   const c = cs[tv]; if (tv !== 'phrase' || PK[c.x] !== 'note' || c.y < 0) return;
   const n = clamp(kOct * 12 + semi, 0, 119), x = c.x;
@@ -19564,7 +19658,7 @@ const HINTK = {
   sect:'Type hex · Enter add or open · Enter×2 new phrase · Del cell · Shift+Del line · [ ] other sect · Alt+→ open · Shift+arrows select',
   phrase:'Notes Z–; and Q–P · 1 off · / mute track · −/= octave · Del cell · Shift+Del row · Ins add row · Shift+arrows select · Shift+Alt+arrows other phrase · Ctrl+C/V',
   inst:'Ctrl+arrows change · Enter runs › rows · [ ] other instrument · Alt+← phrase',
-  mixer:'Type hex for VOL and PAN · FX row: Ctrl+▲▶ on (up to 4), Ctrl+▼◀ off · Enter mutes, solos, toggles CHN or opens FX · SC row: Enter sends to the sidechain bus · Del resets · Alt+→ FX · Alt+↑ back',
+  mixer:'Type hex for VOL and PAN · FX row: Ctrl+▲▶ on (up to 4), Ctrl+▼◀ off · Enter mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (Enter says for what) · Del resets · Alt+→ FX · Alt+↑ back',
   fx:'Type hex · Ctrl+arrows change · Enter adds · → opens its controls · Del removes or resets · [ ] other track · Alt+← mixer',
   project:'Ctrl+arrows change · Enter runs › rows · Del resets · Ctrl+S save · Shift+Ctrl+S save as · Ctrl+O open',
 };
@@ -19802,7 +19896,7 @@ function apStrip(want){
   const NA = ntr(), PF = polyFrom(), c = cs.song, PH = playhead(), on = apF === 'strip', sr = on && apSel ? apAsSong(selRect) : null;
   const cols = `2.6em repeat(${PF},minmax(0,1fr)) 3px repeat(${NA - PF},minmax(0,1fr)) 3px minmax(0,1fr)`;
   const cell = (y, t) => {
-    const v = S.song[y][t]; let cls = t === MT ? 'gx' : t < PF ? 'gm' : 'gp', lab = '';
+    const v = S.song[y][t]; let cls = (t === MT ? 'gx' : t < PF ? 'gm' : 'gp') + (isBusT(t) ? ' bus' : ''), lab = '';
     if (v >= 0){ const ph = firstPhrase(v); lab = t === MT ? hx(songShown(v)) : sectsOn || ph < 0 ? hx(v) : hx(ph);
       cls += t !== MT && blockMuted(S, y, t) ? ' m' : ' f'; if (PH && PH[t] === y) cls += ' p'; }
     if (sr && y >= sr.y0 && y <= sr.y1 && t >= sr.x0 && t <= sr.x1) cls += ' sl';
@@ -20384,7 +20478,7 @@ grid.addEventListener('pointerdown', e => {
 // The column under character ch of a track group's row (a column's leading space counts as that column).
 function pvColAt(g, ch){ let pos = 0; for (let j = 0; j < g.C.length; j++){ const x = g.C[j], end = pos + (j ? 1 : 0) + pvW(x); if (ch < end) return x; pos = end; } return g.C[g.C.length - 1]; }
 let pvUsesLast = null, pvSig = '', pvHoldX = false;   // pvHoldX: this draw keeps the sideways scroll (the wheel moved the row)
-const pvTk = t => t === MT ? ' gx' : isPolyT(t) ? ' gp' : ' gm';
+const pvTk = t => t === MT ? ' gx' : (isPolyT(t) ? ' gp' : ' gm') + (isBusT(t) ? ' bus' : '');
 const pvFitS = (s, w) => s.length > w ? s.slice(0, w) : s.padEnd(w);
 function pvBarDraw(y, rows, lpb, warn, warnT){
   let nm = ''; try { nm = typeof songSecName === 'function' ? String(songSecName(y) || '') : ''; } catch(e){}
@@ -20456,7 +20550,7 @@ function pvLines(c, L, cc, rsel, playRows){
   // 1: the track bands (number, MONO / POLY / MST)
   start(); lead();
   each(g => { if (g.fold) return put(pvFitS(g.t === MT ? 'MS' : d2(g.t + 1), stripW(g)), 'pvfh', to(g, null, null), {title:g.t === MT ? 'Master: nothing on this row' : 'Track' + (g.t1 > g.t ? 's ' + d2(g.t + 1) + '–' + d2(g.t1 + 1) : ' ' + d2(g.t + 1)) + ': nothing on this row'});
-    put(pvFitS(g.t === MT ? 'MST' : d2(g.t + 1) + (isPolyT(g.t) ? ' POLY' : ' MONO'), g.w), 'pvh' + pvTk(g.t) + (g.t < NT && S.mix[g.t] && S.mix[g.t].mute ? ' pvmu' : '') + (g.cur ? ' pvhc' : ''), to(g, null, null)); });
+    put(pvFitS(g.t === MT ? 'MST' : d2(g.t + 1) + trkKind(g.t), g.w), 'pvh' + pvTk(g.t) + (g.t < NT && S.mix[g.t] && S.mix[g.t].mute ? ' pvmu' : '') + (g.cur ? ' pvhc' : ''), to(g, null, null)); });
   end();
   // 2: the phrase (×N: on the song N times, so an edit changes every copy) and its instrument
   start(); lead();
@@ -20516,7 +20610,7 @@ function pvLines(c, L, cc, rsel, playRows){
   if (sig !== pvSig){ pvSig = sig; if (!pvHoldX) requestAnimationFrame(pvScroll); }
   pvHoldX = false;
   const lpb = S.plpb[cPhrase] || 0, el2 = lpb || S.lpb;
-  return {title:'PATTERN', sub:cTrack === MT ? 'MASTER' : 'TRACK ' + d2(cTrack + 1) + (isPolyT(cTrack) ? ' · POLY' : ' · MONO'), prLit:playRows(q => q.phrase === cPhrase ? q.step : null),
+  return {title:'PATTERN', sub:cTrack === MT ? 'MASTER' : 'TRACK ' + d2(cTrack + 1) + ' ·' + trkKind(cTrack), prLit:playRows(q => q.phrase === cPhrase ? q.step : null),
     pset:[{t:'PH ' + hx(cPhrase) + ' ', cls:'lb'}, {t:'LEN ', cls:'lb'}, {t:d2(curLen), cls:cc(0, -2, 'v'), x:0, y:-2}, {t:' LPB ', cls:'lb'}, {t:lpb ? d2(lpb) : '--', cls:cc(1, -2, lpb ? 'v' : 'e'), x:1, y:-2},
       {t:' 1/' + (el2 * 4) + (el2 % 3 === 0 ? ' trip' : '') + (lpb ? '' : ' song'), cls:'lb'}]};
 }
@@ -20541,7 +20635,7 @@ function pvScroll(){
 function pvInfo(){
   const base = info(); if (selA) return base;
   const c = cs.phrase, t = cTrack, u = (pvUsesLast || [])[cPhrase] || 0;
-  return (t === MT ? 'MASTER' : `TRACK ${d2(t + 1)} ${isPolyT(t) ? 'POLY' : 'MONO'}`) + ` · PH ${hx(cPhrase)}` + (c.y >= 0 ? ` · ROW ${rS(c.y)}` : '') + ' · ' + base
+  return (t === MT ? 'MASTER' : `TRACK ${d2(t + 1)}${trkKind(t)}`) + ` · PH ${hx(cPhrase)}` + (c.y >= 0 ? ` · ROW ${rS(c.y)}` : '') + ' · ' + base
     + (pvPend() ? ' · a new phrase: it goes on the song at this row when it has a note' : u > 1 ? ` · this phrase is on the song ${u} times, so edits change every copy` : '');
 }
 const pvHint = () => inMode === 'keys'

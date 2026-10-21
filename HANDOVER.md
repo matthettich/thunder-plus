@@ -24,6 +24,42 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 21 Oct: one Source for every sidechain (no mixer sidechain bus); bus tracks look darker
+
+Cache `thunderplus-v203`; desktop **v1.2.16** (pending: see below); `chains-worklet.js?v=34`, `waves-worklet.js?v=27` (shared blocks
+synced, MODFX regenerated). Owner: the single mixer sidechain bus was confusing ("what use cases does it solve?"); drop it,
+let each sidechain user pick its own source, keep the mixer's SC row as a light that shows a track is used as a sidechain;
+and make a track acting as a bus look a little darker on every screen so it isn't programmed by mistake.
+- **`sck`, one param** on Sidechain In, Sidechain Comp, Classic Comp, Noise Gate, Envelope Filter, Bus Comp, Glue Comp
+  (modules and MODFX slots): 0 = Self (Off on Sidechain In), 1–8 = Send n, 9 + t = track t (0-based; Track 1 = 9), max
+  136 (`SCK_MAX` = NSEND + CHAN_COUNT in the chains engine; the SHARED block has its own `SCK_TOP = 136` because …waves has
+  no CHAN_COUNT). Engine `ctx.key(sck)` → Float32Array or null (sends → `sendIn`, tracks → `ctx.tap`). Modules: patched SC
+  input wins, else `K = ctx.key(p.sck)`, else their own input. Editor: `SCK_OPTS(self)` / `SCK_P` in the SHARED EDITOR
+  block (…waves gets just Self). `addModule` (engine) and `normalize` (editor) convert old `src`/`snd`/`source` (the editor
+  can't know the song: the old bus becomes Self there).
+- **Host**: the mixer `scBus` is unconnected (`scv = 0`). `sckUses()` lists every user (chains modules plus `S.tfx`/`S.mfx`
+  slots with sck > 0); `keyTrackList()` = their distinct tracks (≤ 32) is what `tapNode()` merges (`chnTapList` is it now).
+  Track / master effects: the TFX worklet has 3 inputs (1 = the tap merger, 2 = `sendDly`), `tapMap` in processorOptions
+  and `{tapmap}` on its port; `fxKeySync(node, slots)` wires them (routeTrack, setMfx, after a tap rebuild).
+- **Old songs**: `scMigrate(j)` at the top of `normSong` (flag `sc2`; `freshSong` has it): Sidechain In `src`/`snd` →
+  sck; anything on the old bus (Sidechain Comp always, others with `source ≥ .5`, MODFX slots too) → the **lowest track
+  with SC on** (none: Self); then `m.sc = false`. `scConv` → `scNote()` toast once, at load / project open.
+- **Mixer SC row**: ON when `sckUsesOf(t)` isn't empty (title and info line list them); Enter / EDIT → `scSay(t)`; no more
+  toggling. CHN row: a source heard only through its bus shows **BS** (was MISS) with the bus track in the info line.
+- **Bus look**: `isBusT(t)` (= `busPlan().feeds.has(t)`), `trkKind(t)` → ' BUS' / ' POLY' / ' MONO' in every TRACK nn
+  label (info lines, Phrase / Pattern title, Pattern band, strip). Class `bus` on Arrange cells, the side strip, Song
+  classic grid and Pattern view cells (`filter:brightness(.78) saturate(1.15)`), Arrange's header number (bold underline,
+  title "bus of tracks …"), the mixer header; mixer cells get `mbus` (a 22 % track-colour tint, they're bare text).
+  `busHint(t)` once per track per session from `newBlock` and `typeNote`: `busNote` rides on the next toast ("New phrase 03
+  · … · track 04 is a bus of tracks 01, 02: notes here play through its chain too") or shows alone; toast() lets it stay
+  4.5 s.
+- Checked: node dsp_test (Bus Comp Self −2.5 dB, keyed by loud track 3 −20.1 dB; old `src` converts); headless app
+  with audio: a snare's Bus Comp keyed by a muted kick ducks, master Glue keyed by track 3, Send 1 into a track-FX Bus Comp
+  (0.036 → 0.011), migration (track-keyed → 11 with SC on tracks 3 and 4, sends kept, `sc` cleared, note once; no SC
+  tracks → Self; new songs untouched), SC light + Enter toast, bus look screenshots in plum and night (Arrange, Song,
+  Pattern, Mixer), bus 1 → 4 / Send 1 / tap / Glue bus 5 / renders + stems, editor (Source lists 41 with 32 tracks,
+  migration), …waves loads; mute and duplicate regression tests identical. Not heard by ear yet.
+
 ## 20 Oct (10): …chains buses, Sidechain Out (sends 1–8), sidechain from any track, Bus Comp and Glue Comp, 128 chain tracks
 
 Cache `thunderplus-v202`; desktop **v1.2.15** (20 Oct) has everything up to here; `chains-worklet.js?v=33`, `waves-worklet.js?v=26` (the shared blocks were synced:
