@@ -24,6 +24,34 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 21 Oct (3): engine controls in the middle; the sound view in the right column
+
+Cache `thunderplus-v205`. Owner (screenshot of Tone drum on the Desktop synth layout): the space under the Engine row
+"looks awkward on any synth engine aside from layers". It was empty because a non-Layers engine's card sat in the right
+column, and the waveform no longer grows into the room (19 Oct, so ◀ ▶ stay put).
+- `synDesk()` no longer moves `bassWrap/blipWrap/xWrap/voxWrap` into `#synRight`: they stay in `#main` before
+  `#layersBand` (where Layers has its strip and card), so the engine's sections spread across the middle (3 to 4 a row).
+  The Engine row doesn't move between engines (checked: same top for Tone drum, Blip, FM Drum, Skin, Breath, Table).
+- **Sound view** (`#sndWrap` / `.sndcard`, the engine cards' `--smp` colour): Desktop synth layout only, every engine but
+  Layers, in `#synRight` after `#fxWrap` (synDesk moves it; `sndVis()` from bassUI and synDesk shows it). Two screens in
+  the waveform's `--screen` colours:
+  - Spectrogram of the pad's render: `spgOf(c, cols, rows)` (2048-point Hann FFT with `SpecUtil.fft`, ≤ 480 × 260,
+    20 Hz–20 kHz log, 84 dB below the render's loudest point fades to the screen colour, gamma 1.3), kept on the render as
+    `c.spg` like `waveEnv`; `spgImg` paints it in the skin's colours (kept until those change). Lines at 100 / 1k / 10k
+    like the tracker SCOPE. Tap plays the pad.
+  - A playhead per sounding note (`sndPH`): from `vuHit` (taps, keys, MIDI: `sndHit(i, now, rate, mono)`) and `padBlink`
+    (the song with the synth open: `sndHit(pad, e.t, e.rate, false, e)`, following sample start / slices / reverse / cut).
+  - **Output** scope: an analyser tapped off `master` (rebuilt with the context), drawn from a rising zero crossing.
+  - Paints once per render / pad / resize (`drawWave` calls `sndSoon`); the rAF loop (`sndFrame`) runs only while
+    something sounds (`tp.on`, `audioWake` < 1.5 s, or a playhead), started by `synMeterOn` and `padBlink`.
+  - Live engines (Acid, Machine, Bass, Voice) have no pad effects, so the sound view is the right column's only card.
+  - State is `var` / function declarations on purpose: drawWave and bassUI can reach it during start-up.
+- Checked headless at 1000 (narrow: unchanged, sound view hidden), 1440 and 1920: Tone drum, Table, Acid on a synth slot,
+  Layers (unchanged: effects and voice cards on the right, no sound view), tap and song playback, no console errors.
+- To revert: put back the `ew` move in `synDesk()` (`r.prepend(...ew)` / `$('layersBand').before(...ew)`), and delete
+  `#sndWrap`, the `.snd*` CSS, the sound-view block after `drawWave`, and its calls (drawWave, bassUI, synDesk,
+  synMeterOn, vuHit, padBlink).
+
 ## 21 Oct (2): the Song screen's sections lane is only as wide as its names
 
 Cache `thunderplus-v204`. Owner (on the unfolded Fold): "the song window on mobile looks a little awkward because of the

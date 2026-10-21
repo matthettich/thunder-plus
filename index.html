@@ -373,6 +373,17 @@ body:not(.noed) .wvMobNote{display:none}
 .voicecard .ttl{font-size:var(--fs-4); font-weight:600}
 .voicecard .lbl{font-size:var(--fs-3); color:var(--muted)}
 .voicecard .sec h3::before{background:var(--famc)}
+/* the sound view (Desktop synth layout, engines other than Layers): the engine card's colour, and two monitor screens
+   like the waveform's: the render's spectrogram, and a scope of the output under it */
+.sndcard{--fam:var(--smp); border:3.5px solid var(--fam); background:var(--panel)}
+.sndcard>header{display:flex; align-items:baseline; gap:8px; padding:8px 8px 8px 12px; border-bottom:2px solid var(--fam); flex-wrap:wrap}
+.sndcard .ttl{font-size:var(--fs-4); font-weight:600}
+.sndcard .lbl{font-size:var(--fs-3); color:var(--muted)}
+.sndspec, .sndscope{position:relative; background:var(--screen)}
+.sndspec{height:clamp(170px, 30vh, 300px); cursor:pointer}
+.sndscope{height:92px; border-top:2px solid var(--fam)}
+.sndspec canvas, .sndscope canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
+.sndtag{position:absolute; left:8px; top:5px; font:var(--fs-2)/1.2 var(--mono, monospace); letter-spacing:.06em; text-transform:uppercase; color:var(--screen-ink); opacity:.7; pointer-events:none}
 /* 32-step sequencer: a compact grid of little bars */
 .stepgrid{display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:3px 6px; margin:6px 0}
 .stepgrid input[type=range]{width:100%; height:20px}
@@ -1089,8 +1100,8 @@ body.sdesk{display:grid; grid-template-columns:210px minmax(0,1fr) clamp(340px, 
 body.sdesk>.top{grid-column:1 / -1; grid-row:1}
 body.sdesk>#dock{grid-column:1; grid-row:2; height:auto; min-height:0; border-top:0; border-right:1px solid var(--line); padding:10px 12px 18px 10px; display:block; overflow-y:auto}
 body.sdesk>#main{grid-column:2; grid-row:2}
-/* An engine with no effects or voice controls (anything but Layers) leaves the right column empty: it folds away and
-   the sound's controls take the width. */
+/* A right column with nothing in it folds away and the middle takes the width (a fallback: Layers has its effects and
+   voice cards there, every other engine the sound view, under its effects if it has them). */
 body.sdesk:not(:has(#synRight > :not([hidden]))){grid-template-columns:210px minmax(0,1fr) 0}
 body.sdesk:not(:has(#synRight > :not([hidden]))) > #synRight{display:none}
 body.sdesk>#synRight{grid-column:3; grid-row:2; min-height:0; overflow-y:auto; overscroll-behavior:contain; border-left:1px solid var(--line); background:var(--bench)}
@@ -1963,6 +1974,19 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="secgrp"><div class="secgh">Envelopes</div><div class="secs" id="voiceEnvSecs"></div></div>
     <div class="secgrp"><div class="secgh">LFOs &amp; modulation</div><div class="secs" id="voiceModSecs"></div></div>
     <div class="secgrp"><div class="secgh">Tuning</div><div class="secs" id="voiceTuneSecs"></div></div>
+  </section>
+  </div>
+
+  <!-- The sound view: Desktop synth layout only, for every engine but Layers, in the right column under Effects
+       (synDesk() moves it there, sndVis() shows it). -->
+  <div class="cardwrap" style="padding-top:0" id="sndWrap" hidden>
+  <section class="sndcard" id="sndCard" aria-label="Sound view">
+    <header>
+      <span class="ttl" id="sndTtl">Sound</span>
+      <span class="lbl">time across, pitch up · tap to play</span>
+    </header>
+    <div class="sndspec"><canvas id="sndSpec" aria-label="Spectrogram of the pad's sound: time across, 20 Hz to 20 kHz up. A line runs across it while it plays. Tap to play"></canvas></div>
+    <div class="sndscope"><canvas id="sndScope" aria-label="Scope: the output's waveform while anything plays"></canvas><span class="sndtag">Output</span></div>
   </section>
   </div>
 </div>
@@ -7121,7 +7145,7 @@ function padLevel(){
 // The Synth page's output meter: runs while something sounds (and a moment after), then stops.
 let smRaf = 0, smLv = 0, smPk = 0, smPkT = 0;
 const smPos = a => a <= 0 ? 0 : Math.max(0, Math.min(1, (20 * Math.log10(a) + 48) / 54));
-function synMeterOn(){ if (!smRaf) smRaf = requestAnimationFrame(synMeterFrame); }
+function synMeterOn(){ if (!smRaf) smRaf = requestAnimationFrame(synMeterFrame); sndWake(); }
 function synMeterFrame(){
   smRaf = 0; const m = $('vMeter'); if (!m) return;
   const a = padLevel(), now = performance.now();
@@ -7200,7 +7224,7 @@ function play(i, vel = 1){
 // and the meters replay them in step with the sound.
 const hits = [];
 let vuRaf = 0, vuEls = [];
-function vuHit(i, rate, vel, mono){ const c = slotAt(cache, i); if (!c) return; slotAt(hits, i); if (!hits[i]) hits[i] = []; if (mono) hits[i].length = 0; hits[i].push({t0:ctx.currentTime, rate, vel, c}); if (hits[i].length > 8) hits[i].shift(); if (!vuRaf) vuRaf = requestAnimationFrame(vuFrame); }
+function vuHit(i, rate, vel, mono){ sndHit(i, ctx.currentTime, rate, mono); const c = slotAt(cache, i); if (!c) return; slotAt(hits, i); if (!hits[i]) hits[i] = []; if (mono) hits[i].length = 0; hits[i].push({t0:ctx.currentTime, rate, vel, c}); if (hits[i].length > 8) hits[i].shift(); if (!vuRaf) vuRaf = requestAnimationFrame(vuFrame); }
 function vuFrame(){
   vuRaf = 0; if (!ctx) return;
   const now = ctx.currentTime, H = slotAt(hits, cur) || []; let live = false;
@@ -10094,6 +10118,7 @@ function bassUI(){
   if (on){ for (const r of bassRows) r.refresh(); for (const f of bassSegs) f(); bassVizKick(); }
   if (vx){ for (const r of voxRows) r.refresh(); const ta = $('voxTxt'); if (document.activeElement !== ta) ta.value = XV().txt; voxSylShow(); }
   if (bl) for (const r of blipRows) r.refresh();
+  sndVis();
 }
 // The picture: each partial as a bar at its frequency (C2 to 20 kHz), at the wobble's position right now.
 let bvRaf = 0, bvCore = null;
@@ -10490,6 +10515,7 @@ function waveEnv(c){
 }
 function drawWave(){
   const cv = $('wave'); if (view !== 'synth' || !cv.clientWidth) return;   // hidden: painted when the synth page opens
+  sndSoon();   // the sound view's spectrogram follows the waveform (a new render, another pad, a resize)
   const dpr = window.devicePixelRatio || 1, w = Math.max(10, cv.clientWidth), h = cv.clientHeight || 150;
   cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
@@ -10512,6 +10538,166 @@ function drawWave(){
   meta.append(el('span', null, 'tap to play'));
 }
 window.addEventListener('resize', () => drawWave());
+
+/* ---------- sound view (Desktop synth layout; every engine but Layers) ----------
+   Owner, 21 Oct: with an engine's controls back in the middle, the right column has its effects and, under them, this:
+   the pad's render as a spectrogram (time across, 20 Hz–20 kHz up on a log scale, with the tracker SCOPE's lines at
+   100, 1k and 10k), a line that runs across it while the pad sounds (a tap, the keys, MIDI, or the song), and a scope
+   of the output while anything plays. The spectrogram is made once per render and size and kept on the render (like
+   waveEnv), and the animation only runs while there is sound, so it costs nothing while you're editing.
+   To remove: the #sndWrap HTML, the .snd* CSS, this block, and its calls (drawWave, bassUI, synDesk, synMeterOn,
+   vuHit, padBlink). */
+// (var and function declarations: drawWave() and bassUI() can reach these during start-up, before this block has run)
+var SPG_N = 2048, SPG_RANGE = 84;   // FFT size; the dB below the render's loudest point that fades to the screen colour
+var sndRaf = 0, sndQ = 0, sndAn = null, sndBuf = null, sndCol = null;
+var sndPH = [];   // playheads: {c, t0, rate, from, to, end} in seconds of the render and audio-context time
+function sndOn(){ const w = $('sndWrap'); return view === 'synth' && !!w && !w.hidden; }
+// A CSS colour as [r, g, b] (the canvas turns any colour into #rrggbb or rgba()).
+function rgbOf(css){
+  const g = rgbOf.g || (rgbOf.g = document.createElement('canvas').getContext('2d'));
+  g.fillStyle = '#000'; g.fillStyle = css || '#000'; const s = g.fillStyle;
+  if (s[0] === '#') return [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)];
+  const m = s.match(/[\d.]+/g) || [0, 0, 0]; return [+m[0], +m[1], +m[2]];
+}
+// Shown on the Desktop synth layout for any engine but Layers (Layers has its effects and voice cards there).
+function sndVis(){
+  const w = $('sndWrap'); if (!w) return;
+  const v = kit && kit.voices ? kit.voices[cur] : null;
+  const show = document.body.classList.contains('sdesk') && !!v && (isBassV(v) || isVoxV(v) || isBlipV(v) || isXEngV(v));
+  $('sndTtl').textContent = 'Sound · ' + (isSyn(cur) ? 'Synth ' : 'Pad ') + hx(cur);
+  if (w.hidden !== !show){ w.hidden = !show; if (!show && sndPH) sndPH.length = 0; }
+  if (show) sndSoon();
+}
+// The render's spectrogram as cols × rows of 0..1 (row 0 = 20 kHz), kept on the render.
+function spgOf(c, cols, rows){
+  if (c.spg && c.spg.d === c.data && c.spg.cols === cols && c.spg.rows === rows) return c.spg;
+  const d = c.data, n = d.length, N = SPG_N, H = N >> 1, ny = c.sr / 2, re = new Float64Array(N), im = new Float64Array(N), pw = new Float64Array(H);
+  const win = spgOf.win || (spgOf.win = Float64Array.from({length:N}, (_, i) => 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N)));
+  // each row: its centre bin (read between bins where they're wider than a row, at the bottom) and the bins it covers
+  const bc = new Float32Array(rows), b0 = new Int32Array(rows), b1 = new Int32Array(rows);
+  for (let y = 0; y < rows; y++){
+    const fOf = r => 20 * Math.pow(1000, 1 - r / rows);
+    bc[y] = fOf(y + 0.5) / ny * H; b0[y] = Math.max(1, Math.floor(fOf(y + 1) / ny * H)); b1[y] = Math.ceil(fOf(y) / ny * H);
+  }
+  const db = new Float32Array(cols * rows).fill(-200), hop = n / cols, ref = 20 * Math.log10(N / 4);   // 0 dB: a full-scale sine
+  let top = -200;
+  for (let x = 0; x < cols; x++){
+    const s = Math.round((x + 0.5) * hop) - H;
+    for (let i = 0; i < N; i++){ const k = s + i; re[i] = k >= 0 && k < n ? d[k] * win[i] : 0; im[i] = 0; }
+    SpecUtil.fft(re, im);
+    for (let b = 0; b < H; b++) pw[b] = re[b] * re[b] + im[b] * im[b];
+    for (let y = 0; y < rows; y++){
+      if (bc[y] >= H - 1) continue;   // above the render's top frequency
+      let p;
+      if (b1[y] - b0[y] <= 1){ const i0 = Math.floor(bc[y]), f = bc[y] - i0; p = pw[i0] * (1 - f) + pw[i0 + 1] * f; }
+      else { p = 0; for (let b = b0[y], e = Math.min(H - 1, b1[y]); b <= e; b++) if (pw[b] > p) p = pw[b]; }
+      const v = 10 * Math.log10(p + 1e-24) - ref; db[x * rows + y] = v; if (v > top) top = v;
+    }
+  }
+  const lv = new Float32Array(cols * rows), lo = top - SPG_RANGE;
+  for (let i = 0; i < lv.length; i++){ const t = (db[i] - lo) / SPG_RANGE; lv[i] = t <= 0 ? 0 : t >= 1 ? 1 : Math.pow(t, 1.3); }
+  return c.spg = {d, cols, rows, lv, img:null, key:''};
+}
+// The spectrogram painted in the screen's colours (kept until the skin changes).
+function spgImg(S, bg, ink){
+  const key = bg.join() + '/' + ink.join(); if (S.img && S.key === key) return S.img;
+  const cv = document.createElement('canvas'); cv.width = S.cols; cv.height = S.rows;
+  const g = cv.getContext('2d'), im = g.createImageData(S.cols, S.rows), p = im.data;
+  for (let x = 0; x < S.cols; x++) for (let y = 0; y < S.rows; y++){
+    const t = S.lv[x * S.rows + y], o = (y * S.cols + x) * 4;
+    p[o] = bg[0] + (ink[0] - bg[0]) * t; p[o + 1] = bg[1] + (ink[1] - bg[1]) * t; p[o + 2] = bg[2] + (ink[2] - bg[2]) * t; p[o + 3] = 255;
+  }
+  g.putImageData(im, 0, 0); S.img = cv; S.key = key; return cv;
+}
+function sndFit(cv){
+  const dpr = Math.min(2, devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return null;
+  const W = Math.round(w * dpr), H = Math.round(h * dpr); if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
+  return {g:cv.getContext('2d'), W, H, w, h, dpr};
+}
+function sndSpecPaint(){
+  const F = sndFit($('sndSpec')); if (!F) return;
+  const {g, W, H, w, h, dpr} = F, C = sndCol, c = slotAt(cache, cur);
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  if (c && c.data && c.data.length){
+    const S = spgOf(c, Math.max(64, Math.min(480, Math.round(w))), Math.max(64, Math.min(260, Math.round(h))));
+    g.imageSmoothingEnabled = true; g.drawImage(spgImg(S, C.bgR, C.inkR), 0, 0, W, H);
+  }
+  // 100, 1k and 10k, as on the tracker's SCOPE (here up the side: 20 Hz at the bottom, 20 kHz at the top)
+  g.font = `${10 * dpr}px ${C.font}`; g.textBaseline = 'bottom';
+  for (const f of [100, 1000, 10000]){
+    const y = Math.round((1 - Math.log(f / 20) / Math.log(1000)) * H);
+    g.fillStyle = C.line; g.globalAlpha = 0.55; g.fillRect(0, y, W, dpr); g.globalAlpha = 0.75;
+    g.fillStyle = C.ink; g.fillText(f >= 1000 ? f / 1000 + 'k' : String(f), 4 * dpr, y - 2 * dpr); g.globalAlpha = 1;
+  }
+  // where each sounding note is in the render: a line with the screen colour either side, so it shows on any part
+  if (sndPH.length && ctx){
+    const t = ctx.currentTime - (ctx.outputLatency || ctx.baseLatency || 0);
+    for (const p of sndPH){
+      if (t < p.t0 || p.c !== c) continue;
+      const pos = p.from + (t - p.t0) * p.rate * (p.to < p.from ? -1 : 1), x = pos / (c.data.length / c.sr) * W;
+      if (x < 0 || x > W) continue;
+      g.fillStyle = C.bg; g.fillRect(x - 2 * dpr, 0, 4 * dpr, H); g.fillStyle = C.ink; g.fillRect(x - dpr / 2, 0, dpr, H);
+    }
+  }
+}
+// The output, tapped off the master (pads, keys, MIDI and the song: what you hear). Rebuilt with the audio context.
+function sndAnalyser(){
+  if (!ctx || !master) return null;
+  if (sndAn && sndAn.context === ctx && sndAn._m === master) return sndAn;
+  try { if (sndAn && sndAn._m) sndAn._m.disconnect(sndAn); } catch(e){}
+  try { const a = ctx.createAnalyser(); a.fftSize = 2048; master.connect(a); a._m = master; sndAn = a; sndBuf = new Float32Array(a.fftSize); }
+  catch(e){ sndAn = null; }
+  return sndAn;
+}
+function sndScopePaint(live){
+  const F = sndFit($('sndScope')); if (!F) return;
+  const {g, W, H, dpr} = F, C = sndCol, mid = H / 2;
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  g.fillStyle = C.line; g.fillRect(0, Math.round(mid), W, dpr);
+  const a = live ? sndAnalyser() : null; if (!a) return;
+  a.getFloatTimeDomainData(sndBuf);
+  // start on a rising zero crossing, so a steady tone stands still instead of sliding about
+  const b = sndBuf, span = 1536; let s = 0;
+  for (let i = 1; i < b.length - span; i++) if (b[i - 1] <= 0 && b[i] > 0){ s = i; break; }
+  g.strokeStyle = C.ink; g.lineWidth = 1.5 * dpr; g.lineJoin = 'round'; g.beginPath();
+  for (let x = 0; x <= W; x++){
+    const v = b[s + Math.min(span - 1, Math.floor(x / W * span))], y = mid - Math.max(-1, Math.min(1, v)) * (mid - 3 * dpr);
+    if (x) g.lineTo(x, y); else g.moveTo(x, y);
+  }
+  g.stroke();
+}
+function sndColours(){
+  const bg = cssv('--screen') || '#000', ink = cssv('--screen-ink') || '#fff';
+  sndCol = {bg, ink, line:cssv('--screen-line') || '#3a3a3a', bgR:rgbOf(bg), inkR:rgbOf(ink), font:cssv('--font') || 'sans-serif'};
+}
+// A still picture (a new render, another pad, a resize, a skin), then the animation if anything's sounding.
+function sndSoon(){ if (!sndQ) sndQ = requestAnimationFrame(() => { sndQ = 0; if (!sndOn()) return; sndColours(); sndSpecPaint(); sndScopePaint(false); sndWake(); }); }
+function sndWake(){ if (!sndRaf && sndOn()) sndRaf = requestAnimationFrame(sndFrame); }
+function sndFrame(){
+  sndRaf = 0; if (!sndOn()) return; if (!sndCol) sndColours();
+  const t = ctx ? ctx.currentTime - (ctx.outputLatency || ctx.baseLatency || 0) : 0;
+  for (let i = sndPH.length - 1; i >= 0; i--) if (t > sndPH[i].end) sndPH.splice(i, 1);
+  const live = !!ctx && (tp.on || performance.now() - audioWake < 1500 || sndPH.length > 0);
+  sndSpecPaint(); sndScopePaint(live);
+  if (live) sndRaf = requestAnimationFrame(sndFrame);
+}
+// A note of pad i starts at audio time t0 (now, or ahead for the song) at a playback rate; ev is the song's note, for
+// where in the render it starts (sample start, a slice) and whether it plays backwards. mono: a retrigger, so it
+// replaces the pad's earlier line.
+function sndHit(i, t0, rate, mono, ev){
+  if (i !== cur || !sndOn()) return;
+  const c = slotAt(cache, i); if (!c || !c.data || !c.data.length || !(rate > 0)) return;
+  const dur = c.data.length / c.sr; let from = 0, to = dur;
+  if (ev){
+    const sl = ev.ofsSec != null, s0 = sl ? ev.ofsSec : clamp(ev.ofs || 0, 0, 255) / 256 * dur, e0 = sl ? Math.min(dur, ev.ofsSec + (ev.durSec || dur)) : dur;
+    if (ev.rev){ from = sl ? e0 : dur - s0; to = sl ? s0 : 0; } else { from = s0; to = e0; }
+  }
+  let end = t0 + Math.abs(to - from) / rate; if (ev && ev.cut != null) end = Math.min(end, ev.cut);
+  if (mono) sndPH.length = 0;
+  sndPH.push({c, t0, rate, from, to, end}); if (sndPH.length > 8) sndPH.shift();
+  sndWake();
+}
+$('sndSpec').addEventListener('pointerdown', () => play(cur));
 
 /* ---------- randomisers ---------- */
 const rnd = (a, b) => a + Math.random() * (b - a), rint = (a, b) => Math.round(rnd(a, b)), logr = (a, b) => a * Math.pow(b / a, Math.random());
@@ -14662,6 +14848,7 @@ function pumpRun(){
 // With the synth open, light each pad as the tracker plays it (in time with the sound).
 function padBlink(e){
   if (view === 'tracker' || !padEls[e.pad]) return;
+  if (sndOn()){ let au = true; try { au = audible(e.track); } catch(err){} if (au) sndHit(e.pad, e.t, e.rate, false, e); sndWake(); }   // the sound view's line, and its scope
   const ms = Math.max(0, (e.t - ctx.currentTime + (ctx.outputLatency || ctx.baseLatency || 0)) * 1000);
   setTimeout(() => { if (tp.on && view !== 'tracker' && audible(e.track)) flash(e.pad); }, ms);
 }
@@ -19994,10 +20181,12 @@ function synDesk(){
   B.toggle('sdesk', on); if (r) r.hidden = !on;
   const fx = $('fxWrap'), vc = $('voiceWrap');
   if (r && fx && vc){ if (on && fx.parentElement !== r) r.append(fx, vc); else if (!on && fx.parentElement === r) $('main').append(fx, vc); }
-  // An engine other than Layers has no effects or voice cards, so its own controls (Bass, Blip, Voice, or the engine's
-  // card) take the right column instead, scrolling on their own beside the pad and its waveform.
-  const ew = ['bassWrap', 'blipWrap', 'xWrap', 'voxWrap'].map(id => $(id)).filter(Boolean);
-  if (r && ew.length){ if (on && ew[0].parentElement !== r) r.prepend(...ew); else if (!on && ew[0].parentElement === r) $('layersBand').before(...ew); }
+  // An engine other than Layers keeps its own controls (Bass, Blip, Voice, or the engine's card) in the middle, under
+  // the Engine row, where Layers has its strip and layer card (owner, 21 Oct: the middle sat empty while they were in
+  // the right column). The right column has its effects, if it has any, and the sound view under them.
+  const sw = $('sndWrap');
+  if (r && sw){ if (on && sw.parentElement !== r) fx.after(sw); else if (!on && sw.parentElement === r) $('main').append(sw); }
+  sndVis();
   if (on !== was) drawWave();
 }
 addEventListener('resize', synDesk);
