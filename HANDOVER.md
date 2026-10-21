@@ -2097,8 +2097,15 @@ A code review (audio, storage, UI, DSP) found these; all fixed and checked headl
    a kit-voice limit that stays). What has to change, checked 20 Oct:
    - **Block mutes** and **song files**: done 20 Oct (9) (`setBlockMute` / `smuteX`, `songOut` / `songX`), tested with a
      `NT = 128` debug copy. Older versions and Thunder Perform's deck open such songs with tracks 1–32 and the master.
-   - **Sidechain by track**: `tapNode()` is one 32-input ChannelMerger feeding …chains' input 2 (Web Audio caps a node at
-     32 channels); …chains' Track In says 1–32. Wire in only the tracks a Sidechain In picks. Medium; can come later.
+   - **…chains only knows 32 tracks**: `CHAN_COUNT = 32` in `chains/chains-worklet.js` (Track In / Chain Out `track`
+     params, the per-track buffers `busesL/R` and `_tmpL/R`, the node's own `track`, two per-block loops) and 17 uses in
+     `chains/index.html` (the pickers). Tracks 33+ can't run through …chains until it's raised to NT. Small.
+   - **Sidechain by track**: `tapNode()` is one 32-input ChannelMerger feeding every …chains node's input 2 (Web Audio
+     caps a node at 32 channels). Plan (owner agreed 20 Oct, not built): merge only the tracks the patch's Sidechain In
+     modules pick (`src` > 0), send the worklet a track → channel map for `ctx.tap`, rewire when the picks change
+     (`chnDiff`). Limit becomes 32 different source tracks at once (a source shared by several tracks counts once);
+     each track's chain is its own node, so pairs stay independent (3 ducked by 2, 4 by 6). A `src` outside the map
+     falls back to the sidechain bus (the owner won't modulate `src`). Medium.
    - **Screens**: Arrange with 129 columns needs more zoom / sideways scroll (side panel especially) and may need to draw
      only the visible cells (~33,000 at 256 rows); 3-digit track numbers in labels. Medium.
    - **Thunder Perform** (`matthettich/thunder-perform-`) runs this app as its decks (submodule on the `deck` branch):
