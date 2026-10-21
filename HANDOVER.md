@@ -24,6 +24,23 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 21 Oct (6): Shift-click and Shift-drag select in Arrange; the selection in its own colour
+
+Cache `thunderplus-v208`. Owner: "in arrange mode, can we make shift + click select phrases? Shift+click+drag could as
+well", then: Shift-click 1 then Shift-click 5 should select everything between, and the selection was hard to see.
+- `sxDown()` (SONG EXTRAS mouse, Arrange as the Song screen and the side Arrange with the keys): a Shift press captures
+  the pointer and returns true, so it is never a tap, hold-to-mute or block move. `sxEnd()`: a Shift-click without moving
+  starts a selection on that cell when there is none (`selA` there, toast "Selecting from here…"), else moves the
+  cursor end, so the rectangle runs from the first Shift-click to this one. A Shift-drag goes through `sxStart()`'s select
+  branch (`d.sel`/`d.filled` false), so it draws a new selection even when it starts on a block. `sxSelToast()` is the
+  shared "n cells selected" toast.
+- Colour: `.tarr{--ar-sel}` amber, sky blue on the amber/orange skins (the same list as PATTERN VIEW's `--pv-sel`);
+  `b.sl` (and the drop target `b.dt`) use it instead of `--ar-cur`. On the Simple / Matrix skins `--ar-cur` is the
+  blocks' colour, and their more specific `b.f` rule (background shorthand, glow box-shadow) wiped the tint and outline
+  off selected blocks entirely, so `b.sl` now uses `!important`.
+- Checked headless on mustard: Shift-click 0:0 → 1 cell, Shift-click 0:2 → 3, then 2:4 → 15; Escape clears; a Shift-drag
+  from a block to 3:1 → 8 cells and nothing moved; no errors.
+
 ## 21 Oct (5): one line between CLICK and OCT
 
 Cache `thunderplus-v207`. Owner: the line between CLICK and OCT on the tracker's top strip looked thick. CLICK's right

@@ -930,10 +930,17 @@ body.asong .tagrid .rn{text-align:right; padding-right:7px}
 .agbox{position:absolute; box-sizing:border-box; border:2px solid var(--tk); border-radius:4px}
 .agbox.gm{--tk:var(--tk-mono)} .agbox.gp{--tk:var(--tk-poly)} .agbox.gx{--tk:var(--tk-mst)}
 body.asong .tagrid .rn, body.asong .tath{font-size:var(--fs-2)}
-.tarr .tagrid b.sl{box-shadow:inset 0 0 0 2px var(--ar-cur); background-image:linear-gradient(color-mix(in srgb, var(--ar-cur) 22%, transparent), color-mix(in srgb, var(--ar-cur) 22%, transparent))}
+/* The song selection in its own colour (owner, 21 Oct, mustard skin): it was the cursor's colour, which on the Simple and
+   Matrix skins is the blocks' colour too, so a selection looked like more blocks. Amber, or sky blue on the amber and
+   orange skins, as PATTERN VIEW's selection in the phrase. */
+.tarr{--ar-sel:#f0b429}
+:root:is([data-skin="night"],[data-skin="mustard"],[data-skin="citrus"],[data-skin="contrast"],[data-skin="sunset"],[data-skin="desert"],[data-skin="complement"],[data-skin="espresso"]) .tarr{--ar-sel:#3fa7e0}
+/* !important: the Simple and Matrix skins' block rule (background shorthand, glow box-shadow) is more specific and
+   wiped the tint and outline off selected blocks, so only empty cells showed it. */
+.tarr .tagrid b.sl{box-shadow:inset 0 0 0 2px var(--ar-sel) !important; background-image:linear-gradient(color-mix(in srgb, var(--ar-sel) 55%, transparent), color-mix(in srgb, var(--ar-sel) 55%, transparent)) !important}
 /* ===== SONG EXTRAS (see the JS block of the same name): drop targets, the drag tag, the right-click menu, the section
    lane, the loop's row numbers, the phrase peek and its DOGS | PEEK switch ===== */
-.tarr .tagrid b.dt{outline:2px dashed var(--ar-cur); outline-offset:-2px; background-image:linear-gradient(color-mix(in srgb, var(--ar-cur) 30%, transparent), color-mix(in srgb, var(--ar-cur) 30%, transparent))}
+.tarr .tagrid b.dt{outline:2px dashed var(--ar-sel); outline-offset:-2px; background-image:linear-gradient(color-mix(in srgb, var(--ar-sel) 40%, transparent), color-mix(in srgb, var(--ar-sel) 40%, transparent)) !important}
 .tagrid.sxdrag, .tagrid.sxdrag b{cursor:grabbing}
 .sxtag{position:fixed; z-index:1000; pointer-events:none; padding:3px 8px; font:600 var(--fs-2)/1.4 var(--mono); background:var(--ink); color:var(--inv); white-space:nowrap}
 .sxtag.err{background:#a3261e; color:#fff}
@@ -18937,6 +18944,14 @@ function sxDown(e){
   if (e.button !== 0) return false;
   const b = e.target.closest('b[data-y]'); if (!b) return false;
   const y = +b.dataset.y, t = +b.dataset.t, r = sxRect(), filled = S.song[y][t] >= 0;
+  // Shift (owner, 21 Oct): the first Shift-click starts a selection on that cell and the next selects everything between
+  // (with a selection already there it reaches from its corner); a Shift-drag draws a new selection from where it
+  // started, on blocks too (a plain drag on a block moves it). Never a tap, a hold-to-mute or a move.
+  if (e.shiftKey && !e.altKey){
+    e.preventDefault(); try { arrGrid.setPointerCapture(e.pointerId); } catch(_){}
+    sxDrag = {id:e.pointerId, x0:e.clientX, y0:e.clientY, y, t, mode:null, shift:true, alt:false, sel:false, filled:false, last:{y, t}, ev:e};
+    return true;
+  }
   sxDrag = {id:e.pointerId, x0:e.clientX, y0:e.clientY, y, t, mode:null, alt:e.altKey, sel:sxIn(r, y, t), filled, last:{y, t}, ev:e};
   // Alt on a block waits to see whether it's a click (mute, as before) or the start of an Alt-drag copy.
   if (e.altKey){ e.preventDefault(); try { arrGrid.setPointerCapture(e.pointerId); } catch(_){} return true; }
@@ -19005,10 +19020,17 @@ function sxEnd(e){
   for (const b of sxMarks) b.classList.remove('dt', 'dtx'); sxMarks = [];
   if (sxTag){ sxTag.remove(); sxTag = null; }
   if (e.type === 'pointercancel') return;
+  if (!d.mode && d.shift){   // Shift-click: the first starts a selection on this cell, the next selects everything between
+    const first = !(selA && selA.v === 'song');
+    if (first) selA = {x:d.t, y:d.y, v:'song'};
+    cs.song.x = d.t; cs.song.y = d.y; if (d.t !== MT && !(apReady && apF)) cTrack = d.t;
+    draw(); if (first) toast('Selecting from here · Shift-click another block to select everything between'); else sxSelToast(); return;
+  }
   if (!d.mode){ if (d.alt){ toggleBlockMute(d.y, d.t); } return; }   // Alt-click without a drag: mute, as before
-  if (d.mode === 'select'){ const r = selRect(), n = sxCols(r).length * (r.y1 - r.y0 + 1); toast(`${n} cell${n > 1 ? 's' : ''} selected · drag them to move, Alt-drag to copy, right-click for more`); return; }
+  if (d.mode === 'select'){ sxSelToast(); return; }
   sxAim(d, e); sxApply(d);
 }
+function sxSelToast(){ const r = selRect(), n = sxCols(r).length * (r.y1 - r.y0 + 1); toast(`${n} cell${n > 1 ? 's' : ''} selected · drag them to move, Alt-drag to copy, right-click for more`); }
 // Blocks land where they were dropped: a move takes them away from where they were, a copy leaves them (copies use the
 // same phrases, like paste; Clone in the menu makes new ones). Empty cells in the selection don't wipe what's there.
 function sxApply(d){
