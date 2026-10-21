@@ -26,7 +26,7 @@ Keep this file up to date at the end of a work session.
 
 ## 20 Oct (10): …chains buses, Sidechain Out (sends 1–8), sidechain from any track, Bus Comp and Glue Comp, 128 chain tracks
 
-Cache `thunderplus-v202`; `chains-worklet.js?v=33`, `waves-worklet.js?v=26` (the shared blocks were synced:
+Cache `thunderplus-v202`; desktop **v1.2.15** (20 Oct) has everything up to here; `chains-worklet.js?v=33`, `waves-worklet.js?v=26` (the shared blocks were synced:
 `python3 tools/sync-shared.py`; MODFX regenerated: `node tools/modfx.mjs`). Owner: do the two more-tracks fixes for
 …chains, a Sidechain Out module, buses (several tracks summed through a chain to another track, "like a DAW": each
 source after its own fader), and stereo Bus Comp + Glue Comp (two modules).
@@ -2146,7 +2146,6 @@ A code review (audio, storage, UI, DSP) found these; all fixed and checked headl
      `NT = 128` debug copy. Older versions and Thunder Perform's deck open such songs with tracks 1–32 and the master.
    - **…chains' track limit** and **sidechain by track**: done 20 Oct (10) (`CHAN_COUNT = 128`, pickers follow the
      app's NT; `chnTapList` / `tapmap`).
-   - (Sidechain by track: see above, done.)
    - **Screens**: Arrange with 129 columns needs more zoom / sideways scroll (side panel especially) and may need to draw
      only the visible cells (~33,000 at 256 rows); 3-digit track numbers in labels. Medium.
    - **Thunder Perform** (`matthettich/thunder-perform-`) runs this app as its decks (submodule on the `deck` branch):
