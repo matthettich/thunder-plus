@@ -24,6 +24,29 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 20 Oct (9): groundwork for more than 32 tracks (mutes and the song file), nothing changes at 32
+
+Cache `thunderplus-v201`. Owner: do steps 1 and 2 of "More tracks than 32" (Open items 9) now; the GUI and the mono / poly
+split come later. `NT` is still 32, so the app behaves and saves exactly as before.
+- **Block mutes** go through `blockMuted(Sx, y, t)` / `setBlockMute(y, t, on)` / `smuteInsertRows(at, h)` /
+  `mutedCount()` (beside `blockMuted`); nothing else touches `S.smute`. Tracks 1–32 stay in `smute[y]`; tracks 33+ (only
+  when NT > 32) in `S.smuteX[y]`, 32-bit words (word k bit b = track 33 + 32k + b), made on the first such mute and
+  removed when empty, so with 32 tracks it never exists. normSong reads `smuteX` only when NT > 32.
+- **Song file**: `songOut(Sx)` is what storage (`storeWrite(TK…)`, 3 places) and project files (`projBlob`) write. With
+  NT ≤ 32 it returns the song itself. Above, each row is tracks 1–32 + the master (33 numbers, as every version reads) and
+  tracks 33+ go in `songX[row]` (trailing empties trimmed, null when empty). normSong: a row of NT + 1 numbers (in
+  memory: undo steps, or anything while NT is 32) is read as it is; a row of 33 with NT > 32 takes the master from slot
+  32 and tracks 33+ from `songX`. Undo snapshots keep the in-memory shape.
+- To raise the limit later: `NT` (and TRACKS' clamp, 8–NT already), then the screens, the mono / poly split and sidechain
+  by track (Open items 9). Opening a bigger song in an older version keeps tracks 1–32 and the master; saving it there
+  drops the rest.
+- Checked headless: every mute path (hold, Alt-click, M, the menu over a selection, Insert / Ctrl+Backspace / Shift+Del in
+  a column, Delete, undo, Ctrl+D pattern and track with notes, drag move, Alt-drag copy, the muted count) gives identical
+  results in the old and new builds; storage and the project file are byte-for-byte the song as before; the duplicate
+  tests identical. A debug copy with `NT = 128`: mutes on tracks 33 and 100 (no aliasing onto 1), save → 33-number rows
+  + songX, reopen, undo, an old 33-number file (the master stays the master); that 128-track song opened in this build and
+  in the previous one keeps tracks 1–32, their mutes and the master.
+
 ## 20 Oct (8): Renoise's Ctrl+D; clones on Ctrl+Alt+C / Ctrl+Shift+C
 
 Cache `thunderplus-v200`. Desktop **v1.2.14** (20 Oct) has everything up to here. Owner: has used Renoise's Ctrl+D (both: sequencer and pattern editor, by context); keep Thunder's
@@ -2072,11 +2095,8 @@ A code review (audio, storage, UI, DSP) found these; all fixed and checked headl
 9. **More tracks than 32 (up to 128): planned, not started** (owner, 20 Oct: likely wanted later; the GUI and the
    mono / poly split need deciding first; few old songs to worry about). TRACKS is 8–32 now (24 with a voice per track,
    a kit-voice limit that stays). What has to change, checked 20 Oct:
-   - **Block mutes** are one 32-bit number per song row (`S.smute[y]`, `1 << t`, ~14 places): track 33's bit would be
-     track 1's. Small.
-   - **Song files** keep the master column at slot 32 of each row (`S.song[y][MT]`, `MT = NT = 32`). Plan: leave tracks
-     1–32 and the master where they are in the file and save tracks 33+ (and their mutes) in a separate section, so
-     older versions and Thunder Perform's deck still open new songs (without the extra tracks). Small.
+   - **Block mutes** and **song files**: done 20 Oct (9) (`setBlockMute` / `smuteX`, `songOut` / `songX`), tested with a
+     `NT = 128` debug copy. Older versions and Thunder Perform's deck open such songs with tracks 1–32 and the master.
    - **Sidechain by track**: `tapNode()` is one 32-input ChannelMerger feeding …chains' input 2 (Web Audio caps a node at
      32 channels); …chains' Track In says 1–32. Wire in only the tracks a Sidechain In picks. Medium; can come later.
    - **Screens**: Arrange with 129 columns needs more zoom / sideways scroll (side panel especially) and may need to draw

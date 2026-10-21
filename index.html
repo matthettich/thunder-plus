@@ -7393,7 +7393,7 @@ function instFit(){
     I.pad = want; I.kf = isSyn(want) ? 1 : 0; ch = true; }
   if (!ch) return;
   if (!undo.pend) undo.cur = JSON.stringify(S);   // part of the kit change, not a song edit of its own
-  clearTimeout(sT); sT = setTimeout(() => storeWrite(TK, JSON.stringify(S)), 600); songVer++;
+  clearTimeout(sT); sT = setTimeout(() => storeWrite(TK, JSON.stringify(songOut(S))), 600); songVer++;
 }
 function setSlotKind(i, held){
   if (vtrk) return toast('A voice per track is on (Settings → Kit): mono tracks get drums, poly tracks synths.', 4000);
@@ -13007,7 +13007,16 @@ function normSong(j){
   S.swing = clamp(int(j.swing, 50), 50, 75); S.swingB = clamp(int(j.swingB, 2), 1, 7); S.limiter = j.limiter !== false;
   S.renderFrom = clamp(int(j.renderFrom, 0), 0, 255); S.master = clamp(int(j.master, 255), 0, 255);
   if (Array.isArray(j.secs)){ const seen = new Set(); S.secs = j.secs.filter(q => q && typeof q.n === 'string' && q.n.trim()).map(q => ({y:clamp(int(q.y, 0), 0, 255), n:q.n.trim().slice(0, 16)})).filter(q => !seen.has(q.y) && seen.add(q.y)); }   // SONG EXTRAS
-  if (Array.isArray(j.song)) j.song.slice(0, 256).forEach((r, i) => { if (Array.isArray(r)) for (let t = 0; t <= MT; t++) S.song[i][t] = clamp(int(r[t], -1), -1, 255); });
+  // Song rows: as in memory (NT tracks then the master, NT + 1 numbers: an undo step, or any song while NT is 32), or as
+  // saved with more than 32 tracks (songOut): tracks 1–32 then the master (33 numbers, as every version saves), tracks 33
+  // and up in songX[row] (missing or null = empty). A version with fewer tracks keeps the ones it has.
+  if (Array.isArray(j.song)) j.song.slice(0, 256).forEach((r, i) => { if (!Array.isArray(r)) return;
+    const cell = v => clamp(int(v, -1), -1, 255);
+    if (r.length === NT + 1 || r.length !== 33){ for (let t = 0; t <= MT; t++) S.song[i][t] = cell(r[t]); return; }
+    for (let t = 0; t < Math.min(32, NT); t++) S.song[i][t] = cell(r[t]);
+    S.song[i][MT] = cell(r[32]);
+    const x = Array.isArray(j.songX) && Array.isArray(j.songX[i]) ? j.songX[i] : null;
+    for (let t = 32; t < NT; t++) S.song[i][t] = x ? cell(x[t - 32]) : -1; });
   if (Array.isArray(j.chains)) j.chains.slice(0, 256).forEach((c, i) => { if (Array.isArray(c)) S.chains[i] = Array.from({length:16}, (_, k) => {
     const r = Array.isArray(c[k]) ? c[k] : []; return [clamp(int(r[0], -1), -1, 255), clamp(int(r[1], 0), -128, 127)]; }); });
   // Songs from before v2 used the first FX list (RET DEL CUT CHA PSL RND OFS REV PAN TPO HOP): move them to the current names.
@@ -13062,6 +13071,11 @@ function normSong(j){
   if (j.chainPatch && typeof j.chainPatch === 'object' && (j.chainPatch.format === 'chains.patch' || j.chainPatch.format === 'waves.patch')) S.chainPatch = j.chainPatch;
   if (Array.isArray(j.irs)) S.irs = j.irs.slice(0, 4).map(e => e && typeof e === 'object' && e.L && typeof e.L === 'object' ? {name:String(e.name || 'IR').slice(0, 40), sr:clamp(int(e.sr, 48000), 8000, 192000), len:+e.len || 0, L:e.L, R:e.R && typeof e.R === 'object' ? e.R : null} : null);
   if (Array.isArray(j.smute)) j.smute.slice(0, 256).forEach((v, i) => S.smute[i] = int(v, 0) | 0);
+  // Tracks 33 and up (only with NT > 32): their mute words, kept for the tracks this version has.
+  if (NT > 32 && Array.isArray(j.smuteX)){ const W = Math.ceil((NT - 32) / 32);
+    const X = j.smuteX.slice(0, 256).map(w => Array.isArray(w) && w.some(v => int(v, 0)) ? w.slice(0, W).map(v => int(v, 0) | 0) : null);
+    while (X.length < 256) X.push(null);
+    if (X.some(Boolean)) S.smuteX = X; }
 // Voice-per-track parity: one synth voice per song track. ntr caps at 24, because 24 tracks need pads
 // 8–31: exactly 32 voices.
   S.ntr = clamp(int(j.ntr, 16), 8, vtrk ? 24 : NT);   // 32 with the shared voices; 24 with a voice per track (32 voices)
@@ -13177,7 +13191,16 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase(); if (k !== 'z' && k !== 'y') return;
   e.preventDefault(); undoStep(k === 'y' || e.shiftKey ? 1 : -1);
 });
-function flushS(){ clearTimeout(sT); storeWrite(TK, JSON.stringify(S)); }
+function flushS(){ clearTimeout(sT); storeWrite(TK, JSON.stringify(songOut(S))); }
+// The song as it is saved (storage and project files). With 32 tracks (NT, today) it is the song itself, exactly as always.
+// With more, each row keeps tracks 1–32 and the master where every version reads them (33 numbers) and tracks 33 and up go
+// in songX[row] (null when empty), so an older version (or Thunder Perform's deck) still opens the song, without those
+// tracks. Block mutes are already split that way (smute, smuteX). normSong reads both shapes; undo keeps the in-memory one.
+function songOut(Sx){
+  if (NT <= 32) return Sx;
+  const songX = Sx.song.map(r => { const x = r.slice(32, NT); let n = x.length; while (n && x[n - 1] < 0) n--; return n ? x.slice(0, n) : null; });
+  return Object.assign({}, Sx, {song:Sx.song.map(r => r.slice(0, 32).concat([r[MT]])), songX});
+}
 // A kit edit waits 900 ms (a …waves edit longer) before it's saved: closing or hiding the app saves it now.
 function flushKit(){
   try { const w = WV.frame && WV.frame.contentWindow; if (w && typeof w.__wavesFlush === 'function') w.__wavesFlush(); } catch(e){}   // its edit lands in sTimer
@@ -13201,7 +13224,7 @@ function placePending(){
 const niOf = Sx => clamp((Sx && Sx.ni) | 0 || 16, 16, NI);
 function niUp(i){ if (S.ni < NI && i >= S.ni){ S.ni = NI; try { toast(`This song now uses ${NI} instruments: INS above 0F plays its own instrument (it played 0F before).`, 5000); } catch(e){} } }
 function niScan(){ if (S.ni >= NI) return; for (const ph of S.phrases) if (ph) for (const r of ph) if (r[IC] >= S.ni) return niUp(r[IC]); }
-function saveS(){ if (pendPlace) queueMicrotask(placePending); try { niScan(); } catch(e){} snap(); clearTimeout(sT); sT = setTimeout(() => storeWrite(TK, JSON.stringify(S)), 600);
+function saveS(){ if (pendPlace) queueMicrotask(placePending); try { niScan(); } catch(e){} snap(); clearTimeout(sT); sT = setTimeout(() => storeWrite(TK, JSON.stringify(songOut(S))), 600);
   try { songVer++; songBeatsSoon(); } catch(e){} }   // the song changed: MIDI song positions are worked out again (just after, with clock on)
 const isEmptySect = c => !c || c.every(r => r[0] < 0);
 const isEmptyPhrase = p => !p || p.every(r => r.every(v => v < 0));
@@ -13220,8 +13243,39 @@ function freePhrase(){
 }
 const audible = t => { const any = S.mix.some(m => m.solo); return !S.mix[t].mute && (!any || S.mix[t].solo); };
 // A muted song block: the sect stays on the song, it just plays silently (a pattern-matrix mute).
-// Track t's mute bit for song row y. The master column (MT) has none: 1 << 32 is 1 in JS, which is track 1's bit.
-const blockMuted = (Sx, y, t) => !!(Sx.smute && y >= 0 && y < 256 && t >= 0 && t < MT && (Sx.smute[y] >> t) & 1);
+// Track t's mute bit for song row y. The master column (MT) has none. JS bit operations are 32-bit (1 << 32 is 1, track
+// 1's bit), so tracks 1–32 live in smute[y] (as they always have, so every version reads them) and tracks 33 and up, only
+// with more than 32 tracks (NT > 32), in smuteX[y]: an array of 32-bit words, word k bit b = track 33 + 32k + b. smuteX
+// is made the first time such a block is muted; with 32 tracks it never exists and songs are saved exactly as before.
+// (20 Oct: groundwork for more tracks, see HANDOVER "More tracks than 32".) Read and write mutes only through these.
+const blockMuted = (Sx, y, t) => {
+  if (!Sx.smute || !(y >= 0 && y < 256 && t >= 0 && t < MT)) return false;
+  if (t < 32) return !!((Sx.smute[y] >> t) & 1);
+  const w = Sx.smuteX && Sx.smuteX[y]; return !!(w && (w[(t - 32) >> 5] >> ((t - 32) & 31)) & 1);
+};
+function setBlockMute(y, t, on){
+  if (!(y >= 0 && y < 256 && t >= 0 && t < MT)) return;
+  if (t < 32){ if (on) S.smute[y] |= 1 << t; else S.smute[y] &= ~(1 << t); return; }
+  const k = (t - 32) >> 5, b = 1 << ((t - 32) & 31);
+  if (!on && !(S.smuteX && S.smuteX[y])) return;
+  if (!S.smuteX) S.smuteX = new Array(256).fill(null);
+  const w = S.smuteX[y] || (S.smuteX[y] = []);
+  while (w.length <= k) w.push(0);
+  if (on) w[k] |= b; else w[k] &= ~b;
+  if (!w.some(Boolean)) S.smuteX[y] = null;
+  if (!S.smuteX.some(Boolean)) delete S.smuteX;
+}
+// Song rows moved as a whole (DUPLICATE inserts rows): the mutes go with them.
+function smuteInsertRows(at, h){
+  S.smute.splice(at, 0, ...new Array(h).fill(0)); S.smute.length = 256;
+  if (S.smuteX){ S.smuteX.splice(at, 0, ...new Array(h).fill(null)); S.smuteX.length = 256; if (!S.smuteX.some(Boolean)) delete S.smuteX; }
+}
+function mutedCount(){
+  const pop = m => { let a = 0; for (; m; m &= m - 1) a++; return a; };
+  let n = S.smute.reduce((a, m) => a + pop(m), 0);
+  if (S.smuteX) for (const w of S.smuteX) if (w) for (const m of w) n += pop(m);
+  return n;
+}
 // Sects and phrases with the same number, when both are free, so the song's numbers match the phrases they open.
 function freePair(){
   const uc = new Set(), up = new Set();
@@ -14744,7 +14798,7 @@ async function shareLast(){
 let projFile = null;
 const canFS = !inAI && typeof window.showSaveFilePicker === 'function';
 const PJT = [{description:'...Thunder project', accept:{'application/json':['.json']}}];
-const projBlob = () => new Blob([JSON.stringify({app:'thunder-project', v:1, song:Object.assign({}, S, {presets:fullPresets(), irs:irsFull()}), kit:kitToJSON(false)})], {type:'application/json'});
+const projBlob = () => new Blob([JSON.stringify({app:'thunder-project', v:1, song:Object.assign({}, songOut(S), {presets:fullPresets(), irs:irsFull()}), kit:kitToJSON(false)})], {type:'application/json'});
 const projName = () => `${safe(S.name || 'Song')} project.json`;
 // Sharing the project file: the share sheet on phones (Drive, Gmail, Quick Share, Nearby…), so a song started on the
 // phone can be opened on the computer with LOAD PROJECT, and the other way round.
@@ -15278,7 +15332,7 @@ function getCell(v, x, y){
   const p = S.phrases[cPhrase]; return p ? p[y][x] : -1;
 }
 function setCell(v, x, y, val){
-  if (v === 'song'){ S.song[y][x] = val; if (val < 0 && x < MT) S.smute[y] &= ~(1 << x); }
+  if (v === 'song'){ S.song[y][x] = val; if (val < 0 && x < MT) setBlockMute(y, x, false); }
   else if (v === 'sect'){ sectRowEdit(cSect, y)[x] = val; }
   else { if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase(); S.phrases[cPhrase][y][x] = val; }
   saveS();
@@ -15860,11 +15914,11 @@ function dupPattern(){
   if (!src.length) return toast(h > 1 ? 'Nothing on those rows to duplicate.' : 'Nothing on this row to duplicate.');
   for (let y = 256 - h; y < 256; y++) if (S.song[y].some(v => v >= 0)) return toast(`No room: the song’s last ${h > 1 ? h + ' rows aren’t' : 'row isn’t'} empty.`);
   S.song.splice(at, 0, ...Array.from({length:h}, () => new Array(NT + 1).fill(-1))); S.song.length = 256;
-  S.smute.splice(at, 0, ...new Array(h).fill(0)); S.smute.length = 256;
+  smuteInsertRows(at, h);
   if (Array.isArray(S.secs)) S.secs = S.secs.map(q => q.y >= at ? {y:q.y + h, n:q.n} : q).filter(q => q.y < 256);
   if (loopArm && loopArm.v === 'song' && loopArm.y0 >= at){ loopArm.y0 += h; loopArm.y1 += h; }
   let made = 0, last = -1;
-  for (const [x, y, v, mu] of src){ const ny = y + h; newBlock({x, y:ny}, v); const id = S.song[ny][x]; if (id >= 0 && id !== v){ made++; last = id; if (mu) S.smute[ny] |= 1 << x; } }
+  for (const [x, y, v, mu] of src){ const ny = y + h; newBlock({x, y:ny}, v); const id = S.song[ny][x]; if (id >= 0 && id !== v){ made++; last = id; if (mu) setBlockMute(ny, x, true); } }
   c.y += h; if (sel) selA.y += h;
   const VR = asongOn() || (apReady && apF) ? arrRows() : songRows(); if (c.y > (c.top || 0) + VR - 1) c.top = Math.min(256 - VR, c.y - VR + 1);
   saveS(); draw();
@@ -15885,7 +15939,7 @@ function dupTrack(notes){
   S.tfx[to] = clone(S.tfx[t] || freshChainFx());
   let want = 0, made = 0;
   if (notes) for (let y = 0; y < 256; y++){ const v = S.song[y][t]; if (v < 0) continue; want++; newBlock({x:to, y}, v);
-    const id = S.song[y][to]; if (id >= 0 && id !== v){ made++; if (blockMuted(S, y, t)) S.smute[y] |= 1 << to; } }
+    const id = S.song[y][to]; if (id >= 0 && id !== v){ made++; if (blockMuted(S, y, t)) setBlockMute(y, to, true); } }
   mixChanged(); rtFx(to);
   // The cursor goes to the new track, as in Renoise.
   if (tv === 'mixer') cs.mixer.x = to;
@@ -15981,11 +16035,11 @@ function rowOp(op){
     col.forEach((v, y) => S.song[y][c.x] = v);
     // block mutes move with their blocks (the master column has no mute bits)
     if (c.x < MT){
-      const mb = S.smute.map(m => (m >> c.x) & 1);
-      if (op === 'clear') mb[c.y] = 0;
-      else if (op === 'insert'){ mb.splice(c.y, 0, 0); mb.length = 256; }
-      else { mb.splice(c.y, 1); mb.push(0); }
-      mb.forEach((b, y) => S.smute[y] = (S.smute[y] & ~(1 << c.x)) | (b << c.x));
+      const mb = S.smute.map((m, y) => blockMuted(S, y, c.x));
+      if (op === 'clear') mb[c.y] = false;
+      else if (op === 'insert'){ mb.splice(c.y, 0, false); mb.length = 256; }
+      else { mb.splice(c.y, 1); mb.push(false); }
+      mb.forEach((b, y) => setBlockMute(y, c.x, !!b));
     }
   } else if (tv === 'sect' || tv === 'phrase'){
     const A = rowsArr(tv);
@@ -16259,7 +16313,7 @@ function psetSet(x, v){ if (x === 0) S.plen[cPhrase] = clamp(v, 1, PROWS); else 
 function toggleBlockMute(y, t){
   if (t === MT) return toast('The master column can’t be muted.');
   if (y < 0 || y > 255 || S.song[y][t] < 0) return toast('Nothing there to mute.');
-  S.smute[y] ^= 1 << t; saveS(); draw();
+  setBlockMute(y, t, !blockMuted(S, y, t)); saveS(); draw();
   toast((blockMuted(S, y, t) ? 'Muted' : 'Unmuted') + ` row ${rS(y, 3)} · track ${d2(t + 1)}`);
 }
 function go(v){
@@ -18210,7 +18264,7 @@ function drawArr(PH){
   const mark = (y, t, k) => { const row = arrGrid.children[y], b = row && row.querySelector(`b[data-t="${t}"]`); if (b){ b.classList.add(k); arrMark.push(b); } };
   mark(cs.song.y, cs.song.x, 'c');
   if (ms && selA && selA.v === 'song'){ const r = selRect(); for (let y = r.y0; y <= r.y1; y++) for (let t = r.x0; t <= r.x1; t++) mark(y, t, 'sl'); }
-  const nm = S.smute.reduce((a, m) => { for (; m; m &= m - 1) a++; return a; }, 0);
+  const nm = mutedCount();
   $('tArrSub').textContent = (ms ? S.name + ' · ' : '') + (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : '');
   { const lb = arrEl.querySelector('.tahl b'); if (lb && lb.textContent !== (ms ? 'SONG' : 'ARRANGE')) lb.textContent = ms ? 'SONG' : 'ARRANGE'; }
   // As the Song screen the grid holds whole rows only (the space left over sits under the boxes), so it never ends on half a row.
@@ -18521,8 +18575,8 @@ function sxApply(d){
   const r = d.r, src = [];
   for (let y = r.y0; y <= r.y1; y++) for (const t of p.cols){ const v = S.song[y][t]; if (v >= 0) src.push([t, y, v, t !== MT && blockMuted(S, y, t)]); }
   if (!src.length) return toast('Nothing to move: the selection is empty.');
-  if (!d.copy) for (const [t, y] of src){ S.song[y][t] = -1; if (t !== MT) S.smute[y] &= ~(1 << t); }
-  for (const [t, y, v, mu] of src){ const nt = sxT(sxU(t) + d.du), ny = y + d.dy; S.song[ny][nt] = v; if (nt !== MT){ if (mu) S.smute[ny] |= 1 << nt; else S.smute[ny] &= ~(1 << nt); } }
+  if (!d.copy) for (const [t, y] of src){ S.song[y][t] = -1; if (t !== MT) setBlockMute(y, t, false); }
+  for (const [t, y, v, mu] of src){ const nt = sxT(sxU(t) + d.du), ny = y + d.dy; S.song[ny][nt] = v; if (nt !== MT) setBlockMute(ny, nt, !!mu); }
   const x0 = sxT(p.u0), x1 = sxT(p.u1);
   selA = {x:x0, y:r.y0 + d.dy, v:'song'}; cs.song.x = x1; cs.song.y = r.y1 + d.dy; cTrack = x1 === MT ? cTrack : x1;
   saveS(); draw();
@@ -18566,7 +18620,7 @@ function sxMuteRect(r){
   for (let y = r.y0; y <= r.y1; y++) for (const t of cols) if (S.song[y][t] >= 0) cells.push([y, t]);
   if (!cells.length) return toast('Nothing to mute here.');
   const mute = cells.some(([y, t]) => !blockMuted(S, y, t));
-  for (const [y, t] of cells){ if (mute) S.smute[y] |= 1 << t; else S.smute[y] &= ~(1 << t); }
+  for (const [y, t] of cells) setBlockMute(y, t, mute);
   saveS(); draw(); toast(`${mute ? 'Muted' : 'Unmuted'} ${cells.length} block${cells.length > 1 ? 's' : ''}`);
 }
 function sxClearRect(r, keep){ const cells = []; for (let y = r.y0; y <= r.y1; y++) for (const t of sxCols(r)) cells.push([y, t]); songDelete(cells, keep); }
