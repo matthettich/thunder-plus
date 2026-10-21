@@ -842,6 +842,7 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 @keyframes recblink{50%{opacity:.35}}
 .trows button.on .rv small, .trows button.on small{color:var(--inv)}
 .toct{border-left:1px solid var(--line)}
+#tRecBar + .toct{border-left:0}   /* REC / CLICK already end in a line: two side by side read as one thick one (owner, 21 Oct) */
 /* On a phone the tabs take the first line; tempo, ticks, rows and INPUT share the second. */
 @media (max-width:600px){
   .ttabbar{flex-wrap:wrap} .ttabbar .ttabs{flex:1 1 100%; border-bottom:1px solid var(--line)}

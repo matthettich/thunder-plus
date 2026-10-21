@@ -24,6 +24,12 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 21 Oct (5): one line between CLICK and OCT
+
+Cache `thunderplus-v207`. Owner: the line between CLICK and OCT on the tracker's top strip looked thick. CLICK's right
+border and `.toct`'s left border sat side by side (2 px); `#tRecBar + .toct{border-left:0}` leaves one. `#tRecBar` is
+never hidden and always ends in a bordered `.rv` (REC when CLICK is dropped by `fitsel`/`fitxp`), so the line stays.
+
 ## 21 Oct (4): a ? on every …waves and …chains module
 
 Cache `thunderplus-v206`. Owner: "a small ? on every module in waves and chains that displays a tooltip about what the
