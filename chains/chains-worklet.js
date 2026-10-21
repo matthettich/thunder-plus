@@ -13,7 +13,10 @@
    since a worklet can't fetch. */
 
 (() => {   // everything lives in this scope, so a page that loads it keeps its own names
-const BLOCK = 128, CHAN_COUNT = 32, PROTOCOL = 2, TARGET = 'chains';
+// CHAN_COUNT: the tracks a patch can address (Track In, Chain Out, Sidechain In's Source): 128 since 20 Oct, ready for more
+// than 32 tracks in ...Thunder Plus (it was 32). Buses are cleared only where something was written, so the size costs little.
+// NSEND: Sidechain Out's sends (1–8), heard by any Sidechain In set to that send.
+const BLOCK = 128, CHAN_COUNT = 128, NSEND = 8, PROTOCOL = 2, TARGET = 'chains';
 
 /* ── shared helpers ───────────────────────────────────────────────────────── */
 const TS = 4096, SIN = new Float32Array(TS + 1);
@@ -429,14 +432,16 @@ const ChainOut = {
 const SidechainIn = {
   type:'scin', scope:'mono', cost:.05,
   inputs:{}, outputs:{ out:'audio', env:'cv', duck:'cv' },
-  params:{ send:[1,0,1,.01], sens:[6,-12,24,.5], release:[150,10,1000,1], src:[0,0,CHAN_COUNT,1] },
+  params:{ send:[1,0,1,.01], sens:[6,-12,24,.5], release:[150,10,1000,1], src:[0,0,CHAN_COUNT,1], snd:[0,0,NSEND,1] },
   create:()=>({ env:0, pk:0, em:0 }),
   show(st){ const v = [st.pk > 1e-5 ? 20 * Math.log10(st.pk) : -120, st.em]; st.pk = 0; st.em = 0; return v; },
   // Env rises as the sidechain hits (to open a filter, say); Duck is its mirror, 1 while the sidechain is quiet and
   // dipping on each hit, ready for a VCA's CV to pump a sound. Sensitivity (dB) sets how hard the hits push them (a
   // quiet kick needs more); Level only sets the audio Out. A 2 ms attack and the Release make a smooth envelope.
   process(st, io, ctx){
-    const k = Math.round(io.p.src || 0), tk = k > 0 && ctx.tap ? ctx.tap(k - 1) : null;   // a track's own sound, or the bus
+    // SENDS (20 Oct): Send 1–8 (snd) wins over Source; it hears what Sidechain Out modules send there, in any chain.
+    const sn = Math.round(io.p.snd || 0), k = Math.round(io.p.src || 0);
+    const tk = sn > 0 && ctx.sendIn ? ctx.sendIn(sn - 1) : k > 0 && ctx.tap ? ctx.tap(k - 1) : null;   // a send, a track's own sound, or the bus
     const L = tk || ctx.scL, R = tk || ctx.scR, g = io.p.send, oE = io.out.env, oD = io.out.duck, sg = Math.pow(10, io.p.sens / 20);
     const ka = 1 - Math.exp(-1 / (.002 * ctx.sr)), kr = 1 - Math.exp(-1 / Math.max(1, io.p.release / 1000 * ctx.sr));
     let pk = st.pk;
@@ -469,6 +474,25 @@ const SidechainComp = {
       const g = over > 0 ? Math.pow(10, -over * (1 - 1 / rat) / 20) : 1;
       const gg = 1 - mx + g * mk * mx; io.out.out[i] = io.in.in[i] * gg; oR[i] = XR[i] * gg;
     }
+  }
+};
+
+/* Sidechain Out (20 Oct): sends what comes into it to Send 1–8, so a Sidechain In set to that send (in this chain or any
+   other) hears it, to duck by it or follow it. A bus made in …chains (several Track Ins summed) can drive other tracks'
+   compressors this way. Mono (both sides averaged), at Level. In ...Thunder Plus the sends travel between the tracks'
+   chain nodes through one block of delay (128 samples, ~3 ms), so chains can listen to each other without a loop; a
+   chain's Sidechain Out runs in the node of the lowest track its chain comes out on (a Chain Out in the same chain). */
+const SidechainOut = {
+  type:'scout', scope:'mono', cost:.02,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{},
+  params:{ snd:[1,1,NSEND,1], level:[1,0,2,.01] },
+  create:() => ({ pk:0 }),
+  show(st){ const v = [st.pk > 1e-5 ? 20 * Math.log10(st.pk) : -120]; st.pk = 0; return v; },
+  process(st, io, ctx){
+    const n = clamp(Math.round(io.p.snd || 1), 1, NSEND) - 1, o = ctx.sendOut ? ctx.sendOut(n) : null, g = io.p.level, L = io.in.in, R = inR(io);
+    let pk = st.pk;
+    for (let i = 0; i < ctx.block; i++){ const x = (L[i] + R[i]) * .5 * g; if (o) o[i] += x; const a = x < 0 ? -x : x; if (a > pk) pk = a; }
+    st.pk = pk < 8 ? pk : 8;
   }
 };
 
@@ -4270,6 +4294,93 @@ const ClassicComp = {
   show(st){ const v = [-st.gr]; st.gr = 0; return v; }
 };
 
+/* Bus Comp and Glue Comp (20 Oct, original code): two stereo bus compressors, both sides turned down together.
+   Bus Comp is the punchy console bus compressor (after the classic VCA bus compressor's controls): stepped Ratio 2, 4
+   or 10:1, stepped Attack and Release with Auto, a peak detector and a firm 2 dB knee. Glue Comp is the smoother one:
+   any Ratio, an RMS detector, a wide Knee, Range to cap how far it turns down, Auto release and a soft clipper.
+   Both listen to their own sound, the mixer's sidechain bus (Source Sidechain), or a cable into SC (always wins:
+   a Sidechain In set to a track or a send, so one track or bus ducks this one); SC high-pass keeps the lows out of the
+   detector so a bass doesn't pump the mix. Auto release follows the music: about 0.1 s after a short hit, sliding to
+   1.2 s while the reduction is held (dual release, as on hardware). Gain reduction shows on the module. */
+const BC_RATIO = [2, 4, 10], BC_ATT = [.0001, .0003, .001, .003, .01, .03], BC_REL = [.1, .3, .6, 1.2, -1], BC_HPF = [0, 60, 90, 150, 250];
+// The detector's high-pass: a 12 dB/oct state-variable filter (Zavalishin's TPT), one per side.
+function bcHp(z, x, g, k){ const hp = (x - (k + g) * z[0] - z[1]) / (1 + k * g + g * g), bp = g * hp + z[0]; z[0] = g * hp + bp; const lp = g * bp + z[1]; z[1] = g * bp + lp; return hp; }
+// The key: what the compressor listens to, per sample (absolute value, after the high-pass), and how loud it is.
+function bcKey(st, io, ctx, p){
+  const scP = linked(io, 'sc'), bus = !scP && p.source >= .5 && !!ctx.scL && typeof ctx.scOn === 'function' && !!ctx.scOn();
+  const hz = BC_HPF[clamp(Math.round(p.schpf || 0), 0, BC_HPF.length - 1)];
+  if (hz !== st.hz){ st.hz = hz; st.hg = hz ? Math.tan(Math.PI * Math.min(hz, ctx.sr * .45) / ctx.sr) : 0; }
+  return { scP, SL:bus ? ctx.scL : io.in.in, SR:bus ? (ctx.scR || ctx.scL) : inR(io), SC:io.in.sc };
+}
+// Auto release: the reduction held for a while (sus → 1) slows the release from 0.1 s towards 1.2 s.
+function bcRel(st, g, sr, rel){
+  if (rel > 0) return bfK(rel, sr);
+  st.sus += ((g > 1 ? 1 : 0) - st.sus) * bfK(.6, sr);
+  return bfK(.1 + 1.1 * st.sus, sr);
+}
+const BusComp = {
+  type:'buscomp', scope:'mono', cost:.15,
+  inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ thresh:[-12,-40,0,.1], ratio:[1,0,2,1], attack:[4,0,5,1], release:[4,0,4,1], makeup:[0,0,20,.1], schpf:[0,0,4,1], source:[0,0,1,1], mix:[1,0,1,.01] },
+  create:() => ({ g:0, gr:0, sus:0, hz:-1, hg:0, zl:[0, 0], zr:[0, 0] }),
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
+    const { scP, SL, SR, SC } = bcKey(st, io, ctx, p), hg = st.hg, K = Math.SQRT2;
+    const thr = p.thresh, sl = 1 - 1 / BC_RATIO[clamp(Math.round(p.ratio), 0, 2)], kn = 2, mk = p.makeup, mx = u(p.mix);
+    const ka = bfK(BC_ATT[clamp(Math.round(p.attack), 0, 5)], sr), rel = BC_REL[clamp(Math.round(p.release), 0, 4)];
+    let g = st.g, most = 0, kr = bcRel(st, g, sr, rel);
+    for (let i = 0; i < B; i++){
+      let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
+      let a, b;
+      if (scP){ a = SC[i]; if (hg) a = bcHp(st.zl, a, hg, K); a = Math.abs(a); b = 0; }
+      else { a = SL[i]; b = SR[i]; if (hg){ a = bcHp(st.zl, a, hg, K); b = bcHp(st.zr, b, hg, K); } a = Math.abs(a); b = Math.abs(b); }
+      const det = a > b ? a : b, xdB = det > 1e-6 ? 8.685889638 * Math.log(det) : -120, over = xdB - thr;
+      const t = over <= -kn / 2 ? 0 : over < kn / 2 ? sl * (over + kn / 2) * (over + kn / 2) / (2 * kn) : sl * over;
+      if ((i & 31) === 0) kr = bcRel(st, g, sr, rel);
+      g += (t - g) * (t > g ? ka : kr);
+      if (g > most) most = g;
+      const gain = Math.exp((mk - g) * .1151292546);
+      oL[i] = xl + (fxGuard(xl * gain) - xl) * mx; oR[i] = xr + (fxGuard(xr * gain) - xr) * mx;
+    }
+    st.g = g > 1e-6 && g < 200 ? g : 0; st.gr = Math.max(st.gr, most);
+    st.zl[0] = fxClean(st.zl[0]); st.zl[1] = fxClean(st.zl[1]); st.zr[0] = fxClean(st.zr[0]); st.zr[1] = fxClean(st.zr[1]);
+  },
+  show(st){ const v = [-st.gr]; st.gr = 0; return v; }
+};
+const GlueComp = {
+  type:'glue', scope:'mono', cost:.15,
+  inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ thresh:[-15,-40,0,.1], ratio:[2,1,10,.1], attack:[.01,.0001,.03,.0001], release:[.3,.05,1.5,.01], auto:[1,0,1,1], knee:[8,0,18,.1],
+    range:[20,1,40,.5], makeup:[0,0,20,.1], clip:[0,0,1,1], schpf:[0,0,4,1], source:[0,0,1,1], mix:[1,0,1,.01] },
+  create:() => ({ g:0, gr:0, sus:0, ms:0, hz:-1, hg:0, zl:[0, 0], zr:[0, 0] }),
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
+    const { scP, SL, SR, SC } = bcKey(st, io, ctx, p), hg = st.hg, K = Math.SQRT2;
+    const thr = p.thresh, sl = 1 - 1 / Math.max(1, p.ratio), kn = Math.max(0, p.knee), rg = Math.max(.5, p.range), mk = p.makeup, mx = u(p.mix), clip = p.clip >= .5;
+    const ka = bfK(p.attack, sr), rel = p.auto >= .5 ? -1 : p.release, km = bfK(.006, sr);   // RMS over ~6 ms
+    let g = st.g, ms = st.ms, most = 0, kr = bcRel(st, g, sr, rel);
+    for (let i = 0; i < B; i++){
+      let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
+      let a, b;
+      if (scP){ a = SC[i]; if (hg) a = bcHp(st.zl, a, hg, K); b = a; }
+      else { a = SL[i]; b = SR[i]; if (hg){ a = bcHp(st.zl, a, hg, K); b = bcHp(st.zr, b, hg, K); } }
+      const sq = a * a > b * b ? a * a : b * b; ms += (sq - ms) * km;
+      const xdB = ms > 1e-12 ? 4.342944819 * Math.log(ms * 2) : -120, over = xdB - thr;   // ×2: a sine's RMS reads as its peak
+      let t = over <= -kn / 2 ? 0 : kn > 0 && over < kn / 2 ? sl * (over + kn / 2) * (over + kn / 2) / (2 * kn) : sl * over;
+      if (t > rg) t = rg;
+      if ((i & 31) === 0) kr = bcRel(st, g, sr, rel);
+      g += (t - g) * (t > g ? ka : kr);
+      if (g > most) most = g;
+      const gain = Math.exp((mk - g) * .1151292546);
+      let yl = xl * gain, yr = xr * gain; if (clip){ yl = soft(yl); yr = soft(yr); }
+      oL[i] = xl + (fxGuard(yl) - xl) * mx; oR[i] = xr + (fxGuard(yr) - xr) * mx;
+    }
+    st.g = g > 1e-6 && g < 200 ? g : 0; st.ms = fxClean(ms); st.gr = Math.max(st.gr, most);
+    st.zl[0] = fxClean(st.zl[0]); st.zl[1] = fxClean(st.zl[1]); st.zr[0] = fxClean(st.zr[0]); st.zr[1] = fxClean(st.zr[1]);
+  },
+  show(st){ const v = [-st.gr]; st.gr = 0; return v; }
+};
+
 /* Noise gate: closes (turns the sound down by Range) when it falls below Threshold, so hiss, hum and spill between
    hits disappear; it opens again a few dB higher than it closes, so it doesn't chatter. Attack is how fast it opens,
    Hold how long it stays open after the sound drops, Release how fast it closes. Source Sidechain lets the mixer's
@@ -4376,7 +4487,7 @@ const SHARED_MODULES = { beads:Beads,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,
   autotune:PitchCorrect, vowel:VowelFilter, rotary:RotarySpk, gdelay:GrainDelay, reverse:ReverseEcho, envfilt:EnvFilter,
   bytebeat:Bytebeat, chaos:Chaos, marbles:MarblesM, tides:TidesM,
-  sdelay:SimpleDelay, filter:Filter, cut:LoHiCut, compressor:ClassicComp, ngate:NoiseGate, autopan:AutoPan, pump:Pump };
+  sdelay:SimpleDelay, filter:Filter, cut:LoHiCut, compressor:ClassicComp, ngate:NoiseGate, autopan:AutoPan, pump:Pump, buscomp:BusComp, glue:GlueComp };
 /* ===SHARED MODULES END=== */
 /* TRACK IN STEREO (owner, 20 Oct): the starter patch sent only Track In's left side into its first effect. In a patch
    made before (ti2 not set), a Track In whose Out R goes nowhere gets Out R → In R of every module its Out feeds, where
@@ -4400,7 +4511,7 @@ const MODULES = { ...SHARED_MODULES, trackIn:TrackIn,
   eq:EQ, comp:Comp, saturation:Saturation, tape:Tape, chorus:Chorus, crush:Crush, delay:Delay, reverb:Reverb, rings:Rings, clouds:Clouds, beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
-  scin:SidechainIn, sccomp:SidechainComp,
+  scin:SidechainIn, sccomp:SidechainComp, scout:SidechainOut,
   lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter, steps:Steps, clock:Clock, repeat:Repeat,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant,
   blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong, resample:Resample, chainOut:ChainOut };
@@ -4446,6 +4557,13 @@ class ChainsEngine {
     this.quality = opts.quality || 'full';
     this.graph = new Graph();
     this.busesL = new Float32Array(CHAN_COUNT * BLOCK); this.busesR = new Float32Array(CHAN_COUNT * BLOCK);
+    this._bw = new Uint8Array(CHAN_COUNT); this._bwl = [];   // the buses written this block (cleared next block, not all 128)
+    // SENDS: Sidechain Out writes sendOut (NSEND × BLOCK); Sidechain In reads sendIn (the host's input 3, one block later;
+    // standalone, the engine's own previous block).
+    this.sendOut = new Float32Array(NSEND * BLOCK); this.sendIn = null; this._sendPrev = null;
+    // SOURCE: tapMap[track] = the channel of input 2 that carries that track's own sound (the host sends only the tracks a
+    // Sidechain In picks, 'tapmap'); null = channel k is track k (an older host).
+    this.tapMap = null;
     this.load = 0; this.telemetryOn = false;
     this._ios = new Map(); this._states = new Map();
     this._busy = 0; this._frames = 0;
@@ -4462,9 +4580,12 @@ class ChainsEngine {
     this._ctx = { sr:sampleRate, block:BLOCK, quality:this.quality, transport:this.transport, engine:this,
       trackInL:k => this.trackInL ? this.trackInL.subarray(k * BLOCK, (k + 1) * BLOCK) : null,
       trackInR:k => this.trackInR ? this.trackInR.subarray(k * BLOCK, (k + 1) * BLOCK) : null,
-      busL:k => this.busesL.subarray(k * BLOCK, (k + 1) * BLOCK), busR:k => this.busesR.subarray(k * BLOCK, (k + 1) * BLOCK),
+      busL:k => { if (!this._bw[k]){ this._bw[k] = 1; this._bwl.push(k); } return this.busesL.subarray(k * BLOCK, (k + 1) * BLOCK); },
+      busR:k => { if (!this._bw[k]){ this._bw[k] = 1; this._bwl.push(k); } return this.busesR.subarray(k * BLOCK, (k + 1) * BLOCK); },
       scL:this.scL, scR:this.scR, scOn:() => this.scOn,
-      tap:k => (this.taps && this.taps[k]) || this._zero };   // SOURCE: track k's own sound (input 2), silence when not sent
+      tap:k => { const c = this.tapMap ? this.tapMap[k] : k; return (c >= 0 && this.taps && this.taps[c]) || this._zero; },   // SOURCE: track k's own sound (input 2), silence when not sent
+      sendOut:n => this.sendOut.subarray(n * BLOCK, (n + 1) * BLOCK),
+      sendIn:n => (this.sendIn && this.sendIn[n]) || this._zero };
   }
   addModule(id, type, o = {}){
     const def = MODULES[type]; if (!def) return;
@@ -4507,6 +4628,18 @@ class ChainsEngine {
     if (this._act && this._actKey === key) return this._act;
     const act = new Set(), q = [];
     for (const m of g.mods.values()) if (m.def === ChainOut && clamp((m.inst.params.track | 0) - 1, 0, CHAN_COUNT - 1) === this.focus){ act.add(m.id); q.push(m.id); }
+    // SENDS: a Sidechain Out runs in one node only (else every node would add it to the send again): the node of the lowest
+    // track a Chain Out in its chain (the modules joined to it by cables, either way) goes to.
+    if ([...g.mods.values()].some(m => m.def === SidechainOut)){
+      const nb = new Map(); for (const id of g.mods.keys()) nb.set(id, []);
+      for (const c of g.cables){ if (nb.has(c.a[0]) && nb.has(c.b[0])){ nb.get(c.a[0]).push(c.b[0]); nb.get(c.b[0]).push(c.a[0]); } }
+      for (const m of g.mods.values()){
+        if (m.def !== SidechainOut || act.has(m.id)) continue;
+        const seen = new Set([m.id]), w = [m.id]; let low = CHAN_COUNT;
+        while (w.length){ const id = w.pop(), x = g.mods.get(id); if (x && x.def === ChainOut) low = Math.min(low, clamp((x.inst.params.track | 0) - 1, 0, CHAN_COUNT - 1)); for (const y of nb.get(id) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } }
+        if (low === this.focus){ act.add(m.id); q.push(m.id); }
+      }
+    }
     if (tel) for (const m of g.mods.values()) if (m.def === SidechainIn && !act.has(m.id)){ act.add(m.id); q.push(m.id); }   // its meter shows before it's patched
     while (q.length){ for (const c of g.inc.get(q.pop()) || []) if (!act.has(c.a[0])){ act.add(c.a[0]); q.push(c.a[0]); } }
     this._act = act; this._actKey = key; return act;
@@ -4544,7 +4677,9 @@ class ChainsEngine {
   }
   process(frames = BLOCK){
     const t0 = Date.now();
-    this.busesL.fill(0); this.busesR.fill(0); this._render(frames);
+    for (const k of this._bwl){ this.busesL.fill(0, k * BLOCK, (k + 1) * BLOCK); this.busesR.fill(0, k * BLOCK, (k + 1) * BLOCK); this._bw[k] = 0; }
+    this._bwl.length = 0; this.sendOut.fill(0);
+    this._render(frames);
     this._tickLoad(Date.now() - t0, frames);
   }
   bus(slot){ return this.busesL.subarray((slot - 1) * BLOCK, slot * BLOCK); }
@@ -4686,6 +4821,9 @@ class ChainsEngine {
       case 'quality': this.quality = m.value; return;
       case 'transport': return this.setTransport(m.value);
       case 'telemetry': this.telemetryOn = m.value === 'load' ? 'load' : !!m.value; return;   // true: meters, mods and displays ~31×/s; 'load': the load number ~4×/s; false: nothing
+      case 'tapmap': {   // SOURCE: [track, …], channel i of input 2 carries track[i]'s own sound
+        const a = new Int16Array(CHAN_COUNT).fill(-1); (Array.isArray(m.value) ? m.value : []).forEach((t, i) => { if (t >= 0 && t < CHAN_COUNT) a[t] = i; }); this.tapMap = a; return; }
+      case 'busmap': this.busMap = Array.isArray(m.value) ? m.value.filter(t => t >= 0 && t < CHAN_COUNT) : []; return;   // BUS FEEDS (ThunderChains)
     }
   }
 }
@@ -4724,9 +4862,12 @@ class ChainsProcessor extends AudioWorkletProcessor {
     { const sc = _ins && _ins[1]; e.setSidechain(sc && sc[0], sc && (sc[1] || sc[0]), BLOCK); }
     try { e.process(BLOCK); }
     catch (err){ e.busesL.fill(0); e.busesR.fill(0); if ((this._blocks & 255) === 0) this.port.postMessage({ target:TARGET, op:OP.error, value:{ op:'process', message:String(err?.message || err) } }); }
+    // SENDS: standalone, a Sidechain In hears the sends of the block before (as in ...Thunder Plus, one block late).
+    if (!e._sendPrev){ e._sendPrev = new Float32Array(NSEND * BLOCK); e.sendIn = Array.from({length:NSEND}, (_, n) => e._sendPrev.subarray(n * BLOCK, (n + 1) * BLOCK)); }
+    e._sendPrev.set(e.sendOut);
     const out = outs[0], L = out[0], R = out[1] || out[0];
     L.fill(0); if (R !== L) R.fill(0);
-    for (let k = 0; k < CHAN_COUNT; k++){
+    for (const k of e._bwl){
       const o = k * BLOCK;
       for (let i = 0; i < BLOCK; i++){ L[i] += e.busesL[o + i]; if (R !== L) R[i] += e.busesR[o + i]; }
     }
@@ -4764,10 +4905,15 @@ class ThunderChains extends AudioWorkletProcessor {
     if (o.patch && typeof o.patch === 'object'){
       try { this.engine.loadPatch(o.patch); } catch (err){}
     }
+    // BUS FEEDS and SOURCE channels from the start (the host's later changes come as 'busmap' / 'tapmap' messages).
+    if (Array.isArray(o.busMap)) this.engine.handleMessage({ op:'busmap', value:o.busMap });
+    if (Array.isArray(o.tapMap)) this.engine.handleMessage({ op:'tapmap', value:o.tapMap });
     this.engine.onShed = info => this.port.postMessage({ target:'chains-host', op:OP.shed, value:info });
     this.engine.onResample = v => { try { this.port.postMessage({ target:'chains-host', op:'resample', value:Object.assign(v, { track:this.track }) }, [v.L.buffer, v.R.buffer]); } catch (e){} };
     this._tmpL = new Float32Array(CHAN_COUNT * BLOCK);
     this._tmpR = new Float32Array(CHAN_COUNT * BLOCK);
+    this._tw = [];   // the track slots filled last block (cleared next block, not all of them)
+    this._sendCh = Array.from({length:NSEND}, () => null);
     this._blocks = 0;
     this.port.onmessage = e => this._recv(e.data);
     this.port.postMessage({ target:'chains-host', op:OP.ready,
@@ -4792,17 +4938,29 @@ class ThunderChains extends AudioWorkletProcessor {
     if (params) for (let k = 1; k <= 15; k++){ const a = params['b' + k]; e.bsw[k] = a ? a[0] : -1; }   // BYPASS: the tracker's switches
     const L = o[0], R = o[1] || o[0];
     // Feed this track's input into the engine's per-track buffers.
-    this._tmpL.fill(0); this._tmpR.fill(0);
-    if (i && i.length){ this._tmpL.set(i[0].subarray(0, n), this.track * BLOCK); this._tmpR.set((i[1] || i[0]).subarray(0, n), this.track * BLOCK); }
+    for (const k of this._tw){ this._tmpL.fill(0, k * BLOCK, (k + 1) * BLOCK); this._tmpR.fill(0, k * BLOCK, (k + 1) * BLOCK); }
+    this._tw.length = 0;
+    if (i && i.length){ this._tmpL.set(i[0].subarray(0, n), this.track * BLOCK); this._tmpR.set((i[1] || i[0]).subarray(0, n), this.track * BLOCK); this._tw.push(this.track); }
+    // BUS FEEDS (20 Oct): the other tracks this node's chain takes in (a bus: Track In 1, 2, 3 → … → Chain Out 4), each one
+    // after its own effects, fader and pan, as stereo pairs on inputs 4 and 5 (16 tracks each), in busMap's order.
+    const bm = e.busMap;
+    if (bm && bm.length) for (let j = 0; j < bm.length && j < 32; j++){
+      const t = bm[j], inp = ins[4 + (j >> 4)], c = (j & 15) * 2; if (t === this.track || !inp || !inp[c]) continue;
+      this._tmpL.set(inp[c].subarray(0, n), t * BLOCK); this._tmpR.set((inp[c + 1] || inp[c]).subarray(0, n), t * BLOCK); this._tw.push(t);
+    }
     e.setTrackInputs(this._tmpL, this._tmpR);
     { const sc = ins[1]; e.setSidechain(sc && sc[0], sc && (sc[1] || sc[0]), n); }
     { const tk = ins[2]; e.taps = tk && tk.length ? tk : null; }   // SOURCE: the tracks' own sounds (Sidechain In set to a track)
+    // SENDS: input 3 carries every chain's Sidechain Out sends (one channel per send), a block late.
+    { const sd = ins[3]; for (let k = 0; k < NSEND; k++) this._sendCh[k] = sd && sd[k] ? sd[k] : null; e.sendIn = this._sendCh; }
     try { e.process(BLOCK); }
     catch (err){ e.busesL.fill(0); e.busesR.fill(0); if ((this._blocks & 255) === 0) this.port.postMessage({ target:'chains-host', op:OP.error, value:{ op:'process', message:String(err?.message || err) } }); }
     // Return this track's bus (the sum of its Chain Out modules) downstream.
     const bL = e.busesL.subarray(this.track * BLOCK, this.track * BLOCK + n);
     const bR = e.busesR.subarray(this.track * BLOCK, this.track * BLOCK + n);
     L.set(bL); if (R !== L) R.set(bR);
+    // SENDS out: output 1, one channel per send (what this node's Sidechain Outs wrote this block).
+    { const so = outs[1]; if (so) for (let k = 0; k < so.length && k < NSEND; k++) so[k].set(e.sendOut.subarray(k * BLOCK, k * BLOCK + n)); }
     ++this._blocks;
     if (e.telemetryOn === true){ if (this._blocks % 12 === 0) this.port.postMessage({ target:'chains-host', op:OP.meter, value:e.telemetry() }); }
     else if (e.telemetryOn === 'load'){ if (this._blocks % 96 === 0) this.port.postMessage({ target:'chains-host', op:OP.meter, value:{ load:e.load, light:true } }); }

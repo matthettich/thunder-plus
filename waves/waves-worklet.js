@@ -4211,6 +4211,93 @@ const ClassicComp = {
   show(st){ const v = [-st.gr]; st.gr = 0; return v; }
 };
 
+/* Bus Comp and Glue Comp (20 Oct, original code): two stereo bus compressors, both sides turned down together.
+   Bus Comp is the punchy console bus compressor (after the classic VCA bus compressor's controls): stepped Ratio 2, 4
+   or 10:1, stepped Attack and Release with Auto, a peak detector and a firm 2 dB knee. Glue Comp is the smoother one:
+   any Ratio, an RMS detector, a wide Knee, Range to cap how far it turns down, Auto release and a soft clipper.
+   Both listen to their own sound, the mixer's sidechain bus (Source Sidechain), or a cable into SC (always wins:
+   a Sidechain In set to a track or a send, so one track or bus ducks this one); SC high-pass keeps the lows out of the
+   detector so a bass doesn't pump the mix. Auto release follows the music: about 0.1 s after a short hit, sliding to
+   1.2 s while the reduction is held (dual release, as on hardware). Gain reduction shows on the module. */
+const BC_RATIO = [2, 4, 10], BC_ATT = [.0001, .0003, .001, .003, .01, .03], BC_REL = [.1, .3, .6, 1.2, -1], BC_HPF = [0, 60, 90, 150, 250];
+// The detector's high-pass: a 12 dB/oct state-variable filter (Zavalishin's TPT), one per side.
+function bcHp(z, x, g, k){ const hp = (x - (k + g) * z[0] - z[1]) / (1 + k * g + g * g), bp = g * hp + z[0]; z[0] = g * hp + bp; const lp = g * bp + z[1]; z[1] = g * bp + lp; return hp; }
+// The key: what the compressor listens to, per sample (absolute value, after the high-pass), and how loud it is.
+function bcKey(st, io, ctx, p){
+  const scP = linked(io, 'sc'), bus = !scP && p.source >= .5 && !!ctx.scL && typeof ctx.scOn === 'function' && !!ctx.scOn();
+  const hz = BC_HPF[clamp(Math.round(p.schpf || 0), 0, BC_HPF.length - 1)];
+  if (hz !== st.hz){ st.hz = hz; st.hg = hz ? Math.tan(Math.PI * Math.min(hz, ctx.sr * .45) / ctx.sr) : 0; }
+  return { scP, SL:bus ? ctx.scL : io.in.in, SR:bus ? (ctx.scR || ctx.scL) : inR(io), SC:io.in.sc };
+}
+// Auto release: the reduction held for a while (sus → 1) slows the release from 0.1 s towards 1.2 s.
+function bcRel(st, g, sr, rel){
+  if (rel > 0) return bfK(rel, sr);
+  st.sus += ((g > 1 ? 1 : 0) - st.sus) * bfK(.6, sr);
+  return bfK(.1 + 1.1 * st.sus, sr);
+}
+const BusComp = {
+  type:'buscomp', scope:'mono', cost:.15,
+  inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ thresh:[-12,-40,0,.1], ratio:[1,0,2,1], attack:[4,0,5,1], release:[4,0,4,1], makeup:[0,0,20,.1], schpf:[0,0,4,1], source:[0,0,1,1], mix:[1,0,1,.01] },
+  create:() => ({ g:0, gr:0, sus:0, hz:-1, hg:0, zl:[0, 0], zr:[0, 0] }),
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
+    const { scP, SL, SR, SC } = bcKey(st, io, ctx, p), hg = st.hg, K = Math.SQRT2;
+    const thr = p.thresh, sl = 1 - 1 / BC_RATIO[clamp(Math.round(p.ratio), 0, 2)], kn = 2, mk = p.makeup, mx = u(p.mix);
+    const ka = bfK(BC_ATT[clamp(Math.round(p.attack), 0, 5)], sr), rel = BC_REL[clamp(Math.round(p.release), 0, 4)];
+    let g = st.g, most = 0, kr = bcRel(st, g, sr, rel);
+    for (let i = 0; i < B; i++){
+      let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
+      let a, b;
+      if (scP){ a = SC[i]; if (hg) a = bcHp(st.zl, a, hg, K); a = Math.abs(a); b = 0; }
+      else { a = SL[i]; b = SR[i]; if (hg){ a = bcHp(st.zl, a, hg, K); b = bcHp(st.zr, b, hg, K); } a = Math.abs(a); b = Math.abs(b); }
+      const det = a > b ? a : b, xdB = det > 1e-6 ? 8.685889638 * Math.log(det) : -120, over = xdB - thr;
+      const t = over <= -kn / 2 ? 0 : over < kn / 2 ? sl * (over + kn / 2) * (over + kn / 2) / (2 * kn) : sl * over;
+      if ((i & 31) === 0) kr = bcRel(st, g, sr, rel);
+      g += (t - g) * (t > g ? ka : kr);
+      if (g > most) most = g;
+      const gain = Math.exp((mk - g) * .1151292546);
+      oL[i] = xl + (fxGuard(xl * gain) - xl) * mx; oR[i] = xr + (fxGuard(xr * gain) - xr) * mx;
+    }
+    st.g = g > 1e-6 && g < 200 ? g : 0; st.gr = Math.max(st.gr, most);
+    st.zl[0] = fxClean(st.zl[0]); st.zl[1] = fxClean(st.zl[1]); st.zr[0] = fxClean(st.zr[0]); st.zr[1] = fxClean(st.zr[1]);
+  },
+  show(st){ const v = [-st.gr]; st.gr = 0; return v; }
+};
+const GlueComp = {
+  type:'glue', scope:'mono', cost:.15,
+  inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ thresh:[-15,-40,0,.1], ratio:[2,1,10,.1], attack:[.01,.0001,.03,.0001], release:[.3,.05,1.5,.01], auto:[1,0,1,1], knee:[8,0,18,.1],
+    range:[20,1,40,.5], makeup:[0,0,20,.1], clip:[0,0,1,1], schpf:[0,0,4,1], source:[0,0,1,1], mix:[1,0,1,.01] },
+  create:() => ({ g:0, gr:0, sus:0, ms:0, hz:-1, hg:0, zl:[0, 0], zr:[0, 0] }),
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
+    const { scP, SL, SR, SC } = bcKey(st, io, ctx, p), hg = st.hg, K = Math.SQRT2;
+    const thr = p.thresh, sl = 1 - 1 / Math.max(1, p.ratio), kn = Math.max(0, p.knee), rg = Math.max(.5, p.range), mk = p.makeup, mx = u(p.mix), clip = p.clip >= .5;
+    const ka = bfK(p.attack, sr), rel = p.auto >= .5 ? -1 : p.release, km = bfK(.006, sr);   // RMS over ~6 ms
+    let g = st.g, ms = st.ms, most = 0, kr = bcRel(st, g, sr, rel);
+    for (let i = 0; i < B; i++){
+      let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
+      let a, b;
+      if (scP){ a = SC[i]; if (hg) a = bcHp(st.zl, a, hg, K); b = a; }
+      else { a = SL[i]; b = SR[i]; if (hg){ a = bcHp(st.zl, a, hg, K); b = bcHp(st.zr, b, hg, K); } }
+      const sq = a * a > b * b ? a * a : b * b; ms += (sq - ms) * km;
+      const xdB = ms > 1e-12 ? 4.342944819 * Math.log(ms * 2) : -120, over = xdB - thr;   // ×2: a sine's RMS reads as its peak
+      let t = over <= -kn / 2 ? 0 : kn > 0 && over < kn / 2 ? sl * (over + kn / 2) * (over + kn / 2) / (2 * kn) : sl * over;
+      if (t > rg) t = rg;
+      if ((i & 31) === 0) kr = bcRel(st, g, sr, rel);
+      g += (t - g) * (t > g ? ka : kr);
+      if (g > most) most = g;
+      const gain = Math.exp((mk - g) * .1151292546);
+      let yl = xl * gain, yr = xr * gain; if (clip){ yl = soft(yl); yr = soft(yr); }
+      oL[i] = xl + (fxGuard(yl) - xl) * mx; oR[i] = xr + (fxGuard(yr) - xr) * mx;
+    }
+    st.g = g > 1e-6 && g < 200 ? g : 0; st.ms = fxClean(ms); st.gr = Math.max(st.gr, most);
+    st.zl[0] = fxClean(st.zl[0]); st.zl[1] = fxClean(st.zl[1]); st.zr[0] = fxClean(st.zr[0]); st.zr[1] = fxClean(st.zr[1]);
+  },
+  show(st){ const v = [-st.gr]; st.gr = 0; return v; }
+};
+
 /* Noise gate: closes (turns the sound down by Range) when it falls below Threshold, so hiss, hum and spill between
    hits disappear; it opens again a few dB higher than it closes, so it doesn't chatter. Attack is how fast it opens,
    Hold how long it stays open after the sound drops, Release how fast it closes. Source Sidechain lets the mixer's
@@ -4317,7 +4404,7 @@ const SHARED_MODULES = { beads:Beads,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,
   autotune:PitchCorrect, vowel:VowelFilter, rotary:RotarySpk, gdelay:GrainDelay, reverse:ReverseEcho, envfilt:EnvFilter,
   bytebeat:Bytebeat, chaos:Chaos, marbles:MarblesM, tides:TidesM,
-  sdelay:SimpleDelay, filter:Filter, cut:LoHiCut, compressor:ClassicComp, ngate:NoiseGate, autopan:AutoPan, pump:Pump };
+  sdelay:SimpleDelay, filter:Filter, cut:LoHiCut, compressor:ClassicComp, ngate:NoiseGate, autopan:AutoPan, pump:Pump, buscomp:BusComp, glue:GlueComp };
 /* ===SHARED MODULES END=== */
 
 /* ---------- Karplus–Strong string (original code) ----------

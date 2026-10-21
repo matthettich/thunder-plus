@@ -24,6 +24,53 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 20 Oct (10): …chains buses, Sidechain Out (sends 1–8), sidechain from any track, Bus Comp and Glue Comp, 128 chain tracks
+
+Cache `thunderplus-v202`; `chains-worklet.js?v=33`, `waves-worklet.js?v=26` (the shared blocks were synced:
+`python3 tools/sync-shared.py`; MODFX regenerated: `node tools/modfx.mjs`). Owner: do the two more-tracks fixes for
+…chains, a Sidechain Out module, buses (several tracks summed through a chain to another track, "like a DAW": each
+source after its own fader), and stereo Bus Comp + Glue Comp (two modules).
+- **128 chain tracks** (`CHAN_COUNT = 128` in the worklet and editor; `NSEND = 8`). The engine clears only the buses
+  written (`_bw`/`_bwl`, `busL`/`busR` mark them) and ThunderChains only the track slots it filled (`_tw`), so the size
+  costs nothing per block. The editor's pickers list `TRK_N` = the host's `thunderChains.tracks` (a getter for NT: the
+  object is made before NT exists) else 32. `chainsTracks()` ignores a Chain Out past NT instead of clamping it to NT.
+- **Sidechain from any track**: `chnTapList(patch)` = the distinct `src` tracks of Sidechain Ins with no Send, ≤ 32; the
+  player's `tapNode()` builds a merger of just those (rebuilt when the list changes, reconnecting every node) and sends
+  `tapmap` (engine `tapMap[track] = channel`; `ctx.tap` reads through it; null = identity for an old host). `inpTap`
+  uses the list. Also in `processorOptions.tapMap` (an offline render can end before a message arrives).
+- **Sidechain Out** (`scout`, chains-only, after Sidechain Comp): writes (L+R)/2 × Level into `ctx.sendOut(n)`. Sidechain
+  In got `snd` (0 off, 1–8; wins over `src`) reading `ctx.sendIn(n)`. In ThunderChains the sends leave on output 1 (8
+  channels) and come back on input 3: player `sendBus` (8 ch, discrete) → `sendDly` (DelayNode, 128 samples: a loop needs
+  a delay) → every node; `sendSync(b)` after each rewire (a rewire drops the node's outputs). A Sidechain Out runs in one
+  node only: `_active()` adds it to the node of the lowest Chain Out track in its connected chain (undirected). Standalone
+  (ChainsProcessor) the engine loops its own sends back a block later.
+- **Buses**: `busPlan()` (host, beside `chnTaps`; cached on a fingerprint of Track In / Chain Out tracks, cables and
+  CHN): per Track In t with CHN on, BFS over cables to the Chain Out tracks it reaches; b ≠ t with `chainsFeed(b)` makes t
+  a source of bus b (`feeds` b → [t], `targets` t → [b]); `pure` when t's own Chain Out isn't reached. Loop-closing edges
+  are dropped (`P.loop`). Player `busSync()` (end of `routeTrack`, also on its no-chain early return): per bus node a
+  splitter per source on `p` (after FX, fader, pan) into 32-channel mergers → inputs 4 / 5 (16 stereo sources each),
+  `busmap` (also in `processorOptions.busMap`); pure sources' `p → out` is cut (`_routed`), restored when not. ThunderChains
+  copies each mapped source into its track slot, so the bus chain's Track In t reads it. Solo: `audible()` keeps a
+  soloed bus's sources and a soloed source's bus. Renders: `pass()` adds the sources of kept buses; `renderOut` adds a bus
+  track fed by kept sources (even with no notes, stem named "Bus") and skips stems of pure sources (they're in the bus).
+  `chainsAutoOn` now also turns CHN on for new Track In tracks (`chainsAutoTracks()`).
+- **Editor**: Chain Out set to a track no Track In is on is a bus (`m.bus = 1`, kept with the patch, toast); back on a
+  Track In's track it's an insert. A Track In's change no longer drags a bus Chain Out; `alignChainTracks` leaves bus outs
+  alone. Help texts (Track In, Chain Out, Sidechain Out, Sidechain In's Send), port tips, palette (Sidechain group),
+  categories, a SEND meter for Sidechain Out (`display:'scout'`), meters start empty (`scaleX(0)`).
+- **Bus Comp** (`buscomp`) and **Glue Comp** (`glue`) in the SHARED MODULES block (so …waves has them) with editor entries,
+  presets and `display:'gr'`; also MODFX (track, master and pad effects; `tools/modfx-spec.mjs`). Both stereo-linked, SC
+  input wins, else `source` (Self / the mixer's sidechain bus), SC high-pass (TPT SVF `bcHp`), auto release `bcRel`
+  (0.1 → 1.2 s as reduction holds). Bus Comp: peak, 2 dB knee, stepped ratio / attack / release. Glue: RMS (~6 ms), knee,
+  Range cap, Soft clip.
+- Checked: node (`scratchpad/dsp_test.js`: both comps' gain reduction on a −6 dBFS sine at −20 dB threshold ≈ theory,
+  send loopback one block late, Sidechain Out runs only in its node, tap map, Chain Out to track 120, buses cleared).
+  Headless app with audio: bus 1 → 4 (track 4 mute / fader 0 silences it, solo either side keeps both, CHN off on 1 plays
+  it direct again), Send 1 → Bus Comp SC on another track (GR ~ −17 dB; Send 2 empty ~ 0), Source track 1 tap (GR −14 dB),
+  tracks 1–3 → stereo mixer → Glue → Chain Out 5 (all three routed, GR −9 dB), render + stems (mix, the Bus stem, no
+  stems for bused tracks), editor (bus flag, Track In change leaves it, back to insert), Glue / Bus Comp as track FX,
+  …waves loads; mute and duplicate regression tests identical. Not heard by ear yet.
+
 ## 20 Oct (9): groundwork for more than 32 tracks (mutes and the song file), nothing changes at 32
 
 Cache `thunderplus-v201`. Owner: do steps 1 and 2 of "More tracks than 32" (Open items 9) now; the GUI and the mono / poly
@@ -2097,15 +2144,9 @@ A code review (audio, storage, UI, DSP) found these; all fixed and checked headl
    a kit-voice limit that stays). What has to change, checked 20 Oct:
    - **Block mutes** and **song files**: done 20 Oct (9) (`setBlockMute` / `smuteX`, `songOut` / `songX`), tested with a
      `NT = 128` debug copy. Older versions and Thunder Perform's deck open such songs with tracks 1–32 and the master.
-   - **…chains only knows 32 tracks**: `CHAN_COUNT = 32` in `chains/chains-worklet.js` (Track In / Chain Out `track`
-     params, the per-track buffers `busesL/R` and `_tmpL/R`, the node's own `track`, two per-block loops) and 17 uses in
-     `chains/index.html` (the pickers). Tracks 33+ can't run through …chains until it's raised to NT. Small.
-   - **Sidechain by track**: `tapNode()` is one 32-input ChannelMerger feeding every …chains node's input 2 (Web Audio
-     caps a node at 32 channels). Plan (owner agreed 20 Oct, not built): merge only the tracks the patch's Sidechain In
-     modules pick (`src` > 0), send the worklet a track → channel map for `ctx.tap`, rewire when the picks change
-     (`chnDiff`). Limit becomes 32 different source tracks at once (a source shared by several tracks counts once);
-     each track's chain is its own node, so pairs stay independent (3 ducked by 2, 4 by 6). A `src` outside the map
-     falls back to the sidechain bus (the owner won't modulate `src`). Medium.
+   - **…chains' track limit** and **sidechain by track**: done 20 Oct (10) (`CHAN_COUNT = 128`, pickers follow the
+     app's NT; `chnTapList` / `tapmap`).
+   - (Sidechain by track: see above, done.)
    - **Screens**: Arrange with 129 columns needs more zoom / sideways scroll (side panel especially) and may need to draw
      only the visible cells (~33,000 at 256 rows); 3-digit track numbers in labels. Medium.
    - **Thunder Perform** (`matthettich/thunder-perform-`) runs this app as its decks (submodule on the `deck` branch):

@@ -368,7 +368,11 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
    document and sends changes to it through ChainsBridge.
    Phase 1 is UI-only: Track In modules are silence standalone; the host wires
    tracker audio in Phase 2. */
-const PROTOCOL = 2, TARGET = 'chains', CHAN_COUNT = 32;
+// CHAN_COUNT: the tracks a patch can address (as the engine, 128 since 20 Oct). TRK_N: how many the pickers list, the
+// host app's track count (...Thunder Plus says, thunderChains.tracks), else 32. NSEND: Sidechain Out's sends.
+const PROTOCOL = 2, TARGET = 'chains', CHAN_COUNT = 128, NSEND = 8;
+const TRK_N = (() => { try { const w = window.parent !== window && window.parent.thunderChains; return w && w.tracks > 0 ? Math.min(CHAN_COUNT, w.tracks | 0) : 32; } catch (e) { return 32; } })();
+const trackOpts = () => Array.from({length:TRK_N}, (_, i) => [i + 1, 'Track ' + (i + 1)]);
 
 /* Module table. It mirrors MODULES in chains-worklet.js (inputs, outputs and parameter ranges must match).
    ui: per-parameter label (l), value format (f) and dropdown choices (c). */
@@ -962,8 +966,25 @@ Object.assign(SHARED_MODULES, {
       release:{l:'Release', f:v => Math.round(v * 100) + '% of the step'}, curve:{l:'Curve', f:pct} },
     about:'Pump: the “sidechain” duck without a sidechain. On every quarter note (or Every) the level drops by Depth and comes back over Release, a share of the step; Curve goes from a straight line to a fast early recovery. The pumping of a kick-ducked pad or bass, locked to the song.' }, STEREO)
 });
-Object.assign(SHARED_FAMILY, { sdelay:'afx', filter:'afx', cut:'afx', compressor:'util', ngate:'util', autopan:'afx', pump:'afx' });
-SHARED_PALETTE.push(['Basic effects', [['sdelay', 'Simple delay'], ['filter', 'Filter'], ['cut', 'Low and high cut'], ['compressor', 'Compressor'], ['ngate', 'Noise gate'], ['autopan', 'Auto-pan'], ['pump', 'Pump (ducking)']], 'audio']);
+/* Bus Comp and Glue Comp (20 Oct): stereo bus compressors with a sidechain input. */
+const BC_RELN = ['0.1 s', '0.3 s', '0.6 s', '1.2 s', 'Auto'], BC_HPFN = ['Off', '60 Hz', '90 Hz', '150 Hz', '250 Hz'];
+Object.assign(SHARED_MODULES, {
+  buscomp:Object.assign({ label:'Bus Comp', scope:'mono',
+    params:{ thresh:[-12,-40,0,.1], ratio:[1,0,2,1], attack:[4,0,5,1], release:[4,0,4,1], makeup:[0,0,20,.1], schpf:[0,0,4,1], source:[0,0,1,1], mix:[1,0,1,.01] },
+    ui:Object.assign({ thresh:{l:'Threshold', f:db}, ratio:{l:'Ratio', c:opts(['2:1', '4:1', '10:1'])}, attack:{l:'Attack', c:opts(['0.1 ms', '0.3 ms', '1 ms', '3 ms', '10 ms', '30 ms'])},
+      release:{l:'Release', c:opts(BC_RELN)}, makeup:{l:'Makeup', f:db}, schpf:{l:'SC high-pass', c:opts(BC_HPFN)}, source:{l:'Source', c:opts(['Self', 'Sidechain'])} }, MIXP), display:'gr',
+    about:'Bus Comp: the punchy console bus compressor for a group or the mix, both sides together. Ratio 2, 4 or 10:1, Attack and Release in the classic steps (Auto release follows the music: quick after a hit, slower while it holds), Makeup to bring the level back. SC high-pass keeps the lows out of what it listens to, so a kick or bass doesn’t pump everything. It listens to its own sound, the Mixer’s sidechain bus (Source Sidechain), or a cable into SC (a Sidechain In set to a track or a send: one bus ducking another). Mix for parallel compression; the meter shows the gain reduction.' }, SC_IO),
+  glue:Object.assign({ label:'Glue Comp', scope:'mono',
+    params:{ thresh:[-15,-40,0,.1], ratio:[2,1,10,.1], attack:[.01,.0001,.03,.0001], release:[.3,.05,1.5,.01], auto:[1,0,1,1], knee:[8,0,18,.1],
+      range:[20,1,40,.5], makeup:[0,0,20,.1], clip:[0,0,1,1], schpf:[0,0,4,1], source:[0,0,1,1], mix:[1,0,1,.01] },
+    ui:Object.assign({ thresh:{l:'Threshold', f:db}, ratio:{l:'Ratio', f:v => v.toFixed(1) + ':1'}, attack:{l:'Attack', f:v => v < .01 ? (v * 1000).toFixed(1) + ' ms' : secs(v)},
+      release:{l:'Release', f:secs}, auto:{l:'Auto release', c:opts(['Off (use Release)', 'On'])}, knee:{l:'Knee', f:v => v.toFixed(1) + ' dB'},
+      range:{l:'Range', f:v => '−' + v.toFixed(1) + ' dB at most'}, makeup:{l:'Makeup', f:db}, clip:{l:'Soft clip', c:opts(['Off', 'On'])},
+      schpf:{l:'SC high-pass', c:opts(BC_HPFN)}, source:{l:'Source', c:opts(['Self', 'Sidechain'])} }, MIXP), display:'gr',
+    about:'Glue Comp: the smooth bus compressor that makes a group sound like one performance. It listens to the average level (not each peak), with a wide Knee, so it eases in; Range caps how far it ever turns down, Auto release follows the music, and Soft clip rounds off the loudest peaks after Makeup. SC high-pass, Source and the SC input work as on the Bus Comp. Mix blends in the dry sound.' }, SC_IO)
+});
+Object.assign(SHARED_FAMILY, { sdelay:'afx', filter:'afx', cut:'afx', compressor:'util', ngate:'util', autopan:'afx', pump:'afx', buscomp:'util', glue:'util' });
+SHARED_PALETTE.push(['Basic effects', [['sdelay', 'Simple delay'], ['filter', 'Filter'], ['cut', 'Low and high cut'], ['compressor', 'Compressor'], ['buscomp', 'Bus Comp'], ['glue', 'Glue Comp'], ['ngate', 'Noise gate'], ['autopan', 'Auto-pan'], ['pump', 'Pump (ducking)']], 'audio']);
 function mergeShared(palette, groupFam, portLabel){
   const have = new Set(); for (const [, items] of palette) for (const [t] of items) have.add(t);
   for (const [g, items, where] of SHARED_PALETTE){
@@ -987,12 +1008,12 @@ function mergeShared(palette, groupFam, portLabel){
    tint), so what's what reads at a glance, zoomed out. */
 const PAL_LAYOUT = [
   ['§In and out'],
-  ['In and out', '#0f8f8f', ['trackIn', 'chainOut', 'scin', 'resample', 'out']],
+  ['In and out', '#0f8f8f', ['trackIn', 'chainOut', 'scin', 'scout', 'resample', 'out']],
   ['§Sound'],
   ['Sound sources', '#b8792a', ['string', 'vco', 'fm', 'additive', 'noise', 'plaits', 'elements', 'bytebeat', 'blipdrum']],
   ['§Mix and dynamics'],
   ['Mix and level', '#7b8794', ['mixer', 'smixer', 'vca', 'utility', 'width', 'meter']],
-  ['Dynamics', '#e07a2e', ['compressor', 'comp', 'sccomp', 'limiter', 'ngate', 'ott', 'transient']],
+  ['Dynamics', '#e07a2e', ['compressor', 'buscomp', 'glue', 'comp', 'sccomp', 'limiter', 'ngate', 'ott', 'transient']],
   ['§Effects'],
   ['Filters and EQ', '#2e9e4f', ['filter', 'cut', 'eq', 'air', 'vcf', 'ladder', 'blades', 'autowah', 'envfilt', 'vowel']],
   ['Drive and lo-fi', '#d23c3c', ['saturation', 'odrive', 'drive', 'tube', 'folder', 'cab', 'crush', 'lofi', 'degrade', 'tape', 'vinyl', 'dub']],
@@ -1059,12 +1080,13 @@ function buildShow(n){
   const kind = MODULES[n.m.type].display;
   if (kind === 'bars' || kind === 'life'){ const box = h('div', {class:'shw ' + kind}); (kind === 'bars' ? buildBars : buildLife)(n, box); return box; }
   const box = h('div', {class:'shw' + (kind === 'gr' ? ' gr' : '')}), rows = [];
-  const mk = lbl => { const i = h('i'), b = h('b'), v = h('span', {text:'—'}), tr = h('div', {class:'tr'}, i, b);
+  const mk = lbl => { const i = h('i'), b = h('b'), v = h('span', {text:'—'}), tr = h('div', {class:'tr'}, i, b); i.style.transform = 'scaleX(0)';   // empty until the first reading
     if (kind === 'meter'){ const z = h('span', {class:'z'}); z.style.left = (showPos(0) * 100) + '%'; tr.append(z); }
     const r = h('div', {class:'ch'}, h('span', {text:lbl}), tr, v); box.append(r); rows.push({r, i, b, v, hold:-200, ht:0}); };
   if (kind === 'meter'){ mk('L'); mk('R'); box.title = 'Bars: average (VU) level. Tick: peak (held 1.5 s). Number: peak in dB. The red line is 0 dB.'; }
   else if (kind === 'scin'){ mk('IN'); mk('ENV'); rows[1].b.hidden = true; box.classList.add('sci'); box.title = 'IN: the level of what Source picks (peak, dB). ENV: the envelope its hits make (what Env and Duck send out).'; }
-  else { mk('GR'); rows[0].b.hidden = true; box.title = 'Gain reduction: how much the limiter is turning the sound down.'; }
+  else if (kind === 'scout'){ mk('SEND'); box.classList.add('sci'); box.title = 'What this Sidechain Out sends (peak, dB).'; }
+  else { mk('GR'); rows[0].b.hidden = true; box.title = 'Gain reduction: how much it is turning the sound down.'; }
   n.show = { kind, rows, seen:0 };
   return box;
 }
@@ -1084,6 +1106,8 @@ function paintShows(list){
     if (S.kind === 'bars'){ for (let i = 0; i < 8; i++) S.lit[i] = Math.max(S.lit[i], v[i] || 0); continue; }
     if (S.kind === 'life'){ S.x = v[0]; S.gen = v[1]; S.live = v.slice(2, 10); continue; }
     if (S.kind === 'scin'){ scinPaint(S, v[0], v[1], now); continue; }
+    if (S.kind === 'scout'){ const A = S.rows[0], pk = v[0]; A.i.style.transform = 'scaleX(' + showPos(pk) + ')'; if (pk >= A.hold || now - A.ht > 1500){ A.hold = pk; A.ht = now; }
+      A.b.style.left = (showPos(A.hold) * 100) + '%'; A.v.textContent = A.hold <= -90 ? '−∞' : (A.hold > 0 ? '+' : '') + A.hold.toFixed(1); continue; }
     if (S.kind === 'meter') for (let c = 0; c < 2; c++){
       const R = S.rows[c], vu = v[c], pk = v[c + 2];
       R.i.style.transform = 'scaleX(' + showPos(vu) + ')';
@@ -1154,7 +1178,7 @@ const mixShown = (m, k) => !MIXT.has(m.type) || mixChan(k) <= (Math.round(m.para
 const MODULES = {
   trackIn:{ label:'Track In', scope:'mono', inputs:{}, outputs:{ out:'audio', outR:'audio' },
     params:{ track:[1,1,CHAN_COUNT,1] },
-    ui:{ track:{l:'Track', c:Array.from({length:CHAN_COUNT}, (_, i) => [i + 1, 'Track ' + (i + 1)])} } },
+    ui:{ track:{l:'Track', c:trackOpts()} } },
 
   resample:{ label:'Resample', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
     params:{ rec:[0,0,1,1], bars:[1,0,3,1], pad:[7,0,31,1], slices:[3,0,4,1] },
@@ -1213,8 +1237,9 @@ const MODULES = {
       res:{l:'Resonance', f:pct}, atk:{l:'Attack', f:v => Math.round(v) + ' ms'}, rel:{l:'Release', f:v => Math.round(v) + ' ms'},
       mix:{l:'Mix', f:wet}, level:{l:'Level', f:pct} } },
   // SOURCE (owner, 19 Oct): the bus (the Mixer's SC row) or one track's own sound; a meter shows what it hears.
-  scin:{ label:'Sidechain In', scope:'mono', inputs:{}, outputs:{ out:'audio', env:'cv', duck:'cv' }, params:{ src:[0,0,CHAN_COUNT,1], send:[1,0,1,.01], sens:[6,-12,24,.5], release:[150,10,1000,1] },
-    ui:{ src:{l:'Source', fixed:true, c:[[0, 'Sidechain bus (Mixer SC)'], ...Array.from({length:CHAN_COUNT}, (_, i) => [i + 1, 'Track ' + (i + 1)])]},
+  scin:{ label:'Sidechain In', scope:'mono', inputs:{}, outputs:{ out:'audio', env:'cv', duck:'cv' }, params:{ src:[0,0,CHAN_COUNT,1], snd:[0,0,NSEND,1], send:[1,0,1,.01], sens:[6,-12,24,.5], release:[150,10,1000,1] },
+    ui:{ src:{l:'Source', fixed:true, c:[[0, 'Sidechain bus (Mixer SC)'], ...trackOpts()]},
+      snd:{l:'Send', fixed:true, c:[[0, 'Off (use Source)'], ...Array.from({length:NSEND}, (_, i) => [i + 1, 'Send ' + (i + 1) + ' (a Sidechain Out)'])]},
       send:{l:'Level', f:pct}, sens:{l:'Sensitivity', f:db}, release:{l:'Release', f:v => Math.round(v) + ' ms'} }, display:'scin' },
   sccomp:{ label:'Sidechain Comp', scope:'mono', inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' }, params:{ threshold:[.3,0,1,.001], ratio:[4,1,20,.1], attack:[6,.1,200,.1], release:[140,5,2000,1], makeup:[1,1,4,.01], mix:[1,0,1,.01] },
     ui:{ threshold:{l:'Threshold', f:pct}, ratio:{l:'Ratio', f:v => v.toFixed(1) + ':1'}, attack:{l:'Attack', f:v => Math.round(v) + ' ms'}, release:{l:'Release', f:v => Math.round(v) + ' ms'}, makeup:{l:'Makeup', f:pct}, mix:{l:'Mix', f:wet} } },
@@ -1236,7 +1261,11 @@ const MODULES = {
 
   chainOut:{ label:'Chain Out', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{},
     params:{ track:[1,1,CHAN_COUNT,1], level:[1,0,2,.01] },
-    ui:{ track:{l:'Track', c:Array.from({length:CHAN_COUNT}, (_, i) => [i + 1, 'Track ' + (i + 1)])}, level:{l:'Level', f:pct} } }
+    ui:{ track:{l:'Track', c:trackOpts()}, level:{l:'Level', f:pct} } },
+  // SENDS (20 Oct): Send 1–8 for any Sidechain In (Send) to listen to, in this chain or another track's.
+  scout:{ label:'Sidechain Out', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{},
+    params:{ snd:[1,1,NSEND,1], level:[1,0,2,.01] },
+    ui:{ snd:{l:'Send', fixed:true, c:Array.from({length:NSEND}, (_, i) => [i + 1, 'Send ' + (i + 1)])}, level:{l:'Level', f:pct} }, display:'scout' }
 };
 Object.assign(MODULES, SHARED_MODULES);
 for (const [t, d] of Object.entries(MODULES)){
@@ -1477,7 +1506,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=32';
+    const url = opts.url || './chains-worklet.js?v=33';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -1595,6 +1624,9 @@ const PORT_TIP = {
          env:{ l:'Envelope', t:'Sidechain envelope — rises as the sidechain hits, as a control voltage. Patch into a CV jack to open something on each hit (a cutoff…).' },
          duck:{ l:'Duck', t:'Sidechain duck — 1 while the sidechain is quiet, dipping on each hit. Patch into a VCA’s CV to duck a sound (the classic pump).' } },
   sccomp:{ sc:{ t:'Sidechain input — patch a signal here to duck by it, or leave it unpatched to use the Mixer’s Sidechain Out bus. The light flashes with the sidechain it hears.' } },
+  buscomp:{ sc:{ t:'Sidechain input — a cable here always wins: patch a Sidechain In (set to a track or a send) to duck by it. Unpatched: its own sound, or the Mixer’s sidechain bus with Source on Sidechain.' } },
+  glue:{ sc:{ t:'Sidechain input — a cable here always wins: patch a Sidechain In (set to a track or a send) to duck by it. Unpatched: its own sound, or the Mixer’s sidechain bus with Source on Sidechain.' } },
+  scout:{ in:{ t:'What to send: Send (1–8) carries it to every Sidechain In set to that send, in this chain or another track’s.' } },
 };
 function portTip(type, port){ return PORT_TIP[type] && PORT_TIP[type][port]; }
 function makeJack(n, port, kind, dir, small){
@@ -1629,24 +1661,28 @@ function applyChainTrack(m, N){
 }
 function chainTrackLists(){ const ins = [], outs = []; for (const x of nodes.values()){ if (x.m.type === 'trackIn') ins.push(x.m); else if (x.m.type === 'chainOut') outs.push(x.m); } return { ins, outs }; }
 function routeTrackChange(n, v){
-  const N = Math.max(1, Math.min(CHAN_COUNT, Math.round(+v) || 1)), { ins, outs } = chainTrackLists(), old = n.m.params.track | 0;
+  const N = Math.max(1, Math.min(TRK_N, Math.round(+v) || 1)), { ins, outs } = chainTrackLists(), old = n.m.params.track | 0;
   if (n.m.type === 'trackIn'){
     // A track that already has a chain: stay here (no jump to the other chain, which was disorienting) and say so.
     if (ins.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain, so this one stays on track ' + old + '. Pick a free track (the list marks the used ones).'); return { reject:true }; }
-    for (const o of outs) if ((o.params.track | 0) === old) applyChainTrack(o, N);   // this pair's Chain Out follows
+    for (const o of outs) if ((o.params.track | 0) === old && !o.bus) applyChainTrack(o, N);   // this pair's Chain Out follows (a bus's stays)
     return { v:N };
   }
-  // The Chain Out always follows its Track In, so a lone output snaps back rather than moving the input.
-  const mate = ins.find(m => (m.params.track | 0) === old);
-  if (mate){ const it = mate.params.track | 0; if (N !== it){ toast('Chain Out follows its Track In — track ' + it + '.'); return { v:it }; } }
-  if (outs.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain, so this one stays on track ' + old + '.'); return { reject:true }; }
+  // BUS (owner, 20 Oct): a Chain Out normally goes back to its Track In's track (an insert), and follows it. Set to a track
+  // no Track In is on, it is a bus (m.bus, kept with the patch): the tracks whose Track Ins feed it play through that track,
+  // after their own faders, and its fader and effects level them all. Back on a Track In's track, it's an insert again.
+  const bus = !ins.some(m => (m.params.track | 0) === N);
+  if (!bus && outs.some(m => m !== n.m && !m.bus && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain, so this one stays on track ' + old + '.'); return { reject:true }; }
+  if (bus && !n.m.bus) toast('Chain Out to track ' + N + ': a bus. The tracks whose Track In feed it now play through track ' + N + ', after their own faders; track ' + N + '’s fader and effects level them all.', 6000);
+  if (!bus && n.m.bus) toast('Chain Out back on track ' + N + ': an insert again.');
+  n.m.bus = bus ? 1 : 0;
   return { v:N };
 }
 function alignChainTracks(quiet){
   const { ins, outs } = chainTrackLists();
   if (ins.length !== 1) return;   // with several Track Ins, pairing is up to the user
   const N = ins[0].params.track | 0;
-  for (const o of outs) if ((o.params.track | 0) !== N){ applyChainTrack(o, N); if (!quiet) toast('Chain Out follows the Track In — track ' + N + '.'); }
+  for (const o of outs) if (!o.bus && (o.params.track | 0) !== N){ applyChainTrack(o, N); if (!quiet) toast('Chain Out follows the Track In — track ' + N + '.'); }   // a bus keeps its track
 }
 function setParam(n, key, v, fromUser){
   if (key === 'track' && (n.m.type === 'trackIn' || n.m.type === 'chainOut')){
@@ -1772,6 +1808,10 @@ function paintNote(n){
    The module keeps the name (m.pre, saved with the patch) and shows "edited" once a control moves (m.preEd).
    Choice values are the parameter's own numbers (e.g. sdelay div 6 = 1/8D). */
 const PRESETS = {
+  buscomp:[['Mix bus glue', {thresh:-14, ratio:0, attack:5, release:4, makeup:2, schpf:1}], ['Drum bus punch', {thresh:-18, ratio:1, attack:3, release:1, makeup:4}],
+    ['Smash', {thresh:-30, ratio:2, attack:0, release:0, makeup:10, mix:.5}], ['Sidechain duck', {thresh:-26, ratio:2, attack:1, release:2, source:1}]],
+  glue:[['Gentle glue', {thresh:-12, ratio:2, attack:.01, auto:1, knee:10, range:6, makeup:1.5}], ['Drum glue', {thresh:-18, ratio:4, attack:.003, auto:1, knee:6, range:12, makeup:3, clip:1}],
+    ['Master glue', {thresh:-10, ratio:1.5, attack:.03, auto:1, knee:12, range:4, makeup:1, schpf:2}], ['Pumping bus', {thresh:-28, ratio:6, attack:.0005, auto:0, release:.15, range:20, makeup:6}]],
   compressor:[['Gentle glue', {thresh:-20, ratio:2, attack:.03, release:.2, knee:10, makeup:2}], ['Drum punch', {thresh:-24, ratio:4, attack:.02, release:.1, knee:4, makeup:5}],
     ['Vocal leveller', {thresh:-24, ratio:3, attack:.005, release:.15, knee:8, makeup:5}], ['Parallel smash', {thresh:-36, ratio:10, attack:.001, release:.08, knee:2, makeup:12, mix:.4}],
     ['Sidechain duck', {source:1, thresh:-30, ratio:8, attack:.002, release:.18, knee:4}]],
@@ -2030,7 +2070,7 @@ function addModule(type, x, y, params){
   if (type === 'trackIn' || type === 'chainOut'){
     const same = doc.modules.filter(x => x.type === type), used = new Set(same.map(x => x.params.track | 0));
     if (type === 'chainOut'){ const ti = doc.modules.filter(x => x.type === 'trackIn'); if (ti.length === 1) m.params.track = ti[0].params.track | 0; }
-    if (used.has(m.params.track | 0)){ let n = 1; while (n <= CHAN_COUNT && used.has(n)) n++; m.params.track = Math.min(n, CHAN_COUNT); }
+    if (used.has(m.params.track | 0)){ let n = 1; while (n <= TRK_N && used.has(n)) n++; m.params.track = Math.min(n, TRK_N); }
   }
   doc.modules.push(m);
   if (bridge) bridge.addModule(m.id, type, { params:m.params, pos:m.pos });
@@ -2478,7 +2518,7 @@ function captureCustom(name, ids){
 function pasteTracks(graph){
   const out = new Map(), byTrack = new Map(), tk = m => m.params.track | 0;
   const usedIn = new Set(doc.modules.filter(x => x.type === 'trackIn').map(tk)), usedOut = new Set(doc.modules.filter(x => x.type === 'chainOut').map(tk));
-  const free = used => { let n = 1; while (n <= CHAN_COUNT && used.has(n)) n++; return n <= CHAN_COUNT ? n : 0; };
+  const free = used => { let n = 1; while (n <= TRK_N && used.has(n)) n++; return n <= TRK_N ? n : 0; };
   for (const cm of graph.modules) if (cm.type === 'trackIn'){
     const k = tk(cm); if (!usedIn.has(k)){ usedIn.add(k); continue; }
     const n = free(usedIn); if (n){ usedIn.add(n); out.set(cm.id, n); byTrack.set(k, n); }
@@ -2610,7 +2650,7 @@ const PALETTE = [
   ['Effects', [['eq','EQ'],['comp','Compressor'],['saturation','Saturation'],['tape','Tape'],['chorus','Chorus'],['crush','Bitcrush'],['delay','Tape delay'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['phaser','Phaser'],['reverb','Reverb'],['rings','Rings'],['clouds','Clouds'],['beads','Beads'],['vocoder','Vocoder']]],
   ['More effects', [['repeat','Repeat (beat repeat)'],['comb','Comb resonator'],['transient','Transient shaper'],['tgate','Trance gate'],['ott','Multiband squash'],['fshift','Frequency shifter'],['vinyl','Vinyl'],['dub','Dub tape'],['cab','Speaker cab'],['tube','Tube'],['flanger','Flanger'],['tremolo','Tremolo'],['odrive','Overdrive'],['folder','Wavefolder'],['autowah','Auto-wah'],['pshift','Pitch shifter'],['ladder','Ladder filter'],['xmod','Cross-mod'],['space','Space reverb'],['lofi','Lo-fi'],['drive','Drive'],['air','Air'],['room','Room reverb']]],
   ['Stereo', [['width','Width']]],
-  ['Sidechain', [['scin','Sidechain In'],['sccomp','Sidechain Comp']]],
+  ['Sidechain', [['scin','Sidechain In'],['scout','Sidechain Out'],['sccomp','Sidechain Comp'],['buscomp','Bus Comp'],['glue','Glue Comp']]],
   ['§Control', []],
   ['Modulation sources', [['lfo','LFO'],['adsr','ADSR'],['random','Random'],['atten','Attenuverter'],['steps','Steps'],['clock','Clock']]],
   ['§Audio → CV', []],
@@ -2841,7 +2881,7 @@ const pnameEl = document.getElementById('pname');
       play(){ if (TW && TW.play) TW.play(); },
       playing(){ return !!(TW && TW.playing && TW.playing()); },
       /* The app jumps to a track's chain (e.g. from the Mixer) by centring and highlighting its pair. */
-      focusTrack(N){ return focusChainTrack(Math.max(1, Math.min(CHAN_COUNT, N | 0))); },
+      focusTrack(N){ return focusChainTrack(Math.max(1, Math.min(TRK_N, N | 0))); },
       /* The bottom panel moved a control (the app has already sent it to the sound): show it here, and keep it in this
          patch so this editor's next save doesn't put the old value back. */
       setParam(id, key, v){ const n = nodes.get(id); if (!n || typeof v !== 'number') return; n.m.params[key] = v; const c = n.ctl[key]; if (c) c.show(); },
@@ -2926,7 +2966,7 @@ function helpDoc(){
   const EDGE = { afx:'#b24fb0', mod:'#c99a00', aout:'#3f6fb5', util:'#e07a2e' };
   const KC = { audio:'#22958d', mod:'#7a58c8', gate:'#c93d78' };
   const ABOUT = {
-    trackIn:'Your tracker track, in stereo. Pick the track (1–32); in …Thunder Plus it carries that track’s sound. On its own it is silence — patch it through effects into a Chain Out.',
+    trackIn:'Your tracker track, in stereo. Pick the track; in …Thunder Plus it carries that track’s sound. On its own it is silence — patch it through effects into a Chain Out. With its Chain Out on the same track it is an insert (the sound before the track’s own effects and fader). Into a Chain Out on another track it is a bus send: the track is heard after its own effects, fader and pan, and plays through that bus (several Track Ins into a mixer, a compressor, then Chain Out to a free track make a group bus).',
     vcf:'A filter. Low-pass softens, band-pass keeps the middle, high-pass thins. Patch an envelope into Cutoff for classic sweeps.',
     vca:'An amplifier. Patch an envelope into CV so notes start and stop (with nothing in CV it stays open); Gain sets the loudness.',
     mixer:'Mixes up to 16 sounds, each with its own level, plus a master level. Inputs sets how many channels it shows (4 to start).',
@@ -2946,13 +2986,14 @@ function helpDoc(){
     repeat:'Repeat: beat repeat. While Hold is on (or Gate is high) it loops the slice that just played, one note value long; Decay fades each pass and Pitch drops it. Reverse plays the slice backwards; Tape stop slows the sound to a halt.',
     vocoder:'A vocoder: the sound you patch into In (left) is the carrier, and In R is the modulator that shapes it (leave In R unpatched and it uses In for both). Mode picks the band count — Talkbox and the 4…64 band banks split the carrier into bands that the modulator’s levels open and close, or Spectral cross-synthesises them with an FFT. Resonance sharpens the bands, Attack and Release set how fast the levels follow, Mix blends the vocoded sound with the dry carrier, and Level sets the output.',
     scin:'Sidechain In: brings a sidechain into this chain. Source picks what it listens to: the sidechain bus (turn a track’s Sidechain Out on in the Mixer’s SC row) or one track’s own sound, before its effects and fader, so even a muted “ghost” kick drives it. The meter shows what it hears (IN) and the envelope (ENV), before you patch it anywhere. Out is the sound (Level sets how loud), Envelope rises with each hit (to open a filter) and Duck dips with it (into a VCA’s CV, to pump a sound). Sensitivity sets how hard the hits push them (raise it for a quiet kick) and Release how fast they recover. Or just drop a Sidechain Comp after this track’s sound.',
+    scout:'Sidechain Out: sends what you patch into it to Send 1–8. Any Sidechain In with its Send set to that number hears it, in this chain or in another track’s (in …Thunder Plus a block later, about 3 ms). So a drum bus made here can duck the pads on another track: Sidechain Out → Send 1 here, and there Sidechain In (Send 1) → the SC of a compressor.',
     sccomp:'Sidechain Comp: ducks its In by the sidechain — either the Mixer sidechain bus or whatever is patched into SC (so a kick on another track can pump this one). Threshold, Ratio, Attack, Release, Makeup and Mix. With nothing on the sidechain bus it falls back to compressing its own input.',
     lfo:'A slow oscillator for wobbles and sweeps. Depth sets how far it moves a slider; Sync to tempo follows the tempo. Reset restarts its cycle.',
     adsr:'An envelope for shaping effects: patch a gate into it and its output into a slider’s modulation jack.',
     random:'A new random value at Rate, or each time Clock fires. Smooth glides between values.',
     atten:'Scales a modulation signal (negative turns it upside down) and adds an offset.',
     resample:'Records what passes through it into a pad of the kit, so you can chop it like a breakbeat. Set Record to Armed while the song plays: it starts on the next bar, records Bars bars (4 beats each at the song tempo), loads the take into the chosen pad as a sample, cuts it into Slices on the instruments that play that pad, and sets Record back to Off. The sound passes through unchanged.',
-    chainOut:'Sends sound back to a tracker track, in stereo if you patch In R. Track picks which track it returns to (use the same track as your Track In); in …Thunder the Mixer sends it back through that track and anything after it.',
+    chainOut:'Sends sound back to a tracker track, in stereo if you patch In R. Track picks which track: the same track as its Track In for an insert, or another track to make a bus (that track’s fader and effects then level the bus, and the source tracks play through it). Level sets how loud.',
     adsr:'An envelope for shaping effects: patch a gate into it and its output into a slider’s modulation jack.'
   };
   const guide = [
@@ -3013,7 +3054,7 @@ window.addEventListener('keydown', e => { const ov = document.getElementById('he
 const meterBars = [];
 {
   const host = document.getElementById('meters');
-  for (let k = 0; k < CHAN_COUNT; k++){ const b = h('span', {class:'b', title:'Chain ' + (k + 1) + ' / Track ' + (k + 1)}, h('i')); host.append(b); meterBars.push(b.firstChild); }
+  for (let k = 0; k < TRK_N; k++){ const b = h('span', {class:'b', title:'Chain ' + (k + 1) + ' / Track ' + (k + 1)}, h('i')); host.append(b); meterBars.push(b.firstChild); }
 }
 function onMeter(m){
   modSeen = Date.now();
@@ -3026,11 +3067,11 @@ function onMeter(m){
     : (m.load < .5 ? 'Plenty of room' : m.load <= .8 ? 'Getting busy' : 'Overloaded: try Draft quality or fewer heavy effects.');
   if (EMBED){
     // Standalone peaks stay in the top-bar strip (this engine’s own buses).
-    for (let k = 0; k < CHAN_COUNT; k++){ busPeaks[k] = m.buses[k] || 0; if (meterBars[k]) meterBars[k].style.transform = 'scaleX(' + Math.min(1, busPeaks[k]) + ')'; }
+    for (let k = 0; k < TRK_N; k++){ busPeaks[k] = m.buses[k] || 0; if (meterBars[k]) meterBars[k].style.transform = 'scaleX(' + Math.min(1, busPeaks[k]) + ')'; }
     paintMods(m.mods || []); paintShows(m.shows);
     return;   // module meters belong to the host audio (paintHostMeters)
   }
-  for (let k = 0; k < CHAN_COUNT; k++){ busPeaks[k] = m.buses[k] || 0; if (meterBars[k]) meterBars[k].style.transform = 'scaleX(' + Math.min(1, busPeaks[k]) + ')'; }
+  for (let k = 0; k < TRK_N; k++){ busPeaks[k] = m.buses[k] || 0; if (meterBars[k]) meterBars[k].style.transform = 'scaleX(' + Math.min(1, busPeaks[k]) + ')'; }
   paintMods(m.mods || []); paintShows(m.shows); if (m.jacks) paintJacks(m.jacks); if (Array.isArray(m.byp)) setLiveByp(m.byp);
   if (m.wasm && (m.wasm.tfx !== WASM_OK.tfx)){ WASM_OK = m.wasm; for (const n of nodes.values()) paintNote(n); }
   for (const n of nodes.values()) if (n.meter) n.meter.style.transform = 'scaleX(' + Math.min(1, busPeaks[((n.m.params.track | 0) || 1) - 1] || 0) + ')';
@@ -3113,7 +3154,7 @@ function paintHostMeters(){
     n.meter.style.transform = 'scaleX(' + Math.min(1, src[k] || 0) + ')';
   }
   // The bus strip: the tracker audio wins over the preview engine's own buses.
-  for (let k = 0; k < CHAN_COUNT; k++){
+  for (let k = 0; k < TRK_N; k++){
     const v = hostPeaks[k] != null ? hostPeaks[k] : (busPeaks[k] || 0);
     if (meterBars[k]) meterBars[k].style.transform = 'scaleX(' + Math.min(1, v) + ')';
   }

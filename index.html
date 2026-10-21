@@ -2267,7 +2267,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" hidden></div>
 
-<script src="waves/waves-worklet.js?v=25"></script>
+<script src="waves/waves-worklet.js?v=26"></script>
 <script>
 /* ===ENGINE START=== */
 const BASE = 65.40639; // C2
@@ -3134,6 +3134,28 @@ const MODFX = {
     ['release', 'Release', 'log', 0.01, 2, 0.15, v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s'],
     ['knee', 'Knee', 'lin', 0, 24, 6, v => v.toFixed(1) + ' dB'],
     ['makeup', 'Makeup', 'lin', 0, 24, 0, v => '+' + v.toFixed(1) + ' dB'],
+    ['source', 'Source', 'opt', 0, 1, 0, ['Self', 'Sidechain']],
+    ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet']]},
+  buscomp:{name:'Bus Comp', short:'BUSC', long:'Bus Comp: the punchy console bus compressor: stepped ratio, attack and release with Auto, sidechain high-pass (Thunder original)', tail:false, pad:true, track:true, group:'Dynamics and EQ', credit:'Thunder original', ps:[
+    ['thresh', 'Threshold', 'lin', -40, 0, -12, v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'],
+    ['ratio', 'Ratio', 'opt', 0, 2, 1, ['2:1', '4:1', '10:1']],
+    ['attack', 'Attack', 'opt', 0, 5, 4, ['0.1 ms', '0.3 ms', '1 ms', '3 ms', '10 ms', '30 ms']],
+    ['release', 'Release', 'opt', 0, 4, 4, ['0.1 s', '0.3 s', '0.6 s', '1.2 s', 'Auto']],
+    ['makeup', 'Makeup', 'lin', 0, 20, 0, v => '+' + v.toFixed(1) + ' dB'],
+    ['schpf', 'SC high-pass', 'opt', 0, 4, 0, ['Off', '60 Hz', '90 Hz', '150 Hz', '250 Hz']],
+    ['source', 'Source', 'opt', 0, 1, 0, ['Self', 'Sidechain']],
+    ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet']]},
+  glue:{name:'Glue Comp', short:'GLUE', long:'Glue Comp: the smooth bus compressor: RMS, wide knee, Range, Auto release and soft clip, for groups and the master (Thunder original)', tail:false, pad:true, track:true, group:'Dynamics and EQ', credit:'Thunder original', ps:[
+    ['thresh', 'Threshold', 'lin', -40, 0, -15, v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'],
+    ['ratio', 'Ratio', 'log', 1, 10, 2, v => v.toFixed(1) + ':1'],
+    ['attack', 'Attack', 'log', 0.0001, 0.03, 0.01, v => v < 0.01 ? (v * 1000).toFixed(1) + ' ms' : Math.round(v * 1000) + ' ms'],
+    ['release', 'Release', 'log', 0.05, 1.5, 0.3, v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s'],
+    ['auto', 'Auto release', 'opt', 0, 1, 1, ['Off', 'On']],
+    ['knee', 'Knee', 'lin', 0, 18, 8, v => v.toFixed(1) + ' dB'],
+    ['range', 'Range', 'lin', 1, 40, 20, v => '−' + v.toFixed(1) + ' dB'],
+    ['makeup', 'Makeup', 'lin', 0, 20, 0, v => '+' + v.toFixed(1) + ' dB'],
+    ['clip', 'Soft clip', 'opt', 0, 1, 0, ['Off', 'On']],
+    ['schpf', 'SC high-pass', 'opt', 0, 4, 0, ['Off', '60 Hz', '90 Hz', '150 Hz', '250 Hz']],
     ['source', 'Source', 'opt', 0, 1, 0, ['Self', 'Sidechain']],
     ['mix', 'Mix', 'lin', 0, 1, 1, v => Math.round(v * 100) + '% wet']]},
   ngate:{name:'Noise gate', short:'NGAT', long:'Noise gate: silences the sound below a threshold, with hold, release, range and sidechain (Thunder original)', tail:false, pad:true, track:true, group:'Dynamics and EQ', credit:'Thunder original', ps:[
@@ -6968,7 +6990,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=25', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=26', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -12054,14 +12076,15 @@ let chainAutoBefore = null;
 function chainsAutoOn(before){
   if (chainAutoBefore) return; chainAutoBefore = before;
   setTimeout(() => { const b = chainAutoBefore; chainAutoBefore = null; let any = false;
-    for (const t of chainsTracks()) if (!b.has(t) && !S.chainOn[t]){ S.chainOn[t] = true; any = true; toast('Track ' + (t + 1) + ' now runs through …chains (Mixer → CHN is on).'); }
+    for (const t of chainsAutoTracks()) if (!b.has(t) && !S.chainOn[t]){ S.chainOn[t] = true; any = true; toast('Track ' + (t + 1) + ' now runs through …chains (Mixer → CHN is on).'); }
     if (any){ saveS(); chainsPush(); if (view === 'tracker') draw(); } }, 0);
 }
 window.thunderChains = {
+  get tracks(){ return NT; },   // how many tracks the editor's pickers list (Track In, Chain Out, Sidechain In's Source); a getter: NT is defined further down
   load: () => S.chainPatch ? JSON.parse(JSON.stringify(S.chainPatch)) : null,
   save: d => {
     if (CH.dropping) return;
-    const had = !!S.chainPatch, before = chainsTracks(); S.chainPatch = d;
+    const had = !!S.chainPatch, before = chainsAutoTracks(); S.chainPatch = d;
     if (had) chainsAutoOn(before);   // not on the very first save, which is the editor's starter patch
     chainsChanged();
   },
@@ -12069,7 +12092,7 @@ window.thunderChains = {
      No structural diff, no native-FX rebuild — smooth while dragging. */
   param(id, name, value){
     const d = S.chainPatch; if (!d || !Array.isArray(d.modules)) return;
-    const before = name === 'track' ? chainsTracks() : null;
+    const before = name === 'track' ? chainsAutoTracks() : null;
     const m = d.modules.find(x => x.id === id); if (m) (m.params = m.params || {})[name] = value;
     if (before){ chainsAutoOn(before); chainsPush(); }   // a Track In / Chain Out moved: re-route the tracks either way
     if (!rt || !rt.pl) return;
@@ -12785,7 +12808,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=32')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=33')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -12800,7 +12823,57 @@ const chnClone = o => o == null ? o : JSON.parse(JSON.stringify(o));
    reads them every block, so sliders move the sound smoothly); only real structure becomes
    add/remove/connect/disconnect. A missing/short previous patch forces a full reload. */
 // SOURCE: does the patch have a Sidechain In listening to a track (so the …chains nodes need every track's own sound)?
-const chnTaps = d => !!(d && Array.isArray(d.modules) && d.modules.some(m => m && m.type === 'scin' && m.params && Math.round(+m.params.src || 0) > 0));
+// SOURCE: the tracks the patch's Sidechain In modules listen to (Source set to a track, no Send picked), sorted, at most 32
+// (Web Audio's channel limit for the one connection that carries them; owner, 20 Oct: 32 different source tracks is plenty).
+function chnTapList(d){
+  const set = new Set();
+  if (d && Array.isArray(d.modules)) for (const m of d.modules) if (m && m.type === 'scin' && m.params){
+    const k = Math.round(+m.params.src || 0), sn = Math.round(+m.params.snd || 0); if (k > 0 && !(sn > 0) && k <= NT) set.add(k - 1); }
+  return [...set].sort((a, b) => a - b).slice(0, 32);
+}
+const chnTaps = d => chnTapList(d).length > 0;
+// SENDS: the patch has a Sidechain Out, or a Sidechain In listening to a send.
+const chnSends = d => !!(d && Array.isArray(d.modules) && d.modules.some(m => m && (m.type === 'scout' || (m.type === 'scin' && m.params && Math.round(+m.params.snd || 0) > 0))));
+/* BUS (owner, 20 Oct): a chain whose Track In is on one track and whose Chain Out goes to another is a bus: tracks 1, 2, 3
+   → a mixer → a compressor → Chain Out 4. busPlan() says which tracks feed which: for every Track In (track t), the Chain
+   Out tracks its sound reaches through the patch's cables. A Chain Out on another track b makes t a source of bus b, heard
+   there after its own effects, fader and pan (as a DAW's bus); t is pure when its sound doesn't come back out on t too, and
+   then plays only through the bus. Only tracks with CHN on take part, and a bus only while its own track runs through
+   …chains (chainsFeed), so a source is never silenced by a bus that isn't there. A loop (1 into 4 and 4 into 1) can't play:
+   the cable that closes it is left out (plan.loop). Cached on a cheap fingerprint of the patch's tracks and cables. */
+let busPlanH = null, busPlanVal = null;
+function busPlan(){
+  const d = S.chainPatch, ok = !!(d && d.format === 'chains.patch' && Array.isArray(d.modules));
+  let h = ok ? 7 : 0; const mx = v => { h = (h * 31 + v) | 0; }, ms = x => { x = String(x); for (let i = 0; i < x.length; i++) mx(x.charCodeAt(i)); };
+  if (ok){ for (const m of d.modules) if (m){ ms(m.id); const k = m.type === 'trackIn' ? 1 : m.type === 'chainOut' ? 2 : 3; mx(k); if (k < 3) mx(+(m.params && m.params.track) | 0); }
+    for (const c of d.cables || []) if (c && c.from && c.to){ ms(c.from[0]); mx(59); ms(c.to[0]); } }
+  for (let t = 0; t < NT; t++) mx(S.chainOn && S.chainOn[t] ? 2 : 1);
+  if (busPlanVal && busPlanH === h) return busPlanVal;
+  busPlanH = h;
+  const feeds = new Map(), targets = new Map(), pure = new Set(), P = busPlanVal = {feeds, targets, pure, loop:false};
+  if (!ok) return P;
+  const by = new Map(); for (const m of d.modules) if (m && m.id != null) by.set(m.id, m);
+  const nx = new Map(); for (const c of d.cables || []) if (c && c.from && c.to){ const a = c.from[0]; if (!nx.has(a)) nx.set(a, []); nx.get(a).push(c.to[0]); }
+  const trk = m => { const k = int(m.params && m.params.track, 1); return k >= 1 && k <= NT ? k - 1 : -1; };
+  const adj = new Map(), reaches = (a, b) => { const seen = new Set([a]), w = [a]; while (w.length){ const x = w.pop(); if (x === b) return true; for (const y of adj.get(x) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } } return false; };
+  for (const m of by.values()){
+    if (m.type !== 'trackIn') continue; const t = trk(m); if (t < 0 || !(S.chainOn && S.chainOn[t])) continue;
+    const seen = new Set([m.id]), w = [m.id], outs = new Set();
+    while (w.length){ const id = w.pop(), x = by.get(id); if (x && x.type === 'chainOut'){ const o = trk(x); if (o >= 0) outs.add(o); }
+      for (const y of nx.get(id) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } }
+    let fed = false;
+    for (const b of [...outs].sort((a, c) => a - c)){
+      if (b === t || !chainsFeed(b)) continue;
+      if (reaches(b, t)){ P.loop = true; continue; }
+      if (!adj.has(t)) adj.set(t, []); adj.get(t).push(b); fed = true;
+      if (!feeds.has(b)) feeds.set(b, []); feeds.get(b).push(t);
+      if (!targets.has(t)) targets.set(t, []); targets.get(t).push(b);
+    }
+    if (fed && !outs.has(t)) pure.add(t);
+  }
+  for (const v of feeds.values()) v.sort((a, b) => a - b);
+  return P;
+}
 function chnDiff(prev, next){
   if (!next) return [];
   // STEREO: the engine patched an older (no st2) patch's right sides itself; once the editor saves them (st2), reload
@@ -12826,11 +12899,15 @@ function chnDiff(prev, next){
 }
 function chainsNode(ac, track, patch, tempo){
   if (!chnSync.has(ac)) return null;   // module not loaded yet: caller re-routes when ready
-  // Inputs: 0 the track, 1 the sidechain bus, 2 (SOURCE) every track's own sound, one channel each, when the patch has a
-  // Sidechain In set to a track. 'max' so input 2 arrives with all 32 channels (a mono track input is read as both sides).
-  const n = new AudioWorkletNode(ac, 'thunder-chains', {numberOfInputs:3, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
+  // Inputs: 0 the track, 1 the sidechain bus, 2 (SOURCE) the own sound of each track a Sidechain In listens to, one channel
+  // each ('tapmap' says which), 3 (SENDS) the Sidechain Out sends, a block late, 4 and 5 (BUS) the other tracks this chain
+  // takes in, after their faders, 16 stereo pairs each ('busmap'). Outputs: 0 the track's return, 1 (SENDS) this node's
+  // Sidechain Outs, one channel per send. 'max' so the inputs arrive with all their channels.
+  const n = new AudioWorkletNode(ac, 'thunder-chains', {numberOfInputs:6, numberOfOutputs:2, outputChannelCount:[2, 8], channelCount:2,
     channelCountMode:'max', channelInterpretation:'speakers',
-    processorOptions:{bytes:chnBin(), track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac)}});
+    processorOptions:{bytes:chnBin(), track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac),
+      // BUS and SOURCE maps from the start (later changes go as messages): an offline render can finish before a message arrives.
+      busMap:(busPlan().feeds.get(track) || []).slice(0, 32), tapMap:chnTapList(patch)}});
   n.load = 0;
   // 2048 samples (~45 ms) per look, read every 60 ms, so short hits (hats, clicks) still show on the meters.
   n.an = ac.createAnalyser(); n.an.fftSize = 2048;   // hears the chains return: the chain screen's Chain Out meters
@@ -12897,10 +12974,16 @@ function resampleApply(v){
 function chainsTracks(){
   const ids = new Set();
   for (const m of ((S.chainPatch && S.chainPatch.modules) || []))
-    if (m && m.type === 'chainOut'){ const k = clamp(int(m.params && m.params.track, 1), 1, NT) - 1; ids.add(k); }
+    if (m && m.type === 'chainOut'){ const k = int(m.params && m.params.track, 1); if (k >= 1 && k <= NT) ids.add(k - 1); }   // a track this version doesn't have: ignored
   return ids;
 }
 const chainsFeed = t => !!(S.chainOn && S.chainOn[t] && chainsTracks().has(t));
+// The tracks a NEW pair turns CHN on for: Chain Out tracks, and (BUS, 20 Oct) Track In tracks, a bus's sources.
+function chainsAutoTracks(){
+  const ids = chainsTracks();
+  for (const m of ((S.chainPatch && S.chainPatch.modules) || [])) if (m && m.type === 'trackIn'){ const k = int(m.params && m.params.track, 1); if (k >= 1 && k <= NT) ids.add(k - 1); }
+  return ids;
+}
 function tfxBin(){ return tfxBytes || null; }   // the effects wasm, once the loader has fetched it (false when it couldn't)
 // Resolves true once this audio context can make effect nodes.
 function tfxReady(ac){
@@ -13241,7 +13324,11 @@ function freePhrase(){
   for (let i = 0; i < 256; i++) if (!used.has(i) && isEmptyPhrase(S.phrases[i])) return i;
   return -1;
 }
-const audible = t => { const any = S.mix.some(m => m.solo); return !S.mix[t].mute && (!any || S.mix[t].solo); };
+const audible = t => { const any = S.mix.some(m => m.solo); if (S.mix[t].mute) return false; if (!any || S.mix[t].solo) return true;
+  // BUS (20 Oct): soloing a bus keeps its sources playing into it; soloing a source keeps its bus (DAW behaviour).
+  const P = busPlan(); for (const b of P.targets.get(t) || []) if (S.mix[b] && S.mix[b].solo) return true;
+  for (const u of P.feeds.get(t) || []) if (S.mix[u] && S.mix[u].solo) return true;
+  return false; };
 // A muted song block: the sect stays on the song, it just plays silently (a pattern-matrix mute).
 // Track t's mute bit for song row y. The master column (MT) has none. JS bit operations are 32-bit (1 << 32 is 1, track
 // 1's bit), so tracks 1–32 live in smute[y] (as they always have, so every version reads them) and tracks 33 and up, only
@@ -13620,16 +13707,68 @@ function makePlayer(ac, out, getBuf, live){
   // SIDECHAIN IN by track (owner, 19 Oct): every track's own sound, mono, before its effects and fader (so a muted
   // ghost kick still drives it, and nothing can loop back into a chain), one channel per track on a 32-channel merger
   // that goes to input 2 of the …chains nodes while the patch has a Sidechain In set to a track. Made when first needed.
-  let taps = null;
-  const tapNode = () => { if (!taps){ taps = ac.createChannelMerger(NT); for (let t = 0; t < NT; t++) try { buses[t].inp.connect(taps, 0, t); } catch(e){} } return taps; };
+  // 20 Oct: only the tracks picked (chnTapList), so any track can be a source (a node takes at most 32 channels), and each
+  // node is told which channel is which track ('tapmap'). Rebuilt when the picks change.
+  let taps = null, tapKey = null, tapList = [];
+  function tapNode(){
+    const list = chnTapList(S.chainPatch), key = list.join(',');
+    if (taps && key === tapKey) return taps;
+    if (taps){ try { taps.disconnect(); } catch(e){} for (const t of tapList) try { buses[t].inp.disconnect(taps); } catch(e){} }
+    for (const b of buses) if (b) b._tapTo = null;
+    taps = ac.createChannelMerger(Math.max(1, list.length)); tapList = list; tapKey = key;
+    list.forEach((t, i) => { try { buses[t].inp.connect(taps, 0, i); } catch(e){} });
+    const want = chnTaps(S.chainPatch);
+    for (const b of buses) if (b && b.chn && want){ try { taps.connect(b.chn, 0, 2); b._tapTo = b.chn; if (b.chn._send) b.chn._send({target:'chains-host', op:'tapmap', value:tapList}); } catch(e){} }
+    return taps;
+  }
   function tapSync(b){
     if (!b) return;
     const want = !!b.chn && chnTaps(S.chainPatch);
+    if (want) tapNode();   // the picks may have changed (rebuilds and reconnects every node)
     if (b._tapTo && (b._tapTo !== b.chn || !want)){ try { taps.disconnect(b._tapTo, 0, 2); } catch(e){} b._tapTo = null; }
-    if (want && !b._tapTo){ try { tapNode().connect(b.chn, 0, 2); b._tapTo = b.chn; } catch(e){} }
+    if (want && !b._tapTo){ try { taps.connect(b.chn, 0, 2); b._tapTo = b.chn; if (b.chn._send) b.chn._send({target:'chains-host', op:'tapmap', value:tapList}); } catch(e){} }
   }
   const tapsSync = () => { for (let t = 0; t < NT; t++) tapSync(buses[t]); };
-  const inpTap = t => { if (taps && t < NT) try { buses[t].inp.connect(taps, 0, t); } catch(e){} };   // rewiring a track disconnects its input from everything
+  const inpTap = t => { const i = tapList.indexOf(t); if (taps && i >= 0) try { buses[t].inp.connect(taps, 0, i); } catch(e){} };   // rewiring a track disconnects its input from everything
+  // SENDS (20 Oct): every chain node's Sidechain Out sends (output 1, one channel per send) are summed here and come back,
+  // one block (128 samples) later, on every node's input 3, so chains can hear each other without a loop (a loop in Web
+  // Audio needs a delay in it, and plays silence otherwise).
+  const sendBus = ac.createGain(), sendDly = ac.createDelay(0.05);
+  for (const x of [sendBus, sendDly]){ x.channelCount = 8; x.channelCountMode = 'explicit'; x.channelInterpretation = 'discrete'; }
+  sendDly.delayTime.value = 128 / ac.sampleRate; sendBus.connect(sendDly);
+  function sendSync(b){
+    if (!b) return;
+    const want = !!b.chn && chnSends(S.chainPatch);
+    if (b._sendTo && (b._sendTo !== b.chn || !want)){ try { b._sendTo.disconnect(sendBus); } catch(e){} try { sendDly.disconnect(b._sendTo, 0, 3); } catch(e){} b._sendTo = null; }
+    if (want){ try { b.chn.connect(sendBus, 1); sendDly.connect(b.chn, 0, 3); b._sendTo = b.chn; } catch(e){} }   // again after a rewire (it drops the node's outputs); a repeat connect is ignored
+  }
+  // BUS (20 Oct): each bus track's chain node hears its sources (busPlan) after their effects, fader and pan, as stereo pairs
+  // on inputs 4 and 5 (a splitter per source, a 32-channel merger per 16 sources), told which is which ('busmap'). A pure
+  // source no longer goes to the speakers (only through its bus). Rebuilt when the plan or the nodes change; off: no buses
+  // (a render of one source's stem).
+  let busKey = '', busOff = false;
+  function busSync(){
+    const P = busOff ? null : busPlan(), want = [];
+    if (P) for (const [bt, src] of P.feeds){ const b = buses[bt]; if (b && b.chn) want.push([bt, src.slice(0, 32)]); }
+    const routed = new Set(); if (P) for (const [, src] of want) for (const t of src) if (P.pure.has(t)) routed.add(t);
+    const key = want.map(([bt, src]) => bt + ':' + src.join(',') + ':' + (buses[bt].chn.__k || (buses[bt].chn.__k = Math.random()))).join('|') + '/' + [...routed].join(',');
+    if (key === busKey) return; busKey = key;
+    for (const b of buses){ if (!b) continue;
+      if (b._feedM){ for (const m of b._feedM) try { m.disconnect(); } catch(e){} b._feedM = null; }
+      if (b.spl) try { b.spl.disconnect(); } catch(e){}
+      if (b._routed){ try { b.p.connect(out); } catch(e){} b._routed = false; } }
+    for (const [bt, src] of want){
+      const b = buses[bt], ms = [];
+      for (let k = 0; k * 16 < src.length; k++) ms.push(ac.createChannelMerger(32));
+      src.forEach((t, j) => { const q = buses[t]; if (!q) return; if (!q.spl){ q.spl = ac.createChannelSplitter(2); q.p.connect(q.spl); }
+        const m = ms[j >> 4], c = (j & 15) * 2; try { q.spl.connect(m, 0, c); q.spl.connect(m, 1, c + 1); } catch(e){} });
+      ms.forEach((m, k) => { try { m.connect(b.chn, 0, 4 + k); } catch(e){} });
+      b._feedM = ms;
+      if (b.chn._send) b.chn._send({target:'chains-host', op:'busmap', value:src});
+    }
+    for (const t of routed){ const q = buses[t]; try { q.p.disconnect(out); } catch(e){} q._routed = true; }
+  }
+  const setBusOff = v => { busOff = !!v; busSync(); };
   // The beat clock for tempo-locked track and master effects (Flex, Step gate, Retrigger): the song position in beats
   // (wrapping every 16) as sample-accurate automation on a constant source, wired into every effect node's `bp`.
   // −1 while stopped. The sequencer's 'beat' events ramp it from row to row, so it follows TPO exactly, live and offline.
@@ -13915,7 +14054,7 @@ function makePlayer(ac, out, getBuf, live){
     const wantFx = !!fxOk && chain.length > 0;
     if (!wantChn && b.chn){ try { if (b.chn._send) b.chn._send({target:'chains-host', op:'dispose'}); b.chn.disconnect(); } catch(e){} b.chn = null; tapSync(b); }
     if (!wantFx && b.fx){ try { b.fx.port.postMessage(null); } catch(e){} b.fx = null; }
-    if (!wantChn && !wantFx){ try { b.inp.disconnect(); } catch(e){} b.inp.connect(b.g); inpTap(t); return; }
+    if (!wantChn && !wantFx){ try { b.inp.disconnect(); } catch(e){} b.inp.connect(b.g); inpTap(t); busSync(); return; }
     if (wantChn && !b.chn){
       try {
         b.chn = chainsNode(ac, t, S.chainPatch, S.bpm);
@@ -13944,6 +14083,8 @@ function makePlayer(ac, out, getBuf, live){
       head.connect(b.g);
       b._chnRef = b.chn; b._fxRef = b.fx;
     }
+    sendSync(b);   // SENDS (after the rewire, which drops the node's outputs)
+    busSync();     // BUS: sources into their bus nodes (only rebuilt when something changed)
   }
   // Reset audio engine: let go of every node this player made.
   function dispose(){
@@ -13953,11 +14094,12 @@ function makePlayer(ac, out, getBuf, live){
     for (const b of buses){ if (!b) continue;
       try { if (b.fx){ b.fx.port.postMessage(null); b.fx.disconnect(); } } catch(e){}
       try { if (b.chn){ if (b.chn._send) b.chn._send({target:'chains-host', op:'dispose'}); b.chn.disconnect(); } } catch(e){}
-      try { b.inp.disconnect(); b.g.disconnect(); b.p.disconnect(); b.scs.disconnect(); } catch(e){} }
+      try { b.inp.disconnect(); b.g.disconnect(); b.p.disconnect(); b.scs.disconnect(); if (b.spl) b.spl.disconnect(); if (b._feedM) for (const m of b._feedM) m.disconnect(); } catch(e){} }
     try { scBus.disconnect(); } catch(e){}
     try { if (taps) taps.disconnect(); } catch(e){}
+    try { sendBus.disconnect(); sendDly.disconnect(); } catch(e){}
   }
-  return {play, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync};
+  return {play, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff};
 }
 
 /* ---------- live playback ---------- */
@@ -14676,6 +14818,9 @@ function mkBuf(d, sr){
   b.copyToChannel(d, 0); return b;
 }
 async function pass(evs, keep, N, sr, getB, lim, masterFx){
+  // BUS (20 Oct): a bus track's render takes its sources with it (they play through it); one pure source rendered on its
+  // own (its stem, if asked for) plays without the bus.
+  { const P = busPlan(), k2 = new Set(keep); for (const b of keep) for (const t of P.feeds.get(b) || []) if (audible(t)) k2.add(t); keep = k2; }
   const M = S.mst, useM = !!(masterFx && M && M.on);
   let lat = useM ? mstLatency(M, sr) : 0;
   const O = window.OfflineAudioContext || window.webkitOfflineAudioContext, oc = new O(2, N + lat + (lim ? safeLatency(sr) : 0), sr), out = oc.createGain();
@@ -14704,6 +14849,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
     pl.setFx(t, tfxChain(S.tfx[t], sr, S.bpm), ok);
     if (chnOk) pl.routeTrack(t, tfxChain(S.tfx[t], sr, S.bpm), ok);
   }
+  if (chnOk) pl.busSync();
   // …chains tempo follows the song, like the live engines.
   if (chnOk) for (const b of pl.buses) if (b && b.chn){ try { b.chn.port.postMessage({target:'chains-host', op:'transport', value:{tempo:S.bpm, lpb:S.lpb || 4, ticks:S.ticks || 6, playing:true}}); } catch(e){} }
   for (const e of evs) if (!(e.type === 'note' && e.ii != null && (S.insts[e.ii] || {}).mo === 1)) pl.play(e);   // MIDI-only instruments are silent in renders
@@ -14739,6 +14885,12 @@ async function renderOut(stems){
     const notes = evs.filter(e => e.type === 'note' && kit.voices[e.pad]);   // (a slot the kit doesn't have is silent)
     if (!notes.length) return toast('Nothing to render: the song has no notes yet.');
     const keepT = []; for (let t = 0; t < NT; t++) if (audible(t) && notes.some(e => e.track === t)) keepT.push(t);
+    // BUS (20 Oct): a bus track renders even with no notes of its own when a source plays into it; a source heard only
+    // through its bus has no stem of its own: it is in the bus's stem (so the stems still add up to the mix).
+    const BP = busPlan();
+    for (const [b, src] of BP.feeds) if (!keepT.includes(b) && audible(b) && src.some(t => keepT.includes(t))) keepT.push(b);
+    keepT.sort((a, b) => a - b);
+    const inBus = t => BP.pure.has(t) && (BP.targets.get(t) || []).some(b => keepT.includes(b));
     if (!keepT.length) return toast('Every track with notes is muted.');
     toast('Rendering pads…'); await idle();
     const pads = new Map();
@@ -14776,9 +14928,11 @@ async function renderOut(stems){
     const files = [{name:`${base} mix.wav`, data:wavN(scale(mix), sr, ex.bits)}];
     if (stems){
       for (const t of keepT){
+        if (inBus(t)) continue;   // BUS: it is in its bus's stem
         toast(`Rendering stem ${d2(t + 1)} of ${keepT.length} tracks…`); await idle();
         const st = cut(await pass(evs, new Set([t]), N, sr, getB, false, false));
-        files.push({name:`${base} ${d2(t + 1)} ${safe(stemName(t, notes))}.wav`, data:wavN(scale(st), sr, ex.bits)});
+        const nm = BP.feeds.has(t) && !notes.some(e => e.track === t) ? 'Bus' : stemName(t, notes);   // BUS: a bus with no notes of its own
+        files.push({name:`${base} ${d2(t + 1)} ${safe(nm)}.wav`, data:wavN(scale(st), sr, ex.bits)});
       }
     }
     lastR = files;
