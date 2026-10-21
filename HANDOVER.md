@@ -26,7 +26,7 @@ Keep this file up to date at the end of a work session.
 
 ## 20 Oct (8): Renoise's Ctrl+D; clones on Ctrl+Alt+C / Ctrl+Shift+C
 
-Cache `thunderplus-v200`. Owner: has used Renoise's Ctrl+D (both: sequencer and pattern editor, by context); keep Thunder's
+Cache `thunderplus-v200`. Desktop **v1.2.14** (20 Oct) has everything up to here. Owner: has used Renoise's Ctrl+D (both: sequencer and pattern editor, by context); keep Thunder's
 clone on Ctrl+Alt+C and clone down on Ctrl+Shift+C ("to match").
 - `globalKeys` (by `e.code`, since ⌥ changes `e.key` on a Mac): Ctrl/⌘+Shift+C → `cloneDown`, Ctrl/⌘+Alt+C → `cloneHere`,
   Ctrl/⌘+D / Ctrl/⌘+Alt+D → `dupKey(alt)`. The old Ctrl/⌘+D (clone) and Ctrl/⌘+Shift+D (clone down) are gone.
