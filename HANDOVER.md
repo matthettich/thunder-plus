@@ -26,7 +26,7 @@ Keep this file up to date at the end of a work session.
 
 ## 21 Oct: one Source for every sidechain (no mixer sidechain bus); bus tracks look darker
 
-Cache `thunderplus-v203`; desktop **v1.2.16** (pending: see below); `chains-worklet.js?v=34`, `waves-worklet.js?v=27` (shared blocks
+Cache `thunderplus-v203`; desktop **v1.2.16** (21 Oct) has everything up to here; `chains-worklet.js?v=34`, `waves-worklet.js?v=27` (shared blocks
 synced, MODFX regenerated). Owner: the single mixer sidechain bus was confusing ("what use cases does it solve?"); drop it,
 let each sidechain user pick its own source, keep the mixer's SC row as a light that shows a track is used as a sidechain;
 and make a track acting as a bus look a little darker on every screen so it isn't programmed by mistake.
