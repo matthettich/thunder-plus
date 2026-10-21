@@ -2118,7 +2118,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Shift+Alt arrows</dt><dd>as PAD mode's OPTION+arrows: in a phrase, the phrase above / below / left / right on the Song grid; on the Song, the next block that way</dd>
         <dt>[ ]</dt><dd>previous / next sect, phrase or instrument, by number</dd>
         <dt>Shift+Enter</dt><dd>as the pad's EDIT: on a filled phrase note, stamps the current note and instrument over it</dd>
-        <dt>Ctrl/⌘ C X V A</dt><dd>copy, cut, paste over the cursor or selection, select all · Ctrl/⌘+B block select · Ctrl/⌘+D clone a song block (then paste puts a unique copy at the cursor) · Ctrl/⌘+Shift+D clone it to the row below</dd>
+        <dt>Ctrl/⌘ C X V A</dt><dd>copy, cut, paste over the cursor or selection, select all · Ctrl/⌘+B block select · Ctrl/⌘+Alt+C clone a song block (then paste puts a unique copy at the cursor) · Ctrl/⌘+Shift+C clone it to the row below</dd>
+        <dt>Ctrl/⌘ D</dt><dd>duplicate, as in Renoise: on the Song (or Arrange) the pattern you're on (the song row, or the selected rows) goes in again just below as unique copies; on Phrase, Mixer and FX the track goes into the next empty track of its kind (volume, pan, effects) · Ctrl/⌘+Alt+D the track with its notes too</dd>
         <dt>Esc</dt><dd>drop the selection</dd>
         <dt>Space</dt><dd>play this screen · Shift+Space the song · with Loop on, Space loops the selected rows</dd>
         <dt>/</dt><dd>mute or unmute the track you're on (the whole track, as the mixer's M; M on the Song mutes one block)</dd>
@@ -15816,7 +15817,7 @@ function newBlock(c, src){
   const ph = firstPhrase(cid);
   return toast((src < 0 ? 'New phrase ' : 'Unique copy: phrase ') + hx(ph) + (ph !== cid ? ' (block ' + hx(cid) + ')' : '') + ' · SHIFT+▶ opens it');
 }
-// CLONE (Ctrl/⌘+D, the command row's CLN, Edit ▾, right-click) on the song (owner, 19 Oct: "Cmd+D then paste drops
+// CLONE (Ctrl/⌘+Alt+C, the command row's CLN, Edit ▾, right-click) on the song (owner, 19 Oct: "Cmd+D then paste drops
 // the clone on the cell that was copied"): it COPIES the block under the cursor (or the selected blocks) as a unique
 // clone. The original stays as it is; PASTE then puts a new copy, phrases and all with new numbers, where the cursor is,
 // and every paste makes another (pasteClone). EDIT×2 / Enter twice on a block still makes a unique copy in place.
@@ -15841,7 +15842,62 @@ function pasteClone(){
   const ph = firstPhrase(last);
   toast(made === 1 ? 'Unique copy: phrase ' + hx(ph) + (ph !== last ? ' (block ' + hx(last) + ')' : '') + ' · paste again for another' : `Pasted ${made} unique copies`);
 }
-// CLN↓ (command row, Ctrl/⌘+Shift+D) on the song: the block under the cursor, or every block in the
+// Ctrl/⌘+D, Renoise's two (owner, 20 Oct). On the Song (and Arrange holding the keys, which runs as the Song) it is the
+// pattern sequencer's duplicate; on Phrase, Pattern, Sect, Mixer and FX the pattern editor's Duplicate Track. notes:
+// Ctrl/⌘+Alt+D, the track "incl. Patterns" (on the Song it duplicates the pattern as Ctrl/⌘+D does).
+function dupKey(notes){
+  if (tv === 'song') return dupPattern();
+  if (tv === 'phrase' || tv === 'sect' || tv === 'mixer' || tv === 'fx') return dupTrack(notes);
+  toast(`${keyHint('mod+D')} duplicates the pattern on the Song (or Arrange) and the track on Phrase, Mixer and FX.`);
+}
+// The sequencer's duplicate: the song row the cursor is on (the pattern), or the selected rows, every track and the master,
+// go in again right below as new, unique copies (new phrase numbers, mutes kept); the rows below move down, section names
+// with them. The cursor (and the selection) move onto the copy, as Renoise does.
+function dupPattern(){
+  const c = cs.song, sel = selA && selA.v === 'song', r = sel ? selRect() : {y0:c.y, y1:c.y}, h = r.y1 - r.y0 + 1, at = r.y1 + 1;
+  const src = [];
+  for (let y = r.y0; y <= r.y1; y++) for (let x = 0; x <= MT; x++){ if (x >= ntr() && x !== MT) continue; const v = S.song[y][x]; if (v >= 0) src.push([x, y, v, blockMuted(S, y, x)]); }
+  if (!src.length) return toast(h > 1 ? 'Nothing on those rows to duplicate.' : 'Nothing on this row to duplicate.');
+  for (let y = 256 - h; y < 256; y++) if (S.song[y].some(v => v >= 0)) return toast(`No room: the song’s last ${h > 1 ? h + ' rows aren’t' : 'row isn’t'} empty.`);
+  S.song.splice(at, 0, ...Array.from({length:h}, () => new Array(NT + 1).fill(-1))); S.song.length = 256;
+  S.smute.splice(at, 0, ...new Array(h).fill(0)); S.smute.length = 256;
+  if (Array.isArray(S.secs)) S.secs = S.secs.map(q => q.y >= at ? {y:q.y + h, n:q.n} : q).filter(q => q.y < 256);
+  if (loopArm && loopArm.v === 'song' && loopArm.y0 >= at){ loopArm.y0 += h; loopArm.y1 += h; }
+  let made = 0, last = -1;
+  for (const [x, y, v, mu] of src){ const ny = y + h; newBlock({x, y:ny}, v); const id = S.song[ny][x]; if (id >= 0 && id !== v){ made++; last = id; if (mu) S.smute[ny] |= 1 << x; } }
+  c.y += h; if (sel) selA.y += h;
+  const VR = asongOn() || (apReady && apF) ? arrRows() : songRows(); if (c.y > (c.top || 0) + VR - 1) c.top = Math.min(256 - VR, c.y - VR + 1);
+  saveS(); draw();
+  if (made < src.length) return toast(`Duplicated ${made} of ${src.length} blocks: no free sects or phrases left.`);
+  toast(`Pattern${h > 1 ? 's' : ''} duplicated: row${h > 1 ? 's ' + rS(at, 3) + '–' + rS(at + h - 1, 3) : ' ' + rS(at, 3)}, ${made} block${made > 1 ? 's' : ''} as unique copies · the rows below moved down`);
+}
+// The pattern editor's Duplicate Track: Thunder's tracks are fixed, so the copy goes into the next track to the right of the
+// same kind (mono or poly) that has nothing on the song. It gets the volume, pan, sidechain-out and the track's effects
+// (not mute or solo); with notes, every block of the track too, as unique copies on the same rows (block mutes kept).
+// …chains isn't copied: its patch is one for the whole song.
+function dupTrack(notes){
+  const mst = tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
+  if (mst) return toast('The master can’t be duplicated.');
+  const t = dkTrack(), PF = polyFrom(), poly = t >= PF, end = poly ? ntr() : PF;
+  let to = -1; for (let u = t + 1; u < end; u++) if (S.song.every(row => row[u] < 0)){ to = u; break; }
+  if (to < 0) return toast(`No empty ${poly ? 'poly' : 'mono'} track to the right of track ${d2(t + 1)} to duplicate it into.`);
+  const a = S.mix[t], b = S.mix[to]; b.vol = a.vol; b.pan = a.pan; b.sc = a.sc;
+  S.tfx[to] = clone(S.tfx[t] || freshChainFx());
+  let want = 0, made = 0;
+  if (notes) for (let y = 0; y < 256; y++){ const v = S.song[y][t]; if (v < 0) continue; want++; newBlock({x:to, y}, v);
+    const id = S.song[y][to]; if (id >= 0 && id !== v){ made++; if (blockMuted(S, y, t)) S.smute[y] |= 1 << to; } }
+  mixChanged(); rtFx(to);
+  // The cursor goes to the new track, as in Renoise.
+  if (tv === 'mixer') cs.mixer.x = to;
+  else if (tv === 'fx') cFxT = to;
+  else if (tv === 'phrase' && pvActive()) pvGo(to, cs.song.y, 'first', null);
+  else if (tv === 'phrase' && S.song[cs.song.y][to] >= 0){ const ph = firstPhrase(S.song[cs.song.y][to]); if (ph >= 0){ cTrack = to; cs.song.x = to; cSect = S.song[cs.song.y][to]; cPhrase = ph; } }
+  draw();
+  const extra = notes ? (made < want ? ` and ${made} of ${want} blocks (no free sects or phrases left)` : want ? ` and its ${made} block${made > 1 ? 's' : ''}, as unique copies` : ' (it has no blocks yet)')
+    : ` · no notes (${keyHint('mod+alt+D')} brings them too)`;
+  toast(`Track ${d2(t + 1)} duplicated to track ${d2(to + 1)}: volume, pan and effects${extra}` + (S.chainOn[t] ? ' · …chains isn’t copied' : ''));
+}
+// CLN↓ (command row, Ctrl/⌘+Shift+C) on the song: the block under the cursor, or every block in the
 // selection, is cloned into new, unique numbers on the row(s) just below; the cursor follows.
 function cloneDown(){
   if (tv !== 'song') return toast('CLN↓ works on the SONG screen.');
@@ -16454,8 +16510,8 @@ const cmdMini = () => inMode === 'keys' && cmdBar;
 const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b:-1', '−', 'Change the value down (EDIT+◀)'], ['b:1', '+', 'Change the value up (EDIT+▶)'],
   ['b:16', '++', 'Change the value up a lot (EDIT+▲)'], ['prev', '‹', 'Previous: the block above in the song; the previous sect, phrase, instrument or FX track elsewhere (OPTION+▲ on the song, OPTION+◀ elsewhere)'], ['next', '›', 'Next: the block below in the song; the next sect, phrase, instrument or FX track elsewhere (OPTION+▼ on the song, OPTION+▶ elsewhere)'],
   ['clr', 'CLEAR', 'Clear (OPTION+EDIT)'], ['sel', 'SELECT', 'Start or cancel a selection (SHIFT+OPTION)'],
-  ['clone', 'CLN', 'Clone: copies the block (or the selected blocks); PASTE then puts a unique copy with new numbers at the cursor (Ctrl/⌘+D)'],
-  ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on the row below (Ctrl/⌘+Shift+D)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (OPTION)'],
+  ['clone', 'CLN', 'Clone: copies the block (or the selected blocks); PASTE then puts a unique copy with new numbers at the cursor (Ctrl/⌘+Alt+C)'],
+  ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on the row below (Ctrl/⌘+Shift+C)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (OPTION)'],
   ['cut', 'CUT', 'Cut the selection, or what is under the cursor (OPTION+EDIT)'], ['paste', 'PASTE', 'Paste (SHIFT+EDIT)'],
   ['undo', 'UNDO', 'Undo the last change to the song (Ctrl/⌘+Z)'], ['redo', 'REDO', 'Redo (Ctrl/⌘+Y)'], ['song', '▶', 'Play the song from the cursor row, or stop it (SHIFT+PLAY)']];
 function cmdAction(a){
@@ -16542,7 +16598,7 @@ $('tCmd').addEventListener('click', e => { const b = e.target.closest('button[da
    screen has the two clones instead of the ±16 steps. Keys: Ctrl/⌘ ones and Del work in both input modes; the value
    is Ctrl/⌘+arrows (and EDIT (X) + arrows in PAD mode). */
 const CMD_NOUN = {song:'block', sect:'sect', phrase:'phrase', inst:'instrument', fx:'FX track', mixer:'track', project:'setting'};
-// 'mod+shift+D' → ⇧⌘D on a Mac, Ctrl+Shift+D elsewhere.
+// 'mod+shift+C' → ⇧⌘C on a Mac, Ctrl+Shift+C elsewhere.
 function keyHint(s){
   if (!s) return '';
   const M = {mod:['⌘', 'Ctrl'], shift:['⇧', 'Shift'], alt:['⌥', 'Alt']}, p = s.split('+');
@@ -16561,7 +16617,10 @@ function cmdItems(){
     it('sel', selA ? 'Cancel the selection' : 'Start a selection', 'mod+B'),
     {a:'all', l:'Select all', k:keyHint('mod+A'), f:selectAll, off:!GRIDV.has(tv) || onPset()},
     ...(onSong ? [it('rmv', 'Remove from song (keep the phrase)', '')] : []),
-    ...(onSong ? [null, it('clone', 'Clone (paste puts a unique copy)', 'mod+D'), it('cldn', 'Clone down (onto the row below)', 'mod+shift+D')] : []),
+    ...(onSong ? [null, it('clone', 'Clone (paste puts a unique copy)', 'mod+alt+C'), it('cldn', 'Clone down (onto the row below)', 'mod+shift+C'),
+      {a:'dup', l:'Duplicate the pattern (insert below)', k:keyHint('mod+D'), f:() => dupKey(false)}] : []),
+    ...(['phrase', 'sect', 'mixer', 'fx'].includes(tv) ? [null, {a:'dup', l:'Duplicate the track (no notes)', k:keyHint('mod+D'), f:() => dupKey(false)},
+      {a:'dupn', l:'Duplicate the track with its notes', k:keyHint('mod+alt+D'), f:() => dupKey(true)}] : []),
     null,
     ...(onSong ? [] : [val('b:16', 'Value up a lot', '▲')]), val('b:1', 'Value up', '▶'), val('b:-1', 'Value down', '◀'), ...(onSong ? [] : [val('b:-16', 'Value down a lot', '▼')]),
     ...(tv === 'phrase' && !mstView() ? [null, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill}] : []),
@@ -18537,8 +18596,8 @@ function sxCtx(y, t){
     {l:'Cut', k:ks ? 'Ctrl+X' : '', f:() => copyHere(true), off:!n},
     {l:'Paste here', k:ks ? 'Ctrl+V' : '', f:() => { if (multi){ cs.song.x = r.x0; cs.song.y = r.y0; } selA = null; paste(); }, off:!(clip && clip.v === 'song')},
     null,
-    {l:'Clone (paste puts a unique copy)', k:ks ? 'Ctrl+D' : '', f:() => cloneHere(), off:!n},
-    {l:'Clone down', k:ks ? 'Ctrl+Shift+D' : '', f:() => cloneDown(), off:!n},
+    {l:'Clone (paste puts a unique copy)', k:ks ? keyHint('mod+alt+C') : '', f:() => cloneHere(), off:!n},
+    {l:'Clone down', k:ks ? keyHint('mod+shift+C') : '', f:() => cloneDown(), off:!n},
     null,
     {l:'Mute / unmute', k:ks ? 'M' : '', f:() => sxMuteRect(r), off:!n || (t === MT && !multi)},
     {l:'Loop these rows', f:() => sxLoopRows(r.y0, r.y1), off:r.y1 <= r.y0},
@@ -19008,7 +19067,12 @@ function globalKeys(e){
   // Ctrl/⌘+arrows.)
   if (mod && !e.altKey && (e.key === 'z' || e.key === 'Z')){ undoStep(e.shiftKey ? 1 : -1); return true; }
   if (mod && !e.altKey && (e.key === 'y' || e.key === 'Y')){ undoStep(1); return true; }
-  if (mod && !e.altKey && e.shiftKey && (e.key === 'd' || e.key === 'D') && tv === 'song'){ if (!e.repeat) cloneDown(); return true; }
+  // Renoise's keys (owner, 20 Oct): Ctrl/⌘+D duplicates (the pattern on the Song / Arrange, the track elsewhere), Ctrl/⌘+Alt+D
+  // the track with its notes; Thunder's own clones moved to Ctrl/⌘+Alt+C (clone) and Ctrl/⌘+Shift+C (clone down).
+  // e.code: Alt changes e.key on a Mac (⌥C is ç).
+  if (mod && e.shiftKey && !e.altKey && e.code === 'KeyC'){ if (!e.repeat) cloneDown(); return true; }
+  if (mod && e.altKey && !e.shiftKey && e.code === 'KeyC'){ if (!e.repeat) cloneHere(); return true; }
+  if (mod && !e.shiftKey && e.code === 'KeyD'){ if (!e.repeat) dupKey(e.altKey); return true; }
   // Clipboard, in either input mode.
   if (mod && !e.altKey && !e.shiftKey){
     const lo = e.key.toLowerCase();
@@ -19016,7 +19080,6 @@ function globalKeys(e){
     if (lo === 'x'){ copyHere(true); return true; }
     if (lo === 'v'){ paste(); return true; }
     if (lo === 'a'){ selectAll(); return true; }
-    if (lo === 'd' && tv === 'song'){ if (!e.repeat) cloneHere(); return true; }
   }
   return false;
 }
@@ -19516,7 +19579,7 @@ function apFoot(arrOk){
   if (!apFootEl) return;
   const k = inMode === 'keys', tap = coarse ? 'tap' : 'click';
   const ph = apHost === 'phrase', fol = {phrase:'the phrase follows (PIN keeps it)', fx:'FX follows its track', mixer:'the Mixer follows its track', inst:'INST follows its instrument', sect:'the sect follows'}[apHost] || 'nothing else moves';
-  const t = apF === 'arr' ? `THE KEYS ARE ON THE SONG · ${k ? 'arrows' : '▲▼◀▶'} move the song cursor and ${fol} · everything works as on the Song screen (${k ? 'hex, Enter, Del, M, Ctrl+D, drag, right-click' : 'EDIT, EDIT×2, OPTION+EDIT, CLN'}) · ${ph ? `${k ? 'Alt+→' : 'SHIFT+▶'} opens the block · Esc` : k ? 'Alt+→, Esc' : 'SHIFT+▶'} or a ${tap} on the ${ph ? 'phrase' : 'screen'}: back to it`
+  const t = apF === 'arr' ? `THE KEYS ARE ON THE SONG · ${k ? 'arrows' : '▲▼◀▶'} move the song cursor and ${fol} · everything works as on the Song screen (${k ? 'hex, Enter, Del, M, Ctrl+D, Ctrl+Alt+C, drag, right-click' : 'EDIT, EDIT×2, OPTION+EDIT, CLN'}) · ${ph ? `${k ? 'Alt+→' : 'SHIFT+▶'} opens the block · Esc` : k ? 'Alt+→, Esc' : 'SHIFT+▶'} or a ${tap} on the ${ph ? 'phrase' : 'screen'}: back to it`
     : arrOk && tv !== 'phrase' ? `${tap.toUpperCase()} · the keys move here and work as on the Song screen · twice on a block: edit its phrase · Esc gives them back`
     : arrOk ? `${tap.toUpperCase()} (or ${k ? 'Alt+←' : 'SHIFT+◀'}, or the SONG tab) · the keys move here: the song cursor moves and the phrase follows · twice: edit that block's phrase · HOLD a block to mute it · PIN keeps this phrase up`
     : apFoot0;

@@ -24,6 +24,27 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 20 Oct (8): Renoise's Ctrl+D; clones on Ctrl+Alt+C / Ctrl+Shift+C
+
+Cache `thunderplus-v200`. Owner: has used Renoise's Ctrl+D (both: sequencer and pattern editor, by context); keep Thunder's
+clone on Ctrl+Alt+C and clone down on Ctrl+Shift+C ("to match").
+- `globalKeys` (by `e.code`, since ⌥ changes `e.key` on a Mac): Ctrl/⌘+Shift+C → `cloneDown`, Ctrl/⌘+Alt+C → `cloneHere`,
+  Ctrl/⌘+D / Ctrl/⌘+Alt+D → `dupKey(alt)`. The old Ctrl/⌘+D (clone) and Ctrl/⌘+Shift+D (clone down) are gone.
+- `dupKey` (before `cloneDown`): on the Song (and Arrange holding the keys, which runs as the Song) → `dupPattern()`, the
+  sequencer's duplicate: the cursor's song row (or the selection's rows), every track and the master, inserted again just
+  below as unique copies (`newBlock`), block mutes kept; rows below move down (`S.song`, `S.smute`, `S.secs`, a song
+  `loopArm` below); cursor and selection go onto the copy. Refused when the song's last rows aren't empty.
+  On Phrase / Pattern / Sect / Mixer / FX → `dupTrack(notes)`, Renoise's Duplicate Track (Ctrl+D columns + effects, no
+  notes; Ctrl+Alt+D "incl. Patterns"): Thunder's tracks are fixed, so it goes into the next track right of `dkTrack()`
+  of the same kind (mono / poly) with nothing on the song: `S.mix` vol / pan / sc (not mute / solo), `S.tfx` (cloned),
+  `rtFx`; with notes every block as a unique copy on the same row, block mutes kept. …chains isn't copied (one patch per
+  song). The cursor follows (Mixer x, FX `cFxT`, pattern view `pvGo`, plain Phrase opens the copy on this row if any).
+- Edit ▾ / right-click (`cmdItems`): Duplicate the pattern on the Song; Duplicate the track / with its notes elsewhere.
+  Clone / Clone down labels, CMDS tooltips, the Song right-click menu (`sxCtx`), help KEYS table, Arrange footer, README.
+- On a Mac ⌥⌘D is the system's Dock hiding toggle, so Ctrl+Alt+D is the one to use there (mod takes Ctrl too).
+- Checked headless: Song one row and three selected rows (sections and mutes move, undo), Arrange, clone + paste, clone
+  down, Phrase (skips a non-empty track), Pattern view with notes twice, Mixer poly track, no room, Edit ▾ lists.
+
 ## 20 Oct (7): / mutes the track (Renoise's key)
 
 Cache `thunderplus-v199`. Desktop **v1.2.13** (20 Oct) has everything up to here. Owner: add Renoise's mute key.
