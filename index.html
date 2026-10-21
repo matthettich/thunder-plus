@@ -2102,7 +2102,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Tab</dt><dd>next column (phrase) or track</dd>
         <dt>Home End PgUp PgDn</dt><dd>top, bottom, 16 rows</dd>
         <dt>Ctrl/⌘ + arrows</dt><dd>change the value (◀▶ ±1, ▲▼ more)</dd>
-        <dt>Z S X … /</dt><dd>notes, lower octave</dd>
+        <dt>Z S X … ;</dt><dd>notes, lower octave (the E above is on the upper row: / mutes the track)</dd>
         <dt>Q 2 W … P</dt><dd>notes, upper octave</dd>
         <dt>− = or num / *</dt><dd>octave down / up</dd>
         <dt>1 or Caps Lock</dt><dd>note off</dd>
@@ -2121,6 +2121,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Ctrl/⌘ C X V A</dt><dd>copy, cut, paste over the cursor or selection, select all · Ctrl/⌘+B block select · Ctrl/⌘+D clone a song block (then paste puts a unique copy at the cursor) · Ctrl/⌘+Shift+D clone it to the row below</dd>
         <dt>Esc</dt><dd>drop the selection</dd>
         <dt>Space</dt><dd>play this screen · Shift+Space the song · with Loop on, Space loops the selected rows</dd>
+        <dt>/</dt><dd>mute or unmute the track you're on (the whole track, as the mixer's M; M on the Song mutes one block)</dd>
         <dt>Ctrl/⌘ /</dt><dd>solo the track you're on (again: unsolo it) · Ctrl/⌘+Shift+/ clears every solo</dd>
         <dt>Ctrl+Space</dt><dd>play just this pattern (the song row, every track), looped: turns LOOP on and plays; again stops (⌘+Space works too if Spotlight isn't on it) · Alt+L turns LOOP off</dd>
         <dt>Alt+L</dt><dd>loop the pattern on/off: the song repeats the row it is on (LOOP in the tab bar)</dd>
@@ -15974,6 +15975,15 @@ function playPatLoop(){
 // Ctrl/⌘+/ (owner, 20 Oct: Renoise's solo key): the track being worked on, as the bottom panel's track strip picks it (dkTrack:
 // the song cursor's track on Song and with Arrange holding the keys, the mixer's, FX's, else the phrase's). Solo adds up, as
 // the mixer's S does; all: clear every solo (as the deck's SOLO button).
+// / (owner, 20 Oct: Renoise's mute key): mutes or unmutes the whole track (the mixer's M), as soloKey picks it. On the Song
+// screen M still mutes just the block under the cursor.
+function muteKey(){
+  const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
+  if (mst) return toast('The master can’t be muted.');
+  const t = dkTrack(), m = S.mix[t]; if (!m) return;
+  m.mute = !m.mute; mixChanged(); draw();
+  toast(`${m.mute ? 'Muted' : 'Unmuted'} track ${d2(t + 1)} · / again ${m.mute ? 'unmutes' : 'mutes'} it`);
+}
 function soloKey(all){
   if (all){ if (!S.mix.some(m => m.solo)) return toast('Nothing is soloed.'); S.mix.forEach(m => m.solo = false); mixChanged(); draw(); return toast('Solo cleared: every track plays.'); }
   const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
@@ -18971,6 +18981,9 @@ function globalKeys(e){
   if (mod && !e.altKey && !e.shiftKey && (e.code === 'Space' || e.key === ' ')){ if (!e.repeat) playPatLoop(); return true; }   // play this pattern, looped
   // Ctrl/⌘+/ solos the track you're on (Renoise's key), again un-solos it; Ctrl/⌘+Shift+/ clears every solo.
   if (mod && !e.altKey && (e.code === 'Slash' || e.key === '/' || e.key === '?')){ if (!e.repeat) soloKey(e.shiftKey); return true; }
+  // / mutes the track you're on (Renoise's key, owner 20 Oct), on every cell: it was the lower piano row's last note, E an
+  // octave up, which E on the upper row also plays. Numpad / is still octave down; Shift+/ (?) still opens help.
+  if (!mod && !e.altKey && !e.shiftKey && e.key === '/' && e.code !== 'NumpadDivide'){ if (!e.repeat) muteKey(); return true; }
   // Alt+L loops the pattern, Shift+Alt+L the selection; Alt+, / Alt+. transpose the selection down / up a semitone. They
   // work on every cell (plain L , . are piano keys on a note cell). e.code, since Alt changes e.key on a Mac.
   if (e.altKey && !mod && e.shiftKey && e.code === 'KeyL'){ if (!e.repeat) toggleLoop(); return true; }
@@ -19278,7 +19291,7 @@ const HINTK = {
   song:'Type hex · Enter add or open · Enter×2 new sect · Del cell · Shift+Del line · M mute block · Ctrl+arrows ±1/±16 · Alt+→ open · Shift+arrows select',
   songP:'Type hex · Enter add · Enter×2 new phrase (unique copy on a block) · M mute block · Del cell · Shift+Del line · Alt+→ open phrase · Shift+arrows select',
   sect:'Type hex · Enter add or open · Enter×2 new phrase · Del cell · Shift+Del line · [ ] other sect · Alt+→ open · Shift+arrows select',
-  phrase:'Notes Z–/ and Q–P · 1 off · −/= octave · Del cell · Shift+Del row · Ins add row · Shift+arrows select · Shift+Alt+arrows other phrase · Ctrl+C/V',
+  phrase:'Notes Z–; and Q–P · 1 off · / mute track · −/= octave · Del cell · Shift+Del row · Ins add row · Shift+arrows select · Shift+Alt+arrows other phrase · Ctrl+C/V',
   inst:'Ctrl+arrows change · Enter runs › rows · [ ] other instrument · Alt+← phrase',
   mixer:'Type hex for VOL and PAN · FX row: Ctrl+▲▶ on (up to 4), Ctrl+▼◀ off · Enter mutes, solos, toggles CHN or opens FX · SC row: Enter sends to the sidechain bus · Del resets · Alt+→ FX · Alt+↑ back',
   fx:'Type hex · Ctrl+arrows change · Enter adds · → opens its controls · Del removes or resets · [ ] other track · Alt+← mixer',
@@ -19627,7 +19640,7 @@ function welcome(force){
   const pad = inMode !== 'keys', wrap = el('div', 'welcome'), box = el('div', 'wbox');
   box.innerHTML = pad
     ? `<h2>Three things to know</h2><ol><li><kbd>PLAY</kbd> plays the starter beat; <kbd>PLAY</kbd> again stops.</li><li>Move with the <kbd>▲▼◀▶</kbd> pad; <kbd>EDIT</kbd> on an empty cell adds a note or a block, <kbd>EDIT</kbd> twice makes a new phrase.</li><li>Hold <kbd>EDIT</kbd> and press <kbd>▲▼</kbd> to change a value; <kbd>SHIFT</kbd> + <kbd>▶</kbd> opens what the cursor is on.</li></ol>`
-    : `<h2>Three things to know</h2><ol><li><kbd>Space</kbd> plays this screen, <kbd>Shift</kbd>+<kbd>Space</kbd> the song.</li><li>Arrows move; type a note (<kbd>Z</kbd>–<kbd>/</kbd>, <kbd>Q</kbd>–<kbd>P</kbd>) or hex to edit the cell; <kbd>Enter</kbd> opens what the cursor is on.</li><li><kbd>Synth</kbd> at the top is where the sounds live; <kbd>?</kbd> opens Help from anywhere.</li></ol>`;
+    : `<h2>Three things to know</h2><ol><li><kbd>Space</kbd> plays this screen, <kbd>Shift</kbd>+<kbd>Space</kbd> the song.</li><li>Arrows move; type a note (<kbd>Z</kbd>–<kbd>;</kbd>, <kbd>Q</kbd>–<kbd>P</kbd>) or hex to edit the cell; <kbd>Enter</kbd> opens what the cursor is on.</li><li><kbd>Synth</kbd> at the top is where the sounds live; <kbd>?</kbd> opens Help from anywhere.</li></ol>`;
   const foot = el('div', 'wfoot'), more = el('button', null, 'More in Help'), ok = el('button', 'ok', 'Got it'); more.type = ok.type = 'button';
   foot.append(el('span', null, 'The hint line under the grid shows the keys for each screen.'), more, ok); box.append(foot); wrap.append(box);
   const close = () => { wrap.remove(); try { localStorage.setItem(WLK, '1'); } catch(e){} };

@@ -24,6 +24,17 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 20 Oct (7): / mutes the track (Renoise's key)
+
+Cache `thunderplus-v199`. Owner: add Renoise's mute key.
+- `/` (no modifiers, not numpad: `e.code !== 'NumpadDivide'`) in `globalKeys` → `muteKey()` (before `soloKey`): toggles
+  `S.mix[t].mute` for `dkTrack()` (the whole track, as the mixer's M; M on the Song still mutes one block); the master
+  can't be muted. globalKeys runs through `apRun`, so with Arrange holding the keys it is Arrange's cursor's track.
+- Lost: the tracker's lower piano row no longer has `/` (E an octave up); `E` on the upper row plays the same note.
+  PIANO still has `/`, so the Synth page plays it as before. Numpad / is still octave down, Shift+/ (?) still help.
+  Help (KEYS table, the notes row), the Phrase hint, the welcome lines and README say Z–; now.
+- Checked headless: Song, a Phrase note cell (nothing typed), Arrange on an empty cell, master, numpad /, Shift+/, E.
+
 ## 20 Oct (6): Arrange beside Phrase IS the Song screen; pattern selection colour; Ctrl+/ solo
 
 Cache `thunderplus-v198`. Owner: CLN↓ in the command bar said it only works on the Song screen; "the arrange window is
