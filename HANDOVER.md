@@ -26,7 +26,7 @@ Keep this file up to date at the end of a work session.
 
 ## 20 Oct (7): / mutes the track (Renoise's key)
 
-Cache `thunderplus-v199`. Owner: add Renoise's mute key.
+Cache `thunderplus-v199`. Desktop **v1.2.13** (20 Oct) has everything up to here. Owner: add Renoise's mute key.
 - `/` (no modifiers, not numpad: `e.code !== 'NumpadDivide'`) in `globalKeys` → `muteKey()` (before `soloKey`): toggles
   `S.mix[t].mute` for `dkTrack()` (the whole track, as the mixer's M; M on the Song still mutes one block); the master
   can't be muted. globalKeys runs through `apRun`, so with Arrange holding the keys it is Arrange's cursor's track.
