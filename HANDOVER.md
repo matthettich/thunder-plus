@@ -2069,6 +2069,21 @@ A code review (audio, storage, UI, DSP) found these; all fixed and checked headl
    render-comparison test in CI), the inventory of what to port, milestones, stores and licensing:
    [`docs/ENGINE-PLUGIN-PLAN.md`](docs/ENGINE-PLUGIN-PLAN.md).
 
+9. **More tracks than 32 (up to 128): planned, not started** (owner, 20 Oct: likely wanted later; the GUI and the
+   mono / poly split need deciding first; few old songs to worry about). TRACKS is 8–32 now (24 with a voice per track,
+   a kit-voice limit that stays). What has to change, checked 20 Oct:
+   - **Block mutes** are one 32-bit number per song row (`S.smute[y]`, `1 << t`, ~14 places): track 33's bit would be
+     track 1's. Small.
+   - **Song files** keep the master column at slot 32 of each row (`S.song[y][MT]`, `MT = NT = 32`). Plan: leave tracks
+     1–32 and the master where they are in the file and save tracks 33+ (and their mutes) in a separate section, so
+     older versions and Thunder Perform's deck still open new songs (without the extra tracks). Small.
+   - **Sidechain by track**: `tapNode()` is one 32-input ChannelMerger feeding …chains' input 2 (Web Audio caps a node at
+     32 channels); …chains' Track In says 1–32. Wire in only the tracks a Sidechain In picks. Medium; can come later.
+   - **Screens**: Arrange with 129 columns needs more zoom / sideways scroll (side panel especially) and may need to draw
+     only the visible cells (~33,000 at 256 rows); 3-digit track numbers in labels. Medium.
+   - **Thunder Perform** (`matthettich/thunder-perform-`) runs this app as its decks (submodule on the `deck` branch):
+     merge `main` into `deck` and bump its pin afterwards; its README has the same note.
+
 ### Standard DAW features still missing (suggested 14 Oct, in rough priority order)
 
 Already there, for reference: undo/redo, stem export, sidechain, FX automation from tracker commands, sample
