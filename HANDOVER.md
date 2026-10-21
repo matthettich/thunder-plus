@@ -24,6 +24,21 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 20 Oct (5): Arrange's arrows reach empty cells with PATTERN view on
+
+Cache `thunderplus-v197`. Owner (desktop, Phrase in PATTERN view, Arrange beside it holding the keys, KEYS mode): the
+arrows only reached filled blocks (mono tracks), never an empty cell (the poly tracks, one filled), so no new pattern could
+be started from Arrange. Arrange is meant to work exactly as the Song screen did.
+- Cause: `pvLines` (every draw) pulled `cs.song` back onto the open phrase's block (`pvAlign`, `cs.song.x = cTrack`). A
+  filled block made the phrase follow (`apFollow`), so the cursor landed; on an empty cell the phrase stays, so the
+  pattern snapped the cursor back. Playing, `followPlay`'s `pvFollow` did the same every step.
+- Fix: with Arrange or the strip holding the keys (`apReady && apF`), `pvLines` runs as before (the pattern still shows the
+  open phrase's row) and then puts `cs.song` x / y / top back where Arrange had it (`pvLinesIn` guards the re-entry);
+  `followPlay` skips `pvFollow` then. Keys back to the phrase (Esc, a click on it) re-align as before.
+- Checked headless (pattern view, Arrange focus, stopped and playing): arrows across empty mono/poly cells and rows,
+  Enter / Enter×2 on an empty cell, hex, M, Del, Shift+arrows select, copy/paste, Ctrl+D clone; without pattern view
+  unchanged. The pattern's OWN arrows (keys on the phrase) still skip folded empty tracks, by design (EMPTY TRACKS FOLDED).
+
 ## 20 Oct (4): Ctrl+Space plays just this pattern, looped
 
 Cache `thunderplus-v196`. Owner: a key to quickly play only the active pattern.

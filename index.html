@@ -15172,7 +15172,7 @@ function followPlay(){
   if (tv === 'song'){ if (tp.mode === 'song') cs.song.y = own.row; }
   else if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0){ cSect = own.sect; cs.sect.y = own.cr; } }
   else if (tv === 'phrase'){ if (own.phrase >= 0){ cPhrase = own.phrase; cs.phrase.y = own.step; } }
-  if (tv === 'phrase' && tp.mode === 'song' && own.row >= 0 && pvActive()) pvFollow(P, own);   // PATTERN VIEW: the song row follows too
+  if (tv === 'phrase' && tp.mode === 'song' && own.row >= 0 && pvActive() && !(apReady && apF)) pvFollow(P, own);   // PATTERN VIEW: the song row follows too (not the cursor Arrange is moving)
 }
 // TRACKS (Song): how many tracks this song uses (8–32, but 24 at most with a voice per track, so every
 // track keeps its own voice within 40 kit voices). Song and Mixer show as many as fit and scroll sideways.
@@ -20069,7 +20069,13 @@ function pvBarDraw(y, rows, lpb, warn, warnT){
   pvTxt(pvB.fold, pvFold ? 'EMPTY TRACKS FOLDED' : 'EMPTY TRACKS SHOWN'); pvB.fold.title = pvFold ? 'Show the tracks with nothing on this row at full width' : 'Fold the tracks with nothing on this row to narrow strips';
 }
 // The pattern's lines for draw(): header bands, column names, then the rows. Returns what draw() shows around them.
+// With Arrange (or the song strip) holding the keys the song cursor is Arrange's, not the pattern's: the pattern still
+// shows the open phrase's row, but the cursor is put back where Arrange had it (owner, 20 Oct: the pattern used to pull it
+// back onto the open phrase's block, so the arrows could only reach filled blocks, never an empty cell to start a new one).
+var pvLinesIn = false;
 function pvLines(c, L, cc, rsel, playRows){
+  if (apReady && apF && !pvLinesIn){ const s = cs.song, k = {x:s.x, y:s.y, top:s.top}; pvLinesIn = true;
+    try { return pvLines(c, L, cc, rsel, playRows); } finally { pvLinesIn = false; s.x = k.x; s.y = k.y; s.top = k.top; } }
   if (!pvHas(cs.song.y, cTrack, cPhrase) && !pvPend()) pvAlign();
   const Y = cs.song.y, row = S.song[Y] || [], uses = pvUsesLast = pvUses(), k = pvSectRow();
   const onRow = pvHas(Y, cTrack, cPhrase), pend = !onRow && pvPend();
