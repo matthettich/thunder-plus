@@ -24,6 +24,16 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 20 Oct (4): Ctrl+Space plays just this pattern, looped
+
+Cache `thunderplus-v196`. Owner: a key to quickly play only the active pattern.
+- `playPatLoop()` (after `toggleLoopPat`), from `globalKeys` on Ctrl/⌘+Space (no Alt/Shift): stopped → LOOP on (if off)
+  and `tStart('song', {row})` from the cursor's row when anything on it is filled (else `songRow()`), so every track of
+  that song row repeats; playing → `tStop()`, as Space. LOOP stays on afterwards; Alt+L turns it off. ⌘+Space is
+  Spotlight on a Mac (the app never sees it), so Ctrl+Space is the documented key there too. Help KEYS table, the LOOP
+  button's tooltip and README say so.
+- Checked headless: Song screen (empty cell on a filled row loops that row), Phrase, Alt+L off while playing, Space stops.
+
 ## 20 Oct (3): the Phrase title line never overlaps
 
 Cache `thunderplus-v195`. Desktop **v1.2.10** (20 Oct) has everything up to here. Owner: with the side panel open (and bigger text), PHRASE | PATTERN ran over the track name.
