@@ -932,16 +932,22 @@ body.asong .tagrid .rn, body.asong .tath{font-size:var(--fs-2)}
 .sxmenu button:disabled{opacity:.4}
 .sxmenu kbd{font:500 var(--fs-1) var(--mono); color:var(--muted)}
 .sxmenu hr{border:0; border-top:1px solid color-mix(in srgb, var(--line) 30%, transparent); margin:4px 0; width:100%}
-body.asong.sxsecs .tarr{padding-left:92px}
-.sxlane{position:absolute; left:0; top:0; bottom:0; width:88px; z-index:3}
+/* SECTIONS LANE WIDTH (owner, 21 Oct: on the phone the empty lane and its long label pushed the song grid off centre): --sxw is
+   set by sxLaneSize() from the longest section name (narrow while there are none), at most 88px (60px under 900px). */
+body.asong.sxsecs .tarr{padding-left:calc(var(--sxw, 88px) + 4px)}
+.sxlane{position:absolute; left:0; top:0; bottom:0; width:var(--sxw, 88px); z-index:3}
 .sxlane[hidden]{display:none}
 .sxlane .sxlh{position:absolute; left:4px; font:700 var(--fs-1)/16px var(--mono); letter-spacing:.06em; color:var(--ar-dim)}
-.sxsec{position:absolute; left:2px; width:84px; box-sizing:border-box; min-height:0; margin:0; padding:3px 4px 0 7px; border:0; border-left:4px solid hsl(var(--sxh) 55% 45%); border-top:1px solid hsl(var(--sxh) 55% 45%); border-radius:0;
+.sxsec{position:absolute; left:2px; width:calc(var(--sxw, 88px) - 4px); box-sizing:border-box; min-height:0; margin:0; padding:3px 4px 0 7px; border:0; border-left:4px solid hsl(var(--sxh) 55% 45%); border-top:1px solid hsl(var(--sxh) 55% 45%); border-radius:0;
   background:color-mix(in srgb, hsl(var(--sxh) 55% 45%) 13%, transparent); color:var(--ar-ink); font:700 var(--fs-2)/1.2 var(--mono); letter-spacing:.04em; text-align:left;
   display:flex; align-items:flex-start; justify-content:flex-start; overflow:hidden; cursor:pointer; box-shadow:none}
 .sxsec span{display:block; max-width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis}
 .sxsec.cont{border-top:1px dashed color-mix(in srgb, hsl(var(--sxh) 55% 45%) 60%, transparent); color:var(--ar-dim)}
 .sxsec:hover{background:color-mix(in srgb, hsl(var(--sxh) 55% 45%) 24%, transparent)}
+.sxsec.sxm{--sxh:0; visibility:hidden; width:max-content; max-width:none; left:0; top:0; pointer-events:none}   /* measures a name (sxLaneSize) */
+.sxadd{position:absolute; left:2px; width:calc(var(--sxw, 88px) - 4px); box-sizing:border-box; min-height:0; margin:0; padding:0; border:1px dashed color-mix(in srgb, var(--ar-dim) 70%, transparent); border-radius:0;
+  background:transparent; color:var(--ar-dim); font:700 var(--fs-3)/1 var(--mono); display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:none; opacity:.8}
+.sxadd:hover{opacity:1; color:var(--ar-ink); border-style:solid}
 .tarr .tagrid .rn.lp{background:color-mix(in srgb, var(--ar-cur) 26%, transparent); color:var(--ar-ink); box-shadow:inset 3px 0 0 var(--ar-cur)}
 .tarr .tagrid .rn.sxlp{background:color-mix(in srgb, var(--ar-cur) 50%, transparent); color:var(--ar-ink)}
 .tstage.peek{pointer-events:auto}
@@ -951,7 +957,7 @@ body.asong.sxsecs .tarr{padding-left:92px}
 .sxsw button + button{border-left:0}
 .sxsw button.on{background:var(--ts-ink, var(--ink)); border-color:var(--ts-ink, var(--ink)); color:var(--ts-bg, var(--panel))}
 .sxpk{flex:1; min-height:0; display:flex; flex-direction:column; gap:3px; padding-top:30px; font:var(--fs-3)/1.35 var(--mono); color:var(--ts-ink, var(--ink)); overflow:hidden}
-@media (max-width:899px){ body.asong.sxsecs .tarr{padding-left:64px} .sxlane{width:60px} .sxsec{width:56px; padding-left:5px} }
+@media (max-width:899px){ .sxsec{padding-left:5px} }
 .sxpk[hidden]{display:none}
 .sxpkt{font-weight:700; letter-spacing:.04em} .sxpkt i{font-style:normal; font-size:var(--fs-1); border:1px solid currentColor; padding:0 4px; margin-left:6px; opacity:.7}
 .sxpki, .sxpkn{color:var(--ts-dim, var(--muted)); margin:0}
@@ -15758,7 +15764,7 @@ function projRows(){
     {l:'SONG MOUSE', ck:'Song: drag to select, move, copy; right-click menu', get:() => SX.mouse ? 1 : 0, set:v => sxSet('mouse', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'With a mouse on the Song screen: drag across empty cells to select, drag a block or the selection to move it, Alt-drag to copy it, right-click for a menu (copy, paste, clone, mute, loop, open, name a section, clear). Off: clicks only, as before'},
     {l:'SECTIONS', ck:'Song: section names beside the rows', get:() => SX.secs ? 1 : 0, set:v => sxSet('secs', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
-      info:() => 'A lane left of the row numbers names runs of rows (INTRO, DROP…): double-click it (or right-click a block) to name the section from that row, click a name to go there. Needs a wide screen. Off hides the lane; the names stay in the song'},
+      info:() => 'The SECT lane left of the row numbers names runs of rows (INTRO, DROP…): tap the + on the cursor’s row (or tap the empty lane, double-click it, right-click a block) to name the section from that row; click a name to go there; hold or right-click a name to rename, loop or remove it. The lane is only as wide as its names. Needs a wide screen. Off hides the lane; the names stay in the song'},
     {l:'LOOP DRAG', ck:'Song: drag the row numbers to loop', get:() => SX.loop ? 1 : 0, set:v => sxSet('loop', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Drag down the Song screen’s row numbers to loop those rows (PLAY on this screen loops them; LOOP SEL turns it off). A tap still plays from that row'},
     {l:'SONG PEEK', ck:'Song: the phrase under the cursor beside it (not the dogs)', get:() => SX.peek ? 1 : 0, set:v => sxSet('peek', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
@@ -18458,6 +18464,7 @@ function drawArr(PH){
   arrEl.classList.toggle('dk', tScreen === 'dark');
   // Blocks grow with the panel: row height follows the column width (16–40px).
   const NA = ntr(), ms = asongOn(), mx = ms || arrSideMst();   // ms: Arrange is the Song screen; mx: it shows the master column
+  sxLaneSize();   // SONG EXTRAS: the section lane's width, before anything is measured
   const arRH = arrSize();
   let lastR = -1; for (let y = 255; y >= 0; y--) if (S.song[y].some(v => v >= 0)){ lastR = y; break; }
   const N = clamp(Math.max(lastR + 2, 16, cs.song.y + 1, (cs.song.top || 0) + 40), 1, 256);   // room to line up with the Song screen's top row
@@ -18930,15 +18937,36 @@ async function sxSecEdit(y){
 function sxSecRemove(y){ S.secs = (S.secs || []).filter(q => q.y !== y); saveS(); draw(); toast('Section removed'); }
 let sxLane = null, sxLaneKey = '';
 const sxLaneOn = () => asongOn() && SX.secs && arrEl.clientWidth >= 560;
+// SECTIONS LANE WIDTH: run by drawArr before it measures anything, so the columns and the boxes are laid out once at the
+// right width. The lane is as wide as its longest name needs (the label's width while there are none).
+let sxWKey = '', sxMeas = null;
+function sxLaneSize(){
+  const on = sxLaneOn(); document.body.classList.toggle('sxsecs', on); if (!on) return;
+  if (!sxLane){ sxLane = el('div', 'sxlane'); sxLane.setAttribute('aria-label', 'Song sections'); arrEl.append(sxLane); sxLaneWire(); }
+  const L = sxSecs(), small = document.body.classList.contains('arrsmall');
+  const key = [L.map(q => q.n).join('\n'), small, tScale, document.fonts ? document.fonts.status : ''].join('|');
+  if (key === sxWKey) return; sxWKey = key;
+  if (!sxMeas || !sxMeas.isConnected){ sxMeas = el('button', 'sxsec sxm'); sxMeas.type = 'button'; sxMeas.tabIndex = -1; sxMeas.setAttribute('aria-hidden', 'true'); sxMeas.append(el('span')); }
+  sxLane.append(sxMeas);
+  const lab = el('span', 'sxlh', 'SECT'); lab.style.visibility = 'hidden'; sxLane.append(lab);
+  let w = lab.offsetWidth + 8; lab.remove();
+  for (const q of L){ sxMeas.firstChild.textContent = q.n; w = Math.max(w, sxMeas.getBoundingClientRect().width + 6); }
+  sxMeas.remove();
+  w = clamp(Math.ceil(w), 28, small ? 60 : 88);
+  document.body.style.setProperty('--sxw', w + 'px'); sxLaneKey = '';
+}
 function sxLaneDraw(){
   const on = sxLaneOn(); document.body.classList.toggle('sxsecs', on);
   if (!on){ if (sxLane) sxLane.hidden = true; sxLaneKey = ''; return; }
-  if (!sxLane){ sxLane = el('div', 'sxlane'); sxLane.setAttribute('aria-label', 'Song sections'); arrEl.append(sxLane); sxLaneWire(); }
+  if (!sxLane) sxLaneSize();
   sxLane.hidden = false;
   const a = arrEl.getBoundingClientRect(), g = arrGrid.getBoundingClientRect(), th = $('tArrTh').getBoundingClientRect(), rh = arrRowH() || 22, top = cs.song.top || 0, VR = arrRows();
-  const L = sxSecs(), key = [JSON.stringify(L), top, VR, rh, g.top - a.top, g.height, th.top - a.top].join('|');
+  // The + on the cursor's row when that row isn't in a section yet (so the lane says what it's for: owner, 21 Oct)
+  const L = sxSecs(), cy = cs.song.y, add = cy >= top && cy < top + VR && !songSecAt(cy) ? cy : -1;
+  const key = [JSON.stringify(L), top, VR, rh, g.top - a.top, g.height, th.top - a.top, add].join('|');
   if (key === sxLaneKey) return; sxLaneKey = key;
-  let h = `<span class="sxlh" style="top:${(th.top - a.top).toFixed(1)}px">SECTIONS</span>`;
+  let h = `<span class="sxlh" style="top:${(th.top - a.top).toFixed(1)}px" title="Song sections: name a part of the song (INTRO, VERSE, DROP…) from a row">SECT</span>`;
+  if (add >= 0) h += `<button type="button" class="sxadd" data-ay="${add}" style="top:${(g.top - a.top + 3 + (add - top) * rh).toFixed(1)}px;height:${(rh - 3).toFixed(1)}px" title="Name a section starting at row ${rS(add, 3)}" aria-label="Name a section starting at row ${rS(add, 3)}">+</button>`;
   L.forEach((s, i) => {
     const end = i + 1 < L.length ? L[i + 1].y - 1 : 255, a0 = Math.max(s.y, top), a1 = Math.min(end, top + VR - 1); if (a1 < a0) return;
     const y = g.top - a.top + 3 + (a0 - top) * rh, hh = (a1 - a0 + 1) * rh - 3;
@@ -18948,12 +18976,23 @@ function sxLaneDraw(){
 }
 function sxLaneRow(clientY){ const g = arrGrid.getBoundingClientRect(), rh = arrRowH() || 22; return clamp((cs.song.top || 0) + Math.floor((clientY - g.top - 2) / rh), 0, 255); }
 function sxLaneWire(){
+  // touch: a tap on the empty lane names a section at that row (a long press opens the menu instead). Done on pointerup:
+  // the page's touch handling keeps a click from reaching a bare div.
+  let lastPt = '', dn = null;
+  sxLane.addEventListener('pointerdown', e => { lastPt = e.pointerType; dn = {x:e.clientX, y:e.clientY, t:performance.now()}; }, true);
+  sxLane.addEventListener('pointerup', e => {
+    const d = dn; dn = null; if (!d || e.pointerType !== 'touch' || e.target.closest('.sxsec, .sxadd')) return;
+    if (performance.now() - d.t < 450 && Math.abs(e.clientX - d.x) < 10 && Math.abs(e.clientY - d.y) < 10) sxSecEdit(sxLaneRow(e.clientY));
+  });
   sxLane.addEventListener('click', e => {
-    const b = e.target.closest('.sxsec'); if (!b) return;
+    const ad = e.target.closest('.sxadd'); if (ad){ sxSecEdit(+ad.dataset.ay); return; }
+    const b = e.target.closest('.sxsec');
+    if (!b) return;   // touch: a tap on the empty lane names a section there
     const y = +b.dataset.sy; cs.song.y = y; if (y < (cs.song.top || 0) || y >= (cs.song.top || 0) + arrRows()) cs.song.top = y; if (tv !== 'song') go('song'); else draw();
   });
-  // double-click on a section's first row renames it; anywhere else starts a new section at that row
-  sxLane.addEventListener('dblclick', e => { e.preventDefault(); sxSecEdit(sxLaneRow(e.clientY)); });
+  // double-click on a section's first row renames it; anywhere else starts a new section at that row (the + and a
+  // touch tap already asked)
+  sxLane.addEventListener('dblclick', e => { e.preventDefault(); if (e.target.closest('.sxadd') || lastPt === 'touch') return; sxSecEdit(sxLaneRow(e.clientY)); });
   sxLane.addEventListener('contextmenu', e => {
     e.preventDefault(); const y = sxLaneRow(e.clientY), s = songSecAt(y);
     const items = [{l:'Name a section from row ' + rS(y, 3) + '…', f:() => sxSecEdit(y), off:!!(s && s.y === y)}];

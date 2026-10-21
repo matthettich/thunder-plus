@@ -24,6 +24,22 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 21 Oct (2): the Song screen's sections lane is only as wide as its names
+
+Cache `thunderplus-v204`. Owner (on the unfolded Fold): "the song window on mobile looks a little awkward because of the
+sections label and I couldn't figure out how to use sections", shorten it so the grid is more centred.
+- SECTIONS LANE WIDTH: `sxLaneSize()` (called at the top of drawArr, before arrSize measures the columns) sets `--sxw` on
+  body: the label (now **SECT**) + 8 px while there are no sections, else the widest name measured with a hidden
+  `.sxsec.sxm` (`width:max-content`, `--sxh:0` so its 4 px border counts) + 6, capped 88 px (60 under 900 px). `.tarr`
+  padding, `.sxlane` and `.sxsec` widths follow the variable (the old fixed 92/88/84 and 64/60/56 are gone). Keyed on the
+  names, arrsmall, tScale and font status.
+- Discoverability: a dashed **+** (`.sxadd`) sits in the lane on the cursor's row when that row isn't in a section; it
+  opens the naming prompt. Touch: a short tap on the empty lane names a section at that row, done on pointerup (the page's
+  touch handling keeps a click from reaching the bare div); a long press still opens the menu. Mouse double-click as before.
+- Checked headless at 884 and 960 px wide (touch, DPR 2) and 1440: empty lane 30 px (grid from x 76 → 46 at 884), + and
+  tap name sections, widths fit INTRO / VERSE / BREAKDOWN (cut with … at 60 px), double-click / right-click on desktop;
+  mute and duplicate regression tests identical.
+
 ## 21 Oct: one Source for every sidechain (no mixer sidechain bus); bus tracks look darker
 
 Cache `thunderplus-v203`; desktop **v1.2.16** (21 Oct) has everything up to here; `chains-worklet.js?v=34`, `waves-worklet.js?v=27` (shared blocks

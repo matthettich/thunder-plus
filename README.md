@@ -147,7 +147,7 @@ Tap **Tracker** at the top for a sequencer that plays the kit. 16 tracks:
 
 **Song screen extras (Oct 2026).** Each can be switched off in Settings (View on a computer), and the song stays the same either way.
 - **Mouse:** drag across empty cells to select blocks, drag a block (or the selection) to move it, hold Alt (Option) while dragging to copy it, and right-click for a menu (copy, cut, paste here, clone, clone down, mute, loop these rows, open the phrase, name a section, clear). *SONG MOUSE.*
-- **Sections:** a lane left of the row numbers names runs of rows (INTRO, VERSE, DROP…). Double-click it, or right-click a block, to name the section starting at that row; click a name to go there; right-click a section to rename, loop or remove it. The info line names the section the cursor is in, and the Pattern view shows it. Wide screens. *SECTIONS.*
+- **Sections:** the **SECT** lane left of the row numbers names runs of rows (INTRO, VERSE, DROP…). Tap the dashed **+** on the cursor's row (or tap the empty lane, double-click it, or right-click a block) to name the section starting at that row; tap a name to go there; hold or right-click a section to rename, loop or remove it. The lane is only as wide as its longest name (narrow while there are none, 21 Oct), so the grid stays centred on the phone. The info line names the section the cursor is in, and the Pattern view shows it. Wide screens. *SECTIONS.*
 - **Loop by dragging:** drag down the row numbers to loop those rows (LOOP shows them; PLAY on the Song screen loops them). A tap still plays from that row. *LOOP DRAG.*
 - **Phrase peek:** beside the Song screen, a DOGS | PEEK switch shows the phrase under the cursor instead of the dancing dogs (the dogs stay the default). *SONG PEEK.*
 
