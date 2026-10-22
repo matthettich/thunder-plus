@@ -24,6 +24,41 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 21 Oct (7): the tracker grid with a mouse works like Renoise; right-click solos; …chains and …waves on Mobile apart
+
+Cache `thunderplus-v209`. Owner asked for a review of the mouse against Renoise / SunVox and picked the first four fixes, plus
+…chains shown on the Fold without …waves (chains hidden by default).
+- **MOUSE SELECT** block (before `let drag = null;`, with its CSS by `.tgrid span[data-x]`; to remove: the block, the CSS, the
+  `mselDown` line in `gridDown` and in the Pattern view's pointerdown). Mouse only (`pointerType === 'mouse'`, left button), on
+  GRIDV screens drawn in the grid (Phrase, Pattern view's open track, Sect, the classic Song grid; not Arrange):
+  - `mselDown()`: Shift-click anchors at the cursor (or keeps the selection's anchor) and moves the cursor end, then a drag goes
+    on; a press inside the selection is `grab`; a press elsewhere drops the selection (mouse only: touch still moves the corner)
+    and is `pend`, which becomes `sel` after 5 px. The cursor's own FILLED cell returns false, so `gridDown`'s value drag runs
+    as before; the cursor's EMPTY phrase cell selects (the old mouse drag there did nothing, 19 Oct). A click on the cursor's
+    effect cell still opens the picker (`mselEnd` → `editTap`).
+  - `mselFrame()` (one per animation frame): `mselCell()` finds the cell under the pointer (data-x, or in Pattern view
+    `pvSpanAt()` through `pvMap`, open track only); past the grid's top or bottom an interval steps the cursor a row each 60 ms.
+    `grab` moves `selA` and the cursor with the drag as the preview; `mselDxOk()` allows sideways only onto visible columns of
+    the same `PK` kind (Phrase) or between tracks (Song, not the master), else rows only. Line selections move rows only.
+  - `mselApply()`: reads the original rectangle, clears it unless copying (Alt, Ctrl or ⌘ held on release), writes it at the
+    offset (overwrites, as paste; Song carries block mutes). One undo step (all in one pointerup). Esc while dragging:
+    `mselBack()`. Toasts count visible cells (`mselN`).
+  - `pvSpanAt(s, clientX)` was pulled out of the Pattern view's pointerdown (same logic) so `mselCell` can use it.
+- **Shift while dragging a value**: `drag.big` (read on each pointermove) → `bump(d, true)`.
+- **Right-click solo**: `soloTrack(t)`. `gridDown`'s right-click on a y = −1 track number (Song, Mixer) solos and sets
+  `mselNoMenu` so `cmdCtx` skips the menu once; the meters (`#tMeters .mtr`, class `so` when soloed) and Arrange's header
+  (`#tArrTh i[data-t]`, click mutes, right-click solos, mouse only; `.so` styled with `--ar-pl`).
+- **Mobile editors split**: `thunderplus-mobile-chains-v1` / `thunderplus-mobile-waves-v1` (`mobCh`, `mobWv`; unset → the
+  old `thunderplus-mobile-editors-v1`, so a ticked old box starts both on). `noChains()`, `noWaves()`, `noEdFor(view)`
+  replace `noEditors()` (every remaining use was a …chains one). Body classes `nowv` (was `noed`, hides `.wvEdit`) and
+  `noch`. Settings → App: Show …chains on Mobile, Show …waves on Mobile, both off by default.
+- Checked headless (1400 and 1600 wide, Fold width 884 for Settings): drag select, move, one undo step, Alt-drag copy with
+  the copy cursor, click-away, Shift-click, sideways onto another kind stays put, Esc puts it back, value drag +1 then
+  Shift +12, empty cursor cell selects, effect cell opens the picker, wheel, drag past the bottom scrolls on, Pattern view
+  select stays in the open track, a touch press starts nothing new, right-click solo on meter / Mixer header / Arrange
+  header with no menu, right-click on a cell still opens the menu, Mobile ticks (Chains only, both, neither, old key
+  migrates), no page errors.
+
 ## 21 Oct (6): Shift-click and Shift-drag select in Arrange; the selection in its own colour
 
 Cache `thunderplus-v208`. Owner: "in arrange mode, can we make shift + click select phrases? Shift+click+drag could as

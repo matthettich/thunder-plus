@@ -2,7 +2,7 @@
 
 ...Thunder with **…waves** built in: a modular synth whose Out modules feed a new oscillator type in the layers. ...Thunder is part of this app now; its old address (https://matthettich.github.io/Thunder-/) forwards here.
 
-**Mobile and Desktop.** ⚙ Settings → App → **Mobile** switches the app between ...Thunder and ...Thunder Plus. Mobile (...Thunder) shows only Synth and Tracker, hides the …waves and …chains editors and puts the tracker in PAD input; Desktop (...Thunder Plus) shows all four screens and goes back to the input you used there. …waves layers and …chains effects play in both, live and in renders, so the same kit and project files open and sound the same either way. Mobile is the first choice on a touch screen; the choice is saved per browser.
+**Mobile and Desktop.** ⚙ Settings → App → **Mobile** switches the app between ...Thunder and ...Thunder Plus. Mobile (...Thunder) shows only Synth and Tracker, hides the …waves and …chains editors and puts the tracker in PAD input; Desktop (...Thunder Plus) shows all four screens and goes back to the input you used there. …waves layers and …chains effects play in both, live and in renders, so the same kit and project files open and sound the same either way. Mobile is the first choice on a touch screen; the choice is saved per browser. On Mobile, **Show …chains on Mobile** and **Show …waves on Mobile** (under the Mobile tick, both off at first) bring back one editor or both, for a big screen like the unfolded Fold.
 
 **Coming from the old ...Thunder.** Where ...Thunder left a song and kit in the browser, the first time this app opens it offers to open them, saving its own song and kit to a project file first. **File → Open ...Thunder's saved work** does the same any time.
 
@@ -225,6 +225,13 @@ These screen, transport and undo keys also work in PAD mode.
 **Screen colour.** Every tracker screen has its own pastel, on its tab and its button in the side map: Song blue, Sect lilac, Phrase mint, Inst peach, Mixer butter, FX pink, Project aqua. Project → SCREEN set to BY SCREEN (the default) colours the screen to match; or pick one pastel for all of them (blue, lilac, mint, peach, butter), or black. The pastels use dark text at readable contrast.
 
 On touch, tap a cell to move there, tap it again to open or add, and drag up or down on the cursor's cell to change the value. Drag a finger up or down anywhere else on the screen (between or beside the lines, the title, the info lines) to scroll through the rows; sideways too when big text makes the lines wider than the screen. Tap a track number to mute it.
+
+**With a mouse** the tracker grid (Phrase, the Pattern view's open track, Sect and the classic Song grid) works like Renoise's pattern editor (21 Oct). Touch is unchanged.
+- **Drag** to select a block (from any cell except the cursor's own filled one). Dragging past the top or bottom of the grid scrolls on. The wheel moves a row per notch.
+- **Shift-click** selects from the cursor to where you click; Shift-click again to grow or shrink it. A plain click outside the selection lets it go.
+- **Drag a selection** to move it; hold **Alt** (Option), **Ctrl** or **⌘** as you let go to copy it. It overwrites what's under it, as paste does, and undoes in one step. On Phrase it goes sideways only onto columns of the same kind (notes to notes, effects to effects). Esc while dragging puts it back.
+- **Drag the cursor's cell** to change its value, as before; hold **Shift** while dragging for big steps (an octave on a note, 16 on a number).
+- **Right-click a track number** (Song, Mixer, Arrange's header) **or a meter** to solo the track, again to un-solo it; a click mutes. Arrange's track numbers mute and solo with a mouse only, so a slip on the phone can't silence a track.
 
 **Rendering.** Project → RENDER SONG saves a stereo WAV; RENDER STEMS saves a zip with the mix plus one WAV per track. Stems are all the same length and include each track's effects; they skip the limiter and the master effects. Rate, bits and normalising follow the Export settings.
 
