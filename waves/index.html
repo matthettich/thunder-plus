@@ -81,6 +81,8 @@ button{cursor:pointer}
 .bklist{display:grid; gap:5px}
 .bkrow{display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; font-size:12.5px}
 .bkrow .btn{padding:3px 9px; font-size:12.5px}
+.ctxmenu .qainp{margin:2px 2px 6px; padding:6px 8px; font:inherit; min-width:240px}   /* QUICK ADD */
+.ctxmenu .qalist{display:grid; min-height:0} .ctxmenu .ctxitem.qa1{font-weight:600}
 .ctxmenu{position:fixed; z-index:2000000; min-width:220px; padding:4px; background:var(--panel); border:1px solid #111; display:grid}
 .ctxitem{border:0; background:none; text-align:left; padding:7px 12px; font-size:14px}
 .ctxitem:hover{background:var(--panel-2)}
@@ -2423,6 +2425,29 @@ function showMenu(x, y, items){
   ctx.style.left = Math.min(x, window.innerWidth - r.width - 8) + 'px'; ctx.style.top = Math.min(y, window.innerHeight - r.height - 8) + 'px';
 }
 function hideMenu(){ ctx.hidden = true; }
+/* QUICK ADD (21 Oct): double-click an empty spot of the patch, type a few letters of a module's name, then Enter (or a
+   click on it in the list) adds it right there. Esc or a click elsewhere closes it. Custom modules are in the list too. */
+ws.addEventListener('dblclick', e => {
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  if (!under || !ws.contains(under) || under.closest('.node, .hint, .hit, .decor, .dock, .bend, button, input, select, textarea')) return;
+  e.preventDefault();
+  const [wx, wy] = worldPt(e);
+  const all = PALETTE.filter(([g]) => !isSection(g)).flatMap(([, items]) => items).concat(((doc && doc.custom) || []).map(c => ['c:' + c.id, c.name + ' (custom)']));
+  const seen = new Set(), list = all.filter(([t]) => !seen.has(t) && seen.add(t)).sort((a, b) => a[1].localeCompare(b[1]));
+  const inp = h('input', {class:'qainp', type:'text', placeholder:'Find a module…', 'aria-label':'Find a module'}), box = h('div', {class:'qalist'});
+  let shown = [];
+  const add = t => { hideMenu(); addItem(t, wx - 20, wy - 16); };
+  const render = () => { const q = inp.value.trim().toLowerCase();
+    shown = (q ? list.filter(([t, l]) => l.toLowerCase().includes(q) || t.toLowerCase().includes(q)) : list).slice(0, 14);
+    box.replaceChildren(...(shown.length ? shown.map(([t, l], i) => { const b = h('button', {class:'ctxitem' + (i === 0 ? ' qa1' : ''), text:l}); b.addEventListener('click', () => add(t)); return b; })
+      : [h('div', {class:'ctxhead', text:'No module by that name'})])); };
+  inp.addEventListener('input', render);
+  inp.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter'){ ev.preventDefault(); if (shown[0]) add(shown[0][0]); } else if (ev.key === 'Escape'){ ev.preventDefault(); hideMenu(); } });
+  ctx.replaceChildren(inp, box); render(); ctx.hidden = false;
+  const r = ctx.getBoundingClientRect();
+  ctx.style.left = Math.max(8, Math.min(e.clientX, window.innerWidth - r.width - 8)) + 'px'; ctx.style.top = Math.max(8, Math.min(e.clientY, window.innerHeight - 380)) + 'px';
+  setTimeout(() => inp.focus(), 0);
+});
 window.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   hideMenu();

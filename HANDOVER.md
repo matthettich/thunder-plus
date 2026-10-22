@@ -24,6 +24,59 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 22 Oct: the Renoise audit batch — track names, selection tools, render a part, file safety, the rest of the mouse
+
+Cache `thunderplus-v210`. Owner asked for everything from the usability audit except automation (Open items 10, later),
+custom key bindings and live DEL-timing recording. Each block is marked in `index.html` and can come out on its own.
+- **TRACK NAMES**: `S.mix[t].nm` (≤ 12) and `.col` (index into `TCOL`, 0 none), read in `normSong`, so they save and undo
+  with the song. `tName`, `tCol`, `trkLab` ("TRACK 02 KICK"), `trkTip`. Shown: Phrase / Pattern titles (`tSub` regex takes the
+  name; `#tSub.tcl` colour mark), Pattern bands, Arrange's `#tArrTh i` (`.tcl`, `--tc`), Song / Mixer headers (grid spans now
+  take `st`, an inline style), meters, `dkStripT`, stem file names. `nameTrack(t)` is an `askSheet` with the new `swatch`
+  option. Double-clicks: the headers are redrawn by the first click so the browser never fires dblclick: `hdDbl(t)` (two
+  presses on the same track in 400 ms) in `gridDown`'s header branch, Arrange's header click and the Pattern bands; the meters
+  and `dkStripT` use dblclick; the Phrase title is caught on `scr` (it holds pointer capture for drag-scroll).
+- **SELECTION TOOLS** (before MOUSE SELECT): `selScope`, `interpSel`, `volSel`, `instSel`, `stretchSel(expand)`, `pasteMix`
+  (Ctrl/⌘+Shift+V in `globalKeys`). Items in `cmdItems` (so Edit ▾ and right-click). One undo step each.
+- **RENDER PART** (before `shareLast`): `renderScope()` builds a stand-in song (a copy of the lists, the part at row 0, sect and
+  phrase 255 for a phrase part; song rows copied down with their block mutes), `makeSeq(S2, 'song', {row:0, once:true})`, then
+  the same `pass()` as RENDER SONG (no master / limiter for a phrase). To a slot: `freeSlot()` (no note in the song plays it,
+  factory name first, drums first), layers off, `assignSample`, an instrument set to play it. Or a WAV via `deliver`.
+- **FILE SAFETY** (replaces the old `saveProj` / `openProj` / `loadProjFile` block): `markChange` (from `saveS` and `changed`,
+  armed 2.5 s after start) → `projDirty` (localStorage `thunderplus-dirty-v1`), `dirtyShow` (title "• Song — ...Thunder Plus",
+  `#bFile.dirty`). `okToLeave(what)` / `guardLeave` before New, Open, Recent, Restore, demo, a break's new song, …Thunder import
+  and the desktop close; "Don't save" makes a backup first. `projSet(path, handle)`: the desktop app remembers a path
+  (`thunderplus-projpath-v1`), a browser the FileSystemFileHandle (IndexedDB `thunderplus-files` / kv `cur`; `fsPerm` asks again
+  after a restart). `recentL` (kv `recent`, 8) → File ▾ → Open recent…. Backups: kv `bkIndex` + `bk<time>`, every 3 min when
+  `bkDirty` (not while playing or rendering), 10 kept, File ▾ → Restore a backup…. `.thunder` is the extension (JSON;
+  `.json` opens; the file input and pickers accept both). `loadProjText(text, name, where)`.
+- **Desktop shell** (`electron/`): preload exposes `thunderDesktop.files` (open, read, save, saveAs, pathOf via
+  `webUtils.getPathForFile`) and `thunderDesktop.app` (ready, onCloseAsk, closeAck, closeReply, onOpenPath). `main.js`: only
+  `.thunder` / `.json` paths are read or written; writes go to `<file>.saving` then rename. The window's close is held until the
+  page answers (it acks at once; no ack in 3 s, a crash or a reload → it closes); a quit carries on after the reply. A
+  `.thunder` path from argv, a second launch or the Mac's `open-file` waits for `thunder:page-ready`. `package.json` has
+  `fileAssociations` for `.thunder` (installer, Mac, AppImage; not the portable .exe). Checked with a fake-Electron harness
+  (close held / Cancel / OK / silent page / quit, read, atomic save, save as, open, moved file, argv, second instance,
+  open-file); not run in a real Electron here (no npm registry), so check a close and a double-click on the next build.
+- **SLIDER MOUSE** (after `loadAudioInto`): wheel on the focused slider (2% a notch, Shift 0.2%), Shift-drag at a tenth, via
+  `sliderSet` (fires input, then change). Not `#gset` / `.rlock` / dialogs. `makeRow` rows get a right-click menu (`sxMenu`).
+- **FILE DROP**: `dragenter/over/leave/drop` on the window (`body.dropping`, `.pad.droptgt`; pads carry `data-pad`). Audio →
+  `loadAudioInto(f, pad)` (factored out of `fileIn`); projects → `okToLeave` then `loadProjText` (desktop: the dropped path);
+  kits, `.mid`, …chains patches and preset files to their existing importers.
+- **Arrange**: middle-click (a capture listener before the press handler; `mousedown` stops autoscroll) mutes the block or
+  `sxMuteRect` the selection; `sxAim` copies with Alt, ⌘ (Mac) or Ctrl; `arrGo` makes a phrase on a double-tap / click of an
+  empty cell on the Song screen (`newBlock(…, -1)`, then opens it).
+- **Pattern view bands**: `pvBandT`; Alt-click mutes, right-click solos (capture listeners on `grid`, before the band's open
+  handler), double-press names; `.pvso` underline.
+- **QUICK ADD** in `chains/index.html` and `waves/index.html` (after `hideMenu`, outside the shared blocks): dblclick on empty
+  canvas → the context menu holds a search box and up to 14 matches (custom modules too); Enter adds the first at the spot.
+- Checked headless (1400–1600 wide, the Fold folded 412 and unfolded 884 with touch): names (dialog, every place it shows,
+  save/load, undo, double-clicks leave mute as it was), each tool's numbers, render to a slot / WAV (phrase, selection, song
+  row), dirty dot, Save changes? (Don't save → backup → restore), Save / Ctrl+S to a browser handle and to a desktop path, path
+  and recent across a reload, close ask (Cancel / Save / clean), open by path, open recent, slider wheel / fine wheel /
+  Shift-drag / menu, a WAV dropped on pad 03, middle-click, double-click new phrase, Ctrl-drag copy, Pattern bands, quick add in
+  both editors, the earlier mouse suites again, no page errors. (Opening chains/ or waves/ on their own logs a 404 for their
+  sw.js: that was so before.)
+
 ## 21 Oct (7): the tracker grid with a mouse works like Renoise; right-click solos; …chains and …waves on Mobile apart
 
 Cache `thunderplus-v209`. Owner asked for a review of the mouse against Renoise / SunVox and picked the first four fixes, plus
@@ -2306,6 +2359,12 @@ A code review (audio, storage, UI, DSP) found these; all fixed and checked headl
      only the visible cells (~33,000 at 256 rows); 3-digit track numbers in labels. Medium.
    - **Thunder Perform** (`matthettich/thunder-perform-`) runs this app as its decks (submodule on the `deck` branch):
      merge `main` into `deck` and bump its pin afterwards; its README has the same note.
+
+10. **Automation, Renoise-style: later, after the app is stable** (owner, 21 Oct: likes how Renoise does it, but
+    there's a lot to work on, so stability comes first). Renoise draws an envelope per parameter per pattern in an
+    automation lane under the pattern, with points, curves and lines, and parameters can also be recorded live. Thunder
+    Plus today has tracker commands (CCA–CCD, FXO, VOL, PAN, PIT…) and, from 21 Oct, Interpolate for ramps. Not started;
+    decide the scope with the owner first (which parameters, per phrase or per song, how it shows on the phone).
 
 ### Standard DAW features still missing (suggested 14 Oct, in rough priority order)
 

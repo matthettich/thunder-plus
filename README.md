@@ -90,7 +90,7 @@ An 8-pad drum synth and 16-track tracker for the browser, built for a Galaxy Z F
 
 The top bar has two menus that work like ...Seeds': **File ▾** and **⚙ Settings ▾** each open a dropdown under the button. Only one is open at a time; tap outside it, tap the button again, or press Esc to close it.
 
-- **File ▾**: Save project, Save as… and Load project…, with their keyboard shortcuts (plus Export / Import chains; on the …waves and …chains screens it drives that patch instead).
+- **File ▾**: Save project, Save as…, Open project…, Open recent… and Restore a backup…, with their keyboard shortcuts (plus Export / Import chains; on the …waves and …chains screens it drives that patch instead). A dot on File ▾ (and before the song's name in the window title) means the song has changes that aren't in its project file yet.
 - **View ▾** and **Audio & MIDI ▾** (Desktop only): on a computer the long Settings list is split in three. View has the screen, Arrange, skin, text size and the panel switches (keypad, bottom panel and its parts, stage); Audio & MIDI has the output, latency, rate and MIDI; Settings keeps the song, input, render, mastering, kit and app. On Mobile everything stays under the one gear.
 - **Settings sheets.** The long lists open in their own window, like the preset browser: **Screen settings…** (text and colour, layout and panels, the Phrase screen, the Song screen) and **Skin…** in the Screen part of the menu (View on Desktop); **Song settings…** (name, tracks, tempo, groove, pattern length, the song's impulse responses) and **Input settings…** (PAD or KEYS, note on entry, edit step, sticky keys, commands) in Project. Each window has a search box and tap-to-open groups. The menu keeps what you change mid-session: Text size, Simple phrase and Follow. **Skin…** shows every skin as a little tracker in its colours; tap one to try it on the app straight away, **Done** keeps it, **Back to …** returns to the skin you had.
 - **⚙ Settings ▾**: one scrolling list with a section per topic, ruled off from each other: **Kit** (save, load, factory, clear), **MIDI**, **Export**, **Skin** and **Audio**. On the tracker, a **Project** section comes first with everything on the Project screen as touch controls (checkboxes, dropdowns, sliders with − and +, buttons), grouped into Input, Screen, Song, Render, Project file and App. On the …waves and …chains screens a section for that patch comes first instead. The Project screen is still there and changes the same settings.
@@ -232,6 +232,24 @@ On touch, tap a cell to move there, tap it again to open or add, and drag up or 
 - **Drag a selection** to move it; hold **Alt** (Option), **Ctrl** or **⌘** as you let go to copy it. It overwrites what's under it, as paste does, and undoes in one step. On Phrase it goes sideways only onto columns of the same kind (notes to notes, effects to effects). Esc while dragging puts it back.
 - **Drag the cursor's cell** to change its value, as before; hold **Shift** while dragging for big steps (an octave on a note, 16 on a number).
 - **Right-click a track number** (Song, Mixer, Arrange's header) **or a meter** to solo the track, again to un-solo it; a click mutes. Arrange's track numbers mute and solo with a mouse only, so a slip on the phone can't silence a track.
+- **Pattern view's track bands** (the number and name over each track): Alt-click mutes the track, right-click solos it, a double-click names it; a plain click still opens it.
+- **Arrange:** middle-click a block to mute it (or the whole selection it's in), Alt-drag *or* Ctrl/⌘-drag copies, and on the Song screen a double-click on an empty cell starts a new phrase there and opens it.
+- **Synth sliders:** right-click one for Reset, Type a value… and Learn a MIDI knob for it; the wheel nudges the slider you clicked last (Shift+wheel in fine steps); Shift-drag moves it a tenth as fast. (The settings menus' sliders stay locked against stray touches.)
+- **Drop files on the window:** audio on a pad loads into that pad (anywhere else, the selected pad); a `.thunder` / `.json` project opens, a kit file loads, a `.mid` imports, a …chains patch imports.
+- **…chains and …waves:** double-click an empty spot of the patch, type part of a module's name and press Enter to add it right there.
+
+**Track names and colours** (21 Oct). Double-click a track number (Song, Mixer, Arrange, a meter, the Pattern view's band, the Phrase title or the bottom panel's TRACK strip), or Edit ▾ → **Name this track…**, for a name of up to 12 letters and a colour. They show on the Phrase and Pattern titles, Arrange, the Song and Mixer headers, the meters and the bottom panel, and name the stem files (`Song 02 Kick.wav`). They're saved with the song.
+
+**Selection tools** (21 Oct, Renoise's Advanced Edit), in Edit ▾ and the right-click menu on a phrase. Each is one undo step and works on the selection, or the whole phrase:
+- **Interpolate:** a ramp between the values on the first and last selected rows, in each volume and effect column selected (an effect needs the same command at both ends).
+- **Volume…:** scale by a percent, fade in, fade out, or set every note's volume (an empty volume counts as FF).
+- **Instrument…:** set every note to one instrument, or swap two.
+- **Shrink** (every other row, double time) and **Expand** (spread out, half time); what would land past the end is left out and the toast says so.
+- **Mix-paste** (Ctrl/⌘+Shift+V, every grid screen): like paste, but only into empty cells.
+
+**Render a part** (21 Oct, Renoise's Render To Sample). Edit ▾ (or File ▾) → **Render … to a slot…** renders the phrase selection (or the whole phrase), or on the Song screen the selected blocks (or the cursor's song row), into a kit slot as its sample: pick a slot this song doesn't play, the current one or any other. The slot's other layers are turned off (undo brings the sound back) and an instrument is set to play it. **Render … as a WAV** saves the same part as a file. A phrase renders its track alone without the master's effects; song rows render with the master column, effects and limiter. Tempo changes from earlier rows aren't carried in.
+
+**Project files** (21 Oct). Projects save as `.thunder` files (the same JSON inside; `.json` projects still open). The app remembers the file you saved or opened, so Ctrl/⌘+S goes back to it after a restart too (in Chrome or Edge the browser asks once to allow it; on a phone it downloads a copy), and File ▾ → **Open recent…** lists the last eight. New song, Open, Load demo, a break's new song and Restore ask **Save changes?** first when there's anything unsaved. Every 3 minutes while you work (and before anything replaces the song) the song and kit are backed up in the browser, the last 10: File ▾ → **Restore a backup…**. In the desktop app, closing the window asks too, a `.thunder` file opens with a double-click, and saves are written safely (to a temporary file first, then swapped in).
 
 **Rendering.** Project → RENDER SONG saves a stereo WAV; RENDER STEMS saves a zip with the mix plus one WAV per track. Stems are all the same length and include each track's effects; they skip the limiter and the master effects. Rate, bits and normalising follow the Export settings.
 
@@ -257,7 +275,9 @@ Synthesis and effects come from Mutable Instruments (Plaits, Rings, Clouds, Elem
 The `electron` folder wraps the same app as a desktop program for Windows, macOS or Linux. It runs from its own
 `app://thunder/` address (not plain files), so the …waves and …chains editors, the mastering engine and the bass
 engine load their audio worklets as they do on the web. Songs and kits are saved inside the app (separately from
-the browser's copy); use File → Save to move work between them.
+the browser's copy); use File → Save to move work between them. Project files are `.thunder` files: the installer
+makes them open in the app with a double-click (also from the Mac's Finder; not the Windows portable .exe), and closing
+the window with unsaved changes asks Save / Don't save / Cancel.
 
 **Updates.** Installed copies check GitHub Releases when they open (and every few hours): on Windows and Linux
 the new version downloads by itself and asks to restart; on a Mac (unsigned) it says a new version is out and opens

@@ -90,6 +90,15 @@
         "repo": "thunder-plus",
         "releaseType": "release"
       }
+    ],
+    "fileAssociations": [
+      {
+        "ext": "thunder",
+        "name": "Thunder Plus project",
+        "description": "...Thunder Plus project",
+        "role": "Editor",
+        "mimeType": "application/x-thunder-plus"
+      }
     ]
   },
   "dependencies": {
