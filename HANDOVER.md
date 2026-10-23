@@ -24,7 +24,7 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
-## 23 Oct (3): the LXR-02's voices as engines (lxr/, GPL-3.0, optional)
+## 23 Oct (4): the LXR-02's voices as engines (lxr/, GPL-3.0, optional)
 
 Cache `thunderplus-v219`, `lxr/lxr-engine.js?v=1`, `lxr/lxr.wasm?v=1`. Owner: Erica Synths open-sourced the LXR-02
 firmware (https://github.com/erica-synths/lxr-desktop-app, GPL-3.0 with trademark terms); include it as an engine.
