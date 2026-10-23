@@ -24,6 +24,31 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 22 Oct (7): a bus is FX commands only; buses outlined in Pattern view
+
+Cache `thunderplus-v216`. Desktop **v1.2.19** (22 Oct, started with Run workflow through the API: this session can push
+branches but not tags) has everything up to 22 Oct (6). Owner: on a bus, no note entry, FX only; notes it already had keep
+playing until playback is stopped and started again; a bus should look different in Pattern view (Arrange already shows
+it darker), e.g. a cyan border in the plum skin.
+- BUS FX ONLY (after `mstView`): `busTrack(t)`, `hasNotes(p)` (cols 0..IC), `busFxView()`, `busSay()`. `pCols`, `move`'s
+  step off the LEN line, the phrase draw's cursor clamp and `pvColsOf` give a bus with no notes the FX columns only (as
+  the master). Refused with a toast on a bus: `typeNote` (not REC while playing, which `recLive` refuses), `typeOff`,
+  `typeHex` on V / I, `editTap` and `bump` on note / V / I, `recNote`, `recLive`, `euclidFill`, `volSel`, `instSel`.
+  `paste` and `pasteMix` keep only the FX columns there (a toast says so). `busHint`'s one-time note now says FX only. The
+  hint line on a bus says so (and that old notes go silent at the next PLAY).
+- `makeSeq` takes `busT` (the buses when it starts) and plays no notes or note-offs on them (`nbus`); commands still run.
+  So a track that becomes a bus mid-song keeps its notes until PLAY starts again. Note: a bus whose chain doesn't take its
+  own Track In was already silent through the routing (its Chain Out replaces its sound); only a chain that mixes its own
+  Track In in hears its notes until the restart.
+- Look (Pattern view only): `--tk-bus` (`.tscr` #1f9bb0 cyan; term skins `var(--mxbus, …)`, overridden where cyan is one of
+  the skin's own track colours: matrix / bwterm / espresso a brighter cyan, night pink, midnight amber, ocean violet, miami
+  indigo, tomato / desert blue, winter magenta). `pvLines` groups carry `bus`; their bands use it (`span.bus` in `.pvon`, no
+  darkening there), their cells get `pvbus` (a 12% tint) and the first / last span of each line `pvbl` / `pvbr` (a 2 px
+  line each side), the ENDS HERE rows too.
+- Checked headless (plum): a normal track 4 sounds, becomes a bus mid-play and keeps sounding, silent after a restart;
+  old notes show and typing a note is refused; with them cleared FX columns only and the cursor on FX1; an FX command
+  types; a pasted line keeps only its FX; the band and side lines are rgb(31,155,176); earlier suites.
+
 ## 22 Oct (6): PLAY on a bus plays it with its sources
 
 Cache `thunderplus-v215`. Owner (in Pattern view on a bus): Space on a bus should make every track connected to it sound.

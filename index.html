@@ -1177,6 +1177,20 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .tgrid span.mbus:not(.cur):not(.sel){background-color:color-mix(in srgb, var(--tk) 22%, transparent)}
 .tgrid span.th.bus{font-weight:800; text-decoration:underline; text-underline-offset:2px}
 #tArrTh i.bus{filter:brightness(.7); font-weight:800; text-decoration:underline; text-underline-offset:2px}
+/* BUS in PATTERN VIEW (owner, 22 Oct): Arrange shows buses darker; in Pattern view a bus takes its own colour (--tk-bus: cyan,
+   or the skin's --mxbus where cyan is already one of its track colours): its bands, a light tint down its columns and a
+   line either side. */
+.tscr{--tk-bus:#1f9bb0}
+:root[data-skinbase="term"] .tscr{--tk-bus:var(--mxbus, #1f9bb0)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="espresso"]){--mxbus:#4fd8eb}
+:root[data-skin="night"]{--mxbus:#ff7ab6} :root[data-skin="midnight"]{--mxbus:#ffc857}
+:root[data-skin="ocean"]{--mxbus:#7a4fc9} :root[data-skin="miami"]{--mxbus:#5b5be0} :root:is([data-skin="tomato"],[data-skin="desert"]){--mxbus:#2f6fd6}
+:root[data-skin="winter"]{--mxbus:#c0568f}
+.tgrid.pvon span.bus{--tk:var(--tk-bus); filter:none}
+.tgrid.pvon span.pvbus{--tk:var(--tk-bus)}
+.tgrid.pvon span.pvbus:not(.cur):not(.sel):not(.pl):not(.pvnow){background-color:color-mix(in srgb, var(--tk-bus) 12%, transparent)}
+.tgrid.pvon span.pvbl{box-shadow:inset 2px 0 0 var(--tk-bus)} .tgrid.pvon span.pvbr{box-shadow:inset -2px 0 0 var(--tk-bus)}
+.tgrid.pvon span.pvbl.pvbr{box-shadow:inset 2px 0 0 var(--tk-bus), inset -2px 0 0 var(--tk-bus)}
 /* ===== PATTERN VIEW (setting PATTERN VIEW; to remove: delete this CSS block, the JS block of the same name and the
    lines marked "PATTERN VIEW" in the script) =====
    The Phrase screen as a pattern: every track's phrase for one song row side by side (Renoise-style), a column group per
@@ -13846,7 +13860,10 @@ const firstPhrase = cid => { const c = cid >= 0 ? S.chains[cid] : null, r = c ? 
 // MPC swing note values (the hardware's 1/8, 1/16, 1/16T … grid): how many groove counts make one pair.
 const SWINGB = ['8ths', '16ths', 'Triplet', 'Dotted-8th', 'Half', 'Wide-6', 'Wide-7'];
 function makeSeq(S, mode, o){
-  const once = !!o.once, tr = []; let loop = o.loop || null;   // loop: {y0,y1} rows to cycle; api.setLoop swaps it while playing
+  const once = !!o.once, tr = []; let loop = o.loop || null;
+  // BUS FX ONLY (owner, 22 Oct): the tracks that are buses when PLAY starts play their commands, not their notes; a track
+  // that becomes a bus while it plays keeps its notes until PLAY starts again.
+  const busT = new Set(); for (let t = 0; t < NT; t++) if (isBusT(t)) busT.add(t);   // loop: {y0,y1} rows to cycle; api.setLoop swaps it while playing
   for (let t = 0; t <= MT; t++) tr.push({on:false, empty:false, row:0, cr:0, step:0, inst:0, rate:1, tsp:0, next:-1, last:null, rnl:{}, rnlNote:0, nth:new Map(), arc:{mode:0, spd:1},
     rel:0, g:0, grv:null, dir:0, pp:1, cnt:0});   // dir/pp/cnt: DIR's play direction, ping-pong heading, steps played this pass
   const api = {time:0, bpm:S.bpm, tks:clamp(S.ticks || TICKS, 1, 32), grv:null, base:null, bt:0, btT:null};
@@ -14024,7 +14041,7 @@ function makeSeq(S, mode, o){
         const mods = {arp:null, bend:null, vib:null};
         // Tracks 9–16 are polyphonic: all four note columns play, as a chord, over whatever is still ringing.
         const poly = isPolyT(t), ns = poly ? r.slice(0, NCOL) : [r[0]];
-        const offN = t < MT && ns.includes(OFF), notes = t < MT ? ns.filter(x => x >= 0 && x < 120) : [];
+        const nbus = t < MT && !busT.has(t), offN = nbus && ns.includes(OFF), notes = nbus ? ns.filter(x => x >= 0 && x < 120) : [];   // BUS FX ONLY
         // POLY OFF per column (owner, 19 Oct): an OFF in a note column stops only the note started from that column; a
         // mono track's OFF stops the track as before. ncol: the column of each of `notes`.
         const ncol = ns.map((x, c) => x >= 0 && x < 120 ? c : -1).filter(c => c >= 0), offC = poly && offN ? ns.map((x, c) => x === OFF ? c : -1).filter(c => c >= 0) : null;
@@ -15115,6 +15132,7 @@ function recNote(note, vol, ii, h, ts){
   note = clamp(Math.round(note), 0, 119);
   if (tp.on) return recLive(note, vol, ii, h, ts);
   if (tv !== 'phrase' || cTrack === MT) return recSay('REC writes notes into a phrase: open one (or press PLAY to record as the song plays).');
+  if (busTrack(cTrack)) return recSay(`REC: track ${d2(cTrack + 1)} is a bus: FX commands only.`);   // BUS FX ONLY
   if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase();
   const y = cs.phrase.y, row = S.phrases[cPhrase][y], poly = polyView();
   // A chord: the keys held together go in one row. The first key of it starts the row afresh.
@@ -15129,6 +15147,7 @@ function recNote(note, vol, ii, h, ts){
 }
 function recLive(note, vol, ii, h, ts){
   const tr = recTrack(); if (tr < 0) return recSay('REC: put the cursor on the track to record into.');
+  if (busTrack(tr)) return recSay(`REC: track ${d2(tr + 1)} is a bus: FX commands only.`);   // BUS FX ONLY
   const at = recStep(p2a(ts || performance.now()), tr);
   if (!at) return;   // the track hasn't started yet (counting in)
   if (at.ph < 0) return recSay(`Track ${d2(tr + 1)} has no phrase here to record into: put a block on the song first.`);
@@ -16155,7 +16174,15 @@ const PK = ['note', 'note', 'note', 'note', 'vol', 'inst', 'fxc', 'fxv', 'fxc', 
 const polyView = () => isPolyT(cTrack);
 // Master phrases (the MST column's) are commands only: just the three FX columns.
 const mstView = () => cTrack === MT;
-const pCols = () => mstView() ? [6, 7, 8, 9, 10, 11] : polyView() ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 4, 5, 6, 7, 8, 9, 10, 11];
+/* BUS FX ONLY (owner, 22 Oct): a bus (a track others play through) takes FX commands only. Its phrase shows just the FX
+   columns, as the master's does, unless notes from before it became a bus are still there: they show, so Delete can
+   clear them, and keep playing until PLAY starts again (makeSeq takes which tracks are buses when it starts). Typing a
+   note, a volume or an instrument on a bus is refused with busSay(); a paste keeps only its FX columns there. */
+const busTrack = t => t >= 0 && t < NT && isBusT(t);
+const hasNotes = p => !!p && p.some(r => { for (let x = 0; x <= IC; x++) if (r[x] >= 0) return true; return false; });
+const busFxView = () => busTrack(cTrack) && !hasNotes(S.phrases[cPhrase]);
+function busSay(t = cTrack){ toast(`Track ${d2(t + 1)} is a bus (other tracks play through it): FX commands only, no notes.`); return true; }
+const pCols = () => mstView() || busFxView() ? [6, 7, 8, 9, 10, 11] : polyView() ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 4, 5, 6, 7, 8, 9, 10, 11];
 const kindAt = (v, x) => v === 'song' ? 'sect' : v === 'sect' ? (x ? 'tsp' : 'phrase') : PK[x];
 function getCell(v, x, y){
   if (v === 'song') return S.song[y][x];
@@ -16478,6 +16505,7 @@ function bump(d, big){
   if (onPset()) return psetSet(c.x, psetGet(c.x) + d * (big ? (c.x ? 4 : 8) : 1));
   if (GRIDV.has(tv)){
     const k = kindAt(tv, c.x); let v = getCell(tv, c.x, c.y);
+    if (tv === 'phrase' && (k === 'note' || k === 'vol' || k === 'inst') && busTrack(cTrack)) return busSay();   // BUS FX ONLY
     // An EMPTY song block (Arrange, the Song screen): changing its value (Ctrl/⌘ + arrows, EDIT + arrows) starts a new
     // pattern on the next free number, as EDIT×2 does, not the last number used (00 on a fresh song). (owner, 19 Oct)
     if (k !== 'tsp' && v < 0 && tv === 'song' && !sectsOn) return newBlock(c, -1);
@@ -16621,6 +16649,7 @@ function editTap(enter){
   if (onPset()) return toast(c.x ? 'EDIT+arrows change the lines per beat (-- = the song’s)' : 'EDIT+arrows change how many rows this phrase plays (1–32)');
   if (GRIDV.has(tv)){
     const k = kindAt(tv, c.x), v = getCell(tv, c.x, c.y);
+    if (tv === 'phrase' && (k === 'note' || k === 'vol' || k === 'inst') && busTrack(cTrack)) return busSay();   // BUS FX ONLY
     // EDIT on a filled note stamps the current note (and instrument, once one is chosen) over it;
     // on a filled instrument it makes that instrument the current one.
     if (tv === 'phrase' && v >= 0 && (k === 'note' || k === 'inst')){
@@ -16667,7 +16696,7 @@ function editDouble(wasEmpty){
 const busHinted = new Set();
 // The note joins whatever the key says next (New phrase 03 …), or shows alone once the key is done.
 function busHint(t){ if (busHinted.has(t) || !isBusT(t)) return; busHinted.add(t);
-  busNote = `track ${d2(t + 1)} is a ${busOf(t)}: notes here play through its chain too`; queueMicrotask(() => { if (busNote) toast(''); }); }
+  busNote = `track ${d2(t + 1)} is a ${busOf(t)}: FX commands only, no notes`; queueMicrotask(() => { if (busNote) toast(''); }); }
 function newBlock(c, src){
   if (c && c.x < NT) busHint(c.x);
   let cid, pid;
@@ -17079,8 +17108,9 @@ function paste(){
   // Pasting over a selection starts at its top row.
   const y0 = selA ? selRect().y0 : c.y; selA = null;
   if (y0 < 0) return toast('Move to a row first.');
-  let n = 0;
-  clip.d.forEach((row, j) => { const y = y0 + j; if (y < dm.h) n++; row.forEach((val, i) => { const x = x0 + i; if (val !== undefined && x < dm.w && y < dm.h) setCell(tv, x, y, val); }); });
+  let n = 0; const fxOnly = tv === 'phrase' && busTrack(cTrack); let cut = 0;   // BUS FX ONLY: a paste keeps its FX columns
+  clip.d.forEach((row, j) => { const y = y0 + j; if (y < dm.h) n++; row.forEach((val, i) => { const x = x0 + i; if (val !== undefined && x < dm.w && y < dm.h){ if (fxOnly && x < FX0){ if (val >= 0) cut++; return; } setCell(tv, x, y, val); } }); });
+  if (cut) return (toast(`Pasted the FX columns only: track ${d2(cTrack + 1)} is a bus.`), draw());
   toast(clip.line ? `Pasted ${n} line${n > 1 ? 's' : ''}` + (n < clip.d.length ? ` (${clip.d.length - n} past the end were left out)` : '') : 'Pasted'); draw();
 }
 // The phrase's LEN / LPB line sits above row 0 (y = -2): ▲ from row 0 reaches it, ▼ goes back.
@@ -17090,7 +17120,7 @@ const onMstCell = () => tv === 'mixer' && cs.mixer.y === 7 && cs.mixer.mx === 1;
 function move(dx, dy){
   const c = cs[tv], d = dims(tv);
   if (tv === 'fx') return moveFx(dx, dy, d.h);
-  if (tv === 'phrase' && c.y === -2){ if (dy > 0){ c.y = 0; c.x = mstView() ? FX0 : 0; } else c.x = clamp(c.x + dx, 0, 1); return draw(); }
+  if (tv === 'phrase' && c.y === -2){ if (dy > 0){ c.y = 0; c.x = mstView() || busFxView() ? FX0 : 0; } else c.x = clamp(c.x + dx, 0, 1); return draw(); }
   if (tv === 'phrase' && dy === -1 && c.y === 0){ c.y = -2; c.x = c.x > 0 ? 1 : 0; return draw(); }
   if (tv === 'phrase' && dx && pvActive()) return pvMoveX(dx);   // PATTERN VIEW: past the track's first or last column, on to the next track
   if (tv === 'phrase' && dx){ const C = pCols(), i = Math.max(0, C.indexOf(c.x)); c.x = C[clamp(i + dx, 0, C.length - 1)]; }
@@ -17574,6 +17604,7 @@ function euclid(k, n, r){
 let eucLast = '5 16 0';
 async function euclidFill(){
   if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Euclidean fill writes notes into it.');
+  if (busTrack(cTrack)) return busSay();   // BUS FX ONLY
   const a = await askText({title:'Euclidean fill', body:'HITS STEPS ROTATE, e.g. 5 16 or 3 8 2. Fills the note column under the cursor over the selected rows (or from the cursor down), with the note there (or the last one).'}, eucLast, 12, 'Fill');
   if (a == null) return;
   const v = a.trim().split(/[\s,/:]+/).map(x => parseInt(x, 10)); if (!(v[0] >= 0 && v[1] >= 1)) return toast('Type the hits and steps, like 5 16.');
@@ -17800,7 +17831,7 @@ function draw(){
   } else if (tv === 'phrase' && pvActive()){ ({title, sub, pset, prLit} = pvLines(c, L, cc, rsel, playRows));   // PATTERN VIEW
   } else if (tv === 'phrase'){
     title = 'PHRASE ' + hx(cPhrase); sub = cTrack === MT ? 'MASTER' : trkLab(cTrack) + ' ·' + trkKind(cTrack);
-    const poly = polyView(), mst = mstView(); if (mst && c.y >= 0 && c.x < FX0) c.x = FX0; else if (!poly && c.x >= 1 && c.x < NCOL) c.x = 0;
+    const poly = polyView(), mst = mstView(); if ((mst || busFxView()) && c.y >= 0 && c.x < FX0) c.x = FX0; else if (!poly && c.x >= 1 && c.x < NCOL) c.x = 0;
     const p = S.phrases[cPhrase], pr = playRows(q => q.phrase === cPhrase ? q.step : null), len = plen(cPhrase), lpb = S.plpb[cPhrase] || 0, el2 = lpb || S.lpb; prLit = pr;
     pset = [{t:'LEN ', cls:'lb'}, {t:d2(len), cls:cc(0, -2, 'v'), x:0, y:-2}, {t:' LPB ', cls:'lb'}, {t:lpb ? d2(lpb) : '--', cls:cc(1, -2, lpb ? 'v' : 'e'), x:1, y:-2},
       {t:' 1/' + (el2 * 4) + (el2 % 3 === 0 ? ' trip' : '') + (lpb ? '' : ' song'), cls:'lb pstail'}];
@@ -17941,6 +17972,8 @@ function draw(){
   if (mstP) hintTxt = inMode === 'keys' ? 'Master phrase: commands only · letters pick a command (V F G R T…) · type hex for its value · Del cell · Ctrl+Shift+↑↓ lines · Ctrl+C/V' : HINT.phraseM;
   if (tv === 'fx' && cs.fx.y > FXSLOTS) hintTxt = 'Slot ' + (cFxS + 1) + ' controls · ▲▼ pick one · ' + (inMode === 'keys' ? '← or Esc back to the slots' : '◀ back to the slots');
   if (tv === 'phrase' && pvActive()) hintTxt = pvHint();   // PATTERN VIEW
+  if (tv === 'phrase' && busTrack(cTrack)) hintTxt = 'BUS: FX commands only · ' + (hasNotes(S.phrases[cPhrase]) ? 'its old notes go silent at the next PLAY (Del clears them) · ' : '')
+    + (inMode === 'keys' ? 'letters pick a command · hex its value · Space plays it with the tracks that feed it' : 'EDIT on an FX cell picks a command · PLAY plays it with the tracks that feed it');   // BUS FX ONLY
   { const h = $('tHint'), txt = (tv === 'phrase' && !mstP ? 'NOW ' + curS() + (inMode === 'keys' ? ' · oct ' + kOct + ' · step ' + kStep : '') + ' · ' : '') + hintTxt;
     if (h.textContent !== txt){ h.textContent = txt; h.classList.remove('open'); h.classList.toggle('more', h.scrollHeight > h.clientHeight + 1); } }
   // The fit check comes after the title, info and hint lines have this screen's text (19 Oct): before, it measured with
@@ -20058,6 +20091,7 @@ function interpSel(){
 async function volSel(){
   const q = selScope(false, 'Volume'); if (!q) return;
   if (mstView()) return toast('The master phrase has no volume column.');
+  if (busTrack(cTrack)) return busSay();
   const i = await askPick({title:'Volume', body:'Every row with a note in ' + q.where + '. An empty volume counts as FF (full).'}, ['Scale by a percent…', 'Fade in', 'Fade out', 'Set every note to…']);
   if (i < 0) return;
   let pct = 100, setv = -1;
@@ -20076,6 +20110,7 @@ async function volSel(){
 async function instSel(){
   const q = selScope(false, 'Instrument'); if (!q) return;
   if (mstView()) return toast('The master phrase has no instruments.');
+  if (busTrack(cTrack)) return busSay();
   const i = await askPick({title:'Instrument', body:'Every note in ' + q.where + '.'}, ['Set every note to one instrument…', 'Swap two instruments…']);
   if (i < 0) return;
   const hexIn = v => { const n = parseInt(String(v).trim(), 16); return n >= 0 && n < NI ? n : -1; };
@@ -20115,8 +20150,9 @@ function pasteMix(){
   const y0 = selA ? selRect().y0 : c.y; selA = null;
   if (y0 < 0) return toast('Move to a row first.');
   let n = 0;
+  const fxOnly = tv === 'phrase' && busTrack(cTrack);   // BUS FX ONLY
   clip.d.forEach((row, j) => row.forEach((val, i) => { const x = x0 + i, y = y0 + j;
-    if (val === undefined || x >= dm.w || y >= dm.h) return;
+    if (val === undefined || x >= dm.w || y >= dm.h || (fxOnly && x < FX0)) return;
     const empty = kindAt(tv, x) === 'tsp' ? !getCell(tv, x, y) : getCell(tv, x, y) < 0, has = kindAt(tv, x) === 'tsp' ? !!val : val >= 0;
     if (empty && has){ setCell(tv, x, y, val); n++; } }));
   toast(n ? `Mix-pasted ${n} cell${n > 1 ? 's' : ''} into the empty ones` : 'Mix-paste: every cell it would fill already has something.'); draw();
@@ -20532,13 +20568,13 @@ const HEXK = '0123456789abcdef';
 function curKind(){ const c = cs[tv]; if (onPset()) return 'param'; if (GRIDV.has(tv)) return kindAt(tv, c.x); if (tv === 'mixer') return 'mix'; return 'param'; }
 function down1(){ const c = cs[tv], d = dims(tv); c.y = clamp(c.y + (GRIDV.has(tv) ? kStep : 1), 0, d.h - 1); }
 function typeNote(semi){
-  if (tv === 'phrase' && cTrack < NT) busHint(cTrack);
+  if (tv === 'phrase' && busTrack(cTrack) && !(rec.on && tp.on)) return busSay();   // BUS FX ONLY
   if (rec.on && tp.on){ recKey(clamp(kOct * 12 + semi, 0, 119), audKey); return; }   // REC while playing: at the playhead, not the cursor
   const c = cs[tv]; if (tv !== 'phrase' || PK[c.x] !== 'note' || c.y < 0) return;
   const n = clamp(kOct * 12 + semi, 0, 119), x = c.x;
   setCell('phrase', x, c.y, n); const y = c.y; down1(); after('note', 'phrase', x, y, n);
 }
-function typeOff(){ const c = cs[tv]; if (tv !== 'phrase' || PK[c.x] !== 'note' || c.y < 0) return; const x = c.x; setCell('phrase', x, c.y, OFF); const y = c.y; down1(); after('note', 'phrase', x, y, OFF); }
+function typeOff(){ const c = cs[tv]; if (tv !== 'phrase' || PK[c.x] !== 'note' || c.y < 0) return; if (busTrack(cTrack)) return busSay(); const x = c.x; setCell('phrase', x, c.y, OFF); const y = c.y; down1(); after('note', 'phrase', x, y, OFF); }
 function typeHex(d){
   const c = cs[tv], k = curKind(), now = performance.now(), key = tv + c.x + ':' + c.y + ':' + cSect + ':' + cPhrase;
   const fresh = hexBuf.key !== key || now - hexBuf.t > 1500 || hexBuf.n >= 2;
@@ -20551,6 +20587,7 @@ function typeHex(d){
   if (onPset()){ psetSet(c.x, v); if (done) hexBuf.key = ''; return; }
   if (GRIDV.has(tv)){
     if (k === 'note' || k === 'fxc') return;
+    if (tv === 'phrase' && (k === 'vol' || k === 'inst') && busTrack(cTrack)) return busSay();   // BUS FX ONLY
     if (k === 'fxv' && getCell(tv, c.x - 1, c.y) < 0) return toast('Pick an effect in the column to the left first.');
     if (tv === 'song' && !sectsOn){
       if (!done) return toast('Phrase ' + hx(v, 1) + '_');
@@ -21508,7 +21545,7 @@ function pvNotes(p, len){ let m = 0; if (p) for (let y = 0; y < len && y < p.len
 // A track's columns: its notes (the open poly track all four, other poly tracks the ones in use), V, I, FX1 (+FX2, FX3).
 function pvColsOf(t, p, len, cur){
   const fx = pvFx ? [FX0, FX0 + 1, FX0 + 2, FX0 + 3, FX0 + 4, FX0 + 5] : [FX0, FX0 + 1];
-  if (t === MT) return fx;
+  if (t === MT || (busTrack(t) && !hasNotes(p))) return fx;   // BUS FX ONLY
   const nn = !isPolyT(t) ? 1 : cur ? NCOL : Math.max(1, pvNotes(p, len));
   return [...Array.from({length:nn}, (_, i) => i), VC, IC, ...fx];
 }
@@ -21628,7 +21665,7 @@ function pvLines(c, L, cc, rsel, playRows){
     const C = pvColsOf(t, p, len, cur), w = C.reduce((a, x) => a + pvW(x), 0) + C.length - 1;
     let inst = -1, more = false;
     if (p) for (let r = 0; r < len; r++){ const q = p[r]; if (inst < 0 && q[IC] >= 0) inst = q[IC]; if (!pvFx && !more) for (let m = FX0 + 2; m < RW; m++) if (q[m] >= 0){ more = true; break; } }
-    G.push({t, cid, cur, ph, p, len, C, w, inst, more, dim:!cur && ((t < NT && !!(S.mix[t] && S.mix[t].mute)) || blockMuted(S, Y, t))});
+    G.push({t, cid, cur, ph, p, len, C, w, inst, more, bus:busTrack(t), dim:!cur && ((t < NT && !!(S.mix[t] && S.mix[t].mute)) || blockMuted(S, Y, t))});
   }
   let rowsN = 0; for (const g of G) if (!g.fold && g.ph >= 0) rowsN = Math.max(rowsN, g.len);
   // Drift: every block on this row should last as long as the rest; one that doesn't runs ahead of them (or falls behind).
@@ -21679,7 +21716,7 @@ function pvLines(c, L, cc, rsel, playRows){
   // {t, y, g, c0}: the run starts c0 characters into track group g). The cursor's cell stays a span of its own, the phrase
   // editor's data-x / data-y cell, so dragging it still changes its value (gridDown).
   const cells = (g, y, C) => {   // C: [[x, text, cls], …] in column order; the space between two columns joins the run before it
-    const tint = g.cur ? ' pvc' + pvTk(g.t) : '';
+    const tint = (g.cur ? ' pvc' + pvTk(g.t) : '') + (g.bus ? ' pvbus' : ''), i0 = ln.length;   // BUS: its own colour down its columns
     let run = null, pos = 0;
     const flush = () => { if (run) put(run.t, run.cls || 'pvsp' + tint, {t:g.t, y:y >= 0 ? y : null, g, c0:run.c0}); run = null; };
     C.forEach(([x, s, cls], j) => {
@@ -21690,6 +21727,7 @@ function pvLines(c, L, cc, rsel, playRows){
       if (run){ run.cls = k; run.t += s; } else run = {t:s, cls:k, c0:pos};
       pos += s.length; });
     flush();
+    if (g.bus && ln.length > i0){ ln[i0].cls += ' pvbl'; ln[ln.length - 1].cls += ' pvbr'; }   // a line down each side
   };
   // 3: the column names (N1+: more note columns than shown; + after FX1: FX2 or FX3 in use, hidden)
   start(); lead();
@@ -21705,7 +21743,7 @@ function pvLines(c, L, cc, rsel, playRows){
     put(rS(r) + ' ', 'rn pvrn' + (r % 4 ? '' : ' rn4') + (r < curLen ? rsel(r) : ''), null, r < curLen ? {r} : null); put(' ', '');
     G.forEach((g, i) => { if (i) put('  ', 'pvg');
       if (g.fold) return put(' '.repeat(stripW(g)), 'pvf', to(g, null, r));
-      if (g.ph >= 0 && r >= g.len) return put(pvFitS(r === g.len ? (g.w >= 9 ? 'ENDS HERE' : 'END') : '', g.w), 'pvz', to(g, null, r));
+      if (g.ph >= 0 && r >= g.len) return put(pvFitS(r === g.len ? (g.w >= 9 ? 'ENDS HERE' : 'END') : '', g.w), 'pvz' + (g.bus ? ' pvbus pvbl pvbr' : ''), to(g, null, r));
       const q = g.p ? g.p[r] : null;
       cells(g, r, g.C.map(x => {
         const v = q ? q[x] : -1, kd = PK[x];
