@@ -24,6 +24,19 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 23 Oct (2): the FX column's command picker in groups
+
+Cache `thunderplus-v218`. Owner: organise the tracker FX for the FX column menu into categories, like the track FX.
+- `FXC_GROUPS` (before `FXLIST_ALL`): Volume and pan · Pitch and arpeggio · Note timing · Sound · Chance and random ·
+  Effects · Tempo and groove · Play order · MIDI, the everyday ones first in each. `fxcGroup(name)` (else 'More', for a
+  command added later and not grouped), `fxcByGroup(names)` (groups in first-appearance order). `FXLIST_ALL` is now in
+  that order (was alphabetical); `FXLIST_MST` is `MST_FXC` grouped, groups in the order the master list had them
+  (volume, effects, tempo, play order, timing, chance). `fxpOpen` passes `heads` to `fxpFill` as `fxsOpen` does
+  (sticky `.fph` headings; keys and clicks skip them). Only the picker's order changed: `FXC` numbers, `MST_FXC` (EDIT+▲▼
+  on the master) and letter typing are as before.
+- Checked headless (1600, 412): 41 commands + --- under nine headings, NOW on the cell's command, ▼▼ / a letter / Enter,
+  a click chooses, the master list grouped; no page errors.
+
 ## 23 Oct: ROWS sets PATTERN LEN; new songs LPB 8; the phrase cursor wraps
 
 Cache `thunderplus-v217`. Owner: when the rows of a phrase are changed, that number should become the default for new

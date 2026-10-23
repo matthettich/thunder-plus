@@ -166,7 +166,7 @@ Tap **Tracker** at the top for a sequencer that plays the kit. 16 tracks:
 
 **Chords and polyphony.** The second half of the tracks is polyphonic, whatever the track count (9–16 with 16 tracks, 17–32 with 32; with an odd count the mono half gets the extra one), and the first half plays one note at a time. On the Song and Mixer screens one pink box labelled MONO surrounds the mono tracks (always on the left) and one green box labelled POLY surrounds the polyphonic ones (always on the right), each label giving its track range; in Phrase the note column takes the open track's colour. A phrase opened from one of them shows four note columns (N1–N4), so a row can hold a chord, and notes ring over each other up to 4 per track (a fifth steals the oldest). A note OFF in any note column releases every note on the track; on synth slots that's their release, drum pads stop at once. Tracks 1–8 stay monophonic and play only N1. Instruments 08–0F play the synth slots in new songs (older songs keep their instruments as they were). Songs saved before the chord columns open with their notes in N1.
 
-**FX column.** Sequencer commands:
+**FX column.** Sequencer commands. EDIT on an FX cell opens a list of them under headings by what they do (Volume and pan, Pitch and arpeggio, Note timing, Sound, Chance and random, Effects, Tempo and groove, Play order, MIDI), as the FX slot's effect list is; a master phrase lists only its own commands, the same way:
 
 | | | | |
 |---|---|---|---|

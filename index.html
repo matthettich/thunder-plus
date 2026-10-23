@@ -16555,10 +16555,27 @@ const FXB = {ARP:'Arpeggio: the note, +X and +Y semitones', ARC:'Arpeggio shape 
   PGM:'MIDI program change (00–7F)', CSL:'MIDI CC glide: this row’s CCA–CCD move to their value over XY ticks (00 the step)',
   DIR:'Play direction from here on: 00 forward, 01 backwards, 02 ping-pong, 03 random'};
 for (const c of CC_CMDS) FXB[c] = `MIDI CC: send 00–7F to the instrument’s CC ${c[2]}`;
-const FXLIST_ALL = [-1, ...FXC.map((n, i) => i).sort((a, b) => FXC[a] < FXC[b] ? -1 : 1)];
+// FX COLUMN GROUPS (owner, 23 Oct): the picker lists the commands under headings by what they do, as the track effect
+// picker does (fxsOpen), the everyday ones first in each group. Only the picker's order changes: cells keep their
+// command numbers (FXC), and EDIT+▲▼ / letters step as before. A command in no group goes under MORE at the end.
+const FXC_GROUPS = [
+  ['Volume and pan', ['VOL', 'PAN']],
+  ['Pitch and arpeggio', ['PIT', 'FIN', 'TSP', 'PSL', 'PBN', 'PVB', 'ARP', 'ARC']],
+  ['Note timing', ['DEL', 'KIL', 'OFF', 'RET']],
+  ['Sound', ['INS', 'STA', 'PLY', 'WOB']],
+  ['Chance and random', ['CHA', 'NTH', 'RND', 'RNL', 'SED', 'REP']],
+  ['Effects', ['FXO', 'BYP', 'FLX', 'GAT', 'RTG']],
+  ['Tempo and groove', ['TPO', 'TIC', 'GRV', 'GGR']],
+  ['Play order', ['HOP', 'DIR']],
+  ['MIDI', ['PGM', 'CCA', 'CCB', 'CCC', 'CCD', 'CSL']]];
+const fxcGroup = n => { for (const [g, l] of FXC_GROUPS) if (l.includes(n)) return g; return 'More'; };
+// The names gathered by group, the groups in the order they first appear in names.
+const fxcByGroup = names => [...new Set(names.map(fxcGroup))].flatMap(g => names.filter(n => fxcGroup(n) === g));
+const FXLIST_ALL = [-1, ...fxcByGroup([...FXC_GROUPS.flatMap(([, l]) => l), ...FXC.filter(n => fxcGroup(n) === 'More').sort()])
+  .map(n => FXC.indexOf(n)).filter(i => i >= 0)];
 // Master phrases offer only the commands that mean something on the master bus: its level and effects first, then timing.
 const MST_FXC = ['VOL', 'FXO', 'FLX', 'GAT', 'RTG', 'TPO', 'TIC', 'GGR', 'HOP', 'DEL', 'CHA', 'NTH', 'REP', 'RND', 'RNL', 'SED'];
-const FXLIST_MST = [-1, ...MST_FXC.map(n => FXC.indexOf(n)).filter(i => i >= 0)];
+const FXLIST_MST = [-1, ...fxcByGroup(MST_FXC).map(n => FXC.indexOf(n)).filter(i => i >= 0)];
 let FXLIST = FXLIST_ALL;
 const fxListNow = () => (FXLIST = mstView() ? FXLIST_MST : FXLIST_ALL);
 const fxp = {open:false, x:0, y:0, i:0, now:-1, slot:-1};
@@ -16579,7 +16596,8 @@ function fxpFill(items, now, title, wide, heads){
 function fxpOpen(x, y){
   fxListNow(); const v = getCell('phrase', x, y); fxp.now = v;
   Object.assign(fxp, {open:true, x, y, slot:-1, i:Math.max(0, FXLIST.indexOf(v >= 0 ? v : last.fxc))});
-  fxpFill(FXLIST.map(f => [f < 0 ? '---' : FXC[f], f < 0 ? 'No command (clear this cell)' : FXB[FXC[f]] || '', f === v]), v, 'FX COMMAND', false);
+  const heads = {}; FXLIST.forEach((f, k) => { if (f < 0) return; const g = fxcGroup(FXC[f]); if (FXLIST[k - 1] < 0 || g !== fxcGroup(FXC[FXLIST[k - 1]])) heads[k] = g.toUpperCase(); });
+  fxpFill(FXLIST.map(f => [f < 0 ? '---' : FXC[f], f < 0 ? 'No command (clear this cell)' : FXB[FXC[f]] || '', f === v]), v, 'FX COMMAND', false, heads);
 }
 // EDIT on an FX-screen slot: every effect in a list, the slot's own one marked NOW. Choosing it opens its controls.
 function fxsOpen(k){
