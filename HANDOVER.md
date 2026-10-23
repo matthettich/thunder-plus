@@ -24,6 +24,20 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 22 Oct (6): PLAY on a bus plays it with its sources
+
+Cache `thunderplus-v215`. Owner (in Pattern view on a bus): Space on a bus should make every track connected to it sound.
+- BUS PLAY (before `playCtx`): on Phrase (Pattern view or not) or Sect, with no LOOP SEL selection loop, when `cTrack` is a
+  bus, `busPlay()` starts `tStart('song', {row, loop:{v:'bus', y0:row, y1:row}, only})`: `only` = `busSources(b)`, the
+  bus and every track feeding it, transitively (`busPlan().feeds`). `makeSeq`'s song start skips tracks not in `o.only`.
+  The row: `busRowOf` (Pattern view's row, the row the phrase sits on, or the sect's row; else the song cursor's). A toast
+  says which tracks; a row where nothing feeding it plays says so instead. `syncLoop` leaves a `'bus'` loop alone (it
+  would have dropped it on the next redraw), and `followPlay` doesn't jump to another track when the bus has no block of
+  its own (it fell back to the first playing track and moved the cursor off the bus).
+- Checked headless: Pattern view on an empty bus (track 4 fed by track 1 through a Glue): Space plays only track 1, the
+  row loops, the cursor stays, the bus track's meter carries the sound and tracks 2 / 3 stay silent; Space stops; a
+  plain track still plays its phrase; an empty row toasts; earlier suites.
+
 ## 22 Oct (5): view keys; Pattern view reaches buses and the master; no INST part on a bus
 
 Cache `thunderplus-v214`. Owner: keys to switch between Tracker, Synth, Waves and Chains (took Alt+8 / Alt+9 / Alt+`);
