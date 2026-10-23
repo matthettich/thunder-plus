@@ -24,6 +24,28 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 23 Oct: Electro presets (a drum kit and synth sounds)
+
+Cache `thunderplus-v217`. Owner asked for electro-inspired presets (after an electro demo made for wake.mobi in the spirit of
+The Hacker vs Commuter's *Roentgen* on Cultivated Electronics: punchy 808 machine funk, cold arps, tense leads).
+- **Electro drums** (the last group in `drumKitGroups()`): Kick, Kick (driven boom), Snare, Clap, Closed hat, Open hat, Zap tom,
+  Laser, Rim tick, Robot clank, Noise burst. The 808 pushed the way electro uses it (shorter driven kicks, a snappier snare,
+  a tight clap, crisp metal hats), plus zaps and lasers (big, fast pitch drops), an FM-metal clank and a gated noise burst.
+  Pad levels were set by rendering each sound and matching the 808 kit's peaks (kicks −1 dB, snare −3, clap −8, hats −7,
+  toms −2, percussion −3 to −4).
+- **Electro kit** for pads 1–8 (the last entry in `drumKits()`, so File ▾ → Drum kits… lists it): Kick, Snare, Clap, Closed hat,
+  Open hat, Zap tom, Laser, Rim tick. `kitTag` also strips " drums" now, so the kit is called "Electro".
+- **Electro** synth group (the end of `factoryVoicePresets()`): Electro bass (saw), Electro bass (pulse), 808 bass (drop), Acid
+  electro (bass engine), Cold arp (a pulse pluck with a 352 ms delay, a dotted 8th at 128 BPM), Electro stab (minor 7 chord),
+  String machine, Robot choir (formant), Zap lead, Hard sync lead, Toy robot lead (chip + crush), Laser zap.
+- Both groups come **after** every existing group: preset keys are `f<group>:<item>`, so a group inserted earlier would make
+  saved Recent picks point at other sounds. For the same reason the drum machines' spread in `factoryVoicePresets()` skips
+  'Electro drums'; its sounds are added at the end instead, as 'Electro …'.
+- To take it out: delete the ELECTRO group in `drumKitGroups()`, its line in `drumKits()`, the ELECTRO lines at the end of
+  `factoryVoicePresets()`, the `&& g !== 'Electro drums'` filter beside them, and `| drums$` in `kitTag`.
+- Checked: every new sound renders (no errors, levels as above) and the app loads clean. Not touched: engines, the song
+  format, layer presets.
+
 ## 22 Oct (7): a bus is FX commands only; buses outlined in Pattern view
 
 Cache `thunderplus-v216`. Desktop **v1.2.19** (22 Oct, started with Run workflow through the API: this session can push

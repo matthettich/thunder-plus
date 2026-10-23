@@ -8522,6 +8522,43 @@ function drumKitGroups(){
       {type:'pink', atk:3, dec:700, hpCut:500, lpCut:3000, level:0.3},
       {type:'fmmetal', a:0.85, b:0.6, ...hz(360), atk:1, dec:1600, hpCut:2000, level:0.3}], {len:4}, 6)],
   ]],
+  // ELECTRO (23 Oct, owner asked for electro presets): the 808 pushed the way electro uses it (shorter, driven kicks,
+  // a snappier snare, a tight clap, crisp metal hats) plus the zaps, lasers and clanks electro is built from.
+  // Last in the list so saved Recent picks keep their places. To take it out: delete this group, its line at the end
+  // of drumKits() and the ELECTRO lines at the end of factoryVoicePresets() (and the Electro filter beside them).
+  ['Electro drums', [
+    ['Kick', () => D('Electro Kick', [
+      {type:'sine', ...hz(52), pAmt:12, pDec:55, atk:0.1, dec:620, level:0.95},
+      {type:'sine', ...hz(104), pAmt:12, pDec:30, atk:0.1, dec:60, level:0.25},
+      {type:'click', a:0.15, level:0.5, hpCut:500, lpCut:6000, atk:0.05, dec:7}], {drive:0.35, len:3}, -1)],
+    ['Kick (driven boom)', () => D('Electro Boom', [
+      {type:'sine', ...hz(46), pAmt:14, pDec:70, atk:0.1, dec:2400, level:0.95},
+      {type:'click', a:0.1, level:0.35, hpCut:400, lpCut:5000, atk:0.05, dec:6}], {drive:0.5, len:5, gPAmt:2, gPDec:900}, -1)],
+    ['Snare', () => D('Electro Snare', [
+      {type:'tri', ...hz(190), pAmt:3, pDec:18, atk:0.1, dec:110, level:0.7},
+      {type:'sine', ...hz(345), pAmt:3, pDec:18, atk:0.1, dec:80, level:0.35},
+      {type:'white', atk:0.1, dec:150, hpCut:2000, hpRes:0.15, lpCut:11000, level:1},
+      {type:'click', a:0.2, level:0.35, atk:0.05, dec:4}], {drive:0.25}, -3)],
+    ['Clap', () => D('Electro Clap', clap(9, 30, 150, 420, 0.18, 900, 1400, 0.35, 0.3), null, 7)],
+    ['Closed hat', () => D('Electro Closed hat', [
+      {type:'metal', a:0.62, atk:0.1, dec:65, hpCut:9500, hpRes:0.5, lpCut:16000, level:1}], CHK, 6.5, 0.2)],
+    ['Open hat', () => D('Electro Open hat', [
+      {type:'metal', a:0.62, atk:0.1, dec:900, hpCut:9000, hpRes:0.45, lpCut:16000, level:1}], Object.assign({}, CHK, cut(200, 60)), 5.5, 0.05)],
+    ['Zap tom', () => D('Electro Zap tom', [
+      {type:'sine', ...hz(120), pAmt:30, pDec:60, atk:0.1, dec:360, level:0.9},
+      {type:'square', ...hz(120), pAmt:30, pDec:60, atk:0.1, dec:50, lpCut:2500, level:0.15}], {drive:0.3}, -2)],
+    ['Laser', () => D('Electro Laser', [
+      {type:'sine', ...hz(220), pAmt:48, pDec:110, atk:0.1, dec:280, level:0.8},
+      {type:'tri', ...hz(440), pAmt:48, pDec:70, atk:0.1, dec:120, level:0.25}], null, 0.5)],
+    ['Rim tick', () => D('Electro Rim tick', [
+      {type:'sine', ...hz(1700, 12), atk:0.05, dec:12, level:0.85},
+      {type:'click', a:0.2, level:0.45, atk:0.05, dec:3}], {tune:12}, 1.5)],
+    ['Robot clank', () => D('Electro Robot clank', [
+      {type:'fmmetal', a:0.7, b:0.55, ...hz(420), atk:0.1, dec:180, hpCut:600, level:0.7},
+      {type:'click', a:0.1, level:0.3, atk:0.05, dec:4}], {drive:0.2}, -2.5)],
+    ['Noise burst', () => D('Electro Noise burst', [
+      {type:'white', atk:0.2, dec:200, hpCut:3000, hpRes:0.3, lpCut:12000, level:0.9}], cut(70, 25), -2.5)],
+  ]],
   ];
 }
 // The kits: eight sounds from one machine, in the factory kit's pad order (kick, snare, clap, closed hat, open hat,
@@ -8539,10 +8576,11 @@ function drumKits(){
     ['Funk kit (acoustic)', ['Kick', 'Snare', 'Snare (ghost)', 'Closed hat', 'Open hat', 'Floor tom', 'High tom', 'Crash']],
     ['Studio kit (acoustic)', ['Kick', 'Snare', 'Snare (ghost)', 'Closed hat', 'Open hat', 'Floor tom', 'High tom', 'Crash']],
     ['Jazz kit (acoustic)', ['Kick', 'Snare', 'Snare (ghost)', 'Closed hat', 'Open hat', 'Floor tom', 'High tom', 'Ride']],
+    ['Electro drums', ['Kick', 'Snare', 'Clap', 'Closed hat', 'Open hat', 'Zap tom', 'Laser', 'Rim tick']],   // ELECTRO
   ];
 }
 // "808" from "808-style drums", "Funk" from "Funk kit (acoustic)": the prefix a kit's sounds carry in the Presets list.
-const kitTag = g => g.replace(/-style.*$| kit \(.*$/, '');
+const kitTag = g => g.replace(/-style.*$| kit \(.*$| drums$/, '');   // ELECTRO: "Electro drums" → "Electro"
 // Pads 1–8 get the kit; the synth slots (and any further drum pads) stay as they are. Each pad is its own undo step.
 function loadClassicKit(i){
   const K = drumKits()[i], G = K && drumKitGroups().find(g => g[0] === K[0]); if (!G) return;
@@ -8950,9 +8988,47 @@ function factoryVoicePresets(){
       {type:'white', atk:30, dec:300, sus:0.3, rel:200, hpCut:2000, lpCut:5000, level:0.1}], {lfo1Rate:5.5, lfo1Depth:1, r1dst:1, r1amt:0.06})],
   ]],
   // the classic drum machines, one group each (after the others, so saved Recent picks keep their places)
-  ...drumKitGroups().filter(([g]) => !g.includes('acoustic')).map(([g, list]) => [g, list.map(([n, make]) => [kitTag(g) + ' ' + n, make])]),
+  ...drumKitGroups().filter(([g]) => !g.includes('acoustic') && g !== 'Electro drums').map(([g, list]) => [g, list.map(([n, make]) => [kitTag(g) + ' ' + n, make])]),
   engGroup(['drift', 'Drift (tape pads)']),
   ...drumKitGroups().filter(([g]) => g.includes('acoustic')).map(([g, list]) => [g, list.map(([n, make]) => [kitTag(g) + ' ' + n, make])]),
+  // ELECTRO (23 Oct): its drums, then basses, arps, stabs, strings, choir and leads. Last, so saved Recent picks keep
+  // their places (preset keys count groups from the top). To take it out: delete these lines.
+  ...drumKitGroups().filter(([g]) => g === 'Electro drums').map(([g, list]) => [g, list.map(([n, make]) => ['Electro ' + n, make])]),
+  ['Electro', [
+    ['Electro bass (saw)', () => PS('Electro saw bass', [
+      {type:'saw', tune:-24, atk:1, dec:320, sus:0.45, rel:90, lpCut:520, lpRes:0.55, lpEnv:0.6, fDec:150, level:0.8},
+      {type:'sine', tune:-24, atk:1, dec:300, sus:0.9, rel:90, level:0.55}], {drive:0.3})],
+    ['Electro bass (pulse)', () => PS('Electro pulse bass', [
+      {type:'pulse', a:0.3, tune:-24, atk:1, dec:260, sus:0.55, rel:80, lpCut:850, lpRes:0.35, lpEnv:0.45, fDec:170, level:0.75},
+      {type:'sine', tune:-36, atk:1, dec:300, sus:0.9, rel:80, level:0.45}], {drive:0.25, level:-2})],
+    ['808 bass (drop)', () => PS('808 bass', [
+      {type:'sine', tune:-24, pAmt:12, pDec:55, atk:0.5, dec:1600, sus:0.75, rel:220, level:0.9},
+      {type:'tri', tune:-12, pAmt:12, pDec:40, atk:0.5, dec:120, sus:0, rel:80, level:0.15}], {drive:0.45, level:-2})],
+    ['Acid electro (bass engine)', () => BE('Acid electro', {shape:0, cut:380, res:0.8, fenv:4.5, fdec:140, glide:45, legato:1, sub:0.25, vDrive:0.35})],
+    ['Cold arp', () => PS('Cold arp', [
+      {type:'pulse', a:0.3, atk:0.5, dec:170, sus:0, rel:120, lpCut:2600, lpRes:0.35, lpEnv:0.4, fDec:90, level:0.7},
+      {type:'square', tune:12, fine:6, atk:0.5, dec:90, sus:0, rel:80, lpCut:3500, level:0.2}], {fx:[PFX('delay', {time:352, regen:0.35, mix:0.25})]})],
+    ['Electro stab', () => PS('Electro stab', [
+      {type:'chord', a:cA('Minor 7'), b:0.6, atk:1, dec:240, sus:0, rel:160, lpCut:2100, lpRes:0.35, lpEnv:0.45, fDec:130, level:0.72}],
+      {fx:[PFX('room', {size:0.35, wet:0.2})]})],
+    ['String machine', () => PS('String machine', [
+      {type:'supersaw', a:0.28, b:0.55, atk:450, dec:1500, sus:0.85, rel:1400, lpCut:3200, lpRes:0.05, level:0.55},
+      {type:'saw', tune:12, fine:-7, atk:500, dec:1500, sus:0.8, rel:1400, lpCut:4200, level:0.25}], {len:8, tail:3, level:2, fx:[PFX('chorus', {depth:0.6, mix:0.45})]})],
+    ['Robot choir', () => PS('Robot choir', [
+      {type:'formant', a:0.52, b:0.35, atk:350, dec:1500, sus:0.85, rel:1200, lpCut:3000, level:0.55},
+      {type:'formant', a:0.38, b:0.45, fine:-9, atk:400, dec:1500, sus:0.85, rel:1200, lpCut:2600, level:0.4},
+      {type:'square', tune:-12, atk:300, dec:1500, sus:0.8, rel:1200, lpCut:700, level:0.15}], {len:8, tail:3, level:4, fx:[PFX('chorus', {depth:0.35, mix:0.3})]})],
+    ['Zap lead', () => PS('Zap lead', [
+      {type:'square', pAmt:12, pDec:28, atk:1, dec:300, sus:0.7, rel:150, lpCut:3800, lpRes:0.3, level:0.55},
+      {type:'saw', fine:9, pAmt:12, pDec:28, atk:1, dec:300, sus:0.7, rel:150, lpCut:5000, level:0.35}], {glide:20})],
+    ['Hard sync lead', () => PS('Hard sync lead', [
+      {type:'saw', a:0.7, atk:1, dec:350, sus:0.65, rel:160, lpCut:6000, lpRes:0.15, level:0.6}], {glide:25, fx:[PFX('delay', {time:352, regen:0.3, mix:0.2})]})],
+    ['Toy robot lead', () => PS('Toy robot lead', [
+      {type:'chip', a:0.4, b:0.25, atk:1, dec:250, sus:0.8, rel:60, level:0.6}], {fx:[PFX('crush', {down:0.3, bits:7, mix:0.6})], lfo1Rate:7, lfo1Depth:1, r1dst:1, r1amt:0.05})],
+    ['Laser zap', () => PS('Laser zap', [
+      {type:'sine', pAmt:36, pDec:140, atk:0.5, dec:350, sus:0, rel:120, level:0.75},
+      {type:'square', pAmt:36, pDec:90, atk:0.5, dec:120, sus:0, rel:80, lpCut:3000, level:0.15}])],
+  ]],
   ];
 }
 // Layer presets: tagged with the pad pitch they were written for (vt: 0 = a drum pad, 24 = a synth slot), so a
