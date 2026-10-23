@@ -24,6 +24,38 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 22 Oct (4): dynamics displays in …chains / …waves and on the FX screen
+
+Cache `thunderplus-v213`, `chains-worklet.js?v=35`, `waves-worklet.js?v=28`. Owner: compressors (and the limiter, anything
+that needs it) should show the standard display (threshold, gain reduction…); "we have a little metering, but it could use
+a better gui"; double-clicking the title bar should fold to a reasonable size.
+- Engine (shared block of chains-worklet.js, synced): `show()` of Compressor (`ClassicComp`), Bus Comp, Glue Comp, Noise
+  gate (new) and Limiter now sends `[reduction dB ≤ 0, level the detector hears dB, peak out dB]` (`st.dd`, `st.op`, the
+  gate's `gm`/`ep`, the limiter's pre-Input `ai`). Sidechain Comp (…chains only) too. `withLevels(def)` (after `linDb`)
+  wraps a wasm effect's create/process/show to send `[0, peak in, peak out]`: Transient shaper and Multiband squash in the
+  shared block, Pressure (`Comp`) after the block in both worklets.
+- Editor (shared block of chains/index.html, synced): display kinds `dyn` (compressor, buscomp, glue, ngate, limiter,
+  sccomp) and `dynlv` (comp, ott, transient). DYNAMICS DISPLAY: `DYN` (type → curve params from the module's own params),
+  `dynOut` (the engine's soft-knee / Range / limiter / gate maths), `buildDyn` (canvas `.dyncv` 116 px, plus `n.mini`, a one-
+  line GR / OUT meter shown only when folded: `.node.collapsed > .dmini`), `dynPush` (80-sample history ≈ 2.5 s at the
+  ~31 Hz telemetry; numbers hold their peak 0.4 s), `drawDyn` (curve square with threshold, unity line and a live dot;
+  history with the GR lane on top (0…−24 dB) and levels below (−60…+6, input filled, output teal, threshold dashed); fixed
+  screen colours on the skin's `--glass`, because a monochrome skin made GR and output the same grey). Redrawn on each
+  telemetry (rAF) and every 150 ms when the settings' signature changes. Both editors' `buildNode` put `n.mini` after the
+  ports. The old `gr` kind is kept for anything else.
+- FX screen (index.html): the track-effect worklet (`TFX_SRC`, a template string: no backticks) takes `{tel:true|false}`
+  and, every 12 blocks, posts `{dyn:[[slot, key, v]]}` from the shared modules' `show()` and, for wasm Pressure / OTT /
+  Transient (ids 7, 28, 26), peaks measured around `slotRun` (`pk(n)`). FX DYNAMICS: `fxDynIn` keeps a history per slot on
+  the node (`n.dyn`), `fxTelSet` turns one node's reports on (the stage's track, from `stageTick`; off when the stage
+  doesn't show the chain and in `setView` away from the tracker). `stageChain` draws a thin GR / Δ bar under each dynamics
+  box and, below the chain, the display (`fxDynPaint`, the same design) for the cursor's slot (`cFxS`) or the first
+  dynamics slot; 30 fps while the track has one. Curves from `TFX[type].map(f)` (the module params). Only on the stage
+  (desktop widths); the phone FX screen has no display yet. The mastering window keeps its own meters.
+- Checked headless: the demo song through Track In → Compressor → Glue → Bus Comp → Sidechain Comp → Gate → Pressure →
+  Squash → Transient → Limiter → Chain Out: all nine draw, reductions read (−18 dB at −30 / 6:1), level-only ones show Δ,
+  folding keeps a one-line meter and unfolding redraws; FX screen with Glue, Pressure, Limiter on track 1: reports for
+  all three, display follows the cursor's slot, reports off away from FX; earlier suites; no page errors.
+
 ## 22 Oct (3): CHN on stays in the Mixer with tidy pairs; stereo jacks read L / R
 
 Cache `thunderplus-v212`. Owner: turning CHN on in the Mixer shouldn't jump to …chains; the pairs should be waiting there,

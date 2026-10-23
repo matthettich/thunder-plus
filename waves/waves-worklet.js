@@ -878,6 +878,24 @@ const PingPong = {
    the engine's telemetry() collects them. */
 const dbLin = d => Math.pow(10, d / 20);
 const linDb = v => v > 1e-9 ? 20 * Math.log10(v) : -180;
+/* METERING (owner, 22 Oct): an effect with no gain reduction of its own to report (Pressure, Multiband squash, Transient
+   shaper) shows how loud it goes in and comes out: show() sends [0, peak in dB, peak out dB] and the editor draws the
+   change. Wraps create / process / show in place and returns the effect. */
+function withLevels(def){
+  const C = def.create, P = def.process;
+  def.create = function(sr){ return Object.assign(C.call(this, sr) || {}, { lip:0, lop:0 }); };
+  def.process = function(st, io, ctx){
+    const L = io.in.in, R = io.in.inR && linked(io, 'inR') ? io.in.inR : L, B = ctx.block; let a = st.lip || 0;
+    for (let i = 0; i < B; i++){ const x = L[i] < 0 ? -L[i] : L[i], y = R[i] < 0 ? -R[i] : R[i]; if (x > a && x < 8) a = x; if (y > a && y < 8) a = y; }
+    st.lip = a; P.call(this, st, io, ctx);
+    const oL = io.out.out, oR = io.out.outR || oL; let b = st.lop || 0;
+    for (let i = 0; i < B; i++){ const x = oL[i] < 0 ? -oL[i] : oL[i], y = oR[i] < 0 ? -oR[i] : oR[i]; if (x > b && x < 8) b = x; if (y > b && y < 8) b = y; }
+    st.lop = b;
+  };
+  def.show = function(st){ const v = [0, linDb(st.lip || 0), linDb(st.lop || 0)]; st.lip = 0; st.lop = 0; return v; };
+  return def;
+}
+withLevels(TransientFx); withLevels(OttFx);
 const inR = io => linked(io, 'inR') ? io.in.inR : io.in.in;
 
 /* Meter: passes stereo audio straight through and reports VU (300 ms average) and peak levels, so a meter can sit
@@ -907,15 +925,15 @@ const Limiter = {
   type:'limiter', scope:'mono', cost:.1,
   inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
   params:{ input:[0,0,24,.1], ceil:[-.3,-24,0,.1], rel:[.15,.01,1,.001] },
-  create(sr){ const n = Math.max(8, Math.round(sr * .002)); return { n, bl:new Float32Array(n), br:new Float32Array(n), pk:new Float32Array(n), w:0, peak:0, pi:0, env:1, gr:1 }; },
+  create(sr){ const n = Math.max(8, Math.round(sr * .002)); return { n, bl:new Float32Array(n), br:new Float32Array(n), pk:new Float32Array(n), w:0, peak:0, pi:0, env:1, gr:1, ai:0, op:0 }; },
   process(st, io, ctx){
     const L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, n = st.n, pk = st.pk;
     const gin = dbLin(io.p.input), ceil = dbLin(io.p.ceil), kr = 1 - Math.exp(-1 / (ctx.sr * io.p.rel)), ka = 1 - Math.exp(-5 / n);
-    let env = st.env, w = st.w, gr = st.gr, peak = st.peak, pi = st.pi;
+    let env = st.env, w = st.w, gr = st.gr, peak = st.peak, pi = st.pi, am = 0, op = st.op;
     for (let i = 0; i < ctx.block; i++){
       const yl0 = st.bl[w], yr0 = st.br[w];   // the sample leaving the lookahead
       const l = L[i] * gin, r = R[i] * gin, a = Math.max(l < 0 ? -l : l, r < 0 ? -r : r);
-      st.bl[w] = l; st.br[w] = r; pk[w] = a;
+      st.bl[w] = l; st.br[w] = r; pk[w] = a; if (a > am) am = a;
       // the loudest sample still to come out: a running maximum, rescanned only when the old maximum leaves
       if (a >= peak){ peak = a; pi = w; } else if (pi === w){ peak = 0; for (let j = 0; j < n; j++) if (pk[j] > peak){ peak = pk[j]; pi = j; } }
       w = w + 1 === n ? 0 : w + 1;
@@ -925,10 +943,12 @@ const Limiter = {
       if (yl > ceil) yl = ceil; else if (yl < -ceil) yl = -ceil;   // the last word: a hard ceiling
       if (yr > ceil) yr = ceil; else if (yr < -ceil) yr = -ceil;
       oL[i] = yl; oR[i] = yr; if (env < gr) gr = env;
+      { const ao = yl < 0 ? -yl : yl, bo = yr < 0 ? -yr : yr; if (ao > op) op = ao; if (bo > op) op = bo; }
     }
-    st.env = env; st.w = w; st.gr = gr; st.peak = peak; st.pi = pi;
+    st.env = env; st.w = w; st.gr = gr; st.peak = peak; st.pi = pi; st.op = op;
+    { const ai = am / gin; if (ai > st.ai && ai < 8) st.ai = ai; }   // the level coming in, before Input
   },
-  show(st){ const v = [linDb(st.gr)]; st.gr = 1; return v; }
+  show(st){ const v = [linDb(st.gr), linDb(st.ai), linDb(st.op)]; st.gr = 1; st.ai = 0; st.op = 0; return v; }
 };
 
 /* Utility: gain (smoothed, so moving it never clicks), pan, mono, polarity flip and mute. */
@@ -4192,26 +4212,26 @@ const ClassicComp = {
   type:'compressor', scope:'mono', cost:.15,
   inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },
   params:{ thresh:[-18,-60,0,.1], ratio:[4,1,20,.1], attack:[.01,.0001,.25,.0001], release:[.15,.01,2,.001], knee:[6,0,24,.1], makeup:[0,0,24,.1], sck:[0,0,SCK_TOP,1], mix:[1,0,1,.01] },
-  create:() => ({ g:0, gr:0 }),
+  create:() => ({ g:0, gr:0, dd:-120, op:0 }),
   process(st, io, ctx){
     const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
     const scP = linked(io, 'sc'), K = !scP && p.sck > 0 && ctx.key ? ctx.key(p.sck) : null;   // SOURCE: a track or a send (Self: null)
     const SL = K || L, SR = K || R, SC = io.in.sc;
     const thr = p.thresh, sl = 1 - 1 / Math.max(1, p.ratio), kn = Math.max(0, p.knee), mk = p.makeup, ka = bfK(p.attack, sr), kr = bfK(p.release, sr), mx = u(p.mix);
-    let g = st.g, most = 0;
+    let g = st.g, most = 0, dd = st.dd, op = st.op;
     for (let i = 0; i < B; i++){
       let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
       let det; if (scP) det = Math.abs(SC[i]); else { const a = Math.abs(SL[i]), b = Math.abs(SR[i]); det = a > b ? a : b; }
-      const xdB = det > 1e-6 ? 8.685889638 * Math.log(det) : -120, over = xdB - thr;
+      const xdB = det > 1e-6 ? 8.685889638 * Math.log(det) : -120, over = xdB - thr; if (xdB > dd) dd = xdB;
       const t = over <= -kn / 2 ? 0 : over < kn / 2 ? sl * (over + kn / 2) * (over + kn / 2) / (2 * kn) : sl * over;   // gain reduction wanted, dB (soft knee)
       g += (t - g) * (t > g ? ka : kr);
       if (g > most) most = g;
       const gain = Math.exp((mk - g) * .1151292546);
-      oL[i] = xl + (fxGuard(xl * gain) - xl) * mx; oR[i] = xr + (fxGuard(xr * gain) - xr) * mx;
+      oL[i] = xl + (fxGuard(xl * gain) - xl) * mx; oR[i] = xr + (fxGuard(xr * gain) - xr) * mx; const ao = oL[i] < 0 ? -oL[i] : oL[i], bo = oR[i] < 0 ? -oR[i] : oR[i]; if (ao > op) op = ao; if (bo > op) op = bo;
     }
-    st.g = g > 1e-6 && g < 200 ? g : 0; st.gr = Math.max(st.gr, most);
+    st.g = g > 1e-6 && g < 200 ? g : 0; st.gr = Math.max(st.gr, most); st.dd = dd; st.op = op < 8 ? op : 8;
   },
-  show(st){ const v = [-st.gr]; st.gr = 0; return v; }
+  show(st){ const v = [-st.gr, st.dd, linDb(st.op)]; st.gr = 0; st.dd = -120; st.op = 0; return v; }
 };
 
 /* Bus Comp and Glue Comp (20 Oct, original code): two stereo bus compressors, both sides turned down together.
@@ -4242,50 +4262,50 @@ const BusComp = {
   type:'buscomp', scope:'mono', cost:.15,
   inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },
   params:{ thresh:[-12,-40,0,.1], ratio:[1,0,2,1], attack:[4,0,5,1], release:[4,0,4,1], makeup:[0,0,20,.1], schpf:[0,0,4,1], sck:[0,0,SCK_TOP,1], mix:[1,0,1,.01] },
-  create:() => ({ g:0, gr:0, sus:0, hz:-1, hg:0, zl:[0, 0], zr:[0, 0] }),
+  create:() => ({ g:0, gr:0, sus:0, hz:-1, hg:0, zl:[0, 0], zr:[0, 0], dd:-120, op:0 }),
   process(st, io, ctx){
     const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
     const { scP, SL, SR, SC } = bcKey(st, io, ctx, p), hg = st.hg, K = Math.SQRT2;
     const thr = p.thresh, sl = 1 - 1 / BC_RATIO[clamp(Math.round(p.ratio), 0, 2)], kn = 2, mk = p.makeup, mx = u(p.mix);
     const ka = bfK(BC_ATT[clamp(Math.round(p.attack), 0, 5)], sr), rel = BC_REL[clamp(Math.round(p.release), 0, 4)];
-    let g = st.g, most = 0, kr = bcRel(st, g, sr, rel);
+    let g = st.g, most = 0, kr = bcRel(st, g, sr, rel), dd = st.dd, op = st.op;
     for (let i = 0; i < B; i++){
       let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
       let a, b;
       if (scP){ a = SC[i]; if (hg) a = bcHp(st.zl, a, hg, K); a = Math.abs(a); b = 0; }
       else { a = SL[i]; b = SR[i]; if (hg){ a = bcHp(st.zl, a, hg, K); b = bcHp(st.zr, b, hg, K); } a = Math.abs(a); b = Math.abs(b); }
-      const det = a > b ? a : b, xdB = det > 1e-6 ? 8.685889638 * Math.log(det) : -120, over = xdB - thr;
+      const det = a > b ? a : b, xdB = det > 1e-6 ? 8.685889638 * Math.log(det) : -120, over = xdB - thr; if (xdB > dd) dd = xdB;
       const t = over <= -kn / 2 ? 0 : over < kn / 2 ? sl * (over + kn / 2) * (over + kn / 2) / (2 * kn) : sl * over;
       if ((i & 31) === 0) kr = bcRel(st, g, sr, rel);
       g += (t - g) * (t > g ? ka : kr);
       if (g > most) most = g;
       const gain = Math.exp((mk - g) * .1151292546);
-      oL[i] = xl + (fxGuard(xl * gain) - xl) * mx; oR[i] = xr + (fxGuard(xr * gain) - xr) * mx;
+      oL[i] = xl + (fxGuard(xl * gain) - xl) * mx; oR[i] = xr + (fxGuard(xr * gain) - xr) * mx; const ao = oL[i] < 0 ? -oL[i] : oL[i], bo = oR[i] < 0 ? -oR[i] : oR[i]; if (ao > op) op = ao; if (bo > op) op = bo;
     }
-    st.g = g > 1e-6 && g < 200 ? g : 0; st.gr = Math.max(st.gr, most);
+    st.g = g > 1e-6 && g < 200 ? g : 0; st.gr = Math.max(st.gr, most); st.dd = dd; st.op = op < 8 ? op : 8;
     st.zl[0] = fxClean(st.zl[0]); st.zl[1] = fxClean(st.zl[1]); st.zr[0] = fxClean(st.zr[0]); st.zr[1] = fxClean(st.zr[1]);
   },
-  show(st){ const v = [-st.gr]; st.gr = 0; return v; }
+  show(st){ const v = [-st.gr, st.dd, linDb(st.op)]; st.gr = 0; st.dd = -120; st.op = 0; return v; }
 };
 const GlueComp = {
   type:'glue', scope:'mono', cost:.15,
   inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },
   params:{ thresh:[-15,-40,0,.1], ratio:[2,1,10,.1], attack:[.01,.0001,.03,.0001], release:[.3,.05,1.5,.01], auto:[1,0,1,1], knee:[8,0,18,.1],
     range:[20,1,40,.5], makeup:[0,0,20,.1], clip:[0,0,1,1], schpf:[0,0,4,1], sck:[0,0,SCK_TOP,1], mix:[1,0,1,.01] },
-  create:() => ({ g:0, gr:0, sus:0, ms:0, hz:-1, hg:0, zl:[0, 0], zr:[0, 0] }),
+  create:() => ({ g:0, gr:0, sus:0, ms:0, hz:-1, hg:0, zl:[0, 0], zr:[0, 0], dd:-120, op:0 }),
   process(st, io, ctx){
     const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
     const { scP, SL, SR, SC } = bcKey(st, io, ctx, p), hg = st.hg, K = Math.SQRT2;
     const thr = p.thresh, sl = 1 - 1 / Math.max(1, p.ratio), kn = Math.max(0, p.knee), rg = Math.max(.5, p.range), mk = p.makeup, mx = u(p.mix), clip = p.clip >= .5;
     const ka = bfK(p.attack, sr), rel = p.auto >= .5 ? -1 : p.release, km = bfK(.006, sr);   // RMS over ~6 ms
-    let g = st.g, ms = st.ms, most = 0, kr = bcRel(st, g, sr, rel);
+    let g = st.g, ms = st.ms, most = 0, kr = bcRel(st, g, sr, rel), dd = st.dd, op = st.op;
     for (let i = 0; i < B; i++){
       let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
       let a, b;
       if (scP){ a = SC[i]; if (hg) a = bcHp(st.zl, a, hg, K); b = a; }
       else { a = SL[i]; b = SR[i]; if (hg){ a = bcHp(st.zl, a, hg, K); b = bcHp(st.zr, b, hg, K); } }
       const sq = a * a > b * b ? a * a : b * b; ms += (sq - ms) * km;
-      const xdB = ms > 1e-12 ? 4.342944819 * Math.log(ms * 2) : -120, over = xdB - thr;   // ×2: a sine's RMS reads as its peak
+      const xdB = ms > 1e-12 ? 4.342944819 * Math.log(ms * 2) : -120, over = xdB - thr; if (xdB > dd) dd = xdB;   // ×2: a sine's RMS reads as its peak
       let t = over <= -kn / 2 ? 0 : kn > 0 && over < kn / 2 ? sl * (over + kn / 2) * (over + kn / 2) / (2 * kn) : sl * over;
       if (t > rg) t = rg;
       if ((i & 31) === 0) kr = bcRel(st, g, sr, rel);
@@ -4293,12 +4313,12 @@ const GlueComp = {
       if (g > most) most = g;
       const gain = Math.exp((mk - g) * .1151292546);
       let yl = xl * gain, yr = xr * gain; if (clip){ yl = soft(yl); yr = soft(yr); }
-      oL[i] = xl + (fxGuard(yl) - xl) * mx; oR[i] = xr + (fxGuard(yr) - xr) * mx;
+      oL[i] = xl + (fxGuard(yl) - xl) * mx; oR[i] = xr + (fxGuard(yr) - xr) * mx; const ao = oL[i] < 0 ? -oL[i] : oL[i], bo = oR[i] < 0 ? -oR[i] : oR[i]; if (ao > op) op = ao; if (bo > op) op = bo;
     }
-    st.g = g > 1e-6 && g < 200 ? g : 0; st.ms = fxClean(ms); st.gr = Math.max(st.gr, most);
+    st.g = g > 1e-6 && g < 200 ? g : 0; st.ms = fxClean(ms); st.gr = Math.max(st.gr, most); st.dd = dd; st.op = op < 8 ? op : 8;
     st.zl[0] = fxClean(st.zl[0]); st.zl[1] = fxClean(st.zl[1]); st.zr[0] = fxClean(st.zr[0]); st.zr[1] = fxClean(st.zr[1]);
   },
-  show(st){ const v = [-st.gr]; st.gr = 0; return v; }
+  show(st){ const v = [-st.gr, st.dd, linDb(st.op)]; st.gr = 0; st.dd = -120; st.op = 0; return v; }
 };
 
 /* Noise gate: closes (turns the sound down by Range) when it falls below Threshold, so hiss, hum and spill between
@@ -4309,23 +4329,26 @@ const NoiseGate = {
   type:'ngate', scope:'mono', cost:.1,
   inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' },
   params:{ thresh:[-45,-80,0,.1], range:[90,0,90,1], attack:[.0005,.0001,.05,.0001], hold:[.03,0,.5,.001], release:[.12,.005,2,.001], sck:[0,0,SCK_TOP,1] },
-  create:() => ({ e:0, open:false, hold:0, g:0 }),
+  create:() => ({ e:0, open:false, hold:0, g:0, gm:1, ep:0, op:0 }),
+  // METERING: [reduction dB (how far it is closed), the level it hears, peak out]
+  show(st){ const v = [Math.max(-120, linDb(st.gm)), linDb(st.ep), linDb(st.op)]; st.gm = 1; st.ep = 0; st.op = 0; return v; },
   process(st, io, ctx){
     const p = io.p, sr = ctx.sr, B = ctx.block, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
     const scP = linked(io, 'sc'), K = !scP && p.sck > 0 && ctx.key ? ctx.key(p.sck) : null;   // SOURCE: a track or a send (Self: null)
     const SL = K || L, SR = K || R, SC = io.in.sc;
     const on = Math.pow(10, p.thresh / 20), off = on * .6, floor = p.range >= 89.5 ? 0 : Math.pow(10, -p.range / 20);
     const ka = bfK(p.attack, sr), kr = bfK(p.release, sr), ke = bfK(.005, sr), hn = Math.round(p.hold * sr);
-    let e = st.e, open = st.open, hold = st.hold, g = st.g;
+    let e = st.e, open = st.open, hold = st.hold, g = st.g, gm = st.gm, ep = st.ep, op = st.op;
     for (let i = 0; i < B; i++){
       let xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
       let a; if (scP) a = Math.abs(SC[i]); else { const x = Math.abs(SL[i]), y = Math.abs(SR[i]); a = x > y ? x : y; }
       e = a > e ? a : e + (a - e) * ke;   // peak follower: instant up, ~5 ms down
+      if (e > ep) ep = e;
       if (e > on){ open = true; hold = hn; } else if (open && e < off){ if (hold > 0) hold--; else open = false; }
       const t = open ? 1 : floor; g += (t - g) * (t > g ? ka : kr);
-      oL[i] = xl * g; oR[i] = xr * g;
+      oL[i] = xl * g; oR[i] = xr * g; if (g < gm) gm = g; const ao = oL[i] < 0 ? -oL[i] : oL[i], bo = oR[i] < 0 ? -oR[i] : oR[i]; if (ao > op) op = ao; if (bo > op) op = bo;
     }
-    st.e = fxClean(e); st.open = open; st.hold = hold; st.g = g > 1e-7 ? g : 0;
+    st.e = fxClean(e); st.open = open; st.hold = hold; st.g = g > 1e-7 ? g : 0; st.gm = gm; st.ep = ep < 8 ? ep : 8; st.op = op < 8 ? op : 8;
   }
 };
 
@@ -4409,6 +4432,7 @@ const SHARED_MODULES = { beads:Beads,
   bytebeat:Bytebeat, chaos:Chaos, marbles:MarblesM, tides:TidesM,
   sdelay:SimpleDelay, filter:Filter, cut:LoHiCut, compressor:ClassicComp, ngate:NoiseGate, autopan:AutoPan, pump:Pump, buscomp:BusComp, glue:GlueComp };
 /* ===SHARED MODULES END=== */
+withLevels(Comp);   // METERING: Pressure shows its levels in and out
 
 /* ---------- Karplus–Strong string (original code) ----------
    A plucked string: a burst of noise (darkened by Bright, notched by the pick Position) is fed round a delay line one

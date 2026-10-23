@@ -414,11 +414,11 @@ const SHARED_MODULES = {
       fb:{l:'Feedback', f:pct}, blend:{l:'Blend', f:wet}, verb:{l:'Reverb', f:pct} } },
   comb:{ label:'Comb resonator', fx:true, params:{ note:[48,24,96,1], fb:[0.85,-0.99,0.99,.01], damp:[0.3,0,0.99,.01], spread:[8,0,50,1], mix:[0.6,0,1,.01] },
     ui:{ note:{l:'Note', f:v => ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((v % 12) + 12) % 12] + (Math.floor(v / 12) - 1)}, fb:{l:'Feedback', f:v => (v < 0 ? 'hollow ' : '') + Math.round(Math.abs(v) * 100) + '%'}, damp:{l:'Damping', f:v => Math.round(v * 100) + '%'}, spread:{l:'Spread', f:v => Math.round(v) + ' cents'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
-  transient:{ label:'Transient shaper', fx:true, params:{ att:[0.5,-1,1,.01], sus:[0,-1,1,.01], out:[1,0,2,.01], mix:[1,0,1,.01] },
+  transient:{ label:'Transient shaper', fx:true, display:'dynlv', params:{ att:[0.5,-1,1,.01], sus:[0,-1,1,.01], out:[1,0,2,.01], mix:[1,0,1,.01] },
     ui:{ att:{l:'Attack', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, sus:{l:'Sustain', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, out:{l:'Output', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
   tgate:{ label:'Trance gate', fx:true, params:{ div:[2,0,5,1], pat:[4,0,8,1], len:[0.6,0.05,1,.01], depth:[1,0,1,.01], smooth:[3,0.5,30,.01] },
     ui:{ div:{l:'Step', c:opts(['1/32', '1/16T', '1/16', '1/8T', '1/8', '1/4'])}, pat:{l:'Pattern', c:opts(['All steps', 'Every other', 'Offbeats', '3-3-2', 'Trance 1', 'Trance 2', 'Stutter', 'Sparse', 'Clave'])}, len:{l:'Length', f:v => Math.round(v * 100) + '%'}, depth:{l:'Depth', f:v => Math.round(v * 100) + '%'}, smooth:{l:'Smoothing', f:v => Math.round(v) + ' ms'} } },
-  ott:{ label:'Multiband squash', fx:true, params:{ depth:[0.5,0,1,.01], time:[0.4,0,1,.01], lo:[0,-12,12,.01], mid:[0,-12,12,.01], hi:[0,-12,12,.01], out:[0,-12,12,.01] },
+  ott:{ label:'Multiband squash', fx:true, display:'dynlv', params:{ depth:[0.5,0,1,.01], time:[0.4,0,1,.01], lo:[0,-12,12,.01], mid:[0,-12,12,.01], hi:[0,-12,12,.01], out:[0,-12,12,.01] },
     ui:{ depth:{l:'Depth', f:v => Math.round(v * 100) + '%'}, time:{l:'Time', f:v => Math.round(v * 100) + '%'}, lo:{l:'Low', f:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'}, mid:{l:'Mid', f:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'}, hi:{l:'High', f:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'}, out:{l:'Output', f:v => (v > 0 ? '+' : '') + v.toFixed(1) + ' dB'} } },
   fshift:{ label:'Frequency shifter', fx:true, params:{ shift:[0.15,-1,1,.01], fb:[0,0,0.9,.01], mix:[1,0,1,.01] },
     ui:{ shift:{l:'Shift', f:v => (v > 0 ? '+' : '') + Math.round(Math.sign(v) * v * v * 2000) + ' Hz'}, fb:{l:'Feedback', f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', f:v => Math.round(v * 100) + '%'} } },
@@ -536,8 +536,8 @@ Object.assign(SHARED_MODULES, {
   meter:Object.assign({ label:'Meter', scope:'mono', params:{ trim:[0,-24,24,.1] }, ui:{ trim:{l:'Trim', f:db} }, display:'meter',
     about:'Meter: a stereo level meter you can put between any two modules. The bars show the average (VU) level, the tick the peak, and the numbers the peak in dB (red past 0 dB). Trim raises or lowers the level on the way through.' }, STEREO),
   limiter:Object.assign({ label:'Limiter', scope:'mono', params:{ input:[0,0,24,.1], ceil:[-.3,-24,0,.1], rel:[.15,.01,1,.001] },
-    ui:{ input:{l:'Input', f:db}, ceil:{l:'Ceiling', f:db}, rel:{l:'Release', f:secs} }, display:'gr',
-    about:'Limiter: a peak limiter with a 2 ms look-ahead, so nothing gets past Ceiling. Input pushes the sound into it for more loudness; Release sets how fast it lets go. The bar shows the gain reduction.' }, STEREO),
+    ui:{ input:{l:'Input', f:db}, ceil:{l:'Ceiling', f:db}, rel:{l:'Release', f:secs} }, display:'dyn',
+    about:'Limiter: a peak limiter with a 2 ms look-ahead, so nothing gets past Ceiling. Input pushes the sound into it for more loudness; Release sets how fast it lets go. The display shows the curve (Input up to Ceiling), the levels in and out and the gain reduction.' }, STEREO),
   utility:Object.assign({ label:'Utility', scope:'mono', params:{ gain:[0,-60,24,.1], pan:[0,-1,1,.01], mono:[0,0,1,1], flip:[0,0,3,1], mute:[0,0,1,1] },
     ui:{ gain:{l:'Gain', f:v => v <= -59.9 ? '−∞ dB' : db(v)}, pan:{l:'Pan', f:v => Math.abs(v) < .005 ? 'Centre' : (v < 0 ? 'L ' : 'R ') + Math.round(Math.abs(v) * 100)},
       mono:{l:'Stereo', c:opts(['Stereo','Mono'])}, flip:{l:'Polarity', c:opts(['Normal','Flip left','Flip right','Flip both'])}, mute:{l:'Mute', c:opts(['Sound on','Muted'])} },
@@ -954,12 +954,12 @@ Object.assign(SHARED_MODULES, {
   compressor:Object.assign({ label:'Compressor', scope:'mono',
     params:{ thresh:[-18,-60,0,.1], ratio:[4,1,20,.1], attack:[.01,.0001,.25,.0001], release:[.15,.01,2,.001], knee:[6,0,24,.1], makeup:[0,0,24,.1], sck:SCK_P, mix:[1,0,1,.01] },
     ui:Object.assign({ thresh:{l:'Threshold', f:db}, ratio:{l:'Ratio', f:v => v >= 19.95 ? '20:1 (limit)' : v.toFixed(1) + ':1'}, attack:{l:'Attack', f:v => v < .01 ? (v * 1000).toFixed(1) + ' ms' : secs(v)},
-      release:{l:'Release', f:secs}, knee:{l:'Knee', f:v => v.toFixed(1) + ' dB'}, makeup:{l:'Makeup', f:db}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')} }, MIXP),
+      release:{l:'Release', f:secs}, knee:{l:'Knee', f:v => v.toFixed(1) + ' dB'}, makeup:{l:'Makeup', f:db}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')} }, MIXP), display:'dyn',
     about:'Compressor: the classic one. Above Threshold the level is turned down by Ratio (4:1: 4 dB over comes out 1 dB over), Attack and Release set how fast, Knee how gently it starts, Makeup brings the level back up. Source listens to another track’s own sound or a send instead (a kick ducking a bass); a cable into SC always wins. Mix blends the dry sound back in (parallel compression).' }, SC_IO),
   ngate:Object.assign({ label:'Noise gate', scope:'mono',
     params:{ thresh:[-45,-80,0,.1], range:[90,0,90,1], attack:[.0005,.0001,.05,.0001], hold:[.03,0,.5,.001], release:[.12,.005,2,.001], sck:SCK_P },
     ui:{ thresh:{l:'Threshold', f:db}, range:{l:'Range', f:v => v >= 89.5 ? 'Silence' : '−' + Math.round(v) + ' dB'}, attack:{l:'Attack', f:v => v < .01 ? (v * 1000).toFixed(1) + ' ms' : secs(v)},
-      hold:{l:'Hold', f:secs}, release:{l:'Release', f:secs}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')} },
+      hold:{l:'Hold', f:secs}, release:{l:'Release', f:secs}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')} }, display:'dyn',
     about:'Noise gate: silences the sound (or turns it down by Range) when it falls below Threshold, so hiss, hum and spill between hits go away. It opens again a few dB higher than it closes, so it doesn’t chatter; Hold keeps it open a moment after the sound drops. Source lets another track or a send open it (a pad chopped in time with the drums); a cable into SC always wins.' }, SC_IO),
   autopan:Object.assign({ label:'Auto-pan', scope:'mono',
     params:{ sync:[1,0,1,1], div:[2,0,6,1], rate:[2,.05,20,.01], depth:[.8,0,1,.01], shape:[0,0,2,1] },
@@ -978,7 +978,7 @@ Object.assign(SHARED_MODULES, {
   buscomp:Object.assign({ label:'Bus Comp', scope:'mono',
     params:{ thresh:[-12,-40,0,.1], ratio:[1,0,2,1], attack:[4,0,5,1], release:[4,0,4,1], makeup:[0,0,20,.1], schpf:[0,0,4,1], sck:SCK_P, mix:[1,0,1,.01] },
     ui:Object.assign({ thresh:{l:'Threshold', f:db}, ratio:{l:'Ratio', c:opts(['2:1', '4:1', '10:1'])}, attack:{l:'Attack', c:opts(['0.1 ms', '0.3 ms', '1 ms', '3 ms', '10 ms', '30 ms'])},
-      release:{l:'Release', c:opts(BC_RELN)}, makeup:{l:'Makeup', f:db}, schpf:{l:'SC high-pass', c:opts(BC_HPFN)}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')} }, MIXP), display:'gr',
+      release:{l:'Release', c:opts(BC_RELN)}, makeup:{l:'Makeup', f:db}, schpf:{l:'SC high-pass', c:opts(BC_HPFN)}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')} }, MIXP), display:'dyn',
     about:'Bus Comp: the punchy console bus compressor for a group or the mix, both sides together. Ratio 2, 4 or 10:1, Attack and Release in the classic steps (Auto release follows the music: quick after a hit, slower while it holds), Makeup to bring the level back. SC high-pass keeps the lows out of what it listens to, so a kick or bass doesn’t pump everything. It listens to its own sound, or Source: another track’s own sound or a send (one bus ducking another); a cable into SC always wins. Mix for parallel compression; the meter shows the gain reduction.' }, SC_IO),
   glue:Object.assign({ label:'Glue Comp', scope:'mono',
     params:{ thresh:[-15,-40,0,.1], ratio:[2,1,10,.1], attack:[.01,.0001,.03,.0001], release:[.3,.05,1.5,.01], auto:[1,0,1,1], knee:[8,0,18,.1],
@@ -986,7 +986,7 @@ Object.assign(SHARED_MODULES, {
     ui:Object.assign({ thresh:{l:'Threshold', f:db}, ratio:{l:'Ratio', f:v => v.toFixed(1) + ':1'}, attack:{l:'Attack', f:v => v < .01 ? (v * 1000).toFixed(1) + ' ms' : secs(v)},
       release:{l:'Release', f:secs}, auto:{l:'Auto release', c:opts(['Off (use Release)', 'On'])}, knee:{l:'Knee', f:v => v.toFixed(1) + ' dB'},
       range:{l:'Range', f:v => '−' + v.toFixed(1) + ' dB at most'}, makeup:{l:'Makeup', f:db}, clip:{l:'Soft clip', c:opts(['Off', 'On'])},
-      schpf:{l:'SC high-pass', c:opts(BC_HPFN)}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')} }, MIXP), display:'gr',
+      schpf:{l:'SC high-pass', c:opts(BC_HPFN)}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')} }, MIXP), display:'dyn',
     about:'Glue Comp: the smooth bus compressor that makes a group sound like one performance. It listens to the average level (not each peak), with a wide Knee, so it eases in; Range caps how far it ever turns down, Auto release follows the music, and Soft clip rounds off the loudest peaks after Makeup. SC high-pass, Source and the SC input work as on the Bus Comp. Mix blends in the dry sound.' }, SC_IO)
 });
 Object.assign(SHARED_FAMILY, { sdelay:'afx', filter:'afx', cut:'afx', compressor:'util', ngate:'util', autopan:'afx', pump:'afx', buscomp:'util', glue:'util' });
@@ -1100,7 +1100,7 @@ const MODULE_USE = {
   glue:'On the mix or a group: Ratio 2:1, Attack around 10 ms, Auto release, Threshold for 1–2 dB of reduction, so it sounds like one performance.',
   comp:'Parallel squash on drums: Pressure high and Mix around 30%, so the hits stay punchy while the room and tails come up.',
   sccomp:'On a pad or bass, set Source to the kick’s track: Ratio 4:1 and Release around 150 ms give the classic sidechain pump.',
-  limiter:'Last on the mix or a loud group: Ceiling −1 dB, then raise Input until the bar shows a few dB of reduction for more loudness without clipping.',
+  limiter:'Last on the mix or a loud group: Ceiling −1 dB, then raise Input until the display shows a few dB of reduction for more loudness without clipping.',
   ngate:'On a noisy sample: Threshold just above the hiss, Hold 20 ms. Or set Source to the drums to chop a pad in their rhythm.',
   ott:'On a pad, vocal or drum bus: Depth around 30% brings up detail and air; turn it up for the hyped, crunchy EDM sound.',
   transient:'On a drum loop: Attack up for snappier hits, Sustain down to dry up a roomy sample.',
@@ -1267,12 +1267,19 @@ window.addEventListener('wheel', e => { if (mhelpBtnOn && !(mhelpEl && mhelpEl.c
 .shw.gr .tr i{left:auto; right:0; transform-origin:right; background:var(--gate)}
 .shw canvas.bdbars{width:100%; height:96px; display:block; touch-action:none; cursor:ns-resize}
 .shw canvas.lifegrid{width:100%; height:132px; display:block; touch-action:none; cursor:pointer}
-.shw .lifebtns{display:flex; gap:6px; flex-wrap:wrap}`;
+.shw .lifebtns{display:flex; gap:6px; flex-wrap:wrap}
+.shw canvas.dyncv{width:100%; height:116px; display:block}
+.node > .dmini{display:none; padding:6px 12px 8px} .node.collapsed > .dmini{display:grid}
+.dmini .ch{grid-template-columns:28px 1fr 58px}
+.dmini .tr i{background:#3cc8b9}
+.dmini.gr .tr i{left:auto; right:0; transform-origin:right; background:#f39a43}
+.dmini .ch span:last-child{font-weight:600; color:var(--ink)}`;
   const el = document.createElement('style'); el.textContent = css; document.head.append(el);
 }
 const SHOW_LO = -48, SHOW_HI = 3, showPos = d => Math.max(0, Math.min(1, (d - SHOW_LO) / (SHOW_HI - SHOW_LO)));
 function buildShow(n){
   const kind = MODULES[n.m.type].display;
+  if (kind === 'dyn' || kind === 'dynlv'){ const box = h('div', {class:'shw dyn'}); buildDyn(n, box, kind); return box; }
   if (kind === 'bars' || kind === 'life'){ const box = h('div', {class:'shw ' + kind}); (kind === 'bars' ? buildBars : buildLife)(n, box); return box; }
   const box = h('div', {class:'shw' + (kind === 'gr' ? ' gr' : '')}), rows = [];
   const mk = lbl => { const i = h('i'), b = h('b'), v = h('span', {text:'—'}), tr = h('div', {class:'tr'}, i, b); i.style.transform = 'scaleX(0)';   // empty until the first reading
@@ -1300,6 +1307,7 @@ function paintShows(list){
     const S = n.show; S.seen = now;
     if (S.kind === 'bars'){ for (let i = 0; i < 8; i++) S.lit[i] = Math.max(S.lit[i], v[i] || 0); continue; }
     if (S.kind === 'life'){ S.x = v[0]; S.gen = v[1]; S.live = v.slice(2, 10); continue; }
+    if (S.kind === 'dyn' || S.kind === 'dynlv'){ dynPush(n, v, now); continue; }
     if (S.kind === 'scin'){ scinPaint(S, v[0], v[1], now); continue; }
     if (S.kind === 'scout'){ const A = S.rows[0], pk = v[0]; A.i.style.transform = 'scaleX(' + showPos(pk) + ')'; if (pk >= A.hold || now - A.ht > 1500){ A.hold = pk; A.ht = now; }
       A.b.style.left = (showPos(A.hold) * 100) + '%'; A.v.textContent = A.hold <= -90 ? '−∞' : (A.hold > 0 ? '+' : '') + A.hold.toFixed(1); continue; }
@@ -1316,6 +1324,157 @@ function paintShows(list){
       R.v.textContent = gr > -0.05 ? '0.0 dB' : gr.toFixed(1) + ' dB';
     }
   }
+}
+/* DYNAMICS DISPLAY (owner, 22 Oct): compressors, the gate and the limiter show what they are doing, as a DAW's compressor
+   does. Left, the transfer curve (level in across, level out up), from the module's own Threshold, Ratio, Knee, Range and
+   Makeup (the limiter's Input and Ceiling, the gate's Threshold and Range), with the threshold dashed and a dot where the
+   sound is now. Right, the last 2.5 s: the level it hears (grey), what comes out (teal), the threshold (dashed) and the gain
+   reduction hanging from the top (orange, 24 dB deep), with the reduction in dB and the levels in and out. Effects with no
+   reduction of their own to report (Pressure, Multiband squash, Transient shaper: kind 'dynlv') show the levels in and out
+   and the change between them. Folded, the module keeps a one-line meter (n.mini). The engine's show() sends
+   [reduction dB (≤ 0), level in dB, peak out dB] ~31 times a second (telemetry). */
+const DYN_LO = -60, DYN_HI = 6, DYN_N = 80, DYN_GR = 24;
+const DYN = {
+  compressor: p => ({ thr:p.thresh, ratio:p.ratio, knee:p.knee, mk:p.makeup }),
+  buscomp: p => ({ thr:p.thresh, ratio:[2, 4, 10][Math.max(0, Math.min(2, Math.round(p.ratio)))], knee:2, mk:p.makeup }),
+  glue: p => ({ thr:p.thresh, ratio:p.ratio, knee:p.knee, range:p.range, mk:p.makeup }),
+  sccomp: p => ({ thr:-60 + p.threshold * 60, ratio:p.ratio, knee:0, mk:20 * Math.log10(Math.max(1, p.makeup)) }),
+  ngate: p => ({ gate:true, thr:p.thresh, range:p.range }),
+  limiter: p => ({ lim:true, gain:p.input, ceil:p.ceil, thr:p.ceil - p.input })
+};
+// Level out for a level in (dB), as the module's own maths has it (the soft knee and Range of the engine's compressors).
+function dynOut(c, x){
+  if (c.lim) return Math.min(x + c.gain, c.ceil);
+  if (c.gate) return x >= c.thr ? x : c.range >= 89.5 ? -999 : x - c.range;
+  const sl = 1 - 1 / Math.max(1, c.ratio), kn = Math.max(0, c.knee || 0), over = x - c.thr;
+  let t = over <= -kn / 2 ? 0 : kn > 0 && over < kn / 2 ? sl * (over + kn / 2) * (over + kn / 2) / (2 * kn) : sl * over;
+  if (c.range != null && t > c.range) t = c.range;
+  return x - t + (c.mk || 0);
+}
+const dynDb = d => d <= -90 ? '−∞' : (d > .05 ? '+' : d < -.05 ? '−' : '') + Math.abs(d).toFixed(1);
+function buildDyn(n, box, kind){
+  const cv = h('canvas', {class:'dyncv'}), lv = kind === 'dynlv';
+  box.append(cv);
+  box.title = lv ? 'The last 2.5 s: grey, the level going in; teal, what comes out. The number is how much louder (+) or quieter (−) it comes out.'
+    : 'Left: the transfer curve, level in (across) to level out (up), from these settings; dashed, the threshold; the dot, the sound now. '
+      + 'Right: the last 2.5 s: grey, the level it hears; teal, what comes out; orange from the top, the gain reduction (its peak in dB above).';
+  const i = h('i'), v = h('span', {text:'—'}), tr = h('div', {class:'tr'}, i); i.style.transform = 'scaleX(0)';
+  const mini = h('div', {class:'shw dmini' + (lv ? '' : ' gr'), title: lv ? 'Level out, and the change from the level in' : 'Gain reduction'},
+    h('div', {class:'ch'}, h('span', {text: lv ? 'OUT' : 'GR'}), tr, v));
+  const H = new Float32Array(DYN_N * 3); for (let k = 0; k < DYN_N; k++){ H[k * 3 + 1] = -120; H[k * 3 + 2] = -120; }
+  n.show = { kind, cv, h:H, w:0, cur:[0, -120, -120], hold:[0, -120, -120], holdT:[0, 0, 0], txtT:0, sig:'', dirty:true, col:null, colT:0, seen:0, mi:i, mv:v };
+  n.mini = mini;
+}
+function dynPush(n, v, now){
+  const S = n.show, gr = Math.max(-120, Math.min(0, +v[0] || 0)), li = Math.max(-120, +v[1] || -120), lo = Math.max(-120, +v[2] || -120);
+  const k = S.w * 3; S.h[k] = gr; S.h[k + 1] = li; S.h[k + 2] = lo; S.w = (S.w + 1) % DYN_N;
+  S.cur[0] = gr; S.cur[1] = li; S.cur[2] = lo;
+  // The numbers hold their peak ~0.4 s (the reduction its deepest), so they can be read.
+  const lv = S.kind === 'dynlv', red = lv ? (li > -80 ? lo - li : 0) : gr, cand = [red, li, lo];
+  for (let j = 0; j < 3; j++){ const deeper = j === 0 && !lv ? cand[0] <= S.hold[0] : j === 0 ? Math.abs(cand[0]) >= Math.abs(S.hold[0]) : cand[j] >= S.hold[j];
+    if (deeper || now - S.holdT[j] > 400){ S.hold[j] = cand[j]; S.holdT[j] = now; } }
+  if (now - S.txtT > 100){ S.txtT = now;   // the folded meter, ~10 times a second
+    if (lv){ S.mi.style.transform = 'scaleX(' + showPos(S.hold[2]) + ')'; S.mv.textContent = li > -80 ? 'Δ ' + dynDb(S.hold[0]) : '—'; }
+    else { S.mi.style.transform = 'scaleX(' + Math.min(1, -S.hold[0] / DYN_GR) + ')'; S.mv.textContent = dynDb(S.hold[0]) + ' dB'; } }
+  S.dirty = true; dynSchedule();
+}
+let dynRaf = 0;
+function dynSchedule(){
+  if (dynRaf) return;
+  dynRaf = requestAnimationFrame(() => { dynRaf = 0;
+    for (const n of nodes.values()){ const S = n.show; if (!S || !S.dirty || (S.kind !== 'dyn' && S.kind !== 'dynlv')) continue; S.dirty = false; if (n.el.isConnected && !n.m.collapsed) drawDyn(n); } });
+}
+// A setting moved (the curve), or the module was unfolded: draw again even with no sound coming in.
+setInterval(() => { for (const n of nodes.values()){ const S = n.show; if (!S || (S.kind !== 'dyn' && S.kind !== 'dynlv')) continue;
+  if (n.m.collapsed || !n.el.isConnected){ S.sig = ''; continue; }
+  const f = DYN[n.m.type], sig = (f ? JSON.stringify(f(n.m.params)) : 'lv') + S.cv.clientWidth;
+  if (sig !== S.sig){ S.sig = sig; drawDyn(n); } } }, 150);
+function dynLum(c){
+  let r = 0, g = 0, b = 0, m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c);
+  if (m){ let x = m[1]; if (x.length === 3) x = x.replace(/./g, '$&$&'); r = parseInt(x.slice(0, 2), 16); g = parseInt(x.slice(2, 4), 16); b = parseInt(x.slice(4, 6), 16); }
+  else if ((m = /rgba?\(([^)]+)\)/.exec(c))) [r, g, b] = m[1].split(',').map(parseFloat);
+  return (.2126 * r + .7152 * g + .0722 * b) / 255;
+}
+// The screen is the skin's meter glass (read every few seconds, so a new skin shows), with its own fixed colours, as a
+// hardware meter has: a monochrome skin made the reduction and the output the same grey.
+function dynColors(n, S, now){
+  if (S.col && now - S.colT < 3000) return S.col;
+  const cs = getComputedStyle(n.el), bg = cs.getPropertyValue('--glass').trim() || '#050607', dark = dynLum(bg) < .5;
+  S.col = dark ? { bg, fg:'255,255,255', audio:'#3cc8b9', gr:'#f39a43', hot:'#e5484d' } : { bg, fg:'0,0,0', audio:'#0f7a70', gr:'#c45f0c', hot:'#c42b2b' };
+  S.col.font = cs.fontFamily || 'system-ui, sans-serif'; S.colT = now; return S.col;
+}
+function drawDyn(n){
+  const S = n.show, cv = S.cv, W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+  const dpr = Math.min(3, (devicePixelRatio || 1) * 1.5), pw = Math.round(W * dpr), ph = Math.round(H * dpr);
+  if (cv.width !== pw || cv.height !== ph){ cv.width = pw; cv.height = ph; }
+  const g = cv.getContext('2d'), now = performance.now(), C = dynColors(n, S, now), F = a => 'rgba(' + C.fg + ',' + a + ')';
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  const lv = S.kind === 'dynlv', f = !lv && DYN[n.m.type], c = f ? f(n.m.params) : null, pad = 5;
+  const Y = (db, top, h) => top + (DYN_HI - Math.max(DYN_LO, Math.min(DYN_HI, db))) / (DYN_HI - DYN_LO) * h;
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  // ---- the transfer curve
+  let hx = pad;
+  if (c){
+    const s = H - pad * 2, x0 = pad, y0 = pad, X = db => x0 + (Math.max(DYN_LO, Math.min(DYN_HI, db)) - DYN_LO) / (DYN_HI - DYN_LO) * s, YY = db => Y(db, y0, s);
+    hx = x0 + s + 7;
+    g.strokeStyle = F(.08); g.lineWidth = 1; g.beginPath();
+    for (let d = 0; d >= DYN_LO; d -= 12){ const a = Math.round(X(d)) + .5, b = Math.round(YY(d)) + .5; g.moveTo(a, y0); g.lineTo(a, y0 + s); g.moveTo(x0, b); g.lineTo(x0 + s, b); }
+    g.stroke();
+    g.strokeStyle = F(.18); g.setLineDash([2, 3]); g.beginPath(); g.moveTo(X(DYN_LO), YY(DYN_LO)); g.lineTo(X(DYN_HI), YY(DYN_HI)); g.stroke();
+    const tx = Math.round(X(c.thr)) + .5; g.strokeStyle = C.gr; g.globalAlpha = .6; g.beginPath(); g.moveTo(tx, y0); g.lineTo(tx, y0 + s); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+    const at = d => { const o = dynOut(c, d); return o < DYN_LO - 1 ? y0 + s : YY(o); };
+    g.strokeStyle = F(.92); g.lineWidth = 1.8; g.beginPath();
+    for (let d = DYN_LO; d <= DYN_HI + 1e-6; d += .5){ if (d === DYN_LO) g.moveTo(X(d), at(d)); else g.lineTo(X(d), at(d)); }
+    g.stroke();
+    const L = S.cur[1];
+    if (L > DYN_LO){ const px = X(L), py = at(L); g.fillStyle = C.gr; g.globalAlpha = .28; g.beginPath(); g.arc(px, py, 6.5, 0, 7); g.fill(); g.globalAlpha = 1; g.beginPath(); g.arc(px, py, 3.2, 0, 7); g.fill(); }
+    g.font = '600 9px ' + C.font; g.textBaseline = 'top'; g.fillStyle = F(.55);
+    const tl = 'T ' + dynDb(c.thr); g.fillText(tl, Math.min(tx + 3, x0 + s - g.measureText(tl).width - 3), y0 + 3);
+    g.strokeStyle = F(.22); g.lineWidth = 1; g.strokeRect(x0 + .5, y0 + .5, s - 1, s - 1);
+  }
+  // ---- the last 2.5 s: the gain reduction in its own lane at the top (0 to −24 dB, deeper is lower), the levels below
+  const hy = pad, hw = W - hx - pad, hh = H - pad * 2, N = DYN_N, st = hw / (N - 1), K = j => ((S.w + j) % N) * 3;
+  const gh = lv ? 0 : Math.round(hh * .34), ly = hy + (gh ? gh + 3 : 0), lh = hh - (gh ? gh + 3 : 0);
+  g.save(); g.beginPath(); g.rect(hx, hy, hw, hh); g.clip();
+  // levels: a grid every 12 dB, 0 dB in red, what it hears (filled), the threshold (dashed), what comes out (a line)
+  g.strokeStyle = F(.07); g.lineWidth = 1; g.beginPath();
+  for (let d = -12; d >= DYN_LO; d -= 12){ const b = Math.round(Y(d, ly, lh)) + .5; g.moveTo(hx, b); g.lineTo(hx + hw, b); }
+  g.stroke();
+  g.strokeStyle = C.hot; g.globalAlpha = .55; g.beginPath(); { const b = Math.round(Y(0, ly, lh)) + .5; g.moveTo(hx, b); g.lineTo(hx + hw, b); } g.stroke(); g.globalAlpha = 1;
+  g.fillStyle = F(.15); g.beginPath(); g.moveTo(hx, ly + lh);
+  for (let j = 0; j < N; j++) g.lineTo(hx + j * st, Y(S.h[K(j) + 1], ly, lh));
+  g.lineTo(hx + hw, ly + lh); g.closePath(); g.fill();
+  g.strokeStyle = F(.32); g.lineWidth = 1; g.beginPath();
+  for (let j = 0; j < N; j++){ const b = Y(S.h[K(j) + 1], ly, lh); if (j) g.lineTo(hx + j * st, b); else g.moveTo(hx, b); }
+  g.stroke();
+  if (c){ const b = Math.round(Y(c.thr, ly, lh)) + .5; g.strokeStyle = C.gr; g.globalAlpha = .8; g.setLineDash([3, 3]); g.lineWidth = 1; g.beginPath(); g.moveTo(hx, b); g.lineTo(hx + hw, b); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
+  g.strokeStyle = C.audio; g.lineWidth = 1.6; g.beginPath();
+  for (let j = 0; j < N; j++){ const b = Y(S.h[K(j) + 2], ly, lh); if (j) g.lineTo(hx + j * st, b); else g.moveTo(hx, b); }
+  g.stroke();
+  if (gh){
+    const gy = d => hy + Math.min(DYN_GR, -d) / DYN_GR * gh;
+    g.fillStyle = F(.05); g.fillRect(hx, hy, hw, gh);
+    g.strokeStyle = F(.08); g.lineWidth = 1; g.beginPath(); for (let d = -6; d > -DYN_GR; d -= 6){ const b = Math.round(gy(d)) + .5; g.moveTo(hx, b); g.lineTo(hx + hw, b); } g.stroke();
+    g.fillStyle = C.gr; g.globalAlpha = .45; g.beginPath(); g.moveTo(hx, hy);
+    for (let j = 0; j < N; j++) g.lineTo(hx + j * st, gy(S.h[K(j)]));
+    g.lineTo(hx + hw, hy); g.closePath(); g.fill(); g.globalAlpha = 1;
+    g.strokeStyle = C.gr; g.lineWidth = 1.6; g.beginPath();
+    for (let j = 0; j < N; j++){ const b = gy(S.h[K(j)]); if (j) g.lineTo(hx + j * st, b); else g.moveTo(hx, b); }
+    g.stroke();
+    g.strokeStyle = F(.22); g.beginPath(); g.moveTo(hx, hy + gh + 1.5); g.lineTo(hx + hw, hy + gh + 1.5); g.stroke();
+  }
+  g.restore();
+  // ---- the numbers: the reduction (or the change) top left, the levels in and out at the bottom
+  g.textBaseline = 'top'; g.font = '700 11.5px ' + C.font;
+  const red = S.hold[0], on = lv ? S.cur[1] > -80 : red < -.05, rt = lv ? (on ? 'Δ ' + dynDb(red) + ' dB' : 'Δ —') : 'GR ' + dynDb(red) + ' dB';
+  { const w = g.measureText(rt).width; g.fillStyle = C.bg; g.globalAlpha = .75; g.fillRect(hx + 2, hy + 2, w + 6, 15); g.globalAlpha = 1;
+    g.fillStyle = on ? (lv ? C.audio : C.gr) : F(.45); g.fillText(rt, hx + 5, hy + 3); }
+  g.font = '600 9px ' + C.font; g.textBaseline = 'bottom';
+  const it = 'IN ' + dynDb(S.hold[1]), ot = 'OUT ' + dynDb(S.hold[2]), iw = g.measureText(it).width, ow = g.measureText(ot).width;
+  g.fillStyle = C.bg; g.globalAlpha = .7; g.fillRect(hx + 1, hy + hh - 13, iw + 6, 12); g.fillRect(hx + hw - ow - 7, hy + hh - 13, ow + 6, 12); g.globalAlpha = 1;
+  g.fillStyle = F(.7); g.fillText(it, hx + 4, hy + hh - 2);
+  g.fillStyle = C.audio; g.fillText(ot, hx + hw - ow - 4, hy + hh - 2);
+  g.strokeStyle = F(.22); g.lineWidth = 1; g.strokeRect(hx + .5, hy + .5, hw - 1, hh - 1);
 }
 /* STEREO (owner, 19 Oct): VCF, VCA, Sidechain Comp, Blades, Meta and Phaser got In R / Out R. A patch made before
    (st2 not set) gets their right side patched once, wherever the left side is: a cable from X's Out to one of them
@@ -1393,7 +1552,7 @@ const MODULES = {
     ui:{ treble:{l:'Treble', f:v => db(v * 24 - 12)}, mid:{l:'Mid', f:v => db(v * 24 - 12)}, bass:{l:'Bass', f:v => db(v * 24 - 12)},
       tfreq:{l:'Treble freq', f:v => khz((v * v * 15 + 1) * 1000)}, bfreq:{l:'Bass freq', f:v => khz(v * v * 1570 + 30)},
       lowpass:{l:'Low-pass', f:v => khz((v * v * 15 + 1) * 1000)}, hipass:{l:'High-pass', f:v => v > 0 ? khz(v * v * 1570 + 30) : 'Off'}, out:{l:'Output', f:v => db(v * 36 - 18)} } },
-  comp:{ label:'Compressor', fx:true, params:{ press:[.4,0,1,.01], speed:[.2,0,1,.01], mew:[1,0,1,.01], out:[1,0,1,.01], mix:[1,0,1,.01] },
+  comp:{ label:'Compressor', fx:true, display:'dynlv', params:{ press:[.4,0,1,.01], speed:[.2,0,1,.01], mew:[1,0,1,.01], out:[1,0,1,.01], mix:[1,0,1,.01] },
     ui:Object.assign({ press:{l:'Pressure', f:v => v > 0 ? pct(v) : 'Off'}, speed:{l:'Speed', f:pct}, mew:{l:'Mewiness', f:v => (v * 2 - 1).toFixed(2)}, out:{l:'Output', f:pct} }, MIXP) },
   saturation:{ label:'Saturation', fx:true, params:{ drive:[.4,0,1,.01], hipass:[0,0,1,.01], out:[.8,0,1,.01], mix:[1,0,1,.01] },
     ui:Object.assign({ drive:{l:'Drive', f:pct}, hipass:{l:'High-pass', f:pct}, out:{l:'Output', f:pct} }, MIXP) },
@@ -1435,7 +1594,7 @@ const MODULES = {
   scin:{ label:'Sidechain In', scope:'mono', inputs:{}, outputs:{ out:'audio', env:'cv', duck:'cv' }, params:{ sck:[NSEND + 1,0,NSEND + CHAN_COUNT,1], send:[1,0,1,.01], sens:[6,-12,24,.5], release:[150,10,1000,1] },
     ui:{ sck:{l:'Source', fixed:true, c:SCK_OPTS('Off')},
       send:{l:'Level', f:pct}, sens:{l:'Sensitivity', f:db}, release:{l:'Release', f:v => Math.round(v) + ' ms'} }, display:'scin' },
-  sccomp:{ label:'Sidechain Comp', scope:'mono', inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' }, params:{ threshold:[.3,0,1,.001], ratio:[4,1,20,.1], attack:[6,.1,200,.1], release:[140,5,2000,1], makeup:[1,1,4,.01], mix:[1,0,1,.01], sck:SCK_P },
+  sccomp:{ label:'Sidechain Comp', scope:'mono', display:'dyn', inputs:{ in:'audio', inR:'audio', sc:'audio' }, outputs:{ out:'audio', outR:'audio' }, params:{ threshold:[.3,0,1,.001], ratio:[4,1,20,.1], attack:[6,.1,200,.1], release:[140,5,2000,1], makeup:[1,1,4,.01], mix:[1,0,1,.01], sck:SCK_P },
     ui:{ sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')}, threshold:{l:'Threshold', f:pct}, ratio:{l:'Ratio', f:v => v.toFixed(1) + ':1'}, attack:{l:'Attack', f:v => Math.round(v) + ' ms'}, release:{l:'Release', f:v => Math.round(v) + ' ms'}, makeup:{l:'Makeup', f:pct}, mix:{l:'Mix', f:wet} } },
 
   lfo:{ label:'LFO', scope:'mono', inputs:{ reset:'gate' }, outputs:{ out:'cv' },
@@ -1700,7 +1859,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=34';
+    const url = opts.url || './chains-worklet.js?v=35';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -2216,7 +2375,7 @@ function buildNode(m){
   if (def.display) kids.push(buildShow(n));
   if (NOTES[m.type]){ n.note = h('div', {class:'status'}); kids.push(n.note); }
   const body = h('div', {class:'body'}, kids);
-  n.el = catStyle(h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id}, head, ports, body), m.type);
+  n.el = catStyle(h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id}, head, ports, n.mini || null, body), m.type);   // n.mini: a folded dynamics module's meter
   n.head = head;
   n.el.style.left = m.pos[0] + 'px'; n.el.style.top = m.pos[1] + 'px';
   n.el.style.zIndex = ++zTop;

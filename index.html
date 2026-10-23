@@ -2331,7 +2331,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" hidden></div>
 
-<script src="waves/waves-worklet.js?v=27"></script>
+<script src="waves/waves-worklet.js?v=28"></script>
 <script>
 /* ===ENGINE START=== */
 const BASE = 65.40639; // C2
@@ -7064,7 +7064,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=27', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=28', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -12986,6 +12986,7 @@ class ThunderFx extends AudioWorkletProcessor {
     this.x = new WebAssembly.Instance(globalThis.__tfxMod, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports;
     if (this.x._initialize) this.x._initialize();
     this.slots = []; this.dead = false; this.buf = null; this.ms = 0; this.fr = 0; this.idle = 0;
+    this.tel = false; this.telN = 0;   // FX DYNAMICS: the app wants the dynamics slots' levels ({tel:true}), ~31 times a second
     // for the shared-module slots (MODFX): their transport (the song tempo, from the beat clock while it plays) and the sidechain bus (input 1)
     this.spb = sampleRate / 2; this.bpm = 120; this.wasOn = false; this.startN = 0;
     this.scL = new Float32Array(128); this.scR = new Float32Array(128); this.scOn = false;
@@ -12996,8 +12997,9 @@ class ThunderFx extends AudioWorkletProcessor {
       key:v => { v = Math.round(v) || 0; if (v <= 0) return null; if (v <= 8) return (this.sends && this.sends[v - 1]) || this.zero;
         const c = this.tapIdx[v - 9]; return (c >= 0 && this.taps && this.taps[c]) || this.zero; }};
     this.set(op.chain || []);
-    this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else if (e.data && e.data.irs !== undefined) globalThis.__thunderIR = e.data.irs; else if (e.data && e.data.tapmap) this.setTap(e.data.tapmap); else this.set(e.data); };
+    this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else if (e.data && e.data.irs !== undefined) globalThis.__thunderIR = e.data.irs; else if (e.data && e.data.tapmap) this.setTap(e.data.tapmap); else if (e.data && e.data.tel !== undefined) this.tel = !!e.data.tel; else this.set(e.data); };
   }
+  pk(n){ const L = this.L, R = this.R; let p = 0; for (let k = 0; k < n; k++){ const a = L[k] < 0 ? -L[k] : L[k], b = R[k] < 0 ? -R[k] : R[k]; if (a > p) p = a; if (b > p) p = b; } return p < 8 ? p : 8; }
   setTap(list){ this.tapIdx.fill(-1); (Array.isArray(list) ? list : []).forEach((t, i) => { if (t >= 0 && t < 128) this.tapIdx[t] = i; }); }
   drop(s){ try { if (s.def){ if (s.def.destroy) s.def.destroy(s.st); } else if (!s.js && s.h >= 0) this.x.tfx_free(s.h); } catch (e){} }
   set(chain){
@@ -13103,11 +13105,22 @@ class ThunderFx extends AudioWorkletProcessor {
       if (s.g === undefined) s.g = tg;
       if (!tg && s.g <= 0){ if (s.js && s.js.feed) s.js.feed(this.L, this.R, n, tr); continue; }
       const fade = s.g !== tg; if (fade){ this.dL.set(this.L); this.dR.set(this.R); }
+      // FX DYNAMICS: Pressure, Multiband squash and the Transient shaper (wasm) have no reduction to report: their levels in and out
+      const lvm = this.tel && !s.def && !s.js && (s.t === 7 || s.t === 26 || s.t === 28);
+      if (lvm){ const a = this.pk(n); if (!(s.lip > a)) s.lip = a; }
       this.slotRun(s, n, tr);
+      if (lvm){ const a = this.pk(n); if (!(s.lop > a)) s.lop = a; }
       if (fade){ const L = this.L, R = this.R, d = 1 / (sampleRate * 0.005); let g = s.g;
         for (let k = 0; k < n; k++){ g = tg ? Math.min(1, g + d) : Math.max(0, g - d); L[k] = this.dL[k] + (L[k] - this.dL[k]) * g; R[k] = this.dR[k] + (R[k] - this.dR[k]) * g; }
         s.g = g; }
     }
+    // FX DYNAMICS: [slot, key, [reduction dB, level in dB, peak out dB]] for each dynamics slot (the shared modules' own show())
+    if (this.tel && ++this.telN >= 12){ this.telN = 0; const out = [], db = v => v > 1e-9 ? 20 * Math.log10(v) : -180;
+      for (const s of this.slots){
+        if (s.def && s.def.show){ try { out.push([s.slot, s.key, s.def.show(s.st)]); } catch (e){} }
+        else if (!s.def && !s.js && (s.t === 7 || s.t === 26 || s.t === 28)){ out.push([s.slot, s.key, [0, db(s.lip || 0), db(s.lop || 0)]]); s.lip = 0; s.lop = 0; }
+      }
+      if (out.length) this.port.postMessage({dyn:out}); }
     // Date.now() is coarse, but its average over many blocks is the real cost: report it as a share of real time.
     this.ms += Date.now() - t0; this.fr += n;
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
@@ -13135,7 +13148,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=34')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=35')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -13356,6 +13369,7 @@ function tfxNode(ac, chain){
     channelCountMode:'max', channelInterpretation:'speakers', processorOptions:{bytes:tfxBin(), chain, irs:irsOpt(ac), tapMap:keyTrackList()}});   // irs: this audio thread's copy of the song's impulse responses
   n.load = 0; n.port.onmessage = e => { const d = e.data; if (!d) return;
     if (typeof d.load === 'number') n.load = n.load * 0.6 + d.load * 0.4;
+    if (d.dyn) fxDynIn(n, d.dyn);
     if (d.failed){ const t = String(d.failed).split(':')[1], F = TFX[t]; toast((F ? F.long.replace(/^based on /, '') : 'An effect') + ' stopped working and was bypassed. Change its settings to restart it.'); } };
   return n;
 }
@@ -18060,6 +18074,10 @@ function dogsFollow(){
 let stgT0 = 0, stgBeat = -1, stgBpm = 120, stgSide = 1, stgOn = false, stgFrameT = 0;
 function stageStart(t0){ stgT0 = t0; stgBeat = -1; stgBpm = S.bpm; dogMove = 0; dogPh = null; dogN = 0; }
 function stageTick(now){
+  // FX DYNAMICS: the shown track's effects report their levels while the stage shows its chain; ~30 frames a second then
+  const chn = stgKindNow === 'chain' && !$('tStage').hidden, ft = cFxT >= NT ? -1 : Math.min(cFxT, ntr() - 1);
+  fxTelSet(chn ? fxDynNodeOf(ft) : null);
+  if (chn && now - stgFrameT > 33){ const A = ft < 0 ? S.mfx : S.tfx[ft] || []; if (A.some(f => f && isFxDyn(f.type))){ stgFrameT = now; stageCanvas(false); } }
   if (stgOn !== !!tp.on){ stgOn = !!tp.on; if (stgKindNow === 'dogs' || stgKindNow === 'drum') dogsState(); else if (stgKindNow) stageCanvas(true); }
   if (!stgKindNow || $('tStage').hidden) return;
   if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (now - stgFrameT > 45){ stgFrameT = now; stageCanvas(false); } return; }
@@ -18272,18 +18290,147 @@ function stageSpec(){
   g.lineTo(W, H); g.closePath(); g.fillStyle = X.mono; g.fill();
 }
 // FX: the track's effects as a chain of boxes, in order, with ...chains first when it feeds the track.
+/* FX DYNAMICS (owner, 22 Oct): the track effects' compressors, gate and limiter show what they are doing on the FX screen's
+   stage, as in …chains (the same display as chains/index.html's DYNAMICS DISPLAY, drawn here again): the transfer curve
+   from the slot's own settings with a dot where the sound is, and the last 2.5 s of the level it hears (grey), what comes
+   out (teal), the threshold (dashed) and the gain reduction in its own lane (orange). Pressure, Multiband squash and the
+   Transient shaper show their levels in and out and the change. The track-effect worklet reports them ~31 times a second
+   while the stage shows that track ({tel:true}); each dynamics box in the chain gets a thin bar of its reduction too. */
+const FXDYN = {
+  compressor: p => ({ thr:p.thresh, ratio:p.ratio, knee:p.knee, mk:p.makeup }),
+  buscomp: p => ({ thr:p.thresh, ratio:[2, 4, 10][clamp(Math.round(p.ratio), 0, 2)], knee:2, mk:p.makeup }),
+  glue: p => ({ thr:p.thresh, ratio:p.ratio, knee:p.knee, range:p.range, mk:p.makeup }),
+  ngate: p => ({ gate:true, thr:p.thresh, range:p.range }),
+  limiter: p => ({ lim:true, gain:p.input, ceil:p.ceil, thr:p.ceil - p.input })
+}, FXLV = new Set(['comp', 'ott', 'transient']), FXD_N = 80, FXD_LO = -60, FXD_HI = 6, FXD_GR = 24;
+const isFxDyn = type => !!(FXDYN[type] && TFX[type] && TFX[type].mod) || (FXLV.has(type) && !!TFX[type]);
+function fxDynOut(c, x){
+  if (c.lim) return Math.min(x + c.gain, c.ceil);
+  if (c.gate) return x >= c.thr ? x : c.range >= 89.5 ? -999 : x - c.range;
+  const sl = 1 - 1 / Math.max(1, c.ratio), kn = Math.max(0, c.knee || 0), over = x - c.thr;
+  let t = over <= -kn / 2 ? 0 : kn > 0 && over < kn / 2 ? sl * (over + kn / 2) * (over + kn / 2) / (2 * kn) : sl * over;
+  if (c.range != null && t > c.range) t = c.range;
+  return x - t + (c.mk || 0);
+}
+const fxDb = d => d <= -90 ? '−∞' : (d > .05 ? '+' : d < -.05 ? '−' : '') + Math.abs(d).toFixed(1);
+function fxDynNew(key){ const h = new Float32Array(FXD_N * 3); for (let k = 0; k < FXD_N; k++){ h[k * 3 + 1] = -120; h[k * 3 + 2] = -120; } return { key, h, w:0, cur:[0, -120, -120], hold:[0, -120, -120], holdT:[0, 0, 0], t:0, q:0 }; }
+function fxDynFeed(D, v, now, lv){
+  const gr = Math.max(-120, Math.min(0, +v[0] || 0)), li = Math.max(-120, +v[1] || -120), lo = Math.max(-120, +v[2] || -120);
+  const k = D.w * 3; D.h[k] = gr; D.h[k + 1] = li; D.h[k + 2] = lo; D.w = (D.w + 1) % FXD_N; D.cur = [gr, li, lo];
+  const cand = [lv ? (li > -80 ? lo - li : 0) : gr, li, lo];   // the numbers hold their peak ~0.4 s, so they can be read
+  for (let j = 0; j < 3; j++){ const deeper = j === 0 && !lv ? cand[0] <= D.hold[0] : j === 0 ? Math.abs(cand[0]) >= Math.abs(D.hold[0]) : cand[j] >= D.hold[j];
+    if (deeper || now - D.holdT[j] > 400){ D.hold[j] = cand[j]; D.holdT[j] = now; } }
+}
+function fxDynIn(n, list){
+  const now = performance.now(); n.dyn = n.dyn || new Map();
+  for (const [slot, key, v] of list){ let D = n.dyn.get(slot); if (!D || D.key !== key){ D = fxDynNew(key); n.dyn.set(slot, D); }
+    fxDynFeed(D, v, now, FXLV.has(String(key).split(':')[1])); D.t = now; }
+}
+// The node that runs a track's effects (t −1: the master's), and switching its reports on (one node at a time).
+const fxDynNodeOf = t => !rt ? null : t < 0 ? rt.mfx || null : (rt.pl.buses[t] && rt.pl.buses[t].fx) || null;
+let fxTelNode = null;
+function fxTelSet(node){
+  if (node === fxTelNode) return;
+  if (fxTelNode) try { fxTelNode.port.postMessage({tel:false}); } catch(e){}
+  fxTelNode = node || null;
+  if (fxTelNode) try { fxTelNode.port.postMessage({tel:true}); } catch(e){}
+}
+// The display, in CSS pixels at (x, y), W × H, on a dark glass of its own (fixed colours, as in …chains).
+function fxDynPaint(g, x, y, W, H, D, c, lv, font){
+  const C = { bg:'#0b0c0e', audio:'#3cc8b9', gr:'#f39a43', hot:'#e5484d' }, F = a => 'rgba(255,255,255,' + a + ')', pad = 5;
+  const Y = (db, top, h) => top + (FXD_HI - Math.max(FXD_LO, Math.min(FXD_HI, db))) / (FXD_HI - FXD_LO) * h;
+  g.save(); g.translate(x, y); g.fillStyle = C.bg; g.fillRect(0, 0, W, H); g.lineJoin = 'round'; g.lineCap = 'round';
+  let hx = pad;
+  if (c){
+    const s = Math.min(H - pad * 2, W * .45), x0 = pad, y0 = (H - s) / 2, X = db => x0 + (Math.max(FXD_LO, Math.min(FXD_HI, db)) - FXD_LO) / (FXD_HI - FXD_LO) * s, YY = db => Y(db, y0, s);
+    hx = x0 + s + 8;
+    g.strokeStyle = F(.08); g.lineWidth = 1; g.beginPath();
+    for (let d = 0; d >= FXD_LO; d -= 12){ const a = Math.round(X(d)) + .5, b = Math.round(YY(d)) + .5; g.moveTo(a, y0); g.lineTo(a, y0 + s); g.moveTo(x0, b); g.lineTo(x0 + s, b); }
+    g.stroke();
+    g.strokeStyle = F(.18); g.setLineDash([2, 3]); g.beginPath(); g.moveTo(X(FXD_LO), YY(FXD_LO)); g.lineTo(X(FXD_HI), YY(FXD_HI)); g.stroke();
+    const tx = Math.round(X(c.thr)) + .5; g.strokeStyle = C.gr; g.globalAlpha = .6; g.beginPath(); g.moveTo(tx, y0); g.lineTo(tx, y0 + s); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+    const at = d => { const o = fxDynOut(c, d); return o < FXD_LO - 1 ? y0 + s : YY(o); };
+    g.strokeStyle = F(.92); g.lineWidth = 1.8; g.beginPath();
+    for (let d = FXD_LO; d <= FXD_HI + 1e-6; d += .5){ if (d === FXD_LO) g.moveTo(X(d), at(d)); else g.lineTo(X(d), at(d)); }
+    g.stroke();
+    const L = D.cur[1];
+    if (L > FXD_LO){ const px = X(L), py = at(L); g.fillStyle = C.gr; g.globalAlpha = .28; g.beginPath(); g.arc(px, py, 6.5, 0, 7); g.fill(); g.globalAlpha = 1; g.beginPath(); g.arc(px, py, 3.2, 0, 7); g.fill(); }
+    g.font = '600 9px ' + font; g.textBaseline = 'top'; g.fillStyle = F(.55);
+    const tl = 'T ' + fxDb(c.thr); g.fillText(tl, Math.min(tx + 3, x0 + s - g.measureText(tl).width - 3), y0 + 3);
+    g.strokeStyle = F(.22); g.lineWidth = 1; g.strokeRect(x0 + .5, y0 + .5, s - 1, s - 1);
+  }
+  const hy = pad, hw = W - hx - pad, hh = H - pad * 2, N = FXD_N, st = hw / (N - 1), K = j => ((D.w + j) % N) * 3;
+  const gh = lv ? 0 : Math.round(hh * .34), ly = hy + (gh ? gh + 3 : 0), lh = hh - (gh ? gh + 3 : 0);
+  g.save(); g.beginPath(); g.rect(hx, hy, hw, hh); g.clip();
+  g.strokeStyle = F(.07); g.lineWidth = 1; g.beginPath();
+  for (let d = -12; d >= FXD_LO; d -= 12){ const b = Math.round(Y(d, ly, lh)) + .5; g.moveTo(hx, b); g.lineTo(hx + hw, b); }
+  g.stroke();
+  g.strokeStyle = C.hot; g.globalAlpha = .55; g.beginPath(); { const b = Math.round(Y(0, ly, lh)) + .5; g.moveTo(hx, b); g.lineTo(hx + hw, b); } g.stroke(); g.globalAlpha = 1;
+  g.fillStyle = F(.15); g.beginPath(); g.moveTo(hx, ly + lh);
+  for (let j = 0; j < N; j++) g.lineTo(hx + j * st, Y(D.h[K(j) + 1], ly, lh));
+  g.lineTo(hx + hw, ly + lh); g.closePath(); g.fill();
+  g.strokeStyle = F(.32); g.lineWidth = 1; g.beginPath();
+  for (let j = 0; j < N; j++){ const b = Y(D.h[K(j) + 1], ly, lh); if (j) g.lineTo(hx + j * st, b); else g.moveTo(hx, b); }
+  g.stroke();
+  if (c){ const b = Math.round(Y(c.thr, ly, lh)) + .5; g.strokeStyle = C.gr; g.globalAlpha = .8; g.setLineDash([3, 3]); g.lineWidth = 1; g.beginPath(); g.moveTo(hx, b); g.lineTo(hx + hw, b); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
+  g.strokeStyle = C.audio; g.lineWidth = 1.6; g.beginPath();
+  for (let j = 0; j < N; j++){ const b = Y(D.h[K(j) + 2], ly, lh); if (j) g.lineTo(hx + j * st, b); else g.moveTo(hx, b); }
+  g.stroke();
+  if (gh){
+    const gy = d => hy + Math.min(FXD_GR, -d) / FXD_GR * gh;
+    g.fillStyle = F(.05); g.fillRect(hx, hy, hw, gh);
+    g.strokeStyle = F(.08); g.lineWidth = 1; g.beginPath(); for (let d = -6; d > -FXD_GR; d -= 6){ const b = Math.round(gy(d)) + .5; g.moveTo(hx, b); g.lineTo(hx + hw, b); } g.stroke();
+    g.fillStyle = C.gr; g.globalAlpha = .45; g.beginPath(); g.moveTo(hx, hy);
+    for (let j = 0; j < N; j++) g.lineTo(hx + j * st, gy(D.h[K(j)]));
+    g.lineTo(hx + hw, hy); g.closePath(); g.fill(); g.globalAlpha = 1;
+    g.strokeStyle = C.gr; g.lineWidth = 1.6; g.beginPath();
+    for (let j = 0; j < N; j++){ const b = gy(D.h[K(j)]); if (j) g.lineTo(hx + j * st, b); else g.moveTo(hx, b); }
+    g.stroke();
+    g.strokeStyle = F(.22); g.beginPath(); g.moveTo(hx, hy + gh + 1.5); g.lineTo(hx + hw, hy + gh + 1.5); g.stroke();
+  }
+  g.restore();
+  g.textBaseline = 'top'; g.font = '700 11.5px ' + font;
+  const red = D.hold[0], on = lv ? D.cur[1] > -80 : red < -.05, rt2 = lv ? (on ? 'Δ ' + fxDb(red) + ' dB' : 'Δ —') : 'GR ' + fxDb(red) + ' dB';
+  { const w = g.measureText(rt2).width; g.fillStyle = C.bg; g.globalAlpha = .75; g.fillRect(hx + 2, hy + 2, w + 6, 15); g.globalAlpha = 1;
+    g.fillStyle = on ? (lv ? C.audio : C.gr) : F(.45); g.fillText(rt2, hx + 5, hy + 3); }
+  g.font = '600 9px ' + font; g.textBaseline = 'bottom';
+  const it = 'IN ' + fxDb(D.hold[1]), ot = 'OUT ' + fxDb(D.hold[2]), iw = g.measureText(it).width, ow = g.measureText(ot).width;
+  g.fillStyle = C.bg; g.globalAlpha = .7; g.fillRect(hx + 1, hy + hh - 13, iw + 6, 12); g.fillRect(hx + hw - ow - 7, hy + hh - 13, ow + 6, 12); g.globalAlpha = 1;
+  g.fillStyle = F(.7); g.fillText(it, hx + 4, hy + hh - 2);
+  g.fillStyle = C.audio; g.fillText(ot, hx + hw - ow - 4, hy + hh - 2);
+  g.strokeStyle = F(.22); g.lineWidth = 1; g.strokeRect(hx + .5, hy + .5, hw - 1, hh - 1);
+  g.restore();
+}
+// The slot the stage shows: the cursor's, when it is a dynamics effect, else the first one (−1: none).
+const fxDynSlot = A => A[cFxS] && isFxDyn(A[cFxS].type) ? cFxS : (A || []).findIndex(f => f && isFxDyn(f.type));
 function stageChain(){
   const t = cFxT >= NT ? -1 : Math.min(cFxT, ntr() - 1), A = t < 0 ? S.mfx : S.tfx[t] || [], X = stgCtx(); if (!X) return; const {g, W, H, dpr} = X; g.clearRect(0, 0, W, H);
   $('tStagePhT').textContent = (t < 0 ? 'MASTER' : 'TRACK ' + d2(t + 1)) + ' · SIGNAL';
-  const items = [t < 0 ? 'ALL TRACKS' : 'TRACK ' + d2(t + 1) + ' IN']; if (t >= 0 && chainsFeed(t)) items.push('…CHAINS');
-  A.forEach((f, k) => { if (f) items.push((k + 1) + ' ' + TFX[f.type].n + ' ' + fxNameOf(f.type) + (f.on ? '' : '  (off)')); });
-  items.push(t < 0 ? 'OUTPUT' : 'FADER · PAN → MASTER');
-  const bh = Math.min(34 * dpr, (H - 10 * dpr) / (items.length * 1.6)), gap = bh * .6, bw = Math.min(W - 4 * dpr, 260 * dpr), x = (W - bw) / 2; let y = Math.max(2 * dpr, (H - items.length * bh - (items.length - 1) * gap) / 2);
+  const items = [t < 0 ? 'ALL TRACKS' : 'TRACK ' + d2(t + 1) + ' IN'], slotOf = [-1]; if (t >= 0 && chainsFeed(t)){ items.push('…CHAINS'); slotOf.push(-1); }
+  A.forEach((f, k) => { if (f){ items.push((k + 1) + ' ' + TFX[f.type].n + ' ' + fxNameOf(f.type) + (f.on ? '' : '  (off)')); slotOf.push(k); } });
+  items.push(t < 0 ? 'OUTPUT' : 'FADER · PAN → MASTER'); slotOf.push(-1);
+  // FX DYNAMICS: a display under the chain for the cursor's dynamics slot (or the first)
+  const ds = fxDynSlot(A), node = fxDynNodeOf(t), now = performance.now(), dh = ds >= 0 ? Math.round(Math.min(H * .5, 230 * dpr, Math.max(120 * dpr, W * .6) + 19 * dpr)) : 0, top = H - dh;   // as tall as its width wants
+  const bh = Math.min(34 * dpr, (top - 10 * dpr) / (items.length * 1.6)), gap = bh * .6, bw = Math.min(W - 4 * dpr, 260 * dpr), x = (W - bw) / 2; let y = Math.max(2 * dpr, (top - items.length * bh - (items.length - 1) * gap) / 2);
   g.font = `${Math.max(9, Math.min(12, bh / dpr * .42)) * dpr}px ${X.font}`; g.textBaseline = 'middle'; g.lineWidth = 1.5 * dpr;
-  items.forEach((s, i) => { const off = /\(off\)$/.test(s); g.strokeStyle = off ? X.dim : X.ink; g.strokeRect(x + .5, y + .5, bw - 1, bh - 1); g.fillStyle = off ? X.mid : X.ink;
+  items.forEach((s, i) => { const off = /\(off\)$/.test(s); g.strokeStyle = off ? X.dim : X.ink; g.lineWidth = (slotOf[i] === ds && ds >= 0 ? 2.5 : 1.5) * dpr; g.strokeRect(x + .5, y + .5, bw - 1, bh - 1); g.lineWidth = 1.5 * dpr; g.fillStyle = off ? X.mid : X.ink;
     let txt = s; while (g.measureText(txt).width > bw - 16 * dpr && txt.length > 3) txt = txt.slice(0, -2) + '…'; g.fillText(txt, x + 8 * dpr, y + bh / 2);
+    // a dynamics slot: its reduction (or, for the level-only ones, its change) as a thin bar along the bottom of its box
+    const k = slotOf[i], f = k >= 0 ? A[k] : null, D = f && isFxDyn(f.type) && node && node.dyn ? node.dyn.get(k) : null;
+    if (D && now - D.t < 600){ const lv = FXLV.has(f.type), v = D.hold[0], fr = lv ? Math.min(1, Math.abs(v) / 12) : Math.min(1, -v / FXD_GR);
+      if (fr > .002){ g.fillStyle = lv ? '#3cc8b9' : '#f39a43'; g.fillRect(x + 3 * dpr, y + bh - 5 * dpr, (bw - 6 * dpr) * fr, 3 * dpr); } }
     if (i < items.length - 1){ g.strokeStyle = X.mid; g.beginPath(); g.moveTo(W / 2, y + bh); g.lineTo(W / 2, y + bh + gap); g.moveTo(W / 2 - 4 * dpr, y + bh + gap - 5 * dpr); g.lineTo(W / 2, y + bh + gap); g.lineTo(W / 2 + 4 * dpr, y + bh + gap - 5 * dpr); g.stroke(); }
     y += bh + gap; });
+  if (ds < 0) return;
+  const f = A[ds], lv = FXLV.has(f.type), key = ds + ':' + f.type;
+  let D = node && node.dyn && node.dyn.get(ds); if (!D || D.key !== key){ D = fxDynNew(key); if (node){ node.dyn = node.dyn || new Map(); node.dyn.set(ds, D); } }
+  if (now - D.t > 300 && now - D.q > 32){ D.q = now; fxDynFeed(D, [0, -120, -120], now, lv); }   // nothing reporting (stopped, or the track asleep): the history runs on, quiet
+  const c = lv ? null : FXDYN[f.type](TFX[f.type].map(f, ctx ? ctx.sampleRate : 48000, S.bpm));
+  const dw = Math.min(W - 8 * dpr, 460 * dpr), dx = (W - dw) / 2, ty = top + 2 * dpr;
+  g.fillStyle = X.ink; g.font = `${10 * dpr}px ${X.font}`; g.textBaseline = 'top';
+  g.fillText(`SLOT ${ds + 1} · ${TFX[f.type].n} ${fxNameOf(f.type)}${f.on ? '' : ' (off)'}`, dx, ty);
+  const dy = ty + 15 * dpr, dhh = H - dy - 4 * dpr; if (dhh < 40 * dpr) return;
+  g.save(); g.scale(dpr, dpr); fxDynPaint(g, dx / dpr, dy / dpr, dw / dpr, dhh / dpr, D, c, lv, X.font); g.restore();
 }
 /* ---------- mastering window ---------- */
 const MW_STAGES = [['eq', 'EQ'], ['sup', 'SUPPRESS'], ['comp', 'COMPRESS'], ['lim', 'LIMIT']];
@@ -20844,6 +20991,7 @@ function setView(v){
   document.body.classList.toggle('trkv', tr); songBtn(); topSelVis();
   try { localStorage.setItem(VK, view); } catch(e){}
   updView();
+  if (!tr) fxTelSet(null);   // FX DYNAMICS: no stage, no reports
   if (tr){ releaseAll(); measure(); arrLayout(true); refitSize = scr.clientWidth + 'x' + scr.clientHeight; frameWake(); }   // one fit+draw; the observers that fire next find nothing changed
   else if (!wv){ releaseAll(); refreshAll(); }
   else releaseAll();
