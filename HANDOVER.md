@@ -24,6 +24,32 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 22 Oct (3): CHN on stays in the Mixer with tidy pairs; stereo jacks read L / R
+
+Cache `thunderplus-v212`. Owner: turning CHN on in the Mixer shouldn't jump to …chains; the pairs should be waiting there,
+and they were spaced so far apart you couldn't see them all. Then: stereo outputs read "Out L" / "Out R", inputs too.
+- `setChainOn()` (CHN FROM THE MIXER): never changes screen (`focusChainHit` is gone). A song with no patch yet
+  (`chainPatch:null`, which made `ensureChainPair` fail and the old code jump to the editor, whose starter patch was for
+  track 1 only) gets `chainsBlank()` (the editor's `blankDoc` shape) and a pair for every track whose CHN is on. A track
+  that already has a Chain Out just runs through it again. A toast says which. `CH.fitNext` → the next `setView('chains')`
+  calls `chainFitTry()` → the editor's new `chainsEmbed.fit()` (`fitAll(1)`: whole patch, no closer than 100%) instead of
+  focusing the cursor track's chain.
+- TIDY PAIRS: `ensureChainPair` puts a pair 40 px below `chainsBottom(P)` (box tops + `CHN_BOX` heights: Track In 260,
+  Chain Out 290, others 400, folded 80; group bounds), first one at y 40, so fresh pairs are 330 px apart. The old
+  `maxY + 220 + idx * 160` grew the gap with every Track In (220, 600, 1140, 1840 …). Measured in the editor: Track In
+  255 px, Chain Out 288 px, Tape delay 369 px tall, 250 wide. Existing patches keep their layout.
+- STEREO LABELS: `portName(type, port, dir)` in both editors (outside the shared block, next to `makeJack`): a port whose
+  `port + 'R'` twin exists on the same side reads "<label> L" (Out L, In L, In 3 L); mono ports unchanged. Used by the jack
+  label, its tooltip and Help's module cards. Help / tips text that named the left jack updated (shared block, then
+  `tools/sync-shared.py`; the worklet blocks were already equal and are untouched).
+- Shift+drag box selection already exists in both editors (`ws` pointerdown with Shift on the empty background; additive;
+  any box it touches). Checked in the app: it works. It does not start on a box, a cable (`.hit`) or a group (`.decor`).
+- Checked headless (1600 wide): CHN on with Enter on the Mixer for 4 tracks in a new song (stays on the Mixer, 4 pairs at
+  y 40/370/700/1030, 8 cables, each track feeds its chain), off/on again (no new pair, no jump), …chains opens fitted with
+  no overlaps and every box in view, an 8th track after the editor saved (y 1360, refits), below the starter patch
+  (y 500); labels in both editors (Track In Out L/R, Chain Out In L/R, waves Out In L/R, mono VCO/ADSR/VCA stay Out);
+  the earlier selection and FX suites again; no page errors.
+
 ## 22 Oct (2): Shift+▲▼ selects cells, Ctrl/⌘+Shift+▲▼ lines; FX and the Mixer follow the Song / Arrange track
 
 Cache `thunderplus-v211`. Owner: Shift+▲▼ should select what is straight up and down from the cursor, keep a way to take

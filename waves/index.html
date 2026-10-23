@@ -502,7 +502,7 @@ const SHARED_ABOUT = {
   autowah:'Auto-wah (based on DaisySP): a filter that opens as the sound gets louder.',
   pshift:'Pitch shifter (based on DaisySP): shifts the sound up or down in semitones without changing its speed. A longer Window is smoother, Spray adds grit.',
   ladder:'Ladder filter (based on DaisySP): a four-pole transistor-ladder filter with drive, in low-, band- and high-pass. Resonance near the top squeals.',
-  xmod:'Cross-mod (based on Mutable Instruments Warps): In is the modulator; the carrier is In R or a built-in oscillator at Note. Algorithm sweeps crossfade, fold, ring modulation, XOR, compare and morph into a vocoder; Timbre shapes each one.',
+  xmod:'Cross-mod (based on Mutable Instruments Warps): In L is the modulator; the carrier is In R or a built-in oscillator at Note. Algorithm sweeps crossfade, fold, ring modulation, XOR, compare and morph into a vocoder; Timbre shapes each one.',
   space:'Space reverb (based on Cloud Seed by Ghost Note Audio): a big, modulated algorithmic reverb for long washes. Mix keeps the dry sound until half way.',
   lofi:'Lo-fi (based on Airwindows DeRez2): lowers the sample rate (Rate) and bit depth (Bits); Hardness goes from smooth to gritty.',
   drive:'Drive (based on Airwindows PurestDrive): subtle saturation that thickens without sounding distorted.',
@@ -1060,12 +1060,12 @@ const catStyle = (el, type) => { const c = CAT_COLOR[type]; if (c){ el.classList
    a click elsewhere, Escape, panning or zooming close it. buildNode() in each page adds the button (mhelpBtn). */
 const MODULE_USE = {
   // in and out, sources
-  trackIn:'Set Track to your drums’ track, patch Out and Out R through a Room reverb into a Chain Out on the same track, and the drums play through that reverb.',
+  trackIn:'Set Track to your drums’ track, patch Out L and Out R through a Room reverb into a Chain Out on the same track, and the drums play through that reverb.',
   chainOut:'For a drum group: Track Ins for the kick, snare and hats → a Mixer → a Glue Comp → a Chain Out on a free track. That track’s fader now turns the whole kit up and down.',
   scin:'Set Source to the kick’s track, then patch Duck into a VCA’s CV on a pad for a pump, or Envelope into a filter’s Cutoff jack so the filter opens on every kick.',
   scout:'In the drum chain, patch the drums into a Sidechain Out on Send 1. In the pad’s chain, a Sidechain In on Send 1 → the SC of a compressor makes the drums duck the pad.',
   resample:'Put it after a chain you like, set Bars to 2 and Record to Armed while the song plays: the next two bars land in a pad, sliced and ready to chop.',
-  out:'The last module of every patch: patch your VCA (or its effects) into In and In R. In …Thunder, Output picks which Waves In it plays on.',
+  out:'The last module of every patch: patch your VCA (or its effects) into In L and In R. In …Thunder, Output picks which Waves In it plays on.',
   hostIn:'Start each voice here: Pitch → an oscillator’s Pitch, Gate → an ADSR’s Gate, and Velocity into a VCA’s Gain jack so harder notes play louder.',
   seq:'Set eight notes, turn Run on and you hear a bass line without a keyboard (it plays through Host In). Set a step to Rest for space.',
   string:'Host In Pitch and Gate in, Decay long and Position near the bridge for a twangy pluck; raise Mute for palm-muted chugs.',
@@ -1128,7 +1128,7 @@ const MODULE_USE = {
   autopan:'On hi-hats or a pad: Sync on, Division 1/8, Depth 60%, so the sound sways across the stereo field in time.',
   rotary:'On an organ or electric piano: Speed Slow, then switch to Fast (or patch a gate into Fast) for the spinning speaker speeding up.',
   ringmod:'On a vocal, Freq around 30 Hz makes a classic robot voice; a higher Freq on drums makes clangy, metallic hits.',
-  xmod:'Patch a drum loop into In and a pad into In R, then move Algorithm toward the vocoder end: the drums play the pad’s harmony.',
+  xmod:'Patch a drum loop into In L and a pad into In R, then move Algorithm toward the vocoder end: the drums play the pad’s harmony.',
   fshift:'On a vocal or drum loop: a few Hz of Shift for a subtle phasing shimmer, or 300 Hz with Feedback up for metallic, spiralling sounds.',
   meta:'A drum loop into In and a synth into Mod, Mode Ring mod, Mix 50%: metallic, bell-like hits that follow the synth’s notes.',
   // delays
@@ -1155,7 +1155,7 @@ const MODULE_USE = {
   pshift:'Pitch −12 on a vocal for a deep, monstrous double; Pitch +12 with Mix 30% adds a sparkly octave on top.',
   harm:'On a vocal or lead: Voice 1 a third up, then Level 2 up with Voice 2 a fifth up, for an instant three-part harmony.',
   autotune:'On a vocal: Key and Scale to match the song, Speed Snap for the hard robotic effect, or around 30 ms with some Humanize for a natural tightening.',
-  vocoder:'A synth pad into In and a vocal or drum loop into In R, Mode 16 bands: the pad speaks with the voice’s rhythm and words.',
+  vocoder:'A synth pad into In L and a vocal or drum loop into In R, Mode 16 bands: the pad speaks with the voice’s rhythm and words.',
   // granular and spectral
   clouds:'On a piano or pad: Position half way, Size large, Density and Texture up, Blend mostly wet. Flip Freeze for an instant ambient bed.',
   beads:'Feed it a short vocal or guitar phrase: Density around 60%, a large Size, Feedback and some Reverb for an evolving cloud. Freeze holds it as a pad.',
@@ -1754,9 +1754,15 @@ const modById = id => doc.modules.find(m => m.id === id);
 const busPeaks = new Array(BUS_COUNT).fill(0);
 
 /* ----- controls ----- */
+// STEREO LABELS (owner, 22 Oct): a port with a right-hand twin (out + outR, in + inR, in3 + in3R) reads "Out L" / "In L"
+// beside "Out R" / "In R"; a mono port keeps plain "Out" / "In".
+function portName(type, port, dir){
+  const d = MODULES[type], io = d && (dir === 'in' ? d.inputs : d.outputs), base = PORT_LABEL[port] || port;
+  return io && (port + 'R') in io ? base + ' L' : base;
+}
 function makeJack(n, port, kind, dir, small){
   const j = h('span', {class: small ? 'jack small' : 'jack', 'data-id': n.m.id, 'data-port': port, 'data-dir': dir, 'data-kind': kind,
-    title: small ? plabel(n.m.type, port.slice(2)) + ' modulation input' : (PORT_LABEL[port] || port) + (dir === 'in' ? ' input' : ' output')});
+    title: small ? plabel(n.m.type, port.slice(2)) + ' modulation input' : portName(n.m.type, port, dir) + (dir === 'in' ? ' input' : ' output')});
   n.jacks[dir + ':' + port] = j;
   j.addEventListener('pointerdown', e => onJackDown(e, j));
   return j;
@@ -1766,7 +1772,7 @@ function portEl(n, port, kind, dir){
   // A thin level meter beside every jack: what comes out of an output, what arrives at a patched input.
   const pm = h('i', {class:'pm', 'data-kind': KIND[kind] || 'mod', 'aria-hidden':'true'}, h('b'));
   (n.pms || (n.pms = {}))[dir + ':' + port] = { el:pm.firstChild, v:0, shown:-1 };
-  const row = h('div', {class:'port'}, j, pm, h('span', {text: PORT_LABEL[port] || port}));
+  const row = h('div', {class:'port'}, j, pm, h('span', {text: portName(n.m.type, port, dir)}));
   row.addEventListener('pointerdown', e => { if (e.target !== j && e.button !== 2) onJackDown(e, j); });
   return row;
 }
@@ -2808,7 +2814,7 @@ function helpDoc(){
   ];
   const groups = PALETTE.filter(([g]) => !isSection(g)).map(([g, items]) => '<div class="mgroup"><h3>' + esc(g) + '</h3><div class="mgrid">' + items.map(([t]) => {
     const d = MODULES[t], ed = EDGE[famOf(t)];
-    const io = (lbl, o) => Object.keys(o).length ? '<div class="io"><b>' + lbl + '</b>' + Object.entries(o).map(([p, k]) => '<span class="pt"><i style="background:' + KC[KIND[k]] + '"></i>' + esc(PORT_LABEL[p] || p) + '</span>').join('') + '</div>' : '';
+    const io = (lbl, o) => Object.keys(o).length ? '<div class="io"><b>' + lbl + '</b>' + Object.entries(o).map(([p, k]) => '<span class="pt"><i style="background:' + KC[KIND[k]] + '"></i>' + esc((PORT_LABEL[p] || p) + ((p + 'R') in o ? ' L' : '')) + '</span>').join('') + '</div>' : '';
     return '<div class="mcard" style="--ed:' + ed + '"><h4>' + esc(d.label) + '</h4><p>' + esc(ABOUT[t] || SHARED_ABOUT[t] || d.about || '') + '</p>' + io('Inputs', d.inputs) + io('Outputs', d.outputs) + '</div>';
   }).join('') + '</div></div>').join('');
   return '<!doctype html><html><head><meta charset="utf-8"><style>' +

@@ -12367,7 +12367,7 @@ function openWaves(){ if (!noWaves()) setView('waves'); }
 function closeWaves(){ setView('synth'); }
 
 /* ---------- …chains editor: a full-screen frame; the patch is read from and saved into the song ---------- */
-const CH = { doc:null, frame:null };   // doc: the song's chains patch (kept here, where Phase 2 routing can see it)
+const CH = { doc:null, frame:null, fitNext:false };   // doc: the song's chains patch (kept here, where Phase 2 routing can see it)
 /* Throw the editor frame away (a new song, an import, an undo): it reloads from the song next time. Removing it fires its
    pagehide, which saves its own (now stale) patch; ignore that, or it wrote the old patch over the one just loaded. */
 function chainsDropFrame(){ if (!CH.frame) return; CH.dropping = true; try { CH.frame.remove(); } finally { CH.dropping = false; } CH.frame = null; }
@@ -12466,10 +12466,14 @@ function leaveChains(){
 }
 function openChains(){ if (!noChains()) setView('chains'); }
 function closeChains(){ setView('synth'); }
-// Jump to the …chains screen and centre + highlight a track's chain (used when its CHN is switched on and
-// the track already has a chain, and when picking a track that is already used inside the editor).
+// Opening …chains from the tracker centres + highlights the chain of the track you were on (setView).
 let chainFocusT = null;
-function focusChainHit(t){ chainFocusT = t; openChains(); chainFocusTry(); }
+// After the Mixer added pairs (setChainOn), the next opening fits the whole patch in view instead (the frame may still be
+// loading its patch, so it keeps trying for a few seconds).
+function chainFitTry(){
+  const go = () => { const a = chApi(); return !!(a && a.fit && a.fit()); };
+  if (!go()){ let n = 0; const iv = setInterval(() => { if (go() || ++n > 24 || view !== 'chains') clearInterval(iv); }, 150); }
+}
 function chainFocusTry(){
   // Done once the editor really found that track's modules (a frame still loading its patch finds none yet).
   // A fresh frame can still rebuild its modules just after (dropping the highlight), so the found track is shown again twice.
@@ -14868,15 +14872,30 @@ function chainsFeedChanged(t){ saveS(); rtFx(t); draw(); }
 // Each enabled track gets its own Track In + Chain Out pair, wired straight through, so every track keeps
 // its own chain and toggling one never disturbs another. The pair is placed below everything already in
 // the patch (so it never overlaps); the chains editor reloads to show it when next opened.
+// TIDY PAIRS (owner, 22 Oct): a new pair goes one row below the lowest box, by the editor's box heights (Track In 255 px,
+// Chain Out 288 px at zoom 1; anything else is taken as 400, a folded box as 80), so pairs stack 330 px apart. It used to
+// add 160 px more for every Track In already there, so the gaps kept growing and the pairs ran off the screen.
+const CHN_BOX = {trackIn:260, chainOut:290};
+function chainsBottom(P){
+  let b = -Infinity;
+  for (const m of P.modules) if (m && m.pos) b = Math.max(b, (m.pos[1] | 0) + (m.collapsed ? 80 : CHN_BOX[m.type] || 400));
+  for (const g of P.groups || []) if (g && Array.isArray(g.bounds)) b = Math.max(b, (g.bounds[1] | 0) + (g.bounds[3] | 0));
+  return b;
+}
+// The editor's empty patch (blankDoc in chains/index.html), for a song that has none yet.
+function chainsBlank(){
+  const now = Math.floor(Date.now() / 1000);
+  return { format:'chains.patch', version:1, meta:{ name:'Untitled', created:now, modified:now }, transport:{ tempo:120, lpb:4, ticks:6, swing:0 },
+    modules:[], cables:[], groups:[], custom:[], view:{ x:0, y:0, zoom:1, ui:2 } };
+}
 function ensureChainPair(t){
   const P = S.chainPatch;
   if (!P || P.format !== 'chains.patch' || !Array.isArray(P.modules)) return false;
   const N = t + 1;
   if (P.modules.some(m => m && m.type === 'chainOut' && (m.params.track | 0) === N)) return false;
-  let maxY = 0; for (const m of P.modules) if (m && m.pos) maxY = Math.max(maxY, m.pos[1] | 0);
-  const idx = P.modules.filter(m => m && m.type === 'trackIn').length;
+  const b = chainsBottom(P);
   const tag = Date.now().toString(36) + Math.floor(Math.random() * 1e5).toString(36);
-  const idIn = 'tin' + tag, idOut = 'tou' + tag, y = Math.round(maxY + 220 + idx * 160);
+  const idIn = 'tin' + tag, idOut = 'tou' + tag, y = Number.isFinite(b) ? Math.round(b + 40) : 40;
   P.modules.push({ id:idIn,  type:'trackIn',  scope:'mono', pos:[24, y],       collapsed:false, params:{ track:N } });
   P.modules.push({ id:idOut, type:'chainOut', scope:'mono', pos:[354, y], collapsed:false, params:{ track:N, level:1 } });
   P.cables = P.cables || [];
@@ -14885,13 +14904,21 @@ function ensureChainPair(t){
   CH.doc = P;
   return true;
 }
+// CHN FROM THE MIXER (owner, 22 Oct): switching CHN on stays in the Mixer (it used to jump to …chains when the song had no
+// patch yet, or when the track already had a chain). A song with no patch gets an empty one with a pair for every track
+// whose CHN is on; otherwise the track gets its pair. The next time …chains opens it fits them all in view (CH.fitNext).
 function setChainOn(t, on){
   const was = !!S.chainOn[t]; S.chainOn[t] = !!on;
-  const added = on && !was && ensureChainPair(t);
+  let added = false;
+  if (on && !was){
+    if (!S.chainPatch){ S.chainPatch = chainsBlank(); CH.doc = S.chainPatch; for (let k = 0; k < ntr(); k++) if (S.chainOn[k] && ensureChainPair(k)) added = true; }
+    else added = ensureChainPair(t);
+  }
   saveS();
-  if (added && CH.frame) chainsDropFrame();   // the editor reloads with the new pair when it next opens
+  if (added){ CH.fitNext = true; if (CH.frame) chainsDropFrame(); }   // the editor reloads with the new pair when it next opens
   chainsPush(); draw();
-  if (on && !added && !was && !noChains()) focusChainHit(t);   // already had a chain: jump to and highlight it
+  if (on && !was) toast(added ? `Track ${t + 1} now runs through …chains: its Track In and Chain Out are there, wired straight through.`
+    : `Track ${t + 1} runs through its chain in …chains again.`);
 }
 // Re-route every track that runs through …chains now, AND every track that did until this change (its Chain Out
 // was deleted or set to another track): without that, the old track kept a chains node with no way out and went silent.
@@ -20809,7 +20836,8 @@ function setView(v){
   document.body.classList.toggle('chv', ch);
   if (wv) showWaves(); else if (was === 'waves') leaveWaves();
   if (ch) showChains(); else if (was === 'chains') leaveChains();
-  if (ch && was === 'tracker'){ chainFocusT = dkTrack(); chainFocusTry(); }   // open on the chain of the track you were on, if it has one
+  if (ch && CH.fitNext){ CH.fitNext = false; chainFitTry(); }   // pairs added from the Mixer: show them all
+  else if (ch && was === 'tracker'){ chainFocusT = dkTrack(); chainFocusTry(); }   // open on the chain of the track you were on, if it has one
   if (ch || was === 'chains') CH.doc = S.chainPatch || null;
   $('bSet').title = tr ? 'Settings: the Project rows plus kit, MIDI, export, skin and audio'
     : 'Settings: kit, MIDI, export, skin and audio';
