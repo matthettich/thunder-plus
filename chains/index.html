@@ -1711,6 +1711,14 @@ const newId = p => (p || 'm') + Date.now().toString(36) + Math.floor(Math.random
    and everything else is saved under its own names so it never mixes with the standalone …chains. */
 const TW = (() => { try { return window.parent !== window && window.parent.thunderChains || null; } catch (e) { return null; } })();
 const EMBED = !!TW, KP = EMBED ? 'thunderplus.chains.' : 'chains.';
+
+/* VIEW KEYS (owner, 22 Oct): inside ...Thunder Plus, Alt+0 the synth, Alt+1–7 the tracker's screens, Alt+8 …waves, Alt+9
+   …chains and Alt+` back to the last view work from here too: this page has the keys while it shows, so it passes them on. */
+if (EMBED) window.addEventListener('keydown', e => {
+  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.repeat || !/^(Digit[0-9]|Backquote)$/.test(e.code) || !TW.viewKey) return;
+  const t = e.target; if (t && t.closest && t.closest('input:not([type=range]):not([type=checkbox]), textarea, [contenteditable="true"]')) return;
+  e.preventDefault(); e.stopPropagation(); TW.viewKey(e.code);
+}, true);
 if (EMBED) document.documentElement.classList.add('embed');
 const SETKEY = KP + 'settings';
 let settings = {};

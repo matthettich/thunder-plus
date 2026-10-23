@@ -24,6 +24,25 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 22 Oct (5): view keys; Pattern view reaches buses and the master; no INST part on a bus
+
+Cache `thunderplus-v214`. Owner: keys to switch between Tracker, Synth, Waves and Chains (took Alt+8 / Alt+9 / Alt+`);
+in Pattern view the arrows didn't move onto the bus or the master; on a bus, hide the bottom panel's instrument part so
+…chains gets the room.
+- VIEW KEYS (index.html, before `setView`): `viewKey(code)`: Alt+0 synth, Alt+1–7 tracker screens, Alt+8 …waves, Alt+9
+  …chains (a toast when Mobile hides it), Alt+` `lastView` (set in `setView` whenever the view changes). A capture
+  keydown on the page takes Alt+8 / 9 / ` everywhere and Alt+0 off the tracker (the tracker's `globalKeys` and the synth
+  page keep their own Alt+0 / Alt+1–7). Both editors (after `const EMBED`, outside the shared block) catch Alt+digit /
+  Alt+` in the capture phase and call `TW.viewKey` (`thunderChains.viewKey` / `thunderWaves.viewKey`). Leaving an editor
+  blurs its iframe so the tracker gets the keys back. Help (KEYS legend, the synth page table) and README updated.
+- Pattern view: `pvNextTrack` (◀▶ past a track's edge, Tab / Shift+Tab) never steps over a bus (`isBusT`) or the master
+  column, folded or not; landing there opens it like any track (an empty cell: a pending phrase, `pendPlace`, so nothing
+  is added until a note is typed). Other empty tracks are still stepped over while EMPTY TRACKS FOLDED.
+- Bottom panel: `deckLayout` hides `#dkInst` while `dkTrack()` is a bus; `deckInst` skips it then.
+- Checked headless: every view key from the tracker, synth and inside both editors (focus in the frame), the tracker's
+  arrows after Alt+3 from …chains; Pattern view ▶ from the last filled track onto the bus, on to the master, Shift+Tab /
+  Tab back, nothing added to the song; the panel on track 1 / the bus (Mixer and Phrase) / track 2; the earlier suites.
+
 ## 22 Oct (4): dynamics displays in …chains / …waves and on the FX screen
 
 Cache `thunderplus-v213`, `chains-worklet.js?v=35`, `waves-worklet.js?v=28`. Owner: compressors (and the limiter, anything
