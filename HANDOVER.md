@@ -24,6 +24,121 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 23 Oct (3): PLAN — …sample, a wave editor (not started)
+
+Status: **plan only, nothing built.** The owner will start this later; this entry is the brief.
+
+**How to start (owner):** open a session on this repo and say *"Build …sample from HANDOVER.md, 23 Oct (3), starting with
+step 1."* Mock-up: the design canvas "Sample editor mockup" (https://claude.ai/artifact/4mJaZERazXoijdPHmAEGq1, private to
+the owner; read it with the Artifact tool's `read`). The layout is also written out below in case the link is gone.
+
+**What the owner wants (23 Oct):** a wave editor like BIAS Peak with features from the Renoise sample editor. It should
+look like Thunder Plus and be easy to bring into it as another screen. Later it should be able to process audio through
+VST plug-ins. "…sample" is a working name; ask the owner before it shows anywhere.
+
+**Where it goes:** `sample/index.html` (and `sample/core.js`, see below), a page of its own like `waves/` and `chains/`:
+- Minimal skin, white.
+- Works standalone first: open or drop audio files, export WAV.
+- Then it becomes a fifth screen in a frame: Tracker · Synth · Waves · Chains · Sample.
+  - Copy how `WV.frame` / `CH.frame` are made, around line 12374 of `index.html`.
+  - `skinFrame()` carries the skins into the frame.
+- When it ships, add its files to:
+  - `sw.js` `FILES`, and bump the cache;
+  - `electron/copy-app.js` `PARTS`, plus `sample` in its `refs` regex.
+
+**Three layers.** Keep these apart so the core can later be ported to C++/wasm (see `docs/ENGINE-PLUGIN-PLAN.md`):
+1. **Core** (`sample/core.js`, no DOM, no Web Audio):
+   - The sample model: `sr`, channels as `Float32Array[]`, `loop {mode, start, end, xfade, release}`, `slices[]`, cue
+     `markers[]`, and playback props `{note, fine, vol, pan, syncLines, interp}`.
+   - Every edit is a processor `(chans, sr, sel, params) → chans`.
+   - An undo stack that keeps only the changed range.
+   - WAV read/write (16/24-bit, 32-bit float).
+2. **UI:**
+   - Canvas waveform with an overview strip and a zoomed view.
+   - Min/max peak levels cached per zoom, so long files scroll smoothly.
+   - Exposed as `mount(container, host)` rather than owning the page.
+3. **Host** (standalone page or Thunder Plus) supplies:
+   - the AudioContext;
+   - file open and save;
+   - the skin's CSS variables;
+   - the key-command registry, so shortcuts go through Thunder's Renoise-style keys;
+   - sending a sample to, and taking one from, a Thunder layer or INST.
+
+**Thunder's side of the data** (check these before wiring):
+- Layer samples are **mono**, up to 30 s: `L.sample = {sr, name, id, data: Float32Array}`.
+  - Kept in IndexedDB as 16-bit PCM: the "samples in IndexedDB" block, `smpDb()`, around line 10855.
+  - Files carry them as base64: `smpToJSON` / `smpFromJSON`.
+  - The editor is stereo. Either mix to mono when it hands a sample to a layer, or widen Thunder's samples to stereo
+    first (a bigger job: the player, the renders and the JSON). Ask the owner which.
+- Break chopping already has the pieces:
+  - INST fields `slc`, `smode`, `sync`, `beats`;
+  - `findHits()`, `slicePoints()`, `stretchData()`.
+- The editor's slices should match them:
+  - "Transients" uses `findHits()`;
+  - hand-placed slice markers need a new INST field (say `slcAt`, a list of seconds) that `slicePoints()` uses when it
+    is there;
+  - Beat sync maps to `sync` / `beats`.
+
+**Layout (the mock-up), desktop:**
+- **Top bar:** as in Thunder.
+- **Grey band:**
+  - Sample number, name, rate, bit depth, channels and length.
+  - Play · Play loop · Stop.
+  - Tool: Select / Draw / Zoom.
+  - Zero crossings and Snap to slices checkboxes.
+  - Zoom: − + Fit Selection.
+- **Black monitor screen:**
+  - Overview strip with the view window outlined.
+  - Beat ruler with the loop shown as a gold bar.
+  - L and R lanes with the selection in light grey, and pink numbered slice flags.
+  - Gold LOOP / END lines, a teal cue marker and a red playhead.
+- **Readout line (mono):** SEL, LEN, CURSOR, PEAK, RMS, VIEW.
+- **Three Seeds-style cards:**
+  - **Loop** (`--pl`): Off / Forward / Backward / Ping-pong; start and end; crossfade; leave the loop at note-off;
+    Loop the selection; Crossfade loop; Loop tuner.
+  - **Slices** (`--smp`): detect by Transients / Beats / Equal; sensitivity; slice chips; Slices to pads; Render to
+    samples; Clear.
+  - **Playback** (`--std`): base note; fine tune; volume; pan; beat sync (lines); interpolation None / Linear / Cubic /
+    Sinc.
+- **Right column:**
+  - **Process** in groups:
+    - Level: Normalize, Gain, Fade in/out, Remove DC.
+    - Edit: Trim, Silence, Reverse, Invert phase.
+    - Rate & pitch: Resample, Pitch shift, Time stretch, Bit depth.
+    - Channels: To mono, To stereo, Swap L / R.
+    - Plugins: Apply plugin…, dashed and marked DESKTOP.
+  - **History:** click a step to go back; Undo / Redo.
+- **Bottom dock:** the song's samples, in pad style.
+- **On the Fold** (884 unfolded): the cards keep three across and the right column drops below. Make Process a
+  `Process ▾` menu there instead. At 412 (folded) the cards stack.
+
+**Build order:**
+1. `core.js`: model, WAV in and out, undo, and the Level / Edit / Channels processors. Test it in node like
+   `tools/drums/`.
+2. The page:
+   - top bar, grey band, monitor screen;
+   - select, zoom, scroll;
+   - play the selection and the loop. Forward loops use `AudioBufferSourceNode` `loopStart` / `loopEnd`. Backward and
+     ping-pong play a preview buffer built with the loop reversed, or forward then reversed.
+3. Process column and history; export WAV; keep the session in IndexedDB so a reload loses nothing.
+4. Loop card (crossfade loop, loop tuner); Slices card (detection, render slices to new samples).
+5. Rate & pitch:
+   - Resample (windowed sinc) and Bit depth (with dither) in JS.
+   - Pitch shift and Time stretch: start from `stretchData()`, or a permissive library compiled with the `dsp/` wasm
+     toolchain:
+     - Signalsmith Stretch (MIT);
+     - r8brain (MIT) or libsamplerate (BSD) for resampling.
+   - **Not Rubber Band** (GPL or paid). The licensing rule below applies.
+6. The frame in Thunder Plus: Sample tab, skins, sending to and from layers and INST, key commands.
+7. Later, desktop only: **Apply plugin…**
+   - An Electron native module (C++) loads a VST3 (SDK MIT since 3.8).
+   - It renders the selection offline and hands the buffer back; the plug-in's own window opens natively.
+   - Offline rendering avoids the browser's real-time limits.
+   - The web and Android builds hide the item.
+
+**Checks for each step:** as in other entries, headless at 412, 884 and 1600, with no page errors. Exported WAVs must
+read back identical in node.
+
 ## 23 Oct (2): the FX column's command picker in groups
 
 Cache `thunderplus-v218`. Owner: organise the tracker FX for the FX column menu into categories, like the track FX.
