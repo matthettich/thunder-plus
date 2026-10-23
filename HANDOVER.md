@@ -24,11 +24,54 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## Before a commercial release (standing checklist: keep it current, read it before selling)
+
+Owner (23 Oct): leaning away from selling Thunder Plus, but may change their mind. Keep a commercial build a short,
+mechanical job: everything it would need is listed here, and new work must not add to it without a line below. This
+is housekeeping, not legal advice: have a lawyer look before selling.
+
+**Today:** Thunder Plus itself has no licence (no LICENSE file; `electron/package.json` says `"license": "UNLICENSED"`),
+so it is all rights reserved, though the repo is public. All third-party code is MIT / BSD / ISC / zlib / Apache, fonts
+are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
+
+1. **GPL: `lxr/` only.** To ship closed: `git rm -r lxr` (optionally also the `<script src="lxr/lxr-engine.js…">` line in
+   `index.html`; every other LXR hook is guarded by `typeof LxrCore`, `sw.js` caches it as OPTIONAL, and
+   `electron/copy-app.js` copies it only when present). Pads on a Firmware engine then open as Layers, so render any that
+   matter to samples first (Render a part to a slot, or Export this pad). Check: no "LXR-02 firmware" engine group, no
+   File ▾ → Import LXR kit, no LXR errors besides the script's 404. The other way is to release under GPL-3.0 (selling
+   is allowed; the source must be offered; buyers may share it). The plugin / mobile plan
+   (`docs/ENGINE-PLUGIN-PLAN.md`) must leave `lxr/` out of any closed build.
+2. **The rule that keeps this list short.** Only permissive code goes into the app itself. Anything with limits (GPL,
+   LGPL, non-commercial, attribution-only-with-conditions…) goes in its own folder the way `lxr/` does: its own LICENSE
+   and NOTICE, loaded optionally, every hook in the app guarded, OPTIONAL in `sw.js`, copied-if-present by
+   `copy-app.js`, a section in `THIRD_PARTY_NOTICES.md`, and a line in item 1. Never non-commercial code at all (the
+   original Sonic Potions LXR firmware is non-commercial; the LXR-02 code in `lxr/` is Erica's GPL release).
+3. **Names in the UI** (trademarks; a "based on X" credit can stay):
+   - layer / oscillator names `Plaits`, `Elements`, `FM Genesis`, `FM SoundBlaster` (the oscillator table near the top
+     of the engine block); pad effects `Clouds`, `Rings`, `Beads`; the `Plaits` section title. Later additions already
+     use generic names (Cross-mod, Space reverb, Lo-fi…) with credits in `FX_CREDIT`.
+   - drum kits and presets: "CR-78- / 808- / 606- / 909- / 707- / 727- / 505-style" (and the one "Roland" in the kit
+     notes), "(808-ish)", "(Nord-ish)", "House organ (M1 style)", and the "MPC swing" labels.
+   - help and README comparisons (Renoise, M8, SunVox, Koala, Ableton) only describe; reword if needed.
+   - the …waves and …chains editors (`waves/`, `chains/`, also from `matthettich/waves`) carry the same Mutable names.
+   - LXR names go with `lxr/`; if it stays, keep them truthful ("from the LXR-02 firmware"), as its NOTICE requires.
+   - Find them: `grep -n -E "Plaits|Elements|Clouds|Rings|Beads|Genesis|SoundBlaster|Roland|CR-78|808|909|606|707|727|505|Nord|M1 style|MPC" index.html chains/index.html waves/index.html README.md`
+   - check that "Thunder Plus" / "...Thunder" is free to use as a product name where it would be sold.
+4. **Notices that must ship** (in place; keep them current): `THIRD_PARTY_NOTICES.md` (the MIT texts and credits; it is
+   copied into the desktop app), `fonts/OFL-*.txt`, `sounds/FluidR3Mono_License.md`, and Electron's own licence files
+   (electron-builder adds them). The credits shown in the app (`FX_CREDIT`, the effect help) stay.
+5. **Thunder Plus's own terms:** pick a licence or EULA, set `"license"` in `electron/package.json`, and decide whether
+   the repo stays public. Code signing (Windows, Mac notarisation) is separate from licensing.
+6. **Plugins and mobile, if they happen** (`docs/ENGINE-PLUGIN-PLAN.md`): iPlug2 is permissive; JUCE needs a paid licence
+   (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
+   stores' terms.
+
 ## 23 Oct (4): the LXR-02's voices as engines (lxr/, GPL-3.0, optional)
 
 Cache `thunderplus-v219`, `lxr/lxr-engine.js?v=1`, `lxr/lxr.wasm?v=1`. Owner: Erica Synths open-sourced the LXR-02
 firmware (https://github.com/erica-synths/lxr-desktop-app, GPL-3.0 with trademark terms); include it as an engine.
-Owner's standing wish (licensing): anything with licence limits kept removable, since Thunder Plus may be sold.
+Owner's standing wish (licensing): anything with licence limits kept removable, in case Thunder Plus is ever sold
+(see **Before a commercial release** above).
 - **Everything is in `lxr/`** (read `lxr/README.md` and `lxr/NOTICE.md`): `src/firmware/` the firmware files the build
   reads, unchanged (commit a43cd4f), with its LICENSE and NOTICE.md; `src/lxr_wasm.c` the interface; `src/stub/` HAL,
   Cortex-M intrinsics (__SSAT, __QADD16… in C) and ST's USB header (empty, nothing used); `src/tools/lxr_meta.py` (host
