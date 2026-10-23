@@ -24,6 +24,30 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 22 Oct (2): Shift+▲▼ selects cells, Ctrl/⌘+Shift+▲▼ lines; FX and the Mixer follow the Song / Arrange track
+
+Cache `thunderplus-v211`. Owner: Shift+▲▼ should select what is straight up and down from the cursor, keep a way to take
+whole lines; PAD mode stays as it is. Then: going to FX from a phrase should land on the track selected in Arrange / Song.
+- `shiftSel()` (KEYS mode Shift+arrows): with no selection, any Shift+arrow starts a block at the cursor and grows it
+  (spreadsheet style). On a line selection Shift+▲▼ still grows the lines (`lineSel`), Shift+◀▶ turns it into a block over
+  the same rows. ▲▼ set `c.y` directly (clamped to the grid) instead of `move()`, which took ▲ on a phrase's top row to the
+  title row (y −2).
+- `keysDown`'s `mod` branch: Ctrl/⌘+Shift+▲▼ → `lineSel` in both input modes; where it returns false (off the grid) it falls
+  through to `bump`, which is all Ctrl/⌘+Shift+▲▼ did before. PAD mode's own SHIFT+▲▼ (pad and keyboard Shift) unchanged.
+- Help (KEYS tables, `#tLegKeys`, the PAD paragraph), `info()` hint (Shift+arrows grow for a block), the empty-paste toast,
+  the master-phrase hint and the README's keyboard section updated (it still said Alt+arrows change values and Ctrl/⌘+Shift
+  changes screen).
+- FX FOLLOWS ARRANGE in `go()`: from Song, Sect or Phrase (and from Inst when `instViaTrk`, i.e. Inst was reached from one
+  of those, so walking Phrase → Inst → Mixer → FX counts), FX opens on `cs.song.x` (the master column → `NT`) and the Mixer
+  on that track (master → row 7), instead of `cTrack`, which stays on the phrase's track when Arrange's cursor moves to an
+  empty block. `nav()`'s Phrase → Inst (sets `tv` without `go`) sets `instViaTrk` too. Mixer → Inst → Mixer and Project ↔
+  FX keep what they had.
+- Checked headless (1400 and 1600 wide) with a test hook injected into a served copy: cell blocks (grow, widen, top row),
+  lines (first press, grow, Shift+▲▼ grows lines, block ↔ lines, Ctrl+C copies lines, plain arrow drops them) on Phrase,
+  Song and Sect; Mixer Ctrl+Shift+▲ still changes the value; PAD keyboard and on-screen SHIFT+▲▼ lines, PAD Ctrl+Shift+▼;
+  hints and help; FX / Mixer from a phrase after the song cursor moved, the master column, the Alt+▶ walk, Arrange holding
+  the keys on an empty block then Esc and walk to FX; no page errors.
+
 ## 22 Oct: the Renoise audit batch — track names, selection tools, render a part, file safety, the rest of the mouse
 
 Cache `thunderplus-v210`. Owner asked for everything from the usability audit except automation (Open items 10, later),
