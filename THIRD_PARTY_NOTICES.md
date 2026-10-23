@@ -33,6 +33,15 @@ used (not the separate DaisySP-LGPL modules).
 https://github.com/GhostNoteAudio/CloudSeedCore. Copyright (c) 2024 Ghost Note Audio / Ghost Note Engineering Ltd.
 The app's Space reverb. Its delay buffers are shrunk at build time to fit phones (see `dsp/tfx/build.sh`).
 
+## LXR firmware (lxr/, GPL-3.0, optional)
+
+The Firmware drum, snare, cymbal and hat engines and the LXR kit import are the LXR-02 drum machine's firmware
+(https://github.com/erica-synths/lxr-desktop-app, Copyright (C) 2012-2026 Erica Synths), compiled to WebAssembly. Unlike
+everything else listed here they are under the **GNU General Public License version 3** with the firmware's additional
+terms, and they live entirely in the `lxr` folder with their source, licence and notice (`lxr/NOTICE.md`). The app runs
+without that folder. Thunder Plus is not affiliated with or endorsed by Erica Synths; "Erica Synths", "LXR" and "LXR-02"
+are Erica Synths' names.
+
 ---
 
 The Comb resonator, Transient shaper, Trance gate, Multiband squash and Frequency shifter (`dsp/tfx/fx_extra.cc`), and the

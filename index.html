@@ -2346,6 +2346,9 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <div class="toast" id="toast" hidden></div>
 
 <script src="waves/waves-worklet.js?v=28"></script>
+<!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
+     this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
+<script src="lxr/lxr-engine.js?v=1"></script>
 <script>
 /* ===ENGINE START=== */
 const BASE = 65.40639; // C2
@@ -6652,12 +6655,16 @@ const XENG = {
   resynth:{live:false, d:() => ResynthCore.defaults()},
   bytebeat:{live:false, d:() => BytebeatCore.defaults()},
   sf:{live:false, d:() => ({bank:0, prog:0, trans:0, velo:0.7, atk:1, rel:1})},
+  // LXR ENGINES: lxdrum, lxsnare, lxcym, lxhat, when lxr/ is there (an entry with r renders itself)
+  ...(typeof LxrCore !== 'undefined' ? LxrCore.xeng() : {}),
 };
 const isXEngV = v => !!(v && XENG[v.engine]);
+const isLxV = v => !!(v && typeof LxrCore !== 'undefined' && LxrCore.isKind(v.engine));
 function normX(kind, o){ const d = XENG[kind].d(), r = {}; for (const k in d) r[k] = o && typeof o[k] === 'number' && isFinite(o[k]) ? o[k] : d[k]; delete r.tune; delete r.drive; delete r.level; return r; }
 function xParams(V){ return Object.assign(normX(V.engine, V[V.engine]), {tune:V.tune || 0, drive:V.drive || 0, level:V.level || 0}); }
 function renderX(V, sr, hold){
   const k = V.engine, P = xParams(V);
+  if (XENG[k].r) return XENG[k].r(P, sr, hold, V, songBpm());   // LXR ENGINES (and any engine that renders itself)
   if (k === 'acid') return renderLiveCore(AcidCore, P, sr, hold || Math.min(V.len || 1, 1.2), false);
   if (k === 'mach') return renderLiveCore(MachCore, P, sr, hold || Math.min(V.len || 2, 2));
   if (k === 'tone') return ToneDrum.render(P, sr);
@@ -7042,14 +7049,17 @@ function audio(){
    If the Worker can't start (or a voice needs …waves and the Worker couldn't load it), everything renders here
    as before. */
 const pend = [], padRev = [];
-const PW = {w:null, ready:false, wv:false, id:0, jobs:new Map()};
-function rwStart(plMod, txMod){
+const PW = {w:null, ready:false, wv:false, lx:false, id:0, jobs:new Map()};
+// LXR ENGINES: the Worker loads lxr/lxr-engine.js before the engine code (so XENG has the Firmware engines there too)
+// and gets the page's compiled lxr.wasm (lxMod) in its init message.
+const LXR_JS = 'lxr/lxr-engine.js?v=1';
+function rwStart(plMod, txMod, lxMod){
   try {
     const sc = [...document.scripts].find(x => x.textContent.includes('===ENGINE ' + 'START==='));
     const t = sc.textContent, A = t.indexOf('/* ===ENGINE ' + 'START=== */'), B = t.indexOf('/* ===ENGINE ' + 'END=== */');
     if (A < 0 || B < A) return;
     const glue = `
-var S = {bpm:120}, WVOK = false;
+var S = {bpm:120}, WVOK = false, LXOK = false;
 self.onmessage = async e => {
   const m = e.data;
   if (m.op === 'init'){
@@ -7057,7 +7067,8 @@ self.onmessage = async e => {
     try { if (m.pl){ PL = await WebAssembly.instantiate(m.pl, imp); if (PL.exports._initialize) PL.exports._initialize(); } } catch(err){ PL = null; }
     try { if (m.tx){ TX = await WebAssembly.instantiate(m.tx, imp); if (TX.exports._initialize) TX.exports._initialize(); } } catch(err){ TX = null; }
     try { if (m.wv && m.pl && m.tx){ importScripts(m.wv); if (self.WavesDSP){ WavesDSP.wasmInit({dspModule:m.pl, tfxModule:m.tx}); WV.ready = true; WVOK = true; } } } catch(err){}
-    postMessage({op:'ready', wv:WVOK, pl:!!PL, tx:!!TX}); return;
+    try { if (m.lx && self.LxrCore){ LxrCore.attachModule(m.lx); LXOK = true; } } catch(err){}
+    postMessage({op:'ready', wv:WVOK, pl:!!PL, tx:!!TX, lx:LXOK}); return;
   }
   if (m.op === 'irs'){ self.__thunderIR = m.v; return; }   // the song's impulse responses (Convolution reverb)
   if (m.op === 'render'){
@@ -7069,16 +7080,17 @@ self.onmessage = async e => {
     } catch(err){ postMessage({op:'fail', id:m.id, err:String(err && err.message || err)}); }
   }
 };`;
-    const url = URL.createObjectURL(new Blob([t.slice(A, B), glue], {type:'text/javascript'}));
+    const pre = typeof LxrCore !== 'undefined' ? `try { importScripts(${JSON.stringify(new URL(LXR_JS, location.href).href)}); } catch(e){}\n` : '';
+    const url = URL.createObjectURL(new Blob([pre, t.slice(A, B), glue], {type:'text/javascript'}));
     const w = new Worker(url); URL.revokeObjectURL(url);
     w.onmessage = e => {
       const m = e.data;
-      if (m.op === 'ready'){ PW.ready = !!(m.pl || !plMod) && !!(m.tx || !txMod); PW.wv = !!m.wv; try { if ((S.irs || []).some(Boolean)) w.postMessage({op:'irs', v:irsLive()}); } catch(e){} if (PW.ready) prerender(); return; }
+      if (m.op === 'ready'){ PW.ready = !!(m.pl || !plMod) && !!(m.tx || !txMod); PW.wv = !!m.wv; PW.lx = !!m.lx; try { if ((S.irs || []).some(Boolean)) w.postMessage({op:'irs', v:irsLive()}); } catch(e){} if (PW.ready) prerender(); return; }
       const j = PW.jobs.get(m.id); if (!j) return; PW.jobs.delete(m.id);
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, wv:new URL('waves/waves-worklet.js?v=28', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, wv:new URL('waves/waves-worklet.js?v=28', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -7086,7 +7098,7 @@ self.onmessage = async e => {
 function rwDown(){ PW.ready = false; try { PW.w && PW.w.terminate(); } catch(e){} PW.w = null; for (const j of PW.jobs.values()) j.no(new Error('worker')); PW.jobs.clear(); }
 // Can the Worker render this voice? (It has no …waves engine if loading that failed.)
 // The Worker needs the …waves engine for …waves layers and for the module effects (MODFX); without it, those pads render here.
-const rwCan = v => PW.ready && PW.w && v.engine !== 'sf' && !(PW.wv === false && ((WV.doc && v.layers.some(l => l.on && l.type === 'waves')) || (v.fx || []).some(f => f && f.on && FX[f.type] && FX[f.type].mod)));
+const rwCan = v => PW.ready && PW.w && v.engine !== 'sf' && !(isLxV(v) && !PW.lx) && !(PW.wv === false && ((WV.doc && v.layers.some(l => l.on && l.type === 'waves')) || (v.fx || []).some(f => f && f.on && FX[f.type] && FX[f.type].mod)));
 // Renders a voice in the Worker: resolves to {data, st:[[fx index, peaks]…]}. Rejects when the Worker can't.
 function renderAsync(v, sr, hold, stages){
   if (!rwCan(v)) return Promise.reject(new Error('no worker'));
@@ -7098,7 +7110,7 @@ function renderAsync(v, sr, hold, stages){
 }
 const padSR = () => ctx ? ctx.sampleRate : srGuess;
 // A pad that renders in time with the song re-renders when the tempo changes: synced mod LFOs/sequence, or a Vector wave sequence in note values.
-const padBpm = i => { const v = kit.voices[i]; return voiceSynced(v) || (v && v.engine === 'vector' && v.vector && (v.vector.mode | 0) === 1 && (v.vector.sdiv | 0) > 0) ? songBpm() : 0; };
+const padBpm = i => { const v = kit.voices[i]; return voiceSynced(v) || (v && v.engine === 'vector' && v.vector && (v.vector.mode | 0) === 1 && (v.vector.sdiv | 0) > 0) || (isLxV(v) && LxrCore.synced(v)) ? songBpm() : 0; };   // LXR ENGINES: an LFO synced to the tempo
 function stale(i){ const c = slotAt(cache, i); return !c || slotAt(dirty, i) || c.sr !== padSR() || (c.bpm || 0) !== padBpm(i); }
 function install(i, c){ slotAt(padRev, i); padRev[i] = (padRev[i] || 0) + 1; cache[i] = c; dirty[i] = false; bufs[i] = null; }
 function bgRender(i){
@@ -7697,6 +7709,8 @@ const ENGINE_GROUPS = [
   ['Layers', [['layers', 'Layers', 'stacked oscillators, FM, noise, samples — the original pad']]],
   ['Drums', [['tone', 'Tone drum', 'tone + noise one-shot'], ['blip', 'Blip', 'tone · kick · FM · ring · noise · grain'], ['fmdrum', 'FM Drum', '3-op FM percussion, pitch and index envelopes'],
     ['skin', 'Skin', 'a drum head: membrane modes, mallet, shell'], ['breath', 'Breath', 'noise through resonators: hats, shakers, risers, wind']]],
+  // LXR ENGINES: the LXR-02 firmware's voices, when lxr/ is there
+  ...(typeof LxrCore !== 'undefined' ? [['LXR-02 firmware', Object.keys(LxrCore.engines).map(k => [k, LxrCore.engines[k].name, LxrCore.engines[k].tag])]] : []),
   ['Keys', [['piano', 'Piano', 'struck stiff strings, hammer, soundboard'], ['ep', 'Tine EP', 'tine · pickup bark · bell · tremolo'], ['organ', 'Organ', 'drawbars, percussion, click, rotary']]],
   ['Synths', [['acid', 'Acid', 'the squelchy mono bass line, live'], ['mach', 'Machine', 'machine oscillators · HP/LP · LFO, live'], ['modal', 'Modal', 'resonant modes struck, plucked, rubbed or bowed'],
     ['swarm', 'Swarm', 'oscillator cloud · drift · bloom'], ['drift', 'Drift', 'two-line analog poly · tape wow & flutter · haze'], ['table', 'Table', 'wavetables · warp · unison'], ['phase', 'Phase', 'phase distortion · DCW · resonance'],
@@ -8551,6 +8565,26 @@ function loadClassicKit(i){
   refreshAll(); save();
   toast(`${kitTag(K[0])}-style kit on pads 1–8. Undo puts a pad back.`);
 }
+/* LXR ENGINES: File ▾ → Import LXR kit (.snd)… A kit file from the LXR-02's SD card (8 name bytes, then the sound
+   parameters) becomes seven pads in a row: drums 1–3, snare, cymbal, closed and open hat, each on its Firmware engine
+   with the kit's values. A modulation target on another voice is dropped (a pad's LFO and velocity reach its own voice). */
+function pickLxrKit(){
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.snd,.SND';
+  inp.addEventListener('change', () => { const f = inp.files && inp.files[0]; if (f) importLxrKit(f); });
+  inp.click();
+}
+async function importLxrKit(f){
+  let K; try { K = LxrCore.readKit(await f.arrayBuffer()); } catch(e){ return toast('That isn’t an LXR kit file (a .snd from the kit folder).'); }
+  const n = K.sounds.length, last = nslots() - 1, here = Math.min(cur, Math.max(0, last - n + 1));
+  const i = await askPick({title:'LXR kit: ' + K.name, body:`Its ${n} sounds (drums 1–3, snare, cymbal, closed and open hat) go on ${n} pads in a row, each on its Firmware engine. Undo puts a pad back.`},
+    here > 0 ? ['Pads 1–' + n, `Pads ${here + 1}–${here + n} (from this pad)`] : ['Pads 1–' + n]);
+  if (i < 0) return;
+  const at = i === 0 ? 0 : here;
+  K.sounds.forEach((snd, j) => { const p = at + j; if (p > last || !kit.voices[p]) return;
+    kit.voices[p] = PE((K.name + ' ' + snd.name).slice(0, 24), snd.kind, normX(snd.kind, Object.assign(XENG[snd.kind].d(), snd.o)), {len:LxrCore.len(snd.kind), gate:400}); changed(p, true); });
+  refreshAll(); save();
+  toast(`${K.name}: ${n} sounds on pads ${at + 1}–${at + n}.`);
+}
 async function pickClassicKit(){
   const K = drumKits(), list = K.map(([g, pads]) => (g.includes('acoustic') ? kitTag(g) + ' kit (acoustic)' : kitTag(g)) + ' — ' + pads.filter(n => n !== 'Open hat').map(n => n === 'Closed hat' ? 'hats' : n === 'Snare (ghost)' ? 'ghost snare' : n.toLowerCase()).join(', '));
   const i = await askPick({title:'Drum kits', body:'Puts eight sounds from one kit on pads 1–8, in the factory kit’s order. The synth slots stay as they are. Every sound of each kit is also in a pad’s Presets list.'}, list);
@@ -8710,6 +8744,9 @@ async function pickBreak(){
     saveS(); draw(); toast(`${b[0]} added at row ${rS(y, 3)} on tracks 1–6.`);
   }
 }
+// LXR ENGINES: the firmware's init kit, its seven sounds, as one group of the pad Presets list
+const lxrPresetGroup = () => ['LXR-02 firmware', LxrCore.initKit().map(({name, kind, o}) =>
+  ['Init kit · ' + name, () => PE(name, kind, normX(kind, Object.assign(XENG[kind].d(), o)), {len:LxrCore.len(kind), gate:400})])];
 // An engine's presets (its card's list, less Init) as one group of the pad Presets list.
 const engGroup = ([k, gn]) => [gn, XUI[k].pre.slice(1).map(([n, o, x, e]) =>
     [n, () => PE(n, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:k === 'modal' || k === 'swarm' || k === 'drift' || k === 'piano' || k === 'ep' || k === 'strings' || k === 'partials' || k === 'vector' || k === 'scanned' || k === 'resynth' ? 6 : k === 'breath' || k === 'fmdrum' || k === 'skin' || k === 'chip' || k === 'bytebeat' ? 2 : 4, gate:400}, x || {},
@@ -8939,6 +8976,7 @@ function factoryVoicePresets(){
       {type:'sine', tune:12, atk:0.5, dec:1200, sus:0, rel:900, level:0.25}], {len:8})],
   ]],
   ...[['acid', 'Acid'], ['mach', 'Machine synth'], ['tone', 'Tone drums'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Electric piano'], ['organ', 'Organ'], ['table', 'Table'], ['breath', 'Breath'], ['strings', 'Strings'], ['fmdrum', 'FM Drum'], ['wind', 'Wind'], ['phase', 'Phase'], ['partials', 'Partials'], ['skin', 'Skin'], ['chip', 'Chip'], ['vector', 'Vector'], ['scanned', 'Scanned'], ['resynth', 'Resynth'], ['bytebeat', 'Bytebeat']].map(engGroup),
+  ...(typeof LxrCore !== 'undefined' ? [lxrPresetGroup()] : []),   // LXR ENGINES
   ['Leads', [
     ['Square lead', () => PS('Square lead', [
       {type:'square', atk:3, dec:300, sus:0.75, rel:180, lpCut:3200, lpRes:0.25, level:0.6},
@@ -10028,6 +10066,8 @@ const XUI = {
       ['Nostalgic lead', {voices:1, aSaw:0.7, bPulse:0.5, detune:6, cut:2800, res:0.2, fenv:0.3, fatk:20, fdec:600, fsus:0.5, atk:25, dec:800, sus:0.8, rel:400, vib:14, vibRate:5, vibDelay:350, wow:0.45, flutter:0.3, chorus:0.25, sat:0.4, age:0.35, hiss:0.15}],
       ['Wobbly bass', {oct:0, voices:1, aSaw:0.8, bPulse:0, sub:0.6, cut:520, res:0.3, fenv:0.45, fatk:3, fdec:320, fsus:0.25, atk:4, dec:600, sus:0.75, rel:220, wow:0.3, flutter:0.15, chorus:0, sat:0.5, age:0.25, hiss:0.1}],
       ['Lost broadcast', {aSaw:0.5, bPulse:0.6, detune:11, noise:0.1, hp:600, hpRes:0.2, cut:2000, atk:600, rel:2000, wow:0.6, wowRate:0.8, flutter:0.6, chorus:0.3, sat:0.5, age:0.9, hiss:0.6}]]},
+  // LXR ENGINES: each voice's knob pages, from the firmware's menus (lxr/lxr-engine.js)
+  ...(typeof LxrCore !== 'undefined' ? LxrCore.xui() : {}),
 };
 const xRows = []; let xKind = '';
 const XEV = () => { const v = V(), k = v.engine; if (!v[k]) v[k] = normX(k, null); return v[k]; };
@@ -11232,7 +11272,7 @@ function fileItems(){
     null,
     ['Save kit…', () => $('bSaveKit').click()], ['Load kit…', () => $('kitIn').click()],
     ['Export song presets…', exportPresets], ['Import presets…', () => $('presetIn').click()],
-    ['Factory drums (pads 1–8)', factoryPads, null, null, true], ['Drum kits…', pickClassicKit], ['Clear all kit slots', clearKit, null, null, true],
+    ['Factory drums (pads 1–8)', factoryPads, null, null, true], ['Drum kits…', pickClassicKit], ...(typeof LxrCore !== 'undefined' ? [['Import LXR kit (.snd)…', pickLxrKit]] : []), ['Clear all kit slots', clearKit, null, null, true],
     null,
     ['Export this pad (WAV)', () => $('bExPad').click()], ['Export all pads (.zip)', () => $('bExKit').click()],
     ...(canShare ? [['Share this pad…', () => $('bShPad').click()], ['Share all pads…', () => $('bShKit').click()]] : []),
@@ -12337,6 +12377,8 @@ let plFailed = false;
   const bytes = async p => { const r = await fetch(p); if (!r.ok) throw new Error(p + ' ' + r.status); return new Uint8Array(await r.arrayBuffer()); };
   const z = () => 0, imp = {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}};
   let plMod = null, txMod = null;
+  // LXR ENGINES: lxr/lxr.wasm, compiled here (and handed to the render Worker) when the engine file loaded
+  const lxP = typeof LxrCore !== 'undefined' ? LxrCore.load('lxr/lxr.wasm?v=1').catch(e => { console.warn('LXR engines', e); return null; }) : Promise.resolve(null);
   const [plB, txB] = await Promise.all([bytes(WASM_DSP).catch(() => null), bytes(WASM_TFX).catch(() => null)]);
   tfxBytes = txB || false; tfxLoadDone();
   try {
@@ -12353,8 +12395,9 @@ let plFailed = false;
     if (globalThis.WavesDSP && plMod && txMod){ WavesDSP.wasmInit({dspModule:plMod, tfxModule:txMod}); WV.ready = true; }
     try { if (globalThis.WavesDSP && WavesDSP.modsPrepare) WavesDSP.modsPrepare(); } catch(e){}   // the Random/Function generators' wasm: compiled in the background here (the page's thread won't compile it on the spot)
   } catch(e){ console.warn('…waves WebAssembly', e); }
-  if (typeof Worker !== 'undefined') rwStart(plMod, txMod);
-  for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; if (v && v.layers.some(l => l.on && (l.type === 'plaits' || l.type === 'elements' || l.type === 'waves')) || (v.fx || []).some(f => f.on)) dirty[i] = true; }
+  const lxMod = await lxP;
+  if (typeof Worker !== 'undefined') rwStart(plMod, txMod, lxMod);
+  for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; if (v && v.layers.some(l => l.on && (l.type === 'plaits' || l.type === 'elements' || l.type === 'waves')) || (v.fx || []).some(f => f.on) || isLxV(v)) dirty[i] = true; }
   refreshLayer(); renderFx();
   showCur(); renderStrip();
   prerender();   // the rest of the kit in idle moments, so the first PLAY doesn't render them all at once

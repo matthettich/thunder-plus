@@ -10,6 +10,9 @@ for (const f of PARTS){
   if (!fs.existsSync(from)){ console.error('Missing from the app: ' + f); process.exit(1); }
   fs.cpSync(from, path.join(dst, f), {recursive:true});
 }
+// LXR ENGINES: lxr/ (the LXR-02 firmware's voices, GPL-3.0) when it is there, its source and licence included.
+// Leave the folder out of the repo to build without it; the app then has no Firmware engines.
+if (fs.existsSync(path.join(src, 'lxr'))) fs.cpSync(path.join(src, 'lxr'), path.join(dst, 'lxr'), {recursive:true});
 // Files index.html fetches by name (worklets, fonts, icons): each must exist in ./app.
 const html = fs.readFileSync(path.join(dst, 'index.html'), 'utf8');
 const refs = new Set();

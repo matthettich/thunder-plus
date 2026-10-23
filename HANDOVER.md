@@ -24,6 +24,50 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 23 Oct (3): the LXR-02's voices as engines (lxr/, GPL-3.0, optional)
+
+Cache `thunderplus-v219`, `lxr/lxr-engine.js?v=1`, `lxr/lxr.wasm?v=1`. Owner: Erica Synths open-sourced the LXR-02
+firmware (https://github.com/erica-synths/lxr-desktop-app, GPL-3.0 with trademark terms); include it as an engine.
+Owner's standing wish (licensing): anything with licence limits kept removable, since Thunder Plus may be sold.
+- **Everything is in `lxr/`** (read `lxr/README.md` and `lxr/NOTICE.md`): `src/firmware/` the firmware files the build
+  reads, unchanged (commit a43cd4f), with its LICENSE and NOTICE.md; `src/lxr_wasm.c` the interface; `src/stub/` HAL,
+  Cortex-M intrinsics (__SSAT, __QADD16… in C) and ST's USB header (empty, nothing used); `src/tools/lxr_meta.py` (host
+  clang program over the firmware's menu tables → the knob pages, names, dtypes, option lists, modTargets, init kit);
+  `src/lxr-engine.src.js` + `build.sh` → `lxr.wasm` (151 kB, no imports) and `lxr-engine.js` (META inlined). Toolchain as
+  dsp/build.sh: clang 18 + wasi-sdk 25 sysroot/builtins (both downloadable here from GitHub releases), `-O3 -ffast-math
+  -funsigned-char` (ARM's char is unsigned).
+- **The wasm** (`lxr_*` exports): init (mixer, parameterArray, velocity mod nodes, the four voice inits), init_kit,
+  load (= preset_sendDrumsetParametersImmediate: VEL_DEST / TARGET_LFO through modTargets, then parameterOrder through
+  midiParser_ccHandler), trigger (= voiceControl_noteOn; 5 closed hat, 6 open), render (one voice, as
+  mixer_calcNextSampleBlock does it before pan and FX bus; 64-sample blocks at REAL_FS 44140). Defined in the wrapper:
+  activeParameters, the RNG (xorshift, seeded per render), adc_getFaderVolume = 1, seq_getBpm (lxr_set_bpm), seq_setMute
+  / menu_* no-ops, menu_activePage 0.
+- **Rendering** (`LxrCore.render`): the module's memory is restored to a copy taken after start-up before every render
+  (the firmware keeps filter/osc/counter state its init functions leave, so the 2nd render of the same pad differed);
+  init kit + the pad's bytes; other voices' VEL_DEST/TARGET_LFO cleared; 320 blocks to settle; trigger with note 60 +
+  Tune; blocks until 0.3 s below 3e-5 or Max len (≤ 12 s); windowed-sinc to the app's rate (32 taps, 1024-phase table);
+  Level/Drive as KeysUtil.finish but **not normalised** (a kit's balance carries over).
+- **Engines** `lxdrum`, `lxsnare`, `lxcym`, `lxhat` (XENG via `LxrCore.xeng()`, XUI via `LxrCore.xui()`, ENGINE_GROUPS
+  group "LXR-02 firmware" after Drums). Pad values: `p<param number>` (drum = drum 1's numbers), `vdst` / `ldst` (0 or a
+  position in this engine's target list: its voice's modTargets range, only its own knobs), `vel` (Hit), `open` (hat).
+  Sections follow the menu pages; the mod page is split into Pitch envelope and Velocity; rows use short names in
+  their section (SHORT), target lists the full ones. Pan, audio out and the LFO's destination voice are left out.
+- **index.html** (search `LXR ENGINES`): script tag before the engine block; XENG spread; `isLxV`; renderX calls
+  `XENG[k].r(P, sr, hold, V, songBpm())` when an entry renders itself; the Worker blob starts with
+  `importScripts(lxr-engine.js)` (when the page has LxrCore), init gets the page's compiled module (`lx`), `PW.lx`;
+  `rwCan` needs PW.lx for LXR pads; the wasm loader compiles `lxr/lxr.wasm` alongside dsp/tfx and marks LXR pads dirty
+  when ready; padBpm re-renders a pad whose LFO is synced and routed; pad Presets group (init kit, seven sounds);
+  File ▾ → **Import LXR kit (.snd)…** (`pickLxrKit` / `importLxrKit`: 8 name bytes + params, onto pads 1–7 or from
+  this pad). sw.js caches lxr files as OPTIONAL (a missing folder doesn't break install); electron/copy-app.js copies
+  `lxr/` when present.
+- **Removal** (before selling): delete `lxr/` (and optionally its script tag). Checked headless: no engines, no import
+  item, a saved LXR pad falls back to Layers, only the script's 404 in the console.
+- Checked: Node renders of all seven init-kit sounds (no NaN, kick/tom/click/snare/cymbal/hats look right on
+  spectrograms), knobs act (decay, coarse, Tune = semitone, cutoff, velocity → decay), identical repeat renders; in the
+  page (1600 and 412): engines in the list, cards, page and Worker renders, presets group, kit import through the
+  dialog (edited values and drum 2's velocity target carried over). **Not heard by ear, not compared with a real LXR.**
+- Open: compare against the owner's machine (same kit file, same note); LXR-02 user samples (SD card waveforms) aren't
+  there; no export back to .snd yet.
 ## 23 Oct (3): PLAN — …sample, a wave editor (not started)
 
 Status: **plan only, nothing built.** The owner will start this later; this entry is the brief.
