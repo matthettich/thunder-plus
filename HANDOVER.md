@@ -24,6 +24,26 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## 23 Oct: ROWS sets PATTERN LEN; new songs LPB 8; the phrase cursor wraps
+
+Cache `thunderplus-v217`. Owner: when the rows of a phrase are changed, that number should become the default for new
+phrases; default lines per beat 8; up past the top of a phrase or pattern (or down past the bottom) should wrap round,
+with the view following (on the phone the cursor was getting lost).
+- ROWS = DEFAULT: `setRows` (tab bar ROWS −/+/typed) and `psetSet` x 0 (the LEN line) call `setDefLen(n)`, so `S.dlen`
+  (PATTERN LEN) follows and every empty phrase takes the new length too. Delete on LEN (back to 16) does the same. The
+  PATTERN LEN info line and the ROWS dialog say so.
+- LPB 8: `freshSong` has `lpb:8` and the Settings LPB row `d:8` (old files without `lpb` still load as 4). Note this
+  reverses the 14 Oct "new songs LPB 4" (owner's choice now, after the swing fix). Things written in 16ths are pinned:
+  `demoSong` sets `S.lpb = 4`, `breakSong` `lpb:4`, and `placeBreak` into a song that isn't LPB 4 gives the break's
+  phrases their own LPB 4 (`plpb`) and works its DEL ticks out at 4.
+- WRAP: in `move()`, a vertical step past either end of the phrase (`dims('phrase').h` = the open phrase's LEN, Pattern
+  view included) goes to the other end; a longer jump (PgUp/PgDn) stops at the end first, then wraps. `draw()`'s follow
+  scrolls `c.top`. ▲ on the top row no longer goes to the LEN / LPB line: the folded phone hides that line (`thdFit` f6),
+  so the cursor vanished there. Tap LEN / LPB to reach it (wide screens); ▼ from it still returns to row 0. Shift+▲▼
+  selections stay clamped (`shiftSel`).
+- Checked headless (412 folded, 884 unfolded, 1600): ▲ at row 0 → last row visible, ▼ at the last → row 0, 16 and 32
+  rows, Pattern view, ArrowUp, PgUp twice, Shift+▲ at the top, LEN line ▼; no page errors.
+
 ## 22 Oct (7): a bus is FX commands only; buses outlined in Pattern view
 
 Cache `thunderplus-v216`. Desktop **v1.2.19** (22 Oct, started with Run workflow through the API: this session can push
