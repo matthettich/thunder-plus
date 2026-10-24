@@ -2361,10 +2361,10 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" hidden></div>
 
-<script src="waves/waves-worklet.js?v=28"></script>
+<script src="waves/waves-worklet.js?v=29"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
-<script src="lxr/lxr-engine.js?v=1"></script>
+<script src="lxr/lxr-engine.js?v=2"></script>
 <!-- …PUMP (23 Oct 2026): the pump mastering plugins' parameter tables and presets (generated in matthettich/pump by
      wasm/build.sh); pump/pump.wasm is their DSP, fetched by the wasm loader. -->
 <script src="pump/pump-meta.js?v=1"></script>
@@ -7078,7 +7078,7 @@ const pend = [], padRev = [];
 const PW = {w:null, ready:false, wv:false, lx:false, id:0, jobs:new Map()};
 // LXR ENGINES: the Worker loads lxr/lxr-engine.js before the engine code (so XENG has the Firmware engines there too)
 // and gets the page's compiled lxr.wasm (lxMod) in its init message.
-const LXR_JS = 'lxr/lxr-engine.js?v=1';
+const LXR_JS = 'lxr/lxr-engine.js?v=2';
 function rwStart(plMod, txMod, lxMod){
   try {
     const sc = [...document.scripts].find(x => x.textContent.includes('===ENGINE ' + 'START==='));
@@ -7116,7 +7116,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, wv:new URL('waves/waves-worklet.js?v=28', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, wv:new URL('waves/waves-worklet.js?v=29', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -13616,7 +13616,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=35')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=36')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);

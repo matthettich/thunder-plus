@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.22** (24 Oct 2026; Run workflow through the API with version 1.2.22) has everything in "24 Oct" below: the Windows
+  Arrange-box and …pump-meter fixes, the reverb Mix curve, mouse on values, the mixer fader bars and the header meter.
 - **v1.2.20** (24 Oct 2026, UTC; Run workflow through the API with version 1.2.20, from `0e73a86`) has everything up to
   that commit: the LXR-02 engines (`lxr/`), the …pump bus and master effects (`pump/`), the grouped FX column picker,
   ROWS → PATTERN LEN, LPB 8 for new songs and the phrase cursor wrap. All three platforms built; installed copies update
@@ -74,6 +76,42 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
 6. **Plugins and mobile, if they happen** (`docs/ENGINE-PLUGIN-PLAN.md`): iPlug2 is permissive; JUCE needs a paid licence
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
+
+## 24 Oct: Windows fixes, reverb Mix curve, mouse on values, header meter, LXR presets — desktop v1.2.22
+
+Cache `thunderplus-v225`, `chains/chains-worklet.js?v=36`, `waves/waves-worklet.js?v=29`, `lxr/lxr-engine.js?v=2`. Each
+change is its own commit, tested in headless Chromium (and the DSP in Node) before it went in.
+- **Arrange boxes on Windows.** `.tagrid` scrolls with a real scrollbar there (17 px+, none on Mac / phones), so the blocks
+  were narrower than the MONO / POLY / MST tabs and track numbers above them, and the boxes (measured from the header) drifted
+  up to ~16 px by MST. `arrSbw()` sets `--arsb` on `#tArr` and `.tath` / `.tagp` take it as `margin-right`.
+- **…pump meters on the FX screen.** `stageRoom()` measured each line with a Range over the whole `.ln`; the description line's
+  `.fxdesc` is `display:block` up to 68ch, so a 21-character "pump COMP: compressor" reserved ~540 px and at 150 % scaling the
+  stage fell under its 150 px minimum and hid. Empty slots have no description, which is why the meter only showed there. It
+  now measures `.fxdesc`'s client rects (the text). Built-in effects benefit too.
+- **Reverb Mix curve** (`rvMix(m)` → `[cos(πm/2), sin²(πm/2)]`): 10 % −32 dB, 35 % −11 dB, 50 % a real middle (dry −3, tail −6),
+  100 % tail only. Before: Room / Space held the dry full while the tail reached full by 50 % (Room 35 % = −3 dB), Galactic was
+  1−(1−m)³, Spring / Pitch reverb crossfaded with the tail ×1.4. In …chains / …waves the shared block has `rvMix` and
+  `effect(…, wetAt)` runs Galactic / Space / Room fully wet and blends in JS; Spring, Plate and Pitch reverb's reverb branch use
+  it (Pitch **delay** keeps `1 − mix/2`). In Thunder: `rvMix` is a function declaration in the ENGINE block (shipped to the
+  track-FX worklet by `toString()`), pad Space / Room are `blend:true` (Room `blendKey:'wet'`) and blend in `txRun`, track slots
+  t 8 / 20 / 24 set `s.wi` and `slotRun` blends against its dry copy, and Thunder's own `PitchFxCore` reverb branch uses it.
+  All measured on a noise burst: every reverb, pad and track, within 0.3 dB of the curve. Songs sound drier at the same setting.
+- **Mouse on values** (VALUE MOUSE, `valCell`): Mixer VOL / PAN / MASTER and the FX, INST, PROJECT rows' values change on a drag
+  (16 px a step, `bump`) or the wheel from the first press, instead of moving between lines; a click only selects (`drag.tap`),
+  a click on the selected value is EDIT as before.
+- **Mixer fader bars** (MIXER FADERS, `mixFaders`): a bar over each track's meter at its VOL on the meter's scale (0 dB at the
+  top, 6 dB a line, half a line above = +6 dB / FF). Drag, Shift fine, double-click = E0; one undo step per drag.
+- **Header meter** (HEADER METER, `#hMeter`, `hmFrame`): master L / R between the screen buttons and File, −48…0 dB, amber over
+  −6, a peak tick held 1 s, a red end after a clip (click clears). Own analysers on `master`, re-attached when `master` changes.
+  Hidden under 700 px.
+- **Keys / defaults:** `\` mutes the cursor's track (as `/`); Desktop starts Phrase in pattern mode at 80 % text
+  (`tScaleDef`, `pvMode`) unless the user already chose.
+- **Engine cards:** ◀ ▶ around each card's Presets button step its presets (PRESET STEP, `preAt` per pad + engine); the button
+  shows the preset's name.
+- **LXR presets:** 41 (`PRESETS` in `lxr/lxr-engine.js`, written by knob name through `alias()` / `named()`), each rendered and
+  checked for pitch, length and peak < 1.0. Also in `lxr/src/lxr-engine.src.js`, so a rebuild keeps them.
+- **…chains:** a mixer's Pan sliders draw at half opacity (`.row.sl.pan`), so level and pan are easy to tell apart.
+- **Not a bug:** engine switching doesn't play the voice; what the owner heard was a pattern sending it a note.
 
 ## 23 Oct (7): …pump pop-up windows for CALM, TONE, BAND, WIDE and HEAT (stage 3 of 3)
 
