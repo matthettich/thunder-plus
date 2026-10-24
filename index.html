@@ -223,6 +223,9 @@ body:not(.nowv) .wvMobNote{display:none}
 .wvview[hidden],.chview[hidden]{display:none}
 .wvview iframe,.chview iframe{flex:1; border:0; width:100%; height:100%; display:block}
 .kitname{width:150px}
+/* HEADER METER (owner, 24 Oct): the master level between the screen buttons and File */
+.hmeter{flex:1 1 140px; min-width:90px; max-width:420px; height:22px; display:block; cursor:pointer}
+@media (max-width:700px){ .hmeter{display:none} }
 
 /* scrolling editor made of bands */
 .main{flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; display:flex; flex-direction:column}
@@ -1751,6 +1754,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <div class="brand" aria-label="...Thunder Plus">...Thunder<span class="plus" aria-hidden="true">+</span></div>
   <div class="seg" id="segView" role="group" aria-label="Screen"></div>
   <input id="kitName" class="kitname" type="text" aria-label="Kit name" spellcheck="false">
+  <canvas id="hMeter" class="hmeter" role="img" aria-label="Master level" title="Master level, left over right (what you hear). A red end: it clipped (click to clear)"></canvas>
   <div class="sp"></div>
   <button type="button" id="bUpd" hidden title="A newer desktop build is out">Update</button>
   <div class="setwrap">
@@ -19508,6 +19512,47 @@ function deckStripMeter(now){
 // Scope: the master's spectrum, drawn as Quite Noise draws its Shape graph — 20 Hz to 20 kHz across, faint
 // lines at 100, 1k and 10k, a dashed reference at −48 dB, and the spectrum filled in the section's colour.
 let dkAn = null, dkSpec = null, dkScopeT = 0, dkScopeIdle = false;
+/* HEADER METER (owner, 24 Oct): the master's level, left over right, in the top bar on every screen. It listens to the master
+   gain (everything you hear goes through it: pads, previews, the tracker), so it re-attaches when the audio restarts with a
+   new master. −48 dB at the left, 0 dB at the right edge: the ink bar, its last 6 dB amber, a peak tick that holds for a
+   second, and a red end once a peak reaches 0 dB (it stays until clicked). ~30 frames a second, nothing when hidden. */
+const HM = {m:null, an:null, buf:null, lv:[0, 0], pk:[0, 0], pt:[0, 0], clip:false, t:0, drawn:''};
+function hmAttach(){
+  if (HM.m === master || !ctx || !master) return !!HM.an;
+  try { const sp = ctx.createChannelSplitter(2); HM.an = [ctx.createAnalyser(), ctx.createAnalyser()]; master.connect(sp);
+    HM.an.forEach((a, i) => { a.fftSize = 512; sp.connect(a, i); }); HM.buf = new Float32Array(512); HM.m = master; return true; }
+  catch(e){ HM.an = null; HM.m = master; return false; }
+}
+function hmFrame(now){
+  requestAnimationFrame(hmFrame);
+  const c = $('hMeter'); if (!c || document.hidden || !c.offsetParent || now - HM.t < 32) return;
+  const dt = HM.t ? Math.min(0.2, (now - HM.t) / 1000) : 0.03; HM.t = now;
+  const live = hmAttach(), dk = Math.pow(10, -20 * dt / 20);   // falls 20 dB a second
+  for (let s = 0; s < 2; s++){
+    let p = 0; if (live){ HM.an[s].getFloatTimeDomainData(HM.buf); for (let i = 0; i < HM.buf.length; i++){ const v = HM.buf[i] < 0 ? -HM.buf[i] : HM.buf[i]; if (v > p) p = v; } }
+    HM.lv[s] = Math.max(p, HM.lv[s] * dk);
+    if (p >= HM.pk[s]){ HM.pk[s] = p; HM.pt[s] = now; } else if (now - HM.pt[s] > 1000) HM.pk[s] = Math.max(p, HM.pk[s] * dk);   // held a second, then falls
+    if (p >= 0.999) HM.clip = true;
+  }
+  const r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr); if (!W || !H) return;
+  const pos = g => lvl(g), key = [W, H, HM.clip, ...HM.lv.map(v => (pos(v) * W) | 0), ...HM.pk.map(v => (pos(v) * W) | 0)].join(',');
+  if (key === HM.drawn) return; HM.drawn = key;   // nothing moved: no redraw (silence costs nothing)
+  if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
+  const g = c.getContext('2d'), st = getComputedStyle(c), ink = st.color || '#111';
+  g.clearRect(0, 0, W, H);
+  const bh = Math.max(2, Math.round(H * 0.3)), gap = Math.max(1, Math.round(H * 0.12)), y0 = Math.round((H - bh * 2 - gap) / 2), amber = W * lvl(Math.pow(10, -6 / 20));
+  for (let s = 0; s < 2; s++){
+    const y = y0 + s * (bh + gap), x = pos(HM.lv[s]) * W;
+    g.globalAlpha = 0.13; g.fillStyle = ink; g.fillRect(0, y, W, bh); g.globalAlpha = 1;   // the empty track: a faint wash of the ink, in any skin
+    g.fillStyle = ink; g.fillRect(0, y, Math.min(x, amber), bh);
+    if (x > amber){ g.fillStyle = '#e8a33a'; g.fillRect(amber, y, x - amber, bh); }
+    const px = Math.min(W - dpr, pos(HM.pk[s]) * W); if (HM.pk[s] > 0.004){ g.fillStyle = HM.pk[s] >= 0.999 ? '#e5484d' : ink; g.fillRect(px, y, Math.max(1, dpr * 1.5), bh); }
+  }
+  for (let d = -12; d >= -36; d -= 12){ const x = Math.round(W * lvl(Math.pow(10, d / 20))); g.globalAlpha = 0.35; g.fillStyle = ink; g.fillRect(x, y0 - gap, 1, gap); g.globalAlpha = 1; }   // ticks at −12, −24, −36
+  if (HM.clip){ g.fillStyle = '#e5484d'; g.fillRect(W - Math.round(4 * dpr), y0, Math.round(4 * dpr), bh * 2 + gap); }
+}
+$('hMeter').addEventListener('click', () => { HM.clip = false; HM.pk = [0, 0]; HM.drawn = ''; });
+requestAnimationFrame(hmFrame);
 function specAnalyser(){ if (!dkAn && rt && ctx){ try { dkAn = ctx.createAnalyser(); dkAn.fftSize = 4096; dkAn.smoothingTimeConstant = 0.8; master.connect(dkAn); dkSpec = new Float32Array(dkAn.frequencyBinCount); } catch(e){ dkAn = null; } } return dkAn; }
 function deckScope(now){
   if (!deckShown() || !deck.scope || now - dkScopeT < 50) return; dkScopeT = now;
