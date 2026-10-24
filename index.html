@@ -2923,6 +2923,13 @@ function renderLayer(L, V, sr, out, N){
 // offline; `tx` is that module's effect number and map() turns these rows into its 0–1 parameters.
 const dBf = v => (v > 0.05 ? '+' : v < -0.05 ? '−' : '±') + Math.abs(v).toFixed(1) + ' dB';
 const khzf = v => v.toFixed(1) + ' kHz', hzf = v => Math.round(v) + ' Hz', pcf = v => Math.round(v * 100) + '%';
+/* REVERB MIX (owner, 24 Oct): one wet/dry curve for every reverb's Mix (Room's Wet), the same as …chains' rvMix. The dry
+   falls as an equal-power fade, cos(πm/2), and the tail rises as sin²(πm/2): 10 % a touch (−32 dB), 35 % about −11 dB,
+   50 % a real middle (dry −3 dB, tail −6 dB), 100 % the tail alone. Room and Space used to keep the dry full while the tail
+   reached full by 50 %, and Galactic's own mix was 1−(1−m)³. A function declaration, so the track-FX worklet gets it by
+   toString(). Returns [dry gain, wet gain]. */
+function rvMix(m){ const a = (m < 0 ? 0 : m > 1 ? 1 : m) * Math.PI / 2, s = Math.sin(a); return [Math.cos(a), s * s]; }
+const wetPct = v => Math.round(v * 100) + '% wet';
 const wetDry = v => `W ${Math.round(Math.min(1, v * 2) * 100)} · D ${Math.round(Math.min(1, 2 - v * 2) * 100)}`;
 const sq01 = v => Math.sqrt(Math.max(0, Math.min(1, v)));
 // Space reverb: Size exactly 1 (a line at the end of its shrunk buffer) never decays, so the maps stop at 0.99.
@@ -2939,9 +2946,9 @@ const FX = {
     map:f => [f.pressure, f.speed, (f.mewiness + 1) / 2, f.output, f.mix]},
   reverb:{name:'Reverb', tx:8, segs:[], rows:{replace:{l:'Replace', min:0, max:1, c:'lin', d:0.5, f:pcf}, brightness:{l:'Brightness', min:0, max:1, c:'lin', d:0.5, f:pcf},
       detune:{l:'Detune', min:0, max:1, c:'lin', d:0.5, f:pcf}, bigness:{l:'Bigness', min:0, max:1, c:'lin', d:1, f:pcf},
-      mix:{l:'Mix', min:0, max:1, c:'lin', d:0.35, f:wetDry}}, init:{},
+      mix:{l:'Mix', min:0, max:1, c:'lin', d:0.35, f:wetPct}}, init:{},
     // Galactic's own mix turns the dry hit down fast (−9 dB at 30%), so it runs fully wet and the blend happens
-    // here, like the delay's: dry stays full until half way, wet reaches full at half way.
+    // in txRun with the shared reverb curve (rvMix).
     map:f => [f.replace, f.brightness, f.detune, f.bigness, 1], blend:true},
   delay:{name:'Tape delay', tx:9, segs:[], rows:{time:{l:'Time', min:70, max:1800, c:'log', d:250, f:v => Math.round(v) + ' ms'}, regen:{l:'Feedback', min:0, max:1, c:'lin', d:0.37, f:pcf},
       tone:{l:'Tone', min:0, max:1, c:'lin', d:0.5, f:pcf}, reso:{l:'Resonance', min:0, max:1, c:'lin', d:0, f:pcf}, flutter:{l:'Flutter', min:0, max:1, c:'lin', d:0, f:pcf},
@@ -2993,7 +3000,7 @@ const FX = {
     init:{carrier: 3}, map:f => [f.alg, f.timbre, f.clvl, f.mlvl, (f.carrier | 0), f.note, f.mix]},
   space:{name:'Space reverb', tx:20, segs:[],
     rows:{size:{l:'Size', min:0, max:1, c:'lin', d:0.5, f:v => Math.round(v * 100) + '%'}, decay:{l:'Decay', min:0, max:1, c:'lin', d:0.55, f:v => Math.round(v * 100) + '%'}, diff:{l:'Diffusion', min:0, max:1, c:'lin', d:0.7, f:v => Math.round(v * 100) + '%'}, mod:{l:'Modulation', min:0, max:1, c:'lin', d:0.4, f:v => Math.round(v * 100) + '%'}, tone:{l:'Tone', min:0, max:1, c:'lin', d:0.6, f:v => Math.round(v * 100) + '%'}, lowcut:{l:'Low cut', min:0, max:1, c:'lin', d:0.2, f:v => Math.round(v * 100) + '%'}, pre:{l:'Pre-delay', min:0, max:1, c:'lin', d:0.1, f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', min:0, max:1, c:'lin', d:0.35, f:v => Math.round(v * 100) + '%'}},
-    init:{}, map:f => [Math.min(f.size, SPACE_SIZE_MAX), f.decay, f.diff, f.mod, f.tone, f.lowcut, f.pre, f.mix]},
+    init:{}, map:f => [Math.min(f.size, SPACE_SIZE_MAX), f.decay, f.diff, f.mod, f.tone, f.lowcut, f.pre, 1], blend:true},   // REVERB MIX: blended in txRun
   lofi:{name:'Lo-fi', tx:21, segs:[],
     rows:{rate:{l:'Rate', min:0, max:1, c:'lin', d:0.6, f:v => Math.round(v * 100) + '%'}, rez:{l:'Bits', min:0, max:1, c:'lin', d:0.6, f:v => Math.round(v * 100) + '%'}, hard:{l:'Hardness', min:0, max:1, c:'lin', d:0.5, f:v => Math.round(v * 100) + '%'}, mix:{l:'Mix', min:0, max:1, c:'lin', d:1, f:v => Math.round(v * 100) + '%'}},
     init:{}, map:f => [f.rate, f.rez, f.hard, f.mix]},
@@ -3005,7 +3012,7 @@ const FX = {
     init:{}, map:f => [f.air, f.gnd]},
   room:{name:'Room reverb', tx:24, segs:[],
     rows:{size:{l:'Size', min:0, max:1, c:'lin', d:0.5, f:v => Math.round(v * 100) + '%'}, sustain:{l:'Sustain', min:0, max:1, c:'lin', d:0.5, f:v => Math.round(v * 100) + '%'}, mulch:{l:'Mulch', min:0, max:1, c:'lin', d:0.5, f:v => Math.round(v * 100) + '%'}, wet:{l:'Wet', min:0, max:1, c:'lin', d:0.35, f:v => Math.round(v * 100) + '%'}},
-    init:{}, map:f => [f.size, f.sustain, f.mulch, f.wet]},
+    init:{}, map:f => [f.size, f.sustain, f.mulch, 1], blend:true, blendKey:'wet'},   // REVERB MIX: blended in txRun
   // Thunder's own effects and four more Airwindows (Oct 2026)
   comb:{name:'Comb resonator', tx:25, segs:[],
     rows:{note:{l:'Note', min:24, max:96, c:'int', d:48, f:v => ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((v % 12) + 12) % 12] + (Math.floor(v / 12) - 1)}, fb:{l:'Feedback', min:-0.99, max:0.99, c:'lin', d:0.85, f:v => (v < 0 ? 'hollow ' : '') + Math.round(Math.abs(v) * 100) + '%'}, damp:{l:'Damping', min:0, max:0.99, c:'lin', d:0.3, f:v => Math.round(v * 100) + '%'}, spread:{l:'Spread', min:0, max:50, c:'lin', d:8, f:v => Math.round(v) + ' cents'}, mix:{l:'Mix', min:0, max:1, c:'lin', d:0.6, f:v => Math.round(v * 100) + '%'}},
@@ -3378,7 +3385,7 @@ function txRun(f, a, sr){
       for (let i = 0; i < n; i++) out[off + i] = (L2[i] + R2[i]) * 0.5;
     }
   } finally { x.tfx_free(h); }
-  if (d.blend){ const w = Math.min(1, f.mix * 2), dr = Math.min(1, 2 - f.mix * 2); for (let i = 0; i < out.length; i++) out[i] = a[i] * dr + out[i] * w; }
+  if (d.blend){ const [dr, w] = rvMix(f[d.blendKey || 'mix']); for (let i = 0; i < out.length; i++) out[i] = a[i] * dr + out[i] * w; }   // REVERB MIX
   return out;
 }
 const fxReady = f => FX[f.type] && (FX[f.type].mod ? !!modDef(FX[f.type].mod) : FX[f.type].js || (FX[f.type].tx != null ? !!TX : !!PL));
@@ -6741,7 +6748,7 @@ class PitchFxCore {
     return y * 0.25;
   }
   process(Lb, Rb, n, p){
-    const sr = this.sr, mix = p.mix, dry = 1 - mix * 0.5, r1 = Math.pow(2, p.pitch / 12), r2 = Math.pow(2, p.pitch2 / 12), win = sr * 0.06;
+    const sr = this.sr, mix = p.mix, rv = rvMix(mix), dry = p.kind | 0 ? rv[0] : 1 - mix * 0.5, wgm = rv[1], r1 = Math.pow(2, p.pitch / 12), r2 = Math.pow(2, p.pitch2 / 12), win = sr * 0.06;
     const tc = 1 - Math.exp(-2 * Math.PI * (500 + p.tone * p.tone * 12000) / sr), mode = p.mode | 0, D = this.D;
     if (p.kind | 0){   // reverb
       // Size tops out at a ~7 s tail (it was 0.97, ~14 s), and the shimmer loop is scaled to stay under unity (measured: it rose at 0.45 of the old value, decays at 0.4): with large
@@ -6759,7 +6766,7 @@ class PitchFxCore {
           // A slow limiter on the loop: if the shimmer builds past 0.35 it is turned down, so it always dies away.
           const a = Math.abs(this.lp[ch]); this.fenv = this.fenv || [0, 0]; this.fenv[ch] += (a - this.fenv[ch]) * (a > this.fenv[ch] ? 0.002 : 0.00005);
           this.fbS[ch] = Math.tanh(this.lp[ch] * (this.fenv[ch] > 0.35 ? 0.35 / this.fenv[ch] : 1));
-          if (ch) Rb[i] = x0 * dry + w * mix * 1.8; else Lb[i] = x0 * dry + w * mix * 1.8;
+          if (ch) Rb[i] = x0 * dry + w * wgm * 1.8; else Lb[i] = x0 * dry + w * wgm * 1.8;   // REVERB MIX
         }
       }
       return;
@@ -12879,7 +12886,7 @@ const TFX = {
     map:f => [u8(f.press), u8(f.speed), u8(f.mew), u8(f.out), u8(f.mix)]},
   reverb:{n:'VERB', long:'Airwindows Galactic', id:8, ps:[
       P_('replace', 'REPLACE', 128, pc), P_('bright', 'BRIGHTNESS', 128, pc), P_('detune', 'DETUNE', 128, pc), P_('big', 'BIGNESS', 255, pc),
-      P_('mix', 'MIX', 48, v => Math.round((1 - Math.pow(1 - u8(v), 3)) * 100) + '% wet')],
+      P_('mix', 'MIX', 48, v => Math.round(u8(v) * 100) + '% wet')],   // REVERB MIX: the knob is the blend now
     map:f => [u8(f.replace), u8(f.bright), u8(f.detune), u8(f.big), u8(f.mix)]},
   delay:{n:'DLY', long:'Airwindows TapeDelay2', id:9, ps:[
       P_('steps', 'TIME', 3, v => { const s = dlySec(v, S.bpm); return `${v} step${v > 1 ? 's' : ''} · ` + (s > 1.83 ? 'max 1.8 s' : s < 0.07 ? 'min 70 ms' : Math.round(s * 1000) + ' ms'); }, 1, 32),
@@ -13476,7 +13483,10 @@ class ThunderFx extends AudioWorkletProcessor {
         s.on = on; s.slot = slot; next.push(s); continue;
       }
       if (i >= 0){ s = old[i]; old.splice(i, 1); if (s.h < 0){ s.h = x.tfx_new(c.t, sampleRate); if (s.h < 0) continue; } } else { const h = x.tfx_new(c.t, sampleRate); if (h < 0) continue; s = {key:c.key, h}; }
-      s.t = c.t; s.p = c.p; new Float32Array(x.memory.buffer, x.tfx_params(s.h), 12).set(c.p);
+      // REVERB MIX: Galactic (8), Space (20) and Room (24) run fully wet; slotRun blends them with rvMix
+      s.t = c.t; s.wi = c.t === 8 ? 4 : c.t === 20 ? 7 : c.t === 24 ? 3 : -1; s.p = c.p;
+      if (s.wi >= 0){ s.wm = c.p[s.wi]; s.p = c.p.slice(); s.p[s.wi] = 1; s.rv = rvMix(s.wm); }
+      new Float32Array(x.memory.buffer, x.tfx_params(s.h), 12).set(s.p);
       s.on = on; s.slot = slot; next.push(s);
     }
     for (const s of old) this.drop(s);
@@ -13511,7 +13521,8 @@ class ThunderFx extends AudioWorkletProcessor {
     for (let k = 0; k < n; k++){ const a = L[k], b = R[k]; if (!(a > -1e4 && a < 1e4 && b > -1e4 && b < 1e4)){ bad = true; break; } }
     if (bad){ try { x.tfx_free(s.h); s.h = x.tfx_new(s.t, sampleRate); if (s.h >= 0 && s.p) new Float32Array(x.memory.buffer, x.tfx_params(s.h), 12).set(s.p); } catch (e){ s.h = -1; }
       if (this.buf !== x.memory.buffer){ this.buf = x.memory.buffer; this.L = new Float32Array(this.buf, x.tfx_l(), 128); this.R = new Float32Array(this.buf, x.tfx_r(), 128); }
-      this.L.set(this.cL); this.R.set(this.cR); }
+      this.L.set(this.cL); this.R.set(this.cR); return; }
+    if (s.wi >= 0){ const dg = s.rv[0], wg = s.rv[1], cL = this.cL, cR = this.cR; for (let k = 0; k < n; k++){ L[k] = cL[k] * dg + L[k] * wg; R[k] = cR[k] * dg + R[k] * wg; } }   // REVERB MIX
   }
   process(inputs, outputs, params){
     if (this.dead) return false;
@@ -13809,7 +13820,7 @@ function tfxReady(ac){
     tfxLoaded.set(ac, (async () => {
       await tfxLoad; if (!tfxBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       await chainsReady(ac);   // the …chains engine publishes the shared modules (ChainsDSP) in the audio thread, for the MODFX slots
-      if (!tfxURL) tfxURL = URL.createObjectURL(new Blob([DegradeCore.toString() + '\n' + ResonCore.toString() + '\n' + PitchFxCore.toString() + '\n' + clkSpb.toString() + '\n' + FlexCore.toString() + '\n' + StepGateCore.toString() + '\n' + RetrigCore.toString() + '\n' + TFX_SRC], {type:'application/javascript'}));
+      if (!tfxURL) tfxURL = URL.createObjectURL(new Blob([rvMix.toString() + '\n' + DegradeCore.toString() + '\n' + ResonCore.toString() + '\n' + PitchFxCore.toString() + '\n' + clkSpb.toString() + '\n' + FlexCore.toString() + '\n' + StepGateCore.toString() + '\n' + RetrigCore.toString() + '\n' + TFX_SRC], {type:'application/javascript'}));
       await ac.audioWorklet.addModule(tfxURL);
       return true;
     })().catch(() => false));
