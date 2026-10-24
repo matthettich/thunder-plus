@@ -3019,3 +3019,8 @@ Deliberately left for later:
 - **Ctrl/⌘+N** new song (`newSong()`, shared with the File menu and Project's › NEW SONG). **Ctrl/⌘+T**
   (`newPhraseRight()`): a new empty phrase on the nearest empty non-bus track to the right on the current song row,
   opened there. Both are browser-reserved in a tab; they work in the desktop app.
+- **SKIN THEME** (24 Oct): the …pump windows (`themeFor()` / `skinTheme()` in pump/ui/kit.js) and the FX screen's
+  dynamics viewer (`fxDynPal()`) take their colours from the tracker skin's `--ts-*` / `--tk-*` variables. The windows'
+  DARK key still picks pump's own palettes on this device; Ctrl/⌘-click DARK goes back to the skin. `applySkin()` calls
+  `PumpFX.skinChanged()` so open windows repaint. Also: Ctrl/⌘+\ solos (same as Ctrl/⌘+/); a plain arrow key drops a
+  selection.

@@ -42,6 +42,46 @@ function skinDark(){
     if (m && m.length >= 3 && !(m.length > 3 && +m[3] === 0)) return (0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]) / 255 < 0.45;
     return getComputedStyle(document.documentElement).colorScheme.includes('dark'); } catch(e){ return false; }
 }
+/* SKIN THEME (owner, 24 Oct: the windows' own pink / cyan / lime palettes looked out of place in Thunder): unless the DARK
+   key has picked pump's own light or dark look on this device, a window takes its colours from Thunder's skin, the
+   tracker screen's (the --ts-* and --tk-* variables): its background and ink, the cursor's colour as the accent, the
+   track colours as the second accent. themeFor() is the one entry; buildTheme() stays pump's own palettes. */
+let probe = null;
+function skinColor(name){
+  try {
+    const host = document.querySelector('.tscr') || document.documentElement;
+    if (!probe || probe.parentNode !== host){ probe = document.createElement('i'); probe.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none'; host.appendChild(probe); }
+    probe.style.color = 'var(' + name + ')';
+    const c = getComputedStyle(probe).color || '', n = (c.match(/-?\d*\.?\d+(e-?\d+)?/g) || []).map(Number);
+    if (!probe.style.color || n.length < 3) return null;
+    if (/^color\(/.test(c)) return [n[0] * 255, n[1] * 255, n[2] * 255, n.length > 3 ? n[3] : 1];   // color(srgb r g b / a), from color-mix()
+    return [n[0], n[1], n[2], n.length > 3 ? n[3] : 1];
+  } catch(e){ return null; }
+}
+const lum = c => (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
+const near = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) < 40;
+function skinTheme(){
+  const bg = skinColor('--ts-bg'), ink = skinColor('--ts-ink'); if (!bg || !ink) return null;
+  const flat = c => c && c[3] < 1 ? mix(alpha(c, 1), bg, 1 - c[3]).map((v, i) => i === 3 ? 1 : v) : c;
+  bg[3] = ink[3] = 1;
+  const cur = flat(skinColor('--ts-cur-bg')), curInk = flat(skinColor('--ts-cur')), mono = flat(skinColor('--tk-mono')), poly = flat(skinColor('--tk-poly'));
+  const line = flat(skinColor('--ts-line')), mute = flat(skinColor('--ts-mute')), dark = lum(bg) < 0.45, t = {dark, skin:true};
+  // the accent: the cursor's colour, unless that's just the ink (the plain skins), then a track colour
+  const pick = (...L) => L.find(c => c && !near(c, ink) && !near(c, bg));
+  const neon = pick(cur, mono, poly) || ink, second = pick(...[poly, mono, cur].filter(c => c && !near(c, neon))) || mix(neon, ink, 0.5);
+  t.bg = bg; t.screen = mix(bg, ink, dark ? 0.05 : 0.025); t.panel = mix(bg, ink, 0.04); t.panel2 = mix(bg, ink, 0.10); t.ink = ink; t.ink2 = mix(ink, bg, 0.38);
+  t.dim = line && !near(line, bg) ? line : mix(ink, bg, 0.65); t.neon = neon; t.neonInk = curInk && near(neon, cur || [-99, 0, 0]) ? curInk : (lum(neon) > 0.55 ? hex(0x07070B) : hex(0xFFFFFF));
+  t.on = mix(bg, neon, 0.08); t.second = second; t.red = mute || hex(0xD0302A); t.grid = alpha(ink, dark ? 0.12 : 0.10); t.glow = alpha(neon, dark ? 0.22 : 0);
+  return t;
+}
+function themeFor(type){
+  let v = null; try { v = localStorage.getItem(THEME_KEY); } catch(e){}
+  if (v === 'dark' || v === 'light') return buildTheme(type, v === 'dark');
+  if (THEME === 'skin'){ const t = skinTheme(); if (t) return t; }
+  return buildTheme(type, themeDark());
+}
+// Thunder calls this when the skin changes: open windows that follow it repaint in the new colours.
+FX.skinChanged = () => { for (const w of wins.values()){ w.th = themeFor(w.type); w.dark = w.th.dark; w.styleDom(); w.dirty = true; } };
 function themeDark(){
   let v = null; try { v = localStorage.getItem(THEME_KEY); } catch(e){}
   if (v === 'dark' || v === 'light') return v === 'dark';
@@ -291,7 +331,7 @@ class Win {
     this.vals = info.values; this.on = info.on; this.sel = info.sel; this.preset = info.preset; this.lat = info.latency || 0; this.tname = FX.trackName(t);
     this.controls = []; this.status = ''; this.menu = null; this.help = false; this.active = null; this.bodyActive = false;
     this.depth = 0; this.pend = {}; this.liveQ = null; this.dirty = true; this.lastFrame = -1e9; this.lastPaint = 0; this.sr = 48000;
-    this.dark = themeDark(); this.th = buildTheme(this.type, this.dark); this.narrow = innerWidth < NARROW;
+    this.th = themeFor(this.type); this.dark = this.th.dark; this.narrow = innerWidth < NARROW;
     this.ab = abStore.get(this.abKey()) || {sel:0, s:[null, null]}; abStore.set(this.abKey(), this.ab);
     this.buildDom(); this.buildHeader();
     this.h = this.D.make(this) || {};
@@ -391,13 +431,13 @@ class Win {
     this.copyBtn = this.button('COPY', () => this.copyAB()); this.copyBtn.small = true; this.copyBtn.tip = 'Copy this setting to the other slot';
     this.helpBtn = this.button('?', () => { this.help = !this.help; }, () => this.help); this.helpBtn.small = true; this.helpBtn.tip = 'Mouse and keyboard shortcuts (?)';
     this.darkBtn = this.button('DARK', () => this.setDark(!this.dark), () => this.dark); this.darkBtn.small = true;
-    this.darkBtn.tip = 'Light or dark (remembered on this device; Ctrl/Cmd-click: follow Thunder’s skin again)';
+    this.darkBtn.tip = 'pump’s own light or dark colours (remembered on this device; Ctrl/Cmd-click: follow Thunder’s skin again, the default)';
     this.darkBtn.onExclusive = () => { try { localStorage.removeItem(THEME_KEY); } catch(e){} for (const w of wins.values()) w.setDark(themeDark(), true); this.status = 'Follows Thunder’s skin'; };
     if (this.D.bypass !== false){ this.bypBtn = this.button('BYPASS', () => this.setOn(!this.on), () => !this.on); this.bypBtn.small = true;
       this.bypBtn.tip = 'Bypass: the FX slot’s ACTIVE (latency-matched, so the timing never jumps)'; }
     this.closeBtn = this.button('✕', () => this.close()); this.closeBtn.small = true; this.closeBtn.tip = 'Close the window (Esc; Back on a phone)';
   }
-  setDark(d, noStore){ this.dark = d; this.th = buildTheme(this.type, d); if (!noStore){ try { localStorage.setItem(THEME_KEY, d ? 'dark' : 'light'); } catch(e){} for (const w of wins.values()) if (w !== this) w.setDark(d, true); }
+  setDark(d, noStore){ if (!noStore){ try { localStorage.setItem(THEME_KEY, d ? 'dark' : 'light'); } catch(e){} for (const w of wins.values()) if (w !== this) w.setDark(d, true); } this.th = themeFor(this.type); this.dark = this.th.dark;
     this.styleDom(); this.dirty = true; }
   get headH(){ return this.narrow ? HEAD_N : HEAD; }
   kindLines(){ const k = String(this.fx.long || '').toUpperCase(); if (!k) return []; const i = k.indexOf(' '); return i < 0 ? [k] : [k.slice(0, i), k.slice(i + 1)]; }

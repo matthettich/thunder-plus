@@ -2202,7 +2202,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Esc</dt><dd>drop the selection</dd>
         <dt>Space</dt><dd>play this screen · Shift+Space the song · with Loop on, Space loops the selected rows</dd>
         <dt>/</dt><dd>mute or unmute the track you're on (the whole track, as the mixer's M; M on the Song mutes one block)</dd>
-        <dt>Ctrl/⌘ /</dt><dd>solo the track you're on (again: unsolo it) · Ctrl/⌘+Shift+/ clears every solo</dd>
+        <dt>Ctrl/⌘ / or \</dt><dd>solo the track you're on (again: unsolo it) · Ctrl/⌘+Shift+/ (or \) clears every solo</dd>
         <dt>Ctrl+Space</dt><dd>play just this pattern (the song row, every track), looped: turns LOOP on and plays; again stops (⌘+Space works too if Spotlight isn't on it) · Alt+L turns LOOP off</dd>
         <dt>Alt+L</dt><dd>loop the pattern on/off: the song repeats the row it is on (LOOP in the tab bar)</dd>
         <dt>Shift+Alt+L</dt><dd>loop the selection on/off (LOOP SEL beside it, on a computer)</dd>
@@ -11480,6 +11480,7 @@ function applySkin(id){
   try { drawWave(); renderPads(); } catch(e){}
   rbWheel();
   skinFrames();
+  try { if (window.PumpFX && PumpFX.skinChanged) PumpFX.skinChanged(); } catch(e){}   // …pump windows follow the skin (SKIN THEME in pump/ui/kit.js)
   try { engFitDue = true; engFit(); } catch(e){}   // the engine button's width follows the skin's font
 }
 // …waves and …chains are their own pages (white, Minimal) in frames. The Matrix skin is carried into them
@@ -18920,9 +18921,33 @@ function fxTelSet(node){
   fxTelNode = node || null;
   if (fxTelNode) try { fxTelNode.port.postMessage({tel:true}); } catch(e){}
 }
-// The display, in CSS pixels at (x, y), W × H, on a dark glass of its own (fixed colours, as in …chains).
+/* SKIN THEME (owner, 24 Oct: the viewer's own black glass looked out of place): its colours come from the tracker's skin
+   (--ts-* / --tk-*), as the …pump windows' do: the screen's background, its ink for the lines and the transfer curve, the
+   cursor's colour for the audio, a track colour for gain reduction, the mute colour for 0 dB. Worked out once per skin. */
+let fxPalSkin = null, fxPalV = null, fxPalProbe = null;
+function fxSkinRgb(name){
+  if (!fxPalProbe || !fxPalProbe.isConnected){ fxPalProbe = document.createElement('i'); fxPalProbe.style.cssText = 'position:absolute;width:0;height:0;visibility:hidden;pointer-events:none'; scr.appendChild(fxPalProbe); }
+  fxPalProbe.style.color = ''; fxPalProbe.style.color = 'var(' + name + ')';
+  const c = getComputedStyle(fxPalProbe).color || '', n = (c.match(/-?\d*\.?\d+(e-?\d+)?/g) || []).map(Number);
+  if (n.length < 3) return null;
+  return /^color\(/.test(c) ? [n[0] * 255, n[1] * 255, n[2] * 255] : [n[0], n[1], n[2]];
+}
+function fxDynPal(){
+  const key = skin + '|' + (document.documentElement.getAttribute('data-skin') || '');
+  if (fxPalV && fxPalSkin === key) return fxPalV;
+  const bg = fxSkinRgb('--ts-bg') || [11, 12, 14], ink = fxSkinRgb('--ts-ink') || [255, 255, 255];
+  const near = (a, b) => a && b && Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) < 40;
+  const pick = (...L) => L.find(q => q && !near(q, ink) && !near(q, bg));
+  const cur = fxSkinRgb('--ts-cur-bg'), mono = fxSkinRgb('--tk-mono'), poly = fxSkinRgb('--tk-poly');
+  const audio = pick(cur, mono, poly) || ink, gr = pick(...[poly, mono, cur].filter(q => q && !near(q, audio))) || [243, 154, 67];
+  const hot = fxSkinRgb('--ts-mute') || [229, 72, 77], mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  const rgb = q => 'rgb(' + q.map(Math.round).join(',') + ')';
+  fxPalSkin = key;
+  return fxPalV = {bg:rgb(mix(bg, ink, 0.035)), audio:rgb(audio), gr:rgb(gr), hot:rgb(hot), ink:ink.map(Math.round).join(',')};
+}
+// The display, in CSS pixels at (x, y), W × H, in the skin's colours (fxDynPal).
 function fxDynPaint(g, x, y, W, H, D, c, lv, font){
-  const C = { bg:'#0b0c0e', audio:'#3cc8b9', gr:'#f39a43', hot:'#e5484d' }, F = a => 'rgba(255,255,255,' + a + ')', pad = 5;
+  const C = fxDynPal(), F = a => 'rgba(' + C.ink + ',' + a + ')', pad = 5;
   const Y = (db, top, h) => top + (FXD_HI - Math.max(FXD_LO, Math.min(FXD_HI, db))) / (FXD_HI - FXD_LO) * h;
   g.save(); g.translate(x, y); g.fillStyle = C.bg; g.fillRect(0, 0, W, H); g.lineJoin = 'round'; g.lineCap = 'round';
   let hx = pad;
@@ -21023,7 +21048,7 @@ function globalKeys(e){
   if (e.altKey && !mod && e.code === 'Digit0'){ setView('synth'); return true; }
   if (mod && !e.altKey && !e.shiftKey && (e.code === 'Space' || e.key === ' ')){ if (!e.repeat) playPatLoop(); return true; }   // play this pattern, looped
   // Ctrl/⌘+/ solos the track you're on (Renoise's key), again un-solos it; Ctrl/⌘+Shift+/ clears every solo.
-  if (mod && !e.altKey && (e.code === 'Slash' || e.key === '/' || e.key === '?')){ if (!e.repeat) soloKey(e.shiftKey); return true; }
+  if (mod && !e.altKey && (e.code === 'Slash' || e.key === '/' || e.key === '?' || e.code === 'Backslash' || e.key === '\\' || e.key === '|')){ if (!e.repeat) soloKey(e.shiftKey); return true; }   // Ctrl/⌘+\ too (owner, 24 Oct)
   // / mutes the track you're on (Renoise's key, owner 20 Oct), on every cell: it was the lower piano row's last note, E an
   // octave up, which E on the upper row also plays. Numpad / is still octave down; Shift+/ (?) still opens help.
   if (!mod && !e.altKey && !e.shiftKey && e.key === '/' && e.code !== 'NumpadDivide'){ if (!e.repeat) muteKey(); return true; }
@@ -22442,7 +22467,7 @@ try { const v = localStorage.getItem(VK); if (v !== 'synth') setView(v === 'chai
      is the shared window kit (sets PumpFX.openHook); multiband.js what BAND, WIDE and HEAT share (load it before them);
      one file per plugin (docs/PUMP-FX.md, "The pop-up kit"). A type without a file says its window comes later. Add new
      ones here, in sw.js FILES, with ?v= like these. -->
-<script src="pump/ui/kit.js?v=1"></script>
+<script src="pump/ui/kit.js?v=2"></script>
 <script src="pump/ui/eq.js?v=1"></script>
 <script src="pump/ui/comp.js?v=1"></script>
 <script src="pump/ui/limit.js?v=1"></script>
