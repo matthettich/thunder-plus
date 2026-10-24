@@ -22367,14 +22367,21 @@ try { const v = localStorage.getItem(VK); if (v !== 'synth') setView(v === 'chai
 })();
 </script>
 
-<!-- …PUMP WINDOWS (stage 2, 23 Oct 2026): each pump effect's own window, opened by the FX screen's › OPEN. kit.js is the
-     shared window kit (sets PumpFX.openHook); one file per plugin (docs/PUMP-FX.md, "The pop-up kit"). A type without a
-     file says its window comes later. Add new ones here, in sw.js FILES, with ?v= like these. -->
+<!-- …PUMP WINDOWS (stages 2 and 3, 23 Oct 2026): each pump effect's own window, opened by the FX screen's › OPEN. kit.js
+     is the shared window kit (sets PumpFX.openHook); multiband.js what BAND, WIDE and HEAT share (load it before them);
+     one file per plugin (docs/PUMP-FX.md, "The pop-up kit"). A type without a file says its window comes later. Add new
+     ones here, in sw.js FILES, with ?v= like these. -->
 <script src="pump/ui/kit.js?v=1"></script>
 <script src="pump/ui/eq.js?v=1"></script>
 <script src="pump/ui/comp.js?v=1"></script>
 <script src="pump/ui/limit.js?v=1"></script>
 <script src="pump/ui/meter.js?v=1"></script>
+<script src="pump/ui/multiband.js?v=1"></script>
+<script src="pump/ui/calm.js?v=1"></script>
+<script src="pump/ui/tone.js?v=1"></script>
+<script src="pump/ui/band.js?v=1"></script>
+<script src="pump/ui/wide.js?v=1"></script>
+<script src="pump/ui/heat.js?v=1"></script>
 <script>
 if ('serviceWorker' in navigator && location.protocol === 'https:'){
   try { if (window.self === window.top) navigator.serviceWorker.register('sw.js').catch(() => {}); } catch(e){}

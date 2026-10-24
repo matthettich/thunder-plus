@@ -75,6 +75,53 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 23 Oct (7): …pump pop-up windows for CALM, TONE, BAND, WIDE and HEAT (stage 3 of 3)
+
+Cache `thunderplus-v222`, `pump/ui/multiband.js?v=1`, `calm.js?v=1`, `tone.js?v=1`, `band.js?v=1`, `wide.js?v=1`, `heat.js?v=1`
+(new; index.html's `…PUMP WINDOWS` block, multiband.js before band / wide / heat; `sw.js` FILES). All nine pump effects
+now open their own window from the FX screen's **› OPEN** (and the bottom panel's OPEN). Same approach as stage 2: each
+window is its plugin's `UI<Name>.cpp` on the kit's canvas, in the plugin's coordinates. **Read `docs/PUMP-FX.md`**,
+"Multiband windows" and "What stage 3's windows do".
+- **`pump/ui/multiband.js`** ports pump's `common/ui/MultibandUI.hpp` as `PumpUI.Multiband(ui, cfg)`: band regions between
+  draggable crossover handles (drag, Shift fine, wheel 1/12 octave, double-click to type with Tab to the next), the S / M / B
+  strip (click, hold = momentary, Ctrl/Cmd-click = only this band), Alt + hold a band = hear only it (`PumpFX.hold` kind 0,
+  slide across to switch, released on up / Alt up / blur / close), drag / wheel / double-click in a band = its main amount,
+  Ctrl/Cmd + drag = its second, the band menu (solo, mute, bypass, copy / paste, reset), keys 1–4, ←/→, S / M / B, Esc (clears
+  every solo; with none, closes). Selecting a band moves the FX screen's BAND (`setSel`) and back.
+- **What each window has:** CALM: spectra, the live reduction from the top (two detectors in L/R, M/S), the sensitivity curve
+  and its six nodes, focus edges, Alt-listen and Alt-hold node solo (kind 1 with region), DELTA, keys. TONE: spectra, the
+  balance curve, auto level line, target curve, Alt-listen, DELTA, A / D / T. BAND: thresholds on the level scale with
+  detector bars, the GAIN lane (drag = makeup) with the combined response, band panel with transfer curve. WIDE: mid / side
+  spectra, width bars with stereoize hatch, mono-bass line (draggable), phosphor vectorscope, correlation overall (lowest
+  hold) and per band, the band image. HEAT: band glow, drive bars, curve picker, into-curve / heat / auto gain readouts,
+  transfer curve, oversampling, latency. Narrow layouts (480 wide) stack the same parts for a folded phone.
+- **No interface changes** to `PumpFX`, the worklet or pump.wasm: every feed the windows need was already in the telemetry.
+  The kit is unchanged; `PumpUI` gains `Multiband`, `mbEffective`, `mbBandMag`, `MB_STRIP`. pump repo untouched.
+- **WIDE's vectorscope** is the plugin's phosphor image, but sized 1× or 2× the scope (nearest to the screen's pixels: window
+  scale × device pixel ratio) instead of always 2×, with the splat and margins scaled to match, and decay + repaint in one
+  pass over a 32-bit view: paint 82 → 41 ms/s on a 1× desktop (a 2× phone draws as many pixels as the plugin).
+- **Left out / different** (as stage 2): display settings the plugins keep in their UI state are kept on this device (BAND's
+  GAIN range, CALM's GR scale and listen width, TONE's curve scale, target on/off, listen width; localStorage
+  `thunderplus-pump-band-lane-v1`, `…-calm-gr-v1`, `…-calm-lq-v1`, `…-tone-range-v1`, `…-tone-target-v1`, `…-tone-lq-v1`); copied
+  band settings are per page; CALM's and the multiband windows' Esc does the plugin's thing first, then closes.
+- Checked headless (Playwright; 1600 × 1000 mouse, 884 × 1100 and 412 × 915 touch at DPR 2), demo song playing, bus = tracks
+  1 + 2 → …chains Chain Out 4: each of the five opened from slot 1 of the bus and of the master; dragging a dial moves `f.pump`,
+  the FX box and the sound (BAND / WIDE / HEAT output −24 dB: RMS −22 → −46 dB, TONE −12 dB: −17 → −29); an FX box moved → the
+  window follows; a crossover dragged (120 → 177 Hz, box `50 177 Hz`) and typed (250); Alt-hold a band = hold kind 0 with the
+  band, low band −18 dB vs top band −39 … −44 dB against −15 dB full, released → −15 dB, nothing saved; touch: the SOLO / DELTA
+  keys held = on while held, off after; CALM node drag, Alt-listen (−18 → −48 dB around 1 kHz) and node solo (regions below /
+  band / above for nodes 1 / 3 / 6); TONE Alt-listen (−17 → −55 dB); strip M, Ctrl-click S exclusive and again clears, keys
+  2 + B; the FX screen's BAND row moves the window's band; one drag = one undo step (BAND threshold 0 → −19.3, Ctrl+Z → 0); a
+  preset from the window's menu applies exactly, Ctrl+Z / UNDO removes it; Esc / ✕ close, no telemetry frames after, reopen
+  shows the slot; five windows at once (desktop), one at a time (phone); save → reload identical; WIDE correlation with
+  stereoize 1 → 0.2 per band, scope spreads. CPU (headless software rendering, paint / frame handling ms per s at ~20 fps):
+  CALM 33 / 21, TONE 22 / 16, BAND 29 / 14, WIDE 41 / 17, HEAT 28 / 18. Stage 1 checks (t1–t7) and stage 2 checks (p2–p7) give
+  the same results as before. No page errors. **Not tried on the Fold or by ear.**
+- Screenshots (session scratchpad `pop3/`): `cmp_calm.png`, `cmp_tone.png`, `cmp_band.png`, `cmp_wide.png`, `cmp_heat.png`
+  (plugin above, pop-up below, same preset and theme), `desk_*_bus.png`, `desk_*_master.png`, `fold_*`, `unfold_*`,
+  `desk_five_windows.png`, `desk_wide_stereoize.png`.
+- **Next:** delay compensation for buses (none in Thunder yet), a try on the Fold, and by ear.
+
 ## 23 Oct (6): …pump pop-up windows for EQ, COMP, LIMIT and METER (stage 2 of 3)
 
 Cache `thunderplus-v221`, `pump/ui/kit.js?v=1`, `eq.js?v=1`, `comp.js?v=1`, `limit.js?v=1`, `meter.js?v=1` (new; index.html's
