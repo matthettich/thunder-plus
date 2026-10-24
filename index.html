@@ -2207,7 +2207,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Ctrl/⌘ D</dt><dd>duplicate, as in Renoise: on the Song (or Arrange) the pattern you're on (the song row, or the selected rows) goes in again just below as unique copies; on Phrase, Mixer and FX the track goes into the next empty track of its kind (volume, pan, effects) · Ctrl/⌘+Alt+D the track with its notes too</dd>
         <dt>Esc</dt><dd>drop the selection</dd>
         <dt>Space</dt><dd>play this screen · Shift+Space the song · with Loop on, Space loops the selected rows</dd>
-        <dt>/</dt><dd>mute or unmute the track you're on (the whole track, as the mixer's M; M on the Song mutes one block)</dd>
+        <dt>/ or \</dt><dd>mute or unmute the track you're on (the whole track, as the mixer's M; M on the Song mutes one block)</dd>
         <dt>Ctrl/⌘ / or \</dt><dd>solo the track you're on (again: unsolo it) · Ctrl/⌘+Shift+/ (or \) clears every solo</dd>
         <dt>Ctrl+Space</dt><dd>play just this pattern (the song row, every track), looped: turns LOOP on and plays; again stops (⌘+Space works too if Spotlight isn't on it) · Alt+L turns LOOP off</dd>
         <dt>Alt+L</dt><dd>loop the pattern on/off: the song repeats the row it is on (LOOP in the tab bar)</dd>
@@ -17481,7 +17481,7 @@ function muteKey(){
   if (mst) return toast('The master can’t be muted.');
   const t = dkTrack(), m = S.mix[t]; if (!m) return;
   m.mute = !m.mute; mixChanged(); draw();
-  toast(`${m.mute ? 'Muted' : 'Unmuted'} track ${d2(t + 1)} · / again ${m.mute ? 'unmutes' : 'mutes'} it`);
+  toast(`${m.mute ? 'Muted' : 'Unmuted'} track ${d2(t + 1)} · / or \\ again ${m.mute ? 'unmutes' : 'mutes'} it`);
 }
 function soloKey(all){
   if (all){ if (!S.mix.some(m => m.solo)) return toast('Nothing is soloed.'); S.mix.forEach(m => m.solo = false); mixChanged(); draw(); return toast('Solo cleared: every track plays.'); }
@@ -21086,6 +21086,8 @@ function globalKeys(e){
   // / mutes the track you're on (Renoise's key, owner 20 Oct), on every cell: it was the lower piano row's last note, E an
   // octave up, which E on the upper row also plays. Numpad / is still octave down; Shift+/ (?) still opens help.
   if (!mod && !e.altKey && !e.shiftKey && e.key === '/' && e.code !== 'NumpadDivide'){ if (!e.repeat) muteKey(); return true; }
+  // \ mutes it too (owner, 24 Oct: one key, on Windows and Mac keyboards alike; Ctrl/⌘+\ solos, above)
+  if (!mod && !e.altKey && !e.shiftKey && (e.code === 'Backslash' || e.key === '\\')){ if (!e.repeat) muteKey(); return true; }
   // Alt+L loops the pattern, Shift+Alt+L the selection; Alt+, / Alt+. transpose the selection down / up a semitone. They
   // work on every cell (plain L , . are piano keys on a note cell). e.code, since Alt changes e.key on a Mac.
   if (e.altKey && !mod && e.shiftKey && e.code === 'KeyL'){ if (!e.repeat) toggleLoop(); return true; }
