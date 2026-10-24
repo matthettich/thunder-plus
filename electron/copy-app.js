@@ -2,7 +2,7 @@
 // It then checks that every file the page loads at run time made it in, and stops the build if one didn't.
 const fs = require('fs'), path = require('path');
 const src = path.join(__dirname, '..'), dst = path.join(__dirname, 'app');
-const PARTS = ['index.html', 'manifest.webmanifest', 'master-worklet.js', 'icons', 'fonts', 'waves', 'chains', 'sounds', 'THIRD_PARTY_NOTICES.md'];
+const PARTS = ['index.html', 'manifest.webmanifest', 'master-worklet.js', 'icons', 'fonts', 'waves', 'chains', 'pump', 'sounds', 'THIRD_PARTY_NOTICES.md'];
 fs.rmSync(dst, {recursive:true, force:true});
 fs.mkdirSync(dst, {recursive:true});
 for (const f of PARTS){
@@ -16,7 +16,7 @@ if (fs.existsSync(path.join(src, 'lxr'))) fs.cpSync(path.join(src, 'lxr'), path.
 // Files index.html fetches by name (worklets, fonts, icons): each must exist in ./app.
 const html = fs.readFileSync(path.join(dst, 'index.html'), 'utf8');
 const refs = new Set();
-for (const m of html.matchAll(/["'`(]((?:waves|chains|fonts|icons)\/[\w.\-\/]+|master-worklet\.js)(?:\?[^"'`)]*)?["'`)]/g)) refs.add(m[1]);
+for (const m of html.matchAll(/["'`(]((?:waves|chains|pump|fonts|icons)\/[\w.\-\/]+|master-worklet\.js)(?:\?[^"'`)]*)?["'`)]/g)) refs.add(m[1]);
 const missing = [...refs].filter(r => !fs.existsSync(path.join(dst, r)));
 if (missing.length){ console.error('index.html loads files that are not in the app:\n  ' + missing.join('\n  ')); process.exit(1); }
 console.log('Copied the app into electron/app (' + refs.size + ' referenced files checked)');

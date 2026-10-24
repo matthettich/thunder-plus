@@ -2349,6 +2349,9 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=1"></script>
+<!-- …PUMP (23 Oct 2026): the pump mastering plugins' parameter tables and presets (generated in matthettich/pump by
+     wasm/build.sh); pump/pump.wasm is their DSP, fetched by the wasm loader. -->
+<script src="pump/pump-meta.js?v=1"></script>
 <script>
 /* ===ENGINE START=== */
 const BASE = 65.40639; // C2
@@ -12367,7 +12370,7 @@ $('midiKeysSel').addEventListener('change', e => { releaseKeys(); midi.keys = +e
 moPorts(); miPorts();
 
 /* ---------- Plaits loader ---------- */
-const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm';
+const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=1';
 // Each wasm is decoded and compiled once and shared: the synth here, the …waves engine and the render Worker.
 let plFailed = false;
 (async () => {
@@ -12379,6 +12382,9 @@ let plFailed = false;
   let plMod = null, txMod = null;
   // LXR ENGINES: lxr/lxr.wasm, compiled here (and handed to the render Worker) when the engine file loaded
   const lxP = typeof LxrCore !== 'undefined' ? LxrCore.load('lxr/lxr.wasm?v=1').catch(e => { console.warn('LXR engines', e); return null; }) : Promise.resolve(null);
+  // …PUMP: the pump mastering effects (pump/pump.wasm), fetched alongside; effect nodes that asked for it get it now
+  bytes(PUMP_WASM).then(b => { pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage({pumpBytes:b}); } catch(e){} pumpWait.clear();
+    return WebAssembly.instantiate(b, imp).then(r => { pumpMain = r.instance.exports; if (pumpMain._initialize) pumpMain._initialize(); }); }).catch(e => { if (PM) console.warn('pump effects', e); });
   const [plB, txB] = await Promise.all([bytes(WASM_DSP).catch(() => null), bytes(WASM_TFX).catch(() => null)]);
   tfxBytes = txB || false; tfxLoadDone();
   try {
@@ -12995,6 +13001,249 @@ for (const k in MODFX){ const M = MODFX[k]; if (!M.track) continue;
   }
   TFX[k] = {n:M.short, long:M.long, mod:k, tail:M.tail, ps, map:f => { const o = {}; for (const p in conv) o[p] = conv[p][1](f[conv[p][0]]); return o; }};
 }
+/* ---------- …PUMP: the nine pump mastering plugins as track effects (bus tracks and the master; 23 Oct (5)) ----------
+   pump/pump.wasm is the plugins' own DSP (matthettich/pump, wasm/pump_wasm.cpp: one C interface over the nine engines);
+   pump/pump-meta.js (PUMP_META) is their parameter tables and factory presets, generated from the plugins' Params.hpp.
+   A slot keeps EVERY parameter, by the plugin's symbol, in f.pump (the plugin's own units: dB, Hz, ms, %…), so a song
+   holds what the plugin would save; the FX screen shows a few of them as the usual hex-byte boxes (PUMP_BOX), each box's
+   byte mirroring f.pump (pumpSync). The interface for the pop-up windows (later stages) is window.PumpFX below and
+   docs/PUMP-FX.md. */
+const PM = globalThis.PUMP_META || null;
+const PUMP_TYPES = PM ? PM.types.slice() : [];
+const PUMP_KEY = t => 'p' + t;   // the TFX key: peq, pcomp, plimit, pcalm, ptone, pband, pwide, pheat, pmeter
+const PUMP_SHORT = {eq:'pEQ', comp:'pCOMP', limit:'pLIM', calm:'pCALM', tone:'pTONE', band:'pBAND', wide:'pWIDE', heat:'pHEAT', meter:'pMETR'};
+// The boxes on the FX screen, in order. 'b#_x' = the selected band's x (BAND picks it: f.sel, a Thunder field, not a
+// plugin parameter); '@sck' = Thunder's sidechain source for COMP's External sidechain (f.sck, as the MODFX slots have it).
+const PUMP_BOX = {
+  eq:{sel:24, rows:['out_gain', 'auto_gain', 'phase', '#', 'b#_used', 'b#_shape', 'b#_freq', 'b#_gain', 'b#_q', 'b#_slope', 'b#_place', 'b#_dyn', 'b#_dyn_range', 'b#_dyn_thresh']},
+  comp:{rows:['style', 'threshold', 'ratio', 'knee', 'attack', 'release', 'auto_release', 'range', 'out_gain', 'auto_makeup', 'mix', 'sc_source', '@sck', 'sc_hpf']},
+  limit:{rows:['gain', 'ceiling', 'style', 'lookahead', 'attack', 'release', 'true_peak', 'oversampling']},
+  calm:{rows:['depth', 'sharpness', 'selectivity', 'attack', 'release', 'mode', 'focus_low', 'focus_high', 'mix', 'quality']},
+  tone:{rows:['recover', 'tame', 'bias', 'brighten', 'body', 'speed', 'auto_level', 'out_gain', 'mix', 'quality']},
+  band:{sel:4, rows:['bands', 'xover1', 'xover2', 'xover3', 'xover_mode', 'out_gain', 'mix', 'auto_makeup', '#', 'b#_mode', 'b#_thresh', 'b#_ratio', 'b#_attack', 'b#_release', 'b#_range', 'b#_makeup']},
+  wide:{sel:4, rows:['out_gain', 'balance', 'mono_bass', 'mono_freq', 'bands', 'xover1', 'xover2', 'xover3', '#', 'b#_width', 'b#_stereoize']},
+  heat:{sel:4, rows:['out_gain', 'mix', 'oversampling', 'auto_gain', 'bands', 'xover1', 'xover2', 'xover3', '#', 'b#_mode', 'b#_drive', 'b#_mix', 'b#_level']},
+  meter:{rows:['target', 'custom_lufs', 'custom_tp']}};
+// A new slot starts at the plugin's defaults except these (CPU on the phone: oversampling off where the plugin allows it).
+// Presets that don't set them keep the slot's value (PUMP_CPU), unless applied with {keepCpu:false}.
+const PUMP_START = {limit:{oversampling:0}, heat:{oversampling:0}};
+const PUMP_CPU = {limit:['oversampling'], heat:['oversampling']};
+// Parameters a preset (or A/B) never touches, as in the plugins: output meters, bypass, listening state, hidden placeholders.
+const PF_OUT = 8, PF_BYP = 16, PF_HID = 32, PF_NOUNDO = 64, PF_INT = 2, PF_BOOL = 4, PF_AUTO = 1;
+const pumpSkip = p => !!(p.flags & (PF_OUT | PF_BYP | PF_NOUNDO | PF_HID));
+const pumpFx = t => PM && PM.fx[t];
+const pumpIdx = {};   // type → {symbol: index}
+for (const t of PUMP_TYPES){ const m = {}; PM.fx[t].params.forEach((p, i) => m[p.s] = i); pumpIdx[t] = m; }
+// ParamSpec (common/PumpParams.hpp) in JS: 0..1 <-> value, clamp, and the plugins' display text.
+function pumpNorm(p, v){
+  if (!(p.max > p.min)) return 0; v = Math.min(p.max, Math.max(p.min, +v));
+  return p.scale === 'log' ? Math.log(v / p.min) / Math.log(p.max / p.min) : p.scale === 'pow' ? Math.pow((v - p.min) / (p.max - p.min), 1 / (p.skew > 0 ? p.skew : 1)) : (v - p.min) / (p.max - p.min);
+}
+function pumpFrom(p, n){
+  n = Math.min(1, Math.max(0, +n || 0));
+  let v = p.scale === 'log' ? p.min * Math.pow(p.max / p.min, n) : p.scale === 'pow' ? p.min + (p.max - p.min) * Math.pow(n, p.skew > 0 ? p.skew : 1) : p.min + (p.max - p.min) * n;
+  if (p.flags & (PF_INT | PF_BOOL)) v = Math.round(v);
+  return v;
+}
+function pumpClamp(p, v){
+  v = +v; if (!Number.isFinite(v)) v = Number.isNaN(v) ? p.def : v > 0 ? p.max : p.min;
+  v = Math.min(p.max, Math.max(p.min, v)); if (p.flags & (PF_INT | PF_BOOL)) v = Math.round(v);
+  return v;
+}
+function pumpFmt(p, v){
+  const f = (x, d) => x.toFixed(d), a = Math.abs(v);
+  if (p.ch){ const i = Math.round(v - p.min); return p.ch[i] != null ? p.ch[i] : '?'; }
+  if (p.flags & PF_BOOL) return v >= 0.5 ? 'ON' : 'OFF';
+  switch (p.unit){
+    case 'dB': if (v <= -119.5 && p.min <= -119) return '-INF'; if (a < 0.05) return '0.0 dB'; return (v > 0 ? '+' : '') + f(v, a < 9.95 ? 1 : 0) + ' dB';
+    case 'LU': return f(v, 1) + ' LU';
+    case 'Hz': return v >= 10000 ? f(v / 1000, 1) + ' kHz' : v >= 1000 ? f(v / 1000, 2) + ' kHz' : v >= 100 ? f(v, 0) + ' Hz' : f(v, 1) + ' Hz';
+    case 'ms': return v >= 1000 ? f(v / 1000, 2) + ' s' : v >= 100 ? f(v, 0) + ' ms' : v >= 10 ? f(v, 1) + ' ms' : f(v, 2) + ' ms';
+    case '%': return f(v, 0) + '%';
+    case 'ratio': if (v >= p.max - 1e-3 && p.max >= 20) return 'INF:1'; return f(v, v < 10 ? 1 : 0) + ':1';
+    case 'oct': return f(v, 2) + ' oct';
+    case 'x': return f(v, 0) + 'x';
+    case 's': return f(v, 1) + ' s';
+    default: return p.flags & PF_INT ? f(v, 0) : a >= 100 ? f(v, 0) : f(v, 2);
+  }
+}
+// A box's byte for a value and back: a choice or on/off is its index, a small whole-number range the number itself,
+// anything else 00–FF along the plugin's own knob curve (pumpNorm).
+const pumpBoxKind = p => p.ch ? 'ch' : (p.flags & PF_BOOL) ? 'bool' : (p.flags & PF_INT) && p.max - p.min <= 255 ? 'int' : 'cont';
+function pumpByte(p, v){ const k = pumpBoxKind(p); return k === 'ch' ? Math.round(v - p.min) : k === 'bool' ? (v >= 0.5 ? 1 : 0) : k === 'int' ? Math.round(v) : Math.round(pumpNorm(p, v) * 255); }
+function pumpUnbyte(p, b){ const k = pumpBoxKind(p); return k === 'ch' ? p.min + b : k === 'bool' ? (b ? 1 : 0) : k === 'int' ? b : pumpFrom(p, b / 255); }
+const pumpSymOf = (q, f) => q.tpl.replace('#', String(clamp((f.sel | 0), 0, q.selN - 1) + 1));
+function pumpFresh(type){
+  const fx = pumpFx(type), f = {type:PUMP_KEY(type), on:true, pump:{}};
+  for (const p of fx.params) f.pump[p.s] = p.def;
+  Object.assign(f.pump, PUMP_START[type] || {});
+  if (PUMP_BOX[type].sel) f.sel = 0;
+  if (PUMP_BOX[type].rows.includes('@sck')) f.sck = 0;
+  pumpBytes(f); return f;
+}
+// Every box's byte from f.pump (after a preset, a pop-up edit, a load or undo).
+function pumpBytes(f){
+  const P = TFX[f.type]; if (!P || !P.pump) return;
+  for (const q of P.ps) if (q.tpl){ const p = pumpFx(P.pump).params[pumpIdx[P.pump][pumpSymOf(q, f)]]; if (p) f[q.k] = pumpByte(p, f.pump[p.s]); }
+  f._sel = f.sel | 0;
+}
+// After a box was moved: the boxes whose byte no longer matches f.pump write their value into it (a changed BAND
+// first re-reads the band rows instead). Called by fxChanged and before the slot is sent to the worklet.
+function pumpSync(f){
+  const P = f && TFX[f.type]; if (!P || !P.pump) return;
+  if (P.sel && (f._sel | 0) !== (f.sel | 0)){ pumpBytes(f); return; }
+  const fx = pumpFx(P.pump);
+  for (const q of P.ps) if (q.tpl){ const p = fx.params[pumpIdx[P.pump][pumpSymOf(q, f)]]; if (!p) continue;
+    const b = clamp(int(f[q.k], q.d), q.min, q.max);
+    if (b !== pumpByte(p, f.pump[p.s])) f.pump[p.s] = pumpClamp(p, pumpUnbyte(p, b)); f[q.k] = b; }
+}
+function pumpNorm1(o){   // a saved slot → a slot (every symbol, clamped; new parameters at their defaults)
+  const type = String(o.type).slice(1), fx = pumpFx(type); if (!fx) return null;
+  const f = pumpFresh(type), src = o.pump && typeof o.pump === 'object' ? o.pump : {};
+  for (const p of fx.params) if (src[p.s] !== undefined) f.pump[p.s] = pumpClamp(p, src[p.s]);
+  f.on = o.on !== false;
+  if (typeof o.pname === 'string' && o.pname) f.pname = o.pname.slice(0, 80);   // the last preset applied (shown on PRESET)
+  if (PUMP_BOX[type].sel) f.sel = clamp(int(o.sel, 0), 0, PUMP_BOX[type].sel - 1);
+  if ('sck' in f) f.sck = clamp(int(o.sck, 0), 0, 8 + NT);
+  pumpBytes(f); return f;
+}
+const PUMP_SCK = ['NONE', 'SEND 1', 'SEND 2', 'SEND 3', 'SEND 4', 'SEND 5', 'SEND 6', 'SEND 7', 'SEND 8', ...Array.from({length:128}, (_, i) => 'TRACK ' + d2(i + 1))];
+for (const type of PUMP_TYPES){
+  const fx = pumpFx(type), B = PUMP_BOX[type], ps = [];
+  for (const r of B.rows){
+    if (r === '#'){ ps.push({k:'sel', l:'BAND', d:0, min:0, max:B.sel - 1, band:true, fmt:(v, f) => {
+      const s = 'BAND ' + d2(v + 1); if (type !== 'eq' || !f || !f.pump) return s;
+      const u = f.pump['b' + (v + 1) + '_used'] >= 0.5, P = fx.params, I = pumpIdx.eq, b = 'b' + (v + 1) + '_';
+      return s + (u ? ' · ' + pumpFmt(P[I[b + 'shape']], f.pump[b + 'shape']) + ' ' + pumpFmt(P[I[b + 'freq']], f.pump[b + 'freq']) : ' · unused'); }});
+      continue; }
+    if (r === '@sck'){ ps.push({k:'sck', l:'SC FROM', d:0, min:0, max:8 + NT, names:PUMP_SCK.slice(0, 9 + NT), thunder:true}); continue; }
+    const sym0 = r.replace('#', '1'), p = fx.params[pumpIdx[type][sym0]]; if (!p) continue;
+    let l = String(p.sn).replace(/^Band \d+ /, '').toUpperCase();
+    if (r.includes('#') && B.rows.some(o => !o.includes('#') && o !== '#' && fx.params[pumpIdx[type][o]] && String(fx.params[pumpIdx[type][o]].sn).toUpperCase() === l)) l = 'BAND ' + l;
+    const kind = pumpBoxKind(p), q = {k:'p_' + r.replace('#', 'n'), l, tpl:r, selN:B.sel || 1, d:pumpByte(p, (PUMP_START[type] || {})[p.s] ?? p.def)};
+    if (kind === 'ch') Object.assign(q, {min:0, max:p.ch.length - 1, names:p.ch.map(s => s.toUpperCase())});
+    else if (kind === 'bool') Object.assign(q, {min:0, max:1, names:['OFF', 'ON']});
+    else Object.assign(q, {min:kind === 'int' ? p.min : 0, max:kind === 'int' ? p.max : 255});
+    // the text: the exact value while the byte still matches it (a pop-up or preset can set values between the steps)
+    q.fmt = (v, f) => { const pp = f && f.pump ? fx.params[pumpIdx[type][pumpSymOf(q, f)]] : p, cur = f && f.pump ? f.pump[pp.s] : undefined;
+      return pumpFmt(pp, cur !== undefined && pumpByte(pp, cur) === v ? cur : pumpUnbyte(pp, v)); };
+    ps.push(q);
+  }
+  TFX[PUMP_KEY(type)] = {n:PUMP_SHORT[type], long:'pump ' + fx.name + ': ' + fx.long.toLowerCase(), about:fx.about, pump:type, pt:PUMP_TYPES.indexOf(type), sel:B.sel || 0, sck:B.rows.includes('@sck'), ps,
+    // the plugin's own values by symbol (the dynamics display reads its curve from these)
+    map:f => f.pump || {}};
+  FX_GROUP[PUMP_KEY(type)] = 'Mastering (…pump)';
+  FX_CREDIT[PUMP_KEY(type)] = 'pump ' + fx.name + ' (…pump mastering plugins, by wake)';
+}
+// Only bus tracks (a track …chains sums others into) and the master get the pump effects in their pickers; a slot that has
+// one keeps it if the track stops being a bus.
+const isPumpT = k => !!(TFX[k] && TFX[k].pump);
+const pumpAllowed = t => t >= NT || isBusT(t);
+/* …PUMP: window.PumpFX, the interface the pop-up windows (later stages) use. Documented in docs/PUMP-FX.md; keep the two
+   in step. A slot is addressed by (track, slot): track 0..NT-1, or NT (PumpFX.MASTER) for the master; slot 0..3. */
+const PumpFX = window.PumpFX = (() => {
+  const subs = new Set(), watchers = new Set(), lats = new Map();
+  let settleT = 0, pollT = 0;
+  const arr = t => t >= NT ? S.mfx : (S.tfx && S.tfx[t]);
+  const slotOf = (t, k) => { const A = arr(t), f = A && A[k]; return f && isPumpT(f.type) ? f : null; };
+  const typeOf = f => TFX[f.type].pump;
+  const spec = (type, sym) => { const fx = pumpFx(type), i = fx ? pumpIdx[type][sym] : undefined; return i === undefined ? null : fx.params[i]; };
+  const keyOf = (k, f) => k + ':' + f.type;
+  const nodeOf = t => fxDynNodeOf(t >= NT ? -1 : t);
+  const notify = (t, src) => { for (const cb of watchers) try { cb(t, src); } catch(e){ console.warn('PumpFX watcher', e); } };
+  function apply(t, f, live){
+    pumpBytes(f);
+    if (live){ rtFx(t); clearTimeout(settleT); settleT = setTimeout(() => { settleT = 0; saveS(); }, 350); }
+    else { clearTimeout(settleT); settleT = 0; saveS(); rtFx(t); }
+  }
+  function poll(){   // keeps each subscription's node (rebuilt routes, a new audio context) asking for telemetry
+    for (const s of subs){ const f = slotOf(s.t, s.k);
+      if (!f || keyOf(s.k, f) !== s.key){ subs.delete(s); try { s.cb({gone:true}); } catch(e){} continue; }
+      const n = nodeOf(s.t);
+      if (n !== s.node){ if (s.node) try { s.node.port.postMessage({ptel:{key:s.key, on:false}}); } catch(e){}
+        s.node = n || null; if (n) try { n.port.postMessage({ptel:{key:s.key, on:true, back:s.back}}); } catch(e){} } }
+    if (subs.size && !pollT) pollT = setInterval(poll, 500);
+    if (!subs.size && pollT){ clearInterval(pollT); pollT = 0; }
+  }
+  return {
+    MASTER:NT, meta:PM, types:PUMP_TYPES,
+    // the TFX key (FX slot f.type) of a pump type, and back
+    key:PUMP_KEY, typeOfKey:k => isPumpT(k) ? TFX[k].pump : null,
+    allowed:pumpAllowed,
+    list(){ const out = []; for (let t = 0; t <= NT; t++) (arr(t) || []).forEach((f, k) => { if (f && isPumpT(f.type)) out.push({track:t, slot:k, type:typeOf(f), on:!!f.on, key:keyOf(k, f)}); }); return out; },
+    get(t, k){ const f = slotOf(t, k); if (!f) return null;
+      return {track:t, slot:k, type:typeOf(f), key:keyOf(k, f), on:!!f.on, values:Object.assign({}, f.pump), sel:f.sel | 0, sck:+f.sck || 0, preset:f.pname || '', latency:this.latency(t, k)}; },
+    params:type => pumpFx(type) ? pumpFx(type).params : [],
+    set(t, k, values, opts = {}){
+      const f = slotOf(t, k); if (!f || !values) return null; const type = typeOf(f), done = {};
+      for (const sym in values){
+        if (sym === 'bypass'){ f.on = !(+values[sym] >= 0.5); done.bypass = f.on ? 0 : 1; continue; }   // the plugin's bypass is the slot's ACTIVE
+        const p = spec(type, sym); if (!p || (p.flags & PF_OUT)) continue;
+        f.pump[sym] = done[sym] = pumpClamp(p, values[sym]); }
+      if (!opts.keepPreset) delete f.pname;
+      apply(t, f, !!opts.live); notify(t, opts.src); return done;
+    },
+    setOn(t, k, on){ const f = slotOf(t, k); if (!f) return; f.on = !!on; fxChanged(t); },
+    setSel(t, k, band){ const f = slotOf(t, k); if (!f || !TFX[f.type].sel) return; f.sel = clamp(band | 0, 0, TFX[f.type].sel - 1); pumpBytes(f); fxChanged(t); },
+    presets:type => pumpFx(type) ? pumpFx(type).presets.map((p, i) => ({index:i, name:p.n, section:p.sec})) : [],
+    // As the plugin's preset menu: every parameter a preset may touch goes to the preset's value or its default.
+    // keepCpu (default true): the CPU settings of PUMP_CPU (oversampling) stay as they are unless the preset sets them.
+    applyPreset(t, k, which, opts = {}){
+      const f = slotOf(t, k); if (!f) return false; const type = typeOf(f), fx = pumpFx(type);
+      const i = typeof which === 'number' ? which : fx.presets.findIndex(p => p.n === which), pr = fx.presets[i]; if (!pr) return false;
+      const keep = opts.keepCpu === false ? [] : (PUMP_CPU[type] || []);
+      for (const p of fx.params){ if (pumpSkip(p)) continue;
+        if (pr.v[p.s] !== undefined) f.pump[p.s] = pumpClamp(p, pr.v[p.s]); else if (!keep.includes(p.s)) f.pump[p.s] = p.def; }
+      f.pname = pr.n; apply(t, f, false); notify(t, opts.src); return true;
+    },
+    hold(t, k, kind, a = 0, b = 0, c = 0, d = 0){ const f = slotOf(t, k), n = nodeOf(t); if (f && n) try { n.port.postMessage({phold:{key:keyOf(k, f), kind, a, b, c, d}}); } catch(e){} },
+    // Telemetry ~31 times a second while subscribed (also while the song is stopped, as long as sound reaches the
+    // effect); cb({gone:true}) once when the slot is emptied or gets another effect. Returns the unsubscribe function.
+    subscribe(t, k, cb, opts = {}){
+      const f = slotOf(t, k); if (!f || typeof cb !== 'function') return () => {};
+      const s = {t, k, cb, key:keyOf(k, f), back:clamp(opts.back == null ? 8192 : opts.back | 0, 0, 32768), node:null};
+      subs.add(s); poll();
+      return () => { if (!subs.has(s)) return; subs.delete(s); if (s.node) try { s.node.port.postMessage({ptel:{key:s.key, on:false}}); } catch(e){} poll(); };
+    },
+    onChange(cb){ watchers.add(cb); return () => watchers.delete(cb); },
+    latency(t, k){ const f = slotOf(t, k); if (!f) return null; const v = lats.get((t >= NT ? 'M' : t) + '/' + keyOf(k, f));
+      return v != null ? v : pumpMain ? pumpLatencyOf(f, ctx ? ctx.sampleRate : 48000) : null; },   // reported by the worklet, else worked out here
+    format(type, sym, v){ const p = spec(type, sym); return p ? pumpFmt(p, v) : String(v); },
+    toNorm(type, sym, v){ const p = spec(type, sym); return p ? pumpNorm(p, v) : 0; },
+    fromNorm(type, sym, x){ const p = spec(type, sym); return p ? pumpFrom(p, x) : 0; },
+    clamp(type, sym, v){ const p = spec(type, sym); return p ? pumpClamp(p, v) : v; },
+    // The FX screen's OPEN: the pop-up windows set openHook(track, slot, info); until then a note says they're coming.
+    openHook:null,
+    open(t, k){ const f = slotOf(t, k); if (!f) return;
+      const info = this.get(t, k);
+      if (typeof this.openHook === 'function') return this.openHook(t, k, info);
+      toast(`pump ${pumpFx(info.type).name}: its full window comes in a later update. The boxes here change its main settings.`); },
+    // for the app
+    _feed(n, frames){ for (const fr of frames){
+      if (fr.type === 8 || fr.type === 2) n.pmeter = n.pmeter || new Map(), n.pmeter.set(fr.slot, {key:fr.key, t:fr.t, at:performance.now()});
+      for (const s of subs) if (s.node === n && s.key === fr.key && fr.rings) try { s.cb(fr); } catch(e){ console.warn('PumpFX subscriber', e); } } },
+    _lat(n, list){ for (let t = 0; t <= NT; t++) if (nodeOf(t) === n){ for (const [slot, key, v] of list) lats.set((t >= NT ? 'M' : t) + '/' + key, v); notify(t, 'latency'); } },
+    _notify:notify
+  };
+})();
+// …PUMP: after a box moved (fxChanged), its value goes into f.pump before the song is saved or sent.
+// A box's help line: what it is in the plugin, its exact value, and (ACTIVE) the slot's latency.
+function pumpRowInfo(t, k, q){
+  const A = t >= NT ? S.mfx : S.tfx[t], f = A && A[k]; if (!f || !q.tpl) return q.k === 'sck' ? ': what feeds COMP’s External sidechain (SC SOURCE = External): a send or a track’s own sound' : q.band ? ': which band the rows below change' : '';
+  const type = TFX[f.type].pump, p = pumpFx(type).params[pumpIdx[type][pumpSymOf(q, f)]];
+  return p ? ' (' + p.n + ' = ' + pumpFmt(p, f.pump[p.s]) + ')' : '';
+}
+// A toast's note when a pump effect goes on a bus: its latency isn't compensated.
+const pumpBusNote = type => ['calm', 'tone', 'limit'].includes(type) ? '. It delays this bus (see OPEN’s note): fine on the master, on a bus it plays late against the other tracks' : '';
+const pumpSyncT = t => { const A = t >= NT ? S.mfx : (S.tfx && S.tfx[t]); (A || []).forEach(f => { if (f && isPumpT(f.type)) pumpSync(f); }); };
+// What the FX screen says about a pump slot's latency (nothing compensates it: on a bus it plays late against the rest).
+function pumpLatTxt(t, k){
+  const v = PumpFX.latency(t, k), sr = ctx ? ctx.sampleRate : 48000;
+  if (v == null) return '';
+  if (!v) return 'no latency';
+  const ms = (v / sr * 1000).toFixed(v / sr < 0.01 ? 1 : 0) + ' ms';
+  return t >= NT ? 'latency ' + ms + ' (the whole mix moves; nothing to line up)' : 'latency ' + ms + ': this bus plays that much late against the other tracks (not compensated)';
+}
 // The track effects in their groups (the pad list's: FX_GROUPS, MODFX.group or FX_GROUP), the everyday ones first in
 // each group (FXT_FIRST), then the rest in the old order. The slot picker shows the group names as headings; a slot
 // keeps its effect by name, so the order can change freely.
@@ -13003,15 +13252,20 @@ const FXT_FIRST = ['compressor', 'limiter', 'ngate', 'eq', 'filter', 'cut', 'dri
 const fxtGroup = k => (MODFX[k] && MODFX[k].group) || FX_GROUP[k] || 'More';
 const FXT_LIST = (() => {
   const all = ['eq', 'comp', 'reverb', 'delay', 'pdelay', 'preverb', 'density', 'tape', 'chorus', 'crush', 'degrade', 'reson', 'rings', 'clouds', 'beads', 'flanger', 'phaser', 'tremolo', 'odrive', 'folder', 'autowah', 'pshift', 'ladder', 'xmod', 'space', 'lofi', 'drive', 'air', 'room', 'comb', 'transient', 'tgate', 'sgate', 'flex', 'retrig', 'ott', 'fshift', 'vinyl', 'dub', 'cab', 'tube',
-    ...Object.keys(MODFX).filter(k => MODFX[k].track)];
+    ...Object.keys(MODFX).filter(k => MODFX[k].track), ...PUMP_TYPES.map(PUMP_KEY)];
   const gi = k => { const i = FX_GROUPS.indexOf(fxtGroup(k)); return i < 0 ? FX_GROUPS.length : i; }, fi = k => { const i = FXT_FIRST.indexOf(k); return i < 0 ? 999 : i; };
   return all.map((k, i) => [k, i]).sort((a, b) => gi(a[0]) - gi(b[0]) || fi(a[0]) - fi(b[0]) || a[1] - b[1]).map(e => e[0]);
 })();
-const TAILS = new Set(['pdelay', 'preverb', 'reson', 'reverb', 'delay', 'rings', 'clouds', 'beads', 'space', 'room', 'pshift', 'comb', ...Object.keys(MODFX).filter(k => MODFX[k].track && MODFX[k].tail)]);
+// (…PUMP: the pump effects count as tails so a render runs on past their latency; the render trims the silence after)
+const TAILS = new Set(['pdelay', 'preverb', 'reson', 'reverb', 'delay', 'rings', 'clouds', 'beads', 'space', 'room', 'pshift', 'comb', ...Object.keys(MODFX).filter(k => MODFX[k].track && MODFX[k].tail), ...PUMP_TYPES.map(PUMP_KEY)]);
+// …PUMP: the effects a slot picker offers on track t (the pump ones only on a bus or the master).
+const fxtL = (t = cFxT) => pumpAllowed(t) ? FXT_LIST : FXT_LIST.filter(k => !isPumpT(k));
+const fxtOk = (t, k) => !!TFX[k] && (!isPumpT(k) || pumpAllowed(t));
 const FXSLOTS = 4;
-function freshTfx(type){ const f = {type, on:true}; for (const p of TFX[type].ps) f[p.k] = p.d; return f; }
+function freshTfx(type){ if (TFX[type].pump) return pumpFresh(TFX[type].pump); const f = {type, on:true}; for (const p of TFX[type].ps) f[p.k] = p.d; return f; }
 function normTfx(o){
   if (!o || typeof o !== 'object' || !TFX[o.type]) return null;
+  if (TFX[o.type].pump) return pumpNorm1(o);
   const f = freshTfx(o.type); f.on = o.on !== false;
   for (const p of TFX[o.type].ps) f[p.k] = clamp(int(o[p.k], p.d), p.min, p.max);
   return f;
@@ -13023,6 +13277,8 @@ function tfxChain(A, sr, bpm){
   const out = [];
   // Switched-off slots go too (on:false): the tracker's FXO can switch them on while the song plays.
   (A || []).forEach((f, k) => { if (!f || !TFX[f.type]) return;
+    if (TFX[f.type].pump){ pumpSync(f); const P = TFX[f.type], fx = pumpFx(P.pump);   // …PUMP: every value, in the plugin's parameter order
+      out.push({key:k + ':' + f.type, pt:P.pt, pv:fx.params.map(p => f.pump[p.s] ?? p.def), bi:pumpIdx[P.pump].bypass ?? -1, on:!!f.on, slot:k, sck:+f.sck || 0}); return; }
     if (TFX[f.type].mod){ out.push({key:k + ':' + f.type, mod:TFX[f.type].mod, mp:TFX[f.type].map(f, sr, bpm), bpm, on:!!f.on, slot:k}); return; }   // a shared module (MODFX)
     const p = new Array(12).fill(0); TFX[f.type].map(f, sr, bpm).forEach((v, i) => p[i] = v); out.push({key:k + ':' + f.type, t:TFX[f.type].id, p, on:!!f.on, slot:k}); });
   return out;
@@ -13043,6 +13299,8 @@ class ThunderFx extends AudioWorkletProcessor {
     const op = o.processorOptions || {};
     if (op.irs !== undefined) globalThis.__thunderIR = op.irs;   // the song's impulse responses (Convolution reverb), for this whole audio thread
     if (!globalThis.__tfxMod) globalThis.__tfxMod = new WebAssembly.Module(op.bytes);
+    if (op.pump && !globalThis.__pumpBytes) globalThis.__pumpBytes = op.pump;   // …PUMP: pump.wasm, compiled when a pump slot first needs it
+    this.ptel = new Map(); this.platS = '';   // …PUMP: the pump slots whose full telemetry a pop-up wants (key → {back, rp}); the latencies last reported
     const z = () => 0;
     this.x = new WebAssembly.Instance(globalThis.__tfxMod, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports;
     if (this.x._initialize) this.x._initialize();
@@ -13058,16 +13316,84 @@ class ThunderFx extends AudioWorkletProcessor {
       key:v => { v = Math.round(v) || 0; if (v <= 0) return null; if (v <= 8) return (this.sends && this.sends[v - 1]) || this.zero;
         const c = this.tapIdx[v - 9]; return (c >= 0 && this.taps && this.taps[c]) || this.zero; }};
     this.set(op.chain || []);
-    this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else if (e.data && e.data.irs !== undefined) globalThis.__thunderIR = e.data.irs; else if (e.data && e.data.tapmap) this.setTap(e.data.tapmap); else if (e.data && e.data.tel !== undefined) this.tel = !!e.data.tel; else this.set(e.data); };
+    this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else if (e.data && e.data.irs !== undefined) globalThis.__thunderIR = e.data.irs; else if (e.data && e.data.tapmap) this.setTap(e.data.tapmap); else if (e.data && e.data.tel !== undefined) this.tel = !!e.data.tel;
+      else if (e.data && e.data.pumpBytes){ if (!globalThis.__pumpBytes) globalThis.__pumpBytes = e.data.pumpBytes; this.pumpAsked = false; this.set(this.chain || []); }
+      else if (e.data && e.data.ptel){ const q = e.data.ptel; if (q.on) this.ptel.set(q.key, {back:Math.max(0, Math.min(32768, q.back | 0)), rp:[]}); else this.ptel.delete(q.key); }
+      else if (e.data && e.data.phold){ const q = e.data.phold, P = globalThis.__pumpX, sl = this.slots.find(x => x.key === q.key && x.pu !== undefined); if (P && sl) try { P.pump_hold(sl.pu, q.kind | 0, +q.a || 0, +q.b || 0, +q.c || 0, +q.d || 0); } catch (err){} }
+      else this.set(e.data); };
   }
   pk(n){ const L = this.L, R = this.R; let p = 0; for (let k = 0; k < n; k++){ const a = L[k] < 0 ? -L[k] : L[k], b = R[k] < 0 ? -R[k] : R[k]; if (a > p) p = a; if (b > p) p = b; } return p < 8 ? p : 8; }
   setTap(list){ this.tapIdx.fill(-1); (Array.isArray(list) ? list : []).forEach((t, i) => { if (t >= 0 && t < 128) this.tapIdx[t] = i; }); }
-  drop(s){ try { if (s.def){ if (s.def.destroy) s.def.destroy(s.st); } else if (!s.js && s.h >= 0) this.x.tfx_free(s.h); } catch (e){} }
+  // …PUMP: the pump mastering effects (pump.wasm: their plugins' own DSP), one module instance for this audio thread
+  pumpX(){
+    const g = globalThis; if (g.__pumpX) return g.__pumpX; if (!g.__pumpBytes) return null;
+    try { const z = () => 0, m = new WebAssembly.Module(g.__pumpBytes);
+      const x = new WebAssembly.Instance(m, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports;
+      if (x._initialize) x._initialize(); g.__pumpX = x; return x; } catch (e){ g.__pumpBytes = null; return null; }
+  }
+  pumpIO(P){ if (this.pbuf !== P.memory.buffer){ this.pbuf = P.memory.buffer; this.pIO = [0, 1, 2, 3].map(c => new Float32Array(this.pbuf, P.pump_io(c), 128)); } return this.pIO; }
+  pumpNew(P, s){
+    const st = new Float32Array(P.memory.buffer, P.pump_stage(), 512);
+    for (let j = 0; j < s.pv.length && j < 512; j++) st[j] = s.pv[j];
+    if (s.bi >= 0) st[s.bi] = s.byp ? 1 : 0;
+    s.pu = P.pump_new(s.pt, sampleRate); s.dirty = false; return s.pu >= 0;
+  }
+  pumpRun(s, n){
+    const P = globalThis.__pumpX; if (!P || s.dead || s.pu < 0) return;
+    if (s.dirty){ const v = new Float32Array(P.memory.buffer, P.pump_values(s.pu), s.pv.length);
+      for (let j = 0; j < s.pv.length; j++) v[j] = s.pv[j];
+      if (s.bi >= 0) v[s.bi] = s.byp ? 1 : 0;
+      P.pump_commit(s.pu); s.dirty = false; }
+    let io = this.pumpIO(P), sc = 0;
+    if (s.sck > 0){ const K = this.mctx.key(s.sck); if (K){ io[2].set(K.subarray(0, n)); io[3].set(K.subarray(0, n)); sc = 1; } }   // COMP's External sidechain: the picked send or track
+    io[0].set(this.L.subarray(0, n)); io[1].set(this.R.subarray(0, n));
+    try { P.pump_process(s.pu, n, sc); }
+    catch (e){ s.dead = true; this.port.postMessage({failed:s.key}); return; }   // crashed: bypassed from now on
+    io = this.pumpIO(P);
+    const oL = io[0], oR = io[1]; let bad = false;
+    for (let k = 0; k < n; k++){ const a = oL[k], b = oR[k]; if (!(a > -8 && a < 8 && b > -8 && b < 8)){ bad = true; break; } }
+    if (bad){ try { P.pump_free(s.pu); this.pumpNew(P, s); } catch (e){ s.dead = true; } return; }   // went bad: start it afresh with its settings, pass this block
+    this.L.set(oL.subarray(0, n)); this.R.set(oR.subarray(0, n));
+  }
+  // One telemetry snapshot of a pump slot (pump_tel exchanges its meters, so it is read once per report), and its
+  // reading for the FX screen's dynamics display: [reduction dB, level in dB, peak out dB].
+  pumpTel(s){
+    const P = globalThis.__pumpX; if (!P || s.pu < 0 || s.dead) return null;
+    const len = P.pump_tel_len(s.pt), t = new Float32Array(P.memory.buffer, P.pump_tel(s.pu), len).slice();
+    const db = v => v > 1e-9 ? 20 * Math.log10(v) : -180, o = db(Math.max(t[1], t[2]));
+    let dyn = null;
+    if (s.pt === 1) dyn = [Math.min(t[5], t[6], 0), t[7] > -199 ? t[7] : -180, o];
+    else if (s.pt === 2) dyn = [-Math.max(0, t[5]), db(Math.max(t[3], t[4])), o];
+    else if (s.pt === 5){ let g = 0; for (let b = 0; b < Math.round(t[20]); b++) g = Math.min(g, t[5 + b]); dyn = [g, db(Math.max(t[3], t[4])), o]; }
+    return {t, dyn};
+  }
+  // A pop-up's feed: the snapshot plus every sample feed's new samples since the last report (the first one reaches back).
+  pumpFrame(s, w, t){
+    const P = globalThis.__pumpX, rings = [], nr = P.pump_rings(s.pu);
+    for (let k = 0; k < nr; k++){
+      const pos = P.pump_ring_pos(s.pu, k) >>> 0, cap = P.pump_ring_cap(s.pu, k);
+      if (w.rp[k] === undefined) w.rp[k] = (pos - Math.min(w.back, cap - 1, pos)) >>> 0;
+      let cnt = (pos - w.rp[k]) >>> 0; if (cnt > cap - 1) cnt = cap - 1; if (cnt > 32768) cnt = 32768;
+      const from = (pos - cnt) >>> 0, d = cnt ? new Float32Array(P.memory.buffer, P.pump_ring_read(s.pu, k, from, cnt), cnt).slice() : new Float32Array(0);
+      rings.push({k, pos, d}); w.rp[k] = pos;
+    }
+    return {slot:s.slot, key:s.key, type:s.pt, sr:sampleRate, lat:P.pump_latency(s.pu), t, rings};
+  }
+  drop(s){ try { if (s.pu !== undefined){ if (s.pu >= 0 && globalThis.__pumpX) globalThis.__pumpX.pump_free(s.pu); s.pu = -1; return; } if (s.def){ if (s.def.destroy) s.def.destroy(s.st); } else if (!s.js && s.h >= 0) this.x.tfx_free(s.h); } catch (e){} }
   set(chain){
     const x = this.x, old = this.slots.slice(), next = [];
+    this.chain = chain;
     for (const c of chain){
       let i = old.findIndex(s => s.key === c.key), s;
       const on = c.on !== false, slot = c.slot == null ? -1 : c.slot;
+      if (c.pt !== undefined){   // …PUMP: a pump effect. Until pump.wasm reaches this audio thread the sound passes.
+        const P = this.pumpX();
+        if (!P){ if (!this.pumpAsked){ this.pumpAsked = true; this.port.postMessage({needPump:true}); } continue; }
+        if (i >= 0 && old[i].pu !== undefined && old[i].pt === c.pt && old[i].pu >= 0 && !old[i].dead){ s = old[i]; old.splice(i, 1); s.pv = c.pv; s.dirty = true; }
+        else { s = {key:c.key, h:-2, pt:c.pt, pv:c.pv, bi:c.bi, byp:!on};
+          try { if (!this.pumpNew(P, s)) continue; } catch (e){ continue; } }
+        s.on = on; s.slot = slot; s.sck = c.sck | 0; next.push(s); continue;
+      }
       if (c.mod){   // a shared …chains/…waves module (MODFX), run as it runs in …chains
         const D = globalThis.ChainsDSP, def = D && D.MODULES ? D.MODULES[c.mod] : null;
         if (!def) continue;   // the …chains engine isn't in this audio thread: no slot, the sound passes
@@ -13119,6 +13445,7 @@ class ThunderFx extends AudioWorkletProcessor {
   slotRun(s, n, tr){
     const x = this.x;
     if (s.def){ this.modRun(s, n); return; }
+    if (s.pu !== undefined){ this.pumpRun(s, n); return; }
     if (s.js){ s.js.process(this.L, this.R, n, s.dp, tr); return; }
     if (s.h < 0) return;
     if (!this.cL){ this.cL = new Float32Array(128); this.cR = new Float32Array(128); }
@@ -13163,6 +13490,8 @@ class ThunderFx extends AudioWorkletProcessor {
     for (const s of this.slots){
       // On or off: the slot's own setting, unless an FXO switch is holding it. Changes fade over 5 ms.
       const sv = s.slot >= 0 && s.slot < 4 ? swv[s.slot] : -1, tg = (sv < -0.5 ? s.on : sv > 0.5) ? 1 : 0;
+      // …PUMP: on / off is the plugin's own bypass (latency-matched, crossfaded), so the timing never jumps; METER just stops
+      if (s.pu !== undefined){ if (s.byp !== !tg){ s.byp = !tg; s.dirty = true; } if (!(s.bi < 0 && s.byp)) this.slotRun(s, n, tr); continue; }
       if (s.g === undefined) s.g = tg;
       if (!tg && s.g <= 0){ if (s.js && s.js.feed) s.js.feed(this.L, this.R, n, tr); continue; }
       const fade = s.g !== tg; if (fade){ this.dL.set(this.L); this.dR.set(this.R); }
@@ -13176,15 +13505,27 @@ class ThunderFx extends AudioWorkletProcessor {
         s.g = g; }
     }
     // FX DYNAMICS: [slot, key, [reduction dB, level in dB, peak out dB]] for each dynamics slot (the shared modules' own show())
-    if (this.tel && ++this.telN >= 12){ this.telN = 0; const out = [], db = v => v > 1e-9 ? 20 * Math.log10(v) : -180;
+    if ((this.tel || this.ptel.size) && ++this.telN >= 12){ this.telN = 0; const out = [], db = v => v > 1e-9 ? 20 * Math.log10(v) : -180, pout = [];
       for (const s of this.slots){
+        if (s.pu !== undefined){   // …PUMP: the dynamics display (COMP, LIMIT, BAND), METER / LIMIT loudness for the FX screen, a pop-up's feed
+          const w = this.ptel.get(s.key); if (!this.tel && !w) continue;
+          let r = null; try { r = this.pumpTel(s); } catch (e){} if (!r) continue;
+          if (this.tel && r.dyn) out.push([s.slot, s.key, r.dyn]);
+          if (w){ try { pout.push(this.pumpFrame(s, w, r.t)); } catch (e){} }
+          else if (s.pt === 8 || s.pt === 2) pout.push({slot:s.slot, key:s.key, type:s.pt, t:r.t});
+          continue; }
+        if (!this.tel) continue;
         if (s.def && s.def.show){ try { out.push([s.slot, s.key, s.def.show(s.st)]); } catch (e){} }
         else if (!s.def && !s.js && (s.t === 7 || s.t === 26 || s.t === 28)){ out.push([s.slot, s.key, [0, db(s.lip || 0), db(s.lop || 0)]]); s.lip = 0; s.lop = 0; }
       }
-      if (out.length) this.port.postMessage({dyn:out}); }
+      if (out.length) this.port.postMessage({dyn:out});
+      if (pout.length) this.port.postMessage({pump:pout}); }
     // Date.now() is coarse, but its average over many blocks is the real cost: report it as a share of real time.
     this.ms += Date.now() - t0; this.fr += n;
-    if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
+    if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0;
+      // …PUMP: each pump slot's latency, when it changes (the FX screen warns on buses: nothing compensates it)
+      const P = globalThis.__pumpX; if (P){ const lat = []; for (const s of this.slots) if (s.pu !== undefined && s.pu >= 0) lat.push([s.slot, s.key, P.pump_latency(s.pu)]);
+        const k = JSON.stringify(lat); if (k !== this.platS){ this.platS = k; this.port.postMessage({plat:lat}); } } }
     o[0].set(this.L.subarray(0, n)); if (o[1]) o[1].set(this.R.subarray(0, n));
     let op = 0; for (let k = 0; k < n; k++){ const v = this.L[k] < 0 ? -this.L[k] : this.L[k], w = this.R[k] < 0 ? -this.R[k] : this.R[k]; if (v > op) op = v; if (w > op) op = w; }
     this.idle = ip < 1e-7 && op < 1e-6 ? this.idle + n : 0;
@@ -13236,7 +13577,7 @@ function sckUses(){
   const out = [], d = S.chainPatch;
   if (d && Array.isArray(d.modules)) for (const m of d.modules) if (m && SCK_TYPES.has(m.type) && m.params && +m.params.sck > 0)
     out.push({v:+m.params.sck, where:'…chains ' + (SCK_NAME[m.type] || m.type), t:-1});
-  const slots = (A, t) => (A || []).forEach((f, k) => { if (f && MODFX[f.type] && +f.sck > 0) out.push({v:+f.sck, where:(t === NT ? 'master' : 'track ' + d2(t + 1)) + ' FX ' + (k + 1) + ' ' + (MODFX[f.type].short || f.type), t}); });
+  const slots = (A, t) => (A || []).forEach((f, k) => { if (f && (MODFX[f.type] || (TFX[f.type] && TFX[f.type].sck)) && +f.sck > 0) out.push({v:+f.sck, where:(t === NT ? 'master' : 'track ' + d2(t + 1)) + ' FX ' + (k + 1) + ' ' + ((MODFX[f.type] && MODFX[f.type].short) || TFX[f.type].n || f.type), t}); });
   for (let t = 0; t < NT; t++) slots(S.tfx && S.tfx[t], t);
   slots(S.mfx, NT);
   return out;
@@ -13253,7 +13594,7 @@ function keyTrackList(){
 const chnTapList = () => keyTrackList();   // (the old name: …chains nodes get the same list)
 const sckHasTrack = A => A.some(v => sckTrack(v) >= 0), sckHasSend = A => A.some(v => v >= 1 && v <= SCK_SEND);
 const patchScks = d => d && Array.isArray(d.modules) ? d.modules.filter(m => m && SCK_TYPES.has(m.type) && m.params).map(m => +m.params.sck || 0) : [];
-const slotScks = A => (A || []).filter(f => f && MODFX[f.type]).map(f => +f.sck || 0);
+const slotScks = A => (A || []).filter(f => f && (MODFX[f.type] || (TFX[f.type] && TFX[f.type].sck))).map(f => +f.sck || 0);   // (…PUMP: COMP's SC FROM)
 const chnTaps = d => sckHasTrack(patchScks(d));
 // SENDS: the patch has a Sidechain Out, or something listening to a send.
 const chnSends = d => !!(d && Array.isArray(d.modules) && (d.modules.some(m => m && m.type === 'scout') || sckHasSend(patchScks(d))));
@@ -13424,13 +13765,36 @@ function tfxReady(ac){
   }
   return tfxLoaded.get(ac);
 }
+// …PUMP: pump.wasm goes to each audio thread once, with its first effect node (or by message when a node asks for it).
+let pumpWasmBytes = null; const pumpSent = new WeakSet(), pumpWait = new Set();
+const pumpBin = () => pumpWasmBytes || null;
+// A copy on this thread, only to ask a slot's latency (renders line the master up by it; the FX screen says it before
+// the audio has started): the same code the worklet runs, so the same number.
+let pumpMain = null; const pumpLatCache = new Map();
+function pumpLatencyOf(f, sr){
+  if (!pumpMain || !f || !isPumpT(f.type)) return 0;
+  const P = TFX[f.type], vals = pumpFx(P.pump).params.map(p => f.pump[p.s] ?? p.def), key = P.pt + '/' + sr + '/' + vals.join(',');
+  if (pumpLatCache.has(key)) return pumpLatCache.get(key);
+  let lat = 0;
+  try { const st = new Float32Array(pumpMain.memory.buffer, pumpMain.pump_stage(), 512); vals.forEach((v, i) => st[i] = v);
+    const h = pumpMain.pump_new(P.pt, sr); if (h >= 0){ lat = pumpMain.pump_latency(h); pumpMain.pump_free(h); } } catch(e){ lat = 0; }
+  if (pumpLatCache.size > 200) pumpLatCache.clear();
+  pumpLatCache.set(key, lat); return lat;
+}
+// The master's pump slots together (switched on): a render starts that much later, and pass() trims it off as it does
+// the mastering's latency. (A bus's latency isn't compensated anywhere: see pumpLatTxt.)
+const pumpChainLatency = (A, sr) => (A || []).reduce((n, f) => n + (f && f.on && isPumpT(f.type) ? pumpLatencyOf(f, sr) : 0), 0);
 function tfxNode(ac, chain){
   // Inputs: 0 the track, 1 (SOURCE) the picked tracks' own sounds, one channel each ('tapmap'), 2 (SENDS) the Sidechain Out sends.
+  const pb = pumpBin() && !pumpSent.has(ac) ? pumpBin() : null; if (pb) pumpSent.add(ac);
   const n = new AudioWorkletNode(ac, 'thunder-tfx', {numberOfInputs:3, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
-    channelCountMode:'max', channelInterpretation:'speakers', processorOptions:{bytes:tfxBin(), chain, irs:irsOpt(ac), tapMap:keyTrackList()}});   // irs: this audio thread's copy of the song's impulse responses
+    channelCountMode:'max', channelInterpretation:'speakers', processorOptions:{bytes:tfxBin(), chain, irs:irsOpt(ac), tapMap:keyTrackList(), pump:pb}});   // irs: this audio thread's copy of the song's impulse responses
   n.load = 0; n.port.onmessage = e => { const d = e.data; if (!d) return;
     if (typeof d.load === 'number') n.load = n.load * 0.6 + d.load * 0.4;
     if (d.dyn) fxDynIn(n, d.dyn);
+    if (d.needPump){ if (pumpBin()) n.port.postMessage({pumpBytes:pumpBin()}); else pumpWait.add(n); }
+    if (d.pump) PumpFX._feed(n, d.pump);
+    if (d.plat){ n.plat = d.plat; PumpFX._lat(n, d.plat); }
     if (d.failed){ const t = String(d.failed).split(':')[1], F = TFX[t]; toast((F ? F.long.replace(/^based on /, '') : 'An effect') + ' stopped working and was bypassed. Change its settings to restart it.'); } };
   return n;
 }
@@ -14945,7 +15309,7 @@ function rtFx(t){
   else if (rt.mfx){ rt.mfx.port.postMessage(null); try { rt.mfx.disconnect(); } catch(e){} rt.mfx = null; rt.pl.setMfx(null); rtRoute(); }
 }
 function rtAllFx(){ for (let t = 0; t <= NT; t++) rtFx(t); }
-function fxChanged(t){ saveS(); rtFx(t); }
+function fxChanged(t){ pumpSyncT(t); saveS(); rtFx(t); try { PumpFX._notify(t, 'fx'); } catch(e){} }
 function chainsFeedChanged(t){ saveS(); rtFx(t); draw(); }
 // Each enabled track gets its own Track In + Chain Out pair, wired straight through, so every track keeps
 // its own chain and toggling one never disturbs another. The pair is placed below everything already in
@@ -15344,7 +15708,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   // own (its stem, if asked for) plays without the bus.
   { const P = busPlan(), k2 = new Set(keep); for (const b of keep) for (const t of P.feeds.get(b) || []) if (audible(t)) k2.add(t); keep = k2; }
   const M = S.mst, useM = !!(masterFx && M && M.on);
-  let lat = useM ? mstLatency(M, sr) : 0;
+  let lat = (useM ? mstLatency(M, sr) : 0) + (masterFx ? pumpChainLatency(S.mfx, sr) : 0);   // …PUMP: the master's pump effects' latency too
   const O = window.OfflineAudioContext || window.webkitOfflineAudioContext, oc = new O(2, N + lat + (lim ? safeLatency(sr) : 0), sr), out = oc.createGain();
   out.gain.value = curve(S.master);
   const wantChn = [...keep].some(t => chainsFeed(t)) && S.chainPatch && S.chainPatch.format === 'chains.patch';
@@ -16320,6 +16684,7 @@ const fxList = A => (A || []).filter(Boolean).map(f => TFX[f.type].n + (f.on ? '
 // nothing on yet, slots fill in order (1, 2, 3, 4) with the effect type last chosen.
 function fxActiveStep(t, d){
   const A = t >= NT ? S.mfx : S.tfx[t]; if (!A) return;
+  if (!fxtOk(t, lastFxType)) lastFxType = 'eq';   // …PUMP: not on a plain track
   const where = t >= NT ? 'The master' : 'Track ' + d2(t + 1);
   if (d > 0){
     if (fxCount(A) >= FXSLOTS) return toast(where + ' already runs all ' + FXSLOTS + ' effects.');
@@ -16344,17 +16709,27 @@ function fxRows(){
   const open = cy > FXSLOTS;   // the cursor is down in a slot's controls, not up in the slot list
   const rows = [{l:'TRACK', get:() => cFxT >= NT ? ntr() : cFxT, set:v => cFxT = v >= ntr() ? NT : v, min:0, max:ntr(), big:4, fmt:v => v >= ntr() ? 'MST  master, after every track' : d2(v + 1),
     info:() => 'Which track these effects are on (MST is the master). OPTION+◀▶ also changes it'}];
-  for (let k = 0; k < FXSLOTS; k++) rows.push({l:(A[k] ? (open && k === cFxS ? '▪ ' : '› ') : '') + 'SLOT ' + (k + 1), gap:k === 0, get:() => A[k] ? FXT_LIST.indexOf(A[k].type) + 1 : 0,
-    set:v => { A[k] = v ? freshTfx(FXT_LIST[v - 1]) : null; if (v) lastFxType = FXT_LIST[v - 1]; cFxS = k; fxChanged(t); }, min:0, max:FXT_LIST.length, big:1, d:0,
-    fmt:v => v ? TFX[FXT_LIST[v - 1]].n.padEnd(5) + (A[k] && !A[k].on ? 'OFF  ' : '') + fxNameOf(FXT_LIST[v - 1]) : '---',
+  const FL = fxtL(t);   // …PUMP: the pump effects only on a bus or the master (a slot that has one shows it anyway)
+  const FLk = k => A[k] && !FL.includes(A[k].type) ? FL.concat([A[k].type]) : FL;
+  for (let k = 0; k < FXSLOTS; k++) rows.push({l:(A[k] ? (open && k === cFxS ? '▪ ' : '› ') : '') + 'SLOT ' + (k + 1), gap:k === 0, get:() => A[k] ? FLk(k).indexOf(A[k].type) + 1 : 0,
+    set:v => { const L = FLk(k); A[k] = v ? freshTfx(L[v - 1]) : null; if (v) lastFxType = L[v - 1]; cFxS = k; fxChanged(t); }, min:0, max:FLk(k).length, big:1, d:0,
+    fmt:v => v ? (n => n.padEnd(Math.max(5, n.length + 1)))(TFX[FLk(k)[v - 1]].n) + (A[k] && !A[k].on ? 'OFF  ' : '') + fxNameOf(FLk(k)[v - 1]) : '---',
     tap:() => { cFxS = k; fxsOpen(k); },
-    info:v => v ? `Slot ${k + 1} runs ${TFX[FXT_LIST[v - 1]].long}. EDIT lists the effects, EDIT+arrows steps through them, ▶ opens its controls, OPTION+EDIT removes it` : `Empty. EDIT lists the effects to pick one; EDIT+arrows steps through them. Slots run top to bottom`});
+    info:v => v ? `Slot ${k + 1} runs ${TFX[FLk(k)[v - 1]].long}. EDIT lists the effects, EDIT+arrows steps through them, ▶ opens its controls, OPTION+EDIT removes it` : `Empty. EDIT lists the effects to pick one; EDIT+arrows steps through them. Slots run top to bottom`});
   const k = cFxS, f = A[k];
-  if (!f){ rows.push({l:'› ADD TO SLOT ' + (k + 1), gap:true, act:() => { A[k] = freshTfx(lastFxType); fxChanged(t); draw(); }, info:() => `Puts ${TFX[lastFxType].long} in slot ${k + 1}`}); return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows); }
+  const addT = () => fxtOk(t, lastFxType) ? lastFxType : 'eq';
+  if (!f){ rows.push({l:'› ADD TO SLOT ' + (k + 1), gap:true, act:() => { A[k] = freshTfx(addT()); fxChanged(t); draw(); }, info:() => `Puts ${TFX[addT()].long} in slot ${k + 1}`}); return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows); }
   rows.push({l:'ACTIVE', gap:true, desc:TFX[f.type].long, tog:true, get:() => f.on ? 1 : 0, set:v => { f.on = !!v; fxChanged(t); }, min:0, max:1, d:1, fmt:v => onOff(v) + `  slot ${k + 1} ` + TFX[f.type].n,
-    info:() => `Slot ${k + 1}: ${TFX[f.type].long}. OFF bypasses it`});
-  for (const q of TFX[f.type].ps) rows.push({l:q.l, get:() => f[q.k], set:v => { f[q.k] = v; fxChanged(t); }, min:q.min, max:q.max, big:q.names ? 1 : 16, d:q.d, tog:q.names && q.names.length === 2,
-    fmt:v => q.names ? q.names[v] : (q.min < 0 ? sgn(v) : q.max > 99 ? hx(v) : d2(v)) + '  ' + q.fmt(v), info:() => TFX[f.type].long + ' · ' + q.l.toLowerCase()});
+    info:() => `Slot ${k + 1}: ${TFX[f.type].long}. ` + (TFX[f.type].about ? TFX[f.type].about + ' ' + (pumpLatTxt(t, k) ? pumpLatTxt(t, k)[0].toUpperCase() + pumpLatTxt(t, k).slice(1) + '. ' : '') : '') + 'OFF bypasses it'});
+  const PU = TFX[f.type].pump;   // …PUMP: a pump effect's boxes (fmt sees the slot: it shows the exact value), its presets and OPEN
+  for (const q of TFX[f.type].ps) rows.push({l:q.l, get:() => f[q.k], set:v => { f[q.k] = v; if (PU) delete f.pname; fxChanged(t); }, min:q.min, max:q.max, big:q.names ? (q.max > 40 ? 8 : 1) : q.band ? 1 : 16, d:q.d, tog:q.names && q.names.length === 2,
+    fmt:v => q.names ? q.names[v] : q.band ? q.fmt(v, f) : (q.min < 0 ? sgn(v) : q.max > 99 ? hx(v) : d2(v)) + '  ' + q.fmt(v, f),
+    info:() => TFX[f.type].long + ' · ' + q.l.toLowerCase() + (PU ? pumpRowInfo(t, k, q) : '')});
+  if (PU){
+    rows.push({l:'› PRESET' + (f.pname ? '  ' + f.pname.toUpperCase() : ''), gap:true, act:() => pumpPresetOpen(t, k), info:() => 'Pick one of pump ' + pumpFx(PU).name + '’s factory presets (Factory, Sources, Chains)' + (f.pname ? '. Last: ' + f.pname : '')});
+    rows.push({l:'› OPEN', act:() => PumpFX.open(t, k), info:() => 'Opens pump ' + pumpFx(PU).name + '’s own window (every control, its displays)' + (pumpLatTxt(t, k) ? ' · ' + pumpLatTxt(t, k) : '')});
+    if (PU === 'meter') rows.push({l:'› RESET', act:() => { PumpFX.set(t, k, {reset:(f.pump.reset | 0) + 1}, {live:true, keepPreset:true}); toast('pump METER: loudness reset.'); }, info:() => 'Starts the loudness measurement again (integrated, LRA, maxima)'});
+  }
   return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows);
 }
 // The FX screen is two regions: the slot list (TRACK + SLOT 1–4) and the controls of one slot
@@ -16623,8 +16998,8 @@ let FXLIST = FXLIST_ALL;
 const fxListNow = () => (FXLIST = mstView() ? FXLIST_MST : FXLIST_ALL);
 const fxp = {open:false, x:0, y:0, i:0, now:-1, slot:-1};
 // The picker's items now: the phrase commands, or (from an FX slot) the effects.
-const fxpN = () => fxp.slot >= 0 ? FXT_LIST.length + 1 : FXLIST.length;
-const fxpTag = k => fxp.slot >= 0 ? (k ? TFX[FXT_LIST[k - 1]].n : '---') : (FXLIST[k] < 0 ? '---' : FXC[FXLIST[k]]);
+const fxpN = () => fxp.pre ? fxp.pre.list.length : fxp.slot >= 0 ? fxtL().length + 1 : FXLIST.length;
+const fxpTag = k => fxp.pre ? fxp.pre.list[k].name : fxp.slot >= 0 ? (k ? TFX[fxtL()[k - 1]].n : '---') : (FXLIST[k] < 0 ? '---' : FXC[FXLIST[k]]);
 // heads: {item index: a heading shown above it} (the effects' groups); headings aren't items, so the keys skip them.
 function fxpFill(items, now, title, wide, heads){
   const L = $('fxPickList'); L.innerHTML = '';
@@ -16638,25 +17013,34 @@ function fxpFill(items, now, title, wide, heads){
 }
 function fxpOpen(x, y){
   fxListNow(); const v = getCell('phrase', x, y); fxp.now = v;
-  Object.assign(fxp, {open:true, x, y, slot:-1, i:Math.max(0, FXLIST.indexOf(v >= 0 ? v : last.fxc))});
+  Object.assign(fxp, {open:true, x, y, slot:-1, pre:null, i:Math.max(0, FXLIST.indexOf(v >= 0 ? v : last.fxc))});
   const heads = {}; FXLIST.forEach((f, k) => { if (f < 0) return; const g = fxcGroup(FXC[f]); if (FXLIST[k - 1] < 0 || g !== fxcGroup(FXC[FXLIST[k - 1]])) heads[k] = g.toUpperCase(); });
   fxpFill(FXLIST.map(f => [f < 0 ? '---' : FXC[f], f < 0 ? 'No command (clear this cell)' : FXB[FXC[f]] || '', f === v]), v, 'FX COMMAND', false, heads);
 }
 // EDIT on an FX-screen slot: every effect in a list, the slot's own one marked NOW. Choosing it opens its controls.
 function fxsOpen(k){
-  const A = cFxT >= NT ? S.mfx : S.tfx[cFxT], f = A[k], cur = f ? f.type : null;
-  Object.assign(fxp, {open:true, slot:k, i:cur ? FXT_LIST.indexOf(cur) + 1 : FXT_LIST.indexOf(lastFxType) + 1});
-  const heads = {}; FXT_LIST.forEach((t, j) => { const g = fxtGroup(t); if (!j || g !== fxtGroup(FXT_LIST[j - 1])) heads[j + 1] = g.toUpperCase(); });
+  const A = cFxT >= NT ? S.mfx : S.tfx[cFxT], f = A[k], cur = f ? f.type : null, FL = fxtL();
+  Object.assign(fxp, {open:true, slot:k, pre:null, i:cur ? FL.indexOf(cur) + 1 : Math.max(0, FL.indexOf(lastFxType) + 1)});
+  const heads = {}; FL.forEach((t, j) => { const g = fxtGroup(t); if (!j || g !== fxtGroup(FL[j - 1])) heads[j + 1] = g.toUpperCase(); });
   fxpFill([['---', f ? 'Empty this slot (remove the effect)' : 'Leave this slot empty', !f],
-    ...FXT_LIST.map(t => [TFX[t].n, TFX[t].long, t === cur])], cur, 'EFFECT · ' + fxWho(cFxT) + ' SLOT ' + (k + 1), true, heads);
+    ...FL.map(t => [TFX[t].n, TFX[t].long, t === cur])], cur, 'EFFECT · ' + fxWho(cFxT) + ' SLOT ' + (k + 1), true, heads);
 }
-function fxpClose(){ if (!fxp.open) return; fxp.open = false; $('fxPick').hidden = true; }
+// …PUMP: a pump slot's factory presets in the same list, under their sections (FACTORY, SOURCES, CHAINS).
+function pumpPresetOpen(t, k){
+  const A = t >= NT ? S.mfx : S.tfx[t], f = A && A[k]; if (!f || !isPumpT(f.type)) return;
+  const type = TFX[f.type].pump, list = PumpFX.presets(type), cur = list.findIndex(p => p.name === f.pname);
+  Object.assign(fxp, {open:true, slot:-1, pre:{t, k, list}, i:Math.max(0, cur)});
+  const heads = {}; list.forEach((p, j) => { if (!j || p.section !== list[j - 1].section) heads[j] = p.section; });
+  fxpFill(list.map(p => [String(p.index).padStart(2, '0'), p.name, p.name === f.pname]), cur, 'PRESET · pump ' + pumpFx(type).name + ' · ' + fxWho(t) + ' SLOT ' + (k + 1), true, heads);
+}
+function fxpClose(){ if (!fxp.open) return; fxp.open = false; fxp.pre = null; $('fxPick').hidden = true; }
 function fxpShow(jump){
   $('fxPickList').querySelectorAll('.fpi').forEach((it, k) => { const on = k === fxp.i; it.classList.toggle('on', on); it.setAttribute('aria-selected', on);
     if (on) it.scrollIntoView({block:jump ? 'center' : 'nearest'}); });
 }
 function fxpMove(d){ fxp.i = clamp(fxp.i + d, 0, fxpN() - 1); fxpShow(false); }
 function fxpChoose(k = fxp.i){
+  if (fxp.pre){ const {t, k:sl, list} = fxp.pre, p = list[k]; fxpClose(); fxp.pre = null; if (p && PumpFX.applyPreset(t, sl, p.index)) toast('Preset: ' + p.name + (p.section !== 'FACTORY' ? ' (' + p.section.toLowerCase() + ')' : '')); draw(); return; }
   if (fxp.slot >= 0) return fxsChoose(fxp.slot, k);
   const f = FXLIST[k], {x, y} = fxp; fxpClose();
   if (f < 0){ setCell('phrase', x, y, -1); setCell('phrase', x + 1, y, -1); saveS(); draw(); return; }
@@ -16667,8 +17051,8 @@ function fxpChoose(k = fxp.i){
 function fxsChoose(s, k){
   fxpClose(); const t = cFxT, A = t >= NT ? S.mfx : S.tfx[t], had = A[s];
   if (!k){ A[s] = null; cFxS = s; cs.fx.y = s + 1; fxChanged(t); saveS(); draw(); if (had) toast(`Slot ${s + 1} emptied.`); return; }
-  const type = FXT_LIST[k - 1];
-  if (!had || had.type !== type){ A[s] = freshTfx(type); fxChanged(t); saveS(); toast(`Slot ${s + 1}: ${TFX[type].long}`); }
+  const type = fxtL(t)[k - 1];
+  if (!had || had.type !== type){ A[s] = freshTfx(type); fxChanged(t); saveS(); toast(`Slot ${s + 1}: ${TFX[type].long}` + (isPumpT(type) && t < NT ? pumpBusNote(type) : '')); }
   lastFxType = type; cFxS = s; cs.fx.y = FXSLOTS + 1; draw();
 }
 // The pad's buttons while the list is open. Returns true when it used the press.
@@ -18200,7 +18584,7 @@ function stageTick(now){
   // FX DYNAMICS: the shown track's effects report their levels while the stage shows its chain; ~30 frames a second then
   const chn = stgKindNow === 'chain' && !$('tStage').hidden, ft = cFxT >= NT ? -1 : Math.min(cFxT, ntr() - 1);
   fxTelSet(chn ? fxDynNodeOf(ft) : null);
-  if (chn && now - stgFrameT > 33){ const A = ft < 0 ? S.mfx : S.tfx[ft] || []; if (A.some(f => f && isFxDyn(f.type))){ stgFrameT = now; stageCanvas(false); } }
+  if (chn && now - stgFrameT > 33){ const A = ft < 0 ? S.mfx : S.tfx[ft] || []; if (A.some(f => f && fxStageLive(f.type))){ stgFrameT = now; stageCanvas(false); } }
   if (stgOn !== !!tp.on){ stgOn = !!tp.on; if (stgKindNow === 'dogs' || stgKindNow === 'drum') dogsState(); else if (stgKindNow) stageCanvas(true); }
   if (!stgKindNow || $('tStage').hidden) return;
   if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (now - stgFrameT > 45){ stgFrameT = now; stageCanvas(false); } return; }
@@ -18424,9 +18808,14 @@ const FXDYN = {
   buscomp: p => ({ thr:p.thresh, ratio:[2, 4, 10][clamp(Math.round(p.ratio), 0, 2)], knee:2, mk:p.makeup }),
   glue: p => ({ thr:p.thresh, ratio:p.ratio, knee:p.knee, range:p.range, mk:p.makeup }),
   ngate: p => ({ gate:true, thr:p.thresh, range:p.range }),
-  limiter: p => ({ lim:true, gain:p.input, ceil:p.ceil, thr:p.ceil - p.input })
+  limiter: p => ({ lim:true, gain:p.input, ceil:p.ceil, thr:p.ceil - p.input }),
+  // …PUMP: COMP's curve and LIMIT's from their own values; BAND has one curve per band, so it shows its deepest reduction only
+  pcomp: p => ({ thr:p.threshold, ratio:p.ratio, knee:p.knee, range:p.range, mk:p.out_gain }),
+  plimit: p => ({ lim:true, gain:p.gain, ceil:p.ceiling, thr:p.ceiling - p.gain }),
+  pband: () => null
 }, FXLV = new Set(['comp', 'ott', 'transient']), FXD_N = 80, FXD_LO = -60, FXD_HI = 6, FXD_GR = 24;
-const isFxDyn = type => !!(FXDYN[type] && TFX[type] && TFX[type].mod) || (FXLV.has(type) && !!TFX[type]);
+const isFxDyn = type => !!(FXDYN[type] && TFX[type] && (TFX[type].mod || TFX[type].pump)) || (FXLV.has(type) && !!TFX[type]);
+const fxStageLive = type => isFxDyn(type) || type === 'pmeter';   // …PUMP: METER's loudness readout redraws too
 function fxDynOut(c, x){
   if (c.lim) return Math.min(x + c.gain, c.ceil);
   if (c.gate) return x >= c.thr ? x : c.range >= 89.5 ? -999 : x - c.range;
@@ -18544,6 +18933,9 @@ function stageChain(){
       if (fr > .002){ g.fillStyle = lv ? '#3cc8b9' : '#f39a43'; g.fillRect(x + 3 * dpr, y + bh - 5 * dpr, (bw - 6 * dpr) * fr, 3 * dpr); } }
     if (i < items.length - 1){ g.strokeStyle = X.mid; g.beginPath(); g.moveTo(W / 2, y + bh); g.lineTo(W / 2, y + bh + gap); g.moveTo(W / 2 - 4 * dpr, y + bh + gap - 5 * dpr); g.lineTo(W / 2, y + bh + gap); g.lineTo(W / 2 + 4 * dpr, y + bh + gap - 5 * dpr); g.stroke(); }
     y += bh + gap; });
+  // …PUMP: METER's loudness under the chain (the cursor's METER slot, or the first when no dynamics slot is shown)
+  const ms = A[cFxS] && A[cFxS].type === 'pmeter' ? cFxS : ds < 0 ? A.findIndex(f => f && f.type === 'pmeter') : -1;
+  if (ms >= 0){ pumpMeterPaint(g, W, H, dpr, X, A[ms], ms, node, top); return; }
   if (ds < 0) return;
   const f = A[ds], lv = FXLV.has(f.type), key = ds + ':' + f.type;
   let D = node && node.dyn && node.dyn.get(ds); if (!D || D.key !== key){ D = fxDynNew(key); if (node){ node.dyn = node.dyn || new Map(); node.dyn.set(ds, D); } }
@@ -18554,6 +18946,30 @@ function stageChain(){
   g.fillText(`SLOT ${ds + 1} · ${TFX[f.type].n} ${fxNameOf(f.type)}${f.on ? '' : ' (off)'}`, dx, ty);
   const dy = ty + 15 * dpr, dhh = H - dy - 4 * dpr; if (dhh < 40 * dpr) return;
   g.save(); g.scale(dpr, dpr); fxDynPaint(g, dx / dpr, dy / dpr, dw / dpr, dhh / dpr, D, c, lv, X.font); g.restore();
+}
+// …PUMP: METER's readout on the FX stage (from the worklet's telemetry: PUMP-FX.md, METER layout).
+function pumpMeterPaint(g, W, H, dpr, X, f, k, node, top0){
+  const rd = node && node.pmeter && node.pmeter.get(k), fresh = rd && rd.key === k + ':' + f.type && performance.now() - rd.at < 1500, t = fresh ? rd.t : null;
+  const top = Math.min(top0, H - 150 * dpr), dw = Math.min(W - 8 * dpr, 460 * dpr), dx = (W - dw) / 2, ty = top + 2 * dpr;
+  if (top0 < H - 150 * dpr){ /* the chain left room */ }
+  const v = i => t && Number.isFinite(t[i]) && t[i] > -70 ? t[i] : null, n1 = x => x == null ? '--.-' : (x > 0 ? '+' : '') + x.toFixed(1);
+  const P = pumpFx('meter').params, tg = P[pumpIdx.meter.target], tgt = pumpFmt(tg, f.pump.target);
+  g.save(); g.scale(dpr, dpr);
+  const x0 = dx / dpr, y0 = (ty + 15 * dpr) / dpr, w = dw / dpr, h = Math.min(140, (H - ty - 19 * dpr) / dpr);
+  g.fillStyle = X.ink; g.font = `10px ${X.font}`; g.textBaseline = 'top';
+  g.fillText(`SLOT ${k + 1} · pMETR LOUDNESS${f.on ? '' : ' (off)'} · TARGET ${tgt.toUpperCase()}`, x0, ty / dpr);
+  g.fillStyle = '#0b0c0e'; g.fillRect(x0, y0, w, h);
+  const C = (a) => 'rgba(255,255,255,' + a + ')';
+  const cells = [['SHORT-TERM', v(6), 'LUFS'], ['INTEGRATED', v(7), 'LUFS'], ['MOMENTARY', v(5), 'LUFS'], ['LRA', t && t[8] > -70 ? t[8] : null, 'LU'],
+    ['TRUE PEAK', v(11), 'dBTP'], ['PLR', t && Number.isFinite(t[13]) && t[13] > -70 ? t[13] : null, 'LU']];
+  const cw = w / 3, chh = h / 2;
+  cells.forEach(([lab, val, u], i) => { const cx = x0 + (i % 3) * cw + 8, cy = y0 + Math.floor(i / 3) * chh + 6;
+    g.fillStyle = C(.55); g.font = `600 9px ${X.font}`; g.fillText(lab, cx, cy);
+    g.fillStyle = i < 2 ? '#3cc8b9' : C(.9); g.font = `700 ${Math.min(22, chh * .38)}px ${X.font}`; g.fillText(n1(val), cx, cy + 13);
+    g.fillStyle = C(.55); g.font = `600 9px ${X.font}`; g.fillText(u, cx, cy + 13 + Math.min(22, chh * .38) + 2); });
+  if (!fresh){ g.fillStyle = C(.45); g.font = `600 9px ${X.font}`; g.fillText('waiting for sound…', x0 + w - 110, y0 + h - 14); }
+  g.strokeStyle = C(.22); g.lineWidth = 1; g.strokeRect(x0 + .5, y0 + .5, w - 1, h - 1);
+  g.restore();
 }
 /* ---------- mastering window ---------- */
 const MW_STAGES = [['eq', 'EQ'], ['sup', 'SUPPRESS'], ['comp', 'COMPRESS'], ['lim', 'LIMIT']];
@@ -18975,10 +19391,16 @@ function deckFx(){
       b.type = 'button'; b.title = TFX[f.type].long + (f.on ? '' : ' (off)'); b.addEventListener('click', () => { dkFxSel = k; deckFx(); }); sl.append(b); });
     const f = A[dkFxSel];
     if (!f){ box.append(el('p', 'note', 'No effects on this track. Add them on the FX screen (Mixer → FX row).')); return; }
-    const getF = () => FA()[dkFxSel], on = () => fxChanged(mst ? NT : dkTrack());
+    const getF = () => FA()[dkFxSel], on = () => { const g = getF(); if (g && isPumpT(g.type)) delete g.pname; fxChanged(mst ? NT : dkTrack()); };
     for (const q of TFX[f.type].ps){
-      const def = {l:q.l.charAt(0) + q.l.slice(1).toLowerCase(), min:q.min, max:q.max, c:'int', d:q.d, f:q.fmt};
+      // (a choice shows its name; …PUMP boxes read the slot for the exact value)
+      const def = {l:q.l.charAt(0) + q.l.slice(1).toLowerCase(), min:q.min, max:q.max, c:'int', d:q.d, f:q.names ? v => q.names[v] ?? String(v) : q.tpl || q.band ? v => q.fmt(v, getF()) : q.fmt};
       const r = makeRow(def, q.k, getF, {idp:'dkf' + dkFxSel, on}); box.append(r.r); dkFxRows.push(r); }
+    if (isPumpT(f.type)){   // …PUMP: its presets and its window
+      const tt = mst ? NT : dkTrack(), sl0 = dkFxSel, bar = el('div', 'dkslots dkpump');
+      const pb = el('button', null, 'PRESET ▾'); pb.type = 'button'; pb.title = 'Factory presets'; pb.addEventListener('click', () => pumpPresetOpen(tt, sl0));
+      const ob = el('button', null, 'OPEN'); ob.type = 'button'; ob.title = 'Its full window'; ob.addEventListener('click', () => PumpFX.open(tt, sl0));
+      bar.append(pb, ob); box.append(bar); }
   }
   dkFxRows.forEach(r => { if (r.getObj()) r.refresh(); });
 }

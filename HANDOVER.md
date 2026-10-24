@@ -57,7 +57,8 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    - LXR names go with `lxr/`; if it stays, keep them truthful ("from the LXR-02 firmware"), as its NOTICE requires.
    - Find them: `grep -n -E "Plaits|Elements|Clouds|Rings|Beads|Genesis|SoundBlaster|Roland|CR-78|808|909|606|707|727|505|Nord|M1 style|MPC" index.html chains/index.html waves/index.html README.md`
    - check that "Thunder Plus" / "...Thunder" is free to use as a product name where it would be sold.
-4. **Notices that must ship** (in place; keep them current): `THIRD_PARTY_NOTICES.md` (the MIT texts and credits; it is
+4. **Notices that must ship** (in place; keep them current): `THIRD_PARTY_NOTICES.md` (the MIT texts and credits, and pffft's
+   BSD-style notice for `pump/pump.wasm`, which is otherwise the owner's own …pump code: nothing to remove for a closed build; it is
    copied into the desktop app), `fonts/OFL-*.txt`, `sounds/FluidR3Mono_License.md`, and Electron's own licence files
    (electron-builder adds them). The credits shown in the app (`FX_CREDIT`, the effect help) stay.
 5. **Thunder Plus's own terms:** pick a licence or EULA, set `"license"` in `electron/package.json`, and decide whether
@@ -65,6 +66,78 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
 6. **Plugins and mobile, if they happen** (`docs/ENGINE-PLUGIN-PLAN.md`): iPlug2 is permissive; JUCE needs a paid licence
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
+
+## 23 Oct (5): the nine …pump plugins as bus and master effects (stage 1 of 3: sound, FX boxes, the pop-up interface)
+
+Cache `thunderplus-v220`, `pump/pump.wasm?v=1`, `pump/pump-meta.js?v=1` (both new; `sw.js` FILES and `electron/copy-app.js`
+PARTS / its refs check have `pump`). Owner: "add these to thunder plus as FX I could use on Bus and the master track", with
+"parameters in that screen that look like all of the other plugins"; later stages add "a pop up window that you can open
+from the FX screen" with each plugin's whole interface. The mastering window (`master-worklet.js`, `S.mst`) is untouched.
+**Read `docs/PUMP-FX.md`**: the slot format, `window.PumpFX` (the interface the pop-ups build on), telemetry layouts,
+latency, CPU. Search `…PUMP` in index.html.
+- **DSP = the plugins' own code.** matthettich/pump (local commit, not pushed): `wasm/pump_wasm.cpp` (one C interface;
+  `Host<Name>` = each `Plugin<Name>.hpp` without DPF: same prepare/activate/sync/run, chunking, BypassMixer, sanitising,
+  ScopeRings / MeterValues), `wasm/pump_meta.cpp` (Params.hpp tables → `pump-meta.js`, so presets and ranges stay in
+  parity), `wasm/build.sh` (wasi-sdk 25, `-O3 -ffast-math -fno-finite-math-only -msimd128`, pffft's wasm SIMD; 582 kB, imports
+  fd_close/fd_seek/fd_write only), `wasm/compare.cpp` + `compare.mjs` (wasm vs native), `tests/wasm_wrapper.cpp`. No threads
+  in a worklet: new compile option **`PUMP_SYNC_KERNELS`** (Util.hpp, FFT.hpp, Multiband.hpp, EQEngine.hpp) designs the
+  worker-thread kernels on the calling thread (EQ linear phase: at most one kernel build per 80 ms of audio while values
+  move; it allocates on the audio thread, so expect a crackle when dragging EQ values in linear phase on a phone). Plugins
+  unchanged (`make`, `make tests` pass; the tests now also run EQ/BAND/WIDE/HEAT built with the option, and the wrapper test).
+- **Slots** (`TFX` keys `peq pcomp plimit pcalm ptone pband pwide pheat pmeter`, short names pEQ pCOMP pLIM pCALM pTONE pBAND
+  pWIDE pHEAT pMETR, group "Mastering (…pump)" last in the picker): `f.pump` holds **every** plugin parameter by symbol (plugin
+  units); `f.on` is the plugin's bypass (latency-matched; `pump.bypass` ignored); `f.sel` the band the band rows show; `f.sck`
+  COMP's External sidechain feed (Thunder's Source list: sends, tracks; `sckUses` / `slotScks` include it, so taps connect);
+  `f.pname` last preset. The FX boxes are bytes `f.p_*` mirroring `f.pump` (`pumpBytes` writes them from `f.pump`, `pumpSync`
+  writes a moved box into `f.pump`; `fxChanged` runs it first). `freshTfx` / `normTfx` / `tfxChain` branch on `TFX[k].pump`.
+  Box display: the exact value while the byte still matches it (a preset or pop-up can set values between byte steps).
+- **FX-screen boxes** (`PUMP_BOX`; a choice is its name, on/off a toggle, small whole numbers themselves, the rest 00–FF on
+  the plugin's own knob curve): EQ out_gain, auto_gain, phase, BAND (1–24) + that band's used, shape, freq, gain, Q, slope,
+  place, dyn, dyn range, dyn thresh · COMP style, threshold, ratio, knee, attack, release, auto release, range, output, auto
+  makeup, mix, SC source, SC FROM (Thunder's), SC HPF · LIMIT gain, ceiling, style, lookahead, attack, release, true peak,
+  oversampling · CALM depth, sharpness, selectivity, attack, release, mode, focus low/high, mix, quality · TONE recover, tame,
+  bias, brighten, body, speed, auto level, output, mix, quality · BAND bands, xover 1–3, crossover, output, mix, auto makeup,
+  BAND (1–4) + mode, thresh, ratio, attack, release, range, makeup · WIDE output, balance, mono bass, mono freq, bands, xover
+  1–3, BAND + width, stereoize · HEAT output, mix, oversampling, auto gain, bands, xover 1–3, BAND + mode, drive, band mix,
+  level · METER target, custom LUFS, custom TP. Then **› PRESET** (the factory list in the FX picker, FACTORY / SOURCES /
+  CHAINS headings: `pumpPresetOpen`, `fxp.pre`), **› OPEN** (`PumpFX.open` → `PumpFX.openHook`, a toast until the pop-ups
+  exist) and METER's **› RESET**. The bottom panel's FX part shows the same rows plus PRESET ▾ / OPEN (and now shows choice
+  names for every effect's choice rows; it printed a % before).
+- **Only buses and the master**: `fxtL(t)` (the picker, SLOT stepping, `fxsChoose`) hides pump types unless `pumpAllowed(t)`
+  (`t >= NT || isBusT(t)`); `fxActiveStep` / ADD TO SLOT fall back to EQ. A slot keeps its effect if the bus stops being one.
+- **Worklet** (`TFX_SRC`): pump.wasm goes to each audio thread once, in the first effect node's `processorOptions.pump`
+  (`pumpSent` per context), else a node asks (`{needPump}` → `{pumpBytes}`; `pumpWait` holds askers until the fetch
+  lands). One module instance per audio thread (`globalThis.__pumpX`), a handle per slot; values go by index (`pv`, with
+  `bi` = bypass index), `pump_commit` diffs them like a host. Telemetry: `pump_tel` once per report (it exchanges the meters);
+  with `{tel:true}` (FX stage) COMP / LIMIT / BAND feed the dynamics display, METER / LIMIT their numbers (`{pump:[…]}` →
+  `node.pmeter`); a pop-up's `{ptel:{key,on,back}}` adds the full frame with each ScopeRing's new samples. `{phold}` =
+  Alt-listen. `{plat}` reports latencies when they change. NaN / crash: restart or bypass, as the other wasm slots.
+- **FX stage** (1920-wide screens; at 1600 the stage has no room, as for every effect): pCOMP draws its curve + GR
+  history, pLIM the limiter curve, pBAND the GR lane (no single curve); a METER slot shows short-term / integrated /
+  momentary / LRA / true peak / PLR (`pumpMeterPaint`).
+- **Latency**: no compensation in Thunder's FX chains. Master: harmless live; **renders now trim it** (`pass()` adds
+  `pumpChainLatency(S.mfx)` to the mastering's latency; `pumpLatencyOf` asks a main-thread copy of pump.wasm, `pumpMain`).
+  Bus: plays late against the other tracks; the ACTIVE line / OPEN help / a toast for CALM, TONE, LIMIT on a bus say so.
+  Pump types are in `TAILS` so renders run past their latency (the silence after is trimmed).
+- **CPU / defaults** (node, this machine, ms per s of audio): EQ 1–5 (linear 10–14), COMP 8–16, LIMIT 35 (oversampling off;
+  2x 45, 8x 76), CALM 10–12, TONE 11–16, BAND 12–22, WIDE 6–8, HEAT 11 (1x; 4x 43), METER 17; in the page each node's
+  load was 0.7–4.7 % of real time. New slots start at the plugin defaults except LIMIT and HEAT oversampling off
+  (`PUMP_START`); presets that don't set oversampling keep it (`PUMP_CPU`; `applyPreset(…, {keepCpu:false})` = exactly the
+  plugin).
+- Checked: wasm vs native build of the same wrapper on pump's test mix, 10 s, 49 effect/preset runs incl. a mid-run value
+  change: identical for 13, worst difference −135.5 dB relative to the output (EQ linear phase), typically −140…−150 dB, same
+  latencies. Headless (1920 × 1080 and 412 × 915), demo song, bus = tracks 1 + 2 → …chains Chain Out 4: each of the nine on
+  the bus and on the master, put in through the FX picker; sound passes (telemetry out peaks), each acts (COMP GR −26 dB at
+  −40 / 4:1; LIMIT +12 dB holds −1.0 dBTP, GR 15 dB; CALM 7.5 dB reduction; TONE band gains; BAND GR −24/−17/−8 dB, RMS −7 dB;
+  WIDE correlation 1 → 0.6 with stereoize; HEAT level match; METER −15 LUFS); a box moves `f.pump` and undo/redo restores
+  it; preset 1 of each applies exactly; COMP SC FROM track 1 keys it (GR 0 → −30 dB); a live drag is one undo step;
+  `subscribe` gone on a type change; save → reload round-trips every slot (both rounds identical JSON); renders line the
+  master up (onset sample identical with LIMIT, CALM + TONE on the master); the mastering window's limiter still limits
+  (peak −1.9 → −3.9 dBFS, also with a pump COMP on the master); plain-track pickers list no pump effect; no page errors.
+  **Not heard by ear; not tried on the Fold.**
+- **Open / next stages**: the pop-up windows (stage 2–3; build on `PumpFX`, see docs/PUMP-FX.md "What the pop-up stage
+  should do"); delay compensation for buses (none anywhere in Thunder yet); the phone FX screen has no dynamics display (as
+  before); the bottom panel's FX part follows its own slot buttons, not the FX cursor (as before).
 
 ## 23 Oct (4): the LXR-02's voices as engines (lxr/, GPL-3.0, optional)
 
