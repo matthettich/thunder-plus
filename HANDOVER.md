@@ -3002,3 +3002,20 @@ Deliberately left for later:
 - Not built or run in the cloud session (no npm registry access there): first real run is the owner's.
 - Auto-update: `electron/updater.js` (electron-updater, GitHub provider `matthettich/thunder-plus`). The workflow's
   `release` job (tags `vX.Y.Z` only) runs `gh release create` with every platform's files incl. `latest*.yml`.
+
+## Track focus, live song edits, Ctrl/⌘+N and Ctrl/⌘+T (24 Oct)
+
+- **FOCUS TRACK** (`focusT()`, beside `dkTrack()`): one answer to "which track am I on" for the bottom panel (INST,
+  …CHAINS, FX, TRACK) and the FX target in `draw()`. Arrange (or the song strip) holding the keys → its cursor's track;
+  Mixer → its cursor (MASTER row = master); FX → its track; else the open track. `MT` means the master: the panel then
+  shows FX · MASTER and a MASTER strip (S.master level, master-out meter; pan, mute, solo, INST and …CHAINS hidden).
+  Fixed with it: Arrange's master click left the panel on the phrase's track; the Mixer's master row showed track 01;
+  Arrange beside Mixer/FX only moved them on blocks with a phrase (now empty blocks and the master too); clicking a
+  screen tab while Arrange had the keys bounced the next key back to Phrase (go() now drops the focus); ▲▼ on the
+  Song/Arrange master column jumped to the last track.
+- **LIVE SONG EDITS** (in `makeSeq`, `wake()`): with the song playing live, a track that had no block when PLAY started
+  joins as soon as its cell on the lead track's song row gets a block, lined up with that row's start (`T.r0`). Renders
+  and BUS PLAY are unchanged. Notes in blocks already playing were always read live.
+- **Ctrl/⌘+N** new song (`newSong()`, shared with the File menu and Project's › NEW SONG). **Ctrl/⌘+T**
+  (`newPhraseRight()`): a new empty phrase on the nearest empty non-bus track to the right on the current song row,
+  opened there. Both are browser-reserved in a tab; they work in the desktop app.

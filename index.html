@@ -1294,6 +1294,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkScope{--dkc:#dbe6f8; flex:0 0 var(--dkws, 300px); min-width:90px}
 #dkInst{--dkc:#fbe2d2; flex:1 1 0; min-width:210px}
 #dkFx{--dkc:#f8dce8; flex:0 0 var(--dkwf, 320px); min-width:200px}
+.tdeck.mst #dkFx{flex:1 1 var(--dkwf, 320px)}   /* FOCUS TRACK: on the master, FX takes the room INST and …CHAINS leave */
 /* Sections keep their widths: when they don't all fit, the panel scrolls sideways instead of squeezing them (only the
    instrument section gives up its spare room). */
 /* …chains controls mapped into the panel: columns of rows that grow sideways (the panel scrolls), a module's name above its controls */
@@ -2190,7 +2191,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Delete · Backspace</dt><dd>clear the cell under the cursor; a highlighted selection is cleared as a whole</dd>
         <dt>Shift+Delete/Backspace</dt><dd>clear the whole row, then step down</dd>
         <dt>Insert · Ctrl/⌘+Backspace</dt><dd>add a row · remove a row (rows below move up)</dd>
-        <dt>Ctrl/⌘ S</dt><dd>save · Shift+Ctrl/⌘+S save as · Ctrl/⌘+O open</dd>
+        <dt>Ctrl/⌘ S</dt><dd>save · Shift+Ctrl/⌘+S save as · Ctrl/⌘+O open · Ctrl/⌘+N new song</dd>
+        <dt>Ctrl/⌘ T</dt><dd>a new, empty phrase on the nearest empty track to the right, on the song row you're on (Song, Sect, Phrase)</dd>
         <dt>Ctrl/⌘ Z Y</dt><dd>undo, redo (Shift+Ctrl/⌘+Z redo too)</dd>
         <dt>Shift+Alt arrows</dt><dd>as PAD mode's OPTION+arrows: in a phrase, the phrase above / below / left / right on the Song grid; on the Song, the next block that way</dd>
         <dt>[ ]</dt><dd>previous / next sect, phrase or instrument, by number</dd>
@@ -11260,7 +11262,7 @@ function fileItems(){
     null,
     ['Phrases… (find ones not on the song)', () => phlOpen(true)],
     null,
-    ['New song', guardLeave('a new song', () => { setSong(freshSong(), 'New song. The kit is unchanged.'); setDirty(false); }), null, null, true],
+    ['New song', newSong, null, 'N', true],
     ['Open project…', openProj, null, 'O'], ...(recentL.length ? [['Open recent…', openRecent]] : []),
     ['Save project' + (projLabel() ? ' (' + projLabel() + ')' : '') + (projDirty ? '  •' : ''), () => saveProj(false), null, 'S'], ['Save as…', () => saveProj(true), null, '⇧S'],
     ['Restore a backup…', restoreBackup],
@@ -14294,8 +14296,9 @@ function makeSeq(S, mode, o){
   // BUS FX ONLY (owner, 22 Oct): the tracks that are buses when PLAY starts play their commands, not their notes; a track
   // that becomes a bus while it plays keeps its notes until PLAY starts again.
   const busT = new Set(); for (let t = 0; t < NT; t++) if (isBusT(t)) busT.add(t);   // loop: {y0,y1} rows to cycle; api.setLoop swaps it while playing
-  for (let t = 0; t <= MT; t++) tr.push({on:false, empty:false, row:0, cr:0, step:0, inst:0, rate:1, tsp:0, next:-1, last:null, rnl:{}, rnlNote:0, nth:new Map(), arc:{mode:0, spd:1},
-    rel:0, g:0, grv:null, dir:0, pp:1, cnt:0});   // dir/pp/cnt: DIR's play direction, ping-pong heading, steps played this pass
+  const fresh = () => ({on:false, empty:false, row:0, cr:0, step:0, inst:0, rate:1, tsp:0, next:-1, last:null, rnl:{}, rnlNote:0, nth:new Map(), arc:{mode:0, spd:1},
+    rel:0, g:0, grv:null, dir:0, pp:1, cnt:0, r0:0});   // dir/pp/cnt: DIR's play direction, ping-pong heading, steps played this pass; r0: when it entered its song row
+  for (let t = 0; t <= MT; t++) tr.push(fresh());
   const api = {time:0, bpm:S.bpm, tks:clamp(S.ticks || TICKS, 1, 32), grv:null, base:null, bt:0, btT:null};
   const NIs = niOf(S);   // INS goes up to the song's instruments (0F for songs from before 64)
   const lenOf = id => id >= 0 && S.plen ? clamp(S.plen[id] || 16, 1, PROWS) : 16;
@@ -14351,6 +14354,26 @@ function makeSeq(S, mode, o){
   else { const T = tr[o.track]; T.on = true; if (loop) T.step = loop.y0; settle(T, o.track); }
   api.alive = () => tr.some(T => T.on);
   api.setLoop = l => { loop = l || null; };
+  /* LIVE SONG EDITS (owner, 24 Oct: notes typed into a track while the SONG plays never sounded when that track had no
+     block when PLAY started, e.g. a new phrase on an empty track in Pattern view: each track walks the song on its own and
+     an idle one never looked again). While playing live, an idle track whose cell on the song row the others are on gets a
+     block joins them, lined up with that row's start (a lead track's r0), from the next line of its phrase. Its notes
+     then play as the playhead crosses them. Renders and BUS PLAY's set of tracks are as before. Phrases and blocks already
+     playing were always read live (S), so edits to them were heard (250 ms ahead of the playhead). */
+  const wakeOk = mode === 'song' && !once && !!o.live;
+  function wake(rel){
+    let L = null; for (let t = 0; t <= MT; t++){ const T = tr[t]; if (T.on && !T.empty){ L = T; break; } }
+    if (!L) return;
+    const y = L.row; if (y < 0 || y > 255 || !S.song[y]) return;
+    for (let t = 0; t <= MT; t++){
+      const T = tr[t]; if (T.on || !(t < (S.ntr || 16) || t === MT) || (o.only && !o.only.has(t))) continue;
+      const cid = S.song[y][t], c = cid >= 0 ? S.chains[cid] : null, p = c && c[0] ? c[0][0] : -1;
+      if (p < 0 || (loop && (y < loop.y0 || y > loop.y1))) continue;
+      const line = 60 / api.bpm / plpbOf(S, p), st = Math.max(0, Math.ceil((rel - L.r0) / line - 1e-6));
+      if (st >= lenOf(p)) continue;   // past its end on this row: it starts with the next row
+      Object.assign(T, fresh(), {on:true, row:y, cr:0, step:st, g:st, cnt:st, r0:L.r0, rel:L.r0 + st * line});
+    }
+  }
   // A random whole number from -dn to +up.
   const rint = (dn, up) => Math.floor(rand() * (dn + up + 1)) - dn;
   // Arpeggio: [time, rate multiplier] pairs from `at` to the end of the step.
@@ -14381,6 +14404,7 @@ function makeSeq(S, mode, o){
     if (api.base == null) api.base = api.time;
     let rel0 = Infinity; for (const T of tr) if (T.on && T.rel < rel0) rel0 = T.rel;
     if (rel0 === Infinity) rel0 = api.time - api.base;
+    if (wakeOk) wake(rel0);   // LIVE SONG EDITS: a track given a block while the song plays joins in
     const t0 = api.base + rel0, evs = [], pos = new Array(NT + 1).fill(null), {amt:sw, beat:swB} = swingOf();
     let nb = api.bpm, ngrv = api.grv; const tks0 = api.tks;
     // The song position in beats at this step, for the player's beat clock (tempo-locked effects).
@@ -14538,13 +14562,14 @@ function makeSeq(S, mode, o){
       else T.step = dirNext(T, T.step, L);
       // A phrase selection loops mid-phrase: wrap as soon as the step passes the loop's last row.
       if (mode === 'phrase' && loop && T.next < 0 && (T.step > loop.y1 || T.step < loop.y0)) T.step = loop.y0;
+      let newRow = false;
       if (T.step >= L){
         T.cnt = 0;
         T.step = T.next >= 0 ? T.next : 0; T.next = -1;
         if (mode === 'phrase'){ if (loop && T.step >= loop.y1 + 1) T.step = loop.y0; }
         else { T.cr++;
           if (loop && mode === 'sect' && (T.cr > loop.y1 || T.cr < loop.y0)) T.cr = loop.y0;
-          settle(T, t); }
+          settle(T, t); newRow = T.cr === 0; }
       }
       // The row just moved to: an empty numbered song cell counts as an empty pattern, so its steps
       // run to emptyLen() rather than the plain default.
@@ -14552,6 +14577,7 @@ function makeSeq(S, mode, o){
         if (dirGo !== -1) T.step = dirGo === Infinity ? L2 - 1 : dirGo === -2 ? Math.floor(rand() * L2) : clamp(dirGo, 0, L2 - 1);
         if (T.step >= L2) T.step = 0; }
       T.rel += dur; T.g++;
+      if (newRow) T.r0 = T.rel;   // LIVE SONG EDITS: the song row starts here (what a waking track lines up with)
     }
     // TPO or TIC on this row: tell the player, so tempo-synced …chains modules follow (live and in renders).
     if (nb !== api.bpm || api.tks !== tks0) evs.push({type:'tempo', t:t0, bpm:nb, tks:api.tks});
@@ -16026,6 +16052,8 @@ async function okToLeave(what){
   return await saveProj(false);
 }
 const guardLeave = (what, fn) => async () => { if (await okToLeave(what)) fn(); };
+// NEW SONG: the File menu, Project's › NEW SONG and Ctrl/⌘+N (owner, 24 Oct). Clears the song, keeps the kit; unsaved changes ask first.
+function newSong(){ return guardLeave('a new song', () => { setSong(freshSong(), 'New song. The kit is unchanged.'); setDirty(false); })(); }
 let saving = false;
 // Save: back to the project's file (the desktop app writes it by path; Chrome / Edge through the file handle), else it asks
 // where. Elsewhere (phones) it downloads a copy. Save as always asks. True when it saved.
@@ -16774,7 +16802,7 @@ function projRows(){
     ...(noChains() ? [] : [{l:'› EXPORT CHAINS', act:exportChains, info:() => 'Save the …chains patch (lives in the song) as its own .chains.json file'},
     {l:'› IMPORT CHAINS', act:() => $('chainsIn').click(), info:() => 'Load a .chains.json file into this song (…waves patches work too, keeping their effects)'}]),
     ...(canShareProj() ? [{l:'› SHARE PROJECT', act:shareProj, info:() => 'Send the project file (song and kit) to Drive, email, a chat or your other device, then open it there with LOAD PROJECT'}] : []),
-    {l:'› NEW SONG', dbl:true, act:guardLeave('a new song', () => { setSong(freshSong(), 'New song. The kit is unchanged.'); setDirty(false); }), info:() => 'Clears the song, keeps the kit. Tap EDIT twice'},
+    {l:'› NEW SONG', dbl:true, act:newSong, info:() => 'Clears the song, keeps the kit. Tap EDIT twice · Ctrl/⌘+N'},
     {l:'› LOAD DEMO', dbl:true, act:guardLeave('the demo song', () => { setSong(demoSong(), 'Loaded the starter beat.'); setDirty(false); }), info:() => 'Replaces the song with the starter beat. Tap EDIT twice'},
     {l:'INPUT', sec:'Input', gap:true, get:() => inMode === 'keys' ? 1 : 0, set:v => setInput(v ? 'keys' : 'pad'), min:0, max:1, tog:true, d:0, fmt:v => v ? 'KEYS' : 'PAD', info:() => 'PAD: on-screen d-pad and four keys; the keyboard still types notes and hex (Z = OPTION, X = EDIT, Alt+arrows page). KEYS: type notes and hex, with an on-screen keypad on touch screens'},
     {l:'COMMANDS', get:() => cmdOn ? 1 : 0, set:v => setCmd(!!v), min:0, max:1, tog:true, d:+coarse, fmt:onOff, info:() => 'A row of buttons for the two-key commands: change value, clear, select, copy, cut, paste, other sect or phrase, play the song'},
@@ -17598,7 +17626,7 @@ function move(dx, dy){
   if (tv === 'phrase' && dx){ const C = pCols(), i = Math.max(0, C.indexOf(c.x)); c.x = C[clamp(i + dx, 0, C.length - 1)]; }
   else if (tv === 'mixer' && c.y === 7 && dx){ c.mx = clamp((c.mx || 0) + dx, 0, 1); return draw(); }
   else if (tv === 'song' && dx){ const ui = clamp((c.x === MT ? ntr() : c.x) + dx, 0, ntr()); c.x = ui === ntr() ? MT : ui; }   // the master column sits after the last track
-  else c.x = clamp(c.x + dx, 0, d.w - 1);
+  else if (!(tv === 'song' && c.x === MT)) c.x = clamp(c.x + dx, 0, d.w - 1);   // FOCUS TRACK (24 Oct): ▲▼ on the master column stay on it (they jumped to the last track)
   const wasY = c.y; c.y = clamp(c.y + dy, 0, d.h - 1);
   if (tv === 'mixer' && c.y === 7 && wasY !== 7) c.mx = 0;
   draw();
@@ -17804,6 +17832,30 @@ function songGridDir(dir){
 // block that plays it (the phrase's own track first, then any track), so the Song screen and the Arrange
 // panel follow phrase changes live and the place is kept when you switch back to the Song screen. A
 // phrase that is not placed in the song leaves the cursor where it is.
+/* NEW PHRASE RIGHT (owner, 24 Oct): Ctrl/⌘+T puts a new, empty phrase (the lowest free number) on the nearest empty track to
+   the right of the one you're on, on the song row you're on, and opens it there: on track 02 with track 04 filled and
+   track 05 empty, it lands on track 05. Buses are stepped over (they hold FX commands, not notes); the master never gets
+   one. Song screen (and Arrange holding the keys): the song cursor moves to the new block (Arrange's phrase follows it).
+   To remove: delete this function and its line in keysDown (marked NEW PHRASE RIGHT). */
+function newPhraseRight(){
+  const song = tv === 'song';
+  if (!song && tv !== 'phrase' && tv !== 'sect') return toast(`${keyHint('mod+T')} adds a phrase on the next empty track: on the Song, Sect or Phrase screen.`);
+  if (tv === 'phrase' && !(pendPlace && pendPlace.p === cPhrase) && !pvHas(cs.song.y, cTrack, cPhrase)) followPhraseBlock();   // the row the open phrase sits on
+  const t0 = song ? cs.song.x : cTrack, y = cs.song.y, n = ntr();
+  if (t0 === MT || t0 >= n - 1) return toast('There is no track to the right of this one.');
+  let t = -1; for (let u = t0 + 1; u < n; u++) if (!isBusT(u) && S.song[y] && S.song[y][u] < 0){ t = u; break; }
+  if (t < 0) return toast(`No empty track to the right of track ${d2(t0 + 1)} on song row ${rS(y, 3)}.`);
+  const p = freePhrase(); if (p < 0) return toast('No free phrases left.');
+  setSongPhrase(t, y, p); const cid = S.song[y][t];
+  if (cid < 0) return toast('No free sects left.');
+  if (pendPlace && pendPlace.p === cPhrase && isEmptyPhrase(S.phrases[cPhrase])) pendPlace = null;   // an untouched new phrase stays off the song
+  if (song){ cs.song.x = t; selA = null; }
+  else if (tv === 'phrase' && pvActive()) pvGo(t, y, 'first', null);   // PATTERN VIEW: the cursor goes to its first column
+  else { cTrack = t; cSect = cid; cs.song.x = t; selA = null;
+    if (tv === 'phrase'){ cPhrase = p; const c = cs.phrase; c.y = clamp(c.y, 0, plen(p) - 1); c.x = 0; } }
+  toast(`Phrase ${hx(p)} on track ${d2(t + 1)} · song row ${rS(y, 3)}`);
+  draw();
+}
 function followPhraseBlock(){
   if (tv !== 'phrase' || cPhrase < 0) return;
   const cur = cs.song.y || 0;
@@ -18262,7 +18314,7 @@ function draw(){
   if (selA && selA.v !== tv) selA = null;
   // The FX target follows the track being edited: moving to another phrase (or block) moves the FX panel and the FX
   // screen with it. The master column's phrases point it at the master (MT is the FX screen's master, NT).
-  if (tv === 'phrase' || tv === 'sect') cFxT = Math.min(cTrack, NT); else if (tv === 'song') cFxT = cs.song.x === MT ? NT : Math.min(cs.song.x, ntr() - 1);
+  if (tv === 'phrase' || tv === 'sect' || tv === 'song'){ const t = focusT(); cFxT = t === MT ? NT : t; }   // FOCUS TRACK: Arrange's cursor while it has the keys
   scr.dataset.v = tv; grid.classList.toggle('grp', tv === 'song' || tv === 'mixer');   // room above the grid for the MONO / POLY labels
   const c = cs[tv], dm = dims(tv);
   if (onPset()) c.x = clamp(c.x, 0, 1); else { if (!(tv === 'song' && c.x === MT)) c.x = clamp(c.x, 0, dm.w - 1); c.y = clamp(c.y, 0, dm.h - 1); }
@@ -19228,8 +19280,20 @@ const deckH = () => deck.h || clamp(Math.round(innerHeight * 0.25), 168, 240);
 const deckSave = () => { try { localStorage.setItem(DKK, JSON.stringify(deck)); } catch(e){} };
 const deckShown = () => !$('tDeck').hidden;
 const dkSec = k => $('dk' + k[0].toUpperCase() + k.slice(1));
-// The track the panel follows: the Mixer's or FX screen's track there, otherwise the current track.
-const dkTrack = () => Math.min(tv === 'song' ? cs.song.x : tv === 'mixer' ? cs.mixer.x : tv === 'fx' && cFxT < NT ? cFxT : cTrack, ntr() - 1);
+/* FOCUS TRACK (owner, 24 Oct: in Pattern view a click on Arrange's master left the panel's FX and TRACK on track 02, and
+   the Mixer's master row showed track 01). The one track every follower shows: the bottom panel (INST, …CHAINS, FX, TRACK)
+   and the FX target. Arrange (or the song strip) holding the keys: its cursor's track, as on the Song screen; the Mixer:
+   its cursor's track (the MASTER row: the master); FX: its track; else the open track. MT is the master. */
+function focusT(){
+  const n = ntr(), tr = t => t === MT ? MT : Math.min(t, n - 1);
+  if (tv === 'song' || (apReady && apF)) return tr(cs.song.x);
+  if (tv === 'mixer') return cs.mixer.y === 7 ? MT : tr(cs.mixer.x);
+  if (tv === 'fx') return cFxT >= NT ? MT : tr(cFxT);
+  return tr(cTrack);
+}
+const dkMst = () => focusT() === MT;
+// The track the panel follows (focusT); on the master, the last track for callers that need one (they check dkMst first).
+const dkTrack = () => { const t = focusT(); return t === MT ? ntr() - 1 : t; };
 // The instrument the panel shows: on Song, the one the block under the cursor plays; on Mixer and FX, the first
 // one the track's blocks play; in a phrase (and anywhere else) the current instrument.
 function dkInstNow(){
@@ -19260,8 +19324,8 @@ function deckLayout(){
   $('tDeck').style.setProperty('--dkh', deckH() + 'px');
   $('tDeck').style.setProperty('--dkws', deck.ws + 'px'); $('tDeck').style.setProperty('--dkwf', deck.wf + 'px');
   // BUS (owner, 22 Oct): on a bus track the instrument part steps aside, so its …chains controls get the room.
-  const bus = isBusT(dkTrack());
-  for (const [k, l] of DK_SECS){ const sct = dkSec(k), col = DK_FOLD.has(k) && !deck[k]; sct.hidden = k === 'inst' && bus; sct.classList.toggle('col', col); sct.classList.toggle('first', k === 'scope');
+  const mst = dkMst(), bus = !mst && isBusT(dkTrack()); $('tDeck').classList.toggle('mst', mst);   // FOCUS TRACK: the master has no instrument or …chains of its own
+  for (const [k, l] of DK_SECS){ const sct = dkSec(k), col = DK_FOLD.has(k) && !deck[k]; sct.hidden = (k === 'inst' && (bus || mst)) || (k === 'chn' && mst); sct.classList.toggle('col', col); sct.classList.toggle('first', k === 'scope');
     const t = sct.querySelector('.dkt'); if (t && DK_FOLD.has(k)){ t.setAttribute('aria-expanded', String(!col)); t.title = col ? 'Open ' + l : 'Fold ' + l + ' to a narrow strip'; } }
   $('dkBody').hidden = false; if ($('dkBare')) $('dkBare').hidden = true; $('dkOffs').hidden = true;
   // ✕ (and SOLO) at the end of TRACK's header. Only moved when out of place: this runs on every redraw, and moving a
@@ -19272,36 +19336,39 @@ function deckLayout(){
 // Channel strip: the current track's level, fader, pan, mute and solo.
 const stVol = $('stVol'), stPan = $('stPan');
 // The fader: drag up and down (0–255, 224 is the default), arrows step it, double-click resets.
-const stSet = v => { const t = dkTrack(); S.mix[t].vol = clamp(Math.round(v), 0, 255); mixChanged(); deckStrip(); };
+const stGet = () => dkMst() ? S.master : S.mix[dkTrack()].vol;
+const stSet = v => { v = clamp(Math.round(v), 0, 255); if (dkMst()){ S.master = v; rtRoute(); saveS(); } else { S.mix[dkTrack()].vol = v; mixChanged(); } deckStrip(); };
 const stPos = v => { const h = stVol.clientHeight - 16; return 8 + v / 255 * h; };
 stVol.addEventListener('pointerdown', e => { e.preventDefault(); try { stVol.setPointerCapture(e.pointerId); } catch(_){} stVol.focus();
-  const r = stVol.getBoundingClientRect(), h = r.height - 16, y0 = e.clientY, v0 = S.mix[dkTrack()].vol;
+  const r = stVol.getBoundingClientRect(), h = r.height - 16, y0 = e.clientY, v0 = stGet();
   // A grab on the cap moves it relative (no jump); a press elsewhere on the track jumps there first.
   const capY = r.bottom - stPos(v0); let base = Math.abs(e.clientY - capY) < 12 ? v0 : clamp((r.bottom - 8 - e.clientY) / h * 255, 0, 255), from = y0;
   if (base !== v0) stSet(base);
   const mv = ev => { stSet(base + (from - ev.clientY) / h * 255 * (ev.shiftKey ? 0.25 : 1)); };
   const up = () => { stVol.removeEventListener('pointermove', mv); stVol.removeEventListener('pointerup', up); stVol.removeEventListener('pointercancel', up); };
   stVol.addEventListener('pointermove', mv); stVol.addEventListener('pointerup', up); stVol.addEventListener('pointercancel', up); });
-stVol.addEventListener('keydown', e => { const d = {ArrowUp:1, ArrowRight:1, ArrowDown:-1, ArrowLeft:-1, PageUp:16, PageDown:-16}[e.key]; if (!d) return; e.preventDefault(); e.stopPropagation(); stSet(S.mix[dkTrack()].vol + d * (e.shiftKey ? 16 : 4)); });
-stPan.addEventListener('input', () => { const t = dkTrack(); S.mix[t].pan = +stPan.value; mixChanged(); deckStrip(); });
-stVol.addEventListener('dblclick', () => { S.mix[dkTrack()].vol = TRK_UNITY; mixChanged(); deckStrip(); });
-stPan.addEventListener('dblclick', () => { S.mix[dkTrack()].pan = 128; mixChanged(); deckStrip(); });
-$('stMute').addEventListener('click', () => { const m = S.mix[dkTrack()]; m.mute = !m.mute; mixChanged(); draw(); });
-$('stSolo').addEventListener('click', () => { const m = S.mix[dkTrack()]; m.solo = !m.solo; mixChanged(); draw(); });
+stVol.addEventListener('keydown', e => { const d = {ArrowUp:1, ArrowRight:1, ArrowDown:-1, ArrowLeft:-1, PageUp:16, PageDown:-16}[e.key]; if (!d) return; e.preventDefault(); e.stopPropagation(); stSet(stGet() + d * (e.shiftKey ? 16 : 4)); });
+stPan.addEventListener('input', () => { if (dkMst()) return; const t = dkTrack(); S.mix[t].pan = +stPan.value; mixChanged(); deckStrip(); });
+stVol.addEventListener('dblclick', () => stSet(dkMst() ? 255 : TRK_UNITY));
+stPan.addEventListener('dblclick', () => { if (dkMst()) return; S.mix[dkTrack()].pan = 128; mixChanged(); deckStrip(); });
+$('stMute').addEventListener('click', () => { if (dkMst()) return; const m = S.mix[dkTrack()]; m.mute = !m.mute; mixChanged(); draw(); });
+$('stSolo').addEventListener('click', () => { if (dkMst()) return; const m = S.mix[dkTrack()]; m.solo = !m.solo; mixChanged(); draw(); });
 function deckStrip(){
   const anySolo = S.mix.some(m => m.solo); $('dkSolo').hidden = !anySolo || !deckShown();
   if (!deckShown() || !deck.strip) return;
-  const t = dkTrack(), m = S.mix[t], poly = t >= polyFrom();
-  $('dkStripT').textContent = `${trkLab(t)}${trkKind(t)}`;
-  $('dkStripB').classList.toggle('gm', !poly); $('dkStripB').classList.toggle('gp', poly);
+  const mst = dkMst(), t = dkTrack(), m = mst ? {vol:S.master, pan:128} : S.mix[t], poly = !mst && t >= polyFrom();
+  $('dkStripT').textContent = mst ? 'MASTER' : `${trkLab(t)}${trkKind(t)}`;
+  $('dkStripB').classList.toggle('gm', !mst && !poly); $('dkStripB').classList.toggle('gp', poly); $('dkStripB').classList.toggle('gx', mst);
+  stPan.disabled = mst; $('stMute').hidden = $('stSolo').hidden = mst;   // FOCUS TRACK: the master's strip is its level only
   const fy = stPos(m.vol); stVol.querySelector('.stcap').style.bottom = fy + 'px'; stVol.querySelector('.stfill').style.height = Math.max(0, fy - 8) + 'px';
-  stVol.querySelector('.st0').style.bottom = stPos(TRK_UNITY) + 'px'; stVol.setAttribute('aria-valuenow', m.vol); stVol.setAttribute('aria-valuetext', dB(trackGain(m.vol)));
+  const gain = mst ? curve(m.vol) : trackGain(m.vol);
+  stVol.querySelector('.st0').style.bottom = stPos(mst ? 255 : TRK_UNITY) + 'px'; stVol.setAttribute('aria-valuenow', m.vol); stVol.setAttribute('aria-valuetext', dB(gain));
   if (document.activeElement !== stPan) stPan.value = m.pan;
-  $('stVolV').textContent = dB(trackGain(m.vol)).replace(/^(\d)/, '+$1');
-  $('stPanV').textContent = m.pan === 128 ? 'C' : m.pan < 128 ? 'L' + Math.round((128 - m.pan) / 128 * 100) : 'R' + Math.round((m.pan - 128) / 127 * 100);
+  $('stVolV').textContent = dB(gain).replace(/^(\d)/, '+$1');
+  $('stPanV').textContent = mst ? '—' : m.pan === 128 ? 'C' : m.pan < 128 ? 'L' + Math.round((128 - m.pan) / 128 * 100) : 'R' + Math.round((m.pan - 128) / 127 * 100);
   const mu = $('stMute'), so = $('stSolo'); mu.classList.toggle('on', !!m.mute); so.classList.toggle('on', !!m.solo);
   mu.setAttribute('aria-pressed', String(!!m.mute)); so.setAttribute('aria-pressed', String(!!m.solo));
-  $('stM').title = anySolo && !m.solo ? 'Silent: another track is soloed' : '';
+  $('stM').title = mst ? 'Master level, left and right' : anySolo && !m.solo ? 'Silent: another track is soloed' : '';
 }
 // The strip's meter is stereo: the shown track's bus (after its pan) is split into left and right, each with its
 // own analyser, re-attached when the shown track changes. Peaks fall back smoothly, like the other meters.
@@ -19310,12 +19377,12 @@ function deckMetersPaint(){}
 function deckStripMeter(now){
   if (!deckShown() || !deck.strip || now - dkStT < 33) return;
   const dt = now - dkStT; dkStT = now;
-  const t = dkTrack(), bars = $('stM').children;
+  const t = dkMst() ? 'm' : dkTrack(), bars = $('stM').children, node = k => k === 'm' ? rt.out : rt.pl.buses[k].p;   // FOCUS TRACK: 'm' the master out
   if (!rt || !ctx){ for (const b of bars) b.style.setProperty('--lv', '0%'); return; }
   if (!dkSt || dkSt.t !== t){
-    try { if (dkSt){ rt.pl.buses[dkSt.t].p.disconnect(dkSt.sp); }
+    try { if (dkSt){ node(dkSt.t).disconnect(dkSt.sp); }
       const sp = ctx.createChannelSplitter(2), a = [ctx.createAnalyser(), ctx.createAnalyser()]; a.forEach((x, i) => { x.fftSize = 512; sp.connect(x, i); });
-      rt.pl.buses[t].p.connect(sp); dkSt = {t, sp, a, lv:[0, 0]}; } catch(e){ dkSt = null; return; }
+      node(t).connect(sp); dkSt = {t, sp, a, lv:[0, 0]}; } catch(e){ dkSt = null; return; }
   }
   const dk = Math.pow(0.86, Math.max(0.5, dt) * 0.12), quiet = !(tp.on || now - audioWake < 1500);
   dkSt.a.forEach((x, i) => { let p = 0;
@@ -19402,7 +19469,7 @@ function deckInst(){
 function deckFx(){
   if (!deckShown() || !deck.fx) return;
   // The master's effects when the FX target is the master (the MST column, or the FX screen on the master).
-  const mst = tv !== 'mixer' && cFxT >= NT, t = mst ? NT : dkTrack(), FA = () => (mst ? S.mfx : S.tfx[dkTrack()]) || [], A = FA();
+  const mst = dkMst(), t = mst ? NT : dkTrack(), FA = () => (mst ? S.mfx : S.tfx[dkTrack()]) || [], A = FA();
   const sig = t + ':' + A.map(f => f ? f.type + (f.on ? 1 : 0) : '-').join(',') + ':' + dkFxSel;
   $('dkFxT').textContent = mst ? 'FX · MASTER' : `FX · TRACK ${d2(t + 1)}`;
   if (sig !== dkFxSig){
@@ -19411,7 +19478,7 @@ function deckFx(){
     A.forEach((f, k) => { if (!f) return; const b = el('button', (k === dkFxSel ? 'on' : '') + (f.on ? '' : ' off'), (k + 1) + ' ' + TFX[f.type].n);
       b.type = 'button'; b.title = TFX[f.type].long + (f.on ? '' : ' (off)'); b.addEventListener('click', () => { dkFxSel = k; deckFx(); }); sl.append(b); });
     const f = A[dkFxSel];
-    if (!f){ box.append(el('p', 'note', 'No effects on this track. Add them on the FX screen (Mixer → FX row).')); return; }
+    if (!f){ box.append(el('p', 'note', mst ? 'No effects on the master. Add them on the FX screen (Mixer → MASTER row → FX).' : 'No effects on this track. Add them on the FX screen (Mixer → FX row).')); return; }
     const getF = () => FA()[dkFxSel], on = () => { const g = getF(); if (g && isPumpT(g.type)) delete g.pname; fxChanged(mst ? NT : dkTrack()); };
     for (const q of TFX[f.type].ps){
       // (a choice shows its name; …PUMP boxes read the slot for the exact value)
@@ -19490,7 +19557,7 @@ async function dkcMenu(d){
   else if (i === 2){ openChains(); const go = () => { const a = chApi(); return !!(a && a.reveal && a.reveal(d.id)); }; if (!go()){ setTimeout(go, 200); setTimeout(go, 600); } }
 }
 function deckChains(){
-  if (!deckShown() || !deck.chn) return;
+  if (!deckShown() || !deck.chn || dkSec('chn').hidden) return;   // FOCUS TRACK: hidden on the master
   const t = dkTrack(), d = S.chainPatch, L = (d && Array.isArray(d.deck)) ? d.deck : [], act = chainMods(t);
   const byId = new Map(((d && d.modules) || []).map(m => [m.id, m]));
   const live = L.filter(x => x && byId.has(x.id) && byId.get(x.id).params && typeof byId.get(x.id).params[x.p] === 'number');
@@ -20838,7 +20905,7 @@ function hdDbl(t){ const now = performance.now(), d = hdLast.t === t && now - hd
 // (the screen takes the pointer for a drag-scroll, so the double-click lands on #trk's screen, not on the title itself)
 scr.addEventListener('dblclick', e => { const t = document.elementFromPoint(e.clientX, e.clientY);
   if (t && t.closest && t.closest('#tSub') && view === 'tracker' && tv === 'phrase' && cTrack !== MT) nameTrack(cTrack); });
-$('dkStripT').addEventListener('dblclick', () => nameTrack(dkTrack()));
+$('dkStripT').addEventListener('dblclick', () => { if (!dkMst()) nameTrack(dkTrack()); });
 // Scrolling with a finger: up or down anywhere on the screen (between and beside the lines, the title, the
 // info lines) moves through the rows, the cursor riding along; sideways when big text makes lines too wide.
 let sdrag = null;
@@ -20990,6 +21057,7 @@ function globalKeys(e){
   if (mod && e.shiftKey && !e.altKey && e.code === 'KeyC'){ if (!e.repeat) cloneDown(); return true; }
   if (mod && e.altKey && !e.shiftKey && e.code === 'KeyC'){ if (!e.repeat) cloneHere(); return true; }
   if (mod && !e.shiftKey && e.code === 'KeyD'){ if (!e.repeat) dupKey(e.altKey); return true; }
+  if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyT'){ if (!e.repeat) newPhraseRight(); return true; }   // NEW PHRASE RIGHT (a browser tab keeps Ctrl+T; the desktop app gets it)
   if (mod && !e.altKey && e.shiftKey && e.code === 'KeyV'){ pasteMix(); return true; }   // SELECTION TOOLS: mix-paste
   // Clipboard, in either input mode.
   if (mod && !e.altKey && !e.shiftKey){
@@ -21001,12 +21069,13 @@ function globalKeys(e){
   }
   return false;
 }
-// Project files, from the synth or the tracker: Ctrl/⌘+S save, Shift+Ctrl/⌘+S save as, Ctrl/⌘+O open.
+// Project files, from the synth or the tracker: Ctrl/⌘+S save, Shift+Ctrl/⌘+S save as, Ctrl/⌘+O open, Ctrl/⌘+N new song.
 function fileKeys(e){
   if (!(e.ctrlKey || e.metaKey) || e.altKey) return false;
   const lo = e.key.toLowerCase();
   if (lo === 's'){ if (!e.repeat) saveProj(e.shiftKey); return true; }
   if (lo === 'o' && !e.shiftKey){ if (!e.repeat) openProj(); return true; }
+  if (lo === 'n' && !e.shiftKey){ if (!e.repeat) newSong(); return true; }   // NEW SONG (a browser tab keeps Ctrl+N for a new window; the desktop app gets it)
   return false;
 }
 document.addEventListener('keydown', e => {
@@ -21281,7 +21350,7 @@ const HINTK = {
   inst:'Ctrl+arrows change · Enter runs › rows · [ ] other instrument · Alt+← phrase',
   mixer:'Type hex for VOL and PAN · FX row: Ctrl+▲▶ on (up to 4), Ctrl+▼◀ off · Enter mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (Enter says for what) · Del resets · Alt+→ FX · Alt+↑ back',
   fx:'Type hex · Ctrl+arrows change · Enter adds · → opens its controls · Del removes or resets · [ ] other track · Alt+← mixer',
-  project:'Ctrl+arrows change · Enter runs › rows · Del resets · Ctrl+S save · Shift+Ctrl+S save as · Ctrl+O open',
+  project:'Ctrl+arrows change · Enter runs › rows · Del resets · Ctrl+S save · Shift+Ctrl+S save as · Ctrl+O open · Ctrl+N new song',
 };
 
 /* ===== ARRANGE PAGING (settings ARRANGE FOCUS and SONG STRIP) =====
@@ -21338,13 +21407,15 @@ function apFocus(f, sync){
 function apFollow(){
   const k = apKey(); if (k === apLastKey) return false; apLastKey = k;
   if (apPin) return false;
+  // Beside another screen that screen follows: FX its track's effects, Mixer its track (FOCUS TRACK, 24 Oct: on an empty
+  // block and the master column too; they used to wait for a block with a phrase), Inst the block's instrument.
+  const t = cs.song.x, hm = apHost === 'fx' || apHost === 'mixer';
+  if (apHost === 'fx') cFxT = t === MT ? NT : Math.min(t, ntr() - 1);
+  else if (apHost === 'mixer'){ if (t === MT) cs.mixer.y = 7; else { cs.mixer.x = Math.min(t, ntr() - 1); if (cs.mixer.y === 7) cs.mixer.y = 0; } }
   const r = S.song[cs.song.y], cid = r ? r[cs.song.x] : -1, p = cid >= 0 ? firstPhrase(cid) : -1;
-  if (p < 0 || (p === cPhrase && cTrack === cs.song.x)) return false;
+  if (p < 0 || (p === cPhrase && cTrack === cs.song.x)) return hm;
   cPhrase = p; cTrack = cs.song.x; cSect = cid;
-  // Beside another screen that screen follows the block: FX its track's effects, Mixer its track, Inst its instrument.
-  if (apHost === 'fx') cFxT = cTrack === MT ? NT : cTrack;
-  else if (apHost === 'mixer' && cTrack < ntr()){ cs.mixer.x = cTrack; if (cs.mixer.y === 7) cs.mixer.y = 0; }
-  else if (apHost === 'inst'){ const ii = phraseInfo(p).inst; if (ii >= 0) cInst = ii; }
+  if (apHost === 'inst'){ const ii = phraseInfo(p).inst; if (ii >= 0) cInst = ii; }
   return true;
 }
 function apAsSong(fn){ const t0 = tv, s0 = selA; tv = 'song'; selA = apSel; try { return fn(); } finally { tv = t0; selA = s0; } }
@@ -21385,7 +21456,7 @@ function apBack(){
   return apRun(f, [e, pad]); }; }
 // A screen opened by a command run for Arrange ends the focus (apBack). SHIFT+◀ on Phrase pages into Arrange; with
 // Arrange holding the keys SHIFT+▶ goes back into the phrase and SHIFT+◀ does nothing (Song is the first screen).
-{ const f = go; go = v => { if (apSong) apWent = true; return f(v); }; }
+{ const f = go; go = v => { if (apSong) apWent = true; else if (apF && v !== tv){ apF = null; apSel = null; } return f(v); }; }   // FOCUS TRACK (24 Oct): a tab clicked while Arrange had the keys
 { const f = nav; nav = dir => {
   // Beside Phrase, ▶ (Alt+→ / SHIFT+▶) does what it does on the Song screen: opens the cursor's block (its phrase, or SECT
   // with sects shown), and the keys go back to the screen (go() ends the focus). Beside another screen it goes back to it.
