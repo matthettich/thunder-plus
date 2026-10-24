@@ -623,6 +623,9 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .vengine .engbtn{min-height:36px; padding:6px 12px; font-weight:600}
 .vengine .enggrp{display:inline-flex; flex:none} .vengine .enggrp > button{margin:0} .vengine .enggrp > button + button{border-left:0}
 .vengine .engstep{min-height:36px; min-width:36px; padding:0 8px; font-size:var(--fs-3)}
+.enggrp.prestep{display:inline-flex; flex:none} .enggrp.prestep > button{margin:0} .enggrp.prestep > button + button{border-left:0}
+.enggrp.prestep .engstep{padding:0 8px}
+.enggrp.prestep .engpre{max-width:12em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .vengine .enggrp .engbtn{width:var(--engw, 9.5em); padding-inline:6px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}   /* one width for every engine, so ◀ ▶ stay put */
 .updb.storeb{background:#c0392b; color:#fff; white-space:normal; max-width:calc(100vw - 32px); z-index:21}
 @media (max-width:480px){ .top .tmode .mx{display:inline} .top .tmode,.top .tcpu{padding:0 8px} .top .tcpu{min-width:72px} }
@@ -9195,7 +9198,7 @@ function enginePresetEntries(kind){
   const v = V(), k = v.engine;
   const spec = kind === 'bass' ? {title:'Bass presets', list:BASS_PRE, fn:bassPreset} : kind === 'blip' ? {title:'Blip presets', list:BLIP_PRE, fn:blipPreset}
     : kind === 'vox' ? {title:'Voice presets', list:VOX_PRE, fn:voxPreset} : {title:(XUI[k] ? XUI[k].title : 'Engine') + ' presets', list:(XUI[k] && XUI[k].pre) || [], fn:xPreset};
-  const es = spec.list.map((pr, i) => ({key:'e' + i, name:pr[0], apply:() => spec.fn(i), make:() => onVoiceCopy(() => spec.fn(i, true))}));
+  const es = spec.list.map((pr, i) => ({key:'e' + i, name:pr[0], apply:() => { prePick(kind, i); spec.fn(i); }, make:() => onVoiceCopy(() => spec.fn(i, true))}));
   const rk = kind === 'x' ? 'x:' + k : kind, rec = recentPresets.list(rk).map(key => es.find(e => e.key === key)).filter(Boolean);
   const groups = [[spec.title.replace(/ presets$/, ''), es]]; if (rec.length) groups.unshift(['Recent', rec]);
   return {title:spec.title, groups, rk};
@@ -9216,6 +9219,21 @@ function presetEntries(kind){
       : {key, name:it[0], apply:() => onLayerPreset(key), make:() => layerVoice(it[1], it[2])}; all.set(key, e); return e; }); G.push([gn, es]); });
   const rec = recentPresets.list(kind).map(k => all.get(k)).filter(Boolean); if (rec.length) G.splice(1, 0, ['Recent', rec]);
   return G;
+}
+/* PRESET STEP (owner, 24 Oct): the preset each pad last took on each engine card, so ◀ ▶ step on from it and the card's
+   Presets button shows its name (until a knob moves it on, the name stays as a reminder of where it started). */
+const preAt = new Map();
+const preSpec = kind => { const k = V().engine; return kind === 'bass' ? [BASS_PRE, bassPreset] : kind === 'blip' ? [BLIP_PRE, blipPreset] : kind === 'vox' ? [VOX_PRE, voxPreset] : [(XUI[k] && XUI[k].pre) || [], xPreset]; };
+const preKey = kind => cur + '|' + (kind === 'x' ? V().engine : kind);
+function prePick(kind, i){ preAt.set(preKey(kind), i); }
+function preStep(kind, d){
+  const [L, fn] = preSpec(kind), n = L.length; if (!n) return;
+  const at = preAt.get(preKey(kind)), i = at == null ? (d > 0 ? 1 % n : n - 1) : ((at + d) % n + n) % n;   // the first step from nothing skips Init
+  prePick(kind, i); fn(i);
+}
+function preLabels(){
+  for (const [id, kind] of [['bassPre', 'bass'], ['blipPre', 'blip'], ['voxPre', 'vox'], ['xPre', 'x']]){ const b = $(id + 'Btn'); if (!b) continue;
+    const [L] = preSpec(kind), i = preAt.get(preKey(kind)), t = i != null && L[i] ? L[i][0] : 'Presets…'; if (b.textContent !== t){ b.textContent = t; b.title = i != null ? 'Preset: ' + t + ' (tap for the list)' : 'Presets for this engine'; } }
 }
 let pbOpen = null, pbPreview = null;
 function stopPreview(){ if (pbPreview){ try { pbPreview.stop(); } catch(e){} pbPreview = null; } }
@@ -9287,7 +9305,10 @@ function presetSheet(kind){
   // reach the card header.)
   if (ENGINE_PRESET_SHEET) for (const [id, kind] of [['bassPre', 'bass'], ['blipPre', 'blip'], ['voxPre', 'vox'], ['xPre', 'x']]){ const sel = $(id); if (!sel) continue;
     const b = el('button', 'sm presel engpre', 'Presets…'); b.type = 'button'; b.id = id + 'Btn'; b.title = 'Presets for this engine'; b.setAttribute('aria-haspopup', 'dialog');
-    sel.hidden = true; sel.after(b); b.addEventListener('click', () => presetSheet(kind)); }
+    sel.hidden = true; b.addEventListener('click', () => presetSheet(kind));
+    // PRESET STEP (owner, 24 Oct): ◀ ▶ either side step through this engine's presets (wrapping), as the engine's ◀ ▶ do
+    const arr = (d, t, lab) => { const a = el('button', 'sm engstep', t); a.type = 'button'; a.title = lab; a.setAttribute('aria-label', lab); a.addEventListener('click', () => preStep(kind, d)); return a; };
+    const grp = el('span', 'enggrp prestep'); grp.append(arr(-1, '◀', 'Previous preset'), b, arr(1, '▶', 'Next preset')); sel.after(grp); }
   $('presetIn').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) importPresetsFile(f); });
 })();
 /* ---------- the Acid, Machine, Tone drum and Modal cards (one card, built for whichever engine the pad uses) ---------- */
@@ -10586,7 +10607,7 @@ function refreshAll(){
   $('vName').value = V().name; $('kitName').value = kit.name;
   vRows.forEach(r => r.refresh()); updChoke();
   refreshVoiceGlobals(); refreshTune();
-  refreshLayer(); renderPads(); renderFx();
+  refreshLayer(); renderPads(); renderFx(); try { preLabels(); } catch(e){}
   bassUI();
   showCur();
   try { ccBadges(); } catch(e){}   // sliders may have been rebuilt (another layer type or effect)
@@ -16504,7 +16525,9 @@ function setSects(on){
 // STEP NUMBERS (Project): row numbers in decimal (the default) or hex. TEXT SIZE scales the screen's text.
 const SDK = 'thunderplus-stepdec-v1', TSK = 'thunderplus-textsize-v1';
 let stepDec = (() => { try { return localStorage.getItem(SDK) !== '0'; } catch(e){ return true; } })();
-let tScale = (() => { try { const v = parseInt(localStorage.getItem(TSK), 10); return v >= 60 && v <= 200 ? v : 100; } catch(e){ return 100; } })();
+// DESKTOP DEFAULT (owner, 24 Oct): 80 % on Desktop, 100 % on Mobile, until a size is chosen.
+const tScaleDef = () => isMobile() ? 100 : 80;
+let tScale = (() => { try { const v = parseInt(localStorage.getItem(TSK), 10); return v >= 60 && v <= 200 ? v : tScaleDef(); } catch(e){ return tScaleDef(); } })();
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
 // FOLLOW (Project): while the song plays, the cursor rides the playhead. Off by default.
@@ -16872,7 +16895,7 @@ function projRows(){
       info:() => 'ON: the Phrase screen on its own, as big as it fits, for easier reading: no Arrange beside it, no song strip over it, no piano down the side, no PATTERN view. TEXT SIZE still makes it bigger or smaller. Other screens are unchanged. OFF: the Phrase screen as before'},
     {l:'STEP NUMBERS', ck:'Display steps as decimal', get:() => stepDec ? 1 : 0, set:v => setStepDec(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'DECIMAL' : 'HEX',
       info:() => 'Row numbers in Song, Sect, Phrase and Arrange: DECIMAL counts 0, 1, 2… (song rows 000–255, phrase rows 00–31); HEX is 00–FF. Phrase, sect and instrument numbers and the values stay hex'},
-    {l:'TEXT SIZE', get:() => tScale, set:v => setTScale(v), min:60, max:200, step:10, big:20, d:100, fmt:v => v + '%',
+    {l:'TEXT SIZE', get:() => tScale, set:v => setTScale(v), min:60, max:200, step:10, big:20, d:tScaleDef(), fmt:v => v + '%',
       info:() => 'Size of the text and lines on the tracker screen. Bigger shows fewer rows (and scrolls sideways when a line no longer fits); drag a finger up or down anywhere on the screen to scroll'},
     {l:'FOLLOW', ck:'Follow playhead', get:() => followOn ? 1 : 0, set:v => setFollow(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'While the song plays, Song and Phrase scroll with the playhead: the cursor rides along, and Phrase (and Sect) switch to what the cursor’s track is playing. Off leaves the screen where you put it'},
@@ -22068,7 +22091,9 @@ const PVK = 'thunderplus-patternview-v1', PVUK = 'thunderplus-patternview-ui-v1'
 let pvOn = (() => { try { return localStorage.getItem(PVK) !== '0'; } catch(e){ return true; } })();
 // The view's own state, kept between sessions: pattern or phrase, FX2/FX3 shown, empty tracks folded.
 let pvMode = false, pvFx = false, pvFold = true;
-try { const o = JSON.parse(localStorage.getItem(PVUK) || '{}') || {}; pvMode = !!o.m; pvFx = !!o.fx; pvFold = o.fold !== false; } catch(e){}
+// DESKTOP DEFAULT (owner, 24 Oct): the Phrase screen opens in PATTERN mode on Desktop until pattern / phrase is chosen.
+pvMode = !isMobile();
+try { const o = JSON.parse(localStorage.getItem(PVUK) || '{}') || {}; if ('m' in o) pvMode = !!o.m; pvFx = !!o.fx; pvFold = o.fold !== false; } catch(e){}
 function pvSave(){ try { localStorage.setItem(PVUK, JSON.stringify({m:pvMode, fx:pvFx, fold:pvFold})); } catch(e){} }
 function setPv(on){ pvOn = !!on; try { localStorage.setItem(PVK, pvOn ? '1' : '0'); } catch(e){} draw(); }
 // It needs width: the computer and the unfolded Fold. On the folded phone the buttons are hidden and Phrase is as before.
