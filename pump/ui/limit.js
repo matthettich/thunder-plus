@@ -12,7 +12,7 @@ const DESC = [['Slow leveling does most', 'of the work: the cleanest,', 'least c
   ['Early attack and slow', 'release: avoids audible', 'distortion at all costs.']];
 const RANGE_KEY = 'thunderplus-pump-limit-range-v1';
 const fmtDb = (db, plus) => !Number.isFinite(db) || db <= -119 ? '-inf' : (plus && db >= 0 ? '+' : '') + db.toFixed(1);
-const meterT = db => db >= 0 ? 0 : db >= -12 ? 0.5 * (-db / 12) : db >= -48 ? 0.5 + 0.5 * ((-db - 12) / 36) : 1;   // Pro-L scale: the top 12 dB take half
+const meterT = db => db >= 0 ? 0 : db >= -12 ? 0.5 * (-db / 12) : db >= -48 ? 0.5 + 0.5 * ((-db - 12) / 36) : 1;   // meter scale: the top 12 dB take half the height
 
 U.define('limit', {W:1000, H:620, nW:480, nH:984, bypass:true, back:4095, make(ui){
   let display = R(), meterArea = R(), inBars = R(), grBar = R(), outBars = R(), loud = R(), loudReadouts = R(), loudGrid = R(), ceilTag = R(), gainTag = R();

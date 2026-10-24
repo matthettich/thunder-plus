@@ -77,7 +77,7 @@ checks the refs). Owner: "a pop up window that you can open from the FX screen" 
   the rest 1000 × 620) scaled to the window, so the layouts, drawing and mouse code are line-by-line ports of
   `plugins/<p>/UI<Name>.cpp`, and `kit.js` ports `common/ui/PumpUI.hpp` (header with brand / tag / kind, preset menu with
   sections and Save preset…, UNDO / REDO, A / B / COPY, ?, DARK, BYPASS, plus ✕; Dial, SliderRow, Button, Segmented,
-  MenuButton, value fields; FabFilter typed entry (1k, A4, C#3+13, 2x, 50 %, inf; a real `<input>`, so a phone shows its
+  MenuButton, value fields; typed entry (1k, A4, C#3+13, 2x, 50 %, inf; a real `<input>`, so a phone shows its
   keyboard) with Tab rings; menus; status line; help overlay) and `Theme.hpp` (all nine accents, light / dark). Text sizes
   are converted from NanoVG's (ascent-to-descent) to CSS em: labels × 0.887, mono × 0.758; the narrow layouts read 12 %
   larger. `SpectrumView` (Blackman-Harris, 320 log points, +4.5 dB/oct, ballistics) is ported too; EQ's pre and post
@@ -104,7 +104,7 @@ checks the refs). Owner: "a pop up window that you can open from the FX screen" 
   wheel / type, transfer inset (drag threshold, Ctrl/⌘-drag ratio, wheel knee, typed ratio → knee → threshold), In / Out /
   GR meters with holds (click resets), detector bar, sidechain (HP / LP / SC GAIN, LISTEN latch / hold), styles, all dials
   with the plugin's value text, ↑↓ threshold, ←→ style. LIMIT: 5 s history (in, out, GR, short-term LUFS), gain drag,
-  ceiling line drag, target line, -n s chips, Pro-L meter scale with holds, loudness screen (click / R resets: hold kind 2),
+  ceiling line drag, target line, -n s chips, meter scale (top 12 dB = half the height) with holds, loudness screen (click / R resets: hold kind 2),
   styles with their descriptions, timing, channel link, options (true peak, DC, OS, UNITY latch / hold, dither menu), keys.
   METER: integrated with target colours and delta, loudness bar, S / M, the eight statistics, history since the reset
   (1 / 3 / 10 / 30 min, momentary band, short-term and integrated lines, target band), spectrum, correlation (lowest

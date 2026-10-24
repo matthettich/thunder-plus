@@ -3,7 +3,7 @@
    native biquads). Settings arrive as {set:{sup, comp, lim}}; meters go back about 20 times a second.
    Every stage is stereo-linked: both channels get the same gain, so the stereo image never shifts.
 
-   Suppressor (in the spirit of Soothe / Gullfoss): a short-time spectrum (2048-point FFT, 75% overlap) is compared
+   Suppressor: a short-time spectrum (2048-point FFT, 75% overlap) is compared
    with a smoothed version of itself. Bins that stick out above that smooth shape by more than Selectivity are
    resonances; each is turned down by Depth times its excess (capped), with per-bin attack and release, then the
    reduction curve is smoothed across frequency (Sharpness: narrow notches or broad dips). Focus limits it to a

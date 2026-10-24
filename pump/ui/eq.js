@@ -246,7 +246,7 @@ U.define('eq', {W:1040, H:660, nW:480, nH:824, bypass:true, back:8192, cmdKeys:'
     if (sel < 0) ui.text(bandPanel.cx, bandPanel.cy + 10, 'No band selected', 'label', 13, t.ink2, 'center', 1);
   }
 
-  // ---- mouse on the display (Pro-Q conventions plus Ozone's Alt-solo; see UIEQ.cpp)
+  // ---- mouse on the display (node conventions plus Alt-solo; see UIEQ.cpp)
   function down(x, y, btn, m, dbl){
     if (!display.has(x, y)) return false;
     const b = nodeAt(x, y); pressX = curX = x; pressY = curY = y;
