@@ -20975,6 +20975,11 @@ function soloTrack(t){
 }
 /* ===== MOUSE SELECT end ===== */
 let drag = null;
+/* VALUE MOUSE (owner, 24 Oct): with a mouse, a value on the Mixer (VOL, PAN, MASTER) or on the FX, INST and PROJECT screens
+   changes as soon as it is dragged up or down or scrolled over with the wheel, instead of the drag or wheel moving between
+   lines. A click still only selects it, and a click on the selected value acts as before (EDIT). Shift takes big steps. */
+const valCell = (s, x, y) => !!s && !onPset() && (tv === 'mixer' ? y === 0 || y === 1 || (y === 7 && x === 0)
+  : (tv === 'fx' || tv === 'inst' || tv === 'project') && y >= 0 && !s.classList.contains('lb') && !s.classList.contains('act'));
 const gridDown = e => {
   // RIGHT-CLICK (Ctrl+click on a Mac): the cell under the mouse becomes the cursor, unless it is inside the selection
   // (which stays); the contextmenu event that follows opens the commands there (cmdCtx). Nothing is edited or dragged.
@@ -21005,6 +21010,11 @@ const gridDown = e => {
   if (selA && selA.v === tv && GRIDV.has(tv) && y >= 0){ c.x = x; c.y = y; draw(); return startScroll(e); }
   if (tv === 'mixer' && y === 7){ if (x === 1){ c.y = 7; c.mx = 1; draw(); openMst(); return; } if (c.mx === 1){ c.mx = 0; c.y = 7; draw(); return startScroll(e); } }
   const was = GRIDV.has(tv) || tv === 'mixer' ? c.x === x && c.y === y : c.y === y;
+  if (e.pointerType === 'mouse' && e.button === 0 && valCell(s, x, y)){   // VALUE MOUSE: the drag changes it from the start
+    c.x = x; c.y = y; if (tv === 'mixer' && y === 7) c.mx = 0; if (!was) draw();
+    drag = {id:e.pointerId, y0:e.clientY, lastY:e.clientY, acc:0, edit:true, tap:was, moved:false, sy:c.y, mp:false, hold:false};
+    e.preventDefault(); try { grid.setPointerCapture(e.pointerId); } catch(_){} return;
+  }
   c.x = x; c.y = y; if (!was) draw();
   // A drag that starts on the cursor's own cell changes its value; one that starts anywhere else scrolls.
   if (!was) return startScroll(e);
@@ -21108,7 +21118,7 @@ const dragEnd = e => {
   if (e.clientY != null) drag.lastY = e.clientY;
   if (gridPend){ cancelAnimationFrame(gridPend); gridPend = 0; gridDragMove(); }
   const d = drag; drag = null;
-  if (d.edit && !d.moved && e.type === 'pointerup'){
+  if (d.edit && !d.moved && e.type === 'pointerup' && d.tap !== false){   // VALUE MOUSE: a click on another value only selects it
     const c = cs[tv];
     if (tv === 'song' && S.song[c.y][c.x] >= 0) return nav('right');
     if (tv === 'sect' && c.x === 0){ const r = sectRow(cSect, c.y); if (r && r[0] >= 0) return nav('right'); }
@@ -21118,9 +21128,16 @@ const dragEnd = e => {
 };
 grid.addEventListener('pointerup', dragEnd); grid.addEventListener('pointercancel', dragEnd);
 // Mouse wheel moves the cursor a row per notch, so long screens scroll.
-let wAcc = 0;
+let wAcc = 0, vAcc = 0;
 scr.addEventListener('wheel', e => {
   if (fxp.open || (e.ctrlKey && e.target.closest && e.target.closest('#tArr'))) return;   // Ctrl+wheel over Arrange zooms it
+  { const v = e.target.closest && e.target.closest('[data-x]'), x = v ? +v.dataset.x : 0, y = v ? +v.dataset.y : -1;   // VALUE MOUSE: the wheel over a value changes it
+    if (v && grid.contains(v) && valCell(v, x, y)){ e.preventDefault();
+      const c = cs[tv]; if (c.x !== x || c.y !== y){ c.x = x; c.y = y; if (tv === 'mixer' && y === 7) c.mx = 0; vAcc = 0; draw(); }
+      const dy = e.deltaY || e.deltaX; vAcc += e.deltaMode === 1 ? dy * 40 : dy;   // Shift+wheel comes as deltaX on some systems
+      const n = Math.trunc(vAcc / 40); if (!n) return; vAcc -= n * 40;
+      for (let k = 0; k < Math.abs(n); k++) bump(n < 0 ? 1 : -1, e.shiftKey);   // up raises it
+      return; } }
   if (tv === 'mixer' || onPset()) return; e.preventDefault();
   // PATTERN view: a sideways swipe, a tilt wheel or Shift+wheel scrolls across the tracks (the cursor stays put).
   if (pvActive() && grid.contains(e.target)){
