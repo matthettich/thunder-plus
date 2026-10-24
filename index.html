@@ -1087,6 +1087,9 @@ body.arrsmall .tarr.zoomed :is(.tagrid .rn, .tath>:first-child), body.arrsmall .
 /* .tath and .tagp scroll themselves, and a sticky child there is placed inside their padding: left 0 is the same spot. */
 .tarr.zoomed .tath>:first-child, .tarr.zoomed .tagp::before, body.arrsmall .tarr.zoomed .tath>:first-child, body.arrsmall .tarr.zoomed .tagp::before{left:0}
 .tarr.zoomed .tath, .tarr.zoomed .tagp{overflow:hidden}
+/* WINDOWS SCROLLBAR (24 Oct): the block grid's classic scrollbar takes width there (none on Mac / phones), so the tabs and
+   track numbers above are pulled in by the same width (--arsb, measured in arrSbw) and their columns line up with the blocks. */
+.tath, .tagp{margin-right:var(--arsb, 0px)}
 .tafoot{flex:none; overflow:hidden; box-sizing:border-box; font-size:var(--fs-2); line-height:1.35; color:var(--ar-dim); padding:6px 10px 8px; border-top:1px solid var(--ts-line, var(--ar-line)); font-family:var(--font)}
 @media (max-width:480px){ .top{flex-wrap:wrap} .top .brand{display:none} .top .kitname{order:9; flex:1 1 100%} .top button{white-space:nowrap} .ttabs button{padding:0 10px; font-size:var(--fs-3)} .tmode .mx{display:none} .tmode{padding:0 10px} .tctl{padding-inline:10px} .tcmd{padding-inline:10px} }
 /* Colourful boxes at the bottom of every screen, the same as the tracker's PAD-mode nav pad: a darker grey
@@ -18600,7 +18603,11 @@ const stageWant = () => view !== 'tracker' || stage === 'off' || spActive() ? ''
 function stageRoom(){
   const asg = asongOn(), sr = scr.getBoundingClientRect(), gr = (asg ? arrEl : grid).getBoundingClientRect(), rg = document.createRange();
   let right = asg ? gr.right : 0; const lines = asg ? [] : grid.querySelectorAll('.ln');   // Arrange as the Song screen: the dogs dance beside it
-  for (let i = 0; i < Math.min(lines.length, 80); i++){ rg.selectNodeContents(lines[i]); const r = rg.getBoundingClientRect(); if (r.width && r.right > right) right = r.right; }
+  // FX DESCRIPTION (24 Oct): a wrapping line's text sits in a block (.fxdesc, up to 68ch wide), and a range over the line took
+  // that whole block, so a short description ("pump COMP: compressor") pushed the stage ~half a screen right: on a narrow
+  // window (Windows at 150 %) it dropped under its minimum and the slot's meter never drew. Measure the text itself.
+  for (let i = 0; i < Math.min(lines.length, 80); i++){ const L = lines[i], d = L.classList.contains('wrap') && L.querySelector('.fxdesc');
+    rg.selectNodeContents(d || L); for (const r of d ? rg.getClientRects() : [rg.getBoundingClientRect()]) if (r.width && r.right > right) right = r.right; }
   if (!asg) grid.querySelectorAll('.tgbox').forEach(b => { const r = b.getBoundingClientRect(); if (r.right > right) right = r.right; });
   const left = right - sr.left + 18;
   return {right, left, w:sr.width - left - 14, top:gr.top - sr.top, h:gr.height};
@@ -19924,9 +19931,13 @@ function drawArr(PH){
   if (ms){ const pitch = arrRowH() || arRH + 2, avail = arrAvail(), rows = Math.max(2, Math.floor((avail - 3) / pitch)), hg = (3 + rows * pitch) + 'px';
     if (arrGrid.style.height !== hg) arrGrid.style.height = hg; }
   else if (arrGrid.style.height) arrGrid.style.height = '';
-  arrAlign(); arrFollowX(); arrBoxes();
+  arrSbw(); arrAlign(); arrFollowX(); arrBoxes();
   sxAfterArr();   // SONG EXTRAS: the loop's row numbers and the section lane
 }
+// The block grid's vertical scrollbar width (Windows draws a real one; Mac and phones overlay theirs, 0 px): the headers
+// leave the same space on their right (--arsb), or their columns come out wider than the blocks and the boxes drift.
+function arrSbw(){ const w = Math.max(0, arrGrid.offsetWidth - arrGrid.clientWidth) + 'px';
+  if (arrEl.style.getPropertyValue('--arsb') !== w) arrEl.style.setProperty('--arsb', w); }
 // The MONO / POLY / MST boxes around Arrange's columns when it is the Song screen: drawn over the panel from the group
 // tabs down to the last whole row, measured from the track-number cells (only when something that moves them changed).
 let arrBoxKey = '';
