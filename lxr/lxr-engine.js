@@ -132,6 +132,85 @@ function fromKit(bytes, src){
   return {kind, o};
 }
 
+/* ---------- presets ----------
+   Written with short names (coarse, dec, cut…) that mean the same knob on every voice; named() turns them into this
+   engine's parameters. Values are the machine's own 0-127 (menus by position: wave 0 sine, 1 tri, 2 saw, 3 square,
+   4 noise, 5 PWM; filter 0 LP, 1 HP, 2 BP, 3 BP unity, 4 notch, 5 peak, 6 LP2, 7 off; transient 0 snap, 1 offset,
+   2 click, 3 click 2, 4 tick, 5 kick, 6 rim, 7 drop, 8 hat, 9 clap, 10 kick 2, 11 snare, 12 tom, 13 snap 2).
+   Coarse is about 12 steps an octave on the drum (31 ≈ 50 Hz, 48 ≈ 130 Hz, 64 ≈ 330 Hz). */
+const WAVE = {lxdrum:'OSC_WAVE_DRUM1', lxsnare:'OSC_WAVE_SNARE', lxcym:'WAVE1_CYM', lxhat:'WAVE1_HH'};
+const DIST = {lxdrum:'DRIVE1', lxsnare:'SNARE_DISTORTION', lxcym:'CYMBAL_DISTORTION', lxhat:'HAT_DISTORTION'};
+function alias(k, a){
+  const n = VOICES[k].voice + 1, cy = k === 'lxcym', mo = cy ? '_CYM' : '', mw = cy ? '_CYM' : '_HH';
+  const A = {coarse:'COARSE' + n, fine:'FINE' + n, wave:WAVE[k], pw:'PWM_' + n, atk:'VELOA' + n, dec:k === 'lxhat' ? 'VELOD6_CLOSED' : 'VELOD' + n,
+    decO:'VELOD6_OPEN', slope:'VOL_SLOPE' + n, rpt:'REPEAT' + n, pDec:'MOD_EG' + n, pSlope:'PITCH_SLOPE' + n, pAmt:'MODAMNT' + n,
+    fmAmt:'FMAMNT' + n, fmFreq:'FM_FREQ' + n, fmWave:'MOD_WAVE_DRUM' + n, fmMode:'MIX_MOD_' + n, noiseF:'NOISE_FREQ1', noiseMix:'MIX1',
+    m1f:'MOD_OSC_F1' + mo, m2f:'MOD_OSC_F2' + mo, m1l:'MOD_OSC_GAIN1' + mo, m2l:'MOD_OSC_GAIN2' + mo, m1w:'WAVE2' + mw, m2w:'WAVE3' + mw,
+    tWave:'TRANS' + n + '_WAVE', tLvl:'TRANS' + n + '_VOL', tPitch:'TRANS' + n + '_FREQ', cut:'FILTER_FREQ_' + n, res:'RESO_' + n,
+    ftype:'FILTER_TYPE_' + n, fdrive:'FILTER_DRIVE_' + n, lfoRate:'FREQ_LFO' + n, lfoSync:'SYNC_LFO' + n, lfoAmt:'AMOUNT_LFO' + n,
+    lfoWave:'WAVE_LFO' + n, lfoOfs:'OFFSET_LFO' + n, vol:'VOL' + n, srate:'VOICE_DECIMATION' + n, drive:DIST[k]};
+  return A[a];
+}
+function named(k, q){
+  const o = {}, E = ENG[k];
+  for (const a in q){
+    if (a === 'open' || a === 'vdst' || a === 'ldst' || a === 'vel'){ o[a] = q[a]; continue; }
+    const nm = alias(k, a), n = nm && PAR['PAR_' + nm];
+    if (n == null || !(('p' + n) in E.defs)){ if (typeof console !== 'undefined') console.warn('LXR preset: no knob ' + a + ' on ' + k); continue; }
+    o['p' + n] = q[a];
+  }
+  return o;
+}
+const PRESETS = {
+  lxdrum:[
+    ['Deep kick', {coarse:30, dec:30, slope:40, pAmt:62, pDec:24, pSlope:30, tWave:5, tLvl:45}],
+    ['Punch kick', {coarse:36, dec:22, slope:50, pAmt:72, pDec:15, pSlope:24, tWave:2, tLvl:80, drive:85}],
+    ['Long boom', {coarse:29, dec:52, slope:30, pAmt:38, pDec:30, pSlope:40}],
+    ['Dirty kick', {coarse:34, dec:27, pAmt:78, pDec:18, drive:118, fdrive:70, cut:96, tWave:10, tLvl:60}],
+    ['Crushed kick', {coarse:33, dec:26, pAmt:66, pDec:20, srate:38, drive:90}],
+    ['Low tom', {coarse:42, dec:34, pAmt:34, pDec:32, tWave:12, tLvl:35}],
+    ['Mid tom', {coarse:48, dec:30, pAmt:32, pDec:30, tWave:12, tLvl:35}],
+    ['High tom', {coarse:54, dec:26, pAmt:30, pDec:28, tWave:12, tLvl:30}],
+    ['FM perc', {coarse:58, dec:18, slope:60, pAmt:20, pDec:12, fmAmt:85, fmFreq:72, fmWave:0}],
+    ['Metal knock', {coarse:62, dec:14, wave:3, fmAmt:60, fmFreq:66, fmWave:3, ftype:2, cut:92, res:40}],
+    ['Clave', {coarse:92, dec:6, slope:70, pAmt:0, tWave:4, tLvl:50}],
+    ['Rimshot', {coarse:72, dec:5, pAmt:10, pDec:6, tWave:6, tLvl:110, ftype:1, cut:62}],
+    ['Zap', {coarse:66, dec:20, pAmt:118, pDec:26, pSlope:60}],
+    ['Bleep', {coarse:76, dec:16, wave:3, pAmt:0}],
+    ['Sub drop', {coarse:27, dec:58, pAmt:50, pDec:60, pSlope:80}],
+  ],
+  lxsnare:[
+    ['Tight snare', {coarse:48, dec:10, noiseMix:70, pAmt:62, pDec:12, tWave:0, tLvl:60}],
+    ['Fat snare', {coarse:43, dec:20, noiseMix:82, pAmt:70, pDec:16, ftype:0, cut:105, drive:85}],
+    ['Clap', {dec:13, rpt:3, noiseMix:127, ftype:2, cut:80, res:25, tWave:9, tLvl:80}],
+    ['Rimshot', {coarse:64, dec:5, noiseMix:22, pAmt:40, pDec:6, tWave:6, tLvl:72, vol:96}],
+    ['Brush', {dec:26, atk:8, noiseMix:127, ftype:1, cut:78, vol:110}],
+    ['Snap', {dec:6, noiseMix:100, ftype:1, cut:70, tWave:13, tLvl:90}],
+    ['Crunch snare', {coarse:46, dec:14, noiseMix:75, pAmt:60, pDec:14, srate:48, drive:105}],
+    ['Lo-fi snare', {coarse:45, dec:16, noiseMix:78, ftype:0, cut:82, srate:62}],
+    ['Gated snare', {coarse:47, dec:18, slope:127, noiseMix:80, pAmt:55, pDec:14, drive:80}],
+    ['Flam', {coarse:48, dec:11, rpt:1, noiseMix:72, pAmt:60, pDec:12}],
+  ],
+  lxcym:[
+    ['Crash', {dec:118, ftype:1, cut:62}],
+    ['Ride', {wave:3, coarse:100, m1f:70, m1l:90, m2f:104, m2l:80, m1w:3, m2w:3, dec:116, ftype:2, cut:96, res:18}],
+    ['Splash', {dec:104, ftype:1, cut:74}],
+    ['Trash cymbal', {dec:112, drive:96, srate:72, ftype:1, cut:58, vol:100}],
+    ['Swell', {atk:95, dec:114, ftype:1, cut:66, vol:112}],
+    ['Bell', {wave:0, coarse:84, m1w:0, m1f:60, m1l:75, m2w:0, m2f:92, m2l:50, dec:110, ftype:7, vol:112}],
+    ['Dark cymbal', {dec:116, ftype:0, cut:90, res:15}],
+  ],
+  lxhat:[
+    ['Tight hat', {dec:3, ftype:1, cut:112}],
+    ['Metal hat', {wave:3, m1w:3, m2w:3, m1f:80, m2f:110, dec:6, ftype:2, cut:106, res:30}],
+    ['Open hat', {open:1, decO:26}],
+    ['Long open hat', {open:1, decO:44}],
+    ['Crunchy hat', {dec:6, srate:60, drive:100}],
+    ['Shaker', {wave:4, atk:16, dec:10, ftype:1, cut:100}],
+    ['Pedal hat', {dec:4, ftype:2, cut:100, vol:127}],
+  ],
+};
+
 /* ---------- WebAssembly ---------- */
 let X = null, mod = null, fresh = null;
 /* The firmware keeps state between hits (filters, oscillator phases, counters its init functions leave alone), as the
@@ -157,6 +236,7 @@ const LxrCore = {
       const pre = [['Init', {}]];   // the init kit's sound for this voice (drum: drum 1)
       if (k === 'lxdrum') pre.push(['Init kit drum 2', fromKit(init, 1).o], ['Init kit drum 3', fromKit(init, 2).o]);
       if (k === 'lxhat') pre.push(['Init kit open hat', {open:1}]);
+      for (const [n, q] of PRESETS[k] || []) pre.push([n, named(k, q)]);
       o[k] = {title:VOICES[k].name, tag:VOICES[k].tag, rows:ENG[k].rows, secs:ENG[k].secs, pre,
         note:'The machine’s own 0–127 knobs, on its pages. Hit is how hard the pad is struck when it renders, for the Velocity target. The LFO and velocity reach this voice’s knobs; Volume is the voice’s own level, before the pad’s Level.'};
     }
