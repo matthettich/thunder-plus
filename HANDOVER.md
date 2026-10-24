@@ -67,6 +67,75 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 23 Oct (6): …pump pop-up windows for EQ, COMP, LIMIT and METER (stage 2 of 3)
+
+Cache `thunderplus-v221`, `pump/ui/kit.js?v=1`, `eq.js?v=1`, `comp.js?v=1`, `limit.js?v=1`, `meter.js?v=1` (new; index.html's
+`…PUMP WINDOWS` script block after the main script, `sw.js` FILES; `electron/copy-app.js` already copies all of `pump/` and
+checks the refs). Owner: "a pop up window that you can open from the FX screen" for the pump FX on buses and the master.
+**Read `docs/PUMP-FX.md`, "The pop-up kit"**: the kit's API and how stage 3 adds CALM, TONE, BAND, WIDE, HEAT.
+- **Design: the plugin's own window on a canvas.** Each window draws in the plugin's logical coordinates (EQ 1040 × 660,
+  the rest 1000 × 620) scaled to the window, so the layouts, drawing and mouse code are line-by-line ports of
+  `plugins/<p>/UI<Name>.cpp`, and `kit.js` ports `common/ui/PumpUI.hpp` (header with brand / tag / kind, preset menu with
+  sections and Save preset…, UNDO / REDO, A / B / COPY, ?, DARK, BYPASS, plus ✕; Dial, SliderRow, Button, Segmented,
+  MenuButton, value fields; FabFilter typed entry (1k, A4, C#3+13, 2x, 50 %, inf; a real `<input>`, so a phone shows its
+  keyboard) with Tab rings; menus; status line; help overlay) and `Theme.hpp` (all nine accents, light / dark). Text sizes
+  are converted from NanoVG's (ascent-to-descent) to CSS em: labels × 0.887, mono × 0.758; the narrow layouts read 12 %
+  larger. `SpectrumView` (Blackman-Harris, 320 log points, +4.5 dB/oct, ballistics) is ported too; EQ's pre and post
+  analyzers share one complex FFT.
+- **Light / dark:** `THEME = 'skin'` in kit.js (a dark Thunder skin gives pump's dark look); DARK overrides it on this device
+  for every window; Ctrl/⌘-click DARK follows the skin again. One constant to change.
+- **Windows:** desktop: several at once (one per slot, cascaded, OPEN again raises it), moved by the header's brand,
+  resized from the corner (uniform scale, remembered per type), fitted to the screen. Below 640 css px: the narrow layout
+  (480 wide; each plugin file has one), full screen under the top bar, one at a time. Esc, ✕ and Back close (Back:
+  `PumpFX.backHook` in the popstate handler). Keys typed in a window stay in it (`typing()` asks `PumpFX.ownsKey`), except
+  Space (Thunder plays / stops) and Ctrl/⌘ shortcuts the window doesn't use (save, open…).
+- **Thunder mappings:** BYPASS = the slot's ACTIVE (METER has none, as the plugin); UNDO / REDO / Ctrl/⌘+Z = Thunder's undo
+  (the song's last change; a drag or a gesture is one step: live sets while dragging, one plain set at the end); A / B per
+  slot for the session; presets through `PumpFX.applyPreset` (Factory / Sources / Chains) plus your own on this device
+  (`localStorage thunderplus-pump-user-presets-v1`; `pname` = its name via the new `set(…, {preset})`); COMP's External
+  sidechain menu lists Thunder's sends and tracks (new `PumpFX.setSck` / `sckNames`, the FX screen's SC FROM).
+- **What each does:** EQ: the curve display with pre / post analyzers, per-band fills, dynamic range shading and the live
+  dynamic movement, nodes (drag = freq + gain of the selection, Shift fine, Alt one axis, Ctrl/⌘-drag Q, wheel Q / slope,
+  Ctrl/⌘-wheel gain, Alt-wheel dynamic range), double-click or Ctrl/⌘-click to add (Alt: dynamic), drag the curve to add,
+  Alt-hold a node = solo (hold kind 0), Alt-hold / drag empty space = listen (kind 1, wheel / up-down width), box select,
+  Shift-click range, Ctrl/⌘-click toggle, right-click band / display menus, Delete, B, Esc, ←/→, Ctrl/⌘+A/C/V/D, SOLO latch
+  (a hold, never saved), the band panel and globals, ±dB range, OUT meter. The selected band follows the FX screen's BAND
+  and back (`setSel` is now a view change: no undo step). COMP: history (in / out / GR, 4.8 s), threshold line drag /
+  wheel / type, transfer inset (drag threshold, Ctrl/⌘-drag ratio, wheel knee, typed ratio → knee → threshold), In / Out /
+  GR meters with holds (click resets), detector bar, sidechain (HP / LP / SC GAIN, LISTEN latch / hold), styles, all dials
+  with the plugin's value text, ↑↓ threshold, ←→ style. LIMIT: 5 s history (in, out, GR, short-term LUFS), gain drag,
+  ceiling line drag, target line, -n s chips, Pro-L meter scale with holds, loudness screen (click / R resets: hold kind 2),
+  styles with their descriptions, timing, channel link, options (true peak, DC, OS, UNITY latch / hold, dither menu), keys.
+  METER: integrated with target colours and delta, loudness bar, S / M, the eight statistics, history since the reset
+  (1 / 3 / 10 / 30 min, momentary band, short-term and integrated lines, target band), spectrum, correlation (lowest
+  hold) and balance, L/R peak + RMS meters with true-peak holds, target / custom fields / history / scale, RESET and R.
+- **Left out** (in the plugins): user presets are on this device, not files; the plugins' own undo history (Thunder's undo
+  instead); "remember DARK for new instances" is this device's setting. Telemetry only while a window is open.
+- **Fixes to stage 1:** unsubscribing one telemetry subscriber stopped the feed for every subscriber of that slot (the
+  worklet keys feeds by slot): now it stops only when the last one leaves (`shared()` in PumpFX). Undo / redo and loading a
+  song now send `onChange` (`'undo'`, `'load'`) as the doc said; `set` / `applyPreset` / `setOn` redraw the FX screen and
+  the bottom panel (`drawSoon`, 80 ms).
+- Checked headless (Playwright; 1600 × 1000 mouse, 884 × 1100, 412 × 915 touch at DPR 2), demo song, bus = tracks 1 + 2 →
+  …chains Chain Out 4, playing: each of the four opened from slot 1 of the bus and of the master (screenshots below);
+  dragging an EQ node moves `f.pump`, the FX box (byte and text) and the sound (post RMS −16.4 → −15.6 dB; typed +12 dB →
+  −10.8 dB); an FX box moved → the window follows; undo (Ctrl+Z in the window) restores; double-click / double-tap adds a
+  band at 1 kHz +6 dB, drag moves it (1 → 2 kHz), Alt-hold / SOLO solos it (−17 → −39 dB RMS, released on up), Delete /
+  DELETE removes it; preset "Master: tilt brighter" from the window's menu applies exactly (FX row shows it), Ctrl+Z
+  undoes it; LIMIT gain dial dragged 0 → 13.5 dB: GR 2.9 → 17.1 dB, FX box +14 dB; two windows at once (desktop), one at a
+  time (phone); save → reload: identical slots, window reopens with them; A/B, Save preset… / load, COMP External from
+  track 01 (GR −29.9 dB, SC FROM box TRACK 01), LIMIT and METER resets, ↑↓ stay in the window (tracker cursor unmoved),
+  Space plays / stops, Esc and Back close, a dark skin gives dark windows, DARK and Ctrl-click DARK, wheel Q, Alt-drag
+  listen, window move / resize, help, touch long-press (band menu, typed entry), the window closes when its slot is
+  emptied or changes type, a stage-3 type gets the toast, no paints 5 s after stopping, no frames after closing. CPU
+  (headless software rendering, main thread): Thunder playing ~290–310 ms/s; a window adds ~80–180 (paint 20–38 ms/s at
+  20–25 fps, EQ / METER spectra ~16 ms/s; the rest is canvas rasterising, cheaper with a GPU). The stage-1 checks (t1–t7 in
+  the session scratchpad) give the same results as before. No page errors. **Not tried on the Fold or by ear.**
+- Screenshots (session scratchpad `pop/`): `desk_*_bus.png`, `desk_*_master.png`, `dark_*.png` and `cmp_*.png` (plugin
+  above, pop-up below), `fold_all_bus.png`, `fold_all_master.png`, `desk_two_windows.png`, `fold_eq_presetmenu.png`,
+  `listen_help.png`, `fold_eq_longpress.png`.
+- **Next (stage 3):** CALM, TONE, BAND, WIDE, HEAT: port `common/ui/MultibandUI.hpp` into the kit first (BAND, WIDE, HEAT),
+  WIDE's vectorscope from rings 0/1; one file each plus the script line, sw.js entry and cache bump.
+
 ## 23 Oct (5): the nine …pump plugins as bus and master effects (stage 1 of 3: sound, FX boxes, the pop-up interface)
 
 Cache `thunderplus-v220`, `pump/pump.wasm?v=1`, `pump/pump-meta.js?v=1` (both new; `sw.js` FILES and `electron/copy-app.js`

@@ -7332,7 +7332,8 @@ addEventListener('pointerdown', e => {
   if (!a || a === t || !t || !t.matches || !t.matches('input[type=range]')) return;
   if (a.matches && a.matches('textarea, [contenteditable], input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button])')) a.blur();
 }, true);
-function typing(e){ const t = e.target; return !!(t && t.matches && t.matches('input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=file]),textarea,select,[contenteditable]') && t.getClientRects().length); }
+function typing(e){ const t = e.target; if (window.PumpFX && PumpFX.ownsKey) try { if (PumpFX.ownsKey(e)) return true; } catch(_){}   // …PUMP: a pop-up window's own keys
+  return !!(t && t.matches && t.matches('input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=file]),textarea,select,[contenteditable]') && t.getClientRects().length); }
 /* ---------- change handling ---------- */
 let rTimer = 0, sTimer = 0;
 function changed(i = cur, light){
@@ -13151,16 +13152,21 @@ const PumpFX = window.PumpFX = (() => {
   const keyOf = (k, f) => k + ':' + f.type;
   const nodeOf = t => fxDynNodeOf(t >= NT ? -1 : t);
   const notify = (t, src) => { for (const cb of watchers) try { cb(t, src); } catch(e){ console.warn('PumpFX watcher', e); } };
+  // the FX screen and the bottom panel show the new values (stage 2: a pop-up's edits; at most ~12 redraws a second while dragging)
+  let drawQ = 0; const drawSoon = () => { if (!drawQ) drawQ = setTimeout(() => { drawQ = 0; try { draw(); } catch(e){} }, 80); };
   function apply(t, f, live){
     pumpBytes(f);
     if (live){ rtFx(t); clearTimeout(settleT); settleT = setTimeout(() => { settleT = 0; saveS(); }, 350); }
     else { clearTimeout(settleT); settleT = 0; saveS(); rtFx(t); }
+    drawSoon();
   }
+  // (stage 2) the worklet keeps one feed per slot: it stops only when no other subscriber of that slot still reads it
+  const shared = (s, node) => { for (const o of subs) if (o !== s && o.node === node && o.key === s.key) return true; return false; };
   function poll(){   // keeps each subscription's node (rebuilt routes, a new audio context) asking for telemetry
     for (const s of subs){ const f = slotOf(s.t, s.k);
       if (!f || keyOf(s.k, f) !== s.key){ subs.delete(s); try { s.cb({gone:true}); } catch(e){} continue; }
       const n = nodeOf(s.t);
-      if (n !== s.node){ if (s.node) try { s.node.port.postMessage({ptel:{key:s.key, on:false}}); } catch(e){}
+      if (n !== s.node){ if (s.node && !shared(s, s.node)) try { s.node.port.postMessage({ptel:{key:s.key, on:false}}); } catch(e){}
         s.node = n || null; if (n) try { n.port.postMessage({ptel:{key:s.key, on:true, back:s.back}}); } catch(e){} } }
     if (subs.size && !pollT) pollT = setInterval(poll, 500);
     if (!subs.size && pollT){ clearInterval(pollT); pollT = 0; }
@@ -13180,11 +13186,17 @@ const PumpFX = window.PumpFX = (() => {
         if (sym === 'bypass'){ f.on = !(+values[sym] >= 0.5); done.bypass = f.on ? 0 : 1; continue; }   // the plugin's bypass is the slot's ACTIVE
         const p = spec(type, sym); if (!p || (p.flags & PF_OUT)) continue;
         f.pump[sym] = done[sym] = pumpClamp(p, values[sym]); }
-      if (!opts.keepPreset) delete f.pname;
+      if (typeof opts.preset === 'string' && opts.preset) f.pname = opts.preset.slice(0, 80);   // (stage 2) a pop-up's own preset
+      else if (!opts.keepPreset) delete f.pname;
       apply(t, f, !!opts.live); notify(t, opts.src); return done;
     },
-    setOn(t, k, on){ const f = slotOf(t, k); if (!f) return; f.on = !!on; fxChanged(t); },
-    setSel(t, k, band){ const f = slotOf(t, k); if (!f || !TFX[f.type].sel) return; f.sel = clamp(band | 0, 0, TFX[f.type].sel - 1); pumpBytes(f); fxChanged(t); },
+    setOn(t, k, on){ const f = slotOf(t, k); if (!f) return; f.on = !!on; fxChanged(t); drawSoon(); },
+    // (stage 2) the band the FX screen shows is a view: changing it is no undo step of its own (saved with the next edit)
+    setSel(t, k, band){ const f = slotOf(t, k); if (!f || !TFX[f.type].sel) return; const v = clamp(band | 0, 0, TFX[f.type].sel - 1); if (v === (f.sel | 0)) return;
+      f.sel = v; pumpBytes(f); drawSoon(); notify(t, 'sel'); },
+    // (stage 2) COMP's External sidechain feed (f.sck: 0 none, 1-8 send n, 9 + t track t), and the names of the choices
+    setSck(t, k, v){ const f = slotOf(t, k); if (!f || !('sck' in f)) return; f.sck = clamp(v | 0, 0, 8 + NT); fxChanged(t); drawSoon(); },
+    sckNames:() => PUMP_SCK.slice(0, 9 + NT),
     presets:type => pumpFx(type) ? pumpFx(type).presets.map((p, i) => ({index:i, name:p.n, section:p.sec})) : [],
     // As the plugin's preset menu: every parameter a preset may touch goes to the preset's value or its default.
     // keepCpu (default true): the CPU settings of PUMP_CPU (oversampling) stay as they are unless the preset sets them.
@@ -13203,7 +13215,7 @@ const PumpFX = window.PumpFX = (() => {
       const f = slotOf(t, k); if (!f || typeof cb !== 'function') return () => {};
       const s = {t, k, cb, key:keyOf(k, f), back:clamp(opts.back == null ? 8192 : opts.back | 0, 0, 32768), node:null};
       subs.add(s); poll();
-      return () => { if (!subs.has(s)) return; subs.delete(s); if (s.node) try { s.node.port.postMessage({ptel:{key:s.key, on:false}}); } catch(e){} poll(); };
+      return () => { if (!subs.has(s)) return; subs.delete(s); if (s.node && !shared(s, s.node)) try { s.node.port.postMessage({ptel:{key:s.key, on:false}}); } catch(e){} poll(); };
     },
     onChange(cb){ watchers.add(cb); return () => watchers.delete(cb); },
     latency(t, k){ const f = slotOf(t, k); if (!f) return null; const v = lats.get((t >= NT ? 'M' : t) + '/' + keyOf(k, f));
@@ -13218,6 +13230,14 @@ const PumpFX = window.PumpFX = (() => {
       const info = this.get(t, k);
       if (typeof this.openHook === 'function') return this.openHook(t, k, info);
       toast(`pump ${pumpFx(info.type).name}: its full window comes in a later update. The boxes here change its main settings.`); },
+    // (stage 2) what the pop-up windows need from the app: Thunder's undo (the whole song's history; onChange follows
+    // with src 'undo'), a toast, the track's name, and two hooks the windows set: ownsKey(e) (true: the app's key
+    // handlers leave this key alone, see typing()) and backHook() (true: Back closed a window).
+    undo(dir){ undoStep(dir < 0 ? -1 : 1); },
+    toast(msg, ms){ toast(msg, ms); },
+    trackName(t){ if (t >= NT) return 'MASTER'; const n = tName(t); return 'TRACK ' + d2(t + 1) + (isBusT(t) ? ' BUS' : '') + (n ? ' · ' + n : ''); },
+    ownsKey:null, backHook:null,
+    _notifyAll(src){ for (let t = 0; t <= NT; t++) notify(t, src); },
     // for the app
     _feed(n, frames){ for (const fr of frames){
       if (fr.type === 8 || fr.type === 2) n.pmeter = n.pmeter || new Map(), n.pmeter.set(fr.slot, {key:fr.key, t:fr.t, at:performance.now()});
@@ -14109,6 +14129,7 @@ function undoStep(dir){
   Object.assign(S, n); CH.doc = S.chainPatch || null; chainsDropFrame(); saveS(); undo.busy = false;
   if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); mstSync(); }
   draw(); toast(dir < 0 ? 'Undo' : 'Redo');
+  try { PumpFX._notifyAll('undo'); } catch(e){}   // …PUMP: open pop-up windows read their slot again
 }
 setTimeout(kitUndoReset, 0);
 // On the Synth page too (the tracker has its own keys): Ctrl/⌘+Z undoes, with Shift (or Y) redoes.
@@ -16405,7 +16426,7 @@ function irsUI(sec){
   }
   sec.append(box);
 }
-function setSong(s, msg){ tStop(true); irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){} }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); }
+function setSong(s, msg){ tStop(true); irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){} }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -21588,6 +21609,7 @@ try { new ResizeObserver(() => drawWave()).observe($('wave')); } catch(e){}   //
 const trap = () => { try { history.pushState({thunder:1}, ''); } catch(e){} };
 trap();
 addEventListener('popstate', () => {
+  try { if (PumpFX.backHook && PumpFX.backHook()){ trap(); return; } } catch(e){}   // …PUMP: Back closes a pop-up window
   if (mwOpenNow){ closeMst(); trap(); return; }   // Back closes the mastering window
   if (helpOpen()){ hideHelp(); trap(); return; }
   if (gsetOpen()){ gsetToggle(false); trap(); return; }
@@ -22345,6 +22367,14 @@ try { const v = localStorage.getItem(VK); if (v !== 'synth') setView(v === 'chai
 })();
 </script>
 
+<!-- …PUMP WINDOWS (stage 2, 23 Oct 2026): each pump effect's own window, opened by the FX screen's › OPEN. kit.js is the
+     shared window kit (sets PumpFX.openHook); one file per plugin (docs/PUMP-FX.md, "The pop-up kit"). A type without a
+     file says its window comes later. Add new ones here, in sw.js FILES, with ?v= like these. -->
+<script src="pump/ui/kit.js?v=1"></script>
+<script src="pump/ui/eq.js?v=1"></script>
+<script src="pump/ui/comp.js?v=1"></script>
+<script src="pump/ui/limit.js?v=1"></script>
+<script src="pump/ui/meter.js?v=1"></script>
 <script>
 if ('serviceWorker' in navigator && location.protocol === 'https:'){
   try { if (window.self === window.top) navigator.serviceWorker.register('sw.js').catch(() => {}); } catch(e){}
