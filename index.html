@@ -721,7 +721,11 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
    JetBrains Mono, about 10% wider: a lit cell pushed the rest of its line right (owner, 19 Oct: the mixer's meters
    looked torn). Each meter cell is exactly its characters' width in the line's own font (ch), the glyph clipped to it at the sides. */
 .tgrid .mt, .tgrid .mm:is(.m1,.m2,.m3){display:inline-block; vertical-align:top; height:1.3em; clip-path:inset(-1em 0 -1em 0)}   /* sides clipped; up and down the block still overlaps its neighbours, so a bar has no seams */
-.tgrid .mt{width:calc(2 * var(--chw, 1ch))}   /* --chw: a character's advance in the grid (chwSet), letter-spacing included */
+.tgrid .mt{width:calc(2 * var(--chw, 1ch))}
+.mfhost{position:absolute; left:0; top:0; width:0; height:0; z-index:3}
+.mfbar{position:absolute; height:3px; background:var(--ts-ink); border-radius:1px; cursor:ns-resize; touch-action:none; box-shadow:0 0 0 1px var(--ts-bg)}
+.mfbar::before{content:''; position:absolute; left:0; right:0; top:-5px; bottom:-5px}   /* an easier grab than 3 px */
+.mfbar.mu{opacity:.45} .mfbar.on, .mfbar:hover{background:var(--ts-cur-bg, var(--ts-ink)); height:4px}   /* --chw: a character's advance in the grid (chwSet), letter-spacing included */
 .tscr .m1{color:var(--ts-ok)} .tscr .m2{color:var(--ts-hot)} .tscr .m3{color:var(--ts-clip)}
 .tscr .pl{background:var(--ts-pl-bg); color:var(--ts-pl)}
 .tscr .sel{background:var(--ts-sel)}
@@ -18506,6 +18510,7 @@ function draw(){
       grid.scrollLeft = Math.max(0, Math.min(left + w + m - V, left - 6)); } }
   meterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mt')] : []; masterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mm')] : [];
   if (tv === 'mixer') chwSet();
+  mixFaders();   // MIXER FADERS
   $('tTitle').textContent = title;
   // TITLE LINE FIT: "TRACK 02 · MONO" gets shorter when the line is tight: TRACK 02 (f3; the phrase's note columns show
   // mono or poly anyway, owner 20 Oct), then T02 (f4).
@@ -18585,6 +18590,50 @@ function chwSet(){
   if (w > 0){ grid.style.setProperty('--chw', w.toFixed(3) + 'px'); chwKey = k; }
 }
 try { document.fonts.addEventListener('loadingdone', () => { chwKey = ''; if (tv === 'mixer') chwSet(); }); } catch(e){}
+/* MIXER FADERS (owner, 24 Oct): a little bar over each track's meter at its fader level, on the meter's own scale (the
+   top of the 0 line is 0 dB, each line 6 dB, the bottom −48 dB). Drag it up or down to set the track's volume, as a
+   fader: above the top is the +6 dB of headroom (FF), below the bottom is off. Shift drags finely; a double-click puts
+   it back to E0 (0 dB). The VOL row's hex follows it, and Undo takes it back. */
+const volDb = v => { const g = trackGain(v); return g <= 0.00001 ? -999 : 20 * Math.log10(g); };
+const dbVol = d => d >= 0 ? clamp(Math.round(TRK_UNITY + d / 6 * (255 - TRK_UNITY)), TRK_UNITY, 255) : d <= -60 ? 0 : clamp(Math.round(TRK_UNITY * Math.pow(10, d / 40)), 0, TRK_UNITY);
+let mfDrag = null;
+function mixFaders(){
+  let host = grid.querySelector('.mfhost');
+  if (tv !== 'mixer' || !meterEls.length || !mixN){ if (host) host.remove(); return; }
+  if (!host){ host = el('div', 'mfhost'); host.setAttribute('aria-hidden', 'true'); grid.append(host); }
+  const g = grid.getBoundingClientRect(), ox = grid.scrollLeft - g.left - grid.clientLeft, oy = grid.scrollTop - g.top - grid.clientTop;
+  if (host.children.length !== mixN){ host.replaceChildren(); for (let i = 0; i < mixN; i++){ const b = el('i', 'mfbar'); b.dataset.i = i; host.append(b); } }
+  for (let i = 0; i < mixN; i++){
+    const t = mixL + i, a = meterEls[i].getBoundingClientRect(), z = meterEls[(MH - 1) * mixN + i].getBoundingClientRect(), b = host.children[i];
+    const top = a.top + oy, bot = z.bottom + oy, rowH = (bot - top) / MH, d = volDb(S.mix[t].vol);
+    const y = d >= 0 ? top - Math.min(1, d / 6) * rowH * 0.5 : d <= -48 ? bot : top + (-d / 48) * (bot - top);   // the headroom: half a line above the top
+    Object.assign(b.style, {left:(a.left + ox - 2).toFixed(1) + 'px', width:(a.width + 4).toFixed(1) + 'px', top:(y - 1.5).toFixed(1) + 'px'});
+    b.dataset.t = t; b.dataset.top = top; b.dataset.bot = bot; b.title = 'Track ' + d2(t + 1) + ' · ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)) + ' · drag to change, double-click for 0 dB';
+    b.classList.toggle('mu', !!S.mix[t].mute);
+  }
+}
+grid.addEventListener('pointerdown', e => {
+  const b = e.target.closest && e.target.closest('.mfbar'); if (!b || tv !== 'mixer') return;
+  e.preventDefault(); e.stopPropagation();
+  const t = +b.dataset.t;
+  mfDrag = {t, id:e.pointerId, y0:e.clientY, v0:S.mix[t].vol, top:+b.dataset.top, bot:+b.dataset.bot, oy:grid.scrollTop - grid.getBoundingClientRect().top - grid.clientTop};
+  try { b.setPointerCapture(e.pointerId); } catch(err){}
+  b.classList.add('on'); cs.mixer.x = t; cs.mixer.y = 0;
+}, true);
+grid.addEventListener('pointermove', e => {
+  if (!mfDrag || e.pointerId !== mfDrag.id) return; e.preventDefault();
+  const D = mfDrag, top = D.top, bot = D.bot, rowH = (bot - top) / MH;
+  let v;
+  if (e.shiftKey){ v = clamp(Math.round(D.v0 - (e.clientY - D.y0) / 4), 0, 255); }   // fine: one step every 4 px
+  else { const y = e.clientY + D.oy, d = y <= top ? Math.min(6, (top - y) / (rowH * 0.5) * 6) : y >= bot + rowH * 0.5 ? -999 : y >= bot ? -48 : -(y - top) / (bot - top) * 48; v = dbVol(d); }
+  if (v === S.mix[D.t].vol) return;
+  S.mix[D.t].vol = v; if (rt) rt.pl.applyMix(); draw();
+  toast('Track ' + d2(D.t + 1) + ' · VOL ' + hx(v) + ' · ' + dB(trackGain(v)), 900);
+}, true);
+const mfEnd = e => { if (!mfDrag || e.pointerId !== mfDrag.id) return; const t = mfDrag.t; mfDrag = null; grid.querySelectorAll('.mfbar.on').forEach(b => b.classList.remove('on')); mixChanged(); draw(); };
+grid.addEventListener('pointerup', mfEnd, true); grid.addEventListener('pointercancel', mfEnd, true);
+grid.addEventListener('dblclick', e => { const b = e.target.closest && e.target.closest('.mfbar'); if (!b || tv !== 'mixer') return; e.preventDefault(); e.stopPropagation();
+  const t = +b.dataset.t; S.mix[t].vol = TRK_UNITY; mixChanged(); draw(); toast('Track ' + d2(t + 1) + ' · VOL E0 · 0.0 dB'); }, true);
 function paintMeters(){
   const bs = rt ? rt.pl.buses : null;
   document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { e.style.height = (bs ? lvl(bs[t].lv) * 100 : 0).toFixed(1) + '%'; });
