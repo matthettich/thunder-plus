@@ -215,6 +215,9 @@ body.alting svg.cables rect.bend{opacity:1; pointer-events:all}
 .numsmall{width:90px; padding:4px 6px; border:1px solid #111; background:#fff; font-size:13px}
 .valedit{width:100%; padding:1px 4px; font-size:13px; text-align:right; background:var(--panel); border:1px solid var(--muted); color:var(--ink)}
 input[type=range]{width:100%; accent-color:#111; margin:0}
+/* MIXER PAN (owner, 24 Oct): a mixer's Pan sliders lighter than its Level ones, so it's plain which one a drag is moving (any skin's colour) */
+.row.sl.pan input[type=range]{opacity:.5} .row.sl.pan:hover input[type=range], .row.sl.pan input[type=range]:active{opacity:.75}
+.row.sl.pan > span:first-child{opacity:.75}
 select{width:100%; padding:4px 6px; background:#fff; border:1px solid #111; font-size:13px; min-width:0}
 .btn{padding:6px 10px; border:1px solid #111; background:#fff; font-weight:500}
 .btn:hover{border-color:var(--muted)}
@@ -2142,7 +2145,7 @@ function slider(n, key, spec){
   inp.addEventListener('input', () => { setParam(n, key, +inp.value, true); out.textContent = fmt(+inp.value); });
   inp.addEventListener('dblclick', () => { store.snapshot(); setParam(n, key, def); });
   inp.title = 'Double-click to reset';
-  const r = h('div', {class:'row sl', 'data-jackhost':'', 'data-id': n.m.id, 'data-key': key},
+  const r = h('div', {class:'row sl' + (MIXT.has(n.m.type) && /^p\d+$/.test(key) ? ' pan' : ''), 'data-jackhost':'', 'data-id': n.m.id, 'data-key': key},   // MIXER PAN: drawn lighter
     makeJack(n, 'p:' + key, 'mod', 'in', true), h('span', {class:'lbl', text: label}), h('div', {class:'rng'}, inp, mark), out);
   n.ctl[key].row = r; n.ctl[key].out = out; n.ctl[key].mark = mark; n.ctl[key].fmt = fmt;
   r.addEventListener('pointerdown', e => { if (learn && learn.on && !e.target.closest('.jack')) armLearn(n, key, r); });
