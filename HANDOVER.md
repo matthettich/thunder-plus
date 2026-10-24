@@ -24,6 +24,14 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## Desktop releases
+
+- **v1.2.20** (24 Oct 2026, UTC; Run workflow through the API with version 1.2.20, from `0e73a86`) has everything up to
+  that commit: the LXR-02 engines (`lxr/`), the …pump bus and master effects (`pump/`), the grouped FX column picker,
+  ROWS → PATTERN LEN, LPB 8 for new songs and the phrase cursor wrap. All three platforms built; installed copies update
+  themselves from it. Releasing from a session: `gh api -X POST repos/matthettich/thunder-plus/actions/workflows/desktop.yml/dispatches -f ref=main -f 'inputs[version]=X.Y.Z'`
+  (sessions can push branches but not tags), next version after the newest on the Releases page.
+
 ## Before a commercial release (standing checklist: keep it current, read it before selling)
 
 Owner (23 Oct): leaning away from selling Thunder Plus, but may change their mind. Keep a commercial build a short,
