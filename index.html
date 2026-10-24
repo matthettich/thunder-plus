@@ -21239,7 +21239,7 @@ function keysDown(e, pad){
     // ⌥/Alt + arrows change screen (◀▶ in tab order, ▲ Project, ▼ Mixer; from Phrase ◀ gives Arrange the keys, as
     // SHIFT+◀ does on the pad). Option moves, Command edits (owner, 19 Oct; they were the other way round that morning).
     else if (e.altKey) nav(arrow);
-    else { if (keyTransArrow(arrow)) return true; if (selA && selA.line) selA = null; const m = {up:[0, -1], down:[0, 1], left:[-1, 0], right:[1, 0]}[arrow]; move(m[0], m[1]); }
+    else { if (keyTransArrow(arrow)) return true; if (selA) selA = null; /* SELECT RELEASE (owner, 24 Oct): a plain arrow lets any selection go (blocks grew before) */ const m = {up:[0, -1], down:[0, 1], left:[-1, 0], right:[1, 0]}[arrow]; move(m[0], m[1]); }
     return true;
   }
   if (e.altKey) return false;
