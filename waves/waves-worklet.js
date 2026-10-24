@@ -331,7 +331,9 @@ const Mixer = (() => {
 /* ── effects: ...Thunder's track effects (Airwindows, DaisySP, Mutable Instruments) ──
    Stereo: Right in is optional (the left/mono input feeds both sides when it's empty). */
 const u = v => clamp(v, 0, 1);
-function effect(type, id, params, map, cost){
+// wetAt (REVERB MIX, 24 Oct): the index in map()'s list of a reverb's own wet/dry control. The reverb is then run fully
+// wet and blended here with rvMix's curve, so every reverb's Mix feels the same (see rvMix).
+function effect(type, id, params, map, cost, wetAt){
   return {
     type, scope:'mono', cost: cost || 1, effect:true,
     inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' }, params,
@@ -345,6 +347,7 @@ function effect(type, id, params, map, cost){
       // five new typed arrays per effect per block were steady garbage on the audio thread.
       if (st.buf !== buf || st.vh !== st.h){ st.buf = buf; st.vh = st.h; st.P = new Float32Array(buf, x.tfx_params(st.h), 12); st.L = new Float32Array(buf, x.tfx_l(), 128); st.R = new Float32Array(buf, x.tfx_r(), 128); }
       const P = st.P, L = st.L, R = st.R; P.fill(0); P.set(map(io.p, ctx));
+      const wm = wetAt == null ? -1 : P[wetAt]; if (wm >= 0) P[wetAt] = 1;   // REVERB MIX: fully wet in, blended below
       // The wasm only checks its output. A NaN or infinity on the way IN hangs the tape delay for good and leaves
       // twenty other effects silent, so bad or absurd samples are zeroed here first.
       // The ±1e-18 (−360 dB, alternating so it has no DC) keeps the effects' filters and delay lines out of denormal
@@ -356,6 +359,7 @@ function effect(type, id, params, map, cost){
       const L2 = st.L, R2 = st.R;
       let bad = false; for (let i = 0; i < ctx.block; i++){ const a = L2[i], b = R2[i]; if (!(a > -1e4 && a < 1e4 && b > -1e4 && b < 1e4)){ bad = true; break; } }
       if (bad){ try { x.tfx_free(st.h); st.h = x.tfx_new(id, ctx.sr); } catch (e){ st.h = -1; } io.out.out.fill(0); io.out.outR.fill(0); return; }   // its state went bad: start it afresh
+      if (wm >= 0){ const [dg, wg] = rvMix(wm), oL = io.out.out, oR = io.out.outR; for (let i = 0; i < ctx.block; i++){ oL[i] = L0[i] * dg + L2[i] * wg; oR[i] = R0[i] * dg + R2[i] * wg; } return; }
       io.out.out.set(L2.subarray(0, ctx.block)); io.out.outR.set(R2.subarray(0, ctx.block));
     }
   };
@@ -365,7 +369,7 @@ const EQ = effect('eq', 6, { treble:[.5,0,1,.01], mid:[.5,0,1,.01], bass:[.5,0,1
 const Comp = effect('comp', 7, { press:[.4,0,1,.01], speed:[.2,0,1,.01], mew:[1,0,1,.01], out:[1,0,1,.01], mix:[1,0,1,.01] },
   p => [u(p.press), u(p.speed), u(p.mew), u(p.out), u(p.mix)], .4);
 const Reverb = effect('reverb', 8, { replace:[.5,0,1,.01], bright:[.5,0,1,.01], detune:[.5,0,1,.01], big:[1,0,1,.01], mix:[.25,0,1,.01] },
-  p => [u(p.replace), u(p.bright), u(p.detune), u(p.big), u(p.mix)], 1.5);
+  p => [u(p.replace), u(p.bright), u(p.detune), u(p.big), u(p.mix)], 1.5, 4);   // REVERB MIX
 /* TapeDelay2's tape runs through 88200 samples at "speed" 1–26 per sample, so speed sets the time. */
 const Delay = effect('delay', 9, { time:[.375,.07,1.8,.001], regen:[.38,0,1,.01], tone:[.5,0,1,.01], reso:[0,0,1,.01], flutter:[0,0,1,.01], mix:[.25,0,1,.01] },
   (p, ctx) => { const sp = clamp(88200 / (clamp(p.time, .07, 1.8) * ctx.sr), 1, 26); return [Math.pow((sp - 1) / 25, .25), u(p.regen), u(p.tone), u(p.reso), u(p.flutter), u(p.mix)]; }, .8);
@@ -505,6 +509,12 @@ const Out = {
 // SOURCE (21 Oct): the top of a Source (sck) param: 0 Self, 1–8 Send 1–8, 9–136 Track 1–128 (ctx.key resolves it; …waves
 // has no ctx.key, so there every Source is Self).
 const SCK_TOP = 136;
+/* REVERB MIX (owner, 24 Oct): one wet/dry curve for every reverb's Mix (Wet on Room). The reverbs used to keep the dry at
+   full while the tail came up to full by 50 % (Room, Space), or crossfade straight with the tail boosted (Spring, Pitch
+   reverb), so a low setting already sounded drenched and 50 % was nowhere near halfway. Now the dry falls as an equal-power
+   fade, cos(πm/2), and the tail rises as sin²(πm/2): 10 % is a touch (−32 dB), 35 % about −11 dB, 50 % a real middle
+   (dry −3 dB, tail −6 dB), 100 % the tail alone. Returns [dry gain, wet gain]. */
+const rvMix = m => { const a = (m < 0 ? 0 : m > 1 ? 1 : m) * Math.PI / 2, s = Math.sin(a); return [Math.cos(a), s * s]; };
 
 /* Mutable Instruments Beads (MIT): time, size, pitch, shape, density, feedback, blend, reverb + media. */
 // Beads divides by zero with Freeze on and Size at exactly 1, which traps the whole wasm module. Cap it just under.
@@ -540,7 +550,7 @@ const XmodFx = effect('xmod', 19, { alg:[0.3,0,1,.01], timbre:[0.5,0,1,.01], car
 // Size exactly 1 (the line at the end of its shrunk buffer) never decays: it sits at 5× the input for good.
 const SPACE_SIZE_MAX = 0.99;
 const SpaceFx = effect('space', 20, { size:[0.5,0,1,.01], decay:[0.55,0,1,.01], diff:[0.7,0,1,.01], mod:[0.4,0,1,.01], tone:[0.6,0,1,.01], lowcut:[0.2,0,1,.01], pre:[0.1,0,1,.01], mix:[0.35,0,1,.01] },
-  p => [Math.min(p.size, SPACE_SIZE_MAX), p.decay, p.diff, p.mod, p.tone, p.lowcut, p.pre, p.mix], 2);
+  p => [Math.min(p.size, SPACE_SIZE_MAX), p.decay, p.diff, p.mod, p.tone, p.lowcut, p.pre, p.mix], 2, 7);   // REVERB MIX
 /* Lo-fi, based on Airwindows DeRez2 (MIT). */
 const LofiFx = effect('lofi', 21, { rate:[0.6,0,1,.01], rez:[0.6,0,1,.01], hard:[0.5,0,1,.01], mix:[1,0,1,.01] },
   p => [p.rate, p.rez, p.hard, p.mix], 0.3);
@@ -552,7 +562,7 @@ const AirFx = effect('air', 23, { air:[0.5,0,1,.01], gnd:[0.5,0,1,.01] },
   p => [p.air, p.gnd], 0.3);
 /* Room reverb, based on Airwindows Verbity2 (MIT). */
 const RoomFx = effect('room', 24, { size:[0.5,0,1,.01], sustain:[0.5,0,1,.01], mulch:[0.5,0,1,.01], wet:[0.35,0,1,.01] },
-  p => [p.size, p.sustain, p.mulch, p.wet], 1);
+  p => [p.size, p.sustain, p.mulch, p.wet], 1, 3);   // REVERB MIX
 
 /* Comb resonator, original code. */
 const CombFx = effect('comb', 25, { note:[48,24,96,1], fb:[0.85,-0.99,0.99,.01], damp:[0.3,0,0.99,.01], spread:[8,0,50,1], mix:[0.6,0,1,.01] },
@@ -1013,7 +1023,7 @@ const Spring = {
   process(st, io, ctx){
     const p = io.p, sr = ctx.sr, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
     const g = .55 + p.decay * .43, a = .3 + p.chirp * .45, kl = 1 - Math.exp(-2 * Math.PI * (1500 * Math.pow(6, p.tone)) / sr);
-    const kh = 1 - Math.exp(-2 * Math.PI * 140 / sr), kp = 1 - Math.exp(-2 * Math.PI * 900 / sr), drip = p.drip * 3, mx = p.mix;
+    const kh = 1 - Math.exp(-2 * Math.PI * 140 / sr), kp = 1 - Math.exp(-2 * Math.PI * 900 / sr), drip = p.drip * 3, mx = p.mix, [dg, wg] = rvMix(mx);
     const base = (.028 + p.length * .05) * sr;
     for (let c = 0; c < 2; c++){
       const s = st.s[c], X = c ? R : L, O = c ? oR : oL, D = s.d, N = D.length, len = base * (c ? 1.13 : 1);
@@ -1035,7 +1045,7 @@ const Spring = {
         }
         if (!(v > -8 && v < 8)){ v = 0; X2.fill(0); Y2.fill(0); s.lp = s.hp = 0; }
         D[s.w] = v; s.w = s.w + 1 === N ? 0 : s.w + 1;
-        O[i] = x * (1 - mx) + v * mx * 1.4;
+        O[i] = x * dg + v * wg * 1.4;   // REVERB MIX
       }
       if (c) st.t = t;
     }
@@ -1066,7 +1076,7 @@ const Plate = {
     return st;
   },
   process(st, io, ctx){
-    const p = io.p, s = st.s, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, mx = p.mix;
+    const p = io.p, s = st.s, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, mx = p.mix, [dg, wg] = rvMix(mx);
     const sz = p.size, dec = p.decay, dd2 = clamp(dec + .15, .25, .5), kd = 1 - p.damp * .9, sc = s * sz;
     const pre = Math.min(st.pre.n - 1, Math.round(p.pre * ctx.sr) + 1), exc = p.mod * 16 * s;
     const ind = st.ind, ik = st.indK, A1 = st.ap1, D1 = st.dl1, A2 = st.ap2, D2 = st.dl2;
@@ -1102,7 +1112,7 @@ const Plate = {
       // output taps across both halves
       const yl = (plAt(nl[0], tl[0]) + plAt(nl[1], tl[1]) - plAt(nl[2], tl[2]) + plAt(nl[3], tl[3]) - plAt(nl[4], tl[4]) - plAt(nl[5], tl[5]) - plAt(nl[6], tl[6])) * .6;
       const yr = (plAt(nr[0], tr[0]) + plAt(nr[1], tr[1]) - plAt(nr[2], tr[2]) + plAt(nr[3], tr[3]) - plAt(nr[4], tr[4]) - plAt(nr[5], tr[5]) - plAt(nr[6], tr[6])) * .6;
-      oL[i] = L[i] * (1 - mx) + yl * mx; oR[i] = R[i] * (1 - mx) + yr * mx;
+      oL[i] = L[i] * dg + yl * wg; oR[i] = R[i] * dg + yr * wg;   // REVERB MIX
     }
     st.lp0 = lp0; st.lp1 = lp1; st.fb0 = fb0; st.fb1 = fb1; st.bw = bw; st.ph = ph;
   }
@@ -1629,7 +1639,7 @@ class PitchFxCore {
     return y * 0.25;
   }
   process(Lb, Rb, n, p){
-    const sr = this.sr, mix = p.mix, dry = 1 - mix * 0.5, r1 = Math.pow(2, p.pitch / 12), r2 = Math.pow(2, p.pitch2 / 12), win = sr * 0.06;
+    const sr = this.sr, mix = p.mix, rv = rvMix(mix), dry = p.kind | 0 ? rv[0] : 1 - mix * 0.5, wgm = rv[1], r1 = Math.pow(2, p.pitch / 12), r2 = Math.pow(2, p.pitch2 / 12), win = sr * 0.06;
     const tc = 1 - Math.exp(-2 * Math.PI * (500 + p.tone * p.tone * 12000) / sr), mode = p.mode | 0, D = this.D;
     if (p.kind | 0){   // reverb
       // Size tops out at a ~7 s tail (it was 0.97, ~14 s), and the shimmer loop is scaled to stay under unity (measured: it rose at 0.45 of the old value, decays at 0.4): with large
@@ -1647,7 +1657,7 @@ class PitchFxCore {
           // A slow limiter on the loop: if the shimmer builds past 0.35 it is turned down, so it always dies away.
           const a = Math.abs(this.lp[ch]); this.fenv = this.fenv || [0, 0]; this.fenv[ch] += (a - this.fenv[ch]) * (a > this.fenv[ch] ? 0.002 : 0.00005);
           this.fbS[ch] = Math.tanh(this.lp[ch] * (this.fenv[ch] > 0.35 ? 0.35 / this.fenv[ch] : 1));
-          if (ch) Rb[i] = x0 * dry + w * mix * 1.8; else Lb[i] = x0 * dry + w * mix * 1.8;
+          if (ch) Rb[i] = x0 * dry + w * wgm * 1.8; else Lb[i] = x0 * dry + w * wgm * 1.8;   // REVERB MIX
         }
       }
       return;

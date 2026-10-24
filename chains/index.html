@@ -1568,7 +1568,7 @@ const MODULES = {
   delay:{ label:'Tape delay', fx:true, params:{ time:[.375,.07,1.8,.001], regen:[.38,0,1,.01], tone:[.5,0,1,.01], reso:[0,0,1,.01], flutter:[0,0,1,.01], mix:[.25,0,1,.01] },
     ui:Object.assign({ time:{l:'Time', f:secs}, regen:{l:'Repeats', f:pct}, tone:{l:'Tone', f:pct}, reso:{l:'Resonance', f:pct}, flutter:{l:'Flutter', f:pct} }, MIXP) },
   reverb:{ label:'Reverb', fx:true, params:{ replace:[.5,0,1,.01], bright:[.5,0,1,.01], detune:[.5,0,1,.01], big:[1,0,1,.01], mix:[.25,0,1,.01] },
-    ui:{ replace:{l:'Replace', f:pct}, bright:{l:'Brightness', f:pct}, detune:{l:'Detune', f:pct}, big:{l:'Size', f:pct}, mix:{l:'Mix', f:v => Math.round((1 - Math.pow(1 - v, 3)) * 100) + '% wet'} } },
+    ui:{ replace:{l:'Replace', f:pct}, bright:{l:'Brightness', f:pct}, detune:{l:'Detune', f:pct}, big:{l:'Size', f:pct}, mix:{l:'Mix', f:wet} } },   // REVERB MIX: the shared curve, so the number is the knob
   rings:{ label:'Rings', fx:true, extraIn:{ pitch:'cv' },
     params:{ model:[0,0,5,1], poly:[0,0,2,1], note:[0,-24,36,1], structure:[.4,0,1,.01], bright:[.5,0,1,.01], damp:[.6,0,1,.01], pos:[.3,0,1,.01], input:[.5,0,1,.01], mix:[.8,0,1,.01] },
     ui:Object.assign({ model:{l:'Model', c:opts(['Modal','Sympathetic','String','FM voice','Quantized','String + reverb'])}, poly:{l:'Width', c:opts(['1','2','4'])},
