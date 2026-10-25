@@ -77,6 +77,35 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 25 Oct (2): …chains buses and sends, and CHN no longer adds I/O
+
+Cache `thunderplus-v229` (only `index.html` changed; no worklet or editor file did). Not played by ear: the routing plan, the
+toggle and the engine's bus mixing are covered by tests, but the page's audio wiring in a browser is not.
+- **BUG: switching CHN on from the Mixer rebuilt the patch.** `setChainOn` → `ensureChainPair` added a Track In **and** a
+  Chain Out for the track. On a pure bus source (a Track In wired into a Chain Out on another track) that added back an
+  output — turning the bus into a send — and a second Track In besides, which is why "the inputs did not work". It now adds
+  nothing when the track already has any Track In / Chain Out in the patch; a track with no I/O of its own still gets the
+  straight-through pair, so one switch from the Mixer is still all it takes. If the CHN comes on by itself (adding I/O in
+  the editor, `chainsAutoOn`), nothing is added either way.
+- **BUG: a Chain Out for a track that brings its own sound in counted as a bus.** With tracks 4 and 5 keeping their outs and
+  also feeding track 6, the plan read "4 feeds bus 5" and "5 feeds bus 4" — a feedback pair the loop check then skipped, so
+  the send only half worked and the bus column was asymmetric. `busPlan` now treats a Chain Out on a track that has its own
+  Track In as that track's own output, never a bus (owner, 25 Oct). **A bus is a Chain Out with no Track In beside it.**
+  Consequence, accepted with the owner: you cannot send into a track that also has its own input. The alternative was a
+  per-Chain-Out "Bus" switch and a patch-format change.
+- **A track still needs CHN on to feed a bus** (unchanged; confirmed with the owner), and the bus track needs CHN on because
+  its node is what hears the feeds. Both ends are what the Mixer's BS/ON show.
+- **MISS said the wrong thing.** When the Chain Out existed but its target track's CHN was off, the Mixer said "patch needs a
+  Chain Out set to <this track>", which sent the owner looking for an output already in the patch. `chainOutTargetsOf(t)`
+  walks the patch without the CHN test, so the cell now says "its Chain Out feeds track N, whose CHN is off". The other case
+  keeps a version of the old wording.
+- **Engine check:** a `thunder-chains` node given two tracks on inputs 4/5 with `busmap` mixes them (peak 0.38 for 0.3 +
+  0.2); with no map it is silent. So the DSP and the host node were never at fault. **If a bus shows BS but is still not
+  heard, the next place to look is `busSync()` (the splitter / 32-channel merger wiring), not `busPlan`.**
+- **Tests:** five in `tests/app-logic.test.js` — the bus patch, the send patch, the both-ends-need-CHN rule, and the CHN
+  toggle adding nothing / adding a pair for an untouched track. Each of the three rules was reverted in turn and a test
+  failed (mutation-checked), so they cannot quietly regress.
+
 ## 25 Oct: a test suite, the Function generator hang, and failures that used to be silent
 
 Cache `thunderplus-v228`, `chains/chains-worklet.js?v=38`, `waves/waves-worklet.js?v=31`, `pump/ui/kit.js?v=3`. **Not yet played

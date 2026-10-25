@@ -13714,6 +13714,12 @@ function busPlan(){
   const by = new Map(); for (const m of d.modules) if (m && m.id != null) by.set(m.id, m);
   const nx = new Map(); for (const c of d.cables || []) if (c && c.from && c.to){ const a = c.from[0]; if (!nx.has(a)) nx.set(a, []); nx.get(a).push(c.to[0]); }
   const trk = m => { const k = int(m.params && m.params.track, 1); return k >= 1 && k <= NT ? k - 1 : -1; };
+  // OWNER (25 Oct): a Chain Out for a track that brings its own sound in (it has a Track In of its own) is that track's own
+  // output, not a bus. A bus is a track the patch feeds from elsewhere: a Chain Out with no Track In beside it. Without this,
+  // a send (4 and 5 keep their outs and also feed 6) read the other track's out as a bus, which the loop check then skipped,
+  // so the mixer showed a bus that only half worked.
+  const ownIn = new Set();
+  for (const m of by.values()) if (m.type === 'trackIn'){ const k = trk(m); if (k >= 0) ownIn.add(k); }
   const adj = new Map(), reaches = (a, b) => { const seen = new Set([a]), w = [a]; while (w.length){ const x = w.pop(); if (x === b) return true; for (const y of adj.get(x) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } } return false; };
   for (const m of by.values()){
     if (m.type !== 'trackIn') continue; const t = trk(m); if (t < 0 || !(S.chainOn && S.chainOn[t])) continue;
@@ -13722,7 +13728,7 @@ function busPlan(){
       for (const y of nx.get(id) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } }
     let fed = false;
     for (const b of [...outs].sort((a, c) => a - c)){
-      if (b === t || !chainsFeed(b)) continue;
+      if (b === t || ownIn.has(b) || !chainsFeed(b)) continue;   // its own out, or not a bus (see ownIn above)
       if (reaches(b, t)){ P.loop = true; continue; }
       if (!adj.has(t)) adj.set(t, []); adj.get(t).push(b); fed = true;
       if (!feeds.has(b)) feeds.set(b, []); feeds.get(b).push(t);
@@ -13837,6 +13843,22 @@ function chainsTracks(){
   return ids;
 }
 const chainsFeed = t => !!(S.chainOn && S.chainOn[t] && chainsTracks().has(t));
+// The tracks this track's Chain Outs feed, ignoring CHN. Used only to say WHY a chain shows MISS: the Chain Out may be there
+// and its target simply switched off in the Mixer, which is not the same problem as a Chain Out that does not exist.
+function chainOutTargetsOf(t){
+  const P = S.chainPatch, ms = (P && Array.isArray(P.modules)) ? P.modules : [];
+  const byId = new Map(), nx = new Map();
+  for (const m of ms) if (m && m.id != null){ byId.set(m.id, m); nx.set(m.id, []); }
+  for (const c of (P && P.cables) || []) if (c && c.from && c.to && nx.has(c.from[0])) nx.get(c.from[0]).push(c.to[0]);
+  const seen = new Set(), w = [], out = new Set();
+  for (const m of ms) if (m && m.type === 'trackIn' && (((m.params && m.params.track) | 0) === t + 1) && !seen.has(m.id)){ seen.add(m.id); w.push(m.id); }
+  while (w.length){
+    const id = w.pop(), x = byId.get(id);
+    if (x && x.type === 'chainOut'){ const k = int(x.params && x.params.track, 1); if (k >= 1 && k <= NT) out.add(k - 1); }
+    for (const y of nx.get(id) || []) if (!seen.has(y)){ seen.add(y); w.push(y); }
+  }
+  return [...out].sort((a, b) => a - b);
+}
 // The tracks a NEW pair turns CHN on for: Chain Out tracks, and (BUS, 20 Oct) Track In tracks, a bus's sources.
 function chainsAutoTracks(){
   const ids = chainsTracks();
@@ -15451,7 +15473,10 @@ function ensureChainPair(t){
   const P = S.chainPatch;
   if (!P || P.format !== 'chains.patch' || !Array.isArray(P.modules)) return false;
   const N = t + 1;
-  if (P.modules.some(m => m && m.type === 'chainOut' && (m.params.track | 0) === N)) return false;
+  // OWNER (25 Oct): if the track already has I/O in the patch, leave the patch alone. Adding a Chain Out to a track whose
+  // Track In was wired into a bus turned that bus back into a send, and it added a second Track In besides. A track with no
+  // I/O of its own still gets the straight-through pair, so switching CHN on in the Mixer is still all it takes.
+  if (P.modules.some(m => m && (m.type === 'trackIn' || m.type === 'chainOut') && (((m.params && m.params.track) | 0) === N))) return false;
   const b = chainsBottom(P);
   const tag = Date.now().toString(36) + Math.floor(Math.random() * 1e5).toString(36);
   const idIn = 'tin' + tag, idOut = 'tou' + tag, y = Number.isFinite(b) ? Math.round(b + 40) : 40;
@@ -15477,7 +15502,7 @@ function setChainOn(t, on){
   if (added){ CH.fitNext = true; if (CH.frame) chainsDropFrame(); }   // the editor reloads with the new pair when it next opens
   chainsPush(); draw();
   if (on && !was) toast(added ? `Track ${t + 1} now runs through …chains: its Track In and Chain Out are there, wired straight through.`
-    : `Track ${t + 1} runs through its chain in …chains again.`);
+    : `Track ${t + 1} runs through …chains again. The Track In / Chain Out already in the patch decide where it goes (a Chain Out on another track makes it a bus).`);
 }
 // Re-route every track that runs through …chains now, AND every track that did until this change (its Chain Out
 // was deleted or set to another track): without that, the old track kept a chains node with no way out and went silent.
@@ -18266,9 +18291,14 @@ function info(){
     if (c.y === 5){
       const on = chainsFeed(c.x), flag = !!(S.chainOn && S.chainOn[c.x]);
       const tg = !on && flag && busPlan().targets.get(c.x);
+      // MISS has two causes and they need different fixes: no Chain Out for the track, or a Chain Out feeding a track whose
+      // CHN is off (the bus is there, the bus track just is not listening). Saying "needs a Chain Out" for the second one sent
+      // the owner looking for an output that was already in the patch.
+      const ot = !on && !tg && flag ? chainOutTargetsOf(c.x).filter(u => u !== c.x) : null;
       return `${trkLab(c.x)}${trkKind(c.x)} · …chains ` + (on ? 'ON (track runs through the chains patch)'
         : tg ? 'BS: feeds the bus on ' + (tg.length > 1 ? 'tracks ' : 'track ') + tg.map(u => d2(u + 1)).join(', ') + ' (heard there, not on its own) · EDIT toggles'
-        : flag ? 'MISS: patch needs a Chain Out set to track ' + d2(c.x + 1) + ' · EDIT toggles' : 'off · EDIT toggles');
+        : ot && ot.length ? 'MISS: its Chain Out feeds ' + (ot.length > 1 ? 'tracks ' : 'track ') + ot.map(u => d2(u + 1)).join(', ') + ', whose CHN is off (switch that track on, or this one) · EDIT toggles'
+        : flag ? 'MISS: the patch needs a Chain Out for this track, or a bus it can feed · EDIT toggles' : 'off · EDIT toggles');
     }
     if (c.y === 6){ const U = sckUsesOf(c.x);
       return `${trkLab(c.x)}${trkKind(c.x)} · SIDECHAIN SOURCE ` + (U.length ? 'for ' + U.map(u => u.where).join(', ') : 'for nothing yet · pick this track as Source on a compressor, gate, envelope filter or Sidechain In'); }

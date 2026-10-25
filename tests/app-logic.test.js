@@ -103,6 +103,76 @@ test('service worker: every precached file exists, and every versioned asset the
   }
 });
 
+/* ───────── …chains bus routing (owner's report, 25 Oct) ─────────
+   The plan decides which tracks a chain node hears as buses. Three rules, confirmed with the owner:
+   1. a Chain Out for a track that has its own Track In is that track's own output, not a bus;
+   2. a track with a Track In and no Chain Out of its own is a "pure" source: muted, heard only through its bus;
+   3. both the source and the bus still need CHN on. */
+function planOf(mods, cables, onTracks, NT = 16) {
+  const S = { chainPatch: { format: 'chains.patch', modules: mods, cables }, chainOn: new Array(NT).fill(0) };
+  for (const t of onTracks) S.chainOn[t - 1] = 1;
+  const c = sandbox({ S, NT, int: (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; }, busPlanVal: null, busPlanH: 0 });
+  vm.runInContext(cut('index.html', /function chainsTracks\(\)\{[\s\S]*?\n\}\n/, 'chainsTracks') + cut('index.html', /const chainsFeed = [^\n]*\n/, 'chainsFeed') + cut('index.html', /function busPlan\(\)\{[\s\S]*?\n\}\n/, 'busPlan') + '\nthis.plan=busPlan;', c);
+  const P = c.plan();
+  // Host-realm copies (Array.from), not the vm's arrays: deepStrictEqual also compares prototypes, and a cross-realm array
+  // has a different Array.prototype, which fails even when the contents are identical.
+  return { feeds: Array.from(P.feeds, ([b, src]) => [b + 1, Array.from(src, x => x + 1)]), targets: Array.from(P.targets, ([t, b]) => [t + 1, Array.from(b, x => x + 1)]), pure: Array.from(P.pure, x => x + 1), loop: P.loop };
+}
+const T = (id, type, track) => ({ id, type, params: track == null ? {} : { track } });
+const Cb = (a, b) => ({ from: [a, 'out'], to: [b, 'in'] });
+
+test('bus: Track In 1+2 -> mixer -> compressor -> Chain Out 7 is a bus: both muted, both heard on 7', () => {
+  const p = planOf([T('i1', 'trackIn', 1), T('i2', 'trackIn', 2), T('mx', 'mixer'), T('cp', 'compressor'), T('o7', 'chainOut', 7)],
+    [Cb('i1', 'mx'), Cb('i2', 'mx'), Cb('mx', 'cp'), Cb('cp', 'o7')], [1, 2, 7]);
+  assert.deepEqual(p.feeds, [[7, [1, 2]]], 'bus 7 is fed by 1 and 2');
+  assert.deepEqual(p.pure, [1, 2], 'both sources are muted on their own');
+  assert.deepEqual(p.targets, [[1, [7]], [2, [7]]], 'the Mixer shows BS for both');
+  assert.equal(p.loop, false);
+});
+
+test('send: tracks 4 and 5 keep their own outs and also feed bus 6, with no false loop', () => {
+  const p = planOf([T('i4', 'trackIn', 4), T('i5', 'trackIn', 5), T('mx', 'mixer'), T('rv', 'reverb'), T('o4', 'chainOut', 4), T('o5', 'chainOut', 5), T('o6', 'chainOut', 6)],
+    [Cb('i4', 'mx'), Cb('i5', 'mx'), Cb('mx', 'rv'), Cb('rv', 'o4'), Cb('rv', 'o5'), Cb('rv', 'o6')], [4, 5, 6]);
+  assert.deepEqual(p.feeds, [[6, [4, 5]]], 'only track 6 is a bus; Chain Out 4 and 5 are the tracks\' own outputs');
+  assert.deepEqual(p.pure, [], 'nothing is muted: both keep their outs, so this is a send');
+  assert.equal(p.loop, false, 'the rule removes the false feedback loop the old plan found here');
+});
+
+test('bus: a whole-bus feed still works when the sources have no outputs of their own', () => {
+  const p = planOf([T('i4', 'trackIn', 4), T('i5', 'trackIn', 5), T('mx', 'mixer'), T('rv', 'reverb'), T('o6', 'chainOut', 6)],
+    [Cb('i4', 'mx'), Cb('i5', 'mx'), Cb('mx', 'rv'), Cb('rv', 'o6')], [4, 5, 6]);
+  assert.deepEqual(p.feeds, [[6, [4, 5]]]); assert.deepEqual(p.pure, [4, 5]);
+});
+
+test('bus routing needs CHN on both ends: the bus off means nothing is routed (this is the MISS the Mixer showed)', () => {
+  const mods = [T('i1', 'trackIn', 1), T('i2', 'trackIn', 2), T('mx', 'mixer'), T('cp', 'compressor'), T('o7', 'chainOut', 7)], cables = [Cb('i1', 'mx'), Cb('i2', 'mx'), Cb('mx', 'cp'), Cb('cp', 'o7')];
+  assert.deepEqual(planOf(mods, cables, [1, 2]).feeds, [], 'sources on, bus off: no routing');
+  assert.deepEqual(planOf(mods, cables, [7]).feeds, [], 'bus on, sources off: no routing');
+  assert.deepEqual(planOf(mods, cables, [1, 2, 7]).feeds, [[7, [1, 2]]], 'both on: routed');
+});
+
+test('CHN: switching it on leaves a track that already has I/O in the patch alone (no second Track In, no added Chain Out)', () => {
+  const ensure = cut('index.html', /function ensureChainPair\(t\)\{[\s\S]*?\n\}\n/, 'ensureChainPair');
+  const mk = mods => { const S = { chainPatch: { format: 'chains.patch', modules: mods, cables: [] } }, CH = {};
+    const c = sandbox({ S, CH, Date, chainsBottom: () => 0 }); vm.runInContext(ensure + '\nthis.ensure=ensureChainPair;this.S=S;this.CH=CH;', c); return c; };
+
+  // a pure bus source: a Track In, no Chain Out. Enabling CHN must not give it an output.
+  let c = mk([{ id: 'tin1', type: 'trackIn', params: { track: 1 } }]);
+  assert.equal(c.ensure(0), false, 'nothing added'); assert.equal(c.S.chainPatch.modules.length, 1, 'still just the Track In (was: a second Track In plus a Chain Out)');
+
+  // a normal pair: no duplicate either
+  c = mk([{ id: 'tin1', type: 'trackIn', params: { track: 1 } }, { id: 'tou1', type: 'chainOut', params: { track: 1 } }]);
+  assert.equal(c.ensure(0), false); assert.equal(c.S.chainPatch.modules.length, 2);
+
+  // untouched track: still gets the straight-through pair, so one switch from the Mixer is all it takes
+  c = mk([]);
+  assert.equal(c.ensure(3), true, 'pair added'); assert.equal(c.S.chainPatch.modules.length, 2);
+  const [a, b] = c.S.chainPatch.modules;
+  assert.deepEqual([a.type, a.params.track, b.type, b.params.track], ['trackIn', 4, 'chainOut', 4], 'Track In + Chain Out for track 4');
+  assert.equal(c.S.chainPatch.cables.length, 2, 'left and right wired through');
+  assert.equal(c.CH.doc, c.S.chainPatch, 'the editor is given the patch');
+});
+
 /* ───────── the two worklets share one block, kept in step by tools/sync-shared.py ───────── */
 test('shared blocks: waves and chains carry byte-identical SHARED MODULES and SHARED EDITOR blocks (run tools/sync-shared.py if this fails)', () => {
   const blk = (rel, tag) => cut(rel, new RegExp('/\\* ===' + tag + ' START===[\\s\\S]*?/\\* ===' + tag + ' END=== \\*/\\n'), 'the ' + tag + ' block');
