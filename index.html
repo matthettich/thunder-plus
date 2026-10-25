@@ -4645,7 +4645,11 @@ class ToneDrum {
       if (p.dist > 0){ const d = 1 + p.dist * 12; y = Math.tanh(y * d) / Math.tanh(d) * 0.9; }
       const o = y - dcx + 0.995 * dc; dcx = y; dc = o; out[i] = o;
     }
-    const lv = Math.pow(10, (p.level || 0) / 20) * 0.8, dr = (p.drive || 0) > 0.001 ? 1 + p.drive * p.drive * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1;
+    // 0.5, not 0.8 (owner, 25 Oct): the raw tone peaks around 1.18, so 0.8 left a single hit at -0.5 dBFS with no headroom to
+    // stack. At 320 ms decay a 16th-note pattern at 120 BPM reached +5.4 dBFS and held the safety limiter down 6 dB, which is
+    // what the owner heard as clipping. 0.5 is 4 dB less: one hit about -4.6 dBFS, and the limiter is only touched at the
+    // densest moments.
+    const lv = Math.pow(10, (p.level || 0) / 20) * 0.5, dr = (p.drive || 0) > 0.001 ? 1 + p.drive * p.drive * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1;
     for (let i = 0; i < N; i++){ let y = out[i] * lv; if (dr) y = Math.tanh(y * dr) * dn; out[i] = y; }
     let end = N; while (end > 1 && Math.abs(out[end - 1]) < 1e-4) end--;
     const res = out.slice(0, Math.max(end, 1)), fl = Math.min(res.length, Math.round(sr * 0.002)); for (let i = 0; i < fl; i++) res[res.length - 1 - i] *= i / fl;

@@ -77,6 +77,22 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 25 Oct (4): the Tone drum's level (the "clipping" the owner heard)
+
+Cache `thunderplus-v231` (only `index.html` changed).
+- **What it was:** not dropouts. `ToneDrum.render` synthesises a peak of about 1.18 and applied a fixed `* 0.8`, so a single hit
+  came out at 0.939 (-0.5 dBFS) with no headroom to stack. With its 320 ms decay, a 16th-note pattern at 120 BPM reached
+  1.851 (+5.4 dBFS), so the safety limiter (ceiling -1 dBFS, which the song output does pass through: `rt.out` → `safeLim`)
+  was held down ~6 dB for as long as it played. That pumping/distortion is what sounded like clipping. The render is 70–110 ms
+  for a 2.26 s buffer, but pads render in the worker, so it was not a main-thread dropout.
+- **Fix (owner's choice):** the trim is now `* 0.5`, 4 dB less. One hit peaks at 0.587 (-4.6 dBFS), a dense 16th-note pattern
+  at 1.157 (+1.3 dBFS) so the limiter is only touched ~2.3 dB at the densest moments, and sparse patterns do not touch it.
+  The voice's own Level control still scales in dB. **Tone drums are 4 dB quieter in every song that uses them**, which was
+  accepted; raise the pad's LEVEL where one needs to sit louder.
+- **Tests:** `tests/tone-drum.test.js` pins a single hit's peak (-4.6 dBFS band), the 16th-note pattern peak, and the Level
+  control. Reverting the trim to 0.8 makes them fail, so the level cannot drift back up unnoticed. `ToneDrum` itself is
+  unchanged otherwise and is not covered by the other golden tests (those are …chains, …waves and the mastering chain).
+
 ## 25 Oct (3): the Mixer has its own size
 
 Cache `thunderplus-v230` (only `index.html` changed). Looked at in Chrome on Desktop by the owner; not measured from here.
