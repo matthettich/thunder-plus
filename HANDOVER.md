@@ -77,6 +77,14 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 25 Oct (6): phrase/pattern space and stable text size
+
+Cache `thunderplus-v233` (`index.html` and `sw.js`).
+- Pattern row navigation, row count and LPB, plus FX2/3 and EMPTY TRACKS toggles, share the PHRASE | PATTERN title line; the duplicate phrase LEN/LPB title data is removed in Pattern mode.
+- The KEYS-mode command bar stays below the tracker beside the lower controls, rather than occupying a line inside the grid. The root note's info text no longer repeats “the pad’s own pitch.”
+- Phrase and Pattern text size is fitted on entry (and when TEXT SIZE changes), then held through viewport resizes. The grids calculate visible row count from their current height and can reveal all 32 phrase steps when enough vertical space is available.
+- `npm test` passes, including checks for fixed text sizing and the control-bar layout.
+
 ## 25 Oct (5): a build number, and MIXER SIZE in the View menu
 
 Cache `thunderplus-v232` (`index.html` and `sw.js`). The owner asked how to tell a build apart without DevTools.

@@ -91,6 +91,27 @@ test('mixer size: defaults to 100 %, honours a stored value, and ignores a missi
   assert.equal(c.mixScale, 100, 'blocked storage does not throw');
 });
 
+test('phrase and pattern text size stays fixed on resize and refits when TEXT SIZE changes', () => {
+  const blk = cut('index.html', /let phraseFitBase = null, phraseFitScale = -1;\nfunction fit\(\)\{[\s\S]*?\n\}\n/, 'phrase fit');
+  let pvCalls = 0;
+  const c = sandbox({ view: 'tracker', tv: 'phrase', fitTries: 0, layoutSig: '', scr: { clientWidth: 824, clientHeight: 560, style: { fontSize: '' } },
+    grid: { clientHeight: 420 }, spActive: () => false, spCols: () => 0, FITROWS: 18, BASEW: 52, CW: 0.6, mixScale: 100, tScale: 100,
+    pvActive: () => true, pvFit: fs => { pvCalls++; return Math.min(fs, 12); } });
+  vm.runInContext(blk + '\nthis.runFit=fit;', c);
+  c.runFit(); const initial = c.scr.style.fontSize;
+  c.scr.clientWidth = 1400; c.scr.clientHeight = 1000; c.grid.clientHeight = 850; c.runFit();
+  assert.equal(c.scr.style.fontSize, initial, 'resizing preserves the fitted phrase/pattern size'); assert.equal(pvCalls, 1, 'pattern fit runs once, not on resize');
+  c.tScale = 150; c.runFit(); const scaled = c.scr.style.fontSize; assert.notEqual(scaled, initial, 'changing TEXT SIZE refits'); assert.equal(pvCalls, 2);
+  c.scr.clientWidth = 1800; c.scr.clientHeight = 1400; c.grid.clientHeight = 1200; c.runFit(); assert.equal(c.scr.style.fontSize, scaled, 'resizing after TEXT SIZE preserves the new size');
+});
+
+test('pattern controls are in the title line and the KEYS command bar stays below the tracker', () => {
+  const src = H.read('index.html');
+  assert.match(src, /pvSeg\.after\(pvBar\)/); assert.doesNotMatch(src, /grid\.before\(pvBar\)/);
+  assert.match(src, /if \(bar\.parentNode !== cmdHome\) cmdHome\.insertBefore\(bar, cmdHomeNext\)/);
+  assert.doesNotMatch(src, /scr\.insertBefore\(bar, info\)/);
+});
+
 /* ───────── the build number (owner, 25 Oct): one number, shown in the View / Project menus ───────── */
 test('build number: the page\'s BUILD is the service-worker cache number, so "which build is this?" cannot lie', () => {
   const build = cut('index.html', /const BUILD = (\d+);/, 'const BUILD');

@@ -9,7 +9,7 @@ device, so it runs in about 15 seconds.
 | `waves.test.js` | every waves module in its real voice chain, plus `WavesProcessor` and the output limiter |
 | `master.test.js` | the mastering chain (suppressor, compressor, limiter), including what each stage must *do* |
 | `hangs.test.js` | renders that once froze the audio thread, run in a child process with a time limit |
-| `app-logic.test.js` | logic cut out of the HTML/JS: logger, PatchStore dirty flag, sample prune, `esc()`, CSP header, service-worker file list, shared-block sync |
+| `app-logic.test.js` | logic cut out of the HTML/JS: logger, PatchStore dirty flag, sample prune, `esc()`, phrase/pattern sizing and layout, CSP header, service-worker file list, shared-block sync |
 | `updater.test.js` | the desktop updater's SHA-256 check |
 
 ## Golden hashes

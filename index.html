@@ -821,23 +821,19 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .tcmd .ca{font-size:.9em}
 @media (max-width:600px){ .tcmd button{flex-direction:column; gap:1px; line-height:1.1; letter-spacing:.02em} .tcmd button[data-c=next]{flex-direction:column-reverse} .tcmd .ca{font-size:var(--fs-2)} }
 .tcmd button.on{background:var(--pl); color:var(--inv)}
-/* COMMAND BAR (KEYS mode, View ▾; owner, 19 Oct: mock-up A): the editor's own toolbar, at the bottom of the middle
-   column under whatever is there (the phrase, the pattern, Arrange as the Song screen, the mixer…), just above the info
-   lines, in PHRASE | PATTERN's look: groups of joined buttons in the screen's ink. It acts on whatever has the keys; the
-   tag at its left says what (.cmtag). Buttons that do nothing there are greyed (.off), not hidden, so it keeps its shape. */
 .tcmd .cmtag{display:none}
-.tscr > .tcmd.cmini{display:flex; flex:none; flex-wrap:wrap; align-items:center; gap:.35em 0; height:auto; margin:0; padding:.5em 0 .15em; background:transparent; border:0;
-  overflow:visible; font:600 .7em/1 var(--mono); letter-spacing:.04em; color:var(--ts-ink)}
-.tscr > .tcmd.cmini::before{content:none; display:none}   /* no COMMANDS caption */
-.tscr > .tcmd.cmini .cmtag{display:inline-block; min-width:8.5ch; margin-right:.6em; color:var(--ts-th); letter-spacing:.1em}
-.tscr > .tcmd.cmini button, :root[data-skinbase] .tscr > .tcmd.cmini button:not(#zz){flex:none; min-height:0; height:auto; margin:0; padding:.32em .6em; font:inherit; letter-spacing:inherit; line-height:1;
-  border:1px solid var(--ts-ink); border-radius:0; background:transparent; color:var(--ts-ink); box-shadow:none; transform:none; transition:none; text-shadow:none}
-.tscr > .tcmd.cmini button + button, :root[data-skinbase] .tscr > .tcmd.cmini button:not(#zz) + button{border-left:0}
-.tscr > .tcmd.cmini :is([data-c=cut],[data-c=sel],[data-c="b:-16"],[data-c=prev]), :root[data-skinbase] .tscr > .tcmd.cmini :is([data-c=cut],[data-c=sel],[data-c="b:-16"],[data-c=prev]):not(#zz){margin-left:.9em; border-left:1px solid var(--ts-ink)}
-.tscr > .tcmd.cmini [data-c=song], :root[data-skinbase] .tscr > .tcmd.cmini [data-c=song]:not(#zz){margin-left:auto; border-left:1px solid var(--ts-ink)}
-.tscr > .tcmd.cmini button:hover, :root[data-skinbase] .tscr > .tcmd.cmini button:not(#zz):hover{background:color-mix(in srgb, var(--ts-ink) 14%, transparent)}
-.tscr > .tcmd.cmini button:is(.on,.dn), :root[data-skinbase] .tscr > .tcmd.cmini button:is(.on,.dn):not(#zz){background:var(--ts-ink)!important; color:var(--ts-bg)}
-.tscr > .tcmd.cmini button.off, :root[data-skinbase] .tscr > .tcmd.cmini button.off:not(#zz){opacity:.32; pointer-events:none}
+.tcmd.cmini{display:flex; flex:none; flex-wrap:wrap; align-items:center; gap:.35em 0; height:auto; margin:0; padding:.45em 16px; background:var(--side); border:0;
+  overflow:visible; font:600 .7em/1 var(--mono); letter-spacing:.04em; color:var(--ink)}
+.tcmd.cmini::before{content:none; display:none}
+.tcmd.cmini .cmtag{display:inline-block; min-width:8.5ch; margin-right:.6em; color:var(--muted); letter-spacing:.1em}
+.tcmd.cmini button, :root[data-skinbase] .tcmd.cmini button:not(#zz){flex:none; min-height:0; height:auto; margin:0; padding:.32em .6em; font:inherit; letter-spacing:inherit; line-height:1;
+  border:1px solid var(--line); border-radius:0; background:transparent; color:var(--ink); box-shadow:none; transform:none; transition:none; text-shadow:none}
+.tcmd.cmini button + button, :root[data-skinbase] .tcmd.cmini button:not(#zz) + button{border-left:0}
+.tcmd.cmini :is([data-c=cut],[data-c=sel],[data-c="b:-16"],[data-c=prev]), :root[data-skinbase] .tcmd.cmini :is([data-c=cut],[data-c=sel],[data-c="b:-16"],[data-c=prev]):not(#zz){margin-left:.9em; border-left:1px solid var(--line)}
+.tcmd.cmini [data-c=song], :root[data-skinbase] .tcmd.cmini [data-c=song]:not(#zz){margin-left:auto; border-left:1px solid var(--line)}
+.tcmd.cmini button:hover, :root[data-skinbase] .tcmd.cmini button:not(#zz):hover{background:color-mix(in srgb, var(--ink) 14%, transparent)}
+.tcmd.cmini button:is(.on,.dn), :root[data-skinbase] .tcmd.cmini button:is(.on,.dn):not(#zz){background:var(--ink)!important; color:var(--inv)}
+.tcmd.cmini button.off, :root[data-skinbase] .tcmd.cmini button.off:not(#zz){opacity:.32; pointer-events:none}
 .tcmd button[hidden]{display:none} .tcmd button[data-c=song]{font-size:var(--fs-5)} .tcmd.cpad :is([data-c=undo],[data-c=redo]){font-size:20px; font-weight:500; line-height:1} .tcmd :is([data-c=prev],[data-c=next]){font-size:24px; font-weight:500; line-height:1}
 /* One row on wide screens. */
 @media (min-width:700px){
@@ -1223,7 +1219,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
    then gives way a step at a time while that isn't enough: f1 the "1/16 song" note goes, f2 PHR | PAT, f3 the track
    name without MONO / POLY, f4 as T02, f5 the track name goes, f6 LEN / LPB (ROWS and LPB are on the top strip too),
    and f7, last, lets the line wrap rather than overlap. */
-.thd > .thl{flex:none}
+.thd > .thl{flex:0 1 auto; min-width:0}
 .thd > .tsub{flex:1 1 0; min-width:0; text-align:right}
 .tscr .pvseg .lshort, .thd.f2 .pvseg .lfull{display:none} .thd.f2 .pvseg .lshort{display:inline}
 .thd > .tsub :is(.lmid, .lshort), .thd.f3 > .tsub .lfull, .thd.f4 > .tsub .lmid{display:none}
@@ -1233,20 +1229,22 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .thd.f7{flex-wrap:wrap; row-gap:.3em}
 .tscr .thd > .phsw{flex:none; margin-left:.9em}
 .tscr .pvseg button.on,.tscr .pvbar button.on{background:var(--ts-ink); color:var(--ts-bg)}
-.tscr .pvbar{display:flex; align-items:center; gap:.7em; flex:none; min-width:0; overflow:hidden; white-space:nowrap; padding:.15em 0 .35em;
-  font:600 .74em/1.25 var(--mono); color:var(--ts-ink)}
+.tscr .thl .pvbar{display:flex; align-items:center; gap:.28em; flex:0 1 auto; min-width:0; overflow:hidden; white-space:nowrap; padding:0;
+  font:600 .7em/1 var(--mono); color:var(--ts-ink)}
 .tscr .pvbar[hidden]{display:none}
-.tscr .pvbar button{font-size:calc(.7em / .74); line-height:1; letter-spacing:.04em}   /* the same size as PHRASE | PATTERN and DANCE · DRUM · KEYS · HIDE above (owner, 19 Oct) */
-.tscr .pvbar .pvrow{font-size:1.2em; font-weight:700; letter-spacing:.02em}
-.tscr .pvbar .pvtag{border:1px solid var(--ts-dim); color:var(--ts-th); padding:.18em .55em; letter-spacing:.08em}
-.tscr .pvbar .pvlen{color:var(--ts-th); font-weight:400}
-.tscr .pvbar .pvwarn{color:var(--ts-mute); border:1px solid currentColor; padding:.18em .55em; min-width:0; overflow:hidden; text-overflow:ellipsis}
+.tscr .pvbar button{font-size:1em; line-height:1; letter-spacing:.04em}
+.tscr .pvbar .pvrow{font-size:1em; font-weight:700; letter-spacing:.02em}
+.tscr .pvbar .pvtag{border:1px solid var(--ts-dim); color:var(--ts-th); padding:.12em .35em; letter-spacing:.05em; max-width:9ch; overflow:hidden; text-overflow:ellipsis}
+.tscr .pvbar .pvlen{color:var(--ts-th); font-weight:400; min-width:0; overflow:hidden; text-overflow:ellipsis}
+.tscr .pvbar .pvwarn{color:var(--ts-mute); border:1px solid currentColor; padding:.12em .3em; min-width:0; overflow:hidden; text-overflow:ellipsis}
 .tscr .pvbar :is(.pvtag,.pvwarn)[hidden]{display:none}
-.tscr .pvbar .pvsp{flex:1 1 auto; min-width:0}
-.tscr .pvbar button{flex:none}
-.tscr .pvbar .pvud{display:flex; flex:none; margin-left:-.3em}   /* ▲ ▼ after SONG ROW: song rows run down the song */
-.tscr .pvbar .pvud button{padding:.32em .5em; line-height:1}
+.tscr .pvbar .pvsp{display:none}
+.tscr .pvbar button{flex:none; padding:.24em .38em}
+.tscr .pvbar .pvud{display:flex; flex:none; margin-left:-.2em}
+.tscr .pvbar .pvud button{padding:.24em .35em; line-height:1}
 .tscr .pvbar .pvud button + button{border-left:0}
+.tscr .pvbar button.on{background:var(--ts-ink); color:var(--ts-bg)}
+@media (max-width:900px){.tscr .pvbar .pvtag{display:none}.tscr .pvbar{gap:.2em}.tscr .pvbar .pvrow{font-size:.9em}.tscr .pvbar .pvlen{font-size:.9em}}
 /* The grid: lines as wide as their text (so the 4/4 shading runs on when it scrolls sideways), every cell a full-height
    block so the bands, the hatching and the column rules join up from line to line. */
 .tgrid.pvon{overflow-x:auto; overflow-y:hidden}   /* the tracks scroll sideways: a scrollbar to drag, a sideways wheel or swipe */
@@ -16618,7 +16616,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 232;
+const BUILD = 233;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18155,18 +18153,13 @@ function applyCmdOrder(){
   const sb = by.song; if (sb){ sb.textContent = cmdSongLab(); sb.classList.toggle('on', tp.on); }
   if (typeof cmdBarState === 'function') cmdBarState();
 }
-// COMMAND BAR as the editor's toolbar (owner, 19 Oct): in KEYS mode it lives in the middle column just above the info
-// lines (cmdBarState puts it back there after each draw: Arrange as the Song screen goes in before the info lines too);
-// in PAD mode, or with the bar off, it goes home (the COMMANDS row under the screen). Its tag says what the buttons act
-// on, the side Arrange panel when that has the keys; what can't act there is greyed.
 const cmdHome = $('tCmd').parentNode, cmdHomeNext = $('tCmd').nextElementSibling, cmdTag = el('span', 'cmtag');
 cmdTag.title = 'What these buttons act on: whatever has the keys';
 $('tCmd').prepend(cmdTag);
 function cmdBarState(){
-  const bar = $('tCmd'), info = scr.querySelector('.tinfo');
-  if (!bar.classList.contains('cmini')){ if (bar.parentNode !== cmdHome) cmdHome.insertBefore(bar, cmdHomeNext); return; }
-  if (bar.parentNode !== scr || bar.nextElementSibling !== info) scr.insertBefore(bar, info);
-  if (bar.hidden) return;
+  const bar = $('tCmd');
+  if (bar.parentNode !== cmdHome) cmdHome.insertBefore(bar, cmdHomeNext);
+  if (!bar.classList.contains('cmini') || bar.hidden) return;
   const arr = !!apF || (tv === 'song' && asongOn()), v = apF ? 'song' : tv, grid = GRIDV.has(v) && !(v === tv && onPset());
   const tag = arr ? 'ARRANGE' : v === 'phrase' && pvActive() ? 'PATTERN' : VNAME[v] || v.toUpperCase();
   if (cmdTag.textContent !== tag) cmdTag.textContent = tag;
@@ -18301,7 +18294,7 @@ function info(){
   if (tv === 'phrase'){
     const p = S.phrases[cPhrase], r = p ? p[c.y] : freshPhrase()[0], k = PK[c.x], v = r[c.x];
     if (k === 'note'){ const cn = c.x ? `Chord note ${c.x + 1}: ` : '';
-      return cn + (v < 0 ? 'No note' : v === OFF ? 'Note off: releases every note on this track' : `${noteS(v)} · ` + (v === ROOT ? 'the pad’s own pitch' : `${sgn(v - ROOT)} st from the pad’s pitch`)); }
+      return cn + (v < 0 ? 'No note' : v === OFF ? 'Note off: releases every note on this track' : noteS(v) + (v === ROOT ? '' : ` · ${sgn(v - ROOT)} st from the pad’s pitch`)); }
     if (k === 'vol') return v < 0 ? 'Volume: full' : `Volume ${hx(v)} · ${dB(curve(v))}`;
     if (k === 'inst'){ if (v < 0) return 'Instrument: same as the last note on this track'; const I = S.insts[v] || S.insts[0]; return `Instrument ${hx(v)} → ${isSyn(I.pad) ? 'synth' : 'pad'} ${hx(I.pad)} ${(kit.voices[I.pad] || {}).name || ''}`; }
     const ci = k === 'fxc' ? v : r[c.x - 1], vv = k === 'fxc' ? r[c.x + 1] : v;
@@ -18340,15 +18333,11 @@ function measure(force){
   s.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;font-size:100px;font-family:' + getComputedStyle(scr).fontFamily;
   s.textContent = '0123456789'; document.body.append(s); CW = s.getBoundingClientRect().width / 1000 || 0.6; s.remove();
 }
+let phraseFitBase = null, phraseFitScale = -1;
 function fit(){
   if (view !== 'tracker') return;
-  fitTries = 0; layoutSig = '';   // the next draw measures again
+  fitTries = 0; layoutSig = '';
   const W = scr.clientWidth - 24, H = scr.clientHeight - 16; if (W <= 0 || H <= 0) return;
-  // Height: the phrase's LEN line, its column header and 16 rows (18 lines) must fit in the grid, with the
-  // title line and up to three info lines (0.8em each) around it: ~5.5em of extras. Then measure the grid
-  // itself and shrink until 18 lines really fit, since the buttons below can be tall on a phone.
-  // The Mixer is taller: 19 lines (VOL to SC, the meter scale, MASTER and its L and R) plus the MONO/POLY labels.
-  // SIMPLE PHRASE: sized to the phrase's own width, and only 10 rows need to fit (the rest scroll with the cursor).
   const spc = spActive() ? spCols() : 0, ROWS = tv === 'mixer' ? 20 : spc ? 12 : FITROWS;
   let fs = Math.max(7, Math.min(spc ? 40 : 30, W / ((spc || BASEW) * CW), H / (ROWS * 1.3 + 5.5)));
   for (let i = 0; i < 6; i++){
@@ -18357,11 +18346,15 @@ function fit(){
     if (!gh || fit >= ROWS + 0.2 || fs <= 7) break;
     fs = Math.max(7, fs * fit / (ROWS + 0.3));
   }
-  fs = pvFit(fs, W);   // PATTERN VIEW: smaller text so more tracks fit, and room for its header lines
-  // TEXT SIZE (Project): scale what fits. Bigger shows fewer rows and the lines can scroll sideways. The Mixer does not take
-  // TEXT SIZE: it has its own (MIXER SIZE), so sizing the tracker never changes the Mixer and the other way round.
-  const sc = tv === 'mixer' ? mixScale : tScale;
-  if (sc !== 100) scr.style.fontSize = Math.max(5, fs * sc / 100).toFixed(2) + 'px';
+  const sc = tv === 'mixer' ? mixScale : tScale, phraseView = tv === 'phrase' && !spc;
+  if (phraseView){
+    if (phraseFitBase == null || phraseFitScale !== sc){
+      if (pvActive()) fs = pvFit(fs, W);
+      phraseFitBase = fs; phraseFitScale = sc;
+    }
+    fs = phraseFitBase;
+  } else { phraseFitBase = null; phraseFitScale = -1; }
+  scr.style.fontSize = Math.max(5, fs * sc / 100).toFixed(2) + 'px';
 }
 // Song shows 16 rows, more when the screen is tall (unfolded in portrait).
 function songRows(){ const fs = parseFloat(scr.style.fontSize) || 14, h = grid.clientHeight - (grid.classList.contains('grp') ? fs * 1.15 + fs * .12 + 3 : fs * .25); return h > 0 ? clamp(Math.floor(h / (fs * 1.3) + 0.02) - 1, 8, 48) : 16; }
@@ -18371,7 +18364,7 @@ let fitTries = 0;
 function fitCheck(){
   // The Mixer is never exempt from this check: it must show all 20 of its rows (VOL to MASTER), so a size that does not fit
   // is brought back to one that does. TEXT SIZE is allowed to scroll or run past on purpose; a clipped Mixer row would be a bug.
-  const bypass = tv === 'mixer' ? false : tScale !== 100;
+  const bypass = tv === 'mixer' ? false : tv === 'phrase' || tScale !== 100;
   if (bypass || fitTries >= 3 || !(tv === 'song' || tv === 'phrase' || tv === 'mixer' || tv === 'sect') || asongOn()) return false;   // Arrange as Song: no text grid to fit
   const g = grid.getBoundingClientRect(), bottom = g.top + grid.clientTop + grid.clientHeight;
   let end = 0; const lns = grid.querySelectorAll(':scope > .ln'); if (lns.length) end = lns[lns.length - 1].getBoundingClientRect().bottom;
@@ -18678,7 +18671,7 @@ function draw(){
   paintMeters();
   instList();
   apAfterDraw();   // ARRANGE PAGING: focus look, phrase follow, song strip
-  cmdBarState();   // COMMAND BAR: in the middle column, its tag and greyed buttons (after Arrange's own changes)
+  cmdBarState();
 }
 // A character's real advance in the grid (its font, size and the letter-spacing it inherits; 1ch leaves the spacing out),
 // for the meter cells' widths. Measured when the text size, skin or fonts change.
@@ -22326,7 +22319,6 @@ function pvFit(fs, W){
   }
   return f;
 }
-// PHRASE | PATTERN on the title line, and the pattern's bar under it.
 const pvSeg = el('span', 'pvseg'); pvSeg.hidden = true; pvSeg.setAttribute('role', 'group'); pvSeg.setAttribute('aria-label', 'Phrase or pattern');
 // The full words, or PHR | PAT when the title line is tight (TITLE LINE FIT; owner, 20 Oct: PATTERN ran into the track name).
 const pvSegB = [['ph', 'PHRASE', 'PHR', 'This phrase on its own (stays chosen until you switch)'], ['pt', 'PATTERN', 'PAT', 'Pattern: every track’s phrase for this song row, side by side (stays chosen until you switch)']]
@@ -22336,7 +22328,7 @@ const pvBar = el('div', 'pvbar'); pvBar.hidden = true; pvBar.setAttribute('role'
 pvBar.innerHTML = '<span class="pvrow"></span><span class="pvud"><button type="button" data-pv="prev" aria-label="Song row above" title="The song row above (Shift+Alt+↑)">▲</button>'
   + '<button type="button" data-pv="next" aria-label="Song row below" title="The song row below (Shift+Alt+↓)">▼</button></span><span class="pvtag" hidden></span><span class="pvlen"></span>'
   + '<span class="pvwarn" hidden></span><span class="pvsp"></span><button type="button" data-pv="fx"></button><button type="button" data-pv="fold"></button>';
-grid.before(pvBar);
+pvSeg.after(pvBar);
 const pvB = {row:pvBar.querySelector('.pvrow'), tag:pvBar.querySelector('.pvtag'), len:pvBar.querySelector('.pvlen'), warn:pvBar.querySelector('.pvwarn'),
   fx:pvBar.querySelector('[data-pv=fx]'), fold:pvBar.querySelector('[data-pv=fold]')};
 for (const box of [pvSeg, pvBar]){
@@ -22492,9 +22484,11 @@ function pvBarDraw(y, rows, lpb, warn, warnT){
   pvTxt(pvB.row, 'SONG ROW ' + rS(y, 3));
   pvB.tag.hidden = !nm; pvTxt(pvB.tag, nm.toUpperCase());
   pvTxt(pvB.len, rows + ' ROWS · LPB ' + lpb);
-  pvB.warn.hidden = !warn; pvTxt(pvB.warn, warn); pvB.warn.title = warnT || warn;
-  pvTxt(pvB.fx, pvFx ? 'FX2/3 SHOWN' : 'FX2/3 HIDDEN'); pvB.fx.title = pvFx ? 'Hide the FX2 and FX3 columns' : 'Show the FX2 and FX3 columns (a dotted FX1 value has more on its row)';
-  pvTxt(pvB.fold, pvFold ? 'EMPTY TRACKS FOLDED' : 'EMPTY TRACKS SHOWN'); pvB.fold.title = pvFold ? 'Show the tracks with nothing on this row at full width' : 'Fold the tracks with nothing on this row to narrow strips';
+  pvB.warn.hidden = !warn; pvTxt(pvB.warn, warn ? '!' : ''); pvB.warn.title = warnT || warn; pvB.warn.setAttribute('aria-label', warn || 'No pattern length mismatch');
+  pvTxt(pvB.fx, 'FX2/3'); pvB.fx.title = pvFx ? 'Hide the FX2 and FX3 columns' : 'Show the FX2 and FX3 columns (a dotted FX1 value has more on its row)';
+  pvB.fx.classList.toggle('on', pvFx); pvB.fx.setAttribute('aria-pressed', String(pvFx));
+  pvTxt(pvB.fold, 'EMPTY'); pvB.fold.title = pvFold ? 'Show the tracks with nothing on this row at full width' : 'Fold the tracks with nothing on this row to narrow strips';
+  pvB.fold.classList.toggle('on', pvFold); pvB.fold.setAttribute('aria-pressed', String(pvFold));
 }
 // The pattern's lines for draw(): header bands, column names, then the rows. Returns what draw() shows around them.
 // With Arrange (or the song strip) holding the keys the song cursor is Arrange's, not the pattern's: the pattern still
@@ -22538,7 +22532,7 @@ function pvLines(c, L, cc, rsel, playRows){
     if (off.length === 1) warn = say(off[0]);
     else if (off.length > 1){ warn = `TRACKS ${off.map(d => d.t === MT ? 'MST' : d2(d.t + 1)).join(' ')} ARE OTHER LENGTHS: THEY DRIFT FROM HERE`; warnT = off.map(say).join('\n'); }
   }
-  pvBarDraw(Y, rowsN, lpbRef, warn, warnT);   // first: the bar's height decides how many rows fit
+  pvBarDraw(Y, rowsN, lpbRef, warn, warnT);
   const fs = parseFloat(scr.style.fontSize) || 14, VR = Math.max(4, Math.floor((grid.clientHeight - fs * .25) / (fs * 1.3) + 0.02) - 3);
   if (c.top == null) c.top = 0;
   if (c.y >= 0){ if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; }
@@ -22617,10 +22611,7 @@ function pvLines(c, L, cc, rsel, playRows){
   const sig = cTrack + ':' + Y + ':' + G.map(g => g.fold ? 'f' + g.t1 : g.w).join(',') + ':' + c.x + ':' + c.y + ':' + scr.style.fontSize;
   if (sig !== pvSig){ pvSig = sig; if (!pvHoldX) requestAnimationFrame(pvScroll); }
   pvHoldX = false;
-  const lpb = S.plpb[cPhrase] || 0, el2 = lpb || S.lpb;
-  return {title:'PATTERN', sub:cTrack === MT ? 'MASTER' : trkLab(cTrack) + ' ·' + trkKind(cTrack), prLit:playRows(q => q.phrase === cPhrase ? q.step : null),
-    pset:[{t:'PH ' + hx(cPhrase) + ' ', cls:'lb'}, {t:'LEN ', cls:'lb'}, {t:d2(curLen), cls:cc(0, -2, 'v'), x:0, y:-2}, {t:' LPB ', cls:'lb'}, {t:lpb ? d2(lpb) : '--', cls:cc(1, -2, lpb ? 'v' : 'e'), x:1, y:-2},
-      {t:' 1/' + (el2 * 4) + (el2 % 3 === 0 ? ' trip' : '') + (lpb ? '' : ' song'), cls:'lb'}]};
+  return {title:'PATTERN', sub:cTrack === MT ? 'MASTER' : trkLab(cTrack) + ' ·' + trkKind(cTrack), prLit:playRows(q => q.phrase === cPhrase ? q.step : null), pset:[]};
 }
 // After draw(): the open track's whole column group in view when it fits (its start when it doesn't), the cursor always,
 // and a track's group (not half of one) first after the row numbers.
