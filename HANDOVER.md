@@ -77,6 +77,74 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 25 Oct: a test suite, the Function generator hang, and failures that used to be silent
+
+Cache `thunderplus-v228`, `chains/chains-worklet.js?v=38`, `waves/waves-worklet.js?v=31`, `pump/ui/kit.js?v=3`. **Not yet played
+by ear or released** (no desktop build): the changes were checked by `npm test` (below) and in Chrome's console on a local server,
+nothing more. Play a pattern, an engine switch, a pump window, and the Function generator in Audio range with Sync on before
+releasing.
+- **BUG FIXED: the Function generator (`tides`) hung the audio thread** in its Audio range with a clock, either Sync to tempo
+  or a cable on Clock (every division and tempo; the first block never returned). Nothing in the editor stopped a user choosing
+  it. The loop is inside the Mutable Instruments Tides ramp extractor in `mods.wasm`, which cannot be rebuilt without wasi-sdk
+  (not installed here; see `dsp/mods/build.sh`), so `TidesM.process` now does not hand the wasm a clock in the Audio range
+  (`const audio = p.range >= .5, clk = !audio && ...`) and Frequency decides, as with no clock. Control range is unchanged.
+  This is a guard, not a cure: if the wasm is rebuilt, the extractor's audio path is the thing to look at. Regression tests in
+  `tests/hangs.test.js` run the render in a child process with a time limit (a hang cannot be asserted in-process).
+- **`npm test`** (root `package.json`, no dependencies, Node 20+, ~10 s, 52 tests; `tests/README.md` explains it). Loads the
+  worklets and page scripts into a Node `vm`: no browser, no audio device. Every chains and waves module is rendered in three
+  parameter sets and the float bits are hashed against `tests/golden/*.json` (657 hashes); the processor wrappers
+  (`ChainsProcessor`, `ThunderChains`, `WavesProcessor`) are driven with a signal loud enough to reach the `soft()` output
+  limiter; the mastering chain is tested for what each stage does as well as for its hash. `npm run test:golden:update`
+  accepts an intended change to the sound; review the golden diff first. **A golden hash says "unchanged", never "correct"**,
+  and modules that need a gate or clock are rendered without one (see the comment above `SKIP` in `chains.test.js`).
+  Mutation-tested: 20 deliberate regressions injected, each must fail a test; the ones that first slipped through (the soft
+  limiter knee, Bus Comp's `clip`, the limiter's default ceiling, the waves output limiter) are covered now.
+- **Failures that used to be invisible are logged.** `tpLog(where, err)` (top of `index.html`; `window.tpLogs` holds what was
+  printed) is console-only, prints each distinct message once and stops at 200, so a failure in a render loop cannot flood
+  it. Global `error` / `unhandledrejection` handlers use it. Wired to: every WASM load / compile / instantiate failure (page,
+  render Worker via its `ready` message's `errs`, both worklets, the Random / Function generators' wasm, a crashed effect once
+  per instance), a failed kv write (`kvSet` / `kvDel` also log from the transaction's error / abort, which never reached the
+  `catch`), service-worker registration, the song / IR load and the converted-song save, and the editors' save hand-off.
+  **About 390 empty `catch`es remain on purpose** (audio-node teardown, `localStorage`, focus): logging those would flood the
+  console during playback and hide the real ones. Leave them silent, and say why in a comment if you touch one.
+- **Editors' unsaved flag** (`PatchStore.save`, waves and chains): inside Thunder Plus the hand-off to the page (`TW.save`)
+  decides `dirty`, so a failed hand-off stays dirty and the pause / pagehide / leave paths retry it. It used to clear
+  `dirty` regardless and the edit was forgotten until the next one. On its own, the `localStorage` write decides.
+- **Memory:** `IRDATA` (decoded impulse responses) was never pruned, so every project opened with IRs added a few MB until a
+  reload. The existing 60 s prune of `smpHeld` now drops `IRDATA` entries that nothing refers to (the song's IRs, undo history
+  and presets keep theirs; `irsResolve()` reloads from IndexedDB if one is needed again). It still only runs with 8+ samples
+  held and not while playing: that was the original gate and was left alone.
+- **Pump windows:** a draw or tick that throws is reported once per message (`warnOnce` in `pump/ui/kit.js`), not ~60 times a
+  second for as long as the window is open.
+- **Desktop updater** (`electron/updater.js`): the direct download (Mac .dmg, portable .exe) is hashed as it streams and checked
+  against the SHA-256 GitHub lists for the asset (`digest: sha256:...`); a mismatch is deleted and never opened. A release
+  with no digest behaves as before. This catches corruption and a swapped file, **not** a compromised release (the digest is
+  from the same account).
+- **Content Security Policy, report-only, desktop only** (`electron/main.js`, a `Content-Security-Policy-Report-Only` header on
+  the `app://` pages). It lists what it would block and blocks nothing; read the console of the desktop app, fix what it
+  reports, and only then make it enforcing. The website has none: a `<meta>` tag cannot carry Report-Only, so on GitHub Pages
+  it would enforce at once. The app is inline `<script>`, so `'unsafe-inline'` has to stay until those move out or get
+  nonces; today it stops loading anything from another site and locks object / base / form, not injected inline script.
+- **Section names** in the Arrange lane use `esc()` rather than stripping `<>&"` (a section called `R&B` now shows as `R&B`).
+- **`modsWhy` is in the SHARED MODULES block**, so its text is one neutral label. `chains/` is the source of truth: edit there
+  and run `python3 tools/sync-shared.py` (a test fails if the two blocks differ). An earlier hand edit gave the two files
+  different labels, which the next sync would have silently undone.
+- **Left alone on purpose.** (a) `inAI` / `window.claude` (about a dozen branches): not dead code, the in-app text says
+  "Inside AI, files come out as .zip" and "MIDI is blocked inside AI"; remove it only if running inside a Claude artifact is
+  no longer supported. (b) The IPC file read / save accept any `.thunder` / `.json` path: the page legitimately passes paths the
+  main process has never seen (a dropped file, the stored current-file path, the recent list), so an allow-list would need to be
+  remembered across restarts and a mistake makes Save fail on a user's project. (c) The waves oscillator starts every voice at
+  `Math.random()`, which the engine's `seed` does not control; a musical choice, and the tests give their scope a deterministic
+  `Math.random` instead (`freezeClock` in `tests/helpers.js`). (d) `localStorage` helpers repeated in `pump/ui/*.js` differ on
+  purpose (number-checked, JSON, raw string); each file is its own function scope, and a shared module would be one more thing
+  every pop-up depends on.
+- **Corrections to the 25 Oct code review.** The "duplicated worklet / editor code" is mostly deliberate: `tools/sync-shared.py`
+  copies the shared blocks from chains into waves (what differs, `mixDef`, `normalize`, `blankDoc`, differs for real waves-versus-
+  chains reasons). `innerHTML` is not a glaring XSS risk (dynamic sites use `esc()` or numbers and constants). The one Electron
+  sandbox setting I doubted (`contextIsolation`) is on.
+- **Chrome's console on `file://`** shows ~28 CORS errors (fonts, manifest, every `.wasm`): the page was opened by double-click.
+  It needs a server (`python3 -m http.server`) or the desktop app; `file://` was never supported.
+
 ## 24 Oct: Windows fixes, reverb Mix curve, mouse on values, header meter, LXR presets — desktop v1.2.22
 
 Cache `thunderplus-v225`, `chains/chains-worklet.js?v=36`, `waves/waves-worklet.js?v=29`, `lxr/lxr-engine.js?v=2`. Each

@@ -1,0 +1,12 @@
+{
+  "name": "thunder-plus-tests",
+  "private": true,
+  "description": "Test runner for Thunder Plus. The app itself has no build step; this file only holds the test scripts and has no dependencies. The desktop app's own package.json is electron/package.json.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:golden:update": "UPDATE_GOLDEN=1 node --test tests/*.test.js",
+    "sync": "python3 tools/sync-shared.py"
+  },
+  "engines": { "node": ">=20" }
+}

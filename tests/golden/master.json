@@ -1,0 +1,20 @@
+{
+ "off @-12dB": "67bbf54d",
+ "off @0dB": "d6bc2be5",
+ "off @9dB": "b104dbc1",
+ "sup @-12dB": "04e9154d",
+ "sup @0dB": "9396c1c5",
+ "sup @9dB": "5de2c159",
+ "comp @-12dB": "34e8c545",
+ "comp @0dB": "707407a9",
+ "comp @9dB": "3de1a13d",
+ "lim @-12dB": "7e357be5",
+ "lim @0dB": "3ead13d5",
+ "lim @9dB": "5b969ca1",
+ "all @-12dB": "9d6b92b1",
+ "all @0dB": "fc11b0cd",
+ "all @9dB": "5d9d47d9",
+ "compParallel @-12dB": "517b46fd",
+ "compParallel @0dB": "cd06ea85",
+ "compParallel @9dB": "3abd39b9"
+}
