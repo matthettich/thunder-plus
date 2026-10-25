@@ -79,6 +79,18 @@ test('esc(): escapes the characters that can break out of text or a quoted attri
   assert.ok(!/[<>"]/.test(esc('<img src=x onerror="a">')), 'no raw angle bracket or quote survives');
 });
 
+/* ───────── MIXER SIZE (Project): its own size, separate from TEXT SIZE ───────── */
+test('mixer size: defaults to 100 %, honours a stored value, and ignores a missing, garbled or out-of-range one', () => {
+  const blk = cut('index.html', /const MSK = 'thunderplus-mixsize-v1';[\s\S]*?let mixScale = \(\(\) => \{[\s\S]*?\}\)\(\);\n/, 'the mixer size block');
+  const value = raw => { const c = sandbox({ localStorage: { getItem: () => raw } }); vm.runInContext(blk + '\nthis.mixScale=mixScale;this.mixScaleDef=mixScaleDef;', c); return { v: c.mixScale, d: c.mixScaleDef() }; };
+  assert.deepEqual(value(null), { v: 100, d: 100 }, 'nothing stored: 100 % (fills the screen; the old 80 % Desktop text size no longer applies to the Mixer)');
+  assert.equal(value('150').v, 150, 'a stored size is used');
+  assert.equal(value('60').v, 60); assert.equal(value('200').v, 200, 'both ends of the range');
+  for (const bad of ['40', '210', '', 'abc', 'NaN']) assert.equal(value(bad).v, 100, 'out of range or garbled (' + JSON.stringify(bad) + ') falls back to the default');
+  const c = sandbox({ localStorage: { getItem: () => { throw new Error('blocked'); } } }); vm.runInContext(blk + '\nthis.mixScale=mixScale;', c);
+  assert.equal(c.mixScale, 100, 'blocked storage does not throw');
+});
+
 /* ───────── the Electron CSP header (electron/main.js) ───────── */
 test('electron CSP: report-only, no outside origins, wasm and blob allowed, and the response is passed through intact', async () => {
   const src = H.read('electron/main.js'), csp = src.match(/const CSP = \[[\s\S]*?\]\.join\('; '\);/)[0], wc = src.match(/const withCsp = res => \{[^\n]*\};/)[0];

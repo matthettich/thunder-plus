@@ -16601,6 +16601,12 @@ let stepDec = (() => { try { return localStorage.getItem(SDK) !== '0'; } catch(e
 // DESKTOP DEFAULT (owner, 24 Oct): 80 % on Desktop, 100 % on Mobile, until a size is chosen.
 const tScaleDef = () => isMobile() ? 100 : 80;
 let tScale = (() => { try { const v = parseInt(localStorage.getItem(TSK), 10); return v >= 60 && v <= 200 ? v : tScaleDef(); } catch(e){ return tScaleDef(); } })();
+// MIXER SIZE (owner, 25 Oct): the Mixer has a size of its own, separate from TEXT SIZE, because it is the one screen read at
+// a glance and it is limited by its 20 rows rather than by the text. The fitted size fills the grid, so 100 % is larger than
+// the 80 % TEXT SIZE gave it on Desktop; the window shows fewer tracks as it grows and follows the cursor.
+const MSK = 'thunderplus-mixsize-v1';
+const mixScaleDef = () => 100;
+let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10); return v >= 60 && v <= 200 ? v : mixScaleDef(); } catch(e){ return mixScaleDef(); } })();
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
 // FOLLOW (Project): while the song plays, the cursor rides the playhead. Off by default.
@@ -16721,6 +16727,7 @@ for (const id of ['tInlSide', 'tInlPad']) $(id).addEventListener('click', e => {
 });
 function setStepDec(on){ stepDec = on; try { localStorage.setItem(SDK, on ? '1' : '0'); } catch(e){} arrSig = ''; draw(); }
 function setTScale(v){ tScale = clamp(Math.round(v / 10) * 10, 60, 200); try { localStorage.setItem(TSK, String(tScale)); } catch(e){} fit(); draw(); }
+function setMixScale(v){ mixScale = clamp(Math.round(v / 10) * 10, 60, 200); try { localStorage.setItem(MSK, String(mixScale)); } catch(e){} fit(); draw(); }
 function setArr(m){ arrMode = m; try { localStorage.setItem(ARK, String(m)); } catch(e){} arrBody(); arrSig = ''; draw(); fit(); draw(); }
 const cs = {song:{x:0, y:0, top:0}, sect:{x:0, y:0}, phrase:{x:0, y:0, top:0}, inst:{x:0, y:0}, mixer:{x:0, y:0}, fx:{x:0, y:0}, project:{x:0, y:0}};
 let cSect = 0, cPhrase = 0, cInst = 0, cTrack = 0, cFxT = 0, cFxS = 0, lastFxType = 'eq', selA = null, clip = null;
@@ -16969,7 +16976,9 @@ function projRows(){
     {l:'STEP NUMBERS', ck:'Display steps as decimal', get:() => stepDec ? 1 : 0, set:v => setStepDec(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'DECIMAL' : 'HEX',
       info:() => 'Row numbers in Song, Sect, Phrase and Arrange: DECIMAL counts 0, 1, 2… (song rows 000–255, phrase rows 00–31); HEX is 00–FF. Phrase, sect and instrument numbers and the values stay hex'},
     {l:'TEXT SIZE', get:() => tScale, set:v => setTScale(v), min:60, max:200, step:10, big:20, d:tScaleDef(), fmt:v => v + '%',
-      info:() => 'Size of the text and lines on the tracker screen. Bigger shows fewer rows (and scrolls sideways when a line no longer fits); drag a finger up or down anywhere on the screen to scroll'},
+      info:() => 'Size of the text and lines on the tracker screen (the Mixer has its own size: MIXER SIZE). Bigger shows fewer rows (and scrolls sideways when a line no longer fits); drag a finger up or down anywhere on the screen to scroll'},
+    {l:'MIXER SIZE', get:() => mixScale, set:v => setMixScale(v), min:60, max:200, step:10, big:20, d:mixScaleDef(), fmt:v => v + '%',
+      info:() => 'Size of the Mixer only, separate from TEXT SIZE: 100 % fills the screen, which is already larger than the 80 % Desktop text size gave it. Above that it takes whatever room is left, never past the screen (all its rows stay visible); bigger shows fewer tracks at once, and the window follows the cursor (TRK nn–nn of 32 ◀▶)'},
     {l:'FOLLOW', ck:'Follow playhead', get:() => followOn ? 1 : 0, set:v => setFollow(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'While the song plays, Song and Phrase scroll with the playhead: the cursor rides along, and Phrase (and Sect) switch to what the cursor’s track is playing. Off leaves the screen where you put it'},
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
@@ -18336,8 +18345,10 @@ function fit(){
     fs = Math.max(7, fs * fit / (ROWS + 0.3));
   }
   fs = pvFit(fs, W);   // PATTERN VIEW: smaller text so more tracks fit, and room for its header lines
-  // TEXT SIZE (Project): scale what fits. Bigger shows fewer rows and the lines can scroll sideways.
-  if (tScale !== 100) scr.style.fontSize = Math.max(5, fs * tScale / 100).toFixed(2) + 'px';
+  // TEXT SIZE (Project): scale what fits. Bigger shows fewer rows and the lines can scroll sideways. The Mixer does not take
+  // TEXT SIZE: it has its own (MIXER SIZE), so sizing the tracker never changes the Mixer and the other way round.
+  const sc = tv === 'mixer' ? mixScale : tScale;
+  if (sc !== 100) scr.style.fontSize = Math.max(5, fs * sc / 100).toFixed(2) + 'px';
 }
 // Song shows 16 rows, more when the screen is tall (unfolded in portrait).
 function songRows(){ const fs = parseFloat(scr.style.fontSize) || 14, h = grid.clientHeight - (grid.classList.contains('grp') ? fs * 1.15 + fs * .12 + 3 : fs * .25); return h > 0 ? clamp(Math.floor(h / (fs * 1.3) + 0.02) - 1, 8, 48) : 16; }
@@ -18345,7 +18356,10 @@ function songRows(){ const fs = parseFloat(scr.style.fontSize) || 14, h = grid.c
 // text down by just enough so it ends inside. A few tries at most, reset by every fit().
 let fitTries = 0;
 function fitCheck(){
-  if (tScale !== 100 || fitTries >= 3 || !(tv === 'song' || tv === 'phrase' || tv === 'mixer' || tv === 'sect') || asongOn()) return false;   // Arrange as Song: no text grid to fit
+  // The Mixer is never exempt from this check: it must show all 20 of its rows (VOL to MASTER), so a size that does not fit
+  // is brought back to one that does. TEXT SIZE is allowed to scroll or run past on purpose; a clipped Mixer row would be a bug.
+  const bypass = tv === 'mixer' ? false : tScale !== 100;
+  if (bypass || fitTries >= 3 || !(tv === 'song' || tv === 'phrase' || tv === 'mixer' || tv === 'sect') || asongOn()) return false;   // Arrange as Song: no text grid to fit
   const g = grid.getBoundingClientRect(), bottom = g.top + grid.clientTop + grid.clientHeight;
   let end = 0; const lns = grid.querySelectorAll(':scope > .ln'); if (lns.length) end = lns[lns.length - 1].getBoundingClientRect().bottom;
   grid.querySelectorAll('.tgbox').forEach(b => { end = Math.max(end, b.getBoundingClientRect().bottom); });
@@ -18572,7 +18586,7 @@ function draw(){
       if (r.top - m < g.top) grid.scrollTop -= g.top - r.top + m;
       else if (r.bottom + m > g.bottom) grid.scrollTop += r.bottom - g.bottom + m; } }
   // With big text a line can be wider than the screen: when the cursor moves, scroll sideways to keep it in view.
-  const hk = tv + ':' + c.x + ':' + c.y + ':' + tScale;
+  const hk = tv + ':' + c.x + ':' + c.y + ':' + (tv === 'mixer' ? mixScale : tScale);
   // PATTERN view does its own (pvScroll, from where the view is now), so a click on a track scrolled into view doesn't jump.
   if (hk !== hKey){ hKey = hk; const cu = grid.querySelector('.cur');
     if (pvActive()){}
@@ -18894,7 +18908,7 @@ let thdSig = '', thdW = 0;
 function thdFit(){
   const hd = scr.querySelector('.thd'); if (!hd || !hd.offsetParent) return;
   const sw = $('tStagePs'), sub = $('tSub');
-  const sig = [thdW, tScale, $('tTitle').textContent, psetHTML, sub.textContent, pvSeg.hidden, sw.hidden, [...sw.querySelectorAll('button')].map(b => b.hidden ? 0 : 1).join(''), [...scr.querySelector('.thl').children].map(e => e.hidden ? 0 : e.textContent.length).join(',')].join('|');   // (Arrange's FOLLOWS / PINNED tag too)
+  const sig = [thdW, tv === 'mixer' ? mixScale : tScale, $('tTitle').textContent, psetHTML, sub.textContent, pvSeg.hidden, sw.hidden, [...sw.querySelectorAll('button')].map(b => b.hidden ? 0 : 1).join(''), [...scr.querySelector('.thl').children].map(e => e.hidden ? 0 : e.textContent.length).join(',')].join('|');   // (Arrange's FOLLOWS / PINNED tag too)
   if (sig === thdSig) return; thdSig = sig;
   const F = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7']; hd.classList.remove(...F);
   const over = () => hd.scrollWidth > hd.clientWidth + 1, cut = () => !!sub.textContent && sub.scrollWidth > sub.clientWidth + 1;

@@ -77,6 +77,24 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 25 Oct (3): the Mixer has its own size
+
+Cache `thunderplus-v230` (only `index.html` changed). Looked at in Chrome on Desktop by the owner; not measured from here.
+- **MIXER SIZE** (Project, beside TEXT SIZE): 60–200 %, saved per device (`thunderplus-mixsize-v1`, default 100). The Mixer no
+  longer takes TEXT SIZE and TEXT SIZE no longer moves it, so sizing the tracker leaves the Mixer alone and the other way
+  round. Mobile was already at 100 % and does not change.
+- **Why 100 % is bigger than before:** the Mixer is fitted to 20 rows (VOL to MASTER), and on Desktop TEXT SIZE defaulted to
+  80 %, so the Mixer used about two-thirds of the available height. At its own 100 % it fills the grid: roughly 25 % larger in
+  each direction. Above 100 % it takes whatever room is left, never past the screen: `fitCheck` is never bypassed for the
+  Mixer (it must keep every row visible), where TEXT SIZE is allowed to scroll or run past on purpose.
+- **Not the font cap:** the size is height-bound by those 20 rows, not by the 30 px font cap. If it still reads small, the next
+  lever is giving the Mixer more vertical room (drop the title / info line on that screen, or shorten the meter row) — a layout
+  change, not a size change.
+- Implementing it: `mixScale` / `mixScaleDef` / `setMixScale` / `MSK` beside `tScale`; the effective scale is chosen in `fit()`
+  (`tv === 'mixer' ? mixScale : tScale`) and used in `fitCheck`, the cursor's sideways-scroll key (`hk`) and the title-line
+  fit (`thdFit`). A test in `tests/app-logic.test.js` covers the default (100), a stored value, both ends of the range, garbled
+  or out-of-range values, and blocked storage.
+
 ## 25 Oct (2): …chains buses and sends, and CHN no longer adds I/O
 
 Cache `thunderplus-v229` (only `index.html` changed; no worklet or editor file did). Not played by ear: the routing plan, the
