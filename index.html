@@ -98,6 +98,7 @@ body.mob .deskmenu{display:none}
 .gset .band .bar .lbl{font-size:var(--fs-3); color:var(--muted)}
 .gset .pbody{padding:0}
 .gset .note{font-size:var(--fs-3); color:var(--muted)}
+.gset .setbuild{padding:4px 10px 2px; font-size:var(--fs-3); color:var(--muted); font-variant-numeric:tabular-nums; user-select:text; -webkit-user-select:text}
 .gset .tsec{padding-top:2px}
 /* Panels moved inside Project and Screen (Mastering, Export, Skin): their own title bar gives way to the h3. */
 .gset .tsec .band{display:block} .gset .tsec .band > .bar{display:none}
@@ -11363,6 +11364,9 @@ const deskUpdApi = (window.thunderDesktop && window.thunderDesktop.updates) || n
 let deskUpd = null;
 function deskUpdShow(s){
   const was = deskUpd && deskUpd.avail; deskUpd = s || null;
+  // The window title carries the packaged version in the desktop app (Electron follows the page's title), so a test build
+  // can be told apart from the taskbar / title bar as well as from the build stamp in the View and Project menus.
+  if (deskUpd && deskUpd.version) document.title = '...Thunder Plus ' + deskUpd.version;
   const b = $('bUpd'), on = !!(s && s.avail); b.hidden = !on;
   if (!on) return;
   // Mac and the portable .exe download it themselves (dl: 0–1, then 1 when it's in Downloads): the button shows how far.
@@ -16611,6 +16615,11 @@ let tScale = (() => { try { const v = parseInt(localStorage.getItem(TSK), 10); r
 const MSK = 'thunderplus-mixsize-v1';
 const mixScaleDef = () => 100;
 let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10); return v >= 60 && v <= 200 ? v : mixScaleDef(); } catch(e){ return mixScaleDef(); } })();
+// BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
+// and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
+// which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
+const BUILD = 232;
+const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
 // FOLLOW (Project): while the song plays, the cursor rides the playhead. Off by default.
@@ -22015,7 +22024,7 @@ addEventListener('keydown', e => {
 const SET_SHEETS = true;
 const SHEETS = {
   screen:{title:'Screen', about:'Layout and panels, the Phrase and Song screens, text size and colour', groups:[
-    ['Text & colour', ['TEXT SIZE', 'STEP NUMBERS', 'SCREEN']],
+    ['Text & colour', ['TEXT SIZE', 'MIXER SIZE', 'STEP NUMBERS', 'SCREEN']],
     ['Layout & panels', ['ARRANGE', 'ARRANGE SIDE', 'SIDE PANEL', 'INST LIST', 'SECT', 'KEYS KEYPAD', 'COMMAND BAR', 'BOTTOM PANEL', 'STAGE']],
     ['Phrase screen', ['SIMPLE PHRASE', 'FOLLOW', 'NEIGHBORS', 'PATTERN VIEW', 'ARRANGE FOCUS', 'SONG STRIP']],
     ['Song screen', ['CLASSIC SONG', 'SONG MOUSE', 'SECTIONS', 'LOOP DRAG', 'SONG PEEK']]]},
@@ -22033,7 +22042,7 @@ const SHEETS = {
     ['Patterns', ['PATTERN LEN', '› ALL PHRASES TO']],
     ['Impulse responses', 'irs']]},
 };
-const SHEET_QUICK = ['TEXT SIZE', 'SIMPLE PHRASE', 'FOLLOW', 'COMMAND BAR'];   // kept in the menus' Screen part too
+const SHEET_QUICK = ['TEXT SIZE', 'MIXER SIZE', 'SIMPLE PHRASE', 'FOLLOW', 'COMMAND BAR'];   // kept in the menus' Screen part too
 const rowKey = r => r.l.replace(/\s+\d+$/, '');                    // '› ALL PHRASES TO 16' → '› ALL PHRASES TO'
 const sheetKeys = new Set(Object.values(SHEETS).flatMap(K => K.groups.flatMap(([, ks]) => Array.isArray(ks) ? ks : [])));
 const inSheet = r => SET_SHEETS && sheetKeys.has(rowKey(r));
@@ -22211,6 +22220,7 @@ function buildProj(){
     if (name === 'Mastering'){ const x = $('pMaster'); if (x){ x.hidden = false; sec.append(x); } }
     if (name === 'Song') irsUI(sec);
   }
+  list.append(el('div', 'setbuild', buildStamp()));   // which build this is (the Project and View menus both end with it)
   body.scrollTop = keep;
 }
 // On Desktop the panel switches (keypad, bottom panel, stage) are under View with the rest of the screen; on Mobile
@@ -22225,6 +22235,7 @@ function buildScreen(){
     for (const k of SHEET_QUICK){ const r = R.get(k); if (r) qs.append(tsetRow(r)); }
     let g2 = ''; for (const r of projRows()){ if (r.sec) g2 = r.sec; if (g2 === 'Screen' && r.l !== 'SKIN' && !inSheet(r)) qs.append(tsetRow(r)); }
     qs.append(sheetBtn('screen'), sheetBtn('skin'));
+    qs.append(el('div', 'setbuild', buildStamp()));   // which build this is
     list.replaceChildren(el('div', 'sethead', 'Screen'), qs); if (sk) sk.hidden = true; return;
   }
   list.innerHTML = ''; list.append(el('div', 'sethead', 'Screen'));

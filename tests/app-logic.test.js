@@ -91,6 +91,15 @@ test('mixer size: defaults to 100 %, honours a stored value, and ignores a missi
   assert.equal(c.mixScale, 100, 'blocked storage does not throw');
 });
 
+/* ───────── the build number (owner, 25 Oct): one number, shown in the View / Project menus ───────── */
+test('build number: the page\'s BUILD is the service-worker cache number, so "which build is this?" cannot lie', () => {
+  const build = cut('index.html', /const BUILD = (\d+);/, 'const BUILD');
+  const n = Number(build.match(/(\d+)/)[1]);
+  const cache = cut('sw.js', /const CACHE = 'thunderplus-v(\d+)'/, 'the CACHE name');
+  assert.equal(n, Number(cache.match(/v(\d+)/)[1]), 'index.html says build ' + n + ' but sw.js caches v' + cache.match(/v(\d+)/)[1] + ': bump both together');
+  assert.ok(n > 0);
+});
+
 /* ───────── the Electron CSP header (electron/main.js) ───────── */
 test('electron CSP: report-only, no outside origins, wasm and blob allowed, and the response is passed through intact', async () => {
   const src = H.read('electron/main.js'), csp = src.match(/const CSP = \[[\s\S]*?\]\.join\('; '\);/)[0], wc = src.match(/const withCsp = res => \{[^\n]*\};/)[0];

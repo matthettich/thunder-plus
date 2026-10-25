@@ -77,6 +77,21 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 25 Oct (5): a build number, and MIXER SIZE in the View menu
+
+Cache `thunderplus-v232` (`index.html` and `sw.js`). The owner asked how to tell a build apart without DevTools.
+- **BUILD** (`const BUILD` in `index.html`) is the number shown as "build 232" at the foot of **both** the View → Screen and
+  the Project menus (`buildStamp()`), and it must equal the number in `sw.js`'s `CACHE` — a test fails if they disagree, so
+  bumping one without the other cannot ship a build that lies about itself. The same line reads "v1.2.22 · build 232" in the
+  desktop app: the packaged version comes from the updater bridge (`window.thunderDesktop.updates.state()`, already fetched on
+  load), so a test build is identifiable by both numbers.
+- **Desktop window title:** when the bridge reports a version, the page sets `document.title` to "...Thunder Plus 1.2.22" and
+  Electron follows it, so the packaged version is readable from the title bar / taskbar. The website keeps "...Thunder Plus"
+  (no bridge there).
+- **MIXER SIZE is now in the View menu**, directly under TEXT SIZE (`SHEET_QUICK`), as well as in the Screen sheet's "Text &
+  colour" group. Like TEXT SIZE it is a sheet row, so it is not repeated in the Project section.
+- Style: `.gset .setbuild` (small, muted, tabular figures, selectable text so the number can be copied).
+
 ## 25 Oct (4): the Tone drum's level (the "clipping" the owner heard)
 
 Cache `thunderplus-v231` (only `index.html` changed).
