@@ -10,7 +10,7 @@
 // used, and File ▾ has "Check for updates…". If electron-updater can't check (an unsigned Mac build, say), the newest
 // release is read from GitHub's API instead, so a new build is still announced.
 const { app, dialog, shell, BrowserWindow, net } = require('electron');
-const fs = require('fs'), path = require('path');
+const fs = require('fs'), path = require('path'), crypto = require('crypto');
 
 let au = null;
 try { au = require('electron-updater').autoUpdater; } catch (e) { au = null; }
@@ -40,7 +40,8 @@ function setupUpdates({ name, page, repo }){
     const r = await net.fetch('https://api.github.com/repos/' + repo + '/releases/tags/v' + version, { headers: GH });
     if (!r.ok) return null;
     const a = ((await r.json()).assets || []).find(x => x && wantAsset(String(x.name)));
-    return a ? { url: a.browser_download_url, name: path.basename(String(a.name)), size: a.size || 0 } : null;
+    const m = a && /^sha256:([0-9a-f]{64})$/i.exec(String(a.digest || ''));   // GitHub's own SHA-256 of the asset (absent on old releases)
+    return a ? { url: a.browser_download_url, name: path.basename(String(a.name)), size: a.size || 0, sha256: m ? m[1].toLowerCase() : null } : null;
   };
   // The downloaded file: the Mac mounts the .dmg and shows its window (drag the app to Applications, after quitting
   // this one, since the Finder won't replace an app that's open); the portable .exe is shown in its folder.
@@ -63,18 +64,22 @@ function setupUpdates({ name, page, repo }){
       const dir = app.getPath('downloads'), file = path.join(dir, a.name); part = file + '.part';
       const r = await net.fetch(a.url); if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
       const total = +r.headers.get('content-length') || a.size || 0, out = fs.createWriteStream(part), rd = r.body.getReader();
+      const hash = crypto.createHash('sha256');   // hashed as it arrives: no second pass over a 130–250 MB file
       let got = 0, shown = 0, werr = null; out.on('error', e => { werr = e; });   // a disk error must not take the app down
       try {
         for (;;){
           const { done, value } = await rd.read(); if (done) break;
           if (werr) throw werr;
-          got += value.length;
+          got += value.length; hash.update(value);
           if (!out.write(Buffer.from(value))) await new Promise(res => { const go = () => { out.off('drain', go); out.off('error', go); res(); }; out.on('drain', go); out.on('error', go); });
           if (total){ const f = Math.min(.99, got / total); if (f - shown >= .01){ shown = f; state.dl = f; send(); bar(f); } }
         }
       } finally { await new Promise(res => { if (werr) return res(); out.once('error', res); out.end(res); }); }
       if (werr) throw werr;
       if (total && got < total) throw new Error('cut short');
+      // The file must be the one GitHub lists. A mismatch is a corrupt or swapped download: it is deleted and never opened.
+      // (No digest on the release = an older release: carry on as before.)
+      if (a.sha256 && hash.digest('hex') !== a.sha256) throw new Error('checksum mismatch');
       try { fs.rmSync(file, { force: true }); } catch (e) {}
       fs.renameSync(part, file); part = null;
       dl.file = file; dl.version = version; state.dl = 1; state.file = a.name; send(); bar(-1);

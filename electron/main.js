@@ -17,6 +17,28 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 // Web MIDI, the save/open dialogs, the output device list and audio are allowed; nothing else is asked for.
 const ALLOW = new Set(['midi', 'midiSysex', 'fileSystem', 'clipboard-sanitized-write', 'clipboard-read', 'speaker-selection']);   // no 'media': the app never uses the mic or camera
 
+/* CONTENT SECURITY POLICY, report-only (so nothing can break): the console lists what it WOULD block, to read before it is ever
+   enforced. Everything the app loads is its own (app://thunder/), so there are no outside origins to allow. What it can't do
+   yet: the app is inline <script> blocks, so 'unsafe-inline' has to stay until they are moved out or given nonces; until then
+   this stops pulling in a script, frame, image or connection from another site and locks object / base / form, not injected
+   inline script. 'wasm-unsafe-eval': the effects and engines are WebAssembly; blob: is how worklets and workers are made.
+   A <meta> tag can't carry Report-Only, which is why this is a header, set here for the pages the app:// handler serves. */
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:",
+  "worker-src 'self' blob:",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self'",
+  "img-src 'self' data: blob:",
+  "media-src 'self' blob: data:",
+  "connect-src 'self' blob:",
+  "frame-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+].join('; ');
+const withCsp = res => { const h = new Headers(res.headers); h.set('Content-Security-Policy-Report-Only', CSP); return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h }); };
+
 // One copy at a time: opening it again brings the open window to the front (two copies would fight over
 // the same saved songs and kit).
 if (!app.requestSingleInstanceLock()){ app.quit(); return; }   // return: or whenReady below would still open a second window
@@ -81,7 +103,7 @@ app.whenReady().then(() => {
     if (p === '' || p.endsWith('/')) p += 'index.html';
     const file = path.normalize(path.join(ROOT, p));
     if (!file.startsWith(ROOT + path.sep)) return new Response('Not found', { status:404 });
-    return net.fetch(pathToFileURL(file).toString());
+    return net.fetch(pathToFileURL(file).toString()).then(res => /\.html?$/i.test(file) ? withCsp(res) : res);
   });
   session.defaultSession.setPermissionRequestHandler((wc, perm, cb) => cb(ALLOW.has(perm)));
   session.defaultSession.setPermissionCheckHandler((wc, perm) => ALLOW.has(perm));

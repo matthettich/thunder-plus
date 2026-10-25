@@ -10,6 +10,15 @@
 const FX = window.PumpFX;
 if (!FX || !FX.meta) return;
 const PM = FX.meta;
+// A window's draw and tick run every animation frame, so a plugin whose code throws would otherwise log ~60 warnings a
+// second for as long as the window is open. Each distinct message is reported once (to the page's tpLog when it has one).
+const warnSeen = new Set();
+function warnOnce(where, e){
+  try {
+    const msg = String(e && e.message || e), key = where + '|' + msg; if (warnSeen.has(key) || warnSeen.size >= 50) return; warnSeen.add(key);
+    if (typeof window.tpLog === 'function') window.tpLog(where, e); else console.warn('[thunder] ' + where + ': ' + msg);
+  } catch (_) { /* the reporter must never throw */ }
+}
 
 /* ---------------------------------------------------------------- colours (Theme.hpp) */
 const hex = h => [(h >> 16) & 255, (h >> 8) & 255, h & 255, 1];
@@ -606,7 +615,7 @@ class Win {
     g.setTransform(sc * dpr, 0, 0, sc * dpr, 0, 0); g.lineCap = 'butt'; g.lineJoin = 'miter'; this._f = this._ls = null;
     this.fill(R(0, 0, this.W, this.H), this.th.bg);
     this.drawHeader();
-    try { if (this.h.drawBody) this.h.drawBody(); } catch(e){ console.warn('pump window', e); }
+    try { if (this.h.drawBody) this.h.drawBody(); } catch(e){ warnOnce('pump window draw (' + this.type + ')', e); }
     for (const c of this.controls) if (c.visible) c.draw(this);
     if (this.h.drawOverlay) this.h.drawOverlay();
     this.drawFooter();
@@ -772,7 +781,7 @@ class Win {
 
 function loop(ts){
   raf = 0; const dt = lastTs ? clamp((ts - lastTs) / 1000, 0.001, 0.25) : 1 / 30; lastTs = ts;
-  for (const w of wins.values()) try { w.tick(dt, ts); } catch(e){ console.warn('pump window', e); }
+  for (const w of wins.values()) try { w.tick(dt, ts); } catch(e){ warnOnce('pump window tick (' + w.type + ')', e); }
   if (wins.size) raf = requestAnimationFrame(loop); else lastTs = 0;
 }
 function open(t, k, info){

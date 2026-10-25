@@ -1726,6 +1726,27 @@ body.apfs #apStrip .apsr b.c{background:#9a63ff; color:#fff}
 /* ===== END ARRANGE PAGING ===== */
 </style>
 <script>
+/* DIAGNOSTICS: tpLog(where, err) is for catches that used to swallow a failure that matters (a wasm that would not
+   load, a worker that died, a file that would not parse). Console only, never a pop-up. Each distinct message is
+   printed once and the total is capped, so a failure inside a render or audio loop cannot flood the console or slow
+   the page. Catches around calls that are *expected* to throw (stopping a node that already stopped, disconnecting
+   one that is not connected) stay silent on purpose and say so in a comment. Window.tpLogs keeps what was printed
+   so it can be read back from the console when something is reported broken. */
+(function(){
+  const seen = new Set(), logs = []; let n = 0;
+  function tpLog(where, err){
+    try {
+      const msg = String(err && err.message || err), key = where + '|' + msg;
+      if (seen.has(key) || n >= 200) return; seen.add(key); n++;
+      logs.push({t: Date.now(), where, msg, stack: err && err.stack ? String(err.stack).split('\n').slice(0, 4).join('\n') : ''});
+      if (logs.length > 200) logs.shift();
+      console.warn('[thunder] ' + where + ': ' + msg);
+    } catch (_) { /* the logger must never throw */ }
+  }
+  window.tpLog = tpLog; window.tpLogs = logs;
+  addEventListener('error', e => tpLog('uncaught', e.error || e.message));
+  addEventListener('unhandledrejection', e => tpLog('unhandled promise', e.reason));
+})();
 // No long-press menu outside text fields (it is how Chrome offers "Search Google for…").
 document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.closest && e.target.closest('input,textarea,[contenteditable]'))) e.preventDefault(); }, true);
 // A file dropped on the window must not replace the app with that file (the browser's default; in the desktop app it
@@ -2361,7 +2382,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" hidden></div>
 
-<script src="waves/waves-worklet.js?v=29"></script>
+<script src="waves/waves-worklet.js?v=31"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -7053,7 +7074,7 @@ function audio(){
     if (aset.sink && ctx.setSinkId) ctx.setSinkId(aset.sink).catch(() => { audStatus(); });
     try { if (ctx.renderCapacity){ ctx.renderCapacity.addEventListener('update', e => { cpu.cap = {avg:e.averageLoad, peak:e.peakLoad, under:e.underrunRatio, t:performance.now()}; }); ctx.renderCapacity.start({updateInterval:0.5}); } else cpuProbe(ctx); } catch(e){}   // no renderCapacity: time the audio thread
     master = ctx.createGain(); master.gain.value = clamp(aset.vol, 0, 100) / 100; master.connect(ctx.destination);
-    try { mwReady(ctx); } catch(e){}   // the safety limiter's worklet, loading before the first note needs it
+    try { mwReady(ctx); } catch(e){ tpLog('safety limiter did not start', e); }   // the safety limiter's worklet, loading before the first note needs it
     ctx.addEventListener && ctx.addEventListener('statechange', () => { audStatus(); if (typeof audioInterrupted === 'function') audioInterrupted(); });
     prerender();   // ensure() re-renders only the pads whose rate differs from this context's
   }
@@ -7089,12 +7110,13 @@ var S = {bpm:120}, WVOK = false, LXOK = false;
 self.onmessage = async e => {
   const m = e.data;
   if (m.op === 'init'){
-    const z = () => 0, imp = {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}};
-    try { if (m.pl){ PL = await WebAssembly.instantiate(m.pl, imp); if (PL.exports._initialize) PL.exports._initialize(); } } catch(err){ PL = null; }
-    try { if (m.tx){ TX = await WebAssembly.instantiate(m.tx, imp); if (TX.exports._initialize) TX.exports._initialize(); } } catch(err){ TX = null; }
-    try { if (m.wv && m.pl && m.tx){ importScripts(m.wv); if (self.WavesDSP){ WavesDSP.wasmInit({dspModule:m.pl, tfxModule:m.tx}); WV.ready = true; WVOK = true; } } } catch(err){}
-    try { if (m.lx && self.LxrCore){ LxrCore.attachModule(m.lx); LXOK = true; } } catch(err){}
-    postMessage({op:'ready', wv:WVOK, pl:!!PL, tx:!!TX, lx:LXOK}); return;
+    const z = () => 0, imp = {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}, errs = [];
+    const why = (w, err) => errs.push(w + ': ' + String(err && err.message || err));   // sent back in 'ready'; the page logs them
+    try { if (m.pl){ PL = await WebAssembly.instantiate(m.pl, imp); if (PL.exports._initialize) PL.exports._initialize(); } } catch(err){ PL = null; why('render worker dsp wasm', err); }
+    try { if (m.tx){ TX = await WebAssembly.instantiate(m.tx, imp); if (TX.exports._initialize) TX.exports._initialize(); } } catch(err){ TX = null; why('render worker effects wasm', err); }
+    try { if (m.wv && m.pl && m.tx){ importScripts(m.wv); if (self.WavesDSP){ WavesDSP.wasmInit({dspModule:m.pl, tfxModule:m.tx}); WV.ready = true; WVOK = true; } } } catch(err){ why('render worker waves engine', err); }
+    try { if (m.lx && self.LxrCore){ LxrCore.attachModule(m.lx); LXOK = true; } } catch(err){ why('render worker LXR engine', err); }
+    postMessage({op:'ready', wv:WVOK, pl:!!PL, tx:!!TX, lx:LXOK, errs}); return;
   }
   if (m.op === 'irs'){ self.__thunderIR = m.v; return; }   // the song's impulse responses (Convolution reverb)
   if (m.op === 'render'){
@@ -7111,12 +7133,12 @@ self.onmessage = async e => {
     const w = new Worker(url); URL.revokeObjectURL(url);
     w.onmessage = e => {
       const m = e.data;
-      if (m.op === 'ready'){ PW.ready = !!(m.pl || !plMod) && !!(m.tx || !txMod); PW.wv = !!m.wv; PW.lx = !!m.lx; try { if ((S.irs || []).some(Boolean)) w.postMessage({op:'irs', v:irsLive()}); } catch(e){} if (PW.ready) prerender(); return; }
+      if (m.op === 'ready'){ if (m.errs) for (const x of m.errs) tpLog('render worker', x); PW.ready = !!(m.pl || !plMod) && !!(m.tx || !txMod); PW.wv = !!m.wv; PW.lx = !!m.lx; try { if ((S.irs || []).some(Boolean)) w.postMessage({op:'irs', v:irsLive()}); } catch(e){} if (PW.ready) prerender(); return; }
       const j = PW.jobs.get(m.id); if (!j) return; PW.jobs.delete(m.id);
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, wv:new URL('waves/waves-worklet.js?v=29', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, wv:new URL('waves/waves-worklet.js?v=31', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -9460,7 +9482,7 @@ async function sfFetchGM(){
       if (got - last > total / 8){ last = got; toast(`General MIDI sounds: ${Math.round(got / total * 100)}%`, 3000); } }
     bytes = new Uint8Array(got); let o = 0; for (const p of parts){ bytes.set(p, o); o += p.length; } bytes = bytes.buffer; }
   else bytes = await r.arrayBuffer();
-  try { await sfPut(GM_FONT.id, GM_FONT.name, bytes); } catch(e){}
+  try { await sfPut(GM_FONT.id, GM_FONT.name, bytes); } catch(e){ tpLog('could not store the GM SoundFont', e); }
   return bytes;
 }
 // Loads (and parses) a font by id: from memory, IndexedDB, or (GM) the network. Shared by everything that asks at once.
@@ -10955,7 +10977,11 @@ setInterval(() => {
     for (const m of JSON.stringify(S.presets || {}).matchAll(/"ref":"([^"]+)"/g)) keep.add(m[1]);
     for (const e of S.irs || []) if (e) for (const c of [e.L, e.R]) if (c && c.ref) keep.add(c.ref);
     for (const id of [...smpHeld.keys()]) if (!keep.has(id)) smpHeld.delete(id);
-  } catch(e){}
+    // IRDATA (the decoded impulse responses) is a second reference to the same audio, and was never pruned: every project
+    // opened with IRs in it added a few MB that lived until the page reloaded. An id outside `keep` (the current song's IRs,
+    // the undo history, the presets) is not needed; irsResolve() reloads one from IndexedDB if it ever is.
+    if (typeof IRDATA !== 'undefined') for (const id of [...IRDATA.keys()]) if (!keep.has(id)) IRDATA.delete(id);
+  } catch(e){ tpLog('could not trim the held samples', e); }
 }, 60000);
 function idbOpen(name){ return new Promise((res, rej) => { try { const r = indexedDB.open(name, 1); r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('smp')) r.result.createObjectStore('smp'); }; r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch(e){ rej(e); } }); }
 function smpDb(){ return sdbP || (sdbP = idbOpen(SDB)); }
@@ -10991,7 +11017,7 @@ async function resolveSamples(){
     // A kit saved before samples moved to IndexedDB still has them inside localStorage: move them now.
     try { if ((localStorage.getItem(KEY) || '').includes('"b64"')) save(); } catch(e){}
     // Likewise song presets imported before samples-by-reference: move their audio out of the song.
-    try { if (S && S.presets && JSON.stringify(S.presets).includes('"b64"')){ await Promise.all(presetsByRef(S.presets)); saveS(); } } catch(e){}
+    try { if (S && S.presets && JSON.stringify(S.presets).includes('"b64"')){ await Promise.all(presetsByRef(S.presets)); saveS(); } } catch(e){ tpLog('could not move preset samples out of the song', e); }
   } finally { smpResolving = false; }
 }
 // Drops stored samples the kit no longer uses (only from this app's own store). Samples the saved kit and song still
@@ -11453,7 +11479,7 @@ $('audLvl').addEventListener('input', e => {
 $('audLvl').addEventListener('change', asetSave);
 const updLat = makeSeg($('segLat'), [['interactive', 'Lowest'], ['balanced', 'Balanced'], ['playback', 'Safest']], () => latOf(), v => { aset.lat = v; aset.latPick = true; asetSave(); audRestartRow(); });
 const updARate = makeSeg($('segARate'), [[0, 'Device'], [44100, '44.1k'], [48000, '48k']], () => aset.rate, v => { aset.rate = v; asetSave(); audRestartRow(); });
-$('audRestart').addEventListener('click', () => { try { save(); } catch(e){} applyUpdate(); });
+$('audRestart').addEventListener('click', () => { try { save(); } catch(e){ tpLog('save before restart failed', e); } applyUpdate(); });
 $('audReset').addEventListener('click', () => resetAudio());
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (!$('pAudio').hidden) audRefresh(); });
 /* ---------- skins (the ...Seeds set) ---------- */
@@ -12428,21 +12454,21 @@ let plFailed = false;
   // …PUMP: the pump mastering effects (pump/pump.wasm), fetched alongside; effect nodes that asked for it get it now
   bytes(PUMP_WASM).then(b => { pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage({pumpBytes:b}); } catch(e){} pumpWait.clear();
     return WebAssembly.instantiate(b, imp).then(r => { pumpMain = r.instance.exports; if (pumpMain._initialize) pumpMain._initialize(); }); }).catch(e => { if (PM) console.warn('pump effects', e); });
-  const [plB, txB] = await Promise.all([bytes(WASM_DSP).catch(() => null), bytes(WASM_TFX).catch(() => null)]);
+  const [plB, txB] = await Promise.all([bytes(WASM_DSP).catch(e => { tpLog('wasm fetch (dsp)', e); return null; }), bytes(WASM_TFX).catch(e => { tpLog('wasm fetch (effects)', e); return null; })]);
   tfxBytes = txB || false; tfxLoadDone();
   try {
     if (!plB) throw new Error('no dsp wasm');
     plMod = await WebAssembly.compile(plB);
     PL = await WebAssembly.instantiate(plMod, imp); if (PL.exports._initialize) PL.exports._initialize();
-  } catch(e){ plFailed = true; plMod = null; }
+  } catch(e){ plFailed = true; plMod = null; tpLog('wasm init (dsp: Plaits / Elements will be silent)', e); }
   try {
     if (!txB) throw new Error('no tfx wasm');
     txMod = await WebAssembly.compile(txB);
     TX = await WebAssembly.instantiate(txMod, imp); if (TX.exports._initialize) TX.exports._initialize();
-  } catch(e){ txMod = null; }
+  } catch(e){ txMod = null; tpLog('wasm init (effects: the wasm effects will be bypassed)', e); }
   try {
     if (globalThis.WavesDSP && plMod && txMod){ WavesDSP.wasmInit({dspModule:plMod, tfxModule:txMod}); WV.ready = true; }
-    try { if (globalThis.WavesDSP && WavesDSP.modsPrepare) WavesDSP.modsPrepare(); } catch(e){}   // the Random/Function generators' wasm: compiled in the background here (the page's thread won't compile it on the spot)
+    try { if (globalThis.WavesDSP && WavesDSP.modsPrepare) WavesDSP.modsPrepare(); } catch(e){ tpLog('generators wasm prepare', e); }   // the Random/Function generators' wasm: compiled in the background here (the page's thread won't compile it on the spot)
   } catch(e){ console.warn('…waves WebAssembly', e); }
   const lxMod = await lxP;
   if (typeof Worker !== 'undefined') rwStart(plMod, txMod, lxMod);
@@ -13616,7 +13642,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=36')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=38')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -14107,8 +14133,8 @@ function demoSong(){
   return S;
 }
 let S = (() => { try { const s = localStorage.getItem(TK) || localStorage.getItem('thunder-song-v1'); return s ? normSong(JSON.parse(s)) : demoSong(); } catch(e){ return demoSong(); } })();
-setTimeout(() => { try { irsResolve(); } catch(e){} }, 0);   // the song's impulse responses (Convolution reverb), from IndexedDB
-setTimeout(() => { if (swingConv || scConv) try { saveS(); } catch(e){} swingNote(); scNote(); }, 0);   // an older saved song was converted: save the new numbers, say so
+setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0);   // the song's impulse responses (Convolution reverb), from IndexedDB
+setTimeout(() => { if (swingConv || scConv) try { saveS(); } catch(e){ tpLog('could not save the converted song', e); } swingNote(); scNote(); }, 0);   // an older saved song was converted: save the new numbers, say so
 let sT = 0;
 // Undo: every saved change keeps the state before it (up to 200 steps). Changes made by one key or tap
 // (a paste, a cut, a note plus its instrument) settle at the end of that event, so they undo as one step.
@@ -16062,8 +16088,11 @@ async function fsPerm(h, write){ try { const o = {mode:write ? 'readwrite' : 're
 let kvDbP = null;
 function kvDb(){ if (!kvDbP) kvDbP = new Promise((res, rej) => { try { const r = indexedDB.open('thunderplus-files', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch(e){ rej(e); } }); return kvDbP; }
 async function kvGet(k){ try { const db = await kvDb(); return await new Promise(res => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => res(undefined); }); } catch(e){ return undefined; } }
-async function kvSet(k, v){ try { const db = await kvDb(); await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = tx.onerror = tx.onabort = () => res(); }); } catch(e){} }
-async function kvDel(k){ try { const db = await kvDb(); await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = tx.onerror = tx.onabort = () => res(); }); } catch(e){} }
+// A failed write (storage full, blocked, private mode) fires the transaction's error or abort, which never reaches the
+// catch, so those log too. The promise still resolves either way: callers carry on exactly as before.
+const kvFail = (what, k, tx) => tpLog(what + ' "' + k + '" failed (is the browser storage full?)', tx && tx.error);
+async function kvSet(k, v){ try { const db = await kvDb(); await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => { kvFail('saving', k, tx); res(); }; }); } catch(e){ tpLog('saving "' + k + '" failed', e); } }
+async function kvDel(k){ try { const db = await kvDb(); await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => { kvFail('deleting', k, tx); res(); }; }); } catch(e){ tpLog('deleting "' + k + '" failed', e); } }
 // The project file: a handle (browser) or a path (desktop app). Remembered across restarts.
 let projFile = null, projPath = null;
 const PPK = 'thunderplus-projpath-v1', DTK = 'thunderplus-dirty-v1';
@@ -16130,7 +16159,7 @@ async function loadProjText(text, name, where){
     const j = JSON.parse(text);
     if (!j || (!j.song && j.app !== 'thunder-song')) throw new Error('This file isn’t a ...Thunder project.');
     if (j.kit){ const k = kitFromJSON(j.kit); if (!await kitReplaceOk(k, 'Open this project?')) return false; setKit(k); }
-    const ns = normSong(j.app === 'thunder-song' ? j : j.song); if (ns.presets) try { presetsByRef(ns.presets); } catch(e){}
+    const ns = normSong(j.app === 'thunder-song' ? j : j.song); if (ns.presets) try { presetsByRef(ns.presets); } catch(e){ tpLog('could not move preset samples out of the loaded song', e); }
     setSong(ns, 'Loaded ' + (j.song && j.song.name || name));
     if (where && (where.path || where.h)){ projSet(where.path, where.h); setDirty(false); } else setDirty(!!(where && where.dirty));
     return true;
@@ -16498,7 +16527,7 @@ function irsUI(sec){
   }
   sec.append(box);
 }
-function setSong(s, msg){ tStop(true); irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){} }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
+function setSong(s, msg){ tStop(true); irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -20541,7 +20570,7 @@ function sxLaneDraw(){
   L.forEach((s, i) => {
     const end = i + 1 < L.length ? L[i + 1].y - 1 : 255, a0 = Math.max(s.y, top), a1 = Math.min(end, top + VR - 1); if (a1 < a0) return;
     const y = g.top - a.top + 3 + (a0 - top) * rh, hh = (a1 - a0 + 1) * rh - 3;
-    h += `<button type="button" class="sxsec${a0 > s.y ? ' cont' : ''}" data-sy="${s.y}" style="top:${y.toFixed(1)}px;height:${hh.toFixed(1)}px;--sxh:${Math.round((i * 67 + 200) % 360)}" title="${s.n.replace(/[<>&"]/g, '')}: rows ${rS(s.y, 3)}–${rS(end, 3)} · click to go there, double-click its first row to rename, another row to start a new section, right-click for more"><span>${s.n.replace(/[<>&"]/g, '')}</span></button>`;
+    h += `<button type="button" class="sxsec${a0 > s.y ? ' cont' : ''}" data-sy="${s.y}" style="top:${y.toFixed(1)}px;height:${hh.toFixed(1)}px;--sxh:${Math.round((i * 67 + 200) % 360)}" title="${esc(s.n)}: rows ${rS(s.y, 3)}–${rS(end, 3)} · click to go there, double-click its first row to rename, another row to start a new section, right-click for more"><span>${esc(s.n)}</span></button>`;
   });
   sxLane.innerHTML = h;
 }
@@ -22573,7 +22602,7 @@ const hadSW = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
 // Samples, SoundFonts and the song live in this origin's storage; ask the browser to keep it when the device runs low
 // on space (Chrome grants this silently to an installed app) instead of evicting it like a visited site's cache.
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch(e){}
-function applyUpdate(){ try { flushS(); flushKit(); saveCur(); } catch(e){} location.reload(); }
+function applyUpdate(){ try { flushS(); flushKit(); saveCur(); } catch(e){ tpLog('saving before the update reload failed', e); } location.reload(); }
 function updBanner(){
   if ($('updB')) return;
   const b = el('button', 'updb', 'New version ready · tap to update'); b.id = 'updB'; b.type = 'button';
@@ -22627,7 +22656,7 @@ try { const v = localStorage.getItem(VK); if (v !== 'synth') setView(v === 'chai
      is the shared window kit (sets PumpFX.openHook); multiband.js what BAND, WIDE and HEAT share (load it before them);
      one file per plugin (docs/PUMP-FX.md, "The pop-up kit"). A type without a file says its window comes later. Add new
      ones here, in sw.js FILES, with ?v= like these. -->
-<script src="pump/ui/kit.js?v=2"></script>
+<script src="pump/ui/kit.js?v=3"></script>
 <script src="pump/ui/eq.js?v=1"></script>
 <script src="pump/ui/comp.js?v=1"></script>
 <script src="pump/ui/limit.js?v=1"></script>
@@ -22640,7 +22669,7 @@ try { const v = localStorage.getItem(VK); if (v !== 'synth') setView(v === 'chai
 <script src="pump/ui/heat.js?v=1"></script>
 <script>
 if ('serviceWorker' in navigator && location.protocol === 'https:'){
-  try { if (window.self === window.top) navigator.serviceWorker.register('sw.js').catch(() => {}); } catch(e){}
+  try { if (window.self === window.top) navigator.serviceWorker.register('sw.js').catch(e => tpLog('service worker (offline use and updates) did not register', e)); } catch(e){ tpLog('service worker (offline use and updates) did not register', e); }
 }
 </script>
 </body>

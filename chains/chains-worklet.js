@@ -59,7 +59,13 @@ function wasmInit(o){
       if (x._initialize) x._initialize();
       WASM.tfxX = x;
     }
-  } catch (e) { WASM.tfx = WASM.tfxX = null; }
+  } catch (e) {
+    // The effects fall back to bypass without it. wasmInit runs once at set-up, never per block, so one warning is
+    // safe on the audio thread; the reason is also kept in WASM.err for anyone inspecting it.
+    WASM.tfx = WASM.tfxX = null;
+    (WASM.err = WASM.err || []).push('effects wasm: ' + String(e && e.message || e));
+    try { console.warn('[thunder] chains worklet effects wasm', e); } catch (_) {}
+  }
 }
 
 /* ── module definitions ─────────────────────────────────────────────────────
@@ -180,7 +186,9 @@ function effect(type, id, params, map, cost, wetAt){
       // numbers on silence, where x86 (the Windows PC) runs some of them up to 30× slower.
       for (let i = 0; i < ctx.block; i++){ const a = L0[i], b = R0[i], dn = i & 1 ? 1e-18 : -1e-18; L[i] = (a > -8 && a < 8 ? a : 0) + dn; R[i] = (b > -8 && b < 8 ? b : 0) + dn; }
       try { x.tfx_process(st.h, ctx.block); }
-      catch (e){ try { x.tfx_free(st.h); } catch (e2){} st.h = -1; io.out.out.set(L0); io.out.outR.set(R0); return; }   // crashed: bypass it
+      catch (e){ try { x.tfx_free(st.h); } catch (e2){ /* freeing a crashed handle may itself throw: nothing more to do */ } st.h = -1; io.out.out.set(L0); io.out.outR.set(R0);
+        if (!st.warned){ st.warned = true; try { console.warn('[thunder] chains effect ' + type + ' crashed and is bypassed', e); } catch (_) {} }   // once per instance: st.h = -1 sends every later block to the bypass above
+        return; }   // crashed: bypass it
       if (st.buf !== x.memory.buffer){ st.buf = x.memory.buffer; st.P = new Float32Array(st.buf, x.tfx_params(st.h), 12); st.L = new Float32Array(st.buf, x.tfx_l(), 128); st.R = new Float32Array(st.buf, x.tfx_r(), 128); }   // the memory grew inside process
       const L2 = st.L, R2 = st.R;
       let bad = false; for (let i = 0; i < ctx.block; i++){ const a = L2[i], b = R2[i]; if (!(a > -1e4 && a < 1e4 && b > -1e4 && b < 1e4)){ bad = true; break; } }
@@ -4052,6 +4060,12 @@ function modsX(){
     return R.x;
   } catch (e){ modsPrepare(); return null; }
 }
+/* Why the generators' wasm failed, kept in MODS_RT.err (read it from a console) and warned once per failure. The callers
+   count failures (R.fails stops at 3), so this cannot repeat on the audio thread. */
+function modsWhy(what, e){
+  const R = MODS_RT; (R.err = R.err || []).push(what + ': ' + String(e && e.message || e));
+  try { console.warn('[thunder] generators wasm ' + what, e); } catch (_) {}   // one text for both worklets: this block is copied into waves by tools/sync-shared.py
+}
 function modsUse(inst){
   const x = inst.exports; if (x._initialize) x._initialize();
   MODS_RT.x = x; MODS_RT.gen++; MODS_RT.buf = null;
@@ -4065,7 +4079,7 @@ function modsPrepare(){
   if (R.fails >= 3 || typeof WebAssembly === 'undefined' || !WebAssembly.instantiate) return Promise.resolve(false);
   const p = R.mod ? WebAssembly.instantiate(R.mod, MODS_WASI).then(inst => ({ module:R.mod, instance:inst })) : WebAssembly.instantiate(modsBytes(MODS_WASM_B64), MODS_WASI);
   R.pending = p.then(r => { R.mod = r.module; modsUse(r.instance); R.pending = null; return true; },
-    () => { R.fails = 3; R.pending = null; return false; });
+    e => { R.fails = 3; R.pending = null; modsWhy('could not start (the Random / Function generators stay silent)', e); return false; });
   return R.pending;
 }
 /* This module's object in the instance (st.h), made when needed. Null: output silence this block. */
@@ -4089,7 +4103,7 @@ function modsRun(st, x, n){
   try {
     if (!x.mods_process(st.h, n)){ try { x.mods_free(st.h); } catch (e){} st.h = -1; }   // a bad value came out: start it afresh
     return true;
-  } catch (e){ if (MODS_RT.x === x){ MODS_RT.x = null; MODS_RT.fails++; } st.h = -1; return false; }
+  } catch (e){ if (MODS_RT.x === x){ MODS_RT.x = null; MODS_RT.fails++; modsWhy('crashed (restarting it; gives up after 3)', e); } st.h = -1; return false; }
 }
 function modsClose(st){
   if (st.h >= 0 && st.gen === MODS_RT.gen && MODS_RT.x) try { MODS_RT.x.mods_free(st.h); } catch (e){}
@@ -4166,7 +4180,12 @@ const TidesM = {
     if (rs) st.ck = -1;
     const x = modsOpen(st, 1, ctx.sr);
     if (!x){ modsSilence(io); return; }
-    const P = st.P, IN = MODS_RT.IN, OUT = MODS_RT.OUT, clk = linked(io, 'clock'), sync = !clk && p.sync >= .5;
+    // A clock (a cable on Clock, or Sync to tempo) sends the wasm down its ramp-extractor path, and in the Audio range that
+    // extractor never returns: the first block hangs the audio thread for good (found by the test suite; every division and
+    // tempo does it, and so does a cable). So in the Audio range the clock is not handed over and Frequency decides, exactly as
+    // with no clock. Control range (the default) is untouched.
+    const audio = p.range >= .5, clk = !audio && linked(io, 'clock'), sync = !audio && !clk && p.sync >= .5;
+    const P = st.P, IN = MODS_RT.IN, OUT = MODS_RT.OUT;
     P[0] = p.mode; P[1] = p.output; P[2] = p.range; P[3] = p.freq; P[4] = p.shape; P[5] = p.slope; P[6] = p.smooth; P[7] = p.shift;
     P[8] = linked(io, 'pitch') ? 1 : 0; P[9] = linked(io, 'trig') ? 1 : 0; P[10] = clk || sync ? 1 : 0; P[11] = p.ratio; P[12] = rs ? 1 : 0;
     IN.set(io.in.trig.subarray(0, n), 0);

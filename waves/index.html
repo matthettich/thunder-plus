@@ -1659,6 +1659,12 @@ const newId = p => (p || 'm') + Date.now().toString(36) + Math.floor(Math.random
    and everything else is saved under its own names so it never mixes with the standalone …waves. */
 const TW = (() => { try { return window.parent !== window && window.parent.thunderWaves || null; } catch (e) { return null; } })();
 const EMBED = !!TW, KP = EMBED ? 'thunderplus.waves.' : 'waves.';
+/* A save or load that fails is reported (console only) instead of vanishing. Inside Thunder Plus it goes to the page's own
+   tpLog, so everything is read from one place (window.tpLogs there); on its own it prints here, once per message. */
+const tpLog = (() => { const seen = new Set(); return (where, err) => { try {
+  const p = window.parent !== window && window.parent.tpLog; if (typeof p === 'function') return p('waves editor: ' + where, err);
+  const msg = String(err && err.message || err), key = where + '|' + msg; if (seen.has(key) || seen.size >= 100) return; seen.add(key); console.warn('[waves] ' + where + ': ' + msg);
+} catch (_) { /* the logger must never throw */ } }; })();
 
 /* VIEW KEYS (owner, 22 Oct): inside ...Thunder Plus, Alt+0 the synth, Alt+1–7 the tracker's screens, Alt+8 …waves, Alt+9
    …chains and Alt+` back to the last view work from here too: this page has the keys while it shows, so it passes them on. */
@@ -1698,12 +1704,15 @@ class PatchStore {
       }
       this.doc.meta.modified = Math.floor(Date.now() / 1000);
       localStorage.setItem(STORE_KEY, JSON.stringify(this.doc));
-      this.dirty = false;
+      if (!EMBED) this.dirty = false;   // on its own, this copy is the only one
     } catch (e) {}
-    if (EMBED){ try { TW.save(JSON.parse(JSON.stringify(this.doc))); } catch (e) {} this.dirty = false; }
+    // Inside Thunder Plus the copy handed to the page is the one that counts (it is what the song saves), so that decides
+    // whether the patch is still unsaved. A hand-off that throws leaves it dirty: the pause / pagehide / leave paths then
+    // try again, where clearing it here would have forgotten the edit until the next one.
+    if (EMBED){ try { TW.save(JSON.parse(JSON.stringify(this.doc))); this.dirty = false; } catch (e) { tpLog('could not hand the patch to Thunder Plus (the last edit may not be saved; it will be retried)', e); } }
   }
   static open(){
-    if (EMBED){ try { const d = TW.load(); if (d) return d; } catch (e) {} }
+    if (EMBED){ try { const d = TW.load(); if (d) return d; } catch (e) { tpLog('could not read the patch from Thunder Plus (opening a blank one)', e); } }
     try { return JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) { return null; }
   }
   static backups(){ try { return JSON.parse(localStorage.getItem(BAK_KEY) || '[]'); } catch (e) { return []; } }
@@ -1815,7 +1824,7 @@ class WavesBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './waves-worklet.js?v=29';
+    const url = opts.url || './waves-worklet.js?v=31';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'waves', {
