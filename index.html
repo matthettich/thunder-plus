@@ -15569,7 +15569,7 @@ function tStart(mode, o){
   seq.time = ctx.currentTime + 0.08 + ci; stageStart(seq.time);
   met.next = 0; rec.hist = []; if (ci) countIn(ctx.currentTime + 0.08, recS.cnt, seq.bpm);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
-  Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0});
+  Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0, t0:seq.time});
   tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
   bgPlay(true);   // BACKGROUND PLAY
   void r;
@@ -16639,7 +16639,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 245;
+const BUILD = 246;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -17893,7 +17893,7 @@ function tickLen(){
   let txt;
   if (tp.on){
     if (tp.mode !== 'song') txt = '—';
-    else { const el = Math.max(0, ctx.currentTime - tp.seq.time), tot = songRemain(tp.row0); txt = (lenMode ? 'TO ' + mmss(Math.min(el, tot)) : 'LEFT ' + mmss(Math.max(0, tot - el))); }
+    else { const el = Math.max(0, ctx.currentTime - tp.t0), tot = songRemain(tp.row0); txt = (lenMode ? 'TO ' + mmss(Math.min(el, tot)) : 'LEFT ' + mmss(Math.max(0, tot - el))); }
   } else { const rem = songRemain(cs.song.y); txt = lenMode ? 'TO ' + mmss(Math.max(0, songRemain(0) - rem)) : 'LEFT ' + mmss(rem); }
   if (b.textContent !== txt) b.textContent = txt;
 }
@@ -18733,6 +18733,7 @@ function draw(){
       grid.scrollLeft = Math.max(0, Math.min(left + w + m - V, left - 6)); } }
   meterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mt')] : []; masterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mm')] : [];
   if (tv === 'mixer') chwSet();
+  tickLen();
   mixFaders();   // MIXER FADERS
   $('tTitle').textContent = title;
   // TITLE LINE FIT: "TRACK 02 · MONO" gets shorter when the line is tight: TRACK 02 (f3; the phrase's note columns show
