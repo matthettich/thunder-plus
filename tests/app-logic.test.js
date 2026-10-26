@@ -145,6 +145,26 @@ test('service worker: every precached file exists, and every versioned asset the
   }
 });
 
+/* ───────── opening a project from the phone: Files / email / share sheet ───────── */
+test('phone file handling: .thunder files open with the installed app, and a shared project reaches the page', () => {
+  const m = JSON.parse(H.read('manifest.webmanifest'));
+  const fh = (m.file_handlers || []).find(h => h.action === './');
+  assert.ok(fh, 'manifest: a file_handlers entry for the app page');
+  assert.ok(fh.accept['application/octet-stream'].includes('.thunder'), 'manifest: .thunder as application/octet-stream (what an unknown extension arrives as)');
+  assert.ok(fh.accept['application/json'].includes('.thunder'), 'manifest: .thunder as application/json');
+  const sh = m.share_target || {}, sf = ((sh.params || {}).files || []).find(f => f.name === 'project');
+  assert.equal(sh.method, 'POST'); assert.equal(sh.enctype, 'multipart/form-data');
+  assert.ok(sf && sf.accept.includes('.thunder') && sf.accept.includes('application/octet-stream'), 'manifest: the share target takes .thunder');
+  const src = H.read('index.html');
+  assert.match(src, /launchQueue\.setConsumer/, 'index.html: file_handlers files are handed to loadProjFile');
+  assert.ok(src.includes("$('projIn').accept = '*/*'"), 'index.html: the phone picker shows unknown file types instead of hiding .thunder');
+  assert.match(src, /openSharedProject/, 'index.html: a share_target project is read from the cache');
+  const sw = H.read('sw.js');
+  assert.match(sw, /share-target/, 'sw.js: receives the share_target POST');
+  assert.match(sw, /thunder-share/, 'sw.js: parks the shared file for the page');
+  assert.doesNotMatch(sw, /'thunderplus-share'/, 'sw.js: the waiting-project cache must not be deleted by the activate clean-up');
+});
+
 /* ───────── …chains bus routing (owner's report, 25 Oct) ─────────
    The plan decides which tracks a chain node hears as buses. Three rules, confirmed with the owner:
    1. a Chain Out for a track that has its own Track In is that track's own output, not a bus;

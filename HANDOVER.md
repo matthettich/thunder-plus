@@ -77,6 +77,16 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 25 Oct (8): Android opens an emailed .thunder project
+
+Build 247 (`index.html`, `manifest.webmanifest` → `?v=8`, `sw.js` → `thunderplus-v247`).
+- Owner's report: a `.thunder` emailed from the Mac to the Android phone was not offered to the webapp (a `.json` was). Cause: the PWA declared no file associations, and on Android the LOAD PROJECT picker filters by MIME, where a custom extension can be hidden.
+- `manifest.webmanifest` now has **`file_handlers`** for `.thunder` (and `.json`) under `application/json`, `application/x-thunder` and `application/octet-stream` (what an unknown extension arrives as), so an installed copy is an "Open with" choice. **`share_target`** (`./share-target`, POST, `multipart/form-data`) is the fallback for Gmail's Share sheet.
+- `index.html`: `launchQueue.setConsumer` opens the file handed over by `file_handlers`; `openSharedProject()` reads a file shared through the share target. The LOAD PROJECT input is switched to `*/*` just before it opens, so Android's MIME filter cannot hide a `.thunder`.
+- `sw.js`: the POST handler parks the shared `File` in the **`thunder-share`** cache (deliberately not a `thunderplus-*` name, which the activate clean-up deletes) and 303-redirects to `./?shared=1`.
+- Android must have the installed app. Chrome refreshes the WebAPK after the manifest change; if the chooser is still empty, remove and reinstall from Settings → App. Sharing the attachment from Gmail to ...Thunder Plus works even when "Open with" does not offer it.
+- Tests: `npm test` passes (65), including a new check for the manifest, `launchQueue`, the share target and the cache naming.
+
 ## 25 Oct (7): playback keys swapped on desktop KEYS mode (to swap back, read this first)
 
 Build 245 (`index.html`, `sw.js` → `thunderplus-v245`).
