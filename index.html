@@ -2357,7 +2357,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p><b>Settings → Master → Open mastering…</b> (or the <b>MASTERING</b> cell on the Mixer's master row: ▶ from the master level, then EDIT; or › MASTERING on the FX screen's master) puts a chain on the master bus: <b>EQ → Suppress → Compress → Limit</b>. Each has its own switch; the readouts show short-term loudness in and out (LUFS) and the highest peak. <b>EQ</b>: drag a point (left/right is frequency, up/down is gain), shift-drag or scroll for width, double-click empty space to add a bell, double-click a point to switch it off; the band row sets exact values. <b>Suppress</b> turns down resonances that stick out of the spectrum (Depth, Sharpness, Selectivity, Speed; drag the lines to set its range; Delta plays only what it removes). <b>Compress</b> is a glue compressor (its sidechain high-pass keeps the bass from pumping it). <b>Limit</b> catches every peak at the Ceiling, between samples too. Renders of the song include the chain and keep its ceiling; stems don't.</p>
 <h3>Settings</h3>
 <p><b>⚙ Settings</b> at the top: it starts with Audio (output device, level, latency, rate), then this screen’s own settings (in the tracker every Project setting: Song, Input, Screen, Render), then Master, Skin, Export, MIDI, Kit and App (Mobile, install, check for update). There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), show or hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD; it starts hidden on a computer and shown in the Mobile setup), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound, the <b>…chains</b> controls you have added for the current track (in …chains, right-click a control or a module → Add to the bottom panel; right-click one in the panel to remove it), the current track’s effects, and a channel strip for the current track (stereo meter, fader with 0 dB at E0 and +6 dB at the top, pan, M and S). When it holds more than fits, the panel scrolls sideways. Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. On a big screen the space beside the grid is the <b>stage</b> (Settings → STAGE): BY SCREEN shows something useful for each screen (the dogs dance to the beat on Song and Project — a hop every beat, a bigger one on the bar, and a new dance (arms up, arms down, leg kicks, jumping jacks) every time the cursor’s track starts a phrase, so they count beats and phrases for you — Sect previews the phrase, Phrase shows a piano lighting the notes as they play, Inst the waveform, Mixer the master spectrum, FX the effects chain), DOGS shows the dogs everywhere, OFF leaves it empty. In the bar above the grid, double-click the tempo or LPB to type a new one (ticks a step are in Settings). The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value. With a mouse, a drag selects instead (the wheel scrolls), a selection drags to move (Alt, Ctrl or ⌘ copies), and right-click on a track number solos it: see Tracker · KEYS mode → Mouse.</p>
-<p><b>Project files</b> are <code>.thunder</code> files (.json ones still open). A dot on <b>File ▾</b> and in the window title means changes that aren't in the file yet; New, Open and the rest ask <b>Save changes?</b> first. The app remembers the file (Ctrl/⌘+S goes back to it after a restart) and File ▾ → <b>Open recent…</b> lists the last eight. Every 3 minutes the song and kit are backed up in the browser, the last 10: File ▾ → <b>Restore a backup…</b>. On Android, install the app (<b>Settings → App</b>) to open a <code>.thunder</code> from Files, Downloads or an email attachment with it; if a picker still hides the file, <b>LOAD PROJECT</b> shows every file, and an email app's <b>Share</b> can send it to ...Thunder Plus too. Drop audio on a pad to load it; drop a project, kit or .mid on the window to open it. On the synth page, right-click a slider for Reset / Type a value / MIDI learn, the wheel nudges the slider you clicked, and Shift-drag is fine control.</p>
+<p><b>Project files</b> are <code>.thunder</code> files (.json ones still open). A dot on <b>File ▾</b> and in the window title means changes that aren't in the file yet; New, Open and the rest ask <b>Save changes?</b> first. The app remembers the file (Ctrl/⌘+S goes back to it after a restart) and File ▾ → <b>Open recent…</b> lists the last eight. Every 3 minutes the song and kit are backed up in the browser, the last 10: File ▾ → <b>Restore a backup…</b>. On Android, tapping a <code>.thunder</code> attachment can’t offer a web app (Android doesn’t give a PWA the custom extension), so either tap <b>Share</b> on the attachment and send it to ...Thunder Plus (install it first: <b>Settings → App</b>), or download it and use <b>LOAD PROJECT</b>; that picker now shows every file. Drop audio on a pad to load it; drop a project, kit or .mid on the window to open it. On the synth page, right-click a slider for Reset / Type a value / MIDI learn, the wheel nudges the slider you clicked, and Shift-drag is fine control.</p>
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots to start, up to 64: <b>SLOTS</b> at the top of the Synth page (− and + step by 8, tap the number to type one; fewer slots only hide the last ones, and their sounds come back). <b>THIS SLOT</b> sets how the selected slot plays: <b>ONE-SHOT</b> plays its whole sound, like a drum; <b>HELD</b> sounds until note-off, like a synth. By default: <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song. <b>A voice per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chopping breaks</h3>
@@ -16113,6 +16113,9 @@ async function shareLast(){
   catch(e){ if (e && e.name !== 'AbortError') toast('Sharing didn’t work here. The render was saved to your downloads.'); }
 }
 const canFS = !inAI && typeof window.showSaveFilePicker === 'function';
+// Chrome Android (132+) has the file pickers now, but its `types` filter is MIME-based and hides a custom
+// .thunder. Use the plain file input there (no `accept` at all), which shows every file.
+const isAndroid = /Android/i.test(navigator.userAgent);
 /* ===== FILE SAFETY (21 Oct): an unsaved-changes dot and a "Save changes?" before anything replaces the song (and before
    the desktop app closes); the project file is remembered across restarts (the desktop app by its path, a browser by
    the file handle it may keep) with File ▾ → Open recent…; projects are .thunder files (JSON, as before: .json still
@@ -16197,7 +16200,7 @@ async function saveProj(as){
       catch(e){ if (e && e.name === 'AbortError') return false; }   // permission gone or file moved: ask for a file instead
     }
     if (canFS){
-      try { const h = await window.showSaveFilePicker({suggestedName:projName(), types:PJT}); await writeTo(h); setDirty(false); projSet(null, h); toast('Saved ' + h.name); return true; }
+      try { const h = await window.showSaveFilePicker(Object.assign({suggestedName:projName()}, isAndroid ? {} : {types:PJT})); await writeTo(h); setDirty(false); projSet(null, h); toast('Saved ' + h.name); return true; }
       catch(e){ if (e && e.name === 'AbortError') return false; toast('Couldn’t save there: ' + ((e && e.message) || e)); return false; }
     }
     if (as){ const n = await askText({title:'Save project as', body:'The song is renamed and saved to your downloads.'}, S.name, 40, 'Save'); if (n == null) return false; S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); }
@@ -16223,14 +16226,14 @@ async function loadProjFile(f, h){ return loadProjText(await f.text(), f.name, h
 async function openProj(){
   if (!await okToLeave('opening another project')) return;
   if (DESK){ const r = await DESK.open(); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path}); else if (r && r.error) toast('Couldn’t open it: ' + r.error); return; }
-  if (canFS && typeof window.showOpenFilePicker === 'function'){
+  if (canFS && !isAndroid && typeof window.showOpenFilePicker === 'function'){
     try { const [h] = await window.showOpenFilePicker({types:PJT}); await loadProjFile(await h.getFile(), h); }
     catch(e){ if (e && e.name !== 'AbortError') toast('Couldn’t open that file.'); }
     return;
   }
-  // Android's file picker filters by MIME type, and a custom .thunder often arrives as
-  // application/octet-stream or with no type at all: show every file and let loadProjText check it.
-  $('projIn').accept = '*/*';
+  // Android's picker filters by MIME type, and a custom .thunder often arrives as application/octet-stream
+  // or with no type at all: no accept list at all shows every file and lets loadProjText check it.
+  $('projIn').removeAttribute('accept');
   $('projIn').click();
 }
 // RECENT: the last 8 project files (desktop: paths; Chrome / Edge: handles). Phones that download have none.
@@ -16642,7 +16645,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 247;
+const BUILD = 248;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);

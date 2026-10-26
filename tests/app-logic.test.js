@@ -157,7 +157,9 @@ test('phone file handling: .thunder files open with the installed app, and a sha
   assert.ok(sf && sf.accept.includes('.thunder') && sf.accept.includes('application/octet-stream'), 'manifest: the share target takes .thunder');
   const src = H.read('index.html');
   assert.match(src, /launchQueue\.setConsumer/, 'index.html: file_handlers files are handed to loadProjFile');
-  assert.ok(src.includes("$('projIn').accept = '*/*'"), 'index.html: the phone picker shows unknown file types instead of hiding .thunder');
+  assert.match(src, /canFS && !isAndroid/, 'index.html: Android skips the File System Access picker (its MIME filter hides .thunder)');
+  assert.ok(src.includes("$('projIn').removeAttribute('accept')"), 'index.html: the phone picker has no accept list, so it shows unknown file types');
+  assert.match(src, /showSaveFilePicker\(Object\.assign\(\{suggestedName/, 'index.html: Save uses the same type-free picker on Android');
   assert.match(src, /openSharedProject/, 'index.html: a share_target project is read from the cache');
   const sw = H.read('sw.js');
   assert.match(sw, /share-target/, 'sw.js: receives the share_target POST');

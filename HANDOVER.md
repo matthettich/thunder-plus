@@ -77,15 +77,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
-## 25 Oct (8): Android opens an emailed .thunder project
+## 25 Oct (8): Android project transfer (correction: what actually works)
 
-Build 247 (`index.html`, `manifest.webmanifest` → `?v=8`, `sw.js` → `thunderplus-v247`).
-- Owner's report: a `.thunder` emailed from the Mac to the Android phone was not offered to the webapp (a `.json` was). Cause: the PWA declared no file associations, and on Android the LOAD PROJECT picker filters by MIME, where a custom extension can be hidden.
-- `manifest.webmanifest` now has **`file_handlers`** for `.thunder` (and `.json`) under `application/json`, `application/x-thunder` and `application/octet-stream` (what an unknown extension arrives as), so an installed copy is an "Open with" choice. **`share_target`** (`./share-target`, POST, `multipart/form-data`) is the fallback for Gmail's Share sheet.
-- `index.html`: `launchQueue.setConsumer` opens the file handed over by `file_handlers`; `openSharedProject()` reads a file shared through the share target. The LOAD PROJECT input is switched to `*/*` just before it opens, so Android's MIME filter cannot hide a `.thunder`.
+Build 248 (`index.html`, `manifest.webmanifest` → `?v=8`, `sw.js` → `thunderplus-v248`).
+- Owner's report: a `.thunder` emailed from the Mac to the Android phone was not offered to the webapp (a `.json` was). Cause (confirmed): **Chrome Android has no `launchQueue`** (BCD: Chrome Android false; `file_handlers` is desktop/ChromeOS only), so Android cannot offer a PWA in "Open with" for a custom extension. Separately, Chrome Android 132+ now has `showOpenFilePicker`, and its `types` filter is MIME-based: the old `PJT` list showed `.json` but hid `.thunder`.
+- **The reliable Android routes are the share target and LOAD PROJECT.** `manifest.webmanifest` now has a `share_target` (`./share-target`, POST, `multipart/form-data`, accepts `.thunder`/`.json` as `application/json`, `application/x-thunder` and `application/octet-stream`). Gmail → Share on the attachment → ...Thunder Plus loads it. `file_handlers` + `launchQueue` are kept for desktop/ChromeOS and are harmless on Android.
+- `index.html`: on Android, LOAD PROJECT skips `showOpenFilePicker` and uses the hidden file input with **no `accept` list at all**, so every file is selectable and `loadProjText` validates it; SAVE likewise omits the `types` filter on Android. `openSharedProject()` reads the file the service worker saved.
 - `sw.js`: the POST handler parks the shared `File` in the **`thunder-share`** cache (deliberately not a `thunderplus-*` name, which the activate clean-up deletes) and 303-redirects to `./?shared=1`.
-- Android must have the installed app. Chrome refreshes the WebAPK after the manifest change; if the chooser is still empty, remove and reinstall from Settings → App. Sharing the attachment from Gmail to ...Thunder Plus works even when "Open with" does not offer it.
-- Tests: `npm test` passes (65), including a new check for the manifest, `launchQueue`, the share target and the cache naming.
+- The share target needs the installed WebAPK to pick up the new manifest: Chrome checks about once a day. Force it with `chrome://webapks` → Update, or remove and reinstall the app (Settings → App). Downloading the attachment and using LOAD PROJECT works even without that.
+- Tests: `npm test` passes (65), including checks for the manifest, the Android picker, the share target and the cache naming.
 
 ## 25 Oct (7): playback keys swapped on desktop KEYS mode (to swap back, read this first)
 
