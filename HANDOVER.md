@@ -77,6 +77,20 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 25 Oct (7): playback keys swapped on desktop KEYS mode (to swap back, read this first)
+
+Build 245 (`index.html`, `sw.js` → `thunderplus-v245`).
+- Desktop KEYS mode (the keyboard, `inMode === 'keys'`, and `matchMedia('(pointer:fine)')`): **Space plays the whole song**
+  (from the cursor's row; Space again stops it) and **Shift+Space plays the current phrase** (the cursor's block's phrase on
+  the Song screen, else the open phrase; Shift+Space again stops it).
+- Before: Space = play this screen (phrase, pattern, track), Shift+Space = the song.
+- Pad mode and touch are unchanged (Space = play this screen, Shift+Space = the song).
+- Code: `playKeySwap()` and `playPhraseNow()` sit just above `playCtx()`; the tracker's Space branch in the KEYS handler
+  (`if (k === ' ')`) reads `playKeySwap()`. To swap back, make `playKeySwap()` return `false`: `playCtx()` and the old
+  Shift+Space branch are still there.
+- Non-tracker screens (Synth, Waves, Chains) keep their own handling: Shift+Space = the song, and Space still plays the pad.
+  The swap doesn't reach them, so Shift+Space there doesn't play a phrase.
+
 ## 25 Oct (6): phrase/pattern space and stable text size
 
 Cache `thunderplus-v233` (`index.html` and `sw.js`).
