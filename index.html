@@ -16639,7 +16639,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 246;
+const BUILD = 247;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -16899,7 +16899,7 @@ let fxPaneTop = 0;
 function fxPaneFit(rebuilt){
   const pane = grid.querySelector('.fxpane'); if (!pane) return;
   const s4 = pane.querySelector('span[data-y="' + Math.min(4, FXSLOTS) + '"][data-x="0"]'), ln4 = s4 && s4.closest('.ln');
-  if (ln4) pane.style.maxHeight = (ln4.offsetTop + ln4.offsetHeight) + 'px';
+  if (ln4) pane.style.maxHeight = (ln4.offsetTop + ln4.offsetHeight + 8) + 'px';   // a little room under the last visible slot, so the dashed line doesn't touch it
   if (rebuilt) pane.scrollTop = fxPaneTop;
   const cu = pane.querySelector('.cur'), cl = cu && cu.closest('.ln');
   if (cl){ const pr = pane.getBoundingClientRect(), r = cl.getBoundingClientRect(); if (r.top < pr.top) pane.scrollTop -= pr.top - r.top; else if (r.bottom > pr.bottom) pane.scrollTop += r.bottom - pr.bottom; }
