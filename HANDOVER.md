@@ -82,8 +82,11 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
 Owner asked for these next, in their words:
 1. **…chains: show which modules are live.** When a chain is turned off in the Mixer, its modules look different (a dashed
    outline, a drop shadow or similar) so it's easy to see which are active.
-2. **…waves and …chains selection:** Shift-click on a module behaves like Max/MSP (adds it to / takes it out of the
-   selection); Ctrl-click selects the modules clicked. (Confirm the exact Max behaviour wanted before building.)
+2. **…waves and …chains: modules behave like Max/MSP's edit mode (owner: "make it all match Max").** Click selects one
+   (drops the rest); Shift-click adds / removes a module; drag on empty space = a box selection (Shift-drag adds to it);
+   Alt/⌥-drag duplicates and drags the copy; Ctrl/⌘-click works the module's controls without selecting or moving it;
+   Alt/⌥-click opens its help; Delete / Backspace removes the selection (item 4). Check what the editors use these
+   modifiers for today, and move anything that clashes.
 3. **Bus back to a normal track:** a track made into a bus can be changed back.
 4. **Delete / Backspace on a selected module deletes it** (…waves and …chains).
 5. **Clone down (CLN↓) inserts a new row in the arrangement** instead of overwriting the phrases below it.
