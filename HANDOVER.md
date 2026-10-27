@@ -77,6 +77,31 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 27 Oct: usability audit (read this first when reviewing it)
+
+Owner asked for an audit of key commands, mouse gestures, behaviours and anything that would make Thunder Plus feel
+streamlined, familiar and professional, plus a plan, to review with another agent. Four audits ran at build 254 (keys,
+mouse/trackpad/touch, behaviours, and a screen-by-screen walkthrough at desktop, Fold unfolded and Fold cover sizes).
+- **Owner-facing write-up and plan:** the doc "Thunder Plus: usability audit and plan",
+  https://claude.ai/artifact/8yDBMKuKciLpnVqYRHVrTH (summary, a section per area with severity and effort, the plan as
+  four phases with checklists, and a table of the owner's own past decisions to settle before Phase 2).
+- **Agent-facing detail with code locations:** `docs/USABILITY-AUDIT.md` (ids K1…, M1…, B1…, V1…).
+- **Summary.** Close to pro already (rich Renoise-like keys; the engine picker and pump windows are polished). What
+  holds it back: trust bugs (Shift/Z/X stuck in KEYS mode silently pasting or clearing; Insert wiping half a phrase;
+  "Save changes?" missing kit and …waves edits; undo after Open saving the old song over the new file; warning toasts
+  gone in 2 s), controls that behave differently per surface (sliders jump to the click, wheel overshoots on
+  trackpads, Shift fine here and big steps there, Space per screen, four menu and four confirm styles), a look with no
+  type system (36 styles on one screen, header covering the tabs on the unfolded Fold, faint muted text, dark skins with
+  a light grid), and Help/legend/README describing keys from before 25 Oct.
+- **Plan.** Phase 1: the bugs, no design changes (below). Gate: the owner's calls on Space, Shift, drag-from-cursor,
+  Arrange hold-to-mute, wheel focus, editor wheel/keys/undo, skins, pinch-zoom (table in the doc, with a recommendation
+  each). Phase 2: one feel (shared slider and wheel behaviour, modifier map, one menu and confirm component, editor keys
+  pass up, physical note keys, one undo step per gesture, touch sizing). Phase 3: one look (type system, responsive
+  header, tabular numbers, contrast, skins, less on-screen text, Synth page, pump windows, Mixer, cover screen). Phase 4:
+  pro extras (one key table for Help/legend/README/tooltips, command palette, named undo, render progress, system
+  clipboard, missing Renoise commands, glossary, two-tab lock).
+- **Phase 1 status:** see "27 Oct (2)" above this entry when it lands; until then nothing from the audit is fixed.
+
 ## 26 Oct (4): Settings → Audio → …pump live (Auto / Rendered)
 
 Build 254. Owner asked for the "force renders" idea as an option. A per-device setting (`aset.psLive`, saved with the
