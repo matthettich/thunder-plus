@@ -77,6 +77,27 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 26 Oct: review of the 25 Oct changes (four fixes)
+
+Build 250 (`index.html`, `sw.js` → `thunderplus-v250`; the 27 Oct battery work, further down, is 249). Everything from 25 Oct was read through and the app was loaded headless
+(no console errors; FX pane, phrase / pattern, song length, engines and play keys exercised). Four things were wrong:
+- **Song length (LEFT / TO) read 41:40 on every song** and cost ~150 ms per read: `songRemain` ran the looping song sequencer,
+  which never ends, so it always hit its 20000-step guard. It now uses the render's one-pass sequencer
+  (`{once:true, sim:true}`), so the end is the last filled row of the cursor's block (where PLAY goes round again) and a read
+  is a few ms. Stopped, it is worked out 400 ms after edits pause (`lenSoon`), not inside every draw; playing, once at PLAY
+  (`tp.lenTot`). TO now counts from the block's top row, not row 000.
+- **PHRASE ↔ PATTERN kept the other's text size.** The held phrase size (25 Oct (6)) was keyed on TEXT SIZE alone, so
+  PATTERN's smaller fit stuck on PHRASE and the other way round, until a Mixer visit. The key is now TEXT SIZE + view mode +
+  character width (a late web font refits too). Still held through window resizes, as intended.
+- **Swapped play keys (25 Oct (7)) lost LOOP SEL and BUS PLAY.** Shift+Space on the Phrase / Sect screens is now the old Space
+  (`playCtx`), and Space on the Song screen is `playCtx` too (the song from the cursor, or LOOP SEL's rows). On the Song
+  screen Shift+Space plays the block's phrase on the block's own track (it used `cTrack`, which can be another track).
+- **-6 dB engine start overwrote the layers' level.** Level is the pad's, so going back to layers after trying an engine left
+  them 6 dB off. The layers' level is kept in `v.levelL` (as `tuneL` is) and comes back with them.
+- Tests: 67 pass; the two new ones fail on the 25 Oct code.
+- Left alone, worth a look: Delete on an FX slot removes the *last* effect, not the slot under the cursor (as written on
+  25 Oct); the held phrase size also survives folding / unfolding the Fold (by design, but the cover screen gets the unfolded size).
+
 ## 25 Oct (8): Android project transfer (correction: what actually works)
 
 Build 248 (`index.html`, `manifest.webmanifest` → `?v=8`, `sw.js` → `thunderplus-v248`).

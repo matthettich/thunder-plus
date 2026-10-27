@@ -7814,8 +7814,10 @@ function setEngine(x){
   else if (XENG[x]){ v.engine = x; v.tune = 0; v[x] = normX(x, v[x]); if (x === 'sf'){ if (!v.sfFont) v.sfFont = GM_FONT.id; setTimeout(() => sfPreparePad(cur), 0); }
     if (x === 'resynth' && !v.rsData) v.rsData = ResynthCore.demoRs(48000); }   // Resynth starts on the built-in pluck until a sample is loaded
   else if (x === 'blip'){ const first = !v.blip; v.engine = 'blip'; v.tune = 0; v.blip = normBlip(v.blip); if (first) blipPreset(isSyn(cur) ? 0 : 3, true); }
-  else { v.engine = 'layers'; if (typeof v.tuneL === 'number') v.tune = v.tuneL; }
-  if (engFirst) v.level = ENGINE_LEVEL;
+  else { v.engine = 'layers'; if (typeof v.tuneL === 'number') v.tune = v.tuneL; if (typeof v.levelL === 'number'){ v.level = v.levelL; delete v.levelL; } }
+  // FIX (26 Oct): Level is the pad's, shared with its layers, so going back to layers after trying an engine left the layers
+  // 6 dB down (or up). The layers' level is kept aside when the -6 dB start replaces it, and comes back with them (as tuneL).
+  if (engFirst){ if (!was) v.levelL = v.level || 0; v.level = ENGINE_LEVEL; }
   changed(cur); refreshAll();
 }
 function bassPreset(i, quiet){
@@ -15573,7 +15575,7 @@ function tStart(mode, o){
   seq.time = ctx.currentTime + 0.08 + ci; stageStart(seq.time);
   met.next = 0; rec.hist = []; if (ci) countIn(ctx.currentTime + 0.08, recS.cnt, seq.bpm);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
-  Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0, t0:seq.time});
+  Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0, t0:seq.time, lenTot:null, lenPre:0});
   tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
   bgPlay(true);   // BACKGROUND PLAY
   void r;
@@ -16671,7 +16673,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 248;
+const BUILD = 250;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -17908,28 +17910,51 @@ function drawPat(){
   const D = $('tDots'), n = Math.min(tk, 16);
   if (D.childElementCount !== n) D.innerHTML = '<i></i>'.repeat(n);
 }
-// Lights the dots up to the tick that is sounding now (only while playing).
-// SONG LENGTH: the time left (LEFT) from the playhead to the end, or up to it (TO), tapped to switch. Each start row is
-// simulated once per edit (songRemain caches by row), so it costs nothing while the song plays.
-const lenCache = new Map(); let lenVer = -1, lenMode = 0;
+// SONG LENGTH: the time left (LEFT) from the playhead to the end, or up to it (TO), tapped to switch. "The end" is where
+// PLAY would go round again: the last filled row of the block the row is in (the song loops there), as a render stops.
+// FIX (26 Oct): the first version ran the looping song sequencer, which never ends, so every song read 41:40 (its 20000-step
+// guard) and each read cost ~150 ms on a desktop. It now runs the render's one-pass sequencer (once), which ends at the
+// block's last row. Each row is still worked out once per edit; while stopped that waits until the edits pause (lenSoon),
+// so typing notes never waits on it, and while playing the total is worked out once, at PLAY.
+const lenCache = new Map(); let lenVer = -1, lenS = null, lenMode = 0, lenT = 0, lenTV = -1;
+const lenFresh = () => lenVer === songVer && lenS === S;
 function songRemain(row){
-  if (lenVer !== songVer){ lenCache.clear(); lenVer = songVer; }
+  if (!lenFresh()){ lenCache.clear(); lenVer = songVer; lenS = S; }
   if (lenCache.has(row)) return lenCache.get(row);
   let secs = 0;
-  try { const seq = makeSeq(S, 'song', {row, live:false}); for (let g = 0; seq.alive() && g < 20000; g++) seq.step(); secs = Math.max(0, seq.time - (seq.base || 0)); } catch(e){ secs = 0; }
+  try {
+    const seq = makeSeq(S, 'song', {row, once:true, sim:true}), t0 = seq.time; let end = t0;
+    // The sequencer's time stops at the start of the last row it played, so the end is that row's start plus its line.
+    for (let g = 0; seq.alive() && g < 200000 && end - t0 < 7200; g++){ const r = seq.step(); end = Math.max(end, r.t + r.line); }
+    secs = Math.max(0, end - t0);
+  } catch(e){ secs = 0; }
   lenCache.set(row, secs); return secs;
 }
+// Stopped, after an edit: work the times out once the edits pause, not on every keystroke.
+function lenSoon(){
+  if (lenT && lenTV === songVer) return;
+  clearTimeout(lenT); lenTV = songVer; lenT = setTimeout(() => { lenT = 0; tickLen(true); }, 400);
+}
 function mmss(s){ const m = Math.floor(s / 60), r = Math.floor(s % 60); return m + ':' + String(r).padStart(2, '0'); }
-function tickLen(){
+function tickLen(now){
   const b = $('tLen'); if (!b) return;
   let txt;
   if (tp.on){
     if (tp.mode !== 'song') txt = '—';
-    else { const el = Math.max(0, ctx.currentTime - tp.t0), tot = songRemain(tp.row0); txt = (lenMode ? 'TO ' + mmss(Math.min(el, tot)) : 'LEFT ' + mmss(Math.max(0, tot - el))); }
-  } else { const rem = songRemain(cs.song.y); txt = lenMode ? 'TO ' + mmss(Math.max(0, songRemain(0) - rem)) : 'LEFT ' + mmss(rem); }
+    else {
+      if (tp.lenTot == null){ const top = songBlockTop(tp.row0); tp.lenTot = songRemain(tp.row0); tp.lenPre = Math.max(0, songRemain(top) - tp.lenTot); }
+      const el = Math.max(0, ctx.currentTime - tp.t0), tot = tp.lenTot;
+      txt = lenMode ? 'TO ' + mmss(tp.lenPre + Math.min(el, tot)) : 'LEFT ' + mmss(Math.max(0, tot - el));
+    }
+  } else {
+    const y = cs.song.y, top = songBlockTop(y);
+    if (!now && !(lenFresh() && lenCache.has(y) && lenCache.has(top))) return lenSoon();   // keeps the last text until then
+    const rem = songRemain(y); txt = lenMode ? 'TO ' + mmss(Math.max(0, songRemain(top) - rem)) : 'LEFT ' + mmss(rem);
+  }
   if (b.textContent !== txt) b.textContent = txt;
 }
-$('tLen').addEventListener('click', () => { lenMode ^= 1; tickLen(); });
+$('tLen').addEventListener('click', () => { lenMode ^= 1; tickLen(true); });
+// Lights the dots up to the tick that is sounding now (only while playing).
 function tickDots(){
   const D = $('tDots'); if (!D) return;
   let k = -1;
@@ -18158,11 +18183,14 @@ function busPlay(){
 }
 function playKeySwap(){ return inMode === 'keys' && matchMedia('(pointer:fine)').matches; }
 // The phrase under the cursor (its block's phrase on the Song screen), from its start; Space again stops it.
+// FIX (26 Oct): on the Phrase and Sect screens this is the old Space (playCtx), so LOOP SEL, BUS PLAY and a sect still play
+// as they did; on the Song screen the block's phrase plays on the block's own track (it played on cTrack, which can be another).
 function playPhraseNow(){
   if (tp.on) return tStop();
+  if (tv === 'phrase' || tv === 'sect') return playCtx();
   const cid = tv === 'song' && S.song[cs.song.y] ? S.song[cs.song.y][cs.song.x] : -1;
   const ph = cid >= 0 ? firstPhrase(cid) : -1;
-  return tStart('phrase', {phrase:ph >= 0 ? ph : cPhrase, track:cTrack});
+  return tStart('phrase', {phrase:ph >= 0 ? ph : cPhrase, track:ph >= 0 ? cs.song.x : cTrack});
 }
 function playCtx(){
   if (tp.on) return tStop();
@@ -18503,9 +18531,12 @@ function fit(){
   }
   const sc = tv === 'mixer' ? mixScale : tScale, phraseView = tv === 'phrase' && !spc;
   if (phraseView){
-    if (phraseFitBase == null || phraseFitScale !== sc){
+    // Held through resizes, but not across PHRASE ↔ PATTERN or a change of font (FIX 26 Oct: keyed on TEXT SIZE alone, the
+    // size fitted for one stayed on the other: PATTERN's smaller text stuck on PHRASE, PHRASE's on PATTERN, until a Mixer visit).
+    const key = sc + '|' + (pvActive() ? 'pv' : 'ph') + '|' + CW;
+    if (phraseFitBase == null || phraseFitScale !== key){
       if (pvActive()) fs = pvFit(fs, W);
-      phraseFitBase = fs; phraseFitScale = sc;
+      phraseFitBase = fs; phraseFitScale = key;
     }
     fs = phraseFitBase;
   } else { phraseFitBase = null; phraseFitScale = -1; }
@@ -21732,7 +21763,7 @@ function keysDown(e, pad){
   if (e.altKey) return false;
   // PLAY KEYS (25 Oct): with the keyboard (KEYS mode) on a desktop, Space plays the song and Shift+Space the phrase. Pad mode
   // and touch keep Space = play this screen, Shift+Space = the song. To swap back, make playKeySwap() return false.
-  if (k === ' '){ if (!e.repeat){ const sw = playKeySwap(); if (sw ? !e.shiftKey : e.shiftKey){ if (tp.on) tStop(); else tStart('song', {row:songRow()}); } else if (sw) playPhraseNow(); else playCtx(); } return true; }
+  if (k === ' '){ if (!e.repeat){ const sw = playKeySwap(); if (sw && !e.shiftKey && tv === 'song') playCtx(); else if (sw ? !e.shiftKey : e.shiftKey){ if (tp.on) tStop(); else tStart('song', {row:songRow()}); } else if (sw) playPhraseNow(); else playCtx(); } return true; }   // (swapped, on the Song screen Space is playCtx: the song from the cursor, or LOOP SEL's rows)
   if (k === 'Enter'){ if (!e.repeat) editTap(!e.shiftKey); return true; }   // Shift+Enter = the pad's EDIT (stamps over a filled note)
   // Delete and Backspace clear the cell under the cursor, or the whole highlighted selection. Shift+Delete/Backspace
   // clear the whole row and step down. Ctrl/⌘+Backspace removes the row (rows below move up); Insert adds a blank row.

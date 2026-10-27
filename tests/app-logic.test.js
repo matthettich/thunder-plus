@@ -105,6 +105,27 @@ test('phrase and pattern text size stays fixed on resize and refits when TEXT SI
   c.scr.clientWidth = 1800; c.scr.clientHeight = 1400; c.grid.clientHeight = 1200; c.runFit(); assert.equal(c.scr.style.fontSize, scaled, 'resizing after TEXT SIZE preserves the new size');
 });
 
+test('phrase / pattern size: PHRASE <-> PATTERN and a new font refit (the held size is per view mode, not shared)', () => {
+  const blk = cut('index.html', /let phraseFitBase = null, phraseFitScale = -1;\nfunction fit\(\)\{[\s\S]*?\n\}\n/, 'phrase fit');
+  let pv = true, pvCalls = 0;
+  const c = sandbox({ view: 'tracker', tv: 'phrase', fitTries: 0, layoutSig: '', scr: { clientWidth: 824, clientHeight: 560, style: { fontSize: '' } },
+    grid: { clientHeight: 420 }, spActive: () => false, spCols: () => 0, FITROWS: 18, BASEW: 52, CW: 0.6, mixScale: 100, tScale: 100,
+    pvActive: () => pv, pvFit: fs => { pvCalls++; return Math.min(fs, 9); } });
+  vm.runInContext(blk + '\nthis.runFit=fit;', c);
+  c.runFit(); const pattern = c.scr.style.fontSize; assert.equal(pattern, '9.00px');
+  pv = false; c.runFit(); const phrase = c.scr.style.fontSize; assert.notEqual(phrase, pattern, 'PHRASE does not keep PATTERN\'s smaller size');
+  pv = true; c.runFit(); assert.equal(c.scr.style.fontSize, pattern, 'and PATTERN gets its own back'); assert.equal(pvCalls, 2);
+  c.CW = 0.62; c.runFit(); assert.equal(pvCalls, 3, 'a font that arrives late (another character width) refits');
+});
+
+test('song length: counted with the one-pass sequencer (the looping one never ends), and worked out after edits pause', () => {
+  const src = H.read('index.html');
+  const blk = cut('index.html', /function songRemain\(row\)\{[\s\S]*?\n\}\n/, 'songRemain');
+  assert.match(blk, /makeSeq\(S, 'song', \{row, once:true, sim:true\}\)/, 'once: stops at the block\'s last row, as a render does');
+  assert.match(blk, /r\.t \+ r\.line/, 'the end is the last row\'s start plus its line');
+  assert.match(src, /function lenSoon\(\)\{/); assert.match(src, /lenTot:null, lenPre:0/, 'PLAY works the total out afresh');
+});
+
 test('pattern controls are in the title line and the KEYS command bar stays below the tracker', () => {
   const src = H.read('index.html');
   assert.match(src, /pvSeg\.after\(pvBar\)/); assert.doesNotMatch(src, /grid\.before\(pvBar\)/);
