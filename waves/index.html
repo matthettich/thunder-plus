@@ -2397,10 +2397,9 @@ ws.addEventListener('wheel', e => {
   if (e.ctrlKey || e.metaKey){ e.preventDefault(); if (inGesture) return; zoomAt(e.clientX, e.clientY, v.zoom * Math.exp(-e.deltaY * k * 0.01)); return; }
   if (e.target.closest('select')) return;
   e.preventDefault();
-  // A mouse wheel moves in big steps on one axis; a trackpad sends small, smooth amounts.
-  const mouse = e.deltaMode !== 0 || (e.deltaX === 0 && Math.abs(e.deltaY) >= 40 && Math.abs(e.deltaY) % 1 === 0);
-  if (e.shiftKey){ v.y -= (e.deltaY || e.deltaX) * k; applyPan(); store.touch(); return; }
-  if (mouse){ zoomAt(e.clientX, e.clientY, v.zoom * Math.exp(-e.deltaY * k * 0.0018)); return; }
+  // WHEEL SCROLLS (Thunder Plus owner, 27 Oct, Phase 2; it zoomed with a mouse): the wheel and a two-finger swipe move
+  // around the patch, Shift+wheel sideways; Ctrl/⌘+wheel or a pinch zooms (above), as in most canvases.
+  if (e.shiftKey && !e.deltaX){ v.x -= e.deltaY * k; applyPan(); store.touch(); return; }
   v.x -= e.deltaX * k; v.y -= e.deltaY * k; applyPan(); store.touch();
 }, { passive:false });
 // Safari reports trackpad pinches as gesture events.
@@ -2981,7 +2980,7 @@ function helpDoc(){
     ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal cables carry sound, purple dashed cables carry modulation and pink dashed cables carry gates. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the centre, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
     ['Polyphony', 'Host In runs once for every voice, and so does anything it feeds; everything else (effects, LFOs, Out) runs once. Put effects after the voices, before Out.'],
-    ['Moving around', 'Drag the background or scroll with two fingers to pan. Pinch, Ctrl-scroll or a mouse wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
+    ['Moving around', 'Drag the background, scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways). Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
     ['Selecting and the right-click menu', 'Shift-click or Shift-drag to select modules. Hold Option (Alt on Windows) and drag a module’s title bar to copy it (or the selection) and drop the copy where you let go. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
     ['Playing', 'Your computer keyboard plays notes: Z to M is the lower octave, Q to P the upper one, and - and = change octave. MIDI keyboards work too, and on touch screens the Keys bar in the corner of the patch plays notes.'],

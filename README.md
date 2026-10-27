@@ -237,7 +237,7 @@ On touch, tap a cell to move there, tap it again to open or add, and drag up or 
 - **Right-click a track number** (Song, Mixer, Arrange's header) **or a meter** to solo the track, again to un-solo it; a click mutes. Arrange's track numbers mute and solo with a mouse only, so a slip on the phone can't silence a track.
 - **Pattern view's track bands** (the number and name over each track): Alt-click mutes the track, right-click solos it, a double-click names it; a plain click still opens it.
 - **Arrange:** middle-click a block to mute it (or the whole selection it's in), Alt-drag *or* Ctrl/⌘-drag copies, and on the Song screen a double-click on an empty cell starts a new phrase there and opens it.
-- **Synth sliders:** right-click one for Reset, Type a value… and Learn a MIDI knob for it; the wheel nudges the slider you clicked last (Shift+wheel in fine steps); Shift-drag moves it a tenth as fast. (The settings menus' sliders stay locked against stray touches.)
+- **Synth sliders:** right-click one for Reset, Type a value… and Learn a MIDI knob for it; every slider drags from where it is (no jump to the click; Shift ten times finer; on touch only a sideways slide moves it), double-click, Alt-click or Ctrl/⌘-click resets it, and the wheel moves the slider the pointer rests on (outlined; Shift+wheel in fine steps). (The settings menus' sliders stay locked against stray touches.)
 - **Drop files on the window:** audio on a pad loads into that pad (anywhere else, the selected pad); a `.thunder` / `.json` project opens, a kit file loads, a `.mid` imports, a …chains patch imports.
 - **…chains and …waves:** double-click an empty spot of the patch, type part of a module's name and press Enter to add it right there.
 

@@ -116,6 +116,12 @@ body.mob .deskmenu{display:none}
 /* Sliders in Settings are locked: a finger scrolling the menu passes over them. Tap one to unlock it, then drag;
    it locks again a few seconds after you stop. */
 :is(#gset,.rlock) input[type=range]:not(.unl){pointer-events:none; opacity:.5}
+/* ONE SLIDER (27 Oct, Phase 2): a vertical swipe over a slider scrolls the page; the value tip while dragging; the slider the
+   wheel will move (it rested under the pointer) is outlined */
+input[type=range], .row:has(> input[type=range]){touch-action:pan-y}
+@media (pointer:coarse){ input[type=range]:not(:is(#gset, .rlock) *){pointer-events:none} }
+.sldtip{position:fixed; z-index:140; transform:translate(-50%, calc(-100% - 6px)); padding:2px 7px; border-radius:4px; background:var(--ink, #222); color:var(--panel, #fff); font:600 12px/1.5 var(--font); pointer-events:none; white-space:nowrap}
+input[type=range].wheelon{outline:2px solid var(--ink); outline-offset:2px; border-radius:4px}
 :is(#gset,.rlock) input[type=range].unl{outline:2px solid var(--ink); outline-offset:3px; border-radius:4px}
 .gset .tsr output{min-width:70px; font-variant-numeric:tabular-nums; font-size:var(--fs-3)}
 .gset .tsr .stp{min-width:34px; padding-inline:0}
@@ -2365,7 +2371,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p><b>Settings → Master → Open mastering…</b> (or the <b>MASTERING</b> cell on the Mixer's master row: ▶ from the master level, then EDIT; or › MASTERING on the FX screen's master) puts a chain on the master bus: <b>EQ → Suppress → Compress → Limit</b>. Each has its own switch; the readouts show short-term loudness in and out (LUFS) and the highest peak. <b>EQ</b>: drag a point (left/right is frequency, up/down is gain), shift-drag or scroll for width, double-click empty space to add a bell, double-click a point to switch it off; the band row sets exact values. <b>Suppress</b> turns down resonances that stick out of the spectrum (Depth, Sharpness, Selectivity, Speed; drag the lines to set its range; Delta plays only what it removes). <b>Compress</b> is a glue compressor (its sidechain high-pass keeps the bass from pumping it). <b>Limit</b> catches every peak at the Ceiling, between samples too. Renders of the song include the chain and keep its ceiling; stems don't.</p>
 <h3>Settings</h3>
 <p><b>⚙ Settings</b> at the top: it starts with Audio (output device, level, latency, rate), then this screen’s own settings (in the tracker every Project setting: Song, Input, Screen, Render), then Master, Skin, Export, MIDI, Kit and App (Mobile, install, check for update). There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), show or hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD; it starts hidden on a computer and shown in the Mobile setup), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound, the <b>…chains</b> controls you have added for the current track (in …chains, right-click a control or a module → Add to the bottom panel; right-click one in the panel to remove it), the current track’s effects, and a channel strip for the current track (stereo meter, fader with 0 dB at E0 and +6 dB at the top, pan, M and S). When it holds more than fits, the panel scrolls sideways. Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. On a big screen the space beside the grid is the <b>stage</b> (Settings → STAGE): BY SCREEN shows something useful for each screen (the dogs dance to the beat on Song and Project — a hop every beat, a bigger one on the bar, and a new dance (arms up, arms down, leg kicks, jumping jacks) every time the cursor’s track starts a phrase, so they count beats and phrases for you — Sect previews the phrase, Phrase shows a piano lighting the notes as they play, Inst the waveform, Mixer the master spectrum, FX the effects chain), DOGS shows the dogs everywhere, OFF leaves it empty. In the bar above the grid, double-click the tempo or LPB to type a new one (ticks a step are in Settings). The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value. With a mouse, a drag selects instead (the wheel scrolls), a selection drags to move (Alt, Ctrl or ⌘ copies), and right-click on a track number solos it: see Tracker · KEYS mode → Mouse.</p>
-<p><b>Project files</b> are <code>.thunder</code> files (.json ones still open). A dot on <b>File ▾</b> and in the window title means changes that aren't in the file yet; New, Open and the rest ask <b>Save changes?</b> first. The app remembers the file (Ctrl/⌘+S goes back to it after a restart) and File ▾ → <b>Open recent…</b> lists the last eight. Every 3 minutes the song and kit are backed up in the browser, the last 10: File ▾ → <b>Restore a backup…</b>. On Android, tapping a <code>.thunder</code> attachment can’t offer a web app (Android doesn’t give a PWA the custom extension), so either tap <b>Share</b> on the attachment and send it to ...Thunder Plus (install it first: <b>Settings → App</b>), or download it and use <b>LOAD PROJECT</b>; that picker now shows every file. Drop audio on a pad to load it; drop a project, kit or .mid on the window to open it. On the synth page, right-click a slider for Reset / Type a value / MIDI learn, the wheel nudges the slider you clicked, and Shift-drag is fine control.</p>
+<p><b>Project files</b> are <code>.thunder</code> files (.json ones still open). A dot on <b>File ▾</b> and in the window title means changes that aren't in the file yet; New, Open and the rest ask <b>Save changes?</b> first. The app remembers the file (Ctrl/⌘+S goes back to it after a restart) and File ▾ → <b>Open recent…</b> lists the last eight. Every 3 minutes the song and kit are backed up in the browser, the last 10: File ▾ → <b>Restore a backup…</b>. On Android, tapping a <code>.thunder</code> attachment can’t offer a web app (Android doesn’t give a PWA the custom extension), so either tap <b>Share</b> on the attachment and send it to ...Thunder Plus (install it first: <b>Settings → App</b>), or download it and use <b>LOAD PROJECT</b>; that picker now shows every file. Drop audio on a pad to load it; drop a project, kit or .mid on the window to open it. <b>Sliders</b> all work alike: drag one from where it is (it doesn't jump to the click), hold Shift for fine control; on a touch screen it moves only once your finger slides sideways. Double-click, Alt-click or Ctrl/⌘-click resets it, double-click the value to type one, right-click for Reset / Type a value / MIDI learn. The wheel moves the slider the pointer rests on (it gets an outline); Shift+wheel in fine steps.</p>
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots to start, up to 64: <b>SLOTS</b> at the top of the Synth page (− and + step by 8, tap the number to type one; fewer slots only hide the last ones, and their sounds come back). <b>THIS SLOT</b> sets how the selected slot plays: <b>ONE-SHOT</b> plays its whole sound, like a drum; <b>HELD</b> sounds until note-off, like a synth. By default: <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song. <b>A voice per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chopping breaks</h3>
@@ -7508,6 +7514,7 @@ function makeRow(def, key, getObj, opts = {}){
   const reset = () => { if (row.def.d == null) return; getObj()[key] = row.def.d; row.refresh(); (opts.on || (() => changed(cur, true)))(); };
   lab.addEventListener('dblclick', reset);
   inp.addEventListener('dblclick', reset);   // the slider itself too (its default, as on the label)
+  inp._reset = reset; inp._out = out;   // ONE SLIDER: Alt/Ctrl-click resets, the tip shows the readout
   // SLIDER MOUSE: right-click for its menu.
   // opts.menu: more items for this row's menu (a …chains row in the bottom panel: remove it, show its module), in the same
   // menu (FIX 27 Oct, audit M3: the panel added a second menu, a dialog, under this one).
@@ -7516,7 +7523,7 @@ function makeRow(def, key, getObj, opts = {}){
       {l:'Reset to default', f:reset, off:row.def.d == null}, {l:'Type a value…', f:typeBox},
       {l:'Learn a MIDI knob for it', f:() => { setLearn(true); midi.target = -1; midi.ccTarget = inp.id; renderPads(); ccBadges(); midiStatus(`${rowLabel(inp.id)}: turn a knob on the controller.`); }},
       ...(opts.menu ? [null, ...opts.menu()] : [])]); });
-  inp.title = 'Double-click to reset';
+  inp.title = 'Drag to change (Shift: finer) · double-click or Alt-click to reset';
   if (!opts.noTrack) rows.push(row);
   return row;
 }
@@ -11753,8 +11760,8 @@ async function loadAudioInto(f, pad){
   } catch(err){ toast('Couldn’t read that audio file.'); }
 }
 /* ===== SLIDER MOUSE (21 Oct): the synth sliders with a mouse, as in a DAW =====
-   Right-click a slider for Reset / Type a value / Learn a MIDI knob (makeRow); the wheel nudges the slider you clicked last
-   (a slider you only pass over doesn't take the wheel, so the page still scrolls); Shift-drag moves it a tenth as fast.
+   Right-click a slider for Reset / Type a value / Learn a MIDI knob (makeRow); the wheel nudges the slider the pointer rests
+   on (WHEEL FOCUS; one only passed over doesn't take it, so the page still scrolls); a drag is relative, Shift a tenth (ONE SLIDER).
    Not the settings menus' sliders (they lock against stray touches). To remove: this block and the contextmenu in makeRow. */
 const sliderOk = r => !!r && r.matches && r.matches('input[type=range]') && !r.disabled && !r.closest('#gset, .rlock, .ask');
 function sliderSet(r, v){
@@ -11774,22 +11781,72 @@ function wheelSteps(key, e, per = 100){
   a.v += px; a.t = now; const n = Math.trunc(a.v / per); a.v -= n * per; wheelAcc.set(key, a);
   return Math.max(-8, Math.min(8, n));
 }
+/* WHEEL FOCUS (owner, 27 Oct, Phase 2): the wheel moves the slider under the pointer once the pointer has rested on it for a
+   moment (it is outlined then); until then the wheel scrolls the page, so scrolling past sliders never changes them. It
+   was only the slider clicked last, with nothing to show which. */
+let wheelR = null, wheelCand = null, wheelT = 0;
+const wheelOff = () => { clearTimeout(wheelT); wheelT = 0; if (wheelR) wheelR.classList.remove('wheelon'); wheelR = null; };
+const wheelArm = r => { clearTimeout(wheelT); wheelCand = r; wheelT = setTimeout(() => { if (wheelCand === r && sliderOk(r)){ wheelR = r; r.classList.add('wheelon'); } }, 350); };
+document.addEventListener('pointerover', e => {
+  if (e.pointerType !== 'mouse') return;
+  const r = e.target.closest && e.target.closest('input[type=range]');
+  if (r !== wheelCand){ wheelOff(); wheelCand = null; }
+  if (sliderOk(r) && r !== wheelR) wheelArm(r);
+}, true);
+document.addEventListener('pointerout', e => { const r = e.target.closest && e.target.closest('input[type=range]'); if (r && r === wheelCand && !(e.relatedTarget && r.contains(e.relatedTarget))){ wheelOff(); wheelCand = null; } }, true);
 document.addEventListener('wheel', e => {
-  const r = e.target.closest && e.target.closest('input[type=range]'); if (!sliderOk(r) || document.activeElement !== r) return;
+  const r = e.target.closest && e.target.closest('input[type=range]'); if (!sliderOk(r) || e.ctrlKey) return;
+  if (r !== wheelR){ if (r === wheelCand) wheelArm(r); return; }   // still scrolling past: let the page scroll, and wait again
   if (!(e.deltaY || e.deltaX)) return; e.preventDefault();
   const n = wheelSteps(r, e); if (!n) return;
   const mn = r.min === '' ? 0 : +r.min, mx = r.max === '' ? 100 : +r.max, st = r.step === 'any' || !+r.step ? (mx - mn) / 1000 : +r.step;
   sliderSet(r, +r.value - n * Math.max(st, (mx - mn) * (e.shiftKey ? 0.002 : 0.02)));
 }, {passive:false});
+/* ONE SLIDER (owner, 27 Oct, Phase 2): every host slider (not the locked settings menus) behaves the same, as a DAW knob:
+   - a drag moves it from where it is (no jump to the click), sideways, the slider's width for its whole range; Shift held
+     makes it ten times finer, and pressing or letting go of Shift mid-drag carries on from there (no jump);
+   - on a touch screen nothing changes until the finger has moved sideways (a vertical swipe scrolls the page; a tap
+     does nothing), so brushing a slider while scrolling never changes the sound;
+   - a tip shows the value while it moves;
+   - double-click, Alt/⌥-click or Ctrl/⌘-click puts it back to its default (makeRow's); double-click the value to type one.
+   The wheel takes the slider under the pointer once it has rested on it (below). To go back: this block. */
+let sldTip = null;
+function sliderTip(r, on){
+  if (!on){ if (sldTip) sldTip.hidden = true; return; }
+  if (!sldTip){ sldTip = el('div', 'sldtip'); sldTip.setAttribute('aria-hidden', 'true'); document.body.append(sldTip); }
+  const row = r.closest('.row'), o = r._out || (row && row.querySelector('output'));
+  sldTip.textContent = o && o.textContent ? o.textContent : String(r.value);
+  const b = r.getBoundingClientRect(), mn = r.min === '' ? 0 : +r.min, mx = r.max === '' ? 100 : +r.max, f = mx > mn ? (+r.value - mn) / (mx - mn) : 0;
+  sldTip.hidden = false; sldTip.style.left = Math.round(b.left + f * b.width) + 'px'; sldTip.style.top = Math.round(b.top) + 'px';
+}
+const sldReset = r => { if (typeof r._reset === 'function') r._reset(); else r.dispatchEvent(new MouseEvent('dblclick', {bubbles:true})); };
+// On a touch screen the sliders take no touches themselves (CSS, pointer:coarse), or the browser would jump them to the
+// finger before any script runs: the slider under the finger is found here, in the row it sits in.
+function sliderAt(e){
+  const t = e.target; if (!t || !t.closest) return null;
+  const r = t.closest('input[type=range]'); if (r) return r;
+  const host = t.closest('.row') || t; if (!host.querySelectorAll) return null;
+  for (const q of host.querySelectorAll('input[type=range]')){ const b = q.getBoundingClientRect(); if (e.clientX >= b.left - 2 && e.clientX <= b.right + 2 && e.clientY >= b.top - 8 && e.clientY <= b.bottom + 8) return q; }
+  return null;
+}
 document.addEventListener('pointerdown', e => {
-  const r = e.target.closest && e.target.closest('input[type=range]');
-  if (!e.shiftKey || e.pointerType !== 'mouse' || e.button !== 0 || !sliderOk(r)) return;
-  e.preventDefault(); r.focus();
-  const w = Math.max(40, r.getBoundingClientRect().width), mn = r.min === '' ? 0 : +r.min, mx = r.max === '' ? 100 : +r.max, x0 = e.clientX, v0 = +r.value, id = e.pointerId;
+  const r = sliderAt(e);
+  if (e.button !== 0 || !sliderOk(r)) return;
+  e.preventDefault(); e.stopPropagation();
+  const touch = e.pointerType === 'touch';
+  if (!touch && (e.altKey || (MACK ? e.metaKey : e.ctrlKey))){ sldReset(r); return; }   // Alt / Ctrl / ⌘ -click: the default
+  if (!touch) r.focus({preventScroll:true});
+  const w = Math.max(40, r.getBoundingClientRect().width), mn = r.min === '' ? 0 : +r.min, mx = r.max === '' ? 100 : +r.max, id = e.pointerId;
+  let lastX = e.clientX, v = +r.value, live = !touch;
+  const x0 = e.clientX, y0 = e.clientY;
   try { r.setPointerCapture(id); } catch(_){}
-  const mv = ev => { if (ev.pointerId === id) sliderSet(r, v0 + (ev.clientX - x0) / w * (mx - mn) / 10); };
-  const up = ev => { if (ev.pointerId !== id) return; r.removeEventListener('pointermove', mv); r.removeEventListener('pointerup', up); r.removeEventListener('pointercancel', up); };
-  r.addEventListener('pointermove', mv); r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up);
+  if (live) sliderTip(r, true);
+  const mv = ev => { if (ev.pointerId !== id) return;
+    if (!live){ const dx = ev.clientX - x0, dy = ev.clientY - y0; if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)){ end(ev); return; } if (Math.abs(dx) < 6) return; live = true; lastX = ev.clientX; r.focus({preventScroll:true}); }
+    v = clamp(v + (ev.clientX - lastX) / w * (mx - mn) * (ev.shiftKey ? 0.1 : 1), mn, mx); lastX = ev.clientX;
+    sliderSet(r, v); sliderTip(r, true); };
+  const end = ev => { if (ev.pointerId !== id) return; sliderTip(r, false); try { r.releasePointerCapture(id); } catch(_){} r.removeEventListener('pointermove', mv); r.removeEventListener('pointerup', end); r.removeEventListener('pointercancel', end); };
+  r.addEventListener('pointermove', mv); r.addEventListener('pointerup', end); r.addEventListener('pointercancel', end);
 }, true);
 /* ===== FILE DROP (21 Oct): drop files on the window =====
    An audio file on a pad loads into that pad (anywhere else: the selected pad); a .thunder / .json project opens (asking
@@ -16853,7 +16910,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 257;
+const BUILD = 258;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);

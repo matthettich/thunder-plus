@@ -2750,10 +2750,9 @@ ws.addEventListener('wheel', e => {
   if (e.ctrlKey || e.metaKey){ e.preventDefault(); if (inGesture) return; zoomAt(e.clientX, e.clientY, v.zoom * Math.exp(-e.deltaY * k * 0.01)); return; }
   if (e.target.closest('select')) return;
   e.preventDefault();
-  // A mouse wheel moves in big steps on one axis; a trackpad sends small, smooth amounts.
-  const mouse = e.deltaMode !== 0 || (e.deltaX === 0 && Math.abs(e.deltaY) >= 40 && Math.abs(e.deltaY) % 1 === 0);
-  if (e.shiftKey){ v.y -= (e.deltaY || e.deltaX) * k; applyPan(); store.touch(); return; }
-  if (mouse){ zoomAt(e.clientX, e.clientY, v.zoom * Math.exp(-e.deltaY * k * 0.0018)); return; }
+  // WHEEL SCROLLS (Thunder Plus owner, 27 Oct, Phase 2; it zoomed with a mouse): the wheel and a two-finger swipe move
+  // around the patch, Shift+wheel sideways; Ctrl/⌘+wheel or a pinch zooms (above), as in most canvases.
+  if (e.shiftKey && !e.deltaX){ v.x -= e.deltaY * k; applyPan(); store.touch(); return; }
   v.x -= e.deltaX * k; v.y -= e.deltaY * k; applyPan(); store.touch();
 }, { passive:false });
 // Safari reports trackpad pinches as gesture events.
@@ -3418,7 +3417,7 @@ function helpDoc(){
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the centre, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
     ['Sound as modulation', 'Audio can drive anything a control voltage can. Patch a sound into Envelope Follow to make it swell a filter or level, into Gate Extract to fire envelopes and clocks from hits, or into Pitch Follow to track a monophonic melody. Then shape it with Slew (to smooth it), Sample & Hold (to step it) or Quantizer (to snap it to a scale).'],
     ['Tracks', 'Each track has its own Track In and Chain Out. In the Mixer, turning a track’s CHN on adds that track’s pair (wired straight through, in a column below everything else) without leaving the Mixer, so every track gets its own chain and toggling one never disturbs another; the next time you come here, the patch is fitted so you see them all. If that track already has a chain, switching its CHN on just runs it through that chain again. The output always follows its own input — set the Track In and its Chain Out moves with it, and a Chain Out can’t be pointed elsewhere. Picking a track that is already used also jumps to and highlights the existing chain. A track takes one pair; control (cv/gate) inputs are not limited.'],
-    ['Moving around', 'Drag the background or scroll with two fingers to pan. Pinch, Ctrl-scroll or a mouse wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
+    ['Moving around', 'Drag the background, scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways). Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
     ['Selecting and the right-click menu', 'Shift-click or Shift-drag to select modules. Hold Option (Alt on Windows) and drag a module’s title bar to copy it (or the selection) and drop the copy where you let go. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
     ['Presets', 'Effects and sound sources have a Preset row at the top. Pick a factory preset (it sets every control: the ones it names, the rest back to their defaults), Default, or one of yours; Undo takes it back. Save as a preset keeps the module’s settings on this device under a name, for every patch; Delete one of yours removes one. The row keeps the preset’s name and says “edited” once you move a control.'],

@@ -166,3 +166,18 @@ test('Phase 2 keys and mouse: Space = the song everywhere, Shift = fine, a drag 
   assert.match(src, /if \(d\.altMute && !d\.moved && e\.type === 'pointerup'\)\{ toggleBlockMute/, 'an Alt-click on the Song still mutes');
   assert.match(src, /const holdOk = e\.pointerType !== 'mouse';/, 'Arrange hold-to-mute: touch and pen only');
 });
+
+test('Phase 2 sliders and wheel: relative drag, Shift finer, touch must slide, Alt/Ctrl-click resets; the wheel waits for the pointer to rest; editors scroll', () => {
+  const src = H.read('index.html');
+  assert.match(src, /v = clamp\(v \+ \(ev\.clientX - lastX\) \/ w \* \(mx - mn\) \* \(ev\.shiftKey \? 0\.1 : 1\), mn, mx\); lastX = ev\.clientX;/, 'relative, re-anchored each move (Shift mid-drag never jumps)');
+  assert.match(src, /if \(Math\.abs\(dx\) < 6\) return; live = true;/, 'touch: nothing until it slides sideways');
+  assert.match(src, /if \(!touch && \(e\.altKey \|\| \(MACK \? e\.metaKey : e\.ctrlKey\)\)\)\{ sldReset\(r\); return; \}/, 'Alt / Ctrl / ⌘-click resets');
+  assert.match(src, /inp\._reset = reset; inp\._out = out;/, 'makeRow gives the reset and the readout');
+  assert.match(src, /@media \(pointer:coarse\)\{ input\[type=range\]:not\(:is\(#gset, \.rlock\) \*\)\{pointer-events:none\} \}/, 'no native jump on touch');
+  assert.match(src, /if \(r !== wheelR\)\{ if \(r === wheelCand\) wheelArm\(r\); return; \}/, 'the wheel scrolls past until the slider is armed');
+  for (const f of ['waves/index.html', 'chains/index.html']) {
+    const w = H.read(f);
+    assert.match(w, /if \(e\.ctrlKey \|\| e\.metaKey\)\{ e\.preventDefault\(\); if \(inGesture\) return; zoomAt\(/, f + ': Ctrl/⌘+wheel zooms');
+    assert.doesNotMatch(w, /if \(mouse\)\{ zoomAt\(/, f + ': a plain mouse wheel no longer zooms');
+  }
+});
