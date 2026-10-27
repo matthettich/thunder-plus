@@ -119,12 +119,18 @@ comment marked Phase 2 / 27 Oct at the code; `tests/usability.test.js` has a tes
 - **Not done / left:** a full sweep giving every menu item its key hint and one item order; long-press menus on track
   numbers (their right-click solos, the owner's choice) and Mixer strips / FX slots on touch (mouse right-click there is
   the Edit menu already). Ctrl+N still opens a browser window in a browser tab.
-- **Next in the queue** ("27 Oct (4)"): items 1, 3, 5, 6 (dashed modules for a chain switched off, bus back to a track,
-  CLN↓ inserts a row, Arrange "Remove row"); item 2 and 4 are done here. Then the gain staging talk: `docs/GAIN-STAGING.md`
+- **The owner's queue ("27 Oct (4)") is done too (build 262):** (1) …chains draws the modules of a track whose CHN is off
+  dashed and faded (`paintChainOff`, from `TW.chainOn()`; the Mixer's CHN and undo tell the editor, `chainOnChanged`);
+  (3) "Make this track a normal track (not a bus)" in the track menus (Song / Arrange right-click, Edit ▾) when the track
+  is a bus: `unBus(t)` takes its Chain Out(s) out, gives it a straight pair, gives each source without a Chain Out of its
+  own one, and leaves the bus's modules in the patch unplugged; (5) CLN↓ inserts new song rows below (`songRowsInsert`,
+  shared with Ctrl+D) instead of needing the rows below empty; (6) "Remove row" in the Song / Arrange menu
+  (`songRowRemove`, `songRowsRemove`: every track and the master, mutes, sections, an armed loop). (2) and (4) are Phase 2's
+  Max gestures above. Then the gain staging talk: `docs/GAIN-STAGING.md`
   (the VOL field and the meter fader are one post-chain value; a proposed TRIM / fader / master OUT split and five
   questions; the owner doesn't mind old songs changing sound).
 
-## 27 Oct (4): owner's queue (after the Phase 2 decisions; not started)
+## 27 Oct (4): owner's queue (done in builds 260 and 262: see "27 Oct (5)")
 
 Owner asked for these next, in their words:
 1. **…chains: show which modules are live.** When a chain is turned off in the Mixer, its modules look different (a dashed

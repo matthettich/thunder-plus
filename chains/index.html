@@ -168,6 +168,9 @@ body.alting svg.cables rect.bend{opacity:1; pointer-events:all}
 .node > header .byp.on{background:var(--ink); border-color:var(--ink); color:var(--panel)}
 .node > header .byp.seq{outline:2px dashed var(--ink); outline-offset:1px}   /* bypassed by the tracker, not the patch */
 .node.bypassed > :is(.ports, .body){opacity:.42}
+/* CHAIN OFF (Thunder Plus owner, 27 Oct): the modules of a track whose CHN is off in the Mixer (the chain isn't heard) */
+.node.chnoff{outline:2px dashed var(--muted); outline-offset:3px; box-shadow:none !important; filter:saturate(.35)}
+.node.chnoff > :is(.ports, .body){opacity:.55}
 .node > header .fold{border:0; background:none; color:var(--muted); width:20px; height:22px; margin-left:-6px; padding:0; display:grid; place-items:center; flex:none}
 .node > header .fold:hover{background:var(--panel-2); color:var(--ink)}
 .node > header .fold svg{transition:transform .15s}
@@ -2121,7 +2124,7 @@ function rebuildNode(id){
   const o = nodes.get(id); if (!o) return;
   o.el.remove(); nodes.delete(id);
   buildNode(o.m);
-  syncCableEls(); markMapped(); markDeck(); markScene();
+  syncCableEls(); markMapped(); markDeck(); markScene(); paintChainOff();
 }
 function slider(n, key, spec){
   const [def, min, max, step] = spec, fmt = fmtOf(n.m.type, key), label = plabel(n.m.type, key);
@@ -2460,7 +2463,7 @@ function renderAll(){
   for (const m of doc.modules) buildNode(m);
   selected = new Set([...selected].filter(id => nodes.has(id)));
   alignChainTracks(true);   // keep each track's input and output in step on load, undo and redo
-  renderGroups(); syncCableEls(); markMapped(); markDeck(); applyPan(); renderCustom(); paintByp();
+  renderGroups(); syncCableEls(); markMapped(); markDeck(); applyPan(); renderCustom(); paintByp(); paintChainOff();
   document.getElementById('pname').value = doc.meta.name || 'Untitled';
   ws.style.backgroundColor = (doc.view && doc.view.bg) || '';
 }
@@ -2492,7 +2495,7 @@ function removeModule(id){
   if (bridge) bridge.removeModule(id);
   else if (EMBED && TW && TW.mod) TW.mod({ op:'remove', id });   // the remove op also drops its cables
   if (n) n.el.remove(); nodes.delete(id); selected.delete(id);
-  syncCableEls(); store.touch(); paintByp();
+  syncCableEls(); store.touch(); paintByp(); paintChainOff();
 }
 function addAtCenter(type){
   const v = view();
@@ -2548,6 +2551,18 @@ function cableGroup(kind){
   g.append(line);
   const ends = [0, 1].map(() => { const c = svgEl('circle', {r:3.5, fill: CABLE[kind][1]}); g.append(c); return c; });
   return { g, line, ends, kind };
+}
+/* CHAIN OFF (Thunder Plus owner, 27 Oct): inside Thunder Plus, a module whose every track has CHN off in the Mixer is drawn
+   dashed and faded, so the live chains stand out. A module belongs to the tracks whose Track In reaches it and whose Chain
+   Out it reaches, through the cables; one on no track (unplugged) is left as it is. */
+function paintChainOff(){
+  const on = EMBED && TW && TW.chainOn ? TW.chainOn() : null;
+  if (!on){ for (const n of nodes.values()) n.el.classList.remove('chnoff'); return; }
+  const fwd = new Map(), back = new Map(), add = (M, a, b) => { if (!M.has(a)) M.set(a, []); M.get(a).push(b); };
+  for (const c of doc.cables) if (c && c.from && c.to){ add(fwd, c.from[0], c.to[0]); add(back, c.to[0], c.from[0]); }
+  const tracks = new Map(), walk = (M, start, t) => { const seen = new Set([start]), w = [start]; while (w.length){ const x = w.pop(); if (!tracks.has(x)) tracks.set(x, new Set()); tracks.get(x).add(t); for (const y of M.get(x) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } } };
+  for (const m of doc.modules){ const t = (m.params && m.params.track) | 0; if (t < 1) continue; if (m.type === 'trackIn') walk(fwd, m.id, t); else if (m.type === 'chainOut') walk(back, m.id, t); }
+  for (const n of nodes.values()){ const ts = tracks.get(n.m.id); n.el.classList.toggle('chnoff', !!(ts && ts.size && [...ts].every(t => !on[t - 1]))); }
 }
 function syncCableEls(){
   for (const [c, el] of cableEls) if (!doc.cables.includes(c)){ el.g.remove(); cableEls.delete(c); }
@@ -2981,7 +2996,7 @@ function pasteGraph(graph, pos){
     const c = { from, to, bend:0 }; if (cc.pts) c.pts = cc.pts.map(p => [p[0] + pos[0], p[1] + pos[1]]);
     doc.cables.push(c); if (bridge) bridge.connect(from, to);
   }
-  syncCableEls(); store.touch(); paintByp();
+  syncCableEls(); store.touch(); paintByp(); paintChainOff();
   return ids;
 }
 // Alt/Option-drag: copy the dragged modules where they stand (with the cables between them, as Duplicate does), select
@@ -3315,7 +3330,8 @@ const pnameEl = document.getElementById('pname');
     // …Thunder Plus shows this page as its "…chains" screen: it pauses the sound when you switch away and saves into the song.
     window.chainsEmbed = {
       pause(){ if (store){ clearTimeout(store._timer); if (store.dirty) store.save(); } if (bridge) bridge.ctx.suspend().catch(() => {}); },   // store/bridge: not there yet if the screen is left at once
-      resume(){ if (bridge) bridge.resume(); },
+      resume(){ if (bridge) bridge.resume(); try { paintChainOff(); } catch (e) {} },
+      chainOnChanged(){ try { paintChainOff(); } catch (e) {} },   // CHAIN OFF: the Mixer's CHN changed
       /* ONE UNDO: the app's undo or redo put another version of this patch in the song; show it here (no reload). */
       setDoc(d){ if (!store) return; clearTimeout(store._timer); store.undo.length = 0; store.redo.length = 0;
         store._restore(JSON.stringify(normalize(d ? JSON.parse(JSON.stringify(d)) : blankDoc()))); clearTimeout(store._timer); store.dirty = false; },

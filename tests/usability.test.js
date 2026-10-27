@@ -226,3 +226,15 @@ test('Phase 2 rest: one menu (press-drag-release, pads and layers), one confirm,
   assert.match(src, /html\{-webkit-touch-callout:none; touch-action:manipulation;/, 'pinch-zoom allowed (CSS)');
   assert.match(src, /\.pads, \.pad\{touch-action:pan-x pan-y\}/, 'but not on the pads');
 });
+
+test('owner\'s queue (27 Oct): CLN↓ inserts a row, Remove row, a bus back to a normal track, chains of a CHN-off track drawn dashed', () => {
+  const src = H.read('index.html'), ch = H.read('chains/index.html');
+  assert.match(src, /if \(!songRowsInsert\(d0, h\)\) return toast/, 'CLN↓ inserts new rows below');
+  assert.match(src, /function songRowRemove\(\)\{/, 'Remove row');
+  assert.match(src, /Remove row ' \+ rS\(r\.y0, 3\) \+ ' \(the rows below move up\)'/, 'in the Song / Arrange menu');
+  assert.match(src, /function unBus\(t\)\{/, 'bus back to a track');
+  assert.match(src, /\{a:'unbus', l:'Make this track a normal track \(not a bus\)'/, 'in the track menus');
+  assert.match(src, /chainOn: \(\) => Array\.from\(\{length:NT\}/, 'the editor can ask which chains are heard');
+  assert.match(ch, /function paintChainOff\(\)\{/, 'the editor draws CHN-off chains');
+  assert.match(ch, /\.node\.chnoff\{outline:2px dashed/, 'dashed');
+});
