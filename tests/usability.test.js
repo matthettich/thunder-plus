@@ -197,3 +197,14 @@ test('Phase 2 editors: app keys pass up, Ctrl+S/O/N are the project, one undo hi
     assert.match(w, /if \(TW\.appKey\(\{key:e\.key/, f + ': APP KEYS');
   }
 });
+
+test('Phase 2 editors: modules take Max/MSP edit-mode gestures', () => {
+  for (const f of ['waves/index.html', 'chains/index.html']) {
+    const w = H.read(f);
+    assert.match(w, /if \(maxOperate\(e\)\) return;   \/\/ MAX: Ctrl\/⌘-click works the module/, f + ': Ctrl/⌘-click never selects');
+    assert.match(w, /if \(e\.altKey && maxHelpPend\(e, n\)\) return;/, f + ': Alt-click opens help (Alt-drag copies)');
+    assert.match(w, /const box = e\.pointerType === 'mouse' && e\.button === 0;\n  if \(box && !e\.shiftKey\) clearSel\(\);\n  if \(box \|\| e\.shiftKey\)\{/, f + ': a background drag is a selection box');
+    assert.match(w, /if \(\(e\.key !== 'Delete' && e\.key !== 'Backspace'\)[^\n]*\n[^\n]*\n  e\.preventDefault\(\); store\.snapshot\(\); const ids = \[\.\.\.selected\]; for \(const x of ids\) removeModule\(x\);/, f + ': Delete removes the selection');
+    assert.match(w, /n\.el\.addEventListener\('pointerdown', e => \{ e\.stopPropagation\(\); n\.el\.style\.zIndex = \+\+zTop; maxBodyDown\(e, n\); \}\);/, f + ': a click on a module selects it');
+  }
+});

@@ -2088,11 +2088,13 @@ function buildNode(m){
   n.el.style.left = m.pos[0] + 'px'; n.el.style.top = m.pos[1] + 'px';
   n.el.style.zIndex = ++zTop;
   paintNote(n);
-  n.el.addEventListener('pointerdown', e => { e.stopPropagation(); n.el.style.zIndex = ++zTop; });
+  n.el.addEventListener('pointerdown', e => { e.stopPropagation(); n.el.style.zIndex = ++zTop; maxBodyDown(e, n); });
   head.addEventListener('dblclick', e => { if (e.target.closest('button')) return; store.snapshot(); setCollapsed(n, !m.collapsed); });
   head.addEventListener('pointerdown', e => {
     if (e.target.closest('button') || e.button === 2) return;
     e.preventDefault();
+    if (maxOperate(e)) return;   // MAX: Ctrl/⌘-click works the module, never selects or moves it
+    if (e.altKey && maxHelpPend(e, n)) return;   // MAX: Alt-click (no drag) opens its help; Alt-drag still copies
     if (e.shiftKey){ setSel(m.id, !selected.has(m.id)); return; }
     if (!selected.has(m.id)){ clearSel(); setSel(m.id, true); }
     head.setPointerCapture(e.pointerId);
@@ -2168,6 +2170,32 @@ function addItem(type, x, y){
 }
 
 /* ----- selection ----- */
+/* MAX (Thunder Plus owner, 27 Oct, Phase 2: "make it all match Max"): modules take Max/MSP's edit-mode gestures.
+   Click a module (its title or any part that isn't a control) to select just it; Shift-click adds it or takes it out;
+   a drag on the background draws a selection box (Shift adds); Alt/⌥-drag copies (buildNode); Ctrl/⌘-click works the
+   module without selecting or moving it (its controls always work with a plain click here, as this patch plays live);
+   Alt/⌥-click opens its help; Delete or Backspace removes the selection. */
+const maxOperate = e => e.pointerType === 'mouse' && (MAC ? e.metaKey : e.ctrlKey);
+function maxBodyDown(e, n){
+  if (e.button !== 0 || (n.head && n.head.contains(e.target)) || e.target.closest('input, select, textarea, button, .jack, .row, .hit, [contenteditable], canvas, svg, .knob, .ctl') || maxOperate(e)) return;   // (the title bar has its own)
+  if (e.altKey){ maxHelp(n); return; }
+  if (e.shiftKey) setSel(n.m.id, !selected.has(n.m.id));
+  else if (!selected.has(n.m.id)){ clearSel(); setSel(n.m.id, true); }
+}
+function maxHelp(n){ const b = n.head && n.head.querySelector('.mq'); if (b) b.click(); }
+// Alt on a title bar: help if the mouse comes up without moving, else the Alt-drag copy goes ahead (buildNode).
+function maxHelpPend(e, n){
+  const sx = e.clientX, sy = e.clientY;
+  const up = ev => { window.removeEventListener('pointerup', up, true); if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 4) maxHelp(n); };
+  window.addEventListener('pointerup', up, true);
+  return false;
+}
+window.addEventListener('keydown', e => {
+  if ((e.key !== 'Delete' && e.key !== 'Backspace') || e.ctrlKey || e.metaKey || e.altKey || typing(e) || !selected.size) return;
+  if ((learn && learn.on) || document.querySelector('.dlgov')) return;
+  e.preventDefault(); store.snapshot(); const ids = [...selected]; for (const x of ids) removeModule(x); clearSel();
+  toast(ids.length === 1 ? 'Module removed (Undo brings it back).' : ids.length + ' modules removed (Undo brings them back).');
+});
 function setSel(id, on){ const n = nodes.get(id); on ? selected.add(id) : selected.delete(id); if (n) n.el.classList.toggle('selected', on); }
 function clearSel(){ for (const id of selected){ const n = nodes.get(id); if (n) n.el.classList.remove('selected'); } selected.clear(); }
 
@@ -2469,7 +2497,12 @@ ws.addEventListener('pointerdown', e => {
   if (drag) return;
   if (e.target.closest('.node, .hint, .hit, .decor, .dock, .bend')) return;
   if (e.button === 2) return;
-  if (e.shiftKey){
+  // MAX (Thunder Plus owner, 27 Oct, Phase 2): with a mouse, a drag on the background draws a selection box, as in Max's
+  // edit mode (it replaces the selection; with Shift it adds). The wheel or a two-finger swipe pans, and so does a
+  // middle-button drag; on a touch screen a drag still pans.
+  const box = e.pointerType === 'mouse' && e.button === 0;
+  if (box && !e.shiftKey) clearSel();
+  if (box || e.shiftKey){
     const lasso = document.getElementById('lasso'), r0 = ws.getBoundingClientRect(), sx = e.clientX, sy = e.clientY;
     ws.setPointerCapture(e.pointerId); lasso.hidden = false;
     const box = ev => [Math.min(sx, ev.clientX), Math.min(sy, ev.clientY), Math.max(sx, ev.clientX), Math.max(sy, ev.clientY)];
@@ -2482,7 +2515,7 @@ ws.addEventListener('pointerdown', e => {
     mv(e); ws.addEventListener('pointermove', mv); ws.addEventListener('pointerup', up);
     return;
   }
-  clearSel();
+  if (e.pointerType !== 'mouse') clearSel();   // (a middle-button pan keeps the selection)
   if (touches.size > 1) return;
   ws.setPointerCapture(e.pointerId); ws.classList.add('panning');
   // Pan by each step's movement, not from where the finger first landed: after a pinch (a second finger came and
@@ -2815,7 +2848,7 @@ function renderCustom(){
       ['Rename “' + c.name + '”…', async () => { const nm = await askDialog('Rename this custom module:', { input:c.name, ok:'Rename' }); if (nm && nm.trim()){ store.snapshot(); c.name = nm.trim(); renderCustom(); } }],
       ['Delete “' + c.name + '”', () => { store.snapshot(); doc.custom = doc.custom.filter(x => x !== c); renderCustom(); store.touch(); }]]); });
     return h('div', {class:'pwrap'}, b);
-  }) : [h('div', {class:'qempty', text:'Select modules (Shift-click), right-click and choose Make custom module.'})]));
+  }) : [h('div', {class:'qempty', text:'Select modules (click, Shift-click or drag a box), right-click and choose Make custom module.'})]));
 }
 const allBtn = document.getElementById('pall');
 function updateAllBtn(){ const any = Object.values(pstate.open).some(Boolean); allBtn.textContent = any ? 'Collapse all' : 'Expand all'; }
@@ -3004,9 +3037,9 @@ function helpDoc(){
     ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal cables carry sound, purple dashed cables carry modulation and pink dashed cables carry gates. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the centre, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
     ['Polyphony', 'Host In runs once for every voice, and so does anything it feeds; everything else (effects, LFOs, Out) runs once. Put effects after the voices, before Out.'],
-    ['Moving around', 'Drag the background, scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways). Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
+    ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
-    ['Selecting and the right-click menu', 'Shift-click or Shift-drag to select modules. Hold Option (Alt on Windows) and drag a module’s title bar to copy it (or the selection) and drop the copy where you let go. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
+    ['Selecting and the right-click menu', 'As in Max: click a module to select it, Shift-click to add it or take it out, drag on the background for a selection box (Shift adds to it). Delete or Backspace removes the selection. Hold Option (Alt on Windows) and drag a module’s title bar to copy it (or the selection) and drop the copy where you let go; Option-click opens its help; Ctrl/⌘-click works a module without selecting it. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
     ['Playing', 'Your computer keyboard plays notes: Z to M is the lower octave, Q to P the upper one, and - and = change octave. MIDI keyboards work too, and on touch screens the Keys bar in the corner of the patch plays notes.'],
     ['MIDI learn', 'Press MIDI learn, click a slider, then move a knob on your controller. Press Delete to clear the slider’s mapping, and Done when you’re finished.'],
     ['Saving', 'Your patch saves itself as you work. File → Save downloads it as a file; Open loads one. Settings → Backups holds earlier versions.']
