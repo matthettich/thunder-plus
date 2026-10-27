@@ -77,6 +77,38 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 26 Oct (3): …pump synths live: Mono live, Poly live, Coil live, with a safety net
+
+Build 253 (`index.html`, `sw.js` → `thunderplus-v253`; `pump-synth-engine.js?v=2`, new `pump-synth-worklet.js?v=1`). Owner:
+keep the rendered engines and add live ones as separate engines; liked the safety net. Nothing in pump changed (the wasm
+already took MIDI at any frame).
+- **Engines:** `pmonol`, `ppolyl`, `pcoill` (picker: Mono, Mono live, Poly, Poly live, Coil, Coil live). A live engine and its
+  rendered twin share one set of values: `setEngine` copies them over (and keeps Tune and Level, no -6 dB restart). XENG
+  entries carry `twin`. Live cards add the rows a played line needs (MONO: Glide & legato; POLY: Glide); `Hit` reads
+  *Velocity* there. Presets: the rendered engines' (the live ones share them).
+- **Playing:** `pump/synth/pump-synth-worklet.js` (processor `thunder-psyn`), loaded by `bassReady` with the other live
+  worklets (`PSYN_WK`, `psOK`). One node per track and pad (`psNode` in `makePlayer`), four note lanes of AudioParams
+  (`r` rate, `g` gate, `t` trig, `l` legato, `v` velocity), driven by the existing `bassNote` (lane objects look like a bass
+  node), so slides, arps, bends, vibrato, KIL/OFF and exports behave as for Acid. Mono tracks use lane 0; poly tracks
+  `polyPs` (a free lane, else the oldest). In the worklet: note on = nearest note to 60 + Tune + 12 log2(rate), a slide is
+  legato (new note on before the old note off), every other pitch is bend over ±24 st (COIL ±12, retuned at most once a
+  block). Bend is one per instrument: a poly track's chord bends together. The wasm's bytes go with the first node on each
+  audio thread (`psSent`); one instance per thread. The node sleeps after a second of silence with nothing held.
+- **Velocity:** the VOL column is the note's MIDI velocity (`vc` added to note events), the pad's Velocity when there is
+  none; the level keeps only the instrument's volume, so a soft note isn't turned down twice. Level, Drive and POLY's
+  +8 dB trim are applied in the worklet as the render applies them.
+- **Safety net (`psLive`, `psFallback`):** once a second while the song plays, if live …pump nodes take over 12 % of the
+  audio thread and the audio is dropping out or the thread is over 92 % (or they alone are over 75 %), twice in a row:
+  their nodes are dropped and `psNode` returns null for the rest of the visit, so `startNote` plays the pad's render (the
+  twin's sound of the same values). Toast once; reload to try again. Also null (render) with no worklet or wasm. Exports
+  always play live.
+- **Checked:** live output equals the render for the same note (max difference 1.5e-8, all three); in the page, an offline
+  player through the real `makePlayer` plays them (MONO live peak -17.1 dB = its render's), a VOL 30 note is 2.5 dB softer
+  (velocity only), a C-major chord on Poly live, Coil live; the safety net drops the nodes and the next note renders.
+  CPU, desktop, one note: MONO 2.9 %, POLY 5.4 %, COIL 2.6 % of a core (expect several times that on the Fold).
+- **Not yet:** a Settings switch to force renders (e.g. to save battery on the phone); RET's fade applies to both
+  velocity and level on live notes; a poly track's per-column slide bends the whole chord.
+
 ## 26 Oct (2): …pump synths: MONO, POLY and COIL as synth engines
 
 Build 252 (`index.html`, `sw.js` → `thunderplus-v252`). Owner: diversify the synth section by porting the …pump

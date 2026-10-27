@@ -19,8 +19,8 @@ const SILENT_IN_PLUGIN = new Set(['pmono:Self-oscillating filter']);
 
 test('pump synths: every factory preset of MONO, POLY and COIL renders, finite and below full scale', () => {
   const P = load(), ui = P.xui(), xe = P.xeng();
-  assert.deepEqual(Object.keys(ui), ['pmono', 'ppoly', 'pcoil']);
-  for (const k in ui) {
+  assert.deepEqual(Object.keys(ui), ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'pcoil', 'pcoill'], 'each instrument and its live twin');
+  for (const k of P.rendered) {   // (a live twin renders through its rendered engine, with the same presets)
     for (const [name, o] of ui[k].pre) {
       const d = P.render(k, Object.assign(xe[k].d(), o, { tune: 0, level: 0, drive: 0 }), 48000, 1, { len: P.len(k) }), { pk, bad } = stats(d);
       assert.equal(bad, 0, k + ' ' + name + ': NaN or infinity in the render');
@@ -63,5 +63,54 @@ test('pump synths: every row and section has a value in the pad, and Hit and Vol
     for (const key of Object.keys(rows)) assert.ok(key in d, k + ': a row with no value (' + key + ')');
     for (const [, keys] of ui[k].secs) for (const key of keys) assert.ok(rows[key], k + ': a section lists ' + key + ' but there is no row for it');
     assert.ok('vel' in d && 'volume' in d, k + ': Hit and Volume');
+  }
+});
+
+/* ───────── live (26 Oct): pump-synth-worklet.js, the Mono live / Poly live / Coil live engines ───────── */
+function liveNode(kind, over) {
+  const P = load(), c = H.workletScope({ Date }); H.load(c, 'pump/synth/pump-synth-worklet.js');
+  const Proc = c.__registered['thunder-psyn'], bytes = new Uint8Array(fs.readFileSync(path.join(H.ROOT, 'pump/synth/pump-synth.wasm')));
+  const node = new Proc({ processorOptions: Object.assign({ p: Object.assign(P.xeng()[kind].d(), { tune: 0, level: 0, drive: 0 }, over || {}), bytes }, P.liveSpec(kind)) });
+  return { P, c, node };
+}
+const lanes = over => { const o = {}; for (let j = 0; j < 4; j++) { o['r' + j] = [1]; o['g' + j] = [0]; o['t' + j] = [0]; o['l' + j] = [0]; o['v' + j] = [100]; } for (const k in over) o[k] = over[k]; for (const k in o) o[k] = Float32Array.from(o[k]); return o; };
+const stepAt = (at, a, b) => Array.from({ length: 128 }, (_, i) => (i >= at ? b : a));
+const block = (node, P) => { const o = [[new Float32Array(128), new Float32Array(128)]]; node.process([], o, lanes(P)); return o[0]; };
+function spy(c, name, log) { const X = c.__psynX; c.__psynX = Object.assign({}, X, { [name]: (...a) => { log.push(a); return X[name](...a); } }); }
+
+test('pump synths live: notes become MIDI at their sample: retrigger, legato (note on before the old note off), bend, note off, velocity', () => {
+  const { c, node } = liveNode('pmonol');
+  block(node, {}); const log = []; spy(c, 'psyn_midi', log);
+  const ev = () => log.splice(0).map(([, f, s, a, b]) => [f, s, a, b]);
+  block(node, { t0: stepAt(10, 0, 1), g0: stepAt(10, 0, 1), v0: [90] });
+  assert.deepEqual(ev(), [[10, 0x90, 60, 90]], 'note on: C-4 is the plugin\'s 60, at its sample, with its velocity');
+  block(node, { t0: stepAt(5, 1, 2), g0: [1], r0: [Math.pow(2, 7 / 12)] });
+  assert.deepEqual(ev(), [[5, 0x80, 60, 0], [5, 0x90, 67, 100]], 'a new note retriggers: note off, then note on');
+  block(node, { t0: stepAt(5, 2, 3), g0: [1], l0: [1], r0: [2] });
+  assert.deepEqual(ev(), [[5, 0x90, 72, 100], [5, 0x80, 67, 0]], 'a slide is legato: the new note on before the old note off');
+  block(node, { t0: [3], g0: [1], r0: Array.from({ length: 128 }, (_, i) => Math.pow(2, (12 + 2 * i / 127) / 12)) });
+  const b = ev(); assert.ok(b.length >= 3 && b.every(([, s]) => s === 0xE0), 'a pitch ramp is pitch bend');
+  const last = b[b.length - 1], st = ((last[3] << 7 | last[2]) - 8192) / 8191 * 24; assert.ok(st > 1.4 && st < 2.05, 'bend reaches the ramp (' + st.toFixed(2) + ' st)');
+  block(node, { t0: [3], g0: stepAt(64, 1, 0), r0: [Math.pow(2, 14 / 12)] });
+  assert.deepEqual(ev(), [[64, 0x80, 72, 0]], 'note off when the gate drops');
+});
+
+test('pump synths live: a poly track\'s chord takes the lanes, one note each', () => {
+  const { c, node } = liveNode('ppolyl');
+  block(node, {}); const log = []; spy(c, 'psyn_midi', log);
+  block(node, { t0: stepAt(0, 0, 1), g0: [1], t1: stepAt(0, 0, 1), g1: [1], r1: [Math.pow(2, 4 / 12)], t2: stepAt(0, 0, 1), g2: [1], r2: [Math.pow(2, 7 / 12)] });
+  assert.deepEqual(log.filter(a => a[2] === 0x90).map(a => a[3]).sort(), [60, 64, 67]);
+});
+
+test('pump synths live: plays exactly what the pad renders (same values, same note), and sleeps in silence', () => {
+  for (const [k, kl] of [['pmono', 'pmonol'], ['ppoly', 'ppolyl'], ['pcoil', 'pcoill']]) {
+    const { P, c, node } = liveNode(kl), sr = 48000, offB = 188, N = 2 * sr, L = new Float32Array(N + 128);
+    for (let b = 0; b * 128 < N; b++) { const o = block(node, { t0: [1], g0: [b < offB ? 1 : 0] }); for (let i = 0; i < 128; i++) L[b * 128 + i] = 0.5 * (o[0][i] + o[1][i]); }
+    const r = P.render(k, Object.assign(P.xeng()[k].d(), { tune: 0, level: 0, drive: 0 }), sr, offB * 128 / sr), lat = k === 'pmono' ? 32 : 0;
+    let md = 0; for (let i = 0; i < r.length - 200; i++) md = Math.max(md, Math.abs(L[i + lat] - r[i]));
+    assert.ok(md < 1e-5, kl + ': live and rendered differ by ' + md);
+    let calls = 0; spy(c, 'psyn_process', { push: () => calls++ });
+    for (let b = 0; b < 400; b++) block(node, { t0: [1], g0: [0] });
+    assert.ok(calls < 400, kl + ': still running after a second of silence');
   }
 });

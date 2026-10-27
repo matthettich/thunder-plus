@@ -11,6 +11,13 @@
  * died away; the pad then plays that recording re-pitched for other notes. The stereo output is folded to mono (pads are
  * mono). The page and the render Worker both load this file (after pump-synth-meta.js); without the folder Thunder Plus
  * runs as before, with no …pump engines.
+ *
+ * LIVE (26 Oct): each instrument also comes as a live engine (Mono live, Poly live, Coil live: pmonol, ppolyl, pcoill),
+ * played by pump-synth-worklet.js in the tracker as the plugin is in a DAW (a note's own pitch, velocity, length, legato
+ * and glide; POLY's chords through its own voices). A live engine and its rendered twin share one set of values: a pad
+ * switched between them keeps its sound (index.html: setEngine copies them over). The safety net: whenever a live engine
+ * can't play live (no AudioWorklet, the wasm didn't load, or the device couldn't keep up and the page switched live off),
+ * the tracker plays the pad's render instead, which is the twin's render of the same values (XENG r below).
  */
 (function(G){
 'use strict';
@@ -23,12 +30,24 @@ const KINDS = {
   ppoly:{t:1, k:'poly', name:'Poly', title:'pump POLY', tag:'two oscillators · poly-mod · four filter voicings · chorus', len:4, trim:2.5},
   pcoil:{t:2, k:'coil', name:'Coil', title:'pump COIL', tag:'tuned springs kicked by the note · tanks, clang to pluck', len:4},
 };
+/* The live twins: the same instrument, played live. Shown after their rendered engine in the picker. */
+const LIVE = {
+  pmonol:{twin:'pmono', name:'Mono live', title:'pump MONO live', tag:'played live: each note its own pitch, velocity and length · glide, legato'},
+  ppolyl:{twin:'ppoly', name:'Poly live', title:'pump POLY live', tag:'played live: chords through its own voices, unison and chorus'},
+  pcoill:{twin:'pcoil', name:'Coil live', title:'pump COIL live', tag:'played live: every note kicks its own springs, as hard as it is played'},
+};
+const ORDER = ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'pcoil', 'pcoill'];
 /* trim: POLY's level is set for chords (a voice sums in at 0.3, 8 of them to a chord), so one rendered note sat 8-10 dB
    under MONO's and COIL's. A pad is one note, which the tracker stacks for chords, so POLY's render is 8 dB up (x2.5);
    the sound is unchanged. MONO and COIL are as the plugin. */
 /* Kept in the pad (so it carries the plugin's whole state) but not shown: they do nothing to a single rendered note
    (the mod wheel, pitch bend, glide and note priority need a played line). */
 const HIDE = new Set(['wheel_vib', 'glide', 'glide_mode', 'priority', 'legato', 'bend_range', 'wheel_mod', 'bend']);
+/* ...which a live twin shows (bend range and the mod wheel stay hidden: the tracker's pitch commands are sent as bend
+   over the whole range, and there is no wheel). */
+const LIVE_ROWS = {pmonol:[['Glide & legato', ['glide', 'glide_mode', 'legato', 'priority']]], ppolyl:[['Glide', ['glide']]], pcoill:[]};
+/* What the live instance is held to whatever the pad says: the widest bend, so a slide of an octave or two is one bend. */
+const LIVE_FIXED = {pmonol:{bend_range:24}, ppolyl:{bend_range:24}, pcoill:{bend:12}};
 /* Each card's sections (the plugins' own panels). */
 const SECS = {
   pmono:[['Oscillator 1', ['osc1_wave', 'osc1_oct', 'osc1_level']], ['Oscillator 2', ['osc2_wave', 'osc2_oct', 'osc2_pitch', 'osc2_level', 'sync']],
@@ -50,7 +69,7 @@ const LBL = {f_a:'Attack', f_d:'Decay', f_s:'Sustain', f_r:'Release', a_a:'Attac
   a_saw:'Saw', a_pulse:'Pulse', b_saw:'Saw', b_tri:'Triangle', b_pulse:'Pulse', b_low:'LFO range', level_a:'Level', level_b:'Level',
   pm_env:'Filter env', pm_oscb:'Osc B', pm_freq_a:'→ Freq A', pm_pw_a:'→ PW A', pm_filter:'→ Filter', hpf:'High-pass',
   voice_mode:'Mode', unison_detune:'Unison', velocity:'Vel → kick', lfo_pitch:'→ Pitch', lfo_filter:'→ Filter', lfo_pw:'→ PW',
-  lfo_delay:'Delay', lfo_shape:'Shape', lfo_rate:'Rate', sync:'Sync to 1', fm:'FM 3 → 1', pw:'Pulse width'};
+  lfo_delay:'Delay', lfo_shape:'Shape', lfo_rate:'Rate', sync:'Sync to 1', fm:'FM 3 → 1', pw:'Pulse width', glide_mode:'Glide when', priority:'Priority'};
 const SEMIS = new Set(['osc2_pitch', 'osc3_pitch', 'a_freq', 'b_freq']);
 const sg = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v);
 const hz = v => v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 1 : 2) + ' kHz' : v >= 100 ? Math.round(v) + ' Hz' : v.toFixed(v >= 10 ? 1 : 2) + ' Hz';
@@ -84,6 +103,15 @@ for (const key in KINDS){
   for (const pr of m.presets) if (pr.n !== 'Default') pre.push([pr.n, Object.assign({}, pr.v)]);
   ENG[key] = {rows, defs, secs, pre, about:m.about || '', specs:m.params};
 }
+for (const key in LIVE){
+  const T = ENG[LIVE[key].twin], m = META.synth[KINDS[LIVE[key].twin].k], rows = Object.assign({}, T.rows);
+  for (const p of m.params) if (HIDE.has(p.s) && LIVE_ROWS[key].some(([, ks]) => ks.includes(p.s))) rows[p.s] = rowOf(p);
+  rows.vel = Object.assign({}, rows.vel, {l:'Velocity'});   // live: the VOL column is the velocity; this is a note's without one
+  const secs = T.secs.slice(), at = secs.findIndex(([t]) => t === 'Play');
+  secs.splice(at < 0 ? secs.length : at, 0, ...LIVE_ROWS[key]);
+  ENG[key] = Object.assign({}, T, {rows, secs});
+}
+const twinOf = k => LIVE[k] ? LIVE[k].twin : k;
 
 /* ---------- WebAssembly ---------- */
 const z = () => 0, IMP = {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}};
@@ -100,28 +128,42 @@ function finish(out, p, sr){
   const res = out.slice(0, Math.max(end, 1)), fl = Math.min(res.length, Math.round(sr * 0.003)); for (let i = 0; i < fl; i++) res[res.length - 1 - i] *= i / fl;
   return res;
 }
+let bytes = null;
 const PsynCore = {
-  engines: KINDS,
+  // every engine, in the picker's order: [key, name, tag]
+  engines: Object.fromEntries(ORDER.map(k => [k, KINDS[k] || LIVE[k]])),
+  rendered: Object.keys(KINDS),
   ready: () => !!X,
   module: () => mod,
+  bytes: () => bytes,   // the wasm file, for the live engines' worklet (it compiles its own instance on the audio thread)
   // the page: fetch and compile the wasm, instantiate it here; the Module goes to the render Worker
-  async load(url){ const r = await fetch(url); if (!r.ok) throw new Error(url + ' ' + r.status); mod = await WebAssembly.compile(await r.arrayBuffer());
+  async load(url){ const r = await fetch(url); if (!r.ok) throw new Error(url + ' ' + r.status); bytes = new Uint8Array(await r.arrayBuffer()); mod = await WebAssembly.compile(bytes);
     attach(await WebAssembly.instantiate(mod, IMP)); return mod; },
   // the Worker: the page's compiled Module
   attachModule(m){ mod = m; attach(new WebAssembly.Instance(m, IMP)); },
-  isKind: k => !!KINDS[k],
-  // XENG entries (live:false: rendered); r renders, rel is the amp's release in ms (how a held note fades when let go)
-  xeng(){ const o = {}; for (const k in KINDS) o[k] = {live:false, d:() => Object.assign({}, ENG[k].defs), r:(P, sr, hold, V) => PsynCore.render(k, P, sr, hold, V),
-    rel:P => k === 'pcoil' ? (P.release || 0.4) * 1000 : (P.a_r || 150)}; return o; },
+  isKind: k => !!(KINDS[k] || LIVE[k]),
+  isLive: k => !!LIVE[k],
+  twin: k => LIVE[k] ? LIVE[k].twin : Object.keys(LIVE).find(q => LIVE[q].twin === k) || null,
+  // what a live node is made with: the instrument, its parameter symbols in order, the values held fixed, the level trim
+  liveSpec: k => LIVE[k] ? {type:KINDS[twinOf(k)].t, syms:ENG[k].specs.map(p => p.s), fixed:LIVE_FIXED[k], trim:KINDS[twinOf(k)].trim || 1} : null,
+  /* XENG entries. Rendered (live:false) and live; both render with r (a live engine's render is its safety net, and what
+     the Synth page plays), and rel is the amp's release in ms (how a held rendered note fades when let go). */
+  xeng(){ const o = {}; for (const k of ORDER){ const tw = twinOf(k);
+    o[k] = {live:!!LIVE[k], twin:LIVE[k] ? tw : PsynCore.twin(k), d:() => Object.assign({}, ENG[k].defs), r:(P, sr, hold, V) => PsynCore.render(tw, P, sr, hold, V),
+      rel:P => tw === 'pcoil' ? (P.release || 0.4) * 1000 : (P.a_r || 150)}; }
+    return o; },
   // XUI entries: the card's rows, sections and the plugin's factory presets
   xui(){
     const o = {};
-    for (const k in KINDS) o[k] = {title:KINDS[k].title, tag:KINDS[k].tag, rows:ENG[k].rows, secs:ENG[k].secs, pre:ENG[k].pre,
-      note:ENG[k].about + ' The …pump plugin’s own engine and values: C-4 plays its MIDI note 60. Hit is how hard the note is played when the pad renders; '
-        + (k === 'pcoil' ? 'the springs ring for their Decay and fade over Release when the note is let go.' : 'a held note fades over the Amp release when it is let go.')};
+    for (const k of ORDER){ const E = PsynCore.engines[k], tw = twinOf(k);
+      o[k] = {title:E.title, tag:E.tag, rows:ENG[k].rows, secs:ENG[k].secs, pre:ENG[k].pre,
+        note:ENG[k].about + ' The …pump plugin’s own engine and values: C-4 plays its MIDI note 60. ' + (LIVE[k]
+          ? 'Played live in the tracker, like the plugin in a DAW: the VOL column is each note’s velocity (Velocity here when a note has none), a note sounds for as long as it is held, and slides, bends and vibrato bend its pitch. '
+            + 'The Synth page and pad effects use its render, and so does the tracker on a device that can’t keep up (it says so). It shares its values with ' + KINDS[tw].title + ': switch between them and the sound stays.'
+          : 'Hit is how hard the note is played when the pad renders; ' + (tw === 'pcoil' ? 'the springs ring for their Decay and fade over Release when the note is let go.' : 'a held note fades over the Amp release when it is let go.'))}; }
     return o;
   },
-  len: k => (KINDS[k] && KINDS[k].len) || 2,
+  len: k => (KINDS[twinOf(k)] && KINDS[twinOf(k)].len) || 2,
   /* One note: values staged, a fresh instance (so a pad renders the same every time), note on at 0, note off after the
      hold, then until it dies away (at most 12 s). Folded to mono, the plugin's latency (MONO's oversampler) taken off. */
   render(k, P, sr, hold, V){

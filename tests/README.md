@@ -11,7 +11,7 @@ device, so it runs in about 15 seconds.
 | `hangs.test.js` | renders that once froze the audio thread, run in a child process with a time limit |
 | `app-logic.test.js` | logic cut out of the HTML/JS: logger, PatchStore dirty flag, sample prune, `esc()`, phrase/pattern sizing and layout, CSP header, service-worker file list, shared-block sync |
 | `updater.test.js` | the desktop updater's SHA-256 check |
-| `pump-synth.test.js` | the …pump synth engines (MONO, POLY, COIL from `pump/synth/`): every factory preset renders finite and below full scale, hold / release / Tune, golden output |
+| `pump-synth.test.js` | the …pump synth engines (MONO, POLY, COIL from `pump/synth/`): every factory preset renders finite and below full scale, hold / release / Tune, golden output; the live worklet's notes as MIDI (retrigger, legato, bend, chords), live = render for the same note, sleeping in silence |
 
 ## Golden hashes
 

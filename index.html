@@ -2401,7 +2401,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
      pump-synth.wasm, their parameters and presets in pump-synth-meta.js, both built by pump/wasm/build.sh). Without the folder
      there are no …pump engines. The render Worker loads the same two files (PSYN_JS below). -->
 <script src="pump/synth/pump-synth-meta.js?v=1"></script>
-<script src="pump/synth/pump-synth-engine.js?v=1"></script>
+<script src="pump/synth/pump-synth-engine.js?v=2"></script>
 <!-- …PUMP (23 Oct 2026): the pump mastering plugins' parameter tables and presets (generated in matthettich/pump by
      wasm/build.sh); pump/pump.wasm is their DSP, fetched by the wasm loader. -->
 <script src="pump/pump-meta.js?v=1"></script>
@@ -7128,7 +7128,7 @@ const PW = {w:null, ready:false, wv:false, lx:false, ps:false, id:0, jobs:new Ma
 // and gets the page's compiled lxr.wasm (lxMod) in its init message.
 const LXR_JS = 'lxr/lxr-engine.js?v=2';
 // …PUMP SYNTHS: likewise the instruments' tables and glue, and the page's compiled pump-synth.wasm (psMod)
-const PSYN_JS = ['pump/synth/pump-synth-meta.js?v=1', 'pump/synth/pump-synth-engine.js?v=1'];
+const PSYN_JS = ['pump/synth/pump-synth-meta.js?v=1', 'pump/synth/pump-synth-engine.js?v=2'];
 function rwStart(plMod, txMod, lxMod, psMod){
   try {
     const sc = [...document.scripts].find(x => x.textContent.includes('===ENGINE ' + 'START==='));
@@ -7822,13 +7822,16 @@ function setEngine(x){
   const v = V();
   const was = v.engine === 'bass' || v.engine === 'vox' || v.engine === 'blip' || !!XENG[v.engine];
   if (x === (v.engine || 'layers')) return;
+  // …PUMP SYNTHS: a rendered engine and its live twin (Mono / Mono live…) share one set of values: switching between them
+  // copies them over and keeps the pad's Tune and Level, so the sound stays.
+  const old = v.engine, twin = !!(XENG[x] && XENG[x].twin && XENG[x].twin === old && v[old]), tuneWas = v.tune;
   // A pad's first use of an engine starts it at ENGINE_LEVEL (-6 dB), so a new synth isn't louder than the rest of the mix.
-  const engFirst = x !== 'layers' && !(x === 'bass' ? v.bass : x === 'vox' ? v.vox : x === 'blip' ? v.blip : XENG[x] ? v[x] : 1);
+  const engFirst = !twin && x !== 'layers' && !(x === 'bass' ? v.bass : x === 'vox' ? v.vox : x === 'blip' ? v.blip : XENG[x] ? v[x] : 1);
   hushPad(cur);   // the old engine's notes stop now instead of ringing out under the new one
   if (!was) v.tuneL = v.tune;
   if (x === 'bass'){ const first = !v.bass; v.engine = 'bass'; v.tune = 0; v.bass = normBass(v.bass); if (first) bassPreset(1, true); }
   else if (x === 'vox'){ v.engine = 'vox'; v.tune = 0; v.vox = normVox(v.vox); }
-  else if (XENG[x]){ v.engine = x; v.tune = 0; v[x] = normX(x, v[x]); if (x === 'sf'){ if (!v.sfFont) v.sfFont = GM_FONT.id; setTimeout(() => sfPreparePad(cur), 0); }
+  else if (XENG[x]){ v.engine = x; v.tune = 0; v[x] = normX(x, twin ? Object.assign({}, v[old]) : v[x]); if (twin) v.tune = tuneWas; if (x === 'sf'){ if (!v.sfFont) v.sfFont = GM_FONT.id; setTimeout(() => sfPreparePad(cur), 0); }
     if (x === 'resynth' && !v.rsData) v.rsData = ResynthCore.demoRs(48000); }   // Resynth starts on the built-in pluck until a sample is loaded
   else if (x === 'blip'){ const first = !v.blip; v.engine = 'blip'; v.tune = 0; v.blip = normBlip(v.blip); if (first) blipPreset(isSyn(cur) ? 0 : 3, true); }
   else { v.engine = 'layers'; if (typeof v.tuneL === 'number') v.tune = v.tuneL; if (typeof v.levelL === 'number'){ v.level = v.levelL; delete v.levelL; } }
@@ -9068,7 +9071,7 @@ function factoryVoicePresets(){
   ]],
   ...[['acid', 'Acid'], ['mach', 'Machine synth'], ['tone', 'Tone drums'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Electric piano'], ['organ', 'Organ'], ['table', 'Table'], ['breath', 'Breath'], ['strings', 'Strings'], ['fmdrum', 'FM Drum'], ['wind', 'Wind'], ['phase', 'Phase'], ['partials', 'Partials'], ['skin', 'Skin'], ['chip', 'Chip'], ['vector', 'Vector'], ['scanned', 'Scanned'], ['resynth', 'Resynth'], ['bytebeat', 'Bytebeat']].map(engGroup),
   ...(typeof LxrCore !== 'undefined' ? [lxrPresetGroup()] : []),   // LXR ENGINES
-  ...(typeof PsynCore !== 'undefined' ? Object.keys(PsynCore.engines).map(k => [k, PsynCore.engines[k].title]).map(engGroup) : []),   // …PUMP SYNTHS
+  ...(typeof PsynCore !== 'undefined' ? PsynCore.rendered.map(k => [k, PsynCore.engines[k].title]).map(engGroup) : []),   // …PUMP SYNTHS (the live twins share these)
   ['Leads', [
     ['Square lead', () => PS('Square lead', [
       {type:'square', atk:3, dec:300, sus:0.75, rel:180, lpCut:3200, lpRes:0.25, level:0.6},
@@ -14667,7 +14670,7 @@ function makeSeq(S, mode, o){
             const ev = {type:'note', t:nat, track:t, poly, col:ncol[q], pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain:gain * hg, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? nat + fx.KIL * tick : null, rel:fx.OFF != null ? nat + fx.OFF * tick : null,
               slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
-              ii, mn:note + 12 + ntc / 100, vel:hg * (fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255, tick};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out; tick: NOTE LEN
+              ii, mn:note + 12 + ntc / 100, vel:hg * (fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255, tick, vc:fx.VOL != null ? fx.VOL : r[VC]};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out; tick: NOTE LEN
             if (!o.sim && ((I.slc | 0) > 1 || I.sync)){ const c = o.live ? ensurePlay(ev.pad) : ensure(ev.pad); if (c){ applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; } }
             evs.push(ev);
             if (every){ let k = 1;
@@ -14846,6 +14849,7 @@ function makePlayer(ac, out, getBuf, live){
     const V = kit.voices[pad], vx = isVoxV(V), lx = liveX(V), kind = vx ? 'vox' : lx ? V.engine : 'bass', key = t + ':' + pad + ':' + kind + (j ? ':' + j : ''); let b = bassN.get(key); if (b) return b;
     // The pad's engine changed: drop this track's nodes of the old kind, or every engine switch would leave one running.
     for (const [k, o] of bassN) if (k.startsWith(t + ':' + pad + ':') && o.kind !== kind) bassDrop(k, o);
+    if (isPsV(V)) return psNode(t, pad, V, kind, key);   // …PUMP SYNTHS live (null: play the render instead)
     try {
       const node = new AudioWorkletNode(ac, 'thunder-' + kind, {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{p:vx ? voxParams(V) : lx ? xParams(V) : bassParams(V)}});
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
@@ -14859,6 +14863,34 @@ function makePlayer(ac, out, getBuf, live){
     bassN.set(key, b); if (live) bassLive.add(b);
     return b;
   }
+  /* …PUMP SYNTHS live: one node per track and pad with four note lanes (a mono track uses the first). Returns the first
+     lane (lanes: all four), or null when it can't play live: no worklet or wasm here, or this device couldn't keep up
+     (psLive.off), and the tracker then plays the pad's render, its twin's sound with the same values (the safety net).
+     An export (an offline context) always plays live: it has all the time it needs. */
+  function psNode(t, pad, V, kind, key){
+    const sp = PsynCore.liveSpec(kind), by = PsynCore.bytes();
+    if (!sp || !by || !psOK.has(ac) || (ac === ctx && psLive.off)) return null;
+    try {
+      const node = new AudioWorkletNode(ac, 'thunder-psyn', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2],
+        processorOptions:Object.assign({p:xParams(V)}, sp, psSent.has(ac) ? {} : {bytes:by})});
+      psSent.add(ac);
+      const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
+      node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
+      node.load = 0; node.port.onmessage = e => { const d = e.data; if (d && typeof d.load === 'number') node.load = node.load * 0.6 + d.load * 0.4; };
+      const lanes = [0, 1, 2, 3].map(j => ({node, g, pn, pad, kind, ps:true, lane:j, rate:P('r' + j), gate:P('g' + j), trig:P('t' + j), leg:P('l' + j), vel:P('v' + j), n:0, lastOn:-1, cur:null}));
+      const b = lanes[0]; b.lanes = lanes;
+      bassN.set(key, b); if (live) bassLive.add(b);
+      return b;
+    } catch(e){ tpLog('pump synth live node', e); return null; }
+  }
+  // A poly track on a live …pump engine: its notes take the node's four lanes, a free one first, else the oldest.
+  function polyPs(ev){
+    const b = bassNode(ev.track, ev.pad); if (!b || !b.lanes) return false;
+    const L = b.lanes, free = L.filter(x => !x.cur || x.cur.stopAt != null || x.cur.ended), pick = (free.length ? free : L).reduce((x, y) => (x.lastOn <= y.lastOn ? x : y));
+    const T = vs[ev.track]; for (let q = T.length - 1; q >= 0; q--) if (T[q].bass === pick) T.splice(q, 1);   // the lane's last note: the new one takes it
+    const kv = kit.voices[ev.pad], ck = kv ? kv.choke : 0;
+    bassNote(ev, pick, T, ck); return true;
+  }
   function bassNote(ev, b, T, ck, fk){
     const t = Math.max(ev.t, ac.currentTime), leg = ev.slide && ev.slide.dur > 0 ? 1 : 0;
     for (const P of [b.gate, b.trig, b.leg]) P.cancelScheduledValues(t);
@@ -14871,8 +14903,14 @@ function makePlayer(ac, out, getBuf, live){
       b.syl.setValueAtTime(k, t); b.same.setValueAtTime(leg, t);
     }
     if (b.acc){ b.acc.cancelScheduledValues(t); b.acc.setValueAtTime(ev.acc ? 1 : 0, t); }
+    // …PUMP SYNTHS live: the VOL column is the note's velocity, as on the plugin (none: the pad's Velocity), so the level
+    // keeps only the instrument's volume (and RET's fades) and isn't turned down twice
+    let gain = ev.gain;
+    if (b.ps){ const vc = ev.vc != null && ev.vc >= 0 ? ev.vc : -1, hit = (xParams(kit.voices[b.pad]).vel) || 100;
+      b.vel.cancelScheduledValues(t); b.vel.setValueAtTime(clamp(Math.round((vc >= 0 ? 127 : hit) * (ev.vel != null ? ev.vel : 1)), 1, 127), t);
+      if (vc >= 0){ const c = curve(vc); gain = c > 1e-4 ? ev.gain / c : 0; } }
     b.leg.setValueAtTime(leg, t); b.gate.setValueAtTime(1, t); b.trig.setValueAtTime(++b.n, t);
-    b.g.gain.setValueAtTime(ev.gain, t); b.pn.pan.setValueAtTime(clamp((ev.pan - 128) / 127, -1, 1), t);
+    b.g.gain.setValueAtTime(gain, t); b.pn.pan.setValueAtTime(clamp((ev.pan - 128) / 127, -1, 1), t);
     if (ev.wob != null && b.wob) b.wob.setValueAtTime(ev.wob, t);
     b.lastOn = t; if (b.cur) alive.delete(b.cur);
     const v = {bass:b, src:{playbackRate:b.rate, stop(){}}, g:b.g, pn:b.pn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn:true, rel:0};
@@ -14980,6 +15018,7 @@ function makePlayer(ac, out, getBuf, live){
   function startNote(ev){
     if (!kit.voices[ev.pad]) return;   // an instrument on a slot this kit doesn't have (a song from a bigger kit): silent
     if (ev.poly && isSyn(ev.pad) && isVoxV(kit.voices[ev.pad]) && polyVox(ev)) return;
+    if (ev.poly && isLivePad(ev.pad) && isPsV(kit.voices[ev.pad]) && polyPs(ev)) return;   // …PUMP SYNTHS live: chords through its own voices
     if (isLivePad(ev.pad)){ const bn = bassNode(ev.track, ev.pad); if (bn){
       // bass is mono: it takes over from whatever the track was playing
       const T = vs[ev.track]; for (const v of T) if (v.bass !== bn) kill(v, ev.t, v.syn ? Math.min(relTc(v), 0.05) : 0.004); T.length = 0;
@@ -15153,7 +15192,11 @@ function makePlayer(ac, out, getBuf, live){
     try { if (taps) taps.disconnect(); } catch(e){}
     try { sendBus.disconnect(); sendDly.disconnect(); } catch(e){}
   }
-  return {play, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, mfxKeys:() => fxKeySync(mfx, S.mfx)};
+  // …PUMP SYNTHS live: how much of the audio thread their nodes take (each reports ms of work per ms of sound), and
+  // dropping them (the safety net: the next notes play the renders)
+  const psLoad = () => { let l = 0, n = 0; for (const b of bassN.values()) if (b.ps){ l += b.node.load || 0; n++; } return {load:l, nodes:n}; };
+  const psDrop = () => { for (const [k, b] of [...bassN]) if (b.ps) bassDrop(k, b); };
+  return {play, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop};
 }
 
 /* ---------- live playback ---------- */
@@ -15417,11 +15460,34 @@ class XP_${name} extends AudioWorkletProcessor {
 }
 registerProcessor('thunder-${name}', XP_${name});`;
 let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bassLive = new Set();
+// …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
+const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=1', psOK = new WeakSet(), psSent = new WeakSet();
+/* …PUMP SYNTHS live, THE SAFETY NET (owner, 26 Oct): while the song plays, once a second: if the audio is dropping out or
+   the audio thread is nearly full, and the live …pump nodes are a real part of that, twice in a row, the live engines
+   switch to their renders for the rest of this visit (psLive.off): their nodes go, and the next notes play the pads'
+   renders, the same values' sound. Said once; a reload tries live again. An export always plays them live. */
+const psLive = {off:false, strikes:0};
+setInterval(() => {
+  if (psLive.off || !rt || !rt.pl || !tp.on || !ctx || document.hidden) { psLive.strikes = 0; return; }
+  const {load, nodes} = rt.pl.psLoad(); if (!nodes){ psLive.strikes = 0; return; }
+  const now = performance.now(), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
+  const whole = cap ? cap.avg : pr ? pr.load : null, drop = now - glitch.t < 1100 || (cap && cap.under > 0.01);
+  const over = load > 0.12 && (drop || (whole != null && whole > 0.92) || load > 0.75);
+  psLive.strikes = over ? psLive.strikes + 1 : 0;
+  if (psLive.strikes >= 2) psFallback('this device couldn’t keep up with them live');
+}, 1000);
+function psFallback(why){
+  if (psLive.off) return; psLive.off = true; psLive.strikes = 0;
+  try { if (rt && rt.pl) rt.pl.psDrop(); } catch(e){}
+  tpLog('pump synths live: playing the renders', why);
+  toast('Mono live, Poly live and Coil live are playing their rendered sound for now: ' + why + '. Reload to try them live again.', 8000);
+}
 function bassReady(ac){
   if (!bassLoad.has(ac)){
     let pr = Promise.resolve(false);
     try { if (ac.audioWorklet){ if (!bassURL) bassURL = URL.createObjectURL(new Blob([BassCore.toString() + BASS_PROC + '\n' + VoxCore.toString() + VOX_PROC + '\n' + AcidCore.toString() + XPROC('acid', 'AcidCore') + '\n' + MachCore.toString() + XPROC('mach', 'MachCore')], {type:'text/javascript'}));
-      pr = ac.audioWorklet.addModule(bassURL).then(() => { bassOK.add(ac); return true; }, () => false); } } catch(e){}
+      pr = ac.audioWorklet.addModule(bassURL).then(() => { bassOK.add(ac); return true; }, () => false)
+        .then(ok => typeof PsynCore === 'undefined' ? ok : ac.audioWorklet.addModule(PSYN_WK).then(() => { psOK.add(ac); return ok; }, e => { tpLog('pump synths live worklet (the live ones play their renders)', e); return ok; })); } } catch(e){}
     bassLoad.set(ac, pr);
   }
   return bassLoad.get(ac);
@@ -16695,7 +16761,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 252;
+const BUILD = 253;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
