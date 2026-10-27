@@ -77,6 +77,53 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 27 Oct (5): usability Phase 2 ("one feel"), built to the owner's calls in "27 Oct (3)"
+
+Builds 257–261. Owner: "implement the rest of phase two" (and the editors' gestures "match Max"). Each change has a
+comment marked Phase 2 / 27 Oct at the code; `tests/usability.test.js` has a test per part; each part was checked headless.
+- **(1) Space, Shift, drag, hold (257).** `playKeySwap()` returns true: Space plays / stops the song in every mode and on
+  every screen; Shift+Space this screen (the block's phrase on the Song; the selected pad on the Synth page, which had
+  Space = pad). The on-screen PLAY button keeps the pad's meaning. Tracker value drags: Shift slows (48 px a step), Ctrl/⌘
+  big steps (`drag.pos` accumulates, so Shift mid-drag never jumps); the wheel over a value no longer takes big steps, and
+  Ctrl+wheel there is left to zoom. With a mouse a drag always selects, from the cursor's own cell too (`mselDown`
+  `filled`; a click on it still opens / edits, `mselEnd`); **Alt-drag edits** (`altDrag`, gridDown and Pattern view's
+  open track), and an Alt-click on the Song still mutes (`drag.altMute`); Alt-press inside a selection still copies it.
+  Arrange hold-to-mute is touch and pen only (`holdOk`).
+- **(2) One slider (258).** Document capture pointerdown for every host range input (`sliderOk`, not #gset / .rlock):
+  relative drag, Shift a tenth (re-anchored per move), value tip (`.sldtip`), Alt / Ctrl / ⌘-click resets (`inp._reset`
+  from makeRow), touch moves only after a 6 px sideways slide (on `pointer:coarse` ranges have pointer-events:none and
+  `sliderAt()` finds them, or Chrome jumps them to the finger first). WHEEL FOCUS: the slider the pointer rests on for
+  350 ms (outlined, `.wheelon`) takes the wheel; until then the page scrolls. …waves / …chains: wheel pans, Shift+wheel
+  sideways, Ctrl/⌘+wheel or pinch zooms. …pump windows already matched (Shift fine, Cmd/Alt reset): untouched.
+- **(3) Editors (259).** APP KEYS: the editors pass Space (…waves; …chains already did), F2–F9 and Ctrl/⌘+S / Shift+S /
+  O / N up (`TW.appKey` → `editorKey`), so they act on the project; on those screens File ▾ shows the project's items first
+  and the patch's as "New / Open a … patch file / Export the … patch". ONE UNDO: inside Thunder the editors' Undo / Redo are
+  the song's (`TW.undo` → `undoStep`); …waves edits are `{k:'W'}` steps (`thunderWaves.save`), …chains edits are song
+  steps (S.chainPatch); `PatchStore.snapshot()` hands off a pending edit first, so edits stay separate steps; undo shows the
+  patch in the open editor (`chainsEmbed.setDoc` / `wavesEmbed.setDoc`) instead of dropping the frame (only when the patch
+  actually changed, `chWas`).
+- **(4) Max gestures (260)** in both editors: click a module (title or non-control part) selects just it; Shift-click
+  toggles; mouse drag on the background = selection box (Shift adds); middle-drag / wheel / two fingers pan (touch drag
+  still pans); Alt-drag copies (as before); Alt-click opens its help (`maxHelpPend`); Ctrl/⌘-click (⌘ on a Mac) works it
+  without selecting; Delete / Backspace removes the selection (queue item 4 done). Module controls still work with a
+  plain click (the patch plays live), the one deliberate difference from Max's locked/unlocked modes.
+- **(5) The rest (261).** `sxMenu` picks on release when opened by a held press (`ptrHeld`); `ctxBind(el, fn)` = right-click
+  + long-press menus, now on the Synth page's pads (right-click only: a long press holds the note) and layers. ONE CONFIRM:
+  the inline Yes / Cancel row (`ask()`), File ▾'s "Tap again" and the Project rows' "Tap EDIT twice" are `askYes` (File
+  items skip it when the project is dirty, since "Save changes?" asks). NOTE KEYS BY POSITION: `PIANO_CODE` / `pianoOf`
+  (tracker, Synth page), `K_CODE` (…waves). ONE STEP PER GESTURE: `snap()` and `kitSettle()` wait while a pointer is down
+  (`undoHeld`), one step on release (a Mixer fader drag made a step per move). TOUCH SIZING on `pointer:coarse`: 40 px
+  hit areas (faders' `::before`, deck grip and header buttons, rows, ranges, menu items, the Arrange resize handle).
+  PINCH-ZOOM: viewport no longer blocks it, `html{touch-action:manipulation}`; pads `pan-x pan-y`, keypad / PAD buttons
+  `none`, Arrange keeps its own pinch.
+- **Not done / left:** a full sweep giving every menu item its key hint and one item order; long-press menus on track
+  numbers (their right-click solos, the owner's choice) and Mixer strips / FX slots on touch (mouse right-click there is
+  the Edit menu already). Ctrl+N still opens a browser window in a browser tab.
+- **Next in the queue** ("27 Oct (4)"): items 1, 3, 5, 6 (dashed modules for a chain switched off, bus back to a track,
+  CLN↓ inserts a row, Arrange "Remove row"); item 2 and 4 are done here. Then the gain staging talk: `docs/GAIN-STAGING.md`
+  (the VOL field and the meter fader are one post-chain value; a proposed TRIM / fader / master OUT split and five
+  questions; the owner doesn't mind old songs changing sound).
+
 ## 27 Oct (4): owner's queue (after the Phase 2 decisions; not started)
 
 Owner asked for these next, in their words:
