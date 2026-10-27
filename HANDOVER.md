@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.26** (27 Oct 2026; Run workflow through the API with version 1.2.26) has the gain staging (TRIM, master OUT, PRE
+  sends, the CHN crossfade) and its review fixes: "27 Oct (6)" below, build 265.
 - **v1.2.22** (24 Oct 2026; Run workflow through the API with version 1.2.22) has everything in "24 Oct" below: the Windows
   Arrange-box and …pump-meter fixes, the reverb Mix curve, mouse on values, the mixer fader bars and the header meter.
 - **v1.2.20** (24 Oct 2026, UTC; Run workflow through the API with version 1.2.20, from `0e73a86`) has everything up to
@@ -105,6 +107,15 @@ into `deck`; `deck` sends `master` to the host, and OUT sits before `master`, so
 - Cache `thunderplus-v264`, `chains/chains-worklet.js?v=39` (index.html, chains/index.html, sw.js).
 - **Not done:** the bus's sources switching back to the speakers when a bus goes away (not crossfaded); a first native
   track FX added or removed is still a rewire. Not yet played by the owner.
+- **Review fixes (build 265),** from a separate review of 264 (it found no audio faults: old songs render bit-identical or
+  within 1 LSB, ~−138 dBFS, from the extra gain nodes): the master row is hex only with two-space gaps (with OUT and the
+  dB labels it was the Mixer's widest line, and a phone's fit shrank all its text: now as big as before or bigger at 360,
+  384 and 412 px); `fitCheck` measures where lines end in the content, not on screen (scrolled to the OUT cursor it never
+  converged and ran 2 px over); a VOL bar drag keeps the cursor's row (it went to row 0, now TRIM); typed hex and double
+  EDIT tell MASTER / MASTERING / OUT apart; `onMstCell` is any master cell, so / Ctrl+/ Ctrl+D there no longer hit the last
+  track; Bus send is `fixed` (no modulation jack); Help and README say NORMALISE undoes OUT in renders. Two older faults the
+  review noticed: a removed track or master effect node let go of its taps, sends and beat clock (`fxDrop`), and Reset
+  audio re-attaches the bottom panel's strip meter (`dkSt = null`). `npm test` 97/97. Desktop **v1.2.26** from here.
 
 ## 27 Oct (5): usability Phase 2 ("one feel"), built to the owner's calls in "27 Oct (3)"
 

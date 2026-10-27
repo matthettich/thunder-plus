@@ -1540,7 +1540,7 @@ const MODULES = {
     params:{ track:[1,1,CHAN_COUNT,1], pre:[0,0,1,1] },
     // PRE SENDS (owner, 27 Oct): into a bus (a Chain Out on another track), the track is heard after its fader (the default)
     // or before it; mute and solo silence it either way. On an insert (its Chain Out on its own track) it changes nothing.
-    ui:{ track:{l:'Track', c:trackOpts()}, pre:{l:'Bus send', c:opts(['After its fader','Before its fader'])} } },
+    ui:{ track:{l:'Track', c:trackOpts()}, pre:{l:'Bus send', fixed:true, c:opts(['After its fader','Before its fader'])} } },   // fixed: routing, no jack
 
   resample:{ label:'Resample', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
     params:{ rec:[0,0,1,1], bars:[1,0,3,1], pad:[7,0,31,1], slices:[3,0,4,1] },
@@ -1650,7 +1650,7 @@ function deckDesc(m, key){
   return d;
 }
 const deckHas = (id, key) => (doc.deck || []).some(d => d.id === id && d.p === key);
-const deckKeys = m => Object.keys(MODULES[m.type].params).filter(k => !(MODULES[m.type].ui[k] || {}).hide && !(MODULES[m.type].ui[k] || {}).fixed && mixShown(m, k) && !(k === 'track' && (m.type === 'trackIn' || m.type === 'chainOut')) && !(k === 'pre' && m.type === 'trackIn'));   // (routing, not a control to play)
+const deckKeys = m => Object.keys(MODULES[m.type].params).filter(k => !(MODULES[m.type].ui[k] || {}).hide && !(MODULES[m.type].ui[k] || {}).fixed && mixShown(m, k) && !(k === 'track' && (m.type === 'trackIn' || m.type === 'chainOut')));
 function deckChange(fn){
   store.snapshot(); doc.deck = (doc.deck || []).slice(); fn(doc.deck); store.touch(); store.save();
   markDeck(); if (EMBED && TW && TW.deck) TW.deck();

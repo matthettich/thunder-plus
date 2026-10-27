@@ -137,7 +137,21 @@ test('sources: the per-track graph, PRE feeds, master OUT live and in renders, t
   assert.match(src, /m\.trim = clamp\(int\(o\.trim, TRIM_0\), 0, 255\);/, 'older songs: TRIM 0 dB'); assert.match(src, /S\.mout = clamp\(int\(j\.mout, 255\), 0, 255\);/, 'older songs: OUT 0 dB');
   assert.match(src, /b\.vol = a\.vol; b\.trim = a\.trim;/, 'Ctrl+D copies TRIM');
   // …chains: Track In's Bus send, in the editor and the engine (cache-buster moved with it)
-  assert.match(H.read('chains/index.html'), /params:\{ track:\[1,1,CHAN_COUNT,1\], pre:\[0,0,1,1\] \},[\s\S]{0,400}pre:\{l:'Bus send', c:opts\(\['After its fader','Before its fader'\]\)\}/);
+  assert.match(H.read('chains/index.html'), /params:\{ track:\[1,1,CHAN_COUNT,1\], pre:\[0,0,1,1\] \},[\s\S]{0,400}pre:\{l:'Bus send', fixed:true, c:opts\(\['After its fader','Before its fader'\]\)\}/);
   assert.match(H.read('chains/chains-worklet.js'), /params:\{ track:\[1,1,CHAN_COUNT,1\], pre:\[0,0,1,1\] \}/);
   for (const f of ['index.html', 'chains/index.html', 'sw.js']) assert.match(H.read(f), /chains-worklet\.js\?v=39/, f + ': chains-worklet v=39');
+});
+
+/* ───────── the review's fixes (27 Oct) ───────── */
+test('review fixes: a narrow master row, the fader drag keeps the row, master cells apart for hex and keys, removed FX let go', () => {
+  const src = H.read('index.html'), row = src.match(/const mxc = c\.y === 7 \? c\.mx \|\| 0 : -1[\s\S]*?\n    L\.push\(\[[\s\S]*?\]\);\n/);
+  assert.ok(row, 'the master row');
+  // no dB labels in the row itself (the phone's fit shrank every line for them): only in tips (title:) and the info line
+  assert.doesNotMatch(row[0].replace(/title:[^}]*/g, ''), /dB\(/, 'the master row shows hex only');
+  assert.match(src, /cs\.mixer\.x = t; if \(cs\.mixer\.y === 7\)\{ cs\.mixer\.y = 1; cs\.mixer\.mx = 0; \}/, 'a VOL bar drag no longer puts the cursor on TRIM');
+  assert.equal((src.match(/\+ \(tv === 'mixer' && c\.y === 7 \? ':m' \+ \(c\.mx \|\| 0\) : ''\)/g) || []).length, 2, 'typed hex and double EDIT tell MASTER, MASTERING and OUT apart');
+  assert.match(src, /const onMstCell = \(\) => tv === 'mixer' && cs\.mixer\.y === 7;/, '/ Ctrl+/ Ctrl+D on any master cell are the master\'s');
+  assert.match(src, /if \(oldFx\)\{ fxDrop\(oldFx\);/, 'a removed track effect lets go of its inputs'); assert.match(src, /if \(mfx && mfx !== n\) fxDrop\(mfx\);/, 'the master\'s too');
+  assert.match(src, /rt = null; dkSt = null;/, 'Reset audio re-attaches the bottom panel\'s meter');
+  assert.match(H.read('chains/index.html'), /pre:\{l:'Bus send', fixed:true,/, 'Bus send has no modulation jack');
 });
