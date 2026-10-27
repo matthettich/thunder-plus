@@ -1679,6 +1679,7 @@ if (EMBED) window.addEventListener('keydown', e => {
    Ctrl/⌘+Z is the song's undo too (ONE UNDO). */
 if (EMBED) window.addEventListener('keydown', e => {
   if (!TW || !TW.appKey || e.repeat || typing(e) || document.querySelector('.dlgov')) return;
+  if (e.key === ' ' && e.target && e.target.closest && e.target.closest('button, [role=button], [role=option], [tabindex]')) return;   // Space on a focused item works it (the module list adds the module)
   const mod = e.ctrlKey || e.metaKey, k = (e.key || '').toLowerCase();
   const app = (/^F[2-9]$/.test(e.key) && !mod && !e.altKey) || (mod && !e.altKey && (k === 's' || ((k === 'o' || k === 'n') && !e.shiftKey))) ||
     (e.key === ' ' && !mod && !e.altKey);

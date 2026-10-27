@@ -218,7 +218,7 @@ test('Phase 2 rest: one menu (press-drag-release, pads and layers), one confirm,
   assert.doesNotMatch(src, /'Tap again: ' \+ it\[0\]/, 'no "Tap again" in the File menu');
   assert.doesNotMatch(src, /return toast\('Tap EDIT again to '/, 'no "Tap EDIT twice"');
   assert.match(src, /const PIANO_CODE = \{KeyZ:0, KeyS:1,/, 'note keys by e.code');
-  assert.match(src, /const pn = pianoOf\(e\);   \/\/ NOTE KEYS BY POSITION/, 'Synth page too');
+  assert.match(src, /const pn = e\.code === 'Slash' \? 16 : pianoOf\(e\);   \/\/ NOTE KEYS BY POSITION/, 'Synth page too');
   assert.match(H.read('waves/index.html'), /const keyOf = e => K_CODE\[e\.code\]/, '…waves too');
   assert.match(src, /if \(undoHeld && !undo\.busy && !recTake\)\{ undoWant = true; return; \}/, 'one step per gesture');
   assert.match(src, /@media \(pointer:coarse\)\{\n  \.mfbar::before\{top:-19px; bottom:-19px\}/, '40 px touch targets');
@@ -237,4 +237,13 @@ test('owner\'s queue (27 Oct): CLN↓ inserts a row, Remove row, a bus back to a
   assert.match(src, /chainOn: \(\) => Array\.from\(\{length:NT\}/, 'the editor can ask which chains are heard');
   assert.match(ch, /function paintChainOff\(\)\{/, 'the editor draws CHN-off chains');
   assert.match(ch, /\.node\.chnoff\{outline:2px dashed/, 'dashed');
+});
+
+test('Phase 2 review fixes: slow right-click, editor hand-offs, double EDIT, empty cursor cell, a stuck pointer', () => {
+  const src = H.read('index.html');
+  assert.match(src, /if \(Math\.hypot\(ev\.clientX - x0, ev\.clientY - y0\) < 6\) return;   \/\/ let go without moving/, 'a menu item needs a slide');
+  assert.match(src, /function patchKey\(d\)\{/, 'view-only hand-offs are no step');
+  assert.match(src, /if \(performance\.now\(\) - t0 < 400\)\{ if \(opts\.dblOk\) done\(true\); return; \}/, 'a double EDIT goes through');
+  assert.match(src, /else if \(m\.was && !m\.filled && \(tv === 'song' \|\| tv === 'sect'\)\) editTap\(\);/, 'an empty cursor cell click adds');
+  assert.match(src, /addEventListener\('keydown', \(\) => \{ if \(undoHeld\) undoLetGo\(\); \}, true\);/, 'a key lets a stuck pointer go');
 });

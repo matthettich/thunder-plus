@@ -116,6 +116,12 @@ comment marked Phase 2 / 27 Oct at the code; `tests/usability.test.js` has a tes
   hit areas (faders' `::before`, deck grip and header buttons, rows, ranges, menu items, the Arrange resize handle).
   PINCH-ZOOM: viewport no longer blocks it, `html{touch-action:manipulation}`; pads `pan-x pan-y`, keypad / PAD buttons
   `none`, Arrange keeps its own pinch.
+- **Review fixes (263),** from a separate review of 257–261: a right-click held without moving no longer runs the item
+  under the pointer (a slide is needed); opening, panning or the editors' first hand-off are no undo steps (`patchKey`
+  leaves out view and save time; `WV.born` / `CH.born`, `undoQuiet`); a double EDIT on a confirm row still goes through
+  (`askSheet` `dblOk`, early backdrop taps ignored); a click on the cursor's empty cell adds again on the classic Song and
+  Sect; a lost pointerup can't leave undo held (a key or a buttonless move lets go; undoStep takes a waiting step
+  first); …waves Space on a focused item works the item; the Synth page's octave keys and top E go by position.
 - **Not done / left:** a full sweep giving every menu item its key hint and one item order; long-press menus on track
   numbers (their right-click solos, the owner's choice) and Mixer strips / FX slots on touch (mouse right-click there is
   the Edit menu already). Ctrl+N still opens a browser window in a browser tab.

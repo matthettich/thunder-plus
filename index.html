@@ -7610,7 +7610,10 @@ function askSheet(msg, opts){
     };
     askOpen = done;
     no.addEventListener('click', () => done(null)); ok.addEventListener('click', () => done(inp ? inp.value : true));
-    wrap.addEventListener('pointerdown', e => { if (e.target === wrap){ e.preventDefault(); done(null); } });
+    // A tap on the backdrop cancels, but not in the first 0.4 s (the second tap of a double tap that opened it); with
+    // opts.dblOk that second tap is the OK (a row's double EDIT goes straight through, as before the dialog).
+    const t0 = performance.now();
+    wrap.addEventListener('pointerdown', e => { if (e.target !== wrap) return; e.preventDefault(); if (performance.now() - t0 < 400){ if (opts.dblOk) done(true); return; } done(null); });
     document.addEventListener('keydown', key, true);
     document.body.append(wrap);
     // A list ("Save changes?": Save, Don't save) focuses its first choice, so Enter picks it; with nothing focused Enter
@@ -10800,10 +10803,11 @@ document.addEventListener('keydown', e => {
   // ◀ ▶ step through the pads; with the desktop layout's list (body.sdesk) ▲ ▼ do it too, and the picked one is kept in view.
   const step = { ArrowLeft:-1, ArrowRight:1, ...(document.body.classList.contains('sdesk') ? { ArrowUp:-1, ArrowDown:1 } : {}) }[e.key];
   if (step){ if (!e.target.matches('input[type=range]')){ select((cur + step + nslots()) % nslots()); const pe = padEls[cur]; if (pe && document.body.classList.contains('sdesk')) pe.p.scrollIntoView({block:'nearest'}); e.preventDefault(); } return; }
-  if (e.key === '-' || e.key === '=' || e.code === 'NumpadDivide' || e.code === 'NumpadMultiply'){
-    setOct(kOct + (e.key === '=' || e.code === 'NumpadMultiply' ? 1 : -1)); e.preventDefault(); return; }
+  // (by position too: on a German keyboard the - key sits where the US / is, the top E)
+  const octK = e.code ? (e.code === 'Minus' ? -1 : e.code === 'Equal' || e.code === 'NumpadMultiply' ? 1 : e.code === 'NumpadDivide' ? -1 : 0) : (e.key === '-' ? -1 : e.key === '=' ? 1 : 0);
+  if (octK){ setOct(kOct + octK); e.preventDefault(); return; }
   const lo = e.key.length === 1 ? e.key.toLowerCase() : '';
-  const pn = pianoOf(e);   // NOTE KEYS BY POSITION
+  const pn = e.code === 'Slash' ? 16 : pianoOf(e);   // NOTE KEYS BY POSITION (the Synth page keeps / as the top E)
   if (pn !== undefined && !e.shiftKey){
     const st = kOct * 12 + pn - ROOT;
     if (isSyn(cur)){ releaseNote(keyHeld.get(e.code)); keyHeld.set(e.code, holdNote(cur, st)); } else playNote(cur, st);
@@ -12711,6 +12715,8 @@ let plFailed = false;
   prerender();   // the rest of the kit in idle moments, so the first PLAY doesn't render them all at once
 })();
 
+// A patch as undo sees it: without its view (pan, zoom) and its save time, which every hand-off from an editor carries.
+function patchKey(d){ if (!d) return 'null'; try { const c = Object.assign({}, d, {view:null}); if (c.meta) c.meta = Object.assign({}, c.meta, {modified:0}); return JSON.stringify(c); } catch(e){ return String(Math.random()); } }
 /* APP KEYS (owner, 27 Oct, Phase 2): the keys the …waves and …chains screens pass up, as they work on every other screen:
    Space and Shift+Space the song, F2–F4 the tracker's screens, F5–F8 the transport, F9 REC, Ctrl/⌘+S / Shift+S / O / N the
    project (they acted on the patch). True when the key was used. */
@@ -12741,15 +12747,17 @@ window.thunderWaves = {
   appKey: e => editorKey(e),   // APP KEYS from inside the editor (transport, files, help)
   load: () => kit.waves ? JSON.parse(JSON.stringify(kit.waves)) : null,
   // (a hand-off of the same patch isn't an edit) ONE UNDO: an edit is a step in the song's history ('W': the patch before)
-  save: d => { const was = JSON.stringify(kit.waves || null), edit = was !== JSON.stringify(d || null);
-    if (edit && !undo.busy){ undo.past.push({k:'W', j:was}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; }
+  save: d => { const was = JSON.stringify(kit.waves || null), edit = patchKey(kit.waves) !== patchKey(d);
+    // (a hand-off that only moved the view, or the first one, the editor's starter patch, is no step: review, 27 Oct)
+    // (nor the hand-off as it opens)
+    if (edit && kit.waves && !undo.busy && !(WV.born && performance.now() - WV.born < 3000)){ undo.past.push({k:'W', j:was}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; }
     kit.waves = d; wavesChanged(edit); },
   undo: dir => undoStep(dir), canUndo: () => undo.past.length > 0, canRedo: () => undo.future.length > 0,
   close: () => closeWaves()
 };
 const wvApi = () => { try { return WV.frame && WV.frame.contentWindow && WV.frame.contentWindow.wavesEmbed; } catch(e){ return null; } };
 function showWaves(){
-  if (!WV.frame){ WV.frame = document.createElement('iframe'); WV.frame.title = '…waves'; WV.frame.allow = 'midi; autoplay'; WV.frame.src = 'waves/index.html'; WV.frame.addEventListener('load', () => skinFrame(WV.frame)); $('wvView').append(WV.frame); }
+  if (!WV.frame){ WV.born = performance.now(); WV.frame = document.createElement('iframe'); WV.frame.title = '…waves'; WV.frame.allow = 'midi; autoplay'; WV.frame.src = 'waves/index.html'; WV.frame.addEventListener('load', () => skinFrame(WV.frame)); $('wvView').append(WV.frame); }
   else { const a = wvApi(); if (a) a.resume(); }
   setTimeout(() => { try { WV.frame.contentWindow.focus(); } catch(e){} }, 0);   // keys go to …waves, not the pads
 }
@@ -12800,6 +12808,8 @@ window.thunderChains = {
   load: () => S.chainPatch ? JSON.parse(JSON.stringify(S.chainPatch)) : null,
   save: d => {
     if (CH.dropping) return;
+    // ONE UNDO: a hand-off that only moved the view (or saved its time), or the first (the starter patch), is no step
+    if (!S.chainPatch || patchKey(S.chainPatch) === patchKey(d) || (CH.born && performance.now() - CH.born < 3000)) undoQuiet = true;
     const had = !!S.chainPatch, before = chainsAutoTracks(); S.chainPatch = d;
     if (had) chainsAutoOn(before);   // not on the very first save, which is the editor's starter patch
     chainsChanged();
@@ -12854,7 +12864,7 @@ let chMeterWanted = false;
 function chainsTelemetry(full){ try { if (rt) for (const b of rt.pl.buses) if (b && b.chn && b.chn._send) b.chn._send({target:'chains-host', op:'telemetry', value:full ? true : 'load'}); } catch(e){} }
 function showChains(){
   chMeterWanted = true; chainsTelemetry(true);
-  if (!CH.frame){ CH.frame = document.createElement('iframe'); CH.frame.title = '…chains'; CH.frame.allow = 'midi; autoplay'; CH.frame.src = 'chains/index.html'; CH.frame.addEventListener('load', () => skinFrame(CH.frame)); $('chView').append(CH.frame); }
+  if (!CH.frame){ CH.born = performance.now(); CH.frame = document.createElement('iframe'); CH.frame.title = '…chains'; CH.frame.allow = 'midi; autoplay'; CH.frame.src = 'chains/index.html'; CH.frame.addEventListener('load', () => skinFrame(CH.frame)); $('chView').append(CH.frame); }
   else { const a = chApi(); if (a) a.resume(); }
   setTimeout(() => { try { CH.frame.contentWindow.focus(); } catch(e){} }, 0);   // keys go to …chains, not the pads
 }
@@ -14428,8 +14438,12 @@ var recTake = false;   // REC: a live take is under way; its notes become one un
 function undoReset(){ undo.past.length = 0; undo.future.length = 0; undo.cur = JSON.stringify(S); try { kitUndoBase(); } catch(e){} }
 /* ONE UNDO STEP PER GESTURE (27 Oct, Phase 2): while a pointer is down (a fader, a value or a selection being dragged), the
    changes it makes wait, and become one step when it lets go. A drag of the Mixer's faders made a step per mouse move. */
-let undoHeld = false, undoWant = false;
-addEventListener('pointerdown', () => { undoHeld = true; }, true);
+let undoHeld = false, undoWant = false, undoQuiet = false;   // undoQuiet: the next snap only takes the state as it is (no step)
+addEventListener('pointerdown', e => { undoHeld = !!(e.buttons || e.pointerType !== 'mouse'); }, true);
+// A pointerup swallowed elsewhere (a native menu, a popup) can't leave it held: a key, or a mouse move with no button down,
+// lets go too, and undo itself takes any waiting step first.
+addEventListener('keydown', () => { if (undoHeld) undoLetGo(); }, true);
+addEventListener('pointermove', e => { if (undoHeld && e.pointerType === 'mouse' && !e.buttons) undoLetGo(); }, true);
 const undoLetGo = () => { if (!undoHeld) return; setTimeout(() => { undoHeld = false; if (undoWant){ undoWant = false; snap(); } }, 0); };
 addEventListener('pointerup', undoLetGo, true); addEventListener('pointercancel', undoLetGo, true); addEventListener('blur', undoLetGo);
 function snap(){
@@ -14439,7 +14453,8 @@ function snap(){
   queueMicrotask(() => {
     undo.pend = false;
     const j = JSON.stringify(S);
-    if (undo.cur !== null && j !== undo.cur){ undo.past.push({k:'S', j:undo.cur}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; }
+    if (undoQuiet) undoQuiet = false;
+    else if (undo.cur !== null && j !== undo.cur){ undo.past.push({k:'S', j:undo.cur}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; }
     undo.cur = j;
   });
 }
@@ -14468,6 +14483,8 @@ function kitSnap(i){
 }
 function kitFlush(){ vUndo.t.forEach((h, i) => { if (h){ clearTimeout(h); vUndo.t[i] = 0; kitSettle(i); } }); }
 function undoStep(dir){
+  if (undoHeld || undoWant){ undoHeld = false; undoWant = false; }   // ONE GESTURE: a waiting step first (below)
+  if (!undo.busy && !recTake){ const j = JSON.stringify(S); if (undoQuiet) undoQuiet = false; else if (undo.cur !== null && j !== undo.cur){ undo.past.push({k:'S', j:undo.cur}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; } undo.cur = j; }
   try { recEndTake(); } catch(e){}   // REC: the take so far is a step of its own (recording goes on as a new take)
   kitFlush();
   const from = dir < 0 ? undo.past : undo.future, to = dir < 0 ? undo.future : undo.past;
@@ -17046,7 +17063,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 262;
+const BUILD = 263;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -17732,7 +17749,7 @@ function editTap(enter){
   const r = rowsOf(tv)[c.y]; if (!r) return;
   // ONE CONFIRM (27 Oct, Phase 2): a row that replaces something asks in the app's one dialog (it took a second EDIT, the
   // "Tap EDIT twice" note). A double EDIT still goes straight through (editDouble), as before.
-  if (r.act){ if (r.dbl){ const nm = r.l.replace('› ', ''); askYes({title:nm.charAt(0) + nm.slice(1).toLowerCase() + '?', body:String((r.info && r.info()) || '').replace(/\.?\s*Tap EDIT twice[^.]*\.?/, '.').replace(/ · Ctrl\/⌘\+N/, '')}, nm.charAt(0) + nm.slice(1).toLowerCase()).then(ok => { if (ok) r.act(); }); return; } return r.act(); }
+  if (r.act){ if (r.dbl){ const nm = r.l.replace('› ', ''); askSheet({title:nm.charAt(0) + nm.slice(1).toLowerCase() + '?', body:String((r.info && r.info()) || '').replace(/\.?\s*Tap EDIT twice[^.]*\.?/, '.').replace(/ · Ctrl\/⌘\+N/, '')}, {ok:nm.charAt(0) + nm.slice(1).toLowerCase(), dblOk:true}).then(v => { if (v === true) r.act(); }); return; } return r.act(); }
   if (r.tog){ r.set(r.get() ? 0 : 1); if (r.after) r.after(); saveS(); draw(); return; }
   if (r.tap) r.tap();
 }
@@ -21163,7 +21180,7 @@ function sxMenu(x, y, title, items){
   // go over an item picks it; letting go where it opened keeps the menu up for a click.
   if (ptrHeld){ const t0 = performance.now(), x0 = x, y0 = y;
     const up = ev => { removeEventListener('pointerup', up, true); if (sxMenuEl !== m) return;
-      if (performance.now() - t0 < 200 && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+      if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;   // let go without moving: the menu stays up (a slow right-click ran the item under the pointer)
       const b = document.elementFromPoint(ev.clientX, ev.clientY), it = b && b.closest && b.closest('.sxmenu button');
       if (it && m.contains(it) && !it.disabled){ ev.preventDefault(); ev.stopPropagation(); it.click(); } };
     addEventListener('pointerup', up, true); }
@@ -21755,6 +21772,7 @@ function mselEnd(e){
   if (m.mode === 'pend'){   // a click: the cursor is there already; on Phrase an effect cell still opens the picker
     if (m.was && tv === 'phrase' && PK[cs.phrase.x] === 'fxc') editTap();
     else if (m.filled && tv === 'song') nav('right');   // as the cursor-cell click did: open the block
+    else if (m.was && !m.filled && (tv === 'song' || tv === 'sect')) editTap();   // the cursor's empty cell: a click adds, as before
     else if (m.filled && tv === 'sect'){ const r = cs.sect.x === 0 && sectRow(cSect, cs.sect.y); if (r && r[0] >= 0) nav('right'); else editTap(); }
     return;
   }
