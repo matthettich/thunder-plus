@@ -77,6 +77,36 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 26 Oct (2): …pump synths: MONO, POLY and COIL as synth engines
+
+Build 252 (`index.html`, `sw.js` → `thunderplus-v252`). Owner: diversify the synth section by porting the …pump
+instruments, TABLE skipped. WOB, SING, KIT and MACHINE were left out on purpose: WOB is a C++ port of Bass, SING of
+Voice, MACHINE is the LXR firmware already in `lxr/`, KIT overlaps the drum engines.
+- **What:** engine group *…pump* with **Mono** (`pmono`), **Poly** (`ppoly`), **Coil** (`pcoil`). The sound is the plugins'
+  own DSP: `pump/synth/pump-synth.wasm` (242 kB), built in the pump repo by `wasm/build.sh` from `wasm/pump_synth.cpp`
+  (each plugin's `sync()` and `run()` without DPF; MIDI in, audio out). `pump-synth-meta.js` (generated there too) has
+  the parameters and every factory preset. `pump/synth/pump-synth-engine.js` is the glue (hand-written, here).
+- **Rendered, like LXR:** a fresh instance per render, note on (MIDI 60 + Tune's semitones; Tune's fraction as a slightly
+  different render rate), note off after the hold (a held slot: its length), then until it has died away (max 12 s);
+  stereo folded to mono, MONO's oversampler latency (32 samples) taken off. The page compiles the wasm and hands the
+  Module to the render Worker (`PSYN_JS`, `psMod`, `PW.ps`), as `lxr/` does.
+- **Pad values** are the plugin's own symbols and values (so a pad = the plugin with the same values), plus `vel` (Hit:
+  the velocity the note renders with). Mod wheel, bend, glide, priority and legato are kept in the pad but not shown
+  (nothing for one rendered note). Held notes fade over the engine's release: `XENG[k].rel` (new, read by `relOf`):
+  MONO and POLY `a_r`, COIL `release`.
+- **Level:** no normalising, the plugin's Volume is the level, except POLY renders x2.5 (+8 dB): its level is set for
+  8-voice chords and one note sat 8-10 dB under the others. Factory presets peak about -4 to -20 dBFS before the pad's
+  -6 dB start.
+- **Card:** the plugins' panels as sections; `noRnd` rows (Volume, Hit) are skipped by Random (new flag in `xRandom`).
+- **Tests:** `tests/pump-synth.test.js`: every factory preset renders finite and under full scale, hold / release / Tune,
+  same render twice, golden hashes (`tests/golden/pump-synth.json`). 71 pass.
+- **Rebuilding:** in pump, `WASI_SDK=… sh wasm/build.sh OUT`, copy `OUT/pump-synth.wasm` and `OUT/pump-synth-meta.js` here,
+  bump their `?v=` (index.html script tag, `PSYN_JS`, the `PsynCore.load` URL, sw.js), then `UPDATE_GOLDEN=1 npm test` if the
+  sound changed on purpose. `pump/pump.wasm` (the FX) was not rebuilt.
+- **Known:** MONO's factory preset *Self-oscillating filter* is silent: nothing excites the filter on a fresh instance (a
+  pump issue; the plugin does the same). **Next steps if wanted:** play them live (one instance per track and pad in a
+  worklet, chords through the plugin's own voices; the wasm interface already takes MIDI at any frame), and the rest of
+  the pump instruments (PHASE and LIFE are new there since).
 ## 26 Oct: SING sibilants (build 251)
 
 S, SH, Z, ZH (and CH, JH through them) were as loud as the vowels and gated on and off in 4 ms, so they came out as

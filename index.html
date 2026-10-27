@@ -2397,6 +2397,11 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
+<!-- …PUMP SYNTHS (26 Oct 2026): pump MONO, POLY and COIL as rendered synth engines (pump/synth/: the plugins' own DSP in
+     pump-synth.wasm, their parameters and presets in pump-synth-meta.js, both built by pump/wasm/build.sh). Without the folder
+     there are no …pump engines. The render Worker loads the same two files (PSYN_JS below). -->
+<script src="pump/synth/pump-synth-meta.js?v=1"></script>
+<script src="pump/synth/pump-synth-engine.js?v=1"></script>
 <!-- …PUMP (23 Oct 2026): the pump mastering plugins' parameter tables and presets (generated in matthettich/pump by
      wasm/build.sh); pump/pump.wasm is their DSP, fetched by the wasm loader. -->
 <script src="pump/pump-meta.js?v=1"></script>
@@ -3504,6 +3509,7 @@ const isSyn = i => slotHeld && typeof slotHeld[i] === 'boolean' ? slotHeld[i] : 
 // Blip, SoundFont, which fades by the font) work as before: their hidden layers' release, at least 30 ms.
 function relOf(V){
   if (!V) return 0.03;
+  if (isXEngV(V) && XENG[V.engine].rel) return Math.max(1, XENG[V.engine].rel(xParams(V))) / 1000;   // an engine that says (…pump: its amp release)
   const own = isBassV(V) ? V.bass : isVoxV(V) ? V.vox : isXEngV(V) && V.engine !== 'sf' ? xParams(V) : null;
   if (own && typeof own.rel === 'number') return V.engine === 'chip' ? Math.max(1, own.rel * 1000 / 60) / 1000 : Math.max(1, own.rel) / 1000;
   let r = 0; for (const L of V.layers || []) if (L.on && L.level > 0 && L.mode === 'ADSR') r = Math.max(r, L.rel);
@@ -6721,9 +6727,12 @@ const XENG = {
   sf:{live:false, d:() => ({bank:0, prog:0, trans:0, velo:0.7, atk:1, rel:1})},
   // LXR ENGINES: lxdrum, lxsnare, lxcym, lxhat, when lxr/ is there (an entry with r renders itself)
   ...(typeof LxrCore !== 'undefined' ? LxrCore.xeng() : {}),
+  // …PUMP SYNTHS: pmono, ppoly, pcoil, when pump/synth/ is there (rendered by the plugins' own DSP)
+  ...(typeof PsynCore !== 'undefined' ? PsynCore.xeng() : {}),
 };
 const isXEngV = v => !!(v && XENG[v.engine]);
 const isLxV = v => !!(v && typeof LxrCore !== 'undefined' && LxrCore.isKind(v.engine));
+const isPsV = v => !!(v && typeof PsynCore !== 'undefined' && PsynCore.isKind(v.engine));   // …PUMP SYNTHS
 function normX(kind, o){ const d = XENG[kind].d(), r = {}; for (const k in d) r[k] = o && typeof o[k] === 'number' && isFinite(o[k]) ? o[k] : d[k]; delete r.tune; delete r.drive; delete r.level; return r; }
 function xParams(V){ return Object.assign(normX(V.engine, V[V.engine]), {tune:V.tune || 0, drive:V.drive || 0, level:V.level || 0}); }
 function renderX(V, sr, hold){
@@ -7114,17 +7123,19 @@ function audio(){
    If the Worker can't start (or a voice needs …waves and the Worker couldn't load it), everything renders here
    as before. */
 const pend = [], padRev = [];
-const PW = {w:null, ready:false, wv:false, lx:false, id:0, jobs:new Map()};
+const PW = {w:null, ready:false, wv:false, lx:false, ps:false, id:0, jobs:new Map()};
 // LXR ENGINES: the Worker loads lxr/lxr-engine.js before the engine code (so XENG has the Firmware engines there too)
 // and gets the page's compiled lxr.wasm (lxMod) in its init message.
 const LXR_JS = 'lxr/lxr-engine.js?v=2';
-function rwStart(plMod, txMod, lxMod){
+// …PUMP SYNTHS: likewise the instruments' tables and glue, and the page's compiled pump-synth.wasm (psMod)
+const PSYN_JS = ['pump/synth/pump-synth-meta.js?v=1', 'pump/synth/pump-synth-engine.js?v=1'];
+function rwStart(plMod, txMod, lxMod, psMod){
   try {
     const sc = [...document.scripts].find(x => x.textContent.includes('===ENGINE ' + 'START==='));
     const t = sc.textContent, A = t.indexOf('/* ===ENGINE ' + 'START=== */'), B = t.indexOf('/* ===ENGINE ' + 'END=== */');
     if (A < 0 || B < A) return;
     const glue = `
-var S = {bpm:120}, WVOK = false, LXOK = false;
+var S = {bpm:120}, WVOK = false, LXOK = false, PSOK = false;
 self.onmessage = async e => {
   const m = e.data;
   if (m.op === 'init'){
@@ -7134,7 +7145,8 @@ self.onmessage = async e => {
     try { if (m.tx){ TX = await WebAssembly.instantiate(m.tx, imp); if (TX.exports._initialize) TX.exports._initialize(); } } catch(err){ TX = null; why('render worker effects wasm', err); }
     try { if (m.wv && m.pl && m.tx){ importScripts(m.wv); if (self.WavesDSP){ WavesDSP.wasmInit({dspModule:m.pl, tfxModule:m.tx}); WV.ready = true; WVOK = true; } } } catch(err){ why('render worker waves engine', err); }
     try { if (m.lx && self.LxrCore){ LxrCore.attachModule(m.lx); LXOK = true; } } catch(err){ why('render worker LXR engine', err); }
-    postMessage({op:'ready', wv:WVOK, pl:!!PL, tx:!!TX, lx:LXOK, errs}); return;
+    try { if (m.ps && self.PsynCore){ PsynCore.attachModule(m.ps); PSOK = true; } } catch(err){ why('render worker pump synths', err); }
+    postMessage({op:'ready', wv:WVOK, pl:!!PL, tx:!!TX, lx:LXOK, ps:PSOK, errs}); return;
   }
   if (m.op === 'irs'){ self.__thunderIR = m.v; return; }   // the song's impulse responses (Convolution reverb)
   if (m.op === 'render'){
@@ -7146,17 +7158,18 @@ self.onmessage = async e => {
     } catch(err){ postMessage({op:'fail', id:m.id, err:String(err && err.message || err)}); }
   }
 };`;
-    const pre = typeof LxrCore !== 'undefined' ? `try { importScripts(${JSON.stringify(new URL(LXR_JS, location.href).href)}); } catch(e){}\n` : '';
+    const pre = (typeof LxrCore !== 'undefined' ? `try { importScripts(${JSON.stringify(new URL(LXR_JS, location.href).href)}); } catch(e){}\n` : '')
+      + (typeof PsynCore !== 'undefined' ? `try { importScripts(${PSYN_JS.map(f => JSON.stringify(new URL(f, location.href).href)).join(', ')}); } catch(e){}\n` : '');
     const url = URL.createObjectURL(new Blob([pre, t.slice(A, B), glue], {type:'text/javascript'}));
     const w = new Worker(url); URL.revokeObjectURL(url);
     w.onmessage = e => {
       const m = e.data;
-      if (m.op === 'ready'){ if (m.errs) for (const x of m.errs) tpLog('render worker', x); PW.ready = !!(m.pl || !plMod) && !!(m.tx || !txMod); PW.wv = !!m.wv; PW.lx = !!m.lx; try { if ((S.irs || []).some(Boolean)) w.postMessage({op:'irs', v:irsLive()}); } catch(e){} if (PW.ready) prerender(); return; }
+      if (m.op === 'ready'){ if (m.errs) for (const x of m.errs) tpLog('render worker', x); PW.ready = !!(m.pl || !plMod) && !!(m.tx || !txMod); PW.wv = !!m.wv; PW.lx = !!m.lx; PW.ps = !!m.ps; try { if ((S.irs || []).some(Boolean)) w.postMessage({op:'irs', v:irsLive()}); } catch(e){} if (PW.ready) prerender(); return; }
       const j = PW.jobs.get(m.id); if (!j) return; PW.jobs.delete(m.id);
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, wv:new URL('waves/waves-worklet.js?v=31', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=31', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -7164,7 +7177,7 @@ self.onmessage = async e => {
 function rwDown(){ PW.ready = false; try { PW.w && PW.w.terminate(); } catch(e){} PW.w = null; for (const j of PW.jobs.values()) j.no(new Error('worker')); PW.jobs.clear(); }
 // Can the Worker render this voice? (It has no …waves engine if loading that failed.)
 // The Worker needs the …waves engine for …waves layers and for the module effects (MODFX); without it, those pads render here.
-const rwCan = v => PW.ready && PW.w && v.engine !== 'sf' && !(isLxV(v) && !PW.lx) && !(PW.wv === false && ((WV.doc && v.layers.some(l => l.on && l.type === 'waves')) || (v.fx || []).some(f => f && f.on && FX[f.type] && FX[f.type].mod)));
+const rwCan = v => PW.ready && PW.w && v.engine !== 'sf' && !(isLxV(v) && !PW.lx) && !(isPsV(v) && !PW.ps) && !(PW.wv === false && ((WV.doc && v.layers.some(l => l.on && l.type === 'waves')) || (v.fx || []).some(f => f && f.on && FX[f.type] && FX[f.type].mod)));
 // Renders a voice in the Worker: resolves to {data, st:[[fx index, peaks]…]}. Rejects when the Worker can't.
 function renderAsync(v, sr, hold, stages){
   if (!rwCan(v)) return Promise.reject(new Error('no worker'));
@@ -7787,6 +7800,8 @@ const ENGINE_GROUPS = [
     ['partials', 'Partials', 'additive · 256 harmonics · morph'], ['chip', 'Chip', '8-bit · duty · arp · LFSR'],
     ['vector', 'Vector', 'four waves on a joystick · wave sequence'], ['scanned', 'Scanned', 'a ring of masses, scanned as a wave'],
     ['resynth', 'Resynth', 'a sample rebuilt from its partials'], ['bytebeat', 'Bytebeat', 'one-line formulas of t · 8-bit · a b c knobs']]],
+  // …PUMP SYNTHS: the …pump plugins' instruments, when pump/synth/ is there
+  ...(typeof PsynCore !== 'undefined' ? [['…pump', Object.keys(PsynCore.engines).map(k => [k, PsynCore.engines[k].name, PsynCore.engines[k].tag])]] : []),
   ['Strings & wind', [['strings', 'Strings', 'plucked ensemble · strum · body'], ['wind', 'Wind', 'reed · jet · bow, physical models']]],
   ['Voice & bass', [['bass', 'Bass', 'additive bass, live in the tracker'], ['vox', 'Voice', 'a singing voice, a syllable per note']]],
   ['Fonts', [['sf', 'SoundFont', 'a preset of a .sf2 / .sf3 file, General MIDI built in']]],
@@ -9053,6 +9068,7 @@ function factoryVoicePresets(){
   ]],
   ...[['acid', 'Acid'], ['mach', 'Machine synth'], ['tone', 'Tone drums'], ['modal', 'Modal'], ['swarm', 'Swarm'], ['piano', 'Piano'], ['ep', 'Electric piano'], ['organ', 'Organ'], ['table', 'Table'], ['breath', 'Breath'], ['strings', 'Strings'], ['fmdrum', 'FM Drum'], ['wind', 'Wind'], ['phase', 'Phase'], ['partials', 'Partials'], ['skin', 'Skin'], ['chip', 'Chip'], ['vector', 'Vector'], ['scanned', 'Scanned'], ['resynth', 'Resynth'], ['bytebeat', 'Bytebeat']].map(engGroup),
   ...(typeof LxrCore !== 'undefined' ? [lxrPresetGroup()] : []),   // LXR ENGINES
+  ...(typeof PsynCore !== 'undefined' ? Object.keys(PsynCore.engines).map(k => [k, PsynCore.engines[k].title]).map(engGroup) : []),   // …PUMP SYNTHS
   ['Leads', [
     ['Square lead', () => PS('Square lead', [
       {type:'square', atk:3, dec:300, sus:0.75, rel:180, lpCut:3200, lpRes:0.25, level:0.6},
@@ -10166,6 +10182,8 @@ const XUI = {
       ['Lost broadcast', {aSaw:0.5, bPulse:0.6, detune:11, noise:0.1, hp:600, hpRes:0.2, cut:2000, atk:600, rel:2000, wow:0.6, wowRate:0.8, flutter:0.6, chorus:0.3, sat:0.5, age:0.9, hiss:0.6}]]},
   // LXR ENGINES: each voice's knob pages, from the firmware's menus (lxr/lxr-engine.js)
   ...(typeof LxrCore !== 'undefined' ? LxrCore.xui() : {}),
+  // …PUMP SYNTHS: each instrument's panels and its plugin's factory presets (pump/synth/pump-synth-engine.js)
+  ...(typeof PsynCore !== 'undefined' ? PsynCore.xui() : {}),
 };
 const xRows = []; let xKind = '';
 const XEV = () => { const v = V(), k = v.engine; if (!v[k]) v[k] = normX(k, null); return v[k]; };
@@ -10181,7 +10199,7 @@ function xRandom(){
   const k = V().engine, U = XUI[k], o = XV(), r = Math.random;
   if (k === 'sf'){ const f = SF.fonts.get(V().sfFont || GM_FONT.id); if (!f || !f.presets.length) return; const pr = f.presets[Math.floor(r() * f.presets.length)];
     o.bank = pr.bank; o.prog = pr.prog; V().name = pr.name.slice(0, 24); changed(cur); refreshAll(); sfPreparePad(cur).then(() => sfPanel(true)); return; }
-  for (const key in U.rows){ const d = U.rows[key]; if (key === 'oct') continue;
+  for (const key in U.rows){ const d = U.rows[key]; if (key === 'oct' || d.noRnd) continue;
     let x = d.c === 'log' ? d.min * Math.pow(d.max / d.min, r()) : d.min + (d.max - d.min) * r(); if (d.c === 'int') x = Math.round(x); o[key] = x; }
   changed(cur); refreshAll();
 }
@@ -12486,6 +12504,8 @@ let plFailed = false;
   let plMod = null, txMod = null;
   // LXR ENGINES: lxr/lxr.wasm, compiled here (and handed to the render Worker) when the engine file loaded
   const lxP = typeof LxrCore !== 'undefined' ? LxrCore.load('lxr/lxr.wasm?v=1').catch(e => { console.warn('LXR engines', e); return null; }) : Promise.resolve(null);
+  // …PUMP SYNTHS: pump/synth/pump-synth.wasm, compiled here and handed to the render Worker (as LXR's is)
+  const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=1').catch(e => { tpLog('pump synths wasm (the …pump engines will be silent)', e); return null; }) : Promise.resolve(null);
   // …PUMP: the pump mastering effects (pump/pump.wasm), fetched alongside; effect nodes that asked for it get it now
   bytes(PUMP_WASM).then(b => { pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage({pumpBytes:b}); } catch(e){} pumpWait.clear();
     return WebAssembly.instantiate(b, imp).then(r => { pumpMain = r.instance.exports; if (pumpMain._initialize) pumpMain._initialize(); }); }).catch(e => { if (PM) console.warn('pump effects', e); });
@@ -12505,9 +12525,9 @@ let plFailed = false;
     if (globalThis.WavesDSP && plMod && txMod){ WavesDSP.wasmInit({dspModule:plMod, tfxModule:txMod}); WV.ready = true; }
     try { if (globalThis.WavesDSP && WavesDSP.modsPrepare) WavesDSP.modsPrepare(); } catch(e){ tpLog('generators wasm prepare', e); }   // the Random/Function generators' wasm: compiled in the background here (the page's thread won't compile it on the spot)
   } catch(e){ console.warn('…waves WebAssembly', e); }
-  const lxMod = await lxP;
-  if (typeof Worker !== 'undefined') rwStart(plMod, txMod, lxMod);
-  for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; if (v && v.layers.some(l => l.on && (l.type === 'plaits' || l.type === 'elements' || l.type === 'waves')) || (v.fx || []).some(f => f.on) || isLxV(v)) dirty[i] = true; }
+  const lxMod = await lxP, psMod = await psP;
+  if (typeof Worker !== 'undefined') rwStart(plMod, txMod, lxMod, psMod);
+  for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; if (v && v.layers.some(l => l.on && (l.type === 'plaits' || l.type === 'elements' || l.type === 'waves')) || (v.fx || []).some(f => f.on) || isLxV(v) || isPsV(v)) dirty[i] = true; }
   refreshLayer(); renderFx();
   showCur(); renderStrip();
   prerender();   // the rest of the kit in idle moments, so the first PLAY doesn't render them all at once
@@ -16675,7 +16695,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 251;
+const BUILD = 252;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
