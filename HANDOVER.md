@@ -3240,3 +3240,25 @@ Deliberately left for later:
   DARK key still picks pump's own palettes on this device; Ctrl/⌘-click DARK goes back to the skin. `applySkin()` calls
   `PumpFX.skinChanged()` so open windows repaint. Also: Ctrl/⌘+\ solos (same as Ctrl/⌘+/); a plain arrow key drops a
   selection.
+
+## Battery: idle audio engine and display loops (27 Oct)
+
+Owner's phone (the Fold) was running out of battery quickly. Measured headless (whole browser, idle, tracker screen at
+373×830; numbers vary run to run): before the first sound 6–7.5% CPU and 120 rAF callbacks a second; after one pad tap the
+AudioContext kept running for good, 12–21% CPU and 180 rAF/s, in the background and with the screen off too. Changes, all
+marked `BATTERY (27 Oct)`:
+- **Hidden + idle suspends the engine** (`bgArm()` / `bgIdle()`, after `audioInterrupted()`): hidden, song stopped, not
+  rendering, nothing held and nothing heard for 20 s → `ctx.suspend()`. Visible again resumes at once; any sound resumes
+  it through `audio()` (which now calls `bgArm(); hmWake();`). Not while following MIDI clock (`midi.clkIn`) or with a
+  MIDI input connected, so the MPC can start a song or play notes with the screen off without a late first beat.
+  On screen it is never suspended, so a pad tap stays instant. Measured with it: ~3% CPU.
+- **Header meter** (`hmFrame` → `hmDraw`): silent, it looks 6 times a second on a timer instead of every display frame;
+  `hmWake()` brings it back at once. It now reads levels even when the meter isn't shown (phone width), because
+  `frameIdle()` uses them.
+- **Tracker loop** (`frameIdle()`): no longer kept at full rate just because the deck is open (on a phone it always is);
+  stays at full rate while the master has level (`HM.lv`), so keys and MIDI notes still animate the deck.
+- **Synth meter** (`synMeterFrame`): bug, it never stopped after the first sound (in silence `a >= smPk`, 0 >= 0,
+  restamped the peak time every frame). Now ends when level and peak are gone; `smOnT` gives a new note 1.5 s.
+- Result: idle 6 rAF/s instead of 120–180; before the first sound ~4% CPU instead of 6–7.5%. Tests: `tests/*.test.js`
+  all pass. Not yet tried on the Fold: check a pad tap after coming back to the app sounds at once, and that the
+  battery use in Android's settings drops.

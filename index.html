@@ -7094,6 +7094,7 @@ function audio(){
     prerender();   // ensure() re-renders only the pads whose rate differs from this context's
   }
   if (ctx.state === 'suspended') ctx.resume();
+  bgArm(); hmWake();   // BATTERY: a sound restarts the hidden-idle countdown and wakes the header meter at once
   return ctx;
 }
 /* ---------- pad rendering: a background Worker, with the UI thread as the fallback ----------
@@ -7269,16 +7270,19 @@ function padLevel(){
   const b = padBus.buf; padBus.an.getFloatTimeDomainData(b); let p = 0; for (let i = 0; i < b.length; i++){ const a = b[i] < 0 ? -b[i] : b[i]; if (a > p) p = a; } return p;
 }
 // The Synth page's output meter: runs while something sounds (and a moment after), then stops.
-let smRaf = 0, smLv = 0, smPk = 0, smPkT = 0;
+let smRaf = 0, smLv = 0, smPk = 0, smPkT = 0, smOnT = 0;
 const smPos = a => a <= 0 ? 0 : Math.max(0, Math.min(1, (20 * Math.log10(a) + 48) / 54));
-function synMeterOn(){ if (!smRaf) smRaf = requestAnimationFrame(synMeterFrame); sndWake(); }
+function synMeterOn(){ smOnT = performance.now(); if (!smRaf) smRaf = requestAnimationFrame(synMeterFrame); sndWake(); }
 function synMeterFrame(){
   smRaf = 0; const m = $('vMeter'); if (!m) return;
   const a = padLevel(), now = performance.now();
   smLv = Math.max(a, smLv * 0.86);
   if (a >= smPk || now - smPkT > 1500){ smPk = a; smPkT = now; }
   if (m.offsetWidth){ m.firstElementChild.style.transform = 'scaleX(' + smPos(smLv).toFixed(3) + ')'; m.lastElementChild.style.left = (smPos(smPk) * 100).toFixed(1) + '%'; m.classList.toggle('over', smPk > 1); }
-  if (smLv > 0.0005 || now - smPkT < 1500) smRaf = requestAnimationFrame(synMeterFrame);
+  // BATTERY (27 Oct): this used to test now - smPkT < 1500, but once silent `a >= smPk` (0 >= 0) restamps smPkT every
+  // frame, so after the first sound the meter ran at the display rate for good. The peak's own value ends the hold;
+  // smOnT gives a new note 1.5 s to reach the analyser.
+  if (smLv > 0.0005 || smPk > 0.0005 || now - smOnT < 1500) smRaf = requestAnimationFrame(synMeterFrame);
   else { m.firstElementChild.style.transform = 'scaleX(0)'; m.lastElementChild.style.left = '0'; m.classList.remove('over'); smLv = smPk = 0; }
 }
 // Every source a pad has sounding (taps, keys, MIDI), so an engine change can silence them at once.
@@ -15600,6 +15604,28 @@ function audioInterrupted(){
   if (!intT) intT = setTimeout(() => { intT = 0; if (tp.on && ctx && ctx.state !== 'running'){ tStop(); toast('Audio was interrupted: press PLAY to continue.', 4000); } }, 2500);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) audioInterrupted(); });
+/* BATTERY (27 Oct): once the first sound started the engine, the AudioContext ran for as long as the app stayed open: its
+   safety limiter and CPU probe worklets processing silence every few ms, in the background and with the screen off too
+   (measured idle: about 3x the CPU of before the first sound). Now, while the app is hidden, the song is stopped and nothing
+   has sounded for 20 s, the engine is suspended. Coming back resumes it at once, and anything that makes a sound resumes it
+   through audio(). It is left running while following MIDI clock or with a MIDI input connected, so the MPC can start the
+   song or play notes with the screen off without the first beat waiting for the audio to restart. */
+var bgSusT = 0, bgSus = false, lastSnd = 0;   // var, not let: audio() calls bgArm() and may run before this line has
+function bgArm(){ lastSnd = performance.now(); if (document.hidden && !bgSusT) bgSusT = setTimeout(bgIdle, 20000); }
+function bgIdle(){
+  bgSusT = 0;
+  if (!document.hidden || !ctx || ctx.state !== 'running') return;
+  const midiIn = !!(midi.access && midi.access.inputs && midi.access.inputs.size);
+  const busy = tp.on || rendering || midi.clkIn || midiIn || midiHeld.size || kb.held.size || synHeld.some(Boolean)
+    || performance.now() - Math.max(lastSnd, audioWake) < 20000;
+  if (busy){ bgSusT = setTimeout(bgIdle, 20000); return; }
+  bgSus = true; ctx.suspend().catch(() => { bgSus = false; });
+}
+document.addEventListener('visibilitychange', () => {
+  clearTimeout(bgSusT); bgSusT = 0;
+  if (document.hidden){ if (ctx) bgSusT = setTimeout(bgIdle, 20000); return; }
+  if (bgSus){ bgSus = false; if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); }
+});
 function pump(){
   try { pumpRun(); }
   catch(e){ console.error(e); try { tStop(); } catch(e2){} toast('Playback stopped: ' + ((e && e.message) || 'something went wrong') + '.', 5000); }
@@ -19738,9 +19764,20 @@ function hmAttach(){
     HM.an.forEach((a, i) => { a.fftSize = 512; sp.connect(a, i); }); HM.buf = new Float32Array(512); HM.m = master; return true; }
   catch(e){ HM.an = null; HM.m = master; return false; }
 }
+/* BATTERY (27 Oct): the meter asked for every display frame forever (120 a second on the Fold), which keeps the screen
+   from dropping to its low refresh rate even with nothing playing. Silent, it now looks again 6 times a second; any sound
+   brings it straight back (audio() calls hmWake(), and the next look catches anything else within 160 ms). */
+var hmSleepT = 0;   // var, not let: audio() calls hmWake() and may run before this line has
+function hmWake(){ if (hmSleepT){ clearTimeout(hmSleepT); hmSleepT = 0; requestAnimationFrame(hmFrame); } }
 function hmFrame(now){
-  requestAnimationFrame(hmFrame);
-  const c = $('hMeter'); if (!c || document.hidden || !c.offsetParent || now - HM.t < 32) return;
+  hmDraw(now);
+  const quiet = !tp.on && HM.lv[0] < 0.004 && HM.lv[1] < 0.004 && HM.pk[0] < 0.004 && HM.pk[1] < 0.004;
+  if (quiet) hmSleepT = setTimeout(() => { hmSleepT = 0; requestAnimationFrame(hmFrame); }, 160);
+  else requestAnimationFrame(hmFrame);
+}
+function hmDraw(now){
+  // Levels are read even while the meter itself isn't shown (phone width): frameIdle() uses them to know something sounds.
+  const c = $('hMeter'); if (document.hidden || now - HM.t < 32) return;
   const dt = HM.t ? Math.min(0.2, (now - HM.t) / 1000) : 0.03; HM.t = now;
   const live = hmAttach(), dk = Math.pow(10, -20 * dt / 20);   // falls 20 dB a second
   for (let s = 0; s < 2; s++){
@@ -19749,6 +19786,7 @@ function hmFrame(now){
     if (p >= HM.pk[s]){ HM.pk[s] = p; HM.pt[s] = now; } else if (now - HM.pt[s] > 1000) HM.pk[s] = Math.max(p, HM.pk[s] * dk);   // held a second, then falls
     if (p >= 0.999) HM.clip = true;
   }
+  if (!c || !c.offsetParent) return;
   const r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr); if (!W || !H) return;
   const pos = g => lvl(g), key = [W, H, HM.clip, ...HM.lv.map(v => (pos(v) * W) | 0), ...HM.pk.map(v => (pos(v) * W) | 0)].join(',');
   if (key === HM.drawn) return; HM.drawn = key;   // nothing moved: no redraw (silence costs nothing)
@@ -21008,8 +21046,11 @@ $('tCpu').addEventListener('click', () => {
 });
 // Stopped, nothing sounding and no live display (deck scope, meters): the loop drops to 10 Hz on a timer instead
 // of a callback every display frame (120 a second on the Fold, for nothing). tStart() and the pads wake it.
+// BATTERY (27 Oct): the deck no longer keeps it at full rate by just being open (on a phone it nearly always is). Its
+// scope, strip meter and stage already draw nothing new in silence; while the master has any level (keys, MIDI notes,
+// a tail ringing out) the loop stays at full rate, read from the header meter.
 let rafT = 0;
-const frameIdle = () => !tp.on && !rendering && performance.now() - audioWake > 1500 && !deckShown();
+const frameIdle = () => !tp.on && !rendering && performance.now() - audioWake > 1500 && !(HM.lv[0] >= 0.004 || HM.lv[1] >= 0.004);
 function frameWake(){ if (raf === -1){ clearTimeout(rafT); raf = 0; } if (!raf && view === 'tracker') frame(); }
 function frame(){
   raf = 0; if (view !== 'tracker') return;
