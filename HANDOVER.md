@@ -3154,6 +3154,13 @@ A code review (audio, storage, UI, DSP) found these; all fixed and checked headl
     Plus today has tracker commands (CCA–CCD, FXO, VOL, PAN, PIT…) and, from 21 Oct, Interpolate for ramps. Not started;
     decide the scope with the owner first (which parameters, per phrase or per song, how it shows on the phone).
 
+11. **Idle dogs settle after a while (battery): later** (owner, 27 Oct: "we will look later"). With the song stopped, the
+    deck's dancing dogs breathe and wag forever (`.dogs.idle .bob` / `.tail`, `dkBreath` 3.4 s and `dkWag` 2.6 s, both
+    `infinite`). Running CSS animations keep the Fold's screen redrawing at its full rate whenever Thunder Plus is open
+    and stopped, the last idle cost left after the 27 Oct battery work. Idea: after about a minute without a touch, a key
+    or a sound, drop the `idle` class (or pause the animations) so the dogs sit still, and bring it back on the next
+    touch, key or sound. Check with the owner how long before they settle, and whether they should settle at all.
+
 ### Standard DAW features still missing (suggested 14 Oct, in rough priority order)
 
 Already there, for reference: undo/redo, stem export, sidechain, FX automation from tracker commands, sample
@@ -3262,3 +3269,4 @@ marked `BATTERY (27 Oct)`:
 - Result: idle 6 rAF/s instead of 120–180; before the first sound ~4% CPU instead of 6–7.5%. Tests: `tests/*.test.js`
   all pass. Not yet tried on the Fold: check a pad tap after coming back to the app sounds at once, and that the
   battery use in Android's settings drops.
+- Left for later: the idle dogs' endless breathe/wag animation (open item 11).
