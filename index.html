@@ -4169,7 +4169,9 @@ thunder:TH AH N D ER|seeds:S IY D Z|yes:Y EH S|ok:OW K EY|okay:OW K EY`;
     const tfm = g && (g.k === 'hold' || g.k === 'glide') ? 24 : g && g.k === 'son' ? 16 : 10;
     const kf = 1 - Math.exp(-dt * 1000 / (tfm / Math.max(0.3, p.cons))), ka = 1 - Math.exp(-dt * 1000 / 4), K = this.k, T = this.tg;
     K.f1 += (T.f1 - K.f1) * kf; K.f2 += (T.f2 - K.f2) * kf; K.f3 += (T.f3 - K.f3) * kf;
-    K.av += (T.av - K.av) * ka; K.an += (T.an - K.an) * ka; K.ah += (T.ah - K.ah) * ka; K.nf += (T.nf - K.nf) * ka; K.nb += (T.nb - K.nb) * ka; K.nz += (T.nz - K.nz) * ka;
+    // frication fades in over ~8 ms and out over ~12 ms (a hard-edged noise gate sounds like a burst); P T K bursts stay sharp (26 Oct)
+    const kn1 = 1 - Math.exp(-dt * 1000 / 8), kn2 = 1 - Math.exp(-dt * 1000 / 12);
+    K.av += (T.av - K.av) * ka; K.an += (T.an - K.an) * (g && g.k === 'burst' ? ka : T.an > K.an ? kn1 : kn2); K.ah += (T.ah - K.ah) * ka; K.nf += (T.nf - K.nf) * ka; K.nb += (T.nb - K.nb) * ka; K.nz += (T.nz - K.nz) * ka;
     // amplitude envelope
     const er = this.envT > this.env ? 1 - Math.exp(-dt * 1000 / Math.max(0.5, p.atk)) : 1 - Math.exp(-dt * 1000 * 4.6 / Math.max(1, p.rel));
     this.env += (this.envT - this.env) * er; if (this.envT === 0 && this.env < 1e-4) this.env = 0;
@@ -4228,9 +4230,9 @@ thunder:TH AH N D ER|seeds:S IY D Z|yes:Y EH S|ok:OW K EY|okay:OW K EY`;
       Y:{t:'L', f:[260, 2070, 3020], av:0.85, d:50},
       M:{t:'N', f:[270, 1000, 2200], av:0.55, d:65}, N:{t:'N', f:[270, 1600, 2600], av:0.55, d:60}, NG:{t:'N', f:[270, 2000, 2600], av:0.55, d:65},
       F:{t:'F', f:[300, 1100, 2100], nf:5000, nb:5000, fa:0.1, d:85}, TH:{t:'F', f:[300, 1400, 2600], nf:5500, nb:5000, fa:0.072, d:80},
-      S:{t:'F', f:[320, 1700, 2600], nf:5600, nb:2400, fa:0.22, d:100}, SH:{t:'F', f:[300, 1800, 2400], nf:2700, nb:1600, fa:0.48, d:100},
+      S:{t:'F', f:[320, 1700, 2600], nf:5600, nb:2400, fa:0.07, d:100}, SH:{t:'F', f:[300, 1800, 2400], nf:2700, nb:1600, fa:0.15, d:100},
       V:{t:'Z', f:[280, 1100, 2100], nf:5000, nb:5000, fa:0.045, av:0.3, d:55}, DH:{t:'Z', f:[280, 1400, 2600], nf:5500, nb:5000, fa:0.035, av:0.3, d:45},
-      Z:{t:'Z', f:[300, 1700, 2600], nf:5600, nb:2400, fa:0.14, av:0.35, d:75}, ZH:{t:'Z', f:[300, 1800, 2400], nf:2700, nb:1600, fa:0.28, av:0.35, d:75},
+      Z:{t:'Z', f:[300, 1700, 2600], nf:5600, nb:2400, fa:0.045, av:0.35, d:75}, ZH:{t:'Z', f:[300, 1800, 2400], nf:2700, nb:1600, fa:0.09, av:0.35, d:75},
       P:{t:'P', f:[220, 900, 2100], bf:1100, bb:2200, ba:0.7}, B:{t:'B', f:[220, 900, 2100], bf:1100, bb:2200, ba:0.36},
       T:{t:'P', f:[250, 1700, 2600], bf:4200, bb:3000, ba:0.35}, D:{t:'B', f:[250, 1700, 2600], bf:4200, bb:3000, ba:0.22},
       K:{t:'P', f:[280, 1900, 2300], bf:2100, bb:1500, ba:0.5}, G:{t:'B', f:[280, 1900, 2300], bf:2100, bb:1500, ba:0.28},
@@ -16673,7 +16675,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 250;
+const BUILD = 251;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);

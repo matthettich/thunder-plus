@@ -77,6 +77,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 26 Oct: SING sibilants (build 251)
+
+S, SH, Z, ZH (and CH, JH through them) were as loud as the vowels and gated on and off in 4 ms, so they came out as
+bursts of noise. Their frication levels (fa) are about a third of what they were (S 0.22 -> 0.07, SH 0.48 -> 0.15,
+Z 0.14 -> 0.045, ZH 0.28 -> 0.09: 8-10 dB under the vowel), and frication now fades in over 8 ms and out over 12 ms
+(P T K bursts keep the 4 ms). The same change went into pump SING (the C++ port).
+
 ## 26 Oct: review of the 25 Oct changes (four fixes)
 
 Build 250 (`index.html`, `sw.js` → `thunderplus-v250`; the 27 Oct battery work, further down, is 249). Everything from 25 Oct was read through and the app was loaded headless
