@@ -77,6 +77,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 26 Oct (4): Settings → Audio → …pump live (Auto / Rendered)
+
+Build 254. Owner asked for the "force renders" idea as an option. A per-device setting (`aset.psLive`, saved with the
+other audio settings, so the Fold can stay Rendered while the desktop plays live from the same song): **Auto** (default)
+plays the live engines live with the safety net; **Rendered** always plays their renders (lighter on the battery).
+`psNode` returns null when it is Rendered; switching to it drops the live nodes at once. Picking either also undoes a
+safety-net switch (`psLive.off`), so live can be retried without a reload (the safety-net toast now says so). The row and
+its note only show when `pump/synth/` is there. `psLive` moved up next to `aset` (the Audio panel reads it at start-up).
+
 ## 26 Oct (3): …pump synths live: Mono live, Poly live, Coil live, with a safety net
 
 Build 253 (`index.html`, `sw.js` → `thunderplus-v253`; `pump-synth-engine.js?v=2`, new `pump-synth-worklet.js?v=1`). Owner:
@@ -106,7 +115,7 @@ already took MIDI at any frame).
   player through the real `makePlayer` plays them (MONO live peak -17.1 dB = its render's), a VOL 30 note is 2.5 dB softer
   (velocity only), a C-major chord on Poly live, Coil live; the safety net drops the nodes and the next note renders.
   CPU, desktop, one note: MONO 2.9 %, POLY 5.4 %, COIL 2.6 % of a core (expect several times that on the Fold).
-- **Not yet:** a Settings switch to force renders (e.g. to save battery on the phone); RET's fade applies to both
+- **Not yet:** RET's fade applies to both
   velocity and level on live notes; a poly track's per-column slide bends the whole chord.
 
 ## 26 Oct (2): …pump synths: MONO, POLY and COIL as synth engines

@@ -114,3 +114,11 @@ test('pump synths live: plays exactly what the pad renders (same values, same no
     assert.ok(calls < 400, kl + ': still running after a second of silence');
   }
 });
+
+test('pump synths live: Settings → Audio → …pump live (this device): Rendered keeps them off, Auto lets them (and undoes the safety net)', () => {
+  const src = H.read('index.html');
+  assert.match(src, /psLive:'auto'/, 'the device setting, Auto by default');
+  assert.match(src, /\(ac === ctx && \(psLive\.off \|\| aset\.psLive === 'render'\)\)\) return null;/, 'a live node is made only when Auto (and the safety net hasn\'t switched)');
+  assert.match(src, /aset\.psLive = v; asetSave\(\); psLive\.off = false;/, 'picking either resets the safety net');
+  assert.ok(src.indexOf('const psLive = {off:false') < src.indexOf('psLiveNote();\n'), 'psLive exists before the Audio panel first draws');
+});

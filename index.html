@@ -1915,6 +1915,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="audrow"><span>Level</span><input type="range" id="audLvl" min="0" max="100" step="1" aria-label="Output level"><output id="audLvlV"></output></div>
       <div class="segrow"><span>Latency</span><div class="seg" id="segLat"></div></div>
       <div class="segrow"><span>Rate</span><div class="seg" id="segARate"></div></div>
+      <div class="segrow" id="psLiveRow" hidden><span>…pump live</span><div class="seg" id="segPsLive"></div></div>
+      <p class="note" id="psLiveNote" hidden></p>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Latency and rate change when audio restarts. That reloads ...Thunder; your song and kit are kept.</span><button id="audRestart" class="on">Restart audio</button></div>
       <p class="note" id="audNote">Output picks where everything plays: the synth, the tracker and previews. Level is the overall volume after the tracker’s master. Lowest latency answers the pads fastest; Safest uses a bigger buffer if you hear crackles. Rate: Device uses the output’s own rate.</p>
     </div>
@@ -7035,11 +7037,12 @@ const Lc = () => V().layers[V().sel];
 // Output device, level, latency and sample rate. Latency and rate are fixed when the AudioContext is made,
 // so changing them asks for a restart; the output device and level change live.
 const AUK = 'thunderplus-audio-v1';
-const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90};
+const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto'};   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
   try { const o = JSON.parse(localStorage.getItem(AUK) || '{}'); return Object.assign(d, o && typeof o === 'object' ? o : {}); } catch(e){ return d; } })();
 // Latency: what the person picked, else Balanced in the Mobile setup (phones click at Lowest when busy) and Lowest on desktop.
 const latOf = () => aset.latPick && aset.lat ? aset.lat : (typeof platform !== 'undefined' && platform === 'mobile' ? 'balanced' : 'interactive');
 function asetSave(){ try { localStorage.setItem(AUK, JSON.stringify(aset)); } catch(e){} }
+const psLive = {off:false, strikes:0};   // …PUMP SYNTHS live: the safety net's switch for this visit (see psFallback)
 let aLive = null; // the latency and rate the running context was made with
 
 /* ---------- audio ---------- */
@@ -11535,6 +11538,21 @@ $('audLvl').addEventListener('input', e => {
 $('audLvl').addEventListener('change', asetSave);
 const updLat = makeSeg($('segLat'), [['interactive', 'Lowest'], ['balanced', 'Balanced'], ['playback', 'Safest']], () => latOf(), v => { aset.lat = v; aset.latPick = true; asetSave(); audRestartRow(); });
 const updARate = makeSeg($('segARate'), [[0, 'Device'], [44100, '44.1k'], [48000, '48k']], () => aset.rate, v => { aset.rate = v; asetSave(); audRestartRow(); });
+/* …PUMP SYNTHS LIVE (owner, 26 Oct), for this device: AUTO plays Mono live, Poly live and Coil live live, with the safety net
+   (their renders when the device can't keep up); RENDERED always plays their renders, the same values' sound, which is
+   lighter on the battery. Picking AUTO again also undoes a safety-net switch, so live can be tried again without a reload. */
+const updPsLive = makeSeg($('segPsLive'), [['auto', 'Auto'], ['render', 'Rendered']], () => aset.psLive === 'render' ? 'render' : 'auto', v => {
+  aset.psLive = v; asetSave(); psLive.off = false; psLive.strikes = 0;
+  if (v === 'render'){ try { if (rt && rt.pl) rt.pl.psDrop(); } catch(e){} }
+  psLiveNote(); });
+function psLiveNote(){
+  const on = typeof PsynCore !== 'undefined'; $('psLiveRow').hidden = $('psLiveNote').hidden = !on; if (!on) return;
+  $('psLiveNote').textContent = aset.psLive === 'render'
+    ? '…pump live: Rendered. On this device Mono live, Poly live and Coil live play their rendered sound (the same values, as the rendered engines play them): lighter on the battery. Auto plays them live.'
+    : psLive.off ? '…pump live: Auto, but playing their renders for now: this device couldn’t keep up with them live. Tap Auto to try live again.'
+    : '…pump live: Auto. Mono live, Poly live and Coil live play live, and switch to their rendered sound if this device can’t keep up (it says so). Rendered always plays their renders, lighter on the battery.';
+}
+psLiveNote();
 $('audRestart').addEventListener('click', () => { try { save(); } catch(e){ tpLog('save before restart failed', e); } applyUpdate(); });
 $('audReset').addEventListener('click', () => resetAudio());
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (!$('pAudio').hidden) audRefresh(); });
@@ -14869,7 +14887,7 @@ function makePlayer(ac, out, getBuf, live){
      An export (an offline context) always plays live: it has all the time it needs. */
   function psNode(t, pad, V, kind, key){
     const sp = PsynCore.liveSpec(kind), by = PsynCore.bytes();
-    if (!sp || !by || !psOK.has(ac) || (ac === ctx && psLive.off)) return null;
+    if (!sp || !by || !psOK.has(ac) || (ac === ctx && (psLive.off || aset.psLive === 'render'))) return null;   // (Settings → Audio → …pump live)
     try {
       const node = new AudioWorkletNode(ac, 'thunder-psyn', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2],
         processorOptions:Object.assign({p:xParams(V)}, sp, psSent.has(ac) ? {} : {bytes:by})});
@@ -15466,9 +15484,8 @@ const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=1', psOK = new WeakSet(), ps
    the audio thread is nearly full, and the live …pump nodes are a real part of that, twice in a row, the live engines
    switch to their renders for the rest of this visit (psLive.off): their nodes go, and the next notes play the pads'
    renders, the same values' sound. Said once; a reload tries live again. An export always plays them live. */
-const psLive = {off:false, strikes:0};
 setInterval(() => {
-  if (psLive.off || !rt || !rt.pl || !tp.on || !ctx || document.hidden) { psLive.strikes = 0; return; }
+  if (psLive.off || aset.psLive === 'render' || !rt || !rt.pl || !tp.on || !ctx || document.hidden) { psLive.strikes = 0; return; }
   const {load, nodes} = rt.pl.psLoad(); if (!nodes){ psLive.strikes = 0; return; }
   const now = performance.now(), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
   const whole = cap ? cap.avg : pr ? pr.load : null, drop = now - glitch.t < 1100 || (cap && cap.under > 0.01);
@@ -15480,7 +15497,8 @@ function psFallback(why){
   if (psLive.off) return; psLive.off = true; psLive.strikes = 0;
   try { if (rt && rt.pl) rt.pl.psDrop(); } catch(e){}
   tpLog('pump synths live: playing the renders', why);
-  toast('Mono live, Poly live and Coil live are playing their rendered sound for now: ' + why + '. Reload to try them live again.', 8000);
+  toast('Mono live, Poly live and Coil live are playing their rendered sound for now: ' + why + '. Settings → Audio → …pump live: tap Auto to try live again.', 8000);
+  try { psLiveNote(); } catch(e){}
 }
 function bassReady(ac){
   if (!bassLoad.has(ac)){
@@ -16761,7 +16779,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 253;
+const BUILD = 254;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
