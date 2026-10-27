@@ -151,3 +151,18 @@ test('docs (K3): Help, the key legend, the tour and the README match the keys', 
   assert.match(src, /id="tLegSpace"/); assert.match(src, /playKeySwap\(\) \? '<kbd>Space<\/kbd> plays the song/, 'the tour follows the Space order');
   assert.doesNotMatch(rd, /Delete clears the whole row and steps down; Shift\+Delete clears just the cell/, 'README: Delete clears the cell');
 });
+
+/* ───────── Phase 2 (27 Oct, the owner's calls): one meaning for Space, Shift, drag and hold ───────── */
+test('Phase 2 keys and mouse: Space = the song everywhere, Shift = fine, a drag selects (Alt-drag edits), hold-to-mute is touch only', () => {
+  const src = H.read('index.html');
+  assert.match(src, /function playKeySwap\(\)\{ return true; \}/, 'Space plays the song in every mode');
+  assert.match(src, /if \(e\.shiftKey && view === 'synth'\)\{ play\(cur\); return; \}\n\s*if \(tp\.on\) tStop\(\); else tStart\('song', \{row:songRow\(\)\}\); return; \}/, 'Synth page: Space the song, Shift+Space the pad');
+  assert.doesNotMatch(src, /if \(e\.key === ' ' && !e\.target\.matches\('button'\)\)\{ play\(cur\);/, 'the old Synth-page Space = pad is gone');
+  assert.match(src, /drag\.pos = \(drag\.pos \|\| 0\) \+ \(drag\.lastY - e\.clientY\) \/ \(e\.shiftKey \? 48 : 16\);\n\s*drag\.lastY = e\.clientY; drag\.big = !!\(e\.ctrlKey \|\| e\.metaKey\);/, 'Shift slows a value drag, Ctrl/⌘ takes big steps');
+  assert.match(src, /bump\(n < 0 \? 1 : -1, false\);/, 'the wheel no longer takes big steps with Shift');
+  assert.match(src, /if \(e\.altKey && y >= 0 && !inSel && altDrag\(e, x, y\)\) return;/, 'Alt-drag edits (gridDown)');
+  assert.match(src, /if \(x != null && e\.altKey && altDrag\(e, x, m\.y\)\) return;/, 'Alt-drag edits (Pattern view)');
+  assert.match(src, /const filled = was && getCell\(tv, x, y\) >= 0;/, 'the cursor\'s own cell selects too');
+  assert.match(src, /if \(d\.altMute && !d\.moved && e\.type === 'pointerup'\)\{ toggleBlockMute/, 'an Alt-click on the Song still mutes');
+  assert.match(src, /const holdOk = e\.pointerType !== 'mouse';/, 'Arrange hold-to-mute: touch and pen only');
+});
