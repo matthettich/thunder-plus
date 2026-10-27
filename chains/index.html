@@ -1728,6 +1728,16 @@ if (EMBED) window.addEventListener('keydown', e => {
   const t = e.target; if (t && t.closest && t.closest('input:not([type=range]):not([type=checkbox]), textarea, [contenteditable="true"]')) return;
   e.preventDefault(); e.stopPropagation(); TW.viewKey(e.code);
 }, true);
+/* APP KEYS (Thunder Plus owner, 27 Oct, Phase 2): inside …Thunder Plus the app's keys work here as on every screen:
+   F2–F9 (screens, transport, REC), Ctrl/⌘+S (Shift: Save as), Ctrl/⌘+O and Ctrl/⌘+N act on the PROJECT (Space already plays the song, below). The patch's own Save / Open / New are in the app's File menu.
+   Ctrl/⌘+Z is the song's undo too (ONE UNDO). */
+if (EMBED) window.addEventListener('keydown', e => {
+  if (!TW || !TW.appKey || e.repeat || typing(e) || document.querySelector('.dlgov')) return;
+  const mod = e.ctrlKey || e.metaKey, k = (e.key || '').toLowerCase();
+  const app = (/^F[2-9]$/.test(e.key) && !mod && !e.altKey) || (mod && !e.altKey && (k === 's' || ((k === 'o' || k === 'n') && !e.shiftKey)));
+  if (!app) return;
+  if (TW.appKey({key:e.key, code:e.code, shiftKey:e.shiftKey, ctrlKey:e.ctrlKey, metaKey:e.metaKey, altKey:e.altKey})){ e.preventDefault(); e.stopPropagation(); }
+}, true);
 if (EMBED) document.documentElement.classList.add('embed');
 const SETKEY = KP + 'settings';
 let settings = {};
@@ -1740,6 +1750,9 @@ class PatchStore {
   constructor(doc){ this.doc = doc; this.onRestore = function(){}; this.undo = []; this.redo = []; this._timer = 0; this.dirty = false; }
   /* Call before changing the patch: the current state becomes one Undo step. */
   snapshot(){
+    // ONE UNDO (Thunder Plus, 27 Oct, Phase 2): inside Thunder Plus the song's undo is the history, and it takes a step on
+    // each hand-off; an edit still waiting for its autosave goes now, so it stays a step of its own.
+    if (EMBED && this.dirty){ clearTimeout(this._timer); this.save(); }
     this.undo.push(JSON.stringify(this.doc));
     if (this.undo.length > 60) this.undo.shift();
     this.redo.length = 0; this._schedule();
@@ -3220,14 +3233,20 @@ dtoggle.addEventListener('click', () => setDrawer(drawer.classList.contains('col
 const fileMenu = document.getElementById('filemenu'), fileBtn = document.getElementById('filebtn');
 const setMenu = document.getElementById('setmenu'), setBtn = document.getElementById('setbtn');
 fileMenu.querySelectorAll('kbd').forEach(k => { const v = k.dataset.k; k.textContent = MAC ? v.replace('⇧', '⇧⌘').replace(/^([A-Z])$/, '⌘$1') : 'Ctrl+' + v.replace('⇧', 'Shift+'); });
-fileBtn.addEventListener('click', () => { document.getElementById('undobtn').disabled = !store.undo.length; document.getElementById('redobtn').disabled = !store.redo.length; fileMenu.hidden = !fileMenu.hidden; });
+fileBtn.addEventListener('click', () => { document.getElementById('undobtn').disabled = !canUndo(); document.getElementById('redobtn').disabled = !canRedo(); fileMenu.hidden = !fileMenu.hidden; });
 fileMenu.addEventListener('click', e => { if (e.target.closest('.fitem')) fileMenu.hidden = true; });
 window.addEventListener('pointerdown', e => { if (!fileMenu.hidden && !fileMenu.contains(e.target) && e.target !== fileBtn) fileMenu.hidden = true; }, true);
 setBtn.addEventListener('click', () => { renderBackups(); setMenu.hidden = !setMenu.hidden; setBtn.setAttribute('aria-expanded', String(!setMenu.hidden)); });
 window.addEventListener('pointerdown', e => { if (!setMenu.hidden && !setMenu.contains(e.target) && e.target !== setBtn){ setMenu.hidden = true; setBtn.setAttribute('aria-expanded', 'false'); } }, true);
 
-function undo(){ if (store.back()) toast('Undone.'); }
-function redo(){ if (store.forward()) toast('Redone.'); }
+/* ONE UNDO (Thunder Plus owner, 27 Oct, Phase 2): inside Thunder Plus, Undo and Redo here are the song's: one history for
+   the tracker, the synth and this patch (the app puts the patch back here, setDoc). On its own the patch keeps its own. */
+const sharedUndo = () => !!(EMBED && TW && TW.undo);
+function flushToHost(){ if (store && store.dirty){ clearTimeout(store._timer); store.save(); } }
+function undo(){ if (sharedUndo()){ flushToHost(); TW.undo(-1); return; } if (store.back()) toast('Undone.'); }
+function redo(){ if (sharedUndo()){ flushToHost(); TW.undo(1); return; } if (store.forward()) toast('Redone.'); }
+const canUndo = () => sharedUndo() ? !!(TW.canUndo && TW.canUndo()) : !!store.undo.length;
+const canRedo = () => sharedUndo() ? !!(TW.canRedo && TW.canRedo()) : !!store.redo.length;
 function newPatch(){
   store.snapshot();
   const b = blankDoc(); for (const k of Object.keys(doc)) delete doc[k]; Object.assign(doc, b);
@@ -3264,12 +3283,15 @@ const pnameEl = document.getElementById('pname');
     window.chainsEmbed = {
       pause(){ if (store){ clearTimeout(store._timer); if (store.dirty) store.save(); } if (bridge) bridge.ctx.suspend().catch(() => {}); },   // store/bridge: not there yet if the screen is left at once
       resume(){ if (bridge) bridge.resume(); },
+      /* ONE UNDO: the app's undo or redo put another version of this patch in the song; show it here (no reload). */
+      setDoc(d){ if (!store) return; clearTimeout(store._timer); store.undo.length = 0; store.redo.length = 0;
+        store._restore(JSON.stringify(normalize(d ? JSON.parse(JSON.stringify(d)) : blankDoc()))); clearTimeout(store._timer); store.dirty = false; },
       /* The app's Settings gear opens this patch's settings menu. */
       settings(){ const b = document.getElementById('setbtn'); if (b) b.click(); },
       /* The app's top bar drives these (the frame's own File/Settings buttons hide when embedded). */
       file:{
         new(){ newPatch(); }, open(){ pickFile('patch'); }, save(){ savePatch(false); }, saveAs(){ savePatch(true); },
-        undo(){ undo(); }, redo(){ redo(); }, canUndo(){ return !!store.undo.length; }, canRedo(){ return !!store.redo.length; },
+        undo(){ undo(); }, redo(){ redo(); }, canUndo(){ return canUndo(); }, canRedo(){ return canRedo(); },
         exportCustom(){ if (!doc.custom.length){ toast('No custom modules yet.'); return; } store.exportCustom(); },
         importCustom(){ pickFile('custom'); }
       },

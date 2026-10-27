@@ -181,3 +181,19 @@ test('Phase 2 sliders and wheel: relative drag, Shift finer, touch must slide, A
     assert.doesNotMatch(w, /if \(mouse\)\{ zoomAt\(/, f + ': a plain mouse wheel no longer zooms');
   }
 });
+
+test('Phase 2 editors: app keys pass up, Ctrl+S/O/N are the project, one undo history with the song', () => {
+  const src = H.read('index.html');
+  assert.match(src, /function editorKey\(e\)\{/, 'the app keys from the editors');
+  assert.match(src, /appKey: e => editorKey\(e\),[\s\S]*appKey: e => editorKey\(e\),/, 'both editors get them');
+  assert.match(src, /undo: dir => undoStep\(dir\), canUndo: \(\) => undo\.past\.length > 0/, 'their undo is the song\'s');
+  assert.match(src, /if \(e\.k === 'W'\)\{/, '…waves patch edits are steps in the song\'s history');
+  assert.match(src, /if \(a && a\.setDoc && CH\.frame\) try \{ a\.setDoc\(S\.chainPatch\); ok = true; \}/, 'undo shows the patch in the open editor (no reload)');
+  for (const f of ['waves/index.html', 'chains/index.html']) {
+    const w = H.read(f);
+    assert.match(w, /function undo\(\)\{ if \(sharedUndo\(\)\)\{ flushToHost\(\); TW\.undo\(-1\); return; \}/, f + ': Undo goes to the song');
+    assert.match(w, /if \(EMBED && this\.dirty\)\{ clearTimeout\(this\._timer\); this\.save\(\); \}/, f + ': each edit hands off before the next (a step each)');
+    assert.match(w, /setDoc\(d\)\{ if \(!store\) return;/, f + ': setDoc');
+    assert.match(w, /if \(TW\.appKey\(\{key:e\.key/, f + ': APP KEYS');
+  }
+});

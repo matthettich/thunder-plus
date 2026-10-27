@@ -11421,10 +11421,16 @@ window.addEventListener('pointerdown', e => { if (gsetOpen() && !$('gset').conta
 const frameApi = () => view === 'waves' ? wvApi() : view === 'chains' ? chApi() : null;
 function fileItems(){
   const a = frameApi(), f = a && a.file;
+  // APP KEYS (27 Oct, Phase 2): Ctrl/⌘+S, O and N are the project's here too, so the project's items come first and the
+  // patch's own file commands (they were New / Open / Save / Save as) say so.
+  const pn = view === 'waves' ? '…waves' : '…chains';
   if (f) return [
-    ['New', () => f.new()], ['Open…', () => f.open()], ['Save', () => f.save()], ['Save as…', () => f.saveAs()],
+    ['Undo', () => f.undo(), () => !f.canUndo(), 'Z'], ['Redo', () => f.redo(), () => !f.canRedo(), '⇧Z'],
     null,
-    ['Undo', () => f.undo(), () => !f.canUndo()], ['Redo', () => f.redo(), () => !f.canRedo()],
+    ['Save project' + (projLabel() ? ' (' + projLabel() + ')' : '') + (projDirty ? '  •' : ''), () => saveProj(false), null, 'S'], ['Save project as…', () => saveProj(true), null, '⇧S'],
+    ['Open project…', openProj, null, 'O'],
+    null,
+    ['New ' + pn + ' patch', () => f.new()], ['Open a ' + pn + ' patch file…', () => f.open()], ['Export the ' + pn + ' patch…', () => f.saveAs()],
     null,
     ['Export custom modules…', () => f.exportCustom()], ['Import custom modules…', () => f.importCustom()]
   ];
@@ -12668,13 +12674,40 @@ let plFailed = false;
   prerender();   // the rest of the kit in idle moments, so the first PLAY doesn't render them all at once
 })();
 
+/* APP KEYS (owner, 27 Oct, Phase 2): the keys the …waves and …chains screens pass up, as they work on every other screen:
+   Space and Shift+Space the song, F2–F4 the tracker's screens, F5–F8 the transport, F9 REC, Ctrl/⌘+S / Shift+S / O / N the
+   project (they acted on the patch). True when the key was used. */
+function editorKey(e){
+  const mod = e.ctrlKey || e.metaKey, k = (e.key || '').toLowerCase();
+  if (mod && !e.altKey){
+    if (k === 's'){ saveProj(e.shiftKey); return true; }
+    if (k === 'o' && !e.shiftKey){ openProj(); return true; }
+    if (k === 'n' && !e.shiftKey){ newSong(); return true; }
+    return false;
+  }
+  if (e.altKey) return false;
+  if (e.key === ' '){ if (tp.on) tStop(); else tStart('song', {row:songRow()}); return true; }
+  if (e.key === 'F9'){ setRec(!rec.on); return true; }
+  if (/^F[5-8]$/.test(e.key)){
+    if (e.key === 'F5') tStart('song', {row:0}); else if (e.key === 'F6'){ if (tp.on) tStop(); playCtx(); }
+    else if (e.key === 'F7') tStart('song', {row:cs.song.y}); else stopKey();
+    return true;
+  }
+  if (PAGEK[e.key]){ setView('tracker'); go(PAGEK[e.key]); return true; }
+  return false;
+}
 /* ---------- ...waves editor: a full-screen frame; the patch is read from and saved into the kit ---------- */
 const usesWaves = v => v.layers.some(l => l.on && l.type === 'waves');
 function wavesChanged(edit){ if (edit) try { markChange(); } catch(e){} WV.doc = kit.waves || null; for (let i = 0; i < nslots(); i++) if (usesWaves(kit.voices[i])){ dirty[i] = true; cache[i] = null; } clearTimeout(sTimer); sTimer = setTimeout(save, 900); }
 window.thunderWaves = {
   viewKey: code => viewKey(code),   // VIEW KEYS from inside the editor
+  appKey: e => editorKey(e),   // APP KEYS from inside the editor (transport, files, help)
   load: () => kit.waves ? JSON.parse(JSON.stringify(kit.waves)) : null,
-  save: d => { const edit = JSON.stringify(kit.waves || null) !== JSON.stringify(d || null); kit.waves = d; wavesChanged(edit); },   // (a hand-off of the same patch isn't an edit)
+  // (a hand-off of the same patch isn't an edit) ONE UNDO: an edit is a step in the song's history ('W': the patch before)
+  save: d => { const was = JSON.stringify(kit.waves || null), edit = was !== JSON.stringify(d || null);
+    if (edit && !undo.busy){ undo.past.push({k:'W', j:was}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; }
+    kit.waves = d; wavesChanged(edit); },
+  undo: dir => undoStep(dir), canUndo: () => undo.past.length > 0, canRedo: () => undo.future.length > 0,
   close: () => closeWaves()
 };
 const wvApi = () => { try { return WV.frame && WV.frame.contentWindow && WV.frame.contentWindow.wavesEmbed; } catch(e){ return null; } };
@@ -12723,6 +12756,8 @@ function chainsAutoOn(before){
 }
 window.thunderChains = {
   viewKey: code => viewKey(code),   // VIEW KEYS from inside the editor
+  appKey: e => editorKey(e),   // APP KEYS from inside the editor (transport, files, help)
+  undo: dir => undoStep(dir), canUndo: () => undo.past.length > 0, canRedo: () => undo.future.length > 0,   // ONE UNDO: the song's history
   get tracks(){ return NT; },   // how many tracks the editor's pickers list (Track In, Chain Out, Sidechain In's Source); a getter: NT is defined further down
   load: () => S.chainPatch ? JSON.parse(JSON.stringify(S.chainPatch)) : null,
   save: d => {
@@ -14399,6 +14434,11 @@ function undoStep(dir){
       setKit(k, true); } catch(err){ toast('Couldn’t put the kit back.'); } finally { undo.busy = false; }
     draw(); return toast(`${dir < 0 ? 'Undo' : 'Redo'}: kit ${kit.name || ''}`.trim());
   }
+  if (e.k === 'W'){   // ONE UNDO (27 Oct, Phase 2): a …waves patch edit; the editor shows the patch put back
+    to.push({k:'W', j:JSON.stringify(kit.waves || null)});
+    undo.busy = true; try { kit.waves = JSON.parse(e.j); wavesChanged(true); const a = wvApi(); if (a && a.setDoc) a.setDoc(kit.waves); } catch(err){ tpLog('undo …waves', err); } finally { undo.busy = false; }
+    return toast(`${dir < 0 ? 'Undo' : 'Redo'}: …waves patch`);
+  }
   if (e.k === 'V'){   // a sound edit: put the pad back as it was
     to.push({k:'V', i:e.i, j:vUndo.cur[e.i]}); vUndo.cur[e.i] = e.j;
     undo.busy = true; try { const v = voiceFromJSON(JSON.parse(e.j)); let miss = false;
@@ -14410,8 +14450,12 @@ function undoStep(dir){
   // Swap the contents in place rather than the object: the running sequencer holds this object, so
   // replacing it would keep playing the old song (the screen would show the undo, the speakers wouldn't).
   undo.busy = true; const n = normSong(JSON.parse(undo.cur));
+  // ONE UNDO: an open …chains editor is shown the patch put back (it was thrown away and reloaded, losing its view)
+  const chWas = JSON.stringify(S.chainPatch || null);
   for (const k of Object.keys(S)) if (!(k in n)) delete S[k];
-  Object.assign(S, n); CH.doc = S.chainPatch || null; chainsDropFrame(); saveS(); undo.busy = false;
+  Object.assign(S, n); CH.doc = S.chainPatch || null;
+  if (chWas !== JSON.stringify(S.chainPatch || null)){ const a = chApi(); let ok = false; if (a && a.setDoc && CH.frame) try { a.setDoc(S.chainPatch); ok = true; } catch(err){ tpLog('undo: …chains editor', err); } if (!ok) chainsDropFrame(); }
+  saveS(); undo.busy = false;
   if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); mstSync(); }
   draw(); toast(dir < 0 ? 'Undo' : 'Redo');
   try { PumpFX._notifyAll('undo'); } catch(e){}   // …PUMP: open pop-up windows read their slot again
@@ -16910,7 +16954,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 258;
+const BUILD = 259;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
