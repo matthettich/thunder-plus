@@ -129,7 +129,8 @@ test('guards: KEYS mode modifiers, the Synth page keys, dialogs over Settings, u
   assert.match(src, /addEventListener\('beforeunload', e => \{ if \(selfReload \|\| DESK \|\| !projDirty\) return; e\.preventDefault\(\); e\.returnValue = ''; \}\);/, 'B8');
   assert.match(src, /selfReload = true;/, 'B8: the update reload passes');
   // M17: only the left button drags a mixer fader
-  assert.match(src, /closest\('\.mfbar'\); if \(!b \|\| tv !== 'mixer'\) return;\n  if \(e\.button !== 0\) return;/, 'M17');
+  assert.match(src, /closest\('\.mfbar:not\(\.mobar\)'\); if \(!b \|\| tv !== 'mixer'\) return;[^\n]*\n  if \(e\.button !== 0\) return;/, 'M17');   // (27 Oct: the master OUT bar has its own handler)
+  assert.match(src, /closest\('\.mobar'\); if \(!b \|\| tv !== 'mixer' \|\| e\.button !== 0\) return;/, 'M17: the master OUT bar too');
   // M3: a …chains slider row in the bottom panel opens one menu (its own, with the panel items), not that and a modal
   assert.match(src, /makeRow\(def, x\.p, getObj, \{[^}]*menu:\(\) => dkcItems\(x\)\}\);/, 'M3: the slider row carries the items');
   assert.match(src, /if \(Array\.isArray\(x\.o\) && x\.o\.length\) r\.addEventListener\('contextmenu', e => \{ e\.preventDefault\(\); dkcMenu\(x, e\); \}\);/, 'M3: only list rows get the second menu');

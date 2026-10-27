@@ -1,8 +1,8 @@
 # Gain staging: tracks, …chains and the master (audit, 27 Oct)
 
 The owner asked whether to split the track volume (the meter's fader) from the Mixer's VOL field (as a pre-gain into
-…chains), and to add a master fader bar on the Mixer page. Nothing is changed yet; this is the read of the code at
-build 257. Owner (27 Oct): old songs changing how they sound is fine.
+…chains), and to add a master fader bar on the Mixer page. "Today" and "Recommended split" below are the read of the code
+at build 257. Owner (27 Oct): old songs changing how they sound is fine. **Built in build 264: see "Built" at the end.**
 
 ## Today
 
@@ -41,7 +41,7 @@ Per track (`makePlayer`, `routeTrack`; `applyMix`):
   limiter, capped at 0 dB, default 0 dB, drawn as a bar like the tracks'.
 - Phrase VOL stays note gain. CPU: none (`inp` is already a GainNode).
 
-## Questions for the owner
+## Questions for the owner (answered 27 Oct: see "Owner's calls")
 
 1. Should the new master bar fade after the limiter (OUT), or simply edit MASTER (pre-limiter)? And the master
    column's VOL automation: which one?
@@ -50,3 +50,49 @@ Per track (`makePlayer`, `routeTrack`; `applyMix`):
    nodes: a bigger change.)
 4. Does Thunder Perform read `mix.vol` itself? Then it needs `trim` too.
 5. A short crossfade when CHN is switched on or off?
+
+## Owner's calls (27 Oct)
+
+1. **The master bar is a master OUT fader after the limiter**; MASTER stays the drive into it, and the master phrase's
+   VOL keeps moving MASTER.
+2. **PRE-fader bus sends: yes**, as an option per send, tapping after the source's chain and FX, before VOL and pan;
+   **mute and solo still silence them**.
+3. A DRY (pre-chain) send tap: no.
+4. Thunder Perform: answered from its code. It reads nothing of the mix itself; it runs Thunder Plus in frames from its
+   pinned submodule, this repo's `deck` branch (13 Oct, far behind `main`), so it gets all of this only once `main` is
+   merged into `deck` and the submodule moved on. `deck` sends `master` to the host's deck input, after which OUT sits.
+5. **CHN on / off crossfades** (about 20 ms).
+
+## Built (build 264)
+
+Each part has a `GAIN STAGING`, `PRE SENDS` or `CHN SWITCH` comment at the code; `tests/gain-staging.test.js` covers it.
+
+- **Per track** (`makePlayer`): `voices → inp (TRIM) → dry ─┬→ [track FX] → ins → g (VOL, mute, solo) → p (pan) → out / its bus`,
+  with `inp → …chains → wet` joining at the same point, and `ins → pre` (1 or 0 with mute / solo) for PRE sends. `inp`
+  also feeds the Sidechain In taps, the chain's Track In meter (`anIn`) and `ai` (the Mixer's TRIM light). `routeTrack`
+  no longer pulls `inp` off everything to rewire; it rewires only what changed (a removed track-FX node is now
+  disconnected too: it used to stay wired to the fader, silent).
+- **TRIM**: `S.mix[t].trim`, 0–255, 80 = 0 dB, 00 −18 dB, FF +18 dB, even dB steps (`trimDb`, `trimGain`, `trimS`). The
+  Mixer's first row is `TRM` (EDIT+arrows, typed hex, Delete resets, mouse drag / wheel, Ctrl/⌘+D copies it). Its light:
+  an underline in the meter's hot colour above −6 dB and clip colour above −1 dB, from the input peak (held 0.6 s), read
+  only for the tracks on screen. The info line gives the input peak. **VOL** is the bar on the meter (unchanged) and the
+  bottom panel's slider.
+- **Master OUT**: `S.mout` (0–255, `curve()`, FF = 0 dB), `rt.mo` between the limiter (mastering's or the safety one, or
+  none) and the device's level. Live it glides (`moApply`, no `rtRoute` rewire); renders put it last (stems too, as
+  MASTER is). The master row reads MASTER → FX → MASTERING → OUT (`c.mx` 0, 1, 2); OUT's bar stands on the L / R meter
+  (`mixOutBar`: drag sideways, Shift fine, left of the meter is off, a double-click / double-tap is 0 dB). The bottom
+  panel's master strip and its meter are OUT now (they were MASTER, before the limiter). Project → MASTER OUT.
+- **PRE sends**: a Track In's `pre` param (…chains editor: "Bus send: After its fader / Before its fader"; also in the
+  engine's def, ignored there). `busPlan().pre` lists the sources it applies to; `busSync` feeds them from `pre`
+  (`splP`) instead of `p` (`spl`). The editor's switch calls `busSync` at once. A track has one Track In, so the switch
+  is per source track (all the buses it feeds). A pure source (heard only through its bus) on PRE: its own fader then
+  changes nothing, as on a console.
+- **CHN switch**: `chnIn` / `chnOut` crossfade `dry` and `wet` over `XF` = 20 ms (`ramp`, anchored at now: a linear
+  ramp starts at the previous event, and the first try came in at about 60% at once). A new chain fades in only when its
+  engine posts `ready` (`n._onReady`); until then the track stays dry (it used to drop out). The old node is disposed
+  after its fade. Renders switch at once. Not crossfaded: a bus's sources coming back to the speakers when the bus goes
+  (they switch), and adding or removing a track's first native FX (a rewire, as before).
+- Headless Chromium checks (not in `npm test`): offline renders gave TRIM +5.95 dB for 42 steps and exactly ±18 dB at
+  00 / FF; a PRE send kept its level with VOL at 0, ignored pan, followed TRIM and went silent on mute, while a post send
+  followed VOL, pan and mute; live, CHN on / off recorded on the audio thread showed no level dip or bump and no sample
+  step bigger than the test sine's own; the OUT bar sat exactly on the meter's dB scale at 1400, 882 and 384 px wide.

@@ -1537,8 +1537,10 @@ const mixChan = k => { const r = /^(?:p:)?(?:in|l|p)(\d+)R?$/.exec(k); return r 
 const mixShown = (m, k) => !MIXT.has(m.type) || mixChan(k) <= (Math.round(m.params.chans) || 4);
 const MODULES = {
   trackIn:{ label:'Track In', scope:'mono', inputs:{}, outputs:{ out:'audio', outR:'audio' },
-    params:{ track:[1,1,CHAN_COUNT,1] },
-    ui:{ track:{l:'Track', c:trackOpts()} } },
+    params:{ track:[1,1,CHAN_COUNT,1], pre:[0,0,1,1] },
+    // PRE SENDS (owner, 27 Oct): into a bus (a Chain Out on another track), the track is heard after its fader (the default)
+    // or before it; mute and solo silence it either way. On an insert (its Chain Out on its own track) it changes nothing.
+    ui:{ track:{l:'Track', c:trackOpts()}, pre:{l:'Bus send', c:opts(['After its fader','Before its fader'])} } },
 
   resample:{ label:'Resample', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
     params:{ rec:[0,0,1,1], bars:[1,0,3,1], pad:[7,0,31,1], slices:[3,0,4,1] },
@@ -1648,7 +1650,7 @@ function deckDesc(m, key){
   return d;
 }
 const deckHas = (id, key) => (doc.deck || []).some(d => d.id === id && d.p === key);
-const deckKeys = m => Object.keys(MODULES[m.type].params).filter(k => !(MODULES[m.type].ui[k] || {}).hide && !(MODULES[m.type].ui[k] || {}).fixed && mixShown(m, k) && !(k === 'track' && (m.type === 'trackIn' || m.type === 'chainOut')));
+const deckKeys = m => Object.keys(MODULES[m.type].params).filter(k => !(MODULES[m.type].ui[k] || {}).hide && !(MODULES[m.type].ui[k] || {}).fixed && mixShown(m, k) && !(k === 'track' && (m.type === 'trackIn' || m.type === 'chainOut')) && !(k === 'pre' && m.type === 'trackIn'));   // (routing, not a control to play)
 function deckChange(fn){
   store.snapshot(); doc.deck = (doc.deck || []).slice(); fn(doc.deck); store.touch(); store.save();
   markDeck(); if (EMBED && TW && TW.deck) TW.deck();
@@ -1895,7 +1897,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=38';
+    const url = opts.url || './chains-worklet.js?v=39';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -3448,7 +3450,7 @@ document.getElementById('hintx').addEventListener('click', () => { hint.hidden =
 // Each module type's description: the Help page's cards and the ? on each module's title bar (with SHARED_ABOUT and the
 // modules' own about for the shared ones).
 const PAGE_ABOUT = {
-  trackIn:'Your tracker track, in stereo. Pick the track; in …Thunder Plus it carries that track’s sound. On its own it is silence — patch it through effects into a Chain Out. With its Chain Out on the same track it is an insert (the sound before the track’s own effects and fader). Into a Chain Out on another track it is a bus send: the track is heard after its own effects, fader and pan, and plays through that bus (several Track Ins into a mixer, a compressor, then Chain Out to a free track make a group bus).',
+  trackIn:'Your tracker track, in stereo. Pick the track; in …Thunder Plus it carries that track’s sound. On its own it is silence — patch it through effects into a Chain Out. With its Chain Out on the same track it is an insert (the sound before the track’s own effects and fader). Into a Chain Out on another track it is a bus send: the track is heard after its own effects, fader and pan, and plays through that bus (several Track Ins into a mixer, a compressor, then Chain Out to a free track make a group bus). Bus send: Before its fader takes the track after its effects but before its fader and pan, so its fader no longer changes what the bus hears (a reverb or monitor send); mute and solo still silence it.',
   vcf:'A filter. Low-pass softens, band-pass keeps the middle, high-pass thins. Patch an envelope into Cutoff for classic sweeps.',
   vca:'An amplifier. Patch an envelope into CV so notes start and stop (with nothing in CV it stays open); Gain sets the loudness.',
   mixer:'Mixes up to 16 sounds, each with its own level, plus a master level. Inputs sets how many channels it shows (4 to start).',

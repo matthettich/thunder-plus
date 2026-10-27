@@ -77,6 +77,35 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 27 Oct (6): gain staging: TRIM, VOL, master OUT, PRE sends, CHN crossfade (build 264)
+
+Owner: "look at the handover document for information about gain staging changes, let me know if you have questions, and
+then implement the changes". The plan was `docs/GAIN-STAGING.md`; its five questions went to the owner, who took every
+recommendation: the master bar is an **OUT fader after the limiter** (MASTER stays the drive, the master phrase's VOL keeps
+moving MASTER); **PRE-fader bus sends** as an option, **mute and solo still silence them**; no dry (pre-chain) send; a
+**~20 ms crossfade** on CHN. Question 4 was answered from Thunder Perform's code (it reads nothing of the mix; it runs this
+app in frames from its pinned submodule, this repo's `deck` branch from 13 Oct, so it gets this only once `main` is merged
+into `deck`; `deck` sends `master` to the host, and OUT sits before `master`, so that still fits).
+- **What changed, where:** `docs/GAIN-STAGING.md` → "Built" has the whole list with the names in the code. In short: the
+  Mixer's first row is **TRIM** (`S.mix[t].trim`, 80 = 0 dB, ±18 dB, on `inp`, before …chains and FX; a light when the
+  input runs hot); the meter's bar and the bottom panel's slider stay **VOL**; the master row is MASTER → FX → MASTERING →
+  **OUT** (`S.mout`, `rt.mo`, after the limiter, in renders too, with a bar on the L / R meter; the bottom panel's master
+  strip is OUT now); a Track In's **Bus send** (`pre`) in …chains; `routeTrack` crossfades `dry` / `wet` (`chnIn`,
+  `chnOut`, `ramp`) and no longer pulls the track's input off its taps to rewire.
+- **Old songs** open with TRIM and OUT at 0 dB and every Track In after its fader, so they sound as before.
+- **Also fixed on the way:** a removed track-FX node stayed wired to the fader (silent); a click on the Mixer's master row
+  moved the track cursor to track 1 (now it keeps it, and Shift+Option+▲ goes back to it); a new …chains pair is placed by
+  the editor's real box heights (`CHN_BOX`, Track In grew a row).
+- **Tests:** `tests/gain-staging.test.js` (6 tests: TRIM's scale, `applyMix`, the crossfade's ramps and node lifetimes,
+  `busPlan().pre`, source guards for the graph, OUT, the Mixer and the song file); `npm test` 96/96. Headless Chromium
+  checks (offline renders of TRIM, PRE / post sends with VOL, pan, mute; a live CHN on / off recorded on the audio thread;
+  the OUT bar at 1400, 882 and 384 px; mouse drags of the OUT bar, a VOL bar and a TRIM value) are described in the doc.
+  To repeat them: serve the repo, make a copy of index.html with `window.__ev = src => eval(src);` before the app's last
+  `})();` (the app is one closure), and evaluate through it.
+- Cache `thunderplus-v264`, `chains/chains-worklet.js?v=39` (index.html, chains/index.html, sw.js).
+- **Not done:** the bus's sources switching back to the speakers when a bus goes away (not crossfaded); a first native
+  track FX added or removed is still a rewire. Not yet played by the owner.
+
 ## 27 Oct (5): usability Phase 2 ("one feel"), built to the owner's calls in "27 Oct (3)"
 
 Builds 257–261. Owner: "implement the rest of phase two" (and the editors' gestures "match Max"). Each change has a
@@ -134,7 +163,7 @@ comment marked Phase 2 / 27 Oct at the code; `tests/usability.test.js` has a tes
   (`songRowRemove`, `songRowsRemove`: every track and the master, mutes, sections, an armed loop). (2) and (4) are Phase 2's
   Max gestures above. Then the gain staging talk: `docs/GAIN-STAGING.md`
   (the VOL field and the meter fader are one post-chain value; a proposed TRIM / fader / master OUT split and five
-  questions; the owner doesn't mind old songs changing sound).
+  questions; the owner doesn't mind old songs changing sound). Built in "27 Oct (6)".
 
 ## 27 Oct (4): owner's queue (done in builds 260 and 262: see "27 Oct (5)")
 

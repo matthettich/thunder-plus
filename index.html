@@ -753,6 +753,12 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 }
 .mfbar::before{content:''; position:absolute; left:0; right:0; top:-5px; bottom:-5px}   /* an easier grab than 3 px */
 .mfbar.mu{opacity:.45} .mfbar.on, .mfbar:hover{background:var(--ts-cur-bg, var(--ts-ink)); height:4px}   /* --chw: a character's advance in the grid (chwSet), letter-spacing included */
+/* GAIN STAGING (27 Oct): the master OUT bar stands across the L / R meter (its height is set inline) and drags sideways */
+.mfbar.mobar{width:3px; cursor:ew-resize} .mfbar.mobar.on, .mfbar.mobar:hover{width:4px}
+.mfbar.mobar::before{left:-6px; right:-6px; top:0; bottom:0}
+@media (pointer:coarse){ .mfbar.mobar::before{left:-19px; right:-19px} }
+/* the TRIM row's light: what the track sends in runs hot (above −6 dB) or near full scale (above −1 dB) */
+.tscr .trm.ih{box-shadow:inset 0 -3px var(--ts-hot)} .tscr .trm.ic{box-shadow:inset 0 -3px var(--ts-clip)}
 .tscr .m1{color:var(--ts-ok)} .tscr .m2{color:var(--ts-hot)} .tscr .m3{color:var(--ts-clip)}
 .tscr .pl{background:var(--ts-pl-bg); color:var(--ts-pl)}
 .tscr .sel{background:var(--ts-sel)}
@@ -2383,6 +2389,9 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p><b>Synth → Engine: Voice</b> turns a synth slot (9–16) into a singing robot. Type the <b>lyrics</b>: each note the tracker plays sings the next syllable (its consonants on the attack, the vowel held until the note ends), and PLAY starts the lyrics again from the top. A <b>slide</b> keeps the syllable it's on, for runs over one vowel. The chips under the lyrics show every syllable as the engine will say it. If a word comes out wrong, split it with a hyphen (<i>to-night</i>) or spell it in brackets with ARPAbet sounds: <i>[HH EH L OW]</i> (AA AE AH AO AW AY EH ER EY IH IY OW OY UH UW AX; B CH D DH F G HH JH K L M N NG P R S SH T TH V W Y Z ZH). <b>Robot</b> goes from a natural voice to a buzzy one, <b>Size</b> changes the voice's size (bigger is deeper), <b>Voice</b> at 0 whispers, <b>Diction</b> speeds the consonants up or slows them down. A full stop, comma, ; : ! ? or _ is a <b>rest</b>: that note (or pad step) is silent, so <i>hello . world</i> pauses between the words and several in a row pause longer. <b>Consonant noise</b> sets how loud the hiss of K, T, P, S and H is, and <b>Clarity</b> narrows the formants and lifts their presence so words are easier to make out. The pad (and exports) sing the whole line, one syllable every <b>Pad step</b>. One voice per track (mono).</p>
 <h3>Bass engine</h3>
 <p>Any synth slot (08 and up) can be a <b>bass</b> instead of layers: on the Synth page pick <b>Engine: Bass</b>. It is an additive mono bass in the spirit of Reaktor's Lazerbass, for dubstep and drum &amp; bass: up to 64 partials (Shape goes saw › square › triangle; Bright, Odd / even, Stretch), a sub oscillator, a resonant low-pass with its own envelope, vowel formants, a comb, Reese detune and stereo Width. The <b>Wobble</b> moves the cutoff, vowel, comb and level at a rate locked to the song's tempo (4 bars down to 1/32, triplets and dotted). In the tracker it plays live, so the wobble keeps time on every note however high you play, a held note wobbles for as long as it's held, and Glide and Legato slide between notes (PSL slides without restarting). The <b>WOB</b> command changes the rate from a row on (WOB 06 = 1/4, WOB 0B = 1/16, WOB 00 back to the voice's own). Presets get you started; the bottom panel's instrument section shows its level, cutoff, resonance and wobble. The voice's Level, Tune and Drive apply; pad effects don't (use the track's FX).</p>
+<h3>Levels: TRIM, VOL, MASTER, OUT</h3>
+<p>Each track runs <b>TRIM → …chains → its FX → VOL (with mute and solo) → pan</b>. <b>TRIM</b> is the Mixer's first row: the track's input gain, 80 = 0 dB, from −18 to +18 dB, set before the chain and effects hear it. It lights yellow under the value when what the track sends in runs hot (above −6 dB) and red near full scale (above −1 dB): …chains has no limiter of its own. <b>VOL</b> is the fader: the bar on each track's meter (drag it, Shift for fine, double-click for 0 dB) and the bottom panel's slider. On the master row, <b>MASTER</b> is the drive into the limiter (the master phrase's VOL moves it), then FX, MASTERING and <b>OUT</b>: the master fader, after the limiter, FF = 0 dB and never a boost. Its bar stands on the L / R meter (drag it sideways) and the bottom panel's master strip is OUT too. Renders and stems take every one of these as you hear them. Turning a track's <b>CHN</b> on or off fades between the chain and the dry sound over 20 ms, so it doesn't click.</p>
+<p><b>Buses and PRE sends.</b> A Track In patched into a Chain Out on another track feeds that bus after its fader and pan. Set the Track In's <b>Bus send</b> to <b>Before its fader</b> and the bus hears it after its chain and effects but before VOL and pan, so pulling the fader down leaves the send alone (a reverb or monitor send). Mute and solo still silence it.</p>
 <h3>Mastering</h3>
 <p><b>Settings → Master → Open mastering…</b> (or the <b>MASTERING</b> cell on the Mixer's master row: ▶ from the master level, then EDIT; or › MASTERING on the FX screen's master) puts a chain on the master bus: <b>EQ → Suppress → Compress → Limit</b>. Each has its own switch; the readouts show short-term loudness in and out (LUFS) and the highest peak. <b>EQ</b>: drag a point (left/right is frequency, up/down is gain), shift-drag or scroll for width, double-click empty space to add a bell, double-click a point to switch it off; the band row sets exact values. <b>Suppress</b> turns down resonances that stick out of the spectrum (Depth, Sharpness, Selectivity, Speed; drag the lines to set its range; Delta plays only what it removes). <b>Compress</b> is a glue compressor (its sidechain high-pass keeps the bass from pumping it). <b>Limit</b> catches every peak at the Ceiling, between samples too. Renders of the song include the chain and keep its ceiling; stems don't.</p>
 <h3>Settings</h3>
@@ -12823,6 +12832,7 @@ window.thunderChains = {
     if (before){ chainsAutoOn(before); chainsPush(); }   // a Track In / Chain Out moved: re-route the tracks either way
     if (!rt || !rt.pl) return;
     if (name === 'src' && rt.pl.tapsSync) rt.pl.tapsSync();   // a Sidechain In switched between the bus and a track
+    if (name === 'pre' && rt.pl.busSync){ rt.pl.busSync(); if (view === 'tracker') draw(); }   // PRE SENDS: a Track In's Bus send before / after its fader
     const msg = { target:'chains-host', op:'param', id, name, value };
     for (const b of rt.pl.buses){
       if (!b || !b.chn || !b.chn._send) continue;
@@ -12943,6 +12953,13 @@ const curve = v => Math.pow(Math.max(0, Math.min(255, v)) / 255, 2);
 const TRK_UNITY = 224;
 const trackGain = v => { v = Math.max(0, Math.min(255, v)); return v <= TRK_UNITY ? Math.pow(v / TRK_UNITY, 2) : Math.pow(10, (v - TRK_UNITY) / (255 - TRK_UNITY) * 6 / 20); };
 const dB = g => g <= 0.00001 ? '−∞ dB' : (20 * Math.log10(g)).toFixed(1) + ' dB';
+/* GAIN STAGING (owner, 27 Oct; docs/GAIN-STAGING.md): TRIM is a track's input gain, before its taps, …chains and track FX;
+   VOL (the meter's fader bar, the bottom panel's slider) stays the fader after them. 80 is 0 dB, 00 −18 dB, FF +18 dB, in
+   even dB steps (about 0.14 dB a step, 2.3 dB for 16): the VOL scale (E0 = 0 dB, +6 at most) is too narrow for a trim. */
+const TRIM_0 = 128, TRIM_DB = 18;
+const trimDb = v => { v = Math.max(0, Math.min(255, Math.round(+v || 0))); return v >= TRIM_0 ? (v - TRIM_0) / 127 * TRIM_DB : (v - TRIM_0) / 128 * TRIM_DB; };
+const trimGain = v => Math.pow(10, trimDb(v) / 20);
+const trimS = v => { const d = trimDb(v); return (d > 0.04 ? '+' : '') + (Math.abs(d) < 0.05 ? '0.0' : d.toFixed(1)) + ' dB'; };
 const sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'}[c]));
@@ -13915,7 +13932,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=38')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=39')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -13972,17 +13989,19 @@ function scSay(t){ const U = sckUsesOf(t); toast(U.length ? `Track ${d2(t + 1)} 
    there after its own effects, fader and pan (as a DAW's bus); t is pure when its sound doesn't come back out on t too, and
    then plays only through the bus. Only tracks with CHN on take part, and a bus only while its own track runs through
    …chains (chainsFeed), so a source is never silenced by a bus that isn't there. A loop (1 into 4 and 4 into 1) can't play:
-   the cable that closes it is left out (plan.loop). Cached on a cheap fingerprint of the patch's tracks and cables. */
+   the cable that closes it is left out (plan.loop). Cached on a cheap fingerprint of the patch's tracks and cables.
+   PRE SENDS (owner, 27 Oct): plan.pre holds the sources whose Track In has Bus send "Before its fader": their buses hear them
+   after their chain and effects but before their fader and pan (mute and solo still silence them). */
 let busPlanH = null, busPlanVal = null;
 function busPlan(){
   const d = S.chainPatch, ok = !!(d && d.format === 'chains.patch' && Array.isArray(d.modules));
   let h = ok ? 7 : 0; const mx = v => { h = (h * 31 + v) | 0; }, ms = x => { x = String(x); for (let i = 0; i < x.length; i++) mx(x.charCodeAt(i)); };
-  if (ok){ for (const m of d.modules) if (m){ ms(m.id); const k = m.type === 'trackIn' ? 1 : m.type === 'chainOut' ? 2 : 3; mx(k); if (k < 3) mx(+(m.params && m.params.track) | 0); }
+  if (ok){ for (const m of d.modules) if (m){ ms(m.id); const k = m.type === 'trackIn' ? 1 : m.type === 'chainOut' ? 2 : 3; mx(k); if (k < 3) mx(+(m.params && m.params.track) | 0); if (k === 1) mx(+(m.params && m.params.pre) ? 5 : 4); }
     for (const c of d.cables || []) if (c && c.from && c.to){ ms(c.from[0]); mx(59); ms(c.to[0]); } }
   for (let t = 0; t < NT; t++) mx(S.chainOn && S.chainOn[t] ? 2 : 1);
   if (busPlanVal && busPlanH === h) return busPlanVal;
   busPlanH = h;
-  const feeds = new Map(), targets = new Map(), pure = new Set(), P = busPlanVal = {feeds, targets, pure, loop:false};
+  const feeds = new Map(), targets = new Map(), pure = new Set(), pre = new Set(), P = busPlanVal = {feeds, targets, pure, pre, loop:false};   // pre: PRE SENDS
   if (!ok) return P;
   const by = new Map(); for (const m of d.modules) if (m && m.id != null) by.set(m.id, m);
   const nx = new Map(); for (const c of d.cables || []) if (c && c.from && c.to){ const a = c.from[0]; if (!nx.has(a)) nx.set(a, []); nx.get(a).push(c.to[0]); }
@@ -14008,6 +14027,7 @@ function busPlan(){
       if (!targets.has(t)) targets.set(t, []); targets.get(t).push(b);
     }
     if (fed && !outs.has(t)) pure.add(t);
+    if (fed && +(m.params && m.params.pre)) pre.add(t);   // PRE SENDS (27 Oct): its Track In's Bus send is "Before its fader"
   }
   for (const v of feeds.values()) v.sort((a, b) => a - b);
   return P;
@@ -14066,6 +14086,7 @@ function chainsNode(ac, track, patch, tempo){
       n._live = true;
       for (const m of n._q){ try { n.port.postMessage(m); } catch(e){} }
       n._q.length = 0;
+      if (n._onReady){ const f = n._onReady; n._onReady = null; try { f(); } catch(e){} }   // CHN SWITCH: fade the chain in now
       // The engine's load number a few times a second; the full meter/modulation stream (~31 msgs/s per node) only
       // while the …chains screen is showing (showChains/leaveChains switch it).
       n._send({target:'chains-host', op:'telemetry', value:chMeterWanted ? true : 'load'});
@@ -14216,7 +14237,7 @@ const freshInst = i => ({pad:i % NSLOT, tsp:0, vol:255, pan:128, rev:0, ofs:0, s
   kf:i % NSLOT >= NPAD ? 1 : 0, hut:0, huv:0, mlen:0, eco:0, ecr:0.5, ecf:30, ecp:0});   // instruments 08–0F play the synth slots
 const ECHO_RATES = [['1/32', 1/8], ['1/16T', 1/6], ['1/16', 1/4], ['1/8T', 1/3], ['1/8', 1/2], ['1/4T', 2/3], ['1/8D', 3/4], ['1/4', 1], ['1/4D', 3/2], ['1/2', 2], ['1 BAR', 4]];
 const echoRateI = I => { const b = +I.ecr > 0 ? +I.ecr : 0.5; let k = 0; ECHO_RATES.forEach(([, v], i) => { if (Math.abs(Math.log(v / b)) < Math.abs(Math.log(ECHO_RATES[k][1] / b))) k = i; }); return k; };
-const freshMix = () => ({vol:224, pan:128, mute:false, solo:false, sc:false, nm:'', col:0});   // nm, col: TRACK NAMES (21 Oct)
+const freshMix = () => ({vol:224, trim:TRIM_0, pan:128, mute:false, solo:false, sc:false, nm:'', col:0});   // nm, col: TRACK NAMES (21 Oct) · trim: GAIN STAGING (27 Oct)
 /* TRACK NAMES (21 Oct): a track's name (up to 12 letters) and colour (TCOL index, 0 = none) live in S.mix[t].nm / .col, so
    they save with the song. Shown on Phrase / Pattern titles, Arrange, the Song and Mixer headers, the meters, the bottom
    panel's strip and the stem file names. Edit ▾ → Name this track…, or double-click a track number or the Phrase title. */
@@ -14271,7 +14292,7 @@ function normMst(j){
 function freshSong(){
   // MPC swing: the classic hardware's shuffle, applied on 8th, 16th or dotted-8th grid.
   // Voice-per-track parity: one synth voice per song track — ntr tracks need ntr + 8 pads, capped at 32.
-  return {app:'thunder-song', v:6, name:'Song 1', bpm:120, swing:50, swingB:2, limiter:true, renderFrom:0, master:255, chainPatch:null,
+  return {app:'thunder-song', v:6, name:'Song 1', bpm:120, swing:50, swingB:2, limiter:true, renderFrom:0, master:255, mout:255, chainPatch:null,
     song:Array.from({length:256}, () => new Array(NT + 1).fill(-1)), chains:new Array(256).fill(null), phrases:new Array(256).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
     tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:8, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
@@ -14317,7 +14338,7 @@ function normSong(j){
   // MPC swing: the classic hardware's 50–75% range, where 50% is straight and 66–67% is the triplet feel.
   S.mst = normMst(j.mst);
   S.swing = clamp(int(j.swing, 50), 50, 75); S.swingB = clamp(int(j.swingB, 2), 1, 7); S.limiter = j.limiter !== false;
-  S.renderFrom = clamp(int(j.renderFrom, 0), 0, 255); S.master = clamp(int(j.master, 255), 0, 255);
+  S.renderFrom = clamp(int(j.renderFrom, 0), 0, 255); S.master = clamp(int(j.master, 255), 0, 255); S.mout = clamp(int(j.mout, 255), 0, 255);   // mout: GAIN STAGING, the master OUT fader
   if (Array.isArray(j.secs)){ const seen = new Set(); S.secs = j.secs.filter(q => q && typeof q.n === 'string' && q.n.trim()).map(q => ({y:clamp(int(q.y, 0), 0, 255), n:q.n.trim().slice(0, 16)})).filter(q => !seen.has(q.y) && seen.add(q.y)); }   // SONG EXTRAS
   // Song rows: as in memory (NT tracks then the master, NT + 1 numbers: an undo step, or any song while NT is 32), or as
   // saved with more than 32 tracks (songOut): tracks 1–32 then the master (33 numbers, as every version saves), tracks 33
@@ -14376,7 +14397,7 @@ function normSong(j){
     I.mlen = clamp(int(o.mlen, 0), 0, 255); I.eco = clamp(int(o.eco, 0), 0, 16); I.ecr = ECHO_RATES.some(([, v]) => Math.abs(v - +o.ecr) < 1e-9) ? +o.ecr : 0.5;
     I.ecf = clamp(int(o.ecf, 30), 0, 100); I.ecp = clamp(int(o.ecp, 0), -12, 12); } });
   if (Array.isArray(j.mix)) j.mix.slice(0, NT).forEach((o, i) => { if (o && typeof o === 'object'){ const m = S.mix[i];
-    m.vol = clamp(int(o.vol, 224), 0, 255); m.pan = clamp(int(o.pan, 128), 0, 255); m.mute = !!o.mute; m.solo = !!o.solo; m.sc = false;
+    m.vol = clamp(int(o.vol, 224), 0, 255); m.trim = clamp(int(o.trim, TRIM_0), 0, 255); m.pan = clamp(int(o.pan, 128), 0, 255); m.mute = !!o.mute; m.solo = !!o.solo; m.sc = false;   // trim: GAIN STAGING (older songs: 0 dB)
     m.nm = typeof o.nm === 'string' ? o.nm.trim().slice(0, 12) : ''; m.col = clamp(int(o.col, 0), 0, TCOL.length - 1); } });   // TRACK NAMES   // sc: the old mixer sidechain bus (gone 21 Oct)
   if (Array.isArray(j.tfx)) for (let t = 0; t < NT; t++) S.tfx[t] = normChainFx(j.tfx[t]);
   S.mfx = normChainFx(j.mfx);
@@ -15047,7 +15068,6 @@ function makePlayer(ac, out, getBuf, live){
     if (want && !b._tapTo){ try { taps.connect(b.chn, 0, 2); b._tapTo = b.chn; if (b.chn._send) b.chn._send({target:'chains-host', op:'tapmap', value:tapList}); } catch(e){} }
   }
   const tapsSync = () => { for (let t = 0; t < NT; t++) tapSync(buses[t]); };
-  const inpTap = t => { const i = tapList.indexOf(t); if (taps && i >= 0) try { buses[t].inp.connect(taps, 0, i); } catch(e){} };   // rewiring a track disconnects its input from everything
   // SENDS (20 Oct): every chain node's Sidechain Out sends (output 1, one channel per send) are summed here and come back,
   // one block (128 samples) later, on every node's input 3, so chains can hear each other without a loop (a loop in Web
   // Audio needs a delay in it, and plays silence otherwise).
@@ -15069,17 +15089,22 @@ function makePlayer(ac, out, getBuf, live){
     const P = busOff ? null : busPlan(), want = [];
     if (P) for (const [bt, src] of P.feeds){ const b = buses[bt]; if (b && b.chn) want.push([bt, src.slice(0, 32)]); }
     const routed = new Set(); if (P) for (const [, src] of want) for (const t of src) if (P.pure.has(t)) routed.add(t);
-    const key = want.map(([bt, src]) => bt + ':' + src.join(',') + ':' + (buses[bt].chn.__k || (buses[bt].chn.__k = Math.random()))).join('|') + '/' + [...routed].join(',');
+    const key = want.map(([bt, src]) => bt + ':' + src.map(t => t + (P.pre.has(t) ? 'p' : '')).join(',') + ':' + (buses[bt].chn.__k || (buses[bt].chn.__k = Math.random()))).join('|') + '/' + [...routed].join(',');
     if (key === busKey) return; busKey = key;
     for (const b of buses){ if (!b) continue;
       if (b._feedM){ for (const m of b._feedM) try { m.disconnect(); } catch(e){} b._feedM = null; }
       if (b.spl) try { b.spl.disconnect(); } catch(e){}
+      if (b.splP) try { b.splP.disconnect(); } catch(e){}
       if (b._routed){ try { b.p.connect(out); } catch(e){} b._routed = false; } }
     for (const [bt, src] of want){
       const b = buses[bt], ms = [];
       for (let k = 0; k * 16 < src.length; k++) ms.push(ac.createChannelMerger(32));
-      src.forEach((t, j) => { const q = buses[t]; if (!q) return; if (!q.spl){ q.spl = ac.createChannelSplitter(2); q.p.connect(q.spl); }
-        const m = ms[j >> 4], c = (j & 15) * 2; try { q.spl.connect(m, 0, c); q.spl.connect(m, 1, c + 1); } catch(e){} });
+      // PRE SENDS (owner, 27 Oct): a source whose Track In says "Before its fader" is heard from `pre` (after its chain and
+      // effects, before VOL and pan; mute and solo still silence it), the rest from `p` (after its fader and pan).
+      src.forEach((t, j) => { const q = buses[t]; if (!q) return; let s;
+        if (P.pre.has(t)){ if (!q.splP){ q.splP = ac.createChannelSplitter(2); q.pre.connect(q.splP); } s = q.splP; }
+        else { if (!q.spl){ q.spl = ac.createChannelSplitter(2); q.p.connect(q.spl); } s = q.spl; }
+        const m = ms[j >> 4], c = (j & 15) * 2; try { s.connect(m, 0, c); s.connect(m, 1, c + 1); } catch(e){} });
       ms.forEach((m, k) => { try { m.connect(b.chn, 0, 4 + k); } catch(e){} });
       b._feedM = ms;
       if (b.chn._send) b.chn._send({target:'chains-host', op:'busmap', value:src});
@@ -15096,12 +15121,19 @@ function makePlayer(ac, out, getBuf, live){
   const setMfx = n => { mfx = n || null; clockTo(mfx); if (mfx) fxKeySync(mfx, S.mfx); };   // SOURCE: the master's effect slots
   const fxNodeOf = t => t >= MT ? mfx : buses[t] && buses[t].fx;
   const FXP = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'sw6', 'sw7', 'flx', 'gat', 'rtg'];
+  /* GAIN STAGING (owner, 27 Oct; docs/GAIN-STAGING.md). Per track:
+       voices → inp (TRIM) → dry ────────────────┐
+                    └→ …chains → wet ───────────┴→ [track FX] → ins → g (VOL, mute, solo) → p (pan) → out / its bus
+                                                                  └→ pre (mute, solo) → a PRE send's bus
+     inp also feeds the Sidechain In taps, the chain's Track In meter and `ai` (the Mixer's TRIM light). dry and wet
+     crossfade when CHN is switched (CHN SWITCH below), so …chains comes and goes without a click. */
   for (let t = 0; t <= NT; t++){
-    const inp = ac.createGain(), g = ac.createGain(), p = ac.createStereoPanner(), scs = ac.createGain();
-    inp.connect(g); g.connect(p); p.connect(out);
+    const inp = ac.createGain(), dry = ac.createGain(), ins = ac.createGain(), g = ac.createGain(), p = ac.createStereoPanner(), scs = ac.createGain(), pre = ac.createGain();
+    pre.channelCount = 2; pre.channelCountMode = 'explicit'; pre.channelInterpretation = 'speakers';   // a PRE send is a stereo pair, like the pan's
+    inp.connect(dry); dry.connect(ins); ins.connect(g); g.connect(p); p.connect(out); ins.connect(pre);   // (pre runs only once a bus listens to it)
     scs.gain.value = 0;   // (the old post-fader Sidechain Out send: gone with the mixer bus, 21 Oct)
-    let an = null; if (live && t < NT){ an = ac.createAnalyser(); an.fftSize = 512; p.connect(an); }
-    buses.push({inp, g, p, an, scs, lv:0, pk:0, fx:null, chn:null});
+    let an = null, ai = null; if (live && t < NT){ an = ac.createAnalyser(); an.fftSize = 512; p.connect(an); ai = ac.createAnalyser(); ai.fftSize = 512; inp.connect(ai); }
+    buses.push({inp, dry, ins, g, p, pre, an, ai, scs, lv:0, pk:0, ilv:0, ipk:0, ipt:0, fx:null, chn:null, wet:null, _fade:new Set()});
   }
   // Bass voices: one live node per track and voice (see bassReady), made when it first plays.
   const bassN = new Map(); let bpmNow = (S && S.bpm) || 120;
@@ -15387,9 +15419,11 @@ function makePlayer(ac, out, getBuf, live){
     const at = ac.currentTime;
     buses.forEach((b, t) => {
       if (t >= NT){ b.g.gain.value = 1; return; }
-      const m = S.mix[t], gv = (filter ? filter(t) : audible(t)) ? trackGain(m.vol) : 0, pv = clamp((m.pan - 128) / 127, -1, 1);
+      const m = S.mix[t], on = filter ? filter(t) : audible(t), gv = on ? trackGain(m.vol) : 0, pv = clamp((m.pan - 128) / 127, -1, 1);
+      const tg = trimGain(m.trim == null ? TRIM_0 : m.trim), prv = on ? 1 : 0;   // GAIN STAGING: TRIM on the input; a PRE send keeps mute and solo
       const scv = 0;   // SOURCE: no mixer sidechain bus
-      if (live){ b.g.gain.setTargetAtTime(gv, at, 0.012); b.p.pan.setTargetAtTime(pv, at, 0.012); b.scs.gain.setTargetAtTime(scv, at, 0.012); } else { b.g.gain.value = gv; b.p.pan.value = pv; b.scs.gain.value = scv; }
+      if (live){ b.g.gain.setTargetAtTime(gv, at, 0.012); b.p.pan.setTargetAtTime(pv, at, 0.012); b.scs.gain.setTargetAtTime(scv, at, 0.012); b.inp.gain.setTargetAtTime(tg, at, 0.012); b.pre.gain.setTargetAtTime(prv, at, 0.012); }
+      else { b.g.gain.value = gv; b.p.pan.value = pv; b.scs.gain.value = scv; b.inp.gain.value = tg; b.pre.gain.value = prv; }
     });
   }
   // Puts track t's effects between its input and its fader, or takes them out when the list is empty.
@@ -15399,16 +15433,47 @@ function makePlayer(ac, out, getBuf, live){
     const b = buses[t]; if (!b) return;
     routeTrack(t, chain, ok);
   }
-  // Rebuild one track's insert chain: inp -> [chains?] -> [native fx?] -> g.
+  /* CHN SWITCH (owner, 27 Oct): …chains comes in and goes out over XF seconds, the dry path the other way, instead of the
+     hard switch that cut tails and could click. Live only: a render's routing is set before it starts. */
+  const XF = 0.02;
+  function ramp(prm, to){
+    if (!live){ prm.value = to; return; }
+    // Anchored at now: a linear ramp starts at the PREVIOUS event, so after the `wet.gain.value = 0` of a moment ago it
+    // started part-way up (the chain came in at about 60% at once, a bump in level).
+    const at = ac.currentTime, v = prm.value;
+    try { prm.cancelScheduledValues(at); prm.setValueAtTime(v, at); prm.linearRampToValueAtTime(to, at + XF); } catch(e){ prm.value = to; }
+  }
+  // A new chain node into the track: inp -> chain -> wet -> mid. Faded in once its engine says it is ready (until then it
+  // plays silence, so the track keeps its dry sound meanwhile; it used to drop out for a moment).
+  function chnIn(b, mid){
+    const n = b.chn, wet = ac.createGain(); wet.gain.value = 0;
+    b.inp.connect(n); try { b.inp.connect(n.anIn); n.connect(n.an); } catch(e){}   // the Track In and Chain Out meters
+    n.connect(wet); wet.connect(mid); b.wet = wet;
+    const go = () => { if (b.chn !== n) return; ramp(wet.gain, 1); ramp(b.dry.gain, 0); };
+    if (!live || n._live) go(); else n._onReady = go;
+  }
+  // The chain leaves the track: dry fades back in, the chain's return fades out, then its node goes.
+  function chnOut(b){
+    const n = b.chn, wet = b.wet; b.chn = null; b.wet = null; n._onReady = null;
+    ramp(b.dry.gain, 1);
+    const drop = () => {
+      try { if (n._send) n._send({target:'chains-host', op:'dispose'}); n.disconnect(); } catch(e){}
+      try { b.inp.disconnect(n); } catch(e){} try { b.inp.disconnect(n.anIn); } catch(e){}
+      if (wet){ try { wet.disconnect(); } catch(e){} b._fade.delete(wet); }
+    };
+    if (live && wet){ ramp(wet.gain, 0); b._fade.add(wet); setTimeout(drop, XF * 1000 + 40); } else drop();
+    tapSync(b);
+  }
+  // Rebuild one track's insert: inp -> dry / [chains -> wet] -> [native fx] -> ins (-> g, pre).
   function routeTrack(t, chain, fxOk){
     const b = buses[t]; if (!b) return;
     // …chains readiness is its own thing (chainsNode self-guards and retries), so it must NOT
     // ride on the native-FX flag: a browser without the fx worklet should still run chains.
     const wantChn = chainsFeed(t) && !!S.chainPatch && S.chainPatch.format === 'chains.patch';
     const wantFx = !!fxOk && chain.length > 0;
-    if (!wantChn && b.chn){ try { if (b.chn._send) b.chn._send({target:'chains-host', op:'dispose'}); b.chn.disconnect(); } catch(e){} b.chn = null; tapSync(b); }
-    if (!wantFx && b.fx){ try { b.fx.port.postMessage(null); } catch(e){} b.fx = null; }
-    if (!wantChn && !wantFx){ try { b.inp.disconnect(); } catch(e){} b.inp.connect(b.g); inpTap(t); busSync(); return; }
+    if (!wantChn && b.chn) chnOut(b);
+    let oldFx = null;
+    if (!wantFx && b.fx){ try { b.fx.port.postMessage(null); } catch(e){} oldFx = b.fx; b.fx = null; }
     if (wantChn && !b.chn){
       try {
         b.chn = chainsNode(ac, t, S.chainPatch, S.bpm);
@@ -15425,19 +15490,16 @@ function makePlayer(ac, out, getBuf, live){
     if (wantFx && !b.fx){ try { b.fx = tfxNode(ac, chain); clockTo(b.fx); } catch(e){ b.fx = null; } }
     else if (wantFx && b.fx){ try { b.fx.port.postMessage(chain); } catch(e){} }
     fxKeySync(b.fx, S.tfx[t]);   // SOURCE: the picked tracks and the sends, as this track's effect slots ask
-    // Rewire only when which nodes sit in the slot changed: disconnecting/reconnecting a
-    // running worklet every param change is its own little click.
-    if (b._chnRef !== b.chn || b._fxRef !== b.fx){
-      try { b.inp.disconnect(); } catch(e){} inpTap(t);
-      try { if (b.fx) b.fx.disconnect(); } catch(e){}
-      try { if (b.chn) b.chn.disconnect(); } catch(e){}
-      let head = b.inp;
-      // disconnect() above also dropped the meter taps: put them back (they used to stay silent after the first rewire).
-      if (b.chn){ head.connect(b.chn); try { b.inp.connect(b.chn.anIn); b.chn.connect(b.chn.an); } catch(e){} head = b.chn; }
-      if (b.fx){ head.connect(b.fx); head = b.fx; }
-      head.connect(b.g);
-      b._chnRef = b.chn; b._fxRef = b.fx;
+    // Rewire only what changed: disconnecting/reconnecting a running worklet every param change is its own little click.
+    // The track's input is no longer pulled off everything (its taps and meters stay put).
+    const mid = b.fx || b.ins;
+    if (b._fxRef !== b.fx){
+      if (oldFx) try { oldFx.disconnect(); } catch(e){}   // (a removed effect node used to stay wired to the fader, silent)
+      for (const n of [b.dry, b.wet, ...b._fade]) if (n){ try { n.disconnect(); } catch(e){} n.connect(mid); }
+      if (b.fx) b.fx.connect(b.ins);
+      b._fxRef = b.fx;
     }
+    if (b._chnRef !== b.chn){ if (b.chn) chnIn(b, mid); b._chnRef = b.chn; }
     sendSync(b);   // SENDS (after the rewire, which drops the node's outputs)
     busSync();     // BUS: sources into their bus nodes (only rebuilt when something changed)
   }
@@ -15449,7 +15511,7 @@ function makePlayer(ac, out, getBuf, live){
     for (const b of buses){ if (!b) continue;
       try { if (b.fx){ b.fx.port.postMessage(null); b.fx.disconnect(); } } catch(e){}
       try { if (b.chn){ if (b.chn._send) b.chn._send({target:'chains-host', op:'dispose'}); b.chn.disconnect(); } } catch(e){}
-      try { b.inp.disconnect(); b.g.disconnect(); b.p.disconnect(); b.scs.disconnect(); if (b.spl) b.spl.disconnect(); if (b._feedM) for (const m of b._feedM) m.disconnect(); } catch(e){} }
+      try { b.inp.disconnect(); b.dry.disconnect(); b.ins.disconnect(); b.pre.disconnect(); if (b.wet) b.wet.disconnect(); for (const w of b._fade) w.disconnect(); b.g.disconnect(); b.p.disconnect(); b.scs.disconnect(); if (b.spl) b.spl.disconnect(); if (b.splP) b.splP.disconnect(); if (b._feedM) for (const m of b._feedM) m.disconnect(); } catch(e){} }
     try { scBus.disconnect(); } catch(e){}
     try { if (taps) taps.disconnect(); } catch(e){}
     try { sendBus.disconnect(); sendDly.disconnect(); } catch(e){}
@@ -15592,7 +15654,7 @@ function resetAudio(){
     try { rt.pl.dispose(); } catch(e){}
     try { if (rt.mfx){ rt.mfx.port.postMessage(null); rt.mfx.disconnect(); } } catch(e){}
     try { if (rt.mst){ if (rt.mst.output) rt.mst.output.disconnect(); if (rt.mst.input) rt.mst.input.disconnect(); } } catch(e){}
-    try { rt.out.disconnect(); if (rt.lim._drop) rt.lim._drop(); else rt.lim.disconnect(); } catch(e){}
+    try { rt.out.disconnect(); if (rt.lim._drop) rt.lim._drop(); else rt.lim.disconnect(); rt.mo.disconnect(); } catch(e){}
     rt = null;
   }
   try { master.disconnect(); } catch(e){}
@@ -15603,8 +15665,9 @@ function resetAudio(){
 function rtInit(){
   audio();
   if (!rt){
-    const out = ctx.createGain(), lim = safeLim(ctx, master);
-    rt = {out, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); bassReady(ctx);
+    // mo: the master OUT fader (GAIN STAGING, 27 Oct), after mastering and the safety limiter, before the device's level
+    const out = ctx.createGain(), mo = ctx.createGain(), lim = safeLim(ctx, mo); mo.gain.value = curve(S.mout == null ? 255 : S.mout); mo.connect(master);
+    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); bassReady(ctx);
     // the master meter listens to everything going out, synth pads included
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
     master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
@@ -15814,13 +15877,18 @@ function rtRoute(){
   if (!rt) return;
   // With mastering on, its own limiter replaces the simple safety limiter.
   const ms = S.mst && S.mst.on && rt.mst ? rt.mst : null, mLim = ms && ms.wk && S.mst.lim.on;
-  const dest = S.limiter && !mLim ? rt.lim : master;
+  // MASTER (rt.out, the drive) → master FX → mastering → limiter → OUT (rt.mo, the master fader; GAIN STAGING, 27 Oct) → the device
+  const dest = S.limiter && !mLim ? rt.lim : rt.mo;
   try { rt.out.disconnect(); } catch(e){}
   if (ms){ try { ms.output.disconnect(); } catch(e){} ms.output.connect(dest); }
   const into = ms ? ms.input : dest;
   if (rt.mfx){ try { rt.mfx.disconnect(); } catch(e){} rt.out.connect(rt.mfx); rt.mfx.connect(into); } else rt.out.connect(into);
   rt.out.gain.value = curve(S.master);
+  moApply();
 }
+// The master OUT fader's level to the live graph (GAIN STAGING, 27 Oct). Gliding, and without rtRoute's rewire, so a drag
+// neither zips nor clicks.
+function moApply(){ if (rt && rt.mo && ctx) rt.mo.gain.setTargetAtTime(curve(S.mout == null ? 255 : S.mout), ctx.currentTime, 0.012); }
 // Sends a track's (or with t = NT, the master's) effect list to the live worklets.
 function rtFx(t){
   if (!rt) return;
@@ -15839,7 +15907,7 @@ function chainsFeedChanged(t){ saveS(); rtFx(t); draw(); }
 // TIDY PAIRS (owner, 22 Oct): a new pair goes one row below the lowest box, by the editor's box heights (Track In 255 px,
 // Chain Out 288 px at zoom 1; anything else is taken as 400, a folded box as 80), so pairs stack 330 px apart. It used to
 // add 160 px more for every Track In already there, so the gaps kept growing and the pairs ran off the screen.
-const CHN_BOX = {trackIn:260, chainOut:290};
+const CHN_BOX = {trackIn:305, chainOut:315};   // (27 Oct: measured again; Track In grew a row with its Bus send, PRE SENDS)
 function chainsBottom(P){
   let b = -Infinity;
   for (const m of P.modules) if (m && m.pos) b = Math.max(b, (m.pos[1] | 0) + (m.collapsed ? 80 : CHN_BOX[m.type] || 400));
@@ -16294,6 +16362,8 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   let lat = (useM ? mstLatency(M, sr) : 0) + (masterFx ? pumpChainLatency(S.mfx, sr) : 0);   // …PUMP: the master's pump effects' latency too
   const O = window.OfflineAudioContext || window.webkitOfflineAudioContext, oc = new O(2, N + lat + (lim ? safeLatency(sr) : 0), sr), out = oc.createGain();
   out.gain.value = curve(S.master);
+  // GAIN STAGING (27 Oct): the master OUT fader, last, as live (stems too, as MASTER is, so they still add up to the mix)
+  const mo = oc.createGain(); mo.gain.value = curve(S.mout == null ? 255 : S.mout); mo.connect(oc.destination);
   const wantChn = [...keep].some(t => chainsFeed(t)) && S.chainPatch && S.chainPatch.format === 'chains.patch';
   const wantFx = [...keep].some(t => fxAny(S.tfx[t])) || (masterFx && fxAny(S.mfx));
   const ok = wantFx ? await tfxReady(oc) : false;
@@ -16306,9 +16376,9 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   if (useM){ const wkOk = mstNeedsWk(M) ? await mwReady(oc) : true; const ch = mstChain(oc, M, false); head.connect(ch.input); head = ch.output; mLim = !!(ch.wk && M.lim.on); if (!wkOk && mstNeedsWk(M)) toast('Mastering effects couldn’t load for this render; EQ only.'); }
   if (lim && !mLim){
     let wk = null; if (await mwReady(oc)) try { wk = safeWk(oc); } catch(e){ wk = null; }
-    if (wk){ head.connect(wk); wk.connect(oc.destination); lat += safeLatency(sr); }   // its lookahead delays the mix: trimmed below
-    else { const c = mkLimiter(oc); head.connect(c); c.connect(oc.destination); }
-  } else head.connect(oc.destination);
+    if (wk){ head.connect(wk); wk.connect(mo); lat += safeLatency(sr); }   // its lookahead delays the mix: trimmed below
+    else { const c = mkLimiter(oc); head.connect(c); c.connect(mo); }
+  } else head.connect(mo);
   if (evs.some(e => e.type === 'note' && isLivePad(e.pad))) await bassReady(oc);
   await sfPrepare(evs);   // SoundFont pads: fonts loaded and their presets decoded before the render starts
   const pl = makePlayer(oc, out, getB, false);
@@ -17063,7 +17133,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 263;
+const BUILD = 264;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -17474,7 +17544,9 @@ function projRows(){
     {l:'SWING NOTE', opts:true, get:() => clamp(S.swingB || 2, 1, 7), set:v => S.swingB = v, tap:() => S.swingB = (S.swingB || 2) % 7 + 1, min:1, max:7, d:2, fmt:v => SWINGB[v - 1],
       info:() => 'MPC swing note value: the beat the swing lands on (the hardware’s 1/16, 1/16T, 1/8, 1/8T… settings). 16ths pairs steps 2 3, 6 7…; 8ths pairs 1 2, 3 4…'},
     {l:'LIMITER', sec:'Mastering', gap:true, get:() => S.limiter ? 1 : 0, set:v => S.limiter = !!v, min:0, max:1, tog:true, d:1, fmt:onOff, after:rtRoute, info:() => 'Catches peaks on the master. Renders use it on the mix only, so stems stay clean'},
-    {l:'MASTER', get:() => S.master, set:v => S.master = v, min:0, max:255, big:16, d:255, after:rtRoute, info:v => 'Master level ' + dB(curve(v))},
+    {l:'MASTER', get:() => S.master, set:v => S.master = v, min:0, max:255, big:16, d:255, after:rtRoute, info:v => 'Master level ' + dB(curve(v)) + ' into the limiter (the master phrase’s VOL moves it) · OUT is the fader after it'},
+    // GAIN STAGING (27 Oct): the master fader, after the limiter (the Mixer's OUT and its bar, the bottom panel's master strip)
+    {l:'MASTER OUT', get:() => S.mout == null ? 255 : S.mout, set:v => S.mout = v, min:0, max:255, big:16, d:255, after:() => moApply(), info:v => 'Master OUT ' + dB(curve(v)) + ': the master fader, after the limiter and mastering (FF is 0 dB, no boost)'},
     {l:'RENDER FROM', sec:'Render & export', get:() => S.renderFrom, set:v => S.renderFrom = v, min:0, max:255, big:16, d:0, fmt:v => 'ROW ' + rS(v, 3), gap:true, info:() => 'Renders play from this row until each track reaches an empty row'},
     {l:'RATE', get:() => ex.sr === 48000 ? 1 : 0, set:v => ex.sr = v ? 48000 : 44100, min:0, max:1, tog:true, d:1, fmt:v => v ? '48K' : '44.1K', info:() => 'Sample rate for renders (shared with the synth’s export)'},
     {l:'BITS', get:() => ex.bits === 24 ? 1 : 0, set:v => ex.bits = v ? 24 : 16, min:0, max:1, tog:true, d:1, fmt:v => v ? '24' : '16', info:() => 'Bit depth for renders'},
@@ -17578,11 +17650,12 @@ function bump(d, big){
   }
   if (tv === 'mixer'){
     if (c.y === 7 && c.mx === 1){ S.mst.on = d > 0; mstChanged(); draw(); return; }
-    if (c.y === 7) S.master = clamp(S.master + d * (big ? 16 : 1), 0, 255), rtRoute();
+    if (c.y === 7 && c.mx === 2) S.mout = clamp((S.mout == null ? 255 : S.mout) + d * (big ? 16 : 1), 0, 255), moApply();   // GAIN STAGING: master OUT
+    else if (c.y === 7) S.master = clamp(S.master + d * (big ? 16 : 1), 0, 255), rtRoute();
     else if (c.y === 4) return fxActiveStep(c.x, d > 0 ? 1 : -1);
     else if (c.y === 5){ setChainOn(c.x, d > 0); draw(); return; }
     else { const m = S.mix[c.x];
-      if (c.y === 0) m.vol = clamp(m.vol + d * (big ? 16 : 1), 0, 255);
+      if (c.y === 0) m.trim = clamp((m.trim == null ? TRIM_0 : m.trim) + d * (big ? 16 : 1), 0, 255);   // GAIN STAGING: the first row is TRIM
       else if (c.y === 1) m.pan = clamp(m.pan + d * (big ? 16 : 1), 0, 255);
       else if (c.y === 2) m.mute = d > 0; else if (c.y === 3) m.solo = d > 0; }   // (SC row: a light now, nothing to change)
     mixChanged(); draw(); return;
@@ -17910,7 +17983,7 @@ function dupTrack(notes){
   const t = dkTrack(), PF = polyFrom(), poly = t >= PF, end = poly ? ntr() : PF;
   let to = -1; for (let u = t + 1; u < end; u++) if (S.song.every(row => row[u] < 0)){ to = u; break; }
   if (to < 0) return toast(`No empty ${poly ? 'poly' : 'mono'} track to the right of track ${d2(t + 1)} to duplicate it into.`);
-  const a = S.mix[t], b = S.mix[to]; b.vol = a.vol; b.pan = a.pan; b.sc = a.sc;
+  const a = S.mix[t], b = S.mix[to]; b.vol = a.vol; b.trim = a.trim; b.pan = a.pan; b.sc = a.sc;   // trim: GAIN STAGING
   S.tfx[to] = clone(S.tfx[t] || freshChainFx());
   let want = 0, made = 0;
   if (notes) for (let y = 0; y < 256; y++){ const v = S.song[y][t]; if (v < 0) continue; want++; newBlock({x:to, y}, v);
@@ -17924,7 +17997,7 @@ function dupTrack(notes){
   draw();
   const extra = notes ? (made < want ? ` and ${made} of ${want} blocks (no free sects or phrases left)` : want ? ` and its ${made} block${made > 1 ? 's' : ''}, as unique copies` : ' (it has no blocks yet)')
     : ` · no notes (${keyHint('mod+alt+D')} brings them too)`;
-  toast(`Track ${d2(t + 1)} duplicated to track ${d2(to + 1)}: volume, pan and effects${extra}` + (S.chainOn[t] ? ' · …chains isn’t copied' : ''));
+  toast(`Track ${d2(t + 1)} duplicated to track ${d2(to + 1)}: trim, volume, pan and effects${extra}` + (S.chainOn[t] ? ' · …chains isn’t copied' : ''));
 }
 // CLN↓ (command row, Ctrl/⌘+Shift+C) on the song: the block under the cursor, or every block in the
 // selection, is cloned into new, unique numbers on the row(s) just below; the cursor follows.
@@ -18005,7 +18078,7 @@ function del(){
     if (tv === 'phrase' && k === 'note'){ const r = S.phrases[cPhrase] && S.phrases[cPhrase][c.y]; if (r && r.slice(0, NCOL).every(n => n < 0)) r[IC] = -1; }
     return draw();
   }
-  if (tv === 'mixer'){ if (c.y === 4) return fxDelLast(onMstCell() ? NT : c.x); if (c.y === 5){ setChainOn(c.x, false); return draw(); } if (c.y === 7 && c.mx === 1) return toast('Mastering: EDIT opens it · EDIT+◀ turns it off, EDIT+▶ on'); if (c.y === 7){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.vol = f.vol; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; } mixChanged(); return draw(); }
+  if (tv === 'mixer'){ if (c.y === 4) return fxDelLast(onMstCell() ? NT : c.x); if (c.y === 5){ setChainOn(c.x, false); return draw(); } if (c.y === 7 && c.mx === 1) return toast('Mastering: EDIT opens it · EDIT+◀ turns it off, EDIT+▶ on'); if (c.y === 7 && c.mx === 2){ S.mout = 255; moApply(); } else if (c.y === 7){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.trim = f.trim; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; } mixChanged(); return draw(); }
   const r = rowsOf(tv)[c.y]; if (r && r.get && r.d != null){ r.set(r.d); if (r.after) r.after(); saveS(); draw(); }
 }
 // Whole rows: clear a row, insert a blank one (rows below move down), or remove one (rows below move up).
@@ -18269,7 +18342,7 @@ function move(dx, dy){
     if (ny < 0 || ny > h - 1){ c.y = ny < 0 ? (c.y === 0 ? h - 1 : 0) : (c.y === h - 1 ? 0 : h - 1); return draw(); } }
   if (tv === 'phrase' && dx && pvActive()) return pvMoveX(dx);   // PATTERN VIEW: past the track's first or last column, on to the next track
   if (tv === 'phrase' && dx){ const C = pCols(), i = Math.max(0, C.indexOf(c.x)); c.x = C[clamp(i + dx, 0, C.length - 1)]; }
-  else if (tv === 'mixer' && c.y === 7 && dx){ c.mx = clamp((c.mx || 0) + dx, 0, 1); return draw(); }
+  else if (tv === 'mixer' && c.y === 7 && dx){ c.mx = clamp((c.mx || 0) + dx, 0, 2); return draw(); }   // MASTER, MASTERING, OUT
   else if (tv === 'song' && dx){ const ui = clamp((c.x === MT ? ntr() : c.x) + dx, 0, ntr()); c.x = ui === ntr() ? MT : ui; }   // the master column sits after the last track
   else if (!(tv === 'song' && c.x === MT)) c.x = clamp(c.x + dx, 0, d.w - 1);   // FOCUS TRACK (24 Oct): ▲▼ on the master column stay on it (they jumped to the last track)
   const wasY = c.y; c.y = clamp(c.y + dy, 0, d.h - 1);
@@ -18487,7 +18560,7 @@ let mixBack = null;
 function mixMaster(dir){
   const c = cs.mixer;
   if (dir === 'down'){ if (c.y === 7) return; mixBack = {x:c.x, y:c.y}; c.y = 7; c.mx = 0; }
-  else { if (c.y !== 7) return; const b = mixBack || {x:0, y:0}; c.x = b.x; c.y = b.y; c.mx = 0; mixBack = null; }
+  else { if (c.y !== 7) return; const b = mixBack || {x:c.x, y:0}; c.x = b.x; c.y = b.y; c.mx = 0; mixBack = null; }   // (a click on the master row keeps the track: back to it)
   draw();
 }
 function shiftAltArrow(dir){
@@ -18856,7 +18929,7 @@ async function euclidFill(){
 /* ---------- drawing ---------- */
 const scr = $('tScr'), grid = $('tGrid');
 grid.addEventListener('scroll', e => { if (e.target.classList && e.target.classList.contains('fxpane')){ fxPaneTop = e.target.scrollTop; fxPaneCue(); } }, true);
-let CW = 0.6, meterEls = [], masterEls = [];
+let CW = 0.6, meterEls = [], masterEls = [], trimEls = [], trimLit = '';
 const MH = 8, MW = 36;
 const HINT = {
   song:'EDIT add · EDIT×2 new sect · OPT+EDIT clear · EDIT+◀▶ ±1 ▲▼ ±16 · SHIFT+▶ open · OPT+arrows next block',
@@ -18899,7 +18972,8 @@ function info(){
   }
   if (tv === 'mixer'){
     if (c.y === 7 && c.mx === 1) return 'Mastering ' + (S.mst.on ? 'on' : 'off') + ' · ' + mstChainTxt() + ' · EDIT opens it · EDIT+◀▶ off / on';
-    if (c.y === 7) return 'Master ' + dB(curve(S.master)) + (fxCount(S.mfx) ? ' · FX ' + fxList(S.mfx) : '') + ' · SHIFT+▶ master effects';
+    if (c.y === 7 && c.mx === 2){ const mo = S.mout == null ? 255 : S.mout; return 'Master OUT ' + hx(mo) + ' · ' + dB(curve(mo)) + ' · the master fader, after the limiter (no boost: FF is 0 dB) · drag its bar on the meter · OPT+EDIT 0 dB'; }   // GAIN STAGING
+    if (c.y === 7) return 'Master ' + dB(curve(S.master)) + ' into ' + (S.mst.on && S.mst.lim && S.mst.lim.on ? 'mastering’s limiter' : S.limiter ? 'the limiter' : 'OUT (no limiter)') + (fxCount(S.mfx) ? ' · FX ' + fxList(S.mfx) : '') + ' · SHIFT+▶ master effects · ▶▶ OUT, the fader after it';
     if (c.y === 5){
       const on = chainsFeed(c.x), flag = !!(S.chainOn && S.chainOn[c.x]);
       const tg = !on && flag && busPlan().targets.get(c.x);
@@ -18908,7 +18982,7 @@ function info(){
       // the owner looking for an output that was already in the patch.
       const ot = !on && !tg && flag ? chainOutTargetsOf(c.x).filter(u => u !== c.x) : null;
       return `${trkLab(c.x)}${trkKind(c.x)} · …chains ` + (on ? 'ON (track runs through the chains patch)'
-        : tg ? 'BS: feeds the bus on ' + (tg.length > 1 ? 'tracks ' : 'track ') + tg.map(u => d2(u + 1)).join(', ') + ' (heard there, not on its own) · EDIT toggles'
+        : tg ? 'BS: feeds the bus on ' + (tg.length > 1 ? 'tracks ' : 'track ') + tg.map(u => d2(u + 1)).join(', ') + ' (heard there, not on its own' + (busPlan().pre.has(c.x) ? ', before its fader' : '') + ') · EDIT toggles'
         : ot && ot.length ? 'MISS: its Chain Out feeds ' + (ot.length > 1 ? 'tracks ' : 'track ') + ot.map(u => d2(u + 1)).join(', ') + ', whose CHN is off (switch that track on, or this one) · EDIT toggles'
         : flag ? 'MISS: the patch needs a Chain Out for this track, or a bus it can feed · EDIT toggles' : 'off · EDIT toggles');
     }
@@ -18916,7 +18990,11 @@ function info(){
       return `${trkLab(c.x)}${trkKind(c.x)} · SIDECHAIN SOURCE ` + (U.length ? 'for ' + U.map(u => u.where).join(', ') : 'for nothing yet · pick this track as Source on a compressor, gate, envelope filter or Sidechain In'); }
     if (c.y === 4){ const A = S.tfx[c.x], n = fxCount(A);
       return `${trkLab(c.x)}${trkKind(c.x)} · ${n}/${FXSLOTS} active` + (A.some(Boolean) ? ' · ' + fxList(A) : '') + ' · OPTION+▲▶ turn effects on, OPTION+▼◀ off (settings kept) · EDIT opens FX'; }
-    const m = S.mix[c.x]; return `${trkLab(c.x)}${trkKind(c.x)} · ${dB(trackGain(m.vol))} · ${panS(m.pan)}` + (m.mute ? ' · muted' : '') + (m.solo ? ' · solo' : '');
+    const m = S.mix[c.x];
+    // GAIN STAGING: on TRIM, what it sends in (its light) and where VOL is
+    if (c.y === 0){ const b = rt && rt.pl.buses[c.x], ip = b && b.ipk > 0.00002 ? (20 * Math.log10(b.ipk)).toFixed(1) + ' dB' : '';
+      return `${trkLab(c.x)}${trkKind(c.x)} · TRIM ${trimS(m.trim)} into ` + (chainsFeed(c.x) ? '…chains and ' : '') + `its FX` + (ip ? ` · in peak ${ip}` + (b.ipk >= 0.999 ? ' (over 0 dB!)' : '') : '') + ` · VOL ${dB(trackGain(m.vol))} (the bar on the meter)`; }
+    return `${trkLab(c.x)}${trkKind(c.x)} · TRIM ${trimS(m.trim)} · VOL ${dB(trackGain(m.vol))} · ${panS(m.pan)}` + (m.mute ? ' · muted' : '') + (m.solo ? ' · solo' : '');
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.info) return '';
   return typeof r.info === 'function' ? r.info(r.get ? r.get() : 0) : r.info;
@@ -18962,7 +19040,7 @@ function songRows(){ const fs = parseFloat(scr.style.fontSize) || 14, h = grid.c
 // text down by just enough so it ends inside. A few tries at most, reset by every fit().
 let fitTries = 0;
 function fitCheck(){
-  // The Mixer is never exempt from this check: it must show all 20 of its rows (VOL to MASTER), so a size that does not fit
+  // The Mixer is never exempt from this check: it must show all 20 of its rows (TRIM to MASTER), so a size that does not fit
   // is brought back to one that does. TEXT SIZE is allowed to scroll or run past on purpose; a clipped Mixer row would be a bug.
   const bypass = tv === 'mixer' ? false : tv === 'phrase' || tScale !== 100;
   if (bypass || fitTries >= 3 || !(tv === 'song' || tv === 'phrase' || tv === 'mixer' || tv === 'sect') || asongOn()) return false;   // Arrange as Song: no text grid to fit
@@ -19129,12 +19207,14 @@ function draw(){
   } else if (tv === 'mixer'){
     const [T0, T1] = trackWin(c, 4); mixL = T0; mixN = T1 - T0; sub = trkSub(T0, T1);
     const hd = ['    ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t) + tkm(t) + ' gt' + (tCol(t) ? ' tcl' : ''), x:t, y:-1, title:trkTip(t), st:tCol(t) ? '--tc:' + tCol(t) : ''}, ' '); L.push(hd);
-    ['VOL ', 'PAN ', 'MUT ', 'SOL '].forEach((n, y) => {
-      const ln = [{t:n, cls:'lb'}];
+    // GAIN STAGING (27 Oct): the first row is TRIM (the track's input gain, before …chains and its FX); VOL is the fader bar
+    // over the meter. TRIM's value lights as the meter does when what it sends in runs hot (paintMeters, trimEls).
+    [{t:'TRM ', cls:'lb', title:'TRIM: each track’s input gain, before …chains and its effects (80 = 0 dB, ±18 dB). VOL is the bar on the meter below'}, 'PAN ', 'MUT ', 'SOL '].forEach((n, y) => {
+      const ln = [typeof n === 'string' ? {t:n, cls:'lb'} : n];
       for (let t = T0; t < T1; t++){ const m = S.mix[t];
-        const tx = y === 0 ? hx(m.vol) : y === 1 ? hx(m.pan) : y === 2 ? (m.mute ? 'MU' : '--') : (m.solo ? 'SO' : '--');
+        const tx = y === 0 ? hx(m.trim == null ? TRIM_0 : m.trim) : y === 1 ? hx(m.pan) : y === 2 ? (m.mute ? 'MU' : '--') : (m.solo ? 'SO' : '--');
         const on = y < 2 || (y === 2 ? m.mute : m.solo);
-        ln.push({t:tx, cls:cc(t, y, on ? (y === 2 ? 'v mu2' : y === 3 ? 'v so2' : 'v') : 'e') + tkm(t), x:t, y}, ' '); }
+        ln.push({t:tx, cls:cc(t, y, on ? (y === 2 ? 'v mu2' : y === 3 ? 'v so2' : 'v') : 'e') + tkm(t) + (y === 0 ? ' trm' : ''), x:t, y}, ' '); }
       L.push(ln);
     });
     const fl = [{t:'FX  ', cls:'lb'}];
@@ -19158,8 +19238,12 @@ function draw(){
       L.push(ml);
     }
     const mn = fxCount(S.mfx);
-    L.push([{t:'MASTER ', cls:'lb'}, {t:hx(S.master), cls:'v' + (c.y === 7 && c.mx !== 1 ? ' cur' : ''), x:0, y:7}, '  ', {t:dB(curve(S.master)), cls:'lb'}, '   ', {t:mn ? 'FX ' + fxList(S.mfx) : 'FX --', cls:mn ? 'cf' : 'e'}, '   ',
-      {t:'MASTERING ' + (S.mst.on ? 'ON' : 'OFF'), cls:'mstc' + (S.mst.on ? ' on' : '') + (c.y === 7 && c.mx === 1 ? ' cur' : ''), x:1, y:7}]);
+    // The master row in signal order: MASTER (the drive into the limiter) → FX → MASTERING → OUT (GAIN STAGING, 27 Oct: the
+    // master fader, after the limiter; its bar is on the L / R meter). ◀▶ move MASTER (mx 0), MASTERING (1), OUT (2).
+    const mxc = c.y === 7 ? c.mx || 0 : -1, mo = S.mout == null ? 255 : S.mout;
+    L.push([{t:'MASTER ', cls:'lb'}, {t:hx(S.master), cls:'v' + (mxc === 0 ? ' cur' : ''), x:0, y:7}, '  ', {t:dB(curve(S.master)), cls:'lb'}, '   ', {t:mn ? 'FX ' + fxList(S.mfx) : 'FX --', cls:mn ? 'cf' : 'e'}, '   ',
+      {t:'MASTERING ' + (S.mst.on ? 'ON' : 'OFF'), cls:'mstc' + (S.mst.on ? ' on' : '') + (mxc === 1 ? ' cur' : ''), x:1, y:7}, '   ',
+      {t:'OUT ', cls:'lb', title:'Master OUT: the master fader, after the limiter (FF = 0 dB, no boost). Its bar is on the meter below'}, {t:hx(mo), cls:'v' + (mxc === 2 ? ' cur' : ''), x:2, y:7}, ' ', {t:dB(curve(mo)), cls:'lb'}]);
     for (const ch of ['L', 'R']) L.push([{t:ch + '   ', cls:'lb'}, {t:'', cls:'mm m1'}, {t:'', cls:'mm m2'}, {t:'', cls:'mm m3'}, {t:'', cls:'mm e'}, ' ', {t:'', cls:'mm lb'}]);
   } else {
     if (tv === 'inst'){ title = 'INST ' + hx(cInst); const I = S.insts[cInst]; sub = (isSyn(I.pad) ? 'SYNTH ' : 'PAD ') + hx(I.pad); }
@@ -19209,6 +19293,7 @@ function draw(){
       const left = r.left - g.left - grid.clientLeft + grid.scrollLeft, w = Math.min(r.width, V * 0.5), m = Math.min(r.width, 40);
       grid.scrollLeft = Math.max(0, Math.min(left + w + m - V, left - 6)); } }
   meterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mt')] : []; masterEls = tv === 'mixer' ? [...grid.querySelectorAll('.mm')] : [];
+  trimEls = tv === 'mixer' ? [...grid.querySelectorAll('.trm')] : []; trimLit = '';   // GAIN STAGING: the TRIM row's input light
   if (tv === 'mixer') chwSet();
   tickLen();
   mixFaders();   // MIXER FADERS
@@ -19301,8 +19386,8 @@ const volDb = v => { const g = trackGain(v); return g <= 0.00001 ? -999 : 20 * M
 const dbVol = d => d >= 0 ? clamp(Math.round(TRK_UNITY + d / 6 * (255 - TRK_UNITY)), TRK_UNITY, 255) : d <= -60 ? 0 : clamp(Math.round(TRK_UNITY * Math.pow(10, d / 40)), 0, TRK_UNITY);
 let mfDrag = null;
 function mixFaders(){
-  let host = grid.querySelector('.mfhost');
-  if (tv !== 'mixer' || !meterEls.length || !mixN){ if (host) host.remove(); return; }
+  let host = grid.querySelector('.mfhost:not(.mohost)');
+  if (tv !== 'mixer' || !meterEls.length || !mixN){ if (host) host.remove(); mixOutBar(); return; }
   if (!host){ host = el('div', 'mfhost'); host.setAttribute('aria-hidden', 'true'); grid.append(host); }
   const g = grid.getBoundingClientRect(), ox = grid.scrollLeft - g.left - grid.clientLeft, oy = grid.scrollTop - g.top - grid.clientTop;
   if (host.children.length !== mixN){ host.replaceChildren(); for (let i = 0; i < mixN; i++){ const b = el('i', 'mfbar'); b.dataset.i = i; host.append(b); } }
@@ -19311,12 +19396,54 @@ function mixFaders(){
     const top = a.top + oy, bot = z.bottom + oy, rowH = (bot - top) / MH, d = volDb(S.mix[t].vol);
     const y = d >= 0 ? top - Math.min(1, d / 6) * rowH * 0.5 : d <= -48 ? bot : top + (-d / 48) * (bot - top);   // the headroom: half a line above the top
     Object.assign(b.style, {left:(a.left + ox - 2).toFixed(1) + 'px', width:(a.width + 4).toFixed(1) + 'px', top:(y - 1.5).toFixed(1) + 'px'});
-    b.dataset.t = t; b.dataset.top = top; b.dataset.bot = bot; b.title = 'Track ' + d2(t + 1) + ' · ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)) + ' · drag to change, double-click for 0 dB';
+    b.dataset.t = t; b.dataset.top = top; b.dataset.bot = bot; b.title = 'Track ' + d2(t + 1) + ' · VOL ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)) + ' · the fader, after …chains and the FX (TRIM is above, before them) · drag to change, double-click for 0 dB';
     b.classList.toggle('mu', !!S.mix[t].mute);
   }
+  mixOutBar();
+}
+/* MASTER OUT BAR (GAIN STAGING, owner 27 Oct): the master fader as an upright bar across the L / R meter, on the meter's
+   scale (−48 dB at its left end, 0 dB at its right; OUT never boosts). Drag it sideways; left of the meter is off. Shift
+   drags finely; a double-click puts it back to 0 dB (FF). The master row's OUT follows it, and Undo takes it back. */
+const outDb = v => { const g = curve(v); return g <= 0.00001 ? -999 : 20 * Math.log10(g); };
+const dbOut = d => d <= -60 ? 0 : clamp(Math.round(255 * Math.pow(10, Math.min(0, d) / 40)), 0, 255);
+let moDrag = null, moTap = {t:0, x:0};
+function mixOutBar(){
+  let host = grid.querySelector('.mohost');
+  if (tv !== 'mixer' || masterEls.length !== 10){ if (host) host.remove(); return; }
+  if (!host){ host = el('div', 'mfhost mohost'); host.setAttribute('aria-hidden', 'true'); host.append(el('i', 'mfbar mobar')); grid.append(host); }
+  const b = host.firstChild, g = grid.getBoundingClientRect(), ox = grid.scrollLeft - g.left - grid.clientLeft, oy = grid.scrollTop - g.top - grid.clientTop;
+  const lnL = masterEls[0].closest('.ln'), lnR = masterEls[5].closest('.ln'); if (!lnL || !lnR) return;
+  const a = masterEls[0].getBoundingClientRect(), tL = lnL.getBoundingClientRect(), bR = lnR.getBoundingClientRect();
+  const cw = parseFloat(grid.style.getPropertyValue('--chw')) || parseFloat(getComputedStyle(lnL).fontSize) * 0.6;
+  const x0 = a.left + ox, w = MW * cw, mo = S.mout == null ? 255 : S.mout, d = outDb(mo), x = d <= -48 ? x0 - 4 : x0 + (d + 48) / 48 * w;
+  Object.assign(b.style, {left:(x - 1.5).toFixed(1) + 'px', top:(tL.top + oy).toFixed(1) + 'px', height:(bR.bottom - tL.top).toFixed(1) + 'px'});
+  b.dataset.x0 = x0; b.dataset.w = w;
+  b.title = 'Master OUT · ' + hx(mo) + ' · ' + dB(curve(mo)) + ' · the master fader, after the limiter · drag to change, double-click for 0 dB';
+  b.classList.toggle('on', !!moDrag);
 }
 grid.addEventListener('pointerdown', e => {
-  const b = e.target.closest && e.target.closest('.mfbar'); if (!b || tv !== 'mixer') return;
+  const b = e.target.closest && e.target.closest('.mobar'); if (!b || tv !== 'mixer' || e.button !== 0) return;
+  e.preventDefault(); e.stopPropagation();
+  const now = performance.now(), two = now - moTap.t < 350 && Math.abs(e.clientX - moTap.x) < 8; moTap = {t:two ? 0 : now, x:e.clientX};
+  if (two){ S.mout = 255; moApply(); saveS(); cs.mixer.y = 7; cs.mixer.mx = 2; draw(); toast('Master OUT · FF · 0.0 dB'); return; }   // double-click / double-tap: 0 dB
+  const g = grid.getBoundingClientRect();
+  moDrag = {id:e.pointerId, x0:+b.dataset.x0, w:+b.dataset.w, cx:e.clientX, v0:S.mout == null ? 255 : S.mout, ox:grid.scrollLeft - g.left - grid.clientLeft};
+  try { grid.setPointerCapture(e.pointerId); } catch(err){}   // the grid, not the bar: a redraw rebuilds the bar
+  cs.mixer.y = 7; cs.mixer.mx = 2; draw();
+}, true);
+grid.addEventListener('pointermove', e => {
+  if (!moDrag || e.pointerId !== moDrag.id) return; e.preventDefault(); e.stopPropagation();
+  const D = moDrag, x = e.clientX + D.ox;
+  const v = e.shiftKey ? clamp(Math.round(D.v0 + (e.clientX - D.cx) / 4), 0, 255) : x < D.x0 - 6 ? 0 : dbOut((x - D.x0) / Math.max(1, D.w) * 48 - 48);
+  if (v === (S.mout == null ? 255 : S.mout)) return;
+  S.mout = v; moApply(); draw();
+  toast('Master OUT · ' + hx(v) + ' · ' + dB(curve(v)), 900);
+}, true);
+const moDragEnd = e => { if (!moDrag || e.pointerId !== moDrag.id) return; moDrag = null; try { grid.releasePointerCapture(e.pointerId); } catch(err){} saveS(); draw(); };
+grid.addEventListener('pointerup', moDragEnd, true); grid.addEventListener('pointercancel', moDragEnd, true);
+
+grid.addEventListener('pointerdown', e => {
+  const b = e.target.closest && e.target.closest('.mfbar:not(.mobar)'); if (!b || tv !== 'mixer') return;   // (the master OUT bar has its own)
   if (e.button !== 0) return;   // FIX (27 Oct, audit M17): a right or middle click no longer starts a fader drag (right-click: the menu)
   e.preventDefault(); e.stopPropagation();
   const t = +b.dataset.t;
@@ -19336,10 +19463,12 @@ grid.addEventListener('pointermove', e => {
 }, true);
 const mfEnd = e => { if (!mfDrag || e.pointerId !== mfDrag.id) return; const t = mfDrag.t; mfDrag = null; grid.querySelectorAll('.mfbar.on').forEach(b => b.classList.remove('on')); mixChanged(); draw(); };
 grid.addEventListener('pointerup', mfEnd, true); grid.addEventListener('pointercancel', mfEnd, true);
-grid.addEventListener('dblclick', e => { const b = e.target.closest && e.target.closest('.mfbar'); if (!b || tv !== 'mixer') return; e.preventDefault(); e.stopPropagation();
+grid.addEventListener('dblclick', e => { const b = e.target.closest && e.target.closest('.mfbar:not(.mobar)'); if (!b || tv !== 'mixer') return; e.preventDefault(); e.stopPropagation();
   const t = +b.dataset.t; S.mix[t].vol = TRK_UNITY; mixChanged(); draw(); toast('Track ' + d2(t + 1) + ' · VOL E0 · 0.0 dB'); }, true);
 function paintMeters(){
   const bs = rt ? rt.pl.buses : null;
+  if (trimEls.length){ const now = performance.now(), lit = trimEls.map((e, i) => { const b = bs && bs[mixL + i], p = b && now - (b.iseen || 0) < 1000 ? b.ipk : 0; return p >= 0.891 ? 2 : p >= 0.5 ? 1 : 0; });
+    const sig = lit.join(''); if (sig !== trimLit){ trimLit = sig; trimEls.forEach((e, i) => { e.classList.toggle('ih', lit[i] === 1); e.classList.toggle('ic', lit[i] === 2); }); } }   // GAIN STAGING: the TRIM light
   document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { e.style.height = (bs ? lvl(bs[t].lv) * 100 : 0).toFixed(1) + '%'; });
   // Track meters: element k * mixN + i is line k (from the top) of the i-th track on screen.
   meterEls.forEach((e, i) => { const k = Math.floor(i / mixN), t = mixL + i % mixN, f = (bs ? lvl(bs[t].lv) : 0) * MH * 8 - (MH - 1 - k) * 8;
@@ -20143,9 +20272,11 @@ function deckLayout(){
 }
 // Channel strip: the current track's level, fader, pan, mute and solo.
 const stVol = $('stVol'), stPan = $('stPan');
-// The fader: drag up and down (0–255, 224 is the default), arrows step it, double-click resets.
-const stGet = () => dkMst() ? S.master : S.mix[dkTrack()].vol;
-const stSet = v => { v = clamp(Math.round(v), 0, 255); if (dkMst()){ S.master = v; rtRoute(); saveS(); } else { S.mix[dkTrack()].vol = v; mixChanged(); } deckStrip(); };
+// The fader: drag up and down (0–255, 224 is the default), arrows step it, double-click resets. GAIN STAGING (27 Oct): a
+// track's is its VOL (after …chains and its FX; TRIM is the Mixer's first row), the master's is OUT (after the limiter;
+// MASTER, the drive into it, stays on the Mixer's master row and the Project screen).
+const stGet = () => dkMst() ? (S.mout == null ? 255 : S.mout) : S.mix[dkTrack()].vol;
+const stSet = v => { v = clamp(Math.round(v), 0, 255); if (dkMst()){ S.mout = v; moApply(); saveS(); } else { S.mix[dkTrack()].vol = v; mixChanged(); } deckStrip(); };
 const stPos = v => { const h = stVol.clientHeight - 16; return 8 + v / 255 * h; };
 stVol.addEventListener('pointerdown', e => { e.preventDefault(); try { stVol.setPointerCapture(e.pointerId); } catch(_){} stVol.focus();
   const r = stVol.getBoundingClientRect(), h = r.height - 16, y0 = e.clientY, v0 = stGet();
@@ -20164,8 +20295,8 @@ $('stSolo').addEventListener('click', () => { if (dkMst()) return; const m = S.m
 function deckStrip(){
   const anySolo = S.mix.some(m => m.solo); $('dkSolo').hidden = !anySolo || !deckShown();
   if (!deckShown() || !deck.strip) return;
-  const mst = dkMst(), t = dkTrack(), m = mst ? {vol:S.master, pan:128} : S.mix[t], poly = !mst && t >= polyFrom();
-  $('dkStripT').textContent = mst ? 'MASTER' : `${trkLab(t)}${trkKind(t)}`;
+  const mst = dkMst(), t = dkTrack(), m = mst ? {vol:S.mout == null ? 255 : S.mout, pan:128} : S.mix[t], poly = !mst && t >= polyFrom();
+  $('dkStripT').textContent = mst ? 'MASTER OUT' : `${trkLab(t)}${trkKind(t)}`;
   $('dkStripB').classList.toggle('gm', !mst && !poly); $('dkStripB').classList.toggle('gp', poly); $('dkStripB').classList.toggle('gx', mst);
   stPan.disabled = mst; $('stMute').hidden = $('stSolo').hidden = mst;   // FOCUS TRACK: the master's strip is its level only
   const fy = stPos(m.vol); stVol.querySelector('.stcap').style.bottom = fy + 'px'; stVol.querySelector('.stfill').style.height = Math.max(0, fy - 8) + 'px';
@@ -20176,7 +20307,8 @@ function deckStrip(){
   $('stPanV').textContent = mst ? '—' : m.pan === 128 ? 'C' : m.pan < 128 ? 'L' + Math.round((128 - m.pan) / 128 * 100) : 'R' + Math.round((m.pan - 128) / 127 * 100);
   const mu = $('stMute'), so = $('stSolo'); mu.classList.toggle('on', !!m.mute); so.classList.toggle('on', !!m.solo);
   mu.setAttribute('aria-pressed', String(!!m.mute)); so.setAttribute('aria-pressed', String(!!m.solo));
-  $('stM').title = mst ? 'Master level, left and right' : anySolo && !m.solo ? 'Silent: another track is soloed' : '';
+  stVol.setAttribute('aria-label', mst ? 'Master out' : 'Track volume'); stVol.title = mst ? 'Master OUT: the master fader, after the limiter · drag · double-click for 0 dB' : 'Volume: drag · double-click for 0 dB · +6 dB at the top';
+  $('stM').title = mst ? 'Master level after OUT, left and right' : anySolo && !m.solo ? 'Silent: another track is soloed' : '';
 }
 // The strip's meter is stereo: the shown track's bus (after its pan) is split into left and right, each with its
 // own analyser, re-attached when the shown track changes. Peaks fall back smoothly, like the other meters.
@@ -20185,7 +20317,7 @@ function deckMetersPaint(){}
 function deckStripMeter(now){
   if (!deckShown() || !deck.strip || now - dkStT < 33) return;
   const dt = now - dkStT; dkStT = now;
-  const t = dkMst() ? 'm' : dkTrack(), bars = $('stM').children, node = k => k === 'm' ? rt.out : rt.pl.buses[k].p;   // FOCUS TRACK: 'm' the master out
+  const t = dkMst() ? 'm' : dkTrack(), bars = $('stM').children, node = k => k === 'm' ? rt.mo : rt.pl.buses[k].p;   // FOCUS TRACK: 'm' the master out (after the OUT fader: GAIN STAGING)
   if (!rt || !ctx){ for (const b of bars) b.style.setProperty('--lv', '0%'); return; }
   if (!dkSt || dkSt.t !== t){
     try { if (dkSt){ node(dkSt.t).disconnect(dkSt.sp); }
@@ -21551,6 +21683,12 @@ function frame(){
     for (let t = 0; t < ntr(); t++){ const b = rt.pl.buses[t]; b.an.getFloatTimeDomainData(mbuf);
       let p = 0; for (let i = 0; i < mbuf.length; i++){ const a = mbuf[i] < 0 ? -mbuf[i] : mbuf[i]; if (a > p) p = a; }
       const nl = Math.max(p, b.lv * dk), v = nl < 0.002 ? 0 : nl; if (v !== b.lv){ any = true; b.lv = v; } }
+    // GAIN STAGING: the Mixer's TRIM light, from what the shown tracks send in (after TRIM): the peak held 0.6 s, then falling
+    if (tv === 'mixer' && trimEls.length) for (let i = 0; i < mixN; i++){ const b = rt.pl.buses[mixL + i]; if (!b || !b.ai) continue; b.ai.getFloatTimeDomainData(mbuf);
+      let p = 0; for (let k = 0; k < mbuf.length; k++){ const a = mbuf[k] < 0 ? -mbuf[k] : mbuf[k]; if (a > p) p = a; }
+      const was = b.ipk;
+      if (p >= b.ipk){ b.ipk = p; b.ipt = mt; } else if (mt - b.ipt > 600){ b.ipk = Math.max(p, b.ipk * dk); if (b.ipk < 0.0005) b.ipk = 0; }
+      b.iseen = mt; if (b.ipk !== was) any = true; }
     if (rt.man){ const now = mt;
       rt.man.forEach((a, s) => { a.getFloatTimeDomainData(mbuf2);
         let p = 0; for (let i = 0; i < mbuf2.length; i++){ const v = mbuf2[i] < 0 ? -mbuf2[i] : mbuf2[i]; if (v > p) p = v; }
@@ -21816,11 +21954,11 @@ function altDrag(e, x, y){
   try { grid.setPointerCapture(e.pointerId); } catch(_){}
   return true;
 }
-/* VALUE MOUSE (owner, 24 Oct): with a mouse, a value on the Mixer (VOL, PAN, MASTER) or on the FX, INST and PROJECT screens
+/* VALUE MOUSE (owner, 24 Oct): with a mouse, a value on the Mixer (TRIM, PAN, MASTER, OUT) or on the FX, INST and PROJECT screens
    changes as soon as it is dragged up or down or scrolled over with the wheel, instead of the drag or wheel moving between
    lines. A click still only selects it, and a click on the selected value acts as before (EDIT). Ctrl/⌘ takes big steps,
    Shift slows a drag down (27 Oct: Shift took big steps). */
-const valCell = (s, x, y) => !!s && !onPset() && (tv === 'mixer' ? y === 0 || y === 1 || (y === 7 && x === 0)
+const valCell = (s, x, y) => !!s && !onPset() && (tv === 'mixer' ? y === 0 || y === 1 || (y === 7 && (x === 0 || x === 2))
   : (tv === 'fx' || tv === 'inst' || tv === 'project') && y >= 0 && !s.classList.contains('lb') && !s.classList.contains('act'));
 const gridDown = e => {
   // RIGHT-CLICK (Ctrl+click on a Mac): the cell under the mouse becomes the cursor, unless it is inside the selection
@@ -21855,14 +21993,15 @@ const gridDown = e => {
   if (mselDown(e, x, y)) return;   // MOUSE SELECT: drag selects, Shift-click extends, a selection drags to move or copy
   // While selecting, a tap only moves the selection's corner there: it never opens or edits the cell.
   if (selA && selA.v === tv && GRIDV.has(tv) && y >= 0){ c.x = x; c.y = y; draw(); return startScroll(e); }
-  if (tv === 'mixer' && y === 7){ if (x === 1){ c.y = 7; c.mx = 1; draw(); openMst(); return; } if (c.mx === 1){ c.mx = 0; c.y = 7; draw(); return startScroll(e); } }
-  const was = GRIDV.has(tv) || tv === 'mixer' ? c.x === x && c.y === y : c.y === y;
+  if (tv === 'mixer' && y === 7){ if (x === 1){ c.y = 7; c.mx = 1; draw(); openMst(); return; } if (c.mx === 1){ c.mx = x; c.y = 7; draw(); return startScroll(e); } }
+  // (the master row's cells are numbered by mx, not track: GAIN STAGING, 27 Oct, added OUT as mx 2)
+  const was = tv === 'mixer' && y === 7 ? c.y === 7 && (c.mx || 0) === x : GRIDV.has(tv) || tv === 'mixer' ? c.x === x && c.y === y : c.y === y;
   if (e.pointerType === 'mouse' && e.button === 0 && valCell(s, x, y)){   // VALUE MOUSE: the drag changes it from the start
-    c.x = x; c.y = y; if (tv === 'mixer' && y === 7) c.mx = 0; if (!was) draw();
+    if (tv === 'mixer' && y === 7){ c.y = 7; c.mx = x; } else { c.x = x; c.y = y; } if (!was) draw();
     drag = {id:e.pointerId, y0:e.clientY, lastY:e.clientY, acc:0, edit:true, tap:was, moved:false, sy:c.y, mp:false, hold:false};
     e.preventDefault(); try { grid.setPointerCapture(e.pointerId); } catch(_){} return;
   }
-  c.x = x; c.y = y; if (!was) draw();
+  if (tv === 'mixer' && y === 7){ c.y = 7; c.mx = x; } else { c.x = x; c.y = y; } if (!was) draw();   // (the master row: by mx, the track cursor stays)
   // A drag that starts on the cursor's own cell changes its value; one that starts anywhere else scrolls.
   if (!was) return startScroll(e);
   // PHRASE + MOUSE (owner, 19 Oct): a click never adds or stamps a note, it only moves the cursor (Enter or EDIT adds),
@@ -21984,7 +22123,8 @@ scr.addEventListener('wheel', e => {
   if (fxp.open || (e.ctrlKey && e.target.closest && e.target.closest('#tArr'))) return;   // Ctrl+wheel over Arrange zooms it
   { const v = e.target.closest && e.target.closest('[data-x]'), x = v ? +v.dataset.x : 0, y = v ? +v.dataset.y : -1;   // VALUE MOUSE: the wheel over a value changes it
     if (v && grid.contains(v) && valCell(v, x, y) && !e.ctrlKey){ e.preventDefault();   // (Ctrl+wheel is a trackpad pinch: zoom, never a value)
-      const c = cs[tv]; if (c.x !== x || c.y !== y){ c.x = x; c.y = y; if (tv === 'mixer' && y === 7) c.mx = 0; vAcc = 0; draw(); }
+      const c = cs[tv]; if (tv === 'mixer' && y === 7){ if (c.y !== 7 || (c.mx || 0) !== x){ c.y = 7; c.mx = x; vAcc = 0; draw(); } }   // MASTER or OUT
+      else if (c.x !== x || c.y !== y){ c.x = x; c.y = y; vAcc = 0; draw(); }
       const dy = e.deltaY || e.deltaX; vAcc += e.deltaMode === 1 ? dy * 40 : dy;   // Shift+wheel comes as deltaX on some systems
       const n = Math.trunc(vAcc / 40); if (!n) return; vAcc -= n * 40;
       for (let k = 0; k < Math.abs(n); k++) bump(n < 0 ? 1 : -1, false);   // up raises it (Shift took big steps: Phase 2, Shift is fine)
@@ -22191,7 +22331,7 @@ function typeHex(d){
   }
   if (tv === 'mixer'){
     if (c.y === 7 && c.mx === 1) return;
-    if (c.y === 7){ S.master = v; rtRoute(); } else if (c.y === 5){ setChainOn(c.x, !!v); return; } else if (c.y === 0) S.mix[c.x].vol = v; else if (c.y === 1) S.mix[c.x].pan = v; else return;
+    if (c.y === 7 && c.mx === 2){ S.mout = v; moApply(); } else if (c.y === 7){ S.master = v; rtRoute(); } else if (c.y === 5){ setChainOn(c.x, !!v); return; } else if (c.y === 0) S.mix[c.x].trim = v; else if (c.y === 1) S.mix[c.x].pan = v; else return;   // GAIN STAGING: TRIM, OUT
     if (done) hexBuf.key = ''; mixChanged(); draw(); return;
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.get || r.tog) return;
@@ -22363,7 +22503,7 @@ const HINTK = {
   sect:'Type hex · Enter add or open · Enter×2 new phrase · Del cell · Shift+Del line · [ ] other sect · Alt+→ open · Shift+arrows select',
   phrase:'Notes Z–; and Q–P · 1 off · / mute track · −/= octave · Del cell · Shift+Del row · Ins add row · Shift+arrows select · Shift+Alt+arrows other phrase · Ctrl+C/V',
   inst:'Ctrl+arrows change · Enter runs › rows · [ ] other instrument · Alt+← phrase',
-  mixer:'Type hex for VOL and PAN · FX row: Ctrl+▲▶ on (up to 4), Ctrl+▼◀ off · Enter mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (Enter says for what) · Del resets · Alt+→ FX · Alt+↑ back',
+  mixer:'Type hex for TRIM, PAN, MASTER and OUT · VOL is the bar on each meter · FX row: Ctrl+▲▶ on (up to 4), Ctrl+▼◀ off · Enter mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (Enter says for what) · Del resets · Alt+→ FX · Alt+↑ back',
   fx:'Type hex · Ctrl+arrows change · Enter adds · → opens its controls · Del removes or resets · [ ] other track · Alt+← mixer',
   project:'Ctrl+arrows change · Enter runs › rows · Del resets · Ctrl+S save · Shift+Ctrl+S save as · Ctrl+O open · Ctrl+N new song',
 };

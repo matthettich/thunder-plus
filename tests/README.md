@@ -13,6 +13,7 @@ device, so it runs in about 15 seconds.
 | `updater.test.js` | the desktop updater's SHA-256 check |
 | `pump-synth.test.js` | the …pump synth engines (MONO, POLY, COIL from `pump/synth/`): every factory preset renders finite and below full scale, hold / release / Tune, golden output; the live worklet's notes as MIDI (retrigger, legato, bend, chords), live = render for the same note, sleeping in silence |
 | `usability.test.js` | the usability audit's Phase 1 fixes (`docs/USABILITY-AUDIT.md`): toast timing and queue, wheel step accumulation (host sliders and pump windows), AltGr, F8 panic, row insert/remove inside a phrase's LEN, Delete on a selection, and source guards for KEYS-mode modifiers, Synth-page keys, dialogs over Settings, unsaved-change marks, Open's fresh undo, leaving the page, and the key docs |
+| `gain-staging.test.js` | the 27 Oct gain staging (`docs/GAIN-STAGING.md`): TRIM's scale, `applyMix` (TRIM, VOL, the PRE tap with mute and solo), the CHN crossfade's ramps and node lifetimes, `busPlan().pre`, and source guards for the per-track graph, the master OUT (live and in renders), the Mixer rows and the song file |
 
 ## Golden hashes
 

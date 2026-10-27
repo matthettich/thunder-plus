@@ -382,7 +382,7 @@ const Repeat = {
 const TrackIn = {
   type:'trackIn', scope:'mono', cost:.02,
   inputs:{}, outputs:{ out:'audio', outR:'audio' },
-  params:{ track:[1,1,CHAN_COUNT,1] },
+  params:{ track:[1,1,CHAN_COUNT,1], pre:[0,0,1,1] },   // pre: PRE SENDS (27 Oct), read by Thunder's routing only
   create:() => ({}),
   process(st, io, ctx){
     const k = clamp((io.p.track | 0) - 1, 0, CHAN_COUNT - 1);
