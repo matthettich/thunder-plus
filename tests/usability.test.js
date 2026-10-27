@@ -208,3 +208,21 @@ test('Phase 2 editors: modules take Max/MSP edit-mode gestures', () => {
     assert.match(w, /n\.el\.addEventListener\('pointerdown', e => \{ e\.stopPropagation\(\); n\.el\.style\.zIndex = \+\+zTop; maxBodyDown\(e, n\); \}\);/, f + ': a click on a module selects it');
   }
 });
+
+test('Phase 2 rest: one menu (press-drag-release, pads and layers), one confirm, note keys by position, one undo step per gesture, touch sizes, pinch-zoom', () => {
+  const src = H.read('index.html');
+  assert.match(src, /if \(ptrHeld\)\{ const t0 = performance\.now\(\)/, 'menus pick on release');
+  assert.match(src, /function ctxBind\(el, fn, opts = \{\}\)\{/, 'right-click and long-press menus');
+  assert.match(src, /ctxBind\(\$\('pads'\)/, 'pads'); assert.match(src, /ctxBind\(\$\('strip'\)/, 'layers');
+  assert.match(src, /function ask\(msg, fn\)\{ askYes\(msg, 'Yes'\)\.then/, 'the inline Yes / Cancel row is the dialog');
+  assert.doesNotMatch(src, /'Tap again: ' \+ it\[0\]/, 'no "Tap again" in the File menu');
+  assert.doesNotMatch(src, /return toast\('Tap EDIT again to '/, 'no "Tap EDIT twice"');
+  assert.match(src, /const PIANO_CODE = \{KeyZ:0, KeyS:1,/, 'note keys by e.code');
+  assert.match(src, /const pn = pianoOf\(e\);   \/\/ NOTE KEYS BY POSITION/, 'Synth page too');
+  assert.match(H.read('waves/index.html'), /const keyOf = e => K_CODE\[e\.code\]/, '…waves too');
+  assert.match(src, /if \(undoHeld && !undo\.busy && !recTake\)\{ undoWant = true; return; \}/, 'one step per gesture');
+  assert.match(src, /@media \(pointer:coarse\)\{\n  \.mfbar::before\{top:-19px; bottom:-19px\}/, '40 px touch targets');
+  assert.match(src, /<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">/, 'pinch-zoom allowed');
+  assert.match(src, /html\{-webkit-touch-callout:none; touch-action:manipulation;/, 'pinch-zoom allowed (CSS)');
+  assert.match(src, /\.pads, \.pad\{touch-action:pan-x pan-y\}/, 'but not on the pads');
+});

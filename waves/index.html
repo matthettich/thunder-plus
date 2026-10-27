@@ -3193,14 +3193,19 @@ const K_UP  = ['q','2','w','3','e','r','5','t','6','y','7','u','i','9','o','0','
 let octave = 0;
 const held = new Map();
 function pitchOf(k){ const i = K_LOW.indexOf(k), j = K_UP.indexOf(k); return i >= 0 ? i : (j >= 0 ? 12 + j : -1); }
+/* NOTE KEYS BY POSITION (Thunder Plus, 27 Oct, Phase 2): the key's place (e.code) picks the note, as on a US keyboard, so
+   QWERTZ and AZERTY play the same notes; the letter is the fallback for keys without a code. */
+const K_CODE = {KeyZ:'z', KeyS:'s', KeyX:'x', KeyD:'d', KeyC:'c', KeyV:'v', KeyG:'g', KeyB:'b', KeyH:'h', KeyN:'n', KeyJ:'j', KeyM:'m', Comma:',', KeyL:'l', Period:'.', Semicolon:';', Slash:'/',
+  KeyQ:'q', Digit2:'2', KeyW:'w', Digit3:'3', KeyE:'e', KeyR:'r', Digit5:'5', KeyT:'t', Digit6:'6', KeyY:'y', Digit7:'7', KeyU:'u', KeyI:'i', Digit9:'9', KeyO:'o', Digit0:'0', KeyP:'p'};
+const keyOf = e => K_CODE[e.code] || (e.key || '').toLowerCase();
 window.addEventListener('keydown', e => {
   if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || typing(e) || !bridge) return;
-  const key = e.key.toLowerCase();
-  if (key === '-' || key === '='){ octave = Math.max(-4, Math.min(4, octave + (key === '=' ? 1 : -1))); toast('Octave ' + (octave + 4)); return; }
-  const p = pitchOf(key); if (p < 0 || held.has(key)) return;
+  const k0 = (e.key || '').toLowerCase();
+  if (k0 === '-' || k0 === '='){ octave = Math.max(-4, Math.min(4, octave + (k0 === '=' ? 1 : -1))); toast('Octave ' + (octave + 4)); return; }
+  const key = keyOf(e), p = pitchOf(key); if (p < 0 || held.has(key)) return;
   const pitch = p + octave * 12; held.set(key, pitch); bridge.resume(); bridge.noteOn(pitch, 1);
 });
-window.addEventListener('keyup', e => { const key = e.key.toLowerCase(), pitch = held.get(key); if (pitch == null) return; held.delete(key); if (bridge) bridge.noteOff(pitch); });
+window.addEventListener('keyup', e => { const key = keyOf(e), pitch = held.get(key); if (pitch == null) return; held.delete(key); if (bridge) bridge.noteOff(pitch); });
 window.addEventListener('blur', () => { held.forEach(p => bridge && bridge.noteOff(p)); held.clear(); });
 /* on-screen keys */
 {

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -26,7 +26,7 @@
 /* An instrument, not a web page: no text selection, no long-press callout and no browser pinch-zoom anywhere.
    Chrome's tap-to-search sheet (the Google search that slid up from the bottom) only opens on selectable text,
    so this stops it on every screen, not just the tracker grid. Fields stay editable. */
-html{-webkit-touch-callout:none; touch-action:pan-x pan-y; -webkit-text-size-adjust:100%; text-size-adjust:100%; overscroll-behavior:none}   /* no pull-to-refresh on a drag (a reload mid-session) */
+html{-webkit-touch-callout:none; touch-action:manipulation; -webkit-text-size-adjust:100%; text-size-adjust:100%; overscroll-behavior:none}   /* no pull-to-refresh on a drag (a reload mid-session) */
 body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),textarea,[contenteditable]:not([contenteditable=false])){user-select:text; -webkit-user-select:text; -webkit-touch-callout:default}
 </style>
@@ -448,6 +448,9 @@ body:not(.nowv) .wvMobNote{display:none}
      the dock's 24px block padding and its 1px top border. */
   height:calc(70px * 2 + 10px + 24px + 1px); overflow-y:auto; touch-action:pan-y; overscroll-behavior:contain}
 .pads{display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:6px}
+/* PINCH-ZOOM (owner, 27 Oct, Phase 2): the page can be pinched (small text on the cover screen), but not where two fingers
+   play: the pads, the keypad and the PAD buttons (touch-action:none there), and the Arrange keeps its own pinch (.tagrid). */
+.pads, .pad{touch-action:pan-x pan-y}
 .pad{height:70px; border:1px solid var(--line); background:var(--panel); display:flex; flex-direction:column;
   justify-content:space-between; align-items:flex-start; padding:6px 8px; text-align:left; font-size:var(--fs-3); touch-action:none; min-width:0; gap:0}
 .pad b{font-size:var(--fs-5); font-weight:600}
@@ -735,6 +738,19 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .tgrid .mt{width:calc(2 * var(--chw, 1ch))}
 .mfhost{position:absolute; left:0; top:0; width:0; height:0; z-index:3}
 .mfbar{position:absolute; height:3px; background:var(--ts-ink); border-radius:1px; cursor:ns-resize; touch-action:none; box-shadow:0 0 0 1px var(--ts-bg)}
+/* TOUCH SIZING (owner, 27 Oct, Phase 2; audit M12): on a touch screen every control is at least 40 px to the finger.
+   Visual sizes stay; the hit areas grow (::before), and rows that are only text get taller. */
+.mfbar::before{content:''; position:absolute; left:-4px; right:-4px; top:-8px; bottom:-8px}
+@media (pointer:coarse){
+  .mfbar::before{top:-19px; bottom:-19px}
+  .dkgrip{top:-14px; height:28px}
+  .row{min-height:40px}
+  input[type=range]{height:40px}
+  .dkh{height:32px} .dkh .dkt, .dkh .dkx, .dkh .dksolo{height:28px}
+  .dkh .dkx{width:36px}
+  .sxmenu button, .askitem, .setmenu button{min-height:40px}
+  .tarrh{width:32px; left:-16px}
+}
 .mfbar::before{content:''; position:absolute; left:0; right:0; top:-5px; bottom:-5px}   /* an easier grab than 3 px */
 .mfbar.mu{opacity:.45} .mfbar.on, .mfbar:hover{background:var(--ts-cur-bg, var(--ts-ink)); height:4px}   /* --chw: a character's advance in the grid (chwSet), letter-spacing included */
 .tscr .m1{color:var(--ts-ok)} .tscr .m2{color:var(--ts-hot)} .tscr .m3{color:var(--ts-clip)}
@@ -10691,6 +10707,22 @@ function renderStrip(){
 const BOXPAL = ['#dbe6f8', '#e9e0f8', '#d8f0e2', '#fbe2d2', '#f6edc8', '#f8dce8', '#d5eef2'], BOXGREEN = '#d8f0e2';
 const padEls = [];
 function trackOfPad(i){ return vtrk ? i - NPAD : i; }
+/* MENUS EVERYWHERE (27 Oct, Phase 2): a right-click on a pad, or on a layer in the strip (a long press too, there: a long
+   press on a pad holds its note), opens the app's menu for it. */
+setTimeout(() => {
+  ctxBind($('pads'), e => { const pe = e.target.closest && e.target.closest('.pad[data-pad]'); if (!pe) return null; const i = +pe.dataset.pad, v = kit.voices[i];
+    return {title:'PAD ' + hx(i) + (v && v.name ? ' · ' + v.name.toUpperCase() : ''), items:[
+      {l:'Play it', f:() => { select(i); play(i); }},
+      {l:'Edit it', f:() => select(i)},
+      {l:'Load a sample into it…', f:() => { select(i); $('fileIn').click(); }},
+      {l:'Rename it…', f:() => { select(i); const n = $('vName'); n.focus(); n.select(); }},
+      {l:'Learn a MIDI note for it', f:() => { setLearn(true); padPress(i); }}]}; }, {touch:false});
+  ctxBind($('strip'), e => { const c = e.target.closest && e.target.closest('.lcell'); if (!c) return null; const i = [...$('strip').children].indexOf(c), v = V(), L = v.layers[i]; if (!L) return null;
+    return {title:'LAYER ' + (i + 1) + ' · ' + (TYPE[L.type] ? TYPE[L.type].name : L.type).toUpperCase(), items:[
+      {l:'Edit it', f:() => { v.sel = i; refreshLayer(); renderStrip(); }},
+      {l:L.on ? 'Turn it off' : 'Turn it on', f:() => { L.on = !L.on; if (i === v.sel) refreshLayer(); renderStrip(); changed(); }},
+      {l:'Load a sample into it…', f:() => { v.sel = i; refreshLayer(); renderStrip(); $('fileIn').click(); }}]}; });
+}, 0);
 // The pad's number (its badge): incremental with the pad's position, never tied to which audio track is
 // playing. With a voice per track the track pads follow the drums (pads 8–39 double as tracks 1–32),
 // so each synth voice has one-to-one parity with its track by position alone.
@@ -10701,7 +10733,7 @@ function buildPads(){
     const p1 = el('span', 'p1'), b = el('b', null, hx(i)), m = el('span', 'pm'), n = el('span', 'pn');
     p1.append(b, m); p.append(p1, n); host.append(p); padEls.push({p, n, m, b});
     // Synth slots sound while the pad is held, then release.
-    p.addEventListener('pointerdown', e => { e.preventDefault(); try { p.setPointerCapture(e.pointerId); } catch(_){} padPress(i, true); });
+    p.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button > 0) return; e.preventDefault(); try { p.setPointerCapture(e.pointerId); } catch(_){} padPress(i, true); });   // (a right-click is the pad's menu)
     const up = () => { if (padHeld[i]){ releaseNote(padHeld[i]); padHeld[i] = null; } };
     p.addEventListener('pointerup', up); p.addEventListener('pointercancel', up);
     p.addEventListener('click', () => { if (!ptrJust()) padPress(i); });
@@ -10771,8 +10803,9 @@ document.addEventListener('keydown', e => {
   if (e.key === '-' || e.key === '=' || e.code === 'NumpadDivide' || e.code === 'NumpadMultiply'){
     setOct(kOct + (e.key === '=' || e.code === 'NumpadMultiply' ? 1 : -1)); e.preventDefault(); return; }
   const lo = e.key.length === 1 ? e.key.toLowerCase() : '';
-  if (lo in PIANO && !e.shiftKey){
-    const st = kOct * 12 + PIANO[lo] - ROOT;
+  const pn = pianoOf(e);   // NOTE KEYS BY POSITION
+  if (pn !== undefined && !e.shiftKey){
+    const st = kOct * 12 + pn - ROOT;
     if (isSyn(cur)){ releaseNote(keyHeld.get(e.code)); keyHeld.set(e.code, holdNote(cur, st)); } else playNote(cur, st);
     e.preventDefault(); return; }
 });
@@ -11503,8 +11536,11 @@ function gfileToggle(open = $('gfile').hidden){
     if (it[3]) b.append(el('kbd', null, MACK ? it[3].replace('⇧', '⇧⌘').replace(/^([A-Z])$/, '⌘$1') : 'Ctrl+' + it[3].replace('⇧', 'Shift+')));
     if (it[2] && it[2]()) b.disabled = true;
     b.addEventListener('click', () => {
-      if (it[4] && !b.classList.contains('sure')){ b.classList.add('sure'); b.firstChild.textContent = 'Tap again: ' + it[0]; return; }
-      gfileToggle(false); it[1]();
+      // ONE CONFIRM (27 Oct, Phase 2): the app's one dialog (it was "Tap again: …" in the menu). With unsaved changes the
+      // item's own "Save changes?" asks instead, so it isn't asked twice.
+      gfileToggle(false);
+      if (it[4] && !projDirty){ askYes({title:it[0] + '?', body:'It replaces the song you have open; the kit stays.'}, it[0]).then(ok => { if (ok) it[1](); }); return; }
+      it[1]();
     });
     host.append(b);
   }
@@ -11725,7 +11761,8 @@ $('kitIn').addEventListener('change', async e => {
     setKit(k); toast('Loaded ' + kit.name + '. Undo puts the previous kit back.'); } catch(err){ toast(err.message || 'Couldn’t read that kit file.'); }
 });
 let pending = null;
-function ask(msg, fn){ pending = fn; $('confirmMsg').textContent = msg; $('confirmRow').hidden = false; }
+// ONE CONFIRM (27 Oct, Phase 2): the app's one dialog (askYes); this was an inline Yes / Cancel row under the buttons.
+function ask(msg, fn){ askYes(msg, 'Yes').then(ok => { if (ok) fn(); }); }
 $('bYes').addEventListener('click', () => { $('confirmRow').hidden = true; if (pending) pending(); pending = null; });
 $('bNo').addEventListener('click', () => { $('confirmRow').hidden = true; pending = null; });
 $('bFactory').addEventListener('click', () => ask('Put the factory drums on pads 1–8? The synth slots stay as they are.', factoryPads));
@@ -14388,7 +14425,14 @@ let sT = 0;
 const undo = {past:[], future:[], cur:JSON.stringify(S), busy:false, pend:false};
 var recTake = false;   // REC: a live take is under way; its notes become one undo step when it ends (recEndTake)
 function undoReset(){ undo.past.length = 0; undo.future.length = 0; undo.cur = JSON.stringify(S); try { kitUndoBase(); } catch(e){} }
+/* ONE UNDO STEP PER GESTURE (27 Oct, Phase 2): while a pointer is down (a fader, a value or a selection being dragged), the
+   changes it makes wait, and become one step when it lets go. A drag of the Mixer's faders made a step per mouse move. */
+let undoHeld = false, undoWant = false;
+addEventListener('pointerdown', () => { undoHeld = true; }, true);
+const undoLetGo = () => { if (!undoHeld) return; setTimeout(() => { undoHeld = false; if (undoWant){ undoWant = false; snap(); } }, 0); };
+addEventListener('pointerup', undoLetGo, true); addEventListener('pointercancel', undoLetGo, true); addEventListener('blur', undoLetGo);
 function snap(){
+  if (undoHeld && !undo.busy && !recTake){ undoWant = true; return; }
   if (undo.busy || undo.pend || recTake) return;
   undo.pend = true;
   queueMicrotask(() => {
@@ -14413,6 +14457,7 @@ function kitUndoBase(){
 // 3.7 MB and ~100 ms of work.
 function vSnap(v){ for (const L of v.layers) if (L.sample && L.sample.data){ if (!L.sample.id) L.sample.id = smpId(); smpHeld.set(L.sample.id, L.sample); } return JSON.stringify(voiceToJSON(v, 'ref')); }
 function kitSettle(i){
+  if (undoHeld){ clearTimeout(vUndo.t[i]); vUndo.t[i] = setTimeout(() => { vUndo.t[i] = 0; kitSettle(i); }, 350); return; }   // ONE GESTURE: not while the pointer is down
   const v = kit.voices[i]; if (!v) return; const j = vSnap(v), prev = vUndo.cur[i];
   if (prev != null && j !== prev){ undo.past.push({k:'V', i, j:prev}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; }
   vUndo.cur[i] = j;
@@ -16954,7 +16999,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 260;
+const BUILD = 261;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -17638,7 +17683,9 @@ function editTap(enter){
   }
   if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 4) return go('fx'); if (c.y === 5){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (c.y === 6){ scSay(c.x); return; } /* SOURCE: the SC row only shows; Enter / EDIT says what listens to the track */ if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
   const r = rowsOf(tv)[c.y]; if (!r) return;
-  if (r.act){ if (r.dbl) return toast('Tap EDIT again to ' + r.l.replace('› ', '').toLowerCase() + '.'); return r.act(); }
+  // ONE CONFIRM (27 Oct, Phase 2): a row that replaces something asks in the app's one dialog (it took a second EDIT, the
+  // "Tap EDIT twice" note). A double EDIT still goes straight through (editDouble), as before.
+  if (r.act){ if (r.dbl){ const nm = r.l.replace('› ', ''); askYes({title:nm.charAt(0) + nm.slice(1).toLowerCase() + '?', body:String((r.info && r.info()) || '').replace(/\.?\s*Tap EDIT twice[^.]*\.?/, '.').replace(/ · Ctrl\/⌘\+N/, '')}, nm.charAt(0) + nm.slice(1).toLowerCase()).then(ok => { if (ok) r.act(); }); return; } return r.act(); }
   if (r.tog){ r.set(r.get() ? 0 : 1); if (r.after) r.after(); saveS(); draw(); return; }
   if (r.tap) r.tap();
 }
@@ -21057,6 +21104,31 @@ function sxMenu(x, y, title, items){
   const r = m.getBoundingClientRect();
   m.style.left = Math.max(4, Math.min(x, innerWidth - r.width - 6)) + 'px'; m.style.top = Math.max(4, Math.min(y, innerHeight - r.height - 6)) + 'px';
   const first = m.querySelector('button:not(:disabled)'); if (first) first.focus({preventScroll:true});
+  // PRESS-DRAG-RELEASE (27 Oct, Phase 2), as desktop menus do: opened while a button is still held (a right-press), letting
+  // go over an item picks it; letting go where it opened keeps the menu up for a click.
+  if (ptrHeld){ const t0 = performance.now(), x0 = x, y0 = y;
+    const up = ev => { removeEventListener('pointerup', up, true); if (sxMenuEl !== m) return;
+      if (performance.now() - t0 < 200 && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+      const b = document.elementFromPoint(ev.clientX, ev.clientY), it = b && b.closest && b.closest('.sxmenu button');
+      if (it && m.contains(it) && !it.disabled){ ev.preventDefault(); ev.stopPropagation(); it.click(); } };
+    addEventListener('pointerup', up, true); }
+}
+// Is a pointer button down right now (a menu opening on a right-press can then be picked from on release)?
+let ptrHeld = false;
+addEventListener('pointerdown', e => { ptrHeld = e.pointerType === 'mouse'; }, true);
+addEventListener('pointerup', () => { setTimeout(() => { ptrHeld = false; }, 0); }, true);
+addEventListener('pointercancel', () => { ptrHeld = false; }, true);
+/* MENUS EVERYWHERE (27 Oct, Phase 2): ctxBind(el, fn) gives el the app's one menu (sxMenu) on a right-click and, on a touch
+   screen, on a long press (half a second, still); fn(e) returns {title, items} or null for no menu there. */
+function ctxBind(el, fn, opts = {}){
+  el.addEventListener('contextmenu', e => { const r = fn(e); if (!r) return; e.preventDefault(); e.stopPropagation(); sxMenu(e.clientX, e.clientY, r.title, r.items); });
+  if (opts.touch === false) return;
+  let lp = null;
+  el.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') return; clearTimeout(lp && lp.t); const x = e.clientX, y = e.clientY;
+    lp = {x, y, t:setTimeout(() => { const r = fn(e); lp = null; if (!r) return; if (navigator.vibrate) try { navigator.vibrate(12); } catch(_){} el._lpDone = performance.now(); sxMenu(x, y, r.title, r.items); }, 500)}; });
+  const cancel = e => { if (lp && (e.type !== 'pointermove' || Math.hypot(e.clientX - lp.x, e.clientY - lp.y) > 8)){ clearTimeout(lp.t); lp = null; } };
+  el.addEventListener('pointermove', cancel); el.addEventListener('pointerup', cancel); el.addEventListener('pointercancel', cancel);
+  el.addEventListener('click', e => { if (el._lpDone && performance.now() - el._lpDone < 700){ e.preventDefault(); e.stopPropagation(); el._lpDone = 0; } }, true);   // the press that opened the menu isn't also a tap
 }
 window.addEventListener('pointerdown', e => { if (sxMenuEl && !sxMenuEl.contains(e.target)) sxMenuClose(); }, true);
 window.addEventListener('keydown', e => {
@@ -22005,6 +22077,12 @@ let inMode = (() => { try { const m = localStorage.getItem(IK); if (m === 'keys'
 let kOct = 4, hexBuf = {key:'', n:0, t:0}, kpSig = '';
 const PIANO = {z:0, s:1, x:2, d:3, c:4, v:5, g:6, b:7, h:8, n:9, j:10, m:11, ',':12, l:13, '.':14, ';':15, '/':16,
   q:12, 2:13, w:14, 3:15, e:16, r:17, 5:18, t:19, 6:20, y:21, 7:22, u:23, i:24, 9:25, o:26, 0:27, p:28};
+/* NOTE KEYS BY POSITION (owner, 27 Oct, Phase 2): the piano keys are read from where the key is (e.code), not the letter
+   on it, so a German, French or Nordic keyboard plays the same notes as a US one (QWERTZ played A for C; AZERTY lost the
+   sharps and the 1 note off). Hex digits and FX letters still go by the letter. */
+const PIANO_CODE = {KeyZ:0, KeyS:1, KeyX:2, KeyD:3, KeyC:4, KeyV:5, KeyG:6, KeyB:7, KeyH:8, KeyN:9, KeyJ:10, KeyM:11, Comma:12, KeyL:13, Period:14, Semicolon:15,
+  KeyQ:12, Digit2:13, KeyW:14, Digit3:15, KeyE:16, KeyR:17, Digit5:18, KeyT:19, Digit6:20, KeyY:21, Digit7:22, KeyU:23, KeyI:24, Digit9:25, KeyO:26, Digit0:27, KeyP:28};
+const pianoOf = e => e.code && e.code in PIANO_CODE ? PIANO_CODE[e.code] : (e.key && e.key.length === 1 && e.key.toLowerCase() in PIANO ? PIANO[e.key.toLowerCase()] : undefined);
 const HEXK = '0123456789abcdef';
 function curKind(){ const c = cs[tv]; if (onPset()) return 'param'; if (GRIDV.has(tv)) return kindAt(tv, c.x); if (tv === 'mixer') return 'mix'; return 'param'; }
 function down1(){ const c = cs[tv], d = dims(tv); c.y = clamp(c.y + (GRIDV.has(tv) ? kStep : 1), 0, d.h - 1); }
@@ -22140,8 +22218,8 @@ function keysDown(e, pad){
   if (k === '=' || k === '+'){ setOct(kOct + 1); return true; }
   if (e.repeat) return false;
   if (kind === 'note'){
-    if (lo in PIANO){ audKey = e.code; try { typeNote(PIANO[lo]); } finally { audKey = null; } return true; }
-    if (k === '1' || k === '`'){ typeOff(); return true; }
+    { const pn = pianoOf(e); if (pn !== undefined){ audKey = e.code; try { typeNote(pn); } finally { audKey = null; } return true; } }
+    if (k === '1' || k === '`' || e.code === 'Digit1' || e.code === 'Backquote'){ typeOff(); return true; }
     return false;
   }
   if (kind === 'fxc') return k.length === 1 && /[a-z]/i.test(k) ? fxLetter(k) : false;
