@@ -739,12 +739,20 @@ class Win {
     if (this.active){ const c = this.active; this.active = null; c.up(this, x, y); this.dirty = true; return; }
     if (this.bodyActive){ this.bodyActive = false; if (this.h.up) this.h.up(x, y, cancel); this.dirty = true; }
   }
+  // WHEEL (27 Oct, Thunder Plus audit M2): the movement is added up and a step taken per 100 px (a mouse notch), as the
+  // host's sliders do; one step per event made a trackpad flick (30-100 events) run a control across its whole range.
+  wheelN(e){
+    const raw = e.deltaY || e.deltaX, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
+    const now = performance.now(); if (now - (this.wT || 0) > 250 || Math.sign(this.wAcc || 0) !== Math.sign(px)) this.wAcc = 0;
+    this.wAcc += px; this.wT = now; const n = Math.trunc(this.wAcc / 100); this.wAcc -= n * 100; return clamp(n, -8, 8);
+  }
   pWheel(e){
-    e.preventDefault(); const [x, y] = this.pos(e), m = modsOf(e), dy = e.deltaY < 0 ? 1 : e.deltaY > 0 ? -1 : 0; if (!dy) return;
+    e.preventDefault(); const [x, y] = this.pos(e), m = modsOf(e); if (!(e.deltaY || e.deltaX)) return;
     this.dirty = true;
-    if (this.menu){ const tot = this.menu.itemH * this.menu.items.length + 8; this.menu.scroll = clamp(this.menu.scroll - dy * 22, 0, Math.max(0, tot - this.menu.r.h)); return; }
-    for (let i = this.controls.length - 1; i >= 0; i--){ const c = this.controls[i]; if (c.visible && c.enabled && c.r.has(x, y)){ if (c.wheel(this, dy, m) && c.sym != null) this.status = this.paramStatus(c.sym); return; } }
-    if (y > this.headH && y < this.H - FOOT && this.h.wheel) this.h.wheel(x, y, dy, m);
+    if (this.menu){ const px = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY, tot = this.menu.itemH * this.menu.items.length + 8; this.menu.scroll = clamp(this.menu.scroll + px * 0.5, 0, Math.max(0, tot - this.menu.r.h)); return; }
+    const n = this.wheelN(e); if (!n) return; const dy = n < 0 ? 1 : -1;
+    for (let i = this.controls.length - 1; i >= 0; i--){ const c = this.controls[i]; if (c.visible && c.enabled && c.r.has(x, y)){ let ok = false; for (let k = 0; k < Math.abs(n); k++) ok = c.wheel(this, dy, m) || ok; if (ok && c.sym != null) this.status = this.paramStatus(c.sym); return; } }
+    if (y > this.headH && y < this.H - FOOT && this.h.wheel) for (let k = 0; k < Math.abs(n); k++) this.h.wheel(x, y, dy, m);
   }
   // ---- keys -----------------------------------------------------------------------------------------------------
   keyDown(e){

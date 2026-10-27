@@ -12,6 +12,7 @@ device, so it runs in about 15 seconds.
 | `app-logic.test.js` | logic cut out of the HTML/JS: logger, PatchStore dirty flag, sample prune, `esc()`, phrase/pattern sizing and layout, CSP header, service-worker file list, shared-block sync |
 | `updater.test.js` | the desktop updater's SHA-256 check |
 | `pump-synth.test.js` | the …pump synth engines (MONO, POLY, COIL from `pump/synth/`): every factory preset renders finite and below full scale, hold / release / Tune, golden output; the live worklet's notes as MIDI (retrigger, legato, bend, chords), live = render for the same note, sleeping in silence |
+| `usability.test.js` | the usability audit's Phase 1 fixes (`docs/USABILITY-AUDIT.md`): toast timing and queue, wheel step accumulation (host sliders and pump windows), AltGr, F8 panic, row insert/remove inside a phrase's LEN, Delete on a selection, and source guards for KEYS-mode modifiers, Synth-page keys, dialogs over Settings, unsaved-change marks, Open's fresh undo, leaving the page, and the key docs |
 
 ## Golden hashes
 

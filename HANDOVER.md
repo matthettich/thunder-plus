@@ -77,6 +77,51 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 27 Oct (2): usability Phase 1 (the audit's bugs; no design changes)
+
+Build 255. Owner said "go for it" to the plan in "27 Oct: usability audit" below. Phase 1 is done; every owner decision
+in the doc's gate table is untouched (Space order, Shift fine/big, drag-from-cursor, Arrange hold-to-mute, wheel focus,
+editor keys, skins, pinch-zoom: all still as the owner set them). Ids are `docs/USABILITY-AUDIT.md`'s; each fix has a
+`FIX (27 Oct, audit …)` comment at the change.
+- **K1** KEYS mode returns before the PAD key table, and keyup lets go of a held PAD key in either mode (Shift then X no
+  longer pastes; Z then X no longer clears). Ctrl/⌘+B toggles the block selection (no repeat).
+- **K2** Insert / Ctrl/⌘+Backspace move rows only inside the phrase's LEN (a sect's 16); the row pushed past the end goes,
+  rows kept past the LEN stay (Renoise). It used to cut every phrase to 16 rows and throw.
+- **K4** Delete (and Shift+Delete / row ops) on a selection clears it (`clearSel`, toast says Undo brings it back); the
+  clipboard is no longer replaced.
+- **K6** AltGr symbols (`{ } [ ] \ | @` on DE/FR/Nordic layouts) reach the tracker without Ctrl/Alt (`noAltGr`); Ctrl+Alt+
+  letters and digits are still commands.
+- **K7** A `<select>` blurs after a pick made with the pointer, so piano keys and arrows go back to the tracker (keyboard
+  use of the select keeps focus; dialogs excluded).
+- **K8** The Synth page's keys act only on the Synth page (not on …waves / …chains).
+- **K3** Help ("Main keys", Alt/⌥+arrows, CLN on Ctrl/⌘+Alt+C · Ctrl/⌘+Shift+C, Ctrl/⌘+D, Ctrl/⌘+T, Ctrl+Space, / \ mute,
+  Ctrl/⌘+/ solo, F8 twice, the lower note row ending at ;), the key legend's Space line (follows `playKeySwap()`), the
+  first-run tour's Space line (same), README (Space order, Delete vs Shift+Delete, F8 twice), Help's MIDI location.
+- **M2** Wheel steps add up movement, one step per 100 px (lines × 40, pages × 400), reset after 250 ms or a turn, at most
+  8 a event: host sliders (`wheelSteps`) and pump windows (`Win.wheelN`, kit.js v=4). Pump menus scroll by pixels.
+- **M3** A …chains slider row in the bottom panel opens one menu (its own, with the panel items: `makeRow` `opts.menu`);
+  list rows get a non-modal `sxMenu` instead of the `askPick` modal.
+- **M17** Mixer bars drag on the left button only.
+- **B1** "Save changes?" now notices `setKit` (Load kit, Factory drums, Clear slots), …waves edits (`wavesChanged(true)`,
+  `thunderWaves.save` only when the patch changed), pad/kit names, choke and SLOTS edits (`markKit`).
+- **B2** Open project starts a fresh undo history (`undoReset`), so undo can't bring the old song back over the new file.
+  Funk breaks and other in-song loads keep their undo (owner's decision, not touched).
+- **B3** `toast(msg, ms)` honours ms (1–12 s); errors with no time stay 4–8 s; a long toast (≥ 4 s) isn't wiped by a
+  short one (the short one shows after; up to 3 long ones queue); tap dismisses; `role=status aria-live=polite`.
+- **B8** The browser asks before closing a tab with unsaved changes (not on the app's own update reload, not in the
+  desktop app, which asks itself).
+- **B12** A dialog opened from Settings sits above the menu (`.ask` z 125 > `.setmenu` 120) and the menu's key handler
+  leaves it the keys (`if (askOpen) return;`).
+- **B13** List dialogs ("Save changes?") focus the first choice (Save); arrows move, Enter picks.
+- **B18** F8 / Stop when already stopped = panic: synths let go, held MIDI released, CC 64/120/123 on every channel of
+  every open port; toast says so.
+- **V1** On desktop windows wider than 600 px where the tabs don't fit (Fold unfolded 882, 1024), the transport strip
+  goes on its own row under the tabs (`.ttabbar.wrap2`, `patFit`); checked at 882/1024/1180/1400.
+- **Tests:** `tests/usability.test.js` (8 tests); `npm test` 83/83. Headless (Chromium) checks of each fix above passed,
+  except M3, which is covered by the source test only (needs a …chains patch mapped to the panel).
+- **Left for the review:** everything in the doc's gate table and Phases 2–4. Also seen while doing this (not fixed):
+  Ctrl+N on the Synth page in a browser tab still opens a browser window (browsers keep it; desktop app gets it).
+
 ## 27 Oct: usability audit (read this first when reviewing it)
 
 Owner asked for an audit of key commands, mouse gestures, behaviours and anything that would make Thunder Plus feel
@@ -100,7 +145,7 @@ mouse/trackpad/touch, behaviours, and a screen-by-screen walkthrough at desktop,
   header, tabular numbers, contrast, skins, less on-screen text, Synth page, pump windows, Mixer, cover screen). Phase 4:
   pro extras (one key table for Help/legend/README/tooltips, command palette, named undo, render progress, system
   clipboard, missing Renoise commands, glossary, two-tab lock).
-- **Phase 1 status:** see "27 Oct (2)" above this entry when it lands; until then nothing from the audit is fixed.
+- **Phase 1 status:** done in build 255, see "27 Oct (2)" above. The doc's Phase 1 checklist is ticked.
 
 ## 26 Oct (4): Settings → Audio → …pump live (Auto / Rendered)
 
