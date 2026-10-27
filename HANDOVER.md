@@ -77,6 +77,41 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 27 Oct (4): owner's queue (after the Phase 2 decisions; not started)
+
+Owner asked for these next, in their words:
+1. **…chains: show which modules are live.** When a chain is turned off in the Mixer, its modules look different (a dashed
+   outline, a drop shadow or similar) so it's easy to see which are active.
+2. **…waves and …chains selection:** Shift-click on a module behaves like Max/MSP (adds it to / takes it out of the
+   selection); Ctrl-click selects the modules clicked. (Confirm the exact Max behaviour wanted before building.)
+3. **Bus back to a normal track:** a track made into a bus can be changed back.
+4. **Delete / Backspace on a selected module deletes it** (…waves and …chains).
+5. **Clone down (CLN↓) inserts a new row in the arrangement** instead of overwriting the phrases below it.
+6. **Arrange right-click → "Remove row":** removes the whole song row (the rows below move up).
+
+## 27 Oct (3): the owner's calls for Phase 2 (read before starting Phase 2)
+
+Owner went through the gate table in the plan doc (https://claude.ai/artifact/8yDBMKuKciLpnVqYRHVrTH, "Your calls before
+Phase 2", now with a "Your call" column). Phase 2 can start; build it to these:
+- **Space:** plays / stops the song everywhere, every mode, the Synth page included (the pad auditions from its note keys
+  and a click); **Shift+Space** plays this screen. Replaces `playKeySwap()`'s split and the Synth page's Space = pad.
+- **Shift:** fine everywhere (sliders, faders, pump, tracker drags and nudges); **Ctrl/⌘ = big steps** (octave, 16).
+- **Ctrl/⌘+arrows (values) and Alt/⌥+arrows (screens):** keep. A Renoise key option can come later (Phase 4).
+- **Drag from the cursor's filled cell:** always selects, as Renoise; **Alt/⌥-drag edits** the value. On the Song grid
+  Alt-click mutes on press today (`tv === 'song' && e.altKey` in the grid pointerdown): make it wait to tell a click
+  (mute) from a drag (edit), as Arrange's `sxDown` already does.
+- **Hold-to-mute in Arrange:** touch and pen only. With a mouse, Alt-click mutes (already does) and middle-click too; add
+  Alt-click to Help's Arrange row.
+- **Wheel on sliders:** the slider under the pointer, after the pointer rests on it a moment, highlighted while it takes
+  the wheel (scrolling past doesn't change it).
+- **Wheel in …waves / …chains:** scrolls; Ctrl+wheel or a pinch zooms.
+- **Ctrl/⌘+S, N, O in the editors:** act on the project; patch export moves to a menu item in the editor.
+- **Undo in the editors:** one shared history with the song, the DAW way (the bigger job; plan it first).
+- **Skins:** keep all of them for now. The owner will list which to keep and which to revise. Done now (build 256): a
+  first visit starts on **Simple rainbow** (`'rainbow'`; was Simple grey). Saved picks are kept.
+- **Pinch-zoom:** allow it, except on the pads, the keypad and the Arrange (which keeps its own pinch): `touch-action` on
+  those, and drop `maximum-scale=1, user-scalable=no` from the viewport.
+
 ## 27 Oct (2): usability Phase 1 (the audit's bugs; no design changes)
 
 Build 255. Owner said "go for it" to the plan in "27 Oct: usability audit" below. Phase 1 is done; every owner decision

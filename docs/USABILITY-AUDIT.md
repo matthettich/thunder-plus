@@ -10,6 +10,8 @@ function. "Owner decision, revisit?" = a choice the owner made on purpose (see H
 asking. Severity: P1 breaks expectations or costs work, P2 friction, P3 polish. Effort: S < 1 h, M hours, L a day+.
 
 Phase 1 (bugs, no design changes) is tracked in HANDOVER.md, "27 Oct: usability audit".
+Phase 1 is done (build 255, HANDOVER "27 Oct (2)"). The owner's calls on every "Owner decision, revisit?" row are in
+HANDOVER "27 Oct (3)": build Phase 2 to those.
 
 ## Keys
 
