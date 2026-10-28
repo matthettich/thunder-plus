@@ -2439,11 +2439,11 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <!-- …PUMP SYNTHS (26 Oct 2026): pump MONO, POLY and COIL as rendered synth engines (pump/synth/: the plugins' own DSP in
      pump-synth.wasm, their parameters and presets in pump-synth-meta.js, both built by pump/wasm/build.sh). Without the folder
      there are no …pump engines. The render Worker loads the same two files (PSYN_JS below). -->
-<script src="pump/synth/pump-synth-meta.js?v=1"></script>
-<script src="pump/synth/pump-synth-engine.js?v=2"></script>
+<script src="pump/synth/pump-synth-meta.js?v=2"></script>
+<script src="pump/synth/pump-synth-engine.js?v=3"></script>
 <!-- …PUMP (23 Oct 2026): the pump mastering plugins' parameter tables and presets (generated in matthettich/pump by
      wasm/build.sh); pump/pump.wasm is their DSP, fetched by the wasm loader. -->
-<script src="pump/pump-meta.js?v=1"></script>
+<script src="pump/pump-meta.js?v=2"></script>
 <script>
 /* ===ENGINE START=== */
 const BASE = 65.40639; // C2
@@ -7168,7 +7168,7 @@ const PW = {w:null, ready:false, wv:false, lx:false, ps:false, id:0, jobs:new Ma
 // and gets the page's compiled lxr.wasm (lxMod) in its init message.
 const LXR_JS = 'lxr/lxr-engine.js?v=2';
 // …PUMP SYNTHS: likewise the instruments' tables and glue, and the page's compiled pump-synth.wasm (psMod)
-const PSYN_JS = ['pump/synth/pump-synth-meta.js?v=1', 'pump/synth/pump-synth-engine.js?v=2'];
+const PSYN_JS = ['pump/synth/pump-synth-meta.js?v=2', 'pump/synth/pump-synth-engine.js?v=3'];
 function rwStart(plMod, txMod, lxMod, psMod){
   try {
     const sc = [...document.scripts].find(x => x.textContent.includes('===ENGINE ' + 'START==='));
@@ -12683,7 +12683,7 @@ $('midiKeysSel').addEventListener('change', e => { releaseKeys(); midi.keys = +e
 moPorts(); miPorts();
 
 /* ---------- Plaits loader ---------- */
-const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=1';
+const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=2';
 // Each wasm is decoded and compiled once and shared: the synth here, the …waves engine and the render Worker.
 let plFailed = false;
 (async () => {
@@ -12696,7 +12696,7 @@ let plFailed = false;
   // LXR ENGINES: lxr/lxr.wasm, compiled here (and handed to the render Worker) when the engine file loaded
   const lxP = typeof LxrCore !== 'undefined' ? LxrCore.load('lxr/lxr.wasm?v=1').catch(e => { console.warn('LXR engines', e); return null; }) : Promise.resolve(null);
   // …PUMP SYNTHS: pump/synth/pump-synth.wasm, compiled here and handed to the render Worker (as LXR's is)
-  const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=1').catch(e => { tpLog('pump synths wasm (the …pump engines will be silent)', e); return null; }) : Promise.resolve(null);
+  const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=2').catch(e => { tpLog('pump synths wasm (the …pump engines will be silent)', e); return null; }) : Promise.resolve(null);
   // …PUMP: the pump mastering effects (pump/pump.wasm), fetched alongside; effect nodes that asked for it get it now
   bytes(PUMP_WASM).then(b => { pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage({pumpBytes:b}); } catch(e){} pumpWait.clear();
     return WebAssembly.instantiate(b, imp).then(r => { pumpMain = r.instance.exports; if (pumpMain._initialize) pumpMain._initialize(); }); }).catch(e => { if (PM) console.warn('pump effects', e); });
@@ -15789,7 +15789,7 @@ class XP_${name} extends AudioWorkletProcessor {
 registerProcessor('thunder-${name}', XP_${name});`;
 let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bassLive = new Set();
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
-const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=1', psOK = new WeakSet(), psSent = new WeakSet();
+const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=2', psOK = new WeakSet(), psSent = new WeakSet();
 /* …PUMP SYNTHS live, THE SAFETY NET (owner, 26 Oct): while the song plays, once a second: if the audio is dropping out or
    the audio thread is nearly full, and the live …pump nodes are a real part of that, twice in a row, the live engines
    switch to their renders for the rest of this visit (psLive.off): their nodes go, and the next notes play the pads'
@@ -17136,7 +17136,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 265;
+const BUILD = 266;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23652,7 +23652,7 @@ if (new URLSearchParams(location.search).has('shared')) setTimeout(openSharedPro
      one file per plugin (docs/PUMP-FX.md, "The pop-up kit"). A type without a file says its window comes later. Add new
      ones here, in sw.js FILES, with ?v= like these. -->
 <script src="pump/ui/kit.js?v=4"></script>
-<script src="pump/ui/eq.js?v=1"></script>
+<script src="pump/ui/eq.js?v=2"></script>
 <script src="pump/ui/comp.js?v=1"></script>
 <script src="pump/ui/limit.js?v=1"></script>
 <script src="pump/ui/meter.js?v=1"></script>

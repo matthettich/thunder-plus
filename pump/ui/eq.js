@@ -7,8 +7,9 @@ const U = window.PumpUI; if (!U) return;
 const {R, clamp, css, mix, alpha, Dial, Feed, Spectrum} = U;
 const NB = 24, LO = 15, HI = 22000, NP = 220;
 const SHAPES = ['Bell', 'Low Shelf', 'High Shelf', 'Low Cut', 'High Cut', 'Notch', 'Band Pass', 'Tilt Shelf'];
-const SLOPES = ['6 dB/oct', '12 dB/oct', '18 dB/oct', '24 dB/oct', '30 dB/oct', '36 dB/oct', '48 dB/oct', '72 dB/oct', '96 dB/oct'];
-const SLOPE_V = [6, 12, 18, 24, 30, 36, 48, 72, 96];
+const SLOPES = ['6 dB/oct', '12 dB/oct', '18 dB/oct', '24 dB/oct', '30 dB/oct', '36 dB/oct', '48 dB/oct', '72 dB/oct', '96 dB/oct', 'Brickwall'];
+// Brickwall (pump's kBrickwallSlope): the plugin's elliptic cut, drawn here as the steepest Butterworth the curve takes (96 dB/oct)
+const SLOPE_V = [6, 12, 18, 24, 30, 36, 48, 72, 96, 1000];
 const PLACES = ['Stereo', 'Left', 'Right', 'Mid', 'Side'];
 const hasGain = s => s === 0 || s === 1 || s === 2 || s === 7;
 const hasSlope = s => s !== 0;
@@ -90,7 +91,7 @@ U.define('eq', {W:1040, H:660, nW:480, nH:824, bypass:true, back:8192, cmdKeys:'
   const mouseScale = () => { const s = ui.value('gain_scale') * 0.01; return Math.abs(s) < 0.05 ? (s < 0 ? -0.05 : 0.05) : s; };
   const summary = b => SHAPES[shape(b)] + '  ' + ui.fmt(b_(b, 'freq'));
   const sr = () => ui.sr || 48000;
-  const protoOf = (b, extra = 0) => proto(shape(b), freq(b), effGain(b) + extra, qOf(b), SLOPE_V[clamp(Math.round(V(b, 'slope')), 0, 8)], sr());
+  const protoOf = (b, extra = 0) => proto(shape(b), freq(b), effGain(b) + extra, qOf(b), SLOPE_V[clamp(Math.round(V(b, 'slope')), 0, 9)], sr());
   const yOfDb = db => display.cy - db / dbRange * (display.h / 2 - 14), dbOfY = y => (display.cy - y) / (display.h / 2 - 14) * dbRange;
   const xOfF = f => ui.freqToX(display, f, LO, HI), fOfX = x => ui.xToFreq(display, x, LO, HI);
   function nodePos(b){
@@ -134,7 +135,7 @@ U.define('eq', {W:1040, H:660, nW:480, nH:824, bypass:true, back:8192, cmdKeys:'
   const pushAud = on => ui.hold(1, on ? 1 : 0, audF, audQ, 0);
   const bandColor = b => { const t = ui.th; switch (place(b)){ case 3: return mix(t.neon, t.ink, 0.35); case 4: return t.second; case 1: case 2: return mix(t.second, t.ink, 0.3); default: return t.dark ? t.neon : mix(t.neon, t.ink, 0.55); } };
   const readout = b => { let s = 'Band ' + (b + 1) + '  ' + SHAPES[shape(b)] + '  ' + ui.fmt(b_(b, 'freq')); if (hasGain(shape(b))) s += '  ' + ui.fmt(b_(b, 'gain')); s += '  Q ' + qOf(b).toFixed(2);
-    if (hasSlope(shape(b)) && !hasGain(shape(b))) s += '  ' + SLOPES[clamp(Math.round(V(b, 'slope')), 0, 8)]; return s; };
+    if (hasSlope(shape(b)) && !hasGain(shape(b))) s += '  ' + SLOPES[clamp(Math.round(V(b, 'slope')), 0, 9)]; return s; };
   function nearCurve(x, y){ for (let p = 0; p < NP - 1; p++) if (x >= curveX[p] && x <= curveX[p + 1]){ const t = (x - curveX[p]) / Math.max(1e-3, curveX[p + 1] - curveX[p]); return Math.abs(yOfDb(curveDb[p] + (curveDb[p + 1] - curveDb[p]) * t) - y) < 7; } return false; }
   function startNodeDrag(x, y){
     dragSet = selectedBands(); for (const b of dragSet) orig[b] = [freq(b), gain(b), qOf(b)];

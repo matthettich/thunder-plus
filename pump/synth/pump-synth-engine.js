@@ -27,7 +27,7 @@ if (!META || !META.synth) return;
 /* engine key in Thunder Plus -> the instrument (type id in pump-synth.wasm, its meta) */
 const KINDS = {
   pmono:{t:0, k:'mono', name:'Mono', title:'pump MONO', tag:'three oscillators · sync, FM · ladder, SVF, diode, Sallen-Key', len:2},
-  ppoly:{t:1, k:'poly', name:'Poly', title:'pump POLY', tag:'two oscillators · poly-mod · four filter voicings · chorus', len:4, trim:2.5},
+  ppoly:{t:1, k:'poly', name:'Poly', title:'pump POLY', tag:'two oscillators · poly-mod · four filter voicings · chorus', len:4, trim:1.5},
   pcoil:{t:2, k:'coil', name:'Coil', title:'pump COIL', tag:'tuned springs kicked by the note · tanks, clang to pluck', len:4},
 };
 /* The live twins: the same instrument, played live. Shown after their rendered engine in the picker. */
@@ -37,9 +37,11 @@ const LIVE = {
   pcoill:{twin:'pcoil', name:'Coil live', title:'pump COIL live', tag:'played live: every note kicks its own springs, as hard as it is played'},
 };
 const ORDER = ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'pcoil', 'pcoill'];
-/* trim: POLY's level is set for chords (a voice sums in at 0.3, 8 of them to a chord), so one rendered note sat 8-10 dB
-   under MONO's and COIL's. A pad is one note, which the tracker stacks for chords, so POLY's render is 8 dB up (x2.5);
-   the sound is unchanged. MONO and COIL are as the plugin. */
+/* trim: POLY's level is set for chords (a voice sums in at 0.3, 8 of them to a chord), so one rendered note sits under
+   MONO's and COIL's. A pad is one note, which the tracker stacks for chords, so POLY's render is 3.5 dB up (x1.5): as
+   far as its loudest factory voice (Unison brass lead) allows without passing -1 dBFS, since the plugin's own safety
+   limiter comes before this. Since pump's volume pass (every instrument at VOLUME 0 dB, about -20 dBFS RMS), one
+   rendered note: MONO about -20 dBFS RMS, COIL -24, POLY -25. MONO and COIL are as the plugin. */
 /* Kept in the pad (so it carries the plugin's whole state) but not shown: they do nothing to a single rendered note
    (the mod wheel, pitch bend, glide and note priority need a played line). */
 const HIDE = new Set(['wheel_vib', 'glide', 'glide_mode', 'priority', 'legato', 'bend_range', 'wheel_mod', 'bend']);

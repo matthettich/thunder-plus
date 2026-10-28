@@ -35,7 +35,7 @@ class PsynProc extends AudioWorkletProcessor {
     super();
     const op = o.processorOptions || {};
     if (op.bytes && !globalThis.__psynBytes) globalThis.__psynBytes = op.bytes;
-    this.type = op.type | 0; this.syms = op.syms || []; this.fixed = op.fixed || {}; this.p = op.p || {}; this.trim = op.trim || 1;   // trim: as the render's (POLY +8 dB)
+    this.type = op.type | 0; this.syms = op.syms || []; this.fixed = op.fixed || {}; this.p = op.p || {}; this.trim = op.trim || 1;   // trim: as the render's (POLY +3.5 dB)
     this.range = this.type === 2 ? 12 : 24;   // the bend range the instance is set to (COIL's Bend goes to 12)
     this.h = -1; this.dirty = false; this.dead = false;
     this.lane = Array.from({length:LANES}, () => ({note:-1, lt:0, lg:false}));
