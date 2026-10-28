@@ -47,7 +47,7 @@ const ORDER = ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'pcoil', 'pcoill'];
 const HIDE = new Set(['wheel_vib', 'glide', 'glide_mode', 'priority', 'legato', 'bend_range', 'wheel_mod', 'bend']);
 /* ...which a live twin shows (bend range and the mod wheel stay hidden: the tracker's pitch commands are sent as bend
    over the whole range, and there is no wheel). */
-const LIVE_ROWS = {pmonol:[['Glide & legato', ['glide', 'glide_mode', 'legato', 'priority']]], ppolyl:[['Glide', ['glide']]], pcoill:[]};
+const LIVE_ROWS = {pmonol:[['Glide & legato', ['glide', 'glide_mode', 'legato', 'priority']]], ppolyl:[['Glide', ['glide']]], pcoill:[['Voices', ['voices']]]};   // COIL's VOICES: how many notes ring at once (a rendered pad is one)
 /* What the live instance is held to whatever the pad says: the widest bend, so a slide of an octave or two is one bend. */
 const LIVE_FIXED = {pmonol:{bend_range:24}, ppolyl:{bend_range:24}, pcoill:{bend:12}};
 /* Each card's sections (the plugins' own panels). */
