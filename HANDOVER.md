@@ -79,6 +79,20 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (6): FX screen fixes, FX presets, EQ window, Alt+A (build 273)
+
+- **FX screen stage:** it sat right of the widest text line, so it moved as the picked effect's controls and description
+  changed. `stageRoom()` now starts it at 72 characters at least on the FX screen.
+- **Alt+A (`arrKeyToggle`):** `apFocus('arr', true)` from any tracker screen (the Arrange-beside-any-screen machinery
+  already existed); again (or Esc) gives the keys back. In `globalKeys`, so it goes through `apRun`.
+- **FX presets:** `FX_FACTORY` (214 presets, 66 effect types; envfilt, autotune and utility have none yet), `fxPresetOpen`
+  in the fxp picker (`fxp.tpre`, headings DEFAULTS / FACTORY / THIS SONG), `fxPreApply` (named values, the rest to
+  defaults, the sidechain source kept), `fxPresetSave` into `S.fxPre[type]` (`normFxPre` on load). Any parameter edit
+  clears the slot's `pname`. Checked headless: every factory value is a real parameter within its range.
+- **EQ window:** …pump EQ (`peq`) allowed on every track (`pumpAnyTrack` in `fxtL` / `fxtOk`); the other pump effects stay
+  bus / master only. `eqWindow(t)` (› EQ WINDOW, the last FX screen row) finds the track's pump EQ or adds one to the first
+  free slot, and calls `PumpFX.open`. LINEAR mode adds latency, which a normal track has no compensation for.
+
 ## 30 Oct (5): drum presets by type, 93 new ones (build 272)
 
 - The pad Presets list now starts with one group per drum type (`DRUM_TYPES`: Kicks, Snares, Claps & snaps, Rims &

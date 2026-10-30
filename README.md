@@ -190,6 +190,8 @@ Instrument commands: `VOL` volume, `PIT` pitch (signed semitones), `FIN` fine tu
 
 **Track effects.** Open FX from the tab, from the mixer's FX row (EDIT), or with SHIFT+▶ in the mixer (on the MASTER row it opens the master chain). On the mixer's FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. Each track has 8 slots that run top to bottom; EDIT on an empty slot adds an effect, EDIT+arrows picks another type, OPTION+EDIT removes it. The settings of the slot you were last on are listed underneath, as hex values like the rest of the tracker. The effects:
 
+**FX presets and the EQ window (Oct 2026).** Every effect's controls on the FX screen end with **› PRESET** (INIT, factory presets, the song's own) and **› SAVE AS PRESET…**. **› EQ WINDOW** opens the track's …pump EQ in its pop-up window, adding one if needed; …pump EQ can go on any track. **Alt+A** gives Arrange the keys from any tracker screen while that screen stays beside it; Alt+A or Esc gives them back.
+
 - **EQ** – Airwindows EQ: treble, mid and bass, their frequencies, lowpass, highpass, output
 - **COMP** – Airwindows Pressure4 compressor, with a mix control for parallel compression
 - **VERB** – Airwindows Galactic reverb
