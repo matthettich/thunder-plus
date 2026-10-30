@@ -79,6 +79,24 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (4): Acid line generator and Breaks to chop (build 271)
+
+- **Acid line… (Edit ▾ / right-click on a phrase, `acidLine`):** pump ACID's `randomizeSteps` / `mutateSteps`
+  (plugins/acid/AcidParams.hpp) ported as `acidRoll` / `acidMutate`. It reads the phrase rows back into steps first
+  (`acidRead`: note = note, empty after a sounding step = tie, OFF or empty after a rest = rest, VOL ≥ C0 = accent, a
+  PSL on the next row = slide), rolls the lit lanes and writes them back (`acidWrite`): accent VOL FF, plain no volume,
+  slide PSL 03 on the note slid into (the player plays a PSL note legato), rest OFF after a sounding step. Rows: the
+  selection, else the phrase's LEN. The panel stays open (R roll, M mutate, Space play, Esc done); each roll is an undo
+  step. Checked headless: the write/read round trip is exact, lanes left alone keep their steps, accents never run past
+  3, the first step is always the root.
+- **Breaks to chop (File ▾, `pickChopBreak`):** pump BREAK's 14 built-in breaks (`CHOP_BREAKS` = kBreaks) and its kit
+  renderer (`renderChopBreak` = BreakSounds.hpp renderBreak, with pump's Rng / OnePole / Svf / FracDelay as small
+  closures). Matches the C++ to 2e-7 on all 14 at 48 kHz (built the plugin's renderBreak and compared). Summed to mono,
+  into a slot with `assignSample`; instruments on that slot get SLICES 16, GRID, SYNC REPITCH (as the plugin's FIT),
+  BEATS 4. Renders on the UI thread in 0.5–1 s on a computer; move it to the pad Worker if phones stall.
+- Not ported: BREAK's own 16-step slice sequencer (the tracker is the sequencer) and its momentary effects (Flex /
+  Retrigger with FLX / RTG cover them); ACID's own sequencer modes (Song / Keys / Free).
+
 ## Possible future work: search and tidier groups in the sound and effect pickers (owner, 30 Oct: nice to have, not started)
 
 Surveyed 30 Oct (line numbers as of build 270).

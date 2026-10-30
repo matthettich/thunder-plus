@@ -1,6 +1,6 @@
 // ...Thunder Plus offline support. The app page is fetched fresh when online (so updates show up)
 // and served from the cache when offline.
-const CACHE = 'thunderplus-v270';
+const CACHE = 'thunderplus-v271';
 const FILES = ['./', './index.html', './manifest.webmanifest?v=8', './master-worklet.js?v=4', './pump/pump-meta.js?v=2', './pump/pump.wasm?v=2', './pump/synth/pump-synth-meta.js?v=2', './pump/synth/pump-synth-engine.js?v=4', './pump/synth/pump-synth-worklet.js?v=2', './pump/synth/pump-synth.wasm?v=2', './pump/ui/kit.js?v=4', './pump/ui/eq.js?v=2', './pump/ui/comp.js?v=1', './pump/ui/limit.js?v=1', './pump/ui/meter.js?v=1', './pump/ui/multiband.js?v=1', './pump/ui/calm.js?v=1', './pump/ui/tone.js?v=1', './pump/ui/band.js?v=1', './pump/ui/wide.js?v=1', './pump/ui/heat.js?v=1', './icons/plus-icon-192.png?v=2', './icons/plus-icon-512.png?v=2', './icons/plus-icon-maskable-512.png?v=2', './icons/plus-apple-touch-icon.png?v=2',
   './fonts/Jost-400.woff', './fonts/Jost-500.woff', './fonts/Jost-600.woff', './fonts/Jost-700.woff', './fonts/JetBrainsMono-400.woff2', './fonts/JetBrainsMono-700.woff2', './fonts/ShareTechMono-400.woff',
   './waves/index.html', './waves/waves-worklet.js?v=31', './waves/dsp/thunder-dsp.wasm', './waves/dsp/tfx.wasm', './waves/fonts/Jost-400.woff', './waves/fonts/Jost-500.woff', './waves/fonts/Jost-600.woff', './waves/fonts/Jost-700.woff',

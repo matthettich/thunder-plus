@@ -577,6 +577,11 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .ask .askitem{text-align:left; padding:8px 10px; min-height:38px}
 .ask input{width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid var(--line); background:var(--panel); min-height:38px}
 .ask .btnrow{justify-content:flex-end}
+.acidask .acidf{display:grid; grid-template-columns:7.5em 1fr; align-items:center; gap:8px; margin:8px 0}
+.acidask .acidf select{min-height:30px; width:100%}
+.acidask .acidr{display:flex; align-items:center; gap:8px} .acidask .acidr input{flex:1; min-width:0} .acidask .acidr b{width:3.2em; text-align:right; font-weight:500}
+.acidask .acidf .seg button{padding:3px 8px}
+.acidask .btnrow{margin-top:12px}
 .ask .ok{background:var(--pl); color:var(--inv); border-color:var(--pl); font-weight:600}
 /* First launch: the three gestures the whole app rests on, shown once over the tracker; any tap closes it. */
 .welcome{position:fixed; inset:0; z-index:65; display:flex; align-items:flex-end; justify-content:center; background:rgba(0,0,0,.42); padding:16px; padding-bottom:calc(130px + env(safe-area-inset-bottom,0px))}
@@ -2431,7 +2436,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p>Each track and the master have 8 effect slots (FX screen, or the Mixer’s FX row): 37 effects in all: Flex, Step gate, Retrigger, EQ, compressor, three reverbs, tape delay, dub tape, saturation, drive, tube, tape, vinyl, lo-fi, bitcrush, chorus, flanger, phaser, tremolo, trance gate, auto-wah, ladder filter, comb resonator, wavefolder, overdrive, pitch and frequency shifters, cross-mod, transient shaper, multiband squash, speaker cab, air, and Rings, Clouds and Beads. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
 <p><b>…chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback. Its <b>Resample</b> module records what passes through it into a pad, starting on the next bar, and slices it so you can chop it like a breakbeat.</p></section>
-    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots; on a computer, where they are a list down the left, ▲▼ do too)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the pad as it is (<kbd>Space</kbd> plays or stops the song, as everywhere)</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr><tr><td><kbd>Alt</kbd> <kbd>8</kbd> · <kbd>9</kbd> · <kbd>0</kbd> · <kbd>`</kbd></td><td>…waves · …chains · the synth · back to the last view (these and Alt+1–7 work from …waves and …chains too)</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound (kicks, snares, hats, percussion, IDM and glitch hits, basses, pads, chords, keys and leads, including Bass and Blip engine sounds). <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once. <b>Drum kits…</b> (File ▾, or ⚙ Settings → Kit) puts a CR-78-, 808-, 606-, 909-, 707-, 727- or 505-style kit, or a clean acoustic kit (Funk, Studio, Jazz), on pads 1–8 and keeps the synth slots; every sound of each kit is also in the Presets list, in its own group. <b>Funk breaks…</b> (File ▾) loads one of twelve original breaks, with swing, ghost notes and a laid-back snare, as a new song with its acoustic kit, or adds its four bars to this song.</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modelled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. <b>Drift</b> is a two-line analog pad synth laid out like the big 1970s CS-series polysynths (two oscillator lines per voice, a high-pass and a low-pass with their own envelope, up to four drifting unison voices) followed by a tape stage — <b>Wow</b> and <b>Flutter</b> on the pitch, chorus, saturation, <b>Age</b> (worn top and bottom, the odd dropout) and hiss — for warm, wobbly, faded pads; its presets are in the pad Presets list under Drift (tape pads). <b>…pump</b> (group in the engine list) has the pump plugins' instruments with their own sound and presets: <b>Mono</b> (three oscillators, four filters), <b>Poly</b> (two oscillators, poly-mod, unison, chorus) and <b>Coil</b> (tuned springs kicked by the note). Each renders a note like the other engines (<b>Hit</b> is how hard it is played), and each has a <b>live</b> twin that plays the plugin in the tracker note by note, with the VOL column as velocity, slides and bends as pitch bend, and glide (Coil live also sets how many <b>Voices</b> ring at once, 1–16). A twin shares its values with the rendered engine; if the device can't keep up, the live ones fall back to their renders and say so (Settings → Audio → …pump live). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
+    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots; on a computer, where they are a list down the left, ▲▼ do too)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the pad as it is (<kbd>Space</kbd> plays or stops the song, as everywhere)</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr><tr><td><kbd>Alt</kbd> <kbd>8</kbd> · <kbd>9</kbd> · <kbd>0</kbd> · <kbd>`</kbd></td><td>…waves · …chains · the synth · back to the last view (these and Alt+1–7 work from …waves and …chains too)</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound (kicks, snares, hats, percussion, IDM and glitch hits, basses, pads, chords, keys and leads, including Bass and Blip engine sounds). <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once. <b>Drum kits…</b> (File ▾, or ⚙ Settings → Kit) puts a CR-78-, 808-, 606-, 909-, 707-, 727- or 505-style kit, or a clean acoustic kit (Funk, Studio, Jazz), on pads 1–8 and keeps the synth slots; every sound of each kit is also in the Presets list, in its own group. <b>Funk breaks…</b> (File ▾) loads one of twelve original breaks, with swing, ghost notes and a laid-back snare, as a new song with its acoustic kit, or adds its four bars to this song. <b>Breaks to chop</b> (File ▾) has the fourteen breaks of …pump BREAK, rendered by its own kit with room and tape, as a one-bar loop in a slot, cut into 16 slices (C-4 plays slice 1) and synced to the tempo, ready to re-sequence. <b>Acid line…</b> (Edit ▾ or right-click on a phrase) writes a random bass line into the phrase the way …pump ACID does — scale, root, density, accents, slides and octave jumps; Roll (R) again or Mutate (M) a few steps, and light only the lanes you want changed — for an Acid pad (accents are volume FF, slides PSL).</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modelled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. <b>Drift</b> is a two-line analog pad synth laid out like the big 1970s CS-series polysynths (two oscillator lines per voice, a high-pass and a low-pass with their own envelope, up to four drifting unison voices) followed by a tape stage — <b>Wow</b> and <b>Flutter</b> on the pitch, chorus, saturation, <b>Age</b> (worn top and bottom, the odd dropout) and hiss — for warm, wobbly, faded pads; its presets are in the pad Presets list under Drift (tape pads). <b>…pump</b> (group in the engine list) has the pump plugins' instruments with their own sound and presets: <b>Mono</b> (three oscillators, four filters), <b>Poly</b> (two oscillators, poly-mod, unison, chorus) and <b>Coil</b> (tuned springs kicked by the note). Each renders a note like the other engines (<b>Hit</b> is how hard it is played), and each has a <b>live</b> twin that plays the plugin in the tracker note by note, with the VOL column as velocity, slides and bends as pitch bend, and glide (Coil live also sets how many <b>Voices</b> ring at once, 1–16). A twin shares its values with the rendered engine; if the device can't keep up, the live ones fall back to their renders and say so (Settings → Audio → …pump live). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
@@ -8919,6 +8924,144 @@ async function pickBreak(){
     saveS(); draw(); toast(`${b[0]} added at row ${rS(y, 3)} on tracks 1–6.`);
   }
 }
+/* CHOP BREAKS (owner, 30 Oct): pump BREAK's fourteen built-in breaks (plugins/break/BreakParams.hpp kBreaks and
+   BreakSounds.hpp renderBreak, ported line for line): an acoustic-style kit (a sine kick with a beater click, a snare's two
+   head modes and wires, six-partial hats and ride with a bell, toms), each hit on its sixteenth with the break's swing and a
+   drummer's drift, then a small Schroeder room and tape (saturation, a high cut, wow and flutter, a little hiss). Rendered
+   three bars over and the middle one kept, so the tails of one bar run into the next and it loops. Unlike the Funk breaks
+   (notes on a kit), this one is a one-bar sample in a slot, sliced 16 ways (C-4 plays slice 1) and synced to the tempo, to
+   chop in the tracker, as the plugin does. Mono here (the plugin's hats right and ride left are summed). */
+const CHOP_BREAKS = [   // name, bpm, swing, kick, snare (X hard, x, g ghost), hats (x closed, o open), ride, toms (1 high … 3 low), room, tape, bright, tight
+  ['Pocket', 96, 0.10, 'x.x.......x..x..', '....X..g.g..X..g', 'xxxxxxxxxxxxxxox', '................', '................', 0.25, 0.35, 0.55, 0.70],
+  ['Ghost notes', 98, 0.12, 'x..x..x...x..x..', 'g...X.gg.g.gX.gg', 'x.x.x.x.x.x.x.o.', '................', '................', 0.20, 0.30, 0.60, 0.65],
+  ['Hot butter', 100, 0.08, 'x.x...x..x...x..', '....X..g.g.gX..g', 'xxxxxxxoxxxxxoxx', '................', '................', 0.30, 0.45, 0.55, 0.60],
+  ['Street funk', 92, 0.06, 'x......xx.x.....', '....X.......X...', 'x.x.x.x.x.x.x.x.', '................', '................', 0.45, 0.55, 0.45, 0.70],
+  ['Gospel run', 104, 0.15, 'x.x.......xx....', '....X..x.x..X..x', 'x.x.x.x.x.x.x.x.', '................', '................', 0.35, 0.40, 0.65, 0.55],
+  ['Soul shuffle', 88, 0.33, 'x.....x.x.....x.', '....X.......X..g', 'x.xxx.xxx.xxx.xx', '................', '................', 0.40, 0.50, 0.45, 0.60],
+  ['Heavy one', 90, 0.05, 'x..x.xx...x.....', '....X.......X...', 'x.x.x.x.x.x.o.x.', '................', '................', 0.30, 0.60, 0.40, 0.75],
+  ['Slow grind', 84, 0.20, 'x.........x.....', '........X.......', 'x.x.x.x.x.x.x.x.', '................', '................', 0.50, 0.55, 0.40, 0.60],
+  ['Double time', 112, 0.04, 'x.x...x.x.x...x.', '....X..g....X.g.', 'xxxxxxxxxxxxxxxx', '................', '................', 0.20, 0.30, 0.70, 0.80],
+  ['Ride strut', 102, 0.18, 'x......xx.....x.', '....X..g....X..g', '................', 'x.xxx.xxx.xxx.xx', '................', 0.35, 0.35, 0.60, 0.60],
+  ['Open hat strut', 106, 0.10, 'x..x..x.x..x....', '....X.......X...', 'x.o.x.o.x.o.x.o.', '................', '................', 0.30, 0.40, 0.60, 0.65],
+  ['Tom break', 100, 0.10, 'x.x.......x.....', '....X.......X.X.', 'x.x.x.x.x.......', '................', '..........1122.3', 0.45, 0.45, 0.50, 0.55],
+  ['Rimshot drive', 96, 0.12, 'x.x..x....x..x..', '....X..x.x..X..x', 'xoxxxoxxxoxxxoxx', '................', '................', 0.25, 0.45, 0.70, 0.70],
+  ['Lazy sunday', 86, 0.28, 'x..x......x.....', '....X.....g.X...', 'x.x.x.x.x.x.x.x.', '................', '................', 0.55, 0.60, 0.35, 0.50]];
+// pump's Rng (xorshift32), OnePole (TPT), Svf (TPT state variable) and FracDelay (cubic), as small closures
+const bkRng = seed => { let s = (seed >>> 0) || 1; const next = () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s; };
+  const uni = () => (next() >>> 8) * (1 / 16777216); return {uni, bi:() => 2 * uni() - 1}; };
+const bkOnePole = (fc, sr) => { const g = Math.tan(Math.PI * Math.min(Math.max(fc, 1), 0.49 * sr) / sr), G = g / (1 + g); let z = 0;
+  const lp = x => { const v = (x - z) * G, y = v + z; z = y + v; return y; }; return {lp, hp:x => x - lp(x)}; };
+const bkSvfBand = (f, q, sr) => { const g = Math.tan(Math.PI * Math.min(Math.max(f, 5), 0.49 * sr) / sr), k = 1 / Math.max(q, 0.05), a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2; let c1 = 0, c2 = 0;
+  return x => { const v3 = x - c2, v1 = a1 * c1 + a2 * v3, v2 = c2 + a2 * c1 + a3 * v3; c1 = 2 * v1 - c1; c2 = 2 * v2 - c2; return v1 * k; }; };
+function bkDelay(max){ let size = 4; while (size < max + 8) size <<= 1; const buf = new Float32Array(size), mask = size - 1; let w = 0;
+  const at = d => buf[(w - 1 - d) & mask];
+  return {push:x => { buf[w] = x; w = (w + 1) & mask; }, read:d => { d = Math.min(Math.max(d, 1), max); const i = d | 0, f = d - i, ym1 = at(i - 1), y0 = at(i), y1 = at(i + 1), y2 = at(i + 2);
+    const c1 = 0.5 * (y1 - ym1), c2 = ym1 - 2.5 * y0 + 2 * y1 - 0.5 * y2, c3 = 0.5 * (y2 - ym1) + 1.5 * (y0 - y1); return ((c3 * f + c2) * f + c1) * f + y0; }}; }
+function bkRoom(sr, size){
+  const cms = [29.7, 37.1, 41.1, 43.7], ams = [5.0, 1.7], fb = 0.62 + 0.2 * size, damp = 0.35;
+  const side = s => ({comb:cms.map(ms => ({b:new Float32Array(Math.max(1, Math.floor(sr * ms * (0.6 + 0.4 * size) * (s ? 1.03 : 1) / 1000))), i:0, lp:0})),
+    ap:ams.map(ms => ({b:new Float32Array(Math.max(1, Math.floor(sr * ms * (s ? 1.07 : 1) / 1000))), i:0}))});
+  const S2 = [side(0), side(1)];
+  return (s, x) => { const q = S2[s]; let y = 0;
+    for (const c of q.comb){ const o = c.b[c.i]; c.lp = o * (1 - damp) + c.lp * damp; c.b[c.i] = x + c.lp * fb; c.i = (c.i + 1) % c.b.length; y += o; }
+    y *= 0.25;
+    for (const a of q.ap){ const o = a.b[a.i], w = y + o * 0.5; a.b[a.i] = w; a.i = (a.i + 1) % a.b.length; y = o - w * 0.5; }
+    return y; };
+}
+const BK_KICK = 0, BK_SNARE = 1, BK_HATC = 2, BK_HATO = 3, BK_RIDE = 4, BK_TOM = 5;
+function bkHit(L, R, sr, h, b, rng){
+  const at = Math.round(h.time * sr), v = Math.min(Math.max(h.vel, 0), 1.3), [, , , , , , , , room, , bright, tight] = b;
+  const gl = Math.cos((h.pan + 1) * Math.PI * 0.25) * Math.SQRT2, gr = Math.sin((h.pan + 1) * Math.PI * 0.25) * Math.SQRT2, TAU = 2 * Math.PI;
+  const put = (i, y) => { if (i >= 0 && i < L.length){ L[i] += y * gl; R[i] += y * gr; } };
+  if (h.kind === BK_KICK){
+    const f0 = 55 + 8 * bright, dec = 0.075 + 0.05 * (1 - tight), click = bkOnePole(3500 + 2500 * bright, sr), n = Math.floor(sr * 0.6); let ph = 0, ph2 = 0;
+    for (let i = 0; i < n; i++){ const t = i / sr, f = f0 * (1 + 1.1 * Math.exp(-t / 0.012)); ph += f / sr; ph2 += 2.1 * f / sr;
+      const body = Math.sin(TAU * ph) * Math.exp(-t / dec), shell = 0.25 * Math.sin(TAU * ph2) * Math.exp(-t / 0.04), cl = click.lp(rng.bi()) * Math.exp(-t / 0.0025) * 1.6;
+      put(at + i, Math.tanh(1.6 * (body + shell + cl) * v) * 0.9); }
+  } else if (h.kind === BK_SNARE){
+    const ghost = h.variant === 1, hard = h.variant === 2, f1 = 185 + 20 * bright, f2 = f1 * 1.62, bodyDec = ghost ? 0.03 : 0.06, wireDec = ghost ? 0.035 : 0.065 + 0.03 * room;
+    const band = bkSvfBand(2600 + 2200 * bright + (hard ? 1500 : 0), 0.8, sr), hp = bkOnePole(900, sr), n = Math.floor(sr * 0.6); let p1 = 0, p2 = 0;
+    for (let i = 0; i < n; i++){ const t = i / sr, pm = 1 + 0.25 * Math.exp(-t / 0.008); p1 += f1 * pm / sr; p2 += f2 * pm / sr;
+      const head = (0.7 * Math.sin(TAU * p1) + 0.45 * Math.sin(TAU * p2)) * Math.exp(-t / bodyDec), wn = rng.bi();
+      const wires = (band(wn) * 0.9 + hp.hp(wn) * 0.6) * Math.exp(-t / wireDec), crack = hard ? rng.bi() * Math.exp(-t / 0.004) * 0.8 : 0;
+      put(at + i, Math.tanh((head * 0.8 + wires * 1.1 + crack) * v * 1.2) * 0.75); }
+  } else if (h.kind === BK_TOM){
+    const f0 = [0, 190, 145, 105][Math.min(Math.max(h.variant, 1), 3)], lp = bkOnePole(1500, sr), n = Math.floor(sr * 0.8); let ph = 0;
+    for (let i = 0; i < n; i++){ const t = i / sr; ph += f0 * (1 + 0.35 * Math.exp(-t / 0.03)) / sr;
+      put(at + i, Math.tanh((Math.sin(TAU * ph) * Math.exp(-t / 0.28) + lp.lp(rng.bi()) * Math.exp(-t / 0.05) * 0.5) * v * 1.2) * 0.75); }
+  } else {
+    const ratio = [1.0, 1.341, 1.567, 1.89, 2.131, 2.71], ride = h.kind === BK_RIDE, open = h.kind === BK_HATO, base = ride ? 520 : 3100 + 600 * bright;
+    const dec = ride ? 0.9 : open ? 0.28 : 0.035 + 0.02 * (1 - tight), ph = ratio.map(() => rng.uni());
+    const hp = bkOnePole(ride ? 1800 : 6500, sr), band = bkSvfBand(ride ? 5200 : 9000 + 2000 * bright, 0.9, sr);
+    const n = Math.floor(sr * (ride ? 1.6 : open ? 0.6 : 0.15)), cut = h.variant > 0 ? h.variant : n;
+    for (let i = 0; i < n; i++){ const t = i / sr; let m = 0;
+      for (let k = 0; k < 6; k++){ ph[k] += base * ratio[k] / sr; ph[k] -= Math.floor(ph[k]); m += ph[k] < 0.5 ? 1 : -1; }
+      m /= 6; const x = band(m * 0.6 + rng.bi() * 0.7); let env = Math.exp(-t / dec) * (1 - Math.exp(-t / 0.0006));
+      if (i > cut) env *= Math.exp(-(i - cut) / (0.006 * sr));
+      let y = hp.hp(x) * env; if (ride) y += 0.35 * Math.sin(TAU * 2.6 * base * t) * Math.exp(-t / 0.25);
+      put(at + i, y * v * (ride ? 0.6 : 0.85)); }
+  }
+}
+// Break i at sr: one bar, looping, about -14 dBFS RMS. Returns {L, R, bpm, name}.
+function renderChopBreak(i, sr){
+  const b = CHOP_BREAKS[Math.min(Math.max(i, 0), CHOP_BREAKS.length - 1)], [name, bpm, swing, K, Sn, H, Rd, T, room, tape, bright, tight] = b;
+  const bar = 240 / bpm, six = bar / 16, barN = Math.round(bar * sr), N = barN * 3 + Math.floor(sr * 2);
+  const L = new Float32Array(N), R = new Float32Array(N), rng = bkRng(0xB4EA + 131 * i), hits = [];
+  for (let rep = 0; rep < 3; rep++){
+    const feel = bkRng(0x5EE1 + 977 * i);
+    for (let k = 0; k < 16; k++){
+      const base = rep * bar + k * six + ((k & 1) ? swing * six : 0), when = sp => base + feel.bi() * (1 - tight) * sp + 0.004;
+      const beat = k % 4 === 0 ? 1 : k % 2 === 0 ? 0.85 : 0.72;
+      if (K[k] === 'x') hits.push({kind:BK_KICK, time:when(0.006), vel:0.95 + 0.08 * feel.bi(), variant:0, pan:0});
+      if (Sn[k] === 'X' || Sn[k] === 'x' || Sn[k] === 'g'){ const vr = Sn[k] === 'g' ? 1 : Sn[k] === 'X' ? 2 : 0;
+        const vel = vr === 1 ? 0.22 + 0.06 * feel.uni() : (vr === 2 ? 1.05 : 0.8) + 0.05 * feel.bi();
+        hits.push({kind:BK_SNARE, time:when(vr === 1 ? 0.010 : 0.005) + (vr === 2 ? 0.003 : 0), vel, variant:vr, pan:0.05}); }
+      if (H[k] === 'x' || H[k] === 'o') hits.push({kind:H[k] === 'o' ? BK_HATO : BK_HATC, time:when(0.008), vel:0.55 + 0.35 * beat + 0.08 * feel.bi(), variant:0, pan:0.3});
+      if (Rd[k] === 'x') hits.push({kind:BK_RIDE, time:when(0.008), vel:0.6 + 0.3 * beat + 0.06 * feel.bi(), variant:0, pan:-0.35});
+      if (T[k] >= '1' && T[k] <= '3') hits.push({kind:BK_TOM, time:when(0.006), vel:0.9 + 0.06 * feel.bi(), variant:+T[k], pan:T[k] === '1' ? 0.35 : T[k] === '2' ? 0 : -0.35});
+    }
+  }
+  for (const h of hits) if (h.kind === BK_HATO){ let next = 1e9; for (const o of hits) if (o.kind === BK_HATC && o.time > h.time && o.time < next) next = o.time; if (next < 1e8) h.variant = Math.floor((next - h.time) * sr); }
+  for (const h of hits) bkHit(L, R, sr, h, b, rng);
+  const rm = bkRoom(sr, room), tL = bkOnePole(7000 + 9000 * bright, sr), tR = bkOnePole(7000 + 9000 * bright, sr), hL = bkOnePole(28, sr), hR = bkOnePole(28, sr), rHp = bkOnePole(250, sr);
+  const wet = 0.10 + 0.32 * room, drive = 1 + 2.5 * tape, dl = bkDelay(256), dr = bkDelay(256), oL = new Float32Array(N), oR = new Float32Array(N), TAU = 2 * Math.PI;
+  for (let n = 0; n < N; n++){
+    const send = rHp.hp(0.5 * (L[n] + R[n])); let l = L[n] + wet * rm(0, send), r = R[n] + wet * rm(1, send);
+    l = Math.tanh(l * drive) / drive * 1.25; r = Math.tanh(r * drive) / drive * 1.25;
+    l = tL.lp(hL.hp(l)); r = tR.lp(hR.hp(r));
+    const wob = 30 + tape * (6 * Math.sin(TAU * 2 * n / barN) + 1.5 * Math.sin(TAU * 29 * n / barN));   // whole cycles a bar: the loop stays seamless
+    dl.push(l); dr.push(r); l = dl.read(wob); r = dr.read(wob);
+    oL[n] = l + tape * 0.0015 * rng.bi(); oR[n] = r + tape * 0.0015 * rng.bi();
+  }
+  const off = barN + 30, xL = oL.slice(off, off + barN), xR = oR.slice(off, off + barN), xf = Math.floor(0.003 * sr);
+  for (let j = 0; j < xf; j++){ const t = j / xf; xL[j] = oL[off + barN + j] * (1 - t) + xL[j] * t; xR[j] = oR[off + barN + j] * (1 - t) + xR[j] * t; }
+  let e = 0; for (let n = 0; n < barN; n++) e += 0.5 * (xL[n] * xL[n] + xR[n] * xR[n]);
+  const g = 0.2 / Math.sqrt(e / barN + 1e-12); for (let n = 0; n < barN; n++){ xL[n] *= g; xR[n] *= g; }
+  return {L:xL, R:xR, bpm, name};
+}
+async function pickChopBreak(){
+  const i = await askPick({title:'Breaks to chop', body:'The fourteen breaks of …pump BREAK, played by its acoustic-style kit with swing, room and tape. One goes into a slot as a one-bar loop cut into 16 slices: C-4 plays slice 1, C#4 slice 2…, in time with the song.'},
+    CHOP_BREAKS.map(b => `${b[0]} — ${b[1]} BPM` + (b[2] >= 0.2 ? ', swung' : '')));
+  if (i < 0) return;
+  const f = freeSlot(), nm = k => hx(k) + ' · ' + ((kit.voices[k] && kit.voices[k].name) || 'Pad');
+  const opts = [...(f >= 0 ? [['A slot this song doesn’t play: ' + nm(f), f]] : []), ['This slot: ' + nm(cur), cur], ['Another slot…', -2]];
+  const k = await askPick({title:CHOP_BREAKS[i][0], body:'The slot’s other layers are turned off and the break becomes its sample (undo puts the sound back).'}, opts.map(o => o[0]));
+  if (k < 0) return; let pad = opts[k][1];
+  if (pad === -2){ const a = await askText({title:'Which slot?', body:`Hex, 00 to ${hx(nslots() - 1)}.`}, hx(f >= 0 ? f : cur), 2, 'Load'); if (a == null) return;
+    pad = parseInt(a.trim(), 16); if (!(pad >= 0 && pad < Math.min(nslots(), kit.voices.length))) return toast(`Type a slot in hex, 00 to ${hx(nslots() - 1)}.`); }
+  toast('Rendering ' + CHOP_BREAKS[i][0] + '…', 3000); await new Promise(res => setTimeout(res, 40));   // about half a second on a computer, longer on a phone
+  const sr = padSR(), r = renderChopBreak(i, sr), d = new Float32Array(r.L.length);
+  for (let n = 0; n < d.length; n++) d[n] = (r.L[n] + r.R[n]) * 0.5;
+  const vo = kit.voices[pad]; vo.layers.forEach(L => { L.on = false; }); vo.sel = 0; vo.name = ('Break ' + r.name).slice(0, 24);
+  assignSample(pad, d, sr, 'Break · ' + r.name);
+  // An instrument to play it (one that already plays the slot, else the first one no phrase uses), sliced 16 ways and fitted to the tempo.
+  let ins = S.insts.findIndex(I => I.pad === pad);
+  if (ins < 0){ const usedI = new Set(); for (const p of S.phrases) if (p) for (const row of p) if (row && row[IC] >= 0) usedI.add(row[IC]);
+    const cand = [pad, ...Array.from({length:NI}, (_, n) => n)].filter(n => n < NI && !usedI.has(n)); if (cand.length){ ins = cand[0]; S.insts[ins].pad = pad; } }
+  S.insts.forEach(I => { if (I.pad === pad){ I.slc = 16; I.smode = 0; I.sync = 1; I.beats = 4; } });
+  saveS(); draw();
+  toast(`${r.name} (${r.bpm} BPM) in slot ${hx(pad)}, 16 slices, synced to the tempo` + (ins >= 0 ? ` · instrument ${hx(ins)}: C-4 plays slice 1` : ''), 6000);
+}
 // LXR ENGINES: the firmware's init kit, its seven sounds, as one group of the pad Presets list
 const lxrPresetGroup = () => ['LXR-02 firmware', LxrCore.initKit().map(({name, kind, o}) =>
   ['Init kit · ' + name, () => PE(name, kind, normX(kind, Object.assign(XENG[kind].d(), o)), {len:LxrCore.len(kind), gate:400})])];
@@ -11498,6 +11641,7 @@ function fileItems(){
     ...(canShareProj() ? [['Share project…', shareProj]] : []),
     ['Load demo song', guardLeave('the demo song', () => { setSong(demoSong(), 'Loaded the starter beat.'); setDirty(false); }), null, null, true],
     ['Funk breaks…', pickBreak],
+    ['Breaks to chop (…pump BREAK)…', pickChopBreak],
     ...(hasThunderWork() ? [['Open ...Thunder’s saved work…', guardLeave('...Thunder’s saved work', () => thunderImport(false))]] : []),
     null,
     ['Render song (WAV)', () => renderOut(false)], ['Render stems (.zip)', () => renderOut(true)],
@@ -17140,7 +17284,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 270;
+const BUILD = 271;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18909,7 +19053,7 @@ function cmdItems(){
       {a:'dupn', l:'Duplicate the track with its notes', k:keyHint('mod+alt+D'), f:() => dupKey(true)}] : []),
     null,
     ...(onSong ? [] : [val('b:16', 'Value up a lot', '▲')]), val('b:1', 'Value up', '▶'), val('b:-1', 'Value down', '◀'), ...(onSong ? [] : [val('b:-16', 'Value down a lot', '▼')]),
-    ...(tv === 'phrase' && !mstView() ? [null, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill}] : []),
+    ...(tv === 'phrase' && !mstView() ? [null, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill}, {a:'acid', l:'Acid line… (generate a bass line)', k:'', f:acidLine}] : []),
     ...(tv === 'phrase' ? [null, {a:'interp', l:'Interpolate (ramp the selection)', k:'', f:interpSel, off:!(selA && selA.v === 'phrase')},   // SELECTION TOOLS
       ...(mstView() ? [] : [{a:'volsel', l:'Volume… (scale, fade, set)', k:'', f:volSel}, {a:'instsel', l:'Instrument… (set, swap)', k:'', f:instSel}]),
       {a:'shrink', l:'Shrink (every other row)', k:'', f:() => stretchSel(false)}, {a:'expand', l:'Expand (spread out)', k:'', f:() => stretchSel(true)}] : []),
@@ -18948,6 +19092,118 @@ async function euclidFill(){
   const src = P[c.y], note = src[col] >= 0 && src[col] < 120 ? src[col] : last.note, ins = src[IC] >= 0 ? src[IC] : defInst(), pat = euclid(k, n, rot);
   for (let y = y0; y <= y1; y++){ const r = P[y]; if (pat[(y - y0) % n]){ r[col] = note; if (r[IC] < 0) r[IC] = ins; } else r[col] = -1; }
   saveS(); draw(); toast(`Euclidean ${k} in ${n}${rot ? ', rotated ' + rot : ''}: rows ${rS(y0)}–${rS(y1)}, ${noteS(note)}`);
+}
+
+/* ACID LINE (owner, 30 Oct): pump ACID's random pattern generator (plugins/acid/AcidParams.hpp, randomizeSteps and
+   mutateSteps), writing a bass line into the open phrase for an Acid pad. Acid-line logic, as a hardware bass line's random
+   mode: the first step plays the root; notes come from the scale (the root and the fifth more often, often the same note
+   again); octave jumps up likelier than down and likelier on accents; rests and ties by DENSITY (a tie only after a note);
+   accents on notes only, never more than three in a row; a slide only from a note into a note, likelier into a big jump.
+   LANES pick what is rolled again (the rest stays), MUTATE rolls them on about a quarter of the steps only.
+   In the phrase: a note is a note (the base note + the step), a tie an empty row (the note holds), a rest a note OFF (only
+   after a sounding step), an accent volume FF (the Acid engine accents C0 and up; a plain note has no volume, FF level
+   unaccented), a slide PSL 03 on the note slid into (legato, about half a step). It reads the phrase back first, so the
+   lanes left alone keep what is there, hand edits included. Each roll is one undo step. */
+const ACID_SCALES = [['Minor', [0, 2, 3, 5, 7, 8, 10]], ['Phrygian', [0, 1, 3, 5, 7, 8, 10]], ['Dorian', [0, 2, 3, 5, 7, 9, 10]],
+  ['Harmonic minor', [0, 2, 3, 5, 7, 8, 11]], ['Minor pentatonic', [0, 3, 5, 7, 10]], ['Blues', [0, 3, 5, 6, 7, 10]], ['Major', [0, 2, 4, 5, 7, 9, 11]],
+  ['Chromatic', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]], ['Root & fifth', [0, 7]], ['Octaves', [0]]];
+const ACID_LANES = [['notes', 'NOTES'], ['oct', 'OCTAVES'], ['acc', 'ACCENTS'], ['slide', 'SLIDES'], ['time', 'TIME']];
+const acidSet = {scale:0, root:0, base:ROOT, density:75, accent:30, slide:25, octave:30, lanes:{notes:true, oct:true, acc:true, slide:true, time:true}};
+const ACID_NOTE = 0, ACID_TIE = 1, ACID_REST = 2;
+const acidPc = n => ((n % 12) + 12) % 12, acidOct = n => n >= 12 ? (n >= 24 ? 2 : 1) : (n < 0 ? -1 : 0);
+// The generator, as pump's (notes are semitones from the pattern's C, -12 to 24; `only` limits it to some steps).
+function acidRoll(st, L, lanes, R, rnd, only){
+  const sc = ACID_SCALES[R.scale][1], want = i => !only || only[i];
+  const pick = prev => { const u = rnd(); if (prev >= 0 && u < 0.22) return prev; if (u < 0.45) return 0; if (u < 0.58 && sc.includes(7)) return 7; return sc[Math.floor(rnd() * sc.length)]; };
+  if (lanes.time) for (let i = 0; i < L; i++){ if (!want(i)) continue; if (i === 0 && !only){ st[i].gate = ACID_NOTE; continue; }
+    const u = rnd(), prev = i > 0 && st[i - 1].gate !== ACID_REST;
+    st[i].gate = u < R.density ? ACID_NOTE : prev && u < R.density + (1 - R.density) * 0.3 ? ACID_TIE : ACID_REST; }
+  let prevPc = -1;
+  for (let i = 0; i < L; i++){ const s = st[i]; let pc = acidPc(s.note - R.root), oc = acidOct(s.note - R.root);
+    if (want(i)){
+      if (lanes.notes) pc = i === 0 && !only ? 0 : pick(prevPc);
+      if (lanes.oct){ const u = rnd(), up = R.octave * (s.accent ? 0.85 : 0.6), dn = R.octave * 0.25; oc = u < up ? 1 : u < up + dn ? -1 : 0; if (R.scale === 9 && u < 0.08 + R.octave * 0.3) oc = 2; } }
+    let nn = R.root + pc + 12 * oc; while (nn > 24) nn -= 12; while (nn < -12) nn += 12;
+    s.note = nn; if (s.gate === ACID_NOTE) prevPc = pc; }
+  if (lanes.acc){ let run = 0; for (let i = 0; i < L; i++){ const s = st[i]; if (!want(i)){ run = s.accent ? run + 1 : 0; continue; }
+    s.accent = s.gate === ACID_NOTE && run < 3 && rnd() < R.accent * (acidOct(s.note - R.root) > 0 ? 1.4 : 1); run = s.accent ? run + 1 : 0; } }
+  if (lanes.slide || lanes.time || lanes.notes || lanes.oct) for (let i = 0; i < L; i++){ const s = st[i], nx = st[(i + 1) % L];
+    if (s.gate === ACID_REST || nx.gate !== ACID_NOTE){ if (lanes.slide || lanes.time) s.slide = false; continue; }
+    if (!lanes.slide || !want(i)) continue;
+    s.slide = rnd() < R.slide * (Math.abs(nx.note - s.note) >= 7 ? 1.5 : 1); }
+  for (const s of st) if (s.gate === ACID_REST){ s.accent = false; s.slide = false; }
+}
+function acidMutate(st, L, lanes, R, rnd){ const only = new Array(L).fill(false), n = Math.max(2, Math.floor(L / 4)); for (let k = 0; k < n; k++) only[Math.floor(rnd() * L)] = true; acidRoll(st, L, lanes, R, rnd, only); }
+// The phrase's rows y0..y0+L-1 as steps, and back.
+const PSL_I = () => FXC.indexOf('PSL');
+function acidRead(P, y0, L, base){
+  const st = []; let sounding = false, lastN = 0;
+  for (let i = 0; i < L; i++){ const r = P[y0 + i] || blankRow(), n = r[0];
+    if (n >= 0 && n < 120){ lastN = clamp(n - base, -12, 24); st.push({note:lastN, gate:ACID_NOTE, accent:r[VC] >= 0xC0, slide:false}); sounding = true; }
+    else if (n === OFF || !sounding){ st.push({note:lastN, gate:ACID_REST, accent:false, slide:false}); sounding = false; }
+    else st.push({note:lastN, gate:ACID_TIE, accent:false, slide:false}); }
+  for (let i = 0; i < L; i++){ const nx = P[y0 + (i + 1) % L]; if (st[i].gate !== ACID_REST && st[(i + 1) % L].gate === ACID_NOTE && nx)
+    for (let m = FX0; m < RW; m += 2) if (nx[m] === PSL_I()) st[i].slide = true; }
+  return st;
+}
+function acidWrite(P, y0, L, base, st, ins){
+  const psl = PSL_I();
+  for (let i = 0; i < L; i++){ const r = P[y0 + i], s = st[i], prev = st[(i - 1 + L) % L];
+    for (let m = FX0; m < RW; m += 2) if (r[m] === psl){ r[m] = -1; r[m + 1] = -1; }
+    for (let c = 1; c < NCOL; c++) r[c] = -1;
+    if (s.gate === ACID_NOTE){ r[0] = clamp(base + s.note, 0, 119); r[IC] = ins; r[VC] = s.accent ? 0xFF : -1;
+      if (prev.slide && (i > 0 || L > 1)){ let m = FX0; while (m < RW && r[m] >= 0) m += 2; if (m < RW){ r[m] = psl; r[m + 1] = 3; } } }
+    else { r[0] = s.gate === ACID_REST && prev.gate !== ACID_REST ? OFF : -1; r[VC] = -1; r[IC] = -1; }   // a tie: empty (the note holds); a rest: OFF after a sounding step
+  }
+}
+function acidLine(){
+  if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Acid line writes a bass line into it.');
+  if (busTrack(cTrack)) return busSay();
+  if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase();
+  let y0 = 0, L = plen(cPhrase);
+  if (selA && selA.v === 'phrase'){ const R = selRect(); y0 = R.y0; L = Math.max(2, Math.min(R.y1, plen(cPhrase) - 1) - y0 + 1); }
+  const P = () => S.phrases[cPhrase];
+  const src = P()[cs.phrase.y], ins = src && src[IC] >= 0 ? src[IC] : (P().find(r => r[IC] >= 0) || [])[IC] ?? defInst();
+  const R = () => ({scale:acidSet.scale, root:acidSet.root, density:acidSet.density / 100, accent:acidSet.accent / 100, slide:acidSet.slide / 100, octave:acidSet.octave / 100});
+  const roll = mut => {
+    const st = acidRead(P(), y0, L, acidSet.base), lanes = acidSet.lanes;
+    if (!ACID_LANES.some(([k]) => lanes[k])) return toast('Light at least one lane: NOTES, OCTAVES, ACCENTS, SLIDES or TIME.');
+    if (mut) acidMutate(st, L, lanes, R(), Math.random); else acidRoll(st, L, lanes, R(), Math.random);
+    acidWrite(P(), y0, L, acidSet.base, st, ins); saveS(); draw();
+    const nN = st.filter(s => s.gate === ACID_NOTE).length;
+    toast(`${mut ? 'Mutated' : 'Rolled'}: ${nN} notes, ${st.filter(s => s.accent).length} accents, ${st.filter(s => s.slide).length} slides · rows ${rS(y0)}–${rS(y0 + L - 1)}`, 1600);
+  };
+  // the panel: an .ask dialog that stays open, so the line can be rolled again while it plays
+  if (askOpen) askOpen(null);
+  const wrap = el('div', 'ask acidask'), box = el('div', 'askbox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Acid line');
+  box.append(el('div', 'asktitle', 'Acid line'), el('div', 'askmsg', `Rows ${rS(y0)}–${rS(y0 + L - 1)} of this phrase, instrument ${hx(ins)}. Accents are volume FF, slides PSL. Use it with an Acid pad (Engine: Acid).`));
+  const field = (label, ctl) => { const f = el('label', 'acidf'); f.append(el('span', null, label), ctl); box.append(f); return ctl; };
+  const sel = (label, opts, k) => { const s = el('select'); opts.forEach(([v, t]) => s.append(new Option(t, v))); s.value = acidSet[k]; s.addEventListener('change', () => { acidSet[k] = +s.value; }); return field(label, s); };
+  sel('Scale', ACID_SCALES.map(([n], i) => [i, n]), 'scale');
+  sel('Root', NN.map((n, i) => [i, n.replace('-', '')]), 'root');
+  sel('Base note', [24, 36, 48, 60].map(v => [v, noteS(v) + (v === ROOT ? ' (the pad’s pitch)' : '')]), 'base');
+  for (const [k, label] of [['density', 'Density'], ['accent', 'Accents'], ['slide', 'Slides'], ['octave', 'Octave jumps']]){
+    const w = el('span', 'acidr'), r = el('input'), v = el('b', null, acidSet[k] + '%'); r.type = 'range'; r.min = 0; r.max = 100; r.value = acidSet[k];
+    r.addEventListener('input', () => { acidSet[k] = +r.value; v.textContent = r.value + '%'; }); w.append(r, v); field(label, w); }
+  const lanes = el('div', 'seg'); lanes.setAttribute('aria-label', 'Lanes to roll');
+  ACID_LANES.forEach(([k, t]) => { const b = el('button', acidSet.lanes[k] ? 'on' : null, t); b.type = 'button'; b.setAttribute('aria-pressed', !!acidSet.lanes[k]);
+    b.addEventListener('click', () => { acidSet.lanes[k] = !acidSet.lanes[k]; b.classList.toggle('on', acidSet.lanes[k]); b.setAttribute('aria-pressed', acidSet.lanes[k]); }); lanes.append(b); });
+  field('Roll', lanes);
+  const row = el('div', 'btnrow'), mk = (t, f, cls) => { const b = el('button', cls || null, t); b.type = 'button'; b.addEventListener('click', f); row.append(b); return b; };
+  const done = () => { if (askOpen !== done) return; askOpen = null; wrap.remove(); document.removeEventListener('keydown', key, true); };
+  mk('▶ / ■', () => playCtx()); mk('Mutate (M)', () => roll(true)); const go = mk('Roll (R)', () => roll(false), 'ok'); mk('Done', done);
+  box.append(row);
+  // Keys stay in the panel: R rolls, M mutates, Space plays or stops the phrase, Esc / Enter close.
+  const key = e => { const tag = e.target && e.target.tagName;
+    if (e.key === 'Escape' || (e.key === 'Enter' && tag !== 'BUTTON' && tag !== 'SELECT')){ e.preventDefault(); e.stopPropagation(); return done(); }
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'r' || e.key === 'R')){ e.preventDefault(); e.stopPropagation(); return roll(false); }
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'm' || e.key === 'M')){ e.preventDefault(); e.stopPropagation(); return roll(true); }
+    if (e.key === ' ' && tag !== 'BUTTON'){ e.preventDefault(); e.stopPropagation(); return playCtx(); }
+    e.stopPropagation();
+    if (!(e.target && e.target.closest && e.target.closest('.ask'))) e.preventDefault(); };
+  askOpen = done; document.addEventListener('keydown', key, true);
+  const t0 = performance.now(); wrap.addEventListener('pointerdown', e => { if (e.target === wrap && performance.now() - t0 > 400){ e.preventDefault(); done(); } });
+  wrap.append(box); document.body.append(wrap); setTimeout(() => go.focus(), 0);
 }
 
 /* ---------- drawing ---------- */
