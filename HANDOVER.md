@@ -79,6 +79,26 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (10): MUT, GEN and PRB (build 277)
+
+- New commands at the end of `FXC` (saved songs keep their numbers): `MUT`, `GEN` (group Sound), `PRB` (Chance and random).
+- `PRB XX`: in the row's command loop, like RND: removes the command to its left unless `rand() * 255 < XX` (the
+  song's seeded random, so SED repeats it); with none to its left it acts as the note's chance.
+- `MUT` / `GEN` set `ev.vk` ('m'/'g' + value) on the note; `startNote` plays `varBuf(ev, ac)` (else the pad).
+  `varVoice`: GEN → `genVoice(type, FAMILY, n, RANGE)` on `GEN_SPACE` (12 types on Tone drum, Breath, Skin, FM Drum,
+  Blip; FAMILY picks a centre per control by `bkHash`, RANGE spreads around it); MUT → `mutVoice(pad, n, RANGE)` (engine
+  controls by their XUI rows in lin/log space, whole-number controls only past half range; layers by `MUT_LAYER`).
+  MUT variations are scaled to the pad's peak (`varLevel`). Sliced / synced instruments ignore both.
+- Cache `VAR` (key: pad, vk, RANGE, and the pad's render revision for MUT or type+FAMILY for GEN), ~48 MB LRU. Live:
+  `varWant` renders in the Worker when the sequencer makes the event (ahead of the note) and `varPrefetch` at every
+  tStart renders the outright values; until ready the pad plays. Offline renders (`ac !== ctx`) render synchronously,
+  so exports are exact.
+- INST rows (not on MIDI instruments): RANGE (`mrng`, default 40 hex), GEN TYPE (`gtype`: AUTO by the pad's name via
+  `drumTypeOf`, or one of `GEN_TYPES`), FAMILY (`gcen`).
+- Checked headless: all 12 GEN types sound, GEN is deterministic, low RANGE keeps a kick's pitch within ~3 Hz and full
+  within its whole box; MUT on layer kits and engine presets; a playing phrase with GEN+RND and MUT+PRB filled the cache
+  in the Worker with no errors; the offline path renders.
+
 ## 30 Oct (9): Enter on effect cells, as on notes (build 276)
 
 - Keyboard Enter on a filled command cell picks it up (`pickUp`: command and value become current); on an empty one it
