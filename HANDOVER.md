@@ -79,6 +79,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (11): Tab in a phrase (build 278)
+
+- KEYS-mode Tab in the phrase editor: note → instrument → FX1 → FX2 → FX3 → first note (Shift+Tab back); the other
+  note columns and VOL are on the arrows (VOL: Tab goes on to the instrument). Master / bus-FX phrases: FX1–3.
+  Pattern view keeps Tab = next track (`pvTab`).
+
 ## 30 Oct (10): MUT, GEN and PRB (build 277)
 
 - New commands at the end of `FXC` (saved songs keep their numbers): `MUT`, `GEN` (group Sound), `PRB` (Chance and random).
