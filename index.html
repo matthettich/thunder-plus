@@ -2433,7 +2433,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <h3>Flex, Step gate and Retrigger</h3>
 <p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (16 patterns; <code>FLX</code> picks one from a row). <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT</code> picks. <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot.</p>
 <h3>Track effects</h3>
-<p>Each track and the master have 8 effect slots (FX screen, or the Mixer’s FX row): 37 effects in all: Flex, Step gate, Retrigger, EQ, compressor, three reverbs, tape delay, dub tape, saturation, drive, tube, tape, vinyl, lo-fi, bitcrush, chorus, flanger, phaser, tremolo, trance gate, auto-wah, ladder filter, comb resonator, wavefolder, overdrive, pitch and frequency shifters, cross-mod, transient shaper, multiband squash, speaker cab, air, and Rings, Clouds and Beads. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter. Under a slot's controls, <b>› PRESET</b> lists INIT, factory presets (214 across the effects) and the song's own, and <b>› SAVE AS PRESET…</b> keeps the slot's settings for that effect. <b>› EQ WINDOW</b> (at the bottom of the FX screen, on any track) opens the track's …pump EQ in its own window, adding one to a free slot if needed; …pump EQ works on every track, the other …pump effects on buses and the master.</p>
+<p>Each track and the master have 8 effect slots (FX screen, or the Mixer’s FX row): 37 effects in all: Flex, Step gate, Retrigger, EQ, compressor, three reverbs, tape delay, dub tape, saturation, drive, tube, tape, vinyl, lo-fi, bitcrush, chorus, flanger, phaser, tremolo, trance gate, auto-wah, ladder filter, comb resonator, wavefolder, overdrive, pitch and frequency shifters, cross-mod, transient shaper, multiband squash, speaker cab, air, and Rings, Clouds and Beads. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter. For drums and IDM: <b>Beat grains</b> (a rhythmic grain cloud in time with the song, after Output Portal: rate, density, size, position, spray, pitch and random pitch, reverse, shape, stereo, freeze), <b>Beat scramble</b> (re-orders the last bar's slices, some reversed; keep the beats, new every bar or looped) and <b>Glitch sequencer</b> (each step may stutter, reverse, jump an octave, tape-stop, crush or drop out). Under a slot's controls, <b>› PRESET</b> lists INIT, factory presets (214 across the effects) and the song's own, and <b>› SAVE AS PRESET…</b> keeps the slot's settings for that effect. <b>› EQ WINDOW</b> (at the bottom of the FX screen, on any track) opens the track's …pump EQ in its own window, adding one to a free slot if needed; …pump EQ works on every track, the other …pump effects on buses and the master.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
 <p><b>…chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback. Its <b>Resample</b> module records what passes through it into a pad, starting on the next bar, and slices it so you can chop it like a breakbeat.</p></section>
     <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots; on a computer, where they are a list down the left, ▲▼ do too)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the pad as it is (<kbd>Space</kbd> plays or stops the song, as everywhere)</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr><tr><td><kbd>Alt</kbd> <kbd>8</kbd> · <kbd>9</kbd> · <kbd>0</kbd> · <kbd>`</kbd></td><td>…waves · …chains · the synth · back to the last view (these and Alt+1–7 work from …waves and …chains too)</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound (kicks, snares, hats, percussion, IDM and glitch hits, basses, pads, chords, keys and leads, including Bass and Blip engine sounds). <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once. <b>Drum kits…</b> (File ▾, or ⚙ Settings → Kit) puts a CR-78-, 808-, 606-, 909-, 707-, 727- or 505-style kit, or a clean acoustic kit (Funk, Studio, Jazz), on pads 1–8 and keeps the synth slots; every sound of each kit is also in the Presets list, in its own group. <b>Funk breaks…</b> (File ▾) loads one of twelve original breaks, with swing, ghost notes and a laid-back snare, as a new song with its acoustic kit, or adds its four bars to this song. <b>Breaks to chop</b> (File ▾) has the fourteen breaks of …pump BREAK, rendered by its own kit with room and tape, as a one-bar loop in a slot, cut into 16 slices (C-4 plays slice 1) and synced to the tempo, ready to re-sequence. <b>Acid line…</b> (Edit ▾ or right-click on a phrase) writes a random bass line into the phrase the way …pump ACID does — scale, root, density, accents, slides and octave jumps; Roll (R) again or Mutate (M) a few steps, and light only the lanes you want changed — for an Acid pad (accents are volume FF, slides PSL).</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modelled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. <b>Drift</b> is a two-line analog pad synth laid out like the big 1970s CS-series polysynths (two oscillator lines per voice, a high-pass and a low-pass with their own envelope, up to four drifting unison voices) followed by a tape stage — <b>Wow</b> and <b>Flutter</b> on the pitch, chorus, saturation, <b>Age</b> (worn top and bottom, the odd dropout) and hiss — for warm, wobbly, faded pads; its presets are in the pad Presets list under Drift (tape pads). <b>…pump</b> (group in the engine list) has the pump plugins' instruments with their own sound and presets: <b>Mono</b> (three oscillators, four filters), <b>Poly</b> (two oscillators, poly-mod, unison, chorus) and <b>Coil</b> (tuned springs kicked by the note). Each renders a note like the other engines (<b>Hit</b> is how hard it is played), and each has a <b>live</b> twin that plays the plugin in the tracker note by note, with the VOL column as velocity, slides and bends as pitch bend, and glide (Coil live also sets how many <b>Voices</b> ring at once, 1–16). A twin shares its values with the rendered engine; if the device can't keep up, the live ones fall back to their renders and say so (Settings → Audio → …pump live). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
@@ -10955,7 +10955,7 @@ const FX_GROUP = {eq:'Dynamics and EQ', comp:'Dynamics and EQ', transient:'Dynam
   chorus:'Modulation', flanger:'Modulation', phaser:'Modulation', tremolo:'Modulation', xmod:'Modulation', fshift:'Modulation',
   delay:'Delays', pdelay:'Delays', reverb:'Reverbs', space:'Reverbs', room:'Reverbs', preverb:'Reverbs',
   ladder:'Filters', autowah:'Filters', rings:'Resonators', comb:'Resonators', reson:'Resonators', pshift:'Pitch and voice',
-  clouds:'Spectral and granular', beads:'Spectral and granular', tgate:'Rhythmic'};
+  clouds:'Spectral and granular', beads:'Spectral and granular', tgate:'Rhythmic', grains:'Rhythmic', scramble:'Rhythmic', glitch:'Rhythmic'};
 const FX_GROUPS = ['Dynamics and EQ', 'Filters', 'Drive and lo-fi', 'Modulation', 'Delays', 'Reverbs', 'Pitch and voice', 'Resonators', 'Spectral and granular', 'Rhythmic', 'Utility', 'More'];
 { const groups = new Map();
   for (const k of Object.keys(FX)){ const g = FX[k].group || FX_GROUP[k] || 'More'; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(k); }
@@ -13506,6 +13506,146 @@ class RetrigCore {
     }
   }
 }
+/* IDM DRUM EFFECTS (owner, 30 Oct): three more tempo-locked track and master effects, plain JS like Flex. They share
+   beatLock (Flex's clock lock: the song position in beats from `tr.bp`, followed sample by sample) and bkHash (a
+   repeatable random number per bar and step, so LOOP 1 / 2 BARS repeat their choices).
+   - Beat grains (GrainsCore, id 100): a rhythmic grain cloud, after Output Portal: on every step (1/4 … 1/32T) a grain
+     may start, read from POSITION beats back (+ SPRAY), SIZE long, at PITCH (+ RANDOM PITCH: octaves, fifths or any),
+     sometimes reversed, panned by STEREO, shaped smooth to percussive. FREEZE holds the buffer. Free-runs at the last
+     tempo when the song is stopped, so pads and live playing go through it too.
+   - Beat scramble (ScrambleCore, id 101): each SLICE of the bar may play another slice from the last bar instead (CHANCE),
+     some reversed; KEEP BEATS leaves each beat's first slice alone; VARY: new choices every bar, or one or two bars looped.
+   - Glitch sequencer (GlitchCore, id 102): each step may stutter, reverse, jump an octave up or down, tape-stop, crush or
+     drop out, weighted by its row, CHANCE of anything at all; VARY as above. Both pass the sound through when stopped. */
+function beatLock(o, tr, n){
+  const bp = tr && tr.bp, spb = clkSpb(o, bp, n), q0 = bp && bp.length > 1 ? bp[0] : -1;
+  if (q0 < 0) o.ph = -1;
+  else if (!(o.ph >= 0)) o.ph = q0;
+  else { let e = q0 - o.ph; e -= 16 * Math.round(e / 16); if (Math.abs(e) > 0.004) o.ph = q0; else o.ph += e * 0.1; }
+  if (!(o.sp > 0) || Math.abs(spb / o.sp - 1) > 0.02) o.sp = spb;
+  return spb;
+}
+function bkHash(a, b, c){ let h = Math.imul((a | 0) * 73856093 ^ (b | 0) * 19349663 ^ (c | 0) * 83492791, 2654435761) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h = (h ^ (h >>> 13)) >>> 0; return h / 4294967296; }
+class GrainsCore {
+  constructor(sr){ this.sr = sr; this.N = Math.ceil(sr * 6); this.bL = new Float32Array(this.N); this.bR = new Float32Array(this.N); this.w = 0; this.spb = sr / 2; this.sp = sr / 2; this.ph = -1; this.fph = 0; this.last = -1; this.v = []; this.seed = 1; this.fill = 0; }
+  static get STEPS(){ return [1, 0.5, 0.25, 0.125, 1 / 3, 1 / 6, 1 / 12]; }
+  static get NAMES(){ return ['1/4', '1/8', '1/16', '1/32', '1/8T', '1/16T', '1/32T']; }
+  rnd(){ let s = this.seed; s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; this.seed = s || 1; return (s >>> 8) / 16777216; }
+  start(dp, stepS){
+    if (this.v.length >= 24) this.v.shift();
+    const RP = [[0], [-12, 0, 12], [-12, -5, 0, 7, 12], null][Math.max(0, Math.min(3, dp.rpitch | 0))];
+    let st = dp.pitch; if (dp.rpitch | 0) st += RP ? RP[Math.floor(this.rnd() * RP.length)] : Math.round((this.rnd() * 2 - 1) * 12);
+    const rate = Math.pow(2, st / 12), len = Math.max(64, Math.round((0.1 + dp.size * 3.9) * stepS)), rev = this.rnd() < dp.rev;
+    const back = Math.max(0, (dp.pos * 2 + this.rnd() * dp.spray) * this.sp) + len * Math.max(1, rate) + 4;
+    if (back >= this.N - 8) return;
+    let x = this.w - back; if (x < 0) x += this.N;
+    const pan = (this.rnd() * 2 - 1) * dp.spread, a = (pan + 1) * Math.PI / 4;
+    this.v.push({x, rate:rev ? -rate : rate, len, age:0, gl:Math.cos(a) * Math.SQRT2, gr:Math.sin(a) * Math.SQRT2, rev, span:len * rate});
+  }
+  process(L, R, n, dp, tr){
+    const N = this.N, bL = this.bL, bR = this.bR, spb = beatLock(this, tr, n), sk = 1 - Math.exp(-1 / (this.sr * 0.1));
+    const di = Math.max(0, Math.min(6, dp.div | 0)), stepB = GrainsCore.STEPS[di], shape = dp.shape, mix = dp.mix;
+    for (let i = 0; i < n; i++){
+      if (!dp.freeze || this.fill < 2 * this.sp){ bL[this.w] = L[i]; bR[this.w] = R[i]; this.w = this.w + 1 >= N ? 0 : this.w + 1; if (this.fill < N) this.fill++; }   // FREEZE holds once two beats are in
+      this.sp += (spb - this.sp) * sk;
+      let q = this.ph; if (q >= 0){ this.ph += 1 / this.sp; if (this.ph >= 16) this.ph -= 16; } else { q = this.fph; this.fph += 1 / this.sp; if (this.fph >= 16) this.fph -= 16; }
+      const k = Math.floor(q / stepB + 1e-9);
+      if (k !== this.last){ this.last = k; const stepS = stepB * this.sp;
+        if (this.rnd() < dp.density) this.start(dp, stepS);
+        if (dp.density > 0.6 && this.rnd() < (dp.density - 0.6) * 2.5) this.start(dp, stepS); }
+      let yl = 0, yr = 0;
+      for (let j = this.v.length - 1; j >= 0; j--){
+        const g = this.v[j], t = g.age / g.len;
+        if (t >= 1){ this.v.splice(j, 1); continue; }
+        const hann = Math.sin(Math.PI * t) ** 2, perc = Math.min(1, g.age / (0.002 * this.sr)) * Math.exp(-t * 6), env = hann + (perc - hann) * shape;
+        let x = g.rev ? g.x + g.span - g.age * -g.rate : g.x + g.age * g.rate; x %= N; if (x < 0) x += N;
+        const a = Math.floor(x), f = x - a, b = a + 1 >= N ? 0 : a + 1;
+        yl += (bL[a] + (bL[b] - bL[a]) * f) * env * g.gl; yr += (bR[a] + (bR[b] - bR[a]) * f) * env * g.gr;
+        g.age++;
+      }
+      const nv = this.v.length, gn = nv > 1 ? 1 / Math.sqrt(0.5 + nv * 0.5) : 1;
+      L[i] += (yl * gn - L[i]) * mix; R[i] += (yr * gn - R[i]) * mix;
+    }
+  }
+}
+class ScrambleCore {
+  constructor(sr){ this.sr = sr; this.N = Math.ceil(sr * 13); this.bL = null; this.bR = null; this.w = 0; this.D = 0; this.xo = 0; this.xc = 0; this.xn = 1; this.spb = sr / 2; this.sp = sr / 2; this.ph = -1; this.wr = 0; this.pq = -1; this.sl = -1; this.src = 0; this.rv = false; }
+  rd(b, D){ const N = this.N; let x = this.w - D; if (x < 0) x += N; const i = Math.floor(x), f = x - i, j = i + 1 >= N ? 0 : i + 1; return b[i] + (b[j] - b[i]) * f; }
+  process(L, R, n, dp, tr){
+    if (!this.bL){ this.bL = new Float32Array(this.N); this.bR = new Float32Array(this.N); }
+    const N = this.N, bL = this.bL, bR = this.bR, spb = beatLock(this, tr, n), sk = 1 - Math.exp(-1 / (this.sr * 0.1));
+    const div = [0.5, 0.25, 0.125][Math.max(0, Math.min(2, dp.div | 0))], per = Math.round(4 / div), XF = Math.max(16, Math.round(this.sr * dp.xf / 1000)), mix = dp.mix;
+    for (let i = 0; i < n; i++){
+      bL[this.w] = L[i]; bR[this.w] = R[i];
+      this.sp += (spb - this.sp) * sk;
+      const q = this.ph; if (q >= 0){ this.ph += 1 / this.sp; if (this.ph >= 16) this.ph -= 16; }
+      let D = 0;
+      if (q >= 0){
+        if (this.pq >= 0 && q < this.pq - 8) this.wr++;
+        this.pq = q;
+        const bar = Math.floor(q / 4), p = q - bar * 4, s = Math.min(per - 1, Math.floor(p / div + 1e-9));
+        const key = dp.vary === 1 ? 0 : dp.vary === 2 ? (bar & 1) : this.wr * 4 + bar;
+        if (s !== this.sl){ this.sl = s;
+          const keep = dp.keep && (s * div) % 1 < 1e-6, go = !keep && bkHash(key, s, dp.seed) < dp.chance;
+          this.src = go ? s - 1 - Math.floor(bkHash(key, s + 97, dp.seed) * (per - 1)) : s;   // another of the last bar's slices
+          this.rv = go && bkHash(key, s + 211, dp.seed) < dp.rev; if (this.rv && this.src === s) this.src = s - 1; }
+        const u = p - s * div, r = this.src * div + (this.rv ? div - u : u);
+        D = Math.max(0, Math.min(N - 4, (p - r) * this.sp));
+      }
+      if (Math.abs(D - this.D) > 8){ this.xo = this.D; this.xc = XF; this.xn = XF; }
+      this.D = D;
+      let yl = this.rd(bL, D), yr = this.rd(bR, D);
+      if (this.xc > 0){ const f = this.xc / this.xn; yl += (this.rd(bL, this.xo) - yl) * f; yr += (this.rd(bR, this.xo) - yr) * f; this.xc--; }
+      L[i] += (yl - L[i]) * mix; R[i] += (yr - R[i]) * mix;
+      this.w = this.w + 1 >= N ? 0 : this.w + 1;
+    }
+  }
+}
+class GlitchCore {
+  constructor(sr){ this.sr = sr; this.N = Math.ceil(sr * 13); this.bL = null; this.bR = null; this.w = 0; this.D = 0; this.xo = 0; this.xc = 0; this.xn = 1; this.g = 1; this.spb = sr / 2; this.sp = sr / 2; this.ph = -1; this.wr = 0; this.pq = -1; this.sl = -1; this.act = 0; this.sub = 4; this.hl = 0; this.hr = 0; this.hc = 0; }
+  static get ACTS(){ return ['none', 'stutter', 'reverse', 'octave up', 'octave down', 'tape stop', 'crush', 'gate']; }
+  rd(b, D){ const N = this.N; let x = this.w - D; if (x < 0) x += N; const i = Math.floor(x), f = x - i, j = i + 1 >= N ? 0 : i + 1; return b[i] + (b[j] - b[i]) * f; }
+  pick(key, s, dp){
+    if (bkHash(key, s, dp.seed) >= dp.chance) return 0;
+    const W = [dp.stut, dp.rev, dp.pitch * 0.5, dp.pitch * 0.5, dp.tape, dp.crush, dp.gate], tot = W.reduce((a, b) => a + b, 0); if (!(tot > 0)) return 0;
+    let u = bkHash(key, s + 131, dp.seed) * tot; for (let k = 0; k < W.length; k++){ u -= W[k]; if (u < 0) return k + 1; } return 0;
+  }
+  process(L, R, n, dp, tr){
+    if (!this.bL){ this.bL = new Float32Array(this.N); this.bR = new Float32Array(this.N); }
+    const N = this.N, bL = this.bL, bR = this.bR, spb = beatLock(this, tr, n), sk = 1 - Math.exp(-1 / (this.sr * 0.1));
+    const div = [0.5, 0.25, 0.125][Math.max(0, Math.min(2, dp.div | 0))], per = Math.round(4 / div), XF = Math.max(16, Math.round(this.sr * 0.003)), gk = 1 - Math.exp(-1 / (this.sr * 0.002)), mix = dp.mix;
+    for (let i = 0; i < n; i++){
+      bL[this.w] = L[i]; bR[this.w] = R[i];
+      this.sp += (spb - this.sp) * sk;
+      const q = this.ph; if (q >= 0){ this.ph += 1 / this.sp; if (this.ph >= 16) this.ph -= 16; }
+      let D = 0, g = 1, act = 0;
+      if (q >= 0){
+        if (this.pq >= 0 && q < this.pq - 8) this.wr++;
+        this.pq = q;
+        const bar = Math.floor(q / 4), p = q - bar * 4, s = Math.min(per - 1, Math.floor(p / div + 1e-9));
+        const key = dp.vary === 1 ? 0 : dp.vary === 2 ? (bar & 1) : this.wr * 4 + bar;
+        if (s !== this.sl){ this.sl = s; this.act = this.pick(key, s, dp); this.sub = [2, 4, 8][Math.floor(bkHash(key, s + 307, dp.seed) * 3)]; }
+        act = this.act;
+        const Ls = div * this.sp, u = (p - s * div) * this.sp;
+        if (act === 1){ const sb = Ls / this.sub; D = u - (u % sb); }
+        else if (act === 2) D = 2 * u;
+        else if (act === 3) D = u + Ls - ((2 * u) % Ls);
+        else if (act === 4) D = u / 2;
+        else if (act === 5){ D = u * u / (2 * Ls); g = Math.max(0, 1 - u / Ls); }
+        else if (act === 7) g = 0;
+        D = Math.max(0, Math.min(N - 4, D));
+      }
+      if (Math.abs(D - this.D) > 8){ this.xo = this.D; this.xc = XF; this.xn = XF; }
+      this.D = D; this.g += (g - this.g) * gk;
+      let yl = this.rd(bL, D), yr = this.rd(bR, D);
+      if (this.xc > 0){ const f = this.xc / this.xn; yl += (this.rd(bL, this.xo) - yl) * f; yr += (this.rd(bR, this.xo) - yr) * f; this.xc--; }
+      if (act === 6){ if (this.hc <= 0){ this.hl = Math.round(yl * 24) / 24; this.hr = Math.round(yr * 24) / 24; this.hc = 6; } this.hc--; yl = this.hl; yr = this.hr; }
+      yl *= this.g; yr *= this.g;
+      L[i] += (yl - L[i]) * mix; R[i] += (yr - R[i]) * mix;
+      this.w = this.w + 1 >= N ? 0 : this.w + 1;
+    }
+  }
+}
 const TFX = {
   eq:{n:'EQ', long:'Airwindows EQ', id:6, ps:[
       P_('treble', 'TREBLE', 128, v => sdb(u8(v) * 24 - 12)), P_('mid', 'MID', 128, v => sdb(u8(v) * 24 - 12)), P_('bass', 'BASS', 128, v => sdb(u8(v) * 24 - 12)),
@@ -13560,6 +13700,20 @@ const TFX = {
       P_('m2', 'STEPS 9-16', 0xAA, v => [...Array(8)].map((_, j) => (v >> (7 - j)) & 1 ? 'x' : '.').join('')), EN('div', 'STEP', 1, ['1/8', '1/16', '1/32', '1/16T', '1/8T']),
       P_('len', 'LENGTH', 191, pc), P_('depth', 'DEPTH', 255, pc), P_('smooth', 'SMOOTH', 40, v => (0.3 + u8(v) * 19.7).toFixed(1) + ' ms')],
     map:f => [f.pat, f.m1, f.m2, f.div, Math.max(0.03, u8(f.len)), u8(f.depth), 0.3 + u8(f.smooth) * 19.7]},
+  grains:{n:'GRNS', long:'Beat grains: a rhythmic grain cloud in time with the song — pitch, reverse, spray, freeze — for granular drum mangling, after Output Portal (Thunder original)', id:100, ps:[
+      EN('div', 'RATE', 2, GrainsCore.NAMES), P_('density', 'DENSITY', 200, pc), P_('size', 'SIZE', 60, v => Math.round((0.1 + u8(v) * 3.9) * 100) + '% of a step'),
+      P_('pos', 'POSITION', 30, v => (u8(v) * 2).toFixed(2) + ' beats back'), P_('spray', 'SPRAY', 40, v => '+' + u8(v).toFixed(2) + ' beat'), P_('pitch', 'PITCH', 24, v => (v - 24 > 0 ? '+' : '') + (v - 24) + ' st', 0, 48),
+      EN('rpitch', 'RANDOM PITCH', 0, ['OFF', 'OCTAVES', 'OCT + 5THS', 'ANY ±12']), P_('rev', 'REVERSE', 0, pc), P_('shape', 'SHAPE', 60, v => v < 85 ? 'smooth' : v < 170 ? 'rounded' : 'percussive'),
+      P_('spread', 'STEREO', 128, pc), EN('freeze', 'FREEZE', 0, ['OFF', 'HOLD']), P_('mix', 'MIX', 200, v => pc(v) + ' wet')],
+    map:f => [f.div, u8(f.density), u8(f.size), u8(f.pos), u8(f.spray), f.pitch - 24, f.rpitch, u8(f.rev), u8(f.shape), u8(f.spread), f.freeze, u8(f.mix)]},
+  scramble:{n:'SCRM', long:'Beat scramble: reshuffles the last bar’s slices in time with the song, some reversed (Thunder original)', id:101, ps:[
+      EN('div', 'SLICE', 1, ['1/8', '1/16', '1/32']), P_('chance', 'CHANCE', 128, pc), P_('rev', 'REVERSE', 40, pc), EN('keep', 'KEEP BEATS', 1, ['OFF', 'ON']),
+      EN('vary', 'VARY', 0, ['EVERY BAR', 'LOOP 1 BAR', 'LOOP 2 BARS']), P_('seed', 'SEED', 0, v => String(v)), P_('xf', 'SMOOTH', 40, v => (u8(v) * 20).toFixed(1) + ' ms'), P_('mix', 'MIX', 255, v => pc(v) + ' wet')],
+    map:f => [f.div, u8(f.chance), u8(f.rev), f.keep, f.vary, f.seed, u8(f.xf) * 20, u8(f.mix)]},
+  glitch:{n:'GLCH', long:'Glitch sequencer: each step may stutter, reverse, jump an octave, tape-stop, crush or drop out, in time with the song (Thunder original)', id:102, ps:[
+      EN('div', 'STEP', 1, ['1/8', '1/16', '1/32']), P_('chance', 'CHANCE', 90, pc), P_('stut', 'STUTTER', 200, pc), P_('rev', 'REVERSE', 120, pc), P_('pitch', 'OCTAVE', 100, pc),
+      P_('tape', 'TAPE STOP', 60, pc), P_('crush', 'CRUSH', 80, pc), P_('gate', 'DROPOUT', 80, pc), EN('vary', 'VARY', 0, ['EVERY BAR', 'LOOP 1 BAR', 'LOOP 2 BARS']), P_('seed', 'SEED', 0, v => String(v)), P_('mix', 'MIX', 255, v => pc(v) + ' wet')],
+    map:f => [f.div, u8(f.chance), u8(f.stut), u8(f.rev), u8(f.pitch), u8(f.tape), u8(f.crush), u8(f.gate), f.vary, f.seed, u8(f.mix)]},
   retrig:{n:'RTRG', long:'Retrigger: repeats a slice in time with the song, each repeat quieter or pitched (Thunder original). RTG in the tracker plays it; ALWAYS repeats while the slot is on', id:93, ps:[
       EN('mode', 'MODE', 0, ['RTG ONLY', 'ALWAYS']), EN('div', 'RATE', 2, RetrigCore.NAMES), P_('decay', 'DECAY', 38, pc),
       P_('pitch', 'PITCH', 24, v => (v - 24 > 0 ? '+' : '') + (v - 24) + ' st a repeat', 0, 48), P_('gate', 'GATE', 255, pc), P_('mix', 'MIX', 255, v => pc(v) + ' wet')],
@@ -13942,13 +14096,13 @@ const FXT_FIRST = ['compressor', 'limiter', 'ngate', 'eq', 'filter', 'cut', 'dri
   'sdelay', 'delay', 'room', 'plate', 'reverb', 'pshift', 'pump', 'utility', 'width'];
 const fxtGroup = k => (MODFX[k] && MODFX[k].group) || FX_GROUP[k] || 'More';
 const FXT_LIST = (() => {
-  const all = ['eq', 'comp', 'reverb', 'delay', 'pdelay', 'preverb', 'density', 'tape', 'chorus', 'crush', 'degrade', 'reson', 'rings', 'clouds', 'beads', 'flanger', 'phaser', 'tremolo', 'odrive', 'folder', 'autowah', 'pshift', 'ladder', 'xmod', 'space', 'lofi', 'drive', 'air', 'room', 'comb', 'transient', 'tgate', 'sgate', 'flex', 'retrig', 'ott', 'fshift', 'vinyl', 'dub', 'cab', 'tube',
+  const all = ['eq', 'comp', 'reverb', 'delay', 'pdelay', 'preverb', 'density', 'tape', 'chorus', 'crush', 'degrade', 'reson', 'rings', 'clouds', 'beads', 'flanger', 'phaser', 'tremolo', 'odrive', 'folder', 'autowah', 'pshift', 'ladder', 'xmod', 'space', 'lofi', 'drive', 'air', 'room', 'comb', 'transient', 'tgate', 'sgate', 'flex', 'retrig', 'grains', 'scramble', 'glitch', 'ott', 'fshift', 'vinyl', 'dub', 'cab', 'tube',
     ...Object.keys(MODFX).filter(k => MODFX[k].track), ...PUMP_TYPES.map(PUMP_KEY)];
   const gi = k => { const i = FX_GROUPS.indexOf(fxtGroup(k)); return i < 0 ? FX_GROUPS.length : i; }, fi = k => { const i = FXT_FIRST.indexOf(k); return i < 0 ? 999 : i; };
   return all.map((k, i) => [k, i]).sort((a, b) => gi(a[0]) - gi(b[0]) || fi(a[0]) - fi(b[0]) || a[1] - b[1]).map(e => e[0]);
 })();
 // (…PUMP: the pump effects count as tails so a render runs on past their latency; the render trims the silence after)
-const TAILS = new Set(['pdelay', 'preverb', 'reson', 'reverb', 'delay', 'rings', 'clouds', 'beads', 'space', 'room', 'pshift', 'comb', ...Object.keys(MODFX).filter(k => MODFX[k].track && MODFX[k].tail), ...PUMP_TYPES.map(PUMP_KEY)]);
+const TAILS = new Set(['grains', 'pdelay', 'preverb', 'reson', 'reverb', 'delay', 'rings', 'clouds', 'beads', 'space', 'room', 'pshift', 'comb', ...Object.keys(MODFX).filter(k => MODFX[k].track && MODFX[k].tail), ...PUMP_TYPES.map(PUMP_KEY)]);
 // …PUMP: the effects a slot picker offers on track t (the pump ones only on a bus or the master).
 // …pump EQ on every track (owner, 30 Oct: a pump-style EQ window per track); the other pump effects stay on buses and the master.
 const pumpAnyTrack = k => !!(TFX[k] && TFX[k].pump === 'eq');
@@ -14107,6 +14261,13 @@ class ThunderFx extends AudioWorkletProcessor {
         const q = c.p; s.dp = c.t === 95 ? {pat:q[0], mix:q[1], xf:q[2]} : c.t === 94 ? {pat:q[0], m1:q[1], m2:q[2], div:q[3], len:q[4], depth:q[5], smooth:q[6]} : {mode:q[0], div:q[1], decay:q[2], pitch:q[3], gate:q[4], mix:q[5]};
         s.on = on; s.slot = slot; next.push(s); continue;
       }
+      if (c.t >= 100 && c.t <= 102){   // IDM DRUM EFFECTS: Beat grains / Beat scramble / Glitch sequencer, plain JS on the beat clock
+        if (i >= 0 && old[i].js && old[i].jt === c.t){ s = old[i]; old.splice(i, 1); } else s = {key:c.key, h:-2, jt:c.t, js:c.t === 100 ? new GrainsCore(sampleRate) : c.t === 101 ? new ScrambleCore(sampleRate) : new GlitchCore(sampleRate)};
+        const q = c.p; s.dp = c.t === 100 ? {div:q[0], density:q[1], size:q[2], pos:q[3], spray:q[4], pitch:q[5], rpitch:q[6], rev:q[7], shape:q[8], spread:q[9], freeze:q[10], mix:q[11]}
+          : c.t === 101 ? {div:q[0], chance:q[1], rev:q[2], keep:q[3], vary:q[4], seed:q[5], xf:q[6], mix:q[7]}
+          : {div:q[0], chance:q[1], stut:q[2], rev:q[3], pitch:q[4], tape:q[5], crush:q[6], gate:q[7], vary:q[8], seed:q[9], mix:q[10]};
+        s.on = on; s.slot = slot; next.push(s); continue;
+      }
       if (c.t === 97 || c.t === 96){   // Pitch delay / reverb: plain JS
         if (i >= 0 && old[i].js && old[i].jt === c.t){ s = old[i]; old.splice(i, 1); } else s = {key:c.key, h:-2, jt:c.t, js:new PitchFxCore(sampleRate)};
         const q = c.p; s.dp = {kind:q[0], mode:q[1], time:q[2], fb:q[3], pitch:q[4], pitch2:q[5], tone:q[6], size:q[7], wow:q[8], mix:q[9]};
@@ -14125,7 +14286,7 @@ class ThunderFx extends AudioWorkletProcessor {
       s.on = on; s.slot = slot; next.push(s);
     }
     for (const s of old) this.drop(s);
-    this.slots = next; this.idle = 0; this.clocked = next.some(s => s.js && s.jt >= 93 && s.jt <= 95);
+    this.slots = next; this.idle = 0; this.clocked = next.some(s => s.js && ((s.jt >= 93 && s.jt <= 95) || (s.jt >= 100 && s.jt <= 102)));
   }
   modRun(s, n){
     if (s.dead) return;
@@ -14481,7 +14642,7 @@ function tfxReady(ac){
     tfxLoaded.set(ac, (async () => {
       await tfxLoad; if (!tfxBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       await chainsReady(ac);   // the …chains engine publishes the shared modules (ChainsDSP) in the audio thread, for the MODFX slots
-      if (!tfxURL) tfxURL = URL.createObjectURL(new Blob([rvMix.toString() + '\n' + DegradeCore.toString() + '\n' + ResonCore.toString() + '\n' + PitchFxCore.toString() + '\n' + clkSpb.toString() + '\n' + FlexCore.toString() + '\n' + StepGateCore.toString() + '\n' + RetrigCore.toString() + '\n' + TFX_SRC], {type:'application/javascript'}));
+      if (!tfxURL) tfxURL = URL.createObjectURL(new Blob([rvMix.toString() + '\n' + DegradeCore.toString() + '\n' + ResonCore.toString() + '\n' + PitchFxCore.toString() + '\n' + clkSpb.toString() + '\n' + FlexCore.toString() + '\n' + StepGateCore.toString() + '\n' + RetrigCore.toString() + '\n' + beatLock.toString() + '\n' + bkHash.toString() + '\n' + GrainsCore.toString() + '\n' + ScrambleCore.toString() + '\n' + GlitchCore.toString() + '\n' + TFX_SRC], {type:'application/javascript'}));
       await ac.audioWorklet.addModule(tfxURL);
       return true;
     })().catch(() => false));
@@ -17452,7 +17613,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 274;
+const BUILD = 275;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -17785,6 +17946,15 @@ const FX_FACTORY = {
   tgate:[['Trance 1/16', {div:2, pat:4}], ['Stutter 1/32', {div:0, pat:6, len:120}], ['Clave', {div:2, pat:8}], ['Sparse 1/8', {div:4, pat:7}]],
   sgate:[['Gallop', {pat:5}], ['Broken', {pat:6, div:1}], ['Tresillo', {pat:15}], ['Dense 1/32', {pat:13, div:2, len:160}], ['Triplet stab', {pat:7, div:3, len:120}]],
   flex:[['Repeat 1/8', {pat:2}], ['Stutter build', {pat:4}], ['Tape stop', {pat:6}], ['Random slices', {pat:16}], ['Beat juggle', {pat:14}], ['Reverse 1/8', {pat:8}]],
+  grains:[['Portal-ish cloud', {div:2, density:220, size:90, pos:30, spray:60, rpitch:1, rev:60, spread:200, mix:200}], ['Granular stutter 1/32', {div:3, density:255, size:40, pos:10, spray:10, shape:200, mix:220}],
+    ['Octave sparkle', {div:2, density:180, size:50, pitch:36, rpitch:1, shape:150, spread:220, mix:150}], ['Reverse wash', {div:1, density:200, size:160, pos:60, spray:120, rev:230, mix:180}],
+    ['Pitch scatter', {div:5, density:230, size:60, spray:90, rpitch:3, rev:80, shape:120, spread:255, mix:200}], ['Frozen beat', {div:2, density:240, size:120, pos:40, spray:80, freeze:1, mix:230}],
+    ['Slow drift', {div:0, density:180, size:220, pos:80, spray:150, pitch:12, shape:0, mix:170}], ['Percussive grains', {div:4, density:255, size:30, pos:20, spray:40, shape:255, rpitch:2, mix:210}]],
+  scramble:[['Light shuffle 1/16', {div:1, chance:90, rev:20}], ['Chopped 1/16', {div:1, chance:200, rev:60, keep:0}], ['Loop 2-bar re-edit', {div:1, chance:170, rev:50, vary:2}],
+    ['1/32 mince', {div:2, chance:180, rev:90, keep:0}], ['1/8 swap', {div:0, chance:160, rev:40}], ['Reverse heavy', {div:1, chance:200, rev:200}]],
+  glitch:[['Gentle glitch', {chance:60}], ['IDM chaos', {chance:200, stut:220, rev:160, pitch:140, tape:80, crush:120, gate:120}], ['Stutter only 1/16', {chance:150, stut:255, rev:0, pitch:0, tape:0, crush:0, gate:0}],
+    ['Octave jumps', {chance:130, stut:40, rev:40, pitch:255, tape:0, crush:0, gate:30}], ['Broken tape', {chance:120, stut:60, rev:60, pitch:30, tape:255, crush:60, gate:60}],
+    ['Bit dropout 1/32', {div:2, chance:160, stut:120, rev:40, pitch:40, tape:0, crush:220, gate:200}], ['Looped 1-bar glitch', {chance:170, vary:1}]],
   retrig:[['1/16 fade', {div:2, decay:90}], ['1/32 roll', {div:3, decay:40}], ['Pitch up roll', {div:3, pitch:30, decay:60}], ['Pitch down 1/16', {div:2, pitch:16}], ['Triplet stutter', {div:6, decay:70}], ['Always 1/8 echo', {mode:1, div:1, decay:120, mix:150}]],
   width:[['Wide', {width:200}], ['Mono bass, wide top', {width:190, bass:150}], ['Mono', {width:0}]],
   ensemble:[['String machine', {mode:0, depth:180}], ['Classic I+II', {mode:3}]],

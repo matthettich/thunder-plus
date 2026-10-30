@@ -79,6 +79,16 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (8): IDM drum effects (build 275)
+
+- Three plain-JS track / master effects on the beat clock, ids 100–102 in the track-FX worklet (`GrainsCore`,
+  `ScrambleCore`, `GlitchCore`, with `beatLock` = Flex's clock lock and `bkHash`; all added to the worklet Blob and to
+  `clocked`), TFX keys `grains`, `scramble`, `glitch` (group Rhythmic), 21 factory presets.
+- Beat grains free-runs at the last tempo when the song is stopped (Flex-style effects pass through instead); FREEZE
+  holds once two beats are in the buffer. It counts as a tail (TAILS) for renders.
+- Checked offline on a synthetic drum loop (finite, no silence, ~80× realtime for all three together) and in the real
+  worklet (fxOk, levels on the track while playing). Track / master only: not pad effects yet (the pad menu is FX + MODFX).
+
 ## 30 Oct (7): Backspace steps down, Arrange follows Shift+Alt moves, Ctrl+Space loop off (build 274)
 
 - Backspace in a phrase clears the cell and steps down by the edit step (KEYS mode handler); Delete still clears in place.
