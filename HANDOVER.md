@@ -79,6 +79,20 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (12): FXS / FXV, SCA / SCG, CUT / RES / DEC (build 279), after an audit against the M8's commands
+
+- New `FXC` entries at the end: FXS, FXV, SCA, SCG, CUT, RES, DEC (master phrases may use FXS, FXV, SCG, PRB).
+- FXS XY sets `T.fxs` (slot X, parameter Y, 1-based); FXV makes an `fxp` event; the player's `fxpTo` keeps per-slot
+  overrides (`fxOv`), builds the slot's values with `TFX[type].map` and posts `{pset:{slot, p | mp}}` to the track's
+  effect node at the note's time (`atTime`: timer live, `ac.suspend` offline). The worklet merges it into its last chain
+  and runs `set()`. `resetSeq` posts the slots' own values back. …pump slots are skipped.
+- SCA / SCG: `T.scl` / `gscl` replace `S` in the KEY FOLLOW `scaleSnap`.
+- CUT / RES / DEC: per-track state (`T.cut`, `T.res`, `T.dec`, FF turns CUT and DEC off) → `ev.tw`; `varBuf` low-passes
+  (`shapeData`, the voice filter's 2-pole) and fades the pad's render or its MUT / GEN variation, cached in `VAR`.
+  Not for sliced / synced instruments.
+- Checked headless: an FXV sweep on a Filter slot sent the cutoffs on time and the slot's own came back at stop; CUT and
+  DEC notes were shaped and cached.
+
 ## 30 Oct (11): Tab in a phrase (build 278)
 
 - KEYS-mode Tab in the phrase editor: note → instrument → FX1 → FX2 → FX3 → first note (Shift+Tab back); the other

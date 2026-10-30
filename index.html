@@ -2420,7 +2420,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <section id="hPad"><h2>Tracker · PAD mode</h2><table><tr><td>Arrows</td><td>Move</td></tr><tr><td>SHIFT + ◀▶</td><td>Change screen (through every screen in tab order)</td></tr><tr><td>SHIFT + ▲▼</td><td>In Song, Sect and Phrase: select the cursor's line, then grow the selection a line at a time (OPTION copies, OPTION+EDIT cuts). On the other screens: Project / Mixer</td></tr><tr><td>EDIT</td><td>Add, or run a › row · in a phrase, on a filled note stamps the current note and instrument over it; on an instrument, volume or effect, picks it up · tap twice for a new sect or phrase, or a note off</td></tr><tr><td>EDIT + arrows</td><td>Change the value (◀▶ by 1, ▲▼ by more)</td></tr><tr><td>OPTION + EDIT</td><td>Clear (with a selection: cut)</td></tr><tr><td>OPTION + arrows</td><td>Other sect, phrase, instrument or FX track · on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀) · in Song, page up/down</td></tr><tr><td>OPTION + arrows in Phrase</td><td>Go to the phrase above / below on this track (▲▼) or to the left / right on this row (◀▶), as laid out on the Song grid. A phrase not in the song steps by number. (Settings → Input → PATTERN NAV; off: ▲▼ jump 16 phrases)</td></tr><tr><td>SHIFT + OPTION + arrows</td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in KEYS mode</td></tr><tr><td>SHIFT + OPTION</td><td>Start or cancel a selection; arrows grow it, OPTION copies</td></tr><tr><td>SHIFT + EDIT</td><td>Paste</td></tr><tr><td>PLAY · SHIFT + PLAY</td><td>Play this screen · play the song · with LOOP on, PLAY loops the selected rows</td><tr><td>LOOP · SEMI +/−</td><td>Loop the selection (sticky) · transpose the phrase selection ±1 semitone at once</td></tr><tr><td>◀ ▶ on the FX screen</td><td>Open a slot's controls · back to the slot list (a sideways swipe does it too)</td></tr><tr><td>EDIT on an FX slot</td><td>A list of every effect (like the FX command list): pick one and its controls open; its own effect, marked NOW, keeps its settings; --- empties the slot</td></tr><tr><td>Row numbers</td><td>Tap to select whole lines, then COPY and PASTE</td></tr></table><p><b>One finger is enough.</b> With <b>Sticky keys</b> on, tap SHIFT or OPTION alone and it stays lit for the next button. The <b>command row</b> (Project → COMMANDS) gives every two-key command its own button: change, prev/next, clear, select, copy, cut, paste, play song, and on the SONG screen CLN↓ (clones the block, or the selected blocks, into new numbers on a new row below; the rows below move down) and CLN (clone): the block under the cursor is copied, phrases and all, to the next free number.</p><p>On a computer keyboard in PAD mode the keyboard is not disabled: arrows move, <kbd>Enter</kbd> opens, <kbd>Space</kbd> plays, typing letters and hex edits the cell, and <kbd>Shift</kbd> selects lines (so does <kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>▲▼</kbd>, as in KEYS mode). <kbd>Z</kbd> stays OPTION (not a note), <kbd>X</kbd> stays EDIT, and <kbd>Alt</kbd>+arrows page (OPTION+arrow) rather than change the value.</p><h3>Touch</h3><p>Tap a cell to move there; tap it again to open or add. Drag up or down on the cursor’s cell to change its value; drag elsewhere to scroll.</p></section>
     <section id="hFx"><h2>FX column commands</h2>
 <p>Each phrase row has three effect columns: a command and a hex value. The info line at the bottom of the screen explains the one under the cursor.</p>
-<div class="fxg"><div><code>CSL</code>MIDI CC glide: the <code>CCA</code>–<code>CCD</code> commands on the same row move to their value over XY ticks instead of jumping (00: across the step), from the value sent before</div><div><code>DIR</code>play direction for this track from the next row on: 00 forward, 01 backwards, 02 ping-pong, 03 a random row each step (a phrase still lasts as many steps as it has rows)</div><div><code>BYP</code>…chains module X (the number on its BYP button; 0 = all) in (Y 0), bypassed (Y 1), or the other way from the patch for Y rows then back</div><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FLX</code>Flex pattern: 00 off, 01–10</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>retrigger every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>PRB</code>chance the command to its left happens (as RND changes it; with none, the note's chance)</div><div><code>MUT</code>play variation XX of the pad's sound (INST › RANGE: how far); RND or RNL after it for a new one each time</div><div><code>GEN</code>play a fresh sound XX of the instrument's GEN TYPE (INST › GEN TYPE, FAMILY, RANGE)</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row Y</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div><div><code>CCA</code>–<code>CCD</code>MIDI CC: 00–7F to the instrument’s CC slot A–D (the CC numbers are on INST)</div><div><code>PGM</code>MIDI program change 00–7F, just before the row’s note</div></div>
+<div class="fxg"><div><code>CSL</code>MIDI CC glide: the <code>CCA</code>–<code>CCD</code> commands on the same row move to their value over XY ticks instead of jumping (00: across the step), from the value sent before</div><div><code>DIR</code>play direction for this track from the next row on: 00 forward, 01 backwards, 02 ping-pong, 03 a random row each step (a phrase still lasts as many steps as it has rows)</div><div><code>BYP</code>…chains module X (the number on its BYP button; 0 = all) in (Y 0), bypassed (Y 1), or the other way from the patch for Y rows then back</div><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FXS</code>pick what FXV moves on this track: slot X (1–8), its parameter Y (1–F, in the FX screen's order)</div><div><code>FXV</code>set that parameter, 00 its lowest – FF its highest (the slot's own value comes back when the song stops)</div><div><code>SCA</code>this track's scale from here on: X the root (0 = C … B), Y the scale (0 off, 1 major, 2 minor, 3 harmonic minor…); KEY FOLLOW instruments</div><div><code>SCG</code>every track's scale from here on, as SCA</div><div><code>CUT</code>low-pass the pad from here on, 00 dark – FF off</div><div><code>RES</code>resonance for CUT</div><div><code>DEC</code>shorten the pad from here on, 00 a click – FF its own length</div><div><code>FLX</code>Flex pattern: 00 off, 01–10</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>retrigger every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>PRB</code>chance the command to its left happens (as RND changes it; with none, the note's chance)</div><div><code>MUT</code>play variation XX of the pad's sound (INST › RANGE: how far); RND or RNL after it for a new one each time</div><div><code>GEN</code>play a fresh sound XX of the instrument's GEN TYPE (INST › GEN TYPE, FAMILY, RANGE)</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row Y</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div><div><code>CCA</code>–<code>CCD</code>MIDI CC: 00–7F to the instrument’s CC slot A–D (the CC numbers are on INST)</div><div><code>PGM</code>MIDI program change 00–7F, just before the row’s note</div></div>
 <p><b>MIDI instruments</b> (INST › OUTPUT MIDI or PAD+MIDI) send to their <b>PORT</b> A–D: ⚙ Settings → MIDI (on a computer, Audio &amp; MIDI ▾ in the top bar) says which cable each letter is on this device, so a song plays the same on the phone and the computer. <code>CCA</code>–<code>CCD</code> and <code>PGM</code> work on rows without a note too (on the track’s last instrument), and <code>RND</code>, <code>RNL</code> and <code>REP</code> change them like any command. <code>PSL</code>, <code>PBN</code>, <code>PVB</code>, <code>PIT</code>/<code>FIN</code> on a held note and fractions of a semitone are sent as pitch bend: set INST › <b>BEND RANGE</b> to the range your gear bends. <code>ARP</code> plays its steps as notes, then the note itself again (unless the next row retunes it or plays another note).</p>
 <p><b>LFO → CC:</b> INST › <b>LFO CC</b> (set a CC number) runs an LFO on that CC while the song plays: SHAPE, RATE in time with the song (T triplet, D dotted), DEPTH (127 is the whole range), CENTRE, and RESTART (FREE from PLAY, NOTE at each of the instrument’s notes). <b>Song position:</b> with clock out on, playing the song from a row partway into a block sends Song Position Pointer and Continue, so the gear starts at the same place; with clock in on, the other device’s Continue after a Song Position Pointer plays the song from there.</p>
 <p><b>Playing and recording from a MIDI keyboard:</b> ⚙ Settings → MIDI → <b>Keys play</b>: in the tracker the keyboard plays the instrument you're on (the INST screen's, or the cursor row's in a phrase) and holds it while the key is down; a MIDI instrument plays its gear, with bend, aftertouch, sustain and every unlearned knob passed through. <b>Notes in</b> picks the input and channel, <b>Clock from</b> the input Clock in follows, and each port has its own <b>delay</b>. <b>REC</b> on the top strip (F9): stopped, a note or chord goes in at the cursor and the cursor moves on when you let go; playing, notes land on the step they were played on in the track under the cursor, with velocity and OFFs (a take is one undo step). <b>CLICK</b> is the metronome; Settings → <b>Record &amp; play</b> has its level, the count-in, REC TIMING (STEP, or TICKS: the step plus a <code>DEL</code>) and LIVE TRANSPOSE (a key transposes the KEY FOLLOW instruments as the song plays).</p>
@@ -9337,18 +9337,43 @@ function varPut(key, rec){
   VAR.map.set(key, rec); VAR.bytes += rec.data.length * 4;
   while (VAR.bytes > 48e6 && VAR.map.size > 1){ const [k0, r0] = VAR.map.entries().next().value; VAR.map.delete(k0); VAR.bytes -= r0.data.length * 4; }
 }
-// An AudioBuffer of the variation on context ac: offline renders (exports) make it here and now; live, it renders in the
-// Worker and the pad plays meanwhile.
+// CUT / RES / DEC (owner, 30 Oct): the pad's sound (or its MUT / GEN variation) low-passed and shortened, per note, from the
+// track's last CUT / RES / DEC. Done to the rendered sound here (a 2-pole low-pass, as the voice filter, and a fade), so
+// it works for every engine, at once, and the result is kept with the variations.
+const cutHz = v => 30 * Math.pow(18000 / 30, clamp(v, 0, 255) / 255);
+const decSec = v => 0.008 * Math.pow(4 / 0.008, clamp(v, 0, 254) / 254);
+function shapeData(src, sr, tw){
+  const tau = tw.dec != null ? decSec(tw.dec) : 0, N = tau ? Math.min(src.length, Math.ceil(tau * 9.3 * sr)) : src.length, d = src.slice(0, N);
+  if (tw.cut != null){
+    const fc = Math.min(cutHz(tw.cut), sr * 0.45), g = Math.tan(Math.PI * fc / sr), k = 2 - 2 * Math.min(clamp(tw.res | 0, 0, 255) / 255 * 0.97, 0.97), a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2;
+    let l1 = 0, l2 = 0; for (let i = 0; i < N; i++){ const v3 = d[i] - l2, v1 = a1 * l1 + a2 * v3, v2 = l2 + a2 * l1 + a3 * v3; l1 = 2 * v1 - l1; l2 = 2 * v2 - l2; d[i] = v2; }
+  }
+  if (tau){ const k = Math.exp(-1 / (tau * sr)); let e = 1; for (let i = 0; i < N; i++){ d[i] *= e; e *= k; } const fl = Math.min(N, 64); for (let i = 0; i < fl; i++) d[N - 1 - i] *= i / fl; }
+  return d;
+}
+// An AudioBuffer for a note with MUT / GEN and / or CUT / RES / DEC on context ac: offline renders (exports) make it here
+// and now; live, a variation renders in the Worker and the pad plays meanwhile (shaped by CUT / DEC all the same).
 function varBuf(ev, ac){
-  const key = varKey(ev), sr = ac.sampleRate, live = ac === ctx;
-  let rec = VAR.map.get(key);
-  if (rec && rec.sr !== sr && !live) rec = null;
-  if (!rec){
-    const v = varVoice(ev); if (!v) return null;
-    const hold = isSyn(ev.pad) ? v.len : 0;
-    if (!live || !PW.ready || !rwCan(v)){ if (live && tp.on) { varWant(ev); return null; } rec = {sr, data:varLevel(ev, renderVoice(v, sr, null, hold))}; varPut(key, rec); }
-    else { varWant(ev); return null; }
-  } else { VAR.map.delete(key); VAR.map.set(key, rec); }   // most recent last
+  const sr = ac.sampleRate, live = ac === ctx, I0 = S.insts[ev.ii];
+  if (I0 && ((I0.slc | 0) > 1 || I0.sync)) return null;   // sliced / synced: the pad as it is
+  let key = null, rec = null;
+  if (ev.vk){
+    key = varKey(ev); rec = VAR.map.get(key);
+    if (rec && rec.sr !== sr && !live) rec = null;
+    if (!rec){
+      const v = varVoice(ev);
+      if (v){ const hold = isSyn(ev.pad) ? v.len : 0;
+        if (!live || (!tp.on && !(PW.ready && rwCan(v)))){ rec = {sr, data:varLevel(ev, renderVoice(v, sr, null, hold))}; varPut(key, rec); }
+        else varWant(ev); }
+    } else { VAR.map.delete(key); VAR.map.set(key, rec); }   // most recent last
+  }
+  if (!rec && !ev.tw) return null;
+  if (!rec){ const c = live ? ensurePlay(ev.pad) : ensure(ev.pad); if (!c) return null; rec = c; key = 'p' + ev.pad + ':r' + (slotAt(padRev, ev.pad) || 0) + ':' + c.sr; }
+  if (ev.tw){
+    const k2 = key + ':c' + ev.tw.cut + ':q' + ev.tw.res + ':d' + ev.tw.dec; let r2 = VAR.map.get(k2);
+    if (!r2 || r2.src !== rec.data){ r2 = {sr:rec.sr, data:shapeData(rec.data, rec.sr, ev.tw), src:rec.data}; varPut(k2, r2); }
+    rec = r2; key = k2;
+  }
   let M = VAR.bufs.get(ac); if (!M){ M = new Map(); VAR.bufs.set(ac, M); }
   const bk = key + (ev.rev ? ':r' : ''); let e = M.get(bk);
   if (!e || e.d !== rec.data){ const d = ev.rev ? rec.data.slice().reverse() : rec.data, b = ac.createBuffer(1, d.length, rec.sr); b.copyToChannel(d, 0); e = {d:rec.data, b}; M.set(bk, e); if (M.size > 256) M.delete(M.keys().next().value); }
@@ -13433,7 +13458,7 @@ const CC_NAMES = {0:'bank select', 1:'mod wheel', 2:'breath', 4:'foot', 5:'glide
 // A port letter's cable on this device, for INST.
 const portName = p => { const o = midiOut(p); return o ? (o.name || 'connected') : midi.outIds[p] ? 'not connected now' : 'no cable: Settings › MIDI'; };
 const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
-  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB'];   // new commands go on the end, so saved songs keep their numbers
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC'];   // new commands go on the end, so saved songs keep their numbers
 const FXC_V1 = ['RET','DEL','CUT','CHA','PSL','RND','OFS','REV','PAN','TPO','HOP'];   // song files before v2
 const V1NAME = {CUT:'KIL', OFS:'STA', REV:'PLY'};
 const SIGNED = new Set(['PBN','TSP','PIT','FIN']);
@@ -13443,6 +13468,14 @@ for (const c of CC_CMDS) RSTEP[c] = 8;   // CC values run 00–7F: F is nearly t
 const ARCM = ['up', 'down', 'up-down', 'random'];
 const ticksS = v => `${v} tick${v === 1 ? '' : 's'}`;
 const FXI = {
+  FXS:v => { const k = Math.max(1, v >> 4) - 1, pi = Math.max(1, v & 15) - 1, A = cTrack >= NT ? S.mfx : S.tfx[cTrack], f = A && A[k], q = f && TFX[f.type] && TFX[f.type].ps[pi];
+    return `FXV on this track now moves slot ${k + 1}` + (f ? ` (${fxNameOf(f.type)}) ` + (q ? q.l : `— it has no parameter ${(v & 15) || 1}`) : ' (empty on this track)') + ' · X slot, Y parameter'; },
+  FXV:v => `Sets the parameter FXS picked to ${Math.round(v / 2.55)}% of its range (back to the slot's own when the song stops)`,
+  SCA:v => `This track's scale from here on: ${SCALES[Math.min(SCALES.length - 1, v & 15)][0]} on ${NN[(v >> 4) % 12].replace('-', '')} (KEY FOLLOW instruments)`,
+  SCG:v => `Every track's scale from here on: ${SCALES[Math.min(SCALES.length - 1, v & 15)][0]} on ${NN[(v >> 4) % 12].replace('-', '')} (KEY FOLLOW instruments; SCA wins on its track)`,
+  CUT:v => v >= 255 ? 'Filter off (open) from here on' : `Low-pass the pad at ${Math.round(cutHz(v))} Hz from here on`,
+  RES:v => `Resonance ${Math.round(v / 2.55)}% for CUT, from here on`,
+  DEC:v => v >= 255 ? 'The pad’s own length from here on' : `The pad fades out over ${decSec(v) < 1 ? Math.round(decSec(v) * 1000) + ' ms' : decSec(v).toFixed(2) + ' s'} from here on`,
   MUT:v => `Mutate: variation ${hx(v)} of the pad’s sound, as far as the instrument’s RANGE lets it (the same number, the same sound; RND or RNL to the right picks a new one)`,
   GEN:v => `Generate: fresh sound ${hx(v)} of the instrument’s GEN TYPE, in its FAMILY, as far as its RANGE (the same number, the same sound)`,
   PRB:v => `Chance the command to its left happens: ${Math.round(v / 2.55)}% (with none to its left, the note’s chance)`,
@@ -14309,6 +14342,7 @@ class ThunderFx extends AudioWorkletProcessor {
     this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else if (e.data && e.data.irs !== undefined) globalThis.__thunderIR = e.data.irs; else if (e.data && e.data.tapmap) this.setTap(e.data.tapmap); else if (e.data && e.data.tel !== undefined) this.tel = !!e.data.tel;
       else if (e.data && e.data.pumpBytes){ if (!globalThis.__pumpBytes) globalThis.__pumpBytes = e.data.pumpBytes; this.pumpAsked = false; this.set(this.chain || []); }
       else if (e.data && e.data.ptel){ const q = e.data.ptel; if (q.on) this.ptel.set(q.key, {back:Math.max(0, Math.min(32768, q.back | 0)), rp:[]}); else this.ptel.delete(q.key); }
+      else if (e.data && e.data.pset){ const q = e.data.pset, ch = (this.chain || []).map(c => c && c.slot === q.slot ? Object.assign({}, c, q.p ? {p:q.p} : {}, q.mp ? {mp:q.mp} : {}, q.pv ? {pv:q.pv} : {}) : c); this.set(ch); }   // FXV: one slot's settings for now (the chain's own come back with the next full set)
       else if (e.data && e.data.phold){ const q = e.data.phold, P = globalThis.__pumpX, sl = this.slots.find(x => x.key === q.key && x.pu !== undefined); if (P && sl) try { P.pump_hold(sl.pu, q.kind | 0, +q.a || 0, +q.b || 0, +q.c || 0, +q.d || 0); } catch (err){} }
       else this.set(e.data); };
   }
@@ -15360,7 +15394,7 @@ function makeSeq(S, mode, o){
   // pattern length so it lasts as long as a fresh phrase would.
   const emptyLen = () => clamp(S.dlen || 16, 1, PROWS);
   // Random numbers: Math.random until a SED command seeds them, so a seeded song plays the same every time.
-  let seeded = null;
+  let seeded = null, gscl = null;   // gscl: SCG, the song's scale from here on
   const rand = () => { if (!seeded) return Math.random(); let x = seeded.s += 0x6D2B79F5; x = Math.imul(x ^ x >>> 15, x | 1); x ^= x + Math.imul(x ^ x >>> 7, x | 61); return ((x ^ x >>> 14) >>> 0) / 4294967296; };
   const sectId = (T, t) => mode === 'song' ? (T.row < 256 ? S.song[T.row][t] : -1) : o.sect;
   // Where in the swing pair this track's current step sits, counting phrase rows from the start of the
@@ -15528,6 +15562,12 @@ function makeSeq(S, mode, o){
         if (fx.GGR != null) ngrv = fx.GGR ? [(fx.GGR >> 4) || api.tks, (fx.GGR & 15) || api.tks] : null;
         if (fx.SED != null) seeded = fx.SED ? {s:fx.SED * 2654435761 >>> 0} : null;
         if (fx.TSP != null) T.tsp = s8(fx.TSP);
+        if (fx.FXS != null) T.fxs = {s:Math.max(1, fx.FXS >> 4) - 1, p:Math.max(1, fx.FXS & 15) - 1};
+        if (fx.SCA != null) T.scl = {scale:Math.min(SCALES.length - 1, fx.SCA & 15), sroot:(fx.SCA >> 4) % 12};
+        if (fx.SCG != null) gscl = {scale:Math.min(SCALES.length - 1, fx.SCG & 15), sroot:(fx.SCG >> 4) % 12};
+        if (fx.CUT != null) T.cut = fx.CUT >= 255 ? null : fx.CUT;
+        if (fx.RES != null) T.res = fx.RES;
+        if (fx.DEC != null) T.dec = fx.DEC >= 255 ? null : fx.DEC;
         if (fx.ARC != null) T.arc = {mode:fx.ARC >> 4, spd:(fx.ARC & 15) || 1};
         if (fx.DIR != null){ T.dir = Math.min(3, fx.DIR); T.pp = T.dir === 1 ? -1 : 1; }   // DIR: from the next row on
         if (fx.HOP != null) hop = Math.min(fx.HOP, PROWS - 1);
@@ -15536,7 +15576,8 @@ function makeSeq(S, mode, o){
           T.nth.set(key, n + 1); play = n % X === (Y - 1) % X; }
         if (fx.CHA != null && rand() * 255 >= fx.CHA) play = false;
         const at = t0 + Math.min((fx.DEL || 0) * tick, dur * 0.98), end = t0 + dur;
-        if (play) fxEvs(t, fx, at, line);   // momentary lengths count rows (a row averages one line)
+        if (play) fxEvs(t, fx, at, line);
+        if (play && fx.FXV != null){ const sel = T.fxs || {s:0, p:0}; evs.push({type:'fxp', t:at, track:t, slot:sel.s, pi:sel.p, v:fx.FXV}); }   // FXV   // momentary lengths count rows (a row averages one line)
         // MIDI: PGM and the CC slots go to the row's instrument (or the track's last), ahead of the row's notes.
         if (play && t < MT){
           let mi = -1;
@@ -15566,7 +15607,7 @@ function makeSeq(S, mode, o){
           let firstRate = 0;
           // KEY FOLLOW instruments: live transpose (live only) and the song's scale, before PIT/FIN. HUMAN TIME / HUMAN VEL:
           // each note a little early or late (± ms) and a little softer (up to %), on the song's random numbers (SED repeats them).
-          const kf = !!I.kf, lx = kf && o.live ? lxp.st : 0, nOf = x => { const b = x + ctsp + I.tsp + T.tsp + nrnd + lx; return (kf ? scaleSnap(S, b) : b) + pit; };
+          const kf = !!I.kf, lx = kf && o.live ? lxp.st : 0, nOf = x => { const b = x + ctsp + I.tsp + T.tsp + nrnd + lx; return (kf ? scaleSnap(T.scl || gscl || S, b) : b) + pit; };
           const hut = clamp(I.hut | 0, 0, 50) / 1000, huv = clamp(I.huv | 0, 0, 90) / 100;
           notes.forEach((n, q) => {
             const nat = hut ? Math.max(t0 - hut, at + (rand() * 2 - 1) * hut) : at, hg = huv ? 1 - rand() * huv : 1;
@@ -15574,7 +15615,7 @@ function makeSeq(S, mode, o){
             if (!q) firstRate = rate;
             const ev = {type:'note', t:nat, track:t, poly, col:ncol[q], pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain:gain * hg, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? nat + fx.KIL * tick : null, rel:fx.OFF != null ? nat + fx.OFF * tick : null,
-              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, vk:fx.GEN != null ? 'g' + fx.GEN : fx.MUT != null ? 'm' + fx.MUT : null, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
+              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, vk:fx.GEN != null ? 'g' + fx.GEN : fx.MUT != null ? 'm' + fx.MUT : null, tw:T.cut != null || T.dec != null ? {cut:T.cut, res:T.res | 0, dec:T.dec} : null, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
               ii, mn:note + 12 + ntc / 100, vel:hg * (fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255, tick, vc:fx.VOL != null ? fx.VOL : r[VC]};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out; tick: NOTE LEN
             if (!o.sim && ((I.slc | 0) > 1 || I.sync)){ const c = o.live ? ensurePlay(ev.pad) : ensure(ev.pad); if (c){ applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; } }
             if (ev.vk && o.live && !o.sim) try { varWant(ev); } catch(e){}   // MUT / GEN: start its render now, ahead of the note
@@ -15873,6 +15914,33 @@ function makePlayer(ac, out, getBuf, live){
   // A tempo change from the song (TPO / TIC) goes to every …chains node at its time: live by timer (the
   // sequencer runs a little ahead), in an offline render by suspending the render at that moment.
   const tempoAt = new Map();
+  // Something to do at time t on the audio side: live by timer, in an offline render by suspending it there (as tempoTo).
+  function atTime(t, f){
+    const O = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (O && ac instanceof O){
+      const q = 128 / ac.sampleRate, at = Math.ceil(t / q) * q;
+      if (!(at > 0 && at < ac.length / ac.sampleRate)){ f(); return; }
+      if (tempoAt.has(at)){ tempoAt.get(at).push(f); return; }
+      const list = [f]; tempoAt.set(at, list);
+      try { ac.suspend(at).then(() => { for (const g of list) g(); return ac.resume(); }).catch(() => {}); } catch(e){ f(); }
+    } else setTimeout(f, Math.max(0, (t - ac.currentTime) * 1000));
+  }
+  // FXV (owner, 30 Oct): a parameter of one effect slot, set from the song. The slot's other settings stay; the changes add
+  // up per slot (fxOv) and go back to the slot's own when the song stops (resetSeq). …pump slots don't take it.
+  const fxOv = new Map();
+  function fxpMsg(t, k, ov){
+    const A = t >= MT ? S.mfx : S.tfx[t], f = A && A[k]; if (!f || isPumpT(f.type) || !TFX[f.type]) return null;
+    const D = TFX[f.type], f2 = Object.assign({}, f, ov), vals = D.map(f2, ac.sampleRate, bpmNow);
+    if (D.mod) return {pset:{slot:k, mp:vals}};
+    const p = new Array(12).fill(0); vals.forEach((v, i) => p[i] = v); return {pset:{slot:k, p}};
+  }
+  function fxpTo(ev){
+    const A = ev.track >= MT ? S.mfx : S.tfx[ev.track], f = A && A[ev.slot]; if (!f || isPumpT(f.type) || !TFX[f.type]) return;
+    const q = TFX[f.type].ps[ev.pi]; if (!q) return;
+    const key = ev.track + ':' + ev.slot, ov = Object.assign({}, fxOv.get(key)); ov[q.k] = q.min + Math.round((q.max - q.min) * ev.v / 255); fxOv.set(key, ov);
+    const m = fxpMsg(ev.track, ev.slot, ov); if (!m) return;
+    atTime(ev.t, () => { const n = fxNodeOf(ev.track); if (n && n.port) try { n.port.postMessage(m); } catch(e){} });
+  }
   function tempoTo(ev){
     bpmNow = ev.bpm || bpmNow;
     for (const b of bassN.values()) if (b.bpm) try { b.bpm.setValueAtTime(ev.bpm, Math.max(ev.t, ac.currentTime)); } catch(e){}
@@ -15898,6 +15966,7 @@ function makePlayer(ac, out, getBuf, live){
       return;
     }
     // FXO / FLX / GAT / RTG: automation on the track's (or the master's) effect node.
+    if (ev.type === 'fxp'){ fxpTo(ev); return; }
     if (ev.type === 'fxc'){ const n = fxNodeOf(ev.track), q = n && n.parameters && n.parameters.get(ev.p); if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} return; }
     if (ev.type === 'chc'){ const b = buses[ev.track], n = b && b.chn, q = n && n.parameters && n.parameters.get(ev.p); if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} return; }   // BYP
     // The master column's VOL: the master level, with a 4 ms glide so it doesn't click.
@@ -15946,7 +16015,7 @@ function makePlayer(ac, out, getBuf, live){
       if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of vs[k]) if (v.choke === ck) kill(v, ev.t);
       return bassNote(ev, bn, T, ck); } }
     { const kv0 = kit.voices[ev.pad]; if (kv0 && kv0.engine === 'sf') return sfNote(ev, kv0); }
-    const b = (ev.vk && !ev.st && typeof varBuf === 'function' && varBuf(ev, ac)) || getBuf(ev.pad, ev.rev, ev.st); if (!b) return;   // MUT / GEN: the variation, else the pad itself
+    const b = ((ev.vk || ev.tw) && !ev.st && typeof varBuf === 'function' && varBuf(ev, ac)) || getBuf(ev.pad, ev.rev, ev.st); if (!b) return;   // MUT / GEN: the variation, else the pad itself
     const T = vs[ev.track];
     for (let k = T.length - 1; k >= 0; k--) if (!live1(T[k], ev.t)) T.splice(k, 1);
     // Mono tracks: the new note takes over (a synth note lets the old one release). Poly: up to 4 ring
@@ -16038,6 +16107,8 @@ function makePlayer(ac, out, getBuf, live){
     clk.on = false; try { clock.offset.cancelScheduledValues(at); clock.offset.setValueAtTime(-1, at); } catch(e){}
     for (const n of [...buses.map(b => b && b.fx), mfx]) if (n && n.parameters) for (const k of FXP){ const q = n.parameters.get(k); if (q) try { q.cancelScheduledValues(at); q.setValueAtTime(-1, at); } catch(e){} }
     for (const b of buses) if (b && b.chn && b.chn.parameters) for (let k = 1; k <= 15; k++){ const q = b.chn.parameters.get('b' + k); if (q) try { q.cancelScheduledValues(at); q.setValueAtTime(-1, at); } catch(e){} }   // BYP back to the patch
+    for (const key of fxOv.keys()){ const [t, k] = key.split(':').map(Number), m = fxpMsg(t, k, {}); if (m) atTime(at, () => { const n = fxNodeOf(t); if (n && n.port) try { n.port.postMessage(m); } catch(e){} }); }   // FXV: back to the slots' own
+    fxOv.clear();
     if (mvol != null){ try { out.gain.cancelScheduledValues(at); out.gain.setValueAtTime(curve(S.master), at); } catch(e){} mvol = null; }
   }
   function stopAll(at){ resetSeq(at); for (const v of alive) kill(v, at); for (const T of vs) T.length = 0; for (const b of bassN.values()) if (b.vox) b.sylN = 0; voxG.clear(); }   // lyrics start over
@@ -17760,7 +17831,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 278;
+const BUILD = 279;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18445,7 +18516,7 @@ function bump(d, big){
 // EDIT on a phrase FX column opens a list of every command with a short note on what it does.
 // Touch: tap one to highlight it, tap it again to choose. Pad: ▲▼ move, EDIT chooses, OPTION closes.
 // Keyboard: arrows, Enter chooses, Esc closes, a letter jumps. Mouse: a click chooses.
-const FXB = {MUT:'Mutate: the note plays variation XX of its pad (INST › RANGE says how far)', GEN:'Generate: the note plays a fresh sound XX of the instrument’s GEN TYPE (INST › FAMILY, RANGE)', PRB:'Chance the command to the left happens (00 never – FF always)', ARP:'Arpeggio: the note, +X and +Y semitones', ARC:'Arpeggio shape (X) and speed in ticks (Y)', CHA:'Chance the note plays (00 never – FF always)',
+const FXB = {FXS:'Effect parameter to move: X the slot (1–8), Y its parameter (1–F, as listed on the FX screen)', FXV:'Set the parameter FXS picked: 00 its lowest – FF its highest', SCA:'Scale for this track from here on: X the root (0 C … B), Y the scale (0 off, 1 major, 2 minor…)', SCG:'Scale for every track from here on, as SCA', CUT:'Low-pass the pad from here on: 00 dark – FF open (off)', RES:'Filter resonance for CUT, from here on', DEC:'Shorten the pad from here on: 00 a click – FF its own length', MUT:'Mutate: the note plays variation XX of its pad (INST › RANGE says how far)', GEN:'Generate: the note plays a fresh sound XX of the instrument’s GEN TYPE (INST › FAMILY, RANGE)', PRB:'Chance the command to the left happens (00 never – FF always)', ARP:'Arpeggio: the note, +X and +Y semitones', ARC:'Arpeggio shape (X) and speed in ticks (Y)', CHA:'Chance the note plays (00 never – FF always)',
   DEL:'Delay the note by ticks', GRV:'Groove: ticks on even (X) and odd (Y) steps', GGR:'Groove for every track at once', HOP:'End the phrase here; the next starts at row Y',
   INS:'Play the note with this instrument', KIL:'Cut the note after ticks', OFF:'Fade the note out after ticks', NTH:'Play only on pass Y of every X times',
   RET:'Retrigger every Y ticks; X fades each hit', REP:'Repeat the track’s last command, adding the value', RND:'Randomise the command to the left (or the pitch)',
@@ -18462,11 +18533,11 @@ for (const c of CC_CMDS) FXB[c] = `MIDI CC: send 00–7F to the instrument’s C
 // command numbers (FXC), and EDIT+▲▼ / letters step as before. A command in no group goes under MORE at the end.
 const FXC_GROUPS = [
   ['Volume and pan', ['VOL', 'PAN']],
-  ['Pitch and arpeggio', ['PIT', 'FIN', 'TSP', 'PSL', 'PBN', 'PVB', 'ARP', 'ARC']],
+  ['Pitch and arpeggio', ['PIT', 'FIN', 'TSP', 'SCA', 'SCG', 'PSL', 'PBN', 'PVB', 'ARP', 'ARC']],
   ['Note timing', ['DEL', 'KIL', 'OFF', 'RET']],
-  ['Sound', ['INS', 'STA', 'PLY', 'WOB', 'MUT', 'GEN']],
+  ['Sound', ['INS', 'STA', 'PLY', 'WOB', 'MUT', 'GEN', 'CUT', 'RES', 'DEC']],
   ['Chance and random', ['CHA', 'PRB', 'NTH', 'RND', 'RNL', 'SED', 'REP']],
-  ['Effects', ['FXO', 'BYP', 'FLX', 'GAT', 'RTG']],
+  ['Effects', ['FXO', 'FXS', 'FXV', 'BYP', 'FLX', 'GAT', 'RTG']],
   ['Tempo and groove', ['TPO', 'TIC', 'GRV', 'GGR']],
   ['Play order', ['HOP', 'DIR']],
   ['MIDI', ['PGM', 'CCA', 'CCB', 'CCC', 'CCD', 'CSL']]];
@@ -18476,7 +18547,7 @@ const fxcByGroup = names => [...new Set(names.map(fxcGroup))].flatMap(g => names
 const FXLIST_ALL = [-1, ...fxcByGroup([...FXC_GROUPS.flatMap(([, l]) => l), ...FXC.filter(n => fxcGroup(n) === 'More').sort()])
   .map(n => FXC.indexOf(n)).filter(i => i >= 0)];
 // Master phrases offer only the commands that mean something on the master bus: its level and effects first, then timing.
-const MST_FXC = ['VOL', 'FXO', 'FLX', 'GAT', 'RTG', 'TPO', 'TIC', 'GGR', 'HOP', 'DEL', 'CHA', 'NTH', 'REP', 'RND', 'RNL', 'SED'];
+const MST_FXC = ['VOL', 'FXO', 'FLX', 'GAT', 'RTG', 'TPO', 'TIC', 'GGR', 'HOP', 'DEL', 'CHA', 'NTH', 'REP', 'RND', 'RNL', 'SED', 'PRB', 'FXS', 'FXV', 'SCG'];
 const FXLIST_MST = [-1, ...fxcByGroup(MST_FXC).map(n => FXC.indexOf(n)).filter(i => i >= 0)];
 let FXLIST = FXLIST_ALL;
 const fxListNow = () => (FXLIST = mstView() ? FXLIST_MST : FXLIST_ALL);
