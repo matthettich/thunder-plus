@@ -9069,11 +9069,176 @@ const lxrPresetGroup = () => ['LXR-02 firmware', LxrCore.initKit().map(({name, k
 const engGroup = ([k, gn]) => [gn, XUI[k].pre.slice(1).map(([n, o, x, e]) =>
     [n, () => PE(n, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:k === 'modal' || k === 'swarm' || k === 'drift' || k === 'piano' || k === 'ep' || k === 'strings' || k === 'partials' || k === 'vector' || k === 'scanned' || k === 'resynth' ? 6 : k === 'breath' || k === 'fmdrum' || k === 'skin' || k === 'chip' || k === 'bytebeat' ? 2 : 4, gate:400}, x || {},
       typeof e === 'string' ? {bbExpr:e} : {}, k === 'resynth' ? {rsData:ResynthCore.demoRs(48000)} : {}))])];
+/* MORE DRUMS (owner, 30 Oct): extra drum presets, written for each type, on the drum engines (Tone drum, FM Drum, Skin,
+   Breath, Blip) and on layers. [type, name, make]. organizeDrums() files them with the rest. */
+function moreDrumPresets(){
+  const E = (k, len) => (name, o, x) => () => PE(name, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:len || 2, gate:400}, x || {}));
+  const T = E('tone', 3), F = E('fmdrum'), K = E('skin', 3), B = E('breath'), BL = (name, o, x) => () => PE(name, 'blip', normBlip(Object.assign(BlipVoice.defaults(), o)), x);
+  const L = (name, layers, o) => () => PD(name, layers, o);
+  return [
+  // KICKS
+  ['Kicks', 'Deep boom kick', T('Deep boom kick', {wave:0, pitch:45, bend:18, bendT:60, tdec:1400, nLev:0, click:0.15}, {len:4})],
+  ['Kicks', 'House kick', T('House kick', {wave:0, pitch:50, bend:26, bendT:35, tdec:450, nLev:0.05, nType:0, nFreq:250, click:0.45, dist:0.15})],
+  ['Kicks', 'Techno thud', T('Techno thud', {wave:0, pitch:52, bend:28, bendT:25, tdec:320, nLev:0.05, nType:0, nFreq:300, click:0.55, dist:0.35})],
+  ['Kicks', 'Hard punch kick', T('Hard punch kick', {wave:0, pitch:58, bend:40, bendT:18, tdec:600, nLev:0, click:0.7, dist:0.85})],
+  ['Kicks', 'Trap long kick', T('Trap long kick', {wave:0, pitch:42, bend:20, bendT:80, tdec:2200, nLev:0, click:0.3, dist:0.2}, {len:4})],
+  ['Kicks', 'Soft lo-fi kick', T('Soft lo-fi kick', {wave:1, pitch:60, bend:12, bendT:40, tdec:260, nLev:0.15, nType:0, nFreq:200, click:0.1, dist:0.1})],
+  ['Kicks', 'Gabber kick', F('Gabber kick', {pitch:60, bend:40, bendT:30, r1:1, i1:0.8, idec1:80, r2:2, i2:0.3, idec2:40, fb:0.4, dec:500, curve:0.7, click:0.6, tone:0.5})],
+  ['Kicks', 'Minimal click kick', BL('Minimal click kick', {pitch:70, kick:0.6, kickT:15, click:0.8, decay:150}, {level:-4})],
+  ['Kicks', 'Felt kick (acoustic)', K('Felt kick', {pitch:58, size:0.8, tension:0.4, tenT:40, dec:350, damp:0.7, muffle:0.7, hard:0.3, shell:0.6, noise:0.2})],
+  ['Kicks', 'Dub kick', K('Dub kick', {pitch:48, size:0.9, tension:0.3, tenT:70, dec:700, damp:0.5, muffle:0.4, hard:0.4, shell:0.7, noise:0.1})],
+  ['Kicks', 'Layered club kick', L('Club kick', [
+    {type:'sine', tune:-4, pAmt:26, pDec:30, atk:0.1, dec:520, level:0.9},
+    {type:'click', a:0.3, level:0.45, hpCut:1200, atk:0.05, dec:9},
+    {type:'tri', tune:8, pAmt:24, pDec:12, atk:0.1, dec:40, level:0.25}], {drive:0.25})],
+  // SNARES
+  ['Snares', 'Fat analog snare', T('Fat analog snare', {wave:1, pitch:180, bend:10, bendT:25, tdec:160, nType:1, nFreq:2800, nRes:0.2, nDec:240, nLev:0.8, click:0.3})],
+  ['Snares', 'Tight funk snare', T('Tight funk snare', {wave:1, pitch:230, bend:6, bendT:15, tdec:90, nType:1, nFreq:4500, nRes:0.25, nDec:140, nLev:0.75, click:0.4})],
+  ['Snares', 'Big dubstep snare', T('Big dubstep snare', {wave:1, pitch:200, bend:14, bendT:30, tdec:180, nType:1, nFreq:2200, nRes:0.3, nDec:320, nLev:0.9, click:0.35, dist:0.4})],
+  ['Snares', 'Dusty snare', T('Dusty snare', {wave:1, pitch:170, bend:8, bendT:20, tdec:120, nType:1, nFreq:1800, nRes:0.2, nDec:200, nLev:0.7, click:0.2, dist:0.25})],
+  ['Snares', 'Piccolo snare', K('Piccolo snare', {pitch:330, size:0.2, tension:0.3, tenT:15, dec:220, damp:0.6, hard:1, pos:0.5, noise:0.7, shell:0.6, shellF:0.9})],
+  ['Snares', 'Deep wood snare', K('Deep wood snare', {pitch:150, size:0.45, tension:0.35, tenT:25, dec:350, damp:0.6, hard:0.9, pos:0.45, noise:0.6, shell:0.8, shellF:0.6})],
+  ['Snares', 'FM noise snare', F('FM noise snare', {pitch:220, bend:12, bendT:20, r1:2.3, i1:0.45, idec1:40, r2:3.1, i2:0.2, idec2:20, noise:0.7, ndec:200, ncut:7000, dec:220, click:0.3})],
+  ['Snares', 'Brush hit', B('Brush hit', {color:0.65, bands:3, freq:1200, spread:0.5, metal:0.25, q:0.3, body:0.45, hp:250, lp:9000, atk:3, dec:240, rel:90})],
+  ['Snares', 'Electro snare', L('Electro snare', [
+    {type:'tri', tune:7, pAmt:12, pDec:15, atk:0.1, dec:110, level:0.6},
+    {type:'white', atk:0.1, dec:190, hpCut:1800, lpCut:9000, lpRes:0.2, level:0.75}], {drive:0.2})],
+  ['Snares', 'Reverb snare', L('Reverb snare', [
+    {type:'tri', tune:5, pAmt:8, pDec:20, atk:0.1, dec:140, level:0.55},
+    {type:'white', atk:0.1, dec:260, hpCut:1200, lpCut:8000, level:0.8}], {fx:[PFX('room', {size:0.7, wet:0.4})], tail:3})],
+  // CLAPS & SNAPS
+  ['Claps & snaps', 'Tight clap', L('Tight clap', [{type:'white', burst:3, spacing:7, atk:0.3, dec:150, hpCut:1100, lpCut:3200, lpRes:0.4, level:1}], {level:5})],
+  ['Claps & snaps', 'Wide clap', L('Wide clap', [{type:'white', burst:5, spacing:11, atk:0.3, dec:320, hpCut:800, lpCut:3000, lpRes:0.3, level:1},
+    {type:'pink', delay:40, atk:0.3, dec:200, hpCut:1500, lpCut:7000, level:0.3}], {level:4})],
+  ['Claps & snaps', 'Big hall clap', L('Hall clap', [{type:'white', burst:4, spacing:10, atk:0.3, dec:300, hpCut:900, lpCut:3500, lpRes:0.3, level:1}], {level:4, fx:[PFX('room', {size:0.85, wet:0.45})], tail:3})],
+  ['Claps & snaps', 'Lo-fi clap', L('Lo-fi clap', [{type:'white', burst:4, spacing:9, atk:0.3, dec:220, hpCut:1000, lpCut:2400, lpRes:0.45, level:1}], {level:5, fx:[PFX('crush', {down:0.35, bits:8, mix:0.6})]})],
+  ['Claps & snaps', 'Finger snap', L('Finger snap', [{type:'white', atk:0.1, dec:45, hpCut:2200, lpCut:7000, lpRes:0.5, level:0.9},
+    {type:'sine', tune:40, atk:0.05, dec:12, level:0.3}], {level:3})],
+  ['Claps & snaps', 'Noise clap (tone drum)', T('Noise clap', {tLev:0, nType:1, nFreq:1100, nRes:0.35, nDec:300, nLev:0.9, nSweep:0.2, click:0.2})],
+  ['Claps & snaps', 'Snap (blip engine)', BL('Blip finger snap', {pitch:1200, kick:0.1, kickT:5, noise:0.8, click:0.7, decay:60, filt:0.4, res:0.5})],
+  ['Claps & snaps', 'Gated clap', T('Gated clap', {tLev:0, nType:1, nFreq:1400, nRes:0.3, nDec:120, nLev:1, nSweep:-0.2, click:0.4, dist:0.3})],
+  // RIMS & STICKS
+  ['Rims & sticks', 'Bright rim', T('Bright rim', {wave:1, pitch:520, bend:4, bendT:5, tdec:40, nType:2, nFreq:3800, nRes:0.5, nDec:25, nLev:0.4, click:0.8})],
+  ['Rims & sticks', 'Dry cross stick', K('Dry cross stick', {pitch:420, size:0.2, tension:0.1, tenT:5, dec:60, damp:0.9, muffle:0.6, hard:1, pos:0.95, noise:0.3, shell:0.9, shellF:0.8})],
+  ['Rims & sticks', 'Stick click', BL('Stick click', {pitch:1500, kick:0.1, kickT:4, click:1, decay:25, filt:0.3, res:0.6})],
+  ['Rims & sticks', 'FM rim', F('FM rim', {pitch:450, bend:2, bendT:5, alg:1, r1:3.2, i1:0.5, idec1:20, r2:5.4, i2:0.3, idec2:10, click:0.6, dec:60, curve:0.1})],
+  ['Rims & sticks', 'Rim (layers)', L('Rim', [{type:'tri', tune:43, atk:0.05, dec:25, level:0.7}, {type:'square', tune:50, atk:0.05, dec:12, hpCut:1500, level:0.3}, {type:'click', a:0.3, level:0.4, atk:0.05, dec:5}])],
+  ['Rims & sticks', 'Side stick (room)', L('Side stick', [{type:'bar', a:0.5, b:0.6, tune:40, atk:0.05, dec:60, level:0.8}, {type:'click', a:0.2, level:0.4, atk:0.05, dec:6}], {fx:[PFX('room', {size:0.3, wet:0.25})]})],
+  // CLOSED HATS
+  ['Closed hats', 'Crisp closed hat', B('Crisp closed hat', {bands:6, freq:7500, spread:0.35, metal:0.95, q:0.55, body:0.8, hp:5000, dec:40, rel:20}, {choke:1})],
+  ['Closed hats', 'Dark closed hat', B('Dark closed hat', {bands:5, freq:4200, spread:0.3, metal:0.85, q:0.5, body:0.7, hp:2500, lp:9000, dec:70, rel:30}, {choke:1})],
+  ['Closed hats', 'Tight tick hat', T('Tight tick hat', {tLev:0, nType:2, nFreq:9500, nRes:0.3, nDec:28, nLev:0.9, click:0.3}, {choke:1})],
+  ['Closed hats', 'Dusty hat', T('Dusty hat', {tLev:0, nType:2, nFreq:6500, nRes:0.2, nDec:55, nLev:0.85, click:0.1, dist:0.3}, {choke:1})],
+  ['Closed hats', 'FM hat', F('FM hat', {pitch:1800, bend:0, alg:2, r1:3.51, i1:0.9, idec1:50, r2:5.43, i2:0.8, idec2:40, fb:0.5, noise:0.4, ndec:40, ncut:12000, dec:50, tone:0.4, click:0})],
+  ['Closed hats', 'Metal hat (layers)', L('Metal hat', [{type:'metal', a:0.6, b:0.4, atk:0.1, dec:35, hpCut:8500, hpRes:0.3, level:1}], {choke:1, level:6})],
+  ['Closed hats', 'Shuffle hat', L('Shuffle hat', [{type:'metal', a:0.55, atk:0.1, dec:80, hpCut:7000, level:0.8}, {type:'white', atk:0.5, dec:60, hpCut:9000, level:0.3}], {choke:1, level:9})],
+  ['Closed hats', 'Blip hat (bright)', BL('Bright blip hat', {pitch:6500, kick:0, noise:1, click:0.5, decay:30, filt:0.7, res:0.4}, {choke:1})],
+  // OPEN HATS
+  ['Open hats', 'Long open hat', B('Long open hat', {bands:6, freq:6000, spread:0.35, metal:0.9, q:0.7, body:0.8, hp:3000, dec:800, rel:300}, {choke:1, len:3})],
+  ['Open hats', 'Short open hat', B('Short open hat', {bands:6, freq:6500, spread:0.35, metal:0.9, q:0.6, body:0.8, hp:3500, dec:220, rel:100}, {choke:1})],
+  ['Open hats', 'Sizzle hat', T('Sizzle hat', {tLev:0, nType:2, nFreq:8000, nRes:0.4, nDec:600, nLev:0.8, nSweep:-0.2, click:0.05}, {choke:1})],
+  ['Open hats', 'FM open hat', F('FM open hat', {pitch:1700, bend:0, alg:2, r1:3.51, i1:0.85, idec1:400, r2:5.43, i2:0.7, idec2:300, fb:0.5, noise:0.4, ndec:350, ncut:12000, dec:450, tone:0.4, click:0}, {choke:1})],
+  ['Open hats', 'Open hat (layers)', L('Open hat', [{type:'metal', a:0.6, b:0.4, atk:0.1, dec:520, hpCut:7500, level:0.9}, {type:'white', atk:0.1, dec:380, hpCut:9000, lpCut:15000, level:0.35}], {choke:1, level:5})],
+  ['Open hats', 'Trashy open hat', L('Trashy open hat', [{type:'metal', a:0.9, b:0.7, atk:0.1, dec:450, hpCut:5500, level:0.85}], {choke:1, level:4, drive:0.25, fx:[PFX('crush', {down:0.2, bits:10, mix:0.4})]})],
+  // CYMBALS
+  ['Cymbals', 'Bright crash', B('Bright crash', {bands:8, freq:5000, spread:0.35, metal:1, q:0.75, body:0.9, hp:1800, dec:2400, sus:0.1, rel:1200}, {len:6})],
+  ['Cymbals', 'Dark crash', B('Dark crash', {bands:8, freq:3000, spread:0.3, metal:1, q:0.8, body:0.9, hp:900, lp:9000, dec:2800, sus:0.1, rel:1400}, {len:6})],
+  ['Cymbals', 'China', B('China', {bands:8, freq:3500, spread:0.45, metal:1, q:0.9, body:0.9, hp:1200, dec:1600, rel:800}, {len:5, drive:0.4})],
+  ['Cymbals', 'Splash', B('Splash', {bands:7, freq:6500, spread:0.35, metal:1, q:0.7, body:0.85, hp:2500, dec:700, rel:300}, {len:3})],
+  ['Cymbals', 'Ride (FM)', F('FM ride', {pitch:620, bend:0, alg:2, r1:1.41, i1:0.75, idec1:1600, r2:3.57, i2:0.6, idec2:1400, noise:0.25, ndec:900, ncut:14000, dec:1800, tone:0.55, click:0.1}, {len:5})],
+  ['Cymbals', 'Ride bell (layers)', L('Ride bell', [{type:'bell', a:0.55, b:0.45, tune:46, atk:0.1, dec:1300, level:0.6}, {type:'metal', a:0.35, b:0.5, atk:0.1, dec:900, hpCut:6000, level:0.4}], {len:5})],
+  ['Cymbals', 'Reverse cymbal', L('Reverse cymbal', [{type:'metal', a:0.9, b:0.6, atk:1600, dec:60, hpCut:3500, level:0.8}, {type:'white', atk:1600, dec:60, hpCut:5000, lpCut:14000, level:0.4}], {len:3})],
+  // TOMS
+  ['Toms', 'Low tom (tone drum)', T('Low tom', {wave:0, pitch:85, bend:10, bendT:110, tdec:550, nLev:0.08, nType:0, nFreq:400, click:0.25})],
+  ['Toms', 'Mid tom (tone drum)', T('Mid tom', {wave:0, pitch:125, bend:10, bendT:100, tdec:450, nLev:0.08, nType:0, nFreq:500, click:0.25})],
+  ['Toms', 'High tom (tone drum)', T('High tom', {wave:0, pitch:175, bend:10, bendT:90, tdec:380, nLev:0.08, nType:0, nFreq:700, click:0.25})],
+  ['Toms', 'Disco syn tom', T('Disco syn tom', {wave:1, pitch:200, bend:24, bendT:220, tdec:400, nLev:0.15, nType:1, nFreq:1200, nDec:100, click:0.1})],
+  ['Toms', 'Simmons-ish tom', F('Simmons-ish tom', {pitch:140, bend:20, bendT:180, alg:0, r1:1, i1:0.3, idec1:150, r2:2, i2:0.15, idec2:80, noise:0.3, ndec:60, ncut:5000, dec:550, curve:0.8})],
+  ['Toms', 'Concert tom', K('Concert tom', {pitch:130, size:0.5, tension:0.25, tenT:70, dec:700, damp:0.35, hard:0.6, shell:0.5})],
+  ['Toms', 'Tight rack tom', K('Tight rack tom', {pitch:200, size:0.35, tension:0.35, tenT:40, dec:350, damp:0.6, muffle:0.3, hard:0.7, shell:0.55})],
+  ['Toms', 'Big floor tom', K('Big floor tom', {pitch:72, size:0.75, tension:0.4, tenT:100, dec:1000, damp:0.35, hard:0.6, shell:0.65})],
+  // HAND DRUMS
+  ['Hand drums', 'High conga', K('High conga', {pitch:240, size:0.28, tension:0.2, tenT:35, dec:420, damp:0.6, hard:0.5, pos:0.4, shell:0.3})],
+  ['Hand drums', 'Low tumba', K('Low tumba', {pitch:150, size:0.4, tension:0.2, tenT:45, dec:600, damp:0.55, hard:0.5, pos:0.4, shell:0.35})],
+  ['Hand drums', 'Muted conga', K('Muted conga', {pitch:230, size:0.28, tension:0.3, tenT:20, dec:150, damp:0.8, muffle:0.8, hard:0.5, pos:0.35, noise:0.2})],
+  ['Hand drums', 'High bongo', K('High bongo', {pitch:520, size:0.12, tension:0.5, tenT:20, dec:160, damp:0.6, hard:0.8, pos:0.7})],
+  ['Hand drums', 'Djembe bass', K('Djembe bass', {pitch:95, size:0.55, tension:0.3, tenT:40, dec:380, damp:0.5, hard:0.5, pos:0.1, shell:0.6})],
+  ['Hand drums', 'Djembe slap', K('Djembe slap', {pitch:340, size:0.35, tension:0.4, tenT:15, dec:140, damp:0.75, muffle:0.4, hard:0.95, pos:0.85, noise:0.5})],
+  ['Hand drums', 'Talking drum', K('Talking drum', {pitch:180, size:0.35, tension:1, tenT:300, dec:600, damp:0.4, hard:0.7, pos:0.3, shell:0.3})],
+  ['Hand drums', 'Timbale', K('Timbale', {pitch:380, size:0.2, tension:0.2, tenT:20, dec:500, damp:0.35, hard:1, pos:0.6, noise:0.2, shell:0.9, shellF:0.9})],
+  ['Hand drums', 'Cajon', K('Cajon', {pitch:90, size:0.6, tension:0.2, tenT:30, dec:250, damp:0.7, muffle:0.5, hard:0.5, noise:0.45, shell:1, shellF:0.3})],
+  ['Hand drums', 'Doumbek tek', K('Doumbek tek', {pitch:600, size:0.12, tension:0.3, tenT:10, dec:90, damp:0.8, hard:0.95, pos:0.9, noise:0.4})],
+  // SHAKERS & TAMBOURINES
+  ['Shakers & tambourines', 'Soft shaker', B('Soft shaker', {grain:0.85, grate:60, bands:2, freq:5000, q:0.25, body:0.4, hp:2500, atk:15, dec:90, rel:40})],
+  ['Shakers & tambourines', 'Long shaker', B('Long shaker', {grain:0.9, grate:90, bands:2, freq:4500, q:0.3, body:0.5, hp:2000, atk:40, dec:220, rel:80})],
+  ['Shakers & tambourines', 'Egg shaker', L('Egg shaker', [{type:'white', burst:2, spacing:25, atk:18, dec:60, hpCut:5500, lpCut:13000, level:0.8}], {level:3})],
+  ['Shakers & tambourines', 'Tambourine', L('Tambourine', [{type:'metal', a:0.85, b:0.8, atk:0.5, dec:260, hpCut:6500, level:0.75}, {type:'white', burst:3, spacing:14, atk:0.5, dec:160, hpCut:7000, level:0.4}], {level:8})],
+  ['Shakers & tambourines', 'Tambourine hit', B('Tambourine hit', {grain:0.4, grate:120, bands:7, freq:6500, spread:0.4, metal:1, q:0.7, body:0.8, hp:4000, dec:300, rel:120})],
+  ['Shakers & tambourines', 'Maracas', L('Maracas', [{type:'white', atk:2, dec:45, hpCut:6000, lpCut:14000, level:0.8}], {level:3})],
+  ['Shakers & tambourines', 'Cabasa', B('Cabasa', {grain:0.7, grate:200, bands:3, freq:7000, q:0.2, body:0.4, hp:4500, atk:5, dec:120, rel:50})],
+  ['Shakers & tambourines', 'Guiro scrape', B('Guiro scrape', {grain:1, grate:35, bands:2, freq:2500, q:0.5, body:0.7, hp:900, atk:30, dec:260, rel:60})],
+  // COWBELLS, BLOCKS & METAL
+  ['Cowbells, blocks & metal', 'Low cowbell', L('Low cowbell', [{type:'square', tune:31, fine:55, atk:0.2, dec:380, hpCut:350, lpCut:3200, lpRes:0.25, level:0.6}, {type:'square', tune:38, fine:36, atk:0.2, dec:380, hpCut:350, lpCut:3200, lpRes:0.25, level:0.6}])],
+  ['Cowbells, blocks & metal', 'Short cowbell', L('Short cowbell', [{type:'square', tune:36, fine:55, atk:0.2, dec:110, hpCut:500, lpCut:4500, lpRes:0.3, level:0.6}, {type:'square', tune:43, fine:36, atk:0.2, dec:110, hpCut:500, lpCut:4500, lpRes:0.3, level:0.6}])],
+  ['Cowbells, blocks & metal', 'Agogo high', F('Agogo high', {pitch:900, bend:0, alg:1, r1:2.76, i1:0.45, idec1:300, r2:5.4, i2:0.15, idec2:150, dec:400, curve:0.2, tone:0.85, click:0.1})],
+  ['Cowbells, blocks & metal', 'Agogo low', F('Agogo low', {pitch:640, bend:0, alg:1, r1:2.76, i1:0.45, idec1:300, r2:5.4, i2:0.15, idec2:150, dec:450, curve:0.2, tone:0.85, click:0.1})],
+  ['Cowbells, blocks & metal', 'Claves (bright)', T('Bright claves', {wave:0, pitch:2400, bend:0, tdec:60, nLev:0, click:0.3})],
+  ['Cowbells, blocks & metal', 'Low woodblock', L('Low woodblock', [{type:'bar', a:0.6, b:0.7, tune:33, atk:0.05, dec:110, level:0.8}])],
+  ['Cowbells, blocks & metal', 'Triangle', F('Triangle', {pitch:2600, bend:0, alg:1, r1:2.7, i1:0.2, idec1:2000, r2:4.2, i2:0.1, idec2:1500, dec:2500, curve:0.1, tone:0.9, click:0}, {len:5})],
+  ['Cowbells, blocks & metal', 'Anvil', F('Anvil', {pitch:1100, bend:0, alg:2, r1:1.73, i1:0.8, idec1:500, r2:4.11, i2:0.6, idec2:300, noise:0.3, ndec:20, dec:700, tone:0.6, click:0.5})],
+  ['Cowbells, blocks & metal', 'Pipe hit', F('Pipe hit', {pitch:420, bend:1, bendT:10, alg:1, r1:2.4, i1:0.5, idec1:600, r2:6.2, i2:0.3, idec2:200, dec:900, curve:0.2, tone:0.7, click:0.3})],
+  ['Cowbells, blocks & metal', 'Glass tink', BL('Glass tink', {pitch:2400, kick:0, fm:0.3, fmR:2.76, decay:500, atk:0.5, click:0.3})],
+  ];
+}
+// DRUMS BY TYPE (owner, 30 Oct): every drum sound in the pad Presets list sits in a group for its type (Kicks, Snares, …),
+// wherever it came from: the hand-made drums, the new ones above, the drum engines' presets (Tone drum, FM Drum, Skin, and
+// the drum ones of Breath, Chip, Bytebeat and Modal) and the classic and acoustic kits. A sound from an engine or kit keeps
+// that in its name ("Round kick (tone drum)", "808 Kick"). The groups they came from go (they were all drums) or keep
+// what isn't a drum. The kits still load whole from File ▾ → Drum kits…; each engine card keeps its own list.
+const DRUM_TYPES = ['Kicks', 'Snares', 'Claps & snaps', 'Rims & sticks', 'Closed hats', 'Open hats', 'Cymbals', 'Toms', 'Hand drums', 'Shakers & tambourines', 'Cowbells, blocks & metal'];
+function drumTypeOf(name){
+  const n = name.toLowerCase();
+  if (/snare|brush/.test(n)) return 'Snares';
+  if (/clap|snap/.test(n)) return 'Claps & snaps';
+  if (/rim|cross stick|side stick|stick click/.test(n)) return 'Rims & sticks';
+  if (/open hat/.test(n)) return 'Open hats';
+  if (/hat\b|hi-hat/.test(n)) return 'Closed hats';
+  if (/crash|ride|cymbal|china|splash/.test(n)) return 'Cymbals';
+  if (/kick|bass drum|sub boom/.test(n)) return 'Kicks';
+  if (/tom\b|timpani/.test(n)) return 'Toms';
+  if (/conga|bongo|tabla|frame drum|taiko|timbale|djembe|cajon|tumba|doumbek|talking drum/.test(n)) return 'Hand drums';
+  if (/shaker|maraca|cabasa|tambourine|guiro/.test(n)) return 'Shakers & tambourines';
+  if (/cowbell|agogo|clave|block|metal|chime|whistle|quijada|ping|clank|bell|perc|triangle|anvil|tink/.test(n)) return 'Cowbells, blocks & metal';
+  return null;
+}
+// Groups whose drums move: group → [the tag added to its names, which of its items are drums (null: all of them)].
+const DRUM_SOURCES = {'Kicks':['', null], 'Snares & claps':['', null], 'Hats & cymbals':['', null], 'Toms & percussion':['', null],
+  'Tone drums':['tone drum', null], 'FM Drum':['FM drum', null], 'Skin':['skin', null], 'Breath':['breath', /hat|shaker|snare|cymbal|kick/i],
+  'Chip':['chip', /noise hat|metal noise|noise snare/i], 'Bytebeat':['bytebeat', /noise hat|lo-fi kick/i], 'Modal':['modal', /wood block|tabla|frame drum|metal plate/i]};
+const isKitGroup = g => /-style (drums|percussion)$| kit \(acoustic\)$/.test(g);
+function organizeDrums(groups){
+  const T = new Map(DRUM_TYPES.map(t => [t, []])), out = [], kits = [];
+  for (const [t, name, make] of moreDrumPresets()) T.get(t).push([name, make]);
+  for (const [g, list] of groups){
+    const src = DRUM_SOURCES[g], kit = isKitGroup(g);
+    if (!src && !kit){ out.push([g, list]); continue; }
+    const keep = [];
+    for (const it of list){
+      const ty = (!src || !src[1] || src[1].test(it[0])) ? drumTypeOf(it[0]) || (src && !src[1] ? 'Cowbells, blocks & metal' : null) : null;
+      if (!ty){ keep.push(it); continue; }
+      const tagged = src && src[0] ? [it[0] + ' (' + src[0] + ')', it[1]] : it;
+      if (kit) kits.push([ty, tagged]); else T.get(ty).push(tagged);
+    }
+    if (keep.length) out.push([g, keep]);
+  }
+  for (const [ty, it] of kits) T.get(ty).push(it);   // the machines and kits after the others in each type
+  return [...DRUM_TYPES.map(t => [t, T.get(t)]).filter(([, l]) => l.length), ...out];
+}
 function factoryVoicePresets(){
   const bass = o => { const p = Object.assign({}, o), dr = p.vDrive || 0; delete p.vDrive; return [normBass(Object.assign(BassCore.defaults(), p)), dr]; };
   const BE = (name, o, x) => { const [b, dr] = bass(o); return PE(name, 'bass', b, Object.assign({drive:dr, len:6, gate:400}, x || {})); };
   const BL = (name, o, x) => PE(name, 'blip', normBlip(Object.assign(BlipVoice.defaults(), o)), x);
-  return [
+  return organizeDrums([
   ['Kicks', [
     ['Boom kick (808-ish)', () => PD('Boom kick', [
       {type:'sine', tune:-5, pAmt:12, pDec:45, atk:0.1, dec:1100, level:0.95},
@@ -9312,7 +9477,7 @@ function factoryVoicePresets(){
   ...drumKitGroups().filter(([g]) => !g.includes('acoustic')).map(([g, list]) => [g, list.map(([n, make]) => [kitTag(g) + ' ' + n, make])]),
   engGroup(['drift', 'Drift (tape pads)']),
   ...drumKitGroups().filter(([g]) => g.includes('acoustic')).map(([g, list]) => [g, list.map(([n, make]) => [kitTag(g) + ' ' + n, make])]),
-  ];
+  ]);
 }
 // Layer presets: tagged with the pad pitch they were written for (vt: 0 = a drum pad, 24 = a synth slot), so a
 // layer keeps its pitch whichever pad it goes on.
@@ -9498,7 +9663,7 @@ function engineSheet(){
   document.addEventListener('keydown', key, true);
   pbOpen = done; render(); document.body.append(wrap);
 }
-const PRK = 'thunderplus-preset-recent-v1';
+const PRK = 'thunderplus-preset-recent-v2';   // v2 (30 Oct): drums regrouped by type, so the old keys (group:item numbers) point elsewhere
 const recentPresets = (() => { let r = null; const load = () => { if (!r){ try { r = JSON.parse(localStorage.getItem(PRK) || '{}'); } catch(e){ r = {}; } if (!r || typeof r !== 'object') r = {}; } return r; };
   return { list:k => (load()[k] || []).slice(0, 8), add:(k, key) => { const o = load(); o[k] = [key, ...(o[k] || []).filter(x => x !== key)].slice(0, 8); try { localStorage.setItem(PRK, JSON.stringify(o)); } catch(e){} } }; })();
 // Runs fn on a throwaway copy of the current pad (fn reads/writes V()), and returns that copy: the engine cards'
@@ -17284,7 +17449,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 271;
+const BUILD = 272;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);

@@ -79,6 +79,19 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (5): drum presets by type, 93 new ones (build 272)
+
+- The pad Presets list now starts with one group per drum type (`DRUM_TYPES`: Kicks, Snares, Claps & snaps, Rims &
+  sticks, Closed hats, Open hats, Cymbals, Toms, Hand drums, Shakers & tambourines, Cowbells, blocks & metal).
+  `organizeDrums()` wraps `factoryVoicePresets()`: it files the 93 new ones (`moreDrumPresets()`, on Tone drum, FM
+  Drum, Skin, Breath, Blip and layers), the old hand-made drum groups, the drum engines' presets (tagged "(tone drum)",
+  "(FM drum)", "(skin)"; from Breath, Chip, Bytebeat and Modal only the drums, `DRUM_SOURCES`) and every classic and
+  acoustic kit sound (already prefixed "808 …", "Funk …"), by name (`drumTypeOf`). Kits go last in each type. The old
+  drum, kit, Tone drums, FM Drum and Skin groups are gone from this list; engine cards keep their own lists and
+  File ▾ → Drum kits… still loads whole kits. LXR and IDM & glitch stay as they were.
+- Recent picks are keyed by group and item number, so `PRK` moved to v2 (old recents are dropped once).
+- Every drum preset was rendered headless: none silent, the new ones within the existing ones' level range.
+
 ## 30 Oct (4): Acid line generator and Breaks to chop (build 271)
 
 - **Acid line… (Edit ▾ / right-click on a phrase, `acidLine`):** pump ACID's `randomizeSteps` / `mutateSteps`
