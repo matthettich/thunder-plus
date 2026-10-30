@@ -79,6 +79,14 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (2): FLX / GAT / RTG add their effect (build 269)
+
+- These commands only drive a Flex, Step gate or Retrigger already in a slot; without one they did nothing, and the owner
+  thought RTG on the master was broken. Now, once a command cell has held FLX, GAT or RTG for 0.9 s (so scrolling or
+  letter-cycling past doesn't add anything), `fxNeed()` (beside `after()`) puts the effect in the first free slot of
+  `cTrack` (the master on the master column) with a toast. Already there: left alone; there but off: a toast says so;
+  no free slot: a toast says so. The slot change isn't part of the cell's undo step.
+
 ## 30 Oct: master cut flash (build 268)
 
 - The owner lost an hour thinking the U-24 interface was dropping out; it was a VOL command on the master track cutting

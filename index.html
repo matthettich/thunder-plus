@@ -2426,7 +2426,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p><b>…chains modules:</b> every effect module in a …chains patch has a <b>BYP</b> button on its title bar with a number: it bypasses the module (its dry sound passes). From a phrase, <code>BYP 31</code> bypasses module 3 on that track's chain, <code>BYP 30</code> puts it back, and <code>BYP 34</code> switches it the other way from the patch for four rows, so a trance gate left bypassed plays for four rows. <code>BYP 0Y</code> does every numbered module. Stopping the song puts them back as the patch has them.</p>
 <p><b>Presets and sidechains in …chains:</b> effects and sound sources have a <b>Preset</b> row: factory presets, Default, and your own (Save as a preset keeps them on this device, for every patch). Every sidechain user has a <b>Source</b>: <b>Self</b>, <b>Send 1–8</b> (what a <b>Sidechain Out</b> in any chain sends) or one <b>track</b>'s own sound, before its effects and fader, so a muted ghost kick still drives it. That goes for <b>Sidechain In</b> (its meter shows what it hears before you patch it), Sidechain Comp, the compressors, the noise gate and the envelope filter, in …chains and as track or master effects. The Mixer's <b>SC</b> row lights when a track is a source for something. The light beside a module's <b>SC</b> input flashes with the sidechain it hears.</p>
 <h3>Flex, Step gate and Retrigger</h3>
-<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (16 patterns; <code>FLX</code> picks one from a row). <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT</code> picks. <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped).</p>
+<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (16 patterns; <code>FLX</code> picks one from a row). <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT</code> picks. <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot.</p>
 <h3>Track effects</h3>
 <p>Each track and the master have 4 effect slots (FX screen, or the Mixer’s FX row): 37 effects in all: Flex, Step gate, Retrigger, EQ, compressor, three reverbs, tape delay, dub tape, saturation, drive, tube, tape, vinyl, lo-fi, bitcrush, chorus, flanger, phaser, tremolo, trance gate, auto-wah, ladder filter, comb resonator, wavefolder, overdrive, pitch and frequency shifters, cross-mod, transient shaper, multiband squash, speaker cab, air, and Rings, Clouds and Beads. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to four, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
@@ -17140,7 +17140,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 268;
+const BUILD = 269;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -17586,6 +17586,22 @@ function defInst(){
   if (Array.isArray(p)){ let m = -1; for (const r of p) if (r && r[IC] > m) m = r[IC]; if (m >= 0) return m; }
   return last.inst;
 }
+/* AUTO SLOT (owner, 30 Oct): FLX, GAT and RTG only drive a Flex, Step gate or Retrigger already in one of the track's (or
+   the master's) FX slots, and without one they did nothing at all, which read as the command being broken. Typing one of
+   them now puts that effect in the first free slot of the track being edited (the master on the master column), with a
+   toast, once the cell has held it for a moment (scrolling or typing past it does nothing). A slot that already has it is left alone (an off one is only pointed out: FXO may have turned it off on purpose). */
+const FX_NEEDS = {FLX:'flex', GAT:'sgate', RTG:'retrig'};
+let fxNeedT = 0;
+function fxNeed(t, type){
+  if (!(t >= 0) || t > MT || !TFX[type]) return;
+  const A = t >= NT ? S.mfx : S.tfx[t]; if (!A) return;
+  const who = t >= NT ? 'the master' : 'track ' + d2(t + 1), have = A.findIndex(f => f && f.type === type);
+  if (have >= 0){ if (!A[have].on) toast(`${TFX[type].long.split(':')[0]} is in slot ${have + 1} of ${who} but switched off, so this command won't be heard until it's on (or FXO ${have + 1}1 turns it on).`, 5000); return; }
+  const k = A.findIndex(f => !f);
+  if (k < 0){ toast(`${who[0].toUpperCase() + who.slice(1)} has no free FX slot for ${TFX[type].long.split(':')[0]}: this command needs one.`, 5000); return; }
+  A[k] = freshTfx(type); fxChanged(t);
+  toast(`Added ${TFX[type].long.split(':')[0]} to slot ${k + 1} of ${who}, so this command plays.`, 4000);
+}
 function after(k, v, x, y, val){
   const prevFxc = last.fxc;
   if (val >= 0 && val !== OFF && k in last) last[k] = val;
@@ -17596,6 +17612,7 @@ function after(k, v, x, y, val){
     if (k === 'note' && val !== OFF){ if (r[IC] < 0){ r[IC] = defInst(); if (!instPicked) last.inst = cInst = r[IC]; } if (pnoeOn) aud(r); }
     if (k === 'inst' && r[0] >= 0 && r[0] !== OFF) aud(r);
     if (k === 'fxc' && r[x + 1] < 0) r[x + 1] = val === prevFxc ? last.fxv : 0;
+    if (k === 'fxc'){ clearTimeout(fxNeedT); if (val >= 0 && FX_NEEDS[FXC[val]]){ const t = cTrack; fxNeedT = setTimeout(() => { if (r[x] === val) fxNeed(t, FX_NEEDS[FXC[val]]); }, 900); } }   // AUTO SLOT: once it settles there, not while scrolling past
     if (k === 'fxc' || k === 'fxv') for (let m = FX0; m < RW; m += 2) if (FXC[r[m]] === 'INS' && r[m + 1] >= 16) niUp(r[m + 1]);   // an INS past 0F typed in
   }
   saveS(); draw();
