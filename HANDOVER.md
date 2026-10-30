@@ -87,7 +87,8 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
 - `MUT` / `GEN` set `ev.vk` ('m'/'g' + value) on the note; `startNote` plays `varBuf(ev, ac)` (else the pad).
   `varVoice`: GEN → `genVoice(type, FAMILY, n, RANGE)` on `GEN_SPACE` (12 types on Tone drum, Breath, Skin, FM Drum,
   Blip; FAMILY picks a centre per control by `bkHash`, RANGE spreads around it); MUT → `mutVoice(pad, n, RANGE)` (engine
-  controls by their XUI rows in lin/log space, whole-number controls only past half range; layers by `MUT_LAYER`).
+  controls by their XUI rows in lin/log space; both move each control by `varNoise` (smooth value noise over the number, a new
+  point every 16, so neighbouring numbers sound alike and RNL drifts), whole-number controls only past half range; layers by `MUT_LAYER`).
   MUT variations are scaled to the pad's peak (`varLevel`). Sliced / synced instruments ignore both.
 - Cache `VAR` (key: pad, vk, RANGE, and the pad's render revision for MUT or type+FAMILY for GEN), ~48 MB LRU. Live:
   `varWant` renders in the Worker when the sequencer makes the event (ahead of the note) and `varPrefetch` at every

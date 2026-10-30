@@ -9264,13 +9264,16 @@ function genTypeOf(I){
   return {Kicks:'Kick', Snares:'Snare', 'Claps & snaps':'Clap', 'Rims & sticks':'Rim', 'Closed hats':'Closed hat', 'Open hats':'Open hat', Cymbals:'Cymbal', Toms:'Tom',
     'Hand drums':'Hand drum', 'Shakers & tambourines':'Shaker', 'Cowbells, blocks & metal':'Metal'}[t] || 'Glitch';
 }
+// Neighbouring numbers make neighbouring sounds: each control follows smooth value noise over the number (a new random point
+// every 16), so 20 and 21 are close and 20 and 40 unrelated, and RNL walking the number drifts the sound.
+const varNoise = (n, i, j) => { const u = n / 16, a = Math.floor(u), f = u - a, w = f * f * (3 - 2 * f); return bkHash(a + 1, i, j) * (1 - w) + bkHash(a + 2, i, j) * w; };
 const genN = (lo, hi, log, x) => log ? lo * Math.pow(hi / lo, x) : lo + (hi - lo) * x;
 const genX = (lo, hi, log, v) => log ? Math.log(v / lo) / Math.log(hi / lo) : (v - lo) / (hi - lo);
 function genVoice(type, fam, seed, range){
   const [k, space, o] = GEN_SPACE[type] || GEN_SPACE.Glitch, p = {}; let i = 0;
   for (const [key, spec] of Object.entries(space)){ i++;
     if (!Array.isArray(spec)){ p[key] = spec; continue; }
-    const [lo, hi, how] = spec, log = how === 'log', c = bkHash(fam + 1, i, 7) * 0.8 + 0.1, x = clamp(c + (bkHash(seed + 1, i, fam + 31) - 0.5) * range, 0, 1);
+    const [lo, hi, how] = spec, log = how === 'log', c = bkHash(fam + 1, i, 7) * 0.8 + 0.1, x = clamp(c + (varNoise(seed, i, fam + 31) - 0.5) * range, 0, 1);
     p[key] = how === 'int' ? Math.round(lo + (hi - lo) * x) : genN(lo, hi, log, x);
   }
   const blip = k === 'blip', v = blip ? PE(type, 'blip', normBlip(Object.assign(BlipVoice.defaults(), p)), {len:o.len, gate:400, choke:o.choke || 0})
@@ -9282,7 +9285,7 @@ function genVoice(type, fam, seed, range){
 const MUT_LAYER = {tune:['add', 12], fine:['add', 50], dec:['mul', 1.5], atk:['mul', 1.2], hold:['mul', 1], rel:['mul', 1], pDec:['mul', 1.5], pAmt:['mul', 1], lpCut:['mul', 2], hpCut:['mul', 2],
   a:['unit', 0.6], b:['unit', 0.6], lpRes:['unit', 0.4], hpRes:['unit', 0.4], level:['mul', 0.4]};
 function mutVoice(base, seed, amt){
-  const v = voiceFromJSON(JSON.parse(JSON.stringify(voiceToJSON(base, false)))), r = (i, j) => bkHash(seed + 1, i, j) * 2 - 1;
+  const v = voiceFromJSON(JSON.parse(JSON.stringify(voiceToJSON(base, false)))), r = (i, j) => varNoise(seed, i, j) * 2 - 1;
   const ek = base.engine && base.engine !== 'layers' ? base.engine : null, ui = ek && typeof XUI !== 'undefined' && XUI[ek];
   if (ek && v[ek] && ui && ui.rows){
     let i = 0; const P = v[ek];
