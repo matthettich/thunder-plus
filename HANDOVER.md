@@ -79,6 +79,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (9): Enter on effect cells, as on notes (build 276)
+
+- Keyboard Enter on a filled command cell picks it up (`pickUp`: command and value become current); on an empty one it
+  writes the current command (only one the master allows, in a master phrase); a quick second Enter opens the picker
+  (`editDouble`). The pad's EDIT still opens the picker at once. v1.2.30 (desktop) has builds up to 275.
+
 ## 30 Oct (8): IDM drum effects (build 275)
 
 - Three plain-JS track / master effects on the beat clock, ids 100–102 in the track-FX worklet (`GrainsCore`,
