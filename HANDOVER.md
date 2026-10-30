@@ -79,6 +79,35 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## Possible future work: search and tidier groups in the sound and effect pickers (owner, 30 Oct: nice to have, not started)
+
+Surveyed 30 Oct (line numbers as of build 270).
+- **Already searchable:** the engine sheet (`engineSheet`), pad and layer presets (`presetSheet`), and quick-add in
+  …chains / …waves. Each is a plain substring match, and each has its own copy of the code.
+- **No search:**
+  - the fxp pop-up (`fxsOpen` FX slot picker, 69 effects or 78 on buses and the master; `fxpOpen` command picker,
+    `FXC_GROUPS`)
+  - the pad "Add effect" `<select id="fxAdd">` (65 effects)
+  - the SoundFont preset `<select>` (`sfPanel`, a flat list of 128+)
+- **Suggested order, smallest first:**
+  1. Type-to-filter in the fxp pop-up. It already has the best keys (▲▼, PgUp/PgDn, Enter, Esc, pad buttons); today a
+     letter only jumps to the next match.
+  2. The engine and preset sheets: focus the search box on open, add ▲▼ and Enter.
+  3. Swap `#fxAdd` and the SoundFont preset menu for the same searchable sheet. Pull the sheet's search out once
+     instead of a fourth copy.
+  4. Tidy the groups. Get the owner to approve the list first, because it touches three apps.
+- **Organisation problems found:**
+  - Effect group names differ between Thunder and `PAL_LAYOUT` in …chains / …waves: Modulation vs Modulation
+    effects, Spectral and granular vs Granular and spectral, Rhythmic vs Rhythmic effects, EQ under Dynamics vs under
+    Filters.
+  - The pad menu (FX + MODFX `pad`, A–Z in each group) and the FX screen (`FXT_LIST`, `FXT_FIRST` order) differ in
+    count and order.
+  - "Mastering (…pump)" isn't in `FX_GROUPS`, so it sorts after More.
+  - Engines: "Synths" is a grab-bag of 13; Bass is under "Voice & bass" but Blip under Drums; the …pump live twins read
+    as duplicates.
+  - Plaits groups are named "Synth models 1/2".
+  - Help line 2431 still says "37 effects".
+
 ## 30 Oct (3): Alt-click mutes the selection (build 270)
 
 - Song / Arrange: an Alt-click (no drag) on a block inside the selection mutes or unmutes every filled block in it
