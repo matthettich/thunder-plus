@@ -79,6 +79,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (7): Backspace steps down, Arrange follows Shift+Alt moves, Ctrl+Space loop off (build 274)
+
+- Backspace in a phrase clears the cell and steps down by the edit step (KEYS mode handler); Delete still clears in place.
+- `songViewRows()`: the rows actually shown where the song cursor is (Arrange's `arrRows()` when the panel is beside the
+  screen or is the Song screen). `phraseGrid`, `shiftAltArrow`, the Song jump and the pattern-view move used the Song
+  grid's taller count, so Shift+Alt+▼ could put the block below Arrange's edge (headless: 32 of 90 moves out of view
+  before, 0 after).
+- Ctrl+Space while playing stops and turns LOOP off.
+
 ## 30 Oct (6): FX screen fixes, FX presets, EQ window, Alt+A (build 273)
 
 - **FX screen stage:** it sat right of the widest text line, so it moved as the picked effect's controls and description
