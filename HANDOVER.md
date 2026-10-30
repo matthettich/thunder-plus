@@ -79,6 +79,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (3): Alt-click mutes the selection (build 270)
+
+- Song / Arrange: an Alt-click (no drag) on a block inside the selection mutes or unmutes every filled block in it
+  (`sxEnd` → `sxMuteRect`, all muted → unmute); on a block among the Ctrl/⌘ picks it does the picks. The text Song grid
+  does the same (`mselEnd`, `msel.alt`). Outside a selection it still mutes the one block; Alt-drag still copies.
+- v1.2.27 released (builds 268–269 plus the 8-slot help fix).
+
 ## 30 Oct (2): FLX / GAT / RTG add their effect (build 269)
 
 - These commands only drive a Flex, Step gate or Retrigger already in a slot; without one they did nothing, and the owner
