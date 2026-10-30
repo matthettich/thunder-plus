@@ -895,6 +895,8 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 .trows button.rec.on{background:#d8324a; color:#fff}   /* REC armed */
 .trows button.rec.cnt{animation:recblink .5s steps(2) infinite}   /* counting in */
 @keyframes recblink{50%{opacity:.35}}
+.tgrid .ln.mcut{animation:mcut 0.8s step-end infinite}   /* the Mixer's master meter while a VOL command turns the master down */
+@keyframes mcut{0%{background:rgba(232,163,58,.4)} 50%{background:transparent}}
 .trows button.on .rv small, .trows button.on small{color:var(--inv)}
 .toct{border-left:1px solid var(--line)}
 #tRecBar + .toct{border-left:0}   /* REC / CLICK already end in a line: two side by side read as one thick one (owner, 21 Oct) */
@@ -17138,7 +17140,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 267;
+const BUILD = 268;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -19476,6 +19478,7 @@ const mfEnd = e => { if (!mfDrag || e.pointerId !== mfDrag.id) return; const t =
 grid.addEventListener('pointerup', mfEnd, true); grid.addEventListener('pointercancel', mfEnd, true);
 grid.addEventListener('dblclick', e => { const b = e.target.closest && e.target.closest('.mfbar:not(.mobar)'); if (!b || tv !== 'mixer') return; e.preventDefault(); e.stopPropagation();
   const t = +b.dataset.t; S.mix[t].vol = TRK_UNITY; mixChanged(); draw(); toast('Track ' + d2(t + 1) + ' · VOL E0 · 0.0 dB'); }, true);
+let mcutOn = false;   // MASTER CUT FLASH: what the Mixer's master meter last showed
 function paintMeters(){
   const bs = rt ? rt.pl.buses : null;
   if (trimEls.length){ const now = performance.now(), lit = trimEls.map((e, i) => { const b = bs && bs[mixL + i], p = b && now - (b.iseen || 0) < 1000 ? b.ipk : 0; return p >= 0.891 ? 2 : p >= 0.5 ? 1 : 0; });
@@ -19486,6 +19489,7 @@ function paintMeters(){
     const ch = BLK[clamp(Math.round(f), 0, 8)]; e.textContent = ch + ch; });
   // Master: a horizontal bar per side, −48 to 0 dB in MW cells, plus the peak in dB.
   if (masterEls.length === 10){
+    const cut = mcutOn = mCut(); for (const k of [0, 5]){ const ln = masterEls[k].closest('.ln'); if (ln && ln.classList.contains('mcut') !== cut) ln.classList.toggle('mcut', cut); }   // MASTER CUT FLASH
     const HB = ' ▏▎▍▌▋▊▉█', zones = [[0, 27], [27, 34], [34, MW]];
     [0, 1].forEach(s => {
       const m = rt && rt.mlv ? rt.mlv[s] : 0, f = lvl(m) * MW, base = s * 5;
@@ -20348,6 +20352,16 @@ let dkAn = null, dkSpec = null, dkScopeT = 0, dkScopeIdle = false;
    gain (everything you hear goes through it: pads, previews, the tracker), so it re-attaches when the audio restarts with a
    new master. −48 dB at the left, 0 dB at the right edge: the ink bar, its last 6 dB amber, a peak tick that holds for a
    second, and a red end once a peak reaches 0 dB (it stays until clicked). ~30 frames a second, nothing when hidden. */
+/* MASTER CUT FLASH (owner, 30 Oct): a VOL command on the master track turns the whole song down with nothing on screen to
+   say so; it read as the audio interface dropping out. While the song plays and a command holds the master more than 3 dB
+   under its MASTER setting, the OUT meters flash amber: the header meter and the Mixer's master meter. It reads the gain
+   the audio thread is using, so it flashes exactly while the cut is heard, and stops when the command lifts it or STOP
+   resets it. */
+function mCut(){
+  if (!rt || !rt.out || !tp.on) return false;
+  const want = curve(S.master == null ? 255 : S.master);
+  return want > 0 && rt.out.gain.value < want * 0.708;
+}
 const HM = {m:null, an:null, buf:null, lv:[0, 0], pk:[0, 0], pt:[0, 0], clip:false, t:0, drawn:''};
 function hmAttach(){
   if (HM.m === master || !ctx || !master) return !!HM.an;
@@ -20379,7 +20393,9 @@ function hmDraw(now){
   }
   if (!c || !c.offsetParent) return;
   const r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr); if (!W || !H) return;
-  const pos = g => lvl(g), key = [W, H, HM.clip, ...HM.lv.map(v => (pos(v) * W) | 0), ...HM.pk.map(v => (pos(v) * W) | 0)].join(',');
+  const cut = mCut(), blink = cut && Math.floor(now / 400) % 2 === 0;
+  if (cut !== !!HM.cut){ HM.cut = cut; if (HM.tip == null) HM.tip = c.title; c.title = cut ? 'The master is turned down by a VOL command on the master track' : HM.tip; }
+  const pos = g => lvl(g), key = [W, H, HM.clip, cut, blink, ...HM.lv.map(v => (pos(v) * W) | 0), ...HM.pk.map(v => (pos(v) * W) | 0)].join(',');
   if (key === HM.drawn) return; HM.drawn = key;   // nothing moved: no redraw (silence costs nothing)
   if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
   const g = c.getContext('2d'), st = getComputedStyle(c), ink = st.color || '#111';
@@ -20387,7 +20403,8 @@ function hmDraw(now){
   const bh = Math.max(2, Math.round(H * 0.3)), gap = Math.max(1, Math.round(H * 0.12)), y0 = Math.round((H - bh * 2 - gap) / 2), amber = W * lvl(Math.pow(10, -6 / 20));
   for (let s = 0; s < 2; s++){
     const y = y0 + s * (bh + gap), x = pos(HM.lv[s]) * W;
-    g.globalAlpha = 0.13; g.fillStyle = ink; g.fillRect(0, y, W, bh); g.globalAlpha = 1;   // the empty track: a faint wash of the ink, in any skin
+    g.globalAlpha = 0.13; g.fillStyle = ink; g.fillRect(0, y, W, bh); g.globalAlpha = 1;
+    if (blink){ g.globalAlpha = 0.7; g.fillStyle = '#e8a33a'; g.fillRect(0, y, W, bh); g.globalAlpha = 1; }   // MASTER CUT FLASH   // the empty track: a faint wash of the ink, in any skin
     g.fillStyle = ink; g.fillRect(0, y, Math.min(x, amber), bh);
     if (x > amber){ g.fillStyle = '#e8a33a'; g.fillRect(amber, y, x - amber, bh); }
     const px = Math.min(W - dpr, pos(HM.pk[s]) * W); if (HM.pk[s] > 0.004){ g.fillStyle = HM.pk[s] >= 0.999 ? '#e5484d' : ink; g.fillRect(px, y, Math.max(1, dpr * 1.5), bh); }
@@ -21705,7 +21722,7 @@ function frame(){
         let p = 0; for (let i = 0; i < mbuf2.length; i++){ const v = mbuf2[i] < 0 ? -mbuf2[i] : mbuf2[i]; if (v > p) p = v; }
         const nl = Math.max(p, rt.mlv[s] * dk), v = nl < 0.0002 ? 0 : nl; if (v !== rt.mlv[s]){ any = true; rt.mlv[s] = v; }
         if (p >= rt.mpk[s] || now - rt.mpt[s] > 1500){ if (p !== rt.mpk[s]) any = true; rt.mpk[s] = p; rt.mpt[s] = now; } }); }
-    if (any){ paintMeters(); deckMetersPaint(); }
+    if (any || (masterEls.length === 10 && mCut() !== mcutOn)){ paintMeters(); deckMetersPaint(); }   // a cut can start or end in a silent stretch
   }
   deckScope(mt); deckStripMeter(mt); stageTick(mt);
 }

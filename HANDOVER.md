@@ -79,6 +79,17 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct: master cut flash (build 268)
+
+- The owner lost an hour thinking the U-24 interface was dropping out; it was a VOL command on the master track cutting
+  the song. Now, while the song plays and the master is more than 3 dB under its MASTER setting because of a command,
+  the header meter and the Mixer's master meter flash amber (`mCut()`, beside `HM`). It reads `rt.out.gain.value`, so it
+  flashes exactly while the cut is heard and stops on STOP (`resetSeq` puts MASTER back). Header meter tooltip says why.
+- Also from that session (not a code change): the Mac desktop app showed ~8 macOS microphone prompts per launch after
+  the owner picked the U-24 by name in Settings → Audio → Output. Likely cause: `setSinkId` with a device id makes
+  Chromium enumerate Core Audio devices, the U-24 has inputs, and an unsigned build can't keep the macOS decision.
+  Workaround: Output back to System default. A real fix needs a signed mac build.
+
 ## 27 Oct (6): gain staging: TRIM, VOL, master OUT, PRE sends, CHN crossfade (build 264)
 
 Owner: "look at the handover document for information about gain staging changes, let me know if you have questions, and
