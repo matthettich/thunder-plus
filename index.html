@@ -283,6 +283,7 @@ body:not(.nowv) .wvMobNote{display:none}
 /* monitor screen (Seeds' black main view) */
 .screen{flex:none; background:var(--screen); border-bottom:1px solid var(--line); position:relative}
 .wave{width:100%; height:150px; display:block; cursor:pointer}
+.wmeta .inuse{font-weight:700}
 .wmeta{display:flex; gap:14px; flex-wrap:nowrap; overflow:hidden; white-space:nowrap; height:1.3em; line-height:1.3; font-size:var(--fs-3); color:#4a4257; font-variant-numeric:tabular-nums}   /* one line always: an extra note (a hot pad) used to wrap and shift the page when changing pads */
 .wmeta span{flex:none} .wmeta span.ov{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis}
 .vrows{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:0 22px; padding-top:4px}
@@ -11366,6 +11367,9 @@ function drawWave(){
   meta.append(el('span', null, (d.length / c.sr).toFixed(3) + ' s'), el('span', null, 'peak ' + (isFinite(db) ? db.toFixed(1) + ' dB' : 'silent')));
   if (pk > 1) meta.append(el('span', 'ov', 'over 0 dB, normalised on export'));
   meta.append(el('span', null, 'tap to play'));
+  // IN USE (31 Oct): which tracks play this pad's sound (through which instruments)
+  try { const u = padUses(cur); const sp = el('span', u.length ? 'inuse' : null, u.length ? 'in use: ' + u.map(x => 'TRK ' + trkList(x.tracks) + ' (inst ' + hx(x.i) + ')').join(' · ') : 'not in the song');
+    sp.title = u.length ? 'This sound plays on ' + u.map(x => 'track ' + trkList(x.tracks) + ' through instrument ' + hx(x.i)).join(', ') + '. Changing it changes it there.' : 'No instrument in the song plays this pad'; meta.append(sp); } catch(e){}
 }
 window.addEventListener('resize', () => drawWave());
 
@@ -18042,7 +18046,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 302;
+const BUILD = 303;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18218,6 +18222,10 @@ function instRows(){
   return [
     {l:'PAD', get:() => I.pad, set:v => I.pad = v, min:0, max:nslots() - 1, big:NPAD, d:cInst % nslots(), fmt:v => hx(v) + '  ' + (isSyn(v) ? 'SYNTH ' : '') + ((kit.voices[v] && kit.voices[v].name) || 'Pad ' + (v + 1)),
       info:() => `Which ...Thunder slot this instrument plays (00–${hx(nslots() - 1)}): a ONE-SHOT slot (a drum) plays its whole sound, a HELD one (a synth) holds until a note OFF. Synth page › SLOTS sets how many. EDIT plays it.`, after:pre, tap:pre},
+    {l:'IN USE', show:() => { const ts = instTracks(cInst); return ts.length ? 'TRACK ' + trkList(ts) : 'NOT IN THE SONG'; },
+      info:() => { const ts = instTracks(cInst); return ts.length ? `Instrument ${hx(cInst)} plays on track${ts.length > 1 ? 's' : ''} ${trkList(ts)} (in the song's phrases: its I column or an INS)` : `No phrase in the song plays instrument ${hx(cInst)}`; }},
+    {l:'PAD SHARED', show:() => { const o = padUses(I.pad).filter(u => u.i !== cInst); return o.length ? o.map(u => 'INST ' + hx(u.i) + ' (TRK ' + trkList(u.tracks) + ')').join(' · ') : 'NO'; },
+      info:() => { const o = padUses(I.pad).filter(u => u.i !== cInst); return o.length ? `Pad ${hx(I.pad)}'s sound is also played by ${o.map(u => 'instrument ' + hx(u.i) + ' on track ' + trkList(u.tracks)).join(', ')}: changing the sound on the Synth page changes it there too. For a new sound, copy the pad to a free one` : `No other instrument in the song plays pad ${hx(I.pad)}: its sound is this instrument's alone`; }},
     {l:'TRANSPOSE', get:() => I.tsp, set:v => I.tsp = v, min:-48, max:48, big:12, d:0, info:v => sgn(v) + ' semitones on every note'},
     {l:'VOLUME', get:() => I.vol, set:v => I.vol = v, min:0, max:255, big:16, d:255, info:v => 'Instrument level ' + dB(curve(v))},
     {l:'PAN', get:() => I.pan, set:v => I.pan = v, min:0, max:255, big:16, d:128, info:panS},
@@ -22131,6 +22139,28 @@ function phraseInfo(pid){
   }
   return {inst, hits: d ? `<svg class="atk" viewBox="0 0 ${L} 1" preserveAspectRatio="none" aria-hidden="true"><path d="${d}"/></svg>` : ''};
 }
+/* IN USE (owner, 31 Oct): where an instrument plays in the song, and which instruments (and so tracks) share a pad's
+   sound, so changing a sound for a new track doesn't quietly change it on another. A phrase counts for every track whose
+   song cells reach it (through their sects); an instrument is in a phrase by its I column or an INS command. */
+function phraseTracks(){
+  const m = new Map();
+  for (let y = 0; y < 256; y++){ const row = S.song[y]; if (!row) continue;
+    for (let t = 0; t < NT; t++){ const v = row[t]; if (v < 0) continue; const c = S.chains[v]; if (!c) continue;
+      for (const r of c) if (r && r[0] >= 0){ let set = m.get(r[0]); if (!set) m.set(r[0], set = new Set()); set.add(t); } } }
+  return m;
+}
+function instTracks(i, PT = phraseTracks()){
+  const out = new Set();
+  for (const [pid, ts] of PT){ const p = S.phrases[pid]; if (!p) continue; const L = Math.min(plen(pid), p.length); let hit = false;
+    for (let y = 0; y < L && !hit; y++){ const r = p[y]; if (r[IC] === i) hit = true; else for (let m = FX0; m < RW; m += 2) if (FXC[r[m]] === 'INS' && r[m + 1] === i){ hit = true; break; } }
+    if (hit) for (const t of ts) out.add(t); }
+  return [...out].sort((a, b) => a - b);
+}
+// Every instrument on pad `pad` that the song plays: [{i, tracks}]
+function padUses(pad){ const PT = phraseTracks(), out = [];
+  for (let i = 0; i < NI; i++){ const I = S.insts[i]; if (!I || I.pad !== pad) continue; const ts = instTracks(i, PT); if (ts.length) out.push({i, tracks:ts}); }
+  return out; }
+const trkList = ts => ts.map(t => d2(t + 1)).join(' ');
 // Instrument colours: spread round the wheel so neighbouring numbers differ; the terminal skins use shades of their one colour.
 const instHue = i => `hsl(${Math.round((i * 137.508) % 360)} 52% 44%)`;
 function drawArr(PH){
@@ -24228,6 +24258,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [303, '31 Oct', ['INST shows IN USE (the tracks that play this instrument) and PAD SHARED (other instruments, and their tracks, that play the same pad’s sound). The Synth page says which tracks use the pad under its waveform. Check them before changing a sound for a new track.']],
   [302, '31 Oct', ['Arrange colours each bus with the tracks it takes in: their blocks, empty cells and track numbers share one colour, the bus a darker shade, so you can see what runs through which bus (including a track added to the bus in …chains).']],
   [301, '31 Oct', ['Arrange: once Shift is let go, a plain click no longer grows the selection: it ends it (Shift-click again to start a new one).']],
   [300, '31 Oct', ['Mastering → COMPRESS shows what it is doing: the gain reduction now in big numbers (and its recent peak), a dot riding the curve at the signal’s level with a red bar for the reduction there, the level against the threshold along the bottom, and the last few seconds of reduction.', 'Mastering → EQ draws each band’s own curve faintly behind the total, so a low shelf looks like a shelf even with the low cut under it.']],

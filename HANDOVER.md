@@ -81,6 +81,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (9): IN USE on INST and the Synth page (build 303)
+
+- Owner: see where an instrument / sound is used before changing it for a new track. `phraseTracks()` (phrase → tracks whose
+  song cells reach it through their sects), `instTracks(i)` (I column or INS), `padUses(pad)` (instruments on that pad with
+  their tracks). INST: read-only rows IN USE and PAD SHARED after PAD. Synth page: `drawWave` adds "in use: TRK …" to
+  `#wMeta`. Checked headless on the demo (inst 00 → track 01, pad shared NO).
+
 ## 31 Oct (8): BUS GROUPS in Arrange (build 302)
 
 - Owner: tracks 1–3 into bus 4, then track 7 added in …chains: show the grouping. `busGroups()` (beside `busPlan`): one of
