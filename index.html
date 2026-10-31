@@ -11657,17 +11657,19 @@ function kitFromJSON(j){
 // Grow the kit to the slot count, keeping one-to-one parity between synth voices and tracks: creating a
 // new track instantiates its voice (a drum one-shot on mono tracks, a simple synth on poly ones).
 // Existing voices are never touched.
+// A new track's voice (a voice per track): mono tracks get a drum one-shot (a copy of the factory Kick's voice, renamed
+// for the track), poly tracks a simple held saw synth.
+function trackVoice(t){
+  if (isPolyT(t)) return mkVoice('Synth T' + d2(t + 1), [{type:'saw', mode:'ADSR', atk:2, dec:400, sus:0.7, rel:200, level:0.8}], {tune:24, len:6, gate:400, tail:2});
+  const kv = voiceFromJSON(JSON.parse(JSON.stringify(voiceToJSON(factoryKit().voices[0])))); kv.name = 'Drums T' + d2(t + 1); return kv;
+}
 function growKit(){
   const n = nslots();
   while (kit.voices.length < n){
     const i = kit.voices.length;
     if (!vtrk && i >= 16) kit.voices.push(slotVoice(i));   // SLOTS: a new slot is a simple synth (or a drum, by its kind)
     else if (!vtrk || i < NPAD) kit.voices.push(mkVoice('Pad ' + (i + 1), []));
-    else { const t = trackOfPad(i);
-      // Mono tracks get a drum one-shot (a copy of the factory Kick's voice, renamed for the track),
-      // poly tracks a simple held saw synth.
-      if (isPolyT(t)) kit.voices.push(mkVoice('Synth T' + d2(t + 1), [{type:'saw', mode:'ADSR', atk:2, dec:400, sus:0.7, rel:200, level:0.8}], {tune:24, len:6, gate:400, tail:2}));
-      else { const kv = voiceFromJSON(JSON.parse(JSON.stringify(voiceToJSON(factoryKit().voices[0])))); kv.name = 'Drums T' + d2(t + 1); kit.voices.push(kv); } }
+    else kit.voices.push(trackVoice(trackOfPad(i)));
   }
   cur = Math.min(cur, n - 1); buildPads(); refreshAll(); save();
 }
@@ -15304,7 +15306,10 @@ function demoSong(){
   for (let i = 0; i < 3; i++){ S.chains[i] = freshSect(); S.chains[i][0][0] = i; S.song[0][i] = i; }
   return S;
 }
-let S = (() => { try { const s = localStorage.getItem(TK) || localStorage.getItem('thunder-song-v1'); return s ? normSong(JSON.parse(s)) : demoSong(); } catch(e){ return demoSong(); } })();
+// FIRST RUN (owner, 31 Oct): with no song saved yet the app opens the bundled ELECTRO project (sounds/ELECTRO.thunder);
+// the starter beat stays underneath until it has loaded (and if it can't be fetched).
+let FIRST_SONG = false;
+let S = (() => { try { const s = localStorage.getItem(TK) || localStorage.getItem('thunder-song-v1'); if (!s) FIRST_SONG = true; return s ? normSong(JSON.parse(s)) : demoSong(); } catch(e){ return demoSong(); } })();
 setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0);   // the song's impulse responses (Convolution reverb), from IndexedDB
 setTimeout(() => { if (swingConv || scConv) try { saveS(); } catch(e){ tpLog('could not save the converted song', e); } swingNote(); scNote(); }, 0);   // an older saved song was converted: save the new numbers, say so
 let sT = 0;
@@ -17004,7 +17009,7 @@ function tStart(mode, o){
   stageStart(t0start);
   met.next = 0; rec.hist = []; if (ci) countIn(ctx.currentTime + 0.08, recS.cnt, seq.bpm);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
-  Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0, t0:t0start, lenTot:null, lenPre:0});
+  Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0, t0:t0start, lenTot:null, lenPre:0, hiRow:null});
   if (rsFirst){   // RESUME: the effect commands passed on the way, then the step it stopped on, now
     for (const e of rsFx.values()) rt.pl.play(Object.assign({}, e, {t:t0start}));
     const d = t0start - rsFirst.t;
@@ -18155,7 +18160,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 310;
+const BUILD = 311;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18234,8 +18239,49 @@ const NVOICES = 32;
 // ntr()/S are initialized after this line runs, so nslots() falls back to the classic 16 until they exist.
 const nslots = () => { try { return vtrk ? (ntr() || 16) + NPAD : NSLOT; } catch(e){ return NSLOT; } };
 const voiceForTrack = t => vtrk ? NPAD + t : t % NSLOT;
+// TRACKS keeps the song (owner, 31 Oct): the first half of the tracks are mono and the rest poly (polyFrom), so a new
+// count moves the line between them. Going from 16 to 17 used to turn the first poly track mono with its phrases. Now the
+// tracks are reordered with the count: the mono tracks keep their places, the poly ones move up past the new mono track,
+// new tracks come in empty (from the unused slots past the count) and a track the count drops goes there, kept, so going
+// back brings it back where it was. Everything that names a track by its number follows it: the song's columns and mutes,
+// the mixer, track FX, …chains (its Track In / Chain Out and SOURCE picks), FX SOURCE picks and, with a voice per track,
+// the track's voice.
+function ntrPerm(n0, n1){
+  const m0 = Math.ceil(n0 / 2), m1 = Math.ceil(n1 / 2), p1 = n1 - m1, mono = [], poly = [], spare = [];
+  for (let t = 0; t < m0; t++) (t < m1 ? mono : spare).push(t);
+  for (let t = m0; t < n0; t++) (t - m0 < p1 ? poly : spare).push(t);
+  const hid = []; for (let t = n0; t < NT; t++) hid.push(t);
+  const free = spare.length ? hid.concat() : hid; let k = 0; const take = () => free[k++];
+  while (mono.length < m1) mono.push(take());
+  while (poly.length < p1) poly.push(take());
+  const P = mono.concat(poly, spare, free.slice(k));   // P[new] = old
+  return P.length === NT ? P : null;
+}
+function ntrRemap(P){
+  const inv = new Array(NT); P.forEach((o, i) => inv[o] = i);
+  const tN = t => t >= 0 && t < NT ? inv[t] : t;
+  for (const r of S.song) if (r){ const c = r.slice(0, NT); for (let t = 0; t < NT; t++) r[t] = c[P[t]]; }
+  if (S.smute) for (let y = 0; y < S.smute.length; y++){ const w = S.smute[y] | 0; if (!w) continue; let v = 0; for (let t = 0; t < 32 && t < NT; t++) if (w & (1 << P[t])) v |= 1 << t; S.smute[y] = v; }
+  const perm = A => { if (!A) return; const c = A.slice(0, NT); for (let t = 0; t < NT; t++) A[t] = c[P[t]]; };
+  perm(S.mix); perm(S.tfx); perm(S.chainOn);
+  const sck = v => { const t = sckTrack(v); return t >= 0 && t < NT ? tN(t) + SCK_SEND + 1 : v; };
+  const slots = A => (A || []).forEach(f => { if (f && f.sck != null && +f.sck > SCK_SEND) f.sck = sck(+f.sck); });
+  for (let t = 0; t < NT; t++) slots(S.tfx[t]); slots(S.mfx);
+  const d = S.chainPatch; if (d && Array.isArray(d.modules)) for (const m of d.modules){ const p = m && m.params; if (!p) continue;
+    if ((m.type === 'trackIn' || m.type === 'chainOut') && +p.track >= 1 && +p.track <= NT) p.track = tN((p.track | 0) - 1) + 1;
+    if (+p.sck > SCK_SEND) p.sck = sck(+p.sck);
+    if (m.type === 'scin' && +p.src >= 1 && +p.src <= NT) p.src = tN((p.src | 0) - 1) + 1; }
+  if (vtrk && kit && kit.voices){ const V = kit.voices, c = V.slice(), nv = [];
+    for (let t = 0; t < NT && NPAD + t < c.length; t++) nv.push(NPAD + P[t] < c.length ? c[NPAD + P[t]] : null);
+    nv.forEach((v, t) => { V[NPAD + t] = v; }); while (V.length && V[V.length - 1] === null) V.pop();
+    return tN; }
+  return tN;
+}
 function setNtr(v){
-  S.ntr = clamp(v, 8, vtrk ? 24 : NT); const n = S.ntr;
+  const n0 = ntr(), n1 = clamp(v, 8, vtrk ? 24 : NT);
+  if (n1 !== n0){ const P = ntrPerm(n0, n1); if (P){ const tN = ntrRemap(P); cTrack = tN(cTrack); if (cs.song.x !== MT) cs.song.x = tN(cs.song.x); cs.mixer.x = tN(cs.mixer.x); if (cFxT < NT) cFxT = tN(cFxT); tp.paused = null; busPlanH = null; } }
+  S.ntr = n1; const n = S.ntr;
+  if (vtrk && n1 !== n0){ kit.voices.forEach((v, i) => { if (v === null) kit.voices[i] = trackVoice(i - NPAD); }); for (let i = 0; i < kit.voices.length; i++){ dirty[i] = true; cache[i] = null; } }
   if (cTrack >= n) cTrack = n - 1; if (cs.song.x >= n && cs.song.x !== MT) cs.song.x = n - 1; if (cs.mixer.x >= n) cs.mixer.x = n - 1;
   // A new track instantiates its voice before the redraw, so the kit keeps one-to-one voice/track parity.
   if (vtrk) growKit();
@@ -19660,6 +19706,7 @@ function lenSoon(){
   clearTimeout(lenT); lenTV = songVer; lenT = setTimeout(() => { lenT = 0; tickLen(true); }, 400);
 }
 function mmss(s){ const m = Math.floor(s / 60), r = Math.floor(s % 60); return m + ':' + String(r).padStart(2, '0'); }
+const tot_ok = t => t.lenTot > 0.05 && isFinite(t.lenTot);
 function tickLen(now){
   const b = $('tLen'); if (!b) return;
   let txt;
@@ -19667,6 +19714,8 @@ function tickLen(now){
     if (tp.mode !== 'song') txt = '—';
     else {
       if (tp.lenTot == null){ const top = songBlockTop(tp.row0); tp.lenTot = songRemain(tp.row0); tp.lenPre = Math.max(0, songRemain(top) - tp.lenTot); }
+      // past the end and still playing: the song went round again (a one-row song never shows a lower row; see the heard steps)
+      if (tot_ok(tp) && ctx.currentTime - tp.t0 > tp.lenTot + 0.05){ tp.t0 += tp.lenTot; tp.row0 = songBlockTop(tp.row0); tp.lenTot = null; return tickLen(now); }
       const el = Math.max(0, ctx.currentTime - tp.t0), tot = tp.lenTot;
       txt = lenMode ? 'TO ' + mmss(tp.lenPre + Math.min(el, tot)) : 'LEFT ' + mmss(Math.max(0, tot - el));
     }
@@ -23135,7 +23184,10 @@ function frame(){
   if (frameIdle()){ raf = -1; rafT = setTimeout(() => { raf = 0; frame(); }, 100); } else raf = requestAnimationFrame(frame);
   if (tp.on && ctx){
     let ch = false;
-    while (tp.q.length && tp.q[0].t <= ctx.currentTime + 0.01){ const e = tp.q.shift(); if (!tp.pos) tp.pos = new Array(NT).fill(null); e.pos.forEach((q, i) => { if (q){ tp.pos[i] = q; sndKeep(i, q); } }); tp.bpm = e.bpm; tp.tks = e.tks; tp.line = e.line; tp.st = e.t; ch = true; }
+    while (tp.q.length && tp.q[0].t <= ctx.currentTime + 0.01){ const e = tp.q.shift(); if (!tp.pos) tp.pos = new Array(NT).fill(null); e.pos.forEach((q, i) => { if (q){ tp.pos[i] = q; sndKeep(i, q); } }); tp.bpm = e.bpm; tp.tks = e.tks; tp.line = e.line; tp.st = e.t; ch = true;
+      // the song's timer starts again when the song wraps back up (owner, 31 Oct: it stayed at 0:00 after the first time through)
+      if (tp.mode === 'song'){ let mx = -1; e.pos.forEach((q, i) => { if (q && i !== MT && q.row > mx) mx = q.row; });
+        if (mx >= 0){ if (tp.hiRow != null && mx < tp.hiRow){ tp.row0 = mx; tp.t0 = e.t; tp.lenTot = null; } tp.hiRow = mx; } } }
     if (!tp.seq.alive() && !tp.q.length && ctx.currentTime > tp.seq.time + 0.3) tStop(); else if (ch){ followPlay(); draw(); }
   }
   tickDots(); tickLen();
@@ -24388,6 +24440,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [311, '31 Oct', ['The first time Thunder Plus opens, it opens the ELECTRO song (with its kit) instead of the starter beat. File ▾ → Load demo song still loads the starter beat.', 'The song timer starts again each time the song goes round, instead of staying at 0:00.', 'TRACKS no longer changes the song: from 16 to 17 a new empty mono track comes in before the poly tracks, which keep their phrases, mixer, effects and …chains routing (17 to 18 adds an empty poly track). Fewer tracks keeps the dropped ones, and going back brings them back where they were.']],
   [310, '31 Oct', ['Poly tracks: a Voice (or …pump live) note takes over the note still holding in its own column instead of singing on top of it; notes side by side in different columns still sing together.', 'Voice engine: new Rough (rasp to growl), Choir (up to 8 singers) and Choir spread; the presets are now …pump SING’s 32 voices: singers from child to deep bass, opera, crooner, raspy rock, growl, whispers, ghost, choirs, aah pad, android, monster, fairy and more.']],
   [309, '31 Oct', ['PLAY starts from the cursor’s song row even when the cursor sits on an empty cell of it (an empty row starts from the next row down that has something).']],
   [308, '31 Oct', ['Smoother playback with the app in the background: the song is booked further ahead while it is hidden, and the desktop app no longer lets the system slow it down when its window is covered or minimised. If it still stutters, Settings → Audio → Latency → Balanced (or Safest) gives the audio more room.']],
@@ -25209,6 +25262,10 @@ async function openSharedProject(){
   } catch(e){ tpLog('the shared project could not be opened', e); toast('That shared project couldn’t be read. Save it and use File ▾ → LOAD PROJECT.', 7000); }
 }
 if (new URLSearchParams(location.search).has('shared')) setTimeout(openSharedProject, 0);
+else if (FIRST_SONG) setTimeout(async () => {
+  try { const r = await fetch('sounds/ELECTRO.thunder?v=1'); if (!r.ok) return; const t = await r.text();
+    if (FIRST_SONG && !projDirty) await loadProjText(t, 'ELECTRO.thunder'); } catch(e){ tpLog('the first-run song could not be loaded', e); }
+}, 0);
 })();
 </script>
 

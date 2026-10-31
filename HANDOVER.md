@@ -81,6 +81,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (17): ELECTRO first-run song; song timer wraps; TRACKS keeps the song (build 311)
+
+- Song timer: `tickLen` restarts from the block top when the elapsed time passes the remaining length, and the heard steps (frame loop) reset it when the rows go back up (`tp.hiRow`).
+- TRACKS: `setNtr` → `ntrPerm(n0, n1)` (P[new] = old: mono kept, poly moved past the new mono, new tracks from the unused slots, dropped ones parked there) and `ntrRemap(P)` (song columns, smute bits, mix, tfx, chainOn, …chains trackIn/chainOut `track`, `sck`/`src` picks, FX `sck`, voice-per-track voices; `trackVoice()` came out of growKit).
+- `sounds/ELECTRO.thunder` (the owner's project, renamed ELECTRO inside) is fetched and opened with `loadProjText` when no song was saved (`FIRST_SONG`, set where `S` is read), unless a shared project is opening or the song was already edited. Precached in sw.js; electron copies `sounds/`.
+
 ## 31 Oct (16): poly voice columns; voice Rough / Choir and SING's presets (build 310)
 
 - Poly tracks: `sameCol()` (by `polyVox`) makes a Voice note (and a …pump live POLY lane, `polyPs`) take over the singer still holding its column's last note, instead of a free one (the owner heard same-column notes stacking). Generic poly samples still ring over, by design.
