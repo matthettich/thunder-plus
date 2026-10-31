@@ -81,6 +81,10 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (15): PLAY from an empty cell's row (build 309)
+
+- `songRow()` now returns the cursor's song row when any cell on it plays (before: only when the cursor's own cell did, else row 0), else the next row down with something, else 0.
+
 ## 31 Oct (14): background playback (build 308, desktop needs the new release)
 
 - Owner: stutters and hangs, especially with the app not in front. `pumpRun` books 1.2 s ahead (256 steps a tick) while

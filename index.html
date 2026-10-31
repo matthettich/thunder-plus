@@ -16908,7 +16908,9 @@ let fxRestartN = 0;
 // Where PLAY starts the song: from the cursor's row when the cell under the cursor holds a block (so it plays
 // from that phrase), otherwise from the top. A tap on a row number, and F7, still start exactly there.
 // The song row SHIFT+PLAY starts from: the cursor's, when its block is filled (PATTERN view: when any track's is).
-const songRow = () => { const r = S.song[cs.song.y]; return r && (r[cs.song.x] >= 0 || (tv === 'phrase' && pvActive() && r.some(v => v >= 0))) ? cs.song.y : 0; };
+// The song row PLAY starts from: the cursor's row when anything plays on it (owner, 31 Oct: the cursor on an empty cell of a
+// filled row started from the top), else the next row down that has something, else the top.
+const songRow = () => { const y0 = cs.song.y; for (let y = y0; y < 256; y++){ const r = S.song[y]; if (r && r.some(v => v >= 0)) return y; } return 0; };
 function tStart(mode, o){
   if (typeof varPrefetch === 'function') varPrefetch();   // MUT / GEN
   if (mode === 'song' && loopPat && !(o && o.loop)){ o = Object.assign({}, o, {loop:{v:'pat', y0:o.row, y1:o.row}}); patRow = o.row; patCur = cs.song.y; }   // LOOP: the pattern
@@ -18094,7 +18096,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 308;
+const BUILD = 309;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24327,6 +24329,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [309, '31 Oct', ['PLAY starts from the cursor’s song row even when the cursor sits on an empty cell of it (an empty row starts from the next row down that has something).']],
   [308, '31 Oct', ['Smoother playback with the app in the background: the song is booked further ahead while it is hidden, and the desktop app no longer lets the system slow it down when its window is covered or minimised. If it still stutters, Settings → Audio → Latency → Balanced (or Safest) gives the audio more room.']],
   [307, '31 Oct', ['Stopping the song leaves the playhead lit where it stopped.', 'Settings → Screen → RESUME (Playback resumes from pause, on): PLAY carries on from that spot, to the step, unless you have moved the cursor since. Off: PLAY starts from the cursor as before.']],
   [306, '31 Oct', ['Song and Arrange: copy, cut, paste and Clone keep each block’s mute (a muted block pastes muted, an unmuted one unmuted).']],
