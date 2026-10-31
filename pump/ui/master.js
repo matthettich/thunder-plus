@@ -87,13 +87,35 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
   const intDial = ui.dial('intensity', 'INTENSITY', 'l'); intDial.tip = 'Intensity: how much of everything (50 % = medium; 25 % light, 100 % twice medium)';
   const cmpBtn = ui.toggle('compare', 'COMPARE'); cmpBtn.holdMomentary = true;
   cmpBtn.tip = 'Compare: hear the original at the master’s loudness, so you judge the sound, not the level (click = latch, click-and-hold = while held; C key)';
-  const SD = [['tone_on', 'tone_amount', 'TONE', 'Tone: broad EQ toward the style’s balance (about a third of the way at medium)'],
+  const SD = [['tone_on', 'tone_amount', 'TONE', 'Tone: broad EQ toward the style’s balance (about half of the way at medium)'],
     ['dyn_on', 'dyn_amount', 'DYNAMICS', 'Dynamics: lifts quiet sections slowly (Punch also glues the loud parts)'],
     ['stereo_on', 'stereo_amount', 'STEREO', 'Stereo: tightens a wide low end; Open and Punch nudge the width']];
   const stageBtn = [], stageAmt = [];
   for (let i = 0; i < 3; i++){ stageBtn[i] = ui.toggle(SD[i][0], SD[i][2]); stageBtn[i].tip = SD[i][3];
     stageAmt[i] = ui.dial(SD[i][1], 'AMOUNT', 's'); stageAmt[i].tip = SD[i][2] + ' amount (on top of INTENSITY; 100 % = as the style has it)'; }
   stageBtn[3] = ui.toggle('loud_on', 'LOUDNESS'); stageBtn[3].tip = 'Loudness: makeup gain and a true-peak limiter that only touches the peaks';
+  // DESTINATION: where the master is going; picks TARGET (and TARGET mode; vinyl also folds the bass to mono).
+  // Moving the TARGET dial anywhere else reads CUSTOM.
+  const DEST = [
+    { item: 'Streaming  -14 LUFS', face: 'STREAM', lufs: -14 },
+    { item: 'Standard  -13.5 LUFS (the reference)', face: 'STANDARD', lufs: -13.5 },
+    { item: 'Vinyl  -12 LUFS, bass mono below 150 Hz', face: 'VINYL', lufs: -12, vinyl: true },
+    { item: 'Club  -9 LUFS', face: 'CLUB', lufs: -9 }];
+  const VINYL_MONO_FREQ = 150, VINYL_MONO_TRIM = 100;
+  const vinylBass = () => Math.abs(V('mono_freq') - VINYL_MONO_FREQ) < 0.5 && Math.abs(V('low_mono_trim') - VINYL_MONO_TRIM) < 0.5;
+  const curDest = () => DEST.findIndex(d => Math.abs(V('target') - d.lufs) < 0.05 && (!d.vinyl || vinylBass()));
+  const destM = ui.menuBtn(null);
+  destM.itemsFn = () => DEST.map(d => d.item);
+  destM.getFn = curDest;
+  destM.setFn = i => {
+    const d = DEST[i]; if (!d) return;
+    const o = { target: d.lufs, loud_mode: 1, loud_on: 1 };
+    if (d.vinyl){ o.mono_freq = VINYL_MONO_FREQ; o.low_mono_trim = VINYL_MONO_TRIM; }
+    else if (vinylBass()){ o.mono_freq = ui.spec('mono_freq').def; o.low_mono_trim = ui.spec('low_mono_trim').def; }   // leaving vinyl (only if still vinyl's)
+    ui.setMany(o); ui.status = 'Destination: ' + d.item;
+  };
+  destM.textFn = () => { const i = curDest(); return i >= 0 ? DEST[i].face + ' ' + DEST[i].lufs : 'CUSTOM ' + V('target').toFixed(1); };
+  destM.tip = 'Destination: sets the loudness TARGET for where the master is going (Streaming -14, Standard -13.5 = the reference’s level, Vinyl -12 with the bass mono below 150 Hz, Club -9). Wheel steps through them';
   const modeSeg = ui.seg('loud_mode', ['GENTLE', 'TARGET']);
   modeSeg.tip = 'Gentle: only as loud as the peaks allow (a couple of dB of peak limiting at most), never past TARGET. Target: to TARGET, however much limiting it takes';
   const targetDial = ui.dial('target', 'TARGET', 's'); targetDial.tip = 'Loudness target (LUFS, integrated). In Gentle mode the most it will reach';
@@ -127,7 +149,7 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
   tint(learnBtn, hue(0, 0)); tint(intDial, hue(1, 0)); tint(cmpBtn, hue(0, 1));
   for (let i = 0; i < 4; i++) tint(stageBtn[i], stageHue[i] = hue(2 + i, 0));
   for (let i = 0; i < 3; i++) tint(stageAmt[i], hue(2 + i, 1));
-  tint(modeSeg, hue(5, 1)); tint(targetDial, hue(5, 2)); tint(ceilDial, hue(6, 2));
+  tint(destM, hue(6, 1)); tint(modeSeg, hue(5, 1)); tint(targetDial, hue(5, 2)); tint(ceilDial, hue(6, 2));
   tint(advBtn, hue(0, 2)); tint(styleSeg, hue(0, 3));
   tint(resetTrimBtn, hue(2, 2)); tint(clearBandsBtn, hue(3, 2));
   tint(gThrD, hue(3, 1)); tint(ratioD, hue(4, 1)); tint(atkD, hue(3, 2)); tint(relD, hue(4, 2)); tint(liftD, hue(3, 3)); tint(liftAtD, hue(4, 3));
@@ -210,9 +232,10 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
     const sh = Dial.heightFor('s');
     for (let i = 0; i < 4; i++){ const p = stageP[i]; stageBtn[i].r = R(p.x + 10, p.y + 10, p.w - 20, 26); if (i < 3) stageAmt[i].r = R(p.cx - 36, p.y + 46, 72, sh); }
     const lp = stageP[3];
-    modeSeg.r = R(lp.x + 10, lp.y + 44, lp.w - 20, 22);
-    targetDial.r = R(lp.x + 6, lp.y + 72, lp.w * 0.5 - 6, sh);
-    ceilDial.r = R(lp.cx, lp.y + 72, lp.w * 0.5 - 6, sh);
+    destM.r = R(lp.x + 10, lp.y + 40, lp.w - 20, 22);
+    modeSeg.r = R(lp.x + 10, lp.y + 66, lp.w - 20, 20);
+    targetDial.r = R(lp.x + 6, lp.y + 88, lp.w * 0.5 - 6, sh);
+    ceilDial.r = R(lp.cx, lp.y + 88, lp.w * 0.5 - 6, sh);
     // ADVANCED: two columns of small dials under each stage's key
     for (const c of advDials) c.visible = advanced;
     limStyleM.visible = resetTrimBtn.visible = clearBandsBtn.visible = advanced;
@@ -226,9 +249,9 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
       gThrD.r = cell(1, 0, 0); ratioD.r = cell(1, 1, 0); atkD.r = cell(1, 0, 1); relD.r = cell(1, 1, 1);
       liftD.r = cell(1, 0, 2); liftAtD.r = cell(1, 1, 2);
       stageAmt[2].r = cell(2, 0, 0); monoD.r = cell(2, 1, 0); lowMonoD.r = cell(2, 0, 1); widthD.r = cell(2, 1, 1);
-      gainD.r = R(lp.x + 6, lp.y + 72 + sh + 2, lp.w * 0.5 - 6, sh);
-      limRelD.r = R(lp.cx, lp.y + 72 + sh + 2, lp.w * 0.5 - 6, sh);
-      limStyleM.r = R(lp.x + 10, lp.b - 32, lp.w - 20, 22);
+      gainD.r = R(lp.x + 6, lp.y + 88 + sh, lp.w * 0.5 - 6, sh);
+      limRelD.r = R(lp.cx, lp.y + 88 + sh, lp.w * 0.5 - 6, sh);
+      limStyleM.r = R(lp.x + 10, Math.min(lp.y + 90 + 2 * sh, lp.b - 24), lp.w - 20, 22);
     }
   }
 
@@ -404,7 +427,8 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
   function drawStageText(){
     const t = ui.th;
     const lines = (i, a, b, bc) => { const p = stageP[i], c = V(STAGE_ON[i]) >= 0.5 ? stageInk(i) : t.ink2;
-      ui.text(p.cx, p.b - 34, a, 'mono', 10.5, c, 'center'); ui.text(p.cx, p.b - 18, b, 'mono', 10.5, bc || c, 'center'); };
+      const lo = i === 3 ? 12 : 0;   // LOUDNESS: under its dials (DESTINATION moved them down)
+      ui.text(p.cx, p.b - 34 + lo, a, 'mono', 10.5, c, 'center'); ui.text(p.cx, p.b - 18 + lo * 0.75, b, 'mono', 10.5, bc || c, 'center'); };
     if (!(ana.valid && planValid)){
       // (the plugin writes this in all four; in ADVANCED, DYNAMICS and LOUDNESS have their dials there, so not those two)
       // (and learned but no frame yet: the song is stopped, the effect asleep, so the plan isn't known here yet)

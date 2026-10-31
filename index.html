@@ -2455,7 +2455,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <script src="pump/synth/pump-synth-engine.js?v=4"></script>
 <!-- …PUMP (23 Oct 2026): the pump mastering plugins' parameter tables and presets (generated in matthettich/pump by
      wasm/build.sh); pump/pump.wasm is their DSP, fetched by the wasm loader. -->
-<script src="pump/pump-meta.js?v=4"></script>
+<script src="pump/pump-meta.js?v=5"></script>
 <script>
 /* ===ENGINE START=== */
 const BASE = 65.40639; // C2
@@ -13181,7 +13181,7 @@ $('midiKeysSel').addEventListener('change', e => { releaseKeys(); midi.keys = +e
 moPorts(); miPorts();
 
 /* ---------- Plaits loader ---------- */
-const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=4';
+const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=5';
 // Each wasm is decoded and compiled once and shared: the synth here, the …waves engine and the render Worker.
 let plFailed = false;
 (async () => {
@@ -18014,7 +18014,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 296;
+const BUILD = 297;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24961,7 +24961,7 @@ if (new URLSearchParams(location.search).has('shared')) setTimeout(openSharedPro
 <script src="pump/ui/band.js?v=1"></script>
 <script src="pump/ui/wide.js?v=1"></script>
 <script src="pump/ui/heat.js?v=1"></script>
-<script src="pump/ui/master.js?v=1"></script>
+<script src="pump/ui/master.js?v=2"></script>
 <script src="pump/ui/gate.js?v=1"></script>
 <script src="pump/ui/tune.js?v=1"></script>
 <script src="pump/ui/chop.js?v=1"></script>

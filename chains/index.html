@@ -1926,7 +1926,7 @@ class ChainsBridge {
   /* The effects code from ...Thunder (tfx.wasm). A worklet can't fetch, so the page does. */
   static wasm(){
     const get = u => fetch(u).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null);
-    return ChainsBridge._wasm || (ChainsBridge._wasm = Promise.all([get('./dsp/tfx.wasm'), get('../pump/pump.wasm?v=4')]));   // PUMP MODULES: …pump's effects
+    return ChainsBridge._wasm || (ChainsBridge._wasm = Promise.all([get('./dsp/tfx.wasm'), get('../pump/pump.wasm?v=5')]));   // PUMP MODULES: …pump's effects
   }
   static standalone(opts){
     opts = opts || {};
