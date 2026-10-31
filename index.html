@@ -982,6 +982,7 @@ body.simpleph .tarr{display:none !important}   /* SIMPLE PHRASE: no Arrange besi
 body.arrvis.arrnarrow .tside{display:none}
 body.arrsmall .tarr{width:240px} body.arrsmall .tath, body.arrsmall .tagrid .ar{grid-template-columns:18px var(--arcols, repeat(8,minmax(0,1fr)) 4px repeat(8,minmax(0,1fr))); gap:1px; padding:0 6px}
 body.arrtiny .tarr{width:200px} body.arrtiny:not(.asong) .tagrid b{color:transparent}
+.tarr.arnolab .tagrid b{color:transparent !important}   /* blocks too narrow for a three-digit number */
 /* ARRANGE as the Song screen (CLASSIC SONG off): the panel sits in the screen in the text grid's place, full width at any
    size, without its grip, its ARRANGE label or its tips (the screen's own title, info and hint lines do those jobs). */
 body.asong .tarr{display:flex; width:auto !important; flex:1 1 auto; min-height:0; border-left:0; margin-top:.3em; font-size:14px}
@@ -8884,7 +8885,7 @@ function placeBreak(s, i, y){
   s.chains.forEach((c, k) => { if (!isEmptySect(c)) usedC.add(k); });
   for (const k of usedC) (s.chains[k] || []).forEach(row => { if (row && row[0] >= 0) usedP.add(row[0]); });
   s.phrases.forEach((p, k) => { if (!isEmptyPhrase(p)) usedP.add(k); });
-  const freeC = [], freeP = []; for (let k = 0; k < 256; k++){ if (!usedC.has(k)) freeC.push(k); if (!usedP.has(k)) freeP.push(k); }
+  const freeC = [], freeP = []; for (let k = 0; k < NPH; k++){ if (!usedC.has(k)) freeC.push(k); if (!usedP.has(k)) freeP.push(k); }
   const tracks = parts.map((bars, t) => [t, bars]).filter(([, bars]) => bars.some(h => h.length));
   const keys = new Set(); for (const [, bars] of tracks) for (const h of bars) keys.add(JSON.stringify(h));
   if (freeC.length < tracks.length || freeP.length < keys.size || tracks.some(([t]) => s.song[y][t] >= 0)) return false;
@@ -13435,13 +13436,17 @@ const TK = 'thunderplus-song-v1', VK = 'thunderplus-view-v1';
 // NI: instruments in a song (00–3F; 16 before 20 Oct). To give songs more, raise it: the I column, INS, the INST screen, the
 // instrument list and song files all follow it (songs keep up to NI; up to 256 fit the hex column).
 const NT = 32, NI = 64, ROOT = 48, OFF = 200, TICKS = 6, BASEW = 52, FITROWS = 18;
+// THREE DIGITS (owner, 30 Oct): sects and phrases are numbered 000–FFF (4096 of each, one pool shared by every track);
+// they were 00–FF, which Arrange's unique copies used up fast. Song rows stay 000–255.
+const NPH = 4096;
 // The master column: song column MT (after the 32 track columns, S.song[row][MT]) plays phrases whose commands go to the
 // master bus (VOL = master level; FXO / FLX / GAT / RTG = the master effects). Its notes are not played.
 const MT = NT;
 const NN = ['C-','C#','D-','D#','E-','F-','F#','G-','G#','A-','A#','B-'];
 const NBL = 'CcDdEFfGgAaB';   // one letter per note for a neighbour's chord: capitals natural, small sharp (c = C#)
-const hx = (v, n = 2) => ((v & (n === 1 ? 15 : 255)) >>> 0).toString(16).toUpperCase().padStart(n, '0');
+const hx = (v, n = 2) => ((v & (n === 1 ? 15 : n === 3 ? 4095 : 255)) >>> 0).toString(16).toUpperCase().padStart(n, '0');
 const h2 = v => v < 0 ? '--' : hx(v);
+const hp = v => hx(v, 3), h3 = v => v < 0 ? '---' : hp(v);   // a sect or phrase number: three digits
 const d2 = n => String(n).padStart(2, '0');
 const noteS = n => n < 0 ? '---' : n === OFF ? 'OFF' : NN[n % 12] + Math.floor(n / 12);
 const curve = v => Math.pow(Math.max(0, Math.min(255, v)) / 255, 2);
@@ -14976,9 +14981,9 @@ function freshSong(){
   // MPC swing: the classic hardware's shuffle, applied on 8th, 16th or dotted-8th grid.
   // Voice-per-track parity: one synth voice per song track — ntr tracks need ntr + 8 pads, capped at 32.
   return {app:'thunder-song', v:6, name:'Song 1', bpm:120, swing:50, swingB:2, limiter:true, renderFrom:0, master:255, mout:255, chainPatch:null,
-    song:Array.from({length:256}, () => new Array(NT + 1).fill(-1)), chains:new Array(256).fill(null), phrases:new Array(256).fill(null),
+    song:Array.from({length:256}, () => new Array(NT + 1).fill(-1)), chains:new Array(NPH).fill(null), phrases:new Array(NPH).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
-    tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:8, ticks:TICKS, dlen:16, plen:new Array(256).fill(16), plpb:new Array(256).fill(0),
+    tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:8, ticks:TICKS, dlen:16, plen:new Array(NPH).fill(16), plpb:new Array(NPH).fill(0),
     ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0), mst:freshMst(), presets:{voices:[], layers:[]}, secs:[], scale:0, sroot:0, ni:NI, sc2:1};   // secs: SONG EXTRAS section names [{y, n}]   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
 }
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;
@@ -15027,14 +15032,14 @@ function normSong(j){
   // saved with more than 32 tracks (songOut): tracks 1–32 then the master (33 numbers, as every version saves), tracks 33
   // and up in songX[row] (missing or null = empty). A version with fewer tracks keeps the ones it has.
   if (Array.isArray(j.song)) j.song.slice(0, 256).forEach((r, i) => { if (!Array.isArray(r)) return;
-    const cell = v => clamp(int(v, -1), -1, 255);
+    const cell = v => clamp(int(v, -1), -1, NPH - 1);
     if (r.length === NT + 1 || r.length !== 33){ for (let t = 0; t <= MT; t++) S.song[i][t] = cell(r[t]); return; }
     for (let t = 0; t < Math.min(32, NT); t++) S.song[i][t] = cell(r[t]);
     S.song[i][MT] = cell(r[32]);
     const x = Array.isArray(j.songX) && Array.isArray(j.songX[i]) ? j.songX[i] : null;
     for (let t = 32; t < NT; t++) S.song[i][t] = x ? cell(x[t - 32]) : -1; });
-  if (Array.isArray(j.chains)) j.chains.slice(0, 256).forEach((c, i) => { if (Array.isArray(c)) S.chains[i] = Array.from({length:16}, (_, k) => {
-    const r = Array.isArray(c[k]) ? c[k] : []; return [clamp(int(r[0], -1), -1, 255), clamp(int(r[1], 0), -128, 127)]; }); });
+  if (Array.isArray(j.chains)) j.chains.slice(0, NPH).forEach((c, i) => { if (Array.isArray(c)) S.chains[i] = Array.from({length:16}, (_, k) => {
+    const r = Array.isArray(c[k]) ? c[k] : []; return [clamp(int(r[0], -1), -1, NPH - 1), clamp(int(r[1], 0), -128, 127)]; }); });
   // Songs from before v2 used the first FX list (RET DEL CUT CHA PSL RND OFS REV PAN TPO HOP): move them to the current names.
   const v1 = !(int(j.v, 1) >= 2);
   const fxIdx = (c, v) => {
@@ -15049,17 +15054,17 @@ function normSong(j){
   // The MPC swing note value (which beat the swing lands on) follows the song; the hardware defaulted to 16ths.
   S.lpb = clamp(int(j.lpb, 4), 1, 16); S.ticks = clamp(int(j.ticks, TICKS), 1, 32); S.dlen = clamp(int(j.dlen, 16), 1, PROWS);
   S.plen.fill(S.dlen);
-  if (Array.isArray(j.plen)) j.plen.slice(0, 256).forEach((v, i) => S.plen[i] = clamp(int(v, S.dlen), 1, PROWS));
-  if (Array.isArray(j.plpb)) j.plpb.slice(0, 256).forEach((v, i) => S.plpb[i] = clamp(int(v, 0), 0, 16));
+  if (Array.isArray(j.plen)) j.plen.slice(0, NPH).forEach((v, i) => S.plen[i] = clamp(int(v, S.dlen), 1, PROWS));
+  if (Array.isArray(j.plpb)) j.plpb.slice(0, NPH).forEach((v, i) => S.plpb[i] = clamp(int(v, 0), 0, 16));
   const old1 = !(int(j.v, 1) >= 3);   // one note column: [note, vol, inst, fx…]
-  if (Array.isArray(j.phrases)) j.phrases.slice(0, 256).forEach((p, i) => { if (Array.isArray(p)) S.phrases[i] = Array.from({length:PROWS}, (_, k) => {
+  if (Array.isArray(j.phrases)) j.phrases.slice(0, NPH).forEach((p, i) => { if (Array.isArray(p)) S.phrases[i] = Array.from({length:PROWS}, (_, k) => {
     const r = Array.isArray(p[k]) ? p[k] : [];
     const o = old1 ? (() => { const q = Array.from({length:9}, (_, m) => clamp(int(r[m], -1), -1, 255)); return [q[0], -1, -1, -1, ...q.slice(1)]; })()
       : Array.from({length:RW}, (_, m) => clamp(int(r[m], -1), -1, 255));
     for (let m = FX0; m < RW; m += 2){ const [c, v] = fxIdx(o[m], o[m + 1]); o[m] = c; o[m + 1] = c < 0 ? -1 : v; }
     return o; }); });
   // Phrases with nothing in them take the project's default length, so a new one starts at that size.
-  for (let i = 0; i < 256; i++){ const p = S.phrases[i]; if (!p || p.every(r => r.every(v => v < 0))) S.plen[i] = S.dlen; }
+  for (let i = 0; i < NPH; i++){ const p = S.phrases[i]; if (!p || p.every(r => r.every(v => v < 0))) S.plen[i] = S.dlen; }
   // Songs saved before v4 came from the 8-pad days, when instruments 08–0F were set to replay pads 00–07. Point those
   // (only the ones still on that old default) at the synth slots 08–0F they're numbered for.
   const old8 = !(int(j.v, 1) >= 4);
@@ -15113,7 +15118,7 @@ function normSong(j){
     const lp = S.lpb / swF;
     if (Number.isInteger(lp)) S.lpb = lp; else S.bpm = clamp(Math.round(S.bpm / swF), 40, 300);
     const div = Number.isInteger(lp) ? swF : 1;
-    for (let i = 0; i < 256; i++) if (S.plpb[i]) S.plpb[i] = clamp(Math.round(S.plpb[i] / div), 1, 16);
+    for (let i = 0; i < NPH; i++) if (S.plpb[i]) S.plpb[i] = clamp(Math.round(S.plpb[i] / div), 1, 16);
     S.ticks = clamp((S.ticks || TICKS) * swF, 1, 32);
     const TICI = FXC.indexOf('TIC');
     for (const ph of S.phrases) if (ph) for (const r of ph) for (let m = FX0; m < RW; m += 2) if (r[m] === TICI && r[m + 1] > 0) r[m + 1] = clamp(r[m + 1] * swF, 1, 32);
@@ -15264,7 +15269,7 @@ function placePending(){
   if (!S.song[q.y] || S.song[q.y][q.x] >= 0){ pendPlace = null; return; }
   if (isEmptyPhrase(S.phrases[q.p])) return;
   pendPlace = null; setSongPhrase(q.x, q.y, q.p);
-  toast(`Phrase ${hx(q.p)} is on the song: row ${rS(q.y, 3)}, track ${d2(q.x + 1)}.`);
+  toast(`Phrase ${hp(q.p)} is on the song: row ${rS(q.y, 3)}, track ${d2(q.x + 1)}.`);
 }
 // An instrument past the song's ni put into a phrase (typed, recorded, imported, pasted) makes it a 64-instrument song.
 const niOf = Sx => clamp((Sx && Sx.ni) | 0 || 16, 16, NI);
@@ -15280,12 +15285,12 @@ const plpbOf = (Sx, id) => (id >= 0 && Sx.plpb && Sx.plpb[id]) || Sx.lpb || 4;
 const clone = o => JSON.parse(JSON.stringify(o));
 function freeSect(){
   const used = new Set(); for (const r of S.song) for (const v of r) if (v >= 0) used.add(v);
-  for (let i = 0; i < 256; i++) if (!used.has(i) && isEmptySect(S.chains[i])) return i;
+  for (let i = 0; i < NPH; i++) if (!used.has(i) && isEmptySect(S.chains[i])) return i;
   return -1;
 }
 function freePhrase(){
   const used = new Set(); for (const c of S.chains) if (c) for (const r of c) if (r[0] >= 0) used.add(r[0]);
-  for (let i = 0; i < 256; i++) if (!used.has(i) && isEmptyPhrase(S.phrases[i])) return i;
+  for (let i = 0; i < NPH; i++) if (!used.has(i) && isEmptyPhrase(S.phrases[i])) return i;
   return -1;
 }
 const audible = t => { const any = S.mix.some(m => m.solo); if (S.mix[t].mute) return false; if (!any || S.mix[t].solo) return true;
@@ -15353,7 +15358,7 @@ function freePair(){
   const uc = new Set(), up = new Set();
   for (const r of S.song) for (const v of r) if (v >= 0) uc.add(v);
   for (const c of S.chains) if (c) for (const r of c) if (r[0] >= 0) up.add(r[0]);
-  for (let i = 0; i < 256; i++) if (!uc.has(i) && isEmptySect(S.chains[i]) && !up.has(i) && isEmptyPhrase(S.phrases[i])) return [i, i];
+  for (let i = 0; i < NPH; i++) if (!uc.has(i) && isEmptySect(S.chains[i]) && !up.has(i) && isEmptyPhrase(S.phrases[i])) return [i, i];
   return [freeSect(), freePhrase()];
 }
 const phraseFree = id => isEmptyPhrase(S.phrases[id]) && !S.chains.some(c => c && c.some(r => r[0] === id));
@@ -15391,7 +15396,7 @@ const songShown = v => v >= 0 && !sectsOn ? (firstPhrase(v) >= 0 ? firstPhrase(v
 const onlyPhrase = (cid, p) => { const c = S.chains[cid]; return !!c && c.filter(r => r[0] >= 0).length === 1 && c.find(r => r[0] >= 0)[0] === p; };
 function sectForPhrase(p, x, y){
   if (onlyPhrase(p, p)) return p;
-  for (let k = 0; k < 256; k++) if (onlyPhrase(k, p)) return k;
+  for (let k = 0; k < NPH; k++) if (onlyPhrase(k, p)) return k;
   const usedElsewhere = k => S.song.some((r, yy) => r.some((v, xx) => v === k && !(xx === x && yy === y)));
   let cid = isEmptySect(S.chains[p]) && !usedElsewhere(p) ? p : -1;
   if (cid < 0) cid = freeSect();
@@ -15401,7 +15406,7 @@ function sectForPhrase(p, x, y){
   return cid;
 }
 function setSongPhrase(x, y, p){
-  const cid = sectForPhrase(clamp(p, 0, 255), x, y); if (cid < 0) return;
+  const cid = sectForPhrase(clamp(p, 0, NPH - 1), x, y); if (cid < 0) return;
   setCell('song', x, y, cid); after('sect', 'song', x, y, cid);
 }
 const firstPhrase = cid => { const c = cid >= 0 ? S.chains[cid] : null, r = c ? c.find(q => q[0] >= 0) : null; return r ? r[0] : -1; };
@@ -17256,7 +17261,7 @@ function renderScope(){
     S2.song[0][cTrack] = 255; S2.chains[255] = Array.from({length:16}, (_, k) => k ? [-1, 0] : [255, 0]);
     S2.phrases[255] = ph; S2.plen[255] = y1 - y0 + 1; S2.plpb[255] = S.plpb[cPhrase] || 0;
     const nm = tName(cTrack);
-    return {S:S2, tracks:[cTrack], master:false, label:`phrase ${hx(cPhrase)}` + (sel ? ` rows ${hx(y0)}–${hx(y1)}` : ''), name:(nm ? nm + ' ' : '') + 'PH' + hx(cPhrase) + (sel ? ' ' + hx(y0) + '-' + hx(y1) : '')};
+    return {S:S2, tracks:[cTrack], master:false, label:`phrase ${hp(cPhrase)}` + (sel ? ` rows ${hx(y0)}–${hx(y1)}` : ''), name:(nm ? nm + ' ' : '') + 'PH' + hp(cPhrase) + (sel ? ' ' + hx(y0) + '-' + hx(y1) : '')};
   }
   const sel = !!(selA && selA.v === 'song'), r = sel ? selRect() : {x0:0, x1:MT, y0:cs.song.y, y1:cs.song.y};
   const S2 = base(), tracks = [];
@@ -17764,7 +17769,7 @@ function saveCur(){ try { localStorage.setItem(CUK, JSON.stringify({tv, midV, cS
 function loadCur(){
   try { const o = JSON.parse(localStorage.getItem(CUK) || 'null'); if (!o) return;
     if (VIEWS.includes(o.tv)) tv = o.tv; if (MID.includes(o.midV)) midV = o.midV;
-    cSect = clamp(int(o.cSect, 0), 0, 255); cPhrase = clamp(int(o.cPhrase, 0), 0, 255); cInst = clamp(int(o.cInst, 0), 0, NI - 1);
+    cSect = clamp(int(o.cSect, 0), 0, NPH - 1); cPhrase = clamp(int(o.cPhrase, 0), 0, NPH - 1); cInst = clamp(int(o.cInst, 0), 0, NI - 1);
     cTrack = clamp(int(o.cTrack, 0), 0, MT); cFxT = clamp(int(o.cFxT, 0), 0, NT);
     if (o.cs) for (const k in cs) if (o.cs[k]) Object.assign(cs[k], {x:int(o.cs[k].x, 0), y:int(o.cs[k].y, 0)});
   } catch(e){}
@@ -17889,7 +17894,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 292;
+const BUILD = 293;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -17964,11 +17969,11 @@ function setNtr(v){
 }
 // The window of tracks a Song or Mixer line has room for (each track takes 3 characters after a lab-wide label).
 let mixL = 0, mixN = 16, winTrk = 16;
-function trackWin(c, lab, extra = 0){
+function trackWin(c, lab, extra = 0, cw = 3){   // cw: characters a column takes, its space included (Song: 3 digits + 1)
   const n = ntr(), fs = parseFloat(scr.style.fontSize) || 14, w = grid.clientWidth;
   // extra: columns kept on screen after the window (Song's master column).
   // When every track fits, the text shrinks a little to make room (fitCheck); otherwise the window gives up a column.
-  const fit = w > 0 ? Math.floor((Math.floor(w / (fs * CW) + 0.01) - lab + 1) / 3) : n, vt = clamp(fit >= n ? n : fit - extra, 1, n);
+  const fit = w > 0 ? Math.floor((Math.floor(w / (fs * CW) + 0.01) - lab + 1) / cw) : n, vt = clamp(fit >= n ? n : fit - extra, 1, n);
   if (c.left == null) c.left = 0;
   const cx = c.x >= n ? n - 1 : c.x;
   if (cx < c.left) c.left = cx; if (cx > c.left + vt - 1) c.left = cx - vt + 1;
@@ -18434,7 +18439,7 @@ function projRows(){
     {l:'LPB', get:() => S.lpb, set:v => S.lpb = v, min:1, max:16, big:4, d:8, fmt:v => v + ' lines/beat · 1/' + (v * 4), info:() => 'Lines per beat: 4 makes each row a 16th, 8 a 32nd (new songs start at 8), 3 or 6 triplets. A phrase can set its own on its LEN line'},
     {l:'TICKS', get:() => S.ticks || TICKS, set:v => { S.ticks = v; if (tp.on && tp.seq) tp.seq.tks = v; }, min:1, max:32, big:4, d:TICKS, fmt:v => v + ' ticks a step', after:chainsTempo, info:() => 'How many ticks each step is cut into for DEL, RET, KIL, OFF, ARC, PSL and GRV (6 by default). A TIC command in a phrase changes it from that row on'},
     {l:'PATTERN LEN', get:() => S.dlen || 16, set:v => setDefLen(v), min:1, max:PROWS, big:4, d:16, fmt:v => v + (v === 1 ? ' row' : ' rows') + ' · new phrases', info:() => 'How many rows a new phrase starts with (empty phrases follow it too). Setting a phrase’s ROWS (at the right of the tab bar) or its LEN line changes this to match'},
-    {l:'› ALL PHRASES TO ' + (S.dlen || 16), dbl:true, act:() => { for (let i = 0; i < 256; i++) S.plen[i] = S.dlen || 16; saveS(); draw(); toast(`Every phrase now plays ${S.dlen || 16} rows. Notes past that are kept, just not played.`); },
+    {l:'› ALL PHRASES TO ' + (S.dlen || 16), dbl:true, act:() => { for (let i = 0; i < NPH; i++) S.plen[i] = S.dlen || 16; saveS(); draw(); toast(`Every phrase now plays ${S.dlen || 16} rows. Notes past that are kept, just not played.`); },
       info:() => `Sets every phrase, used or not, to ${S.dlen || 16} rows. Rows past the end keep their notes. Tap EDIT twice`},
     {l:'SWING', get:() => S.swing, set:v => S.swing = v, min:50, max:75, big:5, d:50, fmt:v => v + '%', info:() => 'MPC swing amount: 50% is straight; higher pushes the off-beat of each pair later. 66–67% is the triplet feel'},
     {l:'SCALE', opts:true, get:() => S.scale | 0, set:v => S.scale = v, min:0, max:SCALES.length - 1, d:0, fmt:v => SCALES[v][0],
@@ -18553,9 +18558,10 @@ function bump(d, big){
     if (k !== 'tsp' && v < 0 && tv === 'song' && !sectsOn) return newBlock(c, -1);
     if (k !== 'tsp' && v < 0) return insertAt(c.x, c.y, k);
     if (k === 'fxv' && getCell(tv, c.x - 1, c.y) < 0) return;
-    if (tv === 'song' && !sectsOn){ setSongPhrase(c.x, c.y, clamp(songShown(v) + d * (big ? 16 : 1), 0, 255)); return; }
+    if (tv === 'song' && !sectsOn){ setSongPhrase(c.x, c.y, clamp(songShown(v) + d * (big ? 16 : 1), 0, NPH - 1)); return; }
     switch (k){
-      case 'sect': case 'phrase': case 'vol': case 'fxv': v = clamp(v + d * (big ? 16 : 1), 0, 255); break;
+      case 'sect': case 'phrase': v = clamp(v + d * (big ? 16 : 1), 0, NPH - 1); break;
+      case 'vol': case 'fxv': v = clamp(v + d * (big ? 16 : 1), 0, 255); break;
       case 'tsp': v = clamp(v + d * (big ? 12 : 1), -128, 127); break;
       case 'note': v = v === OFF ? last.note : clamp(v + d * (big ? 12 : 1), 0, 119); break;
       // NI instruments (00–3F): the big step jumps 8 at a time (00–07 the drum pads, 08–0F the synths, and on).
@@ -18766,7 +18772,7 @@ function editDouble(wasEmpty){
     if (isS) S.chains[id] = fresh ? freshSect() : clone(S.chains[curV] || freshSect());
     else { S.phrases[id] = fresh ? freshPhrase() : clone(S.phrases[curV] || freshPhrase()); S.plen[id] = fresh ? (S.dlen || 16) : plen(curV); S.plpb[id] = fresh ? 0 : (S.plpb[curV] || 0); }
     setCell(tv, c.x, c.y, id); after(isS ? 'sect' : 'phrase', tv, c.x, c.y, id);
-    return toast((fresh ? 'New ' : 'Cloned to ') + (isS ? 'sect ' : 'phrase ') + hx(id));
+    return toast((fresh ? 'New ' : 'Cloned to ') + (isS ? 'sect ' : 'phrase ') + hp(id));
   }
   if (tv === 'phrase' && c.y >= 0 && PK[c.x] === 'note'){ setCell('phrase', c.x, c.y, OFF); return after('note', 'phrase', c.x, c.y, OFF); }
   if (tv === 'phrase' && c.y >= 0 && PK[c.x] === 'fxc') return fxpOpen(c.x, c.y);   // Enter twice on an effect: the picker
@@ -18818,7 +18824,7 @@ function newBlock(c, src){
   }
   setCell('song', c.x, c.y, cid); after('sect', 'song', c.x, c.y, cid);
   const ph = firstPhrase(cid);
-  return toast((src < 0 ? 'New phrase ' : 'Unique copy: phrase ') + hx(ph) + (ph !== cid ? ' (block ' + hx(cid) + ')' : '') + ' · SHIFT+▶ opens it');
+  return toast((src < 0 ? 'New phrase ' : 'Unique copy: phrase ') + hp(ph) + (ph !== cid ? ' (block ' + hp(cid) + ')' : '') + ' · SHIFT+▶ opens it');
 }
 // CLONE (Ctrl/⌘+Alt+C, the command row's CLN, Edit ▾, right-click) on the song (owner, 19 Oct: "Cmd+D then paste drops
 // the clone on the cell that was copied"): it COPIES the block under the cursor (or the selected blocks) as a unique
@@ -18874,7 +18880,7 @@ function pasteClone(){
   if (!want) return toast('Nothing to paste here.');
   if (made < want) return toast(`Pasted ${made} of ${want} clones: no free sects or phrases left.`);
   const ph = firstPhrase(last);
-  toast(made === 1 ? 'Unique copy: phrase ' + hx(ph) + (ph !== last ? ' (block ' + hx(last) + ')' : '') + ' · paste again for another' : `Pasted ${made} unique copies`);
+  toast(made === 1 ? 'Unique copy: phrase ' + hp(ph) + (ph !== last ? ' (block ' + hp(last) + ')' : '') + ' · paste again for another' : `Pasted ${made} unique copies`);
 }
 // Ctrl/⌘+D, Renoise's two (owner, 20 Oct). On the Song (and Arrange holding the keys, which runs as the Song) it is the
 // pattern sequencer's duplicate; on Phrase, Pattern, Sect, Mixer and FX the pattern editor's Duplicate Track. notes:
@@ -18951,7 +18957,7 @@ function cloneDown(){
   saveS(); draw();
   if (made < src.length) return toast(`Cloned ${made} of ${src.length}: no free sects or phrases left.`);
   const ph = firstPhrase(lastId);
-  return toast(made === 1 ? 'Cloned down: phrase ' + hx(ph) + (ph !== lastId ? ' (block ' + hx(lastId) + ')' : '') : `Cloned ${made} blocks down`);
+  return toast(made === 1 ? 'Cloned down: phrase ' + hp(ph) + (ph !== lastId ? ' (block ' + hp(lastId) + ')' : '') : `Cloned ${made} blocks down`);
 }
 // DELETE on the song (owner, 19 Oct): the block goes, and so does what it plays: its sect and phrase are emptied (their
 // numbers free again) unless another block on the song still plays them, so a shared phrase keeps playing for its other
@@ -18972,7 +18978,7 @@ function songDelete(cells, keep){
   selA = null;
   if (!n){ draw(); return toast('Nothing to delete here.'); }
   const undoK = keyHint('mod+Z') || 'Undo';
-  if (keep){ saveS(); draw(); return toast(n > 1 ? `Removed ${n} blocks from the song; their phrases are kept` : `Removed block ${hx([...gone.values()][0])} from the song; its phrase is kept`); }
+  if (keep){ saveS(); draw(); return toast(n > 1 ? `Removed ${n} blocks from the song; their phrases are kept` : `Removed block ${hp([...gone.values()][0])} from the song; its phrase is kept`); }
   const uses = new Map(); for (const r of S.song) for (const v of r) if (v >= 0) uses.set(v, (uses.get(v) || 0) + 1);
   const erased = [], kept = [];
   for (const [cid, shown] of gone){
@@ -18985,8 +18991,8 @@ function songDelete(cells, keep){
     }
   }
   saveS(); draw();
-  const kp = kept.length === 1 ? `phrase ${hx(kept[0][0])} is still on the song ${kept[0][1]} more time${kept[0][1] > 1 ? 's' : ''}, so it stays` : kept.length ? `${kept.length} phrases still on the song elsewhere stay` : '';
-  if (n === 1 && erased.length <= 1) return toast(erased.length ? `Deleted block ${hx([...gone.values()][0])} and its phrase · ${undoK} brings it back` : `Removed the block: ${kp}`);
+  const kp = kept.length === 1 ? `phrase ${hp(kept[0][0])} is still on the song ${kept[0][1]} more time${kept[0][1] > 1 ? 's' : ''}, so it stays` : kept.length ? `${kept.length} phrases still on the song elsewhere stay` : '';
+  if (n === 1 && erased.length <= 1) return toast(erased.length ? `Deleted block ${hp([...gone.values()][0])} and its phrase · ${undoK} brings it back` : `Removed the block: ${kp}`);
   toast(`Deleted ${n} block${n > 1 ? 's' : ''} and ${erased.length} phrase${erased.length === 1 ? '' : 's'}` + (kp ? ` (${kp})` : '') + ` · ${undoK} brings ${n > 1 ? 'them' : 'it'} back`);
 }
 function fxDelLast(t){
@@ -19244,7 +19250,7 @@ function copyHere(cut){
   if (row.every(q => q < 0) && kindAt(tv, x0) !== 'tsp') return toast('Nothing under the cursor to ' + (cut ? 'cut.' : 'copy.'));
   clip = {v:tv, x0, d:[row], line:false};
   if (cut) row.forEach((_, i) => setCell(tv, x0 + i, c.y, kindAt(tv, x0 + i) === 'tsp' ? 0 : -1));
-  const what = tv === 'song' ? 'block ' + hx(v) : tv === 'sect' ? 'sect row' : 'cell';
+  const what = tv === 'song' ? 'block ' + hp(v) : tv === 'sect' ? 'sect row' : 'cell';
   toast(`${cut ? 'Cut' : 'Copied'} ${what}. ${pasteKey()} pastes it.`); draw();
 }
 function paste(){
@@ -19295,7 +19301,7 @@ function move(dx, dy){
 function psetGet(x){ return x === 0 ? plen(cPhrase) : (S.plpb[cPhrase] || 0); }
 function setDefLen(v){
   const d = clamp(v, 1, PROWS); S.dlen = d;
-  for (let i = 0; i < 256; i++) if (isEmptyPhrase(S.phrases[i])) S.plen[i] = d;
+  for (let i = 0; i < NPH; i++) if (isEmptyPhrase(S.phrases[i])) S.plen[i] = d;
 }
 // ROWS at the right of the tab bar: how many rows the open phrase plays.
 // On the sect screen it's the phrase on the cursor's row; elsewhere the phrase last opened.
@@ -19328,7 +19334,7 @@ document.querySelectorAll('#tClk .tce').forEach(b => {
     if (last && now - last < 450){ last = null; clkEdit(b); } else last = now; });
 });
 function drawPat(){
-  const id = rowsId(); $('tRowsP').textContent = 'ROWS'; $('tRowsV').title = 'Rows in phrase ' + hx(id) + ' · tap to type a number'; $('tRowsN').textContent = plen(id);
+  const id = rowsId(); $('tRowsP').textContent = 'ROWS'; $('tRowsV').title = 'Rows in phrase ' + hp(id) + ' · tap to type a number'; $('tRowsN').textContent = plen(id);
   const live = tp.on, tk = live ? tp.tks : (S.ticks || TICKS);
   if (!$('tClk').querySelector('input')){ $('tClkB').textContent = live ? tp.bpm : S.bpm; $('tClkT').textContent = S.lpb || 4; }
   $('tClk').classList.toggle('live', live);
@@ -19441,11 +19447,11 @@ function nav(dir){
   if (tv === 'song' && !sectsOn){ cTrack = cs.song.x; const x = cs.song.x, y = cs.song.y, e = S.song[y][x] < 0; go('phrase'); if (!e) return null;
     // An empty block opens a fresh phrase (not the last one open, which belongs to another block: notes typed
     // there used to land somewhere else). It goes on the song in this block as soon as it has a note.
-    const fp = freePhrase(); if (fp < 0) return toast(`Empty block: showing phrase ${hx(cPhrase)}, the last one open (no free phrases left).`);
+    const fp = freePhrase(); if (fp < 0) return toast(`Empty block: showing phrase ${hp(cPhrase)}, the last one open (no free phrases left).`);
     cPhrase = fp; cs.phrase.y = 0; pendPlace = {x, y, p:fp}; draw();
-    return toast(`Empty block: new phrase ${hx(fp)}. It goes on the song at row ${rS(y, 3)} when you add a note.`); }
-  if (tv === 'song'){ if (S.song[cs.song.y][cs.song.x] < 0){ cTrack = cs.song.x; go('sect'); return toast(`Empty row: showing sect ${hx(cSect)}, the last one open.`); } return go('sect'); }
-  if (tv === 'sect'){ const r = sectRow(cSect, cs.sect.y); if (!r || r[0] < 0){ go('phrase'); return toast(`No phrase on that row: showing phrase ${hx(cPhrase)}, the last one open.`); } return go('phrase'); }
+    return toast(`Empty block: new phrase ${hp(fp)}. It goes on the song at row ${rS(y, 3)} when you add a note.`); }
+  if (tv === 'song'){ if (S.song[cs.song.y][cs.song.x] < 0){ cTrack = cs.song.x; go('sect'); return toast(`Empty row: showing sect ${hp(cSect)}, the last one open.`); } return go('sect'); }
+  if (tv === 'sect'){ const r = sectRow(cSect, cs.sect.y); if (!r || r[0] < 0){ go('phrase'); return toast(`No phrase on that row: showing phrase ${hp(cPhrase)}, the last one open.`); } return go('phrase'); }
   if (tv === 'phrase'){ const p = S.phrases[cPhrase], r = p && p[cs.phrase.y]; cInst = r && r[IC] >= 0 ? r[IC] : last.inst; tv = 'inst'; midV = 'inst'; instViaTrk = true; draw(); }
 }
 // PREV / NEXT on the song: the cursor jumps to the previous or next block (pattern) in its track.
@@ -19472,13 +19478,13 @@ function optDir(dir, grid){
   // to the nearest filled block that way (songGridDir). With PATTERN NAV off: ◀▶ previous/next block in the track,
   // ▲▼ 16 rows, as before.
   if (tv === 'song'){ if (grid && patNavOn) return songGridDir(dir); if (big) move(0, -d * 16); else songJump(d); return; }
-  if (tv === 'sect'){ cSect = clamp(cSect + d * (big ? 16 : 1), 0, 255); selA = null; return draw(); }
+  if (tv === 'sect'){ cSect = clamp(cSect + d * (big ? 16 : 1), 0, NPH - 1); selA = null; return draw(); }
   // The phrase editor: OPTION+▲▼ steps one pattern at a time (PATTERN NAV, on by default); with it off
   // they jump 16 patterns, as before. OPTION+◀▶ and KEYS-mode Ctrl/⌘+▲▼ always step one.
   // PAD mode's OPTION+arrows (grid): move on the Song grid to the nearest phrase above, below, left or right of
   // this one (phraseGrid). A phrase not placed in the song steps by number as before, so it can still be left.
   if (tv === 'phrase' && grid && patNavOn && phraseGrid(dir)) return;
-  if (tv === 'phrase'){ const step = big ? (patNavOn ? 1 : 16) : 1; cPhrase = clamp(cPhrase + d * step, 0, 255); selA = null; followPhraseBlock(); return draw(); }
+  if (tv === 'phrase'){ const step = big ? (patNavOn ? 1 : 16) : 1; cPhrase = clamp(cPhrase + d * step, 0, NPH - 1); selA = null; followPhraseBlock(); return draw(); }
   if (tv === 'inst'){ cInst = last.inst = clamp(cInst + d, 0, NI - 1); instPicked = true; return draw(); }
   if (tv === 'fx'){ const n = ntr(), i = cFxT >= NT ? n : cFxT, j = (i + d + n + 1) % (n + 1); cFxT = j >= n ? NT : j; return draw(); }
 }
@@ -19575,7 +19581,7 @@ function newPhraseRight(){
   else if (tv === 'phrase' && pvActive()) pvGo(t, y, 'first', null);   // PATTERN VIEW: the cursor goes to its first column
   else { cTrack = t; cSect = cid; cs.song.x = t; selA = null;
     if (tv === 'phrase'){ cPhrase = p; const c = cs.phrase; c.y = clamp(c.y, 0, plen(p) - 1); c.x = 0; } }
-  toast(`Phrase ${hx(p)} on track ${d2(t + 1)} · song row ${rS(y, 3)}`);
+  toast(`Phrase ${hp(p)} on track ${d2(t + 1)} · song row ${rS(y, 3)}`);
   draw();
 }
 function followPhraseBlock(){
@@ -20014,12 +20020,12 @@ function info(){
       : `${what} · arrows extend · OPTION copies · OPTION+EDIT cuts · SHIFT+OPTION cancels`;
   }
   if (tv === 'song' && c.x === MT){ const v = S.song[c.y][MT];
-    return `MASTER · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty · EDIT×2 new master phrase (its commands drive the master bus: VOL, FXO, FLX, GAT, RTG)' : `phrase ${hx(songShown(v))}` + (isEmptySect(S.chains[v]) ? ' · empty' : '') + ' · commands only, notes are not played'); }
+    return `MASTER · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty · EDIT×2 new master phrase (its commands drive the master bus: VOL, FXO, FLX, GAT, RTG)' : `phrase ${hp(songShown(v))}` + (isEmptySect(S.chains[v]) ? ' · empty' : '') + ' · commands only, notes are not played'); }
   if (tv === 'song'){ const v = S.song[c.y][c.x], mu = blockMuted(S, c.y, c.x) ? ' · MUTED' : '';
-    if (!sectsOn) return `${trkLab(c.x)}${trkKind(c.x)} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty · EDIT×2 new phrase' : isEmptySect(S.chains[v]) ? `block ${hx(v)} · no phrase yet (SHIFT+▶ makes one)` : `phrase ${hx(firstPhrase(v))}` + (isEmptyPhrase(S.phrases[firstPhrase(v)]) ? ' (empty)' : '') + (firstPhrase(v) !== v ? ` · block ${hx(v)}` : '')) + mu;
-    return `${trkLab(c.x)}${trkKind(c.x)} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty' : `sect ${hx(v)}` + (isEmptySect(S.chains[v]) ? ' (empty)' : '')) + mu; }
+    if (!sectsOn) return `${trkLab(c.x)}${trkKind(c.x)} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty · EDIT×2 new phrase' : isEmptySect(S.chains[v]) ? `block ${hp(v)} · no phrase yet (SHIFT+▶ makes one)` : `phrase ${hp(firstPhrase(v))}` + (isEmptyPhrase(S.phrases[firstPhrase(v)]) ? ' (empty)' : '') + (firstPhrase(v) !== v ? ` · block ${hp(v)}` : '')) + mu;
+    return `${trkLab(c.x)}${trkKind(c.x)} · ROW ${rS(c.y, 3)} · ` + (v < 0 ? 'empty' : `sect ${hp(v)}` + (isEmptySect(S.chains[v]) ? ' (empty)' : '')) + mu; }
   if (tv === 'sect'){ const r = sectRow(cSect, c.y) || [-1, 0];
-    return c.x === 0 ? (r[0] < 0 ? 'No phrase. The sect ends at the first empty row.' : `Phrase ${hx(r[0])}` + (isEmptyPhrase(S.phrases[r[0]]) ? ' (empty)' : '')) : `Transpose ${sgn(r[1])} semitones for this row`; }
+    return c.x === 0 ? (r[0] < 0 ? 'No phrase. The sect ends at the first empty row.' : `Phrase ${hp(r[0])}` + (isEmptyPhrase(S.phrases[r[0]]) ? ' (empty)' : '')) : `Transpose ${sgn(r[1])} semitones for this row`; }
   if (onPset()){ const len = plen(cPhrase), lpb = S.plpb[cPhrase] || 0, e2 = lpb || S.lpb;
     return c.x === 0 ? `Phrase length: plays ${len} row${len > 1 ? 's' : ''} (1–32), then the sect moves on`
       : `Lines per beat for this phrase: ${lpb || '-- (the song’s ' + S.lpb + ')'} · each row is a 1/${e2 * 4} note` + (e2 % 3 === 0 ? ' (triplet feel)' : ''); }
@@ -20205,27 +20211,27 @@ function draw(){
     sub = S.name;
     const VR = arrRows(); if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; c.top = clamp(c.top, 0, 256 - VR);
   } else if (tv === 'song'){
-    const [T0, T1] = trackWin(c, stepDec ? 4 : 3, 1), ts = trkSub(T0, T1); sub = ts ? ts + '  ' + S.name : S.name;
+    const [T0, T1] = trackWin(c, stepDec ? 4 : 3, 1, 4), ts = trkSub(T0, T1); sub = ts ? ts + '  ' + S.name : S.name;
     const VR = songRows(); if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; c.top = clamp(c.top, 0, 256 - VR);
-    const hd = [stepDec ? '    ' : '   ']; for (let t = T0; t < T1; t++) hd.push({t:d2(t + 1), cls:'th' + mc(t) + tk(t) + ' gt' + (tCol(t) ? ' tcl' : ''), x:t, y:-1, title:trkTip(t), st:tCol(t) ? '--tc:' + tCol(t) : ''}, ' ');
-    hd.push(' ', {t:'MS', cls:'th gx gt', x:MT, y:-1}); L.push(hd);   // the master column, in its own box after the poly tracks
+    const hd = [stepDec ? '    ' : '   ']; for (let t = T0; t < T1; t++) hd.push({t:' ' + d2(t + 1), cls:'th' + mc(t) + tk(t) + ' gt' + (tCol(t) ? ' tcl' : ''), x:t, y:-1, title:trkTip(t), st:tCol(t) ? '--tc:' + tCol(t) : ''}, ' ');
+    hd.push(' ', {t:' MS', cls:'th gx gt', x:MT, y:-1}); L.push(hd);   // the master column, in its own box after the poly tracks
     for (let y = c.top; y < c.top + VR; y++){
       const ln = [{t:rS(y, 3), cls:'rn' + (y % 4 ? '' : ' rn4') + rsel(y), r:y}, ' '];
       for (let t = T0; t < T1; t++){ const v = S.song[y][t], pl = PH && PH[t] === y;
-        ln.push({t:h2(songShown(v)), cls:cc(t, y, (v < 0 ? 'e' : 'v') + (pl ? ' pl' : '') + (v >= 0 && blockMuted(S, y, t) ? ' sm' : '')) + tk(t) + (y === c.top + VR - 1 ? ' gb' : ''), x:t, y}, ' '); }
+        ln.push({t:h3(songShown(v)), cls:cc(t, y, (v < 0 ? 'e' : 'v') + (pl ? ' pl' : '') + (v >= 0 && blockMuted(S, y, t) ? ' sm' : '')) + tk(t) + (y === c.top + VR - 1 ? ' gb' : ''), x:t, y}, ' '); }
       { const v = S.song[y][MT], pl = PH && PH[MT] === y;
-        ln.push(' ', {t:h2(songShown(v)), cls:cc(MT, y, (v < 0 ? 'e' : 'v') + (pl ? ' pl' : '')) + ' gx' + (y === c.top + VR - 1 ? ' gb' : ''), x:MT, y}); }
+        ln.push(' ', {t:h3(songShown(v)), cls:cc(MT, y, (v < 0 ? 'e' : 'v') + (pl ? ' pl' : '')) + ' gx' + (y === c.top + VR - 1 ? ' gb' : ''), x:MT, y}); }
       L.push(ln);
     }
   } else if (tv === 'sect'){
-    title = 'SECT ' + hx(cSect); sub = cTrack === MT ? 'MASTER' : 'TRACK ' + d2(cTrack + 1);
+    title = 'SECT ' + hp(cSect); sub = cTrack === MT ? 'MASTER' : 'TRACK ' + d2(cTrack + 1);
     const ch = S.chains[cSect], pr = playRows(p => tp.mode !== 'phrase' && p.sect === cSect ? p.cr : null); prLit = pr;
-    L.push([stepDec ? '   ' : '  ', {t:'PH', cls:'th'}, ' ', {t:'TP', cls:'th'}]);
+    L.push([stepDec ? '   ' : '  ', {t:'PH ', cls:'th'}, ' ', {t:'TP', cls:'th'}]);
     for (let y = 0; y < 16; y++){ const r = sectRow(cSect, y) || [-1, 0];
-      L.push([{t:stepDec ? d2(y) : hx(y, 1), cls:'rn' + (y % 4 ? '' : ' rn4') + rsel(y), r:y}, ' ', {t:h2(r[0]), cls:cc(0, y, r[0] < 0 ? 'e' : 'v'), x:0, y}, ' ', {t:hx(r[1]), cls:cc(1, y, r[1] ? 'v' : 'e'), x:1, y}]); }
+      L.push([{t:stepDec ? d2(y) : hx(y, 1), cls:'rn' + (y % 4 ? '' : ' rn4') + rsel(y), r:y}, ' ', {t:h3(r[0]), cls:cc(0, y, r[0] < 0 ? 'e' : 'v'), x:0, y}, ' ', {t:hx(r[1]), cls:cc(1, y, r[1] ? 'v' : 'e'), x:1, y}]); }
   } else if (tv === 'phrase' && pvActive()){ ({title, sub, pset, prLit} = pvLines(c, L, cc, rsel, playRows));   // PATTERN VIEW
   } else if (tv === 'phrase'){
-    title = 'PHRASE ' + hx(cPhrase); sub = cTrack === MT ? 'MASTER' : trkLab(cTrack) + ' ·' + trkKind(cTrack);
+    title = 'PHRASE ' + hp(cPhrase); sub = cTrack === MT ? 'MASTER' : trkLab(cTrack) + ' ·' + trkKind(cTrack);
     const poly = polyView(), mst = mstView(); if ((mst || busFxView()) && c.y >= 0 && c.x < FX0) c.x = FX0; else if (!poly && c.x >= 1 && c.x < NCOL) c.x = 0;
     const p = S.phrases[cPhrase], pr = playRows(q => q.phrase === cPhrase ? q.step : null), len = plen(cPhrase), lpb = S.plpb[cPhrase] || 0, el2 = lpb || S.lpb; prLit = pr;
     pset = [{t:'LEN ', cls:'lb'}, {t:d2(len), cls:cc(0, -2, 'v'), x:0, y:-2}, {t:' LPB ', cls:'lb'}, {t:lpb ? d2(lpb) : '--', cls:cc(1, -2, lpb ? 'v' : 'e'), x:1, y:-2},
@@ -20787,7 +20793,7 @@ function stagePreview(){
   const L = plen(pid), notes = []; let lo = 999, hi = -1, inst = -1;
   if (p) for (let y = 0; y < L && y < p.length; y++) for (let c = 0; c < NCOL; c++){ const n = p[y][c];
     if (n >= 0 && n < OFF){ notes.push([y, n, c]); lo = Math.min(lo, n); hi = Math.max(hi, n); if (inst < 0 && p[y][IC] >= 0) inst = p[y][IC]; } }
-  $('tStagePhT').textContent = `PHRASE ${hx(pid)} · ${L} ROWS` + (inst >= 0 ? ` · INST ${hx(inst)}` : '') + (notes.length ? '' : ' · EMPTY');
+  $('tStagePhT').textContent = `PHRASE ${hp(pid)} · ${L} ROWS` + (inst >= 0 ? ` · INST ${hx(inst)}` : '') + (notes.length ? '' : ' · EMPTY');
   const lpb = S.plpb && S.plpb[pid] ? S.plpb[pid] : (S.lpb || 4), rh = H / L;
   g.strokeStyle = X.dim; g.lineWidth = dpr;
   for (let y = 0; y <= L; y += lpb){ const yy = Math.round(y * rh) + .5; g.beginPath(); g.moveTo(0, yy); g.lineTo(W, yy); g.stroke(); }
@@ -21860,7 +21866,7 @@ function phlOpen(open = true){
 function phlDraw(){
   const use = songPhraseUse(), body = $('phlBody'); body.replaceChildren();
   let shown = 0, total = 0, out = 0;
-  for (let id = 0; id < 256; id++){
+  for (let id = 0; id < NPH; id++){
     const p = S.phrases[id]; if (isEmptyPhrase(p)) continue;
     const L = plen(id), notes = []; let lo = 999, hi = -1, cols = 0, inst = -1;
     for (let y = 0; y < L && y < p.length; y++) for (let c = 0; c < NCOL; c++){ const n = p[y][c];
@@ -21869,7 +21875,7 @@ function phlDraw(){
     if (phlF === 'out' && at) continue;
     shown++;
     const box = el('div', 'phli'), h = el('h4');
-    h.append('PH ' + hx(id) + ' ');
+    h.append('PH ' + hp(id) + ' ');
     h.append(el('small', null, `${L} rows · ${notes.length} note${notes.length === 1 ? '' : 's'}` + (cols > 1 ? ' · chords' : '') + (inst >= 0 ? ` · inst ${hx(inst)}` : '') +
       (at ? ` · on the song: ${at.slice(0, 3).map(([y, t]) => `row ${rS(y, 3)} tr ${d2(t + 1)}`).join(', ')}${at.length > 3 ? '…' : ''}` : ' · not on the song')));
     const bt = el('div', 'bt'), bo = el('button', null, 'Open'), bp = el('button', null, 'Place'); bo.type = bp.type = 'button';
@@ -21891,7 +21897,7 @@ function phlGo(id){
   phlOpen(false); if (view !== 'tracker') setView('tracker');
   if (tv !== 'phrase') go('phrase');
   cPhrase = id; cs.phrase.y = 0; selA = null; draw();
-  if (!songPhraseUse().has(id)) toast(`Phrase ${hx(id)} isn't on the song: File ▾ → Phrases… → Place puts it there.`);
+  if (!songPhraseUse().has(id)) toast(`Phrase ${hp(id)} isn't on the song: File ▾ → Phrases… → Place puts it there.`);
 }
 function phlPlace(id){
   const x = cs.song.x; let y = cs.song.y;
@@ -21899,7 +21905,7 @@ function phlPlace(id){
   if (y > 255) return toast('No empty row below the cursor in that track.');
   setSongPhrase(x, y, id); cs.song.y = y;
   phlOpen(false); if (view !== 'tracker') setView('tracker'); go('song');
-  toast(`Phrase ${hx(id)} placed: row ${rS(y, 3)}, track ${d2(x + 1)}${x >= polyFrom() ? ' (poly)' : ' (mono)'}.`);
+  toast(`Phrase ${hp(id)} placed: row ${rS(y, 3)}, track ${d2(x + 1)}${x >= polyFrom() ? ' (poly)' : ' (mono)'}.`);
 }
 $('phlX').addEventListener('click', () => phlOpen(false));
 document.querySelectorAll('#phl .phlf button').forEach(b => b.addEventListener('click', () => { phlF = b.dataset.f; phlDraw(); }));
@@ -21939,7 +21945,7 @@ function drawArr(PH){
       let cls = (t < PFg ? 'gm ' : 'gp ') + (BUS.has(t) ? 'bus ' : ''), lab = '', sty = '';
       if (v >= 0){
         const empty = isEmptySect(S.chains[v]), ph = firstPhrase(v);
-        cls += empty ? 'z' : 'f'; lab = sectsOn || ph < 0 ? hx(v) : hx(ph);
+        cls += empty ? 'z' : 'f'; lab = sectsOn || ph < 0 ? hp(v) : hp(ph);
         if (blockMuted(S, y, t)) cls = cls.replace(/[zf]$/, 'm');
         // Coloured by the instrument its phrase plays, with the phrase's notes as ticks when the blocks are big.
         if (!empty && ph >= 0){ const pi = phraseInfo(ph); if (pi.inst >= 0) sty = ` style="--ib:${instHue(pi.inst)};--ibp:${100 - (pi.inst % 5) * 17}%"`;
@@ -21949,7 +21955,7 @@ function drawArr(PH){
       h += `<b class="${cls.trim()}"${sty} data-y="${y}" data-t="${t}">${lab}</b>`;
     }
     if (mx){ const v = S.song[y][MT];   // the master column: commands only, never muted
-      h += `<span></span><b class="gx${v < 0 ? '' : isEmptySect(S.chains[v]) ? ' z' : ' f'}" data-y="${y}" data-t="${MT}">${v < 0 ? '' : hx(songShown(v))}</b>`; }
+      h += `<span></span><b class="gx${v < 0 ? '' : isEmptySect(S.chains[v]) ? ' z' : ' f'}" data-y="${y}" data-t="${MT}">${v < 0 ? '' : hp(songShown(v))}</b>`; }
     h += '</div>';
   }
   const PF = polyFrom();
@@ -22073,7 +22079,9 @@ function arrSize(){
   // As the Song screen the row height comes from the space the grid HAS (arrAvail), not the grid's own height: drawArr
   // snaps that height to whole rows, so reading it back here flipped 12 rows ↔ 13 rows on every redraw during playback.
   const cw = (W - 34) / (NA + mx + 0.3 + (G + mx) * 0.2) * z, rh = clamp(Math.round(cw * 0.8), 16, z > 1 ? (arrDeskZ() ? (ms ? 34 : 40) : 44) : ms ? clamp(Math.floor(arrAvail() / 12) - 3, 16, 30) : 40);   // as the Song screen: at least about 12 rows, as the text grid showed
-  arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', clamp(Math.round(rh * 0.5), 8, 16) + 'px');
+  // THREE DIGITS: the label also has to fit the block's width (three characters); too narrow for 7 px text, no label.
+  const lf = Math.min(clamp(Math.round(rh * 0.5), 8, 16), Math.floor(cwFit * z / 2));
+  arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', Math.max(7, lf) + 'px'); arrEl.classList.toggle('arnolab', lf < 7);
   // Where the MONO | POLY break sits when every track fits (track PF's column starts after a spacer every 8 tracks):
   // the header's ○ is centred over it, and stays there while zoomed so it is always in the same place.
   { const p = sm ? 6 : 8, rnw = RNW, g = sm ? 1 : 2, PF = polyFrom(), colL = t => p + rnw + g + t * (cwFit + g) + (ms ? (t >= PF ? 1 : 0) : Math.floor(t / 8)) * (SP + g);
@@ -22468,7 +22476,7 @@ function sxCtx(y, t){
   const filled = S.song[cs.song.y][cs.song.x] >= 0, ks = inMode === 'keys';
   const n = multi ? (() => { let k = 0; for (let yy = r.y0; yy <= r.y1; yy++) for (const tt of sxCols(r)) if (S.song[yy][tt] >= 0) k++; return k; })() : (filled ? 1 : 0);
   const title = multi ? `${n} BLOCK${n === 1 ? '' : 'S'} · ${sxCols(r).map(c => c === MT ? 'MST' : d2(c + 1)).filter((c, i, a) => i === 0 || i === a.length - 1).join('–')} · ${rS(r.y0, 3)}–${rS(r.y1, 3)}`
-    : `${t === MT ? 'MST' : 'TRACK ' + d2(t + 1)} · ROW ${rS(y, 3)}` + (filled ? ` · ${hx(songShown(S.song[y][t]))}` : '');
+    : `${t === MT ? 'MST' : 'TRACK ' + d2(t + 1)} · ROW ${rS(y, 3)}` + (filled ? ` · ${hp(songShown(S.song[y][t]))}` : '');
   const items = [
     {l:'Copy', k:ks ? 'Ctrl+C' : '', f:() => copyHere(false), off:!n},
     {l:'Cut', k:ks ? 'Ctrl+X' : '', f:() => copyHere(true), off:!n},
@@ -22627,7 +22635,7 @@ function stagePeek(){
   let uses = 0; for (let y = 0; y < 256; y++) for (let k = 0; k < ntr(); k++){ const b = S.song[y][k]; if (b >= 0 && firstPhrase(b) === pid) uses++; }
   let inst = -1; if (p) for (const r of p) if (r && r[IC] >= 0){ inst = r[IC]; break; }
   const lpb = S.plpb && S.plpb[pid] ? S.plpb[pid] : (S.lpb || 4);
-  let h = `<b class="sxpkt">PHRASE ${hx(pid)} <i>PEEK</i></b><span class="sxpki">${t === MT ? 'Master' : 'Track ' + d2(t + 1)}${inst >= 0 ? ' · inst ' + hx(inst) : ''} · ${L} rows · on the song ${uses}×</span><div class="sxpkr">`;
+  let h = `<b class="sxpkt">PHRASE ${hp(pid)} <i>PEEK</i></b><span class="sxpki">${t === MT ? 'Master' : 'Track ' + d2(t + 1)}${inst >= 0 ? ' · inst ' + hx(inst) : ''} · ${L} rows · on the song ${uses}×</span><div class="sxpkr">`;
   for (let y = 0; y < L; y++){
     const r = (p && p[y]) || [], n = r[0], more = r.slice(1, NCOL).filter(x => x >= 0).length, fc = r[FX0], fv = r[FX0 + 1];
     const cell = (s, on) => on ? s : `<i>${s}</i>`;
@@ -23369,7 +23377,7 @@ function patFit(){
 }
 try { new ResizeObserver(() => patFit()).observe(document.querySelector('.ttabbar')); } catch(e){ addEventListener('resize', patFit); }
 $('tRowsUp').addEventListener('click', () => setRows(plen(rowsId()) + 1));
-$('tRowsV').addEventListener('click', async () => { const id = rowsId(), n = await askText({title:`Rows in phrase ${hx(id)}`, body:`1 to ${PROWS}. The − and + beside it step by one. New phrases start at this size too.`}, plen(id), 4, 'Set'); if (n != null && Number.isFinite(+n) && n.trim() !== '') setRows(Math.round(+n)); });
+$('tRowsV').addEventListener('click', async () => { const id = rowsId(), n = await askText({title:`Rows in phrase ${hp(id)}`, body:`1 to ${PROWS}. The − and + beside it step by one. New phrases start at this size too.`}, plen(id), 4, 'Set'); if (n != null && Number.isFinite(+n) && n.trim() !== '') setRows(Math.round(+n)); });
 $('tClk').addEventListener('click', () => toast(`${tp.on ? tp.bpm : S.bpm} BPM, ${tp.on ? tp.tks : S.ticks || TICKS} ticks a step. Set them in Project (TEMPO, TICKS); TPO and TIC change them as the song plays.`));
 $('projIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadProjFile(f); });
 $('chainsIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importChainsFile(f); });
@@ -23408,20 +23416,21 @@ function typeNote(semi){
 function typeOff(){ const c = cs[tv]; if (tv !== 'phrase' || PK[c.x] !== 'note' || c.y < 0) return; if (busTrack(cTrack)) return busSay(); const x = c.x; setCell('phrase', x, c.y, OFF); const y = c.y; down1(); after('note', 'phrase', x, y, OFF); }
 function typeHex(d){
   const c = cs[tv], k = curKind(), now = performance.now(), key = tv + c.x + ':' + c.y + ':' + cSect + ':' + cPhrase + (tv === 'mixer' && c.y === 7 ? ':m' + (c.mx || 0) : '') + (tv === 'mixer' && mixFv() ? ':v' : '');   // (MASTER, MASTERING, OUT share x and y)
-  const fresh = hexBuf.key !== key || now - hexBuf.t > 1500 || hexBuf.n >= 2;
-  const v = fresh ? d : ((hexBuf.v << 4) | d) & 255;
+  const wide = GRIDV.has(tv) && !onPset() && (k === 'sect' || k === 'phrase'), nd = wide ? 3 : 2;   // THREE DIGITS: a sect or phrase number
+  const fresh = hexBuf.key !== key || now - hexBuf.t > 1500 || hexBuf.n >= nd;
+  const v = fresh ? d : ((hexBuf.v << 4) | d) & (wide ? 4095 : 255);
   hexBuf = {key, n:fresh ? 1 : hexBuf.n + 1, v, t:now};
   // Two digits finish an entry. An instrument number (00–0F) also finishes on a first digit that no second digit could
   // follow (1–F), so "3" and "03" both give 03; a first 0 waits for its second digit instead of moving on (typing "03"
   // used to write 00 here and 03 on the next row).
-  const done = hexBuf.n >= 2 || (k === 'inst' && hexBuf.n === 1 && v * 16 > NI - 1);
+  const done = hexBuf.n >= nd || (k === 'inst' && hexBuf.n === 1 && v * 16 > NI - 1);
   if (onPset()){ psetSet(c.x, v); if (done) hexBuf.key = ''; return; }
   if (GRIDV.has(tv)){
     if (k === 'note' || k === 'fxc') return;
     if (tv === 'phrase' && (k === 'vol' || k === 'inst') && busTrack(cTrack)) return busSay();   // BUS FX ONLY
     if (k === 'fxv' && getCell(tv, c.x - 1, c.y) < 0) return toast('Pick an effect in the column to the left first.');
     if (tv === 'song' && !sectsOn){
-      if (!done) return toast('Phrase ' + hx(v, 1) + '_');
+      if (!done) return toast('Phrase ' + hx(v, hexBuf.n) + '_'.repeat(nd - hexBuf.n));
       const y = c.y; setSongPhrase(c.x, y, v); down1(); hexBuf.key = ''; return;
     }
     const val = k === 'inst' ? clamp(v, 0, NI - 1) : k === 'tsp' ? (v > 127 ? v - 256 : v) : v;
@@ -23758,7 +23767,7 @@ apPinB.addEventListener('click', () => apPinToggle(apPinB));
 function apPinToggle(b){
   apPin = !apPin; if (b) b.blur();
   if (!apPin && apF){ apLastKey = ''; apFollow(); }
-  draw(); toast(apPin ? `Pinned: phrase ${hx(cPhrase)} stays up while you move around the song.` : 'Unpinned: the phrase follows the song cursor.');
+  draw(); toast(apPin ? `Pinned: phrase ${hp(cPhrase)} stays up while you move around the song.` : 'Unpinned: the phrase follows the song cursor.');
 }
 const apTagEl = el('span', 'aptag'); apTagEl.hidden = true;
 { const h = scr.querySelector('.thl'); if (h) h.append(apTagEl); }
@@ -23856,7 +23865,7 @@ function apStrip(want){
   const cols = `2.6em repeat(${PF},minmax(0,1fr)) 3px repeat(${NA - PF},minmax(0,1fr)) 3px minmax(0,1fr)`;
   const cell = (y, t) => {
     const v = S.song[y][t]; let cls = (t === MT ? 'gx' : t < PF ? 'gm' : 'gp') + (isBusT(t) ? ' bus' : ''), lab = '';
-    if (v >= 0){ const ph = firstPhrase(v); lab = t === MT ? hx(songShown(v)) : sectsOn || ph < 0 ? hx(v) : hx(ph);
+    if (v >= 0){ const ph = firstPhrase(v); lab = t === MT ? hp(songShown(v)) : sectsOn || ph < 0 ? hp(v) : hp(ph);
       cls += t !== MT && blockMuted(S, y, t) ? ' m' : ' f'; if (PH && PH[t] === y) cls += ' p'; }
     if (sr && y >= sr.y0 && y <= sr.y1 && t >= sr.x0 && t <= sr.x1) cls += ' sl';
     if (t === c.x && y === c.y) cls += ' c';
@@ -24001,6 +24010,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [293, '30 Oct', ['Sects and phrases are numbered 000–FFF now: 4,096 of each instead of 256, so Arrange’s unique copies don’t run out. Type three hex digits into a song or sect cell. Songs saved from now on need this version (or newer) to open with every block.']],
   [292, '30 Oct', ['Song / Arrange: the first Shift-click starts the selection on the cell you click (it reached from the cursor, which beside Phrase sits on the phrase you’re editing).']],
   [291, '30 Oct', ['Ctrl/⌘+D on the Song and Arrange counts Ctrl/⌘-clicked blocks: it duplicates every row from the first pick to the last (it took only the cursor’s row).']],
   [290, '30 Oct', ['Shift+Option+arrows move around the Song / Arrange from the Mixer too (▲▼ used to jump to the master row; that row is now ▼ past the VOL faders).', 'PAD mode with a computer keyboard: a selection grows only while Shift is held; a plain arrow lets it go, as in KEYS mode.']],
@@ -24443,7 +24453,7 @@ function pvBlock(cid){
 }
 // How many song blocks play each phrase (a shared phrase: an edit changes every copy).
 function pvUses(){
-  const n = new Array(256).fill(0);
+  const n = new Array(NPH).fill(0);
   for (const r of S.song) for (let t = 0; t <= MT; t++){ const cid = r[t]; if (cid < 0) continue; const ch = S.chains[cid]; if (!ch) continue;
     const seen = []; for (const q of ch){ const p = q[0]; if (p >= 0 && !seen.includes(p)){ seen.push(p); n[p]++; } } }
   return n;
@@ -24618,9 +24628,9 @@ function pvLines(c, L, cc, rsel, playRows){
   start(); lead();
   each(g => { if (g.fold) return put(pvFitS(g.t1 > g.t ? '–' + d2(g.t1 + 1) : '', stripW(g)), 'pvfh', to(g, null, null));
     const u = g.ph >= 0 ? uses[g.ph] : 0;
-    let s = g.cur && pend ? 'NEW PH ' + hx(g.ph) : g.ph < 0 ? (g.cid >= 0 ? 'BLOCK ' + hx(g.cid) : 'EMPTY') : 'PH ' + hx(g.ph) + (u > 1 ? ' ×' + u : '') + (g.cur && !onRow ? ' OFF SONG' : '');
+    let s = g.cur && pend ? 'NEW PH ' + hp(g.ph) : g.ph < 0 ? (g.cid >= 0 ? 'BLOCK ' + hp(g.cid) : 'EMPTY') : 'PH ' + hp(g.ph) + (u > 1 ? ' ×' + u : '') + (g.cur && !onRow ? ' OFF SONG' : '');
     if (g.inst >= 0 && s.length + 4 <= g.w) s = s.padEnd(g.w - 3) + 'I' + hx(g.inst);
-    put(pvFitS(s, g.w), 'pvh2' + pvTk(g.t) + (u > 1 ? ' pvsh' : '') + (g.cur ? ' pvhc' : ''), to(g, null, null), u > 1 ? {title:`Phrase ${hx(g.ph)} is on the song ${u} times: an edit changes every copy`} : null); });
+    put(pvFitS(s, g.w), 'pvh2' + pvTk(g.t) + (u > 1 ? ' pvsh' : '') + (g.cur ? ' pvhc' : ''), to(g, null, null), u > 1 ? {title:`Phrase ${hp(g.ph)} is on the song ${u} times: an edit changes every copy`} : null); });
   end();
   // A run of cells in the same colour is one span: a span costs ~20 µs of layout on every redraw, and one per cell made the
   // pattern three times slower than the phrase. A tap finds its column from where it lands in the run (pvMap entry
@@ -24695,7 +24705,7 @@ function pvScroll(){
 function pvInfo(){
   const base = info(); if (selA) return base;
   const c = cs.phrase, t = cTrack, u = (pvUsesLast || [])[cPhrase] || 0;
-  return (t === MT ? 'MASTER' : `${trkLab(t)}${trkKind(t)}`) + ` · PH ${hx(cPhrase)}` + (c.y >= 0 ? ` · ROW ${rS(c.y)}` : '') + ' · ' + base
+  return (t === MT ? 'MASTER' : `${trkLab(t)}${trkKind(t)}`) + ` · PH ${hp(cPhrase)}` + (c.y >= 0 ? ` · ROW ${rS(c.y)}` : '') + ' · ' + base
     + (pvPend() ? ' · a new phrase: it goes on the song at this row when it has a note' : u > 1 ? ` · this phrase is on the song ${u} times, so edits change every copy` : '');
 }
 const pvHint = () => inMode === 'keys'

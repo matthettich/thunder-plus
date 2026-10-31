@@ -79,6 +79,22 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (25): THREE DIGITS: sects and phrases 000–FFF (build 293)
+
+- Owner ran out of unique sects/phrases in Arrange (one 256 pool shared by every track). `NPH = 4096` (next to NT):
+  `S.chains`, `S.phrases`, `S.plen`, `S.plpb` are NPH long; the loader (`normSong`) reads up to NPH and clamps song
+  cells and sect-row phrases to NPH − 1; `freeSect` / `freePhrase` / `freePair` / `sectForPhrase` / break placement /
+  the Phrases list / `pvUses` / the ±16 steps and `cSect` / `cPhrase` clamps all use NPH. Song ROWS are still 256
+  (every remaining `256` is a row count).
+- Display: `hx(v, 3)` now masks 4095; `hp(v)` = 3-digit id, `h3(v)` = `---` for empty. The Song text grid shows 3 digits
+  (headers padded, `trackWin(c, lab, extra, cw)` takes 4 chars a column there), Sect's PH column, Arrange (main and side,
+  label font now also fits the block width: `--arf` ≤ width / 2, `.arnolab` hides labels below 7 px), the strip, Pattern
+  view headers, titles, status lines and toasts.
+- Typing: `typeHex` takes three digits for kinds `sect` (song cells) and `phrase` (sect column), mask 4095.
+- Compatibility: older builds (and Thunder Perform, if it slices to 256) drop blocks numbered above 0FF from a song saved
+  by 293+. Songs from older builds open unchanged.
+- Undo snapshots grew a little (plen/plpb 4096 long, ~2 ms per JSON at 220 blocks).
+
 ## 30 Oct (24): first Shift-click anchors on the clicked cell (build 292)
 
 - `sxEnd` Shift-click: with no selection, the anchor is now the clicked cell (it was `cs.song`, the cursor; beside Phrase
