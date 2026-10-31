@@ -1114,6 +1114,10 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tagrid b .atk{position:absolute; left:3px; right:3px; bottom:3px; height:3px; fill:currentColor; opacity:.85; pointer-events:none}
 .tagrid b{overflow:hidden}
 .tagrid b.z{background:transparent; box-shadow:inset 0 0 0 1px var(--ar-blk); color:var(--ar-blk)}
+/* EMPTY BLOCKS (owner, 31 Oct): sideways lines over a block whose phrases hold nothing, in the outline's colour, on every skin
+   (an overlay, as some skins colour every block's background themselves). Not on a playing or muted block. */
+.tagrid b.z:not(.p):not(.m)::after{content:''; position:absolute; inset:2px; border-radius:1px; pointer-events:none;
+  background:repeating-linear-gradient(180deg, color-mix(in srgb, var(--ar-blk) 50%, transparent) 0 1px, transparent 1px 3px)}
 .tagrid b.m{background:transparent; box-shadow:inset 0 0 0 1px var(--ar-dim); color:var(--ar-dim); text-decoration:line-through;
   background-image:repeating-linear-gradient(135deg, transparent 0 3px, var(--ar-empty) 3px 5px)}
 .tagrid b.p{background:var(--ar-pl); color:var(--ar-pl-ink); box-shadow:none}
@@ -15366,6 +15370,9 @@ function saveS(){ try { markChange(); } catch(e){}   // FILE SAFETY: unsaved cha
   if (pendPlace) queueMicrotask(placePending); try { niScan(); } catch(e){} snap(); clearTimeout(sT); sT = setTimeout(() => storeWrite(TK, JSON.stringify(songOut(S))), 600);
   try { songVer++; songBeatsSoon(); } catch(e){} }   // the song changed: MIDI song positions are worked out again (just after, with clock on)
 const isEmptySect = c => !c || c.every(r => r[0] < 0);
+// EMPTY BLOCKS (owner, 31 Oct): Arrange shows a block whose phrases hold nothing (no notes, no commands) striped, so the
+// blocks that actually play stand out from the empty placeholders.
+const sectHasData = v => { const c = S.chains[v]; return !!c && c.some(r => r[0] >= 0 && !isEmptyPhrase(S.phrases[r[0]])); };
 const isEmptyPhrase = p => !p || p.every(r => r.every(v => v < 0));
 const plen = id => id >= 0 && S.plen ? clamp(S.plen[id] || S.dlen || 16, 1, PROWS) : (S.dlen || 16);
 const plpbOf = (Sx, id) => (id >= 0 && Sx.plpb && Sx.plpb[id]) || Sx.lpb || 4;
@@ -18017,7 +18024,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 298;
+const BUILD = 299;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22082,7 +22089,7 @@ function drawArr(PH){
       const v = S.song[y][t];
       let cls = (t < PFg ? 'gm ' : 'gp ') + (BUS.has(t) ? 'bus ' : ''), lab = '', sty = '';
       if (v >= 0){
-        const empty = isEmptySect(S.chains[v]), ph = firstPhrase(v);
+        const empty = isEmptySect(S.chains[v]) || !sectHasData(v), ph = firstPhrase(v);   // EMPTY BLOCKS (31 Oct): a block whose phrases have nothing in them is striped
         cls += empty ? 'z' : 'f'; lab = sectsOn || ph < 0 ? hp(v) : hp(ph);
         if (blockMuted(S, y, t)) cls = cls.replace(/[zf]$/, 'm');
         // Coloured by the instrument its phrase plays, with the phrase's notes as ticks when the blocks are big.
@@ -24149,6 +24156,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [299, '31 Oct', ['Arrange: a block whose phrase is still empty (no notes, no commands) has sideways lines through it, so you can tell the blocks that play from the empty placeholders.']],
   [298, '31 Oct', ['FOLLOW: the screen still follows the playhead (the phrase playing, the rows paging along), but the cursor stays where you put it, so you can type and edit while the song plays. Moving the cursor brings it back into view.']],
   [297, '31 Oct', ['Bottom panel on a bus track: the FX part fills the space the instrument part leaves (there was a blank gap before the channel strip).']],
   [296, '31 Oct', ['…pump MASTER, GATE, TUNE and CHOP open their own windows (› OPEN on the FX screen, OPEN in the bottom panel). MASTER: the tone curve over the song, LEARN, the stages, ADVANCED trims and free bands. GATE: draw the steps and their levels. TUNE: Live, and Graph (capture the voice, then drag its notes). CHOP: play the eight pads, several at once on a touch screen, and LEARN their notes or keys.', 'Redo works again after an undo (it lost its history).']],

@@ -81,6 +81,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (5): EMPTY BLOCKS striped in Arrange (build 299)
+
+- Owner: tell empty blocks from ones that play. `drawArr` marks a block `z` when its sect has no phrase OR every phrase in
+  it is empty (`sectHasData`: any note or command). `z` blocks get horizontal lines as a `::after` overlay in `--ar-blk`
+  (the rainbow skins set every non-`f` block's background, so a background-image was lost there); not on playing or muted
+  blocks. Checked headless (rainbow skin): new empty blocks striped, a copy of a filled block solid.
+
 ## 31 Oct (4): EDIT WHILE FOLLOWING (build 298)
 
 - Owner: with FOLLOW on, the cursor rode the playhead, so you couldn't edit while it played. Now `followPlay` moves the
