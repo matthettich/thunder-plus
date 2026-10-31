@@ -79,6 +79,16 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (21): Mixer VOL fader from the keyboard (build 289)
+
+- Since GAIN STAGING split TRIM (row 0) from VOL (the `.mfbar` on each meter), VOL had no keyboard route. Now the
+  Mixer cursor has a sub-state `cs.mixer.fv` on row 6 (`mixFv()` = fv && y === 6): ▼ from SC sets it, ▼ again goes to
+  the master row, ▲ from the master row comes back to it, ▲ from it goes to SC. Kept as a flag rather than a new row so
+  every `c.y === 7` master check stays as it was.
+- On the fader: EDIT/Ctrl/⌘+◀▶ ±1, ▲▼ ±16 (the mixer value branch), hex typing (`typeHex`), Delete → E0 (TRK_UNITY),
+  Enter toasts the value, the status line shows VOL. The bar gets `.cur`; the SC cell isn't lit. Clicking a fader
+  selects it; any other grid click clears fv.
+
 ## 30 Oct (20): pad FX paging, stuck slider tip (build 288)
 
 - Pad / synth effect slots (`renderFx`) get ‹ › buttons either side of the name (`.fxpg`): they swap that slot for the

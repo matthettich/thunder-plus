@@ -759,7 +759,7 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
   .tarrh{width:32px; left:-16px}
 }
 .mfbar::before{content:''; position:absolute; left:0; right:0; top:-5px; bottom:-5px}   /* an easier grab than 3 px */
-.mfbar.mu{opacity:.45} .mfbar.on, .mfbar:hover{background:var(--ts-cur-bg, var(--ts-ink)); height:4px}   /* --chw: a character's advance in the grid (chwSet), letter-spacing included */
+.mfbar.mu{opacity:.45} .mfbar.cur{background:var(--ts-cur-bg, var(--ts-ink)); height:5px; box-shadow:0 0 0 1px var(--ts-bg), 0 0 0 3px var(--ts-cur-bg, var(--ts-ink))} .mfbar.on, .mfbar:hover{background:var(--ts-cur-bg, var(--ts-ink)); height:4px}   /* --chw: a character's advance in the grid (chwSet), letter-spacing included */
 /* GAIN STAGING (27 Oct): the master OUT bar stands across the L / R meter (its height is set inline) and drags sideways */
 .mfbar.mobar{width:3px; cursor:ew-resize} .mfbar.mobar.on, .mfbar.mobar:hover{width:4px}
 .mfbar.mobar::before{left:-6px; right:-6px; top:0; bottom:0}
@@ -17889,7 +17889,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 288;
+const BUILD = 289;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18571,6 +18571,7 @@ function bump(d, big){
     else if (c.y === 7) S.master = clamp(S.master + d * (big ? 16 : 1), 0, 255), rtRoute();
     else if (c.y === 4) return fxActiveStep(c.x, d > 0 ? 1 : -1);
     else if (c.y === 5){ setChainOn(c.x, d > 0); draw(); return; }
+    else if (mixFv()){ const m = S.mix[c.x]; m.vol = clamp(m.vol + d * (big ? 16 : 1), 0, 255); }   // VOL FADER
     else { const m = S.mix[c.x];
       if (c.y === 0) m.trim = clamp((m.trim == null ? TRIM_0 : m.trim) + d * (big ? 16 : 1), 0, 255);   // GAIN STAGING: the first row is TRIM
       else if (c.y === 1) m.pan = clamp(m.pan + d * (big ? 16 : 1), 0, 255);
@@ -18744,7 +18745,7 @@ function editTap(enter){
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
   }
-  if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 4) return go('fx'); if (c.y === 5){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (c.y === 6){ scSay(c.x); return; } /* SOURCE: the SC row only shows; Enter / EDIT says what listens to the track */ if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
+  if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 4) return go('fx'); if (c.y === 5){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (mixFv()){ toast(`Track ${d2(c.x + 1)} · VOL ${hx(S.mix[c.x].vol)} · ${dB(trackGain(S.mix[c.x].vol))} · EDIT+◀▶ ±1, ▲▼ ±16, Delete puts it back to E0 (0 dB)`); return; } if (c.y === 6){ scSay(c.x); return; } /* SOURCE: the SC row only shows; Enter / EDIT says what listens to the track */ if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
   const r = rowsOf(tv)[c.y]; if (!r) return;
   // ONE CONFIRM (27 Oct, Phase 2): a row that replaces something asks in the app's one dialog (it took a second EDIT, the
   // "Tap EDIT twice" note). A double EDIT still goes straight through (editDouble), as before.
@@ -19005,7 +19006,7 @@ function del(){
     if (tv === 'phrase' && k === 'note'){ const r = S.phrases[cPhrase] && S.phrases[cPhrase][c.y]; if (r && r.slice(0, NCOL).every(n => n < 0)) r[IC] = -1; }
     return draw();
   }
-  if (tv === 'mixer'){ if (c.y === 4) return fxDelLast(onMstCell() ? NT : c.x); if (c.y === 5){ setChainOn(c.x, false); return draw(); } if (c.y === 7 && c.mx === 1) return toast('Mastering: EDIT opens it · EDIT+◀ turns it off, EDIT+▶ on'); if (c.y === 7 && c.mx === 2){ S.mout = 255; moApply(); } else if (c.y === 7){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (c.y === 0) m.trim = f.trim; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; } mixChanged(); return draw(); }
+  if (tv === 'mixer'){ if (c.y === 4) return fxDelLast(onMstCell() ? NT : c.x); if (c.y === 5){ setChainOn(c.x, false); return draw(); } if (c.y === 7 && c.mx === 1) return toast('Mastering: EDIT opens it · EDIT+◀ turns it off, EDIT+▶ on'); if (c.y === 7 && c.mx === 2){ S.mout = 255; moApply(); } else if (c.y === 7){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (mixFv()) m.vol = TRK_UNITY; else if (c.y === 0) m.trim = f.trim; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; } mixChanged(); return draw(); }
   const r = rowsOf(tv)[c.y]; if (r && r.get && r.d != null){ r.set(r.d); if (r.after) r.after(); saveS(); draw(); }
 }
 // Whole rows: clear a row, insert a blank one (rows below move down), or remove one (rows below move up).
@@ -19274,6 +19275,14 @@ function move(dx, dy){
   if (tv === 'phrase' && dx && pvActive()) return pvMoveX(dx);   // PATTERN VIEW: past the track's first or last column, on to the next track
   if (tv === 'phrase' && dx){ const C = pCols(), i = Math.max(0, C.indexOf(c.x)); c.x = C[clamp(i + dx, 0, C.length - 1)]; }
   else if (tv === 'mixer' && c.y === 7 && dx){ c.mx = clamp((c.mx || 0) + dx, 0, 2); return draw(); }   // MASTER, MASTERING, OUT
+  // VOL FADER (owner, 30 Oct): ▼ from the SC row lands on the track's fader (the bar on its meter); ▼ again goes on to
+  // the master row, ▲ from there comes back to it, ▲ from the fader to SC. EDIT+arrows change it as any cell.
+  if (tv === 'mixer' && dy && !dx){
+    if (c.fv && c.y === 6){ c.fv = false; if (dy > 0){ c.y = 7; c.mx = 0; } return draw(); }
+    if (c.y === 6 && dy === 1){ c.fv = true; return draw(); }
+    if (c.y === 7 && dy === -1){ c.y = 6; c.fv = true; return draw(); }
+  }
+  if (tv === 'mixer' && dy) c.fv = false;
   else if (tv === 'song' && dx){ const ui = clamp((c.x === MT ? ntr() : c.x) + dx, 0, ntr()); c.x = ui === ntr() ? MT : ui; }   // the master column sits after the last track
   else if (!(tv === 'song' && c.x === MT)) c.x = clamp(c.x + dx, 0, d.w - 1);   // FOCUS TRACK (24 Oct): ▲▼ on the master column stay on it (they jumped to the last track)
   const wasY = c.y; c.y = clamp(c.y + dy, 0, d.h - 1);
@@ -19996,7 +20005,7 @@ const HINT = {
   phraseM:'Master phrase: commands only · EDIT add a command (VOL level, FXO effects on/off, FLX GAT RTG patterns) · EDIT+◀▶ ±1 ▲▼ ±more · OPT+EDIT clear',
   phrase:'EDIT add note · EDIT×2 note off · EDIT+◀▶ ±1 ▲▼ ±octave · OPT+EDIT clear · OPT+arrows go to phrase · SHIFT+▶ inst',
   inst:'EDIT+◀▶ ±1 ▲▼ ±more · EDIT on › runs it · OPT+◀▶ other instrument · SHIFT+◀ phrase',
-  mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · FX row: OPT+▲▶ FX on (up to 4), OPT+▼◀ off · EDIT mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (EDIT says for what) · OPT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
+  mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · ▼ from SC: the VOL fader · FX row: OPT+▲▶ FX on (up to 4), OPT+▼◀ off · EDIT mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (EDIT says for what) · OPT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
   fx:'EDIT adds · ▶ opens its controls · EDIT+◀▶ change · OPT+EDIT remove or reset · OPT+◀▶ other track · SHIFT+◀ mixer',
   project:'EDIT on › runs it · EDIT+◀▶ change · OPT+EDIT reset · SHIFT+▼ back',
 };
@@ -20044,6 +20053,7 @@ function info(){
         : ot && ot.length ? 'MISS: its Chain Out feeds ' + (ot.length > 1 ? 'tracks ' : 'track ') + ot.map(u => d2(u + 1)).join(', ') + ', whose CHN is off (switch that track on, or this one) · EDIT toggles'
         : flag ? 'MISS: the patch needs a Chain Out for this track, or a bus it can feed · EDIT toggles' : 'off · EDIT toggles');
     }
+    if (mixFv()){ const m = S.mix[c.x]; return `${trkLab(c.x)}${trkKind(c.x)} · VOL ${hx(m.vol)} · ${dB(trackGain(m.vol))} (the fader on its meter, after …chains and the FX) · EDIT+◀▶ ±1, EDIT+▲▼ ±16 · ▲ SC, ▼ master row`; }
     if (c.y === 6){ const U = sckUsesOf(c.x);
       return `${trkLab(c.x)}${trkKind(c.x)} · SIDECHAIN SOURCE ` + (U.length ? 'for ' + U.map(u => u.where).join(', ') : 'for nothing yet · pick this track as Source on a compressor, gate, envelope filter or Sidechain In'); }
     if (c.y === 4){ const A = S.tfx[c.x], n = fxCount(A);
@@ -20187,7 +20197,7 @@ function draw(){
   let title = VNAME[tv], sub = '', pset = null;
   const sr = selA ? selRect() : null;
   const rsel = y => sr && selA.line && y >= sr.y0 && y <= sr.y1 ? ' sel' : '';
-  const cc = (x, y, base) => base + (sr && x >= sr.x0 && x <= sr.x1 && y >= sr.y0 && y <= sr.y1 ? ' sel' : '') + (c.x === x && c.y === y ? ' cur' : '');
+  const cc = (x, y, base) => base + (sr && x >= sr.x0 && x <= sr.x1 && y >= sr.y0 && y <= sr.y1 ? ' sel' : '') + (c.x === x && c.y === y && !(tv === 'mixer' && mixFv()) ? ' cur' : '');
   const mc = t => (S.mix[t].mute ? ' mu' : '') + (S.mix[t].solo ? ' so' : '');
   const tk = t => t === MT ? ' gx' : (isPolyT(t) ? ' gp' : ' gm') + (isBusT(t) ? ' bus' : '');   // the track's group: pink mono, green poly; BUS darker
   const tkm = t => tk(t) + (t !== MT && isBusT(t) ? ' mbus' : '');   // the mixer's cells are bare text: a bus column gets a tint
@@ -20449,6 +20459,7 @@ try { document.fonts.addEventListener('loadingdone', () => { chwKey = ''; if (tv
 const volDb = v => { const g = trackGain(v); return g <= 0.00001 ? -999 : 20 * Math.log10(g); };
 const dbVol = d => d >= 0 ? clamp(Math.round(TRK_UNITY + d / 6 * (255 - TRK_UNITY)), TRK_UNITY, 255) : d <= -60 ? 0 : clamp(Math.round(TRK_UNITY * Math.pow(10, d / 40)), 0, TRK_UNITY);
 let mfDrag = null;
+const mixFv = () => !!cs.mixer.fv && cs.mixer.y === 6;   // the Mixer cursor is on a track's VOL fader (below SC)
 function mixFaders(){
   let host = grid.querySelector('.mfhost:not(.mohost)');
   if (tv !== 'mixer' || !meterEls.length || !mixN){ if (host) host.remove(); mixOutBar(); return; }
@@ -20461,7 +20472,7 @@ function mixFaders(){
     const y = d >= 0 ? top - Math.min(1, d / 6) * rowH * 0.5 : d <= -48 ? bot : top + (-d / 48) * (bot - top);   // the headroom: half a line above the top
     Object.assign(b.style, {left:(a.left + ox - 2).toFixed(1) + 'px', width:(a.width + 4).toFixed(1) + 'px', top:(y - 1.5).toFixed(1) + 'px'});
     b.dataset.t = t; b.dataset.top = top; b.dataset.bot = bot; b.title = 'Track ' + d2(t + 1) + ' · VOL ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)) + ' · the fader, after …chains and the FX (TRIM is above, before them) · drag to change, double-click for 0 dB';
-    b.classList.toggle('mu', !!S.mix[t].mute);
+    b.classList.toggle('mu', !!S.mix[t].mute); b.classList.toggle('cur', mixFv() && t === cs.mixer.x);
   }
   mixOutBar();
 }
@@ -20507,10 +20518,11 @@ const moDragEnd = e => { if (!moDrag || e.pointerId !== moDrag.id) return; moDra
 grid.addEventListener('pointerup', moDragEnd, true); grid.addEventListener('pointercancel', moDragEnd, true);
 
 grid.addEventListener('pointerdown', e => {
+  if (tv === 'mixer') cs.mixer.fv = false;   // a click elsewhere leaves the VOL fader cursor; a click on a fader takes it (below)
   const b = e.target.closest && e.target.closest('.mfbar:not(.mobar)'); if (!b || tv !== 'mixer') return;   // (the master OUT bar has its own)
   if (e.button !== 0) return;   // FIX (27 Oct, audit M17): a right or middle click no longer starts a fader drag (right-click: the menu)
   e.preventDefault(); e.stopPropagation();
-  const t = +b.dataset.t;
+  const t = +b.dataset.t; cs.mixer.x = t; cs.mixer.y = 6; cs.mixer.fv = true;
   mfDrag = {t, id:e.pointerId, y0:e.clientY, v0:S.mix[t].vol, top:+b.dataset.top, bot:+b.dataset.bot, oy:grid.scrollTop - grid.getBoundingClientRect().top - grid.clientTop};
   try { b.setPointerCapture(e.pointerId); } catch(err){}
   b.classList.add('on'); cs.mixer.x = t; if (cs.mixer.y === 7){ cs.mixer.y = 1; cs.mixer.mx = 0; }   // the track's column; the row stays (row 0 is TRIM now, not VOL), off the master row onto PAN
@@ -23397,7 +23409,7 @@ function typeNote(semi){
 }
 function typeOff(){ const c = cs[tv]; if (tv !== 'phrase' || PK[c.x] !== 'note' || c.y < 0) return; if (busTrack(cTrack)) return busSay(); const x = c.x; setCell('phrase', x, c.y, OFF); const y = c.y; down1(); after('note', 'phrase', x, y, OFF); }
 function typeHex(d){
-  const c = cs[tv], k = curKind(), now = performance.now(), key = tv + c.x + ':' + c.y + ':' + cSect + ':' + cPhrase + (tv === 'mixer' && c.y === 7 ? ':m' + (c.mx || 0) : '');   // (MASTER, MASTERING, OUT share x and y)
+  const c = cs[tv], k = curKind(), now = performance.now(), key = tv + c.x + ':' + c.y + ':' + cSect + ':' + cPhrase + (tv === 'mixer' && c.y === 7 ? ':m' + (c.mx || 0) : '') + (tv === 'mixer' && mixFv() ? ':v' : '');   // (MASTER, MASTERING, OUT share x and y)
   const fresh = hexBuf.key !== key || now - hexBuf.t > 1500 || hexBuf.n >= 2;
   const v = fresh ? d : ((hexBuf.v << 4) | d) & 255;
   hexBuf = {key, n:fresh ? 1 : hexBuf.n + 1, v, t:now};
@@ -23419,7 +23431,7 @@ function typeHex(d){
   }
   if (tv === 'mixer'){
     if (c.y === 7 && c.mx === 1) return;
-    if (c.y === 7 && c.mx === 2){ S.mout = v; moApply(); } else if (c.y === 7){ S.master = v; rtRoute(); } else if (c.y === 5){ setChainOn(c.x, !!v); return; } else if (c.y === 0) S.mix[c.x].trim = v; else if (c.y === 1) S.mix[c.x].pan = v; else return;   // GAIN STAGING: TRIM, OUT
+    if (c.y === 7 && c.mx === 2){ S.mout = v; moApply(); } else if (c.y === 7){ S.master = v; rtRoute(); } else if (c.y === 5){ setChainOn(c.x, !!v); return; } else if (mixFv()) S.mix[c.x].vol = v; else if (c.y === 0) S.mix[c.x].trim = v; else if (c.y === 1) S.mix[c.x].pan = v; else return;   // GAIN STAGING: TRIM, OUT; the VOL fader
     if (done) hexBuf.key = ''; mixChanged(); draw(); return;
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.get || r.tog) return;
@@ -23597,7 +23609,7 @@ const HINTK = {
   sect:'Type hex · Enter add or open · Enter×2 new phrase · Del cell · Shift+Del line · [ ] other sect · Alt+→ open · Shift+arrows select',
   phrase:'Notes Z–; and Q–P · 1 off · / mute track · −/= octave · Del cell · Shift+Del row · Ins add row · Shift+arrows select · Shift+Alt+arrows other phrase · Ctrl+C/V',
   inst:'Ctrl+arrows change · Enter runs › rows · [ ] other instrument · Alt+← phrase',
-  mixer:'Type hex for TRIM, PAN, MASTER and OUT · VOL is the bar on each meter · FX row: Ctrl+▲▶ on (up to 4), Ctrl+▼◀ off · Enter mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (Enter says for what) · Del resets · Alt+→ FX · Alt+↑ back',
+  mixer:'Type hex for TRIM, PAN, VOL, MASTER and OUT · VOL is the bar on each meter: ▼ from the SC row reaches it · FX row: Ctrl+▲▶ on (up to 4), Ctrl+▼◀ off · Enter mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (Enter says for what) · Del resets · Alt+→ FX · Alt+↑ back',
   fx:'Type hex · Ctrl+arrows change · Enter adds · → opens its controls · Del removes or resets · [ ] other track · Alt+← mixer',
   project:'Ctrl+arrows change · Enter runs › rows · Del resets · Ctrl+S save · Shift+Ctrl+S save as · Ctrl+O open · Ctrl+N new song',
 };
@@ -23991,6 +24003,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [289, '30 Oct', ['Mixer: ▼ from the SC row now lands on the track’s VOL fader (the bar on its meter), so the volume works from the keyboard again: Ctrl/⌘+◀▶ ±1, Ctrl/⌘+▲▼ ±16, Delete back to 0 dB. ▼ again goes on to the master row.']],
   [288, '30 Oct', ['Pad and synth effects have ‹ › arrows by their name: page that slot through every effect (← → work too once the name or an arrow has focus).', 'A slider’s value tip no longer gets stuck on the screen when the panel redraws mid-drag.']],
   [287, '30 Oct', ['Shift+Option+arrows in the phrase editor (with Arrange) move one cell at a time, into empty cells too: an empty cell opens a fresh phrase that goes on the song once it has a note. On the Song screen they still jump to the next block, and step into the empty cell when there is none.']],
   [286, '30 Oct', ['Copy and paste on the Song and Arrange take the master column along (it didn’t paste before).']],
