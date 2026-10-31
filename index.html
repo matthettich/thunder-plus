@@ -1260,7 +1260,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
    line either side. */
 .tscr{--tk-bus:#1f9bb0}
 :root[data-skinbase="term"] .tscr{--tk-bus:var(--mxbus, #1f9bb0)}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="espresso"]){--mxbus:#4fd8eb}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="espresso"]){--mxbus:#4fd8eb} :root[data-skin="matrixlight"]{--mxbus:#0a7f95}
 :root[data-skin="night"]{--mxbus:#ff7ab6} :root[data-skin="midnight"]{--mxbus:#ffc857}
 :root[data-skin="ocean"]{--mxbus:#7a4fc9} :root[data-skin="miami"]{--mxbus:#5b5be0} :root:is([data-skin="tomato"],[data-skin="desert"]){--mxbus:#2f6fd6}
 :root[data-skin="winter"]{--mxbus:#c0568f}
@@ -1507,7 +1507,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 @keyframes dkBreath{0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.025)}}
 @keyframes dkWag{0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-10deg)}}
 @media (prefers-reduced-motion: reduce){ .dogs .bob, .dogs .tail{animation:none!important} }
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .dogs{--dk-pink:var(--mxsoft)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"]) .dogs{--dk-pink:var(--mxsoft)}
 /* DRUM (the phrase stage's DANCE · DRUM · KEYS): the pittie behind a drum kit with sticks, the husky on bongos. The kit
    only shows in .drum; arms rest over their drums (CSS variables) and strike with dogsHit(); no hops or breathing. */
 .dogs .kit{display:none}
@@ -1578,6 +1578,11 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="matrix"]{--mx:#00ff41; --mx2:#00c834; --mxdim:#0a7a25; --mxbg:#000000; --mxpanel:#010d04; --mxpanel2:#03180a; --mxon:#000000;
   --mxsoft:#b6ffc9; --mxpoly:#9dffb5; --mxglowc:rgba(0,255,65,.55); --mxscan:rgba(0,255,65,.045); --mxred:#ff3b3b;
   --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:dark}
+:root[data-skin="matrixlight"]{--mx:#00702d; --mx2:#2f7d47; --mxdim:#a9cdb4; --mxbg:#ffffff; --mxpanel:#f4faf6; --mxpanel2:#e3f1e7; --mxon:#ffffff;
+  --mxsoft:#0b4d22; --mxpoly:#3f8a57; --mxglowc:rgba(0,112,45,.16); --mxscan:transparent; --mxred:#cc2a22;
+  --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+/* (owner, 31 Oct) the matrix skins drop the brand's dots, so the screen tabs end where the tracker tabs below do */
+:root:is([data-skin="matrix"],[data-skin="matrixlight"]) .brand .bdots{display:none}
 :root[data-skin="bwterm"]{--mx:#ffffff; --mx2:#bdbdbd; --mxdim:#5a5a5a; --mxbg:#000000; --mxpanel:#0a0a0a; --mxpanel2:#161616; --mxon:#000000;
   --mxsoft:#d6d6d6; --mxpoly:#9a9a9a; --mxglowc:transparent; --mxscan:transparent; --mxred:#ff4d4d;
   --font:"Helvetica Neue",Helvetica,Arial,"Nimbus Sans","Liberation Sans",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:dark}
@@ -1630,7 +1635,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="greywhite"]{--mxcur:#9a63ff; --mxcuron:#ffffff}
 :root[data-skin="bwlight"]{--mxcur:#2f6fe0; --mxcuron:#ffffff}
 :root[data-skin="bwterm"]{--mxcur:#3ad1ff; --mxcuron:#000000}
-:root[data-skin="matrix"]{--mxcur:#00e5ff; --mxcuron:#000000}
+:root[data-skin="matrix"]{--mxcur:#00e5ff; --mxcuron:#000000} :root[data-skin="matrixlight"]{--mxcur:#0062d6; --mxcuron:#ffffff}
 :root[data-skin="winter"]{--mxcur:#2f8fd8; --mxcuron:#ffffff}
 :root[data-skin="monotone"] .tscr{--ts-cur-bg:#2f6fe0; --ts-cur:#ffffff}
 :root[data-skinbase="term"]{
@@ -1657,10 +1662,10 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
    second panel tone, so the app's menus read as their own strip above the SONG / PHRASE… row, and the screen tabs are
    plain words with the open one underlined. Only the bar's own buttons change (the menus that open from it keep the skin's
    colours); a pressed button stays filled. Dark Simple skins, Pastel and Minimal are unchanged. */
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .top{background:var(--mxpanel2)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"]) .top{background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
 /* pads, command row and keypad: plain keys with outlines and an offset block; a hit fills */
 :root[data-skinbase="term"] :is(.tcmd,.dock,.tctl){background:var(--mxbg)}
 :root[data-skinbase="term"] :is(.tcmd button,.tkp .kp,.pads .pad){background:var(--mxbg); color:var(--mx); border-color:var(--mx);
@@ -1697,7 +1702,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="greywhite"]{--mxmst:#c9b7f2}
 :root[data-skin="contrast"]{--mxmst:#d6331f; --mxmston:#ffffff}
 :root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg))}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .tdeck{--stpink:var(--mx)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"]) .tdeck{--stpink:var(--mx)}
 :root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkChn,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkChn{--dkp:9%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
 :root[data-skinbase="term"] .dkh .dksolo{background:var(--mxsoft); color:var(--mxon)} :root[data-skinbase="term"] .stms button.so.on{background:var(--mxsoft); color:var(--mxon)}
 :root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
@@ -1705,7 +1710,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
    could go grey (plum: green into pink gave #d2d0d2). Light skins mix it with white so the hue stays; the dark skins
    (near-neutral backgrounds) keep mixing with theirs. */
 :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 35%, #ffffff)}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
 :root[data-skinbase="term"] .tagrid b.f[style]{background:color-mix(in srgb, var(--mx) var(--ibp, 100%), var(--mxsoft)); color:var(--mxon)} :root[data-skinbase="term"] .tagrid b.f{text-shadow:none; box-shadow:0 0 8px var(--mxglowc)}
 :root[data-skinbase="term"] .tscr .nbl, :root[data-skinbase="term"] .tscr .nbr{color:var(--mx2)}
 :root[data-skinbase="term"] ::selection{background:var(--mx); color:var(--mxon)}
@@ -1842,7 +1847,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 
 
 <div class="top">
-  <div class="brand" aria-label="...Thunder Plus">...Thunder<span class="plus" aria-hidden="true">+</span></div>
+  <div class="brand" aria-label="...Thunder Plus"><span class="bdots">...</span>Thunder<span class="plus" aria-hidden="true">+</span></div>
   <div class="seg" id="segView" role="group" aria-label="Screen"></div>
   <input id="kitName" class="kitname" type="text" aria-label="Kit name" spellcheck="false">
   <canvas id="hMeter" class="hmeter" role="img" aria-label="Master level" title="Master level, left over right (what you hear). A red end: it clipped (click to clear)"></canvas>
@@ -12246,6 +12251,7 @@ const SKINS = [
   {id:'mincolorblack', name:'Minimal colors black', base:'minimal', dots:['#0b0b0d', '#26262b', '#1f3550', '#4a2232']},
   {id:'neon', name:'Neon', dots:['#05050a', '#00f0ff', '#ff2bd6', '#a8ff3d']},
   {id:'matrix', name:'Matrix', base:'term', dots:['#000000', '#00ff41', '#0a7a25', '#b6ffc9']},
+  {id:'matrixlight', name:'Matrix light', base:'term', dots:['#ffffff', '#00702d', '#a9cdb4', '#0062d6']},
   {id:'bwterm', name:'Simple black', base:'term', dots:['#000000', '#ffffff', '#5a5a5a', '#9a9a9a']},
   {id:'bwlight', name:'Simple white', base:'term', dots:['#ffffff', '#000000', '#a6a6a6', '#6b6b6b']},
   {id:'mustard', name:'Simple mustard', base:'term', dots:['#e3d9f6', '#a37800', '#f2cf63', '#6f55bf']},
@@ -12288,6 +12294,21 @@ function rbWheel(){
   const t0 = performance.now();
   rbT = setInterval(() => { if (!document.hidden) de.style.setProperty('--rbo', ((performance.now() - t0) * 0.018 % 360).toFixed(1) + 'deg'); }, 100);
 }
+// MATRIX TABS (owner, 31 Oct): in the Matrix skins the screen tabs (Tracker … Chains) end where the tracker's tabs below
+// (… PROJECT) do: their buttons share out the difference. Other skins, or a gap too big to be the same row of tabs: as is.
+function alignTabs(){
+  const seg = $('segView'); if (!seg) return; const bs = [...seg.querySelectorAll('button')];
+  for (const b of bs) b.style.minWidth = '';
+  if (!/^matrix/.test(skin) || !bs.length) return;
+  const tabs = [...document.querySelectorAll('.ttabs button[data-v]')].filter(b => b.offsetParent), last = tabs[tabs.length - 1];
+  if (!last) return;
+  const d = last.getBoundingClientRect().right - bs[bs.length - 1].getBoundingClientRect().right;
+  if (d <= 0 || d > 240) return;
+  const add = d / bs.length; for (const b of bs) b.style.minWidth = (b.getBoundingClientRect().width + add) + 'px';
+}
+addEventListener('resize', () => requestAnimationFrame(alignTabs));
+try { new ResizeObserver(() => requestAnimationFrame(alignTabs)).observe(document.getElementById('tTabs')); } catch(e){}
+try { document.fonts.ready.then(() => alignTabs()); } catch(e){}
 function applySkin(id){
   const sk = SKINS.find(k => k.id === id) || SKINS[2]; skin = sk.id;
   const de = document.documentElement;
@@ -12300,6 +12321,7 @@ function applySkin(id){
   skinFrames();
   try { if (window.PumpFX && PumpFX.skinChanged) PumpFX.skinChanged(); } catch(e){}   // …pump windows follow the skin (SKIN THEME in pump/ui/kit.js)
   try { engFitDue = true; engFit(); } catch(e){}   // the engine button's width follows the skin's font
+  setTimeout(alignTabs, 60);
 }
 // …waves and …chains are their own pages (white, Minimal) in frames. The Matrix skin is carried into them
 // with a stylesheet added to each frame's page; other skins leave them as they are.
@@ -17131,8 +17153,6 @@ function padBlink(e){
    every MIDI port and channel All Sound Off, All Notes Off and the sustain pedal up (a stop only sent All Notes Off on the
    channels the song used). Effect tails ring on; Settings → Audio → Reset audio engine clears those too. */
 function stopKey(){ if (tp.on) return tStop(); panic(); }
-let stopTapT = 0;
-function toTop(){ tp.paused = null; cs.song.y = 0; cs.song.top = 0; try { draw(); } catch(e){} toast('Back to the top of the song.', 1500); }
 function panic(){
   try { if (rt && ctx) rt.pl.stopAll(ctx.currentTime); } catch(e){}
   try { moRelease(); } catch(e){}
@@ -17141,6 +17161,8 @@ function panic(){
     for (let ch = 0; ch < 16; ch++){ msend([0xB0 | ch, 64, 0], null, false, p); msend([0xB0 | ch, 120, 0], null, false, p); msend([0xB0 | ch, 123, 0], null, false, p); } } } catch(e){ tpLog('panic: MIDI out', e); }
   toast('Panic: every note let go' + (ports ? ' (and All Notes Off on ' + ports + ' MIDI port' + (ports > 1 ? 's' : '') + ')' : '') + '.', 3000);
 }
+let stopTapT = 0;
+function toTop(){ tp.paused = null; cs.song.y = 0; cs.song.top = 0; try { draw(); } catch(e){} toast('Back to the top of the song.', 1500); }
 function tStop(quiet){
   if (tp.timer) tp.timer.stop();
   // RESUME: where the song stopped (the positions last heard), the track it follows, and the cursor then
@@ -18171,7 +18193,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 312;
+const BUILD = 313;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24456,6 +24478,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [313, '31 Oct', ['New skin: Matrix light (Settings → Screen → Skin, under Neon & Matrix): the Matrix look on white, in a deep green that reads easily, with a blue cursor.', 'Matrix and Matrix light: the title drops its dots, and the screen tabs (Tracker … Chains) end where the tracker tabs below (… PROJECT) do.']],
   [312, '31 Oct', ['File ▾ → Load ELECTRO (demo project) opens the bundled ELECTRO song and kit on any device (the first-run song only comes in where no song was saved yet).', 'Touch: tapping STOP twice puts the song back to its top (the next PLAY starts from the beginning).', 'Settings (and the File and Edit menus) no longer run off the right edge of a phone or foldable screen.']],
   [311, '31 Oct', ['The first time Thunder Plus opens, it opens the ELECTRO song (with its kit) instead of the starter beat. File ▾ → Load demo song still loads the starter beat.', 'The song timer starts again each time the song goes round, instead of staying at 0:00.', 'TRACKS no longer changes the song: from 16 to 17 a new empty mono track comes in before the poly tracks, which keep their phrases, mixer, effects and …chains routing (17 to 18 adds an empty poly track). Fewer tracks keeps the dropped ones, and going back brings them back where they were.']],
   [310, '31 Oct', ['Poly tracks: a Voice (or …pump live) note takes over the note still holding in its own column instead of singing on top of it; notes side by side in different columns still sing together.', 'Voice engine: new Rough (rasp to growl), Choir (up to 8 singers) and Choir spread; the presets are now …pump SING’s 32 voices: singers from child to deep bass, opera, crooner, raspy rock, growl, whispers, ghost, choirs, aah pad, android, monster, fairy and more.']],
@@ -24623,7 +24646,7 @@ function setSheet(kind){
 }
 // Skin: every skin as a little tracker in its own colours, grouped. A tap puts it on the app at once (the app behind
 // the sheet is the preview); Done keeps it, "Back to …" returns to the skin you opened the sheet with.
-const SKIN_GROUPS = [['Pastel', ['auto', 'light']], ['Minimal', ['minimal', 'mincolor', 'monotone', 'minblack', 'mincolorblack']], ['Neon & Matrix', ['neon', 'matrix']], ['Rainbow', ['rainbow', 'rainbowdyn']]];
+const SKIN_GROUPS = [['Pastel', ['auto', 'light']], ['Minimal', ['minimal', 'mincolor', 'monotone', 'minblack', 'mincolorblack']], ['Neon & Matrix', ['neon', 'matrix', 'matrixlight']], ['Rainbow', ['rainbow', 'rainbowdyn']]];
 const hexLum = h => { const n = parseInt(h.slice(1), 16), c = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * c(n >> 16 & 255) + 0.7152 * c(n >> 8 & 255) + 0.0722 * c(n & 255); };
 const hexCon = (a, b) => { const x = hexLum(a), y = hexLum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
 function skinGroups(){
