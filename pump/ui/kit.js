@@ -28,7 +28,9 @@ const css = c => typeof c === 'string' ? c : `rgba(${Math.round(c[0])},${Math.ro
 // the suite's accents: neon (fills, curves), deep (the ink in light mode), second (second curves, side, selections)
 const ACCENTS = {eq:[0x4DF3FF, 0x00636D, 0xFF4FA0], comp:[0xFF74DC, 0x8E0F68, 0x19B5A5], limit:[0xC8FF4D, 0x3B5C00, 0x7A5CFF],
   calm:[0xB9A0FF, 0x4528B5, 0xFFAE3B], tone:[0x5CFFB4, 0x006E44, 0xFF6E4A], band:[0xFFB24F, 0x934000, 0x2F86FF],
-  wide:[0x73B4FF, 0x1443AC, 0xFF8A3D], heat:[0xFF8676, 0xA21F12, 0x2A9BC9], meter:[0xFFF04F, 0x625800, 0xB64DFF]};
+  wide:[0x73B4FF, 0x1443AC, 0xFF8A3D], heat:[0xFF8676, 0xA21F12, 0x2A9BC9], meter:[0xFFF04F, 0x625800, 0xB64DFF],
+  // (31 Oct) the windows of MASTER, GATE, TUNE and CHOP
+  master:[0xDCDCE3, 0x3B3B44, 0x9A63FF], gate:[0x5CCBFF, 0x00527A, 0xFF8F3D], tune:[0xFFAA85, 0x8A3210, 0x2E86E0], chop:[0xC6FF6B, 0x3E6100, 0xD45CFF]};
 function buildTheme(type, dark){
   const a = ACCENTS[type] || ACCENTS.eq, neon = hex(a[0]), deep = hex(a[1]), second = hex(a[2]), white = hex(0xFFFFFF), black = hex(0x07070B), t = {dark};
   if (!dark){
