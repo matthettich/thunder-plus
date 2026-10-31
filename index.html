@@ -18348,7 +18348,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 324;
+const BUILD = 325;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -19054,17 +19054,27 @@ function after(k, v, x, y, val){
 // the row's instrument always, plus the cell under the cursor (its note, volume, or effect with its value).
 // say: tell what is current even when nothing changed (Enter on a note). The instrument is always marked as chosen
 // (instPicked), even when it already was the current one: otherwise new notes kept taking the phrase's highest one.
+// ENTER COPIES TOO (owner, 31 Oct): a note or command Enter picks up (or Enter writes) is also put in the clipboard, so
+// Ctrl/⌘+V (PASTE) pastes it, as Copy on that cell would: a note with its instrument, a command with its value.
+function clipCellQuiet(x, y){
+  const p = S.phrases[cPhrase]; if (!p || !p[y]) return false; const r = p[y], k = PK[x];
+  if (k === 'note'){ if (!(r[x] >= 0)) return false; const row = new Array(IC - x + 1); row[0] = r[x]; row[IC - x] = r[IC]; clip = {v:'phrase', x0:x, d:[row], line:false}; return true; }
+  if (k === 'fxc' || k === 'fxv'){ const x0 = k === 'fxc' ? x : x - 1; if (!(r[x0] >= 0)) return false; clip = {v:'phrase', x0, d:[[r[x0], r[x0 + 1]]], line:false}; return true; }
+  return false;
+}
 function pickUp(x, y, say){
   const p = S.phrases[cPhrase]; if (!p || y < 0) return;
   const r = p[y], k = PK[x], got = [];
+  const clipped = say && tv === 'phrase' && clipCellQuiet(x, y);
   if (r[IC] >= 0 && (r[IC] !== last.inst || r[IC] !== cInst || !instPicked)){ last.inst = cInst = r[IC]; instPicked = true; const I = S.insts[r[IC]]; got.push(`instrument ${hx(r[IC])} (pad ${hx(I.pad)} ${(kit.voices[I.pad] || {}).name || ''})`.replace(' )', ')')); }
   if (k === 'note' && r[x] >= 0 && r[x] !== OFF && r[x] !== last.note){ last.note = r[x]; got.push('note ' + noteS(r[x])); }
   if (k === 'vol' && r[VC] >= 0 && r[VC] !== last.vol){ last.vol = r[VC]; got.push('volume ' + hx(r[VC])); }
   if (k === 'fxc' || k === 'fxv'){ const cx = k === 'fxc' ? x : x - 1, fc = r[cx], fv = Math.max(0, r[cx + 1]);
     if (fc >= 0 && FXC[fc] && (fc !== last.fxc || fv !== last.fxv)){ last.fxc = fc; last.fxv = fv; got.push(`effect ${FXC[fc]} ${hx(fv)}`); } }
   const fx = k === 'fxc' || k === 'fxv';
-  if (got.length){ toast('Now current: ' + got.join(' · ') + (say ? (fx ? ' · Enter on an empty effect cell adds it · Enter twice opens the list' : ' · Enter on an empty note adds it') : '')); draw(); }
-  else if (say) toast(fx ? `Already current: effect ${FXC[last.fxc]} ${hx(last.fxv)} · Enter twice opens the list` : `Already current: note ${noteS(last.note)} · instrument ${hx(last.inst)}`);
+  const cp = clipped ? ' · copied (' + pasteKey() + ' pastes it)' : '';
+  if (got.length){ toast('Now current: ' + got.join(' · ') + cp + (say ? (fx ? ' · Enter on an empty effect cell adds it · Enter twice opens the list' : ' · Enter on an empty note adds it') : '')); draw(); }
+  else if (say) toast((fx ? `Already current: effect ${FXC[last.fxc]} ${hx(last.fxv)}` : `Already current: note ${noteS(last.note)} · instrument ${hx(last.inst)}`) + cp + (fx ? ' · Enter twice opens the list' : ''));
 }
 const curS = () => `inst ${hx(last.inst)} · ${FXC[last.fxc]} ${hx(last.fxv)}`;
 // Hear a phrase row: the whole chord when the phrase is open from a polyphonic track.
@@ -19279,7 +19289,7 @@ function editTap(enter){
     if (tv === 'phrase' && k === 'fxc'){
       const okHere = last.fxc >= 0 && FXC[last.fxc] && (!mstView() || MST_FXC.includes(FXC[last.fxc]));
       if (enter && v >= 0){ pickUp(c.x, c.y, true); return; }
-      if (enter && okHere){ lastTap.empty = true; insertAt(c.x, c.y, k); return; }
+      if (enter && okHere){ lastTap.empty = true; insertAt(c.x, c.y, k); clipCellQuiet(c.x, c.y); return; }
       lastTap = {t:0, key:'', empty:false}; return fxpOpen(c.x, c.y);
     }
     if (tv === 'phrase') pickUp(c.x, c.y);
@@ -23881,6 +23891,9 @@ grid.addEventListener('dblclick', e => {
 let wAcc = 0, vAcc = 0;
 scr.addEventListener('wheel', e => {
   if (fxp.open || (e.ctrlKey && e.target.closest && e.target.closest('#tArr'))) return;   // Ctrl+wheel over Arrange zooms it
+  // ARRANGE WHEEL (owner, 31 Oct): over Arrange's blocks the wheel scrolls Arrange itself, smoothly, as dragging its
+  // scrollbar does (it moved the screen's cursor a row a notch)
+  if (e.target.closest && e.target.closest('#tArrGrid')) return;
   { const v = e.target.closest && e.target.closest('[data-x]'), x = v ? +v.dataset.x : 0, y = v ? +v.dataset.y : -1;   // VALUE MOUSE: the wheel over a value changes it
     // FX SLOTS (owner, 31 Oct: too easy to change an effect by accident): over a slot the wheel moves between the slots,
     // it never swaps the effect (EDIT, the effect list or EDIT+arrows still do)
@@ -24692,6 +24705,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [325, '31 Oct', ['Enter on a note or command in a phrase (picking it up as the current one, or writing the current command) also copies it, so Ctrl/⌘+V or SHIFT+EDIT pastes it: a note with its instrument, a command with its value.', 'The mouse wheel over Arrange scrolls Arrange smoothly, as dragging its scrollbar does.']],
   [324, '31 Oct', ['Settings → App → Clear unused phrases: empties every phrase and block that isn’t on the song, so their numbers are free for new ones. It says how many first, and Undo brings them back.', 'New skin: Opuntia (prickly pear), in Art & design: pad greens with the flowers’ neon magenta, the fruit’s deep magenta and the yellow and orange blooms on the keys.']],
   [323, '31 Oct', ['Eight new skins under Art & design (Settings → Screen → Skin): Haring, IDM, Line art, Lautrec poster, Vice (Miami night), Braun, TE and Koss retro. Each has its own accent colours, and PLAY and EDIT (and a few more keys in Haring and TE) take them on the touch deck.']],
   [322, '31 Oct', ['FOLLOW has a middle setting, PATTERN (Settings → Screen → FOLLOW: OFF / PATTERN / ON): while the song plays, the Phrase (and Sect) screen switches to what your track is playing, but nothing scrolls and the cursor stays where you put it.', 'Arrange keeps its place when you click a block: a block already on screen no longer jumps to the bottom; one off the edge comes in, to the middle of Arrange when it was far away.']],
