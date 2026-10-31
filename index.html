@@ -18255,7 +18255,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 321;
+const BUILD = 322;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18272,8 +18272,13 @@ function nbPhrase(t){
   return ch[k] && ch[k][0] >= 0 ? ch[k][0] : (ch.find(q => q[0] >= 0) || [-1])[0];
 }
 const FLK = 'thunderplus-follow-v1';
-let followOn = (() => { try { return localStorage.getItem(FLK) === '1'; } catch(e){ return false; } })();
-function setFollow(on){ followOn = on; try { localStorage.setItem(FLK, on ? '1' : '0'); } catch(e){} if (on) followPlay(); draw(); }
+// FOLLOW (owner, 31 Oct): OFF; PATTERN (between the two: the Phrase and Sect screens switch to what the cursor's track is
+// playing, but nothing scrolls with the playhead and the cursor stays put); ON (the screen follows the playhead too).
+// followMode 0 / 1 / 2; followOn: ON, the full follow (the paging checks read it). Stored '1' (ON, as before) or 'p'.
+let followMode = (() => { try { const v = localStorage.getItem(FLK); return v === '1' ? 2 : v === 'p' ? 1 : 0; } catch(e){ return 0; } })();
+let followOn = followMode === 2;
+function setFollow(m){ m = m === true ? 2 : m === false ? 0 : clamp(m | 0, 0, 2); followMode = m; followOn = m === 2;
+  try { localStorage.setItem(FLK, m === 2 ? '1' : m === 1 ? 'p' : '0'); } catch(e){} if (m) followPlay(); draw(); }
 /* RESUME (owner, 31 Oct): stopping the song leaves the playhead showing where it stopped (tp.paused), on every screen.
    PLAYBACK RESUMES FROM PAUSE (off by default since build 318, this device): PLAY then carries on from that spot, to the step, as long as
    the cursor hasn't moved since; move it and PLAY starts from the cursor as before. Off: PLAY starts from the cursor. */
@@ -18301,8 +18306,12 @@ function setKp(on){ kpOn = !!on; try { localStorage.setItem(KPOK, kpOn ? '1' : '
 // Song: the cursor's row follows its track. Sect and Phrase: they switch to what the cursor's track is
 // playing and the cursor rides along. Not while a selection is being made.
 function followPlay(){
-  if (!followOn || !tp.on || !tp.pos || selA || sdrag || drag) return;
+  if (!followMode || !tp.on || !tp.pos || selA || sdrag || drag) return;
   const P = tp.pos, own = P[tv === 'song' ? cs.song.x : cTrack] || (tp.loopV === 'bus' ? null : P.find(Boolean)); if (!own) return;   // BUS PLAY: an empty bus stays put
+  if (followMode === 1){   // FOLLOW PATTERN: only which phrase / sect is shown follows the cursor's track; nothing scrolls
+    if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0) cSect = own.sect; }
+    else if (tv === 'phrase'){ const mine = P[cTrack]; if (mine && mine.phrase >= 0 && mine.phrase !== cPhrase){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); } }
+    return; }
   // EDIT WHILE FOLLOWING (owner, 31 Oct): the screen follows the playhead (the song row, the sect, the phrase the cursor's
   // track plays, and the rows scroll a page when the playhead runs off them), but the cursor stays on its row, so you
   // can edit while it plays. c.pg: the rows were paged by the playhead (draw() then doesn't scroll back to the cursor;
@@ -18860,8 +18869,8 @@ function projRows(){
       info:() => 'Size of the text and lines on the tracker screen (the Mixer has its own size: MIXER SIZE). Bigger shows fewer rows (and scrolls sideways when a line no longer fits); drag a finger up or down anywhere on the screen to scroll'},
     {l:'MIXER SIZE', get:() => mixScale, set:v => setMixScale(v), min:60, max:200, step:10, big:20, d:mixScaleDef(), fmt:v => v + '%',
       info:() => 'Size of the Mixer only, separate from TEXT SIZE: 100 % fills the screen, which is already larger than the 80 % Desktop text size gave it. Above that it takes whatever room is left, never past the screen (all its rows stay visible); bigger shows fewer tracks at once, and the window follows the cursor (TRK nn–nn of 32 ◀▶)'},
-    {l:'FOLLOW', ck:'Follow playhead', get:() => followOn ? 1 : 0, set:v => setFollow(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
-      info:() => 'While the song plays, Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. The cursor stays on its row, so you can type and edit while it plays (moving it brings it back into view). Off leaves the screen where you put it'},
+    {l:'FOLLOW', segs:true, get:() => followMode, set:v => setFollow(v), min:0, max:2, d:0, fmt:v => ['OFF', 'PATTERN', 'ON'][v] || 'OFF',
+      info:() => 'While the song plays. ON: Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. PATTERN: Phrase (and Sect) switch to what the cursor’s track is playing, but nothing scrolls and the rows stay where you put them. OFF: the screen stays where you put it. The cursor stays on its row in every mode, so you can edit while it plays'},
     {l:'RESUME', ck:'Playback resumes from pause', get:() => resumeOn ? 1 : 0, set:v => setResume(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'ON: after you stop the song, PLAY carries on from where it stopped (the playhead stays there to show it), unless you have moved the cursor since. OFF: PLAY starts from the cursor, as before. Either way the stopped spot stays lit'},
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
@@ -20658,7 +20667,7 @@ function draw(){
   if (tv === 'song' && asongOn()){
     // Arrange is the Song screen: no text to build, just keep the cursor's row in Arrange's view (drawArr draws it).
     sub = S.name;
-    const VR = arrRows(); if (!(c.pg && followOn && tp.on)){ c.pg = false; if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; } c.top = clamp(c.top, 0, 256 - VR);
+    const VR = arrRows(); if (!(c.pg && followOn && tp.on)){ c.pg = false; arrKeepRow(c, VR); } c.top = clamp(c.top, 0, 256 - VR);
   } else if (tv === 'song'){
     const [T0, T1] = trackWin(c, stepDec ? 4 : 3, 1, 4), ts = trkSub(T0, T1); sub = ts ? ts + '  ' + S.name : S.name;
     const VR = songRows(); if (!(c.pg && followOn && tp.on)){ c.pg = false; if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; } c.top = clamp(c.top, 0, 256 - VR);   // (c.pg: EDIT WHILE FOLLOWING)
@@ -24221,8 +24230,20 @@ const apKey = () => { const r = S.song[cs.song.y]; return cs.song.x + ':' + cs.s
 function apTop(){
   const c = cs.song, VR = Math.max(2, arrRows()); c.top = c.top || 0;
   if (c.pg && followOn && tp.on) return;   // EDIT WHILE FOLLOWING: the playhead paged it
-  if (c.y < c.top) c.top = c.y; else if (c.y > c.top + VR - 1) c.top = c.y - VR + 1;
+  arrKeepRow(c, VR);
   c.top = clamp(c.top, 0, 256 - VR);
+}
+/* ARRANGE KEEPS ITS PLACE (owner, 31 Oct: a click on a block sometimes jumped it to the bottom of Arrange). The row Arrange
+   really shows first is read from the grid's scroll (the remembered top could lag behind it), so a block already on screen
+   never moves; a cursor one row off the edge scrolls one row; one further away lands in the middle of Arrange's own
+   window (not the bottom edge). */
+function arrKeepRow(c, VR){
+  try { const rh = arrRowH(); if (rh > 0 && arrGrid.offsetParent && arrIgnore < 0){ const real = clamp(Math.round(arrGrid.scrollTop / rh), 0, 255); if (real !== c.top) c.top = real; } } catch(e){}
+  const top = c.top || 0;
+  if (c.y >= top && c.y <= top + VR - 1) return;
+  if (c.y === top - 1) c.top = c.y;
+  else if (c.y === top + VR) c.top = c.y - VR + 1;
+  else c.top = Math.max(0, c.y - Math.floor((VR - 1) / 2));
 }
 // f: 'arr', 'strip' or null (the phrase has the keys). sync: start on the block that plays the phrase being edited
 // (SHIFT+◀, a tap on the strip); a tap in the panel puts the cursor where the finger is instead.
@@ -24578,6 +24599,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [322, '31 Oct', ['FOLLOW has a middle setting, PATTERN (Settings → Screen → FOLLOW: OFF / PATTERN / ON): while the song plays, the Phrase (and Sect) screen switches to what your track is playing, but nothing scrolls and the cursor stays where you put it.', 'Arrange keeps its place when you click a block: a block already on screen no longer jumps to the bottom; one off the edge comes in, to the middle of Arrange when it was far away.']],
   [321, '31 Oct', ['Arrange: right-click a block (or a selection) → Colour this block… / Colour these blocks…: one of the track colours, shown everywhere that block is used and kept in the song (None goes back to the instrument’s colour).', 'Arrange’s scrollbar is easier to drag: the grid no longer snaps back to whole rows under the mouse, and its length stays put while scrolling (the song plus 32 rows).']],
   [320, '31 Oct', ['A track added (or taken away) with TRACKS no longer plays through the effects of the track that used to have its number: the sound is re-routed with the tracks (a new track 9 had kept track 9’s delay, unseen).', 'Song and Arrange: Shift-click selects from the block you are on (the one already picked) to the block clicked, the first time; a second Shift-click is no longer needed.']],
   [319, '31 Oct', ['PHRASE works straight after SONG: on the Phrase screen, SONG hands the keys to Arrange beside it, and PHRASE now takes them back (it did nothing until another tab was clicked). SONG again still opens the Song screen.']],
@@ -24830,6 +24852,11 @@ function tsetRow(r){
     lb.append(cb, document.createTextNode(r.ck || tsetLabel(r.l))); row.append(lb, inf); return row;
   }
   const c = el('div', 'tsc');
+  if (r.segs){ // a few named choices side by side (FOLLOW: OFF / PATTERN / ON)
+    const sg = el('div', 'seg'), L = []; for (let v = r.min; v <= r.max; v++) L.push([v, r.fmt(v)]);
+    makeSeg(sg, L, () => r.get(), v => { tsetSet(r, v); refresh(); });
+    c.append(sg); row.append(lab(), c, inf); return row;
+  }
   if (r.tog){ // two named choices: PAD / KEYS, 44.1K / 48K…
     const sg = el('div', 'seg'); makeSeg(sg, [[0, r.fmt(0)], [1, r.fmt(1)]], () => r.get() ? 1 : 0, v => { tsetSet(r, v); refresh(); });
     c.append(sg); row.append(lab(), c, inf); return row;
