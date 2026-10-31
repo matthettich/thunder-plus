@@ -79,6 +79,16 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (22): Shift+Option from the Mixer, PAD-mode keyboard selections (build 290)
+
+- Mixer Shift+Alt+▲▼ now go to `shiftAltArrow` like every other non-Phrase screen; `mixMaster` / `mixBack` are gone
+  (the master row is reached with ▼ past the VOL fader, build 289).
+- PAD input mode with a computer keyboard: plain arrow keys clear `selA` when Shift isn't held and no OPTION / EDIT is held
+  or latched (the keydown path before `press(b, true)`), so a selection only grows while Shift is down. KEYS mode already
+  did this (SELECT RELEASE, 24 Oct). The on-screen pad buttons keep their one-finger selections.
+- Ctrl/⌘+D with a Song / Arrange selection already duplicates the selected rows (every track + master); checked headless.
+- Help: the Shift+Alt row describes the one-cell phrase stepping and the Mixer; the mixing help mentions the VOL fader keys.
+
 ## 30 Oct (21): Mixer VOL fader from the keyboard (build 289)
 
 - Since GAIN STAGING split TRIM (row 0) from VOL (the `.mfbar` on each meter), VOL had no keyboard route. Now the
