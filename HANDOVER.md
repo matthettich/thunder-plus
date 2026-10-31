@@ -79,6 +79,11 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (24): first Shift-click anchors on the clicked cell (build 292)
+
+- `sxEnd` Shift-click: with no selection, the anchor is now the clicked cell (it was `cs.song`, the cursor; beside Phrase
+  that's the edited phrase's block, so Shift-clicking rows 0 and 1 selected 0–3). The next Shift-click extends as before.
+
 ## 30 Oct (23): Ctrl/⌘+D with picked blocks (build 291)
 
 - Owner: "Cmd+D on a selection didn't work". Shift-click, Shift-drag and Shift+arrow selections all duplicated fine
