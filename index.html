@@ -16711,7 +16711,7 @@ const isLivePad = i => isSyn(i) && (isBassV(kit.voices[i]) || isVoxV(kit.voices[
 const liveX = v => !!(v && XENG[v.engine] && XENG[v.engine].live);
 // A bass voice was edited: the live nodes playing it hear the change at once.
 function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v), lx = liveX(v); if (!isBassV(v) && !vx && !lx) return; const kind = vx ? 'vox' : lx ? v.engine : 'bass', p = vx ? voxParams(v) : lx ? xParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && b.kind === kind) try { b.node.port.postMessage({set:p}); } catch(e){} }
-const MW_URL = 'master-worklet.js?v=4', mwLoad = new WeakMap();
+const MW_URL = 'master-worklet.js?v=5', mwLoad = new WeakMap();
 function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
 const mstNeedsWk = M => M.sup.on || M.comp.on || M.lim.on;
@@ -18024,7 +18024,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 299;
+const BUILD = 300;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -21279,10 +21279,15 @@ function mwRows(id, k, rows, togs){
 let mwEqDirty = true, mwCurve = null, mwDrag = null;
 const EQ_F = Array.from({length:240}, (_, i) => 20 * Math.pow(1000, i / 239));
 const EQ_NAMES = {lowcut:'Low cut', lowshelf:'Low shelf', bell:'Bell', highshelf:'High shelf', highcut:'High cut'};
+let mwBandCurves = [];
 function mwEqCurve(){
   // the combined response, from the same biquads the engine uses (in an idle offline context)
   const tot = new Float32Array(EQ_F.length), f = new Float32Array(EQ_F), mag = new Float32Array(EQ_F.length), ph = new Float32Array(EQ_F.length);
-  if (S.mst.eq.on) for (const n of eqBuild(mwP(), S.mst.eq)){ n.getFrequencyResponse(f, mag, ph); for (let i = 0; i < tot.length; i++) tot[i] += 20 * Math.log10(Math.max(1e-6, mag[i])); }
+  // (31 Oct) and each band's own, drawn faintly behind the total: a low shelf over the low cut summed into a bump
+  mwBandCurves = [];
+  if (S.mst.eq.on) for (const n of eqBuild(mwP(), S.mst.eq)){ n.getFrequencyResponse(f, mag, ph);
+    let own = mwBandCurves.find(o => o.b === n._b); if (!own){ own = {b:n._b, v:new Float32Array(EQ_F.length)}; mwBandCurves.push(own); }
+    for (let i = 0; i < tot.length; i++){ const d = 20 * Math.log10(Math.max(1e-6, mag[i])); tot[i] += d; own.v[i] += d; } }
   mwCurve = tot; mwEqDirty = false;
 }
 function mwGeo(c){ const r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
@@ -21308,6 +21313,10 @@ function mwEqDraw(){
   const c = $('mwEqC'), G = mwGeo(c), g = c.getContext('2d'), C = mwColors(); if (!G.W) return;
   if (mwEqDirty || !mwCurve) mwEqCurve();
   g.clearRect(0, 0, G.W, G.H); mwSpectrum(g, G, C, -10, -100); mwGrid(g, G, C, true);
+  // each band on its own (the selected one a little stronger), then the total
+  for (const o of mwBandCurves){ const sel = S.mst.eq.bands[mwBand] === o.b; g.strokeStyle = sel ? C.fill : C.muted; g.globalAlpha = sel ? .9 : .45; g.lineWidth = (sel ? 1.6 : 1) * G.dpr;
+    g.setLineDash(sel ? [] : [3 * G.dpr, 3 * G.dpr]); g.beginPath(); EQ_F.forEach((f, i) => { const x = G.x(f), y = G.y(clamp(o.v[i], -24, 24)); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); }
+  g.setLineDash([]); g.globalAlpha = 1;
   // the curve
   g.strokeStyle = C.ink; g.lineWidth = 2.2 * G.dpr; g.lineJoin = 'miter'; g.beginPath();
   EQ_F.forEach((f, i) => { const x = G.x(f), y = G.y(clamp(mwCurve[i], -24, 24)); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke();
@@ -21385,18 +21394,57 @@ function mwSupDraw(){
   c.addEventListener('pointermove', e => { if (!mwSupDrag || e.pointerId !== mwSupDrag.id) return; const G = mwGeo(c), M = S.mst.sup, f = Math.round(G.f((e.clientX - G.r.left) * G.dpr));
     if (mwSupDrag.k === 'lo') M.lo = clamp(f, 20, Math.min(2000, M.hi / 2)); else M.hi = clamp(f, Math.max(1000, M.lo * 2), 20000); mstChanged(); mwBuild(); });
   const end = e => { if (mwSupDrag && e.pointerId === mwSupDrag.id) mwSupDrag = null; }; c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end); }
-/* Compressor: its curve (in → out) and the gain reduction now */
+/* Compressor: its curve (in → out) and what it is doing now (owner, 31 Oct: "show the compression visually in the knee
+   display"). The detector's level (compIn: dB, after the sidechain high-pass) is a dot riding the curve, with a bar from the
+   straight line down to it: the reduction the threshold makes. Along the bottom the detector level against the threshold;
+   on the right the gain reduction meter with its peak hold; at the top the reduction now in big numbers, its recent peak,
+   and the threshold. A short history of the reduction runs under the curve. Ballistics: fast up, ~20 dB/s down. */
+const mwComp = {lv:-200, gr:0, grHold:0, holdT:0, hist:new Float32Array(150), hi:0};
 function mwCompDraw(){
-  const c = $('mwCompC'), G = mwGeo(c), g = c.getContext('2d'), C = mwColors(); if (!G.W) return; const M = S.mst.comp, P = 10 * G.dpr, sz = Math.min(G.W - 40 * G.dpr, G.H) - 2 * P;
-  g.clearRect(0, 0, G.W, G.H); const X = d => P + (d + 60) / 60 * sz, Y = d => P + sz - (d + 60) / 60 * sz;
-  g.strokeStyle = C.line; g.lineWidth = G.dpr; for (let d = -60; d <= 0; d += 12){ g.beginPath(); g.moveTo(X(d), Y(-60)); g.lineTo(X(d), Y(0)); g.moveTo(X(-60), Y(d)); g.lineTo(X(0), Y(d)); g.stroke(); }
-  g.setLineDash([4 * G.dpr, 4 * G.dpr]); g.strokeStyle = C.muted; g.beginPath(); g.moveTo(X(-60), Y(-60)); g.lineTo(X(0), Y(0)); g.stroke(); g.setLineDash([]);
+  const c = $('mwCompC'), G = mwGeo(c), g = c.getContext('2d'), C = mwColors(); if (!G.W) return; const M = S.mst.comp, d1 = G.dpr;
+  const m = mstMeter, live = !!(m && M.on && S.mst.on && (tp.on || performance.now() - audioWake < 1500)), K = mwComp;
+  // the readings, with ballistics (this runs ~30 times a second)
+  const lvNow = live && Number.isFinite(m.compIn) ? m.compIn : -200, grNow = live ? Math.min(0, m.comp || 0) : 0;
+  K.lv = lvNow > K.lv ? lvNow : Math.max(lvNow, K.lv - 0.7); K.gr = grNow < K.gr ? grNow : Math.min(0, K.gr + 0.6);
+  if (K.gr <= K.grHold){ K.grHold = K.gr; K.holdT = 60; } else if (--K.holdT <= 0) K.grHold = Math.min(0, K.grHold + 0.3);
+  K.hist[K.hi] = K.gr; K.hi = (K.hi + 1) % K.hist.length;
+  const P = 10 * d1, top = 34 * d1, meterW = 14 * d1, inBar = 10 * d1, histH = 26 * d1;
+  const sz = Math.max(60 * d1, Math.min(G.W - meterW - 30 * d1 - P, G.H - top - inBar - histH - 22 * d1));
+  const X = d => P + (d + 60) / 60 * sz, Y = d => top + sz - (d + 60) / 60 * sz;
+  g.clearRect(0, 0, G.W, G.H);
+  g.strokeStyle = C.line; g.lineWidth = d1; for (let d = -60; d <= 0; d += 12){ g.beginPath(); g.moveTo(X(d), Y(-60)); g.lineTo(X(d), Y(0)); g.moveTo(X(-60), Y(d)); g.lineTo(X(0), Y(d)); g.stroke(); }
+  g.fillStyle = C.muted; g.font = `${9 * d1}px ${C.font}`; for (const d of [-48, -24, 0]) g.fillText(String(d), X(d) - 8 * d1, Y(-60) + 11 * d1);
+  g.setLineDash([4 * d1, 4 * d1]); g.strokeStyle = C.muted; g.beginPath(); g.moveTo(X(-60), Y(-60)); g.lineTo(X(0), Y(0)); g.stroke();
+  // the threshold, as a line up the graph
+  const tx = X(clamp(M.thr, -60, 0)); g.beginPath(); g.moveTo(tx, Y(0)); g.lineTo(tx, Y(-60)); g.stroke(); g.setLineDash([]);
   const cv = x => { const s = 1 - 1 / M.ratio, o = x - M.thr; if (M.knee > 0 && Math.abs(o) <= M.knee / 2) return -s * (o + M.knee / 2) ** 2 / (2 * M.knee); return o > 0 ? -s * o : 0; };
   const mk = M.automk ? -cv(0) * 0.5 + M.makeup : M.makeup;
-  g.strokeStyle = C.ink; g.lineWidth = 2.2 * G.dpr; g.beginPath(); for (let d = -60; d <= 0; d += .5){ const y = clamp(d + cv(d) + mk, -60, 6); d === -60 ? g.moveTo(X(d), Y(y)) : g.lineTo(X(d), Y(y)); } g.stroke();
-  const gr = mstMeter && M.on && S.mst.on ? mstMeter.comp : 0, bx = G.W - 26 * G.dpr, bh = sz;
-  g.strokeStyle = C.ink; g.lineWidth = G.dpr; g.strokeRect(bx + .5, P + .5, 14 * G.dpr, bh); g.fillStyle = C.fill; g.fillRect(bx + 1, P + 1, 14 * G.dpr - 1, clamp(-gr / 20, 0, 1) * bh);
-  g.fillStyle = C.muted; g.font = `${10 * G.dpr}px ${C.font}`; g.fillText('GR', bx - 2 * G.dpr, P + bh + 12 * G.dpr);
+  // the area the compressor takes off, between the straight line and the curve (no makeup), above the threshold
+  g.fillStyle = C.fill; g.globalAlpha = .28; g.beginPath(); g.moveTo(X(-60), Y(-60));
+  for (let d = -60; d <= 0; d += .5) g.lineTo(X(d), Y(clamp(d + cv(d), -60, 0))); for (let d = 0; d >= -60; d -= .5) g.lineTo(X(d), Y(d)); g.closePath(); g.fill(); g.globalAlpha = 1;
+  g.strokeStyle = C.ink; g.lineWidth = 2.2 * d1; g.beginPath(); for (let d = -60; d <= 0; d += .5){ const y = clamp(d + cv(d) + mk, -60, 6); d === -60 ? g.moveTo(X(d), Y(y)) : g.lineTo(X(d), Y(y)); } g.stroke();
+  // the signal now: where the detector sits, and the reduction there
+  if (K.lv > -60){ const x = clamp(K.lv, -60, 0), y0 = Y(x), y1 = Y(clamp(x + cv(x), -60, 0)), y2 = Y(clamp(x + cv(x) + mk, -60, 6));
+    g.strokeStyle = C.clip; g.lineWidth = 3 * d1; g.beginPath(); g.moveTo(X(x), y0); g.lineTo(X(x), y1); g.stroke();
+    g.fillStyle = C.clip; g.beginPath(); g.arc(X(x), y2, 4.5 * d1, 0, 2 * Math.PI); g.fill(); }
+  // the detector level along the bottom, against the threshold
+  const by = Y(-60) + 16 * d1; g.strokeStyle = C.line; g.lineWidth = d1; g.strokeRect(X(-60) + .5, by + .5, sz, inBar);
+  if (K.lv > -60){ g.fillStyle = K.lv > M.thr ? C.clip : C.fill; g.fillRect(X(-60) + 1, by + 1, X(clamp(K.lv, -60, 0)) - X(-60), inBar - 1); }
+  g.fillStyle = C.ink; g.fillRect(tx - d1, by - 2 * d1, 2 * d1, inBar + 4 * d1);
+  // the reduction over the last few seconds
+  const hy = by + inBar + 6 * d1, n = K.hist.length, w = sz / n; g.strokeStyle = C.line; g.strokeRect(X(-60) + .5, hy + .5, sz, histH);
+  g.fillStyle = C.fill; for (let i = 0; i < n; i++){ const v = K.hist[(K.hi + i) % n]; if (v < -0.05) g.fillRect(X(-60) + i * w, hy + 1, Math.ceil(w), clamp(-v / 12, 0, 1) * (histH - 1)); }
+  g.fillStyle = C.muted; g.fillText('GR, last 5 s (to −12 dB)', X(-60) + 4 * d1, hy + histH - 4 * d1);
+  // the GR meter with its peak hold
+  const bx = X(0) + 16 * d1, bh = sz;
+  g.strokeStyle = C.ink; g.lineWidth = d1; g.strokeRect(bx + .5, top + .5, meterW, bh); g.fillStyle = C.fill; g.fillRect(bx + 1, top + 1, meterW - 1, clamp(-K.gr / 20, 0, 1) * bh);
+  if (K.grHold < -0.05){ const hy2 = top + clamp(-K.grHold / 20, 0, 1) * bh; g.fillStyle = C.clip; g.fillRect(bx + 1, hy2 - d1, meterW - 1, 2 * d1); }
+  g.fillStyle = C.muted; for (const d of [0, 5, 10, 15, 20]) g.fillText(String(d), bx + meterW + 3 * d1, top + d / 20 * bh + 4 * d1);
+  g.fillText('GR', bx, top + bh + 12 * d1);
+  // the numbers
+  g.fillStyle = C.ink; g.font = `bold ${20 * d1}px ${C.font}`; g.fillText((K.gr < -0.05 ? K.gr.toFixed(1) : '0.0') + ' dB', P, 22 * d1);
+  g.font = `${10 * d1}px ${C.font}`; g.fillStyle = C.muted;
+  g.fillText(live ? `peak ${K.grHold < -0.05 ? K.grHold.toFixed(1) : '0.0'} · in ${K.lv > -60 ? K.lv.toFixed(1) : '—'} dB · thr ${M.thr.toFixed(1)}` : (M.on && S.mst.on ? 'play to see it work' : 'compressor off'), P + 112 * d1, 21 * d1);
 }
 /* Limiter: its gain reduction over the last few seconds */
 const mwLimHist = new Float32Array(240); let mwLimI = 0;
@@ -24156,6 +24204,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [300, '31 Oct', ['Mastering → COMPRESS shows what it is doing: the gain reduction now in big numbers (and its recent peak), a dot riding the curve at the signal’s level with a red bar for the reduction there, the level against the threshold along the bottom, and the last few seconds of reduction.', 'Mastering → EQ draws each band’s own curve faintly behind the total, so a low shelf looks like a shelf even with the low cut under it.']],
   [299, '31 Oct', ['Arrange: a block whose phrase is still empty (no notes, no commands) has sideways lines through it, so you can tell the blocks that play from the empty placeholders.']],
   [298, '31 Oct', ['FOLLOW: the screen still follows the playhead (the phrase playing, the rows paging along), but the cursor stays where you put it, so you can type and edit while the song plays. Moving the cursor brings it back into view.']],
   [297, '31 Oct', ['Bottom panel on a bus track: the FX part fills the space the instrument part leaves (there was a blank gap before the channel strip).']],

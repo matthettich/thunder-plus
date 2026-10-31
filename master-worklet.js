@@ -167,7 +167,7 @@ class Suppressor {
 /* ── Compressor ── */
 class Compressor {
   constructor(sr){
-    this.sr = sr; this.gr = 0; this.load = 0;
+    this.sr = sr; this.gr = 0; this.load = 0; this.detMax = -200;   // detMax: the detector's loudest level (dB) since the meters last read it
     this.p = {thr:-14, ratio:2, atk:10, rel:150, auto:true, knee:6, makeup:0, automk:true, mix:1, hpf:80};
     this.hp = [{x1:0, x2:0, y1:0, y2:0}, {x1:0, x2:0, y1:0, y2:0}]; this.setHpf();
   }
@@ -192,6 +192,7 @@ class Compressor {
       const l = L[i], r = R[i];
       const dl = this.hpOn ? this.hpOne(this.hp[0], l) : l, dr = this.hpOn ? this.hpOne(this.hp[1], r) : r;
       const lv = linToDb(Math.max(Math.abs(dl), Math.abs(dr)));
+      if (lv > this.detMax) this.detMax = lv;
       const target = this.curve(lv);   // ≤ 0
       if (target < this.gr) this.gr = target + (this.gr - target) * ca;
       else {
@@ -331,8 +332,8 @@ class MasterProcessor extends AudioWorkletProcessor {
       if (++this.n >= Math.round(sampleRate / 128 / 20)){
         this.n = 0;
         this.port.postMessage({meter:{inPk:this.inPk, outPk:this.outPk, tp:this.tpMax, inLu:this.inLu.shortTerm(), outLu:this.outLu.shortTerm(),
-          load:this.load || 0, comp:this.compGr, lim:this.on.lim ? linToDb(this.lim.grMin) : 0, sup:this.on.sup ? this.sup.bands(48) : null}});
-        this.inPk = 0; this.outPk = 0; this.compGr = 0; this.lim.grMin = 1;
+          load:this.load || 0, comp:this.compGr, compIn:this.on.comp ? this.comp.detMax : -200, lim:this.on.lim ? linToDb(this.lim.grMin) : 0, sup:this.on.sup ? this.sup.bands(48) : null}});
+        this.inPk = 0; this.outPk = 0; this.compGr = 0; this.lim.grMin = 1; this.comp.detMax = -200;
       }
     }
     return true;

@@ -81,6 +81,17 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (6): Mastering window: compressor feedback, EQ band curves (build 300)
+
+- Owner: hard to dial the mastering compressor in without seeing it work. `master-worklet.js` (v5) now reports the
+  detector's loudest level per meter period (`compIn`, dB, after the SC high-pass). `mwCompDraw` shows the GR now (big),
+  its peak hold, a dot on the curve at the detector level with a red bar for the reduction there, the reduction area
+  shaded, a threshold line, the detector level vs the threshold along the bottom, and 5 s of GR history. Ballistics in `mwComp`.
+- Owner: "the low shelf doesn't seem to be a low shelf". It is (WebAudio lowshelf: +9 dB set → +9.0 at 20 Hz, +4.5 at
+  110 Hz, flat by 400 Hz); the default 28 Hz low cut under it made the total look like a bump. `mwEqCurve` keeps each
+  band's own response (`mwBandCurves`) and `mwEqDraw` draws them faintly (the selected band in colour). Note: WebAudio
+  shelves ignore Q, so a shelf's slope is fixed (a Q for shelves would need our own biquads).
+
 ## 31 Oct (5): EMPTY BLOCKS striped in Arrange (build 299)
 
 - Owner: tell empty blocks from ones that play. `drawArr` marks a block `z` when its sect has no phrase OR every phrase in
