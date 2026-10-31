@@ -79,6 +79,17 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (20): pad FX paging, stuck slider tip (build 288)
+
+- Pad / synth effect slots (`renderFx`) get ‹ › buttons either side of the name (`.fxpg`): they swap that slot for the
+  previous / next effect in the + Add effect menu's order (`fxOrder()`), fresh defaults, On state kept. The name is
+  focusable; ← → on it or on the arrows page too.
+- The ONE SLIDER drag's `end` now also listens on the window (capture) and for `lostpointercapture`: a slider redrawn
+  mid-drag never got its pointerup, leaving the value tip ("0%") stuck. `sliderTip` hides for a detached slider, and on
+  window blur.
+- Owner asked whether Shift+Option+arrows could drive Arrange from the Mixer / FX screens: they already do (the key
+  routing sends every screen but Phrase to `shiftAltArrow`), except Mixer ▲▼, which is the master-row jump (`mixMaster`).
+
 ## 30 Oct (19): Shift+Option+arrows into empty cells (build 287)
 
 - `phraseGrid` (phrase editor, PATTERN NAV on, the Arrange panel) now steps one song cell per press, empty cells included,

@@ -11142,6 +11142,7 @@ $('fxAdd').addEventListener('change', e => {
 });
 const tailRow = makeRow({l:'Tail', min:0, max:8, c:'half', d:2, f:v => v.toFixed(1) + ' s'}, 'tail', V, {idp:'fx', noTrack:true, on:() => changed()});
 $('fxTail').append(tailRow.r);
+const fxOrder = () => [...$('fxAdd').querySelectorAll('option')].map(o => o.value).filter(Boolean);
 function renderFx(){
   const v = V(), list = $('fxList'); v.fx = v.fx || []; list.innerHTML = ''; vuEls = [];
   $('fxTitle').textContent = 'Effects · ' + (isSyn(cur) ? 'Synth ' : 'Pad ') + hx(cur);
@@ -11149,8 +11150,17 @@ function renderFx(){
   v.fx.forEach((f, idx) => {
     const d = FX[f.type]; if (!d) return;
     const slot = el('div', 'fxslot' + (f.on ? '' : ' off')), head = el('div', 'fxhead');
-    head.append(el('span', 'n', d.name), el('span', 'cr', FX_CREDIT[f.type]), el('div', 'sp'));
     const mk = (label, fn, aria) => { const b = el('button', 'sm', label); b.type = 'button'; if (aria) b.setAttribute('aria-label', aria); b.addEventListener('click', fn); head.append(b); return b; };
+    // ‹ › page this slot through the effects, in the + Add effect menu's order (the new one starts at its defaults)
+    const pg = (dir, kb) => { const ks = fxOrder(), i = ks.indexOf(f.type), t = ks[(i + dir + ks.length) % ks.length];
+      const nf = freshFx(t); nf.on = f.on; v.fx[idx] = nf; if (!fxReady(nf)) toast(plFailed ? 'Effects couldn’t load in this view. They work in the installed app.' : 'Effects are still loading.');
+      renderFx(); changed(); const b = $('fxList').children[idx]; const q = b && b.querySelector(kb ? '.fxhead .n' : dir < 0 ? '.fxpg.l' : '.fxpg.r'); if (q) q.focus({preventScroll:true}); };
+    const pl = mk('', () => pg(-1), 'Previous effect'), nm = el('span', 'n', d.name), pr = mk('', () => pg(1), 'Next effect');
+    pl.innerHTML = ico('left'); pr.innerHTML = ico('right'); pl.className = 'sm fxpg l'; pr.className = 'sm fxpg r';
+    pl.title = 'Previous effect (←)'; pr.title = 'Next effect (→)';
+    head.append(nm, pr, el('span', 'cr', FX_CREDIT[f.type]), el('div', 'sp'));
+    nm.tabIndex = 0; nm.title = 'Focus here, then ← → page through the effects';
+    for (const b of [pl, nm, pr]) b.addEventListener('keydown', e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){ e.preventDefault(); e.stopPropagation(); pg(e.key === 'ArrowLeft' ? -1 : 1, b === nm); } });
     const onB = mk(f.on ? 'On' : 'Off', () => { f.on = !f.on; renderFx(); changed(); }); onB.classList.toggle('on', f.on);
     const up = mk('', () => { v.fx.splice(idx - 1, 0, v.fx.splice(idx, 1)[0]); renderFx(); changed(); }, 'Move up'); up.disabled = idx === 0;
     const dn = mk('', () => { v.fx.splice(idx + 1, 0, v.fx.splice(idx, 1)[0]); renderFx(); changed(); }, 'Move down'); dn.disabled = idx === v.fx.length - 1;
@@ -12348,6 +12358,7 @@ document.addEventListener('wheel', e => {
    The wheel takes the slider under the pointer once it has rested on it (below). To go back: this block. */
 let sldTip = null;
 function sliderTip(r, on){
+  if (on && !r.isConnected) on = false;
   if (!on){ if (sldTip) sldTip.hidden = true; return; }
   if (!sldTip){ sldTip = el('div', 'sldtip'); sldTip.setAttribute('aria-hidden', 'true'); document.body.append(sldTip); }
   const row = r.closest('.row'), o = r._out || (row && row.querySelector('output'));
@@ -12355,6 +12366,7 @@ function sliderTip(r, on){
   const b = r.getBoundingClientRect(), mn = r.min === '' ? 0 : +r.min, mx = r.max === '' ? 100 : +r.max, f = mx > mn ? (+r.value - mn) / (mx - mn) : 0;
   sldTip.hidden = false; sldTip.style.left = Math.round(b.left + f * b.width) + 'px'; sldTip.style.top = Math.round(b.top) + 'px';
 }
+addEventListener('blur', () => sliderTip(null, false));
 const sldReset = r => { if (typeof r._reset === 'function') r._reset(); else r.dispatchEvent(new MouseEvent('dblclick', {bubbles:true})); };
 // On a touch screen the sliders take no touches themselves (CSS, pointer:coarse), or the browser would jump them to the
 // finger before any script runs: the slider under the finger is found here, in the row it sits in.
@@ -12381,8 +12393,11 @@ document.addEventListener('pointerdown', e => {
     if (!live){ const dx = ev.clientX - x0, dy = ev.clientY - y0; if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)){ end(ev); return; } if (Math.abs(dx) < 6) return; live = true; lastX = ev.clientX; r.focus({preventScroll:true}); }
     v = clamp(v + (ev.clientX - lastX) / w * (mx - mn) * (ev.shiftKey ? 0.1 : 1), mn, mx); lastX = ev.clientX;
     sliderSet(r, v); sliderTip(r, true); };
-  const end = ev => { if (ev.pointerId !== id) return; sliderTip(r, false); try { r.releasePointerCapture(id); } catch(_){} r.removeEventListener('pointermove', mv); r.removeEventListener('pointerup', end); r.removeEventListener('pointercancel', end); };
-  r.addEventListener('pointermove', mv); r.addEventListener('pointerup', end); r.addEventListener('pointercancel', end);
+  // The drag ends wherever the button comes up: the slider can be redrawn mid-drag (its panel rebuilt), and the old one
+  // never hears its pointerup, which left the value tip stuck on the screen. So the window listens too.
+  const end = ev => { if (ev.pointerId !== id) return; sliderTip(r, false); try { r.releasePointerCapture(id); } catch(_){} r.removeEventListener('pointermove', mv); r.removeEventListener('pointerup', end); r.removeEventListener('pointercancel', end); r.removeEventListener('lostpointercapture', end); removeEventListener('pointerup', end, true); removeEventListener('pointercancel', end, true); };
+  r.addEventListener('pointermove', mv); r.addEventListener('pointerup', end); r.addEventListener('pointercancel', end); r.addEventListener('lostpointercapture', end);
+  addEventListener('pointerup', end, true); addEventListener('pointercancel', end, true);
 }, true);
 /* ===== FILE DROP (21 Oct): drop files on the window =====
    An audio file on a pad loads into that pad (anywhere else: the selected pad); a .thunder / .json project opens (asking
@@ -17874,7 +17889,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 287;
+const BUILD = 288;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23976,6 +23991,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [288, '30 Oct', ['Pad and synth effects have ‹ › arrows by their name: page that slot through every effect (← → work too once the name or an arrow has focus).', 'A slider’s value tip no longer gets stuck on the screen when the panel redraws mid-drag.']],
   [287, '30 Oct', ['Shift+Option+arrows in the phrase editor (with Arrange) move one cell at a time, into empty cells too: an empty cell opens a fresh phrase that goes on the song once it has a note. On the Song screen they still jump to the next block, and step into the empty cell when there is none.']],
   [286, '30 Oct', ['Copy and paste on the Song and Arrange take the master column along (it didn’t paste before).']],
   [285, '30 Oct', ['PLAY no longer moves the cursor to another track: on a track with nothing playing on that row (a bus, an empty cell) it stays put, and only rides the rows in Pattern view with FOLLOW.']],
