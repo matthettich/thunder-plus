@@ -79,6 +79,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (23): Ctrl/⌘+D with picked blocks (build 291)
+
+- Owner: "Cmd+D on a selection didn't work". Shift-click, Shift-drag and Shift+arrow selections all duplicated fine
+  (checked headless); Cmd/Ctrl-click picks (`sxPicks`) were ignored, so only the cursor's row went in. `dupPattern` now
+  takes the rows from the first pick to the last (whole rows, every track + master) and moves the picks onto the copy.
+
 ## 30 Oct (22): Shift+Option from the Mixer, PAD-mode keyboard selections (build 290)
 
 - Mixer Shift+Alt+▲▼ now go to `shiftAltArrow` like every other non-Phrase screen; `mixMaster` / `mixBack` are gone

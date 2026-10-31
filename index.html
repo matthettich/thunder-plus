@@ -17889,7 +17889,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 290;
+const BUILD = 291;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18888,14 +18888,17 @@ function dupKey(notes){
 // go in again right below as new, unique copies (new phrase numbers, mutes kept); the rows below move down, section names
 // with them. The cursor (and the selection) move onto the copy, as Renoise does.
 function dupPattern(){
-  const c = cs.song, sel = selA && selA.v === 'song', r = sel ? selRect() : {y0:c.y, y1:c.y}, h = r.y1 - r.y0 + 1, at = r.y1 + 1;
+  // Cmd/Ctrl-clicked picks (owner, 30 Oct: they weren't counted, so only the cursor's row went in again) duplicate the rows
+  // from the first picked row to the last.
+  const c = cs.song, pk = sxPicks.length > 0, sel = !pk && selA && selA.v === 'song';
+  const r = pk ? {y0:Math.min(...sxPicks.map(q => q.y)), y1:Math.max(...sxPicks.map(q => q.y))} : sel ? selRect() : {y0:c.y, y1:c.y}, h = r.y1 - r.y0 + 1, at = r.y1 + 1;
   const src = [];
   for (let y = r.y0; y <= r.y1; y++) for (let x = 0; x <= MT; x++){ if (x >= ntr() && x !== MT) continue; const v = S.song[y][x]; if (v >= 0) src.push([x, y, v, blockMuted(S, y, x)]); }
   if (!src.length) return toast(h > 1 ? 'Nothing on those rows to duplicate.' : 'Nothing on this row to duplicate.');
   if (!songRowsInsert(at, h)) return toast(`No room: the song’s last ${h > 1 ? h + ' rows aren’t' : 'row isn’t'} empty.`);
   let made = 0, last = -1;
   for (const [x, y, v, mu] of src){ const ny = y + h; newBlock({x, y:ny}, v); const id = S.song[ny][x]; if (id >= 0 && id !== v){ made++; last = id; if (mu) setBlockMute(ny, x, true); } }
-  c.y += h; if (sel) selA.y += h;
+  c.y += h; if (sel) selA.y += h; if (pk) for (const q of sxPicks) q.y += h;
   const VR = asongOn() || (apReady && apF) ? arrRows() : songRows(); if (c.y > (c.top || 0) + VR - 1) c.top = Math.min(256 - VR, c.y - VR + 1);
   saveS(); draw();
   if (made < src.length) return toast(`Duplicated ${made} of ${src.length} blocks: no free sects or phrases left.`);
@@ -23998,6 +24001,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [291, '30 Oct', ['Ctrl/⌘+D on the Song and Arrange counts Ctrl/⌘-clicked blocks: it duplicates every row from the first pick to the last (it took only the cursor’s row).']],
   [290, '30 Oct', ['Shift+Option+arrows move around the Song / Arrange from the Mixer too (▲▼ used to jump to the master row; that row is now ▼ past the VOL faders).', 'PAD mode with a computer keyboard: a selection grows only while Shift is held; a plain arrow lets it go, as in KEYS mode.']],
   [289, '30 Oct', ['Mixer: ▼ from the SC row now lands on the track’s VOL fader (the bar on its meter), so the volume works from the keyboard again: Ctrl/⌘+◀▶ ±1, Ctrl/⌘+▲▼ ±16, Delete back to 0 dB. ▼ again goes on to the master row.']],
   [288, '30 Oct', ['Pad and synth effects have ‹ › arrows by their name: page that slot through every effect (← → work too once the name or an arrow has focus).', 'A slider’s value tip no longer gets stuck on the screen when the panel redraws mid-drag.']],
