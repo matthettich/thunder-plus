@@ -16914,6 +16914,10 @@ function tStart(mode, o){
   if (mode === 'song' && loopPat && !(o && o.loop)){ o = Object.assign({}, o, {loop:{v:'pat', y0:o.row, y1:o.row}}); patRow = o.row; patCur = cs.song.y; }   // LOOP: the pattern
   const wasOn = tp.on;   // REC: no count-in when PLAY jumps somewhere else mid-song
   tStop(true);
+  // RESUME: carry on from where the song stopped, if the cursor hasn't moved since (and not for a loop)
+  const pz = tp.paused; tp.paused = null;
+  const resume = mode === 'song' && resumeOn && !wasOn && pz && !(o && o.loop) && pz.key === curKey() && S.song[pz.row] && S.song[pz.row][pz.ref] >= 0;
+  if (resume) o = Object.assign({}, o, {row:pz.row});
   const r = rtInit();
   const seq = makeSeq(S, mode, Object.assign({}, o, {live:true}));   // live: chops never render on this thread (ensurePlay)
   if (!seq.alive()){ toast(mode === 'song' ? `Row ${rS(o.row, 3)} is empty. Put a sect on it, or move to a row that has some.` : 'Nothing to play here yet.'); draw(); return; }
@@ -16925,10 +16929,27 @@ function tStart(mode, o){
   moStart(mode === 'song' ? o.row : -1);   // before the start time is set: the song position takes a moment to work out
   // REC: a count-in plays its bars of clicks first (not when another device's clock starts us: it has its own timing).
   const ci = rec.on && recS.cnt > 0 && !mx.slave && !wasOn ? recS.cnt * 4 * 60 / seq.bpm : 0;
-  seq.time = ctx.currentTime + 0.08 + ci; stageStart(seq.time);
+  // RESUME: run the sequencer silently up to the step it stopped on (keeping the effect commands it passes). That step has
+  // then been worked out already: its events are moved to play now, and the sequencer's clock with them.
+  let rsFirst = null, rsFx = null;
+  if (resume && pz.step > 0){ rsFx = new Map(); let g = 0;
+    while (seq.alive() && g++ < 4096){
+      const r = seq.step(), p = r.pos && r.pos[pz.ref];
+      if (p && (p.row > pz.row || (p.row === pz.row && p.step >= pz.step))){ rsFirst = r; break; }
+      for (const e of r.evs) if (CHASE_T.has(e.type)) rsFx.set(e.type + ':' + e.track + ':' + (e.p || ''), e); } }
+  const t0start = ctx.currentTime + 0.08 + ci;
+  if (rsFirst){ const d = t0start - rsFirst.t; seq.base += d; seq.time += d; if (seq.btT != null) seq.btT += d; }
+  else seq.time = t0start;
+  stageStart(t0start);
   met.next = 0; rec.hist = []; if (ci) countIn(ctx.currentTime + 0.08, recS.cnt, seq.bpm);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
-  Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0, t0:seq.time, lenTot:null, lenPre:0});
+  Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0, t0:t0start, lenTot:null, lenPre:0});
+  if (rsFirst){   // RESUME: the effect commands passed on the way, then the step it stopped on, now
+    for (const e of rsFx.values()) rt.pl.play(Object.assign({}, e, {t:t0start}));
+    const d = t0start - rsFirst.t;
+    for (const e of rsFirst.evs){ const q = Object.assign({}, e, {t:e.t + d}); for (const k of ['cut', 'rel']) if (q[k] != null) q[k] += d; if (moEv(q)) continue; rt.pl.play(q); }
+    tp.q.push({t:t0start, pos:rsFirst.pos, bpm:seq.bpm, tks:rsFirst.tks, line:rsFirst.line});
+  }
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
   tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
   bgPlay(true);   // BACKGROUND PLAY
@@ -17041,6 +17062,12 @@ function panic(){
 }
 function tStop(quiet){
   if (tp.timer) tp.timer.stop();
+  // RESUME: where the song stopped (the positions last heard), the track it follows, and the cursor then
+  if (tp.on && tp.mode === 'song' && tp.pos && tp.pos.some(Boolean)){
+    const P = tp.pos.map(q => q && Object.assign({}, q)), want = tv === 'song' ? cs.song.x : cTrack;
+    const ref = P[want] && P[want].row >= 0 && want !== MT ? want : P.findIndex((q, i) => q && q.row >= 0 && i !== MT);
+    tp.paused = ref >= 0 ? {pos:P, ref, row:P[ref].row, step:P[ref].step, key:curKey()} : null;
+  }
   tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null;
   if (rt) rt.pl.stopAll(ctx.currentTime);
   moStop();
@@ -18005,7 +18032,7 @@ function irsUI(sec){
   }
   sec.append(box);
 }
-function setSong(s, msg){ tStop(true); irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
+function setSong(s, msg){ tStop(true); tp.paused = null; irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -18063,7 +18090,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 306;
+const BUILD = 307;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18082,6 +18109,13 @@ function nbPhrase(t){
 const FLK = 'thunderplus-follow-v1';
 let followOn = (() => { try { return localStorage.getItem(FLK) === '1'; } catch(e){ return false; } })();
 function setFollow(on){ followOn = on; try { localStorage.setItem(FLK, on ? '1' : '0'); } catch(e){} if (on) followPlay(); draw(); }
+/* RESUME (owner, 31 Oct): stopping the song leaves the playhead showing where it stopped (tp.paused), on every screen.
+   PLAYBACK RESUMES FROM PAUSE (on by default, this device): PLAY then carries on from that spot, to the step, as long as
+   the cursor hasn't moved since; move it and PLAY starts from the cursor as before. Off: PLAY starts from the cursor. */
+const RSK = 'thunderplus-resume-v1';
+let resumeOn = (() => { try { return localStorage.getItem(RSK) !== '0'; } catch(e){ return true; } })();
+function setResume(on){ resumeOn = on; try { localStorage.setItem(RSK, on ? '1' : '0'); } catch(e){} draw(); }
+const curKey = () => [tv, cs.song.x, cs.song.y, cs.phrase.y, cs.sect.y, cPhrase, cSect, cTrack].join(',');
 // Pads mode: OPTION + arrows move around the Song grid, in the phrase editor (phraseGrid) and on the Song screen (songGridDir).
 // On by default; off restores the old OPTION+arrow behaviour (phrase: jump 16 patterns; Song: ◀▶ prev/next block, ▲▼ 16 rows). KEYS mode's
 // Shift+Alt+arrows are OPTION+arrows in a phrase (19 Oct), so this applies there too; [ ] step by number, Ctrl/⌘+arrows change values.
@@ -18617,6 +18651,8 @@ function projRows(){
       info:() => 'Size of the Mixer only, separate from TEXT SIZE: 100 % fills the screen, which is already larger than the 80 % Desktop text size gave it. Above that it takes whatever room is left, never past the screen (all its rows stay visible); bigger shows fewer tracks at once, and the window follows the cursor (TRK nn–nn of 32 ◀▶)'},
     {l:'FOLLOW', ck:'Follow playhead', get:() => followOn ? 1 : 0, set:v => setFollow(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'While the song plays, Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. The cursor stays on its row, so you can type and edit while it plays (moving it brings it back into view). Off leaves the screen where you put it'},
+    {l:'RESUME', ck:'Playback resumes from pause', get:() => resumeOn ? 1 : 0, set:v => setResume(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'ON: after you stop the song, PLAY carries on from where it stopped (the playhead stays there to show it), unless you have moved the cursor since. OFF: PLAY starts from the cursor, as before. Either way the stopped spot stays lit'},
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. A poly track shows its whole chord: all four notes when there is room (unfolded, desktop), otherwise one letter per voice (capital = natural, small = sharp, so CEGa is C E G A#; · is an empty voice, × a note off). Only to look at; they can’t be edited'},
     {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText({title:'Rename the song'}, S.name, 40, 'Rename'); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); } }, info:() => 'EDIT renames the song'},
@@ -20362,6 +20398,7 @@ let gridLit = [];   // row-number spans lit as the playhead (Sect and Phrase), c
 // lit — the same gate both views used to apply on their own. Returns an NT-length array of song rows
 // (-1 where a track is silent) shared by both, or null when nothing should be lit.
 function playhead(){
+  if (!tp.on && tp.paused){ const rows = new Array(NT + 1).fill(-1); tp.paused.pos.forEach((p, t) => { if (p && p.row >= 0) rows[t] = p.row; }); return rows; }   // RESUME: where it stopped
   if (!tp.on || !tp.pos) return null;
   const rows = new Array(NT + 1).fill(-1);
   if (tp.mode === 'song'){ for (let t = 0; t <= MT; t++){ const p = tp.pos[t]; if (p && p.row >= 0) rows[t] = p.row; } return rows; }
@@ -20386,7 +20423,7 @@ function draw(){
   scr.dataset.v = tv; grid.classList.toggle('grp', tv === 'song' || tv === 'mixer');   // room above the grid for the MONO / POLY labels
   const c = cs[tv], dm = dims(tv);
   if (onPset()) c.x = clamp(c.x, 0, 1); else { if (!(tv === 'song' && c.x === MT)) c.x = clamp(c.x, 0, dm.w - 1); c.y = clamp(c.y, 0, dm.h - 1); }
-  const P = tp.on ? tp.pos : null, PH = playhead(), L = [];
+  const P = tp.on ? tp.pos : tp.paused ? tp.paused.pos : null, PH = playhead(), L = [];   // (RESUME: the stopped spot stays lit)
   let title = VNAME[tv], sub = '', pset = null;
   const sr = selA ? selRect() : null;
   const rsel = y => sr && selA.line && y >= sr.y0 && y <= sr.y1 ? ' sel' : '';
@@ -24286,6 +24323,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [307, '31 Oct', ['Stopping the song leaves the playhead lit where it stopped.', 'Settings → Screen → RESUME (Playback resumes from pause, on): PLAY carries on from that spot, to the step, unless you have moved the cursor since. Off: PLAY starts from the cursor as before.']],
   [306, '31 Oct', ['Song and Arrange: copy, cut, paste and Clone keep each block’s mute (a muted block pastes muted, an unmuted one unmuted).']],
   [305, '31 Oct', ['Playing (or rendering) the song from a row past the top now picks up the effect commands above it: the last FXO, FLX, GAT, RTG and BYP of each track and of the master column, the master VOL, TVL and TPN. So FLX 00 at the top keeps Flex off when you start further down.']],
   [304, '31 Oct', ['Pattern view: the master (and a bus with only commands) always shows FX1, FX2 and FX3; FX2/3 now only folds the tracks.', 'Phrase with a mouse: a click on an effect cell selects it; a double-click opens the effect list (a click opened it too easily).']],

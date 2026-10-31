@@ -81,6 +81,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (13): RESUME from pause; the stopped spot stays lit (build 307)
+
+- `tStop` keeps `tp.paused` (song mode: a copy of the last heard positions, the followed track `ref`, its row / step, and
+  `curKey()` = the cursor then). `playhead()` and the render's `P` show it while stopped. RESUME (Settings → Screen, on by
+  default, `thunderplus-resume-v1`): `tStart` (song, not a loop, cursor unchanged, the ref track still has a block there)
+  starts at that row, steps the sequencer silently to the stopped step (keeping CHASE events), then shifts the sequencer's
+  clock (`base`, `time`, `btT`) so that step plays now and plays its events shifted. Moving the cursor = start from it.
+  `setSong` clears it. Checked headless: stop at 0/13 → PLAY resumes at 0/13; after ▲, PLAY starts at the cursor.
+
 ## 31 Oct (12): block mutes travel with copy / paste (build 306)
 
 - `songMu(x, y)`; `clip.mu` (parallel to `clip.d`) from `copySel`, `copyHere` and `cloneHere` on the Song; picks carry `mu`.
