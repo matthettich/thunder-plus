@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('thunderDesktop', {
     read: p => ipcRenderer.invoke('thunder:file-read', p),                         // {path, name, text} | {error}
     save: (p, text) => ipcRenderer.invoke('thunder:file-save', p, text),           // {ok, path} | {error}
     saveAs: (name, text, near) => ipcRenderer.invoke('thunder:file-saveas', name, text, near),  // the Save dialog → {ok, path} | null
+    outPick: (name, near) => ipcRenderer.invoke('thunder:out-pick', name, near),   // RENDER TO: the Save dialog for a render → path | null
+    outWrite: (p, data) => ipcRenderer.invoke('thunder:out-write', p, data),      // write it (bytes) → {ok, path} | {error}
+    outShow: p => ipcRenderer.invoke('thunder:out-show', p),                       // show it in its folder
     pathOf: f => { try { return (webUtils && webUtils.getPathForFile(f)) || ''; } catch (e) { return ''; } }   // a dropped file's path, so Save goes back to it
   },
   app: {

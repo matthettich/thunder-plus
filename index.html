@@ -62,6 +62,7 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .setwrap{position:relative; display:flex}
 .setmenu{position:absolute; top:calc(100% + 6px); left:0; z-index:120; background:var(--panel); color:var(--ink); border:1px solid var(--ink); box-shadow:none; padding:6px; white-space:normal}
 .setmenu[hidden]{display:none}
+.rprog .askbox{min-width:min(360px, 86vw)} .rpbar{height:14px; border:1px solid var(--line); margin:12px 0 6px; background:var(--panel2, transparent)} .rpbar i{display:block; height:100%; width:0; background:var(--ink); transition:width .15s linear} .rppct{font-variant-numeric:tabular-nums; font-size:var(--fs-3); text-align:right}
 #bFile, #bEdit, #bView, #bAud, .top #bSet{min-height:34px; padding:0 12px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; border:1px solid var(--line); background:var(--panel); white-space:nowrap}
 #bFile:hover, #bEdit:hover, #bView:hover, #bAud:hover, .top #bSet:hover{border-color:var(--ink)}
 /* View and Audio & MIDI split the Settings menu on Desktop; on Mobile everything stays under the one gear. */
@@ -11873,7 +11874,51 @@ function padWav(i){
   const nt = ex.noteName ? ' ' + padNote(v) : '';
   return {name: `${String(i + 1).padStart(2, '0')} ${safe(v.name)}${nt}.wav`, data: wavBytes(d, ex.sr, ex.bits)};
 }
-async function deliver(filename, blob){
+/* RENDER TO (owner, 31 Oct: renders went to the browser's downloads, with no say in where): a render or export asks where
+   to save first. Desktop app: the system Save dialog (it remembers the last folder), then the file is written there and a
+   toast offers to show it in its folder. Chrome / Edge on a computer: their Save picker. Anywhere else (phones, Firefox,
+   Safari): a download, and the toast says it went to Downloads. pickOut() returns where (null: cancelled). */
+async function pickOut(filename){
+  if (inAI) return {ai:true};
+  if (DESK && DESK.outPick){ const p = await DESK.outPick(filename, typeof projPath !== 'undefined' ? projPath : ''); return p ? {path:p} : null; }
+  if (typeof window.showSaveFilePicker === 'function' && !isAndroid){
+    const ext = (filename.match(/\.(\w+)$/) || [])[1] || 'wav', MT2 = {wav:'audio/wav', zip:'application/zip', mid:'audio/midi'};
+    try { const h = await window.showSaveFilePicker({suggestedName:filename, types:[{description:ext.toUpperCase() + ' file', accept:{[MT2[ext] || 'application/octet-stream']:['.' + ext]}}]}); return {h}; }
+    catch(e){ if (e && e.name === 'AbortError') return null; }   // (a picker that won't open here: download instead)
+  }
+  return {dl:true};
+}
+async function writeOut(to, filename, blob){
+  if (!to) return;
+  if (to.ai) return deliverAI(filename, blob);
+  if (to.path){ const r = await DESK.outWrite(to.path, await blob.arrayBuffer());
+    if (r && r.ok){ const nm = r.path.split(/[\\/]/).pop(); toastAct('Saved ' + nm + ' in ' + r.path.slice(0, r.path.length - nm.length - 1), 'Show', () => DESK.outShow(r.path)); }
+    else toast('Couldn’t save it: ' + ((r && r.error) || 'unknown error')); return; }
+  if (to.h){ try { const w = await to.h.createWritable(); await w.write(blob); await w.close(); toast('Saved ' + (to.h.name || filename)); } catch(e){ toast('Couldn’t save it: ' + ((e && e.message) || e)); } return; }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000); toast('Saved ' + filename + ' to your Downloads folder', 4000);
+}
+// A toast with one button (Show in folder).
+function toastAct(msg, label, fn){
+  toast(msg, 7000);
+  try { const t = $('toast'); if (t && !t.hidden && t.textContent.startsWith(msg.slice(0, 20))){ const b = document.createElement('button'); b.className = 'tact'; b.textContent = label; b.style.marginLeft = '10px';
+    b.addEventListener('click', e => { e.stopPropagation(); fn(); }); t.append(b); t.style.pointerEvents = 'auto'; } } catch(e){}
+}
+async function deliver(filename, blob){ const to = await pickOut(filename); if (to) await writeOut(to, filename, blob); }
+/* RENDER PROGRESS (owner, 31 Oct): a window with what is rendering and a bar that follows the audio being rendered (each
+   offline pass reports how far it has got; the passes, the mix then each stem, share the bar). */
+const rprog = {el:null, bar:null, lab:null, pct:null, n:1, i:0,
+  open(title, n){ this.close(); this.n = Math.max(1, n || 1); this.i = 0;
+    const w = el('div', 'ask rprog'), b = el('div', 'askbox'); w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', title);
+    b.append(el('div', 'asktitle', title)); this.lab = el('div', 'askmsg', 'Getting ready…'); b.append(this.lab);
+    const tr = el('div', 'rpbar'), f = el('i'); tr.append(f); b.append(tr); this.bar = f; this.pct = el('div', 'rppct', '0%'); b.append(this.pct);
+    w.append(b); document.body.append(w); this.el = w; },
+  step(i, label){ this.i = i; if (this.lab && label) this.lab.textContent = label; this.set(0); },
+  set(f){ if (!this.bar) return; const v = Math.max(0, Math.min(1, (this.i + Math.max(0, Math.min(1, f))) / this.n)); this.bar.style.width = (v * 100).toFixed(1) + '%'; this.pct.textContent = Math.floor(v * 100) + '%'; },
+  close(){ if (this.el) this.el.remove(); this.el = this.bar = this.lab = this.pct = null; } };
+let passProg = null;   // pass() reports how far its render has got here (0–1)
+async function deliverAI(filename, blob){
   if (inAI){
     let dl = null; try { dl = await window.claude.use('downloads'); } catch(e){}
     if (!dl){ toast('Saving files isn’t available in this view.'); return; }
@@ -17455,6 +17500,10 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   // …chains tempo follows the song, like the live engines.
   if (chnOk) for (const b of pl.buses) if (b && b.chn){ try { b.chn.port.postMessage({target:'chains-host', op:'transport', value:{tempo:S.bpm, lpb:S.lpb || 4, ticks:S.ticks || 6, playing:true}}); } catch(e){} }
   for (const e of evs) if (!(e.type === 'note' && e.ii != null && (S.insts[e.ii] || {}).mo === 1)) pl.play(e);   // MIDI-only instruments are silent in renders
+  // RENDER PROGRESS: a stop every ~2 % of the render reports how far it has got (a moment a tempo change already stops at
+  // can't take a second stop: that report is skipped)
+  if (passProg){ const pg = passProg, tot = oc.length / sr, q = 128 / sr, k = Math.max(1, Math.ceil(tot / 50 / q)) * q;
+    for (let t = k; t < tot - q; t += k){ const at = t, p = oc.suspend(at); if (p && p.then) p.then(() => { try { pg(at / tot); } catch(e){} return oc.resume(); }).catch(() => {}); } }
   const b = await oc.startRendering();
   return [b.getChannelData(0).slice(lat, lat + N), b.getChannelData(1).slice(lat, lat + N)];   // the latency (mastering, the limiter's lookahead) trimmed off
 }
@@ -17478,7 +17527,11 @@ function stemName(t, notes){
 }
 async function renderOut(stems){
   if (rendering) return toast('Already rendering…');
+  // RENDER TO: where it goes is asked first (the file's name is known: the song's name)
+  const fname = `${safe(S.name || 'Song')} ${stems ? 'stems.zip' : 'mix.wav'}`, to = await pickOut(inAI && !stems ? fname.replace(/\.wav$/, '.zip') : fname);
+  if (!to) return;
   rendering = true; tStop();
+  rprog.open(stems ? 'Rendering stems' : 'Rendering the song', 1);
   try {
     const sr = ex.sr, seq = makeSeq(S, 'song', {row:S.renderFrom, once:true});
     if (!seq.alive()) return toast(`Nothing to render: row ${rS(S.renderFrom, 3)} is empty. Set RENDER FROM to the first row of the song.`);
@@ -17494,12 +17547,12 @@ async function renderOut(stems){
     keepT.sort((a, b) => a - b);
     const inBus = t => BP.pure.has(t) && (BP.targets.get(t) || []).some(b => keepT.includes(b));
     if (!keepT.length) return toast('Every track with notes is muted.');
-    toast('Rendering pads…'); await idle();
-    const pads = new Map();
+    const nStem = stems ? keepT.filter(t => !inBus(t)).length : 0; rprog.n = 1.15 + nStem; rprog.step(0, 'Rendering the pads…'); await idle();
+    const pads = new Map(); let pi = 0; const pN = new Set(notes.map(e => e.pad)).size;
     // In the Worker when it can (the page stays responsive), here otherwise.
     for (const e of notes) if (!pads.has(e.pad)){ const v = kit.voices[e.pad], hold = isSyn(e.pad) ? v.len : 0;
       let d; try { d = (await renderAsync(v, sr, hold, false)).data; } catch(err){ d = renderVoice(v, sr, null, hold); await idle(); }
-      pads.set(e.pad, d); }
+      pads.set(e.pad, d); rprog.set(0.15 * ++pi / pN); }
     const bufs = new Map();
     const getB = (pad, rev, st) => { const k = pad + (rev ? 'r' : 'f') + stKey(st); let b = bufs.get(k);
       if (!b){ const d0 = pads.get(pad); if (!d0) return null; let d = st ? stretchData(d0, sr, loopSecs(pad, d0, sr), st) : d0;
@@ -17509,8 +17562,9 @@ async function renderOut(stems){
     // Reverb, delay and resonator tails ring past the last note: render extra, then trim the silence.
     const tail = keepT.some(t => hasTailAny(S.tfx[t])) || hasTailAny(S.mfx) || keepT.some(t => chainsFeed(t)) ? 8 : 0;
     const N0 = Math.ceil((end + 0.05) * sr), N = N0 + Math.ceil(tail * sr), secs = (N0 / sr).toFixed(1);
-    toast(`Rendering mix (${secs} s${tail ? ' + effect tails' : ''})…`); await idle();
-    let mix = await pass(evs, new Set(keepT), N, sr, getB, S.limiter, true);
+    rprog.step(0.15, `Rendering the mix (${secs} s${tail ? ' + effect tails' : ''})…`); await idle();
+    passProg = f => rprog.set(f);
+    let mix; try { mix = await pass(evs, new Set(keepT), N, sr, getB, S.limiter, true); } finally { passProg = null; }
     let len = N;
     if (tail){
       let pk0 = 0; for (const ch of mix) for (let i = 0; i < ch.length; i++){ const a = Math.abs(ch[i]); if (a > pk0) pk0 = a; }
@@ -17531,18 +17585,20 @@ async function renderOut(stems){
     if (stems){
       for (const t of keepT){
         if (inBus(t)) continue;   // BUS: it is in its bus's stem
-        toast(`Rendering stem ${d2(t + 1)} of ${keepT.length} tracks…`); await idle();
-        const st = cut(await pass(evs, new Set([t]), N, sr, getB, false, false));
+        rprog.step(1.15 + files.length - 1, `Rendering stem ${files.length} of ${nStem}: track ${d2(t + 1)}…`); await idle();
+        passProg = f => rprog.set(f); let st0; try { st0 = await pass(evs, new Set([t]), N, sr, getB, false, false); } finally { passProg = null; }
+        const st = cut(st0);
         const nm = tName(t) || (BP.feeds.has(t) && !notes.some(e => e.track === t) ? 'Bus' : stemName(t, notes));   // TRACK NAMES first; BUS: a bus with no notes of its own
         files.push({name:`${base} ${d2(t + 1)} ${safe(nm)}.wav`, data:wavN(scale(st), sr, ex.bits)});
       }
     }
     lastR = files;
-    if (stems) await deliver(`${base} stems.zip`, zipBlob(files));
-    else if (inAI) await deliver(`${base} mix.zip`, zipBlob(files));
-    else await deliver(files[0].name, new Blob([files[0].data], {type:'audio/wav'}));
+    rprog.close();
+    if (stems) await writeOut(to, fname, zipBlob(files));
+    else if (inAI) await writeOut(to, `${base} mix.zip`, zipBlob(files));
+    else await writeOut(to, files[0].name, new Blob([files[0].data], {type:'audio/wav'}));
   } catch(err){ toast('Render failed: ' + ((err && err.message) || err)); }
-  finally { rendering = false; draw(); }
+  finally { rendering = false; passProg = null; rprog.close(); draw(); }
 }
 /* ===== RENDER PART (21 Oct): render a phrase selection (or the whole phrase), or song rows (the selection, else the
    cursor's row), into a slot as a sample, or save it as a WAV. Renoise's Render To Sample, for making one-shots and loops.
@@ -18198,7 +18254,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 314;
+const BUILD = 315;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24483,6 +24539,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [315, '31 Oct', ['Render song and Render stems ask where to save first (the desktop app: the Save dialog, starting in your Music folder and then wherever the last one went; Chrome and Edge: their Save picker; elsewhere the file goes to Downloads, and it says so), then show a progress window with a bar that follows the render. When it is saved the desktop app tells you where, with a Show button that opens the folder.', 'Other exports (pads, kits, presets, rendered parts) ask where to save the same way.']],
   [314, '31 Oct', ['Matrix light: dark grey outlines instead of green (the track groups keep their colours).', 'Desktop app: audio starts on Latency Balanced (a bigger buffer) unless you picked one in Settings → Audio, which keeps playback from crackling when the computer is busy.']],
   [313, '31 Oct', ['New skin: Matrix light (Settings → Screen → Skin, under Neon & Matrix): the Matrix look on white, in a deep green that reads easily, with a blue cursor.', 'Matrix and Matrix light: the title drops its dots, and the screen tabs (Tracker … Chains) end where the tracker tabs below (… PROJECT) do.']],
   [312, '31 Oct', ['File ▾ → Load ELECTRO (demo project) opens the bundled ELECTRO song and kit on any device (the first-run song only comes in where no song was saved yet).', 'Touch: tapping STOP twice puts the song back to its top (the next PLAY starts from the beginning).', 'Settings (and the File and Edit menus) no longer run off the right edge of a phone or foldable screen.']],

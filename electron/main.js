@@ -134,6 +134,28 @@ app.whenReady().then(() => {
     if (r.canceled || !r.filePath) return null;
     return writeProj(isProj(r.filePath) ? r.filePath : r.filePath + '.thunder', text);
   });
+  // RENDER TO (owner, 31 Oct: "I don't have any clue where render renders a file to"): renders and exports ask where to go
+  // first, with the system Save dialog (starting where the last one went, else the project's folder, else Music), then the
+  // page writes the file there and can show it in its folder. Only .wav, .zip and .mid files are written this way.
+  let lastOut = '';
+  const OUT_EXT = { wav: 'WAV audio', zip: 'Zip archive', mid: 'MIDI file' };
+  ipcMain.handle('thunder:out-pick', async (e, name, near) => {
+    const base = String(name || 'Render.wav').replace(/[\\/:*?"<>|]/g, '_'), ext = (base.match(/\.(\w+)$/) || [])[1] || 'wav';
+    if (!OUT_EXT[ext.toLowerCase()]) return null;
+    const dir = lastOut && fs.existsSync(lastOut) ? lastOut : isProj(near) && fs.existsSync(path.dirname(near)) ? path.dirname(near) : app.getPath('music');
+    const r = await dialog.showSaveDialog(win, { defaultPath: path.join(dir, base), filters: [{ name: OUT_EXT[ext.toLowerCase()], extensions: [ext.toLowerCase()] }] });
+    if (r.canceled || !r.filePath) return null;
+    let f = r.filePath; if (!f.toLowerCase().endsWith('.' + ext.toLowerCase())) f += '.' + ext.toLowerCase();
+    lastOut = path.dirname(f); return f;
+  });
+  ipcMain.handle('thunder:out-write', async (e, f, data) => {
+    try {
+      if (typeof f !== 'string' || !/\.(wav|zip|mid)$/i.test(f)) return { error: 'not a render file' };
+      await fs.promises.writeFile(f, Buffer.from(data instanceof ArrayBuffer ? new Uint8Array(data) : data));
+      return { ok: true, path: f };
+    } catch (err) { return { error: String((err && err.message) || err) }; }
+  });
+  ipcMain.handle('thunder:out-show', (e, f) => { if (typeof f === 'string' && fs.existsSync(f)) shell.showItemInFolder(f); return true; });
   ipcMain.on('thunder:page-ready', () => { pageReady = true; if (pendingPath && win){ const p = pendingPath; pendingPath = null; win.webContents.send('thunder:open-path', p); } });
   ipcMain.on('thunder:close-ack', () => clearTimeout(ackT));
   ipcMain.on('thunder:close-reply', (e, ok) => { clearTimeout(ackT); if (!ok){ quitting = false; return; } closeOk = true; if (win) win.close(); if (quitting) app.quit(); });

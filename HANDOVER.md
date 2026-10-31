@@ -81,6 +81,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (21): RENDER TO and render progress (build 315; desktop needs the new release)
+
+- `pickOut(filename)` → {path} (desktop: IPC thunder:out-pick, the Save dialog; remembers the last folder, else the project's, else Music) | {h} (showSaveFilePicker, not Android) | {dl} | {ai} | null (cancelled); `writeOut(to, name, blob)` writes (thunder:out-write, .wav/.zip/.mid only) and toasts where, with Show (thunder:out-show). `deliver()` = pick + write; the old body is `deliverAI`.
+- renderOut asks first (before the render, while the click still counts as a gesture), then `rprog` (a .ask sheet with a bar) runs across pads (15 %), the mix and each stem; `pass()` reports through `passProg` with an offline suspend every ~2 % (a time a tempo change already suspends at is skipped).
+- The owner couldn't find renders: the desktop app's anchor download had no visible destination.
+
 ## 31 Oct (20): Matrix light outlines; desktop starts on Balanced (build 314)
 
 - `latOf()`: the desktop app (window.thunderDesktop) defaults to 'balanced' like phones. The owner heard stutter only in the desktop app, not the browser on the same computer; the app keeps its own settings (Lowest by default before this).
