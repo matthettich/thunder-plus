@@ -17874,7 +17874,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 284;
+const BUILD = 285;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -17917,7 +17917,12 @@ function followPlay(){
   const P = tp.pos, own = P[tv === 'song' ? cs.song.x : cTrack] || (tp.loopV === 'bus' ? null : P.find(Boolean)); if (!own) return;   // BUS PLAY: an empty bus stays put
   if (tv === 'song'){ if (tp.mode === 'song') cs.song.y = own.row; }
   else if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0){ cSect = own.sect; cs.sect.y = own.cr; } }
-  else if (tv === 'phrase'){ if (own.phrase >= 0){ cPhrase = own.phrase; cs.phrase.y = own.step; } }
+  else if (tv === 'phrase'){
+    // The cursor stays on its own track (owner, 30 Oct): when that track isn't playing on this row (an empty cell, a bus with
+    // no block), the cursor only rides the rows, in Pattern view; the plain phrase editor stays put.
+    const mine = P[cTrack];
+    if (mine && mine.phrase >= 0){ cPhrase = mine.phrase; cs.phrase.y = mine.step; }
+    else if (pvActive() && own.step != null) cs.phrase.y = Math.min(own.step, Math.max(0, plen(cPhrase) - 1)); }
   if (tv === 'phrase' && tp.mode === 'song' && own.row >= 0 && pvActive() && !(apReady && apF)) pvFollow(P, own);   // PATTERN VIEW: the song row follows too (not the cursor Arrange is moving)
   // ARRANGE PAGES (owner, 30 Oct): Arrange (beside the screen, or as the Song screen) turns a page when the playing row runs
   // off its bottom (or top): the playing row becomes its first. Not while Arrange has the keys (you're moving it).
@@ -23959,6 +23964,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [285, '30 Oct', ['PLAY no longer moves the cursor to another track: on a track with nothing playing on that row (a bus, an empty cell) it stays put, and only rides the rows in Pattern view with FOLLOW.']],
   [284, '30 Oct', ['With FOLLOW on, the cursor stays visible on the playing row (it blended into the playhead bar in Pattern view).']],
   [283, '30 Oct', ['With FOLLOW on, Arrange turns the page when playback runs past its bottom, so the playing row stays in sight.']],
   [282, '30 Oct', ['Help brought up to date: effect counts and groups, the drum-type presets, the master’s commands, Tab, Backspace, Enter, Alt+A and Ctrl+Space.']],
@@ -24449,7 +24455,9 @@ function pvRow(d){
   pvGo(cTrack, y, null, null);
 }
 // FOLLOW while the song plays: the song row (and the track, when the open one is silent) ride along.
-function pvFollow(P, own){ const t = P.indexOf(own); if (t >= 0 && t !== cTrack && (t < ntr() || t === MT)) cTrack = t; cs.song.y = own.row; cs.song.x = cTrack; }
+function pvFollow(P, own){   // the song row follows; the cursor keeps its track (and takes that track's phrase on the new row, if it has one)
+  const row = own.row; if (cs.song.y !== row && !P[cTrack]){ const cid = S.song[row] ? S.song[row][cTrack] : -1, ph = cid >= 0 ? firstPhrase(cid) : -1; if (ph >= 0){ cPhrase = ph; cSect = cid; } }
+  cs.song.y = row; cs.song.x = cTrack; }
 // A tap on another track opens its phrase there; on the open track it moves the cursor (only the cursor's own cell, and
 // the row numbers, are left to gridDown: dragging the cursor's cell changes its value, a row number selects lines).
 let pvMap = [];

@@ -79,6 +79,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (17): PLAY keeps the cursor's track (build 285)
+
+- `followPlay` took the first playing track when the cursor's track wasn't playing on the row, and `pvFollow` moved
+  `cTrack` to it (a bus with no block there jumped to track 1). Now the cursor keeps its track and column: the phrase
+  editor stays put, Pattern view only rides the rows (and takes the cursor track's phrase on a new song row if it has one).
+
 ## 30 Oct (16): cursor on the playhead (build 284)
 
 - With FOLLOW the cursor rides the playing row; `.ln.plr span.cur` used the screen's background colour, so in Pattern view
