@@ -13196,7 +13196,7 @@ let plFailed = false;
   // …PUMP SYNTHS: pump/synth/pump-synth.wasm, compiled here and handed to the render Worker (as LXR's is)
   const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=2').catch(e => { tpLog('pump synths wasm (the …pump engines will be silent)', e); return null; }) : Promise.resolve(null);
   // …PUMP: the pump mastering effects (pump/pump.wasm), fetched alongside; effect nodes that asked for it get it now
-  bytes(PUMP_WASM).then(b => { pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage({pumpBytes:b}); } catch(e){} pumpWait.clear();
+  bytes(PUMP_WASM).then(b => { pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage({pumpBytes:b}); } catch(e){} pumpWait.clear(); pumpToChains(b);
     return WebAssembly.instantiate(b, imp).then(r => { pumpMain = r.instance.exports; if (pumpMain._initialize) pumpMain._initialize(); }); }).catch(e => { if (PM) console.warn('pump effects', e); });
   const [plB, txB] = await Promise.all([bytes(WASM_DSP).catch(e => { tpLog('wasm fetch (dsp)', e); return null; }), bytes(WASM_TFX).catch(e => { tpLog('wasm fetch (effects)', e); return null; })]);
   tfxBytes = txB || false; tfxLoadDone();
@@ -14653,7 +14653,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=39')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=40')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -14784,7 +14784,7 @@ function chainsNode(ac, track, patch, tempo){
   // Sidechain Outs, one channel per send. 'max' so the inputs arrive with all their channels.
   const n = new AudioWorkletNode(ac, 'thunder-chains', {numberOfInputs:6, numberOfOutputs:2, outputChannelCount:[2, 8], channelCount:2,
     channelCountMode:'max', channelInterpretation:'speakers',
-    processorOptions:{bytes:chnBin(), track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac),
+    processorOptions:{bytes:chnBin(), pump:pumpBin() || null, track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac),
       // BUS and SOURCE maps from the start (later changes go as messages): an offline render can finish before a message arrives.
       busMap:(busPlan().feeds.get(track) || []).slice(0, 32), tapMap:chnTapList(patch)}});
   n.load = 0;
@@ -14897,6 +14897,8 @@ function tfxReady(ac){
 // …PUMP: pump.wasm goes to each audio thread once, with its first effect node (or by message when a node asks for it).
 let pumpWasmBytes = null; const pumpSent = new WeakSet(), pumpWait = new Set();
 const pumpBin = () => pumpWasmBytes || null;
+// PUMP MODULES (…chains): pump.wasm for the live …chains nodes made before it arrived (their pump modules pass sound until then)
+function pumpToChains(b){ try { if (typeof rt !== 'undefined' && rt && rt.pl && rt.pl.buses) for (const x of rt.pl.buses) if (x && x.chn && x.chn.port) x.chn.port.postMessage({target:'chains-host', op:'pump', value:b}); } catch(e){} }   // (not _send: it would JSON-copy the bytes)
 // A copy on this thread, only to ask a slot's latency (renders line the master up by it; the FX screen says it before
 // the audio has started): the same code the worklet runs, so the same number.
 let pumpMain = null; const pumpLatCache = new Map();
