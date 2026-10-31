@@ -81,6 +81,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (16): poly voice columns; voice Rough / Choir and SING's presets (build 310)
+
+- Poly tracks: `sameCol()` (by `polyVox`) makes a Voice note (and a …pump live POLY lane, `polyPs`) take over the singer still holding its column's last note, instead of a free one (the owner heard same-column notes stacking). Generic poly samples still ring over, by design.
+- VoxCore: `rough` (per-period jitter, shimmer, weaker odd periods), `choir` 1–8 + `spread` (extra glottal sources, detuned by CDET × spread, through the same formants; mono). VOX_PRE = pump SING's presets (SingParams.hpp), applied over VOX_BASE (SING's defaults); drive goes to the pad's Drive.
+- Not done: pump SING itself (its VOICEBANK engine needs oto.ini banks read from disk; the wasm has no file system). FLX was benchmarked: about 0.3% of real time, flat over 2 minutes, so the owner's 60% CPU is elsewhere (asked for the CPU meter's By part breakdown).
+
 ## 31 Oct (15): PLAY from an empty cell's row (build 309)
 
 - `songRow()` now returns the cursor's song row when any cell on it plays (before: only when the cursor's own cell did, else row 0), else the next row down with something, else 0.
