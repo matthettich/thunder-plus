@@ -17874,7 +17874,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 286;
+const BUILD = 287;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -19462,15 +19462,20 @@ function optDir(dir, grid){
 function phraseGrid(dir){
   followPhraseBlock();
   const x0 = cs.song.x, y0 = cs.song.y, here = S.song[y0] && S.song[y0][x0];
-  if (!(here >= 0) || !(S.chains[here] || []).some(r => r[0] === cPhrase)) return false;
-  let x = x0, y = y0, hit = false;
-  if (dir === 'left' || dir === 'right'){ const d = dir === 'right' ? 1 : -1, n = ntr(), last = arrSideMst() ? n : n - 1;   // u = n is the master column
-    for (let u = (x0 === MT ? n : x0) + d; u >= 0 && u <= last; u += d){ const t = u === n ? MT : u; if (S.song[y0] && S.song[y0][t] >= 0){ x = t; hit = true; break; } } }
-  else { const d = dir === 'down' ? 1 : -1; for (y = y0 + d; y >= 0 && y < 256; y += d) if (S.song[y] && S.song[y][x0] >= 0){ hit = true; break; } }
-  if (!hit){ toast({up:'No phrase above on this track.', down:'No phrase below on this track.', left:'No phrase to the left on this row.', right:'No phrase to the right on this row.'}[dir]); return true; }
-  const cid = S.song[y][x], p = firstPhrase(cid);
-  cs.song.x = x; cs.song.y = y; cTrack = x; cSect = cid; selA = null;
-  if (p >= 0) cPhrase = p;
+  const pend = !!pendPlace && pendPlace.p === cPhrase && pendPlace.x === x0 && pendPlace.y === y0;   // on an empty cell already
+  if (!pend && (!(here >= 0) || !(S.chains[here] || []).some(r => r[0] === cPhrase))) return false;
+  // One cell at a time, empty cells included (as in Pattern view): an empty cell opens a fresh phrase that goes on the
+  // song once it has a note. At the grid's edge it stays put.
+  let x = x0, y = y0;
+  if (dir === 'left' || dir === 'right'){ const n = ntr(), last = arrSideMst() ? n : n - 1;   // u = n is the master column
+    const u = (x0 === MT ? n : x0) + (dir === 'right' ? 1 : -1); if (u < 0 || u > last) return true; x = u === n ? MT : u; }
+  else { y = y0 + (dir === 'down' ? 1 : -1); if (y < 0 || y > 255) return true; }
+  const cid = S.song[y] ? S.song[y][x] : -1;
+  let p = cid >= 0 ? firstPhrase(cid) : -1;
+  if (p >= 0){ cSect = cid; pendPlace = null; }
+  else { const fp = freePhrase(); if (fp < 0){ toast('No free phrases left.'); return true; } p = fp; pendPlace = {x, y, p:fp}; }
+  cs.song.x = x; cs.song.y = y; cTrack = x; cPhrase = p; selA = null;
+  if (cs.phrase.y >= 0) cs.phrase.y = clamp(cs.phrase.y, 0, plen(p) - 1);
   const VR = songViewRows(), top = cs.song.top || 0;
   if (y < top) cs.song.top = y; else if (y > top + VR - 1) cs.song.top = y - VR + 1;
   cs.song.top = clamp(cs.song.top, 0, 256 - VR);
@@ -19478,7 +19483,7 @@ function phraseGrid(dir){
 }
 // SHIFT + OPTION + arrows: move around the Song grid, block by block, and let the phrase editor follow.
 // ◀▶ jump to the previous/next block on this Song row (stops at the row's ends); ▲▼ jump to the same
-// track's block on the row above/below. Empty cells are skipped, and it stops when there is none.
+// track's block on the row above/below. When there is no block that way it steps one cell, into the empty one.
 // Mixer: Shift+Option+▼ jumps to the master row, Shift+Option+▲ comes back to the track the cursor was on.
 let mixBack = null;
 function mixMaster(dir){
@@ -19493,11 +19498,11 @@ function shiftAltArrow(dir){
   if (dir === 'left' || dir === 'right'){
     const d = dir === 'right' ? 1 : -1;
     for (x = x0 + d; x >= 0 && x < ntr(); x += d) if (S.song[y0] && S.song[y0][x] >= 0){ hit = true; break; }
-    if (!hit) return;
+    if (!hit){ x = x0 + d; if (x < 0 || x >= ntr()) return; }   // no block that way: one cell, empty or not
   } else {
     const d = dir === 'down' ? 1 : -1;
     for (y = y0 + d; y >= 0 && y < 256; y += d) if (S.song[y] && S.song[y][x0] >= 0){ hit = true; break; }
-    if (!hit) return;
+    if (!hit){ y = y0 + d; if (y < 0 || y > 255) return; }
   }
   cs.song.x = x; cs.song.y = y; selA = null;
   const cid = S.song[y] && S.song[y][x], p = cid >= 0 ? firstPhrase(cid) : -1; if (p >= 0) cPhrase = p;
@@ -19508,8 +19513,8 @@ function shiftAltArrow(dir){
 }
 // PAD mode's OPTION+arrows on the Song screen (PATTERN NAV on), and in Arrange when it has the keys on Phrase: the
 // phrase editor's spatial move. ◀▶ go to the nearest filled block on this row (the master column counts where it's
-// shown; Arrange's side panel has none), ▲▼ to the nearest filled block in this column. Empty cells are skipped; at an
-// edge the cursor stays and a toast says so. Like songJump (the old OPTION+◀▶) it leaves the selection alone.
+// shown; Arrange's side panel has none), ▲▼ to the nearest filled block in this column. With no block that way it steps one
+// cell into the empty one; at the grid's edge it stays. Like songJump (the old OPTION+◀▶) it leaves the selection alone.
 function songGridDir(dir){
   const c = cs.song, n = ntr(), mst = apF !== 'arr' || arrSideMst(), has = (y, t) => !!S.song[y] && S.song[y][t] >= 0;
   let x = c.x, y = c.y, hit = false;
@@ -19520,8 +19525,10 @@ function songGridDir(dir){
     const d = dir === 'down' ? 1 : -1;
     for (let v = c.y + d; v >= 0 && v < 256; v += d) if (has(v, c.x)){ y = v; hit = true; break; }
   }
-  if (!hit) return void toast({up:'No more blocks above in this track.', down:'No more blocks below in this track.',
-    left:'No block to the left on this row.', right:'No block to the right on this row.'}[dir]);
+  if (!hit){   // no block that way: one cell, into the empty one (it stays put at the grid's edge)
+    if (dir === 'left' || dir === 'right'){ const u = (c.x === MT ? n : c.x) + (dir === 'right' ? 1 : -1), last = mst ? n : n - 1;
+      if (u < 0 || u > last) return; x = u === n ? MT : u; }
+    else { y = c.y + (dir === 'down' ? 1 : -1); if (y < 0 || y > 255) return; } }
   c.x = x; c.y = y; draw();
 }
 // While the phrase editor is open the Song cursor keeps up with the phrase being edited: it moves to a
@@ -23969,6 +23976,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [287, '30 Oct', ['Shift+Option+arrows in the phrase editor (with Arrange) move one cell at a time, into empty cells too: an empty cell opens a fresh phrase that goes on the song once it has a note. On the Song screen they still jump to the next block, and step into the empty cell when there is none.']],
   [286, '30 Oct', ['Copy and paste on the Song and Arrange take the master column along (it didn’t paste before).']],
   [285, '30 Oct', ['PLAY no longer moves the cursor to another track: on a track with nothing playing on that row (a bus, an empty cell) it stays put, and only rides the rows in Pattern view with FOLLOW.']],
   [284, '30 Oct', ['With FOLLOW on, the cursor stays visible on the playing row (it blended into the playhead bar in Pattern view).']],

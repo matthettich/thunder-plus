@@ -79,6 +79,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (19): Shift+Option+arrows into empty cells (build 287)
+
+- `phraseGrid` (phrase editor, PATTERN NAV on, the Arrange panel) now steps one song cell per press, empty cells included,
+  like Pattern view's `pvGo`: a filled cell opens its first phrase; an empty one takes `freePhrase()` and sets `pendPlace`,
+  so the phrase lands on the song with its first note (`placePending`). It also runs while you sit on such a pending cell.
+  It no longer toasts "No phrase above on this track." etc.; at the grid's edge it stays put.
+- `shiftAltArrow` and `songGridDir` (Song screen) still jump to the nearest block, but with none that way they step one
+  cell into the empty one instead of doing nothing / toasting.
+
 ## 30 Oct (18): master column copy / paste (build 286)
 
 - `copySel` on the Song copied columns x0..x1 by number, so a selection reaching the master (column 32) also took the unused
