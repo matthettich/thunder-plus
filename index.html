@@ -1508,7 +1508,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 @keyframes dkBreath{0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.025)}}
 @keyframes dkWag{0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-10deg)}}
 @media (prefers-reduced-motion: reduce){ .dogs .bob, .dogs .tail{animation:none!important} }
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"]) .dogs{--dk-pink:var(--mxsoft)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .dogs{--dk-pink:var(--mxsoft)}
 /* DRUM (the phrase stage's DANCE · DRUM · KEYS): the pittie behind a drum kit with sticks, the husky on bongos. The kit
    only shows in .drum; arms rest over their drums (CSS variables) and strike with dogsHit(); no hops or breathing. */
 .dogs .kit{display:none}
@@ -1610,6 +1610,14 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="koss"]{--mx:#f1e4cc; --mx2:#c7b493; --mxdim:#5a4434; --mxbg:#2a1f19; --mxpanel:#32261e; --mxpanel2:#3e2f25; --mxon:#2a1f19;
   --mxsoft:#f08a2c; --mxpoly:#e0b13a; --mxglowc:transparent; --mxscan:transparent; --mxred:#ff6b4a; --mxcur:#f08a2c; --mxcuron:#2a1f19; --mxbus:#b8b8b0;
   --font:"Jost","Helvetica Neue",Helvetica,Arial,system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:dark}
+:root[data-skin="opuntia"]{--mx:#1d3b26; --mx2:#4d6b52; --mxdim:#b7cfa9; --mxbg:#edf3e3; --mxpanel:#f4f8ec; --mxpanel2:#dbe8cb; --mxon:#ffffff;
+  --mxsoft:#ff1fa6; --mxpoly:#5c9a5a; --mxglowc:rgba(255,31,166,.18); --mxscan:transparent; --mxred:#e0115f; --mxcur:#ff1fa6; --mxcuron:#ffffff; --mxbus:#ff8a1f; --mxline:#3f6b47;
+  --font:"Jost","Helvetica Neue",Helvetica,Arial,system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:light}
+/* OPUNTIA (owner, 31 Oct): prickly pear: pad greens with the flowers' neon magenta, the fruit's deep magenta, the yellow and
+   orange blooms */
+:root[data-skin="opuntia"] .brand{font-weight:600; letter-spacing:.02em} :root[data-skin="opuntia"] .brand .plus{color:#ff1fa6}
+:root[data-skin="opuntia"] #tPad .k[data-b="play"]:not(#zz){background:#ff1fa6; color:#fff; border-color:#a4135e} :root[data-skin="opuntia"] #tPad .k[data-b="edit"]:not(#zz){background:#ffd23f; color:#1d3b26; border-color:#1d3b26}
+:root[data-skin="opuntia"] #tPad .k[data-b="shift"]:not(#zz){background:#a4135e; color:#fff} :root[data-skin="opuntia"] #tPad .k[data-b="loop"]:not(#zz){background:#ff8a1f; color:#1d3b26}
 :root[data-skin="braun"] .brand{font-weight:500; letter-spacing:.01em} :root[data-skin="braun"] .brand .plus{color:#e85d1c}
 :root[data-skin="te"] .brand{font-weight:700; text-transform:lowercase; letter-spacing:0} :root[data-skin="te"] .brand .plus{color:#ff6a13}
 :root[data-skin="te"] :is(button,select,.setmenu){border-radius:6px}
@@ -1703,7 +1711,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
   --stdc:var(--mxdim); --fmc:var(--mxdim); --addc:var(--mxdim); --noisec:var(--mxdim); --smpc:var(--mxdim); --plc:var(--mxdim); --wvc:var(--mxdim);
   --meter-ok:var(--mx); --meter-hot:var(--mxsoft); --meter-clip:var(--mxred); --mxglow:0 0 6px var(--mxglowc)}
 :root[data-skin="matrixlight"]{--line:#2b2b2b}
-:root[data-skin="vice"]{--line:#5a468f} :root[data-skin="koss"]{--line:#7a5c45}
+:root[data-skin="vice"]{--line:#5a468f} :root[data-skin="opuntia"]{--line:#3f6b47} :root[data-skin="koss"]{--line:#7a5c45}
 :root[data-skinbase="term"] body{background:var(--mxbg); color:var(--mx); font-family:var(--font); text-shadow:var(--mxglow)}
 :root[data-skinbase="term"] :is(button,select,input,textarea){font-family:var(--font)}
 :root[data-skinbase="term"] :is(kbd,code,.tscr,.fxpick){font-family:var(--mono)}
@@ -1722,10 +1730,10 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
    second panel tone, so the app's menus read as their own strip above the SONG / PHRASE… row, and the screen tabs are
    plain words with the open one underlined. Only the bar's own buttons change (the menus that open from it keep the skin's
    colours); a pressed button stays filled. Dark Simple skins, Pastel and Minimal are unchanged. */
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"]) .top{background:var(--mxpanel2)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .top{background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
 /* pads, command row and keypad: plain keys with outlines and an offset block; a hit fills */
 :root[data-skinbase="term"] :is(.tcmd,.dock,.tctl){background:var(--mxbg)}
 :root[data-skinbase="term"] :is(.tcmd button,.tkp .kp,.pads .pad){background:var(--mxbg); color:var(--mx); border-color:var(--mxline, var(--mx));
@@ -1762,7 +1770,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="greywhite"]{--mxmst:#c9b7f2}
 :root[data-skin="contrast"]{--mxmst:#d6331f; --mxmston:#ffffff}
 :root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg))}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"]) .tdeck{--stpink:var(--mx)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .tdeck{--stpink:var(--mx)}
 :root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkChn,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkChn{--dkp:9%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
 :root[data-skinbase="term"] .dkh .dksolo{background:var(--mxsoft); color:var(--mxon)} :root[data-skinbase="term"] .stms button.so.on{background:var(--mxsoft); color:var(--mxon)}
 :root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
@@ -1770,7 +1778,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
    could go grey (plum: green into pink gave #d2d0d2). Light skins mix it with white so the hue stays; the dark skins
    (near-neutral backgrounds) keep mixing with theirs. */
 :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 35%, #ffffff)}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
 :root[data-skinbase="term"] .tagrid b.f[style]{background:color-mix(in srgb, var(--mx) var(--ibp, 100%), var(--mxsoft)); color:var(--mxon)} :root[data-skinbase="term"] .tagrid b.f{text-shadow:none; box-shadow:0 0 8px var(--mxglowc)}
 :root[data-skinbase="term"] .tscr .nbl, :root[data-skinbase="term"] .tscr .nbr{color:var(--mx2)}
 :root[data-skinbase="term"] ::selection{background:var(--mx); color:var(--mxon)}
@@ -1958,7 +1966,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="btnrow" id="mobEdRow"><label class="cb" title="Shows the …chains editor on Mobile (a big screen like the unfolded Fold has room for it). Off: the song's …chains effects still play."><input type="checkbox" id="ckMobCh">Show …chains on Mobile</label><label class="cb" title="Shows the …waves editor on Mobile. Off: the kit's …waves layers still play."><input type="checkbox" id="ckMobWv">Show …waves on Mobile</label></div>
       <div class="btnrow"><button type="button" id="updBtn">Check for update</button><button type="button" id="helpBtn2">Help &amp; keys</button></div>
       <div class="btnrow" id="installRow" hidden><button type="button" id="installBtn" hidden>Install app</button><span class="lbl" id="installMsg"></span></div>
-      <div class="btnrow" id="storeRow"><span class="lbl" id="storeInfo">Storage: …</span><button type="button" id="storeTidy" title="Deletes stored samples that no pad, preset or saved song uses">Clear unused samples</button></div>
+      <div class="btnrow" id="storeRow"><span class="lbl" id="storeInfo">Storage: …</span><button type="button" id="storeTidy" title="Deletes stored samples that no pad, preset or saved song uses">Clear unused samples</button><button type="button" id="phrTidy" title="Empties every phrase and block that isn't on the song, so their numbers are free for new ones (Undo brings them back)">Clear unused phrases</button></div>
     </div>
   </section>
 
@@ -12061,6 +12069,26 @@ async function storeInfo(){
   } catch(e){ out.textContent = 'Storage: unavailable'; }
 }
 $('storeTidy').addEventListener('click', async () => { smpTidy(); toast('Unused samples cleared.'); setTimeout(storeInfo, 800); });
+$('phrTidy').addEventListener('click', () => purgePhrases());
+/* CLEAR UNUSED PHRASES (owner, 31 Oct: free up pattern numbers). Every block (chain) that no song cell uses, the master
+   column too, is emptied, and every phrase that no remaining block plays; their numbers are free again for new ones.
+   One undo step. Block colours of emptied blocks go with them. */
+async function purgePhrases(){
+  const useC = new Set(); for (let y = 0; y < 256; y++){ const r = S.song[y]; if (r) for (let t = 0; t <= MT; t++) if (r[t] >= 0) useC.add(r[t]); }
+  const useP = new Set(); for (const v of useC){ const c = S.chains[v]; if (c) for (const q of c) if (q[0] >= 0) useP.add(q[0]); }
+  const dropC = [], dropP = [];
+  for (let v = 0; v < S.chains.length; v++) if (S.chains[v] && !useC.has(v)) dropC.push(v);
+  for (let id = 0; id < S.phrases.length; id++) if (S.phrases[id] && !useP.has(id)) dropP.push(id);
+  const nP = dropP.filter(id => !isEmptyPhrase(S.phrases[id])).length;
+  if (!dropC.length && !dropP.length) return toast('Nothing to clear: every phrase and block is on the song.');
+  const ok = await askYes({title:'Clear unused phrases?', body:`Empties ${nP} phrase${nP === 1 ? '' : 's'} with notes or commands` + (dropP.length > nP ? ` (and ${dropP.length - nP} empty one${dropP.length - nP === 1 ? '' : 's'})` : '') + ` and ${dropC.length} block${dropC.length === 1 ? '' : 's'} that aren't on the song, so their numbers are free for new ones. Undo brings them back.`}, 'Clear');
+  if (!ok) return;
+  for (const v of dropC){ S.chains[v] = null; if (S.bcol) delete S.bcol[v]; }
+  for (const id of dropP){ S.phrases[id] = null; if (S.plen) S.plen[id] = S.dlen || 16; if (S.plpb) S.plpb[id] = 0; }
+  if (clip && clip.v === 'song') clip = null;   // a copied block could point at one of them
+  saveS(); arrSig = ''; draw();
+  toast(`Cleared ${nP} phrase${nP === 1 ? '' : 's'} and ${dropC.length} block${dropC.length === 1 ? '' : 's'} not on the song.`, 4000);
+}
 // Keep a dropdown inside the window: it hangs from its button's left edge, and moves left if it would run off.
 function placeMenu(menu){
   menu.style.left = '0px'; menu.style.right = 'auto';
@@ -12366,6 +12394,7 @@ const SKINS = [
   {id:'braun', name:'Braun', base:'term', dots:['#f2f0eb', '#2b2b2b', '#e85d1c', '#4b8f3b']},
   {id:'te', name:'TE', base:'term', dots:['#e7e7e5', '#121212', '#ff6a13', '#3c5cff']},
   {id:'koss', name:'Koss retro', base:'term', dots:['#2a1f19', '#f1e4cc', '#f08a2c', '#e0b13a']},
+  {id:'opuntia', name:'Opuntia (prickly pear)', base:'term', dots:['#edf3e3', '#1d3b26', '#ff1fa6', '#ffd23f']},
   {id:'bwterm', name:'Simple black', base:'term', dots:['#000000', '#ffffff', '#5a5a5a', '#9a9a9a']},
   {id:'bwlight', name:'Simple white', base:'term', dots:['#ffffff', '#000000', '#a6a6a6', '#6b6b6b']},
   {id:'mustard', name:'Simple mustard', base:'term', dots:['#e3d9f6', '#a37800', '#f2cf63', '#6f55bf']},
@@ -18319,7 +18348,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 323;
+const BUILD = 324;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24663,6 +24692,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [324, '31 Oct', ['Settings → App → Clear unused phrases: empties every phrase and block that isn’t on the song, so their numbers are free for new ones. It says how many first, and Undo brings them back.', 'New skin: Opuntia (prickly pear), in Art & design: pad greens with the flowers’ neon magenta, the fruit’s deep magenta and the yellow and orange blooms on the keys.']],
   [323, '31 Oct', ['Eight new skins under Art & design (Settings → Screen → Skin): Haring, IDM, Line art, Lautrec poster, Vice (Miami night), Braun, TE and Koss retro. Each has its own accent colours, and PLAY and EDIT (and a few more keys in Haring and TE) take them on the touch deck.']],
   [322, '31 Oct', ['FOLLOW has a middle setting, PATTERN (Settings → Screen → FOLLOW: OFF / PATTERN / ON): while the song plays, the Phrase (and Sect) screen switches to what your track is playing, but nothing scrolls and the cursor stays where you put it.', 'Arrange keeps its place when you click a block: a block already on screen no longer jumps to the bottom; one off the edge comes in, to the middle of Arrange when it was far away.']],
   [321, '31 Oct', ['Arrange: right-click a block (or a selection) → Colour this block… / Colour these blocks…: one of the track colours, shown everywhere that block is used and kept in the song (None goes back to the instrument’s colour).', 'Arrange’s scrollbar is easier to drag: the grid no longer snaps back to whole rows under the mouse, and its length stays put while scrolling (the song plus 32 rows).']],
@@ -24841,7 +24871,7 @@ function setSheet(kind){
 }
 // Skin: every skin as a little tracker in its own colours, grouped. A tap puts it on the app at once (the app behind
 // the sheet is the preview); Done keeps it, "Back to …" returns to the skin you opened the sheet with.
-const SKIN_GROUPS = [['Pastel', ['auto', 'light']], ['Minimal', ['minimal', 'mincolor', 'monotone', 'minblack', 'mincolorblack']], ['Neon & Matrix', ['neon', 'matrix', 'matrixlight']], ['Rainbow', ['rainbow', 'rainbowdyn']], ['Art & design', ['haring', 'idm', 'lineart', 'lautrec', 'vice', 'braun', 'te', 'koss']]];
+const SKIN_GROUPS = [['Pastel', ['auto', 'light']], ['Minimal', ['minimal', 'mincolor', 'monotone', 'minblack', 'mincolorblack']], ['Neon & Matrix', ['neon', 'matrix', 'matrixlight']], ['Rainbow', ['rainbow', 'rainbowdyn']], ['Art & design', ['haring', 'idm', 'lineart', 'lautrec', 'vice', 'braun', 'te', 'koss', 'opuntia']]];
 const hexLum = h => { const n = parseInt(h.slice(1), 16), c = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * c(n >> 16 & 255) + 0.7152 * c(n >> 8 & 255) + 0.0722 * c(n & 255); };
 const hexCon = (a, b) => { const x = hexLum(a), y = hexLum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
 function skinGroups(){
