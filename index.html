@@ -18370,7 +18370,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 327;
+const BUILD = 328;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18429,6 +18429,7 @@ function followPlay(){
   if (followMode === 1){   // FOLLOW PATTERN: only which phrase / sect is shown follows the cursor's track; nothing scrolls
     if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0) cSect = own.sect; }
     else if (tv === 'phrase'){ const mine = P[cTrack]; if (mine && mine.phrase >= 0 && mine.phrase !== cPhrase){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); } }
+    arrFollowPage(own);   // Arrange follows the playing pattern too
     return; }
   // EDIT WHILE FOLLOWING (owner, 31 Oct): the screen follows the playhead (the song row, the sect, the phrase the cursor's
   // track plays, and the rows scroll a page when the playhead runs off them), but the cursor stays on its row, so you
@@ -18445,9 +18446,13 @@ function followPlay(){
     if (mine && mine.phrase >= 0){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); page(cs.phrase, mine.step, pvr, pvActive() ? 256 : plen(cPhrase)); }
     else if (pvActive() && own.step != null) page(cs.phrase, own.step, pvr, 256); }
   if (tv === 'phrase' && tp.mode === 'song' && own.row >= 0 && pvActive() && !(apReady && apF)) pvFollow(P, own);   // PATTERN VIEW: the song row follows too (not the cursor Arrange is moving)
-  // ARRANGE PAGES (owner, 30 Oct): Arrange (beside the screen, or as the Song screen) turns a page when the playing row runs
-  // off its bottom (or top): the playing row becomes its first. Not while Arrange has the keys (you're moving it).
-  try { if (tp.mode === 'song' && own.row >= 0 && apF !== 'arr' && (asongOn() || (tv !== 'song' && apPanel()))){
+  arrFollowPage(own);
+}
+// ARRANGE PAGES (owner, 30 Oct): Arrange (beside the screen, or as the Song screen) turns a page when the playing row runs
+// off its bottom (or top): the playing row becomes its first. Not while Arrange has the keys (you're moving it). FOLLOW
+// PATTERN does it too (owner, 31 Oct).
+function arrFollowPage(own){
+  try { if (tp.mode === 'song' && own && own.row >= 0 && apF !== 'arr' && (asongOn() || (tv !== 'song' && apPanel()))){
     const VR = Math.max(2, arrRows()), top = cs.song.top || 0;
     if (own.row < top || own.row > top + VR - 1){ cs.song.top = clamp(own.row, 0, Math.max(0, 256 - VR)); cs.song.pg = true; } } } catch(e){}
 }
@@ -18988,7 +18993,7 @@ function projRows(){
     {l:'MIXER SIZE', get:() => mixScale, set:v => setMixScale(v), min:60, max:200, step:10, big:20, d:mixScaleDef(), fmt:v => v + '%',
       info:() => 'Size of the Mixer only, separate from TEXT SIZE: 100 % fills the screen, which is already larger than the 80 % Desktop text size gave it. Above that it takes whatever room is left, never past the screen (all its rows stay visible); bigger shows fewer tracks at once, and the window follows the cursor (TRK nn–nn of 32 ◀▶)'},
     {l:'FOLLOW', segs:true, get:() => followMode, set:v => setFollow(v), min:0, max:2, d:0, fmt:v => ['OFF', 'PATTERN', 'ON'][v] || 'OFF',
-      info:() => 'While the song plays. ON: Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. PATTERN: Phrase (and Sect) switch to what the cursor’s track is playing, but nothing scrolls and the rows stay where you put them. OFF: the screen stays where you put it. The cursor stays on its row in every mode, so you can edit while it plays'},
+      info:() => 'While the song plays. ON: Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. PATTERN: Phrase (and Sect) switch to what the cursor’s track is playing and Arrange turns its pages with the song, but the phrase’s rows stay where you put them. OFF: the screen stays where you put it. The cursor stays on its row in every mode, so you can edit while it plays'},
     {l:'TAB', segs:true, get:() => tabTracks ? 1 : 0, set:v => setTabTracks(!!v), min:0, max:1, d:1, fmt:v => v ? 'TRACKS' : 'COLUMNS',
       info:() => 'In a phrase. TRACKS (as Renoise): Tab / Shift+Tab go to the next / previous track’s phrase. COLUMNS: they step note → instrument → FX1 → FX2 → FX3, so the instrument is one press away'},
     {l:'RESUME', ck:'Playback resumes from pause', get:() => resumeOn ? 1 : 0, set:v => setResume(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
@@ -20798,7 +20803,7 @@ function draw(){
   if (tv === 'song' && asongOn()){
     // Arrange is the Song screen: no text to build, just keep the cursor's row in Arrange's view (drawArr draws it).
     sub = S.name;
-    const VR = arrRows(); if (!(c.pg && followOn && tp.on)){ c.pg = false; arrKeepRow(c, VR); } c.top = clamp(c.top, 0, 256 - VR);
+    const VR = arrRows(); if (!(c.pg && followMode && tp.on)){ c.pg = false; arrKeepRow(c, VR); } c.top = clamp(c.top, 0, 256 - VR);
   } else if (tv === 'song'){
     const [T0, T1] = trackWin(c, stepDec ? 4 : 3, 1, 4), ts = trkSub(T0, T1); sub = ts ? ts + '  ' + S.name : S.name;
     const VR = songRows(); if (!(c.pg && followOn && tp.on)){ c.pg = false; if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; } c.top = clamp(c.top, 0, 256 - VR);   // (c.pg: EDIT WHILE FOLLOWING)
@@ -24393,7 +24398,7 @@ const apKey = () => { const r = S.song[cs.song.y]; return cs.song.x + ':' + cs.s
 // Keep the song cursor's row in the panel's view (Arrange shows the rows from cs.song.top down).
 function apTop(){
   const c = cs.song, VR = Math.max(2, arrRows()); c.top = c.top || 0;
-  if (c.pg && followOn && tp.on) return;   // EDIT WHILE FOLLOWING: the playhead paged it
+  if (c.pg && followMode && tp.on) return;   // EDIT WHILE FOLLOWING: the playhead paged it (FOLLOW ON or PATTERN)
   arrKeepRow(c, VR);
   c.top = clamp(c.top, 0, 256 - VR);
 }
@@ -24768,6 +24773,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [328, '31 Oct', ['FOLLOW PATTERN: Arrange follows the playing pattern too, turning a page when the playing row runs off it, as with FOLLOW ON.']],
   [327, '31 Oct', ['Arrange beside another screen: one click on a block shows it there (its phrase, or its track’s mixer or effects) and the keys stay where they were, so you can type straight away; a double-click opens it. Dragging there still selects (Arrange takes the keys for that).', 'Arrange’s scrollbar is easy to grab: the panel’s resize grip no longer lies over it, and with a mouse the scrollbar is wider with a clear thumb.', 'IDM is the skin a first visit starts on.']],
   [326, '31 Oct', ['Esc switches EDIT mode (as in Renoise): off, the note keys only play the instrument and the phrase can’t be typed into; EDIT OFF shows at the top right. Esc still drops a selection first.', 'Tab and Shift+Tab go to the next / previous track (in a phrase, that track’s phrase on this song row). Settings → Screen → TAB → COLUMNS puts back the old note → instrument → FX steps.', 'The mouse wheel no longer changes values on the Mixer, FX and Inst screens: hold Alt/⌥ to change one with the wheel.', 'The wheel over Arrange moves the song cursor a row a notch, as ▲▼ do, and Arrange scrolls with it at the edge; Shift+wheel only scrolls.', 'The playhead in Arrange stands out: the playing blocks get an outline in the skin’s ink and the playing row a band.', 'The first FLX (or FXO, GAT, RTG) of a song is no longer lost when you press PLAY right after opening it.', 'Clicking the master column (Shift-click too) or an empty cell in Arrange sets the track Phrase and Pattern view open on.']],
   [325, '31 Oct', ['Enter on a note or command in a phrase (picking it up as the current one, or writing the current command) also copies it, so Ctrl/⌘+V or SHIFT+EDIT pastes it: a note with its instrument, a command with its value.', 'The mouse wheel over Arrange scrolls Arrange smoothly, as dragging its scrollbar does.']],
