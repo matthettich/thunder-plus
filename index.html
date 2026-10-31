@@ -18254,7 +18254,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 316;
+const BUILD = 317;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22450,7 +22450,7 @@ function drawArr(PH){
   const PFg = polyFrom();   // each block carries its track's group, so the mono and poly sections take their colours
   const BUS = busPlan().feeds;   // BUS: a bus track's column is a little darker
   const BG = busGroups();   // BUS GROUPS (31 Oct): each bus and the tracks it takes in share a colour
-  const spAt = t => ms ? t > 0 && t === PFg : t > 0 && t % 8 === 0;   // where a spacer column sits before track t
+  const spAt = t => t > 0 && t === PFg;   // where a spacer column sits before track t: the MONO | POLY break (owner, 31 Oct: with 17 tracks the side panel's every-8 spacer fell inside MONO, between 8 and 9)
   for (let y = 0; y < N; y++){
     h += `<div class="ar"><span class="rn${y % 4 ? '' : ' r4'}" data-ry="${y}">${rS(y, 3)}</span>`;
     for (let t = 0; t < NA; t++){
@@ -22476,7 +22476,7 @@ function drawArr(PH){
   const PF = polyFrom();
   const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (spAt(t) ? '<span></span>' : '') + `<i data-t="${t}"${BG.get(t) ? ` style="--bgc:${BG.get(t)}"` : ''} class="${BG.get(t) ? 'bg ' : ''}${t < PF ? 'gm' : 'gp'}${m.mute ? ' mu' : ''}${m.solo ? ' so' : ''}${tCol(t) ? ' tcl' : ''}${isBusT(t) ? ' bus' : ''}" title="${esc(trkTip(t))}${isBusT(t) ? ' (' + busOf(t) + ')' : ''} · click mutes, right-click solos, double-click names"${tCol(t) ? ` style="--tc:${tCol(t)}"` : ''}>${t + 1}</i>`).join('') + (mx ? '<span></span><i class="gx">MS</i>' : '');
   // MONO and POLY tabs spanning their tracks' columns (track t sits in grid column 2 + t + one per 8-track gap before it).
-  const col = t => 2 + t + (ms ? (t >= PF && PF > 0 ? 1 : 0) : Math.floor(t / 8)), rng = (a, b) => d2(a) + (b > a ? '–' + d2(b) : '');
+  const col = t => 2 + t + (t >= PF && PF > 0 ? 1 : 0), rng = (a, b) => d2(a) + (b > a ? '–' + d2(b) : '');
   let gp = '';
   if (PF > 0) gp += `<b class="gm" style="grid-column:${col(0)} / ${col(PF - 1) + 1}" title="Mono tracks ${rng(1, PF)}">MONO ${rng(1, PF)}</b>`;
   if (NA > PF) gp += `<b class="gp" style="grid-column:${col(PF)} / ${col(NA - 1) + 1}" title="Poly tracks ${rng(PF + 1, NA)}">POLY ${rng(PF + 1, NA)}</b>`;
@@ -22580,16 +22580,16 @@ function arrSize(){
   // space beside it, as it had beside the text grid. A narrow screen (or STAGE off) still gives Arrange the whole width.
   if (ms) arrEl.style.maxWidth = stage !== 'off' ? Math.round((sm ? 12 : 16) + (sm ? 18 : 22) + (NA + 1) * 46 + 3 * 12 + 4) + 'px' : '';
   else if (arrEl.style.maxWidth) arrEl.style.maxWidth = '';
-  // Spacers: every 8 tracks in the side panel; as the Song screen only at the MONO | POLY break and before MST (12px),
-  // so each group gets its own box.
-  const PFs = polyFrom(), SP = ms ? 12 : 4, nSp = ms ? (PFs > 0 && PFs < NA ? 1 : 0) + 1 : G - 1 + mx;
+  // Spacers: only at the MONO | POLY break and before MST (12px as the Song screen, 4px in the side panel), so each
+  // group gets its own box.
+  const PFs = polyFrom(), SP = ms ? 12 : 4, nSp = (PFs > 0 && PFs < NA ? 1 : 0) + mx;
   const RNW = ms ? 30 : sm ? 18 : 22;   // the row-number column (wider as the Song screen: see body.asong in the CSS)
   const W = arrGrid.clientWidth, cwFit = (W - (sm ? 12 : 16) - RNW - nSp * SP - (NA + mx + nSp) * (sm ? 1 : 2)) / (NA + mx);
   arrFitW = cwFit; if (arrZoom > arrZMax()) arrZoom = arrZMax();   // a zoom saved on a smaller screen
   const z = arrZoom > 1 ? arrZoom : 1;
   const col = z > 1 ? Math.max(6, cwFit * z).toFixed(1) + 'px' : 'minmax(0,1fr)', grp = [];
   if (ms){ if (PFs > 0) grp.push(`repeat(${PFs},${col})`); if (NA > PFs) grp.push(`repeat(${NA - PFs},${col})`); grp.push(col); }
-  else { for (let g = 0; g < NA; g += 8) grp.push(`repeat(${Math.min(8, NA - g)},${col})`); if (mx) grp.push(col); }
+  else { if (PFs > 0) grp.push(`repeat(${Math.min(PFs, NA)},${col})`); if (NA > PFs) grp.push(`repeat(${NA - PFs},${col})`); if (mx) grp.push(col); }
   arrEl.style.setProperty('--arcols', grp.join(` ${SP}px `));
   // As the Song screen the row height comes from the space the grid HAS (arrAvail), not the grid's own height: drawArr
   // snaps that height to whole rows, so reading it back here flipped 12 rows ↔ 13 rows on every redraw during playback.
@@ -22599,7 +22599,7 @@ function arrSize(){
   arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', Math.max(7, lf) + 'px'); arrEl.classList.toggle('arnolab', lf < 7);
   // Where the MONO | POLY break sits when every track fits (track PF's column starts after a spacer every 8 tracks):
   // the header's ○ is centred over it, and stays there while zoomed so it is always in the same place.
-  { const p = sm ? 6 : 8, rnw = RNW, g = sm ? 1 : 2, PF = polyFrom(), colL = t => p + rnw + g + t * (cwFit + g) + (ms ? (t >= PF ? 1 : 0) : Math.floor(t / 8)) * (SP + g);
+  { const p = sm ? 6 : 8, rnw = RNW, g = sm ? 1 : 2, PF = polyFrom(), colL = t => p + rnw + g + t * (cwFit + g) + (t >= PF && PF > 0 ? 1 : 0) * (SP + g);
     const bx = PF > 0 && PF < NA ? (colL(PF - 1) + cwFit + colL(PF)) / 2 : W / 2;
     arrEl.style.setProperty('--azfx', Math.max(120, Math.min(W - 70, bx)).toFixed(1) + 'px'); }
   arrEl.classList.toggle('zoomed', z > 1);
@@ -24540,6 +24540,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [317, '31 Oct', ['Arrange (beside the Phrase screen and the others): the only gap between columns is at the MONO | POLY line, as on the Song screen. With an odd number of tracks the old gap every 8 tracks fell inside MONO (between 8 and 9).']],
   [316, '31 Oct', ['Tracker → PROJECT has › LOAD ELECTRO too (EDIT twice), beside › LOAD DEMO, for phones.']],
   [315, '31 Oct', ['Render song and Render stems ask where to save first (the desktop app: the Save dialog, starting in your Music folder and then wherever the last one went; Chrome and Edge: their Save picker; elsewhere the file goes to Downloads, and it says so), then show a progress window with a bar that follows the render. When it is saved the desktop app tells you where, with a Show button that opens the folder.', 'Other exports (pads, kits, presets, rendered parts) ask where to save the same way.']],
   [314, '31 Oct', ['Matrix light: dark grey outlines instead of green (the track groups keep their colours).', 'Desktop app: audio starts on Latency Balanced (a bigger buffer) unless you picked one in Settings → Audio, which keeps playback from crackling when the computer is busy.']],
