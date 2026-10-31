@@ -79,6 +79,53 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (26): …pump creative effects, MASTER and …chains modules (build 294)
+
+Owner: port pump's effects Thunder Plus didn't have, each its own thing (keep the old reverbs and delays), into …chains
+where they fit, MASTER last; hold off on AMP (note below); ROOM and the converter not wanted. Worked unattended: calls
+marked *(guess)* are for the owner to confirm.
+
+- **pump side (matthettich/pump `ab079e4`, `2b86cfe`):** the creative plugins needed no DSP split. `wasm/shim/DistrhoPlugin.hpp`
+  stands in for DPF so each plugin's own `Plugin<Name>.hpp` compiles unchanged; one translation unit per plugin
+  (`wasm/fx/<name>.cpp`: the plugins' `using namespace` lines would clash in one), `wasm/fx/Runner.hpp` the interface,
+  `HostShim` in `pump_wasm.cpp` hosts them. Types 9–23 after the nine: tube snap gate echo spring verb grain vox tune
+  crush swirl stutter chop twang master. New exports `pump_midi`, `pump_transport`, `pump_text`, `pump_state_get/set`;
+  MASTER's LEARN is `pump_hold` kind 3 (1 start, 2 finish, 3 cancel); telemetry for these is the common five values
+  (MASTER adds learning / learned / LUFS). wasi has no threads: STUTTER's mutex is a no-op stand-in; MASTER's one
+  try/catch reads as plain blocks (parseAnalysis never throws). pump.wasm 1.5 MB (was 0.58). CPU per instance (node,
+  48 kHz): 0.4–5 % of a core. Not checked against the native plugins sample for sample (there's no parity test for the
+  shim path yet: `tests/parity.cpp` covers the nine); the smoke tests (`wsmoke.mjs` in the session scratchpad) run all 24
+  finite.
+- **Track effects:** `PUMP_CREATIVE` (14) go on **every track** (`pumpAnyTrack`), MASTER on buses / master only. Each in the
+  picker group of its kind (`PUMP_GROUP`) *(guess: not one …pump group)*. FX rows: every parameter a preset may set, in
+  the plugin's order (`PUMP_BOX` filled in automatically for types without a hand list; STUTTER has ~80 rows, VOX ~60).
+  No **› OPEN** for them (no windows yet). Transport: the worklet works out the song position from the beat clock
+  (`this.ppq`) and calls `pump_transport` per block; GATE / STUTTER / CHOP keep the node awake on the clock (`clk`).
+- **NOTES FROM** (`f.nin`: 0 off, 1 + t = track t) on TUNE, VOX, TWANG, STUTTER, CHOP *(guess: off by default, any track's
+  notes; STUTTER has no MIDI switch of its own and plays moves on C–G)*. `pmNotes` in the player sends note on / off as
+  `{pmidi:[[slot, time, status, d1, d2]…]}`; the worklet holds them until their block (sample-timed). **Offline renders
+  don't deliver worklet messages until the end**, so there `pmPost` suspends the render at the note's block (sharing
+  `tempoAt` with the tempo changes, suspend at 0 allowed). Notes keep Thunder's numbering (C-4 = MIDI 60), so CHOP's pad 1
+  (MIDI 48) is Thunder's C-3.
+- **MASTER:** rows › LEARN (shows the learned LUFS), › FINISH LEARN, › CANCEL LEARN, › FORGET. The analysis text lives in
+  the slot (`f.ana`, saved with the song), goes to the plugin with the chain (`ana`), and the worklet polls it about
+  twice a second (`pumpStateGet`, ASCII by hand: no TextDecoder in a worklet) and posts `{pana}` when it changes;
+  `PumpFX._ana` stores it (no undo step of its own). Checked live: LEARN 5 s of the demo → `-15.3 LUFS`, renders use it.
+- **…chains:** `tools/pump-chains.mjs` writes `===PUMP MODULES===` (chains-worklet.js) and `===PUMP EDITOR===` /
+  `===PUMP PALETTE===` (chains/index.html) from pump-meta.js: keys `ptube` … `ptwang` (13; **CHOP left out**: its pads need
+  notes). Curved knobs (Hz, ms) are 0–1 on the plugin's curve; choices and whole numbers are the plugin's values. **pump
+  VOX starts on Split L/R** (In L carrier, In R voice: the owner's ask). The bytes reach the chains worklet as
+  processorOptions `pump`, or later by `op:'pump'` (`pumpToChains`); the standalone page fetches `../pump/pump.wasm`.
+  Not in …waves (no shared block). Big modules are tall (VOX shows all ~60 rows; fold it by its title).
+  `chains-worklet.js?v=40`; tests feed pump.wasm to the chains tests (39 new golden hashes, none changed).
+- **Next if wanted:** pop-up windows for the fifteen (one `pump/ui/<type>.js` each, as the nine; the shim host would
+  need their feeds: rings, meters); a curated, shorter row list for STUTTER / VOX / CHOP; FXV for pump slots; a parity
+  test for the shim types; CHOP in …chains with a gate / pitch input.
+- **AMP (held, owner 30 Oct):** pump AMP loads .nam models and cab IRs from files (`ModelGuard`, `NamJson`,
+  `nam_unity.cpp`: the NAM runtime). For Thunder Plus it needs: the NAM code built for wasm (no threads; check its
+  licence goes in THIRD_PARTY_NOTICES), the model and IR files carried in the song or the kit (as the convolution
+  reverb's IRs are: `globalThis.__thunderIR`), and a file picker on the FX screen. Probably a …chains module too.
+
 ## 30 Oct (25): THREE DIGITS: sects and phrases 000–FFF (build 293)
 
 - Owner ran out of unique sects/phrases in Arrange (one 256 pool shared by every track). `NPH = 4096` (next to NT):

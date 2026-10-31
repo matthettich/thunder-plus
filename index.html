@@ -17996,7 +17996,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 293;
+const BUILD = 294;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24120,6 +24120,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [294, '30 Oct', ['Fourteen more …pump effects, each its own effect next to Thunder’s (the older reverbs and delays stay): TUBE, CRUSH, SNAP, SWIRL, ECHO, SPRING, VERB, TWANG, VOX, TUNE, GRAIN, GATE, STUTTER and CHOP, on any track, bus or the master, with the plugins’ presets. They follow the song’s tempo.', 'NOTES FROM sends a track’s notes to TUNE, VOX, TWANG, STUTTER or CHOP as MIDI (CHOP’s pads, TUNE’s notes, VOX’s synth carrier).', '…pump MASTER on buses and the master: › LEARN, play the song, › FINISH LEARN. It keeps what it learned with the song.', '…chains: thirteen of them as modules, each in its kind’s group. pump VOX there: carrier into In L, voice into In R.']],
   [293, '30 Oct', ['Sects and phrases are numbered 000–FFF now: 4,096 of each instead of 256, so Arrange’s unique copies don’t run out. Type three hex digits into a song or sect cell. Songs saved from now on need this version (or newer) to open with every block.']],
   [292, '30 Oct', ['Song / Arrange: the first Shift-click starts the selection on the cell you click (it reached from the cursor, which beside Phrase sits on the phrase you’re editing).']],
   [291, '30 Oct', ['Ctrl/⌘+D on the Song and Arrange counts Ctrl/⌘-clicked blocks: it duplicates every row from the first pick to the last (it took only the cursor’s row).']],
