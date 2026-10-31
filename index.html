@@ -15311,6 +15311,9 @@ function undoStep(dir){
   Object.assign(S, n); CH.doc = S.chainPatch || null;
   try { const a = chApi(); if (a && a.chainOnChanged) a.chainOnChanged(); } catch(e){}   // CHAIN OFF: CHN may have changed
   if (chWas !== JSON.stringify(S.chainPatch || null)){ const a = chApi(); let ok = false; if (a && a.setDoc && CH.frame) try { a.setDoc(S.chainPatch); ok = true; } catch(err){ tpLog('undo: …chains editor', err); } if (!ok) chainsDropFrame(); }
+  // (31 Oct) the song as it now is: normSong can add what the stored text lacked (fxPre: {}), and a cur that differs from S
+  // made the next undo / redo take a fresh step and throw the redo history away
+  undo.cur = JSON.stringify(S);
   saveS(); undo.busy = false;
   if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); mstSync(); }
   draw(); toast(dir < 0 ? 'Undo' : 'Redo');
@@ -18011,7 +18014,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 295;
+const BUILD = 296;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24135,6 +24138,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [296, '31 Oct', ['…pump MASTER, GATE, TUNE and CHOP open their own windows (› OPEN on the FX screen, OPEN in the bottom panel). MASTER: the tone curve over the song, LEARN, the stages, ADVANCED trims and free bands. GATE: draw the steps and their levels. TUNE: Live, and Graph (capture the voice, then drag its notes). CHOP: play the eight pads, several at once on a touch screen, and LEARN their notes or keys.', 'Redo works again after an undo (it lost its history).']],
   [295, '31 Oct', ['pump VOX shows its main controls only (engine, mode, routing, bands, formant, the synth carrier, the Voice FX switches, mix), on the FX screen and in …chains. Its presets still set everything.']],
   [294, '30 Oct', ['Fourteen more …pump effects, each its own effect next to Thunder’s (the older reverbs and delays stay): TUBE, CRUSH, SNAP, SWIRL, ECHO, SPRING, VERB, TWANG, VOX, TUNE, GRAIN, GATE, STUTTER and CHOP, on any track, bus or the master, with the plugins’ presets. They follow the song’s tempo.', 'NOTES FROM sends a track’s notes to TUNE, VOX, TWANG, STUTTER or CHOP as MIDI (CHOP’s pads, TUNE’s notes, VOX’s synth carrier).', '…pump MASTER on buses and the master: › LEARN, play the song, › FINISH LEARN. It keeps what it learned with the song.', '…chains: thirteen of them as modules, each in its kind’s group. pump VOX there: carrier into In L, voice into In R.']],
   [293, '30 Oct', ['Sects and phrases are numbered 000–FFF now: 4,096 of each instead of 256, so Arrange’s unique copies don’t run out. Type three hex digits into a song or sect cell. Songs saved from now on need this version (or newer) to open with every block.']],

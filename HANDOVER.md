@@ -81,6 +81,27 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (2): pop-up windows for pump MASTER, GATE, TUNE and CHOP; redo fix (build 296)
+
+- Owner: "anything that needs a pop out should get one". Picked: MASTER (what it decided), GATE (step grid), TUNE (Graph
+  mode is unusable without one), CHOP (pads). Not STUTTER (owner may drop it; its custom pattern is plugin state with no
+  editor here). The other ten work from rows.
+- **pump `7225807`:** `RunnerExtra<P>` in each `wasm/fx/<name>.cpp` gives the window's feeds (`kTel` floats after the common
+  five; layouts in those files' comments), rings, commands (`pump_hold` kind 3) and momentary parameters (kind 4: CHOP's
+  pad triggers, never saved). `pump_tel_len` per type from `pumpfx_tel_<name>()`. tel buffer 4096.
+- **Slot state:** `f.pst` = the plugin's own text (MASTER `analysis`, TUNE `notes` + `curve`; `PUMP_STATES`). `PumpFX.getState /
+  setState` (one undo step; `{quiet:true}` saves without one, for a capture's curve). Keys in `PUMP_STATE_UI` (curve) stay out
+  of the worklet; `PUMP_STATE_OUT` (analysis) are polled back. Build 294's `f.ana` still loads into `pst.analysis`.
+- **Windows** `pump/ui/master.js`, `gate.js`, `tune.js`, `chop.js` (ports of each `UI<Name>.cpp`, with narrow layouts);
+  accents added to `kit.js` (v5). OPEN shows for `PUMP_WIN` + MASTER. Each file works around a few kit gaps inside itself
+  (MASTER: per-control rainbow tint, peak meters; GATE: long-press-then-drag sets `ui.bodyActive`; CHOP: its own capture
+  pointer listener for multi-touch pads; TUNE: note finder and text formats ported from TuneNotes.hpp). Checked headless,
+  desktop and phone, light and dark: screenshots in the session scratchpad `win-*/`. **Not tried by ear or on the Fold.**
+- **Redo fix:** after an undo, `undo.cur` is now `JSON.stringify(S)` (normSong added `fxPre: {}` the stored text lacked, so the
+  next step looked like a new edit and cleared the redo history). Checked: set, set, undo, undo, redo, redo round-trips.
+- Known: TUNE's capture of a synth shows short blips at note attacks (the pitch detector); with NOTES FROM holding a CHOP pad
+  from PLAY, the frozen bar can be the silent first one (the plugin does the same).
+
 ## 31 Oct: pump VOX trimmed (build 295)
 
 - Owner: trim VOX (keep it); STUTTER may be dropped later (not yet). `PUMP_BOX.vox` is a hand list of 23 rows (+ SC FROM,
