@@ -1362,6 +1362,9 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkInst{--dkc:#fbe2d2; flex:1 1 0; min-width:210px}
 #dkFx{--dkc:#f8dce8; flex:0 0 var(--dkwf, 320px); min-width:200px}
 .tdeck.mst #dkFx{flex:1 1 var(--dkwf, 320px)}   /* FOCUS TRACK: on the master, FX takes the room INST and …CHAINS leave */
+/* BUS (31 Oct fix): INST steps aside on a bus and left a blank gap before TRACK. …CHAINS keeps the width its controls need
+   (it already grows with them); FX takes the rest, as on the master. */
+.tdeck.bus #dkFx{flex:1 1 var(--dkwf, 320px)}
 /* Sections keep their widths: when they don't all fit, the panel scrolls sideways instead of squeezing them (only the
    instrument section gives up its spare room). */
 /* …chains controls mapped into the panel: columns of rows that grow sideways (the panel scrolls), a module's name above its controls */
@@ -21471,7 +21474,7 @@ function deckLayout(){
   $('tDeck').style.setProperty('--dkh', deckH() + 'px');
   $('tDeck').style.setProperty('--dkws', deck.ws + 'px'); $('tDeck').style.setProperty('--dkwf', deck.wf + 'px');
   // BUS (owner, 22 Oct): on a bus track the instrument part steps aside, so its …chains controls get the room.
-  const mst = dkMst(), bus = !mst && isBusT(dkTrack()); $('tDeck').classList.toggle('mst', mst);   // FOCUS TRACK: the master has no instrument or …chains of its own
+  const mst = dkMst(), bus = !mst && isBusT(dkTrack()); $('tDeck').classList.toggle('mst', mst); $('tDeck').classList.toggle('bus', bus);   // FOCUS TRACK: the master has no instrument or …chains of its own
   for (const [k, l] of DK_SECS){ const sct = dkSec(k), col = DK_FOLD.has(k) && !deck[k]; sct.hidden = (k === 'inst' && (bus || mst)) || (k === 'chn' && mst); sct.classList.toggle('col', col); sct.classList.toggle('first', k === 'scope');
     const t = sct.querySelector('.dkt'); if (t && DK_FOLD.has(k)){ t.setAttribute('aria-expanded', String(!col)); t.title = col ? 'Open ' + l : 'Fold ' + l + ' to a narrow strip'; } }
   $('dkBody').hidden = false; if ($('dkBare')) $('dkBare').hidden = true; $('dkOffs').hidden = true;
@@ -24138,6 +24141,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [297, '31 Oct', ['Bottom panel on a bus track: the FX part fills the space the instrument part leaves (there was a blank gap before the channel strip).']],
   [296, '31 Oct', ['…pump MASTER, GATE, TUNE and CHOP open their own windows (› OPEN on the FX screen, OPEN in the bottom panel). MASTER: the tone curve over the song, LEARN, the stages, ADVANCED trims and free bands. GATE: draw the steps and their levels. TUNE: Live, and Graph (capture the voice, then drag its notes). CHOP: play the eight pads, several at once on a touch screen, and LEARN their notes or keys.', 'Redo works again after an undo (it lost its history).']],
   [295, '31 Oct', ['pump VOX shows its main controls only (engine, mode, routing, bands, formant, the synth carrier, the Voice FX switches, mix), on the FX screen and in …chains. Its presets still set everything.']],
   [294, '30 Oct', ['Fourteen more …pump effects, each its own effect next to Thunder’s (the older reverbs and delays stay): TUBE, CRUSH, SNAP, SWIRL, ECHO, SPRING, VERB, TWANG, VOX, TUNE, GRAIN, GATE, STUTTER and CHOP, on any track, bus or the master, with the plugins’ presets. They follow the song’s tempo.', 'NOTES FROM sends a track’s notes to TUNE, VOX, TWANG, STUTTER or CHOP as MIDI (CHOP’s pads, TUNE’s notes, VOX’s synth carrier).', '…pump MASTER on buses and the master: › LEARN, play the song, › FINISH LEARN. It keeps what it learned with the song.', '…chains: thirteen of them as modules, each in its kind’s group. pump VOX there: carrier into In L, voice into In R.']],

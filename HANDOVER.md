@@ -81,6 +81,11 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (3): bottom panel on a bus (build 297)
+
+- Owner: a blank gap before TRACK on bus tracks. INST is hidden on a bus and was the only part that stretched; `.tdeck.bus`
+  (set with `mst` in the deck layout) lets `#dkFx` grow as on the master. …CHAINS keeps its content width.
+
 ## 31 Oct (2): pop-up windows for pump MASTER, GATE, TUNE and CHOP; redo fix (build 296)
 
 - Owner: "anything that needs a pop out should get one". Picked: MASTER (what it decided), GATE (step grid), TUNE (Graph
