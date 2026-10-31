@@ -1581,6 +1581,8 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="matrixlight"]{--mx:#00702d; --mx2:#2f7d47; --mxdim:#a9cdb4; --mxbg:#ffffff; --mxpanel:#f4faf6; --mxpanel2:#e3f1e7; --mxon:#ffffff;
   --mxsoft:#0b4d22; --mxpoly:#3f8a57; --mxglowc:rgba(0,112,45,.16); --mxscan:transparent; --mxred:#cc2a22;
   --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+/* (owner, 31 Oct) Matrix light's outlines are dark grey, not green; the green stays for text, fills and the lit tab */
+:root[data-skin="matrixlight"]{--mxline:#2b2b2b}
 /* (owner, 31 Oct) the matrix skins drop the brand's dots, so the screen tabs end where the tracker tabs below do */
 :root:is([data-skin="matrix"],[data-skin="matrixlight"]) .brand .bdots{display:none}
 :root[data-skin="bwterm"]{--mx:#ffffff; --mx2:#bdbdbd; --mxdim:#5a5a5a; --mxbg:#000000; --mxpanel:#0a0a0a; --mxpanel2:#161616; --mxon:#000000;
@@ -1644,19 +1646,20 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
   --std:var(--mx); --fm:var(--mx2); --add:var(--mxpoly); --noise:var(--mx2); --smp:var(--mx); --pl:var(--mxsoft); --fx:var(--mx); --rec:var(--mxred);
   --stdc:var(--mxdim); --fmc:var(--mxdim); --addc:var(--mxdim); --noisec:var(--mxdim); --smpc:var(--mxdim); --plc:var(--mxdim); --wvc:var(--mxdim);
   --meter-ok:var(--mx); --meter-hot:var(--mxsoft); --meter-clip:var(--mxred); --mxglow:0 0 6px var(--mxglowc)}
+:root[data-skin="matrixlight"]{--line:#2b2b2b}
 :root[data-skinbase="term"] body{background:var(--mxbg); color:var(--mx); font-family:var(--font); text-shadow:var(--mxglow)}
 :root[data-skinbase="term"] :is(button,select,input,textarea){font-family:var(--font)}
 :root[data-skinbase="term"] :is(kbd,code,.tscr,.fxpick){font-family:var(--mono)}
-:root[data-skinbase="term"] :is(button,select,input[type=text],input[type=number],textarea){background:var(--mxbg); color:var(--mx); border-color:var(--mx)}
+:root[data-skinbase="term"] :is(button,select,input[type=text],input[type=number],textarea){background:var(--mxbg); color:var(--mx); border-color:var(--mxline, var(--mx))}
 :root[data-skinbase="term"] :is(button.on,.seg button.on,.ttabs button.on,.ttabs button[data-v].on,.tmap button[data-v].on,#bFile.on,.top #bSet.on){
-  background:var(--mx)!important; color:var(--mxon)!important; border-color:var(--mx); text-shadow:none; box-shadow:0 0 12px var(--mxglowc)}
+  background:var(--mx)!important; color:var(--mxon)!important; border-color:var(--mxline, var(--mx)); text-shadow:none; box-shadow:0 0 12px var(--mxglowc)}
 :root[data-skinbase="term"] :is(.ttabs button[data-v],.tmap button[data-v]){background:var(--mxbg); color:var(--mx)}
-:root[data-skinbase="term"] :is(.lcell,.layercard,.fxcard,.voicecard){background:var(--mxpanel); border-color:var(--mx); box-shadow:0 0 10px -4px var(--mxglowc)}
+:root[data-skinbase="term"] :is(.lcell,.layercard,.fxcard,.voicecard){background:var(--mxpanel); border-color:var(--mxline, var(--mx)); box-shadow:0 0 10px -4px var(--mxglowc)}
 :root[data-skinbase="term"] input[type=range], :root[data-skinbase="term"] input[type=checkbox]{accent-color:var(--mx)}
 :root[data-skinbase="term"] svg:not(.ic){color:var(--mx)} :root[data-skinbase="term"] svg.ic{color:inherit}
 :root[data-skinbase="term"] button.on svg{color:var(--mxon)}
 :root[data-skinbase="term"] .brand .plus{color:var(--mx)} :root[data-skinbase="term"] .brand .plus::before{color:var(--mxdim); -webkit-text-stroke:.05em var(--mxbg)}
-:root[data-skinbase="term"] .setmenu{background:var(--mxbg); border-color:var(--mx); box-shadow:0 0 18px -4px var(--mxglowc)}
+:root[data-skinbase="term"] .setmenu{background:var(--mxbg); border-color:var(--mxline, var(--mx)); box-shadow:0 0 18px -4px var(--mxglowc)}
 :root[data-skinbase="term"] .gset .gsec + .gsec, :root[data-skinbase="term"] .gset h3{border-color:var(--mxdim)}
 /* Light Simple skins (owner chose mock-up D, 19 Oct; the inverted dark bar was too heavy): the top bar takes the skin's
    second panel tone, so the app's menus read as their own strip above the SONG / PHRASE… row, and the screen tabs are
@@ -1668,7 +1671,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
 /* pads, command row and keypad: plain keys with outlines and an offset block; a hit fills */
 :root[data-skinbase="term"] :is(.tcmd,.dock,.tctl){background:var(--mxbg)}
-:root[data-skinbase="term"] :is(.tcmd button,.tkp .kp,.pads .pad){background:var(--mxbg); color:var(--mx); border-color:var(--mx);
+:root[data-skinbase="term"] :is(.tcmd button,.tkp .kp,.pads .pad){background:var(--mxbg); color:var(--mx); border-color:var(--mxline, var(--mx));
   box-shadow:4px 4px 0 0 var(--mxbg), 4px 4px 0 1.5px var(--mxdim)}
 :root[data-skinbase="term"] :is(.tcmd button.dn,.tkp .kp.dn,.pads .pad.hit,.pads .pad.hit.hit){background:var(--mx)!important; color:var(--mxon)!important; text-shadow:none;
   box-shadow:1px 1px 0 0 var(--mxbg), 1px 1px 0 1.5px var(--mxdim), 0 0 16px var(--mxglowc)}
@@ -1676,12 +1679,12 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skinbase="term"] :is(.pads .pad .pm,.pads .pad.syn b::after){color:var(--mx2)}
 :root[data-skinbase="term"] .tcmd::before{color:var(--mx2)}
 /* PAD-mode nav pad: the keys that are pastel in the other skins are solid; pressed or on turns them back */
-:root[data-skinbase="term"] #tPad .k{background:var(--mx); color:var(--mxon); border-color:var(--mx); text-shadow:none;
+:root[data-skinbase="term"] #tPad .k{background:var(--mx); color:var(--mxon); border-color:var(--mxline, var(--mx)); text-shadow:none;
   box-shadow:4px 4px 0 0 var(--mxbg), 4px 4px 0 1.5px var(--mxdim), 0 0 12px -2px var(--mxglowc)}
 :root[data-skinbase="term"] :is(#tPad .k.dn,#tPad .k.on){background:var(--mxbg); color:var(--mx); text-shadow:var(--mxglow);
   box-shadow:1px 1px 0 0 var(--mxbg), 1px 1px 0 1.5px var(--mxdim), 0 0 16px var(--mxglowc)}
 :root[data-skinbase="term"] :is(#tPad .k.lt,#tPad #kPlay.on){background:var(--mxsoft); color:var(--mxon)}
-:root[data-skinbase="term"] :is(.tcmd,.tctl,.tcmd:not([hidden]) + .tctl){border-top-color:var(--mx)}
+:root[data-skinbase="term"] :is(.tcmd,.tctl,.tcmd:not([hidden]) + .tctl){border-top-color:var(--mxline, var(--mx))}
 /* the tracker screen: the skin's background whatever its own colour setting, a solid cursor and (Matrix) faint scanlines */
 :root[data-skinbase="term"] :is(.tscr,.tscr[data-ts]){--ts-bg:var(--mxbg); --ts-ink:var(--mx); --ts-dim:var(--mxdim); --ts-rn:var(--mx2); --ts-rn4:var(--mx); --ts-th:var(--mx2);
   --ts-vol:var(--mxpoly); --ts-inst:var(--mx2); --ts-fx:var(--mx); --ts-mute:var(--mxred); --ts-solo:var(--mxsoft); --ts-pl-bg:var(--mx); --ts-pl:var(--mxon);
@@ -7130,7 +7133,9 @@ const AUK = 'thunderplus-audio-v1';
 const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto'};   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
   try { const o = JSON.parse(localStorage.getItem(AUK) || '{}'); return Object.assign(d, o && typeof o === 'object' ? o : {}); } catch(e){ return d; } })();
 // Latency: what the person picked, else Balanced in the Mobile setup (phones click at Lowest when busy) and Lowest on desktop.
-const latOf = () => aset.latPick && aset.lat ? aset.lat : (typeof platform !== 'undefined' && platform === 'mobile' ? 'balanced' : 'interactive');
+// The desktop app starts on Balanced too (owner, 31 Oct: playback stuttered in the desktop app and not in the browser on the
+// same computer; the app keeps its own settings, so it was on Lowest, the smallest buffer). A pick in Settings → Audio wins.
+const latOf = () => aset.latPick && aset.lat ? aset.lat : ((typeof platform !== 'undefined' && platform === 'mobile') || window.thunderDesktop ? 'balanced' : 'interactive');
 function asetSave(){ try { localStorage.setItem(AUK, JSON.stringify(aset)); } catch(e){} }
 const psLive = {off:false, strikes:0};   // …PUMP SYNTHS live: the safety net's switch for this visit (see psFallback)
 let aLive = null; // the latency and rate the running context was made with
@@ -18193,7 +18198,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 313;
+const BUILD = 314;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24478,6 +24483,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [314, '31 Oct', ['Matrix light: dark grey outlines instead of green (the track groups keep their colours).', 'Desktop app: audio starts on Latency Balanced (a bigger buffer) unless you picked one in Settings → Audio, which keeps playback from crackling when the computer is busy.']],
   [313, '31 Oct', ['New skin: Matrix light (Settings → Screen → Skin, under Neon & Matrix): the Matrix look on white, in a deep green that reads easily, with a blue cursor.', 'Matrix and Matrix light: the title drops its dots, and the screen tabs (Tracker … Chains) end where the tracker tabs below (… PROJECT) do.']],
   [312, '31 Oct', ['File ▾ → Load ELECTRO (demo project) opens the bundled ELECTRO song and kit on any device (the first-run song only comes in where no song was saved yet).', 'Touch: tapping STOP twice puts the song back to its top (the next PLAY starts from the beginning).', 'Settings (and the File and Edit menus) no longer run off the right edge of a phone or foldable screen.']],
   [311, '31 Oct', ['The first time Thunder Plus opens, it opens the ELECTRO song (with its kit) instead of the starter beat. File ▾ → Load demo song still loads the starter beat.', 'The song timer starts again each time the song goes round, instead of staying at 0:00.', 'TRACKS no longer changes the song: from 16 to 17 a new empty mono track comes in before the poly tracks, which keep their phrases, mixer, effects and …chains routing (17 to 18 adds an empty poly track). Fewer tracks keeps the dropped ones, and going back brings them back where they were.']],

@@ -81,9 +81,14 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (20): Matrix light outlines; desktop starts on Balanced (build 314)
+
+- `latOf()`: the desktop app (window.thunderDesktop) defaults to 'balanced' like phones. The owner heard stutter only in the desktop app, not the browser on the same computer; the app keeps its own settings (Lowest by default before this).
+
 ## 31 Oct (19): Matrix light; Matrix tabs line up (build 313)
 
 - Skin `matrixlight` (base term): Matrix's vars on white (--mx #00702d, cursor #0062d6, bus #0a7f95), added to every list of the boxed-tab term skins (matrix, bwterm, night, espresso, midnight) and to SKIN_GROUPS.
+- Matrix light outlines: `--mxline` (#2b2b2b; the term rules' border colours read `var(--mxline, var(--mx))`) and `--line`. The arrange group boxes keep their group colours.
 - `.brand .bdots` (the "...") hidden in both Matrix skins; `alignTabs()` widens #segView's buttons so Chains ends at the last tracker tab (runs on skin change, resize, #tTabs resize, fonts loaded).
 - Build 312's STOP-twice helpers moved below panic() (the usability test cuts stopKey…panic); the owner's Electro131 save is identical to the bundled ELECTRO.
 
