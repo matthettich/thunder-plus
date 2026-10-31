@@ -18254,7 +18254,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 315;
+const BUILD = 316;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18786,6 +18786,7 @@ function projRows(){
     ...(canShareProj() ? [{l:'› SHARE PROJECT', act:shareProj, info:() => 'Send the project file (song and kit) to Drive, email, a chat or your other device, then open it there with LOAD PROJECT'}] : []),
     {l:'› NEW SONG', dbl:true, act:newSong, info:() => 'Clears the song, keeps the kit. Tap EDIT twice · Ctrl/⌘+N'},
     {l:'› LOAD DEMO', dbl:true, act:guardLeave('the demo song', () => { setSong(demoSong(), 'Loaded the starter beat.'); setDirty(false); }), info:() => 'Replaces the song with the starter beat. Tap EDIT twice'},
+    {l:'› LOAD ELECTRO', dbl:true, act:guardLeave('ELECTRO', loadElectro), info:() => 'Opens the ELECTRO demo project (song and kit). Tap EDIT twice'},
     {l:'INPUT', sec:'Input', gap:true, get:() => inMode === 'keys' ? 1 : 0, set:v => setInput(v ? 'keys' : 'pad'), min:0, max:1, tog:true, d:0, fmt:v => v ? 'KEYS' : 'PAD', info:() => 'PAD: on-screen d-pad and four keys; the keyboard still types notes and hex (Z = OPTION, X = EDIT, Alt+arrows page). KEYS: type notes and hex, with an on-screen keypad on touch screens'},
     {l:'COMMANDS', get:() => cmdOn ? 1 : 0, set:v => setCmd(!!v), min:0, max:1, tog:true, d:+coarse, fmt:onOff, info:() => 'A row of buttons for the two-key commands: change value, clear, select, copy, cut, paste, other sect or phrase, play the song'},
     {l:'COMMAND BAR', ck:'Show the command bar (KEYS mode)', get:() => cmdBar ? 1 : 0, set:v => setCmdBar(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // COMMAND BAR
@@ -24539,6 +24540,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [316, '31 Oct', ['Tracker → PROJECT has › LOAD ELECTRO too (EDIT twice), beside › LOAD DEMO, for phones.']],
   [315, '31 Oct', ['Render song and Render stems ask where to save first (the desktop app: the Save dialog, starting in your Music folder and then wherever the last one went; Chrome and Edge: their Save picker; elsewhere the file goes to Downloads, and it says so), then show a progress window with a bar that follows the render. When it is saved the desktop app tells you where, with a Show button that opens the folder.', 'Other exports (pads, kits, presets, rendered parts) ask where to save the same way.']],
   [314, '31 Oct', ['Matrix light: dark grey outlines instead of green (the track groups keep their colours).', 'Desktop app: audio starts on Latency Balanced (a bigger buffer) unless you picked one in Settings → Audio, which keeps playback from crackling when the computer is busy.']],
   [313, '31 Oct', ['New skin: Matrix light (Settings → Screen → Skin, under Neon & Matrix): the Matrix look on white, in a deep green that reads easily, with a blue cursor.', 'Matrix and Matrix light: the title drops its dots, and the screen tabs (Tracker … Chains) end where the tracker tabs below (… PROJECT) do.']],
@@ -24812,7 +24814,7 @@ function buildProj(){
   const body = $('gset'), keep = body.scrollTop; for (const id of INNER_SECS){ const x = $(id); if (x) $('gsetBody').append(x); }
   list.innerHTML = ''; list.append(el('div', 'sethead', 'Project'));
   const trk = view === 'tracker';
-  const inFile = new Set(['› SAVE', '› SAVE AS', '› LOAD PROJECT', '› EXPORT CHAINS', '› IMPORT CHAINS', '› SHARE PROJECT', '› NEW SONG', '› LOAD DEMO', '› RENDER SONG', '› RENDER STEMS', '› SHARE LAST RENDER', '› EXPORT MIDI FILE', '› IMPORT MIDI FILE']);
+  const inFile = new Set(['› SAVE', '› SAVE AS', '› LOAD PROJECT', '› EXPORT CHAINS', '› IMPORT CHAINS', '› SHARE PROJECT', '› NEW SONG', '› LOAD DEMO', '› LOAD ELECTRO', '› RENDER SONG', '› RENDER STEMS', '› SHARE LAST RENDER', '› EXPORT MIDI FILE', '› IMPORT MIDI FILE']);
   list.append(el('p', 'note', 'Saving, opening, rendering and exporting are in the File menu.'));
   // The song, how you play, then rendering & export and mastering. (Screen has its own section; UPDATE APP is under App.)
   const groups = new Map(); let g = 'Tracker';
