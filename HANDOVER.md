@@ -81,6 +81,18 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (8): BUS GROUPS in Arrange (build 302)
+
+- Owner: tracks 1–3 into bus 4, then track 7 added in …chains: show the grouping. `busGroups()` (beside `busPlan`): one of
+  `BUS_COLORS` per bus (by track order), given to the bus and its sources (`busPlan().feeds`); first bus wins for a track
+  that feeds two; a bus feeding a bus keeps its own. `drawArr` adds class `bg` + `--bgc` to those cells and headers: empty
+  cells tinted, blocks filled with it (instead of the instrument colour; `!important` to beat the rainbow skins), header
+  line and number in it; the bus stays darker (the existing `.bus` filter). Checked headless on the rainbow skin.
+- Not done: moving a track next to its bus (reordering tracks), as other DAWs do. It would have to renumber everything
+  that names a track: song columns, …chains Track In / Chain Out / Sidechain In, every Source and SC FROM, NOTES FROM,
+  the mixer, mutes, names and colours, pads per track (voice-per-track kits), MIDI routing, Thunder Perform's view. Doable
+  as an explicit "Move track…" command with its own tests; the owner was told so (31 Oct).
+
 ## 31 Oct (7): Arrange: a plain click ends a Shift selection (build 301)
 
 - The selection is `selA`→cursor, so a plain click (which moves the cursor) kept growing it. `sxEnd`: a click with no drag,

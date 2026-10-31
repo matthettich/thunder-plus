@@ -1243,6 +1243,14 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 /* BUS (owner, 21 Oct): a track other tracks play through looks a little darker everywhere it shows (Arrange and its
    numbers, the song strip, the Song and Mixer text grids, the pattern view) and its labels say BUS. */
 .tagrid b.bus, #apStrip .apsr b.bus, .tgrid span.bus{filter:brightness(.78) saturate(1.15)}
+/* BUS GROUPS (31 Oct): a bus and the tracks it takes in share a colour (--bgc): their empty cells are tinted with it, their
+   blocks filled with it, the header's line under the number in it. The bus is darker, as above. (:root raises the empty
+   cells over the rainbow skins' own column colours.) */
+:root .tarr .tagrid b.bg:not(.f):not(.p):not(.m){background:color-mix(in srgb, var(--bgc) 30%, var(--panel, #fff))}
+:root .tarr.dk .tagrid b.bg:not(.f):not(.p):not(.m){background:color-mix(in srgb, var(--bgc) 32%, #111)}
+:root .tarr .tagrid b.bg.f:not(.p){background:var(--bgc)!important; color:#fff}   /* (!important: the rainbow skins colour every block that way) */
+:root .tarr .tagrid b.bg.f.p{background:#fff!important; color:var(--bgc); box-shadow:inset 0 0 0 2px var(--bgc)}
+.tath i.bg{box-shadow:inset 0 -3px 0 var(--bgc); color:var(--bgc); font-weight:800}
 .tgrid span.mbus:not(.cur):not(.sel){background-color:color-mix(in srgb, var(--tk) 22%, transparent)}
 .tgrid span.th.bus{font-weight:800; text-decoration:underline; text-underline-offset:2px}
 #tArrTh i.bus{filter:brightness(.7); font-weight:800; text-decoration:underline; text-underline-offset:2px}
@@ -14766,6 +14774,16 @@ function scSay(t){ const U = sckUsesOf(t); toast(U.length ? `Track ${d2(t + 1)} 
    PRE SENDS (owner, 27 Oct): plan.pre holds the sources whose Track In has Bus send "Before its fader": their buses hear them
    after their chain and effects but before their fader and pan (mute and solo still silence them). */
 let busPlanH = null, busPlanVal = null;
+// BUS GROUPS (owner, 31 Oct): a colour for each bus, given to the bus and to every track it takes in (from …chains), so
+// Arrange shows which tracks run through which bus. The bus is drawn darker (as every bus is). A track that feeds two
+// buses takes the first one's colour; a bus that itself feeds another bus keeps its own. Track → CSS colour.
+const BUS_COLORS = ['#2f8fcf', '#d0553a', '#2fa36a', '#9a52d0', '#c79a1f', '#1fa7a0', '#d04f8f', '#6b7fd8'];
+function busGroups(){
+  const P = busPlan(), out = new Map(); let k = 0;
+  for (const b of [...P.feeds.keys()].sort((a, c) => a - c)){ const c = BUS_COLORS[k++ % BUS_COLORS.length]; out.set(b, c); }
+  for (const [b, src] of P.feeds) for (const t of src) if (!out.has(t)) out.set(t, out.get(b));
+  return out;
+}
 function busPlan(){
   const d = S.chainPatch, ok = !!(d && d.format === 'chains.patch' && Array.isArray(d.modules));
   let h = ok ? 7 : 0; const mx = v => { h = (h * 31 + v) | 0; }, ms = x => { x = String(x); for (let i = 0; i < x.length; i++) mx(x.charCodeAt(i)); };
@@ -18024,7 +18042,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 301;
+const BUILD = 302;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22129,6 +22147,7 @@ function drawArr(PH){
   let h = '';
   const PFg = polyFrom();   // each block carries its track's group, so the mono and poly sections take their colours
   const BUS = busPlan().feeds;   // BUS: a bus track's column is a little darker
+  const BG = busGroups();   // BUS GROUPS (31 Oct): each bus and the tracks it takes in share a colour
   const spAt = t => ms ? t > 0 && t === PFg : t > 0 && t % 8 === 0;   // where a spacer column sits before track t
   for (let y = 0; y < N; y++){
     h += `<div class="ar"><span class="rn${y % 4 ? '' : ' r4'}" data-ry="${y}">${rS(y, 3)}</span>`;
@@ -22136,12 +22155,13 @@ function drawArr(PH){
       if (spAt(t)) h += '<span></span>';
       const v = S.song[y][t];
       let cls = (t < PFg ? 'gm ' : 'gp ') + (BUS.has(t) ? 'bus ' : ''), lab = '', sty = '';
+      const grp = BG.get(t); if (grp){ cls += 'bg '; sty = ` style="--bgc:${grp}"`; }
       if (v >= 0){
         const empty = isEmptySect(S.chains[v]) || !sectHasData(v), ph = firstPhrase(v);   // EMPTY BLOCKS (31 Oct): a block whose phrases have nothing in them is striped
         cls += empty ? 'z' : 'f'; lab = sectsOn || ph < 0 ? hp(v) : hp(ph);
         if (blockMuted(S, y, t)) cls = cls.replace(/[zf]$/, 'm');
         // Coloured by the instrument its phrase plays, with the phrase's notes as ticks when the blocks are big.
-        if (!empty && ph >= 0){ const pi = phraseInfo(ph); if (pi.inst >= 0) sty = ` style="--ib:${instHue(pi.inst)};--ibp:${100 - (pi.inst % 5) * 17}%"`;
+        if (!empty && ph >= 0){ const pi = phraseInfo(ph); if (grp) sty = ` style="--bgc:${grp};--ib:${grp}"`; else if (pi.inst >= 0) sty = ` style="--ib:${instHue(pi.inst)};--ibp:${100 - (pi.inst % 5) * 17}%"`;
           if (arRH >= 26 && pi.hits) lab += pi.hits; }
       }
       if (S.mix[t].mute || (anySolo && !S.mix[t].solo)) cls += ' tm';
@@ -22152,7 +22172,7 @@ function drawArr(PH){
     h += '</div>';
   }
   const PF = polyFrom();
-  const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (spAt(t) ? '<span></span>' : '') + `<i data-t="${t}" class="${t < PF ? 'gm' : 'gp'}${m.mute ? ' mu' : ''}${m.solo ? ' so' : ''}${tCol(t) ? ' tcl' : ''}${isBusT(t) ? ' bus' : ''}" title="${esc(trkTip(t))}${isBusT(t) ? ' (' + busOf(t) + ')' : ''} · click mutes, right-click solos, double-click names"${tCol(t) ? ` style="--tc:${tCol(t)}"` : ''}>${t + 1}</i>`).join('') + (mx ? '<span></span><i class="gx">MS</i>' : '');
+  const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (spAt(t) ? '<span></span>' : '') + `<i data-t="${t}"${BG.get(t) ? ` style="--bgc:${BG.get(t)}"` : ''} class="${BG.get(t) ? 'bg ' : ''}${t < PF ? 'gm' : 'gp'}${m.mute ? ' mu' : ''}${m.solo ? ' so' : ''}${tCol(t) ? ' tcl' : ''}${isBusT(t) ? ' bus' : ''}" title="${esc(trkTip(t))}${isBusT(t) ? ' (' + busOf(t) + ')' : ''} · click mutes, right-click solos, double-click names"${tCol(t) ? ` style="--tc:${tCol(t)}"` : ''}>${t + 1}</i>`).join('') + (mx ? '<span></span><i class="gx">MS</i>' : '');
   // MONO and POLY tabs spanning their tracks' columns (track t sits in grid column 2 + t + one per 8-track gap before it).
   const col = t => 2 + t + (ms ? (t >= PF && PF > 0 ? 1 : 0) : Math.floor(t / 8)), rng = (a, b) => d2(a) + (b > a ? '–' + d2(b) : '');
   let gp = '';
@@ -24208,6 +24228,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [302, '31 Oct', ['Arrange colours each bus with the tracks it takes in: their blocks, empty cells and track numbers share one colour, the bus a darker shade, so you can see what runs through which bus (including a track added to the bus in …chains).']],
   [301, '31 Oct', ['Arrange: once Shift is let go, a plain click no longer grows the selection: it ends it (Shift-click again to start a new one).']],
   [300, '31 Oct', ['Mastering → COMPRESS shows what it is doing: the gain reduction now in big numbers (and its recent peak), a dot riding the curve at the signal’s level with a red bar for the reduction there, the level against the threshold along the bottom, and the last few seconds of reduction.', 'Mastering → EQ draws each band’s own curve faintly behind the total, so a low shelf looks like a shelf even with the low cut under it.']],
   [299, '31 Oct', ['Arrange: a block whose phrase is still empty (no notes, no commands) has sideways lines through it, so you can tell the blocks that play from the empty placeholders.']],
