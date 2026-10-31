@@ -2455,7 +2455,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <script src="pump/synth/pump-synth-engine.js?v=4"></script>
 <!-- …PUMP (23 Oct 2026): the pump mastering plugins' parameter tables and presets (generated in matthettich/pump by
      wasm/build.sh); pump/pump.wasm is their DSP, fetched by the wasm loader. -->
-<script src="pump/pump-meta.js?v=2"></script>
+<script src="pump/pump-meta.js?v=3"></script>
 <script>
 /* ===ENGINE START=== */
 const BASE = 65.40639; // C2
@@ -13181,7 +13181,7 @@ $('midiKeysSel').addEventListener('change', e => { releaseKeys(); midi.keys = +e
 moPorts(); miPorts();
 
 /* ---------- Plaits loader ---------- */
-const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=2';
+const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=3';
 // Each wasm is decoded and compiled once and shared: the synth here, the …waves engine and the render Worker.
 let plFailed = false;
 (async () => {
@@ -14048,7 +14048,19 @@ for (const k in MODFX){ const M = MODFX[k]; if (!M.track) continue;
 const PM = globalThis.PUMP_META || null;
 const PUMP_TYPES = PM ? PM.types.slice() : [];
 const PUMP_KEY = t => 'p' + t;   // the TFX key: peq, pcomp, plimit, pcalm, ptone, pband, pwide, pheat, pmeter
-const PUMP_SHORT = {eq:'pEQ', comp:'pCOMP', limit:'pLIM', calm:'pCALM', tone:'pTONE', band:'pBAND', wide:'pWIDE', heat:'pHEAT', meter:'pMETR'};
+const PUMP_SHORT = {eq:'pEQ', comp:'pCOMP', limit:'pLIM', calm:'pCALM', tone:'pTONE', band:'pBAND', wide:'pWIDE', heat:'pHEAT', meter:'pMETR',
+  tube:'pTUBE', snap:'pSNAP', gate:'pGATE', echo:'pECHO', spring:'pSPRG', verb:'pVERB', grain:'pGRAN', vox:'pVOX', tune:'pTUNE', crush:'pCRSH',
+  swirl:'pSWRL', stutter:'pSTUT', chop:'pCHOP', twang:'pTWNG', master:'pMSTR'};
+/* …PUMP CREATIVE (30 Oct 2026): pump's creative effects, each its own effect beside Thunder's (the old reverbs, delays and
+   the rest stay). Same slot format and PumpFX interface as the nine mastering ones; on every track, pads' tracks, buses and
+   the master. Their DSP is each plugin's own Plugin<Name>.hpp (pump's wasm/fx and wasm/shim). FX-screen boxes: every
+   parameter a preset may set, in the plugin's order (PUMP_BOX below fills them in), plus Thunder's own rows:
+   '@nin' NOTES FROM (f.nin: 0 off, 1 + t = track t's notes as MIDI: TUNE, VOX, TWANG, STUTTER, CHOP), '@sck' SC FROM (VOX). */
+const PUMP_CREATIVE = new Set(['tube', 'snap', 'gate', 'echo', 'spring', 'verb', 'grain', 'vox', 'tune', 'crush', 'swirl', 'stutter', 'chop', 'twang']);
+const PUMP_NOTES = new Set(['vox', 'tune', 'twang', 'stutter', 'chop']);
+// where each one sits in the effect picker: beside Thunder's own of the same kind
+const PUMP_GROUP = {tube:'Drive and lo-fi', crush:'Drive and lo-fi', snap:'Dynamics and EQ', gate:'Rhythmic', stutter:'Rhythmic', chop:'Rhythmic',
+  echo:'Delays', spring:'Reverbs', verb:'Reverbs', grain:'Spectral and granular', vox:'Pitch and voice', tune:'Pitch and voice', swirl:'Modulation', twang:'Resonators'};
 // The boxes on the FX screen, in order. 'b#_x' = the selected band's x (BAND picks it: f.sel, a Thunder field, not a
 // plugin parameter); '@sck' = Thunder's sidechain source for COMP's External sidechain (f.sck, as the MODFX slots have it).
 const PUMP_BOX = {
@@ -14063,6 +14075,12 @@ const PUMP_BOX = {
   meter:{rows:['target', 'custom_lufs', 'custom_tp']}};
 // A new slot starts at the plugin's defaults except these (CPU on the phone: oversampling off where the plugin allows it).
 // Presets that don't set them keep the slot's value (PUMP_CPU), unless applied with {keepCpu:false}.
+for (const t of PUMP_TYPES) if (!PUMP_BOX[t] && PM.fx[t]){   // …PUMP CREATIVE: every parameter a preset may set, then Thunder's rows
+  const rows = PM.fx[t].params.filter(p => !(p.flags & (8 | 16 | 32 | 64))).map(p => p.s);
+  if (t === 'vox'){ const i = rows.indexOf('route'); rows.splice(i < 0 ? rows.length : i + 1, 0, '@sck'); }
+  if (PUMP_NOTES.has(t)) rows.push('@nin');
+  PUMP_BOX[t] = {rows};
+}
 const PUMP_START = {limit:{oversampling:0}, heat:{oversampling:0}};
 const PUMP_CPU = {limit:['oversampling'], heat:['oversampling']};
 // Parameters a preset (or A/B) never touches, as in the plugins: output meters, bypass, listening state, hidden placeholders.
@@ -14116,6 +14134,7 @@ function pumpFresh(type){
   Object.assign(f.pump, PUMP_START[type] || {});
   if (PUMP_BOX[type].sel) f.sel = 0;
   if (PUMP_BOX[type].rows.includes('@sck')) f.sck = 0;
+  if (PUMP_BOX[type].rows.includes('@nin')) f.nin = 0;   // …PUMP CREATIVE: NOTES FROM
   pumpBytes(f); return f;
 }
 // Every box's byte from f.pump (after a preset, a pop-up edit, a load or undo).
@@ -14142,6 +14161,7 @@ function pumpNorm1(o){   // a saved slot → a slot (every symbol, clamped; new 
   if (typeof o.pname === 'string' && o.pname) f.pname = o.pname.slice(0, 80);   // the last preset applied (shown on PRESET)
   if (PUMP_BOX[type].sel) f.sel = clamp(int(o.sel, 0), 0, PUMP_BOX[type].sel - 1);
   if ('sck' in f) f.sck = clamp(int(o.sck, 0), 0, 8 + NT);
+  if ('nin' in f) f.nin = clamp(int(o.nin, 0), 0, NT);
   pumpBytes(f); return f;
 }
 const PUMP_SCK = ['NONE', 'SEND 1', 'SEND 2', 'SEND 3', 'SEND 4', 'SEND 5', 'SEND 6', 'SEND 7', 'SEND 8', ...Array.from({length:128}, (_, i) => 'TRACK ' + d2(i + 1))];
@@ -14154,6 +14174,7 @@ for (const type of PUMP_TYPES){
       return s + (u ? ' · ' + pumpFmt(P[I[b + 'shape']], f.pump[b + 'shape']) + ' ' + pumpFmt(P[I[b + 'freq']], f.pump[b + 'freq']) : ' · unused'); }});
       continue; }
     if (r === '@sck'){ ps.push({k:'sck', l:'SC FROM', d:0, min:0, max:8 + NT, names:PUMP_SCK.slice(0, 9 + NT), thunder:true}); continue; }
+    if (r === '@nin'){ ps.push({k:'nin', l:'NOTES FROM', d:0, min:0, max:NT, names:['OFF', ...Array.from({length:NT}, (_, i) => 'TRACK ' + d2(i + 1))], thunder:true}); continue; }
     const sym0 = r.replace('#', '1'), p = fx.params[pumpIdx[type][sym0]]; if (!p) continue;
     let l = String(p.sn).replace(/^Band \d+ /, '').toUpperCase();
     if (r.includes('#') && B.rows.some(o => !o.includes('#') && o !== '#' && fx.params[pumpIdx[type][o]] && String(fx.params[pumpIdx[type][o]].sn).toUpperCase() === l)) l = 'BAND ' + l;
@@ -14169,8 +14190,8 @@ for (const type of PUMP_TYPES){
   TFX[PUMP_KEY(type)] = {n:PUMP_SHORT[type], long:'pump ' + fx.name + ': ' + fx.long.toLowerCase(), about:fx.about, pump:type, pt:PUMP_TYPES.indexOf(type), sel:B.sel || 0, sck:B.rows.includes('@sck'), ps,
     // the plugin's own values by symbol (the dynamics display reads its curve from these)
     map:f => f.pump || {}};
-  FX_GROUP[PUMP_KEY(type)] = 'Mastering (…pump)';
-  FX_CREDIT[PUMP_KEY(type)] = 'pump ' + fx.name + ' (…pump mastering plugins, by wake)';
+  FX_GROUP[PUMP_KEY(type)] = PUMP_GROUP[type] || 'Mastering (…pump)';
+  FX_CREDIT[PUMP_KEY(type)] = 'pump ' + fx.name + (PUMP_CREATIVE.has(type) ? ' (…pump effects, by wake)' : ' (…pump mastering plugins, by wake)');
 }
 // Only bus tracks (a track …chains sums others into) and the master get the pump effects in their pickers; a slot that has
 // one keeps it if the track stops being a bus.
@@ -14316,7 +14337,8 @@ const FXT_LIST = (() => {
 const TAILS = new Set(['grains', 'pdelay', 'preverb', 'reson', 'reverb', 'delay', 'rings', 'clouds', 'beads', 'space', 'room', 'pshift', 'comb', ...Object.keys(MODFX).filter(k => MODFX[k].track && MODFX[k].tail), ...PUMP_TYPES.map(PUMP_KEY)]);
 // …PUMP: the effects a slot picker offers on track t (the pump ones only on a bus or the master).
 // …pump EQ on every track (owner, 30 Oct: a pump-style EQ window per track); the other pump effects stay on buses and the master.
-const pumpAnyTrack = k => !!(TFX[k] && TFX[k].pump === 'eq');
+// …PUMP CREATIVE (30 Oct): the creative ones on every track too.
+const pumpAnyTrack = k => !!(TFX[k] && (TFX[k].pump === 'eq' || PUMP_CREATIVE.has(TFX[k].pump)));
 const fxtL = (t = cFxT) => pumpAllowed(t) ? FXT_LIST : FXT_LIST.filter(k => !isPumpT(k) || pumpAnyTrack(k));
 const fxtOk = (t, k) => !!TFX[k] && (!isPumpT(k) || pumpAllowed(t) || pumpAnyTrack(k));
 const FXSLOTS = 8;
@@ -14336,7 +14358,8 @@ function tfxChain(A, sr, bpm){
   // Switched-off slots go too (on:false): the tracker's FXO can switch them on while the song plays.
   (A || []).forEach((f, k) => { if (!f || !TFX[f.type]) return;
     if (TFX[f.type].pump){ pumpSync(f); const P = TFX[f.type], fx = pumpFx(P.pump);   // …PUMP: every value, in the plugin's parameter order
-      out.push({key:k + ':' + f.type, pt:P.pt, pv:fx.params.map(p => f.pump[p.s] ?? p.def), bi:pumpIdx[P.pump].bypass ?? -1, on:!!f.on, slot:k, sck:+f.sck || 0}); return; }
+      out.push({key:k + ':' + f.type, pt:P.pt, pv:fx.params.map(p => f.pump[p.s] ?? p.def), bi:pumpIdx[P.pump].bypass ?? -1, on:!!f.on, slot:k, sck:+f.sck || 0,
+        cr:PUMP_CREATIVE.has(P.pump), clk:P.pump === 'gate' || P.pump === 'stutter' || P.pump === 'chop'}); return; }   // …PUMP CREATIVE: the transport; clk: keep running on the clock while silent
     if (TFX[f.type].mod){ out.push({key:k + ':' + f.type, mod:TFX[f.type].mod, mp:TFX[f.type].map(f, sr, bpm), bpm, on:!!f.on, slot:k}); return; }   // a shared module (MODFX)
     const p = new Array(12).fill(0); TFX[f.type].map(f, sr, bpm).forEach((v, i) => p[i] = v); out.push({key:k + ':' + f.type, t:TFX[f.type].id, p, on:!!f.on, slot:k}); });
   return out;
@@ -14378,6 +14401,7 @@ class ThunderFx extends AudioWorkletProcessor {
       else if (e.data && e.data.pumpBytes){ if (!globalThis.__pumpBytes) globalThis.__pumpBytes = e.data.pumpBytes; this.pumpAsked = false; this.set(this.chain || []); }
       else if (e.data && e.data.ptel){ const q = e.data.ptel; if (q.on) this.ptel.set(q.key, {back:Math.max(0, Math.min(32768, q.back | 0)), rp:[]}); else this.ptel.delete(q.key); }
       else if (e.data && e.data.pset){ const q = e.data.pset, ch = (this.chain || []).map(c => c && c.slot === q.slot ? Object.assign({}, c, q.p ? {p:q.p} : {}, q.mp ? {mp:q.mp} : {}, q.pv ? {pv:q.pv} : {}) : c); this.set(ch); }   // FXV: one slot's settings for now (the chain's own come back with the next full set)
+      else if (e.data && e.data.pmidi){ const q = this.pq || (this.pq = []); for (const m of e.data.pmidi) q.push(m); q.sort((a, b) => a[1] - b[1]); }   // …PUMP CREATIVE: [slot, at (s), status, d1, d2]
       else if (e.data && e.data.phold){ const q = e.data.phold, P = globalThis.__pumpX, sl = this.slots.find(x => x.key === q.key && x.pu !== undefined); if (P && sl) try { P.pump_hold(sl.pu, q.kind | 0, +q.a || 0, +q.b || 0, +q.c || 0, +q.d || 0); } catch (err){} }
       else this.set(e.data); };
   }
@@ -14403,6 +14427,13 @@ class ThunderFx extends AudioWorkletProcessor {
       for (let j = 0; j < s.pv.length; j++) v[j] = s.pv[j];
       if (s.bi >= 0) v[s.bi] = s.byp ? 1 : 0;
       P.pump_commit(s.pu); s.dirty = false; }
+    if (s.cr){   // …PUMP CREATIVE: the song's tempo and position, and the notes of NOTES FROM that fall in this block
+      const T = this.mctx.transport; P.pump_transport(s.pu, T.tempo, T.playing ? this.ppq || 0 : 0, T.playing ? 1 : 0);
+      const q = this.pq;
+      if (q && q.length){ const end = currentTime + n / sampleRate;
+        for (let j = 0; j < q.length; j++){ const m = q[j]; if (m[1] >= end) break;
+          if (m[0] === s.slot){ P.pump_midi(s.pu, Math.max(0, Math.min(n - 1, Math.round((m[1] - currentTime) * sampleRate))), m[2], m[3], m[4]); q.splice(j--, 1); } } }
+    }
     let io = this.pumpIO(P), sc = 0;
     if (s.sck > 0){ const K = this.mctx.key(s.sck); if (K){ io[2].set(K.subarray(0, n)); io[3].set(K.subarray(0, n)); sc = 1; } }   // COMP's External sidechain: the picked send or track
     io[0].set(this.L.subarray(0, n)); io[1].set(this.R.subarray(0, n));
@@ -14451,7 +14482,7 @@ class ThunderFx extends AudioWorkletProcessor {
         if (i >= 0 && old[i].pu !== undefined && old[i].pt === c.pt && old[i].pu >= 0 && !old[i].dead){ s = old[i]; old.splice(i, 1); s.pv = c.pv; s.dirty = true; }
         else { s = {key:c.key, h:-2, pt:c.pt, pv:c.pv, bi:c.bi, byp:!on};
           try { if (!this.pumpNew(P, s)) continue; } catch (e){ continue; } }
-        s.on = on; s.slot = slot; s.sck = c.sck | 0; next.push(s); continue;
+        s.on = on; s.slot = slot; s.sck = c.sck | 0; s.cr = !!c.cr; s.clk = !!c.clk; next.push(s); continue;
       }
       if (c.mod){   // a shared …chains/…waves module (MODFX), run as it runs in …chains
         const D = globalThis.ChainsDSP, def = D && D.MODULES ? D.MODULES[c.mod] : null;
@@ -14498,7 +14529,7 @@ class ThunderFx extends AudioWorkletProcessor {
       s.on = on; s.slot = slot; next.push(s);
     }
     for (const s of old) this.drop(s);
-    this.slots = next; this.idle = 0; this.clocked = next.some(s => s.js && ((s.jt >= 93 && s.jt <= 95) || (s.jt >= 100 && s.jt <= 102)));
+    this.slots = next; this.idle = 0; this.clocked = next.some(s => (s.js && ((s.jt >= 93 && s.jt <= 95) || (s.jt >= 100 && s.jt <= 102))) || s.clk);
   }
   modRun(s, n){
     if (s.dead) return;
@@ -14545,6 +14576,7 @@ class ThunderFx extends AudioWorkletProcessor {
     const swv = this.swv || (this.swv = [0, 0, 0, 0, 0, 0, 0, 0]); swv[0] = params.sw0[0]; swv[1] = params.sw1[0]; swv[2] = params.sw2[0]; swv[3] = params.sw3[0]; swv[4] = params.sw4[0]; swv[5] = params.sw5[0]; swv[6] = params.sw6[0]; swv[7] = params.sw7[0]; const bp = params.bp;   // reused: no array per block
     // bp (the beat clock) is an a-rate ramp whenever the song plays, so "bp.length < 2" kept every track-FX node awake
     // for the whole song. Only a tempo-locked slot (Flex / Step gate / Retrigger) needs to hear the clock while silent.
+    if (this.pq && this.pq.length){ const old = currentTime - 1; while (this.pq.length && this.pq[0][1] < old) this.pq.shift(); if (this.pq.length) this.idle = 0; }   // …PUMP CREATIVE: notes due wake it (stale ones are dropped)
     if (ip < 1e-7 && this.idle >= sampleRate && !this.clocked){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
     if (i && i.length){ L.set(i[0]); R.set(i[1] || i[0]); } else { L.fill(0); R.fill(0); }
     // A NaN or infinity reaching the wasm hangs the tape delay for good and leaves many effects silent: zero those samples.
@@ -14555,6 +14587,7 @@ class ThunderFx extends AudioWorkletProcessor {
       const T = this.mctx.transport, on = bp[0] >= 0 && bp[bp.length - 1] >= 0;
       if (on){ clkSpb(this, bp, n); if (!this.wasOn) this.startN++; } this.wasOn = on;
       T.playing = on; T.startN = this.startN; T.tempo = on ? Math.max(20, Math.min(999, 60 * sampleRate / this.spb)) : this.bpm;
+      this.ppq = on ? Math.max(0, bp[n - 1] + (this.cu || 0) - (n - 1) * T.tempo / 60 / sampleRate) : 0;   // …PUMP CREATIVE: the song position (quarter notes) at this block's start
       const tk = inputs[1], sd = inputs[2]; this.taps = tk && tk.length ? tk : null; this.sends = sd && sd.length ? sd : null; }   // SOURCE
     if (!this.dL){ this.dL = new Float32Array(128); this.dR = new Float32Array(128); }
     for (const s of this.slots){
@@ -16019,7 +16052,7 @@ function makePlayer(ac, out, getBuf, live){
     // FXO / FLX / GAT / RTG: automation on the track's (or the master's) effect node.
     if (ev.type === 'fxp'){ fxpTo(ev); return; }
     if (ev.type === 'tvl' || ev.type === 'tpn'){ if (ev.track < NT) trackTo(ev); return; }
-    if (ev.type === 'stp'){ for (let k = 0; k <= NT; k++) if (ev.all || k === ev.track){ for (const v of vs[k]) kill(v, ev.t, 0.004); vs[k].length = 0; } return; }   // STP
+    if (ev.type === 'stp'){ for (let k = 0; k <= NT; k++) if (ev.all || k === ev.track){ for (const v of vs[k]) kill(v, ev.t, 0.004); vs[k].length = 0; if (k < NT) pmNotes(k, ev.t, null); } return; }   // STP
     if (ev.type === 'fxc'){ const n = fxNodeOf(ev.track), q = n && n.parameters && n.parameters.get(ev.p); if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} return; }
     if (ev.type === 'chc'){ const b = buses[ev.track], n = b && b.chn, q = n && n.parameters && n.parameters.get(ev.p); if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} return; }   // BYP
     // The master column's VOL: the master level, with a 4 ms glide so it doesn't click.
@@ -16027,10 +16060,46 @@ function makePlayer(ac, out, getBuf, live){
       try { g.setValueAtTime(mvol == null ? curve(S.master) : mvol, at); g.linearRampToValueAtTime(to, at + 0.004); } catch(e){} mvol = to; return; }
     const T = vs[ev.track];
     // OFF releases every note on the track: synth slots over their release, drum pads at once.
+    if (ev.type === 'off' && ev.track < NT) pmNotes(ev.track, ev.t, null);   // …PUMP CREATIVE: NOTES FROM hears the OFF
     if (ev.type === 'off' && ev.cols){ for (let k = T.length - 1; k >= 0; k--) if (ev.cols.includes(T[k].col)){ kill(T[k], ev.t, relTc(T[k])); T.splice(k, 1); } return; }   // a poly column's OFF
     if (ev.type === 'off'){ for (const v of T) kill(v, ev.t, relTc(v)); T.length = 0; return; }
     if (ev.type === 'mod'){ for (const v of T) if (live1(v, ev.t)) modVoice(v, ev); return; }
+    if (ev.track < NT && ev.mn != null) pmNotes(ev.track, ev.t, ev);
     startNote(ev);
+  }
+  /* …PUMP CREATIVE: NOTES FROM. A track's notes go, as MIDI, to the pump effect slots (on any track or the master) whose
+     NOTES FROM is that track, timed to the sample: the worklet holds them until their block. A new note on a mono track
+     ends the one before; OFF, STP and a note's own end (KIL, a cut) end them too. */
+  const pmHeld = new Map();
+  function pmNotes(tr, at, ev){
+    let dest = null;
+    for (let k = 0; k <= NT; k++){ const A = k >= NT ? S.mfx : S.tfx[k]; if (!A) continue;
+      for (let j = 0; j < A.length; j++){ const f = A[j]; if (f && f.nin === tr + 1 && TFX[f.type] && TFX[f.type].pump) (dest || (dest = [])).push([k, j]); } }
+    const held = pmHeld.get(tr) || [], msgs = [];
+    if (!ev || !ev.poly){ for (const n of held) msgs.push([0x80, n, 0]); held.length = 0; }
+    let end = Infinity;
+    if (ev){ const n = clamp(Math.round(ev.mn), 0, 127), vel = clamp(Math.round((ev.vel == null ? 1 : ev.vel) * 127), 1, 127);
+      if ((ev.vel == null ? 1 : ev.vel) > 0){ msgs.push([0x90, n, vel]); held.push(n); end = moEnd(ev); } }
+    pmHeld.set(tr, held);
+    if (!dest || !msgs.length) return;
+    const t0 = Math.max(at, ac.currentTime);
+    for (const [k, j] of dest){ const node = fxNodeOf(k); if (!node) continue;
+      const list = msgs.map(m => [j, t0, m[0], m[1], m[2]]);
+      if (end < Infinity) for (const n of held.slice(-1)) list.push([j, Math.max(end, t0), 0x80, n, 0]);
+      pmPost(node, list, t0); }
+  }
+  // Live, the worklet gets the notes at once and holds them until their time. An offline render runs its audio thread
+  // without stopping for messages (they would all arrive at the end), so there the render is suspended at the start of
+  // the note's block (one suspension per block, shared by every note in it) and the notes are sent then.
+  function pmPost(node, list, t0){
+    const send = () => { try { node.port.postMessage({pmidi:list}); } catch(e){} };
+    const O = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!(O && ac instanceof O)){ send(); return; }
+    const q = 128 / ac.sampleRate, at = Math.floor(t0 / q + 1e-9) * q;   // (a note at 0 too: before the first block)
+    if (!(at >= 0 && at < ac.length / ac.sampleRate)){ send(); return; }
+    if (tempoAt.has(at)){ tempoAt.get(at).push(send); return; }   // the tempo changes' suspensions: one per block, shared
+    const fs = [send]; tempoAt.set(at, fs);
+    try { ac.suspend(at).then(() => { for (const f of fs) f(); return ac.resume(); }).catch(() => {}); } catch(e){ send(); }
   }
   function modVoice(v, ev){
       try {
@@ -18332,7 +18401,7 @@ function fxRows(){
   }
   if (PU){
     rows.push({l:'› PRESET' + (f.pname ? '  ' + f.pname.toUpperCase() : ''), gap:true, act:() => pumpPresetOpen(t, k), info:() => 'Pick one of pump ' + pumpFx(PU).name + '’s factory presets (Factory, Sources, Chains)' + (f.pname ? '. Last: ' + f.pname : '')});
-    rows.push({l:'› OPEN', act:() => PumpFX.open(t, k), info:() => 'Opens pump ' + pumpFx(PU).name + '’s own window (every control, its displays)' + (pumpLatTxt(t, k) ? ' · ' + pumpLatTxt(t, k) : '')});
+    if (!PUMP_CREATIVE.has(PU)) rows.push({l:'› OPEN', act:() => PumpFX.open(t, k), info:() => 'Opens pump ' + pumpFx(PU).name + '’s own window (every control, its displays)' + (pumpLatTxt(t, k) ? ' · ' + pumpLatTxt(t, k) : '')});
     if (PU === 'meter') rows.push({l:'› RESET', act:() => { PumpFX.set(t, k, {reset:(f.pump.reset | 0) + 1}, {live:true, keepPreset:true}); toast('pump METER: loudness reset.'); }, info:() => 'Starts the loudness measurement again (integrated, LRA, maxima)'});
   }
   return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows).concat([eqRow]);
@@ -21576,7 +21645,7 @@ function deckFx(){
       const tt = mst ? NT : dkTrack(), sl0 = dkFxSel, bar = el('div', 'dkslots dkpump');
       const pb = el('button', null, 'PRESET ▾'); pb.type = 'button'; pb.title = 'Factory presets'; pb.addEventListener('click', () => pumpPresetOpen(tt, sl0));
       const ob = el('button', null, 'OPEN'); ob.type = 'button'; ob.title = 'Its full window'; ob.addEventListener('click', () => PumpFX.open(tt, sl0));
-      bar.append(pb, ob); box.append(bar); }
+      bar.append(pb); if (!PUMP_CREATIVE.has(TFX[f.type].pump)) bar.append(ob); box.append(bar); }   // (…PUMP CREATIVE: no windows yet)
   }
   dkFxRows.forEach(r => { if (r.getObj()) r.refresh(); });
 }
