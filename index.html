@@ -18063,7 +18063,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 305;
+const BUILD = 306;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -19031,18 +19031,18 @@ function makeUnique(){
 }
 function cloneHere(){
   if (tv !== 'song') return toast('CLONE works on the SONG screen.');
-  const c = cs.song, sel = selA && selA.v === 'song', r = sel ? selRect() : {x0:c.x, x1:c.x, y0:c.y, y1:c.y}, d = [];
-  for (let y = r.y0; y <= r.y1; y++){ const row = []; for (let x = r.x0; x <= r.x1; x++) row.push(getCell('song', x, y)); d.push(row); }
+  const c = cs.song, sel = selA && selA.v === 'song', r = sel ? selRect() : {x0:c.x, x1:c.x, y0:c.y, y1:c.y}, d = [], mu = [];
+  for (let y = r.y0; y <= r.y1; y++){ const row = [], mr = []; for (let x = r.x0; x <= r.x1; x++){ row.push(getCell('song', x, y)); mr.push(songMu(x, y)); } d.push(row); mu.push(mr); }
   const n = d.flat().filter(v => v >= 0).length;
   if (!n) return toast(sel ? 'Nothing to clone in the selection.' : 'Move onto a filled block to clone it.');
-  clip = {v:'song', x0:r.x0, d, line:false, uniq:true}; selA = null; draw();
+  clip = {v:'song', x0:r.x0, d, mu, line:false, uniq:true}; selA = null; draw();
   toast(`Clone copied (${n} block${n > 1 ? 's' : ''}): ${pasteKey()} puts a unique copy, with new numbers, where the cursor is`);
 }
 // PICKS: copy or cut the picked cells (they keep their phrases; a cut clears their blocks), paste them with the cursor at
 // their top-left, the same layout. Their blocks are shared, as a rectangle paste shares them; Clone makes unique copies.
 function copyPicks(cut){
   const P = sxPicks.slice(), y0 = Math.min(...P.map(p => p.y)), u0 = Math.min(...P.map(p => sxU(p.t)));
-  const d = P.map(p => ({dy:p.y - y0, du:sxU(p.t) - u0, id:S.song[p.y] ? S.song[p.y][p.t] : -1}));
+  const d = P.map(p => ({dy:p.y - y0, du:sxU(p.t) - u0, id:S.song[p.y] ? S.song[p.y][p.t] : -1, mu:songMu(p.t, p.y)}));
   const n = d.filter(c => c.id >= 0).length;
   clip = {v:'song', picks:d, uniq:false, line:false};
   sxPicks = []; selA = null;
@@ -19053,7 +19053,7 @@ function pastePicks(){
   const c = cs.song, u0 = sxU(c.x), n0 = ntr(); let n = 0, out = 0;
   for (const p of clip.picks){ const y = c.y + p.dy, u = u0 + p.du, t = sxT(u);
     if (p.id < 0) continue; if (y > 255 || u > n0 || (u === n0 && t !== MT)){ out++; continue; }
-    setCell('song', t, y, p.id); n++; }
+    setCell('song', t, y, p.id); if (t !== MT && t < NT) setBlockMute(y, t, !!p.mu); n++; }
   saveS(); draw();
   toast(out ? `Pasted ${n} blocks · ${out} past the end were left out` : `Pasted ${n} block${n === 1 ? '' : 's'}`);
 }
@@ -19062,7 +19062,7 @@ function pasteClone(){
   let want = 0, made = 0, last = -1;
   clip.d.forEach((row, j) => row.forEach((v, i) => {
     const x = x0 + i, y = y0 + j; if (v < 0 || y > 255 || (x >= ntr() && x !== MT)) return;
-    want++; newBlock({x, y}, v); const id = getCell('song', x, y); if (id >= 0 && id !== v){ made++; last = id; } }));
+    want++; newBlock({x, y}, v); const id = getCell('song', x, y); if (id >= 0 && id !== v){ made++; last = id; if (x !== MT && x < NT) setBlockMute(y, x, !!(clip.mu && clip.mu[j] && clip.mu[j][i])); } }));
   saveS(); draw();
   if (!want) return toast('Nothing to paste here.');
   if (made < want) return toast(`Pasted ${made} of ${want} clones: no free sects or phrases left.`);
@@ -19405,13 +19405,16 @@ function clearSel(){
   const line = !!selA.line, rows = r.y1 - r.y0 + 1; selA = null;
   toast(`Cleared ${line ? rows + ' line' + (rows > 1 ? 's' : '') : n + ' cell' + (n > 1 ? 's' : '')} · ${keyHint('mod+Z') || 'Undo'} brings ${(line ? rows : n) === 1 ? 'it' : 'them'} back`); draw();
 }
+// MUTED BLOCKS COPY (owner, 31 Oct): song copies keep each block's mute (clip.mu, parallel to clip.d), and pastes put it back.
+const songMu = (x, y) => x !== MT && x < NT && blockMuted(S, y, x);
 function copySel(cut){
   const r = selRect(), d = [], line = !!selA.line;
   // SONG (owner, 30 Oct): the columns as they sit on screen (the tracks in use, then the master), not the raw numbers 0–32,
   // so a selection that takes in the master column copies it, and pastes it back on the master (it used to fall off the end).
   const xs = tv === 'song' ? sxCols(r) : Array.from({length:r.x1 - r.x0 + 1}, (_, i) => r.x0 + i);
-  for (let y = r.y0; y <= r.y1; y++){ const row = []; for (const x of xs){ row.push(getCell(tv, x, y)); if (cut) setCell(tv, x, y, kindAt(tv, x) === 'tsp' ? 0 : -1); } d.push(row); }
-  clip = {v:tv, x0:r.x0, d, line}; selA = null;
+  const mu = [];
+  for (let y = r.y0; y <= r.y1; y++){ const row = [], mr = []; for (const x of xs){ row.push(getCell(tv, x, y)); mr.push(tv === 'song' && songMu(x, y)); if (cut) setCell(tv, x, y, kindAt(tv, x) === 'tsp' ? 0 : -1); } d.push(row); mu.push(mr); }
+  clip = {v:tv, x0:r.x0, d, line, ...(tv === 'song' ? {mu} : {})}; selA = null;
   const n = line ? d.length : d.length * d[0].length, what = line ? ' line' : ' cell';
   toast(`${cut ? 'Cut' : 'Copied'} ${n}${what}${n > 1 ? 's' : ''}. ${pasteKey()} pastes at the cursor.`); draw();
 }
@@ -19435,7 +19438,7 @@ function copyHere(cut){
   let x0 = c.x, row = [v];
   if (tv === 'phrase' && (k === 'fxc' || k === 'fxv')){ x0 = k === 'fxc' ? c.x : c.x - 1; row = [getCell(tv, x0, c.y), getCell(tv, x0 + 1, c.y)]; }
   if (row.every(q => q < 0) && kindAt(tv, x0) !== 'tsp') return toast('Nothing under the cursor to ' + (cut ? 'cut.' : 'copy.'));
-  clip = {v:tv, x0, d:[row], line:false};
+  clip = {v:tv, x0, d:[row], line:false, ...(tv === 'song' ? {mu:[[songMu(c.x, c.y)]]} : {})};
   if (cut) row.forEach((_, i) => setCell(tv, x0 + i, c.y, kindAt(tv, x0 + i) === 'tsp' ? 0 : -1));
   const what = tv === 'song' ? 'block ' + hp(v) : tv === 'sect' ? 'sect row' : 'cell';
   toast(`${cut ? 'Cut' : 'Copied'} ${what}. ${pasteKey()} pastes it.`); draw();
@@ -19451,7 +19454,8 @@ function paste(){
   if (y0 < 0) return toast('Move to a row first.');
   let n = 0; const fxOnly = tv === 'phrase' && busTrack(cTrack); let cut = 0;   // BUS FX ONLY: a paste keeps its FX columns
   const colAt = i => { if (tv !== 'song') return x0 + i; const u = sxU(x0) + i, n0 = ntr(); return u === n0 ? MT : u < n0 ? u : -1; };   // SONG: by screen column, the master after the last track
-  clip.d.forEach((row, j) => { const y = y0 + j; if (y < dm.h) n++; row.forEach((val, i) => { const x = colAt(i); if (val !== undefined && x >= 0 && (x < dm.w || (tv === 'song' && x === MT)) && y < dm.h){ if (fxOnly && x < FX0){ if (val >= 0) cut++; return; } setCell(tv, x, y, val); } }); });
+  clip.d.forEach((row, j) => { const y = y0 + j; if (y < dm.h) n++; row.forEach((val, i) => { const x = colAt(i); if (val !== undefined && x >= 0 && (x < dm.w || (tv === 'song' && x === MT)) && y < dm.h){ if (fxOnly && x < FX0){ if (val >= 0) cut++; return; } setCell(tv, x, y, val);
+    if (tv === 'song' && val >= 0 && x !== MT && x < NT) setBlockMute(y, x, !!(clip.mu && clip.mu[j] && clip.mu[j][i])); } }); });   // MUTED BLOCKS COPY
   if (cut) return (toast(`Pasted the FX columns only: track ${d2(cTrack + 1)} is a bus.`), draw());
   toast(clip.line ? `Pasted ${n} line${n > 1 ? 's' : ''}` + (n < clip.d.length ? ` (${clip.d.length - n} past the end were left out)` : '') : 'Pasted'); draw();
 }
@@ -24282,6 +24286,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [306, '31 Oct', ['Song and Arrange: copy, cut, paste and Clone keep each block’s mute (a muted block pastes muted, an unmuted one unmuted).']],
   [305, '31 Oct', ['Playing (or rendering) the song from a row past the top now picks up the effect commands above it: the last FXO, FLX, GAT, RTG and BYP of each track and of the master column, the master VOL, TVL and TPN. So FLX 00 at the top keeps Flex off when you start further down.']],
   [304, '31 Oct', ['Pattern view: the master (and a bus with only commands) always shows FX1, FX2 and FX3; FX2/3 now only folds the tracks.', 'Phrase with a mouse: a click on an effect cell selects it; a double-click opens the effect list (a click opened it too easily).']],
   [303, '31 Oct', ['INST shows IN USE (the tracks that play this instrument) and PAD SHARED (other instruments, and their tracks, that play the same pad’s sound). The Synth page says which tracks use the pad under its waveform. Check them before changing a sound for a new track.']],

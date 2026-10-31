@@ -81,6 +81,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (12): block mutes travel with copy / paste (build 306)
+
+- `songMu(x, y)`; `clip.mu` (parallel to `clip.d`) from `copySel`, `copyHere` and `cloneHere` on the Song; picks carry `mu`.
+  `paste`, `pastePicks` and `pasteClone` set each pasted block's mute from it (unmuted overwrites a muted one). Arrange's
+  drag move / copy already kept mutes. Checked headless: selection, single block, Clone, and unmuted over muted.
+
 ## 31 Oct (11): CHASE effect commands when starting mid-song (build 305)
 
 - Owner: FLX 00 at the top of the master column, FLX on later; starting between them played Flex on (the node's `flx` is −1
