@@ -11953,7 +11953,10 @@ $('storeTidy').addEventListener('click', async () => { smpTidy(); toast('Unused 
 // Keep a dropdown inside the window: it hangs from its button's left edge, and moves left if it would run off.
 function placeMenu(menu){
   menu.style.left = '0px'; menu.style.right = 'auto';
-  const r = menu.getBoundingClientRect(), over = r.right - (innerWidth - 8);
+  // the screen's width, not innerWidth: on a phone an open menu running off the edge widens the page, and innerWidth with it
+  // (owner, 31 Oct: Settings cut off on the Fold), so it measured as fitting
+  const vw = Math.min(document.documentElement.clientWidth || innerWidth, (window.visualViewport && visualViewport.width) || innerWidth, innerWidth);
+  const r = menu.getBoundingClientRect(), over = r.right - (vw - 8);
   if (over > 0) menu.style.left = Math.max(-r.left + 8, -over) + 'px';
 }
 // A dropdown is placed from its button's left edge when it opens, and pulled left if it would run off.
@@ -12060,6 +12063,7 @@ function fileItems(){
     ['Restore a backup…', restoreBackup],
     ...(canShareProj() ? [['Share project…', shareProj]] : []),
     ['Load demo song', guardLeave('the demo song', () => { setSong(demoSong(), 'Loaded the starter beat.'); setDirty(false); }), null, null, true],
+    ['Load ELECTRO (demo project)', guardLeave('ELECTRO', loadElectro)],
     ['Funk breaks…', pickBreak],
     ['Breaks to chop (…pump BREAK)…', pickChopBreak],
     ...(hasThunderWork() ? [['Open ...Thunder’s saved work…', guardLeave('...Thunder’s saved work', () => thunderImport(false))]] : []),
@@ -15297,6 +15301,11 @@ function normSong(j){
   try { if (localStorage.getItem(VTRK) !== '1' && j.voices && j.voices.length > 16) { vtrk = true; localStorage.setItem(VTRK, '1'); } } catch(e){}
   return S;
 }
+// ELECTRO: the demo project (song and kit), on File ▾ too, for a device that already had a song when it arrived.
+async function loadElectro(){
+  try { const r = await fetch('sounds/ELECTRO.thunder?v=1'); if (!r.ok) throw new Error(r.status); await loadProjText(await r.text(), 'ELECTRO.thunder'); }
+  catch(e){ toast('Couldn’t load ELECTRO: ' + ((e && e.message) || e) + '.'); }
+}
 function demoSong(){
   const S = freshSong(); S.name = 'Starter beat'; S.lpb = 4;   // written in 16ths (new songs are LPB 8)
   const P = steps => { const p = freshPhrase(); for (const [i, n, v, ins, c, cv] of steps){ const r = p[i]; r[0] = n; r[VC] = v; r[IC] = ins; if (c){ r[FX0] = FXC.indexOf(c); r[FX0 + 1] = cv; } } return p; };
@@ -17122,6 +17131,8 @@ function padBlink(e){
    every MIDI port and channel All Sound Off, All Notes Off and the sustain pedal up (a stop only sent All Notes Off on the
    channels the song used). Effect tails ring on; Settings → Audio → Reset audio engine clears those too. */
 function stopKey(){ if (tp.on) return tStop(); panic(); }
+let stopTapT = 0;
+function toTop(){ tp.paused = null; cs.song.y = 0; cs.song.top = 0; try { draw(); } catch(e){} toast('Back to the top of the song.', 1500); }
 function panic(){
   try { if (rt && ctx) rt.pl.stopAll(ctx.currentTime); } catch(e){}
   try { moRelease(); } catch(e){}
@@ -18160,7 +18171,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 311;
+const BUILD = 312;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -20029,7 +20040,12 @@ function press(b, fromKey){
     else if (b === 'edit' && mod('shift')){ used.shift = used.edit = true; takeLatch(); paste(); }
     keyVis(); return;
   }
-  if (b === 'play'){ if (mod('shift')){ used.shift = true; takeLatch(); if (tp.on) tStop(); else tStart('song', {row:songRow()}); } else playCtx(); return; }
+  if (b === 'play'){
+    // STOP tapped twice (owner, 31 Oct): the second tap, within 450 ms of the stop, plays nothing and puts the song back to
+    // its top (the cursor on row 00, RESUME's stopped spot forgotten), so the next PLAY starts the song from the beginning.
+    if (!tp.on && performance.now() - stopTapT < 450){ stopTapT = 0; toTop(); return; }
+    if (tp.on) stopTapT = performance.now();
+    if (mod('shift')){ used.shift = true; takeLatch(); if (tp.on) tStop(); else tStart('song', {row:songRow()}); } else playCtx(); return; }
   // LOOP is a sticky toggle, not a held key: a tap flips it (the pattern loop; LOOP SEL is in the tab bar on a computer).
   if (b === 'loop'){ toggleLoopPat(); clearTimeout(rep); return; }
   if (b === 'xposeUp'){ transposeSel(1); clearTimeout(rep); return; }
@@ -24440,6 +24456,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [312, '31 Oct', ['File ▾ → Load ELECTRO (demo project) opens the bundled ELECTRO song and kit on any device (the first-run song only comes in where no song was saved yet).', 'Touch: tapping STOP twice puts the song back to its top (the next PLAY starts from the beginning).', 'Settings (and the File and Edit menus) no longer run off the right edge of a phone or foldable screen.']],
   [311, '31 Oct', ['The first time Thunder Plus opens, it opens the ELECTRO song (with its kit) instead of the starter beat. File ▾ → Load demo song still loads the starter beat.', 'The song timer starts again each time the song goes round, instead of staying at 0:00.', 'TRACKS no longer changes the song: from 16 to 17 a new empty mono track comes in before the poly tracks, which keep their phrases, mixer, effects and …chains routing (17 to 18 adds an empty poly track). Fewer tracks keeps the dropped ones, and going back brings them back where they were.']],
   [310, '31 Oct', ['Poly tracks: a Voice (or …pump live) note takes over the note still holding in its own column instead of singing on top of it; notes side by side in different columns still sing together.', 'Voice engine: new Rough (rasp to growl), Choir (up to 8 singers) and Choir spread; the presets are now …pump SING’s 32 voices: singers from child to deep bass, opera, crooner, raspy rock, growl, whispers, ghost, choirs, aah pad, android, monster, fairy and more.']],
   [309, '31 Oct', ['PLAY starts from the cursor’s song row even when the cursor sits on an empty cell of it (an empty row starts from the next row down that has something).']],

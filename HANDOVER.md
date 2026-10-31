@@ -81,6 +81,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (18): Load ELECTRO, STOP twice to the top, menus on phones (build 312)
+
+- File ▾ → Load ELECTRO (`loadElectro`, beside `demoSong`). The owner's web copies (phone and computer) held an older 8-row save of the song in browser storage; the first-run load never replaces a saved song.
+- Touch PLAY/STOP: a second tap within 450 ms of a stop calls `toTop()` (tp.paused cleared, cursor to row 00) instead of playing.
+- `placeMenu` measures against documentElement.clientWidth / visualViewport: on mobile an overflowing menu widens the page and innerWidth with it, so Settings was never pulled back in.
+
 ## 31 Oct (17): ELECTRO first-run song; song timer wraps; TRACKS keeps the song (build 311)
 
 - Song timer: `tickLen` restarts from the block top when the elapsed time passes the remaining length, and the heard steps (frame loop) reset it when the rows go back up (`tp.hiRow`).
