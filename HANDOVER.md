@@ -81,6 +81,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (7): Arrange: a plain click ends a Shift selection (build 301)
+
+- The selection is `selA`→cursor, so a plain click (which moves the cursor) kept growing it. `sxEnd`: a click with no drag,
+  no Alt and no Shift drops `selA`. Checked headless: Shift-click 2 cells, release Shift, click → no selection; Shift-clicks
+  start a new one.
+
 ## 31 Oct (6): Mastering window: compressor feedback, EQ band curves (build 300)
 
 - Owner: hard to dial the mastering compressor in without seeing it work. `master-worklet.js` (v5) now reports the

@@ -18024,7 +18024,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 300;
+const BUILD = 301;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22519,7 +22519,11 @@ function sxEnd(e){
     draw(); sxSelToast(); return;
   }
   // Alt-click without a drag mutes. On a block inside the selection (or among the picks) it mutes them all (owner, 30 Oct).
-  if (!d.mode){ if (d.alt){ const r = sxRect(); if (d.sel && r) sxMuteRect(r); else if (sxPicks.some(p => p.y === d.y && p.t === d.t)) sxMuteCells(sxPicks.map(p => [p.y, p.t])); else toggleBlockMute(d.y, d.t); } return; }
+  if (!d.mode){ if (d.alt){ const r = sxRect(); if (d.sel && r) sxMuteRect(r); else if (sxPicks.some(p => p.y === d.y && p.t === d.t)) sxMuteCells(sxPicks.map(p => [p.y, p.t])); else toggleBlockMute(d.y, d.t); }
+    // A plain click (Shift let go) ends the selection (owner, 31 Oct): the selection reaches from its anchor to the cursor,
+    // so a plain click that moved the cursor kept growing it.
+    else if (selA && selA.v === 'song'){ selA = null; draw(); }
+    return; }
   if (d.mode === 'select'){ sxSelToast(); return; }
   sxAim(d, e); sxApply(d);
 }
@@ -24204,6 +24208,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [301, '31 Oct', ['Arrange: once Shift is let go, a plain click no longer grows the selection: it ends it (Shift-click again to start a new one).']],
   [300, '31 Oct', ['Mastering → COMPRESS shows what it is doing: the gain reduction now in big numbers (and its recent peak), a dot riding the curve at the signal’s level with a red bar for the reduction there, the level against the threshold along the bottom, and the last few seconds of reduction.', 'Mastering → EQ draws each band’s own curve faintly behind the total, so a low shelf looks like a shelf even with the low cut under it.']],
   [299, '31 Oct', ['Arrange: a block whose phrase is still empty (no notes, no commands) has sideways lines through it, so you can tell the blocks that play from the empty placeholders.']],
   [298, '31 Oct', ['FOLLOW: the screen still follows the playhead (the phrase playing, the rows paging along), but the cursor stays where you put it, so you can type and edit while the song plays. Moving the cursor brings it back into view.']],
