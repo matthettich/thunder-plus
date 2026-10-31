@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.34** (31 Oct 2026, UTC; Run workflow through the API with version 1.2.34, from `3c992cb`) has build 294: the …pump
+  creative effects, MASTER and the …chains pump modules ("30 Oct (26)" below). All three platforms built.
 - **v1.2.26** (27 Oct 2026; Run workflow through the API with version 1.2.26) has the gain staging (TRIM, master OUT, PRE
   sends, the CHN crossfade) and its review fixes: "27 Oct (6)" below, build 265.
 - **v1.2.22** (24 Oct 2026; Run workflow through the API with version 1.2.22) has everything in "24 Oct" below: the Windows
