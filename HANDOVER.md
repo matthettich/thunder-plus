@@ -81,6 +81,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (11): CHASE effect commands when starting mid-song (build 305)
+
+- Owner: FLX 00 at the top of the master column, FLX on later; starting between them played Flex on (the node's `flx` is −1
+  = the slot's own pattern until a command arrives). `chaseEvs(row, at)`: a silent `makeSeq` run from row 0 until every
+  track is at or past `row`, keeping the last `fxc` / `chc` / `mvol` / `tvl` / `tpn` event per track and parameter; sent at
+  the start by `tStart` (song mode, row > 0) and prepended in `renderOut` (RENDER FROM > 0). Not chased: TPO, LPB, SCA/SCG,
+  TSP, GRV (the sequencer's own state; a bigger change). Checked headless: FLX 00 on row 0, FLX 05 on row 2 → start at row 1
+  sends flx 0, at row 3 flx 5.
+
 ## 31 Oct (10): Pattern view master FX columns; effect cells open on double-click (build 304)
 
 - `pvColsOf`: the master and commands-only buses always get FX1–FX3 (`pvFx` / FX2/3 folds the tracks only).

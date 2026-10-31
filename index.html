@@ -16929,10 +16929,27 @@ function tStart(mode, o){
   met.next = 0; rec.hist = []; if (ci) countIn(ctx.currentTime + 0.08, recS.cnt, seq.bpm);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0, t0:seq.time, lenTot:null, lenPre:0});
+  if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
   tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
   bgPlay(true);   // BACKGROUND PLAY
   void r;
 }
+/* CHASE (owner, 31 Oct): playing the song from a row past the top, the effect commands of the rows before it still count:
+   the last FXO, FLX, GAT, RTG and BYP of each track and the master column, the master VOL, TVL and TPN. A silent run of
+   the sequencer from the top to the start row (no sound: its events are only read) finds them; each one's last value is
+   sent at the start. So "FLX 00 at the top, FLX on later" starts with Flex off when you start in between. */
+const CHASE_T = new Set(['fxc', 'chc', 'mvol', 'tvl', 'tpn']);
+function chaseEvs(row, at){
+  const pre = makeSeq(S, 'song', {row:0, once:true}); if (!pre.alive()) return [];
+  const last = new Map(); let guard = 0;
+  while (pre.alive() && guard++ < 20000){
+    const r = pre.step(), rows = (r.pos || []).filter(Boolean).map(p => p.row).filter(v => v >= 0);
+    if (rows.length && Math.min(...rows) >= row) break;
+    for (const e of r.evs) if (CHASE_T.has(e.type)) last.set(e.type + ':' + e.track + ':' + (e.p || ''), e);
+  }
+  return [...last.values()].map(e => Object.assign({}, e, {t:at}));
+}
+function chaseFx(row, at){ for (const e of chaseEvs(row, at)) rt.pl.play(e); }
 // The SONG button in the synth's top bar: play the song from the tracker's cursor row, or stop it.
 // The label (Song / Stop) is switched by the .on class in CSS, so the button's size and position never
 // change with the transport state.
@@ -17330,7 +17347,7 @@ async function renderOut(stems){
   try {
     const sr = ex.sr, seq = makeSeq(S, 'song', {row:S.renderFrom, once:true});
     if (!seq.alive()) return toast(`Nothing to render: row ${rS(S.renderFrom, 3)} is empty. Set RENDER FROM to the first row of the song.`);
-    const evs = []; let guard = 0;
+    const evs = (S.renderFrom | 0) > 0 ? chaseEvs(S.renderFrom | 0, seq.time) : []; let guard = 0;   // CHASE: the effect commands before RENDER FROM
     while (seq.alive() && seq.time < 1200 && guard++ < 100000){ const r = seq.step(); for (const e of r.evs) evs.push(e); }
     const notes = evs.filter(e => e.type === 'note' && kit.voices[e.pad]);   // (a slot the kit doesn't have is silent)
     if (!notes.length) return toast('Nothing to render: the song has no notes yet.');
@@ -18046,7 +18063,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 304;
+const BUILD = 305;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24265,6 +24282,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [305, '31 Oct', ['Playing (or rendering) the song from a row past the top now picks up the effect commands above it: the last FXO, FLX, GAT, RTG and BYP of each track and of the master column, the master VOL, TVL and TPN. So FLX 00 at the top keeps Flex off when you start further down.']],
   [304, '31 Oct', ['Pattern view: the master (and a bus with only commands) always shows FX1, FX2 and FX3; FX2/3 now only folds the tracks.', 'Phrase with a mouse: a click on an effect cell selects it; a double-click opens the effect list (a click opened it too easily).']],
   [303, '31 Oct', ['INST shows IN USE (the tracks that play this instrument) and PAD SHARED (other instruments, and their tracks, that play the same pad’s sound). The Synth page says which tracks use the pad under its waveform. Check them before changing a sound for a new track.']],
   [302, '31 Oct', ['Arrange colours each bus with the tracks it takes in: their blocks, empty cells and track numbers share one colour, the bus a darker shade, so you can see what runs through which bus (including a track added to the bus in …chains).']],
