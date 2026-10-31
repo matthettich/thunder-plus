@@ -79,6 +79,19 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (13): Renoise-style commands (build 280)
+
+- `FXC` += FDI, TRM, APN, TVL, TPN, STP, LPB, PDL, ONE, MPB, MAT (master may use LPB, PDL, STP).
+- Per note (`ev.fdi`, `ev.trm`, `ev.apn`): `startNote` ramps the voice gain in, and hangs an OscillatorNode (X cycles a
+  beat at `bpmNow`, depth Y/15) on its gain / pan, stopped when the source ends.
+- TVL / TPN events → `trackTo` in the player: `tvlOv` / `tpnOv` (also read by `applyMix`, so mute and solo still work),
+  set with a 4 ms setTargetAtTime; cleared and `applyMix()`ed in `resetSeq`.
+- STP kills the voices of the track (00) or every track (01). LPB sets `api.lpb` (every track's line length from the
+  next row; 00 back to the phrases'), PDL adds XX rows to every playing track's next step (`pdl`). ONE keeps one random
+  note (and its column) of a chord row. MPB / MAT are MIDI-only events (`moCmd`, and the MIDI export).
+- Checked headless: sequencer times for LPB 8 then 0, PDL 2 and STP were exact; TVL 40 / TPN 20 reached the bus while
+  playing and the mixer's came back at stop. Not done (yet): Renoise's Zxx (a phrase from a note), Exx, Jxx, pan slides.
+
 ## 30 Oct (12): FXS / FXV, SCA / SCG, CUT / RES / DEC (build 279), after an audit against the M8's commands
 
 - New `FXC` entries at the end: FXS, FXV, SCA, SCG, CUT, RES, DEC (master phrases may use FXS, FXV, SCG, PRB).
