@@ -79,6 +79,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (16): cursor on the playhead (build 284)
+
+- With FOLLOW the cursor rides the playing row; `.ln.plr span.cur` used the screen's background colour, so in Pattern view
+  (no column box) it vanished into the bar. It now keeps the cursor colour with a ring. Checked headless: the cursor
+  stays on its track and column when Space starts playback.
+
 ## 30 Oct (15): Arrange pages with playback (build 283)
 
 - `followPlay` (FOLLOW on, song mode): when the playing row leaves Arrange's rows (`arrRows()`), `cs.song.top` jumps so

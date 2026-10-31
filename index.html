@@ -777,7 +777,7 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
    own background with dark text; the row number stays lit. */
 .tscr .tgrid .ln.plr{background:var(--ts-ink)}
 .tscr .tgrid .ln.plr span:not(.pl){color:var(--ts-bg)}
-.tscr .tgrid .ln.plr span.cur{background:var(--ts-bg); color:var(--ts-ink)}
+.tscr .tgrid .ln.plr span.cur{background:var(--ts-cur-bg); color:var(--ts-cur); outline:2px solid var(--ts-bg); outline-offset:-1px}   /* the cursor riding the playhead (FOLLOW) keeps its own colour, ringed, so it stays visible on the bar (owner, 30 Oct: it vanished in Pattern view) */
 .tscr .tgrid .ln.plr span.sel{color:var(--ts-ink)}
 .tinfo{flex:none; font-size:.8em; line-height:1.35; color:var(--ts-info); border-top:1px solid var(--ts-line); padding-top:.45em; margin-top:.3em}
 .tinfo>div{overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2}
@@ -17874,7 +17874,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 283;
+const BUILD = 284;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23959,6 +23959,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [284, '30 Oct', ['With FOLLOW on, the cursor stays visible on the playing row (it blended into the playhead bar in Pattern view).']],
   [283, '30 Oct', ['With FOLLOW on, Arrange turns the page when playback runs past its bottom, so the playing row stays in sight.']],
   [282, '30 Oct', ['Help brought up to date: effect counts and groups, the drum-type presets, the master’s commands, Tab, Backspace, Enter, Alt+A and Ctrl+Space.']],
   [281, '30 Oct', ['This list: after an update the app now says what changed (Help › What’s new shows it again).']],
