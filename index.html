@@ -1913,9 +1913,9 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <button id="bSaveKit">Save kit (.json)</button>
         <button id="bLoadKit">Load kit…</button>
         <input type="file" id="kitIn" accept=".json,application/json" hidden>
-        <button id="bFactory">Factory kit</button>
+        <button id="bFactory">Factory drums (pads 1–8)</button>
         <button id="bClassic">Drum kits…</button>
-        <button id="bClearKit">Clear all slots</button>
+        <button id="bClearKit">Clear all kit slots</button>
       </div>
       <div class="btnrow">
         <label class="cb"><input type="checkbox" id="ckVtrk">A voice per track</label>
@@ -12090,6 +12090,7 @@ window.addEventListener('pointerdown', e => { if (gsetOpen() && !$('gset').conta
    On the Waves and Chains screens it drives that patch (New, Open, Save, Undo, custom modules);
    elsewhere it drives the project file (save/load, chains import/export). */
 const frameApi = () => view === 'waves' ? wvApi() : view === 'chains' ? chApi() : null;
+const editShown = () => { const b = $('bEdit'); return !!(b && b.offsetParent !== null && !b.hidden); };
 function fileItems(){
   const a = frameApi(), f = a && a.file;
   // APP KEYS (27 Oct, Phase 2): Ctrl/⌘+S, O and N are the project's here too, so the project's items come first and the
@@ -12108,10 +12109,9 @@ function fileItems(){
   // Everything that saves, opens, renders or exports lives here, on every screen. Items with a 5th entry true
   // replace what you have, so they ask for a second tap.
   return [
-    ['Undo', () => undoStep(-1), () => !undo.past.length && !vUndo.t.some(Boolean), 'Z'], ['Redo', () => undoStep(1), () => !undo.future.length, '⇧Z'],
-    null,
-    ['Phrases… (find ones not on the song)', () => phlOpen(true)],
-    null,
+    // MENUS (owner, 31 Oct: things in the right place): with the Edit menu on screen, Undo / Redo and Phrases… are there
+    // only; a phone has no Edit menu, so they stay here
+    ...(editShown() ? [] : [['Undo', () => undoStep(-1), () => !undo.past.length && !vUndo.t.some(Boolean), 'Z'], ['Redo', () => undoStep(1), () => !undo.future.length, '⇧Z'], null, ['Phrases… (find ones not on the song)', () => phlOpen(true)], null]),
     ['New song', newSong, null, 'N', true],
     ['Open project…', openProj, null, 'O'], ...(recentL.length ? [['Open recent…', openRecent]] : []),
     ['Save project' + (projLabel() ? ' (' + projLabel() + ')' : '') + (projDirty ? '  •' : ''), () => saveProj(false), null, 'S'], ['Save as…', () => saveProj(true), null, '⇧S'],
@@ -18254,7 +18254,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 317;
+const BUILD = 318;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18274,10 +18274,10 @@ const FLK = 'thunderplus-follow-v1';
 let followOn = (() => { try { return localStorage.getItem(FLK) === '1'; } catch(e){ return false; } })();
 function setFollow(on){ followOn = on; try { localStorage.setItem(FLK, on ? '1' : '0'); } catch(e){} if (on) followPlay(); draw(); }
 /* RESUME (owner, 31 Oct): stopping the song leaves the playhead showing where it stopped (tp.paused), on every screen.
-   PLAYBACK RESUMES FROM PAUSE (on by default, this device): PLAY then carries on from that spot, to the step, as long as
+   PLAYBACK RESUMES FROM PAUSE (off by default since build 318, this device): PLAY then carries on from that spot, to the step, as long as
    the cursor hasn't moved since; move it and PLAY starts from the cursor as before. Off: PLAY starts from the cursor. */
 const RSK = 'thunderplus-resume-v1';
-let resumeOn = (() => { try { return localStorage.getItem(RSK) !== '0'; } catch(e){ return true; } })();
+let resumeOn = (() => { try { return localStorage.getItem(RSK) === '1'; } catch(e){ return false; } })();   // off unless turned on (owner, 31 Oct: it was on by default)
 function setResume(on){ resumeOn = on; try { localStorage.setItem(RSK, on ? '1' : '0'); } catch(e){} draw(); }
 const curKey = () => [tv, cs.song.x, cs.song.y, cs.phrase.y, cs.sect.y, cPhrase, cSect, cTrack].join(',');
 // Pads mode: OPTION + arrows move around the Song grid, in the phrase editor (phraseGrid) and on the Song screen (songGridDir).
@@ -18857,7 +18857,7 @@ function projRows(){
       info:() => 'Size of the Mixer only, separate from TEXT SIZE: 100 % fills the screen, which is already larger than the 80 % Desktop text size gave it. Above that it takes whatever room is left, never past the screen (all its rows stay visible); bigger shows fewer tracks at once, and the window follows the cursor (TRK nn–nn of 32 ◀▶)'},
     {l:'FOLLOW', ck:'Follow playhead', get:() => followOn ? 1 : 0, set:v => setFollow(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'While the song plays, Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. The cursor stays on its row, so you can type and edit while it plays (moving it brings it back into view). Off leaves the screen where you put it'},
-    {l:'RESUME', ck:'Playback resumes from pause', get:() => resumeOn ? 1 : 0, set:v => setResume(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+    {l:'RESUME', ck:'Playback resumes from pause', get:() => resumeOn ? 1 : 0, set:v => setResume(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'ON: after you stop the song, PLAY carries on from where it stopped (the playhead stays there to show it), unless you have moved the cursor since. OFF: PLAY starts from the cursor, as before. Either way the stopped spot stays lit'},
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. A poly track shows its whole chord: all four notes when there is room (unfolded, desktop), otherwise one letter per voice (capital = natural, small = sharp, so CEGa is C E G A#; · is an empty voice, × a note off). Only to look at; they can’t be edited'},
@@ -20275,6 +20275,7 @@ function cmdItems(){
     it('sel', selA ? 'Cancel the selection' : 'Start a selection', 'mod+B'),
     {a:'all', l:'Select all', k:keyHint('mod+A'), f:selectAll, off:!GRIDV.has(tv) || onPset()},
     ...(onSong ? [it('rmv', 'Remove from song (keep the phrase)', '')] : []),
+    {a:'phl', l:'Phrases… (find ones not on the song)', k:'', f:() => phlOpen(true)},
     ...(onSong ? [null, it('clone', 'Clone (paste puts a unique copy)', 'mod+alt+C'), it('cldn', 'Clone down (into a new row below)', 'mod+shift+C'),
       {a:'dup', l:'Duplicate the pattern (insert below)', k:keyHint('mod+D'), f:() => dupKey(false)}, {a:'rmrow', l:'Remove the row (the rows below move up)', k:'', f:songRowRemove}] : []),
     ...(['phrase', 'sect', 'mixer', 'fx', 'song'].includes(tv) && (() => { try { const bt = tv === 'song' ? cs.song.x : dkTrack(); return bt >= 0 && bt < NT && isBusT(bt); } catch(e){ return false; } })()
@@ -23751,6 +23752,12 @@ let wAcc = 0, vAcc = 0;
 scr.addEventListener('wheel', e => {
   if (fxp.open || (e.ctrlKey && e.target.closest && e.target.closest('#tArr'))) return;   // Ctrl+wheel over Arrange zooms it
   { const v = e.target.closest && e.target.closest('[data-x]'), x = v ? +v.dataset.x : 0, y = v ? +v.dataset.y : -1;   // VALUE MOUSE: the wheel over a value changes it
+    // FX SLOTS (owner, 31 Oct: too easy to change an effect by accident): over a slot the wheel moves between the slots,
+    // it never swaps the effect (EDIT, the effect list or EDIT+arrows still do)
+    if (v && grid.contains(v) && tv === 'fx' && y >= 1 && y <= FXSLOTS && !e.ctrlKey){ e.preventDefault();
+      const dy = e.deltaMode === 1 ? (e.deltaY || e.deltaX) * 40 : (e.deltaY || e.deltaX); let n;   // one slot a notch; a trackpad's small steps add up
+      if (Math.abs(dy) >= 50){ n = Math.sign(dy); vAcc = 0; } else { vAcc += dy; n = Math.trunc(vAcc / 100); if (!n) return; vAcc -= n * 100; }
+      const c = cs.fx, ny = clamp((c.y >= 1 && c.y <= FXSLOTS ? c.y : y) + n, 1, FXSLOTS); if (ny !== c.y){ c.y = ny; draw(); } return; }
     if (v && grid.contains(v) && valCell(v, x, y) && !e.ctrlKey){ e.preventDefault();   // (Ctrl+wheel is a trackpad pinch: zoom, never a value)
       const c = cs[tv]; if (tv === 'mixer' && y === 7){ if (c.y !== 7 || (c.mx || 0) !== x){ c.y = 7; c.mx = x; vAcc = 0; draw(); } }   // MASTER or OUT
       else if (c.x !== x || c.y !== y){ c.x = x; c.y = y; vAcc = 0; draw(); }
@@ -24540,6 +24547,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [318, '31 Oct', ['RESUME (Playback resumes from pause) is now off unless you turn it on (Settings → Screen → RESUME): PLAY starts from the cursor. The stopped spot still stays lit.', 'FX screen: the mouse wheel over the effect slots moves between them, one slot a notch; it no longer swaps the effect (EDIT and the effect list still do).', 'Menus: on a computer Undo, Redo and Phrases… are in the Edit menu only (a phone, with no Edit menu, keeps them in File); the kit buttons in Settings say Factory drums (pads 1–8) and Clear all kit slots, as File does.']],
   [317, '31 Oct', ['Arrange (beside the Phrase screen and the others): the only gap between columns is at the MONO | POLY line, as on the Song screen. With an odd number of tracks the old gap every 8 tracks fell inside MONO (between 8 and 9).']],
   [316, '31 Oct', ['Tracker → PROJECT has › LOAD ELECTRO too (EDIT twice), beside › LOAD DEMO, for phones.']],
   [315, '31 Oct', ['Render song and Render stems ask where to save first (the desktop app: the Save dialog, starting in your Music folder and then wherever the last one went; Chrome and Edge: their Save picker; elsewhere the file goes to Downloads, and it says so), then show a progress window with a bar that follows the render. When it is saved the desktop app tells you where, with a Show button that opens the folder.', 'Other exports (pads, kits, presets, rendered parts) ask where to save the same way.']],
