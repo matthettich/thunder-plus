@@ -14135,6 +14135,7 @@ function pumpFresh(type){
   if (PUMP_BOX[type].sel) f.sel = 0;
   if (PUMP_BOX[type].rows.includes('@sck')) f.sck = 0;
   if (PUMP_BOX[type].rows.includes('@nin')) f.nin = 0;   // …PUMP CREATIVE: NOTES FROM
+  if (type === 'master') f.ana = '';   // …PUMP MASTER: the learned analysis (pump's own text), '' = not learned yet
   pumpBytes(f); return f;
 }
 // Every box's byte from f.pump (after a preset, a pop-up edit, a load or undo).
@@ -14162,6 +14163,7 @@ function pumpNorm1(o){   // a saved slot → a slot (every symbol, clamped; new 
   if (PUMP_BOX[type].sel) f.sel = clamp(int(o.sel, 0), 0, PUMP_BOX[type].sel - 1);
   if ('sck' in f) f.sck = clamp(int(o.sck, 0), 0, 8 + NT);
   if ('nin' in f) f.nin = clamp(int(o.nin, 0), 0, NT);
+  if (type === 'master') f.ana = typeof o.ana === 'string' && o.ana.startsWith('pumpmaster') ? o.ana.slice(0, 20000) : '';
   pumpBytes(f); return f;
 }
 const PUMP_SCK = ['NONE', 'SEND 1', 'SEND 2', 'SEND 3', 'SEND 4', 'SEND 5', 'SEND 6', 'SEND 7', 'SEND 8', ...Array.from({length:128}, (_, i) => 'TRACK ' + d2(i + 1))];
@@ -14196,6 +14198,8 @@ for (const type of PUMP_TYPES){
 // Only bus tracks (a track …chains sums others into) and the master get the pump effects in their pickers; a slot that has
 // one keeps it if the track stops being a bus.
 const isPumpT = k => !!(TFX[k] && TFX[k].pump);
+// …PUMP MASTER: the loudness its analysis measured (null: nothing learned)
+const pumpAnaLufs = tx => { const m = /;lufs=(-?[\d.]+)/.exec(tx || ''); return m ? +m[1] : null; };
 const pumpAllowed = t => t >= NT || isBusT(t);
 /* …PUMP: window.PumpFX, the interface the pop-up windows (later stages) use. Documented in docs/PUMP-FX.md; keep the two
    in step. A slot is addressed by (track, slot): track 0..NT-1, or NT (PumpFX.MASTER) for the master; slot 0..3. */
@@ -14299,6 +14303,11 @@ const PumpFX = window.PumpFX = (() => {
     _feed(n, frames){ for (const fr of frames){
       if (fr.type === 8 || fr.type === 2) n.pmeter = n.pmeter || new Map(), n.pmeter.set(fr.slot, {key:fr.key, t:fr.t, at:performance.now()});
       for (const s of subs) if (s.node === n && s.key === fr.key && fr.rings) try { s.cb(fr); } catch(e){ console.warn('PumpFX subscriber', e); } } },
+    // …PUMP MASTER: a LEARN finished: the analysis goes into the slot (saved with the song), not an undo step of its own
+    _ana(n, list){ for (let t = 0; t <= NT; t++) if (nodeOf(t) === n) for (const [slot, key, text] of list){
+      const f = slotOf(t, slot); if (!f || keyOf(slot, f) !== key || TFX[f.type].pump !== 'master' || f.ana === text) continue;
+      f.ana = text; saveS(); notify(t, 'learn'); try { draw(); } catch(e){}
+      toast(text ? 'pump MASTER learned the song' + (pumpAnaLufs(text) != null ? ' (' + pumpAnaLufs(text).toFixed(1) + ' LUFS)' : '') + '.' : 'pump MASTER: nothing learned.'); } },
     _lat(n, list){ for (let t = 0; t <= NT; t++) if (nodeOf(t) === n){ for (const [slot, key, v] of list) lats.set((t >= NT ? 'M' : t) + '/' + key, v); notify(t, 'latency'); } },
     _notify:notify
   };
@@ -14359,7 +14368,8 @@ function tfxChain(A, sr, bpm){
   (A || []).forEach((f, k) => { if (!f || !TFX[f.type]) return;
     if (TFX[f.type].pump){ pumpSync(f); const P = TFX[f.type], fx = pumpFx(P.pump);   // …PUMP: every value, in the plugin's parameter order
       out.push({key:k + ':' + f.type, pt:P.pt, pv:fx.params.map(p => f.pump[p.s] ?? p.def), bi:pumpIdx[P.pump].bypass ?? -1, on:!!f.on, slot:k, sck:+f.sck || 0,
-        cr:PUMP_CREATIVE.has(P.pump), clk:P.pump === 'gate' || P.pump === 'stutter' || P.pump === 'chop'}); return; }   // …PUMP CREATIVE: the transport; clk: keep running on the clock while silent
+        cr:PUMP_CREATIVE.has(P.pump) || P.pump === 'master', clk:P.pump === 'gate' || P.pump === 'stutter' || P.pump === 'chop',
+        ...(P.pump === 'master' ? {ana:typeof f.ana === 'string' ? f.ana : ''} : {})}); return; }   // …PUMP MASTER: its learned analysis   // …PUMP CREATIVE: the transport; clk: keep running on the clock while silent
     if (TFX[f.type].mod){ out.push({key:k + ':' + f.type, mod:TFX[f.type].mod, mp:TFX[f.type].map(f, sr, bpm), bpm, on:!!f.on, slot:k}); return; }   // a shared module (MODFX)
     const p = new Array(12).fill(0); TFX[f.type].map(f, sr, bpm).forEach((v, i) => p[i] = v); out.push({key:k + ':' + f.type, t:TFX[f.type].id, p, on:!!f.on, slot:k}); });
   return out;
@@ -14419,8 +14429,22 @@ class ThunderFx extends AudioWorkletProcessor {
     const st = new Float32Array(P.memory.buffer, P.pump_stage(), 512);
     for (let j = 0; j < s.pv.length && j < 512; j++) st[j] = s.pv[j];
     if (s.bi >= 0) st[s.bi] = s.byp ? 1 : 0;
-    s.pu = P.pump_new(s.pt, sampleRate); s.dirty = false; return s.pu >= 0;
+    s.pu = P.pump_new(s.pt, sampleRate); s.dirty = false;
+    if (s.pu >= 0 && s.ana) this.pumpState(P, s, s.ana);   // …PUMP MASTER: what it learned
+    s.anaIn = s.ana || ''; return s.pu >= 0;
   }
+  // …PUMP MASTER: its analysis text into the plugin (pump_state_set: "key\0value\0" in pump_text), and out (pump_state_get)
+  // (plain ASCII by hand: an AudioWorklet has no TextEncoder / TextDecoder; pump's analysis text is ASCII)
+  pumpState(P, s, text){
+    const b = new Uint8Array(P.memory.buffer, P.pump_text(), 65536), k = 'analysis', v = String(text || '');
+    if (k.length + v.length + 2 > 65536) return;
+    for (let i = 0; i < k.length; i++) b[i] = k.charCodeAt(i); b[k.length] = 0;
+    for (let i = 0; i < v.length; i++) b[k.length + 1 + i] = v.charCodeAt(i) & 127; b[k.length + 1 + v.length] = 0; P.pump_state_set(s.pu);
+  }
+  pumpStateGet(P, s){ let b = new Uint8Array(P.memory.buffer, P.pump_text(), 65536); const k = 'analysis';
+    for (let i = 0; i < k.length; i++) b[i] = k.charCodeAt(i); b[k.length] = 0;
+    const n = P.pump_state_get(s.pu); b = new Uint8Array(P.memory.buffer, P.pump_text(), n); let t = '';
+    for (let i = 0; i < n; i += 4096) t += String.fromCharCode.apply(null, b.subarray(i, Math.min(n, i + 4096))); return t; }
   pumpRun(s, n){
     const P = globalThis.__pumpX; if (!P || s.dead || s.pu < 0) return;
     if (s.dirty){ const v = new Float32Array(P.memory.buffer, P.pump_values(s.pu), s.pv.length);
@@ -14434,6 +14458,8 @@ class ThunderFx extends AudioWorkletProcessor {
         for (let j = 0; j < q.length; j++){ const m = q[j]; if (m[1] >= end) break;
           if (m[0] === s.slot){ P.pump_midi(s.pu, Math.max(0, Math.min(n - 1, Math.round((m[1] - currentTime) * sampleRate))), m[2], m[3], m[4]); q.splice(j--, 1); } } }
     }
+    if (s.ms && ((s.msN = (s.msN | 0) + 1) % 192) === 0){   // …PUMP MASTER: about twice a second, has it learned something new?
+      try { const tx = this.pumpStateGet(P, s); if (tx !== s.anaIn && tx !== s.anaOut){ s.anaOut = tx; this.port.postMessage({pana:[[s.slot, s.key, tx]]}); } } catch (e){} }
     let io = this.pumpIO(P), sc = 0;
     if (s.sck > 0){ const K = this.mctx.key(s.sck); if (K){ io[2].set(K.subarray(0, n)); io[3].set(K.subarray(0, n)); sc = 1; } }   // COMP's External sidechain: the picked send or track
     io[0].set(this.L.subarray(0, n)); io[1].set(this.R.subarray(0, n));
@@ -14480,9 +14506,13 @@ class ThunderFx extends AudioWorkletProcessor {
         const P = this.pumpX();
         if (!P){ if (!this.pumpAsked){ this.pumpAsked = true; this.port.postMessage({needPump:true}); } continue; }
         if (i >= 0 && old[i].pu !== undefined && old[i].pt === c.pt && old[i].pu >= 0 && !old[i].dead){ s = old[i]; old.splice(i, 1); s.pv = c.pv; s.dirty = true; }
-        else { s = {key:c.key, h:-2, pt:c.pt, pv:c.pv, bi:c.bi, byp:!on};
+        else { s = {key:c.key, h:-2, pt:c.pt, pv:c.pv, bi:c.bi, byp:!on, ana:c.ana};
           try { if (!this.pumpNew(P, s)) continue; } catch (e){ continue; } }
-        s.on = on; s.slot = slot; s.sck = c.sck | 0; s.cr = !!c.cr; s.clk = !!c.clk; next.push(s); continue;
+        s.on = on; s.slot = slot; s.sck = c.sck | 0; s.cr = !!c.cr; s.clk = !!c.clk;
+        if (c.ana !== undefined){ s.ms = true; s.ana = c.ana;   // …PUMP MASTER: a new analysis from the app (a load, undo, FORGET) goes in
+          if (s.pu >= 0 && c.ana !== s.anaIn && c.ana !== s.anaOut){ try { this.pumpState(globalThis.__pumpX, s, c.ana); } catch (e){} }
+          s.anaIn = c.ana; }
+        next.push(s); continue;
       }
       if (c.mod){   // a shared …chains/…waves module (MODFX), run as it runs in …chains
         const D = globalThis.ChainsDSP, def = D && D.MODULES ? D.MODULES[c.mod] : null;
@@ -14925,6 +14955,7 @@ function tfxNode(ac, chain){
     if (d.dyn) fxDynIn(n, d.dyn);
     if (d.needPump){ if (pumpBin()) n.port.postMessage({pumpBytes:pumpBin()}); else pumpWait.add(n); }
     if (d.pump) PumpFX._feed(n, d.pump);
+    if (d.pana) PumpFX._ana(n, d.pana);   // …PUMP MASTER: it learned
     if (d.plat){ n.plat = d.plat; PumpFX._lat(n, d.plat); }
     if (d.failed){ const t = String(d.failed).split(':')[1], F = TFX[t]; toast((F ? F.long.replace(/^based on /, '') : 'An effect') + ' stopped working and was bypassed. Change its settings to restart it.'); } };
   return n;
@@ -18404,6 +18435,14 @@ function fxRows(){
   if (PU){
     rows.push({l:'› PRESET' + (f.pname ? '  ' + f.pname.toUpperCase() : ''), gap:true, act:() => pumpPresetOpen(t, k), info:() => 'Pick one of pump ' + pumpFx(PU).name + '’s factory presets (Factory, Sources, Chains)' + (f.pname ? '. Last: ' + f.pname : '')});
     if (!PUMP_CREATIVE.has(PU)) rows.push({l:'› OPEN', act:() => PumpFX.open(t, k), info:() => 'Opens pump ' + pumpFx(PU).name + '’s own window (every control, its displays)' + (pumpLatTxt(t, k) ? ' · ' + pumpLatTxt(t, k) : '')});
+    if (PU === 'master'){   // …PUMP MASTER: LEARN (play the song while it listens), as the plugin's LEARN key
+      const L = pumpAnaLufs(f.ana);
+      rows.push({l:'› LEARN' + (L != null ? '  LEARNED ' + L.toFixed(1) + ' LUFS' : '  NOT LEARNED YET'), act:() => { PumpFX.hold(t, k, 3, 1); toast('pump MASTER is listening: play the song (or the loudest part). FINISH LEARN, or stopping the song, ends it.', 6000); },
+        info:() => 'Listens to the song and makes one subtle master from it (tone, dynamics, stereo, loudness). Start it, play the song, then FINISH LEARN or stop' + (L != null ? '. Learned: ' + L.toFixed(1) + ' LUFS' : '')});
+      rows.push({l:'› FINISH LEARN', act:() => PumpFX.hold(t, k, 3, 2), info:() => 'Ends LEARN now and uses what it heard'});
+      rows.push({l:'› CANCEL LEARN', act:() => PumpFX.hold(t, k, 3, 3), info:() => 'Stops listening and keeps the master it had'});
+      if (L != null) rows.push({l:'› FORGET', dbl:true, act:() => { f.ana = ''; fxChanged(t); saveS(); draw(); toast('pump MASTER forgot the song (it passes the sound until it learns again).'); }, info:() => 'Clears what it learned. Tap EDIT twice'});
+    }
     if (PU === 'meter') rows.push({l:'› RESET', act:() => { PumpFX.set(t, k, {reset:(f.pump.reset | 0) + 1}, {live:true, keepPreset:true}); toast('pump METER: loudness reset.'); }, info:() => 'Starts the loudness measurement again (integrated, LRA, maxima)'});
   }
   return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows).concat([eqRow]);
