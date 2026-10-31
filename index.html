@@ -15820,6 +15820,7 @@ function makeSeq(S, mode, o){
         } else {
           let r = Math.min(T.row, 256) - 1; while (r >= 0 && S.song[r][t] >= 0) r--;
           T.row = r + 1; T.cr = 0;
+          (api.wrapT || (api.wrapT = new Set())).add(t);   // SONG LOOP: its effect switches start again (next step)
           if (T.row > 255 || S.song[T.row][t] < 0){ T.on = false; return; }
         }
       }
@@ -15899,6 +15900,10 @@ function makeSeq(S, mode, o){
     // The song position in beats at this step, for the player's beat clock (tempo-locked effects).
     if (api.btT == null){ api.btT = t0; api.bt = 0; } else { api.bt += (t0 - api.btT) * api.bpm / 60; api.btT = t0; }
     evs.push({type:'beat', t:t0, b:api.bt});
+    // SONG LOOP (owner, 31 Oct: an FXO 00 near the end left the master's effects off when the song came round, so its FLX
+    // did nothing): a track (or the master column) that goes back to the top of its block starts with its effect switches,
+    // patterns and gate as a fresh PLAY does; the commands on that first row then apply as usual (they come after).
+    if (api.wrapT && api.wrapT.size){ for (const t of api.wrapT) evs.push({type:'fxreset', t:t0, track:t}); api.wrapT.clear(); }
     // FXO / FLX / GAT / RTG (any track, and the master column) and the master column's VOL: automation for the player.
     const fxEvs = (t, fx, at, line) => {
       if (fx.FXO != null){ const X = fx.FXO >> 4, Y = fx.FXO & 15;
@@ -16390,6 +16395,10 @@ function makePlayer(ac, out, getBuf, live){
     if (ev.type === 'fxp'){ fxpTo(ev); return; }
     if (ev.type === 'tvl' || ev.type === 'tpn'){ if (ev.track < NT) trackTo(ev); return; }
     if (ev.type === 'stp'){ for (let k = 0; k <= NT; k++) if (ev.all || k === ev.track){ for (const v of vs[k]) kill(v, ev.t, 0.004); vs[k].length = 0; if (k < NT) pmNotes(k, ev.t, null); } return; }   // STP
+    if (ev.type === 'fxreset'){ const n = fxNodeOf(ev.track), at = Math.max(ev.t, ac.currentTime);
+      if (n && n.parameters) for (const k of FXP){ const q = n.parameters.get(k); if (q) try { q.cancelScheduledValues(at); q.setValueAtTime(-1, at); } catch(e){} }
+      for (const k of [...fxcPend.keys()]) if (k.startsWith(ev.track + ':')) fxcPend.delete(k);
+      return; }
     if (ev.type === 'fxc'){ const n = fxNodeOf(ev.track), q = n && n.parameters && n.parameters.get(ev.p);
       if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){}
       else fxcPend.set(ev.track + ':' + ev.p, ev);   // FIRST PLAY (owner, 31 Oct): the effect isn't built yet: it gets the value when it is
@@ -18370,7 +18379,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 328;
+const BUILD = 329;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18429,7 +18438,10 @@ function followPlay(){
   if (followMode === 1){   // FOLLOW PATTERN: only which phrase / sect is shown follows the cursor's track; nothing scrolls
     if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0) cSect = own.sect; }
     else if (tv === 'phrase'){ const mine = P[cTrack]; if (mine && mine.phrase >= 0 && mine.phrase !== cPhrase){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); } }
-    arrFollowPage(own);   // Arrange follows the playing pattern too
+    // Arrange follows the playing pattern too: on the Song screen the selected block moves to the row playing on its track
+    // (owner, 31 Oct), unless you've just moved it yourself; Arrange turns its pages with it
+    else if (tv === 'song' && tp.mode === 'song' && own.row >= 0 && cs.song.y !== own.row && performance.now() - arrHandT > 4000 && !selA){ cs.song.y = own.row; }
+    arrFollowPage(own);
     return; }
   // EDIT WHILE FOLLOWING (owner, 31 Oct): the screen follows the playhead (the song row, the sect, the phrase the cursor's
   // track plays, and the rows scroll a page when the playhead runs off them), but the cursor stays on its row, so you
@@ -18451,7 +18463,11 @@ function followPlay(){
 // ARRANGE PAGES (owner, 30 Oct): Arrange (beside the screen, or as the Song screen) turns a page when the playing row runs
 // off its bottom (or top): the playing row becomes its first. Not while Arrange has the keys (you're moving it). FOLLOW
 // PATTERN does it too (owner, 31 Oct).
+// HANDS ON (owner, 31 Oct: the wheel couldn't get past the playhead): for 4 s after you scroll Arrange or move in it with
+// the wheel, it doesn't turn its pages for the playhead.
+let arrHandT = -1e9;
 function arrFollowPage(own){
+  if (performance.now() - arrHandT < 4000) return;
   try { if (tp.mode === 'song' && own && own.row >= 0 && apF !== 'arr' && (asongOn() || (tv !== 'song' && apPanel()))){
     const VR = Math.max(2, arrRows()), top = cs.song.top || 0;
     if (own.row < top || own.row > top + VR - 1){ cs.song.top = clamp(own.row, 0, Math.max(0, 256 - VR)); cs.song.pg = true; } } } catch(e){}
@@ -18925,8 +18941,8 @@ function projRows(){
     {l:'› LOAD DEMO', dbl:true, act:guardLeave('the demo song', () => { setSong(demoSong(), 'Loaded the starter beat.'); setDirty(false); }), info:() => 'Replaces the song with the starter beat. Tap EDIT twice'},
     {l:'› LOAD ELECTRO', dbl:true, act:guardLeave('ELECTRO', loadElectro), info:() => 'Opens the ELECTRO demo project (song and kit). Tap EDIT twice'},
     {l:'INPUT', sec:'Input', gap:true, get:() => inMode === 'keys' ? 1 : 0, set:v => setInput(v ? 'keys' : 'pad'), min:0, max:1, tog:true, d:0, fmt:v => v ? 'KEYS' : 'PAD', info:() => 'PAD: on-screen d-pad and four keys; the keyboard still types notes and hex (Z = OPTION, X = EDIT, Alt+arrows page). KEYS: type notes and hex, with an on-screen keypad on touch screens'},
-    {l:'COMMANDS', get:() => cmdOn ? 1 : 0, set:v => setCmd(!!v), min:0, max:1, tog:true, d:+coarse, fmt:onOff, info:() => 'A row of buttons for the two-key commands: change value, clear, select, copy, cut, paste, other sect or phrase, play the song'},
-    {l:'COMMAND BAR', ck:'Show the command bar (KEYS mode)', get:() => cmdBar ? 1 : 0, set:v => setCmdBar(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // COMMAND BAR
+    {l:'COMMANDS', ck:'Show the COMMANDS buttons', get:() => cmdOn ? 1 : 0, set:v => setCmd(!!v), min:0, max:1, tog:true, d:+coarse, fmt:onOff, info:() => 'A row of buttons for the two-key commands: change value, clear, select, copy, cut, paste, other sect or phrase, play the song'},
+    {l:'COMMAND BAR', ck:'Thin command bar instead of the big COMMANDS buttons (KEYS mode)', get:() => cmdBar ? 1 : 0, set:v => setCmdBar(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // COMMAND BAR
       info:() => 'KEYS mode: one thin line of buttons above the bottom panel for the command row’s commands (undo, cut, copy, paste, clear, select, clone, change the value, previous / next, play the song). Hover a button for its key. OFF: hidden'},
     {l:'STICKY KEYS', get:() => latchOn ? 1 : 0, set:v => setLatch(!!v), min:0, max:1, tog:true, d:1, fmt:onOff, info:() => 'Tap SHIFT or OPTION on its own and it stays lit for the next button, so no command needs two fingers. Tap it again to cancel'},
     {l:'EDIT STEP', get:() => kStep, set:v => kStep = v, min:0, max:16, big:4, fmt:v => v + (v === 1 ? ' row' : ' rows'), info:() => 'How far the cursor moves after you type a note or value or delete a row (the edit step). Keyboard: { and }'},
@@ -22701,7 +22717,7 @@ function arrAlign(){
 arrGrid.addEventListener('scroll', () => {
   arrHSync();
   if (arrIgnore >= 0 && Math.abs(arrGrid.scrollTop - arrIgnore) <= 1){ arrIgnore = -1; return; }
-  arrIgnore = -1; arrUserT = performance.now();
+  arrIgnore = -1; arrUserT = performance.now(); arrHandT = arrUserT;
   const rh = arrRowH(); if (!(rh > 0)) return;
   const c = cs.song, top = clamp(Math.round(arrGrid.scrollTop / rh), 0, 255);
   if (top === c.top) return;
@@ -22818,12 +22834,16 @@ let arrWAcc = 0;
 arrGrid.addEventListener('wheel', e => {
   if (e.ctrlKey) return;
   e.preventDefault();
-  if (e.shiftKey){ const d = e.deltaY || e.deltaX; arrGrid.scrollTop += e.deltaMode === 1 ? d * 40 : d; return; }   // Shift: scroll only
+  if (e.shiftKey){ const d = e.deltaY || e.deltaX; arrGrid.scrollTop += e.deltaMode === 1 ? d * 40 : d; arrHandT = performance.now(); return; }   // Shift: scroll only
   const dy = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY; let n;
   if (Math.abs(dy) >= 50){ n = Math.sign(dy); arrWAcc = 0; } else { arrWAcc += dy; n = Math.trunc(arrWAcc / 100); if (!n) return; arrWAcc -= n * 100; }
   const c = cs.song, y = clamp(c.y + n, 0, 255); if (y === c.y) return;
-  c.y = y; arrUserT = -1e9; c.pg = false;
-  if (apReady && apF === 'arr' && typeof apFollow === 'function') apFollow();
+  c.y = y; arrUserT = -1e9; c.pg = false; arrHandT = performance.now();
+  // Beside the Phrase screen the phrase moves with it (owner, 31 Oct: stopped, the wheel couldn't move there: the shown
+  // song row is the open phrase's, so it was pulled back): Pattern view opens this track's pattern on the new row (an empty
+  // cell too, as Shift+Alt+▲▼ do); the plain phrase editor the block's phrase there.
+  if (tv === 'phrase' && !(apReady && apF === 'arr')){ if (typeof pvActive === 'function' && pvActive()){ try { pvGo(cTrack, y, cs.phrase.x, null); } catch(_){} } else { apLastKey = ''; try { apFollow(); } catch(_){} } }
+  else if (apReady && apF === 'arr' && typeof apFollow === 'function') apFollow();
   if (tv === 'song' || (apReady && apF)) { try { apTop(); } catch(_){} }
   else { try { arrKeepRow(c, Math.max(2, arrRows())); } catch(_){} }
   draw();
@@ -23198,6 +23218,8 @@ function sxCtx(y, t){
     {l:'Loop these rows', f:() => sxLoopRows(r.y0, r.y1), off:r.y1 <= r.y0},
     {l:'Open the phrase', k:ks ? 'Shift+→' : '', f:sxOpen, off:multi || !filled},
     {l:multi ? 'Colour these blocks…' : 'Colour this block…', f:() => sxColour(r), off:!n},
+    // THE COMMAND BAR'S COMMANDS TOO (owner, 31 Oct): UNIQ was the one button the menu lacked (the Edit part below has the rest)
+    {l:'Make unique (new phrases, in place)', k:'', f:() => cmdAction('uniq'), off:!n},
   ];
   if (SX.secs) items.push({l:songSecAt(r.y0) && songSecAt(r.y0).y === r.y0 ? 'Rename the section here…' : 'Name a section from row ' + rS(r.y0, 3) + '…', f:() => sxSecEdit(r.y0)});
   items.push(null, {l:'Remove from song (keep the phrase)', f:() => sxClearRect(r, true), off:!n}, {l:'Delete (the phrase too)', k:ks ? 'Del' : '', f:() => sxClearRect(r, false), off:!n},
@@ -24773,6 +24795,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [329, '31 Oct', ['When the song loops round, each track (and the master column) starts again with its own effect settings, as a fresh PLAY does: an FXO 00 near the end no longer leaves the effects off for the next pass.', 'FOLLOW PATTERN on the Song screen: the selected block moves with the playing pattern (beside Phrase it already did), unless you have just moved it yourself.', 'The wheel over Arrange beside the Phrase screen moves the phrase with it (stopped, it couldn’t move there); for 4 seconds after you scroll or move Arrange yourself it doesn’t jump back to the playhead.', 'Arrange’s right-click menu has Make unique too (UNIQ was the one command-bar button it lacked).', 'Settings: COMMAND BAR is now called “Thin command bar instead of the big COMMANDS buttons”, and COMMANDS (show or hide the big buttons) sits beside it in View.']],
   [328, '31 Oct', ['FOLLOW PATTERN: Arrange follows the playing pattern too, turning a page when the playing row runs off it, as with FOLLOW ON.']],
   [327, '31 Oct', ['Arrange beside another screen: one click on a block shows it there (its phrase, or its track’s mixer or effects) and the keys stay where they were, so you can type straight away; a double-click opens it. Dragging there still selects (Arrange takes the keys for that).', 'Arrange’s scrollbar is easy to grab: the panel’s resize grip no longer lies over it, and with a mouse the scrollbar is wider with a clear thumb.', 'IDM is the skin a first visit starts on.']],
   [326, '31 Oct', ['Esc switches EDIT mode (as in Renoise): off, the note keys only play the instrument and the phrase can’t be typed into; EDIT OFF shows at the top right. Esc still drops a selection first.', 'Tab and Shift+Tab go to the next / previous track (in a phrase, that track’s phrase on this song row). Settings → Screen → TAB → COLUMNS puts back the old note → instrument → FX steps.', 'The mouse wheel no longer changes values on the Mixer, FX and Inst screens: hold Alt/⌥ to change one with the wheel.', 'The wheel over Arrange moves the song cursor a row a notch, as ▲▼ do, and Arrange scrolls with it at the edge; Shift+wheel only scrolls.', 'The playhead in Arrange stands out: the playing blocks get an outline in the skin’s ink and the playing row a band.', 'The first FLX (or FXO, GAT, RTG) of a song is no longer lost when you press PLAY right after opening it.', 'Clicking the master column (Shift-click too) or an empty cell in Arrange sets the track Phrase and Pattern view open on.']],
@@ -24901,7 +24924,7 @@ const SHEETS = {
     ['Patterns', ['PATTERN LEN', '› ALL PHRASES TO']],
     ['Impulse responses', 'irs']]},
 };
-const SHEET_QUICK = ['TEXT SIZE', 'MIXER SIZE', 'SIMPLE PHRASE', 'FOLLOW', 'COMMAND BAR'];   // kept in the menus' Screen part too
+const SHEET_QUICK = ['TEXT SIZE', 'MIXER SIZE', 'SIMPLE PHRASE', 'FOLLOW', 'COMMANDS', 'COMMAND BAR'];   // kept in the menus' Screen part too
 const rowKey = r => r.l.replace(/\s+\d+$/, '');                    // '› ALL PHRASES TO 16' → '› ALL PHRASES TO'
 const sheetKeys = new Set(Object.values(SHEETS).flatMap(K => K.groups.flatMap(([, ks]) => Array.isArray(ks) ? ks : [])));
 const inSheet = r => SET_SHEETS && sheetKeys.has(rowKey(r));
