@@ -585,6 +585,8 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .ask .ok{background:var(--pl); color:var(--inv); border-color:var(--pl); font-weight:600}
 /* First launch: the three gestures the whole app rests on, shown once over the tracker; any tap closes it. */
 .welcome{position:fixed; inset:0; z-index:65; display:flex; align-items:flex-end; justify-content:center; background:rgba(0,0,0,.42); padding:16px; padding-bottom:calc(130px + env(safe-area-inset-bottom,0px))}
+.welcome .wnh{font-weight:600; margin:12px 0 4px; font-size:var(--fs-3); opacity:.8} .welcome .wnl{margin:0 0 4px 1.1em; padding:0} .welcome .wnl li{margin:3px 0}
+.welcome .wbox{max-height:calc(100vh - 48px); overflow:auto}
 @media (min-width:700px){ .welcome{align-items:center; padding-bottom:16px} }
 .welcome .wbox{background:var(--bench); color:var(--ink); border:1px solid var(--line); box-shadow:0 8px 32px rgba(0,0,0,.35); width:min(460px, 100%); padding:18px 20px}
 .welcome h2{margin:0 0 10px; font-size:var(--fs-5)}
@@ -2374,7 +2376,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <div class="help" id="help" hidden role="dialog" aria-modal="true" aria-label="Help">
   <div class="hhead"><b>HELP</b>
     <div class="seg" id="helpNav"><button type="button" data-h="hStart">Start</button><button type="button" data-h="hAll">Everywhere</button><button type="button" data-h="hKeys">KEYS mode</button><button type="button" data-h="hPad">PAD mode</button><button type="button" data-h="hFx">FX</button><button type="button" data-h="hSynth">Synth</button></div>
-    <div class="sp"></div><button type="button" id="helpX" aria-label="Close help"><span class="hx">Close </span><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
+    <div class="sp"></div><button type="button" id="helpNew" class="sm">What’s new</button><button type="button" id="helpX" aria-label="Close help"><span class="hx">Close </span><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
   <div class="hbody" id="helpBody" tabindex="-1"><div class="hwrap">
     <section id="hStart">
 <h2>Getting started</h2>
@@ -17872,7 +17874,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 280;
+const BUILD = 281;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23948,6 +23950,48 @@ function welcome(force){
 }
 setTimeout(() => { if (view === 'tracker' && !helpOpen() && !inAI) welcome(false); }, 900);
 $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); });
+/* WHAT'S NEW (owner, 30 Oct): after an update, a short list of what changed since the build this device last ran, once
+   (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
+   again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
+const CHANGES = [
+  [281, '30 Oct', ['This list: after an update the app now says what changed (Help › What’s new shows it again).']],
+  [280, '30 Oct', ['Commands from Renoise: FDI fades a note in, TRM and APN put tremolo and auto-pan on a note, TVL and TPN set a track’s level and pan, STP stops notes, LPB changes lines per beat, PDL pauses the song, ONE plays one note of a chord, MPB and MAT send MIDI pitch bend and pressure.']],
+  [279, '30 Oct', ['FXS + FXV move any effect parameter from the song (FXS picks slot and parameter, FXV sets it).', 'SCA and SCG set a track’s or the song’s scale; CUT, RES and DEC filter and shorten any pad from here on.']],
+  [278, '30 Oct', ['Tab in a phrase: note → instrument → FX1 → FX2 → FX3 (Shift+Tab back).']],
+  [277, '30 Oct', ['MUT plays a variation of the pad, GEN a fresh sound of a drum type (INST: RANGE, GEN TYPE, FAMILY); RND or RNL after them for new ones. PRB is the chance the command to its left happens.']],
+  [276, '30 Oct', ['Enter on an effect cell picks it up; on an empty one writes the current effect; Enter twice opens the list.']],
+  [275, '30 Oct', ['New IDM effects: Beat grains (a rhythmic grain cloud), Beat scramble and Glitch sequencer, with presets.']],
+  [274, '30 Oct', ['Backspace in a phrase clears and steps down. Arrange follows Shift+Alt pattern moves. Ctrl+Space stop turns LOOP off.']],
+  [273, '30 Oct', ['Effect presets: › PRESET and › SAVE AS PRESET… under every effect on the FX screen.', '› EQ WINDOW opens a track’s …pump EQ in its own window (pump EQ works on any track now).', 'Alt+A gives Arrange the keys from any screen.']],
+  [272, '30 Oct', ['Drum presets are grouped by type (Kicks, Snares, Claps…), with 93 new drum sounds.']],
+  [271, '30 Oct', ['Edit › Acid line… writes a random 303-style bass line; File › Breaks to chop loads …pump BREAK’s breaks as sliced loops.']],
+  [270, '30 Oct', ['Alt-click a block inside a selection on Song / Arrange mutes the whole selection.']],
+  [269, '30 Oct', ['Typing FLX, GAT or RTG adds the effect to a free slot if the track doesn’t have it.']],
+  [268, '30 Oct', ['The OUT meters flash amber while a master VOL command is turning the song down.']],
+];
+const SEENK = 'thunderplus-seen-build';
+function whatsNew(force){
+  let seen = 0; try { seen = +localStorage.getItem(SEENK) || 0; } catch(e){}
+  const set = () => { try { localStorage.setItem(SEENK, String(BUILD)); } catch(e){} };
+  if (!force && !seen){   // a first run: the welcome, not a list of changes; someone who ran it before this list existed gets today's
+    let back = false; try { back = !!localStorage.getItem(WLK); } catch(e){}
+    if (!back){ set(); return; }
+    seen = 267; }
+  const list = CHANGES.filter(([b]) => force ? true : b > seen).slice(0, force ? 12 : 10);
+  if (!list.length){ if (force) toast('Nothing new to show.'); set(); return; }
+  if (document.querySelector('.welcome')) return;
+  const wrap = el('div', 'welcome'), box = el('div', 'wbox');
+  box.append(el('h2', null, force ? 'What’s new' : 'Updated to build ' + BUILD));
+  for (const [b, d, lines] of list){ box.append(el('div', 'wnh', 'Build ' + b + ' · ' + d)); const ul = el('ul', 'wnl'); for (const t of lines) ul.append(el('li', null, t)); box.append(ul); }
+  const foot = el('div', 'wfoot'), more = el('button', null, 'Help'), ok = el('button', 'ok', 'Got it'); more.type = ok.type = 'button';
+  foot.append(el('span', null, 'Help has the details; this list is in Help › What’s new.'), more, ok); box.append(foot); wrap.append(box);
+  const close = () => { wrap.remove(); set(); };
+  ok.addEventListener('click', close); more.addEventListener('click', () => { close(); showHelp(); });
+  wrap.addEventListener('pointerdown', e => { if (e.target === wrap){ e.preventDefault(); close(); } });
+  document.body.append(wrap); setTimeout(() => ok.focus(), 0);
+}
+setTimeout(() => { if (!helpOpen() && !inAI && !document.querySelector('.welcome')) whatsNew(false); }, 1400);
+$('helpNew').addEventListener('click', () => { hideHelp(); whatsNew(true); });
 // A hint longer than two lines opens fully on a tap (and folds again on the next).
 $('tHint').addEventListener('click', () => { const h = $('tHint'); if (h.classList.contains('more') || h.classList.contains('open')){ h.classList.toggle('open'); scheduleRefit(false); } });
 $('helpX').addEventListener('click', hideHelp);

@@ -79,6 +79,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## Keep doing with every build: What's new
+
+- `CHANGES` (beside `whatsNew`, after `welcome`) lists what changed, newest first: `[build, date, [lines]]`. Add a line
+  for every build someone would notice, in plain words, when bumping `BUILD`. After an update the app shows the entries
+  newer than the build this device last ran (`thunderplus-seen-build`) once; a first run shows the welcome instead (a
+  device that had run the app before the list existed sees the 30 Oct entries); Help's header has What's new.
+
 ## 30 Oct (13): Renoise-style commands (build 280)
 
 - `FXC` += FDI, TRM, APN, TVL, TPN, STP, LPB, PDL, ONE, MPB, MAT (master may use LPB, PDL, STP).
