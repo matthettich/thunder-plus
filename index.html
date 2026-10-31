@@ -18254,7 +18254,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 319;
+const BUILD = 320;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18373,7 +18373,11 @@ function ntrRemap(P){
 }
 function setNtr(v){
   const n0 = ntr(), n1 = clamp(v, 8, vtrk ? 24 : NT);
-  if (n1 !== n0){ const P = ntrPerm(n0, n1); if (P){ const tN = ntrRemap(P); cTrack = tN(cTrack); if (cs.song.x !== MT) cs.song.x = tN(cs.song.x); cs.mixer.x = tN(cs.mixer.x); if (cFxT < NT) cFxT = tN(cFxT); tp.paused = null; busPlanH = null; } }
+  if (n1 !== n0){ const P = ntrPerm(n0, n1); if (P){ const tN = ntrRemap(P); cTrack = tN(cTrack); if (cs.song.x !== MT) cs.song.x = tN(cs.song.x); cs.mixer.x = tN(cs.mixer.x); if (cFxT < NT) cFxT = tN(cFxT); tp.paused = null; busPlanH = null;
+    // the sound follows the tracks (owner, 31 Oct: a new track kept the delay of the track that had been at its number)
+    if (rt){ try { rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); for (let t = 0; t <= NT; t++){ try { pumpSyncT(t); } catch(e){} } rtAllFx(); rtRoute(); rt.pl.applyMix(); } catch(e){ tpLog('tracks: re-routing the sound', e); } }
+    try { CH.doc = S.chainPatch || null; chainsDropFrame(); } catch(e){}
+    try { PumpFX._notifyAll('load'); } catch(e){} } }
   S.ntr = n1; const n = S.ntr;
   if (vtrk && n1 !== n0){ kit.voices.forEach((v, i) => { if (v === null) kit.voices[i] = trackVoice(i - NPAD); }); for (let i = 0; i < kit.voices.length; i++){ dirty[i] = true; cache[i] = null; } }
   if (cTrack >= n) cTrack = n - 1; if (cs.song.x >= n && cs.song.x !== MT) cs.song.x = n - 1; if (cs.mixer.x >= n) cs.mixer.x = n - 1;
@@ -22759,7 +22763,7 @@ function sxDown(e){
   // PICKS (25 Oct): Cmd on a Mac, Ctrl elsewhere, adds or removes this one cell from the picks; a Shift-click or a plain press starts again.
   if ((MACK ? e.metaKey : e.ctrlKey) && !e.shiftKey && !e.altKey){ e.preventDefault(); const i = sxPicks.findIndex(p => p.y === y && p.t === t); if (i >= 0) sxPicks.splice(i, 1); else sxPicks.push({y, t}); cs.song.x = t; cs.song.y = y; if (t !== MT && !(apReady && apF)) cTrack = t; draw(); return true; }
   if (e.shiftKey || (sxPicks.length && !e.altKey)) sxPicks = [];
-  // Shift (owner, 21 Oct): the first Shift-click starts a selection on that cell and the next selects everything between
+  // Shift (owner, 21 Oct): a Shift-click selects from the block the cursor is on (the one already picked) to the clicked cell
   // (with a selection already there it reaches from its corner); a Shift-drag draws a new selection from where it
   // started, on blocks too (a plain drag on a block moves it). Never a tap, a hold-to-mute or a move.
   if (e.shiftKey && !e.altKey){
@@ -22835,9 +22839,11 @@ function sxEnd(e){
   for (const b of sxMarks) b.classList.remove('dt', 'dtx'); sxMarks = [];
   if (sxTag){ sxTag.remove(); sxTag = null; }
   if (e.type === 'pointercancel') return;
-  if (!d.mode && d.shift){   // Shift-click: the first starts a selection on this cell (not from the cursor), the next selects everything between
+  if (!d.mode && d.shift){   // Shift-click: selects from the cursor's block (or the selection's corner) to this cell
     const first = !(selA && selA.v === 'song');
-    if (first) selA = {x:d.t, y:d.y, v:'song'};   // the anchor is the clicked cell (owner, 30 Oct: it was the cursor, which beside Phrase sits on the phrase's block)
+    // the anchor is the block already picked, where the cursor is (owner, 31 Oct: "select should start with whatever pattern
+    // is already selected"; 30 Oct it had become the clicked cell, so a second Shift-click was needed)
+    if (first) selA = {x:cs.song.x, y:cs.song.y, v:'song'};
     cs.song.x = d.t; cs.song.y = d.y; if (d.t !== MT && !(apReady && apF)) cTrack = d.t;
     draw(); sxSelToast(); return;
   }
@@ -24550,6 +24556,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [320, '31 Oct', ['A track added (or taken away) with TRACKS no longer plays through the effects of the track that used to have its number: the sound is re-routed with the tracks (a new track 9 had kept track 9’s delay, unseen).', 'Song and Arrange: Shift-click selects from the block you are on (the one already picked) to the block clicked, the first time; a second Shift-click is no longer needed.']],
   [319, '31 Oct', ['PHRASE works straight after SONG: on the Phrase screen, SONG hands the keys to Arrange beside it, and PHRASE now takes them back (it did nothing until another tab was clicked). SONG again still opens the Song screen.']],
   [318, '31 Oct', ['RESUME (Playback resumes from pause) is now off unless you turn it on (Settings → Screen → RESUME): PLAY starts from the cursor. The stopped spot still stays lit.', 'FX screen: the mouse wheel over the effect slots moves between them, one slot a notch; it no longer swaps the effect (EDIT and the effect list still do).', 'Menus: on a computer Undo, Redo and Phrases… are in the Edit menu only (a phone, with no Edit menu, keeps them in File); the kit buttons in Settings say Factory drums (pads 1–8) and Clear all kit slots, as File does.']],
   [317, '31 Oct', ['Arrange (beside the Phrase screen and the others): the only gap between columns is at the MONO | POLY line, as on the Song screen. With an odd number of tracks the old gap every 8 tracks fell inside MONO (between 8 and 9).']],
