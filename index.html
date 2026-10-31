@@ -18254,7 +18254,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 318;
+const BUILD = 319;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24281,6 +24281,9 @@ function apBack(){
 // keys, as SHIFT+◀ does; a tap while Arrange has them opens the Song screen as before. Without the panel (the folded phone,
 // the setting off) it opens the Song screen straight away.
 function apTabSong(e){
+  // PHRASE while Arrange has the keys (owner, 31 Oct: after SONG, PHRASE did nothing until another tab was clicked, since the
+  // screen was already Phrase): the keys go back to the phrase
+  if (e.target.closest('[data-v="phrase"]') && apF && tv === 'phrase'){ e.stopPropagation(); e.preventDefault(); apFocus(null); draw(); return; }
   if (!e.target.closest('[data-v="song"]') || !apReady || apF === 'arr' || tv !== 'phrase' || !apArrOk()) return;
   e.stopPropagation(); e.preventDefault(); apFocus('arr', true); draw();
 }
@@ -24547,6 +24550,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [319, '31 Oct', ['PHRASE works straight after SONG: on the Phrase screen, SONG hands the keys to Arrange beside it, and PHRASE now takes them back (it did nothing until another tab was clicked). SONG again still opens the Song screen.']],
   [318, '31 Oct', ['RESUME (Playback resumes from pause) is now off unless you turn it on (Settings → Screen → RESUME): PLAY starts from the cursor. The stopped spot still stays lit.', 'FX screen: the mouse wheel over the effect slots moves between them, one slot a notch; it no longer swaps the effect (EDIT and the effect list still do).', 'Menus: on a computer Undo, Redo and Phrases… are in the Edit menu only (a phone, with no Edit menu, keeps them in File); the kit buttons in Settings say Factory drums (pads 1–8) and Clear all kit slots, as File does.']],
   [317, '31 Oct', ['Arrange (beside the Phrase screen and the others): the only gap between columns is at the MONO | POLY line, as on the Song screen. With an odd number of tracks the old gap every 8 tracks fell inside MONO (between 8 and 9).']],
   [316, '31 Oct', ['Tracker → PROJECT has › LOAD ELECTRO too (EDIT twice), beside › LOAD DEMO, for phones.']],
