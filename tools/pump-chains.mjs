@@ -22,6 +22,8 @@ const GROUP = {tube:'Drive and lo-fi', crush:'Drive and lo-fi', snap:'Dynamics',
 const DEF = {vox:{route:3}};   // VOX: Split L/R (carrier left, voice right), the natural …chains patch
 const COST = {tube:1.2, snap:.4, gate:.3, echo:.8, spring:1.2, verb:1.5, grain:1.2, vox:2, tune:1.2, crush:.5, swirl:.8, stutter:.6, twang:1.5};
 const SKIP = 8 | 16 | 32 | 64;
+// the knobs a module shows, where not every one (owner, 31 Oct: trim VOX); the others stay at the plugin's defaults
+const ROWS = {vox:['engine', 'mode', 'route', 'bands', 'formant', 'attack', 'release', 'source', 'wave', 'octave', 'chord', 'key', 'scale', 'ensemble', 'voice_dry', 'carrier_dry', 'fx_pitch', 'fx_formant', 'fx_robot_on', 'fx_char_on', 'fx_filter', 'fx_mix', 'out_gain']};
 const r6 = v => +(+v).toPrecision(7);
 const spec = {}, edit = {}, about = {};
 for (const k of KEYS){
@@ -30,6 +32,7 @@ for (const k of KEYS){
   const ps = [];
   fx.params.forEach((p, i) => {
     if (p.flags & SKIP) return;
+    if (ROWS[k] && !ROWS[k].includes(p.s) && !(DEF[k] && DEF[k][p.s] != null)) return;
     const whole = !!(p.ch || (p.flags & (2 | 4)));
     const curved = !whole && (p.scale === 'log' || (p.scale === 'pow' && p.skew !== 1));
     let def = DEF[k] && DEF[k][p.s] != null ? DEF[k][p.s] : p.def;
@@ -37,6 +40,7 @@ for (const k of KEYS){
     // [symbol, plugin index, 'n' (0…1 on the curve) | 'v' (the value), min, max, scale, skew, default, step]
     ps.push([p.s, i, curved ? 'n' : 'v', r6(p.min), r6(p.max), p.scale, r6(p.skew), r6(def), whole ? 1 : curved ? .001 : r6((p.max - p.min) / 1000)]);
   });
+  if (ROWS[k]) ps.sort((a, b) => ROWS[k].indexOf(a[0]) - ROWS[k].indexOf(b[0]));   // in the hand-picked order
   spec[key] = {t, np:fx.params.length, cost:COST[k] || 1, ps};
   const ui = {};
   for (const q of ps){ const p = fx.params[q[1]];

@@ -139,7 +139,7 @@ test('sources: the per-track graph, PRE feeds, master OUT live and in renders, t
   // …chains: Track In's Bus send, in the editor and the engine (cache-buster moved with it)
   assert.match(H.read('chains/index.html'), /params:\{ track:\[1,1,CHAN_COUNT,1\], pre:\[0,0,1,1\] \},[\s\S]{0,400}pre:\{l:'Bus send', fixed:true, c:opts\(\['After its fader','Before its fader'\]\)\}/);
   assert.match(H.read('chains/chains-worklet.js'), /params:\{ track:\[1,1,CHAN_COUNT,1\], pre:\[0,0,1,1\] \}/);
-  for (const f of ['index.html', 'chains/index.html', 'sw.js']) assert.match(H.read(f), /chains-worklet\.js\?v=40/, f + ': chains-worklet v=40');
+  for (const f of ['index.html', 'chains/index.html', 'sw.js']) assert.match(H.read(f), /chains-worklet\.js\?v=41/, f + ': chains-worklet v=41');
 });
 
 /* ───────── the review's fixes (27 Oct) ───────── */

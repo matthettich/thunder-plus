@@ -14075,6 +14075,8 @@ const PUMP_BOX = {
   meter:{rows:['target', 'custom_lufs', 'custom_tp']}};
 // A new slot starts at the plugin's defaults except these (CPU on the phone: oversampling off where the plugin allows it).
 // Presets that don't set them keep the slot's value (PUMP_CPU), unless applied with {keepCpu:false}.
+// …PUMP CREATIVE: VOX's rows picked by hand (owner, 31 Oct: trim it). The rest are kept in the slot and set by presets.
+PUMP_BOX.vox = {rows:['engine', 'mode', 'route'].concat(['@sck'], ['bands', 'formant', 'attack', 'release', 'source', 'wave', 'octave', 'chord', 'key', 'scale', 'ensemble', 'voice_dry', 'carrier_dry', 'fx_pitch', 'fx_formant', 'fx_robot_on', 'fx_char_on', 'fx_filter', 'fx_mix', 'out_gain'], ['@nin'])};
 for (const t of PUMP_TYPES) if (!PUMP_BOX[t] && PM.fx[t]){   // …PUMP CREATIVE: every parameter a preset may set, then Thunder's rows
   const rows = PM.fx[t].params.filter(p => !(p.flags & (8 | 16 | 32 | 64))).map(p => p.s);
   if (t === 'vox'){ const i = rows.indexOf('route'); rows.splice(i < 0 ? rows.length : i + 1, 0, '@sck'); }
@@ -14683,7 +14685,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=40')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=41')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -17996,7 +17998,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 294;
+const BUILD = 295;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24120,6 +24122,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [295, '31 Oct', ['pump VOX shows its main controls only (engine, mode, routing, bands, formant, the synth carrier, the Voice FX switches, mix), on the FX screen and in …chains. Its presets still set everything.']],
   [294, '30 Oct', ['Fourteen more …pump effects, each its own effect next to Thunder’s (the older reverbs and delays stay): TUBE, CRUSH, SNAP, SWIRL, ECHO, SPRING, VERB, TWANG, VOX, TUNE, GRAIN, GATE, STUTTER and CHOP, on any track, bus or the master, with the plugins’ presets. They follow the song’s tempo.', 'NOTES FROM sends a track’s notes to TUNE, VOX, TWANG, STUTTER or CHOP as MIDI (CHOP’s pads, TUNE’s notes, VOX’s synth carrier).', '…pump MASTER on buses and the master: › LEARN, play the song, › FINISH LEARN. It keeps what it learned with the song.', '…chains: thirteen of them as modules, each in its kind’s group. pump VOX there: carrier into In L, voice into In R.']],
   [293, '30 Oct', ['Sects and phrases are numbered 000–FFF now: 4,096 of each instead of 256, so Arrange’s unique copies don’t run out. Type three hex digits into a song or sect cell. Songs saved from now on need this version (or newer) to open with every block.']],
   [292, '30 Oct', ['Song / Arrange: the first Shift-click starts the selection on the cell you click (it reached from the cursor, which beside Phrase sits on the phrase you’re editing).']],

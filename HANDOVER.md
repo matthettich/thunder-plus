@@ -81,6 +81,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct: pump VOX trimmed (build 295)
+
+- Owner: trim VOX (keep it); STUTTER may be dropped later (not yet). `PUMP_BOX.vox` is a hand list of 23 rows (+ SC FROM,
+  NOTES FROM); `ROWS.vox` in `tools/pump-chains.mjs` the same for the …chains module, in that order. Hidden parameters stay in
+  `f.pump` at their values and presets still set them; in …chains they sit at the plugin's defaults. `chains-worklet.js?v=41`;
+  two pvox golden hashes moved (the hidden knobs now take the plugin's exact defaults instead of a curve round trip).
+
 ## 30 Oct (26): …pump creative effects, MASTER and …chains modules (build 294)
 
 Owner: port pump's effects Thunder Plus didn't have, each its own thing (keep the old reverbs and delays), into …chains
