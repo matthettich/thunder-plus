@@ -81,6 +81,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (10): Pattern view master FX columns; effect cells open on double-click (build 304)
+
+- `pvColsOf`: the master and commands-only buses always get FX1–FX3 (`pvFx` / FX2/3 folds the tracks only).
+- Mouse in Phrase: `mselEnd` no longer opens the picker for a click on the cursor's effect cell, and `dragEnd` returns for
+  every `d.mp` click; a `dblclick` on the grid opens `fxpOpen` on the cursor's effect cell. Keyboard (Enter twice) and touch
+  unchanged. Checked headless: click selects (no picker), a second click still none, double-click opens it.
+
 ## 31 Oct (9): IN USE on INST and the Synth page (build 303)
 
 - Owner: see where an instrument / sound is used before changing it for a new track. `phraseTracks()` (phrase → tracks whose
