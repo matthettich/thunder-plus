@@ -14774,16 +14774,6 @@ function scSay(t){ const U = sckUsesOf(t); toast(U.length ? `Track ${d2(t + 1)} 
    PRE SENDS (owner, 27 Oct): plan.pre holds the sources whose Track In has Bus send "Before its fader": their buses hear them
    after their chain and effects but before their fader and pan (mute and solo still silence them). */
 let busPlanH = null, busPlanVal = null;
-// BUS GROUPS (owner, 31 Oct): a colour for each bus, given to the bus and to every track it takes in (from …chains), so
-// Arrange shows which tracks run through which bus. The bus is drawn darker (as every bus is). A track that feeds two
-// buses takes the first one's colour; a bus that itself feeds another bus keeps its own. Track → CSS colour.
-const BUS_COLORS = ['#2f8fcf', '#d0553a', '#2fa36a', '#9a52d0', '#c79a1f', '#1fa7a0', '#d04f8f', '#6b7fd8'];
-function busGroups(){
-  const P = busPlan(), out = new Map(); let k = 0;
-  for (const b of [...P.feeds.keys()].sort((a, c) => a - c)){ const c = BUS_COLORS[k++ % BUS_COLORS.length]; out.set(b, c); }
-  for (const [b, src] of P.feeds) for (const t of src) if (!out.has(t)) out.set(t, out.get(b));
-  return out;
-}
 function busPlan(){
   const d = S.chainPatch, ok = !!(d && d.format === 'chains.patch' && Array.isArray(d.modules));
   let h = ok ? 7 : 0; const mx = v => { h = (h * 31 + v) | 0; }, ms = x => { x = String(x); for (let i = 0; i < x.length; i++) mx(x.charCodeAt(i)); };
@@ -14822,6 +14812,16 @@ function busPlan(){
   }
   for (const v of feeds.values()) v.sort((a, b) => a - b);
   return P;
+}
+// BUS GROUPS (owner, 31 Oct): a colour for each bus, given to the bus and to every track it takes in (from …chains), so
+// Arrange shows which tracks run through which bus. The bus is drawn darker (as every bus is). A track that feeds two
+// buses takes the first one's colour; a bus that itself feeds another bus keeps its own. Track → CSS colour.
+const BUS_COLORS = ['#2f8fcf', '#d0553a', '#2fa36a', '#9a52d0', '#c79a1f', '#1fa7a0', '#d04f8f', '#6b7fd8'];
+function busGroups(){
+  const P = busPlan(), out = new Map(); let k = 0;
+  for (const b of [...P.feeds.keys()].sort((a, c) => a - c)){ const c = BUS_COLORS[k++ % BUS_COLORS.length]; out.set(b, c); }
+  for (const [b, src] of P.feeds) for (const t of src) if (!out.has(t)) out.set(t, out.get(b));
+  return out;
 }
 function chnDiff(prev, next){
   if (!next) return [];
