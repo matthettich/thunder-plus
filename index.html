@@ -16155,7 +16155,7 @@ function makePlayer(ac, out, getBuf, live){
     const at = ac.currentTime;
     buses.forEach((b, t) => {
       if (t >= NT){ b.g.gain.value = 1; return; }
-      const m = S.mix[t], on = filter ? filter(t) : audible(t), gv = on ? trackGain(m.vol) * (tvlOv.has(t) ? tvlOv.get(t) / 255 : 1) : 0, pv = clamp(((tpnOv.has(t) ? tpnOv.get(t) : m.pan) - 128) / 127, -1, 1);   // TVL / TPN
+      const m = S.mix[t], on = filter ? filter(t) : audible(t), tv = typeof tvlOv !== 'undefined' && tvlOv.has(t) ? tvlOv.get(t) / 255 : 1, tpv = typeof tpnOv !== 'undefined' && tpnOv.has(t) ? tpnOv.get(t) : m.pan, gv = on ? trackGain(m.vol) * tv : 0, pv = clamp((tpv - 128) / 127, -1, 1);   // TVL / TPN (guarded: the tests load applyMix alone)
       const tg = trimGain(m.trim == null ? TRIM_0 : m.trim), prv = on ? 1 : 0;   // GAIN STAGING: TRIM on the input; a PRE send keeps mute and solo
       const scv = 0;   // SOURCE: no mixer sidechain bus
       if (live){ b.g.gain.setTargetAtTime(gv, at, 0.012); b.p.pan.setTargetAtTime(pv, at, 0.012); b.scs.gain.setTargetAtTime(scv, at, 0.012); b.inp.gain.setTargetAtTime(tg, at, 0.012); b.pre.gain.setTargetAtTime(prv, at, 0.012); }
