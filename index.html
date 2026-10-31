@@ -17874,7 +17874,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 285;
+const BUILD = 286;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -19195,7 +19195,10 @@ function clearSel(){
 }
 function copySel(cut){
   const r = selRect(), d = [], line = !!selA.line;
-  for (let y = r.y0; y <= r.y1; y++){ const row = []; for (let x = r.x0; x <= r.x1; x++){ row.push(getCell(tv, x, y)); if (cut) setCell(tv, x, y, kindAt(tv, x) === 'tsp' ? 0 : -1); } d.push(row); }
+  // SONG (owner, 30 Oct): the columns as they sit on screen (the tracks in use, then the master), not the raw numbers 0–32,
+  // so a selection that takes in the master column copies it, and pastes it back on the master (it used to fall off the end).
+  const xs = tv === 'song' ? sxCols(r) : Array.from({length:r.x1 - r.x0 + 1}, (_, i) => r.x0 + i);
+  for (let y = r.y0; y <= r.y1; y++){ const row = []; for (const x of xs){ row.push(getCell(tv, x, y)); if (cut) setCell(tv, x, y, kindAt(tv, x) === 'tsp' ? 0 : -1); } d.push(row); }
   clip = {v:tv, x0:r.x0, d, line}; selA = null;
   const n = line ? d.length : d.length * d[0].length, what = line ? ' line' : ' cell';
   toast(`${cut ? 'Cut' : 'Copied'} ${n}${what}${n > 1 ? 's' : ''}. ${pasteKey()} pastes at the cursor.`); draw();
@@ -19235,7 +19238,8 @@ function paste(){
   const y0 = selA ? selRect().y0 : c.y; selA = null;
   if (y0 < 0) return toast('Move to a row first.');
   let n = 0; const fxOnly = tv === 'phrase' && busTrack(cTrack); let cut = 0;   // BUS FX ONLY: a paste keeps its FX columns
-  clip.d.forEach((row, j) => { const y = y0 + j; if (y < dm.h) n++; row.forEach((val, i) => { const x = x0 + i; if (val !== undefined && x < dm.w && y < dm.h){ if (fxOnly && x < FX0){ if (val >= 0) cut++; return; } setCell(tv, x, y, val); } }); });
+  const colAt = i => { if (tv !== 'song') return x0 + i; const u = sxU(x0) + i, n0 = ntr(); return u === n0 ? MT : u < n0 ? u : -1; };   // SONG: by screen column, the master after the last track
+  clip.d.forEach((row, j) => { const y = y0 + j; if (y < dm.h) n++; row.forEach((val, i) => { const x = colAt(i); if (val !== undefined && x >= 0 && (x < dm.w || (tv === 'song' && x === MT)) && y < dm.h){ if (fxOnly && x < FX0){ if (val >= 0) cut++; return; } setCell(tv, x, y, val); } }); });
   if (cut) return (toast(`Pasted the FX columns only: track ${d2(cTrack + 1)} is a bus.`), draw());
   toast(clip.line ? `Pasted ${n} line${n > 1 ? 's' : ''}` + (n < clip.d.length ? ` (${clip.d.length - n} past the end were left out)` : '') : 'Pasted'); draw();
 }
@@ -22870,8 +22874,9 @@ function pasteMix(){
   if (y0 < 0) return toast('Move to a row first.');
   let n = 0;
   const fxOnly = tv === 'phrase' && busTrack(cTrack);   // BUS FX ONLY
-  clip.d.forEach((row, j) => row.forEach((val, i) => { const x = x0 + i, y = y0 + j;
-    if (val === undefined || x >= dm.w || y >= dm.h || (fxOnly && x < FX0)) return;
+  const colAt = i => { if (tv !== 'song') return x0 + i; const u = sxU(x0) + i, n0 = ntr(); return u === n0 ? MT : u < n0 ? u : -1; };   // SONG: by screen column (the master too)
+  clip.d.forEach((row, j) => row.forEach((val, i) => { const x = colAt(i), y = y0 + j;
+    if (val === undefined || x < 0 || (x >= dm.w && !(tv === 'song' && x === MT)) || y >= dm.h || (fxOnly && x < FX0)) return;
     const empty = kindAt(tv, x) === 'tsp' ? !getCell(tv, x, y) : getCell(tv, x, y) < 0, has = kindAt(tv, x) === 'tsp' ? !!val : val >= 0;
     if (empty && has){ setCell(tv, x, y, val); n++; } }));
   toast(n ? `Mix-pasted ${n} cell${n > 1 ? 's' : ''} into the empty ones` : 'Mix-paste: every cell it would fill already has something.'); draw();
@@ -23964,6 +23969,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [286, '30 Oct', ['Copy and paste on the Song and Arrange take the master column along (it didn’t paste before).']],
   [285, '30 Oct', ['PLAY no longer moves the cursor to another track: on a track with nothing playing on that row (a bus, an empty cell) it stays put, and only rides the rows in Pattern view with FOLLOW.']],
   [284, '30 Oct', ['With FOLLOW on, the cursor stays visible on the playing row (it blended into the playhead bar in Pattern view).']],
   [283, '30 Oct', ['With FOLLOW on, Arrange turns the page when playback runs past its bottom, so the playing row stays in sight.']],

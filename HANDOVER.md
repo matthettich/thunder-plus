@@ -79,6 +79,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (18): master column copy / paste (build 286)
+
+- `copySel` on the Song copied columns x0..x1 by number, so a selection reaching the master (column 32) also took the unused
+  columns between the last track and it, and `paste` / `pasteMix` dropped anything at or past `dims('song').w` (= ntr()),
+  the master included. Song clips are now by screen column (`sxCols` / `sxU`: the tracks in use, then the master) and
+  paste maps back the same way. v1.2.32 (desktop) has builds up to 285.
+
 ## 30 Oct (17): PLAY keeps the cursor's track (build 285)
 
 - `followPlay` took the first playing track when the cursor's track wasn't playing on the row, and `pvFollow` moved
