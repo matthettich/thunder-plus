@@ -81,6 +81,16 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (4): EDIT WHILE FOLLOWING (build 298)
+
+- Owner: with FOLLOW on, the cursor rode the playhead, so you couldn't edit while it played. Now `followPlay` moves the
+  screen, not the cursor: the song row / sect / phrase the cursor's track plays as before, but the rows only page
+  (`page()`: when the playhead leaves the visible rows, `c.top` jumps to it and `c.pg` is set). The renders (Song, Arrange
+  as Song, Phrase, Pattern view via `pvVR()`, `apTop`) skip their scroll-to-cursor while `c.pg && followOn && tp.on`;
+  `move()` clears `c.pg` (a move shows the cursor again). In Phrase the cursor's row is clamped to the new phrase's length.
+  (Build 284's note about the cursor riding the playhead no longer applies; its ring style stays for when they meet.)
+  Checked headless: playing with FOLLOW, the cursor stays on row 04 while the playhead runs on, ▼ moves it, no errors.
+
 ## 31 Oct (3): bottom panel on a bus (build 297)
 
 - Owner: a blank gap before TRACK on bus tracks. INST is hidden on a bus and was the only part that stretched; `.tdeck.bus`

@@ -18017,7 +18017,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 297;
+const BUILD = 298;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -18058,20 +18058,26 @@ function setKp(on){ kpOn = !!on; try { localStorage.setItem(KPOK, kpOn ? '1' : '
 function followPlay(){
   if (!followOn || !tp.on || !tp.pos || selA || sdrag || drag) return;
   const P = tp.pos, own = P[tv === 'song' ? cs.song.x : cTrack] || (tp.loopV === 'bus' ? null : P.find(Boolean)); if (!own) return;   // BUS PLAY: an empty bus stays put
-  if (tv === 'song'){ if (tp.mode === 'song') cs.song.y = own.row; }
-  else if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0){ cSect = own.sect; cs.sect.y = own.cr; } }
+  // EDIT WHILE FOLLOWING (owner, 31 Oct): the screen follows the playhead (the song row, the sect, the phrase the cursor's
+  // track plays, and the rows scroll a page when the playhead runs off them), but the cursor stays on its row, so you
+  // can edit while it plays. c.pg: the rows were paged by the playhead (draw() then doesn't scroll back to the cursor;
+  // moving the cursor brings it back into view).
+  const page = (c, row, VR, len) => { if (row < 0) return; const top = c.top || 0; if (row < top || row > top + VR - 1){ c.top = clamp(row, 0, Math.max(0, len - VR)); c.pg = true; } };
+  if (tv === 'song'){ if (tp.mode === 'song' && !asongOn()) page(cs.song, own.row, songRows(), 256); }
+  else if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0) cSect = own.sect; }
   else if (tv === 'phrase'){
-    // The cursor stays on its own track (owner, 30 Oct): when that track isn't playing on this row (an empty cell, a bus with
-    // no block), the cursor only rides the rows, in Pattern view; the plain phrase editor stays put.
+    // The screen stays on the cursor's own track (owner, 30 Oct): when that track isn't playing on this row (an empty cell,
+    // a bus with no block), only the rows follow, in Pattern view; the plain phrase editor stays put.
     const mine = P[cTrack];
-    if (mine && mine.phrase >= 0){ cPhrase = mine.phrase; cs.phrase.y = mine.step; }
-    else if (pvActive() && own.step != null) cs.phrase.y = Math.min(own.step, Math.max(0, plen(cPhrase) - 1)); }
+    const pvr = pvActive() ? pvVR() : Math.max(4, songRows());
+    if (mine && mine.phrase >= 0){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); page(cs.phrase, mine.step, pvr, pvActive() ? 256 : plen(cPhrase)); }
+    else if (pvActive() && own.step != null) page(cs.phrase, own.step, pvr, 256); }
   if (tv === 'phrase' && tp.mode === 'song' && own.row >= 0 && pvActive() && !(apReady && apF)) pvFollow(P, own);   // PATTERN VIEW: the song row follows too (not the cursor Arrange is moving)
   // ARRANGE PAGES (owner, 30 Oct): Arrange (beside the screen, or as the Song screen) turns a page when the playing row runs
   // off its bottom (or top): the playing row becomes its first. Not while Arrange has the keys (you're moving it).
   try { if (tp.mode === 'song' && own.row >= 0 && apF !== 'arr' && (asongOn() || (tv !== 'song' && apPanel()))){
     const VR = Math.max(2, arrRows()), top = cs.song.top || 0;
-    if (own.row < top || own.row > top + VR - 1) cs.song.top = clamp(own.row, 0, Math.max(0, 256 - VR)); } } catch(e){}
+    if (own.row < top || own.row > top + VR - 1){ cs.song.top = clamp(own.row, 0, Math.max(0, 256 - VR)); cs.song.pg = true; } } } catch(e){}
 }
 // TRACKS (Song): how many tracks this song uses (8–32, but 24 at most with a voice per track, so every
 // track keeps its own voice within 40 kit voices). Song and Mixer show as many as fit and scroll sideways.
@@ -18560,7 +18566,7 @@ function projRows(){
     {l:'MIXER SIZE', get:() => mixScale, set:v => setMixScale(v), min:60, max:200, step:10, big:20, d:mixScaleDef(), fmt:v => v + '%',
       info:() => 'Size of the Mixer only, separate from TEXT SIZE: 100 % fills the screen, which is already larger than the 80 % Desktop text size gave it. Above that it takes whatever room is left, never past the screen (all its rows stay visible); bigger shows fewer tracks at once, and the window follows the cursor (TRK nn–nn of 32 ◀▶)'},
     {l:'FOLLOW', ck:'Follow playhead', get:() => followOn ? 1 : 0, set:v => setFollow(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
-      info:() => 'While the song plays, Song and Phrase scroll with the playhead: the cursor rides along, and Phrase (and Sect) switch to what the cursor’s track is playing. Off leaves the screen where you put it'},
+      info:() => 'While the song plays, Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. The cursor stays on its row, so you can type and edit while it plays (moving it brings it back into view). Off leaves the screen where you put it'},
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. A poly track shows its whole chord: all four notes when there is room (unfolded, desktop), otherwise one letter per voice (capital = natural, small = sharp, so CEGa is C E G A#; · is an empty voice, × a note off). Only to look at; they can’t be edited'},
     {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText({title:'Rename the song'}, S.name, 40, 'Rename'); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); } }, info:() => 'EDIT renames the song'},
@@ -19405,6 +19411,7 @@ const onPset = () => tv === 'phrase' && cs.phrase.y === -2;
 const onMstCell = () => tv === 'mixer' && cs.mixer.y === 7;   // any of MASTER, MASTERING, OUT (27 Oct: it was MASTERING only, so / on MASTER muted the last track)
 function move(dx, dy){
   const c = cs[tv], d = dims(tv);
+  if (tv === 'song' || tv === 'phrase') c.pg = false;   // EDIT WHILE FOLLOWING: a move shows the cursor again
   if (tv === 'fx') return moveFx(dx, dy, d.h);
   if (tv === 'phrase' && c.y === -2){ if (dy > 0){ c.y = 0; c.x = mstView() || busFxView() ? FX0 : 0; } else c.x = clamp(c.x + dx, 0, 1); return draw(); }
   // WRAP (owner, 23 Oct): past the top of a phrase (Pattern view too) the cursor goes round to its last row, past the
@@ -20340,10 +20347,10 @@ function draw(){
   if (tv === 'song' && asongOn()){
     // Arrange is the Song screen: no text to build, just keep the cursor's row in Arrange's view (drawArr draws it).
     sub = S.name;
-    const VR = arrRows(); if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; c.top = clamp(c.top, 0, 256 - VR);
+    const VR = arrRows(); if (!(c.pg && followOn && tp.on)){ c.pg = false; if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; } c.top = clamp(c.top, 0, 256 - VR);
   } else if (tv === 'song'){
     const [T0, T1] = trackWin(c, stepDec ? 4 : 3, 1, 4), ts = trkSub(T0, T1); sub = ts ? ts + '  ' + S.name : S.name;
-    const VR = songRows(); if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; c.top = clamp(c.top, 0, 256 - VR);
+    const VR = songRows(); if (!(c.pg && followOn && tp.on)){ c.pg = false; if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; } c.top = clamp(c.top, 0, 256 - VR);   // (c.pg: EDIT WHILE FOLLOWING)
     const hd = [stepDec ? '    ' : '   ']; for (let t = T0; t < T1; t++) hd.push({t:' ' + d2(t + 1), cls:'th' + mc(t) + tk(t) + ' gt' + (tCol(t) ? ' tcl' : ''), x:t, y:-1, title:trkTip(t), st:tCol(t) ? '--tc:' + tCol(t) : ''}, ' ');
     hd.push(' ', {t:' MS', cls:'th gx gt', x:MT, y:-1}); L.push(hd);   // the master column, in its own box after the poly tracks
     for (let y = c.top; y < c.top + VR; y++){
@@ -20384,7 +20391,7 @@ function draw(){
     L.push(['   ', ...(nbOn ? [{t:nbHead(nbHasL, cTrack - 1, nbPL), cls:'nb nbl'}] : []), ...(poly ? [{t:'N1  N2  N3  N4 ', cls:'th'}] : [{t:'N  ', cls:'th'}]), ' ',
       ...(nbOn ? [{t:nbHead(nbHasR, cTrack + 1, nbPR), cls:'nb nbr'}] : []), {t:'V ', cls:'th'}, ' ', {t:'I ', cls:'th'}, ' ', {t:'FX1   ', cls:'th'}, ' ', {t:'FX2   ', cls:'th'}, ' ', {t:'FX3', cls:'th'}]);
     const VR = Math.max(4, songRows()); if (c.top == null) c.top = 0;
-    if (c.y >= 0){ if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; }
+    if (c.y >= 0 && !(c.pg && followOn && tp.on)){ c.pg = false; if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; }   // (c.pg: EDIT WHILE FOLLOWING)
     c.top = clamp(c.top, 0, Math.max(0, len - VR));
     const nbL = nbOn && cTrack < MT ? nbPhrase(cTrack - 1) : -1, nbR = nbOn && cTrack < MT ? nbPhrase(cTrack + 1) : -1;
     const nbCell = (pid, y, cls) => { const q = pid >= 0 && S.phrases[pid] && y < plen(pid) ? S.phrases[pid][y] : null;
@@ -23787,6 +23794,7 @@ const apKey = () => { const r = S.song[cs.song.y]; return cs.song.x + ':' + cs.s
 // Keep the song cursor's row in the panel's view (Arrange shows the rows from cs.song.top down).
 function apTop(){
   const c = cs.song, VR = Math.max(2, arrRows()); c.top = c.top || 0;
+  if (c.pg && followOn && tp.on) return;   // EDIT WHILE FOLLOWING: the playhead paged it
   if (c.y < c.top) c.top = c.y; else if (c.y > c.top + VR - 1) c.top = c.y - VR + 1;
   c.top = clamp(c.top, 0, 256 - VR);
 }
@@ -24141,6 +24149,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [298, '31 Oct', ['FOLLOW: the screen still follows the playhead (the phrase playing, the rows paging along), but the cursor stays where you put it, so you can type and edit while the song plays. Moving the cursor brings it back into view.']],
   [297, '31 Oct', ['Bottom panel on a bus track: the FX part fills the space the instrument part leaves (there was a blank gap before the channel strip).']],
   [296, '31 Oct', ['…pump MASTER, GATE, TUNE and CHOP open their own windows (› OPEN on the FX screen, OPEN in the bottom panel). MASTER: the tone curve over the song, LEARN, the stages, ADVANCED trims and free bands. GATE: draw the steps and their levels. TUNE: Live, and Graph (capture the voice, then drag its notes). CHOP: play the eight pads, several at once on a touch screen, and LEARN their notes or keys.', 'Redo works again after an undo (it lost its history).']],
   [295, '31 Oct', ['pump VOX shows its main controls only (engine, mode, routing, bands, formant, the synth carrier, the Voice FX switches, mix), on the FX screen and in …chains. Its presets still set everything.']],
@@ -24644,6 +24653,8 @@ function pvRow(d){
   pvGo(cTrack, y, null, null);
 }
 // FOLLOW while the song plays: the song row (and the track, when the open one is silent) ride along.
+// Pattern view's rows on screen (followPlay pages by the same number)
+function pvVR(){ const fs = parseFloat(scr.style.fontSize) || 14; return Math.max(4, Math.floor((grid.clientHeight - fs * .25) / (fs * 1.3) + 0.02) - 3); }
 function pvFollow(P, own){   // the song row follows; the cursor keeps its track (and takes that track's phrase on the new row, if it has one)
   const row = own.row; if (cs.song.y !== row && !P[cTrack]){ const cid = S.song[row] ? S.song[row][cTrack] : -1, ph = cid >= 0 ? firstPhrase(cid) : -1; if (ph >= 0){ cPhrase = ph; cSect = cid; } }
   cs.song.y = row; cs.song.x = cTrack; }
@@ -24739,9 +24750,9 @@ function pvLines(c, L, cc, rsel, playRows){
     else if (off.length > 1){ warn = `TRACKS ${off.map(d => d.t === MT ? 'MST' : d2(d.t + 1)).join(' ')} ARE OTHER LENGTHS: THEY DRIFT FROM HERE`; warnT = off.map(say).join('\n'); }
   }
   pvBarDraw(Y, rowsN, lpbRef, warn, warnT);
-  const fs = parseFloat(scr.style.fontSize) || 14, VR = Math.max(4, Math.floor((grid.clientHeight - fs * .25) / (fs * 1.3) + 0.02) - 3);
+  const VR = pvVR();
   if (c.top == null) c.top = 0;
-  if (c.y >= 0){ if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; }
+  if (c.y >= 0 && !(c.pg && followOn && tp.on)){ c.pg = false; if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; }   // (c.pg: EDIT WHILE FOLLOWING)
   c.top = clamp(c.top, 0, Math.max(0, rowsN - VR));
   const CG = G.find(g => g.cur); if (c.y >= 0 && !CG.C.includes(c.x)) c.x = pvNear(CG.C, c.x);
   // Lines are made of spans only, so a tap finds its track by position: pvMap[line][span] = {t, x, y} (null: not another track).
