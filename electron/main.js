@@ -13,6 +13,12 @@ protocol.registerSchemesAsPrivileged([{ scheme:'app', privileges:{ standard:true
 
 // Audio can start without a click first (the tracker's play button still works the same).
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+// PLAYBACK IN THE BACKGROUND (owner, 31 Oct: stutters and hangs when the app isn't in front): besides backgroundThrottling
+// (below), Chromium lowers a hidden or covered window's renderer priority and slows its timers; these keep it running as
+// in front, so the sequencer (main thread) keeps feeding the audio on time.
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 
 // Web MIDI, the save/open dialogs, the output device list and audio are allowed; nothing else is asked for.
 const ALLOW = new Set(['midi', 'midiSysex', 'fileSystem', 'clipboard-sanitized-write', 'clipboard-read', 'speaker-selection']);   // no 'media': the app never uses the mic or camera

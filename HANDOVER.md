@@ -81,6 +81,16 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (14): background playback (build 308, desktop needs the new release)
+
+- Owner: stutters and hangs, especially with the app not in front. `pumpRun` books 1.2 s ahead (256 steps a tick) while
+  `document.hidden` (250 ms in front), trims `tp.q` while hidden (no frames drain it), and stops a song that ended while
+  hidden. Electron main.js adds `disable-renderer-backgrounding`, `disable-background-timer-throttling`,
+  `disable-backgrounding-occluded-windows` (backgroundThrottling was already off). Measured headless: margin ahead of the
+  audio clock 0.24 s in front, ≥1.2 s hidden; one 57 ms long task in 10 s of the demo. Not yet looked at: per-step
+  allocation in the sequencer, the many worklets' cost with big songs; the audio latency setting (Balanced / Safest) is
+  the user-side lever for audio-thread underruns.
+
 ## 31 Oct (13): RESUME from pause; the stopped spot stays lit (build 307)
 
 - `tStop` keeps `tp.paused` (song mode: a copy of the last heard positions, the followed track `ref`, its row / step, and

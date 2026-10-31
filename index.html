@@ -17027,19 +17027,23 @@ function pump(){
 function pumpRun(){
   if (!tp.on) return;
   audioWake = performance.now();
-  if (view !== 'tracker' && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open
+  if ((view !== 'tracker' || document.hidden) && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open (or the app is hidden: no frames)
   const s = tp.seq; let n = 0;
   // The page was stopped for a while (a frozen tab, a long pause, a system dialog): rather than playing every row
   // missed in that time at once, move the timeline on so the song continues from where it was.
   if (s.alive() && s.time < ctx.currentTime - 0.5 && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
   // Schedule 250 ms ahead, so a busy moment on the UI thread can't make notes late (it was 150 ms on a computer).
-  // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate.
-  while (s.alive() && s.time < ctx.currentTime + 0.25 && n++ < 64){
+  // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate. With the app in the
+  // background (owner, 31 Oct: stutters there) 1.2 s: the system runs a hidden page's thread late and in bursts, and
+  // nothing is being edited then. Coming back to the front, it drops to 250 ms as the booked notes play out.
+  const ahead = document.hidden ? 1.2 : 0.25;
+  while (s.alive() && s.time < ctx.currentTime + ahead && n++ < (document.hidden ? 256 : 64)){
     const r = s.step(); for (const e of r.evs){ if (moEv(e)) continue; rt.pl.play(e); if (e.type === 'note') padBlink(e); } tp.q.push({t:r.t, pos:r.pos, bpm:s.bpm, tks:r.tks, line:r.line});
     mx.pend.forEach((P, t) => { if (P && P.length) pendFlush(t, r.t); });   // ARP returns due by this row, on tracks the row left alone
     if (rec.on) recHist(r);   // REC: when each of the recording track's steps is heard
   }
   moClock(s); moLfo(s); moRamp(); moEcho(); metRun(s);
+  if (document.hidden && !s.alive() && ctx.currentTime > s.time + 0.3) tStop(true);   // the song ended while hidden (frame() isn't running to see it)
 }
 // With the synth open, light each pad as the tracker plays it (in time with the sound).
 function padBlink(e){
@@ -18090,7 +18094,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 307;
+const BUILD = 308;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24323,6 +24327,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [308, '31 Oct', ['Smoother playback with the app in the background: the song is booked further ahead while it is hidden, and the desktop app no longer lets the system slow it down when its window is covered or minimised. If it still stutters, Settings → Audio → Latency → Balanced (or Safest) gives the audio more room.']],
   [307, '31 Oct', ['Stopping the song leaves the playhead lit where it stopped.', 'Settings → Screen → RESUME (Playback resumes from pause, on): PLAY carries on from that spot, to the step, unless you have moved the cursor since. Off: PLAY starts from the cursor as before.']],
   [306, '31 Oct', ['Song and Arrange: copy, cut, paste and Clone keep each block’s mute (a muted block pastes muted, an unmuted one unmuted).']],
   [305, '31 Oct', ['Playing (or rendering) the song from a row past the top now picks up the effect commands above it: the last FXO, FLX, GAT, RTG and BYP of each track and of the master column, the master VOL, TVL and TPN. So FLX 00 at the top keeps Flex off when you start further down.']],
