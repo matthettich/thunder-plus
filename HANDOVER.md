@@ -79,6 +79,14 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (14): Help and README audit (build 282)
+
+- Checked both against the code and fixed: effect counts (72 a track, 81 bus / master, 65 pad) and groups, the
+  drum-type preset groups, …pump EQ on any track, the master's command list (`MST_FXC`), the key legend (Tab, Enter,
+  Backspace, Ctrl+Space, Alt+A, letter cycling), Shift+Alt on Arrange / the Mixer, README's instrument (64) and slot (8)
+  counts, `FXI.GRV` (this track, not all). When adding commands or effects, update Help's `fxg` list, the key legend
+  (`tLegKeys`) and README together.
+
 ## Keep doing with every build: What's new
 
 - `CHANGES` (beside `whatsNew`, after `welcome`) lists what changed, newest first: `[build, date, [lines]]`. Add a line
