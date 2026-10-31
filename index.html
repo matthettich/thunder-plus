@@ -1074,7 +1074,15 @@ body.asong.sxsecs .tarr{padding-left:calc(var(--sxw, 88px) + 4px)}
 /* ARRANGE SIDE (18 Oct): LEFT, the default, puts the side panel before the screen, so SHIFT+◀ goes left to the song and
    SHIFT+▶ right to the phrase, as the keys say; the grip moves to its right edge. RIGHT is the old layout. */
 body.arrleft .tbody > .tarr{order:-1; border-left:0; border-right:1px solid var(--line)}
-body.arrleft .tbody > .tarr .tarrh{left:auto; right:-10px}
+body.arrleft .tbody > .tarr .tarrh{left:auto; right:-13px; width:12px}   /* (owner, 31 Oct) outside the panel: half of it lay over Arrange's scrollbar, so grabbing the scrollbar resized the panel */
+body.arrleft .tbody > .tarr .tarrh::after{left:4px}
+/* ARRANGE SCROLLBAR (owner, 31 Oct: hard to grab): a wide, plainly visible thumb, with a mouse (phones keep their overlay one) */
+@media (pointer:fine){
+.tagrid::-webkit-scrollbar{width:14px; height:14px; background:transparent}
+.tagrid::-webkit-scrollbar-track{background:color-mix(in srgb, var(--ar-dim, #888) 12%, transparent); border-left:1px solid color-mix(in srgb, var(--ar-dim, #888) 30%, transparent)}
+.tagrid::-webkit-scrollbar-thumb{background:color-mix(in srgb, var(--ar-ink, #333) 45%, transparent); border:3px solid transparent; background-clip:padding-box; border-radius:7px; min-height:40px}
+.tagrid::-webkit-scrollbar-thumb:hover, .tagrid::-webkit-scrollbar-thumb:active{background-color:color-mix(in srgb, var(--ar-ink, #333) 75%, transparent)}
+}
 .tahd{display:grid; grid-template-columns:minmax(0, calc(var(--azfx, 50%) - 32px)) 44px minmax(0,1fr); align-items:center; gap:0; padding:8px 10px 6px; font-size:var(--fs-3); font-weight:700; letter-spacing:.05em; flex:none}
 /* ARRANGE at the left, ○ over the MONO | POLY break (--azfx, from arrSize: where the break is when every track fits,
    so it stays put while zoomed), the rows / muted line and + at the right. */
@@ -12427,7 +12435,7 @@ const SKINS = [
   {id:'rainbowdyn', name:'Simple rainbow dynamic', base:'term', dots:['#e8b52f', '#3aa85a', '#4c6ee6', '#b04ce6']},
 ];
 const SKK = 'thunderplus-skin-v1';
-let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k => k.id === v)) return v; } catch(e){} return 'rainbow'; })();   // Simple rainbow for a first visit (owner, 27 Oct; it was Simple grey). A saved pick is kept
+let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k => k.id === v)) return v; } catch(e){} return 'idm'; })();   // IDM for a first visit (owner, 31 Oct; it was Simple rainbow)   // Simple rainbow for a first visit (owner, 27 Oct; it was Simple grey). A saved pick is kept
 // Simple rainbow dynamic: a hue-rotate filter on the page goes once round the colour wheel every 20 seconds, so the
 // colours visibly drift. Greys and white stay put; only the colours move. It's set twenty times a second in 0.9° steps,
 // below a visible step, so the drift looks continuous at a third of the repaints of a per-frame animation. Paused while
@@ -18362,7 +18370,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 326;
+const BUILD = 327;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24368,6 +24376,7 @@ const APK = 'thunderplus-arrfocus-v1', SSK = 'thunderplus-songstrip-v1';
 let apOn = (() => { try { return localStorage.getItem(APK) !== '0'; } catch(e){ return true; } })();
 let ssOn = (() => { try { return localStorage.getItem(SSK) !== '0'; } catch(e){ return true; } })();
 let apF = null;        // who has the keys instead of the phrase: 'arr' (the side panel), 'strip' (the song strip) or null
+let apTookT = -1e9;   // ONE CLICK: when a press in the panel last took the keys
 let apHost = 'phrase'; // the screen Arrange is beside while it has the keys (owner, 19 Oct: every screen, not only Phrase)
 let apPin = false;     // PIN: the phrase stays up while the song cursor moves
 let apSel = null;      // the song selection made while Arrange has the keys (selA always belongs to the screen drawn)
@@ -24518,7 +24527,7 @@ const apTagEl = el('span', 'aptag'); apTagEl.hidden = true;
 const apFootEl = arrEl.querySelector('.tafx'), apFoot0 = apFootEl ? apFootEl.textContent : '';
 // A tap or click anywhere in the panel (not its resize grip) gives Arrange the keys. The block or row number under the
 // finger then moves the song cursor as usual: a block through arrGo → apArrGo, a row number in the grid's own handler.
-arrEl.addEventListener('pointerdown', e => { if (apF !== 'arr' && apReady && apArrOk() && !e.target.closest('#tArrH')){ apFocus('arr', false); draw(); } }, true);
+arrEl.addEventListener('pointerdown', e => { if (apF !== 'arr' && apReady && apArrOk() && !e.target.closest('#tArrH')){ apFocus('arr', false); apTookT = performance.now(); draw(); } }, true);   // (apTookT: a plain click on a block gives them back, apArrGo)
 // Right-click on the side panel (a mouse): Arrange takes the keys, the song cursor goes to that cell, and the Song screen's
 // commands open there (cmdItems, run as on the Song screen through apRun), with mute and open-its-phrase on top. (19 Oct)
 arrGrid.addEventListener('contextmenu', e => {
@@ -24543,11 +24552,16 @@ function apArrGo(y, t){
   if (!apReady || !apArrOk()) return false;
   const k = y + ':' + t, now = performance.now(), dbl = apF === 'arr' && apTap.k === k && now - apTap.t < 380;
   apTap = {t:dbl ? 0 : now, k:dbl ? '' : k};
-  apFocus('arr', false); cs.song.x = t; cs.song.y = y; apTop();
+  // ONE CLICK (owner, 31 Oct, #7): a click on a block selects it and the screen beside shows it (its phrase, its track's
+  // mixer or effects), and the keys stay where they were (on the phrase), so you can type straight away; Alt+A or Alt+◀
+  // still give Arrange the keys. A double-click opens the block's phrase (from another screen, the Phrase screen).
+  // (It was: the first click gave Arrange the keys and the phrase only followed; the second gave them back.)
+  if (apF !== 'arr' && tv !== 'song') apHost = tv;
+  cs.song.x = t; cs.song.y = y; apTop();
   if (dbl){ const cid = S.song[y][t];
     if (cid >= 0){ ensureSectPhrase(cid); const p = firstPhrase(cid); if (p >= 0){ cPhrase = p; cTrack = t; cSect = cid; } }
     apFocus(null); if (cid >= 0 && tv !== 'phrase'){ go('phrase'); return true; } }
-  else apFollow();
+  else { apLastKey = ''; apFollow(); if (tv === 'phrase' && pvActive()) cTrack = t; if (performance.now() - apTookT < 2000 && apF === 'arr' && tv !== 'song'){ apTookT = -1e9; apFocus(null); } }   // the keys go back to the screen this click took them from
   draw(); return true;
 }
 // draw()'s last hook: the focus look, the phrase following a cursor moved some other way (a row number, an undo), the
@@ -24754,6 +24768,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [327, '31 Oct', ['Arrange beside another screen: one click on a block shows it there (its phrase, or its track’s mixer or effects) and the keys stay where they were, so you can type straight away; a double-click opens it. Dragging there still selects (Arrange takes the keys for that).', 'Arrange’s scrollbar is easy to grab: the panel’s resize grip no longer lies over it, and with a mouse the scrollbar is wider with a clear thumb.', 'IDM is the skin a first visit starts on.']],
   [326, '31 Oct', ['Esc switches EDIT mode (as in Renoise): off, the note keys only play the instrument and the phrase can’t be typed into; EDIT OFF shows at the top right. Esc still drops a selection first.', 'Tab and Shift+Tab go to the next / previous track (in a phrase, that track’s phrase on this song row). Settings → Screen → TAB → COLUMNS puts back the old note → instrument → FX steps.', 'The mouse wheel no longer changes values on the Mixer, FX and Inst screens: hold Alt/⌥ to change one with the wheel.', 'The wheel over Arrange moves the song cursor a row a notch, as ▲▼ do, and Arrange scrolls with it at the edge; Shift+wheel only scrolls.', 'The playhead in Arrange stands out: the playing blocks get an outline in the skin’s ink and the playing row a band.', 'The first FLX (or FXO, GAT, RTG) of a song is no longer lost when you press PLAY right after opening it.', 'Clicking the master column (Shift-click too) or an empty cell in Arrange sets the track Phrase and Pattern view open on.']],
   [325, '31 Oct', ['Enter on a note or command in a phrase (picking it up as the current one, or writing the current command) also copies it, so Ctrl/⌘+V or SHIFT+EDIT pastes it: a note with its instrument, a command with its value.', 'The mouse wheel over Arrange scrolls Arrange smoothly, as dragging its scrollbar does.']],
   [324, '31 Oct', ['Settings → App → Clear unused phrases: empties every phrase and block that isn’t on the song, so their numbers are free for new ones. It says how many first, and Undo brings them back.', 'New skin: Opuntia (prickly pear), in Art & design: pad greens with the flowers’ neon magenta, the fruit’s deep magenta and the yellow and orange blooms on the keys.']],
