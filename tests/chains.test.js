@@ -4,11 +4,12 @@
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('fs'), path = require('path');
 const H = require('./helpers');
 const BYTES = new Uint8Array(fs.readFileSync(path.join(H.ROOT, 'chains/dsp/tfx.wasm')));
+const PUMP = new Uint8Array(fs.readFileSync(path.join(H.ROOT, 'pump/pump.wasm')));   // PUMP MODULES: the …pump effects
 const BLOCKS = 400;   // ~1.07 s: long enough for delays, reverse and stretch to produce their wet signal (40 blocks was shorter than their delay times)
 
 function engine({ wasm = true } = {}) {
   const ctx = H.freezeClock(H.workletScope()); H.load(ctx, 'chains/chains-worklet.js');
-  if (wasm) ctx.ChainsDSP.wasmInit({ tfxBytes: BYTES });
+  if (wasm){ ctx.ChainsDSP.wasmInit({ tfxBytes: BYTES }); ctx.__pumpBytes = PUMP; }
   const E = new ctx.ChainsDSP.ChainsEngine(48000, { focus: 0, quality: 'full', transport: { tempo: 120, lpb: 4, ticks: 6, playing: true } });
   return { ctx, E, D: ctx.ChainsDSP };
 }
