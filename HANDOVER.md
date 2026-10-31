@@ -79,6 +79,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 30 Oct (15): Arrange pages with playback (build 283)
+
+- `followPlay` (FOLLOW on, song mode): when the playing row leaves Arrange's rows (`arrRows()`), `cs.song.top` jumps so
+  the playing row is first (a page turn), for Arrange beside a screen and as the Song screen; not while Arrange has the
+  keys. Checked headless on Phrase and Song at 240 BPM: the playing row stayed in view throughout.
+
 ## 30 Oct (14): Help and README audit (build 282)
 
 - Checked both against the code and fixed: effect counts (72 a track, 81 bus / master, 65 pad) and groups, the
@@ -217,6 +223,22 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
   BEATS 4. Renders on the UI thread in 0.5–1 s on a computer; move it to the pad Worker if phones stall.
 - Not ported: BREAK's own 16-step slice sequencer (the tracker is the sequencer) and its momentary effects (Flex /
   Retrigger with FLX / RTG cover them); ACID's own sequencer modes (Song / Keys / Free).
+
+## Possible future work: automation lanes, like Renoise (owner, 30 Oct: wanted; a big build, plan agreed in outline)
+
+What exists already: `FXV` moves any effect slot parameter in time (`fxpTo` → `{pset}` into the slot's worklet, timer live,
+`ac.suspend` offline, restored at stop); `TVL` / `TPN` move a track's level and pan (`trackTo`, AudioParams); the master's
+VOL (`mvol`); CUT / MUT for pads through `varBuf`. So the playback half of automation is mostly built.
+1. **Lanes per pattern (phase 1, ~a day).** Data: per song row / phrase, a list of lanes `{target:{kind:'fx'|'mix'|'mst',
+   track, slot, param}, pts:[[pos, value, curve]]}` saved in the song (normalise on load). Playback: at each row the
+   sequencer emits the lane's value (or a ramp over the row) as `fxp` / `tvl` / `tpn` / `mvol` events, so live and renders
+   share one path. Editor: desktop Pattern view, a lane under a track's column (click to add points, drag, right-click
+   delete, a lane picker listing the track's slots and their parameters, like FXS).
+2. **Recording:** with REC on, moving a mixer or FX-screen control writes points into the playing pattern's lane.
+3. **Touch editing** on the Fold (bigger handles, a lane sheet).
+4. **Pad / instrument parameters:** only through renders (`varBuf`: CUT / RES / DEC / MUT), so stepped per note, not smooth.
+Also audit candidates the owner can pick from: Elektron (trig conditions, parameter locks), Polyend Tracker, SunVox,
+LSDJ, Furnace / OpenMPT.
 
 ## Possible future work: search and tidier groups in the sound and effect pickers (owner, 30 Oct: nice to have, not started)
 
