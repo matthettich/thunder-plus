@@ -992,7 +992,7 @@ body.asong .tgrid, body.asong .tarrh, body.asong .tafoot, body.asong .thd{displa
 /* One header line (SONG, the song's name and rows, − ○ +), then the MONO / POLY / MST boxes with the rows scrolling inside
    them: the grid is sized to whole rows and snaps to them, so the bottom never shows half a row. */
 body.asong .tahd{font-size:var(--fs-4); padding:0 2px 6px}
-body.asong .tagrid{flex:none; padding-bottom:0; scroll-snap-type:y mandatory; scroll-padding-top:3px}
+body.asong .tagrid{flex:none; padding-bottom:0; scroll-snap-type:y proximity; scroll-padding-top:3px}   /* proximity (31 Oct): mandatory snapping fought a scrollbar drag */
 body.asong .tagrid .ar{scroll-snap-align:start}
 /* A wider row-number column, so the MONO box's edge never sits on the numbers. */
 body.asong :is(.tath, .tagrid .ar, .tagp){grid-template-columns:30px var(--arcols)}
@@ -15350,6 +15350,7 @@ function normSong(j){
   S.tune = Array.from({length:12}, (_, k) => clamp(Number.isFinite(+((j.tune || [])[k])) ? +j.tune[k] : 0, -100, 100));
   S.presets = normPresets(j.presets);
   S.fxPre = normFxPre(j.fxPre);   // FX PRESETS: the song's own, per effect type
+  S.bcol = {}; if (j.bcol && typeof j.bcol === 'object') for (const k in j.bcol){ const v = int(k, -1), c = int(j.bcol[k], 0); if (v >= 0 && c > 0 && c < TCOL.length) S.bcol[v] = c; }   // BLOCK COLOURS
   S.scale = clamp(int(j.scale, 0), 0, SCALES.length - 1); S.sroot = clamp(int(j.sroot, 0), 0, 11);   // SCALE / SCALE ROOT (20 Oct)
   // ni: the instruments the song was made with. Songs from before 20 Oct had 16, and an INS above 0F (typed, or from RND,
   // RNL or REP) played 0F: they keep doing so (makeSeq clamps to ni) until an instrument past 0F is put in a phrase (niUp).
@@ -18254,7 +18255,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 320;
+const BUILD = 321;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22448,7 +22449,9 @@ function drawArr(PH){
   sxLaneSize();   // SONG EXTRAS: the section lane's width, before anything is measured
   const arRH = arrSize();
   let lastR = -1; for (let y = 255; y >= 0; y--) if (S.song[y].some(v => v >= 0)){ lastR = y; break; }
-  const N = clamp(Math.max(lastR + 2, 16, cs.song.y + 1, (cs.song.top || 0) + 40), 1, 256);   // room to line up with the Song screen's top row
+  // (owner, 31 Oct) a steady length, so the scrollbar's thumb doesn't shrink under the mouse as it is dragged: the song and
+  // 32 empty rows past its end (at least 64), more only when the cursor or the view goes further
+  const N = clamp(Math.max(lastR + 33, 64, cs.song.y + 1, (cs.song.top || 0) + 40), 1, 256);   // room to line up with the Song screen's top row
   const play = PH || new Array(NT).fill(-1);   // the shared playhead, so Arrange lights the same rows as Song
   const anySolo = S.mix.some(m => m.solo);
   let h = '';
@@ -22468,7 +22471,9 @@ function drawArr(PH){
         cls += empty ? 'z' : 'f'; lab = sectsOn || ph < 0 ? hp(v) : hp(ph);
         if (blockMuted(S, y, t)) cls = cls.replace(/[zf]$/, 'm');
         // Coloured by the instrument its phrase plays, with the phrase's notes as ticks when the blocks are big.
-        if (!empty && ph >= 0){ const pi = phraseInfo(ph); if (grp) sty = ` style="--bgc:${grp};--ib:${grp}"`; else if (pi.inst >= 0) sty = ` style="--ib:${instHue(pi.inst)};--ibp:${100 - (pi.inst % 5) * 17}%"`;
+        if (!empty && ph >= 0){ const pi = phraseInfo(ph), bc = S.bcol && TCOL[S.bcol[v] | 0];   // BLOCK COLOURS first
+          if (bc) sty = grp ? ` style="--bgc:${bc};--ib:${bc};--ibp:100%"` : ` style="--ib:${bc};--ibp:100%"`;   // (over a bus group's colour too)
+          else if (grp) sty = ` style="--bgc:${grp};--ib:${grp}"`; else if (pi.inst >= 0) sty = ` style="--ib:${instHue(pi.inst)};--ibp:${100 - (pi.inst % 5) * 17}%"`;
           if (arRH >= 26 && pi.hits) lab += pi.hits; }
       }
       if (S.mix[t].mute || (anySolo && !S.mix[t].solo)) cls += ' tm';
@@ -22536,19 +22541,22 @@ function arrBoxes(){
 }
 // ARRANGE and the Song screen show the same rows: the panel's top row is always the Song screen's top row, and
 // scrolling the panel scrolls the Song screen with it (they used to scroll apart, e.g. the panel at row 000, Song at 002).
-let arrIgnore = -1, arrMark = [];
+let arrIgnore = -1, arrMark = [], arrUserT = -1e9;
 const arrRowH = () => { const r = arrGrid.children; return r.length > 1 ? r[1].getBoundingClientRect().top - r[0].getBoundingClientRect().top : 0; };
 // The height the grid can have as the Song screen: the panel below the headers. It never depends on the grid's own height.
 function arrAvail(){ return arrEl.clientHeight - arrGrid.offsetTop - 2; }
 function arrAlign(){
   const rh = arrRowH(); if (!(rh > 0)) return;
+  // SCROLLBAR (owner, 31 Oct: dragging Arrange's scrollbar was hard): while the user is scrolling it, the grid isn't pulled
+  // back to whole rows under the mouse
+  if (performance.now() - arrUserT < 450) return;
   const st = Math.max(0, Math.min(Math.round((cs.song.top || 0) * rh), arrGrid.scrollHeight - arrGrid.clientHeight));
   if (Math.abs(arrGrid.scrollTop - st) > 1){ arrIgnore = st; arrGrid.scrollTop = st; }
 }
 arrGrid.addEventListener('scroll', () => {
   arrHSync();
   if (arrIgnore >= 0 && Math.abs(arrGrid.scrollTop - arrIgnore) <= 1){ arrIgnore = -1; return; }
-  arrIgnore = -1;
+  arrIgnore = -1; arrUserT = performance.now();
   const rh = arrRowH(); if (!(rh > 0)) return;
   const c = cs.song, top = clamp(Math.round(arrGrid.scrollTop / rh), 0, 255);
   if (top === c.top) return;
@@ -22994,6 +23002,19 @@ arrGrid.addEventListener('contextmenu', e => {
   e.preventDefault();
   const m = sxCtx(+b.dataset.y, +b.dataset.t); sxMenu(e.clientX, e.clientY, m.title, m.items);
 });
+// BLOCK COLOURS (owner, 31 Oct): right-click → Colour… gives the block (every block of the selection) one of the track
+// colours, kept in the song (S.bcol: block number → colour), so every place that block is used shows it. None goes back to
+// the instrument's colour.
+async function sxColour(r){
+  const ids = new Set(); for (let y = r.y0; y <= r.y1; y++) for (const t of sxCols(r)){ const v = S.song[y][t]; if (v >= 0) ids.add(v); }
+  if (!ids.size) return;
+  const first = [...ids][0], sw = {sel:(S.bcol && S.bcol[first]) | 0, cols:TCOL, names:TCOL_N};
+  const ok = await askSheet({title:ids.size > 1 ? `Colour ${ids.size} blocks` : 'Colour block ' + hp(songShown(first)), body:'Every place these blocks are used in the song shows the colour. None: the instrument’s colour.'}, {ok:'Set', swatch:sw});
+  if (ok == null) return;
+  if (!S.bcol) S.bcol = {};
+  for (const v of ids){ if (sw.sel) S.bcol[v] = sw.sel; else delete S.bcol[v]; }
+  saveS(); arrSig = ''; draw();
+}
 // The Song screen's menu for the block (or the selection) at y, t: {title, items}. The side Arrange panel uses it too, run
 // as the Song screen (its contextmenu handler in ARRANGE PAGING), so the two menus are the same.
 function sxCtx(y, t){
@@ -23015,6 +23036,7 @@ function sxCtx(y, t){
     {l:'Mute / unmute', k:ks ? 'M' : '', f:() => sxMuteRect(r), off:!n || (t === MT && !multi)},
     {l:'Loop these rows', f:() => sxLoopRows(r.y0, r.y1), off:r.y1 <= r.y0},
     {l:'Open the phrase', k:ks ? 'Shift+→' : '', f:sxOpen, off:multi || !filled},
+    {l:multi ? 'Colour these blocks…' : 'Colour this block…', f:() => sxColour(r), off:!n},
   ];
   if (SX.secs) items.push({l:songSecAt(r.y0) && songSecAt(r.y0).y === r.y0 ? 'Rename the section here…' : 'Name a section from row ' + rS(r.y0, 3) + '…', f:() => sxSecEdit(r.y0)});
   items.push(null, {l:'Remove from song (keep the phrase)', f:() => sxClearRect(r, true), off:!n}, {l:'Delete (the phrase too)', k:ks ? 'Del' : '', f:() => sxClearRect(r, false), off:!n},
@@ -24556,6 +24578,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [321, '31 Oct', ['Arrange: right-click a block (or a selection) → Colour this block… / Colour these blocks…: one of the track colours, shown everywhere that block is used and kept in the song (None goes back to the instrument’s colour).', 'Arrange’s scrollbar is easier to drag: the grid no longer snaps back to whole rows under the mouse, and its length stays put while scrolling (the song plus 32 rows).']],
   [320, '31 Oct', ['A track added (or taken away) with TRACKS no longer plays through the effects of the track that used to have its number: the sound is re-routed with the tracks (a new track 9 had kept track 9’s delay, unseen).', 'Song and Arrange: Shift-click selects from the block you are on (the one already picked) to the block clicked, the first time; a second Shift-click is no longer needed.']],
   [319, '31 Oct', ['PHRASE works straight after SONG: on the Phrase screen, SONG hands the keys to Arrange beside it, and PHRASE now takes them back (it did nothing until another tab was clicked). SONG again still opens the Song screen.']],
   [318, '31 Oct', ['RESUME (Playback resumes from pause) is now off unless you turn it on (Settings → Screen → RESUME): PLAY starts from the cursor. The stopped spot still stays lit.', 'FX screen: the mouse wheel over the effect slots moves between them, one slot a notch; it no longer swaps the effect (EDIT and the effect list still do).', 'Menus: on a computer Undo, Redo and Phrases… are in the Edit menu only (a phone, with no Edit menu, keeps them in File); the kit buttons in Settings say Factory drums (pads 1–8) and Clear all kit slots, as File does.']],
