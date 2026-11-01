@@ -115,7 +115,9 @@ test('guards: KEYS mode modifiers, the Synth page keys, dialogs over Settings, u
   assert.match(src, /if \(e\.ctrlKey \|\| e\.metaKey \|\| e\.altKey\) return;\n(?:\s*\/\/[^\n]*\n)*\s*if \(inMode === 'keys'\) return;\n\s*const b = KEYB\[e\.key\];/, 'K1: KEYS mode stops before the PAD table');
   assert.match(src, /const b = KEYB\[e\.key\]; if \(b && \(inMode !== 'keys' \|\| b in held\)\)\{ e\.preventDefault\(\); release\(b, true\); \}/, 'K1: and a held PAD key is let go in either mode');
   // K8: the Synth page's keys only on the Synth page
-  assert.match(src, /go\(VIEWS\[\+e\.code\.slice\(5\) - 1\]\); return; \}\n  if \(view !== 'synth'\) return;/, 'K8');
+  assert.match(src, /\n  if \(view !== 'synth'\) return;   \/\/ FIX \(27 Oct, audit K8\)[^\n]*\n[\s\S]{0,400}const pd = \/\^Digit\[1-8\]\$\//, 'K8');
+  // 1 Nov (audit #1): F2–F9 on the Synth page (F5 reloaded the page there)
+  assert.match(src, /F-KEYS OFF THE TRACKER[\s\S]{0,600}\/\^F\[2-9\]\$\/\.test\(e\.key\)/, 'Synth page F-keys');
   // B12: a dialog sits over the Settings menu and gets its keys
   assert.match(src, /\.ask\{[^}]*z-index:125;/, 'B12: .ask above .setmenu (120)');
   assert.ok(+src.match(/\.ask\{[^}]*z-index:(\d+);/)[1] > +src.match(/\.setmenu\{[^}]*z-index:(\d+)/)[1], 'B12: above the menu');
