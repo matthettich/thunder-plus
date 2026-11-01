@@ -2570,8 +2570,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <!-- …PUMP SYNTHS (26 Oct 2026): pump MONO, POLY and COIL as rendered synth engines (pump/synth/: the plugins' own DSP in
      pump-synth.wasm, their parameters and presets in pump-synth-meta.js, both built by pump/wasm/build.sh). Without the folder
      there are no …pump engines. The render Worker loads the same two files (PSYN_JS below). -->
-<script src="pump/synth/pump-synth-meta.js?v=4"></script>
-<script src="pump/synth/pump-synth-engine.js?v=6"></script>
+<script src="pump/synth/pump-synth-meta.js?v=5"></script>
+<script src="pump/synth/pump-synth-engine.js?v=7"></script>
 <!-- …PUMP (23 Oct 2026): the pump mastering plugins' parameter tables and presets (generated in matthettich/pump by
      wasm/build.sh); pump/pump.wasm is their DSP, fetched by the wasm loader. -->
 <script src="pump/pump-meta.js?v=5"></script>
@@ -7321,7 +7321,7 @@ const PW = {w:null, ready:false, wv:false, lx:false, ps:false, id:0, jobs:new Ma
 // and gets the page's compiled lxr.wasm (lxMod) in its init message.
 const LXR_JS = 'lxr/lxr-engine.js?v=2';
 // …PUMP SYNTHS: likewise the instruments' tables and glue, and the page's compiled pump-synth.wasm (psMod)
-const PSYN_JS = ['pump/synth/pump-synth-meta.js?v=4', 'pump/synth/pump-synth-engine.js?v=6'];
+const PSYN_JS = ['pump/synth/pump-synth-meta.js?v=5', 'pump/synth/pump-synth-engine.js?v=7'];
 function rwStart(plMod, txMod, lxMod, psMod){
   try {
     const sc = [...document.scripts].find(x => x.textContent.includes('===ENGINE ' + 'START==='));
@@ -13475,7 +13475,7 @@ let plFailed = false;
   // LXR ENGINES: lxr/lxr.wasm, compiled here (and handed to the render Worker) when the engine file loaded
   const lxP = typeof LxrCore !== 'undefined' ? LxrCore.load('lxr/lxr.wasm?v=1').catch(e => { console.warn('LXR engines', e); return null; }) : Promise.resolve(null);
   // …PUMP SYNTHS: pump/synth/pump-synth.wasm, compiled here and handed to the render Worker (as LXR's is)
-  const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=4').catch(e => { tpLog('pump synths wasm (the …pump engines will be silent)', e); return null; }) : Promise.resolve(null);
+  const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=5').catch(e => { tpLog('pump synths wasm (the …pump engines will be silent)', e); return null; }) : Promise.resolve(null);
   // …PUMP: the pump mastering effects (pump/pump.wasm), fetched alongside; effect nodes that asked for it get it now
   bytes(PUMP_WASM).then(b => { pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage({pumpBytes:b}); } catch(e){} pumpWait.clear(); pumpToChains(b);
     return WebAssembly.instantiate(b, imp).then(r => { pumpMain = r.instance.exports; if (pumpMain._initialize) pumpMain._initialize(); }); }).catch(e => { if (PM) console.warn('pump effects', e); });
@@ -18545,7 +18545,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 339;
+const BUILD = 340;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25005,6 +25005,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [340, '31 Oct', ['…pump LIFE as engines Life and Life kit live: the groovebox’s eight FM / ring / kick tones and its pitch-shifting delay, played from the tracker (C-4 up the white keys on the kit live engine). Its Game of Life grid stays in the plugin.']],
   [339, '31 Oct', ['Six more …pump instruments as synth engines (Engine → …pump), each the plugin’s own sound with its factory presets, rendered and live: Fold (west coast: complex oscillator, wavefolder, low-pass gate), Gloss (hyperpop: seven machines), Tract (vocal-tract singers and choirs), and the drum machines Strike, Boing and X0X.', 'Drum machines: a pad plays one drum (Drum picks it, and only its page shows); the “kit live” engines play the whole kit from one track, C-4 the first drum and up the white keys (D-4, E-4, F-4…).']],
   [338, '31 Oct', ['New synth engines from …pump: Orbit and Orbit live (Engine → …pump), the ORBIT chaos synth: strange attractors (Lorenz, Rössler, double scroll, Thomas, Halvorsen, Duffing) as oscillators at the note’s pitch, CHAOS from a clean tone through period doubling into chaos, SYNC, AXIS, WIDTH, drive, a ladder filter with its own envelope, DRIFT, and its 13 factory voices. The plugin’s own sound (checked sample for sample against it). Orbit live plays chords through its own voices, with glide; its slides and bends reach ±2 semitones.']],
   [337, '31 Oct', ['Flex has 256 patterns, after the OP-Z and Pocket Operator punch-ins. FLX 01–10 are as before; 11–FF go in families by the first digit (the second picks the variant, gentler to wilder): 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops, spin-ups, wow and flutter, 8 scratches, 9 gates, pumps and swells, A filter sweeps and wobbles, B bit crush and downsampling, C fading repeats, D juggles, E swing, 6/8 and vibrato, F chaos. The FX screen’s PATTERN and the FLX hint name each one.', 'A song saved before this that uses FLX 11–FF (they all played pattern 10) keeps sounding as it did, and says so when it opens: Project → FLX 11–FF → NEW switches it to the new patterns.', 'New skin: IDM pink & green, exactly IDM with pink for its orange and green for its blue. The pink-paper one is now called IDM pink paper.']],

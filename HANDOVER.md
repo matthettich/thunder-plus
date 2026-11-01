@@ -84,9 +84,10 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
 ## 31 Oct (later still): six more pump instruments (build 339, web only)
 - Owner: "all of those pump synths and effects in Thunder Plus", new sounds first. Effects: every pump effect is already in
   pump.wasm except AMP (.nam models) and ROOM (room correction). Instruments ported so far: MONO, POLY, COIL, ORBIT, FOLD,
-  GLOSS, TRACT, STRIKE, BOING, X0X. Still to do, new sounds: FREEZE (its built-in sources are made on a thread from PRISM's,
-  which wasm here hasn't got: needs a synchronous path), BREAK and LIFE (sequencer instruments: decide how they play from
-  the tracker). Then the ones Thunder has its own versions of: ACID, MODAL, PHASE, VECTOR, PRISM, TABLE, WOB, SING (and KIT,
+  GLOSS, TRACT, STRIKE, BOING, X0X, LIFE (build 340: its tones as a kit, `KIT_DRUM` t1…t8; the grid's rows hidden and its
+  mode held at Loop with a stopped host, so only the tracker plays it). Still to do, new sounds: FREEZE and BREAK (their
+  built-in sounds are made on a std::thread, BREAK's breaks and FREEZE's spectra from PRISM's sources; wasi here has no
+  threads or mutex: they need a thread-free builder in pump, and a plan for the first note's cost on the audio thread). Then the ones Thunder has its own versions of: ACID, MODAL, PHASE, VECTOR, PRISM, TABLE, WOB, SING (and KIT,
   MACHINE, left out on purpose in Oct).
 - pump (wasm/pump_synth.cpp): one `Synth<Name>` per plugin with its plugin's `sync()` body copied (keep in step), activate
   syncing again after `engine.prepare()`; X0X gets a stopped Transport. New type ids are `kT<Name>` (FOLD's own `kFold`

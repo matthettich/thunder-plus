@@ -19,7 +19,7 @@ const SILENT_IN_PLUGIN = new Set(['pmono:Self-oscillating filter']);
 
 test('pump synths: every factory preset of every …pump instrument renders, finite and below full scale', () => {
   const P = load(), ui = P.xui(), xe = P.xeng();
-  assert.deepEqual(Object.keys(ui), ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'pcoil', 'pcoill', 'porbit', 'porbitl', 'pfold', 'pfoldl', 'pgloss', 'pglossl', 'ptract', 'ptractl', 'pstrike', 'pstrikel', 'pboing', 'pboingl', 'px0x', 'px0xl'], 'each instrument and its live twin');
+  assert.deepEqual(Object.keys(ui), ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'pcoil', 'pcoill', 'porbit', 'porbitl', 'pfold', 'pfoldl', 'pgloss', 'pglossl', 'ptract', 'ptractl', 'pstrike', 'pstrikel', 'pboing', 'pboingl', 'px0x', 'px0xl', 'plife', 'plifel'], 'each instrument and its live twin');
   for (const k of P.rendered) {   // (a live twin renders through its rendered engine, with the same presets)
     for (const [name, o] of ui[k].pre) {
       const d = P.render(k, Object.assign(xe[k].d(), o, { tune: 0, level: 0, drive: 0 }), 48000, 1, { len: P.len(k) }), { pk, bad } = stats(d);
@@ -46,7 +46,7 @@ test('pump synths: a note is held for the hold, released, then rendered until it
 
 test('pump synths: a pad renders the same every time (a fresh instance per render), and the output is golden', () => {
   const P = load(), xe = P.xeng(), got = {};
-  for (const k of ['pmono', 'ppoly', 'pcoil', 'porbit', 'pfold', 'pgloss', 'ptract', 'pstrike', 'pboing', 'px0x']) {
+  for (const k of ['pmono', 'ppoly', 'pcoil', 'porbit', 'pfold', 'pgloss', 'ptract', 'pstrike', 'pboing', 'px0x', 'plife']) {
     const p = Object.assign(xe[k].d(), { tune: 0, level: 0, drive: 0 });
     const a = P.render(k, p, 48000, 0.5), b = P.render(k, p, 48000, 0.5);
     assert.equal(H.hashFloats(a), H.hashFloats(b), k + ': two renders of the same pad differ');
@@ -103,7 +103,7 @@ test('pump synths live: a poly track\'s chord takes the lanes, one note each', (
 });
 
 test('pump synths live: plays exactly what the pad renders (same values, same note), and sleeps in silence', () => {
-  for (const [k, kl] of [['pmono', 'pmonol'], ['ppoly', 'ppolyl'], ['pcoil', 'pcoill'], ['porbit', 'porbitl'], ['pfold', 'pfoldl'], ['pgloss', 'pglossl'], ['ptract', 'ptractl'], ['pstrike', 'pstrikel'], ['pboing', 'pboingl'], ['px0x', 'px0xl']]) {
+  for (const [k, kl] of [['pmono', 'pmonol'], ['ppoly', 'ppolyl'], ['pcoil', 'pcoill'], ['porbit', 'porbitl'], ['pfold', 'pfoldl'], ['pgloss', 'pglossl'], ['ptract', 'ptractl'], ['pstrike', 'pstrikel'], ['pboing', 'pboingl'], ['px0x', 'px0xl'], ['plife', 'plifel']]) {
     const { P, c, node } = liveNode(kl), sr = 48000, offB = 188, N = 2 * sr, L = new Float32Array(N + 128);
     for (let b = 0; b * 128 < N; b++) { const o = block(node, { t0: [1], g0: [b < offB ? 1 : 0] }); for (let i = 0; i < 128; i++) L[b * 128 + i] = 0.5 * (o[0][i] + o[1][i]); }
     const r = P.render(k, Object.assign(P.xeng()[k].d(), { tune: 0, level: 0, drive: 0 }), sr, offB * 128 / sr), lat = P.latency(k, sr);

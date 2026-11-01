@@ -40,6 +40,7 @@ const KINDS = {
   pstrike:{t:7, k:'strike', name:'Strike', title:'pump STRIKE', tag:'drum synth: modal, string, circuit, FM, west, additive, chaos · 8 drums', len:1.5, kit:true},
   pboing:{t:8, k:'boing', name:'Boing', title:'pump BOING', tag:'spring drums: a tuned spring and a drum voice per pad · spring tank · 8 drums', len:1.5, kit:true},
   px0x:{t:9, k:'x0x', name:'X0X', title:'pump X0X', tag:'rhythm machine: 11 analog drums on five classic machines’ circuits', len:1.5, kit:true},
+  plife:{t:10, k:'life', name:'Life', title:'pump LIFE', tag:'groovebox voices: 8 FM / ring / kick tones · pitch-shifting delay', len:1.5, kit:true},
 };
 /* The live twins: the same instrument, played live. Shown after their rendered engine in the picker. */
 const LIVE = {
@@ -52,9 +53,10 @@ const LIVE = {
   ptractl:{twin:'ptract', name:'Tract live', title:'pump TRACT live', tag:'played live: a choir per chord, glide, vowels that move as you hold'},
   pstrikel:{twin:'pstrike', name:'Strike kit live', title:'pump STRIKE kit live', tag:'the whole kit on one track: C-4 D-4 E-4… play its eight drums'},
   pboingl:{twin:'pboing', name:'Boing kit live', title:'pump BOING kit live', tag:'the whole kit on one track: C-4 D-4 E-4… play its eight drums'},
+  plifel:{twin:'plife', name:'Life kit live', title:'pump LIFE kit live', tag:'its eight tones on one track: C-4 D-4 E-4… (the Game of Life grid stays in the plugin)'},
   px0xl:{twin:'px0x', name:'X0X kit live', title:'pump X0X kit live', tag:'the whole kit on one track: C-4 D-4 E-4… play its eleven drums'},
 };
-const ORDER = ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'pcoil', 'pcoill', 'porbit', 'porbitl', 'pfold', 'pfoldl', 'pgloss', 'pglossl', 'ptract', 'ptractl', 'pstrike', 'pstrikel', 'pboing', 'pboingl', 'px0x', 'px0xl'];
+const ORDER = ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'pcoil', 'pcoill', 'porbit', 'porbitl', 'pfold', 'pfoldl', 'pgloss', 'pglossl', 'ptract', 'ptractl', 'pstrike', 'pstrikel', 'pboing', 'pboingl', 'px0x', 'px0xl', 'plife', 'plifel'];
 /* trim: POLY's level is set for chords (a voice sums in at 0.3, 8 of them to a chord), so one rendered note sits under
    MONO's and COIL's. A pad is one note, which the tracker stacks for chords, so POLY's render is 3.5 dB up (x1.5): as
    far as its loudest factory voice (Unison brass lead) allows without passing -1 dBFS, since the plugin's own safety
@@ -66,14 +68,16 @@ const HIDE = new Set(['wheel_vib', 'glide', 'glide_mode', 'priority', 'legato', 
 /* ...which a live twin shows (bend range and the mod wheel stay hidden: the tracker's pitch commands are sent as bend
    over the whole range, and there is no wheel). */
 const LIVE_ROWS = {pmonol:[['Glide & legato', ['glide', 'glide_mode', 'legato', 'priority']]], ppolyl:[['Glide', ['glide']]], pcoill:[['Voices', ['voices']]], porbitl:[['Voices', ['voices', 'voice_mode', 'glide']]],
-  pfoldl:[['Voices', ['voices', 'voice_mode', 'glide']]], pglossl:[['Voices', ['mode', 'glide']]], ptractl:[['Voices', ['voices', 'voice_mode', 'glide']]], pstrikel:[], pboingl:[], px0xl:[]};   // COIL's VOICES: how many notes ring at once (a rendered pad is one)
+  pfoldl:[['Voices', ['voices', 'voice_mode', 'glide']]], pglossl:[['Voices', ['mode', 'glide']]], ptractl:[['Voices', ['voices', 'voice_mode', 'glide']]], pstrikel:[], pboingl:[], px0xl:[], plifel:[]};   // COIL's VOICES: how many notes ring at once (a rendered pad is one)
 /* What the live instance is held to whatever the pad says: the widest bend, so a slide of an octave or two is one bend. */
 const LIVE_FIXED = {pmonol:{bend_range:24}, ppolyl:{bend_range:24}, pcoill:{bend:12}, pglossl:{bend_range:24}};
 /* Held whatever the pad says, rendered and live: X0X's own sequencer off (the tracker plays it). */
-const FIXED = {px0x:{seq_mode:0}};
+const FIXED = {px0x:{seq_mode:0}, plife:{mode:0}};
 /* A kit's drums: the parameters named <drum>_… (in the plugin's order), the rest are the kit's. X0X's step patterns and
    its sequencer's settings are left out (the tracker is the sequencer). */
-const KIT_SKIP = /(_steps|^seq_|^swing$|^ac_steps$)/;
+const KIT_SKIP = /(_steps|^seq_|^swing$|^ac_steps$|^(mode|rate|length|offset|sensitivity|x_wrap|y_wrap|colour|cols|rows|rule|trigger|pattern|reseed)$)/;
+/* a kit's drums' prefixes (LIFE's tones are t1…t8; its fx_ rows are the kit's delay) */
+const KIT_DRUM = {plife:/^t\d+$/};
 const whiteKey = i => 48 + [0, 2, 4, 5, 7, 9, 11][i % 7] + 12 * Math.floor(i / 7);
 const noteName = n => ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][n % 12] + '-' + (Math.floor(n / 12) - 1);   // the tracker's names (MIDI 60 is C-4)
 /* Each card's sections (the plugins' own panels). */
@@ -142,14 +146,15 @@ const ENG = {};
 for (const key in KINDS){
   const K = KINDS[key], m = META.synth[K.k], rows = {}, defs = {};
   for (const p of m.params){ defs[al(p.s)] = p.def; if (!HIDE.has(p.s) && !((p.flags | 0) & (8 | 32))) rows[al(p.s)] = rowOf(p); }
-  if (key === 'pcoil' && rows.velocity) rows.velocity.l = 'Vel → kick';   // COIL's: how hard a note kicks the springs
+  if (key === 'pcoil' && rows.velocity) rows.velocity.l = 'Vel → kick';
+  if (key === 'plife'){ rows.fm.l = 'FM (all)'; rows.decay.l = 'Decay (all)'; rows.pitch_range.l = 'LFO → pitch'; rows.lfo_rate.l = 'LFO rate'; rows.lfo_depth.l = 'LFO depth'; }   // COIL's: how hard a note kicks the springs
   if (rows.volume) rows.volume.noRnd = true;   // a random sound at -40 dB isn't a sound
   rows.vel = {l:'Hit', min:1, max:127, c:'int', d:100, f:v => String(Math.round(v)), noRnd:true}; defs.vel = 100;
   let secs;
   if (K.kit){   // the drums' pages (one shows at a time: the pad's Drum), then the kit's
     const drums = [], kitKeys = [];
     for (const p of m.params){ const s = al(p.s); if (KIT_SKIP.test(p.s)){ delete rows[s]; continue; } if (!rows[s]) continue;
-      const i = p.s.indexOf('_'), pre = i > 0 ? p.s.slice(0, i) : '', d = pre && m.params.filter(q => q.s.startsWith(pre + '_')).length >= 5 ? pre : '';
+      const i = p.s.indexOf('_'), pre = i > 0 ? p.s.slice(0, i) : '', d = pre && (!KIT_DRUM[key] || KIT_DRUM[key].test(pre)) && m.params.filter(q => q.s.startsWith(pre + '_')).length >= 5 ? pre : '';
       if (!d){ kitKeys.push(s); continue; }
       let g = drums.find(x => x.pre === d); if (!g){ g = {pre:d, ps:[], keys:[]}; drums.push(g); }
       g.ps.push(p); g.keys.push(s); }
