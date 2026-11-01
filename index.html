@@ -87,6 +87,13 @@ body.mob .deskmenu{display:none}
 .gfile hr{border:0; border-top:1px solid var(--line); margin:4px 2px; width:auto}
 .gfile{max-height:calc(100vh - 80px); overflow-y:auto}
 .gfile .fitem.sure{background:var(--ink); color:var(--inv)}
+/* Menu groups (1 Nov): "Export ▸" opens its items in place below it, indented */
+.msubbox{display:grid; gap:2px; margin:0 0 4px 12px; padding-left:4px; border-left:2px solid var(--line)}
+.msubbox[hidden]{display:none}
+.sxmenu .msubbox{margin:0 0 4px 14px}
+.msub[aria-expanded="true"]{font-weight:600}
+#gedit{width:340px}
+.gfile .fitem:focus-visible{outline:2px solid var(--ink); outline-offset:-2px}
 /* Settings: one scrolling list, a section per topic (no tabs) */
 .gset{width:min(400px, calc(100vw - 20px)); max-height:calc(100vh - 80px); overflow-y:auto; overscroll-behavior:contain}
 @supports (height: 1dvh){ .gset{max-height:calc(100dvh - 80px)} }
@@ -2087,7 +2094,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <button id="bExPad">Save this pad</button>
         <button id="bExKit">Save all pads (.zip)</button>
         <button id="bShPad" hidden>Share pad…</button>
-        <button id="bShKit" hidden>Share all 8…</button>
+        <button id="bShKit" hidden>Share all pads…</button>
       </div>
       <p class="note" id="exNote">How pads export (File → Export this pad / all pads): mono WAV one-shots, trimmed at the tail. In Koala, import them from Files into a sample pad; in SunVox, load them into a Sampler module.</p>
     </div>
@@ -2104,7 +2111,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="segrow"><span>Rate</span><div class="seg" id="segARate"></div></div>
       <div class="segrow" id="psLiveRow" hidden><span>…pump live</span><div class="seg" id="segPsLive"></div></div>
       <p class="note" id="psLiveNote" hidden></p>
-      <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Latency and rate change when audio restarts. That reloads ...Thunder; your song and kit are kept.</span><button id="audRestart" class="on">Restart audio</button></div>
+      <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Latency and rate change when audio restarts. That reloads ...Thunder; your song and kit are kept.</span><button id="audRestart" class="on">Apply (reload)</button></div>
       <p class="note" id="audNote">Output picks where everything plays: the synth, the tracker and previews. Level is the overall volume after the tracker’s master. Lowest latency answers the pads fastest; Safest uses a bigger buffer if you hear crackles. Rate: Device uses the output’s own rate.</p>
     </div>
   </section>
@@ -12312,51 +12319,64 @@ window.addEventListener('pointerdown', e => { if (gsetOpen() && !$('gset').conta
    elsewhere it drives the project file (save/load, chains import/export). */
 const frameApi = () => view === 'waves' ? wvApi() : view === 'chains' ? chApi() : null;
 const editShown = () => { const b = $('bEdit'); return !!(b && b.offsetParent !== null && !b.hidden); };
+/* FILE MENU (1 Nov, audit #4): {l, k, f, off, ask, sub} items, like Edit's. The project commands stay at the top level;
+   Examples ▸, Export ▸, Import ▸ and Kit ▸ open in place below their row. ask:'song' items replace the song (they ask
+   when there's nothing unsaved, else "Save changes?" asks); ask:'kit' items replace kit slots and always ask. */
 function fileItems(){
-  const a = frameApi(), f = a && a.file;
+  const a = frameApi(), f = a && a.file, K = keyHint;
+  const saveIt = {l:'Save project' + (projLabel() ? ' (' + projLabel() + ')' : '') + (projDirty ? '  •' : ''), k:K('mod+S'), f:() => saveProj(false)};
+  const saveAs = {l:'Save project as…', k:K('mod+shift+S'), f:() => saveProj(true)};
   // APP KEYS (27 Oct, Phase 2): Ctrl/⌘+S, O and N are the project's here too, so the project's items come first and the
   // patch's own file commands (they were New / Open / Save / Save as) say so.
   const pn = view === 'waves' ? '…waves' : '…chains';
   if (f) return [
-    ['Undo', () => f.undo(), () => !f.canUndo(), 'Z'], ['Redo', () => f.redo(), () => !f.canRedo(), '⇧Z'],
-    null,
-    ['Save project' + (projLabel() ? ' (' + projLabel() + ')' : '') + (projDirty ? '  •' : ''), () => saveProj(false), null, 'S'], ['Save project as…', () => saveProj(true), null, '⇧S'],
-    ['Open project…', openProj, null, 'O'],
-    null,
-    ['New ' + pn + ' patch', () => f.new()], ['Open a ' + pn + ' patch file…', () => f.open()], ['Export the ' + pn + ' patch…', () => f.saveAs()],
-    null,
-    ['Export custom modules…', () => f.exportCustom()], ['Import custom modules…', () => f.importCustom()]
+    {l:'Undo', k:K('mod+Z'), f:() => f.undo(), off:!f.canUndo()}, {l:'Redo', k:K('mod+shift+Z'), f:() => f.redo(), off:!f.canRedo()},
+    null, saveIt, saveAs, {l:'Open project…', k:K('mod+O'), f:openProj},
+    null, {l:'New ' + pn + ' patch', f:() => f.new()}, {l:'Open a ' + pn + ' patch file…', f:() => f.open()}, {l:'Export the ' + pn + ' patch…', f:() => f.saveAs()},
+    null, {l:'Export custom modules…', f:() => f.exportCustom()}, {l:'Import custom modules…', f:() => f.importCustom()}
   ];
-  // Everything that saves, opens, renders or exports lives here, on every screen. Items with a 5th entry true
-  // replace what you have, so they ask for a second tap.
+  const ed = editShown();
   return [
     // MENUS (owner, 31 Oct: things in the right place): with the Edit menu on screen, Undo / Redo and Phrases… are there
     // only; a phone has no Edit menu, so they stay here
-    ...(editShown() ? [] : [['Undo', () => undoStep(-1), () => !undo.past.length && !vUndo.t.some(Boolean), 'Z'], ['Redo', () => undoStep(1), () => !undo.future.length, '⇧Z'], null, ['Phrases… (find ones not on the song)', () => phlOpen(true)], null]),
-    ['New song', newSong, null, 'N', true],
-    ['Open project…', openProj, null, 'O'], ...(recentL.length ? [['Open recent…', openRecent]] : []),
-    ['Save project' + (projLabel() ? ' (' + projLabel() + ')' : '') + (projDirty ? '  •' : ''), () => saveProj(false), null, 'S'], ['Save as…', () => saveProj(true), null, '⇧S'],
-    ['Restore a backup…', restoreBackup],
-    ...(canShareProj() ? [['Share project…', shareProj]] : []),
-    ['Load demo song', guardLeave('the demo song', () => { setSong(demoSong(), 'Loaded the starter beat.'); setDirty(false); }), null, null, true],
-    ['Load ELECTRO (demo project)', guardLeave('ELECTRO', loadElectro)],
-    ['Funk breaks…', pickBreak],
-    ['Breaks to chop (…pump BREAK)…', pickChopBreak],
-    ...(hasThunderWork() ? [['Open ...Thunder’s saved work…', guardLeave('...Thunder’s saved work', () => thunderImport(false))]] : []),
+    ...(ed ? [] : [{l:'Undo', k:K('mod+Z'), f:() => undoStep(-1), off:!undo.past.length && !vUndo.t.some(Boolean)}, {l:'Redo', k:K('mod+shift+Z'), f:() => undoStep(1), off:!undo.future.length}, null, {l:'Phrases… (find ones not on the song)', f:() => phlOpen(true)}, null]),
+    {l:'New song', k:K('mod+N'), f:newSong, ask:'song'},
+    {l:'Open project…', k:K('mod+O'), f:openProj}, ...(recentL.length ? [{l:'Open recent…', f:openRecent}] : []),
+    saveIt, saveAs,
+    {l:'Restore a backup…', f:restoreBackup},
+    ...(canShareProj() ? [{l:'Share project…', f:shareProj}] : []),
+    ...(typeof defSongItems === 'function' ? defSongItems() : []),
+    {l:'Examples', sub:[
+      {l:'Demo song (the starter beat)', f:guardLeave('the demo song', () => { setSong(demoSong(), 'Loaded the starter beat.'); setDirty(false); }), ask:'song'},
+      {l:'ELECTRO (demo project)', f:guardLeave('ELECTRO', loadElectro)},
+      {l:'Funk breaks…', f:pickBreak},
+      {l:'Breaks to chop (…pump BREAK)…', f:pickChopBreak}]},
     null,
-    ['Render song (WAV)', () => renderOut(false)], ['Render stems (.zip)', () => renderOut(true)],
-    ['Render a part to a slot… (the phrase or song selection)', () => renderPart('pad')], ['Render a part as a WAV', () => renderPart('wav')],   // RENDER PART
-    ...(canShare && lastR ? [['Share last render…', shareLast]] : []),
-    ['Export MIDI file (.mid)', exportMidiFile], ['Import MIDI file…', () => $('midIn').click()],
+    {l:'Render song (WAV)', f:() => renderOut(false)}, {l:'Render stems (.zip)', f:() => renderOut(true)},
+    // RENDER PART: on a computer it's in Edit ▾ → Tools (by the selection it renders); a phone has no Edit menu
+    ...(ed ? [] : [{l:'Render a part to a slot… (the phrase or song selection)', f:() => renderPart('pad')}, {l:'Render a part as a WAV', f:() => renderPart('wav')}]),
+    ...(canShare && lastR ? [{l:'Share last render…', f:shareLast}] : []),
     null,
-    ['Save kit…', () => $('bSaveKit').click()], ['Load kit…', () => $('kitIn').click()],
-    ['Export song presets…', exportPresets], ['Import presets…', () => $('presetIn').click()],
-    ['Factory drums (pads 1–8)', factoryPads, null, null, 'kit'], ['Drum kits…', pickClassicKit], ...(typeof LxrCore !== 'undefined' ? [['Import LXR kit (.snd)…', pickLxrKit]] : []), ['Clear all kit slots', clearKit, null, null, 'kit'],
-    null,
-    ['Export this pad (WAV)', () => $('bExPad').click()], ['Export all pads (.zip)', () => $('bExKit').click()],
-    ...(canShare ? [['Share this pad…', () => $('bShPad').click()], ['Share all pads…', () => $('bShKit').click()]] : []),
-    ...(noChains() ? [] : [null, ['Export chains…', exportChains], ['Import chains…', () => $('chainsIn').click()]]),
-    ...(deskUpdApi ? [null, ['Check for updates…' + (deskUpd && deskUpd.version ? ' (you have ' + deskUpd.version + ')' : ''), () => deskUpdApi.check()]] : [])
+    {l:'Export', sub:[
+      {l:'MIDI file (.mid)', f:exportMidiFile},
+      {l:'Song presets…', f:exportPresets},
+      null,
+      {l:'This pad (WAV)', f:() => $('bExPad').click()}, {l:'All pads (.zip)', f:() => $('bExKit').click()},
+      ...(canShare ? [{l:'Share this pad…', f:() => $('bShPad').click()}, {l:'Share all pads…', f:() => $('bShKit').click()}] : []),
+      ...(noChains() ? [] : [null, {l:'Chains…', f:exportChains}])]},
+    {l:'Import', sub:[
+      {l:'MIDI file…', f:() => $('midIn').click()},
+      {l:'Presets…', f:() => $('presetIn').click()},
+      ...(typeof LxrCore !== 'undefined' ? [{l:'LXR kit (.snd)…', f:pickLxrKit}] : []),
+      ...(noChains() ? [] : [{l:'Chains…', f:() => $('chainsIn').click()}]),
+      ...(hasThunderWork() ? [null, {l:'...Thunder’s saved work…', f:guardLeave('...Thunder’s saved work', () => thunderImport(false))}] : [])]},
+    {l:'Kit', sub:[
+      {l:'Save kit…', f:() => $('bSaveKit').click()}, {l:'Load kit…', f:() => $('kitIn').click()},
+      null,
+      {l:'Drum kits…', f:pickClassicKit}, {l:'Factory drums (pads 1–8)', f:factoryPads, ask:'kit'},
+      null,
+      {l:'Clear all kit slots', f:clearKit, ask:'kit'}]},
+    ...(deskUpdApi ? [null, {l:'Check for updates…' + (deskUpd && deskUpd.version ? ' (you have ' + deskUpd.version + ')' : ''), f:() => deskUpdApi.check()}] : [])
   ];
 }
 /* ---------- DESKTOP APP UPDATES (electron/preload.js → window.thunderDesktop) ----------
@@ -12390,27 +12410,52 @@ function gfileToggle(open = $('gfile').hidden){
   if (open && gsetOpen()) gsetToggle(false);
   if (open && !$('gedit').hidden) geditToggle(false);
   const host = $('gfile'); host.replaceChildren();
-  for (const it of fileItems()){
-    if (!it){ host.append(el('hr')); continue; }
-    const b = el('button', 'fitem'); b.type = 'button'; b.setAttribute('role', 'menuitem');
-    b.append(el('span', null, it[0]));
-    if (it[3]) b.append(el('kbd', null, MACK ? it[3].replace('⇧', '⇧⌘').replace(/^([A-Z])$/, '⌘$1') : 'Ctrl+' + it[3].replace('⇧', 'Shift+')));
-    if (it[2] && it[2]()) b.disabled = true;
-    b.addEventListener('click', () => {
-      // ONE CONFIRM (27 Oct, Phase 2): the app's one dialog (it was "Tap again: …" in the menu). With unsaved changes the
-      // item's own "Save changes?" asks instead, so it isn't asked twice.
-      gfileToggle(false);
-      // FIX (1 Nov, audit #1): kit items ('kit') never go through "Save changes?", so they always ask, with the kit's own words
-      // (they used to run at once when the song had unsaved changes, and said "the kit stays" when it didn't).
-      if (it[4] === 'kit'){ askYes({title:it[0] + '?', body:'It replaces the sounds on those slots; the song stays. Undo puts the kit back.'}, it[0]).then(ok => { if (ok) it[1](); }); return; }
-      if (it[4] && !projDirty){ askYes({title:it[0] + '?', body:'It replaces the song you have open; the kit stays.'}, it[0]).then(ok => { if (ok) it[1](); }); return; }
-      it[1]();
-    });
-    host.append(b);
-  }
+  // ONE CONFIRM (27 Oct, Phase 2): the app's one dialog (it was "Tap again: …" in the menu). With unsaved changes the item's
+  // own "Save changes?" asks instead, so it isn't asked twice. FIX (1 Nov, audit #1): kit items never go through "Save
+  // changes?", so they always ask, with the kit's own words (they ran at once when the song had unsaved changes).
+  if (open) menuFill(host, fileItems(), it => {
+    gfileToggle(false);
+    if (it.ask === 'kit'){ askYes({title:it.l + '?', body:'It replaces the sounds on those slots; the song stays. Undo puts the kit back.'}, it.l).then(ok => { if (ok) it.f(); }); return; }
+    if (it.ask && !projDirty){ askYes({title:it.l + '?', body:'It replaces the song you have open; the kit stays.'}, it.l).then(ok => { if (ok) it.f(); }); return; }
+    it.f();
+  });
   $('gfile').hidden = !open;
   $('bFile').classList.toggle('on', open); $('bFile').setAttribute('aria-expanded', String(open));
   if (open) placeMenu($('gfile'));
+}
+/* MENUS WITH GROUPS (1 Nov, audit #4): menuFill(host, items, pick, cls) turns {l, k, f, off} items (null = a rule) into
+   buttons; an item with sub:[…] is a "Name ▸" row whose items open in place below it, indented (an accordion: the same
+   with a mouse, a finger or the keys, where ▶ / ◀ open and close it). File ▾, Edit ▾ and the right-click menus use it. */
+function menuFill(host, items, pick, cls = 'fitem'){
+  for (const it of menuTidy(items)){
+    if (!it){ host.append(el('hr')); continue; }
+    const b = el('button', cls); b.type = 'button'; b.setAttribute('role', 'menuitem');
+    if (it.sub){
+      const subs = menuTidy(it.sub); if (!subs.some(Boolean)) continue;
+      const box = el('div', 'msubbox'); box.hidden = true; box.setAttribute('role', 'group'); box.setAttribute('aria-label', it.l);
+      b.classList.add('msub'); b.setAttribute('aria-haspopup', 'true'); b.setAttribute('aria-expanded', 'false');
+      const car = el('kbd', 'mcar', '▸'); b.append(el('span', null, it.l), car);
+      b._sub = open => { box.hidden = open == null ? !box.hidden : !open; b.setAttribute('aria-expanded', String(!box.hidden)); car.textContent = box.hidden ? '▸' : '▾'; };
+      b.addEventListener('click', () => b._sub());
+      menuFill(box, subs, pick, cls);
+      host.append(b, box); continue;
+    }
+    b.append(el('span', null, it.l)); if (it.k) b.append(el('kbd', null, it.k));
+    if (it.off) b.disabled = true;
+    b.addEventListener('click', () => pick(it));
+    host.append(b);
+  }
+}
+// The buttons a menu's arrow keys move through: enabled, and not inside a closed group.
+const menuNavList = m => [...m.querySelectorAll('button:not(:disabled)')].filter(b => !b.closest('.msubbox[hidden]'));
+// ▲▼ move, ▶ opens a group (or goes into it), ◀ closes the group you're in, Home / End jump. True when handled.
+function menuNavKey(m, e){
+  const L = menuNavList(m), cur = document.activeElement, i = L.indexOf(cur);
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){ const n = L[(i + (e.key === 'ArrowDown' ? 1 : -1) + L.length) % L.length] || L[0]; if (n) n.focus(); return true; }
+  if (e.key === 'Home' || e.key === 'End'){ const n = e.key === 'Home' ? L[0] : L[L.length - 1]; if (n) n.focus(); return true; }
+  if (e.key === 'ArrowRight' && cur && cur._sub){ cur._sub(true); const n = menuNavList(m)[menuNavList(m).indexOf(cur) + 1]; if (n) n.focus(); return true; }
+  if (e.key === 'ArrowLeft' && cur && m.contains(cur)){ const box = cur.closest('.msubbox'); if (box){ const h = box.previousElementSibling; if (h && h._sub){ h._sub(false); h.focus(); } return true; } }
+  return false;
 }
 $('bFile').addEventListener('click', () => gfileToggle());
 window.addEventListener('pointerdown', e => { if (!$('gfile').hidden && !$('gfile').contains(e.target) && !$('bFile').contains(e.target)){ gfileToggle(false); swallowTap(e); } }, true);
@@ -12418,7 +12463,7 @@ window.addEventListener('pointerdown', e => { if (!$('gfile').hidden && !$('gfil
 /* ---------- Edit menu (Desktop): the COMMANDS row's commands in the top bar (cmdItems, by the command row) ----------
    In the tracker: all of them, for where the cursor is. On Waves / Chains: that patch's Undo / Redo; on Synth: Undo / Redo. */
 function editItems(){
-  if (view === 'tracker') return apReady && apF ? apSongItems() : cmdItems();   // ARRANGE PAGING: Arrange holding the keys is the Song screen
+  if (view === 'tracker') return apReady && apF ? apSongItems() : cmdItems(true);   // ARRANGE PAGING: Arrange holding the keys is the Song screen
   const a = frameApi(), f = a && a.file;
   if (f) return [{l:'Undo', f:() => f.undo(), off:!f.canUndo()}, {l:'Redo', f:() => f.redo(), off:!f.canRedo()}];
   return [{l:'Undo', f:() => undoStep(-1), off:!undo.past.length && !vUndo.t.some(Boolean)}, {l:'Redo', f:() => undoStep(1), off:!undo.future.length}];
@@ -12426,19 +12471,35 @@ function editItems(){
 function geditToggle(open = $('gedit').hidden){
   if (open){ if (gsetOpen()) gsetToggle(false); if (!$('gfile').hidden) gfileToggle(false); sxMenuClose(); }
   const host = $('gedit'); host.replaceChildren();
-  if (open) for (const it of menuTidy(editItems())){
-    if (!it){ host.append(el('hr')); continue; }
-    const b = el('button', 'fitem'); b.type = 'button'; b.setAttribute('role', 'menuitem');
-    b.append(el('span', null, it.l)); if (it.k) b.append(el('kbd', null, it.k));
-    if (it.off) b.disabled = true;
-    b.addEventListener('click', () => { geditToggle(false); it.f(); });
-    host.append(b);
-  }
+  if (open) menuFill(host, editItems(), it => { geditToggle(false); it.f(); });
   host.hidden = !open;
   $('bEdit').classList.toggle('on', open); $('bEdit').setAttribute('aria-expanded', String(open));
   if (open) placeMenu(host);
 }
 $('bEdit').addEventListener('click', () => geditToggle());
+/* MENU KEYS (1 Nov, audit V8): File ▾ and Edit ▾ from the keyboard. On a focused menu button ▼, Enter or Space opens it on
+   its first item. In an open menu ▲▼ move, ▶ / ◀ open and close a group (at the top level they go to the next or previous
+   menu), Home / End jump, Enter / Space pick, Esc closes back to its button and Tab closes. */
+const TOPM = [['bFile', 'gfile', o => gfileToggle(o)], ['bEdit', 'gedit', o => geditToggle(o)]];
+window.addEventListener('keydown', e => {
+  if (sxMenuEl || typing(e)) return;
+  const open = TOPM.find(([, g]) => !$(g).hidden), act = document.activeElement;
+  const first = g => { const L = menuNavList($(g)); if (L[0]) L[0].focus(); };
+  if (!open){ const foc = TOPM.find(([b]) => act === $(b));
+    if (foc && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); e.stopImmediatePropagation(); foc[2](true); first(foc[1]); }
+    return; }
+  const m = $(open[1]), inM = m.contains(act);
+  if (e.key === 'Escape'){ e.preventDefault(); e.stopImmediatePropagation(); open[2](false); $(open[0]).focus(); return; }
+  if (e.key === 'Tab'){ open[2](false); return; }
+  const lr = e.key === 'ArrowLeft' || e.key === 'ArrowRight';
+  if (lr && !(inM && ((e.key === 'ArrowRight' && act._sub) || (e.key === 'ArrowLeft' && act.closest('.msubbox'))))){
+    e.preventDefault(); e.stopImmediatePropagation();
+    const vis = TOPM.filter(([b]) => $(b).offsetParent), i = vis.indexOf(open), n = vis[(i + (e.key === 'ArrowRight' ? 1 : -1) + vis.length) % vis.length];
+    if (n && n !== open){ open[2](false); n[2](true); first(n[1]); }
+    return; }
+  if (/^(Arrow(Down|Up|Left|Right)|Home|End)$/.test(e.key)){ e.preventDefault(); e.stopImmediatePropagation(); if (inM) menuNavKey(m, e); else first(open[1]); return; }
+  if ((e.key === 'Enter' || e.key === ' ') && inM) e.stopImmediatePropagation();   // the focused item's own click
+}, true);
 window.addEventListener('pointerdown', e => { if (!$('gedit').hidden && !$('gedit').contains(e.target) && !$('bEdit').contains(e.target)){ geditToggle(false); swallowTap(e); } }, true);
 
 /* ---------- audio settings panel ---------- */
@@ -18656,7 +18717,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 347;
+const BUILD = 348;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -19860,6 +19921,12 @@ function cloneDown(){
 // and the phrase stays under its number. CUT keeps the phrase too (it is on the clipboard to be pasted).
 // REMOVE ROW (owner, 27 Oct): Arrange's (and the Song's) right-click → Remove row: the song row the cursor is on, or the
 // selected rows, go entirely (every track and the master); the rows below move up. Their sects and phrases stay (Undo).
+// INSERT A SONG ROW (1 Nov, Edit ▾): a whole empty row at the cursor, every track and the master; the rows below move down.
+function songRowInsert(){
+  if (tv !== 'song') return toast('Insert row works on the SONG screen.');
+  if (!songRowsInsert(cs.song.y, 1)) return toast('The last song row has blocks, so nothing can move down.');
+  saveS(); draw(); toast(`Inserted row ${rS(cs.song.y, 3)} · the rows below moved down`);
+}
 function songRowRemove(){
   if (tv !== 'song') return toast('Remove row works on the SONG screen.');
   const c = cs.song, sel = selA && selA.v === 'song', r = sel ? selRect() : {y0:c.y, y1:c.y}, h = r.y1 - r.y0 + 1;
@@ -20729,35 +20796,63 @@ function keyHint(s){
     return ['shift', 'alt', 'mod'].filter(m => mods.includes(m)).map(m => M[m][0]).join('') + rest.join('+'); }
   return p.map(x => M[x] ? M[x][1] : x).join('+');
 }
-function cmdItems(){
+/* EDIT MENU ORDER (1 Nov, audit #4): cmdItems(full). The right-click menus (full false) show what applies where you are,
+   as before. Edit ▾ in the top bar (full true) always shows the same items in the same places and greys out the ones that
+   don't apply here, so a pick is always where you last found it. The generators, selection tools and rendering sit in a
+   Tools ▸ group (in Edit ▾: the top bar has no room for a Tools menu on a 13" laptop). */
+function toolItems(full){
+  const ph = tv === 'phrase', phSel = !!(selA && selA.v === 'phrase'), sg = tv === 'song', mst = ph && mstView();
+  const what = selA && selA.v === tv ? 'the selection' : sg ? 'this song row' : 'this phrase';
+  const L = [
+    ...(ph && !mst || full ? [{a:'euc', l:'Euclidean fill…', k:'', f:euclidFill, off:!ph || mst}, {a:'acid', l:'Acid line… (a random bass line)', k:'', f:acidLine, off:!ph || mst}] : []),
+    null,
+    ...(ph || full ? [{a:'xpu', l:'Transpose up a semitone', k:keyHint('alt+.'), f:() => transposeSel(1), off:!phSel}, {a:'xpd', l:'Transpose down a semitone', k:keyHint('alt+,'), f:() => transposeSel(-1), off:!phSel},
+      {a:'interp', l:'Interpolate (ramp the selection)', k:'', f:interpSel, off:!phSel},   // SELECTION TOOLS
+      ...(mst ? [] : [{a:'volsel', l:'Volume… (scale, fade, set)', k:'', f:volSel, off:!ph}, {a:'instsel', l:'Instrument… (set, swap)', k:'', f:instSel, off:!ph}]),
+      {a:'shrink', l:'Shrink (every other row)', k:'', f:() => stretchSel(false), off:!ph}, {a:'expand', l:'Expand (spread out)', k:'', f:() => stretchSel(true), off:!ph}] : []),
+    null,
+    ...(ph || sg || full ? [{a:'rpad', l:'Render ' + what + ' to a slot…', k:'', f:() => renderPart('pad'), off:!(ph || sg)},   // RENDER PART
+      {a:'rwav', l:'Render ' + what + ' as a WAV', k:'', f:() => renderPart('wav'), off:!(ph || sg)}] : []),
+    null,
+    {a:'phl', l:'Phrases… (find ones not on the song)', k:'', f:() => phlOpen(true)},
+    ...(full ? [{a:'phclr', l:'Clear unused phrases…', k:'', f:purgePhrases}] : [])
+  ];
+  return menuTidy(L);
+}
+function cmdItems(full){
   const onSong = tv === 'song', ks = inMode === 'keys', it = (a, l, k, more) => Object.assign({a, l, k:keyHint(k), f:() => cmdAction(a)}, more);
-  const val = (a, l, arw) => it(a, l, (ks ? 'mod+' : 'X+') + arw);
+  const val = (a, l, arw, more) => it(a, l, (ks ? 'mod+' : 'X+') + arw, more);
+  const grid = GRIDV.has(tv), trk = ['phrase', 'sect', 'mixer', 'fx'].includes(tv), rowsOk = tv === 'phrase' || tv === 'sect' || onSong;
+  const isBus = ['phrase', 'sect', 'mixer', 'fx', 'song'].includes(tv) && (() => { try { const bt = onSong ? cs.song.x : dkTrack(); return bt >= 0 && bt < NT && isBusT(bt); } catch(e){ return false; } })();
   return [
     it('undo', 'Undo', 'mod+Z', {off:!undo.past.length && !vUndo.t.some(Boolean)}), it('redo', 'Redo', 'mod+shift+Z', {off:!undo.future.length}),
     null,
     it('cut', 'Cut', 'mod+X'), it('copy', 'Copy', 'mod+C'), it('paste', 'Paste', 'mod+V', {off:!clip}),
-    ...(GRIDV.has(tv) ? [{a:'mixp', l:'Mix-paste (only into empty cells)', k:keyHint('mod+shift+V'), f:pasteMix, off:!clip}] : []),   // SELECTION TOOLS
+    ...(grid || full ? [{a:'mixp', l:'Mix-paste (only into empty cells)', k:keyHint('mod+shift+V'), f:pasteMix, off:!clip || !grid}] : []),   // SELECTION TOOLS
     it('clr', onSong ? 'Delete (the phrase too)' : 'Clear', 'Del'),
     null,
     it('sel', selA ? 'Cancel the selection' : 'Start a selection', 'mod+B'),
-    {a:'all', l:'Select all', k:keyHint('mod+A'), f:selectAll, off:!GRIDV.has(tv) || onPset()},
-    ...(onSong ? [it('rmv', 'Remove from song (keep the phrase)', '')] : []),
-    {a:'phl', l:'Phrases… (find ones not on the song)', k:'', f:() => phlOpen(true)},
-    ...(onSong ? [null, it('clone', 'Clone (paste puts a unique copy)', 'mod+alt+C'), it('cldn', 'Clone down (into a new row below)', 'mod+shift+C'),
-      {a:'dup', l:'Duplicate the pattern (insert below)', k:keyHint('mod+D'), f:() => dupKey(false)}, {a:'insp', l:'Insert paste (new rows below)', k:keyHint('mod+alt+V'), f:insertPaste, off:!(clip && clip.v === 'song')}, {a:'rmrow', l:'Remove the row (the rows below move up)', k:'', f:songRowRemove}] : []),
-    ...(['phrase', 'sect', 'mixer', 'fx', 'song'].includes(tv) && (() => { try { const bt = tv === 'song' ? cs.song.x : dkTrack(); return bt >= 0 && bt < NT && isBusT(bt); } catch(e){ return false; } })()
-      ? [null, {a:'unbus', l:'Make this track a normal track (not a bus)', k:'', f:() => unBus(tv === 'song' ? cs.song.x : dkTrack())}] : []),   // BUS BACK TO A TRACK
-    ...(['phrase', 'sect', 'mixer', 'fx'].includes(tv) ? [null, {a:'dup', l:'Duplicate the track (no notes)', k:keyHint('mod+D'), f:() => dupKey(false)},
-      {a:'dupn', l:'Duplicate the track with its notes', k:keyHint('mod+alt+D'), f:() => dupKey(true)}] : []),
+    {a:'all', l:'Select all', k:keyHint('mod+A'), f:selectAll, off:!grid || onPset()},
+    ...(onSong || full ? [it('rmv', 'Remove from song (keep the phrase)', '', {off:!onSong})] : []),
+    // ROWS (1 Nov, audit K10): Insert and Ctrl/⌘+Backspace in the menu, for keyboards with no Insert key
+    ...(full ? [null, onSong ? {a:'rins', l:'Insert a song row (rows below move down)', k:'', f:songRowInsert}
+        : {a:'rins', l:'Insert a row', k:'Insert', f:() => rowOp('insert'), off:!rowsOk || !!selA},
+      onSong ? {a:'rmrow', l:'Remove the song row (rows below move up)', k:'', f:songRowRemove}
+        : {a:'rdel', l:'Remove the row (rows below move up)', k:keyHint('mod+Backspace'), f:() => rowOp('remove'), off:!rowsOk || !!selA}] : []),
+    ...(onSong || full ? [null, it('clone', 'Clone (paste puts a unique copy)', 'mod+alt+C', {off:!onSong}), it('cldn', 'Clone down (into a new row below)', 'mod+shift+C', {off:!onSong}),
+      {a:'dup', l:'Duplicate the pattern (insert below)', k:keyHint('mod+D'), f:() => dupKey(false), off:!onSong}, {a:'insp', l:'Insert paste (new rows below)', k:keyHint('mod+alt+V'), f:insertPaste, off:!onSong || !(clip && clip.v === 'song')},
+      ...(onSong && !full ? [{a:'rmrow', l:'Remove the row (rows below move up)', k:'', f:songRowRemove}] : [])] : []),
+    ...(isBus ? [null, {a:'unbus', l:'Make this track a normal track (not a bus)', k:'', f:() => unBus(onSong ? cs.song.x : dkTrack())}] : []),   // BUS BACK TO A TRACK
+    ...(trk || full ? [null, {a:'dup', l:'Duplicate the track (no notes)', k:keyHint('mod+D'), f:() => dupKey(false), off:!trk},
+      {a:'dupn', l:'Duplicate the track with its notes', k:keyHint('mod+alt+D'), f:() => dupKey(true), off:!trk}] : []),
+    ...(full ? [{a:'newph', l:'New phrase on the next empty track', k:keyHint('mod+T'), f:newPhraseRight},
+      null, {a:'mute', l:'Mute / unmute this track', k:'/', f:muteKey}, {a:'solo', l:'Solo / unsolo this track', k:keyHint('mod+/'), f:() => soloKey(false)},
+      {a:'loopp', l:'Loop the pattern', k:keyHint('alt+L'), f:toggleLoopPat}, {a:'loops', l:'Loop the selection', k:keyHint('shift+alt+L'), f:toggleLoop}] : []),
+    ...(['song', 'phrase', 'mixer', 'fx'].includes(tv) || full ? [null, {a:'tname', l:'Name this track…', k:'', f:nameTrackHere, off:!['song', 'phrase', 'mixer', 'fx'].includes(tv)}] : []),
     null,
-    ...(onSong ? [] : [val('b:16', 'Value up a lot', '▲')]), val('b:1', 'Value up', '▶'), val('b:-1', 'Value down', '◀'), ...(onSong ? [] : [val('b:-16', 'Value down a lot', '▼')]),
-    ...(tv === 'phrase' && !mstView() ? [null, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill}, {a:'acid', l:'Acid line… (generate a bass line)', k:'', f:acidLine}] : []),
-    ...(tv === 'phrase' ? [null, {a:'interp', l:'Interpolate (ramp the selection)', k:'', f:interpSel, off:!(selA && selA.v === 'phrase')},   // SELECTION TOOLS
-      ...(mstView() ? [] : [{a:'volsel', l:'Volume… (scale, fade, set)', k:'', f:volSel}, {a:'instsel', l:'Instrument… (set, swap)', k:'', f:instSel}]),
-      {a:'shrink', l:'Shrink (every other row)', k:'', f:() => stretchSel(false)}, {a:'expand', l:'Expand (spread out)', k:'', f:() => stretchSel(true)}] : []),
-    ...(['song', 'phrase', 'mixer', 'fx'].includes(tv) ? [null, {a:'tname', l:'Name this track…', k:'', f:nameTrackHere}] : []),
-    ...(tv === 'phrase' || tv === 'song' ? [null, {a:'rpad', l:'Render ' + (selA && selA.v === tv ? 'the selection' : tv === 'song' ? 'this song row' : 'this phrase') + ' to a slot…', k:'', f:() => renderPart('pad')},   // RENDER PART
-      {a:'rwav', l:'Render ' + (selA && selA.v === tv ? 'the selection' : tv === 'song' ? 'this song row' : 'this phrase') + ' as a WAV', k:'', f:() => renderPart('wav')}] : []),
+    {l:'Tools', sub:toolItems(full)},
+    null,
+    ...(onSong && !full ? [] : [val('b:16', 'Value up a lot', '▲', {off:onSong})]), val('b:1', 'Value up', '▶'), val('b:-1', 'Value down', '◀'), ...(onSong && !full ? [] : [val('b:-16', 'Value down a lot', '▼', {off:onSong})]),
     null,
     it('prev', 'Previous ' + (CMD_NOUN[tv] || ''), onSong ? '' : '['), it('next', 'Next ' + (CMD_NOUN[tv] || ''), onSong ? '' : ']'),
     null,
@@ -23494,13 +23589,7 @@ function sxMenu(x, y, title, items){
   sxMenuClose();
   const m = sxMenuEl = el('div', 'sxmenu'); m.setAttribute('role', 'menu'); m.setAttribute('aria-label', title);
   m.append(el('div', 'sxmt', title));
-  for (const it of items){
-    if (!it){ m.append(el('hr')); continue; }
-    const b = el('button'); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.append(el('span', null, it.l)); if (it.k) b.append(el('kbd', null, it.k));
-    if (it.off) b.disabled = true;
-    b.addEventListener('click', () => { sxMenuClose(); it.f(); });
-    m.append(b);
-  }
+  menuFill(m, items, it => { sxMenuClose(); it.f(); }, '');
   document.body.append(m);
   const r = m.getBoundingClientRect();
   m.style.left = Math.max(4, Math.min(x, innerWidth - r.width - 6)) + 'px'; m.style.top = Math.max(4, Math.min(y, innerHeight - r.height - 6)) + 'px';
@@ -23535,8 +23624,7 @@ window.addEventListener('pointerdown', e => { if (sxMenuEl && !sxMenuEl.contains
 window.addEventListener('keydown', e => {
   if (!sxMenuEl) return;
   if (e.key === 'Escape'){ e.preventDefault(); e.stopImmediatePropagation(); sxMenuClose(); return; }
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); e.stopImmediatePropagation();
-    const L = [...sxMenuEl.querySelectorAll('button:not(:disabled)')], i = L.indexOf(document.activeElement); const n = L[(i + (e.key === 'ArrowDown' ? 1 : -1) + L.length) % L.length]; if (n) n.focus(); return; }
+  if (/^(Arrow(Down|Up|Left|Right)|Home|End)$/.test(e.key)){ e.preventDefault(); e.stopImmediatePropagation(); menuNavKey(sxMenuEl, e); return; }
   if (e.key === 'Enter' || e.key === ' '){ e.stopImmediatePropagation(); return; }   // the focused item's own click
   e.stopImmediatePropagation();
 }, true);
@@ -24957,7 +25045,7 @@ arrGrid.addEventListener('contextmenu', e => {
   sxMenu(e.clientX, e.clientY, m.title, items);
 });
 // Arrange holding the keys: the Edit menu's items and the command bar's tooltips are the Song screen's, and run as it.
-function apSongItems(){ return apAsSong(cmdItems).map(it => it && Object.assign({}, it, {f:() => apRun(it.f, [])})); }
+function apSongItems(){ const w = it => it && (it.sub ? Object.assign({}, it, {sub:it.sub.map(w)}) : Object.assign({}, it, {f:() => apRun(it.f, [])})); return apAsSong(() => cmdItems(true)).map(w); }
 // A tap on the phrase (anywhere on the screen but the strip) gives the keys back to it.
 // Not the command bar (it acts on whatever has the keys: its tag says ARRANGE), the info and hint lines, or the stage.
 scr.addEventListener('pointerdown', e => { if (apF && !apStripEl.contains(e.target) && !e.target.closest('#tCmd, .tinfo, #tStage, #tStagePs')){ apFocus(null); draw(); } }, true);
@@ -25185,6 +25273,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [348, '1 Nov', ['File menu in groups: Examples ▸, Export ▸, Import ▸ and Kit ▸ open in place below their row; the project commands stay on top.', "Edit menu: the same items in the same places on every screen (greyed out where they don't apply), with Insert a row, Remove the row, Mute, Solo, Loop, New phrase and a Tools ▸ group (Euclidean, Acid, Transpose, Interpolate, Volume, Instrument, Shrink, Expand, Render a part, Clear unused phrases). The right-click menu has Tools ▸ too.", 'File and Edit work from the keyboard: ▼ / Enter opens, arrows move, ▶ ◀ open groups or go to the next menu, Esc closes.', 'Settings: Follow, Tab, Song mouse and Loop drag are in Input settings; Resume is in Record & play.']],
   [347, '1 Nov', ['Factory drums and Clear all kit slots in the File menu always ask first (they ran at once when the song had unsaved changes), and say what they replace.', 'The Synth page answers F2–F9 as the tracker does (F5 used to reload the page; F6 plays the pad).', "Key hints fixed: Edit ▾ Play the song shows Space in KEYS mode; Arrange's Open the phrase shows Alt+→ and Copy/Cut/Paste show ⌘ on a Mac; the Mixer hint says up to 8 effects."]],
   [346, '1 Nov', ['Drum machines (…pump Strike, Boing, X0X, Life): Put the whole kit on free slots… (on the card’s Drum section) gives each drum a slot of its own. It only uses slots that are still empty and that nothing plays, adds new slots when there aren’t enough, names each one before it starts, and one undo puts everything back. Each slot’s own instrument plays it (C-4).', 'Presets → Breaks is gone again: File ▾ → Breaks to chop already had the same fourteen breaks (sliced, synced, into a free slot). STA on a synced loop still works.']],
   [345, '1 Nov', ['Drum machine pads (…pump Strike, Boing, X0X, Life) show which drum they play: in the pad list (“Kick · Snare”) and on the engine line, and both follow Drum as you change it.']],
@@ -25316,12 +25405,16 @@ const SHEETS = {
   screen:{title:'Screen', about:'Layout and panels, the Phrase and Song screens, text size and colour', groups:[
     ['Text & colour', ['TEXT SIZE', 'MIXER SIZE', 'STEP NUMBERS', 'SCREEN']],
     ['Layout & panels', ['ARRANGE', 'ARRANGE SIDE', 'SIDE PANEL', 'INST LIST', 'SECT', 'KEYS KEYPAD', 'COMMAND BAR', 'BOTTOM PANEL', 'BOTTOM BAR', 'STAGE']],
-    ['Phrase screen', ['SIMPLE PHRASE', 'FOLLOW', 'TAB', 'NEIGHBORS', 'PATTERN VIEW', 'ARRANGE FOCUS', 'SONG STRIP']],
-    ['Song screen', ['CLASSIC SONG', 'SONG MOUSE', 'SECTIONS', 'LOOP DRAG', 'SONG PEEK']]]},
-  input:{title:'Input', about:'PAD or KEYS, notes as you type, edit step, sticky keys, the command row', groups:[
+    ['Phrase screen', ['SIMPLE PHRASE', 'NEIGHBORS', 'PATTERN VIEW', 'ARRANGE FOCUS', 'SONG STRIP']],
+    ['Song screen', ['CLASSIC SONG', 'SECTIONS', 'SONG PEEK']]]},
+  // MENUS (1 Nov, audit #4): how keys and the mouse behave is Input's (FOLLOW, TAB, SONG MOUSE and LOOP DRAG were under
+  // Screen), and RESUME is playback (it was left over in the View menu)
+  input:{title:'Input', about:'PAD or KEYS, notes as you type, edit step, sticky keys, the command row, follow, the mouse', groups:[
     ['Playing', ['INPUT', 'PLAY NOTE ON ENTRY']],
-    ['Editing', ['EDIT STEP', 'STICKY KEYS', 'COMMANDS', 'PATTERN NAV']]]},
-  seq:{title:'Record & play', about:'Recording from a MIDI keyboard, the metronome and count-in, live transpose', groups:[
+    ['Editing', ['EDIT STEP', 'STICKY KEYS', 'COMMANDS', 'PATTERN NAV', 'FOLLOW', 'TAB']],
+    ['Mouse', ['SONG MOUSE', 'LOOP DRAG']]]},
+  seq:{title:'Record & play', about:'Playback, recording from a MIDI keyboard, the metronome and count-in, live transpose', groups:[
+    ['Playback', ['RESUME']],
     ['Recording', ['REC TIMING', 'REC VELOCITY', 'REC NOTE OFFS']],
     ['Metronome', ['METRONOME', 'CLICK LEVEL', 'COUNT-IN']],
     ['Live transpose', ['LIVE TRANSPOSE']]]},
