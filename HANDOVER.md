@@ -81,6 +81,18 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 1 Nov: BREAK's breaks as samples; STA on synced loops (build 341, web only)
+- Owner: BREAK is basically the tracker already; port its breaks as samples. What BREAK does that the tracker covers: slices
+  (INST → SLICES / SLICE BY), FIT (SYNC REPITCH, and STRETCH / LOOP keep the pitch), per-step pitch (PIT, PBN), level (VOL),
+  decay (KIL / OFF), reverse (PLY), swing (GRV, MPC swing), the eight momentary effects (FLX patterns, FXO). Not covered:
+  nothing that matters (its per-step reverse inside a slice is PLY with STA).
+- `sounds/breaks/*.wav`: rendered by pump's `renderBreak(i, 48000)` (BreakSounds.hpp) through a small native tool (mono,
+  x0.88 so Slow grind peaks at -1 dB), one bar each. `BREAKS` [name, file, bpm] in index.html; `breakData` (fetch + decode,
+  cached), `breakVoice` (one sample layer, AHD hold = its length), `breakApply` (the pad, and every instrument on the pad:
+  BEATS 4, SYNC REPITCH if it was off). In `presetEntries('voice')` as the group "Breaks (…pump BREAK)"; an entry's `prev`
+  (async preview) is new in the sheet's row.
+- `applyChop`: with SYNC on and SLICES off, STA (ev.ofs) now sets the start into the loop (it was ignored).
+
 ## 31 Oct (later still): six more pump instruments (build 339, web only)
 - Owner: "all of those pump synths and effects in Thunder Plus", new sounds first. Effects: every pump effect is already in
   pump.wasm except AMP (.nam models) and ROOM (room correction). Instruments ported so far: MONO, POLY, COIL, ORBIT, FOLD,

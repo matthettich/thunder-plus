@@ -10024,6 +10024,31 @@ function enginePresetEntries(kind){
   const groups = [[spec.title.replace(/ presets$/, ''), es]]; if (rec.length) groups.unshift(['Recent', rec]);
   return {title:spec.title, groups, rk};
 }
+/* BREAKS (owner, 1 Nov: "port the breakbeats over as samples"): …pump BREAK's fourteen built-in breaks (a bar each, played
+   by pump's own acoustic-style kit, rendered by pump's renderBreak to sounds/breaks/*.wav, mono, peaks at -1 dB), in the pad's
+   Presets… under Breaks. Taking one makes the pad that sample, and every instrument playing the pad SYNC REPITCH over 4
+   BEATS (BREAK's FIT: the bar at the song's tempo); then chop it the tracker's way: STA 00 10 20 … F0 starts it at each of
+   its sixteen 16ths (Renoise's 0S), or INST → SLICES 16 for a slice a note, PLY 01 reversed, FLX for the momentary effects. */
+const BREAKS = [['Pocket', 'pocket.wav', 96], ['Ghost notes', 'ghost-notes.wav', 98], ['Hot butter', 'hot-butter.wav', 100], ['Street funk', 'street-funk.wav', 92], ['Gospel run', 'gospel-run.wav', 104], ['Soul shuffle', 'soul-shuffle.wav', 88], ['Heavy one', 'heavy-one.wav', 90], ['Slow grind', 'slow-grind.wav', 84], ['Double time', 'double-time.wav', 112], ['Ride strut', 'ride-strut.wav', 102], ['Open hat strut', 'open-hat-strut.wav', 106], ['Tom break', 'tom-break.wav', 100], ['Rimshot drive', 'rimshot-drive.wav', 96], ['Lazy sunday', 'lazy-sunday.wav', 86]];
+const brkCache = new Map();
+async function breakData(i){
+  if (brkCache.has(i)) return brkCache.get(i);
+  const r = await fetch('sounds/breaks/' + BREAKS[i][1] + '?v=1'); if (!r.ok) throw new Error(r.status);
+  const b = await new OfflineAudioContext(1, 1, 48000).decodeAudioData(await r.arrayBuffer()), d = {data:new Float32Array(b.getChannelData(0)), sr:b.sampleRate};
+  brkCache.set(i, d); return d;
+}
+function breakVoice(i, d){
+  const [name, , bpm] = BREAKS[i], ms = d.data.length / d.sr * 1000;
+  const v = PD(name + ' ' + bpm, [{type:'sample', level:0.9, mode:'AHD', atk:0.1, hold:Math.round(ms), dec:40, sample:{data:d.data, sr:d.sr, name:name + ' ' + bpm}}], {len:Math.min(30, ms / 1000 + 0.1)});
+  v.level = (v.level || 0) + PRESET_DB; return v;
+}
+async function breakApply(i){
+  let d; try { d = await breakData(i); } catch(e){ return toast('Couldn’t load that break (sounds/breaks isn’t there?).'); }
+  applyVoicePreset(breakVoice(i, d));
+  let n = 0; for (const I of S.insts) if (I.pad === cur){ I.beats = 4; if (!(I.sync | 0)) I.sync = 1; n++; }
+  if (n) saveS();
+  toast(`Break: ${BREAKS[i][0]} (${BREAKS[i][2]} BPM, one bar)` + (n ? ' · its instrument plays it at the song tempo (SYNC REPITCH, 4 BEATS)' : '') + ' · STA 00 10 20 … F0 start it on each 16th');
+}
 function presetEntries(kind){
   if (kind !== 'voice' && kind !== 'layer') return enginePresetEntries(kind).groups;
   const G = [], mine = kind === 'voice' ? SP().voices : SP().layers;
@@ -10035,6 +10060,8 @@ function presetEntries(kind){
   G.push(['This song', own]);
   const fac = kind === 'voice' ? fvp() : flp();
   const all = new Map(); own.forEach(e => all.set(e.key, e));
+  if (kind === 'voice') G.push(['Breaks (…pump BREAK)', BREAKS.map(([name, , bpm], i) => ({key:'brk:' + i, name:name + ' · ' + bpm + ' BPM', apply:() => breakApply(i),
+    prev:async btn => { try { previewVoice(breakVoice(i, await breakData(i)), btn); } catch(e){ toast('Couldn’t load that break.'); } }}))]);   // BREAKS
   fac.forEach(([gn, list], gi) => { const es = list.map((it, i) => { const key = 'f' + gi + ':' + i, e = kind === 'voice'
       ? {key, name:it[0], apply:() => onVoicePreset(key), make:() => facVoice(it)}
       : {key, name:it[0], apply:() => onLayerPreset(key), make:() => layerVoice(Object.assign({}, it[1], {level:facLayerLevel(it[1])}), it[2])}; all.set(key, e); return e; }); G.push([gn, es]); });
@@ -10091,7 +10118,7 @@ function presetSheet(kind){
     const it = el('div', 'pit'), pn = el('button', 'pn', e.name), pp = el('button', 'pp'); pn.type = pp.type = 'button'; pn.title = 'Take this preset';
     pp.innerHTML = '<svg class="ic" aria-hidden="true" style="width:12px;height:12px;fill:currentColor"><use href="#ic-play"/></svg>'; pp.title = 'Hear it'; pp.setAttribute('aria-label', 'Preview ' + e.name);
     pn.addEventListener('click', () => { if (early()) return; recentPresets.add(rkind, e.key); done(); e.apply(); });
-    pp.addEventListener('click', () => { try { previewVoice(e.make(), pp); } catch(err){ toast('Couldn’t preview that preset.'); } });
+    pp.addEventListener('click', () => { if (e.prev) return e.prev(pp); try { previewVoice(e.make(), pp); } catch(err){ toast('Couldn’t preview that preset.'); } });
     it.append(pn, pp);
     if (e.own != null){ const px = el('button', 'px', '✕'); px.type = 'button'; px.title = 'Delete this preset'; px.setAttribute('aria-label', 'Delete ' + e.name);
       px.addEventListener('click', async () => { if (!await askYes({title:'Delete “' + e.name + '”?', body:'It is removed from this song only.'}, 'Delete')) return; const mine = kind === 'voice' ? SP().voices : SP().layers; mine.splice(e.own, 1); saveS(); toast('Deleted “' + e.name + '”.'); render(); });
@@ -16939,6 +16966,7 @@ function applyChop(ev, I, pad, n, semis, bpm, data, sr){
   if (slc >= 2 || sy) ev.rate = rate;
   let s0 = 0, s1 = loop;
   if (slc >= 2){ const pts = slicePoints(pad, I, data, sr), k = ((n - ROOT) % slc + slc) % slc; s0 = pts[k]; s1 = k + 1 < pts.length ? pts[k + 1] : loop; }
+  else if (ev.ofs > 0) s0 = loop * clamp(ev.ofs, 0, 255) / 256;   // STA on a synced loop (owner, 1 Nov: Renoise's 0S chopping): from that point of the loop on (it was ignored: always the top)
   ev.ofsSec = s0 * scale; ev.durSec = Math.max(0.005, (s1 - s0) * scale);
   const end = ev.t + ev.durSec / ev.rate; ev.cut = ev.cut == null ? end : Math.min(ev.cut, end);
   return ev;
@@ -18545,7 +18573,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 340;
+const BUILD = 341;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25005,6 +25033,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [341, '1 Nov', ['Breaks: …pump BREAK’s fourteen breakbeats (a bar each, soul and funk) in a pad’s Presets… → Breaks (…pump BREAK), with ▶ to hear them first. Taking one sets its instrument to play it at the song’s tempo (INST → SYNC REPITCH over 4 BEATS); then chop it as in Renoise: STA 00, 10, 20 … F0 starts it on each of its sixteen 16ths, or SLICES 16 for a slice a note.', 'STA now works on a synced loop (SYNC on, SLICES off): it always started from the top.']],
   [340, '31 Oct', ['…pump LIFE as engines Life and Life kit live: the groovebox’s eight FM / ring / kick tones and its pitch-shifting delay, played from the tracker (C-4 up the white keys on the kit live engine). Its Game of Life grid stays in the plugin.']],
   [339, '31 Oct', ['Six more …pump instruments as synth engines (Engine → …pump), each the plugin’s own sound with its factory presets, rendered and live: Fold (west coast: complex oscillator, wavefolder, low-pass gate), Gloss (hyperpop: seven machines), Tract (vocal-tract singers and choirs), and the drum machines Strike, Boing and X0X.', 'Drum machines: a pad plays one drum (Drum picks it, and only its page shows); the “kit live” engines play the whole kit from one track, C-4 the first drum and up the white keys (D-4, E-4, F-4…).']],
   [338, '31 Oct', ['New synth engines from …pump: Orbit and Orbit live (Engine → …pump), the ORBIT chaos synth: strange attractors (Lorenz, Rössler, double scroll, Thomas, Halvorsen, Duffing) as oscillators at the note’s pitch, CHAOS from a clean tone through period doubling into chaos, SYNC, AXIS, WIDTH, drive, a ladder filter with its own envelope, DRIFT, and its 13 factory voices. The plugin’s own sound (checked sample for sample against it). Orbit live plays chords through its own voices, with glide; its slides and bends reach ±2 semitones.']],
