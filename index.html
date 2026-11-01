@@ -18387,7 +18387,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 330;
+const BUILD = 331;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24414,7 +24414,6 @@ const APK = 'thunderplus-arrfocus-v1', SSK = 'thunderplus-songstrip-v1';
 let apOn = (() => { try { return localStorage.getItem(APK) !== '0'; } catch(e){ return true; } })();
 let ssOn = (() => { try { return localStorage.getItem(SSK) !== '0'; } catch(e){ return true; } })();
 let apF = null;        // who has the keys instead of the phrase: 'arr' (the side panel), 'strip' (the song strip) or null
-let apTookT = -1e9;   // ONE CLICK: when a press in the panel last took the keys
 let apHost = 'phrase'; // the screen Arrange is beside while it has the keys (owner, 19 Oct: every screen, not only Phrase)
 let apPin = false;     // PIN: the phrase stays up while the song cursor moves
 let apSel = null;      // the song selection made while Arrange has the keys (selA always belongs to the screen drawn)
@@ -24565,7 +24564,10 @@ const apTagEl = el('span', 'aptag'); apTagEl.hidden = true;
 const apFootEl = arrEl.querySelector('.tafx'), apFoot0 = apFootEl ? apFootEl.textContent : '';
 // A tap or click anywhere in the panel (not its resize grip) gives Arrange the keys. The block or row number under the
 // finger then moves the song cursor as usual: a block through arrGo → apArrGo, a row number in the grid's own handler.
-arrEl.addEventListener('pointerdown', e => { if (apF !== 'arr' && apReady && apArrOk() && !e.target.closest('#tArrH')){ apFocus('arr', false); apTookT = performance.now(); draw(); } }, true);   // (apTookT: a plain click on a block gives them back, apArrGo)
+// A click or tap anywhere in the panel gives Arrange the keys and they stay there (owner, 31 Oct: wanted, after trying the
+// one-click hand-back of #7 for a build). The screen beside it follows the block it is on (apFollow); Alt+A or Esc gives the
+// keys back, a double-click on a block opens its phrase.
+arrEl.addEventListener('pointerdown', e => { if (apF !== 'arr' && apReady && apArrOk() && !e.target.closest('#tArrH')){ apFocus('arr', false); draw(); } }, true);
 // Right-click on the side panel (a mouse): Arrange takes the keys, the song cursor goes to that cell, and the Song screen's
 // commands open there (cmdItems, run as on the Song screen through apRun), with mute and open-its-phrase on top. (19 Oct)
 arrGrid.addEventListener('contextmenu', e => {
@@ -24590,16 +24592,14 @@ function apArrGo(y, t){
   if (!apReady || !apArrOk()) return false;
   const k = y + ':' + t, now = performance.now(), dbl = apF === 'arr' && apTap.k === k && now - apTap.t < 380;
   apTap = {t:dbl ? 0 : now, k:dbl ? '' : k};
-  // ONE CLICK (owner, 31 Oct, #7): a click on a block selects it and the screen beside shows it (its phrase, its track's
-  // mixer or effects), and the keys stay where they were (on the phrase), so you can type straight away; Alt+A or Alt+◀
-  // still give Arrange the keys. A double-click opens the block's phrase (from another screen, the Phrase screen).
-  // (It was: the first click gave Arrange the keys and the phrase only followed; the second gave them back.)
-  if (apF !== 'arr' && tv !== 'song') apHost = tv;
-  cs.song.x = t; cs.song.y = y; apTop();
+  // A click puts the cursor on the block and Arrange has the keys (the panel's pointerdown gave them); the screen beside
+  // shows the block (its phrase, its track's mixer or effects). A double-click opens the block's phrase and gives the keys
+  // back. (#7's one-click hand-back was tried in build 327 and taken out on 31 Oct: the owner wants the click to focus.)
+  apFocus('arr', false); cs.song.x = t; cs.song.y = y; apTop();
   if (dbl){ const cid = S.song[y][t];
     if (cid >= 0){ ensureSectPhrase(cid); const p = firstPhrase(cid); if (p >= 0){ cPhrase = p; cTrack = t; cSect = cid; } }
     apFocus(null); if (cid >= 0 && tv !== 'phrase'){ go('phrase'); return true; } }
-  else { apLastKey = ''; apFollow(); if (tv === 'phrase' && pvActive()) cTrack = t; if (performance.now() - apTookT < 2000 && apF === 'arr' && tv !== 'song'){ apTookT = -1e9; apFocus(null); } }   // the keys go back to the screen this click took them from
+  else { apLastKey = ''; apFollow(); if (tv === 'phrase' && pvActive()) cTrack = t; }
   draw(); return true;
 }
 // draw()'s last hook: the focus look, the phrase following a cursor moved some other way (a row number, an undo), the
@@ -24806,6 +24806,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [331, '31 Oct', ['Arrange beside another screen: a click (on a block, an empty cell or anywhere in the panel) gives Arrange the keys again and they stay there, with no flicker; the screen beside it still shows the block (its phrase, mixer or effects). A double-click opens the block’s phrase; Alt+A or Esc gives the keys back. (Build 327’s “keys stay on the phrase” is taken out.)']],
   [330, '31 Oct', ['FXO: 9 is now “every slot” (FXO 90 all off, FXO 91 all on, 92–9F all on for that many rows), and FXO 00 puts every slot back as set, so the default value can no longer switch every effect off. (In older songs an FXO 0Y switched every slot: those rows now put them back as set.)', 'A FLX, RTG or GAT pattern switches its effect’s slot back on, even after an FXO turned it off.', 'FOLLOW PATTERN beside Phrase / Pattern view: Arrange’s selected block follows the playing pattern while Arrange has the keys too (only the phrase followed then).']],
   [329, '31 Oct', ['When the song loops round, each track (and the master column) starts again with its own effect settings, as a fresh PLAY does: an FXO 00 near the end no longer leaves the effects off for the next pass.', 'FOLLOW PATTERN on the Song screen: the selected block moves with the playing pattern (beside Phrase it already did), unless you have just moved it yourself.', 'The wheel over Arrange beside the Phrase screen moves the phrase with it (stopped, it couldn’t move there); for 4 seconds after you scroll or move Arrange yourself it doesn’t jump back to the playhead.', 'Arrange’s right-click menu has Make unique too (UNIQ was the one command-bar button it lacked).', 'Settings: COMMAND BAR is now called “Thin command bar instead of the big COMMANDS buttons”, and COMMANDS (show or hide the big buttons) sits beside it in View.']],
   [328, '31 Oct', ['FOLLOW PATTERN: Arrange follows the playing pattern too, turning a page when the playing row runs off it, as with FOLLOW ON.']],
