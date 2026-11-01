@@ -29,6 +29,7 @@ class PsynProc extends AudioWorkletProcessor {
       {name:'t' + j, defaultValue:0, automationRate:'a-rate'},
       {name:'l' + j, defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
       {name:'v' + j, defaultValue:100, minValue:1, maxValue:127, automationRate:'a-rate'});
+    d.push({name:'bpm', defaultValue:120, minValue:10, maxValue:999, automationRate:'k-rate'});   // the song's tempo (WOB's wobble)
     return d;
   }
   constructor(o){
@@ -61,6 +62,7 @@ class PsynProc extends AudioWorkletProcessor {
     if (!X){ L.fill(0); if (R !== L) R.fill(0); return true; }
     const t0 = Date.now();
     if (this.h < 0){ this.open(X); if (this.h < 0){ L.fill(0); if (R !== L) R.fill(0); return true; } }
+    const bpm = P.bpm ? P.bpm[0] : 120; if (bpm !== this.bpm && X.psyn_tempo){ X.psyn_tempo(this.h, bpm); this.bpm = bpm; }
     if (this.dirty){ const v = new Float32Array(X.memory.buffer, X.psyn_values(this.h), this.syms.length); this.values(v); X.psyn_commit(this.h); this.dirty = false; }
     const at = (A, i) => A.length > 1 ? A[i] : A[0];
     let any = false, bfrom = 0;   // bfrom: where the bend lane's note started in this block (bend before it is the old note's)

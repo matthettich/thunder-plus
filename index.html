@@ -2570,8 +2570,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <!-- …PUMP SYNTHS (26 Oct 2026): pump MONO, POLY and COIL as rendered synth engines (pump/synth/: the plugins' own DSP in
      pump-synth.wasm, their parameters and presets in pump-synth-meta.js, both built by pump/wasm/build.sh). Without the folder
      there are no …pump engines. The render Worker loads the same two files (PSYN_JS below). -->
-<script src="pump/synth/pump-synth-meta.js?v=5"></script>
-<script src="pump/synth/pump-synth-engine.js?v=7"></script>
+<script src="pump/synth/pump-synth-meta.js?v=6"></script>
+<script src="pump/synth/pump-synth-engine.js?v=8"></script>
 <!-- …PUMP (23 Oct 2026): the pump mastering plugins' parameter tables and presets (generated in matthettich/pump by
      wasm/build.sh); pump/pump.wasm is their DSP, fetched by the wasm loader. -->
 <script src="pump/pump-meta.js?v=5"></script>
@@ -7321,7 +7321,7 @@ const PW = {w:null, ready:false, wv:false, lx:false, ps:false, id:0, jobs:new Ma
 // and gets the page's compiled lxr.wasm (lxMod) in its init message.
 const LXR_JS = 'lxr/lxr-engine.js?v=2';
 // …PUMP SYNTHS: likewise the instruments' tables and glue, and the page's compiled pump-synth.wasm (psMod)
-const PSYN_JS = ['pump/synth/pump-synth-meta.js?v=5', 'pump/synth/pump-synth-engine.js?v=7'];
+const PSYN_JS = ['pump/synth/pump-synth-meta.js?v=6', 'pump/synth/pump-synth-engine.js?v=8'];
 function rwStart(plMod, txMod, lxMod, psMod){
   try {
     const sc = [...document.scripts].find(x => x.textContent.includes('===ENGINE ' + 'START==='));
@@ -7382,7 +7382,7 @@ function renderAsync(v, sr, hold, stages){
 }
 const padSR = () => ctx ? ctx.sampleRate : srGuess;
 // A pad that renders in time with the song re-renders when the tempo changes: synced mod LFOs/sequence, or a Vector wave sequence in note values.
-const padBpm = i => { const v = kit.voices[i]; return voiceSynced(v) || (v && v.engine === 'vector' && v.vector && (v.vector.mode | 0) === 1 && (v.vector.sdiv | 0) > 0) || (isLxV(v) && LxrCore.synced(v)) ? songBpm() : 0; };   // LXR ENGINES: an LFO synced to the tempo
+const padBpm = i => { const v = kit.voices[i]; return voiceSynced(v) || (v && v.engine === 'vector' && v.vector && (v.vector.mode | 0) === 1 && (v.vector.sdiv | 0) > 0) || (isLxV(v) && LxrCore.synced(v)) || (v && (v.engine === 'pwob' || v.engine === 'pwobl') && v.engine && v[v.engine] && v[v.engine].wob_sync !== 0) ? songBpm() : 0; };   // …PUMP WOB: its wobble follows the tempo   // LXR ENGINES: an LFO synced to the tempo
 function stale(i){ const c = slotAt(cache, i); return !c || slotAt(dirty, i) || c.sr !== padSR() || (c.bpm || 0) !== padBpm(i); }
 function install(i, c){ slotAt(padRev, i); padRev[i] = (padRev[i] || 0) + 1; cache[i] = c; dirty[i] = false; bufs[i] = null; }
 function bgRender(i){
@@ -13502,7 +13502,7 @@ let plFailed = false;
   // LXR ENGINES: lxr/lxr.wasm, compiled here (and handed to the render Worker) when the engine file loaded
   const lxP = typeof LxrCore !== 'undefined' ? LxrCore.load('lxr/lxr.wasm?v=1').catch(e => { console.warn('LXR engines', e); return null; }) : Promise.resolve(null);
   // …PUMP SYNTHS: pump/synth/pump-synth.wasm, compiled here and handed to the render Worker (as LXR's is)
-  const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=5').catch(e => { tpLog('pump synths wasm (the …pump engines will be silent)', e); return null; }) : Promise.resolve(null);
+  const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=6').catch(e => { tpLog('pump synths wasm (the …pump engines will be silent)', e); return null; }) : Promise.resolve(null);
   // …PUMP: the pump mastering effects (pump/pump.wasm), fetched alongside; effect nodes that asked for it get it now
   bytes(PUMP_WASM).then(b => { pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage({pumpBytes:b}); } catch(e){} pumpWait.clear(); pumpToChains(b);
     return WebAssembly.instantiate(b, imp).then(r => { pumpMain = r.instance.exports; if (pumpMain._initialize) pumpMain._initialize(); }); }).catch(e => { if (PM) console.warn('pump effects', e); });
@@ -16450,7 +16450,7 @@ function makePlayer(ac, out, getBuf, live){
       node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
       node.load = 0; node.port.onmessage = e => { const d = e.data; if (d && typeof d.load === 'number') node.load = node.load * 0.6 + d.load * 0.4; };
       const lanes = [0, 1, 2, 3].map(j => ({node, g, pn, pad, kind, ps:true, lane:j, rate:P('r' + j), gate:P('g' + j), trig:P('t' + j), leg:P('l' + j), vel:P('v' + j), n:0, lastOn:-1, cur:null}));
-      const b = lanes[0]; b.lanes = lanes;
+      const b = lanes[0]; b.lanes = lanes; b.bpm = P('bpm'); if (b.bpm) b.bpm.value = bpmNow;   // the song's tempo (WOB's wobble; tempoTo moves it)
       bassN.set(key, b); if (live) bassLive.add(b);
       return b;
     } catch(e){ tpLog('pump synth live node', e); return null; }
@@ -17159,7 +17159,7 @@ class XP_${name} extends AudioWorkletProcessor {
 registerProcessor('thunder-${name}', XP_${name});`;
 let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bassLive = new Set();
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
-const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=4', psOK = new WeakSet(), psSent = new WeakSet();
+const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=5', psOK = new WeakSet(), psSent = new WeakSet();
 /* …PUMP SYNTHS live, THE SAFETY NET (owner, 26 Oct): while the song plays, once a second: if the audio is dropping out or
    the audio thread is nearly full, and the live …pump nodes are a real part of that, twice in a row, the live engines
    switch to their renders for the rest of this visit (psLive.off): their nodes go, and the next notes play the pads'
@@ -18573,7 +18573,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 341;
+const BUILD = 342;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25033,6 +25033,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [342, '1 Nov', ['Two more …pump engines, rendered and live: Freeze (a sound as a cloud of frozen, shimmering spectral grains, on its seven built-in sounds) and Wob (the additive bass: 256 partials, a second spectrum to morph to, vowels, comb, reese, spray and drift, and a wobble in time with the song).']],
   [341, '1 Nov', ['Breaks: …pump BREAK’s fourteen breakbeats (a bar each, soul and funk) in a pad’s Presets… → Breaks (…pump BREAK), with ▶ to hear them first. Taking one sets its instrument to play it at the song’s tempo (INST → SYNC REPITCH over 4 BEATS); then chop it as in Renoise: STA 00, 10, 20 … F0 starts it on each of its sixteen 16ths, or SLICES 16 for a slice a note.', 'STA now works on a synced loop (SYNC on, SLICES off): it always started from the top.']],
   [340, '31 Oct', ['…pump LIFE as engines Life and Life kit live: the groovebox’s eight FM / ring / kick tones and its pitch-shifting delay, played from the tracker (C-4 up the white keys on the kit live engine). Its Game of Life grid stays in the plugin.']],
   [339, '31 Oct', ['Six more …pump instruments as synth engines (Engine → …pump), each the plugin’s own sound with its factory presets, rendered and live: Fold (west coast: complex oscillator, wavefolder, low-pass gate), Gloss (hyperpop: seven machines), Tract (vocal-tract singers and choirs), and the drum machines Strike, Boing and X0X.', 'Drum machines: a pad plays one drum (Drum picks it, and only its page shows); the “kit live” engines play the whole kit from one track, C-4 the first drum and up the white keys (D-4, E-4, F-4…).']],

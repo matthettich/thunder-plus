@@ -81,6 +81,17 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 1 Nov (2): FREEZE and WOB (build 342, web only)
+- pump (ee2500b): PRISM's `renderWith` / `builtinAudio` moved to `plugins/prism/PrismAudio.hpp` (no threads; PrismSources.hpp
+  includes it). `SynthFreeze` makes a built-in source on first use (`makeSpectra(builtinAudio(id))`, ~60 ms in wasm, kept);
+  no File source (row min 1). `SynthWob` + `psyn_tempo(h, bpm)` (SynthBase::tempo, stopped Transport at that bpm). The
+  synth wasm now links pffft and has a no-op `std::mutex` (SING's lyric lock, pulled in by PRISM's sources). FREEZE's
+  parity test is built with `PUMP_TEST_HOOKS` and the tests run with `PUMP_WAIT_SOURCES=1` (the plugin's thread-made sources
+  are then ready from the first note). Parity exact for both.
+- Thunder: `pfreeze/pwob` (+ live). Tempo: renders pass `songBpm()` (XENG r's 5th argument, to `psyn_tempo`), `padBpm`
+  re-renders a WOB pad when the tempo changes (wob_sync on); the live worklet has a k-rate `bpm` AudioParam (lane 0's `b.bpm`,
+  moved by `tempoTo`).
+
 ## 1 Nov: BREAK's breaks as samples; STA on synced loops (build 341, web only)
 - Owner: BREAK is basically the tracker already; port its breaks as samples. What BREAK does that the tracker covers: slices
   (INST → SLICES / SLICE BY), FIT (SYNC REPITCH, and STRETCH / LOOP keep the pitch), per-step pitch (PIT, PBN), level (VOL),

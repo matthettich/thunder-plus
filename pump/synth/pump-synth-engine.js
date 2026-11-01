@@ -40,6 +40,8 @@ const KINDS = {
   pstrike:{t:7, k:'strike', name:'Strike', title:'pump STRIKE', tag:'drum synth: modal, string, circuit, FM, west, additive, chaos · 8 drums', len:1.5, kit:true},
   pboing:{t:8, k:'boing', name:'Boing', title:'pump BOING', tag:'spring drums: a tuned spring and a drum voice per pad · spring tank · 8 drums', len:1.5, kit:true},
   px0x:{t:9, k:'x0x', name:'X0X', title:'pump X0X', tag:'rhythm machine: 11 analog drums on five classic machines’ circuits', len:1.5, kit:true},
+  pfreeze:{t:11, k:'freeze', name:'Freeze', title:'pump FREEZE', tag:'spectral freeze: a sound as a cloud of frozen, shimmering spectral grains', len:4},
+  pwob:{t:12, k:'wob', name:'Wob', title:'pump WOB', tag:'additive bass: 256 partials · morph · vowels · comb · reese · tempo wobble', len:2, bpm:true},
   plife:{t:10, k:'life', name:'Life', title:'pump LIFE', tag:'groovebox voices: 8 FM / ring / kick tones · pitch-shifting delay', len:1.5, kit:true},
 };
 /* The live twins: the same instrument, played live. Shown after their rendered engine in the picker. */
@@ -53,10 +55,12 @@ const LIVE = {
   ptractl:{twin:'ptract', name:'Tract live', title:'pump TRACT live', tag:'played live: a choir per chord, glide, vowels that move as you hold'},
   pstrikel:{twin:'pstrike', name:'Strike kit live', title:'pump STRIKE kit live', tag:'the whole kit on one track: C-4 D-4 E-4… play its eight drums'},
   pboingl:{twin:'pboing', name:'Boing kit live', title:'pump BOING kit live', tag:'the whole kit on one track: C-4 D-4 E-4… play its eight drums'},
+  pfreezel:{twin:'pfreeze', name:'Freeze live', title:'pump FREEZE live', tag:'played live: chords of frozen grains, glide, moving through the sound as you hold'},
+  pwobl:{twin:'pwob', name:'Wob live', title:'pump WOB live', tag:'played live: the wobble in time with the song, glide and legato, bends'},
   plifel:{twin:'plife', name:'Life kit live', title:'pump LIFE kit live', tag:'its eight tones on one track: C-4 D-4 E-4… (the Game of Life grid stays in the plugin)'},
   px0xl:{twin:'px0x', name:'X0X kit live', title:'pump X0X kit live', tag:'the whole kit on one track: C-4 D-4 E-4… play its eleven drums'},
 };
-const ORDER = ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'pcoil', 'pcoill', 'porbit', 'porbitl', 'pfold', 'pfoldl', 'pgloss', 'pglossl', 'ptract', 'ptractl', 'pstrike', 'pstrikel', 'pboing', 'pboingl', 'px0x', 'px0xl', 'plife', 'plifel'];
+const ORDER = ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'pcoil', 'pcoill', 'porbit', 'porbitl', 'pfold', 'pfoldl', 'pgloss', 'pglossl', 'ptract', 'ptractl', 'pstrike', 'pstrikel', 'pboing', 'pboingl', 'px0x', 'px0xl', 'plife', 'plifel', 'pfreeze', 'pfreezel', 'pwob', 'pwobl'];
 /* trim: POLY's level is set for chords (a voice sums in at 0.3, 8 of them to a chord), so one rendered note sits under
    MONO's and COIL's. A pad is one note, which the tracker stacks for chords, so POLY's render is 3.5 dB up (x1.5): as
    far as its loudest factory voice (Unison brass lead) allows without passing -1 dBFS, since the plugin's own safety
@@ -64,11 +68,12 @@ const ORDER = ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'pcoil', 'pcoill', 'porbit'
    rendered note: MONO about -20 dBFS RMS, COIL -24, POLY -25. MONO and COIL are as the plugin. */
 /* Kept in the pad (so it carries the plugin's whole state) but not shown: they do nothing to a single rendered note
    (the mod wheel, pitch bend, glide and note priority need a played line). */
-const HIDE = new Set(['wheel_vib', 'glide', 'glide_mode', 'priority', 'legato', 'bend_range', 'wheel_mod', 'bend', 'voice_mode', 'voices', 'mode', 'follow']);   // (follow: the drum machines' editor follows the drum played)   // (ORBIT's voices and mode: a rendered pad is one note)
+const HIDE = new Set(['wheel_vib', 'glide', 'glide_mode', 'priority', 'legato', 'bend_range', 'wheel_mod', 'bend', 'voice_mode', 'voices', 'mode', 'follow', 'wheel']);   // (wheel: WOB's mod wheel to its wobble: no wheel here)   // (follow: the drum machines' editor follows the drum played)   // (ORBIT's voices and mode: a rendered pad is one note)
 /* ...which a live twin shows (bend range and the mod wheel stay hidden: the tracker's pitch commands are sent as bend
    over the whole range, and there is no wheel). */
 const LIVE_ROWS = {pmonol:[['Glide & legato', ['glide', 'glide_mode', 'legato', 'priority']]], ppolyl:[['Glide', ['glide']]], pcoill:[['Voices', ['voices']]], porbitl:[['Voices', ['voices', 'voice_mode', 'glide']]],
-  pfoldl:[['Voices', ['voices', 'voice_mode', 'glide']]], pglossl:[['Voices', ['mode', 'glide']]], ptractl:[['Voices', ['voices', 'voice_mode', 'glide']]], pstrikel:[], pboingl:[], px0xl:[], plifel:[]};   // COIL's VOICES: how many notes ring at once (a rendered pad is one)
+  pfoldl:[['Voices', ['voices', 'voice_mode', 'glide']]], pglossl:[['Voices', ['mode', 'glide']]], ptractl:[['Voices', ['voices', 'voice_mode', 'glide']]], pstrikel:[], pboingl:[], px0xl:[], plifel:[],
+  pfreezel:[['Voices', ['voices', 'voice_mode', 'glide']]], pwobl:[['Glide & legato', ['glide', 'legato']]]};   // COIL's VOICES: how many notes ring at once (a rendered pad is one)
 /* What the live instance is held to whatever the pad says: the widest bend, so a slide of an octave or two is one bend. */
 const LIVE_FIXED = {pmonol:{bend_range:24}, ppolyl:{bend_range:24}, pcoill:{bend:12}, pglossl:{bend_range:24}};
 /* Held whatever the pad says, rendered and live: X0X's own sequencer off (the tracker plays it). */
@@ -103,6 +108,14 @@ const SECS = {
     ['Colour', ['o_drive', 'drive_type', 'crush_bits', 'crush_rate', 'width']], ['LFO', ['lfo_shape', 'lfo_rate', 'lfo_depth', 'lfo_dest']], ['Play', ['vel', 'volume']]],
   ptract:[['Voice', ['vowel', 'motion', 'motion_rate', 'size', 'tense', 'breath', 'bright']], ['Vibrato', ['vibrato', 'vib_rate', 'jitter']],
     ['Choir', ['singers', 'detune', 'size_spread', 'vowel_spread', 'spread']], ['Amp', ['attack', 'decay', 'sustain', 'release', 'velocity']], ['Play', ['vel', 'octave', 'volume']]],
+  pfreeze:[['Sound', ['source', 'root', 'track']], ['Freeze', ['position', 'speed', 'spray', 'grains', 'blur']],
+    ['Spectrum', ['stretch', 'tilt', 'shimmer', 'low', 'high', 'phase', 'width']], ['Amp', ['attack', 'decay', 'sustain', 'release', 'velocity']], ['Play', ['vel', 'octave', 'volume']]],
+  pwob:[['Partials', ['shape', 'partials', 'tilt', 'odd_even', 'stretch', 'inharm', 'spray', 'drift', 'drift_rate']], ['Morph', ['shape_b', 'tilt_b', 'morph']],
+    ['Filter', ['filter_mode', 'cutoff', 'res', 'filter_env', 'filter_decay', 'key_track']], ['Vowel & comb', ['vowel', 'formant', 'comb_freq', 'comb']],
+    ['Reese & sub', ['detune', 'width', 'sub', 'sub_oct']],
+    ['Wobble', ['wob_sync', 'wob_div', 'wob_rate', 'wob_shape', 'wob_retrig', 'wob_phase', 'wob_smooth', 'wob_delay', 'wob_fade', 'wob_depth']],
+    ['Wobble moves', ['wob_cut', 'wob_vowel', 'wob_comb', 'wob_amp', 'wob_pitch', 'wob_morph']],
+    ['Amp', ['attack', 'decay', 'sustain', 'release']], ['Play', ['vel', 'octave', 'o_tune', 'o_drive', 'volume']]],
   pcoil:[['Springs', ['model', 'tension', 'drip', 'harmonic', 'spread', 'wobble']], ['Ring', ['decay', 'release', 'tone', 'excite']],
     ['Tank & output', ['tank', 'grit', 'width']], ['Play', ['vel', 'velocity', 'octave', 'volume']]],
 };
@@ -147,6 +160,7 @@ for (const key in KINDS){
   const K = KINDS[key], m = META.synth[K.k], rows = {}, defs = {};
   for (const p of m.params){ defs[al(p.s)] = p.def; if (!HIDE.has(p.s) && !((p.flags | 0) & (8 | 32))) rows[al(p.s)] = rowOf(p); }
   if (key === 'pcoil' && rows.velocity) rows.velocity.l = 'Vel → kick';
+  if (key === 'pfreeze' && rows.source) rows.source = Object.assign({}, rows.source, {min:1});   // no File here (built-in sounds only)
   if (key === 'plife'){ rows.fm.l = 'FM (all)'; rows.decay.l = 'Decay (all)'; rows.pitch_range.l = 'LFO → pitch'; rows.lfo_rate.l = 'LFO rate'; rows.lfo_depth.l = 'LFO depth'; }   // COIL's: how hard a note kicks the springs
   if (rows.volume) rows.volume.noRnd = true;   // a random sound at -40 dB isn't a sound
   rows.vel = {l:'Hit', min:1, max:127, c:'int', d:100, f:v => String(Math.round(v)), noRnd:true}; defs.vel = 100;
@@ -218,8 +232,8 @@ const PsynCore = {
   /* XENG entries. Rendered (live:false) and live; both render with r (a live engine's render is its safety net, and what
      the Synth page plays), and rel is the amp's release in ms (how a held rendered note fades when let go). */
   xeng(){ const o = {}; for (const k of ORDER){ const tw = twinOf(k);
-    o[k] = {live:!!LIVE[k], twin:LIVE[k] ? tw : PsynCore.twin(k), d:() => Object.assign({}, ENG[k].defs), r:(P, sr, hold, V) => PsynCore.render(tw, P, sr, hold, V),
-      rel:P => tw === 'pcoil' ? (P.release || 0.4) * 1000 : (tw === 'porbit' || tw === 'pgloss' || tw === 'ptract') ? (P.release || 300) : tw === 'pfold' ? (P.fall || 300) : KINDS[tw].kit ? 30 : (P.a_r || 150)}; }
+    o[k] = {live:!!LIVE[k], twin:LIVE[k] ? tw : PsynCore.twin(k), d:() => Object.assign({}, ENG[k].defs), r:(P, sr, hold, V, bpm) => PsynCore.render(tw, P, sr, hold, V, bpm),
+      rel:P => tw === 'pcoil' ? (P.release || 0.4) * 1000 : (tw === 'porbit' || tw === 'pgloss' || tw === 'ptract') ? (P.release || 300) : tw === 'pfold' ? (P.fall || 300) : (tw === 'pfreeze' || tw === 'pwob') ? (P.release || 300) : KINDS[tw].kit ? 30 : (P.a_r || 150)}; }
     return o; },
   // XUI entries: the card's rows, sections and the plugin's factory presets
   xui(){
@@ -239,7 +253,7 @@ const PsynCore = {
   latency(k, sr){ const K = KINDS[twinOf(k)]; if (!X || !K) return 0; const h = X.psyn_new(K.t, sr || 48000); if (h < 0) return 0; try { return X.psyn_latency(h); } finally { X.psyn_free(h); } },
   /* One note: values staged, a fresh instance (so a pad renders the same every time), note on at 0, note off after the
      hold, then until it dies away (at most 12 s). Folded to mono, the plugin's latency (MONO's oversampler) taken off. */
-  render(k, P, sr, hold, V){
+  render(k, P, sr, hold, V, bpm){
     const K = KINDS[k];
     if (!X || !K) return new Float32Array(1);
     const specs = ENG[k].specs, st = f32(X.psyn_stage(), 512), fx = FIXED[k] || {};
@@ -249,6 +263,7 @@ const PsynCore = {
     const tune = +P.tune || 0, semis = K.kit ? 0 : Math.round(tune), frac = tune - semis, rate = sr * Math.pow(2, -frac / 12);
     const h = X.psyn_new(K.t, rate);
     if (h < 0) return new Float32Array(1);
+    if (X.psyn_tempo && bpm > 0) X.psyn_tempo(h, bpm);   // WOB's wobble: the song's tempo
     try {
       const note = K.kit ? whiteKey(Math.max(0, Math.min((K.drums || 8) - 1, Math.round(P.kd || 0)))) : Math.max(0, Math.min(127, 60 + semis)), vel = Math.max(1, Math.min(127, Math.round(P.vel || 100)));
       const holdS = Math.min(12, Math.max(0.02, hold || (V && V.len) || K.len)), offAt = Math.round(holdS * rate);
