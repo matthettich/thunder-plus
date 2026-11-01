@@ -81,6 +81,11 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (night): Flex 256, IDM pink & green (build 337, web only)
+- `FlexCore.SPEC()` builds the table for 17–255 (families by the high nibble: roll, stut, build, rev, down, up, stop/start/wow, scr, gate/pump/swell/fade/mask, filt, crush, echo, jug, swing/tup/drunk/lag, chaos); `ext(k, p, bar)` returns the read position and sets gain `pg`, filter `plp`/`php` (0–1), crush `pcr`/`pbt`. `run()` adds the crush and two TPT state-variable filters (LP 40 Hz·2^(9n), HP 20 Hz·2^(9n), updated every 8 samples). `FlexCore.NAMES` (cached in `_N`) names all 256. Everything is inside the class (it is stringified into the worklet). Offline check: all 256 finite, bounded and audibly different on a chirp.
+- Old songs: `normSong` sets `S.flxOld` when a song without `flx256` has FLX > 0x10 (toast); `flxCap(v)` keeps those on 16. Project → FLX 11–FF (only shown then) clears it. `freshSong` and every normalised song carry `flx256`. The bundled ELECTRO has three FLX above 10, so it opens with the flag.
+- Skin `idmpg`: IDM rules plus accent overrides (pink #ff2d8a for orange, green #1f9e5a for blue). `idmpink` renamed "IDM pink paper".
+
 ## 31 Oct (evening): brand, playing colour, IDM pink (builds 334–336, web only)
 - 334: the brand is `Thunder+` (the `.bdots` "..." span is gone in every skin; titles and help still say ...Thunder).
 - 335: `songBtn()` toggles `html.tpon` while anything plays; IDM lights #tSong, the pad PLAY and the command row's play in its orange then.

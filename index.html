@@ -1523,7 +1523,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 @keyframes dkBreath{0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.025)}}
 @keyframes dkWag{0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-10deg)}}
 @media (prefers-reduced-motion: reduce){ .dogs .bob, .dogs .tail{animation:none!important} }
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .dogs{--dk-pink:var(--mxsoft)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .dogs{--dk-pink:var(--mxsoft)}
 /* DRUM (the phrase stage's DANCE · DRUM · KEYS): the pittie behind a drum kit with sticks, the husky on bongos. The kit
    only shows in .drum; arms rest over their drums (CSS variables) and strike with dogsHit(); no hops or breathing. */
 .dogs .kit{display:none}
@@ -1606,7 +1606,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="lautrec"]{--mx:#2a1f1a; --mx2:#6b5a4c; --mxdim:#d9c7a4; --mxbg:#f4e9d2; --mxpanel:#f8f0de; --mxpanel2:#eadcbc; --mxon:#fff8ea;
   --mxsoft:#d8452e; --mxpoly:#2e7a70; --mxglowc:transparent; --mxscan:transparent; --mxred:#c0392b; --mxcur:#d8452e; --mxcuron:#fff8ea; --mxbus:#c98f12;
   --font:"Jost","Helvetica Neue",Helvetica,Arial,system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:light}
-:root:is([data-skin="idm"],[data-skin="idmpink"]){--mx:#141414; --mx2:#505050; --mxdim:#bdbcb6; --mxbg:#e9e8e3; --mxpanel:#f2f1ec; --mxpanel2:#dddcd5; --mxon:#ffffff;
+:root:is([data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"]){--mx:#141414; --mx2:#505050; --mxdim:#bdbcb6; --mxbg:#e9e8e3; --mxpanel:#f2f1ec; --mxpanel2:#dddcd5; --mxon:#ffffff;
   --mxsoft:#ff4d00; --mxpoly:#ff4d00; --mxglowc:transparent; --mxscan:transparent; --mxred:#ff4d00; --mxcur:#ff4d00; --mxcuron:#141414; --mxbus:#2a6cff; --mxline:#141414;
   --font:"JetBrains Mono",ui-monospace,Menlo,monospace; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:light}
 :root[data-skin="vice"]{--mx:#f4eeff; --mx2:#b9a9dc; --mxdim:#3d2d6b; --mxbg:#140d2b; --mxpanel:#1b1238; --mxpanel2:#251a4a; --mxon:#140d2b;
@@ -1643,7 +1643,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="te"] #tPad .k[data-b="play"]:not(#zz){background:#ff6a13; color:#121212} :root[data-skin="te"] #tPad .k[data-b="edit"]:not(#zz){background:#3c5cff; color:#fff}
 :root[data-skin="te"] #tPad .k[data-b="shift"]:not(#zz){background:#2fb37a; color:#121212} :root[data-skin="te"] #tPad .k[data-b="opt"]:not(#zz){background:#ffffff; color:#121212}
 :root[data-skin="braun"] #tPad .k[data-b="play"]:not(#zz){background:#e85d1c; border-color:#e85d1c} :root[data-skin="braun"] #tPad .k[data-b="edit"]:not(#zz){background:#4b8f3b; border-color:#4b8f3b}
-:root:is([data-skin="idm"],[data-skin="idmpink"]) #tPad .k[data-b="play"]:not(#zz){background:#ff4d00; color:#141414} :root:is([data-skin="idm"],[data-skin="idmpink"]) #tPad .k[data-b="edit"]:not(#zz){background:#2a6cff; color:#fff}
+:root:is([data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"]) #tPad .k[data-b="play"]:not(#zz){background:#ff4d00; color:#141414} :root:is([data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"]) #tPad .k[data-b="edit"]:not(#zz){background:#2a6cff; color:#fff}
 :root[data-skin="lineart"] #tPad .k[data-b="play"]:not(#zz){background:#ff5a5f; border-color:#ff5a5f} :root[data-skin="lineart"] #tPad .k[data-b="edit"]:not(#zz){background:#00a99d; border-color:#00a99d}
 :root[data-skin="lautrec"] #tPad .k[data-b="play"]:not(#zz){background:#d8452e; border-color:#2a1f1a} :root[data-skin="lautrec"] #tPad .k[data-b="edit"]:not(#zz){background:#2e7a70; border-color:#2a1f1a}
 :root[data-skin="vice"] #tPad .k[data-b="play"]:not(#zz){background:#ff3e9a; color:#140d2b} :root[data-skin="vice"] #tPad .k[data-b="edit"]:not(#zz){background:#2de2e6; color:#140d2b}
@@ -1654,10 +1654,10 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="haring"] :is(button,select,input[type=text],input[type=number],textarea,.lcell,.layercard,.fxcard,.voicecard,.setmenu){border-width:2px}
 :root[data-skin="haring"] .brand{font-weight:700; letter-spacing:.02em}
 :root[data-skin="haring"] .brand .plus{color:#e4002b}
-:root:is([data-skin="idm"],[data-skin="idmpink"]).tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]):not(#zz):not(#zz){background:#ff4d00!important; color:#141414!important; border-color:#ff4d00!important}   /* PLAYING: the skin's orange (owner, 31 Oct) */
-:root:is([data-skin="idm"],[data-skin="idmpink"]).tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]) *:not(#zz){color:#141414!important}
-:root:is([data-skin="idm"],[data-skin="idmpink"]) .brand{font-weight:700; text-transform:uppercase; letter-spacing:.08em}
-:root:is([data-skin="idm"],[data-skin="idmpink"]) .brand .plus{color:#ff4d00}
+:root:is([data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"]).tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]):not(#zz):not(#zz){background:#ff4d00!important; color:#141414!important; border-color:#ff4d00!important}   /* PLAYING: the skin's orange (owner, 31 Oct) */
+:root:is([data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"]).tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]) *:not(#zz){color:#141414!important}
+:root:is([data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"]) .brand{font-weight:700; text-transform:uppercase; letter-spacing:.08em}
+:root:is([data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"]) .brand .plus{color:#ff4d00}
 /* IDM PINK (owner, 31 Oct: "an idm skin that is pinks and greens"): IDM's layout, pink paper and green ink, hot pink for the
    accents and the playhead, green for EDIT and poly tracks, while playing the play buttons go neon pink. */
 :root[data-skin="idmpink"]{--mx:#0f2a1c; --mx2:#3d5e4b; --mxdim:#d9b6c6; --mxbg:#f6e6ed; --mxpanel:#fbf0f4; --mxpanel2:#eed3df; --mxon:#ffffff;
@@ -1666,6 +1666,12 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="idmpink"].tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]):not(#zz):not(#zz):not(#zz){background:#ff1ea8!important; color:#fff!important; border-color:#ff1ea8!important; box-shadow:0 0 12px #ff1ea8aa!important}
 :root[data-skin="idmpink"].tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]) *:not(#zz):not(#zz){color:#fff!important}
 :root[data-skin="idmpink"] .brand .plus{color:#ff2d8a}
+/* IDM PINK & GREEN (owner, 31 Oct: "exactly like the IDM skin, except instead of orange and blue, pink and green"): IDM's
+   paper and ink; its orange is pink, its blue green. */
+:root[data-skin="idmpg"]{--mxsoft:#ff2d8a; --mxpoly:#ff2d8a; --mxred:#ff2d8a; --mxcur:#ff2d8a; --mxbus:#1f9e5a}
+:root[data-skin="idmpg"] #tPad .k[data-b="play"]:not(#zz){background:#ff2d8a; color:#141414} :root[data-skin="idmpg"] #tPad .k[data-b="edit"]:not(#zz){background:#1f9e5a; color:#fff}
+:root[data-skin="idmpg"].tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]):not(#zz):not(#zz):not(#zz){background:#ff2d8a!important; color:#141414!important; border-color:#ff2d8a!important}
+:root[data-skin="idmpg"] .brand .plus{color:#ff2d8a}
 :root[data-skin="lautrec"] .brand{font-weight:600; font-style:italic; letter-spacing:.01em}
 :root[data-skin="lautrec"] .brand .plus{color:#d8452e}
 :root[data-skin="vice"] .brand{font-weight:600; letter-spacing:.04em; text-shadow:0 0 14px rgba(255,62,154,.55)}
@@ -1754,10 +1760,10 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
    second panel tone, so the app's menus read as their own strip above the SONG / PHRASE… row, and the screen tabs are
    plain words with the open one underlined. Only the bar's own buttons change (the menus that open from it keep the skin's
    colours); a pressed button stays filled. Dark Simple skins, Pastel and Minimal are unchanged. */
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .top{background:var(--mxpanel2)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .top{background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
 /* pads, command row and keypad: plain keys with outlines and an offset block; a hit fills */
 :root[data-skinbase="term"] :is(.tcmd,.dock,.tctl){background:var(--mxbg)}
 :root[data-skinbase="term"] :is(.tcmd button,.tkp .kp,.pads .pad){background:var(--mxbg); color:var(--mx); border-color:var(--mxline, var(--mx));
@@ -1794,7 +1800,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="greywhite"]{--mxmst:#c9b7f2}
 :root[data-skin="contrast"]{--mxmst:#d6331f; --mxmston:#ffffff}
 :root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg))}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .tdeck{--stpink:var(--mx)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .tdeck{--stpink:var(--mx)}
 :root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkChn,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkChn{--dkp:9%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
 :root[data-skinbase="term"] .dkh .dksolo{background:var(--mxsoft); color:var(--mxon)} :root[data-skinbase="term"] .stms button.so.on{background:var(--mxsoft); color:var(--mxon)}
 :root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
@@ -1802,7 +1808,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
    could go grey (plum: green into pink gave #d2d0d2). Light skins mix it with white so the hue stays; the dark skins
    (near-neutral backgrounds) keep mixing with theirs. */
 :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 35%, #ffffff)}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
 :root[data-skinbase="term"] .tagrid b.f[style]{background:color-mix(in srgb, var(--mx) var(--ibp, 100%), var(--mxsoft)); color:var(--mxon)} :root[data-skinbase="term"] .tagrid b.f{text-shadow:none; box-shadow:0 0 8px var(--mxglowc)}
 :root[data-skinbase="term"] .tscr .nbl, :root[data-skinbase="term"] .tscr .nbr{color:var(--mx2)}
 :root[data-skinbase="term"] ::selection{background:var(--mx); color:var(--mxon)}
@@ -2536,7 +2542,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <section id="hPad"><h2>Tracker · PAD mode</h2><table><tr><td>Arrows</td><td>Move</td></tr><tr><td>SHIFT + ◀▶</td><td>Change screen (through every screen in tab order)</td></tr><tr><td>SHIFT + ▲▼</td><td>In Song, Sect and Phrase: select the cursor's line, then grow the selection a line at a time (OPTION copies, OPTION+EDIT cuts). On the other screens: Project / Mixer</td></tr><tr><td>EDIT</td><td>Add, or run a › row · in a phrase, on a filled note stamps the current note and instrument over it; on an instrument, volume or effect, picks it up · tap twice for a new sect or phrase, or a note off</td></tr><tr><td>EDIT + arrows</td><td>Change the value (◀▶ by 1, ▲▼ by more)</td></tr><tr><td>OPTION + EDIT</td><td>Clear (with a selection: cut)</td></tr><tr><td>OPTION + arrows</td><td>Other sect, phrase, instrument or FX track · on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀) · in Song, page up/down</td></tr><tr><td>OPTION + arrows in Phrase</td><td>Go to the phrase above / below on this track (▲▼) or to the left / right on this row (◀▶), as laid out on the Song grid. A phrase not in the song steps by number. (Settings → Input → PATTERN NAV; off: ▲▼ jump 16 phrases)</td></tr><tr><td>SHIFT + OPTION + arrows</td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in KEYS mode</td></tr><tr><td>SHIFT + OPTION</td><td>Start or cancel a selection; arrows grow it, OPTION copies</td></tr><tr><td>SHIFT + EDIT</td><td>Paste</td></tr><tr><td>PLAY · SHIFT + PLAY</td><td>Play this screen · play the song · with LOOP on, PLAY loops the selected rows</td><tr><td>LOOP · SEMI +/−</td><td>Loop the selection (sticky) · transpose the phrase selection ±1 semitone at once</td></tr><tr><td>◀ ▶ on the FX screen</td><td>Open a slot's controls · back to the slot list (a sideways swipe does it too)</td></tr><tr><td>EDIT on an FX slot</td><td>A list of every effect (like the FX command list): pick one and its controls open; its own effect, marked NOW, keeps its settings; --- empties the slot</td></tr><tr><td>Row numbers</td><td>Tap to select whole lines, then COPY and PASTE</td></tr></table><p><b>One finger is enough.</b> With <b>Sticky keys</b> on, tap SHIFT or OPTION alone and it stays lit for the next button. The <b>command row</b> (Project → COMMANDS) gives every two-key command its own button: change, prev/next, clear, select, copy, cut, paste, play song, and on the SONG screen CLN↓ (clones the block, or the selected blocks, into new numbers on a new row below; the rows below move down) and CLN (clone): the block under the cursor is copied, phrases and all, to the next free number.</p><p>On a computer keyboard in PAD mode the keyboard is not disabled: arrows move, <kbd>Enter</kbd> opens, <kbd>Space</kbd> plays, typing letters and hex edits the cell, and <kbd>Shift</kbd> selects lines (so does <kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>▲▼</kbd>, as in KEYS mode). <kbd>Z</kbd> stays OPTION (not a note), <kbd>X</kbd> stays EDIT, and <kbd>Alt</kbd>+arrows page (OPTION+arrow) rather than change the value.</p><h3>Touch</h3><p>Tap a cell to move there; tap it again to open or add. Drag up or down on the cursor’s cell to change its value; drag elsewhere to scroll.</p></section>
     <section id="hFx"><h2>FX column commands</h2>
 <p>Each phrase row has three effect columns: a command and a hex value. The info line at the bottom of the screen explains the one under the cursor.</p>
-<div class="fxg"><div><code>CSL</code>MIDI CC glide: the <code>CCA</code>–<code>CCD</code> commands on the same row move to their value over XY ticks instead of jumping (00: across the step), from the value sent before</div><div><code>DIR</code>play direction for this track from the next row on: 00 forward, 01 backwards, 02 ping-pong, 03 a random row each step (a phrase still lasts as many steps as it has rows)</div><div><code>BYP</code>…chains module X (the number on its BYP button; 0 = all) in (Y 0), bypassed (Y 1), or the other way from the patch for Y rows then back</div><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FXS</code>pick what FXV moves on this track: slot X (1–8), its parameter Y (1–F, in the FX screen's order)</div><div><code>FXV</code>set that parameter, 00 its lowest – FF its highest (the slot's own value comes back when the song stops)</div><div><code>SCA</code>this track's scale from here on: X the root (0 = C … B), Y the scale (0 off, 1 major, 2 minor, 3 harmonic minor…); KEY FOLLOW instruments</div><div><code>SCG</code>every track's scale from here on, as SCA</div><div><code>CUT</code>low-pass the pad from here on, 00 dark – FF off</div><div><code>FDI</code>fade the note in over XX ticks</div><div><code>TRM</code>tremolo on the note: X cycles a beat, Y depth</div><div><code>APN</code>auto-pan the note: X cycles a beat, Y width</div><div><code>TVL</code>this track's level from here on, 00 silent – FF the mixer's (back at stop)</div><div><code>TPN</code>this track's pan from here on, 80 centre (back at stop)</div><div><code>STP</code>stop every note: 00 this track, 01 every track</div><div><code>LPB</code>lines per beat for every track from here on (00 the phrases' own)</div><div><code>PDL</code>the whole song waits XX rows</div><div><code>ONE</code>one note of the row's chord, at random</div><div><code>MPB</code>MIDI pitch bend, 80 centre</div><div><code>MAT</code>MIDI channel pressure</div><div><code>RES</code>resonance for CUT</div><div><code>DEC</code>shorten the pad from here on, 00 a click – FF its own length</div><div><code>FLX</code>Flex pattern: 00 off, 01–10</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>retrigger every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>PRB</code>chance the command to its left happens (as RND changes it; with none, the note's chance)</div><div><code>MUT</code>play variation XX of the pad's sound (INST › RANGE: how far); RND or RNL after it for a new one each time</div><div><code>GEN</code>play a fresh sound XX of the instrument's GEN TYPE (INST › GEN TYPE, FAMILY, RANGE)</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row Y</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div><div><code>CCA</code>–<code>CCD</code>MIDI CC: 00–7F to the instrument’s CC slot A–D (the CC numbers are on INST)</div><div><code>PGM</code>MIDI program change 00–7F, just before the row’s note</div></div>
+<div class="fxg"><div><code>CSL</code>MIDI CC glide: the <code>CCA</code>–<code>CCD</code> commands on the same row move to their value over XY ticks instead of jumping (00: across the step), from the value sent before</div><div><code>DIR</code>play direction for this track from the next row on: 00 forward, 01 backwards, 02 ping-pong, 03 a random row each step (a phrase still lasts as many steps as it has rows)</div><div><code>BYP</code>…chains module X (the number on its BYP button; 0 = all) in (Y 0), bypassed (Y 1), or the other way from the patch for Y rows then back</div><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FXS</code>pick what FXV moves on this track: slot X (1–8), its parameter Y (1–F, in the FX screen's order)</div><div><code>FXV</code>set that parameter, 00 its lowest – FF its highest (the slot's own value comes back when the song stops)</div><div><code>SCA</code>this track's scale from here on: X the root (0 = C … B), Y the scale (0 off, 1 major, 2 minor, 3 harmonic minor…); KEY FOLLOW instruments</div><div><code>SCG</code>every track's scale from here on, as SCA</div><div><code>CUT</code>low-pass the pad from here on, 00 dark – FF off</div><div><code>FDI</code>fade the note in over XX ticks</div><div><code>TRM</code>tremolo on the note: X cycles a beat, Y depth</div><div><code>APN</code>auto-pan the note: X cycles a beat, Y width</div><div><code>TVL</code>this track's level from here on, 00 silent – FF the mixer's (back at stop)</div><div><code>TPN</code>this track's pan from here on, 80 centre (back at stop)</div><div><code>STP</code>stop every note: 00 this track, 01 every track</div><div><code>LPB</code>lines per beat for every track from here on (00 the phrases' own)</div><div><code>PDL</code>the whole song waits XX rows</div><div><code>ONE</code>one note of the row's chord, at random</div><div><code>MPB</code>MIDI pitch bend, 80 centre</div><div><code>MAT</code>MIDI channel pressure</div><div><code>RES</code>resonance for CUT</div><div><code>DEC</code>shorten the pad from here on, 00 a click – FF its own length</div><div><code>FLX</code>Flex pattern: 00 off, 01–10, then 11–FF in families by the first digit: 1 roll, 2 stutter, 3 build, 4 reverse, 5 pitch down, 6 pitch up, 7 tape, 8 scratch, 9 gate, A filter, B crush, C fade repeat, D juggle, E groove, F chaos (the second digit picks the variant)</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>retrigger every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>PRB</code>chance the command to its left happens (as RND changes it; with none, the note's chance)</div><div><code>MUT</code>play variation XX of the pad's sound (INST › RANGE: how far); RND or RNL after it for a new one each time</div><div><code>GEN</code>play a fresh sound XX of the instrument's GEN TYPE (INST › GEN TYPE, FAMILY, RANGE)</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row Y</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div><div><code>CCA</code>–<code>CCD</code>MIDI CC: 00–7F to the instrument’s CC slot A–D (the CC numbers are on INST)</div><div><code>PGM</code>MIDI program change 00–7F, just before the row’s note</div></div>
 <p><b>MIDI instruments</b> (INST › OUTPUT MIDI or PAD+MIDI) send to their <b>PORT</b> A–D: ⚙ Settings → MIDI (on a computer, Audio &amp; MIDI ▾ in the top bar) says which cable each letter is on this device, so a song plays the same on the phone and the computer. <code>CCA</code>–<code>CCD</code> and <code>PGM</code> work on rows without a note too (on the track’s last instrument), and <code>RND</code>, <code>RNL</code> and <code>REP</code> change them like any command. <code>PSL</code>, <code>PBN</code>, <code>PVB</code>, <code>PIT</code>/<code>FIN</code> on a held note and fractions of a semitone are sent as pitch bend: set INST › <b>BEND RANGE</b> to the range your gear bends. <code>ARP</code> plays its steps as notes, then the note itself again (unless the next row retunes it or plays another note).</p>
 <p><b>LFO → CC:</b> INST › <b>LFO CC</b> (set a CC number) runs an LFO on that CC while the song plays: SHAPE, RATE in time with the song (T triplet, D dotted), DEPTH (127 is the whole range), CENTRE, and RESTART (FREE from PLAY, NOTE at each of the instrument’s notes). <b>Song position:</b> with clock out on, playing the song from a row partway into a block sends Song Position Pointer and Continue, so the gear starts at the same place; with clock in on, the other device’s Continue after a Song Position Pointer plays the song from there.</p>
 <p><b>Playing and recording from a MIDI keyboard:</b> ⚙ Settings → MIDI → <b>Keys play</b>: in the tracker the keyboard plays the instrument you're on (the INST screen's, or the cursor row's in a phrase) and holds it while the key is down; a MIDI instrument plays its gear, with bend, aftertouch, sustain and every unlearned knob passed through. <b>Notes in</b> picks the input and channel, <b>Clock from</b> the input Clock in follows, and each port has its own <b>delay</b>. <b>REC</b> on the top strip (F9): stopped, a note or chord goes in at the cursor and the cursor moves on when you let go; playing, notes land on the step they were played on in the track under the cursor, with velocity and OFFs (a take is one undo step). <b>CLICK</b> is the metronome; Settings → <b>Record &amp; play</b> has its level, the count-in, REC TIMING (STEP, or TICKS: the step plus a <code>DEL</code>) and LIVE TRANSPOSE (a key transposes the KEY FOLLOW instruments as the song plays).</p>
@@ -2547,7 +2553,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p><b>…chains modules:</b> every effect module in a …chains patch has a <b>BYP</b> button on its title bar with a number: it bypasses the module (its dry sound passes). From a phrase, <code>BYP 31</code> bypasses module 3 on that track's chain, <code>BYP 30</code> puts it back, and <code>BYP 34</code> switches it the other way from the patch for four rows, so a trance gate left bypassed plays for four rows. <code>BYP 0Y</code> does every numbered module. Stopping the song puts them back as the patch has them.</p>
 <p><b>Presets and sidechains in …chains:</b> effects and sound sources have a <b>Preset</b> row: factory presets, Default, and your own (Save as a preset keeps them on this device, for every patch). Every sidechain user has a <b>Source</b>: <b>Self</b>, <b>Send 1–8</b> (what a <b>Sidechain Out</b> in any chain sends) or one <b>track</b>'s own sound, before its effects and fader, so a muted ghost kick still drives it. That goes for <b>Sidechain In</b> (its meter shows what it hears before you patch it), Sidechain Comp, the compressors, the noise gate and the envelope filter, in …chains and as track or master effects. The Mixer's <b>SC</b> row lights when a track is a source for something. The light beside a module's <b>SC</b> input flashes with the sidechain it hears.</p>
 <h3>Flex, Step gate and Retrigger</h3>
-<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (16 patterns; <code>FLX</code> picks one from a row). <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT</code> picks. <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot.</p>
+<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (256 patterns; <code>FLX</code> picks one from a row: 01–10 the originals, then families by the first hex digit, after the OP-Z and Pocket Operator punch-ins: 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops and wow, 8 scratches, 9 gates and pumps, A filter sweeps, B bit crush, C fading repeats, D juggles, E swing and feel, F chaos). <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT</code> picks. <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot.</p>
 <h3>Track effects</h3>
 <p>Each track and the master have 8 effect slots (FX screen, or the Mixer’s FX row): 72 effects on a track and 81 on a bus or the master (with the nine …pump ones; …pump EQ goes on any track), in groups: dynamics and EQ (compressors, Bus and Glue Comp, limiter, noise gate, transient shaper, multiband, air), filters (filter, ladder, low and high cut, auto-wah, vowel, envelope filter), drive and lo-fi (saturation, drive, overdrive, tube, tape, wavefolder, bitcrush, lo-fi, degrade, vinyl, dub tape, cab), modulation (chorus, ensemble, dimension, flanger, phaser, tremolo, auto-pan, rotary, ring mod, cross-mod, frequency shifter), delays (simple, tape, BBD, pitch, granular, reverse echo), reverbs (room, plate, spring, space, Galactic, pitch reverb, convolution), pitch and voice (pitch shifter, harmonizer, pitch correct), resonators (resonator, comb, Rings), spectral and granular (Clouds, Beads, spectral, extreme stretch), rhythmic (Flex, Step gate, Retrigger, trance gate, pump, Beat grains, Beat scramble, Glitch sequencer) and utility (stereo width, utility). The pad's Add effect menu has 65 of them. On the Mixer’s FX row, OPTION (Alt in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter. For drums and IDM: <b>Beat grains</b> (a rhythmic grain cloud in time with the song, after Output Portal: rate, density, size, position, spray, pitch and random pitch, reverse, shape, stereo, freeze), <b>Beat scramble</b> (re-orders the last bar's slices, some reversed; keep the beats, new every bar or looped) and <b>Glitch sequencer</b> (each step may stutter, reverse, jump an octave, tape-stop, crush or drop out). Under a slot's controls, <b>› PRESET</b> lists INIT, factory presets (over 230 across the effects) and the song's own, and <b>› SAVE AS PRESET…</b> keeps the slot's settings for that effect. <b>› EQ WINDOW</b> (at the bottom of the FX screen, on any track) opens the track's …pump EQ in its own window, adding one to a free slot if needed; …pump EQ works on every track, the other …pump effects on buses and the master.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
@@ -12412,7 +12418,8 @@ const SKINS = [
   {id:'matrixlight', name:'Matrix light', base:'term', dots:['#ffffff', '#00702d', '#a9cdb4', '#0062d6']},
   {id:'haring', name:'Haring', base:'term', dots:['#ffffff', '#111111', '#e4002b', '#0057b8']},
   {id:'idm', name:'IDM', base:'term', dots:['#e9e8e3', '#141414', '#ff4d00', '#2a6cff']},
-  {id:'idmpink', name:'IDM pink', base:'term', dots:['#f6e6ed', '#0f2a1c', '#ff2d8a', '#1f9e5a']},
+  {id:'idmpg', name:'IDM pink & green', base:'term', dots:['#e9e8e3', '#141414', '#ff2d8a', '#1f9e5a']},
+  {id:'idmpink', name:'IDM pink paper', base:'term', dots:['#f6e6ed', '#0f2a1c', '#ff2d8a', '#1f9e5a']},
   {id:'lineart', name:'Line art', base:'term', dots:['#ffffff', '#1a1a1a', '#ff5a5f', '#00a99d']},
   {id:'lautrec', name:'Lautrec poster', base:'term', dots:['#f4e9d2', '#2a1f1a', '#d8452e', '#2e7a70']},
   {id:'vice', name:'Vice (Miami night)', base:'term', dots:['#140d2b', '#f4eeff', '#ff3e9a', '#2de2e6']},
@@ -13819,7 +13826,7 @@ const FXI = {
     return Y === 0 ? `Switch ${w} off` : Y === 1 ? `Switch ${w} on` : `Switch ${w} on for ${Y} rows, then back as set (momentary)`; },
   BYP:v => { const X = v >> 4, Y = v & 15, w = X ? `…chains module ${hx(X).slice(1)}` : 'every numbered …chains module';
     return (Y === 0 ? `Put ${w} back in` : Y === 1 ? `Bypass ${w} (its dry sound passes)` : `Switch ${w} the other way from the patch for ${Y} rows, then back`) + ' on this track'; },
-  FLX:v => `Flex pattern ${Math.min(16, v)}: ${FlexCore.NAMES[Math.min(16, v)]} (on this track's Flex effect; in the MST column, the master's)`,
+  FLX:v => { const k = flxCap(v); return `Flex pattern ${hx(k)}: ${FlexCore.NAMES[k]}${k !== v ? ' (this song keeps FLX 11–FF as pattern 10: Project → FLX 11–FF)' : ''} (on this track's Flex effect; in the MST column, the master's)`; },
   GAT:v => `Step gate pattern ${Math.min(15, v)}: ${StepGateCore.NAMES[Math.min(15, v)]}`,
   RTG:v => { const X = v >> 4, Y = v & 15; return !X ? 'Retrigger off' : `Retrigger every ${RetrigCore.NAMES[Math.min(8, X) - 1]}` + (Y ? ` for ${Y} rows` : ' until RTG 00') + ' (X: 1 = 1/4 … 5 = 1/64, 6–8 triplets)'; },
   WOB:v => v ? `Bass wobble ${BASS_DIVN[Math.min(BASS_DIV.length, v) - 1]} from here on (01 = 4 bars … 0D = 1/32)` : 'WOB 00: back to the bass voice’s own wobble rate',
@@ -13877,9 +13884,123 @@ function clkSpb(o, bp, n){
    (`ph`, float64, a sample at a time, locked to the clock each block) and a glided samples-per-beat (`sp`), so the read
    head moves smoothly: reading the float32 clock directly made the moving patterns gritty. */
 class FlexCore {
-  constructor(sr){ this.sr = sr; this.N = Math.ceil(sr * 13); this.bL = null; this.bR = null; this.w = 0; this.D = 0; this.xo = 0; this.xc = 0; this.xn = 1; this.g = 1; this.pg = 1; this.spb = sr / 2; this.sp = sr / 2; this.ph = -1; }
-  static get NAMES(){ return ['OFF', 'REPEAT 1/4', 'REPEAT 1/8', 'FILL 1/16', 'STUTTER BUILD', 'HALF SPEED', 'TAPE STOP', 'REVERSE BEATS', 'REVERSE 1/8', 'BACKSPIN', 'SCRATCH',
-    'GATE 1/16', 'TRANCE CHOP', 'SHUFFLE', 'BEAT JUGGLE', 'OCTAVE UP', 'RANDOM SLICES']; }
+  constructor(sr){ this.sr = sr; this.N = Math.ceil(sr * 13); this.bL = null; this.bR = null; this.w = 0; this.D = 0; this.xo = 0; this.xc = 0; this.xn = 1; this.g = 1; this.pg = 1; this.spb = sr / 2; this.sp = sr / 2; this.ph = -1;
+    this.T = null; this.lp = 1; this.hp = 0; this.cr = 1; this.bt = 0; this.slp = 1; this.shp = 0; this.fs = [0, 0, 0, 0, 0, 0, 0, 0]; this.fa = 1; this.fb = 1; this.fk = 0; this.hc = 0; this.hl = 0; this.hr = 0; }
+  /* FLEX 256 (owner, 31 Oct: "reminiscent of the OP-Z and Pocket Operator punch-in effects"): 01–10 are the originals;
+     11–FF are families by the first hex digit, the second one the variant, gentler to wilder:
+     1 ROLL (a roll from late in the bar) · 2 STUTTER (the start of every beat, half, two beats… again) · 3 BUILD (rolls that
+     speed up) · 4 REVERSE · 5 DOWN (slower, pitched down) · 6 UP (faster, pitched up) · 7 TAPE (stops, spin-ups, wow and
+     flutter) · 8 SCRATCH · 9 GATE (chops, pumps, swells) · A FILTER (low- and high-pass sweeps and wobbles) · B CRUSH
+     (bits and sample rate) · C FADE REPEAT (repeats that die away) · D JUGGLE (the bar's slices reordered, the same every
+     bar) · E GROOVE (swing, 6/8, 5s, vibrato) · F CHAOS (a random move on some slices, some new every bar). */
+  static SPEC(){
+    const F = (a, b) => b === 1 ? '' + a : a + '/' + b, fr = x => { for (const d of [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 64]){ const n = Math.round(x * d); if (Math.abs(n / d - x) < 1e-6) return F(n, d); } return x.toFixed(2); };
+    const st = s => { const v = Math.round(12 * Math.log2(s)); return (v > 0 ? '+' : '') + v; };
+    const T = new Array(256).fill(null), put = (X, list) => list.forEach((o, y) => { if (X * 16 + y > 16) T[X * 16 + y] = o; });
+    put(1, [null, ...[[3, 1/2], [3, 1/3], [3, 1/4], [3, 1/6], [3, 1/8], [3, 1/12], [3, 1/16], [3, 1/32], [2, 1/4], [2, 1/8], [2, 1/16], [3.5, 1/16], [3.5, 1/32], [3.5, 1/64], [0, 1/16]]
+      .map(([s, L]) => ({f:'roll', s, L, n:`ROLL ${fr(L)} FROM BEAT ${s + 1}`}))]);
+    put(2, [[1, 1/3], [1, 1/4], [1, 1/8], [1, 1/16], [1/2, 1/4], [1/2, 1/6], [1/2, 1/8], [1/2, 1/16], [2, 1], [2, 1/2], [2, 1/4], [4, 1/2], [4, 1/3], [4, 3/4], [4, 1/8], [1/4, 1/16]]
+      .map(([C, L]) => ({f:'stut', C, L, n:`STUTTER ${fr(L)} EVERY ${fr(C)}`})));
+    put(3, [[[2, 1/2], [3, 1/4], [3.5, 1/8]], [[2, 1/4], [3, 1/8], [3.5, 1/16]], [[2, 1/8], [3, 1/16], [3.5, 1/32]], [[0, 1], [1, 1/2], [2, 1/4], [3, 1/8]],
+      [[0, 1/2], [1, 1/4], [2, 1/8], [3, 1/16]], [[0, 1/4], [1, 1/8], [2, 1/16], [3, 1/32]], [[3, 1/4], [3.5, 1/8], [3.75, 1/16]], [[3, 1/8], [3.5, 1/16], [3.75, 1/32]],
+      [[2, 1/3], [3, 1/6], [3.5, 1/12]], [[0, 1/3], [1, 1/6], [2, 1/12], [3, 1/24]], [[0, 1/16], [1, 1/8], [2, 1/4], [3, 1/2]], [[2, 1/16], [3, 1/8]],
+      [[2, 1/4], [3, 1/8], [3.5, 1/16], [3.75, 1/32]], [[1, 1/2], [2, 1/4], [2.5, 1/8], [3, 1/16], [3.5, 1/32]], [[0, 2], [2, 1], [3, 1/2], [3.5, 1/4]], [[3.5, 1/32], [3.75, 1/64]]]
+      .map((sg, i) => ({f:'build', sg, n:(i === 10 || i === 11 ? 'SLOW DOWN ' : 'BUILD ') + sg.map(q => fr(q[1])).join(' ') + (sg[0][0] ? ` FROM BEAT ${sg[0][0] + 1}` : '')})));
+    put(4, [[4, 'all'], [2, 'all'], [1/4, 'all'], [1/8, 'all'], [1/3, 'all'], [1/6, 'all'], [1, 'alt'], [1/2, 'alt'], [1/4, 'alt'], [2, 'alt'], [1, 'last'], [1/2, 'last'], [1/4, 'last'], [1, 'half'], [2, 'half'], [1/2, 'rnd']]
+      .map(([C, m]) => ({f:'rev', C, m, n:{all:`REVERSE ${fr(C)}S`, alt:`REVERSE EVERY OTHER ${fr(C)}`, last:`REVERSE ${fr(C)}S IN BEAT 4`, half:`REVERSE HALF SPEED ${fr(C)}`, rnd:`REVERSE RANDOM ${fr(C)}S`}[m]})));
+    put(5, [[1, 1/2], [2, 1/2], [1/2, 1/2], [4, 3/4], [1, 3/4], [4, 2/3], [1, 2/3], [4, 1/4], [1, 1/4], [2, 1/2, 2], [1, 1/2, 3], [1/4, 1/2], [2, 3/4, 2], [4, 0.89], [4, 1/2, 2], [1/2, 1/4]]
+      .map(([C, s, a]) => ({f:'down', C, s, a:a || 0, n:`DOWN ${st(s)} EVERY ${fr(C)}` + (a ? ` FROM BEAT ${a + 1}` : '')})));
+    put(6, [[1/2, 2], [1/4, 2], [2, 2], [4, 2], [1, 1.5], [1/2, 1.5], [1, 4/3], [1/2, 4/3], [1/4, 3], [1/4, 4], [1/8, 4], [1, 2, 'last'], [1/2, 2, 'alt'], [1, 1.5, 'alt'], [2, 1.5], [1, 1.1225]]
+      .map(([C, s, m]) => ({f:'up', C, s, m, n:`UP ${st(s)} EVERY ${fr(C)}` + (m === 'last' ? ' IN BEAT 4' : m === 'alt' ? ' (EVERY OTHER)' : '')})));
+    put(7, [{f:'stop', a:3, b:4, n:'TAPE STOP BEAT 4'}, {f:'stop', a:2, b:4, n:'TAPE STOP HALF BAR'}, {f:'stop', a:3.5, b:4, n:'TAPE STOP 1/2 BEAT'}, {f:'stop', C:1, n:'TAPE STOP EVERY BEAT'},
+      {f:'stop', C:2, n:'TAPE STOP EVERY 2 BEATS'}, {f:'stop', C:1/2, n:'TAPE STOP EVERY 1/2'}, {f:'start', a:0, b:1, n:'TAPE START BEAT 1'}, {f:'start', a:0, b:2, n:'TAPE START HALF BAR'},
+      {f:'start', a:0, b:4, n:'TAPE START BAR'}, {f:'start', C:1, n:'TAPE START EVERY BEAT'}, {f:'start', C:2, n:'TAPE START EVERY 2 BEATS'}, {f:'wow', T:1, d:0.012, n:'WOW'},
+      {f:'wow', T:1/2, d:0.02, n:'WOW DEEP'}, {f:'wow', T:1/16, d:0.0012, n:'FLUTTER'}, {f:'wow', T:1/3, d:0.01, T2:1/24, d2:0.0008, n:'WARBLE'}, {f:'stop', a:3.75, b:4, n:'TAPE STOP 1/4 BEAT'}]);
+    put(8, [[1, 0.25, 1], [1, 0.5, 2], [1/2, 0.5, 1], [1/4, 0.5, 1], [2, 0.25, 4], [1, 0.25, 4], [1/2, 0.5, 2, 1], [1, 0.5, 4, 1], [1/4, 1, 1, 1], [4, 0.125, 8], [1, 0.125, 8], [1/2, 1, 2], [2, 0.5, 2], [1, 0.25, 2, 2], [1/2, 0.25, 4, 1], [4, 0.25, 2]]
+      .map(([C, d, k, gt]) => ({f:'scr', C, d, k, gt:gt || 0, n:`${gt === 2 ? 'TRANSFORM' : gt ? 'CHIRP' : 'SCRATCH'} ${fr(C)} ×${k}`})));
+    const M = s => { let m = 0; for (let j = 0; j < 16; j++) if (s[j] === 'x') m |= 1 << (15 - j); return m; };
+    put(9, [{f:'gate', g:1/32, n:'GATE 1/32'}, {f:'gate', g:1/12, n:'GATE 1/8T'}, {f:'gate', g:1/24, n:'GATE 1/16T'}, {f:'pump', C:1, n:'PUMP 1/4'}, {f:'pump', C:1/2, n:'PUMP 1/8'},
+      {f:'swell', C:1, n:'SWELL EVERY BEAT'}, {f:'swell', C:4, n:'SWELL BAR'}, {f:'fade', n:'FADE OUT BAR'},
+      ...['xx.x.xx.x.xx.x.x', 'x...x.x.x...x.xx', 'xxx.x.x.xxx.x.x.', 'x.x.xx.x.x.xx.x.', '.xxx.xxx.xxx.xxx', 'x..xx..xx..xx..x', 'xxxxxx..xxxx..x.', 'x.x.x.x.xxxxxxxx'].map(s => ({f:'mask', m:M(s), n:'GATE ' + s.replace(/x/g, '■').replace(/\./g, '·')}))]);
+    put(10, [{lp:[1, 0.1], n:'LOW-PASS DOWN BAR'}, {lp:[0.1, 1], n:'LOW-PASS UP BAR'}, {hp:[0, 0.85], n:'HIGH-PASS RISER BAR'}, {hp:[0.85, 0], n:'HIGH-PASS DOWN BAR'}, {lp:[1, 0.1], a:3, n:'LOW-PASS DOWN BEAT 4'},
+      {hp:[0, 0.85], a:3, n:'HIGH-PASS UP BEAT 4'}, {lpw:[1, 0.55, 0.4], n:'LOW-PASS WOBBLE 1/4'}, {lpw:[2, 0.55, 0.4], n:'LOW-PASS WOBBLE 1/8'}, {hpw:[1, 0.4, 0.35], n:'HIGH-PASS WOBBLE 1/4'},
+      {lp:[0.35, 0.35], n:'LOW-PASS CLOSED'}, {hp:[0.6, 0.6], n:'HIGH-PASS THIN'}, {lp:[0.62, 0.62], hp:[0.42, 0.42], n:'BAND-PASS'}, {bw:1, n:'BAND SWEEP UP BAR'},
+      {lpw:[1.5, 0.5, 0.42], n:'LOW-PASS WOBBLE 1/8T'}, {lpb:1, n:'LOW-PASS DOWN EVERY BEAT'}, {lp:[0.55, 0.55], hp:[0.5, 0.5], n:'TELEPHONE'}].map(o => Object.assign({f:'filt'}, o)));
+    put(11, [{b:8, n:'CRUSH 8 BIT'}, {b:6, n:'CRUSH 6 BIT'}, {b:4, n:'CRUSH 4 BIT'}, {h:4, n:'DOWNSAMPLE ÷4'}, {h:8, n:'DOWNSAMPLE ÷8'}, {h:16, n:'DOWNSAMPLE ÷16'}, {h:8, b:6, n:'CRUSH ÷8 6 BIT'},
+      {hs:[1, 24], n:'CRUSH SWEEP UP BAR'}, {hs:[24, 1], n:'CRUSH SWEEP DOWN BAR'}, {h:12, b:5, beats:[1, 3], n:'CRUSH BEATS 2 AND 4'}, {h:12, b:5, alt:1/2, n:'CRUSH EVERY OTHER 1/8'},
+      {b:3, n:'CRUSH 3 BIT'}, {h:32, n:'DOWNSAMPLE ÷32'}, {h:4, b:4, n:'CRUSH ÷4 4 BIT'}, {h:16, b:5, a:3, n:'CRUSH BEAT 4'}, {h:12, lp:0.55, n:'CRUSH DARK'}].map(o => Object.assign({f:'crush'}, o)));
+    put(12, [[1, 1/4, 0.6], [1, 1/8, 0.75], [1, 1/3, 0.6], [2, 1/2, 0.6], [2, 3/4, 0.6], [4, 1, 0.6], [4, 3/4, 0.65], [4, 1/2, 0.7], [1/2, 1/8, 0.6], [1/2, 1/16, 0.75], [1, 1/6, 0.7], [4, 1/4, 0.85], [2, 1/3, 0.7], [1, 1/16, 0.85], [4, 3/2, 0.6], [4, 2, 0.5]]
+      .map(([C, L, k]) => ({f:'echo', C, L, k, n:`FADE REPEAT ${fr(L)} EVERY ${fr(C)}`})));
+    put(13, [...[0, 1, 2, 3, 4, 5, 6, 7].map(i => ({f:'jug', G:1/4, c:0.5, rv:i > 5 ? 0.25 : 0, seed:i, n:`JUGGLE 1/16 #${i + 1}`})), ...[0, 1, 2, 3].map(i => ({f:'jug', G:1/2, c:0.6, rv:i > 2 ? 0.3 : 0, seed:8 + i, n:`JUGGLE 1/8 #${i + 1}`})),
+      {f:'jug', G:1/3, c:0.55, rv:0, seed:12, n:'JUGGLE 1/8T'}, {f:'jug', G:1/6, c:0.55, rv:0.2, seed:13, n:'JUGGLE 1/16T'}, {f:'jug', G:1/4, c:1, rv:0.3, seed:14, n:'JUGGLE ALL 1/16'}, {f:'jug', G:1/8, c:0.5, rv:0.2, seed:15, n:'JUGGLE 1/32'}]);
+    put(14, [{f:'swing', C:1/2, a:0.08, n:'SWING 1/8 LIGHT'}, {f:'swing', C:1/2, a:0.12, n:'SWING 1/8'}, {f:'swing', C:1/2, a:0.17, n:'SWING 1/8 HARD'}, {f:'swing', C:1/4, a:0.08, n:'SWING 1/16 LIGHT'},
+      {f:'swing', C:1/4, a:0.12, n:'SWING 1/16'}, {f:'swing', C:1/4, a:0.17, n:'SWING 1/16 HARD'}, {f:'tup', C:1, q:3, n:'6/8 FEEL'}, {f:'tup', C:1/2, q:3, n:'6/8 FEEL 1/8'},
+      {f:'tup', C:1, q:5, n:'5-TUPLET FEEL'}, {f:'wow', T:1, d:0.004, n:'VIBRATO SLOW'}, {f:'wow', T:1/8, d:0.0008, n:'VIBRATO FAST'}, {f:'wow', T:1/2, d:0.009, n:'VIBRATO DEEP'},
+      {f:'drunk', n:'DRUNK'}, {f:'lag', n:'LAID-BACK OFFBEATS'}, {f:'swing', C:1/2, a:0.22, n:'SWING 1/8 EXTREME'}, {f:'swing', C:1/4, a:0.22, n:'SWING 1/16 EXTREME'}]);
+    put(15, Array.from({length:16}, (_, y) => { const G = y < 4 ? 1 : y < 10 ? 1/2 : 1/4, c = 0.25 + 0.5 * ((y < 4 ? y : y < 10 ? y - 4 : y - 10) / (y < 4 ? 3 : 5)), nb = y & 1;
+      return {f:'chaos', G, c, nb, seed:y, n:`CHAOS ${fr(G / 4)} ${Math.round(c * 100)}%` + (nb ? ' NEW EVERY BAR' : '')}; }));
+    return T;
+  }
+  static get NAMES(){
+    if (FlexCore._N) return FlexCore._N;
+    const T = FlexCore.SPEC(), N = ['OFF', 'REPEAT 1/4', 'REPEAT 1/8', 'FILL 1/16', 'STUTTER BUILD', 'HALF SPEED', 'TAPE STOP', 'REVERSE BEATS', 'REVERSE 1/8', 'BACKSPIN', 'SCRATCH',
+      'GATE 1/16', 'TRANCE CHOP', 'SHUFFLE', 'BEAT JUGGLE', 'OCTAVE UP', 'RANDOM SLICES'];
+    for (let k = 17; k < 256; k++) N[k] = T[k] ? T[k].n : 'OFF';
+    return (FlexCore._N = N);
+  }
+  static hh(a, b, c){ let h = Math.imul((a | 0) * 73856093 ^ (b | 0) * 19349663 ^ (c | 0) * 83492791, 2654435761) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h = (h ^ (h >>> 13)) >>> 0; return h / 4294967296; }
+  // 17–255: sets this.pg (gain), this.plp / this.php (filter, 0–1; 1 / 0 = open), this.pcr / this.pbt (hold, bits; 1 / 0 = clean); returns the read position
+  ext(k, p, bar){
+    const o = (this.T || (this.T = FlexCore.SPEC()))[k]; let r = p, g = 1, lp = 1, hp = 0, cr = 1, bt = 0;
+    if (o){ const cs = C => Math.floor(p / C + 1e-9) * C;
+      switch (o.f){
+        case 'roll': if (p >= o.s) r = o.s + (p - o.s) % o.L; break;
+        case 'stut': { const c = cs(o.C); r = c + (p - c) % o.L; } break;
+        case 'build': { let s = null; for (const q of o.sg) if (p >= q[0]) s = q; if (s) r = s[0] + (p - s[0]) % s[1]; } break;
+        case 'rev': { const C = o.C, c = cs(C), i = Math.round(c / C), u = p - c;
+          const on = o.m === 'all' || o.m === 'half' || (o.m === 'alt' && (i & 1)) || (o.m === 'last' && c >= 3 - 1e-9) || (o.m === 'rnd' && FlexCore.hh(i, k, 5) < 0.5);
+          if (on) r = c - (o.m === 'half' ? u / 2 : u); } break;
+        case 'down': if (p >= o.a){ const c = o.a + Math.floor((p - o.a) / o.C + 1e-9) * o.C; r = c + (p - c) * o.s; } break;
+        case 'up': { const C = o.C, c = cs(C), i = Math.round(c / C);
+          if (!o.m || (o.m === 'last' && c >= 3 - 1e-9) || (o.m === 'alt' && (i & 1))) r = c - C * (o.s - 1) + (p - c) * o.s; } break;
+        case 'stop': { const a = o.C ? cs(o.C) : o.a, W = o.C || o.b - o.a;
+          if (p >= a){ const u = Math.min(p - a, W); r = a + u - u * u / (2 * W); if (u > W * 0.85) g = Math.max(0, (W - u) / (W * 0.15)); } } break;
+        case 'start': { const a = o.C ? cs(o.C) : o.a, W = o.C || o.b - o.a;
+          if (p >= a && p < a + W){ const u = p - a; r = a - W / 2 + u * u / (2 * W); g = Math.min(1, u / (W * 0.2)); } else if (!o.C && p >= a + W) r = p - W / 2; } break;
+        case 'wow': r = p - o.d * (1 - Math.cos(2 * Math.PI * p / o.T)) / 2 - (o.d2 ? o.d2 * (1 - Math.cos(2 * Math.PI * p / o.T2)) / 2 : 0); break;
+        case 'scr': { const C = o.C, c = cs(C), u = (p - c) / C; r = c - C * o.d + C * o.d * (1 - Math.cos(2 * Math.PI * o.k * u)) / 2;
+          if (o.gt === 1) g = Math.sin(2 * Math.PI * o.k * u) >= 0 ? 1 : 0; else if (o.gt === 2) g = (p * 16) % 1 < 0.5 ? 1 : 0; } break;
+        case 'gate': g = (p / o.g) % 2 < 1 ? 1 : 0; break;
+        case 'pump': { const u = (p % o.C) / o.C; g = Math.min(1, u * 3); } break;
+        case 'swell': g = (p % o.C) / o.C; break;
+        case 'fade': g = 1 - p / 4; break;
+        case 'mask': g = (o.m >> (15 - Math.min(15, Math.floor(p * 4)))) & 1; break;
+        case 'filt': { const t = o.a ? Math.max(0, (p - o.a) / (4 - o.a)) : p / 4, L = (v, t) => v[0] + (v[1] - v[0]) * t;
+          if (o.lp) lp = L(o.lp, t); if (o.hp) hp = L(o.hp, t);
+          if (o.lpw) lp = o.lpw[1] + o.lpw[2] * Math.cos(2 * Math.PI * p * o.lpw[0]);
+          if (o.hpw) hp = Math.max(0, o.hpw[1] - o.hpw[2] * Math.cos(2 * Math.PI * p));
+          if (o.bw){ hp = 0.05 + 0.7 * t; lp = hp + 0.25; }
+          if (o.lpb) lp = 1 - 0.8 * (p % 1); } break;
+        case 'crush': { let on = true;
+          if (o.beats) on = o.beats.includes(Math.floor(p)); if (o.alt) on = Math.floor(p / o.alt) & 1; if (o.a) on = p >= o.a;
+          if (on){ cr = o.hs ? o.hs[0] + (o.hs[1] - o.hs[0]) * p / 4 : o.h || 1; bt = o.b || 0; if (o.lp) lp = o.lp; } } break;
+        case 'echo': { const c = cs(o.C), n = Math.floor((p - c) / o.L + 1e-9); r = c + (p - c) - n * o.L; g = Math.pow(o.k, n); } break;
+        case 'jug': { const G = o.G, per = Math.round(4 / G), s = Math.min(per - 1, Math.floor(p / G + 1e-9)), u = p - s * G;
+          if (FlexCore.hh(o.seed, s, 11) < o.c){ let src = s - 1 - Math.floor(FlexCore.hh(o.seed, s, 23) * (per - 1)); const rv = FlexCore.hh(o.seed, s, 31) < o.rv;
+            r = src * G + (rv ? G - u : u); } } break;
+        case 'swing': { const C = o.C, c = cs(C), u = (p - c) / C, h = 0.5 + o.a;
+          r = c + C * (u < h ? u * 0.5 / h : 0.5 + (u - h) * 0.5 / (1 - h)); } break;
+        case 'tup': { const C = o.C, c = cs(C), u = (p - c) / C, j = Math.min(o.q - 1, Math.floor(u * o.q + 1e-9)), sj = o.q === 5 ? [0, 1, 2, 3, 3][j] : j;
+          r = c + C * (sj / 4 + (u - j / o.q)); } break;
+        case 'drunk': { const s = Math.floor(p * 4); r = p - FlexCore.hh(bar & 3, s, 41) * 0.06; } break;
+        case 'lag': r = (p % 1) >= 0.5 ? p - 1/16 : p; break;
+        case 'chaos': { const G = o.G, s = Math.floor(p / G + 1e-9), c = s * G, u = p - c, key = o.nb ? (bar & 3) + 1 : 0;
+          if (FlexCore.hh(o.seed, s, key * 7 + 3) < o.c){ const op = Math.floor(FlexCore.hh(o.seed, s, key * 7 + 4) * 7);
+            if (op === 0) r = p - G; else if (op === 1) r = c - u; else if (op === 2) r = c - G + u * 2; else if (op === 3) r = c + u / 2;
+            else if (op === 4) r = c + u % (G / 4); else if (op === 5) g = u < G / 2 ? 1 : 0; else r = c + u - u * u / (2 * G); } } break;
+      } }
+    this.pg = g; this.plp = lp; this.php = hp; this.pcr = cr; this.pbt = bt; return r;
+  }
   pat(k, p, bar){
     let r = p, g = 1, u;
     switch (k){
@@ -13915,7 +14036,7 @@ class FlexCore {
   run(L, R, n, dp, tr){
     if (!this.bL){ this.bL = new Float32Array(this.N); this.bR = new Float32Array(this.N); }
     const N = this.N, bL = this.bL, bR = this.bR, bp = tr && tr.bp, spb = clkSpb(this, bp, n), live = !!(bp && bp.length > 1);
-    const k = !dp ? 0 : tr && tr.flx >= 0 ? Math.min(16, Math.round(tr.flx)) : dp.pat | 0, mix = dp ? dp.mix : 0;
+    const k = !dp ? 0 : tr && tr.flx >= 0 ? Math.min(255, Math.round(tr.flx)) : dp.pat | 0, mix = dp ? dp.mix : 0, fsk = 1 - Math.exp(-1 / (this.sr * 0.015)), fs = this.fs, nyq = this.sr * 0.45;
     const XF = Math.max(16, Math.round(this.sr * (dp ? dp.xf : 5) / 1000)), gk = 1 - Math.exp(-1 / (this.sr * 0.002));
     // Lock our position to the clock: gently while close (the clock's own float32 steps stay out), at once when it jumps.
     const q0 = live ? bp[0] : -1;
@@ -13929,12 +14050,25 @@ class FlexCore {
       this.sp += (spb - this.sp) * sk;
       const q = this.ph; if (q >= 0){ this.ph += 1 / this.sp; if (this.ph >= 16) this.ph -= 16; }
       if (!dp){ this.D = 0; this.w = w + 1 >= N ? 0 : w + 1; continue; }
-      let D = 0, g = 1;
-      if (k > 0 && q >= 0){ const p = q % 4, r = this.pat(k, p, Math.floor(q / 4)); g = this.pg; D = Math.max(0, Math.min(N - 4, (p - r) * this.sp)); }
+      let D = 0, g = 1, lp = 1, hp = 0, cr = 1, bt = 0;
+      if (k > 0 && q >= 0){ const p = q % 4, bar = Math.floor(q / 4), r = k > 16 ? this.ext(k, p, bar) : this.pat(k, p, bar); g = this.pg;
+        if (k > 16){ lp = this.plp; hp = this.php; cr = this.pcr; bt = this.pbt; }
+        D = Math.max(0, Math.min(N - 4, (p - r) * this.sp)); }
       if (Math.abs(D - this.D) > 8){ this.xo = this.D; this.xc = XF; this.xn = XF; }
       this.D = D; this.g += (g - this.g) * gk;
       let yl = this.rd(bL, w, D), yr = this.rd(bR, w, D);
       if (this.xc > 0){ const f = this.xc / this.xn; yl += (this.rd(bL, w, this.xo) - yl) * f; yr += (this.rd(bR, w, this.xo) - yr) * f; this.xc--; }
+      // FLEX 256: CRUSH (hold every cr samples, bt bits) and FILTER (12 dB low- and high-pass state-variable filters)
+      if (cr > 1.01){ if (++this.hc >= cr){ this.hc -= cr; this.hl = yl; this.hr = yr; } yl = this.hl; yr = this.hr; } else { this.hc = 0; this.hl = yl; this.hr = yr; }
+      if (bt > 0){ const qz = Math.pow(2, bt - 1); yl = Math.round(yl * qz) / qz; yr = Math.round(yr * qz) / qz; }
+      this.slp += (lp - this.slp) * fsk; this.shp += (hp - this.shp) * fsk;
+      if (this.slp < 0.995 || this.shp > 0.005){
+        if (!(this.fk++ & 7)){ const sv = f => { const gg = Math.tan(Math.PI * Math.min(nyq, f) / this.sr), kk = 1.1, a1 = 1 / (1 + gg * (gg + kk)); return [a1, gg * a1, gg * gg * a1]; };
+          this.fa = sv(40 * Math.pow(2, this.slp * 9)); this.fb = sv(20 * Math.pow(2, this.shp * 9)); }
+        const svf = (x, j, c, hi) => { const v3 = x - fs[j + 1], v1 = c[0] * fs[j] + c[1] * v3, v2 = fs[j + 1] + c[1] * fs[j] + c[2] * v3; fs[j] = 2 * v1 - fs[j]; fs[j + 1] = 2 * v2 - fs[j + 1]; return hi ? x - 1.1 * v1 - v2 : v2; };
+        if (this.slp < 0.995){ yl = svf(yl, 0, this.fa, false); yr = svf(yr, 2, this.fa, false); }
+        if (this.shp > 0.005){ yl = svf(yl, 4, this.fb, true); yr = svf(yr, 6, this.fb, true); }
+      } else if (fs[0] || fs[1] || fs[4]) fs.fill(0);
       L[i] += (yl * this.g - L[i]) * mix; R[i] += (yr * this.g - R[i]) * mix;
       this.w = w + 1 >= N ? 0 : w + 1;
     }
@@ -15344,7 +15478,7 @@ function normMst(j){
 function freshSong(){
   // MPC swing: the classic hardware's shuffle, applied on 8th, 16th or dotted-8th grid.
   // Voice-per-track parity: one synth voice per song track — ntr tracks need ntr + 8 pads, capped at 32.
-  return {app:'thunder-song', v:6, name:'Song 1', bpm:120, swing:50, swingB:2, limiter:true, renderFrom:0, master:255, mout:255, chainPatch:null,
+  return {app:'thunder-song', v:6, flx256:true, name:'Song 1', bpm:120, swing:50, swingB:2, limiter:true, renderFrom:0, master:255, mout:255, chainPatch:null,
     song:Array.from({length:256}, () => new Array(NT + 1).fill(-1)), chains:new Array(NPH).fill(null), phrases:new Array(NPH).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
     tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:8, ticks:TICKS, dlen:16, plen:new Array(NPH).fill(16), plpb:new Array(NPH).fill(0),
@@ -15492,8 +15626,17 @@ function normSong(j){
   // A voice per track is a synth-page setting, not a song setting — but if the saved kit needs track pads,
   // leave the checkbox on so the kit's voices stay visible.
   try { if (localStorage.getItem(VTRK) !== '1' && j.voices && j.voices.length > 16) { vtrk = true; localStorage.setItem(VTRK, '1'); } } catch(e){}
+  // FLEX 256 (31 Oct): FLX 11–FF used to play pattern 10. A song saved before then that uses them keeps that (S.flxOld)
+  // until you switch it (Project → FLX 11–FF), so it sounds as it did. Songs saved since carry flx256.
+  if (j.flxOld) S.flxOld = true;
+  else if (!j.flx256){ const FI = FXC.indexOf('FLX'); let n = 0;
+    for (const ph of S.phrases) if (ph) for (const r of ph) for (let m = FX0; m < RW; m += 2) if (r[m] === FI && r[m + 1] > 16) n++;
+    if (n){ S.flxOld = true; setTimeout(() => { try { toast(`This song has ${n} FLX above 10: they keep playing pattern 10, as before. Project → FLX 11–FF → NEW gives them the new patterns.`, 8000); } catch(e){} }, 1500); } }
+  S.flx256 = true;
   return S;
 }
+// FLX value → pattern: an old song (S.flxOld) keeps 11–FF on pattern 10
+const flxCap = v => S && S.flxOld ? Math.min(16, v) : Math.min(255, v);
 // ELECTRO: the demo project (song and kit), on File ▾ too, for a device that already had a song when it arrived.
 async function loadElectro(){
   try { const r = await fetch('sounds/ELECTRO.thunder?v=1'); if (!r.ok) throw new Error(r.status); await loadProjText(await r.text(), 'ELECTRO.thunder'); }
@@ -15928,7 +16071,7 @@ function makeSeq(S, mode, o){
       // FLX / GAT / RTG (owner, 31 Oct): a pattern given to an effect switched off by FXO switches its slot back as set (on)
       const slotWake = (cmd, on) => { if (!on) return; const A = t >= MT ? S.mfx : S.tfx[t], ty = FX_NEEDS[cmd];
         (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at, track:t, p:'sw' + k, v:-1}); }); };
-      if (fx.FLX != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:Math.min(16, fx.FLX)}); slotWake('FLX', fx.FLX > 0); }
+      if (fx.FLX != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:flxCap(fx.FLX)}); slotWake('FLX', fx.FLX > 0); }
       if (fx.GAT != null){ evs.push({type:'fxc', t:at, track:t, p:'gat', v:Math.min(15, fx.GAT)}); slotWake('GAT', true); }
       if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', X > 0);
         if (X && Y) evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); }
@@ -18399,7 +18542,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 336;
+const BUILD = 337;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -19048,6 +19191,8 @@ function projRows(){
     {l:'PATTERN LEN', get:() => S.dlen || 16, set:v => setDefLen(v), min:1, max:PROWS, big:4, d:16, fmt:v => v + (v === 1 ? ' row' : ' rows') + ' · new phrases', info:() => 'How many rows a new phrase starts with (empty phrases follow it too). Setting a phrase’s ROWS (at the right of the tab bar) or its LEN line changes this to match'},
     {l:'› ALL PHRASES TO ' + (S.dlen || 16), dbl:true, act:() => { for (let i = 0; i < NPH; i++) S.plen[i] = S.dlen || 16; saveS(); draw(); toast(`Every phrase now plays ${S.dlen || 16} rows. Notes past that are kept, just not played.`); },
       info:() => `Sets every phrase, used or not, to ${S.dlen || 16} rows. Rows past the end keep their notes. Tap EDIT twice`},
+    ...(S.flxOld ? [{l:'FLX 11–FF', opts:true, get:() => 0, set:v => { if (v){ delete S.flxOld; saveS(); toast('FLX 11–FF now play the new Flex patterns (Ctrl/⌘+Z undoes it).'); } }, min:0, max:1, d:0, fmt:v => v ? 'NEW' : 'AS PATTERN 10',
+      info:() => 'This song was made when FLX 11–FF all played pattern 10, and it keeps that so it sounds as it did. NEW: they play the 256 Flex patterns'}] : []),
     {l:'SWING', get:() => S.swing, set:v => S.swing = v, min:50, max:75, big:5, d:50, fmt:v => v + '%', info:() => 'MPC swing amount: 50% is straight; higher pushes the off-beat of each pair later. 66–67% is the triplet feel'},
     {l:'SCALE', opts:true, get:() => S.scale | 0, set:v => S.scale = v, min:0, max:SCALES.length - 1, d:0, fmt:v => SCALES[v][0],
       info:() => 'KEY FOLLOW instruments (INST) play in this scale: a note outside it goes to the nearest note of it (the phrase keeps what you wrote). OFF: every note as written'},
@@ -19216,7 +19361,7 @@ const FXB = {FDI:'Fade the note in over XX ticks', TRM:'Tremolo on the note: X s
   PVB:'Vibrato: X speed, Y depth', SED:'Seed the randomness so it repeats the same way', TPO:'Set the tempo in BPM (hex)', TSP:'Transpose the track from here on',
   VOL:'Set the volume (also of a playing note)', PIT:'Pitch the note ± semitones', FIN:'Fine tune ± cents', PLY:'Play reversed (01) or forwards (00)',
   STA:'Start part way into the sound', PAN:'Pan left or right (80 centre)', TIC:'Ticks a step from here on', WOB:'Bass wobble rate from here on (00 the voice’s own)',
-  FXO:'Effect slot X (1–8, 9 = all) off (Y 0), on (1) or on for Y rows; FXO 00: every slot back as set', BYP:'…chains module X (its number on BYP, 0 = all) in (Y 0), bypassed (1), or the other way from the patch for Y rows', FLX:'Flex pattern (00 off, 01–10)', GAT:'Step gate pattern (00 custom, 01–0F)', RTG:'Retrigger: X rate (1 = 1/4 … 8 = 1/32T), Y rows (0 = until RTG 00)',
+  FXO:'Effect slot X (1–8, 9 = all) off (Y 0), on (1) or on for Y rows; FXO 00: every slot back as set', BYP:'…chains module X (its number on BYP, 0 = all) in (Y 0), bypassed (1), or the other way from the patch for Y rows', FLX:'Flex pattern (00 off, 01–10 the first sixteen; 11–FF: first digit the family, second the variant)', GAT:'Step gate pattern (00 custom, 01–0F)', RTG:'Retrigger: X rate (1 = 1/4 … 8 = 1/32T), Y rows (0 = until RTG 00)',
   PGM:'MIDI program change (00–7F)', CSL:'MIDI CC glide: this row’s CCA–CCD move to their value over XY ticks (00 the step)',
   DIR:'Play direction from here on: 00 forward, 01 backwards, 02 ping-pong, 03 random'};
 for (const c of CC_CMDS) FXB[c] = `MIDI CC: send 00–7F to the instrument’s CC ${c[2]}`;
@@ -24857,6 +25002,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [337, '31 Oct', ['Flex has 256 patterns, after the OP-Z and Pocket Operator punch-ins. FLX 01–10 are as before; 11–FF go in families by the first digit (the second picks the variant, gentler to wilder): 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops, spin-ups, wow and flutter, 8 scratches, 9 gates, pumps and swells, A filter sweeps and wobbles, B bit crush and downsampling, C fading repeats, D juggles, E swing, 6/8 and vibrato, F chaos. The FX screen’s PATTERN and the FLX hint name each one.', 'A song saved before this that uses FLX 11–FF (they all played pattern 10) keeps sounding as it did, and says so when it opens: Project → FLX 11–FF → NEW switches it to the new patterns.', 'New skin: IDM pink & green, exactly IDM with pink for its orange and green for its blue. The pink-paper one is now called IDM pink paper.']],
   [336, '31 Oct', ['New skin: IDM pink (Settings → Skin → Art & design). IDM’s look in pinks and greens: pink paper, dark green ink, hot pink accents, green EDIT and poly tracks; while it plays, the play buttons turn neon pink.']],
   [335, '31 Oct', ['IDM skin: while it plays, the play buttons (Stop at the top, PLAY on the pad and the command row’s play) turn the skin’s orange.']],
   [334, '31 Oct', ['The name at the top left is just Thunder+ in every skin now (the … before it is gone, for more room).']],
@@ -25048,7 +25194,7 @@ function setSheet(kind){
 }
 // Skin: every skin as a little tracker in its own colours, grouped. A tap puts it on the app at once (the app behind
 // the sheet is the preview); Done keeps it, "Back to …" returns to the skin you opened the sheet with.
-const SKIN_GROUPS = [['Pastel', ['auto', 'light']], ['Minimal', ['minimal', 'mincolor', 'monotone', 'minblack', 'mincolorblack']], ['Neon & Matrix', ['neon', 'matrix', 'matrixlight']], ['Rainbow', ['rainbow', 'rainbowdyn']], ['Art & design', ['haring', 'idm', 'idmpink', 'lineart', 'lautrec', 'vice', 'braun', 'te', 'koss', 'opuntia']]];
+const SKIN_GROUPS = [['Pastel', ['auto', 'light']], ['Minimal', ['minimal', 'mincolor', 'monotone', 'minblack', 'mincolorblack']], ['Neon & Matrix', ['neon', 'matrix', 'matrixlight']], ['Rainbow', ['rainbow', 'rainbowdyn']], ['Art & design', ['haring', 'idm', 'idmpg', 'idmpink', 'lineart', 'lautrec', 'vice', 'braun', 'te', 'koss', 'opuntia']]];
 const hexLum = h => { const n = parseInt(h.slice(1), 16), c = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * c(n >> 16 & 255) + 0.7152 * c(n >> 8 & 255) + 0.0722 * c(n & 255); };
 const hexCon = (a, b) => { const x = hexLum(a), y = hexLum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
 function skinGroups(){
