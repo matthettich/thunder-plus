@@ -1,4 +1,4 @@
-/* pump/synth/pump-synth-engine.js: …pump's instruments MONO, POLY and COIL as Thunder Plus synth engines.
+/* pump/synth/pump-synth-engine.js: …pump's instruments MONO, POLY, COIL and ORBIT as Thunder Plus synth engines.
  *
  * The sound is the plugins' own DSP (pump-synth.wasm, built by pump/wasm/build.sh from pump/wasm/pump_synth.cpp, the
  * plugins' engines without DPF). Their parameters and factory presets come from pump-synth-meta.js, generated from the
@@ -29,14 +29,16 @@ const KINDS = {
   pmono:{t:0, k:'mono', name:'Mono', title:'pump MONO', tag:'three oscillators · sync, FM · ladder, SVF, diode, Sallen-Key', len:2},
   ppoly:{t:1, k:'poly', name:'Poly', title:'pump POLY', tag:'two oscillators · poly-mod · four filter voicings · chorus', len:4, trim:1.5},
   pcoil:{t:2, k:'coil', name:'Coil', title:'pump COIL', tag:'tuned springs kicked by the note · tanks, clang to pluck', len:4},
+  porbit:{t:3, k:'orbit', name:'Orbit', title:'pump ORBIT', tag:'strange attractors as oscillators · chaos sweep · ladder filter · drift', len:3},
 };
 /* The live twins: the same instrument, played live. Shown after their rendered engine in the picker. */
 const LIVE = {
   pmonol:{twin:'pmono', name:'Mono live', title:'pump MONO live', tag:'played live: each note its own pitch, velocity and length · glide, legato'},
   ppolyl:{twin:'ppoly', name:'Poly live', title:'pump POLY live', tag:'played live: chords through its own voices, unison and chorus'},
   pcoill:{twin:'pcoil', name:'Coil live', title:'pump COIL live', tag:'played live: every note kicks its own springs, as hard as it is played'},
+  porbitl:{twin:'porbit', name:'Orbit live', title:'pump ORBIT live', tag:'played live: chords through its own voices, glide, the drift keeps moving'},
 };
-const ORDER = ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'pcoil', 'pcoill'];
+const ORDER = ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'pcoil', 'pcoill', 'porbit', 'porbitl'];
 /* trim: POLY's level is set for chords (a voice sums in at 0.3, 8 of them to a chord), so one rendered note sits under
    MONO's and COIL's. A pad is one note, which the tracker stacks for chords, so POLY's render is 3.5 dB up (x1.5): as
    far as its loudest factory voice (Unison brass lead) allows without passing -1 dBFS, since the plugin's own safety
@@ -44,10 +46,10 @@ const ORDER = ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'pcoil', 'pcoill'];
    rendered note: MONO about -20 dBFS RMS, COIL -24, POLY -25. MONO and COIL are as the plugin. */
 /* Kept in the pad (so it carries the plugin's whole state) but not shown: they do nothing to a single rendered note
    (the mod wheel, pitch bend, glide and note priority need a played line). */
-const HIDE = new Set(['wheel_vib', 'glide', 'glide_mode', 'priority', 'legato', 'bend_range', 'wheel_mod', 'bend']);
+const HIDE = new Set(['wheel_vib', 'glide', 'glide_mode', 'priority', 'legato', 'bend_range', 'wheel_mod', 'bend', 'voice_mode', 'voices']);   // (ORBIT's voices and mode: a rendered pad is one note)
 /* ...which a live twin shows (bend range and the mod wheel stay hidden: the tracker's pitch commands are sent as bend
    over the whole range, and there is no wheel). */
-const LIVE_ROWS = {pmonol:[['Glide & legato', ['glide', 'glide_mode', 'legato', 'priority']]], ppolyl:[['Glide', ['glide']]], pcoill:[['Voices', ['voices']]]};   // COIL's VOICES: how many notes ring at once (a rendered pad is one)
+const LIVE_ROWS = {pmonol:[['Glide & legato', ['glide', 'glide_mode', 'legato', 'priority']]], ppolyl:[['Glide', ['glide']]], pcoill:[['Voices', ['voices']]], porbitl:[['Voices', ['voices', 'voice_mode', 'glide']]]};   // COIL's VOICES: how many notes ring at once (a rendered pad is one)
 /* What the live instance is held to whatever the pad says: the widest bend, so a slide of an octave or two is one bend. */
 const LIVE_FIXED = {pmonol:{bend_range:24}, ppolyl:{bend_range:24}, pcoill:{bend:12}};
 /* Each card's sections (the plugins' own panels). */
@@ -56,6 +58,9 @@ const SECS = {
     ['Oscillator 3', ['osc3_wave', 'osc3_oct', 'osc3_pitch', 'osc3_level', 'fm']], ['Mixer', ['pw', 'noise', 'overdrive']],
     ['Filter', ['filter_type', 'cutoff', 'res', 'filter_env', 'key_track', 'filter_mode', 'vel_filter']], ['Filter envelope', ['f_a', 'f_d', 'f_s', 'f_r']],
     ['Amp', ['a_a', 'a_d', 'a_s', 'a_r', 'vel_amp']], ['LFO', ['lfo_shape', 'lfo_rate', 'lfo_pitch', 'lfo_filter', 'lfo_pw']], ['Play', ['vel', 'drift', 'volume']]],
+  porbit:[['Orbit', ['system', 'chaos', 'sync', 'axis', 'width', 'o_drive']], ['Filter', ['cutoff', 'reso', 'keytrack']],
+    ['Mod envelope', ['env_cut', 'env_chaos', 'mod_attack', 'mod_decay', 'mod_sustain', 'mod_release']], ['Drift', ['drift_rate', 'drift_pitch', 'drift_cut', 'drift_chaos']],
+    ['Amp', ['attack', 'decay', 'sustain', 'release', 'velocity']], ['Play', ['vel', 'octave', 'fine', 'volume']]],
   ppoly:[['Oscillator A', ['a_saw', 'a_pulse', 'a_freq', 'a_pw', 'sync', 'level_a']], ['Oscillator B', ['b_saw', 'b_tri', 'b_pulse', 'b_freq', 'b_fine', 'b_pw', 'b_low', 'level_b']],
     ['Mixer', ['noise', 'sub']], ['Poly-mod', ['pm_env', 'pm_oscb', 'pm_freq_a', 'pm_pw_a', 'pm_filter']],
     ['Filter', ['filter_type', 'cutoff', 'res', 'filter_env', 'key_track', 'hpf', 'vel_filter']], ['Filter envelope', ['f_a', 'f_d', 'f_s', 'f_r']],
@@ -71,7 +76,11 @@ const LBL = {f_a:'Attack', f_d:'Decay', f_s:'Sustain', f_r:'Release', a_a:'Attac
   a_saw:'Saw', a_pulse:'Pulse', b_saw:'Saw', b_tri:'Triangle', b_pulse:'Pulse', b_low:'LFO range', level_a:'Level', level_b:'Level',
   pm_env:'Filter env', pm_oscb:'Osc B', pm_freq_a:'→ Freq A', pm_pw_a:'→ PW A', pm_filter:'→ Filter', hpf:'High-pass',
   voice_mode:'Mode', unison_detune:'Unison', velocity:'Vel → kick', lfo_pitch:'→ Pitch', lfo_filter:'→ Filter', lfo_pw:'→ PW',
-  lfo_delay:'Delay', lfo_shape:'Shape', lfo_rate:'Rate', sync:'Sync to 1', fm:'FM 3 → 1', pw:'Pulse width', glide_mode:'Glide when', priority:'Priority'};
+  lfo_delay:'Delay', lfo_shape:'Shape', env_cut:'Env → cutoff', env_chaos:'Env → chaos', mod_attack:'Attack', mod_decay:'Decay', mod_sustain:'Sustain', mod_release:'Release',
+  drift_rate:'Rate', drift_pitch:'→ Pitch', drift_cut:'→ Cutoff', drift_chaos:'→ Chaos', keytrack:'Key follow', reso:'Resonance', fine:'Fine (cents)', lfo_rate:'Rate', sync:'Sync to 1', fm:'FM 3 → 1', pw:'Pulse width', glide_mode:'Glide when', priority:'Priority'};
+/* A plugin parameter whose symbol is one of the pad's own (Thunder's Drive, Tune, Level) is kept in the pad under another
+   name (ORBIT's drive is o_drive), so the pad's Drive doesn't overwrite it. */
+const AL = {drive:'o_drive', tune:'o_tune', level:'o_level'}, al = s => AL[s] || s;
 const SEMIS = new Set(['osc2_pitch', 'osc3_pitch', 'a_freq', 'b_freq']);
 const sg = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v);
 const hz = v => v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 1 : 2) + ' kHz' : v >= 100 ? Math.round(v) + ' Hz' : v.toFixed(v >= 10 ? 1 : 2) + ' Hz';
@@ -96,18 +105,18 @@ function rowOf(p){
 const ENG = {};
 for (const key in KINDS){
   const K = KINDS[key], m = META.synth[K.k], rows = {}, defs = {};
-  for (const p of m.params){ defs[p.s] = p.def; if (!HIDE.has(p.s) && !((p.flags | 0) & (8 | 32))) rows[p.s] = rowOf(p); }
+  for (const p of m.params){ defs[al(p.s)] = p.def; if (!HIDE.has(p.s) && !((p.flags | 0) & (8 | 32))) rows[al(p.s)] = rowOf(p); }
   if (rows.volume) rows.volume.noRnd = true;   // a random sound at -40 dB isn't a sound
   rows.vel = {l:'Hit', min:1, max:127, c:'int', d:100, f:v => String(Math.round(v)), noRnd:true}; defs.vel = 100;
   const secs = SECS[key].map(([t, ks]) => [t, ks.filter(s => rows[s])]).filter(([, ks]) => ks.length);
   // a preset is the plugin's: its values over the defaults (Default is the card's Init)
   const pre = [['Init', {}]];
-  for (const pr of m.presets) if (pr.n !== 'Default') pre.push([pr.n, Object.assign({}, pr.v)]);
+  for (const pr of m.presets) if (pr.n !== 'Default') pre.push([pr.n, Object.fromEntries(Object.entries(pr.v).map(([q, v]) => [al(q), v]))]);
   ENG[key] = {rows, defs, secs, pre, about:m.about || '', specs:m.params};
 }
 for (const key in LIVE){
   const T = ENG[LIVE[key].twin], m = META.synth[KINDS[LIVE[key].twin].k], rows = Object.assign({}, T.rows);
-  for (const p of m.params) if (HIDE.has(p.s) && LIVE_ROWS[key].some(([, ks]) => ks.includes(p.s))) rows[p.s] = rowOf(p);
+  for (const p of m.params) if (HIDE.has(p.s) && LIVE_ROWS[key].some(([, ks]) => ks.includes(al(p.s)))) rows[al(p.s)] = rowOf(p);
   rows.vel = Object.assign({}, rows.vel, {l:'Velocity'});   // live: the VOL column is the velocity; this is a note's without one
   const secs = T.secs.slice(), at = secs.findIndex(([t]) => t === 'Play');
   secs.splice(at < 0 ? secs.length : at, 0, ...LIVE_ROWS[key]);
@@ -147,12 +156,12 @@ const PsynCore = {
   isLive: k => !!LIVE[k],
   twin: k => LIVE[k] ? LIVE[k].twin : Object.keys(LIVE).find(q => LIVE[q].twin === k) || null,
   // what a live node is made with: the instrument, its parameter symbols in order, the values held fixed, the level trim
-  liveSpec: k => LIVE[k] ? {type:KINDS[twinOf(k)].t, syms:ENG[k].specs.map(p => p.s), fixed:LIVE_FIXED[k], trim:KINDS[twinOf(k)].trim || 1} : null,
+  liveSpec: k => LIVE[k] ? {type:KINDS[twinOf(k)].t, syms:ENG[k].specs.map(p => al(p.s)), fixed:LIVE_FIXED[k] || {}, trim:KINDS[twinOf(k)].trim || 1, range:twinOf(k) === 'porbit' ? 2 : twinOf(k) === 'pcoil' ? 12 : 24} : null,   // range: the bend range (ORBIT's is fixed at ±2)
   /* XENG entries. Rendered (live:false) and live; both render with r (a live engine's render is its safety net, and what
      the Synth page plays), and rel is the amp's release in ms (how a held rendered note fades when let go). */
   xeng(){ const o = {}; for (const k of ORDER){ const tw = twinOf(k);
     o[k] = {live:!!LIVE[k], twin:LIVE[k] ? tw : PsynCore.twin(k), d:() => Object.assign({}, ENG[k].defs), r:(P, sr, hold, V) => PsynCore.render(tw, P, sr, hold, V),
-      rel:P => tw === 'pcoil' ? (P.release || 0.4) * 1000 : (P.a_r || 150)}; }
+      rel:P => tw === 'pcoil' ? (P.release || 0.4) * 1000 : tw === 'porbit' ? (P.release || 300) : (P.a_r || 150)}; }
     return o; },
   // XUI entries: the card's rows, sections and the plugin's factory presets
   xui(){
@@ -162,7 +171,8 @@ const PsynCore = {
         note:ENG[k].about + ' The …pump plugin’s own engine and values: C-4 plays its MIDI note 60. ' + (LIVE[k]
           ? 'Played live in the tracker, like the plugin in a DAW: the VOL column is each note’s velocity (Velocity here when a note has none), a note sounds for as long as it is held, and slides, bends and vibrato bend its pitch. '
             + 'The Synth page and pad effects use its render, and so does the tracker on a device that can’t keep up (it says so). It shares its values with ' + KINDS[tw].title + ': switch between them and the sound stays.'
-          : 'Hit is how hard the note is played when the pad renders; ' + (tw === 'pcoil' ? 'the springs ring for their Decay and fade over Release when the note is let go.' : 'a held note fades over the Amp release when it is let go.'))}; }
+          : 'Hit is how hard the note is played when the pad renders; ' + (tw === 'pcoil' ? 'the springs ring for their Decay and fade over Release when the note is let go.' : 'a held note fades over the Amp release when it is let go.'))
+          + (tw === 'porbit' ? ' CHAOS and SYNC are the two to learn: low Chaos and high Sync is a clean, pitched tone; raise Chaos for period doubling and noise, lower Sync to let it drift. Slides and bends reach ±2 semitones (the plugin’s bend range).' : '')}; }
     return o;
   },
   len: k => (KINDS[twinOf(k)] && KINDS[twinOf(k)].len) || 2,
@@ -172,7 +182,7 @@ const PsynCore = {
     const K = KINDS[k];
     if (!X || !K) return new Float32Array(1);
     const specs = ENG[k].specs, st = f32(X.psyn_stage(), 512);
-    for (let i = 0; i < specs.length; i++){ const v = P[specs[i].s]; st[i] = typeof v === 'number' && isFinite(v) ? v : specs[i].def; }
+    for (let i = 0; i < specs.length; i++){ const v = P[al(specs[i].s)]; st[i] = typeof v === 'number' && isFinite(v) ? v : specs[i].def; }
     // the pad's Tune: whole semitones as the note, the rest as a rate (the render made a little slower or faster)
     const tune = +P.tune || 0, semis = Math.round(tune), frac = tune - semis, rate = sr * Math.pow(2, -frac / 12);
     const h = X.psyn_new(K.t, rate);

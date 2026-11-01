@@ -81,6 +81,18 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (late night): pump ORBIT as engines Orbit / Orbit live (build 338, desktop 1.2.57)
+- pump repo (f6fbd10): `wasm/pump_synth.cpp` type 3 `SynthOrbit` (PluginOrbit's `sync()` and run body; no OrbitDsp split in
+  pump, so keep it in step with `plugins/orbit/PluginOrbit.hpp`). `activate()` syncs again after `engine.prepare()` (prepare
+  resets the voices' envelopes; the plugin's first run() re-syncs). `pump_meta.cpp` and `build.sh` list orbit;
+  `PARITY_SYNTH` has orbit: `make build/tests/parity_orbit` is exact (0.00e+00) on defaults and all presets. Rebuilt
+  `pump-synth.wasm` / `pump-synth-meta.js` copied here (MONO, POLY, COIL goldens unchanged).
+- `pump-synth-engine.js?v=5`: `porbit` (t 3) and `porbitl`; card sections Orbit / Filter / Mod envelope / Drift / Amp / Play;
+  `AL` aliases a plugin symbol that is also a pad field (ORBIT's `drive` is kept as `o_drive`, so the pad's Drive doesn't
+  overwrite it); `liveSpec().range` is the bend range (ORBIT ±2, fixed in the plugin), used by `pump-synth-worklet.js?v=3`.
+  Voices and Voice mode are hidden on the rendered engine, shown with Glide on the live one. `rel` = ORBIT's Release.
+- Tests: `tests/pump-synth.test.js` includes porbit / porbitl (presets render, golden, live = render).
+
 ## 31 Oct (night): Flex 256, IDM pink & green (build 337, web only)
 - `FlexCore.SPEC()` builds the table for 17–255 (families by the high nibble: roll, stut, build, rev, down, up, stop/start/wow, scr, gate/pump/swell/fade/mask, filt, crush, echo, jug, swing/tup/drunk/lag, chaos); `ext(k, p, bar)` returns the read position and sets gain `pg`, filter `plp`/`php` (0–1), crush `pcr`/`pbt`. `run()` adds the crush and two TPT state-variable filters (LP 40 Hz·2^(9n), HP 20 Hz·2^(9n), updated every 8 samples). `FlexCore.NAMES` (cached in `_N`) names all 256. Everything is inside the class (it is stringified into the worklet). Offline check: all 256 finite, bounded and audibly different on a chirp.
 - Old songs: `normSong` sets `S.flxOld` when a song without `flx256` has FLX > 0x10 (toast); `flxCap(v)` keeps those on 16. Project → FLX 11–FF (only shown then) clears it. `freshSong` and every normalised song carry `flx256`. The bundled ELECTRO has three FLX above 10, so it opens with the flag.
