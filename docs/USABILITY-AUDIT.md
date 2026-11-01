@@ -1,5 +1,8 @@
 # Usability audit (26–27 Oct 2026)
 
+**Newer:** the 1 Nov audit at build 346 (keys, menus, Renoise / Ableton / Elektron gaps, Monomachine) is the doc at
+https://claude.ai/artifact/TVuFPenRbFDyhVe9JgWpv9; what was built from it is in HANDOVER "1 Nov (7–11)".
+
 Four audits of Thunder Plus at build 254: keys, mouse/trackpad/touch, behaviours, and a screen-by-screen visual
 walkthrough (desktop 1400 and 1920, Fold unfolded 882x1104, Fold cover 412x915). The owner-facing write-up with the
 plan is the doc "Thunder Plus: usability audit and plan" (https://claude.ai/artifact/8yDBMKuKciLpnVqYRHVrTH). This

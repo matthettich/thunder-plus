@@ -81,6 +81,115 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 1 Nov (7–11): the audit's fixes, menus, latency comp, default song, favourites, Perform, sends, scale mode (builds 347–351)
+
+The owner's picks from the 1 Nov audit ("Thunder Plus: usability and feature audit (build 346)", https://claude.ai/artifact/TVuFPenRbFDyhVe9JgWpv9).
+Asked: fix #1, propose #2's keys (NOT built: see "Proposed tracker keys" below), skip #3, do #4–#6, latency comp (Audio menu, off),
+default song, favourites, scale mode, send colour; Link and a live performance mode as plans (below); a queued pattern change
+skipped for now (note below). `tests/perform.test.js` is new.
+
+- **347 audit fixes.** File ▾ kit items carry `ask:'kit'` and always ask (`gfileToggle`; they used to run at once with unsaved
+  changes, which never reach "Save changes?"). Synth-page keydown: F2–F9 (`F-KEYS OFF THE TRACKER`). Hints: Edit ▾ Play = Space
+  in KEYS mode; Arrange menu Open = Alt+→, Copy/Cut/Paste via `keyHint`; Mixer hints "up to 8"; README/legend Esc = EDIT mode.
+- **348 menus** (`menuFill`, `menuNavList`, `menuNavKey`, `TOPM`). Items are `{l, k, f, off, ask, sub}`; `sub` renders an
+  accordion group (`.msub` + `.msubbox`, ▶/◀ open/close). `fileItems()` returns objects now (Examples / Export / Import / Kit
+  groups; Render part only on phones, it's in Edit → Tools on a computer). `cmdItems(full)`: Edit ▾ passes true (every item,
+  greyed when it doesn't apply; Insert / Remove row, Mute, Solo, Loop, New phrase), right-click passes false (as before);
+  both get `{l:'Tools', sub:toolItems(full)}`. `apSongItems` wraps sub items too. A Tools top-bar menu was measured: the bar
+  wraps below 1408 px with it, the MacBook Neo's default width, so (owner's rule) it's a group in Edit. Settings: FOLLOW,
+  TAB, SONG MOUSE, LOOP DRAG → Input sheet; RESUME → Record & play. "Restart audio" button → "Apply (reload)".
+- **349 latency comp** (`pdcPlan(sr)` pure, from busPlan + `pumpChainLatency`; player `pdcSync()`; `aset.pdc`, Audio &
+  MIDI → Latency comp). Per track `dl` (p → dl → out) and, for feeds, `fdl` (p → fdl → spl) / `fdlP` (pre → fdlP → splP).
+  Off = 0 s delays (the nodes are always there). Renders add `round(T·sr)` to `lat`. Checked in offline renders: linear-phase
+  pEQ on a track: off +4,606 samples late, on aligned; pLIMIT on a bus: bus and a direct track aligned. **Not handled:**
+  …chains modules' own latency, sidechain taps, a source feeding two buses with different latencies (it lines up with the
+  later one). **Default song**: `DSK` localStorage, `defSongItems/defSongSave/defSongForget`, `newSong` reads it (song only,
+  name reset; the kit never changes on New). **Favourites**: `favs` (localStorage `thunderplus-favs-v1`, kinds `p:<kind>`,
+  `eng`, `fx`), `favBtn`; preset entries get `fid` (group|name, own: u:name); FX picker rows map through `fxp.types`
+  (['', ...favourites, ...fxtL()]) — `fxpN`, `fxpTag`, `fxsChoose` use it.
+- **350 Perform** (search `PERFORM`). One target id list: `vol:t pan:t cut:t res:t dec:t fx:t:s:p`. `S.perf` (`normPerf`)
+  = scenes `sc` (A `xa`, B `xb`, crossfader `xf`), macros `mac` (`tg:[{id, lo, hi}]`), locks `lk[t]` (LK1–LK4 targets),
+  `lfo[t]` ({id, sh, rt, dp}); `S.parts` (`normParts`, `partSnap`, `partEvs`, `partLoad`). `perfResolve(state)` = scenes
+  morphed + macros on top. Live state `perfLive` (xf, mac, fill, pno, part, sent); `perfPush()` sends only changes via
+  `rt.pl.play`. Sequencer (`makeSeq`): `PF` (= perfLive when live, else from S.perf), `perfDiff` on the first step and on
+  XFD / MAC / PRT, LK revert at the next trig without it, filter targets via `PF.pno` into the note's `tw`, `instsNow()` for
+  PRT, track LFO points per row (≤4 live, 2 in renders). New event `tva` (absolute fader value, kept in `tvlOv` as a share,
+  so STOP / applyMix treat it as TVL). Commands appended to `FXC`: CND NUD RTV SLC XFD MAC LK1–LK4 PRT (NUD and RTV signed).
+  CND: 0 FILL 1 !FILL 2 PRE 3 !PRE 4 NEI 5 !NEI 6 1ST 7 !1ST; PRE/NEI read `T.cres`, set by NTH, CHA and 1ST only. Panel part
+  `#dkPerf` (`deck.perfOn`, View → PERFORM PART, off; `deck.perf` = folded or not), `perfBuild/perfDraw` (from `deckStrip`),
+  sheets `sceneSheet`, `macroSheet`, `lockSheet`, `tgtPicker` (all on `sheetShell`). Reload point `reloadPt` (memory only,
+  `perfSongIn` = Undo's in-place swap, undoable). FILL: panel button (tap latch, hold momentary) and Shift+Alt+F (`fillKey`).
+  **Not done:** engine knobs as targets (pads are rendered; only live engines could follow), …chains controls as targets,
+  …pump slots as targets (they don't take FXV either), scene/macro values while stopped reset at the next PLAY (re-sent then).
+- **351** `busGroups`: a source that isn't pure (keeps its own out = a send) gets `SEND_COLOR` (#7a8a00). The owner's question,
+  answered: yes, a send/return is exactly that in …chains — the track keeps its Track In → its own Chain Out and a cable also
+  goes to another track's Chain Out (that track becomes the bus / return; PRE/post per Track In). `SCALE MODE` (Input,
+  `scaleMode`, localStorage) snaps typed / Synth-page notes with `scaleSnap(S, n)` when S.scale > 0 (no key highlighting yet).
+
+### Not built yet: queued pattern change (owner, 1 Nov: skip for now, note it)
+Tapping a song row / section while playing jumps at once. Plan when wanted: a QUEUE setting (Off / Bar / Pattern, default
+Pattern); a tap while playing sets `tp.queue = {row}`; `makeSeq` gets `api.queue(row)`: at the next bar (`api.bt` crossing a
+multiple of 4) or the end of the current song row (all tracks' `T.step >= L`), every track jumps to that row (as `HOP`
+does per track). Arrange blinks the queued row (CSS class on its row numbers). Also the natural trigger for section launch
+in a performance mode (below). About half a day.
+
+### Proposed tracker keys (audit #2: proposed to the owner 1 Nov, NOT built until they agree)
+Scope comes from the selection, as in Renoise: Ctrl/⌘+A pressed again widens it, then any command acts on it.
+
+| Command | Proposed key | Notes |
+| --- | --- | --- |
+| Transpose ±1 semitone | Alt+, / Alt+. (as now) | with no selection: the whole phrase under the cursor (Phrase) or the cursor block's phrase (Song) |
+| Transpose ±1 octave | Alt+Shift+, / Alt+Shift+. | same scope |
+| Widen the selection | Ctrl/⌘+A again | column → track → pattern (every track on the song row, in Pattern view) |
+| Interpolate | Ctrl/⌘+I | Renoise's key |
+| Shrink / Expand | Ctrl/⌘+Shift+, / Ctrl/⌘+Shift+. | |
+| Insert a row (Macs have no Insert) | Ctrl/⌘+Enter | Insert keeps working; on Song, one column as now |
+| Insert / remove a whole song row | Ctrl/⌘+Shift+Enter / Ctrl/⌘+Shift+Backspace | Insert and Ctrl/⌘+Backspace stay column-only on Song |
+| First / last song row | Ctrl/⌘+Home / Ctrl/⌘+End | |
+| Follow on / off | Ctrl/⌘+Shift+F (and Scroll Lock) | Ableton's key |
+| Play the row under the cursor | Alt+Enter (every track), Shift+Alt+Enter (this track) | |
+| Nudge the selection a row | Ctrl/⌘+Alt+▲ / ▼ | some Windows Intel drivers rotate the screen on Ctrl+Alt+arrows (usually off) |
+| Previous / next instrument | Numpad − / + | Renoise's keys; [ ] stay |
+| Settings | Ctrl/⌘+, | the Mac and Renoise standard |
+
+### Plan: Ableton Link on the desktop app (owner, 1 Nov: wanted eventually)
+- **Licence first.** The Link SDK (github.com/Ableton/link) is dual-licensed: GPLv2+ or a proprietary licence from Ableton
+  (free, by application: link-devs@ableton.com). A closed / sold Thunder Plus needs the proprietary one; until then build it
+  as an optional native addon that is easy to leave out (like `lxr/`). Note it in THIRD_PARTY_NOTICES and the release checklist.
+- **Where it runs.** Browsers can't do Link (UDP multicast), so desktop only: an N-API addon (node-addon-api + Link's C++
+  headers, or the `abl_link` C wrapper) loaded by `electron/main.js`, built per platform in the existing GitHub Actions
+  release workflow (electron-rebuild / prebuildify, Mac universal, Windows x64, Linux x64). Phones: later, in the native app.
+- **Bridge.** main.js owns the Link session (enable, peers, tempo, beat, phase, quantum = 4, start/stop sync) and sends the
+  page a state message on change and a timing message ~every 20 ms over `preload.js` (`window.thunderDesktop.link`:
+  `enable(on)`, `onState(cb)`, `setTempo(bpm)`, `start()`, `stop()`). Timestamps must be mapped: Link uses its own clock
+  (microseconds); send `{beat, phase, at:linkMicros, hostNow}` and convert to `ctx.currentTime` in the page with the offset
+  measured on each message (as `clkIn` does with MIDI clock timestamps).
+- **Following** (a `link` mode beside MIDI clock in, Audio & MIDI → Link: Off / On, the peer count shown): tempo →
+  `setTempoLive(bpm)` (the TPO path); our tempo changes → `setTempo` (Link is symmetric: any peer can change it). Start: with
+  start/stop sync on, a peer's start starts us (and ours them), on the next quantum boundary: compute the time of the next
+  bar from beat/phase and pass `{at}` to `tStart` (needs a "start at" option: the sequencer already schedules from
+  `api.base`). Drift: every second compare Link's beat at a time with `api.bt` there; nudge the playing tempo by a small
+  fraction (±0.5 %) until the phase error is under 1 ms, as clkIn's follower does.
+- **Order:** (1) addon + session + tempo only, (2) start/stop sync with quantum, (3) phase-locked drift correction,
+  (4) Thunder Perform. Roughly 3–5 days, most of it the cross-platform native build. Test against Live and a phone app
+  (e.g. Koala) on one Wi-Fi network.
+
+### Plan: live performance mode (owner, 1 Nov: wanted eventually)
+A screen for playing a song rather than editing it, built on what 350 added (FILL, reload, parts, scenes, macros, locks).
+- **PERFORM screen** (a view beside Song / Mixer, Alt+P or a tab; big targets for the Fold): left, a 4×4 / 8×4 pad grid
+  — tap = mute / unmute a track (Elektron mute mode), hold SHIFT = solo, double-tap = queue its next block; middle, the
+  song's sections as launch buttons (queued: see "queued pattern change" above, which this needs) with the playing one lit
+  and the queued one blinking; right, the crossfader (large, vertical on the phone), scene A/B pickers, the 8 macros as
+  knobs, FILL (hold), RELOAD, PART ◀▶. A top line with tempo (and tap tempo), the bar counter and the CPU.
+- **Mute modes:** global mutes (as now) and "pattern mutes" (block mutes) switchable; mutes and solos can be "armed" and
+  applied together on the next bar (Elektron's pre-mute), which also needs the queue's timing.
+- **Control:** MIDI learn for every control on the screen (pads as notes, knobs as CCs), saved per device; a Launchpad /
+  generic grid template later. Thunder Perform (the separate DJ app) keeps decks and clip launching; this mode is one song
+  played live. Decide with the owner whether Thunder Perform's deck could reuse this screen.
+- **Recording a performance:** optional: write crossfader / macro moves into the MST column as XFD / MAC rows (REC on).
+- **Order:** queue (½ day) → screen layout + mutes (1–2 days) → section launch (1 day) → MIDI learn (1 day) → arm/pre-mute and
+  recording (1 day). Check the Fold cover screen early.
+
 ## 1 Nov (6): kit to free slots; Breaks presets removed (build 346)
 - `kitToSlots()` (button on a kit engine card's Drum section, added in `xBuild` when `U.rows.kd`): slots that are still as
   made (name "Pad n" / "Synth n", layers engine, not the current pad) and that no phrase plays; short → grows the kit (no
