@@ -108,10 +108,11 @@ test('PRE sends: busPlan lists the sources whose Track In says "Before its fader
 test('sources: the per-track graph, PRE feeds, master OUT live and in renders, the Mixer rows, the song file, the editor', () => {
   const src = H.read('index.html');
   // per track: inp (TRIM) → dry / chain → wet → [FX] → ins → g → p, ins → pre
-  assert.match(src, /inp\.connect\(dry\); dry\.connect\(ins\); ins\.connect\(g\); g\.connect\(p\); p\.connect\(out\); ins\.connect\(pre\);/, 'the per-track graph');
+  // (1 Nov: p reaches the master through dl, LATENCY COMPENSATION's delay, 0 s unless the option is on)
+  assert.match(src, /inp\.connect\(dry\); dry\.connect\(ins\); ins\.connect\(g\); g\.connect\(p\); p\.connect\(dl\); dl\.connect\(out\); ins\.connect\(pre\);/, 'the per-track graph');
   assert.match(src, /const mid = b\.fx \|\| b\.ins;/, 'track FX sit between the chain and the fader');
   assert.doesNotMatch(src, /b\.inp\.disconnect\(\); b\.inp\.connect\(b\.g\)/, 'no more wholesale input rewiring (it dropped the taps and meters)');
-  assert.match(src, /if \(P\.pre\.has\(t\)\)\{ if \(!q\.splP\)\{ q\.splP = ac\.createChannelSplitter\(2\); q\.pre\.connect\(q\.splP\); \}/, 'PRE sources feed their bus from the pre tap');
+  assert.match(src, /if \(P\.pre\.has\(t\)\)\{ if \(!q\.splP\)\{ q\.splP = ac\.createChannelSplitter\(2\); q\.fdlP = ac\.createDelay\(1\); q\.fdlP\.delayTime\.value = 0; q\.pre\.connect\(q\.fdlP\); q\.fdlP\.connect\(q\.splP\); \}/, 'PRE sources feed their bus from the pre tap (through the feed delay)');
   assert.match(src, /src\.map\(t => t \+ \(P\.pre\.has\(t\) \? 'p' : ''\)\)/, 'a PRE switch rebuilds the bus feeds');
   assert.match(src, /if \(name === 'pre' && rt\.pl\.busSync\)\{ rt\.pl\.busSync\(\);/, 'the editor\'s switch reaches the live routing');
   assert.match(src, /if \(n\._onReady\)\{ const f = n\._onReady; n\._onReady = null;/, 'the chain node says when to fade in');

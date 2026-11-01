@@ -698,6 +698,10 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .fpi span{color:var(--ts-info); font-family:var(--font); font-size:.92em}
 .fpi i{margin-left:auto; flex:none; font-style:normal; font-size:.75em; color:var(--ts-hint)}
 .fpi.on{background:var(--ts-cur-bg)} .fpi.on :is(b,span,i){color:var(--ts-cur)}
+/* FAVOURITES (1 Nov): the ☆ / ★ on a row of a picker */
+.pfav{flex:none; min-width:32px; min-height:0; padding:0 6px; border:0; background:none; color:var(--muted); font-size:1.05em; line-height:1; cursor:pointer}
+.pfav.fon{color:var(--ink)}
+.fpi .pfav{margin-left:auto; color:var(--ts-hint)} .fpi i + .pfav{margin-left:6px} .fpi .pfav.fon, .fpi.on .pfav{color:var(--ts-cur)}
 .fxpick .fpi{scroll-margin-top:2.4em}   /* keyboard moves keep the item clear of a pinned heading */
 .fph{position:sticky; top:0; z-index:1; padding:.8em 10px .3em; font-size:.75em; font-weight:700; letter-spacing:.1em; color:var(--ts-th); background:var(--ts-bg); border-bottom:1px solid var(--ts-ink)}   /* an effect group's heading */
 .thd{display:flex; justify-content:space-between; gap:12px; font-weight:700; line-height:1.3; flex:none}
@@ -2109,6 +2113,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="audrow"><span>Level</span><input type="range" id="audLvl" min="0" max="100" step="1" aria-label="Output level"><output id="audLvlV"></output></div>
       <div class="segrow"><span>Latency</span><div class="seg" id="segLat"></div></div>
       <div class="segrow"><span>Rate</span><div class="seg" id="segARate"></div></div>
+      <div class="segrow" title="Lines up tracks and buses whose …pump effects look ahead (LIMIT, CALM, TONE, linear-phase EQ…) by delaying everything else to match. Off: those tracks play a little late, as before. Renders follow the same setting."><span>Latency comp</span><div class="seg" id="segPdc"></div></div>
       <div class="segrow" id="psLiveRow" hidden><span>…pump live</span><div class="seg" id="segPsLive"></div></div>
       <p class="note" id="psLiveNote" hidden></p>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Latency and rate change when audio restarts. That reloads ...Thunder; your song and kit are kept.</span><button id="audRestart" class="on">Apply (reload)</button></div>
@@ -7256,7 +7261,7 @@ const Lc = () => V().layers[V().sel];
 // Output device, level, latency and sample rate. Latency and rate are fixed when the AudioContext is made,
 // so changing them asks for a restart; the output device and level change live.
 const AUK = 'thunderplus-audio-v1';
-const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto'};   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
+const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false};   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
   try { const o = JSON.parse(localStorage.getItem(AUK) || '{}'); return Object.assign(d, o && typeof o === 'object' ? o : {}); } catch(e){ return d; } })();
 // Latency: what the person picked, else Balanced in the Mobile setup (phones click at Lowest when busy) and Lowest on desktop.
 // The desktop app starts on Balanced too (owner, 31 Oct: playback stuttered in the desktop app and not in the browser on the
@@ -10015,20 +10020,23 @@ function engineSheet(){
   const hd = el('div', 'phd'), q = el('input'), close = el('button', 'sm', 'Close'); close.type = 'button';
   q.type = 'search'; q.placeholder = 'Search engines…'; q.spellcheck = false; q.setAttribute('aria-label', 'Search engines'); hd.append(el('b', null, 'Engine'), q, close);
   const list = el('div', 'plist'); box.append(hd, list); wrap.append(box);
-  let openCat = ENGINE_GROUPS.findIndex(([, es]) => es.some(e => e[0] === curK));
+  // FAVOURITES: a Favourites group first when there are any (openCat counts in GG())
+  const GG = () => { const all = ENGINE_GROUPS.flatMap(([, es]) => es), f = favs.list('eng').map(k => all.find(e => e[0] === k)).filter(Boolean); return f.length ? [['Favourites', f], ...ENGINE_GROUPS] : ENGINE_GROUPS; };
+  let openCat = GG().findIndex(([, es]) => es.some(e => e[0] === curK));
   const done = () => { if (pbOpen !== done) return; pbOpen = null; wrap.remove(); document.removeEventListener('keydown', key, true); };
   const born = performance.now(), early = () => performance.now() - born < 350;   // the opening tap, as in presetSheet
   const key = e => { if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); done(); } else if (e.target === q) e.stopPropagation(); };
   const row = ([k, name, about]) => {
     const it = el('div', 'pit' + (k === curK ? ' cur' : '')), pn = el('button', 'pn eng'); pn.type = 'button'; pn.append(document.createTextNode(name), el('small', null, about));
     pn.addEventListener('click', () => { if (early()) return; done(); if (k !== curK) setEngine(k); });
-    it.append(pn); return it;
+    it.append(pn, favBtn('eng', k, name, () => { const was = openCat >= 0 ? render.G[openCat] && render.G[openCat][0] : null; render(); const i = render.G.findIndex(g => g[0] === was); if (i !== openCat && was){ openCat = i; render(); } })); return it;
   };
   const render = () => {
     list.replaceChildren(); const f = q.value.trim().toLowerCase();
+    render.G = GG();
     if (f){ let n = 0; for (const [gn, es] of ENGINE_GROUPS) for (const e of es) if ((e[1] + ' ' + e[2]).toLowerCase().includes(f)){ const it = row(e); it.title = gn; list.append(it); n++; }
       if (!n) list.append(el('div', 'pempty', 'Nothing matches “' + q.value.trim() + '”.')); return; }
-    ENGINE_GROUPS.forEach(([gn, es], gi) => {
+    render.G.forEach(([gn, es], gi) => {
       const c = el('button', 'pcat' + (gi === openCat ? ' open' : '')); c.type = 'button'; c.append(document.createTextNode(gn), el('small', null, String(es.length))); c.setAttribute('aria-expanded', String(gi === openCat));
       c.addEventListener('click', () => { if (early()) return; openCat = openCat === gi ? -1 : gi; render(); if (openCat === gi) c.scrollIntoView({block:'nearest'}); });
       list.append(c); if (gi === openCat) for (const e of es) list.append(row(e));
@@ -10038,6 +10046,20 @@ function engineSheet(){
   wrap.addEventListener('pointerdown', e => { if (e.target === wrap){ e.preventDefault(); done(); } });
   document.addEventListener('keydown', key, true);
   pbOpen = done; render(); document.body.append(wrap);
+}
+/* FAVOURITES (owner, 1 Nov): ☆ beside a preset, an engine or an effect puts it in a Favourites group at the top of its
+   list (★ again takes it out). Kept on this device, like Recent: they are not in songs, so files don't change. Ids are
+   names (a group and a name for presets), so they survive lists being regrouped. Kinds: 'p:voice', 'p:layer', 'p:<engine
+   card>' (presets), 'eng' (engines), 'fx' (track and master effects). */
+const FAVK = 'thunderplus-favs-v1';
+const favs = (() => { let r = null; const load = () => { if (!r){ try { r = JSON.parse(localStorage.getItem(FAVK) || '{}'); } catch(e){ r = {}; } if (!r || typeof r !== 'object') r = {}; } return r; };
+  return { list:k => (load()[k] || []).slice(), has:(k, id) => (load()[k] || []).includes(id),
+    toggle:(k, id) => { const o = load(), L = o[k] || []; o[k] = L.includes(id) ? L.filter(x => x !== id) : [...L, id]; try { localStorage.setItem(FAVK, JSON.stringify(o)); } catch(e){} return o[k].includes(id); } }; })();
+function favBtn(kind, id, label, after){
+  const on = favs.has(kind, id), b = el('button', 'pfav' + (on ? ' fon' : ''), on ? '★' : '☆'); b.type = 'button';
+  b.title = on ? 'Take it out of Favourites' : 'Add to Favourites'; b.setAttribute('aria-label', (on ? 'Unfavourite ' : 'Favourite ') + label); b.setAttribute('aria-pressed', String(on));
+  b.addEventListener('click', e => { e.stopPropagation(); const now = favs.toggle(kind, id); toast(now ? label + ' is in Favourites' : label + ' left Favourites', 1400); if (after) after(); });
+  return b;
 }
 const PRK = 'thunderplus-preset-recent-v2';   // v2 (30 Oct): drums regrouped by type, so the old keys (group:item numbers) point elsewhere
 const recentPresets = (() => { let r = null; const load = () => { if (!r){ try { r = JSON.parse(localStorage.getItem(PRK) || '{}'); } catch(e){ r = {}; } if (!r || typeof r !== 'object') r = {}; } return r; };
@@ -10053,6 +10075,8 @@ function enginePresetEntries(kind){
   const es = spec.list.map((pr, i) => ({key:'e' + i, name:pr[0], apply:() => { prePick(kind, i); spec.fn(i); }, make:() => onVoiceCopy(() => spec.fn(i, true))}));
   const rk = kind === 'x' ? 'x:' + k : kind, rec = recentPresets.list(rk).map(key => es.find(e => e.key === key)).filter(Boolean);
   const groups = [[spec.title.replace(/ presets$/, ''), es]]; if (rec.length) groups.unshift(['Recent', rec]);
+  for (const e of es) e.fid = e.name;   // FAVOURITES
+  const fv = favs.list('p:' + rk).map(id => es.find(e => e.fid === id)).filter(Boolean); if (fv.length) groups.unshift(['Favourites', fv]);
   return {title:spec.title, groups, rk};
 }
 function presetEntries(kind){
@@ -10070,6 +10094,9 @@ function presetEntries(kind){
       ? {key, name:it[0], apply:() => onVoicePreset(key), make:() => facVoice(it)}
       : {key, name:it[0], apply:() => onLayerPreset(key), make:() => layerVoice(Object.assign({}, it[1], {level:facLayerLevel(it[1])}), it[2])}; all.set(key, e); return e; }); G.push([gn, es]); });
   const rec = recentPresets.list(kind).map(k => all.get(k)).filter(Boolean); if (rec.length) G.splice(1, 0, ['Recent', rec]);
+  // FAVOURITES: a group and a name each (the song's own: u:name), first in the list when there are any
+  const byF = new Map(); for (const [gn, es] of G){ if (gn === 'Recent') continue; for (const e of es){ e.fid = e.own != null ? e.key : gn + '|' + e.name; byF.set(e.fid, e); } }
+  const fv = favs.list('p:' + kind).map(id => byF.get(id)).filter(Boolean); if (fv.length) G.unshift(['Favourites', fv]);
   return G;
 }
 /* PRESET STEP (owner, 24 Oct): the preset each pad last took on each engine card, so ◀ ▶ step on from it and the card's
@@ -10111,8 +10138,8 @@ function presetSheet(kind){
   // Engine cards' lists are the factory list only: their sounds are saved as pad presets (the pad's Presets… button).
   if (song) ft.append(save, el('span', 'sp'), imp); else ft.append(el('span', 'lbl', 'To keep a sound of your own, save the pad as a preset.'), el('span', 'sp'));
   box.append(hd, list, ft); wrap.append(box);
-  const G = presetEntries(kind); let total = 0; for (const [, es] of G) total += es.length; q.placeholder = `Search ${total} presets…`;
-  let openCat = song ? (G[0] && G[0][1].length ? 0 : (G[1] ? 1 : 0)) : G.length - 1;
+  let G = presetEntries(kind); let total = 0; for (const [gn, es] of G) if (gn !== 'Favourites' && gn !== 'Recent') total += es.length; q.placeholder = `Search ${total} presets…`;
+  let openCat = song ? (G[0] && G[0][1].length ? 0 : (G[1] ? 1 : 0)) : G.length - 1, hadFav = !!(G[0] && G[0][0] === 'Favourites');
   const done = () => { if (pbOpen !== done) return; pbOpen = null; stopPreview(); wrap.remove(); document.removeEventListener('keydown', key, true); };
   // A tap that lands in the first moments after the sheet opens is the tap that opened it (or a double tap): ignore it,
   // so the sheet stays open until a preset is chosen on purpose.
@@ -10124,6 +10151,7 @@ function presetSheet(kind){
     pn.addEventListener('click', () => { if (early()) return; recentPresets.add(rkind, e.key); done(); e.apply(); });
     pp.addEventListener('click', () => { if (e.prev) return e.prev(pp); try { previewVoice(e.make(), pp); } catch(err){ toast('Couldn’t preview that preset.'); } });
     it.append(pn, pp);
+    if (e.fid) it.append(favBtn('p:' + rkind, e.fid, e.name, () => { G = presetEntries(kind); const fo = G[0] && G[0][0] === 'Favourites'; if (fo !== hadFav){ openCat += fo ? 1 : -1; hadFav = fo; } render(); }));   // FAVOURITES
     if (e.own != null){ const px = el('button', 'px', '✕'); px.type = 'button'; px.title = 'Delete this preset'; px.setAttribute('aria-label', 'Delete ' + e.name);
       px.addEventListener('click', async () => { if (!await askYes({title:'Delete “' + e.name + '”?', body:'It is removed from this song only.'}, 'Delete')) return; const mine = kind === 'voice' ? SP().voices : SP().layers; mine.splice(e.own, 1); saveS(); toast('Deleted “' + e.name + '”.'); render(); });
       it.append(px); }
@@ -10131,7 +10159,7 @@ function presetSheet(kind){
   };
   const render = () => {
     list.replaceChildren(); const f = q.value.trim().toLowerCase(); const G2 = f ? presetEntries(kind) : (G.length ? G : presetEntries(kind));
-    if (f){ let n = 0; for (const [gn, es] of G2){ if (gn === 'Recent') continue; for (const e of es) if (e.name.toLowerCase().includes(f)){ const it = row(e); it.title = gn; list.append(it); n++; } }
+    if (f){ let n = 0; for (const [gn, es] of G2){ if (gn === 'Recent' || gn === 'Favourites') continue; for (const e of es) if (e.name.toLowerCase().includes(f)){ const it = row(e); it.title = gn; list.append(it); n++; } }
       if (!n) list.append(el('div', 'pempty', 'Nothing matches “' + q.value.trim() + '”.')); return; }
     G2.forEach(([gn, es], gi) => {
       const c = el('button', 'pcat' + (gi === openCat ? ' open' : '')); c.type = 'button'; c.append(document.createTextNode(gn), el('small', null, String(es.length))); c.setAttribute('aria-expanded', String(gi === openCat));
@@ -12526,7 +12554,7 @@ async function audRefresh(){
   $('audNames').hidden = !sinkOk || !audDevs.length || audDevs.every(d => d.label);
   if (!sinkOk) $('audNote').textContent = 'This browser plays through the system’s output and doesn’t let a web app pick another one. On Android, choose the output in the system’s media output switcher (or plug in the interface); on a computer, Chrome and Edge (and the desktop app) can pick it here.';
   $('audLvl').value = aset.vol; audLvlShow();
-  updLat(); updARate(); audRestartRow(); audStatus();
+  updLat(); updARate(); updPdc(); audRestartRow(); audStatus();
 }
 function audLvlShow(){ const v = aset.vol; $('audLvlV').textContent = v <= 0 ? '−∞ dB' : (20 * Math.log10(v / 100)).toFixed(1) + ' dB'; }
 function audRestartRow(){ $('audRestartRow').hidden = !(ctx && aLive && (aLive.lat !== latOf() || aLive.rate !== aset.rate)); }
@@ -12556,6 +12584,9 @@ $('audLvl').addEventListener('input', e => {
 });
 $('audLvl').addEventListener('change', asetSave);
 const updLat = makeSeg($('segLat'), [['interactive', 'Lowest'], ['balanced', 'Balanced'], ['playback', 'Safest']], () => latOf(), v => { aset.lat = v; aset.latPick = true; asetSave(); audRestartRow(); });
+// LATENCY COMPENSATION (owner, 1 Nov): this device's choice, off by default; the live player re-times at once.
+const updPdc = makeSeg($('segPdc'), [[0, 'Off'], [1, 'On']], () => aset.pdc ? 1 : 0, v => { aset.pdc = !!v; asetSave(); try { if (rt && rt.pl) rt.pl.pdcSync(); } catch(e){}
+  const T = pdcPlan(48000).T; toast(v ? 'Latency comp on' + (T > 0 ? `: everything waits ${Math.round(T * 1000)} ms for the latest track` : ' (nothing has latency right now)') : 'Latency comp off', 2600); });
 const updARate = makeSeg($('segARate'), [[0, 'Device'], [44100, '44.1k'], [48000, '48k']], () => aset.rate, v => { aset.rate = v; asetSave(); audRestartRow(); });
 /* …PUMP SYNTHS LIVE (owner, 26 Oct), for this device: AUTO plays Mono live, Poly live and Coil live live, with the safety net
    (their renders when the device can't keep up); RENDERED always plays their renders, the same values' sound, which is
@@ -13646,7 +13677,7 @@ let plFailed = false;
   const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=7').catch(e => { tpLog('pump synths wasm (the …pump engines will be silent)', e); return null; }) : Promise.resolve(null);
   // …PUMP: the pump mastering effects (pump/pump.wasm), fetched alongside; effect nodes that asked for it get it now
   bytes(PUMP_WASM).then(b => { pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage({pumpBytes:b}); } catch(e){} pumpWait.clear(); pumpToChains(b);
-    return WebAssembly.instantiate(b, imp).then(r => { pumpMain = r.instance.exports; if (pumpMain._initialize) pumpMain._initialize(); }); }).catch(e => { if (PM) console.warn('pump effects', e); });
+    return WebAssembly.instantiate(b, imp).then(r => { pumpMain = r.instance.exports; if (pumpMain._initialize) pumpMain._initialize(); try { if (typeof rt !== 'undefined' && rt && rt.pl) rt.pl.pdcSync(); } catch(e){} }); }).catch(e => { if (PM) console.warn('pump effects', e); });
   const [plB, txB] = await Promise.all([bytes(WASM_DSP).catch(e => { tpLog('wasm fetch (dsp)', e); return null; }), bytes(WASM_TFX).catch(e => { tpLog('wasm fetch (effects)', e); return null; })]);
   tfxBytes = txB || false; tfxLoadDone();
   try {
@@ -15550,6 +15581,28 @@ function pumpLatencyOf(f, sr){
 // The master's pump slots together (switched on): a render starts that much later, and pass() trims it off as it does
 // the mastering's latency. (A bus's latency isn't compensated anywhere: see pumpLatTxt.)
 const pumpChainLatency = (A, sr) => (A || []).reduce((n, f) => n + (f && f.on && isPumpT(f.type) ? pumpLatencyOf(f, sr) : 0), 0);
+/* LATENCY COMPENSATION (owner, 1 Nov: Audio & MIDI → LATENCY COMP, off by default). The …pump effects that look ahead (LIMIT,
+   CALM, TONE, linear-phase EQ…) make a track or bus play late. With the option on, every path to the master is delayed to
+   the latest one: pdcPlan() works out, from the song alone (no audio nodes, so renders get the same answer), each track's
+   arrival at its pan (its own effects' latency, plus for a bus the latest of the tracks that feed it), then
+     d: the delay on its direct way to the master (latest arrival T minus its own), 0 for a pure source (heard only via its bus)
+     f: the delay on its feed into the buses it feeds, so a bus's sources line up with the latest of them.
+   A send (a track heard directly and through a bus) gets the two separately, so both copies line up. */
+function pdcPlan(sr){
+  const none = {on:false, T:0, d:new Map(), f:new Map()};
+  if (!aset.pdc) return none;
+  const P = busPlan(), L = t => t < NT ? pumpChainLatency(S.tfx[t], sr) / sr : 0;
+  const at = new Map(), busy = new Set(), f = new Map(), d = new Map();
+  const atP = t => { if (at.has(t)) return at.get(t); let v = L(t); if (busy.has(t)) return v; busy.add(t);
+    const src = P.feeds.get(t); if (src && src.length){ let m = 0; for (const q of src) m = Math.max(m, atP(q)); v += m; }
+    busy.delete(t); at.set(t, v); return v; };
+  for (let t = 0; t <= NT; t++) atP(t);
+  for (const src of P.feeds.values()){ let m = 0; for (const q of src) m = Math.max(m, at.get(q)); for (const q of src) f.set(q, Math.max(f.get(q) || 0, m - at.get(q))); }
+  const routed = new Set(); for (const src of P.feeds.values()) for (const q of src) if (P.pure.has(q)) routed.add(q);
+  let T = 0; for (let t = 0; t <= NT; t++) if (!routed.has(t)) T = Math.max(T, at.get(t));
+  for (let t = 0; t <= NT; t++) d.set(t, routed.has(t) ? 0 : T - at.get(t));
+  return {on:true, T, d, f};
+}
 function tfxNode(ac, chain){
   // Inputs: 0 the track, 1 (SOURCE) the picked tracks' own sounds, one channel each ('tapmap'), 2 (SENDS) the Sidechain Out sends.
   const pb = pumpBin() && !pumpSent.has(ac) ? pumpBin() : null; if (pb) pumpSent.add(ac);
@@ -16510,23 +16563,31 @@ function makePlayer(ac, out, getBuf, live){
       if (b._feedM){ for (const m of b._feedM) try { m.disconnect(); } catch(e){} b._feedM = null; }
       if (b.spl) try { b.spl.disconnect(); } catch(e){}
       if (b.splP) try { b.splP.disconnect(); } catch(e){}
-      if (b._routed){ try { b.p.connect(out); } catch(e){} b._routed = false; } }
+      if (b._routed){ try { b.dl.connect(out); } catch(e){} b._routed = false; } }
     for (const [bt, src] of want){
       const b = buses[bt], ms = [];
       for (let k = 0; k * 16 < src.length; k++) ms.push(ac.createChannelMerger(32));
       // PRE SENDS (owner, 27 Oct): a source whose Track In says "Before its fader" is heard from `pre` (after its chain and
       // effects, before VOL and pan; mute and solo still silence it), the rest from `p` (after its fader and pan).
       src.forEach((t, j) => { const q = buses[t]; if (!q) return; let s;
-        if (P.pre.has(t)){ if (!q.splP){ q.splP = ac.createChannelSplitter(2); q.pre.connect(q.splP); } s = q.splP; }
-        else { if (!q.spl){ q.spl = ac.createChannelSplitter(2); q.p.connect(q.spl); } s = q.spl; }
+        // (fdl / fdlP: LATENCY COMPENSATION's feed delays, 0 s unless the option is on)
+        if (P.pre.has(t)){ if (!q.splP){ q.splP = ac.createChannelSplitter(2); q.fdlP = ac.createDelay(1); q.fdlP.delayTime.value = 0; q.pre.connect(q.fdlP); q.fdlP.connect(q.splP); } s = q.splP; }
+        else { if (!q.spl){ q.spl = ac.createChannelSplitter(2); q.fdl = ac.createDelay(1); q.fdl.delayTime.value = 0; q.p.connect(q.fdl); q.fdl.connect(q.spl); } s = q.spl; }
         const m = ms[j >> 4], c = (j & 15) * 2; try { s.connect(m, 0, c); s.connect(m, 1, c + 1); } catch(e){} });
       ms.forEach((m, k) => { try { m.connect(b.chn, 0, 4 + k); } catch(e){} });
       b._feedM = ms;
       if (b.chn._send) b.chn._send({target:'chains-host', op:'busmap', value:src});
     }
-    for (const t of routed){ const q = buses[t]; try { q.p.disconnect(out); } catch(e){} q._routed = true; }
+    for (const t of routed){ const q = buses[t]; try { q.dl.disconnect(out); } catch(e){} q._routed = true; }
+    pdcSync();
   }
   const setBusOff = v => { busOff = !!v; busSync(); };
+  // LATENCY COMPENSATION: set every track's delays from pdcPlan (all 0 with the option off). Run after the buses are wired
+  // (busSync) and after a track's effects change (routeTrack); cheap when nothing changed.
+  function pdcSync(){
+    const pl = pdcPlan(ac.sampleRate), set = (n, v) => { if (!n) return; v = Math.max(0, Math.min(0.99, v || 0)); if (Math.abs(n.delayTime.value - v) > 1e-6) n.delayTime.value = v; };
+    for (let t = 0; t < buses.length; t++){ const b = buses[t]; if (!b) continue; set(b.dl, pl.d.get(t)); set(b.fdl, pl.f.get(t)); set(b.fdlP, pl.f.get(t)); }
+  }
   // The beat clock for tempo-locked track and master effects (Flex, Step gate, Retrigger): the song position in beats
   // (wrapping every 16) as sample-accurate automation on a constant source, wired into every effect node's `bp`.
   // −1 while stopped. The sequencer's 'beat' events ramp it from row to row, so it follows TPO exactly, live and offline.
@@ -16552,10 +16613,12 @@ function makePlayer(ac, out, getBuf, live){
   for (let t = 0; t <= NT; t++){
     const inp = ac.createGain(), dry = ac.createGain(), ins = ac.createGain(), g = ac.createGain(), p = ac.createStereoPanner(), scs = ac.createGain(), pre = ac.createGain();
     pre.channelCount = 2; pre.channelCountMode = 'explicit'; pre.channelInterpretation = 'speakers';   // a PRE send is a stereo pair, like the pan's
-    inp.connect(dry); dry.connect(ins); ins.connect(g); g.connect(p); p.connect(out); ins.connect(pre);   // (pre runs only once a bus listens to it)
+    // LATENCY COMPENSATION (1 Nov): dl sits on the way to the master (0 s unless the option asks for more; see pdcPlan)
+    const dl = ac.createDelay(1); dl.delayTime.value = 0;
+    inp.connect(dry); dry.connect(ins); ins.connect(g); g.connect(p); p.connect(dl); dl.connect(out); ins.connect(pre);   // (pre runs only once a bus listens to it)
     scs.gain.value = 0;   // (the old post-fader Sidechain Out send: gone with the mixer bus, 21 Oct)
     let an = null, ai = null; if (live && t < NT){ an = ac.createAnalyser(); an.fftSize = 512; p.connect(an); ai = ac.createAnalyser(); ai.fftSize = 512; inp.connect(ai); }
-    buses.push({inp, dry, ins, g, p, pre, an, ai, scs, lv:0, pk:0, ilv:0, ipk:0, ipt:0, fx:null, chn:null, wet:null, _fade:new Set()});
+    buses.push({inp, dry, ins, g, p, dl, pre, an, ai, scs, lv:0, pk:0, ilv:0, ipk:0, ipt:0, fx:null, chn:null, wet:null, _fade:new Set()});
   }
   // Bass voices: one live node per track and voice (see bassReady), made when it first plays.
   const bassN = new Map(); let bpmNow = (S && S.bpm) || 120;
@@ -17018,6 +17081,7 @@ function makePlayer(ac, out, getBuf, live){
     if (b._chnRef !== b.chn){ if (b.chn) chnIn(b, mid); b._chnRef = b.chn; }
     sendSync(b);   // SENDS (after the rewire, which drops the node's outputs)
     busSync();     // BUS: sources into their bus nodes (only rebuilt when something changed)
+    pdcSync();     // LATENCY COMPENSATION (its effects' latency may have changed)
   }
   // Reset audio engine: let go of every node this player made.
   function dispose(){
@@ -17027,7 +17091,7 @@ function makePlayer(ac, out, getBuf, live){
     for (const b of buses){ if (!b) continue;
       try { if (b.fx){ b.fx.port.postMessage(null); b.fx.disconnect(); } } catch(e){}
       try { if (b.chn){ if (b.chn._send) b.chn._send({target:'chains-host', op:'dispose'}); b.chn.disconnect(); } } catch(e){}
-      try { b.inp.disconnect(); b.dry.disconnect(); b.ins.disconnect(); b.pre.disconnect(); if (b.wet) b.wet.disconnect(); for (const w of b._fade) w.disconnect(); b.g.disconnect(); b.p.disconnect(); b.scs.disconnect(); if (b.spl) b.spl.disconnect(); if (b.splP) b.splP.disconnect(); if (b._feedM) for (const m of b._feedM) m.disconnect(); } catch(e){} }
+      try { b.inp.disconnect(); b.dry.disconnect(); b.ins.disconnect(); b.pre.disconnect(); if (b.wet) b.wet.disconnect(); for (const w of b._fade) w.disconnect(); b.g.disconnect(); b.p.disconnect(); b.dl.disconnect(); if (b.fdl) b.fdl.disconnect(); if (b.fdlP) b.fdlP.disconnect(); b.scs.disconnect(); if (b.spl) b.spl.disconnect(); if (b.splP) b.splP.disconnect(); if (b._feedM) for (const m of b._feedM) m.disconnect(); } catch(e){} }
     try { scBus.disconnect(); } catch(e){}
     try { if (taps) taps.disconnect(); } catch(e){}
     try { sendBus.disconnect(); sendDly.disconnect(); } catch(e){}
@@ -17036,7 +17100,7 @@ function makePlayer(ac, out, getBuf, live){
   // dropping them (the safety net: the next notes play the renders)
   const psLoad = () => { let l = 0, n = 0; for (const b of bassN.values()) if (b.ps){ l += b.node.load || 0; n++; } return {load:l, nodes:n}; };
   const psDrop = () => { for (const [k, b] of [...bassN]) if (b.ps) bassDrop(k, b); };
-  return {play, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop};
+  return {play, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop};
 }
 
 /* ---------- live playback ---------- */
@@ -17931,6 +17995,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   { const P = busPlan(), k2 = new Set(keep); for (const b of keep) for (const t of P.feeds.get(b) || []) if (audible(t)) k2.add(t); keep = k2; }
   const M = S.mst, useM = !!(masterFx && M && M.on);
   let lat = (useM ? mstLatency(M, sr) : 0) + (masterFx ? pumpChainLatency(S.mfx, sr) : 0);   // …PUMP: the master's pump effects' latency too
+  lat += Math.round(pdcPlan(sr).T * sr);   // LATENCY COMPENSATION: everything plays T later, so the render trims it too
   const O = window.OfflineAudioContext || window.webkitOfflineAudioContext, oc = new O(2, N + lat + (lim ? safeLatency(sr) : 0), sr), out = oc.createGain();
   out.gain.value = curve(S.master);
   // GAIN STAGING (27 Oct): the master OUT fader, last, as live (stems too, as MASTER is, so they still add up to the mix)
@@ -17960,6 +18025,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
     if (chnOk) pl.routeTrack(t, tfxChain(S.tfx[t], sr, S.bpm), ok);
   }
   if (chnOk) pl.busSync();
+  pl.pdcSync();   // LATENCY COMPENSATION (lat above already counts its T)
   // …chains tempo follows the song, like the live engines.
   if (chnOk) for (const b of pl.buses) if (b && b.chn){ try { b.chn.port.postMessage({target:'chains-host', op:'transport', value:{tempo:S.bpm, lpb:S.lpb || 4, ticks:S.ticks || 6, playing:true}}); } catch(e){} }
   for (const e of evs) if (!(e.type === 'note' && e.ii != null && (S.insts[e.ii] || {}).mo === 1)) pl.play(e);   // MIDI-only instruments are silent in renders
@@ -18247,7 +18313,29 @@ async function okToLeave(what){
 }
 const guardLeave = (what, fn) => async () => { if (await okToLeave(what)) fn(); };
 // NEW SONG: the File menu, Project's › NEW SONG and Ctrl/⌘+N (owner, 24 Oct). Clears the song, keeps the kit; unsaved changes ask first.
-function newSong(){ return guardLeave('a new song', () => { setSong(freshSong(), 'New song. The kit is unchanged.'); setDirty(false); })(); }
+/* DEFAULT SONG (owner, 1 Nov): File ▾ → Save as default song keeps this song (tracks, buses, …chains, effects, mixer,
+   tempo, its phrases and all) on this device; New song then starts from it instead of the blank one. The kit is not part of
+   it, as New song never touches the kit. Forget the default song goes back to the blank one. */
+const DSK = 'thunderplus-default-song-v1';
+const defSongTxt = () => { try { return localStorage.getItem(DSK); } catch(e){ return null; } };
+function defSongItems(){
+  const has = !!defSongTxt();
+  return [{l:'Save as default song…', f:defSongSave}, ...(has ? [{l:'Forget the default song', f:defSongForget}] : [])];
+}
+async function defSongSave(){
+  flushS();
+  const ok = await askYes({title:'Save as default song?', body:'New song will start from this song (its tracks, buses, …chains, effects, mixer, tempo and phrases) on this device. The kit stays separate.' + (defSongTxt() ? ' It replaces your current default.' : '')}, 'Save as default');
+  if (!ok) return;
+  try { localStorage.setItem(DSK, JSON.stringify(songOut(S))); toast('Saved as the default song: New song starts from it.', 3000); }
+  catch(e){ toast('Couldn’t save the default song: this device’s storage is full.', 4000); }
+}
+async function defSongForget(){
+  const ok = await askYes({title:'Forget the default song?', body:'New song starts from the blank song again.'}, 'Forget');
+  if (!ok) return; try { localStorage.removeItem(DSK); } catch(e){} toast('New song starts blank again.');
+}
+function newSong(){ return guardLeave('a new song', () => {
+  const t = defSongTxt(); let d = null; if (t) try { d = normSong(JSON.parse(t)); d.name = freshSong().name; } catch(e){ d = null; tpLog('the default song could not be read', e); }
+  setSong(d || freshSong(), d ? 'New song from your default. The kit is unchanged.' : 'New song. The kit is unchanged.'); setDirty(false); })(); }
 let saving = false;
 // Save: back to the project's file (the desktop app writes it by path; Chrome / Edge through the file handle), else it asks
 // where. Elsewhere (phones) it downloads a copy. Save as always asks. True when it saved.
@@ -18717,7 +18805,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 348;
+const BUILD = 349;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -19567,14 +19655,16 @@ let FXLIST = FXLIST_ALL;
 const fxListNow = () => (FXLIST = mstView() ? FXLIST_MST : FXLIST_ALL);
 const fxp = {open:false, x:0, y:0, i:0, now:-1, slot:-1};
 // The picker's items now: the phrase commands, or (from an FX slot) the effects.
-const fxpN = () => fxp.tpre ? fxp.tpre.list.length : fxp.pre ? fxp.pre.list.length : fxp.slot >= 0 ? fxtL().length + 1 : FXLIST.length;
-const fxpTag = k => fxp.tpre ? fxp.tpre.list[k].name : fxp.pre ? fxp.pre.list[k].name : fxp.slot >= 0 ? (k ? TFX[fxtL()[k - 1]].n : '---') : (FXLIST[k] < 0 ? '---' : FXC[FXLIST[k]]);
+const fxpN = () => fxp.tpre ? fxp.tpre.list.length : fxp.pre ? fxp.pre.list.length : fxp.slot >= 0 ? fxp.types.length : FXLIST.length;
+const fxpTag = k => fxp.tpre ? fxp.tpre.list[k].name : fxp.pre ? fxp.pre.list[k].name : fxp.slot >= 0 ? (k ? TFX[fxp.types[k]].n : '---') : (FXLIST[k] < 0 ? '---' : FXC[FXLIST[k]]);
 // heads: {item index: a heading shown above it} (the effects' groups); headings aren't items, so the keys skip them.
 function fxpFill(items, now, title, wide, heads){
   const L = $('fxPickList'); L.innerHTML = '';
-  items.forEach(([b, t, isNow], k) => { if (heads && heads[k]){ const h = el('div', 'fph', heads[k]); h.setAttribute('role', 'presentation'); L.append(h); }
+  items.forEach(([b, t, isNow, fav], k) => { if (heads && heads[k]){ const h = el('div', 'fph', heads[k]); h.setAttribute('role', 'presentation'); L.append(h); }
     const it = el('div', 'fpi'); it.dataset.k = k; it.setAttribute('role', 'option');
-    it.append(el('b', null, b), el('span', null, t)); if (isNow) it.append(el('i', null, 'NOW')); L.append(it); });
+    it.append(el('b', null, b), el('span', null, t)); if (isNow) it.append(el('i', null, 'NOW'));
+    if (fav){ const fb = favBtn(fav.kind, fav.id, fav.label, fav.after); fb.addEventListener('pointerdown', e => e.stopPropagation()); fb.addEventListener('pointerup', e => e.stopPropagation()); it.append(fb); }   // FAVOURITES
+    L.append(it); });
   $('fxPickT').textContent = title; $('fxPick').classList.toggle('wide', !!wide);
   $('fxPick').setAttribute('aria-label', wide ? 'Pick an effect' : 'Pick an effect command');
   $('fxPickHint').textContent = coarse ? 'Tap twice or EDIT · OPTION closes' : 'Click, or ▲▼ and Enter · Esc closes';
@@ -19587,12 +19677,17 @@ function fxpOpen(x, y){
   fxpFill(FXLIST.map(f => [f < 0 ? '---' : FXC[f], f < 0 ? 'No command (clear this cell)' : FXB[FXC[f]] || '', f === v]), v, 'FX COMMAND', false, heads);
 }
 // EDIT on an FX-screen slot: every effect in a list, the slot's own one marked NOW. Choosing it opens its controls.
-function fxsOpen(k){
-  const A = cFxT >= NT ? S.mfx : S.tfx[cFxT], f = A[k], cur = f ? f.type : null, FL = fxtL();
-  Object.assign(fxp, {open:true, slot:k, pre:null, i:cur ? FL.indexOf(cur) + 1 : Math.max(0, FL.indexOf(lastFxType) + 1)});
-  const heads = {}; FL.forEach((t, j) => { const g = fxtGroup(t); if (!j || g !== fxtGroup(FL[j - 1])) heads[j + 1] = g.toUpperCase(); });
+// FAVOURITES (1 Nov): the slot's favourite effects first, under FAVOURITES (the ones this track can take), then every
+// effect in its group as before. fxp.types is what each row picks ('' = empty the slot).
+function fxsOpen(k, keepType){
+  const A = cFxT >= NT ? S.mfx : S.tfx[cFxT], f = A[k], cur = f ? f.type : null, FL = fxtL(), FV = favs.list('fx').filter(t => FL.includes(t));
+  const types = ['', ...FV, ...FL], at = t => types.indexOf(t);
+  Object.assign(fxp, {open:true, slot:k, pre:null, types, i:keepType != null ? Math.max(0, at(keepType)) : cur ? at(cur) : Math.max(0, at(lastFxType))});
+  const heads = {}; if (FV.length) heads[1] = 'FAVOURITES';
+  FL.forEach((t, j) => { const g = fxtGroup(t); if (!j || g !== fxtGroup(FL[j - 1])) heads[j + 1 + FV.length] = g.toUpperCase(); });
+  const fav = t => ({kind:'fx', id:t, label:TFX[t].long, after:() => { const sel = fxp.types[fxp.i]; fxsOpen(k, sel || null); }});
   fxpFill([['---', f ? 'Empty this slot (remove the effect)' : 'Leave this slot empty', !f],
-    ...FL.map(t => [TFX[t].n, TFX[t].long, t === cur])], cur, 'EFFECT · ' + fxWho(cFxT) + ' SLOT ' + (k + 1), true, heads);
+    ...types.slice(1).map(t => [TFX[t].n, TFX[t].long, t === cur, fav(t)])], cur, 'EFFECT · ' + fxWho(cFxT) + ' SLOT ' + (k + 1), true, heads);
 }
 // …PUMP: a pump slot's factory presets in the same list, under their sections (FACTORY, SOURCES, CHAINS).
 function pumpPresetOpen(t, k){
@@ -19621,7 +19716,7 @@ function fxpChoose(k = fxp.i){
 function fxsChoose(s, k){
   fxpClose(); const t = cFxT, A = t >= NT ? S.mfx : S.tfx[t], had = A[s];
   if (!k){ A[s] = null; cFxS = s; cs.fx.y = s + 1; fxChanged(t); saveS(); draw(); if (had) toast(`Slot ${s + 1} emptied.`); return; }
-  const type = fxtL(t)[k - 1];
+  const type = (fxp.types && fxp.types[k]) || fxtL(t)[k - 1];
   if (!had || had.type !== type){ A[s] = freshTfx(type); fxChanged(t); saveS(); toast(`Slot ${s + 1}: ${TFX[type].long}` + (isPumpT(type) && t < NT ? pumpBusNote(type) : '')); }
   lastFxType = type; cFxS = s; cs.fx.y = FXSLOTS + 1; draw();
 }
@@ -25273,6 +25368,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [349, '1 Nov', ['Audio & MIDI → Latency comp (off unless you turn it on): tracks and buses with look-ahead …pump effects no longer play late; everything else waits to match, sends included, in renders too.', 'File → Save as default song…: New song starts from the song you saved (tracks, buses, …chains, effects, mixer, tempo). Forget the default song goes back to blank. The kit is separate, as always.', 'Favourites: ☆ beside a preset, an engine or an effect puts it in a Favourites group at the top of its list (kept on this device).']],
   [348, '1 Nov', ['File menu in groups: Examples ▸, Export ▸, Import ▸ and Kit ▸ open in place below their row; the project commands stay on top.', "Edit menu: the same items in the same places on every screen (greyed out where they don't apply), with Insert a row, Remove the row, Mute, Solo, Loop, New phrase and a Tools ▸ group (Euclidean, Acid, Transpose, Interpolate, Volume, Instrument, Shrink, Expand, Render a part, Clear unused phrases). The right-click menu has Tools ▸ too.", 'File and Edit work from the keyboard: ▼ / Enter opens, arrows move, ▶ ◀ open groups or go to the next menu, Esc closes.', 'Settings: Follow, Tab, Song mouse and Loop drag are in Input settings; Resume is in Record & play.']],
   [347, '1 Nov', ['Factory drums and Clear all kit slots in the File menu always ask first (they ran at once when the song had unsaved changes), and say what they replace.', 'The Synth page answers F2–F9 as the tracker does (F5 used to reload the page; F6 plays the pad).', "Key hints fixed: Edit ▾ Play the song shows Space in KEYS mode; Arrange's Open the phrase shows Alt+→ and Copy/Cut/Paste show ⌘ on a Mac; the Mixer hint says up to 8 effects."]],
   [346, '1 Nov', ['Drum machines (…pump Strike, Boing, X0X, Life): Put the whole kit on free slots… (on the card’s Drum section) gives each drum a slot of its own. It only uses slots that are still empty and that nothing plays, adds new slots when there aren’t enough, names each one before it starts, and one undo puts everything back. Each slot’s own instrument plays it (C-4).', 'Presets → Breaks is gone again: File ▾ → Breaks to chop already had the same fourteen breaks (sliced, synced, into a free slot). STA on a synced loop still works.']],
