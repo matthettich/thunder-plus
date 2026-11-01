@@ -1600,7 +1600,6 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 /* (owner, 31 Oct) Matrix light's outlines are dark grey, not green; the green stays for text, fills and the lit tab */
 :root[data-skin="matrixlight"]{--mxline:#2b2b2b}
 /* (owner, 31 Oct) the matrix skins drop the brand's dots, so the screen tabs end where the tracker tabs below do */
-:root:is([data-skin="matrix"],[data-skin="matrixlight"]) .brand .bdots{display:none}
 :root[data-skin="haring"]{--mx:#111111; --mx2:#3a3a3a; --mxdim:#d4d4d4; --mxbg:#ffffff; --mxpanel:#fbfbf7; --mxpanel2:#f1f0ea; --mxon:#ffffff;
   --mxsoft:#e4002b; --mxpoly:#0057b8; --mxglowc:transparent; --mxscan:transparent; --mxred:#e4002b; --mxcur:#e4002b; --mxcuron:#ffffff; --mxbus:#00a651;
   --font:"Jost","Helvetica Neue",Helvetica,Arial,system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:light}
@@ -1930,7 +1929,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 
 
 <div class="top">
-  <div class="brand" aria-label="...Thunder Plus"><span class="bdots">...</span>Thunder<span class="plus" aria-hidden="true">+</span></div>
+  <div class="brand" aria-label="...Thunder Plus">Thunder<span class="plus" aria-hidden="true">+</span></div>
   <div class="seg" id="segView" role="group" aria-label="Screen"></div>
   <input id="kitName" class="kitname" type="text" aria-label="Kit name" spellcheck="false">
   <canvas id="hMeter" class="hmeter" role="img" aria-label="Master level" title="Master level, left over right (what you hear). A red end: it clipped (click to clear)"></canvas>
@@ -18388,7 +18387,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 333;
+const BUILD = 334;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24846,6 +24845,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [334, '31 Oct', ['The name at the top left is just Thunder+ in every skin now (the … before it is gone, for more room).']],
   [333, '31 Oct', ['The song strip above the phrase (phones) shows the row that’s playing while the song plays, with ▶ and its number in the strip’s header; the song cursor stays where you left it. When the strip has the keys it shows the cursor’s row, as before.']],
   [332, '31 Oct', ['Insert paste on the Song and Arrange, as in Renoise: Ctrl/⌘+Alt+V (or right-click → Insert paste) puts the copied rows in between the row you are on and the one below; the rows below move down.', 'Pattern view: the bus column’s outline is one straight frame again (it zigzagged row by row on some screens).']],
   [331, '31 Oct', ['Arrange beside another screen: a click (on a block, an empty cell or anywhere in the panel) gives Arrange the keys again and they stay there, with no flicker; the screen beside it still shows the block (its phrase, mixer or effects). A double-click opens the block’s phrase; Alt+A or Esc gives the keys back. (Build 327’s “keys stay on the phrase” is taken out.)']],
