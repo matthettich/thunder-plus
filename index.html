@@ -1523,7 +1523,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 @keyframes dkBreath{0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.025)}}
 @keyframes dkWag{0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-10deg)}}
 @media (prefers-reduced-motion: reduce){ .dogs .bob, .dogs .tail{animation:none!important} }
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .dogs{--dk-pink:var(--mxsoft)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .dogs{--dk-pink:var(--mxsoft)}
 /* DRUM (the phrase stage's DANCE · DRUM · KEYS): the pittie behind a drum kit with sticks, the husky on bongos. The kit
    only shows in .drum; arms rest over their drums (CSS variables) and strike with dogsHit(); no hops or breathing. */
 .dogs .kit{display:none}
@@ -1606,7 +1606,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="lautrec"]{--mx:#2a1f1a; --mx2:#6b5a4c; --mxdim:#d9c7a4; --mxbg:#f4e9d2; --mxpanel:#f8f0de; --mxpanel2:#eadcbc; --mxon:#fff8ea;
   --mxsoft:#d8452e; --mxpoly:#2e7a70; --mxglowc:transparent; --mxscan:transparent; --mxred:#c0392b; --mxcur:#d8452e; --mxcuron:#fff8ea; --mxbus:#c98f12;
   --font:"Jost","Helvetica Neue",Helvetica,Arial,system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:light}
-:root[data-skin="idm"]{--mx:#141414; --mx2:#505050; --mxdim:#bdbcb6; --mxbg:#e9e8e3; --mxpanel:#f2f1ec; --mxpanel2:#dddcd5; --mxon:#ffffff;
+:root:is([data-skin="idm"],[data-skin="idmpink"]){--mx:#141414; --mx2:#505050; --mxdim:#bdbcb6; --mxbg:#e9e8e3; --mxpanel:#f2f1ec; --mxpanel2:#dddcd5; --mxon:#ffffff;
   --mxsoft:#ff4d00; --mxpoly:#ff4d00; --mxglowc:transparent; --mxscan:transparent; --mxred:#ff4d00; --mxcur:#ff4d00; --mxcuron:#141414; --mxbus:#2a6cff; --mxline:#141414;
   --font:"JetBrains Mono",ui-monospace,Menlo,monospace; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:light}
 :root[data-skin="vice"]{--mx:#f4eeff; --mx2:#b9a9dc; --mxdim:#3d2d6b; --mxbg:#140d2b; --mxpanel:#1b1238; --mxpanel2:#251a4a; --mxon:#140d2b;
@@ -1643,7 +1643,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="te"] #tPad .k[data-b="play"]:not(#zz){background:#ff6a13; color:#121212} :root[data-skin="te"] #tPad .k[data-b="edit"]:not(#zz){background:#3c5cff; color:#fff}
 :root[data-skin="te"] #tPad .k[data-b="shift"]:not(#zz){background:#2fb37a; color:#121212} :root[data-skin="te"] #tPad .k[data-b="opt"]:not(#zz){background:#ffffff; color:#121212}
 :root[data-skin="braun"] #tPad .k[data-b="play"]:not(#zz){background:#e85d1c; border-color:#e85d1c} :root[data-skin="braun"] #tPad .k[data-b="edit"]:not(#zz){background:#4b8f3b; border-color:#4b8f3b}
-:root[data-skin="idm"] #tPad .k[data-b="play"]:not(#zz){background:#ff4d00; color:#141414} :root[data-skin="idm"] #tPad .k[data-b="edit"]:not(#zz){background:#2a6cff; color:#fff}
+:root:is([data-skin="idm"],[data-skin="idmpink"]) #tPad .k[data-b="play"]:not(#zz){background:#ff4d00; color:#141414} :root:is([data-skin="idm"],[data-skin="idmpink"]) #tPad .k[data-b="edit"]:not(#zz){background:#2a6cff; color:#fff}
 :root[data-skin="lineart"] #tPad .k[data-b="play"]:not(#zz){background:#ff5a5f; border-color:#ff5a5f} :root[data-skin="lineart"] #tPad .k[data-b="edit"]:not(#zz){background:#00a99d; border-color:#00a99d}
 :root[data-skin="lautrec"] #tPad .k[data-b="play"]:not(#zz){background:#d8452e; border-color:#2a1f1a} :root[data-skin="lautrec"] #tPad .k[data-b="edit"]:not(#zz){background:#2e7a70; border-color:#2a1f1a}
 :root[data-skin="vice"] #tPad .k[data-b="play"]:not(#zz){background:#ff3e9a; color:#140d2b} :root[data-skin="vice"] #tPad .k[data-b="edit"]:not(#zz){background:#2de2e6; color:#140d2b}
@@ -1654,10 +1654,18 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="haring"] :is(button,select,input[type=text],input[type=number],textarea,.lcell,.layercard,.fxcard,.voicecard,.setmenu){border-width:2px}
 :root[data-skin="haring"] .brand{font-weight:700; letter-spacing:.02em}
 :root[data-skin="haring"] .brand .plus{color:#e4002b}
-:root[data-skin="idm"].tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]):not(#zz):not(#zz){background:#ff4d00!important; color:#141414!important; border-color:#ff4d00!important}   /* PLAYING: the skin's orange (owner, 31 Oct) */
-:root[data-skin="idm"].tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]) *:not(#zz){color:#141414!important}
-:root[data-skin="idm"] .brand{font-weight:700; text-transform:uppercase; letter-spacing:.08em}
-:root[data-skin="idm"] .brand .plus{color:#ff4d00}
+:root:is([data-skin="idm"],[data-skin="idmpink"]).tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]):not(#zz):not(#zz){background:#ff4d00!important; color:#141414!important; border-color:#ff4d00!important}   /* PLAYING: the skin's orange (owner, 31 Oct) */
+:root:is([data-skin="idm"],[data-skin="idmpink"]).tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]) *:not(#zz){color:#141414!important}
+:root:is([data-skin="idm"],[data-skin="idmpink"]) .brand{font-weight:700; text-transform:uppercase; letter-spacing:.08em}
+:root:is([data-skin="idm"],[data-skin="idmpink"]) .brand .plus{color:#ff4d00}
+/* IDM PINK (owner, 31 Oct: "an idm skin that is pinks and greens"): IDM's layout, pink paper and green ink, hot pink for the
+   accents and the playhead, green for EDIT and poly tracks, while playing the play buttons go neon pink. */
+:root[data-skin="idmpink"]{--mx:#0f2a1c; --mx2:#3d5e4b; --mxdim:#d9b6c6; --mxbg:#f6e6ed; --mxpanel:#fbf0f4; --mxpanel2:#eed3df; --mxon:#ffffff;
+  --mxsoft:#ff2d8a; --mxpoly:#1f9e5a; --mxred:#ff2d8a; --mxcur:#ff2d8a; --mxcuron:#0f2a1c; --mxbus:#2fbf71; --mxline:#0f2a1c}
+:root[data-skin="idmpink"] #tPad .k[data-b="play"]:not(#zz){background:#ff2d8a; color:#0f2a1c} :root[data-skin="idmpink"] #tPad .k[data-b="edit"]:not(#zz){background:#1f9e5a; color:#fff}
+:root[data-skin="idmpink"].tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]):not(#zz):not(#zz):not(#zz){background:#ff1ea8!important; color:#fff!important; border-color:#ff1ea8!important; box-shadow:0 0 12px #ff1ea8aa!important}
+:root[data-skin="idmpink"].tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]) *:not(#zz):not(#zz){color:#fff!important}
+:root[data-skin="idmpink"] .brand .plus{color:#ff2d8a}
 :root[data-skin="lautrec"] .brand{font-weight:600; font-style:italic; letter-spacing:.01em}
 :root[data-skin="lautrec"] .brand .plus{color:#d8452e}
 :root[data-skin="vice"] .brand{font-weight:600; letter-spacing:.04em; text-shadow:0 0 14px rgba(255,62,154,.55)}
@@ -1746,10 +1754,10 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
    second panel tone, so the app's menus read as their own strip above the SONG / PHRASE… row, and the screen tabs are
    plain words with the open one underlined. Only the bar's own buttons change (the menus that open from it keep the skin's
    colours); a pressed button stays filled. Dark Simple skins, Pastel and Minimal are unchanged. */
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .top{background:var(--mxpanel2)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .top{background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
 /* pads, command row and keypad: plain keys with outlines and an offset block; a hit fills */
 :root[data-skinbase="term"] :is(.tcmd,.dock,.tctl){background:var(--mxbg)}
 :root[data-skinbase="term"] :is(.tcmd button,.tkp .kp,.pads .pad){background:var(--mxbg); color:var(--mx); border-color:var(--mxline, var(--mx));
@@ -1786,7 +1794,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="greywhite"]{--mxmst:#c9b7f2}
 :root[data-skin="contrast"]{--mxmst:#d6331f; --mxmston:#ffffff}
 :root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg))}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .tdeck{--stpink:var(--mx)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .tdeck{--stpink:var(--mx)}
 :root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkChn,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkChn{--dkp:9%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
 :root[data-skinbase="term"] .dkh .dksolo{background:var(--mxsoft); color:var(--mxon)} :root[data-skinbase="term"] .stms button.so.on{background:var(--mxsoft); color:var(--mxon)}
 :root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
@@ -1794,7 +1802,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
    could go grey (plum: green into pink gave #d2d0d2). Light skins mix it with white so the hue stays; the dark skins
    (near-neutral backgrounds) keep mixing with theirs. */
 :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 35%, #ffffff)}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
 :root[data-skinbase="term"] .tagrid b.f[style]{background:color-mix(in srgb, var(--mx) var(--ibp, 100%), var(--mxsoft)); color:var(--mxon)} :root[data-skinbase="term"] .tagrid b.f{text-shadow:none; box-shadow:0 0 8px var(--mxglowc)}
 :root[data-skinbase="term"] .tscr .nbl, :root[data-skinbase="term"] .tscr .nbr{color:var(--mx2)}
 :root[data-skinbase="term"] ::selection{background:var(--mx); color:var(--mxon)}
@@ -12404,6 +12412,7 @@ const SKINS = [
   {id:'matrixlight', name:'Matrix light', base:'term', dots:['#ffffff', '#00702d', '#a9cdb4', '#0062d6']},
   {id:'haring', name:'Haring', base:'term', dots:['#ffffff', '#111111', '#e4002b', '#0057b8']},
   {id:'idm', name:'IDM', base:'term', dots:['#e9e8e3', '#141414', '#ff4d00', '#2a6cff']},
+  {id:'idmpink', name:'IDM pink', base:'term', dots:['#f6e6ed', '#0f2a1c', '#ff2d8a', '#1f9e5a']},
   {id:'lineart', name:'Line art', base:'term', dots:['#ffffff', '#1a1a1a', '#ff5a5f', '#00a99d']},
   {id:'lautrec', name:'Lautrec poster', base:'term', dots:['#f4e9d2', '#2a1f1a', '#d8452e', '#2e7a70']},
   {id:'vice', name:'Vice (Miami night)', base:'term', dots:['#140d2b', '#f4eeff', '#ff3e9a', '#2de2e6']},
@@ -18390,7 +18399,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 335;
+const BUILD = 336;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24848,6 +24857,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [336, '31 Oct', ['New skin: IDM pink (Settings → Skin → Art & design). IDM’s look in pinks and greens: pink paper, dark green ink, hot pink accents, green EDIT and poly tracks; while it plays, the play buttons turn neon pink.']],
   [335, '31 Oct', ['IDM skin: while it plays, the play buttons (Stop at the top, PLAY on the pad and the command row’s play) turn the skin’s orange.']],
   [334, '31 Oct', ['The name at the top left is just Thunder+ in every skin now (the … before it is gone, for more room).']],
   [333, '31 Oct', ['The song strip above the phrase (phones) shows the row that’s playing while the song plays, with ▶ and its number in the strip’s header; the song cursor stays where you left it. When the strip has the keys it shows the cursor’s row, as before.']],
@@ -25038,7 +25048,7 @@ function setSheet(kind){
 }
 // Skin: every skin as a little tracker in its own colours, grouped. A tap puts it on the app at once (the app behind
 // the sheet is the preview); Done keeps it, "Back to …" returns to the skin you opened the sheet with.
-const SKIN_GROUPS = [['Pastel', ['auto', 'light']], ['Minimal', ['minimal', 'mincolor', 'monotone', 'minblack', 'mincolorblack']], ['Neon & Matrix', ['neon', 'matrix', 'matrixlight']], ['Rainbow', ['rainbow', 'rainbowdyn']], ['Art & design', ['haring', 'idm', 'lineart', 'lautrec', 'vice', 'braun', 'te', 'koss', 'opuntia']]];
+const SKIN_GROUPS = [['Pastel', ['auto', 'light']], ['Minimal', ['minimal', 'mincolor', 'monotone', 'minblack', 'mincolorblack']], ['Neon & Matrix', ['neon', 'matrix', 'matrixlight']], ['Rainbow', ['rainbow', 'rainbowdyn']], ['Art & design', ['haring', 'idm', 'idmpink', 'lineart', 'lautrec', 'vice', 'braun', 'te', 'koss', 'opuntia']]];
 const hexLum = h => { const n = parseInt(h.slice(1), 16), c = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * c(n >> 16 & 255) + 0.7152 * c(n >> 8 & 255) + 0.0722 * c(n & 255); };
 const hexCon = (a, b) => { const x = hexLum(a), y = hexLum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
 function skinGroups(){

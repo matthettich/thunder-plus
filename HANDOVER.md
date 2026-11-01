@@ -81,6 +81,11 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (evening): brand, playing colour, IDM pink (builds 334–336, web only)
+- 334: the brand is `Thunder+` (the `.bdots` "..." span is gone in every skin; titles and help still say ...Thunder).
+- 335: `songBtn()` toggles `html.tpon` while anything plays; IDM lights #tSong, the pad PLAY and the command row's play in its orange then.
+- 336: skin `idmpink` shares every IDM rule (selectors are `:root:is([data-skin="idm"],[data-skin="idmpink"])` and the skin lists name both), then overrides the palette vars and the PLAY / EDIT / playing colours (neon pink #ff1ea8 while playing).
+
 ## 31 Oct (later): song strip follows the playhead (build 333, web only)
 - `apStrip`: while the song plays and the strip doesn't have the keys, its three rows centre on the playing row (`playhead()[cs.song.x]`, else the first playing track) instead of `cs.song.y`; the header adds `▶ row`. Independent of FOLLOW.
 
