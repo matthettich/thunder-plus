@@ -81,6 +81,11 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (late): insert paste; bus frame (build 332, web only)
+- `insertPaste()` (Ctrl/⌘+Alt+V; Song/Arrange right-click "Insert paste"; Edit menu `insp`): `songRowsInsert(at, h)` below the cursor row (or the selection's last row / last pick), then the normal paste for the clip kind (rows/rect → `paste`, picks → `pastePicks`, clone → `pasteClone`) at the new row. Blocks are shared, as paste shares them.
+- Pattern view bus outline: per-cell inset box-shadows (`pvbl`/`pvbr`) zigzagged on the owner's machine (font widths). Now `pvBusFrame(rebuilt)` puts one absolutely positioned `.pvbframe` per bus column in `#tGrid`, from the column-name header cell to the last bus row; redrawn on rebuild or when grid width / font size changes. `pvbl`/`pvbr` stay as markers only.
+- Builds 316–331 are described in CHANGES in index.html.
+
 ## 31 Oct (21): RENDER TO and render progress (build 315; desktop needs the new release)
 
 - `pickOut(filename)` → {path} (desktop: IPC thunder:out-pick, the Save dialog; remembers the last folder, else the project's, else Music) | {h} (showSaveFilePicker, not Android) | {dl} | {ai} | null (cancelled); `writeOut(to, name, blob)` writes (thunder:out-write, .wav/.zip/.mid only) and toasts where, with Show (thunder:out-show). `deliver()` = pick + write; the old body is `deliverAI`.
