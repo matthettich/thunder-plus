@@ -1654,6 +1654,8 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="haring"] :is(button,select,input[type=text],input[type=number],textarea,.lcell,.layercard,.fxcard,.voicecard,.setmenu){border-width:2px}
 :root[data-skin="haring"] .brand{font-weight:700; letter-spacing:.02em}
 :root[data-skin="haring"] .brand .plus{color:#e4002b}
+:root[data-skin="idm"].tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]):not(#zz):not(#zz){background:#ff4d00!important; color:#141414!important; border-color:#ff4d00!important}   /* PLAYING: the skin's orange (owner, 31 Oct) */
+:root[data-skin="idm"].tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]) *:not(#zz){color:#141414!important}
 :root[data-skin="idm"] .brand{font-weight:700; text-transform:uppercase; letter-spacing:.08em}
 :root[data-skin="idm"] .brand .plus{color:#ff4d00}
 :root[data-skin="lautrec"] .brand{font-weight:600; font-style:italic; letter-spacing:.01em}
@@ -17254,7 +17256,8 @@ function chaseFx(row, at){ for (const e of chaseEvs(row, at)) rt.pl.play(e); }
 // The SONG button in the synth's top bar: play the song from the tracker's cursor row, or stop it.
 // The label (Song / Stop) is switched by the .on class in CSS, so the button's size and position never
 // change with the transport state.
-function songBtn(){ const b = $('tSong'); if (!b) return; b.hidden = false; b.classList.toggle('on', tp.on);
+function songBtn(){ document.documentElement.classList.toggle('tpon', !!tp.on);   // PLAYING: skins can light the play buttons (IDM: neon pink)
+  const b = $('tSong'); if (!b) return; b.hidden = false; b.classList.toggle('on', tp.on);
 }
 // The pump's 25 ms tick comes from a Worker: a page timer is slowed to once a second (or frozen) when the app is in
 // the background and nothing audible is playing (a MIDI-only song driving the MPC with the screen off, a muted
@@ -18387,7 +18390,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 334;
+const BUILD = 335;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24845,6 +24848,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [335, '31 Oct', ['IDM skin: while it plays, the play buttons (Stop at the top, PLAY on the pad and the command row’s play) turn the skin’s orange.']],
   [334, '31 Oct', ['The name at the top left is just Thunder+ in every skin now (the … before it is gone, for more room).']],
   [333, '31 Oct', ['The song strip above the phrase (phones) shows the row that’s playing while the song plays, with ▶ and its number in the strip’s header; the song cursor stays where you left it. When the strip has the keys it shows the cursor’s row, as before.']],
   [332, '31 Oct', ['Insert paste on the Song and Arrange, as in Renoise: Ctrl/⌘+Alt+V (or right-click → Insert paste) puts the copied rows in between the row you are on and the one below; the rows below move down.', 'Pattern view: the bus column’s outline is one straight frame again (it zigzagged row by row on some screens).']],
