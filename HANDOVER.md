@@ -81,6 +81,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 1 Nov (6): kit to free slots; Breaks presets removed (build 346)
+- `kitToSlots()` (button on a kit engine card's Drum section, added in `xBuild` when `U.rows.kd`): slots that are still as
+  made (name "Pad n" / "Synth n", layers engine, not the current pad) and that no phrase plays; short → grows the kit (no
+  `setSlots`, so it stays one undo step); `askYes` lists drum → slot; `kitStep()` before, `kitUndoBase()` after (the slots'
+  own per-voice undo steps start after it), so one undo restores the kit and its slot count. A live kit pad fills with
+  the rendered twin. Each new slot is one-shot (`kit.held[sl] = false`), named "STRIKE Snare".
+- Removed build 341's Presets → Breaks (BREAKS, breakData/Voice/Apply, sounds/breaks/*.wav): File → Breaks to chop has
+  them. The sheet's `prev` (async preview) hook stays. `applyChop`'s STA on synced loops stays.
+
 ## 1 Nov (5): drum names on drum machine pads (build 345)
 - `PsynCore.drumName(k, P)` (kits: `K.drumNames` from the card's drum pages); `padDrum(v)` in index.html: the pad list shows
   "name · drum" (unless the name already says it) and `vEngLbl` "pump STRIKE · Snare, rendered…". The Drum row redraws both.

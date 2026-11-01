@@ -10048,31 +10048,6 @@ function enginePresetEntries(kind){
   const groups = [[spec.title.replace(/ presets$/, ''), es]]; if (rec.length) groups.unshift(['Recent', rec]);
   return {title:spec.title, groups, rk};
 }
-/* BREAKS (owner, 1 Nov: "port the breakbeats over as samples"): …pump BREAK's fourteen built-in breaks (a bar each, played
-   by pump's own acoustic-style kit, rendered by pump's renderBreak to sounds/breaks/*.wav, mono, peaks at -1 dB), in the pad's
-   Presets… under Breaks. Taking one makes the pad that sample, and every instrument playing the pad SYNC REPITCH over 4
-   BEATS (BREAK's FIT: the bar at the song's tempo); then chop it the tracker's way: STA 00 10 20 … F0 starts it at each of
-   its sixteen 16ths (Renoise's 0S), or INST → SLICES 16 for a slice a note, PLY 01 reversed, FLX for the momentary effects. */
-const BREAKS = [['Pocket', 'pocket.wav', 96], ['Ghost notes', 'ghost-notes.wav', 98], ['Hot butter', 'hot-butter.wav', 100], ['Street funk', 'street-funk.wav', 92], ['Gospel run', 'gospel-run.wav', 104], ['Soul shuffle', 'soul-shuffle.wav', 88], ['Heavy one', 'heavy-one.wav', 90], ['Slow grind', 'slow-grind.wav', 84], ['Double time', 'double-time.wav', 112], ['Ride strut', 'ride-strut.wav', 102], ['Open hat strut', 'open-hat-strut.wav', 106], ['Tom break', 'tom-break.wav', 100], ['Rimshot drive', 'rimshot-drive.wav', 96], ['Lazy sunday', 'lazy-sunday.wav', 86]];
-const brkCache = new Map();
-async function breakData(i){
-  if (brkCache.has(i)) return brkCache.get(i);
-  const r = await fetch('sounds/breaks/' + BREAKS[i][1] + '?v=1'); if (!r.ok) throw new Error(r.status);
-  const b = await new OfflineAudioContext(1, 1, 48000).decodeAudioData(await r.arrayBuffer()), d = {data:new Float32Array(b.getChannelData(0)), sr:b.sampleRate};
-  brkCache.set(i, d); return d;
-}
-function breakVoice(i, d){
-  const [name, , bpm] = BREAKS[i], ms = d.data.length / d.sr * 1000;
-  const v = PD(name + ' ' + bpm, [{type:'sample', level:0.9, mode:'AHD', atk:0.1, hold:Math.round(ms), dec:40, sample:{data:d.data, sr:d.sr, name:name + ' ' + bpm}}], {len:Math.min(30, ms / 1000 + 0.1)});
-  v.level = (v.level || 0) + PRESET_DB; return v;
-}
-async function breakApply(i){
-  let d; try { d = await breakData(i); } catch(e){ return toast('Couldn’t load that break (sounds/breaks isn’t there?).'); }
-  applyVoicePreset(breakVoice(i, d));
-  let n = 0; for (const I of S.insts) if (I.pad === cur){ I.beats = 4; if (!(I.sync | 0)) I.sync = 1; n++; }
-  if (n) saveS();
-  toast(`Break: ${BREAKS[i][0]} (${BREAKS[i][2]} BPM, one bar)` + (n ? ' · its instrument plays it at the song tempo (SYNC REPITCH, 4 BEATS)' : '') + ' · STA 00 10 20 … F0 start it on each 16th');
-}
 function presetEntries(kind){
   if (kind !== 'voice' && kind !== 'layer') return enginePresetEntries(kind).groups;
   const G = [], mine = kind === 'voice' ? SP().voices : SP().layers;
@@ -10084,8 +10059,6 @@ function presetEntries(kind){
   G.push(['This song', own]);
   const fac = kind === 'voice' ? fvp() : flp();
   const all = new Map(); own.forEach(e => all.set(e.key, e));
-  if (kind === 'voice') G.push(['Breaks (…pump BREAK)', BREAKS.map(([name, , bpm], i) => ({key:'brk:' + i, name:name + ' · ' + bpm + ' BPM', apply:() => breakApply(i),
-    prev:async btn => { try { previewVoice(breakVoice(i, await breakData(i)), btn); } catch(e){ toast('Couldn’t load that break.'); } }}))]);   // BREAKS
   fac.forEach(([gn, list], gi) => { const es = list.map((it, i) => { const key = 'f' + gi + ':' + i, e = kind === 'voice'
       ? {key, name:it[0], apply:() => onVoicePreset(key), make:() => facVoice(it)}
       : {key, name:it[0], apply:() => onLayerPreset(key), make:() => layerVoice(Object.assign({}, it[1], {level:facLayerLevel(it[1])}), it[2])}; all.set(key, e); return e; }); G.push([gn, es]); });
@@ -11118,6 +11091,36 @@ function frzPanel(){
   $('frzInfo').textContent = sm ? (sm.name || 'Sound') + ' · ' + (sm.data.length / sm.sr).toFixed(1) + ' s' + (Math.round(XEV().source || 0) === 0 ? ' · playing (SOURCE File)' : ' · set SOURCE to File to play it')
     : 'No sound of your own yet: SOURCE plays the built-in ones. Load sound… freezes any audio file (its first 20 s).';
 }
+/* KIT TO SLOTS (owner, 1 Nov): a drum machine's drums each on a slot of their own, without touching any sound that's there:
+   only slots that are still as they were made ("Pad 3", "Synth 18", layers) and that no phrase plays; when there aren't
+   enough, new slots are added. It asks first, naming each slot, and one undo puts the whole kit back (slots too). Each
+   slot's own instrument (instrument 1A plays slot 1A) plays it: C-4 in the tracker. */
+async function kitToSlots(){
+  const v = V(), k = v.engine, tw = PsynCore.twin(k) && PsynCore.isLive(k) ? PsynCore.twin(k) : k, U = XUI[tw], P = XEV();
+  const n = U && U.rows.kd ? U.rows.kd.max + 1 : 0; if (!n) return;
+  const used = new Set(); for (const p of S.phrases) if (p) for (const r of p) if (r && rowNote(r) && r[IC] >= 0 && S.insts[r[IC]]) used.add(S.insts[r[IC]].pad);
+  const plain = i => { const w = kit.voices[i]; return !!w && i !== cur && (!w.engine || w.engine === 'layers') && /^(Pad|Synth) \d+$/.test(w.name || '') && !used.has(i); };
+  const free = []; for (let i = 0; i < Math.min(nslots(), kit.voices.length) && free.length < n; i++) if (plain(i)) free.push(i);
+  const grow = n - free.length, room = MAXSLOT - nslots();
+  if (grow > 0 && (vtrk || grow > room)) return toast(vtrk ? 'A voice per track is on (Settings → Kit), so the kit can’t take new slots: free up ' + grow + ' slot' + (grow > 1 ? 's' : '') + ' first.' : 'Not enough room: the kit is at ' + MAXSLOT + ' slots.', 6000);
+  const slots = free.concat(Array.from({length:Math.max(0, grow)}, (_, j) => nslots() + j));
+  const names = Array.from({length:n}, (_, i) => PsynCore.drumName(tw, {kd:i}));
+  const ok = await askYes({title:'Put the ' + U.title + ' kit on ' + n + ' slots?', body:names.map((d, i) => d + ' → ' + hx(slots[i])).join(' · ')
+    + '. Only empty slots that nothing plays' + (grow > 0 ? ', and ' + grow + ' new one' + (grow > 1 ? 's' : '') + ' added to the kit' : '') + ': no sound of yours is replaced. One undo puts it all back.'}, 'Put it on');
+  if (!ok) return;
+  kitStep();
+  if (grow > 0){ const was = NSLOT; NSLOT = kit.slots = nslots() + grow; for (let i = was; i < NSLOT; i++){ dirty[i] = true; cache[i] = null; } try { instFit(); } catch(e){} growKit(); }
+  const base = JSON.parse(JSON.stringify(voiceToJSON(v, true)));
+  if (!Array.isArray(kit.held)) kit.held = [];
+  slots.forEach((sl, i) => {
+    const w = voiceFromJSON(JSON.parse(JSON.stringify(base))); w.engine = tw; w[tw] = Object.assign({}, P, {kd:i}); delete w[k === tw ? '' : k];
+    w.name = (U.title.replace(/^pump /i, '') + ' ' + names[i]).slice(0, 24);
+    kit.voices[sl] = w; while (kit.held.length <= sl) kit.held.push(null); kit.held[sl] = false; dirty[sl] = true; cache[sl] = null;
+  });
+  syncHeld(); buildPads(); refreshAll(); slots.forEach(sl => changed(sl)); kitUndoBase(); save(); try { draw(); } catch(e){}   // kitUndoBase: the slots' own undo steps start here, so one undo is the whole kit
+  const ins = slots.map(sl => S.insts.findIndex(I => I.pad === sl));
+  toast(names.map((d, i) => d + ' ' + hx(slots[i]) + (ins[i] >= 0 && ins[i] !== slots[i] ? ' (inst ' + hx(ins[i]) + ')' : '')).join(' · ') + ' · Ctrl/⌘+Z puts it back', 9000);
+}
 function xKitVis(){ const d = Math.round(XEV().kd || 0); for (const sc of $('xSecs').children) if (sc.dataset && sc.dataset.kd != null) sc.hidden = +sc.dataset.kd !== d; }
 const rsLabel = d => (d.name || 'Sample') + ' · ' + (d.pitched ? 'pitched, ' + hz(d.f0) : 'unpitched') + ' · ' + (d.np || 0) + ' partials';
 function xBuild(){
@@ -11130,6 +11133,10 @@ function xBuild(){
     for (const key of keys){ const r = makeRow(U.rows[key], key, XEV, {idp:'x' + k, noTrack:true, on:() => { changed(cur, true); if (key === 'kd'){ xKitVis(); renderPads(); bassUI(); } }}); sc.append(r.r); xRows.push(r); }
   }
   xKitVis();
+  if (U.rows && U.rows.kd){   // KIT TO SLOTS: on a drum machine's Drum section
+    const sec = host.querySelector('.sec'), bt = el('button', 'sm', 'Put the whole kit on free slots…'); bt.type = 'button';
+    bt.title = 'Each drum on a slot of its own: only empty slots nothing plays (or new ones), asks first, one undo';
+    bt.addEventListener('click', kitToSlots); const row = el('div', 'btnrow'); row.append(bt); if (sec) sec.append(row); }
   if (U.note) host.append(el('p', 'note', U.note));
   const pre = $('xPre'); pre.replaceChildren(); const o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'Presets…'; pre.append(o0);
   U.pre.forEach(([n], i) => { const o = document.createElement('option'); o.value = i; o.textContent = n; pre.append(o); });
@@ -18634,7 +18641,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 345;
+const BUILD = 346;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25163,6 +25170,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [346, '1 Nov', ['Drum machines (…pump Strike, Boing, X0X, Life): Put the whole kit on free slots… (on the card’s Drum section) gives each drum a slot of its own. It only uses slots that are still empty and that nothing plays, adds new slots when there aren’t enough, names each one before it starts, and one undo puts everything back. Each slot’s own instrument plays it (C-4).', 'Presets → Breaks is gone again: File ▾ → Breaks to chop already had the same fourteen breaks (sliced, synced, into a free slot). STA on a synced loop still works.']],
   [345, '1 Nov', ['Drum machine pads (…pump Strike, Boing, X0X, Life) show which drum they play: in the pad list (“Kick · Snare”) and on the engine line, and both follow Drum as you change it.']],
   [344, '1 Nov', ['Freeze plays your own sounds: Load sound… on its card freezes any audio file (its first 20 s, as the pump plugin does) and sets SOURCE to File; ROOT is the note it was played at. It saves with the kit like any sample, and plays live too.']],
   [343, '1 Nov', ['New bottom bar (View → Bottom panel → BOTTOM BAR: FX, or CLASSIC for the panel as it was): the track’s eight effect slots side by side, each with its on/off, its name (a click opens it on the FX screen), a level meter and every one of its values as text, as on the FX screen: drag a value up or down (Shift: fine), Alt+wheel, double-click for its default, right-click to type one. …CHAINS and VOL / PAN / meter stay beside it; INST steps aside, and SCOPE too on a narrow window. On a phone it is off until you turn it on.', 'A stable copy of the app (build 338, as desktop 1.2.57) at …/thunder-plus/stable/, for when the latest build misbehaves.']],
