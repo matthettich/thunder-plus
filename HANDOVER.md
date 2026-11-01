@@ -81,6 +81,23 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 31 Oct (later still): six more pump instruments (build 339, web only)
+- Owner: "all of those pump synths and effects in Thunder Plus", new sounds first. Effects: every pump effect is already in
+  pump.wasm except AMP (.nam models) and ROOM (room correction). Instruments ported so far: MONO, POLY, COIL, ORBIT, FOLD,
+  GLOSS, TRACT, STRIKE, BOING, X0X. Still to do, new sounds: FREEZE (its built-in sources are made on a thread from PRISM's,
+  which wasm here hasn't got: needs a synchronous path), BREAK and LIFE (sequencer instruments: decide how they play from
+  the tracker). Then the ones Thunder has its own versions of: ACID, MODAL, PHASE, VECTOR, PRISM, TABLE, WOB, SING (and KIT,
+  MACHINE, left out on purpose in Oct).
+- pump (wasm/pump_synth.cpp): one `Synth<Name>` per plugin with its plugin's `sync()` body copied (keep in step), activate
+  syncing again after `engine.prepare()`; X0X gets a stopped Transport. New type ids are `kT<Name>` (FOLD's own `kFold`
+  parameter was hidden by a `kFold` type id: every value read as 4). `make build/tests/parity_<name>`: all exact.
+- Glue: `pfold/pgloss/ptract` (+ live), kits `pstrike/pboing/px0x` (`kit:true`): `kd` (Drum) picks the drum a pad renders
+  (`whiteKey(kd)`, MIDI 48 up the white keys), Tune is all rate; card pages per drum from the `<drum>_` parameters (names
+  from their common words), `xKitVis()` in index.html shows only the pad's drum's page (sections carry a third element, the
+  drum index). Kit live: `liveSpec().nb` 48 (the worklet's note base), so C-4 D-4 E-4… play the drums. `FIXED` holds X0X's
+  `seq_mode` 0 (render and live); its step patterns and sequencer rows are not shown. `PsynCore.latency(k)` (GLOSS reports
+  latency; the live-vs-render test uses it).
+
 ## 31 Oct (late night): pump ORBIT as engines Orbit / Orbit live (build 338, desktop 1.2.57)
 - pump repo (f6fbd10): `wasm/pump_synth.cpp` type 3 `SynthOrbit` (PluginOrbit's `sync()` and run body; no OrbitDsp split in
   pump, so keep it in step with `plugins/orbit/PluginOrbit.hpp`). `activate()` syncs again after `engine.prepare()` (prepare

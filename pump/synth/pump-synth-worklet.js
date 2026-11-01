@@ -36,6 +36,7 @@ class PsynProc extends AudioWorkletProcessor {
     const op = o.processorOptions || {};
     if (op.bytes && !globalThis.__psynBytes) globalThis.__psynBytes = op.bytes;
     this.type = op.type | 0; this.syms = op.syms || []; this.fixed = op.fixed || {}; this.p = op.p || {}; this.trim = op.trim || 1;   // trim: as the render's (POLY +3.5 dB)
+    this.nb = op.nb || 60;   // the MIDI note C-4 plays (60; a drum kit's first drum)
     this.range = op.range || (this.type === 2 ? 12 : 24);   // the bend range the instance is set to (COIL's Bend goes to 12, ORBIT's is ±2)
     this.h = -1; this.dirty = false; this.dead = false;
     this.lane = Array.from({length:LANES}, () => ({note:-1, lt:0, lg:false}));
@@ -52,7 +53,7 @@ class PsynProc extends AudioWorkletProcessor {
     this.h = X.psyn_new(this.type, sampleRate); this.dirty = false;
   }
   semis(r){ return (+this.p.tune || 0) + 12 * Math.log2(r > 1e-6 ? r : 1e-6); }
-  bendOf(r, note){ const b = 60 + this.semis(r) - note, k = Math.max(-1, Math.min(1, b / this.range)); return Math.max(0, Math.min(16383, Math.round(8192 + k * 8191))); }
+  bendOf(r, note){ const b = this.nb + this.semis(r) - note, k = Math.max(-1, Math.min(1, b / this.range)); return Math.max(0, Math.min(16383, Math.round(8192 + k * 8191))); }
   bend(X, i, r, note){ const v = this.bendOf(r, note); if (v !== this.sent){ X.psyn_midi(this.h, i, 0xE0, v & 127, v >> 7); this.sent = v; } }
   process(ins, outs, P){
     const X = psynX(), o = outs[0], L = o[0], R = o[1] || o[0], n = L.length;
@@ -72,7 +73,7 @@ class PsynProc extends AudioWorkletProcessor {
         if (tg === ln.lt && ga === ln.lg) continue;
         const r = at(P['r' + j], i);
         if ((tg !== ln.lt && ga) || (ga && !ln.lg)){
-          const leg = tg !== ln.lt && ln.lg && at(P['l' + j], i) >= 0.5, note = Math.max(0, Math.min(127, 60 + Math.round(this.semis(r)))), vel = Math.max(1, Math.min(127, Math.round(at(P['v' + j], i))));
+          const leg = tg !== ln.lt && ln.lg && at(P['l' + j], i) >= 0.5, note = Math.max(0, Math.min(127, this.nb + Math.round(this.semis(r)))), vel = Math.max(1, Math.min(127, Math.round(at(P['v' + j], i))));
           const old = ln.note;
           if (old >= 0 && !leg) X.psyn_midi(this.h, i, 0x80, old, 0);
           this.bl = j; bfrom = i; this.bend(X, i, r, note);
