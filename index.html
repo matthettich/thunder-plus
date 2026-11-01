@@ -18388,7 +18388,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 332;
+const BUILD = 333;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24703,10 +24703,14 @@ function apStrip(want){
     if (t === c.x && y === c.y) cls += ' c';
     return `<b class="${cls}" data-y="${y}" data-t="${t}">${lab}</b>`;
   };
-  let h = `<div class="apsh"><b>SONG</b><span>ROW ${rS(c.y, 3)} · ${c.x === MT ? 'MASTER' : 'TRACK ' + d2(c.x + 1)}</span><i>${on ? (apPin ? 'PINNED' : 'MOVING') : 'TAP'}</i>`
+  // PLAYING (owner, 31 Oct): while the song plays, the strip shows the row that's playing (the cursor's track's row, else
+  // the first track playing), the song cursor stays where it is; when the strip has the keys it shows the cursor's row.
+  let cy = c.y;
+  if (tp.on && tp.mode === 'song' && PH && !on){ const r = PH[c.x] >= 0 ? PH[c.x] : PH.find(v => v >= 0); if (r >= 0) cy = r; }
+  let h = `<div class="apsh"><b>SONG</b><span>ROW ${rS(c.y, 3)} · ${c.x === MT ? 'MASTER' : 'TRACK ' + d2(c.x + 1)}${cy !== c.y ? ' · ▶ ' + rS(cy, 3) : ''}</span><i>${on ? (apPin ? 'PINNED' : 'MOVING') : 'TAP'}</i>`
     + `<button type="button" class="appin${apPin ? ' on' : ''}" aria-pressed="${apPin}" title="PIN: keep this phrase up while you move around the song">PIN</button></div><div class="apsb">`;
-  for (let y = c.y - 1; y <= c.y + 1; y++){
-    h += `<div class="apsr${y === c.y ? ' now' : ''}" style="grid-template-columns:${cols}">`;
+  for (let y = cy - 1; y <= cy + 1; y++){
+    h += `<div class="apsr${y === cy ? ' now' : ''}" style="grid-template-columns:${cols}">`;
     if (y >= 0 && y < 256){ h += `<u>${rS(y, 3)}</u>`; for (let t = 0; t < NA; t++){ if (t === PF) h += '<i></i>'; h += cell(y, t); } h += '<i></i>' + cell(y, MT); }
     h += '</div>';
   }
@@ -24842,6 +24846,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [333, '31 Oct', ['The song strip above the phrase (phones) shows the row that’s playing while the song plays, with ▶ and its number in the strip’s header; the song cursor stays where you left it. When the strip has the keys it shows the cursor’s row, as before.']],
   [332, '31 Oct', ['Insert paste on the Song and Arrange, as in Renoise: Ctrl/⌘+Alt+V (or right-click → Insert paste) puts the copied rows in between the row you are on and the one below; the rows below move down.', 'Pattern view: the bus column’s outline is one straight frame again (it zigzagged row by row on some screens).']],
   [331, '31 Oct', ['Arrange beside another screen: a click (on a block, an empty cell or anywhere in the panel) gives Arrange the keys again and they stay there, with no flicker; the screen beside it still shows the block (its phrase, mixer or effects). A double-click opens the block’s phrase; Alt+A or Esc gives the keys back. (Build 327’s “keys stay on the phrase” is taken out.)']],
   [330, '31 Oct', ['FXO: 9 is now “every slot” (FXO 90 all off, FXO 91 all on, 92–9F all on for that many rows), and FXO 00 puts every slot back as set, so the default value can no longer switch every effect off. (In older songs an FXO 0Y switched every slot: those rows now put them back as set.)', 'A FLX, RTG or GAT pattern switches its effect’s slot back on, even after an FXO turned it off.', 'FOLLOW PATTERN beside Phrase / Pattern view: Arrange’s selected block follows the playing pattern while Arrange has the keys too (only the phrase followed then).']],
