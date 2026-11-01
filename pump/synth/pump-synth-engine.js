@@ -160,7 +160,6 @@ for (const key in KINDS){
   const K = KINDS[key], m = META.synth[K.k], rows = {}, defs = {};
   for (const p of m.params){ defs[al(p.s)] = p.def; if (!HIDE.has(p.s) && !((p.flags | 0) & (8 | 32))) rows[al(p.s)] = rowOf(p); }
   if (key === 'pcoil' && rows.velocity) rows.velocity.l = 'Vel → kick';
-  if (key === 'pfreeze' && rows.source) rows.source = Object.assign({}, rows.source, {min:1});   // no File here (built-in sounds only)
   if (key === 'plife'){ rows.fm.l = 'FM (all)'; rows.decay.l = 'Decay (all)'; rows.pitch_range.l = 'LFO → pitch'; rows.lfo_rate.l = 'LFO rate'; rows.lfo_depth.l = 'LFO depth'; }   // COIL's: how hard a note kicks the springs
   if (rows.volume) rows.volume.noRnd = true;   // a random sound at -40 dB isn't a sound
   rows.vel = {l:'Hit', min:1, max:127, c:'int', d:100, f:v => String(Math.round(v)), noRnd:true}; defs.vel = 100;
@@ -264,6 +263,9 @@ const PsynCore = {
     const h = X.psyn_new(K.t, rate);
     if (h < 0) return new Float32Array(1);
     if (X.psyn_tempo && bpm > 0) X.psyn_tempo(h, bpm);   // WOB's wobble: the song's tempo
+    // FREEZE's File source: the pad's own sound (kept on its last layer, index.html's frzSample)
+    if (k === 'pfreeze' && X.psyn_file && V && V.frzL != null){ const L = V.layers && V.layers[V.frzL], sm = L && L.sample; if (sm && sm.data && sm.data.length){
+      const n = Math.min(sm.data.length, Math.round(sm.sr * 20)), p = X.psyn_buf(n); if (p){ f32(p, n).set(sm.data.subarray(0, n)); X.psyn_file(h, n, sm.sr); } } }
     try {
       const note = K.kit ? whiteKey(Math.max(0, Math.min((K.drums || 8) - 1, Math.round(P.kd || 0)))) : Math.max(0, Math.min(127, 60 + semis)), vel = Math.max(1, Math.min(127, Math.round(P.vel || 100)));
       const holdS = Math.min(12, Math.max(0.02, hold || (V && V.len) || K.len)), offAt = Math.round(holdS * rate);

@@ -2595,7 +2595,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
      pump-synth.wasm, their parameters and presets in pump-synth-meta.js, both built by pump/wasm/build.sh). Without the folder
      there are no …pump engines. The render Worker loads the same two files (PSYN_JS below). -->
 <script src="pump/synth/pump-synth-meta.js?v=6"></script>
-<script src="pump/synth/pump-synth-engine.js?v=8"></script>
+<script src="pump/synth/pump-synth-engine.js?v=9"></script>
 <!-- …PUMP (23 Oct 2026): the pump mastering plugins' parameter tables and presets (generated in matthettich/pump by
      wasm/build.sh); pump/pump.wasm is their DSP, fetched by the wasm loader. -->
 <script src="pump/pump-meta.js?v=5"></script>
@@ -7345,7 +7345,7 @@ const PW = {w:null, ready:false, wv:false, lx:false, ps:false, id:0, jobs:new Ma
 // and gets the page's compiled lxr.wasm (lxMod) in its init message.
 const LXR_JS = 'lxr/lxr-engine.js?v=2';
 // …PUMP SYNTHS: likewise the instruments' tables and glue, and the page's compiled pump-synth.wasm (psMod)
-const PSYN_JS = ['pump/synth/pump-synth-meta.js?v=6', 'pump/synth/pump-synth-engine.js?v=8'];
+const PSYN_JS = ['pump/synth/pump-synth-meta.js?v=6', 'pump/synth/pump-synth-engine.js?v=9'];
 function rwStart(plMod, txMod, lxMod, psMod){
   try {
     const sc = [...document.scripts].find(x => x.textContent.includes('===ENGINE ' + 'START==='));
@@ -11087,6 +11087,37 @@ function rsPanel(){
   }
   $('rsInfo').textContent = v.rsData ? rsLabel(v.rsData) : 'No sample yet: it plays a soft sine. Load a sample to rebuild it from its partials.';
 }
+/* FREEZE FILE (owner, 1 Nov): Freeze's own sound (SOURCE File) is kept as a sample on the pad's last layer (off, so the
+   layers never play it; v.frzL is its index), so it saves, loads and travels with the kit as any sample does. Load sound…
+   takes an audio file (mono, its first 20 s, as the plugin does), and SOURCE goes to File. */
+const isFrzV = v => !!v && (v.engine === 'pfreeze' || v.engine === 'pfreezel');
+const frzSample = v => { const L = v && v.frzL != null && v.layers[v.frzL]; return L && L.sample && L.sample.data ? L.sample : null; };
+function frzPanel(){
+  const host = $('xSecs'); if (!host) return;
+  const v = V(); if (!isFrzV(v)) return;
+  let box = $('frzBox');
+  if (!box){
+    box = el('div', 'sec'); box.id = 'frzBox'; box.append(el('h3', null, 'Your sound'));
+    const info = el('p', 'note'); info.id = 'frzInfo';
+    const ld = el('button', 'sm', 'Load sound…'); ld.type = 'button';
+    ld.addEventListener('click', () => { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'audio/*,.wav,.mp3,.ogg,.m4a,.flac';
+      inp.addEventListener('change', async () => { const file = inp.files && inp.files[0]; if (!file) return;
+        try {
+          const ac = new OfflineAudioContext(1, 1, 48000), buf = await ac.decodeAudioData(await file.arrayBuffer());
+          const n = Math.min(buf.length, Math.round(buf.sampleRate * 20)), mono = new Float32Array(n);
+          for (let c = 0; c < buf.numberOfChannels; c++){ const d = buf.getChannelData(c); for (let i = 0; i < n; i++) mono[i] += d[i] / buf.numberOfChannels; }
+          const w = V(), li = 7; w.frzL = li;
+          const L = freshLayer({on:false, type:'sample'}); L.sample = {data:mono, sr:buf.sampleRate, name:file.name.replace(/\.[^.]+$/, '').slice(0, 40)}; w.layers[li] = L;
+          XEV().source = 0; changed(cur); for (const r of xRows) r.refresh(); frzPanel();
+          toast('Freeze: ' + file.name + (buf.length > n ? ' (its first 20 s)' : '') + ' · SOURCE is File · ROOT is the note it plays at');
+        } catch(e){ toast('That file couldn’t be read as audio.', 5000); } });
+      inp.click(); });
+    const row = el('div', 'btnrow'); row.append(ld); box.append(row, info); host.prepend(box);
+  }
+  const sm = frzSample(v);
+  $('frzInfo').textContent = sm ? (sm.name || 'Sound') + ' · ' + (sm.data.length / sm.sr).toFixed(1) + ' s' + (Math.round(XEV().source || 0) === 0 ? ' · playing (SOURCE File)' : ' · set SOURCE to File to play it')
+    : 'No sound of your own yet: SOURCE plays the built-in ones. Load sound… freezes any audio file (its first 20 s).';
+}
 function xKitVis(){ const d = Math.round(XEV().kd || 0); for (const sc of $('xSecs').children) if (sc.dataset && sc.dataset.kd != null) sc.hidden = +sc.dataset.kd !== d; }
 const rsLabel = d => (d.name || 'Sample') + ' · ' + (d.pitched ? 'pitched, ' + hz(d.f0) : 'unpitched') + ' · ' + (d.np || 0) + ' partials';
 function xBuild(){
@@ -11126,7 +11157,7 @@ function bassUI(){
   // Effects: Layers, and the engines whose render is what plays (engFx); live engines stay dry.
   const fxe = (bl || xe) && engFx(v); $('fxWrap').hidden = on || vx || ((bl || xe) && !fxe);
   $('fxAfter').textContent = fxe ? 'run top to bottom, after the engine' : 'run top to bottom, after the layers';
-  if (xe){ xBuild(); for (const r of xRows) r.refresh(); xKitVis(); if (v.engine === 'sf') sfPanel(); if (v.engine === 'bytebeat') bbPanel(); if (v.engine === 'resynth') rsPanel(); }
+  if (xe){ xBuild(); for (const r of xRows) r.refresh(); xKitVis(); if (v.engine === 'sf') sfPanel(); if (v.engine === 'bytebeat') bbPanel(); if (v.engine === 'resynth') rsPanel(); if (isFrzV(v)) frzPanel(); }
   if (on){ for (const r of bassRows) r.refresh(); for (const f of bassSegs) f(); bassVizKick(); }
   if (vx){ for (const r of voxRows) r.refresh(); const ta = $('voxTxt'); if (document.activeElement !== ta) ta.value = XV().txt; voxSylShow(); }
   if (bl) for (const r of blipRows) r.refresh();
@@ -13526,7 +13557,7 @@ let plFailed = false;
   // LXR ENGINES: lxr/lxr.wasm, compiled here (and handed to the render Worker) when the engine file loaded
   const lxP = typeof LxrCore !== 'undefined' ? LxrCore.load('lxr/lxr.wasm?v=1').catch(e => { console.warn('LXR engines', e); return null; }) : Promise.resolve(null);
   // …PUMP SYNTHS: pump/synth/pump-synth.wasm, compiled here and handed to the render Worker (as LXR's is)
-  const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=6').catch(e => { tpLog('pump synths wasm (the …pump engines will be silent)', e); return null; }) : Promise.resolve(null);
+  const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=7').catch(e => { tpLog('pump synths wasm (the …pump engines will be silent)', e); return null; }) : Promise.resolve(null);
   // …PUMP: the pump mastering effects (pump/pump.wasm), fetched alongside; effect nodes that asked for it get it now
   bytes(PUMP_WASM).then(b => { pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage({pumpBytes:b}); } catch(e){} pumpWait.clear(); pumpToChains(b);
     return WebAssembly.instantiate(b, imp).then(r => { pumpMain = r.instance.exports; if (pumpMain._initialize) pumpMain._initialize(); }); }).catch(e => { if (PM) console.warn('pump effects', e); });
@@ -16471,13 +16502,13 @@ function makePlayer(ac, out, getBuf, live){
     if (!sp || !by || !psOK.has(ac) || (ac === ctx && (psLive.off || aset.psLive === 'render'))) return null;   // (Settings → Audio → …pump live)
     try {
       const node = new AudioWorkletNode(ac, 'thunder-psyn', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2],
-        processorOptions:Object.assign({p:xParams(V)}, sp, psSent.has(ac) ? {} : {bytes:by})});
+        processorOptions:Object.assign({p:xParams(V)}, sp, psSent.has(ac) ? {} : {bytes:by}, frzSample(V) ? {file:{d:frzSample(V).data, sr:frzSample(V).sr}} : {})});
       psSent.add(ac);
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
       node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
       node.load = 0; node.port.onmessage = e => { const d = e.data; if (d && typeof d.load === 'number') node.load = node.load * 0.6 + d.load * 0.4; };
       const lanes = [0, 1, 2, 3].map(j => ({node, g, pn, pad, kind, ps:true, lane:j, rate:P('r' + j), gate:P('g' + j), trig:P('t' + j), leg:P('l' + j), vel:P('v' + j), n:0, lastOn:-1, cur:null}));
-      const b = lanes[0]; b.lanes = lanes; b.bpm = P('bpm'); if (b.bpm) b.bpm.value = bpmNow;   // the song's tempo (WOB's wobble; tempoTo moves it)
+      const b = lanes[0]; b.lanes = lanes; b.fileRef = frzSample(V); b.bpm = P('bpm'); if (b.bpm) b.bpm.value = bpmNow;   // the song's tempo (WOB's wobble; tempoTo moves it)
       bassN.set(key, b); if (live) bassLive.add(b);
       return b;
     } catch(e){ tpLog('pump synth live node', e); return null; }
@@ -17186,7 +17217,7 @@ class XP_${name} extends AudioWorkletProcessor {
 registerProcessor('thunder-${name}', XP_${name});`;
 let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bassLive = new Set();
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
-const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=5', psOK = new WeakSet(), psSent = new WeakSet();
+const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=6', psOK = new WeakSet(), psSent = new WeakSet();
 /* …PUMP SYNTHS live, THE SAFETY NET (owner, 26 Oct): while the song plays, once a second: if the audio is dropping out or
    the audio thread is nearly full, and the live …pump nodes are a real part of that, twice in a row, the live engines
    switch to their renders for the rest of this visit (psLive.off): their nodes go, and the next notes play the pads'
@@ -17222,7 +17253,7 @@ const isBassPad = i => isSyn(i) && isBassV(kit.voices[i]);
 const isLivePad = i => isSyn(i) && (isBassV(kit.voices[i]) || isVoxV(kit.voices[i]) || liveX(kit.voices[i]));
 const liveX = v => !!(v && XENG[v.engine] && XENG[v.engine].live);
 // A bass voice was edited: the live nodes playing it hear the change at once.
-function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v), lx = liveX(v); if (!isBassV(v) && !vx && !lx) return; const kind = vx ? 'vox' : lx ? v.engine : 'bass', p = vx ? voxParams(v) : lx ? xParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && b.kind === kind) try { b.node.port.postMessage({set:p}); } catch(e){} }
+function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v), lx = liveX(v); if (!isBassV(v) && !vx && !lx) return; const kind = vx ? 'vox' : lx ? v.engine : 'bass', p = vx ? voxParams(v) : lx ? xParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && b.kind === kind) try { const fs = lx ? frzSample(v) : null; if (b.lanes && fs !== (b.fileRef || null)){ b.fileRef = fs; b.node.port.postMessage({set:p, file:fs ? {d:fs.data, sr:fs.sr} : {d:null}}); } else b.node.port.postMessage({set:p}); } catch(e){} }   // FREEZE FILE: the sound only when it changed
 const MW_URL = 'master-worklet.js?v=5', mwLoad = new WeakMap();
 function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
@@ -18600,7 +18631,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 343;
+const BUILD = 344;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25129,6 +25160,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [344, '1 Nov', ['Freeze plays your own sounds: Load sound… on its card freezes any audio file (its first 20 s, as the pump plugin does) and sets SOURCE to File; ROOT is the note it was played at. It saves with the kit like any sample, and plays live too.']],
   [343, '1 Nov', ['New bottom bar (View → Bottom panel → BOTTOM BAR: FX, or CLASSIC for the panel as it was): the track’s eight effect slots side by side, each with its on/off, its name (a click opens it on the FX screen), a level meter and every one of its values as text, as on the FX screen: drag a value up or down (Shift: fine), Alt+wheel, double-click for its default, right-click to type one. …CHAINS and VOL / PAN / meter stay beside it; INST steps aside, and SCOPE too on a narrow window. On a phone it is off until you turn it on.', 'A stable copy of the app (build 338, as desktop 1.2.57) at …/thunder-plus/stable/, for when the latest build misbehaves.']],
   [342, '1 Nov', ['Two more …pump engines, rendered and live: Freeze (a sound as a cloud of frozen, shimmering spectral grains, on its seven built-in sounds) and Wob (the additive bass: 256 partials, a second spectrum to morph to, vowels, comb, reese, spray and drift, and a wobble in time with the song).']],
   [341, '1 Nov', ['Breaks: …pump BREAK’s fourteen breakbeats (a bar each, soul and funk) in a pad’s Presets… → Breaks (…pump BREAK), with ▶ to hear them first. Taking one sets its instrument to play it at the song’s tempo (INST → SYNC REPITCH over 4 BEATS); then chop it as in Renoise: STA 00, 10, 20 … F0 starts it on each of its sixteen 16ths, or SLICES 16 for a slice a note.', 'STA now works on a synced loop (SYNC on, SLICES off): it always started from the top.']],

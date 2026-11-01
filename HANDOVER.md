@@ -81,6 +81,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 1 Nov (4): Freeze loads your own sound (build 344)
+- pump (3ad5969): `psyn_buf(n)` + `psyn_file(h, n, sr)` → `SynthFreeze::file()` (makeSpectra of the first 20 s, ROOT as the
+  plugin's setState; ROOT re-read each block as its rootNow). The plugin itself already had LOAD.
+- Thunder: the sound lives on the pad's last layer (off; `v.frzL` = 7) so it saves / loads / travels as a sample.
+  `frzPanel()` (Load sound…, info) on Freeze cards; `PsynCore.render` hands it over for SOURCE 0; live: processorOptions
+  `file`, and `bassPush` sends `{file}` only when the sample object changed (`b.fileRef`). Test in pump-synth.test.js.
+
 ## 1 Nov (3): FX bottom bar; stable copy (build 343)
 - Owner: a DAW-like bottom bar, mostly FX: 8 slots, …chains, volume and pan; every FX value as text (as the FX screen), not
   a picked few; meters / visual feedback over sends; easy to revert; phones off by default.

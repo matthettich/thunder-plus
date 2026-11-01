@@ -42,7 +42,8 @@ class PsynProc extends AudioWorkletProcessor {
     this.h = -1; this.dirty = false; this.dead = false;
     this.lane = Array.from({length:LANES}, () => ({note:-1, lt:0, lg:false}));
     this.bl = 0; this.sent = 8192; this.quiet = 1e9; this.ms = 0; this.fr = 0;
-    this.port.onmessage = e => { const d = e.data || {}; if (d.set){ this.p = d.set; this.dirty = true; } if (d.dispose) this.dead = true; };
+    this.file = op.file || null; this.fileDirty = !!this.file;   // FREEZE FILE: the pad's own sound
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set){ this.p = d.set; this.dirty = true; } if (d.file){ this.file = d.file.d ? d.file : null; this.fileDirty = true; } if (d.dispose) this.dead = true; };
   }
   values(arr){
     for (let i = 0; i < this.syms.length; i++){ const s = this.syms[i], f = this.fixed[s], v = f != null ? f : this.p[s]; if (typeof v === 'number' && isFinite(v)) arr[i] = v; }
@@ -51,7 +52,7 @@ class PsynProc extends AudioWorkletProcessor {
     const st = new Float32Array(X.memory.buffer, X.psyn_stage(), 512);
     for (let i = 0; i < this.syms.length; i++) st[i] = 0;
     this.values(st);
-    this.h = X.psyn_new(this.type, sampleRate); this.dirty = false;
+    this.h = X.psyn_new(this.type, sampleRate); this.dirty = false; this.fileDirty = !!this.file;
   }
   semis(r){ return (+this.p.tune || 0) + 12 * Math.log2(r > 1e-6 ? r : 1e-6); }
   bendOf(r, note){ const b = this.nb + this.semis(r) - note, k = Math.max(-1, Math.min(1, b / this.range)); return Math.max(0, Math.min(16383, Math.round(8192 + k * 8191))); }
@@ -63,6 +64,8 @@ class PsynProc extends AudioWorkletProcessor {
     const t0 = Date.now();
     if (this.h < 0){ this.open(X); if (this.h < 0){ L.fill(0); if (R !== L) R.fill(0); return true; } }
     const bpm = P.bpm ? P.bpm[0] : 120; if (bpm !== this.bpm && X.psyn_tempo){ X.psyn_tempo(this.h, bpm); this.bpm = bpm; }
+    if (this.fileDirty && X.psyn_file){ this.fileDirty = false; const F = this.file, n = F ? Math.min(F.d.length, Math.round(F.sr * 20)) : 0, p = n ? X.psyn_buf(n) : 0;
+      if (p){ new Float32Array(X.memory.buffer, p, n).set(F.d.subarray(0, n)); X.psyn_file(this.h, n, F.sr); } else X.psyn_file(this.h, 0, 0); }
     if (this.dirty){ const v = new Float32Array(X.memory.buffer, X.psyn_values(this.h), this.syms.length); this.values(v); X.psyn_commit(this.h); this.dirty = false; }
     const at = (A, i) => A.length > 1 ? A[i] : A[0];
     let any = false, bfrom = 0;   // bfrom: where the bend lane's note started in this block (bend before it is the old note's)

@@ -123,3 +123,12 @@ test('pump synths live: Settings → Audio → …pump live (this device): Rende
   assert.match(src, /aset\.psLive = v; asetSave\(\); psLive\.off = false;/, 'picking either resets the safety net');
   assert.ok(src.indexOf('const psLive = {off:false') < src.indexOf('psLiveNote();\n'), 'psLive exists before the Audio panel first draws');
 });
+
+test('pump synths: FREEZE plays the pad\'s own sound (SOURCE File, kept on its last layer), silent without one', () => {
+  const P = load(), xe = P.xeng(), sr = 44100, n = sr * 2, d = new Float32Array(n);
+  for (let i = 0; i < n; i++) d[i] = 0.4 * Math.sin(2 * Math.PI * 220 * i / sr) + 0.2 * Math.sin(2 * Math.PI * 660 * i / sr);
+  const V = { frzL: 7, layers: [0, 1, 2, 3, 4, 5, 6, { sample: { data: d, sr } }] }, p = Object.assign(xe.pfreeze.d(), { source: 0, tune: 0, level: 0, drive: 0 });
+  const pk = a => a.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+  assert.ok(pk(P.render('pfreeze', p, 48000, 1, V, 120)) > 0.05, 'the file plays');
+  assert.ok(pk(P.render('pfreeze', p, 48000, 1, null, 120)) < 1e-6, 'no file: silent');
+});
