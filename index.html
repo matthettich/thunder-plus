@@ -11645,7 +11645,7 @@ document.addEventListener('keydown', e => {
   const lo = e.key.length === 1 ? e.key.toLowerCase() : '';
   const pn = e.code === 'Slash' ? 16 : pianoOf(e);   // NOTE KEYS BY POSITION (the Synth page keeps / as the top E)
   if (pn !== undefined && !e.shiftKey){
-    const st = kOct * 12 + pn - ROOT;
+    const st = scaleKey(kOct * 12 + pn) - ROOT;   // SCALE MODE
     if (isSyn(cur)){ releaseNote(keyHeld.get(e.code)); keyHeld.set(e.code, holdNote(cur, st)); } else playNote(cur, st);
     e.preventDefault(); return; }
 });
@@ -15443,9 +15443,13 @@ const BUS_COLORS = ['#2f8fcf', '#d0553a', '#2fa36a', '#9a52d0', '#c79a1f', '#1fa
 function busGroups(){
   const P = busPlan(), out = new Map(); let k = 0;
   for (const b of [...P.feeds.keys()].sort((a, c) => a - c)){ const c = BUS_COLORS[k++ % BUS_COLORS.length]; out.set(b, c); }
+  // SENDS (owner, 1 Nov): a track heard on its own AND through a bus (its Chain Out kept, plus a cable to another track's:
+  // a send / return) takes the send colour instead, so sends stand apart from the tracks that only play through the bus.
+  for (const [, src] of P.feeds) for (const t of src) if (!P.pure.has(t) && !P.feeds.has(t)) out.set(t, SEND_COLOR);
   for (const [b, src] of P.feeds) for (const t of src) if (!out.has(t)) out.set(t, out.get(b));
   return out;
 }
+const SEND_COLOR = '#7a8a00';   // olive: none of the BUS_COLORS
 function chnDiff(prev, next){
   if (!next) return [];
   // STEREO: the engine patched an older (no st2) patch's right sides itself; once the editor saves them (st2), reload
@@ -19006,7 +19010,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 350;
+const BUILD = 351;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -19578,6 +19582,8 @@ function projRows(){
     {l:'EDIT STEP', get:() => kStep, set:v => kStep = v, min:0, max:16, big:4, fmt:v => v + (v === 1 ? ' row' : ' rows'), info:() => 'How far the cursor moves after you type a note or value or delete a row (the edit step). Keyboard: { and }'},
     {l:'PATTERN NAV', ck:'Option + arrows move around the Song grid', get:() => patNavOn ? 1 : 0, set:v => setPatNav(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Pads: hold OPTION and press an arrow to go to the nearest block that way on the Song grid (▲▼ up and down the track, ◀▶ along the row). Works on the Song screen, in Arrange and in the phrase editor (which opens that block’s phrase). OFF: as before (phrase ▲▼ jumps 16 patterns; Song ◀▶ previous/next block, ▲▼ 16 rows). KEYS mode is not affected'},
+    {l:'SCALE MODE', ck:'Notes land on the song’s scale', get:() => scaleMode ? 1 : 0, set:v => setScaleMode(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
+      info:() => 'With a song SCALE set (Song settings → Key), the notes you type and play from the computer keyboard go to the nearest note of the scale, in the tracker and on the Synth page. Notes already in phrases don’t change'},
     {l:'PLAY NOTE ON ENTRY', ck:'Play note on entry', get:() => pnoeOn ? 1 : 0, set:v => setPnoe(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Typing a note into the phrase editor plays that instrument’s sound on the spot, so you hear what you enter. Off makes note entry silent'},
     {l:'KEYS KEYPAD', ck:'Show on-screen keypad', get:() => kpOn ? 1 : 0, set:v => setKp(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
@@ -25085,7 +25091,14 @@ function down1(){ const c = cs[tv], d = dims(tv); c.y = clamp(c.y + (GRIDV.has(t
 let editOn = true;
 function setEditOn(on){ editOn = !!on; document.body.classList.toggle('edoff', !editOn); toast(editOn ? 'Edit mode on: typing writes into the phrase' : 'Edit mode off: the note keys only play (Esc turns editing back on)', 2200); draw(); }
 const edBlock = () => { if (editOn || tv !== 'phrase') return false; toast('Edit mode is off: Esc turns it on', 1400); return true; };
+/* SCALE MODE (owner, 1 Nov, as Live 12's): with it on and a song SCALE set (Settings → Song → Key), the notes you type and
+   play from the computer keyboard land on the scale (the nearest note of it), in the tracker and on the Synth page. This
+   device's choice; off by default. */
+let scaleMode = (() => { try { return localStorage.getItem('thunderplus-scalemode-v1') === '1'; } catch(e){ return false; } })();
+function setScaleMode(on){ scaleMode = !!on; try { localStorage.setItem('thunderplus-scalemode-v1', scaleMode ? '1' : '0'); } catch(e){} }
+const scaleKey = n => scaleMode && (S.scale | 0) > 0 ? scaleSnap(S, n) : n;
 function typeNote(semi){
+  semi = scaleKey(kOct * 12 + semi) - kOct * 12;   // SCALE MODE
   if (!editOn && tv === 'phrase'){ const r = new Array(RW).fill(-1); r[0] = clamp(kOct * 12 + semi, 0, 119); r[IC] = last.inst >= 0 ? last.inst : -1; aud(r); return; }   // EDIT MODE off: play it only
   if (tv === 'phrase' && busTrack(cTrack) && !(rec.on && tp.on)) return busSay();   // BUS FX ONLY
   if (rec.on && tp.on){ recKey(clamp(kOct * 12 + semi, 0, 119), audKey); return; }   // REC while playing: at the playhead, not the cursor
@@ -25721,6 +25734,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [351, '1 Nov', ['Sends have their own colour in Arrange (olive): a track heard on its own and through a bus stands apart from the tracks that only play through it.', 'Input settings → SCALE MODE: typed and played notes land on the song’s scale (off unless you turn it on).']],
   [350, '1 Nov', ['Perform (View → PERFORM PART): FILL, a reload point, parts, two scenes with a crossfader, 8 macros, and per-track locks and an LFO, all in the bottom panel. Nothing changes the song’s own settings; STOP puts the mixer and effects back.', 'New commands: CND (FILL, PRE, NEI, 1ST and their opposites), NUD (early or late), RTV (retrigger crescendo or fade), SLC (pick a slice), XFD, MAC, LK1–LK4 and PRT.', 'Shift+Alt+F: FILL (a tap toggles, a hold lasts while held).']],
   [349, '1 Nov', ['Audio & MIDI → Latency comp (off unless you turn it on): tracks and buses with look-ahead …pump effects no longer play late; everything else waits to match, sends included, in renders too.', 'File → Save as default song…: New song starts from the song you saved (tracks, buses, …chains, effects, mixer, tempo). Forget the default song goes back to blank. The kit is separate, as always.', 'Favourites: ☆ beside a preset, an engine or an effect puts it in a Favourites group at the top of its list (kept on this device).']],
   [348, '1 Nov', ['File menu in groups: Examples ▸, Export ▸, Import ▸ and Kit ▸ open in place below their row; the project commands stay on top.', "Edit menu: the same items in the same places on every screen (greyed out where they don't apply), with Insert a row, Remove the row, Mute, Solo, Loop, New phrase and a Tools ▸ group (Euclidean, Acid, Transpose, Interpolate, Volume, Instrument, Shrink, Expand, Render a part, Clear unused phrases). The right-click menu has Tools ▸ too.", 'File and Edit work from the keyboard: ▼ / Enter opens, arrows move, ▶ ◀ open groups or go to the next menu, Esc closes.', 'Settings: Follow, Tab, Song mouse and Loop drag are in Input settings; Resume is in Record & play.']],
@@ -25860,7 +25874,7 @@ const SHEETS = {
   // MENUS (1 Nov, audit #4): how keys and the mouse behave is Input's (FOLLOW, TAB, SONG MOUSE and LOOP DRAG were under
   // Screen), and RESUME is playback (it was left over in the View menu)
   input:{title:'Input', about:'PAD or KEYS, notes as you type, edit step, sticky keys, the command row, follow, the mouse', groups:[
-    ['Playing', ['INPUT', 'PLAY NOTE ON ENTRY']],
+    ['Playing', ['INPUT', 'PLAY NOTE ON ENTRY', 'SCALE MODE']],
     ['Editing', ['EDIT STEP', 'STICKY KEYS', 'COMMANDS', 'PATTERN NAV', 'FOLLOW', 'TAB']],
     ['Mouse', ['SONG MOUSE', 'LOOP DRAG']]]},
   seq:{title:'Record & play', about:'Playback, recording from a MIDI keyboard, the metronome and count-in, live transpose', groups:[

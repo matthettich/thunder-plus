@@ -88,3 +88,13 @@ test('latency compensation: the plan lines direct tracks, sends and bus sources 
   assert.equal(p.d.get(3), 0, 'the latest path waits for nothing');
   c.aset.pdc = false; assert.equal(c.pdcPlan(1).T, 0, 'off: nothing moves');
 });
+
+test('bus groups: a send (heard directly and through a bus) gets the send colour; pure sources the bus’s', () => {
+  const fn = cut(/function busGroups\(\)\{[\s\S]*?\n\}\nconst SEND_COLOR = '[^']+';/, 'busGroups');
+  const c = vm.createContext({ Map, Set, BUS_COLORS: ['#111111', '#222222'], busPlan: () => ({ feeds: new Map([[3, [0, 1]], [5, [3]]]), pure: new Set([0, 3]) }) });
+  vm.runInContext(fn.replace('const SEND_COLOR', 'var SEND_COLOR'), c);
+  const g = c.busGroups();
+  assert.equal(g.get(3), '#111111'); assert.equal(g.get(5), '#222222');
+  assert.equal(g.get(0), '#111111', 'a pure source: its bus’s colour');
+  assert.equal(g.get(1), c.SEND_COLOR, 'a send: the send colour');
+});
