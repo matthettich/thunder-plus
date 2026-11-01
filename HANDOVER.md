@@ -81,6 +81,20 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 1 Nov (3): FX bottom bar; stable copy (build 343)
+- Owner: a DAW-like bottom bar, mostly FX: 8 slots, …chains, volume and pan; every FX value as text (as the FX screen), not
+  a picked few; meters / visual feedback over sends; easy to revert; phones off by default.
+- `deck.fxbar` (default `!isMobile()`), View → BOTTOM BAR (FX / CLASSIC). `#tDeck.fxbar`: INST hidden, SCOPE hidden when
+  `.narrow` (deck < 1180 px), `#dkFx` flexes. `deckFx()` → `deckFxBar()` builds `#dkFxBar` (8 `.dkfc` columns: `.fon` on/off,
+  `.fnm` name → FX screen at the slot, `.fm` meter, `.fr` rows `<b>label</b><span>value</span>`; drag / Alt+wheel / dblclick
+  default / right-click askText). CLASSIC removes `#dkFxBar` and shows the old slots / rows again.
+- Meters: the tfx worklet takes `{lvl:true|false}` and posts `{lvl:[8 peaks]}` every 12 blocks (each slot's output after it
+  runs, when on). `fxLvlSet(node)` (one node at a time), `fxSlotLevel(t, k)` (-54…0 dB → 0…1), drawn by `deckFxBarMeters()`
+  from `deckStripMeter`.
+- `stable/`: build 338 (commit 6cf0d34) by `git archive`, without sounds/ (its paths read ../sounds/), electron/, tests/,
+  tools/, docs/; its service worker caches as `thunderstable-*`. See stable/README.md. The desktop build doesn't copy it.
+- Removed stray test screenshots from the repo root (orb.png, pink.png, kit.png).
+
 ## 1 Nov (2): FREEZE and WOB (build 342, web only)
 - pump (ee2500b): PRISM's `renderWith` / `builtinAudio` moved to `plugins/prism/PrismAudio.hpp` (no threads; PrismSources.hpp
   includes it). `SynthFreeze` makes a built-in source on first use (`makeSpectra(builtinAudio(id))`, ~60 ms in wasm, kept);

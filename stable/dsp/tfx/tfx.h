@@ -1,0 +1,51 @@
+// ...Thunder track effects: a small realtime effect host compiled to WebAssembly and run in an
+// AudioWorklet, one instance per tracker track (and one on the master). Every effect is an
+// object, so a track can hold several of the same kind.
+#pragma once
+#include <stdlib.h>
+#include <string.h>
+struct Fx {
+  // Every effect starts in zeroed memory, as on the hardware (where they are statics). Without this a
+  // Clouds made where a freed Reverb used to be inherited its leftovers and stayed silent.
+  static void* operator new(size_t n) { void* q = malloc(n); if (q) memset(q, 0, n); return q; }
+  static void operator delete(void* q) { free(q); }
+  float p[12];                 // parameters, written by the worklet straight into wasm memory
+  float sr = 48000.f;
+  Fx() { for (int i = 0; i < 12; ++i) p[i] = 0.f; }
+  virtual ~Fx() {}
+  virtual void process(float* L, float* R, int n) = 0;   // stereo, in place, n <= 128
+};
+Fx* make_rings(float sr);
+Fx* make_clouds(float sr);
+Fx* make_density(float sr);
+Fx* make_totape(float sr);
+Fx* make_chorus(float sr);
+Fx* make_crush(float sr);
+Fx* make_eq(float sr);
+Fx* make_comp(float sr);
+Fx* make_reverb(float sr);
+Fx* make_delay(float sr);
+Fx* make_beads(float sr);
+Fx* make_flanger(float sr);
+Fx* make_phaser(float sr);
+Fx* make_tremolo(float sr);
+Fx* make_overdrive(float sr);
+Fx* make_folder(float sr);
+Fx* make_autowah(float sr);
+Fx* make_pitch(float sr);
+Fx* make_ladder(float sr);
+Fx* make_warps(float sr);
+Fx* make_cloudseed(float sr);
+Fx* make_derez2(float sr);
+Fx* make_purestdrive(float sr);
+Fx* make_air3(float sr);
+Fx* make_verbity2(float sr);
+Fx* make_comb(float sr);
+Fx* make_transient(float sr);
+Fx* make_gate(float sr);
+Fx* make_ott(float sr);
+Fx* make_shift(float sr);
+Fx* make_tovinyl4(float sr);
+Fx* make_dubly(float sr);
+Fx* make_cabs(float sr);
+Fx* make_tube2(float sr);

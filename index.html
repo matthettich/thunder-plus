@@ -1390,7 +1390,31 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkScope{--dkc:#dbe6f8; flex:0 0 var(--dkws, 300px); min-width:90px}
 #dkInst{--dkc:#fbe2d2; flex:1 1 0; min-width:210px}
 #dkFx{--dkc:#f8dce8; flex:0 0 var(--dkwf, 320px); min-width:200px}
-.tdeck.mst #dkFx{flex:1 1 var(--dkwf, 320px)}   /* FOCUS TRACK: on the master, FX takes the room INST and …CHAINS leave */
+.tdeck.mst #dkFx{flex:1 1 var(--dkwf, 320px)}
+/* FX BAR (owner, 1 Nov: "mostly fx focused … like a normal daw"): View → Bottom panel → BOTTOM BAR FX / CLASSIC. FX: the
+   track's eight effect slots side by side, each with every one of its values as text (as on the FX screen), then …CHAINS
+   and the track strip; INST steps aside (and SCOPE when the window is narrow). CLASSIC is the panel as it was. */
+#tDeck.fxbar #dkInst, #tDeck.fxbar.narrow #dkScope{display:none}
+#tDeck.fxbar #dkFx{flex:1 1 auto; min-width:0}
+#tDeck.fxbar #dkFx > .dkw{display:none}
+#tDeck.fxbar #dkChn{flex:0 0 clamp(170px, 18vw, 260px)}
+#tDeck.fxbar #dkScope{flex:0 0 clamp(120px, 11vw, 200px)}
+.dkfxbar{display:grid; grid-template-columns:repeat(8, minmax(92px, 1fr)); gap:3px; height:100%; min-height:0; overflow-x:auto; overflow-y:hidden; padding:3px}
+.dkfc{display:flex; flex-direction:column; min-width:0; min-height:0; border:1px solid var(--line); background:var(--panel)}
+.dkfc .fch{display:flex; align-items:center; gap:4px; padding:2px 4px; border-bottom:1px solid var(--line); white-space:nowrap; min-height:20px}
+.dkfc .fch .fon{flex:none; width:11px; height:11px; border:1.5px solid currentColor; border-radius:50%; padding:0; background:transparent; cursor:pointer}
+.dkfc .fch .fon.on{background:currentColor}
+.dkfc .fch .fnm{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; font-weight:700; font-size:var(--fs-2); text-align:left; border:0; background:none; padding:0; cursor:pointer; color:inherit; font-family:inherit}
+.dkfc .fcb{flex:1 1 auto; min-height:0; overflow-y:auto; font-family:var(--mono); font-size:var(--fs-1); padding:1px 0}
+.dkfc .fr{display:flex; justify-content:space-between; align-items:baseline; gap:4px; padding:0 4px; line-height:1.5; white-space:nowrap}
+.dkfc .fr b{font-weight:400; opacity:.65; overflow:hidden; text-overflow:ellipsis; min-width:0}
+.dkfc .fr span{flex:none; cursor:ns-resize; user-select:none; touch-action:none; font-variant-numeric:tabular-nums}
+.dkfc .fr span:hover, .dkfc .fr span.drag{text-decoration:underline}
+.dkfc .fm{flex:none; height:3px; background:var(--line); position:relative; overflow:hidden}
+.dkfc .fm i{position:absolute; left:0; top:0; bottom:0; width:0; background:currentColor; opacity:.75}
+.dkfc.off .fcb, .dkfc.off .fnm{opacity:.45}
+.dkfc.empty{border-style:dashed; opacity:.6} .dkfc.empty .fcb{display:flex; align-items:center; justify-content:center; cursor:pointer; font-family:inherit}
+.dkfc.cur{outline:2px solid currentColor; outline-offset:-2px}   /* FOCUS TRACK: on the master, FX takes the room INST and …CHAINS leave */
 /* BUS (31 Oct fix): INST steps aside on a bus and left a blank gap before TRACK. …CHAINS keeps the width its controls need
    (it already grows with them); FX takes the rest, as on the master. */
 .tdeck.bus #dkFx{flex:1 1 var(--dkwf, 320px)}
@@ -14860,7 +14884,7 @@ class ThunderFx extends AudioWorkletProcessor {
       key:v => { v = Math.round(v) || 0; if (v <= 0) return null; if (v <= 8) return (this.sends && this.sends[v - 1]) || this.zero;
         const c = this.tapIdx[v - 9]; return (c >= 0 && this.taps && this.taps[c]) || this.zero; }};
     this.set(op.chain || []);
-    this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else if (e.data && e.data.irs !== undefined) globalThis.__thunderIR = e.data.irs; else if (e.data && e.data.tapmap) this.setTap(e.data.tapmap); else if (e.data && e.data.tel !== undefined) this.tel = !!e.data.tel;
+    this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else if (e.data && e.data.irs !== undefined) globalThis.__thunderIR = e.data.irs; else if (e.data && e.data.tapmap) this.setTap(e.data.tapmap); else if (e.data && e.data.tel !== undefined) this.tel = !!e.data.tel; else if (e.data && e.data.lvl !== undefined){ this.lvl = !!e.data.lvl; this.lvlN = 0; this.lvlP = new Float32Array(8); }
       else if (e.data && e.data.pumpBytes){ if (!globalThis.__pumpBytes) globalThis.__pumpBytes = e.data.pumpBytes; this.pumpAsked = false; this.set(this.chain || []); }
       else if (e.data && e.data.ptel){ const q = e.data.ptel; if (q.on) this.ptel.set(q.key, {back:Math.max(0, Math.min(32768, q.back | 0)), rp:[]}); else this.ptel.delete(q.key); }
       else if (e.data && e.data.pset){ const q = e.data.pset, ch = (this.chain || []).map(c => c && c.slot === q.slot ? Object.assign({}, c, q.p ? {p:q.p} : {}, q.mp ? {mp:q.mp} : {}, q.pv ? {pv:q.pv} : {}) : c); this.set(ch); }   // FXV: one slot's settings for now (the chain's own come back with the next full set)
@@ -15076,7 +15100,7 @@ class ThunderFx extends AudioWorkletProcessor {
       // On or off: the slot's own setting, unless an FXO switch is holding it. Changes fade over 5 ms.
       const sv = s.slot >= 0 && s.slot < 8 ? swv[s.slot] : -1, tg = (sv < -0.5 ? s.on : sv > 0.5) ? 1 : 0;
       // …PUMP: on / off is the plugin's own bypass (latency-matched, crossfaded), so the timing never jumps; METER just stops
-      if (s.pu !== undefined){ if (s.byp !== !tg){ s.byp = !tg; s.dirty = true; } if (!(s.bi < 0 && s.byp)) this.slotRun(s, n, tr); continue; }
+      if (s.pu !== undefined){ if (s.byp !== !tg){ s.byp = !tg; s.dirty = true; } if (!(s.bi < 0 && s.byp)) this.slotRun(s, n, tr); if (this.lvl && tg && s.slot >= 0 && s.slot < 8){ const a = this.pk(n); if (a > this.lvlP[s.slot]) this.lvlP[s.slot] = a; } continue; }
       if (s.g === undefined) s.g = tg;
       if (!tg && s.g <= 0){ if (s.js && s.js.feed) s.js.feed(this.L, this.R, n, tr); continue; }
       const fade = s.g !== tg; if (fade){ this.dL.set(this.L); this.dR.set(this.R); }
@@ -15088,7 +15112,9 @@ class ThunderFx extends AudioWorkletProcessor {
       if (fade){ const L = this.L, R = this.R, d = 1 / (sampleRate * 0.005); let g = s.g;
         for (let k = 0; k < n; k++){ g = tg ? Math.min(1, g + d) : Math.max(0, g - d); L[k] = this.dL[k] + (L[k] - this.dL[k]) * g; R[k] = this.dR[k] + (R[k] - this.dR[k]) * g; }
         s.g = g; }
+      if (this.lvl && s.slot >= 0 && s.slot < 8){ const a = this.pk(n); if (a > this.lvlP[s.slot]) this.lvlP[s.slot] = a; }   // FX BAR: each slot's level out
     }
+    if (this.lvl && ++this.lvlN >= 12){ this.lvlN = 0; this.port.postMessage({lvl:Array.from(this.lvlP)}); this.lvlP.fill(0); }
     // FX DYNAMICS: [slot, key, [reduction dB, level in dB, peak out dB]] for each dynamics slot (the shared modules' own show())
     if ((this.tel || this.ptel.size) && ++this.telN >= 12){ this.telN = 0; const out = [], db = v => v > 1e-9 ? 20 * Math.log10(v) : -180, pout = [];
       for (const s of this.slots){
@@ -15415,6 +15441,7 @@ function tfxNode(ac, chain){
   n.load = 0; n.port.onmessage = e => { const d = e.data; if (!d) return;
     if (typeof d.load === 'number') n.load = n.load * 0.6 + d.load * 0.4;
     if (d.dyn) fxDynIn(n, d.dyn);
+    if (d.lvl){ n.lvl = d.lvl; n.lvlT = performance.now(); }   // FX BAR: each slot's level out (fxLvlSet)
     if (d.needPump){ if (pumpBin()) n.port.postMessage({pumpBytes:pumpBin()}); else pumpWait.add(n); }
     if (d.pump) PumpFX._feed(n, d.pump);
     if (d.pst) PumpFX._pst(n, d.pst);   // …PUMP STATE: the plugin changed its own (MASTER learned)
@@ -18573,7 +18600,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 342;
+const BUILD = 343;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -19149,6 +19176,8 @@ function projRows(){
       info:() => 'Typing a note into the phrase editor plays that instrument’s sound on the spot, so you hear what you enter. Off makes note entry silent'},
     {l:'KEYS KEYPAD', ck:'Show on-screen keypad', get:() => kpOn ? 1 : 0, set:v => setKp(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'KEYS mode: show the on-screen keypad at the bottom for tapping in notes. Off hides it — the computer keyboard still types notes and hex, and the octave (OCT, top bar) stays. PAD mode is unchanged'},
+    {l:'BOTTOM BAR', opts:true, get:() => deck.fxbar ? 1 : 0, set:v => setDeck('fxbar', !!v), min:0, max:1, d:isMobile() ? 0 : 1, fmt:v => v ? 'FX' : 'CLASSIC',
+      info:() => 'FX: the bottom panel shows the track’s eight effects side by side with all their values (drag one up or down, Alt+wheel, double-click resets, right-click types), …CHAINS and VOL / PAN; INST steps aside. CLASSIC: the panel as it was (SCOPE, INST, …CHAINS, one effect at a time, TRACK)'},
     {l:'BOTTOM PANEL', ck:'Show the bottom panel', get:() => deck.on ? 1 : 0, set:v => setDeck('on', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'KEYS mode with the keypad off: a panel at the bottom with a spectrum of the master, quick controls for the current instrument, its …chains and the current track’s effects, and a channel strip for the current track. Click INST, …CHAINS or FX to fold that part to a narrow strip; click the strip to open it again'},
     {l:'STAGE', opts:true, get:() => STG.indexOf(stage), set:v => setStage(STG[v]), min:0, max:STG.length - 1, d:0, fmt:v => STG_NAMES[v],
@@ -21751,6 +21780,15 @@ function fxDynIn(n, list){
 // The node that runs a track's effects (t −1: the master's), and switching its reports on (one node at a time).
 const fxDynNodeOf = t => !rt ? null : t < 0 ? rt.mfx || null : (rt.pl.buses[t] && rt.pl.buses[t].fx) || null;
 let fxTelNode = null;
+// FX BAR: the node whose slots' levels the bottom bar shows (one at a time, like the FX screen's reports)
+let fxLvlNode = null;
+function fxLvlSet(node){
+  if (node === fxLvlNode) return;
+  if (fxLvlNode) try { fxLvlNode.port.postMessage({lvl:false}); } catch(e){}
+  fxLvlNode = node || null;
+  if (fxLvlNode) try { fxLvlNode.port.postMessage({lvl:true}); } catch(e){}
+}
+const fxSlotLevel = (t, k) => { const n = fxLvlNode; if (!n || !n.lvl || performance.now() - (n.lvlT || 0) > 400) return 0; const p = n.lvl[k] || 0; return p > 1e-4 ? clamp((20 * Math.log10(p) + 54) / 54, 0, 1) : 0; };   // -54 dB … 0 dB
 function fxTelSet(node){
   if (node === fxTelNode) return;
   if (fxTelNode) try { fxTelNode.port.postMessage({tel:false}); } catch(e){}
@@ -22176,7 +22214,7 @@ mstLabel();
 const DKK = 'thunderplus-deck-v1';
 // In signal-flow order: the instrument, its …chains (they come before the track effects), the track effects, the strip.
 const DK_SECS = [['scope', 'SCOPE'], ['inst', 'INST'], ['chn', '…CHAINS'], ['fx', 'FX'], ['strip', 'TRACK']];
-let deck = (() => { const d = {on:true, scope:true, inst:true, chn:true, fx:true, strip:true, h:0, ws:300, wf:320};
+let deck = (() => { const d = {on:true, scope:true, inst:true, chn:true, fx:true, strip:true, h:0, ws:300, wf:320, fxbar:!isMobile()};   // fxbar: FX BAR (phones: off until turned on)
   try { const o = JSON.parse(localStorage.getItem(DKK) || 'null');
     if (o && typeof o === 'object'){ for (const k in d) if (typeof o[k] === typeof d[k]) d[k] = o[k]; } } catch(e){}
   d.scope = d.strip = true;   // SCOPE and TRACK can't be hidden or folded (older saves could hide them)
@@ -22233,7 +22271,8 @@ function deckLayout(){
   $('tDeck').style.setProperty('--dkh', deckH() + 'px');
   $('tDeck').style.setProperty('--dkws', deck.ws + 'px'); $('tDeck').style.setProperty('--dkwf', deck.wf + 'px');
   // BUS (owner, 22 Oct): on a bus track the instrument part steps aside, so its …chains controls get the room.
-  const mst = dkMst(), bus = !mst && isBusT(dkTrack()); $('tDeck').classList.toggle('mst', mst); $('tDeck').classList.toggle('bus', bus);   // FOCUS TRACK: the master has no instrument or …chains of its own
+  const mst = dkMst(), bus = !mst && isBusT(dkTrack()); $('tDeck').classList.toggle('mst', mst); $('tDeck').classList.toggle('bus', bus);
+  $('tDeck').classList.toggle('fxbar', !!deck.fxbar); $('tDeck').classList.toggle('narrow', $('tDeck').clientWidth < 1180);   // FX BAR   // FOCUS TRACK: the master has no instrument or …chains of its own
   for (const [k, l] of DK_SECS){ const sct = dkSec(k), col = DK_FOLD.has(k) && !deck[k]; sct.hidden = (k === 'inst' && (bus || mst)) || (k === 'chn' && mst); sct.classList.toggle('col', col); sct.classList.toggle('first', k === 'scope');
     const t = sct.querySelector('.dkt'); if (t && DK_FOLD.has(k)){ t.setAttribute('aria-expanded', String(!col)); t.title = col ? 'Open ' + l : 'Fold ' + l + ' to a narrow strip'; } }
   $('dkBody').hidden = false; if ($('dkBare')) $('dkBare').hidden = true; $('dkOffs').hidden = true;
@@ -22287,6 +22326,7 @@ function deckStrip(){
 let dkSt = null; const dkStBuf = new Float32Array(512); let dkStT = 0;
 function deckMetersPaint(){}
 function deckStripMeter(now){
+  try { deckFxBarMeters(); } catch(e){}   // FX BAR: the slots' meters, with the strip's
   if (!deckShown() || !deck.strip || now - dkStT < 33) return;
   const dt = now - dkStT; dkStT = now;
   const t = dkMst() ? 'm' : dkTrack(), bars = $('stM').children, node = k => k === 'm' ? rt.mo : rt.pl.buses[k].p;   // FOCUS TRACK: 'm' the master out (after the OUT fader: GAIN STAGING)
@@ -22446,6 +22486,8 @@ function deckInst(){
 }
 function deckFx(){
   if (!deckShown() || !deck.fx) return;
+  if (deck.fxbar) return deckFxBar();
+  if ($('dkFxBar')){ $('dkFxBar').remove(); $('dkFxSlots').hidden = $('dkFxRows').hidden = false; dkFxSig = ''; }
   // The master's effects when the FX target is the master (the MST column, or the FX screen on the master).
   const mst = dkMst(), t = mst ? NT : dkTrack(), FA = () => (mst ? S.mfx : S.tfx[dkTrack()]) || [], A = FA();
   const sig = t + ':' + A.map(f => f ? f.type + (f.on ? 1 : 0) : '-').join(',') + ':' + dkFxSel;
@@ -22469,6 +22511,60 @@ function deckFx(){
       bar.append(pb); if (!PUMP_CREATIVE.has(TFX[f.type].pump) || PUMP_WIN.has(TFX[f.type].pump)) bar.append(ob); box.append(bar); }   // (…PUMP CREATIVE: no windows yet)
   }
   dkFxRows.forEach(r => { if (r.getObj()) r.refresh(); });
+}
+/* FX BAR: eight columns, one per slot: ● on/off, the effect's name (a click opens it on the FX screen), every value as text
+   (as the FX screen lists them): drag up or down, Alt+wheel a step, double-click its default, right-click to type. A thin
+   meter under each name shows the slot's level (where its effect has one), else how much of the slot is on. */
+let dkFbSig = '', dkFbVals = [];
+function deckFxBar(){
+  const mst = dkMst(), t = mst ? NT : dkTrack(), FA = () => (mst ? S.mfx : S.tfx[dkTrack()]) || [], A = FA();
+  $('dkFxT').textContent = mst ? 'FX · MASTER' : `FX · TRACK ${d2(t + 1)}`;
+  let bar = $('dkFxBar');
+  if (!bar){ bar = el('div', 'dkfxbar'); bar.id = 'dkFxBar'; $('dkFxSlots').parentElement.append(bar); dkFbSig = ''; }
+  $('dkFxSlots').hidden = $('dkFxRows').hidden = true;
+  const sig = t + ':' + Array.from({length:FXSLOTS}, (_, k) => A[k] ? A[k].type + (A[k].on ? 1 : 0) : '-').join(',');
+  if (sig !== dkFbSig){
+    dkFbSig = sig; bar.replaceChildren(); dkFbVals = [];
+    const goFx = k => { cFxT = mst ? NT : dkTrack(); cFxS = k; cs.fx.y = A[k] ? FXSLOTS + 1 : k + 1; go('fx'); };
+    for (let k = 0; k < FXSLOTS; k++){
+      const f = A[k], col = el('div', 'dkfc' + (f ? (f.on ? '' : ' off') : ' empty')), h = el('div', 'fch'), b = el('div', 'fcb');
+      if (!f){ h.append(el('span', 'fnm', (k + 1) + ' ---')); b.textContent = '+ add'; b.title = 'Add an effect in slot ' + (k + 1) + ' (FX screen)'; b.addEventListener('click', () => goFx(k)); col.append(h, b); bar.append(col); continue; }
+      const D = TFX[f.type], on = el('button', 'fon' + (f.on ? ' on' : '')), nm = el('button', 'fnm', (k + 1) + ' ' + D.n); on.type = nm.type = 'button';
+      on.title = f.on ? 'On: click to switch it off' : 'Off: click to switch it on'; on.setAttribute('aria-pressed', String(!!f.on));
+      on.addEventListener('click', () => { const g = FA()[k]; if (!g) return; g.on = !g.on; fxChanged(mst ? NT : dkTrack()); dkFbSig = ''; draw(); });
+      nm.title = D.long + ' · open it on the FX screen'; nm.addEventListener('click', () => goFx(k));
+      const m = el('div', 'fm'); m.append(el('i')); h.append(on, nm); col.append(h, m, b);
+      const getF = () => FA()[k];
+      for (const q of D.ps){
+        const r = el('div', 'fr'), lb = el('b', null, q.l), v = el('span'); r.append(lb, v); b.append(r);
+        const show = x => q.names ? (q.names[x] ?? String(x)) : (q.tpl || q.band) ? q.fmt(x, getF()) : q.fmt(x);
+        const set = x => { const g = getF(); if (!g) return; x = clamp(Math.round(x), q.min, q.max); if (x === g[q.k]) return; g[q.k] = x; if (isPumpT(g.type)) delete g.pname; fxChanged(mst ? NT : dkTrack()); v.textContent = show(x); };
+        v.title = q.l + ': drag up or down (Shift: fine) · Alt+wheel · double-click: default · right-click: type a value';
+        v.addEventListener('pointerdown', e => { if (e.button) return; e.preventDefault(); try { v.setPointerCapture(e.pointerId); } catch(_){} v.classList.add('drag');
+          const y0 = e.clientY, g = getF(), x0 = g ? g[q.k] : q.d, R = q.max - q.min, per = q.names || R <= 16 ? 10 : R <= 64 ? 3 : Math.max(0.4, 150 / R);
+          const mv = ev => set(x0 + (y0 - ev.clientY) / per * (ev.shiftKey ? 0.25 : 1));
+          const up = () => { v.classList.remove('drag'); v.removeEventListener('pointermove', mv); v.removeEventListener('pointerup', up); v.removeEventListener('pointercancel', up); };
+          v.addEventListener('pointermove', mv); v.addEventListener('pointerup', up); v.addEventListener('pointercancel', up); });
+        v.addEventListener('wheel', e => { if (!e.altKey) return; e.preventDefault(); const n = wheelSteps(v, e); if (!n) return; const g = getF(); if (g) set(g[q.k] - n * (q.max - q.min > 64 && !q.names ? Math.max(1, Math.round((q.max - q.min) / 64)) : 1)); }, {passive:false});
+        v.addEventListener('dblclick', () => set(q.d));
+        v.addEventListener('contextmenu', async e => { e.preventDefault(); const g = getF(); if (!g) return;
+          const a = await askText({title:q.l + ' (' + q.min + '–' + q.max + ')', body:'Now ' + show(g[q.k]) + '. A number from ' + q.min + ' to ' + q.max + '.'}, String(g[q.k]), 6, 'Set'); if (a == null) return;
+          const n = parseFloat(a); if (isFinite(n)) set(n); });
+        dkFbVals.push(() => { const g = getF(); if (g && document.activeElement !== v && !v.classList.contains('drag')) v.textContent = show(g[q.k]); });
+      }
+      col.dataset.k = k; bar.append(col);
+    }
+  }
+  dkFbVals.forEach(fn => fn());
+  // which slot the FX screen has open, outlined
+  const cur = tv === 'fx' && cFxT === (mst ? NT : dkTrack()) ? cFxS : -1;
+  for (const c of bar.children) c.classList.toggle('cur', +c.dataset.k === cur);
+}
+// FX BAR meters: each slot's level where its effect node reports one (fxMeter), else nothing
+function deckFxBarMeters(){
+  const bar = $('dkFxBar'); if (!bar || !deck.fxbar || !deckShown() || !deck.fx){ fxLvlSet(null); return; }
+  const mst = dkMst(), t = mst ? NT : dkTrack(); fxLvlSet(fxDynNodeOf(mst ? -1 : t));
+  for (const c of bar.children){ const i = c.querySelector('.fm i'); if (!i) continue; let lv = 0; try { lv = typeof fxSlotLevel === 'function' ? fxSlotLevel(t, +c.dataset.k) : 0; } catch(e){} i.style.width = Math.round(clamp(lv, 0, 1) * 100) + '%'; }
 }
 // Resizing: drag the top edge for the panel's height, and the scope's right edge or the FX section's left edge for
 // their widths. Remembered on this device.
@@ -25033,6 +25129,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [343, '1 Nov', ['New bottom bar (View → Bottom panel → BOTTOM BAR: FX, or CLASSIC for the panel as it was): the track’s eight effect slots side by side, each with its on/off, its name (a click opens it on the FX screen), a level meter and every one of its values as text, as on the FX screen: drag a value up or down (Shift: fine), Alt+wheel, double-click for its default, right-click to type one. …CHAINS and VOL / PAN / meter stay beside it; INST steps aside, and SCOPE too on a narrow window. On a phone it is off until you turn it on.', 'A stable copy of the app (build 338, as desktop 1.2.57) at …/thunder-plus/stable/, for when the latest build misbehaves.']],
   [342, '1 Nov', ['Two more …pump engines, rendered and live: Freeze (a sound as a cloud of frozen, shimmering spectral grains, on its seven built-in sounds) and Wob (the additive bass: 256 partials, a second spectrum to morph to, vowels, comb, reese, spray and drift, and a wobble in time with the song).']],
   [341, '1 Nov', ['Breaks: …pump BREAK’s fourteen breakbeats (a bar each, soul and funk) in a pad’s Presets… → Breaks (…pump BREAK), with ▶ to hear them first. Taking one sets its instrument to play it at the song’s tempo (INST → SYNC REPITCH over 4 BEATS); then chop it as in Renoise: STA 00, 10, 20 … F0 starts it on each of its sixteen 16ths, or SLICES 16 for a slice a note.', 'STA now works on a synced loop (SYNC on, SLICES off): it always started from the top.']],
   [340, '31 Oct', ['…pump LIFE as engines Life and Life kit live: the groovebox’s eight FM / ring / kick tones and its pitch-shifting delay, played from the tracker (C-4 up the white keys on the kit live engine). Its Game of Life grid stays in the plugin.']],
@@ -25158,7 +25255,7 @@ const SET_SHEETS = true;
 const SHEETS = {
   screen:{title:'Screen', about:'Layout and panels, the Phrase and Song screens, text size and colour', groups:[
     ['Text & colour', ['TEXT SIZE', 'MIXER SIZE', 'STEP NUMBERS', 'SCREEN']],
-    ['Layout & panels', ['ARRANGE', 'ARRANGE SIDE', 'SIDE PANEL', 'INST LIST', 'SECT', 'KEYS KEYPAD', 'COMMAND BAR', 'BOTTOM PANEL', 'STAGE']],
+    ['Layout & panels', ['ARRANGE', 'ARRANGE SIDE', 'SIDE PANEL', 'INST LIST', 'SECT', 'KEYS KEYPAD', 'COMMAND BAR', 'BOTTOM PANEL', 'BOTTOM BAR', 'STAGE']],
     ['Phrase screen', ['SIMPLE PHRASE', 'FOLLOW', 'TAB', 'NEIGHBORS', 'PATTERN VIEW', 'ARRANGE FOCUS', 'SONG STRIP']],
     ['Song screen', ['CLASSIC SONG', 'SONG MOUSE', 'SECTIONS', 'LOOP DRAG', 'SONG PEEK']]]},
   input:{title:'Input', about:'PAD or KEYS, notes as you type, edit step, sticky keys, the command row', groups:[
@@ -25363,7 +25460,7 @@ function buildProj(){
 }
 // On Desktop the panel switches (keypad, bottom panel, stage) are under View with the rest of the screen; on Mobile
 // they stay in Project → Input.
-const PANEL_ROWS = new Set(['KEYS KEYPAD', 'BOTTOM PANEL', 'STAGE']);
+const PANEL_ROWS = new Set(['KEYS KEYPAD', 'BOTTOM PANEL', 'BOTTOM BAR', 'STAGE']);
 // Screen: the tracker's screen and arrange settings, then the skin.
 function buildScreen(){
   const list = $('gsecScreen'); if (!list) return;
