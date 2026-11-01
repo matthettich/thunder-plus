@@ -176,7 +176,7 @@ for (const key in KINDS){
       g.name = W[0].slice(0, n).join(' ') || g.pre.toUpperCase();
       g.ps.forEach((p, j) => { const w = W[j].slice(n).join(' '); rows[g.keys[j]] = Object.assign({}, rows[g.keys[j]], {l:w ? w.split(' ').map(x => /^[A-Z]{3,}$/.test(x) ? x[0] + x.slice(1).toLowerCase() : x).join(' ') : p.sn}); }); }
     rows.kd = {l:'Drum', min:0, max:drums.length - 1, c:'int', d:0, f:v => { const g = drums[Math.round(v)]; return g ? g.name : ''; }, noRnd:true}; defs.kd = 0;
-    K.drums = drums.length;
+    K.drums = drums.length; K.drumNames = drums.map(x => x.name);
     secs = [['Drum', ['kd', 'vel']], ...drums.map((g, i) => [g.name, g.keys, i]), ['Kit', kitKeys]];
   } else secs = SECS[key].map(([t, ks]) => [t, ks.filter(s => rows[s])]).filter(([, ks]) => ks.length);
   // a preset is the plugin's: its values over the defaults (Default is the card's Init)
@@ -248,6 +248,8 @@ const PsynCore = {
     return o;
   },
   len: k => (KINDS[twinOf(k)] && KINDS[twinOf(k)].len) || 2,
+  // a drum machine pad's drum (its Drum, kd): its name; '' for the other instruments and for a kit live engine (the whole kit)
+  drumName: (k, P) => { const K = KINDS[k]; return K && K.kit && K.drumNames ? K.drumNames[Math.max(0, Math.min(K.drumNames.length - 1, Math.round((P && P.kd) || 0)))] || '' : ''; },
   // the latency the instrument reports (samples at sr): MONO's oversampler, GLOSS's
   latency(k, sr){ const K = KINDS[twinOf(k)]; if (!X || !K) return 0; const h = X.psyn_new(K.t, sr || 48000); if (h < 0) return 0; try { return X.psyn_latency(h); } finally { X.psyn_free(h); } },
   /* One note: values staged, a fresh instance (so a pad renders the same every time), note on at 0, note off after the

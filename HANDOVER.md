@@ -81,6 +81,14 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 1 Nov (5): drum names on drum machine pads (build 345)
+- `PsynCore.drumName(k, P)` (kits: `K.drumNames` from the card's drum pages); `padDrum(v)` in index.html: the pad list shows
+  "name · drum" (unless the name already says it) and `vEngLbl` "pump STRIKE · Snare, rendered…". The Drum row redraws both.
+- Owner asked about filling pads from a kit without overwriting sounds: not built yet (see the reply: only free slots, ask
+  first, one undo, as File → Breaks to chop / Drum kits… do).
+- Found: File ▾ → Breaks to chop (build 271) already had BREAK's fourteen breaks (a JS port of renderBreak, sliced 16 ways,
+  into a free slot); build 341's Presets → Breaks duplicates them from WAVs. Owner to choose which stays.
+
 ## 1 Nov (4): Freeze loads your own sound (build 344)
 - pump (3ad5969): `psyn_buf(n)` + `psyn_file(h, n, sr)` → `SynthFreeze::file()` (makeSpectra of the first 20 s, ROOT as the
   plugin's setState; ROOT re-read each block as its rootNow). The plugin itself already had LOAD.

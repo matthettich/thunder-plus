@@ -2595,7 +2595,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
      pump-synth.wasm, their parameters and presets in pump-synth-meta.js, both built by pump/wasm/build.sh). Without the folder
      there are no …pump engines. The render Worker loads the same two files (PSYN_JS below). -->
 <script src="pump/synth/pump-synth-meta.js?v=6"></script>
-<script src="pump/synth/pump-synth-engine.js?v=9"></script>
+<script src="pump/synth/pump-synth-engine.js?v=10"></script>
 <!-- …PUMP (23 Oct 2026): the pump mastering plugins' parameter tables and presets (generated in matthettich/pump by
      wasm/build.sh); pump/pump.wasm is their DSP, fetched by the wasm loader. -->
 <script src="pump/pump-meta.js?v=5"></script>
@@ -7345,7 +7345,7 @@ const PW = {w:null, ready:false, wv:false, lx:false, ps:false, id:0, jobs:new Ma
 // and gets the page's compiled lxr.wasm (lxMod) in its init message.
 const LXR_JS = 'lxr/lxr-engine.js?v=2';
 // …PUMP SYNTHS: likewise the instruments' tables and glue, and the page's compiled pump-synth.wasm (psMod)
-const PSYN_JS = ['pump/synth/pump-synth-meta.js?v=6', 'pump/synth/pump-synth-engine.js?v=9'];
+const PSYN_JS = ['pump/synth/pump-synth-meta.js?v=6', 'pump/synth/pump-synth-engine.js?v=10'];
 function rwStart(plMod, txMod, lxMod, psMod){
   try {
     const sc = [...document.scripts].find(x => x.textContent.includes('===ENGINE ' + 'START==='));
@@ -11127,7 +11127,7 @@ function xBuild(){
   for (const [title, keys, kd] of U.secs){
     const sc = el('div', 'sec'); sc.append(el('h3', null, title)); host.append(sc);
     if (kd != null) sc.dataset.kd = kd;   // …PUMP DRUM MACHINES: one drum's page, shown when it is the pad's Drum (xKitVis)
-    for (const key of keys){ const r = makeRow(U.rows[key], key, XEV, {idp:'x' + k, noTrack:true, on:() => { changed(cur, true); if (key === 'kd') xKitVis(); }}); sc.append(r.r); xRows.push(r); }
+    for (const key of keys){ const r = makeRow(U.rows[key], key, XEV, {idp:'x' + k, noTrack:true, on:() => { changed(cur, true); if (key === 'kd'){ xKitVis(); renderPads(); bassUI(); } }}); sc.append(r.r); xRows.push(r); }
   }
   xKitVis();
   if (U.note) host.append(el('p', 'note', U.note));
@@ -11148,6 +11148,7 @@ function bassUI(){
     : vx ? (isSyn(cur) ? 'a singing voice, a syllable per note, live in the tracker' : 'a singing voice: the pad says the whole line')
     : bl ? 'a minimal electronic drum, rendered'
     : xe && v.engine === 'sf' ? 'a SoundFont preset, played note by note from the font (' + (v.sfFontName || GM_FONT.name) + ')'
+    : xe && padDrum(v) ? XUI[v.engine].title + ' · ' + padDrum(v) + ', rendered (Drum on the card picks another)'   // DRUM NAME (owner, 1 Nov)
     : xe ? (XENG[v.engine].live ? (isSyn(cur) ? XUI[v.engine].title.toLowerCase() + ' synth, played live by the tracker' : XUI[v.engine].title.toLowerCase() + ' synth, rendered as a one-shot') : XUI[v.engine].title.toLowerCase() + ', rendered')
     : 'up to 8 layers, rendered';
   if (vEngUpd) vEngUpd();
@@ -11507,11 +11508,13 @@ function buildPads(){
   // The checkbox and the dock follow the mode even when it is flipped from the tracker.
   try { $('ckVtrk').checked = vtrk; } catch(e){}
 }
+// DRUM NAME (owner, 1 Nov): a drum machine pad's drum (pump Strike / Boing / X0X / Life: its Drum), shown with its name
+const padDrum = v => { try { return v && typeof PsynCore !== 'undefined' && PsynCore.isKind(v.engine) && v[v.engine] ? PsynCore.drumName(v.engine, v[v.engine]) : ''; } catch(e){ return ''; } };
 function renderPads(){
   kit.voices.forEach((v, i) => {
     if (i >= padEls.length) return;
     const {p, n, m, b} = padEls[i];
-    n.textContent = v.name || '—';
+    { const dr = padDrum(v), nm = v.name || '—'; n.textContent = dr && !nm.toLowerCase().includes(dr.toLowerCase()) ? nm + ' · ' + dr : nm; }
     // The badge is the pad's own sequential number (00, 01, 02…), independent of which audio track is
     // playing — so toggling the mode never changes label widths or reflows the grid. A voice per track
     // keeps one-to-one parity by position: pads 8+ are tracks 1+.
@@ -18631,7 +18634,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 344;
+const BUILD = 345;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25160,6 +25163,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [345, '1 Nov', ['Drum machine pads (…pump Strike, Boing, X0X, Life) show which drum they play: in the pad list (“Kick · Snare”) and on the engine line, and both follow Drum as you change it.']],
   [344, '1 Nov', ['Freeze plays your own sounds: Load sound… on its card freezes any audio file (its first 20 s, as the pump plugin does) and sets SOURCE to File; ROOT is the note it was played at. It saves with the kit like any sample, and plays live too.']],
   [343, '1 Nov', ['New bottom bar (View → Bottom panel → BOTTOM BAR: FX, or CLASSIC for the panel as it was): the track’s eight effect slots side by side, each with its on/off, its name (a click opens it on the FX screen), a level meter and every one of its values as text, as on the FX screen: drag a value up or down (Shift: fine), Alt+wheel, double-click for its default, right-click to type one. …CHAINS and VOL / PAN / meter stay beside it; INST steps aside, and SCOPE too on a narrow window. On a phone it is off until you turn it on.', 'A stable copy of the app (build 338, as desktop 1.2.57) at …/thunder-plus/stable/, for when the latest build misbehaves.']],
   [342, '1 Nov', ['Two more …pump engines, rendered and live: Freeze (a sound as a cloud of frozen, shimmering spectral grains, on its seven built-in sounds) and Wob (the additive bass: 256 partials, a second spectrum to morph to, vowels, comb, reese, spray and drift, and a wobble in time with the song).']],
