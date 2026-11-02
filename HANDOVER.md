@@ -108,7 +108,10 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
   phones show the CLASSIC bar (big solid buttons, one job), desktop the FX bar (`deck.fxbar`); the FX bar is three unrelated
   panes (…chains help text, FX columns, channel strip) in three visual languages (dashed empty boxes, oval on/off pills, small
   low-contrast rows, label-chip headers); empty slots and help text take most of the space; signal flow isn't shown. Owner
-  to pick a direction; nothing built yet.
+  to pick a direction. **Owner chose A styled like C** (mobile offset blocks), with meters / pictures in spare room: built on
+  `beta` (only `#dkFxBar` CSS, `deckFxBar`, `deckFxBarMeters`, new `dkFxViz`; `stageTick` uses `dkBarTelNode`). Dynamics
+  slots: GR strip always, plus the FX stage's curve display when the panel is tall enough; others: output level history.
+  Ideas not done: EQ / filter response curves, delay echo taps, a styled folded …chains rail.
 
 ## 2 Nov: plan: native desktop app over a shared C++ core (plan only, nothing built)
 
