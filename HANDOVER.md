@@ -81,6 +81,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 1 Nov (13): Arrange's tips at the info line's size; small screens start without the stage (build 353)
+
+- `footAlign()` sets the Arrange footer's (`.tafoot`) font-size to `.tinfo`'s, so its tips read like the phrase's hint
+  lines and more of them fit in the height it shares with the info box.
+- `smallScr()` (device's shorter side < 900 px: phones, the Fold) makes STAGE default to OFF and the phrase stage
+  (DANCE · DRUM · KEYS · HIDE) default to HIDE. Defaults only: stored choices stay. Settings → STAGE's reset value follows.
+
 ## 1 Nov (12): ▶ stays on the COMMANDS row; no CLN on narrow rows (build 352)
 
 - Owner (Fold unfolded): on the Song screen ▶ dropped to a second COMMANDS row at the left, which shrank the phrase and

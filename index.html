@@ -19021,7 +19021,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 352;
+const BUILD = 353;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -19605,7 +19605,7 @@ function projRows(){
       info:() => 'A part in the bottom panel for playing live: FILL, a reload point, parts, the crossfader between two scenes, eight macros, and the editors for scenes, macros and each track’s locks and LFO (CND, XFD, MAC, PRT and LK1–LK4 drive them from the song)'},
     {l:'BOTTOM PANEL', ck:'Show the bottom panel', get:() => deck.on ? 1 : 0, set:v => setDeck('on', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'KEYS mode with the keypad off: a panel at the bottom with a spectrum of the master, quick controls for the current instrument, its …chains and the current track’s effects, and a channel strip for the current track. Click INST, …CHAINS or FX to fold that part to a narrow strip; click the strip to open it again'},
-    {l:'STAGE', opts:true, get:() => STG.indexOf(stage), set:v => setStage(STG[v]), min:0, max:STG.length - 1, d:0, fmt:v => STG_NAMES[v],
+    {l:'STAGE', opts:true, get:() => STG.indexOf(stage), set:v => setStage(STG[v]), min:0, max:STG.length - 1, d:smallScr() ? 2 : 0, fmt:v => STG_NAMES[v],
       info:() => 'Big screens: the space beside the grid. BY SCREEN: the dogs dance on Song and Project; Sect previews the phrase; Phrase shows a piano lighting the notes playing; Inst its waveform; Mixer the master spectrum; FX the effects chain. DOGS: the dogs everywhere. OFF: empty'},
     // REC, METRONOME AND COUNT-IN (kept on this device, like the rows above)
     {l:'METRONOME', sec:'Record & play', gap:true, opts:true, get:() => recS.met, set:v => setMet(v), min:0, max:2, d:1, fmt:v => ['OFF', 'WHILE RECORDING', 'ALWAYS'][v],
@@ -21911,14 +21911,19 @@ function paintMeters(){
 // BY SCREEN (default): the dogs on Song and Project, and something useful on the others — Sect: the phrase under
 // the cursor; Phrase: a piano down the side lighting the notes sounding now; Inst: the instrument's sound as a
 // waveform; Mixer: the master's spectrum; FX: the track's effects chain. DOGS: the dogs everywhere. OFF: nothing.
+// SMALL SCREENS START WITHOUT THE STAGE (owner, 1 Nov): on a phone or the Fold (the device's shorter side under 900 px)
+// STAGE starts OFF and the phrase's DANCE · DRUM · KEYS · HIDE starts on HIDE, so the grid gets the room. Only the
+// default: a choice already made (stored) stays. A function so the Settings list (built earlier) can read it.
+function smallScr(){ try { return Math.min(screen.width, screen.height) < 900; } catch(e){ return false; } }
 const STK = 'thunderplus-stage-v1', STG = ['screen', 'dogs', 'off'], STG_NAMES = ['BY SCREEN', 'DOGS', 'OFF'];
-let stage = (() => { try { const v = localStorage.getItem(STK); if (STG.includes(v)) return v; if (v === 'phrase') return 'screen'; } catch(e){} return 'screen'; })();
+let stage = (() => { try { const v = localStorage.getItem(STK); if (STG.includes(v)) return v; if (v === 'phrase') return 'screen'; } catch(e){} return smallScr() ? 'off' : 'screen'; })();
 function setStage(v){ stage = v; try { localStorage.setItem(STK, v); } catch(e){} stageLayout(); }
 $('tStageX').addEventListener('click', () => { setStage('off'); toast('Stage hidden. Settings → STAGE brings it back.'); });
 // The Phrase screen's stage: DANCE (the dogs), DRUM (the dogs on a kit and bongos), KEYS (the piano, the default) or
 // HIDE (nothing beside the phrase).
 const PHSK = 'thunderplus-phstage-v1', PHS = ['dance', 'drum', 'keys', 'hide'];
-let phStage = (() => { try { const v = localStorage.getItem(PHSK); return PHS.includes(v) ? v : 'keys'; } catch(e){ return 'keys'; } })();
+const phStageDef = () => smallScr() ? 'hide' : 'keys';
+let phStage = (() => { try { const v = localStorage.getItem(PHSK); return PHS.includes(v) ? v : phStageDef(); } catch(e){ return phStageDef(); } })();
 function setPhStage(v){ phStage = PHS.includes(v) ? v : 'keys'; try { localStorage.setItem(PHSK, phStage); } catch(e){} stageLayout(); }
 const stageKind = () => stage === 'dogs' ? 'dogs' : tv === 'song' && SX.peek && asongOn() ? 'peek' /* SONG EXTRAS */ : tv === 'phrase' && mstView() ? 'chain' : tv === 'phrase' ? ({dance:'dogs', drum:'drum', keys:'piano', hide:''})[phStage] : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
 let stgKindNow = '', stgSig = '', stgReq = '';   // stgReq: what the last layout was asked for
@@ -23406,6 +23411,9 @@ function footAlign(){
   if (!tInfoBox || !arrFoot) return;
   const was = tInfoBox.style.minHeight;
   const fx = arrFoot.firstElementChild;
+  // ARRANGE'S TIPS MATCH THE INFO LINE (owner, 1 Nov): the footer's text takes the size of the phrase's info and hint
+  // lines beside it (it was the bigger --fs-2), so more of the tips fit in the same height.
+  arrFoot.style.fontSize = getComputedStyle(tInfoBox).fontSize;
   tInfoBox.style.minHeight = arrFoot.style.height = ''; fx.style.webkitLineClamp = '';
   if (arrShown() && tInfoBox.offsetHeight && arrFoot.offsetHeight){
     const a = tInfoBox.getBoundingClientRect(), b = arrFoot.getBoundingClientRect(), d = a.top - b.top;
@@ -25748,6 +25756,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [353, '1 Nov', ['Arrange’s tips at the bottom use the same text size as the phrase’s info lines.', 'Phones and the Fold start with the stage hidden: Settings → STAGE is OFF and the phrase’s DANCE · DRUM · KEYS · HIDE is on HIDE (only the starting choice; a choice you made stays).']],
   [352, '1 Nov', ['COMMANDS on the Song screen: on a phone or the Fold unfolded (under 1000 px) the button row leaves out CLN (UNIQ and CLN↓ stay; CLN is still Ctrl/⌘+Alt+C and in Edit ▾; wider windows keep it), so ▶ stays at the right end of one row instead of dropping to a second row and shrinking the phrase and Arrange.', 'With Arrange holding the keys beside a phrase (or the song strip), the COMMANDS row leaves out − + and ‹ › (EDIT+◀▶ still changes a block, the arrows and OPTION+arrows move between blocks).']],
   [351, '1 Nov', ['Sends have their own colour in Arrange (olive): a track heard on its own and through a bus stands apart from the tracks that only play through it.', 'Input settings → SCALE MODE: typed and played notes land on the song’s scale (off unless you turn it on).']],
   [350, '1 Nov', ['Perform (View → PERFORM PART): FILL, a reload point, parts, two scenes with a crossfader, 8 macros, and per-track locks and an LFO, all in the bottom panel. Nothing changes the song’s own settings; STOP puts the mixer and effects back.', 'New commands: CND (FILL, PRE, NEI, 1ST and their opposites), NUD (early or late), RTV (retrigger crescendo or fade), SLC (pick a slice), XFD, MAC, LK1–LK4 and PRT.', 'Shift+Alt+F: FILL (a tap toggles, a hold lasts while held).']],
