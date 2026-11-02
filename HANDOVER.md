@@ -88,6 +88,28 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    build flags (`THUNDER_ASIO`, `THUNDER_LINK`); a closed build needs both proprietary agreements or leaves them out. If
    JUCE is chosen for the host instead of permissive libraries, it needs a commercial JUCE licence.
 
+## 2 Nov (2): beta channel; phase 0 started (sequencer golden test); FX bar mockups
+
+- Owner: keep the live build (355) as it is today and publish new work as a **beta**.
+  - **Web beta:** work goes on the **`beta` branch**. `.github/workflows/beta-web.yml` copies it into `beta/` on main on every
+    push (`tools/make-channel.sh`: the stable/ recipe; own SW cache `thunderbeta-*`, `../sounds/`, "(beta)" title); the job
+    refuses to touch anything outside `beta/`. URL: https://matthettich.github.io/thunder-plus/beta/ . It **shares saved songs and
+    kits with the main app** (same site): save a .thunder file before trying anything that could change song data. When the
+    owner is happy: merge `beta` into `main`.
+  - **Desktop beta:** Run workflow → version like `1.3.0-beta.1` + the new **prerelease** box. A pre-release is never "latest",
+    so installed copies (electron-updater and the API fallback) stay on 1.2.59; only someone who downloads it gets it.
+- **Phase 0 of [`docs/NATIVE-DESKTOP-PLAN.md`](docs/NATIVE-DESKTOP-PLAN.md), on `beta`:** `window.__seqTest` in index.html (only
+  with `?seqtest`, inert otherwise) and `tools/seq-golden.mjs` (headless Chrome + playwright): ELECTRO from row 0 in sim mode,
+  Math.random seeded → `tests/golden/seq-electro.json` (1792 rows, 3705 events: note 1823, beat 1792, fxc 49, off 21, mvol 14,
+  tvl 6). Two runs identical. Dumps in `tests/golden/out/` (ignored). **Still to do for phase 0:** more test songs (one with
+  ARP / GEN / PRB / CHASE / parts / loops), the timing rig and the baseline numbers (plan section 12). Then phase 1.
+- **Desktop bottom bar (owner: looks good on mobile, "less intentional" on desktop):** mockups on a Design canvas (three
+  options: A tidied rack, B device chain, C hardware face). Why it reads unintentional, from screenshots of build 355:
+  phones show the CLASSIC bar (big solid buttons, one job), desktop the FX bar (`deck.fxbar`); the FX bar is three unrelated
+  panes (…chains help text, FX columns, channel strip) in three visual languages (dashed empty boxes, oval on/off pills, small
+  low-contrast rows, label-chip headers); empty slots and help text take most of the space; signal flow isn't shown. Owner
+  to pick a direction; nothing built yet.
+
 ## 2 Nov: plan: native desktop app over a shared C++ core (plan only, nothing built)
 
 - Owner: is it worth porting Thunder Plus from Electron to a native Mac / Windows app? It must keep running on the
