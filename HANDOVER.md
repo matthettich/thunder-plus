@@ -26,6 +26,9 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.59** (2 Nov 2026, UTC; Run workflow through the API with version 1.2.59, from `fa3229d`) has build 355: the 1 Nov
+  audit work (menus, latency comp, default song, favourites, Perform, sends, scale mode), the mobile top bar, render Cancel and
+  the FX bar changes. All three platforms built.
 - **v1.2.34** (31 Oct 2026, UTC; Run workflow through the API with version 1.2.34, from `3c992cb`) has build 294: the …pump
   creative effects, MASTER and the …chains pump modules ("30 Oct (26)" below). All three platforms built.
 - **v1.2.26** (27 Oct 2026; Run workflow through the API with version 1.2.26) has the gain staging (TRIM, master OUT, PRE
