@@ -81,6 +81,18 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 1 Nov (12): ▶ stays on the COMMANDS row; no CLN on narrow rows (build 352)
+
+- Owner (Fold unfolded): on the Song screen ▶ dropped to a second COMMANDS row at the left, which shrank the phrase and
+  Arrange. Song showed 15 buttons (UNIQ, CLN, CLN↓ are Song-only) in a 14-column grid.
+- Owner's call: drop CLN when the row is narrow. CSS only: `.tcmd:not(.cmini) [data-c=clone]` is hidden under 1000 px;
+  at 1000 px and up `.tcmd.song` has 15 columns and CLN shows. CLN stays on Ctrl/⌘+Alt+C, Edit ▾ and the thin COMMAND BAR.
+- ▶ (`[data-c=song]`) is pinned to the grid's last column (`grid-column:-2/-1`), so if a row ever wraps it sits right.
+- Checked headless at 412, 764 and 1200 px on Song and Phrase: one row (two on a phone), ▶ last, no clipped labels.
+- Owner: Arrange doesn't need every button. With Arrange / the song strip holding the keys (`apSongLines`), the row also hides
+  − + (`b:±1`) and ‹ › (`prev`/`next`); `draw()` un-hides them on every other screen.
+- Mobile pad vs the M8 was reviewed the same session; owner chose to leave the pad as it is.
+
 ## 1 Nov (7–11): the audit's fixes, menus, latency comp, default song, favourites, Perform, sends, scale mode (builds 347–351)
 
 The owner's picks from the 1 Nov audit ("Thunder Plus: usability and feature audit (build 346)", https://claude.ai/artifact/TVuFPenRbFDyhVe9JgWpv9).

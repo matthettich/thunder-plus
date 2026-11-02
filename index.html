@@ -892,6 +892,17 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 @media (min-width:700px){
   .tcmd, .tcmd.song{grid-template-columns:repeat(14,minmax(0,1fr))}
 }
+/* NO CLN ON A NARROW ROW (owner, 1 Nov): below 1000 px (phones, the Fold unfolded) the big COMMANDS row leaves CLN out, so
+   the Song screen has 14 buttons like the others and ▶ stays on its row (a 15th wrapped onto a second row and shrank the
+   phrase and Arrange). UNIQ and CLN↓ stay; CLN is still Ctrl/⌘+Alt+C, in Edit ▾ and in the thin COMMAND BAR. Wider
+   windows show it, with 15 columns on the Song screen. */
+.tcmd:not(.cmini) button[data-c=clone]{display:none}
+@media (min-width:1000px){
+  .tcmd.song{grid-template-columns:repeat(15,minmax(0,1fr))}
+  .tcmd.song:not(.cmini) button[data-c=clone]:not([hidden]){display:inline-flex}
+}
+/* ▶ (play the song) always sits in the last column, on whichever row it lands: never alone at the left of a row. */
+.tcmd:not(.cmini) button[data-c=song]{grid-column:-2 / -1}
 body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bottom,0px))}
 
 .ttabbar{display:flex; flex:none; border-bottom:1px solid var(--line); background:var(--side); min-width:0}
@@ -19010,7 +19021,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 351;
+const BUILD = 352;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -21761,7 +21772,8 @@ function draw(){
     const g = Object.keys(pc).reverse().find(k => pc[k] === TCV.phrase && k !== 'play'); if (g && pc.play !== TCV.phrase){ pc[g] = pc.play; pc.play = TCV.phrase; }
     for (const k in pc){ const b = $('tPad').querySelector(`.k[data-b=${k}]`); if (b) b.style.setProperty('--sh', pc[k]); } }
   $('tCmd').querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = onSong);
-  $('tCmd').querySelectorAll('[data-c=uniq],[data-c=clone],[data-c=cldn]').forEach(b => b.hidden = !onSong); $('tCmd').classList.toggle('song', onSong);
+  $('tCmd').querySelectorAll('[data-c="b:-1"],[data-c="b:1"],[data-c=prev],[data-c=next]').forEach(b => b.hidden = false);   // Arrange's row hides them (apSongLines)
+  $('tCmd').querySelectorAll('[data-c=uniq],[data-c=clone],[data-c=cldn]').forEach(b => b.hidden = !onSong); $('tCmd').classList.toggle('song', onSong);   // CLN's narrow-screen hiding is in the CSS (.tcmd)
   const selB = $('tCmd').querySelector('[data-c=sel]'); if (selB) selB.classList.toggle('on', !!selA);
   $('tState').innerHTML = tp.on ? ico('play') + 'PLAYING ' + VNAME[tp.mode] : rendering ? ico('render') + 'RENDERING' : ico('stop') + 'STOPPED';
   $('tBpm').textContent = (tp.on ? tp.bpm : S.bpm) + ' BPM · ' + (tp.on ? tp.tks : S.ticks || TICKS) + ' TICKS' + (S.swing > 50 ? ' · SWING ' + S.swing + '%' : '');
@@ -25559,7 +25571,9 @@ function apSongLines(){
   apHint(((t => keys || patNavOn ? t : songHintOld(t))((keys ? HINTK : HINT)[sectsOn ? 'song' : 'songP'])).replace(/(SHIFT|Shift|Ctrl|Alt)\+(▶|→) open( phrase)?/, m => apHost === 'phrase' ? m : (keys ? 'Alt+→' : 'SHIFT+▶') + ' back to ' + VNAME[apHost])
     + (apHost !== 'phrase' ? ' · Esc or a ' + (coarse ? 'tap' : 'click') + ' on the screen: back to ' + VNAME[apHost] : apPin ? ' · PINNED: the phrase stays' : ' · the phrase follows the song cursor'));
   const cmd = $('tCmd');
-  cmd.querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = true);
+  // ARRANGE ROW (owner, 1 Nov): with Arrange (or the song strip) holding the keys the row is for blocks, so − + and ‹ › go
+  // (EDIT+◀▶ still changes a block's number; the arrows and OPTION+arrows move between blocks). draw() brings them back.
+  cmd.querySelectorAll('[data-c="b:-16"],[data-c="b:16"],[data-c="b:-1"],[data-c="b:1"],[data-c=prev],[data-c=next]').forEach(b => b.hidden = true);
   cmd.querySelectorAll('[data-c=uniq],[data-c=clone],[data-c=cldn]').forEach(b => b.hidden = false); cmd.classList.add('song');
   const sb = cmd.querySelector('[data-c=sel]'); if (sb) sb.classList.toggle('on', !!apSel);
   if (keys && kpOn) apAsSong(drawKeypad);
@@ -25734,6 +25748,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [352, '1 Nov', ['COMMANDS on the Song screen: on a phone or the Fold unfolded (under 1000 px) the button row leaves out CLN (UNIQ and CLN↓ stay; CLN is still Ctrl/⌘+Alt+C and in Edit ▾; wider windows keep it), so ▶ stays at the right end of one row instead of dropping to a second row and shrinking the phrase and Arrange.', 'With Arrange holding the keys beside a phrase (or the song strip), the COMMANDS row leaves out − + and ‹ › (EDIT+◀▶ still changes a block, the arrows and OPTION+arrows move between blocks).']],
   [351, '1 Nov', ['Sends have their own colour in Arrange (olive): a track heard on its own and through a bus stands apart from the tracks that only play through it.', 'Input settings → SCALE MODE: typed and played notes land on the song’s scale (off unless you turn it on).']],
   [350, '1 Nov', ['Perform (View → PERFORM PART): FILL, a reload point, parts, two scenes with a crossfader, 8 macros, and per-track locks and an LFO, all in the bottom panel. Nothing changes the song’s own settings; STOP puts the mixer and effects back.', 'New commands: CND (FILL, PRE, NEI, 1ST and their opposites), NUD (early or late), RTV (retrigger crescendo or fade), SLC (pick a slice), XFD, MAC, LK1–LK4 and PRT.', 'Shift+Alt+F: FILL (a tap toggles, a hold lasts while held).']],
   [349, '1 Nov', ['Audio & MIDI → Latency comp (off unless you turn it on): tracks and buses with look-ahead …pump effects no longer play late; everything else waits to match, sends included, in renders too.', 'File → Save as default song…: New song starts from the song you saved (tracks, buses, …chains, effects, mixer, tempo). Forget the default song goes back to blank. The kit is separate, as always.', 'Favourites: ☆ beside a preset, an engine or an effect puts it in a Favourites group at the top of its list (kept on this device).']],
