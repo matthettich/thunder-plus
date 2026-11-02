@@ -1,0 +1,69 @@
+{
+  "id": "./app",
+  "name": "...Thunder Plus",
+  "short_name": "Thunder+",
+  "description": "...Thunder with the \u2026waves modular synth as an oscillator.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0e0e10",
+  "theme_color": "#ffffff",
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "manifest.webmanifest"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "./",
+      "accept": {
+        "application/json": [".thunder", ".json"],
+        "application/x-thunder": [".thunder"],
+        "application/octet-stream": [".thunder"]
+      },
+      "icons": [
+        {
+          "src": "icons/plus-icon-192.png?v=2",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "share_target": {
+    "action": "./share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "project",
+          "accept": ["application/json", "application/x-thunder", "application/octet-stream", ".thunder", ".json"]
+        }
+      ]
+    }
+  },
+  "icons": [
+    {
+      "src": "icons/plus-icon-192.png?v=2",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/plus-icon-512.png?v=2",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/plus-icon-maskable-512.png?v=2",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
