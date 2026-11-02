@@ -64,7 +64,7 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .setmenu[hidden]{display:none}
 body.edoff #tGrid{box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--rec, #d0302a) 70%, transparent)}
 body.edoff #tScr{position:relative} body.edoff #tScr::after{content:'EDIT OFF · Esc'; position:absolute; top:4px; right:10px; z-index:5; font:600 11px var(--mono, monospace); letter-spacing:.06em; padding:2px 6px; background:var(--rec, #d0302a); color:#fff; pointer-events:none}
-.rprog .askbox{min-width:min(360px, 86vw)} .rpbar{height:14px; border:1px solid var(--line); margin:12px 0 6px; background:var(--panel2, transparent)} .rpbar i{display:block; height:100%; width:0; background:var(--ink); transition:width .15s linear} .rppct{font-variant-numeric:tabular-nums; font-size:var(--fs-3); text-align:right}
+.rprog .askbox{min-width:min(360px, 86vw)} .rpbar{height:14px; border:1px solid var(--line); margin:12px 0 6px; background:var(--panel2, transparent)} .rpbar i{display:block; height:100%; width:0; background:var(--ink); transition:width .15s linear} .rppct{font-variant-numeric:tabular-nums; font-size:var(--fs-3); text-align:right; margin-left:auto} .rprow{display:flex; align-items:center; gap:10px}
 #bFile, #bEdit, #bView, #bAud, .top #bSet{min-height:34px; padding:0 12px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; border:1px solid var(--line); background:var(--panel); white-space:nowrap}
 #bFile:hover, #bEdit:hover, #bView:hover, #bAud:hover, .top #bSet:hover{border-color:var(--ink)}
 /* View and Audio & MIDI split the Settings menu on Desktop; on Mobile everything stays under the one gear. */
@@ -1429,11 +1429,14 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .tdeck.mst #dkFx{flex:1 1 var(--dkwf, 320px)}
 /* FX BAR (owner, 1 Nov: "mostly fx focused … like a normal daw"): View → Bottom panel → BOTTOM BAR FX / CLASSIC. FX: the
    track's eight effect slots side by side, each with every one of its values as text (as on the FX screen), then …CHAINS
-   and the track strip; INST steps aside (and SCOPE when the window is narrow). CLASSIC is the panel as it was. */
-#tDeck.fxbar #dkInst, #tDeck.fxbar.narrow #dkScope{display:none}
+   and the track strip; INST and SCOPE step aside (owner, 1 Nov: no scope in the FX bar). CLASSIC is the panel as it was.
+   …CHAINS sits left of the effects because it comes first in the track's sound (TRIM → …chains → FX 1–8 → VOL → pan). */
+#tDeck.fxbar #dkInst, #tDeck.fxbar #dkScope{display:none}
 #tDeck.fxbar #dkFx{flex:1 1 auto; min-width:0}
 #tDeck.fxbar #dkFx > .dkw{display:none}
 #tDeck.fxbar #dkChn{flex:0 0 clamp(170px, 18vw, 260px)}
+#tDeck.fxbar #dkChn{border-left:0}
+#tDeck.fxbar #dkChn.col{flex:0 0 26px; width:26px; min-width:26px}   /* folded …CHAINS gives its room to the effects (owner, 1 Nov) */
 #tDeck.fxbar #dkScope{flex:0 0 clamp(120px, 11vw, 200px)}
 .dkfxbar{display:grid; grid-template-columns:repeat(8, minmax(92px, 1fr)); gap:3px; height:100%; min-height:0; overflow-x:auto; overflow-y:hidden; padding:3px}
 .dkfc{display:flex; flex-direction:column; min-width:0; min-height:0; border:1px solid var(--line); background:var(--panel)}
@@ -12190,15 +12193,26 @@ function toastAct(msg, label, fn){
 async function deliver(filename, blob){ const to = await pickOut(filename); if (to) await writeOut(to, filename, blob); }
 /* RENDER PROGRESS (owner, 31 Oct): a window with what is rendering and a bar that follows the audio being rendered (each
    offline pass reports how far it has got; the passes, the mix then each stem, share the bar). */
-const rprog = {el:null, bar:null, lab:null, pct:null, n:1, i:0,
-  open(title, n){ this.close(); this.n = Math.max(1, n || 1); this.i = 0;
+/* CANCEL (owner, 1 Nov): Cancel (or Esc) stops the render. An offline render can't be aborted part-way, so it stops at its
+   next progress stop (every ~2 % of the audio: it isn't resumed, and the suspended context is let go) or between steps
+   (pads, the mix, each stem). Nothing is saved; the song and kit are untouched. */
+const RENDER_CANCEL = 'render-cancelled';
+const rprog = {el:null, bar:null, lab:null, pct:null, n:1, i:0, cancelled:false, cancelP:null, _cancel:null, _key:null,
+  open(title, n){ this.close(); this.n = Math.max(1, n || 1); this.i = 0; this.cancelled = false;
+    this.cancelP = new Promise((_, rej) => { this._cancel = () => rej(new Error(RENDER_CANCEL)); }); this.cancelP.catch(() => {});
     const w = el('div', 'ask rprog'), b = el('div', 'askbox'); w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', title);
     b.append(el('div', 'asktitle', title)); this.lab = el('div', 'askmsg', 'Getting ready…'); b.append(this.lab);
-    const tr = el('div', 'rpbar'), f = el('i'); tr.append(f); b.append(tr); this.bar = f; this.pct = el('div', 'rppct', '0%'); b.append(this.pct);
+    const tr = el('div', 'rpbar'), f = el('i'); tr.append(f); b.append(tr); this.bar = f; this.pct = el('div', 'rppct', '0%');
+    const cx = el('button', 'sm rpx', 'Cancel'); cx.type = 'button'; cx.title = 'Stop the render (Esc)'; cx.addEventListener('click', () => this.cancel());
+    const row = el('div', 'rprow'); row.append(cx, this.pct); b.append(row);
+    this._key = e => { if (e.key === 'Escape' && this.el){ e.preventDefault(); e.stopImmediatePropagation(); this.cancel(); } };
+    document.addEventListener('keydown', this._key, true);
     w.append(b); document.body.append(w); this.el = w; },
+  cancel(){ if (this.cancelled || !this.el) return; this.cancelled = true; if (this.lab) this.lab.textContent = 'Stopping…'; const x = this.el.querySelector('.rpx'); if (x) x.disabled = true; if (this._cancel) this._cancel(); },
+  check(){ if (this.cancelled) throw new Error(RENDER_CANCEL); },
   step(i, label){ this.i = i; if (this.lab && label) this.lab.textContent = label; this.set(0); },
   set(f){ if (!this.bar) return; const v = Math.max(0, Math.min(1, (this.i + Math.max(0, Math.min(1, f))) / this.n)); this.bar.style.width = (v * 100).toFixed(1) + '%'; this.pct.textContent = Math.floor(v * 100) + '%'; },
-  close(){ if (this.el) this.el.remove(); this.el = this.bar = this.lab = this.pct = null; } };
+  close(){ if (this._key) document.removeEventListener('keydown', this._key, true); this._key = null; if (this.el) this.el.remove(); this.el = this.bar = this.lab = this.pct = null; } };
 let passProg = null;   // pass() reports how far its render has got here (0–1)
 async function deliverAI(filename, blob){
   if (inAI){
@@ -18265,8 +18279,8 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   // RENDER PROGRESS: a stop every ~2 % of the render reports how far it has got (a moment a tempo change already stops at
   // can't take a second stop: that report is skipped)
   if (passProg){ const pg = passProg, tot = oc.length / sr, q = 128 / sr, k = Math.max(1, Math.ceil(tot / 50 / q)) * q;
-    for (let t = k; t < tot - q; t += k){ const at = t, p = oc.suspend(at); if (p && p.then) p.then(() => { try { pg(at / tot); } catch(e){} return oc.resume(); }).catch(() => {}); } }
-  const b = await oc.startRendering();
+    for (let t = k; t < tot - q; t += k){ const at = t, p = oc.suspend(at); if (p && p.then) p.then(() => { if (rprog.cancelled) return; try { pg(at / tot); } catch(e){} return oc.resume(); }).catch(() => {}); } }   // CANCEL: stays suspended
+  const b = passProg && rprog.cancelP ? await Promise.race([oc.startRendering(), rprog.cancelP]) : await oc.startRendering();
   return [b.getChannelData(0).slice(lat, lat + N), b.getChannelData(1).slice(lat, lat + N)];   // the latency (mastering, the limiter's lookahead) trimmed off
 }
 function wavN(chs, sr, bits){
@@ -18314,7 +18328,7 @@ async function renderOut(stems){
     // In the Worker when it can (the page stays responsive), here otherwise.
     for (const e of notes) if (!pads.has(e.pad)){ const v = kit.voices[e.pad], hold = isSyn(e.pad) ? v.len : 0;
       let d; try { d = (await renderAsync(v, sr, hold, false)).data; } catch(err){ d = renderVoice(v, sr, null, hold); await idle(); }
-      pads.set(e.pad, d); rprog.set(0.15 * ++pi / pN); }
+      pads.set(e.pad, d); rprog.set(0.15 * ++pi / pN); rprog.check(); }
     const bufs = new Map();
     const getB = (pad, rev, st) => { const k = pad + (rev ? 'r' : 'f') + stKey(st); let b = bufs.get(k);
       if (!b){ const d0 = pads.get(pad); if (!d0) return null; let d = st ? stretchData(d0, sr, loopSecs(pad, d0, sr), st) : d0;
@@ -18324,7 +18338,7 @@ async function renderOut(stems){
     // Reverb, delay and resonator tails ring past the last note: render extra, then trim the silence.
     const tail = keepT.some(t => hasTailAny(S.tfx[t])) || hasTailAny(S.mfx) || keepT.some(t => chainsFeed(t)) ? 8 : 0;
     const N0 = Math.ceil((end + 0.05) * sr), N = N0 + Math.ceil(tail * sr), secs = (N0 / sr).toFixed(1);
-    rprog.step(0.15, `Rendering the mix (${secs} s${tail ? ' + effect tails' : ''})…`); await idle();
+    rprog.step(0.15, `Rendering the mix (${secs} s${tail ? ' + effect tails' : ''})…`); await idle(); rprog.check();
     passProg = f => rprog.set(f);
     let mix; try { mix = await pass(evs, new Set(keepT), N, sr, getB, S.limiter, true); } finally { passProg = null; }
     let len = N;
@@ -18347,19 +18361,19 @@ async function renderOut(stems){
     if (stems){
       for (const t of keepT){
         if (inBus(t)) continue;   // BUS: it is in its bus's stem
-        rprog.step(1.15 + files.length - 1, `Rendering stem ${files.length} of ${nStem}: track ${d2(t + 1)}…`); await idle();
+        rprog.step(1.15 + files.length - 1, `Rendering stem ${files.length} of ${nStem}: track ${d2(t + 1)}…`); await idle(); rprog.check();
         passProg = f => rprog.set(f); let st0; try { st0 = await pass(evs, new Set([t]), N, sr, getB, false, false); } finally { passProg = null; }
         const st = cut(st0);
         const nm = tName(t) || (BP.feeds.has(t) && !notes.some(e => e.track === t) ? 'Bus' : stemName(t, notes));   // TRACK NAMES first; BUS: a bus with no notes of its own
         files.push({name:`${base} ${d2(t + 1)} ${safe(nm)}.wav`, data:wavN(scale(st), sr, ex.bits)});
       }
     }
-    lastR = files;
+    rprog.check(); lastR = files;
     rprog.close();
     if (stems) await writeOut(to, fname, zipBlob(files));
     else if (inAI) await writeOut(to, `${base} mix.zip`, zipBlob(files));
     else await writeOut(to, files[0].name, new Blob([files[0].data], {type:'audio/wav'}));
-  } catch(err){ toast('Render failed: ' + ((err && err.message) || err)); }
+  } catch(err){ if (err && err.message === RENDER_CANCEL) toast('Render cancelled: nothing was saved.'); else toast('Render failed: ' + ((err && err.message) || err)); }
   finally { rendering = false; passProg = null; rprog.close(); draw(); }
 }
 /* ===== RENDER PART (21 Oct): render a phrase selection (or the whole phrase), or song rows (the selection, else the
@@ -19038,7 +19052,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 354;
+const BUILD = 355;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23047,7 +23061,7 @@ $('hMeter').addEventListener('click', () => { HM.clip = false; HM.pk = [0, 0]; H
 requestAnimationFrame(hmFrame);
 function specAnalyser(){ if (!dkAn && rt && ctx){ try { dkAn = ctx.createAnalyser(); dkAn.fftSize = 4096; dkAn.smoothingTimeConstant = 0.8; master.connect(dkAn); dkSpec = new Float32Array(dkAn.frequencyBinCount); } catch(e){ dkAn = null; } } return dkAn; }
 function deckScope(now){
-  if (!deckShown() || !deck.scope || now - dkScopeT < 50) return; dkScopeT = now;
+  if (!deckShown() || !deck.scope || deck.fxbar || now - dkScopeT < 50) return; dkScopeT = now;
   const c = $('dkScopeC'), r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (!r.width || !r.height) return;
   if (c.width !== Math.round(r.width * dpr) || c.height !== Math.round(r.height * dpr)){ c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr); dkScopeIdle = false; }
   const live = !!(rt && ctx && (tp.on || now - audioWake < 1500)); if (!live && dkScopeIdle) return; dkScopeIdle = !live;
@@ -25773,6 +25787,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [355, '1 Nov', ['Rendering: Cancel (or Esc) on the progress window stops Render song / Render stems; nothing is saved.', 'FX bar: no scope, and folding …CHAINS gives the effects its room.']],
   [354, '1 Nov', ['Mobile setup: the tabs and the tempo strip share one line on the Fold unfolded. The strip drops LOOP (the pad’s LOOP key) and CLICK (Settings → Record & play); LEFT moves to the top bar beside File; the top bar’s meter is shorter, the CPU is just a percentage, and on narrower screens its ▷ Song button steps aside (PLAY and the COMMANDS ▶ still play the song).']],
   [353, '1 Nov', ['Arrange’s tips at the bottom use the same text size as the phrase’s info lines.', 'Phones and the Fold start with the stage hidden: Settings → STAGE is OFF and the phrase’s DANCE · DRUM · KEYS · HIDE is on HIDE (only the starting choice; a choice you made stays).']],
   [352, '1 Nov', ['COMMANDS on the Song screen: on a phone or the Fold unfolded (under 1000 px) the button row leaves out CLN (UNIQ and CLN↓ stay; CLN is still Ctrl/⌘+Alt+C and in Edit ▾; wider windows keep it), so ▶ stays at the right end of one row instead of dropping to a second row and shrinking the phrase and Arrange.', 'With Arrange holding the keys beside a phrase (or the song strip), the COMMANDS row leaves out − + and ‹ › (EDIT+◀▶ still changes a block, the arrows and OPTION+arrows move between blocks).']],
