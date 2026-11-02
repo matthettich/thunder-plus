@@ -3,6 +3,10 @@
 Status: **plan only, nothing built yet** (written 19 Oct 2026). The owner wants to pick this up once Thunder Plus
 itself is well tuned. This doc is the starting point for that work; `HANDOVER.md` points here.
 
+**2 Nov 2026:** [`NATIVE-DESKTOP-PLAN.md`](NATIVE-DESKTOP-PLAN.md) takes the same C++ core further (sequencer, mixer
+and effects too, for a native desktop app and the web app). Its phase 3 *is* this plan's engine port; do it once, in
+`core/` (that plan's name for what this one calls `dsp/engine/`), with the rules in its section 4.1.
+
 ## What the owner wants (19 Oct 2026)
 
 - A **VST** of the Thunder Plus synth engine, first of all to **produce a whole album with it in a DAW** (Ableton

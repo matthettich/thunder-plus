@@ -83,6 +83,39 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
 6. **Plugins and mobile, if they happen** (`docs/ENGINE-PLUGIN-PLAN.md`): iPlug2 is permissive; JUCE needs a paid licence
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
+7. **A native desktop app, if it happens** (`docs/NATIVE-DESKTOP-PLAN.md`, section 9): the **ASIO SDK** (GPLv3 or
+   Steinberg's proprietary licence) and **Ableton Link** (GPLv2+ or Ableton's free proprietary licence) are kept as optional
+   build flags (`THUNDER_ASIO`, `THUNDER_LINK`); a closed build needs both proprietary agreements or leaves them out. If
+   JUCE is chosen for the host instead of permissive libraries, it needs a commercial JUCE licence.
+
+## 2 Nov: plan: native desktop app over a shared C++ core (plan only, nothing built)
+
+- Owner: is it worth porting Thunder Plus from Electron to a native Mac / Windows app? It must keep running on the
+  Android phone, but the desktop is where most of the work happens, so it should be as functional and stable as it can
+  be, with **more stability and less maintenance on both sides** (not two apps again), and **MIDI and timing stability**
+  too. Asked for the plan in as much detail as possible so someone else can pick it up.
+- **The plan: [`docs/NATIVE-DESKTOP-PLAN.md`](docs/NATIVE-DESKTOP-PLAN.md).** In short: one HTML UI (as now), one C++
+  core (sequencer, voices, engines, mixer, effects, MIDI scheduling) and two thin hosts: the web app runs the core as
+  wasm inside an AudioWorklet; a native desktop app runs the same `index.html` in a webview over the native core, with
+  ASIO / WASAPI / CoreAudio, OS-timestamped MIDI, in-process Link and (later) VST3 / CLAP / AU hosting.
+- **Timing answer:** yes. The root cause of late notes today is that the sequencer books notes from the UI thread
+  (`pumpRun`, 250 ms ahead, 1.2 s hidden) and MIDI goes through a smoothed audio→`performance.now()` mapping (`amap`).
+  The plan's phase 2 moves the sequencer onto the audio thread **in the web app first** (so the Fold and the current
+  Electron build get it early); native then adds sample-accurate MIDI / clock out, a proper clock-in PLL and Link.
+  On the phone MIDI out is still sent from the main thread (Web MIDI isn't available in worklets), but with exact,
+  early-computed timestamps.
+- Phases (each ships alone): 0 decisions + golden event-stream tests + a timing rig with a baseline; 1 the core bridge
+  in JS (`core-web.js`, `docs/CORE-BRIDGE.md`); 2 sequencer + rendered-pad playback into a `thunder-core` worklet; 3 the
+  C++ core (absorbs `ENGINE-PLUGIN-PLAN.md`'s engine port); 4 native desktop host as a beta beside Electron; 5 Link,
+  plugin hosting, audio tracks; 6 retire Electron; later, optionally, a native Android shell (Oboe + AMidi).
+- Findings worth knowing: `makeSeq` (≈ lines 16361–16735) is DOM-free, so it can move to a worklet with modest work;
+  all AudioWorklet processors in one context share a global scope, so the sequencer worklet can hand events to the live
+  engines directly; GitHub Pages can't set COOP/COEP, so don't plan on `SharedArrayBuffer`.
+- **Owner decisions still open** (plan section 11): the native host's framework (suggested: permissive libraries,
+  e.g. CHOC / RtAudio / libremidi, rather than JUCE's AGPL / paid licence; ASIO SDK and Link kept as optional build
+  flags like `lxr/`); whether to start phase 2 now (suggested: yes); Link now in Electron or later natively
+  (suggested: later). Correction to the chat on 2 Nov: JUCE was mentioned there as the web-UI shell; for licensing it
+  is the fallback, not the first choice.
 
 ## 1 Nov (14): Mobile top lines (build 354)
 
@@ -4235,6 +4268,13 @@ A code review (audio, storage, UI, DSP) found these; all fixed and checked headl
     and stopped, the last idle cost left after the 27 Oct battery work. Idea: after about a minute without a touch, a key
     or a sound, drop the `idle` class (or pause the animations) so the dogs sit still, and bring it back on the next
     touch, key or sound. Check with the owner how long before they settle, and whether they should settle at all.
+
+12. **Native desktop app over a shared C++ core: planned, not started** (owner, 2 Nov: wants the desktop app as stable
+    and functional as possible, MIDI and timing included, without maintaining two apps; the phone must keep working).
+    The plan, phases, bridge contract, timing design, licensing and open decisions:
+    [`docs/NATIVE-DESKTOP-PLAN.md`](docs/NATIVE-DESKTOP-PLAN.md). It shares phase 3 with item 8 (one C++ core for the app,
+    the plugin and the mobile apps). Next step: phase 0 (golden event streams, timing baseline), then phase 2 (the
+    sequencer onto the audio thread), which helps the Fold and the current Electron app straight away.
 
 ### Standard DAW features still missing (suggested 14 Oct, in rough priority order)
 
