@@ -81,6 +81,18 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    (or the AGPL); the VST3 SDK is MIT since 3.8, but the VST name and logo have Steinberg's own terms; check the app
    stores' terms.
 
+## 1 Nov (14): Mobile top lines (build 354)
+
+- Owner: fit the tabs and the strip under them on one line on mobile. All of it is `body.mob` only:
+  - strip (`#tPat`): `#tLoop` and `#tMet` hidden (LOOP is on the pad, CLICK in Settings → Record & play; `#tLoopSel` was
+    already hidden on mob). REC stays (MIDI keyboard recording).
+  - `#tLen` (LEFT) is moved by `applyPlatform()` into `.top`, before File's `.setwrap`; back before `#tRecBar` on desktop.
+    Hidden off the tracker (`body.mob:not(.trkv)`).
+  - top bar: `.hmeter` 60–110 px, `#tSong` is the icon alone, `.tcpu` drops "CPU " and is 52 px min, tighter File / ⚙,
+    and under 780 px `#tSong` is hidden (owner: fine to drop it if space is needed).
+  - tabs: 9 px side padding so `patFit()` stops adding `.wrap2`.
+- Headless: one top line from 700 px; tabs + strip on one line from about 740 px (two lines below that, as before).
+
 ## 1 Nov (13): Arrange's tips at the info line's size; small screens start without the stage (build 353)
 
 - `footAlign()` sets the Arrange footer's (`.tafoot`) font-size to `.tinfo`'s, so its tips read like the phrase's hint

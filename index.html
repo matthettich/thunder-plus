@@ -952,6 +952,20 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 .tpat.fitsel #tSelBar, .tpat.fitxp #tXposeDn, .tpat.fitxp #tXposeUp{display:none}
 .tpat.fitsel #tMet, .tpat.fitxp #tMet{display:none}   /* no room: CLICK is in Settings → Record & play too */
 body.mob #tLoopSel{display:none}   /* the phone has LOOP (the pattern) only; LOOP SEL is for the computer */
+/* MOBILE TOP LINES (owner, 1 Nov): in the Mobile setup the strip under the tabs drops LOOP (the pad's LOOP key does it) and
+   CLICK (Settings → Record & play), and LEFT moves up into the top bar, left of File. The top bar makes room for it: a
+   shorter level meter, the song button as ▷ / ■ alone, the CPU as a bare percentage. So the tabs and the strip can share
+   one line on the Fold unfolded. */
+body.mob #tLoop, body.mob #tMet{display:none}
+body.mob .top #tLen{flex:none; align-self:center; min-height:0; margin:0 2px}
+body.mob:not(.trkv) .top #tLen{display:none}
+body.mob .top .hmeter{flex:0 1 110px; min-width:60px}
+body.mob #tSong{padding:0 12px; margin:0 2px}
+body.mob #tSong .tl{font-size:0} body.mob #tSong .tl .ic{width:16px; height:16px; margin:0}
+body.mob .top .tcpu .cpuw{display:none}
+body.mob .top{gap:6px} body.mob .top .tcpu{min-width:52px; padding:0 6px} body.mob #bFile, body.mob .top #bSet{padding:0 9px}
+body.mob .ttabs button{padding:0 9px; letter-spacing:.02em}   /* the tabs make room for the strip beside them */
+@media (max-width:780px){ body.mob .top #tSong{display:none} }   /* tight: the pad's PLAY (SHIFT+PLAY) and the COMMANDS ▶ play the song */
 .tsong{border:1px solid var(--line); min-height:34px; padding:0 14px; margin:0 4px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; flex:none; white-space:nowrap; background:var(--panel)}
 .tsong:hover{border-color:var(--ink)}
 .tsong.on{background:var(--pl); color:var(--inv); border-color:var(--pl)}
@@ -7264,6 +7278,9 @@ function setPlatform(p){
 function applyPlatform(){
   const m = isMobile();
   document.body.classList.toggle('mob', m);
+  // MOBILE TOP LINES: LEFT (the song time) sits in the top bar, left of File, in the Mobile setup; back under the tabs on desktop.
+  { const len = $('tLen'), fw = $('bFile') && $('bFile').closest('.setwrap'), rb = $('tRecBar');
+    if (len && fw && rb){ if (m && len.parentNode !== fw.parentNode) fw.before(len); else if (!m && len.parentNode === fw.parentNode) rb.before(len); } }
   document.title = m ? '...Thunder' : '...Thunder Plus'; try { dirtyShow(); } catch(e){}   // FILE SAFETY: • song — app
   const br = document.querySelector('.brand'); if (br) br.setAttribute('aria-label', m ? '...Thunder' : '...Thunder Plus');
   const ck = $('ckMobile'); if (ck) ck.checked = m;
@@ -19021,7 +19038,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 353;
+const BUILD = 354;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25756,6 +25773,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [354, '1 Nov', ['Mobile setup: the tabs and the tempo strip share one line on the Fold unfolded. The strip drops LOOP (the pad’s LOOP key) and CLICK (Settings → Record & play); LEFT moves to the top bar beside File; the top bar’s meter is shorter, the CPU is just a percentage, and on narrower screens its ▷ Song button steps aside (PLAY and the COMMANDS ▶ still play the song).']],
   [353, '1 Nov', ['Arrange’s tips at the bottom use the same text size as the phrase’s info lines.', 'Phones and the Fold start with the stage hidden: Settings → STAGE is OFF and the phrase’s DANCE · DRUM · KEYS · HIDE is on HIDE (only the starting choice; a choice you made stays).']],
   [352, '1 Nov', ['COMMANDS on the Song screen: on a phone or the Fold unfolded (under 1000 px) the button row leaves out CLN (UNIQ and CLN↓ stay; CLN is still Ctrl/⌘+Alt+C and in Edit ▾; wider windows keep it), so ▶ stays at the right end of one row instead of dropping to a second row and shrinking the phrase and Arrange.', 'With Arrange holding the keys beside a phrase (or the song strip), the COMMANDS row leaves out − + and ‹ › (EDIT+◀▶ still changes a block, the arrows and OPTION+arrows move between blocks).']],
   [351, '1 Nov', ['Sends have their own colour in Arrange (olive): a track heard on its own and through a bus stands apart from the tracks that only play through it.', 'Input settings → SCALE MODE: typed and played notes land on the song’s scale (off unless you turn it on).']],
