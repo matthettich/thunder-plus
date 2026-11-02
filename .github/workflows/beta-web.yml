@@ -1,0 +1,39 @@
+# BETA WEB COPY: every push to the `beta` branch publishes that branch's app to beta/ on main, so it runs at
+#   https://matthettich.github.io/thunder-plus/beta/
+# while the main app (the root of main) stays exactly as it is. Work in progress goes to `beta`; when the owner is happy,
+# `beta` is merged into `main` and the main app updates. Script: tools/make-channel.sh (see its header).
+# Run workflow by hand to republish without a new push.
+name: Beta web copy
+
+on:
+  push:
+    branches: [beta]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: beta-web
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main, fetch-depth: 0 }
+      - name: Copy the beta branch into beta/
+        run: |
+          git fetch origin beta
+          bash tools/make-channel.sh origin/beta beta thunderbeta- beta
+      - name: Commit to main (beta/ only)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add beta
+          if git diff --cached --quiet; then echo "beta/ unchanged"; exit 0; fi
+          # Safety: this job may only ever change beta/.
+          if git diff --cached --name-only | grep -v '^beta/'; then echo "refusing: changes outside beta/"; exit 1; fi
+          git commit -m "beta/: publish $(git rev-parse --short origin/beta) from the beta branch"
+          git push origin HEAD:main
