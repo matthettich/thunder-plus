@@ -12,7 +12,27 @@ import http from 'http'; import fs from 'fs'; import path from 'path'; import cr
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const UPDATE = process.argv.includes('--update');
-const SONGS = [{ id: 'electro', file: 'sounds/ELECTRO.thunder', mode: 'song' }];   // add songs here (files under the repo)
+// Test cases: a song file, optionally changed in memory (`edit`), and how it is played (row: a mid-song start, which runs
+// CHASE; loop: rows y0–y1 repeated, capped by maxRows).
+const CMDS = [['ARP', 0x37], ['RET', 0x24], ['DEL', 0x03], ['PRB', 0x80], ['GEN', 0x41], ['CHA', 0x80], ['RND', 0x24], ['TSP', 0x05],
+  ['PIT', 0x0C], ['VOL', 0x90], ['PAN', 0x40], ['NTH', 0x02], ['KIL', 0x04], ['OFF', 0x06], ['TIC', 0x03], ['RNL', 0x13]];
+// Every phrase row with a note gets one command in its third effect column (if free), cycling through CMDS. FXC (the
+// command numbers) is read from index.html so the file stays right if commands are added.
+function withCommands(song) {
+  const src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'), m = src.match(/const FXC = \[([\s\S]*?)\];/);
+  const FXC = [...m[1].matchAll(/'([A-Z0-9]{3})'/g)].map(x => x[1]);
+  let n = 0;
+  (song.song.phrases || []).forEach((ph, i) => { if (!Array.isArray(ph)) return; ph.forEach((r, y) => {
+    if (!Array.isArray(r) || r[0] < 0 || r[10] >= 0) return; const [c, v] = CMDS[(i * 7 + y) % CMDS.length]; r[10] = FXC.indexOf(c); r[11] = v; n++; }); });
+  return n;
+}
+const SONGS = [
+  { id: 'electro', file: 'sounds/ELECTRO.thunder', mode: 'song' },
+  { id: 'electro-mid', file: 'sounds/ELECTRO.thunder', mode: 'song', opt: { row: 9 } },
+  { id: 'electro-loop', file: 'sounds/ELECTRO.thunder', mode: 'song', opt: { loop: { y0: 4, y1: 6 } }, max: 800 },
+  { id: 'electro-cmds', file: 'sounds/ELECTRO.thunder', mode: 'song', edit: withCommands },
+];
+const TIMING = process.argv.includes('--timing');
 const PW = process.env.PLAYWRIGHT || ['/opt/npm-tools/node_modules/playwright/index.mjs', path.join(ROOT, 'node_modules/playwright/index.mjs')].find(f => fs.existsSync(f));
 const CHROME = process.env.CHROME || ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', 'C:/Program Files/Google/Chrome/Application/chrome.exe', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find(f => fs.existsSync(f));
 if (!PW) { console.error('playwright not found: npm i -g playwright, or set PLAYWRIGHT'); process.exit(2); }
@@ -36,8 +56,10 @@ try {
   await page.waitForTimeout(1500);   // let the app's own first-run work settle
   fs.mkdirSync(path.join(ROOT, 'tests/golden/out'), { recursive: true });
   for (const S of SONGS) {
-    const info = await page.evaluate(([t, n]) => window.__seqTest.load(t, n), [fs.readFileSync(path.join(ROOT, S.file), 'utf8'), path.basename(S.file)]);
-    const rows = await page.evaluate(m => window.__seqTest.run(m), S.mode);
+    let text0 = fs.readFileSync(path.join(ROOT, S.file), 'utf8');
+    if (S.edit) { const j = JSON.parse(text0); const n = S.edit(j); text0 = JSON.stringify(j); console.log(`     ${S.id}: ${n} commands added`); }
+    const info = await page.evaluate(([t, n]) => window.__seqTest.load(t, n), [text0, path.basename(S.file)]);
+    const rows = await page.evaluate(([m, mx, o]) => window.__seqTest.run(m, mx, o), [S.mode, S.max || 0, S.opt || null]);
     const text = rows.map(r => JSON.stringify(r)).join('\n') + '\n';
     fs.writeFileSync(path.join(ROOT, `tests/golden/out/seq-${S.id}.jsonl`), text);
     const counts = {}; for (const r of rows) for (const e of r.evs) counts[e.type] = (counts[e.type] || 0) + 1;
@@ -52,6 +74,14 @@ try {
     console.log(`FAIL ${S.id}: rows ${was.rows} → ${now.rows}, events ${was.events} → ${now.events}; first difference at step ${i < 0 ? Math.min(was.rows, now.rows) : i}`);
     if (i >= 0) console.log('  now: ' + JSON.stringify(rows[i]).slice(0, 600));
     console.log(`  full stream: tests/golden/out/seq-${S.id}.jsonl (compare with a run of the last good commit)`);
+  }
+  if (TIMING) {   // plan section 12: how far ahead notes are booked, idle and with the main thread stalled
+    await page.evaluate(([t, n]) => window.__seqTest.load(t, n), [fs.readFileSync(path.join(ROOT, 'sounds/ELECTRO.thunder'), 'utf8'), 'ELECTRO.thunder']);
+    await page.mouse.click(5, 5);   // a gesture, so audio may start
+    for (const [stall, every] of [[-1, 0], [0, 0], [100, 1000], [200, 1000], [400, 1000]]) {
+      const r = await page.evaluate(([a, b]) => window.__seqTest.timing(12000, Math.max(0, a), b), [stall, every]); if (stall < 0) { console.log('timing  (warm-up run, renders the song: ' + r.audio_ms.late + ' late)'); continue; }
+      console.log(`timing  stall ${stall} ms every ${every || '-'} ms: ` + JSON.stringify(r));
+    }
   }
 } finally { await browser.close(); srv.close(); }
 process.exit(failed ? 1 : 0);

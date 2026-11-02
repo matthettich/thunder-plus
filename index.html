@@ -26743,7 +26743,8 @@ else if (FIRST_SONG) setTimeout(async () => {
    stay identical. Math.random is seeded for the run, so GEN / PRB / random commands repeat. Inert without ?seqtest. */
 if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
   async load(text, name){ FIRST_SONG = false; await loadProjText(text, name || 'test.thunder'); return {name:S.name, bpm:S.bpm, nt:NT}; },
-  run(mode, maxRows){
+  run(mode, maxRows, opt){
+    opt = opt || {};
     const R = Math.random; let s = 0x2545F491;
     Math.random = () => { let x = s += 0x6D2B79F5; x = Math.imul(x ^ x >>> 15, x | 1); x ^= x + Math.imul(x ^ x >>> 7, x | 61); return ((x ^ x >>> 14) >>> 0) / 4294967296; };
     const num = v => Math.round(v * 1e6) / 1e6, out = [];
@@ -26751,10 +26752,28 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
       if (typeof v === 'number') o[k] = num(v); else if (typeof v === 'string' || typeof v === 'boolean' || v === null) o[k] = v;
       else if (Array.isArray(v) && v.every(x => typeof x === 'number')) o[k] = v.map(num); } return o; };
     try {
-      const sq = makeSeq(S, mode || 'song', {row:0, once:true, sim:true});
+      const sq = makeSeq(S, mode || 'song', {row:opt.row || 0, loop:opt.loop || null, once:!opt.loop, sim:true});
       for (let n = 0; sq.alive() && n < (maxRows || 20000); n++){ const r = sq.step(); out.push({t:num(r.t), evs:r.evs.map(plain)}); }
     } finally { Math.random = R; }
     return out;
+  },
+  /* TIMING PROBE (plan phase 0, section 12): plays the loaded song for `ms` and records, for every sound event the pump
+     books, how far ahead of the audio clock it was booked (negative: late), and the same for every MIDI message (ahead of
+     performance.now()). `stall` blocks the main thread for that many ms every `every` ms, to show what a busy screen does. */
+  async timing(ms, stall, every){
+    const lead = [], mlead = [];
+    tStart('song', {row:0});   // starts the engine too; the first rows are booked before the probe is in, so they aren't counted
+    for (let i = 0; i < 100 && !(rt && rt.pl && tp.on); i++) await new Promise(r => setTimeout(r, 50));
+    const pl = rt && rt.pl; if (!pl) return {error:'no audio engine'};
+    const play0 = pl.play, ms0 = msend;
+    pl.play = function(e){ try { if (e && typeof e.t === 'number') lead.push(e.t - ctx.currentTime); } catch(_){} return play0.apply(this, arguments); };
+    msend = function(bytes, t){ try { if (t != null) mlead.push(a2p(t) - performance.now()); } catch(_){} return ms0.apply(this, arguments); };
+    let st = 0; if (stall > 0) st = setInterval(() => { const e = performance.now() + stall; while (performance.now() < e){} }, every || 1000);
+    try { await new Promise(r => setTimeout(r, ms)); }
+    finally { clearInterval(st); try { tStop(true); } catch(_){} pl.play = play0; msend = ms0; }
+    const q = (A, f) => { if (!A.length) return null; const B = [...A].sort((x, y) => x - y); return B[Math.min(B.length - 1, Math.floor(f * B.length))]; };
+    const sum = (A, k) => ({n:A.length, late:A.filter(v => v < 0).length, worst:A.length ? Math.min(...A) * k : null, p01:A.length ? q(A, .01) * k : null, median:A.length ? q(A, .5) * k : null});
+    return {audio_ms:sum(lead, 1000), midi_ms:sum(mlead, 1)};
   },
 };
 })();
