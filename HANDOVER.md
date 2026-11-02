@@ -112,6 +112,8 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
   `beta` (only `#dkFxBar` CSS, `deckFxBar`, `deckFxBarMeters`, new `dkFxViz`; `stageTick` uses `dkBarTelNode`). Dynamics
   slots: GR strip always, plus the FX stage's curve display when the panel is tall enough; others: output level history.
   Ideas not done: EQ / filter response curves, delay echo taps, a styled folded …chains rail.
+- **Released to the web as build 356** (owner, 2 Nov): `beta` merged into `main` (FX bar, phase 0 test hook), cache
+  `thunderplus-v356`, What's new entry. Desktop still 1.2.59 (build 355) until the owner runs a desktop release.
 
 ## 2 Nov: plan: native desktop app over a shared C++ core (plan only, nothing built)
 
