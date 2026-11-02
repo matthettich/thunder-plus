@@ -2,3 +2,4 @@ electron/node_modules/
 electron/dist/
 electron/app/
 node_modules/
+tests/golden/out/
