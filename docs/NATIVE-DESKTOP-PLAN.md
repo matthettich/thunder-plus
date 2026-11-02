@@ -451,19 +451,28 @@ Ship it as a **beta beside the Electron app** until it does everything the Elect
 
 ## 12. Measurements (fill in as phases land)
 
-| Measure | Baseline (build 355) | After phase 2 | After phase 3 | Native |
+How: `node tools/seq-golden.mjs --timing` (headless Chrome, ELECTRO, 12 s per case after a warm-up pass). "Lead" = how far
+ahead of the audio clock a note was booked; below 0 = the note started late by that much. Real devices will differ from
+headless; repeat on the PC and the Fold. MIDI rows need a real MIDI out (loopMIDI / IAC loopback): headless has no Web MIDI.
+
+| Measure | Baseline (build 356, headless, 2 Nov) | After phase 2 | After phase 3 | Native |
 |---|---|---|---|---|
-| Note onset error, idle | | | | |
-| Note onset error, 200 ms UI stalls | | | | |
-| Edit-to-heard delay | ~250 ms (1.2 s hidden) | | | |
-| MIDI note jitter (loopback) | | | | |
-| MIDI clock jitter (loopback) | | | | |
-| Clock-in lock time / drift vs MPC | | | | |
-| Fold CPU, demo song | | | | |
-| Underruns per hour, demo song | | | | |
+| Notes late, idle | 0 of 344 (lead: worst 191 ms, median 238 ms) | | | |
+| Notes late, 100 ms stalls every 1 s | 0 of 344 (worst lead 121 ms) | | | |
+| Notes late, 200 ms stalls every 1 s | 0 of 344, but worst lead **14 ms**: right at the edge | | | |
+| Notes late, 400 ms stalls every 1 s | **56 of 344 (16 %), up to 180 ms late** | | | |
+| First play of a song (renders running) | 5 notes late | | | |
+| Edit-to-heard delay | ~250 ms (1.2 s hidden), by design | | | |
+| MIDI note / clock jitter (loopback) | to measure on hardware | | | |
+| Clock-in lock time / drift vs MPC | to measure on hardware | | | |
+| Fold CPU, demo song | to measure | | | |
+
+Reading: today any main-thread stall longer than the ~250 ms look-ahead makes notes late (a big redraw, a render landing,
+GC, a dialog). Phase 2's target: 0 late at every stall size, and edits heard on the next audio block.
 
 ## 13. Where to start (next session)
 
-1. Owner answers 11.1 (can wait until phase 4) and 11.2's first question.
-2. Phase 0: the golden event-stream test and the timing rig; record the baseline in section 12.
-3. Phase 1: `core-web.js` and `docs/CORE-BRIDGE.md`.
+1. ~~Phase 0~~ done in software (2 Nov): `tools/seq-golden.mjs` (4 golden event streams + `--timing`), baseline in
+   section 12. Left for the owner's hardware: MIDI loopback jitter and clock-in vs the MPC, Fold CPU.
+2. Phase 1: `core-web.js` and `docs/CORE-BRIDGE.md`, on `beta`.
+3. Owner answers 11.1 before phase 4.
