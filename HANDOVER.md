@@ -88,6 +88,27 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    build flags (`THUNDER_ASIO`, `THUNDER_LINK`); a closed build needs both proprietary agreements or leaves them out. If
    JUCE is chosen for the host instead of permissive libraries, it needs a commercial JUCE licence.
 
+## 2 Nov (4), night: builds 357–360 released (web 360, desktop 1.2.63)
+
+The (3) entry below went out in 357. Since then, all on `main` and `beta`:
+- **Mastering (358):** new songs use `MST_PUMP` (pump EQ → CALM → COMP → TONE → MASTER, auto master last), on by default
+  (`mstPumpFresh`, `S.mstPump`, `mstOn` / `mstSetOn`); old songs keep their chain. MASTERING opens pump MASTER.
+- **FX:** drag to reorder (`fxMove`; bar header or FX screen slot row, one undo); the edited slot is highlighted
+  (`.ln.fxsel`); FX screen wheel stays in its pane; bar pictures per effect group (`dkFxPic`). …pump COMP / EQ beside
+  Thunder's (`PUMP_GROUP`, `FXT_FIRST`); BAND / WIDE / HEAT / METER on every track (`pumpAnyTrack`). 360 factory presets
+  (`FX_FACTORY_MORE`). **My presets (360):** SAVE AS PRESET also stores in localStorage `thunderplus-fxuser-v1`
+  (`fxUser*`), listed under MY PRESETS in every song.
+- **Menus (358):** the `docs/MENU-AUDIT.md` proposals 2–5 are built (MENU HELP toggle, COMMAND BAR Off/Thin/Big, short
+  labels, right-click trimmed, ⚙ without Kit / Master). Audio & MIDI ports table (proposal 1) is still open.
+- **Song / Arrange:** clone down only inserts on a clash; double-click an empty Arrange cell = new pattern (`arrEmptyTap`);
+  buses always shown in Pattern view; blocks with only OFFs / FX commands get class `o` (`isOffPhrase`); a grey line every
+  4 rows (`.ar.q4`).
+- **Generators:** Acid line styles (`ACID_STYLES`: …pump ACID, Classic 303, Rolling, Squelch) in `acidRoll`.
+- **Synth:** `ENGINE_GROUPS` grouped by sound.
+- **Fit and finish started (on `beta`):** EDIT OFF tag no longer covers the screen header's subtitle; synth slider labels
+  are 96 px on a computer (were cut to "Noise fi…"). The owner's list of further refinements is in the chat (item 7).
+- **On hold:** channel strip (owner is building it in …pump first).
+
 ## 2 Nov (3), evening: the owner's FX bar and bug list (all on `beta`, not released yet)
 
 - **FX bar:** compact TRACK strip (164 px, M/S 30×26) with SOLO · CLEAR moved to the FX header; IN / GR / OUT meters with a
