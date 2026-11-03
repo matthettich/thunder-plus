@@ -12030,7 +12030,47 @@ async function wtImport(files){
   const wt = TableCore.fromCycles(cycles, name); if (wt) wt.from = kinds.includes('sound') ? 'sound' : kinds.every(k => k === 'cycle') ? 'cycles' : 'table';
   return wt;
 }
-const wtLabel = wt => wt.name + ' · ' + wt.nf + (wt.nf === 1 ? ' frame' : ' frames') + (wt.from === 'sound' ? ' cut from a sound' : wt.from === 'cycles' ? ' (single cycles)' : '');
+/* STARTER TABLES (owner, 3 Nov: "build a starter set in"): Table's Starter tables… picker loads one of these into the pad
+   (V.wtData, so the song keeps its own copy and needs nothing else). Each file in wavetables/ is single cycles from
+   Adventure Kid Waveforms (AKWF, Kristoffer Ekstrand, CC0: wavetables/AKWF-LICENSE.md), stacked into one table in the
+   smoothest order; made by tools/akwf-tables.mjs, which reads this list: [file, name, group, AKWF folders]. */
+const WT_STARTER = [
+  ['saw', 'Saw', 'Basic', ['AKWF_bw_saw', 'AKWF_bw_sawbright']],
+  ['saw-round', 'Rounded saw', 'Basic', ['AKWF_bw_sawrounded']],
+  ['saw-gap', 'Gap saw', 'Basic', ['AKWF_bw_sawgap']],
+  ['square', 'Square', 'Basic', ['AKWF_bw_squ']],
+  ['square-round', 'Rounded square', 'Basic', ['AKWF_bw_squrounded']],
+  ['triangle', 'Triangle', 'Basic', ['AKWF_bw_tri']],
+  ['sine', 'Sine harmonics', 'Basic', ['AKWF_bw_sin', 'AKWF_sinharm']],
+  ['blended', 'Blended', 'Basic', ['AKWF_bw_blended']],
+  ['raw', 'Raw', 'Synth', ['AKWF_raw']],
+  ['c604', 'C604', 'Synth', ['AKWF_c604']],
+  ['fm', 'FM', 'Synth', ['AKWF_fmsynth']],
+  ['overtone', 'Overtones', 'Synth', ['AKWF_overtone']],
+  ['symmetric', 'Symmetric', 'Synth', ['AKWF_symetric']],
+  ['linear', 'Linear', 'Synth', ['AKWF_linear']],
+  ['drawn', 'Hand-drawn', 'Synth', ['AKWF_hdrawn']],
+  ['granular', 'Granular', 'Synth', ['AKWF_granular']],
+  ['distorted', 'Distorted', 'Synth', ['AKWF_distorted']],
+  ['voice', 'Voice', 'Instrument', ['AKWF_hvoice']],
+  ['organ', 'Organ', 'Instrument', ['AKWF_eorgan']],
+  ['epiano', 'E-piano', 'Instrument', ['AKWF_epiano']],
+  ['clav', 'Clav', 'Instrument', ['AKWF_clavinet']],
+  ['bass', 'Bass', 'Instrument', ['AKWF_ebass', 'AKWF_dbass']],
+  ['bowed', 'Bowed', 'Instrument', ['AKWF_cello', 'AKWF_violin']],
+  ['reed', 'Reeds', 'Instrument', ['AKWF_oboe', 'AKWF_clarinett', 'AKWF_altosax']],
+  ['guitar', 'Guitar', 'Instrument', ['AKWF_aguitar', 'AKWF_eguitar']],
+  ['theremin', 'Theremin', 'Instrument', ['AKWF_theremin']],
+  ['chip', 'Chip', 'Lo-fi', ['AKWF_oscchip']],
+  ['game', 'Game', 'Lo-fi', ['AKWF_vgame']],
+  ['game-basic', 'Game basic', 'Lo-fi', ['AKWF_vgamebasic']],
+  ['bitreduced', 'Bit-reduced', 'Lo-fi', ['AKWF_bitreduced']],
+];
+async function wtStarter(id){
+  const r = await fetch('wavetables/' + id + '.json?v=1'); if (!r.ok) throw new Error(r.status);
+  const wt = await r.json(); if (!TableCore.wtValid(wt)) throw new Error('bad table'); return wt;
+}
+const wtLabel = wt => wt.name + ' · ' + wt.nf + (wt.nf === 1 ? ' frame' : ' frames') + (wt.from === 'sound' ? ' cut from a sound' : wt.from === 'cycles' ? ' (single cycles)' : wt.from === 'starter' ? ' · starter table (AKWF)' : '');
 function wtPanel(){
   const host = $('xSecs'); if (!host) return;
   const v = V(); if (!v || v.engine !== 'table') return;
@@ -12052,11 +12092,21 @@ function wtPanel(){
       inp.click(); });
     const clr = el('button', 'sm', 'Remove'); clr.type = 'button'; clr.id = 'wtClr';
     clr.addEventListener('click', () => { const w = V(); delete w.wtData; if (w.table && Math.round(w.table.table) === 4) w.table.table = 0; changed(cur); refreshAll(); });
-    const row = el('div', 'btnrow'); row.append(ld, clr); box.append(row, info); host.prepend(box);
+    // the starter tables, grouped; picking one loads it into the pad (a copy, saved with the kit)
+    const pick = document.createElement('select'); pick.id = 'wtPick'; pick.className = 'sm';
+    pick.append(new Option('Starter tables…', ''));
+    for (const g of [...new Set(WT_STARTER.map(t => t[2]))]){ const og = document.createElement('optgroup'); og.label = g;
+      for (const t of WT_STARTER.filter(t => t[2] === g)) og.append(new Option(t[1], t[0])); pick.append(og); }
+    pick.addEventListener('change', async () => { const id = pick.value; pick.value = ''; if (!id) return;
+      try {
+        const wt = await wtStarter(id), w = V(); w.wtData = wt; if (!w.table) w.table = normX('table', null); w.table.table = 4;
+        changed(cur); refreshAll(); toast('Table: ' + wtLabel(wt));
+      } catch(e){ toast('Couldn’t load that table (offline?).', 5000); } });
+    const row = el('div', 'btnrow'); row.append(ld, pick, clr); box.append(row, info); host.prepend(box);
   }
   $('wtClr').hidden = !v.wtData;
   $('wtInfo').textContent = v.wtData ? wtLabel(v.wtData) + (v.table && Math.round(v.table.table) === 4 ? '' : '. Set Table to Loaded to play it.')
-    : 'Load a Serum or WaveEdit table, single-cycle waves (pick several to stack them, a frame each) or any sound, cut into cycles. It becomes the Loaded table and is saved with the kit.';
+    : 'Pick a starter table, or load a Serum or WaveEdit table, single-cycle waves (pick several to stack them, a frame each) or any sound, cut into cycles. It becomes the Loaded table and is saved with the kit.';
 }
 /* FREEZE FILE (owner, 1 Nov): Freeze's own sound (SOURCE File) is kept as a sample on the pad's last layer (off, so the
    layers never play it; v.frzL is its index), so it saves, loads and travels with the kit as any sample does. Load sound…
@@ -20665,7 +20715,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 402;
+const BUILD = 403;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -28903,6 +28953,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [403, '3 Nov', ['Table engine: Starter tables… picks one of 30 ready-made tables (saws, squares, FM, voice, organ, bass, chip and more), made from the free Adventure Kid single-cycle waves.']],
   [402, '3 Nov', ['Table engine: Load wavetable… makes the pad’s own table (Table → Loaded), saved with the kit: Serum or WaveEdit tables, single-cycle waves (pick several to stack them) or any sound, cut into cycles.']],
   [401, '3 Nov', ['Side panel: instrument names show in full: a size smaller, and a long one takes a second line (hover still shows the pad).', 'FX bar: the pitch animation shows every voice, so the Harmonizer’s two intervals both show, each as bright as its level.']],
   [400, '3 Nov', ['FX bar: a click on a value gives the bar the keys until you click elsewhere or press Esc: ▲▼ pick the value above or below, ◀▶ the same value in the next effect, Ctrl/⌘+arrows change it. With the FX screen open above, it follows the value you pick (its slot and row).']],
