@@ -119,6 +119,19 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (15): Alt-click mutes track numbers; Alt+T (build 388)
+
+- Owner: the track mute gesture becomes Alt + click (as Alt-click mutes a block). Arrange's `#tArrTh` click and gridDown's
+  `y === -1` (Song, Mixer): with a mouse, Alt/⌥-click mutes, a plain click puts the cursor on the track (Arrange: the song
+  cursor, and cTrack unless Arrange has the keys), hdDbl's double-click names it with no mute / unmute on the way; right-click
+  solos as before. Touch unchanged (Song: cursor; Mixer: tap mutes). The meters (`#tMeters`, "Mute track N" buttons) still
+  mute on a click. Help and README say so.
+- Alt/⌥+T = NEW PHRASE RIGHT too (globalKeys, by e.code), since a browser tab keeps Ctrl/⌘+T; the Edit menu shows Alt+T.
+- Owner confirmed on a Mac: Ctrl+click opens the menu on Arrange and on a slider.
+- Open: owner says a double-click on an empty Arrange cell made the pattern but jumped to track 1; not reproduced headless
+  (beside Phrase / Pattern view and on the Song screen it opens on the clicked track). Asked which screen, and whether the
+  double-click should stay in Arrange.
+
 ## 3 Nov (14): Acid key from the song; editors' background drag pans (build 387)
 
 - **`songKey(skipPh)`** (before acidLine): Project SCALE / ROOT when set (mapped onto ACID_SCALES by name, else Minor /
