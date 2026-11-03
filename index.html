@@ -15121,7 +15121,7 @@ const TAILS = new Set(['grains', 'pdelay', 'preverb', 'reson', 'reverb', 'delay'
 // …PUMP: the effects a slot picker offers on track t (the pump ones only on a bus or the master).
 // …pump EQ on every track (owner, 30 Oct: a pump-style EQ window per track); the other pump effects stay on buses and the master.
 // …PUMP CREATIVE (30 Oct): the creative ones on every track too.
-const pumpAnyTrack = k => !!(TFX[k] && (TFX[k].pump === 'eq' || TFX[k].pump === 'comp' || PUMP_CREATIVE.has(TFX[k].pump)));   // COMP on every track too (owner, 2 Nov)
+const pumpAnyTrack = k => !!(TFX[k] && (['eq', 'comp', 'band', 'wide', 'heat', 'meter'].includes(TFX[k].pump) || PUMP_CREATIVE.has(TFX[k].pump)));   // COMP (2 Nov), BAND, WIDE, HEAT and METER (2 Nov, later) on every track too; LIMIT, CALM, TONE (they look ahead: a track would play late) and MASTER stay on buses and the master
 const fxtL = (t = cFxT) => pumpAllowed(t) ? FXT_LIST : FXT_LIST.filter(k => !isPumpT(k) || pumpAnyTrack(k));
 const fxtOk = (t, k) => !!TFX[k] && (!isPumpT(k) || pumpAllowed(t) || pumpAnyTrack(k));
 const FXSLOTS = 8;
