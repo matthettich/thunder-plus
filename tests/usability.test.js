@@ -336,3 +336,10 @@ test('vintage sampler (3 Nov): a JS track effect wired into the table, groups, w
   assert.match(src, /VSampCore\.toString\(\)/, 'and has its code');
   assert.match(H.read('core/seq-core.js'), /"vsamp":f =>/, 'the audio-thread core knows its map');
 });
+
+test('row colours (3 Nov): right-click a row number, kept in the song, moved with rows', () => {
+  const src = H.read('index.html');
+  assert.match(src, /S\.rcol = \{\}; if \(j\.rcol/, 'loaded');
+  assert.match(src, /async function rowColour\(y\)\{/, 'the sheet');
+  assert.match(src, /if \(S\.rcol\)\{ const o = \{\}; for \(const k in S\.rcol\)\{ const y = \+k; if \(y < at\) o\[y\] = S\.rcol\[k\]; else if \(y \+ h < 256\)/, 'insert moves them');
+});

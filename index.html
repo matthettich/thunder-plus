@@ -1223,6 +1223,10 @@ body.asong .tagrid .ar{scroll-snap-align:start}
 /* A wider row-number column, so the MONO box's edge never sits on the numbers. */
 body.asong :is(.tath, .tagrid .ar, .tagp){grid-template-columns:30px var(--arcols)}
 body.asong .tagrid .rn{text-align:right; padding-right:7px}
+/* ROW COLOURS (owner, 3 Nov): a song row's number in the colour picked for it (right-click the number), to mark where the
+   sections change; a bar on its left too, so it reads at a glance */
+.tagrid .rn.rc, .tagrid .rn.rc.r4{color:var(--rnc); font-weight:800; box-shadow:inset 3px 0 0 var(--rnc)}
+.tgrid span.rn.rnc{color:var(--rnc); font-weight:800; box-shadow:inset 3px 0 0 var(--rnc)}
 .tagp b.gx{font-size:8px; letter-spacing:0}   /* also in the side panel (MASTER IN ARRANGE) */
 .agboxes{position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:2}
 .agboxes[hidden]{display:none}
@@ -16960,6 +16964,7 @@ function normSong(j){
   S.presets = normPresets(j.presets);
   S.fxPre = normFxPre(j.fxPre);   // FX PRESETS: the song's own, per effect type
   S.perf = normPerf(j.perf); S.parts = normParts(j.parts);   // PERFORM (1 Nov)
+  S.rcol = {}; if (j.rcol && typeof j.rcol === 'object') for (const k in j.rcol){ const y = int(k, -1), c = int(j.rcol[k], 0); if (y >= 0 && y < 256 && c > 0 && c < TCOL.length) S.rcol[y] = c; }   // ROW COLOURS (3 Nov)
   S.bcol = {}; if (j.bcol && typeof j.bcol === 'object') for (const k in j.bcol){ const v = int(k, -1), c = int(j.bcol[k], 0); if (v >= 0 && c > 0 && c < TCOL.length) S.bcol[v] = c; }   // BLOCK COLOURS
   S.scale = clamp(int(j.scale, 0), 0, SCALES.length - 1); S.sroot = clamp(int(j.sroot, 0), 0, 11);   // SCALE / SCALE ROOT (20 Oct)
   // ni: the instruments the song was made with. Songs from before 20 Oct had 16, and an INS above 0F (typed, or from RND,
@@ -17231,6 +17236,7 @@ function songRowsInsert(at, h){
   S.song.splice(at, 0, ...Array.from({length:h}, () => new Array(NT + 1).fill(-1))); S.song.length = 256;
   smuteInsertRows(at, h);
   if (Array.isArray(S.secs)) S.secs = S.secs.map(q => q.y >= at ? {y:q.y + h, n:q.n} : q).filter(q => q.y < 256);
+  if (S.rcol){ const o = {}; for (const k in S.rcol){ const y = +k; if (y < at) o[y] = S.rcol[k]; else if (y + h < 256) o[y + h] = S.rcol[k]; } S.rcol = o; }   // ROW COLOURS go with their rows
   if (loopArm && loopArm.v === 'song' && loopArm.y0 >= at){ loopArm.y0 += h; loopArm.y1 += h; }
   return true;
 }
@@ -17239,6 +17245,7 @@ function songRowsRemove(at, h){
   S.song.splice(at, h); while (S.song.length < 256) S.song.push(new Array(NT + 1).fill(-1));
   smuteRemoveRows(at, h);
   if (Array.isArray(S.secs)) S.secs = S.secs.filter(q => q.y < at || q.y >= at + h).map(q => q.y >= at + h ? {y:q.y - h, n:q.n} : q);
+  if (S.rcol){ const o = {}; for (const k in S.rcol){ const y = +k; if (y < at) o[y] = S.rcol[k]; else if (y >= at + h) o[y - h] = S.rcol[k]; } S.rcol = o; }
   if (loopArm && loopArm.v === 'song'){ if (loopArm.y0 >= at + h){ loopArm.y0 -= h; loopArm.y1 -= h; } else if (loopArm.y1 >= at) loopArm = null; }
 }
 function mutedCount(){
@@ -20380,7 +20387,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 385;
+const BUILD = 386;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23172,7 +23179,7 @@ function draw(){
     const hd = [stepDec ? '    ' : '   ']; for (let t = T0; t < T1; t++) hd.push({t:' ' + d2(t + 1), cls:'th' + mc(t) + tk(t) + ' gt' + (tCol(t) ? ' tcl' : ''), x:t, y:-1, title:trkTip(t), st:tCol(t) ? '--tc:' + tCol(t) : ''}, ' ');
     hd.push(' ', {t:' MS', cls:'th gx gt', x:MT, y:-1}); L.push(hd);   // the master column, in its own box after the poly tracks
     for (let y = c.top; y < c.top + VR; y++){
-      const ln = [{t:rS(y, 3), cls:'rn' + (y % 4 ? '' : ' rn4') + rsel(y), r:y}, ' '];
+      const rc = rowCol(y), ln = [{t:rS(y, 3), cls:'rn' + (y % 4 ? '' : ' rn4') + (rc ? ' rnc' : '') + rsel(y), r:y, st:rc ? '--rnc:' + rc : ''}, ' '];
       for (let t = T0; t < T1; t++){ const v = S.song[y][t], pl = PH && PH[t] === y;
         ln.push({t:h3(songShown(v)), cls:cc(t, y, (v < 0 ? 'e' : 'v') + (pl ? ' pl' : '') + (v >= 0 && blockMuted(S, y, t) ? ' sm' : '')) + tk(t) + (y === c.top + VR - 1 ? ' gb' : ''), x:t, y}, ' '); }
       { const v = S.song[y][MT], pl = PH && PH[MT] === y;
@@ -25924,7 +25931,7 @@ function drawArr(PH){
   const BG = busGroups();   // BUS GROUPS (31 Oct): each bus and the tracks it takes in share a colour
   const spAt = t => t > 0 && t === PFg;   // where a spacer column sits before track t: the MONO | POLY break (owner, 31 Oct: with 17 tracks the side panel's every-8 spacer fell inside MONO, between 8 and 9)
   for (let y = 0; y < N; y++){
-    h += `<div class="ar${y % 4 || y === 0 ? '' : ' q4'}"><span class="rn${y % 4 ? '' : ' r4'}" data-ry="${y}">${rS(y, 3)}</span>`;
+    { const rc = rowCol(y); h += `<div class="ar${y % 4 || y === 0 ? '' : ' q4'}"><span class="rn${y % 4 ? '' : ' r4'}${rc ? ' rc' : ''}" data-ry="${y}"${rc ? ` style="--rnc:${rc}"` : ''}>${rS(y, 3)}</span>`; }
     for (let t = 0; t < NA; t++){
       if (spAt(t)) h += '<span></span>';
       const v = S.song[y][t];
@@ -26516,6 +26523,22 @@ arrGrid.addEventListener('contextmenu', e => {
   e.preventDefault();
   const m = sxCtx(+b.dataset.y, +b.dataset.t); sxMenu(e.clientX, e.clientY, m.title, m.items);
 });
+// ROW COLOURS (owner, 3 Nov: "right click the number of a row and change the color of that number so it's easy to show when
+// there are section changes"): Arrange's (and the Song screen's) row numbers; kept in the song (S.rcol: row → colour, the
+// track colours), moved with inserted / removed rows. None takes it off.
+const rowCol = y => S.rcol && S.rcol[y] ? tcolOf(S.rcol[y]) : '';
+async function rowColour(y){
+  const sw = {sel:(S.rcol && S.rcol[y]) | 0, cols:tcolPal(), names:TCOL_N};
+  const ok = await askSheet({title:'Colour row ' + rS(y, 3), body:'The row number shows in this colour, to mark where the song changes section. None takes it off.'}, {ok:'Set', swatch:sw});
+  if (ok == null) return;
+  if (!S.rcol) S.rcol = {};
+  if (sw.sel) S.rcol[y] = sw.sel; else delete S.rcol[y];
+  saveS(); arrSig = ''; gridHTML = null; draw();
+}
+arrGrid.addEventListener('contextmenu', e => {
+  const rn = e.target.closest && e.target.closest('[data-ry]'); if (!rn || (e.pointerType && e.pointerType === 'touch')) return;
+  e.preventDefault(); e.stopImmediatePropagation(); rowColour(+rn.dataset.ry);
+}, true);
 // BLOCK COLOURS (owner, 31 Oct): right-click → Colour… gives the block (every block of the selection) one of the track
 // colours, kept in the song (S.bcol: block number → colour), so every place that block is used shows it. None goes back to
 // the instrument's colour.
@@ -27251,6 +27274,7 @@ function cmdCtx(e){
   if (e.target.closest('input,textarea,select,[contenteditable],#tArr,#fxPick,.sxmenu')) return;
   e.preventDefault();
   if (!$('gedit').hidden) geditToggle(false);
+  { const rn = tv === 'song' && e.target.closest('[data-r]'); if (rn){ rowColour(+rn.dataset.r); return; } }   // ROW COLOURS (3 Nov): the Song's row numbers
   const sel = selA && selA.v === tv;
   // RIGHT-CLICK (menu audit, 2 Nov): the commands for what's under the pointer; Undo / Redo, selecting, value steps,
   // previous / next and play stay on their keys and in Edit ▾.
@@ -28237,6 +28261,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [386, '3 Nov', ['Right-click a row number in Arrange (or on the Song screen) to give it a colour, to mark where the song changes section. Saved with the song; the colour moves with its row when rows are inserted or removed. None takes it off.']],
   [385, '3 Nov', ['Arrange: moving the cursor past the bottom row turns a page (that row becomes the first shown), and past the top a page back; it used to slip under the bottom edge without following (the gap every four rows threw the count off).', 'A bus in Arrange has one thin frame down its column instead of an outline on every block.', 'Solo plays a track even when it is muted; the mute stays, so when the solo is cleared the track is muted again and the others play.']],
   [384, '3 Nov', ['The FX bar’s spring reverbs (…pump SPRING and Spring reverb) show their springs behind their values: hanging coils that shake with the sound and ring out over DECAY (TENSION, DRIP and WOBBLE change how they move; a two-spring tank shows two).']],
   [383, '3 Nov', ['New effect: Vintage sampler (FX → Drive and lo-fi). Your track as if sampled into an SP-1200, SP-12, MPC60, SP-202 (Hi-Fi, Standard, Lo-Fi 1 and 2) or Emulator II: each machine’s sample rate and bit depth, its converter (the SP-1200 and SP-12 alias, as they had no input filter), an output FILTER from raw to dark, DRIVE into the converter, RATE for the pitched-down sound, and hiss and hum. Presets for each, in › PRESET.']],

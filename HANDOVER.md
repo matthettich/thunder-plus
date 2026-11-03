@@ -119,6 +119,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (13): row number colours (build 386)
+
+- Owner: right-click a row's number to colour it, to show section changes. `S.rcol` (row → track colour index, TCOL), loaded
+  beside `S.bcol`, shifted by songRowsInsert / songRowsRemove; `rowColour(y)` opens the same swatch sheet as block colours.
+  Arrange: a capture contextmenu on `#tArrGrid` for `[data-ry]` (Song screen and beside a screen); Song text grid: cmdCtx on
+  `[data-r]`. Shown as the number in the colour, bold, with a 3 px bar (`.rn.rc` / `span.rn.rnc`, `--rnc`).
+- Headless: the sheet opens on right-click, Red sets `S.rcol[4]`, Arrange and the Song text grid show it, an inserted row
+  moves it.
+
 ## 3 Nov (12): Arrange pages, bus frame, solo over mute (build 385)
 
 - **Arrange row geometry is measured** (`arrRowTop(y)`, `arrRowAt(px)`, `arrRows(top)`): EVERY 4 ROWS (2 Nov) put a 7 px gap
