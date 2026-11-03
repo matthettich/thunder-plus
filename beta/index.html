@@ -20236,7 +20236,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 378;
+const BUILD = 379;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -20316,8 +20316,10 @@ function setKp(on){ kpOn = !!on; try { localStorage.setItem(KPOK, kpOn ? '1' : '
 // Song: the cursor's row follows its track. Sect and Phrase: they switch to what the cursor's track is
 // playing and the cursor rides along. Not while a selection is being made.
 function followPlay(){
-  if (!followMode || !tp.on || !tp.pos || sdrag || drag) return;
+  if (!tp.on || !tp.pos || sdrag || drag) return;
   const P = tp.pos, own = P[tv === 'song' ? cs.song.x : cTrack] || (tp.loopV === 'bus' ? null : P.find(Boolean)); if (!own) return;   // BUS PLAY: an empty bus stays put
+  // FOLLOW OFF (owner, 3 Nov): nothing follows the playhead, but Arrange still turns its pages when the playing row runs off it
+  if (!followMode){ arrFollowPage(own); return; }
   // A SELECTION keeps the cursor and the selection where they are, but Arrange still turns its pages with the playhead
   // (owner, 2 Nov: after selecting rows, Arrange stopped paging even with FOLLOW on: this used to return before paging).
   if (selA){ arrFollowPage(own); return; }
@@ -20354,10 +20356,18 @@ function followPlay(){
 // PATTERN does it too (owner, 31 Oct).
 // HANDS ON (owner, 31 Oct: the wheel couldn't get past the playhead): for 4 s after you scroll Arrange or move in it with
 // the wheel, it doesn't turn its pages for the playhead.
-let arrHandT = -1e9;
+// EVERY FOLLOW MODE (owner, 3 Nov): FOLLOW OFF pages Arrange too. WORKING IN ARRANGE (Arrange has the keys, or it is the Song
+// screen with FOLLOW OFF): it doesn't page while you work there, only after a minute with no key, click or wheel (arrActT,
+// arrHandT); any of them starts the minute again.
+let arrHandT = -1e9, arrActT = -1e9;
+const ARR_IDLE = 60000;
+window.addEventListener('keydown', e => { if (e.key !== ' ' && !/^(Shift|Control|Alt|Meta|AltGraph|CapsLock)$/.test(e.key)) arrActT = performance.now(); }, true);
+$('tArr').addEventListener('pointerdown', () => { arrActT = performance.now(); }, true);
 function arrFollowPage(own){
-  if (performance.now() - arrHandT < 4000) return;
-  try { if (tp.mode === 'song' && own && own.row >= 0 && apF !== 'arr' && (asongOn() || (tv !== 'song' && apPanel()))){
+  const now = performance.now();
+  if (now - arrHandT < 4000) return;
+  if ((apF === 'arr' || (asongOn() && !followMode)) && now - Math.max(arrActT, arrHandT) < ARR_IDLE) return;
+  try { if (tp.mode === 'song' && own && own.row >= 0 && (asongOn() || (tv !== 'song' && apPanel()))){
     const VR = Math.max(2, arrRows()), top = cs.song.top || 0;
     if (own.row < top || own.row > top + VR - 1){ cs.song.top = clamp(own.row, 0, Math.max(0, 256 - VR)); cs.song.pg = true; } } } catch(e){}
 }
@@ -20976,7 +20986,7 @@ function projRows(){
     {l:'MIXER SIZE', get:() => mixScale, set:v => setMixScale(v), min:60, max:200, step:10, big:20, d:mixScaleDef(), fmt:v => v + '%',
       info:() => 'Size of the Mixer only, separate from TEXT SIZE: 100 % fills the screen, which is already larger than the 80 % Desktop text size gave it. Above that it takes whatever room is left, never past the screen (all its rows stay visible); bigger shows fewer tracks at once, and the window follows the cursor (TRK nn–nn of 32 ◀▶)'},
     {l:'FOLLOW', segs:true, get:() => followMode, set:v => setFollow(v), min:0, max:2, d:0, fmt:v => ['OFF', 'PATTERN', 'ON'][v] || 'OFF',
-      info:() => 'While the song plays. ON: Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. PATTERN: Phrase (and Sect) switch to what the cursor’s track is playing and Arrange turns its pages with the song, but the phrase’s rows stay where you put them. OFF: the screen stays where you put it. The cursor stays on its row in every mode, so you can edit while it plays'},
+      info:() => 'While the song plays. ON: Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. PATTERN: Phrase (and Sect) switch to what the cursor’s track is playing and Arrange turns its pages with the song, but the phrase’s rows stay where you put them. OFF: the screen stays where you put it, except that Arrange still turns its pages when the playhead runs off it. While you work in Arrange it waits until you’ve left it alone for a minute. The cursor stays on its row in every mode, so you can edit while it plays'},
     {l:'TAB', segs:true, get:() => tabTracks ? 1 : 0, set:v => setTabTracks(!!v), min:0, max:1, d:1, fmt:v => v ? 'TRACKS' : 'COLUMNS',
       info:() => 'In a phrase. TRACKS (as Renoise): Tab / Shift+Tab go to the next / previous track’s phrase. COLUMNS: they step note → instrument → FX1 → FX2 → FX3, so the instrument is one press away'},
     {l:'RESUME', ck:'Playback resumes from pause', get:() => resumeOn ? 1 : 0, set:v => setResume(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
@@ -23008,7 +23018,7 @@ function draw(){
   if (tv === 'song' && asongOn()){
     // Arrange is the Song screen: no text to build, just keep the cursor's row in Arrange's view (drawArr draws it).
     sub = S.name;
-    const VR = arrRows(); if (!(c.pg && followMode && tp.on)){ c.pg = false; arrKeepRow(c, VR); } c.top = clamp(c.top, 0, 256 - VR);
+    const VR = arrRows(); if (!(c.pg && tp.on)){ c.pg = false; arrKeepRow(c, VR); } c.top = clamp(c.top, 0, 256 - VR);
   } else if (tv === 'song'){
     const [T0, T1] = trackWin(c, stepDec ? 4 : 3, 1, 4), ts = trkSub(T0, T1); sub = ts ? ts + '  ' + S.name : S.name;
     const VR = songRows(); if (!(c.pg && followOn && tp.on)){ c.pg = false; if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; } c.top = clamp(c.top, 0, 256 - VR);   // (c.pg: EDIT WHILE FOLLOWING)
@@ -27550,7 +27560,7 @@ const apKey = () => { const r = S.song[cs.song.y]; return cs.song.x + ':' + cs.s
 // Keep the song cursor's row in the panel's view (Arrange shows the rows from cs.song.top down).
 function apTop(){
   const c = cs.song, VR = Math.max(2, arrRows()); c.top = c.top || 0;
-  if (c.pg && followMode && tp.on) return;   // EDIT WHILE FOLLOWING: the playhead paged it (FOLLOW ON or PATTERN)
+  if (c.pg && tp.on) return;   // EDIT WHILE FOLLOWING: the playhead paged it (every FOLLOW mode, 3 Nov)
   arrKeepRow(c, VR);
   c.top = clamp(c.top, 0, 256 - VR);
 }
@@ -27945,6 +27955,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [379, '3 Nov', ['Arrange turns its pages when the playhead runs off it with FOLLOW OFF too. While you work in Arrange it waits until you’ve left it alone for a minute, then follows.']],
   [378, '3 Nov', ['GAT 00 stops the step gate (it opens until the next GAT); the slot’s CUSTOM steps are GAT 10. Older songs’ GAT 00 are rewritten GAT 10, so they sound as before.', 'EDIT OFF: the Thunder Plus logo gets an orange ring (in edit mode it looks as normal); the EDIT OFF words on the tab and the corner are gone. Click the logo (or Esc) to switch.']],
   [377, '3 Nov', ['FLX fixed: FLX 41–FF all played REVERSE (pattern 40) on the Page sequencer, the first PLAY, starting mid-song and in every render; now each plays its own pattern. The pattern names give note values (ROLL 1/16, not 1/4); GATE 1/32, 1/8T and 1/16T gate at the rate they name.', 'Flex, Step gate and Retrigger draw what they are playing in the FX bar: the pattern’s number and name, its shape over a bar and a playhead.', 'Flex and Step gate have STARTS: ON FLX / ON GAT (new slots) waits, letting the sound through, until an FLX or GAT turns it on (FLX 00 turns it off, STOP waits again); AT PLAY plays the slot’s pattern from PLAY, as songs made before this keep doing.']],
   [376, '3 Nov', ['Stopping the song puts the edit cursor where it stopped, ready to edit (Settings → STOP CURSOR: THERE or STAYS); Alt+G puts the cursor on the playhead at any time.', 'The Thunder Plus logo shows edit mode on the tracker (a red chip) and a click on it switches edit mode, as Esc does.', 'The first notes of live synth pads (poly ones too) play on the first PLAY.', 'FX bar: folded FX is grey and hatched with its tab at the left; a track with no effects says so. Dragging the panel no longer redraws the whole screen on every pixel.', 'Skins: title bars and the bottom panel heads take each skin’s own colours (no more pale bars in 909, IDM and the rest). Block colours: 12 colours in every skin, shown on empty and OFF-only blocks too.', 'The mouse wheel over a scroll bar scrolls that bar.']],
