@@ -105,6 +105,9 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
 - **Lessons from the owner's Fold test:** never post the whole song to the audio thread (`coreDiff` patches); STOP unplugs
   the core's outputs; plug only played tracks (a connected output keeps a track's effects running); drop page notes that
   arrive late (back from the background) instead of bursting.
+- **Owner's to-do (2 Nov):** presets named "hack …" that sound like the parts of The Hacker vs Commuter, *Roentgen PT 2*
+  (Cultivated Electronics, 2021: punchy electro, vintage machine funk). Individual sounds only (drums, bass, leads), not
+  sequences. Needs a reference to work from (a clip to analyse, or the owner's description).
 - **Next:** effect / mixer commands (`fxc`, `fxp`, `tvl`, `tpn`, `mvol`, `chc`) on the audio thread, then SoundFonts and
   MUT / GEN, then MIDI out (6.2 Web: events sent up ahead with exact times).
 - Also tonight: View → KEY HINTS, hints cut at whole parts (`hintFit`), phone top bar (folder icon, clock readout, one
