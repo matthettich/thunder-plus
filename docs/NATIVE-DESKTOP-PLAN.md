@@ -514,6 +514,12 @@ GC, a dialog). Phase 2's target: 0 late at every stall size, and edits heard on 
      StereoPanner params: a core control output wired into those AudioParams would do it), `fxp` (FXV: a port message),
      `chc` (…chains BYP: chains-worklet.js would need the same hook), `tempo` (…chains transport), SoundFonts, MUT / GEN,
      MIDI.
+   - **2c, mix done (2 Nov, late):** TVL / TVA / TPN and the master column's VOL play from the core: three control outputs
+     (NT + 1 a level multiplier per track into a new `cg` gain after VOL / mute / solo; NT + 2 a pan offset per track into
+     the panner's pan; NT + 3 the master's level offset into the master gain), each plugged in by `coreMixT` on its first
+     command and unplugged at STOP (`coreMixOff`, cg back to 1). Checked on ELECTRO with TVL on track 1, TPN on track 3 and
+     master VOL every 4 rows: levels and the left / right balance match the page within run-to-run noise. Still on the page:
+     `fxp` (FXV: the effect's map() is page code), `chc` / `tempo` (…chains), SoundFonts, MUT / GEN, MIDI.
    - **2c:** the other events, moved one by one onto the audio thread. **Done (2 Nov): the beat clock** for
      tempo-locked effects (Flex, Step gate, Retrigger): the core's output NT carries beat + 1 into the player's `clkBus`
      (which the page's ConstantSource, held at −1, also feeds), sampled values identical to the page's. Next: live
