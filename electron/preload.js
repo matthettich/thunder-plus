@@ -23,6 +23,23 @@ contextBridge.exposeInMainWorld('thunderDesktop', {
     closeReply: ok => ipcRenderer.send('thunder:close-reply', !!ok),              // true: close (and quit, if quitting); false: stay
     onOpenPath: cb => { ipcRenderer.on('thunder:open-path', (e, p) => cb(p)); }
   },
+  // ABLETON LINK (3 Nov): the session lives in the main process (link-session.js). available: false when this build has no
+  // Link addon (or it didn't load here; why says what happened). Times are Link's clock in µs; the page maps them itself.
+  link: (() => {
+    let av = { available: false, why: '' }; try { av = ipcRenderer.sendSync('thunder:link-avail') || av; } catch (e) {}
+    const on = ch => cb => { const f = (e, m) => cb(m); ipcRenderer.on(ch, f); return () => ipcRenderer.removeListener(ch, f); };
+    return {
+      available: !!av.available, why: String(av.why || ''),
+      enable: (v, bpm) => ipcRenderer.invoke('thunder:link-enable', !!v, +bpm || 0),   // join / leave; bpm: ours, for a session of one
+      sync: v => ipcRenderer.invoke('thunder:link-sync', !!v),                          // start / stop sync
+      setTempo: bpm => ipcRenderer.invoke('thunder:link-tempo', +bpm),
+      start: (at, sync) => ipcRenderer.invoke('thunder:link-start', +at || 0, !!sync), // we start at Link time `at` (µs)
+      stop: () => ipcRenderer.invoke('thunder:link-stop'),
+      now: () => ipcRenderer.invoke('thunder:link-now'),                                // Link's clock (µs), for the page's round-trip clock ping
+      onState: on('thunder:link-state'),   // {available, enabled, sync, peers, tempo, playing, playAt}
+      onTime: on('thunder:link-time')      // every 20 ms while on: {beat, phase, tempo, at, hostNow}
+    };
+  })(),
   updates: {
     state: () => ipcRenderer.invoke('thunder:upd-state'),   // {version, avail, ready, notifyOnly, dl (0–1 while downloading), file}
     check: () => ipcRenderer.invoke('thunder:upd-check'),   // check now and say the result in a box

@@ -53,7 +53,7 @@ is housekeeping, not legal advice: have a lawyer look before selling.
 
 **Today:** Thunder Plus itself has no licence (no LICENSE file; `electron/package.json` says `"license": "UNLICENSED"`),
 so it is all rights reserved, though the repo is public. All third-party code is MIT / BSD / ISC / zlib / Apache, fonts
-are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
+are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton Link, GPL-2.0-or-later, desktop only)**.
 
 1. **GPL: `lxr/` only.** To ship closed: `git rm -r lxr` (optionally also the `<script src="lxr/lxr-engine.js…">` line in
    `index.html`; every other LXR hook is guarded by `typeof LxrCore`, `sw.js` caches it as OPTIONAL, and
@@ -91,6 +91,283 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    Steinberg's proprietary licence) and **Ableton Link** (GPLv2+ or Ableton's free proprietary licence) are kept as optional
    build flags (`THUNDER_ASIO`, `THUNDER_LINK`); a closed build needs both proprietary agreements or leaves them out. If
    JUCE is chosen for the host instead of permissive libraries, it needs a commercial JUCE licence.
+8. **GPL: `link/` (Ableton Link in the Electron desktop app, 3 Nov).** The addon is built from the Link SDK (GPL-2.0-or-later,
+   or Ableton's free proprietary licence by application: link-devs@ableton.com). To ship closed without that licence:
+   `git rm -r link` (the workflow's "Ableton Link addon" step then does nothing; `electron/main.js` loads
+   `electron/link/thunder_link.node` in a try, `package.json` packages `link/**` only if present, and every page hook is
+   guarded by `LINKAPI` / `lk`). Delete a locally built `electron/link/` too. Check: Settings → Audio & MIDI → Ableton Link
+   says "Not available in this build", and no `thunder_link.node` in the packaged app (`app.asar.unpacked/link/`). The code
+   that stays (`electron/link-session.js`, the `index.html` block) is ours and has no Link code in it. With Ableton's licence,
+   keep `link/` and replace its LICENSE / NOTICE with what that licence asks for. Either way, "Ableton Link" in the UI
+   follows Ableton's guidelines (the name in full, Enabled / Disabled).
+
+## To-do (owner's list: keep it current; newest dated entries below have the details)
+
+- **Track reordering** (moving a track next to its bus, as other DAWs do). Big job: every song row, mixer, send, bus
+  group, block mute and MIDI mapping refers to tracks by index, so it all has to be renumbered together. Owner (2 Nov):
+  later, not while stabilising.
+- **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
+  change it needs.
+- Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
+- Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
+- Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
+
+## 3 Nov (5): FLX check, Flex in the FX bar, pattern effects wait for their command
+
+On a worktree branch off `beta`; not merged, BUILD / sw.js cache not bumped. Owner: "a lot of the [FLX] commands no longer
+sound like the descriptions"; a picture of what Flex is doing in the FX bar; pattern effects should stay off until triggered.
+- **The bug: FLX 41–FF all played pattern 40 (REVERSE BARS) on the Page sequencer and in every render.** The `thunder-tfx`
+  k-rate params `flx` / `gat` / `rtg` / `sw*` had `maxValue:64` (from when FLX was 00–10), and `setValueAtTime` clamps to it.
+  The audio-thread sequencer writes its values past the AudioParam (`__tcOv`), so it was right, except where the page plays
+  the event (`fxcPend` before a node exists, CHASE at PLAY, RESUME, renders). Now 255.
+- **Names in note values.** FlexCore.SPEC lengths are in beats but 17–FF's names printed beats ("ROLL 1/4" was a 16th, "STUTTER
+  1/16" a 64th) while 01–10 and musicians use note values. `nv(beats)` in SPEC names them `1/16`, `1/8T`, `3/16`, `BAR`; the
+  sounds are unchanged. Real DSP fixes: 90–92 (GATE 1/32, 1/8T, 1/16T) gated twice as fast as named (g is half the named
+  period, as GATE 1/16 = 0B); AD renamed LOW-PASS WOBBLE 1/4T (its rate, 1.5 a beat). The table (`node` +
+  `FlexCore.NAMES`) is in tests/flex.test.js's checks: every 11–FF name is parsed and compared with its pattern's numbers.
+- **Old songs:** a song without `flx256` now has its FLX 11–FF rewritten to FLX 10 at load (what they always played; the cell
+  no longer names another pattern), no flag. Songs saved with `flxOld` (31 Oct – 3 Nov, e.g. copies of ELECTRO) keep the flag
+  and Project → FLX 11–FF: their new and old cells can't be told apart. The FX bar shows the pattern that really plays.
+- **STARTS (WAITS FOR ITS COMMAND):** Flex and Step gate get a last value `wait` (STARTS: AT PLAY / ON FLX, ON GAT; map index 3 /
+  7, dp.wait). ON: the slot plays nothing (Step gate: open) while `flx` / `gat` is −1, unless that slot's FXO switch is on
+  (`tr.sw`, set per slot in the tfx processor: then its own PATTERN). An FLX turns it on, FLX 00 off; STOP (resetSeq, the
+  core's stopAll) puts the params back to −1, so it waits again. It is all in the DSP (no new events: goldens unchanged), so
+  both sequencers, CHASE (the last FLX before the start row is sent at PLAY), RESUME and renders behave the same. Defaults:
+  `freshTfx` gives 1 (new slots, FX picker, AUTO SLOT from typing FLX); `normTfx` gives 0 to a saved slot without `wait`
+  (old songs and presets play as before). Retrigger already had it (MODE: RTG ONLY, the default). FXO needs nothing: a slot
+  left off + FXO X1 is already "off until triggered". Judged safe: nothing changes under existing songs; the risk is a new
+  slot whose PATTERN is set by hand and not heard while waiting, so the FX bar says WAITS FOR FLX and the help says how.
+  Not changed: GAT has no "off" value (00 is CUSTOM): once a GAT plays, FXO X0 or STOP turns it off.
+- **FX bar picture** (`dkFxPat` / `dkFxPatDraw` / `dkFxPatState`, before `dkFxResp` in `dkFxViz`): Flex draws the time map
+  of the pattern playing now (FlexCore's own ext / pat on a main-thread instance: x = bar position, y = where it plays from;
+  dashed diagonal = as played, "BAR BEFORE" below 0), its level (gates, pumps, fades) along the bottom, a LP / HP band for
+  filter patterns and shading for crush; label `FLX 2A · STUTTER 1/16 EVERY 1/2` and its source (FLX, PATTERN, WAITS FOR FLX,
+  SLOT OFF). Step gate draws its steps (STEP, LENGTH, DEPTH; CUSTOM from STEPS); Retrigger the slice and its repeats. Drawn
+  once per pattern into `col._pc` (key: pattern, source, values, size, skin; the random ones per bar); each frame copies it
+  and draws the playhead (and the point it plays from). Where the values come from: `fxcNote` records every `fxc` /
+  `fxreset` / `beat` event as booked (the live player's play() and coreMsg for the core's own), `fxcNow(track, p, t)` /
+  `fxcBeat(t)` read them at the heard time (currentTime − outputLatency); tStop clears them.
+- **Checks:** `tests/flex.test.js` (param range, names vs patterns for 11–FF, the first sixteen, STARTS in Flex and Step gate,
+  normTfx / old-song rewrite / flxCap, the FX bar state). `node tools/flex-check.mjs` (headless Chrome, both sequencers):
+  a 180 BPM song with one FLX a bar across 48 patterns (01–10, x2 and x9 of every family, FF), a saw + noise straight into
+  the track's effect node, its output and the beat clock recorded, and the same input and clock run through FlexCore with
+  the pattern each bar should play: before the fix Page failed every bar above 40 (+0–6 dB error), now all bars match
+  (−180 dB or better). `--wait`: waiting bars pass the sound as it is, bar 3's FLX turns it on, PLAY again waits again, and
+  starting from bar 4 CHASE brings bar 3's FLX, both sequencers. The Page sequencer can be a block late on a cold first bar
+  (one bar a few dB off, passes on a re-run); the audio thread is exact. npm test, goldens page and `--core` pass.
+- **To check on the owner's screen:** the picture's legibility at the default panel height (it needs ~34 px under the values);
+  whether STARTS ON FLX as the default for new slots is what they want (one value to flip in TFX.flex / TFX.sgate).
+- Not touched: …chains' and …waves' own FlexCore copies (old 17-pattern version; FLX doesn't drive them).
+
+## 3 Nov (3): skin title bars, block colours
+
+- **Owner:** "using the 909 skin … the light grey/white title bars look odd. Can we change those to match the rest of the
+  skin?" Root cause: every title strip used `--side`, and the term base maps `--side` to `--mxpanel`, which most light
+  term skins set to a paler, near-white tint of their case (909 `#e0e2e3` on `#cfd2d4`, IDM `#f2f1ec` on `#e9e8e3`).
+  Also the bottom panel's name chips (`.dkh .dkt`, "…CHAINS · TRACK 01", "TRACK 01 MONO") were meant to be inverted
+  (ink / inv) but the term button rule (`:root[data-skinbase="term"] :is(button,…)`, higher specificity) turned them into
+  pale keys.
+- **New tokens** on `:root`: `--ttl` (title bar background), `--ttl-ink`, `--ttl-mut`. Defaults: `--side` / `--ink` /
+  `--muted`, so Pastel, Minimal, Neon etc. look exactly as before. Used by `.ttabs`, `.ttabbar`, `.tcpu`, `.dkh`
+  (+ `.dkh .dki` text), `.mwhead` (old mastering window), `.help .hhead`, `.pbs .phd` (preset browser head, which had no
+  background before).
+- **Term skins** (all of them, CSS block "SKIN TITLE BARS" just before the term pads/command-row rules):
+  `--ttl:var(--mxpanel2)` (each skin's own second panel tone: a step deeper than the case in light skins, lifted in dark
+  ones; close to the …pump windows' header, `pump/ui/kit.js` `skinTheme` panel2), `--ttl-mut` = 80% ink. The bottom
+  panel heads `#tDeck .dkh` take their own section's tone (`--dkp`) + `--dkh-up` (4%), and `.dkh .dkt:not(.mstb)` is the
+  ink chip again (like the tracker's "01 MONO" column heads). lcdgreen, matrixlight, sage, valentine, blossom, ocean set
+  `--dkh-up:0%` and full-ink `--ttl-mut` to keep ≥ 4.5:1.
+- Contrast: ink on the title bars ≥ 4.5:1 in every term skin whose own ink on its case is ≥ 4.5:1 (the low-contrast
+  Simple skins mustard, complement, citrus, sunset, miami, desert, tomato were below that before and stay near their own
+  body contrast). Pump windows, menus, the settings sheet: unchanged (already the skin's colours; no light bar).
+- Not changed: side *panels* (`.tside`, `.tcmd`, `.dock`) still use `--side` (in 909 the lighter silver panel).
+- **Block colours (owner: "not very many color selections in the 909 skin … for blocks that are mostly empty"):**
+  three causes. (1) The colour sheet's swatches (`askSheet` `swatch`, `.ask .askswatch button`) were painted over by the
+  term skins' button rules (every button = case colour; `.on` = ink, `!important`), so every term skin showed blank
+  circles: fixed with `:not(#zz):not(#zz)` rules (+ `!important` for `.on`). (2) `arrDraw` only applied `S.bcol` to full
+  blocks: empty (`z`, striped) and OFF-only (`o`) blocks ignored it. Now any block with a colour gets class `bc`,
+  `--ib` (colour) and `--ibi` (`tcInk()`: near-black or white, whichever contrasts more); CSS "BLOCK COLOURS on every
+  block": full = filled; empty = 40% tint + outline + stripes in the colour; OFF-only = filled, stop bar and outline in
+  `--ibi`; muted = outline. Wins over the term ink fill and Rainbow (`#zz` + `!important`); not while playing.
+  (3) The palette grew from 8 to 12 (`TCOL`/`TCOL_N` + Lime, Sky, Brown, Grey; track colours too). Skins can give their
+  own shades via `--tc1…--tc12` (`tcolPal()` reads them once per skin, `tcolOf(i)`; `tCol` uses it): set for 909, 808,
+  Vintage MPC, DX7. Songs store indices, so a song made in 909 shows the same hue names in other skins; an older build
+  drops indices 9–12 on load.
+## 3 Nov (4): the wheel over a scroll bar scrolls it
+
+- Owner: "if my pointer is over a scroll bar, scrollwheel scrolls the bar". Before, the app's own wheel handlers took it:
+  on Arrange's bar the wheel moved the song cursor, on the Pattern view's sideways bar it moved the cursor down (Shift:
+  selected), on the FX screen's effect pane it moved the cursor.
+- `index.html`, just above the slider wheel (WHEEL FOCUS): `sbHit(el, x, y)` says whether a point is on el's own
+  vertical (`'v'`) or horizontal (`'h'`) scrollbar (the strip between the client box and the border; the element must
+  overflow `auto`/`scroll` that way). `sbWheel(e)` runs first (`addEventListener('wheel', sbWheel, {capture:true,
+  passive:false})` on window); on a bar it scrolls that element (vertical bar: up/down; horizontal bar: the wheel's
+  up/down, Shift+wheel's deltaX too; lines ×40, pages × the box), then `preventDefault` + `stopImmediatePropagation`,
+  so no app handler sees it. Off a bar it returns at once: nothing else changed. Ctrl+wheel (zoom, pinch) is left alone.
+- Covers every native bar that takes room, wherever it is: Arrange (`#tArrGrid`, 14 px styled), the Pattern view's
+  sideways bar (`#tGrid.pvon`), the FX screen's pane (`.fxpane`), the bottom panel's INST / FX lists (`#dkInstRows`,
+  `#dkFxRows`) and its body (`#dkBody`, when narrow), Help, Settings, sheets, menus, the preset browser. There are no
+  custom-drawn scrollbars in the app (`arrSbw` only measures Arrange's native one).
+- Not covered: overlay scrollbars (macOS's default "show when scrolling", phones) take no room, so they can't be told
+  from the content under them; there the wheel does what the content does. Arrange and the Pattern view style theirs
+  (`::-webkit-scrollbar`), which makes them classic, room-taking bars on the Mac too.
+- Tests: `tests/usability.test.js` ("wheel on a scrollbar") cuts sbHit/sbWheel and checks the hit areas and the event
+  handling. `node tools/wheel-scrollbar.mjs` (headless Chrome, real scrollbars, 1600×1000, ELECTRO) wheels over each bar
+  and off it; `BASE=1` runs it with sbWheel removed (Arrange, Pattern and FX pane checks then fail, as before the fix).
+
+## 3 Nov (2): the rest of the sequencer move (all on `beta`, not released)
+
+- **FXV:** the core works out an effect slot's settings itself (`fxvMsg`) and hands them to the effect node at the row's
+  time (`tcAt` → `proc.__q`, taken at block start). `make-core` copies each effect's `map()` out of TFX (`TFX_MAP`, 44
+  effects); the shared-module effects send their conversions as data (`TFX[k].cv`). `__seqTest.fxMaps()` checks every
+  non-pump effect against the page's map (all match). …pump slots' FXV stays on the page.
+- **BYP / tempo:** `thunder-chains` registers as `chn:<track>` and reads `__tcOv`, so BYP's b1–b15 come from the core;
+  TPO reaches …chains' transport at its time (`ev.chnCore`). chains-worklet `v=42`.
+- **MUT / GEN / CUT / RES / DEC:** a variation the page renders goes to the core as `vbuf` (key `ii:vk:pad`); an
+  instrument change or a new render of the pad drops the core's copies (`varDrop`; page `coreVarGone`). CUT / RES / DEC use
+  the page's `shapeData` (make-core root). A variation the core doesn't have yet plays from the page, as before.
+- **SoundFonts:** `coreSf()` sends a pad's decoded preset once `sfPreparePad` has it; the core's `sfNote` / `sfRun` is the
+  page's `sfNote` (zones, loops, DAHDS envelope, Web Audio's low-pass with the mod envelope, zone pan, panner laws).
+  Difference: a bend / arp / vibrato moves every zone of a layered preset (the page moved only the first).
+- **MIDI out:** already exact: since the core went live, every row (and so every note, CC and the 24 ppqn clock, worked
+  out from the beat events) reaches the page with the core's audio time, and `msend` books it with that time. What's left
+  is a browser limit: Web MIDI can only be sent from the page, so a page stall longer than the look-ahead (250 ms rows,
+  80 ms clock) still delays it. Only the native host (plan phase 4) removes that. Not changed tonight.
+- `CORE_V` / `CORE_WANT` 6. Checks, all in headless Chrome against ELECTRO: 2152 FXV + 5396 BYP + 55 TPO → 0 late, levels
+  page vs core within run-to-run noise; 1066 MUT / GEN / CUT / DEC → 93 % of variation notes from the core after the first
+  pass; two pads as GM presets → every SoundFont note from the core, track level 0.1000 vs 0.0994. npm test (110, 1
+  skipped), goldens page and `--core` pass. Test scripts were in the session's scratchpad (not kept); the hooks they used
+  are `fxMaps`, `coreStats` (now also lists the nodes the core reaches) and the tally's `var` tag.
+- **Still on the page:** …pump slots' FXV, SYNC-stretched notes, MIDI-only instruments (by design), Thunder Perform.
+
+## 3 Nov: FX bar: EQ / filter curves, echo taps, …chains rail
+
+The three ideas left open in "2 Nov (2)" (desktop bottom bar), all in index.html, FX bar only (CLASSIC untouched). Built
+overnight on a worktree branch off `beta`; not merged, no BUILD / cache bump.
+- **Response curves** (`dkFxResp` → `dkFxCurve`, called from `dkFxViz` before the older `dkFxPic`): in the room under a
+  slot's values (at least 96 × 50 px, else the old picture stays), log 20 Hz – 20 kHz, ±18 dB (Thunder EQ ±12 until its curve
+  needs more; …pump EQ ±30 when a band does), a 0 dB line, the shape filled. Each is the DSP's own maths, not a look-alike:
+  - `filter`, `cut`, `envfilt` (at rest, before the envelope moves it): the TPT SVF of chains-worklet.js (`svfH`), with their
+    k / slope / mix rules; `cut`'s 6 dB one-poles as written. `vowel`: its three formant band-passes (`VF_LF` etc. copied from
+    the worklet's Peterson & Barney table; keep them in step if that table changes).
+  - `ladder`: DaisySP LadderFilter (Huovilainen, 4× with linear interpolation) run on an impulse (`ladderIR`, `irH`).
+  - `eq` (Airwindows EQ): EQProc.cpp's stages alternate every 2nd / 3rd sample, so it is run on an impulse at all six phases
+    and averaged (`awEqIR`, `awEqMag2`). Checked against a plain transcription of EQProc.cpp fed sines: equal to 0.01 dB. The
+    density stages are linearised (small signals). ~8–16 ms to work out, only when a value changes.
+  - `peq`, `pstrip`: pump's analog prototypes (`pmpProto` / `pmpMag2`, as pump/ui/eq.js). STRIP: `pstripBands`, a copy of
+    StripEngine.hpp `buildBands` + the eight console profiles (`PSTRIP_PROF`: HPF / LPF slopes, EQ family, voicing). Keep in
+    step with pump if those change.
+  - Gains that aren't tone (output, makeup, input drive) are left out.
+- **Echo taps** (`dkFxTaps`): `delay` (TapeDelay2: the tape speed the map sets, back to seconds; feedback = regen²), `pdelay`,
+  `sdelay` (ping-pong in L / R lanes), `bbd`, `gdelay`, `reverse`, …pump ECHO (`pecho`: notes from pump's Tempo.hpp table,
+  L / R times, Ping-Pong alternates, Wide offsets R by 15 ms). Bars fade with feedback over 1 bar, or 2 when the first echo is
+  longer than a beat (more if two echoes need it); a grey bar at 0 is the dry level; beat lines, the first echo's time.
+- **Cost:** `dkFxResp` keeps a key per column (values, size, skin, tempo, rate): an unchanged frame is one string compare
+  (measured: 0 pictures in 1.5 s with nothing changing); while a value is dragged at most ~11 a second; `dkCurveMemo` keeps
+  the last 24 curves so a resize or a skin change reuses them. Nothing runs when the bar is hidden (`deckFxBarMeters`).
+- **…chains rail** (`dkChnRail`, `chainOrder`, `deckChnFold`, CSS `.dkcrail`): with the FX bar and no controls mapped, …CHAINS
+  shows the track's modules (those `chainMods` finds) in signal order (Kahn's sort over the cables, ties left to right on the
+  bench) as small offset blocks with an on / bypassed light (`params._byp`), IN · TRACK and OUT · TRACK tags at the ends, and
+  `+ CONTROLS` (or `+ …CHAINS` with no chain). Folded …CHAINS shows a narrower rail beside its title. A block opens …chains at
+  that module (`dkcReveal` → `chApi().reveal`, as the module names in the panel do). Module names: `DKC_LAB`.
+- **Test hook:** `__seqTest.ev(src)` (only with `?seqtest`) evaluates inside the app, for headless UI checks.
+- **To check on the owner's screen:** legibility at the default panel height (the curves need ~50 px under the values: most
+  slots get them at 220 px only when they have few values; drag the panel taller for all), and whether the EQ curve's
+  fine ripples near 16 kHz (real: the triplet stage at sr/3) read as a glitch.
+
+## 3 Nov: Audio & MIDI ports table; tracker keys
+
+On `beta` (worktree branch), not released; BUILD and the sw.js cache name not bumped (the What's new line is filed as 374).
+- **Audio & MIDI** (`docs/MENU-AUDIT.md` proposal 1, done): `#pAudio` / `#pMidi` rebuilt with no paragraphs; each row's
+  explanation is its `title`. AUDIO: Output + Test (`#audOutRow`; without setSinkId its tooltip says why it's greyed),
+  Level, Latency, Rate, Latency comp (switch `#ckPdc`), …pump live (its note is now `#psLiveRow`'s tooltip), Sequencer, the
+  Apply (reload) row when needed, and a small **Reset audio engine** at the bottom (`.audfoot`). MIDI: Connect, Notes in
+  (input + channel dropdowns), Keys play, Mapping (Learn / Unlearn / Reset), Velocity (switch `#ckVel`); a **ports
+  table** (`.mports.mtab`): PORT · DEVICE · DELAY · CLOCK, the clock column is a tick box per port (`#midiClk0`–`3`); the
+  line under it (`#segClkOut`, same id, its `__hint`) says "Clock to B: no cable" when needed; Clock in (switch
+  `#ckClkIn`) and its input (`#midiClkSel`) on one line. Removed ids: `audNote`, `psLiveNote` (element; the function
+  `psLiveNote()` stays and sets the tooltip), `midiNote`, `segPdc`, `segVel`, `segClkIn`. New helper `makeCk(box, get, set)`
+  (makeSeg's on/off twin). CSS: "AUDIO & MIDI PORTS TABLE" after `.mclk`; switch `input.msw1`, tick `input.mck`; ≤ 420 px
+  narrows the table and hides "from". **Ableton Link** goes at the end of `#pMidi .pbody`: an HTML comment marks the spot.
+  Checked at 1440 and 380 (touch) in IDM, Matrix and Calculator watch: no overflow, no horizontal scroll.
+- **Tracker keys** (the table below; owner: build only those that don't clash). Built: Alt+, / Alt+. with no selection
+  transpose the whole phrase (Phrase) or the cursor block's phrases (Song, Arrange, a Song selection's blocks; `xposeScope`);
+  Shift+Alt+, / . an octave; **Ctrl/⌘+A again** widens column → track → pattern (`selA.pat` in the Pattern view:
+  `patParts()` lists the other tracks' phrases on the row; transpose and Delete (`clearSel`) act on all of them, and
+  `pvLines` draws them selected; copy / paste and the selection tools still act on the open track); Ctrl/⌘+I interpolate;
+  Ctrl/⌘+Shift+, / . shrink / expand; Ctrl/⌘+Enter insert row (Song: the cursor column, as Insert); Ctrl/⌘+Shift+Enter a
+  whole song row (`songRowInsert`); Ctrl/⌘+Home / End (`songEndKey`: Song and Arrange the cursor, Pattern view the song row,
+  a phrase the track's first / last block); Ctrl/⌘+Shift+F and Scroll Lock (`followKey`: off ↔ the last mode); Alt+Enter /
+  Shift+Alt+Enter (`playRowKey`: the row once, every track of this song row / this track, Phrase only); Ctrl/⌘+, (`settingsKey`,
+  in `fileKeys` and `editorKey`; closes it too). The on-screen SEMI − + / TRANSPOSE buttons and plain , . on non-note cells
+  still need a selection (`transposeSel(d, true)`), so a stray tap can't move a whole phrase. Labels in Edit ▾ / Tools ▸
+  (`keyHint`), Help (Tracker · KEYS mode), README, the phrase hint line, What's new.
+- **Owner's choices (3 Nov, morning):** Ctrl/⌘+Shift+Backspace **built**: on the Song it removes the whole song row (or
+  the selected rows: `songRowRemove`), the pair of Ctrl/⌘+Shift+Enter; Ctrl/⌘+Backspace (and Edit ▾ → Remove the row) stay
+  the cursor's column only, and off the Song Shift changes nothing. The other two are **skipped** (owner: keep the keys as
+  they are):
+  - **Ctrl/⌘+Alt+▲ / ▼** (nudge the selection a row): `keysDown`'s mod branch already maps Ctrl/⌘ + any arrow (Alt
+    included) to `bump` (change the value), and in PAD mode Alt+arrows are OPTION (`optDir`) before that; plus some
+    Windows Intel graphics drivers rotate the screen on Ctrl+Alt+arrows, and on Linux desktops (GNOME, KDE) Ctrl+Alt+▲▼
+    switch workspaces. Suggest: drag a selection (already moves it), or Alt+Shift+[ / ].
+  - **Numpad − / +** (previous / next instrument): the KEYS handler reads `e.key`, and numpad − / + arrive as '-' and '+',
+    which are already octave down / up (`setOct`) on every tracker screen (Phrase, Pattern view, Song, Inst…). Using `e.code`
+    (NumpadSubtract / NumpadAdd) would split them, but people who use the numpad's − / + for octave today would lose it.
+    Suggest: keep [ ] (already previous / next instrument on INST and in the phrase via OPTION).
+- Tests (session scratchpad, not in the repo): a Playwright run of every built key on Phrase, Song and Pattern view
+  (52 checks, undo included) and of the old keys around them (Insert, Ctrl/⌘+Backspace, Ctrl/⌘+B, Ctrl/⌘+D, Alt+arrows,
+  Alt+3, plain . on an FX cell); Audio & MIDI behaviour (switches save `aset` / midi, clock ticks, delay, channel).
+  New `?seqtest` hooks: `ui()`, `nav({view, tv, pv, track, phrase, songX, songY, x, y})`, `notes(p)`. `npm test` 106 / 106.
+
+## 3 Nov: Ableton Link (desktop, off by default)
+
+Plan steps 1–3 of "Plan: Ableton Link on the desktop app" (below) are built on a branch from `beta`, not merged or released.
+Thunder Perform (step 4) and phones are not.
+- **Where:** `link/` (the native addon: `src/thunder_link.cc` over the Link SDK, plain N-API; `fetch-sdk.sh` pins
+  `Link-4.1.1` by commit into `link/sdk`, not committed; `build.js` → `electron/link/thunder_link.node`, Mac arm64 + x86_64
+  joined by lipo; own LICENSE / NOTICE, GPL-2.0-or-later). `electron/link-session.js` owns the session (state message on
+  change, timing message every 20 ms while on); `electron/main.js` requires the addon in a try (from `app.asar.unpacked`);
+  `electron/preload.js` → `window.thunderDesktop.link`. Page: the **ABLETON LINK** block after `setTempoLive` in
+  `index.html` (`lk*` functions), hooks in `tStart` (`lkPlan` / `lkStarted`), `tStop` (`lkStopped`), `CLK.bpm` and the
+  TEMPO setting (`lkTempoOut`); `aset.link` (off) and `aset.linkSync` (on); rows in Settings → Audio & MIDI (`#linkBox`,
+  shown only with `window.thunderDesktop.link`, "Not available in this build" without the addon).
+- **How it works:** times are Link's µs, mapped to `performance.now()` by a round-trip ping (`lkPing`, shortest of 20) and
+  to the audio clock by a median of `getOutputTimestamp()` (`lkAm`; MIDI's `amap` settles too slowly for a bar line).
+  PLAY with peers starts on the session's next bar; alone it starts at once and moves Link's bar there (the addon's
+  `start` only re-anchors with no peers). Drift: `lkDrift` once a second, PI on the playing tempo (`tp.seq.bpm`), ±0.5 %
+  (±4 % above 1/8 beat). Works with both sequencers (Page and Audio thread): only the start time and `tp.seq.bpm` are used,
+  so `makeSeq` and the core are unchanged (no `make-core` run needed). MIDI Clock in (`mx.slave`) wins over Link.
+- **CI:** `.github/workflows/desktop.yml` has an "Ableton Link addon (optional)" step before the app build, with
+  `continue-on-error`. **Not yet run on GitHub's Mac / Windows machines**: the first desktop workflow run will say whether
+  the addon builds there (Linux x64 built and ran here with node-gyp 11 / GCC 13). If Windows or Mac fails, the app still
+  builds, without Link; the step's log says why.
+- **Tested here:** `node --test tests/link.test.js` (session vs a fake addon, guards, the real addon when built);
+  `node tools/link-test.mjs` (the page against a fake peer in headless Chrome, both sequencers: tempo both ways, start on
+  the next bar to within ~0.2 ms, start/stop sync both ways, drift 0.03 % / a 20 ms jump / 0.3 % converging under 1 ms
+  in a few seconds). The sandbox's fake audio device stalls now and then; the test marks such samples `(h …)` and SKIPs a
+  check that only had those. Two real addon instances in two processes (loopback) agreed on tempo, phase and start/stop.
+  **Not tested:** against Live / Koala / a phone on Wi-Fi; inside Electron itself (no Electron in the sandbox).
+- **Owner, to test:** build the desktop app from this branch (Run workflow with no version), check the step "Ableton
+  Link addon" passed on each OS. Then on one Wi-Fi: Live (Preferences → Link, Tempo & MIDI → Link on, Start Stop Sync on) or
+  Koala (Link on); Thunder Plus Settings → Audio & MIDI → Ableton Link On: the peer count shows; change tempo on either side;
+  press PLAY on each side (the other should start on the next bar); let it run a few minutes listening for flamming against
+  Live's metronome. Ableton's own checklist is `link/sdk/TEST-PLAN.md` (after `sh link/fetch-sdk.sh`). Windows asks to
+  allow network access the first time Link is on (allow private networks).
+- **Left:** Thunder Perform (plan step 4), phones (native app later), a Link icon / button per Ableton's guidelines if
+  wanted, the 1-bar quantum as a setting (Live's Quantization is per app), REC count-in with Link (it is placed before the
+  bar, not tested against a peer). Licence: before selling, see item 8 of the commercial checklist.
+
+## 2 Nov (6), late night: builds 369–373 (web 373, desktop 1.2.69–1.2.73)
+
+- 369: pump's STRIP channel strip in the app (`pstrip`, pump.wasm / pump-meta v6, built from the pump repo with STRIP added
+  to wasm/pump_wasm.cpp, pump_meta.cpp, build.sh and wasm/fx/strip.cpp: those pump edits are local only, not pushed).
+- 370: menus, second pass (owner: "sections with no heading"): `{h:'…'}` heading items in File / Edit (`menuTidy`, `menuFill`;
+  rules in right-click menus), small-caps headings in every panel, switches for on/off rows, link rows (›) for the sheets.
+- 371: skins: Design icons group (bauhaus, swiss, destijl, memphis, valentine, eames, vignelli, bondi); Hardware + dx7, lcdgreen.
+- 372: acid slides on a full row take FX3; a once-ever tip offers Latency: Safest after 4 dropouts in a minute while playing.
+- 373: TVL / TVA / TPN / master VOL on the audio thread (plan §13 2c "mix done"); Calculator watch skin (`calcwatch`).
+- Owner's to-do still open: which skins to keep (cull); hardware MIDI tests and the native host framework (item 6, later).
+  Sequencer move left: FXV, …chains BYP / tempo, SoundFonts, MUT / GEN, MIDI.
 
 ## 2 Nov (5), late night: the audio-thread sequencer (plan phase 2a–2c) released, on by default (web 362, desktop 1.2.65)
 
@@ -128,7 +405,7 @@ The (3) entry below went out in 357. Since then, all on `main` and `beta`:
   (`FX_FACTORY_MORE`). **My presets (360):** SAVE AS PRESET also stores in localStorage `thunderplus-fxuser-v1`
   (`fxUser*`), listed under MY PRESETS in every song.
 - **Menus (358):** the `docs/MENU-AUDIT.md` proposals 2–5 are built (MENU HELP toggle, COMMAND BAR Off/Thin/Big, short
-  labels, right-click trimmed, ⚙ without Kit / Master). Audio & MIDI ports table (proposal 1) is still open.
+  labels, right-click trimmed, ⚙ without Kit / Master). Audio & MIDI ports table (proposal 1): built 3 Nov, see above.
 - **Song / Arrange:** clone down only inserts on a clash; double-click an empty Arrange cell = new pattern (`arrEmptyTap`);
   buses always shown in Pattern view; blocks with only OFFs / FX commands get class `o` (`isOffPhrase`); a grey line every
   4 rows (`.ar.q4`).
@@ -153,9 +430,8 @@ The (3) entry below went out in 357. Since then, all on `main` and `beta`:
   (Acid) or a 4th value (Euclid); Acid's ROLL is Generate (G); Shift+wheel grows the selection on Phrase / Pattern.
 - **Test hooks** (only with `?seqtest`): `__seqTest.state()` and `.phrase()`.
 - **Menu audit:** [`docs/MENU-AUDIT.md`](docs/MENU-AUDIT.md), a proposal, nothing built.
-- **Open:** returning from the Synth page sometimes lands on the full Song screen (not reproduced, ask for steps); acid
-  slides are written only on the next sounding note with a free FX column (by design today); the owner asked about more
-  303-like (Basebot) patterns, see the chat proposal.
+- **Open:** acid slides are written only on the next sounding note with a free FX column (by design today; 372 lets a
+  full row use FX3). The Basebot-style patterns are built (Acid line Styles, 360).
 
 ## 2 Nov (2): beta channel; phase 0 started (sequencer golden test); FX bar mockups
 
@@ -299,26 +575,26 @@ multiple of 4) or the end of the current song row (all tracks' `T.step >= L`), e
 does per track). Arrange blinks the queued row (CSS class on its row numbers). Also the natural trigger for section launch
 in a performance mode (below). About half a day.
 
-### Proposed tracker keys (audit #2: proposed to the owner 1 Nov, NOT built until they agree)
+### Proposed tracker keys (audit #2: proposed 1 Nov; built 3 Nov except the three that clash, see "3 Nov" above)
 Scope comes from the selection, as in Renoise: Ctrl/⌘+A pressed again widens it, then any command acts on it.
 
 | Command | Proposed key | Notes |
 | --- | --- | --- |
-| Transpose ±1 semitone | Alt+, / Alt+. (as now) | with no selection: the whole phrase under the cursor (Phrase) or the cursor block's phrase (Song) |
-| Transpose ±1 octave | Alt+Shift+, / Alt+Shift+. | same scope |
-| Widen the selection | Ctrl/⌘+A again | column → track → pattern (every track on the song row, in Pattern view) |
-| Interpolate | Ctrl/⌘+I | Renoise's key |
-| Shrink / Expand | Ctrl/⌘+Shift+, / Ctrl/⌘+Shift+. | |
-| Insert a row (Macs have no Insert) | Ctrl/⌘+Enter | Insert keeps working; on Song, one column as now |
-| Insert / remove a whole song row | Ctrl/⌘+Shift+Enter / Ctrl/⌘+Shift+Backspace | Insert and Ctrl/⌘+Backspace stay column-only on Song |
-| First / last song row | Ctrl/⌘+Home / Ctrl/⌘+End | |
-| Follow on / off | Ctrl/⌘+Shift+F (and Scroll Lock) | Ableton's key |
-| Play the row under the cursor | Alt+Enter (every track), Shift+Alt+Enter (this track) | |
-| Nudge the selection a row | Ctrl/⌘+Alt+▲ / ▼ | some Windows Intel drivers rotate the screen on Ctrl+Alt+arrows (usually off) |
-| Previous / next instrument | Numpad − / + | Renoise's keys; [ ] stay |
-| Settings | Ctrl/⌘+, | the Mac and Renoise standard |
+| Transpose ±1 semitone | Alt+, / Alt+. (as now) | **built** · with no selection: the whole phrase under the cursor (Phrase) or the cursor block's phrase (Song) |
+| Transpose ±1 octave | Alt+Shift+, / Alt+Shift+. | **built** · same scope |
+| Widen the selection | Ctrl/⌘+A again | **built** · column → track → pattern (every track on the song row, in Pattern view) |
+| Interpolate | Ctrl/⌘+I | **built** · Renoise's key |
+| Shrink / Expand | Ctrl/⌘+Shift+, / Ctrl/⌘+Shift+. | **built** |
+| Insert a row (Macs have no Insert) | Ctrl/⌘+Enter | **built** · Insert keeps working; on Song, one column as now |
+| Insert / remove a whole song row | Ctrl/⌘+Shift+Enter / Ctrl/⌘+Shift+Backspace | **Built** (remove: 3 Nov, owner's choice; Ctrl/⌘+Backspace stays the column remove) |
+| First / last song row | Ctrl/⌘+Home / Ctrl/⌘+End | **built** |
+| Follow on / off | Ctrl/⌘+Shift+F (and Scroll Lock) | **built** · Ableton's key |
+| Play the row under the cursor | Alt+Enter (every track), Shift+Alt+Enter (this track) | **built** |
+| Nudge the selection a row | Ctrl/⌘+Alt+▲ / ▼ | **not built**: Ctrl/⌘+any arrow already changes the value; OS keys (screen rotate, Linux workspaces) |
+| Previous / next instrument | Numpad − / + | **not built**: numpad − / + are already octave down / up |
+| Settings | Ctrl/⌘+, | **built** · the Mac and Renoise standard |
 
-### Plan: Ableton Link on the desktop app (owner, 1 Nov: wanted eventually)
+### Plan: Ableton Link on the desktop app (owner, 1 Nov: wanted eventually; steps 1–3 built 3 Nov, see "3 Nov" above)
 - **Licence first.** The Link SDK (github.com/Ableton/link) is dual-licensed: GPLv2+ or a proprietary licence from Ableton
   (free, by application: link-devs@ableton.com). A closed / sold Thunder Plus needs the proprietary one; until then build it
   as an optional native addon that is easy to leave out (like `lxr/`). Note it in THIRD_PARTY_NOTICES and the release checklist.

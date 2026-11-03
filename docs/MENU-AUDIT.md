@@ -23,7 +23,7 @@ in build 356 on a 1600 px desktop window. Nothing here is built yet; it is a pro
 
 ## Proposals, by menu
 
-**Audio & MIDI** (worst offender)
+**Audio & MIDI** (worst offender) — **done 3 Nov** (see HANDOVER "3 Nov: Audio & MIDI ports table")
 - Two tabs or two clear sections: AUDIO and MIDI, no paragraphs.
 - AUDIO: Output (dropdown) · Test · Level · Latency (Lowest / Balanced / Safest) · Rate · Latency comp · …pump live, one line
   each; "Reset audio engine" as a small button at the bottom.
@@ -68,7 +68,7 @@ in build 356 on a 1600 px desktop window. Nothing here is built yet; it is a pro
 **The File dot** means unsaved changes. Give it a tooltip ("Unsaved changes") so it explains itself.
 
 ## Order to build it in (each small, on `beta`)
-1. Audio & MIDI rebuilt as above (biggest win, self-contained).
+1. Audio & MIDI rebuilt as above (biggest win, self-contained). **Done 3 Nov.** (2–5 were done in build 358.)
 2. Tooltips instead of paragraphs across View and ⚙.
 3. Right-click menus trimmed to their context.
 4. Edit ▾ regrouped, labels shortened, Ctrl+D conflict resolved.

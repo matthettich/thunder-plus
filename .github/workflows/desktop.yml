@@ -57,6 +57,16 @@ jobs:
         shell: bash
         # With a lockfile (made by the Desktop lockfile workflow), exactly those packages; without one, the newest allowed.
         run: if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+      # ABLETON LINK (optional, GPL-2.0-or-later: link/NOTICE.md): the native addon, into electron/link/. If anything here
+      # fails, the app still builds; it then says Link is not available in this build. Leave the link/ folder out of the repo
+      # to build without it (both steps then do nothing).
+      - name: Ableton Link addon (optional)
+        if: hashFiles('link/build.js') != ''
+        continue-on-error: true
+        shell: bash
+        run: |
+          sh link/fetch-sdk.sh
+          node link/build.js
       - name: Build
         working-directory: ${{ env.APP_DIR }}
         shell: bash
