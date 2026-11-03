@@ -52,7 +52,24 @@ class Auto {
   constFrom(t){ const A = this.ev; if (!A.length) return this.v0; const e = A[A.length - 1]; return e.t <= t && (e.k === 0 || e.k === 1) ? e.v : null; }
   hold(t){ const v = this.at(t); this.cancel(t); this.set(v, t); }
   // Drop what is over by time t (the beat clock gets an event a step for as long as the song plays)
-  prune(t){ if (this.ev.length < 48) return; const v = this.at(t), fut = this.ev.filter(e => e.t > t || (e.k === 3 && e.t + e.d > t)); this.v0 = v; this.ev = [{k:0, t, v}, ...fut]; }
+  // Every block (owner, Fold: it sped up and glitched after playing a while: the lists grew to ~50 events each, and each
+  // was walked for every sample): what is over is folded into one value, keeping a fade in progress and a curve running.
+  prune(t){
+    const A = this.ev; if (!A.length || A[0].t > t) return;
+    let v = this.v0, st = null, cur = null, i = 0;
+    const val = x => st ? st.to + (st.from - st.to) * Math.exp(-(x - st.t) / st.tc) : v;
+    for (; i < A.length; i++){ const e = A[i];
+      if (e.k === 1){ if (e.t > t) break; v = e.v; st = null; continue; }
+      if (e.t > t) break;
+      if (e.k === 0){ v = e.v; st = null; cur = null; }
+      else if (e.k === 2){ st = {from:val(e.t), t:e.t, to:e.v, tc:e.tc}; cur = null; }
+      else if (e.k === 3){ if (e.t + e.d > t){ cur = e; } else { v = e.fn(e.t + e.d); st = null; cur = null; } } }
+    if (i === 0) return;
+    const now = cur ? cur.fn(t) : val(t), head = [{k:0, t, v:now}];
+    if (st) head.push({k:2, t, v:st.to, tc:st.tc});
+    if (cur) head.push(cur);
+    this.v0 = now; this.ev = head.concat(A.slice(i));
+  }
   at(t){
     let v = this.v0, pt = 0, st = null;   // st: a target in progress {from, t, to, tc}
     const val = x => st ? st.to + (st.from - st.to) * Math.exp(-(x - st.t) / st.tc) : v;
@@ -137,7 +154,7 @@ class ThunderCore extends AudioWorkletProcessor {
       case 'bpm': if (this.seq) this.seq.bpm = d.v; return;
       case 'perf': if (!perfLive.init) perfLiveInit(); if (d.xf != null) perfLive.xf = d.xf; if (d.mac) perfLive.mac = d.mac.slice(); if (d.fill != null) perfLive.fill = !!d.fill; return;
       case 'lxp': lxp.st = d.st | 0; return;
-      case 'stats': this.port.postMessage({op:'stats', id:d.id, n:this.nN || 0, late:this.nLate || 0, worst:this.worst || 0, voices:this.alive.size, lead:this.leadMin == null ? null : this.leadMin}); this.nN = this.nLate = this.worst = 0; this.leadMin = null; return;
+      case 'stats': this.port.postMessage({op:'stats', id:d.id, n:this.nN || 0, late:this.nLate || 0, worst:this.worst || 0, voices:this.alive.size, lead:this.leadMin == null ? null : this.leadMin, skips:this.skips || 0, lnodes:this.lnodes.size, vs:this.vs.reduce((a, T) => a + (T ? T.length : 0), 0), ovEv:[...tcNodes().values()].reduce((a, p) => a + (p.__ov ? [...p.__ov.p.values()].reduce((b, A) => b + A.ev.length, 0) + p.__ov.g.ev.length + p.__ov.pn.ev.length : 0), 0), clk:this.clk.ev.length, ms:this.pms || 0, blocks:this.pbl || 0}); this.pms = 0; this.pbl = 0; this.nN = this.nLate = this.worst = 0; this.leadMin = null; return;
       case 'sig': { const j = JSON.stringify(S); let h = 0; for (let i = 0; i < j.length; i++) h = (h * 31 + j.charCodeAt(i)) | 0; this.port.postMessage({op:'sig', len:j.length, h}); return; }
       case 'dbg': this.noSampler = !!d.noSampler; return;   // measuring: the page plays every note (the core only sequences)
       case 'die': this.dead = true; this.seq = null; this.alive.clear(); return;   // the page let this core go (Reset audio engine)
@@ -257,7 +274,10 @@ class ThunderCore extends AudioWorkletProcessor {
     this.take(ev); return false;
   }
   stopAll(at){ for (const v of this.alive) this.kill(v, at); for (const T of this.vs) if (T) T.length = 0;
-    for (const L of this.lnodes.values()){ if (L.cur) this.kill(L.cur, at); L.sylN = 0; if (L.proc.__ov) L.proc.__ov.until = at + 4; }   // a live note lets go; its release rings, then the page has the node back
+    for (const L of this.lnodes.values()){ if (L.cur) this.kill(L.cur, at); if (L.lanes) for (const q of L.lanes) if (q.cur) this.kill(q.cur, at); L.sylN = 0;
+      const ov = L.proc.__ov; if (!ov) continue;   // and whatever is still booked on it: gates shut now, no note after this
+      for (const [k, A] of ov.p){ if (/^(gate|g\d)$/.test(k)){ A.cancel(at); A.set(0, at); } else if (/^(trig|t\d)$/.test(k)) A.cancel(at); }
+      ov.until = at + 4; }   // a live note lets go; its release rings, then the page has the node back
     this.voxG.clear();
     // the effect switches go back to the slots' own (−1), as the page's resetSeq does, then the page has the params again
     for (const key of this.fxTouched){ const proc = tcNodes().get(key); if (!proc || !proc.__ov) continue; const ov = proc.__ov;
@@ -327,12 +347,15 @@ class ThunderCore extends AudioWorkletProcessor {
 
   process(inputs, outputs){
     if (this.dead) return false;
+    const __t0 = Date.now(); try { return this.process1(inputs, outputs); } finally { this.pms = (this.pms || 0) + Date.now() - __t0; this.pbl = (this.pbl || 0) + 1; }
+  }
+  process1(inputs, outputs){
     // 1. step the song up to LEAD ahead: the core books its own notes, the rows go up for the page's part
     const s = this.seq;
     if (s){
       // The audio thread itself was held up (a screenshot, the system busy): rather than racing through the rows it missed
       // (owner, Fold: "the speed increased"), the song moves on from now, as the page's pump does.
-      if (s.alive() && s.base != null && s.time < currentTime - 0.03){ const d = currentTime + 0.02 - s.time; s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
+      if (s.alive() && s.base != null && s.time < currentTime - 0.03){ this.skips = (this.skips || 0) + 1; const d = currentTime + 0.02 - s.time; s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
       const rows = []; let n = 0;
       while (s.alive() && s.time < currentTime + this.LEAD && n++ < 3){   // at most 3 steps a block: a longer LEAD (screen off) fills over a few blocks, not in one burst that overruns it
         const r = s.step();
