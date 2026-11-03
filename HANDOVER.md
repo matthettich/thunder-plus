@@ -119,6 +119,14 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (26): an animation for every effect (build 399)
+
+- fxAnimKind: after the old kinds, everything but flex / sgate / retrig / pmeter (and dynamics, spring) gets one: Delays or
+  pump echo → 'echo' (dkFxTaps, lit as a hit runs along), Dynamics and EQ / Filters → 'curve' (track analyser spectrum,
+  48 log bands, + dkFxCurve response cached on the values, dots at turning points), autopan → 'pan', Modulation → 'lfo',
+  Rhythmic → 'beats' (16 steps, from ctx time and bpm while playing), Pitch and voice → 'pitch', Utility → 'field';
+  anything new → 'lfo'. All in dkAnim.
+
 ## 3 Nov (25): …waves live engine (build 398)
 
 - waves/waves-worklet.js (now ?v=32 everywhere): `thunder-wlive` (WavesLiveProc) in the worklet branch, the twin of
