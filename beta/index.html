@@ -66,6 +66,9 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 body:not(.menuhelp) .gset .tsr .tsi{display:none}
 body:not(.menuhelp) :is(#pMaster,#pApp,#pKit,#pSkin,#pMidi,#pExport,#pAudio) .pbody > p.note{display:none}
 body:not(.menuhelp) :is(#pMaster,#pApp,#pKit,#pSkin,#pMidi,#pExport,#pAudio) .bar{cursor:help}
+/* FX SCREEN: the slot being edited, highlighted; a slot dragged to another one */
+.tscr .tgrid .ln.fxsel{background:color-mix(in srgb, #ff5a1f 16%, transparent); box-shadow:inset 4px 0 0 #ff5a1f} .tscr .tgrid .ln.fxsel span{font-weight:700}
+.tscr .tgrid .ln.fxdrag{opacity:.5} .tscr .tgrid .ln.fxdrop{box-shadow:inset 0 -3px 0 #ff5a1f, inset 0 3px 0 #ff5a1f}
 body.edoff #tGrid{box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--rec, #d0302a) 70%, transparent)}
 /* EDIT OFF, easier to see (owner, 2 Nov: "make something look different when you push escape and turn off edit"): on the
    Phrase screen (where it applies) the cursor turns hollow, a dashed red box instead of the filled block, the notes dim a
@@ -21483,6 +21486,21 @@ function acidLine(){
 
 /* ---------- drawing ---------- */
 const scr = $('tScr'), grid = $('tGrid');
+/* FX SCREEN DRAG (owner, 2 Nov): drag a slot row onto another slot row to move the effect there (fxMove). A plain click
+   still picks the slot; a drag only starts after the pointer moves 6 px, and its click is swallowed. */
+grid.addEventListener('pointerdown', e => {
+  if (tv !== 'fx' || e.button || e.pointerType === 'touch') return;
+  const c0 = e.target.closest && e.target.closest('[data-y]'), y0 = c0 ? +c0.dataset.y : -1; if (y0 < 1 || y0 > FXSLOTS) return;
+  const A = cFxT >= NT ? S.mfx : S.tfx[cFxT]; if (!A || !A[y0 - 1]) return;
+  const px = e.clientX, py = e.clientY; let on = false, tgtLn = null, to = -1; const ln0 = c0.closest('.ln');
+  const mv = ev => { if (!on && Math.hypot(ev.clientX - px, ev.clientY - py) < 6) return; if (!on){ on = true; if (ln0) ln0.classList.add('fxdrag'); }
+    const u = document.elementFromPoint(ev.clientX, ev.clientY), c = u && u.closest && u.closest('#tGrid [data-y]'), y = c ? +c.dataset.y : -1, l = c && c.closest('.ln');
+    if (tgtLn && tgtLn !== l) tgtLn.classList.remove('fxdrop'); tgtLn = y >= 1 && y <= FXSLOTS && y !== y0 ? l : null; to = tgtLn ? y - 1 : -1; if (tgtLn) tgtLn.classList.add('fxdrop'); };
+  const up = () => { removeEventListener('pointermove', mv, true); removeEventListener('pointerup', up, true); if (ln0) ln0.classList.remove('fxdrag'); if (tgtLn) tgtLn.classList.remove('fxdrop');
+    if (!on) return; const sw = ev => { ev.stopPropagation(); ev.preventDefault(); }; addEventListener('click', sw, true); setTimeout(() => removeEventListener('click', sw, true), 0);
+    if (to >= 0){ const A2 = cFxT >= NT ? S.mfx : S.tfx[cFxT], last = A2.reduce((m, x, i) => x ? i : m, -1); fxMove(cFxT, y0 - 1, A2[to] ? to : Math.min(to, last)); cs.fx.y = cFxS + 1; draw(); } };
+  addEventListener('pointermove', mv, true); addEventListener('pointerup', up, true);
+}, true);
 grid.addEventListener('scroll', e => { if (e.target.classList && e.target.classList.contains('fxpane')){ fxPaneTop = e.target.scrollTop; fxPaneCue(); } }, true);
 let CW = 0.6, meterEls = [], masterEls = [], trimEls = [], trimLit = '';
 const MH = 8, MW = 36;
@@ -21839,11 +21857,13 @@ function draw(){
       if (r.act){ L.push([{t:r.l, cls:cc(0, y, 'act'), x:0, y}]); return; }
       const val = r.show ? r.show() : r.fmt ? r.fmt(r.get()) : (r.min < 0 ? sgn(r.get()) : hx(r.get()));
       L.push([{t:r.l.padEnd(lw), cls:'lb', x:0, y}, {t:val, cls:cc(0, y, 'v'), x:0, y}]);
+      // FX: the slot whose controls are shown is highlighted (owner, 2 Nov: "make it clearer what effect you are editing")
+      if (tv === 'fx' && y >= 1 && y <= FXSLOTS && y - 1 === cFxS) L[L.length - 1].fxsel = true;
       if (tv === 'fx' && y === FXSLOTS) fxB = L.length;
     });
   }
   const spanH = s => typeof s === 'string' ? s : `<span class="${s.cls || ''}"${s.x != null ? ` data-x="${s.x}" data-y="${s.y}"` : ''}${s.r != null ? ` data-r="${s.r}"` : ''}${s.title ? ` title="${esc(s.title)}"` : ''}${s.st ? ` style="${s.st}"` : ''}>${esc(s.t)}</span>`;
-  const gl = L.map(ln => '<div class="ln' + (ln.b4 ? ' b4' : '') + (ln.wrap ? ' wrap' : '') + '">' + ln.map(spanH).join('') + '</div>');
+  const gl = L.map(ln => '<div class="ln' + (ln.b4 ? ' b4' : '') + (ln.wrap ? ' wrap' : '') + (ln.fxsel ? ' fxsel' : '') + '">' + ln.map(spanH).join('') + '</div>');
   if (tv === 'fx' && fxA != null && fxB != null){ gl.splice(fxB, 0, '</div><div class="ln fxcue"></div>'); gl.splice(fxA, 0, '<div class="fxpane">'); }
   const gh = gl.join('');
   const rebuilt = gh !== gridHTML; if (rebuilt){ gridHTML = gh; grid.innerHTML = gh; gridLit = []; }
@@ -25045,7 +25065,7 @@ function altDrag(e, x, y){
    lines. A click still only selects it, and a click on the selected value acts as before (EDIT). Ctrl/⌘ takes big steps,
    Shift slows a drag down (27 Oct: Shift took big steps). */
 const valCell = (s, x, y) => !!s && !onPset() && (tv === 'mixer' ? y === 0 || y === 1 || (y === 7 && (x === 0 || x === 2))
-  : (tv === 'fx' || tv === 'inst' || tv === 'project') && y >= 0 && !s.classList.contains('lb') && !s.classList.contains('act'));
+  : (tv === 'fx' || tv === 'inst' || tv === 'project') && y >= 0 && !(tv === 'fx' && y >= 1 && y <= FXSLOTS) && !s.classList.contains('lb') && !s.classList.contains('act'));   // FX slot rows: a drag moves the effect (FX SCREEN DRAG), never swaps it (2 Nov)
 const gridDown = e => {
   // RIGHT-CLICK (Ctrl+click on a Mac): the cell under the mouse becomes the cursor, unless it is inside the selection
   // (which stays); the contextmenu event that follows opens the commands there (cmdCtx). Nothing is edited or dragged.
