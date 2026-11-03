@@ -15141,6 +15141,19 @@ function normTfx(o){
 }
 const freshChainFx = () => new Array(FXSLOTS).fill(null);
 const normChainFx = a => Array.from({length:FXSLOTS}, (_, k) => Array.isArray(a) ? normTfx(a[k]) : null);
+/* …PUMP MASTERING (owner, 2 Nov: "swap the mastering chain for the pump mastering fx with the auto master as the final
+   plugin… mastering default on"): a new song's master FX slots 6–8 hold …pump EQ → COMP → MASTER (the auto master, last),
+   on. S.mstPump marks the song: MASTERING (Mixer, Settings, the master strip) switches those …pump slots on and off and
+   opens pump MASTER's window. Songs from before keep the old mastering stage (S.mst) exactly as saved. */
+const MST_PUMP = ['peq', 'pcomp', 'pmaster'];
+function mstPumpFresh(){ const A = freshChainFx(); try { MST_PUMP.forEach((k, i) => { if (TFX[k]) A[FXSLOTS - MST_PUMP.length + i] = freshTfx(k); }); } catch(e){} return A; }
+const mstPumpSlots = () => (S.mfx || []).map((f, k) => f && MST_PUMP.includes(f.type) ? k : -1).filter(k => k >= 0);
+const mstOn = () => S.mstPump ? mstPumpSlots().some(k => S.mfx[k].on) : !!S.mst.on;
+function mstSetOn(v){
+  if (!S.mstPump){ S.mst.on = !!v; mstChanged(); return; }
+  const K = mstPumpSlots(); if (!K.length){ toast('No …pump mastering on the master: add pEQ, pCOMP or pMSTR in its FX slots.'); return; }
+  K.forEach(k => S.mfx[k].on = !!v); fxChanged(NT); saveS(); mstLabel();
+}
 // The live list the worklet gets: on slots only, with each slot's parameters mapped for this rate and tempo.
 function tfxChain(A, sr, bpm){
   const out = [];
@@ -15867,7 +15880,7 @@ function freshSong(){
   return {app:'thunder-song', v:6, flx256:true, name:'Song 1', bpm:120, swing:50, swingB:2, limiter:true, renderFrom:0, master:255, mout:255, chainPatch:null,
     song:Array.from({length:256}, () => new Array(NT + 1).fill(-1)), chains:new Array(NPH).fill(null), phrases:new Array(NPH).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
-    tfx:Array.from({length:NT}, freshChainFx), mfx:freshChainFx(), chainOn:new Array(NT).fill(false), lpb:8, ticks:TICKS, dlen:16, plen:new Array(NPH).fill(16), plpb:new Array(NPH).fill(0),
+    tfx:Array.from({length:NT}, freshChainFx), mfx:mstPumpFresh(), mstPump:true, chainOn:new Array(NT).fill(false), lpb:8, ticks:TICKS, dlen:16, plen:new Array(NPH).fill(16), plpb:new Array(NPH).fill(0),
     ntr:16, smute:new Array(256).fill(0), tune:new Array(12).fill(0), mst:freshMst(), perf:freshPerf(), parts:new Array(PERF_PARTS).fill(null), presets:{voices:[], layers:[]}, secs:[], scale:0, sroot:0, ni:NI, sc2:1};   // secs: SONG EXTRAS section names [{y, n}]   // ntr: tracks in use (8–32, but 24 at most with a voice per track, so every track keeps its voice). smute[row]: a bit
 }
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;
@@ -15974,6 +15987,7 @@ function normSong(j){
     m.nm = typeof o.nm === 'string' ? o.nm.trim().slice(0, 12) : ''; m.col = clamp(int(o.col, 0), 0, TCOL.length - 1); } });   // TRACK NAMES   // sc: the old mixer sidechain bus (gone 21 Oct)
   if (Array.isArray(j.tfx)) for (let t = 0; t < NT; t++) S.tfx[t] = normChainFx(j.tfx[t]);
   S.mfx = normChainFx(j.mfx);
+  S.mstPump = !!j.mstPump;   // …PUMP MASTERING (2 Nov): this song's mastering is the …pump chain in its master FX slots
   if (Array.isArray(j.chainOn)) for (let t = 0; t < NT; t++) S.chainOn[t] = !!j.chainOn[t];
   if (j.chainPatch && typeof j.chainPatch === 'object' && (j.chainPatch.format === 'chains.patch' || j.chainPatch.format === 'waves.patch')) S.chainPatch = j.chainPatch;
   if (Array.isArray(j.irs)) S.irs = j.irs.slice(0, 4).map(e => e && typeof e === 'object' && e.L && typeof e.L === 'object' ? {name:String(e.name || 'IR').slice(0, 40), sr:clamp(int(e.sr, 48000), 8000, 192000), len:+e.len || 0, L:e.L, R:e.R && typeof e.R === 'object' ? e.R : null} : null);
@@ -19943,7 +19957,7 @@ function bump(d, big){
     setCell(tv, c.x, c.y, v); after(k, tv, c.x, c.y, v); return;
   }
   if (tv === 'mixer'){
-    if (c.y === 7 && c.mx === 1){ S.mst.on = d > 0; mstChanged(); draw(); return; }
+    if (c.y === 7 && c.mx === 1){ mstSetOn(d > 0); draw(); return; }
     if (c.y === 7 && c.mx === 2) S.mout = clamp((S.mout == null ? 255 : S.mout) + d * (big ? 16 : 1), 0, 255), moApply();   // GAIN STAGING: master OUT
     else if (c.y === 7) S.master = clamp(S.master + d * (big ? 16 : 1), 0, 255), rtRoute();
     else if (c.y === 5) return fxActiveStep(c.x, d > 0 ? 1 : -1);   // MIXER ROWS (2 Nov): CHN is row 4, FX row 5 (signal order)
@@ -21793,7 +21807,7 @@ function draw(){
     // the Mixer's widest line, and on a phone the fit shrank every line's text to make room for it (review, 27 Oct).
     const mxc = c.y === 7 ? c.mx || 0 : -1, mo = S.mout == null ? 255 : S.mout;
     L.push([{t:'MASTER ', cls:'lb'}, {t:hx(S.master), cls:'v' + (mxc === 0 ? ' cur' : ''), x:0, y:7, title:'MASTER ' + dB(curve(S.master)) + ': the drive into the limiter'}, '  ', {t:mn ? 'FX ' + fxList(S.mfx) : 'FX --', cls:mn ? 'cf' : 'e'}, '  ',
-      {t:'MASTERING ' + (S.mst.on ? 'ON' : 'OFF'), cls:'mstc' + (S.mst.on ? ' on' : '') + (mxc === 1 ? ' cur' : ''), x:1, y:7}, '  ',
+      {t:'MASTERING ' + (mstOn() ? 'ON' : 'OFF'), cls:'mstc' + (mstOn() ? ' on' : '') + (mxc === 1 ? ' cur' : ''), x:1, y:7}, '  ',
       {t:'OUT ', cls:'lb', title:'Master OUT: the master fader, after the limiter (FF = 0 dB, no boost). Its bar is on the meter below'}, {t:hx(mo), cls:'v' + (mxc === 2 ? ' cur' : ''), x:2, y:7, title:'OUT ' + dB(curve(mo))}]);
     for (const ch of ['L', 'R']) L.push([{t:ch + '   ', cls:'lb'}, {t:'', cls:'mm m1'}, {t:'', cls:'mm m2'}, {t:'', cls:'mm m3'}, {t:'', cls:'mm e'}, ' ', {t:'', cls:'mm lb'}]);
   } else {
@@ -22563,8 +22577,11 @@ const mwP = () => mwProto || (mwProto = new (window.OfflineAudioContext || windo
 const stageOn = k => k === 'eq' ? S.mst.eq.on : S.mst[k].on;
 function mstChanged(){ saveS(); clearTimeout(mwSyncT); mwSyncT = setTimeout(mstSync, 16); mwEqDirty = true; mwChain(); mstLabel(); }
 function mstChainTxt(){ const on = MW_STAGES.filter(([k]) => stageOn(k)).map(([, n]) => n); return on.length ? on.join(' → ') : 'nothing switched on'; }
-function mstLabel(){ const l = $('mstLbl'); if (l) l.textContent = S.mst.on ? 'On: ' + MW_STAGES.filter(([k]) => stageOn(k)).map(([, n]) => n.toLowerCase()).join(' → ') : 'Off'; }
+function mstLabel(){ const l = $('mstLbl'); if (l && S.mstPump){ l.textContent = mstOn() ? 'On: …pump ' + mstPumpSlots().filter(k => S.mfx[k].on).map(k => PUMP_SHORT[TFX[S.mfx[k].type].pump] || S.mfx[k].type).join(' → ') : 'Off'; return; } if (l) l.textContent = S.mst.on ? 'On: ' + MW_STAGES.filter(([k]) => stageOn(k)).map(([, n]) => n.toLowerCase()).join(' → ') : 'Off'; }
 function openMst(stage){
+  if (S.mstPump){ const K = mstPumpSlots(), m = K.find(k => S.mfx[k].type === 'pmaster'), k = m != null ? m : K[K.length - 1];
+    if (k == null) return toast('No …pump mastering on the master: add pMSTR in its FX slots (Mixer → MASTER → FX).');
+    try { PumpFX.open(NT, k); } catch(e){ tpLog('could not open the …pump mastering window', e); } return; }
   if (stage) mwSel = stage;
   // below the top bar, so the transport (Song / Stop) stays in reach while you listen
   const tb = document.querySelector('.top'), top = tb ? Math.round(tb.getBoundingClientRect().bottom) : 0;
