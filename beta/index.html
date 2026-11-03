@@ -236,6 +236,57 @@ input[type=range].wheelon{outline:2px solid var(--ink); outline-offset:2px; bord
 @media (pointer:coarse){ .gset :is(.audrow, .segrow, .btnrow, .mports, .tsr) :is(button:not(.seg button), select, input[type=number], input[type=text]), .gset .seg button{min-height:38px} }
 @media (max-width:600px){ .gset :is(.audrow > span:first-child, .segrow > span){width:84px} .gset .mports, .gset .tsr, .gset .tsr.act{grid-template-columns:84px minmax(0,1fr) auto} .gset .tsr, .gset .tsr.act{grid-template-columns:84px minmax(0,1fr)} }
 @media (max-width:480px){ .top #bSet .setx{display:none} }   /* gear only on the cover screen (the tracker too: with the label the bar wrapped to two rows) */
+/* MENU PASS 2 (owner, 2 Nov, later: "a little disorganized … lots of sections with no heading; make it feel really solid").
+   Every menu and panel is built from four things, each with one look:
+   1. the panel's title (Audio, Project, Screen, MIDI, App): plain, larger, ink;
+   2. a section heading (Output, Song & input, Render, Clock…): small caps, muted, on a hairline. File ▾ and Edit ▾ have them too;
+   3. a setting: its name in the label column, the control right of it; an on/off setting is the name and a switch;
+   4. a link to a sheet (Song settings, Skin, Open mastering): a full-width row with its value and a › on the right. */
+.gfile{width:max-content; min-width:268px; max-width:min(400px, calc(100vw - 16px)); gap:0; padding:2px 0 6px}
+.gfile .mhd{font:700 var(--fs-2)/1 var(--mono, inherit); letter-spacing:.12em; text-transform:uppercase; color:var(--muted); padding:11px 10px 6px; margin:4px 8px 0; border-top:1px solid var(--line)}
+.gfile .mhd:first-child{border-top:0; margin-top:0; padding-top:8px}
+.gfile .fitem{padding:6px 10px 6px 18px; min-height:30px}
+.gfile .msubbox{margin-left:22px}
+.gfile .msubbox .fitem{padding-left:10px}
+.gfile hr{margin:4px 10px 4px 18px; border-top-color:var(--track)}
+.gset .sethead, .gset .band .bar .ttl{font:600 var(--fs-5, 15px)/1.2 var(--font, inherit); letter-spacing:0; text-transform:none; color:var(--ink)}
+.gset .band .bar{border-bottom:0; margin:0 0 2px; padding:0}
+.gset .band .bar .lbl{font-size:var(--fs-3)}
+.gset h3{font:700 var(--fs-2)/1.2 var(--mono, inherit); letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin:14px 0 4px; padding:0 0 5px; border-bottom:1px solid var(--line)}
+.gset .tsec > h3:first-child, .gset .pbody > h3:first-child{margin-top:8px}
+.gset .tsec{display:grid; gap:0}
+.gset .gsec, .gset .gsec.band, .gset .band.grey{padding:12px 12px 14px}
+.gset .gsec + .gsec, .gset .gsetbody > section + section{border-top:2px solid var(--line)}
+/* rows: one height, one rule between them */
+.gset .tsr{padding:5px 0; min-height:40px; border-bottom:1px solid var(--track)}
+.gset .tsec > .tsr:last-child, .gset .tsec > .band:last-child{border-bottom:0}
+.gset .tsr.ck{grid-template-columns:minmax(0,1fr)} .gset .tsr.ck .tsi{grid-column:1}
+/* on/off: the name, and a square switch on the right */
+.gset label.cb{display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:30px; color:var(--ink); cursor:pointer; font-weight:500}
+.gset label.cb input[type=checkbox]{order:2; -webkit-appearance:none; appearance:none; flex:none; position:relative; width:36px; height:20px; margin:0; border:1px solid var(--line); background:var(--panel); border-radius:0; cursor:pointer}
+.gset label.cb input[type=checkbox]::before{content:''; position:absolute; top:3px; left:3px; width:12px; height:12px; background:var(--muted); transition:transform .12s, background .12s}
+.gset label.cb input[type=checkbox]:checked{background:var(--ink); border-color:var(--ink)}
+.gset label.cb input[type=checkbox]:checked::before{transform:translateX(16px); background:var(--inv)}
+.gset .btnrow:has(> label.cb){display:grid; gap:0} .gset .btnrow > label.cb + label.cb{border-top:1px solid var(--track)}
+/* links to a sheet or a window */
+.gset .tsr.sbtn{display:block; padding:0; min-height:0}
+.gset .tsr.sbtn > button, .gset #bMst{display:flex; width:100%; justify-content:flex-start; gap:10px; border:0; background:none; min-height:40px; padding:0 2px; font-size:var(--fs-4); color:var(--ink); text-align:left}
+.gset .tsr.sbtn > button::after, .gset #bMst::after{content:'›'; margin-left:auto; color:var(--muted); font-size:1.25em; line-height:1}
+.gset .tsr.sbtn .sbv{margin-left:auto; color:var(--muted); font-size:var(--fs-3)}
+.gset .tsr.sbtn .sbv:empty{display:none}
+.gset .tsr.sbtn > button:has(.sbv:not(:empty))::after{margin-left:0}
+.gset .tsr.sbtn > button, .gset #bMst, .gset .tsec .tsr.sbtn > button:not(.seg button), .gset .tsec .btnrow > #bMst:not(.seg button){padding:0; font-weight:500}
+.gset .tsec .band, .gset .tsec .band.grey{padding:0}
+.gset .tsr input[type=range]{flex:1 1 60px; min-width:50px}
+.gset .tsr .tsc output{min-width:0}
+.gset #audReset{min-height:30px; padding:0 10px}
+.gset .tsr.sbtn > button:hover, .gset #bMst:hover{background:var(--panel2)}
+.gset #pMaster .btnrow{display:block}
+/* action buttons (Test sound, Reset audio engine, Check for update…) all one size */
+.gset #audReset{font-size:var(--fs-3)}
+.gset .btnrow{gap:6px; align-items:center}
+.gset #storeInfo{flex:1 1 100%; font-size:var(--fs-3); color:var(--muted); line-height:1.4}
+@media (pointer:coarse){ .gset .tsr.sbtn > button, .gset #bMst{min-height:46px} .gset label.cb{min-height:38px} .gset label.cb input[type=checkbox]{width:42px; height:24px} .gset label.cb input[type=checkbox]::before{width:16px; height:16px} .gset label.cb input[type=checkbox]:checked::before{transform:translateX(18px)} }
 .help{position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; background:var(--bench); color:var(--ink)}
 .help .hhead{display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--side); flex:none}
 .help #helpNav{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; min-width:0; flex:0 1 auto}
@@ -349,7 +400,7 @@ body:not(.nowv) .wvMobNote{display:none}
 :is(#pAudio,#pMidi) :is(.segrow,.audrow)>span:first-child{width:96px; white-space:nowrap}
 #pAudio .audrow select#audOut{flex-basis:150px}
 #pAudio .btnrow:has(#audReset) > .lbl{display:none}
-#pAudio #audReset{min-height:0; padding:4px 10px; font-size:var(--fs-2)}
+#pAudio #audReset{min-height:30px; padding:0 10px; font-size:var(--fs-3)}   /* (MENU PASS 2: the same size as Test sound) */
 :is(#pAudio,#pMidi) .audrow .mlat input{width:52px}
 #pAudio .audrow input[type=range]{flex-basis:120px; min-width:80px}
 .segrow{min-width:0}
@@ -704,7 +755,7 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .ssh .ssg h3{margin-top:12px}
 .ssh .ssg .irbox{padding-top:8px}
 .gset .tsr.sbtn{grid-template-columns:minmax(0,auto) minmax(0,1fr)}
-.gset .tsr.sbtn button{font-weight:600; min-height:38px; padding-inline:14px; white-space:nowrap}
+.gset .tsr.sbtn button{white-space:nowrap}   /* (MENU PASS 2: a link row now, see MENU PASS 2 at the top) */
 .gset .tsr.sbtn .tsi{grid-column:auto}
 @media (max-width:560px){ .gset .tsr.sbtn{grid-template-columns:minmax(0,1fr)} .gset .tsr.sbtn button{justify-self:start} }
 .sksh{background:rgba(0,0,0,.14)}
@@ -2282,12 +2333,15 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     </div>
   </section>
   <section class="band grey" id="pApp" hidden>
-    <div class="bar"><span class="ttl">App</span><span class="lbl">...Thunder or ...Thunder Plus</span></div>
+    <div class="bar"><span class="ttl">App</span></div>
     <div class="pbody">
+      <h3>Layout</h3>
       <div class="btnrow"><label class="cb" title="Mobile is ...Thunder: the …waves and …chains editors are hidden (tick Show …chains or Show …waves on Mobile to keep one) and the tracker switches to PAD input. Kits and songs keep their …waves layers and …chains effects, and they still play, so files open and sound the same either way. Turn it off for Desktop (...Thunder Plus) to edit those patches. This is saved for this browser."><input type="checkbox" id="ckMobile">Mobile (...Thunder)</label></div>
       <div class="btnrow" id="mobEdRow"><label class="cb" title="Shows the …chains editor on Mobile (a big screen like the unfolded Fold has room for it). Off: the song's …chains effects still play."><input type="checkbox" id="ckMobCh">Show …chains on Mobile</label><label class="cb" title="Shows the …waves editor on Mobile. Off: the kit's …waves layers still play."><input type="checkbox" id="ckMobWv">Show …waves on Mobile</label></div>
+      <h3>Updates &amp; help</h3>
       <div class="btnrow"><button type="button" id="updBtn">Check for update</button><button type="button" id="helpBtn2">Help &amp; keys</button><span class="lbl setbuildL" id="appBuild"></span></div>
       <div class="btnrow" id="installRow" hidden><button type="button" id="installBtn" hidden>Install app</button><span class="lbl" id="installMsg"></span></div>
+      <h3>Storage</h3>
       <div class="btnrow" id="storeRow"><span class="lbl" id="storeInfo">Storage: …</span><button type="button" id="storeTidy" title="Deletes stored samples that no pad, preset or saved song uses">Clear unused samples</button><button type="button" id="phrTidy" title="Empties every phrase and block that isn't on the song, so their numbers are free for new ones (Undo brings them back)">Clear unused phrases</button></div>
     </div>
   </section>
@@ -2327,9 +2381,11 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <button id="bUnlearn">Unlearn</button>
         <button id="bMidiReset">Reset all</button>
       </div>
+      <h3>Input</h3>
       <div class="segrow"><span>Velocity</span><div class="seg" id="segVel"></div></div>
       <div class="audrow"><span>Notes in</span><select id="midiInSel" aria-label="Which MIDI input plays notes"><option value="">Every input</option></select><select id="midiInCh" class="mch" aria-label="Which channel plays notes"></select></div>
       <div class="audrow"><span>Keys play</span><select id="midiKeysSel" aria-label="What a MIDI keyboard plays in the tracker"><option value="1" title="The instrument you are on: its pad, or its MIDI gear">Current instrument</option><option value="0" title="Pads on notes 36–43, the selected synth on the rest">Pads + selected synth</option></select></div>
+      <h3>Output ports</h3>
       <div class="mports" role="group" aria-label="MIDI output ports">
         <span class="mph">PORT</span><span class="mph">DEVICE</span><span class="mph">DELAY</span>
         <span class="mpL">A</span><select id="midiOutSel0" aria-label="MIDI output port A"><option value="">None</option></select><label class="mlat" title="Gear delay for port A: how late this gear sounds after a note, in ms. Raise it if the gear sounds late against ...Thunder, lower it if early"><input type="number" class="numsmall" id="midiLat0" min="-50" max="200" step="1" aria-label="Gear delay for port A, in milliseconds"> ms</label>
@@ -2337,6 +2393,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <span class="mpL">C</span><select id="midiOutSel2" aria-label="MIDI output port C"><option value="">None</option></select><label class="mlat" title="Gear delay for port C, in ms"><input type="number" class="numsmall" id="midiLat2" min="-50" max="200" step="1" aria-label="Gear delay for port C, in milliseconds"> ms</label>
         <span class="mpL">D</span><select id="midiOutSel3" aria-label="MIDI output port D"><option value="">None</option></select><label class="mlat" title="Gear delay for port D, in ms"><input type="number" class="numsmall" id="midiLat3" min="-50" max="200" step="1" aria-label="Gear delay for port D, in milliseconds"> ms</label>
       </div>
+      <h3>Clock</h3>
       <div class="segrow"><span>Clock out to</span><div class="seg" id="segClkOut" role="group" aria-label="Send clock to ports"></div></div>
       <div class="segrow"><span>Clock in</span><div class="seg" id="segClkIn"></div></div>
       <div class="audrow"><span>Clock from</span><select id="midiClkSel" aria-label="Which MIDI input Clock in follows"><option value="" title="The first input that sends clock keeps it until it goes quiet">First that sends</option></select></div>
@@ -2367,15 +2424,17 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <section class="band grey" id="pAudio" hidden>
     <div class="bar"><span class="ttl">Audio</span><span class="lbl" id="audStat">Audio starts with the first sound</span></div>
     <div class="pbody">
+      <h3>Output</h3>
       <div class="audrow"><span>Output</span><select id="audOut" aria-label="Audio output device"><option value="">System default</option></select>
         <button class="sm" id="audNames" hidden>Show device names</button><button class="sm" id="audTest">Test sound</button></div>
       <div class="audrow"><span>Level</span><input type="range" id="audLvl" min="0" max="100" step="1" aria-label="Output level"><output id="audLvlV"></output></div>
+      <h3>Engine</h3>
       <div class="segrow"><span>Latency</span><div class="seg" id="segLat"></div></div>
       <div class="segrow"><span>Rate</span><div class="seg" id="segARate"></div></div>
       <div class="segrow" title="Lines up tracks and buses whose …pump effects look ahead (LIMIT, CALM, TONE, linear-phase EQ…) by delaying everything else to match. Off: those tracks play a little late, as before. Renders follow the same setting."><span>Latency comp</span><div class="seg" id="segPdc"></div></div>
       <div class="segrow" id="psLiveRow" hidden><span>…pump live</span><div class="seg" id="segPsLive"></div></div>
       <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread: the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
-      <div class="audrow"><span>Engine</span><button id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every voice and effect from scratch (song and kit are untouched)">Reset audio engine</button></div>
+      <div class="audrow"><span>Stuck notes</span><button id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every voice and effect from scratch (song and kit are untouched)">Reset audio engine</button></div>
       <p class="note" id="psLiveNote" hidden></p>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Latency and rate change when audio restarts. That reloads ...Thunder; your song and kit are kept.</span><button id="audRestart" class="on">Apply (reload)</button></div>
       <p class="note" id="audNote">Output picks where everything plays: the synth, the tracker and previews. Level is the overall volume after the tracker’s master. Lowest latency answers the pads fastest; Safest uses a bigger buffer if you hear crackles. Rate: Device uses the output’s own rate.</p>
@@ -12794,16 +12853,17 @@ function fileItems(){
   // patch's own file commands (they were New / Open / Save / Save as) say so.
   const pn = view === 'waves' ? '…waves' : '…chains';
   if (f) return [
-    {l:'Undo', k:K('mod+Z'), f:() => f.undo(), off:!f.canUndo()}, {l:'Redo', k:K('mod+shift+Z'), f:() => f.redo(), off:!f.canRedo()},
-    null, saveIt, saveAs, {l:'Open project…', k:K('mod+O'), f:openProj},
-    null, {l:'New ' + pn + ' patch', f:() => f.new()}, {l:'Open a ' + pn + ' patch file…', f:() => f.open()}, {l:'Export the ' + pn + ' patch…', f:() => f.saveAs()},
-    null, {l:'Export custom modules…', f:() => f.exportCustom()}, {l:'Import custom modules…', f:() => f.importCustom()}
+    {h:'Edit'}, {l:'Undo', k:K('mod+Z'), f:() => f.undo(), off:!f.canUndo()}, {l:'Redo', k:K('mod+shift+Z'), f:() => f.redo(), off:!f.canRedo()},
+    {h:'Project'}, {l:'Open project…', k:K('mod+O'), f:openProj}, saveIt, saveAs,
+    {h:(view === 'waves' ? 'Waves' : 'Chains') + ' patch'}, {l:'New patch', f:() => f.new()}, {l:'Open a patch file…', f:() => f.open()}, {l:'Export the patch…', f:() => f.saveAs()},
+    {h:'Custom modules'}, {l:'Export custom modules…', f:() => f.exportCustom()}, {l:'Import custom modules…', f:() => f.importCustom()}
   ];
   const ed = editShown();
   return [
     // MENUS (owner, 31 Oct: things in the right place): with the Edit menu on screen, Undo / Redo and Phrases… are there
     // only; a phone has no Edit menu, so they stay here
-    ...(ed ? [] : [{l:'Undo', k:K('mod+Z'), f:() => undoStep(-1), off:!undo.past.length && !vUndo.t.some(Boolean)}, {l:'Redo', k:K('mod+shift+Z'), f:() => undoStep(1), off:!undo.future.length}, null, {l:'Phrases… (find ones not on the song)', f:() => phlOpen(true)}, null]),
+    ...(ed ? [] : [{h:'Edit'}, {l:'Undo', k:K('mod+Z'), f:() => undoStep(-1), off:!undo.past.length && !vUndo.t.some(Boolean)}, {l:'Redo', k:K('mod+shift+Z'), f:() => undoStep(1), off:!undo.future.length}, {l:'Phrases… (find ones not on the song)', f:() => phlOpen(true)}]),
+    {h:'Project'},
     {l:'New song', k:K('mod+N'), f:newSong, ask:'song'},
     {l:'Open project…', k:K('mod+O'), f:openProj}, ...(recentL.length ? [{l:'Open recent…', f:openRecent}] : []),
     saveIt, saveAs,
@@ -12815,12 +12875,12 @@ function fileItems(){
       {l:'ELECTRO (demo project)', f:guardLeave('ELECTRO', loadElectro)},
       {l:'Funk breaks…', f:pickBreak},
       {l:'Breaks to chop (…pump BREAK)…', f:pickChopBreak}]},
-    null,
+    {h:'Render'},
     {l:'Render song (WAV)', f:() => renderOut(false)}, {l:'Render stems (.zip)', f:() => renderOut(true)},
     // RENDER PART: on a computer it's in Edit ▾ → Tools (by the selection it renders); a phone has no Edit menu
     ...(ed ? [] : [{l:'Render a part to a slot… (the phrase or song selection)', f:() => renderPart('pad')}, {l:'Render a part as a WAV', f:() => renderPart('wav')}]),
     ...(canShare && lastR ? [{l:'Share last render…', f:shareLast}] : []),
-    null,
+    {h:'Import, export & kit'},
     {l:'Export', sub:[
       {l:'MIDI file (.mid)', f:exportMidiFile},
       {l:'Song presets…', f:exportPresets},
@@ -12842,7 +12902,7 @@ function fileItems(){
       {l:'Clear all kit slots', f:clearKit, ask:'kit'},
       null,
       {l:(vtrk ? '✓ ' : '') + 'A voice per track', f:() => { setVtrk(!vtrk); try { $('ckVtrk').checked = vtrk; } catch(e){} }}]},   // (from ⚙'s Kit, 2 Nov)
-    ...(deskUpdApi ? [null, {l:'Check for updates…' + (deskUpd && deskUpd.version ? ' (you have ' + deskUpd.version + ')' : ''), f:() => deskUpdApi.check()}] : [])
+    ...(deskUpdApi ? [{h:'App'}, {l:'Check for updates…' + (deskUpd && deskUpd.version ? ' (you have ' + deskUpd.version + ')' : ''), f:() => deskUpdApi.check()}] : [])
   ];
 }
 /* ---------- DESKTOP APP UPDATES (electron/preload.js → window.thunderDesktop) ----------
@@ -12893,8 +12953,10 @@ function gfileToggle(open = $('gfile').hidden){
    buttons; an item with sub:[…] is a "Name ▸" row whose items open in place below it, indented (an accordion: the same
    with a mouse, a finger or the keys, where ▶ / ◀ open and close it). File ▾, Edit ▾ and the right-click menus use it. */
 function menuFill(host, items, pick, cls = 'fitem'){
+  const heads = host.classList.contains('gfile');
   for (const it of menuTidy(items)){
     if (!it){ host.append(el('hr')); continue; }
+    if (it.h){ if (heads) host.append(el('div', 'mhd', it.h)); else if (host.lastElementChild && !host.lastElementChild.matches('.sxmt, hr')) host.append(el('hr')); continue; }
     const b = el('button', cls); b.type = 'button'; b.setAttribute('role', 'menuitem');
     if (it.sub){
       const subs = menuTidy(it.sub); if (!subs.some(Boolean)) continue;
@@ -19634,7 +19696,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 369;
+const BUILD = 370;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -21841,44 +21903,50 @@ function cmdItems(full){
   const val = (a, l, arw, more) => it(a, l, (ks ? 'mod+' : 'X+') + arw, more);
   const grid = GRIDV.has(tv), trk = ['phrase', 'sect', 'mixer', 'fx'].includes(tv), rowsOk = tv === 'phrase' || tv === 'sect' || onSong;
   const isBus = ['phrase', 'sect', 'mixer', 'fx', 'song'].includes(tv) && (() => { try { const bt = onSong ? cs.song.x : dkTrack(); return bt >= 0 && bt < NT && isBusT(bt); } catch(e){ return false; } })();
-  return [
-    it('undo', 'Undo', 'mod+Z', {off:!undo.past.length && !vUndo.t.some(Boolean)}), it('redo', 'Redo', 'mod+shift+Z', {off:!undo.future.length}),
-    null,
+  return [   // (MENU PASS 2: {h} headings in Edit ▾; rules in the right-click menu)
+    {h:'History'}, it('undo', 'Undo', 'mod+Z', {off:!undo.past.length && !vUndo.t.some(Boolean)}), it('redo', 'Redo', 'mod+shift+Z', {off:!undo.future.length}),
+    {h:'Clipboard'},
     it('cut', 'Cut', 'mod+X'), it('copy', 'Copy', 'mod+C'), it('paste', 'Paste', 'mod+V', {off:!clip}),
     ...(grid || full ? [{a:'mixp', l:'Mix-paste (only into empty cells)', k:keyHint('mod+shift+V'), f:pasteMix, off:!clip || !grid}] : []),   // SELECTION TOOLS
     it('clr', onSong ? 'Delete (the phrase too)' : 'Clear', 'Del'),
-    null,
+    {h:'Select'},
     it('sel', selA ? 'Cancel the selection' : 'Start a selection', 'mod+B'),
     {a:'all', l:'Select all', k:keyHint('mod+A'), f:selectAll, off:!grid || onPset()},
     ...(onSong || full ? [it('rmv', 'Remove from song (keep the phrase)', '', {off:!onSong})] : []),
     // ROWS (1 Nov, audit K10): Insert and Ctrl/⌘+Backspace in the menu, for keyboards with no Insert key
-    ...(full ? [null, onSong ? {a:'rins', l:'Insert a song row (rows below move down)', k:'', f:songRowInsert}
+    ...(full ? [{h:'Rows'}, onSong ? {a:'rins', l:'Insert a song row (rows below move down)', k:'', f:songRowInsert}
         : {a:'rins', l:'Insert a row', k:'Insert', f:() => rowOp('insert'), off:!rowsOk || !!selA},
       onSong ? {a:'rmrow', l:'Remove the song row (rows below move up)', k:'', f:songRowRemove}
         : {a:'rdel', l:'Remove the row (rows below move up)', k:keyHint('mod+Backspace'), f:() => rowOp('remove'), off:!rowsOk || !!selA}] : []),
-    ...(onSong || full ? [null, it('clone', 'Clone (paste puts a unique copy)', 'mod+alt+C', {off:!onSong}), it('cldn', 'Clone down (into a new row below)', 'mod+shift+C', {off:!onSong}),
+    ...(onSong || full ? [{h:'Song blocks'}, it('clone', 'Clone (paste puts a unique copy)', 'mod+alt+C', {off:!onSong}), it('cldn', 'Clone down (into a new row below)', 'mod+shift+C', {off:!onSong}),
       {a:'dup', l:'Duplicate the pattern (insert below)', k:keyHint('mod+D'), f:() => dupKey(false), off:!onSong}, {a:'insp', l:'Insert paste (new rows below)', k:keyHint('mod+alt+V'), f:insertPaste, off:!onSong || !(clip && clip.v === 'song')},
       ...(onSong && !full ? [{a:'rmrow', l:'Remove the row (rows below move up)', k:'', f:songRowRemove}] : [])] : []),
-    ...(isBus ? [null, {a:'unbus', l:'Make this track a normal track (not a bus)', k:'', f:() => unBus(onSong ? cs.song.x : dkTrack())}] : []),   // BUS BACK TO A TRACK
-    ...(trk || full ? [null, {a:'dup', l:'Duplicate the track (no notes)', k:keyHint('mod+D'), f:() => dupKey(false), off:!trk},
+    {h:'Track'},
+    ...(isBus ? [{a:'unbus', l:'Make this track a normal track (not a bus)', k:'', f:() => unBus(onSong ? cs.song.x : dkTrack())}] : []),   // BUS BACK TO A TRACK
+    ...(trk || full ? [{a:'dup', l:'Duplicate the track (no notes)', k:keyHint('mod+D'), f:() => dupKey(false), off:!trk},
       {a:'dupn', l:'Duplicate the track with its notes', k:keyHint('mod+alt+D'), f:() => dupKey(true), off:!trk}] : []),
     ...(full ? [{a:'newph', l:'New phrase on the next empty track', k:keyHint('mod+T'), f:newPhraseRight},
-      null, {a:'mute', l:'Mute / unmute this track', k:'/', f:muteKey}, {a:'solo', l:'Solo / unsolo this track', k:keyHint('mod+/'), f:() => soloKey(false)},
-      {a:'loopp', l:'Loop the pattern', k:keyHint('alt+L'), f:toggleLoopPat}, {a:'loops', l:'Loop the selection', k:keyHint('shift+alt+L'), f:toggleLoop}] : []),
-    ...(['song', 'phrase', 'mixer', 'fx'].includes(tv) || full ? [null, {a:'tname', l:'Name this track…', k:'', f:nameTrackHere, off:!['song', 'phrase', 'mixer', 'fx'].includes(tv)}] : []),
-    null,
+      {a:'mute', l:'Mute / unmute this track', k:'/', f:muteKey}, {a:'solo', l:'Solo / unsolo this track', k:keyHint('mod+/'), f:() => soloKey(false)}] : []),
+    ...(['song', 'phrase', 'mixer', 'fx'].includes(tv) || full ? [{a:'tname', l:'Name this track…', k:'', f:nameTrackHere, off:!['song', 'phrase', 'mixer', 'fx'].includes(tv)}] : []),
+    {h:'Make'},
     ...(genItems(full).length ? [{l:'Generators', sub:genItems(full)}] : []),
     {l:'Tools', sub:toolItems(full)},
-    null,
+    {h:'Values'},
     ...(onSong && !full ? [] : [val('b:16', 'Value up a lot', '▲', {off:onSong})]), val('b:1', 'Value up', '▶'), val('b:-1', 'Value down', '◀'), ...(onSong && !full ? [] : [val('b:-16', 'Value down a lot', '▼', {off:onSong})]),
-    null,
+    {h:'Move'},
     it('prev', 'Previous ' + (CMD_NOUN[tv] || ''), onSong ? '' : '['), it('next', 'Next ' + (CMD_NOUN[tv] || ''), onSong ? '' : ']'),
-    null,
+    {h:'Play'},
+    ...(full ? [{a:'loopp', l:'Loop the pattern', k:keyHint('alt+L'), f:toggleLoopPat}, {a:'loops', l:'Loop the selection', k:keyHint('shift+alt+L'), f:toggleLoop}] : []),
     it('song', tp.on ? 'Stop the song' : 'Play the song from the cursor row', ks ? 'Space' : 'shift+Space')   // FIX (1 Nov, audit #1): KEYS mode plays the song on Space
   ];
 }
 // No rule at the start or end, and never two in a row (after items are left out).
-const menuTidy = L => L.filter((x, i, a) => x || (i > 0 && i < a.length - 1 && a[i - 1] && a.slice(i + 1).some(Boolean)));
+// MENU PASS 2 (owner, 2 Nov: "sections with no heading"): {h:'Song'} items are section headings. A heading with nothing
+// under it (its items all left out) goes; a heading stands in for the rule above it.
+const menuTidy = L => {
+  const out = L.filter((x, i) => { if (!x || !x.h) return true; for (let j = i + 1; j < L.length && L[j] && !L[j].h; j++) return true; return false; });
+  return out.filter((x, i, a) => x || (i > 0 && a[i - 1] && !a[i - 1].h && !(a[i + 1] && a[i + 1].h) && a.slice(i + 1).some(y => y && !y.h)));
+};
 /* EUCLIDEAN FILL (20 Oct; Edit ▾ and the right-click menu on a phrase): HITS spread as evenly as they go over STEPS, turned
    by ROTATE, written into the note column under the cursor (column 1 from the volume and effect columns) over the selected
    rows, or from the cursor to the end of the phrase; the pattern repeats if the rows are more than STEPS. A hit is the note
@@ -26702,6 +26770,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [370, '2 Nov', ['Menus, second pass: every group has a heading (File: Project, Render, Import, export & kit; Edit: History, Clipboard, Select, Rows, Song blocks, Track, Make, Play; Audio: Output, Engine; MIDI: Input, Output ports, Clock; App: Layout, Updates & help, Storage; View: Size, Display, More). On/off settings are switches on the right; Song settings, Skin and Open mastering are rows with a › that open their sheet. FLX 11–FF keeps its capitals.']],
   [369, '2 Nov', ['New effect: pSTRP, pump’s channel strip (Dynamics and EQ in the FX list): eight console styles with gate, compressor, EQ and drive in one slot, and 29 presets. Works on every track, buses and the master.']],
   [368, '2 Nov', ['Presets: the groups are now just Hack and Owls. New: hack bass and hack bass short (the 808-style bass that dives into each note), and 19 more owls: clicks (tick, wood, pop, metal, digital, soft), zaps (fast, mid, low, noisy, FM, laser) and rimshots (high, wood, metal, low, knock, comb, blip).']],
   [367, '2 Nov', ['Fixed: the Hardware skins (Vintage MPC, Nord red, 808, 909, Dr. Sample, M8) didn’t show in the skin list.']],
@@ -26977,12 +27046,14 @@ function skinSheet(){
 }
 // A menu row that opens a sheet: the button, and a line saying what is in it.
 function sheetBtn(kind){
-  const skinRow = kind === 'skin', K = SHEETS[kind], row = el('div', 'tsr act sbtn'), b = el('button', null, skinRow ? 'Skin…' : K.title + ' settings…'); b.type = 'button';
+  const skinRow = kind === 'skin', K = SHEETS[kind], row = el('div', 'tsr act sbtn'), b = el('button', null); b.type = 'button';
   b.setAttribute('aria-haspopup', 'dialog'); b.addEventListener('click', () => skinRow ? skinSheet() : setSheet(kind));
   const cur = SKINS.find(k => k.id === skin);
+  b.append(el('span', null, skinRow ? 'Skin' : K.title + ' settings'), el('span', 'sbv', skinRow && cur ? cur.name : ''));   // MENU PASS 2: a link row (› on the right), the skin's name as its value
   row.append(b, el('div', 'tsi', skinRow ? (cur ? cur.name : '') + ' · ' + SKINS.length + ' skins to pick from' : K.about)); return row;
 }
-const tsetLabel = l => { const t = l.replace(/^›\s*/, '').toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
+const tsetLabel = l => { const t = l.replace(/^›\s*/, '').toLowerCase(); return (t.charAt(0).toUpperCase() + t.slice(1))
+  .replace(/\b(flx|fx|fxo|midi|lpb|bpm|ir|irs|cpu|wav|lfo|eq)\b/gi, m => m.toUpperCase()).replace(/\b([0-9a-f]{2})[-–]([0-9a-f]{2})\b/gi, (m, a, b) => (a + '–' + b).toUpperCase()); };   // MENU PASS 2
 const tsetInfo = r => { try { return typeof r.info === 'function' ? r.info(r.get ? r.get() : 0) : (r.info || ''); } catch(e){ return ''; } };
 function tsetSet(r, v){ r.set(clamp(v, r.min, r.max)); if (r.after) r.after(); saveS(); draw(); }
 function tsetRow(r){
@@ -27050,7 +27121,9 @@ function buildProj(){
   if (!groups.has('Render & export')) groups.set('Render & export', []);
   if (!groups.has('Mastering')) groups.set('Mastering', []);
   const order = ['Song', 'Input', 'Render & export', 'Mastering'];
-  if (SET_SHEETS && trk){ const sec = el('section', 'tsec'); sec.append(el('h3', null, 'Song & input'), sheetBtn('song'), sheetBtn('input'), sheetBtn('seq')); list.append(sec); }   // SETTINGS SHEETS
+  if (SET_SHEETS && trk){ const sec = el('section', 'tsec'); sec.append(el('h3', null, 'Song & input'));   // SETTINGS SHEETS
+    for (const n of ['Song', 'Input']) for (const r of groups.get(n) || []) sec.append(tsetRow(r));   // (MENU PASS 2: the rows no sheet has, e.g. FLX 11-FF, here: they had a "Song" heading of their own)
+    sec.append(sheetBtn('song'), sheetBtn('input'), sheetBtn('seq')); list.append(sec); groups.delete('Song'); groups.delete('Input'); }
   for (const name of [...order.filter(n => groups.has(n)), ...[...groups.keys()].filter(n => !order.includes(n))]){
     if (SET_SHEETS && !groups.get(name).length && name !== 'Render & export' && name !== 'Mastering') continue;
     const sec = el('section', 'tsec'); sec.append(el('h3', null, name)); list.append(sec);
@@ -27072,11 +27145,13 @@ function buildScreen(){
   const list = $('gsecScreen'); if (!list) return;
   const sk = $('pSkin'); if (sk) $('gsetBody').append(sk);
   if (SET_SHEETS){   // SETTINGS SHEETS: the quick rows, any row no sheet lists, then the Screen and Skin buttons
-    const R = rowsByKey(), qs = el('section', 'tsec');
-    for (const k of SHEET_QUICK){ const r = R.get(k); if (r) qs.append(tsetRow(r)); }
-    let g2 = ''; for (const r of projRows()){ if (r.sec) g2 = r.sec; if (g2 === 'Screen' && r.l !== 'SKIN' && !inSheet(r)) qs.append(tsetRow(r)); }
-    qs.append(sheetBtn('screen'), sheetBtn('skin'));
-    list.replaceChildren(el('div', 'sethead', 'Screen'), qs); if (sk) sk.hidden = true; return;
+    // MENU PASS 2 (owner, 2 Nov): every group has a heading: Size, Display, then the links to the full sheets
+    const R = rowsByKey(), sec = t => { const x = el('section', 'tsec'); x.append(el('h3', null, t)); return x; };
+    const sz = sec('Size'), ds = sec('Display'), more = sec('More');
+    for (const k of SHEET_QUICK){ const r = R.get(k); if (r) (k === 'TEXT SIZE' || k === 'MIXER SIZE' ? sz : ds).append(tsetRow(r)); }
+    let g2 = ''; for (const r of projRows()){ if (r.sec) g2 = r.sec; if (g2 === 'Screen' && r.l !== 'SKIN' && !inSheet(r)) ds.append(tsetRow(r)); }
+    more.append(sheetBtn('screen'), sheetBtn('skin'));
+    list.replaceChildren(el('div', 'sethead', 'Screen'), ...[sz, ds].filter(x => x.childElementCount > 1), more); if (sk) sk.hidden = true; return;
   }
   list.innerHTML = ''; list.append(el('div', 'sethead', 'Screen'));
   let g = '', sec = el('section', 'tsec');
