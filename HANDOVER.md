@@ -112,6 +112,28 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (4): the wheel over a scroll bar scrolls it
+
+- Owner: "if my pointer is over a scroll bar, scrollwheel scrolls the bar". Before, the app's own wheel handlers took it:
+  on Arrange's bar the wheel moved the song cursor, on the Pattern view's sideways bar it moved the cursor down (Shift:
+  selected), on the FX screen's effect pane it moved the cursor.
+- `index.html`, just above the slider wheel (WHEEL FOCUS): `sbHit(el, x, y)` says whether a point is on el's own
+  vertical (`'v'`) or horizontal (`'h'`) scrollbar (the strip between the client box and the border; the element must
+  overflow `auto`/`scroll` that way). `sbWheel(e)` runs first (`addEventListener('wheel', sbWheel, {capture:true,
+  passive:false})` on window); on a bar it scrolls that element (vertical bar: up/down; horizontal bar: the wheel's
+  up/down, Shift+wheel's deltaX too; lines ×40, pages × the box), then `preventDefault` + `stopImmediatePropagation`,
+  so no app handler sees it. Off a bar it returns at once: nothing else changed. Ctrl+wheel (zoom, pinch) is left alone.
+- Covers every native bar that takes room, wherever it is: Arrange (`#tArrGrid`, 14 px styled), the Pattern view's
+  sideways bar (`#tGrid.pvon`), the FX screen's pane (`.fxpane`), the bottom panel's INST / FX lists (`#dkInstRows`,
+  `#dkFxRows`) and its body (`#dkBody`, when narrow), Help, Settings, sheets, menus, the preset browser. There are no
+  custom-drawn scrollbars in the app (`arrSbw` only measures Arrange's native one).
+- Not covered: overlay scrollbars (macOS's default "show when scrolling", phones) take no room, so they can't be told
+  from the content under them; there the wheel does what the content does. Arrange and the Pattern view style theirs
+  (`::-webkit-scrollbar`), which makes them classic, room-taking bars on the Mac too.
+- Tests: `tests/usability.test.js` ("wheel on a scrollbar") cuts sbHit/sbWheel and checks the hit areas and the event
+  handling. `node tools/wheel-scrollbar.mjs` (headless Chrome, real scrollbars, 1600×1000, ELECTRO) wheels over each bar
+  and off it; `BASE=1` runs it with sbWheel removed (Arrange, Pattern and FX pane checks then fail, as before the fix).
+
 ## 3 Nov (2): the rest of the sequencer move (all on `beta`, not released)
 
 - **FXV:** the core works out an effect slot's settings itself (`fxvMsg`) and hands them to the effect node at the row's
