@@ -1511,6 +1511,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkFxBar .dkadd{flex:0 0 96px; align-self:stretch; border:1.5px dashed var(--line); background:transparent; color:var(--ink); font-weight:700; font-size:var(--fs-3); letter-spacing:.06em; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px}
 #dkFxBar .dkadd small{font-family:var(--mono); font-weight:400; font-size:var(--fs-1); color:var(--muted)}
 #dkFxBar .dkadd:hover{background:var(--panel)}
+#dkFxBar .dkfc .fch{cursor:grab} #dkFxBar .dkfc.dragging{opacity:.55} #dkFxBar .droptgt{outline:3px solid #ff5a1f; outline-offset:2px}
 /* BUS (31 Oct fix): INST steps aside on a bus and left a blank gap before TRACK. …CHAINS keeps the width its controls need
    (it already grows with them); FX takes the rest, as on the master. */
 .tdeck.bus #dkFx{flex:1 1 var(--dkwf, 320px)}
@@ -17830,6 +17831,17 @@ function rtFx(t){
 }
 function rtAllFx(){ for (let t = 0; t <= NT; t++) rtFx(t); }
 function fxChanged(t){ pumpSyncT(t); saveS(); rtFx(t); try { PumpFX._notify(t, 'fx'); } catch(e){} }
+/* MOVE AN EFFECT (owner, 2 Nov: drag an effect to another slot, in the bottom bar or on the FX screen): the effect leaves
+   slot `from` and goes in at slot `to`; the ones between shift over a slot, as in a DAW's chain. One undo step. */
+function fxMove(t, from, to){
+  const A = t >= NT ? S.mfx : S.tfx[t]; if (!A || from === to || !A[from] || to < 0 || to >= FXSLOTS) return false;
+  const f = A.splice(from, 1)[0]; A.splice(to, 0, f); A.length = FXSLOTS;
+  for (let k = 0; k < FXSLOTS; k++) if (A[k] === undefined) A[k] = null;
+  try { for (const key of [...fxMem.keys()]) if (key.startsWith(t + ':')) fxMem.delete(key); } catch(e){}   // SLOT MEMORY is per slot: start it over
+  if (t === cFxT && cFxS === from) cFxS = to;
+  fxChanged(t); dkFbSig = ''; draw();
+  toast(`${TFX[f.type].long.split(':')[0]}: slot ${from + 1} → ${to + 1}`, 1600); return true;
+}
 function chainsFeedChanged(t){ saveS(); rtFx(t); draw(); }
 // Each enabled track gets its own Track In + Chain Out pair, wired straight through, so every track keeps
 // its own chain and toggling one never disturbs another. The pair is placed below everything already in
@@ -23309,8 +23321,19 @@ function deckFxBar(){
       const D = TFX[f.type], on = el('button', 'fon' + (f.on ? ' on' : '')), nm = el('button', 'fnm', (k + 1) + ' ' + D.n); on.type = nm.type = 'button';
       on.title = f.on ? 'On: click to switch it off' : 'Off: click to switch it on'; on.setAttribute('aria-pressed', String(!!f.on));
       on.addEventListener('click', () => { const g = FA()[k]; if (!g) return; g.on = !g.on; fxChanged(mst ? NT : dkTrack()); dkFbSig = ''; draw(); });
-      nm.title = D.long + ' · open it on the FX screen'; nm.addEventListener('click', () => goFx(k));
+      nm.title = D.long + ' · open it on the FX screen · drag the header to move it to another slot'; nm.addEventListener('click', () => { if (!nm._noClick) goFx(k); });
       const m = el('div', 'fm'); m.append(el('i')); h.append(on, nm); col.append(h, m, b);
+      // DRAG TO REORDER (owner, 2 Nov): drag the header onto another effect (or + ADD FX) to move it there
+      h.addEventListener('pointerdown', e => { if (e.button || e.target === on) return; const x0 = e.clientX, y0 = e.clientY; let dragging = false, tgt = null;
+        const mv = ev => { if (!dragging && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+          if (!dragging){ dragging = true; col.classList.add('dragging'); try { h.setPointerCapture(e.pointerId); } catch(_){} }
+          const u = document.elementFromPoint(ev.clientX, ev.clientY), c = u && u.closest && u.closest('#dkFxBar .dkfc, #dkFxBar .dkadd');
+          if (tgt && tgt !== c) tgt.classList.remove('droptgt'); tgt = c && c !== col ? c : null; if (tgt) tgt.classList.add('droptgt'); };
+        const up = () => { removeEventListener('pointermove', mv, true); removeEventListener('pointerup', up, true); col.classList.remove('dragging'); if (tgt) tgt.classList.remove('droptgt');
+          if (!dragging) return; nm._noClick = true; setTimeout(() => { nm._noClick = false; }, 0);
+          const AA = FA(), last = AA.reduce((m, x, i) => x ? i : m, -1), to = tgt ? (tgt.classList.contains('dkadd') ? last : +tgt.dataset.k) : NaN;   // onto + ADD FX: the end of the chain
+          if (Number.isFinite(to)) fxMove(mst ? NT : dkTrack(), k, to); };
+        addEventListener('pointermove', mv, true); addEventListener('pointerup', up, true); });
       const vz = el('div', 'fviz'); vz.append(document.createElement('canvas')); col.append(vz); col._h = new Float32Array(90); col._w = 0; col._q = 0;
       if (isFxDyn(f.type)){ col.classList.add('dyn'); const dm = document.createElement('canvas'); dm.className = 'fdm'; dm.title = FXLV.has(f.type) ? 'IN, the change in level, OUT' : 'IN level, gain reduction (0 to 24 dB) and OUT level; the line is the threshold'; col.append(dm); }
       const getF = () => FA()[k];
@@ -23339,7 +23362,7 @@ function deckFxBar(){
     }
     const free = Array.from({length:FXSLOTS}, (_, k) => k).filter(k => !A[k]);
     if (free.length){ const ad = el('button', 'dkadd'); ad.type = 'button'; ad.append('+ ADD FX', el('small', null, 'slot ' + (free[0] + 1)));
-      ad.title = 'Add an effect in slot ' + (free[0] + 1) + ' (FX screen)'; ad.addEventListener('click', () => goFx(free[0])); bar.append(ad); }
+      ad.title = 'Add an effect in slot ' + (free[0] + 1) + ' (FX screen)'; ad.dataset.k = free[0]; ad.addEventListener('click', () => goFx(free[0])); bar.append(ad); }
   }
   dkFbVals.forEach(fn => fn());
   // which slot the FX screen has open, outlined
