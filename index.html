@@ -19732,7 +19732,8 @@ function fxPreApply(t, k, vals, name){
 function fxPresetOpen(t, k){
   const A = t >= NT ? S.mfx : S.tfx[t], f = A && A[k]; if (!f || TFX[f.type].pump) return;
   const list = [{name:'INIT', sec:'DEFAULTS', vals:{}}, ...(FX_FACTORY[f.type] || []).map(([name, vals]) => ({name, sec:'FACTORY', vals})),
-    ...fxPreSongList(f.type).map(p => ({name:p.name, sec:'THIS SONG', vals:p.v, full:true}))];
+    ...fxUserList(f.type).map(p => ({name:p.name, sec:'MY PRESETS', vals:p.v, full:true})),
+    ...fxPreSongList(f.type).filter(p => !fxUserList(f.type).some(u => u.name === p.name)).map(p => ({name:p.name, sec:'THIS SONG', vals:p.v, full:true}))];
   const cur = list.findIndex(p => p.name === f.pname);
   Object.assign(fxp, {open:true, slot:-1, tpre:{t, k, list}, i:Math.max(0, cur)});
   const heads = {}; list.forEach((p, j) => { if (!j || p.sec !== list[j - 1].sec) heads[j] = p.sec; });
@@ -19740,12 +19741,21 @@ function fxPresetOpen(t, k){
 }
 async function fxPresetSave(t, k){
   const A = t >= NT ? S.mfx : S.tfx[t], f = A && A[k]; if (!f) return;
-  const name = await askText({title:'Save as a preset', body:`${fxNameOf(f.type)}: this slot’s settings, kept in this song under a name (› PRESET lists it for every ${fxNameOf(f.type)} slot).`}, f.pname && f.pname !== 'INIT' ? f.pname : '', 40, 'Save');
+  const name = await askText({title:'Save as a preset', body:`${fxNameOf(f.type)}: this slot’s settings under a name. › PRESET lists it under MY PRESETS in every song on this device, and the song keeps a copy.`}, f.pname && f.pname !== 'INIT' ? f.pname : '', 40, 'Save');
   if (name == null || !name.trim()) return;
   const n = name.trim(); S.fxPre = S.fxPre || {}; const L = S.fxPre[f.type] = fxPreSongList(f.type).filter(p => p.name !== n);
   const v = {}; for (const q of TFX[f.type].ps) v[q.k] = f[q.k];
-  L.push({name:n, v}); f.pname = n; saveS(); draw(); toast(`Saved preset “${n}” for ${fxNameOf(f.type)}`);
+  L.push({name:n, v}); f.pname = n;
+  fxUserPut(f.type, n, v);   // MY PRESETS: kept on this device for every song as well
+  saveS(); draw(); toast(`Saved preset “${n}” for ${fxNameOf(f.type)}: in My presets (every song) and in this song`);
 }
+/* MY PRESETS (owner, 2 Nov: "save user presets in the fx"): › SAVE AS PRESET… also keeps the preset on this device, so
+   › PRESET lists it in every song under MY PRESETS (the song keeps its copy too, so it travels with the file). Same name,
+   same effect: replaced. Stored as {type: [{name, v}]}; read through normFxPre's checks. */
+const FXU_K = 'thunderplus-fxuser-v1';
+let fxUser = (() => { try { return normFxPre(JSON.parse(localStorage.getItem(FXU_K) || '{}')); } catch(e){ return {}; } })();
+function fxUserList(type){ const L = fxUser && fxUser[type]; return Array.isArray(L) ? L : []; }
+function fxUserPut(type, name, v){ fxUser[type] = fxUserList(type).filter(p => p.name !== name).concat([{name, v}]); try { localStorage.setItem(FXU_K, JSON.stringify(fxUser)); } catch(e){ toast('My presets couldn’t be saved on this device (storage full?): the preset is in the song.'); } }
 function normFxPre(j){
   const o = {}; if (!j || typeof j !== 'object') return o;
   for (const type of Object.keys(j)) if (TFX[type] && !TFX[type].pump && Array.isArray(j[type]))
