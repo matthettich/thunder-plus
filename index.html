@@ -12631,7 +12631,9 @@ function editItems(){
 function geditToggle(open = $('gedit').hidden){
   if (open){ if (gsetOpen()) gsetToggle(false); if (!$('gfile').hidden) gfileToggle(false); sxMenuClose(); }
   const host = $('gedit'); host.replaceChildren();
-  if (open) menuFill(host, editItems(), it => { geditToggle(false); it.f(); });
+  // EDIT ▾ (menu audit, 2 Nov): the value steps, previous / next, play and "start a selection" are keys, not menu commands
+  const KEYONLY = new Set(['b:16', 'b:1', 'b:-1', 'b:-16', 'prev', 'next', 'song', 'sel']);
+  if (open) menuFill(host, editItems().filter(x => !x || !KEYONLY.has(x.a)), it => { geditToggle(false); it.f(); });
   host.hidden = !open;
   $('bEdit').classList.toggle('on', open); $('bEdit').setAttribute('aria-expanded', String(open));
   if (open) placeMenu(host);
