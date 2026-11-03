@@ -366,6 +366,11 @@ input[type=range]{width:100%; accent-color:var(--ink); height:30px; margin:0; to
 /* top bar, like the Seeds title bar */
 .top{display:flex; align-items:center; gap:10px; padding-block:9px; padding-inline:16px; border-bottom:1px solid var(--line); flex:none; flex-wrap:wrap; background:var(--bench)}
 .brand{font-weight:600; font-size:22px; letter-spacing:.01em; white-space:nowrap; margin-right:6px}
+/* EDIT LOGO (3 Nov): on the tracker, edit mode makes the logo a red chip (the REC red; the …plus keeps its colour); a click switches */
+body.trv .top .brand{cursor:pointer; padding:0 6px; margin-left:-6px; transition:background-color .12s, color .12s}
+body.trv.edon .top .brand{background:var(--rec, #d0302a) !important; color:#fff !important}
+body.trv.edon .top .brand .plus{color:#fff !important; opacity:.8}
+:root[data-skin="nord"] body.trv.edon .top .brand{background:#1b1b1b !important}
 .brand .plus{position:relative; z-index:1; display:inline-block; margin-left:3px; font-weight:700; color:var(--wv);
   -webkit-text-stroke:.05em #111; paint-order:stroke fill}
 body.mob .brand .plus, body.nowv .wvEdit{display:none !important}
@@ -27046,7 +27051,16 @@ function down1(){ const c = cs[tv], d = dims(tv); c.y = clamp(c.y + (GRIDV.has(t
    reminder says so). Esc switches it (Esc first drops a selection, as before). On when the app opens. The keypad, the
    pads' EDIT and the mouse still edit. */
 let editOn = true;
-function setEditOn(on){ editOn = !!on; document.body.classList.toggle('edoff', !editOn); toast(editOn ? 'Edit mode on: typing writes into the phrase' : 'Edit mode off: the note keys only play (Esc turns editing back on)', 2200); draw(); }
+/* EDIT LOGO (owner, 3 Nov: "when we are in edit mode, can we change the Thunder Plus logo color? Can we make clicking the
+   logo the quick way to toggle back and forth between note entry / edit mode and edit off?"). On the tracker the logo is
+   a red chip while typing writes into the phrase (edit mode, Esc's other state) and plain with EDIT OFF; a click on it
+   switches, as Esc does. */
+function brandTitle(){ const b = document.querySelector('.top .brand'); if (b) b.title = (editOn ? 'Edit mode on: typing writes into the phrase' : 'Edit off: the note keys only play') + ' · click (or Esc) to switch'; }
+document.body.classList.add('edon');
+{ const b = document.querySelector('.top .brand');
+  if (b){ b.setAttribute('role', 'button'); b.tabIndex = -1; brandTitle();
+    b.addEventListener('click', () => { if (view !== 'tracker') return; setEditOn(!editOn); try { draw(); } catch(e){} }); } }
+function setEditOn(on){ editOn = !!on; document.body.classList.toggle('edoff', !editOn); document.body.classList.toggle('edon', editOn); brandTitle(); toast(editOn ? 'Edit mode on: typing writes into the phrase' : 'Edit mode off: the note keys only play (Esc turns editing back on)', 2200); draw(); }
 const edBlock = () => { if (editOn || tv !== 'phrase') return false; toast('Edit mode is off: Esc turns it on', 1400); return true; };
 /* SCALE MODE (owner, 1 Nov, as Live 12's): with it on and a song SCALE set (Settings → Song → Key), the notes you type and
    play from the computer keyboard land on the scale (the nearest note of it), in the tracker and on the Synth page. This
@@ -27621,6 +27635,7 @@ function setView(v){
   if (tr || wv || ch){ gsetToggle(false); gfileToggle(false); }
   document.body.classList.toggle('wvv', wv);
   document.body.classList.toggle('chv', ch);
+  document.body.classList.toggle('trv', tr);   // EDIT LOGO: the logo shows edit mode on the tracker
   if (wv) showWaves(); else if (was === 'waves') leaveWaves();
   if (ch) showChains(); else if (was === 'chains') leaveChains();
   if (ch && CH.fitNext){ CH.fitNext = false; chainFitTry(); }   // pairs added from the Mixer: show them all
