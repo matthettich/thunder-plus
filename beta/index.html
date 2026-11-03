@@ -1009,6 +1009,27 @@ body:not(.legon) .tside .tlegend{display:none}
 .tside{position:relative; padding-top:26px}
 .tsidex{position:absolute; top:2px; right:2px; min-height:0; width:20px; height:20px; padding:0; font-size:var(--fs-2); line-height:1; border:0; background:transparent; color:var(--muted); z-index:2}
 .tsidex:hover{color:var(--ink); background:var(--panel2)}
+/* SIDE PANEL CARDS (owner, 3 Nov: "the side bar could use a restyle to look more like the fx bar does now", and the
+   instrument list was cut off): the status and meters, and the instruments, are cards like the FX bar's columns (a border,
+   an offset shadow, a dark title bar); the instruments card takes the room that's left and scrolls inside itself, in rows
+   that wrap to the panel's width, so nothing is cut off at the side or the bottom. */
+.tside{gap:14px; padding-right:16px}
+.tside .tcard{flex:none; display:flex; flex-direction:column; min-height:0; border:1.5px solid var(--line); background:var(--panel); color:var(--ink);
+  box-shadow:4px 4px 0 0 #fff, 4px 4px 0 1.5px var(--line)}
+.tside .tcst .tstat{background:var(--ink); color:var(--inv); padding:5px 8px 6px; gap:1px}
+.tside .tcst .tstat b{font-size:var(--fs-3); letter-spacing:.06em}
+.tside .tcst .tstat span{font-size:var(--fs-2); opacity:.8; letter-spacing:.03em}
+.tside .tcst .tmeters{padding:8px}
+.tside .tinlw{flex:1 1 auto; gap:0; min-height:90px}
+.tside .tinlw[hidden]{display:none}
+.tside .tinlh{background:var(--ink); color:var(--inv); padding:5px 8px; font-size:var(--fs-3); letter-spacing:.06em; flex:none}
+.tside .tinl{grid-auto-flow:row; grid-template-rows:none; grid-template-columns:repeat(auto-fill, minmax(92px, 1fr)); gap:3px; padding:6px; overflow-y:auto; overflow-x:hidden; flex:1 1 auto; min-height:0; align-content:start}
+.tside .tinl button{border:1px solid var(--line); background:var(--panel2, transparent); padding:3px 5px; border-radius:0}
+.tside .tinl button.on{background:var(--ink); color:var(--inv); border-color:var(--ink)}
+/* PLAYING (owner, 3 Nov: "flash them as they play, just like on the synth screen"): an instrument lights as its notes sound */
+.acidask option.acidfree{background:color-mix(in srgb, var(--meter-ok, #4fd18a) 16%, var(--panel, #fff))}
+.tinl button.hit{background:#ff5a1f !important; color:#fff !important; border-color:#ff5a1f !important}
+.tinl button.hit i{opacity:.9}
 /* Lp. Sel. and TRANS − + sit side by side: one rule between neighbours, not two. */
 .trows .rv + .rv{border-left:0}
 .tctl{flex:none; background:var(--side); border-top:1px solid var(--line); padding-block:10px 12px; padding-inline:16px;
@@ -2933,9 +2954,9 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <button type="button" data-v="song">SONG</button><button type="button" data-v="sect">SECT</button><button type="button" data-v="phrase">PHRASE</button><button type="button" data-v="inst">INST</button>
         <button type="button" data-v="mixer" style="grid-column:span 2">MIXER</button><button type="button" data-v="fx" style="grid-column:span 2">FX</button>
       </div>
-      <div class="tstat"><b id="tState"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>STOPPED</b><span id="tBpm"></span></div>
-      <div class="tmeters" id="tMeters"></div>
-      <div class="tinlw" id="tInlSideW" hidden><span class="tinlh">INSTRUMENTS</span><div class="tinl" id="tInlSide" aria-label="Instruments and their pads"></div></div>
+      <div class="tcard tcst"><div class="tstat"><b id="tState"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>STOPPED</b><span id="tBpm"></span></div>
+        <div class="tmeters" id="tMeters"></div></div>
+      <div class="tcard tinlw" id="tInlSideW" hidden><span class="tinlh">INSTRUMENTS</span><div class="tinl" id="tInlSide" aria-label="Instruments and their pads"></div></div>
       <button type="button" class="tlegbtn" id="tLegBtn" aria-expanded="false" title="The main keys (? or F1: all of them)">KEYS ▸</button>
       <dl class="tlegend" id="tLegPad">
         <dt>?</dt><dd>help: every key and how it all works</dd>
@@ -19140,7 +19161,8 @@ function pumpRun(){
 }
 // With the synth open, light each pad as the tracker plays it (in time with the sound).
 function padBlink(e){
-  if (view === 'tracker' || !padEls[e.pad]) return;
+  if (view === 'tracker'){ if (inlOn && e.ii != null) inlBlink(e); return; }   // INST LIST: the instrument flashes (3 Nov)
+  if (!padEls[e.pad]) return;
   if (sndOn()){ let au = true; try { au = audible(e.track); } catch(err){} if (au) sndHit(e.pad, e.t, e.rate, false, e); sndWake(); }   // the sound view's line, and its scope
   const ms = Math.max(0, (e.t - ctx.currentTime + (ctx.outputLatency || ctx.baseLatency || 0)) * 1000);
   setTimeout(() => { if (tp.on && view !== 'tracker' && audible(e.track)) flash(e.pad); }, ms);
@@ -20387,7 +20409,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 388;
+const BUILD = 389;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -20627,6 +20649,12 @@ function instList(){
   }
   if (sig === inlSig) return; inlSig = sig;
   const h = rows.join(''); $('tInlSide').innerHTML = h; pd.innerHTML = h;
+}
+// The INST LIST's instrument lights as its note sounds (at the note's time, through the output latency), as the Synth page's pads do.
+function inlBlink(e){
+  const ms = Math.max(0, (e.t - ctx.currentTime + (ctx.outputLatency || ctx.baseLatency || 0)) * 1000), ii = e.ii;
+  setTimeout(() => { if (!tp.on || view !== 'tracker') return; let au = true; try { au = audible(e.track); } catch(err){} if (!au) return;
+    for (const id of ['tInlSide', 'tInlPad']){ const b = $(id).querySelector(`[data-i="${ii}"]`); if (!b || b.hidden) continue; b.classList.add('hit'); clearTimeout(b._hit); b._hit = setTimeout(() => b.classList.remove('hit'), 110); } }, ms);
 }
 // INST LIST with 64 instruments: 00–0F always, the rest once a phrase uses them or they've been changed (kept until the song changes).
 let instShownC = {v:-1, S:null, set:null};
@@ -22932,7 +22960,13 @@ function acidLine(){
   box.append(el('div', 'asktitle', 'Acid line'), el('div', 'askmsg', `Rows ${rS(y0)}–${rS(y0 + L - 1)} of this phrase, instrument ${hx(ins)}. Accents are volume FF, slides PSL. Use it with an Acid pad (Engine: Acid).`));
   const field = (label, ctl) => { const f = el('label', 'acidf'); f.append(el('span', null, label), ctl); box.append(f); return ctl; };
   const sel = (label, opts, k) => { const s = el('select'); opts.forEach(([v, t]) => s.append(new Option(t, v))); s.value = acidSet[k]; s.addEventListener('change', () => { acidSet[k] = +s.value; }); return field(label, s); };
-  { const s = el('select'); for (let k = 0; k < S.insts.length; k++) s.append(new Option(instLabel(k), k)); s.value = ins; s.addEventListener('change', () => { ins = +s.value; }); field('Instrument', s); }
+  // INSTRUMENT (owner, 3 Nov): picking one plays a short note on it (at the line's root), so you hear what it is; the ones no
+  // phrase in the song uses yet are marked, lightly (· free, and a faint tint where the list can be coloured)
+  { const s = el('select'), used = new Set(); for (const ph of S.phrases) if (ph) for (const r of ph) if (r && r[IC] >= 0) used.add(r[IC]);
+    for (let k = 0; k < S.insts.length; k++){ const o = new Option(instLabel(k) + (used.has(k) ? '' : '  · free'), k); if (!used.has(k)) o.className = 'acidfree'; s.append(o); }
+    s.value = ins;
+    s.addEventListener('change', () => { ins = +s.value; try { const h = preview(ins, clamp(acidSet.base + (acidSet.root | 0), 0, 119), -1, false, null, true); if (h) setTimeout(() => previewOff(h), 260); } catch(e){} });
+    field('Instrument', s); }
   sel('Style', ACID_STYLES.map((n, i) => [i, n]), 'style');
   let keyS = null;
   { const s = keyS = el('select'); s.append(new Option(found ? 'From the song: ' + found.name : 'From the song (not enough notes yet)', 1), new Option('Set by hand', 0)); s.value = acidSet.auto ? 1 : 0;
@@ -28314,6 +28348,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [389, '3 Nov', ['The side panel is restyled like the FX bar: the status and meters and the INSTRUMENTS list are cards with dark title bars, and the instruments wrap to the panel’s width and scroll inside their card, so none are cut off. With the instrument list on, each instrument flashes as its notes play, as the pads do on the Synth page.', 'Acid line…: picking an instrument plays a short note on it, and instruments no phrase uses yet are marked · free.']],
   [388, '3 Nov', ['Track numbers (Arrange, Song, Mixer): Alt/⌥-click mutes the track, as Alt-click mutes a block; a plain click picks the track, a double-click names it without muting it on the way, a right-click still solos. (Touch is as before.)', 'Alt/⌥+T adds a new phrase on the next empty track, as Ctrl/⌘+T does; it works in a browser tab, where Chrome keeps Ctrl/⌘+T.']],
   [387, '3 Nov', ['Acid line… finds the song’s key: KEY From the song uses the Project SCALE if you set one, else works it out from the notes your synths and MIDI instruments play (drums never count) and shows what it found; Set by hand keeps your Scale and Root.', '…chains and …waves: a drag on the background moves the view; Shift-drag draws the selection box.']],
   [386, '3 Nov', ['Right-click a row number in Arrange (or on the Song screen) to give it a colour, to mark where the song changes section. Saved with the song; the colour moves with its row when rows are inserted or removed. None takes it off.']],
