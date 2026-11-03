@@ -1622,6 +1622,20 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #tDeck.fxbar #dkChn{flex:0 0 clamp(170px, 18vw, 260px)}
 #tDeck.fxbar #dkChn{border-left:0}
 #tDeck.fxbar #dkChn.col{flex:0 0 26px; width:26px; min-width:26px}   /* folded …CHAINS gives its room to the effects (owner, 1 Nov) */
+/* FOLDED FX (owner, 3 Nov: "make it grey, move the fx header to the left and make it clearer it's collapsed"): the effects'
+   part keeps its room, its tab stands at the left edge like …CHAINS' folded tab, and the rest is the dock's grey,
+   hatched, saying it is folded; a click anywhere opens it (DK_FOLD's handler). */
+#tDeck.fxbar #dkFx.col{flex:1 1 auto; width:auto; min-width:26px; flex-direction:row; background:color-mix(in srgb, var(--side) 84%, #000)}
+#tDeck.fxbar #dkFx.col > .dkh{flex:0 0 26px; height:auto; padding:6px 0; align-items:flex-start; justify-content:center; border-right:1px solid var(--line); background:var(--side)}
+#tDeck.fxbar #dkFx.col .dkt::after{content:' ▸'}
+#tDeck.fxbar #dkFx.col::after{content:'FX FOLDED · CLICK TO SHOW'; flex:1 1 auto; display:flex; align-items:center; justify-content:center; min-width:0; overflow:hidden; white-space:nowrap;
+  font-family:var(--mono); font-size:var(--fs-1); font-weight:700; letter-spacing:.1em; color:var(--muted);
+  background:repeating-linear-gradient(135deg, transparent 0 9px, color-mix(in srgb, var(--line) 14%, transparent) 9px 18px)}
+#tDeck.fxbar #dkFx.col:hover::after{color:var(--ink)}
+/* EMPTY FX (same day): a track with no effects says so beside + ADD FX instead of leaving a bare strip */
+#dkFxBar .dkempty{flex:1 1 auto; align-self:stretch; display:flex; align-items:center; padding:0 14px; min-width:0; color:var(--muted); font-family:var(--mono); font-size:var(--fs-1);
+  font-weight:700; letter-spacing:.1em; white-space:nowrap; overflow:hidden; border:1.5px dashed color-mix(in srgb, var(--line) 30%, transparent);
+  background:repeating-linear-gradient(135deg, transparent 0 9px, color-mix(in srgb, var(--line) 10%, transparent) 9px 18px)}
 #tDeck.fxbar #dkScope{flex:0 0 clamp(120px, 11vw, 200px)}
 /* FX BAR: a compact TRACK strip (owner, 2 Nov: smaller M and S, more room for the effects): fader, meter, scale and a
    narrow M / S column; the strip no longer lines up with the side panel above, by choice. */
@@ -24493,7 +24507,8 @@ function deckFxBar(){
     }
     const free = Array.from({length:FXSLOTS}, (_, k) => k).filter(k => !A[k]);
     if (free.length){ const ad = el('button', 'dkadd'); ad.type = 'button'; ad.append('+ ADD FX', el('small', null, 'slot ' + (free[0] + 1)));
-      ad.title = 'Add an effect in slot ' + (free[0] + 1) + ' (FX screen)'; ad.dataset.k = free[0]; ad.addEventListener('click', () => goFx(free[0])); bar.append(ad); }
+      ad.title = 'Add an effect in slot ' + (free[0] + 1) + ' (FX screen)'; ad.dataset.k = free[0]; ad.addEventListener('click', () => goFx(free[0])); bar.append(ad);
+      if (free.length === FXSLOTS) bar.append(el('div', 'dkempty', 'NO EFFECTS ON ' + (mst ? 'THE MASTER' : 'TRACK ' + d2(t + 1)) + ' YET')); }   // EMPTY FX
   }
   dkFbVals.forEach(fn => fn());
   // which slot the FX screen has open, outlined
