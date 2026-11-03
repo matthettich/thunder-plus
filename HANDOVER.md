@@ -88,6 +88,25 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    build flags (`THUNDER_ASIO`, `THUNDER_LINK`); a closed build needs both proprietary agreements or leaves them out. If
    JUCE is chosen for the host instead of permissive libraries, it needs a commercial JUCE licence.
 
+## 2 Nov (3), evening: the owner's FX bar and bug list (all on `beta`, not released yet)
+
+- **FX bar:** compact TRACK strip (164 px, M/S 30×26) with SOLO · CLEAR moved to the FX header; IN / GR / OUT meters with a
+  dashed threshold on dynamics slots (`dkDynMeters`); a clicked value is highlighted (`dkFbSel`) and the wheel changes it
+  while the button is held.
+- **Fixes:** Arrange "Remove these rows" removed one row (`songRowRemove(rr)`); Arrange stopped paging with FOLLOW while a
+  selection existed (`followPlay`); …chains / …waves showed the previous song's patch when the song had none
+  (`PatchStore.open` fell back to localStorage when embedded); the patch bench's cursor was a permanent open hand; with
+  Arrange holding the keys, the tab of the screen beside it did nothing (`apTabSong`, was PHRASE only).
+- **Changes:** FX slots remember each effect's settings for the session (`fxSwap` / `fxMem`); EDIT OFF looks different on
+  Phrase (`body.tvph`: hollow dashed cursor, dimmed, tab says EDIT OFF); Mixer CHN row above FX (rows 4 / 5 swapped);
+  **Generators ▸** (Acid line, Euclidean fill) in Edit ▾ and the phrase / pattern right-click, with an instrument picker
+  (Acid) or a 4th value (Euclid); Acid's ROLL is Generate (G); Shift+wheel grows the selection on Phrase / Pattern.
+- **Test hooks** (only with `?seqtest`): `__seqTest.state()` and `.phrase()`.
+- **Menu audit:** [`docs/MENU-AUDIT.md`](docs/MENU-AUDIT.md), a proposal, nothing built.
+- **Open:** returning from the Synth page sometimes lands on the full Song screen (not reproduced, ask for steps); acid
+  slides are written only on the next sounding note with a free FX column (by design today); the owner asked about more
+  303-like (Basebot) patterns, see the chat proposal.
+
 ## 2 Nov (2): beta channel; phase 0 started (sequencer golden test); FX bar mockups
 
 - Owner: keep the live build (355) as it is today and publish new work as a **beta**.
