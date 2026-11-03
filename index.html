@@ -63,6 +63,12 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .setmenu{position:absolute; top:calc(100% + 6px); left:0; z-index:120; background:var(--panel); color:var(--ink); border:1px solid var(--ink); box-shadow:none; padding:6px; white-space:normal}
 .setmenu[hidden]{display:none}
 body.edoff #tGrid{box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--rec, #d0302a) 70%, transparent)}
+/* EDIT OFF, easier to see (owner, 2 Nov: "make something look different when you push escape and turn off edit"): on the
+   Phrase screen (where it applies) the cursor turns hollow, a dashed red box instead of the filled block, the notes dim a
+   little, and the PHRASE tab and the tag both say EDIT OFF; other screens show the tag only. */
+body.edoff.tvph .tscr .tgrid span.cur{background:transparent !important; color:inherit !important; outline:2px dashed var(--rec, #d0302a) !important; outline-offset:-2px}
+body.edoff.tvph .tscr .tgrid{opacity:.72}
+body.edoff.tvph .ttabs button.on::after{content:' · EDIT OFF'; color:var(--rec, #d0302a); font-weight:700}
 body.edoff #tScr{position:relative} body.edoff #tScr::after{content:'EDIT OFF · Esc'; position:absolute; top:4px; right:10px; z-index:5; font:600 11px var(--mono, monospace); letter-spacing:.06em; padding:2px 6px; background:var(--rec, #d0302a); color:#fff; pointer-events:none}
 .rprog .askbox{min-width:min(360px, 86vw)} .rpbar{height:14px; border:1px solid var(--line); margin:12px 0 6px; background:var(--panel2, transparent)} .rpbar i{display:block; height:100%; width:0; background:var(--ink); transition:width .15s linear} .rppct{font-variant-numeric:tabular-nums; font-size:var(--fs-3); text-align:right; margin-left:auto} .rprow{display:flex; align-items:center; gap:10px}
 #bFile, #bEdit, #bView, #bAud, .top #bSet{min-height:34px; padding:0 12px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; border:1px solid var(--line); background:var(--panel); white-space:nowrap}
@@ -1438,6 +1444,14 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #tDeck.fxbar #dkChn{border-left:0}
 #tDeck.fxbar #dkChn.col{flex:0 0 26px; width:26px; min-width:26px}   /* folded …CHAINS gives its room to the effects (owner, 1 Nov) */
 #tDeck.fxbar #dkScope{flex:0 0 clamp(120px, 11vw, 200px)}
+/* FX BAR: a compact TRACK strip (owner, 2 Nov: smaller M and S, more room for the effects): fader, meter, scale and a
+   narrow M / S column; the strip no longer lines up with the side panel above, by choice. */
+#tDeck.fxbar #dkStrip{flex:0 0 164px}
+#tDeck.fxbar .dkstrip{grid-template-columns:28px 30px 20px minmax(0,1fr) 30px; padding:10px 10px 10px 8px; gap:6px 5px}
+#tDeck.fxbar .stfad{grid-column:1} #tDeck.fxbar .stm{grid-column:2} #tDeck.fxbar .stsc{grid-column:3} #tDeck.fxbar .stvv{grid-column:1 / 4}
+#tDeck.fxbar .stms{grid-column:5; gap:6px}
+#tDeck.fxbar .stms button{height:26px; font-size:var(--fs-2)}
+#tDeck.fxbar .stpan{grid-column:1 / 6}
 .dkfxbar{display:grid; grid-template-columns:repeat(8, minmax(92px, 1fr)); gap:3px; height:100%; min-height:0; overflow-x:auto; overflow-y:hidden; padding:3px}
 .dkfc{display:flex; flex-direction:column; min-width:0; min-height:0; border:1px solid var(--line); background:var(--panel)}
 .dkfc .fch{display:flex; align-items:center; gap:4px; padding:2px 4px; border-bottom:1px solid var(--line); white-space:nowrap; min-height:20px}
@@ -1474,13 +1488,14 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkFxBar .dkfc .fr{padding:0 8px; line-height:1.55}
 #dkFxBar .dkfc .fr b{opacity:1; color:var(--muted)}
 #dkFxBar .dkfc .fr span{font-weight:700}
+#dkFxBar .dkfc .fr.sel{background:var(--ink); color:var(--inv)} #dkFxBar .dkfc .fr.sel b{color:inherit; opacity:.75}
 #dkFxBar .dkfc .fviz{flex:1 1 0; min-height:0; position:relative; margin:0 6px 6px}
 #dkFxBar .dkfc .fviz canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
 #dkFxBar .dkfc.off .fviz{opacity:.4}
-#dkFxBar .dkfc.dyn .fcb, #dkFxBar .dkfc.dyn .fviz{margin-right:18px}
-#dkFxBar .dkfc .fgr{position:absolute; right:5px; top:34px; bottom:6px; width:8px; background:var(--track)}
-#dkFxBar .dkfc .fgr i{position:absolute; left:0; right:0; top:0; height:0; background:#ff5a1f}
-#dkFxBar .dkfc .fgr::before{content:'GR'; position:absolute; bottom:100%; left:-3px; font:700 7px var(--mono); color:var(--muted)}
+#dkFxBar .dkfc.dyn .fcb, #dkFxBar .dkfc.dyn .fviz{margin-right:44px}
+/* DYNAMICS METERS (owner, 2 Nov: "traditional compression metering … threshold in addition to gain reduction"): IN, GR and
+   OUT bars like a hardware compressor's, a threshold line across IN and OUT, the peak values held under them. */
+#dkFxBar .dkfc .fdm{position:absolute; right:5px; top:32px; width:38px; height:calc(100% - 38px); display:block}
 #dkFxBar .dkadd{flex:0 0 96px; align-self:stretch; border:1.5px dashed var(--line); background:transparent; color:var(--ink); font-weight:700; font-size:var(--fs-3); letter-spacing:.06em; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px}
 #dkFxBar .dkadd small{font-family:var(--mono); font-weight:400; font-size:var(--fs-1); color:var(--muted)}
 #dkFxBar .dkadd:hover{background:var(--panel)}
@@ -15076,6 +15091,18 @@ const fxtL = (t = cFxT) => pumpAllowed(t) ? FXT_LIST : FXT_LIST.filter(k => !isP
 const fxtOk = (t, k) => !!TFX[k] && (!isPumpT(k) || pumpAllowed(t) || pumpAnyTrack(k));
 const FXSLOTS = 8;
 function freshTfx(type){ if (TFX[type].pump) return pumpFresh(TFX[type].pump); const f = {type, on:true}; for (const p of TFX[type].ps) f[p.k] = p.d; return f; }
+/* SLOT MEMORY (owner, 2 Nov: "I accidentally changed my eq and when I brought it back it needed to be set again"): a slot
+   remembers the settings of each effect it has held in this session, so switching its effect away and back (stepping
+   through the list, the picker) brings the old settings back. INIT in › PRESET still resets on purpose. Kept per track and
+   slot, in memory only (not in the song file); a fresh effect when the slot never held that one. */
+const fxMem = new Map();
+function fxSwap(t, k, A, type){
+  const had = A[k]; if (had && had.type === type) return had;
+  if (had) try { fxMem.set(t + ':' + k + ':' + had.type, JSON.parse(JSON.stringify(had))); } catch(e){}
+  const m = type ? fxMem.get(t + ':' + k + ':' + type) : null;
+  A[k] = type ? (m ? JSON.parse(JSON.stringify(m)) : freshTfx(type)) : null;
+  return A[k];
+}
 function normTfx(o){
   if (!o || typeof o !== 'object' || !TFX[o.type]) return null;
   if (TFX[o.type].pump) return pumpNorm1(o);
@@ -19136,8 +19163,11 @@ function setKp(on){ kpOn = !!on; try { localStorage.setItem(KPOK, kpOn ? '1' : '
 // Song: the cursor's row follows its track. Sect and Phrase: they switch to what the cursor's track is
 // playing and the cursor rides along. Not while a selection is being made.
 function followPlay(){
-  if (!followMode || !tp.on || !tp.pos || selA || sdrag || drag) return;
+  if (!followMode || !tp.on || !tp.pos || sdrag || drag) return;
   const P = tp.pos, own = P[tv === 'song' ? cs.song.x : cTrack] || (tp.loopV === 'bus' ? null : P.find(Boolean)); if (!own) return;   // BUS PLAY: an empty bus stays put
+  // A SELECTION keeps the cursor and the selection where they are, but Arrange still turns its pages with the playhead
+  // (owner, 2 Nov: after selecting rows, Arrange stopped paging even with FOLLOW on: this used to return before paging).
+  if (selA){ arrFollowPage(own); return; }
   if (followMode === 1){   // FOLLOW PATTERN: only which phrase / sect is shown follows the cursor's track; nothing scrolls
     if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0) cSect = own.sect; }
     else if (tv === 'phrase'){ const mine = P[cTrack]; if (mine && mine.phrase >= 0 && mine.phrase !== cPhrase){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); } }
@@ -19590,7 +19620,7 @@ function fxRows(){
   const FL = fxtL(t);   // …PUMP: the pump effects only on a bus or the master (a slot that has one shows it anyway)
   const FLk = k => A[k] && !FL.includes(A[k].type) ? FL.concat([A[k].type]) : FL;
   for (let k = 0; k < FXSLOTS; k++) rows.push({l:(A[k] ? (open && k === cFxS ? '▪ ' : '› ') : '') + 'SLOT ' + (k + 1), gap:k === 0, get:() => A[k] ? FLk(k).indexOf(A[k].type) + 1 : 0,
-    set:v => { const L = FLk(k); A[k] = v ? freshTfx(L[v - 1]) : null; if (v) lastFxType = L[v - 1]; cFxS = k; fxChanged(t); }, min:0, max:FLk(k).length, big:1, d:0,
+    set:v => { const L = FLk(k); fxSwap(t, k, A, v ? L[v - 1] : null); if (v) lastFxType = L[v - 1]; cFxS = k; fxChanged(t); }, min:0, max:FLk(k).length, big:1, d:0,
     fmt:v => v ? (n => n.padEnd(Math.max(5, n.length + 1)))(TFX[FLk(k)[v - 1]].n) + (A[k] && !A[k].on ? 'OFF  ' : '') + fxNameOf(FLk(k)[v - 1]) : '---',
     tap:() => { cFxS = k; fxsOpen(k); },
     info:v => v ? `Slot ${k + 1} runs ${TFX[FLk(k)[v - 1]].long}. EDIT lists the effects, EDIT+arrows steps through them, ▶ opens its controls, OPTION+EDIT removes it` : `Empty. EDIT lists the effects to pick one; EDIT+arrows steps through them. Slots run top to bottom`});
@@ -19883,8 +19913,8 @@ function bump(d, big){
     if (c.y === 7 && c.mx === 1){ S.mst.on = d > 0; mstChanged(); draw(); return; }
     if (c.y === 7 && c.mx === 2) S.mout = clamp((S.mout == null ? 255 : S.mout) + d * (big ? 16 : 1), 0, 255), moApply();   // GAIN STAGING: master OUT
     else if (c.y === 7) S.master = clamp(S.master + d * (big ? 16 : 1), 0, 255), rtRoute();
-    else if (c.y === 4) return fxActiveStep(c.x, d > 0 ? 1 : -1);
-    else if (c.y === 5){ setChainOn(c.x, d > 0); draw(); return; }
+    else if (c.y === 5) return fxActiveStep(c.x, d > 0 ? 1 : -1);   // MIXER ROWS (2 Nov): CHN is row 4, FX row 5 (signal order)
+    else if (c.y === 4){ setChainOn(c.x, d > 0); draw(); return; }
     else if (mixFv()){ const m = S.mix[c.x]; m.vol = clamp(m.vol + d * (big ? 16 : 1), 0, 255); }   // VOL FADER
     else { const m = S.mix[c.x];
       if (c.y === 0) m.trim = clamp((m.trim == null ? TRIM_0 : m.trim) + d * (big ? 16 : 1), 0, 255);   // GAIN STAGING: the first row is TRIM
@@ -19997,12 +20027,13 @@ function fxpChoose(k = fxp.i){
   setCell('phrase', x, y, f); after('fxc', 'phrase', x, y, f);
   toast(FXC[f] + ': ' + (FXB[FXC[f]] || ''));
 }
-// Picking the slot's own effect keeps its settings; another one starts fresh. Either way its controls open.
+// Picking the slot's own effect keeps its settings; another one starts fresh, or with the settings it had in this slot
+// before (SLOT MEMORY). Either way its controls open.
 function fxsChoose(s, k){
   fxpClose(); const t = cFxT, A = t >= NT ? S.mfx : S.tfx[t], had = A[s];
-  if (!k){ A[s] = null; cFxS = s; cs.fx.y = s + 1; fxChanged(t); saveS(); draw(); if (had) toast(`Slot ${s + 1} emptied.`); return; }
+  if (!k){ fxSwap(t, s, A, null); cFxS = s; cs.fx.y = s + 1; fxChanged(t); saveS(); draw(); if (had) toast(`Slot ${s + 1} emptied.`); return; }
   const type = (fxp.types && fxp.types[k]) || fxtL(t)[k - 1];
-  if (!had || had.type !== type){ A[s] = freshTfx(type); fxChanged(t); saveS(); toast(`Slot ${s + 1}: ${TFX[type].long}` + (isPumpT(type) && t < NT ? pumpBusNote(type) : '')); }
+  if (!had || had.type !== type){ fxSwap(t, s, A, type); fxChanged(t); saveS(); toast(`Slot ${s + 1}: ${TFX[type].long}` + (isPumpT(type) && t < NT ? pumpBusNote(type) : '')); }
   lastFxType = type; cFxS = s; cs.fx.y = FXSLOTS + 1; draw();
 }
 // The pad's buttons while the list is open. Returns true when it used the press.
@@ -20070,7 +20101,7 @@ function editTap(enter){
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
   }
-  if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 4) return go('fx'); if (c.y === 5){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (mixFv()){ toast(`Track ${d2(c.x + 1)} · VOL ${hx(S.mix[c.x].vol)} · ${dB(trackGain(S.mix[c.x].vol))} · EDIT+◀▶ ±1, ▲▼ ±16, Delete puts it back to E0 (0 dB)`); return; } if (c.y === 6){ scSay(c.x); return; } /* SOURCE: the SC row only shows; Enter / EDIT says what listens to the track */ if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
+  if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 5) return go('fx'); if (c.y === 4){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (mixFv()){ toast(`Track ${d2(c.x + 1)} · VOL ${hx(S.mix[c.x].vol)} · ${dB(trackGain(S.mix[c.x].vol))} · EDIT+◀▶ ±1, ▲▼ ±16, Delete puts it back to E0 (0 dB)`); return; } if (c.y === 6){ scSay(c.x); return; } /* SOURCE: the SC row only shows; Enter / EDIT says what listens to the track */ if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
   const r = rowsOf(tv)[c.y]; if (!r) return;
   // ONE CONFIRM (27 Oct, Phase 2): a row that replaces something asks in the app's one dialog (it took a second EDIT, the
   // "Tap EDIT twice" note). A double EDIT still goes straight through (editDouble), as before.
@@ -20307,9 +20338,11 @@ function songRowInsert(){
   if (!songRowsInsert(cs.song.y, 1)) return toast('The last song row has blocks, so nothing can move down.');
   saveS(); draw(); toast(`Inserted row ${rS(cs.song.y, 3)} · the rows below moved down`);
 }
-function songRowRemove(){
+// rr: the rows to remove ({y0, y1}), when the caller already has them (the right-click menu: owner, 2 Nov, "Remove these
+// rows" on 00–07 removed one row, because the menu moved the cursor to the first row and the selection shrank with it).
+function songRowRemove(rr){
   if (tv !== 'song') return toast('Remove row works on the SONG screen.');
-  const c = cs.song, sel = selA && selA.v === 'song', r = sel ? selRect() : {y0:c.y, y1:c.y}, h = r.y1 - r.y0 + 1;
+  const c = cs.song, sel = !!(rr && rr.y1 >= rr.y0) || !!(selA && selA.v === 'song'), r = rr && rr.y1 >= rr.y0 ? {y0:rr.y0, y1:rr.y1} : sel ? selRect() : {y0:c.y, y1:c.y}, h = r.y1 - r.y0 + 1;
   songRowsRemove(r.y0, h); selA = null; c.y = Math.min(c.y, 255); if (sel) c.y = r.y0;
   saveS(); draw(); toast(h > 1 ? `Removed rows ${rS(r.y0, 3)}–${rS(r.y1, 3)} · the rows below moved up` : `Removed row ${rS(r.y0, 3)} · the rows below moved up`);
 }
@@ -20357,7 +20390,7 @@ function del(){
     if (tv === 'phrase' && k === 'note'){ const r = S.phrases[cPhrase] && S.phrases[cPhrase][c.y]; if (r && r.slice(0, NCOL).every(n => n < 0)) r[IC] = -1; }
     return draw();
   }
-  if (tv === 'mixer'){ if (c.y === 4) return fxDelLast(onMstCell() ? NT : c.x); if (c.y === 5){ setChainOn(c.x, false); return draw(); } if (c.y === 7 && c.mx === 1) return toast('Mastering: EDIT opens it · EDIT+◀ turns it off, EDIT+▶ on'); if (c.y === 7 && c.mx === 2){ S.mout = 255; moApply(); } else if (c.y === 7){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (mixFv()) m.vol = TRK_UNITY; else if (c.y === 0) m.trim = f.trim; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; } mixChanged(); return draw(); }
+  if (tv === 'mixer'){ if (c.y === 5) return fxDelLast(onMstCell() ? NT : c.x); if (c.y === 4){ setChainOn(c.x, false); return draw(); } if (c.y === 7 && c.mx === 1) return toast('Mastering: EDIT opens it · EDIT+◀ turns it off, EDIT+▶ on'); if (c.y === 7 && c.mx === 2){ S.mout = 255; moApply(); } else if (c.y === 7){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (mixFv()) m.vol = TRK_UNITY; else if (c.y === 0) m.trim = f.trim; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; } mixChanged(); return draw(); }
   const r = rowsOf(tv)[c.y]; if (r && r.get && r.d != null){ r.set(r.d); if (r.after) r.after(); saveS(); draw(); }
 }
 // Whole rows: clear a row, insert a blank one (rows below move down), or remove one (rows below move up).
@@ -20824,7 +20857,7 @@ function optDir(dir, grid){
   const d = dir === 'right' || dir === 'up' ? 1 : -1, big = dir === 'up' || dir === 'down';
   if (tv === 'phrase' && !(grid && patNavOn) && pvActive()) return pvRow(dir === 'up' ? -1 : dir === 'down' ? 1 : d);   // PATTERN VIEW: Ctrl+▲▼, [ ], ‹ › step song rows
   // Mixer FX row: OPTION+▲▶ turn effects on in order (up to eight), OPTION+▼◀ turn the last one back off.
-  if (tv === 'mixer'){ if (cs.mixer.y === 4) fxActiveStep(cs.mixer.x, d); return; }
+  if (tv === 'mixer'){ if (cs.mixer.y === 5) fxActiveStep(cs.mixer.x, d); return; }
   // The Song screen (and Arrange holding the keys on Phrase): PAD mode's OPTION+arrows move like the phrase editor's,
   // to the nearest filled block that way (songGridDir). With PATTERN NAV off: ◀▶ previous/next block in the track,
   // ▲▼ 16 rows, as before.
@@ -21180,12 +21213,16 @@ function keyHint(s){
    as before. Edit ▾ in the top bar (full true) always shows the same items in the same places and greys out the ones that
    don't apply here, so a pick is always where you last found it. The generators, selection tools and rendering sit in a
    Tools ▸ group (in Edit ▾: the top bar has no room for a Tools menu on a 13" laptop). */
+// GENERATORS (owner, 2 Nov: "call that generators", findable from a right-click in the phrase or pattern editor): the
+// pattern writers, in their own group of Edit ▾ and the right-click menu, before Tools.
+function genItems(full){
+  const ph = tv === 'phrase', mst = ph && mstView();
+  return ph && !mst || full ? [{a:'acid', l:'Acid line… (a random bass line)', k:'', f:acidLine, off:!ph || mst}, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill, off:!ph || mst}] : [];
+}
 function toolItems(full){
   const ph = tv === 'phrase', phSel = !!(selA && selA.v === 'phrase'), sg = tv === 'song', mst = ph && mstView();
   const what = selA && selA.v === tv ? 'the selection' : sg ? 'this song row' : 'this phrase';
   const L = [
-    ...(ph && !mst || full ? [{a:'euc', l:'Euclidean fill…', k:'', f:euclidFill, off:!ph || mst}, {a:'acid', l:'Acid line… (a random bass line)', k:'', f:acidLine, off:!ph || mst}] : []),
-    null,
     ...(ph || full ? [{a:'xpu', l:'Transpose up a semitone', k:keyHint('alt+.'), f:() => transposeSel(1), off:!phSel}, {a:'xpd', l:'Transpose down a semitone', k:keyHint('alt+,'), f:() => transposeSel(-1), off:!phSel},
       {a:'interp', l:'Interpolate (ramp the selection)', k:'', f:interpSel, off:!phSel},   // SELECTION TOOLS
       ...(mst ? [] : [{a:'volsel', l:'Volume… (scale, fade, set)', k:'', f:volSel, off:!ph}, {a:'instsel', l:'Instrument… (set, swap)', k:'', f:instSel, off:!ph}]),
@@ -21230,6 +21267,7 @@ function cmdItems(full){
       {a:'loopp', l:'Loop the pattern', k:keyHint('alt+L'), f:toggleLoopPat}, {a:'loops', l:'Loop the selection', k:keyHint('shift+alt+L'), f:toggleLoop}] : []),
     ...(['song', 'phrase', 'mixer', 'fx'].includes(tv) || full ? [null, {a:'tname', l:'Name this track…', k:'', f:nameTrackHere, off:!['song', 'phrase', 'mixer', 'fx'].includes(tv)}] : []),
     null,
+    ...(genItems(full).length ? [{l:'Generators', sub:genItems(full)}] : []),
     {l:'Tools', sub:toolItems(full)},
     null,
     ...(onSong && !full ? [] : [val('b:16', 'Value up a lot', '▲', {off:onSong})]), val('b:1', 'Value up', '▶'), val('b:-1', 'Value down', '◀'), ...(onSong && !full ? [] : [val('b:-16', 'Value down a lot', '▼', {off:onSong})]),
@@ -21255,15 +21293,15 @@ let eucLast = '5 16 0';
 async function euclidFill(){
   if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Euclidean fill writes notes into it.');
   if (busTrack(cTrack)) return busSay();   // BUS FX ONLY
-  const a = await askText({title:'Euclidean fill', body:'HITS STEPS ROTATE, e.g. 5 16 or 3 8 2. Fills the note column under the cursor over the selected rows (or from the cursor down), with the note there (or the last one).'}, eucLast, 12, 'Fill');
+  const a = await askText({title:'Euclidean fill', body:'HITS STEPS ROTATE INSTRUMENT, e.g. 5 16, 3 8 2, or 5 16 0 0A for instrument 0A. Fills the note column under the cursor over the selected rows (or from the cursor down), with the note there (or the last one); without an instrument, the row\u2019s own (or the last used).'}, eucLast, 12, 'Fill');
   if (a == null) return;
-  const v = a.trim().split(/[\s,/:]+/).map(x => parseInt(x, 10)); if (!(v[0] >= 0 && v[1] >= 1)) return toast('Type the hits and steps, like 5 16.');
-  const n = clamp(v[1], 1, PROWS), k = clamp(v[0], 0, n), rot = Number.isFinite(v[2]) ? v[2] : 0; eucLast = `${k} ${n} ${rot}`;
+  const tk = a.trim().split(/[\s,/:]+/), v = tk.map(x => parseInt(x, 10)), insPick = tk[3] != null && /^[0-9a-f]{1,2}$/i.test(tk[3]) ? clamp(parseInt(tk[3], 16), 0, S.insts.length - 1) : null;   // INSTRUMENT (owner, 2 Nov) if (!(v[0] >= 0 && v[1] >= 1)) return toast('Type the hits and steps, like 5 16.');
+  const n = clamp(v[1], 1, PROWS), k = clamp(v[0], 0, n), rot = Number.isFinite(v[2]) ? v[2] : 0; eucLast = `${k} ${n} ${rot}` + (insPick != null ? ' ' + hx(insPick) : '');
   if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase();
   const P = S.phrases[cPhrase], c = cs.phrase, col = PK[c.x] === 'note' ? c.x : 0, L = plen(cPhrase);
   let y0 = c.y, y1 = L - 1; if (selA){ const R = selRect(); y0 = R.y0; y1 = Math.min(R.y1, L - 1); selA = null; }
-  const src = P[c.y], note = src[col] >= 0 && src[col] < 120 ? src[col] : last.note, ins = src[IC] >= 0 ? src[IC] : defInst(), pat = euclid(k, n, rot);
-  for (let y = y0; y <= y1; y++){ const r = P[y]; if (pat[(y - y0) % n]){ r[col] = note; if (r[IC] < 0) r[IC] = ins; } else r[col] = -1; }
+  const src = P[c.y], note = src[col] >= 0 && src[col] < 120 ? src[col] : last.note, ins = insPick != null ? insPick : src[IC] >= 0 ? src[IC] : defInst(), pat = euclid(k, n, rot);
+  for (let y = y0; y <= y1; y++){ const r = P[y]; if (pat[(y - y0) % n]){ r[col] = note; if (r[IC] < 0 || insPick != null) r[IC] = ins; } else r[col] = -1; }
   saveS(); draw(); toast(`Euclidean ${k} in ${n}${rot ? ', rotated ' + rot : ''}: rows ${rS(y0)}–${rS(y1)}, ${noteS(note)}`);
 }
 
@@ -21336,7 +21374,7 @@ function acidLine(){
   let y0 = 0, L = plen(cPhrase);
   if (selA && selA.v === 'phrase'){ const R = selRect(); y0 = R.y0; L = Math.max(2, Math.min(R.y1, plen(cPhrase) - 1) - y0 + 1); }
   const P = () => S.phrases[cPhrase];
-  const src = P()[cs.phrase.y], ins = src && src[IC] >= 0 ? src[IC] : (P().find(r => r[IC] >= 0) || [])[IC] ?? defInst();
+  const src = P()[cs.phrase.y]; let ins = src && src[IC] >= 0 ? src[IC] : (P().find(r => r[IC] >= 0) || [])[IC] ?? defInst();   // INSTRUMENT (owner, 2 Nov): picked in the panel
   const R = () => ({scale:acidSet.scale, root:acidSet.root, density:acidSet.density / 100, accent:acidSet.accent / 100, slide:acidSet.slide / 100, octave:acidSet.octave / 100});
   const roll = mut => {
     const st = acidRead(P(), y0, L, acidSet.base), lanes = acidSet.lanes;
@@ -21344,7 +21382,7 @@ function acidLine(){
     if (mut) acidMutate(st, L, lanes, R(), Math.random); else acidRoll(st, L, lanes, R(), Math.random);
     acidWrite(P(), y0, L, acidSet.base, st, ins); saveS(); draw();
     const nN = st.filter(s => s.gate === ACID_NOTE).length;
-    toast(`${mut ? 'Mutated' : 'Rolled'}: ${nN} notes, ${st.filter(s => s.accent).length} accents, ${st.filter(s => s.slide).length} slides · rows ${rS(y0)}–${rS(y0 + L - 1)}`, 1600);
+    toast(`${mut ? 'Mutated' : 'Generated'}: ${nN} notes, ${st.filter(s => s.accent).length} accents, ${st.filter(s => s.slide).length} slides · rows ${rS(y0)}–${rS(y0 + L - 1)}`, 1600);
   };
   // the panel: an .ask dialog that stays open, so the line can be rolled again while it plays
   if (askOpen) askOpen(null);
@@ -21352,6 +21390,7 @@ function acidLine(){
   box.append(el('div', 'asktitle', 'Acid line'), el('div', 'askmsg', `Rows ${rS(y0)}–${rS(y0 + L - 1)} of this phrase, instrument ${hx(ins)}. Accents are volume FF, slides PSL. Use it with an Acid pad (Engine: Acid).`));
   const field = (label, ctl) => { const f = el('label', 'acidf'); f.append(el('span', null, label), ctl); box.append(f); return ctl; };
   const sel = (label, opts, k) => { const s = el('select'); opts.forEach(([v, t]) => s.append(new Option(t, v))); s.value = acidSet[k]; s.addEventListener('change', () => { acidSet[k] = +s.value; }); return field(label, s); };
+  { const s = el('select'); for (let k = 0; k < S.insts.length; k++) s.append(new Option(instLabel(k), k)); s.value = ins; s.addEventListener('change', () => { ins = +s.value; }); field('Instrument', s); }
   sel('Scale', ACID_SCALES.map(([n], i) => [i, n]), 'scale');
   sel('Root', NN.map((n, i) => [i, n.replace('-', '')]), 'root');
   sel('Base note', [24, 36, 48, 60].map(v => [v, noteS(v) + (v === ROOT ? ' (the pad’s pitch)' : '')]), 'base');
@@ -21361,15 +21400,15 @@ function acidLine(){
   const lanes = el('div', 'seg'); lanes.setAttribute('aria-label', 'Lanes to roll');
   ACID_LANES.forEach(([k, t]) => { const b = el('button', acidSet.lanes[k] ? 'on' : null, t); b.type = 'button'; b.setAttribute('aria-pressed', !!acidSet.lanes[k]);
     b.addEventListener('click', () => { acidSet.lanes[k] = !acidSet.lanes[k]; b.classList.toggle('on', acidSet.lanes[k]); b.setAttribute('aria-pressed', acidSet.lanes[k]); }); lanes.append(b); });
-  field('Roll', lanes);
+  field('Generate', lanes);
   const row = el('div', 'btnrow'), mk = (t, f, cls) => { const b = el('button', cls || null, t); b.type = 'button'; b.addEventListener('click', f); row.append(b); return b; };
   const done = () => { if (askOpen !== done) return; askOpen = null; wrap.remove(); document.removeEventListener('keydown', key, true); };
-  mk('▶ / ■', () => playCtx()); mk('Mutate (M)', () => roll(true)); const go = mk('Roll (R)', () => roll(false), 'ok'); mk('Done', done);
+  mk('▶ / ■', () => playCtx()); mk('Mutate (M)', () => roll(true)); const go = mk('Generate (G)', () => roll(false), 'ok'); mk('Done', done);
   box.append(row);
   // Keys stay in the panel: R rolls, M mutates, Space plays or stops the phrase, Esc / Enter close.
   const key = e => { const tag = e.target && e.target.tagName;
     if (e.key === 'Escape' || (e.key === 'Enter' && tag !== 'BUTTON' && tag !== 'SELECT')){ e.preventDefault(); e.stopPropagation(); return done(); }
-    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'r' || e.key === 'R')){ e.preventDefault(); e.stopPropagation(); return roll(false); }
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'g' || e.key === 'G' || e.key === 'r' || e.key === 'R')){ e.preventDefault(); e.stopPropagation(); return roll(false); }
     if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'm' || e.key === 'M')){ e.preventDefault(); e.stopPropagation(); return roll(true); }
     if (e.key === ' ' && tag !== 'BUTTON'){ e.preventDefault(); e.stopPropagation(); return playCtx(); }
     e.stopPropagation();
@@ -21427,7 +21466,7 @@ function info(){
     if (c.y === 7 && c.mx === 1) return 'Mastering ' + (S.mst.on ? 'on' : 'off') + ' · ' + mstChainTxt() + ' · EDIT opens it · EDIT+◀▶ off / on';
     if (c.y === 7 && c.mx === 2){ const mo = S.mout == null ? 255 : S.mout; return 'Master OUT ' + hx(mo) + ' · ' + dB(curve(mo)) + ' · the master fader, after the limiter (no boost: FF is 0 dB) · drag its bar on the meter · OPT+EDIT 0 dB'; }   // GAIN STAGING
     if (c.y === 7) return 'Master ' + dB(curve(S.master)) + ' into ' + (S.mst.on && S.mst.lim && S.mst.lim.on ? 'mastering’s limiter' : S.limiter ? 'the limiter' : 'OUT (no limiter)') + (fxCount(S.mfx) ? ' · FX ' + fxList(S.mfx) : '') + ' · SHIFT+▶ master effects · ▶▶ OUT, the fader after it';
-    if (c.y === 5){
+    if (c.y === 4){
       const on = chainsFeed(c.x), flag = !!(S.chainOn && S.chainOn[c.x]);
       const tg = !on && flag && busPlan().targets.get(c.x);
       // MISS has two causes and they need different fixes: no Chain Out for the track, or a Chain Out feeding a track whose
@@ -21442,7 +21481,7 @@ function info(){
     if (mixFv()){ const m = S.mix[c.x]; return `${trkLab(c.x)}${trkKind(c.x)} · VOL ${hx(m.vol)} · ${dB(trackGain(m.vol))} (the fader on its meter, after …chains and the FX) · EDIT+◀▶ ±1, EDIT+▲▼ ±16 · ▲ SC, ▼ master row`; }
     if (c.y === 6){ const U = sckUsesOf(c.x);
       return `${trkLab(c.x)}${trkKind(c.x)} · SIDECHAIN SOURCE ` + (U.length ? 'for ' + U.map(u => u.where).join(', ') : 'for nothing yet · pick this track as Source on a compressor, gate, envelope filter or Sidechain In'); }
-    if (c.y === 4){ const A = S.tfx[c.x], n = fxCount(A);
+    if (c.y === 5){ const A = S.tfx[c.x], n = fxCount(A);
       return `${trkLab(c.x)}${trkKind(c.x)} · ${n}/${FXSLOTS} active` + (A.some(Boolean) ? ' · ' + fxList(A) : '') + ' · OPTION+▲▶ turn effects on, OPTION+▼◀ off (settings kept) · EDIT opens FX'; }
     const m = S.mix[c.x];
     // GAIN STAGING: on TRIM, what it sends in (its light) and where VOL is
@@ -21583,6 +21622,7 @@ function playhead(){
 }
 function draw(){
   if (view !== 'tracker') return;
+  document.body.classList.toggle('tvph', tv === 'phrase');   // EDIT OFF looks apply to the Phrase screen
   if (apHold){ apDirty = true; return; }   // ARRANGE PAGING: a song command run for Arrange draws once, at its end
   if (arrPlace()) scheduleRefit(false);   // Arrange moved into (or out of) the Song screen: size the text again next frame
   if (spSync()) fit();   // SIMPLE PHRASE: on or off for this screen, so the phrase is sized again (and Arrange hides)
@@ -21691,16 +21731,16 @@ function draw(){
         ln.push({t:tx, cls:cc(t, y, on ? (y === 2 ? 'v mu2' : y === 3 ? 'v so2' : 'v') : 'e') + tkm(t) + (y === 0 ? ' trm' : ''), x:t, y}, ' '); }
       L.push(ln);
     });
+    // MIXER ROWS (owner, 2 Nov): CHN above FX, as the sound goes (TRIM → …chains → FX → VOL): CHN is row 4, FX row 5.
     const fl = [{t:'FX  ', cls:'lb'}];
-    for (let t = T0; t < T1; t++){ const n = fxCount(S.tfx[t]); fl.push({t:n ? d2(n) : '--', cls:cc(t, 4, n ? 'cf' : 'e') + tkm(t), x:t, y:4}, ' '); }
-    L.push(fl);
+    for (let t = T0; t < T1; t++){ const n = fxCount(S.tfx[t]); fl.push({t:n ? d2(n) : '--', cls:cc(t, 5, n ? 'cf' : 'e') + tkm(t), x:t, y:5}, ' '); }
     const cl = [{t:'CHN ', cls:'lb'}];
     const ct = chainsTracks(), BT = busPlan().targets;
     for (let t = T0; t < T1; t++){
       const on = chainsFeed(t), flag = !!(S.chainOn && S.chainOn[t]), bs = !on && flag && BT.has(t), tx = on ? 'ON' : bs ? 'BS' : flag && !ct.has(t) ? 'MISS' : '--';
-      cl.push({t:tx, cls:cc(t, 5, on || bs ? 'cf' : flag ? 'v' : 'e') + tkm(t), x:t, y:5, title:bs ? 'Track ' + d2(t + 1) + ' feeds the bus on track ' + BT.get(t).map(u => d2(u + 1)).join(', ') : undefined}, ' ');
+      cl.push({t:tx, cls:cc(t, 4, on || bs ? 'cf' : flag ? 'v' : 'e') + tkm(t), x:t, y:4, title:bs ? 'Track ' + d2(t + 1) + ' feeds the bus on track ' + BT.get(t).map(u => d2(u + 1)).join(', ') : undefined}, ' ');
     }
-    L.push(cl);
+    L.push(cl, fl);
     const sl = [{t:'SC  ', cls:'lb', title:'Sidechain source: lit when something listens to this track (a compressor, gate, envelope filter or Sidechain In with its Source on it)'}];
     for (let t = T0; t < T1; t++){ const U = sckUsesOf(t), on = U.length > 0; sl.push({t:on ? 'ON' : '--', cls:cc(t, 6, on ? 'cf' : 'e') + tkm(t), x:t, y:6,
       title:'Track ' + d2(t + 1) + (on ? ' is the sidechain source for ' + U.map(u => u.where).join(', ') : ': nothing listens to it as a sidechain')}, ' '); }
@@ -22817,6 +22857,11 @@ function deckLayout(){
   // button between press and release swallows the click.
   const h1 = dkSec('strip').querySelector('.dkh'), tail = $('dkTail');
   if (tail.parentElement !== h1 || h1.lastElementChild !== tail){ let sp = h1.querySelector('.dksp.t'); if (!sp) sp = el('span', 'dksp t'); h1.append(sp, tail); }
+  // FX BAR (owner, 2 Nov: SOLO · CLEAR was cut off in the narrower TRACK header): with the FX bar, SOLO · CLEAR sits at the
+  // right end of the FX header, where there is room; CLASSIC keeps it beside ✕. Moved only when out of place, as above.
+  const so = $('dkSolo'), fh = dkSec('fx').querySelector('.dkh');
+  if (deck.fxbar){ if (so.parentElement !== fh){ let sp = fh.querySelector('.dksp.s'); if (!sp) sp = el('span', 'dksp s'); fh.append(sp, so); } }
+  else if (so.parentElement !== tail){ tail.prepend(so); const sp = fh.querySelector('.dksp.s'); if (sp) sp.remove(); }
 }
 /* ===== PERFORM PART (owner, 1 Nov): the bottom panel's live controls, shown with View → PERFORM PART (off until turned on).
    FILL (a tap latches it, a hold is momentary; Shift+Alt+F), a reload point (SET keeps the song as it is now, RELOAD puts it
@@ -23193,7 +23238,7 @@ function deckFx(){
 /* FX BAR: eight columns, one per slot: ● on/off, the effect's name (a click opens it on the FX screen), every value as text
    (as the FX screen lists them): drag up or down, Alt+wheel a step, double-click its default, right-click to type. A thin
    meter under each name shows the slot's level (where its effect has one), else how much of the slot is on. */
-let dkFbSig = '', dkFbVals = [];
+let dkFbSig = '', dkFbVals = [], dkFbSel = '';   // dkFbSel: the value last clicked (track:slot:param), highlighted
 function deckFxBar(){
   const mst = dkMst(), t = mst ? NT : dkTrack(), FA = () => (mst ? S.mfx : S.tfx[dkTrack()]) || [], A = FA();
   $('dkFxT').textContent = mst ? 'FX · MASTER' : `FX · TRACK ${d2(t + 1)}`;
@@ -23213,10 +23258,13 @@ function deckFxBar(){
       nm.title = D.long + ' · open it on the FX screen'; nm.addEventListener('click', () => goFx(k));
       const m = el('div', 'fm'); m.append(el('i')); h.append(on, nm); col.append(h, m, b);
       const vz = el('div', 'fviz'); vz.append(document.createElement('canvas')); col.append(vz); col._h = new Float32Array(90); col._w = 0; col._q = 0;
-      if (isFxDyn(f.type)){ col.classList.add('dyn'); const gr = el('div', 'fgr'); gr.append(el('i')); gr.title = FXLV.has(f.type) ? 'How much it changes the level' : 'Gain reduction (0 to 24 dB, held briefly)'; col.append(gr); }
+      if (isFxDyn(f.type)){ col.classList.add('dyn'); const dm = document.createElement('canvas'); dm.className = 'fdm'; dm.title = FXLV.has(f.type) ? 'IN, the change in level, OUT' : 'IN level, gain reduction (0 to 24 dB) and OUT level; the line is the threshold'; col.append(dm); }
       const getF = () => FA()[k];
       for (const q of D.ps){
         const r = el('div', 'fr'), lb = el('b', null, q.l), v = el('span'); r.append(lb, v); b.append(r);
+        const selK = t + ':' + k + ':' + q.k; if (dkFbSel === selK) r.classList.add('sel');
+        // PICKED VALUE (owner, 2 Nov): a click on a value (or its label) highlights the row, so you can see what you are editing
+        r.addEventListener('pointerdown', () => { dkFbSel = selK; for (const x of bar.querySelectorAll('.fr.sel')) x.classList.remove('sel'); r.classList.add('sel'); });
         const show = x => q.names ? (q.names[x] ?? String(x)) : (q.tpl || q.band) ? q.fmt(x, getF()) : q.fmt(x);
         const set = x => { const g = getF(); if (!g) return; x = clamp(Math.round(x), q.min, q.max); if (x === g[q.k]) return; g[q.k] = x; if (isPumpT(g.type)) delete g.pname; fxChanged(mst ? NT : dkTrack()); v.textContent = show(x); };
         v.title = q.l + ': drag up or down (Shift: fine) · Alt+wheel · double-click: default · right-click: type a value';
@@ -23225,7 +23273,8 @@ function deckFxBar(){
           const mv = ev => set(x0 + (y0 - ev.clientY) / per * (ev.shiftKey ? 0.25 : 1));
           const up = () => { v.classList.remove('drag'); v.removeEventListener('pointermove', mv); v.removeEventListener('pointerup', up); v.removeEventListener('pointercancel', up); };
           v.addEventListener('pointermove', mv); v.addEventListener('pointerup', up); v.addEventListener('pointercancel', up); });
-        v.addEventListener('wheel', e => { if (!e.altKey) return; e.preventDefault(); const n = wheelSteps(v, e); if (!n) return; const g = getF(); if (g) set(g[q.k] - n * (q.max - q.min > 64 && !q.names ? Math.max(1, Math.round((q.max - q.min) / 64)) : 1)); }, {passive:false});
+        // the wheel changes it with Alt held, or while the mouse button is held on it (owner, 2 Nov: click and hold, then scroll)
+        v.addEventListener('wheel', e => { if (!e.altKey && !(e.buttons & 1) && !v.classList.contains('drag')) return; e.preventDefault(); const n = wheelSteps(v, e); if (!n) return; const g = getF(); if (g) set(g[q.k] - n * (q.max - q.min > 64 && !q.names ? Math.max(1, Math.round((q.max - q.min) / 64)) : 1)); }, {passive:false});
         v.addEventListener('dblclick', () => set(q.d));
         v.addEventListener('contextmenu', async e => { e.preventDefault(); const g = getF(); if (!g) return;
           const a = await askText({title:q.l + ' (' + q.min + '–' + q.max + ')', body:'Now ' + show(g[q.k]) + '. A number from ' + q.min + ' to ' + q.max + '.'}, String(g[q.k]), 6, 'Set'); if (a == null) return;
@@ -23254,14 +23303,49 @@ function deckFxBarMeters(){
     if (now - c._q < 33) continue; c._q = now; c._h[c._w] = lv; c._w = (c._w + 1) % c._h.length;
     try { dkFxViz(c, A[k], k, node, now); } catch(e){} }
 }
+// DYNAMICS METERS: three bars (IN, GR, OUT) for a dynamics slot, from the same reports as the curve display (node.dyn: the
+// slot's reduction, input and output levels), with its threshold drawn across IN and OUT and the held peaks under them.
+function dkDynMeters(cv, f, k, node, now){
+  const W = cv.clientWidth, H = cv.clientHeight; if (W < 20 || H < 40) return;
+  const dpr = devicePixelRatio || 1; if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const lv = FXLV.has(f.type), key = k + ':' + f.type, D = node && node.dyn && node.dyn.get(k), live = D && D.key === key && now - D.t < 600;
+  const cur = live ? D.cur : [0, -120, -120], hold = live ? D.hold : [0, -120, -120];
+  let c = null; try { c = lv ? null : FXDYN[f.type](TFX[f.type].map(f, ctx ? ctx.sampleRate : 48000, S.bpm)); } catch(e){}
+  const st = getComputedStyle(cv), ink = st.color || '#111', font = st.fontFamily || 'monospace';
+  const top = 10, bot = H - 12, bh = bot - top, bw = Math.floor((W - 8) / 3), gap = 4;
+  const lvY = db => top + (FXD_HI - Math.max(FXD_LO, Math.min(FXD_HI, db))) / (FXD_HI - FXD_LO) * bh;   // −60 … +6 dB
+  const bars = [['IN', cur[1], hold[1]], ['GR', cur[0], hold[0]], ['OUT', cur[2], hold[2]]];
+  g.font = '700 7px ' + font; g.textBaseline = 'top'; g.textAlign = 'center';
+  bars.forEach(([lab, v, hv], i) => {
+    const x = i * (bw + gap);
+    g.fillStyle = 'rgba(128,128,128,.22)'; g.fillRect(x, top, bw, bh);
+    if (i === 1){   // GR hangs from the top: 0 to 24 dB (the level-only effects: the change, ±12 dB)
+      const fr = lv ? Math.min(1, Math.abs(v) / 12) : Math.min(1, Math.max(0, -v) / FXD_GR), hf = lv ? Math.min(1, Math.abs(hv) / 12) : Math.min(1, Math.max(0, -hv) / FXD_GR);
+      g.fillStyle = '#ff5a1f'; g.fillRect(x, top, bw, Math.round(fr * bh));
+      g.fillStyle = ink; g.fillRect(x, top + Math.round(hf * bh) - 1, bw, 2);
+    } else {
+      const y = lvY(v), hy = lvY(hv);
+      if (v > FXD_LO){ g.fillStyle = v > -1 ? '#e0564a' : v > -12 ? '#e8b93c' : '#4fd18a'; g.fillRect(x, y, bw, bot - y); }
+      if (hv > FXD_LO){ g.fillStyle = ink; g.fillRect(x, Math.round(hy) - 1, bw, 2); }
+    }
+    g.fillStyle = ink; g.globalAlpha = .7; g.fillText(lab, x + bw / 2, 0); g.globalAlpha = 1;
+    const val = i === 1 ? (lv ? hv : -Math.max(0, -hv)) : hv;
+    g.fillText(i !== 1 && hv <= FXD_LO ? '−∞' : (val > .05 ? '+' : val < -.05 ? '−' : '') + Math.abs(val).toFixed(i === 1 ? 1 : 0), x + bw / 2, bot + 3);
+  });
+  if (c && c.thr != null){   // THRESHOLD across IN and OUT, labelled
+    const ty = Math.round(lvY(c.thr)) + .5; g.strokeStyle = '#ff5a1f'; g.lineWidth = 1.5; g.setLineDash([3, 2]);
+    g.beginPath(); g.moveTo(0, ty); g.lineTo(bw, ty); g.moveTo(2 * (bw + gap), ty); g.lineTo(W, ty); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#ff5a1f'; g.textAlign = 'left'; g.font = '700 7px ' + font; g.fillText('T', bw + 1, Math.max(top, ty - 4));
+  }
+}
 /* FX BAR pictures, in the room under each effect's values (none when the values fill the box). Dynamics (the FX stage's own
    display, fxDynPaint): the transfer curve with the live input dot and the reduction history; every other effect: its
    output level over the last ~3 s, so you can see what it is doing to the sound. Colours from the skin's screen (fxDynPal). */
 function dkFxViz(col, f, k, node, now){
   const cv = col.querySelector('.fviz canvas'); if (!cv || !f) return;
-  const grb = col.querySelector('.fgr i');
-  if (grb){ const D0 = node && node.dyn && node.dyn.get(k), live = D0 && D0.key === k + ':' + f.type && now - D0.t < 600, v = live ? D0.hold[0] : 0;
-    grb.style.height = Math.round((FXLV.has(f.type) ? Math.min(1, Math.abs(v) / 12) : Math.min(1, -v / FXD_GR)) * 100) + '%'; }
+  const dm = col.querySelector('canvas.fdm');
+  if (dm && isFxDyn(f.type)) try { dkDynMeters(dm, f, k, node, now); } catch(e){}
   const W = cv.clientWidth, H = cv.clientHeight; if (W < 40 || H < 30){ if (cv.width) cv.width = 0; return; }
   const dpr = devicePixelRatio || 1; if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); const font = getComputedStyle(cv).fontFamily || 'monospace';
@@ -24266,7 +24350,7 @@ function sxCtx(y, t){
   ];
   if (SX.secs) items.push({l:songSecAt(r.y0) && songSecAt(r.y0).y === r.y0 ? 'Rename the section here…' : 'Name a section from row ' + rS(r.y0, 3) + '…', f:() => sxSecEdit(r.y0)});
   items.push(null, {l:'Remove from song (keep the phrase)', f:() => sxClearRect(r, true), off:!n}, {l:'Delete (the phrase too)', k:ks ? 'Del' : '', f:() => sxClearRect(r, false), off:!n},
-    {l:r.y1 > r.y0 ? 'Remove these rows (the rows below move up)' : 'Remove row ' + rS(r.y0, 3) + ' (the rows below move up)', f:() => { cs.song.y = r.y0; songRowRemove(); }});   // REMOVE ROW (owner, 27 Oct)
+    {l:r.y1 > r.y0 ? 'Remove these rows (the rows below move up)' : 'Remove row ' + rS(r.y0, 3) + ' (the rows below move up)', f:() => { const rr = {y0:r.y0, y1:r.y1}; songRowRemove(rr); sxPicks = []; }});   // REMOVE ROW (owner, 27 Oct; the range passed: 2 Nov)
   // EDIT MENU / RIGHT-CLICK: Undo / Redo first, then the rest of the COMMANDS row this menu doesn't already have.
   const C = cmdItems(), have = new Set(['cut', 'copy', 'paste', 'insp', 'clr', 'rmv', 'clone', 'cldn', 'undo', 'redo', 'rmrow']);
   items.unshift(...C.filter(x => x && (x.a === 'undo' || x.a === 'redo')), null);
@@ -25023,9 +25107,16 @@ scr.addEventListener('wheel', e => {
       for (let k = 0; k < Math.abs(n); k++) bump(n < 0 ? 1 : -1, false);   // up raises it (Shift took big steps: Phase 2, Shift is fine)
       return; } }
   if (tv === 'mixer' || onPset()) return; e.preventDefault();
-  // PATTERN view: a sideways swipe, a tilt wheel or Shift+wheel scrolls across the tracks (the cursor stays put).
+  // SHIFT+WHEEL SELECTS (owner, 2 Nov): on Phrase and the Pattern view, Shift+wheel grows the selection up or down a row a
+  // notch, as Shift+▲▼ does (Windows sends Shift+wheel as a sideways scroll: either axis counts). Sideways scrolling of
+  // the Pattern view stays on a tilt wheel or a trackpad swipe.
+  if (e.shiftKey && tv === 'phrase'){ const d = e.deltaY || e.deltaX; wAcc += e.deltaMode === 1 ? d * 40 : d;
+    const n = Math.trunc(wAcc / 40); if (!n) return; wAcc -= n * 40;
+    for (let k = 0; k < Math.abs(n); k++) shiftSel(n > 0 ? 'down' : 'up');
+    if (pvActive()) pvHoldX = true; return; }
+  // PATTERN view: a sideways swipe or a tilt wheel scrolls across the tracks (the cursor stays put).
   if (pvActive() && grid.contains(e.target)){
-    const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY || e.deltaX : 0;
+    const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : 0;
     if (dx){ grid.scrollLeft += e.deltaMode === 1 ? dx * 40 : dx; return; }
   }
   wAcc += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
@@ -25253,7 +25344,7 @@ function typeHex(d){
   }
   if (tv === 'mixer'){
     if (c.y === 7 && c.mx === 1) return;
-    if (c.y === 7 && c.mx === 2){ S.mout = v; moApply(); } else if (c.y === 7){ S.master = v; rtRoute(); } else if (c.y === 5){ setChainOn(c.x, !!v); return; } else if (mixFv()) S.mix[c.x].vol = v; else if (c.y === 0) S.mix[c.x].trim = v; else if (c.y === 1) S.mix[c.x].pan = v; else return;   // GAIN STAGING: TRIM, OUT; the VOL fader
+    if (c.y === 7 && c.mx === 2){ S.mout = v; moApply(); } else if (c.y === 7){ S.master = v; rtRoute(); } else if (c.y === 4){ setChainOn(c.x, !!v); return; } else if (mixFv()) S.mix[c.x].vol = v; else if (c.y === 0) S.mix[c.x].trim = v; else if (c.y === 1) S.mix[c.x].pan = v; else return;   // GAIN STAGING: TRIM, OUT; the VOL fader
     if (done) hexBuf.key = ''; mixChanged(); draw(); return;
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.get || r.tog) return;
@@ -25578,7 +25669,9 @@ function apBack(){
 function apTabSong(e){
   // PHRASE while Arrange has the keys (owner, 31 Oct: after SONG, PHRASE did nothing until another tab was clicked, since the
   // screen was already Phrase): the keys go back to the phrase
-  if (e.target.closest('[data-v="phrase"]') && apF && tv === 'phrase'){ e.stopPropagation(); e.preventDefault(); apFocus(null); draw(); return; }
+  // ...and the same for every screen Arrange can sit beside (owner, 2 Nov: on FX, after a click in Arrange, FX "could not be
+  // chosen" until Mixer was clicked): the tab of the screen you're on gives it the keys back
+  { const tb = e.target.closest('[data-v]'); if (tb && apF && tb.dataset.v === tv){ e.stopPropagation(); e.preventDefault(); apFocus(null); draw(); return; } }
   if (!e.target.closest('[data-v="song"]') || !apReady || apF === 'arr' || tv !== 'phrase' || !apArrOk()) return;
   e.stopPropagation(); e.preventDefault(); apFocus('arr', true); draw();
 }
@@ -26743,7 +26836,8 @@ else if (FIRST_SONG) setTimeout(async () => {
    stay identical. Math.random is seeded for the run, so GEN / PRB / random commands repeat. Inert without ?seqtest. */
 if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
   async load(text, name){ FIRST_SONG = false; await loadProjText(text, name || 'test.thunder'); return {name:S.name, bpm:S.bpm, nt:NT}; },
-  run(mode, maxRows){
+  run(mode, maxRows, opt){
+    opt = opt || {};
     const R = Math.random; let s = 0x2545F491;
     Math.random = () => { let x = s += 0x6D2B79F5; x = Math.imul(x ^ x >>> 15, x | 1); x ^= x + Math.imul(x ^ x >>> 7, x | 61); return ((x ^ x >>> 14) >>> 0) / 4294967296; };
     const num = v => Math.round(v * 1e6) / 1e6, out = [];
@@ -26751,10 +26845,32 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
       if (typeof v === 'number') o[k] = num(v); else if (typeof v === 'string' || typeof v === 'boolean' || v === null) o[k] = v;
       else if (Array.isArray(v) && v.every(x => typeof x === 'number')) o[k] = v.map(num); } return o; };
     try {
-      const sq = makeSeq(S, mode || 'song', {row:0, once:true, sim:true});
+      const sq = makeSeq(S, mode || 'song', {row:opt.row || 0, loop:opt.loop || null, once:!opt.loop, sim:true});
       for (let n = 0; sq.alive() && n < (maxRows || 20000); n++){ const r = sq.step(); out.push({t:num(r.t), evs:r.evs.map(plain)}); }
     } finally { Math.random = R; }
     return out;
+  },
+  // The open phrase's rows, and the PSL command's number (for generator checks).
+  phrase(){ return {rows:JSON.parse(JSON.stringify(S.phrases[cPhrase] || [])), len:plen(cPhrase), psl:PSL_I(), FX0, RW, VC, IC}; },
+  // What playback and the song cursor are doing now (for follow / paging checks).
+  state(){ const own = tp.pos ? tp.pos.find(Boolean) : null; return {on:!!tp.on, row:own ? own.row : null, top:cs.song.top || 0, y:cs.song.y, rows:arrRows(), sel:!!selA, tv, follow:followMode, apF, hand:Math.round(performance.now() - arrHandT)}; },
+  /* TIMING PROBE (plan phase 0, section 12): plays the loaded song for `ms` and records, for every sound event the pump
+     books, how far ahead of the audio clock it was booked (negative: late), and the same for every MIDI message (ahead of
+     performance.now()). `stall` blocks the main thread for that many ms every `every` ms, to show what a busy screen does. */
+  async timing(ms, stall, every){
+    const lead = [], mlead = [];
+    tStart('song', {row:0});   // starts the engine too; the first rows are booked before the probe is in, so they aren't counted
+    for (let i = 0; i < 100 && !(rt && rt.pl && tp.on); i++) await new Promise(r => setTimeout(r, 50));
+    const pl = rt && rt.pl; if (!pl) return {error:'no audio engine'};
+    const play0 = pl.play, ms0 = msend;
+    pl.play = function(e){ try { if (e && typeof e.t === 'number') lead.push(e.t - ctx.currentTime); } catch(_){} return play0.apply(this, arguments); };
+    msend = function(bytes, t){ try { if (t != null) mlead.push(a2p(t) - performance.now()); } catch(_){} return ms0.apply(this, arguments); };
+    let st = 0; if (stall > 0) st = setInterval(() => { const e = performance.now() + stall; while (performance.now() < e){} }, every || 1000);
+    try { await new Promise(r => setTimeout(r, ms)); }
+    finally { clearInterval(st); try { tStop(true); } catch(_){} pl.play = play0; msend = ms0; }
+    const q = (A, f) => { if (!A.length) return null; const B = [...A].sort((x, y) => x - y); return B[Math.min(B.length - 1, Math.floor(f * B.length))]; };
+    const sum = (A, k) => ({n:A.length, late:A.filter(v => v < 0).length, worst:A.length ? Math.min(...A) * k : null, p01:A.length ? q(A, .01) * k : null, median:A.length ? q(A, .5) * k : null});
+    return {audio_ms:sum(lead, 1000), midi_ms:sum(mlead, 1)};
   },
 };
 })();
