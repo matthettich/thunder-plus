@@ -126,6 +126,58 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (30): starter wavetables from AKWF (build 403, on `beta`)
+
+Owner: "Build a starter set in" (after build 402's Load wavetable…).
+
+- **`wavetables/`** (new top-level folder, ~2 MB, 30 files of 22–85 KB): one wtData JSON per table, plus
+  `AKWF-LICENSE.md` (CC0). Not in `sounds/` on purpose: the beta copy reads `../sounds/` from main, so new sounds there
+  404 on beta until a merge; `wavetables/` goes into the beta copy with the app (make-channel.sh only excludes listed
+  folders). Added to `electron/copy-app.js` PARTS for the desktop build. The service worker caches a table after its
+  first fetch (same-origin, not /sounds/), so a picked table works offline after that.
+- **`WT_STARTER`** (index.html, page side, above `wtLabel`): `[file, name, group, AKWF folders]`, 30 tables in Basic /
+  Synth / Instrument / Lo-fi. **Starter tables…** (`#wtPick`, a select in `#wtBox`) fetches `wavetables/<file>.json?v=1`
+  (`wtStarter`) and copies it into `V.wtData` (`from:'starter'`, id `akwf-<file>`), Table → Loaded. A song never depends
+  on the folder: the pad carries the table.
+- **`tools/akwf-tables.mjs <AKWF folder>`** rebuilds them with the app's own `TableCore.fromCycles` / `wtReadWav` (read out
+  of index.html), from the list above. Order per table: file order, darkest→brightest or a nearest-neighbour walk from the
+  darkest, whichever has the smallest total step between neighbouring spectra (the walk won every table), then thinned
+  evenly to 64 frames. Bump `?v=` in `wtStarter` when the files change.
+- Licence: AKWF is CC0, credited in THIRD_PARTY_NOTICES.md; nothing for the commercial checklist. AKWF's README doesn't
+  say which folders were sampled from hardware, so the names are by character (Raw, C604, FM…), not by synth.
+- Checked: every table renders at three positions (no NaN, full level), test suite, headless Chrome picker.
+
+## 3 Nov (29): loaded wavetables in the Table engine (build 402, on `beta`)
+
+Owner: high-quality wavetables / analog one-shots for the wavetable engine or a sampler, and "I have a bunch of samples
+that I will ultimately like to load". Sample layers (Load sample) and Resynth (its Load sample…) already took any audio;
+the Table engine was the one that couldn't. This lifts the deferral noted on 15 Oct ("Wavetable import … deferred").
+
+- **Table → Loaded** (`TableCore.TABLES[4]`, row max 4): the pad's own table, `V.wtData` = `{v:1, name, id, nf, h, pk, a, from}`:
+  up to 64 frames (`WT_FRAMES`) × partials 1..h (h ≤ 256, `WT_PARTS`, trimmed to the last one above −84 dB), cos/sin as
+  Int16 against the table's peak, base64 (`SpecUtil.b64`). A full 64-frame bright table is ~85 KB in the song; a single
+  cycle is a few KB. Saved and moved with the pad like `rsData` (voiceToJSON copies it). Loaded with no `wtData` plays Basic.
+- `TableCore.fromCycles(cycles, name)` resamples each cycle (any length; Catmull-Rom, periodic) to 2048, takes out DC, FFTs;
+  more than 64 cycles are thinned evenly. `wtPartials(wt)` decodes, cached by id (Map, 9 entries) — works in the render Worker.
+- **render** now takes `wt` (renderX passes `V.wtData`), any frame count (Position spans frame 0..NF−1; 1 frame = static),
+  and builds each frame's band-limited cycle with an inverse FFT the first time the position reaches it (was a per-partial
+  recurrence over all 8 frames). Built-in tables keep 128 partials, so they sound the same.
+- **Import** (page side, `wtImport(files)` from the `#wtBox` panel, `wtPanel()` beside `rsPanel()` in the engine refresh):
+  `wtReadWav` reads WAVs itself (8/16/24/32-bit int, 32/64 float, extensible; mono mix) so frame lengths aren't resampled;
+  Serum's `clm ` chunk gives the frame size; ≤ 4096 samples = one single cycle (several files stack in natural name order,
+  one frame each); otherwise `wtGuessFrame` tries 256/512/600/1024/2048/4096 frames that loop on themselves (value and
+  slope from a frame's end to its own start; the smallest that loops wins), else `wtCutSound`: 32 cycles evenly through
+  the sound at their own pitch (ResynthCore.yin, the median where unsure), each starting on an upward zero crossing with a
+  12 % seam cross-fade from the next cycle; an unpitched sound gives plain 2048-sample frames. Non-WAV files go through
+  decodeAudioData and are always treated as sounds. Remove clears it (Loaded → Basic).
+- Checked: Node (serum 64×2048 at 16/24/32-bit with clm, unmarked serum → 2048, WaveEdit → 256, random-frame tables both
+  sizes, a 110 Hz sweep → 436-sample cycles, noise → 2048 frames; renders in tune, no NaN, ~90 ms a note), real AKWF waves
+  (50 saws stacked; in tune at C2/C4/C6), headless Chrome through the panel (two AKWF files → 2 frames, Loaded, renders).
+  Full test suite passes. **Not heard on the phone yet.**
+- Sound sources discussed with the owner (nothing bundled): AKWF-FREE (CC0, safe to bundle later as a starter set),
+  cc0-obxf-multisamples (CC0, OB-Xf renders), WaveEdit Online banks (licence unconfirmed), Samples From Mars' free analog
+  tape synths (personal use; redistribution terms unknown). Nothing was added to the commercial checklist.
+
 ## 3 Nov (28): side names in full, Harmonizer voices (build 401)
 
 - `.tside .tinl button`: fs-3, tighter, wraps to 2 lines (line-clamp); the card's min-height is 8 rows of 32 px.

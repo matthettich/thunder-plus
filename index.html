@@ -5910,11 +5910,56 @@ class OrganCore {
    is drawn in the time domain, taken apart into partials once and put back together band-limited for the note,
    so moving through a table never aliases. Position moves through the frames (an envelope and an LFO can move it
    too), Warp bends the phase the table is read with (a phase-distortion bend). Unison voices beat against each
-   other, a sub and noise go under, then a resonant two-pole low-pass with its own envelope and an ADSR. */
+   other, a sub and noise go under, then a resonant two-pole low-pass with its own envelope and an ADSR.
+   LOADED TABLES (owner, 3 Nov): a fifth table, Loaded, is the pad's own (V.wtData, saved with the kit), made by Load
+   wavetable… from Serum-style tables, WaveEdit/E352 banks, single-cycle waves (several files stack into one table) or
+   any audio cut into cycles. It keeps up to 64 frames and 256 partials; see TableCore.fromCycles / wtImport. */
 class TableCore {
   static defaults(){ return {oct:2, table:0, pos:0, warp:0, pmod:0, pdec:400, prate:0.5, pdepth:0, unison:1, det:0.25, sub:0, noise:0,
     cut:8000, res:0.2, fenv:0.3, fdec:400, key:0.5, atk:5, dec:600, sus:0.7, rel:300, tune:0, drive:0, level:0}; }
-  static get TABLES(){ return ['Basic', 'Harmonic', 'Formant', 'Digital']; }
+  static get TABLES(){ return ['Basic', 'Harmonic', 'Formant', 'Digital', 'Loaded']; }
+  static get WT_FRAMES(){ return 64; }
+  static get WT_PARTS(){ return 256; }
+  // one cycle (any length) resampled to n points around the loop (Catmull-Rom, periodic)
+  static resampleCycle(x, n){
+    const m = x.length, out = new Float32Array(n); if (!m) return out;
+    for (let i = 0; i < n; i++){
+      const t = i * m / n, k = Math.floor(t), f = t - k, a = x[(k - 1 + m) % m], b = x[k % m], c = x[(k + 1) % m], d = x[(k + 2) % m];
+      out[i] = b + 0.5 * f * (c - a + f * (2 * a - 5 * b + 4 * c - d + f * (3 * (b - c) + d - a)));
+    }
+    return out;
+  }
+  // cycles (Float32Arrays of any length, one per frame) → wtData {v, name, id, nf, h, pk, a}: each frame's partials
+  // 1..h (cos, sin) as Int16 against the table's peak, base64. A few tens of KB for a full table.
+  static fromCycles(cycles, name){
+    const M = 2048, H = TableCore.WT_PARTS, all = (cycles || []).filter(c => c && c.length >= 4);
+    let src = all; const F = TableCore.WT_FRAMES;
+    if (src.length > F) src = Array.from({length:F}, (_, k) => all[Math.round(k * (all.length - 1) / (F - 1))]);
+    if (!src.length) return null;
+    const fr = src.map(c => { const re = new Float64Array(M), im = new Float64Array(M), w = TableCore.resampleCycle(c, M);
+      let dc = 0; for (let i = 0; i < M; i++) dc += w[i]; dc /= M; for (let i = 0; i < M; i++) re[i] = isFinite(w[i]) ? w[i] - dc : 0;
+      SpecUtil.fft(re, im, false); const a = new Float32Array(2 * (H + 1));
+      for (let n = 1; n <= H; n++){ a[2 * n] = re[n] * 2 / M; a[2 * n + 1] = -im[n] * 2 / M; } return a; });
+    // how many partials matter (above -84 dB of the loudest anywhere), so plain tables stay small
+    let pk = 0; for (const a of fr) for (let i = 2; i < a.length; i++) pk = Math.max(pk, Math.abs(a[i]));
+    if (!(pk > 1e-9)) return null;
+    let h = 1; for (const a of fr) for (let n = H; n > h; n--) if (Math.abs(a[2 * n]) + Math.abs(a[2 * n + 1]) > pk * 6e-5){ h = n; break; }
+    h = Math.max(8, Math.min(H, h));
+    const q = new Int16Array(fr.length * h * 2);
+    fr.forEach((a, k) => { for (let n = 1; n <= h; n++){ q[(k * h + n - 1) * 2] = Math.round(a[2 * n] / pk * 32767); q[(k * h + n - 1) * 2 + 1] = Math.round(a[2 * n + 1] / pk * 32767); } });
+    return {v:1, name:String(name || 'Wavetable').slice(0, 40), id:Date.now().toString(36) + Math.random().toString(36).slice(2, 7), nf:fr.length, h, pk:+pk.toPrecision(6),
+      a:SpecUtil.b64(new Uint8Array(q.buffer))};
+  }
+  static wtValid(wt){ return !!(wt && wt.v === 1 && wt.nf >= 1 && wt.h >= 1 && typeof wt.a === 'string' && wt.a.length); }
+  // a loaded table's frames as {re, im} (the same shape partials() gives), cached by its id
+  static wtPartials(wt){
+    const c = TableCore._wc || (TableCore._wc = new Map()), key = wt.id + ':' + wt.a.length; if (c.has(key)) return c.get(key);
+    const u = SpecUtil.unb64(wt.a), q = new Int16Array(u.buffer, u.byteOffset, Math.floor(u.length / 2)), h = wt.h, s = (wt.pk || 1) / 32767, fr = [];
+    for (let k = 0; k < wt.nf; k++){ const re = new Float32Array(h + 1), im = new Float32Array(h + 1);
+      for (let n = 1; n <= h; n++){ re[n] = (q[(k * h + n - 1) * 2] || 0) * s; im[n] = (q[(k * h + n - 1) * 2 + 1] || 0) * s; } fr.push({re, im}); }
+    if (c.size > 8) c.delete(c.keys().next().value);
+    c.set(key, fr); return fr;
+  }
   // one cycle of frame k (0..7) of table t at phase x (0..1), in the time domain
   static shape(t, k, x){
     const m = k / 7;
@@ -5947,17 +5992,20 @@ class TableCore {
     }
     return c[t] = fr;
   }
-  static render(o, sr, hold){
+  static render(o, sr, hold, wt){
     const p = Object.assign(TableCore.defaults(), o || {}), rnd = KeysUtil.rnd(0x7ab1e);
     const f0 = 65.406 * Math.pow(2, p.oct + (p.tune || 0) / 12), h = Math.max(0.02, hold || 1), atk = Math.max(0.0005, p.atk / 1000), dec = Math.max(0.001, p.dec / 1000), rel = Math.max(0.001, p.rel / 1000);
     const len = Math.min(12, h + rel * 6 + 0.05), N = Math.max(1, Math.ceil(len * sr)), out = new Float32Array(N);
-    // band-limited cycles of the eight frames for this note
-    const L = 2048, tb = Math.max(0, Math.min(3, Math.round(p.table))), fr = TableCore.partials(tb), nmax = Math.max(1, Math.min(128, Math.floor(sr * 0.45 / (f0 * 1.06))));
-    const cyc = fr.map(({re, im}) => { const w = new Float32Array(L + 1); let pk = 0;
-      for (let n = 1; n <= nmax; n++){ const wc = Math.cos(6.283185307 * n / L), ws = Math.sin(6.283185307 * n / L), rn = re[n], jn = im[n]; let c = 1, sn = 0; if (Math.abs(rn) + Math.abs(jn) < 1e-5) continue;
-        for (let i = 0; i < L; i++){ w[i] += rn * c + jn * sn; const c2 = c * wc - sn * ws; sn = sn * wc + c * ws; c = c2; } }
-      for (let i = 0; i < L; i++) pk = Math.max(pk, Math.abs(w[i]));
-      if (pk > 0) for (let i = 0; i < L; i++) w[i] /= pk; w[L] = w[0]; return w; });
+    // band-limited cycles of the table's frames for this note (Loaded without a table on the pad plays Basic)
+    let tb = Math.max(0, Math.min(4, Math.round(p.table))); const own = tb === 4 && TableCore.wtValid(wt); if (tb === 4 && !own) tb = 0;
+    const L = 2048, fr = own ? TableCore.wtPartials(wt) : TableCore.partials(tb), H = own ? wt.h : 128, nmax = Math.max(1, Math.min(H, Math.floor(sr * 0.45 / (f0 * 1.06))));
+    // each frame's cycle is built (an inverse FFT) the first time the position reaches it
+    const NF = fr.length, cyc = new Array(NF), cycle = k => { if (cyc[k]) return cyc[k];
+      const {re, im} = fr[k], Zr = new Float64Array(L), Zi = new Float64Array(L), w = new Float32Array(L + 1); let pk = 0;
+      for (let n = 1; n <= nmax; n++){ Zr[n] = re[n] || 0; Zi[n] = -(im[n] || 0); }
+      SpecUtil.fft(Zr, Zi, true);
+      for (let i = 0; i < L; i++){ w[i] = Zr[i]; pk = Math.max(pk, Math.abs(w[i])); }
+      if (pk > 0) for (let i = 0; i < L; i++) w[i] /= pk; w[L] = w[0]; return cyc[k] = w; };
     const U = Math.max(1, Math.min(7, Math.round(p.unison))), ph = [], inc = [];
     for (let u = 0; u < U; u++){ const d = U === 1 ? 0 : ((u / (U - 1)) * 2 - 1) * p.det * p.det * 40; ph.push(rnd()); inc.push(f0 * Math.pow(2, d / 1200) / sr); }
     const ug = 1 / Math.sqrt(U), warp = Math.max(0, Math.min(1, p.warp)), wp = 0.5 - warp * 0.46;
@@ -5970,7 +6018,7 @@ class TableCore {
       posNow = Math.max(0, Math.min(1, p.pos + p.pmod * pe + p.pdepth * 0.5 * Math.sin(lfo + 6.2832 * p.prate * t)));
       cutNow = Math.min(sr * 0.45, p.cut * Math.pow(2, p.fenv * 5 * fe) * Math.pow(f0 / 261.6, p.key)); resNow = p.res;
       const g = Math.tan(Math.PI * Math.max(20, cutNow) / sr), k = 2 - 1.9 * resNow, a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2;
-      const fpos = posNow * 7, fi = Math.min(6, Math.floor(fpos)), ff = fpos - fi, A = cyc[fi], B = cyc[fi + 1];
+      const fpos = posNow * (NF - 1), fi = Math.min(Math.max(0, NF - 2), Math.floor(fpos)), ff = NF > 1 ? fpos - fi : 0, A = cycle(fi), B = NF > 1 ? cycle(fi + 1) : A;
       const i1 = Math.min(N, i0 + CR);
       for (let i = i0; i < i1; i++){
         const tt = i / sr;
@@ -7582,7 +7630,7 @@ function renderX(V, sr, hold){
   if (k === 'piano') return PianoCore.render(P, sr, hold || Math.min(V.len || 3, 4));
   if (k === 'ep') return TineEPCore.render(P, sr, hold || Math.min(V.len || 3, 4));
   if (k === 'organ') return OrganCore.render(P, sr, hold || Math.min(V.len || 2, 3));
-  if (k === 'table') return TableCore.render(P, sr, hold || Math.min(V.len || 2, 4));
+  if (k === 'table') return TableCore.render(P, sr, hold || Math.min(V.len || 2, 4), V.wtData || null);   // V.wtData: a loaded wavetable
   if (k === 'breath') return BreathCore.render(P, sr, hold || Math.min(V.len || 1, 4));
   if (k === 'strings') return StringsCore.render(P, sr, hold || Math.min(V.len || 3, 4));
   if (k === 'fmdrum') return FmDrumCore.render(P, sr);
@@ -11366,7 +11414,7 @@ const XUI = {
       ['TR-808 kit', {bank:128, prog:25}], ['Electronic kit', {bank:128, prog:24}], ['Jazz kit', {bank:128, prog:32}]]},
   table:{title:'Table', tag:'wavetables · warp · unison', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
-      table:{l:'Table', min:0, max:3, c:'int', d:0, f:v => TableCore.TABLES[Math.max(0, Math.min(3, Math.round(v)))]},
+      table:{l:'Table', min:0, max:4, c:'int', d:0, f:v => TableCore.TABLES[Math.max(0, Math.min(4, Math.round(v)))]},
       pos:{l:'Position', min:0, max:1, c:'lin', d:0, f:pct}, warp:{l:'Warp', min:0, max:1, c:'lin', d:0, f:pct},
       pmod:{l:'Position env', min:-1, max:1, c:'lin', d:0, f:pct}, pdec:{l:'Env decay', min:10, max:6000, c:'log', d:400, f:ms},
       prate:{l:'LFO rate', min:0.05, max:20, c:'log', d:0.5, f:v => v.toFixed(2) + ' Hz'}, pdepth:{l:'LFO depth', min:0, max:1, c:'lin', d:0, f:pct},
@@ -11377,7 +11425,7 @@ const XUI = {
       key:{l:'Key follow', min:0, max:1, c:'lin', d:0.5, f:pct},
       atk:{l:'Attack', min:0.5, max:6000, c:'log', d:5, f:ms}, dec:{l:'Decay', min:1, max:8000, c:'log', d:600, f:ms}, sus:{l:'Sustain', min:0, max:1, c:'lin', d:0.7, f:pct}, rel:{l:'Release', min:1, max:8000, c:'log', d:300, f:ms}},
     secs:[['Table', ['oct', 'table', 'pos', 'warp']], ['Motion', ['pmod', 'pdec', 'prate', 'pdepth']], ['Unison & mix', ['unison', 'det', 'sub', 'noise']], ['Filter', ['cut', 'res', 'fenv', 'fdec', 'key']], ['Amp', ['atk', 'dec', 'sus', 'rel']]],
-    note:'Position moves through the eight frames of the table; the envelope and LFO move it for you. Warp bends the phase the table is read with. Basic runs sine → triangle → saw → square → pulse, Harmonic opens a comb of partials, Formant says its vowels, Digital folds and steps a sine.',
+    note:'Position moves through the frames of the table; the envelope and LFO move it for you. Warp bends the phase the table is read with. Basic runs sine → triangle → saw → square → pulse, Harmonic opens a comb of partials, Formant says its vowels, Digital folds and steps a sine. Loaded is your own: Load wavetable… takes a Serum or WaveEdit table, single-cycle waves (pick several to stack them) or any sound, cut into cycles.',
     pre:[['Init', {}], ['Morph bass', {oct:1, table:0, pos:0.55, pmod:0.4, pdec:250, cut:900, res:0.3, fenv:0.6, fdec:200, dec:400, sus:0.5, rel:100, sub:0.5}],
       ['Wide pulse', {table:0, pos:0.9, unison:5, det:0.4, cut:6000, atk:20, sus:0.8, rel:400, prate:0.3, pdepth:0.2}],
       ['Vowel lead', {table:2, pos:0.2, pmod:0.6, pdec:900, oct:3, unison:2, det:0.2, cut:9000, fenv:0.1, atk:10, sus:0.9, rel:250}],
@@ -11896,6 +11944,170 @@ function rsPanel(){
   }
   $('rsInfo').textContent = v.rsData ? rsLabel(v.rsData) : 'No sample yet: it plays a soft sine. Load a sample to rebuild it from its partials.';
 }
+/* LOADED WAVETABLES (owner, 3 Nov): Table's Load wavetable… makes the pad's own table (V.wtData, saved with the kit,
+   TableCore.fromCycles). What a file is, is worked out from the file itself:
+   - a WAV with Serum's 'clm ' chunk: its frame size (usually 2048);
+   - a WAV no longer than 4096 samples: one single cycle (AKWF waves are 600); several picked at once stack, in name order,
+     into one table, a frame each;
+   - a longer WAV that divides into 256/512/1024/2048/4096-sample frames that each loop cleanly: a table (WaveEdit/E352
+     banks are 64 × 256, unmarked Serum tables 2048);
+   - anything else (any WAV, MP3, OGG, FLAC…): a sound, cut into up to 64 cycles evenly through it at its own pitch
+     (ResynthCore.yin), each cross-faded around its loop; an unpitched sound is cut into plain 2048-sample frames.
+   WAVs are read here, not with decodeAudioData, so frame lengths aren't changed by resampling. */
+function wtReadWav(buf){
+  const dv = new DataView(buf); if (buf.byteLength < 44 || dv.getUint32(0, false) !== 0x52494646 || dv.getUint32(8, false) !== 0x57415645) return null;
+  let o = 12, fmt = null, data = null, clm = 0;
+  while (o + 8 <= buf.byteLength){
+    const id = String.fromCharCode(dv.getUint8(o), dv.getUint8(o + 1), dv.getUint8(o + 2), dv.getUint8(o + 3)), n = dv.getUint32(o + 4, true), b = o + 8;
+    if (id === 'fmt '){ fmt = {tag:dv.getUint16(b, true), ch:dv.getUint16(b + 2, true), sr:dv.getUint32(b + 4, true), bits:dv.getUint16(b + 14, true)};
+      if (fmt.tag === 0xFFFE && n >= 26) fmt.tag = dv.getUint16(b + 24, true); }   // WAVE_FORMAT_EXTENSIBLE: the subformat GUID's first word (1 PCM, 3 float)
+    else if (id === 'data') data = [b, Math.min(n, buf.byteLength - b)];
+    else if (id === 'clm '){ let t = ''; for (let i = 0; i < Math.min(n, 64); i++) t += String.fromCharCode(dv.getUint8(b + i)); const m = /<!>\s*(\d+)/.exec(t); if (m) clm = +m[1]; }
+    o = b + n + (n & 1);
+  }
+  if (!fmt || !data) return null;
+  const tag = fmt.tag;
+  const ch = Math.max(1, fmt.ch), bps = fmt.bits >> 3, fr = Math.floor(data[1] / (bps * ch)), x = new Float32Array(fr);
+  for (let i = 0; i < fr; i++){ let s = 0;
+    for (let c = 0; c < ch; c++){ const p = data[0] + (i * ch + c) * bps; let v = 0;
+      if (tag === 3 && bps === 4) v = dv.getFloat32(p, true);
+      else if (tag === 3 && bps === 8) v = dv.getFloat64(p, true);
+      else if (bps === 1) v = (dv.getUint8(p) - 128) / 128;
+      else if (bps === 2) v = dv.getInt16(p, true) / 32768;
+      else if (bps === 3) v = ((dv.getUint8(p) | (dv.getUint8(p + 1) << 8) | (dv.getInt8(p + 2) << 16))) / 8388608;
+      else if (bps === 4) v = dv.getInt32(p, true) / 2147483648;
+      s += isFinite(v) ? v : 0; }
+    x[i] = s / ch; }
+  return {x, sr:fmt.sr || 48000, clm};
+}
+// the frame size whose frames each loop back on themselves (value and slope carry on from the frame's end to its own
+// start), or 0 when none looks like a table. The smallest size that loops wins, since its multiples loop too when frames repeat.
+function wtGuessFrame(x){
+  const n = x.length; let d = 0; for (let i = 1; i < n; i++) d += Math.abs(x[i] - x[i - 1]); d = d / Math.max(1, n - 1) + 1e-9;
+  const sc = {}; let best = Infinity;
+  for (const c of [256, 512, 600, 1024, 2048, 4096]){ if (n % c || n / c < 2 || n / c > 1024) continue;
+    let j = 0; const F = n / c;
+    for (let k = 0; k < F; k++){ const a = k * c, e = a + c - 1, de = x[e] - x[e - 1], ds = x[a + 1] - x[a]; j += Math.abs(x[a] - (x[e] + de)) + Math.abs(ds - de); }
+    sc[c] = j / F / d; best = Math.min(best, sc[c]); }
+  if (!(best < 2)) return 0;
+  for (const c of [256, 512, 600, 1024, 2048, 4096]) if (sc[c] !== undefined && sc[c] <= Math.max(best * 1.5, 0.05)) return c;
+  return 0;
+}
+// a sound → cycles: up to `count` cycles evenly through it, each at its own pitch, cross-faded around the loop
+function wtCutSound(x, sr, count){
+  let pk = 0; for (const v of x) pk = Math.max(pk, Math.abs(v)); if (!(pk > 1e-5)) return [];
+  let s = 0; while (s < x.length && Math.abs(x[s]) < pk * 0.01) s++;
+  let e = x.length; while (e > s + 1 && Math.abs(x[e - 1]) < pk * 0.01) e--;
+  const tmin = Math.max(2, Math.floor(sr / 2000)), tmax = Math.min(Math.floor(sr / 30), 4096), W = tmax, span = e - s - 2 * tmax - W - 2;
+  if (span < tmax * 2) return [x.slice(s, Math.min(e, s + 2048))];
+  const F = Math.max(2, Math.min(count, Math.floor(span / tmax))), at = Array.from({length:F}, (_, k) => s + Math.round(k * span / (F - 1)));
+  const pit = at.map(a => ResynthCore.yin(x, a, W, tmin, tmax, sr)), good = pit.filter(q => q[1] < 0.3).map(q => sr / q[0]).sort((a, b) => a - b);
+  if (good.length < F / 3) return at.map(a => x.slice(a, a + 2048));   // unpitched: plain frames
+  const med = good[good.length >> 1];
+  return at.map((a, k) => {
+    const P = pit[k][1] < 0.3 ? sr / pit[k][0] : med, Pn = Math.max(4, Math.round(P)), ov = Math.max(2, Math.round(Pn * 0.12));
+    let z = a; while (z < a + Pn && !(x[z] <= 0 && x[z + 1] > 0)) z++; if (z >= a + Pn) z = a;   // start on an upward zero crossing
+    const c = new Float32Array(Pn); for (let i = 0; i < Pn; i++) c[i] = x[z + i] || 0;
+    for (let i = 0; i < ov; i++){ const t = i / ov; c[i] = c[i] * t + (x[z + Pn + i] || 0) * (1 - t); }   // the loop's seam, faded from the next cycle
+    return c; });
+}
+async function wtImport(files){
+  files = Array.from(files || []).sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric:true}));
+  const cycles = [], kinds = [];
+  for (const file of files){
+    const ab = await file.arrayBuffer(), w = wtReadWav(ab);
+    if (w && w.x.length){
+      if (w.clm > 0 && w.x.length >= w.clm){ for (let o = 0; o + w.clm <= w.x.length; o += w.clm) cycles.push(w.x.slice(o, o + w.clm)); kinds.push('table'); continue; }
+      if (w.x.length <= 4096){ cycles.push(w.x); kinds.push('cycle'); continue; }
+      const c = wtGuessFrame(w.x); if (c){ for (let o = 0; o + c <= w.x.length; o += c) cycles.push(w.x.slice(o, o + c)); kinds.push('table'); continue; }
+      cycles.push(...wtCutSound(w.x, w.sr, 32)); kinds.push('sound'); continue;
+    }
+    const ac = new OfflineAudioContext(1, 1, 48000), buf = await ac.decodeAudioData(ab), mono = new Float32Array(Math.min(buf.length, buf.sampleRate * 30));
+    for (let c = 0; c < buf.numberOfChannels; c++){ const d = buf.getChannelData(c); for (let i = 0; i < mono.length; i++) mono[i] += d[i] / buf.numberOfChannels; }
+    cycles.push(...wtCutSound(mono, buf.sampleRate, 32)); kinds.push('sound');
+  }
+  const base = files.length ? files[0].name.replace(/\.[^.]+$/, '') : 'Wavetable', name = files.length > 1 ? base + ' +' + (files.length - 1) : base;
+  const wt = TableCore.fromCycles(cycles, name); if (wt) wt.from = kinds.includes('sound') ? 'sound' : kinds.every(k => k === 'cycle') ? 'cycles' : 'table';
+  return wt;
+}
+/* STARTER TABLES (owner, 3 Nov: "build a starter set in"): Table's Starter tables… picker loads one of these into the pad
+   (V.wtData, so the song keeps its own copy and needs nothing else). Each file in wavetables/ is single cycles from
+   Adventure Kid Waveforms (AKWF, Kristoffer Ekstrand, CC0: wavetables/AKWF-LICENSE.md), stacked into one table in the
+   smoothest order; made by tools/akwf-tables.mjs, which reads this list: [file, name, group, AKWF folders]. */
+const WT_STARTER = [
+  ['saw', 'Saw', 'Basic', ['AKWF_bw_saw', 'AKWF_bw_sawbright']],
+  ['saw-round', 'Rounded saw', 'Basic', ['AKWF_bw_sawrounded']],
+  ['saw-gap', 'Gap saw', 'Basic', ['AKWF_bw_sawgap']],
+  ['square', 'Square', 'Basic', ['AKWF_bw_squ']],
+  ['square-round', 'Rounded square', 'Basic', ['AKWF_bw_squrounded']],
+  ['triangle', 'Triangle', 'Basic', ['AKWF_bw_tri']],
+  ['sine', 'Sine harmonics', 'Basic', ['AKWF_bw_sin', 'AKWF_sinharm']],
+  ['blended', 'Blended', 'Basic', ['AKWF_bw_blended']],
+  ['raw', 'Raw', 'Synth', ['AKWF_raw']],
+  ['c604', 'C604', 'Synth', ['AKWF_c604']],
+  ['fm', 'FM', 'Synth', ['AKWF_fmsynth']],
+  ['overtone', 'Overtones', 'Synth', ['AKWF_overtone']],
+  ['symmetric', 'Symmetric', 'Synth', ['AKWF_symetric']],
+  ['linear', 'Linear', 'Synth', ['AKWF_linear']],
+  ['drawn', 'Hand-drawn', 'Synth', ['AKWF_hdrawn']],
+  ['granular', 'Granular', 'Synth', ['AKWF_granular']],
+  ['distorted', 'Distorted', 'Synth', ['AKWF_distorted']],
+  ['voice', 'Voice', 'Instrument', ['AKWF_hvoice']],
+  ['organ', 'Organ', 'Instrument', ['AKWF_eorgan']],
+  ['epiano', 'E-piano', 'Instrument', ['AKWF_epiano']],
+  ['clav', 'Clav', 'Instrument', ['AKWF_clavinet']],
+  ['bass', 'Bass', 'Instrument', ['AKWF_ebass', 'AKWF_dbass']],
+  ['bowed', 'Bowed', 'Instrument', ['AKWF_cello', 'AKWF_violin']],
+  ['reed', 'Reeds', 'Instrument', ['AKWF_oboe', 'AKWF_clarinett', 'AKWF_altosax']],
+  ['guitar', 'Guitar', 'Instrument', ['AKWF_aguitar', 'AKWF_eguitar']],
+  ['theremin', 'Theremin', 'Instrument', ['AKWF_theremin']],
+  ['chip', 'Chip', 'Lo-fi', ['AKWF_oscchip']],
+  ['game', 'Game', 'Lo-fi', ['AKWF_vgame']],
+  ['game-basic', 'Game basic', 'Lo-fi', ['AKWF_vgamebasic']],
+  ['bitreduced', 'Bit-reduced', 'Lo-fi', ['AKWF_bitreduced']],
+];
+async function wtStarter(id){
+  const r = await fetch('wavetables/' + id + '.json?v=1'); if (!r.ok) throw new Error(r.status);
+  const wt = await r.json(); if (!TableCore.wtValid(wt)) throw new Error('bad table'); return wt;
+}
+const wtLabel = wt => wt.name + ' · ' + wt.nf + (wt.nf === 1 ? ' frame' : ' frames') + (wt.from === 'sound' ? ' cut from a sound' : wt.from === 'cycles' ? ' (single cycles)' : wt.from === 'starter' ? ' · starter table (AKWF)' : '');
+function wtPanel(){
+  const host = $('xSecs'); if (!host) return;
+  const v = V(); if (!v || v.engine !== 'table') return;
+  let box = $('wtBox');
+  if (!box){
+    box = el('div', 'sec'); box.id = 'wtBox'; box.append(el('h3', null, 'Wavetable'));
+    const info = el('p', 'note'); info.id = 'wtInfo';
+    const ld = el('button', 'sm', 'Load wavetable…'); ld.type = 'button';
+    ld.addEventListener('click', () => { const inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true; inp.accept = 'audio/*,.wav,.mp3,.ogg,.m4a,.flac';
+      inp.addEventListener('change', async () => { if (!inp.files || !inp.files.length) return;
+        try {
+          toast('Reading ' + (inp.files.length > 1 ? inp.files.length + ' files' : inp.files[0].name) + '…');
+          await new Promise(r => setTimeout(r, 30));
+          const wt = await wtImport(inp.files);
+          if (!wt){ toast('Nothing to make a table from in that (silent?).', 5000); return; }
+          const w = V(); w.wtData = wt; if (!w.table) w.table = normX('table', null); w.table.table = 4;
+          changed(cur); refreshAll(); toast('Table: ' + wtLabel(wt));
+        } catch(e){ toast('That file couldn’t be read as audio.', 5000); } });
+      inp.click(); });
+    const clr = el('button', 'sm', 'Remove'); clr.type = 'button'; clr.id = 'wtClr';
+    clr.addEventListener('click', () => { const w = V(); delete w.wtData; if (w.table && Math.round(w.table.table) === 4) w.table.table = 0; changed(cur); refreshAll(); });
+    // the starter tables, grouped; picking one loads it into the pad (a copy, saved with the kit)
+    const pick = document.createElement('select'); pick.id = 'wtPick'; pick.className = 'sm';
+    pick.append(new Option('Starter tables…', ''));
+    for (const g of [...new Set(WT_STARTER.map(t => t[2]))]){ const og = document.createElement('optgroup'); og.label = g;
+      for (const t of WT_STARTER.filter(t => t[2] === g)) og.append(new Option(t[1], t[0])); pick.append(og); }
+    pick.addEventListener('change', async () => { const id = pick.value; pick.value = ''; if (!id) return;
+      try {
+        const wt = await wtStarter(id), w = V(); w.wtData = wt; if (!w.table) w.table = normX('table', null); w.table.table = 4;
+        changed(cur); refreshAll(); toast('Table: ' + wtLabel(wt));
+      } catch(e){ toast('Couldn’t load that table (offline?).', 5000); } });
+    const row = el('div', 'btnrow'); row.append(ld, pick, clr); box.append(row, info); host.prepend(box);
+  }
+  $('wtClr').hidden = !v.wtData;
+  $('wtInfo').textContent = v.wtData ? wtLabel(v.wtData) + (v.table && Math.round(v.table.table) === 4 ? '' : '. Set Table to Loaded to play it.')
+    : 'Pick a starter table, or load a Serum or WaveEdit table, single-cycle waves (pick several to stack them, a frame each) or any sound, cut into cycles. It becomes the Loaded table and is saved with the kit.';
+}
 /* FREEZE FILE (owner, 1 Nov): Freeze's own sound (SOURCE File) is kept as a sample on the pad's last layer (off, so the
    layers never play it; v.frzL is its index), so it saves, loads and travels with the kit as any sample does. Load sound…
    takes an audio file (mono, its first 20 s, as the plugin does), and SOURCE goes to File. */
@@ -12001,7 +12213,7 @@ function bassUI(){
   // Effects: Layers, and the engines whose render is what plays (engFx); live engines stay dry.
   const fxe = (bl || xe) && engFx(v); $('fxWrap').hidden = on || vx || ((bl || xe) && !fxe);
   $('fxAfter').textContent = fxe ? 'run top to bottom, after the engine' : 'run top to bottom, after the layers';
-  if (xe){ xBuild(); for (const r of xRows) r.refresh(); xKitVis(); if (v.engine === 'sf') sfPanel(); if (v.engine === 'bytebeat') bbPanel(); if (v.engine === 'resynth') rsPanel(); if (isFrzV(v)) frzPanel(); }
+  if (xe){ xBuild(); for (const r of xRows) r.refresh(); xKitVis(); if (v.engine === 'sf') sfPanel(); if (v.engine === 'bytebeat') bbPanel(); if (v.engine === 'resynth') rsPanel(); if (v.engine === 'table') wtPanel(); if (isFrzV(v)) frzPanel(); }
   if (on){ for (const r of bassRows) r.refresh(); for (const f of bassSegs) f(); bassVizKick(); }
   if (vx){ for (const r of voxRows) r.refresh(); const ta = $('voxTxt'); if (document.activeElement !== ta) ta.value = XV().txt; voxSylShow(); }
   if (bl) for (const r of blipRows) r.refresh();
@@ -20503,7 +20715,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 401;
+const BUILD = 403;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -28741,6 +28953,8 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [403, '3 Nov', ['Table engine: Starter tables… picks one of 30 ready-made tables (saws, squares, FM, voice, organ, bass, chip and more), made from the free Adventure Kid single-cycle waves.']],
+  [402, '3 Nov', ['Table engine: Load wavetable… makes the pad’s own table (Table → Loaded), saved with the kit: Serum or WaveEdit tables, single-cycle waves (pick several to stack them) or any sound, cut into cycles.']],
   [401, '3 Nov', ['Side panel: instrument names show in full: a size smaller, and a long one takes a second line (hover still shows the pad).', 'FX bar: the pitch animation shows every voice, so the Harmonizer’s two intervals both show, each as bright as its level.']],
   [400, '3 Nov', ['FX bar: a click on a value gives the bar the keys until you click elsewhere or press Esc: ▲▼ pick the value above or below, ◀▶ the same value in the next effect, Ctrl/⌘+arrows change it. With the FX screen open above, it follows the value you pick (its slot and row).']],
   [399, '3 Nov', ['FX bar: every effect without a display of its own now has a calm animation behind its values. EQs and filters: the track’s spectrum with the response curve and its points over it; delays: the echoes, lit in turn as each hit runs along them; modulation: its LFO (autopan: a dot swinging L to R); rhythmic effects: the bar’s 16 steps with the one playing lit; pitch: the semitones with the note and where it moves to; width and utility: the stereo field.']],

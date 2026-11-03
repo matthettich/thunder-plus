@@ -3,7 +3,7 @@
 const fs = require('fs'), path = require('path');
 const src = path.join(__dirname, '..'), dst = path.join(__dirname, 'app');
 // (pump/ holds the …pump effects' wasm, their parameter tables and, in pump/ui/, the pop-up windows: all copied, all checked below)
-const PARTS = ['index.html', 'manifest.webmanifest', 'master-worklet.js', 'core', 'icons', 'fonts', 'waves', 'chains', 'pump', 'sounds', 'THIRD_PARTY_NOTICES.md'];
+const PARTS = ['index.html', 'manifest.webmanifest', 'master-worklet.js', 'core', 'icons', 'fonts', 'waves', 'chains', 'pump', 'sounds', 'wavetables', 'THIRD_PARTY_NOTICES.md'];
 fs.rmSync(dst, {recursive:true, force:true});
 fs.mkdirSync(dst, {recursive:true});
 for (const f of PARTS){
