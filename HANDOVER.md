@@ -112,6 +112,29 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (3): skin title bars
+
+- **Owner:** "using the 909 skin … the light grey/white title bars look odd. Can we change those to match the rest of the
+  skin?" Root cause: every title strip used `--side`, and the term base maps `--side` to `--mxpanel`, which most light
+  term skins set to a paler, near-white tint of their case (909 `#e0e2e3` on `#cfd2d4`, IDM `#f2f1ec` on `#e9e8e3`).
+  Also the bottom panel's name chips (`.dkh .dkt`, "…CHAINS · TRACK 01", "TRACK 01 MONO") were meant to be inverted
+  (ink / inv) but the term button rule (`:root[data-skinbase="term"] :is(button,…)`, higher specificity) turned them into
+  pale keys.
+- **New tokens** on `:root`: `--ttl` (title bar background), `--ttl-ink`, `--ttl-mut`. Defaults: `--side` / `--ink` /
+  `--muted`, so Pastel, Minimal, Neon etc. look exactly as before. Used by `.ttabs`, `.ttabbar`, `.tcpu`, `.dkh`
+  (+ `.dkh .dki` text), `.mwhead` (old mastering window), `.help .hhead`, `.pbs .phd` (preset browser head, which had no
+  background before).
+- **Term skins** (all of them, CSS block "SKIN TITLE BARS" just before the term pads/command-row rules):
+  `--ttl:var(--mxpanel2)` (each skin's own second panel tone: a step deeper than the case in light skins, lifted in dark
+  ones; close to the …pump windows' header, `pump/ui/kit.js` `skinTheme` panel2), `--ttl-mut` = 80% ink. The bottom
+  panel heads `#tDeck .dkh` take their own section's tone (`--dkp`) + `--dkh-up` (4%), and `.dkh .dkt:not(.mstb)` is the
+  ink chip again (like the tracker's "01 MONO" column heads). lcdgreen, matrixlight, sage, valentine, blossom, ocean set
+  `--dkh-up:0%` and full-ink `--ttl-mut` to keep ≥ 4.5:1.
+- Contrast: ink on the title bars ≥ 4.5:1 in every term skin whose own ink on its case is ≥ 4.5:1 (the low-contrast
+  Simple skins mustard, complement, citrus, sunset, miami, desert, tomato were below that before and stay near their own
+  body contrast). Pump windows, menus, the settings sheet: unchanged (already the skin's colours; no light bar).
+- Not changed: side *panels* (`.tside`, `.tcmd`, `.dock`) still use `--side` (in 909 the lighter silver panel).
+
 ## 3 Nov (2): the rest of the sequencer move (all on `beta`, not released)
 
 - **FXV:** the core works out an effect slot's settings itself (`fxvMsg`) and hands them to the effect node at the row's

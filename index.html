@@ -43,6 +43,10 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
   /* voicecard accent: a complement near each fam colour, so the voice card always contrasts with the layer card */
   --stdc:#c78f2f; --fmc:#50c74f; --addc:#9a3013; --noisec:#2e5de0; --smpc:#45d1a8; --plc:#0b4bb8; --wvc:#d15522;
   --line:var(--ink); --meter-ok:#4fd18a; --meter-hot:#e8b93c; --meter-clip:#e0564a;
+  /* TITLE BARS (3 Nov): the strips that head a panel or a window (the bottom panel's section heads, the tracker's tab
+     bar, the mastering / Help / preset windows' heads) take these, so each skin can set them once. Here: the side
+     colour, as before; the term skins derive their own (SKIN TITLE BARS, after the term base). */
+  --ttl:var(--side); --ttl-ink:var(--ink); --ttl-mut:var(--muted);
   --font:Futura,"Futura PT",Jost,"Century Gothic","Avenir Next",system-ui,sans-serif;
   color-scheme:light;
 }
@@ -310,7 +314,7 @@ input[type=range].wheelon{outline:2px solid var(--ink); outline-offset:2px; bord
 .gset #storeInfo{flex:1 1 100%; font-size:var(--fs-3); color:var(--muted); line-height:1.4}
 @media (pointer:coarse){ .gset .tsr.sbtn > button, .gset #bMst{min-height:46px} .gset label.cb{min-height:38px} .gset label.cb input[type=checkbox]{width:42px; height:24px} .gset label.cb input[type=checkbox]::before{width:16px; height:16px} .gset label.cb input[type=checkbox]:checked::before{transform:translateX(18px)} }
 .help{position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; background:var(--bench); color:var(--ink)}
-.help .hhead{display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--side); flex:none}
+.help .hhead{display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--ttl); color:var(--ttl-ink); flex:none}
 .help #helpNav{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; min-width:0; flex:0 1 auto}
 .help #helpNav button{flex:none}
 .help .hhead b{font-weight:600; letter-spacing:.06em; margin-right:4px}
@@ -756,7 +760,7 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .pbs{position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.42); display:flex; align-items:center; justify-content:center; padding:14px}   /* centred: the same gap above and below */
 @media (min-width:700px){ .pbs{padding:16px} }
 .pbs .pbox{background:var(--bench); color:var(--ink); border:1px solid var(--line); width:min(560px, 100%); max-height:100%; display:flex; flex-direction:column; font-size:var(--fs-4); box-shadow:0 8px 32px rgba(0,0,0,.35)}
-.pbs .phd{display:flex; gap:8px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line)} .pbs .phd b{font-size:var(--fs-5); white-space:nowrap}
+.pbs .phd{display:flex; gap:8px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); background:var(--ttl); color:var(--ttl-ink)} .pbs .phd b{font-size:var(--fs-5); white-space:nowrap}
 .pbs .phd input{flex:1; min-width:0; padding:7px 10px; border:1px solid var(--line); background:var(--panel); min-height:36px}
 .pbs .plist{overflow-y:auto; flex:1; overscroll-behavior:contain}
 .pbs .pcat{display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%; text-align:left; padding:11px 14px; border:0; border-bottom:1px solid var(--line); font-weight:600; background:var(--panel); color:var(--ink); min-height:44px}
@@ -825,7 +829,7 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .trk, .trk *{-webkit-touch-callout:none; user-select:none; -webkit-user-select:none; -webkit-tap-highlight-color:transparent}
 .trk :is(input,textarea,[contenteditable]){user-select:text; -webkit-user-select:text}
 .trk{flex:1; min-height:0; min-width:0; overflow:hidden; display:flex; flex-direction:column; background:var(--bench)}
-.ttabs{display:flex; flex:none; border-bottom:1px solid var(--line); background:var(--side); overflow-x:auto; scrollbar-width:none}
+.ttabs{display:flex; flex:none; border-bottom:1px solid var(--line); background:var(--ttl); overflow-x:auto; scrollbar-width:none}
 .ttabs button{border:0; border-right:1px solid var(--line); background:none; min-height:36px; padding:0 14px; font-weight:500; font-size:var(--fs-4); letter-spacing:.04em; flex:none}
 .ttabs button.on{background:var(--ink); color:var(--inv)}
 .tbody{flex:1; min-height:0; display:flex}
@@ -1061,7 +1065,7 @@ body:not(.legon) .tside .tlegend{display:none}
 .tcmd:not(.cmini) button[data-c=song]{grid-column:-2 / -1}
 body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bottom,0px))}
 
-.ttabbar{display:flex; flex:none; border-bottom:1px solid var(--line); background:var(--side); min-width:0}
+.ttabbar{display:flex; flex:none; border-bottom:1px solid var(--line); background:var(--ttl); min-width:0}
 .ttabbar .ttabs{border-bottom:0; flex:1; min-width:0}
 .tmode{border:0; border-left:1px solid var(--line); min-height:36px; padding:0 12px; font-size:var(--fs-3); font-weight:600; letter-spacing:.04em; flex:none; white-space:nowrap}
 .tmode.on{background:var(--ink); color:var(--inv)}
@@ -1151,7 +1155,7 @@ body.mob .top #tLen{min-height:34px; padding:0 8px; align-self:auto}
 #tSong.on .tl:not(.alt){visibility:hidden}
 #tSong.on .tl.alt{visibility:visible}
 .tcpu{border:0; border-left:1px solid var(--line); min-height:36px; padding:0 10px; font-size:var(--fs-3); font-weight:600; letter-spacing:.04em; flex:none; white-space:nowrap;
-  font-variant-numeric:tabular-nums; position:relative; min-width:84px; text-align:left; background:var(--side)}
+  font-variant-numeric:tabular-nums; position:relative; min-width:84px; text-align:left; background:var(--ttl)}
 .tcpu i{position:absolute; left:0; bottom:0; height:4px; width:0; background:var(--ink); transition:width .3s}
 .tcpu.warn i{background:var(--pl)}
 .tcpu.hot{color:var(--rec)} .tcpu.hot i{background:var(--rec)}
@@ -1752,10 +1756,10 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #tDeck .dks.col .dkt{writing-mode:vertical-rl; transform:rotate(180deg); height:auto; max-height:100%; padding:7px 0; width:18px; flex:0 1 auto}
 .dkh .dkt.fixed{cursor:default}
 /* the thin grey header: one cell per section, its button over it, a rule between sections */
-.dkh{flex:none; display:flex; align-items:center; gap:5px; height:22px; padding:0 6px; background:var(--side); border-bottom:1px solid var(--line); min-width:0}
+.dkh{flex:none; display:flex; align-items:center; gap:5px; height:22px; padding:0 6px; background:var(--ttl); color:var(--ttl-ink); border-bottom:1px solid var(--line); min-width:0}
 .dkh .dkt{min-height:0; height:17px; padding:0 7px; font-size:var(--fs-2); font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--ink); color:var(--inv);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; flex:0 1 auto; min-width:0}
-.dkh .dki{font-size:var(--fs-2); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto}
+.dkh .dki{font-size:var(--fs-2); color:var(--ttl-mut); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto}
 .dkh .dksp{flex:1 1 0}
 .dkoffs{display:none}   /* the old + buttons for hidden parts: parts fold now instead */
 .dkh .dkx{min-height:0; height:17px; width:22px; padding:0; font-size:var(--fs-2); border:1px solid var(--line); background:var(--panel); flex:none}
@@ -1868,7 +1872,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .mstwin{position:fixed; inset:24px; z-index:60; display:flex; flex-direction:column; background:var(--panel); color:var(--ink); border:1px solid var(--ink); box-shadow:6px 6px 0 0 var(--ink)}
 .mstwin[hidden]{display:none}
 @media (max-width:700px){ .mstwin{inset:0; box-shadow:none; border:0} }
-.mwhead{flex:none; display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--line); background:var(--side); flex-wrap:wrap}
+.mwhead{flex:none; display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--line); background:var(--ttl); color:var(--ttl-ink); flex-wrap:wrap}
 .mwhead > b{font-size:var(--fs-4); letter-spacing:.08em}
 .mwon{min-height:30px; padding:0 14px; font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--panel)}
 .mwon.on{background:var(--ink); color:var(--inv)}
@@ -2252,6 +2256,22 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
 :root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
 :root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
+/* SKIN TITLE BARS (owner, 3 Nov: "using the 909 skin … the light grey/white title bars look odd"): the term base gave the
+   title bars --side, i.e. --mxpanel, which in most light skins is a paler, near-white tint of the case (909 #e0e2e3 on
+   #cfd2d4, IDM #f2f1ec on #e9e8e3), so every head read as a white chip pasted on. They now take the skin's second panel
+   tone, --mxpanel2, which every term skin picks as a deeper (light skins) or lifted (dark skins) shade of its own case
+   (909 #b8bcbf, the silver one step down; 808 #36342f), close to the …pump windows' header (pump/ui/kit.js skinTheme:
+   bg + 10% ink). The keys on them stay the skin's keys (the term button rule). Muted text on a head: 80% ink, so it
+   stays ≥ 4.5:1 wherever the skin's own text on its case is. */
+:root[data-skinbase="term"]{--ttl:var(--mxpanel2); --ttl-ink:var(--mx); --ttl-mut:color-mix(in srgb, var(--mx) 80%, var(--mx2)); --dkh-up:4%}
+/* The bottom panel's section heads: their own section's tone (--dkp of the ink, the TERM DECK rule) a shade deeper
+   (--dkh-up), so each head belongs to its section. The name chip (…CHAINS · TRACK 01, FX · TRACK 01, TRACK 01 MONO) is
+   the inverted chip the base rule meant (ink, with the skin's on-ink text), like the tracker's own column heads
+   (01 MONO): the term button rule had turned it into a pale key. Skins whose ink is already near 4.5:1 on their deepest
+   section keep the section's own tone and full ink for the head's text. */
+:root[data-skinbase="term"] #tDeck .dkh{background:color-mix(in srgb, var(--mx) calc(var(--dkp, 0%) + var(--dkh-up)), var(--mxbg))}
+:root[data-skinbase="term"] #tDeck .dkh .dkt:not(.mstb){background:var(--mx); color:var(--mxon); border-color:var(--mx); text-shadow:none}
+:root:is([data-skin="lcdgreen"],[data-skin="matrixlight"],[data-skin="sage"],[data-skin="valentine"],[data-skin="blossom"],[data-skin="ocean"]){--dkh-up:0%; --ttl-mut:var(--mx)}
 /* pads, command row and keypad: plain keys with outlines and an offset block; a hit fills */
 :root[data-skinbase="term"] :is(.tcmd,.dock,.tctl){background:var(--mxbg)}
 :root[data-skinbase="term"] :is(.tcmd button,.tkp .kp,.pads .pad){background:var(--mxbg); color:var(--mx); border-color:var(--mxline, var(--mx));
