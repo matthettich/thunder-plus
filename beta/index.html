@@ -1205,8 +1205,11 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tath i[data-t]{cursor:pointer} .tath i.so{background:var(--ar-pl); color:var(--ar-pl-ink, #3d2c00); border-radius:3px}
 .tagrid{flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:3px 0 8px; touch-action:pan-y}
 .tagrid .ar{margin-bottom:2px}
-/* EVERY 4 ROWS (owner, 2 Nov): a grey line above rows 0, 4, 8… so the song reads in groups of four patterns */
-.tagrid .ar.q4{box-shadow:0 -2px 0 0 color-mix(in srgb, var(--muted, #777) 55%, transparent); margin-top:3px}
+/* EVERY 4 ROWS (owner, 2 Nov): a thin ink line, with even room above and below, over rows 4, 8, 12… so the song reads
+   in groups of four patterns (option C of three; it was a grey bar tight against the row above) */
+.tagrid .ar{position:relative}
+.tagrid .ar.q4{margin-top:7px}
+.tagrid .ar.q4::before{content:''; position:absolute; left:8px; right:8px; top:-5px; height:1px; background:var(--ar-ink, #111); opacity:.45; pointer-events:none}
 .tagrid .rn{font-size:var(--fs-1); line-height:var(--arh,16px); color:var(--ar-dim); cursor:pointer}
 .tagrid .rn.r4{color:var(--ar-ink); font-weight:700}
 .tagrid .rn.pl{background:var(--ar-pl); color:var(--ar-pl-ink); border-radius:2px}
