@@ -21213,12 +21213,16 @@ function keyHint(s){
    as before. Edit ▾ in the top bar (full true) always shows the same items in the same places and greys out the ones that
    don't apply here, so a pick is always where you last found it. The generators, selection tools and rendering sit in a
    Tools ▸ group (in Edit ▾: the top bar has no room for a Tools menu on a 13" laptop). */
+// GENERATORS (owner, 2 Nov: "call that generators", findable from a right-click in the phrase or pattern editor): the
+// pattern writers, in their own group of Edit ▾ and the right-click menu, before Tools.
+function genItems(full){
+  const ph = tv === 'phrase', mst = ph && mstView();
+  return ph && !mst || full ? [{a:'acid', l:'Acid line… (a random bass line)', k:'', f:acidLine, off:!ph || mst}, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill, off:!ph || mst}] : [];
+}
 function toolItems(full){
   const ph = tv === 'phrase', phSel = !!(selA && selA.v === 'phrase'), sg = tv === 'song', mst = ph && mstView();
   const what = selA && selA.v === tv ? 'the selection' : sg ? 'this song row' : 'this phrase';
   const L = [
-    ...(ph && !mst || full ? [{a:'euc', l:'Euclidean fill…', k:'', f:euclidFill, off:!ph || mst}, {a:'acid', l:'Acid line… (a random bass line)', k:'', f:acidLine, off:!ph || mst}] : []),
-    null,
     ...(ph || full ? [{a:'xpu', l:'Transpose up a semitone', k:keyHint('alt+.'), f:() => transposeSel(1), off:!phSel}, {a:'xpd', l:'Transpose down a semitone', k:keyHint('alt+,'), f:() => transposeSel(-1), off:!phSel},
       {a:'interp', l:'Interpolate (ramp the selection)', k:'', f:interpSel, off:!phSel},   // SELECTION TOOLS
       ...(mst ? [] : [{a:'volsel', l:'Volume… (scale, fade, set)', k:'', f:volSel, off:!ph}, {a:'instsel', l:'Instrument… (set, swap)', k:'', f:instSel, off:!ph}]),
@@ -21263,6 +21267,7 @@ function cmdItems(full){
       {a:'loopp', l:'Loop the pattern', k:keyHint('alt+L'), f:toggleLoopPat}, {a:'loops', l:'Loop the selection', k:keyHint('shift+alt+L'), f:toggleLoop}] : []),
     ...(['song', 'phrase', 'mixer', 'fx'].includes(tv) || full ? [null, {a:'tname', l:'Name this track…', k:'', f:nameTrackHere, off:!['song', 'phrase', 'mixer', 'fx'].includes(tv)}] : []),
     null,
+    ...(genItems(full).length ? [{l:'Generators', sub:genItems(full)}] : []),
     {l:'Tools', sub:toolItems(full)},
     null,
     ...(onSong && !full ? [] : [val('b:16', 'Value up a lot', '▲', {off:onSong})]), val('b:1', 'Value up', '▶'), val('b:-1', 'Value down', '◀'), ...(onSong && !full ? [] : [val('b:-16', 'Value down a lot', '▼', {off:onSong})]),
@@ -21288,15 +21293,15 @@ let eucLast = '5 16 0';
 async function euclidFill(){
   if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Euclidean fill writes notes into it.');
   if (busTrack(cTrack)) return busSay();   // BUS FX ONLY
-  const a = await askText({title:'Euclidean fill', body:'HITS STEPS ROTATE, e.g. 5 16 or 3 8 2. Fills the note column under the cursor over the selected rows (or from the cursor down), with the note there (or the last one).'}, eucLast, 12, 'Fill');
+  const a = await askText({title:'Euclidean fill', body:'HITS STEPS ROTATE INSTRUMENT, e.g. 5 16, 3 8 2, or 5 16 0 0A for instrument 0A. Fills the note column under the cursor over the selected rows (or from the cursor down), with the note there (or the last one); without an instrument, the row\u2019s own (or the last used).'}, eucLast, 12, 'Fill');
   if (a == null) return;
-  const v = a.trim().split(/[\s,/:]+/).map(x => parseInt(x, 10)); if (!(v[0] >= 0 && v[1] >= 1)) return toast('Type the hits and steps, like 5 16.');
-  const n = clamp(v[1], 1, PROWS), k = clamp(v[0], 0, n), rot = Number.isFinite(v[2]) ? v[2] : 0; eucLast = `${k} ${n} ${rot}`;
+  const tk = a.trim().split(/[\s,/:]+/), v = tk.map(x => parseInt(x, 10)), insPick = tk[3] != null && /^[0-9a-f]{1,2}$/i.test(tk[3]) ? clamp(parseInt(tk[3], 16), 0, S.insts.length - 1) : null;   // INSTRUMENT (owner, 2 Nov) if (!(v[0] >= 0 && v[1] >= 1)) return toast('Type the hits and steps, like 5 16.');
+  const n = clamp(v[1], 1, PROWS), k = clamp(v[0], 0, n), rot = Number.isFinite(v[2]) ? v[2] : 0; eucLast = `${k} ${n} ${rot}` + (insPick != null ? ' ' + hx(insPick) : '');
   if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase();
   const P = S.phrases[cPhrase], c = cs.phrase, col = PK[c.x] === 'note' ? c.x : 0, L = plen(cPhrase);
   let y0 = c.y, y1 = L - 1; if (selA){ const R = selRect(); y0 = R.y0; y1 = Math.min(R.y1, L - 1); selA = null; }
-  const src = P[c.y], note = src[col] >= 0 && src[col] < 120 ? src[col] : last.note, ins = src[IC] >= 0 ? src[IC] : defInst(), pat = euclid(k, n, rot);
-  for (let y = y0; y <= y1; y++){ const r = P[y]; if (pat[(y - y0) % n]){ r[col] = note; if (r[IC] < 0) r[IC] = ins; } else r[col] = -1; }
+  const src = P[c.y], note = src[col] >= 0 && src[col] < 120 ? src[col] : last.note, ins = insPick != null ? insPick : src[IC] >= 0 ? src[IC] : defInst(), pat = euclid(k, n, rot);
+  for (let y = y0; y <= y1; y++){ const r = P[y]; if (pat[(y - y0) % n]){ r[col] = note; if (r[IC] < 0 || insPick != null) r[IC] = ins; } else r[col] = -1; }
   saveS(); draw(); toast(`Euclidean ${k} in ${n}${rot ? ', rotated ' + rot : ''}: rows ${rS(y0)}–${rS(y1)}, ${noteS(note)}`);
 }
 
@@ -21369,7 +21374,7 @@ function acidLine(){
   let y0 = 0, L = plen(cPhrase);
   if (selA && selA.v === 'phrase'){ const R = selRect(); y0 = R.y0; L = Math.max(2, Math.min(R.y1, plen(cPhrase) - 1) - y0 + 1); }
   const P = () => S.phrases[cPhrase];
-  const src = P()[cs.phrase.y], ins = src && src[IC] >= 0 ? src[IC] : (P().find(r => r[IC] >= 0) || [])[IC] ?? defInst();
+  const src = P()[cs.phrase.y]; let ins = src && src[IC] >= 0 ? src[IC] : (P().find(r => r[IC] >= 0) || [])[IC] ?? defInst();   // INSTRUMENT (owner, 2 Nov): picked in the panel
   const R = () => ({scale:acidSet.scale, root:acidSet.root, density:acidSet.density / 100, accent:acidSet.accent / 100, slide:acidSet.slide / 100, octave:acidSet.octave / 100});
   const roll = mut => {
     const st = acidRead(P(), y0, L, acidSet.base), lanes = acidSet.lanes;
@@ -21377,7 +21382,7 @@ function acidLine(){
     if (mut) acidMutate(st, L, lanes, R(), Math.random); else acidRoll(st, L, lanes, R(), Math.random);
     acidWrite(P(), y0, L, acidSet.base, st, ins); saveS(); draw();
     const nN = st.filter(s => s.gate === ACID_NOTE).length;
-    toast(`${mut ? 'Mutated' : 'Rolled'}: ${nN} notes, ${st.filter(s => s.accent).length} accents, ${st.filter(s => s.slide).length} slides · rows ${rS(y0)}–${rS(y0 + L - 1)}`, 1600);
+    toast(`${mut ? 'Mutated' : 'Generated'}: ${nN} notes, ${st.filter(s => s.accent).length} accents, ${st.filter(s => s.slide).length} slides · rows ${rS(y0)}–${rS(y0 + L - 1)}`, 1600);
   };
   // the panel: an .ask dialog that stays open, so the line can be rolled again while it plays
   if (askOpen) askOpen(null);
@@ -21385,6 +21390,7 @@ function acidLine(){
   box.append(el('div', 'asktitle', 'Acid line'), el('div', 'askmsg', `Rows ${rS(y0)}–${rS(y0 + L - 1)} of this phrase, instrument ${hx(ins)}. Accents are volume FF, slides PSL. Use it with an Acid pad (Engine: Acid).`));
   const field = (label, ctl) => { const f = el('label', 'acidf'); f.append(el('span', null, label), ctl); box.append(f); return ctl; };
   const sel = (label, opts, k) => { const s = el('select'); opts.forEach(([v, t]) => s.append(new Option(t, v))); s.value = acidSet[k]; s.addEventListener('change', () => { acidSet[k] = +s.value; }); return field(label, s); };
+  { const s = el('select'); for (let k = 0; k < S.insts.length; k++) s.append(new Option(instLabel(k), k)); s.value = ins; s.addEventListener('change', () => { ins = +s.value; }); field('Instrument', s); }
   sel('Scale', ACID_SCALES.map(([n], i) => [i, n]), 'scale');
   sel('Root', NN.map((n, i) => [i, n.replace('-', '')]), 'root');
   sel('Base note', [24, 36, 48, 60].map(v => [v, noteS(v) + (v === ROOT ? ' (the pad’s pitch)' : '')]), 'base');
@@ -21394,15 +21400,15 @@ function acidLine(){
   const lanes = el('div', 'seg'); lanes.setAttribute('aria-label', 'Lanes to roll');
   ACID_LANES.forEach(([k, t]) => { const b = el('button', acidSet.lanes[k] ? 'on' : null, t); b.type = 'button'; b.setAttribute('aria-pressed', !!acidSet.lanes[k]);
     b.addEventListener('click', () => { acidSet.lanes[k] = !acidSet.lanes[k]; b.classList.toggle('on', acidSet.lanes[k]); b.setAttribute('aria-pressed', acidSet.lanes[k]); }); lanes.append(b); });
-  field('Roll', lanes);
+  field('Generate', lanes);
   const row = el('div', 'btnrow'), mk = (t, f, cls) => { const b = el('button', cls || null, t); b.type = 'button'; b.addEventListener('click', f); row.append(b); return b; };
   const done = () => { if (askOpen !== done) return; askOpen = null; wrap.remove(); document.removeEventListener('keydown', key, true); };
-  mk('▶ / ■', () => playCtx()); mk('Mutate (M)', () => roll(true)); const go = mk('Roll (R)', () => roll(false), 'ok'); mk('Done', done);
+  mk('▶ / ■', () => playCtx()); mk('Mutate (M)', () => roll(true)); const go = mk('Generate (G)', () => roll(false), 'ok'); mk('Done', done);
   box.append(row);
   // Keys stay in the panel: R rolls, M mutates, Space plays or stops the phrase, Esc / Enter close.
   const key = e => { const tag = e.target && e.target.tagName;
     if (e.key === 'Escape' || (e.key === 'Enter' && tag !== 'BUTTON' && tag !== 'SELECT')){ e.preventDefault(); e.stopPropagation(); return done(); }
-    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'r' || e.key === 'R')){ e.preventDefault(); e.stopPropagation(); return roll(false); }
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'g' || e.key === 'G' || e.key === 'r' || e.key === 'R')){ e.preventDefault(); e.stopPropagation(); return roll(false); }
     if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'm' || e.key === 'M')){ e.preventDefault(); e.stopPropagation(); return roll(true); }
     if (e.key === ' ' && tag !== 'BUTTON'){ e.preventDefault(); e.stopPropagation(); return playCtx(); }
     e.stopPropagation();
