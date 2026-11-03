@@ -372,3 +372,12 @@ test('build 395: Enter on a song block picks it up', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
   assert.match(src, /if \(tv === 'song' && enter && v >= 0\)\{[^\n]*\n[^\n]*\n\s*else \{ last\.sect = v;/);
 });
+
+test('build 398: …waves live engine', () => {
+  const fs = require('fs'), path = require('path'), src = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8'), wk = fs.readFileSync(path.join(__dirname, '..', 'waves', 'waves-worklet.js'), 'utf8');
+  assert.match(wk, /registerProcessor\('thunder-wlive', WavesLiveProc\)/);
+  assert.match(src, /wavesl:\{live:true, d:\(\) => \(\{bus:1, vel:100\}\), r:/);
+  assert.match(src, /if \(isWlV\(V\)\) return wlNode\(t, pad, V, kind, key\)/);
+  assert.match(src, /ps = isPsV\(v\) \|\| isWlV\(v\)/);
+  assert.ok(!/waves-worklet\.js\?v=31/.test(src));
+});

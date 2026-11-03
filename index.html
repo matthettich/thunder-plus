@@ -3172,7 +3172,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
 
-<script src="waves/waves-worklet.js?v=31"></script>
+<script src="waves/waves-worklet.js?v=32"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -3386,6 +3386,33 @@ function wavesPre(L, V, dur, pA, ptau){
   } catch(err){ console.warn('…waves render', err); }
   finally { e.dispose(); Math.random = rnd0; }
   return {data:out, rate:sr};
+}
+
+/* …WAVES LIVE (3 Nov): the …waves patch as an engine of its own, played live in the tracker (thunder-wlive in
+   waves-worklet.js); this is its render, the pad's sound wherever a render plays (the Synth page, a pad preview, the safety
+   net): the patch's Bus, one note at the pad's pitch held for the note (or half a second), then its tail. Stereo summed to
+   mono as a …waves layer renders. */
+function wavesLiveRender(P, sr, hold, V, bpm){
+  const W = globalThis.WavesDSP, doc = wavesDoc(); if (!W || !doc) return new Float32Array(1);
+  const gateS = Math.max(0.01, hold || 0.5), N = Math.min(Math.ceil((gateS + 2.5) * sr / 128) * 128, sr * 10), out = new Float32Array(N);
+  const rnd0 = Math.random; let seed = (0x9e3779b9 ^ ((P.bus | 0) * 7919) ^ Math.round((+P.tune || 0) * 131)) >>> 0;
+  Math.random = () => { seed = (seed + 0x6d2b79f5) >>> 0; let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const e = new W.WavesEngine(sr, {maxVoices:4, transport:{tempo:bpm || 120}, seed, costCeiling:Infinity});
+  let last = 0;
+  try {
+    e.loadPatch(doc);
+    const bus = Math.min(8, Math.max(1, P.bus | 0)), g = Math.pow(10, (+P.level || 0) / 20), dv = +P.drive || 0, dr = dv > 0.001 ? 1 + dv * dv * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1;
+    const k = e.voices.on(36 + (+P.tune || 0) - 60, Math.max(1, Math.min(127, P.vel || 100)) / 127), row = e.voices.rows[k];
+    for (let off = 0; off < N; off += 128){
+      if (row.gate && off / sr >= gateS){ row.gate = 0; row.offAt = e.voices.now; }
+      e.process(128);
+      const a = e.bus(bus), b = e.busR(bus), n = Math.min(128, N - off);
+      for (let i = 0; i < n; i++){ let x = (a[i] + b[i]) * 0.5 * g; if (dr) x = Math.tanh(x * dr) * dn; out[off + i] = x; if (x > 1e-4 || x < -1e-4) last = off + i; }
+      if (!row.gate && off - last > sr * 0.3) break;   // the tail has died away
+    }
+  } catch(err){ console.warn('…waves live render', err); }
+  finally { e.dispose(); Math.random = rnd0; }
+  return out.slice(0, Math.max(1, last + 1));
 }
 
 /* PWM sampler: a sample played the way old hardware did it. A clock (2–32 kHz at the pad's own pitch, and it
@@ -7526,6 +7553,8 @@ const XENG = {
   resynth:{live:false, d:() => ResynthCore.defaults()},
   bytebeat:{live:false, d:() => BytebeatCore.defaults()},
   sf:{live:false, d:() => ({bank:0, prog:0, trans:0, velo:0.7, atk:1, rel:1})},
+  // …WAVES LIVE (3 Nov): the …waves patch played live, one of its 8 buses per pad (wavesLiveRender is its render)
+  wavesl:{live:true, d:() => ({bus:1, vel:100}), r:(P, sr, hold, V, bpm) => wavesLiveRender(P, sr, hold, V, bpm)},
   // LXR ENGINES: lxdrum, lxsnare, lxcym, lxhat, when lxr/ is there (an entry with r renders itself)
   ...(typeof LxrCore !== 'undefined' ? LxrCore.xeng() : {}),
   // …PUMP SYNTHS: pmono, ppoly, pcoil, porbit (and their live twins), when pump/synth/ is there (rendered by the plugins' own DSP)
@@ -7534,6 +7563,7 @@ const XENG = {
 const isXEngV = v => !!(v && XENG[v.engine]);
 const isLxV = v => !!(v && typeof LxrCore !== 'undefined' && LxrCore.isKind(v.engine));
 const isPsV = v => !!(v && typeof PsynCore !== 'undefined' && PsynCore.isKind(v.engine));   // …PUMP SYNTHS
+const isWlV = v => !!(v && v.engine === 'wavesl');   // …WAVES LIVE
 function normX(kind, o){ const d = XENG[kind].d(), r = {}; for (const k in d) r[k] = o && typeof o[k] === 'number' && isFinite(o[k]) ? o[k] : d[k]; delete r.tune; delete r.drive; delete r.level; return r; }
 function xParams(V){ return Object.assign(normX(V.engine, V[V.engine]), {tune:V.tune || 0, drive:V.drive || 0, level:V.level || 0}); }
 function renderX(V, sr, hold){
@@ -7997,7 +8027,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=31', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=32', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -8005,7 +8035,7 @@ self.onmessage = async e => {
 function rwDown(){ PW.ready = false; try { PW.w && PW.w.terminate(); } catch(e){} PW.w = null; for (const j of PW.jobs.values()) j.no(new Error('worker')); PW.jobs.clear(); }
 // Can the Worker render this voice? (It has no …waves engine if loading that failed.)
 // The Worker needs the …waves engine for …waves layers and for the module effects (MODFX); without it, those pads render here.
-const rwCan = v => PW.ready && PW.w && v.engine !== 'sf' && !(isLxV(v) && !PW.lx) && !(isPsV(v) && !PW.ps) && !(PW.wv === false && ((WV.doc && v.layers.some(l => l.on && l.type === 'waves')) || (v.fx || []).some(f => f && f.on && FX[f.type] && FX[f.type].mod)));
+const rwCan = v => PW.ready && PW.w && v.engine !== 'sf' && !(isLxV(v) && !PW.lx) && !(isPsV(v) && !PW.ps) && !(PW.wv === false && ((WV.doc && (isWlV(v) || v.layers.some(l => l.on && l.type === 'waves'))) || (v.fx || []).some(f => f && f.on && FX[f.type] && FX[f.type].mod)));
 // Renders a voice in the Worker: resolves to {data, st:[[fx index, peaks]…]}. Rejects when the Worker can't.
 function renderAsync(v, sr, hold, stages){
   if (!rwCan(v)) return Promise.reject(new Error('no worker'));
@@ -8671,7 +8701,8 @@ const ENGINE_GROUPS = [
     ['swarm', 'Swarm', 'oscillator cloud · drift · bloom'], ['drift', 'Drift', 'two-line analog poly · tape wow & flutter · haze'], ['table', 'Table', 'wavetables · warp · unison'], ['phase', 'Phase', 'phase distortion · DCW · resonance'],
     ['partials', 'Partials', 'additive · 256 harmonics · morph'], ['chip', 'Chip', '8-bit · duty · arp · LFSR'],
     ['vector', 'Vector', 'four waves on a joystick · wave sequence'], ['scanned', 'Scanned', 'a ring of masses, scanned as a wave'],
-    ['resynth', 'Resynth', 'a sample rebuilt from its partials'], ['bytebeat', 'Bytebeat', 'one-line formulas of t · 8-bit · a b c knobs']]],
+    ['resynth', 'Resynth', 'a sample rebuilt from its partials'], ['bytebeat', 'Bytebeat', 'one-line formulas of t · 8-bit · a b c knobs'],
+    ['wavesl', '…waves live', 'your …waves patch played live: a Bus per pad, poly']]],
   // …PUMP SYNTHS: the …pump plugins' instruments, when pump/synth/ is there
   ...(typeof PsynCore !== 'undefined' ? [['…pump', Object.keys(PsynCore.engines).map(k => [k, PsynCore.engines[k].name, PsynCore.engines[k].tag])]] : []),
   ['Strings & wind', [['strings', 'Strings', 'plucked ensemble · strum · body'], ['wind', 'Wind', 'reed · jet · bow, physical models']]],
@@ -8693,6 +8724,7 @@ const ENGINE_GROUPS = [
     ['Keys', ['piano', 'ep', 'organ']],
     ['Pads & textures', ['swarm', 'porbit', 'porbitl', 'pfreeze', 'pfreezel', 'resynth', 'pfold', 'pfoldl']],
     ['Voice', ['vox', 'ptract', 'ptractl']],
+    ['Modular', ['wavesl']],
     ['SoundFont', ['sf']]];
   const used = new Set(), out = [];
   for (const [g, ks] of G){ const es = ks.map(k => all.get(k)).filter(Boolean); es.forEach(e => used.add(e[0])); if (es.length) out.push([g, es]); }
@@ -8724,13 +8756,31 @@ function setEngine(x){
   if (x === 'bass'){ const first = !v.bass; v.engine = 'bass'; v.tune = 0; v.bass = normBass(v.bass); if (first) bassPreset(1, true); }
   else if (x === 'vox'){ v.engine = 'vox'; v.tune = 0; v.vox = normVox(v.vox); }
   else if (XENG[x]){ v.engine = x; v.tune = 0; v[x] = normX(x, twin ? Object.assign({}, v[old]) : v[x]); if (twin) v.tune = tuneWas; if (x === 'sf'){ if (!v.sfFont) v.sfFont = GM_FONT.id; setTimeout(() => sfPreparePad(cur), 0); }
-    if (x === 'resynth' && !v.rsData) v.rsData = ResynthCore.demoRs(48000); }   // Resynth starts on the built-in pluck until a sample is loaded
+    if (x === 'resynth' && !v.rsData) v.rsData = ResynthCore.demoRs(48000);
+    if (x === 'wavesl') wlStart(v, engFirst); }   // Resynth starts on the built-in pluck until a sample is loaded
   else if (x === 'blip'){ const first = !v.blip; v.engine = 'blip'; v.tune = 0; v.blip = normBlip(v.blip); if (first) blipPreset(isSyn(cur) ? 0 : 3, true); }
   else { v.engine = 'layers'; if (typeof v.tuneL === 'number') v.tune = v.tuneL; if (typeof v.levelL === 'number'){ v.level = v.levelL; delete v.levelL; } }
   // FIX (26 Oct): Level is the pad's, shared with its layers, so going back to layers after trying an engine left the layers
   // 6 dB down (or up). The layers' level is kept aside when the -6 dB start replaces it, and comes back with them (as tuneL).
   if (engFirst){ if (!was) v.levelL = v.level || 0; v.level = ENGINE_LEVEL; }
   changed(cur); refreshAll();
+}
+// …WAVES LIVE picked: a song with no …waves patch gets the editor's starter (VCO → VCA with an ADSR → Out 1), so it plays
+// at once; a pad that had a …waves layer keeps that layer's Bus.
+function wlStart(v, first){
+  if (first){ const L = v.layers.find(l => l.on && l.type === 'waves'); if (L) v.wavesl.bus = Math.min(8, Math.max(1, L.wBus | 0 || 1)); }
+  if (kit.waves) return;
+  const now = Math.floor(Date.now() / 1000);
+  kit.waves = {format:'waves.patch', version:1, meta:{name:'Starter', created:now, modified:now}, voice:{mode:'poly', maxVoices:8, steal:'oldest', glide:0},
+    transport:{tempo:120, lpb:4, ticks:6, swing:0}, host:{envelopes:'internal'}, groups:[], custom:[], view:{x:0, y:0, zoom:1},
+    modules:[{id:'m1', type:'hostIn', scope:'poly', pos:[24, 150], collapsed:false, params:{transpose:0}},
+      {id:'m2', type:'vco', scope:'poly', pos:[354, 40], collapsed:false, params:{wave:1, tune:0, fine:0}},
+      {id:'m3', type:'adsr', scope:'poly', pos:[354, 330], collapsed:false, params:{a:.005, d:.2, s:.7, r:.3}},
+      {id:'m4', type:'vca', scope:'poly', pos:[694, 150], collapsed:false, params:{gain:1}},
+      {id:'m5', type:'out', scope:'mono', pos:[1004, 150], collapsed:false, params:{slot:1, level:1}}],
+    cables:[{from:['m1', 'pitch'], to:['m2', 'pitch'], bend:0}, {from:['m1', 'gate'], to:['m3', 'gate'], bend:0}, {from:['m2', 'out'], to:['m4', 'in'], bend:0},
+      {from:['m3', 'out'], to:['m4', 'cv'], bend:0}, {from:['m4', 'out'], to:['m5', 'in'], bend:0}]};
+  WV.doc = kit.waves; toast('…waves live plays the song’s …waves patch: a starter patch is in (Waves at the top edits it).', 4000);
 }
 function bassPreset(i, quiet){
   const pr = BASS_PRE[i]; if (!pr) return; const v = V(), o = Object.assign({}, pr[1]);
@@ -11179,6 +11229,12 @@ function sfRender(V, sr, hold){
 }
 
 const XUI = {
+  wavesl:{title:'…waves live', tag:'the …waves patch, played live', rows:{
+      bus:{l:'Bus', min:1, max:8, c:'int', d:1, f:v => 'Bus ' + Math.round(v)},
+      vel:{l:'Hit', min:1, max:127, c:'int', d:100, f:v => String(Math.round(v))}},
+    secs:[['…waves', ['bus', 'vel']]],
+    note:'Plays the song’s …waves patch live (Waves at the top), its notes going to the patch’s voices: the Bus picks which of the patch’s Out buses this pad hears. Hit is how hard a note with no volume plays; the VOL column is the velocity. A poly track plays up to four notes. Edits to the patch are heard at once.',
+    pre:[['Init', {}]]},
   acid:{title:'Acid', tag:'saw/square · ladder · accent · slide', rows:{
       oct:{l:'Octave', min:-1, max:3, c:'int', d:1, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
       wave:{l:'Wave', min:0, max:1, c:'lin', d:0, f:v => v < 0.03 ? 'Saw' : v > 0.97 ? 'Square' : 'Saw ' + Math.round((1 - v) * 100) + '%'},
@@ -14700,6 +14756,7 @@ let plFailed = false;
   } catch(e){ txMod = null; tpLog('wasm init (effects: the wasm effects will be bypassed)', e); }
   try {
     if (globalThis.WavesDSP && plMod && txMod){ WavesDSP.wasmInit({dspModule:plMod, tfxModule:txMod}); WV.ready = true; }
+    if (plMod) globalThis.__wlMods = {dsp:plMod, tfx:txMod};   // …WAVES LIVE: its nodes get the compiled modules
     try { if (globalThis.WavesDSP && WavesDSP.modsPrepare) WavesDSP.modsPrepare(); } catch(e){ tpLog('generators wasm prepare', e); }   // the Random/Function generators' wasm: compiled in the background here (the page's thread won't compile it on the spot)
   } catch(e){ console.warn('…waves WebAssembly', e); }
   const lxMod = await lxP, psMod = await psP;
@@ -14736,8 +14793,8 @@ function editorKey(e){
   return false;
 }
 /* ---------- ...waves editor: a full-screen frame; the patch is read from and saved into the kit ---------- */
-const usesWaves = v => v.layers.some(l => l.on && l.type === 'waves');
-function wavesChanged(edit){ if (edit) try { markChange(); } catch(e){} WV.doc = kit.waves || null; for (let i = 0; i < nslots(); i++) if (usesWaves(kit.voices[i])){ dirty[i] = true; cache[i] = null; } clearTimeout(sTimer); sTimer = setTimeout(save, 900); }
+const usesWaves = v => isWlV(v) || v.layers.some(l => l.on && l.type === 'waves');
+function wavesChanged(edit){ if (edit) try { markChange(); } catch(e){} WV.doc = kit.waves || null; try { if (rt && rt.pl && rt.pl.wlDoc) rt.pl.wlDoc(WV.doc); } catch(e){} for (let i = 0; i < nslots(); i++) if (usesWaves(kit.voices[i])){ dirty[i] = true; cache[i] = null; } clearTimeout(sTimer); sTimer = setTimeout(save, 900); }
 window.thunderWaves = {
   viewKey: code => viewKey(code),   // VIEW KEYS from inside the editor
   appKey: e => editorKey(e),   // APP KEYS from inside the editor (transport, files, help)
@@ -17984,6 +18041,7 @@ function makePlayer(ac, out, getBuf, live){
     // The pad's engine changed: drop this track's nodes of the old kind, or every engine switch would leave one running.
     for (const [k, o] of bassN) if (k.startsWith(t + ':' + pad + ':') && o.kind !== kind) bassDrop(k, o);
     if (isPsV(V)) return psNode(t, pad, V, kind, key);   // …PUMP SYNTHS live (null: play the render instead)
+    if (isWlV(V)) return wlNode(t, pad, V, kind, key);   // …WAVES LIVE (null: play the render instead)
     try {
       const node = new AudioWorkletNode(ac, 'thunder-' + kind, {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{p:vx ? voxParams(V) : lx ? xParams(V) : bassParams(V), cid:live ? key : null}});   // cid: THUNDER CORE finds the node by it
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
@@ -18017,6 +18075,26 @@ function makePlayer(ac, out, getBuf, live){
       return b;
     } catch(e){ tpLog('pump synth live node', e); return null; }
   }
+  /* …WAVES LIVE: as psNode, a node per track and pad with four lanes, running the song's …waves patch (WV.doc) and playing
+     the pad's Bus. The same safety net (psLive) and setting (Settings → Audio → …pump live) as the …pump live engines. */
+  function wlNode(t, pad, V, kind, key){
+    if (!wlOK.has(ac) || !WV.doc || (ac === ctx && (psLive.off || aset.psLive === 'render'))) return null;
+    const M = globalThis.__wlMods; if (!wlSent.has(ac) && !(M && M.dsp)) return null;   // the wasm isn't compiled yet
+    try {
+      const node = new AudioWorkletNode(ac, 'thunder-wlive', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2],
+        processorOptions:Object.assign({p:xParams(V), cid:live ? key : null, doc:WV.doc}, wlSent.has(ac) ? {} : {dspModule:M.dsp, tfxModule:M.tfx})});
+      wlSent.add(ac);
+      const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
+      node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
+      node.load = 0; node.port.onmessage = e => { const d = e.data; if (d && typeof d.load === 'number') node.load = node.load * 0.6 + d.load * 0.4; };
+      const lanes = [0, 1, 2, 3].map(j => ({node, g, pn, pad, kind, ps:true, wl:true, lane:j, rate:P('r' + j), gate:P('g' + j), trig:P('t' + j), leg:P('l' + j), vel:P('v' + j), n:0, lastOn:-1, cur:null}));
+      const b = lanes[0]; b.lanes = lanes; b.fileRef = null; b.bpm = P('bpm'); if (b.bpm) b.bpm.value = bpmNow;
+      bassN.set(key, b); if (live) bassLive.add(b);
+      return b;
+    } catch(e){ tpLog('…waves live node', e); return null; }
+  }
+  // the patch changed (the …waves screen): every live node plays the new one
+  const wlDoc = doc => { for (const b of bassN.values()) if (b.wl) try { b.node.port.postMessage({doc}); } catch(e){} };
   // A poly track on a live …pump engine: its notes take the node's four lanes, a free one first, else the oldest.
   function polyPs(ev){
     const b = bassNode(ev.track, ev.pad); if (!b || !b.lanes) return false;
@@ -18239,7 +18317,7 @@ function makePlayer(ac, out, getBuf, live){
   function startNote(ev){
     if (!kit.voices[ev.pad]) return;   // an instrument on a slot this kit doesn't have (a song from a bigger kit): silent
     if (ev.poly && isSyn(ev.pad) && isVoxV(kit.voices[ev.pad]) && polyVox(ev)) return;
-    if (ev.poly && isLivePad(ev.pad) && isPsV(kit.voices[ev.pad]) && polyPs(ev)) return;   // …PUMP SYNTHS live: chords through its own voices
+    if (ev.poly && isLivePad(ev.pad) && (isPsV(kit.voices[ev.pad]) || isWlV(kit.voices[ev.pad])) && polyPs(ev)) return;   // …PUMP SYNTHS live: chords through its own voices
     if (isLivePad(ev.pad)){ const bn = bassNode(ev.track, ev.pad); if (bn){
       // bass is mono: it takes over from whatever the track was playing
       const T = vs[ev.track]; for (const v of T) if (v.bass !== bn) kill(v, ev.t, v.syn ? Math.min(relTc(v), 0.05) : 0.004); T.length = 0;
@@ -18478,7 +18556,7 @@ function makePlayer(ac, out, getBuf, live){
     for (const [t, pad, poly] of list){ const V = kit.voices[pad]; if (!V || !isLivePad(pad) || !buses[t]) continue;
       try { if (poly && isVoxV(V)) for (let j = 1; j <= POLY; j++) bassNode(t, pad, j); else bassNode(t, pad); } catch(e){ tpLog('live warm', e); } }
     made = bassN.size - n0; return made; }   // how many were new (they start up on the audio thread over the next moment)
-  return {play, warm, coreTake, clkBus, clkReset, out, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop};
+  return {play, warm, coreTake, clkBus, clkReset, out, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop, wlDoc};
 }
 
 /* ---------- live playback ---------- */
@@ -18755,6 +18833,8 @@ registerProcessor('thunder-${name}', XP_${name});`;
 let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bassLive = new Set();
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=7', psOK = new WeakSet(), psSent = new WeakSet();
+// …WAVES LIVE: the …waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
+const WAVES_WK = 'waves/waves-worklet.js?v=32', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* …PUMP SYNTHS live, THE SAFETY NET (owner, 26 Oct): while the song plays, once a second: if the audio is dropping out or
    the audio thread is nearly full, and the live …pump nodes are a real part of that, twice in a row, the live engines
    switch to their renders for the rest of this visit (psLive.off): their nodes go, and the next notes play the pads'
@@ -18780,7 +18860,8 @@ function bassReady(ac){
     let pr = Promise.resolve(false);
     try { if (ac.audioWorklet){ if (!bassURL) bassURL = URL.createObjectURL(new Blob([BassCore.toString() + BASS_PROC + '\n' + VoxCore.toString() + VOX_PROC + '\n' + AcidCore.toString() + XPROC('acid', 'AcidCore') + '\n' + MachCore.toString() + XPROC('mach', 'MachCore')], {type:'text/javascript'}));
       pr = ac.audioWorklet.addModule(bassURL).then(() => { bassOK.add(ac); return true; }, () => false)
-        .then(ok => typeof PsynCore === 'undefined' ? ok : ac.audioWorklet.addModule(PSYN_WK).then(() => { psOK.add(ac); return ok; }, e => { tpLog('pump synths live worklet (the live ones play their renders)', e); return ok; })); } } catch(e){}
+        .then(ok => typeof PsynCore === 'undefined' ? ok : ac.audioWorklet.addModule(PSYN_WK).then(() => { psOK.add(ac); return ok; }, e => { tpLog('pump synths live worklet (the live ones play their renders)', e); return ok; }))
+        .then(ok => ac.audioWorklet.addModule(WAVES_WK).then(() => { wlOK.add(ac); return ok; }, e => { tpLog('…waves live worklet (it plays its render)', e); return ok; })); } } catch(e){}
     bassLoad.set(ac, pr);
   }
   return bassLoad.get(ac);
@@ -19233,7 +19314,7 @@ function coreDrop(){ coreMixOff(); const n = core.node; if (n){ try { n.port.pos
 const corePost = (m, tr) => { try { core.node.port.postMessage(m, tr || []); } catch(e){ tpLog('core post', e); } };
 function coreKit(){ const kv = [];
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; let live = false; try { live = isLivePad(i); } catch(e){}
-    let lk = null; if (live && v){ const vx = isVoxV(v), lx = liveX(v), ps = isPsV(v); lk = {kind:vx ? 'vox' : lx ? v.engine : 'bass', vox:vx, ps, vel:ps ? (xParams(v).vel || 100) : 0}; }   // LIVE ENGINES: the node the core drives
+    let lk = null; if (live && v){ const vx = isVoxV(v), lx = liveX(v), ps = isPsV(v) || isWlV(v); lk = {kind:vx ? 'vox' : lx ? v.engine : 'bass', vox:vx, ps, vel:ps ? (xParams(v).vel || 100) : 0}; }   // LIVE ENGINES: the node the core drives
     kv.push(v ? {choke:v.choke | 0, syn:isSyn(i), rel:isSyn(i) ? relOf(v) : 0, live, lk, sf:v.engine === 'sf'} : null); }
   corePost({op:'kit', kv}); for (let i = 0; i < kv.length; i++) if (kv[i] && kv[i].sf || (core.sfSent && core.sfSent.has(i))) coreSf(i); }
 // The core dropped its variations (of pad i, or all of them: an instrument changed): send them again when asked
@@ -20417,7 +20498,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 397;
+const BUILD = 398;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -28535,6 +28616,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [398, '3 Nov', ['New engine: …waves live (Synths, and Modular in the engine list). It plays the song’s …waves patch live in the tracker, as the …pump live engines do: each pad picks one of the patch’s 8 Out buses, a poly track plays up to four notes, slides and pitch commands move the notes, the VOL column is the velocity, and an edit to the patch is heard at once. A song with no …waves patch gets the editor’s starter patch. It shares the …pump live safety net (Settings → Audio → …pump live) and plays its render when live isn’t possible.']],
   [397, '3 Nov', ['Side panel: the INSTRUMENTS card always has room for about 16 instruments in two columns; on a short window the side panel scrolls instead of squeezing it.']],
   [396, '3 Nov', ['…chains: a folded Track In, Chain Out, Sidechain In or Sidechain Out shows what it is connected to in its title (Track In · Track 5).']],
   [395, '3 Nov', ['Song and Arrange: Enter on a block makes it the current pattern, as Enter on a note does, so Enter on an empty cell places it: arrange from the keyboard. Enter twice on a block still makes a unique copy.', 'Stopping with the cursor on an empty track (STOP CURSOR: THERE) keeps it on its track; only the row follows.', 'Side panel: on a short window the INSTRUMENTS list scrolls instead of squeezing the instruments to unreadable slivers.']],

@@ -119,6 +119,21 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (25): …waves live engine (build 398)
+
+- waves/waves-worklet.js (now ?v=32 everywhere): `thunder-wlive` (WavesLiveProc) in the worklet branch, the twin of
+  thunder-psyn: lanes r/g/t/l/v ×4 + bpm, cid in __tcNodes, __tcOv/__tcPost, load posts, 2 s quiet sleep. Runs a whole
+  WavesEngine (patch from processorOptions.doc, port {doc} reloads, {set} = xParams) and outputs one bus (p.bus), with
+  Level/Drive and soft(). Pitch = 36 + tune + 12·log2(r) − 60 (as wavesPre). The wasm comes as compiled modules
+  (globalThis.__wlMods, set where plMod/txMod compile) on the first node per context (wlSent). Both registerProcessor
+  calls are in try/catch (the module may be added twice to one context).
+- index.html: XENG.wavesl {live, d:{bus, vel}, r:wavesLiveRender}; XUI.wavesl; picker (Synths; category Modular);
+  isWlV; makePlayer wlNode (lanes flagged ps:true, wl:true → polyPs, psLoad/psDrop, the safety net and bassNote's
+  velocity all apply); wlDoc pushes patch edits (wavesChanged); coreKit lk.ps covers it; bassReady adds WAVES_WK;
+  usesWaves / rwCan include it; setEngine → wlStart seeds kit.waves with the editor's starter if the song has none and
+  carries a waves layer's Bus.
+- Headless: track 5 on wavesl plays live through the core (load ~3%), the render peaks ~0.4, patch edits apply.
+
 ## 3 Nov (24): side instruments card fits ~16 (build 397)
 
 - `.tside .tinlw{min-height:calc(8 * 29px + 12px + 26px)}` and columns minmax(76px): two columns of 8 rows at the
