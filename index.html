@@ -1710,6 +1710,12 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkFxBar .dkfc .fr span{font-weight:700}
 #dkFxBar .dkfc .fr.sel{background:var(--ink); color:var(--inv)} #dkFxBar .dkfc .fr.sel b{color:inherit; opacity:.75}
 #dkFxBar .dkfc .fviz{flex:1 1 0; min-height:0; position:relative; margin:0 6px 6px}
+/* SPRING (owner, 3 Nov): a spring reverb's column has its springs drawn behind its values (dkSpring), hanging down the
+   box and shaking with the sound; the values sit over them with a halo of the panel colour so they stay readable. */
+#dkFxBar .dkfc canvas.fspr{position:absolute; left:0; width:100%; pointer-events:none; z-index:0; display:block}
+#dkFxBar .dkfc.spr .fcb, #dkFxBar .dkfc.spr .fviz{position:relative; z-index:1}
+#dkFxBar .dkfc.spr .fr:not(.sel) b, #dkFxBar .dkfc.spr .fr:not(.sel) span{text-shadow:0 0 3px var(--panel), 0 0 2px var(--panel), 0 0 1px var(--panel)}
+#dkFxBar .dkfc.spr.off canvas.fspr{opacity:.4}
 #dkFxBar .dkfc .fviz canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
 #dkFxBar .dkfc.off .fviz{opacity:.4}
 #dkFxBar .dkfc.dyn .fcb, #dkFxBar .dkfc.dyn .fviz{margin-right:44px}
@@ -20370,7 +20376,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 383;
+const BUILD = 384;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24832,6 +24838,7 @@ function deckFxBar(){
           if (Number.isFinite(to)) fxMove(mst ? NT : dkTrack(), k, to); };
         addEventListener('pointermove', mv, true); addEventListener('pointerup', up, true); });
       const vz = el('div', 'fviz'); vz.append(document.createElement('canvas')); col.append(vz); col._h = new Float32Array(90); col._w = 0; col._q = 0;
+      if (isSpringFx(f)){ col.classList.add('spr'); const sc = document.createElement('canvas'); sc.className = 'fspr'; col.prepend(sc); col._spr = {cv:sc, e:0, t:0}; }   // SPRING
       if (isFxDyn(f.type)){ col.classList.add('dyn'); const dm = document.createElement('canvas'); dm.className = 'fdm'; dm.title = FXLV.has(f.type) ? 'IN, the change in level, OUT' : 'IN level, gain reduction (0 to 24 dB) and OUT level; the line is the threshold'; col.append(dm); }
       const getF = () => FA()[k];
       for (const q of D.ps){
@@ -24885,7 +24892,8 @@ function deckFxBarMeters(){
   const now = performance.now();
   for (const c of bar.children){ const i = c.querySelector('.fm i'); if (!i) continue; const k = +c.dataset.k; let lv = 0; try { lv = typeof fxSlotLevel === 'function' ? fxSlotLevel(t, k) : 0; } catch(e){} i.style.width = Math.round(clamp(lv, 0, 1) * 100) + '%';
     if (now - c._q < 33) continue; c._q = now; c._h[c._w] = lv; c._w = (c._w + 1) % c._h.length;
-    try { dkFxViz(c, A[k], k, node, now); } catch(e){} }
+    try { dkFxViz(c, A[k], k, node, now); } catch(e){}
+    if (c._spr) try { dkSpring(c, A[k], now, lv); } catch(e){} }
 }
 // DYNAMICS METERS: three bars (IN, GR, OUT) for a dynamics slot, from the same reports as the curve display (node.dyn: the
 // slot's reduction, input and output levels), with its threshold drawn across IN and OUT and the held peaks under them.
@@ -24929,6 +24937,53 @@ function dkDynMeters(cv, f, k, node, now){
    rate. Drive and lo-fi: the waveshaper curve, or steps for a crusher. Filters: the response with its resonance peak.
    Values are found by name (time, feedback, decay, rate, depth, drive, cut, res…), as fractions of their range; an effect
    whose values don't match keeps the level history. …pump effects keep it too (their values live in f.pump). */
+// SPRING (owner, 3 Nov: "a cool spring animation like in the pump spring plugin but vertical, with the text on top"): the
+// springs of a spring reverb hang down its column, coiled; the sound's level kicks them and the kick runs down each coil as a
+// wave and dies away over DECAY. TENSION tightens the coils and speeds the wave, DRIP adds a fast shimmer, WOBBLE a slow
+// sway; MODEL's name gives how many springs (one, two or three). Drawn behind the values (a canvas in the column).
+const isSpringFx = f => !!f && !!TFX[f.type] && (/spring|sprg/i.test(f.type) || TFX[f.type].pump === 'spring' || /^S?PRG$|SPRG/.test(TFX[f.type].n || ''));
+function dkSpring(col, f, now, lv){
+  const S2 = col._spr, cv = S2.cv; if (!f) return;
+  const hd = col.querySelector('.fch'), fm = col.querySelector('.fm'), top = (hd ? hd.offsetHeight : 26) + (fm ? fm.offsetHeight : 4);
+  const W = col.clientWidth, H = col.clientHeight - top; if (W < 40 || H < 40) return;
+  if (cv.style.top !== top + 'px'){ cv.style.top = top + 'px'; }
+  cv.style.height = H + 'px';
+  const dpr = devicePixelRatio || 1; if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const v = (re, d) => { const x = dkFxVal(f, re); return x == null ? d : x; };
+  const dec = v(/decay|time/i, .4), ten = v(/tension/i, .3), drip = v(/drip/i, .5), wob = v(/wobble|wow/i, .15);
+  const D = TFX[f.type], mq = D && D.ps && D.ps.find(p => /model/i.test(p.k)), mn = mq && mq.names ? String(mq.names[f[mq.k]] || '') : '';
+  const nS = /three|3/i.test(mn) ? 3 : /two|2|dual|pair/i.test(mn) || !mn ? 2 : 1;
+  // the kick: follows the level up at once, dies away over DECAY (0.15–3 s)
+  const dt = S2.t ? Math.min(0.1, (now - S2.t) / 1000) : 0; S2.t = now;
+  const tau = 0.15 + dec * 2.85; S2.e = Math.max(f.on ? Math.min(1, (lv || 0) * 1.4) : 0, S2.e * Math.exp(-dt / tau));
+  const C = fxDynPal(), ink = 'rgba(' + C.ink + ',', AC = '#ff5a1f', e = S2.e, ts = now / 1000;
+  const coils = Math.round(14 + ten * 22), R = Math.min(W / (nS * 2 + 1) * 0.55, 18), y0 = 10, y1 = H - 10, L = y1 - y0, k = 2 * Math.PI * coils / L;
+  const spd = 3 + ten * 9, A = (2 + 7 * e) * (1 - ten * 0.4);   // the wave's speed down the coil and its size
+  for (let j = 0; j < nS; j++){
+    const cx = W * (j + 1) / (nS + 1), ph0 = j * 1.7;
+    // the mounts at the top and the bottom
+    g.fillStyle = ink + '.25)'; g.fillRect(cx - R - 3, y0 - 6, 2 * R + 6, 3); g.fillRect(cx - R - 3, y1 + 3, 2 * R + 6, 3);
+    for (const back of [true, false]){   // the back of each coil first, faint, then the front over it
+      g.beginPath(); let pen = false;
+      for (let y = y0; y <= y1; y += 1){
+        const u = (y - y0) / L, env = Math.sin(Math.PI * u);   // ends fixed, the middle swings most
+        const wave = Math.sin(u * 6 * Math.PI - ts * spd + ph0) * A * env;
+        const sway = Math.sin(ts * (0.6 + j * 0.13) + ph0) * wob * 6 * env;
+        const shim = drip * e * Math.sin(u * 61 + ts * 47 + ph0) * 1.6 * env;
+        const a = (y - y0) * k + ph0 - ts * spd * 0.15 * e, sn = Math.sin(a), cs = Math.cos(a);
+        const x = cx + R * sn + wave + sway + shim, front = cs > 0;
+        if (front === back){ pen = false; continue; }
+        if (!pen){ g.moveTo(x, y); pen = true; } else g.lineTo(x, y);
+      }
+      g.strokeStyle = back ? ink + '.14)' : ink + (.28 + .3 * e).toFixed(2) + ')'; g.lineWidth = back ? 1.2 : 1.6; g.stroke();
+    }
+    // the drip: a bright point riding down the spring with the kick
+    if (e > 0.04){ const u = ((ts * (0.35 + ten * 0.6) + j * 0.31) % 1), y = y0 + u * L, a = (y - y0) * k + ph0, env = Math.sin(Math.PI * u);
+      const x = cx + R * Math.sin(a) + Math.sin(u * 6 * Math.PI - ts * spd + ph0) * A * env;
+      g.globalAlpha = Math.min(1, e * 1.6); g.fillStyle = AC; g.beginPath(); g.arc(x, y, 2.2, 0, 7); g.fill(); g.globalAlpha = 1; }
+  }
+}
 function dkFxVal(f, re){ const D = TFX[f.type]; if (!D || !D.ps) return null; const q = D.ps.find(p => re.test(p.k) || re.test(p.l)); if (!q || f[q.k] == null) return null; return clamp((f[q.k] - q.min) / ((q.max - q.min) || 1), 0, 1); }
 function dkFxPic(g, W, H, f, C, F, font, now, lvNow){
   if (!f || isPumpT(f.type)) return false;
@@ -28159,6 +28214,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [384, '3 Nov', ['The FX bar’s spring reverbs (…pump SPRING and Spring reverb) show their springs behind their values: hanging coils that shake with the sound and ring out over DECAY (TENSION, DRIP and WOBBLE change how they move; a two-spring tank shows two).']],
   [383, '3 Nov', ['New effect: Vintage sampler (FX → Drive and lo-fi). Your track as if sampled into an SP-1200, SP-12, MPC60, SP-202 (Hi-Fi, Standard, Lo-Fi 1 and 2) or Emulator II: each machine’s sample rate and bit depth, its converter (the SP-1200 and SP-12 alias, as they had no input filter), an output FILTER from raw to dark, DRIVE into the converter, RATE for the pitched-down sound, and hiss and hum. Presets for each, in › PRESET.']],
   [382, '3 Nov', ['Bus tracks have a thin outline on every cell in Arrange, so they stand out even when their blocks are filled.', 'Song: an Alt-drag on a block copies it, as on Arrange (an Alt-click still mutes it); a click on a track number mutes it, as everywhere else. Arrange: Ctrl/⌘-drag a block to copy it, as in Renoise; a Ctrl/⌘-click without dragging still picks it.']],
   [381, '3 Nov', ['Every slider, fader and value now works the same with a mouse: drag from where it is (the Mixer’s faders and the master OUT bar no longer jump to the click), Shift for fine and Ctrl/⌘ for big moves at any point in the drag, double-click or Alt-click to reset, right-click for Reset / Type a value. A double-click on a slider’s number resets it now; Type a value… is in its right-click menu.', 'The wheel moves the fader or value the mouse rests on (it gets an outline), also on the Mixer, the strip fader, the FX bar and in the …pump windows; Shift+wheel is fine, Ctrl/⌘+wheel big steps. The strip fader’s arrow keys: Shift fine, Ctrl/⌘ big.']],

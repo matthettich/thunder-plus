@@ -119,6 +119,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (11): springs in the FX bar (build 384)
+
+- Owner: "a cool spring animation like in the pump spring plugin but vertical and overlay the text on top of it". A spring
+  reverb's FX bar column (`isSpringFx`: …pump SPRING `pspring`, the Spring reverb module effect) gets `canvas.fspr` behind its
+  header-less body (`.dkfc.spr`, values over it with a panel-colour text halo); `dkSpring(col, f, now, lv)` runs in
+  `deckFxBarMeters` (~30 fps): 1–3 vertical helices (from MODEL's name), a travelling wave kicked by the slot's level and
+  dying over DECAY, TENSION = coil count and wave speed, DRIP = shimmer and an orange drip point, WOBBLE = slow sway. My own
+  drawing; the …pump plugin's own animation isn't in this repo.
+
 ## 3 Nov (10): Vintage sampler effect (build 383)
 
 Owner: vintage sampler effects in the degrade (Drive and lo-fi) group, SP-1200, MPC60, SP-202 and so on, "including bit depth".
