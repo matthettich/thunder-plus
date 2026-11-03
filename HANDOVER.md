@@ -116,6 +116,28 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (6): Arrange pages with FOLLOW OFF; the mouse audit (build 379)
+
+- Owner: "I still want the arrange window to page down if the play head passes the end, even if follow is turned off."
+  `followPlay()` returned at once with FOLLOW OFF, so `arrFollowPage` never ran, and `apTop()` / the Song-screen draw only kept
+  a playhead page (`c.pg`) with FOLLOW set, so the view went back to the cursor. Now FOLLOW OFF calls `arrFollowPage` and
+  `c.pg` holds in every mode while playing (a cursor move still brings the cursor back, as before).
+- **Working in Arrange** (Arrange has the keys, `apF === 'arr'`, or it is the Song screen with FOLLOW OFF): no page while you
+  work there, only after `ARR_IDLE` (60 s) with no key (Space and lone modifiers don't count), no click on `#tArr` and no
+  wheel/scroll (`arrActT`, `arrHandT`); any of them starts the minute again (owner's call). The 4 s HANDS ON pause is kept.
+  FOLLOW PATTERN / ON on the Song screen page at once as before; beside a screen with the keys they now also page after the
+  minute (they never did).
+- Checked headless (fake playhead and real playback, ELECTRO at 1600×1000). The FOLLOW setting's info text says so.
+- **Mouse audit (3 Nov), owner's calls, queued:** bug list (Mac Ctrl-click as right-click everywhere, …chains / …waves
+  sliders on the host slider rule, top menus switch in one click and on hover, Song middle-click mutes, Shift mid-drag
+  re-anchors on faders / OUT / strip / FX bar, strip fader left button only, no browser menu on range inputs, phrase wheel a
+  row a notch and no cursor move on Ctrl+wheel, Pattern view right-click on the clicked cell, editor cable drags end outside
+  the frame, jacks left button only, "Remove cable", Arrange sideways swipe). ONE RULE for value controls (sliders, faders,
+  FX bar, pump): double-click resets; right-click = Reset / Type / Learn; Alt/⌘-click resets; Shift ×0.1 held through the
+  drag; holding Ctrl/⌘ during a drag or wheel = big steps; wheel after the rest everywhere. Song grid Alt-drag copies (as
+  Arrange); Arrange Ctrl-click picks, Ctrl-drag copies; track numbers left-click mute / right-click solo everywhere (Pattern
+  view band still opens the track); mixer faders: the cap moves relative, a click on the track jumps (as the strip fader).
+
 ## 3 Nov (5): FLX check, Flex in the FX bar, pattern effects wait for their command
 
 On a worktree branch off `beta`; not merged, BUILD / sw.js cache not bumped. Owner: "a lot of the [FLX] commands no longer
