@@ -26,6 +26,10 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.74** (3 Nov 2026; owner: "merge beta and the app and build a desktop version"; Run workflow through the API with
+  version 1.2.74, from `main` after merging `beta` at build 378): everything in the 3 Nov entries (audio-thread FXV / BYP /
+  MUT / GEN / SoundFonts, Ableton Link (its optional addon step: check it built on Mac / Windows), FX bar curves and Flex
+  pictures, Audio & MIDI ports table, tracker keys, skins, STOP CURSOR, FLX fixes, GAT 00, edit logo).
 - **v1.2.59** (2 Nov 2026, UTC; Run workflow through the API with version 1.2.59, from `fa3229d`) has build 355: the 1 Nov
   audit work (menus, latency comp, default song, favourites, Perform, sends, scale mode), the mobile top bar, render Cancel and
   the FX bar changes. All three platforms built.
