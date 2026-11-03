@@ -1228,6 +1228,9 @@ body.asong .tagrid .rn{text-align:right; padding-right:7px}
 .agboxes[hidden]{display:none}
 .agbox{position:absolute; box-sizing:border-box; border:2px solid var(--tk); border-radius:4px}
 .agbox.gm{--tk:var(--tk-mono)} .agbox.gp{--tk:var(--tk-poly)} .agbox.gx{--tk:var(--tk-mst)}
+/* BUS FRAME IN ARRANGE (owner, 3 Nov): one hairline box down each bus column, from its number to the bottom (it was an
+   outline on every cell, which looked odd moving through a bus's empty blocks) */
+.agbus{position:absolute; box-sizing:border-box; border:1px solid color-mix(in srgb, var(--ar-ink, #111) 65%, transparent); border-radius:3px}
 body.asong .tagrid .rn, body.asong .tath{font-size:var(--fs-2)}
 /* The song selection in its own colour (owner, 21 Oct, mustard skin): it was the cursor's colour, which on the Simple and
    Matrix skins is the blocks' colour too, so a selection looked like more blocks. Amber, or sky blue on the amber and
@@ -1351,7 +1354,6 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 /* While a block is held, show the mute "charging" so the hold is not an invisible gesture. */
 /* BUS OUTLINE (owner, 3 Nov): every cell of a bus track has a hairline outline a pixel out from it, in the grid's ink, so a
    bus stands out filled or empty (its darker tint alone was lost under filled blocks). The cursor, playing and drop outlines win. */
-.tagrid b.bus{outline:1px solid color-mix(in srgb, var(--ar-ink, #111) 70%, transparent); outline-offset:1px}
 .tagrid b.charge{outline:2px dashed var(--ar-dim); outline-offset:-2px}
 .tagrid b.f{background:var(--ar-blk); color:var(--ar-blk-ink)}
 .tagrid b.f[style]{background:var(--ib, var(--ar-blk)); color:#fff}
@@ -17183,7 +17185,9 @@ function freePhrase(){
   for (let i = 0; i < NPH; i++) if (!used.has(i) && isEmptyPhrase(S.phrases[i])) return i;
   return -1;
 }
-const audible = t => { const any = S.mix.some(m => m.solo); if (S.mix[t].mute) return false; if (!any || S.mix[t].solo) return true;
+// SOLO OVER MUTE (owner, 3 Nov): a soloed track plays even when it is muted (however it was muted: keys, a click, the Mixer);
+// solo never changes the mute itself, so when the solo is cleared a muted track is muted again and the rest play.
+const audible = t => { const any = S.mix.some(m => m.solo); if (S.mix[t].solo) return true; if (S.mix[t].mute) return false; if (!any) return true;
   // BUS (20 Oct): soloing a bus keeps its sources playing into it; soloing a source keeps its bus (DAW behaviour).
   const P = busPlan(); for (const b of P.targets.get(t) || []) if (S.mix[b] && S.mix[b].solo) return true;
   for (const u of P.feeds.get(t) || []) if (S.mix[u] && S.mix[u].solo) return true;
@@ -20376,7 +20380,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 384;
+const BUILD = 385;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25709,7 +25713,10 @@ function arrPlace(){
 // phrase editor (a tap, Arrange's keys, OPTION / Ctrl / ⌘ + arrows). Return false to keep MST to the Song screen only.
 function arrSideMst(){ return true; }
 // How many song rows Arrange shows at once, for keeping the cursor's row in view when it is the Song screen.
-function arrRows(){ const rh = arrRowH(); return rh > 0 ? clamp(Math.floor((arrGrid.clientHeight - 3) / rh + 0.01), 2, 96) : 16; }
+// ROWS IN VIEW (3 Nov): the rows that fit from the top row down, measured (every 4th row has a gap above it, EVERY 4 ROWS,
+// so a fixed row height overcounted and the cursor could go under the bottom edge without Arrange following it)
+function arrRows(top = cs.song.top || 0){ const rh = arrRowH(); if (!(rh > 0)) return 16;
+  const h = arrGrid.clientHeight - 3, t0 = arrRowTop(top); let n = 0; while (top + n < 256 && arrRowTop(top + n) - t0 + rh - 1 <= h) n++; return clamp(n, 2, 96); }
 // The panel's width: 0 is the default for the screen size, otherwise what the grip was dragged to.
 const AWK = 'thunderplus-arrange-w-v1';
 let arrW = (() => { try { return Math.max(0, int(localStorage.getItem(AWK), 0)); } catch(e){ return 0; } })(), arrKey = '';
@@ -25938,7 +25945,7 @@ function drawArr(PH){
           else if (grp) sty = ` style="--bgc:${grp};--ib:${grp}"`; else if (pi.inst >= 0) sty = ` style="--ib:${instHue(pi.inst)};--ibp:${100 - (pi.inst % 5) * 17}%"`;
           if (arRH >= 26 && pi.hits) lab += pi.hits; }
       }
-      if (S.mix[t].mute || (anySolo && !S.mix[t].solo)) cls += ' tm';
+      if (!audible(t)) cls += ' tm';   // (3 Nov: as heard: a soloed track plays even when muted)
       h += `<b class="${cls.trim()}"${sty} data-y="${y}" data-t="${t}">${lab}</b>`;
     }
     if (mx){ const v = S.song[y][MT];   // the master column: commands only, never muted
@@ -25973,7 +25980,7 @@ function drawArr(PH){
   $('tArrSub').textContent = (ms ? S.name + ' · ' : '') + (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : '');
   { const lb = arrEl.querySelector('.tahl b'); if (lb && lb.textContent !== (ms ? 'SONG' : 'ARRANGE')) lb.textContent = ms ? 'SONG' : 'ARRANGE'; }
   // As the Song screen the grid holds whole rows only (the space left over sits under the boxes), so it never ends on half a row.
-  if (ms){ const pitch = arrRowH() || arRH + 2, avail = arrAvail(), rows = Math.max(2, Math.floor((avail - 3) / pitch)), hg = (3 + rows * pitch) + 'px';
+  if (ms){ const pitch = (arrRowH() || arRH + 2) * 1.04, avail = arrAvail(), rows = Math.max(2, Math.floor((avail - 3) / pitch)), hg = Math.min(avail, Math.round(3 + rows * pitch)) + 'px';   // (×1.04: the gap every 4 rows)
     if (arrGrid.style.height !== hg) arrGrid.style.height = hg; }
   else if (arrGrid.style.height) arrGrid.style.height = '';
   arrSbw(); arrAlign(); arrFollowX(); arrBoxes();
@@ -25988,15 +25995,20 @@ function arrSbw(){ const w = Math.max(0, arrGrid.offsetWidth - arrGrid.clientWid
 let arrBoxKey = '';
 function arrBoxes(){
   let host = arrEl.querySelector('.agboxes');
-  if (!asongOn()){ if (host) host.hidden = true; arrBoxKey = ''; return; }
+  const ms = asongOn(), buses = [...$('tArrTh').querySelectorAll('i.bus')];
+  if ((!ms && !buses.length) || !arrEl.offsetWidth){ if (host) host.hidden = true; arrBoxKey = ''; return; }
   if (!host){ host = el('div', 'agboxes'); host.setAttribute('aria-hidden', 'true'); arrEl.append(host); }
   host.hidden = false;
-  const key = [arrSig.length, arrGrid.clientWidth, arrGrid.clientHeight, arrGrid.scrollLeft, arrEl.clientWidth, arrEl.clientHeight].join(':');
+  const key = [ms, buses.map(i => i.dataset.t).join(), arrSig.length, arrGrid.clientWidth, arrGrid.clientHeight, arrGrid.scrollLeft, arrEl.clientWidth, arrEl.clientHeight, arrGrid.offsetTop].join(':');
   if (key === arrBoxKey) return; arrBoxKey = key;
   const a = arrEl.getBoundingClientRect(), gp = $('tArrGp').getBoundingClientRect(), g = arrGrid.getBoundingClientRect(), G = {gm:[], gp:[], gx:[]};
   for (const i of $('tArrTh').querySelectorAll('i')) G[i.classList.contains('gx') ? 'gx' : i.classList.contains('gp') ? 'gp' : 'gm'].push(i.getBoundingClientRect());
   const top = gp.top - a.top - 1, bot = g.bottom - a.top + 3; let html = '';
-  for (const k of ['gm', 'gp', 'gx']){ const L = G[k]; if (!L.length) continue;
+  // BUS FRAME (3 Nov): from the bus's number down to the bottom of the grid, a pixel outside its column (inside the clip)
+  for (const i of buses){ const r = i.getBoundingClientRect(); if (!r.width) continue; const l = Math.max(r.left, g.left) - a.left - 2, rr = Math.min(r.right, g.right) - a.left + 2; if (rr - l < 4) continue;
+    const t0 = r.top - a.top - 2, b0 = g.top - a.top + arrGrid.clientHeight + 1;
+    html += `<div class="agbus" style="left:${l.toFixed(1)}px;top:${t0.toFixed(1)}px;width:${(rr - l).toFixed(1)}px;height:${(b0 - t0).toFixed(1)}px"></div>`; }
+  if (ms) for (const k of ['gm', 'gp', 'gx']){ const L = G[k]; if (!L.length) continue;
     const l = L[0].left - a.left - 4, r = L[L.length - 1].right - a.left + 4;
     html += `<div class="agbox ${k}" style="left:${l.toFixed(1)}px;top:${top.toFixed(1)}px;width:${(r - l).toFixed(1)}px;height:${(bot - top).toFixed(1)}px"></div>`; }
   host.innerHTML = html;
@@ -26005,6 +26017,13 @@ function arrBoxes(){
 // scrolling the panel scrolls the Song screen with it (they used to scroll apart, e.g. the panel at row 000, Song at 002).
 let arrIgnore = -1, arrMark = [], arrUserT = -1e9;
 const arrRowH = () => { const r = arrGrid.children; return r.length > 1 ? r[1].getBoundingClientRect().top - r[0].getBoundingClientRect().top : 0; };
+// ROW PLACES (3 Nov): row y's top in the grid's scroll space, measured (EVERY 4 ROWS adds a gap above rows 4, 8, 12…), and
+// the row at a scroll position (the nearest top)
+function arrRowTop(y){ const r = arrGrid.children, rh = arrRowH(); if (!r.length || !(rh > 0)) return y * rh;
+  if (y < r.length && r[y].classList.contains('ar')) return r[y].offsetTop - r[0].offsetTop;
+  const L = Math.min(r.length, 256) - 1; return r[L].offsetTop - r[0].offsetTop + (y - L) * rh; }
+function arrRowAt(px){ const rh = arrRowH(); if (!(rh > 0)) return 0; let y = clamp(Math.round(px / rh), 0, 255);
+  while (y > 0 && arrRowTop(y) > px + rh / 2) y--; while (y < 255 && arrRowTop(y + 1) <= px + rh / 2) y++; return y; }
 // The height the grid can have as the Song screen: the panel below the headers. It never depends on the grid's own height.
 function arrAvail(){ return arrEl.clientHeight - arrGrid.offsetTop - 2; }
 function arrAlign(){
@@ -26012,7 +26031,7 @@ function arrAlign(){
   // SCROLLBAR (owner, 31 Oct: dragging Arrange's scrollbar was hard): while the user is scrolling it, the grid isn't pulled
   // back to whole rows under the mouse
   if (performance.now() - arrUserT < 450) return;
-  const st = Math.max(0, Math.min(Math.round((cs.song.top || 0) * rh), arrGrid.scrollHeight - arrGrid.clientHeight));
+  const st = Math.max(0, Math.min(Math.round(arrRowTop(cs.song.top || 0)), arrGrid.scrollHeight - arrGrid.clientHeight));
   if (Math.abs(arrGrid.scrollTop - st) > 1){ arrIgnore = st; arrGrid.scrollTop = st; }
 }
 arrGrid.addEventListener('scroll', () => {
@@ -26020,7 +26039,7 @@ arrGrid.addEventListener('scroll', () => {
   if (arrIgnore >= 0 && Math.abs(arrGrid.scrollTop - arrIgnore) <= 1){ arrIgnore = -1; return; }
   arrIgnore = -1; arrUserT = performance.now(); arrHandT = arrUserT;
   const rh = arrRowH(); if (!(rh > 0)) return;
-  const c = cs.song, top = clamp(Math.round(arrGrid.scrollTop / rh), 0, 255);
+  const c = cs.song, top = arrRowAt(arrGrid.scrollTop);
   if (top === c.top) return;
   c.top = top;
   if (tv === 'song'){ const VR = asongOn() ? arrRows() : songRows(); if (c.y < top) c.y = top; else if (c.y > top + VR - 1) c.y = Math.min(255, top + VR - 1); }
@@ -26592,15 +26611,17 @@ function sxLaneDraw(){
   const key = [JSON.stringify(L), top, VR, rh, g.top - a.top, g.height, th.top - a.top, add].join('|');
   if (key === sxLaneKey) return; sxLaneKey = key;
   let h = `<span class="sxlh" style="top:${(th.top - a.top).toFixed(1)}px" title="Song sections: name a part of the song (INTRO, VERSE, DROP…) from a row">SECT</span>`;
-  if (add >= 0) h += `<button type="button" class="sxadd" data-ay="${add}" style="top:${(g.top - a.top + 3 + (add - top) * rh).toFixed(1)}px;height:${(rh - 3).toFixed(1)}px" title="Name a section starting at row ${rS(add, 3)}" aria-label="Name a section starting at row ${rS(add, 3)}">+</button>`;
+  const ry = y => arrRowTop(y) - arrRowTop(top);   // (3 Nov: measured rows)
+  if (add >= 0) h += `<button type="button" class="sxadd" data-ay="${add}" style="top:${(g.top - a.top + 3 + ry(add)).toFixed(1)}px;height:${(rh - 3).toFixed(1)}px" title="Name a section starting at row ${rS(add, 3)}" aria-label="Name a section starting at row ${rS(add, 3)}">+</button>`;
   L.forEach((s, i) => {
     const end = i + 1 < L.length ? L[i + 1].y - 1 : 255, a0 = Math.max(s.y, top), a1 = Math.min(end, top + VR - 1); if (a1 < a0) return;
-    const y = g.top - a.top + 3 + (a0 - top) * rh, hh = (a1 - a0 + 1) * rh - 3;
+    const y = g.top - a.top + 3 + ry(a0), hh = ry(a1) - ry(a0) + rh - 3;
     h += `<button type="button" class="sxsec${a0 > s.y ? ' cont' : ''}" data-sy="${s.y}" style="top:${y.toFixed(1)}px;height:${hh.toFixed(1)}px;--sxh:${Math.round((i * 67 + 200) % 360)}" title="${esc(s.n)}: rows ${rS(s.y, 3)}–${rS(end, 3)} · click to go there, double-click its first row to rename, another row to start a new section, right-click for more"><span>${esc(s.n)}</span></button>`;
   });
   sxLane.innerHTML = h;
 }
-function sxLaneRow(clientY){ const g = arrGrid.getBoundingClientRect(), rh = arrRowH() || 22; return clamp((cs.song.top || 0) + Math.floor((clientY - g.top - 2) / rh), 0, 255); }
+function sxLaneRow(clientY){ const g = arrGrid.getBoundingClientRect(), rh = arrRowH() || 22, px = arrRowTop(cs.song.top || 0) + clientY - g.top - 2; let y = clamp((cs.song.top || 0) + Math.floor((clientY - g.top - 2) / rh), 0, 255);
+  while (y > 0 && arrRowTop(y) > px) y--; while (y < 255 && arrRowTop(y + 1) <= px) y++; return y; }
 function sxLaneWire(){
   // touch: a tap on the empty lane names a section at that row (a long press opens the menu instead). Done on pointerup:
   // the page's touch handling keeps a click from reaching a bare div.
@@ -27828,11 +27849,13 @@ function apTop(){
    never moves; a cursor one row off the edge scrolls one row; one further away lands in the middle of Arrange's own
    window (not the bottom edge). */
 function arrKeepRow(c, VR){
-  try { const rh = arrRowH(); if (rh > 0 && arrGrid.offsetParent && arrIgnore < 0){ const real = clamp(Math.round(arrGrid.scrollTop / rh), 0, 255); if (real !== c.top) c.top = real; } } catch(e){}
-  const top = c.top || 0;
+  try { const rh = arrRowH(); if (rh > 0 && arrGrid.offsetParent && arrIgnore < 0){ const real = arrRowAt(arrGrid.scrollTop); if (real !== c.top) c.top = real; } } catch(e){}
+  const top = c.top || 0; VR = arrRows(top);
   if (c.y >= top && c.y <= top + VR - 1) return;
-  if (c.y === top - 1) c.top = c.y;
-  else if (c.y === top + VR) c.top = c.y - VR + 1;
+  // PAGES (owner, 3 Nov: "moving the cursor below the screen break should page the screen down"): just past the bottom, the
+  // cursor's row becomes the first one shown; just past the top, the last
+  if (c.y === top + VR) c.top = c.y;
+  else if (c.y === top - 1) c.top = Math.max(0, c.y - VR + 1);
   else c.top = Math.max(0, c.y - Math.floor((VR - 1) / 2));
 }
 // f: 'arr', 'strip' or null (the phrase has the keys). sync: start on the block that plays the phrase being edited
@@ -28214,6 +28237,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [385, '3 Nov', ['Arrange: moving the cursor past the bottom row turns a page (that row becomes the first shown), and past the top a page back; it used to slip under the bottom edge without following (the gap every four rows threw the count off).', 'A bus in Arrange has one thin frame down its column instead of an outline on every block.', 'Solo plays a track even when it is muted; the mute stays, so when the solo is cleared the track is muted again and the others play.']],
   [384, '3 Nov', ['The FX bar’s spring reverbs (…pump SPRING and Spring reverb) show their springs behind their values: hanging coils that shake with the sound and ring out over DECAY (TENSION, DRIP and WOBBLE change how they move; a two-spring tank shows two).']],
   [383, '3 Nov', ['New effect: Vintage sampler (FX → Drive and lo-fi). Your track as if sampled into an SP-1200, SP-12, MPC60, SP-202 (Hi-Fi, Standard, Lo-Fi 1 and 2) or Emulator II: each machine’s sample rate and bit depth, its converter (the SP-1200 and SP-12 alias, as they had no input filter), an output FILTER from raw to dark, DRIVE into the converter, RATE for the pitched-down sound, and hiss and hum. Presets for each, in › PRESET.']],
   [382, '3 Nov', ['Bus tracks have a thin outline on every cell in Arrange, so they stand out even when their blocks are filled.', 'Song: an Alt-drag on a block copies it, as on Arrange (an Alt-click still mutes it); a click on a track number mutes it, as everywhere else. Arrange: Ctrl/⌘-drag a block to copy it, as in Renoise; a Ctrl/⌘-click without dragging still picks it.']],

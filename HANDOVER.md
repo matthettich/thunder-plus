@@ -119,6 +119,22 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (12): Arrange pages, bus frame, solo over mute (build 385)
+
+- **Arrange row geometry is measured** (`arrRowTop(y)`, `arrRowAt(px)`, `arrRows(top)`): EVERY 4 ROWS (2 Nov) put a 7 px gap
+  above rows 4, 8, 12…, but scroll ↔ row maths used one row height, so `arrRows()` overcounted by a row or more and the cursor
+  went under the bottom edge without Arrange following (owner: "moving the cursor below the screen break should page the
+  screen down"). arrAlign, the scroll listener, arrKeepRow, the section lane and sxLaneRow use the measured places; the
+  Song-screen grid height allows ×1.04 a row for the gaps.
+- **Pages:** arrKeepRow: just past the bottom the cursor's row becomes the top row; just past the top, the bottom row
+  (was one row at a time).
+- **Bus frame:** the per-cell outline (build 382) looked odd moving through a bus's empty blocks; now `.agbus`, one hairline
+  box per bus column from its number to the grid's bottom, drawn by arrBoxes (which now runs beside screens too, for it).
+- **Solo over mute** (owner): `audible()`: a soloed track plays even when muted; solo never touches `mute`, so clearing it
+  leaves muted tracks muted. Arrange's muted-block look follows `audible()`.
+- Headless: arrRows equals the rows really on screen (Song screen and beside Phrase), ▼ / ▲ past the edges page and the grid
+  scrolls there; solo / mute truth table; screenshots of the bus frame.
+
 ## 3 Nov (11): springs in the FX bar (build 384)
 
 - Owner: "a cool spring animation like in the pump spring plugin but vertical and overlay the text on top of it". A spring

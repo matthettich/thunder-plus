@@ -323,7 +323,7 @@ test('owner calls (3 Nov): Song Alt-drag copies, Arrange Ctrl-click picks / Ctrl
   assert.match(src, /sxDrag = \{id:e\.pointerId, x0:e\.clientX, y0:e\.clientY, y, t, mode:null, alt:false, pick:true,/, 'Arrange Ctrl press waits');
   assert.match(src, /if \(!d\.mode && d\.pick\)\{/, 'a Ctrl-click picks on release');
   assert.match(src, /TRACK NUMBERS \(owner, 3 Nov\)/, 'Song track numbers mute');
-  assert.match(src, /\.tagrid b\.bus\{outline:1px solid/, 'bus outline');
+  assert.match(src, /\.agbus\{position:absolute/, "bus frame");
 });
 
 test('vintage sampler (3 Nov): a JS track effect wired into the table, groups, worklet and its Blob', () => {
