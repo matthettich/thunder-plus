@@ -8203,6 +8203,26 @@ const ENGINE_GROUPS = [
   ['Voice & bass', [['bass', 'Bass', 'additive bass, live in the tracker'], ['vox', 'Voice', 'a singing voice, a syllable per note']]],
   ['Fonts', [['sf', 'SoundFont', 'a preset of a .sf2 / .sf3 file, General MIDI built in']]],
 ];
+/* ENGINE CATEGORIES (owner, 2 Nov: "reorganize the synth engines into categories that make more sense"): the list above,
+   regrouped by what an engine sounds like rather than where it came from (…pump, LXR-02). Each live version sits beside
+   its rendered one. Anything not named here (a new engine) lands in More, so nothing goes missing. */
+{ const all = new Map(); for (const [, es] of ENGINE_GROUPS) for (const e of es) all.set(e[0], e);
+  const lxr = typeof LxrCore !== 'undefined' ? Object.keys(LxrCore.engines) : [];
+  const G = [
+    ['Layers', ['layers']],
+    ['Drums & percussion', ['tone', 'blip', 'fmdrum', 'skin', 'breath', 'pstrike', 'pstrikel', 'pboing', 'pboingl', 'px0x', 'px0xl', 'plife', 'plifel', ...lxr]],
+    ['Bass', ['acid', 'bass', 'pwob', 'pwobl']],
+    ['Analog', ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'mach', 'drift']],
+    ['Digital, FM & wavetable', ['table', 'phase', 'partials', 'vector', 'chip', 'pgloss', 'pglossl', 'bytebeat']],
+    ['Physical models', ['modal', 'pcoil', 'pcoill', 'scanned', 'strings', 'wind']],
+    ['Keys', ['piano', 'ep', 'organ']],
+    ['Pads & textures', ['swarm', 'porbit', 'porbitl', 'pfreeze', 'pfreezel', 'resynth', 'pfold', 'pfoldl']],
+    ['Voice', ['vox', 'ptract', 'ptractl']],
+    ['SoundFont', ['sf']]];
+  const used = new Set(), out = [];
+  for (const [g, ks] of G){ const es = ks.map(k => all.get(k)).filter(Boolean); es.forEach(e => used.add(e[0])); if (es.length) out.push([g, es]); }
+  const rest = [...all.values()].filter(e => !used.has(e[0])); if (rest.length) out.push(['More', rest]);
+  ENGINE_GROUPS.length = 0; ENGINE_GROUPS.push(...out); }
 let engFit = () => {}, engFitDue = true;
 const engineName = k => { for (const [, es] of ENGINE_GROUPS) for (const e of es) if (e[0] === k) return e[1]; return k; };
 function engineStep(d){
@@ -27111,6 +27131,8 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
     } finally { Math.random = R; }
     return out;
   },
+  // The engine list's groups (for category checks).
+  engines(){ return ENGINE_GROUPS.map(([g, es]) => g + ': ' + es.map(e => e[1]).join(', ')); },
   // The FX picker's list for track t (or the master: t = NT), with groups (for picker checks).
   fxPick(t){ return fxtL(t).map(k => fxtGroup(k) + ' · ' + TFX[k].n); },
   // Every track effect: its group, factory preset count and controls (for preset work).
