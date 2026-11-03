@@ -2286,7 +2286,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="segrow"><span>Rate</span><div class="seg" id="segARate"></div></div>
       <div class="segrow" title="Lines up tracks and buses whose …pump effects look ahead (LIMIT, CALM, TONE, linear-phase EQ…) by delaying everything else to match. Off: those tracks play a little late, as before. Renders follow the same setting."><span>Latency comp</span><div class="seg" id="segPdc"></div></div>
       <div class="segrow" id="psLiveRow" hidden><span>…pump live</span><div class="seg" id="segPsLive"></div></div>
-      <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread (beta): the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
+      <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread: the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
       <p class="note" id="psLiveNote" hidden></p>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Latency and rate change when audio restarts. That reloads ...Thunder; your song and kit are kept.</span><button id="audRestart" class="on">Apply (reload)</button></div>
       <p class="note" id="audNote">Output picks where everything plays: the synth, the tracker and previews. Level is the overall volume after the tracker’s master. Lowest latency answers the pads fastest; Safest uses a bigger buffer if you hear crackles. Rate: Device uses the output’s own rate.</p>
@@ -7461,7 +7461,7 @@ const Lc = () => V().layers[V().sel];
 // Output device, level, latency and sample rate. Latency and rate are fixed when the AudioContext is made,
 // so changing them asks for a restart; the output device and level change live.
 const AUK = 'thunderplus-audio-v1';
-const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false, core:'page'};   // core: THUNDER CORE, 'page' or 'core' (beta)   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
+const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false, core:'core'};   // core: THUNDER CORE, 'core' (default from build 362, owner) or 'page' (the old pump)   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
   try { const o = JSON.parse(localStorage.getItem(AUK) || '{}'); return Object.assign(d, o && typeof o === 'object' ? o : {}); } catch(e){ return d; } })();
 // Latency: what the person picked, else Balanced in the Mobile setup (phones click at Lowest when busy) and Lowest on desktop.
 // The desktop app starts on Balanced too (owner, 31 Oct: playback stuttered in the desktop app and not in the browser on the
@@ -12835,9 +12835,9 @@ const updPsLive = makeSeg($('segPsLive'), [['auto', 'Auto'], ['render', 'Rendere
   aset.psLive = v; asetSave(); psLive.off = false; psLive.strikes = 0;
   if (v === 'render'){ try { if (rt && rt.pl) rt.pl.psDrop(); } catch(e){} }
   psLiveNote(); });
-const updCore = makeSeg($('segCore'), [['page', 'Page'], ['core', 'Audio thread β']], () => aset.core === 'core' ? 'core' : 'page', v => {
+const updCore = makeSeg($('segCore'), [['core', 'Audio thread'], ['page', 'Page (old)']], () => aset.core === 'page' ? 'page' : 'core', v => {
   aset.core = v; asetSave();
-  if (v === 'core'){ if (ctx) coreLoad(); toast('Sequencer: audio thread (beta), from the next PLAY.', 3000); } else toast('Sequencer: page, from the next PLAY.', 2500); });
+  if (v === 'core'){ if (ctx) coreLoad(); toast('Sequencer: audio thread, from the next PLAY.', 3000); } else toast('Sequencer: page, from the next PLAY.', 2500); });
 function psLiveNote(){
   const on = typeof PsynCore !== 'undefined'; $('psLiveRow').hidden = $('psLiveNote').hidden = !on; if (!on) return;
   $('psLiveNote').textContent = aset.psLive === 'render'
@@ -19422,7 +19422,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 361;
+const BUILD = 362;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26490,6 +26490,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [362, '2 Nov', ['Timing: the song now plays from the audio thread: drums, samples and the live synths (bass, voice, acid, machine, …pump synths) start on their exact sample, so a busy screen, a screenshot or another app can’t make them late. Settings → Audio & MIDI → Sequencer: Page (old) goes back.', 'View → KEY HINTS off hides the key hints under the screens and Arrange, for more rows.', 'Phone: the top bar fits on one line (File is a folder), the song clock is a readout, LOOP lights while on, hints never stop mid-word, the Synth page fits.', 'Arrange: a thin line every 4 rows.']],
   [361, '2 Nov', ['Top bar: the master meter has L / R, a dB scale and the peak in dB; the CPU button shows just the number.', 'Messages come in under the top bar on a computer, shorter; the side panel drops the screen buttons (the tabs are above) and folds the key list behind KEYS.', 'On a computer, sliders and drop-downs are square like the tracker; short one-line empty states; Mixer spectrum says PLAY TO SEE IT when stopped; Audio & MIDI ports are a table.']],
   [360, '2 Nov', ['FX presets: › SAVE AS PRESET… keeps the preset on this device too; it shows under MY PRESETS in every song.', 'Synth engines are grouped by sound: Drums & percussion, Bass, Analog, Digital FM & wavetable, Physical models, Keys, Pads & textures, Voice, SoundFont.', 'Acid line has styles: …pump ACID, Classic 303, Rolling and Squelch, with slides and accents that sound like a 303.', 'Arrange: blocks that only hold OFFs or FX commands look different from empty ones; a grey line every 4 rows.', '⚙ Settings is shorter: Kit lives in File ▸ Kit, Master and Master out in the Mixer.']],
   [359, '2 Nov', ['FX picker: …pump COMP and EQ sit beside Thunder’s compressor and EQ (they were in a group at the very end); every …pump effect is in the group you’d look in.', '…pump BAND, WIDE, HEAT and METER work on every track.', 'About 120 new factory presets: every effect has at least four (Pitch correct, Utility and Envelope filter had none).']],
