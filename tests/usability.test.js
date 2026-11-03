@@ -367,3 +367,8 @@ test('build 394: slow double-click, Shift+Up wrap, Alt+B / Alt+S, stop cursor st
   assert.match(src, /e\.code === 'KeyS'\)\{ if \(!e\.repeat && !pbOpen\) setSheet\('song'\)/);
   assert.match(src, /thunderplus-stopcur-v2/);
 });
+
+test('build 395: Enter on a song block picks it up', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  assert.match(src, /if \(tv === 'song' && enter && v >= 0\)\{[^\n]*\n[^\n]*\n\s*else \{ last\.sect = v;/);
+});

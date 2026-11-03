@@ -119,6 +119,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (22): Enter picks up a pattern on Song / Arrange (build 395)
+
+- editTap: on tv 'song' (Arrange runs as song via apRun), Enter on a filled block sets `last.sect` (toast), so Enter on an
+  empty cell places it through insertAt. The lastTap key is kept, so Enter×2 still makes a unique copy (editDouble).
+- curToPlay: when the cursor's track has no position (an empty track), only the row follows; the track stays.
+- `.tside .tinl{grid-auto-rows:max-content}` + buttons min-height:max-content: the list scrolls on short panels.
+
 ## 3 Nov (21): slow double-click, Shift+▲ wrap, Alt+B / Alt+S, STOP CURSOR off (build 394)
 
 - "Double-click on an empty track jumps to track 1": arrGo counted a double only within 380 ms; a slower system double-click

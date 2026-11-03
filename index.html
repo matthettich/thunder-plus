@@ -1024,7 +1024,10 @@ body:not(.legon) .tside .tlegend{display:none}
 .tside .tinlw[hidden]{display:none}
 .tside .tinlh{background:var(--ink); color:var(--inv); padding:5px 8px; font-size:var(--fs-3); letter-spacing:.06em; flex:none}
 .tside .tinl{grid-auto-flow:row; grid-template-rows:none; grid-template-columns:repeat(auto-fill, minmax(92px, 1fr)); gap:3px; padding:6px; overflow-y:auto; overflow-x:hidden; flex:1 1 auto; min-height:0; align-content:start}
-.tside .tinl button{border:1px solid var(--line); background:var(--panel2, transparent); padding:3px 5px; border-radius:0}
+.tside .tinl button{border:1px solid var(--line); background:var(--panel2, transparent); padding:3px 5px; border-radius:0; min-height:max-content}
+/* (owner, 3 Nov: "now I can't see instruments"): on a short panel the grid squeezed its rows to slivers; rows keep their
+   height and the list scrolls instead */
+.tside .tinl{grid-auto-rows:max-content}
 .tside .tinl button.on{background:var(--ink); color:var(--inv); border-color:var(--ink)}
 /* PLAYING (owner, 3 Nov: "flash them as they play, just like on the synth screen"): an instrument lights as its notes sound */
 .acidask option.acidfree{background:color-mix(in srgb, var(--meter-ok, #4fd18a) 16%, var(--panel, #fff))}
@@ -2998,7 +3001,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>{ }</dt><dd>edit step down / up</dd>
         <dt>0–9 A–F</dt><dd>type hex values</dd>
         <dt>Letters</dt><dd>commands in FX columns (again cycles: R gives RET REP RND RNL RTG RES)</dd>
-        <dt>Enter</dt><dd>add, open or run · twice for new · on a phrase note, instrument, volume or effect, picks it up as the current one (the EDIT button stamps the current note over a note instead) · on an empty effect cell writes the current effect, twice opens the list · a mouse click in a phrase only moves the cursor</dd>
+        <dt>Enter</dt><dd>add, open or run · twice for new · on a phrase note, instrument, volume or effect, picks it up as the current one (on the Song and Arrange, Enter on a block makes it the current pattern, Enter on an empty cell places it) (the EDIT button stamps the current note over a note instead) · on an empty effect cell writes the current effect, twice opens the list · a mouse click in a phrase only moves the cursor</dd>
         <dt>Delete · Backspace</dt><dd>clear the cell under the cursor (in a phrase Backspace then steps down); a highlighted selection is cleared as a whole</dd>
         <dt>Shift+Delete/Backspace</dt><dd>clear the whole row, then step down</dd>
         <dt>Insert · Ctrl/⌘+Backspace</dt><dd>add a row · remove a row (rows below move up; on the Song, the cursor's column only)</dd>
@@ -20411,7 +20414,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 394;
+const BUILD = 395;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -20457,7 +20460,10 @@ function curToPlay(P, mode){
   if (!P || !P.some(Boolean)) return false;
   if (mode === 'song'){
     const want = tv === 'song' ? cs.song.x : cTrack, t = P[want] && P[want].row >= 0 && want !== MT ? want : P.findIndex((q, i) => q && q.row >= 0 && i !== MT); if (t < 0) return false;
-    const q = P[t];
+    const q = P[t], own = t === want;
+    // AN EMPTY TRACK (owner, 3 Nov: "in an empty track in Arrange, stopping moves the cursor back to track 1"): the row comes
+    // from a track that played, the cursor stays on its own track
+    if (!own){ cs.song.y = q.row; const VR = songViewRows(), top = cs.song.top || 0; if (q.row < top || q.row > top + VR - 1) cs.song.top = clamp(q.row - 2, 0, 256 - VR); return true; }
     if (tv === 'phrase' && typeof pvActive === 'function' && pvActive()){ pvGo(t, q.row, null, q.step); return true; }
     cs.song.y = q.row; if (tv === 'song') cs.song.x = t;
     const VR = songViewRows(), top = cs.song.top || 0; if (q.row < top || q.row > top + VR - 1) cs.song.top = clamp(q.row - 2, 0, 256 - VR);
@@ -21519,6 +21525,12 @@ function editTap(enter){
       if (enter && okHere){ lastTap.empty = true; insertAt(c.x, c.y, k); clipCellQuiet(c.x, c.y); return; }
       lastTap = {t:0, key:'', empty:false}; return fxpOpen(c.x, c.y);
     }
+    // ENTER PICKS UP A PATTERN (owner, 3 Nov: as Enter on a note does): on the Song screen and Arrange, Enter on a block makes it
+    // the current one, so Enter on an empty cell places it (keyboard arranging). Enter twice still makes a unique copy.
+    if (tv === 'song' && enter && v >= 0){ const nm = sectsOn ? 'sect ' + hp(v) : 'pattern ' + hp(firstPhrase(v));
+      if (last.sect === v) toast('Already current: ' + nm + ' · Enter on an empty cell places it', 1600);
+      else { last.sect = v; toast('Now current: ' + nm + ' · Enter on an empty cell places it · Enter twice makes a unique copy', 2000); draw(); }
+      return; }
     if (tv === 'phrase') pickUp(c.x, c.y);
     if (k !== 'tsp' && v < 0){ lastTap.empty = true; insertAt(c.x, c.y, k); }
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
@@ -28078,8 +28090,8 @@ $('tSong').addEventListener('click', () => { apRun(() => { if (tp.on) tStop(); e
 $('tLoopTop').addEventListener('click', () => toggleLoop());
 $('tKeyTrans').addEventListener('click', () => toggleKeyTrans());
 const HINTK = {
-  song:'Type hex · Enter add or open · Enter×2 new sect · Del cell · Shift+Del line · M mute block · Ctrl+arrows ±1/±16 · Alt+→ open · Shift+arrows select',
-  songP:'Type hex · Enter add · Enter×2 new phrase (unique copy on a block) · M mute block · Del cell · Shift+Del line · Alt+→ open phrase · Shift+arrows select',
+  song:'Type hex · Enter on a block picks it up, on an empty cell places it · Enter×2 new sect · Del cell · Shift+Del line · M mute block · Ctrl+arrows ±1/±16 · Alt+→ open · Shift+arrows select',
+  songP:'Type hex · Enter on a block picks it up, on an empty cell places it · Enter×2 new phrase (unique copy on a block) · M mute block · Del cell · Shift+Del line · Alt+→ open phrase · Shift+arrows select',
   sect:'Type hex · Enter add or open · Enter×2 new phrase · Del cell · Shift+Del line · [ ] other sect · Alt+→ open · Shift+arrows select',
   phrase:'Notes Z–; and Q–P · 1 off · / mute track · −/= octave · Del cell · Shift+Del row · Ins add row · Shift+arrows select · Ctrl+A again wider · Alt+,/. transpose · Alt+Enter play row · Shift+Alt+arrows other phrase · Ctrl+C/V',
   inst:'Ctrl+arrows change · Enter runs › rows · [ ] other instrument · Alt+← phrase',
@@ -28520,6 +28532,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [395, '3 Nov', ['Song and Arrange: Enter on a block makes it the current pattern, as Enter on a note does, so Enter on an empty cell places it: arrange from the keyboard. Enter twice on a block still makes a unique copy.', 'Stopping with the cursor on an empty track (STOP CURSOR: THERE) keeps it on its track; only the row follows.', 'Side panel: on a short window the INSTRUMENTS list scrolls instead of squeezing the instruments to unreadable slivers.']],
   [394, '3 Nov', ['A slow double-click on an empty Arrange cell (a Mac’s default double-click speed) now makes the new pattern and opens it on that track; it used to do nothing, so the phrase stayed on the track it was on.', 'Shift+▲ on the top row of a phrase wraps round and selects the whole phrase; Shift+▼ on the bottom row too.', 'Alt/⌥+B opens Acid line on Phrase and the Pattern view; Alt/⌥+S opens Song settings from anywhere.', 'Stopping no longer moves the edit cursor to where playback stopped (Settings → STOP CURSOR: STAYS is now the default; Alt+G still jumps to the playhead).']],
   [393, '3 Nov', ['The side panel’s meters work like the track numbers with a mouse: Alt/⌥-click mutes, a click picks the track, right-click solos (a tap on a touch screen still mutes).']],
   [392, '3 Nov', ['Transpose ▲▼ (top bar) is a lock now: while it is on, each ▲ / ▼ transposes the selection a semitone and plays its first note so you hear where it is; Esc, the button or another arrow turns it off.']],
