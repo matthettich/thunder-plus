@@ -2469,7 +2469,8 @@ body.apfs #apStrip .apsr b.c{background:#9a63ff; color:#fff}
   addEventListener('unhandledrejection', e => tpLog('unhandled promise', e.reason));
 })();
 // No long-press menu outside text fields (it is how Chrome offers "Search Google for…").
-document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.closest && e.target.closest('input,textarea,[contenteditable]'))) e.preventDefault(); }, true);
+// Text fields keep it (copy / paste); sliders, switches and buttons never show the browser's menu (3 Nov: a range input did).
+document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.closest && e.target.closest('input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]),textarea,[contenteditable]'))) e.preventDefault(); }, true);
 // A file dropped on the window must not replace the app with that file (the browser's default; in the desktop app it
 // would leave a JSON or WAV viewer until relaunch). The app's own file buttons stay the way in.
 addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', e => e.preventDefault());
@@ -12236,7 +12237,7 @@ function buildPads(){
     const p1 = el('span', 'p1'), b = el('b', null, hx(i)), m = el('span', 'pm'), n = el('span', 'pn');
     p1.append(b, m); p.append(p1, n); host.append(p); padEls.push({p, n, m, b});
     // Synth slots sound while the pad is held, then release.
-    p.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button > 0) return; e.preventDefault(); try { p.setPointerCapture(e.pointerId); } catch(_){} padPress(i, true); });   // (a right-click is the pad's menu)
+    p.addEventListener('pointerdown', e => { if ((e.pointerType === 'mouse' && e.button > 0) || ctxPress(e)) return; e.preventDefault(); try { p.setPointerCapture(e.pointerId); } catch(_){} padPress(i, true); });   // (a right-click is the pad's menu)
     const up = () => { if (padHeld[i]){ releaseNote(padHeld[i]); padHeld[i] = null; } };
     p.addEventListener('pointerup', up); p.addEventListener('pointercancel', up);
     p.addEventListener('click', () => { if (!ptrJust()) padPress(i); });
@@ -13047,7 +13048,11 @@ function swallowTap(e){
   for (const t of types) window.addEventListener(t, eat, true);
   timer = setTimeout(off, 500);
 }
-window.addEventListener('pointerdown', e => { if (gsetOpen() && !$('gset').contains(e.target) && ![$('bSet'), $('bView'), $('bAud')].some(x => x.contains(e.target))){ gsetToggle(false); swallowTap(e); } }, true);
+// TOP MENUS (mouse audit, 3 Nov): a press on another menu button is not "outside": its own click switches menus in one
+// click (each toggle closes the others when it opens), as an OS menu bar does.
+const TOP_MENU_BTNS = ['bFile', 'bEdit', 'bSet', 'bView', 'bAud'];
+const onTopMenuBtn = t => TOP_MENU_BTNS.some(id => { const b = $(id); return b && b.contains(t); });
+window.addEventListener('pointerdown', e => { if (gsetOpen() && !$('gset').contains(e.target) && !onTopMenuBtn(e.target)){ gsetToggle(false); swallowTap(e); } }, true);
 
 /* ---------- File menu: a persistent dropdown in the top bar ----------
    On the Waves and Chains screens it drives that patch (New, Open, Save, Undo, custom modules);
@@ -13144,6 +13149,9 @@ if (deskUpdApi){
   $('bUpd').addEventListener('click', () => { try { deskUpdApi.act(); } catch(e){} });
 }
 const MACK = /Mac|iPhone|iPad/.test(navigator.platform);
+// CONTEXT PRESS (mouse audit, 3 Nov): a right-click, or a Ctrl+click on a Mac (the Mac's right-click). The contextmenu event
+// that follows opens the menu; a press like this must never also start a drag, play a pad or move a value.
+const ctxPress = e => e.button === 2 || (MACK && e.ctrlKey && e.button === 0 && e.pointerType !== 'touch');
 function gfileToggle(open = $('gfile').hidden){
   if (open && gsetOpen()) gsetToggle(false);
   if (open && !$('gedit').hidden) geditToggle(false);
@@ -13201,7 +13209,7 @@ function menuNavKey(m, e){
   return false;
 }
 $('bFile').addEventListener('click', () => gfileToggle());
-window.addEventListener('pointerdown', e => { if (!$('gfile').hidden && !$('gfile').contains(e.target) && !$('bFile').contains(e.target)){ gfileToggle(false); swallowTap(e); } }, true);
+window.addEventListener('pointerdown', e => { if (!$('gfile').hidden && !$('gfile').contains(e.target) && !onTopMenuBtn(e.target)){ gfileToggle(false); swallowTap(e); } }, true);
 
 /* ---------- Edit menu (Desktop): the COMMANDS row's commands in the top bar (cmdItems, by the command row) ----------
    In the tracker: all of them, for where the cursor is. On Waves / Chains: that patch's Undo / Redo; on Synth: Undo / Redo. */
@@ -13222,6 +13230,15 @@ function geditToggle(open = $('gedit').hidden){
   if (open) placeMenu(host);
 }
 $('bEdit').addEventListener('click', () => geditToggle());
+// HOVER SWITCHES (mouse audit, 3 Nov): with one top menu open, moving the mouse onto another menu button opens that one.
+{ const st = {bFile:[() => !$('gfile').hidden, () => gfileToggle(true)], bEdit:[() => !$('gedit').hidden, () => geditToggle(true)],
+    bSet:[() => gsetOpen() && gsetBtn === $('bSet'), () => gsetToggle(true, 'set', $('bSet'))], bView:[() => gsetOpen() && gsetBtn === $('bView'), () => gsetToggle(true, 'view', $('bView'))],
+    bAud:[() => gsetOpen() && gsetBtn === $('bAud'), () => gsetToggle(true, 'aud', $('bAud'))]};
+  for (const id of TOP_MENU_BTNS){ const b = $(id); if (!b) continue;
+    b.addEventListener('pointerenter', e => { if (e.pointerType !== 'mouse' || isMobile() || st[id][0]()) return; if (TOP_MENU_BTNS.some(k => st[k][0]())){ st[id][1](); b._hoverT = performance.now(); } });
+    // A click that lands just after the hover opened this menu keeps it open (the hover already did what the click meant);
+    // a later click on an open menu's button closes it, as before.
+    b.addEventListener('click', e => { if (performance.now() - (b._hoverT || 0) < 600 && st[id][0]()){ b._hoverT = 0; e.stopImmediatePropagation(); e.preventDefault(); } }, true); } }
 /* MENU KEYS (1 Nov, audit V8): File ▾ and Edit ▾ from the keyboard. On a focused menu button ▼, Enter or Space opens it on
    its first item. In an open menu ▲▼ move, ▶ / ◀ open and close a group (at the top level they go to the next or previous
    menu), Home / End jump, Enter / Space pick, Esc closes back to its button and Tab closes. */
@@ -13245,7 +13262,7 @@ window.addEventListener('keydown', e => {
   if (/^(Arrow(Down|Up|Left|Right)|Home|End)$/.test(e.key)){ e.preventDefault(); e.stopImmediatePropagation(); if (inM) menuNavKey(m, e); else first(open[1]); return; }
   if ((e.key === 'Enter' || e.key === ' ') && inM) e.stopImmediatePropagation();   // the focused item's own click
 }, true);
-window.addEventListener('pointerdown', e => { if (!$('gedit').hidden && !$('gedit').contains(e.target) && !$('bEdit').contains(e.target)){ geditToggle(false); swallowTap(e); } }, true);
+window.addEventListener('pointerdown', e => { if (!$('gedit').hidden && !$('gedit').contains(e.target) && !onTopMenuBtn(e.target)){ geditToggle(false); swallowTap(e); } }, true);
 
 /* ---------- audio settings panel ---------- */
 const sinkOk = !!(window.AudioContext && 'setSinkId' in AudioContext.prototype);
@@ -13547,6 +13564,13 @@ function wheelSteps(key, e, per = 100){
   a.v += px; a.t = now; const n = Math.trunc(a.v / per); a.v -= n * per; wheelAcc.set(key, a);
   return Math.max(-8, Math.min(8, n));
 }
+// ONE A NOTCH (mouse audit, 3 Nov): rows and values in the tracker take a step per mouse notch, as Arrange and the FX slots do:
+// a big delta (a notch: 100 px on Windows, a line on Firefox) is one step, small ones (trackpads) add up per 100 px.
+function wheelNotch(key, e){
+  const raw = e.deltaY || e.deltaX, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
+  if (Math.abs(px) >= 50){ wheelAcc.set(key, {v:0, t:performance.now()}); return Math.sign(px); }
+  return wheelSteps(key, e);
+}
 /* WHEEL FOCUS (owner, 27 Oct, Phase 2): the wheel moves the slider under the pointer once the pointer has rested on it for a
    moment (it is outlined then); until then the wheel scrolls the page, so scrolling past sliders never changes them. It
    was only the slider clicked last, with nothing to show which. */
@@ -13633,6 +13657,7 @@ document.addEventListener('pointerdown', e => {
   const r = sliderAt(e);
   if (e.button !== 0 || !sliderOk(r)) return;
   e.preventDefault(); e.stopPropagation();
+  if (ctxPress(e)) return;   // Ctrl+click on a Mac is the right-click: the menu opens, the value stays (3 Nov)
   const touch = e.pointerType === 'touch';
   if (!touch && (e.altKey || (MACK ? e.metaKey : e.ctrlKey))){ sldReset(r); return; }   // Alt / Ctrl / ⌘ -click: the default
   if (!touch) r.focus({preventScroll:true});
@@ -20236,7 +20261,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 379;
+const BUILD = 380;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23311,7 +23336,7 @@ function mixOutBar(){
   b.classList.toggle('on', !!moDrag);
 }
 grid.addEventListener('pointerdown', e => {
-  const b = e.target.closest && e.target.closest('.mobar'); if (!b || tv !== 'mixer' || e.button !== 0) return;
+  const b = e.target.closest && e.target.closest('.mobar'); if (!b || tv !== 'mixer' || e.button !== 0 || ctxPress(e)) return;
   e.preventDefault(); e.stopPropagation();
   const now = performance.now(), two = now - moTap.t < 350 && Math.abs(e.clientX - moTap.x) < 8; moTap = {t:two ? 0 : now, x:e.clientX};
   if (two){ S.mout = 255; moApply(); saveS(); cs.mixer.y = 7; cs.mixer.mx = 2; draw(); toast('Master OUT · FF · 0.0 dB'); return; }   // double-click / double-tap: 0 dB
@@ -23334,7 +23359,7 @@ grid.addEventListener('pointerup', moDragEnd, true); grid.addEventListener('poin
 grid.addEventListener('pointerdown', e => {
   if (tv === 'mixer') cs.mixer.fv = false;   // a click elsewhere leaves the VOL fader cursor; a click on a fader takes it (below)
   const b = e.target.closest && e.target.closest('.mfbar:not(.mobar)'); if (!b || tv !== 'mixer') return;   // (the master OUT bar has its own)
-  if (e.button !== 0) return;   // FIX (27 Oct, audit M17): a right or middle click no longer starts a fader drag (right-click: the menu)
+  if (e.button !== 0 || ctxPress(e)) return;   // FIX (27 Oct, audit M17; Mac Ctrl+click 3 Nov): a right or middle click no longer starts a fader drag (right-click: the menu)
   e.preventDefault(); e.stopPropagation();
   const t = +b.dataset.t; cs.mixer.x = t; cs.mixer.y = 6; cs.mixer.fv = true;
   mfDrag = {t, id:e.pointerId, y0:e.clientY, v0:S.mix[t].vol, top:+b.dataset.top, bot:+b.dataset.bot, oy:grid.scrollTop - grid.getBoundingClientRect().top - grid.clientTop};
@@ -24351,8 +24376,8 @@ function perfBuild(){
   const btn = (txt, title, f) => { const x = el('button', 'sm', txt); x.type = 'button'; x.title = title; if (f) x.addEventListener('click', f); return x; };
   const r1 = el('div', 'pfr'), fill = btn('FILL', 'FILL: a tap turns it on or off; hold it for as long as the fill should last (Shift+Alt+F). Rows with CND 0 (FILL) play while it is on, CND 1 while it is off');
   fill.id = 'pfFill'; let fd = 0;
-  fill.addEventListener('pointerdown', e => { fd = performance.now(); fill._was = perfLive.fill; perfFill(true); try { fill.setPointerCapture(e.pointerId); } catch(_){} });
-  fill.addEventListener('pointerup', () => { if (performance.now() - fd > 350) perfFill(false); else perfFill(!fill._was); });
+  fill.addEventListener('pointerdown', e => { if (e.button || ctxPress(e)) return; fd = performance.now(); fill._was = perfLive.fill; perfFill(true); try { fill.setPointerCapture(e.pointerId); } catch(_){} });
+  fill.addEventListener('pointerup', () => { if (!fd) return; if (performance.now() - fd > 350) perfFill(false); else perfFill(!fill._was); fd = 0; });
   fill.addEventListener('click', e => e.preventDefault());
   r1.append(fill, el('span', 'pfsep'), btn('SET', 'Set the reload point: the song as it is now', perfReloadSet), Object.assign(btn('RELOAD', 'Back to the reload point (one undo step)', perfReload), {id:'pfReload'}),
     el('span', 'pfsep'), el('span', 'pfl', 'PART'), btn('◀', 'Previous part', () => { perfPart = (perfPart + PERF_PARTS - 1) % PERF_PARTS; perfDraw(); }), Object.assign(el('span', 'pfpart'), {id:'pfPart'}),
@@ -24387,7 +24412,8 @@ const stVol = $('stVol'), stPan = $('stPan');
 const stGet = () => dkMst() ? (S.mout == null ? 255 : S.mout) : S.mix[dkTrack()].vol;
 const stSet = v => { v = clamp(Math.round(v), 0, 255); if (dkMst()){ S.mout = v; moApply(); saveS(); } else { S.mix[dkTrack()].vol = v; mixChanged(); } deckStrip(); };
 const stPos = v => { const h = stVol.clientHeight - 16; return 8 + v / 255 * h; };
-stVol.addEventListener('pointerdown', e => { e.preventDefault(); try { stVol.setPointerCapture(e.pointerId); } catch(_){} stVol.focus();
+stVol.addEventListener('pointerdown', e => { if (e.button || ctxPress(e)) return; e.preventDefault();   // left button only (3 Nov)
+  try { stVol.setPointerCapture(e.pointerId); } catch(_){} stVol.focus();
   const r = stVol.getBoundingClientRect(), h = r.height - 16, y0 = e.clientY, v0 = stGet();
   // A grab on the cap moves it relative (no jump); a press elsewhere on the track jumps there first.
   const capY = r.bottom - stPos(v0); let base = Math.abs(e.clientY - capY) < 12 ? v0 : clamp((r.bottom - 8 - e.clientY) / h * 255, 0, 255), from = y0;
@@ -25912,6 +25938,11 @@ arrGrid.addEventListener('touchend', arrPinchEnd); arrGrid.addEventListener('tou
 let arrWAcc = 0;
 arrGrid.addEventListener('wheel', e => {
   if (e.ctrlKey) return;
+  // SIDEWAYS (mouse audit, 3 Nov): a trackpad swipe or a tilt wheel scrolls Arrange across when it is wider than its box
+  // (zoomed in); it used to be eaten and do nothing.
+  if (!e.shiftKey && Math.abs(e.deltaX) > Math.abs(e.deltaY)){
+    if (arrGrid.scrollWidth > arrGrid.clientWidth + 1){ e.preventDefault(); arrGrid.scrollLeft += e.deltaMode === 1 ? e.deltaX * 40 : e.deltaX; arrHandT = performance.now(); }
+    return; }
   e.preventDefault();
   if (e.shiftKey){ const d = e.deltaY || e.deltaX; arrGrid.scrollTop += e.deltaMode === 1 ? d * 40 : d; arrHandT = performance.now(); return; }   // Shift: scroll only
   const dy = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY; let n;
@@ -26024,7 +26055,7 @@ function sxDown(e){
   const rn = e.target.closest('[data-ry]');
   if (rn) return SX.loop ? sxLoopDown(e, rn) : false;
   if (!SX.mouse || e.pointerType === 'touch') return false;
-  if (e.button === 2) return true;   // a right-click is the menu (below), not a press that moves or mutes
+  if (ctxPress(e)) return true;   // a right-click (Ctrl+click on a Mac, 3 Nov) is the menu (below), not a press that moves or mutes
   if (e.button !== 0) return false;
   const b = e.target.closest('b[data-y]'); if (!b) return false;
   const y = +b.dataset.y, t = +b.dataset.t, r = sxRect(), filled = S.song[y][t] >= 0;
@@ -26891,6 +26922,13 @@ const gridDown = e => {
     }
     return;
   }
+  // MIDDLE-CLICK (mouse audit, 3 Nov): on the Song a block mutes or unmutes, as on Arrange; anywhere else it does nothing
+  // (it used to edit, add or open a block, or start a value drag). Other extra buttons do nothing either.
+  if (e.button > 0){
+    if (e.button === 1 && e.pointerType === 'mouse' && tv === 'song'){ const s = e.target.closest('[data-x]'), x = s ? +s.dataset.x : -1, y = s ? +s.dataset.y : -1;
+      if (y >= 0 && S.song[y] && S.song[y][x] >= 0){ e.preventDefault(); toggleBlockMute(y, x); } }
+    return;
+  }
   // Tapping a row number selects that whole line; tapping another grows the selection to it; tapping
   // the only selected line again lets it go.
   const rn = e.target.closest('[data-r]');
@@ -26931,6 +26969,7 @@ const gridDown = e => {
   try { grid.setPointerCapture(e.pointerId); } catch(_){}
 };
 grid.addEventListener('pointerdown', gridDown); $('tPset').addEventListener('pointerdown', gridDown);
+grid.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });   // no autoscroll cursor on a middle-click (3 Nov)
 // TRACK NAMES: double-click a track number (Song, Mixer, Arrange) or the Phrase title to name and colour the track. A click
 // redraws the number, so the browser's dblclick never comes: hdDbl(t) is true on the second press on the same track within
 // 400 ms (the two clicks have muted and unmuted it, as two taps always did).
@@ -27047,9 +27086,11 @@ grid.addEventListener('dblclick', e => {
   e.preventDefault(); fxpOpen(c.x, c.y);
 });
 // Mouse wheel moves the cursor a row per notch, so long screens scroll.
-let wAcc = 0, vAcc = 0;
+let vAcc = 0;
+const WK_ROWS = {}, WK_SEL = {}, WK_VAL = {};   // wheelNotch's counters (rows, Shift+wheel selection, Alt+wheel values)
 scr.addEventListener('wheel', e => {
   if (fxp.open || (e.ctrlKey && e.target.closest && e.target.closest('#tArr'))) return;   // Ctrl+wheel over Arrange zooms it
+  if (e.ctrlKey && !e.altKey) return;   // CTRL+WHEEL (3 Nov): a trackpad pinch / zoom, never a cursor move (it scrolled rows)
   if (e.target.closest && e.target.closest('#tArrGrid')) return;   // ARRANGE WHEEL: its own handler (below)
   { const v = e.target.closest && e.target.closest('[data-x]'), x = v ? +v.dataset.x : 0, y = v ? +v.dataset.y : -1;   // VALUE MOUSE: the wheel over a value changes it
     // FX SLOTS (owner, 31 Oct: too easy to change an effect by accident): over a slot the wheel moves between the slots,
@@ -27063,16 +27104,14 @@ scr.addEventListener('wheel', e => {
     if (v && grid.contains(v) && valCell(v, x, y) && !e.ctrlKey && e.altKey){ e.preventDefault();
       const c = cs[tv]; if (tv === 'mixer' && y === 7){ if (c.y !== 7 || (c.mx || 0) !== x){ c.y = 7; c.mx = x; vAcc = 0; draw(); } }   // MASTER or OUT
       else if (c.x !== x || c.y !== y){ c.x = x; c.y = y; vAcc = 0; draw(); }
-      const dy = e.deltaY || e.deltaX; vAcc += e.deltaMode === 1 ? dy * 40 : dy;   // Shift+wheel comes as deltaX on some systems
-      const n = Math.trunc(vAcc / 40); if (!n) return; vAcc -= n * 40;
+      const n = wheelNotch(WK_VAL, e); if (!n) return;   // a step a notch (3 Nov; Shift+wheel comes as deltaX on some systems)
       for (let k = 0; k < Math.abs(n); k++) bump(n < 0 ? 1 : -1, false);   // up raises it (Shift took big steps: Phase 2, Shift is fine)
       return; } }
   if (tv === 'mixer' || onPset()) return; e.preventDefault();
   // SHIFT+WHEEL SELECTS (owner, 2 Nov): on Phrase and the Pattern view, Shift+wheel grows the selection up or down a row a
   // notch, as Shift+▲▼ does (Windows sends Shift+wheel as a sideways scroll: either axis counts). Sideways scrolling of
   // the Pattern view stays on a tilt wheel or a trackpad swipe.
-  if (e.shiftKey && tv === 'phrase'){ const d = e.deltaY || e.deltaX; wAcc += e.deltaMode === 1 ? d * 40 : d;
-    const n = Math.trunc(wAcc / 40); if (!n) return; wAcc -= n * 40;
+  if (e.shiftKey && tv === 'phrase'){ const n = wheelNotch(WK_SEL, e); if (!n) return;
     for (let k = 0; k < Math.abs(n); k++) shiftSel(n > 0 ? 'down' : 'up');
     if (pvActive()) pvHoldX = true; return; }
   // PATTERN view: a sideways swipe or a tilt wheel scrolls across the tracks (the cursor stays put).
@@ -27080,8 +27119,8 @@ scr.addEventListener('wheel', e => {
     const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : 0;
     if (dx){ grid.scrollLeft += e.deltaMode === 1 ? dx * 40 : dx; return; }
   }
-  wAcc += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
-  const n = Math.trunc(wAcc / 40); if (!n) return; wAcc -= n * 40;
+  if (!e.deltaY) return;   // a sideways swipe off the Pattern view: nothing to scroll
+  const n = wheelNotch(WK_ROWS, e); if (!n) return;   // a row a notch (3 Nov: it was a row per 40 px, 2–3 a notch)
   const c = cs[tv]; let lo = 0, hi = dims(tv).h - 1;
   // FX SCREEN (owner, 2 Nov): the wheel stays in the section the cursor is in, the slot list (rows 0–8) or the effect's
   // values (below); a click moves between them.
@@ -27955,6 +27994,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [380, '3 Nov', ['Mouse fixes: on a Mac a Ctrl+click is a right-click everywhere (it used to drag on Arrange, sliders, faders and pads); with one top menu open, one click or just moving onto another opens it; a middle-click on the Song grid mutes a block, as on Arrange; the wheel moves a phrase a row a notch, and Ctrl+wheel (a pinch) no longer moves the cursor.', 'Pattern view: a right-click acts on the cell you clicked. Arrange scrolls sideways with a trackpad swipe when zoomed in. Sliders never show the browser’s own menu.', '…chains and …waves: sliders work like the rest of the app (drag from where they are, Shift fine, Alt-click resets); right-click a cable to remove it; a cable let go outside the editor no longer sticks; a right-click on a jack doesn’t start a cable; a middle-drag pans over modules too.']],
   [379, '3 Nov', ['Arrange turns its pages when the playhead runs off it with FOLLOW OFF too. While you work in Arrange it waits until you’ve left it alone for a minute, then follows.']],
   [378, '3 Nov', ['GAT 00 stops the step gate (it opens until the next GAT); the slot’s CUSTOM steps are GAT 10. Older songs’ GAT 00 are rewritten GAT 10, so they sound as before.', 'EDIT OFF: the Thunder Plus logo gets an orange ring (in edit mode it looks as normal); the EDIT OFF words on the tab and the corner are gone. Click the logo (or Esc) to switch.']],
   [377, '3 Nov', ['FLX fixed: FLX 41–FF all played REVERSE (pattern 40) on the Page sequencer, the first PLAY, starting mid-song and in every render; now each plays its own pattern. The pattern names give note values (ROLL 1/16, not 1/4); GATE 1/32, 1/8T and 1/16T gate at the rate they name.', 'Flex, Step gate and Retrigger draw what they are playing in the FX bar: the pattern’s number and name, its shape over a bar and a playhead.', 'Flex and Step gate have STARTS: ON FLX / ON GAT (new slots) waits, letting the sound through, until an FLX or GAT turns it on (FLX 00 turns it off, STOP waits again); AT PLAY plays the slot’s pattern from PLAY, as songs made before this keep doing.']],
@@ -28585,7 +28625,17 @@ function pvSpanAt(s, clientX){
   return {m, x};
 }
 grid.addEventListener('pointerdown', e => {
-  if (!pvActive() || (e.button && e.button > 0)) return;
+  if (!pvActive()) return;
+  // RIGHT-CLICK (mouse audit, 3 Nov): the clicked cell becomes the cursor first (another track's opens there), unless it is
+  // inside the selection, so the menu that follows acts on it, as Renoise does. Only the cursor's own cell carries data-x,
+  // so gridDown alone opened the menu for the old cursor.
+  if (ctxPress(e)){ const s = e.target.closest('.ln > span'); if (!s || !grid.contains(s) || s.hasAttribute('data-r')) return;
+    const p = pvSpanAt(s, e.clientX), m = p && p.m; if (!m || m.y == null || p.x == null || m.t < 0) return;
+    if (m.t === cTrack){ const c = cs.phrase, r = selA && selA.v === 'phrase' ? selRect() : null;
+      if (!(r && p.x >= r.x0 && p.x <= r.x1 && m.y >= r.y0 && m.y <= r.y1)){ if (selA && selA.v === 'phrase') selA = null; c.x = p.x; c.y = m.y; draw(); } }
+    else pvGo(m.t, cs.song.y, p.x, m.y);
+    return; }
+  if (e.button && e.button > 0) return;
   const s = e.target.closest('.ln > span'); if (!s || !grid.contains(s) || s.hasAttribute('data-x') || s.hasAttribute('data-r')) return;
   const p = pvSpanAt(s, e.clientX), m = p && p.m; if (!m || (m.t === cTrack && (!m.g || m.y == null))) return;   // the open track's band and names: nothing
   e.stopPropagation(); e.preventDefault();
