@@ -207,7 +207,7 @@ test('Phase 2 editors: modules take Max/MSP edit-mode gestures', () => {
     const w = H.read(f);
     assert.match(w, /if \(maxOperate\(e\)\) return;   \/\/ MAX: Ctrl\/⌘-click works the module/, f + ': Ctrl/⌘-click never selects');
     assert.match(w, /if \(e\.altKey && maxHelpPend\(e, n\)\) return;/, f + ': Alt-click opens help (Alt-drag copies)');
-    assert.match(w, /const box = e\.pointerType === 'mouse' && e\.button === 0;\n  if \(box && !e\.shiftKey\) clearSel\(\);\n  if \(box \|\| e\.shiftKey\)\{/, f + ': a background drag is a selection box');
+    assert.match(w, /const box = e\.button === 0 && e\.shiftKey;\n  if \(box\)\{/, f + ': a Shift-drag on the background is a selection box (a plain drag pans, 3 Nov)');
     assert.match(w, /if \(\(e\.key !== 'Delete' && e\.key !== 'Backspace'\)[^\n]*\n[^\n]*\n  e\.preventDefault\(\); store\.snapshot\(\); const ids = \[\.\.\.selected\]; for \(const x of ids\) removeModule\(x\);/, f + ': Delete removes the selection');
     assert.match(w, /n\.el\.addEventListener\('pointerdown', e => \{ if \(e\.button === 1 && e\.pointerType === 'mouse'\) return; e\.stopPropagation\(\); n\.el\.style\.zIndex = \+\+zTop; if \(MAC && e\.ctrlKey && e\.pointerType === 'mouse'\) return; maxBodyDown\(e, n\); \}\);/, f + ': a click on a module selects it');
   }
@@ -342,4 +342,11 @@ test('row colours (3 Nov): right-click a row number, kept in the song, moved wit
   assert.match(src, /S\.rcol = \{\}; if \(j\.rcol/, 'loaded');
   assert.match(src, /async function rowColour\(y\)\{/, 'the sheet');
   assert.match(src, /if \(S\.rcol\)\{ const o = \{\}; for \(const k in S\.rcol\)\{ const y = \+k; if \(y < at\) o\[y\] = S\.rcol\[k\]; else if \(y \+ h < 256\)/, 'insert moves them');
+});
+
+test('acid key from the song (3 Nov): KEY FOLLOW instruments only, the song SCALE first', () => {
+  const src = H.read('index.html');
+  assert.match(src, /function songKey\(skipPh\)\{\n  if \(\(S\.scale \| 0\) > 0\)/, 'the song SCALE first');
+  assert.match(src, /if \(!I \|\| !I\.kf\) continue;/, 'melodic instruments only');
+  assert.match(src, /const found = songKey\(cPhrase\);/, 'the panel uses it');
 });

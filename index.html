@@ -20387,7 +20387,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 386;
+const BUILD = 387;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22801,7 +22801,7 @@ const ACID_SCALES = [['Minor', [0, 2, 3, 5, 7, 8, 10]], ['Phrygian', [0, 1, 3, 5
   ['Harmonic minor', [0, 2, 3, 5, 7, 8, 11]], ['Minor pentatonic', [0, 3, 5, 7, 10]], ['Blues', [0, 3, 5, 6, 7, 10]], ['Major', [0, 2, 4, 5, 7, 9, 11]],
   ['Chromatic', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]], ['Root & fifth', [0, 7]], ['Octaves', [0]]];
 const ACID_LANES = [['notes', 'NOTES'], ['oct', 'OCTAVES'], ['acc', 'ACCENTS'], ['slide', 'SLIDES'], ['time', 'TIME']];
-const acidSet = {scale:0, root:0, base:ROOT, density:75, accent:30, slide:25, octave:30, style:0, lanes:{notes:true, oct:true, acc:true, slide:true, time:true}};
+const acidSet = {auto:true, scale:0, root:0, base:ROOT, density:75, accent:30, slide:25, octave:30, style:0, lanes:{notes:true, oct:true, acc:true, slide:true, time:true}};
 /* STYLES (owner, 2 Nov: "patterns that sound more like the Basebot hardware 303 clone"): rules on top of …pump ACID's,
    after how hardware 303 sequences tend to sit. CLASSIC 303: the root (and its octave) most of the time, minor 3rd / 5th /
    7th, a chromatic step into the next note now and then, notes on the downbeats more often, accents mostly off the beat,
@@ -22873,6 +22873,39 @@ function acidWrite(P, y0, L, base, st, ins){
   }
   return over;
 }
+/* KEY FROM THE SONG (owner, 3 Nov: "make the generative acid baseline understand the key by looking at the rest of the
+   song"). The song's own SCALE / SCALE ROOT (Project) when set; otherwise the key is worked out from the notes the song's
+   melodic instruments play (KEY FOLLOW on: synths, MIDI; drums and drum kits have it off, so their notes never count): each
+   note's pitch class, weighted by how long it sounds (rows to the next note in its column, at most 16) and by how often its
+   phrase is used, with the sect's and the instrument's transposes; the phrase being written is left out. The profile is
+   matched against the Krumhansl–Kessler major and minor key profiles (the best correlation wins). Too little to go on
+   (under 8 weighted notes or a weak match): null, and the panel keeps the scale and root set by hand. */
+function songKey(skipPh){
+  if ((S.scale | 0) > 0){ const nm = SCALES[S.scale | 0][0].toLowerCase(), i = ACID_SCALES.findIndex(([n]) => n.toLowerCase() === nm);
+    const iv = SCALES[S.scale | 0][1], minor = iv && iv.includes(3) && !iv.includes(4);
+    return {root:S.sroot | 0, scale:i >= 0 ? i : (minor ? 0 : 6), name:ROOTS[S.sroot | 0] + ' ' + SCALES[S.scale | 0][0].toLowerCase(), from:'the song’s SCALE (Project)'}; }
+  const W = new Array(12).fill(0), uses = new Map(), tracks = new Set();
+  for (let y = 0; y < 256; y++){ const row = S.song[y]; if (!row) continue;
+    for (let t = 0; t < NT; t++){ const cid = row[t]; if (cid == null || cid < 0) continue; const ch = S.chains[cid]; if (!Array.isArray(ch)) continue;
+      for (const q of ch){ if (!q || q[0] < 0 || q[0] === skipPh) continue; const k = q[0] + ':' + (q[1] | 0); const u = uses.get(k) || {ph:q[0], tsp:q[1] | 0, n:0, t:new Set()}; u.n++; u.t.add(t); uses.set(k, u); } } }
+  for (const u of uses.values()){ const P = S.phrases[u.ph]; if (!P) continue; let ci = -1, got = false;
+    const len = Math.min(P.length, plen(u.ph));
+    for (let c = 0; c < NCOL; c++){ ci = -1;
+      for (let y = 0; y < len; y++){ const r = P[y]; if (!r) continue; if (r[IC] >= 0) ci = r[IC]; const n = r[c]; if (!(n >= 0 && n < 120)) continue;
+        const I = S.insts[r[IC] >= 0 ? r[IC] : ci]; if (!I || !I.kf) continue;
+        let d = 1; while (y + d < len && d < 16){ const nx = P[y + d]; if (nx && nx[c] >= 0) break; d++; }
+        const pc = (((n + u.tsp + (I.tsp | 0)) % 12) + 12) % 12; W[pc] += d * u.n; got = true; } }
+    if (got) for (const t of u.t) tracks.add(t); }
+  const tot = W.reduce((a, b) => a + b, 0); if (tot < 8) return null;
+  const MAJ = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88], MIN = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+  const corr = (P, r) => { const mx = W.reduce((a, b) => a + b) / 12, mp = P.reduce((a, b) => a + b) / 12; let sxy = 0, sxx = 0, syy = 0;
+    for (let i = 0; i < 12; i++){ const x = W[(i + r) % 12] - mx, y = P[i] - mp; sxy += x * y; sxx += x * x; syy += y * y; } return sxx && syy ? sxy / Math.sqrt(sxx * syy) : 0; };
+  let best = {c:-2};
+  for (let r = 0; r < 12; r++) for (const [P, minor] of [[MAJ, false], [MIN, true]]){ const c = corr(P, r); if (c > best.c) best = {c, root:r, minor}; }
+  if (best.c < 0.5) return null;
+  const tl = [...tracks].sort((a, b) => a - b).map(t => d2(t + 1)), tn = tl.length > 4 ? tl.slice(0, 3).join(', ') + ' and ' + (tl.length - 3) + ' more' : tl.join(', ');
+  return {root:best.root, scale:best.minor ? 0 : 6, name:ROOTS[best.root] + (best.minor ? ' minor' : ' major'), from:'the notes on track' + (tl.length > 1 ? 's ' : ' ') + tn, c:best.c};
+}
 function acidLine(){
   if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Acid line writes a bass line into it.');
   if (busTrack(cTrack)) return busSay();
@@ -22881,6 +22914,9 @@ function acidLine(){
   if (selA && selA.v === 'phrase'){ const R = selRect(); y0 = R.y0; L = Math.max(2, Math.min(R.y1, plen(cPhrase) - 1) - y0 + 1); }
   const P = () => S.phrases[cPhrase];
   const src = P()[cs.phrase.y]; let ins = src && src[IC] >= 0 ? src[IC] : (P().find(r => r[IC] >= 0) || [])[IC] ?? defInst();   // INSTRUMENT (owner, 2 Nov): picked in the panel
+  // KEY FROM THE SONG: worked out when the panel opens (and when KEY is switched back on); FROM SONG uses it at each roll
+  const found = songKey(cPhrase);
+  if (acidSet.auto && found){ acidSet.scale = found.scale; acidSet.root = found.root; }
   const R = () => ({scale:acidSet.scale, root:acidSet.root, density:acidSet.density / 100, accent:acidSet.accent / 100, slide:acidSet.slide / 100, octave:acidSet.octave / 100, style:acidSet.style});
   const roll = mut => {
     const st = acidRead(P(), y0, L, acidSet.base), lanes = acidSet.lanes;
@@ -22898,8 +22934,16 @@ function acidLine(){
   const sel = (label, opts, k) => { const s = el('select'); opts.forEach(([v, t]) => s.append(new Option(t, v))); s.value = acidSet[k]; s.addEventListener('change', () => { acidSet[k] = +s.value; }); return field(label, s); };
   { const s = el('select'); for (let k = 0; k < S.insts.length; k++) s.append(new Option(instLabel(k), k)); s.value = ins; s.addEventListener('change', () => { ins = +s.value; }); field('Instrument', s); }
   sel('Style', ACID_STYLES.map((n, i) => [i, n]), 'style');
-  sel('Scale', ACID_SCALES.map(([n], i) => [i, n]), 'scale');
-  sel('Root', NN.map((n, i) => [i, n.replace('-', '')]), 'root');
+  let keyS = null;
+  { const s = keyS = el('select'); s.append(new Option(found ? 'From the song: ' + found.name : 'From the song (not enough notes yet)', 1), new Option('Set by hand', 0)); s.value = acidSet.auto ? 1 : 0;
+    const f = field('Key', s), note = el('div', 'askmsg acidkey'); note.style.margin = '-2px 0 4px'; box.append(note);
+    const say = () => { note.textContent = acidSet.auto ? (found ? 'Found ' + found.name + ' from ' + found.from + '. Scale and Root follow it.' : 'Not enough melodic notes in the song yet (drums don’t count): using the Scale and Root below.') : 'Scale and Root as set below.'; };
+    s.addEventListener('change', () => { acidSet.auto = s.value === '1'; if (acidSet.auto && found){ acidSet.scale = found.scale; acidSet.root = found.root; scS.value = acidSet.scale; rtS.value = acidSet.root; } say(); });
+    say(); void f; }
+  const scS = sel('Scale', ACID_SCALES.map(([n], i) => [i, n]), 'scale');
+  const rtS = sel('Root', NN.map((n, i) => [i, n.replace('-', '')]), 'root');
+  // picking a Scale or Root by hand switches KEY to Set by hand
+  for (const x of [scS, rtS]) x.addEventListener('change', () => { acidSet.auto = false; if (keyS) keyS.value = '0'; const n = box.querySelector('.acidkey'); if (n) n.textContent = 'Scale and Root as set below.'; });
   sel('Base note', [24, 36, 48, 60].map(v => [v, noteS(v) + (v === ROOT ? ' (the pad’s pitch)' : '')]), 'base');
   for (const [k, label] of [['density', 'Density'], ['accent', 'Accents'], ['slide', 'Slides'], ['octave', 'Octave jumps']]){
     const w = el('span', 'acidr'), r = el('input'), v = el('b', null, acidSet[k] + '%'); r.type = 'range'; r.min = 0; r.max = 100; r.value = acidSet[k];
@@ -28261,6 +28305,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [387, '3 Nov', ['Acid line… finds the song’s key: KEY From the song uses the Project SCALE if you set one, else works it out from the notes your synths and MIDI instruments play (drums never count) and shows what it found; Set by hand keeps your Scale and Root.', '…chains and …waves: a drag on the background moves the view; Shift-drag draws the selection box.']],
   [386, '3 Nov', ['Right-click a row number in Arrange (or on the Song screen) to give it a colour, to mark where the song changes section. Saved with the song; the colour moves with its row when rows are inserted or removed. None takes it off.']],
   [385, '3 Nov', ['Arrange: moving the cursor past the bottom row turns a page (that row becomes the first shown), and past the top a page back; it used to slip under the bottom edge without following (the gap every four rows threw the count off).', 'A bus in Arrange has one thin frame down its column instead of an outline on every block.', 'Solo plays a track even when it is muted; the mute stays, so when the solo is cleared the track is muted again and the others play.']],
   [384, '3 Nov', ['The FX bar’s spring reverbs (…pump SPRING and Spring reverb) show their springs behind their values: hanging coils that shake with the sound and ring out over DECAY (TENSION, DRIP and WOBBLE change how they move; a two-spring tank shows two).']],

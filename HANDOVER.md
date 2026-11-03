@@ -119,6 +119,19 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (14): Acid key from the song; editors' background drag pans (build 387)
+
+- **`songKey(skipPh)`** (before acidLine): Project SCALE / ROOT when set (mapped onto ACID_SCALES by name, else Minor /
+  Major); else a pitch-class profile of every phrase the song uses (×uses), notes of KEY FOLLOW instruments only (drums and
+  kits have it off), each weighted by rows to the next note in its column (≤ 16), with the sect row's and the instrument's
+  transposes, the phrase being written left out; Krumhansl–Kessler major / minor correlation, best wins; null under 8 weighted
+  notes or r < 0.5. The Acid panel: KEY (From the song: X / Set by hand, `acidSet.auto`, on by default) with a line saying what
+  was found and from which tracks; picking Scale or Root by hand switches KEY to Set by hand. Detected keys are Minor or Major.
+- **…chains / …waves:** a plain mouse drag on the background pans (owner); Shift-drag is the selection box; a click there
+  clears the selection.
+- Headless: A minor from a synth line with drums on other notes; the song SCALE wins; drums only → null; ELECTRO → C minor;
+  the panel opens and generates. Editors: plain drag pans 100/60 px, Shift-drag selects, a click clears.
+
 ## 3 Nov (13): row number colours (build 386)
 
 - Owner: right-click a row's number to colour it, to show section changes. `S.rcol` (row → track colour index, TCOL), loaded
