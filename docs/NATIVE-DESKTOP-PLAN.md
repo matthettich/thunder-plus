@@ -500,6 +500,14 @@ GC, a dialog). Phase 2's target: 0 late at every stall size, and edits heard on 
      racing; Reset audio engine drops the core (`coreDrop`); the core loads after STOP, not during the first PLAY; a fast
      path in the sampler (about 4x cheaper for a steady voice). Measuring switches: `__seqTest.coreDbg({noSampler,
      noWire})`. Default stays Page until the owner's Fold retest is clean.
+   - **2c, live engines done (2 Nov night):** the bass, voice, acid / machine and …pump synth nodes register themselves in
+     the audio-thread scope by the page's key (`processorOptions.cid` → `globalThis.__tcNodes`); the core drives one through
+     an override (`proc.__ov`: Auto timelines for its params from the core's first event, read in its process() via
+     `__tcOv`, plus the note's level and pan applied to its output by `__tcPost`; the page sets that node's GainNode /
+     StereoPanner to 1 / centre in `coreTake` when `ev.coreLive` names it). Ports makePlayer's bassNote, polyVox
+     (syllables), polyPs (lanes) and the live kill. A node the page hasn't made yet (its first note) still plays from the
+     page, which makes it; the core takes it from the next note. After STOP the override lets go 4 s later (release).
+     ELECTRO: all 141 notes from the core; pad 8's track level 0.0199 vs 0.0205 (page); CPU 42.2 % vs 42.7 %.
    - **2c:** the other events, moved one by one onto the audio thread. **Done (2 Nov): the beat clock** for
      tempo-locked effects (Flex, Step gate, Retrigger): the core's output NT carries beat + 1 into the player's `clkBus`
      (which the page's ConstantSource, held at −1, also feeds), sampled values identical to the page's. Next: live
