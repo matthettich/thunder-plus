@@ -25159,7 +25159,11 @@ scr.addEventListener('wheel', e => {
   }
   wAcc += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
   const n = Math.trunc(wAcc / 40); if (!n) return; wAcc -= n * 40;
-  const c = cs[tv]; c.y = clamp(c.y + n, 0, dims(tv).h - 1);
+  const c = cs[tv]; let lo = 0, hi = dims(tv).h - 1;
+  // FX SCREEN (owner, 2 Nov): the wheel stays in the section the cursor is in, the slot list (rows 0–8) or the effect's
+  // values (below); a click moves between them.
+  if (tv === 'fx'){ if (c.y <= FXSLOTS) hi = Math.min(hi, FXSLOTS); else lo = FXSLOTS + 1; }
+  c.y = clamp(c.y + n, lo, hi);
   if (pvActive()) pvHoldX = true;   // the pattern stays where it was scrolled to
   draw();
 }, {passive:false});
