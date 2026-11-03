@@ -48,8 +48,10 @@ const FAKE = (avail) => {
     setTempo: bpm => { F.calls.push(['tempo', bpm]); F.setTempo(bpm); F.emit(); return P(true); },
     start: (at, sync) => { F.calls.push(['start', at, sync]); if (F.peers === 0) { F.b0 = 0; F.t0 = at; } if (sync) { F.playing = true; F.playAt = at; } F.emit(); return P(true); },
     stop: () => { F.calls.push(['stop']); F.playing = false; F.playAt = clk(); F.emit(); return P(true); },
-    // Link's clock, read after the way there (0–2 ms) and answered after the way back (0–2 ms), as over IPC
-    now: () => new Promise(r => setTimeout(() => { const v = clk(); setTimeout(() => r(v), Math.random() * F.jitter / 2); }, Math.random() * F.jitter / 2)),
+    // Link's clock, read after the way there and answered after the way back, 0–0.5 ms each (an Electron invoke's round trip
+    // is well under 1 ms; the ping keeps its shortest of 20, so its error is at most half that trip). The timing messages
+    // above keep 0–4 ms: the page must not take its clock from them once a ping is back.
+    now: () => new Promise(r => setTimeout(() => { const v = clk(); setTimeout(() => r(v), Math.random() * 0.5); }, Math.random() * 0.5)),
     onState: cb => { F.sCbs.push(cb); return () => {}; },
     onTime: cb => { F.tCbs.push(cb); return () => {}; }
   } };
@@ -134,8 +136,11 @@ try {
        differ by up to ~50 ppm (0.005 %); 0.03 % is six times that. A 20 ms jump of the session (a peer's bar correction).
        0.3 % (60x real, stress; the loop measures once a second). Typical here: 2–5 s, 6–9 s, 9–13 s; the windows are longer
        because this sandbox's audio clock stalls now and then (see HOST CLOCK) and the loop then has to converge again. */
-    const converge = async (sec) => { const tr = []; let run = 0;
-      for (let i = 0; i < sec * 2; i++) { const x = await phaseErr(page); tr.push(x);
+    // A host clock move (h) during the window is a new disturbance: the window starts again from it (at most twice). At the
+    // ±0.5 % cap the loop closes 5 ms a second, so a 45 ms stall of this sandbox's audio takes ~9 s by design.
+    const converge = async (sec) => { const tr = []; let run = 0, n = sec * 2, again = 2;
+      for (let i = 0; i < n; i++) { const x = await phaseErr(page); tr.push(x);
+        if (x && typeof x === 'object' && again > 0) { again--; n = i + 1 + sec * 2; }
         if (typeof x === 'number') { run = Math.abs(x) < 1 ? run + 1 : 0; if (run >= 4) return { ok: true, tr, at: (i + 1) / 2 }; } await wait(500); }
       return { ok: false, tr }; };
     const said = (r) => (r.ok ? `in ${r.at} s` : 'not') + ': ' + fmt(r.tr.slice(-10));

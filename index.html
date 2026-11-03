@@ -14249,7 +14249,9 @@ function setTempoLive(v){
    gets a state message on each change and a timing message every 20 ms ({beat, phase, tempo, at}: Link's beat at Link time
    `at`, µs) through window.thunderDesktop.link. The website has no LINKAPI, and nothing here runs.
    - Time: Link µs ↔ performance.now() by a clock ping (lkPing, NTP's way: ask for Link's time, take the middle of the round
-     trip; of the last 20 pings the one with the shortest trip), so the IPC's own delay doesn't move our bars. Until the first
+     trip), so the IPC's own delay doesn't move our bars. Of the last minute's pings the best: the shortest trip, less 0.05 ms
+     for each second of age (both are the system's steady clock, so they hardly drift apart; while the song plays this
+     thread is busy and trips grow to 10 ms or more, measured, which a short window would take as ±5 ms of error). Until the first
      ping is back, the offset seen on the timing messages (the smallest: the least delayed). performance.now() ↔ the audio
      clock (the moment a sound is heard, which is what Link's times mean too) by lkAm: the median of the last 25
      getOutputTimestamp() offsets, read with each timing message. amap (MIDI's) is smoothed to ride out jitter and so takes
@@ -14292,8 +14294,9 @@ function lkPing(){
   if (!lk.on || !LINKAPI.now) return;
   const a = performance.now();
   Promise.resolve(LINKAPI.now()).then(us => { const b = performance.now(); if (!lk.on || !(us > 0)) return;
-    lk.pings.push({rtt:b - a, off:(a + b) / 2 - us / 1000}); if (lk.pings.length > 20) lk.pings.shift();
-    lk.off = lk.pings.reduce((x, y) => y.rtt < x.rtt ? y : x).off; }, () => {});
+    lk.pings.push({rtt:b - a, off:(a + b) / 2 - us / 1000, at:b}); if (lk.pings.length > 240) lk.pings.shift();   // a minute at 4 a second
+    const q = p => p.rtt / 2 + (b - p.at) * 5e-5;   // its possible error now, ms
+    lk.off = lk.pings.reduce((x, y) => q(y) < q(x) ? y : x).off; }, () => {});
 }
 function lkTime(m){
   if (!lk.on || !m || !(m.tempo > 0)) return;
@@ -28028,7 +28031,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
   // ABLETON LINK (tools/link-test.mjs, with a fake window.thunderDesktop.link): what the page sees and does. beat: the newest
   // booked beat (mx.beat) with the performance.now() it is heard at, for checking against the fake session's own timeline.
   link(){ const e = mx.beat; return {on:lk.on, live:lkLive(), peers:lk.st ? lk.st.peers : null, ltempo:lk.t ? lk.t.tempo : null, bpm:S.bpm, seqBpm:tp.seq ? tp.seq.bpm : null, playing:!!tp.on, core:!!tp.core,
-    t0p:tp.on && ctx ? tp.t0 * 1000 + lkAm() : null, i:lk.i, off:lk.off, am:lk.am, s0p:lk.s0p, amR:lk.ams.length ? Math.max(...lk.ams) - Math.min(...lk.ams) : null, nP:lk.pings.length, nowP:performance.now(), r:lk.r, err:lk.err, errs:lk.errs.slice(), beat:e && ctx ? {b:e.b, p:e.t * 1000 + lkAm()} : null, box:!$('linkBox').hidden, stat:$('linkStat').textContent}; },
+    t0p:tp.on && ctx ? tp.t0 * 1000 + lkAm() : null, i:lk.i, off:lk.off, am:lk.am, s0p:lk.s0p, amR:lk.ams.length ? Math.max(...lk.ams) - Math.min(...lk.ams) : null, nP:lk.pings.length, rtt:lk.pings.length ? Math.min(...lk.pings.map(p => p.rtt)) : null, nowP:performance.now(), r:lk.r, err:lk.err, errs:lk.errs.slice(), beat:e && ctx ? {b:e.b, p:e.t * 1000 + lkAm()} : null, box:!$('linkBox').hidden, stat:$('linkStat').textContent}; },
   linkSet(v){ aset.link = !!v; lkEnable(!!v); return lk.on; },
   audio(){ rtInit(); return ctx.state; },
   linkPlay(){ const p = performance.now(); playCtx(); return {on:!!tp.on, p, t0p:tp.on && ctx ? tp.t0 * 1000 + lkAm() : null}; },

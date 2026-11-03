@@ -63,12 +63,14 @@ test('link: main.js loads the addon optionally, and every handler answers withou
   assert.match(html, /const lkp = lk \? lkPlan\(/); assert.match(html, /if \(tp\.on && lk && !lk\.restart\) lkStopped\(\)/);
 });
 
-test('link: the real addon, when built here (node link/build.js), loads and answers without going on the network', { skip: !fs.existsSync(path.join(H.ROOT, 'electron/link/thunder_link.node')) && 'not built here' }, () => {
+test('link: the real addon, when built here (node link/build.js), loads and answers without going on the network', { skip: !fs.existsSync(path.join(H.ROOT, 'electron/link/thunder_link.node')) && 'not built here' }, async () => {
   const L = require(path.join(H.ROOT, 'electron/link/thunder_link.node'));
   const a = L.now(), s = L.snapshot(4);
   assert.ok(L.now() >= a); assert.equal(s.enabled, false); assert.equal(s.peers, 0);
   assert.ok(L.setTempo(128)); assert.equal(L.snapshot(4).tempo, 128);
   assert.equal(L.setTempo(5), false, 'out of range');
-  const at = L.now() + 50000; L.start(at, 4, false);
-  assert.ok(Math.abs(L.timeAtBeat(0, 4) - at) < 2, 'alone, beat 0 moves to our start');
+  // Link applies an app-thread commit on its own thread, so reading it straight back can see the old timeline under load
+  const at = L.now() + 500000; L.start(at, 4, false);
+  let d = Infinity; for (let i = 0; i < 50 && Math.abs(d) >= 2; i++) { d = L.timeAtBeat(0, 4) - at; if (Math.abs(d) >= 2) await tick(10); }
+  assert.ok(Math.abs(d) < 2, 'alone, beat 0 moves to our start (off by ' + d + ' µs)');
 });
