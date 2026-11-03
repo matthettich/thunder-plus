@@ -17697,6 +17697,7 @@ function resetAudio(){
     try { if (rt.mfx){ rt.mfx.port.postMessage(null); rt.mfx.disconnect(); } } catch(e){}
     try { if (rt.mst){ if (rt.mst.output) rt.mst.output.disconnect(); if (rt.mst.input) rt.mst.input.disconnect(); } } catch(e){}
     try { rt.out.disconnect(); if (rt.lim._drop) rt.lim._drop(); else rt.lim.disconnect(); rt.mo.disconnect(); } catch(e){}
+    try { coreDrop(); } catch(e){}
     rt = null; dkSt = null;   // the bottom panel's strip meter: re-attached to the new graph (it kept reading the old one)
   }
   try { master.disconnect(); } catch(e){}
@@ -18212,7 +18213,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '2xtn6q';
+const CORE_REV = 'xzida7';
 const CORE_WANT = 3;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -18222,16 +18223,22 @@ function coreLoad(){
   core.loading = ctx.audioWorklet.addModule(CORE_URL()).then(() => {
     const n = new AudioWorkletNode(ctx, 'thunder-core', {numberOfInputs:0, numberOfOutputs:NT + 1, outputChannelCount:[...new Array(NT).fill(2), 1]});
     n.port.onmessage = e => { try { coreMsg(e.data || {}); } catch(err){ tpLog('core message', err); } };
-    core.node = n; coreWire(true); core.ready = true; core.sent.clear(); coreSyncAll(); return true;
+    core.node = n; core.ready = true; core.sent.clear(); coreSyncAll(); return true;
   }, err => { tpLog('core load', err); core.loading = null; toast('The audio-thread sequencer didn’t load here: playing as before.', 3500); return false; });
   return core.loading;
 }
 // The core's outputs into the tracks (and the beat clock). STOP unplugs them at once (owner, Fold: a stop took 10 s while
 // the audio thread worked through its messages): silence never waits for the core; PLAY plugs them back in.
-function coreWire(on){ const n = core.node; if (!n || !rt) return; if (!!core.wired === on) return; core.wired = on;
-  if (!on){ try { n.disconnect(); } catch(e){} return; }
-  for (let t = 0; t < NT; t++) try { n.connect(rt.pl.buses[t].inp, t); } catch(e){}
-  try { n.connect(rt.pl.clkBus, NT); } catch(e){} }   // the beat clock for tempo-locked effects
+// CPU (owner, Fold, 2 Nov: ~10 points more than Page): a connected output keeps its track's whole chain (its effects, its
+// …chains) running even while silent, so only the tracks the song plays on are plugged in, and only while the core plays.
+function coreWire(on){ const n = core.node; if (!n || !rt) return;
+  if (!on){ if (core.wired){ try { n.disconnect(); } catch(e){} } core.wired = null; return; }
+  if (!core.wired){ core.wired = new Set(); try { n.connect(rt.pl.clkBus, NT); } catch(e){} }   // the beat clock for tempo-locked effects
+  for (let t = 0; t < NT; t++) if ((S.song || []).some(r => r && r[t] >= 0)) coreWireT(t); }
+function coreWireT(t){ const n = core.node; if (!n || !rt || !core.wired || core.wired.has(t)) return; core.wired.add(t); try { n.connect(rt.pl.buses[t].inp, t); } catch(e){} }
+// Reset audio engine: this core goes (it played into the old graph) and a fresh one loads
+function coreDrop(){ const n = core.node; if (n){ try { n.port.postMessage({op:'die'}); n.port.onmessage = null; n.disconnect(); } catch(e){} }
+  Object.assign(core, {node:null, ready:false, loading:null, mir:null, wired:null, v:0}); core.sent.clear(); }
 const corePost = (m, tr) => { try { core.node.port.postMessage(m, tr || []); } catch(e){ tpLog('core post', e); } };
 function coreKit(){ const kv = [];
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; let live = false; try { live = isLivePad(i); } catch(e){}
@@ -18285,7 +18292,7 @@ function coreMsg(d){
       if (e.vk && !e.core) try { varWant(e); } catch(err){}
       { const k = (e.core ? 'core ' : 'page ') + e.type + (e.type === 'note' && !e.core ? ' pad ' + e.pad : ''); core.tally.set(k, (core.tally.get(k) || 0) + 1); }
       const midiOnly = moEv(e);
-      if (e.core){ if (e.type === 'note'){ rt.pl.coreTake(e); padBlink(e); } continue; }   // (a beat: the core drives the effects' clock; moEv above still kept MIDI clock's mx.beat)
+      if (e.core){ if (e.type === 'note'){ coreWireT(e.track); rt.pl.coreTake(e); padBlink(e); } continue; }   // (a beat: the core drives the effects' clock; moEv above still kept MIDI clock's mx.beat)
       if (midiOnly) continue;
       rt.pl.play(e); if (e.type === 'note') padBlink(e);
     }
