@@ -131,8 +131,8 @@ test('guards: KEYS mode modifiers, the Synth page keys, dialogs over Settings, u
   assert.match(src, /addEventListener\('beforeunload', e => \{ if \(selfReload \|\| DESK \|\| !projDirty\) return; e\.preventDefault\(\); e\.returnValue = ''; \}\);/, 'B8');
   assert.match(src, /selfReload = true;/, 'B8: the update reload passes');
   // M17: only the left button drags a mixer fader
-  assert.match(src, /closest\('\.mfbar:not\(\.mobar\)'\); if \(!b \|\| tv !== 'mixer'\) return;[^\n]*\n  if \(e\.button !== 0\) return;/, 'M17');   // (27 Oct: the master OUT bar has its own handler)
-  assert.match(src, /closest\('\.mobar'\); if \(!b \|\| tv !== 'mixer' \|\| e\.button !== 0\) return;/, 'M17: the master OUT bar too');
+  assert.match(src, /closest\('\.mfbar:not\(\.mobar\)'\); if \(!b \|\| tv !== 'mixer'\) return;[^\n]*\n  if \(e\.button !== 0 \|\| ctxPress\(e\)\) return;/, 'M17');   // (27 Oct: the master OUT bar has its own handler)
+  assert.match(src, /closest\('\.mobar'\); if \(!b \|\| tv !== 'mixer' \|\| e\.button !== 0 \|\| ctxPress\(e\)\) return;/, 'M17: the master OUT bar too');
   // M3: a …chains slider row in the bottom panel opens one menu (its own, with the panel items), not that and a modal
   assert.match(src, /makeRow\(def, x\.p, getObj, \{[^}]*menu:\(\) => dkcItems\(x\)\}\);/, 'M3: the slider row carries the items');
   assert.match(src, /if \(Array\.isArray\(x\.o\) && x\.o\.length\) r\.addEventListener\('contextmenu', e => \{ e\.preventDefault\(\); dkcMenu\(x, e\); \}\);/, 'M3: only list rows get the second menu');
@@ -172,7 +172,8 @@ test('Phase 2 keys and mouse: Space = the song everywhere, Shift = fine, a drag 
 
 test('Phase 2 sliders and wheel: relative drag, Shift finer, touch must slide, Alt/Ctrl-click resets; the wheel waits for the pointer to rest; editors scroll', () => {
   const src = H.read('index.html');
-  assert.match(src, /v = clamp\(v \+ \(ev\.clientX - lastX\) \/ w \* \(mx - mn\) \* \(ev\.shiftKey \? 0\.1 : 1\), mn, mx\); lastX = ev\.clientX;/, 'relative, re-anchored each move (Shift mid-drag never jumps)');
+  assert.match(src, /v = clamp\(v \+ \(ev\.clientX - lastX\) \/ w \* \(mx - mn\) \* dragMul\(ev\), mn, mx\); lastX = ev\.clientX;/, 'relative, re-anchored each move (Shift mid-drag never jumps)');
+  assert.match(src, /const dragMul = e => e\.shiftKey \? 0\.1 : \(e\.ctrlKey \|\| e\.metaKey\) \? 4 : 1;/, 'ONE RULE: Shift a tenth, Ctrl/⌘ ×4');
   assert.match(src, /if \(Math\.abs\(dx\) < 6\) return; live = true;/, 'touch: nothing until it slides sideways');
   assert.match(src, /if \(!touch && \(e\.altKey \|\| \(MACK \? e\.metaKey : e\.ctrlKey\)\)\)\{ sldReset\(r\); return; \}/, 'Alt / Ctrl / ⌘-click resets');
   assert.match(src, /inp\._reset = reset; inp\._out = out;/, 'makeRow gives the reset and the readout');
@@ -206,9 +207,9 @@ test('Phase 2 editors: modules take Max/MSP edit-mode gestures', () => {
     const w = H.read(f);
     assert.match(w, /if \(maxOperate\(e\)\) return;   \/\/ MAX: Ctrl\/⌘-click works the module/, f + ': Ctrl/⌘-click never selects');
     assert.match(w, /if \(e\.altKey && maxHelpPend\(e, n\)\) return;/, f + ': Alt-click opens help (Alt-drag copies)');
-    assert.match(w, /const box = e\.pointerType === 'mouse' && e\.button === 0;\n  if \(box && !e\.shiftKey\) clearSel\(\);\n  if \(box \|\| e\.shiftKey\)\{/, f + ': a background drag is a selection box');
+    assert.match(w, /const box = e\.button === 0 && e\.shiftKey;\n  if \(box\)\{/, f + ': a Shift-drag on the background is a selection box (a plain drag pans, 3 Nov)');
     assert.match(w, /if \(\(e\.key !== 'Delete' && e\.key !== 'Backspace'\)[^\n]*\n[^\n]*\n  e\.preventDefault\(\); store\.snapshot\(\); const ids = \[\.\.\.selected\]; for \(const x of ids\) removeModule\(x\);/, f + ': Delete removes the selection');
-    assert.match(w, /n\.el\.addEventListener\('pointerdown', e => \{ e\.stopPropagation\(\); n\.el\.style\.zIndex = \+\+zTop; maxBodyDown\(e, n\); \}\);/, f + ': a click on a module selects it');
+    assert.match(w, /n\.el\.addEventListener\('pointerdown', e => \{ if \(e\.button === 1 && e\.pointerType === 'mouse'\) return; e\.stopPropagation\(\); n\.el\.style\.zIndex = \+\+zTop; if \(MAC && e\.ctrlKey && e\.pointerType === 'mouse'\) return; maxBodyDown\(e, n\); \}\);/, f + ': a click on a module selects it');
   }
 });
 
@@ -279,4 +280,104 @@ test('wheel on a scrollbar (3 Nov): scrolls the bar it is over and stops the app
   e = ev(200, 60, { ctrlKey: true }); c.api.sbWheel(e); assert.ok(!e.stopped, 'Ctrl+wheel (zoom) is left alone');
   style.overflowY = 'hidden'; assert.equal(c.api.sbHit(el, 200, 60), '', 'no overflow, no bar');
   el.offsetWidth = 186; style.overflowY = 'auto'; assert.equal(c.api.sbHit(el, 196, 60), '', 'an overlay bar (no room) is not taken');
+});
+
+test('mouse audit (3 Nov): Mac Ctrl+click is the menu, middle-click mutes, top menus switch, a notch is a row, editor sliders', () => {
+  const src = H.read('index.html');
+  assert.match(src, /const ctxPress = e => e\.button === 2 \|\| \(MACK && e\.ctrlKey && e\.button === 0 && e\.pointerType !== 'touch'\);/, 'ctxPress');
+  assert.match(src, /if \(ctxPress\(e\)\) return true;   \/\/ a right-click \(Ctrl\+click on a Mac/, 'Arrange');
+  assert.match(src, /MIDDLE-CLICK \(mouse audit, 3 Nov\)[\s\S]{0,500}toggleBlockMute\(y, x\)/, 'Song middle-click mutes');
+  assert.match(src, /!onTopMenuBtn\(e\.target\)\)\{ gfileToggle\(false\); swallowTap\(e\); \}/, 'File: another menu button is not outside');
+  assert.match(src, /!onTopMenuBtn\(e\.target\)\)\{ geditToggle\(false\); swallowTap\(e\); \}/, 'Edit too');
+  assert.match(src, /b\.addEventListener\('pointerenter', e => \{ if \(e\.pointerType !== 'mouse'/, 'hover switches menus');
+  assert.match(src, /const n = wheelNotch\(WK_ROWS, e\); if \(!n\) return;/, 'a row a notch');
+  assert.match(src, /if \(e\.ctrlKey && !e\.altKey\) return;   \/\/ CTRL\+WHEEL/, 'Ctrl+wheel moves no cursor');
+  assert.match(src, /input:not\(\[type=range\]\)/, 'no browser menu on sliders');
+  for (const f of ['waves/index.html', 'chains/index.html']) {
+    const w = H.read(f);
+    assert.match(w, /ONE SLIDER \(mouse audit, 3 Nov[\s\S]{0,900}if \(e\.altKey \|\| \(MAC \? e\.metaKey : e\.ctrlKey\)\)\{ reset\(\); return; \}[\s\S]{0,800}ev\.shiftKey \? 0\.1/, f + ': the host slider rule');
+    assert.match(w, /if \(ev\.pointerType === 'mouse' && ev\.buttons === 0 && !drag\.drawing && !drag\.armed\)/, f + ': a cable let go outside ends');
+    assert.match(w, /\['Remove cable', \(\) =>/, f + ': Remove cable');
+  }
+});
+
+test('one rule for value controls (3 Nov): faders, strip, FX bar and pump drag relative; double-click resets; right-click menu; wheel after the rest', () => {
+  const src = H.read('index.html');
+  assert.match(src, /mfDrag = \{t, id:e\.pointerId, ly:e\.clientY, vy:mfY\(/, 'VOL fader relative');
+  assert.match(src, /D\.vy = clamp\(D\.vy \+ \(e\.clientY - D\.ly\) \* dragMul\(e\)/, 'VOL fader: dragMul each move');
+  assert.match(src, /D\.vx = clamp\(D\.vx \+ \(e\.clientX - D\.lx\) \* dragMul\(e\)/, 'OUT bar: dragMul each move');
+  assert.match(src, /base = clamp\(base \+ \(from - ev\.clientY\) \/ h \* 255 \* dragMul\(ev\), 0, 255\); from = ev\.clientY;/, 'strip fader');
+  assert.match(src, /x = clamp\(x \+ \(ly - ev\.clientY\) \/ per \* dragMul\(ev\), q\.min, q\.max\); ly = ev\.clientY;/, 'FX bar values');
+  assert.match(src, /out\.addEventListener\('dblclick', e => \{ e\.stopPropagation\(\); reset\(\); \}\);/, 'a slider readout double-click resets');
+  assert.match(src, /valMenu\(e, q\.l, \{reset:\(\) => set\(q\.d\), type:typeIt\}\)/, 'FX bar menu');
+  assert.match(src, /const wheelOk = r => !!r && \(r\.hasAttribute\('data-wheel'\)/, 'data-wheel controls take the wheel after the rest');
+  const k = H.read('pump/ui/kit.js');
+  assert.match(k, /const dragMul = m => m\.shift \? 0\.1 : m\.cmd \? 4 : 1;/, 'pump: dragMul');
+  assert.match(k, /'Reset to default', 'Type a value…'\]/, 'pump: right-click menu');
+  assert.match(k, /if \(c !== this\.wheelC\) return;/, 'pump: the wheel waits for the rest');
+});
+
+test('owner calls (3 Nov): Song Alt-drag copies, Arrange Ctrl-click picks / Ctrl-drag copies, Song track numbers mute, bus outline', () => {
+  const src = H.read('index.html');
+  assert.match(src, /SONG ALT-DRAG COPIES[\s\S]{0,900}if \(mselDown\(e, x, y\)\)\{ msel\.one = true; draw\(\); return; \}/, 'Song Alt-drag');
+  assert.match(src, /sxDrag = \{id:e\.pointerId, x0:e\.clientX, y0:e\.clientY, y, t, mode:null, alt:false, pick:true,/, 'Arrange Ctrl press waits');
+  assert.match(src, /if \(!d\.mode && d\.pick\)\{/, 'a Ctrl-click picks on release');
+  assert.match(src, /TRACK NUMBERS \(owner, 3 Nov\)/, 'Song track numbers mute');
+  assert.match(src, /\.agbus\{position:absolute/, "bus frame");
+});
+
+test('vintage sampler (3 Nov): a JS track effect wired into the table, groups, worklet and its Blob', () => {
+  const src = H.read('index.html');
+  assert.match(src, /class VSampCore \{/, 'the core');
+  assert.match(src, /vsamp:\{n:'VSMP'[^\n]*id:103, ps:\[/, 'the table entry');
+  assert.match(src, /vsamp:'Drive and lo-fi'/, 'its group');
+  assert.match(src, /'cab', 'tube', 'vsamp',/, 'in the picker');
+  assert.match(src, /if \(c\.t === 103\)\{[^\n]*\n[^\n]*new VSampCore\(sampleRate\)/, 'the worklet makes it');
+  assert.match(src, /VSampCore\.toString\(\)/, 'and has its code');
+  assert.match(H.read('core/seq-core.js'), /"vsamp":f =>/, 'the audio-thread core knows its map');
+});
+
+test('row colours (3 Nov): right-click a row number, kept in the song, moved with rows', () => {
+  const src = H.read('index.html');
+  assert.match(src, /S\.rcol = \{\}; if \(j\.rcol/, 'loaded');
+  assert.match(src, /async function rowColour\(y\)\{/, 'the sheet');
+  assert.match(src, /if \(S\.rcol\)\{ const o = \{\}; for \(const k in S\.rcol\)\{ const y = \+k; if \(y < at\) o\[y\] = S\.rcol\[k\]; else if \(y \+ h < 256\)/, 'insert moves them');
+});
+
+test('acid key from the song (3 Nov): KEY FOLLOW instruments only, the song SCALE first', () => {
+  const src = H.read('index.html');
+  assert.match(src, /function songKey\(skipPh\)\{\n  if \(\(S\.scale \| 0\) > 0\)/, 'the song SCALE first');
+  assert.match(src, /if \(!I \|\| !I\.kf\) continue;/, 'melodic instruments only');
+  assert.match(src, /const found = songKey\(cPhrase\);/, 'the panel uses it');
+});
+
+test('acid (3 Nov): 16th grid from the LPB, composed lines', () => {
+  const src = H.read('index.html');
+  assert.match(src, /spr = Math\.max\(1, Math\.round\(lpb \/ 4\)\), Ls = Math\.max\(1, Math\.floor\(L \/ spr\)\)/, 'steps from the LPB');
+  assert.match(src, /function acidWrite\(P, y0, L, base, st, ins, spr = 1\)\{/, 'write on the grid');
+  assert.match(src, /if \(!only && \(R\.style \| 0\) > 0\) return acidCompose\(st, L, lanes, R, rnd\);/, 'composed styles');
+});
+
+test('build 394: slow double-click, Shift+Up wrap, Alt+B / Alt+S, stop cursor stays', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  assert.match(src, /arrClicks = e\.detail/);
+  assert.match(src, /arrGo\(p\.y, p\.t, e\.pointerType === 'mouse' && arrClicks >= 2\)/);
+  assert.match(src, /function shiftSel\(dir, noWrap\)/);
+  assert.match(src, /e\.code === 'KeyB'\)\{ if \(!e\.repeat\) acidLine\(\)/);
+  assert.match(src, /e\.code === 'KeyS'\)\{ if \(!e\.repeat && !pbOpen\) setSheet\('song'\)/);
+  assert.match(src, /thunderplus-stopcur-v2/);
+});
+
+test('build 395: Enter on a song block picks it up', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  assert.match(src, /if \(tv === 'song' && enter && v >= 0\)\{[^\n]*\n[^\n]*\n\s*else \{ last\.sect = v;/);
+});
+
+test('build 398: …waves live engine', () => {
+  const fs = require('fs'), path = require('path'), src = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8'), wk = fs.readFileSync(path.join(__dirname, '..', 'waves', 'waves-worklet.js'), 'utf8');
+  assert.match(wk, /registerProcessor\('thunder-wlive', WavesLiveProc\)/);
+  assert.match(src, /wavesl:\{live:true, d:\(\) => \(\{bus:1, vel:100\}\), r:/);
+  assert.match(src, /if \(isWlV\(V\)\) return wlNode\(t, pad, V, kind, key\)/);
+  assert.match(src, /ps = isPsV\(v\) \|\| isWlV\(v\)/);
+  assert.ok(!/waves-worklet\.js\?v=31/.test(src));
 });

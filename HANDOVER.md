@@ -47,6 +47,9 @@ Keep this file up to date at the end of a work session.
 
 ## Before a commercial release (standing checklist: keep it current, read it before selling)
 
+- **Vintage sampler model names** (3 Nov): the `vsamp` effect's MODEL list (`VSampCore.MODELS`: SP-1200, SP-12, MPC60, SP-202 grades,
+  Emulator II) and its presets (`FX_FACTORY.vsamp`) name the machines. Rename to neutral names ("12-bit drum machine 26k"…) before
+  selling; the DSP is original.
 - **Skin and preset names that name products or people** (2 Nov): the Hardware skins (Vintage MPC, Nord red, 808, 909,
   Dr. Sample SP-202), Wes Anderson, TE, Braun, Koss, and the Hack / Owls preset groups. Fine for the owner's own use;
   rename to neutral names (e.g. "Grey sampler", "Red keys") before selling. The skins use colour palettes only, no logos.
@@ -115,6 +118,280 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
+
+## 3 Nov (27): FX bar keys and FX screen follow (build 400)
+
+- dkFbFoc / dkFbPick / dkFbKey (window keydown capture): a click on a bar value (.fr) gives the bar the keys; ▲▼ rows,
+  ◀▶ columns, Ctrl/⌘+arrows r._fbSet; Esc or a pointerdown outside a .fr ends it (#dkFxBar.kfoc; the pick dims without).
+  With tv 'fx', dkFbPick sets cFxT / cFxS and cs.fx.y = FXSLOTS + 2 + param index (rows: TRACK, slots, ACTIVE, params).
+
+## 3 Nov (26): an animation for every effect (build 399)
+
+- fxAnimKind: after the old kinds, everything but flex / sgate / retrig / pmeter (and dynamics, spring) gets one: Delays or
+  pump echo → 'echo' (dkFxTaps, lit as a hit runs along), Dynamics and EQ / Filters → 'curve' (track analyser spectrum,
+  48 log bands, + dkFxCurve response cached on the values, dots at turning points), autopan → 'pan', Modulation → 'lfo',
+  Rhythmic → 'beats' (16 steps, from ctx time and bpm while playing), Pitch and voice → 'pitch', Utility → 'field';
+  anything new → 'lfo'. All in dkAnim.
+
+## 3 Nov (25): …waves live engine (build 398)
+
+- waves/waves-worklet.js (now ?v=32 everywhere): `thunder-wlive` (WavesLiveProc) in the worklet branch, the twin of
+  thunder-psyn: lanes r/g/t/l/v ×4 + bpm, cid in __tcNodes, __tcOv/__tcPost, load posts, 2 s quiet sleep. Runs a whole
+  WavesEngine (patch from processorOptions.doc, port {doc} reloads, {set} = xParams) and outputs one bus (p.bus), with
+  Level/Drive and soft(). Pitch = 36 + tune + 12·log2(r) − 60 (as wavesPre). The wasm comes as compiled modules
+  (globalThis.__wlMods, set where plMod/txMod compile) on the first node per context (wlSent). Both registerProcessor
+  calls are in try/catch (the module may be added twice to one context).
+- index.html: XENG.wavesl {live, d:{bus, vel}, r:wavesLiveRender}; XUI.wavesl; picker (Synths; category Modular);
+  isWlV; makePlayer wlNode (lanes flagged ps:true, wl:true → polyPs, psLoad/psDrop, the safety net and bassNote's
+  velocity all apply); wlDoc pushes patch edits (wavesChanged); coreKit lk.ps covers it; bassReady adds WAVES_WK;
+  usesWaves / rwCan include it; setEngine → wlStart seeds kit.waves with the editor's starter if the song has none and
+  carries a waves layer's Bus.
+- Headless: track 5 on wavesl plays live through the core (load ~3%), the render peaks ~0.4, patch edits apply.
+
+## 3 Nov (24): side instruments card fits ~16 (build 397)
+
+- `.tside .tinlw{min-height:calc(8 * 29px + 12px + 26px)}` and columns minmax(76px): two columns of 8 rows at the
+  panel's 236 px; the side panel (overflow:auto) scrolls on short windows.
+
+## 3 Nov (23): folded I/O titles in …chains (build 396)
+
+- chains/index.html: `IO_KEY` / `ioTitle(n)` (n.tEl is the title span): collapsed trackIn / chainOut / scin / scout add
+  ' · ' + the choice label of track / sck / snd. Called from paintNote, setCollapsed and setParam.
+
+## 3 Nov (22): Enter picks up a pattern on Song / Arrange (build 395)
+
+- editTap: on tv 'song' (Arrange runs as song via apRun), Enter on a filled block sets `last.sect` (toast), so Enter on an
+  empty cell places it through insertAt. The lastTap key is kept, so Enter×2 still makes a unique copy (editDouble).
+- curToPlay: when the cursor's track has no position (an empty track), only the row follows; the track stays.
+- `.tside .tinl{grid-auto-rows:max-content}` + buttons min-height:max-content: the list scrolls on short panels.
+
+## 3 Nov (21): slow double-click, Shift+▲ wrap, Alt+B / Alt+S, STOP CURSOR off (build 394)
+
+- "Double-click on an empty track jumps to track 1": arrGo counted a double only within 380 ms; a slower system double-click
+  (Mac default) made nothing and the phrase stayed where it was. `arrClicks` (mousedown `e.detail`, the system's own count)
+  is passed to arrGo as `sysDbl`; both the empty-cell (arrEmptyTap) and block (arrTap) doubles take it. The browser's
+  dblclick event never reaches the grid (cells are redrawn between clicks). New `arrNewAt(y, t)`.
+- shiftSel(dir, noWrap): on Phrase (and the Pattern view) Shift+▲ on row 0 → anchor row 0, cursor last row (whole phrase,
+  same columns); Shift+▼ on the last row the other way. Shift+wheel passes noWrap.
+- globalKeys: Alt/⌥+B → acidLine(); Alt/⌥+S → setSheet('song'). Legend rows added.
+- STOP CURSOR default STAYS: key `thunderplus-stopcur-v2`, on only when '1'.
+
+## 3 Nov (20): meters take Alt-click to mute (build 393)
+
+- Owner: the meters too. `#tMeters` buttons: a mouse click picks the track (Song / Mixer cursor, else cTrack; the song cursor
+  unless Arrange has the keys), Alt/⌥-click mutes; touch taps still mute. Right-click solos as before.
+
+## 3 Nov (19): transpose lock plays the first note (build 392)
+
+- Owner: with the top bar's transpose lock on, ▲ / ▼ should play the first note being transposed. `keyTransArrow`: ▲ / ▼
+  transpose (`transposeSel(±1, true)`) and stay armed (it disarmed after one press); another arrow, Esc or the button turn it
+  off. `xposeHear()` plays the first note in `xposeScope()` (its row's instrument, else the phrase's last one before it,
+  else defInst) for 280 ms.
+
+## 3 Nov (18): Acid on the 16th grid, composed lines; calmer animations (build 391)
+
+- Owner: Acid sounded random; "most notes fell on odd numbered steps, which put them off of the clock". acidLine now works in
+  16th steps: `spr` = round(phrase LPB / 4) rows (2 at LPB 8), `Ls` = rows / spr; `acidRead` / `acidWrite` take `spr` (step i =
+  row y0 + i·spr; the rows between are cleared).
+- **`acidCompose`** (Classic 303, Rolling, Squelch; `acidRoll` calls it unless mutating or …pump ACID): a one-bar motif
+  (≤ 16 steps): a note's chance by place in the beat (beat ≫ 8th > 16ths; DENSITY mostly adds 16ths), ties after notes;
+  pitch by place (beat: root, else 5th / ♭7 / 3rd; 8th: root, 5th, ♭7, 3rd, 4th; 16th: repeat or a scale neighbour);
+  first step the root; octaves, accents, slides by style. The phrase: the motif repeated, every 2nd bar a note may change,
+  every 4th bar ends on a turnaround (5th, ♭7, 5th, 2nd). Defaults now Classic 303, DENSITY 45.
+- Headless: at LPB 8 no notes on odd rows over 18 lines; beats + 8ths outnumber 16ths.
+- **Animations calmer** (owner: "too busy… the spring is nice because it's very simple"): room ≤ 18 particles, grains ≤ 14,
+  no glow or dashed reference on clip, no noise specks on steps, 3 grooves on vinyl, 3 strings, 10 bands, 9 swirl points,
+  fainter lines everywhere.
+
+## 3 Nov (17): FX bar animations (build 390)
+
+- Owner: animations like the springs for effects without a good display. `fxAnimKind(f)` picks one (dynamics, EQ / filters,
+  delays, the pattern effects, utilities: none): room (Reverbs), grains (Spectral and granular, pGRAN), steps (crush,
+  degrade, lofi, vsamp, pCRSH), vinyl, clip (the rest of Drive and lo-fi), strings (Resonators), bands (pVOX, vowel), swirl
+  (pSWRL, rotary, dimension, ensemble). The column gets the springs' `canvas.fspr` with `col._spr.kind`; `dkAnim` draws it
+  (~30 fps from deckFxBarMeters), kicked by the slot level, dying over a decay / time / size / feedback value; values read
+  through `dkFxVal` regexes (size, density, drive, bits, rate…). Particles capped (140 room, 90 grains).
+
+## 3 Nov (16): side panel cards, instrument flashes, Acid instrument audition (build 389)
+
+- **Side panel** (`.tside`): the status + meters (`.tcard.tcst`: `#tState` / `#tBpm` on a dark bar) and INST LIST
+  (`.tcard.tinlw`, title bar) are FX-bar-style cards (1.5 px border, offset shadow). The instruments wrap in rows
+  (`repeat(auto-fill, minmax(92px, 1fr))`) and scroll inside the card, which takes the room left (was a fixed 8-row column
+  grid cut off at the side and bottom). PAD mode's copy (`#tInlPad`) keeps its own layout.
+- **Flashes:** `padBlink` on the tracker calls `inlBlink(e)` when INST LIST is on: the instrument's button gets `.hit` for
+  110 ms at the note's sounding time (output latency included), audible tracks only.
+- **Acid:** the Instrument list marks instruments no phrase uses (`· free`, `.acidfree` tint where options can be coloured);
+  a pick plays `preview(ins, base + root)` for 260 ms.
+
+## 3 Nov (15): Alt-click mutes track numbers; Alt+T (build 388)
+
+- Owner: the track mute gesture becomes Alt + click (as Alt-click mutes a block). Arrange's `#tArrTh` click and gridDown's
+  `y === -1` (Song, Mixer): with a mouse, Alt/⌥-click mutes, a plain click puts the cursor on the track (Arrange: the song
+  cursor, and cTrack unless Arrange has the keys), hdDbl's double-click names it with no mute / unmute on the way; right-click
+  solos as before. Touch unchanged (Song: cursor; Mixer: tap mutes). The meters (`#tMeters`, "Mute track N" buttons) still
+  mute on a click. Help and README say so.
+- Alt/⌥+T = NEW PHRASE RIGHT too (globalKeys, by e.code), since a browser tab keeps Ctrl/⌘+T; the Edit menu shows Alt+T.
+- Owner confirmed on a Mac: Ctrl+click opens the menu on Arrange and on a slider.
+- Open: owner says a double-click on an empty Arrange cell made the pattern but jumped to track 1; not reproduced headless
+  (beside Phrase / Pattern view and on the Song screen it opens on the clicked track). Asked which screen, and whether the
+  double-click should stay in Arrange.
+
+## 3 Nov (14): Acid key from the song; editors' background drag pans (build 387)
+
+- **`songKey(skipPh)`** (before acidLine): Project SCALE / ROOT when set (mapped onto ACID_SCALES by name, else Minor /
+  Major); else a pitch-class profile of every phrase the song uses (×uses), notes of KEY FOLLOW instruments only (drums and
+  kits have it off), each weighted by rows to the next note in its column (≤ 16), with the sect row's and the instrument's
+  transposes, the phrase being written left out; Krumhansl–Kessler major / minor correlation, best wins; null under 8 weighted
+  notes or r < 0.5. The Acid panel: KEY (From the song: X / Set by hand, `acidSet.auto`, on by default) with a line saying what
+  was found and from which tracks; picking Scale or Root by hand switches KEY to Set by hand. Detected keys are Minor or Major.
+- **…chains / …waves:** a plain mouse drag on the background pans (owner); Shift-drag is the selection box; a click there
+  clears the selection.
+- Headless: A minor from a synth line with drums on other notes; the song SCALE wins; drums only → null; ELECTRO → C minor;
+  the panel opens and generates. Editors: plain drag pans 100/60 px, Shift-drag selects, a click clears.
+
+## 3 Nov (13): row number colours (build 386)
+
+- Owner: right-click a row's number to colour it, to show section changes. `S.rcol` (row → track colour index, TCOL), loaded
+  beside `S.bcol`, shifted by songRowsInsert / songRowsRemove; `rowColour(y)` opens the same swatch sheet as block colours.
+  Arrange: a capture contextmenu on `#tArrGrid` for `[data-ry]` (Song screen and beside a screen); Song text grid: cmdCtx on
+  `[data-r]`. Shown as the number in the colour, bold, with a 3 px bar (`.rn.rc` / `span.rn.rnc`, `--rnc`).
+- Headless: the sheet opens on right-click, Red sets `S.rcol[4]`, Arrange and the Song text grid show it, an inserted row
+  moves it.
+
+## 3 Nov (12): Arrange pages, bus frame, solo over mute (build 385)
+
+- **Arrange row geometry is measured** (`arrRowTop(y)`, `arrRowAt(px)`, `arrRows(top)`): EVERY 4 ROWS (2 Nov) put a 7 px gap
+  above rows 4, 8, 12…, but scroll ↔ row maths used one row height, so `arrRows()` overcounted by a row or more and the cursor
+  went under the bottom edge without Arrange following (owner: "moving the cursor below the screen break should page the
+  screen down"). arrAlign, the scroll listener, arrKeepRow, the section lane and sxLaneRow use the measured places; the
+  Song-screen grid height allows ×1.04 a row for the gaps.
+- **Pages:** arrKeepRow: just past the bottom the cursor's row becomes the top row; just past the top, the bottom row
+  (was one row at a time).
+- **Bus frame:** the per-cell outline (build 382) looked odd moving through a bus's empty blocks; now `.agbus`, one hairline
+  box per bus column from its number to the grid's bottom, drawn by arrBoxes (which now runs beside screens too, for it).
+- **Solo over mute** (owner): `audible()`: a soloed track plays even when muted; solo never touches `mute`, so clearing it
+  leaves muted tracks muted. Arrange's muted-block look follows `audible()`.
+- Headless: arrRows equals the rows really on screen (Song screen and beside Phrase), ▼ / ▲ past the edges page and the grid
+  scrolls there; solo / mute truth table; screenshots of the bus frame.
+
+## 3 Nov (11): springs in the FX bar (build 384)
+
+- Owner: "a cool spring animation like in the pump spring plugin but vertical and overlay the text on top of it". A spring
+  reverb's FX bar column (`isSpringFx`: …pump SPRING `pspring`, the Spring reverb module effect) gets `canvas.fspr` behind its
+  header-less body (`.dkfc.spr`, values over it with a panel-colour text halo); `dkSpring(col, f, now, lv)` runs in
+  `deckFxBarMeters` (~30 fps): 1–3 vertical helices (from MODEL's name), a travelling wave kicked by the slot's level and
+  dying over DECAY, TENSION = coil count and wave speed, DRIP = shimmer and an orange drip point, WOBBLE = slow sway. My own
+  drawing; the …pump plugin's own animation isn't in this repo.
+
+## 3 Nov (10): Vintage sampler effect (build 383)
+
+Owner: vintage sampler effects in the degrade (Drive and lo-fi) group, SP-1200, MPC60, SP-202 and so on, "including bit depth".
+- **One effect, `vsamp` (VSMP, id 103, plain JS `VSampCore`)** with MODEL: SP-1200 (26.04 kHz, 12-bit, no anti-alias),
+  SP-12 (27.5 kHz, 12-bit, none), MPC60 (40 kHz, 12-bit, soft converter clip), SP-202 HI-FI / STANDARD / LO-FI 1 / LO-FI 2
+  (31.25 / 15.63 / 7.81 / 3.91 kHz, the grades from Sound On Sound's review; 16-bit), Emulator II (27.78 kHz, 8-bit µ-law
+  style companding). Rates and bits are the published ones; filters, drive and noise are by ear (not measured).
+- Chain per channel: DRIVE (±12 dB into the converter, the level compensated after) → the model's anti-alias 2-pole (or
+  none) → clip (hard, or tanh for the MPC60) → sample and hold at model rate × RATE (25–100 %) with quantising → FILTER (0 =
+  raw ZOH, else 24 dB/oct from 0.48 × rate down 3.2 octaves) → hiss and 60 Hz hum (NOISE) → DC block → MIX.
+- Wired like the other JS effects: TFX entry (after degrade), FX_GROUP, the picker list, the tfx worklet branch (`c.t ===
+  103`) and its Blob (`VSampCore.toString()`), `FX_FACTORY.vsamp` presets; `node tools/make-core.mjs` re-run (seq-core's map).
+  Track / bus / master FX only (not a pad effect).
+- Checked headless: each model's converter runs at its rate (counted), 12-bit steps, the level stays put across models, it
+  is in the picker's group, and it plays on a track with no worklet failure. Not listened to against the hardware.
+- Commercial list: the model names (added above).
+
+## 3 Nov (9): Song / Arrange calls, bus outline (build 382)
+
+- **Song text grid Alt-drag copies** (gridDown "SONG ALT-DRAG COPIES"): an Alt-press on a filled block (mouse, not the master)
+  makes it a one-block selection and starts mselDown's grab with `msel.one`; a drag copies (mselApply, the selection then
+  dropped), a click mutes the block (mselEnd), Esc puts it back. Alt-drag no longer changes a Song block's number there.
+- **Arrange Ctrl/⌘ press waits** (`sxDrag.pick`): a click without a drag picks (sxEnd), a drag copies (sxAim's Ctrl / ⌘).
+- **Song track numbers:** a mouse click mutes (toast says so), right-click solos as before; touch and the master's number
+  still move the cursor. Pattern view's band still opens the track (owner's call).
+- **Bus outline** (owner: "we lost the outline on the bus in arrange"): `.tagrid b.bus` gets a 1 px outline, 1 px out, in
+  `--ar-ink` at 70 %; cursor / playing / drop outlines come later in the CSS and win.
+- Faders: the Mixer bars are the cap itself, so "cap relative" is all of it (build 381); the strip fader keeps track-click-jumps.
+- Tests: usability "owner calls (3 Nov)"; 120/120. Headless: Song Alt-drag copy and Alt-click mute, Song number mutes,
+  Arrange Ctrl-click pick and Ctrl-drag copy, screenshots of the bus outline (Song screen and beside Phrase).
+
+## 3 Nov (8): one rule for value controls (build 381)
+
+Owner's calls from the mouse audit. Helpers next to `sliderOk` (SLIDER MOUSE): `dragMul(e)` (Shift 0.1, Ctrl/⌘ held 4, read
+on every move), `resetClick(e)` (Alt, or ⌘ on a Mac / Ctrl elsewhere, left button, not touch), `valMenu(e, title, {reset,
+type, learn, more})` (sxMenu: Reset to default / Type a value… / Learn), `parseLevel(txt, fromDb)` (hex 00–FF or dB),
+`wheelBig(e)` (⌘ on a Mac; Ctrl elsewhere only for a real notch ≥ 50 px, so a pinch stays a zoom).
+- **Host sliders:** Ctrl/⌘ held mid-drag ×4; wheel big steps; a double-click on the readout now resets (typing is in the
+  right-click menu; touch double-tap still types). Sliders without a menu of their own (strip PAN, Perform, tuning…) get a
+  right-click Reset (document contextmenu; makeRow's menu marks `e._valMenu`).
+- **WHEEL FOCUS** takes any `[data-wheel]` element with `el._wheel(d, e)` (d > 0 = up) as well as ranges: the Mixer's VOL
+  bars and OUT bar (4 a notch, Shift 1, big 16), the strip fader, the FX bar's values (their Alt+wheel / held-button wheel
+  stays and stops propagation).
+- **Mixer VOL faders / master OUT bar:** relative (`mfY` / `mfVol`, `moX` / `moVal` map level ↔ place; the drag moves a
+  virtual place `vy` / `vx` by the mouse's movement × dragMul), Alt/⌘-click resets, right-click Reset / Type (`mfType`,
+  `moType`). **Strip fader:** cap relative, track click jumps (as before), dragMul re-read each move, Alt/⌘-click resets,
+  right-click menu, arrows Shift 1 / Ctrl·⌘ 16. **FX bar values:** relative from where they are with dragMul, Alt/⌘-click
+  resets, right-click Reset / Type.
+- **…pump windows (kit.js v=6):** Dial / Row add each move to the unrounded value (`dragMul(m)`), so Shift / Cmd mid-drag
+  never jump; right-click on a value control = in-window menu Reset / Type a value…; mouse double-click resets (touch
+  double-tap and long-press still type); the wheel takes the control the mouse rested on 350 ms (`hoverC` / `wheelC`, outlined
+  in draw); a pinch never changes a value; Cmd+wheel big; header drag left button only.
+- Help's "Sliders, faders and values" paragraph, the FX bar info and the slider / FX value titles say so.
+- Tests: usability "one rule for value controls (3 Nov)", the Phase 2 slider check and gain-staging's VOL check updated;
+  119/119. Headless: pump Dial arithmetic, VOL fader (no jump, Shift a tenth, Alt-click, menu, wheel only after the rest),
+  OUT bar, typed levels, a synth slider (Ctrl ×4, readout double-click resets, menu with Learn), FX bar values, strip fader.
+- Not done: the meter-row / Arrange header double-click to name still mutes and unmutes first (the click mutes at once).
+
+## 3 Nov (7): mouse audit, the bug list (build 380)
+
+From the 3 Nov mouse audit (see "3 Nov (6)" for the owner's calls). Each change has a "3 Nov" / "mouse audit" comment.
+- **Mac Ctrl+click = right-click** everywhere: `ctxPress(e)` (by `MACK`) in Arrange's `sxDown` (it started a drag and dropped
+  the selection, so the menu acted on one block), the host slider capture (it dragged), pads (played), Mixer VOL / OUT bars,
+  the strip fader and FILL; the editors' background, module body and title, jacks and cables (`MAC`). Linux Chrome sends no
+  contextmenu for an emulated Ctrl+click, so "the menu opens" can only be checked on a real Mac.
+- **Top menus:** the outside-click closers skip every top menu button (`TOP_MENU_BTNS`, `onTopMenuBtn`), so one click
+  switches; with one open, `pointerenter` on another opens it (mouse, not Mobile); a click within 600 ms of that hover keeps it.
+- **Song text grid middle-click** mutes / unmutes a filled block (gridDown, before the row numbers); other screens ignore
+  extra buttons; `mousedown` button 1 is prevented on the grid (no autoscroll cursor).
+- **Tracker wheel:** `wheelNotch(key, e)`: a notch (≥ 50 px) is one step, small deltas add up per 100 px (`wheelSteps`), for
+  rows, Shift+wheel selection and Alt+wheel values (they were a step per 40 px: 2–3 a notch). Ctrl+wheel without Alt returns
+  (a pinch never moves the cursor).
+- **Pattern view right-click** (its capture pointerdown): the clicked cell becomes the cursor (another track's opens via
+  `pvGo`) unless inside the selection, then gridDown / cmdCtx open the menu there.
+- **Arrange sideways:** a swipe / tilt (|dx| > |dy|, no Shift) scrolls `arrGrid.scrollLeft` when wider than its box.
+- **Browser menu:** the global contextmenu block now exempts only text-like inputs (not range / checkbox / radio / button).
+- **…chains / …waves (both files, outside the shared block):** sliders take the host rule (mouse: relative drag, Shift ×0.1
+  re-read each move, holding Ctrl/⌘ ×4, Alt / Ctrl / ⌘-click resets, Mac Ctrl+click = menu; touch keeps the native slider);
+  jacks and cables left button only; a cable drag captures the pointer and ends when a mouse comes back with no button
+  (`buttons === 0`); right-click a cable → "Remove cable" (`hit._cable`); middle-drag pans over modules; the lasso ends on
+  pointercancel.
+- Tests: `tests/usability.test.js` "mouse audit (3 Nov)" plus the updated M17 / editor checks; `npm test` 118/118; headless
+  checks (menus, wheel, Pattern view, Song middle-click, editors' sliders and cables, Mac emulation) passed;
+  `tools/wheel-scrollbar.mjs` passes.
+- **Left for the next builds:** the one rule for value controls (double-click reset, right-click menu, Shift held through
+  every drag (faders, OUT, strip, FX bar, pump), Ctrl/⌘ big steps, wheel after the rest everywhere), and the Song / header /
+  fader calls.
+
+## 3 Nov (6): Arrange pages with FOLLOW OFF; the mouse audit (build 379)
+
+- Owner: "I still want the arrange window to page down if the play head passes the end, even if follow is turned off."
+  `followPlay()` returned at once with FOLLOW OFF, so `arrFollowPage` never ran, and `apTop()` / the Song-screen draw only kept
+  a playhead page (`c.pg`) with FOLLOW set, so the view went back to the cursor. Now FOLLOW OFF calls `arrFollowPage` and
+  `c.pg` holds in every mode while playing (a cursor move still brings the cursor back, as before).
+- **Working in Arrange** (Arrange has the keys, `apF === 'arr'`, or it is the Song screen with FOLLOW OFF): no page while you
+  work there, only after `ARR_IDLE` (60 s) with no key (Space and lone modifiers don't count), no click on `#tArr` and no
+  wheel/scroll (`arrActT`, `arrHandT`); any of them starts the minute again (owner's call). The 4 s HANDS ON pause is kept.
+  FOLLOW PATTERN / ON on the Song screen page at once as before; beside a screen with the keys they now also page after the
+  minute (they never did).
+- Checked headless (fake playhead and real playback, ELECTRO at 1600×1000). The FOLLOW setting's info text says so.
+- **Mouse audit (3 Nov), owner's calls, queued:** bug list (Mac Ctrl-click as right-click everywhere, …chains / …waves
+  sliders on the host slider rule, top menus switch in one click and on hover, Song middle-click mutes, Shift mid-drag
+  re-anchors on faders / OUT / strip / FX bar, strip fader left button only, no browser menu on range inputs, phrase wheel a
+  row a notch and no cursor move on Ctrl+wheel, Pattern view right-click on the clicked cell, editor cable drags end outside
+  the frame, jacks left button only, "Remove cable", Arrange sideways swipe). ONE RULE for value controls (sliders, faders,
+  FX bar, pump): double-click resets; right-click = Reset / Type / Learn; Alt/⌘-click resets; Shift ×0.1 held through the
+  drag; holding Ctrl/⌘ during a drag or wheel = big steps; wheel after the rest everywhere. Song grid Alt-drag copies (as
+  Arrange); Arrange Ctrl-click picks, Ctrl-drag copies; track numbers left-click mute / right-click solo everywhere (Pattern
+  view band still opens the track); mixer faders: the cap moves relative, a click on the track jumps (as the strip fader).
 
 ## 3 Nov (5): FLX check, Flex in the FX bar, pattern effects wait for their command
 
