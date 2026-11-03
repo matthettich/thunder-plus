@@ -2984,8 +2984,10 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>F2 F3 F4</dt><dd>Phrase, Mixer, Inst</dd>
         <dt>F5 F6 F7 F8</dt><dd>play song · play this screen · song from cursor · stop (F8 again: all notes off)</dd>
         <dt>Arrows</dt><dd>move · Alt/⌥+arrows change screen (◀▶ in tab order, ▲ Project, ▼ Mixer)</dd>
-        <dt>Shift + arrows</dt><dd>select cells from the cursor: ▲▼ up and down, ◀▶ sideways, in Song, Sect, Phrase</dd>
+        <dt>Shift + arrows</dt><dd>select cells from the cursor: ▲▼ up and down, ◀▶ sideways, in Song, Sect, Phrase · Shift+▲ on a phrase's top row wraps round and selects all of it (Shift+▼ on the bottom row too)</dd>
         <dt>Ctrl/⌘ + Shift + ▲▼</dt><dd>select whole lines (then Shift+▲▼ grows them too); tap row numbers on a touch screen</dd>
+        <dt>Alt + S</dt><dd>Song settings (name, tracks, tempo, swing, scale, pattern length…)</dd>
+        <dt>Alt + B</dt><dd>Acid line: the bass-line generator, on Phrase and the Pattern view</dd>
         <dt>Alt + A</dt><dd>give Arrange the keys from any screen, the screen beside it stays; again or Esc gives them back</dd><dt>Tab</dt><dd>in a phrase: note → instrument → FX1 → FX2 → FX3 (Shift: back; master phrases FX1–3); in Pattern view and elsewhere the next track</dd>
         <dt>Home End PgUp PgDn</dt><dd>top, bottom, 16 rows</dd>
         <dt>Ctrl/⌘ + arrows</dt><dd>change the value (◀▶ ±1, ▲▼ more)</dd>
@@ -20409,7 +20411,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 393;
+const BUILD = 394;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -20444,9 +20446,11 @@ let resumeOn = (() => { try { return localStorage.getItem(RSK) === '1'; } catch(
 /* STOP CURSOR (owner, 3 Nov: "I like having the edit cursor separate from the playback, but I keep expecting to be able to
    stop playback and to edit the patterns playback stopped on"). Settings → STOP CURSOR, this device: THERE (the default)
    puts the edit cursor where the song stopped (its song row, the cursor's track's phrase and step); STAYS leaves it.
-   STOP twice still goes to the top, RESUME still carries on from the spot. Alt+G (any time) puts the cursor on the playhead. */
-const STOPCUR_K = 'thunderplus-stopcur-v1';
-let stopCurOn = (() => { try { return localStorage.getItem(STOPCUR_K) !== '0'; } catch(e){ return true; } })();
+   STOP twice still goes to the top, RESUME still carries on from the spot. Alt+G (any time) puts the cursor on the playhead.
+   STAYS IS THE DEFAULT (owner, 3 Nov: "stopping playback shouldn't drop the edit cursor where the playback ends"): a new
+   key (v2), so every device starts on STAYS; THERE is still in Settings, Alt+G still jumps. */
+const STOPCUR_K = 'thunderplus-stopcur-v2';
+let stopCurOn = (() => { try { return localStorage.getItem(STOPCUR_K) === '1'; } catch(e){ return false; } })();
 function setStopCur(on){ stopCurOn = on; try { localStorage.setItem(STOPCUR_K, on ? '1' : '0'); } catch(e){} draw(); }
 // The edit cursor onto a playing (or stopped) position: P = per-track positions, mode = the sequencer's mode. Returns true when it moved.
 function curToPlay(P, mode){
@@ -22057,7 +22061,7 @@ function selRect(){ const c = cs[tv], ln = selA.line; return {x0:ln ? 0 : Math.m
 // is held. A line selection (Ctrl/⌘+Shift+▲▼, the row numbers, Ctrl/⌘+A) still grows by lines with Shift+▲▼; Shift+◀▶
 // turn it into a block over the same rows. False on screens with nothing to select (and from a track-number row going
 // up or down), so the caller moves the cursor instead.
-function shiftSel(dir){
+function shiftSel(dir, noWrap){
   if (!GRIDV.has(tv) || onPset()) return false;
   const c = cs[tv], side = dir === 'left' || dir === 'right', mine = selA && selA.v === tv;
   if (!side && mine && selA.line) return lineSel(dir === 'down' ? 1 : -1);
@@ -22065,7 +22069,11 @@ function shiftSel(dir){
   if (!mine || selA.line) selA = {x:c.x, y:mine ? selA.y : c.y, v:tv};
   const dx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0, dy = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
   // Up and down stay on the grid's rows: a selection doesn't wrap round the phrase as move() does.
-  if (dy){ c.y = clamp(c.y + dy, 0, dims(tv).h - 1); draw(); return true; }
+  // ...except at the phrase's edge (owner, 3 Nov): Shift+▲ on the top row wraps to the bottom and selects the whole phrase
+  // (top to bottom, the same columns); Shift+▼ on the bottom row the same the other way.
+  const H = dims(tv).h;
+  if (dy && !noWrap && tv === 'phrase' && H > 1 && c.y === (dy < 0 ? 0 : H - 1)){ selA.y = dy < 0 ? 0 : H - 1; c.y = dy < 0 ? H - 1 : 0; draw(); return true; }
+  if (dy){ c.y = clamp(c.y + dy, 0, H - 1); draw(); return true; }
   if (tv === 'phrase' && pvActive()){ const C = pCols(), i = C.indexOf(c.x), j = i + dx; if (i >= 0 && j >= 0 && j < C.length) c.x = C[j]; draw(); return true; }   // PATTERN VIEW: stays in the open track
   move(dx, 0); return true;
 }
@@ -22727,7 +22735,7 @@ function keyHint(s){
 // pattern writers, in their own group of Edit ▾ and the right-click menu, before Tools.
 function genItems(full){
   const ph = tv === 'phrase', mst = ph && mstView();
-  return ph && !mst || full ? [{a:'acid', l:'Acid line… (a random bass line)', k:'', f:acidLine, off:!ph || mst}, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill, off:!ph || mst}] : [];
+  return ph && !mst || full ? [{a:'acid', l:'Acid line… (a random bass line)', k:keyHint('alt+B'), f:acidLine, off:!ph || mst}, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill, off:!ph || mst}] : [];
 }
 function toolItems(full){
   const ph = tv === 'phrase', phSel = !!(selA && selA.v === 'phrase'), sg = tv === 'song', mst = ph && mstView();
@@ -26281,22 +26289,26 @@ arrGrid.addEventListener('scroll', () => {
 // A tap moves the song cursor there (from the phrase screen it opens that block's phrase); a second tap on the
 // same block opens its phrase. Holding a block, or Alt-clicking it, mutes just that block.
 let arrEmptyTap = {t:0, k:''};
-function arrGo(y, t){
+// A new empty pattern in an empty Arrange cell, beside another screen (a double-click); on Phrase it opens, on its track.
+function arrNewAt(y, t){
+  cs.song.x = t; cs.song.y = y; cTrack = t; newBlock({x:t, y}, -1);
+  if (S.song[y][t] >= 0){ toast('New pattern ' + hp(firstPhrase(S.song[y][t])) + ' · track ' + d2(t + 1) + ' · row ' + rS(y, 3), 1600); if (tv === 'phrase'){ tv = 'song'; go('phrase'); return; } }
+  draw();
+}
+function arrGo(y, t, sysDbl){
   // DOUBLE-CLICK AN EMPTY CELL beside any screen too (owner, 2 Nov): a new empty pattern there; on Phrase it opens. Its own
   // tap memory, since the paging and empty-cell rules below take the first click.
   { const k = y + ':' + t, now = performance.now(), empty = !(S.song[y] && S.song[y][t] >= 0);
     if (empty && t !== MT && !sectsOn && !asongOn() && tv !== 'song'){
-      if (arrEmptyTap.k === k && now - arrEmptyTap.t < 380){
-        arrEmptyTap = {t:0, k:''}; cs.song.x = t; cs.song.y = y; cTrack = t; newBlock({x:t, y}, -1);
-        if (S.song[y][t] >= 0){ toast('New pattern ' + hp(firstPhrase(S.song[y][t])) + ' · track ' + d2(t + 1) + ' · row ' + rS(y, 3), 1600); if (tv === 'phrase'){ tv = 'song'; go('phrase'); return; } }
-        draw(); return; }
+      if (arrEmptyTap.k === k && (now - arrEmptyTap.t < 380 || sysDbl)){
+        arrEmptyTap = {t:0, k:''}; arrNewAt(y, t); return; }
       arrEmptyTap = {t:now, k}; } }
   if (!asongOn() && apArrGo(y, t)) return;   // ARRANGE PAGING: on Phrase a tap pages into Arrange instead
   // Beside any other screen a tap on an EMPTY cell just puts the song cursor there, highlighted, and the screen stays
   // (owner, 19 Oct: it used to open the Song screen). A block still goes to the Song screen, twice opens its phrase.
   if (!asongOn() && tv !== 'song' && !(S.song[y] && S.song[y][t] >= 0)){ cs.song.x = t; cs.song.y = y; cTrack = t; arrTap = {t:0, k:''}; draw(); return; }   // (the track the Phrase and Pattern view open on, 31 Oct)
   cs.song.x = t; cs.song.y = y; cTrack = t;
-  const k = y + ':' + t, now = performance.now(), dbl = arrTap.k === k && now - arrTap.t < 380;
+  const k = y + ':' + t, now = performance.now(), dbl = arrTap.k === k && (now - arrTap.t < 380 || !!sysDbl);
   arrTap = {t:dbl ? 0 : now, k:dbl ? '' : k};
   const filled = S.song[y][t] >= 0;
   if (filled && (dbl || tv === 'phrase')){ tv = 'song'; go('phrase'); return; }
@@ -26464,9 +26476,15 @@ const arrUp = e => {
   if (!arrPress || e.pointerId !== arrPress.id) return;
   const p = arrPress; arrPress = null; clearTimeout(p.tm);
   if (p.el) p.el.classList.remove('charge');
-  if (!p.done && e.type === 'pointerup') arrGo(p.y, p.t);
+  if (!p.done && e.type === 'pointerup') arrGo(p.y, p.t, e.pointerType === 'mouse' && arrClicks >= 2);
 };
 arrGrid.addEventListener('pointerup', arrUp); arrGrid.addEventListener('pointercancel', arrUp);
+// SLOW DOUBLE-CLICK (owner, 3 Nov: "double-click on an empty track jumps me to track 1"): the taps count a double only
+// within 380 ms, but the system's double-click (a Mac's is slower by default) can be longer: then nothing was made and the
+// phrase stayed on the track it was on. The mouse's own click count (the system's timing) counts as a double too. (The
+// browser's dblclick never comes here: the cell is redrawn between the clicks.)
+let arrClicks = 0;
+arrGrid.addEventListener('mousedown', e => { arrClicks = e.detail || 0; }, true);
 arrGrid.addEventListener('contextmenu', e => e.preventDefault());
 // MOUSE SELECT: Arrange's track numbers with a mouse: a click mutes the track, a right-click solos it. Touch: nothing (a
 // slip on the small numbers on a phone mustn't silence a track; the meters and the Mixer do that).
@@ -27615,7 +27633,7 @@ scr.addEventListener('wheel', e => {
   // notch, as Shift+▲▼ does (Windows sends Shift+wheel as a sideways scroll: either axis counts). Sideways scrolling of
   // the Pattern view stays on a tilt wheel or a trackpad swipe.
   if (e.shiftKey && tv === 'phrase'){ const n = wheelNotch(WK_SEL, e); if (!n) return;
-    for (let k = 0; k < Math.abs(n); k++) shiftSel(n > 0 ? 'down' : 'up');
+    for (let k = 0; k < Math.abs(n); k++) shiftSel(n > 0 ? 'down' : 'up', true);   // (the wheel never wraps)
     if (pvActive()) pvHoldX = true; return; }
   // PATTERN view: a sideways swipe or a tilt wheel scrolls across the tracks (the cursor stays put).
   if (pvActive() && grid.contains(e.target)){
@@ -27693,6 +27711,8 @@ function globalKeys(e){
   if (mod && e.altKey && !e.shiftKey && e.code === 'KeyC'){ if (!e.repeat) cloneHere(); return true; }
   if (mod && !e.shiftKey && e.code === 'KeyD'){ if (!e.repeat) dupKey(e.altKey); return true; }
   if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyT'){ if (!e.repeat) newPhraseRight(); return true; }   // NEW PHRASE RIGHT (a browser tab keeps Ctrl+T; the desktop app gets it)
+  if (e.altKey && !mod && !e.shiftKey && e.code === 'KeyS'){ if (!e.repeat && !pbOpen) setSheet('song'); e.preventDefault(); return true; }   // SONG SETTINGS (owner, 3 Nov): Alt/⌥+S, from any screen
+  if (e.altKey && !mod && !e.shiftKey && e.code === 'KeyB'){ if (!e.repeat) acidLine(); e.preventDefault(); return true; }   // ACID LINE (owner, 3 Nov): Alt/⌥+B (Bass) on Phrase and the Pattern view
   if (e.altKey && !mod && !e.shiftKey && e.code === 'KeyT'){ if (!e.repeat) newPhraseRight(); e.preventDefault(); return true; }   // …and Alt/⌥+T (owner, 3 Nov: works in a browser tab too)
   if (mod && !e.altKey && e.shiftKey && e.code === 'KeyV'){ pasteMix(); return true; }   // SELECTION TOOLS: mix-paste
   if (mod && e.altKey && !e.shiftKey && e.code === 'KeyV'){ if (!e.repeat) insertPaste(); return true; }   // INSERT PASTE (Song / Arrange)
@@ -28500,6 +28520,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [394, '3 Nov', ['A slow double-click on an empty Arrange cell (a Mac’s default double-click speed) now makes the new pattern and opens it on that track; it used to do nothing, so the phrase stayed on the track it was on.', 'Shift+▲ on the top row of a phrase wraps round and selects the whole phrase; Shift+▼ on the bottom row too.', 'Alt/⌥+B opens Acid line on Phrase and the Pattern view; Alt/⌥+S opens Song settings from anywhere.', 'Stopping no longer moves the edit cursor to where playback stopped (Settings → STOP CURSOR: STAYS is now the default; Alt+G still jumps to the playhead).']],
   [393, '3 Nov', ['The side panel’s meters work like the track numbers with a mouse: Alt/⌥-click mutes, a click picks the track, right-click solos (a tap on a touch screen still mutes).']],
   [392, '3 Nov', ['Transpose ▲▼ (top bar) is a lock now: while it is on, each ▲ / ▼ transposes the selection a semitone and plays its first note so you hear where it is; Esc, the button or another arrow turns it off.']],
   [391, '3 Nov', ['Acid line… writes on the song’s 16th grid: at LPB 8 a step is two rows, so notes no longer land between the 16ths. Classic 303 (now the default), Rolling and Squelch compose the line: a one-bar motif with notes mostly on the beat and the 8ths, the root on the beat, passing notes on the 16ths, repeated through the phrase with a changed note every other bar and a turnaround leading back to the root every fourth bar. …pump ACID keeps its own random lines.', 'The FX bar animations are calmer: fewer moving parts and fainter lines, closer to the springs.']],
