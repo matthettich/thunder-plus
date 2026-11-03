@@ -482,10 +482,16 @@ GC, a dialog). Phase 2's target: 0 late at every stall size, and edits heard on 
      `tests/core.test.js` fails if the bundle is stale. The render helpers (`ensure`, `ensurePlay`, `varWant`,
      `applyChop`) are stubs there, and TFX comes from the page as data (`coreTfx()`). Parity:
      `node tools/seq-golden.mjs --core` gives the same four golden streams on the audio thread. Nothing plays from it yet.
-   - **2b:** a sampler in the core for rendered pads (buffers transferred after each render; mono / poly / choke, rate,
-     slide, ofs, cut / rel fades, gain, pan, arp / bend / vib, FDI, TRM / APN, `mod` / `off` / `stp` events), with one
-     output per track into each track's `inp` (an AudioWorkletNode with NT outputs). Behind a setting on beta, A/B
-     against the current player with `--timing` (target: 0 late at every stall size).
+   - **2b, done (2 Nov), behind Settings → Audio & MIDI → Sequencer: Audio thread β (default Page):** the core steps
+     the song live (`makeSeq` with `live:true`, RESUME, loops, tempo, PERFORM and live transpose mirrored) and plays
+     every rendered pad's note on its own sampler (`core/core-processor.js`: a port of makePlayer's startNote / kill /
+     pitchMods / modVoice on a small AudioParam-like `Auto` class), into NT outputs wired to each track's `inp`. Rows
+     still go up to the page booked LEAD ahead; notes the core sounded come marked `core:true` and the page only lets its
+     own voices give way (`coreTake`). Edits reach the core through `saveS` → `coreSong` (the song copied in place),
+     renders through `install` → `coreBuf`. Measured headless (ELECTRO, 12 s): core notes **0 late with 0, 400 and
+     1000 ms stalls** (page path: 0 / 38 / 69 late, up to 770 ms); the master's average level identical, the playhead
+     identical. Still on the page: live engines (pad 8 in ELECTRO), SoundFonts, MUT / GEN, SYNC-stretched notes, the
+     `beat` clock for tempo-locked effects (213 events / 12 s), effect and mixer commands, MIDI.
    - **2c:** the other events (live engines, `fxp` / `fxc` / `tvl`…, tempo, beat, MIDI) handed from the core to the page
      ahead of time (as the plan's 6.2 "Web" does for MIDI), then moved one by one onto the audio thread.
    - **2d:** edits and mutes as `song.patch` messages (heard on the next block), chops (`applyChop` with the buffer data

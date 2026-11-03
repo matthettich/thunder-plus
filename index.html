@@ -2263,6 +2263,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="segrow"><span>Rate</span><div class="seg" id="segARate"></div></div>
       <div class="segrow" title="Lines up tracks and buses whose …pump effects look ahead (LIMIT, CALM, TONE, linear-phase EQ…) by delaying everything else to match. Off: those tracks play a little late, as before. Renders follow the same setting."><span>Latency comp</span><div class="seg" id="segPdc"></div></div>
       <div class="segrow" id="psLiveRow" hidden><span>…pump live</span><div class="seg" id="segPsLive"></div></div>
+      <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread (beta): the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
       <p class="note" id="psLiveNote" hidden></p>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Latency and rate change when audio restarts. That reloads ...Thunder; your song and kit are kept.</span><button id="audRestart" class="on">Apply (reload)</button></div>
       <p class="note" id="audNote">Output picks where everything plays: the synth, the tracker and previews. Level is the overall volume after the tracker’s master. Lowest latency answers the pads fastest; Safest uses a bigger buffer if you hear crackles. Rate: Device uses the output’s own rate.</p>
@@ -7429,7 +7430,7 @@ const Lc = () => V().layers[V().sel];
 // Output device, level, latency and sample rate. Latency and rate are fixed when the AudioContext is made,
 // so changing them asks for a restart; the output device and level change live.
 const AUK = 'thunderplus-audio-v1';
-const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false};   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
+const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false, core:'page'};   // core: THUNDER CORE, 'page' or 'core' (beta)   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
   try { const o = JSON.parse(localStorage.getItem(AUK) || '{}'); return Object.assign(d, o && typeof o === 'object' ? o : {}); } catch(e){ return d; } })();
 // Latency: what the person picked, else Balanced in the Mobile setup (phones click at Lowest when busy) and Lowest on desktop.
 // The desktop app starts on Balanced too (owner, 31 Oct: playback stuttered in the desktop app and not in the browser on the
@@ -7588,7 +7589,7 @@ const padSR = () => ctx ? ctx.sampleRate : srGuess;
 // A pad that renders in time with the song re-renders when the tempo changes: synced mod LFOs/sequence, or a Vector wave sequence in note values.
 const padBpm = i => { const v = kit.voices[i]; return voiceSynced(v) || (v && v.engine === 'vector' && v.vector && (v.vector.mode | 0) === 1 && (v.vector.sdiv | 0) > 0) || (isLxV(v) && LxrCore.synced(v)) || (v && (v.engine === 'pwob' || v.engine === 'pwobl') && v.engine && v[v.engine] && v[v.engine].wob_sync !== 0) ? songBpm() : 0; };   // …PUMP WOB: its wobble follows the tempo   // LXR ENGINES: an LFO synced to the tempo
 function stale(i){ const c = slotAt(cache, i); return !c || slotAt(dirty, i) || c.sr !== padSR() || (c.bpm || 0) !== padBpm(i); }
-function install(i, c){ slotAt(padRev, i); padRev[i] = (padRev[i] || 0) + 1; cache[i] = c; dirty[i] = false; bufs[i] = null; }
+function install(i, c){ slotAt(padRev, i); padRev[i] = (padRev[i] || 0) + 1; cache[i] = c; dirty[i] = false; bufs[i] = null; if (typeof coreBuf === 'function') try { coreBuf(i); } catch(e){} }
 function bgRender(i){
   slotAt(pend, i);
   if (pend[i]) return;                     // one at a time: when it lands, dirty[i] decides whether to go again
@@ -12803,6 +12804,9 @@ const updPsLive = makeSeg($('segPsLive'), [['auto', 'Auto'], ['render', 'Rendere
   aset.psLive = v; asetSave(); psLive.off = false; psLive.strikes = 0;
   if (v === 'render'){ try { if (rt && rt.pl) rt.pl.psDrop(); } catch(e){} }
   psLiveNote(); });
+const updCore = makeSeg($('segCore'), [['page', 'Page'], ['core', 'Audio thread β']], () => aset.core === 'core' ? 'core' : 'page', v => {
+  aset.core = v; asetSave();
+  if (v === 'core'){ if (ctx) coreLoad(); toast('Sequencer: audio thread (beta), from the next PLAY.', 3000); } else toast('Sequencer: page, from the next PLAY.', 2500); });
 function psLiveNote(){
   const on = typeof PsynCore !== 'undefined'; $('psLiveRow').hidden = $('psLiveNote').hidden = !on; if (!on) return;
   $('psLiveNote').textContent = aset.psLive === 'render'
@@ -13249,7 +13253,7 @@ const lxp = {mode:(() => { try { return Math.min(2, Math.max(0, Math.round(+loca
 const LX_NAMES = ['OFF', 'WHOLE KEYBOARD', 'KEYS BELOW C-4'];
 function setLxp(m){ lxp.mode = clamp(m | 0, 0, 2); lxp.st = 0; try { localStorage.setItem(LXK, String(lxp.mode)); } catch(e){} }
 const lxpIs = n => lxp.mode === 1 || (lxp.mode === 2 && n < 60);
-function lxpKey(n){ const st = lxp.mode === 1 ? n - 60 : n - 48; if (st !== lxp.st){ lxp.st = st; toast('Live transpose ' + sgn(st) + (tp.on ? '' : ' (the next PLAY)')); } }
+function lxpKey(n){ const st = lxp.mode === 1 ? n - 60 : n - 48; if (st !== lxp.st){ lxp.st = st; try { if (core.ready) corePost({op:'lxp', st}); } catch(e){} toast('Live transpose ' + sgn(st) + (tp.on ? '' : ' (the next PLAY)')); } }
 const SCALES = [['OFF', null], ['MAJOR', [0, 2, 4, 5, 7, 9, 11]], ['MINOR', [0, 2, 3, 5, 7, 8, 10]], ['HARMONIC MINOR', [0, 2, 3, 5, 7, 8, 11]],
   ['MELODIC MINOR', [0, 2, 3, 5, 7, 9, 11]], ['DORIAN', [0, 2, 3, 5, 7, 9, 10]], ['PHRYGIAN', [0, 1, 3, 5, 7, 8, 10]], ['LYDIAN', [0, 2, 4, 6, 7, 9, 11]],
   ['MIXOLYDIAN', [0, 2, 4, 5, 7, 9, 10]], ['LOCRIAN', [0, 1, 3, 5, 6, 8, 10]], ['MAJOR PENTATONIC', [0, 2, 4, 7, 9]], ['MINOR PENTATONIC', [0, 3, 5, 7, 10]],
@@ -16272,7 +16276,7 @@ function placePending(){
 const niOf = Sx => clamp((Sx && Sx.ni) | 0 || 16, 16, NI);
 function niUp(i){ if (S.ni < NI && i >= S.ni){ S.ni = NI; try { toast(`This song now uses ${NI} instruments: INS above 0F plays its own instrument (it played 0F before).`, 5000); } catch(e){} } }
 function niScan(){ if (S.ni >= NI) return; for (const ph of S.phrases) if (ph) for (const r of ph) if (r[IC] >= S.ni) return niUp(r[IC]); }
-function saveS(){ try { markChange(); } catch(e){}   // FILE SAFETY: unsaved changes
+function saveS(){ try { markChange(); } catch(e){} try { coreSong(); } catch(e){}   // FILE SAFETY: unsaved changes
   if (pendPlace) queueMicrotask(placePending); try { niScan(); } catch(e){} snap(); clearTimeout(sT); sT = setTimeout(() => storeWrite(TK, JSON.stringify(songOut(S))), 600);
   try { songVer++; songBeatsSoon(); } catch(e){} }   // the song changed: MIDI song positions are worked out again (just after, with clock on)
 const isEmptySect = c => !c || c.every(r => r[0] < 0);
@@ -16508,7 +16512,7 @@ function tgtEvs(id, v, at, pno){
   return [];
 }
 // Live: send what the performance asks for now, only what changed since the last send (sent).
-function perfPush(){
+function perfPush(){ try { if (tp.core) corePost({op:'perf', xf:perfLive.xf, mac:perfLive.mac, fill:perfLive.fill}); } catch(e){}
   if (!perfLive.init) perfLiveInit();
   const want = perfResolve(perfLive), at = ctx ? ctx.currentTime : 0, evs = [];
   for (const [id, v] of want) if (perfLive.sent.get(id) !== v){ evs.push(...tgtEvs(id, v, at, perfLive.pno)); perfLive.sent.set(id, v); }
@@ -17421,6 +17425,16 @@ function makePlayer(ac, out, getBuf, live){
     if (tvlOv.size || tpnOv.size){ tvlOv.clear(); tpnOv.clear(); if (live) try { applyMix(); } catch(e){} }   // TVL / TPN: the mixer's again
     if (mvol != null){ try { out.gain.cancelScheduledValues(at); out.gain.setValueAtTime(curve(S.master), at); } catch(e){} mvol = null; }
   }
+  // THUNDER CORE: a note the core sounded itself. This player's voices on the track still give way (mono takeover, chokes)
+  // and …pump NOTES FROM still hears it, as if it had played it.
+  function coreTake(ev){
+    if (ev.track < NT && ev.mn != null) pmNotes(ev.track, ev.t, ev);
+    const T = vs[ev.track]; if (!T) return;
+    for (let k = T.length - 1; k >= 0; k--) if (!live1(T[k], ev.t)) T.splice(k, 1);
+    if (!ev.poly){ for (const v of T) kill(v, ev.t, v.syn ? Math.min(relTc(v), 0.05) : 0.004); T.length = 0; }
+    const kv = kit.voices[ev.pad], ck = kv ? kv.choke : 0;
+    if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of vs[k]) if (v.choke === ck) kill(v, ev.t);
+  }
   function stopAll(at){ resetSeq(at); for (const v of alive) kill(v, at); for (const T of vs) T.length = 0; for (const b of bassN.values()) if (b.vox) b.sylN = 0; voxG.clear(); }   // lyrics start over
   function applyMix(filter){
     const at = ac.currentTime;
@@ -17528,7 +17542,7 @@ function makePlayer(ac, out, getBuf, live){
   // dropping them (the safety net: the next notes play the renders)
   const psLoad = () => { let l = 0, n = 0; for (const b of bassN.values()) if (b.ps){ l += b.node.load || 0; n++; } return {load:l, nodes:n}; };
   const psDrop = () => { for (const [k, b] of [...bassN]) if (b.ps) bassDrop(k, b); };
-  return {play, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop};
+  return {play, coreTake, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop};
 }
 
 /* ---------- live playback ---------- */
@@ -17682,6 +17696,7 @@ function rtInit(){
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
     master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
     tfxReady(ctx).then(ok => { rt.fxOk = ok; rtAllFx(); if (!ok && (S.tfx.some(fxCount) || fxCount(S.mfx))) toast('Track effects need a newer browser here.'); });
+    if (aset.core === 'core') setTimeout(() => { try { coreLoad(); } catch(e){} }, 0);
     chainsReady(ctx).then(ok => { rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean)) toast('…chains needs a newer browser here.'); });
   }
   return rt;
@@ -18064,6 +18079,8 @@ function tStart(mode, o){
     tp.q.push({t:t0start, pos:rsFirst.pos, bpm:seq.bpm, tks:rsFirst.tks, line:rsFirst.line});
   }
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
+  tp.core = false;
+  if (aset.core === 'core'){ if (core.ready) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null); else coreLoad(); }
   tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
   bgPlay(true);   // BACKGROUND PLAY
   void r;
@@ -18140,6 +18157,7 @@ function pump(){
 // One pump tick. An error here used to repeat every 25 ms with the screen showing PLAYING over silence; pump() stops.
 function pumpRun(){
   if (!tp.on) return;
+  if (tp.core) return corePump();   // THUNDER CORE: the audio thread steps the song; this tick only books MIDI clock, LFOs, clicks
   audioWake = performance.now();
   if ((view !== 'tracker' || document.hidden) && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open (or the app is hidden: no frames)
   const s = tp.seq; let n = 0;
@@ -18166,6 +18184,79 @@ function padBlink(e){
   const ms = Math.max(0, (e.t - ctx.currentTime + (ctx.outputLatency || ctx.baseLatency || 0)) * 1000);
   setTimeout(() => { if (tp.on && view !== 'tracker' && audible(e.track)) flash(e.pad); }, ms);
 }
+/* ===== THUNDER CORE, LIVE (plan phase 2b; Settings → Audio → Sequencer: Audio thread β) =====
+   The song is stepped on the audio thread (core/seq-core.js: makeSeq, copied out of this file by tools/make-core.mjs) and
+   every rendered pad's note sounds there, on its sample: a busy screen, a render landing or a dialog can't make those late.
+   Each row still comes up here, booked ahead as before, for everything else: live engines, SoundFonts, MUT / GEN, effect and
+   mixer commands, MIDI out, the playhead, REC. A note the core played arrives marked core:true; this player's own voices on
+   that track give way to it (coreTake). The core gets the song again after each edit (coreSong), the pads' renders as they
+   land (install → coreBuf), and the live state it reads (tempo, loop, PERFORM, live transpose).
+   Off (Page), nothing here runs. */
+const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map()};   // tally: events by who played them (test hook)
+function coreLoad(){
+  if (core.loading) return core.loading;
+  if (!ctx || !ctx.audioWorklet || !rt) return Promise.resolve(false);
+  core.loading = ctx.audioWorklet.addModule('core/seq-core.js?v=' + BUILD).then(() => {
+    const n = new AudioWorkletNode(ctx, 'thunder-core', {numberOfInputs:0, numberOfOutputs:NT, outputChannelCount:new Array(NT).fill(2)});
+    n.port.onmessage = e => { try { coreMsg(e.data || {}); } catch(err){ tpLog('core message', err); } };
+    for (let t = 0; t < NT; t++) try { n.connect(rt.pl.buses[t].inp, t); } catch(e){}
+    core.node = n; core.ready = true; core.sent.clear(); coreSyncAll(); return true;
+  }, err => { tpLog('core load', err); core.loading = null; toast('The audio-thread sequencer didn’t load here: playing as before.', 3500); return false; });
+  return core.loading;
+}
+const corePost = (m, tr) => { try { core.node.port.postMessage(m, tr || []); } catch(e){ tpLog('core post', e); } };
+function coreKit(){ const kv = [];
+  for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; let live = false; try { live = isLivePad(i); } catch(e){}
+    kv.push(v ? {choke:v.choke | 0, syn:isSyn(i), rel:isSyn(i) ? relOf(v) : 0, live, sf:v.engine === 'sf'} : null); }
+  corePost({op:'kit', kv}); }
+// A pad's render, when the core doesn't have this one yet (a copy: the page keeps playing it too)
+function coreBuf(i){ if (!core.ready) return; const c = slotAt(cache, i); if (!c || !c.data){ if (core.sent.has(i)){ core.sent.delete(i); corePost({op:'buf', pad:i, data:null}); } return; }
+  if (core.sent.get(i) === c.data) return; core.sent.set(i, c.data); const d = c.data.slice(); corePost({op:'buf', pad:i, data:d, sr:c.sr}, [d.buffer]); }
+function coreSyncAll(){ if (!core.ready) return; corePost({op:'load', S, vars:coreVars()}); coreKit(); for (let i = 0; i < nslots(); i++) coreBuf(i); corePost({op:'lxp', st:lxp.st | 0}); coreLead(); }
+const coreLead = () => { if (core.ready) corePost({op:'lead', s:document.hidden ? 1.2 : 0.25}); };
+document.addEventListener('visibilitychange', coreLead);
+// After an edit: the song again (in place, so the running sequencer reads it), at most every 40 ms
+function coreSong(){ if (!tp.core || core.sT) return; core.sT = setTimeout(() => { core.sT = 0; if (tp.core) corePost({op:'song', S}); }, 40); }
+function coreStart(mode, o, t0, rs){
+  coreSyncAll();
+  if (perfLive.init) corePost({op:'perf', xf:perfLive.xf, mac:perfLive.mac, fill:perfLive.fill});
+  const oo = {}; for (const k of ['row', 'loop', 'once', 'only']) if (o && o[k] != null) oo[k] = o[k];
+  core.gen++; corePost({op:'play', gen:core.gen, mode, o:oo, t0, rs});
+  // tp.seq stands in for the sequencer: the page reads its clock, tempo and ticks, and sets the loop and tempo through it
+  const P = {time:t0, tks:tp.tks, base:null, btT:null, _bpm:tp.bpm, _alive:true, alive(){ return this._alive; }, step(){ return {t:this.time, evs:[], pos:null}; },
+    setLoop(l){ corePost({op:'loop', l:l || null}); } };
+  Object.defineProperty(P, 'bpm', {get(){ return this._bpm; }, set(v){ this._bpm = v; corePost({op:'bpm', v}); }});
+  tp.seq = P; tp.core = true;
+}
+function coreMsg(d){
+  if (d.op === 'error'){ tpLog('core: ' + d.where, new Error(d.message)); return; }
+  if ((d.op !== 'rows' && d.op !== 'end') || !tp.on || !tp.core || d.gen !== core.gen) return;
+  const s = tp.seq;
+  if (d.op === 'end'){ s._alive = false; s.time = d.time; return; }
+  audioWake = performance.now();
+  for (const r of d.rows){
+    for (const e of r.evs){
+      if (e.vk && !e.core) try { varWant(e); } catch(err){}
+      { const k = (e.core ? 'core ' : 'page ') + e.type + (e.type === 'note' && !e.core ? ' pad ' + e.pad : ''); core.tally.set(k, (core.tally.get(k) || 0) + 1); }
+      const midiOnly = moEv(e);
+      if (e.core){ rt.pl.coreTake(e); if (e.type === 'note') padBlink(e); continue; }
+      if (midiOnly) continue;
+      rt.pl.play(e); if (e.type === 'note') padBlink(e);
+    }
+    tp.q.push({t:r.t, pos:r.pos, bpm:r.bpm, tks:r.tks, line:r.line});
+    mx.pend.forEach((P, t) => { if (P && P.length) pendFlush(t, r.t); });
+    if (rec.on) recHist(r);
+  }
+  s.time = d.time; s._bpm = d.bpm; s.tks = d.tks; s.base = d.base; s.btT = d.btT; s._alive = d.alive;
+  corePump();
+}
+// The pump tick while the core plays: what is booked from the song clock rather than from rows
+function corePump(){
+  const s = tp.seq; if (!s) return;
+  if ((view !== 'tracker' || document.hidden) && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);
+  moClock(s); moLfo(s); moRamp(); moEcho(); metRun(s);
+  if (document.hidden && !s.alive() && ctx.currentTime > s.time + 0.3) tStop(true);
+}
 /* PANIC (27 Oct, audit B18): Stop when already stopped (F8 again) lets go of everything still sounding: the voices, and on
    every MIDI port and channel All Sound Off, All Notes Off and the sustain pedal up (a stop only sent All Notes Off on the
    channels the song used). Effect tails ring on; Settings → Audio → Reset audio engine clears those too. */
@@ -18189,6 +18280,7 @@ function tStop(quiet){
     tp.paused = ref >= 0 ? {pos:P, ref, row:P[ref].row, step:P[ref].step, key:curKey()} : null;
   }
   tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null;
+  if (tp.core){ tp.core = false; core.gen++; try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }
   if (rt) rt.pl.stopAll(ctx.currentTime);
   moStop();
   try { metStop(); recEndTake(); clearTimeout(rec.cntT); rec.cnt = 0; recBtn(); } catch(e){}   // REC: clicks booked ahead stop, the take is one undo step
@@ -23122,7 +23214,7 @@ function deckLayout(){
    scene A and B, the 8 macros, and the editors for scenes, macros and this track's locks and LFO. See PERFORM above. */
 let reloadPt = null;
 const perfS = () => perfOf();
-function perfFill(on){ perfLive.fill = !!on; perfDraw(); }
+function perfFill(on){ perfLive.fill = !!on; try { if (tp.core) corePost({op:'perf', fill:perfLive.fill}); } catch(e){} perfDraw(); }
 function perfSetXf(v){ if (!perfLive.init) perfLiveInit(); perfLive.xf = clamp(Math.round(v), 0, 255); perfPush(); perfDraw(); }
 function perfSetMac(i, v){ if (!perfLive.init) perfLiveInit(); perfLive.mac[i] = clamp(Math.round(v), 0, 255); perfPush(); perfDraw(); }
 // The song in place, as Undo does (the running sequencer keeps the same S object), as one undoable step.
@@ -27219,6 +27311,15 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
       return await got;
     } finally { ac.close().catch(() => {}); }
   },
+  // THUNDER CORE live (phase 2b): switch the sequencer, and read the core's own timing counters (notes it booked, how many
+  // late, the worst, the smallest lead) since the last call.
+  async coreOn(on){ aset.core = on ? 'core' : 'page'; rtInit(); if (on){ const ok = await coreLoad(); return !!ok; } return true; },
+  coreStats(){ return new Promise(ok => { if (!core.ready) return ok(null); const f = e => { if (e.data && e.data.op === 'stats'){ core.node.port.removeEventListener('message', f); ok(e.data); } };
+    core.node.port.addEventListener('message', f); corePost({op:'stats', id:1}); setTimeout(() => ok(null), 1000); }).then(r => { if (r) r.tally = Object.fromEntries(core.tally); core.tally.clear(); return r; }); },
+  // The master's level (RMS) every 25 ms for `ms` from PLAY (for comparing the two sequencers' sound).
+  async envelope(ms){ tStart('song', {row:0}); const a = ctx.createAnalyser(); a.fftSize = 1024; master.connect(a); const buf = new Float32Array(1024), out = [];
+    const t0 = performance.now(); while (performance.now() - t0 < ms){ a.getFloatTimeDomainData(buf); let s = 0; for (const x of buf) s += x * x; out.push(Math.sqrt(s / buf.length)); await new Promise(r => setTimeout(r, 25)); }
+    tStop(true); try { master.disconnect(a); } catch(e){} return out; },
   // The engine list's groups (for category checks).
   engines(){ return ENGINE_GROUPS.map(([g, es]) => g + ': ' + es.map(e => e[1]).join(', ')); },
   // The FX picker's list for track t (or the master: t = NT), with groups (for picker checks).
