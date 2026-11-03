@@ -15084,6 +15084,18 @@ const fxtL = (t = cFxT) => pumpAllowed(t) ? FXT_LIST : FXT_LIST.filter(k => !isP
 const fxtOk = (t, k) => !!TFX[k] && (!isPumpT(k) || pumpAllowed(t) || pumpAnyTrack(k));
 const FXSLOTS = 8;
 function freshTfx(type){ if (TFX[type].pump) return pumpFresh(TFX[type].pump); const f = {type, on:true}; for (const p of TFX[type].ps) f[p.k] = p.d; return f; }
+/* SLOT MEMORY (owner, 2 Nov: "I accidentally changed my eq and when I brought it back it needed to be set again"): a slot
+   remembers the settings of each effect it has held in this session, so switching its effect away and back (stepping
+   through the list, the picker) brings the old settings back. INIT in › PRESET still resets on purpose. Kept per track and
+   slot, in memory only (not in the song file); a fresh effect when the slot never held that one. */
+const fxMem = new Map();
+function fxSwap(t, k, A, type){
+  const had = A[k]; if (had && had.type === type) return had;
+  if (had) try { fxMem.set(t + ':' + k + ':' + had.type, JSON.parse(JSON.stringify(had))); } catch(e){}
+  const m = type ? fxMem.get(t + ':' + k + ':' + type) : null;
+  A[k] = type ? (m ? JSON.parse(JSON.stringify(m)) : freshTfx(type)) : null;
+  return A[k];
+}
 function normTfx(o){
   if (!o || typeof o !== 'object' || !TFX[o.type]) return null;
   if (TFX[o.type].pump) return pumpNorm1(o);
@@ -19598,7 +19610,7 @@ function fxRows(){
   const FL = fxtL(t);   // …PUMP: the pump effects only on a bus or the master (a slot that has one shows it anyway)
   const FLk = k => A[k] && !FL.includes(A[k].type) ? FL.concat([A[k].type]) : FL;
   for (let k = 0; k < FXSLOTS; k++) rows.push({l:(A[k] ? (open && k === cFxS ? '▪ ' : '› ') : '') + 'SLOT ' + (k + 1), gap:k === 0, get:() => A[k] ? FLk(k).indexOf(A[k].type) + 1 : 0,
-    set:v => { const L = FLk(k); A[k] = v ? freshTfx(L[v - 1]) : null; if (v) lastFxType = L[v - 1]; cFxS = k; fxChanged(t); }, min:0, max:FLk(k).length, big:1, d:0,
+    set:v => { const L = FLk(k); fxSwap(t, k, A, v ? L[v - 1] : null); if (v) lastFxType = L[v - 1]; cFxS = k; fxChanged(t); }, min:0, max:FLk(k).length, big:1, d:0,
     fmt:v => v ? (n => n.padEnd(Math.max(5, n.length + 1)))(TFX[FLk(k)[v - 1]].n) + (A[k] && !A[k].on ? 'OFF  ' : '') + fxNameOf(FLk(k)[v - 1]) : '---',
     tap:() => { cFxS = k; fxsOpen(k); },
     info:v => v ? `Slot ${k + 1} runs ${TFX[FLk(k)[v - 1]].long}. EDIT lists the effects, EDIT+arrows steps through them, ▶ opens its controls, OPTION+EDIT removes it` : `Empty. EDIT lists the effects to pick one; EDIT+arrows steps through them. Slots run top to bottom`});
@@ -20005,12 +20017,13 @@ function fxpChoose(k = fxp.i){
   setCell('phrase', x, y, f); after('fxc', 'phrase', x, y, f);
   toast(FXC[f] + ': ' + (FXB[FXC[f]] || ''));
 }
-// Picking the slot's own effect keeps its settings; another one starts fresh. Either way its controls open.
+// Picking the slot's own effect keeps its settings; another one starts fresh, or with the settings it had in this slot
+// before (SLOT MEMORY). Either way its controls open.
 function fxsChoose(s, k){
   fxpClose(); const t = cFxT, A = t >= NT ? S.mfx : S.tfx[t], had = A[s];
-  if (!k){ A[s] = null; cFxS = s; cs.fx.y = s + 1; fxChanged(t); saveS(); draw(); if (had) toast(`Slot ${s + 1} emptied.`); return; }
+  if (!k){ fxSwap(t, s, A, null); cFxS = s; cs.fx.y = s + 1; fxChanged(t); saveS(); draw(); if (had) toast(`Slot ${s + 1} emptied.`); return; }
   const type = (fxp.types && fxp.types[k]) || fxtL(t)[k - 1];
-  if (!had || had.type !== type){ A[s] = freshTfx(type); fxChanged(t); saveS(); toast(`Slot ${s + 1}: ${TFX[type].long}` + (isPumpT(type) && t < NT ? pumpBusNote(type) : '')); }
+  if (!had || had.type !== type){ fxSwap(t, s, A, type); fxChanged(t); saveS(); toast(`Slot ${s + 1}: ${TFX[type].long}` + (isPumpT(type) && t < NT ? pumpBusNote(type) : '')); }
   lastFxType = type; cFxS = s; cs.fx.y = FXSLOTS + 1; draw();
 }
 // The pad's buttons while the list is open. Returns true when it used the press.
