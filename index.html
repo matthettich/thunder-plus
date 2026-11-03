@@ -80,9 +80,7 @@ body.edoff #tGrid{box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--rec, #d030
    little, and the PHRASE tab and the tag both say EDIT OFF; other screens show the tag only. */
 body.edoff.tvph .tscr .tgrid span.cur{background:transparent !important; color:inherit !important; outline:2px dashed var(--rec, #d0302a) !important; outline-offset:-2px}
 body.edoff.tvph .tscr .tgrid{opacity:.72}
-body.edoff.tvph .ttabs button.on::after{content:' · EDIT OFF'; color:var(--rec, #d0302a); font-weight:700}
-body.edoff #tScr > .thd, body.edoff #tScr .thd{padding-right:118px}   /* the tag sat on the header's right-aligned subtitle (FX: NO EFFECTS) */
-body.edoff #tScr{position:relative} body.edoff #tScr::after{content:'EDIT OFF · Esc'; position:absolute; top:4px; right:10px; z-index:5; font:600 11px var(--mono, monospace); letter-spacing:.06em; padding:2px 6px; background:var(--rec, #d0302a); color:#fff; pointer-events:none}
+/* (3 Nov, owner: the EDIT OFF words went: the logo's orange ring says it; the tab's · EDIT OFF and the corner tag are gone) */
 .rprog .askbox{min-width:min(360px, 86vw)} .rpbar{height:14px; border:1px solid var(--line); margin:12px 0 6px; background:var(--panel2, transparent)} .rpbar i{display:block; height:100%; width:0; background:var(--ink); transition:width .15s linear} .rppct{font-variant-numeric:tabular-nums; font-size:var(--fs-3); text-align:right; margin-left:auto} .rprow{display:flex; align-items:center; gap:10px}
 #bFile, #bEdit, #bView, #bAud, .top #bSet{min-height:34px; padding:0 12px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; border:1px solid var(--line); background:var(--panel); white-space:nowrap}
 #bFile:hover, #bEdit:hover, #bView:hover, #bAud:hover, .top #bSet:hover{border-color:var(--ink)}
@@ -370,11 +368,11 @@ input[type=range]{width:100%; accent-color:var(--ink); height:30px; margin:0; to
 /* top bar, like the Seeds title bar */
 .top{display:flex; align-items:center; gap:10px; padding-block:9px; padding-inline:16px; border-bottom:1px solid var(--line); flex:none; flex-wrap:wrap; background:var(--bench)}
 .brand{font-weight:600; font-size:22px; letter-spacing:.01em; white-space:nowrap; margin-right:6px}
-/* EDIT LOGO (3 Nov): on the tracker, edit mode makes the logo a red chip (the REC red; the …plus keeps its colour); a click switches */
-body.trv .top .brand{cursor:pointer; padding:0 6px; margin-left:-6px; transition:background-color .12s, color .12s}
-body.trv.edon .top .brand{background:var(--rec, #d0302a) !important; color:#fff !important}
-body.trv.edon .top .brand .plus{color:#fff !important; opacity:.8}
-:root[data-skin="nord"] body.trv.edon .top .brand{background:#1b1b1b !important}
+/* EDIT LOGO (3 Nov): on the tracker, EDIT OFF rings the logo in orange (edit mode: the logo as normal); a click switches */
+body.trv .top .brand{cursor:pointer; padding:0 6px; margin-left:-6px; border-radius:2px; transition:box-shadow .12s}
+/* (owner, 3 Nov, second pass: "when Esc is off, it's surrounded by orange, but on it's normal") EDIT OFF: an orange ring */
+body.trv.edoff .top .brand{box-shadow:0 0 0 2px #ff5a1f, inset 0 0 0 1px #ff5a1f}
+:root[data-skin="nord"] body.trv.edoff .top .brand{box-shadow:0 0 0 2px #ffb400, inset 0 0 0 1px #ffb400}
 .brand .plus{position:relative; z-index:1; display:inline-block; margin-left:3px; font-weight:700; color:var(--wv);
   -webkit-text-stroke:.05em #111; paint-order:stroke fill}
 body.mob .brand .plus, body.nowv .wvEdit{display:none !important}
@@ -3119,7 +3117,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p><b>…chains modules:</b> every effect module in a …chains patch has a <b>BYP</b> button on its title bar with a number: it bypasses the module (its dry sound passes). From a phrase, <code>BYP 31</code> bypasses module 3 on that track's chain, <code>BYP 30</code> puts it back, and <code>BYP 34</code> switches it the other way from the patch for four rows, so a trance gate left bypassed plays for four rows. <code>BYP 0Y</code> does every numbered module. Stopping the song puts them back as the patch has them.</p>
 <p><b>Presets and sidechains in …chains:</b> effects and sound sources have a <b>Preset</b> row: factory presets, Default, and your own (Save as a preset keeps them on this device, for every patch). Every sidechain user has a <b>Source</b>: <b>Self</b>, <b>Send 1–8</b> (what a <b>Sidechain Out</b> in any chain sends) or one <b>track</b>'s own sound, before its effects and fader, so a muted ghost kick still drives it. That goes for <b>Sidechain In</b> (its meter shows what it hears before you patch it), Sidechain Comp, the compressors, the noise gate and the envelope filter, in …chains and as track or master effects. The Mixer's <b>SC</b> row lights when a track is a source for something. The light beside a module's <b>SC</b> input flashes with the sidechain it hears.</p>
 <h3>Flex, Step gate and Retrigger</h3>
-<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (256 patterns; <code>FLX</code> picks one from a row: 01–10 the originals, then families by the first hex digit, after the OP-Z and Pocket Operator punch-ins: 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops and wow, 8 scratches, 9 gates and pumps, A filter sweeps, B bit crush, C fading repeats, D juggles, E swing and feel, F chaos). <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT</code> picks. <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot. Pattern names give note values: <i>ROLL 1/16</i> rolls sixteenth notes, <i>STUTTER 1/32 EVERY 1/4</i> repeats a 32nd at the start of every quarter. <b>STARTS</b> on a Flex or Step gate: <b>ON FLX</b> / <b>ON GAT</b> (new slots) keeps it off (Step gate: open) until a command turns it on in the song, or <code>FXO</code> switches its slot on (then it plays its own PATTERN); it stays on until <code>FLX 00</code> (or FXO off), and waits again after STOP. Starting mid-song, the last command before that row is played at the start. <b>AT PLAY</b> (slots from songs made before 3 Nov) plays its PATTERN from PLAY, as before. Retrigger's MODE: RTG ONLY works the same way. In the FX bar, each of these slots draws the pattern it plays now with a playhead: Flex as a time map (where in the bar it plays from: repeats are saw teeth, reverses fall, half speed is a shallower line), its level along the bottom and its filter or crush; Step gate its steps; Retrigger its repeats.</p>
+<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (256 patterns; <code>FLX</code> picks one from a row: 01–10 the originals, then families by the first hex digit, after the OP-Z and Pocket Operator punch-ins: 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops and wow, 8 scratches, 9 gates and pumps, A filter sweeps, B bit crush, C fading repeats, D juggles, E swing and feel, F chaos). <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT 01</code>–<code>0F</code> pick a pattern, <code>GAT 10</code> the CUSTOM steps, and <code>GAT 00</code> stops it (the gate opens until the next GAT). <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot. Pattern names give note values: <i>ROLL 1/16</i> rolls sixteenth notes, <i>STUTTER 1/32 EVERY 1/4</i> repeats a 32nd at the start of every quarter. <b>STARTS</b> on a Flex or Step gate: <b>ON FLX</b> / <b>ON GAT</b> (new slots) keeps it off (Step gate: open) until a command turns it on in the song, or <code>FXO</code> switches its slot on (then it plays its own PATTERN); it stays on until <code>FLX 00</code> (or FXO off), and waits again after STOP. Starting mid-song, the last command before that row is played at the start. <b>AT PLAY</b> (slots from songs made before 3 Nov) plays its PATTERN from PLAY, as before. Retrigger's MODE: RTG ONLY works the same way. In the FX bar, each of these slots draws the pattern it plays now with a playhead: Flex as a time map (where in the bar it plays from: repeats are saw teeth, reverses fall, half speed is a shallower line), its level along the bottom and its filter or crush; Step gate its steps; Retrigger its repeats.</p>
 <h3>Track effects</h3>
 <p>Each track and the master have 8 effect slots (FX screen, or the Mixer’s FX row): 72 effects on a track and 81 on a bus or the master (with the nine …pump ones; …pump EQ goes on any track), in groups: dynamics and EQ (compressors, Bus and Glue Comp, limiter, noise gate, transient shaper, multiband, air), filters (filter, ladder, low and high cut, auto-wah, vowel, envelope filter), drive and lo-fi (saturation, drive, overdrive, tube, tape, wavefolder, bitcrush, lo-fi, degrade, vinyl, dub tape, cab), modulation (chorus, ensemble, dimension, flanger, phaser, tremolo, auto-pan, rotary, ring mod, cross-mod, frequency shifter), delays (simple, tape, BBD, pitch, granular, reverse echo), reverbs (room, plate, spring, space, Galactic, pitch reverb, convolution), pitch and voice (pitch shifter, harmonizer, pitch correct), resonators (resonator, comb, Rings), spectral and granular (Clouds, Beads, spectral, extreme stretch), rhythmic (Flex, Step gate, Retrigger, trance gate, pump, Beat grains, Beat scramble, Glitch sequencer) and utility (stereo width, utility). The pad's Add effect menu has 65 of them. On the Mixer’s FX row, OPTION (Ctrl/⌘ in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter. For drums and IDM: <b>Beat grains</b> (a rhythmic grain cloud in time with the song, after Output Portal: rate, density, size, position, spray, pitch and random pitch, reverse, shape, stereo, freeze), <b>Beat scramble</b> (re-orders the last bar's slices, some reversed; keep the beats, new every bar or looped) and <b>Glitch sequencer</b> (each step may stutter, reverse, jump an octave, tape-stop, crush or drop out). Under a slot's controls, <b>› PRESET</b> lists INIT, factory presets (over 230 across the effects) and the song's own, and <b>› SAVE AS PRESET…</b> keeps the slot's settings for that effect. <b>› EQ WINDOW</b> (at the bottom of the FX screen, on any track) opens the track's …pump EQ in its own window, adding one to a free slot if needed; …pump EQ works on every track, the other …pump effects on buses and the master.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
@@ -14945,7 +14943,7 @@ const FXI = {
   BYP:v => { const X = v >> 4, Y = v & 15, w = X ? `…chains module ${hx(X).slice(1)}` : 'every numbered …chains module';
     return (Y === 0 ? `Put ${w} back in` : Y === 1 ? `Bypass ${w} (its dry sound passes)` : `Switch ${w} the other way from the patch for ${Y} rows, then back`) + ' on this track'; },
   FLX:v => { const k = flxCap(v); return `Flex pattern ${hx(k)}: ${FlexCore.NAMES[k]}${k !== v ? ' (this song keeps FLX 11–FF as pattern 10: Project → FLX 11–FF)' : ''} (on this track's Flex effect; in the MST column, the master's)`; },
-  GAT:v => `Step gate pattern ${Math.min(15, v)}: ${StepGateCore.NAMES[Math.min(15, v)]}`,
+  GAT:v => v === 0 ? 'Step gate off: the gate opens until the next GAT' : v >= 16 ? 'Step gate: the slot’s CUSTOM steps (STEPS 1-8, 9-16)' : `Step gate pattern ${v}: ${StepGateCore.NAMES[v]}`,
   RTG:v => { const X = v >> 4, Y = v & 15; return !X ? 'Retrigger off' : `Retrigger every ${RetrigCore.NAMES[Math.min(8, X) - 1]}` + (Y ? ` for ${Y} rows` : ' until RTG 00') + ' (X: 1 = 1/4 … 5 = 1/64, 6–8 triplets)'; },
   WOB:v => v ? `Bass wobble ${BASS_DIVN[Math.min(BASS_DIV.length, v) - 1]} from here on (01 = 4 bars … 0D = 1/32)` : 'WOB 00: back to the bass voice’s own wobble rate',
   PGM:v => `MIDI program change to ${Math.min(127, v)} (00–7F; most gear shows it as ${Math.min(127, v) + 1}), sent just before this row’s note`,
@@ -15211,7 +15209,8 @@ class StepGateCore {
   static get NAMES(){ return ['CUSTOM', 'EVERY STEP', '8THS', 'OFFBEATS', '3-3-2', 'GALLOP', 'BROKEN', 'TRIPLE', 'QUARTERS', 'OFF 8THS', 'SYNCOPATE', 'HALF ON', 'FIRST HALF', 'DENSE', 'PAIRS', 'TRESILLO']; }
   static mask(s){ let m = 0; for (let j = 0; j < 16; j++) if (s[j] === 'x') m |= 1 << (15 - j); return m; }
   process(L, R, n, dp, tr){
-    const bp = tr && tr.bp, wait = dp.wait && !(tr && (tr.gat >= 0 || tr.sw > 0.5)), live = !wait && !!(bp && bp.length > 1), pi = tr && tr.gat >= 0 ? Math.min(15, Math.round(tr.gat)) : dp.pat | 0;   // wait: STARTS ON GAT, open until a GAT (or FXO on)
+    // tr.gat: −1 the slot's own (PATTERN, or waiting with STARTS ON GAT), 0 GAT 00 (off: the gate opens), 1–15 a pattern, 16 CUSTOM
+    const g = tr && tr.gat >= 0 ? Math.round(tr.gat) : -1, bp = tr && tr.bp, wait = g === 0 || (g < 0 && dp.wait && !(tr && tr.sw > 0.5)), live = !wait && !!(bp && bp.length > 1), pi = g > 0 ? (g >= 16 ? 0 : g) : dp.pat | 0;
     const mask = pi === 0 ? ((dp.m1 & 255) << 8) | (dp.m2 & 255) : StepGateCore.mask(StepGateCore.PATS[pi]);
     const sb = [0.5, 0.25, 0.125, 1 / 6, 1 / 3][dp.div | 0] || 0.25, len = dp.len, lo = 1 - dp.depth, tc = 1 - Math.exp(-1 / (this.sr * Math.max(0.0003, dp.smooth / 1000)));
     for (let i = 0; i < n; i++){
@@ -16691,7 +16690,7 @@ function normMst(j){
 function freshSong(){
   // MPC swing: the classic hardware's shuffle, applied on 8th, 16th or dotted-8th grid.
   // Voice-per-track parity: one synth voice per song track — ntr tracks need ntr + 8 pads, capped at 32.
-  return {app:'thunder-song', v:6, flx256:true, name:'Song 1', bpm:120, swing:50, swingB:2, limiter:true, renderFrom:0, master:255, mout:255, chainPatch:null,
+  return {app:'thunder-song', v:6, flx256:true, gat00:true, name:'Song 1', bpm:120, swing:50, swingB:2, limiter:true, renderFrom:0, master:255, mout:255, chainPatch:null,
     song:Array.from({length:256}, () => new Array(NT + 1).fill(-1)), chains:new Array(NPH).fill(null), phrases:new Array(NPH).fill(null),
     insts:Array.from({length:NI}, (_, i) => freshInst(i)), mix:Array.from({length:NT}, freshMix),
     tfx:Array.from({length:NT}, freshChainFx), mfx:mstPumpFresh(), mstPump:true, chainOn:new Array(NT).fill(false), lpb:8, ticks:TICKS, dlen:16, plen:new Array(NPH).fill(16), plpb:new Array(NPH).fill(0),
@@ -16851,6 +16850,12 @@ function normSong(j){
     for (const ph of S.phrases) if (ph) for (const r of ph) for (let m = FX0; m < RW; m += 2) if (r[m] === FI && r[m + 1] > 16){ r[m + 1] = 16; n++; }
     if (n) setTimeout(() => { try { toastOnce('flx-' + (S.name || ''), `${n} FLX above 10 are now written FLX 10, the pattern they have always played (FLX 11–FF are the new Flex patterns).`, 6000); } catch(e){} }, 1500); }
   S.flx256 = true;
+  // GAT 00 STOPS (owner, 3 Nov: "make gat 00 stop gat"): GAT 00 used to be the slot's CUSTOM steps; it now opens the gate
+  // (off) until the next GAT, and CUSTOM is GAT 10. An older song's GAT 00 cells become GAT 10, so they sound as they did.
+  if (!j.gat00){ const GI = FXC.indexOf('GAT'); let n = 0;
+    for (const ph of S.phrases) if (ph) for (const r of ph) for (let m = FX0; m < RW; m += 2) if (r[m] === GI && r[m + 1] === 0){ r[m + 1] = 16; n++; }
+    if (n) setTimeout(() => { try { toastOnce('gat-' + (S.name || ''), `${n} GAT 00 are now written GAT 10 (the slot's custom steps): GAT 00 now stops the step gate.`, 6000); } catch(e){} }, 1700); }
+  S.gat00 = true;
   return S;
 }
 // FLX value → pattern: an old song (S.flxOld) keeps 11–FF on pattern 10
@@ -17427,7 +17432,7 @@ function makeSeq(S, mode, o){
       const slotWake = (cmd, on) => { if (!on) return; const A = t >= MT ? S.mfx : S.tfx[t], ty = FX_NEEDS[cmd];
         (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at, track:t, p:'sw' + k, v:-1}); }); };
       if (fx.FLX != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:flxCap(fx.FLX)}); slotWake('FLX', fx.FLX > 0); }
-      if (fx.GAT != null){ evs.push({type:'fxc', t:at, track:t, p:'gat', v:Math.min(15, fx.GAT)}); slotWake('GAT', true); }
+      if (fx.GAT != null){ evs.push({type:'fxc', t:at, track:t, p:'gat', v:fx.GAT === 0 ? 0 : fx.GAT >= 16 ? 16 : fx.GAT}); slotWake('GAT', fx.GAT !== 0); }   // GAT 00 stops it, 10 and up: the CUSTOM steps
       if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', X > 0);
         if (X && Y) evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); }
       if (t === MT && fx.VOL != null) evs.push({type:'mvol', t:at, v:fx.VOL});
@@ -18999,7 +19004,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '1nzhzsn';
+const CORE_REV = 'prmbc1';
 const CORE_WANT = 6;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -20231,7 +20236,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 377;
+const BUILD = 378;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25080,8 +25085,8 @@ function dkFxPatState(f, k, t, at){
   if (f.type === 'flex'){ const c = fxcNow(t, 'flx', at), wait = c < 0 && !!f.wait && !(sw > 0.5);
     const p = c >= 0 ? Math.min(255, Math.round(c)) : wait ? 0 : f.pat | 0;
     return {on, wait, src:c >= 0 ? 'FLX' : wait ? 'WAITS FOR FLX' : 'PATTERN', p, name:'FLX ' + hx(p) + ' · ' + (FlexCore.NAMES[p] || '?')}; }
-  if (f.type === 'sgate'){ const c = fxcNow(t, 'gat', at), wait = c < 0 && !!f.wait && !(sw > 0.5), p = c >= 0 ? Math.min(15, Math.round(c)) : f.pat | 0;
-    return {on, wait, src:c >= 0 ? 'GAT' : wait ? 'WAITS FOR GAT' : 'PATTERN', p, name:wait ? 'OPEN' : 'GAT ' + hx(p) + ' · ' + StepGateCore.NAMES[p]}; }
+  if (f.type === 'sgate'){ const c = fxcNow(t, 'gat', at), g = c >= 0 ? Math.round(c) : -1, wait = g === 0 || (g < 0 && !!f.wait && !(sw > 0.5)), p = g > 0 ? (g >= 16 ? 0 : g) : f.pat | 0;
+    return {on, wait, src:g === 0 ? 'GAT 00' : c >= 0 ? 'GAT' : wait ? 'WAITS FOR GAT' : 'PATTERN', p, name:wait ? 'OPEN' : (g >= 16 ? 'GAT 10' : 'GAT ' + hx(p)) + ' · ' + StepGateCore.NAMES[p]}; }
   if (f.type === 'retrig'){ const c = fxcNow(t, 'rtg', at), eng = c > 0.5 ? true : c > -0.5 ? false : (f.mode | 0) === 1, di = c > 0.5 ? Math.min(7, Math.round(c) - 1) : Math.min(7, f.div | 0);
     return {on, wait:!eng, src:c >= 0 ? 'RTG' : eng ? 'ALWAYS' : 'WAITS FOR RTG', p:eng ? di + 1 : 0, di, name:eng ? 'REPEATING ' + RetrigCore.NAMES[di] : 'OFF'}; }
   return null;
@@ -27263,8 +27268,8 @@ function down1(){ const c = cs[tv], d = dims(tv); c.y = clamp(c.y + (GRIDV.has(t
 let editOn = true;
 /* EDIT LOGO (owner, 3 Nov: "when we are in edit mode, can we change the Thunder Plus logo color? Can we make clicking the
    logo the quick way to toggle back and forth between note entry / edit mode and edit off?"). On the tracker the logo is
-   a red chip while typing writes into the phrase (edit mode, Esc's other state) and plain with EDIT OFF; a click on it
-   switches, as Esc does. */
+   as normal while typing writes into the phrase and ringed in orange with EDIT OFF (the owner's second pass; the EDIT OFF
+   words went); a click on it switches, as Esc does. */
 function brandTitle(){ const b = document.querySelector('.top .brand'); if (b) b.title = (editOn ? 'Edit mode on: typing writes into the phrase' : 'Edit off: the note keys only play') + ' · click (or Esc) to switch'; }
 document.body.classList.add('edon');
 { const b = document.querySelector('.top .brand');
@@ -27940,6 +27945,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [378, '3 Nov', ['GAT 00 stops the step gate (it opens until the next GAT); the slot’s CUSTOM steps are GAT 10. Older songs’ GAT 00 are rewritten GAT 10, so they sound as before.', 'EDIT OFF: the Thunder Plus logo gets an orange ring (in edit mode it looks as normal); the EDIT OFF words on the tab and the corner are gone. Click the logo (or Esc) to switch.']],
   [377, '3 Nov', ['FLX fixed: FLX 41–FF all played REVERSE (pattern 40) on the Page sequencer, the first PLAY, starting mid-song and in every render; now each plays its own pattern. The pattern names give note values (ROLL 1/16, not 1/4); GATE 1/32, 1/8T and 1/16T gate at the rate they name.', 'Flex, Step gate and Retrigger draw what they are playing in the FX bar: the pattern’s number and name, its shape over a bar and a playhead.', 'Flex and Step gate have STARTS: ON FLX / ON GAT (new slots) waits, letting the sound through, until an FLX or GAT turns it on (FLX 00 turns it off, STOP waits again); AT PLAY plays the slot’s pattern from PLAY, as songs made before this keep doing.']],
   [376, '3 Nov', ['Stopping the song puts the edit cursor where it stopped, ready to edit (Settings → STOP CURSOR: THERE or STAYS); Alt+G puts the cursor on the playhead at any time.', 'The Thunder Plus logo shows edit mode on the tracker (a red chip) and a click on it switches edit mode, as Esc does.', 'The first notes of live synth pads (poly ones too) play on the first PLAY.', 'FX bar: folded FX is grey and hatched with its tab at the left; a track with no effects says so. Dragging the panel no longer redraws the whole screen on every pixel.', 'Skins: title bars and the bottom panel heads take each skin’s own colours (no more pale bars in 909, IDM and the rest). Block colours: 12 colours in every skin, shown on empty and OFF-only blocks too.', 'The mouse wheel over a scroll bar scrolls that bar.']],
   [375, '3 Nov', ['Song: Ctrl/⌘+Shift+Backspace removes the whole song row (every track and the master, or the selected rows), the pair of Ctrl/⌘+Shift+Enter. Ctrl/⌘+Backspace still removes the row in the cursor’s column only.']],

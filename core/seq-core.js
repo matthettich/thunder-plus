@@ -359,7 +359,7 @@ function makeSeq(S, mode, o){
       const slotWake = (cmd, on) => { if (!on) return; const A = t >= MT ? S.mfx : S.tfx[t], ty = FX_NEEDS[cmd];
         (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at, track:t, p:'sw' + k, v:-1}); }); };
       if (fx.FLX != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:flxCap(fx.FLX)}); slotWake('FLX', fx.FLX > 0); }
-      if (fx.GAT != null){ evs.push({type:'fxc', t:at, track:t, p:'gat', v:Math.min(15, fx.GAT)}); slotWake('GAT', true); }
+      if (fx.GAT != null){ evs.push({type:'fxc', t:at, track:t, p:'gat', v:fx.GAT === 0 ? 0 : fx.GAT >= 16 ? 16 : fx.GAT}); slotWake('GAT', fx.GAT !== 0); }   // GAT 00 stops it, 10 and up: the CUSTOM steps
       if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', X > 0);
         if (X && Y) evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); }
       if (t === MT && fx.VOL != null) evs.push({type:'mvol', t:at, v:fx.VOL});
