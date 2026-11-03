@@ -119,6 +119,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (17): FX bar animations (build 390)
+
+- Owner: animations like the springs for effects without a good display. `fxAnimKind(f)` picks one (dynamics, EQ / filters,
+  delays, the pattern effects, utilities: none): room (Reverbs), grains (Spectral and granular, pGRAN), steps (crush,
+  degrade, lofi, vsamp, pCRSH), vinyl, clip (the rest of Drive and lo-fi), strings (Resonators), bands (pVOX, vowel), swirl
+  (pSWRL, rotary, dimension, ensemble). The column gets the springs' `canvas.fspr` with `col._spr.kind`; `dkAnim` draws it
+  (~30 fps from deckFxBarMeters), kicked by the slot level, dying over a decay / time / size / feedback value; values read
+  through `dkFxVal` regexes (size, density, drive, bits, rate…). Particles capped (140 room, 90 grains).
+
 ## 3 Nov (16): side panel cards, instrument flashes, Acid instrument audition (build 389)
 
 - **Side panel** (`.tside`): the status + meters (`.tcard.tcst`: `#tState` / `#tBpm` on a dark bar) and INST LIST
