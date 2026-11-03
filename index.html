@@ -10132,7 +10132,7 @@ function varWant(ev){
   const key = varKey(ev); if (VAR.map.has(key) || VAR.pend.has(key)) return;
   const v = varVoice(ev); if (!v) return;
   const sr = padSR(); VAR.pend.add(key);
-  const done = data => { VAR.pend.delete(key); if (data) varPut(key, {sr, data:varLevel(ev, data)}); };
+  const done = data => { VAR.pend.delete(key); if (data){ const rec = {sr, data:varLevel(ev, data)}; varPut(key, rec); coreVar(ev, rec); } };
   if (PW.ready && rwCan(v)) renderAsync(v, sr, isSyn(ev.pad) ? v.len : 0, false).then(r => done(r && r.data), () => done(null));
   else setTimeout(() => { try { done(renderVoice(v, sr, null, isSyn(ev.pad) ? v.len : 0)); } catch(e){ done(null); } }, 0);
 }
@@ -18815,7 +18815,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'c3xp3x';
+const CORE_REV = 'ejcd8s';
 const CORE_WANT = 5;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -18859,16 +18859,23 @@ function coreMixOff(){ const M = core.mix; if (!M) return; core.mix = null;
   const pl = rt && rt.pl; if (pl) for (const k of M.on) if (k[0] === 'g'){ const b = pl.buses[+k.slice(1)]; if (b) try { b.cg.gain.cancelScheduledValues(0); b.cg.gain.value = 1; } catch(e){} } }
 // Reset audio engine: this core goes (it played into the old graph) and a fresh one loads
 function coreDrop(){ coreMixOff(); const n = core.node; if (n){ try { n.port.postMessage({op:'die'}); n.port.onmessage = null; n.disconnect(); } catch(e){} }
-  Object.assign(core, {node:null, ready:false, loading:null, mir:null, wired:null, v:0}); core.sent.clear(); }
+  Object.assign(core, {node:null, ready:false, loading:null, mir:null, wired:null, v:0, vsent:null}); core.sent.clear(); }
 const corePost = (m, tr) => { try { core.node.port.postMessage(m, tr || []); } catch(e){ tpLog('core post', e); } };
 function coreKit(){ const kv = [];
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; let live = false; try { live = isLivePad(i); } catch(e){}
     let lk = null; if (live && v){ const vx = isVoxV(v), lx = liveX(v), ps = isPsV(v); lk = {kind:vx ? 'vox' : lx ? v.engine : 'bass', vox:vx, ps, vel:ps ? (xParams(v).vel || 100) : 0}; }   // LIVE ENGINES: the node the core drives
     kv.push(v ? {choke:v.choke | 0, syn:isSyn(i), rel:isSyn(i) ? relOf(v) : 0, live, lk, sf:v.engine === 'sf'} : null); }
   corePost({op:'kit', kv}); }
+// The core dropped its variations (of pad i, or all of them: an instrument changed): send them again when asked
+function coreVarGone(i){ const V = core.vsent; if (!V) return; if (i == null){ V.clear(); return; } for (const k of [...V.keys()]) if (k.endsWith(':' + i)) V.delete(k); }
+const coreOps = ops => { if (ops.some(o => o[0] === 'insts')) coreVarGone(null); return ops; };
+// MUT / GEN: a variation for the core (by instrument, variation and pad: the core can't work out the page's varKey), once
+function coreVar(ev, rec){ if (!core.ready || !rec || !rec.data || ev.ii == null || ev.pad == null) return;
+  const k = ev.ii + ':' + ev.vk + ':' + ev.pad, V = core.vsent || (core.vsent = new Map()); if (V.get(k) === rec.data) return; V.set(k, rec.data);
+  const d = rec.data.slice(); corePost({op:'vbuf', k, pad:ev.pad, data:d, sr:rec.sr}, [d.buffer]); }
 // A pad's render, when the core doesn't have this one yet (a copy: the page keeps playing it too)
-function coreBuf(i){ if (!core.ready) return; const c = slotAt(cache, i); if (!c || !c.data){ if (core.sent.has(i)){ core.sent.delete(i); corePost({op:'buf', pad:i, data:null}); } return; }
-  if (core.sent.get(i) === c.data) return; core.sent.set(i, c.data); const d = c.data.slice(); corePost({op:'buf', pad:i, data:d, sr:c.sr}, [d.buffer]); }
+function coreBuf(i){ if (!core.ready) return; const c = slotAt(cache, i); if (!c || !c.data){ if (core.sent.has(i)){ core.sent.delete(i); coreVarGone(i); corePost({op:'buf', pad:i, data:null}); } return; }
+  if (core.sent.get(i) === c.data) return; core.sent.set(i, c.data); coreVarGone(i); const d = c.data.slice(); corePost({op:'buf', pad:i, data:d, sr:c.sr}, [d.buffer]); }
 /* SONG SYNC (owner, Fold, 2 Nov: stutters on STOP, on Shift-navigating, on the screen going off and on, and a late note
    preview). Posting the whole song after every save made the audio thread unpack hundreds of KB in its own time: a glitch
    each time. Now only what changed goes: top-level fields whole, and the big lists (phrases, chains, song rows,
@@ -18884,12 +18891,12 @@ function coreDiff(){
   return ops;
 }
 function coreSyncAll(){ if (!core.ready) return;
-  if (!core.mir){ coreDiff(); corePost({op:'load', S, vars:coreVars()}); } else { const ops = coreDiff(); if (ops.length) corePost({op:'patch', ops}); corePost({op:'vars', vars:{vtrk, NSLOT}}); } coreKit(); for (let i = 0; i < nslots(); i++) coreBuf(i); corePost({op:'lxp', st:lxp.st | 0}); coreLead(); }
+  if (!core.mir){ coreDiff(); corePost({op:'load', S, vars:coreVars()}); } else { const ops = coreOps(coreDiff()); if (ops.length) corePost({op:'patch', ops}); corePost({op:'vars', vars:{vtrk, NSLOT}}); } coreKit(); for (let i = 0; i < nslots(); i++) coreBuf(i); corePost({op:'lxp', st:lxp.st | 0}); coreLead(); }
 const coreLead = () => { if (core.ready) corePost({op:'lead', s:document.hidden ? 1.2 : 0.25}); };
 document.addEventListener('visibilitychange', coreLead);
 // After an edit: the song again (in place, so the running sequencer reads it), at most every 40 ms
 function coreSong(){ if (!tp.core || !core.mir || core.sT) return;   // only while the core plays (BATTERY): PLAY syncs the rest
-  core.sT = setTimeout(() => { core.sT = 0; const ops = coreDiff(); if (ops.length) corePost({op:'patch', ops}); }, 100); }
+  core.sT = setTimeout(() => { core.sT = 0; const ops = coreOps(coreDiff()); if (ops.length) corePost({op:'patch', ops}); }, 100); }
 function coreStart(mode, o, t0, rs){
   coreSyncAll();
   rt.pl.clkReset(ctx.currentTime);   // the core's clock takes over (a RESUME step played here may have started this one)
@@ -18911,8 +18918,8 @@ function coreMsg(d){
   audioWake = performance.now();
   for (const r of d.rows){
     for (const e of r.evs){
-      if (e.vk && !e.core) try { varWant(e); } catch(err){}
-      { const k = (e.core ? 'core ' : 'page ') + e.type + (e.type === 'note' && !e.core ? ' pad ' + e.pad : ''); core.tally.set(k, (core.tally.get(k) || 0) + 1); }
+      if (e.vk && !e.core) try { varWant(e); const r = VAR.map.get(varKey(e)); if (r) coreVar(e, r); } catch(err){}   // MUT / GEN: the core gets it for the next time
+      { const k = (e.core ? 'core ' : 'page ') + e.type + (e.type === 'note' && (e.vk || e.tw) ? ' var' : '') + (e.type === 'note' && !e.core ? ' pad ' + e.pad : ''); core.tally.set(k, (core.tally.get(k) || 0) + 1); }
       const midiOnly = moEv(e);
       if (e.core){ if (e.type === 'note'){ coreWireT(e.track); rt.pl.coreTake(e); if (e.t >= ctx.currentTime - 0.03) padBlink(e); }
         else if (e.type === 'tvl' || e.type === 'tva' || e.type === 'tpn' || e.type === 'mvol') coreMixT(e);
