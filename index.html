@@ -1029,7 +1029,8 @@ body.mob .top > *{flex-shrink:0} body.mob .top .hmeter{flex:1 1 150px; min-width
 body.mob #bFile{font-size:0; padding:0 12px} body.mob #bFile::after{content:'▾'; font-size:var(--fs-3)} body.mob #bFile.dirty::before{font-size:var(--fs-3)}
 body.mob .top #tLen{min-height:34px; padding:0 10px; border:1px solid var(--line); border-radius:0; background:var(--panel); font:700 var(--fs-3)/1 var(--mono); align-self:auto}
 /* LOOP on the pad (owner): lit in its own colour while the pattern loops */
-#kLoop.on, #tPad #kLoop.on{background:#1f9d5c; color:#fff; border-color:#1f9d5c}   /* tight: the pad's PLAY (SHIFT+PLAY) and the COMMANDS ▶ play the song */
+#kLoop.on, #tPad #kLoop.on:not(#zz){background:#1f9d5c!important; color:#fff!important; border-color:#1f9d5c!important}
+:root[data-skin="idm"] #tPad #kLoop.on:not(#zz):not(#zz){background:#7cd0ff!important; color:#141414!important; border-color:#7cd0ff!important; text-shadow:none!important}   /* IDM (owner): light blue, apart from EDIT's blue */   /* tight: the pad's PLAY (SHIFT+PLAY) and the COMMANDS ▶ play the song */
 .tsong{border:1px solid var(--line); min-height:34px; padding:0 14px; margin:0 4px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; flex:none; white-space:nowrap; background:var(--panel)}
 .tsong:hover{border-color:var(--ink)}
 .tsong.on{background:var(--pl); color:var(--inv); border-color:var(--pl)}
