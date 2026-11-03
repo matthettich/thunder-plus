@@ -474,5 +474,20 @@ GC, a dialog). Phase 2's target: 0 late at every stall size, and edits heard on 
 
 1. ~~Phase 0~~ done in software (2 Nov): `tools/seq-golden.mjs` (4 golden event streams + `--timing`), baseline in
    section 12. Left for the owner's hardware: MIDI loopback jitter and clock-in vs the MPC, Fold CPU.
-2. Phase 1: `core-web.js` and `docs/CORE-BRIDGE.md`, on `beta`.
+2. Phase 2 started first (owner, 2 Nov: "let's do the sequencer move"); phase 1's bridge is built as part of it, one
+   message at a time, rather than as a separate refactor. Steps, each on `beta`:
+   - **2a, done (2 Nov):** `makeSeq` runs inside an AudioWorklet. `tools/make-core.mjs` copies makeSeq and every
+     declaration it reads (found scope-aware with acorn, ~80 of them) out of index.html into `core/seq-core.js`, with the
+     processor from `core/core-processor.js` appended; one copy of the code stays in index.html, and
+     `tests/core.test.js` fails if the bundle is stale. The render helpers (`ensure`, `ensurePlay`, `varWant`,
+     `applyChop`) are stubs there, and TFX comes from the page as data (`coreTfx()`). Parity:
+     `node tools/seq-golden.mjs --core` gives the same four golden streams on the audio thread. Nothing plays from it yet.
+   - **2b:** a sampler in the core for rendered pads (buffers transferred after each render; mono / poly / choke, rate,
+     slide, ofs, cut / rel fades, gain, pan, arp / bend / vib, FDI, TRM / APN, `mod` / `off` / `stp` events), with one
+     output per track into each track's `inp` (an AudioWorkletNode with NT outputs). Behind a setting on beta, A/B
+     against the current player with `--timing` (target: 0 late at every stall size).
+   - **2c:** the other events (live engines, `fxp` / `fxc` / `tvl`…, tempo, beat, MIDI) handed from the core to the page
+     ahead of time (as the plan's 6.2 "Web" does for MIDI), then moved one by one onto the audio thread.
+   - **2d:** edits and mutes as `song.patch` messages (heard on the next block), chops (`applyChop` with the buffer data
+     the core already holds), PERFORM's live state, REC's step history from `pos` events; then the pump goes.
 3. Owner answers 11.1 before phase 4.
