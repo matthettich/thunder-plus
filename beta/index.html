@@ -26841,6 +26841,8 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
     } finally { Math.random = R; }
     return out;
   },
+  // The open phrase's rows, and the PSL command's number (for generator checks).
+  phrase(){ return {rows:JSON.parse(JSON.stringify(S.phrases[cPhrase] || [])), len:plen(cPhrase), psl:PSL_I(), FX0, RW, VC, IC}; },
   // What playback and the song cursor are doing now (for follow / paging checks).
   state(){ const own = tp.pos ? tp.pos.find(Boolean) : null; return {on:!!tp.on, row:own ? own.row : null, top:cs.song.top || 0, y:cs.song.y, rows:arrRows(), sel:!!selA, tv, follow:followMode, apF, hand:Math.round(performance.now() - arrHandT)}; },
   /* TIMING PROBE (plan phase 0, section 12): plays the loaded song for `ms` and records, for every sound event the pump
