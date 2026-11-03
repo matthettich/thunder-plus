@@ -62,6 +62,10 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .setwrap{position:relative; display:flex}
 .setmenu{position:absolute; top:calc(100% + 6px); left:0; z-index:120; background:var(--panel); color:var(--ink); border:1px solid var(--ink); box-shadow:none; padding:6px; white-space:normal}
 .setmenu[hidden]{display:none}
+/* MENU HELP off: explanations hidden (tooltips instead) */
+body:not(.menuhelp) .gset .tsr .tsi{display:none}
+body:not(.menuhelp) :is(#pMaster,#pApp,#pKit,#pSkin,#pMidi,#pExport,#pAudio) .pbody > p.note{display:none}
+body:not(.menuhelp) :is(#pMaster,#pApp,#pKit,#pSkin,#pMidi,#pExport,#pAudio) .bar{cursor:help}
 body.edoff #tGrid{box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--rec, #d0302a) 70%, transparent)}
 /* EDIT OFF, easier to see (owner, 2 Nov: "make something look different when you push escape and turn off edit"): on the
    Phrase screen (where it applies) the cursor turns hollow, a dashed red box instead of the filled block, the notes dim a
@@ -287,6 +291,14 @@ body:not(.nowv) .wvMobNote{display:none}
 .vtype{font:inherit; color:var(--ink); background:var(--inv); border:1px solid var(--line); width:11ch; padding:0 3px; text-align:right}
 .segrow{display:flex; align-items:center; gap:6px; min-height:34px; font-size:var(--fs-3)}
 .segrow>span{color:var(--muted); width:70px; flex:none}
+/* AUDIO & MIDI tidy (menu audit, 2 Nov): labels on one line, Test sound beside Output, Reset as a small button whose note is
+   its tooltip, smaller port delay boxes */
+:is(#pAudio,#pMidi) :is(.segrow,.audrow)>span:first-child{width:96px; white-space:nowrap}
+#pAudio .audrow select#audOut{flex-basis:150px}
+#pAudio .btnrow:has(#audReset) > .lbl{display:none}
+#pAudio #audReset{min-height:0; padding:4px 10px; font-size:var(--fs-2)}
+:is(#pAudio,#pMidi) .audrow .mlat input{width:52px}
+#pAudio .audrow input[type=range]{flex-basis:120px; min-width:80px}
 .segrow{min-width:0}
 .fxgrid .segrow{grid-column:1 / -1}
 .irbox{margin-top:6px} .irrow{align-items:center; flex-wrap:nowrap} .irrow .irn{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-3)}
@@ -2161,14 +2173,14 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <div class="segrow"><span>Velocity</span><div class="seg" id="segVel"></div></div>
       </div>
       <div class="audrow"><span>Notes in</span><select id="midiInSel" aria-label="Which MIDI input plays notes"><option value="">Every input</option></select><select id="midiInCh" class="mch" aria-label="Which channel plays notes"></select></div>
-      <div class="audrow"><span>Keys play</span><select id="midiKeysSel" aria-label="What a MIDI keyboard plays in the tracker"><option value="1">The current instrument (its pad or its MIDI gear)</option><option value="0">The pads (notes 36–43) and the selected synth</option></select></div>
+      <div class="audrow"><span>Keys play</span><select id="midiKeysSel" aria-label="What a MIDI keyboard plays in the tracker"><option value="1" title="The instrument you are on: its pad, or its MIDI gear">Current instrument</option><option value="0" title="Pads on notes 36–43, the selected synth on the rest">Pads + selected synth</option></select></div>
       <div class="audrow"><span>Port A</span><select id="midiOutSel0" aria-label="MIDI output port A"><option value="">None</option></select><label class="mlat" title="Gear delay for port A: how late this gear sounds after a note, in ms. Raise it if the gear sounds late against ...Thunder, lower it if early">delay <input type="number" class="numsmall" id="midiLat0" min="-50" max="200" step="1" aria-label="Gear delay for port A, in milliseconds"> ms</label></div>
       <div class="audrow"><span>Port B</span><select id="midiOutSel1" aria-label="MIDI output port B"><option value="">None</option></select><label class="mlat" title="Gear delay for port B, in ms">delay <input type="number" class="numsmall" id="midiLat1" min="-50" max="200" step="1" aria-label="Gear delay for port B, in milliseconds"> ms</label></div>
       <div class="audrow"><span>Port C</span><select id="midiOutSel2" aria-label="MIDI output port C"><option value="">None</option></select><label class="mlat" title="Gear delay for port C, in ms">delay <input type="number" class="numsmall" id="midiLat2" min="-50" max="200" step="1" aria-label="Gear delay for port C, in milliseconds"> ms</label></div>
       <div class="audrow"><span>Port D</span><select id="midiOutSel3" aria-label="MIDI output port D"><option value="">None</option></select><label class="mlat" title="Gear delay for port D, in ms">delay <input type="number" class="numsmall" id="midiLat3" min="-50" max="200" step="1" aria-label="Gear delay for port D, in milliseconds"> ms</label></div>
       <div class="segrow"><span>Clock out</span><div class="seg" id="segClkOut" role="group" aria-label="Send clock to ports"></div></div>
       <div class="segrow"><span>Clock in</span><div class="seg" id="segClkIn"></div></div>
-      <div class="audrow"><span>Clock from</span><select id="midiClkSel" aria-label="Which MIDI input Clock in follows"><option value="">The first input that sends clock</option></select></div>
+      <div class="audrow"><span>Clock from</span><select id="midiClkSel" aria-label="Which MIDI input Clock in follows"><option value="" title="The first input that sends clock keeps it until it goes quiet">First that sends</option></select></div>
       <p class="note"><b>Notes in</b>: which input and channel play notes and knobs (the others are ignored, so gear that sends its own notes or echoes ours can't play the pads). <b>Keys play</b>: in the tracker a keyboard plays the instrument you're on (a MIDI instrument plays its gear, with bend, mod wheel, aftertouch and sustain passed through); or the pads, as on the Synth page. Instruments set to <b>MIDI</b> (INST › OUTPUT) play on their <b>PORT</b> (A–D) and channel. Pick which cable each port is here: the song keeps only the letter, so it plays the same on the phone and the computer with each one's own gear. <b>Delay</b> (per port): how long that gear takes to sound after a note; raise it if the gear sounds late against ...Thunder, lower it if early. <b>Clock out</b> sends tempo, Start and Stop to the ports lit (A–D) while the song plays (from partway into the song: Song Position Pointer and Continue). <b>Clock in</b> follows another device's clock: its Start and Stop run PLAY (Continue after a Song Position Pointer plays from there), and its tempo sets ours. <b>Clock from</b>: the input to follow; the first one keeps it until it goes quiet, so two devices sending clock can't double the tempo.</p>
       <p class="note" id="midiNote">Plug a controller in (USB-C on the phone), tap Connect MIDI, and pads 00–07 answer notes 36–43; other notes play the selected synth. Tap <b>Learn</b>, then: tap any pad (drums or synths) and hit a key to give it that note, or touch any slider and turn a knob to put it on that knob. A knob works the slider for whichever pad, layer or effect is open. Select a pad or slider in Learn and tap <b>Unlearn</b> to clear it.</p>
     </div>
@@ -2198,7 +2210,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="pbody">
       <div class="audrow"><span>Output</span><select id="audOut" aria-label="Audio output device"><option value="">System default</option></select>
         <button class="sm" id="audNames" hidden>Show device names</button><button class="sm" id="audTest">Test sound</button></div>
-      <div class="btnrow"><button id="audReset" title="Stops playback and rebuilds every voice and effect from scratch (song and kit are untouched)">Reset audio engine</button><span class="lbl">Clears stuck notes and effects</span></div>
+      <div class="btnrow"><button id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every voice and effect from scratch (song and kit are untouched)">Reset audio engine</button><span class="lbl">Clears stuck notes and effects</span></div>
       <div class="audrow"><span>Level</span><input type="range" id="audLvl" min="0" max="100" step="1" aria-label="Output level"><output id="audLvlV"></output></div>
       <div class="segrow"><span>Latency</span><div class="seg" id="segLat"></div></div>
       <div class="segrow"><span>Rate</span><div class="seg" id="segARate"></div></div>
@@ -7292,6 +7304,18 @@ const PFK = 'thunderplus-platform-v1', DIK = 'thunderplus-desktop-input-v1';
 const PF_DEFAULT = matchMedia('(pointer:coarse)').matches ? 'mobile' : 'desktop';
 let platform = (() => { try { const p = localStorage.getItem(PFK); if (p === 'mobile' || p === 'desktop') return p; } catch(e){} return PF_DEFAULT; })();
 const isMobile = () => platform === 'mobile';
+/* MENU HELP (owner, 2 Nov menu audit: "too much text in the Audio & MIDI menu… cumbersome"): the explanations under menu and
+   settings rows hide by default on a computer and become hover tooltips; View → MENU HELP shows them again. Phones (no
+   hover) show them by default. docs/MENU-AUDIT.md. */
+const MHK = 'thunderplus-menuhelp-v1';
+let menuHelp = (() => { try { const v = localStorage.getItem(MHK); return v == null ? null : v === '1'; } catch(e){ return null; } })();
+const menuHelpOn = () => menuHelp == null ? isMobile() : menuHelp;
+function setMenuHelp(on){ menuHelp = !!on; try { localStorage.setItem(MHK, on ? '1' : '0'); } catch(e){} menuHelpApply(); }
+function menuHelpApply(){ document.body.classList.toggle('menuhelp', menuHelpOn());
+  for (const id of ['pMaster', 'pApp', 'pKit', 'pSkin', 'pMidi', 'pExport', 'pAudio']){ const b = document.getElementById(id); if (!b) continue;
+    const bar = b.querySelector('.bar'), t = [...b.querySelectorAll('.pbody > p.note')].map(p => p.textContent.trim()).filter(Boolean).join('\n\n');
+    if (bar) bar.title = t; } }
+setTimeout(menuHelpApply, 0);
 // Settings → App: Mobile normally hides the …waves and …chains editors (they still play). Two ticks bring them back one at a
 // time (owner, 21 Oct: …chains may fit on the unfolded Fold, …waves stays hidden). Both off by default. The old single tick
 // (thunderplus-mobile-editors-v1) turned both on, so a '1' there starts both ticks on.
@@ -13218,7 +13242,7 @@ function miPorts(){
   const fill = (sel, opts, v, none) => { if (!sel) return; const os = v && !opts.some(([q]) => q === v) ? opts.concat([[v, '(not connected)']]) : opts;
     sel.innerHTML = ''; os.forEach(([q, nm], k) => sel.append(new Option(k === 0 ? none : nm, q))); sel.value = v; };
   fill($('midiInSel'), ins, midi.inId, 'Every input');
-  fill($('midiClkSel'), ins, midi.clkId, 'The first input that sends clock');
+  fill($('midiClkSel'), ins, midi.clkId, 'First that sends');
   const ch = $('midiInCh'); if (ch && !ch.options.length){ ch.append(new Option('All channels', '-1')); for (let c = 0; c < 16; c++) ch.append(new Option('Channel ' + (c + 1), String(c))); }
   if (ch) ch.value = String(midi.inCh);
   const ks = $('midiKeysSel'); if (ks) ks.value = String(midi.keys);
@@ -19742,6 +19766,8 @@ function projRows(){
       info:() => 'Every instrument and the pad it plays (long names are cut short). In the side panel; without it, in PAD mode between the arrows and the buttons when there is room. Tap one to open it on INST'},
     {l:'PATTERN VIEW', ck:'Pattern view on the Phrase screen', get:() => pvOn ? 1 : 0, set:v => setPv(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'ON' : 'OFF',   // PATTERN VIEW
       info:() => 'ON: the Phrase screen gets PHRASE | PATTERN buttons (the choice stays until you switch): PATTERN shows every track’s phrase for one song row side by side, and the open track is edited in place. Wide screens only (computer, unfolded Fold). OFF: the Phrase screen as before'},
+    {l:'MENU HELP', ck:'Show explanations in menus', get:() => menuHelpOn() ? 1 : 0, set:v => setMenuHelp(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
+      info:() => 'ON: the explanation under each menu and settings row. OFF: only the names; hover a row for its explanation'},
     {l:'SIMPLE PHRASE', ck:'Show simple phrase screen', get:() => spOn ? 1 : 0, set:v => setSp(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // SIMPLE PHRASE
       info:() => 'ON: the Phrase screen on its own, as big as it fits, for easier reading: no Arrange beside it, no song strip over it, no piano down the side, no PATTERN view. TEXT SIZE still makes it bigger or smaller. Other screens are unchanged. OFF: the Phrase screen as before'},
     {l:'STEP NUMBERS', ck:'Display steps as decimal', get:() => stepDec ? 1 : 0, set:v => setStepDec(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'DECIMAL' : 'HEX',
@@ -26221,7 +26247,8 @@ function tsetSet(r, v){ r.set(clamp(v, r.min, r.max)); if (r.after) r.after(); s
 function tsetRow(r){
   const row = el('div', 'tsr'), inf = el('div', 'tsi', tsetInfo(r).replace(/\.?\s*Tap EDIT twice\.?$/, '.').replace(/^EDIT renames the song$/, ''));
   const lab = () => el('div', 'tsl', tsetLabel(r.l));
-  const refresh = () => { inf.textContent = tsetInfo(r).replace(/\.?\s*Tap EDIT twice\.?$/, '.'); };
+  const refresh = () => { inf.textContent = tsetInfo(r).replace(/\.?\s*Tap EDIT twice\.?$/, '.'); row.title = inf.textContent; };
+  row.title = inf.textContent;   // MENU HELP: the explanation as a tooltip
   if (r.act){
     row.classList.add('act'); const b = el('button', null, tsetLabel(r.l)); b.type = 'button';
     b.addEventListener('click', async () => {
