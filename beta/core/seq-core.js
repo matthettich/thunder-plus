@@ -642,6 +642,7 @@ class ThunderCore extends AudioWorkletProcessor {
       case 'lxp': lxp.st = d.st | 0; return;
       case 'stats': this.port.postMessage({op:'stats', id:d.id, n:this.nN || 0, late:this.nLate || 0, worst:this.worst || 0, voices:this.alive.size, lead:this.leadMin == null ? null : this.leadMin}); this.nN = this.nLate = this.worst = 0; this.leadMin = null; return;
       case 'sig': { const j = JSON.stringify(S); let h = 0; for (let i = 0; i < j.length; i++) h = (h * 31 + j.charCodeAt(i)) | 0; this.port.postMessage({op:'sig', len:j.length, h}); return; }
+      case 'die': this.dead = true; this.seq = null; this.alive.clear(); return;   // the page let this core go (Reset audio engine)
       case 'lead': this.LEAD = Math.max(0.05, Math.min(2, +d.s || 0.25)); return;
     }
   }
@@ -746,6 +747,7 @@ class ThunderCore extends AudioWorkletProcessor {
   stopAll(at){ for (const v of this.alive) this.kill(v, at); for (const T of this.vs) if (T) T.length = 0; }
 
   process(inputs, outputs){
+    if (this.dead) return false;
     // 1. step the song up to LEAD ahead: the core books its own notes, the rows go up for the page's part
     const s = this.seq;
     if (s){
