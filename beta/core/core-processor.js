@@ -22,7 +22,7 @@
      {op:'ready', v}  ·  {op:'rows', rows, time, bpm, tks, alive}  ·  {op:'end'}  ·  {op:'test', id, rows}  ·
      {op:'error', where, message} */
 
-const CORE_V = 5;   // the message set's version: index.html's CORE_WANT must match (3: patch sync; 4: the mix outputs NT+1..NT+3; 5: FXV, BYP, tempo)
+const CORE_V = 6;   // the message set's version: index.html's CORE_WANT must match (3: patch sync; 4: the mix outputs NT+1..NT+3; 5: FXV, BYP, tempo; 6: SoundFonts)
 const coreNum = v => Math.round(v * 1e6) / 1e6;
 const corePlain = e => { const o = {}; for (const k of Object.keys(e).sort()){ const v = e[k];
   if (typeof v === 'number') o[k] = coreNum(v); else if (typeof v === 'string' || typeof v === 'boolean' || v === null) o[k] = v;
@@ -124,6 +124,12 @@ globalThis.__tcPost = (proc, o) => {
    DEC shape the sound here with the page's own shapeData. A note whose variation the core doesn't have yet: the page
    plays it, as before. */
 const varBufs = new Map(), varShaped = new Map(); let varBytes = 0;
+/* SOUNDFONTS (3 Nov): a SoundFont pad's preset, as the page has it once its font is loaded and the preset decoded: the
+   pad's controls (P), the zones, the sample headers they read, and the decoded samples ({d, sr, ls, le}). The voice is
+   the page's sfNote, played here: sfPick / sfVoice (copied from index.html by make-core) choose the zones and their
+   numbers, and each zone runs its sample (looped where the font says), its volume envelope, the font's low-pass with its
+   mod envelope and its own pan. Until a pad's preset arrives, the page plays its notes. */
+const sfPads = new Map();
 function varDrop(pad){ for (const [k, r] of varBufs) if (pad == null || r.pad === pad){ varBufs.delete(k); varBytes -= r.data.length * 4; }
   for (const k of [...varShaped.keys()]) if (pad == null || k.split(':')[2] === String(pad)) varShaped.delete(k); }
 function varIn(d){ const old = varBufs.get(d.k); if (old) varBytes -= old.data.length * 4;
@@ -188,6 +194,7 @@ class ThunderCore extends AudioWorkletProcessor {
       case 'kit': this.kv = d.kv || []; kit = {voices:this.kv}; return;
       case 'buf': if (d.data) coreBufs.set(d.pad, {data:d.data, sr:d.sr}); else coreBufs.delete(d.pad); varDrop(d.pad); return;
       case 'vbuf': varIn(d); return;   // MUT / GEN: a variation the page rendered
+      case 'sf': if (d.data) sfPads.set(d.pad, d.data); else sfPads.delete(d.pad); return;   // SOUNDFONTS: a pad's preset
       case 'vdrop': varDrop(d.pad); return;
       case 'test': {
         const o = d.opt || {}, rows = coreSeeded(() => { const out = [];
@@ -247,6 +254,100 @@ class ThunderCore extends AudioWorkletProcessor {
 
   /* ---- the sampler: the page player's rendered-pad path (makePlayer: startNote, kill, pitchMods, modVoice, play) ---- */
   T(t){ return this.vs[t] || (this.vs[t] = []); }
+  // SOUNDFONTS: makePlayer's sfNote. (One difference: a bend, arpeggio or vibrato moves every zone of a layered preset;
+  // the page's moved only the first.)
+  sfNote(ev){
+    const D = sfPads.get(ev.pad), kv = this.kv[ev.pad]; if (!D || !kv) return;
+    const P = D.P, cl = (v, a, b) => Math.max(a, Math.min(b, v)), lr = Math.log2(Math.max(1e-4, ev.rate));
+    const key = cl(Math.round(60 + 12 * lr + P.trans), 0, 127), vel = cl(Math.round(127 * ((1 - P.velo) + P.velo * Math.sqrt(cl(ev.gain, 0, 1)))), 1, 127);
+    const picks = sfPick(D.font, D.pr, key, vel); if (!picks.length) return;
+    { const ld = ev.t - currentTime; this.nN = (this.nN || 0) + 1; if (ld < 0){ this.nLate = (this.nLate || 0) + 1; this.worst = Math.max(this.worst || 0, -ld); } if (this.leadMin == null || ld < this.leadMin) this.leadMin = ld; }
+    const T = this.T(ev.track);
+    for (let k = T.length - 1; k >= 0; k--) if (!this.live1(T[k], ev.t)) T.splice(k, 1);
+    if (!ev.poly){ for (const v of T) this.kill(v, ev.t, v.syn ? Math.min(this.relTc(v), 0.05) : 0.004); T.length = 0; }
+    else while (T.length >= POLY) this.kill(T.shift(), ev.t, 0.006);
+    const ck = kv.choke || 0;
+    if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of this.T(k)) if (v.choke === ck) this.kill(v, ev.t);
+    const st0 = Math.max(ev.t, currentTime), sr = sampleRate, hz = c => cl(8.176 * Math.pow(2, c / 1200), 20, sr * 0.45);
+    const expTo = (A, from, to, t, d) => { if (!(from > 0) || !(to > 0)){ A.lin(to, t + d); return; } A.curve(x => from * Math.pow(to / from, Math.min(1, Math.max(0, (x - t) / d))), t, d); };
+    const zones = []; let relMax = 0.01, looped = false, base = ev.rate, st = false;
+    for (const {z, stereo} of picks){
+      const vo = sfVoice(D.font, z, key, vel), a = D.smp[z.s]; if (!a || !a.d) continue;
+      let L = a.d, R = null;
+      if (stereo){ const s0 = D.font.samples[z.s], b = s0 && D.smp[s0.link]; if (b && b.d){ const left = s0.type & 4; L = left ? a.d : b.d; R = left ? b.d : a.d; } }
+      const n = R ? Math.min(L.length, R.length) : L.length;
+      const F = Math.pow(2, ((60 + P.trans - vo.root) * vo.scale / 100 + vo.tune) / 12), rate = F * Math.pow(ev.rate, vo.scale / 100);
+      const zr = new Auto(rate);
+      if (ev.slide && ev.slide.dur > 0 && vo.scale === 100){ zr.set(ev.slide.from * F, ev.t); zr.lin(rate, ev.t + ev.slide.dur); }
+      if (!zones.length) base = rate;
+      const lp = (vo.modes === 1 || vo.modes === 3) && a.le > a.ls + 8 && a.le <= n; if (lp) looped = true;
+      const E = vo.v, lg = Math.pow(10, -vo.atten / 200), sus = Math.max(1e-5, lg * Math.pow(10, -E.sus / 200)), atk = E.atk * P.atk;
+      const t1 = st0 + E.delay, t2 = t1 + Math.max(0.0015, atk), t3 = t2 + E.hold, env = new Auto(0);
+      env.set(0, st0); env.set(0, t1); env.lin(lg, t2); env.set(lg, t3);
+      if (E.sus > 0) expTo(env, lg, sus, t3, Math.max(0.005, E.dec * Math.min(1, E.sus / 1000)));
+      let flt = null;
+      if (vo.fc < 13490 || Math.abs(vo.modEnvToFc) > 1){
+        const M = vo.m, f0 = hz(vo.fc), fp = hz(vo.fc + vo.modEnvToFc), fs = hz(vo.fc + vo.modEnvToFc * (1 - M.sus));
+        const m1 = st0 + M.delay, m2 = m1 + Math.max(0.001, M.atk), m3 = m2 + M.hold, fr = new Auto(f0);
+        fr.set(f0, st0); fr.set(f0, m1); expTo(fr, f0, fp, m1, m2 - m1); fr.set(fp, m3); expTo(fr, fp, fs, m3, Math.max(0.005, M.dec * Math.max(0.001, M.sus)));
+        flt = {fr, q:vo.q / 10, k:0, b0:1, b1:0, b2:0, a1:0, a2:0, x1:0, x2:0, y1:0, y2:0, u1:0, u2:0, w1:0, w2:0};
+      }
+      const zp = !R && vo.pan ? vo.pan / 500 : null; if (R || zp != null) st = true;
+      zones.push({L, R, n, sr:a.sr, ls:a.ls, le:a.le, lp, r:zr, rate, env, flt, zp, pos:0, done:false});
+      relMax = Math.max(relMax, Math.min(8, E.rel * P.rel));
+    }
+    if (!zones.length) return;
+    const g0 = ev.gain * Math.pow(10, ((P.level || 0) + 6) / 20);
+    const v = {sf:zones, st, data:null, r:new Auto(base), g:new Auto(g0), f:new Auto(1), pn:new Auto(cl((ev.pan - 128) / 127, -1, 1)), base, rate:base,
+      choke:ck, col:ev.col, ended:false, stopAt:null, syn:true, rel:relMax * 0.4, track:ev.track, end:Infinity, t0:st0, trm:null, apn:null};
+    if (!ev.slide) this.pitchMods(v, ev.t, base, ev);
+    this.alive.add(v);
+    if (ev.cut != null) this.kill(v, ev.cut);
+    if (ev.rel != null) this.kill(v, ev.rel, this.relTc(v));
+    else if (!kv.syn && looped) this.kill(v, st0 + Math.max(0.1, P.len || 2), this.relTc(v));   // a drum pad: a looping zone lets go after the pad's Max len
+    T.push(v);
+  }
+  // One block of a SoundFont voice into its track's output (as the page's nodes: zones → [zone pan] → gain → fade → pan)
+  sfRun(v, out, N){
+    const L = out[0], R = out[1] || out[0], dt = 1 / sampleRate, t0 = currentTime;
+    for (const A of [v.g, v.f, v.pn, v.r]) A.prune(t0);
+    const sL = v.sL || (v.sL = new Float32Array(128)), sR = v.sR || (v.sR = new Float32Array(128)); sL.fill(0); sR.fill(0);
+    const rc = v.r.constFrom(t0); let any = false;
+    for (const z of v.sf){ if (z.done) continue;
+      z.env.prune(t0); z.r.prune(t0); if (z.flt) z.flt.fr.prune(t0);
+      const ec = z.env.constFrom(t0), zc = z.r.constFrom(t0), D = z.L, E = z.R, n = z.n, k0 = z.sr / sampleRate, F = z.flt;
+      const za = z.zp != null ? (z.zp + 1) * Math.PI / 4 : 0, zl = z.zp != null ? Math.cos(za) : 1, zrr = z.zp != null ? Math.sin(za) : 1;
+      for (let i = 0; i < N; i++){
+        const t = t0 + i * dt; if (t < v.t0) continue;
+        if (z.lp){ while (z.pos >= z.le) z.pos -= z.le - z.ls; }
+        else if (z.pos >= n - 1){ z.done = true; break; }
+        const p = z.pos, j = p | 0, fr = p - j, j1 = z.lp && j + 1 >= z.le ? z.ls : j + 1;
+        const e = ec != null ? ec : z.env.at(t);
+        let x = (D[j] + (D[j1] - D[j]) * fr) * e, y = E ? (E[j] + (E[j1] - E[j]) * fr) * e : x;
+        if (F){   // Web Audio's low-pass (Q in dB), its cutoff read every 16 samples
+          if ((F.k++ & 15) === 0){ const f = F.fr.at(t), w = 2 * Math.PI * Math.min(f, sampleRate * 0.49) / sampleRate, c = Math.cos(w), al = Math.sin(w) / (2 * Math.pow(10, F.q / 20)), a0 = 1 + al;
+            F.b0 = (1 - c) / 2 / a0; F.b1 = (1 - c) / a0; F.b2 = F.b0; F.a1 = -2 * c / a0; F.a2 = (1 - al) / a0; }
+          const ox = F.b0 * x + F.b1 * F.x1 + F.b2 * F.x2 - F.a1 * F.y1 - F.a2 * F.y2; F.x2 = F.x1; F.x1 = x; F.y2 = F.y1; F.y1 = ox; x = ox;
+          if (E){ const oy = F.b0 * y + F.b1 * F.u1 + F.b2 * F.u2 - F.a1 * F.w1 - F.a2 * F.w2; F.u2 = F.u1; F.u1 = y; F.w2 = F.w1; F.w1 = oy; y = oy; } else y = x;
+        }
+        if (z.zp != null){ sL[i] += x * zl; sR[i] += x * zrr; } else { sL[i] += x; sR[i] += y; }
+        const ratio = (rc != null ? rc : v.r.at(t)) / v.base;
+        z.pos += (zc != null ? zc : z.r.at(t)) * ratio * k0;
+      }
+      if (!z.done) any = true;
+    }
+    const gc = v.g.constFrom(t0), fc = v.f.constFrom(t0), pc = v.pn.constFrom(t0);
+    for (let i = 0; i < N; i++){
+      const t = t0 + i * dt; if (t < v.t0) continue;
+      if (t >= v.end){ v.ended = true; break; }
+      const G = (gc != null ? gc : v.g.at(t)) * (fc != null ? fc : v.f.at(t)), p = pc != null ? pc : v.pn.at(t);
+      if (!v.st){ const m = sL[i] * G, a = (p + 1) * Math.PI / 4; L[i] += m * Math.cos(a); R[i] += m * Math.sin(a); continue; }   // StereoPannerNode, mono in
+      const l = sL[i] * G, r = sR[i] * G;   // stereo in
+      if (p <= 0){ const x = (p + 1) * Math.PI / 2; L[i] += l + r * Math.cos(x); R[i] += r * Math.sin(x); }
+      else { const x = p * Math.PI / 2; L[i] += l * Math.cos(x); R[i] += r + l * Math.sin(x); }
+    }
+    if (!any) v.ended = true;
+  }
   relTc(v){ return v.syn ? v.rel / 4.6 : 0.004; }
   live1(v, at){ return v && !v.ended && !(v.stopAt != null && v.stopAt <= at); }
   kill(v, at, tc = 0.004){
@@ -279,7 +380,8 @@ class ThunderCore extends AudioWorkletProcessor {
   // render the core holds.
   mine(ev){
     if (this.noSampler) return false;
-    const k = this.kv[ev.pad]; if (!k || k.live || k.sf) return false;
+    const k = this.kv[ev.pad]; if (!k || k.live) return false;
+    if (k.sf) return sfPads.has(ev.pad);   // SOUNDFONTS: once the page has sent the preset (startNote → sfNote)
     if (ev.st) return false;   // stretched (SYNC) notes: the page's stretch cache, for now
     if (ev.vk || ev.tw){ const r = varRec(ev); if (!r) return false; ev.__buf = r; return true; }   // MUT / GEN / CUT / RES / DEC
     return coreBufs.has(ev.pad);
@@ -294,6 +396,7 @@ class ThunderCore extends AudioWorkletProcessor {
     if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of this.T(k)) if (v.choke === ck) this.kill(v, ev.t);
   }
   startNote(ev){
+    if (this.kv[ev.pad] && this.kv[ev.pad].sf){ delete ev.__buf; return this.sfNote(ev); }
     const c = ev.__buf || coreBufs.get(ev.pad), kv = this.kv[ev.pad]; delete ev.__buf; if (!c || !kv) return;
     { const ld = ev.t - currentTime; this.nN = (this.nN || 0) + 1; if (ld < 0){ this.nLate = (this.nLate || 0) + 1; this.worst = Math.max(this.worst || 0, -ld); } if (this.leadMin == null || ld < this.leadMin) this.leadMin = ld; }   // timing stats ({op:'stats'})
     const T = this.T(ev.track);
@@ -471,6 +574,7 @@ class ThunderCore extends AudioWorkletProcessor {
     const tb0 = currentTime, tb1 = currentTime + N * dt;
     for (const v of this.alive){
       const out = outputs[v.track]; if (!out || !out[0]){ continue; }
+      if (v.sf){ this.sfRun(v, out, N); if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const q = T.indexOf(v); if (q >= 0) T.splice(q, 1); } } continue; }   // SOUNDFONTS
       const L = out[0], R = out[1] || out[0], D = v.data, len = D.length, inc0 = v.sr / sr;
       // FAST PATH (the usual case: a note that is just playing): gain, fade, pan and pitch don't move in this block
       const gc = v.trm ? null : v.g.constFrom(tb0), fc = v.f.constFrom(tb0), pc = v.apn ? null : v.pn.constFrom(tb0), rc = v.r.constFrom(tb0);
