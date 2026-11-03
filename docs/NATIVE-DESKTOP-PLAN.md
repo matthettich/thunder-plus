@@ -465,7 +465,7 @@ headless; repeat on the PC and the Fold. MIDI rows need a real MIDI out (loopMID
 | Edit-to-heard delay | ~250 ms (1.2 s hidden), by design | | | |
 | MIDI note / clock jitter (loopback) | to measure on hardware | | | |
 | Clock-in lock time / drift vs MPC | to measure on hardware | | | |
-| Fold CPU, demo song | to measure | | | |
+| Fold CPU, demo song | to measure | headless ELECTRO, 77 samples each, interleaved: Page 36.1 %, core 37.5 % (core sequencing only: 37.7 vs 37.5). Owner's Fold, 2 Nov evening: clicks / drift, but on a stale cached core (fixed: CORE_REV) | | |
 
 Reading: today any main-thread stall longer than the ~250 ms look-ahead makes notes late (a big redraw, a render landing,
 GC, a dialog). Phase 2's target: 0 late at every stall size, and edits heard on the next audio block.
@@ -492,6 +492,14 @@ GC, a dialog). Phase 2's target: 0 late at every stall size, and edits heard on 
      1000 ms stalls** (page path: 0 / 38 / 69 late, up to 770 ms); the master's average level identical, the playhead
      identical. Still on the page: live engines (pad 8 in ELECTRO), SoundFonts, MUT / GEN, SYNC-stretched notes, effect
      and mixer commands, MIDI.
+   - **2b fixes from the owner's Fold test (2 Nov evening):** the offline cache kept the first core (same build
+     number), so the phone never ran the later fixes: the core's URL now carries a hash of the file (`CORE_REV`, written
+     by make-core) and a version handshake (`CORE_WANT`). Edits go as small patches (`coreDiff`), only while the core
+     plays; STOP unplugs the core's outputs at once; only the tracks the song plays on are plugged in (a connected
+     output keeps a track's effects running); at most 3 steps a block; a stalled audio thread skips ahead instead of
+     racing; Reset audio engine drops the core (`coreDrop`); the core loads after STOP, not during the first PLAY; a fast
+     path in the sampler (about 4x cheaper for a steady voice). Measuring switches: `__seqTest.coreDbg({noSampler,
+     noWire})`. Default stays Page until the owner's Fold retest is clean.
    - **2c:** the other events, moved one by one onto the audio thread. **Done (2 Nov): the beat clock** for
      tempo-locked effects (Flex, Step gate, Retrigger): the core's output NT carries beat + 1 into the player's `clkBus`
      (which the page's ConstantSource, held at −1, also feeds), sampled values identical to the page's. Next: live
