@@ -18249,7 +18249,8 @@ function coreSyncAll(){ if (!core.ready) return;
 const coreLead = () => { if (core.ready) corePost({op:'lead', s:document.hidden ? 1.2 : 0.25}); };
 document.addEventListener('visibilitychange', coreLead);
 // After an edit: the song again (in place, so the running sequencer reads it), at most every 40 ms
-function coreSong(){ if (!core.ready || !core.mir || core.sT) return; core.sT = setTimeout(() => { core.sT = 0; const ops = coreDiff(); if (ops.length) corePost({op:'patch', ops}); }, 40); }
+function coreSong(){ if (!tp.core || !core.mir || core.sT) return;   // only while the core plays (BATTERY): PLAY syncs the rest
+  core.sT = setTimeout(() => { core.sT = 0; const ops = coreDiff(); if (ops.length) corePost({op:'patch', ops}); }, 40); }
 function coreStart(mode, o, t0, rs){
   coreSyncAll();
   rt.pl.clkReset(ctx.currentTime);   // the core's clock takes over (a RESUME step played here may have started this one)
@@ -23495,34 +23496,39 @@ function hmDraw(now){
   const cut = mCut(), blink = cut && Math.floor(now / 400) % 2 === 0;
   if (cut !== !!HM.cut){ HM.cut = cut; if (HM.tip == null) HM.tip = c.title; c.title = cut ? 'The master is turned down by a VOL command on the master track' : HM.tip; }
   // Labelled (fit and finish, 2 Nov): L / R at the left, a dB scale under the bars, the held peak in dB at the right
-  const pkMax = Math.max(HM.pk[0], HM.pk[1]), pkTxt = pkMax > 0.0001 ? (20 * Math.log10(pkMax)).toFixed(1) : '-inf';
+  const pkMax = Math.max(HM.pk[0], HM.pk[1]), pkTxt = pkMax > 0.0001 ? (Math.round(40 * Math.log10(pkMax)) / 2).toFixed(1) : '-inf';
   const pos = g => lvl(g), key = [W, H, HM.clip, cut, blink, pkTxt, ...HM.lv.map(v => (pos(v) * W) | 0), ...HM.pk.map(v => (pos(v) * W) | 0)].join(',');
   if (key === HM.drawn) return; HM.drawn = key;   // nothing moved: no redraw (silence costs nothing)
   if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
-  const g = c.getContext('2d'), st = getComputedStyle(c), ink = st.color || '#111';
-  g.clearRect(0, 0, W, H);
+  const g = c.getContext('2d');
+  // BATTERY (owner, Fold, 2 Nov): the skin's colour and font are read once a second, not every frame, and the parts that
+  // never move (L / R, the scale, the empty tracks) are drawn once into a cached layer; each frame only draws the bars.
+  if (!HM.st || now - HM.stT > 1000){ const cs = getComputedStyle(c); HM.st = {ink:cs.color || '#111', font:cs.fontFamily || 'monospace'}; HM.stT = now; }
+  const ink = HM.st.ink, ff = HM.st.font;
   const fs = Math.round(8.5 * dpr), lx = Math.round(12 * dpr), rw = Math.round(64 * dpr), BW = Math.max(10, W - lx - rw);
-  g.font = `600 ${fs}px ${st.fontFamily || 'monospace'}`; g.textBaseline = 'middle';
   const bh = Math.max(2, Math.round(H * 0.18)), gap = Math.max(1, Math.round(H * 0.08)), y0 = Math.round(H * 0.1), amber = BW * lvl(Math.pow(10, -6 / 20));
+  const bk = [W, H, ink, ff].join('|');
+  if (HM.bgK !== bk){
+    const b = HM.bg || (HM.bg = document.createElement('canvas')); b.width = W; b.height = H; const q = b.getContext('2d');
+    q.font = `600 ${fs}px ${ff}`; q.textBaseline = 'middle'; q.fillStyle = ink;
+    for (let s = 0; s < 2; s++){ const y = y0 + s * (bh + gap); q.globalAlpha = 0.6; q.fillText(s ? 'R' : 'L', 0, y + bh / 2 + dpr * 0.5); q.globalAlpha = 0.13; q.fillRect(lx, y, BW, bh); }
+    const ty = y0 + bh * 2 + gap, sy = Math.round(H - fs * 0.6); let last = Infinity;   // right to left, a label only where it doesn't run into the one after it
+    for (const d of [0, -6, -12, -24, -36]){ const x = lx + Math.round(BW * lvl(Math.pow(10, d / 20))), lab = String(d), w = q.measureText(lab).width;
+      q.globalAlpha = 0.4; q.fillRect(Math.min(x, lx + BW - 1), ty, 1, Math.round(2 * dpr));
+      const L0 = d === 0 ? lx + BW - w : x - w / 2; if (L0 + w + 3 * dpr > last || L0 < lx) continue;
+      q.globalAlpha = 0.6; q.fillText(lab, L0, sy); last = L0; }
+    q.globalAlpha = 1; HM.bgK = bk;
+  }
+  g.clearRect(0, 0, W, H); g.drawImage(HM.bg, 0, 0);
   for (let s = 0; s < 2; s++){
     const y = y0 + s * (bh + gap), x = pos(HM.lv[s]) * BW;
-    g.globalAlpha = 0.6; g.fillStyle = ink; g.textAlign = 'left'; g.fillText(s ? 'R' : 'L', 0, y + bh / 2 + dpr * 0.5); g.globalAlpha = 1;
-    g.save(); g.translate(lx, 0);
-    g.globalAlpha = 0.13; g.fillStyle = ink; g.fillRect(0, y, BW, bh); g.globalAlpha = 1;
-    if (blink){ g.globalAlpha = 0.7; g.fillStyle = '#e8a33a'; g.fillRect(0, y, BW, bh); g.globalAlpha = 1; }   // MASTER CUT FLASH
-    g.fillStyle = ink; g.fillRect(0, y, Math.min(x, amber), bh);
-    if (x > amber){ g.fillStyle = '#e8a33a'; g.fillRect(amber, y, x - amber, bh); }
-    const px = Math.min(BW - dpr, pos(HM.pk[s]) * BW); if (HM.pk[s] > 0.004){ g.fillStyle = HM.pk[s] >= 0.999 ? '#e5484d' : ink; g.fillRect(px, y, Math.max(1, dpr * 1.5), bh); }
-    g.restore();
+    if (blink){ g.globalAlpha = 0.7; g.fillStyle = '#e8a33a'; g.fillRect(lx, y, BW, bh); g.globalAlpha = 1; }   // MASTER CUT FLASH
+    g.fillStyle = ink; g.fillRect(lx, y, Math.min(x, amber), bh);
+    if (x > amber){ g.fillStyle = '#e8a33a'; g.fillRect(lx + amber, y, x - amber, bh); }
+    const px = Math.min(BW - dpr, pos(HM.pk[s]) * BW); if (HM.pk[s] > 0.004){ g.fillStyle = HM.pk[s] >= 0.999 ? '#e5484d' : ink; g.fillRect(lx + px, y, Math.max(1, dpr * 1.5), bh); }
   }
-  const ty = y0 + bh * 2 + gap, sy = Math.round(H - fs * 0.6);
-  { let last = Infinity;   // right to left, a label only where it doesn't run into the one after it (narrow meters: fewer numbers)
-    for (const d of [0, -6, -12, -24, -36]){ const x = lx + Math.round(BW * lvl(Math.pow(10, d / 20))), lab = String(d), w = g.measureText(lab).width;
-      g.globalAlpha = 0.4; g.fillStyle = ink; g.fillRect(Math.min(x, lx + BW - 1), ty, 1, Math.round(2 * dpr));
-      const L0 = d === 0 ? lx + BW - w : x - w / 2; if (L0 + w + 3 * dpr > last || L0 < lx) continue;
-      g.globalAlpha = 0.6; g.textAlign = 'left'; g.fillText(lab, L0, sy); g.globalAlpha = 1; last = L0; } }
   if (HM.clip){ g.fillStyle = '#e5484d'; g.fillRect(lx + BW - Math.round(4 * dpr), y0, Math.round(4 * dpr), bh * 2 + gap); }
-  g.font = `600 ${Math.round(11 * dpr)}px ${st.fontFamily || 'monospace'}`; g.textAlign = 'right'; g.fillStyle = HM.clip ? '#e5484d' : ink; g.globalAlpha = pkMax > 0.0001 ? 1 : 0.45;
+  g.font = `600 ${Math.round(11 * dpr)}px ${ff}`; g.textBaseline = 'middle'; g.textAlign = 'right'; g.fillStyle = HM.clip ? '#e5484d' : ink; g.globalAlpha = pkMax > 0.0001 ? 1 : 0.45;
   g.fillText(pkTxt + ' dB', W - dpr, Math.round(H * 0.38)); g.globalAlpha = 1;
 }
 $('hMeter').addEventListener('click', () => { HM.clip = false; HM.pk = [0, 0]; HM.drawn = ''; });
