@@ -1679,6 +1679,31 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkFxBar .dkadd small{font-family:var(--mono); font-weight:400; font-size:var(--fs-1); color:var(--muted)}
 #dkFxBar .dkadd:hover{background:var(--panel)}
 #dkFxBar .dkfc .fch{cursor:grab} #dkFxBar .dkfc.dragging{opacity:.55} #dkFxBar .droptgt{outline:3px solid #ff5a1f; outline-offset:2px}
+/* …CHAINS RAIL (3 Nov, FX bar): the track's …chains modules in signal order as small blocks on the same dock and offset
+   blocks as the effects beside it (deckChains / deckChnFold, dkChnRail). IN and OUT are plain tags at the ends; a block's
+   square light is on (orange) or bypassed (hollow, hatched). Folded …CHAINS: a narrow rail beside the title. */
+#tDeck.fxbar #dkChn .dkb:has(> #dkChnRows.hasrail){padding:0}
+#dkChnRows.hasrail{display:block; height:100%; overflow:hidden}
+.dkcrail{display:flex; flex-flow:column wrap; align-content:flex-start; gap:7px 12px; height:100%; padding:8px 12px 12px 10px; overflow:hidden; box-sizing:border-box;
+  background:color-mix(in srgb, var(--side) 84%, #000); font-size:var(--fs-2)}
+.dkcrail .dkcend{flex:none; align-self:flex-start; font-family:var(--mono); font-size:var(--fs-1); font-weight:700; letter-spacing:.06em; padding:2px 6px; color:var(--inv); background:var(--ink); white-space:nowrap}
+.dkcrail .dkcb{flex:none; display:flex; align-items:center; gap:7px; width:150px; max-width:100%; min-height:0; height:24px; padding:0 8px; margin:0 4px 0 0; border-radius:0; box-sizing:border-box;
+  border:1.5px solid var(--line); background:var(--panel); color:var(--ink); box-shadow:3px 3px 0 0 #fff, 3px 3px 0 1.5px var(--line); font:inherit; font-weight:700; letter-spacing:.04em; text-align:left; cursor:pointer}
+.dkcrail .dkcb span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0}
+.dkcrail .dkcb .fon{flex:none; width:10px; height:10px; border:2px solid currentColor; box-sizing:border-box}
+.dkcrail .dkcb .fon.on{background:#ff5a1f; border-color:#ff5a1f}
+.dkcrail .dkcb.off{background:repeating-linear-gradient(135deg, var(--panel2) 0 6px, var(--track) 6px 12px); color:var(--muted)}
+.dkcrail .dkcb:hover span{text-decoration:underline}
+.dkcrail.chnoff .dkcb{opacity:.55}
+.dkcrail .dkcadd{flex:none; align-self:flex-start; min-height:0; height:24px; padding:0 10px; margin:0; border:1.5px dashed var(--line); border-radius:0; background:transparent; color:var(--ink); box-shadow:none;
+  font:inherit; font-weight:700; letter-spacing:.06em; cursor:pointer}
+.dkcrail .dkcadd:hover{background:var(--panel)}
+/* folded: the title strip, then the rail (blocks only, narrower) */
+#tDeck.fxbar #dkChn.col.hasrail{flex:0 0 auto; width:auto; min-width:26px; flex-direction:row}
+#tDeck.fxbar #dkChn.col.hasrail > .dkh{flex:0 0 26px; border-right:1px solid var(--line)}
+#dkChnRail{flex:1 1 auto; height:auto; max-width:240px; padding:8px 10px 10px 8px; gap:6px 10px}
+#dkChnRail .dkcb{width:112px; height:22px; padding:0 6px; gap:6px; font-size:var(--fs-1)}
+#dkChnRail .dkcend{font-size:var(--fs-1); padding:1px 5px}
 /* BUS (31 Oct fix): INST steps aside on a bus and left a blank gap before TRACK. …CHAINS keeps the width its controls need
    (it already grows with them); FX takes the rest, as on the master. */
 .tdeck.bus #dkFx{flex:1 1 var(--dkwf, 320px)}
@@ -24513,6 +24538,292 @@ function dkFxPic(g, W, H, f, C, F, font, now, lvNow){
       const db = clamp(20 * Math.log10(m || 1e-6), -36, 18), y = y0 + (18 - db) / 54 * h; if (x === x0) g.moveTo(x, y); else g.lineTo(x, y); } g.stroke(); level(); return true; }
   return false;
 }
+/* ===== FX BAR: EQ / FILTER RESPONSE CURVES AND ECHO TAPS (3 Nov) =====
+   In the room under a slot's values, an EQ or filter draws its magnitude response from its current values, worked out
+   with the same formulas its DSP uses (log frequency 20 Hz – 20 kHz, ±18 dB or the effect's own range, a 0 dB line), and a
+   delay draws its echoes as fading bars over 1–2 bars of the song (time from its time / sync values and the tempo, height
+   from the feedback, left and right lanes when the repeats bounce). Both are drawn only when a value (or the size, skin,
+   tempo) changes: dkFxResp keeps a key per column, so a frame costs one string compare. Where the box is too small the
+   older picture (dkFxPic) stays. Tone, not level: output, makeup and input gains are left out of the curves.
+   Which effects: dkFxCurve (eq, filter, cut, ladder, envfilt, vowel, …pump EQ, …pump STRIP's HPF / LPF, voicing and EQ) and
+   dkFxTaps (delay, pdelay, sdelay, bbd, gdelay, reverse, …pump ECHO). */
+const dkCurveMemo = new Map();   // the last curves worked out, by effect and values (a resize or a skin change reuses them)
+let dkFxCurveN = 0;   // pictures drawn (test hook: a value change must draw once, an unchanged frame never)
+const DKR_LO = 20, DKR_HI = 20000;
+// complex helpers for the digital responses (a pair [re, im])
+const cxM = (a, b) => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
+const cxD = (a, b) => { const d = b[0] * b[0] + b[1] * b[1] || 1e-300; return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d]; };
+const cxA2 = a => a[0] * a[0] + a[1] * a[1];
+// TPT state-variable filter (chains-worklet.js bfStep / EnvFilter / Filter): the bilinear map of 1 / (s² + k s + 1), so at a
+// frequency f it is the analog one at Ω = tan(π f / sr) / g. Returns [lp, bp (v1), hp] as complex numbers.
+function svfH(f, sr, g, k){
+  const W = Math.tan(Math.PI * Math.min(f, sr * .499) / sr) / g, D = [1 - W * W, k * W];
+  return [cxD([1, 0], D), cxD([0, W], D), cxD([-W * W, 0], D)];
+}
+// …pump's analog prototypes (pump common/dsp/Biquad.hpp analogPrototype, as pump/ui/eq.js draws them): shape 0 Bell, 1 low
+// shelf, 2 high shelf, 3 low cut, 4 high cut, 5 notch, 6 band pass, 7 tilt. Sections [n0, n1, n2, d0, d1, d2] in s.
+function pmpBwQs(order){ const n2 = order >> 1, first = (order & 1) !== 0, qs = [];
+  for (let k = 0; k < n2; k++){ const a = first ? Math.PI * (k + 1) / order : Math.PI * (2 * k + 1) / (2 * order); qs.push(1 / (2 * Math.cos(a))); }
+  qs.sort((a, b) => a - b); return {qs, first}; }
+function pmpProto(shape, freq, gainDb, q, slope, sr){
+  const out = {sec:[], gain:1}, w0 = 2 * Math.PI * clamp(freq, 1, 0.75 * sr) / sr, G = Math.pow(10, gainDb / 20); q = clamp(q, 0.025, 40);
+  const S = (n0, n1, n2, d0, d1, d2) => out.sec.push([n0, n1, n2, d0, d1, d2]);
+  if (shape === 0){ const A = Math.sqrt(G); S(w0 * w0, A * w0 / q, 1, w0 * w0, w0 / (A * q), 1); }
+  else if (shape === 1 || shape === 2 || shape === 7){
+    const high = shape !== 1, order = slope <= 6 ? 1 : slope <= 12 ? 2 : 4, gk = Math.pow(G, 1 / (2 * order)), rz = high ? w0 / gk : w0 * gk, rp = high ? w0 * gk : w0 / gk;
+    const {qs, first} = pmpBwQs(order); if (qs.length) qs[qs.length - 1] *= q / Math.SQRT1_2;
+    if (first) S(rz, 1, 0, rp, 1, 0);
+    for (const qq of qs) S(rz * rz, rz / qq, 1, rp * rp, rp / qq, 1);
+    out.gain = shape === 7 ? Math.sqrt(G) : high ? G : 1;
+  } else if (shape === 3 || shape === 4){
+    const hp = shape === 3, order = clamp(Math.floor(slope / 6), 1, 16), {qs, first} = pmpBwQs(order); if (qs.length) qs[qs.length - 1] *= q / Math.SQRT1_2;
+    if (first) hp ? S(0, 1, 0, w0, 1, 0) : S(w0, 0, 0, w0, 1, 0);
+    for (const qq of qs) hp ? S(0, 0, 1, w0 * w0, w0 / qq, 1) : S(w0 * w0, 0, 0, w0 * w0, w0 / qq, 1);
+  } else if (shape === 5){ for (let s = 0; s < (slope >= 24 ? 2 : 1); s++) S(w0 * w0, 0, 1, w0 * w0, w0 / q, 1); }
+  else if (shape === 6){ for (let s = 0; s < clamp(Math.floor(slope / 12), 1, 4); s++) S(0, w0 / q, 0, w0 * w0, w0 / q, 1); }
+  return out;
+}
+function pmpMag2(a, w){ let v = a.gain * a.gain; const w2 = w * w;
+  for (const s of a.sec){ const nr = s[0] - s[2] * w2, ni = s[1] * w, dr = s[3] - s[5] * w2, di = s[4] * w; v *= (nr * nr + ni * ni) / Math.max(dr * dr + di * di, 1e-300); }
+  return v; }
+// …pump EQ: Slope's values in dB/oct (Brickwall drawn as the steepest Butterworth, as its own window does)
+const PEQ_SLOPE = [6, 12, 18, 24, 30, 36, 48, 72, 96, 1000];
+// …pump STRIP (pump plugins/strip/StripEngine.hpp): each console's HPF / LPF slopes, EQ family (0 constant, 1 proportional,
+// 2 inductor, 3 passive, 4 wide), shelf Q and bell Q scale, and its fixed voicing [shape, Hz, dB at full COLOUR, Q, slope].
+const PSTRIP_PROF = [
+  [24, 12, 0, .7071, 1, []],
+  [18, 12, 2, 1.45, .65, [[1, 38, .7, .7071, 12], [2, 18000, -.8, .7071, 12]]],
+  [18, 12, 0, .7071, 1, [[1, 15, -.6, .7071, 12], [2, 20000, -.3, .7071, 12]]],
+  [18, 12, 1, 1.25, 1, [[1, 15, -.5, .7071, 12], [2, 12000, .25, .7071, 12]]],
+  [12, 12, 1, .9, 1, [[0, 90, .6, .6, 12], [0, 5000, .3, .5, 12]]],
+  [12, 12, 3, .55, .55, [[1, 70, .6, .7071, 12], [2, 15000, -1.2, .7071, 12]]],
+  [12, 12, 4, .7071, .7, [[0, 2800, .8, .6, 12], [2, 16000, -.6, .7071, 12]]],
+  [12, 12, 4, .7071, .5, [[0, 180, .9, .6, 12], [2, 12000, -1.8, .7071, 6], [1, 25, -1, .7071, 12]]]];
+// StripEngine buildBands: the bands a setting runs, as [shape, Hz, dB, Q, slope]
+function pstripBands(p){
+  const P = PSTRIP_PROF[clamp(Math.round(p.model), 0, 7)], col = clamp((p.color ?? 100) * .01, 0, 1), b = [];
+  if (p.hpf > 10.05) b.push([3, p.hpf, 0, .7071, P[0]]);
+  if (p.lpf < 21990) b.push([4, p.lpf, 0, .7071, P[1]]);
+  if (col > 0) for (const v of P[5]) if (v[2]) b.push([v[0], v[1], v[2] * col, v[3], v[4]]);
+  if (!(p.eq_on >= .5)) return b;
+  const set = (sh, f, g, q, sl) => { if (Math.abs(g) >= .01) b.push([sh, f, g, q, sl]); };
+  const pq = (q, g) => q * clamp(.35 + .1 * Math.abs(g), .4, 2), lb = p.lf_bell >= .5, hb = p.hf_bell >= .5;
+  const gL = p.lf_gain, gLm = p.lmf_gain, gHm = p.hmf_gain, gH = p.hf_gain, fL = p.lf_freq, fLm = p.lmf_freq, fHm = p.hmf_freq, fH = p.hf_freq;
+  switch (P[2]){
+    case 0: set(lb ? 0 : 1, fL, gL, lb ? .9 : .7071, 12); set(0, fLm, gLm, p.lmf_q, 12); set(0, fHm, gHm, p.hmf_q, 12); set(hb ? 0 : 2, fH, gH, hb ? .9 : .7071, 12); break;
+    case 1: set(lb ? 0 : 1, fL, gL, lb ? pq(1, gL) : P[3], 12); set(0, fLm, gLm, pq(p.lmf_q, gLm), 12); set(0, fHm, gHm, pq(p.hmf_q, gHm), 12); set(hb ? 0 : 2, fH, gH, hb ? pq(1, gH) : P[3], 12); break;
+    case 2: set(lb ? 0 : 1, fL, gL, lb ? .8 : P[3], 12); set(0, fLm, gLm, p.lmf_q * (gLm < 0 ? .9 : P[4]), 12); set(0, fHm, gHm, p.hmf_q * (gHm < 0 ? .9 : P[4]), 12); set(hb ? 0 : 2, fH, gH, hb ? .8 : .55, 12); break;
+    case 3:
+      if (lb) set(0, fL, gL, .6, 12); else if (gL > 0){ set(1, fL, gL, P[3], 12); set(0, Math.min(2.6 * fL, 2400), -.42 * gL, .75, 12); } else set(1, fL, gL, .7071, 6);
+      set(0, fLm, gLm, p.lmf_q * P[4], 12); set(0, fHm, gHm, p.hmf_q * P[4], 12);
+      if (gH > 0) set(hb ? 0 : 2, fH, gH, hb ? .7 : .6, 12); else set(2, fH, gH, .7071, 6); break;
+    default: set(lb ? 0 : 1, fL, gL, .6, lb ? 12 : 6); set(0, fLm, gLm, p.lmf_q * P[4], 12); set(0, fHm, gHm, p.hmf_q * P[4], 12); set(hb ? 0 : 2, fH, gH, .6, hb ? 12 : 6);
+  }
+  return b;
+}
+/* Thunder's EQ is Airwindows EQ (dsp/tfx/aw_EQ.cc → EQProc.cpp): one-pole stages that alternate every other and every third
+   sample, the "triplet" treble and the density stages. Its small-signal response is that code run on a small impulse
+   (the density curves are linear near zero), read at each frequency. The alternating stages make it vary with time, so
+   the impulse goes in at each of the six starting phases and the responses are averaged: what a steady tone hears. One
+   channel, as both sides are the same. */
+function awEqIR(P, sr, ph){
+  const [A, B, C, D, E, F, G] = P, N = 16384, h = new Float64Array(N), amp = 1e-5;
+  let dA = A * 12 - 6, dB = B * 12 - 6, dC = C * 12 - 6; const eq = !(dA === 0 && dB === 0 && dC === 0);
+  dA = Math.pow(10, dA / 20) - 1; dB = Math.pow(10, dB / 20) - 1; dC = Math.pow(10, dC / 20) - 1;
+  const trip = -dA, oA = Math.abs(dA), oB = Math.abs(dB), oC = Math.abs(dC);
+  const iC = Math.min(1, (D * D * 15 + 1) * .0188 + .7), lpOn = D * D * 15 + 1 < 15.99;
+  const iA = (E * E * 15 + 1) * 1000 / sr, iB = (F * F * 1570 + 30) * 10 / sr, iD = (G * G * 1570 + 30) / sr, hpOn = G * G * 1570 + 30 > 30.01;
+  const hp = new Float64Array(10), lp = new Float64Array(11), H = new Float64Array(6), L = new Float64Array(6), T = new Float64Array(3);
+  let iH = 0, iL = 0, last = 0, last2 = 0, flip = (ph & 1) === 1, f3 = ph % 3, peak = 0, end = 0;
+  // the density stages for small signals: sin(|v|·π/2) ≈ |v|·π/2 (a boost blends that in), 1 − cos ≈ 0 (a cut blends in nothing)
+  const gA = (dA + 1) * (1 - oA + (dA > 0 ? 1.57079633 * oA : 0)), gB = (dB + 1) * (1 - oB + (dB > 0 ? 1.57079633 * oB : 0)), gC = (dC + 1) * (1 - oC + (dC > 0 ? 1.57079633 * oC : 0));
+  for (let n = 0; n < N; n++){
+    let x = n ? 0 : amp;
+    last2 = last; last = x; flip = !flip; f3++; if (f3 < 1 || f3 > 3) f3 = 1;
+    if (hpOn){ const o = flip ? 0 : 4; for (let j = 0; j < 4; j++){ hp[o + j] = hp[o + j] * (1 - iD) + x * iD; x -= hp[o + j]; } for (let j = 8; j < 10; j++){ hp[j] = hp[j] * (1 - iD) + x * iD; x -= hp[j]; } }
+    if (eq){
+      const c = f3 - 1, tf0 = last2 - x; T[c] += tf0; T[(c + 2) % 3] -= tf0; const tf = T[c] * trip;
+      H[c] = H[c] * (1 - iA) + x * iA; let hi = x - H[c]; L[c] = L[c] * (1 - iB) + x * iB; let bass = L[c];
+      T[0] /= 2; T[1] /= 2; T[2] /= 2; hi += tf;
+      const o = flip ? 3 : 4; H[o] = H[o] * (1 - iA) + hi * iA; hi -= H[o]; L[o] = L[o] * (1 - iB) + bass * iB; bass = L[o];
+      iH = iH * (1 - iA) + hi * iA; hi -= iH; iL = iL * (1 - iB) + bass * iB; bass = iL;
+      const mid = x - bass - hi;
+      x = mid * gB + hi * gA + bass * gC;
+    }
+    if (lpOn){ const o = flip ? 0 : 5; for (let j = 0; j < 5; j++){ lp[o + j] = lp[o + j] * (1 - iC) + x * iC; x = lp[o + j]; } lp[10] = lp[10] * (1 - iC) + x * iC; x = lp[10] * (1 - iC) + x * iC; }
+    h[n] = x / amp; const a = Math.abs(h[n]); if (a > peak) peak = a; if (a > peak * 1e-6) end = n + 1; else if (n - end > 4096) break;   // every stage has died away
+  }
+  return h.subarray(0, Math.max(end, 64));
+}
+// |H|² at each frequency: the six phases' impulse responses averaged (the same as averaging their spectra, at a sixth of
+// the cost), then summed with a turning phasor (no FFT, any frequency)
+function awEqMag2(P, F, sr){
+  const hs = [0, 1, 2, 3, 4, 5].map(ph => awEqIR(P, sr, ph)), n = Math.max(...hs.map(h => h.length)), h = new Float64Array(n), out = new Float64Array(F.length);
+  for (const x of hs) for (let i = 0; i < x.length; i++) h[i] += x[i] / 6;
+  for (let i = 0; i < F.length; i++){
+    const w = 2 * Math.PI * F[i] / sr, c = Math.cos(w), s = -Math.sin(w); let pr = 1, pi = 0, r = 0, m = 0;
+    for (let k = 0; k < n; k++){ r += h[k] * pr; m += h[k] * pi; const t = pr * c - pi * s; pi = pr * s + pi * c; pr = t; }
+    out[i] = r * r + m * m;
+  }
+  return out;
+}
+// DaisySP LadderFilter (dsp/tfx/fx_ds2.cc LadderFx: passband gain 0.25; DaisySP Source/Filters/ladder.cpp): the Huovilainen
+// model at 4× with a linearly interpolated input and the four sub-steps averaged out. Small signals (tanh ≈ x): run on an
+// impulse, then read at each frequency (the whole thing is time-invariant at the base rate).
+function ladderIR(sr, cut, res, drive, mode){
+  const fc = clamp(cut, 5, sr * .425), wc = fc * 2 * Math.PI / (sr * 4), wc2 = wc * wc;
+  const al = .9892 * wc - .4324 * wc2 + .1381 * wc * wc2 - .0202 * wc2 * wc2, Qa = 1.006 + .0536 * wc - .095 * wc2 - .05 * wc2 * wc2;
+  const K = 4 * clamp(res, 0, 1.8), pbg = .25, dv = Math.max(.05, drive), ds = dv > 1 ? 1 + (Math.min(dv, 4) - 1) * (1 - pbg) : dv;
+  const z0 = new Float64Array(4), z1 = new Float64Array(4), N = 16384, h = new Float64Array(N), m = clamp(mode | 0, 0, 5);
+  const LPF = (x, i) => { let ft = x * .76923077 + .23076923 * z0[i] - z1[i]; ft = ft * al + z1[i]; z1[i] = ft; z0[i] = x; return ft; };
+  let old = 0, peak = 0, end = 0;
+  for (let n = 0; n < N; n++){
+    const inp = (n ? 0 : 1) * ds; let tot = 0;
+    for (let j = 0; j < 4; j++){ const it = j / 4, xi = it * old + (1 - it) * inp, uu = xi - (z1[3] - pbg * xi) * K * Qa;
+      const s1 = LPF(uu, 0), s2 = LPF(s1, 1), s3 = LPF(s2, 2), s4 = LPF(s3, 3);
+      tot += (m === 0 ? s4 : m === 1 ? s2 : m === 2 ? (s2 + s4) * 4 - s3 * 8 : m === 3 ? (s1 - s2) * 2 : m === 4 ? uu + s4 - (s1 + s3) * 4 + s2 * 6 : uu + s2 - s1 * 2) * .25; }
+    old = inp; h[n] = tot; const a = Math.abs(tot); if (!(a < 1e6)) return h.subarray(0, n);   // self-oscillating: no steady response
+    if (a > peak) peak = a; if (a > peak * 1e-6) end = n + 1;
+  }
+  return h.subarray(0, Math.max(end, 64));
+}
+// The complex response of an impulse response at each frequency (a direct sum with a turning phasor: no FFT, any frequency)
+function irH(h, F, sr){
+  return Array.from(F, fq => { const w = 2 * Math.PI * fq / sr, c = Math.cos(w), s = -Math.sin(w); let pr = 1, pi = 0, re = 0, im = 0;
+    for (let n = 0; n < h.length; n++){ re += h[n] * pr; im += h[n] * pi; const t = pr * c - pi * s; pi = pr * s + pi * c; pr = t; }
+    return [re, im]; });
+}
+// Vowel filter's formant table (chains-worklet.js VF_F / VF_DB / VF_BW: Peterson & Barney 1952), for its curve in the FX bar
+const VF_LF = [
+  [[730, 1090, 2440], [530, 1840, 2480], [270, 2290, 3010], [570, 840, 2410], [300, 870, 2240]],
+  [[850, 1220, 2810], [610, 2330, 2990], [310, 2790, 3310], [590, 920, 2710], [370, 950, 2670]],
+  [[1030, 1370, 3170], [690, 2610, 3570], [370, 3200, 3730], [680, 1060, 3180], [430, 1170, 3260]]].map(v => v.map(f => f.map(Math.log)));
+const VF_DB = [[-1, -5, -28], [-2, -17, -24], [-4, -24, -28], [0, -7, -34], [-3, -19, -43]], VF_BW = [80, 100, 140], VF_BREF = [500, 1500, 2500], VF_GAIN = 3.2;
+// The response in dB at each frequency in F, or null for an effect that has none. {db, range (± dB), label}
+function dkFxCurve(f, F, sr){
+  const type = f.type, D = TFX[type]; if (!D) return null;
+  const mix = (Hy, mx) => [1 + (Hy[0] - 1) * mx, Hy[1] * mx];   // dry + (wet − dry) × mix
+  const db = new Float64Array(F.length), fromMag2 = m2 => { for (let i = 0; i < F.length; i++) db[i] = 10 * Math.log10(Math.max(m2[i], 1e-30)); };
+  if (type === 'eq'){ fromMag2(awEqMag2(D.map(f), F, sr)); let mx = 0; for (const v of db) mx = Math.max(mx, Math.abs(v)); return {db, range:mx > 12.5 ? 18 : 12, label:'EQ'}; }
+  if (type === 'filter'){ const p = D.map(f), mode = clamp(Math.round(p.mode), 0, 3), r = clamp(p.res, 0, 1), s24 = p.slope >= .5, mx = clamp(p.mix, 0, 1);
+    const k12 = 1.414 - 1.38 * r, k2 = mode < 2 ? .765 - .73 * r : k12, k1 = mode < 2 ? 1.848 : k12;
+    const lc = Math.min(Math.log2(sr * .45), Math.max(3.4, Math.log2(clamp(p.cutoff, 10, sr * .45)))), g = Math.tan(Math.PI * Math.pow(2, lc) / sr);
+    const out = (H, k) => mode === 0 ? H[0] : mode === 1 ? H[2] : mode === 2 ? [k * H[1][0], k * H[1][1]] : [1 - k * H[1][0], -k * H[1][1]];
+    for (let i = 0; i < F.length; i++){ let y = out(svfH(F[i], sr, g, s24 ? k1 : k12), s24 ? k1 : k12); if (s24) y = cxM(y, out(svfH(F[i], sr, g, k2), k2)); db[i] = 10 * Math.log10(Math.max(cxA2(mix(y, mx)), 1e-30)); }
+    return {db, range:18, label:['LOW-PASS', 'HIGH-PASS', 'BAND-PASS', 'NOTCH'][mode]}; }
+  if (type === 'cut'){ const p = D.map(f), sl = clamp(Math.round(p.slope), 0, 2), lo = p.low > 20.5, hi = p.high < 19900;
+    const fl = clamp(p.low, 10, sr * .45), fh = clamp(p.high, 10, sr * .45), gl = Math.tan(Math.PI * fl / sr), gh = Math.tan(Math.PI * fh / sr);
+    const cl = 1 - Math.exp(-2 * Math.PI * fl / sr), ch = 1 - Math.exp(-2 * Math.PI * fh / sr);
+    for (let i = 0; i < F.length; i++){ let y = [1, 0]; const w = 2 * Math.PI * F[i] / sr, zi = [Math.cos(w), -Math.sin(w)];
+      const op = c => cxD([c, 0], [1 - (1 - c) * zi[0], -(1 - c) * zi[1]]);   // P += (x − P) c
+      if (lo){ if (sl === 0){ const P = op(cl); y = cxM(y, [1 - P[0], -P[1]]); } else if (sl === 1) y = cxM(y, svfH(F[i], sr, gl, 1.414)[2]); else y = cxM(y, cxM(svfH(F[i], sr, gl, 1.848)[2], svfH(F[i], sr, gl, .765)[2])); }
+      if (hi){ if (sl === 0) y = cxM(y, op(ch)); else if (sl === 1) y = cxM(y, svfH(F[i], sr, gh, 1.414)[0]); else y = cxM(y, cxM(svfH(F[i], sr, gh, 1.848)[0], svfH(F[i], sr, gh, .765)[0])); }
+      db[i] = 10 * Math.log10(Math.max(cxA2(y), 1e-30)); }
+    return {db, range:18, label:'LOW · HIGH CUT'}; }
+  if (type === 'envfilt'){ const p = D.map(f), mode = clamp(Math.round(p.mode), 0, 2), k = 2 - 1.92 * clamp(p.res, 0, 1), comp = mode === 1 ? Math.pow(k, .6) * 1.32 : Math.pow(k / 2, .3);
+    const fc = clamp(40 * Math.pow(400, clamp(p.freq, 0, 1)), 10, sr * .45), g = Math.tan(Math.PI * fc / sr), mx = clamp(p.mix, 0, 1);
+    for (let i = 0; i < F.length; i++){ const H = svfH(F[i], sr, g, k), y = H[mode === 0 ? 0 : mode === 1 ? 1 : 2]; db[i] = 10 * Math.log10(Math.max(cxA2(mix([y[0] * comp, y[1] * comp], mx)), 1e-30)); }
+    return {db, range:18, label:'AT REST'}; }   // the envelope moves it up (or down) from here
+  if (type === 'vowel'){ const p = D.map(f), voice = clamp(p.voice, 0, 2), vi = Math.min(1, Math.floor(voice)), vf = voice - vi, sh = Math.pow(2, clamp(p.shift, -1, 1));
+    const bw = Math.pow(2.5, 1 - 2 * clamp(p.res, 0, 1)), q = clamp(p.vowel, 0, 4), k0 = Math.min(3, Math.floor(q)), kf = q - k0, mx = clamp(p.mix, 0, 1), dr = .25 + clamp(p.drive, 0, 1) * 10, dn = dr / Math.tanh(dr);
+    const BP = [0, 1, 2].map(j => { const lf = (VF_LF[vi][k0][j] * (1 - kf) + VF_LF[vi][k0 + 1][j] * kf) * (1 - vf) + (VF_LF[vi + 1][k0][j] * (1 - kf) + VF_LF[vi + 1][k0 + 1][j] * kf) * vf;
+      const fc = Math.min(sr * .45, Math.exp(lf) * sh), g = Math.tan(Math.PI * fc / sr), k = clamp(VF_BW[j] * Math.sqrt(fc / VF_BREF[j]) * bw / fc, .02, 2);
+      return [g, k, k * Math.pow(10, (VF_DB[k0][j] * (1 - kf) + VF_DB[k0 + 1][j] * kf) * .5 / 20) * VF_GAIN]; });
+    for (let i = 0; i < F.length; i++){ let y = [0, 0]; for (const [g, k, a] of BP){ const v1 = svfH(F[i], sr, g, k)[1]; y = [y[0] + v1[0] * a * dn, y[1] + v1[1] * a * dn]; } db[i] = 10 * Math.log10(Math.max(cxA2(mix(y, mx)), 1e-30)); }
+    return {db, range:18, label:'VOWEL ' + (Math.abs(q - Math.round(q)) < .08 ? 'AEIOU'[Math.round(q)] : 'AEIOU'[k0] + '>' + 'AEIOU'[k0 + 1])}; }
+  if (type === 'ladder'){ const P = D.map(f), Hs = irH(ladderIR(sr, P[0], P[1], P[2], P[3]), F, sr);
+    for (let i = 0; i < F.length; i++) db[i] = 10 * Math.log10(Math.max(cxA2(mix(Hs[i], clamp(P[4], 0, 1))), 1e-30));
+    return {db, range:18, label:['LP 24', 'LP 12', 'BP 24', 'BP 12', 'HP 24', 'HP 12'][clamp(P[3] | 0, 0, 5)]}; }
+  if (type === 'peq' && f.pump){ const p = f.pump, sc = (p.gain_scale ?? 100) * .01, A = []; let big = 0;
+    for (let b = 1; b <= 24; b++){ if (!(p['b' + b + '_used'] >= .5) || p['b' + b + '_bypass'] >= .5) continue; const sh = Math.round(p['b' + b + '_shape']), g = p['b' + b + '_gain'] * sc;
+      if (sh === 0 || sh === 1 || sh === 2 || sh === 7) big = Math.max(big, Math.abs(g));
+      A.push(pmpProto(sh, p['b' + b + '_freq'], g, p['b' + b + '_q'], PEQ_SLOPE[clamp(Math.round(p['b' + b + '_slope']), 0, 9)], sr)); }
+    for (let i = 0; i < F.length; i++){ const w = 2 * Math.PI * F[i] / sr; let s = 0; for (const a of A) s += 10 * Math.log10(Math.max(pmpMag2(a, w), 1e-30)); db[i] = s; }
+    return {db, range:big > 18 ? 30 : 18, label:A.length ? A.length + ' BAND' + (A.length > 1 ? 'S' : '') : 'NO BANDS'}; }
+  if (type === 'pstrip' && f.pump){ const A = pstripBands(f.pump).map(b => pmpProto(b[0], b[1], b[2], b[3], b[4], sr));
+    for (let i = 0; i < F.length; i++){ const w = 2 * Math.PI * F[i] / sr; let s = 0; for (const a of A) s += 10 * Math.log10(Math.max(pmpMag2(a, w), 1e-30)); db[i] = s; }
+    return {db, range:18, label:'EQ · FILTERS'}; }
+  return null;
+}
+// Note values in beats (chains-worklet.js SD_DIVS and PP_DIVS; pump common/dsp/Tempo.hpp for …pump ECHO)
+const DKT_SD = [.125, 1 / 6, .25, .375, 1 / 3, .5, .75, 2 / 3, 1, 1.5, 2, 4], DKT_PP = [.25, 1 / 3, .5, 2 / 3, 1, 2, 4];
+const DKT_PN = [1 / 16, 1 / 12, 1 / 8, 3 / 16, 1 / 6, 1 / 4, 3 / 8, 1 / 3, 1 / 2, 3 / 4, 2 / 3, 1, 1.5, 4 / 3, 2, 3, 4, 8];
+/* A delay's echoes: {taps:[[seconds, height 0–1, side 'L' | 'R' | 'C']], dry (its level, or null), label}, from the same
+   time and feedback the DSP uses: each repeat is the last × feedback. Ping-pong: the first echo on the left, then they
+   alternate (SDLY, …pump ECHO). */
+function dkFxTaps(f, sr, bpm){
+  const type = f.type, D = TFX[type]; if (!D) return null;
+  const beat = 60 / Math.max(20, bpm || 120), list = [];
+  const run = (T, fb, side, t0 = 0) => { let a = 1; for (let n = 1; n < 64 && a > .03; n++, a *= fb){ list.push([t0 + n * T, Math.min(1, a), side]); if (t0 + n * T > beat * 16) break; } };
+  const pingpong = (TL, TR, fb) => { let t = 0, a = 1; for (let n = 0; n < 64 && a > .03; n++, a *= fb){ const L = !(n & 1); t += L ? TL : TR; list.push([t, Math.min(1, a), L ? 'L' : 'R']); if (t > beat * 16) break; } };
+  let dry = null, label = 'ECHOES';
+  if (type === 'delay'){   // TapeDelay2: the tape speed the map sets, back to seconds (at 88.2 kHz and up it runs every 2nd–4th sample)
+    const sp = clamp(88200 / (dlySec(f.steps, bpm) * sr), 1, 26), cyc = clamp(Math.floor(sr / 44100), 1, 4), m = u8(f.mix);
+    run(88200 * cyc / (sp * sr), Math.pow(u8(f.regen), 2), 'C'); dry = Math.min(1, Math.max(0, 2 - m * 2)); }
+  else if (type === 'pdelay'){ const P = D.map(f); run(Math.max(10, Math.min(2000, P[2])) / 1000, Math.min(.95, P[3]), 'C'); }
+  else if (type === 'sdelay'){ const p = D.map(f), T = p.sync >= .5 ? beat * DKT_SD[clamp(Math.round(p.div), 0, 11)] : p.time, fb = clamp(p.fb, 0, 1) * .95, mx = clamp(p.mix, 0, 1);
+    if (p.mode >= .5){ pingpong(T, T, fb); label = 'PING-PONG'; } else run(T, fb, 'C'); dry = mx <= .5 ? 1 : 2 - 2 * mx; }
+  else if (type === 'bbd'){ const p = D.map(f), T = clamp(p.sync >= .5 ? beat * DKT_PP[clamp(p.div | 0, 0, 6)] : p.time, .02, 1.2); run(T, Math.min(1, p.fb), 'C'); dry = 1 - clamp(p.mix, 0, 1) * .5; }
+  else if (type === 'gdelay' || type === 'reverse'){ const p = D.map(f), T = clamp(p.sync >= .5 ? beat * DKT_PP[clamp(Math.round(p.div), 0, 6)] : p.time, .005, 2.5);
+    run(T, clamp(p.fb, 0, 1) * .9, 'C'); if (type === 'reverse' && p.mode >= .5) label = 'SWELL'; }
+  else if (type === 'pecho' && f.pump){ const p = f.pump, nt = i => DKT_PN[clamp(Math.round(i), 0, 17)] * beat;
+    const TL = p.sync >= .5 ? nt(p.note_l) : p.time_l / 1000, TR = p.link >= .5 ? TL : p.sync >= .5 ? nt(p.note_r) : p.time_r / 1000, fb = clamp(p.feedback, 0, 120) / 100, st = Math.round(p.stereo);
+    if (st === 1){ pingpong(TL, TR, fb); label = 'PING-PONG'; }
+    else if (TL === TR && st !== 2) run(TL, fb, 'C');
+    else { run(TL, fb, 'L'); run(TR, fb, 'R', st === 2 ? .015 : 0); label = st === 2 ? 'WIDE' : 'ECHOES'; }
+    const mx = clamp(p.mix, 0, 100) / 100; dry = mx <= .5 ? 1 : 2 - 2 * mx; }
+  else return null;
+  return {taps:list, dry, label};
+}
+const dkFxRespType = type => !!TFX[type] && (['eq', 'filter', 'cut', 'envfilt', 'ladder', 'vowel', 'peq', 'pstrip', 'delay', 'pdelay', 'sdelay', 'bbd', 'gdelay', 'reverse', 'pecho'].includes(type));
+// Draws the curve or the taps when there is room (true), redrawing only when the key changes; false: the older picture.
+function dkFxResp(col, cv, g, W, H, f, font){
+  if (!f || !dkFxRespType(f.type) || W < 96 || H < 50){ col._rk = ''; return false; }
+  const sr = ctx ? ctx.sampleRate : 48000, bpm = S.bpm || 120, C = fxDynPal();
+  let vals; try { vals = f.pump ? JSON.stringify(f.pump) : TFX[f.type].ps.map(q => f[q.k]).join(','); } catch(e){ vals = ''; }
+  const key = f.type + '|' + vals + '|' + cv.width + 'x' + cv.height + '|' + sr + '|' + bpm + '|' + C.bg + C.ink + '|' + font;
+  if (col._rk === key) return true;
+  const now = performance.now(); if (col._rk && now - (col._rt || 0) < 90) return true;   // while a value is dragged: at most ~11 pictures a second
+  col._rk = key; col._rt = now; dkFxCurveN++;
+  const F = a => 'rgba(' + C.ink + ',' + a + ')', AC = '#ff5a1f', pad = 6, x0 = pad, x1 = W - pad, y0 = 14, y1 = H - 13, w = x1 - x0, h = y1 - y0;
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  const txt = (s, x, y, al, a, sz = 9, wt = 600) => { g.font = wt + ' ' + sz + 'px ' + font; g.textBaseline = 'top'; g.textAlign = al; g.fillStyle = F(a); g.fillText(s, x, y); };
+  const tp = dkFxTaps(f, sr, bpm);
+  if (tp){
+    // 1 bar, or 2 when the first echo is longer than a quarter of one (or as long as two echoes need)
+    const beat = 60 / bpm, bar = beat * 4, T1 = tp.taps.length ? tp.taps[0][0] : beat, Tw = Math.max(T1 > bar / 4 ? 2 * bar : bar, T1 * 2.2), X = t => x0 + t / Tw * w;
+    const two = tp.taps.some(q => q[2] !== 'C'), lanes = two ? [['L', y0, y0 + h / 2 - 2], ['R', y0 + h / 2 + 2, y1]] : [['', y0, y1]];
+    g.lineWidth = 1;
+    for (let b = 0; b * beat <= Tw + 1e-9; b++){ const x = Math.round(X(b * beat)) + .5; if (b % 4 && w / (Tw / beat) < 7) continue; g.strokeStyle = F(b % 4 ? .1 : .3); g.beginPath(); g.moveTo(x, y0); g.lineTo(x, y1); g.stroke(); }
+    for (const [nm, ta, tb] of lanes){ g.strokeStyle = F(.25); g.beginPath(); g.moveTo(x0, Math.round(tb) + .5); g.lineTo(x1, Math.round(tb) + .5); g.stroke(); if (nm) txt(nm, x0 + 2, ta, 'left', .5, 8, 700); }
+    const bw = clamp(Math.round(w / 45), 3, 5);
+    if (tp.dry != null) for (const [, ta, tb] of lanes){ const hh = (tb - ta) * clamp(tp.dry, 0, 1); g.fillStyle = F(.55); g.fillRect(Math.round(X(0)), tb - hh, bw, hh); }
+    for (const [t, a, side] of tp.taps){ if (t > Tw) break; for (const [nm, ta, tb] of lanes){ if (side !== 'C' && nm && nm !== side) continue;
+      const hh = Math.max(1, (tb - ta) * a); g.globalAlpha = .3 + .7 * a; g.fillStyle = AC; g.fillRect(Math.round(X(t)), tb - hh, bw, hh); } }
+    g.globalAlpha = 1;
+    txt(tp.label, 4, 2, 'left', .55); txt(Tw > bar * 1.01 ? (Tw / bar > 2.05 ? (Tw / bar).toFixed(1) + ' BARS' : '2 BARS') : '1 BAR', W - 4, 2, 'right', .55, 8);
+    txt(T1 < 1 ? Math.round(T1 * 1000) + ' ms' : T1.toFixed(2) + ' s', x0, y1 + 2, 'left', .5, 8, 500);
+    g.strokeStyle = F(.22); g.strokeRect(.5, .5, W - 1, H - 1); return true;
+  }
+  // the response: about one point every 2 px, log-spaced 20 Hz – 20 kHz (cached with the key above)
+  const NP = clamp(Math.round(w / 2), 40, 220), FQ = new Float64Array(NP); for (let i = 0; i < NP; i++) FQ[i] = DKR_LO * Math.pow(DKR_HI / DKR_LO, i / (NP - 1));
+  const ck = f.type + '|' + vals + '|' + sr + '|' + NP; let c = dkCurveMemo.get(ck);
+  if (c === undefined){ try { c = dkFxCurve(f, FQ, sr); } catch(e){ c = null; } dkCurveMemo.set(ck, c); if (dkCurveMemo.size > 24) dkCurveMemo.delete(dkCurveMemo.keys().next().value); }
+  if (!c){ col._rk = ''; return false; }
+  const R = c.range, Y = d => y0 + (R - clamp(d, -R - 2, R + 2)) / (2 * R) * h, Xf = fq => x0 + Math.log(fq / DKR_LO) / Math.log(DKR_HI / DKR_LO) * w;
+  g.lineWidth = 1;
+  for (const fq of [50, 200, 500, 2000, 5000]){ const x = Math.round(Xf(fq)) + .5; g.strokeStyle = F(.06); g.beginPath(); g.moveTo(x, y0); g.lineTo(x, y1); g.stroke(); }
+  for (const fq of [100, 1000, 10000]){ const x = Math.round(Xf(fq)) + .5; g.strokeStyle = F(.16); g.beginPath(); g.moveTo(x, y0); g.lineTo(x, y1); g.stroke(); txt(fq >= 1000 ? fq / 1000 + 'k' : String(fq), x + 2, y1 + 2, 'left', .5, 8, 500); }
+  for (const d of [-R / 2, R / 2]){ const y = Math.round(Y(d)) + .5; g.strokeStyle = F(.08); g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); }
+  const z = Math.round(Y(0)) + .5; g.strokeStyle = F(.4); g.beginPath(); g.moveTo(x0, z); g.lineTo(x1, z); g.stroke();
+  g.save(); g.beginPath(); g.rect(x0, y0 - 1, w, h + 2); g.clip();
+  g.beginPath(); g.moveTo(x0, z); for (let i = 0; i < NP; i++) g.lineTo(x0 + w * i / (NP - 1), Y(c.db[i])); g.lineTo(x1, z); g.closePath(); g.fillStyle = AC; g.globalAlpha = .2; g.fill(); g.globalAlpha = 1;
+  g.beginPath(); for (let i = 0; i < NP; i++){ const x = x0 + w * i / (NP - 1), y = Y(c.db[i]); if (i) g.lineTo(x, y); else g.moveTo(x, y); } g.strokeStyle = AC; g.lineWidth = 1.8; g.lineJoin = 'round'; g.stroke();
+  g.restore();
+  txt(c.label, 4, 2, 'left', .55); txt('±' + R + ' dB', W - 4, 2, 'right', .5, 8, 500);
+  g.strokeStyle = F(.22); g.lineWidth = 1; g.strokeRect(.5, .5, W - 1, H - 1);
+  return true;
+}
 /* FX BAR pictures, in the room under each effect's values (none when the values fill the box). Dynamics (the FX stage's own
    display, fxDynPaint): the transfer curve with the live input dot and the reduction history; every other effect: its
    output level over the last ~3 s, so you can see what it is doing to the sound. Colours from the skin's screen (fxDynPal). */
@@ -24530,6 +24841,7 @@ function dkFxViz(col, f, k, node, now){
     const c = lv ? null : FXDYN[f.type](TFX[f.type].map(f, ctx ? ctx.sampleRate : 48000, S.bpm));
     fxDynPaint(g, 0, 0, W, H, D, c, lv, font); return;
   }
+  if (dkFxResp(col, cv, g, W, H, f, font)) return;   // EQ / filter curve, echo taps: drawn only when something changed
   const C = fxDynPal(), F = a => 'rgba(' + C.ink + ',' + a + ')', h = col._h, n = h.length;
   g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
   if (dkFxPic(g, W, H, f, C, F, font, now, h[(col._w - 1 + n) % n])) return;
@@ -24608,7 +24920,74 @@ function dkcItems(d){
   return it;
 }
 function dkcMenu(d, e){ sxMenu(e.clientX, e.clientY, (d.ml + ' · ' + d.l).toUpperCase(), dkcItems(d)); }
+/* …CHAINS RAIL (3 Nov, FX bar only): the track's …chains modules as small blocks in signal order (Track In → … → Chain Out),
+   each with its on / bypassed light, styled like the effect boxes beside it. Shown instead of the help text when the track
+   has no controls in the panel, and as a narrow rail beside the title when …CHAINS is folded. A block opens …chains on that
+   module (chApi().reveal, as the panel's module names do). Rebuilt only when the patch's modules, cables or bypasses change. */
+const DKC_LAB = {adsr:'ADSR', air:'Air', atten:'Attenuverter', autotune:'Pitch correct', autowah:'Auto-wah', bbd:'BBD delay', beads:'Beads', blades:'Blades filter',
+  blipdrum:'Blip drum', bytebeat:'Bytebeat', cab:'Speaker cab', chaos:'Chaos', chorus:'Chorus', clock:'Clock', clouds:'Clouds', comb:'Comb', comp:'Compressor',
+  crush:'Bitcrush', delay:'Tape delay', divider:'Clock divider', drive:'Drive', dub:'Dub tape', envfilt:'Env filter', envfol:'Env follow', eq:'EQ', euclid:'Euclidean',
+  flanger:'Flanger', flex:'Flex', folder:'Wavefolder', fshift:'Freq shifter', gateex:'Gate extract', gdelay:'Grain delay', ladder:'Ladder filter', lfo:'LFO', life:'Life',
+  lofi:'Lo-fi', logic:'Logic', marbles:'Random gen', math:'Math', meta:'Meta mod', odrive:'Overdrive', ott:'Multiband', pdelay:'Pitch delay', phaser:'Phaser',
+  pingpong:'Ping-pong', pitchfol:'Pitch follow', pitchtrk:'Pitch track', preverb:'Pitch reverb', pshift:'Pitch shifter', quant:'Quantizer', random:'Random', repeat:'Repeat',
+  resample:'Resample', retrig:'Retrigger', reverb:'Reverb', reverse:'Reverse echo', ringmod:'Ring mod', rings:'Rings', room:'Room reverb', rotary:'Rotary', saturation:'Saturation',
+  sccomp:'SC comp', scin:'Sidechain In', scout:'Sidechain Out', sgate:'Step gate', slew:'Slew', snh:'Sample & hold', space:'Space reverb', steps:'Steps', tape:'Tape',
+  tgate:'Trance gate', tides:'Function gen', transient:'Transient', tremolo:'Tremolo', tube:'Tube', vca:'VCA', vcf:'VCF', vinyl:'Vinyl', vocoder:'Vocoder', vowel:'Vowel filter',
+  width:'Width', xmod:'Cross-mod', mixer:'Mixer', smixer:'Stereo mixer', spring:'Spring reverb', plate:'Plate reverb', ensemble:'Ensemble', dimension:'Dimension',
+  harm:'Harmonizer', spectral:'Spectral', stretch:'Stretch', convolve:'Convolution', sdelay:'Simple delay', filter:'Filter', cut:'Low / high cut', compressor:'Compressor',
+  buscomp:'Bus comp', glue:'Glue comp', ngate:'Noise gate', autopan:'Auto-pan', pump:'Pump', limiter:'Limiter', utility:'Utility'};
+const dkcLab = m => m.label || DKC_LAB[m.type] || (MODFX[m.type] && MODFX[m.type].name) || (TFX[m.type] && TFX[m.type].long) || (String(m.type).startsWith('pump') ? '…pump ' + String(m.type).slice(4).toUpperCase() : String(m.type));
+// The track's modules in signal order: Kahn's sort over the cables between them, ties by their place on the bench (left first)
+function chainOrder(t, act){
+  const d = S.chainPatch; if (!d || !act.size) return [];
+  const by = new Map(d.modules.filter(m => m && act.has(m.id)).map(m => [m.id, m])), indeg = new Map([...by.keys()].map(k => [k, 0])), out = new Map();
+  for (const c of d.cables || []) if (c && c.from && c.to && by.has(c.from[0]) && by.has(c.to[0]) && c.from[0] !== c.to[0]){
+    const a = c.from[0], b = c.to[0]; if (!out.has(a)) out.set(a, new Set()); if (out.get(a).has(b)) continue; out.get(a).add(b); indeg.set(b, indeg.get(b) + 1); }
+  const pos = id => { const p = by.get(id).pos || [0, 0]; return (+p[0] || 0) * 1e4 + (+p[1] || 0); };
+  const ready = [...indeg].filter(([, n]) => !n).map(([k]) => k), res = [];
+  while (ready.length || res.length < by.size){
+    if (!ready.length){ const left = [...by.keys()].filter(k => !res.includes(k)); ready.push(left.sort((a, b) => pos(a) - pos(b))[0]); indeg.set(ready[0], 0); }   // a loop: go on from its leftmost module
+    ready.sort((a, b) => pos(a) - pos(b)); const k = ready.shift(); if (res.includes(k)) continue; res.push(k);
+    for (const b of out.get(k) || []){ indeg.set(b, indeg.get(b) - 1); if (indeg.get(b) === 0) ready.push(b); }
+  }
+  return res.map(k => by.get(k));
+}
+function dkcReveal(id){ if (noChains()) return; openChains(); if (!id) return; const go = () => { const a = chApi(); return !!(a && a.reveal && a.reveal(id)); }; if (!go()){ setTimeout(go, 200); setTimeout(go, 600); } }
+function dkChnRail(t, act, folded){
+  const mods = chainOrder(t, act), on = !!(S.chainOn && S.chainOn[t]), rail = el('div', 'dkcrail' + (on ? '' : ' chnoff') + (folded ? ' fold' : ''));
+  const ins = mods.filter(m => m.type === 'trackIn'), outs = mods.filter(m => m.type === 'chainOut'), mid = mods.filter(m => m.type !== 'trackIn' && m.type !== 'chainOut');
+  const end = (txt, tip) => { const e = el('span', 'dkcend', txt); e.title = tip; rail.append(e); };
+  const tr = m => d2(clamp(int(m.params && m.params.track, 1), 1, NT));
+  if (ins.length) end((folded ? 'IN ' : 'IN · TRACK ') + ins.map(tr).join(' '), 'Track In: the sound coming in' + (on ? '' : ' (CHN is off on the Mixer: …chains is not heard on this track)'));
+  for (const m of mid){
+    const byp = ((m.params && m.params._byp) || 0) >= .5, b = el('button', 'dkcb' + (byp ? ' off' : ''));
+    b.type = 'button'; b.append(el('i', 'fon' + (byp ? '' : ' on')), el('span', null, dkcLab(m)));
+    b.title = dkcLab(m) + (byp ? ' (bypassed)' : '') + (noChains() ? '' : ' · open it in …chains');
+    b.addEventListener('click', e => { e.stopPropagation(); dkcReveal(m.id); }); rail.append(b);
+  }
+  if (outs.length) end((folded ? 'OUT ' : 'OUT · TRACK ') + outs.map(tr).join(' '), 'Chain Out: where it goes (a bus when it is another track)');
+  if (!mods.length && !folded && !noChains()){ const ad = el('button', 'dkcadd', '+ …CHAINS'); ad.type = 'button'; ad.title = 'No …chains on track ' + d2(t + 1) + ': open …chains to patch one';
+    ad.addEventListener('click', e => { e.stopPropagation(); openChains(); }); rail.append(ad); }
+  else if (!folded && !noChains()){ const ad = el('button', 'dkcadd sm', '+ CONTROLS'); ad.type = 'button';
+    ad.title = 'In …chains, right-click a control or a module → Add to the bottom panel; it shows here for the track whose chain it is in';
+    ad.addEventListener('click', e => { e.stopPropagation(); openChains(); }); rail.append(ad); }
+  return rail;
+}
+const dkChnRailSig = (t, act) => { const d = S.chainPatch; if (!d || !act.size) return t + '|-'; const c = (d.cables || []).filter(x => x && x.from && act.has(x.from[0])).map(x => x.from[0] + '>' + x.to[0]).join(',');
+  return t + '|' + (S.chainOn && S.chainOn[t] ? 1 : 0) + '|' + d.modules.filter(m => m && act.has(m.id)).map(m => m.id + (m.label || '') + ((m.params && m.params._byp) >= .5 ? 'b' : '')).join(',') + '|' + c; };
+let dkChnRailK = '';
+function deckChnFold(){   // FX BAR, …CHAINS folded: the rail beside its title (none without modules: the plain strip)
+  const sec = dkSec('chn'), fold = deck.fxbar && !deck.chn && !sec.hidden && deckShown();
+  let r = $('dkChnRail'); if (!fold){ if (r){ r.remove(); sec.classList.remove('hasrail'); dkChnRailK = ''; } return; }
+  const t = dkTrack(), act = chainMods(t), k = dkChnRailSig(t, act) + '|' + noChains();
+  if (k === dkChnRailK && r) return; dkChnRailK = k;
+  if (r) r.remove();
+  const has = [...act].some(id => { const m = S.chainPatch.modules.find(q => q && q.id === id); return m && m.type !== 'trackIn' && m.type !== 'chainOut'; });
+  sec.classList.toggle('hasrail', has); if (!has) return;
+  r = dkChnRail(t, act, true); r.id = 'dkChnRail'; sec.append(r);
+}
 function deckChains(){
+  try { deckChnFold(); } catch(e){}
   if (!deckShown() || !deck.chn || dkSec('chn').hidden) return;   // FOCUS TRACK: hidden on the master
   const t = dkTrack(), d = S.chainPatch, L = (d && Array.isArray(d.deck)) ? d.deck : [], act = chainMods(t);
   const byId = new Map(((d && d.modules) || []).map(m => [m.id, m]));
@@ -24616,9 +24995,11 @@ function deckChains(){
   const here = live.filter(x => act.has(x.id)), elsewhere = live.length - here.length;
   $('dkChnT').textContent = '…CHAINS · TRACK ' + d2(t + 1);
   $('dkChnI').textContent = here.length ? here.length + ' control' + (here.length === 1 ? '' : 's') + (elsewhere ? ' · ' + elsewhere + ' on other tracks' : '') : '';
-  const sig = t + '|' + (act.size ? [...act].join(',') : '-') + '|' + here.map(x => x.id + '.' + x.p).join(',') + '|' + live.length;
+  const sig = t + '|' + (act.size ? [...act].join(',') : '-') + '|' + here.map(x => x.id + '.' + x.p).join(',') + '|' + live.length + (deck.fxbar && !here.length ? '|rail ' + dkChnRailSig(t, act) : '');
   if (sig !== dkChnSig){
     dkChnSig = sig; dkChnT = t; const box = $('dkChnRows'); box.replaceChildren(); dkChnRows = [];
+    box.classList.toggle('hasrail', !!deck.fxbar && !here.length);
+    if (!here.length && deck.fxbar){ box.append(dkChnRail(t, act, false)); return; }   // FX BAR: the rail instead of the help text
     if (!here.length){
       // Fit and finish (2 Nov): one line and a button instead of a paragraph; the how-to is the button's tooltip
       const p = el('p', 'note dkempty', !act.size ? 'No …chains on track ' + d2(t + 1) : 'No controls here yet' + (elsewhere ? ' (' + elsewhere + ' on other tracks)' : ''));
@@ -28210,6 +28591,8 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
     const sum = (A, k) => ({n:A.length, late:A.filter(v => v < 0).length, worst:A.length ? Math.min(...A) * k : null, p01:A.length ? q(A, .01) * k : null, median:A.length ? q(A, .5) * k : null});
     return {audio_ms:sum(lead, 1000), midi_ms:sum(mlead, 1)};
   },
+  // UI checks (headless screenshots of the FX bar and the like): run a line of code inside the app, where S, TFX, deck… are
+  ev(src){ return eval(src); },
 };
 })();
 </script>
