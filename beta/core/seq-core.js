@@ -592,7 +592,7 @@ const ntr = () => S.ntr || 16;
 const voiceForTrack = t => vtrk ? NPAD + t : t % NSLOT;
 const FX_NEEDS = {FLX:'flex', GAT:'sgate', RTG:'retrig'};
 
-// FXV: the effects' map() functions, from TFX in index.html (44 of them)
+// FXV: the effects' map() functions, from TFX in index.html (45 of them)
 const TFX_MAP = {
   "eq":f => [u8(f.treble), u8(f.mid), u8(f.bass), u8(f.lowpass), u8(f.tfreq), u8(f.bfreq), u8(f.hipass), u8(f.out)],
   "comp":f => [u8(f.press), u8(f.speed), u8(f.mew), u8(f.out), u8(f.mix)],
@@ -611,6 +611,7 @@ const TFX_MAP = {
   "glitch":f => [f.div, u8(f.chance), u8(f.stut), u8(f.rev), u8(f.pitch), u8(f.tape), u8(f.crush), u8(f.gate), f.vary, f.seed, u8(f.mix)],
   "retrig":f => [f.mode, f.div, u8(f.decay), f.pitch - 24, u8(f.gate), u8(f.mix)],
   "degrade":f => [f.bits, f.rate >= 255 ? 48000 : 300 * Math.pow(160, u8(f.rate)), u8(f.noise), u8(f.color), u8(f.follow), u8(f.dry), u8(f.wet)],
+  "vsamp":f => [f.model, f.drive, f.filter, 0.25 + u8(f.rate) * 0.75, u8(f.noise), u8(f.mix)],
   "crush":f => [u8(f.down), f.bits, f.smooth, u8(f.mix)],
   "rings":f => [f.model, [1, 2, 4][f.poly] || 1, f.note, u8(f.structure), u8(f.bright), u8(f.damp), u8(f.pos), u8(f.input) * 2, u8(f.mix)],
   "clouds":f => [f.mode, f.lofi, f.freeze, u8(f.pos), u8(f.size), f.pitch, u8(f.density), u8(f.texture), u8(f.blend), u8(f.fb), u8(f.verb), u8(f.spread)],
