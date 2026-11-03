@@ -2143,6 +2143,7 @@ function setParam(n, key, v, fromUser){
   if (n.m.pre && !preApplying && !PRE_SKIP.has(key) && !n.m.preEd){ n.m.preEd = 1; paintPre(n); }   // PRESETS: moved since
   if (key === 'chans' && MIXT.has(n.m.type)){ mixResize(n); return; }
   const c = n.ctl[key]; if (c && !fromUser) c.show();
+  if (IO_KEY[n.m.type] === key) ioTitle(n);
   store.touch();
 }
 // A mixer's Inputs changed: cables into channels that are now hidden come out, their controls leave the bottom panel,
@@ -2259,7 +2260,17 @@ function choice(n, key, options){
   show();
   return r;
 }
+// FOLDED I/O (owner, 3 Nov): a collapsed Track In / Chain Out / Sidechain In / Out shows what it is connected to in its
+// title ("Track In · Track 5"), so a folded patch still reads; unfolded the control below says it.
+const IO_KEY = { trackIn:'track', chainOut:'track', scin:'sck', scout:'snd' };
+function ioTitle(n){
+  if (!n.tEl) return; const base = n.m.label || MODULES[n.m.type].label, k = IO_KEY[n.m.type];
+  let t = base;
+  if (k && n.m.collapsed){ const c = choicesOf(n.m.type, k), v = n.m.params[k], o = c && c.find(x => x[0] === v); if (o) t += ' · ' + o[1]; }
+  if (n.tEl.textContent !== t) n.tEl.textContent = t;
+}
 function paintNote(n){
+  ioTitle(n);
   const nt = NOTES[n.m.type]; if (!nt || !n.note) return;
   const t = typeof nt === 'function' ? nt(n.m) : nt;
   n.note.textContent = t || ''; n.note.hidden = !t;
@@ -2449,7 +2460,7 @@ function buildNode(m){
   fold.addEventListener('click', () => { store.snapshot(); setCollapsed(n, !m.collapsed); });
   n.foldBtn = fold;
   if (bypOk(def)) n.byp = h('button', {class:'byp', 'aria-label':'Bypass ' + title, text:'BYP', onclick: () => { store.snapshot(); setParam(n, '_byp', ((m.params._byp) || 0) >= .5 ? 0 : 1); paintByp(); }});
-  const head = h('header', {title:'Double-click to collapse or expand'}, fold, h('span', {class:'t', text: title}), n.byp || null, mhelpBtn(m.type, title),
+  const head = h('header', {title:'Double-click to collapse or expand'}, fold, (n.tEl = h('span', {class:'t', text: title})), n.byp || null, mhelpBtn(m.type, title),
     h('button', {class:'x', 'aria-label':'Remove ' + title, title:'Remove', text:'×', onclick: () => { store.snapshot(); removeModule(m.id); }}));
   for (const k in def.params) if (m.params[k] == null) m.params[k] = def.params[k][0];
   const ins = Object.keys(def.inputs).filter(p => mixShown(m, p)), outs = Object.keys(def.outputs);
@@ -2513,7 +2524,7 @@ function buildNode(m){
 function setCollapsed(n, c, quiet){
   n.m.collapsed = !!c;
   n.el.classList.toggle('collapsed', n.m.collapsed);
-  n.foldBtn.setAttribute('aria-expanded', String(!n.m.collapsed));
+  n.foldBtn.setAttribute('aria-expanded', String(!n.m.collapsed)); ioTitle(n);
   if (!quiet) store.touch();
   markScene();
 }
