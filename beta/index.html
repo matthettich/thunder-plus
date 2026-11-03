@@ -1030,7 +1030,11 @@ body:not(.legon) .tside .tlegend{display:none}
 .tside .tinl{grid-auto-rows:max-content}
 /* ...and the card always has room for about 16 of them (8 rows of 2; owner, 3 Nov), the side panel scrolling instead when the
    window is short */
-.tside .tinlw{min-height:calc(8 * 29px + 12px + 26px)}
+.tside .tinlw{min-height:calc(8 * 32px + 12px + 26px)}
+/* NAMES FIT (owner, 3 Nov): two columns cut names short; a size smaller, tighter, and the number closer (the full name and pad
+   are on hover) */
+.tside .tinl button{font-size:var(--fs-3); letter-spacing:-.02em; padding:3px 4px; line-height:1.15; white-space:normal; overflow-wrap:anywhere;
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2} .tside .tinl button i{margin-right:4px}   /* a long name takes a second line */
 .tside .tinl button.on{background:var(--ink); color:var(--inv); border-color:var(--ink)}
 /* PLAYING (owner, 3 Nov: "flash them as they play, just like on the synth screen"): an instrument lights as its notes sound */
 .acidask option.acidfree{background:color-mix(in srgb, var(--meter-ok, #4fd18a) 16%, var(--panel, #fff))}
@@ -20499,7 +20503,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 400;
+const BUILD = 401;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25371,13 +25375,17 @@ function dkAnim(col, f, now, lv){
     const step = tp.on && ctx ? Math.floor(ctx.currentTime * bpm / 60 * 4) % N : -1;
     for (let i = 0; i < N; i++){ const on = i === step; g.fillStyle = on ? AC : ink(i % 4 ? .1 : .2); g.globalAlpha = on ? .35 + .6 * Math.max(e, .3) : 1; g.fillRect(6 + i * cw + 1, y, Math.max(1, cw - 2), 10); g.globalAlpha = 1; }
     return; }
-  if (A.kind === 'pitch'){   // pitch: the semitones as faint lines, the note in and where the effect moves it
-    const sh = (dkFxVal(f, /^(pitch|semi|shift|interval|trans)/i) ?? dkFxVal(f, /pitch|semi|shift|trans/i) ?? .5) * 2 - 1, ln = 12, sp = (H - 20) / (ln * 2), cy = H / 2;
-    g.strokeStyle = ink(.08); g.lineWidth = 1; for (let i = -ln; i <= ln; i++){ const y = Math.round(cy + i * sp) + .5; g.beginPath(); g.moveTo(10, y); g.lineTo(W - 10, y); g.stroke(); }
-    const y2 = cy - sh * ln * sp, x1 = W * 0.3, x2 = W * 0.7;
-    g.strokeStyle = ink(.25); g.beginPath(); g.moveTo(x1, cy); g.lineTo(x2, y2); g.stroke();
+  if (A.kind === 'pitch'){   // pitch: the semitones as faint lines, the note in and where the effect moves it (every voice: the Harmonizer's two)
+    const D = TFX[f.type], vs = [];
+    for (const q of (D && D.ps) || []) if (q.names && ivSemis(q.names[0]) != null){ const n = ivSemis(q.names[f[q.k]] ?? ''), m = /(\d+)$/.exec(q.k), lq = m && D.ps.find(p => p.k === 'lv' + m[1]);
+      if (n != null) vs.push([n, lq && f[lq.k] != null ? f[lq.k] : 1]); }
+    if (!vs.length) vs.push([((dkFxVal(f, /^(pitch|semi|shift|interval|trans)/i) ?? dkFxVal(f, /pitch|semi|shift|trans/i) ?? .5) * 2 - 1) * 12, 1]);
+    const ln = vs.some(([n]) => Math.abs(n) > 12) ? 24 : 12, sp = (H - 20) / (ln * 2), cy = H / 2, x1 = W * 0.28, x2 = W * 0.7;
+    g.strokeStyle = ink(.08); g.lineWidth = 1; for (let i = -ln; i <= ln; i++){ if (ln > 12 && i % 2) continue; const y = Math.round(cy + i * sp) + .5; g.beginPath(); g.moveTo(10, y); g.lineTo(W - 10, y); g.stroke(); }
     g.fillStyle = ink(.4); g.beginPath(); g.arc(x1, cy, 2.5, 0, 7); g.fill();
-    g.fillStyle = AC; g.globalAlpha = .45 + .5 * e; g.beginPath(); g.arc(x2, y2, 2.5 + e * 2, 0, 7); g.fill(); g.globalAlpha = 1;
+    vs.forEach(([n, lvl], j) => { const y2 = cy - n * sp, x = x2 + j * 10, a = clamp(lvl, 0, 1); if (a < 0.02) return;
+      g.strokeStyle = ink((.1 + .2 * a).toFixed(2)); g.beginPath(); g.moveTo(x1, cy); g.lineTo(x, y2); g.stroke();
+      g.fillStyle = AC; g.globalAlpha = (.3 + .6 * e) * (.4 + .6 * a); g.beginPath(); g.arc(x, y2, 2.4 + e * 2 * a, 0, 7); g.fill(); g.globalAlpha = 1; });
     return; }
   if (A.kind === 'field'){   // utility / width: the stereo field, as wide as the Width, breathing with the sound
     const wd = dkFxVal(f, /width|wide|stereo|spread/i) ?? .5, cx = W / 2, cy = H / 2, ry = (H - 24) / 2, rx = Math.max(2, (W / 2 - 12) * Math.min(1, wd * 1.1)) * (0.92 + e * 0.08);
@@ -25437,6 +25445,11 @@ function dkSpring(col, f, now, lv){
       g.globalAlpha = Math.min(1, e * 1.6); g.fillStyle = AC; g.beginPath(); g.arc(x, y, 2.2, 0, 7); g.fill(); g.globalAlpha = 1; }
   }
 }
+// An interval's name ('+maj 3rd', '−oct', 'Unison', '+2 oct') in semitones; null when it isn't one
+function ivSemis(nm){ const t = String(nm).toLowerCase().replace('−', '-'); if (/unison/.test(t)) return 0;
+  const m = /^([+-])\s*(.*)$/.exec(t); if (!m) return null; const sg = m[1] === '-' ? -1 : 1, b = m[2];
+  const v = /2 oct/.test(b) ? 24 : /10th/.test(b) ? 16 : /oct/.test(b) ? 12 : /6th/.test(b) ? 9 : /5th/.test(b) ? 7 : /4th/.test(b) ? 5 : /maj 3rd/.test(b) ? 4 : /min 3rd/.test(b) ? 3 : null;
+  return v == null ? null : sg * v; }
 function dkFxVal(f, re){ const D = TFX[f.type]; if (!D || !D.ps) return null; const q = D.ps.find(p => re.test(p.k) || re.test(p.l)); if (!q || f[q.k] == null) return null; return clamp((f[q.k] - q.min) / ((q.max - q.min) || 1), 0, 1); }
 function dkFxPic(g, W, H, f, C, F, font, now, lvNow){
   if (!f || isPumpT(f.type)) return false;
@@ -28728,6 +28741,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [401, '3 Nov', ['Side panel: instrument names show in full: a size smaller, and a long one takes a second line (hover still shows the pad).', 'FX bar: the pitch animation shows every voice, so the Harmonizer’s two intervals both show, each as bright as its level.']],
   [400, '3 Nov', ['FX bar: a click on a value gives the bar the keys until you click elsewhere or press Esc: ▲▼ pick the value above or below, ◀▶ the same value in the next effect, Ctrl/⌘+arrows change it. With the FX screen open above, it follows the value you pick (its slot and row).']],
   [399, '3 Nov', ['FX bar: every effect without a display of its own now has a calm animation behind its values. EQs and filters: the track’s spectrum with the response curve and its points over it; delays: the echoes, lit in turn as each hit runs along them; modulation: its LFO (autopan: a dot swinging L to R); rhythmic effects: the bar’s 16 steps with the one playing lit; pitch: the semitones with the note and where it moves to; width and utility: the stereo field.']],
   [398, '3 Nov', ['New engine: …waves live (Synths, and Modular in the engine list). It plays the song’s …waves patch live in the tracker, as the …pump live engines do: each pad picks one of the patch’s 8 Out buses, a poly track plays up to four notes, slides and pitch commands move the notes, the VOL column is the velocity, and an edit to the patch is heard at once. A song with no …waves patch gets the editor’s starter patch. It shares the …pump live safety net (Settings → Audio → …pump live) and plays its render when live isn’t possible.']],
