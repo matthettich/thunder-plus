@@ -731,6 +731,12 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .ask .askswatch button{width:30px; height:30px; min-height:0; padding:0; border-radius:50%; border:2px solid var(--line); background:var(--sw, transparent)}
 .ask .askswatch button.none{background:repeating-linear-gradient(45deg, transparent 0 5px, var(--line) 5px 7px)}
 .ask .askswatch button.on{outline:3px solid var(--ink); outline-offset:2px}
+/* (3 Nov) the term skins' button rules (every button: the case colour; .on: the ink) hid the swatches' colours, so the
+   909 and the other term skins showed a row of blank circles: #zz keeps each swatch its own colour in every skin */
+.ask .askswatch button:not(#zz):not(#zz){background:var(--sw, transparent); color:var(--ink); border-color:var(--line); box-shadow:none; text-shadow:none}
+.ask .askswatch button.none:not(#zz):not(#zz){background:repeating-linear-gradient(45deg, transparent 0 5px, var(--line) 5px 7px)}
+.ask .askswatch button.on:not(.none):not(#zz):not(#zz){background:var(--sw, transparent)!important}   /* the term .on rule is !important */
+.ask .askswatch button.none.on:not(#zz):not(#zz){background:repeating-linear-gradient(45deg, transparent 0 5px, var(--line) 5px 7px)!important}
 .tgrid .th.tcl, .tath i.tcl, .mtr.tcl .mn{box-shadow:inset 0 -3px 0 var(--tc)}
 #tSub.tcl::before{content:''; display:inline-block; width:.62em; height:.62em; border-radius:2px; background:var(--tc); margin-right:.4em}
 .ask .asklist{display:flex; flex-direction:column; gap:4px; max-height:50vh; overflow-y:auto}
@@ -1357,6 +1363,17 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
    that plays and not an empty one */
 .tagrid b.o:not(.p){background:var(--ink, #111) !important; color:#ff5a1f !important; box-shadow:inset 0 0 0 1px #ff5a1f}
 .tagrid b.o:not(.p)::after{content:''; position:absolute; left:3px; right:3px; top:50%; height:2px; margin-top:-1px; background:#ff5a1f; pointer-events:none}
+/* BLOCK COLOURS on every block and in every skin (owner, 3 Nov: "not very many colour selections in the 909 skin … at
+   least for blocks that are mostly empty"): a block given a colour (class bc, --ib the colour, --ibi its text) shows it
+   over the skin's own fill (the term skins draw blocks in their ink; Rainbow in its hues). Full blocks: filled. Empty
+   blocks: a tint of it with its outline, the sideways lines in it. OFF-only blocks: filled, the stop bar and outline in
+   the text colour. Not while playing (the playhead's inverted look) or muted. #zz: above the skins' own rules. */
+.tagrid b.f.bc:not(.p):not(#zz){background:var(--ib)!important; color:var(--ibi, #fff); text-shadow:none}
+.tagrid b.z.bc:not(.p):not(#zz){background:color-mix(in srgb, var(--ib) 40%, var(--ar-bg, transparent))!important; color:var(--ar-ink, inherit); box-shadow:inset 0 0 0 1.5px var(--ib)!important; text-shadow:none}
+.tagrid b.z.bc:not(.p):not(.m):not(#zz)::after{background:repeating-linear-gradient(180deg, color-mix(in srgb, var(--ib) 75%, transparent) 0 1px, transparent 1px 3px)}
+.tagrid b.o.bc:not(.p):not(#zz){background:var(--ib)!important; color:var(--ibi, #fff)!important; box-shadow:inset 0 0 0 1px var(--ibi, #fff)!important; text-shadow:none}
+.tagrid b.o.bc:not(.p):not(#zz)::after{background:var(--ibi, #fff)}
+.tagrid b.m.bc:not(#zz){box-shadow:inset 0 0 0 1.5px var(--ib)}
 /* PLAYHEAD (owner, 31 Oct: too subtle): the playing blocks also get an outline in the skin's ink (dark on light skins, light
    on dark ones), and the playing row a faint band across every track */
 .tagrid b.p{outline:2px solid var(--ar-pl-ring, var(--ink)); outline-offset:-1px; position:relative; z-index:1}
@@ -1998,6 +2015,12 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="tr909"] #tPad .k:not(#zz){background:#4a4d50; color:#f0f1f2; border-color:#2a2d30}
 :root[data-skin="tr909"] #tPad .k[data-b="play"]:not(#zz){background:#ff6a13; color:#1f2224; border-color:#a8430b} :root[data-skin="tr909"] #tPad .k[data-b="edit"]:not(#zz){background:#f0f1f2; color:#1f2224}
 :root[data-skin="tr909"] #tPad .k[data-b="shift"]:not(#zz){background:#2a2d30; color:#ff8a42} :root[data-skin="tr909"] #tPad .k[data-b="loop"]:not(#zz){background:#2a2d30; color:#f0f1f2}
+/* SKIN PALETTES (3 Nov) for block and track colours (--tc1 … --tc12: Red, Orange, Yellow, Green, Teal, Blue, Purple, Pink,
+   Lime, Sky, Brown, Grey; read by tcolPal()): the machines' own paint where they have it, the rest toned to sit with it */
+:root[data-skin="tr909"]{--tc1:#e04a0e; --tc2:#ff6a13; --tc3:#f2b705; --tc4:#5b9a3c; --tc5:#2f9a8f; --tc6:#3f6fb5; --tc7:#7a5ab0; --tc8:#d0558a; --tc9:#a3c13a; --tc10:#4aa8d8; --tc11:#8a5a3a; --tc12:#4a4f53}
+:root[data-skin="tr808"]{--tc1:#e2382f; --tc2:#f28c28; --tc3:#f4d23c; --tc4:#6aa84f; --tc5:#3fa79a; --tc6:#4a7fc0; --tc7:#8a63b8; --tc8:#e06a9a; --tc9:#b5cf3a; --tc10:#5bb5e0; --tc11:#9a6a3e; --tc12:#9a9483}
+:root[data-skin="mpc"]{--tc1:#c8312b; --tc2:#d9772b; --tc3:#d6a92a; --tc4:#6b8e3a; --tc5:#3f8a83; --tc6:#4e6f8f; --tc7:#7a5e9a; --tc8:#c45a86; --tc9:#98ad3a; --tc10:#5a9cc4; --tc11:#8a6440; --tc12:#8f8b84}
+:root[data-skin="dx7"]{--tc1:#e2453a; --tc2:#e0883a; --tc3:#d6e86b; --tc4:#6fae5a; --tc5:#5bbfae; --tc6:#5a86c8; --tc7:#8e6ab8; --tc8:#c95a7a; --tc9:#b5d24a; --tc10:#6cb6d8; --tc11:#9a6d45; --tc12:#8a837a}
 /* DR. SAMPLE (SP-202): dark grey plastic, light grey pads, the orange, a green LCD-style mono */
 :root[data-skin="sp202"]{--mx:#e8e6e1; --mx2:#b3b1ac; --mxdim:#6c6e72; --mxbg:#2c2f33; --mxpanel:#363a3f; --mxpanel2:#42464c; --mxon:#2c2f33;
   --mxsoft:#f39a1e; --mxpoly:#9ec3e6; --mxglowc:rgba(168,208,141,.18); --mxscan:transparent; --mxred:#ff5a3c; --mxcur:#a8d08d; --mxcuron:#1d2a17; --mxbus:#9ec3e6; --mxline:#4c5157;
@@ -16531,16 +16554,34 @@ const freshMix = () => ({vol:224, trim:TRIM_0, pan:128, mute:false, solo:false, 
 /* TRACK NAMES (21 Oct): a track's name (up to 12 letters) and colour (TCOL index, 0 = none) live in S.mix[t].nm / .col, so
    they save with the song. Shown on Phrase / Pattern titles, Arrange, the Song and Mixer headers, the meters, the bottom
    panel's strip and the stem file names. Edit ▾ → Name this track…, or double-click a track number or the Phrase title. */
-const TCOL = [null, '#e0564a', '#e8913c', '#d4ac22', '#4fae5a', '#2aa79e', '#4a7fe0', '#9466dc', '#dc5fa2'];
-const TCOL_N = ['None', 'Red', 'Orange', 'Yellow', 'Green', 'Teal', 'Blue', 'Purple', 'Pink'];
+const TCOL = [null, '#e0564a', '#e8913c', '#d4ac22', '#4fae5a', '#2aa79e', '#4a7fe0', '#9466dc', '#dc5fa2', '#97c23a', '#38b2e0', '#a5683a', '#878d95'];
+const TCOL_N = ['None', 'Red', 'Orange', 'Yellow', 'Green', 'Teal', 'Blue', 'Purple', 'Pink', 'Lime', 'Sky', 'Brown', 'Grey'];
+/* SKIN PALETTES (owner, 3 Nov: "there aren't very many color selections in the 909 skin"): the colours are stored as TCOL
+   indices; a skin may give its own shade of each (--tc1 … --tc12 on :root, the same hue order and names), so the swatches
+   and the blocks / tracks drawn in them suit it. Read once per skin. Indices 9–12 (Lime, Sky, Brown, Grey) are new on
+   3 Nov: an older build drops them on load (back to None). */
+let tcPal = null, tcPalSkin = '';
+function tcolPal(){
+  if (tcPal && tcPalSkin === skin) return tcPal;
+  const cs = getComputedStyle(document.documentElement); tcPalSkin = skin;
+  return (tcPal = TCOL.map((c, i) => i ? (cs.getPropertyValue('--tc' + i).trim() || c) : null));
+}
+const tcolOf = i => (i | 0) > 0 ? tcolPal()[i | 0] || '' : '';
+// Readable text on a colour: near-black or white, whichever contrasts more.
+function tcInk(hex){
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim()); if (!m) return '#ffffff';
+  const n = parseInt(m[1], 16), f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+  const L = .2126 * f(n >> 16) + .7152 * f(n >> 8 & 255) + .0722 * f(n & 255);
+  return (L + .05) / .0625 >= 1.05 / (L + .05) ? '#141414' : '#ffffff';
+}
 const tName = t => (t >= 0 && t < NT && S && S.mix && S.mix[t] && S.mix[t].nm) || '';
-const tCol = t => (t >= 0 && t < NT && S && S.mix && S.mix[t] && TCOL[S.mix[t].col | 0]) || '';
+const tCol = t => (t >= 0 && t < NT && S && S.mix && S.mix[t] && tcolOf(S.mix[t].col)) || '';
 const trkLab = t => 'TRACK ' + d2(t + 1) + (tName(t) ? ' ' + tName(t).toUpperCase() : '');
 const trkTip = t => 'Track ' + (t + 1) + (tName(t) ? ': ' + tName(t) : '');
 const COARSE_PT = matchMedia('(pointer:coarse)').matches;   // a touch screen (the tips don't mention the mouse there)
 async function nameTrack(t){
   if (t == null || t < 0 || t >= ntr()) return toast(t === MT ? 'The master has no name to set.' : 'Go to a track first.');
-  const m = S.mix[t], sw = {sel:m.col | 0, cols:TCOL, names:TCOL_N};
+  const m = S.mix[t], sw = {sel:m.col | 0, cols:tcolPal(), names:TCOL_N};
   const v = await askSheet({title:'Track ' + d2(t + 1), body:'A name (up to 12 letters) and a colour. They show on the Phrase title, Arrange, the Song and Mixer headers, the meters and the bottom panel, and name the stem files. Empty: just the number.'},
     {text:m.nm || '', max:12, ok:'Set', swatch:sw});
   if (v == null) return;
@@ -25380,9 +25421,13 @@ function drawArr(PH){
         const offb = !empty && sectOffOnly(v);   // OFF-ONLY BLOCKS (2 Nov)
         cls += empty ? 'z' : offb ? 'o' : 'f'; lab = sectsOn || ph < 0 ? hp(v) : hp(ph);
         if (blockMuted(S, y, t)) cls = cls.replace(/[zfo]$/, 'm');
+        // BLOCK COLOURS first, on every kind of block (3 Nov: empty and OFF-only blocks showed none); class bc lets the
+        // colour win over each skin's own block fill, --ibi is the text on it.
+        const bc = S.bcol && tcolOf(S.bcol[v]);
+        if (bc){ cls += ' bc'; sty = ` style="${grp ? `--bgc:${bc};` : ''}--ib:${bc};--ibp:100%;--ibi:${tcInk(bc)}"`; }   // (over a bus group's colour too)
         // Coloured by the instrument its phrase plays, with the phrase's notes as ticks when the blocks are big.
-        if (!empty && !offb && ph >= 0){ const pi = phraseInfo(ph), bc = S.bcol && TCOL[S.bcol[v] | 0];   // BLOCK COLOURS first
-          if (bc) sty = grp ? ` style="--bgc:${bc};--ib:${bc};--ibp:100%"` : ` style="--ib:${bc};--ibp:100%"`;   // (over a bus group's colour too)
+        if (!empty && !offb && ph >= 0){ const pi = phraseInfo(ph);
+          if (bc);
           else if (grp) sty = ` style="--bgc:${grp};--ib:${grp}"`; else if (pi.inst >= 0) sty = ` style="--ib:${instHue(pi.inst)};--ibp:${100 - (pi.inst % 5) * 17}%"`;
           if (arRH >= 26 && pi.hits) lab += pi.hits; }
       }
@@ -25941,7 +25986,7 @@ arrGrid.addEventListener('contextmenu', e => {
 async function sxColour(r){
   const ids = new Set(); for (let y = r.y0; y <= r.y1; y++) for (const t of sxCols(r)){ const v = S.song[y][t]; if (v >= 0) ids.add(v); }
   if (!ids.size) return;
-  const first = [...ids][0], sw = {sel:(S.bcol && S.bcol[first]) | 0, cols:TCOL, names:TCOL_N};
+  const first = [...ids][0], sw = {sel:(S.bcol && S.bcol[first]) | 0, cols:tcolPal(), names:TCOL_N};
   const ok = await askSheet({title:ids.size > 1 ? `Colour ${ids.size} blocks` : 'Colour block ' + hp(songShown(first)), body:'Every place these blocks are used in the song shows the colour. None: the instrument’s colour.'}, {ok:'Set', swatch:sw});
   if (ok == null) return;
   if (!S.bcol) S.bcol = {};

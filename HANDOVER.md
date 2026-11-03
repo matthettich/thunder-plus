@@ -112,7 +112,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
-## 3 Nov (3): skin title bars
+## 3 Nov (3): skin title bars, block colours
 
 - **Owner:** "using the 909 skin … the light grey/white title bars look odd. Can we change those to match the rest of the
   skin?" Root cause: every title strip used `--side`, and the term base maps `--side` to `--mxpanel`, which most light
@@ -134,6 +134,18 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
   Simple skins mustard, complement, citrus, sunset, miami, desert, tomato were below that before and stay near their own
   body contrast). Pump windows, menus, the settings sheet: unchanged (already the skin's colours; no light bar).
 - Not changed: side *panels* (`.tside`, `.tcmd`, `.dock`) still use `--side` (in 909 the lighter silver panel).
+- **Block colours (owner: "not very many color selections in the 909 skin … for blocks that are mostly empty"):**
+  three causes. (1) The colour sheet's swatches (`askSheet` `swatch`, `.ask .askswatch button`) were painted over by the
+  term skins' button rules (every button = case colour; `.on` = ink, `!important`), so every term skin showed blank
+  circles: fixed with `:not(#zz):not(#zz)` rules (+ `!important` for `.on`). (2) `arrDraw` only applied `S.bcol` to full
+  blocks: empty (`z`, striped) and OFF-only (`o`) blocks ignored it. Now any block with a colour gets class `bc`,
+  `--ib` (colour) and `--ibi` (`tcInk()`: near-black or white, whichever contrasts more); CSS "BLOCK COLOURS on every
+  block": full = filled; empty = 40% tint + outline + stripes in the colour; OFF-only = filled, stop bar and outline in
+  `--ibi`; muted = outline. Wins over the term ink fill and Rainbow (`#zz` + `!important`); not while playing.
+  (3) The palette grew from 8 to 12 (`TCOL`/`TCOL_N` + Lime, Sky, Brown, Grey; track colours too). Skins can give their
+  own shades via `--tc1…--tc12` (`tcolPal()` reads them once per skin, `tcolOf(i)`; `tCol` uses it): set for 909, 808,
+  Vintage MPC, DX7. Songs store indices, so a song made in 909 shows the same hue names in other skins; an older build
+  drops indices 9–12 on load.
 
 ## 3 Nov (2): the rest of the sequencer move (all on `beta`, not released)
 
