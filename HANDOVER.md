@@ -112,6 +112,53 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (5): FLX check, Flex in the FX bar, pattern effects wait for their command
+
+On a worktree branch off `beta`; not merged, BUILD / sw.js cache not bumped. Owner: "a lot of the [FLX] commands no longer
+sound like the descriptions"; a picture of what Flex is doing in the FX bar; pattern effects should stay off until triggered.
+- **The bug: FLX 41–FF all played pattern 40 (REVERSE BARS) on the Page sequencer and in every render.** The `thunder-tfx`
+  k-rate params `flx` / `gat` / `rtg` / `sw*` had `maxValue:64` (from when FLX was 00–10), and `setValueAtTime` clamps to it.
+  The audio-thread sequencer writes its values past the AudioParam (`__tcOv`), so it was right, except where the page plays
+  the event (`fxcPend` before a node exists, CHASE at PLAY, RESUME, renders). Now 255.
+- **Names in note values.** FlexCore.SPEC lengths are in beats but 17–FF's names printed beats ("ROLL 1/4" was a 16th, "STUTTER
+  1/16" a 64th) while 01–10 and musicians use note values. `nv(beats)` in SPEC names them `1/16`, `1/8T`, `3/16`, `BAR`; the
+  sounds are unchanged. Real DSP fixes: 90–92 (GATE 1/32, 1/8T, 1/16T) gated twice as fast as named (g is half the named
+  period, as GATE 1/16 = 0B); AD renamed LOW-PASS WOBBLE 1/4T (its rate, 1.5 a beat). The table (`node` +
+  `FlexCore.NAMES`) is in tests/flex.test.js's checks: every 11–FF name is parsed and compared with its pattern's numbers.
+- **Old songs:** a song without `flx256` now has its FLX 11–FF rewritten to FLX 10 at load (what they always played; the cell
+  no longer names another pattern), no flag. Songs saved with `flxOld` (31 Oct – 3 Nov, e.g. copies of ELECTRO) keep the flag
+  and Project → FLX 11–FF: their new and old cells can't be told apart. The FX bar shows the pattern that really plays.
+- **STARTS (WAITS FOR ITS COMMAND):** Flex and Step gate get a last value `wait` (STARTS: AT PLAY / ON FLX, ON GAT; map index 3 /
+  7, dp.wait). ON: the slot plays nothing (Step gate: open) while `flx` / `gat` is −1, unless that slot's FXO switch is on
+  (`tr.sw`, set per slot in the tfx processor: then its own PATTERN). An FLX turns it on, FLX 00 off; STOP (resetSeq, the
+  core's stopAll) puts the params back to −1, so it waits again. It is all in the DSP (no new events: goldens unchanged), so
+  both sequencers, CHASE (the last FLX before the start row is sent at PLAY), RESUME and renders behave the same. Defaults:
+  `freshTfx` gives 1 (new slots, FX picker, AUTO SLOT from typing FLX); `normTfx` gives 0 to a saved slot without `wait`
+  (old songs and presets play as before). Retrigger already had it (MODE: RTG ONLY, the default). FXO needs nothing: a slot
+  left off + FXO X1 is already "off until triggered". Judged safe: nothing changes under existing songs; the risk is a new
+  slot whose PATTERN is set by hand and not heard while waiting, so the FX bar says WAITS FOR FLX and the help says how.
+  Not changed: GAT has no "off" value (00 is CUSTOM): once a GAT plays, FXO X0 or STOP turns it off.
+- **FX bar picture** (`dkFxPat` / `dkFxPatDraw` / `dkFxPatState`, before `dkFxResp` in `dkFxViz`): Flex draws the time map
+  of the pattern playing now (FlexCore's own ext / pat on a main-thread instance: x = bar position, y = where it plays from;
+  dashed diagonal = as played, "BAR BEFORE" below 0), its level (gates, pumps, fades) along the bottom, a LP / HP band for
+  filter patterns and shading for crush; label `FLX 2A · STUTTER 1/16 EVERY 1/2` and its source (FLX, PATTERN, WAITS FOR FLX,
+  SLOT OFF). Step gate draws its steps (STEP, LENGTH, DEPTH; CUSTOM from STEPS); Retrigger the slice and its repeats. Drawn
+  once per pattern into `col._pc` (key: pattern, source, values, size, skin; the random ones per bar); each frame copies it
+  and draws the playhead (and the point it plays from). Where the values come from: `fxcNote` records every `fxc` /
+  `fxreset` / `beat` event as booked (the live player's play() and coreMsg for the core's own), `fxcNow(track, p, t)` /
+  `fxcBeat(t)` read them at the heard time (currentTime − outputLatency); tStop clears them.
+- **Checks:** `tests/flex.test.js` (param range, names vs patterns for 11–FF, the first sixteen, STARTS in Flex and Step gate,
+  normTfx / old-song rewrite / flxCap, the FX bar state). `node tools/flex-check.mjs` (headless Chrome, both sequencers):
+  a 180 BPM song with one FLX a bar across 48 patterns (01–10, x2 and x9 of every family, FF), a saw + noise straight into
+  the track's effect node, its output and the beat clock recorded, and the same input and clock run through FlexCore with
+  the pattern each bar should play: before the fix Page failed every bar above 40 (+0–6 dB error), now all bars match
+  (−180 dB or better). `--wait`: waiting bars pass the sound as it is, bar 3's FLX turns it on, PLAY again waits again, and
+  starting from bar 4 CHASE brings bar 3's FLX, both sequencers. The Page sequencer can be a block late on a cold first bar
+  (one bar a few dB off, passes on a re-run); the audio thread is exact. npm test, goldens page and `--core` pass.
+- **To check on the owner's screen:** the picture's legibility at the default panel height (it needs ~34 px under the values);
+  whether STARTS ON FLX as the default for new slots is what they want (one value to flip in TFX.flex / TFX.sgate).
+- Not touched: …chains' and …waves' own FlexCore copies (old 17-pattern version; FLX doesn't drive them).
+
 ## 3 Nov (3): skin title bars, block colours
 
 - **Owner:** "using the 909 skin … the light grey/white title bars look odd. Can we change those to match the rest of the
