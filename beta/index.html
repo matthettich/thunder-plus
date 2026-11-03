@@ -2560,7 +2560,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   </div>
   </div>
   <button type="button" class="tsong" id="tLoopTop" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L in KEYS mode)" hidden>Loop</button>
-  <button type="button" class="tsong" id="tKeyTrans" aria-label="Key transpose" title="Key transpose: tap to arm, then ▲ up / ▼ down transposes the selection a semitone" hidden>Transpose ▲▼</button>
+  <button type="button" class="tsong" id="tKeyTrans" aria-label="Key transpose" title="Transpose lock: while it is on, ▲ up / ▼ down transposes the selection a semitone and plays its first note (Esc or a tap turns it off)" hidden>Transpose ▲▼</button>
   <button type="button" class="tsong" id="tSong" aria-label="Play or stop the song" title="Play the song from the tracker's cursor row, or stop it" hidden><span class="tl"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Song</span><span class="tl alt" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>Stop</span></button>
   <button type="button" class="tcpu" id="tCpu" aria-label="Audio load"><span><em class="cpuw">CPU </em>0%</span><i></i></button>
   <button type="button" id="bHelp" aria-label="Help and keys (?)" title="Help and keys (? or F1)">?</button>
@@ -20409,7 +20409,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 391;
+const BUILD = 392;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -21931,16 +21931,25 @@ function syncLoop(){
   if (tv === tp.loopV && selA && selA.v === tv && !onPset()){ const r = selRect(); loopArm = {v:tv, y0:r.y0, y1:r.y1}; }
   tp.seq.setLoop(loopArm && loopArm.v === tp.loopV ? loopArm : null);
 }
-// KEY TRANS. (KEYS mode, top bar): arm it, then the next plain ▲/▼ transposes the selection a semitone and it disarms.
+// KEY TRANS. (KEYS mode, top bar): a lock (owner, 3 Nov): while it is on, ▲ / ▼ transpose the selection a semitone and play its
+// first note, so you hear where it is; it stays on until the button, Esc, or another arrow turns it off.
 function toggleKeyTrans(){
   xposeArm = !xposeArm; keyVis();
-  toast(xposeArm ? 'Key trans. armed: ▲ up / ▼ down a semitone (Esc cancels)' : 'Key trans. off');
+  toast(xposeArm ? 'Transpose lock on: ▲ up / ▼ down a semitone, you hear the first note (Esc or the button turns it off)' : 'Transpose lock off');
 }
-function keyTransArrow(dir){   // dir 'up' | 'down' | other; true when the arrow was used up by an armed key trans.
+function keyTransArrow(dir){   // dir 'up' | 'down' | other; true when the arrow was used up by the transpose lock
   if (!xposeArm) return false;
-  xposeArm = false; keyVis();
-  if (dir === 'up' || dir === 'down'){ transposeSel(dir === 'up' ? 1 : -1, true); return true; }
-  return false;
+  if (dir === 'up' || dir === 'down'){ transposeSel(dir === 'up' ? 1 : -1, true); xposeHear(); return true; }
+  xposeArm = false; keyVis(); return false;
+}
+// The first note of what was transposed, played short on its instrument (the one on its row, else the phrase's last one before it).
+function xposeHear(){
+  try { const sc = xposeScope(); if (!sc) return;
+    for (const q of sc.parts){ const P = S.phrases[q.p]; if (!P) continue;
+      for (let y = q.y0; y <= Math.min(q.y1, P.length - 1); y++){ const row = P[y]; if (!row) continue;
+        for (const x of q.cols){ const n = row[x]; if (!(n >= 0 && n < 120)) continue;
+          let ii = row[IC]; for (let k = y; ii < 0 && k >= 0; k--) if (P[k] && P[k][IC] >= 0) ii = P[k][IC]; if (ii < 0) ii = defInst();
+          const h = preview(ii, n, row[VC], false, null, true); if (h) setTimeout(() => previewOff(h), 280); return; } } } } catch(e){}
 }
 // The top bar's TRANSPOSE ▲▼ exists only in the tracker's KEYS mode (the pad has its own). Its old Loop twin is
 // gone: LOOP sits in the tab bar beside SEMI − +, so the top bar fits one row on the unfolded Fold.
@@ -28487,6 +28496,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [392, '3 Nov', ['Transpose ▲▼ (top bar) is a lock now: while it is on, each ▲ / ▼ transposes the selection a semitone and plays its first note so you hear where it is; Esc, the button or another arrow turns it off.']],
   [391, '3 Nov', ['Acid line… writes on the song’s 16th grid: at LPB 8 a step is two rows, so notes no longer land between the 16ths. Classic 303 (now the default), Rolling and Squelch compose the line: a one-bar motif with notes mostly on the beat and the 8ths, the root on the beat, passing notes on the 16ths, repeated through the phrase with a changed note every other bar and a turnaround leading back to the root every fourth bar. …pump ACID keeps its own random lines.', 'The FX bar animations are calmer: fewer moving parts and fainter lines, closer to the springs.']],
   [390, '3 Nov', ['More FX bar animations behind the values, each showing what its effect does as it plays: reverbs bounce the sound around a room the size of their SIZE, granular effects pop grains, drive and saturation show the wave being pushed into clipping, crushers and the vintage sampler cut it into steps, vinyl spins a record, resonators ring strings, the vocoder lights its bands and the swirly modulation effects turn. Effects that already have a display (dynamics meters, EQ and filter curves, echo taps, Flex, Step gate, Retrigger) keep theirs.']],
   [389, '3 Nov', ['The side panel is restyled like the FX bar: the status and meters and the INSTRUMENTS list are cards with dark title bars, and the instruments wrap to the panel’s width and scroll inside their card, so none are cut off. With the instrument list on, each instrument flashes as its notes play, as the pads do on the Synth page.', 'Acid line…: picking an instrument plays a short note on it, and instruments no phrase uses yet are marked · free.']],
