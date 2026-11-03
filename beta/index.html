@@ -2874,7 +2874,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <script src="pump/synth/pump-synth-engine.js?v=10"></script>
 <!-- …PUMP (23 Oct 2026): the pump mastering plugins' parameter tables and presets (generated in matthettich/pump by
      wasm/build.sh); pump/pump.wasm is their DSP, fetched by the wasm loader. -->
-<script src="pump/pump-meta.js?v=5"></script>
+<script src="pump/pump-meta.js?v=6"></script>
 <script>
 /* ===ENGINE START=== */
 const BASE = 65.40639; // C2
@@ -14114,7 +14114,7 @@ $('midiKeysSel').addEventListener('change', e => { releaseKeys(); midi.keys = +e
 moPorts(); miPorts();
 
 /* ---------- Plaits loader ---------- */
-const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=5';
+const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=6';
 // Each wasm is decoded and compiled once and shared: the synth here, the …waves engine and the render Worker.
 let plFailed = false;
 (async () => {
@@ -15121,20 +15121,20 @@ const PUMP_TYPES = PM ? PM.types.slice() : [];
 const PUMP_KEY = t => 'p' + t;   // the TFX key: peq, pcomp, plimit, pcalm, ptone, pband, pwide, pheat, pmeter
 const PUMP_SHORT = {eq:'pEQ', comp:'pCOMP', limit:'pLIM', calm:'pCALM', tone:'pTONE', band:'pBAND', wide:'pWIDE', heat:'pHEAT', meter:'pMETR',
   tube:'pTUBE', snap:'pSNAP', gate:'pGATE', echo:'pECHO', spring:'pSPRG', verb:'pVERB', grain:'pGRAN', vox:'pVOX', tune:'pTUNE', crush:'pCRSH',
-  swirl:'pSWRL', stutter:'pSTUT', chop:'pCHOP', twang:'pTWNG', master:'pMSTR'};
+  swirl:'pSWRL', stutter:'pSTUT', chop:'pCHOP', twang:'pTWNG', master:'pMSTR', strip:'pSTRP'};
 /* …PUMP CREATIVE (30 Oct 2026): pump's creative effects, each its own effect beside Thunder's (the old reverbs, delays and
    the rest stay). Same slot format and PumpFX interface as the nine mastering ones; on every track, pads' tracks, buses and
    the master. Their DSP is each plugin's own Plugin<Name>.hpp (pump's wasm/fx and wasm/shim). FX-screen boxes: every
    parameter a preset may set, in the plugin's order (PUMP_BOX below fills them in), plus Thunder's own rows:
    '@nin' NOTES FROM (f.nin: 0 off, 1 + t = track t's notes as MIDI: TUNE, VOX, TWANG, STUTTER, CHOP), '@sck' SC FROM (VOX). */
-const PUMP_CREATIVE = new Set(['tube', 'snap', 'gate', 'echo', 'spring', 'verb', 'grain', 'vox', 'tune', 'crush', 'swirl', 'stutter', 'chop', 'twang']);
+const PUMP_CREATIVE = new Set(['tube', 'snap', 'gate', 'echo', 'spring', 'verb', 'grain', 'vox', 'tune', 'crush', 'swirl', 'stutter', 'chop', 'twang', 'strip']);   // STRIP (2 Nov): pump's channel strip, eight consoles
 const PUMP_WIN = new Set(['gate', 'tune', 'chop']);   // (31 Oct) the creative ones with a pop-up window (MASTER has one too)
 const PUMP_NOTES = new Set(['vox', 'tune', 'twang', 'stutter', 'chop']);
 // where each one sits in the effect picker: beside Thunder's own of the same kind
 const PUMP_GROUP = {tube:'Drive and lo-fi', crush:'Drive and lo-fi', snap:'Dynamics and EQ', gate:'Rhythmic', stutter:'Rhythmic', chop:'Rhythmic',
   echo:'Delays', spring:'Reverbs', verb:'Reverbs', grain:'Spectral and granular', vox:'Pitch and voice', tune:'Pitch and voice', swirl:'Modulation', twang:'Resonators',
   // the mastering ones where you'd look for them (owner, 2 Nov: pCOMP wasn't findable; they were in a group at the very end)
-  eq:'Dynamics and EQ', comp:'Dynamics and EQ', limit:'Dynamics and EQ', calm:'Dynamics and EQ', tone:'Dynamics and EQ', band:'Dynamics and EQ', master:'Dynamics and EQ',
+  strip:'Dynamics and EQ', eq:'Dynamics and EQ', comp:'Dynamics and EQ', limit:'Dynamics and EQ', calm:'Dynamics and EQ', tone:'Dynamics and EQ', band:'Dynamics and EQ', master:'Dynamics and EQ',
   heat:'Drive and lo-fi', wide:'Utility', meter:'Utility'};
 // The boxes on the FX screen, in order. 'b#_x' = the selected band's x (BAND picks it: f.sel, a Thunder field, not a
 // plugin parameter); '@sck' = Thunder's sidechain source for COMP's External sidechain (f.sck, as the MODFX slots have it).
@@ -15423,7 +15423,7 @@ function pumpLatTxt(t, k){
 // The track effects in their groups (the pad list's: FX_GROUPS, MODFX.group or FX_GROUP), the everyday ones first in
 // each group (FXT_FIRST), then the rest in the old order. The slot picker shows the group names as headings; a slot
 // keeps its effect by name, so the order can change freely.
-const FXT_FIRST = ['compressor', 'pcomp', 'limiter', 'ngate', 'eq', 'peq', 'filter', 'cut', 'drive', 'odrive', 'density', 'chorus', 'flanger', 'phaser', 'tremolo', 'autopan',
+const FXT_FIRST = ['pstrip', 'compressor', 'pcomp', 'limiter', 'ngate', 'eq', 'peq', 'filter', 'cut', 'drive', 'odrive', 'density', 'chorus', 'flanger', 'phaser', 'tremolo', 'autopan',
   'sdelay', 'delay', 'room', 'plate', 'reverb', 'pshift', 'pump', 'utility', 'width'];
 const fxtGroup = k => (MODFX[k] && MODFX[k].group) || FX_GROUP[k] || 'More';
 const FXT_LIST = (() => {
@@ -19634,7 +19634,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 368;
+const BUILD = 369;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26702,6 +26702,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [369, '2 Nov', ['New effect: pSTRP, pump’s channel strip (Dynamics and EQ in the FX list): eight console styles with gate, compressor, EQ and drive in one slot, and 29 presets. Works on every track, buses and the master.']],
   [368, '2 Nov', ['Presets: the groups are now just Hack and Owls. New: hack bass and hack bass short (the 808-style bass that dives into each note), and 19 more owls: clicks (tick, wood, pop, metal, digital, soft), zaps (fast, mid, low, noisy, FM, laser) and rimshots (high, wood, metal, low, knock, comb, blip).']],
   [367, '2 Nov', ['Fixed: the Hardware skins (Vintage MPC, Nord red, 808, 909, Dr. Sample, M8) didn’t show in the skin list.']],
   [366, '2 Nov', ['New skin: M8 (pocket tracker), in the Hardware group: a black screen, a pixel-style mono everywhere, cyan cursor, magenta and green accents.']],
@@ -27658,6 +27659,8 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
   engines(){ return ENGINE_GROUPS.map(([g, es]) => g + ': ' + es.map(e => e[1]).join(', ')); },
   // The FX picker's list for track t (or the master: t = NT), with groups (for picker checks).
   fxPick(t){ return fxtL(t).map(k => fxtGroup(k) + ' · ' + TFX[k].n); },
+  // Put effect `type` (a TFX key, e.g. 'pstrip') in track t's first slot and send it to the live graph (for effect smoke tests).
+  fxSet(t, type){ S.tfx[t] = S.tfx[t] || []; S.tfx[t][0] = freshTfx(type); saveS(); if (rt) rtFx(t); return S.tfx[t][0].type; },
   // Every track effect: its group, factory preset count and controls (for preset work).
   fxInfo(){ return Object.keys(TFX).filter(k => !isPumpT(k)).map(k => ({k, n:TFX[k].n, long:TFX[k].long, g:fxtGroup(k), fac:(FX_FACTORY[k] || []).length, facv:(FX_FACTORY[k] || []), ps:(TFX[k].ps || []).map(p => ({k:p.k, l:p.l, min:p.min, max:p.max, d:p.d, names:p.names || null}))})); },
   // The open phrase's rows, and the PSL command's number (for generator checks).
