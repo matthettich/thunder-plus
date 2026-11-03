@@ -23393,6 +23393,53 @@ function dkDynMeters(cv, f, k, node, now){
     g.fillStyle = '#ff5a1f'; g.textAlign = 'left'; g.font = '700 7px ' + font; g.fillText('T', bw + 1, Math.max(top, ty - 4));
   }
 }
+/* PICTURES BY EFFECT TYPE (owner, 2 Nov: "the visual displays are mostly the same… something helpful for each"): drawn
+   from the effect's own values, chosen by its group (fxtGroup), with the live output level as a line along the bottom.
+   Delays: the echo taps fading with feedback. Reverbs: pre-delay and the decay. Modulation: the LFO, a dot moving at its
+   rate. Drive and lo-fi: the waveshaper curve, or steps for a crusher. Filters: the response with its resonance peak.
+   Values are found by name (time, feedback, decay, rate, depth, drive, cut, res…), as fractions of their range; an effect
+   whose values don't match keeps the level history. …pump effects keep it too (their values live in f.pump). */
+function dkFxVal(f, re){ const D = TFX[f.type]; if (!D || !D.ps) return null; const q = D.ps.find(p => re.test(p.k) || re.test(p.l)); if (!q || f[q.k] == null) return null; return clamp((f[q.k] - q.min) / ((q.max - q.min) || 1), 0, 1); }
+function dkFxPic(g, W, H, f, C, F, font, now, lvNow){
+  if (!f || isPumpT(f.type)) return false;
+  const grp = fxtGroup(f.type), v = re => dkFxVal(f, re), pad = 6, x0 = pad, x1 = W - pad, y0 = 12, y1 = H - 8, w = x1 - x0, h = y1 - y0;
+  const label = t => { g.font = '600 9px ' + font; g.textBaseline = 'top'; g.fillStyle = F(.55); g.fillText(t, 4, 2); g.fillStyle = '#ff5a1f'; };
+  const grid = () => { g.strokeStyle = F(.1); g.lineWidth = 1; g.beginPath(); for (let q = 1; q < 4; q++){ const y = Math.round(y0 + h * q / 4) + .5; g.moveTo(x0, y); g.lineTo(x1, y); } g.stroke(); g.strokeStyle = g.fillStyle = '#ff5a1f'; g.lineWidth = 1.8; };
+  const level = () => { g.fillStyle = '#4fd18a'; g.globalAlpha = .8; g.fillRect(x0, H - 4, w * clamp(lvNow || 0, 0, 1), 3); g.globalAlpha = 1; };
+  const AC = '#ff5a1f'; g.lineWidth = 1.8; g.strokeStyle = AC; g.fillStyle = AC;
+  if (grp === 'Delays'){
+    const tm = v(/time|delay|rate|^del/i), fb = v(/feed|fb|repeat|regen/i); if (tm == null) return false;
+    grid(); label('ECHOES'); const step = w * (0.08 + 0.32 * tm), k = fb == null ? 0.5 : 0.15 + 0.8 * fb;
+    let a = 1; for (let x = x0; x <= x1 && a > 0.03; x += step, a *= k){ g.globalAlpha = .25 + .75 * a; g.fillRect(Math.round(x), y1 - h * a, 3, h * a); }
+    g.globalAlpha = 1; level(); return true; }
+  if (grp === 'Reverbs'){
+    const dc = v(/decay|time|size|sustain|length/i), pd = v(/pre/i), wet = v(/wet|mix/i); if (dc == null) return false;
+    grid(); label('DECAY'); const sx = x0 + w * 0.25 * (pd || 0), T = w * (0.15 + 0.85 * dc), top = y0 + 4;
+    g.beginPath(); g.moveTo(x0, y1); g.lineTo(sx, y1); g.lineTo(sx, top);
+    for (let x = sx; x <= x1; x += 2){ const e = Math.exp(-4.6 * (x - sx) / T); g.lineTo(x, y1 - (y1 - top) * e); }
+    g.lineTo(x1, y1); g.closePath(); g.globalAlpha = .3; g.fill(); g.globalAlpha = 1; g.stroke(); level(); return true; }
+  if (grp === 'Modulation'){
+    const rt = v(/rate|speed|freq/i), dp = v(/depth|amount|amt|intens/i); if (rt == null) return false;
+    grid(); label('LFO'); const cyc = 1 + 3 * (rt || 0), A = (h / 2 - 2) * (dp == null ? 0.7 : 0.15 + 0.85 * dp), mid = y0 + h / 2;
+    g.beginPath(); for (let x = x0; x <= x1; x += 2){ const y = mid - A * Math.sin((x - x0) / w * cyc * 2 * Math.PI); if (x === x0) g.moveTo(x, y); else g.lineTo(x, y); } g.stroke();
+    const hz = 0.2 + 6 * (rt || 0), ph = (now / 1000 * hz) % 1, dx = x0 + ((ph * w) % w), dy = mid - A * Math.sin((dx - x0) / w * cyc * 2 * Math.PI);
+    g.beginPath(); g.arc(dx, dy, 3.5, 0, 7); g.fill(); level(); return true; }
+  if (grp === 'Drive and lo-fi'){
+    const bits = v(/bit|crush|depth|reso/i), dr = v(/drive|gain|amount|amt|heat|sat|press|dens/i);
+    if (bits != null && /crush|bit|lofi|lo-fi|derez/i.test(f.type + ' ' + (TFX[f.type].long || ''))){
+      grid(); label('STEPS'); const steps = Math.round(3 + (1 - bits) * 2 + bits * 13), mid = y0 + h / 2;
+      g.beginPath(); for (let x = x0; x <= x1; x += 1){ const s = Math.sin((x - x0) / w * 2 * Math.PI), q = Math.round(s * steps) / steps, y = mid - q * (h / 2 - 2); if (x === x0) g.moveTo(x, y); else g.lineTo(x, y); } g.stroke(); level(); return true; }
+    if (dr == null) return false;
+    grid(); label('CURVE'); const k = 1 + 9 * dr, n = Math.tanh(k);
+    g.strokeStyle = F(.2); g.setLineDash([2, 3]); g.beginPath(); g.moveTo(x0, y1); g.lineTo(x1, y0); g.stroke(); g.setLineDash([]); g.strokeStyle = AC;
+    g.beginPath(); for (let x = x0; x <= x1; x += 2){ const u = (x - x0) / w * 2 - 1, o = Math.tanh(k * u) / n, y = y0 + h / 2 - o * h / 2; if (x === x0) g.moveTo(x, y); else g.lineTo(x, y); } g.stroke(); level(); return true; }
+  if (grp === 'Filters'){
+    const cu = v(/cut|freq|tone|center|cent/i), rs = v(/res|q$|emph|peak/i); if (cu == null) return false;
+    grid(); label('RESPONSE'); const fc = 0.08 + 0.84 * cu, Q = 0.7 + 8 * (rs || 0), hp = /hp|high ?pass/i.test(f.type + ' ' + (TFX[f.type].long || ''));
+    g.beginPath(); for (let x = x0; x <= x1; x += 2){ const r = Math.pow(10, ((x - x0) / w - fc) * 2.2), m = hp ? r * r / Math.sqrt((1 - r * r) ** 2 + (r / Q) ** 2) : 1 / Math.sqrt((1 - r * r) ** 2 + (r / Q) ** 2);
+      const db = clamp(20 * Math.log10(m || 1e-6), -36, 18), y = y0 + (18 - db) / 54 * h; if (x === x0) g.moveTo(x, y); else g.lineTo(x, y); } g.stroke(); level(); return true; }
+  return false;
+}
 /* FX BAR pictures, in the room under each effect's values (none when the values fill the box). Dynamics (the FX stage's own
    display, fxDynPaint): the transfer curve with the live input dot and the reduction history; every other effect: its
    output level over the last ~3 s, so you can see what it is doing to the sound. Colours from the skin's screen (fxDynPal). */
@@ -23412,6 +23459,7 @@ function dkFxViz(col, f, k, node, now){
   }
   const C = fxDynPal(), F = a => 'rgba(' + C.ink + ',' + a + ')', h = col._h, n = h.length;
   g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  if (dkFxPic(g, W, H, f, C, F, font, now, h[(col._w - 1 + n) % n])) return;
   g.strokeStyle = F(.1); g.lineWidth = 1; g.beginPath(); for (let q = 1; q < 4; q++){ const y = Math.round(H * q / 4) + .5; g.moveTo(0, y); g.lineTo(W, y); } g.stroke();
   g.beginPath(); g.moveTo(0, H);
   for (let j = 0; j < n; j++){ const v = h[(col._w + j) % n]; g.lineTo(j / (n - 1) * W, H - v * (H - 4)); }
