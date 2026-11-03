@@ -42,6 +42,16 @@ terms, and they live entirely in the `lxr` folder with their source, licence and
 without that folder. Thunder Plus is not affiliated with or endorsed by Erica Synths; "Erica Synths", "LXR" and "LXR-02"
 are Erica Synths' names.
 
+## Ableton Link (link/, GPL-2.0-or-later, optional, desktop app only)
+
+The desktop app's Ableton Link setting uses a native addon built from the Ableton Link SDK
+(https://github.com/Ableton/link, tag Link-4.1.1, Copyright 2016 Ableton AG, Berlin) and its bundled asio-standalone
+(Christopher M. Kohlhoff, Boost Software License 1.0). Link is under the **GNU General Public License version 2 or later**
+(or a separate proprietary licence from Ableton), so the addon is too; it lives entirely in the `link` folder with its
+licence and notice (`link/NOTICE.md`), and the SDK's source is fetched at a pinned commit by `link/fetch-sdk.sh`. The app
+runs without it (the setting then says "Not available in this build"); the website never has it. "Ableton" and "Ableton
+Link" are Ableton AG's names; Thunder Plus is not affiliated with or endorsed by Ableton.
+
 ---
 
 The Comb resonator, Transient shaper, Trance gate, Multiband squash and Frequency shifter (`dsp/tfx/fx_extra.cc`), and the

@@ -2515,8 +2515,11 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       </div>
       <div class="lbl mclkh" id="segClkOut" aria-live="polite"></div>
       <div class="audrow mclk" title="Clock in follows another device’s clock: its Start and Stop run PLAY (Continue after a Song Position Pointer plays from there) and its tempo sets ours. From: the input to follow; the first one that sends keeps it until it goes quiet, so two devices sending clock can’t double the tempo"><span>Clock in</span><input type="checkbox" class="msw1" id="ckClkIn" aria-label="Follow MIDI clock in"><span class="mclkf">from</span><select id="midiClkSel" aria-label="Which MIDI input Clock in follows"><option value="" title="The first input that sends clock keeps it until it goes quiet">First that sends</option></select></div>
-      <!-- ABLETON LINK goes here (desktop only; HANDOVER "Plan: Ableton Link"): one row, the last of the MIDI section, e.g.
-           <h3>Link</h3><div class="audrow" id="linkRow"><span>Link</span>(switch)(peer count)</div> -->
+      <div id="linkBox" hidden>
+        <h3 title="Ableton Link keeps ...Thunder in time with other Link apps on the same Wi-Fi or network (Live, Koala, Reason…): any of them can change the tempo and the others follow, and PLAY waits for the next bar so the bars line up. Start/stop: another app's PLAY and STOP start and stop ...Thunder too, and ours start and stop them (when they have it on). MIDI Clock in, when it is playing us, comes first.">Ableton Link</h3>
+        <div class="segrow" title="Ableton Link: play in time with Live, Koala and other Link apps on the same network (tempo and bars). Desktop app only."><span>Ableton Link</span><div class="seg" id="segLink"></div><span class="lbl" id="linkStat" style="margin-left:8px"></span></div>
+        <div class="segrow" id="linkSyncRow" title="Start / stop sync: another Link app's PLAY starts ...Thunder on its next bar, and ours starts it (both need this on). Stop stops both."><span>Start/stop</span><div class="seg" id="segLinkSync"></div></div>
+              </div>
     </div>
   </section>
 
@@ -7726,7 +7729,7 @@ const Lc = () => V().layers[V().sel];
 // Output device, level, latency and sample rate. Latency and rate are fixed when the AudioContext is made,
 // so changing them asks for a restart; the output device and level change live.
 const AUK = 'thunderplus-audio-v1';
-const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false, core:'core'};   // core: THUNDER CORE, 'core' (default from build 362, owner) or 'page' (the old pump)   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
+const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false, core:'core', link:false, linkSync:true};   // link, linkSync: ABLETON LINK (desktop app), off by default   // core: THUNDER CORE, 'core' (default from build 362, owner) or 'page' (the old pump)   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
   try { const o = JSON.parse(localStorage.getItem(AUK) || '{}'); return Object.assign(d, o && typeof o === 'object' ? o : {}); } catch(e){ return d; } })();
 // Latency: what the person picked, else Balanced in the Mobile setup (phones click at Lowest when busy) and Lowest on desktop.
 // The desktop app starts on Balanced too (owner, 31 Oct: playback stuttered in the desktop app and not in the browser on the
@@ -14262,6 +14265,139 @@ function setTempoLive(v){
   const r = clamp(Math.round(v), 40, 300);
   if (r !== S.bpm){ S.bpm = r; try { rtAllFx(); chainsTempo(); } catch(e){} if (!tp.on) draw(); }
 }
+/* ===== ABLETON LINK (3 Nov; desktop app only, off by default: Settings → Audio & MIDI → Ableton Link) =====
+   The session lives in the desktop app's main process (electron/link-session.js over the optional link/ addon); this page
+   gets a state message on each change and a timing message every 20 ms ({beat, phase, tempo, at}: Link's beat at Link time
+   `at`, µs) through window.thunderDesktop.link. The website has no LINKAPI, and nothing here runs.
+   - Time: Link µs ↔ performance.now() by a clock ping (lkPing, NTP's way: ask for Link's time, take the middle of the round
+     trip), so the IPC's own delay doesn't move our bars. Of the last minute's pings the best: the shortest trip, less 0.05 ms
+     for each second of age (both are the system's steady clock, so they hardly drift apart; while the song plays this
+     thread is busy and trips grow to 10 ms or more, measured, which a short window would take as ±5 ms of error). Until the first
+     ping is back, the offset seen on the timing messages (the smallest: the least delayed). performance.now() ↔ the audio
+     clock (the moment a sound is heard, which is what Link's times mean too) by lkAm: the median of the last 25
+     getOutputTimestamp() offsets, read with each timing message. amap (MIDI's) is smoothed to ride out jitter and so takes
+     seconds to settle after audio starts (measured: 56 ms over 10 s); a bar line can't wait for that.
+   - Tempo: a peer's change → setTempoLive (S.bpm is whole BPM; the sequencer plays Link's exact tempo); ours (the tempo box,
+     Settings) → Link (lkTempoOut).
+   - Start: PLAY waits for the session's next bar (quantum 4) when there are peers; alone it starts at once and moves Link's
+     bar to it. tStart's start time comes from lkPlan. Start/stop sync: a peer's start plays us from its next bar, ours and
+     our STOP go to them.
+   - Drift (lkDrift, once a second while playing): Link's beat against the sequencer's at the newest booked beat (mx.beat), in
+     the bar (mod 4); the playing tempo is nudged by at most ±0.5 % until the error is under 1 ms. A gross error (over 1/8 beat:
+     a session that moved its bar under us, e.g. on joining one) catches up at up to ±4 %, as clkIn does after a Start.
+   MIDI Clock in, while it plays us (mx.slave), comes first: Link then neither moves our tempo nor starts us.
+   To take it out: this block, the hooks marked ABLETON LINK in tStart, tStop, CLK, the TEMPO setting and __seqTest, the
+   #linkBox rows, and aset.link / aset.linkSync. */
+const LINKAPI = (window.thunderDesktop && window.thunderDesktop.link) || null;
+const LQ = 4;   // quantum: one bar
+var lk = {on:false, st:null, t:null, offs:[], off:null, pings:[], ams:[], am:null, lt:null, pend:null, r:0, i:0, err:null, errs:[], drT:0, pgT:0, peerStop:false, restart:false, ipc:0};   // r: the nudge now; i: its learnt rate part   // var: tStart / tStop may run before this line
+const lkLive = () => lk.on && !!lk.t && lk.off != null && !(mx && mx.slave);
+const lkNowUs = () => (performance.now() - lk.off) * 1000;
+const lkBeatAt = us => lk.t.beat + (us - lk.t.at) * lk.t.tempo / 60e6;
+const lkUsAt = b => lk.t.at + (b - lk.t.beat) * 60e6 / lk.t.tempo;
+const lkAm = () => lk.am != null ? lk.am : amap.off != null ? amap.off : mapUpd();   // performance ms − audio ms
+const lkA = us => (us / 1000 + lk.off - lkAm()) / 1000;   // Link µs → audio time
+const lkUs = t => (t * 1000 + lkAm() - lk.off) * 1000;   // audio time → Link µs
+const lkNextBar = us => lkUsAt(Math.ceil(lkBeatAt(us) / LQ - 1e-9) * LQ);
+// One call to the main process (they answer with promises; a failure is logged, never thrown at the transport)
+const lkCall = (what, f) => { try { const r = f(); if (r && typeof r.catch === 'function') r.catch(e => tpLog('Ableton Link: ' + what, e)); } catch(e){ tpLog('Ableton Link: ' + what, e); } };
+function lkEnable(v){
+  if (!LINKAPI || !LINKAPI.available) return;
+  Object.assign(lk, {on:!!v, st:null, t:null, offs:[], off:null, pings:[], ams:[], am:null, lt:null, r:0, i:0, err:null, errs:[]});
+  clearInterval(lk.drT); clearInterval(lk.pgT); lk.drT = lk.pgT = 0;
+  lkCall('sync', () => LINKAPI.sync(!!aset.linkSync)); lkCall('enable', () => LINKAPI.enable(!!v, S.bpm));
+  if (v){ lk.drT = setInterval(lkDrift, 1000); lk.pgT = setInterval(lkPing, 250); for (let i = 0; i < 5; i++) setTimeout(lkPing, 30 * i); }
+  else if (tp.on && tp.seq) tp.seq.bpm = S.bpm;   // drop a nudge
+  lkUi();
+}
+// The clock ping: Link's time asked for at a, answered at b; it was read in between (the middle, if the trip is even)
+function lkPing(){
+  if (!lk.on || !LINKAPI.now) return;
+  const a = performance.now();
+  Promise.resolve(LINKAPI.now()).then(us => { const b = performance.now(); if (!lk.on || !(us > 0)) return;
+    lk.pings.push({rtt:b - a, off:(a + b) / 2 - us / 1000, at:b}); if (lk.pings.length > 240) lk.pings.shift();   // a minute at 4 a second
+    const q = p => p.rtt / 2 + (b - p.at) * 5e-5;   // its possible error now, ms
+    lk.off = lk.pings.reduce((x, y) => q(y) < q(x) ? y : x).off; }, () => {});
+}
+function lkTime(m){
+  if (!lk.on || !m || !(m.tempo > 0)) return;
+  const pn = performance.now(), o = pn - m.at / 1000;
+  lk.offs.push(o); if (lk.offs.length > 50) lk.offs.shift();
+  if (!lk.pings.length) lk.off = Math.min(...lk.offs);
+  lk.t = m;
+  if (m.hostNow) lk.ipc = performance.timeOrigin + pn - m.hostNow;   // (diagnostic: this message's trip, ms)
+  if (ctx){ mapUpd();   // (MIDI's mapping, fresh at 50 Hz)
+    try { const ot = ctx.getOutputTimestamp(); if (ot.performanceTime > 0){ lk.ams.push(ot.performanceTime - ot.contextTime * 1000); if (lk.ams.length > 25) lk.ams.shift();
+      const so = [...lk.ams].sort((a, b) => a - b), md = so[so.length >> 1]; if (lk.am == null || Math.abs(md - lk.am) > 0.05) lk.am = md; } } catch(e){} }   // (a new value only past 50 µs: no flutter)
+}
+function lkState(s){
+  const was = lk.st; lk.st = s; lkUi();
+  if (!lk.on || !s || !s.enabled) return;
+  // Tempo: a change in the session (by a peer, or the first message after joining) is ours too
+  if (lk.lt == null || Math.abs(s.tempo - lk.lt) > 1e-4){ lk.lt = s.tempo; if (!mx.slave && s.tempo >= 20){ lk.r = 0; setTempoLive(s.tempo); } }
+  if (!aset.linkSync || mx.slave || !was) return;
+  // START / STOP SYNC: a peer's start (isPlaying false → true) plays us from the bar it starts on; its stop stops us
+  if (s.playing && !was.playing && !tp.on && lkLive()){
+    let us = lkNextBar(s.playAt || lkNowUs());
+    if (us < lkNowUs() + 60000) us = lkNextBar(lkNowUs() + 100000);   // that bar has passed (or is too close to book): the next one
+    lk.pend = {us}; try { playCtx(); } finally { lk.pend = null; }
+  } else if (!s.playing && was.playing && tp.on){ lk.peerStop = true; try { tStop(); } finally { lk.peerStop = false; } }
+}
+// tStart: when to start. {us, t (audio time), own} or null (Link off: start as before). pend: a peer's start; ci: REC's
+// count-in (s), which plays before the start, so the bar is looked for after it.
+function lkPlan(wasOn, ci){
+  const p = lk.pend; lk.pend = null;
+  if (!lkLive() || !ctx) return null;
+  // The sequencer books its first row 80 ms ahead; 100 ms leaves room for the IPC. An audio clock that has only just started
+  // (this PLAY started the engine) reports its output time late for a moment (amap then moves ~50 ms): 400 ms then.
+  const soon = lkNowUs() + (ctx.currentTime < 0.5 ? 400000 : 100000) + (ci || 0) * 1e6;
+  let us = p ? p.us : lk.st && lk.st.peers > 0 ? lkNextBar(soon) : soon;
+  if (us < lkNowUs() + 60000 + (ci || 0) * 1e6) us = lkNextBar(soon);
+  return {us, t:lkA(us), own:!p, wasOn};
+}
+function lkStarted(a){
+  lk.r = 0; lk.err = null; lk.errs = [];   // (i, the rate difference, carries over: the two clocks haven't changed)
+  if (tp.seq) tp.seq.bpm = lk.t.tempo;   // Link's exact tempo (S.bpm is whole BPM)
+  // Ours: alone, Link's bar moves to our start (the addon only does that with no peers); start/stop sync tells the peers
+  if (a.own) lkCall('start', () => LINKAPI.start(a.us, !!aset.linkSync && !a.wasOn));
+  lk.s0p = tp.t0 * 1000 + lkAm();   // (test hook: when this start is heard, performance.now() ms)
+}
+function lkStopped(){ if (lk.on && aset.linkSync && !lk.peerStop) lkCall('stop', () => LINKAPI.stop()); }
+// Our tempo edits go to the session (Link is symmetric: any peer may change it)
+function lkTempoOut(v){ if (!lk || !lk.on || !(v >= 20)) return; lk.lt = v; lk.r = 0; lkCall('tempo', () => LINKAPI.setTempo(v)); }
+// DRIFT: Link's beat against ours at the newest booked beat, in the bar; the playing tempo is nudged to close it in a second
+function lkDrift(){
+  const e = mx.beat;
+  if (!tp.on || !tp.seq || !lkLive() || !e || !ctx) return;
+  const lt = lk.t.tempo, spb = 60000 / lt;   // ms per beat
+  let err = lkBeatAt(lkUs(e.t)) - e.b; err -= LQ * Math.round(err / LQ);   // + : Link is ahead of us (we must speed up)
+  const ms = err * spb; lk.err = ms; lk.errs.push(Math.round(ms * 1000) / 1000); if (lk.errs.length > 120) lk.errs.shift();
+  // A gross error (a session that moved its bar under us): catch up at up to 4 %. Otherwise PI (gains from a model of this
+  // loop: a measurement once a second at a beat booked up to 250 ms ahead): i learns the steady rate difference (Link's clock
+  // against the sound card's: a P term alone would leave that as a constant error), only from small errors so a jump doesn't
+  // wind it up; the P part closes what is left. Both together never past ±0.5 %; under 0.5 ms only i acts.
+  if (Math.abs(ms) > spb / 8) lk.r = clamp(ms / 1000, -0.04, 0.04);
+  else { if (Math.abs(ms) <= 4) lk.i = clamp(lk.i + 0.3 * ms / 1000, -0.005, 0.005);
+    lk.r = clamp(lk.i + (Math.abs(ms) < 0.5 ? 0 : 0.7 * ms / 1000), -0.005, 0.005); }
+  tp.seq.bpm = lt * (1 + lk.r);   // not setTempoLive: a nudge is no tempo change (S.bpm, the effects' times stay)
+}
+function lkUi(){
+  const box = $('linkBox'); if (!box) return;
+  box.hidden = !LINKAPI; if (!LINKAPI) return;
+  const av = !!LINKAPI.available, s = lk.st;
+  $('segLink').hidden = !av; $('linkSyncRow').hidden = !av;
+  if (updLink) updLink(); if (updLinkSync) updLinkSync();
+  $('linkStat').textContent = !av ? 'Not available in this build' : !aset.link ? 'Disabled'
+    : !s || !s.enabled ? 'Enabled' : `Enabled · ${s.peers} peer${s.peers === 1 ? '' : 's'} · ${(+s.tempo).toFixed(1)} BPM`;
+}
+let updLink = null, updLinkSync = null;
+if (LINKAPI && $('segLink')){
+  updLink = makeSeg($('segLink'), [[false, 'Off'], [true, 'On']], () => !!aset.link, v => { aset.link = !!v; asetSave(); lkEnable(aset.link); });
+  updLinkSync = makeSeg($('segLinkSync'), [[true, 'On'], [false, 'Off']], () => aset.linkSync !== false, v => { aset.linkSync = !!v; asetSave(); if (LINKAPI.available) lkCall('sync', () => LINKAPI.sync(!!v)); });
+  if (LINKAPI.available){ LINKAPI.onState(lkState); LINKAPI.onTime(lkTime); }
+  lkUi();
+  setTimeout(() => { if (aset.link && LINKAPI.available) lkEnable(true); }, 0);   // after the song (S) is loaded
+}
 // Settings → MIDI: a cable for each port letter, and which letters get clock.
 function moPorts(){
   const opts = [['', 'None']]; if (midi.access) midi.access.outputs.forEach(o => opts.push([o.id, o.name || o.id]));
@@ -18498,7 +18634,7 @@ function tStart(mode, o){
   if (typeof varPrefetch === 'function') varPrefetch();   // MUT / GEN
   if (mode === 'song' && loopPat && !(o && o.loop)){ o = Object.assign({}, o, {loop:{v:'pat', y0:o.row, y1:o.row}}); patRow = o.row; patCur = cs.song.y; }   // LOOP: the pattern
   const wasOn = tp.on;   // REC: no count-in when PLAY jumps somewhere else mid-song
-  tStop(true);
+  if (lk) lk.restart = true; try { tStop(true); } finally { if (lk) lk.restart = false; }   // ABLETON LINK: a restart is no STOP for the peers
   // RESUME: carry on from where the song stopped, if the cursor hasn't moved since (and not for a loop)
   const pz = tp.paused; tp.paused = null;
   const resume = mode === 'song' && resumeOn && !wasOn && pz && !(o && o.loop) && pz.key === curKey() && S.song[pz.row] && S.song[pz.row][pz.ref] >= 0;
@@ -18522,11 +18658,13 @@ function tStart(mode, o){
       const r = seq.step(), p = r.pos && r.pos[pz.ref];
       if (p && (p.row > pz.row || (p.row === pz.row && p.step >= pz.step))){ rsFirst = r; break; }
       for (const e of r.evs) if (CHASE_T.has(e.type)) rsFx.set(e.type + ':' + e.track + ':' + (e.p || ''), e); } }
-  const t0start = ctx.currentTime + 0.08 + ci;
+  // ABLETON LINK: on the session's next bar when there are peers (or the bar a peer starts on); lkPlan is null with Link off
+  const lkp = lk ? lkPlan(wasOn, ci) : null;
+  const t0start = lkp ? lkp.t : ctx.currentTime + 0.08 + ci;
   if (rsFirst){ const d = t0start - rsFirst.t; seq.base += d; seq.time += d; if (seq.btT != null) seq.btT += d; }
   else seq.time = t0start;
   stageStart(t0start);
-  met.next = 0; rec.hist = []; if (ci) countIn(ctx.currentTime + 0.08, recS.cnt, seq.bpm);
+  met.next = 0; rec.hist = []; if (ci) countIn(t0start - ci, recS.cnt, seq.bpm);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0, t0:t0start, lenTot:null, lenPre:0, hiRow:null});
   if (rsFirst){   // RESUME: the effect commands passed on the way, then the step it stopped on, now
@@ -18538,6 +18676,7 @@ function tStart(mode, o){
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
   tp.core = false;
   if (aset.core === 'core' && core.ready) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);   // not loaded yet: this PLAY as before, the core loads at STOP
+  if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
   tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
   bgPlay(true);   // BACKGROUND PLAY
   void r;
@@ -18789,6 +18928,7 @@ function panic(){
 let stopTapT = 0;
 function toTop(){ tp.paused = null; cs.song.y = 0; cs.song.top = 0; try { draw(); } catch(e){} toast('Back to the top of the song.', 1500); }
 function tStop(quiet){
+  if (tp.on && lk && !lk.restart) lkStopped();   // ABLETON LINK: start / stop sync
   if (tp.timer) tp.timer.stop();
   // RESUME: where the song stopped (the positions last heard), the track it follows, and the cursor then
   if (tp.on && tp.mode === 'song' && tp.pos && tp.pos.some(Boolean)){
@@ -20579,7 +20719,7 @@ function projRows(){
     {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText({title:'Rename the song'}, S.name, 40, 'Rename'); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); } }, info:() => 'EDIT renames the song'},
     {l:'TRACKS', get:() => ntr(), set:v => setNtr(v), min:8, max:NT, big:8, d:16, fmt:v => v + ' tracks',
       info:() => `How many tracks this song uses, 8 to ${vtrk ? 24 : NT} with ${vtrk ? 'a voice per track (one voice each)' : 'the shared 16 voices'}. Song and Mixer show as many as fit and scroll sideways (arrows, or swipe left and right). Tracks past this number are hidden and silent; their notes are kept`},
-    {l:'TEMPO', get:() => S.bpm, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; }, min:40, max:300, big:10, d:120, fmt:v => v + ' BPM', after:() => { rtAllFx(); chainsTempo(); }, info:() => 'Beats per minute, 4 steps to a beat. Track delays follow it'},
+    {l:'TEMPO', get:() => S.bpm, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; lkTempoOut(v); }, min:40, max:300, big:10, d:120, fmt:v => v + ' BPM', after:() => { rtAllFx(); chainsTempo(); }, info:() => 'Beats per minute, 4 steps to a beat. Track delays follow it'},
     {l:'LPB', get:() => S.lpb, set:v => S.lpb = v, min:1, max:16, big:4, d:8, fmt:v => v + ' lines/beat · 1/' + (v * 4), info:() => 'Lines per beat: 4 makes each row a 16th, 8 a 32nd (new songs start at 8), 3 or 6 triplets. A phrase can set its own on its LEN line'},
     {l:'TICKS', get:() => S.ticks || TICKS, set:v => { S.ticks = v; if (tp.on && tp.seq) tp.seq.tks = v; }, min:1, max:32, big:4, d:TICKS, fmt:v => v + ' ticks a step', after:chainsTempo, info:() => 'How many ticks each step is cut into for DEL, RET, KIL, OFF, ARC, PSL and GRV (6 by default). A TIC command in a phrase changes it from that row on'},
     {l:'PATTERN LEN', get:() => S.dlen || 16, set:v => setDefLen(v), min:1, max:PROWS, big:4, d:16, fmt:v => v + (v === 1 ? ' row' : ' rows') + ' · new phrases', info:() => 'How many rows a new phrase starts with (empty phrases follow it too). Setting a phrase’s ROWS (at the right of the tab bar) or its LEN line changes this to match'},
@@ -21590,7 +21730,7 @@ function rowsId(){ if (tv === 'sect'){ const ch = S.chains[cSect], r = ch && ch[
 function setRows(v){ const id = rowsId(), n = clamp(v, 1, PROWS); S.plen[id] = n; setDefLen(n); if (id === cPhrase){ const c = cs.phrase; if (c.y >= S.plen[id]) c.y = S.plen[id] - 1; } saveS(); draw(); }
 // Tempo and LPB in the tab bar: double-click (or double-tap) a number to type a new one; Enter or a tap away
 // sets it, Esc cancels. Ticks a step stay in Settings.
-const CLK = {bpm:{min:40, max:300, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; rtAllFx(); chainsTempo(); }, name:'Tempo'},
+const CLK = {bpm:{min:40, max:300, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; rtAllFx(); chainsTempo(); lkTempoOut(v); }, name:'Tempo'},   // lkTempoOut: ABLETON LINK
   lpb:{min:1, max:16, set:v => { S.lpb = v; }, name:'LPB'}};
 function clkEdit(b){
   if (b.querySelector('input')) return;
@@ -28012,6 +28152,15 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
   async beatClock(ms){ tStart('song', {row:0}); const a = ctx.createAnalyser(); a.fftSize = 256; rt.pl.clkBus.connect(a); const b = new Float32Array(256), out = [];
     const t0 = performance.now(); while (performance.now() - t0 < ms){ a.getFloatTimeDomainData(b); out.push(Math.round(b[255] * 100) / 100); await new Promise(r => setTimeout(r, 50)); }
     tStop(true); await new Promise(r => setTimeout(r, 100)); a.getFloatTimeDomainData(b); out.push(Math.round(b[255] * 100) / 100); try { rt.pl.clkBus.disconnect(a); } catch(e){} return out; },
+  // ABLETON LINK (tools/link-test.mjs, with a fake window.thunderDesktop.link): what the page sees and does. beat: the newest
+  // booked beat (mx.beat) with the performance.now() it is heard at, for checking against the fake session's own timeline.
+  link(){ const e = mx.beat; return {on:lk.on, live:lkLive(), peers:lk.st ? lk.st.peers : null, ltempo:lk.t ? lk.t.tempo : null, bpm:S.bpm, seqBpm:tp.seq ? tp.seq.bpm : null, playing:!!tp.on, core:!!tp.core,
+    t0p:tp.on && ctx ? tp.t0 * 1000 + lkAm() : null, i:lk.i, off:lk.off, am:lk.am, s0p:lk.s0p, amR:lk.ams.length ? Math.max(...lk.ams) - Math.min(...lk.ams) : null, nP:lk.pings.length, rtt:lk.pings.length ? Math.min(...lk.pings.map(p => p.rtt)) : null, nowP:performance.now(), r:lk.r, err:lk.err, errs:lk.errs.slice(), beat:e && ctx ? {b:e.b, p:e.t * 1000 + lkAm()} : null, box:!$('linkBox').hidden, stat:$('linkStat').textContent}; },
+  linkSet(v){ aset.link = !!v; lkEnable(!!v); return lk.on; },
+  audio(){ rtInit(); return ctx.state; },
+  linkPlay(){ const p = performance.now(); playCtx(); return {on:!!tp.on, p, t0p:tp.on && ctx ? tp.t0 * 1000 + lkAm() : null}; },
+  linkStop(){ if (tp.on) tStop(); return true; },
+  linkTempo(v){ CLK.bpm.set(v); return S.bpm; },
   // The engine list's groups (for category checks).
   engines(){ return ENGINE_GROUPS.map(([g, es]) => g + ': ' + es.map(e => e[1]).join(', ')); },
   // The FX picker's list for track t (or the master: t = NT), with groups (for picker checks).

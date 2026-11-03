@@ -4,6 +4,15 @@ const path = require('path');
 const fs = require('fs'), fsp = fs.promises;
 const { pathToFileURL } = require('url');
 const { setupUpdates } = require('./updater');
+const { linkSession } = require('./link-session');
+/* ABLETON LINK (3 Nov; desktop only, off until the page turns it on): the native addon in ./link (built from the repo's link/
+   folder, GPL-2.0-or-later, see link/NOTICE.md) is OPTIONAL. A build without it, or one whose file won't load on this
+   computer, runs as before and the page says Link is not available in this build. Packaged, a .node file is read from
+   app.asar.unpacked (asarUnpack in package.json): the system can't load a library from inside the archive. */
+let LINK_ADDON = null, LINK_WHY = '';
+try { LINK_ADDON = require(path.join(__dirname, 'link', 'thunder_link.node').replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep)); }
+catch (e) { LINK_WHY = String((e && e.code) || (e && e.message) || e); }
+const link = LINK_ADDON ? linkSession(LINK_ADDON, (ch, m) => { if (win && !win.isDestroyed()) win.webContents.send(ch, m); }) : null;
 
 // The app is served from app://thunder/ rather than opened as plain files. Plain files can't fetch each
 // other, load audio worklets or talk across frames, which the …waves and …chains editors (frames inside
@@ -86,8 +95,9 @@ function createWindow(){
   });
   closeOk = false; pageReady = false;
   win.loadURL('app://thunder/index.html');
-  win.webContents.on('did-start-loading', () => { pageReady = false; });   // a reload: wait for the page again
-  win.webContents.on('render-process-gone', () => { pageReady = false; });
+  // a reload: wait for the page again. ABLETON LINK goes off with the page (a reload turns it on again from its own setting)
+  win.webContents.on('did-start-loading', () => { pageReady = false; if (link) link.off(); });
+  win.webContents.on('render-process-gone', () => { pageReady = false; if (link) link.off(); });
   win.on('close', e => {
     if (closeOk || !pageReady) return;
     e.preventDefault();
@@ -98,7 +108,7 @@ function createWindow(){
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   // The window only ever shows the app: a dropped file (file://) or anything else must not navigate it away.
   win.webContents.on('will-navigate', (e, url) => { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); });
-  win.on('closed', () => { win = null; });
+  win.on('closed', () => { win = null; if (link) link.off(); });
 }
 
 app.on('second-instance', (e, argv) => { if (win){ if (win.isMinimized()) win.restore(); win.focus(); } const p = argPath(argv); if (p) sendPath(p); });
@@ -156,6 +166,15 @@ app.whenReady().then(() => {
     } catch (err) { return { error: String((err && err.message) || err) }; }
   });
   ipcMain.handle('thunder:out-show', (e, f) => { if (typeof f === 'string' && fs.existsSync(f)) shell.showItemInFolder(f); return true; });
+  // ABLETON LINK: the session (link-session.js) and the page's calls. Every handler answers safely without the addon.
+  ipcMain.on('thunder:link-avail', e => { e.returnValue = { available: !!link, why: link ? '' : LINK_WHY || 'not built' }; });
+  ipcMain.handle('thunder:link-enable', (e, on, bpm) => link ? link.enable(on, bpm) : false);
+  ipcMain.handle('thunder:link-sync', (e, on) => link ? link.sync(on) : false);
+  ipcMain.handle('thunder:link-tempo', (e, bpm) => link ? link.setTempo(bpm) : false);
+  ipcMain.handle('thunder:link-start', (e, at, sync) => link ? link.start(at, sync) : 0);
+  ipcMain.handle('thunder:link-stop', () => link ? link.stop() : false);
+  ipcMain.handle('thunder:link-now', () => LINK_ADDON ? LINK_ADDON.now() : 0);   // Link's clock now (µs): the page's clock ping
+  app.on('will-quit', () => { if (link) link.off(); });
   ipcMain.on('thunder:page-ready', () => { pageReady = true; if (pendingPath && win){ const p = pendingPath; pendingPath = null; win.webContents.send('thunder:open-path', p); } });
   ipcMain.on('thunder:close-ack', () => clearTimeout(ackT));
   ipcMain.on('thunder:close-reply', (e, ok) => { clearTimeout(ackT); if (!ok){ quitting = false; return; } closeOk = true; if (win) win.close(); if (quitting) app.quit(); });

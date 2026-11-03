@@ -312,6 +312,13 @@ the browser's copy); use File → Save to move work between them. Project files 
 makes them open in the app with a double-click (also from the Mac's Finder; not the Windows portable .exe), and closing
 the window with unsaved changes asks Save / Don't save / Cancel.
 
+**Ableton Link (desktop app only, off by default).** Settings → Audio & MIDI → **Ableton Link** On keeps the app in time
+with Live, Koala and other Link apps on the same network: tempo both ways, and PLAY waits for the session's next bar.
+**Start/stop** (on by default once Link is on) shares PLAY and STOP with the Link apps that have it on too. MIDI Clock in,
+when it is playing the song, comes first. Link comes from an optional native addon in `link/` (the Ableton Link SDK,
+GPL-2.0-or-later; see `link/NOTICE.md`); a build without it says "Not available in this build". The website has no Link
+(browsers can't reach the network the way Link needs).
+
 **Updates.** Installed copies check GitHub Releases when they open (and every few hours): on Windows and Linux
 the new version downloads by itself and asks to restart; on a Mac (unsigned) it says a new version is out and opens
 https://github.com/matthettich/thunder-plus/releases/latest, which is also the link to give testers. To ship one,

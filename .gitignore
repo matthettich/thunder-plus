@@ -3,3 +3,6 @@ electron/dist/
 electron/app/
 node_modules/
 tests/golden/out/
+electron/link/
+link/sdk/
+link/build/

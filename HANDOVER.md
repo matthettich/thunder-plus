@@ -53,7 +53,7 @@ is housekeeping, not legal advice: have a lawyer look before selling.
 
 **Today:** Thunder Plus itself has no licence (no LICENSE file; `electron/package.json` says `"license": "UNLICENSED"`),
 so it is all rights reserved, though the repo is public. All third-party code is MIT / BSD / ISC / zlib / Apache, fonts
-are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
+are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton Link, GPL-2.0-or-later, desktop only)**.
 
 1. **GPL: `lxr/` only.** To ship closed: `git rm -r lxr` (optionally also the `<script src="lxr/lxr-engine.js…">` line in
    `index.html`; every other LXR hook is guarded by `typeof LxrCore`, `sw.js` caches it as OPTIONAL, and
@@ -91,6 +91,53 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    Steinberg's proprietary licence) and **Ableton Link** (GPLv2+ or Ableton's free proprietary licence) are kept as optional
    build flags (`THUNDER_ASIO`, `THUNDER_LINK`); a closed build needs both proprietary agreements or leaves them out. If
    JUCE is chosen for the host instead of permissive libraries, it needs a commercial JUCE licence.
+8. **GPL: `link/` (Ableton Link in the Electron desktop app, 3 Nov).** The addon is built from the Link SDK (GPL-2.0-or-later,
+   or Ableton's free proprietary licence by application: link-devs@ableton.com). To ship closed without that licence:
+   `git rm -r link` (the workflow's "Ableton Link addon" step then does nothing; `electron/main.js` loads
+   `electron/link/thunder_link.node` in a try, `package.json` packages `link/**` only if present, and every page hook is
+   guarded by `LINKAPI` / `lk`). Delete a locally built `electron/link/` too. Check: Settings → Audio & MIDI → Ableton Link
+   says "Not available in this build", and no `thunder_link.node` in the packaged app (`app.asar.unpacked/link/`). The code
+   that stays (`electron/link-session.js`, the `index.html` block) is ours and has no Link code in it. With Ableton's licence,
+   keep `link/` and replace its LICENSE / NOTICE with what that licence asks for. Either way, "Ableton Link" in the UI
+   follows Ableton's guidelines (the name in full, Enabled / Disabled).
+
+## 3 Nov: Ableton Link (desktop, off by default)
+
+Plan steps 1–3 of "Plan: Ableton Link on the desktop app" (below) are built on a branch from `beta`, not merged or released.
+Thunder Perform (step 4) and phones are not.
+- **Where:** `link/` (the native addon: `src/thunder_link.cc` over the Link SDK, plain N-API; `fetch-sdk.sh` pins
+  `Link-4.1.1` by commit into `link/sdk`, not committed; `build.js` → `electron/link/thunder_link.node`, Mac arm64 + x86_64
+  joined by lipo; own LICENSE / NOTICE, GPL-2.0-or-later). `electron/link-session.js` owns the session (state message on
+  change, timing message every 20 ms while on); `electron/main.js` requires the addon in a try (from `app.asar.unpacked`);
+  `electron/preload.js` → `window.thunderDesktop.link`. Page: the **ABLETON LINK** block after `setTempoLive` in
+  `index.html` (`lk*` functions), hooks in `tStart` (`lkPlan` / `lkStarted`), `tStop` (`lkStopped`), `CLK.bpm` and the
+  TEMPO setting (`lkTempoOut`); `aset.link` (off) and `aset.linkSync` (on); rows in Settings → Audio & MIDI (`#linkBox`,
+  shown only with `window.thunderDesktop.link`, "Not available in this build" without the addon).
+- **How it works:** times are Link's µs, mapped to `performance.now()` by a round-trip ping (`lkPing`, shortest of 20) and
+  to the audio clock by a median of `getOutputTimestamp()` (`lkAm`; MIDI's `amap` settles too slowly for a bar line).
+  PLAY with peers starts on the session's next bar; alone it starts at once and moves Link's bar there (the addon's
+  `start` only re-anchors with no peers). Drift: `lkDrift` once a second, PI on the playing tempo (`tp.seq.bpm`), ±0.5 %
+  (±4 % above 1/8 beat). Works with both sequencers (Page and Audio thread): only the start time and `tp.seq.bpm` are used,
+  so `makeSeq` and the core are unchanged (no `make-core` run needed). MIDI Clock in (`mx.slave`) wins over Link.
+- **CI:** `.github/workflows/desktop.yml` has an "Ableton Link addon (optional)" step before the app build, with
+  `continue-on-error`. **Not yet run on GitHub's Mac / Windows machines**: the first desktop workflow run will say whether
+  the addon builds there (Linux x64 built and ran here with node-gyp 11 / GCC 13). If Windows or Mac fails, the app still
+  builds, without Link; the step's log says why.
+- **Tested here:** `node --test tests/link.test.js` (session vs a fake addon, guards, the real addon when built);
+  `node tools/link-test.mjs` (the page against a fake peer in headless Chrome, both sequencers: tempo both ways, start on
+  the next bar to within ~0.2 ms, start/stop sync both ways, drift 0.03 % / a 20 ms jump / 0.3 % converging under 1 ms
+  in a few seconds). The sandbox's fake audio device stalls now and then; the test marks such samples `(h …)` and SKIPs a
+  check that only had those. Two real addon instances in two processes (loopback) agreed on tempo, phase and start/stop.
+  **Not tested:** against Live / Koala / a phone on Wi-Fi; inside Electron itself (no Electron in the sandbox).
+- **Owner, to test:** build the desktop app from this branch (Run workflow with no version), check the step "Ableton
+  Link addon" passed on each OS. Then on one Wi-Fi: Live (Preferences → Link, Tempo & MIDI → Link on, Start Stop Sync on) or
+  Koala (Link on); Thunder Plus Settings → Audio & MIDI → Ableton Link On: the peer count shows; change tempo on either side;
+  press PLAY on each side (the other should start on the next bar); let it run a few minutes listening for flamming against
+  Live's metronome. Ableton's own checklist is `link/sdk/TEST-PLAN.md` (after `sh link/fetch-sdk.sh`). Windows asks to
+  allow network access the first time Link is on (allow private networks).
+- **Left:** Thunder Perform (plan step 4), phones (native app later), a Link icon / button per Ableton's guidelines if
+  wanted, the 1-bar quantum as a setting (Live's Quantization is per app), REC count-in with Link (it is placed before the
+  bar, not tested against a peer). Licence: before selling, see item 8 of the commercial checklist.
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
@@ -385,7 +432,7 @@ Scope comes from the selection, as in Renoise: Ctrl/⌘+A pressed again widens i
 | Previous / next instrument | Numpad − / + | **not built**: numpad − / + are already octave down / up |
 | Settings | Ctrl/⌘+, | **built** · the Mac and Renoise standard |
 
-### Plan: Ableton Link on the desktop app (owner, 1 Nov: wanted eventually)
+### Plan: Ableton Link on the desktop app (owner, 1 Nov: wanted eventually; steps 1–3 built 3 Nov, see "3 Nov" above)
 - **Licence first.** The Link SDK (github.com/Ableton/link) is dual-licensed: GPLv2+ or a proprietary licence from Ableton
   (free, by application: link-devs@ableton.com). A closed / sold Thunder Plus needs the proprietary one; until then build it
   as an optional native addon that is easy to leave out (like `lxr/`). Note it in THIRD_PARTY_NOTICES and the release checklist.
