@@ -102,6 +102,52 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
 - Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov: Audio & MIDI ports table; tracker keys
+
+On `beta` (worktree branch), not released; BUILD and the sw.js cache name not bumped (the What's new line is filed as 374).
+- **Audio & MIDI** (`docs/MENU-AUDIT.md` proposal 1, done): `#pAudio` / `#pMidi` rebuilt with no paragraphs; each row's
+  explanation is its `title`. AUDIO: Output + Test (`#audOutRow`; without setSinkId its tooltip says why it's greyed),
+  Level, Latency, Rate, Latency comp (switch `#ckPdc`), …pump live (its note is now `#psLiveRow`'s tooltip), Sequencer, the
+  Apply (reload) row when needed, and a small **Reset audio engine** at the bottom (`.audfoot`). MIDI: Connect, Notes in
+  (input + channel dropdowns), Keys play, Mapping (Learn / Unlearn / Reset), Velocity (switch `#ckVel`); a **ports
+  table** (`.mports.mtab`): PORT · DEVICE · DELAY · CLOCK, the clock column is a tick box per port (`#midiClk0`–`3`); the
+  line under it (`#segClkOut`, same id, its `__hint`) says "Clock to B: no cable" when needed; Clock in (switch
+  `#ckClkIn`) and its input (`#midiClkSel`) on one line. Removed ids: `audNote`, `psLiveNote` (element; the function
+  `psLiveNote()` stays and sets the tooltip), `midiNote`, `segPdc`, `segVel`, `segClkIn`. New helper `makeCk(box, get, set)`
+  (makeSeg's on/off twin). CSS: "AUDIO & MIDI PORTS TABLE" after `.mclk`; switch `input.msw1`, tick `input.mck`; ≤ 420 px
+  narrows the table and hides "from". **Ableton Link** goes at the end of `#pMidi .pbody`: an HTML comment marks the spot.
+  Checked at 1440 and 380 (touch) in IDM, Matrix and Calculator watch: no overflow, no horizontal scroll.
+- **Tracker keys** (the table below; owner: build only those that don't clash). Built: Alt+, / Alt+. with no selection
+  transpose the whole phrase (Phrase) or the cursor block's phrases (Song, Arrange, a Song selection's blocks; `xposeScope`);
+  Shift+Alt+, / . an octave; **Ctrl/⌘+A again** widens column → track → pattern (`selA.pat` in the Pattern view:
+  `patParts()` lists the other tracks' phrases on the row; transpose and Delete (`clearSel`) act on all of them, and
+  `pvLines` draws them selected; copy / paste and the selection tools still act on the open track); Ctrl/⌘+I interpolate;
+  Ctrl/⌘+Shift+, / . shrink / expand; Ctrl/⌘+Enter insert row (Song: the cursor column, as Insert); Ctrl/⌘+Shift+Enter a
+  whole song row (`songRowInsert`); Ctrl/⌘+Home / End (`songEndKey`: Song and Arrange the cursor, Pattern view the song row,
+  a phrase the track's first / last block); Ctrl/⌘+Shift+F and Scroll Lock (`followKey`: off ↔ the last mode); Alt+Enter /
+  Shift+Alt+Enter (`playRowKey`: the row once, every track of this song row / this track, Phrase only); Ctrl/⌘+, (`settingsKey`,
+  in `fileKeys` and `editorKey`; closes it too). The on-screen SEMI − + / TRANSPOSE buttons and plain , . on non-note cells
+  still need a selection (`transposeSel(d, true)`), so a stray tap can't move a whole phrase. Labels in Edit ▾ / Tools ▸
+  (`keyHint`), Help (Tracker · KEYS mode), README, the phrase hint line, What's new.
+- **Not built: conflicts** (for the owner to choose other keys):
+  - **Ctrl/⌘+Shift+Backspace** (remove a whole song row): `keysDown`'s mod branch already takes Ctrl/⌘+Backspace *with any
+    Shift* as "remove the row" (the cursor column on Song), so Shift is swallowed by the column version today; giving it
+    the whole-row meaning changes what that chord does now. Also Chrome on Windows / Linux opens "Clear browsing data" on
+    Ctrl+Shift+Delete (not Backspace, so that part is fine). Suggest: right-click / Edit ▾ → Remove the song row, as now,
+    or Ctrl/⌘+Alt+Backspace.
+  - **Ctrl/⌘+Alt+▲ / ▼** (nudge the selection a row): `keysDown`'s mod branch already maps Ctrl/⌘ + any arrow (Alt
+    included) to `bump` (change the value), and in PAD mode Alt+arrows are OPTION (`optDir`) before that; plus some
+    Windows Intel graphics drivers rotate the screen on Ctrl+Alt+arrows, and on Linux desktops (GNOME, KDE) Ctrl+Alt+▲▼
+    switch workspaces. Suggest: drag a selection (already moves it), or Alt+Shift+[ / ].
+  - **Numpad − / +** (previous / next instrument): the KEYS handler reads `e.key`, and numpad − / + arrive as '-' and '+',
+    which are already octave down / up (`setOct`) on every tracker screen (Phrase, Pattern view, Song, Inst…). Using `e.code`
+    (NumpadSubtract / NumpadAdd) would split them, but people who use the numpad's − / + for octave today would lose it.
+    Suggest: keep [ ] (already previous / next instrument on INST and in the phrase via OPTION).
+- Tests (session scratchpad, not in the repo): a Playwright run of every built key on Phrase, Song and Pattern view
+  (52 checks, undo included) and of the old keys around them (Insert, Ctrl/⌘+Backspace, Ctrl/⌘+B, Ctrl/⌘+D, Alt+arrows,
+  Alt+3, plain . on an FX cell); Audio & MIDI behaviour (switches save `aset` / midi, clock ticks, delay, channel).
+  New `?seqtest` hooks: `ui()`, `nav({view, tv, pv, track, phrase, songX, songY, x, y})`, `notes(p)`. `npm test` 106 / 106.
+
 ## 2 Nov (6), late night: builds 369–373 (web 373, desktop 1.2.69–1.2.73)
 
 - 369: pump's STRIP channel strip in the app (`pstrip`, pump.wasm / pump-meta v6, built from the pump repo with STRIP added
@@ -150,7 +196,7 @@ The (3) entry below went out in 357. Since then, all on `main` and `beta`:
   (`FX_FACTORY_MORE`). **My presets (360):** SAVE AS PRESET also stores in localStorage `thunderplus-fxuser-v1`
   (`fxUser*`), listed under MY PRESETS in every song.
 - **Menus (358):** the `docs/MENU-AUDIT.md` proposals 2–5 are built (MENU HELP toggle, COMMAND BAR Off/Thin/Big, short
-  labels, right-click trimmed, ⚙ without Kit / Master). Audio & MIDI ports table (proposal 1) is still open.
+  labels, right-click trimmed, ⚙ without Kit / Master). Audio & MIDI ports table (proposal 1): built 3 Nov, see above.
 - **Song / Arrange:** clone down only inserts on a clash; double-click an empty Arrange cell = new pattern (`arrEmptyTap`);
   buses always shown in Pattern view; blocks with only OFFs / FX commands get class `o` (`isOffPhrase`); a grey line every
   4 rows (`.ar.q4`).
@@ -320,24 +366,24 @@ multiple of 4) or the end of the current song row (all tracks' `T.step >= L`), e
 does per track). Arrange blinks the queued row (CSS class on its row numbers). Also the natural trigger for section launch
 in a performance mode (below). About half a day.
 
-### Proposed tracker keys (audit #2: proposed to the owner 1 Nov, NOT built until they agree)
+### Proposed tracker keys (audit #2: proposed 1 Nov; built 3 Nov except the three that clash, see "3 Nov" above)
 Scope comes from the selection, as in Renoise: Ctrl/⌘+A pressed again widens it, then any command acts on it.
 
 | Command | Proposed key | Notes |
 | --- | --- | --- |
-| Transpose ±1 semitone | Alt+, / Alt+. (as now) | with no selection: the whole phrase under the cursor (Phrase) or the cursor block's phrase (Song) |
-| Transpose ±1 octave | Alt+Shift+, / Alt+Shift+. | same scope |
-| Widen the selection | Ctrl/⌘+A again | column → track → pattern (every track on the song row, in Pattern view) |
-| Interpolate | Ctrl/⌘+I | Renoise's key |
-| Shrink / Expand | Ctrl/⌘+Shift+, / Ctrl/⌘+Shift+. | |
-| Insert a row (Macs have no Insert) | Ctrl/⌘+Enter | Insert keeps working; on Song, one column as now |
-| Insert / remove a whole song row | Ctrl/⌘+Shift+Enter / Ctrl/⌘+Shift+Backspace | Insert and Ctrl/⌘+Backspace stay column-only on Song |
-| First / last song row | Ctrl/⌘+Home / Ctrl/⌘+End | |
-| Follow on / off | Ctrl/⌘+Shift+F (and Scroll Lock) | Ableton's key |
-| Play the row under the cursor | Alt+Enter (every track), Shift+Alt+Enter (this track) | |
-| Nudge the selection a row | Ctrl/⌘+Alt+▲ / ▼ | some Windows Intel drivers rotate the screen on Ctrl+Alt+arrows (usually off) |
-| Previous / next instrument | Numpad − / + | Renoise's keys; [ ] stay |
-| Settings | Ctrl/⌘+, | the Mac and Renoise standard |
+| Transpose ±1 semitone | Alt+, / Alt+. (as now) | **built** · with no selection: the whole phrase under the cursor (Phrase) or the cursor block's phrase (Song) |
+| Transpose ±1 octave | Alt+Shift+, / Alt+Shift+. | **built** · same scope |
+| Widen the selection | Ctrl/⌘+A again | **built** · column → track → pattern (every track on the song row, in Pattern view) |
+| Interpolate | Ctrl/⌘+I | **built** · Renoise's key |
+| Shrink / Expand | Ctrl/⌘+Shift+, / Ctrl/⌘+Shift+. | **built** |
+| Insert a row (Macs have no Insert) | Ctrl/⌘+Enter | **built** · Insert keeps working; on Song, one column as now |
+| Insert / remove a whole song row | Ctrl/⌘+Shift+Enter / Ctrl/⌘+Shift+Backspace | Insert: **built**. Remove: **not built** (Ctrl/⌘+Shift+Backspace is already the column remove) |
+| First / last song row | Ctrl/⌘+Home / Ctrl/⌘+End | **built** |
+| Follow on / off | Ctrl/⌘+Shift+F (and Scroll Lock) | **built** · Ableton's key |
+| Play the row under the cursor | Alt+Enter (every track), Shift+Alt+Enter (this track) | **built** |
+| Nudge the selection a row | Ctrl/⌘+Alt+▲ / ▼ | **not built**: Ctrl/⌘+any arrow already changes the value; OS keys (screen rotate, Linux workspaces) |
+| Previous / next instrument | Numpad − / + | **not built**: numpad − / + are already octave down / up |
+| Settings | Ctrl/⌘+, | **built** · the Mac and Renoise standard |
 
 ### Plan: Ableton Link on the desktop app (owner, 1 Nov: wanted eventually)
 - **Licence first.** The Link SDK (github.com/Ableton/link) is dual-licensed: GPLv2+ or a proprietary licence from Ableton
