@@ -17079,7 +17079,7 @@ function makePlayer(ac, out, getBuf, live){
     for (const [k, o] of bassN) if (k.startsWith(t + ':' + pad + ':') && o.kind !== kind) bassDrop(k, o);
     if (isPsV(V)) return psNode(t, pad, V, kind, key);   // …PUMP SYNTHS live (null: play the render instead)
     try {
-      const node = new AudioWorkletNode(ac, 'thunder-' + kind, {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{p:vx ? voxParams(V) : lx ? xParams(V) : bassParams(V)}});
+      const node = new AudioWorkletNode(ac, 'thunder-' + kind, {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{p:vx ? voxParams(V) : lx ? xParams(V) : bassParams(V), cid:live ? key : null}});   // cid: THUNDER CORE finds the node by it
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
       node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
       node.load = 0; node.port.onmessage = e => { const d = e.data; if (d && typeof d.load === 'number') node.load = node.load * 0.6 + d.load * 0.4; };
@@ -17100,7 +17100,7 @@ function makePlayer(ac, out, getBuf, live){
     if (!sp || !by || !psOK.has(ac) || (ac === ctx && (psLive.off || aset.psLive === 'render'))) return null;   // (Settings → Audio → …pump live)
     try {
       const node = new AudioWorkletNode(ac, 'thunder-psyn', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2],
-        processorOptions:Object.assign({p:xParams(V)}, sp, psSent.has(ac) ? {} : {bytes:by}, frzSample(V) ? {file:{d:frzSample(V).data, sr:frzSample(V).sr}} : {})});
+        processorOptions:Object.assign({p:xParams(V), cid:live ? key : null}, sp, psSent.has(ac) ? {} : {bytes:by}, frzSample(V) ? {file:{d:frzSample(V).data, sr:frzSample(V).sr}} : {})});
       psSent.add(ac);
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
       node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
@@ -17448,6 +17448,9 @@ function makePlayer(ac, out, getBuf, live){
   // and …pump NOTES FROM still hears it, as if it had played it.
   function coreTake(ev){
     if (ev.track < NT && ev.mn != null) pmNotes(ev.track, ev.t, ev);
+    // a live engine node the core now plays: its level and pan move into the node's output (the core's), so these sit at 1 and centre
+    if (ev.coreLive) for (const key of ev.coreLive){ const b = bassN.get(key); if (!b) continue; const at = Math.max(ev.t, ac.currentTime);
+      try { b.g.gain.cancelScheduledValues(at); b.g.gain.setValueAtTime(1, at); b.pn.pan.cancelScheduledValues(at); b.pn.pan.setValueAtTime(0, at); } catch(e){} }
     const T = vs[ev.track]; if (!T) return;
     for (let k = T.length - 1; k >= 0; k--) if (!live1(T[k], ev.t)) T.splice(k, 1);
     if (!ev.poly){ for (const v of T) kill(v, ev.t, v.syn ? Math.min(relTc(v), 0.05) : 0.004); T.length = 0; }
@@ -17738,10 +17741,11 @@ class BassProc extends AudioWorkletProcessor {
     {name:'leg', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
     {name:'bpm', defaultValue:120, minValue:10, maxValue:999, automationRate:'k-rate'},
     {name:'wob', defaultValue:0, minValue:0, maxValue:64, automationRate:'k-rate'}]; }
-  constructor(o){ super(); this.c = new BassCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0;
-    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose) this.dead = true; }; }
+  constructor(o){ super(); this.c = new BassCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0; const __op = (o && o.processorOptions) || {}; if (__op.cid){ this.__cid = __op.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(__op.cid, this); }
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose){ this.dead = true; if (this.__cid && globalThis.__tcNodes && globalThis.__tcNodes.get(this.__cid) === this) globalThis.__tcNodes.delete(this.__cid); } }; }
   process(ins, outs, P){
     if (this.dead) return false;
+    if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);   // THUNDER CORE drives this node (core-processor.js)
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, rate = P.rate, gate = P.gate, trig = P.trig, leg = P.leg, c = this.c;
     c.bpm = P.bpm[0]; c.wob = P.wob[0];
     const rt = i => rate.length > 1 ? rate[i] : rate[0], t0 = Date.now();
@@ -17758,6 +17762,7 @@ class BassProc extends AudioWorkletProcessor {
     }
     c.render(L, R, s, n, rt(s));
     this.ms += Date.now() - t0; this.fr += n;
+    if (this.__ov && globalThis.__tcPost) globalThis.__tcPost(this, outs[0]);
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
     return true;
   }
@@ -17774,10 +17779,11 @@ class VoxProc extends AudioWorkletProcessor {
     {name:'leg', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
     {name:'syl', defaultValue:0, automationRate:'a-rate'},
     {name:'same', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'}]; }
-  constructor(o){ super(); this.c = new VoxCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0;
-    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose) this.dead = true; }; }
+  constructor(o){ super(); this.c = new VoxCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0; const __op = (o && o.processorOptions) || {}; if (__op.cid){ this.__cid = __op.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(__op.cid, this); }
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose){ this.dead = true; if (this.__cid && globalThis.__tcNodes && globalThis.__tcNodes.get(this.__cid) === this) globalThis.__tcNodes.delete(this.__cid); } }; }
   process(ins, outs, P){
     if (this.dead) return false;
+    if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);   // THUNDER CORE drives this node (core-processor.js)
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, c = this.c, rate = P.rate, gate = P.gate, trig = P.trig, leg = P.leg, syl = P.syl, same = P.same;
     const at = (A, i) => A.length > 1 ? A[i] : A[0], t0 = Date.now();
     let s = 0;
@@ -17793,6 +17799,7 @@ class VoxProc extends AudioWorkletProcessor {
     }
     c.render(L, R, s, n, at(rate, s));
     this.ms += Date.now() - t0; this.fr += n;
+    if (this.__ov && globalThis.__tcPost) globalThis.__tcPost(this, outs[0]);
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
     return true;
   }
@@ -17807,10 +17814,11 @@ class XP_${name} extends AudioWorkletProcessor {
     {name:'trig', defaultValue:0, automationRate:'a-rate'},
     {name:'leg', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
     {name:'acc', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'}]; }
-  constructor(o){ super(); this.c = new ${core}(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0;
-    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose) this.dead = true; }; }
+  constructor(o){ super(); this.c = new ${core}(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0; const __op = (o && o.processorOptions) || {}; if (__op.cid){ this.__cid = __op.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(__op.cid, this); }
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose){ this.dead = true; if (this.__cid && globalThis.__tcNodes && globalThis.__tcNodes.get(this.__cid) === this) globalThis.__tcNodes.delete(this.__cid); } }; }
   process(ins, outs, P){
     if (this.dead) return false;
+    if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);   // THUNDER CORE drives this node (core-processor.js)
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, c = this.c, at = (A, i) => A.length > 1 ? A[i] : A[0], t0 = Date.now();
     let s = 0;
     for (let i = 0; i < n; i++){
@@ -17825,6 +17833,7 @@ class XP_${name} extends AudioWorkletProcessor {
     }
     c.render(L, R, s, n, at(P.rate, s));
     this.ms += Date.now() - t0; this.fr += n;
+    if (this.__ov && globalThis.__tcPost) globalThis.__tcPost(this, outs[0]);
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
     return true;
   }
@@ -17832,7 +17841,7 @@ class XP_${name} extends AudioWorkletProcessor {
 registerProcessor('thunder-${name}', XP_${name});`;
 let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bassLive = new Set();
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
-const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=6', psOK = new WeakSet(), psSent = new WeakSet();
+const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=7', psOK = new WeakSet(), psSent = new WeakSet();
 /* …PUMP SYNTHS live, THE SAFETY NET (owner, 26 Oct): while the song plays, once a second: if the audio is dropping out or
    the audio thread is nearly full, and the live …pump nodes are a real part of that, twice in a row, the live engines
    switch to their renders for the rest of this visit (psLive.off): their nodes go, and the next notes play the pads'
@@ -18215,7 +18224,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '1tewqnm';
+const CORE_REV = '13cz4sq';
 const CORE_WANT = 3;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -18244,7 +18253,8 @@ function coreDrop(){ const n = core.node; if (n){ try { n.port.postMessage({op:'
 const corePost = (m, tr) => { try { core.node.port.postMessage(m, tr || []); } catch(e){ tpLog('core post', e); } };
 function coreKit(){ const kv = [];
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; let live = false; try { live = isLivePad(i); } catch(e){}
-    kv.push(v ? {choke:v.choke | 0, syn:isSyn(i), rel:isSyn(i) ? relOf(v) : 0, live, sf:v.engine === 'sf'} : null); }
+    let lk = null; if (live && v){ const vx = isVoxV(v), lx = liveX(v), ps = isPsV(v); lk = {kind:vx ? 'vox' : lx ? v.engine : 'bass', vox:vx, ps, vel:ps ? (xParams(v).vel || 100) : 0}; }   // LIVE ENGINES: the node the core drives
+    kv.push(v ? {choke:v.choke | 0, syn:isSyn(i), rel:isSyn(i) ? relOf(v) : 0, live, lk, sf:v.engine === 'sf'} : null); }
   corePost({op:'kit', kv}); }
 // A pad's render, when the core doesn't have this one yet (a copy: the page keeps playing it too)
 function coreBuf(i){ if (!core.ready) return; const c = slotAt(cache, i); if (!c || !c.data){ if (core.sent.has(i)){ core.sent.delete(i); corePost({op:'buf', pad:i, data:null}); } return; }
@@ -27399,9 +27409,12 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
   coreStats(){ return new Promise(ok => { if (!core.ready) return ok(null); const f = e => { if (e.data && e.data.op === 'stats'){ core.node.port.removeEventListener('message', f); ok(e.data); } };
     core.node.port.addEventListener('message', f); corePost({op:'stats', id:1}); setTimeout(() => ok(null), 1000); }).then(r => { if (r) r.tally = Object.fromEntries(core.tally); core.tally.clear(); return r; }); },
   // The master's level (RMS) every 25 ms for `ms` from PLAY (for comparing the two sequencers' sound).
-  async envelope(ms){ tStart('song', {row:0}); const a = ctx.createAnalyser(); a.fftSize = 1024; master.connect(a); const buf = new Float32Array(1024), out = [];
+  async envelope(ms, pad){ let src = master;
+    if (pad != null){ const sq = makeSeq(S, 'song', {row:0, once:true, sim:true}); let tr = -1; for (let n = 0; n < 400 && sq.alive() && tr < 0; n++) for (const e of sq.step().evs) if (e.type === 'note' && e.pad === pad){ tr = e.track; break; }
+      rtInit(); if (tr >= 0) src = rt.pl.buses[tr].p; }
+    tStart('song', {row:0}); const a = ctx.createAnalyser(); a.fftSize = 1024; src.connect(a); const buf = new Float32Array(1024), out = [];
     const t0 = performance.now(); while (performance.now() - t0 < ms){ a.getFloatTimeDomainData(buf); let s = 0; for (const x of buf) s += x * x; out.push(Math.sqrt(s / buf.length)); await new Promise(r => setTimeout(r, 25)); }
-    tStop(true); try { master.disconnect(a); } catch(e){} return out; },
+    tStop(true); try { src.disconnect(a); } catch(e){} return out; },
   // The tempo-locked effects' beat clock, sampled every 50 ms for `ms` from PLAY.
   async beatClock(ms){ tStart('song', {row:0}); const a = ctx.createAnalyser(); a.fftSize = 256; rt.pl.clkBus.connect(a); const b = new Float32Array(256), out = [];
     const t0 = performance.now(); while (performance.now() - t0 < ms){ a.getFloatTimeDomainData(b); out.push(Math.round(b[255] * 100) / 100); await new Promise(r => setTimeout(r, 50)); }

@@ -50,6 +50,7 @@ class Auto {
   cancel(t){ this.ev = this.ev.filter(e => e.t < t); }
   // The value from time t on, when nothing moves it any more (a constant), else null: the sampler's fast path
   constFrom(t){ const A = this.ev; if (!A.length) return this.v0; const e = A[A.length - 1]; return e.t <= t && (e.k === 0 || e.k === 1) ? e.v : null; }
+  hold(t){ const v = this.at(t); this.cancel(t); this.set(v, t); }
   // Drop what is over by time t (the beat clock gets an event a step for as long as the song plays)
   prune(t){ if (this.ev.length < 48) return; const v = this.at(t), fut = this.ev.filter(e => e.t > t || (e.k === 3 && e.t + e.d > t)); this.v0 = v; this.ev = [{k:0, t, v}, ...fut]; }
   at(t){
@@ -66,11 +67,48 @@ class Auto {
   }
 }
 
+/* LIVE ENGINES (phase 2c): the bass, voice, acid / machine and …pump synth nodes are processors in this same audio-thread
+   scope; each registers itself by the page's key (globalThis.__tcNodes, from its processorOptions.cid). The core drives one
+   by giving it an override (proc.__ov): Auto timelines for its AudioParams (rate, gate, trig, leg, acc, syl, same, wob, and
+   r/g/t/l/v + lane on the …pump synth), read in its process() through __tcOv, from the time the core first set each one;
+   and the note's level and pan (the page's GainNode and StereoPanner after the node, which the core can't reach), applied
+   to its output by __tcPost (the page sets those nodes to 1 and centre when the core takes the node over). */
+const tcNodes = () => globalThis.__tcNodes || (globalThis.__tcNodes = new Map());
+function tcOver(proc){ return proc.__ov || (proc.__ov = {p:new Map(), buf:new Map(), g:new Auto(1), pn:new Auto(0), until:Infinity}); }
+globalThis.__tcOv = (proc, P, n) => {
+  const ov = proc.__ov; if (!ov) return P;
+  if (currentTime > ov.until){ proc.__ov = null; return P; }   // released (the core stopped a while ago): the page's params again
+  const Q = {}, dt = 1 / sampleRate;
+  for (const k in P){ const A = ov.p.get(k); if (!A){ Q[k] = P[k]; continue; }
+    A.prune(currentTime);
+    const src = P[k], b = ov.buf.get(k) || (ov.buf.set(k, new Float32Array(n)), ov.buf.get(k));
+    const c = A.from > currentTime + n * dt ? null : A.constFrom(currentTime);
+    if (A.from <= currentTime && c != null){ Q[k] = [c]; continue; }
+    for (let i = 0; i < n; i++){ const t = currentTime + i * dt; b[i] = t < A.from ? (src.length > 1 ? src[i] : src[0]) : A.at(t); }
+    Q[k] = b; }
+  return Q;
+};
+globalThis.__tcPost = (proc, o) => {
+  const ov = proc.__ov; if (!ov || !o || !o[0]) return; const L = o[0], R = o[1] || null, n = L.length, dt = 1 / sampleRate;
+  ov.g.prune(currentTime); ov.pn.prune(currentTime);
+  const gc = ov.g.constFrom(currentTime), pc = ov.pn.constFrom(currentTime);
+  for (let i = 0; i < n; i++){
+    const t = currentTime + i * dt, g = gc != null ? gc : ov.g.at(t), p = pc != null ? pc : ov.pn.at(t);
+    const l = L[i] * g, r = (R ? R[i] : L[i]) * g;
+    if (!R){ L[i] = l; continue; }
+    // StereoPannerNode, stereo in
+    if (p <= 0){ const x = (p + 1) * Math.PI / 2; L[i] = l + r * Math.cos(x); R[i] = r * Math.sin(x); }
+    else { const x = p * Math.PI / 2; L[i] = l * Math.cos(x); R[i] = r + l * Math.sin(x); }
+  }
+};
+// One driven parameter: a timeline that takes over from the node's own AudioParam at its first event
+function tcParam(ov, k, t){ let A = ov.p.get(k); if (!A){ A = new Auto(0); A.from = t; ov.p.set(k, A); } return A; }
+
 const POLY = 4;
 class ThunderCore extends AudioWorkletProcessor {
   constructor(){
     super();
-    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false;
+    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.voxG = new Map();
     this.clk = new Auto(0); this.clkOn = false; this.clkBase = 0;   // the beat clock (output NT): beat + 1 while playing, 0 stopped
     this.port.onmessage = e => { try { this.msg(e.data || {}); } catch(err){ this.port.postMessage({op:'error', where:(e.data && e.data.op) || '?', message:String(err && err.stack || err)}); } };
     this.port.postMessage({op:'ready', v:CORE_V});
@@ -124,6 +162,10 @@ class ThunderCore extends AudioWorkletProcessor {
   live1(v, at){ return v && !v.ended && !(v.stopAt != null && v.stopAt <= at); }
   kill(v, at, tc = 0.004){
     if (!v || v.ended || (v.stopAt != null && v.stopAt <= at)) return;
+    if (v.live){   // a live engine's note lets go (its release is the engine's own); stopping before a booked note takes it back
+      const B = v.live, L = v.L, ov = tcOver(L.proc), t = Math.max(at, currentTime), G = tcParam(ov, this.pn(L, v.lane, 'gate'), t); v.stopAt = at;
+      if (t < B.lastOn - 1e-6){ G.cancel(t); tcParam(ov, this.pn(L, v.lane, 'trig'), t).cancel(t); }
+      G.set(0, t); return; }
     v.stopAt = at; at = Math.max(at, currentTime);
     v.f.cancel(at); v.f.set(1, at); v.f.target(0, at, tc); v.end = Math.min(v.end, at + tc * 12);
   }
@@ -203,9 +245,73 @@ class ThunderCore extends AudioWorkletProcessor {
     if (ev.type !== 'note' || ev.pad == null || ev.track == null) return false;
     { const I = S && S.insts && ev.ii != null ? S.insts[ev.ii] : null; if (I && (I.mo | 0) === 1) return false; }   // MIDI gear only: the page sends it, nothing sounds here
     if (this.mine(ev)){ this.startNote(ev); return true; }
+    if (this.liveNote(ev)) return true;
     this.take(ev); return false;
   }
-  stopAll(at){ for (const v of this.alive) this.kill(v, at); for (const T of this.vs) if (T) T.length = 0; }
+  stopAll(at){ for (const v of this.alive) this.kill(v, at); for (const T of this.vs) if (T) T.length = 0;
+    for (const L of this.lnodes.values()){ if (L.cur) this.kill(L.cur, at); L.sylN = 0; if (L.proc.__ov) L.proc.__ov.until = at + 4; }   // a live note lets go; its release rings, then the page has the node back
+    this.voxG.clear(); }
+
+  /* ---- live engines: makePlayer's bassNode / bassNote / polyVox / polyPs, driving the registered nodes ---- */
+  lnode(t, pad, j){
+    const k = this.kv[pad], lk = k && k.lk; if (!lk) return null;
+    const key = t + ':' + pad + ':' + lk.kind + (j ? ':' + j : ''), proc = tcNodes().get(key); if (!proc) return null;
+    let L = this.lnodes.get(key); if (!L || L.proc !== proc){ L = {key, proc, pad, kind:lk.kind, vox:!!lk.vox, ps:!!lk.ps, n:1e6 + Math.floor(Math.random() * 1e5) * 10, lastOn:-1, cur:null, sylN:0, took:false};
+      if (L.ps) L.lanes = [0, 1, 2, 3].map(q => ({L, lane:q, n:L.n + q * 1e5, lastOn:-1, cur:null}));
+      this.lnodes.set(key, L); }
+    return L;
+  }
+  // the AudioParam names on this node (a …pump synth's lane j: r/g/t/l/v + j)
+  pn(L, lane, k){ if (!L.ps) return k; return ({rate:'r', gate:'g', trig:'t', leg:'l', vel:'v'})[k] + lane; }
+  liveNote(ev){
+    const k = this.kv[ev.pad], lk = k && k.lk; if (!lk) return false;
+    const T = this.T(ev.track);
+    if (ev.poly && lk.vox){   // polyVox
+      const nodes = []; for (let j = 0; j < POLY; j++){ const L = this.lnode(ev.track, ev.pad, j + 1); if (!L) return false; nodes.push(L); }
+      const key = ev.track + ':' + ev.pad; let G = this.voxG.get(key); if (!G){ G = {sylN:0, lastT:-9, lastK:0}; this.voxG.set(key, G); }
+      const leg = ev.slide && ev.slide.dur > 0;
+      let kk; if (Math.abs(ev.t - G.lastT) < 0.004) kk = G.lastK; else { kk = leg ? Math.max(0, G.sylN - 1) : G.sylN++; G.lastT = ev.t; G.lastK = kk; }
+      const free = nodes.filter(b => !b.cur || b.cur.stopAt != null || b.cur.ended), pick = this.sameCol(nodes, ev) || (free.length ? free : nodes).reduce((x, y) => (x.lastOn <= y.lastOn ? x : y));
+      if (pick.lastOn >= ev.t - 1e-6 && Math.abs(pick.lastOn - ev.t) < 0.004 && free.length === 0) return true;
+      for (let q = T.length - 1; q >= 0; q--) if (T[q].live === pick) T.splice(q, 1);
+      this.liveStart(ev, pick, null, T, k.choke || 0, kk); ev.coreLive = [pick.key]; return true;
+    }
+    if (ev.poly && lk.ps){   // polyPs: the node's four lanes
+      const L = this.lnode(ev.track, ev.pad, 0); if (!L) return false;
+      const Ls = L.lanes, free = Ls.filter(x => !x.cur || x.cur.stopAt != null || x.cur.ended), pick = this.sameCol(Ls, ev) || (free.length ? free : Ls).reduce((x, y) => (x.lastOn <= y.lastOn ? x : y));
+      for (let q = T.length - 1; q >= 0; q--) if (T[q].live === pick) T.splice(q, 1);
+      this.liveStart(ev, L, pick, T, k.choke || 0); ev.coreLive = [L.key]; return true;
+    }
+    const L = this.lnode(ev.track, ev.pad, 0); if (!L) return false;   // mono: it takes over the track
+    for (const v of T) if (v.live !== (L.ps ? L.lanes[0] : L)) this.kill(v, ev.t, v.syn ? Math.min(this.relTc(v), 0.05) : 0.004); T.length = 0;
+    const ck = k.choke || 0; if (ck) for (let q = 0; q < NT; q++) if (q !== ev.track) for (const v of this.T(q)) if (v.choke === ck) this.kill(v, ev.t);
+    this.liveStart(ev, L, L.ps ? L.lanes[0] : null, T, ck); ev.coreLive = [L.key]; return true;
+  }
+  sameCol(nodes, ev){ return ev.col == null ? null : nodes.find(b => b.cur && !b.cur.ended && (b.cur.stopAt == null || b.cur.stopAt > ev.t - 1e-6) && b.cur.col === ev.col && b.lastOn < ev.t - 0.004) || null; }
+  // bassNote: one note on a node (or a …pump synth lane)
+  liveStart(ev, L, lane, T, ck, fk){
+    const ov = tcOver(L.proc); ov.until = Infinity;
+    const B = lane || L, j = lane ? lane.lane : 0, P = k => tcParam(ov, this.pn(L, j, k), Math.max(ev.t, currentTime));
+    const t = Math.max(ev.t, currentTime), leg = ev.slide && ev.slide.dur > 0 ? 1 : 0;
+    for (const k of ['gate', 'trig', 'leg']) P(k).cancel(t);
+    const R = P('rate'); R.hold(t);
+    if (leg){ R.set(ev.slide.from, t); R.lin(ev.rate, t + ev.slide.dur); } else R.set(ev.rate, t);
+    if (L.vox){ const S1 = P('syl'), S2 = P('same'); S1.cancel(t); S2.cancel(t); const kk = fk != null ? fk : leg ? Math.max(0, L.sylN - 1) : L.sylN++; S1.set(kk, t); S2.set(leg, t); }
+    if (this.kv[L.pad] && this.kv[L.pad].lk && !L.vox && !L.ps && L.kind !== 'bass'){ const A = P('acc'); A.cancel(t); A.set(ev.acc ? 1 : 0, t); }
+    let gain = ev.gain;
+    if (L.ps){ const vc = ev.vc != null && ev.vc >= 0 ? ev.vc : -1, hit = (this.kv[L.pad].lk.vel) || 100, V = P('vel'); V.cancel(t); V.set(Math.max(1, Math.min(127, Math.round((vc >= 0 ? 127 : hit) * (ev.vel != null ? ev.vel : 1)))), t);
+      if (vc >= 0){ const c = curve(vc); gain = c > 1e-4 ? ev.gain / c : 0; } }
+    P('leg').set(leg, t); P('gate').set(1, t); B.n += 1; P('trig').set(B.n, t);
+    ov.g.set(gain, t); ov.pn.set(Math.max(-1, Math.min(1, (ev.pan - 128) / 127)), t);
+    if (ev.wob != null && L.kind === 'bass'){ const W = P('wob'); W.set(ev.wob, t); }
+    B.lastOn = t; if (B.cur) this.alive.delete(B.cur);
+    const v = {live:B, L, lane:j, r:R, g:ov.g, pn:ov.pn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn:true, rel:0, track:ev.track, end:Infinity, t0:t};
+    B.cur = v;
+    if (!leg) this.pitchMods(v, t, ev.rate, ev);
+    if (ev.cut != null) this.kill(v, ev.cut);
+    if (ev.rel != null) this.kill(v, ev.rel);
+    T.push(v);
+  }
 
   process(inputs, outputs){
     if (this.dead) return false;
