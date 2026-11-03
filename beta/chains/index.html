@@ -2572,7 +2572,7 @@ function addItem(type, x, y){
 /* ----- selection ----- */
 /* MAX (Thunder Plus owner, 27 Oct, Phase 2: "make it all match Max"): modules take Max/MSP's edit-mode gestures.
    Click a module (its title or any part that isn't a control) to select just it; Shift-click adds it or takes it out;
-   a drag on the background draws a selection box (Shift adds); Alt/⌥-drag copies (buildNode); Ctrl/⌘-click works the
+   a Shift-drag on the background draws a selection box (3 Nov: a plain drag there pans); Alt/⌥-drag copies (buildNode); Ctrl/⌘-click works the
    module without selecting or moving it (its controls always work with a plain click here, as this patch plays live);
    Alt/⌥-click opens its help; Delete or Backspace removes the selection. */
 const maxOperate = e => e.pointerType === 'mouse' && (MAC ? e.metaKey : e.ctrlKey);
@@ -2933,9 +2933,11 @@ ws.addEventListener('pointerdown', e => {
   // MAX (Thunder Plus owner, 27 Oct, Phase 2): with a mouse, a drag on the background draws a selection box, as in Max's
   // edit mode (it replaces the selection; with Shift it adds). The wheel or a two-finger swipe pans, and so does a
   // middle-button drag; on a touch screen a drag still pans.
-  const box = e.pointerType === 'mouse' && e.button === 0;
-  if (box && !e.shiftKey) clearSel();
-  if (box || e.shiftKey){
+  // BACKGROUND DRAG PANS (Thunder Plus owner, 3 Nov: "if I click the background, it just tries to select"): a plain drag on
+  // the background moves the view, as a touch drag and a middle-drag do, and the click clears the selection; Shift-drag
+  // draws the selection box (adding to the selection).
+  const box = e.button === 0 && e.shiftKey;
+  if (box){
     const lasso = document.getElementById('lasso'), r0 = ws.getBoundingClientRect(), sx = e.clientX, sy = e.clientY;
     ws.setPointerCapture(e.pointerId); lasso.hidden = false;
     const box = ev => [Math.min(sx, ev.clientX), Math.min(sy, ev.clientY), Math.max(sx, ev.clientX), Math.max(sy, ev.clientY)];
@@ -2949,7 +2951,7 @@ ws.addEventListener('pointerdown', e => {
     mv(e); ws.addEventListener('pointermove', mv); ws.addEventListener('pointerup', up); ws.addEventListener('pointercancel', up);
     return;
   }
-  if (e.pointerType !== 'mouse') clearSel();   // (a middle-button pan keeps the selection)
+  if (e.pointerType !== 'mouse' || e.button === 0) clearSel();   // (a middle-button pan keeps the selection)
   if (touches.size > 1) return;
   ws.setPointerCapture(e.pointerId); ws.classList.add('panning');
   // Pan by each step's movement, not from where the finger first landed: after a pinch (a second finger came and
@@ -3563,7 +3565,7 @@ function helpDoc(){
     ['Tracks', 'Each track has its own Track In and Chain Out. In the Mixer, turning a track’s CHN on adds that track’s pair (wired straight through, in a column below everything else) without leaving the Mixer, so every track gets its own chain and toggling one never disturbs another; the next time you come here, the patch is fitted so you see them all. If that track already has a chain, switching its CHN on just runs it through that chain again. The output always follows its own input — set the Track In and its Chain Out moves with it, and a Chain Out can’t be pointed elsewhere. Picking a track that is already used also jumps to and highlights the existing chain. A track takes one pair; control (cv/gate) inputs are not limited.'],
     ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
-    ['Selecting and the right-click menu', 'As in Max: click a module to select it, Shift-click to add it or take it out, drag on the background for a selection box (Shift adds to it). Delete or Backspace removes the selection. Hold Option (Alt on Windows) and drag a module’s title bar to copy it (or the selection) and drop the copy where you let go; Option-click opens its help; Ctrl/⌘-click works a module without selecting it. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
+    ['Selecting and the right-click menu', 'As in Max: click a module to select it, Shift-click to add it or take it out, Shift-drag on the background for a selection box (a plain drag there moves the view to it). Delete or Backspace removes the selection. Hold Option (Alt on Windows) and drag a module’s title bar to copy it (or the selection) and drop the copy where you let go; Option-click opens its help; Ctrl/⌘-click works a module without selecting it. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
     ['Presets', 'Effects and sound sources have a Preset row at the top. Pick a factory preset (it sets every control: the ones it names, the rest back to their defaults), Default, or one of yours; Undo takes it back. Save as a preset keeps the module’s settings on this device under a name, for every patch; Delete one of yours removes one. The row keeps the preset’s name and says “edited” once you move a control.'],
     ['Bypass', 'BYP on an effect’s title bar passes its dry sound (its number, 1–F, is what the tracker’s BYP command switches from a phrase: BYP 31 bypasses module 3 on that track, BYP 20 brings module 2 back).'],
     ['MIDI learn', 'Press MIDI learn, click a slider, then move a knob on your controller. Press Delete to clear the slider’s mapping, and Done when you’re finished.'],
