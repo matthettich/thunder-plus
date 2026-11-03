@@ -172,7 +172,8 @@ test('Phase 2 keys and mouse: Space = the song everywhere, Shift = fine, a drag 
 
 test('Phase 2 sliders and wheel: relative drag, Shift finer, touch must slide, Alt/Ctrl-click resets; the wheel waits for the pointer to rest; editors scroll', () => {
   const src = H.read('index.html');
-  assert.match(src, /v = clamp\(v \+ \(ev\.clientX - lastX\) \/ w \* \(mx - mn\) \* \(ev\.shiftKey \? 0\.1 : 1\), mn, mx\); lastX = ev\.clientX;/, 'relative, re-anchored each move (Shift mid-drag never jumps)');
+  assert.match(src, /v = clamp\(v \+ \(ev\.clientX - lastX\) \/ w \* \(mx - mn\) \* dragMul\(ev\), mn, mx\); lastX = ev\.clientX;/, 'relative, re-anchored each move (Shift mid-drag never jumps)');
+  assert.match(src, /const dragMul = e => e\.shiftKey \? 0\.1 : \(e\.ctrlKey \|\| e\.metaKey\) \? 4 : 1;/, 'ONE RULE: Shift a tenth, Ctrl/⌘ ×4');
   assert.match(src, /if \(Math\.abs\(dx\) < 6\) return; live = true;/, 'touch: nothing until it slides sideways');
   assert.match(src, /if \(!touch && \(e\.altKey \|\| \(MACK \? e\.metaKey : e\.ctrlKey\)\)\)\{ sldReset\(r\); return; \}/, 'Alt / Ctrl / ⌘-click resets');
   assert.match(src, /inp\._reset = reset; inp\._out = out;/, 'makeRow gives the reset and the readout');
@@ -298,4 +299,20 @@ test('mouse audit (3 Nov): Mac Ctrl+click is the menu, middle-click mutes, top m
     assert.match(w, /if \(ev\.pointerType === 'mouse' && ev\.buttons === 0 && !drag\.drawing && !drag\.armed\)/, f + ': a cable let go outside ends');
     assert.match(w, /\['Remove cable', \(\) =>/, f + ': Remove cable');
   }
+});
+
+test('one rule for value controls (3 Nov): faders, strip, FX bar and pump drag relative; double-click resets; right-click menu; wheel after the rest', () => {
+  const src = H.read('index.html');
+  assert.match(src, /mfDrag = \{t, id:e\.pointerId, ly:e\.clientY, vy:mfY\(/, 'VOL fader relative');
+  assert.match(src, /D\.vy = clamp\(D\.vy \+ \(e\.clientY - D\.ly\) \* dragMul\(e\)/, 'VOL fader: dragMul each move');
+  assert.match(src, /D\.vx = clamp\(D\.vx \+ \(e\.clientX - D\.lx\) \* dragMul\(e\)/, 'OUT bar: dragMul each move');
+  assert.match(src, /base = clamp\(base \+ \(from - ev\.clientY\) \/ h \* 255 \* dragMul\(ev\), 0, 255\); from = ev\.clientY;/, 'strip fader');
+  assert.match(src, /x = clamp\(x \+ \(ly - ev\.clientY\) \/ per \* dragMul\(ev\), q\.min, q\.max\); ly = ev\.clientY;/, 'FX bar values');
+  assert.match(src, /out\.addEventListener\('dblclick', e => \{ e\.stopPropagation\(\); reset\(\); \}\);/, 'a slider readout double-click resets');
+  assert.match(src, /valMenu\(e, q\.l, \{reset:\(\) => set\(q\.d\), type:typeIt\}\)/, 'FX bar menu');
+  assert.match(src, /const wheelOk = r => !!r && \(r\.hasAttribute\('data-wheel'\)/, 'data-wheel controls take the wheel after the rest');
+  const k = H.read('pump/ui/kit.js');
+  assert.match(k, /const dragMul = m => m\.shift \? 0\.1 : m\.cmd \? 4 : 1;/, 'pump: dragMul');
+  assert.match(k, /'Reset to default', 'Type a value…'\]/, 'pump: right-click menu');
+  assert.match(k, /if \(c !== this\.wheelC\) return;/, 'pump: the wheel waits for the rest');
 });

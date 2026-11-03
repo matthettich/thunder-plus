@@ -148,7 +148,7 @@ body.mob .deskmenu{display:none}
 input[type=range], .row:has(> input[type=range]){touch-action:pan-y}
 @media (pointer:coarse){ input[type=range]:not(:is(#gset, .rlock) *){pointer-events:none} }
 .sldtip{position:fixed; z-index:140; transform:translate(-50%, calc(-100% - 6px)); padding:2px 7px; border-radius:4px; background:var(--ink, #222); color:var(--panel, #fff); font:600 12px/1.5 var(--font); pointer-events:none; white-space:nowrap}
-input[type=range].wheelon{outline:2px solid var(--ink); outline-offset:2px; border-radius:4px}
+input[type=range].wheelon, [data-wheel].wheelon{outline:2px solid var(--ink); outline-offset:2px; border-radius:4px}
 :is(#gset,.rlock) input[type=range].unl{outline:2px solid var(--ink); outline-offset:3px; border-radius:4px}
 .gset .tsr output{min-width:70px; font-variant-numeric:tabular-nums; font-size:var(--fs-3)}
 .gset .tsr .stp{min-width:34px; padding-inline:0}
@@ -3092,7 +3092,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p>The nine <b>…pump</b> mastering plugins run on <b>bus tracks and the master</b>, and <b>EQ</b> on any track too (FX picker → <b>Mastering (…pump)</b>; › EQ WINDOW on the FX screen opens it): <b>EQ</b> (24 bands, cuts to 96 dB/oct or Brickwall, dynamic bands, zero latency or linear phase), <b>COMP</b>, <b>LIMIT</b> (true peak, loudness targets), <b>CALM</b> (resonance suppressor), <b>TONE</b> (tonal balance), <b>BAND</b> (multiband dynamics), <b>WIDE</b> (stereo imager), <b>HEAT</b> (saturator) and <b>METER</b> (loudness). They are the plugins' own DSP, so a setting sounds as it does in the VST3 / CLAP plugin. The slot shows the main settings as hex rows (EQ, BAND, WIDE and HEAT pick a <b>BAND</b> first); <b>› PRESET</b> has the plugin's presets and <b>› OPEN</b> its full window, which works like the plugin: drag, Shift-drag for fine, double-click to type, Ctrl-click to reset, A/B, and Alt held to listen to a band or a range. A slot's ACTIVE is the plugin's bypass. CALM, TONE, LIMIT and linear-phase EQ add latency: renders of the master line it up, but on a bus that track plays late against the others.</p>
 <h3>Settings</h3>
 <p><b>⚙ Settings</b> at the top: it starts with Audio (output device, level, latency, rate), then this screen’s own settings (in the tracker every Project setting: Song, Input, Screen, Render), then Master, Skin, Export, MIDI, Kit and App (Mobile, install, check for update). There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), show or hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD; it starts hidden on a computer and shown in the Mobile setup), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound, the <b>…chains</b> controls you have added for the current track (in …chains, right-click a control or a module → Add to the bottom panel; right-click one in the panel to remove it), the current track’s effects, and a channel strip for the current track (stereo meter, fader with 0 dB at E0 and +6 dB at the top, pan, M and S). When it holds more than fits, the panel scrolls sideways. Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. On a big screen the space beside the grid is the <b>stage</b> (Settings → STAGE): BY SCREEN shows something useful for each screen (the dogs dance to the beat on Song and Project — a hop every beat, a bigger one on the bar, and a new dance (arms up, arms down, leg kicks, jumping jacks) every time the cursor’s track starts a phrase, so they count beats and phrases for you — Sect previews the phrase, Phrase shows a piano lighting the notes as they play, Inst the waveform, Mixer the master spectrum, FX the effects chain), DOGS shows the dogs everywhere, OFF leaves it empty. In the bar above the grid, double-click the tempo or LPB to type a new one (ticks a step are in Settings). The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value. With a mouse, a drag selects instead (the wheel scrolls), a selection drags to move (Alt, Ctrl or ⌘ copies), and right-click on a track number solos it: see Tracker · KEYS mode → Mouse.</p>
-<p><b>Project files</b> are <code>.thunder</code> files (.json ones still open). A dot on <b>File ▾</b> and in the window title means changes that aren't in the file yet; New, Open and the rest ask <b>Save changes?</b> first. The app remembers the file (Ctrl/⌘+S goes back to it after a restart) and File ▾ → <b>Open recent…</b> lists the last eight. Every 3 minutes the song and kit are backed up in the browser, the last 10: File ▾ → <b>Restore a backup…</b>. On Android, tapping a <code>.thunder</code> attachment can’t offer a web app (Android doesn’t give a PWA the custom extension), so either tap <b>Share</b> on the attachment and send it to ...Thunder Plus (install it first: <b>Settings → App</b>), or download it and use <b>LOAD PROJECT</b>; that picker now shows every file. Drop audio on a pad to load it; drop a project, kit or .mid on the window to open it. <b>Sliders</b> all work alike: drag one from where it is (it doesn't jump to the click), hold Shift for fine control; on a touch screen it moves only once your finger slides sideways. Double-click, Alt-click or Ctrl/⌘-click resets it, double-click the value to type one, right-click for Reset / Type a value / MIDI learn. The wheel moves the slider the pointer rests on (it gets an outline); Shift+wheel in fine steps.</p>
+<p><b>Project files</b> are <code>.thunder</code> files (.json ones still open). A dot on <b>File ▾</b> and in the window title means changes that aren't in the file yet; New, Open and the rest ask <b>Save changes?</b> first. The app remembers the file (Ctrl/⌘+S goes back to it after a restart) and File ▾ → <b>Open recent…</b> lists the last eight. Every 3 minutes the song and kit are backed up in the browser, the last 10: File ▾ → <b>Restore a backup…</b>. On Android, tapping a <code>.thunder</code> attachment can’t offer a web app (Android doesn’t give a PWA the custom extension), so either tap <b>Share</b> on the attachment and send it to ...Thunder Plus (install it first: <b>Settings → App</b>), or download it and use <b>LOAD PROJECT</b>; that picker now shows every file. Drop audio on a pad to load it; drop a project, kit or .mid on the window to open it. <b>Sliders, faders and values</b> all work alike (the synth sliders, the Mixer's faders, the strip fader, the FX bar, the …pump windows and the sliders in …chains and …waves): drag one from where it is (it doesn't jump to the click); hold Shift for fine control or Ctrl/⌘ for big moves, and press or let go of either at any time; on a touch screen it moves only once your finger slides sideways. Double-click, Alt-click or Ctrl/⌘-click (⌘ on a Mac) resets it; right-click for Reset / Type a value (and MIDI learn on the synth sliders). The wheel moves the control the pointer rests on (it gets an outline); Shift+wheel in fine steps, Ctrl/⌘+wheel in big ones.</p>
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots to start, up to 64: <b>SLOTS</b> at the top of the Synth page (− and + step by 8, tap the number to type one; fewer slots only hide the last ones, and their sounds come back). <b>THIS SLOT</b> sets how the selected slot plays: <b>ONE-SHOT</b> plays its whole sound, like a drum; <b>HELD</b> sounds until note-off, like a synth. By default: <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new song. <b>A voice per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chopping breaks</h3>
@@ -8263,14 +8263,14 @@ function makeRow(def, key, getObj, opts = {}){
   const r = el('div', 'row'), lab = el('label', null, def.l), inp = el('input'), out = el('output');
   lab.htmlFor = id; inp.id = id; inp.type = 'range'; inp.min = 0; inp.max = 1000; inp.step = 1;
   r.append(lab, inp, out);
+  const reset = () => { if (row.def.d == null) return; getObj()[key] = row.def.d; row.refresh(); (opts.on || (() => changed(cur, true)))(); };
   const row = {def, key, getObj, r, lab, inp, out, fmt:opts.fmt,
     refresh(){ const o = getObj(); const v = o[key]; inp.value = Math.round(toPos(this.def, v) * 1000); out.textContent = (this.fmt || this.def.f || pct)(v); }};
   inp.addEventListener('input', () => { const o = getObj(); o[key] = fromPos(row.def, inp.value / 1000);
     out.textContent = (row.fmt || row.def.f || pct)(o[key]); (opts.on || (() => changed(cur, true)))(); });
-  out.title = 'Double-click to type a value';
-  out.style.cursor = 'text';
+  out.title = 'Double-click to reset · right-click to type a value';
   const typeBox = () => rowTypeBox(row, opts);
-  out.addEventListener('dblclick', e => { e.stopPropagation(); typeBox(); });
+  out.addEventListener('dblclick', e => { e.stopPropagation(); reset(); });   // ONE RULE (3 Nov): double-click resets everywhere; Type a value… is in the right-click menu
   // Touch screens: double-tap the value box to type a value (tap, lift, tap).
   let lastValTap = null;
   out.addEventListener('pointerup', e => {
@@ -8280,19 +8280,18 @@ function makeRow(def, key, getObj, opts = {}){
       else lastValTap = {t:now, x:cx, y:cy};
     }
   });
-  const reset = () => { if (row.def.d == null) return; getObj()[key] = row.def.d; row.refresh(); (opts.on || (() => changed(cur, true)))(); };
   lab.addEventListener('dblclick', reset);
   inp.addEventListener('dblclick', reset);   // the slider itself too (its default, as on the label)
   inp._reset = reset; inp._out = out;   // ONE SLIDER: Alt/Ctrl-click resets, the tip shows the readout
   // SLIDER MOUSE: right-click for its menu.
   // opts.menu: more items for this row's menu (a …chains row in the bottom panel: remove it, show its module), in the same
   // menu (FIX 27 Oct, audit M3: the panel added a second menu, a dialog, under this one).
-  r.addEventListener('contextmenu', e => { if (e.target.closest('input[type=text]') || typeof sxMenu !== 'function') return; e.preventDefault();
+  r.addEventListener('contextmenu', e => { if (e.target.closest('input[type=text]') || typeof sxMenu !== 'function') return; e.preventDefault(); e._valMenu = true;
     sxMenu(e.clientX, e.clientY, String(row.def.l || key).toUpperCase(), [
       {l:'Reset to default', f:reset, off:row.def.d == null}, {l:'Type a value…', f:typeBox},
       {l:'Learn a MIDI knob for it', f:() => { setLearn(true); midi.target = -1; midi.ccTarget = inp.id; renderPads(); ccBadges(); midiStatus(`${rowLabel(inp.id)}: turn a knob on the controller.`); }},
       ...(opts.menu ? [null, ...opts.menu()] : [])]); });
-  inp.title = 'Drag to change (Shift: finer) · double-click or Alt-click to reset';
+  inp.title = 'Drag to change (Shift: finer, Ctrl/⌘: coarser) · double-click or Alt-click to reset · right-click: menu';
   if (!opts.noTrack) rows.push(row);
   return row;
 }
@@ -13547,6 +13546,28 @@ async function loadAudioInto(f, pad){
    on (WHEEL FOCUS; one only passed over doesn't take it, so the page still scrolls); a drag is relative, Shift a tenth (ONE SLIDER).
    Not the settings menus' sliders (they lock against stray touches). To remove: this block and the contextmenu in makeRow. */
 const sliderOk = r => !!r && r.matches && r.matches('input[type=range]') && !r.disabled && !r.closest('#gset, .rlock, .ask');
+/* ONE RULE FOR VALUE CONTROLS (owner, mouse audit 3 Nov): sliders, faders, the FX bar's values and the …pump windows'
+   controls all take the mouse the same way:
+   - a drag moves the value from where it is; Shift held is ten times finer and Ctrl/⌘ held four times coarser, read on
+     every move, so pressing or letting go of either mid-drag carries on from there (no jump);
+   - double-click, Alt/⌥-click or Ctrl/⌘-click (⌘ on a Mac, where Ctrl+click is the right-click) resets it;
+   - right-click opens Reset to default / Type a value… (and Learn a MIDI knob where the control can be learned);
+   - the wheel takes the control the pointer has rested on (outlined; WHEEL FOCUS), Shift fine, Ctrl/⌘ big steps.
+   dragMul(e) / resetClick(e) / valMenu() below; a control that isn't a slider takes the wheel through data-wheel + el._wheel(d, e). */
+const dragMul = e => e.shiftKey ? 0.1 : (e.ctrlKey || e.metaKey) ? 4 : 1;
+const resetClick = e => e.pointerType !== 'touch' && e.button === 0 && (e.altKey || (MACK ? e.metaKey : e.ctrlKey));
+function valMenu(e, title, o){
+  e.preventDefault(); e.stopPropagation(); if (typeof sxMenu !== 'function') return;
+  sxMenu(e.clientX, e.clientY, String(title || '').toUpperCase(), [{l:'Reset to default', f:o.reset || (() => {}), off:!o.reset}, {l:'Type a value…', f:o.type || (() => {}), off:!o.type},
+    ...(o.learn ? [{l:'Learn a MIDI knob for it', f:o.learn}] : []), ...(o.more ? [null, ...o.more] : [])]);
+}
+// A level typed as hex (00–FF, as the tracker shows it) or in dB ("-6", "-6 dB", "+2.5"); null when it isn't either.
+function parseLevel(txt, fromDb){
+  const t = String(txt || '').trim().replace(',', '.').replace('−', '-'); if (!t) return null;
+  if (/db\s*$/i.test(t) || /^[+-]/.test(t) || /\./.test(t)){ const d = parseFloat(t); return isFinite(d) ? fromDb(d) : null; }
+  if (/^[0-9a-f]{1,2}$/i.test(t)) return parseInt(t, 16);
+  return null;
+}
 function sliderSet(r, v){
   const mn = r.min === '' ? 0 : +r.min, mx = r.max === '' ? 100 : +r.max, st = r.step === 'any' || !+r.step ? (mx - mn) / 1000 : +r.step;
   const nv = clamp(Math.round((v - mn) / st) * st + mn, mn, mx); if (Math.abs(nv - +r.value) < st / 2) return;
@@ -13575,15 +13596,18 @@ function wheelNotch(key, e){
    moment (it is outlined then); until then the wheel scrolls the page, so scrolling past sliders never changes them. It
    was only the slider clicked last, with nothing to show which. */
 let wheelR = null, wheelCand = null, wheelT = 0;
+// (3 Nov) besides the sliders: any control marked data-wheel with an el._wheel(d, e) (the Mixer's faders, the strip fader, the FX bar's values)
+const wheelEl = t => t && t.closest ? t.closest('input[type=range], [data-wheel]') : null;
+const wheelOk = r => !!r && (r.hasAttribute('data-wheel') ? r.isConnected && typeof r._wheel === 'function' : sliderOk(r));
 const wheelOff = () => { clearTimeout(wheelT); wheelT = 0; if (wheelR) wheelR.classList.remove('wheelon'); wheelR = null; };
-const wheelArm = r => { clearTimeout(wheelT); wheelCand = r; wheelT = setTimeout(() => { if (wheelCand === r && sliderOk(r)){ wheelR = r; r.classList.add('wheelon'); } }, 350); };
+const wheelArm = r => { clearTimeout(wheelT); wheelCand = r; wheelT = setTimeout(() => { if (wheelCand === r && wheelOk(r)){ wheelR = r; r.classList.add('wheelon'); } }, 350); };
 document.addEventListener('pointerover', e => {
   if (e.pointerType !== 'mouse') return;
-  const r = e.target.closest && e.target.closest('input[type=range]');
+  const r = wheelEl(e.target);
   if (r !== wheelCand){ wheelOff(); wheelCand = null; }
-  if (sliderOk(r) && r !== wheelR) wheelArm(r);
+  if (wheelOk(r) && r !== wheelR) wheelArm(r);
 }, true);
-document.addEventListener('pointerout', e => { const r = e.target.closest && e.target.closest('input[type=range]'); if (r && r === wheelCand && !(e.relatedTarget && r.contains(e.relatedTarget))){ wheelOff(); wheelCand = null; } }, true);
+document.addEventListener('pointerout', e => { const r = wheelEl(e.target); if (r && r === wheelCand && !(e.relatedTarget && r.contains(e.relatedTarget))){ wheelOff(); wheelCand = null; } }, true);
 /* WHEEL ON A SCROLLBAR (owner, 3 Nov): with the pointer on a scroll bar the wheel scrolls that bar, whatever the area
    under it does with the wheel otherwise (Arrange's song cursor, the tracker's rows, the FX bar's values, sliders…). A
    vertical bar scrolls up and down; a horizontal one scrolls sideways with the wheel's up/down (Shift+wheel too). This
@@ -13616,21 +13640,32 @@ function sbWheel(e){
   if (k === 'v') el.scrollTop += d; else el.scrollLeft += d;
 }
 addEventListener('wheel', sbWheel, {capture:true, passive:false});
+// BIG STEPS ON THE WHEEL (3 Nov): ⌘ on a Mac (Ctrl+wheel is a pinch there); Ctrl elsewhere, but only for a real notch: a
+// trackpad pinch sends Ctrl with small deltas, and that stays a zoom.
+const wheelBig = e => { if (MACK) return e.metaKey; const px = Math.abs((e.deltaY || e.deltaX) * (e.deltaMode === 1 ? 40 : 1)); return e.ctrlKey && px >= 50; };
 document.addEventListener('wheel', e => {
-  const r = e.target.closest && e.target.closest('input[type=range]'); if (!sliderOk(r) || e.ctrlKey) return;
+  const r = wheelEl(e.target); if (!wheelOk(r) || (e.ctrlKey && !wheelBig(e))) return;
   if (r !== wheelR){ if (r === wheelCand) wheelArm(r); return; }   // still scrolling past: let the page scroll, and wait again
   if (!(e.deltaY || e.deltaX)) return; e.preventDefault();
   const n = wheelSteps(r, e); if (!n) return;
+  if (r.hasAttribute('data-wheel')){ r._wheel(-n, e); return; }   // up raises it
   const mn = r.min === '' ? 0 : +r.min, mx = r.max === '' ? 100 : +r.max, st = r.step === 'any' || !+r.step ? (mx - mn) / 1000 : +r.step;
-  sliderSet(r, +r.value - n * Math.max(st, (mx - mn) * (e.shiftKey ? 0.002 : 0.02)));
+  sliderSet(r, +r.value - n * Math.max(st, (mx - mn) * (e.shiftKey ? 0.002 : wheelBig(e) ? 0.08 : 0.02)));
 }, {passive:false});
+// RIGHT-CLICK on a slider that has no menu of its own (the strip's PAN, Perform's crossfader and macros, tuning…): Reset to
+// default (what its double-click does). makeRow's sliders keep their own menu (they mark the event).
+document.addEventListener('contextmenu', e => {
+  if (e._valMenu || e.pointerType === 'touch') return; const r = e.target.closest && e.target.closest('input[type=range]'); if (!sliderOk(r)) return;
+  const lab = r.getAttribute('aria-label') || r.title.split(/[·:]/)[0] || 'Slider';
+  valMenu(e, lab, {reset:() => sldReset(r)});
+});
 /* ONE SLIDER (owner, 27 Oct, Phase 2): every host slider (not the locked settings menus) behaves the same, as a DAW knob:
    - a drag moves it from where it is (no jump to the click), sideways, the slider's width for its whole range; Shift held
      makes it ten times finer, and pressing or letting go of Shift mid-drag carries on from there (no jump);
    - on a touch screen nothing changes until the finger has moved sideways (a vertical swipe scrolls the page; a tap
      does nothing), so brushing a slider while scrolling never changes the sound;
    - a tip shows the value while it moves;
-   - double-click, Alt/⌥-click or Ctrl/⌘-click puts it back to its default (makeRow's); double-click the value to type one.
+   - double-click, Alt/⌥-click or Ctrl/⌘-click puts it back to its default (makeRow's), the value too (3 Nov); right-click → Type a value.
    The wheel takes the slider under the pointer once it has rested on it (below). To go back: this block. */
 let sldTip = null;
 function sliderTip(r, on){
@@ -13668,7 +13703,7 @@ document.addEventListener('pointerdown', e => {
   if (live) sliderTip(r, true);
   const mv = ev => { if (ev.pointerId !== id) return;
     if (!live){ const dx = ev.clientX - x0, dy = ev.clientY - y0; if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)){ end(ev); return; } if (Math.abs(dx) < 6) return; live = true; lastX = ev.clientX; r.focus({preventScroll:true}); }
-    v = clamp(v + (ev.clientX - lastX) / w * (mx - mn) * (ev.shiftKey ? 0.1 : 1), mn, mx); lastX = ev.clientX;
+    v = clamp(v + (ev.clientX - lastX) / w * (mx - mn) * dragMul(ev), mn, mx); lastX = ev.clientX;   // ONE RULE: Shift fine, Ctrl/⌘ held big
     sliderSet(r, v); sliderTip(r, true); };
   // The drag ends wherever the button comes up: the slider can be redrawn mid-drag (its panel rebuilt), and the old one
   // never hears its pointerup, which left the value tip stuck on the screen. So the window listens too.
@@ -20261,7 +20296,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 380;
+const BUILD = 381;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -20947,7 +20982,7 @@ function projRows(){
     {l:'KEYS KEYPAD', ck:'Show on-screen keypad', get:() => kpOn ? 1 : 0, set:v => setKp(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'KEYS mode: show the on-screen keypad at the bottom for tapping in notes. Off hides it — the computer keyboard still types notes and hex, and the octave (OCT, top bar) stays. PAD mode is unchanged'},
     {l:'BOTTOM BAR', opts:true, get:() => deck.fxbar ? 1 : 0, set:v => setDeck('fxbar', !!v), min:0, max:1, d:isMobile() ? 0 : 1, fmt:v => v ? 'FX' : 'CLASSIC',
-      info:() => 'FX: the bottom panel shows the track’s eight effects side by side with all their values (drag one up or down, Alt+wheel, double-click resets, right-click types), …CHAINS and VOL / PAN; INST steps aside. CLASSIC: the panel as it was (SCOPE, INST, …CHAINS, one effect at a time, TRACK)'},
+      info:() => 'FX: the bottom panel shows the track’s eight effects side by side with all their values (drag one up or down, the wheel once the mouse rests on it, double-click resets, right-click for Reset / Type a value), …CHAINS and VOL / PAN; INST steps aside. CLASSIC: the panel as it was (SCOPE, INST, …CHAINS, one effect at a time, TRACK)'},
     {l:'PERFORM PART', ck:'Show PERFORM in the bottom panel', get:() => deck.perfOn ? 1 : 0, set:v => setDeck('perfOn', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'A part in the bottom panel for playing live: FILL, a reload point, parts, the crossfader between two scenes, eight macros, and the editors for scenes, macros and each track’s locks and LFO (CND, XFD, MAC, PRT and LK1–LK4 drive them from the song)'},
     {l:'BOTTOM PANEL', ck:'Show the bottom panel', get:() => deck.on ? 1 : 0, set:v => setDeck('on', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
@@ -23298,17 +23333,29 @@ try { document.fonts.addEventListener('loadingdone', () => { chwKey = ''; if (tv
 const volDb = v => { const g = trackGain(v); return g <= 0.00001 ? -999 : 20 * Math.log10(g); };
 const dbVol = d => d >= 0 ? clamp(Math.round(TRK_UNITY + d / 6 * (255 - TRK_UNITY)), TRK_UNITY, 255) : d <= -60 ? 0 : clamp(Math.round(TRK_UNITY * Math.pow(10, d / 40)), 0, TRK_UNITY);
 let mfDrag = null;
+// The fader's place for a level (d dB) on its meter, and back (grid coordinates): the headroom is half a line above the top,
+// below the bottom is off. mfY(-999) sits just under the bottom, so a drag from off starts at off.
+const mfY = (d, top, bot, rowH) => d >= 0 ? top - Math.min(1, d / 6) * rowH * 0.5 : d <= -60 ? bot + rowH * 0.5 + 1 : d <= -48 ? bot : top + (-d / 48) * (bot - top);
+const mfVol = (y, top, bot, rowH) => dbVol(y <= top ? Math.min(6, (top - y) / (rowH * 0.5) * 6) : y >= bot + rowH * 0.5 ? -999 : y >= bot ? -48 : -(y - top) / (bot - top) * 48);
+const mfToast = t => toast('Track ' + d2(t + 1) + ' · VOL ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)), 900);
+function mfSet(t, v){ v = clamp(Math.round(v), 0, 255); if (v === S.mix[t].vol) return; S.mix[t].vol = v; if (rt) rt.pl.applyMix(); }
+const mfReset = t => { S.mix[t].vol = TRK_UNITY; mixChanged(); draw(); toast('Track ' + d2(t + 1) + ' · VOL E0 · 0.0 dB'); };
+async function mfType(t){ const a = await askText({title:'Track ' + d2(t + 1) + ' · VOL', body:'Now ' + hx(S.mix[t].vol) + ' (' + dB(trackGain(S.mix[t].vol)) + '). Type 00–FF, or a level in dB such as -6 (E0 is 0 dB, FF +6 dB).'}, hx(S.mix[t].vol), 8, 'Set');
+  if (a == null) return; const v = parseLevel(a, dbVol); if (v == null) return toast('Not a level: 00–FF or dB, such as -6'); S.mix[t].vol = clamp(v, 0, 255); mixChanged(); draw(); mfToast(t); }
 const mixFv = () => !!cs.mixer.fv && cs.mixer.y === 6;   // the Mixer cursor is on a track's VOL fader (below SC)
 function mixFaders(){
   let host = grid.querySelector('.mfhost:not(.mohost)');
   if (tv !== 'mixer' || !meterEls.length || !mixN){ if (host) host.remove(); mixOutBar(); return; }
   if (!host){ host = el('div', 'mfhost'); host.setAttribute('aria-hidden', 'true'); grid.append(host); }
   const g = grid.getBoundingClientRect(), ox = grid.scrollLeft - g.left - grid.clientLeft, oy = grid.scrollTop - g.top - grid.clientTop;
-  if (host.children.length !== mixN){ host.replaceChildren(); for (let i = 0; i < mixN; i++){ const b = el('i', 'mfbar'); b.dataset.i = i; host.append(b); } }
+  if (host.children.length !== mixN){ host.replaceChildren(); for (let i = 0; i < mixN; i++){ const b = el('i', 'mfbar'); b.dataset.i = i;
+    // WHEEL FOCUS (3 Nov): rest on a fader and the wheel moves it (4 a notch, Shift: 1, Ctrl/⌘: 16)
+    b.dataset.wheel = ''; b._wheel = (d, e) => { const t = +b.dataset.t; if (!S.mix[t]) return; mfSet(t, S.mix[t].vol + d * (e.shiftKey ? 1 : wheelBig(e) ? 16 : 4)); mixChanged(); draw(); mfToast(t); };
+    host.append(b); } }
   for (let i = 0; i < mixN; i++){
     const t = mixL + i, a = meterEls[i].getBoundingClientRect(), z = meterEls[(MH - 1) * mixN + i].getBoundingClientRect(), b = host.children[i];
     const top = a.top + oy, bot = z.bottom + oy, rowH = (bot - top) / MH, d = volDb(S.mix[t].vol);
-    const y = d >= 0 ? top - Math.min(1, d / 6) * rowH * 0.5 : d <= -48 ? bot : top + (-d / 48) * (bot - top);   // the headroom: half a line above the top
+    const y = mfY(d, top, bot, rowH);
     Object.assign(b.style, {left:(a.left + ox - 2).toFixed(1) + 'px', width:(a.width + 4).toFixed(1) + 'px', top:(y - 1.5).toFixed(1) + 'px'});
     b.dataset.t = t; b.dataset.top = top; b.dataset.bot = bot; b.title = 'Track ' + d2(t + 1) + ' · VOL ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)) + ' · the fader, after …chains and the FX (TRIM is above, before them) · drag to change, double-click for 0 dB';
     b.classList.toggle('mu', !!S.mix[t].mute); b.classList.toggle('cur', mixFv() && t === cs.mixer.x);
@@ -23321,15 +23368,23 @@ function mixFaders(){
 const outDb = v => { const g = curve(v); return g <= 0.00001 ? -999 : 20 * Math.log10(g); };
 const dbOut = d => d <= -60 ? 0 : clamp(Math.round(255 * Math.pow(10, Math.min(0, d) / 40)), 0, 255);
 let moDrag = null, moTap = {t:0, x:0};
+const moX = (d, x0, w) => d <= -60 ? x0 - 7 : d <= -48 ? x0 - 4 : x0 + (d + 48) / 48 * w;   // left of the meter is off
+const moVal = (x, x0, w) => x < x0 - 6 ? 0 : dbOut((x - x0) / Math.max(1, w) * 48 - 48);
+const moToast = () => { const v = S.mout == null ? 255 : S.mout; toast('Master OUT · ' + hx(v) + ' · ' + dB(curve(v)), 900); };
+const moReset = () => { S.mout = 255; moApply(); saveS(); cs.mixer.y = 7; cs.mixer.mx = 2; draw(); toast('Master OUT · FF · 0.0 dB'); };
+async function moType(){ const v0 = S.mout == null ? 255 : S.mout; const a = await askText({title:'Master OUT', body:'Now ' + hx(v0) + ' (' + dB(curve(v0)) + '). Type 00–FF, or a level in dB such as -6 (FF is 0 dB).'}, hx(v0), 8, 'Set');
+  if (a == null) return; const v = parseLevel(a, dbOut); if (v == null) return toast('Not a level: 00–FF or dB, such as -6'); S.mout = clamp(v, 0, 255); moApply(); saveS(); draw(); moToast(); }
 function mixOutBar(){
   let host = grid.querySelector('.mohost');
   if (tv !== 'mixer' || masterEls.length !== 10){ if (host) host.remove(); return; }
-  if (!host){ host = el('div', 'mfhost mohost'); host.setAttribute('aria-hidden', 'true'); host.append(el('i', 'mfbar mobar')); grid.append(host); }
+  if (!host){ host = el('div', 'mfhost mohost'); host.setAttribute('aria-hidden', 'true'); const ob = el('i', 'mfbar mobar');
+    ob.dataset.wheel = ''; ob._wheel = (d, e) => { const v0 = S.mout == null ? 255 : S.mout; S.mout = clamp(v0 + d * (e.shiftKey ? 1 : wheelBig(e) ? 16 : 4), 0, 255); moApply(); saveS(); draw(); moToast(); };   // WHEEL FOCUS (3 Nov)
+    host.append(ob); grid.append(host); }
   const b = host.firstChild, g = grid.getBoundingClientRect(), ox = grid.scrollLeft - g.left - grid.clientLeft, oy = grid.scrollTop - g.top - grid.clientTop;
   const lnL = masterEls[0].closest('.ln'), lnR = masterEls[5].closest('.ln'); if (!lnL || !lnR) return;
   const a = masterEls[0].getBoundingClientRect(), tL = lnL.getBoundingClientRect(), bR = lnR.getBoundingClientRect();
   const cw = parseFloat(grid.style.getPropertyValue('--chw')) || parseFloat(getComputedStyle(lnL).fontSize) * 0.6;
-  const x0 = a.left + ox, w = MW * cw, mo = S.mout == null ? 255 : S.mout, d = outDb(mo), x = d <= -48 ? x0 - 4 : x0 + (d + 48) / 48 * w;
+  const x0 = a.left + ox, w = MW * cw, mo = S.mout == null ? 255 : S.mout, x = moX(outDb(mo), x0, w);
   Object.assign(b.style, {left:(x - 1.5).toFixed(1) + 'px', top:(tL.top + oy).toFixed(1) + 'px', height:(bR.bottom - tL.top).toFixed(1) + 'px'});
   b.dataset.x0 = x0; b.dataset.w = w;
   b.title = 'Master OUT · ' + hx(mo) + ' · ' + dB(curve(mo)) + ' · the master fader, after the limiter · drag to change, double-click for 0 dB';
@@ -23339,19 +23394,19 @@ grid.addEventListener('pointerdown', e => {
   const b = e.target.closest && e.target.closest('.mobar'); if (!b || tv !== 'mixer' || e.button !== 0 || ctxPress(e)) return;
   e.preventDefault(); e.stopPropagation();
   const now = performance.now(), two = now - moTap.t < 350 && Math.abs(e.clientX - moTap.x) < 8; moTap = {t:two ? 0 : now, x:e.clientX};
-  if (two){ S.mout = 255; moApply(); saveS(); cs.mixer.y = 7; cs.mixer.mx = 2; draw(); toast('Master OUT · FF · 0.0 dB'); return; }   // double-click / double-tap: 0 dB
-  const g = grid.getBoundingClientRect();
-  moDrag = {id:e.pointerId, x0:+b.dataset.x0, w:+b.dataset.w, cx:e.clientX, v0:S.mout == null ? 255 : S.mout, ox:grid.scrollLeft - g.left - grid.clientLeft};
+  if (two || resetClick(e)){ moReset(); return; }   // double-click / double-tap, or Alt / ⌘-click (3 Nov): 0 dB
+  // RELATIVE (3 Nov): from where the bar is, Shift a tenth, Ctrl/⌘ held four times
+  const x0 = +b.dataset.x0, w = +b.dataset.w;
+  moDrag = {id:e.pointerId, x0, w, lx:e.clientX, vx:moX(outDb(S.mout == null ? 255 : S.mout), x0, w)};
   try { grid.setPointerCapture(e.pointerId); } catch(err){}   // the grid, not the bar: a redraw rebuilds the bar
   cs.mixer.y = 7; cs.mixer.mx = 2; draw();
 }, true);
 grid.addEventListener('pointermove', e => {
   if (!moDrag || e.pointerId !== moDrag.id) return; e.preventDefault(); e.stopPropagation();
-  const D = moDrag, x = e.clientX + D.ox;
-  const v = e.shiftKey ? clamp(Math.round(D.v0 + (e.clientX - D.cx) / 4), 0, 255) : x < D.x0 - 6 ? 0 : dbOut((x - D.x0) / Math.max(1, D.w) * 48 - 48);
+  const D = moDrag; D.vx = clamp(D.vx + (e.clientX - D.lx) * dragMul(e), D.x0 - 12, D.x0 + D.w + 2); D.lx = e.clientX;
+  const v = moVal(D.vx, D.x0, D.w);
   if (v === (S.mout == null ? 255 : S.mout)) return;
-  S.mout = v; moApply(); draw();
-  toast('Master OUT · ' + hx(v) + ' · ' + dB(curve(v)), 900);
+  S.mout = v; moApply(); draw(); moToast();
 }, true);
 const moDragEnd = e => { if (!moDrag || e.pointerId !== moDrag.id) return; moDrag = null; try { grid.releasePointerCapture(e.pointerId); } catch(err){} saveS(); draw(); };
 grid.addEventListener('pointerup', moDragEnd, true); grid.addEventListener('pointercancel', moDragEnd, true);
@@ -23362,24 +23417,29 @@ grid.addEventListener('pointerdown', e => {
   if (e.button !== 0 || ctxPress(e)) return;   // FIX (27 Oct, audit M17; Mac Ctrl+click 3 Nov): a right or middle click no longer starts a fader drag (right-click: the menu)
   e.preventDefault(); e.stopPropagation();
   const t = +b.dataset.t; cs.mixer.x = t; cs.mixer.y = 6; cs.mixer.fv = true;
-  mfDrag = {t, id:e.pointerId, y0:e.clientY, v0:S.mix[t].vol, top:+b.dataset.top, bot:+b.dataset.bot, oy:grid.scrollTop - grid.getBoundingClientRect().top - grid.clientTop};
+  if (resetClick(e)){ mfReset(t); return; }   // ONE RULE (3 Nov): Alt / ⌘-click resets, as a double-click does
+  // RELATIVE (owner, 3 Nov: the bar is the fader's cap, so a grab never jumps it): the fader moves by how far the mouse
+  // does from where it is (vy), Shift a tenth, Ctrl/⌘ held four times, read on every move.
+  const top = +b.dataset.top, bot = +b.dataset.bot, rowH = (bot - top) / MH;
+  mfDrag = {t, id:e.pointerId, ly:e.clientY, vy:mfY(volDb(S.mix[t].vol), top, bot, rowH), top, bot, rowH};
   try { b.setPointerCapture(e.pointerId); } catch(err){}
   b.classList.add('on'); cs.mixer.x = t; if (cs.mixer.y === 7){ cs.mixer.y = 1; cs.mixer.mx = 0; }   // the track's column; the row stays (row 0 is TRIM now, not VOL), off the master row onto PAN
 }, true);
 grid.addEventListener('pointermove', e => {
   if (!mfDrag || e.pointerId !== mfDrag.id) return; e.preventDefault();
-  const D = mfDrag, top = D.top, bot = D.bot, rowH = (bot - top) / MH;
-  let v;
-  if (e.shiftKey){ v = clamp(Math.round(D.v0 - (e.clientY - D.y0) / 4), 0, 255); }   // fine: one step every 4 px
-  else { const y = e.clientY + D.oy, d = y <= top ? Math.min(6, (top - y) / (rowH * 0.5) * 6) : y >= bot + rowH * 0.5 ? -999 : y >= bot ? -48 : -(y - top) / (bot - top) * 48; v = dbVol(d); }
+  const D = mfDrag; D.vy = clamp(D.vy + (e.clientY - D.ly) * dragMul(e), D.top - D.rowH, D.bot + D.rowH); D.ly = e.clientY;
+  const v = mfVol(D.vy, D.top, D.bot, D.rowH);
   if (v === S.mix[D.t].vol) return;
-  S.mix[D.t].vol = v; if (rt) rt.pl.applyMix(); draw();
-  toast('Track ' + d2(D.t + 1) + ' · VOL ' + hx(v) + ' · ' + dB(trackGain(v)), 900);
+  mfSet(D.t, v); draw(); mfToast(D.t);
 }, true);
 const mfEnd = e => { if (!mfDrag || e.pointerId !== mfDrag.id) return; const t = mfDrag.t; mfDrag = null; grid.querySelectorAll('.mfbar.on').forEach(b => b.classList.remove('on')); mixChanged(); draw(); };
 grid.addEventListener('pointerup', mfEnd, true); grid.addEventListener('pointercancel', mfEnd, true);
 grid.addEventListener('dblclick', e => { const b = e.target.closest && e.target.closest('.mfbar:not(.mobar)'); if (!b || tv !== 'mixer') return; e.preventDefault(); e.stopPropagation();
-  const t = +b.dataset.t; S.mix[t].vol = TRK_UNITY; mixChanged(); draw(); toast('Track ' + d2(t + 1) + ' · VOL E0 · 0.0 dB'); }, true);
+  mfReset(+b.dataset.t); }, true);
+// RIGHT-CLICK a fader (3 Nov): Reset / Type a value (the Mixer's command menu stays for the rest of the grid)
+grid.addEventListener('contextmenu', e => { const b = e.target.closest && e.target.closest('.mfbar'); if (!b || tv !== 'mixer') return;
+  if (b.classList.contains('mobar')) valMenu(e, 'Master OUT', {reset:moReset, type:moType});
+  else { const t = +b.dataset.t; valMenu(e, 'Track ' + d2(t + 1) + ' VOL', {reset:() => mfReset(t), type:() => mfType(t)}); } }, true);
 let mcutOn = false;   // MASTER CUT FLASH: what the Mixer's master meter last showed
 function paintMeters(){
   const bs = rt ? rt.pl.buses : null;
@@ -24412,18 +24472,23 @@ const stVol = $('stVol'), stPan = $('stPan');
 const stGet = () => dkMst() ? (S.mout == null ? 255 : S.mout) : S.mix[dkTrack()].vol;
 const stSet = v => { v = clamp(Math.round(v), 0, 255); if (dkMst()){ S.mout = v; moApply(); saveS(); } else { S.mix[dkTrack()].vol = v; mixChanged(); } deckStrip(); };
 const stPos = v => { const h = stVol.clientHeight - 16; return 8 + v / 255 * h; };
+const stReset = () => stSet(dkMst() ? 255 : TRK_UNITY);
 stVol.addEventListener('pointerdown', e => { if (e.button || ctxPress(e)) return; e.preventDefault();   // left button only (3 Nov)
+  if (resetClick(e)){ stReset(); return; }   // ONE RULE (3 Nov): Alt / ⌘-click resets
   try { stVol.setPointerCapture(e.pointerId); } catch(_){} stVol.focus();
   const r = stVol.getBoundingClientRect(), h = r.height - 16, y0 = e.clientY, v0 = stGet();
-  // A grab on the cap moves it relative (no jump); a press elsewhere on the track jumps there first.
+  // A grab on the cap moves it relative (no jump); a press elsewhere on the track jumps there first. Each move adds to it
+  // (Shift a tenth, Ctrl/⌘ held four times, read on every move: no jump when either changes mid-drag, 3 Nov).
   const capY = r.bottom - stPos(v0); let base = Math.abs(e.clientY - capY) < 12 ? v0 : clamp((r.bottom - 8 - e.clientY) / h * 255, 0, 255), from = y0;
   if (base !== v0) stSet(base);
-  const mv = ev => { stSet(base + (from - ev.clientY) / h * 255 * (ev.shiftKey ? 0.25 : 1)); };
+  const mv = ev => { base = clamp(base + (from - ev.clientY) / h * 255 * dragMul(ev), 0, 255); from = ev.clientY; stSet(base); };
   const up = () => { stVol.removeEventListener('pointermove', mv); stVol.removeEventListener('pointerup', up); stVol.removeEventListener('pointercancel', up); };
   stVol.addEventListener('pointermove', mv); stVol.addEventListener('pointerup', up); stVol.addEventListener('pointercancel', up); });
-stVol.addEventListener('keydown', e => { const d = {ArrowUp:1, ArrowRight:1, ArrowDown:-1, ArrowLeft:-1, PageUp:16, PageDown:-16}[e.key]; if (!d) return; e.preventDefault(); e.stopPropagation(); stSet(stGet() + d * (e.shiftKey ? 16 : 4)); });
+stVol.addEventListener('keydown', e => { const d = {ArrowUp:1, ArrowRight:1, ArrowDown:-1, ArrowLeft:-1, PageUp:16, PageDown:-16}[e.key]; if (!d) return; e.preventDefault(); e.stopPropagation(); stSet(stGet() + d * (e.shiftKey ? 1 : (e.ctrlKey || e.metaKey) ? 16 : 4)); });   // Shift fine, Ctrl/⌘ big (3 Nov; Shift was big)
+stVol.dataset.wheel = ''; stVol._wheel = (d, e) => stSet(stGet() + d * (e.shiftKey ? 1 : wheelBig(e) ? 16 : 4));   // WHEEL FOCUS (3 Nov)
+stVol.addEventListener('contextmenu', e => valMenu(e, dkMst() ? 'Master OUT' : 'Track ' + d2(dkTrack() + 1) + ' VOL', {reset:stReset, type:() => dkMst() ? moType() : mfType(dkTrack())}));
 stPan.addEventListener('input', () => { if (dkMst()) return; const t = dkTrack(); S.mix[t].pan = +stPan.value; mixChanged(); deckStrip(); });
-stVol.addEventListener('dblclick', () => stSet(dkMst() ? 255 : TRK_UNITY));
+stVol.addEventListener('dblclick', stReset);
 stPan.addEventListener('dblclick', () => { if (dkMst()) return; S.mix[dkTrack()].pan = 128; mixChanged(); deckStrip(); });
 $('stMute').addEventListener('click', () => { if (dkMst()) return; const m = S.mix[dkTrack()]; m.mute = !m.mute; mixChanged(); draw(); });
 $('stSolo').addEventListener('click', () => { if (dkMst()) return; const m = S.mix[dkTrack()]; m.solo = !m.solo; mixChanged(); draw(); });
@@ -24699,18 +24764,27 @@ function deckFxBar(){
         r.addEventListener('pointerdown', () => { dkFbSel = selK; for (const x of bar.querySelectorAll('.fr.sel')) x.classList.remove('sel'); r.classList.add('sel'); });
         const show = x => q.names ? (q.names[x] ?? String(x)) : (q.tpl || q.band) ? q.fmt(x, getF()) : q.fmt(x);
         const set = x => { const g = getF(); if (!g) return; x = clamp(Math.round(x), q.min, q.max); if (x === g[q.k]) return; g[q.k] = x; if (isPumpT(g.type)) delete g.pname; fxChanged(mst ? NT : dkTrack()); v.textContent = show(x); };
-        v.title = q.l + ': drag up or down (Shift: fine) · Alt+wheel · double-click: default · right-click: type a value';
-        v.addEventListener('pointerdown', e => { if (e.button) return; e.preventDefault(); try { v.setPointerCapture(e.pointerId); } catch(_){} v.classList.add('drag');
-          const y0 = e.clientY, g = getF(), x0 = g ? g[q.k] : q.d, R = q.max - q.min, per = q.names || R <= 16 ? 10 : R <= 64 ? 3 : Math.max(0.4, 150 / R);
-          const mv = ev => set(x0 + (y0 - ev.clientY) / per * (ev.shiftKey ? 0.25 : 1));
-          const up = () => { v.classList.remove('drag'); v.removeEventListener('pointermove', mv); v.removeEventListener('pointerup', up); v.removeEventListener('pointercancel', up); };
-          v.addEventListener('pointermove', mv); v.addEventListener('pointerup', up); v.addEventListener('pointercancel', up); });
-        // the wheel changes it with Alt held, or while the mouse button is held on it (owner, 2 Nov: click and hold, then scroll)
-        v.addEventListener('wheel', e => { if (!e.altKey && !(e.buttons & 1) && !v.classList.contains('drag')) return; e.preventDefault(); const n = wheelSteps(v, e); if (!n) return; const g = getF(); if (g) set(g[q.k] - n * (q.max - q.min > 64 && !q.names ? Math.max(1, Math.round((q.max - q.min) / 64)) : 1)); }, {passive:false});
-        v.addEventListener('dblclick', () => set(q.d));
-        v.addEventListener('contextmenu', async e => { e.preventDefault(); const g = getF(); if (!g) return;
+        v.title = q.l + ': drag up or down (Shift: fine, Ctrl/⌘: coarse) · rest on it and use the wheel · double-click or Alt-click: default · right-click: menu';
+        // ONE RULE (mouse audit, 3 Nov): a drag adds to the value from where it is, Shift a tenth and Ctrl/⌘ held four
+        // times, read on every move (no jump when either changes); Alt / ⌘-click and double-click reset; right-click: Reset /
+        // Type a value; the wheel takes it once the mouse rests on it (and with Alt, or while held, as before).
+        const typeIt = async () => { const g = getF(); if (!g) return;
           const a = await askText({title:q.l + ' (' + q.min + '–' + q.max + ')', body:'Now ' + show(g[q.k]) + '. A number from ' + q.min + ' to ' + q.max + '.'}, String(g[q.k]), 6, 'Set'); if (a == null) return;
-          const n = parseFloat(a); if (isFinite(n)) set(n); });
+          const n = parseFloat(a); if (isFinite(n)) set(n); };
+        v.addEventListener('pointerdown', e => { if (e.button || ctxPress(e)) return; e.preventDefault();
+          if (resetClick(e)){ set(q.d); return; }
+          try { v.setPointerCapture(e.pointerId); } catch(_){} v.classList.add('drag');
+          const g = getF(), R = q.max - q.min, per = q.names || R <= 16 ? 10 : R <= 64 ? 3 : Math.max(0.4, 150 / R);
+          let x = g ? g[q.k] : q.d, ly = e.clientY;
+          const mv = ev => { x = clamp(x + (ly - ev.clientY) / per * dragMul(ev), q.min, q.max); ly = ev.clientY; set(x); };
+          const up = () => { v.classList.remove('drag'); v.removeEventListener('pointermove', mv); v.removeEventListener('pointerup', up); v.removeEventListener('pointercancel', up); v.removeEventListener('lostpointercapture', up); };
+          v.addEventListener('pointermove', mv); v.addEventListener('pointerup', up); v.addEventListener('pointercancel', up); v.addEventListener('lostpointercapture', up); });
+        const wstep = e => { const big = q.max - q.min > 64 && !q.names ? Math.max(1, Math.round((q.max - q.min) / 64)) : 1; return e.shiftKey ? 1 : wheelBig(e) ? big * 4 : big; };
+        v.dataset.wheel = ''; v._wheel = (d, e) => { const g = getF(); if (g) set(g[q.k] + d * wstep(e)); };
+        // the wheel with Alt held, or while the mouse button is held on it (owner, 2 Nov: click and hold, then scroll), even before the rest
+        v.addEventListener('wheel', e => { if (!e.altKey && !(e.buttons & 1) && !v.classList.contains('drag')) return; e.preventDefault(); e.stopPropagation(); const n = wheelSteps(v, e); if (!n) return; v._wheel(-n, e); }, {passive:false});
+        v.addEventListener('dblclick', () => set(q.d));
+        v.addEventListener('contextmenu', e => valMenu(e, q.l, {reset:() => set(q.d), type:typeIt}));
         dkFbVals.push(() => { const g = getF(); if (g && document.activeElement !== v && !v.classList.contains('drag')) v.textContent = show(g[q.k]); });
       }
       col.dataset.k = k; bar.append(col);
@@ -27994,6 +28068,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [381, '3 Nov', ['Every slider, fader and value now works the same with a mouse: drag from where it is (the Mixer’s faders and the master OUT bar no longer jump to the click), Shift for fine and Ctrl/⌘ for big moves at any point in the drag, double-click or Alt-click to reset, right-click for Reset / Type a value. A double-click on a slider’s number resets it now; Type a value… is in its right-click menu.', 'The wheel moves the fader or value the mouse rests on (it gets an outline), also on the Mixer, the strip fader, the FX bar and in the …pump windows; Shift+wheel is fine, Ctrl/⌘+wheel big steps. The strip fader’s arrow keys: Shift fine, Ctrl/⌘ big.']],
   [380, '3 Nov', ['Mouse fixes: on a Mac a Ctrl+click is a right-click everywhere (it used to drag on Arrange, sliders, faders and pads); with one top menu open, one click or just moving onto another opens it; a middle-click on the Song grid mutes a block, as on Arrange; the wheel moves a phrase a row a notch, and Ctrl+wheel (a pinch) no longer moves the cursor.', 'Pattern view: a right-click acts on the cell you clicked. Arrange scrolls sideways with a trackpad swipe when zoomed in. Sliders never show the browser’s own menu.', '…chains and …waves: sliders work like the rest of the app (drag from where they are, Shift fine, Alt-click resets); right-click a cable to remove it; a cable let go outside the editor no longer sticks; a right-click on a jack doesn’t start a cable; a middle-drag pans over modules too.']],
   [379, '3 Nov', ['Arrange turns its pages when the playhead runs off it with FOLLOW OFF too. While you work in Arrange it waits until you’ve left it alone for a minute, then follows.']],
   [378, '3 Nov', ['GAT 00 stops the step gate (it opens until the next GAT); the slot’s CUSTOM steps are GAT 10. Older songs’ GAT 00 are rewritten GAT 10, so they sound as before.', 'EDIT OFF: the Thunder Plus logo gets an orange ring (in edit mode it looks as normal); the EDIT OFF words on the tab and the corner are gone. Click the logo (or Esc) to switch.']],
@@ -29048,7 +29123,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
      is the shared window kit (sets PumpFX.openHook); multiband.js what BAND, WIDE and HEAT share (load it before them);
      one file per plugin (docs/PUMP-FX.md, "The pop-up kit"). A type without a file says its window comes later. Add new
      ones here, in sw.js FILES, with ?v= like these. -->
-<script src="pump/ui/kit.js?v=5"></script>
+<script src="pump/ui/kit.js?v=6"></script>
 <script src="pump/ui/eq.js?v=2"></script>
 <script src="pump/ui/comp.js?v=1"></script>
 <script src="pump/ui/limit.js?v=1"></script>

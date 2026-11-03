@@ -129,7 +129,7 @@ test('sources: the per-track graph, PRE feeds, master OUT live and in renders, t
   assert.match(src, /else if \(c\.y === 0\) S\.mix\[c\.x\]\.trim = v;/, 'typed hex on the first row is TRIM');
   assert.match(src, /if \(c\.y === 0\) m\.trim = f\.trim;/, 'Delete resets TRIM');
   assert.match(src, /c\.mx = clamp\(\(c\.mx \|\| 0\) \+ dx, 0, 2\)/, 'MASTER, MASTERING, OUT');
-  assert.match(src, /S\.mix\[D\.t\]\.vol = v;/, 'the meter\'s bar is still VOL');
+  assert.match(src, /mfSet\(D\.t, v\);/, 'the meter\'s bar is still VOL'); assert.match(src, /function mfSet\(t, v\)\{[^\n]*S\.mix\[t\]\.vol = v;/, 'mfSet sets VOL');
   assert.match(src, /function mixOutBar\(\)\{/, 'the OUT bar on the master meter');
   assert.match(src, /e\.target\.closest\('\.mfbar:not\(\.mobar\)'\)/, 'the track bars leave the OUT bar alone');
   assert.match(src, /\{l:'MASTER OUT', get:\(\) => S\.mout == null \? 255 : S\.mout,/, 'Project → MASTER OUT');

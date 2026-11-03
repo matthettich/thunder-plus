@@ -116,6 +116,33 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (8): one rule for value controls (build 381)
+
+Owner's calls from the mouse audit. Helpers next to `sliderOk` (SLIDER MOUSE): `dragMul(e)` (Shift 0.1, Ctrl/⌘ held 4, read
+on every move), `resetClick(e)` (Alt, or ⌘ on a Mac / Ctrl elsewhere, left button, not touch), `valMenu(e, title, {reset,
+type, learn, more})` (sxMenu: Reset to default / Type a value… / Learn), `parseLevel(txt, fromDb)` (hex 00–FF or dB),
+`wheelBig(e)` (⌘ on a Mac; Ctrl elsewhere only for a real notch ≥ 50 px, so a pinch stays a zoom).
+- **Host sliders:** Ctrl/⌘ held mid-drag ×4; wheel big steps; a double-click on the readout now resets (typing is in the
+  right-click menu; touch double-tap still types). Sliders without a menu of their own (strip PAN, Perform, tuning…) get a
+  right-click Reset (document contextmenu; makeRow's menu marks `e._valMenu`).
+- **WHEEL FOCUS** takes any `[data-wheel]` element with `el._wheel(d, e)` (d > 0 = up) as well as ranges: the Mixer's VOL
+  bars and OUT bar (4 a notch, Shift 1, big 16), the strip fader, the FX bar's values (their Alt+wheel / held-button wheel
+  stays and stops propagation).
+- **Mixer VOL faders / master OUT bar:** relative (`mfY` / `mfVol`, `moX` / `moVal` map level ↔ place; the drag moves a
+  virtual place `vy` / `vx` by the mouse's movement × dragMul), Alt/⌘-click resets, right-click Reset / Type (`mfType`,
+  `moType`). **Strip fader:** cap relative, track click jumps (as before), dragMul re-read each move, Alt/⌘-click resets,
+  right-click menu, arrows Shift 1 / Ctrl·⌘ 16. **FX bar values:** relative from where they are with dragMul, Alt/⌘-click
+  resets, right-click Reset / Type.
+- **…pump windows (kit.js v=6):** Dial / Row add each move to the unrounded value (`dragMul(m)`), so Shift / Cmd mid-drag
+  never jump; right-click on a value control = in-window menu Reset / Type a value…; mouse double-click resets (touch
+  double-tap and long-press still type); the wheel takes the control the mouse rested on 350 ms (`hoverC` / `wheelC`, outlined
+  in draw); a pinch never changes a value; Cmd+wheel big; header drag left button only.
+- Help's "Sliders, faders and values" paragraph, the FX bar info and the slider / FX value titles say so.
+- Tests: usability "one rule for value controls (3 Nov)", the Phase 2 slider check and gain-staging's VOL check updated;
+  119/119. Headless: pump Dial arithmetic, VOL fader (no jump, Shift a tenth, Alt-click, menu, wheel only after the rest),
+  OUT bar, typed levels, a synth slider (Ctrl ×4, readout double-click resets, menu with Learn), FX bar values, strip fader.
+- Not done: the meter-row / Arrange header double-click to name still mutes and unmutes first (the click mutes at once).
+
 ## 3 Nov (7): mouse audit, the bug list (build 380)
 
 From the 3 Nov mouse audit (see "3 Nov (6)" for the owner's calls). Each change has a "3 Nov" / "mouse audit" comment.
