@@ -77,6 +77,7 @@ body.edoff #tGrid{box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--rec, #d030
 body.edoff.tvph .tscr .tgrid span.cur{background:transparent !important; color:inherit !important; outline:2px dashed var(--rec, #d0302a) !important; outline-offset:-2px}
 body.edoff.tvph .tscr .tgrid{opacity:.72}
 body.edoff.tvph .ttabs button.on::after{content:' · EDIT OFF'; color:var(--rec, #d0302a); font-weight:700}
+body.edoff #tScr > .thd, body.edoff #tScr .thd{padding-right:118px}   /* the tag sat on the header's right-aligned subtitle (FX: NO EFFECTS) */
 body.edoff #tScr{position:relative} body.edoff #tScr::after{content:'EDIT OFF · Esc'; position:absolute; top:4px; right:10px; z-index:5; font:600 11px var(--mono, monospace); letter-spacing:.06em; padding:2px 6px; background:var(--rec, #d0302a); color:#fff; pointer-events:none}
 .rprog .askbox{min-width:min(360px, 86vw)} .rpbar{height:14px; border:1px solid var(--line); margin:12px 0 6px; background:var(--panel2, transparent)} .rpbar i{display:block; height:100%; width:0; background:var(--ink); transition:width .15s linear} .rppct{font-variant-numeric:tabular-nums; font-size:var(--fs-3); text-align:right; margin-left:auto} .rprow{display:flex; align-items:center; gap:10px}
 #bFile, #bEdit, #bView, #bAud, .top #bSet{min-height:34px; padding:0 12px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; border:1px solid var(--line); background:var(--panel); white-space:nowrap}
@@ -288,6 +289,7 @@ body:not(.nowv) .wvMobNote{display:none}
 .note{color:var(--muted); font-size:var(--fs-3); line-height:1.45; margin:0; max-width:68ch}
 
 .row{display:grid; grid-template-columns:70px minmax(0,1fr) 64px; align-items:center; gap:6px; font-size:var(--fs-3); min-height:30px}
+@media (min-width:1100px){ .sec .row{grid-template-columns:96px minmax(0,1fr) 60px} }   /* fit and finish, 2 Nov: Noise filter, Tone level… were cut to 'Noise fi…' on a computer */
 .row label{color:var(--muted); user-select:none; -webkit-user-select:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:default}
 .row output{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
 .row output:hover{background:var(--panel2)}
