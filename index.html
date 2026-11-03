@@ -1488,6 +1488,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkFxBar .dkfc .fr{padding:0 8px; line-height:1.55}
 #dkFxBar .dkfc .fr b{opacity:1; color:var(--muted)}
 #dkFxBar .dkfc .fr span{font-weight:700}
+#dkFxBar .dkfc .fr.sel{background:var(--ink); color:var(--inv)} #dkFxBar .dkfc .fr.sel b{color:inherit; opacity:.75}
 #dkFxBar .dkfc .fviz{flex:1 1 0; min-height:0; position:relative; margin:0 6px 6px}
 #dkFxBar .dkfc .fviz canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
 #dkFxBar .dkfc.off .fviz{opacity:.4}
@@ -23231,7 +23232,7 @@ function deckFx(){
 /* FX BAR: eight columns, one per slot: ● on/off, the effect's name (a click opens it on the FX screen), every value as text
    (as the FX screen lists them): drag up or down, Alt+wheel a step, double-click its default, right-click to type. A thin
    meter under each name shows the slot's level (where its effect has one), else how much of the slot is on. */
-let dkFbSig = '', dkFbVals = [];
+let dkFbSig = '', dkFbVals = [], dkFbSel = '';   // dkFbSel: the value last clicked (track:slot:param), highlighted
 function deckFxBar(){
   const mst = dkMst(), t = mst ? NT : dkTrack(), FA = () => (mst ? S.mfx : S.tfx[dkTrack()]) || [], A = FA();
   $('dkFxT').textContent = mst ? 'FX · MASTER' : `FX · TRACK ${d2(t + 1)}`;
@@ -23255,6 +23256,9 @@ function deckFxBar(){
       const getF = () => FA()[k];
       for (const q of D.ps){
         const r = el('div', 'fr'), lb = el('b', null, q.l), v = el('span'); r.append(lb, v); b.append(r);
+        const selK = t + ':' + k + ':' + q.k; if (dkFbSel === selK) r.classList.add('sel');
+        // PICKED VALUE (owner, 2 Nov): a click on a value (or its label) highlights the row, so you can see what you are editing
+        r.addEventListener('pointerdown', () => { dkFbSel = selK; for (const x of bar.querySelectorAll('.fr.sel')) x.classList.remove('sel'); r.classList.add('sel'); });
         const show = x => q.names ? (q.names[x] ?? String(x)) : (q.tpl || q.band) ? q.fmt(x, getF()) : q.fmt(x);
         const set = x => { const g = getF(); if (!g) return; x = clamp(Math.round(x), q.min, q.max); if (x === g[q.k]) return; g[q.k] = x; if (isPumpT(g.type)) delete g.pname; fxChanged(mst ? NT : dkTrack()); v.textContent = show(x); };
         v.title = q.l + ': drag up or down (Shift: fine) · Alt+wheel · double-click: default · right-click: type a value';
@@ -23263,7 +23267,8 @@ function deckFxBar(){
           const mv = ev => set(x0 + (y0 - ev.clientY) / per * (ev.shiftKey ? 0.25 : 1));
           const up = () => { v.classList.remove('drag'); v.removeEventListener('pointermove', mv); v.removeEventListener('pointerup', up); v.removeEventListener('pointercancel', up); };
           v.addEventListener('pointermove', mv); v.addEventListener('pointerup', up); v.addEventListener('pointercancel', up); });
-        v.addEventListener('wheel', e => { if (!e.altKey) return; e.preventDefault(); const n = wheelSteps(v, e); if (!n) return; const g = getF(); if (g) set(g[q.k] - n * (q.max - q.min > 64 && !q.names ? Math.max(1, Math.round((q.max - q.min) / 64)) : 1)); }, {passive:false});
+        // the wheel changes it with Alt held, or while the mouse button is held on it (owner, 2 Nov: click and hold, then scroll)
+        v.addEventListener('wheel', e => { if (!e.altKey && !(e.buttons & 1) && !v.classList.contains('drag')) return; e.preventDefault(); const n = wheelSteps(v, e); if (!n) return; const g = getF(); if (g) set(g[q.k] - n * (q.max - q.min > 64 && !q.names ? Math.max(1, Math.round((q.max - q.min) / 64)) : 1)); }, {passive:false});
         v.addEventListener('dblclick', () => set(q.d));
         v.addEventListener('contextmenu', async e => { e.preventDefault(); const g = getF(); if (!g) return;
           const a = await askText({title:q.l + ' (' + q.min + '–' + q.max + ')', body:'Now ' + show(g[q.k]) + '. A number from ' + q.min + ' to ' + q.max + '.'}, String(g[q.k]), 6, 'Set'); if (a == null) return;
