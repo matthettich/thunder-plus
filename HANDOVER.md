@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.77** (3 Nov 2026; owner: "let's push to main and build"; Run workflow through the API with version 1.2.77, from `main`
+  after merging `beta` at build 403): the Table engine's Load wavetable… (402) and the 30 AKWF starter tables (403).
 - **v1.2.76** (3 Nov 2026; owner: "merge and build desktop"; from `main` after merging `beta` at build 401): side panel
   instrument names in full, the Harmonizer's voices in the pitch animation.
 - **v1.2.75** (3 Nov 2026; owner: "push a new merge and desktop build"; Run workflow through the API with version 1.2.75,
