@@ -47,6 +47,9 @@ Keep this file up to date at the end of a work session.
 
 ## Before a commercial release (standing checklist: keep it current, read it before selling)
 
+- **Vintage sampler model names** (3 Nov): the `vsamp` effect's MODEL list (`VSampCore.MODELS`: SP-1200, SP-12, MPC60, SP-202 grades,
+  Emulator II) and its presets (`FX_FACTORY.vsamp`) name the machines. Rename to neutral names ("12-bit drum machine 26k"…) before
+  selling; the DSP is original.
 - **Skin and preset names that name products or people** (2 Nov): the Hardware skins (Vintage MPC, Nord red, 808, 909,
   Dr. Sample SP-202), Wes Anderson, TE, Braun, Koss, and the Hack / Owls preset groups. Fine for the owner's own use;
   rename to neutral names (e.g. "Grey sampler", "Red keys") before selling. The skins use colour palettes only, no logos.
@@ -115,6 +118,23 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
+
+## 3 Nov (10): Vintage sampler effect (build 383)
+
+Owner: vintage sampler effects in the degrade (Drive and lo-fi) group, SP-1200, MPC60, SP-202 and so on, "including bit depth".
+- **One effect, `vsamp` (VSMP, id 103, plain JS `VSampCore`)** with MODEL: SP-1200 (26.04 kHz, 12-bit, no anti-alias),
+  SP-12 (27.5 kHz, 12-bit, none), MPC60 (40 kHz, 12-bit, soft converter clip), SP-202 HI-FI / STANDARD / LO-FI 1 / LO-FI 2
+  (31.25 / 15.63 / 7.81 / 3.91 kHz, the grades from Sound On Sound's review; 16-bit), Emulator II (27.78 kHz, 8-bit µ-law
+  style companding). Rates and bits are the published ones; filters, drive and noise are by ear (not measured).
+- Chain per channel: DRIVE (±12 dB into the converter, the level compensated after) → the model's anti-alias 2-pole (or
+  none) → clip (hard, or tanh for the MPC60) → sample and hold at model rate × RATE (25–100 %) with quantising → FILTER (0 =
+  raw ZOH, else 24 dB/oct from 0.48 × rate down 3.2 octaves) → hiss and 60 Hz hum (NOISE) → DC block → MIX.
+- Wired like the other JS effects: TFX entry (after degrade), FX_GROUP, the picker list, the tfx worklet branch (`c.t ===
+  103`) and its Blob (`VSampCore.toString()`), `FX_FACTORY.vsamp` presets; `node tools/make-core.mjs` re-run (seq-core's map).
+  Track / bus / master FX only (not a pad effect).
+- Checked headless: each model's converter runs at its rate (counted), 12-bit steps, the level stays put across models, it
+  is in the picker's group, and it plays on a track with no worklet failure. Not listened to against the hardware.
+- Commercial list: the model names (added above).
 
 ## 3 Nov (9): Song / Arrange calls, bus outline (build 382)
 

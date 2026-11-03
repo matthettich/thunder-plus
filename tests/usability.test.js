@@ -325,3 +325,14 @@ test('owner calls (3 Nov): Song Alt-drag copies, Arrange Ctrl-click picks / Ctrl
   assert.match(src, /TRACK NUMBERS \(owner, 3 Nov\)/, 'Song track numbers mute');
   assert.match(src, /\.tagrid b\.bus\{outline:1px solid/, 'bus outline');
 });
+
+test('vintage sampler (3 Nov): a JS track effect wired into the table, groups, worklet and its Blob', () => {
+  const src = H.read('index.html');
+  assert.match(src, /class VSampCore \{/, 'the core');
+  assert.match(src, /vsamp:\{n:'VSMP'[^\n]*id:103, ps:\[/, 'the table entry');
+  assert.match(src, /vsamp:'Drive and lo-fi'/, 'its group');
+  assert.match(src, /'cab', 'tube', 'vsamp',/, 'in the picker');
+  assert.match(src, /if \(c\.t === 103\)\{[^\n]*\n[^\n]*new VSampCore\(sampleRate\)/, 'the worklet makes it');
+  assert.match(src, /VSampCore\.toString\(\)/, 'and has its code');
+  assert.match(H.read('core/seq-core.js'), /"vsamp":f =>/, 'the audio-thread core knows its map');
+});
