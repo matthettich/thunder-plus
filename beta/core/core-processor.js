@@ -2,54 +2,221 @@
    This file is appended to the declarations tools/make-core.mjs copies out of index.html (makeSeq and what it reads), and
    the whole is core/seq-core.js, loaded with audioWorklet.addModule. Edit this file, then run node tools/make-core.mjs.
 
+   Phase 2b: the core steps the song itself (live, as the page's pump did) and plays every note of a rendered pad on its
+   own sampler, at the exact sample, so nothing the page's thread does can make those notes late. Everything else (live
+   engines, SoundFonts, MUT / GEN variations, effect and mixer commands, MIDI) goes up to the page with each row, booked
+   LEAD ahead as before, and the page's player plays it. A note the core plays is sent up too, marked core:true: the page
+   lets its own voices on that track go (mono takeover, chokes) and does the rest of its bookkeeping, without sounding it.
+
    Messages in (from the page, node.port):
-     {op:'load', S, vars}        the song (S) and the few page settings the sequencer reads (vtrk, NSLOT, TFX: coreTfx())
-     {op:'test', id, mode, max, opt}  run the sequencer at once (sim, seeded random) and post every row back: the parity
-                                 check against the page's own makeSeq (tools/seq-golden.mjs --core)
-     {op:'play', mode, row, loop, t} start: rows are stepped on the audio thread as audio time reaches them
-     {op:'stop'}
+     {op:'load', S, vars}        the song (S) and what the sequencer reads from the page (vtrk, NSLOT, TFX: coreTfx())
+     {op:'song', S}              the song changed (an edit): copied into the core's song in place
+     {op:'kit', kv}              per pad: {choke, syn, rel, live, sf} (what decides whether the core can play it)
+     {op:'buf', pad, data, sr}   a pad's render (mono), or data:null when it has none
+     {op:'play', gen, mode, o, t0, rs}  start: o as makeSeq takes it; rs {ref, row, step}: RESUME (the page played that step)
+     {op:'stop', at}  ·  {op:'loop', l}  ·  {op:'bpm', v}  ·  {op:'perf', xf, mac, fill}  ·  {op:'lxp', st}  ·  {op:'lead', s}
+     {op:'test', id, mode, max, opt}  run the sequencer at once (sim, seeded random): tools/seq-golden.mjs --core
    Messages out:
-     {op:'ready'}  ·  {op:'test', id, rows}  ·  {op:'rows', rows}  (live: each row's events, booked LEAD ahead)  ·
+     {op:'ready', v}  ·  {op:'rows', rows, time, bpm, tks, alive}  ·  {op:'end'}  ·  {op:'test', id, rows}  ·
      {op:'error', where, message} */
 
-const CORE_V = 1;
+const CORE_V = 2;
 const coreNum = v => Math.round(v * 1e6) / 1e6;
-// A row's events as plain data (the same shape as the page's test hook writes, so the streams compare exactly)
 const corePlain = e => { const o = {}; for (const k of Object.keys(e).sort()){ const v = e[k];
   if (typeof v === 'number') o[k] = coreNum(v); else if (typeof v === 'string' || typeof v === 'boolean' || v === null) o[k] = v;
   else if (Array.isArray(v) && v.every(x => typeof x === 'number')) o[k] = v.map(coreNum); } return o; };
-// The test hook's seeded Math.random (same sequence as index.html's __seqTest.run)
 function coreSeeded(f){
   const R = Math.random; let s = 0x2545F491;
   Math.random = () => { let x = s += 0x6D2B79F5; x = Math.imul(x ^ x >>> 15, x | 1); x ^= x + Math.imul(x ^ x >>> 7, x | 61); return ((x ^ x >>> 14) >>> 0) / 4294967296; };
   try { return f(); } finally { Math.random = R; }
 }
 
+// The core's own pad renders: what ensure / ensurePlay give the sequencer (chops) and the sampler.
+const coreBufs = new Map();   // pad → {data, sr}
+ensurePlay = pad => coreBufs.get(pad) || null;
+ensure = pad => coreBufs.get(pad) || null;
+
+/* AUTOMATION: the part of AudioParam the page's player uses (setValueAtTime, linearRampToValueAtTime, setTargetAtTime,
+   cancelScheduledValues), evaluated per sample. A curve (vibrato) is a function of time over [t, t + d]. */
+class Auto {
+  constructor(v){ this.v0 = v; this.ev = []; }
+  ins(e){ const A = this.ev; let i = A.length; while (i > 0 && A[i - 1].t > e.t) i--; A.splice(i, 0, e); }
+  set(v, t){ this.ins({k:0, t, v}); }
+  lin(v, t){ this.ins({k:1, t, v}); }
+  target(v, t, tc){ this.ins({k:2, t, v, tc:Math.max(1e-5, tc)}); }
+  curve(fn, t, d){ this.ins({k:3, t, d, fn}); }
+  cancel(t){ this.ev = this.ev.filter(e => e.t < t); }
+  at(t){
+    let v = this.v0, pt = 0, st = null;   // st: a target in progress {from, t, to, tc}
+    const val = x => st ? st.to + (st.from - st.to) * Math.exp(-(x - st.t) / st.tc) : v;
+    for (const e of this.ev){
+      if (e.k === 1){ if (t < e.t){ const a = val(pt); return e.t > pt ? a + (e.v - a) * (t - pt) / (e.t - pt) : e.v; } v = e.v; st = null; pt = e.t; continue; }
+      if (t < e.t) return val(t);
+      if (e.k === 0){ v = e.v; st = null; pt = e.t; }
+      else if (e.k === 2){ st = {from:val(e.t), t:e.t, to:e.v, tc:e.tc}; pt = e.t; }
+      else if (e.k === 3){ if (t < e.t + e.d) return e.fn(t); v = e.fn(e.t + e.d); st = null; pt = e.t + e.d; }
+    }
+    return val(t);
+  }
+}
+
+const POLY = 4;
 class ThunderCore extends AudioWorkletProcessor {
   constructor(){
     super();
-    this.seq = null; this.LEAD = 0.25;
+    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false;
     this.port.onmessage = e => { try { this.msg(e.data || {}); } catch(err){ this.port.postMessage({op:'error', where:(e.data && e.data.op) || '?', message:String(err && err.stack || err)}); } };
     this.port.postMessage({op:'ready', v:CORE_V});
   }
   msg(d){
-    if (d.op === 'load'){ S = d.S; if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } busPlanH = null; busPlanVal = null; return; }
-    if (d.op === 'test'){
-      const o = d.opt || {}, rows = coreSeeded(() => { const out = [];
-        const sq = makeSeq(S, d.mode || 'song', {row:o.row || 0, loop:o.loop || null, once:!o.loop, sim:true});
-        for (let n = 0; sq.alive() && n < (d.max || 20000); n++){ const r = sq.step(); out.push({t:coreNum(r.t), evs:r.evs.map(corePlain)}); }
-        return out; });
-      this.port.postMessage({op:'test', id:d.id, rows}); return;
+    switch (d.op){
+      case 'load': S = d.S; if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } busPlanH = null; busPlanVal = null; return;
+      case 'song': { if (!S){ S = d.S; return; } for (const k of Object.keys(S)) if (!(k in d.S)) delete S[k]; Object.assign(S, d.S); busPlanH = null; busPlanVal = null; return; }   // in place: the running sequencer holds this object
+      case 'kit': this.kv = d.kv || []; kit = {voices:this.kv}; return;
+      case 'buf': if (d.data) coreBufs.set(d.pad, {data:d.data, sr:d.sr}); else coreBufs.delete(d.pad); return;
+      case 'test': {
+        const o = d.opt || {}, rows = coreSeeded(() => { const out = [];
+          const sq = makeSeq(S, d.mode || 'song', {row:o.row || 0, loop:o.loop || null, once:!o.loop, sim:true});
+          for (let n = 0; sq.alive() && n < (d.max || 20000); n++){ const r = sq.step(); out.push({t:coreNum(r.t), evs:r.evs.map(corePlain)}); }
+          return out; });
+        this.port.postMessage({op:'test', id:d.id, rows}); return; }
+      case 'play': return this.play(d);
+      case 'stop': this.seq = null; this.stopAll(d.at == null ? currentTime : d.at); return;
+      case 'loop': if (this.seq) this.seq.setLoop(d.l || null); return;
+      case 'bpm': if (this.seq) this.seq.bpm = d.v; return;
+      case 'perf': if (!perfLive.init) perfLiveInit(); if (d.xf != null) perfLive.xf = d.xf; if (d.mac) perfLive.mac = d.mac.slice(); if (d.fill != null) perfLive.fill = !!d.fill; return;
+      case 'lxp': lxp.st = d.st | 0; return;
+      case 'stats': this.port.postMessage({op:'stats', id:d.id, n:this.nN || 0, late:this.nLate || 0, worst:this.worst || 0, voices:this.alive.size, lead:this.leadMin == null ? null : this.leadMin}); this.nN = this.nLate = this.worst = 0; this.leadMin = null; return;
+      case 'lead': this.LEAD = Math.max(0.05, Math.min(2, +d.s || 0.25)); return;
     }
-    if (d.op === 'play'){ this.seq = makeSeq(S, d.mode || 'song', {row:d.row || 0, loop:d.loop || null, once:!d.loop, sim:true}); this.seq.time = d.t; this.seq.base = null; return; }
-    if (d.op === 'stop'){ this.seq = null; return; }
   }
-  process(){
-    const s = this.seq; if (!s) return true;
-    const rows = []; let n = 0;
-    while (s.alive() && s.time < currentTime + this.LEAD && n++ < 64){ const r = s.step(); rows.push({t:r.t, evs:r.evs, pos:r.pos, tks:r.tks, line:r.line, bpm:s.bpm}); }
-    if (rows.length) this.port.postMessage({op:'rows', rows});
-    if (!s.alive()) this.seq = null;
+  play(d){
+    this.stopAll(currentTime);
+    const seq = makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}));
+    // RESUME: run silently up to the step the song stopped on; the page played that step, the core carries on after it
+    if (d.rs){ let g = 0, first = null;
+      while (seq.alive() && g++ < 4096){ const r = seq.step(), p = r.pos && r.pos[d.rs.ref]; if (p && (p.row > d.rs.row || (p.row === d.rs.row && p.step >= d.rs.step))){ first = r; break; } }
+      if (first){ const dt = d.t0 - first.t; seq.base += dt; seq.time += dt; if (seq.btT != null) seq.btT += dt; }
+      else seq.time = d.t0; }
+    else seq.time = d.t0;
+    this.seq = seq; this.ended = false; this.gen = d.gen | 0;
+  }
+
+  /* ---- the sampler: the page player's rendered-pad path (makePlayer: startNote, kill, pitchMods, modVoice, play) ---- */
+  T(t){ return this.vs[t] || (this.vs[t] = []); }
+  relTc(v){ return v.syn ? v.rel / 4.6 : 0.004; }
+  live1(v, at){ return v && !v.ended && !(v.stopAt != null && v.stopAt <= at); }
+  kill(v, at, tc = 0.004){
+    if (!v || v.ended || (v.stopAt != null && v.stopAt <= at)) return;
+    v.stopAt = at; at = Math.max(at, currentTime);
+    v.f.cancel(at); v.f.set(1, at); v.f.target(0, at, tc); v.end = Math.min(v.end, at + tc * 12);
+  }
+  pitchMods(v, t, base, ev){
+    const pr = v.r;
+    if (ev.arp){ for (const [tt, mul] of ev.arp) pr.set(base * mul, Math.max(tt, t)); if (ev.arp.length) pr.set(base, ev.arp[ev.arp.length - 1][0] + (ev.arp.length > 1 ? ev.arp[1][0] - ev.arp[0][0] : 0.02)); }
+    else if (ev.bend){ pr.set(base, t); pr.lin(base * ev.bend.mul, ev.bend.t1); v.rate = base * ev.bend.mul; }
+    else if (ev.vib && ev.vib.dep){
+      const d = Math.max(0.02, ev.vib.t1 - t), hz = 1 + ev.vib.spd * 1.2, st = ev.vib.dep / 15 * 1.5, t0 = t + 0.0005, dd = d - 0.001;
+      pr.set(base, t); pr.curve(x => base * Math.pow(2, st * Math.sin(2 * Math.PI * hz * d * Math.min(1, Math.max(0, (x - t0) / dd))) / 12), t0, dd);
+    }
+  }
+  modVoice(v, ev){
+    if (ev.gain != null) v.g.set(ev.gain, ev.t);
+    if (ev.pan != null) v.pn.set(Math.max(-1, Math.min(1, (ev.pan - 128) / 127)), ev.t);
+    if (ev.mul != null){ v.rate = v.base * ev.mul; v.r.set(v.rate, ev.t); }
+    this.pitchMods(v, ev.t, v.rate, ev);
+    if (ev.cut != null) this.kill(v, ev.cut);
+    if (ev.rel != null) this.kill(v, ev.rel, v.syn ? this.relTc(v) : 0.05);
+  }
+  // Can the core play this note itself? A rendered pad (not a live engine, a SoundFont or a MUT / GEN variation) whose
+  // render the core holds.
+  mine(ev){
+    const k = this.kv[ev.pad]; if (!k || k.live || k.sf) return false;
+    if ((ev.vk || ev.tw) && !ev.st) return false;
+    if (ev.st) return false;   // stretched (SYNC) notes: the page's stretch cache, for now
+    return coreBufs.has(ev.pad);
+  }
+  // A note the page plays: the core's voices on the track still give way to it (mono takeover, chokes), as they would
+  // to any note in one player.
+  take(ev){
+    const T = this.T(ev.track), kv = this.kv[ev.pad];
+    for (let k = T.length - 1; k >= 0; k--) if (!this.live1(T[k], ev.t)) T.splice(k, 1);
+    if (!ev.poly){ for (const v of T) this.kill(v, ev.t, v.syn ? Math.min(this.relTc(v), 0.05) : 0.004); T.length = 0; }
+    const ck = kv ? kv.choke : 0;
+    if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of this.T(k)) if (v.choke === ck) this.kill(v, ev.t);
+  }
+  startNote(ev){
+    const c = coreBufs.get(ev.pad), kv = this.kv[ev.pad]; if (!c || !kv) return;
+    { const ld = ev.t - currentTime; this.nN = (this.nN || 0) + 1; if (ld < 0){ this.nLate = (this.nLate || 0) + 1; this.worst = Math.max(this.worst || 0, -ld); } if (this.leadMin == null || ld < this.leadMin) this.leadMin = ld; }   // timing stats ({op:'stats'})
+    const T = this.T(ev.track);
+    for (let k = T.length - 1; k >= 0; k--) if (!this.live1(T[k], ev.t)) T.splice(k, 1);
+    if (!ev.poly){ for (const v of T) this.kill(v, ev.t, v.syn ? Math.min(this.relTc(v), 0.05) : 0.004); T.length = 0; }
+    else while (T.length >= POLY) this.kill(T.shift(), ev.t, 0.006);
+    const ck = kv.choke || 0;
+    if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of this.T(k)) if (v.choke === ck) this.kill(v, ev.t);
+    const data = ev.rev ? (c.rev || (c.rev = c.data.slice().reverse())) : c.data, dur = data.length / c.sr;
+    const r = new Auto(ev.rate), g = new Auto(ev.gain), f = new Auto(1), pn = new Auto(Math.max(-1, Math.min(1, (ev.pan - 128) / 127)));
+    if (ev.slide && ev.slide.dur > 0){ r.set(ev.slide.from, ev.t); r.lin(ev.rate, ev.t + ev.slide.dur); }
+    const t0n = Math.max(ev.t, currentTime), hz = x => ((x >> 4) || 1) * (this.seq ? this.seq.bpm : S.bpm) / 60, dep = x => (x & 15) / 15;
+    let trm = null, apn = null;
+    if (ev.fdi > 0){ g.set(0, t0n); g.lin(ev.gain, t0n + ev.fdi); }
+    if (ev.trm && dep(ev.trm) > 0){ const k = dep(ev.trm) / 2; trm = {hz:hz(ev.trm), d:ev.gain * k, t:t0n}; if (!(ev.fdi > 0)) g.v0 = ev.gain * (1 - k); }
+    if (ev.apn && dep(ev.apn) > 0) apn = {hz:hz(ev.apn), d:dep(ev.apn), t:t0n};
+    const syn = !!kv.syn, v = {data, sr:c.sr, r, g, f, pn, trm, apn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn ? kv.rel || 0 : 0, track:ev.track, end:Infinity, pos:0, t0:0};
+    if (!ev.slide) this.pitchMods(v, ev.t, ev.rate, ev);
+    const off = ev.ofsSec != null ? (ev.rev ? Math.max(0, dur - ev.ofsSec - ev.durSec) : ev.ofsSec) : Math.max(0, Math.min(255, ev.ofs || 0)) / 256 * dur;
+    if (off > 0.0005){ f.set(0, t0n); f.lin(1, t0n + 0.0015); }
+    v.t0 = t0n; v.pos = Math.min(off, Math.max(0, dur - 0.001)) * c.sr;
+    this.alive.add(v);
+    if (ev.cut != null) this.kill(v, ev.cut);
+    if (ev.rel != null) this.kill(v, ev.rel, syn ? this.relTc(v) : 0.05);
+    T.push(v);
+  }
+  // One event, as the page's player.play() does for the ones that touch its voices. Returns true when the core sounded it.
+  ev(ev){
+    if (ev.type === 'stp'){ for (let k = 0; k <= NT; k++) if (ev.all || k === ev.track){ for (const v of this.T(k)) this.kill(v, ev.t, 0.004); this.T(k).length = 0; } return false; }
+    if (ev.type === 'off' && ev.track != null){ const T = this.T(ev.track);
+      if (ev.cols){ for (let k = T.length - 1; k >= 0; k--) if (ev.cols.includes(T[k].col)){ this.kill(T[k], ev.t, this.relTc(T[k])); T.splice(k, 1); } return false; }
+      for (const v of T) this.kill(v, ev.t, this.relTc(v)); T.length = 0; return false; }
+    if (ev.type === 'mod' && ev.track != null){ for (const v of this.T(ev.track)) if (this.live1(v, ev.t)) this.modVoice(v, ev); return false; }
+    if (ev.type !== 'note' || ev.pad == null || ev.track == null) return false;
+    { const I = S && S.insts && ev.ii != null ? S.insts[ev.ii] : null; if (I && (I.mo | 0) === 1) return false; }   // MIDI gear only: the page sends it, nothing sounds here
+    if (this.mine(ev)){ this.startNote(ev); return true; }
+    this.take(ev); return false;
+  }
+  stopAll(at){ for (const v of this.alive) this.kill(v, at); for (const T of this.vs) if (T) T.length = 0; }
+
+  process(inputs, outputs){
+    // 1. step the song up to LEAD ahead: the core books its own notes, the rows go up for the page's part
+    const s = this.seq;
+    if (s){
+      const rows = []; let n = 0;
+      while (s.alive() && s.time < currentTime + this.LEAD && n++ < 64){
+        const r = s.step();
+        for (const e of r.evs) if (this.ev(e)) e.core = true;
+        rows.push({t:r.t, evs:r.evs, pos:r.pos, tks:r.tks, line:r.line, bpm:s.bpm});
+      }
+      if (rows.length) this.port.postMessage({op:'rows', gen:this.gen, rows, time:s.time, bpm:s.bpm, tks:s.tks, base:s.base, btT:s.btT, alive:s.alive()});
+      if (!s.alive() && !this.ended){ this.ended = true; this.port.postMessage({op:'end', gen:this.gen, time:s.time}); }
+    }
+    // 2. sound the voices into their tracks' outputs
+    const N = (outputs[0] && outputs[0][0] && outputs[0][0].length) || 128, sr = sampleRate, dt = 1 / sr;
+    for (const v of this.alive){
+      const out = outputs[v.track]; if (!out || !out[0]){ continue; }
+      const L = out[0], R = out[1] || out[0], D = v.data, len = D.length, inc0 = v.sr / sr;
+      for (let i = 0; i < N; i++){
+        const t = currentTime + i * dt;
+        if (t < v.t0) continue;
+        if (t >= v.end || v.pos >= len - 1){ v.ended = true; break; }
+        const p = v.pos, j = p | 0, x = D[j] + (D[j + 1] - D[j]) * (p - j);
+        let g = v.g.at(t); if (v.trm) g += v.trm.d * Math.sin(2 * Math.PI * v.trm.hz * (t - v.trm.t));
+        let pan = v.pn.at(t); if (v.apn) pan = Math.max(-1, Math.min(1, pan + v.apn.d * Math.sin(2 * Math.PI * v.apn.hz * (t - v.apn.t))));
+        const y = x * g * v.f.at(t), a = (pan + 1) * Math.PI / 4;   // StereoPannerNode, mono in: equal power
+        L[i] += y * Math.cos(a); R[i] += y * Math.sin(a);
+        v.pos += v.r.at(t) * inc0;
+      }
+      if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const k = T.indexOf(v); if (k >= 0) T.splice(k, 1); } }
+    }
     return true;
   }
 }
