@@ -64,6 +64,7 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .setmenu[hidden]{display:none}
 /* MENU HELP off: explanations hidden (tooltips instead) */
 body:not(.menuhelp) .gset .tsr .tsi{display:none}
+body:not(.menuhelp) #gsecProj > p.note{display:none}
 body:not(.menuhelp) :is(#pMaster,#pApp,#pKit,#pSkin,#pMidi,#pExport,#pAudio) .pbody > p.note{display:none}
 body:not(.menuhelp) :is(#pMaster,#pApp,#pKit,#pSkin,#pMidi,#pExport,#pAudio) .bar{cursor:help}
 /* FX SCREEN: the slot being edited, highlighted; a slot dragged to another one */
@@ -1170,6 +1171,8 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tath i[data-t]{cursor:pointer} .tath i.so{background:var(--ar-pl); color:var(--ar-pl-ink, #3d2c00); border-radius:3px}
 .tagrid{flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:3px 0 8px; touch-action:pan-y}
 .tagrid .ar{margin-bottom:2px}
+/* EVERY 4 ROWS (owner, 2 Nov): a grey line above rows 0, 4, 8… so the song reads in groups of four patterns */
+.tagrid .ar.q4{box-shadow:0 -2px 0 0 color-mix(in srgb, var(--muted, #777) 55%, transparent); margin-top:3px}
 .tagrid .rn{font-size:var(--fs-1); line-height:var(--arh,16px); color:var(--ar-dim); cursor:pointer}
 .tagrid .rn.r4{color:var(--ar-ink); font-weight:700}
 .tagrid .rn.pl{background:var(--ar-pl); color:var(--ar-pl-ink); border-radius:2px}
@@ -1190,6 +1193,10 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tagrid b.m{background:transparent; box-shadow:inset 0 0 0 1px var(--ar-dim); color:var(--ar-dim); text-decoration:line-through;
   background-image:repeating-linear-gradient(135deg, transparent 0 3px, var(--ar-empty) 3px 5px)}
 .tagrid b.p{background:var(--ar-pl); color:var(--ar-pl-ink); box-shadow:none}
+/* OFF-ONLY BLOCKS (owner, 2 Nov): a block that only stops notes: black with a red stop bar across, plainly not a pattern
+   that plays and not an empty one */
+.tagrid b.o:not(.p){background:var(--ink, #111) !important; color:#ff5a1f !important; box-shadow:inset 0 0 0 1px #ff5a1f}
+.tagrid b.o:not(.p)::after{content:''; position:absolute; left:3px; right:3px; top:50%; height:2px; margin-top:-1px; background:#ff5a1f; pointer-events:none}
 /* PLAYHEAD (owner, 31 Oct: too subtle): the playing blocks also get an outline in the skin's ink (dark on light skins, light
    on dark ones), and the playing row a faint band across every track */
 .tagrid b.p{outline:2px solid var(--ar-pl-ring, var(--ink)); outline-offset:-1px; position:relative; z-index:1}
@@ -8196,6 +8203,26 @@ const ENGINE_GROUPS = [
   ['Voice & bass', [['bass', 'Bass', 'additive bass, live in the tracker'], ['vox', 'Voice', 'a singing voice, a syllable per note']]],
   ['Fonts', [['sf', 'SoundFont', 'a preset of a .sf2 / .sf3 file, General MIDI built in']]],
 ];
+/* ENGINE CATEGORIES (owner, 2 Nov: "reorganize the synth engines into categories that make more sense"): the list above,
+   regrouped by what an engine sounds like rather than where it came from (…pump, LXR-02). Each live version sits beside
+   its rendered one. Anything not named here (a new engine) lands in More, so nothing goes missing. */
+{ const all = new Map(); for (const [, es] of ENGINE_GROUPS) for (const e of es) all.set(e[0], e);
+  const lxr = typeof LxrCore !== 'undefined' ? Object.keys(LxrCore.engines) : [];
+  const G = [
+    ['Layers', ['layers']],
+    ['Drums & percussion', ['tone', 'blip', 'fmdrum', 'skin', 'breath', 'pstrike', 'pstrikel', 'pboing', 'pboingl', 'px0x', 'px0xl', 'plife', 'plifel', ...lxr]],
+    ['Bass', ['acid', 'bass', 'pwob', 'pwobl']],
+    ['Analog', ['pmono', 'pmonol', 'ppoly', 'ppolyl', 'mach', 'drift']],
+    ['Digital, FM & wavetable', ['table', 'phase', 'partials', 'vector', 'chip', 'pgloss', 'pglossl', 'bytebeat']],
+    ['Physical models', ['modal', 'pcoil', 'pcoill', 'scanned', 'strings', 'wind']],
+    ['Keys', ['piano', 'ep', 'organ']],
+    ['Pads & textures', ['swarm', 'porbit', 'porbitl', 'pfreeze', 'pfreezel', 'resynth', 'pfold', 'pfoldl']],
+    ['Voice', ['vox', 'ptract', 'ptractl']],
+    ['SoundFont', ['sf']]];
+  const used = new Set(), out = [];
+  for (const [g, ks] of G){ const es = ks.map(k => all.get(k)).filter(Boolean); es.forEach(e => used.add(e[0])); if (es.length) out.push([g, es]); }
+  const rest = [...all.values()].filter(e => !used.has(e[0])); if (rest.length) out.push(['More', rest]);
+  ENGINE_GROUPS.length = 0; ENGINE_GROUPS.push(...out); }
 let engFit = () => {}, engFitDue = true;
 const engineName = k => { for (const [, es] of ENGINE_GROUPS) for (const e of es) if (e[0] === k) return e[1]; return k; };
 function engineStep(d){
@@ -12346,7 +12373,7 @@ const gsetSecs = () => gsetMode === 'view' ? [['gsecScreen', 'Screen']]
   ...(gsetMode === 'set' ? [] : [GLOBAL_SECS[0]]),
   ...((view === 'waves' || view === 'chains') ? [['gsecPatch', 'Patch']] : []),
   ['gsecProj', 'Project'], ...(gsetMode === 'set' ? [] : [['gsecScreen', 'Screen']]),
-  ...GLOBAL_SECS.slice(1).filter(([id]) => gsetMode !== 'set' || id !== 'pMidi')
+  ...GLOBAL_SECS.slice(1).filter(([id]) => gsetMode !== 'set' || (id !== 'pMidi' && id !== 'pKit'))   // ⚙ on a computer (menu audit, 2 Nov): Kit lives in File ▸ Kit
 ];
 // Every section is shown at once, one under the other with a rule between, as in ...Seeds' Settings menu.
 function showGset(){
@@ -12538,7 +12565,9 @@ function fileItems(){
       null,
       {l:'Drum kits…', f:pickClassicKit}, {l:'Factory drums (pads 1–8)', f:factoryPads, ask:'kit'},
       null,
-      {l:'Clear all kit slots', f:clearKit, ask:'kit'}]},
+      {l:'Clear all kit slots', f:clearKit, ask:'kit'},
+      null,
+      {l:(vtrk ? '✓ ' : '') + 'A voice per track', f:() => { setVtrk(!vtrk); try { $('ckVtrk').checked = vtrk; } catch(e){} }}]},   // (from ⚙'s Kit, 2 Nov)
     ...(deskUpdApi ? [null, {l:'Check for updates…' + (deskUpd && deskUpd.version ? ' (you have ' + deskUpd.version + ')' : ''), f:() => deskUpdApi.check()}] : [])
   ];
 }
@@ -16212,6 +16241,11 @@ const isEmptySect = c => !c || c.every(r => r[0] < 0);
 // blocks that actually play stand out from the empty placeholders.
 const sectHasData = v => { const c = S.chains[v]; return !!c && c.some(r => r[0] >= 0 && !isEmptyPhrase(S.phrases[r[0]])); };
 const isEmptyPhrase = p => !p || p.every(r => r.every(v => v < 0));
+// OFF-ONLY BLOCKS (owner, 2 Nov): a phrase whose only content is note OFFs (in its note columns): a "stop the track here"
+// block. Arrange draws it unlike both a playing block and an empty one.
+// (2 Nov, later: also a phrase with only effect commands, or only OFFs and commands: anything that plays no note)
+const isOffPhrase = p => !!p && !isEmptyPhrase(p) && p.every(r => r.slice(0, NCOL).every(v => v < 0 || v === OFF));
+const sectOffOnly = v => { const c = S.chains[v]; if (!c) return false; const P = c.filter(r => r[0] >= 0).map(r => S.phrases[r[0]]); return P.length > 0 && P.some(isOffPhrase) && P.every(p => isEmptyPhrase(p) || isOffPhrase(p)); };
 const plen = id => id >= 0 && S.plen ? clamp(S.plen[id] || S.dlen || 16, 1, PROWS) : (S.dlen || 16);
 const plpbOf = (Sx, id) => (id >= 0 && Sx.plpb && Sx.plpb[id]) || Sx.lpb || 4;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -19172,7 +19206,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 359;
+const BUILD = 360;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -19698,7 +19732,8 @@ function fxPreApply(t, k, vals, name){
 function fxPresetOpen(t, k){
   const A = t >= NT ? S.mfx : S.tfx[t], f = A && A[k]; if (!f || TFX[f.type].pump) return;
   const list = [{name:'INIT', sec:'DEFAULTS', vals:{}}, ...(FX_FACTORY[f.type] || []).map(([name, vals]) => ({name, sec:'FACTORY', vals})),
-    ...fxPreSongList(f.type).map(p => ({name:p.name, sec:'THIS SONG', vals:p.v, full:true}))];
+    ...fxUserList(f.type).map(p => ({name:p.name, sec:'MY PRESETS', vals:p.v, full:true})),
+    ...fxPreSongList(f.type).filter(p => !fxUserList(f.type).some(u => u.name === p.name)).map(p => ({name:p.name, sec:'THIS SONG', vals:p.v, full:true}))];
   const cur = list.findIndex(p => p.name === f.pname);
   Object.assign(fxp, {open:true, slot:-1, tpre:{t, k, list}, i:Math.max(0, cur)});
   const heads = {}; list.forEach((p, j) => { if (!j || p.sec !== list[j - 1].sec) heads[j] = p.sec; });
@@ -19706,12 +19741,21 @@ function fxPresetOpen(t, k){
 }
 async function fxPresetSave(t, k){
   const A = t >= NT ? S.mfx : S.tfx[t], f = A && A[k]; if (!f) return;
-  const name = await askText({title:'Save as a preset', body:`${fxNameOf(f.type)}: this slot’s settings, kept in this song under a name (› PRESET lists it for every ${fxNameOf(f.type)} slot).`}, f.pname && f.pname !== 'INIT' ? f.pname : '', 40, 'Save');
+  const name = await askText({title:'Save as a preset', body:`${fxNameOf(f.type)}: this slot’s settings under a name. › PRESET lists it under MY PRESETS in every song on this device, and the song keeps a copy.`}, f.pname && f.pname !== 'INIT' ? f.pname : '', 40, 'Save');
   if (name == null || !name.trim()) return;
   const n = name.trim(); S.fxPre = S.fxPre || {}; const L = S.fxPre[f.type] = fxPreSongList(f.type).filter(p => p.name !== n);
   const v = {}; for (const q of TFX[f.type].ps) v[q.k] = f[q.k];
-  L.push({name:n, v}); f.pname = n; saveS(); draw(); toast(`Saved preset “${n}” for ${fxNameOf(f.type)}`);
+  L.push({name:n, v}); f.pname = n;
+  fxUserPut(f.type, n, v);   // MY PRESETS: kept on this device for every song as well
+  saveS(); draw(); toast(`Saved preset “${n}” for ${fxNameOf(f.type)}: in My presets (every song) and in this song`);
 }
+/* MY PRESETS (owner, 2 Nov: "save user presets in the fx"): › SAVE AS PRESET… also keeps the preset on this device, so
+   › PRESET lists it in every song under MY PRESETS (the song keeps its copy too, so it travels with the file). Same name,
+   same effect: replaced. Stored as {type: [{name, v}]}; read through normFxPre's checks. */
+const FXU_K = 'thunderplus-fxuser-v1';
+let fxUser = (() => { try { return normFxPre(JSON.parse(localStorage.getItem(FXU_K) || '{}')); } catch(e){ return {}; } })();
+function fxUserList(type){ const L = fxUser && fxUser[type]; return Array.isArray(L) ? L : []; }
+function fxUserPut(type, name, v){ fxUser[type] = fxUserList(type).filter(p => p.name !== name).concat([{name, v}]); try { localStorage.setItem(FXU_K, JSON.stringify(fxUser)); } catch(e){ toast('My presets couldn’t be saved on this device (storage full?): the preset is in the song.'); } }
 function normFxPre(j){
   const o = {}; if (!j || typeof j !== 'object') return o;
   for (const type of Object.keys(j)) if (TFX[type] && !TFX[type].pump && Array.isArray(j[type]))
@@ -21443,29 +21487,50 @@ const ACID_SCALES = [['Minor', [0, 2, 3, 5, 7, 8, 10]], ['Phrygian', [0, 1, 3, 5
   ['Harmonic minor', [0, 2, 3, 5, 7, 8, 11]], ['Minor pentatonic', [0, 3, 5, 7, 10]], ['Blues', [0, 3, 5, 6, 7, 10]], ['Major', [0, 2, 4, 5, 7, 9, 11]],
   ['Chromatic', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]], ['Root & fifth', [0, 7]], ['Octaves', [0]]];
 const ACID_LANES = [['notes', 'NOTES'], ['oct', 'OCTAVES'], ['acc', 'ACCENTS'], ['slide', 'SLIDES'], ['time', 'TIME']];
-const acidSet = {scale:0, root:0, base:ROOT, density:75, accent:30, slide:25, octave:30, lanes:{notes:true, oct:true, acc:true, slide:true, time:true}};
+const acidSet = {scale:0, root:0, base:ROOT, density:75, accent:30, slide:25, octave:30, style:0, lanes:{notes:true, oct:true, acc:true, slide:true, time:true}};
+/* STYLES (owner, 2 Nov: "patterns that sound more like the Basebot hardware 303 clone"): rules on top of …pump ACID's,
+   after how hardware 303 sequences tend to sit. CLASSIC 303: the root (and its octave) most of the time, minor 3rd / 5th /
+   7th, a chromatic step into the next note now and then, notes on the downbeats more often, accents mostly off the beat,
+   slides mostly into a different note. ROLLING: busy 16ths, octave jumps on the off-steps, accents on the beat, few slides.
+   SQUELCH: more accents and slides, wider jumps. The sliders (density, accents, slides, octaves) still scale each one. */
+const ACID_STYLES = ['…pump ACID', 'Classic 303', 'Rolling', 'Squelch'];
 const ACID_NOTE = 0, ACID_TIE = 1, ACID_REST = 2;
 const acidPc = n => ((n % 12) + 12) % 12, acidOct = n => n >= 12 ? (n >= 24 ? 2 : 1) : (n < 0 ? -1 : 0);
 // The generator, as pump's (notes are semitones from the pattern's C, -12 to 24; `only` limits it to some steps).
 function acidRoll(st, L, lanes, R, rnd, only){
-  const sc = ACID_SCALES[R.scale][1], want = i => !only || only[i];
-  const pick = prev => { const u = rnd(); if (prev >= 0 && u < 0.22) return prev; if (u < 0.45) return 0; if (u < 0.58 && sc.includes(7)) return 7; return sc[Math.floor(rnd() * sc.length)]; };
+  const sc = ACID_SCALES[R.scale][1], want = i => !only || only[i], sty = R.style | 0;
+  const has = d => sc.includes(d);
+  const pick = (prev, i) => { const u = rnd();
+    if (sty === 1){   // CLASSIC 303
+      if (prev >= 0 && u < 0.10) return acidPc(prev + (rnd() < 0.5 ? 1 : -1));   // a chromatic step
+      if (u < 0.50) return 0; if (u < 0.62 && has(3)) return 3; if (u < 0.76 && has(7)) return 7; if (u < 0.84 && has(10)) return 10;
+      return sc[Math.floor(rnd() * sc.length)]; }
+    if (sty === 2){ if (u < 0.62) return 0; if (u < 0.74 && has(7)) return 7; return sc[Math.floor(rnd() * sc.length)]; }   // ROLLING
+    if (sty === 3){ if (prev >= 0 && u < 0.12) return prev; if (u < 0.38) return 0; return sc[Math.floor(rnd() * sc.length)]; }   // SQUELCH
+    if (prev >= 0 && u < 0.22) return prev; if (u < 0.45) return 0; if (u < 0.58 && sc.includes(7)) return 7; return sc[Math.floor(rnd() * sc.length)]; };
+  const dens = i => sty === 2 ? Math.max(R.density, 0.88) : sty === 1 ? clamp(R.density + (i % 4 === 0 ? 0.15 : i % 2 ? -0.05 : 0), 0, 1) : R.density;
   if (lanes.time) for (let i = 0; i < L; i++){ if (!want(i)) continue; if (i === 0 && !only){ st[i].gate = ACID_NOTE; continue; }
-    const u = rnd(), prev = i > 0 && st[i - 1].gate !== ACID_REST;
-    st[i].gate = u < R.density ? ACID_NOTE : prev && u < R.density + (1 - R.density) * 0.3 ? ACID_TIE : ACID_REST; }
+    const u = rnd(), prev = i > 0 && st[i - 1].gate !== ACID_REST, D = dens(i);
+    st[i].gate = u < D ? ACID_NOTE : prev && u < D + (1 - D) * (sty === 1 ? 0.45 : 0.3) ? ACID_TIE : ACID_REST; }
   let prevPc = -1;
   for (let i = 0; i < L; i++){ const s = st[i]; let pc = acidPc(s.note - R.root), oc = acidOct(s.note - R.root);
     if (want(i)){
-      if (lanes.notes) pc = i === 0 && !only ? 0 : pick(prevPc);
-      if (lanes.oct){ const u = rnd(), up = R.octave * (s.accent ? 0.85 : 0.6), dn = R.octave * 0.25; oc = u < up ? 1 : u < up + dn ? -1 : 0; if (R.scale === 9 && u < 0.08 + R.octave * 0.3) oc = 2; } }
+      if (lanes.notes) pc = i === 0 && !only ? 0 : pick(prevPc, i);
+      if (lanes.oct){ const u = rnd(); let up = R.octave * (s.accent ? 0.85 : 0.6), dn = R.octave * 0.25;
+        if (sty === 2){ up = i % 2 ? 0.25 + R.octave : R.octave * 0.15; dn = 0; }   // ROLLING: the off-steps jump up
+        else if (sty === 3){ up = R.octave * 0.9; dn = R.octave * 0.35; }
+        else if (sty === 1){ dn = R.octave * 0.15; }
+        oc = u < up ? 1 : u < up + dn ? -1 : 0; if (R.scale === 9 && u < 0.08 + R.octave * 0.3) oc = 2; } }
     let nn = R.root + pc + 12 * oc; while (nn > 24) nn -= 12; while (nn < -12) nn += 12;
     s.note = nn; if (s.gate === ACID_NOTE) prevPc = pc; }
   if (lanes.acc){ let run = 0; for (let i = 0; i < L; i++){ const s = st[i]; if (!want(i)){ run = s.accent ? run + 1 : 0; continue; }
-    s.accent = s.gate === ACID_NOTE && run < 3 && rnd() < R.accent * (acidOct(s.note - R.root) > 0 ? 1.4 : 1); run = s.accent ? run + 1 : 0; } }
+    const pos = sty === 1 ? (i % 4 === 2 ? 1.8 : i % 2 ? 1.2 : 0.6) : sty === 2 ? (i % 4 === 0 ? 1.6 : 0.6) : sty === 3 ? 1.5 : 1;   // where accents fall
+    s.accent = s.gate === ACID_NOTE && run < 3 && rnd() < R.accent * pos * (acidOct(s.note - R.root) > 0 ? 1.4 : 1); run = s.accent ? run + 1 : 0; } }
   if (lanes.slide || lanes.time || lanes.notes || lanes.oct) for (let i = 0; i < L; i++){ const s = st[i], nx = st[(i + 1) % L];
     if (s.gate === ACID_REST || nx.gate !== ACID_NOTE){ if (lanes.slide || lanes.time) s.slide = false; continue; }
     if (!lanes.slide || !want(i)) continue;
-    s.slide = rnd() < R.slide * (Math.abs(nx.note - s.note) >= 7 ? 1.5 : 1); }
+    const sl = sty === 1 ? (nx.note !== s.note ? 1.3 : 0.4) : sty === 2 ? 0.6 : sty === 3 ? 1.8 : 1;
+    s.slide = rnd() < R.slide * sl * (Math.abs(nx.note - s.note) >= 7 ? 1.5 : 1); }
   for (const s of st) if (s.gate === ACID_REST){ s.accent = false; s.slide = false; }
 }
 function acidMutate(st, L, lanes, R, rnd){ const only = new Array(L).fill(false), n = Math.max(2, Math.floor(L / 4)); for (let k = 0; k < n; k++) only[Math.floor(rnd() * L)] = true; acidRoll(st, L, lanes, R, rnd, only); }
@@ -21499,7 +21564,7 @@ function acidLine(){
   if (selA && selA.v === 'phrase'){ const R = selRect(); y0 = R.y0; L = Math.max(2, Math.min(R.y1, plen(cPhrase) - 1) - y0 + 1); }
   const P = () => S.phrases[cPhrase];
   const src = P()[cs.phrase.y]; let ins = src && src[IC] >= 0 ? src[IC] : (P().find(r => r[IC] >= 0) || [])[IC] ?? defInst();   // INSTRUMENT (owner, 2 Nov): picked in the panel
-  const R = () => ({scale:acidSet.scale, root:acidSet.root, density:acidSet.density / 100, accent:acidSet.accent / 100, slide:acidSet.slide / 100, octave:acidSet.octave / 100});
+  const R = () => ({scale:acidSet.scale, root:acidSet.root, density:acidSet.density / 100, accent:acidSet.accent / 100, slide:acidSet.slide / 100, octave:acidSet.octave / 100, style:acidSet.style});
   const roll = mut => {
     const st = acidRead(P(), y0, L, acidSet.base), lanes = acidSet.lanes;
     if (!ACID_LANES.some(([k]) => lanes[k])) return toast('Light at least one lane: NOTES, OCTAVES, ACCENTS, SLIDES or TIME.');
@@ -21515,6 +21580,7 @@ function acidLine(){
   const field = (label, ctl) => { const f = el('label', 'acidf'); f.append(el('span', null, label), ctl); box.append(f); return ctl; };
   const sel = (label, opts, k) => { const s = el('select'); opts.forEach(([v, t]) => s.append(new Option(t, v))); s.value = acidSet[k]; s.addEventListener('change', () => { acidSet[k] = +s.value; }); return field(label, s); };
   { const s = el('select'); for (let k = 0; k < S.insts.length; k++) s.append(new Option(instLabel(k), k)); s.value = ins; s.addEventListener('change', () => { ins = +s.value; }); field('Instrument', s); }
+  sel('Style', ACID_STYLES.map((n, i) => [i, n]), 'style');
   sel('Scale', ACID_SCALES.map(([n], i) => [i, n]), 'scale');
   sel('Root', NN.map((n, i) => [i, n.replace('-', '')]), 'root');
   sel('Base note', [24, 36, 48, 60].map(v => [v, noteS(v) + (v === ROOT ? ' (the pad’s pitch)' : '')]), 'base');
@@ -23957,7 +24023,7 @@ function drawArr(PH){
   const BG = busGroups();   // BUS GROUPS (31 Oct): each bus and the tracks it takes in share a colour
   const spAt = t => t > 0 && t === PFg;   // where a spacer column sits before track t: the MONO | POLY break (owner, 31 Oct: with 17 tracks the side panel's every-8 spacer fell inside MONO, between 8 and 9)
   for (let y = 0; y < N; y++){
-    h += `<div class="ar"><span class="rn${y % 4 ? '' : ' r4'}" data-ry="${y}">${rS(y, 3)}</span>`;
+    h += `<div class="ar${y % 4 || y === 0 ? '' : ' q4'}"><span class="rn${y % 4 ? '' : ' r4'}" data-ry="${y}">${rS(y, 3)}</span>`;
     for (let t = 0; t < NA; t++){
       if (spAt(t)) h += '<span></span>';
       const v = S.song[y][t];
@@ -23965,10 +24031,11 @@ function drawArr(PH){
       const grp = BG.get(t); if (grp){ cls += 'bg '; sty = ` style="--bgc:${grp}"`; }
       if (v >= 0){
         const empty = isEmptySect(S.chains[v]) || !sectHasData(v), ph = firstPhrase(v);   // EMPTY BLOCKS (31 Oct): a block whose phrases have nothing in them is striped
-        cls += empty ? 'z' : 'f'; lab = sectsOn || ph < 0 ? hp(v) : hp(ph);
-        if (blockMuted(S, y, t)) cls = cls.replace(/[zf]$/, 'm');
+        const offb = !empty && sectOffOnly(v);   // OFF-ONLY BLOCKS (2 Nov)
+        cls += empty ? 'z' : offb ? 'o' : 'f'; lab = sectsOn || ph < 0 ? hp(v) : hp(ph);
+        if (blockMuted(S, y, t)) cls = cls.replace(/[zfo]$/, 'm');
         // Coloured by the instrument its phrase plays, with the phrase's notes as ticks when the blocks are big.
-        if (!empty && ph >= 0){ const pi = phraseInfo(ph), bc = S.bcol && TCOL[S.bcol[v] | 0];   // BLOCK COLOURS first
+        if (!empty && !offb && ph >= 0){ const pi = phraseInfo(ph), bc = S.bcol && TCOL[S.bcol[v] | 0];   // BLOCK COLOURS first
           if (bc) sty = grp ? ` style="--bgc:${bc};--ib:${bc};--ibp:100%"` : ` style="--ib:${bc};--ibp:100%"`;   // (over a bus group's colour too)
           else if (grp) sty = ` style="--bgc:${grp};--ib:${grp}"`; else if (pi.inst >= 0) sty = ` style="--ib:${instHue(pi.inst)};--ibp:${100 - (pi.inst % 5) * 17}%"`;
           if (arRH >= 26 && pi.hits) lab += pi.hits; }
@@ -26170,6 +26237,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [360, '2 Nov', ['FX presets: › SAVE AS PRESET… keeps the preset on this device too; it shows under MY PRESETS in every song.', 'Synth engines are grouped by sound: Drums & percussion, Bass, Analog, Digital FM & wavetable, Physical models, Keys, Pads & textures, Voice, SoundFont.', 'Acid line has styles: …pump ACID, Classic 303, Rolling and Squelch, with slides and accents that sound like a 303.', 'Arrange: blocks that only hold OFFs or FX commands look different from empty ones; a grey line every 4 rows.', '⚙ Settings is shorter: Kit lives in File ▸ Kit, Master and Master out in the Mixer.']],
   [359, '2 Nov', ['FX picker: …pump COMP and EQ sit beside Thunder’s compressor and EQ (they were in a group at the very end); every …pump effect is in the group you’d look in.', '…pump BAND, WIDE, HEAT and METER work on every track.', 'About 120 new factory presets: every effect has at least four (Pitch correct, Utility and Envelope filter had none).']],
   [358, '2 Nov', ['Mastering: new songs master through …pump EQ → CALM → COMP → TONE → MASTER (the auto master last), on by default; MASTERING switches them and opens pump MASTER. Songs you already have keep their mastering.', 'FX: drag an effect to another slot, in the bottom bar (by its header) or on the FX screen (by its slot row). The FX screen highlights the slot you are editing, and the wheel stays in the slot list or the values.', 'FX bar pictures by effect type: echo taps for delays, the decay for reverbs, the LFO for modulation, the curve for drive, the response for filters. …pump COMP now works on every track.', 'Menus: explanations are tooltips on a computer (View → Show explanations in menus brings them back); Audio & MIDI is tidier; Command bar is one choice (Off / Thin / Big); right-click menus only hold what acts on what you clicked; shorter labels.', 'Clone down writes into empty cells and inserts rows only when it would overwrite a block. Double-click an empty cell in Arrange (beside any screen) for a new pattern. Buses always show in the Pattern view. Swarm’s in-between wave names are short.']],
   [357, '2 Nov', ['FX bar: compressors show IN, GR and OUT meters with the threshold; the value you click is highlighted, and the wheel changes it while you hold the button; smaller M and S, and SOLO · CLEAR no longer cut off.', 'Effects remember their settings: switch a slot to another effect and back and its settings return (INIT in › PRESET still resets).', 'Generators (Edit ▾ or right-click in a phrase): Acid line now lets you pick the instrument, and ROLL is Generate (G); Euclidean fill takes an instrument too (5 16 0 0A).', 'Shift+wheel grows the selection on Phrase and the Pattern view. EDIT OFF (Esc) is easy to see: hollow cursor, dimmed notes, PHRASE · EDIT OFF.', 'Mixer: CHN sits above FX, in the order the sound goes.', 'Fixed: Remove these rows in Arrange removed only one row; Arrange stopped turning pages while something was selected; …chains showed the previous song’s chain in a new song; the pointer stuck as a hand in …chains; the screen beside Arrange could not be picked again while Arrange had the keys.']],
@@ -26509,13 +26577,13 @@ function buildProj(){
   for (const name of [...order.filter(n => groups.has(n)), ...[...groups.keys()].filter(n => !order.includes(n))]){
     if (SET_SHEETS && !groups.get(name).length && name !== 'Render & export' && name !== 'Mastering') continue;
     const sec = el('section', 'tsec'); sec.append(el('h3', null, name)); list.append(sec);
-    for (const r of groups.get(name)) sec.append(tsetRow(r));
+    for (const r of groups.get(name)) if (!(name === 'Mastering' && (r.l === 'MASTER' || r.l === 'MASTER OUT'))) sec.append(tsetRow(r));   // (menu audit, 2 Nov: MASTER and OUT are the Mixer's)
     // Export's pad settings join Render (its rate, bits and level are the same ones the tracker rows set), and the
     // mastering window's button joins Mastering.
     if (name === 'Render & export'){ const x = $('pExport'); if (x){ x.hidden = false; sec.append(x);
       for (const id of ['segRate', 'segBits', 'segNorm']){ const r = $(id) && $(id).closest('.segrow'); if (r) r.hidden = trk; } } }
     if (name === 'Mastering'){ const x = $('pMaster'); if (x){ x.hidden = false; sec.append(x); } }
-    if (name === 'Song') irsUI(sec);
+    if (name === 'Song' && !SET_SHEETS) irsUI(sec);   // (with the sheets, the IRs are in Song settings…)
   }
   list.append(el('div', 'setbuild', buildStamp()));   // which build this is (the Project and View menus both end with it)
   body.scrollTop = keep;
@@ -27074,6 +27142,8 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
     } finally { Math.random = R; }
     return out;
   },
+  // The engine list's groups (for category checks).
+  engines(){ return ENGINE_GROUPS.map(([g, es]) => g + ': ' + es.map(e => e[1]).join(', ')); },
   // The FX picker's list for track t (or the master: t = NT), with groups (for picker checks).
   fxPick(t){ return fxtL(t).map(k => fxtGroup(k) + ' · ' + TFX[k].n); },
   // Every track effect: its group, factory preset count and controls (for preset work).
