@@ -15269,17 +15269,17 @@ const TFX = {
    small range is the number itself; anything else 00–FF across its range, on its own curve). They run in the track-effect
    worklet through the shared module itself (ChainsDSP, published in the audio thread by the …chains engine). */
 for (const k in MODFX){ const M = MODFX[k]; if (!M.track) continue;
-  const ps = [], conv = {};
+  const ps = [], conv = {}, cv = {};   // cv: conv as data ([slot key, 0 as is / 1 lin / 2 log, min, max]) for the core's FXV
   for (const [p, l, c, min, max, d, x] of M.ps){
     const L = l.toUpperCase(), q = fxKey(p);   // stored as q in the slot (type → type_), sent to the module as p
     if (c === 'opt'){ const nm = p === 'sck' ? x.slice(0, 9 + NT) : x;   // SOURCE: Self, the sends, the tracks the app has
-      ps.push(EN(q, L, d, nm.map(n => n.toUpperCase()))); conv[p] = [q, b => b]; continue; }
-    if (c === 'int' && max - min <= 255){ ps.push(P_(q, L, Math.round(d), v => x(v), min, max)); conv[p] = [q, b => b]; continue; }
+      ps.push(EN(q, L, d, nm.map(n => n.toUpperCase()))); conv[p] = [q, b => b]; cv[p] = [q, 0]; continue; }
+    if (c === 'int' && max - min <= 255){ ps.push(P_(q, L, Math.round(d), v => x(v), min, max)); conv[p] = [q, b => b]; cv[p] = [q, 0]; continue; }
     const to = c === 'log' ? b => min * Math.pow(max / min, u8(b)) : b => min + (max - min) * u8(b);
     const pos = c === 'log' ? Math.log(d / min) / Math.log(max / min) : (d - min) / (max - min);
-    ps.push(P_(q, L, Math.abs(pos - 0.5) < 1e-6 ? 128 : clamp(Math.round(pos * 255), 0, 255), b => x(to(b)))); conv[p] = [q, to];
+    ps.push(P_(q, L, Math.abs(pos - 0.5) < 1e-6 ? 128 : clamp(Math.round(pos * 255), 0, 255), b => x(to(b)))); conv[p] = [q, to]; cv[p] = [q, c === 'log' ? 2 : 1, min, max];
   }
-  TFX[k] = {n:M.short, long:M.long, mod:k, tail:M.tail, ps, map:f => { const o = {}; for (const p in conv) o[p] = conv[p][1](f[conv[p][0]]); return o; }};
+  TFX[k] = {n:M.short, long:M.long, mod:k, tail:M.tail, ps, cv, map:f => { const o = {}; for (const p in conv) o[p] = conv[p][1](f[conv[p][0]]); return o; }};
 }
 /* ---------- …PUMP: the nine pump mastering plugins as track effects (bus tracks and the master; 23 Oct (5)) ----------
    pump/pump.wasm is the plugins' own DSP (matthettich/pump, wasm/pump_wasm.cpp: one C interface over the nine engines);
@@ -15882,6 +15882,7 @@ class ThunderFx extends AudioWorkletProcessor {
   }
   process(inputs, outputs, params){
     if (this.dead) return false;
+    if (this.__q && this.__q.length){ const q = this.__q, due = currentTime + 64 / sampleRate; while (q.length && q[0][0] <= due) this.port.onmessage({data:q.shift()[1]}); }   // THUNDER CORE: FXV at its time
     if (this.__ov && globalThis.__tcOv) params = globalThis.__tcOv(this, params, outputs[0][0].length);   // THUNDER CORE
     const x = this.x, i = inputs[0], o = outputs[0], n = o[0].length;
     if (this.buf !== x.memory.buffer){ this.buf = x.memory.buffer; this.L = new Float32Array(this.buf, x.tfx_l(), 128); this.R = new Float32Array(this.buf, x.tfx_r(), 128); }
@@ -15973,7 +15974,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=41')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=42')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -16110,7 +16111,7 @@ function chnDiff(prev, next){
   for (const [k, c] of pc) if (!nc.has(k)) ops.push({ op:'disconnect', a:c.from, b:c.to });
   return ops;
 }
-function chainsNode(ac, track, patch, tempo){
+function chainsNode(ac, track, patch, tempo, cid){
   if (!chnSync.has(ac)) return null;   // module not loaded yet: caller re-routes when ready
   // Inputs: 0 the track, 1 the sidechain bus, 2 (SOURCE) the own sound of each track a Sidechain In listens to, one channel
   // each ('tapmap' says which), 3 (SENDS) the Sidechain Out sends, a block late, 4 and 5 (BUS) the other tracks this chain
@@ -16118,7 +16119,7 @@ function chainsNode(ac, track, patch, tempo){
   // Sidechain Outs, one channel per send. 'max' so the inputs arrive with all their channels.
   const n = new AudioWorkletNode(ac, 'thunder-chains', {numberOfInputs:6, numberOfOutputs:2, outputChannelCount:[2, 8], channelCount:2,
     channelCountMode:'max', channelInterpretation:'speakers',
-    processorOptions:{bytes:chnBin(), pump:pumpBin() || null, track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac),
+    processorOptions:{cid:cid || null, bytes:chnBin(), pump:pumpBin() || null, track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac),
       // BUS and SOURCE maps from the start (later changes go as messages): an offline render can finish before a message arrives.
       busMap:(busPlan().feeds.get(track) || []).slice(0, 32), tapMap:chnTapList(patch)}});
   n.load = 0;
@@ -17620,6 +17621,7 @@ function makePlayer(ac, out, getBuf, live){
   function tempoTo(ev){
     bpmNow = ev.bpm || bpmNow;
     for (const b of bassN.values()) if (b.bpm) try { b.bpm.setValueAtTime(ev.bpm, Math.max(ev.t, ac.currentTime)); } catch(e){}
+    if (ev.chnCore) return;   // THUNDER CORE: …chains got the tempo on the audio thread, at its time
     const m = {target:'chains-host', op:'transport', value:{tempo:ev.bpm, ticks:ev.tks}};
     const send = () => { for (const b of buses) if (b && b.chn){ try { if (b.chn._send) b.chn._send(m); else b.chn.port.postMessage(m); } catch(e){} } };
     const O = window.OfflineAudioContext || window.webkitOfflineAudioContext;
@@ -17919,7 +17921,7 @@ function makePlayer(ac, out, getBuf, live){
     if (!wantFx && b.fx){ try { b.fx.port.postMessage(null); } catch(e){} oldFx = b.fx; b.fx = null; }
     if (wantChn && !b.chn){
       try {
-        b.chn = chainsNode(ac, t, S.chainPatch, S.bpm);
+        b.chn = chainsNode(ac, t, S.chainPatch, S.bpm, live ? 'chn:' + t : null);
 
         if (!b.chn) chainsReady(ac).then(ok => { if (ok){ chnSync.add(ac); if (typeof rt !== 'undefined' && rt) rtFx(t); } });
       } catch(e){ b.chn = null; }
@@ -18624,8 +18626,8 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '27g6hx';
-const CORE_WANT = 4;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
+const CORE_REV = 'c3xp3x';
+const CORE_WANT = 5;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
 function coreLoad(){
@@ -27828,7 +27830,7 @@ else if (FIRST_SONG) setTimeout(async () => {
    stay identical. Math.random is seeded for the run, so GEN / PRB / random commands repeat. Inert without ?seqtest. */
 /* THUNDER CORE (plan phase 2): what the audio-thread sequencer (core/seq-core.js) needs from the page besides the song: the
    per-voice-track setting, the slot count, and the effect table's pump flags and control ranges (TFX itself holds DSP). */
-function coreTfx(){ const o = {}; for (const k in TFX) o[k] = {pump:!!TFX[k].pump, ps:(TFX[k].ps || []).map(q => ({k:q.k, min:q.min, max:q.max}))}; return o; }
+function coreTfx(){ const o = {}; for (const k in TFX) o[k] = {pump:!!TFX[k].pump, mod:!!TFX[k].mod, cv:TFX[k].cv || null, ps:(TFX[k].ps || []).map(q => ({k:q.k, min:q.min, max:q.max}))}; return o; }
 function coreVars(){ return {vtrk, NSLOT, TFX:coreTfx()}; }
 if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
   async load(text, name){ FIRST_SONG = false; await loadProjText(text, name || 'test.thunder'); return {name:S.name, bpm:S.bpm, nt:NT}; },
@@ -27893,6 +27895,20 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
   fxSet(t, type){ S.tfx[t] = S.tfx[t] || []; S.tfx[t][0] = freshTfx(type); saveS(); if (rt) rtFx(t); return S.tfx[t][0].type; },
   // Every track effect: its group, factory preset count and controls (for preset work).
   fxInfo(){ return Object.keys(TFX).filter(k => !isPumpT(k)).map(k => ({k, n:TFX[k].n, long:TFX[k].long, g:fxtGroup(k), fac:(FX_FACTORY[k] || []).length, facv:(FX_FACTORY[k] || []), ps:(TFX[k].ps || []).map(p => ({k:p.k, l:p.l, min:p.min, max:p.max, d:p.d, names:p.names || null}))})); },
+  // FXV on the audio thread: the core's copies of the effects' map() (TFX_MAP in core/seq-core.js) against TFX's own, on
+  // random settings and tempos. Returns the effects that differ and the ones whose FXV stays on the page.
+  async fxMaps(n){ const src = await (await fetch(CORE_URL())).text();
+    const M = new Function('AudioWorkletProcessor', 'registerProcessor', 'sampleRate', 'currentTime', src + '\nreturn TFX_MAP;')(class { constructor(){ this.port = {postMessage(){}}; } }, () => {}, 48000, 0);
+    const out = {n:0, bad:[], page:Object.keys(TFX).filter(k => !M[k] && !isPumpT(k))};
+    const G = new Function('AudioWorkletProcessor', 'registerProcessor', 'sampleRate', 'currentTime', src + '\nreturn fxvMap;')(class { constructor(){ this.port = {postMessage(){}}; } }, () => {}, 48000, 0);
+    for (const k of Object.keys(TFX)) if (!M[k] && TFX[k].cv){ const D = TFX[k], C = JSON.parse(JSON.stringify({ps:D.ps.map(q => ({k:q.k, min:q.min, max:q.max})), cv:D.cv, mod:!!D.mod}));
+      for (let i = 0; i < (n || 25); i++){ const f = freshTfx(k); for (const q of D.ps || []) f[q.k] = q.min + Math.round(Math.random() * (q.max - q.min)); out.n++;
+        if (JSON.stringify(D.map(f, 48000, 120)) !== JSON.stringify(G(C, f.type)(f, 48000, 120))){ out.bad.push(k + ' (module)'); break; } } }
+    out.page = out.page.filter(k => !TFX[k].cv);
+    for (const k of Object.keys(M)){ const D = TFX[k]; if (!D){ out.bad.push(k + ' (not in TFX)'); continue; }
+      for (let i = 0; i < (n || 25); i++){ const f = freshTfx(k); for (const q of D.ps || []) f[q.k] = q.min + Math.round(Math.random() * (q.max - q.min));
+        const bpm = 60 + Math.random() * 120; out.n++; if (JSON.stringify(D.map(f, 48000, bpm)) !== JSON.stringify(M[k](f, 48000, bpm))){ out.bad.push(k); break; } } }
+    return out; },
   // The open phrase's rows, and the PSL command's number (for generator checks).
   phrase(){ return {rows:JSON.parse(JSON.stringify(S.phrases[cPhrase] || [])), len:plen(cPhrase), psl:PSL_I(), FX0, RW, VC, IC}; },
   // What playback and the song cursor are doing now (for follow / paging checks).

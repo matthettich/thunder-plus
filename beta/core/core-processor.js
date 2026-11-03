@@ -22,7 +22,7 @@
      {op:'ready', v}  ·  {op:'rows', rows, time, bpm, tks, alive}  ·  {op:'end'}  ·  {op:'test', id, rows}  ·
      {op:'error', where, message} */
 
-const CORE_V = 4;   // the message set's version: index.html's CORE_WANT must match (3: patch sync; 4: the mix outputs NT+1..NT+3)
+const CORE_V = 5;   // the message set's version: index.html's CORE_WANT must match (3: patch sync; 4: the mix outputs NT+1..NT+3; 5: FXV, BYP, tempo)
 const coreNum = v => Math.round(v * 1e6) / 1e6;
 const corePlain = e => { const o = {}; for (const k of Object.keys(e).sort()){ const v = e[k];
   if (typeof v === 'number') o[k] = coreNum(v); else if (typeof v === 'string' || typeof v === 'boolean' || v === null) o[k] = v;
@@ -118,6 +118,25 @@ globalThis.__tcPost = (proc, o) => {
     else { const x = p * Math.PI / 2; L[i] = l * Math.cos(x); R[i] = r + l * Math.sin(x); }
   }
 };
+// A message for another processor in this scope, handled at audio time `at` (its process() takes the due ones at the
+// start of each block: proc.__q, sorted by time). FXV's settings and …chains' tempo go this way instead of a timer on the
+// page, which a busy main thread made late.
+function tcAt(proc, at, msg){ const q = proc.__q || (proc.__q = []); let i = q.length; while (i > 0 && q[i - 1][0] > at) i--; q.splice(i, 0, [at, msg]); }
+// FXV: an effect slot's settings with some controls moved (ov: control key → value), as the page's fxpMsg makes them
+// The effect's map(): its own (TFX_MAP), or for the shared-module effects (MODFX) their controls' conversions, which the
+// page sends as data (TFX[k].cv: [slot key, 0 as is / 1 linear / 2 log, min, max] per module param).
+function fxvMap(D, type){
+  if (TFX_MAP[type]) return TFX_MAP[type];
+  const C = D && D.cv; if (!C) return null;
+  const u8 = v => v === 128 ? 0.5 : Math.max(0, Math.min(255, v)) / 255;
+  return f => { const o = {}; for (const p in C){ const [q, c, a, b] = C[p], v = f[q]; o[p] = c === 0 ? v : c === 2 ? a * Math.pow(b / a, u8(v)) : a + (b - a) * u8(v); } return o; };
+}
+function fxvMsg(f, slot, ov, bpm){
+  const D = TFX[f.type], mp = fxvMap(D, f.type); if (!D || !mp) return null;
+  const vals = mp(Object.assign({}, f, ov), sampleRate, bpm);
+  if (D.mod) return {pset:{slot, mp:vals}};
+  const p = new Array(12).fill(0); vals.forEach((v, i) => p[i] = v); return {pset:{slot, p}};
+}
 // One driven parameter: a timeline that takes over from the node's own AudioParam at its first event
 function tcParam(ov, k, t){ let A = ov.p.get(k); if (!A){ A = new Auto(0); A.from = t; ov.p.set(k, A); } return A; }
 
@@ -125,7 +144,7 @@ const POLY = 4, FXP_CORE = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'sw6', 'sw
 class ThunderCore extends AudioWorkletProcessor {
   constructor(){
     super();
-    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.voxG = new Map(); this.fxTouched = new Set();
+    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.voxG = new Map(); this.fxTouched = new Set(); this.fxOv = new Map();   // fxOv: FXV's moved controls, 'track:slot' → {key: value}
     this.clk = new Auto(0); this.clkOn = false; this.clkBase = 0;   // the beat clock (output NT): beat + 1 while playing, 0 stopped
     this.mixReset();
     this.port.onmessage = e => { try { this.msg(e.data || {}); } catch(err){ this.port.postMessage({op:'error', where:(e.data && e.data.op) || '?', message:String(err && err.stack || err)}); } };
@@ -155,7 +174,7 @@ class ThunderCore extends AudioWorkletProcessor {
       case 'bpm': if (this.seq) this.seq.bpm = d.v; return;
       case 'perf': if (!perfLive.init) perfLiveInit(); if (d.xf != null) perfLive.xf = d.xf; if (d.mac) perfLive.mac = d.mac.slice(); if (d.fill != null) perfLive.fill = !!d.fill; return;
       case 'lxp': lxp.st = d.st | 0; return;
-      case 'stats': this.port.postMessage({op:'stats', id:d.id, n:this.nN || 0, late:this.nLate || 0, worst:this.worst || 0, voices:this.alive.size, lead:this.leadMin == null ? null : this.leadMin, skips:this.skips || 0, lnodes:this.lnodes.size, vs:this.vs.reduce((a, T) => a + (T ? T.length : 0), 0), ovEv:[...tcNodes().values()].reduce((a, p) => a + (p.__ov ? [...p.__ov.p.values()].reduce((b, A) => b + A.ev.length, 0) + p.__ov.g.ev.length + p.__ov.pn.ev.length : 0), 0), clk:this.clk.ev.length, ms:this.pms || 0, blocks:this.pbl || 0}); this.pms = 0; this.pbl = 0; this.nN = this.nLate = this.worst = 0; this.leadMin = null; return;
+      case 'stats': this.port.postMessage({op:'stats', id:d.id, nodes:[...tcNodes().keys()], n:this.nN || 0, late:this.nLate || 0, worst:this.worst || 0, voices:this.alive.size, lead:this.leadMin == null ? null : this.leadMin, skips:this.skips || 0, lnodes:this.lnodes.size, vs:this.vs.reduce((a, T) => a + (T ? T.length : 0), 0), ovEv:[...tcNodes().values()].reduce((a, p) => a + (p.__ov ? [...p.__ov.p.values()].reduce((b, A) => b + A.ev.length, 0) + p.__ov.g.ev.length + p.__ov.pn.ev.length : 0), 0), clk:this.clk.ev.length, ms:this.pms || 0, blocks:this.pbl || 0}); this.pms = 0; this.pbl = 0; this.nN = this.nLate = this.worst = 0; this.leadMin = null; return;
       case 'sig': { const j = JSON.stringify(S); let h = 0; for (let i = 0; i < j.length; i++) h = (h * 31 + j.charCodeAt(i)) | 0; this.port.postMessage({op:'sig', len:j.length, h}); return; }
       case 'dbg': this.noSampler = !!d.noSampler; return;   // measuring: the page plays every note (the core only sequences)
       case 'die': this.dead = true; this.seq = null; this.alive.clear(); return;   // the page let this core go (Reset audio engine)
@@ -284,6 +303,28 @@ class ThunderCore extends AudioWorkletProcessor {
       for (const k of ev.type === 'fxc' ? [ev.p] : FXP_CORE){ const A = tcParam(ov, k, at); if (ev.type === 'fxreset') A.cancel(at); A.set(ev.type === 'fxc' ? ev.v : -1, at); }
       this.fxTouched.add('fx:' + ev.track); return true;
     }
+    // FXV (3 Nov): the selected control of an effect slot, makePlayer's fxpTo: the slot's settings are worked out here
+    // (TFX_MAP: the effect's own map()) and handed to its node at the row's time. Effects whose map isn't in the core
+    // (TFX_MAP) and …pump slots stay on the page.
+    if (ev.type === 'fxp'){
+      const proc = tcNodes().get('fx:' + ev.track), A = S && (ev.track >= NT ? S.mfx : S.tfx && S.tfx[ev.track]), f = A && A[ev.slot];
+      if (!proc || !f || !TFX[f.type] || TFX[f.type].pump || !fxvMap(TFX[f.type], f.type)) return false;
+      const q = TFX[f.type].ps[ev.pi]; if (!q) return false;
+      const key = ev.track + ':' + ev.slot, ov = Object.assign({}, this.fxOv.get(key)); ov[q.k] = q.min + Math.round((q.max - q.min) * ev.v / 255);
+      const m = fxvMsg(f, ev.slot, ov, this.seq ? this.seq.bpm : S.bpm); if (!m) return false;
+      this.fxOv.set(key, ov); tcAt(proc, Math.max(ev.t, currentTime), m); return true;
+    }
+    // BYP (3 Nov): a …chains module's switch (b1–b15 on the track's thunder-chains node), as fxc above
+    if (ev.type === 'chc'){
+      const proc = tcNodes().get('chn:' + ev.track); if (!proc) return false;
+      const ov = tcOver(proc), at = Math.max(ev.t, currentTime); ov.until = Infinity;
+      tcParam(ov, ev.p, at).set(ev.v, at); this.fxTouched.add('chn:' + ev.track); return true;
+    }
+    // A tempo change: …chains' transport, at its time (the page still sets its own tempo and the live engines' bpm)
+    if (ev.type === 'tempo'){
+      let n = 0; for (const [k, proc] of tcNodes()) if (k.startsWith('chn:')){ tcAt(proc, Math.max(ev.t, currentTime), {target:'chains-host', op:'transport', value:{tempo:ev.bpm, ticks:ev.tks}}); n++; }
+      ev.chnCore = n > 0; return false;
+    }
     // the tempo-locked effects' beat clock, as makePlayer's play('beat') ramps its ConstantSource (here + 1: see clkBus)
     if (ev.type === 'beat'){ const at = Math.max(ev.t, currentTime), A = this.clk;
       if (!this.clkOn){ this.clkOn = true; this.clkBase = Math.floor(ev.b / 16) * 16; A.set(ev.b - this.clkBase + 1, at); return true; }
@@ -308,8 +349,12 @@ class ThunderCore extends AudioWorkletProcessor {
     this.voxG.clear();
     // the effect switches go back to the slots' own (−1), as the page's resetSeq does, then the page has the params again
     for (const key of this.fxTouched){ const proc = tcNodes().get(key); if (!proc || !proc.__ov) continue; const ov = proc.__ov;
-      for (const k of FXP_CORE){ const A = ov.p.get(k); if (A){ A.cancel(at); A.set(-1, at); } } ov.until = at + 0.5; }
-    this.fxTouched.clear(); }
+      for (const A of ov.p.values()){ A.cancel(at); A.set(-1, at); } ov.until = at + 0.5; }   // FXO… (fx:) and BYP b1–b15 (chn:)
+    this.fxTouched.clear();
+    // FXV: the slots' own settings again (makePlayer's resetSeq does the same for the ones the page moved)
+    for (const [key, ov] of this.fxOv){ const [t, k] = key.split(':').map(Number), proc = tcNodes().get('fx:' + t), A = S && (t >= NT ? S.mfx : S.tfx && S.tfx[t]), f = A && A[k];
+      const m = proc && f && fxvMsg(f, k, {}, S.bpm); if (m){ if (proc.__q) proc.__q = proc.__q.filter(x => !(x[1].pset && x[1].pset.slot === k)); tcAt(proc, at, m); } }
+    this.fxOv.clear(); }
 
   /* ---- live engines: makePlayer's bassNode / bassNote / polyVox / polyPs, driving the registered nodes ---- */
   lnode(t, pad, j){
