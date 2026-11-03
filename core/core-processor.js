@@ -46,6 +46,8 @@ class Auto {
   target(v, t, tc){ this.ins({k:2, t, v, tc:Math.max(1e-5, tc)}); }
   curve(fn, t, d){ this.ins({k:3, t, d, fn}); }
   cancel(t){ this.ev = this.ev.filter(e => e.t < t); }
+  // Drop what is over by time t (the beat clock gets an event a step for as long as the song plays)
+  prune(t){ if (this.ev.length < 48) return; const v = this.at(t), fut = this.ev.filter(e => e.t > t || (e.k === 3 && e.t + e.d > t)); this.v0 = v; this.ev = [{k:0, t, v}, ...fut]; }
   at(t){
     let v = this.v0, pt = 0, st = null;   // st: a target in progress {from, t, to, tc}
     const val = x => st ? st.to + (st.from - st.to) * Math.exp(-(x - st.t) / st.tc) : v;
@@ -65,6 +67,7 @@ class ThunderCore extends AudioWorkletProcessor {
   constructor(){
     super();
     this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false;
+    this.clk = new Auto(0); this.clkOn = false; this.clkBase = 0;   // the beat clock (output NT): beat + 1 while playing, 0 stopped
     this.port.onmessage = e => { try { this.msg(e.data || {}); } catch(err){ this.port.postMessage({op:'error', where:(e.data && e.data.op) || '?', message:String(err && err.stack || err)}); } };
     this.port.postMessage({op:'ready', v:CORE_V});
   }
@@ -81,7 +84,7 @@ class ThunderCore extends AudioWorkletProcessor {
           return out; });
         this.port.postMessage({op:'test', id:d.id, rows}); return; }
       case 'play': return this.play(d);
-      case 'stop': this.seq = null; this.stopAll(d.at == null ? currentTime : d.at); return;
+      case 'stop': { this.seq = null; const at = d.at == null ? currentTime : d.at; this.stopAll(at); this.clkOn = false; this.clk.cancel(at); this.clk.set(0, at); return; }
       case 'loop': if (this.seq) this.seq.setLoop(d.l || null); return;
       case 'bpm': if (this.seq) this.seq.bpm = d.v; return;
       case 'perf': if (!perfLive.init) perfLiveInit(); if (d.xf != null) perfLive.xf = d.xf; if (d.mac) perfLive.mac = d.mac.slice(); if (d.fill != null) perfLive.fill = !!d.fill; return;
@@ -91,7 +94,7 @@ class ThunderCore extends AudioWorkletProcessor {
     }
   }
   play(d){
-    this.stopAll(currentTime);
+    this.stopAll(currentTime); this.clkOn = false; this.clk.cancel(currentTime); this.clk.set(0, currentTime);
     const seq = makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}));
     // RESUME: run silently up to the step the song stopped on; the page played that step, the core carries on after it
     if (d.rs){ let g = 0, first = null;
@@ -174,6 +177,10 @@ class ThunderCore extends AudioWorkletProcessor {
   }
   // One event, as the page's player.play() does for the ones that touch its voices. Returns true when the core sounded it.
   ev(ev){
+    // the tempo-locked effects' beat clock, as makePlayer's play('beat') ramps its ConstantSource (here + 1: see clkBus)
+    if (ev.type === 'beat'){ const at = Math.max(ev.t, currentTime), A = this.clk;
+      if (!this.clkOn){ this.clkOn = true; this.clkBase = Math.floor(ev.b / 16) * 16; A.set(ev.b - this.clkBase + 1, at); return true; }
+      const v = ev.b - this.clkBase; A.lin(v + 1, at); if (v >= 16){ this.clkBase += 16; A.set(v - 16 + 1, at); } return true; }
     if (ev.type === 'stp'){ for (let k = 0; k <= NT; k++) if (ev.all || k === ev.track){ for (const v of this.T(k)) this.kill(v, ev.t, 0.004); this.T(k).length = 0; } return false; }
     if (ev.type === 'off' && ev.track != null){ const T = this.T(ev.track);
       if (ev.cols){ for (let k = T.length - 1; k >= 0; k--) if (ev.cols.includes(T[k].col)){ this.kill(T[k], ev.t, this.relTc(T[k])); T.splice(k, 1); } return false; }
@@ -201,6 +208,7 @@ class ThunderCore extends AudioWorkletProcessor {
     }
     // 2. sound the voices into their tracks' outputs
     const N = (outputs[0] && outputs[0][0] && outputs[0][0].length) || 128, sr = sampleRate, dt = 1 / sr;
+    { const C = outputs[NT] && outputs[NT][0]; if (C){ const A = this.clk; A.prune(currentTime); if (!A.ev.length && A.v0 === 0) C.fill(0); else for (let i = 0; i < N; i++) C[i] = A.at(currentTime + i * dt); } }
     for (const v of this.alive){
       const out = outputs[v.track]; if (!out || !out[0]){ continue; }
       const L = out[0], R = out[1] || out[0], D = v.data, len = D.length, inc0 = v.sr / sr;

@@ -17022,11 +17022,14 @@ function makePlayer(ac, out, getBuf, live){
   // (wrapping every 16) as sample-accurate automation on a constant source, wired into every effect node's `bp`.
   // −1 while stopped. The sequencer's 'beat' events ramp it from row to row, so it follows TPO exactly, live and offline.
   const clock = ac.createConstantSource(), clk = {on:false, base:0}; clock.offset.value = -1; clock.start();
+  // THUNDER CORE: clkBus is what the effects hear. The core (Sequencer: Audio thread) adds its own beat clock here, the
+  // beat + 1 while it plays and 0 otherwise, so with this source at −1 the effects get the same values, on the sample.
+  const clkBus = ac.createGain(); clock.connect(clkBus);
   let mfx = null, mvol = null;
-  const clockTo = n => { try { if (n && n.parameters) clock.connect(n.parameters.get('bp')); } catch(e){} };
+  const clockTo = n => { try { if (n && n.parameters) clkBus.connect(n.parameters.get('bp')); } catch(e){} };
   // An effect node that goes lets go of its inputs too (the picked tracks, the sends, the beat clock): they kept it running,
   // a little more each time an effect was removed (review, 27 Oct).
-  const fxDrop = n => { if (!n) return; fxKeySync(n, []); try { const q = n.parameters && n.parameters.get('bp'); if (q) clock.disconnect(q); } catch(e){} };
+  const fxDrop = n => { if (!n) return; fxKeySync(n, []); try { const q = n.parameters && n.parameters.get('bp'); if (q) clkBus.disconnect(q); } catch(e){} };
   // FIRST PLAY (owner, 31 Oct: after opening a song, the master's first FLX was lost): an FXO / FLX / GAT / RTG sent before
   // its track's (or the master's) effect node exists waits here, and the node takes it when it is made.
   const fxcPend = new Map();
@@ -17527,7 +17530,7 @@ function makePlayer(ac, out, getBuf, live){
   }
   // Reset audio engine: let go of every node this player made.
   function dispose(){
-    try { clock.stop(); clock.disconnect(); } catch(e){}
+    try { clock.stop(); clock.disconnect(); clkBus.disconnect(); } catch(e){}
     for (const [k, b] of bassN) bassDrop(k, b);
     bassN.clear();
     for (const b of buses){ if (!b) continue;
@@ -17542,7 +17545,8 @@ function makePlayer(ac, out, getBuf, live){
   // dropping them (the safety net: the next notes play the renders)
   const psLoad = () => { let l = 0, n = 0; for (const b of bassN.values()) if (b.ps){ l += b.node.load || 0; n++; } return {load:l, nodes:n}; };
   const psDrop = () => { for (const [k, b] of [...bassN]) if (b.ps) bassDrop(k, b); };
-  return {play, coreTake, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop};
+  const clkReset = at => { clk.on = false; try { clock.offset.cancelScheduledValues(at); clock.offset.setValueAtTime(-1, at); } catch(e){} };
+  return {play, coreTake, clkBus, clkReset, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop};
 }
 
 /* ---------- live playback ---------- */
@@ -18197,9 +18201,10 @@ function coreLoad(){
   if (core.loading) return core.loading;
   if (!ctx || !ctx.audioWorklet || !rt) return Promise.resolve(false);
   core.loading = ctx.audioWorklet.addModule('core/seq-core.js?v=' + BUILD).then(() => {
-    const n = new AudioWorkletNode(ctx, 'thunder-core', {numberOfInputs:0, numberOfOutputs:NT, outputChannelCount:new Array(NT).fill(2)});
+    const n = new AudioWorkletNode(ctx, 'thunder-core', {numberOfInputs:0, numberOfOutputs:NT + 1, outputChannelCount:[...new Array(NT).fill(2), 1]});
     n.port.onmessage = e => { try { coreMsg(e.data || {}); } catch(err){ tpLog('core message', err); } };
     for (let t = 0; t < NT; t++) try { n.connect(rt.pl.buses[t].inp, t); } catch(e){}
+    try { n.connect(rt.pl.clkBus, NT); } catch(e){}   // the beat clock for tempo-locked effects
     core.node = n; core.ready = true; core.sent.clear(); coreSyncAll(); return true;
   }, err => { tpLog('core load', err); core.loading = null; toast('The audio-thread sequencer didn’t load here: playing as before.', 3500); return false; });
   return core.loading;
@@ -18219,6 +18224,7 @@ document.addEventListener('visibilitychange', coreLead);
 function coreSong(){ if (!tp.core || core.sT) return; core.sT = setTimeout(() => { core.sT = 0; if (tp.core) corePost({op:'song', S}); }, 40); }
 function coreStart(mode, o, t0, rs){
   coreSyncAll();
+  rt.pl.clkReset(ctx.currentTime);   // the core's clock takes over (a RESUME step played here may have started this one)
   if (perfLive.init) corePost({op:'perf', xf:perfLive.xf, mac:perfLive.mac, fill:perfLive.fill});
   const oo = {}; for (const k of ['row', 'loop', 'once', 'only']) if (o && o[k] != null) oo[k] = o[k];
   core.gen++; corePost({op:'play', gen:core.gen, mode, o:oo, t0, rs});
@@ -18239,7 +18245,7 @@ function coreMsg(d){
       if (e.vk && !e.core) try { varWant(e); } catch(err){}
       { const k = (e.core ? 'core ' : 'page ') + e.type + (e.type === 'note' && !e.core ? ' pad ' + e.pad : ''); core.tally.set(k, (core.tally.get(k) || 0) + 1); }
       const midiOnly = moEv(e);
-      if (e.core){ rt.pl.coreTake(e); if (e.type === 'note') padBlink(e); continue; }
+      if (e.core){ if (e.type === 'note'){ rt.pl.coreTake(e); padBlink(e); } continue; }   // (a beat: the core drives the effects' clock; moEv above still kept MIDI clock's mx.beat)
       if (midiOnly) continue;
       rt.pl.play(e); if (e.type === 'note') padBlink(e);
     }
@@ -27320,6 +27326,10 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
   async envelope(ms){ tStart('song', {row:0}); const a = ctx.createAnalyser(); a.fftSize = 1024; master.connect(a); const buf = new Float32Array(1024), out = [];
     const t0 = performance.now(); while (performance.now() - t0 < ms){ a.getFloatTimeDomainData(buf); let s = 0; for (const x of buf) s += x * x; out.push(Math.sqrt(s / buf.length)); await new Promise(r => setTimeout(r, 25)); }
     tStop(true); try { master.disconnect(a); } catch(e){} return out; },
+  // The tempo-locked effects' beat clock, sampled every 50 ms for `ms` from PLAY.
+  async beatClock(ms){ tStart('song', {row:0}); const a = ctx.createAnalyser(); a.fftSize = 256; rt.pl.clkBus.connect(a); const b = new Float32Array(256), out = [];
+    const t0 = performance.now(); while (performance.now() - t0 < ms){ a.getFloatTimeDomainData(b); out.push(Math.round(b[255] * 100) / 100); await new Promise(r => setTimeout(r, 50)); }
+    tStop(true); await new Promise(r => setTimeout(r, 100)); a.getFloatTimeDomainData(b); out.push(Math.round(b[255] * 100) / 100); try { rt.pl.clkBus.disconnect(a); } catch(e){} return out; },
   // The engine list's groups (for category checks).
   engines(){ return ENGINE_GROUPS.map(([g, es]) => g + ': ' + es.map(e => e[1]).join(', ')); },
   // The FX picker's list for track t (or the master: t = NT), with groups (for picker checks).

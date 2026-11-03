@@ -457,10 +457,10 @@ headless; repeat on the PC and the Fold. MIDI rows need a real MIDI out (loopMID
 
 | Measure | Baseline (build 356, headless, 2 Nov) | After phase 2 | After phase 3 | Native |
 |---|---|---|---|---|
-| Notes late, idle | 0 of 344 (lead: worst 191 ms, median 238 ms) | | | |
+| Notes late, idle | 0 of 344 (lead: worst 191 ms, median 238 ms) | core notes: 0 of 125 (lead ≥ 68 ms) | | |
 | Notes late, 100 ms stalls every 1 s | 0 of 344 (worst lead 121 ms) | | | |
 | Notes late, 200 ms stalls every 1 s | 0 of 344, but worst lead **14 ms**: right at the edge | | | |
-| Notes late, 400 ms stalls every 1 s | **56 of 344 (16 %), up to 180 ms late** | | | |
+| Notes late, 400 ms stalls every 1 s | **56 of 344 (16 %), up to 180 ms late** | core notes: **0 of 129**; page-booked: 38 of 235 | | |
 | First play of a song (renders running) | 5 notes late | | | |
 | Edit-to-heard delay | ~250 ms (1.2 s hidden), by design | | | |
 | MIDI note / clock jitter (loopback) | to measure on hardware | | | |
@@ -490,10 +490,14 @@ GC, a dialog). Phase 2's target: 0 late at every stall size, and edits heard on 
      own voices give way (`coreTake`). Edits reach the core through `saveS` → `coreSong` (the song copied in place),
      renders through `install` → `coreBuf`. Measured headless (ELECTRO, 12 s): core notes **0 late with 0, 400 and
      1000 ms stalls** (page path: 0 / 38 / 69 late, up to 770 ms); the master's average level identical, the playhead
-     identical. Still on the page: live engines (pad 8 in ELECTRO), SoundFonts, MUT / GEN, SYNC-stretched notes, the
-     `beat` clock for tempo-locked effects (213 events / 12 s), effect and mixer commands, MIDI.
-   - **2c:** the other events (live engines, `fxp` / `fxc` / `tvl`…, tempo, beat, MIDI) handed from the core to the page
-     ahead of time (as the plan's 6.2 "Web" does for MIDI), then moved one by one onto the audio thread.
+     identical. Still on the page: live engines (pad 8 in ELECTRO), SoundFonts, MUT / GEN, SYNC-stretched notes, effect
+     and mixer commands, MIDI.
+   - **2c:** the other events, moved one by one onto the audio thread. **Done (2 Nov): the beat clock** for
+     tempo-locked effects (Flex, Step gate, Retrigger): the core's output NT carries beat + 1 into the player's `clkBus`
+     (which the page's ConstantSource, held at −1, also feeds), sampled values identical to the page's. Next: live
+     engines (their notes as AudioParam automation from the core: the bass / vox / pump nodes already take time-stamped
+     params), `fxc` / `fxp` / `tvl` / `tpn` / `mvol` (param automation on nodes the core can't reach: needs a param
+     output per target, or a shared global in the AudioWorkletGlobalScope, plan 2's "event bus"), then MIDI (6.2 Web).
    - **2d:** edits and mutes as `song.patch` messages (heard on the next block), chops (`applyChop` with the buffer data
      the core already holds), PERFORM's live state, REC's step history from `pos` events; then the pump goes.
 3. Owner answers 11.1 before phase 4.
