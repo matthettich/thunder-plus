@@ -64,6 +64,7 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .setmenu[hidden]{display:none}
 /* MENU HELP off: explanations hidden (tooltips instead) */
 body:not(.menuhelp) .gset .tsr .tsi{display:none}
+body:not(.menuhelp) #gsecProj > p.note{display:none}
 body:not(.menuhelp) :is(#pMaster,#pApp,#pKit,#pSkin,#pMidi,#pExport,#pAudio) .pbody > p.note{display:none}
 body:not(.menuhelp) :is(#pMaster,#pApp,#pKit,#pSkin,#pMidi,#pExport,#pAudio) .bar{cursor:help}
 /* FX SCREEN: the slot being edited, highlighted; a slot dragged to another one */
@@ -12350,7 +12351,7 @@ const gsetSecs = () => gsetMode === 'view' ? [['gsecScreen', 'Screen']]
   ...(gsetMode === 'set' ? [] : [GLOBAL_SECS[0]]),
   ...((view === 'waves' || view === 'chains') ? [['gsecPatch', 'Patch']] : []),
   ['gsecProj', 'Project'], ...(gsetMode === 'set' ? [] : [['gsecScreen', 'Screen']]),
-  ...GLOBAL_SECS.slice(1).filter(([id]) => gsetMode !== 'set' || id !== 'pMidi')
+  ...GLOBAL_SECS.slice(1).filter(([id]) => gsetMode !== 'set' || (id !== 'pMidi' && id !== 'pKit'))   // ⚙ on a computer (menu audit, 2 Nov): Kit lives in File ▸ Kit
 ];
 // Every section is shown at once, one under the other with a rule between, as in ...Seeds' Settings menu.
 function showGset(){
@@ -12542,7 +12543,9 @@ function fileItems(){
       null,
       {l:'Drum kits…', f:pickClassicKit}, {l:'Factory drums (pads 1–8)', f:factoryPads, ask:'kit'},
       null,
-      {l:'Clear all kit slots', f:clearKit, ask:'kit'}]},
+      {l:'Clear all kit slots', f:clearKit, ask:'kit'},
+      null,
+      {l:(vtrk ? '✓ ' : '') + 'A voice per track', f:() => { setVtrk(!vtrk); try { $('ckVtrk').checked = vtrk; } catch(e){} }}]},   // (from ⚙'s Kit, 2 Nov)
     ...(deskUpdApi ? [null, {l:'Check for updates…' + (deskUpd && deskUpd.version ? ' (you have ' + deskUpd.version + ')' : ''), f:() => deskUpdApi.check()}] : [])
   ];
 }
@@ -26518,13 +26521,13 @@ function buildProj(){
   for (const name of [...order.filter(n => groups.has(n)), ...[...groups.keys()].filter(n => !order.includes(n))]){
     if (SET_SHEETS && !groups.get(name).length && name !== 'Render & export' && name !== 'Mastering') continue;
     const sec = el('section', 'tsec'); sec.append(el('h3', null, name)); list.append(sec);
-    for (const r of groups.get(name)) sec.append(tsetRow(r));
+    for (const r of groups.get(name)) if (!(name === 'Mastering' && (r.l === 'MASTER' || r.l === 'MASTER OUT'))) sec.append(tsetRow(r));   // (menu audit, 2 Nov: MASTER and OUT are the Mixer's)
     // Export's pad settings join Render (its rate, bits and level are the same ones the tracker rows set), and the
     // mastering window's button joins Mastering.
     if (name === 'Render & export'){ const x = $('pExport'); if (x){ x.hidden = false; sec.append(x);
       for (const id of ['segRate', 'segBits', 'segNorm']){ const r = $(id) && $(id).closest('.segrow'); if (r) r.hidden = trk; } } }
     if (name === 'Mastering'){ const x = $('pMaster'); if (x){ x.hidden = false; sec.append(x); } }
-    if (name === 'Song') irsUI(sec);
+    if (name === 'Song' && !SET_SHEETS) irsUI(sec);   // (with the sheets, the IRs are in Song settings…)
   }
   list.append(el('div', 'setbuild', buildStamp()));   // which build this is (the Project and View menus both end with it)
   body.scrollTop = keep;
