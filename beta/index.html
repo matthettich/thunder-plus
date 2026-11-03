@@ -1190,6 +1190,10 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tagrid b.m{background:transparent; box-shadow:inset 0 0 0 1px var(--ar-dim); color:var(--ar-dim); text-decoration:line-through;
   background-image:repeating-linear-gradient(135deg, transparent 0 3px, var(--ar-empty) 3px 5px)}
 .tagrid b.p{background:var(--ar-pl); color:var(--ar-pl-ink); box-shadow:none}
+/* OFF-ONLY BLOCKS (owner, 2 Nov): a block that only stops notes: black with a red stop bar across, plainly not a pattern
+   that plays and not an empty one */
+.tagrid b.o:not(.p){background:var(--ink, #111) !important; color:#ff5a1f !important; box-shadow:inset 0 0 0 1px #ff5a1f}
+.tagrid b.o:not(.p)::after{content:''; position:absolute; left:3px; right:3px; top:50%; height:2px; margin-top:-1px; background:#ff5a1f; pointer-events:none}
 /* PLAYHEAD (owner, 31 Oct: too subtle): the playing blocks also get an outline in the skin's ink (dark on light skins, light
    on dark ones), and the playing row a faint band across every track */
 .tagrid b.p{outline:2px solid var(--ar-pl-ring, var(--ink)); outline-offset:-1px; position:relative; z-index:1}
@@ -16212,6 +16216,10 @@ const isEmptySect = c => !c || c.every(r => r[0] < 0);
 // blocks that actually play stand out from the empty placeholders.
 const sectHasData = v => { const c = S.chains[v]; return !!c && c.some(r => r[0] >= 0 && !isEmptyPhrase(S.phrases[r[0]])); };
 const isEmptyPhrase = p => !p || p.every(r => r.every(v => v < 0));
+// OFF-ONLY BLOCKS (owner, 2 Nov): a phrase whose only content is note OFFs (in its note columns): a "stop the track here"
+// block. Arrange draws it unlike both a playing block and an empty one.
+const isOffPhrase = p => !!p && p.some(r => r.slice(0, NCOL).some(v => v === OFF)) && p.every(r => r.every((v, i) => v < 0 || (i < NCOL && v === OFF)));
+const sectOffOnly = v => { const c = S.chains[v]; if (!c) return false; const P = c.filter(r => r[0] >= 0).map(r => S.phrases[r[0]]); return P.length > 0 && P.some(isOffPhrase) && P.every(p => isEmptyPhrase(p) || isOffPhrase(p)); };
 const plen = id => id >= 0 && S.plen ? clamp(S.plen[id] || S.dlen || 16, 1, PROWS) : (S.dlen || 16);
 const plpbOf = (Sx, id) => (id >= 0 && Sx.plpb && Sx.plpb[id]) || Sx.lpb || 4;
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -23965,10 +23973,11 @@ function drawArr(PH){
       const grp = BG.get(t); if (grp){ cls += 'bg '; sty = ` style="--bgc:${grp}"`; }
       if (v >= 0){
         const empty = isEmptySect(S.chains[v]) || !sectHasData(v), ph = firstPhrase(v);   // EMPTY BLOCKS (31 Oct): a block whose phrases have nothing in them is striped
-        cls += empty ? 'z' : 'f'; lab = sectsOn || ph < 0 ? hp(v) : hp(ph);
-        if (blockMuted(S, y, t)) cls = cls.replace(/[zf]$/, 'm');
+        const offb = !empty && sectOffOnly(v);   // OFF-ONLY BLOCKS (2 Nov)
+        cls += empty ? 'z' : offb ? 'o' : 'f'; lab = sectsOn || ph < 0 ? hp(v) : hp(ph);
+        if (blockMuted(S, y, t)) cls = cls.replace(/[zfo]$/, 'm');
         // Coloured by the instrument its phrase plays, with the phrase's notes as ticks when the blocks are big.
-        if (!empty && ph >= 0){ const pi = phraseInfo(ph), bc = S.bcol && TCOL[S.bcol[v] | 0];   // BLOCK COLOURS first
+        if (!empty && !offb && ph >= 0){ const pi = phraseInfo(ph), bc = S.bcol && TCOL[S.bcol[v] | 0];   // BLOCK COLOURS first
           if (bc) sty = grp ? ` style="--bgc:${bc};--ib:${bc};--ibp:100%"` : ` style="--ib:${bc};--ibp:100%"`;   // (over a bus group's colour too)
           else if (grp) sty = ` style="--bgc:${grp};--ib:${grp}"`; else if (pi.inst >= 0) sty = ` style="--ib:${instHue(pi.inst)};--ibp:${100 - (pi.inst % 5) * 17}%"`;
           if (arRH >= 26 && pi.hits) lab += pi.hits; }
