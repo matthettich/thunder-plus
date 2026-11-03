@@ -19063,6 +19063,8 @@ function tStop(quiet){
     const ref = P[want] && P[want].row >= 0 && want !== MT ? want : P.findIndex((q, i) => q && q.row >= 0 && i !== MT);
     tp.paused = ref >= 0 ? {pos:P, ref, row:P[ref].row, step:P[ref].step, key:curKey()} : null;
   }
+  // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
+  const stopP = !quiet && stopCurOn && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
   tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null;
   if (tp.core){ tp.core = false; core.gen++; coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }
   else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
@@ -19072,6 +19074,7 @@ function tStop(quiet){
   songBtn();
   chainsTempo();
   bgPlay(false);   // BACKGROUND PLAY
+  if (stopP) try { if (curToPlay(stopP.P, stopP.mode) && tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
   if (!quiet) draw();
 }
 /* ===== REC, METRONOME AND COUNT-IN (20 Oct) =====
@@ -20153,7 +20156,33 @@ function setFollow(m){ m = m === true ? 2 : m === false ? 0 : clamp(m | 0, 0, 2)
    PLAYBACK RESUMES FROM PAUSE (off by default since build 318, this device): PLAY then carries on from that spot, to the step, as long as
    the cursor hasn't moved since; move it and PLAY starts from the cursor as before. Off: PLAY starts from the cursor. */
 const RSK = 'thunderplus-resume-v1';
-let resumeOn = (() => { try { return localStorage.getItem(RSK) === '1'; } catch(e){ return false; } })();   // off unless turned on (owner, 31 Oct: it was on by default)
+let resumeOn = (() => { try { return localStorage.getItem(RSK) === '1'; } catch(e){ return false; } })();
+/* STOP CURSOR (owner, 3 Nov: "I like having the edit cursor separate from the playback, but I keep expecting to be able to
+   stop playback and to edit the patterns playback stopped on"). Settings → STOP CURSOR, this device: THERE (the default)
+   puts the edit cursor where the song stopped (its song row, the cursor's track's phrase and step); STAYS leaves it.
+   STOP twice still goes to the top, RESUME still carries on from the spot. Alt+G (any time) puts the cursor on the playhead. */
+const STOPCUR_K = 'thunderplus-stopcur-v1';
+let stopCurOn = (() => { try { return localStorage.getItem(STOPCUR_K) !== '0'; } catch(e){ return true; } })();
+function setStopCur(on){ stopCurOn = on; try { localStorage.setItem(STOPCUR_K, on ? '1' : '0'); } catch(e){} draw(); }
+// The edit cursor onto a playing (or stopped) position: P = per-track positions, mode = the sequencer's mode. Returns true when it moved.
+function curToPlay(P, mode){
+  if (!P || !P.some(Boolean)) return false;
+  if (mode === 'song'){
+    const want = tv === 'song' ? cs.song.x : cTrack, t = P[want] && P[want].row >= 0 && want !== MT ? want : P.findIndex((q, i) => q && q.row >= 0 && i !== MT); if (t < 0) return false;
+    const q = P[t];
+    if (tv === 'phrase' && typeof pvActive === 'function' && pvActive()){ pvGo(t, q.row, null, q.step); return true; }
+    cs.song.y = q.row; if (tv === 'song') cs.song.x = t;
+    const VR = songViewRows(), top = cs.song.top || 0; if (q.row < top || q.row > top + VR - 1) cs.song.top = clamp(q.row - 2, 0, 256 - VR);
+    if (q.phrase >= 0){ cTrack = t; cPhrase = q.phrase; if (q.sect >= 0) cSect = q.sect; cs.phrase.y = clamp(q.step, 0, plen(q.phrase) - 1); if (cs.sect && q.cr != null) cs.sect.y = q.cr; }
+    return true; }
+  const q = P.find(x => x && x.phrase === cPhrase) || P.find(Boolean); if (!q || q.step == null) return false;
+  if (q.phrase >= 0 && q.phrase !== cPhrase && tv === 'phrase') return false;
+  cs.phrase.y = clamp(q.step, 0, plen(cPhrase) - 1); return true; }
+function playheadKey(){
+  const P = tp.on ? tp.pos : tp.paused && tp.paused.pos, mode = tp.on ? tp.mode : 'song';
+  if (!curToPlay(P, mode)) return toast('Nothing has played yet.', 1200);
+  if (!tp.on && tp.paused) tp.paused.key = curKey();   // RESUME still carries on from there
+  draw(); }   // off unless turned on (owner, 31 Oct: it was on by default)
 function setResume(on){ resumeOn = on; try { localStorage.setItem(RSK, on ? '1' : '0'); } catch(e){} draw(); }
 const curKey = () => [tv, cs.song.x, cs.song.y, cs.phrase.y, cs.sect.y, cPhrase, cSect, cTrack].join(',');
 // Pads mode: OPTION + arrows move around the Song grid, in the phrase editor (phraseGrid) and on the Song screen (songGridDir).
@@ -20841,6 +20870,8 @@ function projRows(){
       info:() => 'In a phrase. TRACKS (as Renoise): Tab / Shift+Tab go to the next / previous track’s phrase. COLUMNS: they step note → instrument → FX1 → FX2 → FX3, so the instrument is one press away'},
     {l:'RESUME', ck:'Playback resumes from pause', get:() => resumeOn ? 1 : 0, set:v => setResume(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'ON: after you stop the song, PLAY carries on from where it stopped (the playhead stays there to show it), unless you have moved the cursor since. OFF: PLAY starts from the cursor, as before. Either way the stopped spot stays lit'},
+    {l:'STOP CURSOR', segs:true, get:() => stopCurOn ? 1 : 0, set:v => setStopCur(!!v), min:0, max:1, d:1, fmt:v => v ? 'THERE' : 'STAYS',
+      info:() => 'THERE: when you stop the song, the edit cursor goes to where it stopped (the song row, your track’s phrase and step), ready to edit. STAYS: the cursor stays where you left it. STOP twice still goes to the top; Alt+G puts the cursor on the playhead at any time'},
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. A poly track shows its whole chord: all four notes when there is room (unfolded, desktop), otherwise one letter per voice (capital = natural, small = sharp, so CEGa is C E G A#; · is an empty voice, × a note off). Only to look at; they can’t be edited'},
     {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText({title:'Rename the song'}, S.name, 40, 'Rename'); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); } }, info:() => 'EDIT renames the song'},
@@ -26860,7 +26891,8 @@ function globalKeys(e){
   if (mod && !e.altKey && !e.shiftKey && e.code === 'KeyI'){ if (!e.repeat) interpSel(); return true; }   // Renoise's Interpolate
   if (mod && !e.altKey && e.shiftKey && (e.code === 'Comma' || e.code === 'Period')){ if (!e.repeat) stretchSel(e.code === 'Period'); return true; }   // Shrink / Expand
   if (mod && !e.altKey && e.shiftKey && e.code === 'KeyF' || (!mod && !e.altKey && e.key === 'ScrollLock')){ if (!e.repeat) followKey(); return true; }   // Ableton's key
-  if (e.altKey && !mod && e.key === 'Enter'){ if (!e.repeat) playRowKey(!e.shiftKey); return true; }   // the row under the cursor: every track · Shift: this track
+  if (e.altKey && !mod && e.key === 'Enter'){ if (!e.repeat) playRowKey(!e.shiftKey); return true; }
+  if (e.altKey && !mod && !e.shiftKey && e.code === 'KeyG'){ if (!e.repeat) playheadKey(); return true; }   // STOP CURSOR: the cursor onto the playhead   // the row under the cursor: every track · Shift: this track
   if (e.altKey && !mod && !e.shiftKey && (e.code === 'KeyL' || e.code === 'Comma' || e.code === 'Period')){
     if (e.repeat && e.code === 'KeyL') return true;
     if (e.code === 'KeyL') toggleLoopPat(); else transposeSel(e.code === 'Period' ? 1 : -1);
