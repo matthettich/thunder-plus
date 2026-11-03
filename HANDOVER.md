@@ -119,6 +119,11 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (20): meters take Alt-click to mute (build 393)
+
+- Owner: the meters too. `#tMeters` buttons: a mouse click picks the track (Song / Mixer cursor, else cTrack; the song cursor
+  unless Arrange has the keys), Alt/⌥-click mutes; touch taps still mute. Right-click solos as before.
+
 ## 3 Nov (19): transpose lock plays the first note (build 392)
 
 - Owner: with the top bar's transpose lock on, ▲ / ▼ should play the first note being transposed. `keyTransArrow`: ▲ / ▼
