@@ -19631,6 +19631,29 @@ const FX_FACTORY = {
   air:[['Airy', {air:190}], ['Ground', {gnd:190, air:110}]],
   dub:[['Dub', {amt:200}]],
 };
+// MORE FACTORY PRESETS (owner, 2 Nov: "more presets for most of the effects"): added to the lists above, so every effect
+// has at least four. Values are the rows' own numbers, as above.
+const FX_FACTORY_MORE = {
+  preverb:[['Shimmer octave', {mode:0, size:200, fb:150, pitch:36, tone:180, mix:110}], ['Fifth pad', {mode:1, pitch:31, size:180, fb:130, mix:100}], ['Dual octaves', {mode:2, pitch:36, pitch2:12, size:210, fb:160, mix:120}], ['Dark sub swell', {mode:1, pitch:12, size:220, fb:170, tone:70, mix:110}]],
+  folder:[['Soft warmth', {gain:80, offset:128, out:180, mix:200}], ['Bass growl', {gain:190, offset:110, out:130}], ['Parallel fold', {gain:220, offset:150, out:140, mix:110}]],
+  autowah:[['Slow sweep', {wah:90, level:210}], ['Quack', {wah:230, level:190}], ['Parallel wah', {wah:170, mix:140}]],
+  xmod:[['Ring sine', {alg:40, carrier:1, note:60, mix:200}], ['Saw grind', {alg:150, timbre:180, carrier:3, note:36}], ['Fold tri', {alg:110, timbre:200, carrier:2, note:48}], ['Vocoder-ish', {alg:230, timbre:150, carrier:3, note:48, mix:220}]],
+  lofi:[['Crunchy', {rate:110, rez:90, hard:230}], ['Dust', {rate:200, rez:210, hard:80, mix:200}], ['Tape lo-fi', {rate:150, rez:150, hard:120, mix:180}]],
+  drive:[['Gentle', {drive:60}], ['Glue', {drive:110}], ['Full', {drive:240}]],
+  air:[['Sparkle', {air:190, gnd:128}], ['Dark and full', {air:70, gnd:180}], ['Open top', {air:170, gnd:110}], ['Thin', {air:150, gnd:60}]],
+  vinyl:[['Clean master', {mlow:40, slow:60, hlim:40, wear:30}], ['Club vinyl', {mlow:90, slow:110, hlim:90, wear:110}], ['Thrift store', {mlow:120, slow:140, hlim:140, wear:200}]],
+  dub:[['Light tape', {amt:70}], ['Dub thick', {amt:180}], ['Saturated', {amt:240}], ['Parallel dub', {amt:220, mix:140}]],
+  tube:[['Gentle glow', {input:110, tube:100}], ['Bass tube', {input:170, tube:180}], ['Crushed', {input:240, tube:250}]],
+  spring:[['Surf', {decay:170, chirp:220, drip:220, mix:110}], ['Dark spring', {decay:180, tone:70, drip:120, mix:100}], ['Long tank', {decay:240, length:200, mix:120}]],
+  ensemble:[['String machine', {mode:0, rate:120, depth:160, mix:150}], ['Classic I', {mode:1, depth:140, mix:128}], ['Classic I+II', {mode:3, depth:170, tone:150, mix:150}]],
+  dimension:[['Subtle', {mode:0, width:150}], ['Wide', {mode:2, width:200}], ['Widest', {mode:3, width:240, tone:170}]],
+  stretch:[['Smooth drone', {amt:230, win:4, mix:200}], ['Granular haze', {amt:160, win:1, tone:150, mix:150}], ['Dark freeze', {freeze:1, win:3, tone:70, mix:220}]],
+  autotune:[['Hard tune C minor', {key:0, scale:2, speed:0, mix:255}], ['Natural major', {key:0, scale:1, speed:60, humanize:80}], ['Octave down', {trans:-12, speed:20}], ['Pentatonic snap', {scale:5, speed:8}]],
+  rotary:[['Slow organ', {speed:1, drive:60, spread:200}], ['Fast horn', {speed:2, accel:160, spread:230}], ['Driven Leslie', {speed:2, drive:170, balance:150}], ['Stopped', {speed:0, drive:80}]],
+  utility:[['Mono', {mono:1}], ['−6 dB', {gain:150}], ['Hard left', {pan:0}], ['Hard right', {pan:255}], ['Flip polarity', {flip:3}]],
+  envfilt:[['Funk wah', {mode:1, depth:220, res:180, attack:60, release:110}], ['Low-pass bloom', {mode:0, freq:60, depth:230, res:140, release:180}], ['Hi-pass spit', {mode:2, freq:120, depth:200, res:160}], ['Dirty quack', {mode:1, depth:240, res:210, drive:140}]],
+};
+for (const k in FX_FACTORY_MORE) FX_FACTORY[k] = (FX_FACTORY[k] || []).concat(FX_FACTORY_MORE[k]);
 function fxPreSongList(type){ const P = S.fxPre && S.fxPre[type]; return Array.isArray(P) ? P : []; }
 function fxPreApply(t, k, vals, name){
   const A = t >= NT ? S.mfx : S.tfx[t], f = A && A[k]; if (!f) return;
@@ -27015,6 +27038,8 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
     } finally { Math.random = R; }
     return out;
   },
+  // Every track effect: its group, factory preset count and controls (for preset work).
+  fxInfo(){ return Object.keys(TFX).filter(k => !isPumpT(k)).map(k => ({k, n:TFX[k].n, long:TFX[k].long, g:fxtGroup(k), fac:(FX_FACTORY[k] || []).length, facv:(FX_FACTORY[k] || []), ps:(TFX[k].ps || []).map(p => ({k:p.k, l:p.l, min:p.min, max:p.max, d:p.d, names:p.names || null}))})); },
   // The open phrase's rows, and the PSL command's number (for generator checks).
   phrase(){ return {rows:JSON.parse(JSON.stringify(S.phrases[cPhrase] || [])), len:plen(cPhrase), psl:PSL_I(), FX0, RW, VC, IC}; },
   // What playback and the song cursor are doing now (for follow / paging checks).
