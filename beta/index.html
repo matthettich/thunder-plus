@@ -1491,10 +1491,10 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkFxBar .dkfc .fviz{flex:1 1 0; min-height:0; position:relative; margin:0 6px 6px}
 #dkFxBar .dkfc .fviz canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
 #dkFxBar .dkfc.off .fviz{opacity:.4}
-#dkFxBar .dkfc.dyn .fcb, #dkFxBar .dkfc.dyn .fviz{margin-right:18px}
-#dkFxBar .dkfc .fgr{position:absolute; right:5px; top:34px; bottom:6px; width:8px; background:var(--track)}
-#dkFxBar .dkfc .fgr i{position:absolute; left:0; right:0; top:0; height:0; background:#ff5a1f}
-#dkFxBar .dkfc .fgr::before{content:'GR'; position:absolute; bottom:100%; left:-3px; font:700 7px var(--mono); color:var(--muted)}
+#dkFxBar .dkfc.dyn .fcb, #dkFxBar .dkfc.dyn .fviz{margin-right:44px}
+/* DYNAMICS METERS (owner, 2 Nov: "traditional compression metering … threshold in addition to gain reduction"): IN, GR and
+   OUT bars like a hardware compressor's, a threshold line across IN and OUT, the peak values held under them. */
+#dkFxBar .dkfc .fdm{position:absolute; right:5px; top:32px; width:38px; height:calc(100% - 38px); display:block}
 #dkFxBar .dkadd{flex:0 0 96px; align-self:stretch; border:1.5px dashed var(--line); background:transparent; color:var(--ink); font-weight:700; font-size:var(--fs-3); letter-spacing:.06em; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px}
 #dkFxBar .dkadd small{font-family:var(--mono); font-weight:400; font-size:var(--fs-1); color:var(--muted)}
 #dkFxBar .dkadd:hover{background:var(--panel)}
@@ -23251,7 +23251,7 @@ function deckFxBar(){
       nm.title = D.long + ' · open it on the FX screen'; nm.addEventListener('click', () => goFx(k));
       const m = el('div', 'fm'); m.append(el('i')); h.append(on, nm); col.append(h, m, b);
       const vz = el('div', 'fviz'); vz.append(document.createElement('canvas')); col.append(vz); col._h = new Float32Array(90); col._w = 0; col._q = 0;
-      if (isFxDyn(f.type)){ col.classList.add('dyn'); const gr = el('div', 'fgr'); gr.append(el('i')); gr.title = FXLV.has(f.type) ? 'How much it changes the level' : 'Gain reduction (0 to 24 dB, held briefly)'; col.append(gr); }
+      if (isFxDyn(f.type)){ col.classList.add('dyn'); const dm = document.createElement('canvas'); dm.className = 'fdm'; dm.title = FXLV.has(f.type) ? 'IN, the change in level, OUT' : 'IN level, gain reduction (0 to 24 dB) and OUT level; the line is the threshold'; col.append(dm); }
       const getF = () => FA()[k];
       for (const q of D.ps){
         const r = el('div', 'fr'), lb = el('b', null, q.l), v = el('span'); r.append(lb, v); b.append(r);
@@ -23292,14 +23292,49 @@ function deckFxBarMeters(){
     if (now - c._q < 33) continue; c._q = now; c._h[c._w] = lv; c._w = (c._w + 1) % c._h.length;
     try { dkFxViz(c, A[k], k, node, now); } catch(e){} }
 }
+// DYNAMICS METERS: three bars (IN, GR, OUT) for a dynamics slot, from the same reports as the curve display (node.dyn: the
+// slot's reduction, input and output levels), with its threshold drawn across IN and OUT and the held peaks under them.
+function dkDynMeters(cv, f, k, node, now){
+  const W = cv.clientWidth, H = cv.clientHeight; if (W < 20 || H < 40) return;
+  const dpr = devicePixelRatio || 1; if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const lv = FXLV.has(f.type), key = k + ':' + f.type, D = node && node.dyn && node.dyn.get(k), live = D && D.key === key && now - D.t < 600;
+  const cur = live ? D.cur : [0, -120, -120], hold = live ? D.hold : [0, -120, -120];
+  let c = null; try { c = lv ? null : FXDYN[f.type](TFX[f.type].map(f, ctx ? ctx.sampleRate : 48000, S.bpm)); } catch(e){}
+  const st = getComputedStyle(cv), ink = st.color || '#111', font = st.fontFamily || 'monospace';
+  const top = 10, bot = H - 12, bh = bot - top, bw = Math.floor((W - 8) / 3), gap = 4;
+  const lvY = db => top + (FXD_HI - Math.max(FXD_LO, Math.min(FXD_HI, db))) / (FXD_HI - FXD_LO) * bh;   // −60 … +6 dB
+  const bars = [['IN', cur[1], hold[1]], ['GR', cur[0], hold[0]], ['OUT', cur[2], hold[2]]];
+  g.font = '700 7px ' + font; g.textBaseline = 'top'; g.textAlign = 'center';
+  bars.forEach(([lab, v, hv], i) => {
+    const x = i * (bw + gap);
+    g.fillStyle = 'rgba(128,128,128,.22)'; g.fillRect(x, top, bw, bh);
+    if (i === 1){   // GR hangs from the top: 0 to 24 dB (the level-only effects: the change, ±12 dB)
+      const fr = lv ? Math.min(1, Math.abs(v) / 12) : Math.min(1, Math.max(0, -v) / FXD_GR), hf = lv ? Math.min(1, Math.abs(hv) / 12) : Math.min(1, Math.max(0, -hv) / FXD_GR);
+      g.fillStyle = '#ff5a1f'; g.fillRect(x, top, bw, Math.round(fr * bh));
+      g.fillStyle = ink; g.fillRect(x, top + Math.round(hf * bh) - 1, bw, 2);
+    } else {
+      const y = lvY(v), hy = lvY(hv);
+      if (v > FXD_LO){ g.fillStyle = v > -1 ? '#e0564a' : v > -12 ? '#e8b93c' : '#4fd18a'; g.fillRect(x, y, bw, bot - y); }
+      if (hv > FXD_LO){ g.fillStyle = ink; g.fillRect(x, Math.round(hy) - 1, bw, 2); }
+    }
+    g.fillStyle = ink; g.globalAlpha = .7; g.fillText(lab, x + bw / 2, 0); g.globalAlpha = 1;
+    const val = i === 1 ? (lv ? hv : -Math.max(0, -hv)) : hv;
+    g.fillText(i !== 1 && hv <= FXD_LO ? '−∞' : (val > .05 ? '+' : val < -.05 ? '−' : '') + Math.abs(val).toFixed(i === 1 ? 1 : 0), x + bw / 2, bot + 3);
+  });
+  if (c && c.thr != null){   // THRESHOLD across IN and OUT, labelled
+    const ty = Math.round(lvY(c.thr)) + .5; g.strokeStyle = '#ff5a1f'; g.lineWidth = 1.5; g.setLineDash([3, 2]);
+    g.beginPath(); g.moveTo(0, ty); g.lineTo(bw, ty); g.moveTo(2 * (bw + gap), ty); g.lineTo(W, ty); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#ff5a1f'; g.textAlign = 'left'; g.font = '700 7px ' + font; g.fillText('T', bw + 1, Math.max(top, ty - 4));
+  }
+}
 /* FX BAR pictures, in the room under each effect's values (none when the values fill the box). Dynamics (the FX stage's own
    display, fxDynPaint): the transfer curve with the live input dot and the reduction history; every other effect: its
    output level over the last ~3 s, so you can see what it is doing to the sound. Colours from the skin's screen (fxDynPal). */
 function dkFxViz(col, f, k, node, now){
   const cv = col.querySelector('.fviz canvas'); if (!cv || !f) return;
-  const grb = col.querySelector('.fgr i');
-  if (grb){ const D0 = node && node.dyn && node.dyn.get(k), live = D0 && D0.key === k + ':' + f.type && now - D0.t < 600, v = live ? D0.hold[0] : 0;
-    grb.style.height = Math.round((FXLV.has(f.type) ? Math.min(1, Math.abs(v) / 12) : Math.min(1, -v / FXD_GR)) * 100) + '%'; }
+  const dm = col.querySelector('canvas.fdm');
+  if (dm && isFxDyn(f.type)) try { dkDynMeters(dm, f, k, node, now); } catch(e){}
   const W = cv.clientWidth, H = cv.clientHeight; if (W < 40 || H < 30){ if (cv.width) cv.width = 0; return; }
   const dpr = devicePixelRatio || 1; if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); const font = getComputedStyle(cv).fontFamily || 'monospace';
