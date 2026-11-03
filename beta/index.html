@@ -18294,8 +18294,12 @@ function coreMsg(d){
       if (e.vk && !e.core) try { varWant(e); } catch(err){}
       { const k = (e.core ? 'core ' : 'page ') + e.type + (e.type === 'note' && !e.core ? ' pad ' + e.pad : ''); core.tally.set(k, (core.tally.get(k) || 0) + 1); }
       const midiOnly = moEv(e);
-      if (e.core){ if (e.type === 'note'){ coreWireT(e.track); rt.pl.coreTake(e); padBlink(e); } continue; }   // (a beat: the core drives the effects' clock; moEv above still kept MIDI clock's mx.beat)
+      if (e.core){ if (e.type === 'note'){ coreWireT(e.track); rt.pl.coreTake(e); if (e.t >= ctx.currentTime - 0.03) padBlink(e); } continue; }   // (a beat: the core drives the effects' clock; moEv above still kept MIDI clock's mx.beat)
       if (midiOnly) continue;
+      // LATE (owner, Fold: back from another app it sped up and stuttered): rows held up while the app was in the background
+      // arrive together; a note whose time has passed is dropped, not played at once in a burst (the old pump skips ahead
+      // the same way). Commands that set a state (effects, levels, OFF) still apply.
+      if (e.type === 'note' && e.t < ctx.currentTime - 0.03) continue;
       rt.pl.play(e); if (e.type === 'note') padBlink(e);
     }
     tp.q.push({t:r.t, pos:r.pos, bpm:r.bpm, tks:r.tks, line:r.line});
