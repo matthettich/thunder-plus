@@ -19796,7 +19796,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 371;
+const BUILD = 372;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22146,15 +22146,18 @@ function acidRead(P, y0, L, base){
     for (let m = FX0; m < RW; m += 2) if (nx[m] === PSL_I()) st[i].slide = true; }
   return st;
 }
+// FULL ROWS (owner's punch list, 2 Nov): a slide whose note already has all three FX columns used was dropped. It takes
+// the last column now (that command is replaced, and the toast says how many were); Undo brings it back.
 function acidWrite(P, y0, L, base, st, ins){
-  const psl = PSL_I();
+  const psl = PSL_I(); let over = 0;
   for (let i = 0; i < L; i++){ const r = P[y0 + i], s = st[i], prev = st[(i - 1 + L) % L];
     for (let m = FX0; m < RW; m += 2) if (r[m] === psl){ r[m] = -1; r[m + 1] = -1; }
     for (let c = 1; c < NCOL; c++) r[c] = -1;
     if (s.gate === ACID_NOTE){ r[0] = clamp(base + s.note, 0, 119); r[IC] = ins; r[VC] = s.accent ? 0xFF : -1;
-      if (prev.slide && (i > 0 || L > 1)){ let m = FX0; while (m < RW && r[m] >= 0) m += 2; if (m < RW){ r[m] = psl; r[m + 1] = 3; } } }
+      if (prev.slide && (i > 0 || L > 1)){ let m = FX0; while (m < RW && r[m] >= 0) m += 2; if (m >= RW){ m = RW - 2; over++; } r[m] = psl; r[m + 1] = 3; } }
     else { r[0] = s.gate === ACID_REST && prev.gate !== ACID_REST ? OFF : -1; r[VC] = -1; r[IC] = -1; }   // a tie: empty (the note holds); a rest: OFF after a sounding step
   }
+  return over;
 }
 function acidLine(){
   if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Acid line writes a bass line into it.');
@@ -22169,9 +22172,9 @@ function acidLine(){
     const st = acidRead(P(), y0, L, acidSet.base), lanes = acidSet.lanes;
     if (!ACID_LANES.some(([k]) => lanes[k])) return toast('Light at least one lane: NOTES, OCTAVES, ACCENTS, SLIDES or TIME.');
     if (mut) acidMutate(st, L, lanes, R(), Math.random); else acidRoll(st, L, lanes, R(), Math.random);
-    acidWrite(P(), y0, L, acidSet.base, st, ins); saveS(); draw();
+    const over = acidWrite(P(), y0, L, acidSet.base, st, ins); saveS(); draw();
     const nN = st.filter(s => s.gate === ACID_NOTE).length;
-    toast(`${mut ? 'Mutated' : 'Generated'}: ${nN} notes, ${st.filter(s => s.accent).length} accents, ${st.filter(s => s.slide).length} slides · rows ${rS(y0)}–${rS(y0 + L - 1)}`, 1600);
+    toast(`${mut ? 'Mutated' : 'Generated'}: ${nN} notes, ${st.filter(s => s.accent).length} accents, ${st.filter(s => s.slide).length} slides · rows ${rS(y0)}–${rS(y0 + L - 1)}` + (over ? ` · ${over} slide${over === 1 ? '' : 's'} replaced FX3 on a full row` : ''), over ? 3000 : 1600);
   };
   // the panel: an .ask dialog that stays open, so the line can be rolled again while it plays
   if (askOpen) askOpen(null);
@@ -25446,7 +25449,7 @@ function glitchScan(){
   const ps = ctx.playbackStats;
   if (ps && typeof ps.underrunEvents === 'number'){
     if (glitch.base == null) glitch.base = ps.underrunEvents;
-    const k = ps.underrunEvents - glitch.base; if (k > glitch.n){ glitch.n = k; glitch.t = performance.now(); }
+    const k = ps.underrunEvents - glitch.base; if (k > glitch.n){ glitch.n = k; glitch.t = performance.now(); dropNote(); }
     return;
   }
   if (!ctx.getOutputTimestamp) return;
@@ -25454,11 +25457,23 @@ function glitchScan(){
   const off = ts.performanceTime - ts.contextTime * 1000;
   if (glitch.off == null){ glitch.off = off; return; }
   const d = off - glitch.off;
-  if (d > 12){ glitch.n++; glitch.t = performance.now(); glitch.off = off; }
+  if (d > 12){ glitch.n++; glitch.t = performance.now(); glitch.off = off; dropNote(); }
   else if (d < -12) glitch.off = off;          // a resume or a clock re-sync: start again from here
   else glitch.off += d * 0.05;                 // follow the two clocks' slow drift
 }
 setInterval(glitchScan, 100);
+/* DROPOUT TIP (owner's punch list, 2 Nov: phones that stutter). Four dropouts within a minute while the song plays, on a
+   latency other than Safest: once (ever), a toast offers Safest, which gives the audio thread a bigger buffer. It reloads
+   the app (the song and kit are saved first). */
+const dropTip = {ts:[]};
+function dropNote(){
+  if (!tp || !tp.on || latOf() === 'playback') return;
+  const now = performance.now(); dropTip.ts = dropTip.ts.filter(t => now - t < 60000); dropTip.ts.push(now);
+  if (dropTip.ts.length < 4) return; dropTip.ts = [];
+  try { if (localStorage.getItem('thunderplus-seen-droptip')) return; localStorage.setItem('thunderplus-seen-droptip', '1'); } catch(e){ return; }
+  toastAct('Playback keeps dropping out. Latency: Safest gives the audio a bigger buffer (the app reloads; your song is kept).', 'Use Safest',
+    () => { aset.lat = 'playback'; aset.latPick = true; asetSave(); try { save(); } catch(e){} applyUpdate(); });
+}
 function cpuMeter(){
   const now = performance.now(); if (now - cpu.t < 500) return; cpu.t = now;
   const b = $('tCpu'); if (!b) return;
@@ -26870,6 +26885,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [372, '2 Nov', ['Acid line: a slide into a note whose three FX columns are full is no longer dropped: it takes FX3 (the toast says so; Undo brings the old command back).', 'Phones: if the song keeps dropping out (four in a minute), a tip offers Latency: Safest once.']],
   [371, '2 Nov', ['New skins (View → Skin): a Design icons group with Bauhaus, Swiss (International style), De Stijl (Mondrian), Memphis, Valentine (Sottsass red), Eames (mid-century), Vignelli (subway signs) and Bondi (translucent 98); and in Hardware, DX7 and Pea-green LCD.']],
   [370, '2 Nov', ['Menus, second pass: every group has a heading (File: Project, Render, Import, export & kit; Edit: History, Clipboard, Select, Rows, Song blocks, Track, Make, Play; Audio: Output, Engine; MIDI: Input, Output ports, Clock; App: Layout, Updates & help, Storage; View: Size, Display, More). On/off settings are switches on the right; Song settings, Skin and Open mastering are rows with a › that open their sheet. FLX 11–FF keeps its capitals.']],
   [369, '2 Nov', ['New effect: pSTRP, pump’s channel strip (Dynamics and EQ in the FX list): eight console styles with gate, compressor, EQ and drive in one slot, and 29 presets. Works on every track, buses and the master.']],
