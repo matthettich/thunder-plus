@@ -19605,7 +19605,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 366;
+const BUILD = 367;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26673,6 +26673,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [367, '2 Nov', ['Fixed: the Hardware skins (Vintage MPC, Nord red, 808, 909, Dr. Sample, M8) didn’t show in the skin list.']],
   [366, '2 Nov', ['New skin: M8 (pocket tracker), in the Hardware group: a black screen, a pixel-style mono everywhere, cyan cursor, magenta and green accents.']],
   [365, '2 Nov', ['New skins (View → Skin…): a Hardware group with Vintage MPC, Nord red, 808, 909 and Dr. Sample (SP-202), and Wes Anderson (pastel hotel) under Art & design.']],
   [364, '2 Nov', ['New preset groups (Synth → Presets…): Hack (Roentgen): 8 sounds after The Hacker vs Commuter’s Roentgen PT 2: driven 808, zaps, snare, hat, sub, stab, noise wash. Owls (Wake): 11 sounds after Wake’s Encounters With Owls: kicks, hats, click, blip, drone and sub bass, chord pad, glass drone, glitch bass.']],
@@ -26907,7 +26908,7 @@ const hexCon = (a, b) => { const x = hexLum(a), y = hexLum(b); return (Math.max(
 function skinGroups(){
   const used = new Set(SKIN_GROUPS.flatMap(([, ids]) => ids)), light = [], dark = [];
   for (const k of SKINS) if (!used.has(k.id)) (hexLum(k.dots[0]) > 0.3 ? light : dark).push(k.id);
-  return [SKIN_GROUPS[0], SKIN_GROUPS[1], ['Simple', light], ['Simple dark', dark], SKIN_GROUPS[4], SKIN_GROUPS[2], SKIN_GROUPS[3]]
+  return [SKIN_GROUPS[0], SKIN_GROUPS[1], ['Simple', light], ['Simple dark', dark], SKIN_GROUPS[4], ...SKIN_GROUPS.slice(5), SKIN_GROUPS[2], SKIN_GROUPS[3]]   // (groups after the first five: Hardware…; they were left out)
     .map(([n, ids]) => [n, ids.map(id => SKINS.find(k => k.id === id)).filter(Boolean)]).filter(([, ks]) => ks.length);
 }
 // A tiny tracker in the skin's four colours: the background, the most readable of the others for the text, then the
