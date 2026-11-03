@@ -46,6 +46,8 @@ class Auto {
   target(v, t, tc){ this.ins({k:2, t, v, tc:Math.max(1e-5, tc)}); }
   curve(fn, t, d){ this.ins({k:3, t, d, fn}); }
   cancel(t){ this.ev = this.ev.filter(e => e.t < t); }
+  // The value from time t on, when nothing moves it any more (a constant), else null: the sampler's fast path
+  constFrom(t){ const A = this.ev; if (!A.length) return this.v0; const e = A[A.length - 1]; return e.t <= t && (e.k === 0 || e.k === 1) ? e.v : null; }
   // Drop what is over by time t (the beat clock gets an event a step for as long as the song plays)
   prune(t){ if (this.ev.length < 48) return; const v = this.at(t), fut = this.ev.filter(e => e.t > t || (e.k === 3 && e.t + e.d > t)); this.v0 = v; this.ev = [{k:0, t, v}, ...fut]; }
   at(t){
@@ -198,7 +200,7 @@ class ThunderCore extends AudioWorkletProcessor {
     const s = this.seq;
     if (s){
       const rows = []; let n = 0;
-      while (s.alive() && s.time < currentTime + this.LEAD && n++ < 64){
+      while (s.alive() && s.time < currentTime + this.LEAD && n++ < 3){   // at most 3 steps a block: a longer LEAD (screen off) fills over a few blocks, not in one burst that overruns it
         const r = s.step();
         for (const e of r.evs) if (this.ev(e)) e.core = true;
         rows.push({t:r.t, evs:r.evs, pos:r.pos, tks:r.tks, line:r.line, bpm:s.bpm});
@@ -209,9 +211,20 @@ class ThunderCore extends AudioWorkletProcessor {
     // 2. sound the voices into their tracks' outputs
     const N = (outputs[0] && outputs[0][0] && outputs[0][0].length) || 128, sr = sampleRate, dt = 1 / sr;
     { const C = outputs[NT] && outputs[NT][0]; if (C){ const A = this.clk; A.prune(currentTime); if (!A.ev.length && A.v0 === 0) C.fill(0); else for (let i = 0; i < N; i++) C[i] = A.at(currentTime + i * dt); } }
+    const tb0 = currentTime, tb1 = currentTime + N * dt;
     for (const v of this.alive){
       const out = outputs[v.track]; if (!out || !out[0]){ continue; }
       const L = out[0], R = out[1] || out[0], D = v.data, len = D.length, inc0 = v.sr / sr;
+      // FAST PATH (the usual case: a note that is just playing): gain, fade, pan and pitch don't move in this block
+      const gc = v.trm ? null : v.g.constFrom(tb0), fc = v.f.constFrom(tb0), pc = v.apn ? null : v.pn.constFrom(tb0), rc = v.r.constFrom(tb0);
+      if (gc != null && fc != null && pc != null && rc != null && v.t0 <= tb0 && v.end >= tb1){
+        const k = gc * fc, a = (pc + 1) * Math.PI / 4, kl = k * Math.cos(a), kr = k * Math.sin(a), inc = rc * inc0; let p = v.pos;
+        for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, x = D[j] + (D[j + 1] - D[j]) * (p - j); L[i] += x * kl; R[i] += x * kr; p += inc; }
+        v.pos = p;
+        if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const q = T.indexOf(v); if (q >= 0) T.splice(q, 1); } }
+        continue;
+      }
+      for (const A of [v.g, v.f, v.pn, v.r]) A.prune(tb0);
       for (let i = 0; i < N; i++){
         const t = currentTime + i * dt;
         if (t < v.t0) continue;
