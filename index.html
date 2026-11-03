@@ -24005,7 +24005,17 @@ arrGrid.addEventListener('scroll', () => {
 }, {passive:true});
 // A tap moves the song cursor there (from the phrase screen it opens that block's phrase); a second tap on the
 // same block opens its phrase. Holding a block, or Alt-clicking it, mutes just that block.
+let arrEmptyTap = {t:0, k:''};
 function arrGo(y, t){
+  // DOUBLE-CLICK AN EMPTY CELL beside any screen too (owner, 2 Nov): a new empty pattern there; on Phrase it opens. Its own
+  // tap memory, since the paging and empty-cell rules below take the first click.
+  { const k = y + ':' + t, now = performance.now(), empty = !(S.song[y] && S.song[y][t] >= 0);
+    if (empty && t !== MT && !sectsOn && !asongOn() && tv !== 'song'){
+      if (arrEmptyTap.k === k && now - arrEmptyTap.t < 380){
+        arrEmptyTap = {t:0, k:''}; cs.song.x = t; cs.song.y = y; cTrack = t; newBlock({x:t, y}, -1);
+        if (S.song[y][t] >= 0){ toast('New pattern ' + hp(firstPhrase(S.song[y][t])) + ' · track ' + d2(t + 1) + ' · row ' + rS(y, 3), 1600); if (tv === 'phrase'){ tv = 'song'; go('phrase'); return; } }
+        draw(); return; }
+      arrEmptyTap = {t:now, k}; } }
   if (!asongOn() && apArrGo(y, t)) return;   // ARRANGE PAGING: on Phrase a tap pages into Arrange instead
   // Beside any other screen a tap on an EMPTY cell just puts the song cursor there, highlighted, and the screen stays
   // (owner, 19 Oct: it used to open the Song screen). A block still goes to the Song screen, twice opens its phrase.
