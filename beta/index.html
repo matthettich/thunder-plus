@@ -12597,7 +12597,10 @@ function menuFill(host, items, pick, cls = 'fitem'){
       menuFill(box, subs, pick, cls);
       host.append(b, box); continue;
     }
-    b.append(el('span', null, it.l)); if (it.k) b.append(el('kbd', null, it.k));
+    // SHORT LABELS (menu audit, 2 Nov): "Clone (paste puts a unique copy)" shows as "Clone"; the part in brackets is the
+    // tooltip. A label that is only brackets, or a short one ("(all)") stays as it is.
+    const lm = /^(.*\S)\s+\(([^()]{8,})\)(…?)$/.exec(it.l || '');
+    b.append(el('span', null, lm ? lm[1] + lm[3] : it.l)); if (lm) b.title = lm[2].charAt(0).toUpperCase() + lm[2].slice(1); if (it.k) b.append(el('kbd', null, it.k));
     if (it.off) b.disabled = true;
     b.addEventListener('click', () => pick(it));
     host.append(b);
@@ -24379,10 +24382,10 @@ function sxCtx(y, t){
   if (SX.secs) items.push({l:songSecAt(r.y0) && songSecAt(r.y0).y === r.y0 ? 'Rename the section here…' : 'Name a section from row ' + rS(r.y0, 3) + '…', f:() => sxSecEdit(r.y0)});
   items.push(null, {l:'Remove from song (keep the phrase)', f:() => sxClearRect(r, true), off:!n}, {l:'Delete (the phrase too)', k:ks ? 'Del' : '', f:() => sxClearRect(r, false), off:!n},
     {l:r.y1 > r.y0 ? 'Remove these rows (the rows below move up)' : 'Remove row ' + rS(r.y0, 3) + ' (the rows below move up)', f:() => { const rr = {y0:r.y0, y1:r.y1}; songRowRemove(rr); sxPicks = []; }});   // REMOVE ROW (owner, 27 Oct; the range passed: 2 Nov)
-  // EDIT MENU / RIGHT-CLICK: Undo / Redo first, then the rest of the COMMANDS row this menu doesn't already have.
-  const C = cmdItems(), have = new Set(['cut', 'copy', 'paste', 'insp', 'clr', 'rmv', 'clone', 'cldn', 'undo', 'redo', 'rmrow']);
-  items.unshift(...C.filter(x => x && (x.a === 'undo' || x.a === 'redo')), null);
-  items.push(null, ...C.filter(x => !x || !have.has(x.a)));
+  // RIGHT-CLICK (menu audit, 2 Nov): only what acts on the block or rows under the pointer; Undo / Redo, selecting, value
+  // steps, navigation and play stay on their keys and in Edit ▾.
+  const C = cmdItems(), want = new Set(['mixp', 'dup', 'tname', 'unbus']);
+  items.push(null, ...C.filter(x => x && want.has(x.a)));
   return {title, items:menuTidy(items)};
 }
 
@@ -25042,7 +25045,10 @@ function cmdCtx(e){
   e.preventDefault();
   if (!$('gedit').hidden) geditToggle(false);
   const sel = selA && selA.v === tv;
-  sxMenu(e.clientX, e.clientY, VNAME[tv] + (sel ? ' · SELECTION' : ''), menuTidy(cmdItems()));
+  // RIGHT-CLICK (menu audit, 2 Nov): the commands for what's under the pointer; Undo / Redo, selecting, value steps,
+  // previous / next and play stay on their keys and in Edit ▾.
+  const DROP = new Set(['undo', 'redo', 'sel', 'all', 'b:16', 'b:1', 'b:-1', 'b:-16', 'prev', 'next', 'song']);
+  sxMenu(e.clientX, e.clientY, VNAME[tv] + (sel ? ' · SELECTION' : ''), menuTidy(cmdItems().filter(x => !x || !DROP.has(x.a))));
 }
 scr.addEventListener('contextmenu', cmdCtx);
 scr.addEventListener('wheel', () => sxMenuClose(), {passive:true});
