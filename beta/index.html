@@ -968,6 +968,12 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 .tpat{display:flex; align-items:stretch; flex:none; border-left:1px solid var(--line); font-variant-numeric:tabular-nums}
 .tclk{display:flex; align-items:center; gap:2px; padding:0 8px; font-size:var(--fs-2); white-space:nowrap; border-right:1px solid var(--line)}
 .tlen{font:600 var(--fs-2)/1 var(--mono); letter-spacing:.04em; white-space:nowrap; padding:.3em .6em; margin:0 4px; background:transparent; color:inherit; border:1px solid currentColor; border-radius:2px; cursor:pointer; min-width:8.5ch; text-align:center}
+/* SONG CLOCK, a readout (owner, 2 Nov: "it's obvious it's not a menu"): no box, a small label over big tabular digits; a tap
+   still switches LEFT / TO (dotted underline on hover) */
+.tlen, body.mob .top #tLen{display:inline-flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:2px; border:0; border-radius:0; background:transparent; box-shadow:none; min-width:6ch}
+.tlen .tlenl{font:600 var(--fs-1)/1 var(--mono); font-style:normal; letter-spacing:.14em; color:var(--muted)}
+.tlen .tlenv{font:700 var(--fs-4)/1 var(--mono); font-variant-numeric:tabular-nums; letter-spacing:.02em}
+.tlen:hover .tlenv{text-decoration:underline dotted; text-underline-offset:3px}
 .tclk b{font-weight:700; font-size:var(--fs-3)} .tclk .tce{cursor:text; padding:1px 2px; border-radius:2px} .tclk .tce:hover{background:var(--panel2)}
 .tclk .tcin{width:3.6ch; min-height:0; height:20px; padding:0 2px; font:inherit; font-weight:700; text-align:center; border:1px solid var(--ink); background:var(--panel); color:var(--ink); user-select:text; -webkit-user-select:text} .tclk small{font-size:8.5px; letter-spacing:.05em; color:var(--muted); margin-right:4px}
 .tclk.live b{color:var(--pl)}
@@ -1029,7 +1035,7 @@ body.mob .top > *{flex-shrink:0} body.mob .top .hmeter{flex:1 1 150px; min-width
 body.mob .top .kitname{width:auto; flex:1 1 90px; min-width:64px; max-width:220px; flex-shrink:1}   /* the Synth page: the kit name gives way (it pushed CPU and ? off the screen) */
 body.mob .top .brand{flex-shrink:1; min-width:0; overflow:hidden}
 #bFile .filei{display:none; width:20px; height:20px} body.mob #bFile .filei{display:block} body.mob #bFile .filet{display:none} body.mob #bFile{display:inline-flex; align-items:center; padding:0 12px}   /* the phone: a folder (owner: the ▾ alone was confusing) */
-body.mob .top #tLen{min-height:34px; padding:0 10px; border:1px solid var(--line); border-radius:0; background:var(--panel); font:700 var(--fs-3)/1 var(--mono); align-self:auto}
+body.mob .top #tLen{min-height:34px; padding:0 8px; align-self:auto}
 /* LOOP on the pad (owner): lit in its own colour while the pattern loops */
 #kLoop.on, #tPad #kLoop.on:not(#zz){background:#1f9d5c!important; color:#fff!important; border-color:#1f9d5c!important}
 :root[data-skin="idm"] #tPad #kLoop.on:not(#zz):not(#zz){background:#7cd0ff!important; color:#141414!important; border-color:#7cd0ff!important; text-shadow:none!important}   /* IDM (owner): light blue, apart from EDIT's blue */   /* tight: the pad's PLAY (SHIFT+PLAY) and the COMMANDS ▶ play the song */
@@ -1259,6 +1265,7 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tagrid b.c{outline:2px solid var(--ar-cur); outline-offset:0; position:relative; z-index:1}
 .tagrid b.c:not(.f):not(.m):not(.z):not(.p){color:var(--ar-dim)}
 .tafx{display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden}
+body.nohints #tHint, body.nohints .tafoot{display:none}   /* KEY HINTS off */
 /* Zoom (pinch, Ctrl+wheel, or the − + in the header): the blocks get up to 3× bigger and the grid scrolls sideways; the
    track numbers and MONO / POLY labels follow it (scrollLeft kept in step), the row numbers stay at the left. */
 /* − ○ + are quiet: no box, a small dim glyph on a 24 px target (findable, tapped on purpose). An ID beats the skins'
@@ -7383,6 +7390,14 @@ function menuHelpApply(){ document.body.classList.toggle('menuhelp', menuHelpOn(
     const bar = b.querySelector('.bar'), t = [...b.querySelectorAll('.pbody > p.note')].map(p => p.textContent.trim()).filter(Boolean).join('\n\n');
     if (bar) bar.title = t; } }
 setTimeout(menuHelpApply, 0);
+/* KEY HINTS (owner, 2 Nov: "I'd like to see more of the arrangement and phrase"): View → KEY HINTS OFF hides the key hint
+   line under the screens (NOW inst … · EDIT … · PLAY …) and the tips under Arrange. The info line above it stays (what the
+   command under the cursor is and what its value does). */
+const KHK = 'thunderplus-keyhints-v1';
+let keyHints = (() => { try { return localStorage.getItem(KHK) !== '0'; } catch(e){ return true; } })();
+function keyHintsApply(){ document.body.classList.toggle('nohints', !keyHints); }
+function setKeyHints(on){ keyHints = !!on; try { localStorage.setItem(KHK, on ? '1' : '0'); } catch(e){} keyHintsApply(); try { scheduleRefit(true); draw(); } catch(e){} }
+setTimeout(keyHintsApply, 0);
 // Settings → App: Mobile normally hides the …waves and …chains editors (they still play). Two ticks bring them back one at a
 // time (owner, 21 Oct: …chains may fit on the unfolded Fold, …waves stays hidden). Both off by default. The old single tick
 // (thunderplus-mobile-editors-v1) turned both on, so a '1' there starts both ticks on.
@@ -20108,6 +20123,8 @@ function projRows(){
       info:() => 'Every instrument and the pad it plays (long names are cut short). In the side panel; without it, in PAD mode between the arrows and the buttons when there is room. Tap one to open it on INST'},
     {l:'PATTERN VIEW', ck:'Pattern view on the Phrase screen', get:() => pvOn ? 1 : 0, set:v => setPv(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'ON' : 'OFF',   // PATTERN VIEW
       info:() => 'ON: the Phrase screen gets PHRASE | PATTERN buttons (the choice stays until you switch): PATTERN shows every track’s phrase for one song row side by side, and the open track is edited in place. Wide screens only (computer, unfolded Fold). OFF: the Phrase screen as before'},
+    {l:'KEY HINTS', ck:'Show key hints under the screens', get:() => keyHints ? 1 : 0, set:v => setKeyHints(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'ON: the line of keys under each screen and the tips under Arrange. OFF: more room for the phrase and the arrangement; the line describing the command or value under the cursor stays'},
     {l:'MENU HELP', ck:'Show explanations in menus', get:() => menuHelpOn() ? 1 : 0, set:v => setMenuHelp(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'ON: the explanation under each menu and settings row. OFF: only the names; hover a row for its explanation'},
     {l:'SIMPLE PHRASE', ck:'Show simple phrase screen', get:() => spOn ? 1 : 0, set:v => setSp(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // SIMPLE PHRASE
@@ -21136,7 +21153,8 @@ function tickLen(now){
     if (!now && !(lenFresh() && lenCache.has(y) && lenCache.has(top))) return lenSoon();   // keeps the last text until then
     const rem = songRemain(y); txt = lenMode ? 'TO ' + mmss(Math.max(0, songRemain(top) - rem)) : 'LEFT ' + mmss(rem);
   }
-  if (b.textContent !== txt) b.textContent = txt;
+  // a readout, not a button (owner, 2 Nov): a small label over the time
+  if (b.dataset.t !== txt){ b.dataset.t = txt; const sp = txt.indexOf(' '); b.replaceChildren(el('i', 'tlenl', sp > 0 ? txt.slice(0, sp) : ''), el('b', 'tlenv', sp > 0 ? txt.slice(sp + 1) : txt)); }
 }
 $('tLen').addEventListener('click', () => { lenMode ^= 1; tickLen(true); });
 // Lights the dots up to the tick that is sounding now (only while playing).
