@@ -20345,9 +20345,11 @@ function cloneDown(){
   for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ const v = getCell('song', x, y); if (v >= 0) src.push([x, y, v]); }
   if (!src.length) return toast(sel ? 'Nothing to clone in the selection.' : 'Move onto a filled block to clone it down.');
   if (d0 + h > 256) return toast('No room below: the song ends at row ' + rS(255, 3) + '.');
-  // INSERTS (owner, 27 Oct): new song rows go in below for the clones, and the rows below move down; it wrote onto the
-  // next rows, so it needed them empty.
-  if (!songRowsInsert(d0, h)) return toast(`No room: the song’s last ${h > 1 ? h + ' rows aren’t' : 'row isn’t'} empty.`);
+  // INSERTS (owner, 27 Oct): new song rows go in below for the clones, and the rows below move down. ONLY WHEN NEEDED
+  // (owner, 2 Nov): when every cell the clones land on is empty, they are written there and nothing moves; rows go in only
+  // if a clone would land on a block (on any of the selected tracks).
+  const clash = src.some(([x, y]) => getCell('song', x, d0 + y - r.y0) >= 0);
+  if (clash && !songRowsInsert(d0, h)) return toast(`No room: the song’s last ${h > 1 ? h + ' rows aren’t' : 'row isn’t'} empty.`);
   let made = 0, lastId = -1;
   for (const [x, y, v] of src){
     const p = {x, y:d0 + y - r.y0}; newBlock(p, v);

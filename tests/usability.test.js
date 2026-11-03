@@ -232,7 +232,7 @@ test('Phase 2 rest: one menu (press-drag-release, pads and layers), one confirm,
 
 test('owner\'s queue (27 Oct): CLN↓ inserts a row, Remove row, a bus back to a normal track, chains of a CHN-off track drawn dashed', () => {
   const src = H.read('index.html'), ch = H.read('chains/index.html');
-  assert.match(src, /if \(!songRowsInsert\(d0, h\)\) return toast/, 'CLN↓ inserts new rows below');
+  assert.match(src, /if \(clash && !songRowsInsert\(d0, h\)\) return toast/, 'CLN↓ inserts new rows below only when a clone would land on a block (2 Nov)');
   assert.match(src, /function songRowRemove\(rr\)\{/, 'Remove row');
   assert.match(src, /songRowRemove\(rr\); sxPicks = \[\];/, 'the menu passes the selected rows (2 Nov fix)');
   assert.match(src, /Remove row ' \+ rS\(r\.y0, 3\) \+ ' \(the rows below move up\)'/, 'in the Song / Arrange menu');
