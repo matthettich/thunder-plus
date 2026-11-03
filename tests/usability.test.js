@@ -251,3 +251,32 @@ test('Phase 2 review fixes: slow right-click, editor hand-offs, double EDIT, emp
   assert.match(src, /else if \(m\.was && !m\.filled && \(tv === 'song' \|\| tv === 'sect'\)\) editTap\(\);/, 'an empty cursor cell click adds');
   assert.match(src, /addEventListener\('keydown', \(\) => \{ if \(undoHeld\) undoLetGo\(\); \}, true\);/, 'a key lets a stuck pointer go');
 });
+
+/* ───────── 3 Nov: the wheel over a scroll bar scrolls that bar (sbHit / sbWheel) ───────── */
+test('wheel on a scrollbar (3 Nov): scrolls the bar it is over and stops the app\'s own wheel; off the bar nothing changes', () => {
+  const blk = cut('index.html', /function sbHit\(el, x, y\)\{[\s\S]*?\naddEventListener\('wheel', sbWheel, \{capture:true, passive:false\}\);\n/, 'sbHit, sbWheel and their listener');
+  let reg = null;
+  // a 200×100 box at (10, 20) with a 1 px border, a 14 px vertical bar and a 10 px horizontal bar
+  const el = { nodeType: 1, clientWidth: 184, clientHeight: 88, offsetWidth: 200, offsetHeight: 100, scrollTop: 0, scrollLeft: 0,
+    getBoundingClientRect: () => ({ left: 10, top: 20, right: 210, bottom: 120 }) };
+  const style = { borderLeftWidth: '1px', borderTopWidth: '1px', borderRightWidth: '1px', borderBottomWidth: '1px', overflowY: 'auto', overflowX: 'auto' };
+  const c = run(blk + '\nthis.api = {sbHit, sbWheel};', { getComputedStyle: () => style, addEventListener: (t, f, o) => { reg = { t, f, o }; },
+    document: { documentElement: {}, body: {}, scrollingElement: null }, innerWidth: 1600, innerHeight: 1000 });
+  assert.equal(reg.t, 'wheel'); assert.equal(reg.o.capture, true, 'capture: before the app\'s handlers'); assert.equal(reg.o.passive, false);
+  // inside the border: x 11..195 content, 195..209 the vertical bar; y 21..109 content, 109..119 the horizontal bar
+  assert.equal(c.api.sbHit(el, 100, 60), '', 'the content is no bar');
+  assert.equal(c.api.sbHit(el, 200, 60), 'v', 'the right strip is the vertical bar');
+  assert.equal(c.api.sbHit(el, 100, 114), 'h', 'the bottom strip is the horizontal bar');
+  assert.equal(c.api.sbHit(el, 200, 114), '', 'the corner is neither');
+  assert.equal(c.api.sbHit(el, 209.5, 60), '', 'the border is no bar');
+  const ev = (x, y, o = {}) => Object.assign({ target: el, clientX: x, clientY: y, deltaX: 0, deltaY: 100, deltaMode: 0, ctrlKey: false, defaultPrevented: false,
+    stopped: false, prevented: false, preventDefault() { this.prevented = true; }, stopImmediatePropagation() { this.stopped = true; } }, o);
+  let e = ev(200, 60); c.api.sbWheel(e);
+  assert.equal(el.scrollTop, 100); assert.ok(e.stopped && e.prevented, 'the app\'s handlers never see it');
+  e = ev(100, 114); c.api.sbWheel(e); assert.equal(el.scrollLeft, 100, 'a horizontal bar: the wheel\'s up/down scrolls sideways');
+  e = ev(100, 114, { deltaY: 0, deltaX: 3, deltaMode: 1 }); c.api.sbWheel(e); assert.equal(el.scrollLeft, 220, 'Shift+wheel (deltaX), in lines');
+  e = ev(100, 60); c.api.sbWheel(e); assert.ok(!e.stopped && !e.prevented, 'off the bar the event goes on untouched');
+  e = ev(200, 60, { ctrlKey: true }); c.api.sbWheel(e); assert.ok(!e.stopped, 'Ctrl+wheel (zoom) is left alone');
+  style.overflowY = 'hidden'; assert.equal(c.api.sbHit(el, 200, 60), '', 'no overflow, no bar');
+  el.offsetWidth = 186; style.overflowY = 'auto'; assert.equal(c.api.sbHit(el, 196, 60), '', 'an overlay bar (no room) is not taken');
+});

@@ -261,6 +261,7 @@ On touch, tap a cell to move there, tap it again to open or add, and drag up or 
 
 **With a mouse** the tracker grid (Phrase, the Pattern view's open track, Sect and the classic Song grid) works like Renoise's pattern editor (21 Oct). Touch is unchanged.
 - **Drag** to select a block (from any cell except the cursor's own filled one). Dragging past the top or bottom of the grid scrolls on. The wheel moves a row per notch.
+- **The wheel on a scroll bar** (Arrange, the Pattern view, the FX pane, the bottom panel, Help…) scrolls that bar, never a value or the cursor; a sideways bar scrolls sideways with the wheel (Shift+wheel too).
 - **Shift-click** selects from the cursor to where you click; Shift-click again to grow or shrink it. A plain click outside the selection lets it go.
 - **Drag a selection** to move it; hold **Alt** (Option), **Ctrl** or **⌘** as you let go to copy it. It overwrites what's under it, as paste does, and undoes in one step. On Phrase it goes sideways only onto columns of the same kind (notes to notes, effects to effects). Esc while dragging puts it back.
 - **Alt/⌥-drag a cell** to change its value (a plain drag selects, from any cell, as in Renoise); add **Ctrl/⌘** for big steps (an octave on a note, 16 on a number), **Shift** for a slower drag. With a mouse, holding an Arrange block no longer mutes it (touch and pen still do): Alt-click or middle-click mutes.

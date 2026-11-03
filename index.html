@@ -13500,6 +13500,38 @@ document.addEventListener('pointerover', e => {
   if (sliderOk(r) && r !== wheelR) wheelArm(r);
 }, true);
 document.addEventListener('pointerout', e => { const r = e.target.closest && e.target.closest('input[type=range]'); if (r && r === wheelCand && !(e.relatedTarget && r.contains(e.relatedTarget))){ wheelOff(); wheelCand = null; } }, true);
+/* WHEEL ON A SCROLLBAR (owner, 3 Nov): with the pointer on a scroll bar the wheel scrolls that bar, whatever the area
+   under it does with the wheel otherwise (Arrange's song cursor, the tracker's rows, the FX bar's values, sliders…). A
+   vertical bar scrolls up and down; a horizontal one scrolls sideways with the wheel's up/down (Shift+wheel too). This
+   listener runs first (window, capture) and stops the event there; anywhere off a bar nothing changes. Only bars that
+   take room (Windows, and the styled ones: Arrange, the Pattern view) are seen: an overlay bar (Mac, phones) has no
+   room of its own, so the wheel there does what it does on the content. Ctrl+wheel (zoom, a trackpad pinch) is left alone.
+   sbHit(el, x, y): 'v' / 'h' when the point is on el's own vertical / horizontal scrollbar, else ''. */
+function sbHit(el, x, y){
+  if (!el || el.nodeType !== 1) return '';
+  const root = el === document.documentElement || el === document.body;
+  if (root) el = document.scrollingElement || document.documentElement;
+  const r = root ? {left:0, top:0, right:innerWidth, bottom:innerHeight} : el.getBoundingClientRect();
+  const st = getComputedStyle(el), bl = parseFloat(st.borderLeftWidth) || 0, bt = parseFloat(st.borderTopWidth) || 0;
+  const br = root ? 0 : parseFloat(st.borderRightWidth) || 0, bb = root ? 0 : parseFloat(st.borderBottomWidth) || 0;
+  const cw = el.clientWidth, ch = el.clientHeight;
+  const vw = (root ? innerWidth : el.offsetWidth) - bl - br - cw, hh = (root ? innerHeight : el.offsetHeight) - bt - bb - ch;   // the bars' room
+  const ix = x - r.left - bl, iy = y - r.top - bt;   // inside the border
+  if (vw > 0.5 && ix >= cw && ix < cw + vw && iy >= 0 && iy < ch && /auto|scroll/.test(st.overflowY)) return 'v';
+  if (hh > 0.5 && iy >= ch && iy < ch + hh && ix >= 0 && ix < cw && /auto|scroll/.test(st.overflowX)) return 'h';
+  return '';
+}
+function sbWheel(e){
+  if (e.ctrlKey || e.defaultPrevented) return;
+  const t = e.target && e.target.nodeType === 1 ? e.target : null; if (!t) return;
+  const k = sbHit(t, e.clientX, e.clientY); if (!k) return;
+  const el = t === document.documentElement || t === document.body ? (document.scrollingElement || document.documentElement) : t;
+  const unit = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? (k === 'v' ? el.clientHeight : el.clientWidth) : 1;
+  const d = (e.deltaY || e.deltaX) * unit;   // either bar takes the wheel's main axis; Shift+wheel comes as deltaX on some systems
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (k === 'v') el.scrollTop += d; else el.scrollLeft += d;
+}
+addEventListener('wheel', sbWheel, {capture:true, passive:false});
 document.addEventListener('wheel', e => {
   const r = e.target.closest && e.target.closest('input[type=range]'); if (!sliderOk(r) || e.ctrlKey) return;
   if (r !== wheelR){ if (r === wheelCand) wheelArm(r); return; }   // still scrolling past: let the page scroll, and wait again
