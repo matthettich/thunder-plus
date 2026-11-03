@@ -19454,7 +19454,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 362;
+const BUILD = 363;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26522,6 +26522,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [363, '2 Nov', ['Playback: fixed the song speeding up and glitching after playing for a few minutes, and synth chords held after STOP. FXO, FLX, GAT and RTG also switch on their exact step now.', 'Menus are tidier: one layout for every row, one size for every control, one heading style; the build number is under App.']],
   [362, '2 Nov', ['Timing: the song now plays from the audio thread: drums, samples and the live synths (bass, voice, acid, machine, …pump synths) start on their exact sample, so a busy screen, a screenshot or another app can’t make them late. Settings → Audio & MIDI → Sequencer: Page (old) goes back.', 'View → KEY HINTS off hides the key hints under the screens and Arrange, for more rows.', 'Phone: the top bar fits on one line (File is a folder), the song clock is a readout, LOOP lights while on, hints never stop mid-word, the Synth page fits.', 'Arrange: a thin line every 4 rows.']],
   [361, '2 Nov', ['Top bar: the master meter has L / R, a dB scale and the peak in dB; the CPU button shows just the number.', 'Messages come in under the top bar on a computer, shorter; the side panel drops the screen buttons (the tabs are above) and folds the key list behind KEYS.', 'On a computer, sliders and drop-downs are square like the tracker; short one-line empty states; Mixer spectrum says PLAY TO SEE IT when stopped; Audio & MIDI ports are a table.']],
   [360, '2 Nov', ['FX presets: › SAVE AS PRESET… keeps the preset on this device too; it shows under MY PRESETS in every song.', 'Synth engines are grouped by sound: Drums & percussion, Bass, Analog, Digital FM & wavetable, Physical models, Keys, Pads & textures, Voice, SoundFont.', 'Acid line has styles: …pump ACID, Classic 303, Rolling and Squelch, with slides and accents that sound like a 303.', 'Arrange: blocks that only hold OFFs or FX commands look different from empty ones; a grey line every 4 rows.', '⚙ Settings is shorter: Kit lives in File ▸ Kit, Master and Master out in the Mixer.']],
