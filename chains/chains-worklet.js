@@ -5028,6 +5028,7 @@ class ThunderChains extends AudioWorkletProcessor {
     wasmInit({ tfxBytes:o.bytes || o.tfxBytes, tfxModule:o.tfxModule });
     if (o.pump && !globalThis.__pumpBytes) globalThis.__pumpBytes = o.pump;   // PUMP MODULES: …Thunder Plus sends pump.wasm too
     this.track = Math.max(0, Math.min(CHAN_COUNT - 1, (o.track | 0) || 0));
+    if (o.cid){ this.__cid = o.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(o.cid, this); }   // THUNDER CORE (…Thunder Plus): BYP and tempo from the audio-thread sequencer
     this.engine = new ChainsEngine(sampleRate, {
       focus:this.track,
       quality:o.quality ?? 'full',
@@ -5056,7 +5057,8 @@ class ThunderChains extends AudioWorkletProcessor {
       if (m.op === 'irs'){ globalThis.__thunderIR = m.value; return; }   // the song's impulse responses (Convolution reverb), for every node in this thread
       if (m.op === 'pump'){ if (!globalThis.__pumpBytes && m.value) globalThis.__pumpBytes = m.value; return; }   // PUMP MODULES: pump.wasm, when it arrives after the node
       if (m.op === 'dispose'){
-        this.engine.dispose(); this._dead = true;   // process() returns false from now on, so the node can be collected
+        this.engine.dispose(); this._dead = true;
+        if (this.__cid && globalThis.__tcNodes && globalThis.__tcNodes.get(this.__cid) === this) globalThis.__tcNodes.delete(this.__cid);   // process() returns false from now on, so the node can be collected
         this.port.postMessage({ target:'chains-host', op:'disposed', value:{ track:this.track } });
         return;
       }
@@ -5067,6 +5069,8 @@ class ThunderChains extends AudioWorkletProcessor {
   process(ins, outs, params){
     if (this._dead) return false;
     const e = this.engine, i = ins[0], o = outs[0], n = o[0].length;
+    if (this.__q && this.__q.length){ const q = this.__q, due = currentTime + 64 / sampleRate; while (q.length && q[0][0] <= due) this._recv(q.shift()[1]); }   // THUNDER CORE: tempo at its time
+    if (this.__ov && globalThis.__tcOv) params = globalThis.__tcOv(this, params, n);   // THUNDER CORE: BYP
     if (params) for (let k = 1; k <= 15; k++){ const a = params['b' + k]; e.bsw[k] = a ? a[0] : -1; }   // BYPASS: the tracker's switches
     const L = o[0], R = o[1] || o[0];
     // Feed this track's input into the engine's per-track buffers.

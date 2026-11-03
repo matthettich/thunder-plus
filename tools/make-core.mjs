@@ -57,7 +57,20 @@ export function build(){
     });
     return [...used].filter(x => !locals.has(x) || x === (node.id && node.id.name));
   }
-  const seen = new Map(), q = [...ROOTS];
+  // FXV ON THE AUDIO THREAD (3 Nov): each effect's map() (its controls → the numbers its DSP takes), copied out of TFX's
+  // entries one by one, with whatever top-level helpers they read (u8, clamp, dlySec…). An entry whose map reads anything
+  // else (a closure, page state) is left out: its FXV stays on the page.
+  const mapSrc = [], mapNeed = [];
+  { const T = decl.get('TFX'), lit = T && T.node.init;
+    if (lit && lit.type === 'ObjectExpression') for (const pr of lit.properties){
+      if (pr.type !== 'Property' || pr.computed || !pr.value || pr.value.type !== 'ObjectExpression') continue;
+      const key = pr.key.type === 'Identifier' ? pr.key.name : pr.key.value;
+      const m = pr.value.properties.find(x => x.type === 'Property' && !x.computed && (x.key.name || x.key.value) === 'map');
+      if (!m || !/Function/.test(m.value.type)) continue;
+      const need = free(m.value), bad = need.filter(x => !decl.has(x) && !(x in globalThis) || STOP.has(x));
+      if (bad.length) continue;
+      mapSrc.push(JSON.stringify(key) + ':' + src.slice(m.value.start, m.value.end)); mapNeed.push(...need.filter(x => decl.has(x))); } }
+  const seen = new Map(), q = [...ROOTS, ...mapNeed];
   while (q.length){ const n = q.pop(); if (seen.has(n) || STOP.has(n)) continue; const d = decl.get(n); if (!d) continue; seen.set(n, d);
     for (const x of free(d.node)) if (decl.has(x) && !seen.has(x) && !STOP.has(x)) q.push(x); }
   // one copy of each declaration (a line like `const A = 1, B = 2` gives two), in source order
@@ -71,6 +84,8 @@ export function build(){
     + 'let S = null, kit = {voices:[]}, TFX = {};\n'
     + 'const localStorage = {getItem(){ return null; }, setItem(){}};\n\n'
     + parts.map(d => d.text).join('\n') + '\n\n'
+    + '// FXV: the effects\' map() functions, from TFX in index.html (' + mapSrc.length + ' of them)\n'
+    + 'const TFX_MAP = {\n  ' + mapSrc.join(',\n  ') + '\n};\n\n'
     + '/* ===== core/core-processor.js ===== */\n' + proc;
 }
 
