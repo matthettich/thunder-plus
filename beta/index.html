@@ -27188,6 +27188,10 @@ else if (FIRST_SONG) setTimeout(async () => {
    tools/seq-golden.mjs. Loads a song and steps makeSeq in sim mode (no renders, no sound) to the end, returning every
    event as plain data. When the sequencer moves to the audio thread (phase 2) and to C++ (phase 3), this stream must
    stay identical. Math.random is seeded for the run, so GEN / PRB / random commands repeat. Inert without ?seqtest. */
+/* THUNDER CORE (plan phase 2): what the audio-thread sequencer (core/seq-core.js) needs from the page besides the song: the
+   per-voice-track setting, the slot count, and the effect table's pump flags and control ranges (TFX itself holds DSP). */
+function coreTfx(){ const o = {}; for (const k in TFX) o[k] = {pump:!!TFX[k].pump, ps:(TFX[k].ps || []).map(q => ({k:q.k, min:q.min, max:q.max}))}; return o; }
+function coreVars(){ return {vtrk, NSLOT, TFX:coreTfx()}; }
 if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
   async load(text, name){ FIRST_SONG = false; await loadProjText(text, name || 'test.thunder'); return {name:S.name, bpm:S.bpm, nt:NT}; },
   run(mode, maxRows, opt){
@@ -27203,6 +27207,17 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
       for (let n = 0; sq.alive() && n < (maxRows || 20000); n++){ const r = sq.step(); out.push({t:num(r.t), evs:r.evs.map(plain)}); }
     } finally { Math.random = R; }
     return out;
+  },
+  // The same run on the audio thread (core/seq-core.js, plan phase 2): must give exactly run()'s rows.
+  async runCore(mode, maxRows, opt){
+    const ac = new AudioContext(); try {
+      await ac.audioWorklet.addModule('core/seq-core.js?v=' + BUILD);
+      const n = new AudioWorkletNode(ac, 'thunder-core', {numberOfInputs:0, numberOfOutputs:1});
+      const got = new Promise((ok, no) => { n.port.onmessage = e => { const d = e.data || {}; if (d.op === 'test') ok(d.rows); else if (d.op === 'error') no(new Error(d.where + ': ' + d.message)); }; });
+      n.port.postMessage({op:'load', S:JSON.parse(JSON.stringify(S)), vars:coreVars()});
+      n.port.postMessage({op:'test', id:1, mode:mode || 'song', max:maxRows || 0, opt:opt || {}});
+      return await got;
+    } finally { ac.close().catch(() => {}); }
   },
   // The engine list's groups (for category checks).
   engines(){ return ENGINE_GROUPS.map(([g, es]) => g + ': ' + es.map(e => e[1]).join(', ')); },
