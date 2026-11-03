@@ -120,6 +120,8 @@ const dbOf = v => v > 1e-9 ? 20 * Math.log10(v) : -180;
 const now = () => performance.now() / 1000;
 const isMac = /Mac|iP(hone|ad|od)/.test(navigator.platform || navigator.userAgent || '');
 const modsOf = e => ({shift:!!e.shiftKey, alt:!!e.altKey, cmd:isMac ? !!e.metaKey : !!(e.ctrlKey || e.metaKey), ctrl:!!e.ctrlKey});
+// how far a drag goes per pixel: Shift a tenth, Cmd (Ctrl elsewhere) held four times (Thunder Plus's ONE RULE, 3 Nov)
+const dragMul = m => m.shift ? 0.1 : m.cmd ? 4 : 1;
 
 /* ---------------------------------------------------------------- parameters: typed entry (ParamSpec::parse) */
 const PF = {AUTO:1, INT:2, BOOL:4, OUT:8, BYP:16, HID:32, NOUNDO:64};
@@ -236,11 +238,12 @@ class Dial extends Ctl {
     ui.text(cx, cy + rad + 12, this.fmt ? this.fmt(ui.value(this.sym)) : ui.fmt(this.sym), 'mono', this.size === 's' ? 10 : 11, dis ? t.dim : t.ink, 'center');
   }
   down(ui, x, y, btn){ if (btn !== 0) return false; this.ds = this.sym; this.n0 = ui.norm(this.ds); this.x0 = x; this.y0 = y; ui.begin(); return true; }
-  drag(ui, x, y, m){ if (this.ds == null) return; const sens = m.shift ? 0.0008 : 0.005; ui.setNorm(this.ds, this.n0 + ((x - this.x0) - (y - this.y0)) * sens);
-    if (m.shift){ this.n0 = ui.norm(this.ds); this.x0 = x; this.y0 = y; } }
+  // ONE RULE (Thunder Plus mouse audit, 3 Nov): each move adds to where the value is (n0 keeps the unrounded value), Shift a
+  // tenth, Cmd/Ctrl held four times as far, so pressing or letting go of either mid-drag never jumps.
+  drag(ui, x, y, m){ if (this.ds == null) return; const sens = 0.005 * dragMul(m); this.n0 = clamp(this.n0 + ((x - this.x0) - (y - this.y0)) * sens, 0, 1); this.x0 = x; this.y0 = y; ui.setNorm(this.ds, this.n0); }
   up(ui){ if (this.ds != null) ui.end(); this.ds = null; }
   wheel(ui, dy, m){ const p = ui.spec(this.sym); if (p.flags & (PF.INT | PF.BOOL)) ui.setGesture(this.sym, ui.value(this.sym) + (dy > 0 ? 1 : -1));
-    else { const st = m.shift ? 0.002 : 0.02; ui.begin(); ui.setNorm(this.sym, ui.norm(this.sym) + (dy > 0 ? st : -st)); ui.end(); } return true; }
+    else { const st = m.shift ? 0.002 : m.cmd ? 0.08 : 0.02; ui.begin(); ui.setNorm(this.sym, ui.norm(this.sym) + (dy > 0 ? st : -st)); ui.end(); } return true; }
 }
 class Row extends Ctl {
   constructor(sym, label, bipolar = false){ super(); this.sym = sym; this.label = label; this.bipolar = bipolar; this.labelW = 92; this.valueW = 74; this.fmt = null; }
@@ -255,8 +258,7 @@ class Row extends Ctl {
     ui.text(r.r, r.cy, this.fmt ? this.fmt(ui.value(this.sym)) : ui.fmt(this.sym), 'mono', 11.5, dis ? t.dim : t.ink, 'right');
   }
   down(ui, x, y, btn){ if (btn !== 0) return false; this.ds = this.sym; this.n0 = ui.norm(this.ds); this.x0 = x; ui.begin(); return true; }
-  drag(ui, x, y, m){ if (this.ds == null) return; const bw = Math.max(40, this.r.w - this.labelW - this.valueW - 8); ui.setNorm(this.ds, this.n0 + (x - this.x0) / bw * (m.shift ? 0.15 : 1));
-    if (m.shift){ this.n0 = ui.norm(this.ds); this.x0 = x; } }
+  drag(ui, x, y, m){ if (this.ds == null) return; const bw = Math.max(40, this.r.w - this.labelW - this.valueW - 8); this.n0 = clamp(this.n0 + (x - this.x0) / bw * dragMul(m), 0, 1); this.x0 = x; ui.setNorm(this.ds, this.n0); }
   up(ui){ if (this.ds != null) ui.end(); this.ds = null; }
   wheel(ui, dy, m){ return Dial.prototype.wheel.call(this, ui, dy, m); }
 }
@@ -619,6 +621,7 @@ class Win {
     this.drawHeader();
     try { if (this.h.drawBody) this.h.drawBody(); } catch(e){ warnOnce('pump window draw (' + this.type + ')', e); }
     for (const c of this.controls) if (c.visible) c.draw(this);
+    if (this.wheelC && this.wheelC.visible && this.wheelC === this.hoverC && !this.active) this.stroke(R(this.wheelC.r.x - 3, this.wheelC.r.y - 3, this.wheelC.r.w + 6, this.wheelC.r.h + 6), this.th.ink, 1.5);   // WHEEL FOCUS outline
     if (this.h.drawOverlay) this.h.drawOverlay();
     this.drawFooter();
     if (this.help) this.drawHelp();
@@ -639,7 +642,7 @@ class Win {
     this.g = cv.getContext('2d');
     cv.addEventListener('pointerdown', e => this.pDown(e)); cv.addEventListener('pointermove', e => this.pMove(e));
     cv.addEventListener('pointerup', e => this.pUp(e)); cv.addEventListener('pointercancel', e => this.pUp(e, true));
-    cv.addEventListener('pointerleave', () => { if (!this.active && !this.bodyActive && !this.menu){ this.status = ''; this.dirty = true; if (this.h.leave) this.h.leave(); } });
+    cv.addEventListener('pointerleave', () => { this.hoverC = this.wheelC = null; clearTimeout(this.wheelTm); if (!this.active && !this.bodyActive && !this.menu){ this.status = ''; this.dirty = true; if (this.h.leave) this.h.leave(); } });
     cv.addEventListener('wheel', e => this.pWheel(e), {passive:false});
     cv.addEventListener('contextmenu', e => e.preventDefault());
     el.addEventListener('keydown', e => this.keyDown(e)); el.addEventListener('keyup', e => this.keyUp(e));
@@ -699,14 +702,19 @@ class Win {
     for (let i = this.controls.length - 1; i >= 0; i--){
       const c = this.controls[i]; if (!c.visible || !c.enabled || !c.r.has(x, y)) continue;
       if (c.sym != null && c.wantsText){
-        if (btn === 2 || (dbl && btn === 0)){ this.openTextEntry(c.sym, c.valueRect(), this.ringFor(c)); clearTimeout(this.lpT); return; }
-        if ((m.cmd || m.alt) && btn === 0){ const p = this.spec(c.sym); this.setGesture(c.sym, this.h.defaultOf ? this.h.defaultOf(c.sym) : p.def); return; }
+        // ONE RULE (Thunder Plus mouse audit, 3 Nov): a double-click resets (as Alt / Cmd-click), a right-click opens Reset /
+        // Type a value; on a touch screen a double-tap or a long press still types one
+        const dflt = () => { const p = this.spec(c.sym); this.setGesture(c.sym, this.h.defaultOf ? this.h.defaultOf(c.sym) : p.def); };
+        if (btn === 2){ clearTimeout(this.lpT); const vr = c.valueRect();
+          this.openMenu(vr, ['#' + String(this.spec(c.sym).n || c.label || '').toUpperCase(), 'Reset to default', 'Type a value…'], -1, i => { if (i === 1) dflt(); else if (i === 2) this.openTextEntry(c.sym, vr, this.ringFor(c)); }); return; }
+        if (dbl && btn === 0){ clearTimeout(this.lpT); if (touch) this.openTextEntry(c.sym, c.valueRect(), this.ringFor(c)); else dflt(); return; }
+        if ((m.cmd || m.alt) && btn === 0){ dflt(); return; }
       }
       if (c.down(this, x, y, btn, m)) this.active = c;
       return;
     }
     if (y > this.headH && y < this.H - FOOT){ if (this.h.down && this.h.down(x, y, btn, m, dbl)) this.bodyActive = true; return; }
-    if (!this.narrow && y <= this.headH){ this.drag = {kind:'move', x:e.clientX, y:e.clientY, px:this.px, py:this.py}; this.el.classList.add('moving'); }
+    if (!this.narrow && y <= this.headH && btn === 0){ this.drag = {kind:'move', x:e.clientX, y:e.clientY, px:this.px, py:this.py}; this.el.classList.add('moving'); }   // left button only (3 Nov)
   }
   longPress(){   // touch: a held finger that didn't move is a right-click (typed entry on a control, the menus in the displays)
     const lp = this.lp; this.lp = null; if (!lp) return;
@@ -731,6 +739,9 @@ class Win {
     if (!st && y < this.headH && x < this.brandRight()) st = this.fx.about;
     this.status = st;
     if (y > this.headH && y < this.H - FOOT && this.h.hover) this.h.hover(x, y, m);
+    // WHEEL FOCUS (Thunder Plus's rule, 3 Nov): the control the mouse rests on for a moment takes the wheel (outlined then)
+    let hc = null; for (let i = this.controls.length - 1; i >= 0; i--){ const c = this.controls[i]; if (c.visible && c.enabled && c.r.has(x, y)){ hc = c; break; } }
+    if (hc !== this.hoverC){ this.hoverC = hc; this.wheelC = null; clearTimeout(this.wheelTm); if (hc) this.wheelTm = setTimeout(() => { if (this.hoverC === hc){ this.wheelC = hc; this.dirty = true; } }, 350); }
     this.dirty = true;
   }
   paramStatus(s){ const p = this.spec(s); return p ? p.n + '  ' + (this.h.fmtStatus ? this.h.fmtStatus(s) : this.fmt(s)) : ''; }
@@ -752,8 +763,9 @@ class Win {
     e.preventDefault(); const [x, y] = this.pos(e), m = modsOf(e); if (!(e.deltaY || e.deltaX)) return;
     this.dirty = true;
     if (this.menu){ const px = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY, tot = this.menu.itemH * this.menu.items.length + 8; this.menu.scroll = clamp(this.menu.scroll + px * 0.5, 0, Math.max(0, tot - this.menu.r.h)); return; }
+    if (e.ctrlKey && !e.metaKey && (isMac || Math.abs(e.deltaMode ? e.deltaY * 40 : e.deltaY) < 50)) return;   // a pinch (zoom) never changes a value
     const n = this.wheelN(e); if (!n) return; const dy = n < 0 ? 1 : -1;
-    for (let i = this.controls.length - 1; i >= 0; i--){ const c = this.controls[i]; if (c.visible && c.enabled && c.r.has(x, y)){ let ok = false; for (let k = 0; k < Math.abs(n); k++) ok = c.wheel(this, dy, m) || ok; if (ok && c.sym != null) this.status = this.paramStatus(c.sym); return; } }
+    for (let i = this.controls.length - 1; i >= 0; i--){ const c = this.controls[i]; if (c.visible && c.enabled && c.r.has(x, y)){ if (c !== this.wheelC) return; /* not rested on it yet */ let ok = false; for (let k = 0; k < Math.abs(n); k++) ok = c.wheel(this, dy, m) || ok; if (ok && c.sym != null) this.status = this.paramStatus(c.sym); return; } }
     if (y > this.headH && y < this.H - FOOT && this.h.wheel) for (let k = 0; k < Math.abs(n); k++) this.h.wheel(x, y, dy, m);
   }
   // ---- keys -----------------------------------------------------------------------------------------------------
