@@ -1171,6 +1171,8 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tath i[data-t]{cursor:pointer} .tath i.so{background:var(--ar-pl); color:var(--ar-pl-ink, #3d2c00); border-radius:3px}
 .tagrid{flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:3px 0 8px; touch-action:pan-y}
 .tagrid .ar{margin-bottom:2px}
+/* EVERY 4 ROWS (owner, 2 Nov): a grey line above rows 0, 4, 8… so the song reads in groups of four patterns */
+.tagrid .ar.q4{box-shadow:0 -2px 0 0 color-mix(in srgb, var(--muted, #777) 55%, transparent); margin-top:3px}
 .tagrid .rn{font-size:var(--fs-1); line-height:var(--arh,16px); color:var(--ar-dim); cursor:pointer}
 .tagrid .rn.r4{color:var(--ar-ink); font-weight:700}
 .tagrid .rn.pl{background:var(--ar-pl); color:var(--ar-pl-ink); border-radius:2px}
@@ -16221,7 +16223,8 @@ const sectHasData = v => { const c = S.chains[v]; return !!c && c.some(r => r[0]
 const isEmptyPhrase = p => !p || p.every(r => r.every(v => v < 0));
 // OFF-ONLY BLOCKS (owner, 2 Nov): a phrase whose only content is note OFFs (in its note columns): a "stop the track here"
 // block. Arrange draws it unlike both a playing block and an empty one.
-const isOffPhrase = p => !!p && p.some(r => r.slice(0, NCOL).some(v => v === OFF)) && p.every(r => r.every((v, i) => v < 0 || (i < NCOL && v === OFF)));
+// (2 Nov, later: also a phrase with only effect commands, or only OFFs and commands: anything that plays no note)
+const isOffPhrase = p => !!p && !isEmptyPhrase(p) && p.every(r => r.slice(0, NCOL).every(v => v < 0 || v === OFF));
 const sectOffOnly = v => { const c = S.chains[v]; if (!c) return false; const P = c.filter(r => r[0] >= 0).map(r => S.phrases[r[0]]); return P.length > 0 && P.some(isOffPhrase) && P.every(p => isEmptyPhrase(p) || isOffPhrase(p)); };
 const plen = id => id >= 0 && S.plen ? clamp(S.plen[id] || S.dlen || 16, 1, PROWS) : (S.dlen || 16);
 const plpbOf = (Sx, id) => (id >= 0 && Sx.plpb && Sx.plpb[id]) || Sx.lpb || 4;
@@ -23990,7 +23993,7 @@ function drawArr(PH){
   const BG = busGroups();   // BUS GROUPS (31 Oct): each bus and the tracks it takes in share a colour
   const spAt = t => t > 0 && t === PFg;   // where a spacer column sits before track t: the MONO | POLY break (owner, 31 Oct: with 17 tracks the side panel's every-8 spacer fell inside MONO, between 8 and 9)
   for (let y = 0; y < N; y++){
-    h += `<div class="ar"><span class="rn${y % 4 ? '' : ' r4'}" data-ry="${y}">${rS(y, 3)}</span>`;
+    h += `<div class="ar${y % 4 || y === 0 ? '' : ' q4'}"><span class="rn${y % 4 ? '' : ' r4'}" data-ry="${y}">${rS(y, 3)}</span>`;
     for (let t = 0; t < NA; t++){
       if (spAt(t)) h += '<span></span>';
       const v = S.song[y][t];
