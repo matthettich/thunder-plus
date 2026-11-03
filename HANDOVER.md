@@ -119,6 +119,11 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (23): folded I/O titles in …chains (build 396)
+
+- chains/index.html: `IO_KEY` / `ioTitle(n)` (n.tEl is the title span): collapsed trackIn / chainOut / scin / scout add
+  ' · ' + the choice label of track / sck / snd. Called from paintNote, setCollapsed and setParam.
+
 ## 3 Nov (22): Enter picks up a pattern on Song / Arrange (build 395)
 
 - editTap: on tv 'song' (Arrange runs as song via apRun), Enter on a filled block sets `last.sect` (toast), so Enter on an
