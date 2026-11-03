@@ -1438,6 +1438,14 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #tDeck.fxbar #dkChn{border-left:0}
 #tDeck.fxbar #dkChn.col{flex:0 0 26px; width:26px; min-width:26px}   /* folded …CHAINS gives its room to the effects (owner, 1 Nov) */
 #tDeck.fxbar #dkScope{flex:0 0 clamp(120px, 11vw, 200px)}
+/* FX BAR: a compact TRACK strip (owner, 2 Nov: smaller M and S, more room for the effects): fader, meter, scale and a
+   narrow M / S column; the strip no longer lines up with the side panel above, by choice. */
+#tDeck.fxbar #dkStrip{flex:0 0 164px}
+#tDeck.fxbar .dkstrip{grid-template-columns:28px 30px 20px minmax(0,1fr) 30px; padding:10px 10px 10px 8px; gap:6px 5px}
+#tDeck.fxbar .stfad{grid-column:1} #tDeck.fxbar .stm{grid-column:2} #tDeck.fxbar .stsc{grid-column:3} #tDeck.fxbar .stvv{grid-column:1 / 4}
+#tDeck.fxbar .stms{grid-column:5; gap:6px}
+#tDeck.fxbar .stms button{height:26px; font-size:var(--fs-2)}
+#tDeck.fxbar .stpan{grid-column:1 / 6}
 .dkfxbar{display:grid; grid-template-columns:repeat(8, minmax(92px, 1fr)); gap:3px; height:100%; min-height:0; overflow-x:auto; overflow-y:hidden; padding:3px}
 .dkfc{display:flex; flex-direction:column; min-width:0; min-height:0; border:1px solid var(--line); background:var(--panel)}
 .dkfc .fch{display:flex; align-items:center; gap:4px; padding:2px 4px; border-bottom:1px solid var(--line); white-space:nowrap; min-height:20px}
@@ -22817,6 +22825,11 @@ function deckLayout(){
   // button between press and release swallows the click.
   const h1 = dkSec('strip').querySelector('.dkh'), tail = $('dkTail');
   if (tail.parentElement !== h1 || h1.lastElementChild !== tail){ let sp = h1.querySelector('.dksp.t'); if (!sp) sp = el('span', 'dksp t'); h1.append(sp, tail); }
+  // FX BAR (owner, 2 Nov: SOLO · CLEAR was cut off in the narrower TRACK header): with the FX bar, SOLO · CLEAR sits at the
+  // right end of the FX header, where there is room; CLASSIC keeps it beside ✕. Moved only when out of place, as above.
+  const so = $('dkSolo'), fh = dkSec('fx').querySelector('.dkh');
+  if (deck.fxbar){ if (so.parentElement !== fh){ let sp = fh.querySelector('.dksp.s'); if (!sp) sp = el('span', 'dksp s'); fh.append(sp, so); } }
+  else if (so.parentElement !== tail){ tail.prepend(so); const sp = fh.querySelector('.dksp.s'); if (sp) sp.remove(); }
 }
 /* ===== PERFORM PART (owner, 1 Nov): the bottom panel's live controls, shown with View → PERFORM PART (off until turned on).
    FILL (a tap latches it, a hold is momentary; Shift+Alt+F), a reload point (SET keeps the song as it is now, RELOAD puts it
