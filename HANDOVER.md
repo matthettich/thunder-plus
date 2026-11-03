@@ -119,6 +119,17 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (16): side panel cards, instrument flashes, Acid instrument audition (build 389)
+
+- **Side panel** (`.tside`): the status + meters (`.tcard.tcst`: `#tState` / `#tBpm` on a dark bar) and INST LIST
+  (`.tcard.tinlw`, title bar) are FX-bar-style cards (1.5 px border, offset shadow). The instruments wrap in rows
+  (`repeat(auto-fill, minmax(92px, 1fr))`) and scroll inside the card, which takes the room left (was a fixed 8-row column
+  grid cut off at the side and bottom). PAD mode's copy (`#tInlPad`) keeps its own layout.
+- **Flashes:** `padBlink` on the tracker calls `inlBlink(e)` when INST LIST is on: the instrument's button gets `.hit` for
+  110 ms at the note's sounding time (output latency included), audible tracks only.
+- **Acid:** the Instrument list marks instruments no phrase uses (`· free`, `.acidfree` tint where options can be coloured);
+  a pick plays `preview(ins, base + root)` for 260 ms.
+
 ## 3 Nov (15): Alt-click mutes track numbers; Alt+T (build 388)
 
 - Owner: the track mute gesture becomes Alt + click (as Alt-click mutes a block). Arrange's `#tArrTh` click and gridDown's
