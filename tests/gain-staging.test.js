@@ -107,9 +107,9 @@ test('PRE sends: busPlan lists the sources whose Track In says "Before its fader
 /* ───────── the routing, the master OUT and the UI, as source guards ───────── */
 test('sources: the per-track graph, PRE feeds, master OUT live and in renders, the Mixer rows, the song file, the editor', () => {
   const src = H.read('index.html');
-  // per track: inp (TRIM) → dry / chain → wet → [FX] → ins → g → p, ins → pre
+  // per track: inp (TRIM) → dry / chain → wet → [FX] → ins → g → cg (THUNDER CORE's TVL, 1 otherwise) → p, ins → pre
   // (1 Nov: p reaches the master through dl, LATENCY COMPENSATION's delay, 0 s unless the option is on)
-  assert.match(src, /inp\.connect\(dry\); dry\.connect\(ins\); ins\.connect\(g\); g\.connect\(p\); p\.connect\(dl\); dl\.connect\(out\); ins\.connect\(pre\);/, 'the per-track graph');
+  assert.match(src, /inp\.connect\(dry\); dry\.connect\(ins\); ins\.connect\(g\); g\.connect\(cg\); cg\.connect\(p\); p\.connect\(dl\); dl\.connect\(out\); ins\.connect\(pre\);/, 'the per-track graph');
   assert.match(src, /const mid = b\.fx \|\| b\.ins;/, 'track FX sit between the chain and the fader');
   assert.doesNotMatch(src, /b\.inp\.disconnect\(\); b\.inp\.connect\(b\.g\)/, 'no more wholesale input rewiring (it dropped the taps and meters)');
   assert.match(src, /if \(P\.pre\.has\(t\)\)\{ if \(!q\.splP\)\{ q\.splP = ac\.createChannelSplitter\(2\); q\.fdlP = ac\.createDelay\(1\); q\.fdlP\.delayTime\.value = 0; q\.pre\.connect\(q\.fdlP\); q\.fdlP\.connect\(q\.splP\); \}/, 'PRE sources feed their bus from the pre tap (through the feed delay)');
