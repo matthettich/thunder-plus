@@ -43,6 +43,10 @@ Keep this file up to date at the end of a work session.
 
 ## Before a commercial release (standing checklist: keep it current, read it before selling)
 
+- **Skin and preset names that name products or people** (2 Nov): the Hardware skins (Vintage MPC, Nord red, 808, 909,
+  Dr. Sample SP-202), Wes Anderson, TE, Braun, Koss, and the Hack / Owls preset groups. Fine for the owner's own use;
+  rename to neutral names (e.g. "Grey sampler", "Red keys") before selling. The skins use colour palettes only, no logos.
+
 Owner (23 Oct): leaning away from selling Thunder Plus, but may change their mind. Keep a commercial build a short,
 mechanical job: everything it would need is listed here, and new work must not add to it without a line below. This
 is housekeeping, not legal advice: have a lawyer look before selling.
