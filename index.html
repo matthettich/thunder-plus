@@ -11012,6 +11012,7 @@ async function sfPreparePad(i){
   const pr = sfPreset(font, Math.round(P.bank), Math.round(P.prog)); await sfPreparePreset(font, pr);
   const was = sfReadyPads.has(i + ':' + font.id + ':' + (pr && pr.bank) + ':' + (pr && pr.prog)); sfReadyPads.add(i + ':' + font.id + ':' + (pr && pr.bank) + ':' + (pr && pr.prog));
   if (!was){ dirty[i] = true; if (i === cur && view === 'synth') try { showCur(); } catch(e){} }
+  if (typeof coreSf === 'function') try { coreSf(i); } catch(e){ tpLog('core sf', e); }   // THUNDER CORE: the preset, for the audio thread
 }
 // Every SoundFont pad an event list (or the whole kit) uses: before an offline render, and when PLAY starts.
 async function sfPrepare(evs){
@@ -18815,8 +18816,8 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'ejcd8s';
-const CORE_WANT = 5;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
+const CORE_REV = 'wte93';
+const CORE_WANT = 6;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
 function coreLoad(){
@@ -18859,16 +18860,31 @@ function coreMixOff(){ const M = core.mix; if (!M) return; core.mix = null;
   const pl = rt && rt.pl; if (pl) for (const k of M.on) if (k[0] === 'g'){ const b = pl.buses[+k.slice(1)]; if (b) try { b.cg.gain.cancelScheduledValues(0); b.cg.gain.value = 1; } catch(e){} } }
 // Reset audio engine: this core goes (it played into the old graph) and a fresh one loads
 function coreDrop(){ coreMixOff(); const n = core.node; if (n){ try { n.port.postMessage({op:'die'}); n.port.onmessage = null; n.disconnect(); } catch(e){} }
-  Object.assign(core, {node:null, ready:false, loading:null, mir:null, wired:null, v:0, vsent:null}); core.sent.clear(); }
+  Object.assign(core, {node:null, ready:false, loading:null, mir:null, wired:null, v:0, vsent:null, sfSent:null}); core.sent.clear(); }
 const corePost = (m, tr) => { try { core.node.port.postMessage(m, tr || []); } catch(e){ tpLog('core post', e); } };
 function coreKit(){ const kv = [];
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; let live = false; try { live = isLivePad(i); } catch(e){}
     let lk = null; if (live && v){ const vx = isVoxV(v), lx = liveX(v), ps = isPsV(v); lk = {kind:vx ? 'vox' : lx ? v.engine : 'bass', vox:vx, ps, vel:ps ? (xParams(v).vel || 100) : 0}; }   // LIVE ENGINES: the node the core drives
     kv.push(v ? {choke:v.choke | 0, syn:isSyn(i), rel:isSyn(i) ? relOf(v) : 0, live, lk, sf:v.engine === 'sf'} : null); }
-  corePost({op:'kit', kv}); }
+  corePost({op:'kit', kv}); for (let i = 0; i < kv.length; i++) if (kv[i] && kv[i].sf || (core.sfSent && core.sfSent.has(i))) coreSf(i); }
 // The core dropped its variations (of pad i, or all of them: an instrument changed): send them again when asked
 function coreVarGone(i){ const V = core.vsent; if (!V) return; if (i == null){ V.clear(); return; } for (const k of [...V.keys()]) if (k.endsWith(':' + i)) V.delete(k); }
 const coreOps = ops => { if (ops.some(o => o[0] === 'insts')) coreVarGone(null); return ops; };
+/* SOUNDFONTS: a SoundFont pad's preset for the core, once its font is loaded and the preset decoded (sfPreparePad):
+   the pad's controls, the zones, the headers of the samples they use, and those samples (copies). Sent again when any of
+   it changes; the core plays the pad's notes from then on. */
+function coreSf(i){ if (!core.ready) return; const v = kit.voices[i], M = core.sfSent || (core.sfSent = new Map());
+  if (!v || v.engine !== 'sf'){ if (M.has(i)){ M.delete(i); corePost({op:'sf', pad:i, data:null}); } return; }
+  const font = SF.fonts.get(v.sfFont || GM_FONT.id); if (!font) return;
+  const P = xParams(v), pr = sfPreset(font, Math.round(P.bank), Math.round(P.prog)); if (!pr) return;
+  const want = new Set(); for (const z of pr.zones){ want.add(z.s); const s0 = font.samples[z.s]; if (s0 && (s0.type & 6) && s0.link < font.samples.length) want.add(s0.link); }
+  for (const k of want) if (!SF.smp.has(font.id + ':' + k)) return;   // still decoding: sfPreparePad sends it when done
+  const PP = {bank:P.bank, prog:P.prog, trans:P.trans, velo:P.velo, atk:P.atk, rel:P.rel, level:P.level || 0, len:v.len || 0};
+  const sig = font.id + '|' + pr.bank + '|' + pr.prog + '|' + JSON.stringify(PP); if (M.get(i) === sig) return; M.set(i, sig);
+  const samples = new Array(font.samples.length), smp = {}, tr = [];
+  for (const k of want){ const s0 = font.samples[k]; samples[k] = {root:s0.root, corr:s0.corr, type:s0.type, link:s0.link};
+    const a = SF.smp.get(font.id + ':' + k), d = a.d.slice(); smp[k] = {d, sr:a.sr, ls:a.ls, le:a.le}; tr.push(d.buffer); }
+  corePost({op:'sf', pad:i, data:{P:PP, font:{samples}, pr:{zones:pr.zones}, smp}}, tr); }
 // MUT / GEN: a variation for the core (by instrument, variation and pad: the core can't work out the page's varKey), once
 function coreVar(ev, rec){ if (!core.ready || !rec || !rec.data || ev.ii == null || ev.pad == null) return;
   const k = ev.ii + ':' + ev.vk + ':' + ev.pad, V = core.vsent || (core.vsent = new Map()); if (V.get(k) === rec.data) return; V.set(k, rec.data);
