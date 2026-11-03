@@ -1805,7 +1805,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 @keyframes dkBreath{0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.025)}}
 @keyframes dkWag{0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-10deg)}}
 @media (prefers-reduced-motion: reduce){ .dogs .bob, .dogs .tail{animation:none!important} }
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .dogs{--dk-pink:var(--mxsoft)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .dogs{--dk-pink:var(--mxsoft)}
 /* DRUM (the phrase stage's DANCE · DRUM · KEYS): the pittie behind a drum kit with sticks, the husky on bongos. The kit
    only shows in .drum; arms rest over their drums (CSS variables) and strike with dogsHit(); no hops or breathing. */
 .dogs .kit{display:none}
@@ -1974,6 +1974,15 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="m8"] #tPad .k:not(#zz){background:#2b2b2b; color:#e6e6e6; border-color:#000; border-radius:3px}
 :root[data-skin="m8"] #tPad .k[data-b="play"]:not(#zz){background:#2b2b2b; color:#3cdc5a} :root[data-skin="m8"] #tPad .k[data-b="edit"]:not(#zz){background:#2b2b2b; color:#2ce0f0}
 :root[data-skin="m8"] #tPad .k[data-b="shift"]:not(#zz){background:#2b2b2b; color:#ff4fa0} :root[data-skin="m8"] #tPad .k[data-b="loop"]:not(#zz){background:#2b2b2b; color:#e6e6e6}
+/* CALCULATOR WATCH (owner, 2 Nov: "a Casio skin just for fun, inspired by the calculator watch"): the grey-green LCD with
+   black segments, black rubber keys with grey legends, and the face's little colour labels (orange, blue, gold) */
+:root[data-skin="calcwatch"]{--mx:#1b1d17; --mx2:#3f4236; --mxdim:#858a72; --mxbg:#c3c7b0; --mxpanel:#ced1bc; --mxpanel2:#a9ad96; --mxon:#c3c7b0;
+  --mxsoft:#1b1d17; --mxpoly:#5c6150; --mxglowc:transparent; --mxscan:transparent; --mxred:#e2502b; --mxcur:#1b1d17; --mxcuron:#c3c7b0; --mxbus:#3a6fc4; --mxline:#5c6150;
+  --font:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; --mono:"Share Tech Mono","JetBrains Mono",ui-monospace,monospace; color-scheme:light}
+:root[data-skin="calcwatch"] .brand{font-weight:400; letter-spacing:.22em; text-transform:uppercase} :root[data-skin="calcwatch"] .brand .plus{color:#e2502b}
+:root[data-skin="calcwatch"] #tPad .k:not(#zz){background:#222320; color:#cfd0c8; border-color:#000; border-radius:5px}
+:root[data-skin="calcwatch"] #tPad .k[data-b="play"]:not(#zz){background:#222320; color:#ff7a45} :root[data-skin="calcwatch"] #tPad .k[data-b="edit"]:not(#zz){background:#222320; color:#6f9cf0}
+:root[data-skin="calcwatch"] #tPad .k[data-b="shift"]:not(#zz){background:#222320; color:#e2c35a} :root[data-skin="calcwatch"] #tPad .k[data-b="loop"]:not(#zz){background:#222320; color:#cfd0c8}
 /* DESIGN ICONS and two more machines (owner, 2 Nov: "I love the 909 skin … famous designers or iconic styles"). */
 /* BAUHAUS: cream paper, black, the three primaries; Jost is a Futura-like geometric face */
 :root[data-skin="bauhaus"]{--mx:#111111; --mx2:#3a3a3a; --mxdim:#8a8478; --mxbg:#f1ebdc; --mxpanel:#f7f2e6; --mxpanel2:#e4dcc8; --mxon:#f7f2e6;
@@ -2173,7 +2182,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
   --stdc:var(--mxdim); --fmc:var(--mxdim); --addc:var(--mxdim); --noisec:var(--mxdim); --smpc:var(--mxdim); --plc:var(--mxdim); --wvc:var(--mxdim);
   --meter-ok:var(--mx); --meter-hot:var(--mxsoft); --meter-clip:var(--mxred); --mxglow:0 0 6px var(--mxglowc)}
 :root[data-skin="matrixlight"]{--line:#2b2b2b}
-:root[data-skin="vice"]{--line:#5a468f} :root[data-skin="opuntia"]{--line:#3f6b47} :root[data-skin="koss"]{--line:#7a5c45} :root[data-skin="mpc"]{--line:#8f897d} :root[data-skin="nord"]{--line:#3a3a3a} :root[data-skin="tr808"]{--line:#4a4740} :root[data-skin="tr909"]{--line:#8e9397} :root[data-skin="sp202"]{--line:#4c5157} :root[data-skin="wes"]{--line:#c98f9c} :root[data-skin="m8"]{--line:#2a2a2a} :root[data-skin="bauhaus"]{--line:#111111} :root[data-skin="swiss"]{--line:#000000} :root[data-skin="destijl"]{--line:#0d0d0d} :root[data-skin="memphis"]{--line:#1a1a1a} :root[data-skin="valentine"]{--line:#8f1414} :root[data-skin="eames"]{--line:#6b4a33} :root[data-skin="vignelli"]{--line:#333333} :root[data-skin="bondi"]{--line:#9cc9d2} :root[data-skin="dx7"]{--line:#514a43} :root[data-skin="lcdgreen"]{--line:#306230}
+:root[data-skin="vice"]{--line:#5a468f} :root[data-skin="opuntia"]{--line:#3f6b47} :root[data-skin="koss"]{--line:#7a5c45} :root[data-skin="mpc"]{--line:#8f897d} :root[data-skin="nord"]{--line:#3a3a3a} :root[data-skin="tr808"]{--line:#4a4740} :root[data-skin="tr909"]{--line:#8e9397} :root[data-skin="sp202"]{--line:#4c5157} :root[data-skin="wes"]{--line:#c98f9c} :root[data-skin="m8"]{--line:#2a2a2a} :root[data-skin="calcwatch"]{--line:#5c6150} :root[data-skin="bauhaus"]{--line:#111111} :root[data-skin="swiss"]{--line:#000000} :root[data-skin="destijl"]{--line:#0d0d0d} :root[data-skin="memphis"]{--line:#1a1a1a} :root[data-skin="valentine"]{--line:#8f1414} :root[data-skin="eames"]{--line:#6b4a33} :root[data-skin="vignelli"]{--line:#333333} :root[data-skin="bondi"]{--line:#9cc9d2} :root[data-skin="dx7"]{--line:#514a43} :root[data-skin="lcdgreen"]{--line:#306230}
 :root[data-skinbase="term"] body{background:var(--mxbg); color:var(--mx); font-family:var(--font); text-shadow:var(--mxglow)}
 :root[data-skinbase="term"] :is(button,select,input,textarea){font-family:var(--font)}
 :root[data-skinbase="term"] :is(kbd,code,.tscr,.fxpick){font-family:var(--mono)}
@@ -2192,10 +2201,10 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
    second panel tone, so the app's menus read as their own strip above the SONG / PHRASE… row, and the screen tabs are
    plain words with the open one underlined. Only the bar's own buttons change (the menus that open from it keep the skin's
    colours); a pressed button stays filled. Dark Simple skins, Pastel and Minimal are unchanged. */
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .top{background:var(--mxpanel2)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .top{background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
 /* pads, command row and keypad: plain keys with outlines and an offset block; a hit fills */
 :root[data-skinbase="term"] :is(.tcmd,.dock,.tctl){background:var(--mxbg)}
 :root[data-skinbase="term"] :is(.tcmd button,.tkp .kp,.pads .pad){background:var(--mxbg); color:var(--mx); border-color:var(--mxline, var(--mx));
@@ -2232,7 +2241,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="greywhite"]{--mxmst:#c9b7f2}
 :root[data-skin="contrast"]{--mxmst:#d6331f; --mxmston:#ffffff}
 :root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg))}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .tdeck{--stpink:var(--mx)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .tdeck{--stpink:var(--mx)}
 :root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkChn,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkChn{--dkp:9%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
 :root[data-skinbase="term"] .dkh .dksolo{background:var(--mxsoft); color:var(--mxon)} :root[data-skinbase="term"] .stms button.so.on{background:var(--mxsoft); color:var(--mxon)}
 :root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
@@ -2240,7 +2249,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
    could go grey (plum: green into pink gave #d2d0d2). Light skins mix it with white so the hue stays; the dark skins
    (near-neutral backgrounds) keep mixing with theirs. */
 :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 35%, #ffffff)}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
 :root[data-skinbase="term"] .tagrid b.f[style]{background:color-mix(in srgb, var(--mx) var(--ibp, 100%), var(--mxsoft)); color:var(--mxon)} :root[data-skinbase="term"] .tagrid b.f{text-shadow:none; box-shadow:0 0 8px var(--mxglowc)}
 :root[data-skinbase="term"] .tscr .nbl, :root[data-skinbase="term"] .tscr .nbr{color:var(--mx2)}
 :root[data-skinbase="term"] ::selection{background:var(--mx); color:var(--mxon)}
@@ -13234,6 +13243,7 @@ const SKINS = [
   {id:'sp202', name:'Dr. Sample (SP-202)', base:'term', dots:['#2c2f33', '#e8e6e1', '#f39a1e', '#a8d08d']},
   {id:'wes', name:'Wes Anderson (pastel hotel)', base:'term', dots:['#f3d5d3', '#5a1f33', '#d9a425', '#7fb0c9']},
   {id:'m8', name:'M8 (pocket tracker)', base:'term', dots:['#000000', '#d8d8d8', '#2ce0f0', '#ff4fa0']},
+  {id:'calcwatch', name:'Calculator watch', base:'term', dots:['#c3c7b0', '#1b1d17', '#e2502b', '#222320']},
   {id:'bauhaus', name:'Bauhaus', base:'term', dots:['#f1ebdc', '#111111', '#d7261e', '#1f4e9c']},
   {id:'swiss', name:'Swiss (International style)', base:'term', dots:['#ffffff', '#000000', '#e30613', '#4d4d4d']},
   {id:'destijl', name:'De Stijl (Mondrian)', base:'term', dots:['#f5f3ee', '#0d0d0d', '#c8102e', '#0b3d91']},
@@ -17450,13 +17460,14 @@ function makePlayer(ac, out, getBuf, live){
      crossfade when CHN is switched (CHN SWITCH below), so …chains comes and goes without a click. */
   for (let t = 0; t <= NT; t++){
     const inp = ac.createGain(), dry = ac.createGain(), ins = ac.createGain(), g = ac.createGain(), p = ac.createStereoPanner(), scs = ac.createGain(), pre = ac.createGain();
+    const cg = ac.createGain();   // THUNDER CORE's TVL / TVA (a multiplier after VOL): 1, or the core's control output while the core plays
     pre.channelCount = 2; pre.channelCountMode = 'explicit'; pre.channelInterpretation = 'speakers';   // a PRE send is a stereo pair, like the pan's
     // LATENCY COMPENSATION (1 Nov): dl sits on the way to the master (0 s unless the option asks for more; see pdcPlan)
     const dl = ac.createDelay(1); dl.delayTime.value = 0;
-    inp.connect(dry); dry.connect(ins); ins.connect(g); g.connect(p); p.connect(dl); dl.connect(out); ins.connect(pre);   // (pre runs only once a bus listens to it)
+    inp.connect(dry); dry.connect(ins); ins.connect(g); g.connect(cg); cg.connect(p); p.connect(dl); dl.connect(out); ins.connect(pre);   // (pre runs only once a bus listens to it)
     scs.gain.value = 0;   // (the old post-fader Sidechain Out send: gone with the mixer bus, 21 Oct)
     let an = null, ai = null; if (live && t < NT){ an = ac.createAnalyser(); an.fftSize = 512; p.connect(an); ai = ac.createAnalyser(); ai.fftSize = 512; inp.connect(ai); }
-    buses.push({inp, dry, ins, g, p, dl, pre, an, ai, scs, lv:0, pk:0, ilv:0, ipk:0, ipt:0, fx:null, chn:null, wet:null, _fade:new Set()});
+    buses.push({inp, dry, ins, g, cg, p, dl, pre, an, ai, scs, lv:0, pk:0, ilv:0, ipk:0, ipt:0, fx:null, chn:null, wet:null, _fade:new Set()});
   }
   // Bass voices: one live node per track and voice (see bassReady), made when it first plays.
   const bassN = new Map(); let bpmNow = (S && S.bpm) || 120;
@@ -17944,7 +17955,7 @@ function makePlayer(ac, out, getBuf, live){
     for (const b of buses){ if (!b) continue;
       try { if (b.fx){ b.fx.port.postMessage(null); b.fx.disconnect(); } } catch(e){}
       try { if (b.chn){ if (b.chn._send) b.chn._send({target:'chains-host', op:'dispose'}); b.chn.disconnect(); } } catch(e){}
-      try { b.inp.disconnect(); b.dry.disconnect(); b.ins.disconnect(); b.pre.disconnect(); if (b.wet) b.wet.disconnect(); for (const w of b._fade) w.disconnect(); b.g.disconnect(); b.p.disconnect(); b.dl.disconnect(); if (b.fdl) b.fdl.disconnect(); if (b.fdlP) b.fdlP.disconnect(); b.scs.disconnect(); if (b.spl) b.spl.disconnect(); if (b.splP) b.splP.disconnect(); if (b._feedM) for (const m of b._feedM) m.disconnect(); } catch(e){} }
+      try { b.inp.disconnect(); b.dry.disconnect(); b.ins.disconnect(); b.pre.disconnect(); if (b.wet) b.wet.disconnect(); for (const w of b._fade) w.disconnect(); b.g.disconnect(); b.cg.disconnect(); b.p.disconnect(); b.dl.disconnect(); if (b.fdl) b.fdl.disconnect(); if (b.fdlP) b.fdlP.disconnect(); b.scs.disconnect(); if (b.spl) b.spl.disconnect(); if (b.splP) b.splP.disconnect(); if (b._feedM) for (const m of b._feedM) m.disconnect(); } catch(e){} }
     try { scBus.disconnect(); } catch(e){}
     try { if (taps) taps.disconnect(); } catch(e){}
     try { sendBus.disconnect(); sendDly.disconnect(); } catch(e){}
@@ -17954,7 +17965,7 @@ function makePlayer(ac, out, getBuf, live){
   const psLoad = () => { let l = 0, n = 0; for (const b of bassN.values()) if (b.ps){ l += b.node.load || 0; n++; } return {load:l, nodes:n}; };
   const psDrop = () => { for (const [k, b] of [...bassN]) if (b.ps) bassDrop(k, b); };
   const clkReset = at => { clk.on = false; try { clock.offset.cancelScheduledValues(at); clock.offset.setValueAtTime(-1, at); } catch(e){} };
-  return {play, coreTake, clkBus, clkReset, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop};
+  return {play, coreTake, clkBus, clkReset, out, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop};
 }
 
 /* ---------- live playback ---------- */
@@ -18613,15 +18624,15 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'emufuh';
-const CORE_WANT = 3;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
+const CORE_REV = '27g6hx';
+const CORE_WANT = 4;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
 function coreLoad(){
   if (core.loading) return core.loading;
   if (!ctx || !ctx.audioWorklet || !rt) return Promise.resolve(false);
   core.loading = ctx.audioWorklet.addModule(CORE_URL()).then(() => {
-    const n = new AudioWorkletNode(ctx, 'thunder-core', {numberOfInputs:0, numberOfOutputs:NT + 1, outputChannelCount:[...new Array(NT).fill(2), 1]});
+    const n = new AudioWorkletNode(ctx, 'thunder-core', {numberOfInputs:0, numberOfOutputs:NT + 4, outputChannelCount:[...new Array(NT).fill(2), 1, NT, NT, 1]});   // + the mix outputs (coreMixT)
     n.port.onmessage = e => { try { coreMsg(e.data || {}); } catch(err){ tpLog('core message', err); } };
     core.node = n; core.ready = true; core.sent.clear(); coreSyncAll(); return true;
   }, err => { tpLog('core load', err); core.loading = null; toast('The audio-thread sequencer didn’t load here: playing as before.', 3500); return false; });
@@ -18632,12 +18643,31 @@ function coreLoad(){
 // CPU (owner, Fold, 2 Nov: ~10 points more than Page): a connected output keeps its track's whole chain (its effects, its
 // …chains) running even while silent, so only the tracks the song plays on are plugged in, and only while the core plays.
 function coreWire(on){ const n = core.node; if (!n || !rt) return;
-  if (!on){ if (core.wired){ try { n.disconnect(); } catch(e){} } core.wired = null; return; }
+  if (!on){ if (core.wired){ try { n.disconnect(); } catch(e){} } core.wired = null; coreMixOff(); return; }
   if (!core.wired){ core.wired = new Set(); try { n.connect(rt.pl.clkBus, NT); } catch(e){} }   // the beat clock for tempo-locked effects
   for (let t = 0; t < NT; t++) if ((S.song || []).some(r => r && r[t] >= 0)) coreWireT(t); }
 function coreWireT(t){ const n = core.node; if (!n || !rt || !core.wired || core.wired.has(t) || core.noWire) return; core.wired.add(t); try { n.connect(rt.pl.buses[t].inp, t); } catch(e){} }
+/* MIX ON THE AUDIO THREAD (plan 2c): the first TVL / TVA / TPN on a track, or the master column's VOL, that the core played
+   plugs that one control in: the core's level multiplier into the track's cg gain (its own value 0 then, so the core's
+   output is the gain), its pan offset into the panner's pan (the mixer's pan stays the param's own value), its master
+   offset into the master gain. The page then leaves those params alone (the events come marked core:true). STOP unplugs
+   them and puts cg back to 1. */
+function coreMixT(e){
+  const n = core.node, pl = rt && rt.pl; if (!n || !pl || !core.wired || core.noWire) return;
+  const M = core.mix || (core.mix = {on:new Set(), sg:null, sp:null});
+  if (e.type === 'mvol'){ if (M.on.has('m')) return; M.on.add('m'); try { n.connect(pl.out.gain, NT + 3); } catch(err){} return; }
+  const t = e.track, b = pl.buses[t]; if (!b || t >= NT) return;
+  const pan = e.type === 'tpn', key = (pan ? 'p' : 'g') + t; if (M.on.has(key)) return; M.on.add(key);
+  try {
+    if (pan){ if (!M.sp){ M.sp = ctx.createChannelSplitter(NT); n.connect(M.sp, NT + 2); } M.sp.connect(b.p.pan, t); }
+    else { if (!M.sg){ M.sg = ctx.createChannelSplitter(NT); n.connect(M.sg, NT + 1); } b.cg.gain.setValueAtTime(0, 0); b.cg.gain.value = 0; M.sg.connect(b.cg.gain, t); }
+  } catch(err){ tpLog('core mix', err); }
+}
+function coreMixOff(){ const M = core.mix; if (!M) return; core.mix = null;
+  try { if (M.sg) M.sg.disconnect(); if (M.sp) M.sp.disconnect(); } catch(e){}
+  const pl = rt && rt.pl; if (pl) for (const k of M.on) if (k[0] === 'g'){ const b = pl.buses[+k.slice(1)]; if (b) try { b.cg.gain.cancelScheduledValues(0); b.cg.gain.value = 1; } catch(e){} } }
 // Reset audio engine: this core goes (it played into the old graph) and a fresh one loads
-function coreDrop(){ const n = core.node; if (n){ try { n.port.postMessage({op:'die'}); n.port.onmessage = null; n.disconnect(); } catch(e){} }
+function coreDrop(){ coreMixOff(); const n = core.node; if (n){ try { n.port.postMessage({op:'die'}); n.port.onmessage = null; n.disconnect(); } catch(e){} }
   Object.assign(core, {node:null, ready:false, loading:null, mir:null, wired:null, v:0}); core.sent.clear(); }
 const corePost = (m, tr) => { try { core.node.port.postMessage(m, tr || []); } catch(e){ tpLog('core post', e); } };
 function coreKit(){ const kv = [];
@@ -18693,7 +18723,9 @@ function coreMsg(d){
       if (e.vk && !e.core) try { varWant(e); } catch(err){}
       { const k = (e.core ? 'core ' : 'page ') + e.type + (e.type === 'note' && !e.core ? ' pad ' + e.pad : ''); core.tally.set(k, (core.tally.get(k) || 0) + 1); }
       const midiOnly = moEv(e);
-      if (e.core){ if (e.type === 'note'){ coreWireT(e.track); rt.pl.coreTake(e); if (e.t >= ctx.currentTime - 0.03) padBlink(e); } continue; }   // (a beat: the core drives the effects' clock; moEv above still kept MIDI clock's mx.beat)
+      if (e.core){ if (e.type === 'note'){ coreWireT(e.track); rt.pl.coreTake(e); if (e.t >= ctx.currentTime - 0.03) padBlink(e); }
+        else if (e.type === 'tvl' || e.type === 'tva' || e.type === 'tpn' || e.type === 'mvol') coreMixT(e);
+        continue; }   // (a beat: the core drives the effects' clock; moEv above still kept MIDI clock's mx.beat)
       if (midiOnly) continue;
       // LATE (owner, Fold: back from another app it sped up and stuttered): rows held up while the app was in the background
       // arrive together; a note whose time has passed is dropped, not played at once in a burst (the old pump skips ahead
@@ -19796,7 +19828,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 372;
+const BUILD = 373;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26885,6 +26917,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [373, '2 Nov', ['Audio-thread sequencer: track level and pan commands (TVL, TVA, TPN) and the master column’s VOL now play from the audio thread too, so a busy screen can’t make them late.', 'New skin: Calculator watch (Hardware): the grey-green LCD, black rubber keys with orange, blue and gold legends.']],
   [372, '2 Nov', ['Acid line: a slide into a note whose three FX columns are full is no longer dropped: it takes FX3 (the toast says so; Undo brings the old command back).', 'Phones: if the song keeps dropping out (four in a minute), a tip offers Latency: Safest once.']],
   [371, '2 Nov', ['New skins (View → Skin): a Design icons group with Bauhaus, Swiss (International style), De Stijl (Mondrian), Memphis, Valentine (Sottsass red), Eames (mid-century), Vignelli (subway signs) and Bondi (translucent 98); and in Hardware, DX7 and Pea-green LCD.']],
   [370, '2 Nov', ['Menus, second pass: every group has a heading (File: Project, Render, Import, export & kit; Edit: History, Clipboard, Select, Rows, Song blocks, Track, Make, Play; Audio: Output, Engine; MIDI: Input, Output ports, Clock; App: Layout, Updates & help, Storage; View: Size, Display, More). On/off settings are switches on the right; Song settings, Skin and Open mastering are rows with a › that open their sheet. FLX 11–FF keeps its capitals.']],
@@ -27119,7 +27152,7 @@ function setSheet(kind){
 }
 // Skin: every skin as a little tracker in its own colours, grouped. A tap puts it on the app at once (the app behind
 // the sheet is the preview); Done keeps it, "Back to …" returns to the skin you opened the sheet with.
-const SKIN_GROUPS = [['Pastel', ['auto', 'light']], ['Minimal', ['minimal', 'mincolor', 'monotone', 'minblack', 'mincolorblack']], ['Neon & Matrix', ['neon', 'matrix', 'matrixlight']], ['Rainbow', ['rainbow', 'rainbowdyn']], ['Art & design', ['haring', 'idm', 'idmpg', 'idmpink', 'lineart', 'lautrec', 'vice', 'braun', 'te', 'koss', 'opuntia', 'wes']], ['Hardware', ['mpc', 'nord', 'tr808', 'tr909', 'sp202', 'm8', 'dx7', 'lcdgreen']], ['Design icons', ['bauhaus', 'swiss', 'destijl', 'memphis', 'valentine', 'eames', 'vignelli', 'bondi']]];
+const SKIN_GROUPS = [['Pastel', ['auto', 'light']], ['Minimal', ['minimal', 'mincolor', 'monotone', 'minblack', 'mincolorblack']], ['Neon & Matrix', ['neon', 'matrix', 'matrixlight']], ['Rainbow', ['rainbow', 'rainbowdyn']], ['Art & design', ['haring', 'idm', 'idmpg', 'idmpink', 'lineart', 'lautrec', 'vice', 'braun', 'te', 'koss', 'opuntia', 'wes']], ['Hardware', ['mpc', 'nord', 'tr808', 'tr909', 'sp202', 'm8', 'dx7', 'lcdgreen', 'calcwatch']], ['Design icons', ['bauhaus', 'swiss', 'destijl', 'memphis', 'valentine', 'eames', 'vignelli', 'bondi']]];
 const hexLum = h => { const n = parseInt(h.slice(1), 16), c = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * c(n >> 16 & 255) + 0.7152 * c(n >> 8 & 255) + 0.0722 * c(n & 255); };
 const hexCon = (a, b) => { const x = hexLum(a), y = hexLum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
 function skinGroups(){
@@ -27843,6 +27876,11 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
     tStart('song', {row:0}); const a = ctx.createAnalyser(); a.fftSize = 1024; src.connect(a); const buf = new Float32Array(1024), out = [];
     const t0 = performance.now(); while (performance.now() - t0 < ms){ a.getFloatTimeDomainData(buf); let s = 0; for (const x of buf) s += x * x; out.push(Math.sqrt(s / buf.length)); await new Promise(r => setTimeout(r, 25)); }
     tStop(true); try { src.disconnect(a); } catch(e){} return out; },
+  // A track's left and right level (RMS) every 25 ms for `ms` from PLAY, after its pan (for TPN checks).
+  async busLR(t, ms){ tStart('song', {row:0}); const sp = ctx.createChannelSplitter(2), aL = ctx.createAnalyser(), aR = ctx.createAnalyser(); aL.fftSize = aR.fftSize = 1024;
+    rt.pl.buses[t].p.connect(sp); sp.connect(aL, 0); sp.connect(aR, 1); const b = new Float32Array(1024), out = [], rms = a => { a.getFloatTimeDomainData(b); let s = 0; for (const x of b) s += x * x; return Math.sqrt(s / b.length); };
+    const t0 = performance.now(); while (performance.now() - t0 < ms){ out.push([rms(aL), rms(aR)]); await new Promise(r => setTimeout(r, 25)); }
+    tStop(true); try { rt.pl.buses[t].p.disconnect(sp); } catch(e){} return out; },
   // The tempo-locked effects' beat clock, sampled every 50 ms for `ms` from PLAY.
   async beatClock(ms){ tStart('song', {row:0}); const a = ctx.createAnalyser(); a.fftSize = 256; rt.pl.clkBus.connect(a); const b = new Float32Array(256), out = [];
     const t0 = performance.now(); while (performance.now() - t0 < ms){ a.getFloatTimeDomainData(b); out.push(Math.round(b[255] * 100) / 100); await new Promise(r => setTimeout(r, 50)); }
