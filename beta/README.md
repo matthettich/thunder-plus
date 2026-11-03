@@ -1,4 +1,4 @@
 # Thunder Plus: beta copy
 
-Made by `tools/make-channel.sh` from `origin/beta` (commit 0f0c8e8). Do not edit files here: change the source branch and
+Made by `tools/make-channel.sh` from `origin/beta` (commit 6e19515). Do not edit files here: change the source branch and
 publish again. Runs at https://matthettich.github.io/thunder-plus/beta/ and shares saved songs and kits with the main app.

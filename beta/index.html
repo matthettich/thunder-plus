@@ -1026,6 +1026,8 @@ body.mob .ttabs button{padding:0 9px; letter-spacing:.02em}   /* the tabs make r
    File's; the meter gets the room File gave up. */
 body.mob .top{flex-wrap:nowrap}
 body.mob .top > *{flex-shrink:0} body.mob .top .hmeter{flex:1 1 150px; min-width:100px; max-width:260px; flex-shrink:1}
+body.mob .top .kitname{width:auto; flex:1 1 90px; min-width:64px; max-width:220px; flex-shrink:1}   /* the Synth page: the kit name gives way (it pushed CPU and ? off the screen) */
+body.mob .top .brand{flex-shrink:1; min-width:0; overflow:hidden}
 #bFile .filei{display:none; width:20px; height:20px} body.mob #bFile .filei{display:block} body.mob #bFile .filet{display:none} body.mob #bFile{display:inline-flex; align-items:center; padding:0 12px}   /* the phone: a folder (owner: the ▾ alone was confusing) */
 body.mob .top #tLen{min-height:34px; padding:0 10px; border:1px solid var(--line); border-radius:0; background:var(--panel); font:700 var(--fs-3)/1 var(--mono); align-self:auto}
 /* LOOP on the pad (owner): lit in its own colour while the pattern loops */
@@ -18213,7 +18215,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'xzida7';
+const CORE_REV = '1tewqnm';
 const CORE_WANT = 3;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -18235,7 +18237,7 @@ function coreWire(on){ const n = core.node; if (!n || !rt) return;
   if (!on){ if (core.wired){ try { n.disconnect(); } catch(e){} } core.wired = null; return; }
   if (!core.wired){ core.wired = new Set(); try { n.connect(rt.pl.clkBus, NT); } catch(e){} }   // the beat clock for tempo-locked effects
   for (let t = 0; t < NT; t++) if ((S.song || []).some(r => r && r[t] >= 0)) coreWireT(t); }
-function coreWireT(t){ const n = core.node; if (!n || !rt || !core.wired || core.wired.has(t)) return; core.wired.add(t); try { n.connect(rt.pl.buses[t].inp, t); } catch(e){} }
+function coreWireT(t){ const n = core.node; if (!n || !rt || !core.wired || core.wired.has(t) || core.noWire) return; core.wired.add(t); try { n.connect(rt.pl.buses[t].inp, t); } catch(e){} }
 // Reset audio engine: this core goes (it played into the old graph) and a fresh one loads
 function coreDrop(){ const n = core.node; if (n){ try { n.port.postMessage({op:'die'}); n.port.onmessage = null; n.disconnect(); } catch(e){} }
   Object.assign(core, {node:null, ready:false, loading:null, mir:null, wired:null, v:0}); core.sent.clear(); }
@@ -21851,7 +21853,7 @@ function info(){
     if (k === 'vol') return v < 0 ? 'Volume: full' : `Volume ${hx(v)} · ${dB(curve(v))}`;
     if (k === 'inst'){ if (v < 0) return 'Instrument: same as the last note on this track'; const I = S.insts[v] || S.insts[0]; return `Instrument ${hx(v)} → ${isSyn(I.pad) ? 'synth' : 'pad'} ${hx(I.pad)} ${(kit.voices[I.pad] || {}).name || ''}`; }
     const ci = k === 'fxc' ? v : r[c.x - 1], vv = k === 'fxc' ? r[c.x + 1] : v;
-    return ci < 0 || !FXC[ci] ? 'No command. EDIT adds one; EDIT+▲▼ or letters pick from ' + (mstView() ? MST_FXC : FXC).join(' ') : `${FXC[ci]} ${h2(vv)} · ` + (cTrack === MT && FXC[ci] === 'VOL' ? `Master level ${dB(curve(Math.max(0, vv)))} from here on (back to the Mixer’s MASTER when it stops)` : cTrack === MT && /^(FXO|FLX|GAT|RTG)$/.test(FXC[ci]) ? FXI[FXC[ci]](Math.max(0, vv)).replace(/this track's/g, 'the master’s') + ' · on the master bus' : FXI[FXC[ci]](Math.max(0, vv)));
+    return ci < 0 || !FXC[ci] ? 'No command · EDIT adds one' : `${FXC[ci]} ${h2(vv)} · ` + (cTrack === MT && FXC[ci] === 'VOL' ? `Master level ${dB(curve(Math.max(0, vv)))} from here on (back to the Mixer’s MASTER when it stops)` : cTrack === MT && /^(FXO|FLX|GAT|RTG)$/.test(FXC[ci]) ? FXI[FXC[ci]](Math.max(0, vv)).replace(/this track's/g, 'the master’s') + ' · on the master bus' : FXI[FXC[ci]](Math.max(0, vv)));
   }
   if (tv === 'mixer'){
     if (c.y === 7 && c.mx === 1) return 'Mastering ' + (S.mst.on ? 'on' : 'off') + ' · ' + mstChainTxt() + ' · EDIT opens it · EDIT+◀▶ off / on';
@@ -22225,10 +22227,10 @@ function draw(){
   if (mstP) hintTxt = inMode === 'keys' ? 'Master phrase: commands only · letters pick a command (V F G R T…) · type hex for its value · Del cell · Ctrl+Shift+↑↓ lines · Ctrl+C/V' : HINT.phraseM;
   if (tv === 'fx' && cs.fx.y > FXSLOTS) hintTxt = 'Slot ' + (cFxS + 1) + ' controls · ▲▼ pick one · ' + (inMode === 'keys' ? '← or Esc back to the slots' : '◀ back to the slots');
   if (tv === 'phrase' && pvActive()) hintTxt = pvHint();   // PATTERN VIEW
-  if (tv === 'phrase' && busTrack(cTrack)) hintTxt = 'BUS: FX commands only · ' + (hasNotes(S.phrases[cPhrase]) ? 'its old notes go silent at the next PLAY (Del clears them) · ' : '')
-    + (inMode === 'keys' ? 'letters pick a command · hex its value · Shift+Space plays it with the tracks that feed it' : 'EDIT on an FX cell picks a command · PLAY plays it with the tracks that feed it');   // BUS FX ONLY
+  if (tv === 'phrase' && busTrack(cTrack)) hintTxt = 'BUS: FX commands only · ' + (hasNotes(S.phrases[cPhrase]) ? 'old notes are silent (Del clears) · ' : '')
+    + (inMode === 'keys' ? 'letters pick a command · Shift+Space plays it with its tracks' : 'EDIT on FX picks a command · PLAY plays it with its tracks');   // BUS FX ONLY
   { const h = $('tHint'), txt = (tv === 'phrase' && !mstP ? 'NOW ' + curS() + (inMode === 'keys' ? ' · oct ' + kOct + ' · step ' + kStep : '') + ' · ' : '') + hintTxt;
-    if (h.textContent !== txt){ h.textContent = txt; h.classList.remove('open'); const mo = h.scrollHeight > h.clientHeight + 1; h.classList.toggle('more', mo); h.title = mo ? txt + '\n(click to show it all)' : ''; } }
+    hintFit(h, txt); }
   // The fit check comes after the title, info and hint lines have this screen's text (19 Oct): before, it measured with
   // the previous screen's lines, so entering the Mixer left it a few px too big and the first cursor move shrank it.
   const lsig = [tv, gh.length, scr.style.fontSize, tScale, innerWidth, innerHeight, arrW, sideOn, inlOn, stage].join('|');
@@ -26262,7 +26264,14 @@ function apMarkSel(){   // the song selection in the panel (drawArr marks it onl
   for (let y = r.y0; y <= r.y1; y++){ const row = arrGrid.children[y]; if (!row) continue;
     for (let t = r.x0; t <= r.x1; t++){ const b = row.querySelector(`b[data-t="${t}"]`); if (b){ b.classList.add('sl'); arrMark.push(b); } } }
 }
-function apHint(txt){ const h = $('tHint'); if (h.textContent !== txt){ h.textContent = txt; h.classList.remove('open'); const mo = h.scrollHeight > h.clientHeight + 1; h.classList.toggle('more', mo); h.title = mo ? txt + '\n(click to show it all)' : ''; } }
+function apHint(txt){ hintFit($('tHint'), txt); }
+/* HINT FIT (owner, 2 Nov: hint lines ended mid-word in "…"): a hint that doesn't fit drops whole " · " parts from its end
+   until it does, so it never stops mid-sentence; the full text is the tooltip, and a tap shows it all. */
+function hintFit(h, txt){
+  if (h.dataset.full === txt) return; h.dataset.full = txt; h.classList.remove('open', 'more'); h.textContent = txt;
+  if (h.scrollHeight <= h.clientHeight + 1){ h.title = ''; return; }
+  const P = txt.split(' · '); while (P.length > 1 && h.scrollHeight > h.clientHeight + 1){ P.pop(); h.textContent = P.join(' · '); }
+  h.classList.add('more'); h.title = txt + '\n(tap to show it all)'; }
 // While the song has the keys: the Song screen's info and hint lines, its command row (CLN and CLN↓ instead of − − / + +)
 // and, in KEYS mode, its keypad (hex).
 function apSongLines(){
@@ -26571,7 +26580,7 @@ $('helpNew').addEventListener('click', () => { hideHelp(); whatsNew(true); });
 { const B = $('tLegBtn'), set = on => { document.body.classList.toggle('legon', on); B.textContent = on ? 'KEYS ▾' : 'KEYS ▸'; B.setAttribute('aria-expanded', on); };
   let on0 = false; try { on0 = localStorage.getItem('thunderplus-legon') === '1'; } catch(e){}
   set(on0); B.addEventListener('click', () => { const on = !document.body.classList.contains('legon'); set(on); try { localStorage.setItem('thunderplus-legon', on ? '1' : '0'); } catch(e){} }); }
-$('tHint').addEventListener('click', () => { const h = $('tHint'); if (h.classList.contains('more') || h.classList.contains('open')){ h.classList.toggle('open'); scheduleRefit(false); } });
+$('tHint').addEventListener('click', () => { const h = $('tHint'); if (h.classList.contains('more') || h.classList.contains('open')){ const op = h.classList.toggle('open'); if (op) h.textContent = h.dataset.full || h.textContent; else { const t = h.dataset.full; h.dataset.full = ''; hintFit(h, t); } scheduleRefit(false); } });
 $('helpX').addEventListener('click', hideHelp);
 // Runs before the synth and tracker key handlers: ? or F1 toggles help, and while it is open the keys
 // only scroll it (Esc closes).
@@ -27381,6 +27390,8 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
     core.node.port.addEventListener('message', f); corePost({op:'sig'}); setTimeout(() => ok(null), 1000); }); },
   // A few edits as the tracker makes them (a note, a phrase, a song cell, a new phrase), each saved
   edits(){ const p = S.phrases.findIndex(Boolean); S.phrases[p][1][0] = 50; saveS(); S.song[3][2] = -1; saveS(); S.phrases.push(freshPhrase()); saveS(); S.bpm = 133; saveS(); return p; },
+  // Measuring the core's costs: noSampler (the page plays every note), noWire (the core's outputs unplugged)
+  coreDbg(o){ core.noWire = !!o.noWire; if (core.ready) corePost({op:'dbg', noSampler:!!o.noSampler}); },
   coreStats(){ return new Promise(ok => { if (!core.ready) return ok(null); const f = e => { if (e.data && e.data.op === 'stats'){ core.node.port.removeEventListener('message', f); ok(e.data); } };
     core.node.port.addEventListener('message', f); corePost({op:'stats', id:1}); setTimeout(() => ok(null), 1000); }).then(r => { if (r) r.tally = Object.fromEntries(core.tally); core.tally.clear(); return r; }); },
   // The master's level (RMS) every 25 ms for `ms` from PLAY (for comparing the two sequencers' sound).
