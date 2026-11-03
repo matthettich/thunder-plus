@@ -19109,7 +19109,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 356;
+const BUILD = 357;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25950,6 +25950,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [357, '2 Nov', ['FX bar: compressors show IN, GR and OUT meters with the threshold; the value you click is highlighted, and the wheel changes it while you hold the button; smaller M and S, and SOLO · CLEAR no longer cut off.', 'Effects remember their settings: switch a slot to another effect and back and its settings return (INIT in › PRESET still resets).', 'Generators (Edit ▾ or right-click in a phrase): Acid line now lets you pick the instrument, and ROLL is Generate (G); Euclidean fill takes an instrument too (5 16 0 0A).', 'Shift+wheel grows the selection on Phrase and the Pattern view. EDIT OFF (Esc) is easy to see: hollow cursor, dimmed notes, PHRASE · EDIT OFF.', 'Mixer: CHN sits above FX, in the order the sound goes.', 'Fixed: Remove these rows in Arrange removed only one row; Arrange stopped turning pages while something was selected; …chains showed the previous song’s chain in a new song; the pointer stuck as a hand in …chains; the screen beside Arrange could not be picked again while Arrange had the keys.']],
   [356, '2 Nov', ['FX bar (desktop): each effect is a solid box like the phone’s buttons, with a square on/off light; empty slots fold into one + ADD FX.', 'FX bar pictures: compressors and other dynamics show their gain reduction (and, with a taller panel, their curve and a live input dot); other effects show their output level over the last few seconds.']],
   [355, '1 Nov', ['Rendering: Cancel (or Esc) on the progress window stops Render song / Render stems; nothing is saved.', 'FX bar: no scope, and folding …CHAINS gives the effects its room.']],
   [354, '1 Nov', ['Mobile setup: the tabs and the tempo strip share one line on the Fold unfolded. The strip drops LOOP (the pad’s LOOP key) and CLICK (Settings → Record & play); LEFT moves to the top bar beside File; the top bar’s meter is shorter, the CPU is just a percentage, and on narrower screens its ▷ Song button steps aside (PLAY and the COMMANDS ▶ still play the song).']],
