@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.76** (3 Nov 2026; owner: "merge and build desktop"; from `main` after merging `beta` at build 401): side panel
+  instrument names in full, the Harmonizer's voices in the pitch animation.
 - **v1.2.75** (3 Nov 2026; owner: "push a new merge and desktop build"; Run workflow through the API with version 1.2.75,
   from `main` after merging `beta` at build 400): the mouse audit follow-ups (builds 379–400): Arrange paging and bus frame,
   vintage samplers (VSAMP), FX bar animations for every effect, row colours, solo/mute rules, Acid generator from the song's
