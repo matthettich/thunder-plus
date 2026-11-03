@@ -119,6 +119,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (28): side names in full, Harmonizer voices (build 401)
+
+- `.tside .tinl button`: fs-3, tighter, wraps to 2 lines (line-clamp); the card's min-height is 8 rows of 32 px.
+- dkAnim 'pitch': every option param whose names are intervals (ivSemis: '+maj 3rd' → 4 …) is a voice, its alpha from
+  lvN; ±24 lines when a voice is past an octave. Single-shift effects as before.
+
 ## 3 Nov (27): FX bar keys and FX screen follow (build 400)
 
 - dkFbFoc / dkFbPick / dkFbKey (window keydown capture): a click on a bar value (.fr) gives the bar the keys; ▲▼ rows,
