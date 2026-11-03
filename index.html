@@ -25107,9 +25107,16 @@ scr.addEventListener('wheel', e => {
       for (let k = 0; k < Math.abs(n); k++) bump(n < 0 ? 1 : -1, false);   // up raises it (Shift took big steps: Phase 2, Shift is fine)
       return; } }
   if (tv === 'mixer' || onPset()) return; e.preventDefault();
-  // PATTERN view: a sideways swipe, a tilt wheel or Shift+wheel scrolls across the tracks (the cursor stays put).
+  // SHIFT+WHEEL SELECTS (owner, 2 Nov): on Phrase and the Pattern view, Shift+wheel grows the selection up or down a row a
+  // notch, as Shift+▲▼ does (Windows sends Shift+wheel as a sideways scroll: either axis counts). Sideways scrolling of
+  // the Pattern view stays on a tilt wheel or a trackpad swipe.
+  if (e.shiftKey && tv === 'phrase'){ const d = e.deltaY || e.deltaX; wAcc += e.deltaMode === 1 ? d * 40 : d;
+    const n = Math.trunc(wAcc / 40); if (!n) return; wAcc -= n * 40;
+    for (let k = 0; k < Math.abs(n); k++) shiftSel(n > 0 ? 'down' : 'up');
+    if (pvActive()) pvHoldX = true; return; }
+  // PATTERN view: a sideways swipe or a tilt wheel scrolls across the tracks (the cursor stays put).
   if (pvActive() && grid.contains(e.target)){
-    const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY || e.deltaX : 0;
+    const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : 0;
     if (dx){ grid.scrollLeft += e.deltaMode === 1 ? dx * 40 : dx; return; }
   }
   wAcc += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
