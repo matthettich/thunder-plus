@@ -146,7 +146,7 @@ button{cursor:pointer}
 .fam-aout{--edge:#3f6fb5} .fam-grp{--edge:#8a73c9} .fam-util{--edge:#e07a2e}
 
 /* ---------- patch ---------- */
-.ws{position:relative; isolation:isolate; overflow:hidden; touch-action:none; cursor:grab; min-width:0; min-height:0; background:var(--bench)}
+.ws{position:relative; isolation:isolate; overflow:hidden; touch-action:none; cursor:default; min-width:0; min-height:0; background:var(--bench)}
 .ws.panning{cursor:grabbing}
 .world{position:absolute; left:0; top:0; width:0; height:0; transform-origin:0 0}
 svg.cables{position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; pointer-events:none; z-index:1000000}
@@ -1728,7 +1728,10 @@ class PatchStore {
     if (EMBED){ try { TW.save(JSON.parse(JSON.stringify(this.doc))); this.dirty = false; } catch (e) { tpLog('could not hand the patch to Thunder Plus (the last edit may not be saved; it will be retried)', e); } }
   }
   static open(){
-    if (EMBED){ try { const d = TW.load(); if (d) return d; } catch (e) { tpLog('could not read the patch from Thunder Plus (opening a blank one)', e); } }
+    // Inside Thunder Plus the song (or kit) is the only source: one with no patch opens blank. It used to fall back to this
+    // browser's last saved patch, so a new song showed the previous song's chain and then saved it into the new song
+    // (owner, 2 Nov, Windows).
+    if (EMBED){ try { return TW.load() || null; } catch (e) { tpLog('could not read the patch from Thunder Plus (opening a blank one)', e); return null; } }
     try { return JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) { return null; }
   }
   static backups(){ try { return JSON.parse(localStorage.getItem(BAK_KEY) || '[]'); } catch (e) { return []; } }
