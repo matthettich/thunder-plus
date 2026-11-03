@@ -16882,7 +16882,7 @@ function niUp(i){ if (S.ni < NI && i >= S.ni){ S.ni = NI; try { toast(`This song
 function niScan(){ if (S.ni >= NI) return; for (const ph of S.phrases) if (ph) for (const r of ph) if (r[IC] >= S.ni) return niUp(r[IC]); }
 function saveS(){ try { markChange(); } catch(e){} try { coreSong(); } catch(e){}   // FILE SAFETY: unsaved changes
   if (pendPlace) queueMicrotask(placePending); try { niScan(); } catch(e){} snap(); clearTimeout(sT); sT = setTimeout(() => storeWrite(TK, JSON.stringify(songOut(S))), 600);
-  try { songVer++; songBeatsSoon(); } catch(e){} }   // the song changed: MIDI song positions are worked out again (just after, with clock on)
+  try { songVer++; songBeatsSoon(); } catch(e){} try { liveWarmSoon(); } catch(e){} }   // the song changed: MIDI song positions are worked out again (just after, with clock on)
 const isEmptySect = c => !c || c.every(r => r[0] < 0);
 // EMPTY BLOCKS (owner, 31 Oct): Arrange shows a block whose phrases hold nothing (no notes, no commands) striped, so the
 // blocks that actually play stand out from the empty placeholders.
@@ -18155,7 +18155,12 @@ function makePlayer(ac, out, getBuf, live){
   const psLoad = () => { let l = 0, n = 0; for (const b of bassN.values()) if (b.ps){ l += b.node.load || 0; n++; } return {load:l, nodes:n}; };
   const psDrop = () => { for (const [k, b] of [...bassN]) if (b.ps) bassDrop(k, b); };
   const clkReset = at => { clk.on = false; try { clock.offset.cancelScheduledValues(at); clock.offset.setValueAtTime(-1, at); } catch(e){} };
-  return {play, coreTake, clkBus, clkReset, out, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop};
+  // LIVE WARM-UP: make the live engine nodes these notes will need, ahead of them ([track, pad, poly] each)
+  function warm(list){ let made = 0; const n0 = bassN.size;
+    for (const [t, pad, poly] of list){ const V = kit.voices[pad]; if (!V || !isLivePad(pad) || !buses[t]) continue;
+      try { if (poly && isVoxV(V)) for (let j = 1; j <= POLY; j++) bassNode(t, pad, j); else bassNode(t, pad); } catch(e){ tpLog('live warm', e); } }
+    made = bassN.size - n0; return made; }   // how many were new (they start up on the audio thread over the next moment)
+  return {play, warm, coreTake, clkBus, clkReset, out, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop};
 }
 
 /* ---------- live playback ---------- */
@@ -18305,7 +18310,7 @@ function rtInit(){
   if (!rt){
     // mo: the master OUT fader (GAIN STAGING, 27 Oct), after mastering and the safety limiter, before the device's level
     const out = ctx.createGain(), mo = ctx.createGain(), lim = safeLim(ctx, mo); mo.gain.value = curve(S.mout == null ? 255 : S.mout); mo.connect(master);
-    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); bassReady(ctx);
+    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
     // the master meter listens to everything going out, synth pads included
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
     master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
@@ -18462,6 +18467,28 @@ function bassReady(ac){
   }
   return bassLoad.get(ac);
 }
+/* LIVE WARM-UP (owner, 3 Nov: "when I start playback on one of my tracks, the first pad doesn't play right away - it's a
+   polyphonic pad"). A live engine (bass, voice, acid / machine, …pump synths) got its node when its first note came: that
+   note played from the page while the node started up on the audio thread, so it was late or silent. The nodes the song
+   will use are made ahead now: after a song loads or changes (stopped, once things settle), when the engines' worklets
+   are ready, and for the first bars at PLAY. With the nodes there the audio-thread sequencer plays the first note too. */
+let liveWarmT = 0;
+function liveUses(max){ const out = new Map();
+  if (!kit.voices.some((v, i) => v && isLivePad(i))) return [];
+  const R = Math.random; try { const sq = makeSeq(S, 'song', {row:0, once:true, sim:true});
+    for (let n = 0; sq.alive() && n < (max || 4096); n++) for (const e of sq.step().evs)
+      if (e.type === 'note' && e.pad != null && e.track != null && e.track < NT && isLivePad(e.pad)){ const k = e.track + ':' + e.pad + ':' + (e.poly ? 1 : 0); if (!out.has(k)) out.set(k, [e.track, e.pad, !!e.poly]); } }
+  catch(e){ tpLog('live warm', e); } finally { Math.random = R; }
+  return [...out.values()]; }
+let liveWarmKey = '';   // the song and kit the last full warm-up saw: PLAY skips its scan (~170 ms on a long song) when they haven't changed
+const liveKey = () => songVer + '|' + kit.voices.map(v => v ? v.engine || '' : '').join(',');
+function liveWarm(max){ if (!rt || !ctx) return 0; if (max && liveWarmKey === liveKey() && ctx && bassOK.has(ctx)) return 0;
+  const L = liveUses(max); if (!max && bassOK.has(ctx)) liveWarmKey = liveKey(); return L.length ? rt.pl.warm(L) : 0; }
+// The first touch or key press of a session starts the audio engine (a gesture is needed for it), so by the first PLAY its
+// worklets are loaded and the live engines' nodes made: PLAY needn't wait for them (BATTERY: hidden and idle, it suspends).
+{ const go = () => { removeEventListener('pointerdown', go, true); removeEventListener('keydown', go, true); setTimeout(() => { try { if (!rt) rtInit(); } catch(e){ tpLog('early engine start', e); } }, 0); };
+  addEventListener('pointerdown', go, true); addEventListener('keydown', go, true); }
+function liveWarmSoon(ms){ clearTimeout(liveWarmT); liveWarmT = setTimeout(() => { liveWarmT = 0; if (!tp.on && rt) liveWarm(); }, ms || 1200); }
 const isBassPad = i => isSyn(i) && isBassV(kit.voices[i]);
 // Synth slots the tracker plays through a live engine node (bass or voice) rather than a rendered buffer.
 const isLivePad = i => isSyn(i) && (isBassV(kit.voices[i]) || isVoxV(kit.voices[i]) || liveX(kit.voices[i]));
@@ -18658,6 +18685,10 @@ let fxRestartN = 0;
 // filled row started from the top), else the next row down that has something, else the top.
 const songRow = () => { const y0 = cs.song.y; for (let y = y0; y < 256; y++){ const r = S.song[y]; if (r && r.some(v => v >= 0)) return y; } return 0; };
 function tStart(mode, o){
+  // LIVE WARM-UP: the first PLAY of a session starts the audio engine; with live engine pads in the kit it waits (once, at
+  // most 600 ms) for their worklets, so their nodes can be made before the first notes instead of on them
+  if (!(o && o._warm) && !tp.on){ rtInit(); if (!bassOK.has(ctx) && kit.voices.some((v, i) => v && isLivePad(i))){ const oo = Object.assign({}, o, {_warm:true});
+    Promise.race([bassReady(ctx), new Promise(r => setTimeout(r, 600))]).then(() => { if (!tp.on) tStart(mode, oo); }); return; } }
   if (typeof varPrefetch === 'function') varPrefetch();   // MUT / GEN
   if (mode === 'song' && loopPat && !(o && o.loop)){ o = Object.assign({}, o, {loop:{v:'pat', y0:o.row, y1:o.row}}); patRow = o.row; patCur = cs.song.y; }   // LOOP: the pattern
   const wasOn = tp.on;   // REC: no count-in when PLAY jumps somewhere else mid-song
@@ -18674,6 +18705,7 @@ function tStart(mode, o){
   // synth slots here froze the UI for seconds and made the first notes late.
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; if (!slotAt(cache, i) && v && PW.ready && rwCan(v)) bgRender(i); else ensureLive(i); }
   sfPrepare(null);   // SoundFont pads load in the background (notes before that are silent)
+  let warmNew = 0; try { warmNew = liveWarm(512); } catch(e){}   // LIVE WARM-UP: the live engines' nodes for the first bars, before their first notes
   moStart(mode === 'song' ? o.row : -1);   // before the start time is set: the song position takes a moment to work out
   // REC: a count-in plays its bars of clicks first (not when another device's clock starts us: it has its own timing).
   const ci = rec.on && recS.cnt > 0 && !mx.slave && !wasOn ? recS.cnt * 4 * 60 / seq.bpm : 0;
@@ -18687,7 +18719,7 @@ function tStart(mode, o){
       for (const e of r.evs) if (CHASE_T.has(e.type)) rsFx.set(e.type + ':' + e.track + ':' + (e.p || ''), e); } }
   // ABLETON LINK: on the session's next bar when there are peers (or the bar a peer starts on); lkPlan is null with Link off
   const lkp = lk ? lkPlan(wasOn, ci) : null;
-  const t0start = lkp ? lkp.t : ctx.currentTime + 0.08 + ci;
+  const t0start = lkp ? lkp.t : ctx.currentTime + 0.08 + ci + (warmNew ? 0.15 : 0);   // (nodes made just now: a moment to start up)
   if (rsFirst){ const d = t0start - rsFirst.t; seq.base += d; seq.time += d; if (seq.btT != null) seq.btT += d; }
   else seq.time = t0start;
   stageStart(t0start);
