@@ -630,7 +630,7 @@ globalThis.__tcOv = (proc, P, n) => {
   return Q;
 };
 globalThis.__tcPost = (proc, o) => {
-  const ov = proc.__ov; if (!ov || !o || !o[0]) return; const L = o[0], R = o[1] || null, n = L.length, dt = 1 / sampleRate;
+  const ov = proc.__ov; if (!ov || !ov.post || !o || !o[0]) return; const L = o[0], R = o[1] || null, n = L.length, dt = 1 / sampleRate;
   ov.g.prune(currentTime); ov.pn.prune(currentTime);
   const gc = ov.g.constFrom(currentTime), pc = ov.pn.constFrom(currentTime);
   for (let i = 0; i < n; i++){
@@ -645,11 +645,11 @@ globalThis.__tcPost = (proc, o) => {
 // One driven parameter: a timeline that takes over from the node's own AudioParam at its first event
 function tcParam(ov, k, t){ let A = ov.p.get(k); if (!A){ A = new Auto(0); A.from = t; ov.p.set(k, A); } return A; }
 
-const POLY = 4;
+const POLY = 4, FXP_CORE = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'sw6', 'sw7', 'flx', 'gat', 'rtg'];
 class ThunderCore extends AudioWorkletProcessor {
   constructor(){
     super();
-    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.voxG = new Map();
+    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.voxG = new Map(); this.fxTouched = new Set();
     this.clk = new Auto(0); this.clkOn = false; this.clkBase = 0;   // the beat clock (output NT): beat + 1 while playing, 0 stopped
     this.port.onmessage = e => { try { this.msg(e.data || {}); } catch(err){ this.port.postMessage({op:'error', where:(e.data && e.data.op) || '?', message:String(err && err.stack || err)}); } };
     this.port.postMessage({op:'ready', v:CORE_V});
@@ -774,6 +774,14 @@ class ThunderCore extends AudioWorkletProcessor {
   }
   // One event, as the page's player.play() does for the ones that touch its voices. Returns true when the core sounded it.
   ev(ev){
+    // FXO / FLX / GAT / RTG on a track's (or the master's) effect node: makePlayer's 'fxc' and 'fxreset', on the node's own
+    // params from here. A node the page hasn't made yet: the page does it (it holds the value until the node exists).
+    if (ev.type === 'fxc' || ev.type === 'fxreset'){
+      const proc = tcNodes().get('fx:' + ev.track); if (!proc) return false;
+      const ov = tcOver(proc), at = Math.max(ev.t, currentTime); ov.until = Infinity;
+      for (const k of ev.type === 'fxc' ? [ev.p] : FXP_CORE){ const A = tcParam(ov, k, at); if (ev.type === 'fxreset') A.cancel(at); A.set(ev.type === 'fxc' ? ev.v : -1, at); }
+      this.fxTouched.add('fx:' + ev.track); return true;
+    }
     // the tempo-locked effects' beat clock, as makePlayer's play('beat') ramps its ConstantSource (here + 1: see clkBus)
     if (ev.type === 'beat'){ const at = Math.max(ev.t, currentTime), A = this.clk;
       if (!this.clkOn){ this.clkOn = true; this.clkBase = Math.floor(ev.b / 16) * 16; A.set(ev.b - this.clkBase + 1, at); return true; }
@@ -791,7 +799,11 @@ class ThunderCore extends AudioWorkletProcessor {
   }
   stopAll(at){ for (const v of this.alive) this.kill(v, at); for (const T of this.vs) if (T) T.length = 0;
     for (const L of this.lnodes.values()){ if (L.cur) this.kill(L.cur, at); L.sylN = 0; if (L.proc.__ov) L.proc.__ov.until = at + 4; }   // a live note lets go; its release rings, then the page has the node back
-    this.voxG.clear(); }
+    this.voxG.clear();
+    // the effect switches go back to the slots' own (−1), as the page's resetSeq does, then the page has the params again
+    for (const key of this.fxTouched){ const proc = tcNodes().get(key); if (!proc || !proc.__ov) continue; const ov = proc.__ov;
+      for (const k of FXP_CORE){ const A = ov.p.get(k); if (A){ A.cancel(at); A.set(-1, at); } } ov.until = at + 0.5; }
+    this.fxTouched.clear(); }
 
   /* ---- live engines: makePlayer's bassNode / bassNote / polyVox / polyPs, driving the registered nodes ---- */
   lnode(t, pad, j){
@@ -831,7 +843,7 @@ class ThunderCore extends AudioWorkletProcessor {
   sameCol(nodes, ev){ return ev.col == null ? null : nodes.find(b => b.cur && !b.cur.ended && (b.cur.stopAt == null || b.cur.stopAt > ev.t - 1e-6) && b.cur.col === ev.col && b.lastOn < ev.t - 0.004) || null; }
   // bassNote: one note on a node (or a …pump synth lane)
   liveStart(ev, L, lane, T, ck, fk){
-    const ov = tcOver(L.proc); ov.until = Infinity;
+    const ov = tcOver(L.proc); ov.until = Infinity; ov.post = true;
     const B = lane || L, j = lane ? lane.lane : 0, P = k => tcParam(ov, this.pn(L, j, k), Math.max(ev.t, currentTime));
     const t = Math.max(ev.t, currentTime), leg = ev.slide && ev.slide.dur > 0 ? 1 : 0;
     for (const k of ['gate', 'trig', 'leg']) P(k).cancel(t);

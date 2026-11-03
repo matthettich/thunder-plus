@@ -15323,6 +15323,7 @@ class ThunderFx extends AudioWorkletProcessor {
   constructor(o){
     super();
     const op = o.processorOptions || {};
+    const __op = op; if (__op.cid){ this.__cid = __op.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(__op.cid, this); }   // THUNDER CORE: FXO / FLX / GAT / RTG from the audio thread
     if (op.irs !== undefined) globalThis.__thunderIR = op.irs;   // the song's impulse responses (Convolution reverb), for this whole audio thread
     if (!globalThis.__tfxMod) globalThis.__tfxMod = new WebAssembly.Module(op.bytes);
     if (op.pump && !globalThis.__pumpBytes) globalThis.__pumpBytes = op.pump;   // …PUMP: pump.wasm, compiled when a pump slot first needs it
@@ -15529,6 +15530,7 @@ class ThunderFx extends AudioWorkletProcessor {
   }
   process(inputs, outputs, params){
     if (this.dead) return false;
+    if (this.__ov && globalThis.__tcOv) params = globalThis.__tcOv(this, params, outputs[0][0].length);   // THUNDER CORE
     const x = this.x, i = inputs[0], o = outputs[0], n = o[0].length;
     if (this.buf !== x.memory.buffer){ this.buf = x.memory.buffer; this.L = new Float32Array(this.buf, x.tfx_l(), 128); this.R = new Float32Array(this.buf, x.tfx_r(), 128); }
     const L = this.L, R = this.R;
@@ -15917,11 +15919,11 @@ function pdcPlan(sr){
   for (let t = 0; t <= NT; t++) d.set(t, routed.has(t) ? 0 : T - at.get(t));
   return {on:true, T, d, f};
 }
-function tfxNode(ac, chain){
+function tfxNode(ac, chain, cid){
   // Inputs: 0 the track, 1 (SOURCE) the picked tracks' own sounds, one channel each ('tapmap'), 2 (SENDS) the Sidechain Out sends.
   const pb = pumpBin() && !pumpSent.has(ac) ? pumpBin() : null; if (pb) pumpSent.add(ac);
   const n = new AudioWorkletNode(ac, 'thunder-tfx', {numberOfInputs:3, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
-    channelCountMode:'max', channelInterpretation:'speakers', processorOptions:{bytes:tfxBin(), chain, irs:irsOpt(ac), tapMap:keyTrackList(), pump:pb}});   // irs: this audio thread's copy of the song's impulse responses
+    channelCountMode:'max', channelInterpretation:'speakers', processorOptions:{bytes:tfxBin(), chain, irs:irsOpt(ac), tapMap:keyTrackList(), pump:pb, cid:cid || null}});   // irs: this audio thread's copy of the song's impulse responses
   n.load = 0; n.port.onmessage = e => { const d = e.data; if (!d) return;
     if (typeof d.load === 'number') n.load = n.load * 0.6 + d.load * 0.4;
     if (d.dyn) fxDynIn(n, d.dyn);
@@ -17575,7 +17577,7 @@ function makePlayer(ac, out, getBuf, live){
       b.chn._sent = chnClone(S.chainPatch);
     }
     tapSync(b);   // SOURCE: the tracks' own sounds into input 2, while a Sidechain In listens to a track
-    if (wantFx && !b.fx){ try { b.fx = tfxNode(ac, chain); clockTo(b.fx); fxcFlush(t, b.fx); } catch(e){ b.fx = null; } }
+    if (wantFx && !b.fx){ try { b.fx = tfxNode(ac, chain, live ? 'fx:' + t : null); clockTo(b.fx); fxcFlush(t, b.fx); } catch(e){ b.fx = null; } }
     else if (wantFx && b.fx){ try { b.fx.port.postMessage(chain); } catch(e){} }
     fxKeySync(b.fx, S.tfx[t]);   // SOURCE: the picked tracks and the sends, as this track's effect slots ask
     // Rewire only what changed: disconnecting/reconnecting a running worklet every param change is its own little click.
@@ -17995,7 +17997,7 @@ function rtFx(t){
   if (t < NT) return rt.pl.setFx(t, tfxChain(S.tfx[t], ctx.sampleRate, S.bpm), rt.fxOk);
   // (setFx re-seats inp -> [chains?] -> [fx?] -> g, and retries when the chains module finishes loading.)
   const chain = rt.fxOk ? tfxChain(S.mfx, ctx.sampleRate, S.bpm) : [];
-  if (chain.length){ if (rt.mfx){ rt.mfx.port.postMessage(chain); rt.pl.mfxKeys(); } else { try { rt.mfx = tfxNode(ctx, chain); } catch(e){ rt.mfx = null; } rt.pl.setMfx(rt.mfx); rtRoute(); } }
+  if (chain.length){ if (rt.mfx){ rt.mfx.port.postMessage(chain); rt.pl.mfxKeys(); } else { try { rt.mfx = tfxNode(ctx, chain, 'fx:' + MT); } catch(e){ rt.mfx = null; } rt.pl.setMfx(rt.mfx); rtRoute(); } }
   else if (rt.mfx){ rt.mfx.port.postMessage(null); try { rt.mfx.disconnect(); } catch(e){} rt.mfx = null; rt.pl.setMfx(null); rtRoute(); }
 }
 function rtAllFx(){ for (let t = 0; t <= NT; t++) rtFx(t); }
@@ -18269,7 +18271,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '13cz4sq';
+const CORE_REV = 'lhxdao';
 const CORE_WANT = 3;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)

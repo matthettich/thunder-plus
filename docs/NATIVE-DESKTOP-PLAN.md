@@ -508,6 +508,12 @@ GC, a dialog). Phase 2's target: 0 late at every stall size, and edits heard on 
      (syllables), polyPs (lanes) and the live kill. A node the page hasn't made yet (its first note) still plays from the
      page, which makes it; the core takes it from the next note. After STOP the override lets go 4 s later (release).
      ELECTRO: all 141 notes from the core; pad 8's track level 0.0199 vs 0.0205 (page); CPU 42.2 % vs 42.7 %.
+   - **2c, effect switches done (2 Nov night):** FXO / FLX / GAT / RTG (`fxc`) and `fxreset` drive the `thunder-tfx` node's
+     k-rate params (sw0–sw7, flx, gat, rtg) through the same override (node key `fx:<track>`, `fx:<MT>` for the master);
+     STOP puts them back to −1, as `resetSeq` does. Left on the page: `tvl` / `tpn` / `tva` / `mvol` (GainNode and
+     StereoPanner params: a core control output wired into those AudioParams would do it), `fxp` (FXV: a port message),
+     `chc` (…chains BYP: chains-worklet.js would need the same hook), `tempo` (…chains transport), SoundFonts, MUT / GEN,
+     MIDI.
    - **2c:** the other events, moved one by one onto the audio thread. **Done (2 Nov): the beat clock** for
      tempo-locked effects (Flex, Step gate, Retrigger): the core's output NT carries beat + 1 into the player's `clkBus`
      (which the page's ConstantSource, held at −1, also feeds), sampled values identical to the page's. Next: live
