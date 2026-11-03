@@ -457,15 +457,15 @@ headless; repeat on the PC and the Fold. MIDI rows need a real MIDI out (loopMID
 
 | Measure | Baseline (build 356, headless, 2 Nov) | After phase 2 | After phase 3 | Native |
 |---|---|---|---|---|
-| Notes late, idle | 0 of 344 (lead: worst 191 ms, median 238 ms) | | | |
+| Notes late, idle | 0 of 344 (lead: worst 191 ms, median 238 ms) | core notes: 0 of 125 (lead ≥ 68 ms) | | |
 | Notes late, 100 ms stalls every 1 s | 0 of 344 (worst lead 121 ms) | | | |
 | Notes late, 200 ms stalls every 1 s | 0 of 344, but worst lead **14 ms**: right at the edge | | | |
-| Notes late, 400 ms stalls every 1 s | **56 of 344 (16 %), up to 180 ms late** | | | |
+| Notes late, 400 ms stalls every 1 s | **56 of 344 (16 %), up to 180 ms late** | core notes: **0 of 129**; page-booked: 38 of 235 | | |
 | First play of a song (renders running) | 5 notes late | | | |
 | Edit-to-heard delay | ~250 ms (1.2 s hidden), by design | | | |
 | MIDI note / clock jitter (loopback) | to measure on hardware | | | |
 | Clock-in lock time / drift vs MPC | to measure on hardware | | | |
-| Fold CPU, demo song | to measure | | | |
+| Fold CPU, demo song | to measure | headless ELECTRO, 77 samples each, interleaved: Page 36.1 %, core 37.5 % (core sequencing only: 37.7 vs 37.5). Owner's Fold, 2 Nov evening: clicks / drift, but on a stale cached core (fixed: CORE_REV) | | |
 
 Reading: today any main-thread stall longer than the ~250 ms look-ahead makes notes late (a big redraw, a render landing,
 GC, a dialog). Phase 2's target: 0 late at every stall size, and edits heard on the next audio block.
@@ -474,5 +474,46 @@ GC, a dialog). Phase 2's target: 0 late at every stall size, and edits heard on 
 
 1. ~~Phase 0~~ done in software (2 Nov): `tools/seq-golden.mjs` (4 golden event streams + `--timing`), baseline in
    section 12. Left for the owner's hardware: MIDI loopback jitter and clock-in vs the MPC, Fold CPU.
-2. Phase 1: `core-web.js` and `docs/CORE-BRIDGE.md`, on `beta`.
+2. Phase 2 started first (owner, 2 Nov: "let's do the sequencer move"); phase 1's bridge is built as part of it, one
+   message at a time, rather than as a separate refactor. Steps, each on `beta`:
+   - **2a, done (2 Nov):** `makeSeq` runs inside an AudioWorklet. `tools/make-core.mjs` copies makeSeq and every
+     declaration it reads (found scope-aware with acorn, ~80 of them) out of index.html into `core/seq-core.js`, with the
+     processor from `core/core-processor.js` appended; one copy of the code stays in index.html, and
+     `tests/core.test.js` fails if the bundle is stale. The render helpers (`ensure`, `ensurePlay`, `varWant`,
+     `applyChop`) are stubs there, and TFX comes from the page as data (`coreTfx()`). Parity:
+     `node tools/seq-golden.mjs --core` gives the same four golden streams on the audio thread. Nothing plays from it yet.
+   - **2b, done (2 Nov), behind Settings → Audio & MIDI → Sequencer: Audio thread β (default Page):** the core steps
+     the song live (`makeSeq` with `live:true`, RESUME, loops, tempo, PERFORM and live transpose mirrored) and plays
+     every rendered pad's note on its own sampler (`core/core-processor.js`: a port of makePlayer's startNote / kill /
+     pitchMods / modVoice on a small AudioParam-like `Auto` class), into NT outputs wired to each track's `inp`. Rows
+     still go up to the page booked LEAD ahead; notes the core sounded come marked `core:true` and the page only lets its
+     own voices give way (`coreTake`). Edits reach the core through `saveS` → `coreSong` (the song copied in place),
+     renders through `install` → `coreBuf`. Measured headless (ELECTRO, 12 s): core notes **0 late with 0, 400 and
+     1000 ms stalls** (page path: 0 / 38 / 69 late, up to 770 ms); the master's average level identical, the playhead
+     identical. Still on the page: live engines (pad 8 in ELECTRO), SoundFonts, MUT / GEN, SYNC-stretched notes, effect
+     and mixer commands, MIDI.
+   - **2b fixes from the owner's Fold test (2 Nov evening):** the offline cache kept the first core (same build
+     number), so the phone never ran the later fixes: the core's URL now carries a hash of the file (`CORE_REV`, written
+     by make-core) and a version handshake (`CORE_WANT`). Edits go as small patches (`coreDiff`), only while the core
+     plays; STOP unplugs the core's outputs at once; only the tracks the song plays on are plugged in (a connected
+     output keeps a track's effects running); at most 3 steps a block; a stalled audio thread skips ahead instead of
+     racing; Reset audio engine drops the core (`coreDrop`); the core loads after STOP, not during the first PLAY; a fast
+     path in the sampler (about 4x cheaper for a steady voice). Measuring switches: `__seqTest.coreDbg({noSampler,
+     noWire})`. Default stays Page until the owner's Fold retest is clean.
+   - **2c, live engines done (2 Nov night):** the bass, voice, acid / machine and …pump synth nodes register themselves in
+     the audio-thread scope by the page's key (`processorOptions.cid` → `globalThis.__tcNodes`); the core drives one through
+     an override (`proc.__ov`: Auto timelines for its params from the core's first event, read in its process() via
+     `__tcOv`, plus the note's level and pan applied to its output by `__tcPost`; the page sets that node's GainNode /
+     StereoPanner to 1 / centre in `coreTake` when `ev.coreLive` names it). Ports makePlayer's bassNote, polyVox
+     (syllables), polyPs (lanes) and the live kill. A node the page hasn't made yet (its first note) still plays from the
+     page, which makes it; the core takes it from the next note. After STOP the override lets go 4 s later (release).
+     ELECTRO: all 141 notes from the core; pad 8's track level 0.0199 vs 0.0205 (page); CPU 42.2 % vs 42.7 %.
+   - **2c:** the other events, moved one by one onto the audio thread. **Done (2 Nov): the beat clock** for
+     tempo-locked effects (Flex, Step gate, Retrigger): the core's output NT carries beat + 1 into the player's `clkBus`
+     (which the page's ConstantSource, held at −1, also feeds), sampled values identical to the page's. Next: live
+     engines (their notes as AudioParam automation from the core: the bass / vox / pump nodes already take time-stamped
+     params), `fxc` / `fxp` / `tvl` / `tpn` / `mvol` (param automation on nodes the core can't reach: needs a param
+     output per target, or a shared global in the AudioWorkletGlobalScope, plan 2's "event bus"), then MIDI (6.2 Web).
+   - **2d:** edits and mutes as `song.patch` messages (heard on the next block), chops (`applyChop` with the buffer data
+     the core already holds), PERFORM's live state, REC's step history from `pos` events; then the pump goes.
 3. Owner answers 11.1 before phase 4.

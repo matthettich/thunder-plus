@@ -968,6 +968,12 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 .tpat{display:flex; align-items:stretch; flex:none; border-left:1px solid var(--line); font-variant-numeric:tabular-nums}
 .tclk{display:flex; align-items:center; gap:2px; padding:0 8px; font-size:var(--fs-2); white-space:nowrap; border-right:1px solid var(--line)}
 .tlen{font:600 var(--fs-2)/1 var(--mono); letter-spacing:.04em; white-space:nowrap; padding:.3em .6em; margin:0 4px; background:transparent; color:inherit; border:1px solid currentColor; border-radius:2px; cursor:pointer; min-width:8.5ch; text-align:center}
+/* SONG CLOCK, a readout (owner, 2 Nov: "it's obvious it's not a menu"): no box, a small label over big tabular digits; a tap
+   still switches LEFT / TO (dotted underline on hover) */
+.tlen, body.mob .top #tLen{display:inline-flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:2px; border:0; border-radius:0; background:transparent; box-shadow:none; min-width:6ch}
+.tlen .tlenl{font:600 var(--fs-1)/1 var(--mono); font-style:normal; letter-spacing:.14em; color:var(--muted)}
+.tlen .tlenv{font:700 var(--fs-4)/1 var(--mono); font-variant-numeric:tabular-nums; letter-spacing:.02em}
+.tlen:hover .tlenv{text-decoration:underline dotted; text-underline-offset:3px}
 .tclk b{font-weight:700; font-size:var(--fs-3)} .tclk .tce{cursor:text; padding:1px 2px; border-radius:2px} .tclk .tce:hover{background:var(--panel2)}
 .tclk .tcin{width:3.6ch; min-height:0; height:20px; padding:0 2px; font:inherit; font-weight:700; text-align:center; border:1px solid var(--ink); background:var(--panel); color:var(--ink); user-select:text; -webkit-user-select:text} .tclk small{font-size:8.5px; letter-spacing:.05em; color:var(--muted); margin-right:4px}
 .tclk.live b{color:var(--pl)}
@@ -1020,7 +1026,19 @@ body.mob #tSong .tl{font-size:0} body.mob #tSong .tl .ic{width:16px; height:16px
 body.mob .top .tcpu .cpuw{display:none}
 body.mob .top{gap:6px} body.mob .top .tcpu{min-width:52px; padding:0 6px} body.mob #bFile, body.mob .top #bSet{padding:0 9px}
 body.mob .ttabs button{padding:0 9px; letter-spacing:.02em}   /* the tabs make room for the strip beside them */
-@media (max-width:780px){ body.mob .top #tSong{display:none} }   /* tight: the pad's PLAY (SHIFT+PLAY) and the COMMANDS ▶ play the song */
+@media (max-width:780px){ body.mob .top #tSong{display:none} }
+/* TOP BAR, PHONE (owner, Fold unfolded, 2 Nov): ? stayed on a second line, the meter's scale was squashed, LEFT / TO was a
+   smaller box than File. One line that doesn't wrap; File is its ▾ alone (the unsaved dot stays); LEFT / TO is a box like
+   File's; the meter gets the room File gave up. */
+body.mob .top{flex-wrap:nowrap}
+body.mob .top > *{flex-shrink:0} body.mob .top .hmeter{flex:1 1 150px; min-width:100px; max-width:260px; flex-shrink:1}
+body.mob .top .kitname{width:auto; flex:1 1 90px; min-width:64px; max-width:220px; flex-shrink:1}   /* the Synth page: the kit name gives way (it pushed CPU and ? off the screen) */
+body.mob .top .brand{flex-shrink:1; min-width:0; overflow:hidden}
+#bFile .filei{display:none; width:20px; height:20px} body.mob #bFile .filei{display:block} body.mob #bFile .filet{display:none} body.mob #bFile{display:inline-flex; align-items:center; padding:0 12px}   /* the phone: a folder (owner: the ▾ alone was confusing) */
+body.mob .top #tLen{min-height:34px; padding:0 8px; align-self:auto}
+/* LOOP on the pad (owner): lit in its own colour while the pattern loops */
+#kLoop.on, #tPad #kLoop.on:not(#zz){background:#1f9d5c!important; color:#fff!important; border-color:#1f9d5c!important}
+:root[data-skin="idm"] #tPad #kLoop.on:not(#zz):not(#zz){background:#7cd0ff!important; color:#141414!important; border-color:#7cd0ff!important; text-shadow:none!important}   /* IDM (owner): light blue, apart from EDIT's blue */   /* tight: the pad's PLAY (SHIFT+PLAY) and the COMMANDS ▶ play the song */
 .tsong{border:1px solid var(--line); min-height:34px; padding:0 14px; margin:0 4px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; flex:none; white-space:nowrap; background:var(--panel)}
 .tsong:hover{border-color:var(--ink)}
 .tsong.on{background:var(--pl); color:var(--inv); border-color:var(--pl)}
@@ -1205,8 +1223,11 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tath i[data-t]{cursor:pointer} .tath i.so{background:var(--ar-pl); color:var(--ar-pl-ink, #3d2c00); border-radius:3px}
 .tagrid{flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:3px 0 8px; touch-action:pan-y}
 .tagrid .ar{margin-bottom:2px}
-/* EVERY 4 ROWS (owner, 2 Nov): a grey line above rows 0, 4, 8… so the song reads in groups of four patterns */
-.tagrid .ar.q4{box-shadow:0 -2px 0 0 color-mix(in srgb, var(--muted, #777) 55%, transparent); margin-top:3px}
+/* EVERY 4 ROWS (owner, 2 Nov): a thin ink line, with even room above and below, over rows 4, 8, 12… so the song reads
+   in groups of four patterns (option C of three; it was a grey bar tight against the row above) */
+.tagrid .ar{position:relative}
+.tagrid .ar.q4{margin-top:7px}
+.tagrid .ar.q4::before{content:''; position:absolute; left:8px; right:8px; top:-5px; height:1px; background:var(--ar-ink, #111); opacity:.45; pointer-events:none}
 .tagrid .rn{font-size:var(--fs-1); line-height:var(--arh,16px); color:var(--ar-dim); cursor:pointer}
 .tagrid .rn.r4{color:var(--ar-ink); font-weight:700}
 .tagrid .rn.pl{background:var(--ar-pl); color:var(--ar-pl-ink); border-radius:2px}
@@ -1244,6 +1265,7 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tagrid b.c{outline:2px solid var(--ar-cur); outline-offset:0; position:relative; z-index:1}
 .tagrid b.c:not(.f):not(.m):not(.z):not(.p){color:var(--ar-dim)}
 .tafx{display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden}
+body.nohints #tHint, body.nohints .tafoot{display:none}   /* KEY HINTS off */
 /* Zoom (pinch, Ctrl+wheel, or the − + in the header): the blocks get up to 3× bigger and the grid scrolls sideways; the
    track numbers and MONO / POLY labels follow it (scrollLeft kept in step), the row numbers stay at the left. */
 /* − ○ + are quiet: no box, a small dim glyph on a 24 px target (findable, tapped on purpose). An ID beats the skins'
@@ -2114,6 +2136,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <symbol id="ic-play" viewBox="0 0 24 24"><path d="M7 4.5 L19.5 12 L7 19.5Z"/></symbol>
   <symbol id="ic-stop" viewBox="0 0 24 24"><rect x="5.5" y="5.5" width="13" height="13"/></symbol>
   <symbol id="ic-close" viewBox="0 0 24 24"><path d="M6 6 L18 18 M18 6 L6 18"/></symbol>
+  <symbol id="ic-folder" viewBox="0 0 24 24"><path d="M3 6.5 V18.5 H21 V8.5 H11.5 L9.5 6.5 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
   <symbol id="ic-gear" viewBox="0 0 24 24"><path d="M9.49 4.72 L9.71 2.06 L14.29 2.06 L14.51 4.72 L15.38 5.08 L17.41 3.35 L20.65 6.59 L18.92 8.62 L19.28 9.49 L21.94 9.71 L21.94 14.29 L19.28 14.51 L18.92 15.38 L20.65 17.41 L17.41 20.65 L15.38 18.92 L14.51 19.28 L14.29 21.94 L9.71 21.94 L9.49 19.28 L8.62 18.92 L6.59 20.65 L3.35 17.41 L5.08 15.38 L4.72 14.51 L2.06 14.29 L2.06 9.71 L4.72 9.49 L5.08 8.62 L3.35 6.59 L6.59 3.35 L8.62 5.08Z"/><circle cx="12" cy="12" r="3.4"/></symbol>
   <symbol id="ic-up" viewBox="0 0 24 24"><path d="M12 5.5 L19.5 17.5 L4.5 17.5Z"/></symbol>
   <symbol id="ic-down" viewBox="0 0 24 24"><path d="M12 18.5 L19.5 6.5 L4.5 6.5Z"/></symbol>
@@ -2133,7 +2156,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <div class="sp"></div>
   <button type="button" id="bUpd" hidden title="A newer desktop build is out">Update</button>
   <div class="setwrap">
-    <button id="bFile" aria-haspopup="true" aria-expanded="false" title="File: new, open, save, share, render and export (on Waves / Chains: that patch)">File ▾</button>
+    <button id="bFile" aria-haspopup="true" aria-expanded="false" aria-label="File menu" title="File: new, open, save, share, render and export (on Waves / Chains: that patch)"><svg class="filei ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-folder"/></svg><span class="filet">File ▾</span></button>
     <div class="setmenu gfile" id="gfile" hidden role="menu"></div>
   </div>
   <div class="setwrap deskmenu">
@@ -2263,6 +2286,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="segrow"><span>Rate</span><div class="seg" id="segARate"></div></div>
       <div class="segrow" title="Lines up tracks and buses whose …pump effects look ahead (LIMIT, CALM, TONE, linear-phase EQ…) by delaying everything else to match. Off: those tracks play a little late, as before. Renders follow the same setting."><span>Latency comp</span><div class="seg" id="segPdc"></div></div>
       <div class="segrow" id="psLiveRow" hidden><span>…pump live</span><div class="seg" id="segPsLive"></div></div>
+      <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread: the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
       <p class="note" id="psLiveNote" hidden></p>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Latency and rate change when audio restarts. That reloads ...Thunder; your song and kit are kept.</span><button id="audRestart" class="on">Apply (reload)</button></div>
       <p class="note" id="audNote">Output picks where everything plays: the synth, the tracker and previews. Level is the overall volume after the tracker’s master. Lowest latency answers the pads fastest; Safest uses a bigger buffer if you hear crackles. Rate: Device uses the output’s own rate.</p>
@@ -7366,6 +7390,14 @@ function menuHelpApply(){ document.body.classList.toggle('menuhelp', menuHelpOn(
     const bar = b.querySelector('.bar'), t = [...b.querySelectorAll('.pbody > p.note')].map(p => p.textContent.trim()).filter(Boolean).join('\n\n');
     if (bar) bar.title = t; } }
 setTimeout(menuHelpApply, 0);
+/* KEY HINTS (owner, 2 Nov: "I'd like to see more of the arrangement and phrase"): View → KEY HINTS OFF hides the key hint
+   line under the screens (NOW inst … · EDIT … · PLAY …) and the tips under Arrange. The info line above it stays (what the
+   command under the cursor is and what its value does). */
+const KHK = 'thunderplus-keyhints-v1';
+let keyHints = (() => { try { return localStorage.getItem(KHK) !== '0'; } catch(e){ return true; } })();
+function keyHintsApply(){ document.body.classList.toggle('nohints', !keyHints); }
+function setKeyHints(on){ keyHints = !!on; try { localStorage.setItem(KHK, on ? '1' : '0'); } catch(e){} keyHintsApply(); try { scheduleRefit(true); draw(); } catch(e){} }
+setTimeout(keyHintsApply, 0);
 // Settings → App: Mobile normally hides the …waves and …chains editors (they still play). Two ticks bring them back one at a
 // time (owner, 21 Oct: …chains may fit on the unfolded Fold, …waves stays hidden). Both off by default. The old single tick
 // (thunderplus-mobile-editors-v1) turned both on, so a '1' there starts both ticks on.
@@ -7429,7 +7461,7 @@ const Lc = () => V().layers[V().sel];
 // Output device, level, latency and sample rate. Latency and rate are fixed when the AudioContext is made,
 // so changing them asks for a restart; the output device and level change live.
 const AUK = 'thunderplus-audio-v1';
-const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false};   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
+const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false, core:'core'};   // core: THUNDER CORE, 'core' (default from build 362, owner) or 'page' (the old pump)   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
   try { const o = JSON.parse(localStorage.getItem(AUK) || '{}'); return Object.assign(d, o && typeof o === 'object' ? o : {}); } catch(e){ return d; } })();
 // Latency: what the person picked, else Balanced in the Mobile setup (phones click at Lowest when busy) and Lowest on desktop.
 // The desktop app starts on Balanced too (owner, 31 Oct: playback stuttered in the desktop app and not in the browser on the
@@ -7588,7 +7620,7 @@ const padSR = () => ctx ? ctx.sampleRate : srGuess;
 // A pad that renders in time with the song re-renders when the tempo changes: synced mod LFOs/sequence, or a Vector wave sequence in note values.
 const padBpm = i => { const v = kit.voices[i]; return voiceSynced(v) || (v && v.engine === 'vector' && v.vector && (v.vector.mode | 0) === 1 && (v.vector.sdiv | 0) > 0) || (isLxV(v) && LxrCore.synced(v)) || (v && (v.engine === 'pwob' || v.engine === 'pwobl') && v.engine && v[v.engine] && v[v.engine].wob_sync !== 0) ? songBpm() : 0; };   // …PUMP WOB: its wobble follows the tempo   // LXR ENGINES: an LFO synced to the tempo
 function stale(i){ const c = slotAt(cache, i); return !c || slotAt(dirty, i) || c.sr !== padSR() || (c.bpm || 0) !== padBpm(i); }
-function install(i, c){ slotAt(padRev, i); padRev[i] = (padRev[i] || 0) + 1; cache[i] = c; dirty[i] = false; bufs[i] = null; }
+function install(i, c){ slotAt(padRev, i); padRev[i] = (padRev[i] || 0) + 1; cache[i] = c; dirty[i] = false; bufs[i] = null; if (typeof coreBuf === 'function') try { coreBuf(i); } catch(e){} }
 function bgRender(i){
   slotAt(pend, i);
   if (pend[i]) return;                     // one at a time: when it lands, dirty[i] decides whether to go again
@@ -12803,6 +12835,9 @@ const updPsLive = makeSeg($('segPsLive'), [['auto', 'Auto'], ['render', 'Rendere
   aset.psLive = v; asetSave(); psLive.off = false; psLive.strikes = 0;
   if (v === 'render'){ try { if (rt && rt.pl) rt.pl.psDrop(); } catch(e){} }
   psLiveNote(); });
+const updCore = makeSeg($('segCore'), [['core', 'Audio thread'], ['page', 'Page (old)']], () => aset.core === 'page' ? 'page' : 'core', v => {
+  aset.core = v; asetSave();
+  if (v === 'core'){ if (ctx) coreLoad(); toast('Sequencer: audio thread, from the next PLAY.', 3000); } else toast('Sequencer: page, from the next PLAY.', 2500); });
 function psLiveNote(){
   const on = typeof PsynCore !== 'undefined'; $('psLiveRow').hidden = $('psLiveNote').hidden = !on; if (!on) return;
   $('psLiveNote').textContent = aset.psLive === 'render'
@@ -13249,7 +13284,7 @@ const lxp = {mode:(() => { try { return Math.min(2, Math.max(0, Math.round(+loca
 const LX_NAMES = ['OFF', 'WHOLE KEYBOARD', 'KEYS BELOW C-4'];
 function setLxp(m){ lxp.mode = clamp(m | 0, 0, 2); lxp.st = 0; try { localStorage.setItem(LXK, String(lxp.mode)); } catch(e){} }
 const lxpIs = n => lxp.mode === 1 || (lxp.mode === 2 && n < 60);
-function lxpKey(n){ const st = lxp.mode === 1 ? n - 60 : n - 48; if (st !== lxp.st){ lxp.st = st; toast('Live transpose ' + sgn(st) + (tp.on ? '' : ' (the next PLAY)')); } }
+function lxpKey(n){ const st = lxp.mode === 1 ? n - 60 : n - 48; if (st !== lxp.st){ lxp.st = st; try { if (core.ready) corePost({op:'lxp', st}); } catch(e){} toast('Live transpose ' + sgn(st) + (tp.on ? '' : ' (the next PLAY)')); } }
 const SCALES = [['OFF', null], ['MAJOR', [0, 2, 4, 5, 7, 9, 11]], ['MINOR', [0, 2, 3, 5, 7, 8, 10]], ['HARMONIC MINOR', [0, 2, 3, 5, 7, 8, 11]],
   ['MELODIC MINOR', [0, 2, 3, 5, 7, 9, 11]], ['DORIAN', [0, 2, 3, 5, 7, 9, 10]], ['PHRYGIAN', [0, 1, 3, 5, 7, 8, 10]], ['LYDIAN', [0, 2, 4, 6, 7, 9, 11]],
   ['MIXOLYDIAN', [0, 2, 4, 5, 7, 9, 10]], ['LOCRIAN', [0, 1, 3, 5, 6, 8, 10]], ['MAJOR PENTATONIC', [0, 2, 4, 7, 9]], ['MINOR PENTATONIC', [0, 3, 5, 7, 10]],
@@ -16272,7 +16307,7 @@ function placePending(){
 const niOf = Sx => clamp((Sx && Sx.ni) | 0 || 16, 16, NI);
 function niUp(i){ if (S.ni < NI && i >= S.ni){ S.ni = NI; try { toast(`This song now uses ${NI} instruments: INS above 0F plays its own instrument (it played 0F before).`, 5000); } catch(e){} } }
 function niScan(){ if (S.ni >= NI) return; for (const ph of S.phrases) if (ph) for (const r of ph) if (r[IC] >= S.ni) return niUp(r[IC]); }
-function saveS(){ try { markChange(); } catch(e){}   // FILE SAFETY: unsaved changes
+function saveS(){ try { markChange(); } catch(e){} try { coreSong(); } catch(e){}   // FILE SAFETY: unsaved changes
   if (pendPlace) queueMicrotask(placePending); try { niScan(); } catch(e){} snap(); clearTimeout(sT); sT = setTimeout(() => storeWrite(TK, JSON.stringify(songOut(S))), 600);
   try { songVer++; songBeatsSoon(); } catch(e){} }   // the song changed: MIDI song positions are worked out again (just after, with clock on)
 const isEmptySect = c => !c || c.every(r => r[0] < 0);
@@ -16508,7 +16543,7 @@ function tgtEvs(id, v, at, pno){
   return [];
 }
 // Live: send what the performance asks for now, only what changed since the last send (sent).
-function perfPush(){
+function perfPush(){ try { if (tp.core) corePost({op:'perf', xf:perfLive.xf, mac:perfLive.mac, fill:perfLive.fill}); } catch(e){}
   if (!perfLive.init) perfLiveInit();
   const want = perfResolve(perfLive), at = ctx ? ctx.currentTime : 0, evs = [];
   for (const [id, v] of want) if (perfLive.sent.get(id) !== v){ evs.push(...tgtEvs(id, v, at, perfLive.pno)); perfLive.sent.set(id, v); }
@@ -17018,11 +17053,14 @@ function makePlayer(ac, out, getBuf, live){
   // (wrapping every 16) as sample-accurate automation on a constant source, wired into every effect node's `bp`.
   // −1 while stopped. The sequencer's 'beat' events ramp it from row to row, so it follows TPO exactly, live and offline.
   const clock = ac.createConstantSource(), clk = {on:false, base:0}; clock.offset.value = -1; clock.start();
+  // THUNDER CORE: clkBus is what the effects hear. The core (Sequencer: Audio thread) adds its own beat clock here, the
+  // beat + 1 while it plays and 0 otherwise, so with this source at −1 the effects get the same values, on the sample.
+  const clkBus = ac.createGain(); clock.connect(clkBus);
   let mfx = null, mvol = null;
-  const clockTo = n => { try { if (n && n.parameters) clock.connect(n.parameters.get('bp')); } catch(e){} };
+  const clockTo = n => { try { if (n && n.parameters) clkBus.connect(n.parameters.get('bp')); } catch(e){} };
   // An effect node that goes lets go of its inputs too (the picked tracks, the sends, the beat clock): they kept it running,
   // a little more each time an effect was removed (review, 27 Oct).
-  const fxDrop = n => { if (!n) return; fxKeySync(n, []); try { const q = n.parameters && n.parameters.get('bp'); if (q) clock.disconnect(q); } catch(e){} };
+  const fxDrop = n => { if (!n) return; fxKeySync(n, []); try { const q = n.parameters && n.parameters.get('bp'); if (q) clkBus.disconnect(q); } catch(e){} };
   // FIRST PLAY (owner, 31 Oct: after opening a song, the master's first FLX was lost): an FXO / FLX / GAT / RTG sent before
   // its track's (or the master's) effect node exists waits here, and the node takes it when it is made.
   const fxcPend = new Map();
@@ -17056,7 +17094,7 @@ function makePlayer(ac, out, getBuf, live){
     for (const [k, o] of bassN) if (k.startsWith(t + ':' + pad + ':') && o.kind !== kind) bassDrop(k, o);
     if (isPsV(V)) return psNode(t, pad, V, kind, key);   // …PUMP SYNTHS live (null: play the render instead)
     try {
-      const node = new AudioWorkletNode(ac, 'thunder-' + kind, {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{p:vx ? voxParams(V) : lx ? xParams(V) : bassParams(V)}});
+      const node = new AudioWorkletNode(ac, 'thunder-' + kind, {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{p:vx ? voxParams(V) : lx ? xParams(V) : bassParams(V), cid:live ? key : null}});   // cid: THUNDER CORE finds the node by it
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
       node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
       node.load = 0; node.port.onmessage = e => { const d = e.data; if (d && typeof d.load === 'number') node.load = node.load * 0.6 + d.load * 0.4; };
@@ -17077,7 +17115,7 @@ function makePlayer(ac, out, getBuf, live){
     if (!sp || !by || !psOK.has(ac) || (ac === ctx && (psLive.off || aset.psLive === 'render'))) return null;   // (Settings → Audio → …pump live)
     try {
       const node = new AudioWorkletNode(ac, 'thunder-psyn', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2],
-        processorOptions:Object.assign({p:xParams(V)}, sp, psSent.has(ac) ? {} : {bytes:by}, frzSample(V) ? {file:{d:frzSample(V).data, sr:frzSample(V).sr}} : {})});
+        processorOptions:Object.assign({p:xParams(V), cid:live ? key : null}, sp, psSent.has(ac) ? {} : {bytes:by}, frzSample(V) ? {file:{d:frzSample(V).data, sr:frzSample(V).sr}} : {})});
       psSent.add(ac);
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
       node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
@@ -17421,6 +17459,19 @@ function makePlayer(ac, out, getBuf, live){
     if (tvlOv.size || tpnOv.size){ tvlOv.clear(); tpnOv.clear(); if (live) try { applyMix(); } catch(e){} }   // TVL / TPN: the mixer's again
     if (mvol != null){ try { out.gain.cancelScheduledValues(at); out.gain.setValueAtTime(curve(S.master), at); } catch(e){} mvol = null; }
   }
+  // THUNDER CORE: a note the core sounded itself. This player's voices on the track still give way (mono takeover, chokes)
+  // and …pump NOTES FROM still hears it, as if it had played it.
+  function coreTake(ev){
+    if (ev.track < NT && ev.mn != null) pmNotes(ev.track, ev.t, ev);
+    // a live engine node the core now plays: its level and pan move into the node's output (the core's), so these sit at 1 and centre
+    if (ev.coreLive) for (const key of ev.coreLive){ const b = bassN.get(key); if (!b) continue; const at = Math.max(ev.t, ac.currentTime);
+      try { b.g.gain.cancelScheduledValues(at); b.g.gain.setValueAtTime(1, at); b.pn.pan.cancelScheduledValues(at); b.pn.pan.setValueAtTime(0, at); } catch(e){} }
+    const T = vs[ev.track]; if (!T) return;
+    for (let k = T.length - 1; k >= 0; k--) if (!live1(T[k], ev.t)) T.splice(k, 1);
+    if (!ev.poly){ for (const v of T) kill(v, ev.t, v.syn ? Math.min(relTc(v), 0.05) : 0.004); T.length = 0; }
+    const kv = kit.voices[ev.pad], ck = kv ? kv.choke : 0;
+    if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of vs[k]) if (v.choke === ck) kill(v, ev.t);
+  }
   function stopAll(at){ resetSeq(at); for (const v of alive) kill(v, at); for (const T of vs) T.length = 0; for (const b of bassN.values()) if (b.vox) b.sylN = 0; voxG.clear(); }   // lyrics start over
   function applyMix(filter){
     const at = ac.currentTime;
@@ -17513,7 +17564,7 @@ function makePlayer(ac, out, getBuf, live){
   }
   // Reset audio engine: let go of every node this player made.
   function dispose(){
-    try { clock.stop(); clock.disconnect(); } catch(e){}
+    try { clock.stop(); clock.disconnect(); clkBus.disconnect(); } catch(e){}
     for (const [k, b] of bassN) bassDrop(k, b);
     bassN.clear();
     for (const b of buses){ if (!b) continue;
@@ -17528,7 +17579,8 @@ function makePlayer(ac, out, getBuf, live){
   // dropping them (the safety net: the next notes play the renders)
   const psLoad = () => { let l = 0, n = 0; for (const b of bassN.values()) if (b.ps){ l += b.node.load || 0; n++; } return {load:l, nodes:n}; };
   const psDrop = () => { for (const [k, b] of [...bassN]) if (b.ps) bassDrop(k, b); };
-  return {play, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop};
+  const clkReset = at => { clk.on = false; try { clock.offset.cancelScheduledValues(at); clock.offset.setValueAtTime(-1, at); } catch(e){} };
+  return {play, coreTake, clkBus, clkReset, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop};
 }
 
 /* ---------- live playback ---------- */
@@ -17665,6 +17717,7 @@ function resetAudio(){
     try { if (rt.mfx){ rt.mfx.port.postMessage(null); rt.mfx.disconnect(); } } catch(e){}
     try { if (rt.mst){ if (rt.mst.output) rt.mst.output.disconnect(); if (rt.mst.input) rt.mst.input.disconnect(); } } catch(e){}
     try { rt.out.disconnect(); if (rt.lim._drop) rt.lim._drop(); else rt.lim.disconnect(); rt.mo.disconnect(); } catch(e){}
+    try { coreDrop(); } catch(e){}
     rt = null; dkSt = null;   // the bottom panel's strip meter: re-attached to the new graph (it kept reading the old one)
   }
   try { master.disconnect(); } catch(e){}
@@ -17682,6 +17735,7 @@ function rtInit(){
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
     master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
     tfxReady(ctx).then(ok => { rt.fxOk = ok; rtAllFx(); if (!ok && (S.tfx.some(fxCount) || fxCount(S.mfx))) toast('Track effects need a newer browser here.'); });
+    if (aset.core === 'core') setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 0);   // not mid-song: loading it (the module, the song, every pad's render) made the first PLAY stutter
     chainsReady(ctx).then(ok => { rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean)) toast('…chains needs a newer browser here.'); });
   }
   return rt;
@@ -17702,10 +17756,11 @@ class BassProc extends AudioWorkletProcessor {
     {name:'leg', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
     {name:'bpm', defaultValue:120, minValue:10, maxValue:999, automationRate:'k-rate'},
     {name:'wob', defaultValue:0, minValue:0, maxValue:64, automationRate:'k-rate'}]; }
-  constructor(o){ super(); this.c = new BassCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0;
-    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose) this.dead = true; }; }
+  constructor(o){ super(); this.c = new BassCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0; const __op = (o && o.processorOptions) || {}; if (__op.cid){ this.__cid = __op.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(__op.cid, this); }
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose){ this.dead = true; if (this.__cid && globalThis.__tcNodes && globalThis.__tcNodes.get(this.__cid) === this) globalThis.__tcNodes.delete(this.__cid); } }; }
   process(ins, outs, P){
     if (this.dead) return false;
+    if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);   // THUNDER CORE drives this node (core-processor.js)
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, rate = P.rate, gate = P.gate, trig = P.trig, leg = P.leg, c = this.c;
     c.bpm = P.bpm[0]; c.wob = P.wob[0];
     const rt = i => rate.length > 1 ? rate[i] : rate[0], t0 = Date.now();
@@ -17722,6 +17777,7 @@ class BassProc extends AudioWorkletProcessor {
     }
     c.render(L, R, s, n, rt(s));
     this.ms += Date.now() - t0; this.fr += n;
+    if (this.__ov && globalThis.__tcPost) globalThis.__tcPost(this, outs[0]);
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
     return true;
   }
@@ -17738,10 +17794,11 @@ class VoxProc extends AudioWorkletProcessor {
     {name:'leg', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
     {name:'syl', defaultValue:0, automationRate:'a-rate'},
     {name:'same', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'}]; }
-  constructor(o){ super(); this.c = new VoxCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0;
-    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose) this.dead = true; }; }
+  constructor(o){ super(); this.c = new VoxCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0; const __op = (o && o.processorOptions) || {}; if (__op.cid){ this.__cid = __op.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(__op.cid, this); }
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose){ this.dead = true; if (this.__cid && globalThis.__tcNodes && globalThis.__tcNodes.get(this.__cid) === this) globalThis.__tcNodes.delete(this.__cid); } }; }
   process(ins, outs, P){
     if (this.dead) return false;
+    if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);   // THUNDER CORE drives this node (core-processor.js)
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, c = this.c, rate = P.rate, gate = P.gate, trig = P.trig, leg = P.leg, syl = P.syl, same = P.same;
     const at = (A, i) => A.length > 1 ? A[i] : A[0], t0 = Date.now();
     let s = 0;
@@ -17757,6 +17814,7 @@ class VoxProc extends AudioWorkletProcessor {
     }
     c.render(L, R, s, n, at(rate, s));
     this.ms += Date.now() - t0; this.fr += n;
+    if (this.__ov && globalThis.__tcPost) globalThis.__tcPost(this, outs[0]);
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
     return true;
   }
@@ -17771,10 +17829,11 @@ class XP_${name} extends AudioWorkletProcessor {
     {name:'trig', defaultValue:0, automationRate:'a-rate'},
     {name:'leg', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
     {name:'acc', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'}]; }
-  constructor(o){ super(); this.c = new ${core}(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0;
-    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose) this.dead = true; }; }
+  constructor(o){ super(); this.c = new ${core}(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0; const __op = (o && o.processorOptions) || {}; if (__op.cid){ this.__cid = __op.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(__op.cid, this); }
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose){ this.dead = true; if (this.__cid && globalThis.__tcNodes && globalThis.__tcNodes.get(this.__cid) === this) globalThis.__tcNodes.delete(this.__cid); } }; }
   process(ins, outs, P){
     if (this.dead) return false;
+    if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);   // THUNDER CORE drives this node (core-processor.js)
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, c = this.c, at = (A, i) => A.length > 1 ? A[i] : A[0], t0 = Date.now();
     let s = 0;
     for (let i = 0; i < n; i++){
@@ -17789,6 +17848,7 @@ class XP_${name} extends AudioWorkletProcessor {
     }
     c.render(L, R, s, n, at(P.rate, s));
     this.ms += Date.now() - t0; this.fr += n;
+    if (this.__ov && globalThis.__tcPost) globalThis.__tcPost(this, outs[0]);
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
     return true;
   }
@@ -17796,7 +17856,7 @@ class XP_${name} extends AudioWorkletProcessor {
 registerProcessor('thunder-${name}', XP_${name});`;
 let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bassLive = new Set();
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
-const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=6', psOK = new WeakSet(), psSent = new WeakSet();
+const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=7', psOK = new WeakSet(), psSent = new WeakSet();
 /* …PUMP SYNTHS live, THE SAFETY NET (owner, 26 Oct): while the song plays, once a second: if the audio is dropping out or
    the audio thread is nearly full, and the live …pump nodes are a real part of that, twice in a row, the live engines
    switch to their renders for the rest of this visit (psLive.off): their nodes go, and the next notes play the pads'
@@ -18064,6 +18124,8 @@ function tStart(mode, o){
     tp.q.push({t:t0start, pos:rsFirst.pos, bpm:seq.bpm, tks:rsFirst.tks, line:rsFirst.line});
   }
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
+  tp.core = false;
+  if (aset.core === 'core' && core.ready) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);   // not loaded yet: this PLAY as before, the core loads at STOP
   tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
   bgPlay(true);   // BACKGROUND PLAY
   void r;
@@ -18140,6 +18202,7 @@ function pump(){
 // One pump tick. An error here used to repeat every 25 ms with the screen showing PLAYING over silence; pump() stops.
 function pumpRun(){
   if (!tp.on) return;
+  if (tp.core) return corePump();   // THUNDER CORE: the audio thread steps the song; this tick only books MIDI clock, LFOs, clicks
   audioWake = performance.now();
   if ((view !== 'tracker' || document.hidden) && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open (or the app is hidden: no frames)
   const s = tp.seq; let n = 0;
@@ -18166,6 +18229,118 @@ function padBlink(e){
   const ms = Math.max(0, (e.t - ctx.currentTime + (ctx.outputLatency || ctx.baseLatency || 0)) * 1000);
   setTimeout(() => { if (tp.on && view !== 'tracker' && audible(e.track)) flash(e.pad); }, ms);
 }
+/* ===== THUNDER CORE, LIVE (plan phase 2b; Settings → Audio → Sequencer: Audio thread β) =====
+   The song is stepped on the audio thread (core/seq-core.js: makeSeq, copied out of this file by tools/make-core.mjs) and
+   every rendered pad's note sounds there, on its sample: a busy screen, a render landing or a dialog can't make those late.
+   Each row still comes up here, booked ahead as before, for everything else: live engines, SoundFonts, MUT / GEN, effect and
+   mixer commands, MIDI out, the playhead, REC. A note the core played arrives marked core:true; this player's own voices on
+   that track give way to it (coreTake). The core gets the song again after each edit (coreSong), the pads' renders as they
+   land (install → coreBuf), and the live state it reads (tempo, loop, PERFORM, live transpose).
+   Off (Page), nothing here runs. */
+// CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
+// URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
+const CORE_REV = '13cz4sq';
+const CORE_WANT = 3;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
+const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
+const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
+function coreLoad(){
+  if (core.loading) return core.loading;
+  if (!ctx || !ctx.audioWorklet || !rt) return Promise.resolve(false);
+  core.loading = ctx.audioWorklet.addModule(CORE_URL()).then(() => {
+    const n = new AudioWorkletNode(ctx, 'thunder-core', {numberOfInputs:0, numberOfOutputs:NT + 1, outputChannelCount:[...new Array(NT).fill(2), 1]});
+    n.port.onmessage = e => { try { coreMsg(e.data || {}); } catch(err){ tpLog('core message', err); } };
+    core.node = n; core.ready = true; core.sent.clear(); coreSyncAll(); return true;
+  }, err => { tpLog('core load', err); core.loading = null; toast('The audio-thread sequencer didn’t load here: playing as before.', 3500); return false; });
+  return core.loading;
+}
+// The core's outputs into the tracks (and the beat clock). STOP unplugs them at once (owner, Fold: a stop took 10 s while
+// the audio thread worked through its messages): silence never waits for the core; PLAY plugs them back in.
+// CPU (owner, Fold, 2 Nov: ~10 points more than Page): a connected output keeps its track's whole chain (its effects, its
+// …chains) running even while silent, so only the tracks the song plays on are plugged in, and only while the core plays.
+function coreWire(on){ const n = core.node; if (!n || !rt) return;
+  if (!on){ if (core.wired){ try { n.disconnect(); } catch(e){} } core.wired = null; return; }
+  if (!core.wired){ core.wired = new Set(); try { n.connect(rt.pl.clkBus, NT); } catch(e){} }   // the beat clock for tempo-locked effects
+  for (let t = 0; t < NT; t++) if ((S.song || []).some(r => r && r[t] >= 0)) coreWireT(t); }
+function coreWireT(t){ const n = core.node; if (!n || !rt || !core.wired || core.wired.has(t) || core.noWire) return; core.wired.add(t); try { n.connect(rt.pl.buses[t].inp, t); } catch(e){} }
+// Reset audio engine: this core goes (it played into the old graph) and a fresh one loads
+function coreDrop(){ const n = core.node; if (n){ try { n.port.postMessage({op:'die'}); n.port.onmessage = null; n.disconnect(); } catch(e){} }
+  Object.assign(core, {node:null, ready:false, loading:null, mir:null, wired:null, v:0}); core.sent.clear(); }
+const corePost = (m, tr) => { try { core.node.port.postMessage(m, tr || []); } catch(e){ tpLog('core post', e); } };
+function coreKit(){ const kv = [];
+  for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; let live = false; try { live = isLivePad(i); } catch(e){}
+    let lk = null; if (live && v){ const vx = isVoxV(v), lx = liveX(v), ps = isPsV(v); lk = {kind:vx ? 'vox' : lx ? v.engine : 'bass', vox:vx, ps, vel:ps ? (xParams(v).vel || 100) : 0}; }   // LIVE ENGINES: the node the core drives
+    kv.push(v ? {choke:v.choke | 0, syn:isSyn(i), rel:isSyn(i) ? relOf(v) : 0, live, lk, sf:v.engine === 'sf'} : null); }
+  corePost({op:'kit', kv}); }
+// A pad's render, when the core doesn't have this one yet (a copy: the page keeps playing it too)
+function coreBuf(i){ if (!core.ready) return; const c = slotAt(cache, i); if (!c || !c.data){ if (core.sent.has(i)){ core.sent.delete(i); corePost({op:'buf', pad:i, data:null}); } return; }
+  if (core.sent.get(i) === c.data) return; core.sent.set(i, c.data); const d = c.data.slice(); corePost({op:'buf', pad:i, data:d, sr:c.sr}, [d.buffer]); }
+/* SONG SYNC (owner, Fold, 2 Nov: stutters on STOP, on Shift-navigating, on the screen going off and on, and a late note
+   preview). Posting the whole song after every save made the audio thread unpack hundreds of KB in its own time: a glitch
+   each time. Now only what changed goes: top-level fields whole, and the big lists (phrases, chains, song rows,
+   instruments…) item by item, compared as JSON here on the page. A save that changed nothing sends nothing. */
+function coreDiff(){
+  const M = core.mir || (core.mir = new Map()), ops = [];
+  for (const k of Object.keys(S)){ const v = S[k];
+    if (Array.isArray(v) && v.length > 8){ let A = M.get(k); if (!Array.isArray(A)){ A = []; M.set(k, A); }
+      for (let i = 0; i < v.length; i++){ const j = JSON.stringify(v[i] === undefined ? null : v[i]); if (A[i] !== j){ A[i] = j; ops.push([k, i, v[i] === undefined ? null : v[i]]); } }
+      if (A.length !== v.length){ A.length = v.length; ops.push([k, 'len', v.length]); } }
+    else { const j = JSON.stringify(v === undefined ? null : v); if (M.get(k) !== j){ M.set(k, j); ops.push([k, null, v]); } } }
+  for (const k of [...M.keys()]) if (!(k in S)){ M.delete(k); ops.push([k, 'del']); }
+  return ops;
+}
+function coreSyncAll(){ if (!core.ready) return;
+  if (!core.mir){ coreDiff(); corePost({op:'load', S, vars:coreVars()}); } else { const ops = coreDiff(); if (ops.length) corePost({op:'patch', ops}); corePost({op:'vars', vars:{vtrk, NSLOT}}); } coreKit(); for (let i = 0; i < nslots(); i++) coreBuf(i); corePost({op:'lxp', st:lxp.st | 0}); coreLead(); }
+const coreLead = () => { if (core.ready) corePost({op:'lead', s:document.hidden ? 1.2 : 0.25}); };
+document.addEventListener('visibilitychange', coreLead);
+// After an edit: the song again (in place, so the running sequencer reads it), at most every 40 ms
+function coreSong(){ if (!tp.core || !core.mir || core.sT) return;   // only while the core plays (BATTERY): PLAY syncs the rest
+  core.sT = setTimeout(() => { core.sT = 0; const ops = coreDiff(); if (ops.length) corePost({op:'patch', ops}); }, 100); }
+function coreStart(mode, o, t0, rs){
+  coreSyncAll();
+  rt.pl.clkReset(ctx.currentTime);   // the core's clock takes over (a RESUME step played here may have started this one)
+  if (perfLive.init) corePost({op:'perf', xf:perfLive.xf, mac:perfLive.mac, fill:perfLive.fill});
+  const oo = {}; for (const k of ['row', 'loop', 'once', 'only']) if (o && o[k] != null) oo[k] = o[k];
+  core.gen++; corePost({op:'play', gen:core.gen, mode, o:oo, t0, rs}); coreWire(true);
+  // tp.seq stands in for the sequencer: the page reads its clock, tempo and ticks, and sets the loop and tempo through it
+  const P = {time:t0, tks:tp.tks, base:null, btT:null, _bpm:tp.bpm, _alive:true, alive(){ return this._alive; }, step(){ return {t:this.time, evs:[], pos:null}; },
+    setLoop(l){ corePost({op:'loop', l:l || null}); } };
+  Object.defineProperty(P, 'bpm', {get(){ return this._bpm; }, set(v){ this._bpm = v; corePost({op:'bpm', v}); }});
+  tp.seq = P; tp.core = true;
+}
+function coreMsg(d){
+  if (d.op === 'ready'){ core.v = d.v; if (d.v !== CORE_WANT){ core.ready = false; toast('The audio-thread sequencer here is an older copy: reload the app to use it. Playing as before.', 5000); } return; }
+  if (d.op === 'error'){ tpLog('core: ' + d.where, new Error(d.message)); return; }
+  if ((d.op !== 'rows' && d.op !== 'end') || !tp.on || !tp.core || d.gen !== core.gen) return;
+  const s = tp.seq;
+  if (d.op === 'end'){ s._alive = false; s.time = d.time; return; }
+  audioWake = performance.now();
+  for (const r of d.rows){
+    for (const e of r.evs){
+      if (e.vk && !e.core) try { varWant(e); } catch(err){}
+      { const k = (e.core ? 'core ' : 'page ') + e.type + (e.type === 'note' && !e.core ? ' pad ' + e.pad : ''); core.tally.set(k, (core.tally.get(k) || 0) + 1); }
+      const midiOnly = moEv(e);
+      if (e.core){ if (e.type === 'note'){ coreWireT(e.track); rt.pl.coreTake(e); if (e.t >= ctx.currentTime - 0.03) padBlink(e); } continue; }   // (a beat: the core drives the effects' clock; moEv above still kept MIDI clock's mx.beat)
+      if (midiOnly) continue;
+      // LATE (owner, Fold: back from another app it sped up and stuttered): rows held up while the app was in the background
+      // arrive together; a note whose time has passed is dropped, not played at once in a burst (the old pump skips ahead
+      // the same way). Commands that set a state (effects, levels, OFF) still apply.
+      if (e.type === 'note' && e.t < ctx.currentTime - 0.03) continue;
+      rt.pl.play(e); if (e.type === 'note') padBlink(e);
+    }
+    tp.q.push({t:r.t, pos:r.pos, bpm:r.bpm, tks:r.tks, line:r.line});
+    mx.pend.forEach((P, t) => { if (P && P.length) pendFlush(t, r.t); });
+    if (rec.on) recHist(r);
+  }
+  s.time = d.time; s._bpm = d.bpm; s.tks = d.tks; s.base = d.base; s.btT = d.btT; s._alive = d.alive;
+  corePump();
+}
+// The pump tick while the core plays: what is booked from the song clock rather than from rows
+function corePump(){
+  const s = tp.seq; if (!s) return;
+  if ((view !== 'tracker' || document.hidden) && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);
+  moClock(s); moLfo(s); moRamp(); moEcho(); metRun(s);
+  if (document.hidden && !s.alive() && ctx.currentTime > s.time + 0.3) tStop(true);
+}
 /* PANIC (27 Oct, audit B18): Stop when already stopped (F8 again) lets go of everything still sounding: the voices, and on
    every MIDI port and channel All Sound Off, All Notes Off and the sustain pedal up (a stop only sent All Notes Off on the
    channels the song used). Effect tails ring on; Settings → Audio → Reset audio engine clears those too. */
@@ -18189,6 +18364,8 @@ function tStop(quiet){
     tp.paused = ref >= 0 ? {pos:P, ref, row:P[ref].row, step:P[ref].step, key:curKey()} : null;
   }
   tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null;
+  if (tp.core){ tp.core = false; core.gen++; coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }
+  else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
   if (rt) rt.pl.stopAll(ctx.currentTime);
   moStop();
   try { metStop(); recEndTake(); clearTimeout(rec.cntT); rec.cnt = 0; recBtn(); } catch(e){}   // REC: clicks booked ahead stop, the take is one undo step
@@ -19245,7 +19422,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 361;
+const BUILD = 362;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -19946,6 +20123,8 @@ function projRows(){
       info:() => 'Every instrument and the pad it plays (long names are cut short). In the side panel; without it, in PAD mode between the arrows and the buttons when there is room. Tap one to open it on INST'},
     {l:'PATTERN VIEW', ck:'Pattern view on the Phrase screen', get:() => pvOn ? 1 : 0, set:v => setPv(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'ON' : 'OFF',   // PATTERN VIEW
       info:() => 'ON: the Phrase screen gets PHRASE | PATTERN buttons (the choice stays until you switch): PATTERN shows every track’s phrase for one song row side by side, and the open track is edited in place. Wide screens only (computer, unfolded Fold). OFF: the Phrase screen as before'},
+    {l:'KEY HINTS', ck:'Show key hints under the screens', get:() => keyHints ? 1 : 0, set:v => setKeyHints(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'ON: the line of keys under each screen and the tips under Arrange. OFF: more room for the phrase and the arrangement; the line describing the command or value under the cursor stays'},
     {l:'MENU HELP', ck:'Show explanations in menus', get:() => menuHelpOn() ? 1 : 0, set:v => setMenuHelp(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'ON: the explanation under each menu and settings row. OFF: only the names; hover a row for its explanation'},
     {l:'SIMPLE PHRASE', ck:'Show simple phrase screen', get:() => spOn ? 1 : 0, set:v => setSp(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // SIMPLE PHRASE
@@ -20974,7 +21153,8 @@ function tickLen(now){
     if (!now && !(lenFresh() && lenCache.has(y) && lenCache.has(top))) return lenSoon();   // keeps the last text until then
     const rem = songRemain(y); txt = lenMode ? 'TO ' + mmss(Math.max(0, songRemain(top) - rem)) : 'LEFT ' + mmss(rem);
   }
-  if (b.textContent !== txt) b.textContent = txt;
+  // a readout, not a button (owner, 2 Nov): a small label over the time
+  if (b.dataset.t !== txt){ b.dataset.t = txt; const sp = txt.indexOf(' '); b.replaceChildren(el('i', 'tlenl', sp > 0 ? txt.slice(0, sp) : ''), el('b', 'tlenv', sp > 0 ? txt.slice(sp + 1) : txt)); }
 }
 $('tLen').addEventListener('click', () => { lenMode ^= 1; tickLen(true); });
 // Lights the dots up to the tick that is sounding now (only while playing).
@@ -21705,7 +21885,7 @@ function info(){
     if (k === 'vol') return v < 0 ? 'Volume: full' : `Volume ${hx(v)} · ${dB(curve(v))}`;
     if (k === 'inst'){ if (v < 0) return 'Instrument: same as the last note on this track'; const I = S.insts[v] || S.insts[0]; return `Instrument ${hx(v)} → ${isSyn(I.pad) ? 'synth' : 'pad'} ${hx(I.pad)} ${(kit.voices[I.pad] || {}).name || ''}`; }
     const ci = k === 'fxc' ? v : r[c.x - 1], vv = k === 'fxc' ? r[c.x + 1] : v;
-    return ci < 0 || !FXC[ci] ? 'No command. EDIT adds one; EDIT+▲▼ or letters pick from ' + (mstView() ? MST_FXC : FXC).join(' ') : `${FXC[ci]} ${h2(vv)} · ` + (cTrack === MT && FXC[ci] === 'VOL' ? `Master level ${dB(curve(Math.max(0, vv)))} from here on (back to the Mixer’s MASTER when it stops)` : cTrack === MT && /^(FXO|FLX|GAT|RTG)$/.test(FXC[ci]) ? FXI[FXC[ci]](Math.max(0, vv)).replace(/this track's/g, 'the master’s') + ' · on the master bus' : FXI[FXC[ci]](Math.max(0, vv)));
+    return ci < 0 || !FXC[ci] ? 'No command · EDIT adds one' : `${FXC[ci]} ${h2(vv)} · ` + (cTrack === MT && FXC[ci] === 'VOL' ? `Master level ${dB(curve(Math.max(0, vv)))} from here on (back to the Mixer’s MASTER when it stops)` : cTrack === MT && /^(FXO|FLX|GAT|RTG)$/.test(FXC[ci]) ? FXI[FXC[ci]](Math.max(0, vv)).replace(/this track's/g, 'the master’s') + ' · on the master bus' : FXI[FXC[ci]](Math.max(0, vv)));
   }
   if (tv === 'mixer'){
     if (c.y === 7 && c.mx === 1) return 'Mastering ' + (S.mst.on ? 'on' : 'off') + ' · ' + mstChainTxt() + ' · EDIT opens it · EDIT+◀▶ off / on';
@@ -22079,10 +22259,10 @@ function draw(){
   if (mstP) hintTxt = inMode === 'keys' ? 'Master phrase: commands only · letters pick a command (V F G R T…) · type hex for its value · Del cell · Ctrl+Shift+↑↓ lines · Ctrl+C/V' : HINT.phraseM;
   if (tv === 'fx' && cs.fx.y > FXSLOTS) hintTxt = 'Slot ' + (cFxS + 1) + ' controls · ▲▼ pick one · ' + (inMode === 'keys' ? '← or Esc back to the slots' : '◀ back to the slots');
   if (tv === 'phrase' && pvActive()) hintTxt = pvHint();   // PATTERN VIEW
-  if (tv === 'phrase' && busTrack(cTrack)) hintTxt = 'BUS: FX commands only · ' + (hasNotes(S.phrases[cPhrase]) ? 'its old notes go silent at the next PLAY (Del clears them) · ' : '')
-    + (inMode === 'keys' ? 'letters pick a command · hex its value · Shift+Space plays it with the tracks that feed it' : 'EDIT on an FX cell picks a command · PLAY plays it with the tracks that feed it');   // BUS FX ONLY
+  if (tv === 'phrase' && busTrack(cTrack)) hintTxt = 'BUS: FX commands only · ' + (hasNotes(S.phrases[cPhrase]) ? 'old notes are silent (Del clears) · ' : '')
+    + (inMode === 'keys' ? 'letters pick a command · Shift+Space plays it with its tracks' : 'EDIT on FX picks a command · PLAY plays it with its tracks');   // BUS FX ONLY
   { const h = $('tHint'), txt = (tv === 'phrase' && !mstP ? 'NOW ' + curS() + (inMode === 'keys' ? ' · oct ' + kOct + ' · step ' + kStep : '') + ' · ' : '') + hintTxt;
-    if (h.textContent !== txt){ h.textContent = txt; h.classList.remove('open'); const mo = h.scrollHeight > h.clientHeight + 1; h.classList.toggle('more', mo); h.title = mo ? txt + '\n(click to show it all)' : ''; } }
+    hintFit(h, txt); }
   // The fit check comes after the title, info and hint lines have this screen's text (19 Oct): before, it measured with
   // the previous screen's lines, so entering the Mixer left it a few px too big and the first cursor move shrank it.
   const lsig = [tv, gh.length, scr.style.fontSize, tScale, innerWidth, innerHeight, arrW, sideOn, inlOn, stage].join('|');
@@ -23122,7 +23302,7 @@ function deckLayout(){
    scene A and B, the 8 macros, and the editors for scenes, macros and this track's locks and LFO. See PERFORM above. */
 let reloadPt = null;
 const perfS = () => perfOf();
-function perfFill(on){ perfLive.fill = !!on; perfDraw(); }
+function perfFill(on){ perfLive.fill = !!on; try { if (tp.core) corePost({op:'perf', fill:perfLive.fill}); } catch(e){} perfDraw(); }
 function perfSetXf(v){ if (!perfLive.init) perfLiveInit(); perfLive.xf = clamp(Math.round(v), 0, 255); perfPush(); perfDraw(); }
 function perfSetMac(i, v){ if (!perfLive.init) perfLiveInit(); perfLive.mac[i] = clamp(Math.round(v), 0, 255); perfPush(); perfDraw(); }
 // The song in place, as Undo does (the running sequencer keeps the same S object), as one undoable step.
@@ -23369,31 +23549,39 @@ function hmDraw(now){
   const cut = mCut(), blink = cut && Math.floor(now / 400) % 2 === 0;
   if (cut !== !!HM.cut){ HM.cut = cut; if (HM.tip == null) HM.tip = c.title; c.title = cut ? 'The master is turned down by a VOL command on the master track' : HM.tip; }
   // Labelled (fit and finish, 2 Nov): L / R at the left, a dB scale under the bars, the held peak in dB at the right
-  const pkMax = Math.max(HM.pk[0], HM.pk[1]), pkTxt = pkMax > 0.0001 ? (20 * Math.log10(pkMax)).toFixed(1) : '-inf';
+  const pkMax = Math.max(HM.pk[0], HM.pk[1]), pkTxt = pkMax > 0.0001 ? (Math.round(40 * Math.log10(pkMax)) / 2).toFixed(1) : '-inf';
   const pos = g => lvl(g), key = [W, H, HM.clip, cut, blink, pkTxt, ...HM.lv.map(v => (pos(v) * W) | 0), ...HM.pk.map(v => (pos(v) * W) | 0)].join(',');
   if (key === HM.drawn) return; HM.drawn = key;   // nothing moved: no redraw (silence costs nothing)
   if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
-  const g = c.getContext('2d'), st = getComputedStyle(c), ink = st.color || '#111';
-  g.clearRect(0, 0, W, H);
+  const g = c.getContext('2d');
+  // BATTERY (owner, Fold, 2 Nov): the skin's colour and font are read once a second, not every frame, and the parts that
+  // never move (L / R, the scale, the empty tracks) are drawn once into a cached layer; each frame only draws the bars.
+  if (!HM.st || now - HM.stT > 1000){ const cs = getComputedStyle(c); HM.st = {ink:cs.color || '#111', font:cs.fontFamily || 'monospace'}; HM.stT = now; }
+  const ink = HM.st.ink, ff = HM.st.font;
   const fs = Math.round(8.5 * dpr), lx = Math.round(12 * dpr), rw = Math.round(64 * dpr), BW = Math.max(10, W - lx - rw);
-  g.font = `600 ${fs}px ${st.fontFamily || 'monospace'}`; g.textBaseline = 'middle';
   const bh = Math.max(2, Math.round(H * 0.18)), gap = Math.max(1, Math.round(H * 0.08)), y0 = Math.round(H * 0.1), amber = BW * lvl(Math.pow(10, -6 / 20));
+  const bk = [W, H, ink, ff].join('|');
+  if (HM.bgK !== bk){
+    const b = HM.bg || (HM.bg = document.createElement('canvas')); b.width = W; b.height = H; const q = b.getContext('2d');
+    q.font = `600 ${fs}px ${ff}`; q.textBaseline = 'middle'; q.fillStyle = ink;
+    for (let s = 0; s < 2; s++){ const y = y0 + s * (bh + gap); q.globalAlpha = 0.6; q.fillText(s ? 'R' : 'L', 0, y + bh / 2 + dpr * 0.5); q.globalAlpha = 0.13; q.fillRect(lx, y, BW, bh); }
+    const ty = y0 + bh * 2 + gap, sy = Math.round(H - fs * 0.6); let last = Infinity;   // right to left, a label only where it doesn't run into the one after it
+    for (const d of [0, -6, -12, -24, -36]){ const x = lx + Math.round(BW * lvl(Math.pow(10, d / 20))), lab = String(d), w = q.measureText(lab).width;
+      q.globalAlpha = 0.4; q.fillRect(Math.min(x, lx + BW - 1), ty, 1, Math.round(2 * dpr));
+      const L0 = d === 0 ? lx + BW - w : x - w / 2; if (L0 + w + 3 * dpr > last || L0 < lx) continue;
+      q.globalAlpha = 0.6; q.fillText(lab, L0, sy); last = L0; }
+    q.globalAlpha = 1; HM.bgK = bk;
+  }
+  g.clearRect(0, 0, W, H); g.drawImage(HM.bg, 0, 0);
   for (let s = 0; s < 2; s++){
     const y = y0 + s * (bh + gap), x = pos(HM.lv[s]) * BW;
-    g.globalAlpha = 0.6; g.fillStyle = ink; g.textAlign = 'left'; g.fillText(s ? 'R' : 'L', 0, y + bh / 2 + dpr * 0.5); g.globalAlpha = 1;
-    g.save(); g.translate(lx, 0);
-    g.globalAlpha = 0.13; g.fillStyle = ink; g.fillRect(0, y, BW, bh); g.globalAlpha = 1;
-    if (blink){ g.globalAlpha = 0.7; g.fillStyle = '#e8a33a'; g.fillRect(0, y, BW, bh); g.globalAlpha = 1; }   // MASTER CUT FLASH
-    g.fillStyle = ink; g.fillRect(0, y, Math.min(x, amber), bh);
-    if (x > amber){ g.fillStyle = '#e8a33a'; g.fillRect(amber, y, x - amber, bh); }
-    const px = Math.min(BW - dpr, pos(HM.pk[s]) * BW); if (HM.pk[s] > 0.004){ g.fillStyle = HM.pk[s] >= 0.999 ? '#e5484d' : ink; g.fillRect(px, y, Math.max(1, dpr * 1.5), bh); }
-    g.restore();
+    if (blink){ g.globalAlpha = 0.7; g.fillStyle = '#e8a33a'; g.fillRect(lx, y, BW, bh); g.globalAlpha = 1; }   // MASTER CUT FLASH
+    g.fillStyle = ink; g.fillRect(lx, y, Math.min(x, amber), bh);
+    if (x > amber){ g.fillStyle = '#e8a33a'; g.fillRect(lx + amber, y, x - amber, bh); }
+    const px = Math.min(BW - dpr, pos(HM.pk[s]) * BW); if (HM.pk[s] > 0.004){ g.fillStyle = HM.pk[s] >= 0.999 ? '#e5484d' : ink; g.fillRect(lx + px, y, Math.max(1, dpr * 1.5), bh); }
   }
-  const ty = y0 + bh * 2 + gap, sy = Math.round(H - fs * 0.6);
-  for (const d of [-36, -24, -12, -6, 0]){ const x = lx + Math.round(BW * lvl(Math.pow(10, d / 20))); g.globalAlpha = 0.4; g.fillStyle = ink; g.fillRect(Math.min(x, lx + BW - 1), ty, 1, Math.round(2 * dpr));
-    g.globalAlpha = 0.6; g.textAlign = d === 0 ? 'right' : 'center'; g.fillText(String(d), d === 0 ? lx + BW : x, sy); g.globalAlpha = 1; }
   if (HM.clip){ g.fillStyle = '#e5484d'; g.fillRect(lx + BW - Math.round(4 * dpr), y0, Math.round(4 * dpr), bh * 2 + gap); }
-  g.font = `600 ${Math.round(11 * dpr)}px ${st.fontFamily || 'monospace'}`; g.textAlign = 'right'; g.fillStyle = HM.clip ? '#e5484d' : ink; g.globalAlpha = pkMax > 0.0001 ? 1 : 0.45;
+  g.font = `600 ${Math.round(11 * dpr)}px ${ff}`; g.textBaseline = 'middle'; g.textAlign = 'right'; g.fillStyle = HM.clip ? '#e5484d' : ink; g.globalAlpha = pkMax > 0.0001 ? 1 : 0.45;
   g.fillText(pkTxt + ' dB', W - dpr, Math.round(H * 0.38)); g.globalAlpha = 1;
 }
 $('hMeter').addEventListener('click', () => { HM.clip = false; HM.pk = [0, 0]; HM.drawn = ''; });
@@ -26108,7 +26296,14 @@ function apMarkSel(){   // the song selection in the panel (drawArr marks it onl
   for (let y = r.y0; y <= r.y1; y++){ const row = arrGrid.children[y]; if (!row) continue;
     for (let t = r.x0; t <= r.x1; t++){ const b = row.querySelector(`b[data-t="${t}"]`); if (b){ b.classList.add('sl'); arrMark.push(b); } } }
 }
-function apHint(txt){ const h = $('tHint'); if (h.textContent !== txt){ h.textContent = txt; h.classList.remove('open'); const mo = h.scrollHeight > h.clientHeight + 1; h.classList.toggle('more', mo); h.title = mo ? txt + '\n(click to show it all)' : ''; } }
+function apHint(txt){ hintFit($('tHint'), txt); }
+/* HINT FIT (owner, 2 Nov: hint lines ended mid-word in "…"): a hint that doesn't fit drops whole " · " parts from its end
+   until it does, so it never stops mid-sentence; the full text is the tooltip, and a tap shows it all. */
+function hintFit(h, txt){
+  if (h.dataset.full === txt) return; h.dataset.full = txt; h.classList.remove('open', 'more'); h.textContent = txt;
+  if (h.scrollHeight <= h.clientHeight + 1){ h.title = ''; return; }
+  const P = txt.split(' · '); while (P.length > 1 && h.scrollHeight > h.clientHeight + 1){ P.pop(); h.textContent = P.join(' · '); }
+  h.classList.add('more'); h.title = txt + '\n(tap to show it all)'; }
 // While the song has the keys: the Song screen's info and hint lines, its command row (CLN and CLN↓ instead of − − / + +)
 // and, in KEYS mode, its keypad (hex).
 function apSongLines(){
@@ -26295,6 +26490,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [362, '2 Nov', ['Timing: the song now plays from the audio thread: drums, samples and the live synths (bass, voice, acid, machine, …pump synths) start on their exact sample, so a busy screen, a screenshot or another app can’t make them late. Settings → Audio & MIDI → Sequencer: Page (old) goes back.', 'View → KEY HINTS off hides the key hints under the screens and Arrange, for more rows.', 'Phone: the top bar fits on one line (File is a folder), the song clock is a readout, LOOP lights while on, hints never stop mid-word, the Synth page fits.', 'Arrange: a thin line every 4 rows.']],
   [361, '2 Nov', ['Top bar: the master meter has L / R, a dB scale and the peak in dB; the CPU button shows just the number.', 'Messages come in under the top bar on a computer, shorter; the side panel drops the screen buttons (the tabs are above) and folds the key list behind KEYS.', 'On a computer, sliders and drop-downs are square like the tracker; short one-line empty states; Mixer spectrum says PLAY TO SEE IT when stopped; Audio & MIDI ports are a table.']],
   [360, '2 Nov', ['FX presets: › SAVE AS PRESET… keeps the preset on this device too; it shows under MY PRESETS in every song.', 'Synth engines are grouped by sound: Drums & percussion, Bass, Analog, Digital FM & wavetable, Physical models, Keys, Pads & textures, Voice, SoundFont.', 'Acid line has styles: …pump ACID, Classic 303, Rolling and Squelch, with slides and accents that sound like a 303.', 'Arrange: blocks that only hold OFFs or FX commands look different from empty ones; a grey line every 4 rows.', '⚙ Settings is shorter: Kit lives in File ▸ Kit, Master and Master out in the Mixer.']],
   [359, '2 Nov', ['FX picker: …pump COMP and EQ sit beside Thunder’s compressor and EQ (they were in a group at the very end); every …pump effect is in the group you’d look in.', '…pump BAND, WIDE, HEAT and METER work on every track.', 'About 120 new factory presets: every effect has at least four (Pitch correct, Utility and Envelope filter had none).']],
@@ -26417,7 +26613,7 @@ $('helpNew').addEventListener('click', () => { hideHelp(); whatsNew(true); });
 { const B = $('tLegBtn'), set = on => { document.body.classList.toggle('legon', on); B.textContent = on ? 'KEYS ▾' : 'KEYS ▸'; B.setAttribute('aria-expanded', on); };
   let on0 = false; try { on0 = localStorage.getItem('thunderplus-legon') === '1'; } catch(e){}
   set(on0); B.addEventListener('click', () => { const on = !document.body.classList.contains('legon'); set(on); try { localStorage.setItem('thunderplus-legon', on ? '1' : '0'); } catch(e){} }); }
-$('tHint').addEventListener('click', () => { const h = $('tHint'); if (h.classList.contains('more') || h.classList.contains('open')){ h.classList.toggle('open'); scheduleRefit(false); } });
+$('tHint').addEventListener('click', () => { const h = $('tHint'); if (h.classList.contains('more') || h.classList.contains('open')){ const op = h.classList.toggle('open'); if (op) h.textContent = h.dataset.full || h.textContent; else { const t = h.dataset.full; h.dataset.full = ''; hintFit(h, t); } scheduleRefit(false); } });
 $('helpX').addEventListener('click', hideHelp);
 // Runs before the synth and tracker key handlers: ? or F1 toggles help, and while it is open the keys
 // only scroll it (Esc closes).
@@ -27188,6 +27384,10 @@ else if (FIRST_SONG) setTimeout(async () => {
    tools/seq-golden.mjs. Loads a song and steps makeSeq in sim mode (no renders, no sound) to the end, returning every
    event as plain data. When the sequencer moves to the audio thread (phase 2) and to C++ (phase 3), this stream must
    stay identical. Math.random is seeded for the run, so GEN / PRB / random commands repeat. Inert without ?seqtest. */
+/* THUNDER CORE (plan phase 2): what the audio-thread sequencer (core/seq-core.js) needs from the page besides the song: the
+   per-voice-track setting, the slot count, and the effect table's pump flags and control ranges (TFX itself holds DSP). */
+function coreTfx(){ const o = {}; for (const k in TFX) o[k] = {pump:!!TFX[k].pump, ps:(TFX[k].ps || []).map(q => ({k:q.k, min:q.min, max:q.max}))}; return o; }
+function coreVars(){ return {vtrk, NSLOT, TFX:coreTfx()}; }
 if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
   async load(text, name){ FIRST_SONG = false; await loadProjText(text, name || 'test.thunder'); return {name:S.name, bpm:S.bpm, nt:NT}; },
   run(mode, maxRows, opt){
@@ -27204,6 +27404,40 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
     } finally { Math.random = R; }
     return out;
   },
+  // The same run on the audio thread (core/seq-core.js, plan phase 2): must give exactly run()'s rows.
+  async runCore(mode, maxRows, opt){
+    const ac = new AudioContext(); try {
+      await ac.audioWorklet.addModule(CORE_URL());
+      const n = new AudioWorkletNode(ac, 'thunder-core', {numberOfInputs:0, numberOfOutputs:1});
+      const got = new Promise((ok, no) => { n.port.onmessage = e => { const d = e.data || {}; if (d.op === 'test') ok(d.rows); else if (d.op === 'error') no(new Error(d.where + ': ' + d.message)); }; });
+      n.port.postMessage({op:'load', S:JSON.parse(JSON.stringify(S)), vars:coreVars()});
+      n.port.postMessage({op:'test', id:1, mode:mode || 'song', max:maxRows || 0, opt:opt || {}});
+      return await got;
+    } finally { ac.close().catch(() => {}); }
+  },
+  // THUNDER CORE live (phase 2b): switch the sequencer, and read the core's own timing counters (notes it booked, how many
+  // late, the worst, the smallest lead) since the last call.
+  async coreOn(on){ aset.core = on ? 'core' : 'page'; rtInit(); if (on){ const ok = await coreLoad(); return !!ok; } return true; },
+  // Does the core's song equal this one? (after edits: the patch sync)
+  coreSig(){ return new Promise(ok => { if (!core.ready) return ok(null); const f = e => { if (e.data && e.data.op === 'sig'){ core.node.port.removeEventListener('message', f); const j = JSON.stringify(S); let h = 0; for (let i = 0; i < j.length; i++) h = (h * 31 + j.charCodeAt(i)) | 0; ok({same:e.data.h === h && e.data.len === j.length, core:e.data.len, page:j.length}); } };
+    core.node.port.addEventListener('message', f); corePost({op:'sig'}); setTimeout(() => ok(null), 1000); }); },
+  // A few edits as the tracker makes them (a note, a phrase, a song cell, a new phrase), each saved
+  edits(){ const p = S.phrases.findIndex(Boolean); S.phrases[p][1][0] = 50; saveS(); S.song[3][2] = -1; saveS(); S.phrases.push(freshPhrase()); saveS(); S.bpm = 133; saveS(); return p; },
+  // Measuring the core's costs: noSampler (the page plays every note), noWire (the core's outputs unplugged)
+  coreDbg(o){ core.noWire = !!o.noWire; if (core.ready) corePost({op:'dbg', noSampler:!!o.noSampler}); },
+  coreStats(){ return new Promise(ok => { if (!core.ready) return ok(null); const f = e => { if (e.data && e.data.op === 'stats'){ core.node.port.removeEventListener('message', f); ok(e.data); } };
+    core.node.port.addEventListener('message', f); corePost({op:'stats', id:1}); setTimeout(() => ok(null), 1000); }).then(r => { if (r) r.tally = Object.fromEntries(core.tally); core.tally.clear(); return r; }); },
+  // The master's level (RMS) every 25 ms for `ms` from PLAY (for comparing the two sequencers' sound).
+  async envelope(ms, pad){ let src = master;
+    if (pad != null){ const sq = makeSeq(S, 'song', {row:0, once:true, sim:true}); let tr = -1; for (let n = 0; n < 400 && sq.alive() && tr < 0; n++) for (const e of sq.step().evs) if (e.type === 'note' && e.pad === pad){ tr = e.track; break; }
+      rtInit(); if (tr >= 0) src = rt.pl.buses[tr].p; }
+    tStart('song', {row:0}); const a = ctx.createAnalyser(); a.fftSize = 1024; src.connect(a); const buf = new Float32Array(1024), out = [];
+    const t0 = performance.now(); while (performance.now() - t0 < ms){ a.getFloatTimeDomainData(buf); let s = 0; for (const x of buf) s += x * x; out.push(Math.sqrt(s / buf.length)); await new Promise(r => setTimeout(r, 25)); }
+    tStop(true); try { src.disconnect(a); } catch(e){} return out; },
+  // The tempo-locked effects' beat clock, sampled every 50 ms for `ms` from PLAY.
+  async beatClock(ms){ tStart('song', {row:0}); const a = ctx.createAnalyser(); a.fftSize = 256; rt.pl.clkBus.connect(a); const b = new Float32Array(256), out = [];
+    const t0 = performance.now(); while (performance.now() - t0 < ms){ a.getFloatTimeDomainData(b); out.push(Math.round(b[255] * 100) / 100); await new Promise(r => setTimeout(r, 50)); }
+    tStop(true); await new Promise(r => setTimeout(r, 100)); a.getFloatTimeDomainData(b); out.push(Math.round(b[255] * 100) / 100); try { rt.pl.clkBus.disconnect(a); } catch(e){} return out; },
   // The engine list's groups (for category checks).
   engines(){ return ENGINE_GROUPS.map(([g, es]) => g + ': ' + es.map(e => e[1]).join(', ')); },
   // The FX picker's list for track t (or the master: t = NT), with groups (for picker checks).

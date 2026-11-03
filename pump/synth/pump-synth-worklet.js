@@ -35,6 +35,7 @@ class PsynProc extends AudioWorkletProcessor {
   constructor(o){
     super();
     const op = o.processorOptions || {};
+    const __op = op; if (__op.cid){ this.__cid = __op.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(__op.cid, this); }
     if (op.bytes && !globalThis.__psynBytes) globalThis.__psynBytes = op.bytes;
     this.type = op.type | 0; this.syms = op.syms || []; this.fixed = op.fixed || {}; this.p = op.p || {}; this.trim = op.trim || 1;   // trim: as the render's (POLY +3.5 dB)
     this.nb = op.nb || 60;   // the MIDI note C-4 plays (60; a drum kit's first drum)
@@ -43,7 +44,7 @@ class PsynProc extends AudioWorkletProcessor {
     this.lane = Array.from({length:LANES}, () => ({note:-1, lt:0, lg:false}));
     this.bl = 0; this.sent = 8192; this.quiet = 1e9; this.ms = 0; this.fr = 0;
     this.file = op.file || null; this.fileDirty = !!this.file;   // FREEZE FILE: the pad's own sound
-    this.port.onmessage = e => { const d = e.data || {}; if (d.set){ this.p = d.set; this.dirty = true; } if (d.file){ this.file = d.file.d ? d.file : null; this.fileDirty = true; } if (d.dispose) this.dead = true; };
+    this.port.onmessage = e => { const d = e.data || {}; if (d.set){ this.p = d.set; this.dirty = true; } if (d.file){ this.file = d.file.d ? d.file : null; this.fileDirty = true; } if (d.dispose){ if (this.__cid && globalThis.__tcNodes && globalThis.__tcNodes.get(this.__cid) === this) globalThis.__tcNodes.delete(this.__cid); } if (d.dispose) this.dead = true; };
   }
   values(arr){
     for (let i = 0; i < this.syms.length; i++){ const s = this.syms[i], f = this.fixed[s], v = f != null ? f : this.p[s]; if (typeof v === 'number' && isFinite(v)) arr[i] = v; }
@@ -58,6 +59,7 @@ class PsynProc extends AudioWorkletProcessor {
   bendOf(r, note){ const b = this.nb + this.semis(r) - note, k = Math.max(-1, Math.min(1, b / this.range)); return Math.max(0, Math.min(16383, Math.round(8192 + k * 8191))); }
   bend(X, i, r, note){ const v = this.bendOf(r, note); if (v !== this.sent){ X.psyn_midi(this.h, i, 0xE0, v & 127, v >> 7); this.sent = v; } }
   process(ins, outs, P){
+    if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);   // THUNDER CORE drives this node (core-processor.js)
     const X = psynX(), o = outs[0], L = o[0], R = o[1] || o[0], n = L.length;
     if (this.dead){ if (X && this.h >= 0) X.psyn_free(this.h); this.h = -1; return false; }
     if (!X){ L.fill(0); if (R !== L) R.fill(0); return true; }
@@ -110,6 +112,7 @@ class PsynProc extends AudioWorkletProcessor {
       L[i] = a; if (R !== L) R[i] = b; const m = (a < 0 ? -a : a) + (b < 0 ? -b : b); if (m > pk) pk = m; }
     this.quiet = held || pk > 2e-5 ? 0 : this.quiet + n;
     this.ms += Date.now() - t0; this.fr += n;
+    if (this.__ov && globalThis.__tcPost) globalThis.__tcPost(this, outs[0]);
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
     return true;
   }

@@ -5,6 +5,7 @@
 //
 //   node tools/seq-golden.mjs            compare (exit 1 on any difference; the first differing row is printed)
 //   node tools/seq-golden.mjs --update   write the goldens (only after checking why they changed)
+//   node tools/seq-golden.mjs --core     the same cases on the audio thread (core/seq-core.js): must match the same goldens
 //
 // Needs Chrome (or Chromium) and the playwright package: CHROME=/path/to/chrome, PLAYWRIGHT=/path/to/playwright/index.mjs
 // if they aren't found. The full event dumps go to tests/golden/out/ (not committed) for diffing.
@@ -33,6 +34,7 @@ const SONGS = [
   { id: 'electro-cmds', file: 'sounds/ELECTRO.thunder', mode: 'song', edit: withCommands },
 ];
 const TIMING = process.argv.includes('--timing');
+const CORE = process.argv.includes('--core');   // run each case on the audio thread (core/seq-core.js) instead: the same goldens must match
 const PW = process.env.PLAYWRIGHT || ['/opt/npm-tools/node_modules/playwright/index.mjs', path.join(ROOT, 'node_modules/playwright/index.mjs')].find(f => fs.existsSync(f));
 const CHROME = process.env.CHROME || ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', 'C:/Program Files/Google/Chrome/Application/chrome.exe', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find(f => fs.existsSync(f));
 if (!PW) { console.error('playwright not found: npm i -g playwright, or set PLAYWRIGHT'); process.exit(2); }
@@ -59,7 +61,7 @@ try {
     let text0 = fs.readFileSync(path.join(ROOT, S.file), 'utf8');
     if (S.edit) { const j = JSON.parse(text0); const n = S.edit(j); text0 = JSON.stringify(j); console.log(`     ${S.id}: ${n} commands added`); }
     const info = await page.evaluate(([t, n]) => window.__seqTest.load(t, n), [text0, path.basename(S.file)]);
-    const rows = await page.evaluate(([m, mx, o]) => window.__seqTest.run(m, mx, o), [S.mode, S.max || 0, S.opt || null]);
+    const rows = await page.evaluate(([m, mx, o, c]) => c ? window.__seqTest.runCore(m, mx, o) : window.__seqTest.run(m, mx, o), [S.mode, S.max || 0, S.opt || null, CORE]);
     const text = rows.map(r => JSON.stringify(r)).join('\n') + '\n';
     fs.writeFileSync(path.join(ROOT, `tests/golden/out/seq-${S.id}.jsonl`), text);
     const counts = {}; for (const r of rows) for (const e of r.evs) counts[e.type] = (counts[e.type] || 0) + 1;
