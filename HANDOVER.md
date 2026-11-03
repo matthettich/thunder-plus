@@ -101,44 +101,6 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
    keep `link/` and replace its LICENSE / NOTICE with what that licence asks for. Either way, "Ableton Link" in the UI
    follows Ableton's guidelines (the name in full, Enabled / Disabled).
 
-## 3 Nov: Ableton Link (desktop, off by default)
-
-Plan steps 1–3 of "Plan: Ableton Link on the desktop app" (below) are built on a branch from `beta`, not merged or released.
-Thunder Perform (step 4) and phones are not.
-- **Where:** `link/` (the native addon: `src/thunder_link.cc` over the Link SDK, plain N-API; `fetch-sdk.sh` pins
-  `Link-4.1.1` by commit into `link/sdk`, not committed; `build.js` → `electron/link/thunder_link.node`, Mac arm64 + x86_64
-  joined by lipo; own LICENSE / NOTICE, GPL-2.0-or-later). `electron/link-session.js` owns the session (state message on
-  change, timing message every 20 ms while on); `electron/main.js` requires the addon in a try (from `app.asar.unpacked`);
-  `electron/preload.js` → `window.thunderDesktop.link`. Page: the **ABLETON LINK** block after `setTempoLive` in
-  `index.html` (`lk*` functions), hooks in `tStart` (`lkPlan` / `lkStarted`), `tStop` (`lkStopped`), `CLK.bpm` and the
-  TEMPO setting (`lkTempoOut`); `aset.link` (off) and `aset.linkSync` (on); rows in Settings → Audio & MIDI (`#linkBox`,
-  shown only with `window.thunderDesktop.link`, "Not available in this build" without the addon).
-- **How it works:** times are Link's µs, mapped to `performance.now()` by a round-trip ping (`lkPing`, shortest of 20) and
-  to the audio clock by a median of `getOutputTimestamp()` (`lkAm`; MIDI's `amap` settles too slowly for a bar line).
-  PLAY with peers starts on the session's next bar; alone it starts at once and moves Link's bar there (the addon's
-  `start` only re-anchors with no peers). Drift: `lkDrift` once a second, PI on the playing tempo (`tp.seq.bpm`), ±0.5 %
-  (±4 % above 1/8 beat). Works with both sequencers (Page and Audio thread): only the start time and `tp.seq.bpm` are used,
-  so `makeSeq` and the core are unchanged (no `make-core` run needed). MIDI Clock in (`mx.slave`) wins over Link.
-- **CI:** `.github/workflows/desktop.yml` has an "Ableton Link addon (optional)" step before the app build, with
-  `continue-on-error`. **Not yet run on GitHub's Mac / Windows machines**: the first desktop workflow run will say whether
-  the addon builds there (Linux x64 built and ran here with node-gyp 11 / GCC 13). If Windows or Mac fails, the app still
-  builds, without Link; the step's log says why.
-- **Tested here:** `node --test tests/link.test.js` (session vs a fake addon, guards, the real addon when built);
-  `node tools/link-test.mjs` (the page against a fake peer in headless Chrome, both sequencers: tempo both ways, start on
-  the next bar to within ~0.2 ms, start/stop sync both ways, drift 0.03 % / a 20 ms jump / 0.3 % converging under 1 ms
-  in a few seconds). The sandbox's fake audio device stalls now and then; the test marks such samples `(h …)` and SKIPs a
-  check that only had those. Two real addon instances in two processes (loopback) agreed on tempo, phase and start/stop.
-  **Not tested:** against Live / Koala / a phone on Wi-Fi; inside Electron itself (no Electron in the sandbox).
-- **Owner, to test:** build the desktop app from this branch (Run workflow with no version), check the step "Ableton
-  Link addon" passed on each OS. Then on one Wi-Fi: Live (Preferences → Link, Tempo & MIDI → Link on, Start Stop Sync on) or
-  Koala (Link on); Thunder Plus Settings → Audio & MIDI → Ableton Link On: the peer count shows; change tempo on either side;
-  press PLAY on each side (the other should start on the next bar); let it run a few minutes listening for flamming against
-  Live's metronome. Ableton's own checklist is `link/sdk/TEST-PLAN.md` (after `sh link/fetch-sdk.sh`). Windows asks to
-  allow network access the first time Link is on (allow private networks).
-- **Left:** Thunder Perform (plan step 4), phones (native app later), a Link icon / button per Ableton's guidelines if
-  wanted, the 1-bar quantum as a setting (Live's Quantization is per app), REC count-in with Link (it is placed before the
-  bar, not tested against a peer). Licence: before selling, see item 8 of the commercial checklist.
-
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
 - **Track reordering** (moving a track next to its bus, as other DAWs do). Big job: every song row, mixer, send, bus
@@ -147,7 +109,69 @@ Thunder Perform (step 4) and phones are not.
 - **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
   change it needs.
 - Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
+- Owner to pick (3 Nov): the three tracker keys that clash (see "3 Nov: Audio & MIDI ports table; tracker keys").
+- Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
+
+## 3 Nov (2): the rest of the sequencer move (all on `beta`, not released)
+
+- **FXV:** the core works out an effect slot's settings itself (`fxvMsg`) and hands them to the effect node at the row's
+  time (`tcAt` → `proc.__q`, taken at block start). `make-core` copies each effect's `map()` out of TFX (`TFX_MAP`, 44
+  effects); the shared-module effects send their conversions as data (`TFX[k].cv`). `__seqTest.fxMaps()` checks every
+  non-pump effect against the page's map (all match). …pump slots' FXV stays on the page.
+- **BYP / tempo:** `thunder-chains` registers as `chn:<track>` and reads `__tcOv`, so BYP's b1–b15 come from the core;
+  TPO reaches …chains' transport at its time (`ev.chnCore`). chains-worklet `v=42`.
+- **MUT / GEN / CUT / RES / DEC:** a variation the page renders goes to the core as `vbuf` (key `ii:vk:pad`); an
+  instrument change or a new render of the pad drops the core's copies (`varDrop`; page `coreVarGone`). CUT / RES / DEC use
+  the page's `shapeData` (make-core root). A variation the core doesn't have yet plays from the page, as before.
+- **SoundFonts:** `coreSf()` sends a pad's decoded preset once `sfPreparePad` has it; the core's `sfNote` / `sfRun` is the
+  page's `sfNote` (zones, loops, DAHDS envelope, Web Audio's low-pass with the mod envelope, zone pan, panner laws).
+  Difference: a bend / arp / vibrato moves every zone of a layered preset (the page moved only the first).
+- **MIDI out:** already exact: since the core went live, every row (and so every note, CC and the 24 ppqn clock, worked
+  out from the beat events) reaches the page with the core's audio time, and `msend` books it with that time. What's left
+  is a browser limit: Web MIDI can only be sent from the page, so a page stall longer than the look-ahead (250 ms rows,
+  80 ms clock) still delays it. Only the native host (plan phase 4) removes that. Not changed tonight.
+- `CORE_V` / `CORE_WANT` 6. Checks, all in headless Chrome against ELECTRO: 2152 FXV + 5396 BYP + 55 TPO → 0 late, levels
+  page vs core within run-to-run noise; 1066 MUT / GEN / CUT / DEC → 93 % of variation notes from the core after the first
+  pass; two pads as GM presets → every SoundFont note from the core, track level 0.1000 vs 0.0994. npm test (110, 1
+  skipped), goldens page and `--core` pass. Test scripts were in the session's scratchpad (not kept); the hooks they used
+  are `fxMaps`, `coreStats` (now also lists the nodes the core reaches) and the tally's `var` tag.
+- **Still on the page:** …pump slots' FXV, SYNC-stretched notes, MIDI-only instruments (by design), Thunder Perform.
+
+## 3 Nov: FX bar: EQ / filter curves, echo taps, …chains rail
+
+The three ideas left open in "2 Nov (2)" (desktop bottom bar), all in index.html, FX bar only (CLASSIC untouched). Built
+overnight on a worktree branch off `beta`; not merged, no BUILD / cache bump.
+- **Response curves** (`dkFxResp` → `dkFxCurve`, called from `dkFxViz` before the older `dkFxPic`): in the room under a
+  slot's values (at least 96 × 50 px, else the old picture stays), log 20 Hz – 20 kHz, ±18 dB (Thunder EQ ±12 until its curve
+  needs more; …pump EQ ±30 when a band does), a 0 dB line, the shape filled. Each is the DSP's own maths, not a look-alike:
+  - `filter`, `cut`, `envfilt` (at rest, before the envelope moves it): the TPT SVF of chains-worklet.js (`svfH`), with their
+    k / slope / mix rules; `cut`'s 6 dB one-poles as written. `vowel`: its three formant band-passes (`VF_LF` etc. copied from
+    the worklet's Peterson & Barney table; keep them in step if that table changes).
+  - `ladder`: DaisySP LadderFilter (Huovilainen, 4× with linear interpolation) run on an impulse (`ladderIR`, `irH`).
+  - `eq` (Airwindows EQ): EQProc.cpp's stages alternate every 2nd / 3rd sample, so it is run on an impulse at all six phases
+    and averaged (`awEqIR`, `awEqMag2`). Checked against a plain transcription of EQProc.cpp fed sines: equal to 0.01 dB. The
+    density stages are linearised (small signals). ~8–16 ms to work out, only when a value changes.
+  - `peq`, `pstrip`: pump's analog prototypes (`pmpProto` / `pmpMag2`, as pump/ui/eq.js). STRIP: `pstripBands`, a copy of
+    StripEngine.hpp `buildBands` + the eight console profiles (`PSTRIP_PROF`: HPF / LPF slopes, EQ family, voicing). Keep in
+    step with pump if those change.
+  - Gains that aren't tone (output, makeup, input drive) are left out.
+- **Echo taps** (`dkFxTaps`): `delay` (TapeDelay2: the tape speed the map sets, back to seconds; feedback = regen²), `pdelay`,
+  `sdelay` (ping-pong in L / R lanes), `bbd`, `gdelay`, `reverse`, …pump ECHO (`pecho`: notes from pump's Tempo.hpp table,
+  L / R times, Ping-Pong alternates, Wide offsets R by 15 ms). Bars fade with feedback over 1 bar, or 2 when the first echo is
+  longer than a beat (more if two echoes need it); a grey bar at 0 is the dry level; beat lines, the first echo's time.
+- **Cost:** `dkFxResp` keeps a key per column (values, size, skin, tempo, rate): an unchanged frame is one string compare
+  (measured: 0 pictures in 1.5 s with nothing changing); while a value is dragged at most ~11 a second; `dkCurveMemo` keeps
+  the last 24 curves so a resize or a skin change reuses them. Nothing runs when the bar is hidden (`deckFxBarMeters`).
+- **…chains rail** (`dkChnRail`, `chainOrder`, `deckChnFold`, CSS `.dkcrail`): with the FX bar and no controls mapped, …CHAINS
+  shows the track's modules (those `chainMods` finds) in signal order (Kahn's sort over the cables, ties left to right on the
+  bench) as small offset blocks with an on / bypassed light (`params._byp`), IN · TRACK and OUT · TRACK tags at the ends, and
+  `+ CONTROLS` (or `+ …CHAINS` with no chain). Folded …CHAINS shows a narrower rail beside its title. A block opens …chains at
+  that module (`dkcReveal` → `chApi().reveal`, as the module names in the panel do). Module names: `DKC_LAB`.
+- **Test hook:** `__seqTest.ev(src)` (only with `?seqtest`) evaluates inside the app, for headless UI checks.
+- **To check on the owner's screen:** legibility at the default panel height (the curves need ~50 px under the values: most
+  slots get them at 220 px only when they have few values; drag the panel taller for all), and whether the EQ curve's
+  fine ripples near 16 kHz (real: the triplet stage at sr/3) read as a glitch.
 
 ## 3 Nov: Audio & MIDI ports table; tracker keys
 
@@ -195,6 +219,44 @@ On `beta` (worktree branch), not released; BUILD and the sw.js cache name not bu
   Alt+3, plain . on an FX cell); Audio & MIDI behaviour (switches save `aset` / midi, clock ticks, delay, channel).
   New `?seqtest` hooks: `ui()`, `nav({view, tv, pv, track, phrase, songX, songY, x, y})`, `notes(p)`. `npm test` 106 / 106.
 
+## 3 Nov: Ableton Link (desktop, off by default)
+
+Plan steps 1–3 of "Plan: Ableton Link on the desktop app" (below) are built on a branch from `beta`, not merged or released.
+Thunder Perform (step 4) and phones are not.
+- **Where:** `link/` (the native addon: `src/thunder_link.cc` over the Link SDK, plain N-API; `fetch-sdk.sh` pins
+  `Link-4.1.1` by commit into `link/sdk`, not committed; `build.js` → `electron/link/thunder_link.node`, Mac arm64 + x86_64
+  joined by lipo; own LICENSE / NOTICE, GPL-2.0-or-later). `electron/link-session.js` owns the session (state message on
+  change, timing message every 20 ms while on); `electron/main.js` requires the addon in a try (from `app.asar.unpacked`);
+  `electron/preload.js` → `window.thunderDesktop.link`. Page: the **ABLETON LINK** block after `setTempoLive` in
+  `index.html` (`lk*` functions), hooks in `tStart` (`lkPlan` / `lkStarted`), `tStop` (`lkStopped`), `CLK.bpm` and the
+  TEMPO setting (`lkTempoOut`); `aset.link` (off) and `aset.linkSync` (on); rows in Settings → Audio & MIDI (`#linkBox`,
+  shown only with `window.thunderDesktop.link`, "Not available in this build" without the addon).
+- **How it works:** times are Link's µs, mapped to `performance.now()` by a round-trip ping (`lkPing`, shortest of 20) and
+  to the audio clock by a median of `getOutputTimestamp()` (`lkAm`; MIDI's `amap` settles too slowly for a bar line).
+  PLAY with peers starts on the session's next bar; alone it starts at once and moves Link's bar there (the addon's
+  `start` only re-anchors with no peers). Drift: `lkDrift` once a second, PI on the playing tempo (`tp.seq.bpm`), ±0.5 %
+  (±4 % above 1/8 beat). Works with both sequencers (Page and Audio thread): only the start time and `tp.seq.bpm` are used,
+  so `makeSeq` and the core are unchanged (no `make-core` run needed). MIDI Clock in (`mx.slave`) wins over Link.
+- **CI:** `.github/workflows/desktop.yml` has an "Ableton Link addon (optional)" step before the app build, with
+  `continue-on-error`. **Not yet run on GitHub's Mac / Windows machines**: the first desktop workflow run will say whether
+  the addon builds there (Linux x64 built and ran here with node-gyp 11 / GCC 13). If Windows or Mac fails, the app still
+  builds, without Link; the step's log says why.
+- **Tested here:** `node --test tests/link.test.js` (session vs a fake addon, guards, the real addon when built);
+  `node tools/link-test.mjs` (the page against a fake peer in headless Chrome, both sequencers: tempo both ways, start on
+  the next bar to within ~0.2 ms, start/stop sync both ways, drift 0.03 % / a 20 ms jump / 0.3 % converging under 1 ms
+  in a few seconds). The sandbox's fake audio device stalls now and then; the test marks such samples `(h …)` and SKIPs a
+  check that only had those. Two real addon instances in two processes (loopback) agreed on tempo, phase and start/stop.
+  **Not tested:** against Live / Koala / a phone on Wi-Fi; inside Electron itself (no Electron in the sandbox).
+- **Owner, to test:** build the desktop app from this branch (Run workflow with no version), check the step "Ableton
+  Link addon" passed on each OS. Then on one Wi-Fi: Live (Preferences → Link, Tempo & MIDI → Link on, Start Stop Sync on) or
+  Koala (Link on); Thunder Plus Settings → Audio & MIDI → Ableton Link On: the peer count shows; change tempo on either side;
+  press PLAY on each side (the other should start on the next bar); let it run a few minutes listening for flamming against
+  Live's metronome. Ableton's own checklist is `link/sdk/TEST-PLAN.md` (after `sh link/fetch-sdk.sh`). Windows asks to
+  allow network access the first time Link is on (allow private networks).
+- **Left:** Thunder Perform (plan step 4), phones (native app later), a Link icon / button per Ableton's guidelines if
+  wanted, the 1-bar quantum as a setting (Live's Quantization is per app), REC count-in with Link (it is placed before the
+  bar, not tested against a peer). Licence: before selling, see item 8 of the commercial checklist.
+
 ## 2 Nov (6), late night: builds 369–373 (web 373, desktop 1.2.69–1.2.73)
 
 - 369: pump's STRIP channel strip in the app (`pstrip`, pump.wasm / pump-meta v6, built from the pump repo with STRIP added
@@ -206,41 +268,6 @@ On `beta` (worktree branch), not released; BUILD and the sw.js cache name not bu
 - 373: TVL / TVA / TPN / master VOL on the audio thread (plan §13 2c "mix done"); Calculator watch skin (`calcwatch`).
 - Owner's to-do still open: which skins to keep (cull); hardware MIDI tests and the native host framework (item 6, later).
   Sequencer move left: FXV, …chains BYP / tempo, SoundFonts, MUT / GEN, MIDI.
-
-## 3 Nov: FX bar: EQ / filter curves, echo taps, …chains rail
-
-The three ideas left open in "2 Nov (2)" (desktop bottom bar), all in index.html, FX bar only (CLASSIC untouched). Built
-overnight on a worktree branch off `beta`; not merged, no BUILD / cache bump.
-- **Response curves** (`dkFxResp` → `dkFxCurve`, called from `dkFxViz` before the older `dkFxPic`): in the room under a
-  slot's values (at least 96 × 50 px, else the old picture stays), log 20 Hz – 20 kHz, ±18 dB (Thunder EQ ±12 until its curve
-  needs more; …pump EQ ±30 when a band does), a 0 dB line, the shape filled. Each is the DSP's own maths, not a look-alike:
-  - `filter`, `cut`, `envfilt` (at rest, before the envelope moves it): the TPT SVF of chains-worklet.js (`svfH`), with their
-    k / slope / mix rules; `cut`'s 6 dB one-poles as written. `vowel`: its three formant band-passes (`VF_LF` etc. copied from
-    the worklet's Peterson & Barney table; keep them in step if that table changes).
-  - `ladder`: DaisySP LadderFilter (Huovilainen, 4× with linear interpolation) run on an impulse (`ladderIR`, `irH`).
-  - `eq` (Airwindows EQ): EQProc.cpp's stages alternate every 2nd / 3rd sample, so it is run on an impulse at all six phases
-    and averaged (`awEqIR`, `awEqMag2`). Checked against a plain transcription of EQProc.cpp fed sines: equal to 0.01 dB. The
-    density stages are linearised (small signals). ~8–16 ms to work out, only when a value changes.
-  - `peq`, `pstrip`: pump's analog prototypes (`pmpProto` / `pmpMag2`, as pump/ui/eq.js). STRIP: `pstripBands`, a copy of
-    StripEngine.hpp `buildBands` + the eight console profiles (`PSTRIP_PROF`: HPF / LPF slopes, EQ family, voicing). Keep in
-    step with pump if those change.
-  - Gains that aren't tone (output, makeup, input drive) are left out.
-- **Echo taps** (`dkFxTaps`): `delay` (TapeDelay2: the tape speed the map sets, back to seconds; feedback = regen²), `pdelay`,
-  `sdelay` (ping-pong in L / R lanes), `bbd`, `gdelay`, `reverse`, …pump ECHO (`pecho`: notes from pump's Tempo.hpp table,
-  L / R times, Ping-Pong alternates, Wide offsets R by 15 ms). Bars fade with feedback over 1 bar, or 2 when the first echo is
-  longer than a beat (more if two echoes need it); a grey bar at 0 is the dry level; beat lines, the first echo's time.
-- **Cost:** `dkFxResp` keeps a key per column (values, size, skin, tempo, rate): an unchanged frame is one string compare
-  (measured: 0 pictures in 1.5 s with nothing changing); while a value is dragged at most ~11 a second; `dkCurveMemo` keeps
-  the last 24 curves so a resize or a skin change reuses them. Nothing runs when the bar is hidden (`deckFxBarMeters`).
-- **…chains rail** (`dkChnRail`, `chainOrder`, `deckChnFold`, CSS `.dkcrail`): with the FX bar and no controls mapped, …CHAINS
-  shows the track's modules (those `chainMods` finds) in signal order (Kahn's sort over the cables, ties left to right on the
-  bench) as small offset blocks with an on / bypassed light (`params._byp`), IN · TRACK and OUT · TRACK tags at the ends, and
-  `+ CONTROLS` (or `+ …CHAINS` with no chain). Folded …CHAINS shows a narrower rail beside its title. A block opens …chains at
-  that module (`dkcReveal` → `chApi().reveal`, as the module names in the panel do). Module names: `DKC_LAB`.
-- **Test hook:** `__seqTest.ev(src)` (only with `?seqtest`) evaluates inside the app, for headless UI checks.
-- **To check on the owner's screen:** legibility at the default panel height (the curves need ~50 px under the values: most
-  slots get them at 220 px only when they have few values; drag the panel taller for all), and whether the EQ curve's
-  fine ripples near 16 kHz (real: the triplet stage at sr/3) read as a glitch.
 
 ## 2 Nov (5), late night: the audio-thread sequencer (plan phase 2a–2c) released, on by default (web 362, desktop 1.2.65)
 
