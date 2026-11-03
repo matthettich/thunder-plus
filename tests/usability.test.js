@@ -357,3 +357,13 @@ test('acid (3 Nov): 16th grid from the LPB, composed lines', () => {
   assert.match(src, /function acidWrite\(P, y0, L, base, st, ins, spr = 1\)\{/, 'write on the grid');
   assert.match(src, /if \(!only && \(R\.style \| 0\) > 0\) return acidCompose\(st, L, lanes, R, rnd\);/, 'composed styles');
 });
+
+test('build 394: slow double-click, Shift+Up wrap, Alt+B / Alt+S, stop cursor stays', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  assert.match(src, /arrClicks = e\.detail/);
+  assert.match(src, /arrGo\(p\.y, p\.t, e\.pointerType === 'mouse' && arrClicks >= 2\)/);
+  assert.match(src, /function shiftSel\(dir, noWrap\)/);
+  assert.match(src, /e\.code === 'KeyB'\)\{ if \(!e\.repeat\) acidLine\(\)/);
+  assert.match(src, /e\.code === 'KeyS'\)\{ if \(!e\.repeat && !pbOpen\) setSheet\('song'\)/);
+  assert.match(src, /thunderplus-stopcur-v2/);
+});

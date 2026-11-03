@@ -119,6 +119,17 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (21): slow double-click, Shift+▲ wrap, Alt+B / Alt+S, STOP CURSOR off (build 394)
+
+- "Double-click on an empty track jumps to track 1": arrGo counted a double only within 380 ms; a slower system double-click
+  (Mac default) made nothing and the phrase stayed where it was. `arrClicks` (mousedown `e.detail`, the system's own count)
+  is passed to arrGo as `sysDbl`; both the empty-cell (arrEmptyTap) and block (arrTap) doubles take it. The browser's
+  dblclick event never reaches the grid (cells are redrawn between clicks). New `arrNewAt(y, t)`.
+- shiftSel(dir, noWrap): on Phrase (and the Pattern view) Shift+▲ on row 0 → anchor row 0, cursor last row (whole phrase,
+  same columns); Shift+▼ on the last row the other way. Shift+wheel passes noWrap.
+- globalKeys: Alt/⌥+B → acidLine(); Alt/⌥+S → setSheet('song'). Legend rows added.
+- STOP CURSOR default STAYS: key `thunderplus-stopcur-v2`, on only when '1'.
+
 ## 3 Nov (20): meters take Alt-click to mute (build 393)
 
 - Owner: the meters too. `#tMeters` buttons: a mouse click picks the track (Song / Mixer cursor, else cTrack; the song cursor
