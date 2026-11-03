@@ -15148,10 +15148,10 @@ function normTfx(o){
 const freshChainFx = () => new Array(FXSLOTS).fill(null);
 const normChainFx = a => Array.from({length:FXSLOTS}, (_, k) => Array.isArray(a) ? normTfx(a[k]) : null);
 /* …PUMP MASTERING (owner, 2 Nov: "swap the mastering chain for the pump mastering fx with the auto master as the final
-   plugin… mastering default on"): a new song's master FX slots 6–8 hold …pump EQ → COMP → MASTER (the auto master, last),
+   plugin… mastering default on"): a new song's last master FX slots hold …pump EQ → CALM → COMP → TONE → MASTER (the auto master, last),
    on. S.mstPump marks the song: MASTERING (Mixer, Settings, the master strip) switches those …pump slots on and off and
    opens pump MASTER's window. Songs from before keep the old mastering stage (S.mst) exactly as saved. */
-const MST_PUMP = ['peq', 'pcomp', 'pmaster'];
+const MST_PUMP = ['peq', 'pcalm', 'pcomp', 'ptone', 'pmaster'];   // (2 Nov, later) + CALM (the resonance suppressor) and TONE: EQ → CALM → COMP → TONE → MASTER
 function mstPumpFresh(){ const A = freshChainFx(); try { MST_PUMP.forEach((k, i) => { if (TFX[k]) A[FXSLOTS - MST_PUMP.length + i] = freshTfx(k); }); } catch(e){} return A; }
 const mstPumpSlots = () => (S.mfx || []).map((f, k) => f && MST_PUMP.includes(f.type) ? k : -1).filter(k => k >= 0);
 const mstOn = () => S.mstPump ? mstPumpSlots().some(k => S.mfx[k].on) : !!S.mst.on;
