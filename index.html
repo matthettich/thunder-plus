@@ -25669,7 +25669,9 @@ function apBack(){
 function apTabSong(e){
   // PHRASE while Arrange has the keys (owner, 31 Oct: after SONG, PHRASE did nothing until another tab was clicked, since the
   // screen was already Phrase): the keys go back to the phrase
-  if (e.target.closest('[data-v="phrase"]') && apF && tv === 'phrase'){ e.stopPropagation(); e.preventDefault(); apFocus(null); draw(); return; }
+  // ...and the same for every screen Arrange can sit beside (owner, 2 Nov: on FX, after a click in Arrange, FX "could not be
+  // chosen" until Mixer was clicked): the tab of the screen you're on gives it the keys back
+  { const tb = e.target.closest('[data-v]'); if (tb && apF && tb.dataset.v === tv){ e.stopPropagation(); e.preventDefault(); apFocus(null); draw(); return; } }
   if (!e.target.closest('[data-v="song"]') || !apReady || apF === 'arr' || tv !== 'phrase' || !apArrOk()) return;
   e.stopPropagation(); e.preventDefault(); apFocus('arr', true); draw();
 }
