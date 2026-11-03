@@ -316,3 +316,12 @@ test('one rule for value controls (3 Nov): faders, strip, FX bar and pump drag r
   assert.match(k, /'Reset to default', 'Type a value…'\]/, 'pump: right-click menu');
   assert.match(k, /if \(c !== this\.wheelC\) return;/, 'pump: the wheel waits for the rest');
 });
+
+test('owner calls (3 Nov): Song Alt-drag copies, Arrange Ctrl-click picks / Ctrl-drag copies, Song track numbers mute, bus outline', () => {
+  const src = H.read('index.html');
+  assert.match(src, /SONG ALT-DRAG COPIES[\s\S]{0,400}if \(mselDown\(e, x, y\)\)\{ msel\.one = true; draw\(\); return; \}/, 'Song Alt-drag');
+  assert.match(src, /sxDrag = \{id:e\.pointerId, x0:e\.clientX, y0:e\.clientY, y, t, mode:null, alt:false, pick:true,/, 'Arrange Ctrl press waits');
+  assert.match(src, /if \(!d\.mode && d\.pick\)\{/, 'a Ctrl-click picks on release');
+  assert.match(src, /TRACK NUMBERS \(owner, 3 Nov\)/, 'Song track numbers mute');
+  assert.match(src, /\.tagrid b\.bus\{outline:1px solid/, 'bus outline');
+});

@@ -116,6 +116,20 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (9): Song / Arrange calls, bus outline (build 382)
+
+- **Song text grid Alt-drag copies** (gridDown "SONG ALT-DRAG COPIES"): an Alt-press on a filled block (mouse, not the master)
+  makes it a one-block selection and starts mselDown's grab with `msel.one`; a drag copies (mselApply, the selection then
+  dropped), a click mutes the block (mselEnd), Esc puts it back. Alt-drag no longer changes a Song block's number there.
+- **Arrange Ctrl/⌘ press waits** (`sxDrag.pick`): a click without a drag picks (sxEnd), a drag copies (sxAim's Ctrl / ⌘).
+- **Song track numbers:** a mouse click mutes (toast says so), right-click solos as before; touch and the master's number
+  still move the cursor. Pattern view's band still opens the track (owner's call).
+- **Bus outline** (owner: "we lost the outline on the bus in arrange"): `.tagrid b.bus` gets a 1 px outline, 1 px out, in
+  `--ar-ink` at 70 %; cursor / playing / drop outlines come later in the CSS and win.
+- Faders: the Mixer bars are the cap itself, so "cap relative" is all of it (build 381); the strip fader keeps track-click-jumps.
+- Tests: usability "owner calls (3 Nov)"; 120/120. Headless: Song Alt-drag copy and Alt-click mute, Song number mutes,
+  Arrange Ctrl-click pick and Ctrl-drag copy, screenshots of the bus outline (Song screen and beside Phrase).
+
 ## 3 Nov (8): one rule for value controls (build 381)
 
 Owner's calls from the mouse audit. Helpers next to `sliderOk` (SLIDER MOUSE): `dragMul(e)` (Shift 0.1, Ctrl/⌘ held 4, read
