@@ -24883,13 +24883,23 @@ function dkFxViz(col, f, k, node, now){
 // their widths. Remembered on this device.
 function dkDrag(handle, onMove, onEnd){
   handle.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); try { handle.setPointerCapture(e.pointerId); } catch(_){}
-    const st = {x:e.clientX, y:e.clientY, h:deckH(), ws:deck.ws, wf:deck.wf, id:e.pointerId}; handle.classList.add('dn');
+    const st = {x:e.clientX, y:e.clientY, h:deckH(), ws:deck.ws, wf:deck.wf, id:e.pointerId}; handle.classList.add('dn'); dkDragging = true;
     const mv = ev => { if (ev.pointerId !== st.id) return; onMove(ev.clientX - st.x, ev.clientY - st.y, st); };
-    const up = ev => { if (ev.pointerId !== st.id) return; handle.classList.remove('dn'); handle.removeEventListener('pointermove', mv); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up); deckSave(); onEnd && onEnd(); };
+    const up = ev => { if (ev.pointerId !== st.id) return; handle.classList.remove('dn'); handle.removeEventListener('pointermove', mv); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up); dkDragging = false; deckSave(); onEnd && onEnd(); dkRefitNow(); };
     handle.addEventListener('pointermove', mv); handle.addEventListener('pointerup', up); handle.addEventListener('pointercancel', up); });
 }
-let dkFitRaf = 0;
-const dkRefit = () => { if (!dkFitRaf) dkFitRaf = requestAnimationFrame(() => { dkFitRaf = 0; fit(); draw(); }); };
+/* RESIZE STUTTER (owner, 3 Nov, Mac: "resizing the fx bar caused a sequencer stutter"): every pixel of a drag re-fit and
+   redrew the whole tracker and Arrange (here, and again from the screen's ResizeObserver): 100–160 ms blocks while the
+   song played. During a drag the screen is re-fitted at most every DK_DRAG_MS, and once more, fully, when it ends. */
+let dkFitRaf = 0, dkDragging = false, dkDragT = 0, dkDragTimer = 0;
+const DK_DRAG_MS = 160;
+function dkRefitNow(){ clearTimeout(dkDragTimer); dkDragTimer = 0; dkDragT = 0; if (!dkFitRaf) dkFitRaf = requestAnimationFrame(() => { dkFitRaf = 0; fit(); draw(); }); scheduleRefit(false); }
+// true when a drag is on and this refit should wait (a later one is booked)
+function dkDragHold(){ if (!dkDragging) return false; const now = performance.now();
+  if (now - dkDragT >= DK_DRAG_MS){ dkDragT = now; return false; }
+  if (!dkDragTimer) dkDragTimer = setTimeout(() => { dkDragTimer = 0; if (dkDragging){ dkDragT = performance.now(); if (!dkFitRaf) dkFitRaf = requestAnimationFrame(() => { dkFitRaf = 0; fit(); draw(); }); } }, DK_DRAG_MS);
+  return true; }
+const dkRefit = () => { if (dkDragHold()) return; if (!dkFitRaf) dkFitRaf = requestAnimationFrame(() => { dkFitRaf = 0; fit(); draw(); }); };
 dkDrag($('dkGrip'), (dx, dy, st) => { deck.h = clamp(Math.round(st.h - dy), 110, Math.max(140, Math.round(innerHeight * 0.6))); $('tDeck').style.setProperty('--dkh', deck.h + 'px'); dkRefit(); }, dkRefit);
 $('dkGrip').addEventListener('dblclick', () => { deck.h = 0; deckSave(); deckLayout(); dkRefit(); });   // back to following the window
 addEventListener('resize', () => { if (!deck.h) $('tDeck').style.setProperty('--dkh', deckH() + 'px'); });   // before the refit measures the grid
@@ -25161,6 +25171,7 @@ function arrLayout(force){
 let refitRaf = 0, refitForce = false, refitSize = '';
 function scheduleRefit(force){
   refitForce = refitForce || !!force; if (refitRaf) return;
+  if (!force && typeof dkDragHold === 'function' && dkDragging){ if (dkDragHold()) return; }   // RESIZE STUTTER: a panel drag refits at most every DK_DRAG_MS
   refitRaf = requestAnimationFrame(() => { refitRaf = 0; const f = refitForce; refitForce = false; if (f) measure(true);
     const did = arrLayout(f), sz = scr.clientWidth + 'x' + scr.clientHeight;   // the screen element itself changed size (a panel, the keyboard): re-fit
     if (!did && view === 'tracker' && sz !== refitSize){ fit(); draw(); } refitSize = sz; });
