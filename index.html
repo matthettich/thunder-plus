@@ -43,6 +43,10 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
   /* voicecard accent: a complement near each fam colour, so the voice card always contrasts with the layer card */
   --stdc:#c78f2f; --fmc:#50c74f; --addc:#9a3013; --noisec:#2e5de0; --smpc:#45d1a8; --plc:#0b4bb8; --wvc:#d15522;
   --line:var(--ink); --meter-ok:#4fd18a; --meter-hot:#e8b93c; --meter-clip:#e0564a;
+  /* TITLE BARS (3 Nov): the strips that head a panel or a window (the bottom panel's section heads, the tracker's tab
+     bar, the mastering / Help / preset windows' heads) take these, so each skin can set them once. Here: the side
+     colour, as before; the term skins derive their own (SKIN TITLE BARS, after the term base). */
+  --ttl:var(--side); --ttl-ink:var(--ink); --ttl-mut:var(--muted);
   --font:Futura,"Futura PT",Jost,"Century Gothic","Avenir Next",system-ui,sans-serif;
   color-scheme:light;
 }
@@ -310,7 +314,7 @@ input[type=range].wheelon{outline:2px solid var(--ink); outline-offset:2px; bord
 .gset #storeInfo{flex:1 1 100%; font-size:var(--fs-3); color:var(--muted); line-height:1.4}
 @media (pointer:coarse){ .gset .tsr.sbtn > button, .gset #bMst{min-height:46px} .gset label.cb{min-height:38px} .gset label.cb input[type=checkbox]{width:42px; height:24px} .gset label.cb input[type=checkbox]::before{width:16px; height:16px} .gset label.cb input[type=checkbox]:checked::before{transform:translateX(18px)} }
 .help{position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; background:var(--bench); color:var(--ink)}
-.help .hhead{display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--side); flex:none}
+.help .hhead{display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--ttl); color:var(--ttl-ink); flex:none}
 .help #helpNav{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; min-width:0; flex:0 1 auto}
 .help #helpNav button{flex:none}
 .help .hhead b{font-weight:600; letter-spacing:.06em; margin-right:4px}
@@ -732,6 +736,12 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .ask .askswatch button{width:30px; height:30px; min-height:0; padding:0; border-radius:50%; border:2px solid var(--line); background:var(--sw, transparent)}
 .ask .askswatch button.none{background:repeating-linear-gradient(45deg, transparent 0 5px, var(--line) 5px 7px)}
 .ask .askswatch button.on{outline:3px solid var(--ink); outline-offset:2px}
+/* (3 Nov) the term skins' button rules (every button: the case colour; .on: the ink) hid the swatches' colours, so the
+   909 and the other term skins showed a row of blank circles: #zz keeps each swatch its own colour in every skin */
+.ask .askswatch button:not(#zz):not(#zz){background:var(--sw, transparent); color:var(--ink); border-color:var(--line); box-shadow:none; text-shadow:none}
+.ask .askswatch button.none:not(#zz):not(#zz){background:repeating-linear-gradient(45deg, transparent 0 5px, var(--line) 5px 7px)}
+.ask .askswatch button.on:not(.none):not(#zz):not(#zz){background:var(--sw, transparent)!important}   /* the term .on rule is !important */
+.ask .askswatch button.none.on:not(#zz):not(#zz){background:repeating-linear-gradient(45deg, transparent 0 5px, var(--line) 5px 7px)!important}
 .tgrid .th.tcl, .tath i.tcl, .mtr.tcl .mn{box-shadow:inset 0 -3px 0 var(--tc)}
 #tSub.tcl::before{content:''; display:inline-block; width:.62em; height:.62em; border-radius:2px; background:var(--tc); margin-right:.4em}
 .ask .asklist{display:flex; flex-direction:column; gap:4px; max-height:50vh; overflow-y:auto}
@@ -761,7 +771,7 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .pbs{position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.42); display:flex; align-items:center; justify-content:center; padding:14px}   /* centred: the same gap above and below */
 @media (min-width:700px){ .pbs{padding:16px} }
 .pbs .pbox{background:var(--bench); color:var(--ink); border:1px solid var(--line); width:min(560px, 100%); max-height:100%; display:flex; flex-direction:column; font-size:var(--fs-4); box-shadow:0 8px 32px rgba(0,0,0,.35)}
-.pbs .phd{display:flex; gap:8px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line)} .pbs .phd b{font-size:var(--fs-5); white-space:nowrap}
+.pbs .phd{display:flex; gap:8px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); background:var(--ttl); color:var(--ttl-ink)} .pbs .phd b{font-size:var(--fs-5); white-space:nowrap}
 .pbs .phd input{flex:1; min-width:0; padding:7px 10px; border:1px solid var(--line); background:var(--panel); min-height:36px}
 .pbs .plist{overflow-y:auto; flex:1; overscroll-behavior:contain}
 .pbs .pcat{display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%; text-align:left; padding:11px 14px; border:0; border-bottom:1px solid var(--line); font-weight:600; background:var(--panel); color:var(--ink); min-height:44px}
@@ -830,7 +840,7 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .trk, .trk *{-webkit-touch-callout:none; user-select:none; -webkit-user-select:none; -webkit-tap-highlight-color:transparent}
 .trk :is(input,textarea,[contenteditable]){user-select:text; -webkit-user-select:text}
 .trk{flex:1; min-height:0; min-width:0; overflow:hidden; display:flex; flex-direction:column; background:var(--bench)}
-.ttabs{display:flex; flex:none; border-bottom:1px solid var(--line); background:var(--side); overflow-x:auto; scrollbar-width:none}
+.ttabs{display:flex; flex:none; border-bottom:1px solid var(--line); background:var(--ttl); overflow-x:auto; scrollbar-width:none}
 .ttabs button{border:0; border-right:1px solid var(--line); background:none; min-height:36px; padding:0 14px; font-weight:500; font-size:var(--fs-4); letter-spacing:.04em; flex:none}
 .ttabs button.on{background:var(--ink); color:var(--inv)}
 .tbody{flex:1; min-height:0; display:flex}
@@ -1066,7 +1076,7 @@ body:not(.legon) .tside .tlegend{display:none}
 .tcmd:not(.cmini) button[data-c=song]{grid-column:-2 / -1}
 body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bottom,0px))}
 
-.ttabbar{display:flex; flex:none; border-bottom:1px solid var(--line); background:var(--side); min-width:0}
+.ttabbar{display:flex; flex:none; border-bottom:1px solid var(--line); background:var(--ttl); min-width:0}
 .ttabbar .ttabs{border-bottom:0; flex:1; min-width:0}
 .tmode{border:0; border-left:1px solid var(--line); min-height:36px; padding:0 12px; font-size:var(--fs-3); font-weight:600; letter-spacing:.04em; flex:none; white-space:nowrap}
 .tmode.on{background:var(--ink); color:var(--inv)}
@@ -1156,7 +1166,7 @@ body.mob .top #tLen{min-height:34px; padding:0 8px; align-self:auto}
 #tSong.on .tl:not(.alt){visibility:hidden}
 #tSong.on .tl.alt{visibility:visible}
 .tcpu{border:0; border-left:1px solid var(--line); min-height:36px; padding:0 10px; font-size:var(--fs-3); font-weight:600; letter-spacing:.04em; flex:none; white-space:nowrap;
-  font-variant-numeric:tabular-nums; position:relative; min-width:84px; text-align:left; background:var(--side)}
+  font-variant-numeric:tabular-nums; position:relative; min-width:84px; text-align:left; background:var(--ttl)}
 .tcpu i{position:absolute; left:0; bottom:0; height:4px; width:0; background:var(--ink); transition:width .3s}
 .tcpu.warn i{background:var(--pl)}
 .tcpu.hot{color:var(--rec)} .tcpu.hot i{background:var(--rec)}
@@ -1358,6 +1368,17 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
    that plays and not an empty one */
 .tagrid b.o:not(.p){background:var(--ink, #111) !important; color:#ff5a1f !important; box-shadow:inset 0 0 0 1px #ff5a1f}
 .tagrid b.o:not(.p)::after{content:''; position:absolute; left:3px; right:3px; top:50%; height:2px; margin-top:-1px; background:#ff5a1f; pointer-events:none}
+/* BLOCK COLOURS on every block and in every skin (owner, 3 Nov: "not very many colour selections in the 909 skin … at
+   least for blocks that are mostly empty"): a block given a colour (class bc, --ib the colour, --ibi its text) shows it
+   over the skin's own fill (the term skins draw blocks in their ink; Rainbow in its hues). Full blocks: filled. Empty
+   blocks: a tint of it with its outline, the sideways lines in it. OFF-only blocks: filled, the stop bar and outline in
+   the text colour. Not while playing (the playhead's inverted look) or muted. #zz: above the skins' own rules. */
+.tagrid b.f.bc:not(.p):not(#zz){background:var(--ib)!important; color:var(--ibi, #fff); text-shadow:none}
+.tagrid b.z.bc:not(.p):not(#zz){background:color-mix(in srgb, var(--ib) 40%, var(--ar-bg, transparent))!important; color:var(--ar-ink, inherit); box-shadow:inset 0 0 0 1.5px var(--ib)!important; text-shadow:none}
+.tagrid b.z.bc:not(.p):not(.m):not(#zz)::after{background:repeating-linear-gradient(180deg, color-mix(in srgb, var(--ib) 75%, transparent) 0 1px, transparent 1px 3px)}
+.tagrid b.o.bc:not(.p):not(#zz){background:var(--ib)!important; color:var(--ibi, #fff)!important; box-shadow:inset 0 0 0 1px var(--ibi, #fff)!important; text-shadow:none}
+.tagrid b.o.bc:not(.p):not(#zz)::after{background:var(--ibi, #fff)}
+.tagrid b.m.bc:not(#zz){box-shadow:inset 0 0 0 1.5px var(--ib)}
 /* PLAYHEAD (owner, 31 Oct: too subtle): the playing blocks also get an outline in the skin's ink (dark on light skins, light
    on dark ones), and the playing row a faint band across every track */
 .tagrid b.p{outline:2px solid var(--ar-pl-ring, var(--ink)); outline-offset:-1px; position:relative; z-index:1}
@@ -1631,7 +1652,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
    part keeps its room, its tab stands at the left edge like …CHAINS' folded tab, and the rest is the dock's grey,
    hatched, saying it is folded; a click anywhere opens it (DK_FOLD's handler). */
 #tDeck.fxbar #dkFx.col{flex:1 1 auto; width:auto; min-width:26px; flex-direction:row; background:color-mix(in srgb, var(--side) 84%, #000)}
-#tDeck.fxbar #dkFx.col > .dkh{flex:0 0 26px; height:auto; padding:6px 0; align-items:flex-start; justify-content:center; border-right:1px solid var(--line); background:var(--side)}
+#tDeck.fxbar #dkFx.col > .dkh{flex:0 0 26px; height:auto; padding:6px 0; align-items:flex-start; justify-content:center; border-right:1px solid var(--line); background:var(--ttl, var(--side))}
 #tDeck.fxbar #dkFx.col .dkt::after{content:' ▸'}
 #tDeck.fxbar #dkFx.col::after{content:'FX FOLDED · CLICK TO SHOW'; flex:1 1 auto; display:flex; align-items:center; justify-content:center; min-width:0; overflow:hidden; white-space:nowrap;
   font-family:var(--mono); font-size:var(--fs-1); font-weight:700; letter-spacing:.1em; color:var(--muted);
@@ -1771,10 +1792,10 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #tDeck .dks.col .dkt{writing-mode:vertical-rl; transform:rotate(180deg); height:auto; max-height:100%; padding:7px 0; width:18px; flex:0 1 auto}
 .dkh .dkt.fixed{cursor:default}
 /* the thin grey header: one cell per section, its button over it, a rule between sections */
-.dkh{flex:none; display:flex; align-items:center; gap:5px; height:22px; padding:0 6px; background:var(--side); border-bottom:1px solid var(--line); min-width:0}
+.dkh{flex:none; display:flex; align-items:center; gap:5px; height:22px; padding:0 6px; background:var(--ttl); color:var(--ttl-ink); border-bottom:1px solid var(--line); min-width:0}
 .dkh .dkt{min-height:0; height:17px; padding:0 7px; font-size:var(--fs-2); font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--ink); color:var(--inv);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; flex:0 1 auto; min-width:0}
-.dkh .dki{font-size:var(--fs-2); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto}
+.dkh .dki{font-size:var(--fs-2); color:var(--ttl-mut); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto}
 .dkh .dksp{flex:1 1 0}
 .dkoffs{display:none}   /* the old + buttons for hidden parts: parts fold now instead */
 .dkh .dkx{min-height:0; height:17px; width:22px; padding:0; font-size:var(--fs-2); border:1px solid var(--line); background:var(--panel); flex:none}
@@ -1887,7 +1908,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .mstwin{position:fixed; inset:24px; z-index:60; display:flex; flex-direction:column; background:var(--panel); color:var(--ink); border:1px solid var(--ink); box-shadow:6px 6px 0 0 var(--ink)}
 .mstwin[hidden]{display:none}
 @media (max-width:700px){ .mstwin{inset:0; box-shadow:none; border:0} }
-.mwhead{flex:none; display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--line); background:var(--side); flex-wrap:wrap}
+.mwhead{flex:none; display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--line); background:var(--ttl); color:var(--ttl-ink); flex-wrap:wrap}
 .mwhead > b{font-size:var(--fs-4); letter-spacing:.08em}
 .mwon{min-height:30px; padding:0 14px; font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--panel)}
 .mwon.on{background:var(--ink); color:var(--inv)}
@@ -2013,6 +2034,12 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skin="tr909"] #tPad .k:not(#zz){background:#4a4d50; color:#f0f1f2; border-color:#2a2d30}
 :root[data-skin="tr909"] #tPad .k[data-b="play"]:not(#zz){background:#ff6a13; color:#1f2224; border-color:#a8430b} :root[data-skin="tr909"] #tPad .k[data-b="edit"]:not(#zz){background:#f0f1f2; color:#1f2224}
 :root[data-skin="tr909"] #tPad .k[data-b="shift"]:not(#zz){background:#2a2d30; color:#ff8a42} :root[data-skin="tr909"] #tPad .k[data-b="loop"]:not(#zz){background:#2a2d30; color:#f0f1f2}
+/* SKIN PALETTES (3 Nov) for block and track colours (--tc1 … --tc12: Red, Orange, Yellow, Green, Teal, Blue, Purple, Pink,
+   Lime, Sky, Brown, Grey; read by tcolPal()): the machines' own paint where they have it, the rest toned to sit with it */
+:root[data-skin="tr909"]{--tc1:#e04a0e; --tc2:#ff6a13; --tc3:#f2b705; --tc4:#5b9a3c; --tc5:#2f9a8f; --tc6:#3f6fb5; --tc7:#7a5ab0; --tc8:#d0558a; --tc9:#a3c13a; --tc10:#4aa8d8; --tc11:#8a5a3a; --tc12:#4a4f53}
+:root[data-skin="tr808"]{--tc1:#e2382f; --tc2:#f28c28; --tc3:#f4d23c; --tc4:#6aa84f; --tc5:#3fa79a; --tc6:#4a7fc0; --tc7:#8a63b8; --tc8:#e06a9a; --tc9:#b5cf3a; --tc10:#5bb5e0; --tc11:#9a6a3e; --tc12:#9a9483}
+:root[data-skin="mpc"]{--tc1:#c8312b; --tc2:#d9772b; --tc3:#d6a92a; --tc4:#6b8e3a; --tc5:#3f8a83; --tc6:#4e6f8f; --tc7:#7a5e9a; --tc8:#c45a86; --tc9:#98ad3a; --tc10:#5a9cc4; --tc11:#8a6440; --tc12:#8f8b84}
+:root[data-skin="dx7"]{--tc1:#e2453a; --tc2:#e0883a; --tc3:#d6e86b; --tc4:#6fae5a; --tc5:#5bbfae; --tc6:#5a86c8; --tc7:#8e6ab8; --tc8:#c95a7a; --tc9:#b5d24a; --tc10:#6cb6d8; --tc11:#9a6d45; --tc12:#8a837a}
 /* DR. SAMPLE (SP-202): dark grey plastic, light grey pads, the orange, a green LCD-style mono */
 :root[data-skin="sp202"]{--mx:#e8e6e1; --mx2:#b3b1ac; --mxdim:#6c6e72; --mxbg:#2c2f33; --mxpanel:#363a3f; --mxpanel2:#42464c; --mxon:#2c2f33;
   --mxsoft:#f39a1e; --mxpoly:#9ec3e6; --mxglowc:rgba(168,208,141,.18); --mxscan:transparent; --mxred:#ff5a3c; --mxcur:#a8d08d; --mxcuron:#1d2a17; --mxbus:#9ec3e6; --mxline:#4c5157;
@@ -2271,6 +2298,22 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
 :root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
 :root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
+/* SKIN TITLE BARS (owner, 3 Nov: "using the 909 skin … the light grey/white title bars look odd"): the term base gave the
+   title bars --side, i.e. --mxpanel, which in most light skins is a paler, near-white tint of the case (909 #e0e2e3 on
+   #cfd2d4, IDM #f2f1ec on #e9e8e3), so every head read as a white chip pasted on. They now take the skin's second panel
+   tone, --mxpanel2, which every term skin picks as a deeper (light skins) or lifted (dark skins) shade of its own case
+   (909 #b8bcbf, the silver one step down; 808 #36342f), close to the …pump windows' header (pump/ui/kit.js skinTheme:
+   bg + 10% ink). The keys on them stay the skin's keys (the term button rule). Muted text on a head: 80% ink, so it
+   stays ≥ 4.5:1 wherever the skin's own text on its case is. */
+:root[data-skinbase="term"]{--ttl:var(--mxpanel2); --ttl-ink:var(--mx); --ttl-mut:color-mix(in srgb, var(--mx) 80%, var(--mx2)); --dkh-up:4%}
+/* The bottom panel's section heads: their own section's tone (--dkp of the ink, the TERM DECK rule) a shade deeper
+   (--dkh-up), so each head belongs to its section. The name chip (…CHAINS · TRACK 01, FX · TRACK 01, TRACK 01 MONO) is
+   the inverted chip the base rule meant (ink, with the skin's on-ink text), like the tracker's own column heads
+   (01 MONO): the term button rule had turned it into a pale key. Skins whose ink is already near 4.5:1 on their deepest
+   section keep the section's own tone and full ink for the head's text. */
+:root[data-skinbase="term"] #tDeck .dkh{background:color-mix(in srgb, var(--mx) calc(var(--dkp, 0%) + var(--dkh-up)), var(--mxbg))}
+:root[data-skinbase="term"] #tDeck .dkh .dkt:not(.mstb){background:var(--mx); color:var(--mxon); border-color:var(--mx); text-shadow:none}
+:root:is([data-skin="lcdgreen"],[data-skin="matrixlight"],[data-skin="sage"],[data-skin="valentine"],[data-skin="blossom"],[data-skin="ocean"]){--dkh-up:0%; --ttl-mut:var(--mx)}
 /* pads, command row and keypad: plain keys with outlines and an offset block; a hit fills */
 :root[data-skinbase="term"] :is(.tcmd,.dock,.tctl){background:var(--mxbg)}
 :root[data-skinbase="term"] :is(.tcmd button,.tkp .kp,.pads .pad){background:var(--mxbg); color:var(--mx); border-color:var(--mxline, var(--mx));
@@ -16562,16 +16605,34 @@ const freshMix = () => ({vol:224, trim:TRIM_0, pan:128, mute:false, solo:false, 
 /* TRACK NAMES (21 Oct): a track's name (up to 12 letters) and colour (TCOL index, 0 = none) live in S.mix[t].nm / .col, so
    they save with the song. Shown on Phrase / Pattern titles, Arrange, the Song and Mixer headers, the meters, the bottom
    panel's strip and the stem file names. Edit ▾ → Name this track…, or double-click a track number or the Phrase title. */
-const TCOL = [null, '#e0564a', '#e8913c', '#d4ac22', '#4fae5a', '#2aa79e', '#4a7fe0', '#9466dc', '#dc5fa2'];
-const TCOL_N = ['None', 'Red', 'Orange', 'Yellow', 'Green', 'Teal', 'Blue', 'Purple', 'Pink'];
+const TCOL = [null, '#e0564a', '#e8913c', '#d4ac22', '#4fae5a', '#2aa79e', '#4a7fe0', '#9466dc', '#dc5fa2', '#97c23a', '#38b2e0', '#a5683a', '#878d95'];
+const TCOL_N = ['None', 'Red', 'Orange', 'Yellow', 'Green', 'Teal', 'Blue', 'Purple', 'Pink', 'Lime', 'Sky', 'Brown', 'Grey'];
+/* SKIN PALETTES (owner, 3 Nov: "there aren't very many color selections in the 909 skin"): the colours are stored as TCOL
+   indices; a skin may give its own shade of each (--tc1 … --tc12 on :root, the same hue order and names), so the swatches
+   and the blocks / tracks drawn in them suit it. Read once per skin. Indices 9–12 (Lime, Sky, Brown, Grey) are new on
+   3 Nov: an older build drops them on load (back to None). */
+let tcPal = null, tcPalSkin = '';
+function tcolPal(){
+  if (tcPal && tcPalSkin === skin) return tcPal;
+  const cs = getComputedStyle(document.documentElement); tcPalSkin = skin;
+  return (tcPal = TCOL.map((c, i) => i ? (cs.getPropertyValue('--tc' + i).trim() || c) : null));
+}
+const tcolOf = i => (i | 0) > 0 ? tcolPal()[i | 0] || '' : '';
+// Readable text on a colour: near-black or white, whichever contrasts more.
+function tcInk(hex){
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim()); if (!m) return '#ffffff';
+  const n = parseInt(m[1], 16), f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+  const L = .2126 * f(n >> 16) + .7152 * f(n >> 8 & 255) + .0722 * f(n & 255);
+  return (L + .05) / .0625 >= 1.05 / (L + .05) ? '#141414' : '#ffffff';
+}
 const tName = t => (t >= 0 && t < NT && S && S.mix && S.mix[t] && S.mix[t].nm) || '';
-const tCol = t => (t >= 0 && t < NT && S && S.mix && S.mix[t] && TCOL[S.mix[t].col | 0]) || '';
+const tCol = t => (t >= 0 && t < NT && S && S.mix && S.mix[t] && tcolOf(S.mix[t].col)) || '';
 const trkLab = t => 'TRACK ' + d2(t + 1) + (tName(t) ? ' ' + tName(t).toUpperCase() : '');
 const trkTip = t => 'Track ' + (t + 1) + (tName(t) ? ': ' + tName(t) : '');
 const COARSE_PT = matchMedia('(pointer:coarse)').matches;   // a touch screen (the tips don't mention the mouse there)
 async function nameTrack(t){
   if (t == null || t < 0 || t >= ntr()) return toast(t === MT ? 'The master has no name to set.' : 'Go to a track first.');
-  const m = S.mix[t], sw = {sel:m.col | 0, cols:TCOL, names:TCOL_N};
+  const m = S.mix[t], sw = {sel:m.col | 0, cols:tcolPal(), names:TCOL_N};
   const v = await askSheet({title:'Track ' + d2(t + 1), body:'A name (up to 12 letters) and a colour. They show on the Phrase title, Arrange, the Song and Mixer headers, the meters and the bottom panel, and name the stem files. Empty: just the number.'},
     {text:m.nm || '', max:12, ok:'Set', swatch:sw});
   if (v == null) return;
@@ -20130,7 +20191,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 375;
+const BUILD = 376;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25475,9 +25536,13 @@ function drawArr(PH){
         const offb = !empty && sectOffOnly(v);   // OFF-ONLY BLOCKS (2 Nov)
         cls += empty ? 'z' : offb ? 'o' : 'f'; lab = sectsOn || ph < 0 ? hp(v) : hp(ph);
         if (blockMuted(S, y, t)) cls = cls.replace(/[zfo]$/, 'm');
+        // BLOCK COLOURS first, on every kind of block (3 Nov: empty and OFF-only blocks showed none); class bc lets the
+        // colour win over each skin's own block fill, --ibi is the text on it.
+        const bc = S.bcol && tcolOf(S.bcol[v]);
+        if (bc){ cls += ' bc'; sty = ` style="${grp ? `--bgc:${bc};` : ''}--ib:${bc};--ibp:100%;--ibi:${tcInk(bc)}"`; }   // (over a bus group's colour too)
         // Coloured by the instrument its phrase plays, with the phrase's notes as ticks when the blocks are big.
-        if (!empty && !offb && ph >= 0){ const pi = phraseInfo(ph), bc = S.bcol && TCOL[S.bcol[v] | 0];   // BLOCK COLOURS first
-          if (bc) sty = grp ? ` style="--bgc:${bc};--ib:${bc};--ibp:100%"` : ` style="--ib:${bc};--ibp:100%"`;   // (over a bus group's colour too)
+        if (!empty && !offb && ph >= 0){ const pi = phraseInfo(ph);
+          if (bc);
           else if (grp) sty = ` style="--bgc:${grp};--ib:${grp}"`; else if (pi.inst >= 0) sty = ` style="--ib:${instHue(pi.inst)};--ibp:${100 - (pi.inst % 5) * 17}%"`;
           if (arRH >= 26 && pi.hits) lab += pi.hits; }
       }
@@ -26036,7 +26101,7 @@ arrGrid.addEventListener('contextmenu', e => {
 async function sxColour(r){
   const ids = new Set(); for (let y = r.y0; y <= r.y1; y++) for (const t of sxCols(r)){ const v = S.song[y][t]; if (v >= 0) ids.add(v); }
   if (!ids.size) return;
-  const first = [...ids][0], sw = {sel:(S.bcol && S.bcol[first]) | 0, cols:TCOL, names:TCOL_N};
+  const first = [...ids][0], sw = {sel:(S.bcol && S.bcol[first]) | 0, cols:tcolPal(), names:TCOL_N};
   const ok = await askSheet({title:ids.size > 1 ? `Colour ${ids.size} blocks` : 'Colour block ' + hp(songShown(first)), body:'Every place these blocks are used in the song shows the colour. None: the instrument’s colour.'}, {ok:'Set', swatch:sw});
   if (ok == null) return;
   if (!S.bcol) S.bcol = {};
@@ -27730,6 +27795,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [376, '3 Nov', ['Stopping the song puts the edit cursor where it stopped, ready to edit (Settings → STOP CURSOR: THERE or STAYS); Alt+G puts the cursor on the playhead at any time.', 'The Thunder Plus logo shows edit mode on the tracker (a red chip) and a click on it switches edit mode, as Esc does.', 'The first notes of live synth pads (poly ones too) play on the first PLAY.', 'FX bar: folded FX is grey and hatched with its tab at the left; a track with no effects says so. Dragging the panel no longer redraws the whole screen on every pixel.', 'Skins: title bars and the bottom panel heads take each skin’s own colours (no more pale bars in 909, IDM and the rest). Block colours: 12 colours in every skin, shown on empty and OFF-only blocks too.', 'The mouse wheel over a scroll bar scrolls that bar.']],
   [375, '3 Nov', ['Song: Ctrl/⌘+Shift+Backspace removes the whole song row (every track and the master, or the selected rows), the pair of Ctrl/⌘+Shift+Enter. Ctrl/⌘+Backspace still removes the row in the cursor’s column only.']],
   [374, '3 Nov', ['Audio-thread sequencer: effect value changes (FXV), …chains bypass switches (BYP) and tempo changes, MUT / GEN variations with CUT / RES / DEC, and SoundFont pads now play from the audio thread too, so a busy screen can’t make them late.', 'FX bar (computer): EQ and filter slots draw their response curve, delays draw their echoes, and …chains shows the track’s modules as a rail you can click (drag the panel taller for room).', 'Desktop app: Ableton Link (Settings → Audio & MIDI, off at first): tempo, bars and start / stop in time with Live, Koala and other Link apps on the same network.', 'Audio & MIDI is tidier: AUDIO and MIDI sections with one setting a line and no paragraphs (hover a row for what it does); MIDI output ports are one table (device, delay, clock out per port); Latency comp, Velocity and Clock in are switches; Reset audio engine is a small button at the bottom.', 'Tracker keys: Alt+, / Alt+. transpose the whole phrase (or the block on the Song) when nothing is selected, Shift+Alt+, / . an octave; Ctrl/⌘+A again widens the selection (column → track → pattern); Ctrl/⌘+I interpolates; Ctrl/⌘+Shift+, / . shrink and expand; Ctrl/⌘+Enter inserts a row, Ctrl/⌘+Shift+Enter a whole song row; Ctrl/⌘+Home / End the first / last song row; Ctrl/⌘+Shift+F (or Scroll Lock) follow on / off; Alt+Enter plays the row under the cursor; Ctrl/⌘+, opens Settings. Help → Tracker · KEYS mode lists them.']],
   [373, '2 Nov', ['Audio-thread sequencer: track level and pan commands (TVL, TVA, TPN) and the master column’s VOL now play from the audio thread too, so a busy screen can’t make them late.', 'New skin: Calculator watch (Hardware): the grey-green LCD, black rubber keys with orange, blue and gold legends.']],
