@@ -27458,6 +27458,9 @@ function apArrGo(y, t){
   // back. (#7's one-click hand-back was tried in build 327 and taken out on 31 Oct: the owner wants the click to focus.)
   apFocus('arr', false); cs.song.x = t; cs.song.y = y; apTop();
   if (dbl){ const cid = S.song[y][t];
+    // PATTERN VIEW (owner, 3 Nov: double-clicking a block didn't always land in its track there): open it the way Pattern
+    // view opens a track (pvGo: the track's phrase on that song row, a cursor column that track has)
+    if (cid >= 0 && tv === 'phrase' && pvActive()){ apFocus(null); pvGo(t, y, null, null); return true; }
     if (cid >= 0){ ensureSectPhrase(cid); const p = firstPhrase(cid); if (p >= 0){ cPhrase = p; cTrack = t; cSect = cid; } }
     apFocus(null); if (cid >= 0 && tv !== 'phrase'){ go('phrase'); return true; } }
   else { apLastKey = ''; apFollow(); if (tv === 'phrase' && pvActive()) cTrack = t; }
