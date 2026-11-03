@@ -22,7 +22,7 @@
      {op:'ready', v}  ·  {op:'rows', rows, time, bpm, tks, alive}  ·  {op:'end'}  ·  {op:'test', id, rows}  ·
      {op:'error', where, message} */
 
-const CORE_V = 2;
+const CORE_V = 3;   // the message set's version: index.html's CORE_WANT must match (3: patch sync)
 const coreNum = v => Math.round(v * 1e6) / 1e6;
 const corePlain = e => { const o = {}; for (const k of Object.keys(e).sort()){ const v = e[k];
   if (typeof v === 'number') o[k] = coreNum(v); else if (typeof v === 'string' || typeof v === 'boolean' || v === null) o[k] = v;

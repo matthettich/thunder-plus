@@ -74,11 +74,17 @@ export function build(){
     + '/* ===== core/core-processor.js ===== */\n' + proc;
 }
 
+// The bundle's hash goes into index.html (CORE_REV), so its URL changes with it and no cache keeps an old one.
+const REV_RE = /const CORE_REV = '[^']*';/;
+const revOf = out => { let h = 0x811c9dc5; for (let i = 0; i < out.length; i++){ h ^= out.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(36); };
 if (import.meta.url === pathToFileURL(process.argv[1]).href){
-  const out = build(), f = path.join(ROOT, 'core/seq-core.js');
+  const out = build(), f = path.join(ROOT, 'core/seq-core.js'), hf = path.join(ROOT, 'index.html'), html = fs.readFileSync(hf, 'utf8');
+  const want = "const CORE_REV = '" + revOf(out) + "';";
+  if (!REV_RE.test(html)){ console.error('index.html has no CORE_REV line'); process.exit(1); }
   if (process.argv.includes('--check')){
     const have = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
     if (have !== out){ console.error('core/seq-core.js is out of date: run node tools/make-core.mjs'); process.exit(1); }
-    console.log('core/seq-core.js is up to date');
-  } else { fs.writeFileSync(f, out); console.log('wrote core/seq-core.js (' + out.length + ' chars)'); }
+    if (!html.includes(want)){ console.error('index.html CORE_REV is out of date: run node tools/make-core.mjs'); process.exit(1); }
+    console.log('core/seq-core.js and CORE_REV are up to date');
+  } else { fs.writeFileSync(f, out); if (!html.includes(want)) fs.writeFileSync(hf, html.replace(REV_RE, want)); console.log('wrote core/seq-core.js (' + out.length + ' chars), ' + want); }
 }
