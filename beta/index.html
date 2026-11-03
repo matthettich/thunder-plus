@@ -18199,7 +18199,7 @@ function padBlink(e){
    that track give way to it (coreTake). The core gets the song again after each edit (coreSong), the pads' renders as they
    land (install → coreBuf), and the live state it reads (tempo, loop, PERFORM, live transpose).
    Off (Page), nothing here runs. */
-const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map()};   // tally: events by who played them (test hook)
+const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
 function coreLoad(){
   if (core.loading) return core.loading;
   if (!ctx || !ctx.audioWorklet || !rt) return Promise.resolve(false);
@@ -18220,11 +18220,26 @@ function coreKit(){ const kv = [];
 // A pad's render, when the core doesn't have this one yet (a copy: the page keeps playing it too)
 function coreBuf(i){ if (!core.ready) return; const c = slotAt(cache, i); if (!c || !c.data){ if (core.sent.has(i)){ core.sent.delete(i); corePost({op:'buf', pad:i, data:null}); } return; }
   if (core.sent.get(i) === c.data) return; core.sent.set(i, c.data); const d = c.data.slice(); corePost({op:'buf', pad:i, data:d, sr:c.sr}, [d.buffer]); }
-function coreSyncAll(){ if (!core.ready) return; corePost({op:'load', S, vars:coreVars()}); coreKit(); for (let i = 0; i < nslots(); i++) coreBuf(i); corePost({op:'lxp', st:lxp.st | 0}); coreLead(); }
+/* SONG SYNC (owner, Fold, 2 Nov: stutters on STOP, on Shift-navigating, on the screen going off and on, and a late note
+   preview). Posting the whole song after every save made the audio thread unpack hundreds of KB in its own time: a glitch
+   each time. Now only what changed goes: top-level fields whole, and the big lists (phrases, chains, song rows,
+   instruments…) item by item, compared as JSON here on the page. A save that changed nothing sends nothing. */
+function coreDiff(){
+  const M = core.mir || (core.mir = new Map()), ops = [];
+  for (const k of Object.keys(S)){ const v = S[k];
+    if (Array.isArray(v) && v.length > 8){ let A = M.get(k); if (!Array.isArray(A)){ A = []; M.set(k, A); }
+      for (let i = 0; i < v.length; i++){ const j = JSON.stringify(v[i] === undefined ? null : v[i]); if (A[i] !== j){ A[i] = j; ops.push([k, i, v[i] === undefined ? null : v[i]]); } }
+      if (A.length !== v.length){ A.length = v.length; ops.push([k, 'len', v.length]); } }
+    else { const j = JSON.stringify(v === undefined ? null : v); if (M.get(k) !== j){ M.set(k, j); ops.push([k, null, v]); } } }
+  for (const k of [...M.keys()]) if (!(k in S)){ M.delete(k); ops.push([k, 'del']); }
+  return ops;
+}
+function coreSyncAll(){ if (!core.ready) return;
+  if (!core.mir){ coreDiff(); corePost({op:'load', S, vars:coreVars()}); } else { const ops = coreDiff(); if (ops.length) corePost({op:'patch', ops}); corePost({op:'vars', vars:{vtrk, NSLOT}}); } coreKit(); for (let i = 0; i < nslots(); i++) coreBuf(i); corePost({op:'lxp', st:lxp.st | 0}); coreLead(); }
 const coreLead = () => { if (core.ready) corePost({op:'lead', s:document.hidden ? 1.2 : 0.25}); };
 document.addEventListener('visibilitychange', coreLead);
 // After an edit: the song again (in place, so the running sequencer reads it), at most every 40 ms
-function coreSong(){ if (!tp.core || core.sT) return; core.sT = setTimeout(() => { core.sT = 0; if (tp.core) corePost({op:'song', S}); }, 40); }
+function coreSong(){ if (!core.ready || !core.mir || core.sT) return; core.sT = setTimeout(() => { core.sT = 0; const ops = coreDiff(); if (ops.length) corePost({op:'patch', ops}); }, 40); }
 function coreStart(mode, o, t0, rs){
   coreSyncAll();
   rt.pl.clkReset(ctx.currentTime);   // the core's clock takes over (a RESUME step played here may have started this one)
@@ -27323,6 +27338,11 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
   // THUNDER CORE live (phase 2b): switch the sequencer, and read the core's own timing counters (notes it booked, how many
   // late, the worst, the smallest lead) since the last call.
   async coreOn(on){ aset.core = on ? 'core' : 'page'; rtInit(); if (on){ const ok = await coreLoad(); return !!ok; } return true; },
+  // Does the core's song equal this one? (after edits: the patch sync)
+  coreSig(){ return new Promise(ok => { if (!core.ready) return ok(null); const f = e => { if (e.data && e.data.op === 'sig'){ core.node.port.removeEventListener('message', f); const j = JSON.stringify(S); let h = 0; for (let i = 0; i < j.length; i++) h = (h * 31 + j.charCodeAt(i)) | 0; ok({same:e.data.h === h && e.data.len === j.length, core:e.data.len, page:j.length}); } };
+    core.node.port.addEventListener('message', f); corePost({op:'sig'}); setTimeout(() => ok(null), 1000); }); },
+  // A few edits as the tracker makes them (a note, a phrase, a song cell, a new phrase), each saved
+  edits(){ const p = S.phrases.findIndex(Boolean); S.phrases[p][1][0] = 50; saveS(); S.song[3][2] = -1; saveS(); S.phrases.push(freshPhrase()); saveS(); S.bpm = 133; saveS(); return p; },
   coreStats(){ return new Promise(ok => { if (!core.ready) return ok(null); const f = e => { if (e.data && e.data.op === 'stats'){ core.node.port.removeEventListener('message', f); ok(e.data); } };
     core.node.port.addEventListener('message', f); corePost({op:'stats', id:1}); setTimeout(() => ok(null), 1000); }).then(r => { if (r) r.tally = Object.fromEntries(core.tally); core.tally.clear(); return r; }); },
   // The master's level (RMS) every 25 ms for `ms` from PLAY (for comparing the two sequencers' sound).

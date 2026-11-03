@@ -551,7 +551,9 @@ const FX_NEEDS = {FLX:'flex', GAT:'sgate', RTG:'retrig'};
 
    Messages in (from the page, node.port):
      {op:'load', S, vars}        the song (S) and what the sequencer reads from the page (vtrk, NSLOT, TFX: coreTfx())
-     {op:'song', S}              the song changed (an edit): copied into the core's song in place
+     {op:'song', S}              the song changed (an edit): copied into the core's song in place (no longer sent)
+     {op:'patch', ops}           what changed since the last sync (the page's coreDiff), applied in place
+     {op:'vars', vars}           the page settings again (each PLAY)
      {op:'kit', kv}              per pad: {choke, syn, rel, live, sf} (what decides whether the core can play it)
      {op:'buf', pad, data, sr}   a pad's render (mono), or data:null when it has none
      {op:'play', gen, mode, o, t0, rs}  start: o as makeSeq takes it; rs {ref, row, step}: RESUME (the page played that step)
@@ -618,6 +620,12 @@ class ThunderCore extends AudioWorkletProcessor {
     switch (d.op){
       case 'load': S = d.S; if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } busPlanH = null; busPlanVal = null; return;
       case 'song': { if (!S){ S = d.S; return; } for (const k of Object.keys(S)) if (!(k in d.S)) delete S[k]; Object.assign(S, d.S); busPlanH = null; busPlanVal = null; return; }   // in place: the running sequencer holds this object
+      case 'patch': {   // only what changed (coreDiff on the page): [key, null, value] · [key, index, item] · [key, 'len', n] · [key, 'del']
+        if (!S) return;
+        for (const [k, i, v] of d.ops){ if (i === null) S[k] = v; else if (i === 'del') delete S[k]; else if (i === 'len'){ if (Array.isArray(S[k])) S[k].length = v; }
+          else { if (!Array.isArray(S[k])) S[k] = []; S[k][i] = v; } }
+        busPlanH = null; busPlanVal = null; return; }
+      case 'vars': if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } return;
       case 'kit': this.kv = d.kv || []; kit = {voices:this.kv}; return;
       case 'buf': if (d.data) coreBufs.set(d.pad, {data:d.data, sr:d.sr}); else coreBufs.delete(d.pad); return;
       case 'test': {
@@ -633,6 +641,7 @@ class ThunderCore extends AudioWorkletProcessor {
       case 'perf': if (!perfLive.init) perfLiveInit(); if (d.xf != null) perfLive.xf = d.xf; if (d.mac) perfLive.mac = d.mac.slice(); if (d.fill != null) perfLive.fill = !!d.fill; return;
       case 'lxp': lxp.st = d.st | 0; return;
       case 'stats': this.port.postMessage({op:'stats', id:d.id, n:this.nN || 0, late:this.nLate || 0, worst:this.worst || 0, voices:this.alive.size, lead:this.leadMin == null ? null : this.leadMin}); this.nN = this.nLate = this.worst = 0; this.leadMin = null; return;
+      case 'sig': { const j = JSON.stringify(S); let h = 0; for (let i = 0; i < j.length; i++) h = (h * 31 + j.charCodeAt(i)) | 0; this.port.postMessage({op:'sig', len:j.length, h}); return; }
       case 'lead': this.LEAD = Math.max(0.05, Math.min(2, +d.s || 0.25)); return;
     }
   }
@@ -740,6 +749,9 @@ class ThunderCore extends AudioWorkletProcessor {
     // 1. step the song up to LEAD ahead: the core books its own notes, the rows go up for the page's part
     const s = this.seq;
     if (s){
+      // The audio thread itself was held up (a screenshot, the system busy): rather than racing through the rows it missed
+      // (owner, Fold: "the speed increased"), the song moves on from now, as the page's pump does.
+      if (s.alive() && s.base != null && s.time < currentTime - 0.03){ const d = currentTime + 0.02 - s.time; s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
       const rows = []; let n = 0;
       while (s.alive() && s.time < currentTime + this.LEAD && n++ < 3){   // at most 3 steps a block: a longer LEAD (screen off) fills over a few blocks, not in one burst that overruns it
         const r = s.step();
