@@ -197,6 +197,10 @@ input[type=range].wheelon{outline:2px solid var(--ink); outline-offset:2px; bord
 .audrow{display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-height:34px; font-size:var(--fs-3)}
 .audrow>span:first-child{color:var(--muted); width:70px; flex:none}
 .audrow select{flex:1 1 220px; min-width:0}
+.mports{display:grid; grid-template-columns:44px minmax(0,1fr) auto; gap:4px 10px; align-items:center; margin:6px 0}
+.mports .mph{font-size:var(--fs-2); letter-spacing:.08em; color:var(--muted); font-weight:600}
+.mports .mpL{font-weight:700} .mports select{width:100%; min-width:0} .mports .mlat{white-space:nowrap}
+.mclk{flex-wrap:nowrap} .mclk .seg{flex:none} .mclk .mclkf{flex:none; color:var(--muted)} .mclk select{flex:1 1 90px; min-width:0}
 .audrow input[type=range]{flex:1 1 200px; width:auto; min-width:120px}
 .audrow output{min-width:64px; text-align:right; font-variant-numeric:tabular-nums}
 .audrow select.mch{flex:0 0 auto; min-width:90px}
@@ -241,6 +245,21 @@ button.sm{min-height:30px; padding:3px 9px; font-size:var(--fs-3)}
 select{background:var(--panel); border:1px solid var(--line); min-height:34px; padding:0 6px; max-width:100%}
 input[type=text]{background:var(--panel); border:1px solid var(--line); min-height:34px; padding:0 9px; min-width:0}
 input[type=range]{width:100%; accent-color:var(--ink); height:30px; margin:0; touch-action:pan-y}
+/* Fit and finish (2 Nov): on a computer the sliders and drop-downs match the tracker (square, hairline, ink) instead of
+   the browser's rounded controls. Phones keep the native ones: their thumbs are sized for fingers. */
+@media (pointer:fine){
+  input[type=range]{-webkit-appearance:none; appearance:none; background:transparent; cursor:pointer}
+  input[type=range]::-webkit-slider-runnable-track{height:2px; background:color-mix(in srgb, var(--ink) 28%, transparent)}
+  input[type=range]::-moz-range-track{height:2px; background:color-mix(in srgb, var(--ink) 28%, transparent)}
+  input[type=range]::-moz-range-progress{height:2px; background:var(--ink)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:9px; height:16px; margin-top:-7px; background:var(--ink); border:0; border-radius:0}
+  input[type=range]::-moz-range-thumb{width:9px; height:16px; background:var(--ink); border:0; border-radius:0}
+  input[type=range]:hover::-webkit-slider-thumb{background:var(--pl, #ff5a1f)}
+  input[type=range]:focus-visible{outline:1px dashed var(--ink); outline-offset:2px}
+  select{-webkit-appearance:none; appearance:none; border-radius:0; padding-right:24px; cursor:pointer;
+    background-image:linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position:right 12px center, right 7px center; background-size:5px 5px; background-repeat:no-repeat}
+}
 .sp{flex:1}
 
 /* top bar, like the Seeds title bar */
@@ -257,7 +276,7 @@ body:not(.nowv) .wvMobNote{display:none}
 .wvview iframe,.chview iframe{flex:1; border:0; width:100%; height:100%; display:block}
 .kitname{width:150px}
 /* HEADER METER (owner, 24 Oct): the master level between the screen buttons and File */
-.hmeter{flex:1 1 140px; min-width:90px; max-width:420px; height:22px; display:block; cursor:pointer}
+.hmeter{flex:1 1 160px; min-width:110px; max-width:440px; height:32px; display:block; cursor:pointer}
 @media (max-width:700px){ .hmeter{display:none} }
 
 /* scrolling editor made of bands */
@@ -529,6 +548,7 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
   .wave{height:120px}
     .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 }
+/* Fit and finish (2 Nov): on a computer messages come in under the top bar, off the FX bar and the grid's bottom */
 
 /* ---------- skins, from ...Seeds ---------- */
 /* Minimal colors: grey bands, pastel cards and pads */
@@ -685,7 +705,8 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .vengine .enggrp .engbtn{width:var(--engw, 9.5em); padding-inline:6px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}   /* one width for every engine, so ◀ ▶ stay put */
 .updb.storeb{background:#c0392b; color:#fff; white-space:normal; max-width:calc(100vw - 32px); z-index:21}
 @media (max-width:480px){ .top .tmode .mx{display:inline} .top .tmode,.top .tcpu{padding:0 8px} .top .tcpu{min-width:72px} }
-.top .tcpu{border:1px solid var(--line); min-height:34px; background:var(--panel); padding:0 10px; min-width:84px; overflow:hidden}
+.top .tcpu{border:1px solid var(--line); min-height:34px; background:var(--panel); padding:0 10px; min-width:58px; overflow:hidden}
+.tcpu .cpuw{display:none}   /* owner, 2 Nov: drop the CPU word, the room goes to the labels */
 /* The cover screen (412 px): "CPU --" and "?" wrapped the top bar onto a second row, costing two tracker lines. The meter
    keeps only its number and bar, and Help lives in Settings → App there. */
 @media (max-width:480px){ .top .tcpu{min-width:48px; padding:0 6px} .top .tcpu span{font-size:var(--fs-3)} .top .tcpu .cpuw{display:none} .top #bHelp{display:none} }
@@ -861,6 +882,16 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .tlegend dt{font-weight:600}
 .tlegend dd{margin:0; color:var(--muted); min-width:0; overflow-wrap:anywhere}
 .tlegend dt{max-width:96px; white-space:normal}
+/* Fit and finish (2 Nov): the side panel on a computer. The screen buttons repeat the tabs above, so they go; the key list
+   folds behind KEYS ▸ (it was a squeezed two-column list cut off at the bottom) and opens as one column. */
+.dkempty{margin:0 0 8px} .dkemptyb{min-height:28px; padding:0 12px; width:auto; align-self:flex-start}
+.tlegbtn{min-height:26px; font-size:var(--fs-2); font-weight:600; letter-spacing:.06em; text-align:left; padding:0 8px}
+body:not(.legon) .tside .tlegend{display:none}
+@media (min-width:1100px) and (pointer:fine){
+  .tside .tmap{display:none}
+  .tside .tlegend{grid-template-columns:minmax(0,1fr); gap:0}
+  .tside .tlegend dt{max-width:none} .tside .tlegend dd{margin-bottom:7px}
+}
 .tside{position:relative; padding-top:26px}
 .tsidex{position:absolute; top:2px; right:2px; min-height:0; width:20px; height:20px; padding:0; font-size:var(--fs-2); line-height:1; border:0; background:transparent; color:var(--muted); z-index:2}
 .tsidex:hover{color:var(--ink); background:var(--panel2)}
@@ -1014,6 +1045,7 @@ body.mob .ttabs button{padding:0 9px; letter-spacing:.02em}   /* the tabs make r
 .kp.lbl{border-color:transparent; background:none; opacity:1}
 .kp.play{background:var(--pl); color:var(--inv)}
 body.trkv .toast{bottom:calc(var(--k) * 2 + 40px + env(safe-area-inset-bottom,0px))}
+@media (min-width:1100px) and (pointer:fine){ body .toast, body.trkv .toast, body.trkv.cmdv .toast{bottom:auto; top:96px; max-width:min(720px, calc(100% - 32px)); cursor:pointer} }
 /* Phones: taller buttons under the screen, easier to hit with a thumb (the screen's text shrinks to keep 16 rows in view). */
 @media (pointer:coarse) and (max-width:760px){
   .tcmd{gap:10px 8px; padding-top:8px}
@@ -2125,7 +2157,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <button type="button" class="tsong" id="tLoopTop" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Alt+L in KEYS mode)" hidden>Loop</button>
   <button type="button" class="tsong" id="tKeyTrans" aria-label="Key transpose" title="Key transpose: tap to arm, then ▲ up / ▼ down transposes the selection a semitone" hidden>Transpose ▲▼</button>
   <button type="button" class="tsong" id="tSong" aria-label="Play or stop the song" title="Play the song from the tracker's cursor row, or stop it" hidden><span class="tl"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Song</span><span class="tl alt" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>Stop</span></button>
-  <button type="button" class="tcpu" id="tCpu" aria-label="Audio load"><span><em class="cpuw">CPU </em>--</span><i></i></button>
+  <button type="button" class="tcpu" id="tCpu" aria-label="Audio load"><span><em class="cpuw">CPU </em>0%</span><i></i></button>
   <button type="button" id="bHelp" aria-label="Help and keys (?)" title="Help and keys (? or F1)">?</button>
 </div>
 
@@ -2187,13 +2219,15 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       </div>
       <div class="audrow"><span>Notes in</span><select id="midiInSel" aria-label="Which MIDI input plays notes"><option value="">Every input</option></select><select id="midiInCh" class="mch" aria-label="Which channel plays notes"></select></div>
       <div class="audrow"><span>Keys play</span><select id="midiKeysSel" aria-label="What a MIDI keyboard plays in the tracker"><option value="1" title="The instrument you are on: its pad, or its MIDI gear">Current instrument</option><option value="0" title="Pads on notes 36–43, the selected synth on the rest">Pads + selected synth</option></select></div>
-      <div class="audrow"><span>Port A</span><select id="midiOutSel0" aria-label="MIDI output port A"><option value="">None</option></select><label class="mlat" title="Gear delay for port A: how late this gear sounds after a note, in ms. Raise it if the gear sounds late against ...Thunder, lower it if early">delay <input type="number" class="numsmall" id="midiLat0" min="-50" max="200" step="1" aria-label="Gear delay for port A, in milliseconds"> ms</label></div>
-      <div class="audrow"><span>Port B</span><select id="midiOutSel1" aria-label="MIDI output port B"><option value="">None</option></select><label class="mlat" title="Gear delay for port B, in ms">delay <input type="number" class="numsmall" id="midiLat1" min="-50" max="200" step="1" aria-label="Gear delay for port B, in milliseconds"> ms</label></div>
-      <div class="audrow"><span>Port C</span><select id="midiOutSel2" aria-label="MIDI output port C"><option value="">None</option></select><label class="mlat" title="Gear delay for port C, in ms">delay <input type="number" class="numsmall" id="midiLat2" min="-50" max="200" step="1" aria-label="Gear delay for port C, in milliseconds"> ms</label></div>
-      <div class="audrow"><span>Port D</span><select id="midiOutSel3" aria-label="MIDI output port D"><option value="">None</option></select><label class="mlat" title="Gear delay for port D, in ms">delay <input type="number" class="numsmall" id="midiLat3" min="-50" max="200" step="1" aria-label="Gear delay for port D, in milliseconds"> ms</label></div>
-      <div class="segrow"><span>Clock out</span><div class="seg" id="segClkOut" role="group" aria-label="Send clock to ports"></div></div>
-      <div class="segrow"><span>Clock in</span><div class="seg" id="segClkIn"></div></div>
-      <div class="audrow"><span>Clock from</span><select id="midiClkSel" aria-label="Which MIDI input Clock in follows"><option value="" title="The first input that sends clock keeps it until it goes quiet">First that sends</option></select></div>
+      <div class="mports" role="group" aria-label="MIDI output ports">
+        <span class="mph">PORT</span><span class="mph">DEVICE</span><span class="mph">DELAY</span>
+        <span class="mpL">A</span><select id="midiOutSel0" aria-label="MIDI output port A"><option value="">None</option></select><label class="mlat" title="Gear delay for port A: how late this gear sounds after a note, in ms. Raise it if the gear sounds late against ...Thunder, lower it if early"><input type="number" class="numsmall" id="midiLat0" min="-50" max="200" step="1" aria-label="Gear delay for port A, in milliseconds"> ms</label>
+        <span class="mpL">B</span><select id="midiOutSel1" aria-label="MIDI output port B"><option value="">None</option></select><label class="mlat" title="Gear delay for port B, in ms"><input type="number" class="numsmall" id="midiLat1" min="-50" max="200" step="1" aria-label="Gear delay for port B, in milliseconds"> ms</label>
+        <span class="mpL">C</span><select id="midiOutSel2" aria-label="MIDI output port C"><option value="">None</option></select><label class="mlat" title="Gear delay for port C, in ms"><input type="number" class="numsmall" id="midiLat2" min="-50" max="200" step="1" aria-label="Gear delay for port C, in milliseconds"> ms</label>
+        <span class="mpL">D</span><select id="midiOutSel3" aria-label="MIDI output port D"><option value="">None</option></select><label class="mlat" title="Gear delay for port D, in ms"><input type="number" class="numsmall" id="midiLat3" min="-50" max="200" step="1" aria-label="Gear delay for port D, in milliseconds"> ms</label>
+      </div>
+      <div class="segrow"><span>Clock out to</span><div class="seg" id="segClkOut" role="group" aria-label="Send clock to ports"></div></div>
+      <div class="audrow mclk"><span>Clock in</span><div class="seg" id="segClkIn"></div><span class="mclkf">from</span><select id="midiClkSel" aria-label="Which MIDI input Clock in follows"><option value="" title="The first input that sends clock keeps it until it goes quiet">First that sends</option></select></div>
       <p class="note"><b>Notes in</b>: which input and channel play notes and knobs (the others are ignored, so gear that sends its own notes or echoes ours can't play the pads). <b>Keys play</b>: in the tracker a keyboard plays the instrument you're on (a MIDI instrument plays its gear, with bend, mod wheel, aftertouch and sustain passed through); or the pads, as on the Synth page. Instruments set to <b>MIDI</b> (INST › OUTPUT) play on their <b>PORT</b> (A–D) and channel. Pick which cable each port is here: the song keeps only the letter, so it plays the same on the phone and the computer with each one's own gear. <b>Delay</b> (per port): how long that gear takes to sound after a note; raise it if the gear sounds late against ...Thunder, lower it if early. <b>Clock out</b> sends tempo, Start and Stop to the ports lit (A–D) while the song plays (from partway into the song: Song Position Pointer and Continue). <b>Clock in</b> follows another device's clock: its Start and Stop run PLAY (Continue after a Song Position Pointer plays from there), and its tempo sets ours. <b>Clock from</b>: the input to follow; the first one keeps it until it goes quiet, so two devices sending clock can't double the tempo.</p>
       <p class="note" id="midiNote">Plug a controller in (USB-C on the phone), tap Connect MIDI, and pads 00–07 answer notes 36–43; other notes play the selected synth. Tap <b>Learn</b>, then: tap any pad (drums or synths) and hit a key to give it that note, or touch any slider and turn a knob to put it on that knob. A knob works the slider for whichever pad, layer or effect is open. Select a pad or slider in Learn and tap <b>Unlearn</b> to clear it.</p>
     </div>
@@ -2359,7 +2393,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     </header>
     <div class="fxtail" id="fxTail"></div>
     <div id="fxList"></div>
-    <p class="note fxempty" id="fxEmpty">No effects on this pad yet. EQ, Compressor, Reverb and Tape delay shape and place the sound; Rings turns any hit into a tuned resonance, Clouds makes granular clouds; Saturation, Tape, Chorus and Bitcrush colour it. Each effect’s meter shows the level coming out of it.</p>
+    <p class="note fxempty" id="fxEmpty" title="EQ, Compressor, Reverb and Tape delay shape and place the sound; Rings turns any hit into a tuned resonance, Clouds makes granular clouds; Saturation, Tape, Chorus and Bitcrush colour it. Each effect’s meter shows the level coming out of it.">No effects on this pad · + Add effect above</p>
   </section>
   </div>
 
@@ -2510,6 +2544,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="tstat"><b id="tState"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>STOPPED</b><span id="tBpm"></span></div>
       <div class="tmeters" id="tMeters"></div>
       <div class="tinlw" id="tInlSideW" hidden><span class="tinlh">INSTRUMENTS</span><div class="tinl" id="tInlSide" aria-label="Instruments and their pads"></div></div>
+      <button type="button" class="tlegbtn" id="tLegBtn" aria-expanded="false" title="The main keys (? or F1: all of them)">KEYS ▸</button>
       <dl class="tlegend" id="tLegPad">
         <dt>?</dt><dd>help: every key and how it all works</dd>
         <dt>SHIFT + ◀▶</dt><dd>change screen</dd>
@@ -7888,6 +7923,8 @@ let tt = 0, busNote = '';   // busNote: BUS, the one-time note on a bus track (b
    kept: quick ones that arrive meanwhile wait for it (the latest one, shown after), and another long one queues behind
    it (three at most). A click or tap on the toast lets it go and shows the next. Screen readers hear each one (aria-live). */
 const toastQ = []; let toastLong = false, toastQuick = null;
+// toastOnce: a notice that only needs reading once on this device (key: what it is about)
+function toastOnce(key, msg, ms){ const K = 'thunderplus-seen-' + key; try { if (localStorage.getItem(K)) return; localStorage.setItem(K, '1'); } catch(e){} toast(msg, ms); }
 setTimeout(() => { try { $('toast').addEventListener('click', () => toastNext()); } catch(e){} }, 0);
 function toast(msg, ms){ const t = $('toast'); let top = 2000;
   if (busNote){ msg = msg ? msg + ' · ' + busNote : busNote; busNote = ''; top = 4500; }   // BUS: the one-time note rides along
@@ -16072,7 +16109,7 @@ function normSong(j){
   if (j.flxOld) S.flxOld = true;
   else if (!j.flx256){ const FI = FXC.indexOf('FLX'); let n = 0;
     for (const ph of S.phrases) if (ph) for (const r of ph) for (let m = FX0; m < RW; m += 2) if (r[m] === FI && r[m + 1] > 16) n++;
-    if (n){ S.flxOld = true; setTimeout(() => { try { toast(`This song has ${n} FLX above 10: they keep playing pattern 10, as before. Project → FLX 11–FF → NEW gives them the new patterns.`, 8000); } catch(e){} }, 1500); } }
+    if (n){ S.flxOld = true; setTimeout(() => { try { toastOnce('flx-' + (S.name || ''), `${n} FLX above 10 keep playing pattern 10, as before (Project → FLX 11–FF → NEW changes that).`, 6000); } catch(e){} }, 1500); } }
   S.flx256 = true;
   return S;
 }
@@ -19447,7 +19484,7 @@ const mstView = () => cTrack === MT;
 const busTrack = t => t >= 0 && t < NT && isBusT(t);
 const hasNotes = p => !!p && p.some(r => { for (let x = 0; x <= IC; x++) if (r[x] >= 0) return true; return false; });
 const busFxView = () => busTrack(cTrack) && !hasNotes(S.phrases[cPhrase]);
-function busSay(t = cTrack){ toast(`Track ${d2(t + 1)} is a bus (other tracks play through it): FX commands only, no notes. Right-click → Make it a normal track to change that.`, 4500); return true; }
+function busSay(t = cTrack){ toast(`Track ${d2(t + 1)} is a bus: FX commands only, no notes (right-click → Make it a normal track).`, 4500); return true; }
 const pCols = () => mstView() || busFxView() ? [6, 7, 8, 9, 10, 11] : polyView() ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 4, 5, 6, 7, 8, 9, 10, 11];
 const kindAt = (v, x) => v === 'song' ? 'sect' : v === 'sect' ? (x ? 'tsp' : 'phrase') : PK[x];
 function getCell(v, x, y){
@@ -19548,6 +19585,7 @@ function instRows(){
 const onOff = v => v ? 'ON' : 'OFF';
 const fxWho = t => t >= NT ? 'MASTER' : 'TRACK ' + d2(t + 1);
 const fxList = A => (A || []).filter(Boolean).map(f => TFX[f.type].n + (f.on ? '' : '(off)')).join(' › ');
+const fxShort = A => { const n = (A || []).filter(Boolean); return !n.length ? '' : TFX[n[0].type].n + (n[0].on ? '' : '(off)') + (n.length > 1 ? ' +' + (n.length - 1) : ''); };   // the Mixer's master row: the first and how many more
 // Mixer's FX row: turn a track's active effects up or down without leaving the screen. Turning down
 // switches the last slot OFF but keeps its type and settings, so turning back up recalls it; with
 // nothing on yet, slots fill in order (1, 2, 3, 4) with the effect type last chosen.
@@ -20269,7 +20307,7 @@ function editTap(enter){
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
   }
-  if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 5) return go('fx'); if (c.y === 4){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (mixFv()){ toast(`Track ${d2(c.x + 1)} · VOL ${hx(S.mix[c.x].vol)} · ${dB(trackGain(S.mix[c.x].vol))} · EDIT+◀▶ ±1, ▲▼ ±16, Delete puts it back to E0 (0 dB)`); return; } if (c.y === 6){ scSay(c.x); return; } /* SOURCE: the SC row only shows; Enter / EDIT says what listens to the track */ if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
+  if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 5) return go('fx'); if (c.y === 4){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (mixFv()){ toast(`Track ${d2(c.x + 1)} · VOL ${hx(S.mix[c.x].vol)} · ${dB(trackGain(S.mix[c.x].vol))} · Del resets to E0`); return; } if (c.y === 6){ scSay(c.x); return; } /* SOURCE: the SC row only shows; Enter / EDIT says what listens to the track */ if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
   const r = rowsOf(tv)[c.y]; if (!r) return;
   // ONE CONFIRM (27 Oct, Phase 2): a row that replaces something asks in the app's one dialog (it took a second EDIT, the
   // "Tap EDIT twice" note). A double EDIT still goes straight through (editDouble), as before.
@@ -21964,7 +22002,7 @@ function draw(){
     // The row is hex only, with two-space gaps (the dB are in the tips and the info line): with OUT and the dB labels it was
     // the Mixer's widest line, and on a phone the fit shrank every line's text to make room for it (review, 27 Oct).
     const mxc = c.y === 7 ? c.mx || 0 : -1, mo = S.mout == null ? 255 : S.mout;
-    L.push([{t:'MASTER ', cls:'lb'}, {t:hx(S.master), cls:'v' + (mxc === 0 ? ' cur' : ''), x:0, y:7, title:'MASTER ' + dB(curve(S.master)) + ': the drive into the limiter'}, '  ', {t:mn ? 'FX ' + fxList(S.mfx) : 'FX --', cls:mn ? 'cf' : 'e'}, '  ',
+    L.push([{t:'MASTER ', cls:'lb'}, {t:hx(S.master), cls:'v' + (mxc === 0 ? ' cur' : ''), x:0, y:7, title:'MASTER ' + dB(curve(S.master)) + ': the drive into the limiter'}, '  ', {t:mn ? 'FX ' + fxShort(S.mfx) : 'FX --', cls:mn ? 'cf' : 'e', title:mn ? 'Master FX: ' + fxList(S.mfx) : ''}, '  ',
       {t:'MASTERING ' + (mstOn() ? 'ON' : 'OFF'), cls:'mstc' + (mstOn() ? ' on' : '') + (mxc === 1 ? ' cur' : ''), x:1, y:7}, '  ',
       {t:'OUT ', cls:'lb', title:'Master OUT: the master fader, after the limiter (FF = 0 dB, no boost). Its bar is on the meter below'}, {t:hx(mo), cls:'v' + (mxc === 2 ? ' cur' : ''), x:2, y:7, title:'OUT ' + dB(curve(mo))}]);
     for (const ch of ['L', 'R']) L.push([{t:ch + '   ', cls:'lb'}, {t:'', cls:'mm m1'}, {t:'', cls:'mm m2'}, {t:'', cls:'mm m3'}, {t:'', cls:'mm e'}, ' ', {t:'', cls:'mm lb'}]);
@@ -22044,7 +22082,7 @@ function draw(){
   if (tv === 'phrase' && busTrack(cTrack)) hintTxt = 'BUS: FX commands only · ' + (hasNotes(S.phrases[cPhrase]) ? 'its old notes go silent at the next PLAY (Del clears them) · ' : '')
     + (inMode === 'keys' ? 'letters pick a command · hex its value · Shift+Space plays it with the tracks that feed it' : 'EDIT on an FX cell picks a command · PLAY plays it with the tracks that feed it');   // BUS FX ONLY
   { const h = $('tHint'), txt = (tv === 'phrase' && !mstP ? 'NOW ' + curS() + (inMode === 'keys' ? ' · oct ' + kOct + ' · step ' + kStep : '') + ' · ' : '') + hintTxt;
-    if (h.textContent !== txt){ h.textContent = txt; h.classList.remove('open'); h.classList.toggle('more', h.scrollHeight > h.clientHeight + 1); } }
+    if (h.textContent !== txt){ h.textContent = txt; h.classList.remove('open'); const mo = h.scrollHeight > h.clientHeight + 1; h.classList.toggle('more', mo); h.title = mo ? txt + '\n(click to show it all)' : ''; } }
   // The fit check comes after the title, info and hint lines have this screen's text (19 Oct): before, it measured with
   // the previous screen's lines, so entering the Mixer left it a few px too big and the first cursor move shrank it.
   const lsig = [tv, gh.length, scr.style.fontSize, tScale, innerWidth, innerHeight, arrW, sideOn, inlOn, stage].join('|');
@@ -22513,7 +22551,10 @@ function stageSpec(){
   g.clearRect(0, 0, W, H); g.strokeStyle = X.dim; g.lineWidth = dpr; g.strokeRect(.5, .5, W - 1, H - 1);
   const xOf = f => Math.log(f / 20) / Math.log(1000) * W, TOP = -12, BOT = -96, yOf = db => (TOP - db) / (TOP - BOT) * H;
   [100, 1000, 10000].forEach(f => { const x = xOf(f); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); g.fillStyle = X.mid; g.font = `${10 * dpr}px ${X.font}`; g.fillText(f >= 1000 ? f / 1000 + 'k' : f, x + 3 * dpr, H - 5 * dpr); });
-  const an = specAnalyser(); if (!an || !(tp.on || performance.now() - audioWake < 1500)) return;
+  // Fit and finish (2 Nov): level lines, and a word while nothing plays, so the stopped panel isn't a blank box
+  g.save(); g.setLineDash([2 * dpr, 4 * dpr]); g.globalAlpha = 0.5; for (const db of [-24, -48, -72]){ const y = yOf(db); g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); g.fillStyle = X.mid; g.font = `${9 * dpr}px ${X.font}`; g.fillText(db + ' dB', 4 * dpr, y - 3 * dpr); } g.restore();
+  const an = specAnalyser(); if (!an || !(tp.on || performance.now() - audioWake < 1500)){
+    g.fillStyle = X.mid; g.font = `600 ${11 * dpr}px ${X.font}`; g.textAlign = 'center'; g.fillText('SPECTRUM · PLAY TO SEE IT', W / 2, H / 2); g.textAlign = 'left'; return; }
   an.getFloatFrequencyData(dkSpec); const sr = ctx.sampleRate, N = dkSpec.length;
   g.beginPath(); g.moveTo(0, H);
   for (let x = 0; x <= W; x += 3 * dpr){ const f0 = 20 * Math.pow(1000, x / W), f1 = 20 * Math.pow(1000, Math.min(W, x + 3 * dpr) / W);
@@ -23327,22 +23368,33 @@ function hmDraw(now){
   const r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr); if (!W || !H) return;
   const cut = mCut(), blink = cut && Math.floor(now / 400) % 2 === 0;
   if (cut !== !!HM.cut){ HM.cut = cut; if (HM.tip == null) HM.tip = c.title; c.title = cut ? 'The master is turned down by a VOL command on the master track' : HM.tip; }
-  const pos = g => lvl(g), key = [W, H, HM.clip, cut, blink, ...HM.lv.map(v => (pos(v) * W) | 0), ...HM.pk.map(v => (pos(v) * W) | 0)].join(',');
+  // Labelled (fit and finish, 2 Nov): L / R at the left, a dB scale under the bars, the held peak in dB at the right
+  const pkMax = Math.max(HM.pk[0], HM.pk[1]), pkTxt = pkMax > 0.0001 ? (20 * Math.log10(pkMax)).toFixed(1) : '-inf';
+  const pos = g => lvl(g), key = [W, H, HM.clip, cut, blink, pkTxt, ...HM.lv.map(v => (pos(v) * W) | 0), ...HM.pk.map(v => (pos(v) * W) | 0)].join(',');
   if (key === HM.drawn) return; HM.drawn = key;   // nothing moved: no redraw (silence costs nothing)
   if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
   const g = c.getContext('2d'), st = getComputedStyle(c), ink = st.color || '#111';
   g.clearRect(0, 0, W, H);
-  const bh = Math.max(2, Math.round(H * 0.3)), gap = Math.max(1, Math.round(H * 0.12)), y0 = Math.round((H - bh * 2 - gap) / 2), amber = W * lvl(Math.pow(10, -6 / 20));
+  const fs = Math.round(8.5 * dpr), lx = Math.round(12 * dpr), rw = Math.round(64 * dpr), BW = Math.max(10, W - lx - rw);
+  g.font = `600 ${fs}px ${st.fontFamily || 'monospace'}`; g.textBaseline = 'middle';
+  const bh = Math.max(2, Math.round(H * 0.18)), gap = Math.max(1, Math.round(H * 0.08)), y0 = Math.round(H * 0.1), amber = BW * lvl(Math.pow(10, -6 / 20));
   for (let s = 0; s < 2; s++){
-    const y = y0 + s * (bh + gap), x = pos(HM.lv[s]) * W;
-    g.globalAlpha = 0.13; g.fillStyle = ink; g.fillRect(0, y, W, bh); g.globalAlpha = 1;
-    if (blink){ g.globalAlpha = 0.7; g.fillStyle = '#e8a33a'; g.fillRect(0, y, W, bh); g.globalAlpha = 1; }   // MASTER CUT FLASH   // the empty track: a faint wash of the ink, in any skin
+    const y = y0 + s * (bh + gap), x = pos(HM.lv[s]) * BW;
+    g.globalAlpha = 0.6; g.fillStyle = ink; g.textAlign = 'left'; g.fillText(s ? 'R' : 'L', 0, y + bh / 2 + dpr * 0.5); g.globalAlpha = 1;
+    g.save(); g.translate(lx, 0);
+    g.globalAlpha = 0.13; g.fillStyle = ink; g.fillRect(0, y, BW, bh); g.globalAlpha = 1;
+    if (blink){ g.globalAlpha = 0.7; g.fillStyle = '#e8a33a'; g.fillRect(0, y, BW, bh); g.globalAlpha = 1; }   // MASTER CUT FLASH
     g.fillStyle = ink; g.fillRect(0, y, Math.min(x, amber), bh);
     if (x > amber){ g.fillStyle = '#e8a33a'; g.fillRect(amber, y, x - amber, bh); }
-    const px = Math.min(W - dpr, pos(HM.pk[s]) * W); if (HM.pk[s] > 0.004){ g.fillStyle = HM.pk[s] >= 0.999 ? '#e5484d' : ink; g.fillRect(px, y, Math.max(1, dpr * 1.5), bh); }
+    const px = Math.min(BW - dpr, pos(HM.pk[s]) * BW); if (HM.pk[s] > 0.004){ g.fillStyle = HM.pk[s] >= 0.999 ? '#e5484d' : ink; g.fillRect(px, y, Math.max(1, dpr * 1.5), bh); }
+    g.restore();
   }
-  for (let d = -12; d >= -36; d -= 12){ const x = Math.round(W * lvl(Math.pow(10, d / 20))); g.globalAlpha = 0.35; g.fillStyle = ink; g.fillRect(x, y0 - gap, 1, gap); g.globalAlpha = 1; }   // ticks at −12, −24, −36
-  if (HM.clip){ g.fillStyle = '#e5484d'; g.fillRect(W - Math.round(4 * dpr), y0, Math.round(4 * dpr), bh * 2 + gap); }
+  const ty = y0 + bh * 2 + gap, sy = Math.round(H - fs * 0.6);
+  for (const d of [-36, -24, -12, -6, 0]){ const x = lx + Math.round(BW * lvl(Math.pow(10, d / 20))); g.globalAlpha = 0.4; g.fillStyle = ink; g.fillRect(Math.min(x, lx + BW - 1), ty, 1, Math.round(2 * dpr));
+    g.globalAlpha = 0.6; g.textAlign = d === 0 ? 'right' : 'center'; g.fillText(String(d), d === 0 ? lx + BW : x, sy); g.globalAlpha = 1; }
+  if (HM.clip){ g.fillStyle = '#e5484d'; g.fillRect(lx + BW - Math.round(4 * dpr), y0, Math.round(4 * dpr), bh * 2 + gap); }
+  g.font = `600 ${Math.round(11 * dpr)}px ${st.fontFamily || 'monospace'}`; g.textAlign = 'right'; g.fillStyle = HM.clip ? '#e5484d' : ink; g.globalAlpha = pkMax > 0.0001 ? 1 : 0.45;
+  g.fillText(pkTxt + ' dB', W - dpr, Math.round(H * 0.38)); g.globalAlpha = 1;
 }
 $('hMeter').addEventListener('click', () => { HM.clip = false; HM.pk = [0, 0]; HM.drawn = ''; });
 requestAnimationFrame(hmFrame);
@@ -23716,8 +23768,12 @@ function deckChains(){
   if (sig !== dkChnSig){
     dkChnSig = sig; dkChnT = t; const box = $('dkChnRows'); box.replaceChildren(); dkChnRows = [];
     if (!here.length){
-      box.append(el('p', 'note', !act.size ? 'Track ' + (t + 1) + ' has no …chains. In …chains, right-click a control or a module → Add to the bottom panel, and it shows here for the track whose chain it is in.'
-        : 'Right-click any control or module in this track’s …chains → Add to the bottom panel.' + (elsewhere ? ' (' + elsewhere + ' mapped on other tracks.)' : '')));
+      // Fit and finish (2 Nov): one line and a button instead of a paragraph; the how-to is the button's tooltip
+      const p = el('p', 'note dkempty', !act.size ? 'No …chains on track ' + d2(t + 1) : 'No controls here yet' + (elsewhere ? ' (' + elsewhere + ' on other tracks)' : ''));
+      box.append(p);
+      if (!noChains()){ const b = el('button', 'sm dkemptyb', !act.size ? 'Open …chains' : 'Add controls…'); b.type = 'button';
+        b.title = 'In …chains, right-click a control or a module → Add to the bottom panel; it shows here for the track whose chain it is in';
+        b.addEventListener('click', () => openChains()); box.append(b); }
       return;
     }
     let lastId = null;
@@ -24840,7 +24896,7 @@ function cpuMeter(){
   const b = $('tCpu'); if (!b) return;
   const fx = fxLoads().reduce((a, x) => a + x[1], 0), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
   const v = !ctx ? null : cap ? cap.avg : pr ? pr.load : fx;
-  { const sp = b.querySelector('span'); let w = sp.querySelector('.cpuw'); if (!w){ w = document.createElement('em'); w.className = 'cpuw'; w.textContent = 'CPU '; } sp.textContent = v == null ? '--' : Math.round(v * 100) + '%'; sp.prepend(w); }   // the "CPU " word hides on the cover screen
+  { const sp = b.querySelector('span'); let w = sp.querySelector('.cpuw'); if (!w){ w = document.createElement('em'); w.className = 'cpuw'; w.textContent = 'CPU '; } sp.textContent = v == null ? '0%' : Math.round(v * 100) + '%'; sp.prepend(w); b.title = 'Audio load (CPU) · click for details'; }   // the "CPU " word hides on the cover screen
   b.querySelector('i').style.width = v == null ? '0' : Math.min(100, v * 100).toFixed(0) + '%';
   const drop = now - glitch.t < 3000;   // a dropout in the last 3 s turns the meter red
   b.classList.toggle('warn', v != null && v > 0.5); b.classList.toggle('hot', v != null && (v > 0.8 || (cap && cap.under > 0) || drop));
@@ -25157,7 +25213,7 @@ function mselEnd(e){
     return;
   }
   if (m.mode === 'sel'){ const r = selRect(), n = mselN(r);
-    if (n > 1) toast(`${selA.line ? (r.y1 - r.y0 + 1) + ' lines' : n + ' cells'} selected · drag to move, Alt or ${MACK ? '⌘' : 'Ctrl'} to copy, right-click for more`); return; }
+    if (n > 1) toast(`${selA.line ? (r.y1 - r.y0 + 1) + ' lines' : n + ' cells'} selected · drag moves, ${MACK ? '⌘' : 'Ctrl'}/Alt+drag copies`); return; }
   if (!m.on && m.alt && tv === 'song'){ sxMuteRect(m.r); return; }   // Alt-click on a block in the selection: mute (or unmute) them all (owner, 30 Oct)
   if (!m.on){ selA = null; const c = cs[tv]; c.x = m.gx; c.y = m.gy; draw(); return; }   // a click inside the selection: it goes, the cursor goes there
   mselApply(m, !!(e.altKey || e.ctrlKey || e.metaKey));
@@ -25557,7 +25613,7 @@ function patFit(){
 try { new ResizeObserver(() => patFit()).observe(document.querySelector('.ttabbar')); } catch(e){ addEventListener('resize', patFit); }
 $('tRowsUp').addEventListener('click', () => setRows(plen(rowsId()) + 1));
 $('tRowsV').addEventListener('click', async () => { const id = rowsId(), n = await askText({title:`Rows in phrase ${hp(id)}`, body:`1 to ${PROWS}. The − and + beside it step by one. New phrases start at this size too.`}, plen(id), 4, 'Set'); if (n != null && Number.isFinite(+n) && n.trim() !== '') setRows(Math.round(+n)); });
-$('tClk').addEventListener('click', () => toast(`${tp.on ? tp.bpm : S.bpm} BPM, ${tp.on ? tp.tks : S.ticks || TICKS} ticks a step. Set them in Project (TEMPO, TICKS); TPO and TIC change them as the song plays.`));
+$('tClk').addEventListener('click', () => toast(`${tp.on ? tp.bpm : S.bpm} BPM, ${tp.on ? tp.tks : S.ticks || TICKS} ticks a step (Project → TEMPO, TICKS)`));
 $('projIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadProjFile(f); });
 $('chainsIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importChainsFile(f); });
 new ResizeObserver(() => scheduleRefit(false)).observe(scr);
@@ -25815,7 +25871,7 @@ const HINTK = {
   sect:'Type hex · Enter add or open · Enter×2 new phrase · Del cell · Shift+Del line · [ ] other sect · Alt+→ open · Shift+arrows select',
   phrase:'Notes Z–; and Q–P · 1 off · / mute track · −/= octave · Del cell · Shift+Del row · Ins add row · Shift+arrows select · Shift+Alt+arrows other phrase · Ctrl+C/V',
   inst:'Ctrl+arrows change · Enter runs › rows · [ ] other instrument · Alt+← phrase',
-  mixer:'Type hex for TRIM, PAN, VOL, MASTER and OUT · VOL is the bar on each meter: ▼ from the SC row reaches it · FX row: Ctrl+▲▶ on (up to 8), Ctrl+▼◀ off · Enter mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (Enter says for what) · Del resets · Alt+→ FX · Alt+↑ back',
+  mixer:'Type hex · Ctrl+arrows change · Enter mutes, solos, toggles CHN or opens FX · FX row: Ctrl+▲ on, Ctrl+▼ off · SC row: Enter says what it feeds · Del resets · Alt+→ FX',
   fx:'Type hex · Ctrl+arrows change · Enter adds · → opens its controls · Del removes or resets · [ ] other track · Alt+← mixer',
   project:'Ctrl+arrows change · Enter runs › rows · Del resets · Ctrl+S save · Shift+Ctrl+S save as · Ctrl+O open · Ctrl+N new song',
 };
@@ -26052,7 +26108,7 @@ function apMarkSel(){   // the song selection in the panel (drawArr marks it onl
   for (let y = r.y0; y <= r.y1; y++){ const row = arrGrid.children[y]; if (!row) continue;
     for (let t = r.x0; t <= r.x1; t++){ const b = row.querySelector(`b[data-t="${t}"]`); if (b){ b.classList.add('sl'); arrMark.push(b); } } }
 }
-function apHint(txt){ const h = $('tHint'); if (h.textContent !== txt){ h.textContent = txt; h.classList.remove('open'); h.classList.toggle('more', h.scrollHeight > h.clientHeight + 1); } }
+function apHint(txt){ const h = $('tHint'); if (h.textContent !== txt){ h.textContent = txt; h.classList.remove('open'); const mo = h.scrollHeight > h.clientHeight + 1; h.classList.toggle('more', mo); h.title = mo ? txt + '\n(click to show it all)' : ''; } }
 // While the song has the keys: the Song screen's info and hint lines, its command row (CLN and CLN↓ instead of − − / + +)
 // and, in KEYS mode, its keypad (hex).
 function apSongLines(){
@@ -26075,8 +26131,8 @@ function apFoot(arrOk){
   const k = inMode === 'keys', tap = coarse ? 'tap' : 'click';
   const ph = apHost === 'phrase', fol = {phrase:'the phrase follows (PIN keeps it)', fx:'FX follows its track', mixer:'the Mixer follows its track', inst:'INST follows its instrument', sect:'the sect follows'}[apHost] || 'nothing else moves';
   const t = apF === 'arr' ? `THE KEYS ARE ON THE SONG · ${k ? 'arrows' : '▲▼◀▶'} move the song cursor and ${fol} · everything works as on the Song screen (${k ? 'hex, Enter, Del, M, Ctrl+D, Ctrl+Alt+C, drag, right-click' : 'EDIT, EDIT×2, OPTION+EDIT, CLN'}) · ${ph ? `${k ? 'Alt+→' : 'SHIFT+▶'} opens the block · Esc` : k ? 'Alt+→, Esc' : 'SHIFT+▶'} or a ${tap} on the ${ph ? 'phrase' : 'screen'}: back to it`
-    : arrOk && tv !== 'phrase' ? `${tap.toUpperCase()} · the keys move here and work as on the Song screen · twice on a block: edit its phrase · Esc gives them back`
-    : arrOk ? `${tap.toUpperCase()} (or ${k ? 'Alt+←' : 'SHIFT+◀'}, or the SONG tab) · the keys move here: the song cursor moves and the phrase follows · twice: edit that block's phrase · HOLD a block to mute it · PIN keeps this phrase up`
+    : arrOk && tv !== 'phrase' ? `${tap.toUpperCase()} · the keys work here as on the Song screen · twice: edit the phrase · Esc gives them back`
+    : arrOk ? `${tap.toUpperCase()} (or ${k ? 'Alt+←' : 'SHIFT+◀'}) · the keys work here, the phrase follows · twice: edit it · HOLD mutes · PIN keeps this phrase`
     : apFoot0;
   if (apFootEl.textContent !== t){ apFootEl.textContent = t; if (arrFoot) arrFoot.title = t; }
 }
@@ -26357,6 +26413,9 @@ function whatsNew(force){
 setTimeout(() => { if (!helpOpen() && !inAI && !document.querySelector('.welcome')) whatsNew(false); }, 1400);
 $('helpNew').addEventListener('click', () => { hideHelp(); whatsNew(true); });
 // A hint longer than two lines opens fully on a tap (and folds again on the next).
+{ const B = $('tLegBtn'), set = on => { document.body.classList.toggle('legon', on); B.textContent = on ? 'KEYS ▾' : 'KEYS ▸'; B.setAttribute('aria-expanded', on); };
+  let on0 = false; try { on0 = localStorage.getItem('thunderplus-legon') === '1'; } catch(e){}
+  set(on0); B.addEventListener('click', () => { const on = !document.body.classList.contains('legon'); set(on); try { localStorage.setItem('thunderplus-legon', on ? '1' : '0'); } catch(e){} }); }
 $('tHint').addEventListener('click', () => { const h = $('tHint'); if (h.classList.contains('more') || h.classList.contains('open')){ h.classList.toggle('open'); scheduleRefit(false); } });
 $('helpX').addEventListener('click', hideHelp);
 // Runs before the synth and tracker key handlers: ? or F1 toggles help, and while it is open the keys
