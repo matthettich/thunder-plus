@@ -21454,29 +21454,50 @@ const ACID_SCALES = [['Minor', [0, 2, 3, 5, 7, 8, 10]], ['Phrygian', [0, 1, 3, 5
   ['Harmonic minor', [0, 2, 3, 5, 7, 8, 11]], ['Minor pentatonic', [0, 3, 5, 7, 10]], ['Blues', [0, 3, 5, 6, 7, 10]], ['Major', [0, 2, 4, 5, 7, 9, 11]],
   ['Chromatic', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]], ['Root & fifth', [0, 7]], ['Octaves', [0]]];
 const ACID_LANES = [['notes', 'NOTES'], ['oct', 'OCTAVES'], ['acc', 'ACCENTS'], ['slide', 'SLIDES'], ['time', 'TIME']];
-const acidSet = {scale:0, root:0, base:ROOT, density:75, accent:30, slide:25, octave:30, lanes:{notes:true, oct:true, acc:true, slide:true, time:true}};
+const acidSet = {scale:0, root:0, base:ROOT, density:75, accent:30, slide:25, octave:30, style:0, lanes:{notes:true, oct:true, acc:true, slide:true, time:true}};
+/* STYLES (owner, 2 Nov: "patterns that sound more like the Basebot hardware 303 clone"): rules on top of …pump ACID's,
+   after how hardware 303 sequences tend to sit. CLASSIC 303: the root (and its octave) most of the time, minor 3rd / 5th /
+   7th, a chromatic step into the next note now and then, notes on the downbeats more often, accents mostly off the beat,
+   slides mostly into a different note. ROLLING: busy 16ths, octave jumps on the off-steps, accents on the beat, few slides.
+   SQUELCH: more accents and slides, wider jumps. The sliders (density, accents, slides, octaves) still scale each one. */
+const ACID_STYLES = ['…pump ACID', 'Classic 303', 'Rolling', 'Squelch'];
 const ACID_NOTE = 0, ACID_TIE = 1, ACID_REST = 2;
 const acidPc = n => ((n % 12) + 12) % 12, acidOct = n => n >= 12 ? (n >= 24 ? 2 : 1) : (n < 0 ? -1 : 0);
 // The generator, as pump's (notes are semitones from the pattern's C, -12 to 24; `only` limits it to some steps).
 function acidRoll(st, L, lanes, R, rnd, only){
-  const sc = ACID_SCALES[R.scale][1], want = i => !only || only[i];
-  const pick = prev => { const u = rnd(); if (prev >= 0 && u < 0.22) return prev; if (u < 0.45) return 0; if (u < 0.58 && sc.includes(7)) return 7; return sc[Math.floor(rnd() * sc.length)]; };
+  const sc = ACID_SCALES[R.scale][1], want = i => !only || only[i], sty = R.style | 0;
+  const has = d => sc.includes(d);
+  const pick = (prev, i) => { const u = rnd();
+    if (sty === 1){   // CLASSIC 303
+      if (prev >= 0 && u < 0.10) return acidPc(prev + (rnd() < 0.5 ? 1 : -1));   // a chromatic step
+      if (u < 0.50) return 0; if (u < 0.62 && has(3)) return 3; if (u < 0.76 && has(7)) return 7; if (u < 0.84 && has(10)) return 10;
+      return sc[Math.floor(rnd() * sc.length)]; }
+    if (sty === 2){ if (u < 0.62) return 0; if (u < 0.74 && has(7)) return 7; return sc[Math.floor(rnd() * sc.length)]; }   // ROLLING
+    if (sty === 3){ if (prev >= 0 && u < 0.12) return prev; if (u < 0.38) return 0; return sc[Math.floor(rnd() * sc.length)]; }   // SQUELCH
+    if (prev >= 0 && u < 0.22) return prev; if (u < 0.45) return 0; if (u < 0.58 && sc.includes(7)) return 7; return sc[Math.floor(rnd() * sc.length)]; };
+  const dens = i => sty === 2 ? Math.max(R.density, 0.88) : sty === 1 ? clamp(R.density + (i % 4 === 0 ? 0.15 : i % 2 ? -0.05 : 0), 0, 1) : R.density;
   if (lanes.time) for (let i = 0; i < L; i++){ if (!want(i)) continue; if (i === 0 && !only){ st[i].gate = ACID_NOTE; continue; }
-    const u = rnd(), prev = i > 0 && st[i - 1].gate !== ACID_REST;
-    st[i].gate = u < R.density ? ACID_NOTE : prev && u < R.density + (1 - R.density) * 0.3 ? ACID_TIE : ACID_REST; }
+    const u = rnd(), prev = i > 0 && st[i - 1].gate !== ACID_REST, D = dens(i);
+    st[i].gate = u < D ? ACID_NOTE : prev && u < D + (1 - D) * (sty === 1 ? 0.45 : 0.3) ? ACID_TIE : ACID_REST; }
   let prevPc = -1;
   for (let i = 0; i < L; i++){ const s = st[i]; let pc = acidPc(s.note - R.root), oc = acidOct(s.note - R.root);
     if (want(i)){
-      if (lanes.notes) pc = i === 0 && !only ? 0 : pick(prevPc);
-      if (lanes.oct){ const u = rnd(), up = R.octave * (s.accent ? 0.85 : 0.6), dn = R.octave * 0.25; oc = u < up ? 1 : u < up + dn ? -1 : 0; if (R.scale === 9 && u < 0.08 + R.octave * 0.3) oc = 2; } }
+      if (lanes.notes) pc = i === 0 && !only ? 0 : pick(prevPc, i);
+      if (lanes.oct){ const u = rnd(); let up = R.octave * (s.accent ? 0.85 : 0.6), dn = R.octave * 0.25;
+        if (sty === 2){ up = i % 2 ? 0.25 + R.octave : R.octave * 0.15; dn = 0; }   // ROLLING: the off-steps jump up
+        else if (sty === 3){ up = R.octave * 0.9; dn = R.octave * 0.35; }
+        else if (sty === 1){ dn = R.octave * 0.15; }
+        oc = u < up ? 1 : u < up + dn ? -1 : 0; if (R.scale === 9 && u < 0.08 + R.octave * 0.3) oc = 2; } }
     let nn = R.root + pc + 12 * oc; while (nn > 24) nn -= 12; while (nn < -12) nn += 12;
     s.note = nn; if (s.gate === ACID_NOTE) prevPc = pc; }
   if (lanes.acc){ let run = 0; for (let i = 0; i < L; i++){ const s = st[i]; if (!want(i)){ run = s.accent ? run + 1 : 0; continue; }
-    s.accent = s.gate === ACID_NOTE && run < 3 && rnd() < R.accent * (acidOct(s.note - R.root) > 0 ? 1.4 : 1); run = s.accent ? run + 1 : 0; } }
+    const pos = sty === 1 ? (i % 4 === 2 ? 1.8 : i % 2 ? 1.2 : 0.6) : sty === 2 ? (i % 4 === 0 ? 1.6 : 0.6) : sty === 3 ? 1.5 : 1;   // where accents fall
+    s.accent = s.gate === ACID_NOTE && run < 3 && rnd() < R.accent * pos * (acidOct(s.note - R.root) > 0 ? 1.4 : 1); run = s.accent ? run + 1 : 0; } }
   if (lanes.slide || lanes.time || lanes.notes || lanes.oct) for (let i = 0; i < L; i++){ const s = st[i], nx = st[(i + 1) % L];
     if (s.gate === ACID_REST || nx.gate !== ACID_NOTE){ if (lanes.slide || lanes.time) s.slide = false; continue; }
     if (!lanes.slide || !want(i)) continue;
-    s.slide = rnd() < R.slide * (Math.abs(nx.note - s.note) >= 7 ? 1.5 : 1); }
+    const sl = sty === 1 ? (nx.note !== s.note ? 1.3 : 0.4) : sty === 2 ? 0.6 : sty === 3 ? 1.8 : 1;
+    s.slide = rnd() < R.slide * sl * (Math.abs(nx.note - s.note) >= 7 ? 1.5 : 1); }
   for (const s of st) if (s.gate === ACID_REST){ s.accent = false; s.slide = false; }
 }
 function acidMutate(st, L, lanes, R, rnd){ const only = new Array(L).fill(false), n = Math.max(2, Math.floor(L / 4)); for (let k = 0; k < n; k++) only[Math.floor(rnd() * L)] = true; acidRoll(st, L, lanes, R, rnd, only); }
@@ -21510,7 +21531,7 @@ function acidLine(){
   if (selA && selA.v === 'phrase'){ const R = selRect(); y0 = R.y0; L = Math.max(2, Math.min(R.y1, plen(cPhrase) - 1) - y0 + 1); }
   const P = () => S.phrases[cPhrase];
   const src = P()[cs.phrase.y]; let ins = src && src[IC] >= 0 ? src[IC] : (P().find(r => r[IC] >= 0) || [])[IC] ?? defInst();   // INSTRUMENT (owner, 2 Nov): picked in the panel
-  const R = () => ({scale:acidSet.scale, root:acidSet.root, density:acidSet.density / 100, accent:acidSet.accent / 100, slide:acidSet.slide / 100, octave:acidSet.octave / 100});
+  const R = () => ({scale:acidSet.scale, root:acidSet.root, density:acidSet.density / 100, accent:acidSet.accent / 100, slide:acidSet.slide / 100, octave:acidSet.octave / 100, style:acidSet.style});
   const roll = mut => {
     const st = acidRead(P(), y0, L, acidSet.base), lanes = acidSet.lanes;
     if (!ACID_LANES.some(([k]) => lanes[k])) return toast('Light at least one lane: NOTES, OCTAVES, ACCENTS, SLIDES or TIME.');
@@ -21526,6 +21547,7 @@ function acidLine(){
   const field = (label, ctl) => { const f = el('label', 'acidf'); f.append(el('span', null, label), ctl); box.append(f); return ctl; };
   const sel = (label, opts, k) => { const s = el('select'); opts.forEach(([v, t]) => s.append(new Option(t, v))); s.value = acidSet[k]; s.addEventListener('change', () => { acidSet[k] = +s.value; }); return field(label, s); };
   { const s = el('select'); for (let k = 0; k < S.insts.length; k++) s.append(new Option(instLabel(k), k)); s.value = ins; s.addEventListener('change', () => { ins = +s.value; }); field('Instrument', s); }
+  sel('Style', ACID_STYLES.map((n, i) => [i, n]), 'style');
   sel('Scale', ACID_SCALES.map(([n], i) => [i, n]), 'scale');
   sel('Root', NN.map((n, i) => [i, n.replace('-', '')]), 'root');
   sel('Base note', [24, 36, 48, 60].map(v => [v, noteS(v) + (v === ROOT ? ' (the pad’s pitch)' : '')]), 'base');
