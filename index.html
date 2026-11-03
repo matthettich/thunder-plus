@@ -20315,9 +20315,11 @@ function songRowInsert(){
   if (!songRowsInsert(cs.song.y, 1)) return toast('The last song row has blocks, so nothing can move down.');
   saveS(); draw(); toast(`Inserted row ${rS(cs.song.y, 3)} · the rows below moved down`);
 }
-function songRowRemove(){
+// rr: the rows to remove ({y0, y1}), when the caller already has them (the right-click menu: owner, 2 Nov, "Remove these
+// rows" on 00–07 removed one row, because the menu moved the cursor to the first row and the selection shrank with it).
+function songRowRemove(rr){
   if (tv !== 'song') return toast('Remove row works on the SONG screen.');
-  const c = cs.song, sel = selA && selA.v === 'song', r = sel ? selRect() : {y0:c.y, y1:c.y}, h = r.y1 - r.y0 + 1;
+  const c = cs.song, sel = !!(rr && rr.y1 >= rr.y0) || !!(selA && selA.v === 'song'), r = rr && rr.y1 >= rr.y0 ? {y0:rr.y0, y1:rr.y1} : sel ? selRect() : {y0:c.y, y1:c.y}, h = r.y1 - r.y0 + 1;
   songRowsRemove(r.y0, h); selA = null; c.y = Math.min(c.y, 255); if (sel) c.y = r.y0;
   saveS(); draw(); toast(h > 1 ? `Removed rows ${rS(r.y0, 3)}–${rS(r.y1, 3)} · the rows below moved up` : `Removed row ${rS(r.y0, 3)} · the rows below moved up`);
 }
@@ -24279,7 +24281,7 @@ function sxCtx(y, t){
   ];
   if (SX.secs) items.push({l:songSecAt(r.y0) && songSecAt(r.y0).y === r.y0 ? 'Rename the section here…' : 'Name a section from row ' + rS(r.y0, 3) + '…', f:() => sxSecEdit(r.y0)});
   items.push(null, {l:'Remove from song (keep the phrase)', f:() => sxClearRect(r, true), off:!n}, {l:'Delete (the phrase too)', k:ks ? 'Del' : '', f:() => sxClearRect(r, false), off:!n},
-    {l:r.y1 > r.y0 ? 'Remove these rows (the rows below move up)' : 'Remove row ' + rS(r.y0, 3) + ' (the rows below move up)', f:() => { cs.song.y = r.y0; songRowRemove(); }});   // REMOVE ROW (owner, 27 Oct)
+    {l:r.y1 > r.y0 ? 'Remove these rows (the rows below move up)' : 'Remove row ' + rS(r.y0, 3) + ' (the rows below move up)', f:() => { const rr = {y0:r.y0, y1:r.y1}; songRowRemove(rr); sxPicks = []; }});   // REMOVE ROW (owner, 27 Oct; the range passed: 2 Nov)
   // EDIT MENU / RIGHT-CLICK: Undo / Redo first, then the rest of the COMMANDS row this menu doesn't already have.
   const C = cmdItems(), have = new Set(['cut', 'copy', 'paste', 'insp', 'clr', 'rmv', 'clone', 'cldn', 'undo', 'redo', 'rmrow']);
   items.unshift(...C.filter(x => x && (x.a === 'undo' || x.a === 'redo')), null);
