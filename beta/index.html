@@ -10173,7 +10173,7 @@ function factoryVoicePresets(){
   // HACK and OWLS (owner, 2 Nov): sounds measured from records (pitch curves, decays, spectra), the last groups so
   // saved Recent picks keep their places. Synth ones use PS (voice tune +24); drums PD.
   // HACK: The Hacker vs Commuter, "Roentgen PT 2" (Cultivated Electronics, 2021), measured from the track
-  ['Hack (Roentgen)', [
+  ['Hack', [
     // driven 808: ~120 Hz falling to ~57 Hz in ~60 ms, a ~250 ms tail, a click on top; the master is pushed hard
     ['hack kick', () => PD('hack kick', [
       {type:'sine', tune:-2, pAmt:15, pDec:100, atk:0.1, dec:330, level:0.95},
@@ -10206,9 +10206,16 @@ function factoryVoicePresets(){
     ['hack noise wash', () => PS('hack noise wash', [
       {type:'pink', atk:700, dec:2000, sus:0.8, rel:1500, lpCut:1500, lpRes:0.5, level:0.55},
       {type:'saw', tune:-12, fine:-8, atk:900, dec:2000, sus:0.7, rel:1500, lpCut:700, level:0.3}], {len:8, tail:3, level:6, lfo1Rate:0.2, lfo1Depth:1, r1dst:3, r1amt:0.4})],
+    // the bass: each note dives from ~180 Hz into a ~50–60 Hz boom that holds, lightly saturated (an 808-style bass)
+    ['hack bass', () => PS('hack bass', [
+      {type:'sine', tune:-24, pAmt:19, pDec:240, atk:1, dec:1100, sus:0.55, rel:180, level:0.95},
+      {type:'tri', tune:-24, pAmt:19, pDec:240, atk:1, dec:500, sus:0.2, rel:120, lpCut:700, level:0.25}], {drive:0.45, glide:25})],
+    ['hack bass short', () => PS('hack bass short', [
+      {type:'sine', tune:-24, pAmt:16, pDec:160, atk:1, dec:420, sus:0.1, rel:90, level:0.95},
+      {type:'tri', tune:-24, pAmt:16, pDec:160, atk:1, dec:200, sus:0, rel:60, lpCut:700, level:0.25}], {drive:0.5})],
   ]],
   // OWLS: Wake, "Encounters With Owls" (EP), measured from the five tracks
-  ['Owls (Wake)', [
+  ['Owls', [
     // Co-Co: a long 808 diving from ~500 Hz to ~55 Hz
     ['owls long 808', () => PD('owls long 808', [
       {type:'sine', tune:-3, pAmt:38, pDec:100, atk:0.1, dec:750, level:0.95},
@@ -10253,6 +10260,28 @@ function factoryVoicePresets(){
       {type:'square', tune:-12, atk:1, dec:200, sus:0.7, rel:60, lpCut:900, lpRes:0.4, level:0.6},
       {type:'lfsr', a:0.6, b:0.7, tune:-12, atk:1, dec:120, sus:0.3, rel:50, lpCut:2000, level:0.25}],
       {drive:0.4, lfo1Rate:12, lfo1Depth:1, r1dst:3, r1amt:0.6, fx:[PFX('crush', {down:0.3, bits:9, mix:0.5})]})],
+    // CLICKS (1–12 ms, bright; some noise, some with a pitch)
+    ['owls click tick', () => PD('owls click tick', [{type:'click', a:0.6, level:0.9, atk:0.05, dec:2}, {type:'white', atk:0.05, dec:4, hpCut:6000, level:0.7}], {level:6})],
+    ['owls click wood', () => PD('owls click wood', [{type:'sine', tune:40, atk:0.05, dec:9, level:0.8}, {type:'click', a:0.3, level:0.4, atk:0.05, dec:3}], {level:4, tune:12})],
+    ['owls click pop', () => PD('owls click pop', [{type:'sine', tune:40, pAmt:12, pDec:30, atk:0.05, dec:7, level:0.85}], {level:4})],
+    ['owls click metal', () => PD('owls click metal', [{type:'metal', a:0.6, b:0.7, tune:48, atk:0.05, dec:12, hpCut:5000, level:1}, {type:'click', a:0.4, level:0.4, atk:0.05, dec:2}], {level:6})],
+    ['owls click digital', () => PD('owls click digital', [{type:'lfsr', a:0.8, b:0.6, tune:36, atk:0.05, dec:6, level:0.7}], {level:3, fx:[PFX('crush', {down:0.4, bits:6, mix:0.7})]})],
+    ['owls click soft', () => PD('owls click soft', [{type:'pink', atk:0.1, dec:11, hpCut:1500, lpCut:7000, level:1}, {type:'click', a:0.1, level:0.25, atk:0.05, dec:3}], {level:6})],
+    // ZAPS (fast: a few kHz down to a few hundred Hz in ~25 ms, 25–50 ms long)
+    ['owls zap fast', () => PD('owls zap fast', [{type:'sine', tune:48, pAmt:24, pDec:20, atk:0.05, dec:30, level:0.8}, {type:'click', a:0.3, level:0.3, atk:0.05, dec:2}], {level:3, tune:12})],
+    ['owls zap mid', () => PD('owls zap mid', [{type:'tri', tune:28, pAmt:34, pDec:40, atk:0.05, dec:45, level:0.85}], {drive:0.2, level:2})],
+    ['owls zap low', () => PD('owls zap low', [{type:'sine', tune:26, pAmt:20, pDec:60, atk:0.05, dec:50, level:0.9}, {type:'tri', tune:38, pAmt:20, pDec:60, atk:0.05, dec:25, level:0.25}], {drive:0.25})],
+    ['owls zap noisy', () => PD('owls zap noisy', [{type:'sine', tune:37, pAmt:40, pDec:40, atk:0.05, dec:35, level:0.7}, {type:'white', atk:0.05, dec:15, hpCut:3000, level:0.5}], {level:3})],
+    ['owls zap fm', () => PD('owls zap fm', [{type:'fm2', a:rA(2.5), b:0.5, tune:30, pAmt:36, pDec:30, atk:0.05, dec:40, level:0.75}], {drive:0.2, level:2})],
+    ['owls zap laser', () => PD('owls zap laser', [{type:'square', tune:48, pAmt:30, pDec:24, atk:0.05, dec:28, lpCut:9000, level:0.45}, {type:'sine', tune:48, pAmt:30, pDec:24, atk:0.05, dec:28, level:0.8}], {level:5})],
+    // RIMSHOTS and BLIPS (tonal, 300 Hz–1.6 kHz, 5–40 ms, a bright edge)
+    ['owls rim high', () => PD('owls rim high', [{type:'tri', tune:39, atk:0.05, dec:18, level:0.7}, {type:'click', a:0.3, level:0.5, atk:0.05, dec:3}, {type:'white', atk:0.05, dec:8, hpCut:4000, level:0.35}], {level:4, tune:12})],
+    ['owls rim wood', () => PD('owls rim wood', [{type:'sine', tune:33, atk:0.05, dec:24, level:0.7}, {type:'tri', tune:40, atk:0.05, dec:16, level:0.4}, {type:'click', a:0.2, level:0.3, atk:0.05, dec:3}], {level:4, tune:12})],
+    ['owls rim metal', () => PD('owls rim metal', [{type:'metal', a:0.7, b:0.4, tune:47, atk:0.05, dec:25, hpCut:1200, level:0.9}, {type:'click', a:0.3, level:0.4, atk:0.05, dec:3}], {level:6})],
+    ['owls rim low', () => PD('owls rim low', [{type:'tri', tune:31, pAmt:3, pDec:30, atk:0.05, dec:35, level:0.8}, {type:'click', a:0.25, level:0.4, atk:0.05, dec:4}], {level:3})],
+    ['owls rim knock', () => PD('owls rim knock', [{type:'sine', tune:38, pAmt:6, pDec:60, atk:0.05, dec:35, level:0.8}, {type:'pink', atk:0.05, dec:10, hpCut:1500, level:0.35}], {level:3})],
+    ['owls rim comb', () => PD('owls rim comb', [{type:'white', burst:2, spacing:3, atk:0.05, dec:25, hpCut:2500, lpCut:12000, level:0.7}, {type:'metal', a:0.5, b:0.5, tune:44, atk:0.05, dec:18, hpCut:2000, level:0.5}], {level:6})],
+    ['owls rim blip', () => PD('owls rim blip', [{type:'square', tune:31, atk:0.05, dec:14, lpCut:6000, level:0.8}, {type:'sine', tune:43, atk:0.05, dec:10, level:0.6}], {level:6, tune:12})],
   ]],
   ]);
 }
@@ -19605,7 +19634,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 367;
+const BUILD = 368;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26673,6 +26702,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [368, '2 Nov', ['Presets: the groups are now just Hack and Owls. New: hack bass and hack bass short (the 808-style bass that dives into each note), and 19 more owls: clicks (tick, wood, pop, metal, digital, soft), zaps (fast, mid, low, noisy, FM, laser) and rimshots (high, wood, metal, low, knock, comb, blip).']],
   [367, '2 Nov', ['Fixed: the Hardware skins (Vintage MPC, Nord red, 808, 909, Dr. Sample, M8) didn’t show in the skin list.']],
   [366, '2 Nov', ['New skin: M8 (pocket tracker), in the Hardware group: a black screen, a pixel-style mono everywhere, cyan cursor, magenta and green accents.']],
   [365, '2 Nov', ['New skins (View → Skin…): a Hardware group with Vintage MPC, Nord red, 808, 909 and Dr. Sample (SP-202), and Wes Anderson (pastel hotel) under Art & design.']],
