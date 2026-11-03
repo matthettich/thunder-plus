@@ -92,6 +92,16 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
    build flags (`THUNDER_ASIO`, `THUNDER_LINK`); a closed build needs both proprietary agreements or leaves them out. If
    JUCE is chosen for the host instead of permissive libraries, it needs a commercial JUCE licence.
 
+## To-do (owner's list: keep it current; newest dated entries below have the details)
+
+- **Track reordering** (moving a track next to its bus, as other DAWs do). Big job: every song row, mixer, send, bus
+  group, block mute and MIDI mapping refers to tracks by index, so it all has to be renumbered together. Owner (2 Nov):
+  later, not while stabilising.
+- **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
+  change it needs.
+- Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
+- Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
+
 ## 2 Nov (6), late night: builds 369–373 (web 373, desktop 1.2.69–1.2.73)
 
 - 369: pump's STRIP channel strip in the app (`pstrip`, pump.wasm / pump-meta v6, built from the pump repo with STRIP added
@@ -101,8 +111,8 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
 - 371: skins: Design icons group (bauhaus, swiss, destijl, memphis, valentine, eames, vignelli, bondi); Hardware + dx7, lcdgreen.
 - 372: acid slides on a full row take FX3; a once-ever tip offers Latency: Safest after 4 dropouts in a minute while playing.
 - 373: TVL / TVA / TPN / master VOL on the audio thread (plan §13 2c "mix done"); Calculator watch skin (`calcwatch`).
-- Owner's to-do still open: which skins to keep (cull); hardware MIDI tests and the native host framework (item 6, later);
-  the synth-to-tracker issue (owner set aside). Sequencer move left: FXV, …chains BYP / tempo, SoundFonts, MUT / GEN, MIDI.
+- Owner's to-do still open: which skins to keep (cull); hardware MIDI tests and the native host framework (item 6, later).
+  Sequencer move left: FXV, …chains BYP / tempo, SoundFonts, MUT / GEN, MIDI.
 
 ## 2 Nov (5), late night: the audio-thread sequencer (plan phase 2a–2c) released, on by default (web 362, desktop 1.2.65)
 
@@ -165,9 +175,8 @@ The (3) entry below went out in 357. Since then, all on `main` and `beta`:
   (Acid) or a 4th value (Euclid); Acid's ROLL is Generate (G); Shift+wheel grows the selection on Phrase / Pattern.
 - **Test hooks** (only with `?seqtest`): `__seqTest.state()` and `.phrase()`.
 - **Menu audit:** [`docs/MENU-AUDIT.md`](docs/MENU-AUDIT.md), a proposal, nothing built.
-- **Open:** returning from the Synth page sometimes lands on the full Song screen (not reproduced, ask for steps); acid
-  slides are written only on the next sounding note with a free FX column (by design today); the owner asked about more
-  303-like (Basebot) patterns, see the chat proposal.
+- **Open:** acid slides are written only on the next sounding note with a free FX column (by design today; 372 lets a
+  full row use FX3). The Basebot-style patterns are built (Acid line Styles, 360).
 
 ## 2 Nov (2): beta channel; phase 0 started (sequencer golden test); FX bar mockups
 
