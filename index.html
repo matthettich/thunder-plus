@@ -5071,6 +5071,8 @@ class ModalCore {
    held together by Cohesion (a shared drift every voice follows), scattered onto intervals (octaves, fifths, chords),
    fading in one after another (Bloom) and flickering in level (Shimmer). Morphing wave (saw → square → triangle →
    sine), a resonant low-pass with its own envelope, ADSR. Rendered like Modal: one note at the pad's pitch. */
+// A wave name cut short for in-between values ('Tri→Sin 45%'), so a value box never runs into the next one.
+const wvAb = n => ({Saw:'Saw', Square:'Sqr', Triangle:'Tri', Sine:'Sin', Pulse:'Pls', Noise:'Nse', Spectra:'Spc'})[n] || String(n).slice(0, 4);
 class SwarmCore {
   static defaults(){ return {oct:2, voices:16, wave:0, spread:0.35, drift:0.3, rate:0.4, cohes:0.3, scatter:0, ivl:0, bloom:0, shimmer:0, sub:0,
     cut:4000, res:0.15, fenv:0.2, fdec:600, key:0.5, atk:30, dec:800, sus:0.8, rel:600, tune:0, drive:0, level:0}; }
@@ -11024,7 +11026,7 @@ const XUI = {
   swarm:{title:'Swarm', tag:'oscillator cloud · drift · bloom', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
       voices:{l:'Voices', min:1, max:48, c:'int', d:16, f:v => String(Math.round(v))},
-      wave:{l:'Wave', min:0, max:3, c:'lin', d:0, f:v => { const i = Math.min(2, Math.floor(v)), f = v - i; return f < 0.03 ? SwarmCore.WAVES[i] : f > 0.97 ? SwarmCore.WAVES[i + 1] : SwarmCore.WAVES[i] + '→' + SwarmCore.WAVES[i + 1] + ' ' + Math.round(f * 100) + '%'; }},
+      wave:{l:'Wave', min:0, max:3, c:'lin', d:0, f:v => { const i = Math.min(2, Math.floor(v)), f = v - i; return f < 0.03 ? SwarmCore.WAVES[i] : f > 0.97 ? SwarmCore.WAVES[i + 1] : wvAb(SwarmCore.WAVES[i]) + '→' + wvAb(SwarmCore.WAVES[i + 1]) + ' ' + Math.round(f * 100) + '%'; }},   // short names while between two (owner, 2 Nov: the long ones ran into the next box)
       sub:{l:'Sub', min:0, max:1, c:'lin', d:0, f:pct},
       spread:{l:'Spread', min:0, max:1, c:'lin', d:0.35, f:v => '±' + Math.round(v * v * 120) + ' cents'},
       drift:{l:'Drift', min:0, max:1, c:'lin', d:0.3, f:v => '±' + Math.round(v * v * 80) + ' cents'},
