@@ -118,6 +118,30 @@ globalThis.__tcPost = (proc, o) => {
     else { const x = p * Math.PI / 2; L[i] = l * Math.cos(x); R[i] = r + l * Math.sin(x); }
   }
 };
+/* MUT / GEN and CUT / RES / DEC (3 Nov): a note's variation is rendered on the page (or its Worker) as before; once it
+   exists the page sends it here as 'vbuf', keyed by instrument, variation and pad (ii:vk:pad). Any change to the
+   instruments or a new render of the pad drops the core's copies (the page sends them again as notes ask). CUT / RES /
+   DEC shape the sound here with the page's own shapeData. A note whose variation the core doesn't have yet: the page
+   plays it, as before. */
+const varBufs = new Map(), varShaped = new Map(); let varBytes = 0;
+function varDrop(pad){ for (const [k, r] of varBufs) if (pad == null || r.pad === pad){ varBufs.delete(k); varBytes -= r.data.length * 4; }
+  for (const k of [...varShaped.keys()]) if (pad == null || k.split(':')[2] === String(pad)) varShaped.delete(k); }
+function varIn(d){ const old = varBufs.get(d.k); if (old) varBytes -= old.data.length * 4;
+  varBufs.set(d.k, {data:d.data, sr:d.sr, pad:d.pad}); varBytes += d.data.length * 4;
+  while (varBytes > 32e6 && varBufs.size > 1){ const [k0, r0] = varBufs.entries().next().value; varBufs.delete(k0); varBytes -= r0.data.length * 4; } }
+// The sound a note plays, when it has MUT / GEN / CUT / RES / DEC: {data, sr}, or null (the page plays it)
+function varRec(ev){
+  const I = S && S.insts && ev.ii != null ? S.insts[ev.ii] : null;
+  if (I && ((I.slc | 0) > 1 || I.sync)) return coreBufs.get(ev.pad) || null;   // sliced / synced: the pad as it is (the page's varBuf)
+  let base = null, key;
+  if (ev.vk){ key = ev.ii + ':' + ev.vk + ':' + ev.pad; base = varBufs.get(key); if (!base) return null;
+    varBufs.delete(key); varBufs.set(key, base); }   // most recent last
+  else { base = coreBufs.get(ev.pad); key = 'p:' + ev.pad + ':' + ev.pad; if (!base) return null; }
+  if (!ev.tw) return base;
+  const k2 = key + ':c' + ev.tw.cut + ':q' + ev.tw.res + ':d' + ev.tw.dec; let r2 = varShaped.get(k2);
+  if (!r2 || r2.src !== base.data){ r2 = {sr:base.sr, data:shapeData(base.data, base.sr, ev.tw), src:base.data}; varShaped.set(k2, r2); if (varShaped.size > 192) varShaped.delete(varShaped.keys().next().value); }
+  return r2;
+}
 // A message for another processor in this scope, handled at audio time `at` (its process() takes the due ones at the
 // start of each block: proc.__q, sorted by time). FXV's settings and …chains' tempo go this way instead of a timer on the
 // page, which a busy main thread made late.
@@ -158,10 +182,13 @@ class ThunderCore extends AudioWorkletProcessor {
         if (!S) return;
         for (const [k, i, v] of d.ops){ if (i === null) S[k] = v; else if (i === 'del') delete S[k]; else if (i === 'len'){ if (Array.isArray(S[k])) S[k].length = v; }
           else { if (!Array.isArray(S[k])) S[k] = []; S[k][i] = v; } }
+        if (d.ops.some(o => o[0] === 'insts')) varDrop(null);   // an instrument's RANGE / GEN TYPE… changed: its variations are other sounds now
         busPlanH = null; busPlanVal = null; return; }
       case 'vars': if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } return;
       case 'kit': this.kv = d.kv || []; kit = {voices:this.kv}; return;
-      case 'buf': if (d.data) coreBufs.set(d.pad, {data:d.data, sr:d.sr}); else coreBufs.delete(d.pad); return;
+      case 'buf': if (d.data) coreBufs.set(d.pad, {data:d.data, sr:d.sr}); else coreBufs.delete(d.pad); varDrop(d.pad); return;
+      case 'vbuf': varIn(d); return;   // MUT / GEN: a variation the page rendered
+      case 'vdrop': varDrop(d.pad); return;
       case 'test': {
         const o = d.opt || {}, rows = coreSeeded(() => { const out = [];
           const sq = makeSeq(S, d.mode || 'song', {row:o.row || 0, loop:o.loop || null, once:!o.loop, sim:true});
@@ -253,8 +280,8 @@ class ThunderCore extends AudioWorkletProcessor {
   mine(ev){
     if (this.noSampler) return false;
     const k = this.kv[ev.pad]; if (!k || k.live || k.sf) return false;
-    if ((ev.vk || ev.tw) && !ev.st) return false;
     if (ev.st) return false;   // stretched (SYNC) notes: the page's stretch cache, for now
+    if (ev.vk || ev.tw){ const r = varRec(ev); if (!r) return false; ev.__buf = r; return true; }   // MUT / GEN / CUT / RES / DEC
     return coreBufs.has(ev.pad);
   }
   // A note the page plays: the core's voices on the track still give way to it (mono takeover, chokes), as they would
@@ -267,7 +294,7 @@ class ThunderCore extends AudioWorkletProcessor {
     if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of this.T(k)) if (v.choke === ck) this.kill(v, ev.t);
   }
   startNote(ev){
-    const c = coreBufs.get(ev.pad), kv = this.kv[ev.pad]; if (!c || !kv) return;
+    const c = ev.__buf || coreBufs.get(ev.pad), kv = this.kv[ev.pad]; delete ev.__buf; if (!c || !kv) return;
     { const ld = ev.t - currentTime; this.nN = (this.nN || 0) + 1; if (ld < 0){ this.nLate = (this.nLate || 0) + 1; this.worst = Math.max(this.worst || 0, -ld); } if (this.leadMin == null || ld < this.leadMin) this.leadMin = ld; }   // timing stats ({op:'stats'})
     const T = this.T(ev.track);
     for (let k = T.length - 1; k >= 0; k--) if (!this.live1(T[k], ev.t)) T.splice(k, 1);
