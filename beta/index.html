@@ -20409,7 +20409,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 389;
+const BUILD = 390;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24928,6 +24928,7 @@ function deckFxBar(){
         addEventListener('pointermove', mv, true); addEventListener('pointerup', up, true); });
       const vz = el('div', 'fviz'); vz.append(document.createElement('canvas')); col.append(vz); col._h = new Float32Array(90); col._w = 0; col._q = 0;
       if (isSpringFx(f)){ col.classList.add('spr'); const sc = document.createElement('canvas'); sc.className = 'fspr'; col.prepend(sc); col._spr = {cv:sc, e:0, t:0}; }   // SPRING
+      else { const ak = fxAnimKind(f); if (ak){ col.classList.add('spr'); const sc = document.createElement('canvas'); sc.className = 'fspr'; col.prepend(sc); col._spr = {cv:sc, e:0, t:0, kind:ak, P:[]}; } }   // FX ANIMATIONS
       if (isFxDyn(f.type)){ col.classList.add('dyn'); const dm = document.createElement('canvas'); dm.className = 'fdm'; dm.title = FXLV.has(f.type) ? 'IN, the change in level, OUT' : 'IN level, gain reduction (0 to 24 dB) and OUT level; the line is the threshold'; col.append(dm); }
       const getF = () => FA()[k];
       for (const q of D.ps){
@@ -24982,7 +24983,7 @@ function deckFxBarMeters(){
   for (const c of bar.children){ const i = c.querySelector('.fm i'); if (!i) continue; const k = +c.dataset.k; let lv = 0; try { lv = typeof fxSlotLevel === 'function' ? fxSlotLevel(t, k) : 0; } catch(e){} i.style.width = Math.round(clamp(lv, 0, 1) * 100) + '%';
     if (now - c._q < 33) continue; c._q = now; c._h[c._w] = lv; c._w = (c._w + 1) % c._h.length;
     try { dkFxViz(c, A[k], k, node, now); } catch(e){}
-    if (c._spr) try { dkSpring(c, A[k], now, lv); } catch(e){} }
+    if (c._spr) try { if (c._spr.kind) dkAnim(c, A[k], now, lv); else dkSpring(c, A[k], now, lv); } catch(e){} }
 }
 // DYNAMICS METERS: three bars (IN, GR, OUT) for a dynamics slot, from the same reports as the curve display (node.dyn: the
 // slot's reduction, input and output levels), with its threshold drawn across IN and OUT and the held peaks under them.
@@ -25026,6 +25027,101 @@ function dkDynMeters(cv, f, k, node, now){
    rate. Drive and lo-fi: the waveshaper curve, or steps for a crusher. Filters: the response with its resonance peak.
    Values are found by name (time, feedback, decay, rate, depth, drive, cut, res…), as fractions of their range; an effect
    whose values don't match keeps the level history. …pump effects keep it too (their values live in f.pump). */
+/* FX ANIMATIONS (owner, 3 Nov: "add animations similar to the spring for anything that doesn't have a cool display, e.g.
+   pVERB; they should make sense with what the plugin does, and not for ones like Flex that already have one"). Drawn behind
+   the values as the springs are (canvas.fspr), kicked by the slot's level and dying away over the effect's decay or time:
+   ROOM: sound bouncing off the walls of a room (reverbs; the box is the size, the trails the decay) · GRAINS: grains
+   popping up and fading (granular, spectral) · CLIP: a wave and what the drive does to it, glowing as it's pushed (drive,
+   saturation, tape, tube, fold) · STEPS: a wave cut into steps by the rate and the bits (crushers, lo-fi, the vintage
+   sampler) · VINYL: a record turning, with the crackle · STRINGS: strings ringing (resonators) · BANDS: vocoder bands ·
+   SWIRL: a rotating swirl (modulation without a picture of its own). Not on: dynamics (their meters), EQ / filters (the
+   curve), delays (the echo taps), Flex / Step gate / Retrigger / Glitch (their patterns), utilities and meters. */
+function fxAnimKind(f){
+  const k = f && f.type, D = TFX[k]; if (!D || isFxDyn(k)) return '';
+  const g = fxtGroup(k), pk = D.pump || '';
+  if (g === 'Reverbs') return 'room';
+  if (g === 'Spectral and granular' || pk === 'grain') return 'grains';
+  if (/^(crush|degrade|lofi|vsamp|pcrush)$/.test(k)) return 'steps';
+  if (k === 'vinyl') return 'vinyl';
+  if (g === 'Drive and lo-fi') return 'clip';
+  if (g === 'Resonators') return 'strings';
+  if (pk === 'vox' || k === 'vowel') return 'bands';
+  if (k === 'pswirl' || k === 'rotary' || k === 'dimension' || k === 'ensemble') return 'swirl';
+  return '';
+}
+function dkAnim(col, f, now, lv){
+  const A = col._spr, cv = A.cv; if (!f) return;
+  const hd = col.querySelector('.fch'), fm = col.querySelector('.fm'), top = (hd ? hd.offsetHeight : 26) + (fm ? fm.offsetHeight : 4);
+  const W = col.clientWidth, H = col.clientHeight - top; if (W < 40 || H < 40) return;
+  if (cv.style.top !== top + 'px') cv.style.top = top + 'px';
+  cv.style.height = H + 'px';
+  const dpr = devicePixelRatio || 1; if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const v = (re, d) => { const x = dkFxVal(f, re); return x == null ? d : x; }, C = fxDynPal(), ink = a => 'rgba(' + C.ink + ',' + a + ')', AC = '#ff5a1f';
+  const dt = A.t ? Math.min(0.1, (now - A.t) / 1000) : 0; A.t = now; const ts = now / 1000;
+  const dec = v(/decay|time|size|length|feed|fb|regen|sustain/i, .5), tau = 0.12 + dec * 2.4;
+  A.e = Math.max(f.on ? Math.min(1, (lv || 0) * 1.4) : 0, A.e * Math.exp(-dt / tau)); const e = A.e;
+  const P = A.P, rnd = Math.random;
+  if (A.kind === 'room'){   // a room: the box from the size, sound bouncing off its walls, trails over the decay
+    const sz = v(/size|room|space/i, .6), bw = W * (0.45 + sz * 0.5), bh = H * (0.45 + sz * 0.5), x0 = (W - bw) / 2, y0 = (H - bh) / 2;
+    g.strokeStyle = ink(.18); g.lineWidth = 1; g.strokeRect(x0 + .5, y0 + .5, bw - 1, bh - 1);
+    const n = Math.min(4, Math.floor(e * 3 + rnd() * e * 2)), sp = 60 + (1 - sz) * 90;
+    for (let i = 0; i < n && P.length < 140; i++){ const a = rnd() * Math.PI * 2; P.push({x:W / 2, y:H / 2, vx:Math.cos(a) * sp, vy:Math.sin(a) * sp, a:1, hx:[]}); }
+    for (let i = P.length - 1; i >= 0; i--){ const p = P[i]; p.a *= Math.exp(-dt / tau); if (p.a < 0.03){ P.splice(i, 1); continue; }
+      p.hx.push(p.x, p.y); if (p.hx.length > 16) p.hx.splice(0, 2);
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.x < x0 || p.x > x0 + bw){ p.vx = -p.vx; p.x = clamp(p.x, x0, x0 + bw); p.a *= 0.85; }
+      if (p.y < y0 || p.y > y0 + bh){ p.vy = -p.vy; p.y = clamp(p.y, y0, y0 + bh); p.a *= 0.85; }
+      g.strokeStyle = ink((.35 * p.a).toFixed(3)); g.lineWidth = 1.2; g.beginPath(); g.moveTo(p.hx[0], p.hx[1]); for (let j = 2; j < p.hx.length; j += 2) g.lineTo(p.hx[j], p.hx[j + 1]); g.lineTo(p.x, p.y); g.stroke();
+      g.fillStyle = i % 9 ? ink((.5 * p.a).toFixed(3)) : AC; g.globalAlpha = i % 9 ? 1 : p.a; g.beginPath(); g.arc(p.x, p.y, 1.6, 0, 7); g.fill(); g.globalAlpha = 1; }
+    return; }
+  if (A.kind === 'grains'){   // grains: popping up where the position and spray put them, as big as the size, fading
+    const sz = v(/size|grain/i, .4), den = v(/dens|rate|amount/i, .5), pos = v(/pos/i, .5), spr = v(/spray|jitter|spread|rand/i, .4);
+    const n = Math.floor((e * (1 + den * 5)) + (rnd() < e * den ? 1 : 0));
+    for (let i = 0; i < n && P.length < 90; i++) P.push({x:clamp(W * (pos + (rnd() - .5) * (0.25 + spr)), 6, W - 6), y:8 + rnd() * (H - 16), r:2 + sz * 9 * (0.5 + rnd()), a:1, life:0.12 + sz * 0.6, o:rnd() < 0.18});
+    for (let i = P.length - 1; i >= 0; i--){ const p = P[i]; p.a -= dt / p.life; if (p.a <= 0){ P.splice(i, 1); continue; }
+      const k2 = Math.sin(Math.PI * Math.max(0, p.a)); g.globalAlpha = 0.55 * k2; g.fillStyle = p.o ? AC : ink(.5); g.beginPath(); g.ellipse(p.x, p.y, p.r * 1.6, p.r * 0.55, 0, 0, 7); g.fill(); }
+    g.globalAlpha = 1; return; }
+  const mid = H / 2, amp = H * 0.32;
+  if (A.kind === 'clip' || A.kind === 'steps'){
+    const scroll = ts * 1.1, cyc = 2.2, a0 = 0.35 + e * 0.75;
+    const wave = x => Math.sin((x / W * cyc - scroll) * 2 * Math.PI) * a0 + Math.sin((x / W * cyc * 3 - scroll * 1.7) * 2 * Math.PI) * a0 * 0.22;
+    g.setLineDash([2, 4]); g.strokeStyle = ink(.16); g.lineWidth = 1; g.beginPath(); for (let x = 0; x <= W; x += 2){ const y = mid - wave(x) * amp; x ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); g.setLineDash([]);
+    g.strokeStyle = ink((.3 + .35 * e).toFixed(2)); g.lineWidth = 1.8; g.beginPath();
+    if (A.kind === 'clip'){ const dr = v(/drive|gain|amount|amt|heat|sat|input|dens|fold/i, .5), K = 1 + dr * 6, n = Math.tanh(K), fold = /fold/.test(f.type);
+      for (let x = 0; x <= W; x += 2){ const u = wave(x), o = fold ? Math.sin(u * (1 + dr * 3) * Math.PI / 2) : Math.tanh(K * u) / n, y = mid - o * amp; x ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+      if (e > 0.02){ const gr = g.createRadialGradient(W / 2, mid, 2, W / 2, mid, Math.max(W, H) * 0.6); gr.addColorStop(0, 'rgba(255,90,31,' + (0.16 * e * (0.4 + dr)).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(255,90,31,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H); }
+      return; }
+    const bits = v(/bit/i, .5), rate = v(/rate|down|samp/i, .5), st = Math.max(2, Math.round(3 + bits * 14)), hold = Math.max(2, Math.round((1 - rate) * 14 + 2));
+    let px = 0, py = mid; for (let x = 0; x <= W; x += hold){ const q = Math.round(wave(x) * st) / st, y = mid - q * amp; if (!x) g.moveTo(0, y); else { g.lineTo(x, py); g.lineTo(x, y); } px = x; py = y; } g.lineTo(W, py); g.stroke();
+    if (/vsamp|vinyl/.test(f.type) || v(/noise/i, 0) > 0.05){ const nz = v(/noise/i, .3) * (0.3 + e); g.fillStyle = ink(.35); for (let i = 0; i < 20 * nz; i++) g.fillRect(rnd() * W, rnd() * H, 1, 1); }
+    return; }
+  if (A.kind === 'vinyl'){   // a record turning at 33⅓, the crackle on it
+    const R = Math.min(W, H) * 0.42, cx = W / 2, cy = H / 2, rot = ts * 0.555 * 2 * Math.PI;
+    g.fillStyle = ink(.07); g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fill();
+    g.strokeStyle = ink(.12); g.lineWidth = 1; for (let r = R * 0.38; r < R; r += 3){ g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke(); }
+    g.fillStyle = AC; g.globalAlpha = .55; g.beginPath(); g.arc(cx, cy, R * 0.3, 0, 7); g.fill(); g.globalAlpha = 1;
+    g.strokeStyle = ink(.45); g.lineWidth = 2; g.beginPath(); g.moveTo(cx + Math.cos(rot) * R * 0.1, cy + Math.sin(rot) * R * 0.1); g.lineTo(cx + Math.cos(rot) * R * 0.28, cy + Math.sin(rot) * R * 0.28); g.stroke();
+    const cr = v(/crack|dust|noise|wear/i, .4); g.fillStyle = ink(.6); for (let i = 0; i < 1 + cr * 8; i++){ if (rnd() > 0.5) continue; const a = rnd() * 7, r = R * (0.4 + rnd() * 0.58); g.fillRect(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 1.5, 1.5); }
+    return; }
+  if (A.kind === 'strings'){   // strings (one per chord voice), each ringing in its own harmonic, kicked by the sound
+    const nS = 4, br = v(/bright|struct|tone/i, .5);
+    for (let j = 0; j < nS; j++){ const y = H * (j + 1) / (nS + 1), h = j + 1, A2 = (3 + 10 * e) / (1 + j * 0.4), w = 2 * Math.PI * (3 + j * 1.7 + br * 4);
+      g.strokeStyle = j === 0 ? 'rgba(255,90,31,' + (.3 + .5 * e).toFixed(2) + ')' : ink((.2 + .3 * e).toFixed(2)); g.lineWidth = 1.4; g.beginPath();
+      for (let x = 6; x <= W - 6; x += 2){ const u = (x - 6) / (W - 12), yy = y + Math.sin(Math.PI * h * u) * Math.cos(ts * w) * A2; x === 6 ? g.moveTo(x, yy) : g.lineTo(x, yy); } g.stroke();
+      g.fillStyle = ink(.3); g.fillRect(4, y - 3, 2, 6); g.fillRect(W - 6, y - 3, 2, 6); }
+    return; }
+  if (A.kind === 'bands'){   // vocoder bands lighting with the sound
+    const N = 16, bw = (W - 12) / N; if (!A.b) A.b = new Float32Array(N);
+    for (let i = 0; i < N; i++){ const tgt = e * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(ts * (2.1 + i * 0.37) + i * 1.3))) * (1 - Math.abs(i - N * 0.35) / N * 0.8); A.b[i] += (tgt - A.b[i]) * Math.min(1, dt * 14);
+      const h = A.b[i] * (H - 16); g.fillStyle = i % 5 === 2 ? 'rgba(255,90,31,.5)' : ink(.22); g.fillRect(6 + i * bw + 1, H - 8 - h, bw - 2, h); }
+    return; }
+  if (A.kind === 'swirl'){   // modulation: points turning at the rate, spread by the depth
+    const rt = v(/rate|speed|freq/i, .4), dp = v(/depth|amount|amt|width|intens/i, .5), cx = W / 2, cy = H / 2, R = Math.min(W, H) * (0.18 + dp * 0.26);
+    for (let i = 0; i < 24; i++){ const a = ts * (0.4 + rt * 3) * (i % 2 ? 1 : -0.6) + i * 0.785, r = R * (0.45 + (i % 3) * 0.28) * (1 + e * 0.25);
+      g.fillStyle = i % 6 ? ink((.18 + .3 * e).toFixed(2)) : AC; g.beginPath(); g.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.8, 1.6 + e * 1.4, 0, 7); g.fill(); }
+    return; }
+}
 // SPRING (owner, 3 Nov: "a cool spring animation like in the pump spring plugin but vertical, with the text on top"): the
 // springs of a spring reverb hang down its column, coiled; the sound's level kicks them and the kick runs down each coil as a
 // wave and dies away over DECAY. TENSION tightens the coils and speeds the wave, DRIP adds a fast shimmer, WOBBLE a slow
@@ -28348,6 +28444,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [390, '3 Nov', ['More FX bar animations behind the values, each showing what its effect does as it plays: reverbs bounce the sound around a room the size of their SIZE, granular effects pop grains, drive and saturation show the wave being pushed into clipping, crushers and the vintage sampler cut it into steps, vinyl spins a record, resonators ring strings, the vocoder lights its bands and the swirly modulation effects turn. Effects that already have a display (dynamics meters, EQ and filter curves, echo taps, Flex, Step gate, Retrigger) keep theirs.']],
   [389, '3 Nov', ['The side panel is restyled like the FX bar: the status and meters and the INSTRUMENTS list are cards with dark title bars, and the instruments wrap to the panel’s width and scroll inside their card, so none are cut off. With the instrument list on, each instrument flashes as its notes play, as the pads do on the Synth page.', 'Acid line…: picking an instrument plays a short note on it, and instruments no phrase uses yet are marked · free.']],
   [388, '3 Nov', ['Track numbers (Arrange, Song, Mixer): Alt/⌥-click mutes the track, as Alt-click mutes a block; a plain click picks the track, a double-click names it without muting it on the way, a right-click still solos. (Touch is as before.)', 'Alt/⌥+T adds a new phrase on the next empty track, as Ctrl/⌘+T does; it works in a browser tab, where Chrome keeps Ctrl/⌘+T.']],
   [387, '3 Nov', ['Acid line… finds the song’s key: KEY From the song uses the Project SCALE if you set one, else works it out from the notes your synths and MIDI instruments play (drums never count) and shows what it found; Set by hand keeps your Scale and Root.', '…chains and …waves: a drag on the background moves the view; Shift-drag draws the selection box.']],
