@@ -1023,11 +1023,14 @@ body:not(.legon) .tside .tlegend{display:none}
 .tside .tinlw{flex:1 1 auto; gap:0; min-height:90px}
 .tside .tinlw[hidden]{display:none}
 .tside .tinlh{background:var(--ink); color:var(--inv); padding:5px 8px; font-size:var(--fs-3); letter-spacing:.06em; flex:none}
-.tside .tinl{grid-auto-flow:row; grid-template-rows:none; grid-template-columns:repeat(auto-fill, minmax(92px, 1fr)); gap:3px; padding:6px; overflow-y:auto; overflow-x:hidden; flex:1 1 auto; min-height:0; align-content:start}
+.tside .tinl{grid-auto-flow:row; grid-template-rows:none; grid-template-columns:repeat(auto-fill, minmax(76px, 1fr)); gap:3px; padding:6px; overflow-y:auto; overflow-x:hidden; flex:1 1 auto; min-height:0; align-content:start}
 .tside .tinl button{border:1px solid var(--line); background:var(--panel2, transparent); padding:3px 5px; border-radius:0; min-height:max-content}
 /* (owner, 3 Nov: "now I can't see instruments"): on a short panel the grid squeezed its rows to slivers; rows keep their
    height and the list scrolls instead */
 .tside .tinl{grid-auto-rows:max-content}
+/* ...and the card always has room for about 16 of them (8 rows of 2; owner, 3 Nov), the side panel scrolling instead when the
+   window is short */
+.tside .tinlw{min-height:calc(8 * 29px + 12px + 26px)}
 .tside .tinl button.on{background:var(--ink); color:var(--inv); border-color:var(--ink)}
 /* PLAYING (owner, 3 Nov: "flash them as they play, just like on the synth screen"): an instrument lights as its notes sound */
 .acidask option.acidfree{background:color-mix(in srgb, var(--meter-ok, #4fd18a) 16%, var(--panel, #fff))}
@@ -20414,7 +20417,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 396;
+const BUILD = 397;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -28532,6 +28535,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [397, '3 Nov', ['Side panel: the INSTRUMENTS card always has room for about 16 instruments in two columns; on a short window the side panel scrolls instead of squeezing it.']],
   [396, '3 Nov', ['…chains: a folded Track In, Chain Out, Sidechain In or Sidechain Out shows what it is connected to in its title (Track In · Track 5).']],
   [395, '3 Nov', ['Song and Arrange: Enter on a block makes it the current pattern, as Enter on a note does, so Enter on an empty cell places it: arrange from the keyboard. Enter twice on a block still makes a unique copy.', 'Stopping with the cursor on an empty track (STOP CURSOR: THERE) keeps it on its track; only the row follows.', 'Side panel: on a short window the INSTRUMENTS list scrolls instead of squeezing the instruments to unreadable slivers.']],
   [394, '3 Nov', ['A slow double-click on an empty Arrange cell (a Mac’s default double-click speed) now makes the new pattern and opens it on that track; it used to do nothing, so the phrase stayed on the track it was on.', 'Shift+▲ on the top row of a phrase wraps round and selects the whole phrase; Shift+▼ on the bottom row too.', 'Alt/⌥+B opens Acid line on Phrase and the Pattern view; Alt/⌥+S opens Song settings from anywhere.', 'Stopping no longer moves the edit cursor to where playback stopped (Settings → STOP CURSOR: STAYS is now the default; Alt+G still jumps to the playhead).']],

@@ -119,6 +119,11 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (24): side instruments card fits ~16 (build 397)
+
+- `.tside .tinlw{min-height:calc(8 * 29px + 12px + 26px)}` and columns minmax(76px): two columns of 8 rows at the
+  panel's 236 px; the side panel (overflow:auto) scrolls on short windows.
+
 ## 3 Nov (23): folded I/O titles in …chains (build 396)
 
 - chains/index.html: `IO_KEY` / `ioTitle(n)` (n.tEl is the title span): collapsed trackIn / chainOut / scin / scout add
