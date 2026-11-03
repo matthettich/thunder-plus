@@ -2076,7 +2076,7 @@ function makeJack(n, port, kind, dir, small){
   const j = h('span', {class: small ? 'jack small' : 'jack', 'data-id': n.m.id, 'data-port': port, 'data-dir': dir, 'data-kind': kind,
     title: pt ? pt.t : small ? plabel(n.m.type, port.slice(2)) + ' modulation input' : portName(n.m.type, port, dir) + (dir === 'in' ? ' input' : ' output')});
   n.jacks[dir + ':' + port] = j;
-  j.addEventListener('pointerdown', e => onJackDown(e, j));
+  j.addEventListener('pointerdown', e => { if (e.button !== 0 || (MAC && e.ctrlKey && e.pointerType !== 'touch')) return; onJackDown(e, j); });   // left button only (3 Nov: a right or middle click started a cable)
   return j;
 }
 function portEl(n, port, kind, dir){
@@ -2088,7 +2088,7 @@ function portEl(n, port, kind, dir){
   // SC LED (owner, 19 Oct): a light beside an SC input that flashes with the sidechain the module hears (a cable into
   // SC, or the track or send its Source picks), so you can see the sidechain at work.
   if (dir === 'in' && port === 'sc'){ const led = h('i', {class:'scled', 'aria-hidden':'true', title:'Lights with the sidechain this module hears'}); row.append(led); n.scLed = { el:led, v:0, shown:-1 }; }
-  row.addEventListener('pointerdown', e => { if (e.target !== j && e.button !== 2) onJackDown(e, j); });
+  row.addEventListener('pointerdown', e => { if (e.target !== j && e.button === 0 && !(MAC && e.ctrlKey && e.pointerType !== 'touch')) onJackDown(e, j); });
   return row;
 }
 // Keep each track's chain input and output aligned, and only one of each per track. A Chain Out on a
@@ -2204,10 +2204,32 @@ function slider(n, key, spec){
       else lastValTap = {t:now, x:cx, y:cy};
     }
   });
-  inp.addEventListener('pointerdown', () => { store.snapshot(); armLearn(n, key, r); });
+  // ONE SLIDER (mouse audit, 3 Nov; Thunder Plus's rule, as its own sliders and this control in its bottom panel): with a mouse
+  // a drag moves the value from where it is (no jump to the click), Shift is fine (a tenth), holding Ctrl/⌘ takes big steps,
+  // Alt/⌥- or Ctrl/⌘-click resets (Ctrl+click on a Mac is the right-click menu). Touch keeps the plain slider.
+  const reset = () => { store.snapshot(); setParam(n, key, def); inp.value = n.m.params[key]; show(); };
+  inp.addEventListener('pointerdown', e => {
+    store.snapshot(); armLearn(n, key, r);
+    if (e.pointerType === 'touch') return;
+    if (e.button !== 0 || (MAC && e.ctrlKey)){ if (e.button === 0) e.preventDefault(); return; }
+    e.preventDefault(); e.stopPropagation();
+    if (e.altKey || (MAC ? e.metaKey : e.ctrlKey)){ reset(); return; }
+    const w = Math.max(40, inp.getBoundingClientRect().width), lo = +min, hi = +max, st = +step || 0, id = e.pointerId;
+    let v = +inp.value, lastX = e.clientX;
+    try { inp.setPointerCapture(id); } catch(_){}
+    inp.classList.add('drag');
+    const mv = ev => { if (ev.pointerId !== id) return;
+      const dx = ev.clientX - lastX; lastX = ev.clientX;
+      v = Math.max(lo, Math.min(hi, v + dx / w * (hi - lo) * (ev.shiftKey ? 0.1 : (ev.ctrlKey || ev.metaKey) ? 4 : 1)));
+      const q = st ? Math.max(lo, Math.min(hi, lo + Math.round((v - lo) / st) * st)) : v;
+      if (q !== +inp.value){ inp.value = q; inp.dispatchEvent(new Event('input', {bubbles:true})); } };
+    const end = ev => { if (ev.pointerId !== id) return; inp.classList.remove('drag');
+      for (const t of ['pointermove', 'pointerup', 'pointercancel', 'lostpointercapture']) inp.removeEventListener(t, t === 'pointermove' ? mv : end); };
+    inp.addEventListener('pointermove', mv); for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) inp.addEventListener(t, end);
+  });
   inp.addEventListener('input', () => { setParam(n, key, +inp.value, true); out.textContent = fmt(+inp.value); });
-  inp.addEventListener('dblclick', () => { store.snapshot(); setParam(n, key, def); });
-  inp.title = 'Double-click to reset';
+  inp.addEventListener('dblclick', reset);
+  inp.title = 'Drag to change (Shift: fine) · double-click or Alt-click to reset';
   const r = h('div', {class:'row sl' + (MIXT.has(n.m.type) && /^p\d+$/.test(key) ? ' pan' : ''), 'data-jackhost':'', 'data-id': n.m.id, 'data-key': key},   // MIXER PAN: drawn lighter
     makeJack(n, 'p:' + key, 'mod', 'in', true), h('span', {class:'lbl', text: label}), h('div', {class:'rng'}, inp, mark), out);
   n.ctl[key].row = r; n.ctl[key].out = out; n.ctl[key].mark = mark; n.ctl[key].fmt = fmt;
@@ -2454,10 +2476,10 @@ function buildNode(m){
   n.el.style.left = m.pos[0] + 'px'; n.el.style.top = m.pos[1] + 'px';
   n.el.style.zIndex = ++zTop;
   paintNote(n);
-  n.el.addEventListener('pointerdown', e => { e.stopPropagation(); n.el.style.zIndex = ++zTop; maxBodyDown(e, n); });
+  n.el.addEventListener('pointerdown', e => { if (e.button === 1 && e.pointerType === 'mouse') return; e.stopPropagation(); n.el.style.zIndex = ++zTop; if (MAC && e.ctrlKey && e.pointerType === 'mouse') return; maxBodyDown(e, n); });   // middle: the canvas pans; Mac Ctrl+click: the menu (3 Nov)
   head.addEventListener('dblclick', e => { if (e.target.closest('button')) return; store.snapshot(); setCollapsed(n, !m.collapsed); });
   head.addEventListener('pointerdown', e => {
-    if (e.target.closest('button') || e.button === 2) return;
+    if (e.target.closest('button') || e.button !== 0 || (MAC && e.ctrlKey && e.pointerType === 'mouse')) return;   // left button only (3 Nov: a middle-drag moved it)
     e.preventDefault();
     if (maxOperate(e)) return;   // MAX: Ctrl/⌘-click works the module, never selects or moves it
     if (e.altKey && maxHelpPend(e, n)) return;   // MAX: Alt-click (no drag) opens its help; Alt-drag still copies
@@ -2608,8 +2630,10 @@ function syncCableEls(){
     if (cableEls.has(c)) continue;
     const el = cableGroup(cableKind(c));
     const hit = svgEl('path', {fill:'none', stroke:'transparent', 'stroke-width':16, 'pointer-events':'stroke', class:'hit'});
-    const title = svgEl('title', {}); title.textContent = 'Double-click to remove'; hit.append(title);
+    const title = svgEl('title', {}); title.textContent = 'Double-click or right-click to remove'; hit.append(title);
+    hit._cable = c;   // the right-click menu's "Remove cable" (3 Nov)
     hit.addEventListener('pointerdown', ev => {
+      if (ev.button !== 0 || (MAC && ev.ctrlKey && ev.pointerType !== 'touch')) return;   // a right-click (Ctrl+click on a Mac) is the menu
       ev.stopPropagation();
       // A cable lying over a jack shouldn't block it: pass the press through to the jack.
       const jack = document.elementsFromPoint(ev.clientX, ev.clientY).find(x => x.classList && x.classList.contains('jack'));
@@ -2700,9 +2724,14 @@ function onJackDown(e, jack){
   }
   const el = cableGroup(anchor.kind); el.g.style.opacity = .8; svg.append(el.g);
   drag = { anchor, el, x: e.clientX, y: e.clientY, pts: [] };
+  if (e.pointerType !== 'touch'){ try { jack.setPointerCapture(e.pointerId); } catch(_){} }   // keeps the drag when the pointer leaves the frame (3 Nov)
   const want = anchor.dir === 'out' ? 'in' : 'out';
   document.querySelectorAll('.jack[data-dir="' + want + '"]').forEach(j => { if (j.dataset.id !== anchor.id) j.classList.add('target'); });
-  const mv = ev => { drag.x = ev.clientX; drag.y = ev.clientY; drag.shift = ev.shiftKey; autoPanAt(ev); };
+  const mv = ev => {
+    // RELEASED OUTSIDE (3 Nov): a mouse let go outside the editor sent no pointerup here, so the cable stayed and the
+    // canvas kept panning at the edge: back with no button down, the drag is cancelled.
+    if (ev.pointerType === 'mouse' && ev.buttons === 0 && !drag.drawing && !drag.armed){ up({ type:'pointercancel', manual:true }); return; }
+    drag.x = ev.clientX; drag.y = ev.clientY; drag.shift = ev.shiftKey; autoPanAt(ev); };
   const findTarget = ev => {
     for (const x of document.elementsFromPoint(ev.clientX, ev.clientY)){
       if (!x.closest) continue;
@@ -2899,8 +2928,8 @@ window.addEventListener('pointerup', touchEnd, true); window.addEventListener('p
 
 ws.addEventListener('pointerdown', e => {
   if (drag) return;
-  if (e.target.closest('.node, .hint, .hit, .decor, .dock, .bend')) return;
-  if (e.button === 2) return;
+  if (e.button !== 1 && e.target.closest('.node, .hint, .hit, .decor, .dock, .bend')) return;   // a middle-drag pans over anything (3 Nov)
+  if (e.button === 2 || (MAC && e.ctrlKey && e.pointerType === 'mouse')) return;   // the menu (Ctrl+click on a Mac, 3 Nov)
   // MAX (Thunder Plus owner, 27 Oct, Phase 2): with a mouse, a drag on the background draws a selection box, as in Max's
   // edit mode (it replaces the selection; with Shift it adds). The wheel or a two-finger swipe pans, and so does a
   // middle-button drag; on a touch screen a drag still pans.
@@ -2912,11 +2941,12 @@ ws.addEventListener('pointerdown', e => {
     const box = ev => [Math.min(sx, ev.clientX), Math.min(sy, ev.clientY), Math.max(sx, ev.clientX), Math.max(sy, ev.clientY)];
     const mv = ev => { const [a, b, c, d] = box(ev); Object.assign(lasso.style, { left:(a - r0.left) + 'px', top:(b - r0.top) + 'px', width:(c - a) + 'px', height:(d - b) + 'px' }); };
     const up = ev => {
-      ws.removeEventListener('pointermove', mv); ws.removeEventListener('pointerup', up); lasso.hidden = true;
+      ws.removeEventListener('pointermove', mv); ws.removeEventListener('pointerup', up); ws.removeEventListener('pointercancel', up); lasso.hidden = true;
+      if (ev.type === 'pointercancel') return;
       const [a, b, c, d] = box(ev);
       for (const n of nodes.values()){ const r = n.el.getBoundingClientRect(); if (r.right > a && r.left < c && r.bottom > b && r.top < d) setSel(n.m.id, true); }
     };
-    mv(e); ws.addEventListener('pointermove', mv); ws.addEventListener('pointerup', up);
+    mv(e); ws.addEventListener('pointermove', mv); ws.addEventListener('pointerup', up); ws.addEventListener('pointercancel', up);
     return;
   }
   if (e.pointerType !== 'mouse') clearSel();   // (a middle-button pan keeps the selection)
@@ -3108,8 +3138,12 @@ window.addEventListener('keydown', e => {
   for (const id of ['filemenu', 'setmenu']) document.getElementById(id).hidden = true;
 });
 window.addEventListener('pointerdown', e => { if (!ctx.hidden && !ctx.contains(e.target)) hideMenu(); }, true);
+ws.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });   // a middle-drag pans: no autoscroll cursor (3 Nov)
 ws.addEventListener('contextmenu', e => {
   e.preventDefault();
+  // A CABLE (mouse audit, 3 Nov): right-click it to remove it (double-click still does); it had no menu of its own.
+  const hc = e.target.closest && e.target.closest('.hit'), cab = hc && hc._cable;
+  if (cab && doc.cables.includes(cab)){ showMenu(e.clientX, e.clientY, [['Remove cable', () => { if (!doc.cables.includes(cab)) return; store.snapshot(); disconnect(cab); toast('Cable removed.'); }]]); return; }
   const el = e.target.closest('.node'), id = el && el.dataset.id;
   if (id && !selected.has(id)){ clearSel(); setSel(id, true); }
   const sel = [...selected], n = sel.length, items = [];

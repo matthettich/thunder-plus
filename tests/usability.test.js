@@ -131,8 +131,8 @@ test('guards: KEYS mode modifiers, the Synth page keys, dialogs over Settings, u
   assert.match(src, /addEventListener\('beforeunload', e => \{ if \(selfReload \|\| DESK \|\| !projDirty\) return; e\.preventDefault\(\); e\.returnValue = ''; \}\);/, 'B8');
   assert.match(src, /selfReload = true;/, 'B8: the update reload passes');
   // M17: only the left button drags a mixer fader
-  assert.match(src, /closest\('\.mfbar:not\(\.mobar\)'\); if \(!b \|\| tv !== 'mixer'\) return;[^\n]*\n  if \(e\.button !== 0\) return;/, 'M17');   // (27 Oct: the master OUT bar has its own handler)
-  assert.match(src, /closest\('\.mobar'\); if \(!b \|\| tv !== 'mixer' \|\| e\.button !== 0\) return;/, 'M17: the master OUT bar too');
+  assert.match(src, /closest\('\.mfbar:not\(\.mobar\)'\); if \(!b \|\| tv !== 'mixer'\) return;[^\n]*\n  if \(e\.button !== 0 \|\| ctxPress\(e\)\) return;/, 'M17');   // (27 Oct: the master OUT bar has its own handler)
+  assert.match(src, /closest\('\.mobar'\); if \(!b \|\| tv !== 'mixer' \|\| e\.button !== 0 \|\| ctxPress\(e\)\) return;/, 'M17: the master OUT bar too');
   // M3: a …chains slider row in the bottom panel opens one menu (its own, with the panel items), not that and a modal
   assert.match(src, /makeRow\(def, x\.p, getObj, \{[^}]*menu:\(\) => dkcItems\(x\)\}\);/, 'M3: the slider row carries the items');
   assert.match(src, /if \(Array\.isArray\(x\.o\) && x\.o\.length\) r\.addEventListener\('contextmenu', e => \{ e\.preventDefault\(\); dkcMenu\(x, e\); \}\);/, 'M3: only list rows get the second menu');
@@ -208,7 +208,7 @@ test('Phase 2 editors: modules take Max/MSP edit-mode gestures', () => {
     assert.match(w, /if \(e\.altKey && maxHelpPend\(e, n\)\) return;/, f + ': Alt-click opens help (Alt-drag copies)');
     assert.match(w, /const box = e\.pointerType === 'mouse' && e\.button === 0;\n  if \(box && !e\.shiftKey\) clearSel\(\);\n  if \(box \|\| e\.shiftKey\)\{/, f + ': a background drag is a selection box');
     assert.match(w, /if \(\(e\.key !== 'Delete' && e\.key !== 'Backspace'\)[^\n]*\n[^\n]*\n  e\.preventDefault\(\); store\.snapshot\(\); const ids = \[\.\.\.selected\]; for \(const x of ids\) removeModule\(x\);/, f + ': Delete removes the selection');
-    assert.match(w, /n\.el\.addEventListener\('pointerdown', e => \{ e\.stopPropagation\(\); n\.el\.style\.zIndex = \+\+zTop; maxBodyDown\(e, n\); \}\);/, f + ': a click on a module selects it');
+    assert.match(w, /n\.el\.addEventListener\('pointerdown', e => \{ if \(e\.button === 1 && e\.pointerType === 'mouse'\) return; e\.stopPropagation\(\); n\.el\.style\.zIndex = \+\+zTop; if \(MAC && e\.ctrlKey && e\.pointerType === 'mouse'\) return; maxBodyDown\(e, n\); \}\);/, f + ': a click on a module selects it');
   }
 });
 
@@ -279,4 +279,23 @@ test('wheel on a scrollbar (3 Nov): scrolls the bar it is over and stops the app
   e = ev(200, 60, { ctrlKey: true }); c.api.sbWheel(e); assert.ok(!e.stopped, 'Ctrl+wheel (zoom) is left alone');
   style.overflowY = 'hidden'; assert.equal(c.api.sbHit(el, 200, 60), '', 'no overflow, no bar');
   el.offsetWidth = 186; style.overflowY = 'auto'; assert.equal(c.api.sbHit(el, 196, 60), '', 'an overlay bar (no room) is not taken');
+});
+
+test('mouse audit (3 Nov): Mac Ctrl+click is the menu, middle-click mutes, top menus switch, a notch is a row, editor sliders', () => {
+  const src = H.read('index.html');
+  assert.match(src, /const ctxPress = e => e\.button === 2 \|\| \(MACK && e\.ctrlKey && e\.button === 0 && e\.pointerType !== 'touch'\);/, 'ctxPress');
+  assert.match(src, /if \(ctxPress\(e\)\) return true;   \/\/ a right-click \(Ctrl\+click on a Mac/, 'Arrange');
+  assert.match(src, /MIDDLE-CLICK \(mouse audit, 3 Nov\)[\s\S]{0,500}toggleBlockMute\(y, x\)/, 'Song middle-click mutes');
+  assert.match(src, /!onTopMenuBtn\(e\.target\)\)\{ gfileToggle\(false\); swallowTap\(e\); \}/, 'File: another menu button is not outside');
+  assert.match(src, /!onTopMenuBtn\(e\.target\)\)\{ geditToggle\(false\); swallowTap\(e\); \}/, 'Edit too');
+  assert.match(src, /b\.addEventListener\('pointerenter', e => \{ if \(e\.pointerType !== 'mouse'/, 'hover switches menus');
+  assert.match(src, /const n = wheelNotch\(WK_ROWS, e\); if \(!n\) return;/, 'a row a notch');
+  assert.match(src, /if \(e\.ctrlKey && !e\.altKey\) return;   \/\/ CTRL\+WHEEL/, 'Ctrl+wheel moves no cursor');
+  assert.match(src, /input:not\(\[type=range\]\)/, 'no browser menu on sliders');
+  for (const f of ['waves/index.html', 'chains/index.html']) {
+    const w = H.read(f);
+    assert.match(w, /ONE SLIDER \(mouse audit, 3 Nov[\s\S]{0,900}if \(e\.altKey \|\| \(MAC \? e\.metaKey : e\.ctrlKey\)\)\{ reset\(\); return; \}[\s\S]{0,800}ev\.shiftKey \? 0\.1/, f + ': the host slider rule');
+    assert.match(w, /if \(ev\.pointerType === 'mouse' && ev\.buttons === 0 && !drag\.drawing && !drag\.armed\)/, f + ': a cable let go outside ends');
+    assert.match(w, /\['Remove cable', \(\) =>/, f + ': Remove cable');
+  }
 });

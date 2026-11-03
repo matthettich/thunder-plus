@@ -116,6 +116,36 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (7): mouse audit, the bug list (build 380)
+
+From the 3 Nov mouse audit (see "3 Nov (6)" for the owner's calls). Each change has a "3 Nov" / "mouse audit" comment.
+- **Mac Ctrl+click = right-click** everywhere: `ctxPress(e)` (by `MACK`) in Arrange's `sxDown` (it started a drag and dropped
+  the selection, so the menu acted on one block), the host slider capture (it dragged), pads (played), Mixer VOL / OUT bars,
+  the strip fader and FILL; the editors' background, module body and title, jacks and cables (`MAC`). Linux Chrome sends no
+  contextmenu for an emulated Ctrl+click, so "the menu opens" can only be checked on a real Mac.
+- **Top menus:** the outside-click closers skip every top menu button (`TOP_MENU_BTNS`, `onTopMenuBtn`), so one click
+  switches; with one open, `pointerenter` on another opens it (mouse, not Mobile); a click within 600 ms of that hover keeps it.
+- **Song text grid middle-click** mutes / unmutes a filled block (gridDown, before the row numbers); other screens ignore
+  extra buttons; `mousedown` button 1 is prevented on the grid (no autoscroll cursor).
+- **Tracker wheel:** `wheelNotch(key, e)`: a notch (≥ 50 px) is one step, small deltas add up per 100 px (`wheelSteps`), for
+  rows, Shift+wheel selection and Alt+wheel values (they were a step per 40 px: 2–3 a notch). Ctrl+wheel without Alt returns
+  (a pinch never moves the cursor).
+- **Pattern view right-click** (its capture pointerdown): the clicked cell becomes the cursor (another track's opens via
+  `pvGo`) unless inside the selection, then gridDown / cmdCtx open the menu there.
+- **Arrange sideways:** a swipe / tilt (|dx| > |dy|, no Shift) scrolls `arrGrid.scrollLeft` when wider than its box.
+- **Browser menu:** the global contextmenu block now exempts only text-like inputs (not range / checkbox / radio / button).
+- **…chains / …waves (both files, outside the shared block):** sliders take the host rule (mouse: relative drag, Shift ×0.1
+  re-read each move, holding Ctrl/⌘ ×4, Alt / Ctrl / ⌘-click resets, Mac Ctrl+click = menu; touch keeps the native slider);
+  jacks and cables left button only; a cable drag captures the pointer and ends when a mouse comes back with no button
+  (`buttons === 0`); right-click a cable → "Remove cable" (`hit._cable`); middle-drag pans over modules; the lasso ends on
+  pointercancel.
+- Tests: `tests/usability.test.js` "mouse audit (3 Nov)" plus the updated M17 / editor checks; `npm test` 118/118; headless
+  checks (menus, wheel, Pattern view, Song middle-click, editors' sliders and cables, Mac emulation) passed;
+  `tools/wheel-scrollbar.mjs` passes.
+- **Left for the next builds:** the one rule for value controls (double-click reset, right-click menu, Shift held through
+  every drag (faders, OUT, strip, FX bar, pump), Ctrl/⌘ big steps, wheel after the rest everywhere), and the Song / header /
+  fader calls.
+
 ## 3 Nov (6): Arrange pages with FOLLOW OFF; the mouse audit (build 379)
 
 - Owner: "I still want the arrange window to page down if the play head passes the end, even if follow is turned off."
