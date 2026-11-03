@@ -26631,7 +26631,7 @@ function pvLines(c, L, cc, rsel, playRows){
   const G = [];
   for (const t of pvOrder()){
     const cid = row[t] != null ? row[t] : -1, cur = t === cTrack;
-    if (!cur && cid < 0 && pvFold){
+    if (!cur && cid < 0 && pvFold && !isBusT(t)){   // BUSES never fold (owner, 2 Nov: a bus always shows in the Pattern view)
       const g = G[G.length - 1];
       if (g && g.fold && t !== MT && g.t1 === t - 1) g.t1 = t; else G.push({fold:true, t, t1:t});
       continue;
