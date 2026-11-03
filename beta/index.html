@@ -14819,7 +14819,10 @@ const PUMP_WIN = new Set(['gate', 'tune', 'chop']);   // (31 Oct) the creative o
 const PUMP_NOTES = new Set(['vox', 'tune', 'twang', 'stutter', 'chop']);
 // where each one sits in the effect picker: beside Thunder's own of the same kind
 const PUMP_GROUP = {tube:'Drive and lo-fi', crush:'Drive and lo-fi', snap:'Dynamics and EQ', gate:'Rhythmic', stutter:'Rhythmic', chop:'Rhythmic',
-  echo:'Delays', spring:'Reverbs', verb:'Reverbs', grain:'Spectral and granular', vox:'Pitch and voice', tune:'Pitch and voice', swirl:'Modulation', twang:'Resonators'};
+  echo:'Delays', spring:'Reverbs', verb:'Reverbs', grain:'Spectral and granular', vox:'Pitch and voice', tune:'Pitch and voice', swirl:'Modulation', twang:'Resonators',
+  // the mastering ones where you'd look for them (owner, 2 Nov: pCOMP wasn't findable; they were in a group at the very end)
+  eq:'Dynamics and EQ', comp:'Dynamics and EQ', limit:'Dynamics and EQ', calm:'Dynamics and EQ', tone:'Dynamics and EQ', band:'Dynamics and EQ', master:'Dynamics and EQ',
+  heat:'Drive and lo-fi', wide:'Utility', meter:'Utility'};
 // The boxes on the FX screen, in order. 'b#_x' = the selected band's x (BAND picks it: f.sel, a Thunder field, not a
 // plugin parameter); '@sck' = Thunder's sidechain source for COMP's External sidechain (f.sck, as the MODFX slots have it).
 const PUMP_BOX = {
@@ -15107,7 +15110,7 @@ function pumpLatTxt(t, k){
 // The track effects in their groups (the pad list's: FX_GROUPS, MODFX.group or FX_GROUP), the everyday ones first in
 // each group (FXT_FIRST), then the rest in the old order. The slot picker shows the group names as headings; a slot
 // keeps its effect by name, so the order can change freely.
-const FXT_FIRST = ['compressor', 'limiter', 'ngate', 'eq', 'filter', 'cut', 'drive', 'odrive', 'density', 'chorus', 'flanger', 'phaser', 'tremolo', 'autopan',
+const FXT_FIRST = ['compressor', 'pcomp', 'limiter', 'ngate', 'eq', 'peq', 'filter', 'cut', 'drive', 'odrive', 'density', 'chorus', 'flanger', 'phaser', 'tremolo', 'autopan',
   'sdelay', 'delay', 'room', 'plate', 'reverb', 'pshift', 'pump', 'utility', 'width'];
 const fxtGroup = k => (MODFX[k] && MODFX[k].group) || FX_GROUP[k] || 'More';
 const FXT_LIST = (() => {
@@ -27070,6 +27073,8 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
     } finally { Math.random = R; }
     return out;
   },
+  // The FX picker's list for track t (or the master: t = NT), with groups (for picker checks).
+  fxPick(t){ return fxtL(t).map(k => fxtGroup(k) + ' · ' + TFX[k].n); },
   // Every track effect: its group, factory preset count and controls (for preset work).
   fxInfo(){ return Object.keys(TFX).filter(k => !isPumpT(k)).map(k => ({k, n:TFX[k].n, long:TFX[k].long, g:fxtGroup(k), fac:(FX_FACTORY[k] || []).length, facv:(FX_FACTORY[k] || []), ps:(TFX[k].ps || []).map(p => ({k:p.k, l:p.l, min:p.min, max:p.max, d:p.d, names:p.names || null}))})); },
   // The open phrase's rows, and the PSL command's number (for generator checks).
