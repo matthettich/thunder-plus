@@ -119,6 +119,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (19): transpose lock plays the first note (build 392)
+
+- Owner: with the top bar's transpose lock on, ▲ / ▼ should play the first note being transposed. `keyTransArrow`: ▲ / ▼
+  transpose (`transposeSel(±1, true)`) and stay armed (it disarmed after one press); another arrow, Esc or the button turn it
+  off. `xposeHear()` plays the first note in `xposeScope()` (its row's instrument, else the phrase's last one before it,
+  else defInst) for 280 ms.
+
 ## 3 Nov (18): Acid on the 16th grid, composed lines; calmer animations (build 391)
 
 - Owner: Acid sounded random; "most notes fell on odd numbered steps, which put them off of the clock". acidLine now works in
