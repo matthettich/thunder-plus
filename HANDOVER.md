@@ -119,6 +119,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (27): FX bar keys and FX screen follow (build 400)
+
+- dkFbFoc / dkFbPick / dkFbKey (window keydown capture): a click on a bar value (.fr) gives the bar the keys; ▲▼ rows,
+  ◀▶ columns, Ctrl/⌘+arrows r._fbSet; Esc or a pointerdown outside a .fr ends it (#dkFxBar.kfoc; the pick dims without).
+  With tv 'fx', dkFbPick sets cFxT / cFxS and cs.fx.y = FXSLOTS + 2 + param index (rows: TRACK, slots, ACTIVE, params).
+
 ## 3 Nov (26): an animation for every effect (build 399)
 
 - fxAnimKind: after the old kinds, everything but flex / sgate / retrig / pmeter (and dynamics, spring) gets one: Delays or

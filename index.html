@@ -1742,6 +1742,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkFxBar .dkfc .fr b{opacity:1; color:var(--muted)}
 #dkFxBar .dkfc .fr span{font-weight:700}
 #dkFxBar .dkfc .fr.sel{background:var(--ink); color:var(--inv)} #dkFxBar .dkfc .fr.sel b{color:inherit; opacity:.75}
+#dkFxBar:not(.kfoc) .dkfc .fr.sel{background:color-mix(in srgb, var(--ink) 55%, transparent)}   /* (the keys are elsewhere: the pick shows dimmer) */
 #dkFxBar .dkfc .fviz{flex:1 1 0; min-height:0; position:relative; margin:0 6px 6px}
 /* SPRING (owner, 3 Nov): a spring reverb's column has its springs drawn behind its values (dkSpring), hanging down the
    box and shaking with the sound; the values sit over them with a halo of the panel colour so they stay readable. */
@@ -20498,7 +20499,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 399;
+const BUILD = 400;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25057,6 +25058,34 @@ function deckFx(){
    (as the FX screen lists them): drag up or down, Alt+wheel a step, double-click its default, right-click to type. A thin
    meter under each name shows the slot's level (where its effect has one), else how much of the slot is on. */
 let dkFbSig = '', dkFbVals = [], dkFbSel = '';   // dkFbSel: the value last clicked (track:slot:param), highlighted
+/* FX BAR KEYS (owner, 3 Nov: "when the focus is in the bottom FX bar, key commands only affect that bar and/or the upper FX
+   display follows the parameter being edited"): a click on a value gives the bar the keys (dkFbFoc) until a click elsewhere
+   or Esc: ▲▼ pick the value above / below, ◀▶ the same value in the next effect, Ctrl/⌘+arrows change it (◀▶ ±1, ▲▼ more);
+   every other key works as before. The FX screen, when it is open above, follows the value picked (its slot and row). */
+let dkFbFoc = false;
+function dkFbPick(r){
+  const bar = $('dkFxBar'); if (!bar || !r) return;
+  dkFbSel = r.dataset.sel; for (const x of bar.querySelectorAll('.fr.sel')) x.classList.remove('sel'); r.classList.add('sel');
+  const F = r._fb; if (F && tv === 'fx'){ cFxT = F.t; cFxS = F.k; cs.fx.y = FXSLOTS + 2 + F.i; draw(); }
+  try { r.scrollIntoView({block:'nearest'}); } catch(_){}
+}
+function dkFbKey(e){
+  if (!dkFbFoc) return false;
+  const bar = $('dkFxBar'); if (!bar || !bar.isConnected || !bar.offsetParent){ dkFbFoc = false; return false; }
+  if (e.target && e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"]')) return false;
+  if (e.key === 'Escape' && !e.ctrlKey && !e.metaKey && !e.altKey){ dkFbFoc = false; bar.classList.remove('kfoc'); return true; }
+  const dir = {ArrowUp:'u', ArrowDown:'d', ArrowLeft:'l', ArrowRight:'r'}[e.key]; if (!dir || e.altKey || e.shiftKey) return false;
+  const r = bar.querySelector('.fr.sel'); if (!r || !r._fb) return false;
+  const mod = e.ctrlKey || e.metaKey, F = r._fb;
+  if (mod){ const big = F.q.names ? (F.q.max > 40 ? 8 : 1) : F.q.band ? 1 : 16; r._fbSet(dir === 'u' ? big : dir === 'd' ? -big : dir === 'r' ? 1 : -1); return true; }
+  const col = r.closest('.dkfc'), rows = [...col.querySelectorAll('.fr')], i = rows.indexOf(r);
+  if (dir === 'u' || dir === 'd'){ const n = rows[clamp(i + (dir === 'u' ? -1 : 1), 0, rows.length - 1)]; if (n) dkFbPick(n); return true; }
+  const cols = [...bar.querySelectorAll('.dkfc')], c2 = cols[cols.indexOf(col) + (dir === 'r' ? 1 : -1)];
+  if (c2){ const r2 = [...c2.querySelectorAll('.fr')]; if (r2.length) dkFbPick(r2[Math.min(i, r2.length - 1)]); }
+  return true;
+}
+addEventListener('keydown', e => { if (dkFbKey(e)){ e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+addEventListener('pointerdown', e => { if (dkFbFoc && !(e.target.closest && e.target.closest('#dkFxBar .fr'))){ dkFbFoc = false; const b = $('dkFxBar'); if (b) b.classList.remove('kfoc'); } }, true);
 function deckFxBar(){
   const mst = dkMst(), t = mst ? NT : dkTrack(), FA = () => (mst ? S.mfx : S.tfx[dkTrack()]) || [], A = FA();
   $('dkFxT').textContent = mst ? 'FX · MASTER' : `FX · TRACK ${d2(t + 1)}`;
@@ -25095,9 +25124,11 @@ function deckFxBar(){
         const r = el('div', 'fr'), lb = el('b', null, q.l), v = el('span'); r.append(lb, v); b.append(r);
         const selK = t + ':' + k + ':' + q.k; if (dkFbSel === selK) r.classList.add('sel');
         // PICKED VALUE (owner, 2 Nov): a click on a value (or its label) highlights the row, so you can see what you are editing
-        r.addEventListener('pointerdown', () => { dkFbSel = selK; for (const x of bar.querySelectorAll('.fr.sel')) x.classList.remove('sel'); r.classList.add('sel'); });
+        r.addEventListener('pointerdown', () => { dkFbPick(r); dkFbFoc = true; bar.classList.add('kfoc'); });
+        r.dataset.sel = selK; r._fb = {t, k, i:D.ps.indexOf(q), q};
         const show = x => q.names ? (q.names[x] ?? String(x)) : (q.tpl || q.band) ? q.fmt(x, getF()) : q.fmt(x);
         const set = x => { const g = getF(); if (!g) return; x = clamp(Math.round(x), q.min, q.max); if (x === g[q.k]) return; g[q.k] = x; if (isPumpT(g.type)) delete g.pname; fxChanged(mst ? NT : dkTrack()); v.textContent = show(x); };
+        r._fbSet = d => { const g = getF(); if (g) set(g[q.k] + d); };
         v.title = q.l + ': drag up or down (Shift: fine, Ctrl/⌘: coarse) · rest on it and use the wheel · double-click or Alt-click: default · right-click: menu';
         // ONE RULE (mouse audit, 3 Nov): a drag adds to the value from where it is, Shift a tenth and Ctrl/⌘ held four
         // times, read on every move (no jump when either changes); Alt / ⌘-click and double-click reset; right-click: Reset /
@@ -28697,6 +28728,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [400, '3 Nov', ['FX bar: a click on a value gives the bar the keys until you click elsewhere or press Esc: ▲▼ pick the value above or below, ◀▶ the same value in the next effect, Ctrl/⌘+arrows change it. With the FX screen open above, it follows the value you pick (its slot and row).']],
   [399, '3 Nov', ['FX bar: every effect without a display of its own now has a calm animation behind its values. EQs and filters: the track’s spectrum with the response curve and its points over it; delays: the echoes, lit in turn as each hit runs along them; modulation: its LFO (autopan: a dot swinging L to R); rhythmic effects: the bar’s 16 steps with the one playing lit; pitch: the semitones with the note and where it moves to; width and utility: the stereo field.']],
   [398, '3 Nov', ['New engine: …waves live (Synths, and Modular in the engine list). It plays the song’s …waves patch live in the tracker, as the …pump live engines do: each pad picks one of the patch’s 8 Out buses, a poly track plays up to four notes, slides and pitch commands move the notes, the VOL column is the velocity, and an edit to the patch is heard at once. A song with no …waves patch gets the editor’s starter patch. It shares the …pump live safety net (Settings → Audio → …pump live) and plays its render when live isn’t possible.']],
   [397, '3 Nov', ['Side panel: the INSTRUMENTS card always has room for about 16 instruments in two columns; on a short window the side panel scrolls instead of squeezing it.']],
