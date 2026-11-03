@@ -119,6 +119,27 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (30): starter wavetables from AKWF (build 403, on `beta`)
+
+Owner: "Build a starter set in" (after build 402's Load wavetable…).
+
+- **`wavetables/`** (new top-level folder, ~2 MB, 30 files of 22–85 KB): one wtData JSON per table, plus
+  `AKWF-LICENSE.md` (CC0). Not in `sounds/` on purpose: the beta copy reads `../sounds/` from main, so new sounds there
+  404 on beta until a merge; `wavetables/` goes into the beta copy with the app (make-channel.sh only excludes listed
+  folders). Added to `electron/copy-app.js` PARTS for the desktop build. The service worker caches a table after its
+  first fetch (same-origin, not /sounds/), so a picked table works offline after that.
+- **`WT_STARTER`** (index.html, page side, above `wtLabel`): `[file, name, group, AKWF folders]`, 30 tables in Basic /
+  Synth / Instrument / Lo-fi. **Starter tables…** (`#wtPick`, a select in `#wtBox`) fetches `wavetables/<file>.json?v=1`
+  (`wtStarter`) and copies it into `V.wtData` (`from:'starter'`, id `akwf-<file>`), Table → Loaded. A song never depends
+  on the folder: the pad carries the table.
+- **`tools/akwf-tables.mjs <AKWF folder>`** rebuilds them with the app's own `TableCore.fromCycles` / `wtReadWav` (read out
+  of index.html), from the list above. Order per table: file order, darkest→brightest or a nearest-neighbour walk from the
+  darkest, whichever has the smallest total step between neighbouring spectra (the walk won every table), then thinned
+  evenly to 64 frames. Bump `?v=` in `wtStarter` when the files change.
+- Licence: AKWF is CC0, credited in THIRD_PARTY_NOTICES.md; nothing for the commercial checklist. AKWF's README doesn't
+  say which folders were sampled from hardware, so the names are by character (Raw, C604, FM…), not by synth.
+- Checked: every table renders at three positions (no NaN, full level), test suite, headless Chrome picker.
+
 ## 3 Nov (29): loaded wavetables in the Table engine (build 402, on `beta`)
 
 Owner: high-quality wavetables / analog one-shots for the wavetable engine or a sampler, and "I have a bunch of samples
