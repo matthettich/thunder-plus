@@ -112,6 +112,9 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0)**.
   `beta` (only `#dkFxBar` CSS, `deckFxBar`, `deckFxBarMeters`, new `dkFxViz`; `stageTick` uses `dkBarTelNode`). Dynamics
   slots: GR strip always, plus the FX stage's curve display when the panel is tall enough; others: output level history.
   Ideas not done: EQ / filter response curves, delay echo taps, a styled folded …chains rail.
+- **Phase 0 done in software** (on `beta`, 2 Nov evening): goldens for ELECTRO, a mid-song start (CHASE), a loop, and ELECTRO
+  with 1066 commands added; `node tools/seq-golden.mjs --timing` gives the baseline now in the plan's section 12 (400 ms
+  stalls make 16 % of notes late). Desktop **1.2.60** release started from build 356. Next: phase 1 (the core bridge).
 - **Released to the web as build 356** (owner, 2 Nov): `beta` merged into `main` (FX bar, phase 0 test hook), cache
   `thunderplus-v356`, What's new entry. Desktop still 1.2.59 (build 355) until the owner runs a desktop release.
 
