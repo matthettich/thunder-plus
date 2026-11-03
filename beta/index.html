@@ -10110,6 +10110,90 @@ function factoryVoicePresets(){
   ...drumKitGroups().filter(([g]) => !g.includes('acoustic')).map(([g, list]) => [g, list.map(([n, make]) => [kitTag(g) + ' ' + n, make])]),
   engGroup(['drift', 'Drift (tape pads)']),
   ...drumKitGroups().filter(([g]) => g.includes('acoustic')).map(([g, list]) => [g, list.map(([n, make]) => [kitTag(g) + ' ' + n, make])]),
+  // HACK and OWLS (owner, 2 Nov): sounds measured from records (pitch curves, decays, spectra), the last groups so
+  // saved Recent picks keep their places. Synth ones use PS (voice tune +24); drums PD.
+  // HACK: The Hacker vs Commuter, "Roentgen PT 2" (Cultivated Electronics, 2021), measured from the track
+  ['Hack (Roentgen)', [
+    // driven 808: ~120 Hz falling to ~57 Hz in ~60 ms, a ~250 ms tail, a click on top; the master is pushed hard
+    ['hack kick', () => PD('hack kick', [
+      {type:'sine', tune:-2, pAmt:15, pDec:100, atk:0.1, dec:330, level:0.95},
+      {type:'click', a:0.3, level:0.45, hpCut:1200, atk:0.05, dec:6}], {drive:0.55})],
+    // ~500 Hz tone and a noise burst, gone in ~65 ms
+    ['hack snare', () => PD('hack snare', [
+      {type:'tri', tune:35, pAmt:5, pDec:15, atk:0.1, dec:70, level:0.55},
+      {type:'white', atk:0.1, dec:95, hpCut:1500, lpCut:10000, level:0.8},
+      {type:'click', a:0.2, level:0.3, atk:0.05, dec:5}], {drive:0.35})],
+    ['hack hat', () => PD('hack hat', [
+      {type:'metal', a:0.6, b:0.5, tune:40, atk:0.05, dec:70, hpCut:7000, level:0.8},
+      {type:'white', atk:0.05, dec:60, hpCut:8000, level:0.75}], {level:6})],
+    // the electro "zap": a dive from ~2.7 kHz to ~190 Hz in ~100 ms
+    ['hack zap', () => PD('hack zap', [
+      {type:'tri', tune:19, pAmt:48, pDec:150, atk:0.1, dec:260, level:0.8},
+      {type:'sine', tune:31, pAmt:48, pDec:150, atk:0.1, dec:120, level:0.3}], {drive:0.3})],
+    // the low zap / tom: ~450 Hz down to ~100 Hz
+    ['hack zap tom', () => PD('hack zap tom', [
+      {type:'sine', tune:7, pAmt:30, pDec:170, atk:0.1, dec:280, level:0.9},
+      {type:'tri', tune:19, pAmt:30, pDec:170, atk:0.1, dec:90, level:0.25}], {drive:0.35})],
+    // the constant sub under everything (~55–65 Hz), a little driven
+    ['hack sub bass', () => PS('hack sub bass', [
+      {type:'sine', tune:-24, atk:1, dec:400, sus:0.9, rel:80, level:0.9},
+      {type:'tri', tune:-24, atk:1, dec:200, sus:0.5, rel:60, lpCut:500, level:0.3}], {drive:0.3})],
+    // the ~900 Hz stab: a bright, square-ish tone that drifts down a little and closes
+    ['hack stab', () => PS('hack stab', [
+      {type:'square', tune:0, pAmt:1, pDec:200, atk:0.5, dec:260, sus:0.25, rel:150, lpCut:4200, lpRes:0.25, lpEnv:0.3, fDec:160, level:0.55},
+      {type:'saw', tune:12, fine:6, pAmt:1, pDec:200, atk:0.5, dec:200, sus:0.15, rel:120, lpCut:5000, level:0.3}], {drive:0.25})],
+    // the breakdown's wash
+    ['hack noise wash', () => PS('hack noise wash', [
+      {type:'pink', atk:700, dec:2000, sus:0.8, rel:1500, lpCut:1500, lpRes:0.5, level:0.55},
+      {type:'saw', tune:-12, fine:-8, atk:900, dec:2000, sus:0.7, rel:1500, lpCut:700, level:0.3}], {len:8, tail:3, level:6, lfo1Rate:0.2, lfo1Depth:1, r1dst:3, r1amt:0.4})],
+  ]],
+  // OWLS: Wake, "Encounters With Owls" (EP), measured from the five tracks
+  ['Owls (Wake)', [
+    // Co-Co: a long 808 diving from ~500 Hz to ~55 Hz
+    ['owls long 808', () => PD('owls long 808', [
+      {type:'sine', tune:-3, pAmt:38, pDec:100, atk:0.1, dec:750, level:0.95},
+      {type:'click', a:0.15, level:0.25, hpCut:900, atk:0.05, dec:6}], {drive:0.2, len:6})],
+    // Encounters With Owls / Never Shave Again: a tight kick, ~300 Hz down to ~50 Hz in ~60 ms
+    ['owls punch kick', () => PD('owls punch kick', [
+      {type:'sine', tune:-4, pAmt:34, pDec:70, atk:0.1, dec:280, level:0.95},
+      {type:'click', a:0.3, level:0.4, hpCut:1500, atk:0.05, dec:5}], {drive:0.35})],
+    // Neocaridinia: a low, round kick with a long sub
+    ['owls sub kick', () => PD('owls sub kick', [
+      {type:'sine', tune:-1, pAmt:7, pDec:120, atk:0.1, dec:650, level:0.95},
+      {type:'tri', tune:11, pAmt:12, pDec:12, atk:0.1, dec:40, level:0.15}], {drive:0.1, len:6})],
+    ['owls tight hat', () => PD('owls tight hat', [
+      {type:'white', atk:0.05, dec:28, hpCut:8000, level:0.75},
+      {type:'metal', a:0.5, b:0.6, tune:43, atk:0.05, dec:22, hpCut:9000, level:0.35}], {level:5})],
+    // Neocaridinia's click: ~9 ms of bright noise
+    ['owls click', () => PD('owls click', [
+      {type:'click', a:0.5, level:0.6, atk:0.05, dec:4},
+      {type:'white', atk:0.05, dec:10, hpCut:4500, level:0.6}], {level:5})],
+    // Never Shave Again: short ~600 Hz blips
+    ['owls blip', () => PD('owls blip', [
+      {type:'sine', tune:38, pAmt:3, pDec:10, atk:0.1, dec:60, level:0.8},
+      {type:'fm2', a:rA(2), b:0.25, tune:38, atk:0.1, dec:30, level:0.3}])],
+    // Co-Co: the held bass drone (65, 130, 200, 400 Hz stacked: a square-ish tone, darkened)
+    ['owls drone bass', () => PS('owls drone bass', [
+      {type:'square', tune:-24, atk:4, dec:600, sus:0.9, rel:200, lpCut:650, lpRes:0.15, level:0.6},
+      {type:'sine', tune:-24, atk:4, dec:600, sus:0.95, rel:200, level:0.6}], {drive:0.15})],
+    // Encounters With Owls: the deep sub under the long notes
+    ['owls sub bass', () => PS('owls sub bass', [
+      {type:'sine', tune:-24, atk:3, dec:600, sus:0.95, rel:160, level:0.9},
+      {type:'tri', tune:-12, atk:3, dec:400, sus:0.6, rel:120, lpCut:400, level:0.25}], {drive:0.2})],
+    // Encounters With Owls: the bright chord stack at 0:03
+    ['owls chord pad', () => PS('owls chord pad', [
+      {type:'chord', a:cA('Minor 9'), b:0.45, atk:40, dec:1600, sus:0.8, rel:900, lpCut:5200, lpRes:0.1, level:0.6},
+      {type:'saw', tune:12, fine:7, atk:60, dec:1500, sus:0.6, rel:900, lpCut:3500, level:0.2}], {len:8, tail:3, fx:[PFX('chorus', {depth:0.35, mix:0.3})]})],
+    // Co-Co's outro: a bright drone with ~700 Hz partials and a noise bed
+    ['owls glass drone', () => PS('owls glass drone', [
+      {type:'fm2', a:rA(2), b:0.3, atk:600, dec:2000, sus:0.8, rel:1800, level:0.45},
+      {type:'pink', atk:900, dec:2000, sus:0.6, rel:1800, hpCut:600, lpCut:3000, lpRes:0.3, level:0.25}], {len:8, tail:3, level:6})],
+    // Secret Messages: chopped, crushed bass texture
+    ['owls glitch bass', () => PS('owls glitch bass', [
+      {type:'square', tune:-12, atk:1, dec:200, sus:0.7, rel:60, lpCut:900, lpRes:0.4, level:0.6},
+      {type:'lfsr', a:0.6, b:0.7, tune:-12, atk:1, dec:120, sus:0.3, rel:50, lpCut:2000, level:0.25}],
+      {drive:0.4, lfo1Rate:12, lfo1Depth:1, r1dst:3, r1amt:0.6, fx:[PFX('crush', {down:0.3, bits:9, mix:0.5})]})],
+  ]],
   ]);
 }
 // Layer presets: tagged with the pad pitch they were written for (vt: 0 = a drum pad, 24 = a synth slot), so a
@@ -19454,7 +19538,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 363;
+const BUILD = 364;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26522,6 +26606,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [364, '2 Nov', ['New preset groups (Synth → Presets…): Hack (Roentgen): 8 sounds after The Hacker vs Commuter’s Roentgen PT 2: driven 808, zaps, snare, hat, sub, stab, noise wash. Owls (Wake): 11 sounds after Wake’s Encounters With Owls: kicks, hats, click, blip, drone and sub bass, chord pad, glass drone, glitch bass.']],
   [363, '2 Nov', ['Playback: fixed the song speeding up and glitching after playing for a few minutes, and synth chords held after STOP. FXO, FLX, GAT and RTG also switch on their exact step now.', 'Menus are tidier: one layout for every row, one size for every control, one heading style; the build number is under App.']],
   [362, '2 Nov', ['Timing: the song now plays from the audio thread: drums, samples and the live synths (bass, voice, acid, machine, …pump synths) start on their exact sample, so a busy screen, a screenshot or another app can’t make them late. Settings → Audio & MIDI → Sequencer: Page (old) goes back.', 'View → KEY HINTS off hides the key hints under the screens and Arrange, for more rows.', 'Phone: the top bar fits on one line (File is a folder), the song clock is a readout, LOOP lights while on, hints never stop mid-word, the Synth page fits.', 'Arrange: a thin line every 4 rows.']],
   [361, '2 Nov', ['Top bar: the master meter has L / R, a dB scale and the peak in dB; the CPU button shows just the number.', 'Messages come in under the top bar on a computer, shorter; the side panel drops the screen buttons (the tabs are above) and folds the key list behind KEYS.', 'On a computer, sliders and drop-downs are square like the tracker; short one-line empty states; Mixer spectrum says PLAY TO SEE IT when stopped; Audio & MIDI ports are a table.']],
