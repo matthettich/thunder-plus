@@ -119,6 +119,21 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (18): Acid on the 16th grid, composed lines; calmer animations (build 391)
+
+- Owner: Acid sounded random; "most notes fell on odd numbered steps, which put them off of the clock". acidLine now works in
+  16th steps: `spr` = round(phrase LPB / 4) rows (2 at LPB 8), `Ls` = rows / spr; `acidRead` / `acidWrite` take `spr` (step i =
+  row y0 + i·spr; the rows between are cleared).
+- **`acidCompose`** (Classic 303, Rolling, Squelch; `acidRoll` calls it unless mutating or …pump ACID): a one-bar motif
+  (≤ 16 steps): a note's chance by place in the beat (beat ≫ 8th > 16ths; DENSITY mostly adds 16ths), ties after notes;
+  pitch by place (beat: root, else 5th / ♭7 / 3rd; 8th: root, 5th, ♭7, 3rd, 4th; 16th: repeat or a scale neighbour);
+  first step the root; octaves, accents, slides by style. The phrase: the motif repeated, every 2nd bar a note may change,
+  every 4th bar ends on a turnaround (5th, ♭7, 5th, 2nd). Defaults now Classic 303, DENSITY 45.
+- Headless: at LPB 8 no notes on odd rows over 18 lines; beats + 8ths outnumber 16ths.
+- **Animations calmer** (owner: "too busy… the spring is nice because it's very simple"): room ≤ 18 particles, grains ≤ 14,
+  no glow or dashed reference on clip, no noise specks on steps, 3 grooves on vinyl, 3 strings, 10 bands, 9 swirl points,
+  fainter lines everywhere.
+
 ## 3 Nov (17): FX bar animations (build 390)
 
 - Owner: animations like the springs for effects without a good display. `fxAnimKind(f)` picks one (dynamics, EQ / filters,

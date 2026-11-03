@@ -20409,7 +20409,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 390;
+const BUILD = 391;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22829,7 +22829,7 @@ const ACID_SCALES = [['Minor', [0, 2, 3, 5, 7, 8, 10]], ['Phrygian', [0, 1, 3, 5
   ['Harmonic minor', [0, 2, 3, 5, 7, 8, 11]], ['Minor pentatonic', [0, 3, 5, 7, 10]], ['Blues', [0, 3, 5, 6, 7, 10]], ['Major', [0, 2, 4, 5, 7, 9, 11]],
   ['Chromatic', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]], ['Root & fifth', [0, 7]], ['Octaves', [0]]];
 const ACID_LANES = [['notes', 'NOTES'], ['oct', 'OCTAVES'], ['acc', 'ACCENTS'], ['slide', 'SLIDES'], ['time', 'TIME']];
-const acidSet = {auto:true, scale:0, root:0, base:ROOT, density:75, accent:30, slide:25, octave:30, style:0, lanes:{notes:true, oct:true, acc:true, slide:true, time:true}};
+const acidSet = {auto:true, scale:0, root:0, base:ROOT, density:45, accent:30, slide:25, octave:30, style:1, lanes:{notes:true, oct:true, acc:true, slide:true, time:true}};
 /* STYLES (owner, 2 Nov: "patterns that sound more like the Basebot hardware 303 clone"): rules on top of …pump ACID's,
    after how hardware 303 sequences tend to sit. CLASSIC 303: the root (and its octave) most of the time, minor 3rd / 5th /
    7th, a chromatic step into the next note now and then, notes on the downbeats more often, accents mostly off the beat,
@@ -22838,8 +22838,50 @@ const acidSet = {auto:true, scale:0, root:0, base:ROOT, density:75, accent:30, s
 const ACID_STYLES = ['…pump ACID', 'Classic 303', 'Rolling', 'Squelch'];
 const ACID_NOTE = 0, ACID_TIE = 1, ACID_REST = 2;
 const acidPc = n => ((n % 12) + 12) % 12, acidOct = n => n >= 12 ? (n >= 24 ? 2 : 1) : (n < 0 ? -1 : 0);
+/* COMPOSED LINES (owner, 3 Nov: "still sounds a little too much like a random note generator… like the Basebot, the way
+   they used specific genre rules to make coherent basslines"). Classic 303, Rolling and Squelch now write a one-bar motif
+   (16 steps, or the phrase if shorter) and build the phrase from it, as a played bass line does:
+   - rhythm by place in the beat: the beat itself almost always, the 8th between often, the 16ths between rarely (DENSITY
+     mostly adds 16ths); after a note a step can tie (hold) instead of resting;
+   - pitch by place too: the beat leans on the root (then the 5th, the ♭7, the 3rd), the 8th between on the root, 5th, ♭7, 3rd
+     or 4th, a 16th repeats the note before it or steps to its neighbour in the scale (a passing note);
+   - octave jumps, accents and slides placed per style (Classic: accents on the 8th off-beats, slides into a new note;
+     Rolling: octave-up off-steps, accents on the beat; Squelch: more of both);
+   - the phrase: bar 2 repeats the motif, every second bar changes a note now and then (call and response), and every
+     fourth bar ends on a turnaround (5th, ♭7, 5th, the 2nd) that leads back to the root.
+   …pump ACID keeps pump's own generator. Mutate (M) still re-rolls a few steps with the rules below. */
+function acidCompose(st, L, lanes, R, rnd){
+  const sty = R.style | 0, sc = ACID_SCALES[R.scale][1], has = d => sc.includes(d), M = Math.min(L, 16), d = R.density;
+  const PR = sty === 2 ? [1, .5, .95, .5] : sty === 3 ? [.95, .45, .85, .4] : [.95, .22, .78, .28];   // a note's chance by place: beat, 16th, 8th, 16th
+  const tieP = sty === 1 ? .5 : sty === 2 ? .15 : .35;
+  const deg = (pos, prev) => { const u = rnd();
+    if (pos === 0){ if (u < .62) return 0; if (u < .74 && has(7)) return 7; if (u < .84 && has(10)) return 10; if (u < .92 && has(3)) return 3; return 0; }
+    if (pos === 2){ if (u < .32) return 0; if (u < .54 && has(7)) return 7; if (u < .68 && has(10)) return 10; if (u < .8 && has(3)) return 3; if (u < .88 && has(5)) return 5; return sc[Math.floor(rnd() * sc.length)]; }
+    if (prev >= 0 && u < .45) return prev; const k = sc.indexOf(prev); if (k >= 0 && u < .85) return sc[(k + (rnd() < .5 ? 1 : sc.length - 1)) % sc.length]; return 0; };
+  const mot = []; let prev = -1;
+  for (let i = 0; i < M; i++){ const pos = i % 4, p = PR[pos] * (pos % 2 ? 0.35 + 1.3 * d : 0.55 + 0.5 * d);
+    const gate = i === 0 ? ACID_NOTE : rnd() < p ? ACID_NOTE : mot[i - 1].gate !== ACID_REST && rnd() < tieP ? ACID_TIE : ACID_REST;
+    const pc = i === 0 ? 0 : gate === ACID_NOTE ? deg(pos, prev) : prev < 0 ? 0 : prev; if (gate === ACID_NOTE) prev = pc;   // (the line starts on the root)
+    const u = rnd(), upP = R.octave * (sty === 2 ? (pos % 2 ? 1.2 : 0.1) : sty === 3 ? 0.8 : pos === 0 ? 0.2 : 0.6);
+    const oc = gate === ACID_NOTE && u < upP ? 1 : gate === ACID_NOTE && u > 1 - R.octave * 0.1 ? -1 : 0;
+    const accent = gate === ACID_NOTE && rnd() < R.accent * (sty === 1 ? (pos === 2 ? 1.9 : pos % 2 ? 0.8 : 0.45) : sty === 2 ? (pos === 0 ? 1.7 : 0.45) : 1.3);
+    mot.push({gate, pc, oc, accent, slide:false}); }
+  for (let i = 0; i < M; i++){ const m = mot[i], nx = mot[(i + 1) % M]; if (m.gate !== ACID_REST && nx.gate === ACID_NOTE && rnd() < R.slide * (sty === 3 ? 1.6 : 1) * (nx.pc !== m.pc || nx.oc !== m.oc ? 1.3 : 0.3)) m.slide = true; }
+  const TURN = [has(7) ? 7 : 0, has(10) ? 10 : has(5) ? 5 : 0, has(7) ? 7 : 0, has(2) ? 2 : has(1) ? 1 : 0];
+  for (let i = 0; i < L; i++){ const b = Math.floor(i / M), j = i % M, m = Object.assign({}, mot[j]);
+    if (b % 2 === 1 && m.gate === ACID_NOTE && j % 4 && rnd() < 0.14) m.pc = deg(j % 4, m.pc);   // call and response: a note changes
+    if (b % 4 === 3 && M >= 8 && j >= M - 4){ const k = j - (M - 4); m.gate = k % 2 === 0 || rnd() < 0.5 ? ACID_NOTE : ACID_TIE; m.pc = TURN[k]; m.oc = k === 1 && R.octave > 0.2 ? 1 : 0; m.slide = k === 3 && rnd() < R.slide * 1.5; }   // the turnaround
+    const s = st[i];
+    if (lanes.time) s.gate = m.gate;
+    if (lanes.notes || lanes.oct){ const pc = lanes.notes ? m.pc : acidPc(s.note - R.root), oc = lanes.oct ? m.oc : acidOct(s.note - R.root);
+      let nn = R.root + pc + 12 * oc; while (nn > 24) nn -= 12; while (nn < -12) nn += 12; s.note = nn; }
+    if (lanes.acc) s.accent = m.accent;
+    if (lanes.slide) s.slide = m.slide; }
+  for (let i = 0; i < L; i++){ const s = st[i]; if (s.gate === ACID_REST || st[(i + 1) % L].gate !== ACID_NOTE) s.slide = false; if (s.gate !== ACID_NOTE) s.accent = false; }
+}
 // The generator, as pump's (notes are semitones from the pattern's C, -12 to 24; `only` limits it to some steps).
 function acidRoll(st, L, lanes, R, rnd, only){
+  if (!only && (R.style | 0) > 0) return acidCompose(st, L, lanes, R, rnd);   // COMPOSED LINES (Classic, Rolling, Squelch)
   const sc = ACID_SCALES[R.scale][1], want = i => !only || only[i], sty = R.style | 0;
   const has = d => sc.includes(d);
   const pick = (prev, i) => { const u = rnd();
@@ -22878,21 +22920,25 @@ function acidRoll(st, L, lanes, R, rnd, only){
 function acidMutate(st, L, lanes, R, rnd){ const only = new Array(L).fill(false), n = Math.max(2, Math.floor(L / 4)); for (let k = 0; k < n; k++) only[Math.floor(rnd() * L)] = true; acidRoll(st, L, lanes, R, rnd, only); }
 // The phrase's rows y0..y0+L-1 as steps, and back.
 const PSL_I = () => FXC.indexOf('PSL');
-function acidRead(P, y0, L, base){
+// ON THE 16TH GRID (owner, 3 Nov: "most notes fell on odd numbered steps, which put them off of the clock"): a step is a
+// 16th note, spr rows (the phrase's LPB / 4: 2 rows at LPB 8), so step i is row y0 + i × spr; the rows between stay empty.
+function acidRead(P, y0, L, base, spr = 1){
   const st = []; let sounding = false, lastN = 0;
-  for (let i = 0; i < L; i++){ const r = P[y0 + i] || blankRow(), n = r[0];
+  for (let i = 0; i < L; i++){ const r = P[y0 + i * spr] || blankRow(), n = r[0];
     if (n >= 0 && n < 120){ lastN = clamp(n - base, -12, 24); st.push({note:lastN, gate:ACID_NOTE, accent:r[VC] >= 0xC0, slide:false}); sounding = true; }
     else if (n === OFF || !sounding){ st.push({note:lastN, gate:ACID_REST, accent:false, slide:false}); sounding = false; }
     else st.push({note:lastN, gate:ACID_TIE, accent:false, slide:false}); }
-  for (let i = 0; i < L; i++){ const nx = P[y0 + (i + 1) % L]; if (st[i].gate !== ACID_REST && st[(i + 1) % L].gate === ACID_NOTE && nx)
+  for (let i = 0; i < L; i++){ const nx = P[y0 + ((i + 1) % L) * spr]; if (st[i].gate !== ACID_REST && st[(i + 1) % L].gate === ACID_NOTE && nx)
     for (let m = FX0; m < RW; m += 2) if (nx[m] === PSL_I()) st[i].slide = true; }
   return st;
 }
 // FULL ROWS (owner's punch list, 2 Nov): a slide whose note already has all three FX columns used was dropped. It takes
 // the last column now (that command is replaced, and the toast says how many were); Undo brings it back.
-function acidWrite(P, y0, L, base, st, ins){
+function acidWrite(P, y0, L, base, st, ins, spr = 1){
   const psl = PSL_I(); let over = 0;
-  for (let i = 0; i < L; i++){ const r = P[y0 + i], s = st[i], prev = st[(i - 1 + L) % L];
+  for (let i = 0; i < L; i++){ for (let k = 1; k < spr; k++){ const q = P[y0 + i * spr + k]; if (!q) continue;   // the rows between steps: empty
+      for (let c = 0; c < NCOL; c++) q[c] = -1; q[VC] = -1; q[IC] = -1; for (let m = FX0; m < RW; m += 2) if (q[m] === psl){ q[m] = -1; q[m + 1] = -1; } }
+    const r = P[y0 + i * spr], s = st[i], prev = st[(i - 1 + L) % L]; if (!r) continue;
     for (let m = FX0; m < RW; m += 2) if (r[m] === psl){ r[m] = -1; r[m + 1] = -1; }
     for (let c = 1; c < NCOL; c++) r[c] = -1;
     if (s.gate === ACID_NOTE){ r[0] = clamp(base + s.note, 0, 119); r[IC] = ins; r[VC] = s.accent ? 0xFF : -1;
@@ -22945,19 +22991,20 @@ function acidLine(){
   // KEY FROM THE SONG: worked out when the panel opens (and when KEY is switched back on); FROM SONG uses it at each roll
   const found = songKey(cPhrase);
   if (acidSet.auto && found){ acidSet.scale = found.scale; acidSet.root = found.root; }
+  const lpb = (S.plpb && S.plpb[cPhrase]) || S.lpb || 4, spr = Math.max(1, Math.round(lpb / 4)), Ls = Math.max(1, Math.floor(L / spr));   // 16th steps
   const R = () => ({scale:acidSet.scale, root:acidSet.root, density:acidSet.density / 100, accent:acidSet.accent / 100, slide:acidSet.slide / 100, octave:acidSet.octave / 100, style:acidSet.style});
   const roll = mut => {
-    const st = acidRead(P(), y0, L, acidSet.base), lanes = acidSet.lanes;
+    const st = acidRead(P(), y0, Ls, acidSet.base, spr), lanes = acidSet.lanes;
     if (!ACID_LANES.some(([k]) => lanes[k])) return toast('Light at least one lane: NOTES, OCTAVES, ACCENTS, SLIDES or TIME.');
-    if (mut) acidMutate(st, L, lanes, R(), Math.random); else acidRoll(st, L, lanes, R(), Math.random);
-    const over = acidWrite(P(), y0, L, acidSet.base, st, ins); saveS(); draw();
+    if (mut) acidMutate(st, Ls, lanes, R(), Math.random); else acidRoll(st, Ls, lanes, R(), Math.random);
+    const over = acidWrite(P(), y0, Ls, acidSet.base, st, ins, spr); saveS(); draw();
     const nN = st.filter(s => s.gate === ACID_NOTE).length;
     toast(`${mut ? 'Mutated' : 'Generated'}: ${nN} notes, ${st.filter(s => s.accent).length} accents, ${st.filter(s => s.slide).length} slides · rows ${rS(y0)}–${rS(y0 + L - 1)}` + (over ? ` · ${over} slide${over === 1 ? '' : 's'} replaced FX3 on a full row` : ''), over ? 3000 : 1600);
   };
   // the panel: an .ask dialog that stays open, so the line can be rolled again while it plays
   if (askOpen) askOpen(null);
   const wrap = el('div', 'ask acidask'), box = el('div', 'askbox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Acid line');
-  box.append(el('div', 'asktitle', 'Acid line'), el('div', 'askmsg', `Rows ${rS(y0)}–${rS(y0 + L - 1)} of this phrase, instrument ${hx(ins)}. Accents are volume FF, slides PSL. Use it with an Acid pad (Engine: Acid).`));
+  box.append(el('div', 'asktitle', 'Acid line'), el('div', 'askmsg', `Rows ${rS(y0)}–${rS(y0 + L - 1)} of this phrase (${Ls} 16th steps${spr > 1 ? ', one every ' + spr + ' rows at LPB ' + lpb : ''}), instrument ${hx(ins)}. Accents are volume FF, slides PSL. Use it with an Acid pad (Engine: Acid).`));
   const field = (label, ctl) => { const f = el('label', 'acidf'); f.append(el('span', null, label), ctl); box.append(f); return ctl; };
   const sel = (label, opts, k) => { const s = el('select'); opts.forEach(([v, t]) => s.append(new Option(t, v))); s.value = acidSet[k]; s.addEventListener('change', () => { acidSet[k] = +s.value; }); return field(label, s); };
   // INSTRUMENT (owner, 3 Nov): picking one plays a short note on it (at the line's root), so you hear what it is; the ones no
@@ -25065,61 +25112,57 @@ function dkAnim(col, f, now, lv){
   if (A.kind === 'room'){   // a room: the box from the size, sound bouncing off its walls, trails over the decay
     const sz = v(/size|room|space/i, .6), bw = W * (0.45 + sz * 0.5), bh = H * (0.45 + sz * 0.5), x0 = (W - bw) / 2, y0 = (H - bh) / 2;
     g.strokeStyle = ink(.18); g.lineWidth = 1; g.strokeRect(x0 + .5, y0 + .5, bw - 1, bh - 1);
-    const n = Math.min(4, Math.floor(e * 3 + rnd() * e * 2)), sp = 60 + (1 - sz) * 90;
-    for (let i = 0; i < n && P.length < 140; i++){ const a = rnd() * Math.PI * 2; P.push({x:W / 2, y:H / 2, vx:Math.cos(a) * sp, vy:Math.sin(a) * sp, a:1, hx:[]}); }
+    const n = rnd() < e * 0.5 ? 1 : 0, sp = 50 + (1 - sz) * 70;   // CALM (owner, 3 Nov: "too busy… the spring is nice because it's very simple"): a few at a time
+    for (let i = 0; i < n && P.length < 18; i++){ const a = rnd() * Math.PI * 2; P.push({x:W / 2, y:H / 2, vx:Math.cos(a) * sp, vy:Math.sin(a) * sp, a:1, hx:[]}); }
     for (let i = P.length - 1; i >= 0; i--){ const p = P[i]; p.a *= Math.exp(-dt / tau); if (p.a < 0.03){ P.splice(i, 1); continue; }
       p.hx.push(p.x, p.y); if (p.hx.length > 16) p.hx.splice(0, 2);
       p.x += p.vx * dt; p.y += p.vy * dt;
       if (p.x < x0 || p.x > x0 + bw){ p.vx = -p.vx; p.x = clamp(p.x, x0, x0 + bw); p.a *= 0.85; }
       if (p.y < y0 || p.y > y0 + bh){ p.vy = -p.vy; p.y = clamp(p.y, y0, y0 + bh); p.a *= 0.85; }
-      g.strokeStyle = ink((.35 * p.a).toFixed(3)); g.lineWidth = 1.2; g.beginPath(); g.moveTo(p.hx[0], p.hx[1]); for (let j = 2; j < p.hx.length; j += 2) g.lineTo(p.hx[j], p.hx[j + 1]); g.lineTo(p.x, p.y); g.stroke();
-      g.fillStyle = i % 9 ? ink((.5 * p.a).toFixed(3)) : AC; g.globalAlpha = i % 9 ? 1 : p.a; g.beginPath(); g.arc(p.x, p.y, 1.6, 0, 7); g.fill(); g.globalAlpha = 1; }
+      g.strokeStyle = ink((.22 * p.a).toFixed(3)); g.lineWidth = 1; g.beginPath(); g.moveTo(p.hx[0], p.hx[1]); for (let j = 2; j < p.hx.length; j += 2) g.lineTo(p.hx[j], p.hx[j + 1]); g.lineTo(p.x, p.y); g.stroke();
+      g.fillStyle = i % 6 ? ink((.35 * p.a).toFixed(3)) : AC; g.globalAlpha = i % 6 ? 1 : p.a * .7; g.beginPath(); g.arc(p.x, p.y, 1.4, 0, 7); g.fill(); g.globalAlpha = 1; }
     return; }
   if (A.kind === 'grains'){   // grains: popping up where the position and spray put them, as big as the size, fading
     const sz = v(/size|grain/i, .4), den = v(/dens|rate|amount/i, .5), pos = v(/pos/i, .5), spr = v(/spray|jitter|spread|rand/i, .4);
-    const n = Math.floor((e * (1 + den * 5)) + (rnd() < e * den ? 1 : 0));
-    for (let i = 0; i < n && P.length < 90; i++) P.push({x:clamp(W * (pos + (rnd() - .5) * (0.25 + spr)), 6, W - 6), y:8 + rnd() * (H - 16), r:2 + sz * 9 * (0.5 + rnd()), a:1, life:0.12 + sz * 0.6, o:rnd() < 0.18});
+    const n = rnd() < e * (0.25 + den * 0.5) ? 1 : 0;
+    for (let i = 0; i < n && P.length < 14; i++) P.push({x:clamp(W * (pos + (rnd() - .5) * (0.25 + spr)), 6, W - 6), y:8 + rnd() * (H - 16), r:2 + sz * 9 * (0.5 + rnd()), a:1, life:0.12 + sz * 0.6, o:rnd() < 0.18});
     for (let i = P.length - 1; i >= 0; i--){ const p = P[i]; p.a -= dt / p.life; if (p.a <= 0){ P.splice(i, 1); continue; }
-      const k2 = Math.sin(Math.PI * Math.max(0, p.a)); g.globalAlpha = 0.55 * k2; g.fillStyle = p.o ? AC : ink(.5); g.beginPath(); g.ellipse(p.x, p.y, p.r * 1.6, p.r * 0.55, 0, 0, 7); g.fill(); }
+      const k2 = Math.sin(Math.PI * Math.max(0, p.a)); g.globalAlpha = 0.32 * k2; g.fillStyle = p.o ? AC : ink(.5); g.beginPath(); g.ellipse(p.x, p.y, p.r * 1.6, p.r * 0.55, 0, 0, 7); g.fill(); }
     g.globalAlpha = 1; return; }
   const mid = H / 2, amp = H * 0.32;
   if (A.kind === 'clip' || A.kind === 'steps'){
     const scroll = ts * 1.1, cyc = 2.2, a0 = 0.35 + e * 0.75;
     const wave = x => Math.sin((x / W * cyc - scroll) * 2 * Math.PI) * a0 + Math.sin((x / W * cyc * 3 - scroll * 1.7) * 2 * Math.PI) * a0 * 0.22;
-    g.setLineDash([2, 4]); g.strokeStyle = ink(.16); g.lineWidth = 1; g.beginPath(); for (let x = 0; x <= W; x += 2){ const y = mid - wave(x) * amp; x ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); g.setLineDash([]);
-    g.strokeStyle = ink((.3 + .35 * e).toFixed(2)); g.lineWidth = 1.8; g.beginPath();
+    g.strokeStyle = ink((.13 + .2 * e).toFixed(2)); g.lineWidth = 1.2; g.beginPath();
     if (A.kind === 'clip'){ const dr = v(/drive|gain|amount|amt|heat|sat|input|dens|fold/i, .5), K = 1 + dr * 6, n = Math.tanh(K), fold = /fold/.test(f.type);
       for (let x = 0; x <= W; x += 2){ const u = wave(x), o = fold ? Math.sin(u * (1 + dr * 3) * Math.PI / 2) : Math.tanh(K * u) / n, y = mid - o * amp; x ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
-      if (e > 0.02){ const gr = g.createRadialGradient(W / 2, mid, 2, W / 2, mid, Math.max(W, H) * 0.6); gr.addColorStop(0, 'rgba(255,90,31,' + (0.16 * e * (0.4 + dr)).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(255,90,31,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H); }
       return; }
     const bits = v(/bit/i, .5), rate = v(/rate|down|samp/i, .5), st = Math.max(2, Math.round(3 + bits * 14)), hold = Math.max(2, Math.round((1 - rate) * 14 + 2));
     let px = 0, py = mid; for (let x = 0; x <= W; x += hold){ const q = Math.round(wave(x) * st) / st, y = mid - q * amp; if (!x) g.moveTo(0, y); else { g.lineTo(x, py); g.lineTo(x, y); } px = x; py = y; } g.lineTo(W, py); g.stroke();
-    if (/vsamp|vinyl/.test(f.type) || v(/noise/i, 0) > 0.05){ const nz = v(/noise/i, .3) * (0.3 + e); g.fillStyle = ink(.35); for (let i = 0; i < 20 * nz; i++) g.fillRect(rnd() * W, rnd() * H, 1, 1); }
     return; }
   if (A.kind === 'vinyl'){   // a record turning at 33⅓, the crackle on it
     const R = Math.min(W, H) * 0.42, cx = W / 2, cy = H / 2, rot = ts * 0.555 * 2 * Math.PI;
-    g.fillStyle = ink(.07); g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fill();
-    g.strokeStyle = ink(.12); g.lineWidth = 1; for (let r = R * 0.38; r < R; r += 3){ g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke(); }
-    g.fillStyle = AC; g.globalAlpha = .55; g.beginPath(); g.arc(cx, cy, R * 0.3, 0, 7); g.fill(); g.globalAlpha = 1;
-    g.strokeStyle = ink(.45); g.lineWidth = 2; g.beginPath(); g.moveTo(cx + Math.cos(rot) * R * 0.1, cy + Math.sin(rot) * R * 0.1); g.lineTo(cx + Math.cos(rot) * R * 0.28, cy + Math.sin(rot) * R * 0.28); g.stroke();
-    const cr = v(/crack|dust|noise|wear/i, .4); g.fillStyle = ink(.6); for (let i = 0; i < 1 + cr * 8; i++){ if (rnd() > 0.5) continue; const a = rnd() * 7, r = R * (0.4 + rnd() * 0.58); g.fillRect(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 1.5, 1.5); }
+    g.strokeStyle = ink(.14); g.lineWidth = 1; for (const r of [R, R * 0.75, R * 0.55]){ g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke(); }
+    g.fillStyle = AC; g.globalAlpha = .3; g.beginPath(); g.arc(cx, cy, R * 0.3, 0, 7); g.fill(); g.globalAlpha = 1;
+    g.strokeStyle = ink(.3); g.lineWidth = 1.5; g.beginPath(); g.moveTo(cx + Math.cos(rot) * R * 0.1, cy + Math.sin(rot) * R * 0.1); g.lineTo(cx + Math.cos(rot) * R * 0.28, cy + Math.sin(rot) * R * 0.28); g.stroke();
+    const cr = v(/crack|dust|noise|wear/i, .4); g.fillStyle = ink(.45); for (let i = 0; i < 1 + cr * 2; i++){ if (rnd() > 0.35) continue; const a = rnd() * 7, r = R * (0.4 + rnd() * 0.58); g.fillRect(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 1.5, 1.5); }
     return; }
   if (A.kind === 'strings'){   // strings (one per chord voice), each ringing in its own harmonic, kicked by the sound
-    const nS = 4, br = v(/bright|struct|tone/i, .5);
+    const nS = 3, br = v(/bright|struct|tone/i, .5);
     for (let j = 0; j < nS; j++){ const y = H * (j + 1) / (nS + 1), h = j + 1, A2 = (3 + 10 * e) / (1 + j * 0.4), w = 2 * Math.PI * (3 + j * 1.7 + br * 4);
-      g.strokeStyle = j === 0 ? 'rgba(255,90,31,' + (.3 + .5 * e).toFixed(2) + ')' : ink((.2 + .3 * e).toFixed(2)); g.lineWidth = 1.4; g.beginPath();
+      g.strokeStyle = j === 0 ? 'rgba(255,90,31,' + (.2 + .35 * e).toFixed(2) + ')' : ink((.14 + .22 * e).toFixed(2)); g.lineWidth = 1.2; g.beginPath();
       for (let x = 6; x <= W - 6; x += 2){ const u = (x - 6) / (W - 12), yy = y + Math.sin(Math.PI * h * u) * Math.cos(ts * w) * A2; x === 6 ? g.moveTo(x, yy) : g.lineTo(x, yy); } g.stroke();
       g.fillStyle = ink(.3); g.fillRect(4, y - 3, 2, 6); g.fillRect(W - 6, y - 3, 2, 6); }
     return; }
   if (A.kind === 'bands'){   // vocoder bands lighting with the sound
-    const N = 16, bw = (W - 12) / N; if (!A.b) A.b = new Float32Array(N);
+    const N = 10, bw = (W - 12) / N; if (!A.b) A.b = new Float32Array(N);
     for (let i = 0; i < N; i++){ const tgt = e * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(ts * (2.1 + i * 0.37) + i * 1.3))) * (1 - Math.abs(i - N * 0.35) / N * 0.8); A.b[i] += (tgt - A.b[i]) * Math.min(1, dt * 14);
-      const h = A.b[i] * (H - 16); g.fillStyle = i % 5 === 2 ? 'rgba(255,90,31,.5)' : ink(.22); g.fillRect(6 + i * bw + 1, H - 8 - h, bw - 2, h); }
+      const h = A.b[i] * (H - 16) * 0.8; g.fillStyle = i === 3 ? 'rgba(255,90,31,.3)' : ink(.12); g.fillRect(6 + i * bw + 1, H - 8 - h, bw - 2, h); }
     return; }
   if (A.kind === 'swirl'){   // modulation: points turning at the rate, spread by the depth
     const rt = v(/rate|speed|freq/i, .4), dp = v(/depth|amount|amt|width|intens/i, .5), cx = W / 2, cy = H / 2, R = Math.min(W, H) * (0.18 + dp * 0.26);
-    for (let i = 0; i < 24; i++){ const a = ts * (0.4 + rt * 3) * (i % 2 ? 1 : -0.6) + i * 0.785, r = R * (0.45 + (i % 3) * 0.28) * (1 + e * 0.25);
-      g.fillStyle = i % 6 ? ink((.18 + .3 * e).toFixed(2)) : AC; g.beginPath(); g.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.8, 1.6 + e * 1.4, 0, 7); g.fill(); }
+    for (let i = 0; i < 9; i++){ const a = ts * (0.4 + rt * 3) * (i % 2 ? 1 : -0.6) + i * 2.09, r = R * (0.5 + (i % 3) * 0.25) * (1 + e * 0.2);
+      g.fillStyle = i % 4 ? ink((.14 + .22 * e).toFixed(2)) : AC; g.beginPath(); g.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.8, 1.6 + e * 1.4, 0, 7); g.fill(); }
     return; }
 }
 // SPRING (owner, 3 Nov: "a cool spring animation like in the pump spring plugin but vertical, with the text on top"): the
@@ -28444,6 +28487,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [391, '3 Nov', ['Acid line… writes on the song’s 16th grid: at LPB 8 a step is two rows, so notes no longer land between the 16ths. Classic 303 (now the default), Rolling and Squelch compose the line: a one-bar motif with notes mostly on the beat and the 8ths, the root on the beat, passing notes on the 16ths, repeated through the phrase with a changed note every other bar and a turnaround leading back to the root every fourth bar. …pump ACID keeps its own random lines.', 'The FX bar animations are calmer: fewer moving parts and fainter lines, closer to the springs.']],
   [390, '3 Nov', ['More FX bar animations behind the values, each showing what its effect does as it plays: reverbs bounce the sound around a room the size of their SIZE, granular effects pop grains, drive and saturation show the wave being pushed into clipping, crushers and the vintage sampler cut it into steps, vinyl spins a record, resonators ring strings, the vocoder lights its bands and the swirly modulation effects turn. Effects that already have a display (dynamics meters, EQ and filter curves, echo taps, Flex, Step gate, Retrigger) keep theirs.']],
   [389, '3 Nov', ['The side panel is restyled like the FX bar: the status and meters and the INSTRUMENTS list are cards with dark title bars, and the instruments wrap to the panel’s width and scroll inside their card, so none are cut off. With the instrument list on, each instrument flashes as its notes play, as the pads do on the Synth page.', 'Acid line…: picking an instrument plays a short note on it, and instruments no phrase uses yet are marked · free.']],
   [388, '3 Nov', ['Track numbers (Arrange, Song, Mixer): Alt/⌥-click mutes the track, as Alt-click mutes a block; a plain click picks the track, a double-click names it without muting it on the way, a right-click still solos. (Touch is as before.)', 'Alt/⌥+T adds a new phrase on the next empty track, as Ctrl/⌘+T does; it works in a browser tab, where Chrome keeps Ctrl/⌘+T.']],

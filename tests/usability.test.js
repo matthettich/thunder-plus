@@ -350,3 +350,10 @@ test('acid key from the song (3 Nov): KEY FOLLOW instruments only, the song SCAL
   assert.match(src, /if \(!I \|\| !I\.kf\) continue;/, 'melodic instruments only');
   assert.match(src, /const found = songKey\(cPhrase\);/, 'the panel uses it');
 });
+
+test('acid (3 Nov): 16th grid from the LPB, composed lines', () => {
+  const src = H.read('index.html');
+  assert.match(src, /spr = Math\.max\(1, Math\.round\(lpb \/ 4\)\), Ls = Math\.max\(1, Math\.floor\(L \/ spr\)\)/, 'steps from the LPB');
+  assert.match(src, /function acidWrite\(P, y0, L, base, st, ins, spr = 1\)\{/, 'write on the grid');
+  assert.match(src, /if \(!only && \(R\.style \| 0\) > 0\) return acidCompose\(st, L, lanes, R, rnd\);/, 'composed styles');
+});
