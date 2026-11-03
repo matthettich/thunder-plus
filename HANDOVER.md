@@ -109,7 +109,6 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
   change it needs.
 - Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
-- Owner to pick (3 Nov): the three tracker keys that clash (see "3 Nov: Audio & MIDI ports table; tracker keys").
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
@@ -200,12 +199,10 @@ On `beta` (worktree branch), not released; BUILD and the sw.js cache name not bu
   in `fileKeys` and `editorKey`; closes it too). The on-screen SEMI − + / TRANSPOSE buttons and plain , . on non-note cells
   still need a selection (`transposeSel(d, true)`), so a stray tap can't move a whole phrase. Labels in Edit ▾ / Tools ▸
   (`keyHint`), Help (Tracker · KEYS mode), README, the phrase hint line, What's new.
-- **Not built: conflicts** (for the owner to choose other keys):
-  - **Ctrl/⌘+Shift+Backspace** (remove a whole song row): `keysDown`'s mod branch already takes Ctrl/⌘+Backspace *with any
-    Shift* as "remove the row" (the cursor column on Song), so Shift is swallowed by the column version today; giving it
-    the whole-row meaning changes what that chord does now. Also Chrome on Windows / Linux opens "Clear browsing data" on
-    Ctrl+Shift+Delete (not Backspace, so that part is fine). Suggest: right-click / Edit ▾ → Remove the song row, as now,
-    or Ctrl/⌘+Alt+Backspace.
+- **Owner's choices (3 Nov, morning):** Ctrl/⌘+Shift+Backspace **built**: on the Song it removes the whole song row (or
+  the selected rows: `songRowRemove`), the pair of Ctrl/⌘+Shift+Enter; Ctrl/⌘+Backspace (and Edit ▾ → Remove the row) stay
+  the cursor's column only, and off the Song Shift changes nothing. The other two are **skipped** (owner: keep the keys as
+  they are):
   - **Ctrl/⌘+Alt+▲ / ▼** (nudge the selection a row): `keysDown`'s mod branch already maps Ctrl/⌘ + any arrow (Alt
     included) to `bump` (change the value), and in PAD mode Alt+arrows are OPTION (`optDir`) before that; plus some
     Windows Intel graphics drivers rotate the screen on Ctrl+Alt+arrows, and on Linux desktops (GNOME, KDE) Ctrl+Alt+▲▼
@@ -486,7 +483,7 @@ Scope comes from the selection, as in Renoise: Ctrl/⌘+A pressed again widens i
 | Interpolate | Ctrl/⌘+I | **built** · Renoise's key |
 | Shrink / Expand | Ctrl/⌘+Shift+, / Ctrl/⌘+Shift+. | **built** |
 | Insert a row (Macs have no Insert) | Ctrl/⌘+Enter | **built** · Insert keeps working; on Song, one column as now |
-| Insert / remove a whole song row | Ctrl/⌘+Shift+Enter / Ctrl/⌘+Shift+Backspace | Insert: **built**. Remove: **not built** (Ctrl/⌘+Shift+Backspace is already the column remove) |
+| Insert / remove a whole song row | Ctrl/⌘+Shift+Enter / Ctrl/⌘+Shift+Backspace | **Built** (remove: 3 Nov, owner's choice; Ctrl/⌘+Backspace stays the column remove) |
 | First / last song row | Ctrl/⌘+Home / Ctrl/⌘+End | **built** |
 | Follow on / off | Ctrl/⌘+Shift+F (and Scroll Lock) | **built** · Ableton's key |
 | Play the row under the cursor | Alt+Enter (every track), Shift+Alt+Enter (this track) | **built** |
