@@ -1020,7 +1020,16 @@ body.mob #tSong .tl{font-size:0} body.mob #tSong .tl .ic{width:16px; height:16px
 body.mob .top .tcpu .cpuw{display:none}
 body.mob .top{gap:6px} body.mob .top .tcpu{min-width:52px; padding:0 6px} body.mob #bFile, body.mob .top #bSet{padding:0 9px}
 body.mob .ttabs button{padding:0 9px; letter-spacing:.02em}   /* the tabs make room for the strip beside them */
-@media (max-width:780px){ body.mob .top #tSong{display:none} }   /* tight: the pad's PLAY (SHIFT+PLAY) and the COMMANDS ▶ play the song */
+@media (max-width:780px){ body.mob .top #tSong{display:none} }
+/* TOP BAR, PHONE (owner, Fold unfolded, 2 Nov): ? stayed on a second line, the meter's scale was squashed, LEFT / TO was a
+   smaller box than File. One line that doesn't wrap; File is its ▾ alone (the unsaved dot stays); LEFT / TO is a box like
+   File's; the meter gets the room File gave up. */
+body.mob .top{flex-wrap:nowrap}
+body.mob .top > *{flex-shrink:0} body.mob .top .hmeter{flex:1 1 150px; min-width:100px; max-width:260px; flex-shrink:1}
+body.mob #bFile{font-size:0; padding:0 12px} body.mob #bFile::after{content:'▾'; font-size:var(--fs-3)} body.mob #bFile.dirty::before{font-size:var(--fs-3)}
+body.mob .top #tLen{min-height:34px; padding:0 10px; border:1px solid var(--line); border-radius:0; background:var(--panel); font:700 var(--fs-3)/1 var(--mono); align-self:auto}
+/* LOOP on the pad (owner): lit in its own colour while the pattern loops */
+#kLoop.on, #tPad #kLoop.on{background:#1f9d5c; color:#fff; border-color:#1f9d5c}   /* tight: the pad's PLAY (SHIFT+PLAY) and the COMMANDS ▶ play the song */
 .tsong{border:1px solid var(--line); min-height:34px; padding:0 14px; margin:0 4px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; flex:none; white-space:nowrap; background:var(--panel)}
 .tsong:hover{border-color:var(--ink)}
 .tsong.on{background:var(--pl); color:var(--inv); border-color:var(--pl)}
@@ -2136,7 +2145,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <div class="sp"></div>
   <button type="button" id="bUpd" hidden title="A newer desktop build is out">Update</button>
   <div class="setwrap">
-    <button id="bFile" aria-haspopup="true" aria-expanded="false" title="File: new, open, save, share, render and export (on Waves / Chains: that patch)">File ▾</button>
+    <button id="bFile" aria-haspopup="true" aria-expanded="false" aria-label="File menu" title="File: new, open, save, share, render and export (on Waves / Chains: that patch)">File ▾</button>
     <div class="setmenu gfile" id="gfile" hidden role="menu"></div>
   </div>
   <div class="setwrap deskmenu">
@@ -23506,8 +23515,11 @@ function hmDraw(now){
     g.restore();
   }
   const ty = y0 + bh * 2 + gap, sy = Math.round(H - fs * 0.6);
-  for (const d of [-36, -24, -12, -6, 0]){ const x = lx + Math.round(BW * lvl(Math.pow(10, d / 20))); g.globalAlpha = 0.4; g.fillStyle = ink; g.fillRect(Math.min(x, lx + BW - 1), ty, 1, Math.round(2 * dpr));
-    g.globalAlpha = 0.6; g.textAlign = d === 0 ? 'right' : 'center'; g.fillText(String(d), d === 0 ? lx + BW : x, sy); g.globalAlpha = 1; }
+  { let last = Infinity;   // right to left, a label only where it doesn't run into the one after it (narrow meters: fewer numbers)
+    for (const d of [0, -6, -12, -24, -36]){ const x = lx + Math.round(BW * lvl(Math.pow(10, d / 20))), lab = String(d), w = g.measureText(lab).width;
+      g.globalAlpha = 0.4; g.fillStyle = ink; g.fillRect(Math.min(x, lx + BW - 1), ty, 1, Math.round(2 * dpr));
+      const L0 = d === 0 ? lx + BW - w : x - w / 2; if (L0 + w + 3 * dpr > last || L0 < lx) continue;
+      g.globalAlpha = 0.6; g.textAlign = 'left'; g.fillText(lab, L0, sy); g.globalAlpha = 1; last = L0; } }
   if (HM.clip){ g.fillStyle = '#e5484d'; g.fillRect(lx + BW - Math.round(4 * dpr), y0, Math.round(4 * dpr), bh * 2 + gap); }
   g.font = `600 ${Math.round(11 * dpr)}px ${st.fontFamily || 'monospace'}`; g.textAlign = 'right'; g.fillStyle = HM.clip ? '#e5484d' : ink; g.globalAlpha = pkMax > 0.0001 ? 1 : 0.45;
   g.fillText(pkTxt + ' dB', W - dpr, Math.round(H * 0.38)); g.globalAlpha = 1;
