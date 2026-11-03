@@ -27,7 +27,12 @@
       "main.js",
       "updater.js",
       "preload.js",
+      "link-session.js",
+      "link/**/*",
       "app/**/*"
+    ],
+    "asarUnpack": [
+      "link/*.node"
     ],
     "directories": {
       "output": "dist",
