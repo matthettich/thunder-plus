@@ -119,6 +119,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (37): CHN off when a track leaves the …chains patch (build 410, on `beta`)
+
+- Owner: "if a track is added to chains and then the input is changed to a different track, the track still says MISS in
+  the mixer". `chainsAutoOn` only ever switched CHN on (a track newly in `chainsAutoTracks()`); the old track kept
+  `S.chainOn` true with nothing in the patch → MISS. It now also switches CHN off for a track that was in the patch
+  before the edit and isn't after (Track In / Chain Out moved or deleted), with a toast. Same deferred check as before,
+  so a passing state while a module snaps doesn't count. A whole-patch replace (undo, import) is unchanged.
+- Checked headless: Track In + Chain Out on track 1 (CHN on) moved to 3 → CHN on 3 only, no MISS in the Mixer.
+
 ## 3 Nov (36): SWITCH TO …PUMP for older songs (build 409, on `beta`)
 
 - Owner: "when i open it from the mixer it is the old one but I thought we brought the pump fx over, including the auto
