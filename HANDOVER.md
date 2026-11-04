@@ -119,6 +119,21 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (32): FX graph screens, animations inside them; ⌥▲▼ between patterns (build 405, on `beta`)
+
+- Owner: "the orange graphics in the fx should be over white backgrounds so that it looks less jumbled" → "do that change".
+  `fxDynPal()` also builds `fxPalScrV` (bg near white on a light skin: bg 80 % to white; on a dark skin bg 35 % to black);
+  `dkFxViz` is now a wrapper that sets `fxPalScr` while `dkFxViz0` (the old body) draws, so every FX bar graph path
+  (dyn displays, Flex patterns, curves, pictures) fills with the screen colour. Elsewhere fxDynPal is unchanged.
+- The animation canvas (`canvas.fspr`) now covers only the graph box: `dkAnimBox(col, cv)` sets its left/top/width/height
+  to `.fviz` (falls back to below the header when a card has no graph) for both `dkAnim` and `dkSpring`. The z-order from
+  404 stays (over the graph, under the values; opacity .6). Animations scale to the smaller box.
+- Owner: "I'd like to keep [Shift+⌥+▲▼] and also use opt + up/down this way and jump between patterns". keysDown (KEYS
+  mode): ⌥+▲▼ on tv 'phrase' → `optDir(arrow, true)`, on 'song' → `shiftAltArrow(arrow)`, i.e. the Shift+⌥ behaviour.
+  ⌥+◀▶ and ⌥+▲▼ on other screens still `nav()` (▲ Project, ▼ Mixer). PAD mode unchanged (its Alt+arrows were optDir
+  already). Help text, Pattern view hint and README updated. Checked headless: Pattern view ⌥▼▼▲▲ → song rows 1,2,1,0,
+  stays on Phrase.
+
 ## 3 Nov (31): FX bar animations over the graphs; CURSOR ON STOP (build 404, on `beta`)
 
 - Owner: "display the animations lightly on top of the orange visuals in fx … it would make the animations look
