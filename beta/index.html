@@ -15073,7 +15073,12 @@ let chainAutoBefore = null;
 function chainsAutoOn(before){
   if (chainAutoBefore) return; chainAutoBefore = before;
   setTimeout(() => { const b = chainAutoBefore; chainAutoBefore = null; let any = false;
-    for (const t of chainsAutoTracks()) if (!b.has(t) && !S.chainOn[t]){ S.chainOn[t] = true; any = true; toast('Track ' + (t + 1) + ' now runs through …chains (Mixer → CHN is on).'); }
+    const now = chainsAutoTracks();
+    for (const t of now) if (!b.has(t) && !S.chainOn[t]){ S.chainOn[t] = true; any = true; toast('Track ' + (t + 1) + ' now runs through …chains (Mixer → CHN is on).'); }
+    // AND OFF AGAIN (owner, 3 Nov: "if a track is added to chains and then the input is changed to a different track, the
+    // track still says MISS in the mixer"): an edit that takes a track out of the patch (its Track In / Chain Out moved to
+    // another track, or deleted) switches its CHN off, so it plays as before instead of showing MISS.
+    for (const t of b) if (!now.has(t) && S.chainOn[t]){ S.chainOn[t] = false; any = true; toast('Track ' + (t + 1) + ' no longer runs through …chains (Mixer → CHN is off).'); }
     if (any){ saveS(); chainsPush(); if (view === 'tracker') draw(); } }, 0);
 }
 window.thunderChains = {
@@ -20733,7 +20738,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 409;
+const BUILD = 410;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29056,6 +29061,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [410, '3 Nov', ['…chains: moving a Track In / Chain Out to another track (or deleting it) switches the old track’s CHN off, so the Mixer no longer shows MISS for it and the track plays as before.']],
   [409, '3 Nov', ['Mastering: an older song’s MASTERING window has SWITCH TO …PUMP: the song takes the …pump chain new songs have (EQ → CALM → COMP → TONE → MASTER, the auto master last) in the master’s last five FX slots, and its old mastering is switched off. It asks first if those slots hold effects; Undo takes it back.']],
   [408, '3 Nov', ['Arrange and Song: right-click a block → Duplicate this track with its patterns: the track goes into the next empty track of its kind with its volume, pan, effects and every block as a unique copy (also Ctrl/⌘+Alt+D on Phrase, Mixer and FX). Right-click on a track number still solos.', 'Master column: a block that turns effects off (FLX 00, GAT 00, RTG 00, FXO X0) and turns nothing on draws like an OFF-only block, black with the stop bar.']],
   [407, '3 Nov', ['Row colours: right-clicking anywhere in Arrange’s row-number column opens the colour (only the digits did, so it often seemed to do nothing).', 'Pattern view: right-click a row number (or SONG ROW) to colour this pattern’s song row; SONG ROW shows the colour (Settings → ROW COLOUR IN PATTERN, on).', 'Settings → SECTIONS BESIDE PHRASE (off): the SECT lane in Arrange beside the phrase too.']],
