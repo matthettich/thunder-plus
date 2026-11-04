@@ -119,6 +119,21 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (38): ⌥▲▼ from the pattern on screen (build 411, on `beta`)
+
+- Owner: ⌥+arrows "navigated to the patterns around where the cursor was in arrange, but it should move from the pattern
+  currently displayed on the phrase or pattern window". Two causes: with Arrange holding the keys, the keys run as the
+  Song screen (apRun), so ⌥▲▼ moved Arrange's cursor; and phraseGrid / pvRow start from `cs.song`, which is Arrange's
+  cursor (PIN, an empty cell, or a phrase used twice: followPhraseBlock takes the use nearest that cursor).
+- `phShown` {x, y, p}: the pattern the phrase screen shows, set in draw (Phrase, Arrange not holding the keys, the cursor
+  on the phrase's block) and in pvLines (after pvAlign, also while Arrange holds the keys). `phShownGo()` puts cs.song
+  and cTrack back on it when it still holds cPhrase.
+- A wrapper on `globalKeys` (outside apRun): ⌥+▲▼ without Shift on Phrase while Arrange has the keys → `apFocus(null)` +
+  phShownGo, then the key goes on as the phrase's. optDir calls phShownGo before phraseGrid (▲▼) and before pvRow.
+  Shift+⌥+▲▼ unchanged.
+- Checked headless: Pattern view on row 0, Arrange pinned with its cursor at 20 and the keys → ⌥▼▼▲ = rows 1, 2, 1.
+  (Without PIN, any key run for Arrange makes the phrase follow its cursor first, as before.)
+
 ## 3 Nov (37): CHN off when a track leaves the …chains patch (build 410, on `beta`)
 
 - Owner: "if a track is added to chains and then the input is changed to a different track, the track still says MISS in
