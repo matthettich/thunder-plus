@@ -142,6 +142,30 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (48): plan, not built: sharing songs between devices (Google Drive)
+
+Owner asked how hard saving to Google Drive would be, and whether imported samples stay with the song file. Wants to pick
+up the last save seamlessly on Android, Mac and Windows (and an iPad, even though they don't have one). Not decided yet;
+offered the Drive integration and/or SoundFonts in the song file.
+- **What a .thunder file already carries:** every imported sample as data (`kitToJSON(false)`: `smpToJSON` b64; presets
+  embed theirs, `fullPresets`), loaded wavetables (`V.wtData`), Resynth analyses (`V.rsData`) and impulse responses
+  (`irsFull`). No file paths: a song opens complete anywhere. The owner's 1.4 MB test song is mostly samples.
+- **Not carried:** SoundFonts the user loads (.sf2 / .sf3) are kept per device in IndexedDB (`thunderplus-fonts`); a pad
+  stores only `V.sfFont` (id) and `sfFontName`, so on another device it's silent until the same font is loaded. The
+  built-in GM font (`gm-fluidr3`, `sounds/`) is everywhere.
+- **Today, no code:** Google Drive for desktop on Mac / Windows, saving and opening .thunder files in the Drive folder from
+  the desktop app (native dialogs, `pickOut`). Android: Open's file picker reaches Drive; saving only downloads
+  (no `showSaveFilePicker` there), so it's moved by hand.
+- **Proposed, to build:** File → Save to Drive / Open latest from Drive, one "Thunder Plus" folder, Drive API v3 with
+  Google Identity Services and the `drive.file` scope (only files the app makes: non-sensitive, no Google review). A
+  newer-on-Drive check before overwriting (compare modifiedTime with the last one this device saved or opened; ask).
+  Web (GitHub Pages origin, Android, iPad) via the GIS token client; the Electron app needs its own OAuth (system browser
+  + loopback redirect, PKCE) and a "Desktop app" OAuth client. Owner setup: a Google Cloud project, the Drive API on, an
+  OAuth consent screen, a Web client ID for `https://matthettich.github.io` and a Desktop client ID (~15 min; give the
+  steps). Effort: a solid session, mostly sign-in and per-platform testing.
+- **Smaller option:** embed user SoundFonts in the song (b64 of the font's bytes, only the fonts its pads use; can be tens
+  of MB, so behind a setting or an ask at save), loaded into IndexedDB on open when missing.
+
 ## 3 Nov (47): bus bars centred in the gaps (builds 420–421)
 
 - 420: the bars' white halo removed (owner). 421: "it intersects the phrase blocks in an awkward way… center them": each
