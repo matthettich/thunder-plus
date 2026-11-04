@@ -26,6 +26,10 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.79** (3 Nov 2026; owner: "Push all to main and build a desktop build"; Run workflow through the API with version 1.2.79,
+  from `main` after merging `beta` at build 416): SWITCH TO …PUMP (409), CHN off when a track leaves …chains (410), ⌥▲▼ from
+  the pattern on screen (411), pending FX commands kept + Enter twice on an effect value (412), FX bar in the skin's accent
+  (413), the master column's own blocks + shared-phrase warnings (414–415), UNIQUE PER TRACK (416).
 - **v1.2.78** (3 Nov 2026; owner: "push from beta to web and build a desktop"; Run workflow through the API with version 1.2.78,
   from `main` after merging `beta` at build 408): FX graph screens and animations (404–405), ⌥▲▼ between patterns, CURSOR ON
   STOP → PHRASE / ARRANGE ON STOP, REMOVE rows, row colour fixes and Pattern view row colour, sections beside Phrase,
