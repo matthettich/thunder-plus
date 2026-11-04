@@ -1258,6 +1258,7 @@ body.asong .tagrid .rn{text-align:right; padding-right:7px}
    sections change; a bar on its left too, so it reads at a glance */
 .tagrid .rn.rc, .tagrid .rn.rc.r4{color:var(--rnc); font-weight:800; box-shadow:inset 3px 0 0 var(--rnc)}
 .tgrid span.rn.rnc{color:var(--rnc); font-weight:800; box-shadow:inset 3px 0 0 var(--rnc)}
+.tscr .pvbar .pvrow.rnc{color:var(--rnc); font-weight:800; box-shadow:inset 3px 0 0 var(--rnc); padding-left:5px}
 .tagp b.gx{font-size:8px; letter-spacing:0}   /* also in the side panel (MASTER IN ARRANGE) */
 .agboxes{position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:2}
 .agboxes[hidden]{display:none}
@@ -1297,7 +1298,7 @@ body.asong .tagrid .rn, body.asong .tath{font-size:var(--fs-2)}
 .sxmenu hr{border:0; border-top:1px solid color-mix(in srgb, var(--line) 30%, transparent); margin:4px 0; width:100%}
 /* SECTIONS LANE WIDTH (owner, 21 Oct: on the phone the empty lane and its long label pushed the song grid off centre): --sxw is
    set by sxLaneSize() from the longest section name (narrow while there are none), at most 88px (60px under 900px). */
-body.asong.sxsecs .tarr{padding-left:calc(var(--sxw, 88px) + 4px)}
+body.sxsecs .tarr{padding-left:calc(var(--sxw, 88px) + 4px)}   /* (beside Phrase too, with SECTIONS BESIDE PHRASE) */
 .sxlane{position:absolute; left:0; top:0; bottom:0; width:var(--sxw, 88px); z-index:3}
 .sxlane[hidden]{display:none}
 .sxlane .sxlh{position:absolute; left:4px; font:700 var(--fs-1)/16px var(--mono); letter-spacing:.06em; color:var(--ar-dim)}
@@ -20719,7 +20720,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 406;
+const BUILD = 407;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -21461,6 +21462,10 @@ function projRows(){
       info:() => 'With a mouse on the Song screen: drag across empty cells to select, drag a block or the selection to move it, Alt-drag to copy it, right-click for a menu (copy, paste, clone, mute, loop, open, name a section, clear). Off: clicks only, as before'},
     {l:'SECTIONS', ck:'Song: section names beside the rows', get:() => SX.secs ? 1 : 0, set:v => sxSet('secs', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'The SECT lane left of the row numbers names runs of rows (INTRO, DROP…): tap the + on the cursor’s row (or tap the empty lane, double-click it, right-click a block) to name the section from that row; click a name to go there; hold or right-click a name to rename, loop or remove it. The lane is only as wide as its names. Needs a wide screen. Off hides the lane; the names stay in the song'},
+    {l:'SECTIONS BESIDE PHRASE', ck:'Arrange beside the phrase: the SECT lane too', get:() => SX.side ? 1 : 0, set:v => sxSet('side', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
+      info:() => 'With SECTIONS on: the SECT lane also shows in Arrange beside the phrase (it takes a little of Arrange’s width), so section names are there while you edit. Off: only on the Song screen'},
+    {l:'ROW COLOUR IN PATTERN', ck:'Pattern view: right-click a row number to colour the song row', get:() => SX.pvcol ? 1 : 0, set:v => sxSet('pvcol', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'In Pattern view, right-click a row number (or SONG ROW in its bar) to colour this pattern’s song row, the same as right-clicking the row number in Arrange; SONG ROW then shows in that colour. Off: the right-click menu as usual'},
     {l:'LOOP DRAG', ck:'Song: drag the row numbers to loop', get:() => SX.loop ? 1 : 0, set:v => sxSet('loop', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Drag down the Song screen’s row numbers to loop those rows (PLAY on this screen loops them; LOOP SEL turns it off). A tap still plays from that row'},
     {l:'SONG PEEK', ck:'Song: the phrase under the cursor beside it (not the dogs)', get:() => SX.peek ? 1 : 0, set:v => sxSet('peek', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
@@ -26985,9 +26990,11 @@ arrGrid.addEventListener('contextmenu', e => e.preventDefault());
    stageKind / stageLayout / stageCanvas, draw's peek refresh, the peek markup in #tStage, freshSong / normSong's
    `secs`, startScroll's skip). info() is wrapped inside this block.
    A song's sections (S.secs) stay in its file either way, and older versions just ignore them. */
-const SXK = {mouse:'thunderplus-songmouse-v1', secs:'thunderplus-songsecs-v1', loop:'thunderplus-loopdrag-v1', peek:'thunderplus-songpeek-v1'};
+const SXK = {mouse:'thunderplus-songmouse-v1', secs:'thunderplus-songsecs-v1', loop:'thunderplus-loopdrag-v1', peek:'thunderplus-songpeek-v1', side:'thunderplus-songsecs-side-v1', pvcol:'thunderplus-pvrowcol-v1'};
 const sxGet = (k, d) => { try { const v = localStorage.getItem(SXK[k]); return v == null ? d : v === '1'; } catch(e){ return d; } };
-const SX = {mouse:sxGet('mouse', true), secs:sxGet('secs', true), loop:sxGet('loop', true), peek:sxGet('peek', false)};
+// SECTIONS BESIDE PHRASE (owner, 3 Nov: an option, off by default): the SECT lane in Arrange beside the phrase too.
+// ROW COLOUR IN PATTERN (owner, 3 Nov: an option, on by default): right-click Pattern view's row numbers colours its song row.
+const SX = {mouse:sxGet('mouse', true), secs:sxGet('secs', true), loop:sxGet('loop', true), peek:sxGet('peek', false), side:sxGet('side', false), pvcol:sxGet('pvcol', true)};
 function sxSet(k, on){ SX[k] = !!on; try { localStorage.setItem(SXK[k], on ? '1' : '0'); } catch(e){} arrSig = ''; arrBoxKey = ''; layoutSig = ''; arrLayout(true); draw(); stageLayout(); }
 const sxRect = () => selA && selA.v === 'song' ? selRect() : null;
 const sxIn = (r, y, t) => !!r && y >= r.y0 && y <= r.y1 && t >= r.x0 && t <= r.x1;
@@ -27263,7 +27270,13 @@ async function rowColour(y){
   saveS(); arrSig = ''; gridHTML = null; draw();
 }
 arrGrid.addEventListener('contextmenu', e => {
-  const rn = e.target.closest && e.target.closest('[data-ry]'); if (!rn || (e.pointerType && e.pointerType === 'touch')) return;
+  if (e.pointerType && e.pointerType === 'touch') return;
+  // FIX (owner, 3 Nov: "no right click menu showed up"): only the digits took it; a click beside them, still in the number
+  // column, landed on the row and did nothing. Anywhere left of the row's first block now counts.
+  let rn = e.target.closest && e.target.closest('[data-ry]');
+  if (!rn){ const ar = e.target.closest && e.target.closest('.ar'), s2 = ar && ar.querySelector('[data-ry]'), b1 = ar && ar.querySelector('b');
+    if (s2 && e.clientX < (b1 ? b1.getBoundingClientRect().left : s2.getBoundingClientRect().right + 6)) rn = s2; }
+  if (!rn) return;
   e.preventDefault(); e.stopImmediatePropagation(); rowColour(+rn.dataset.ry);
 }, true);
 // BLOCK COLOURS (owner, 31 Oct): right-click → Colour… gives the block (every block of the selection) one of the track
@@ -27331,14 +27344,15 @@ async function sxSecEdit(y){
 }
 function sxSecRemove(y){ S.secs = (S.secs || []).filter(q => q.y !== y); saveS(); draw(); toast('Section removed'); }
 let sxLane = null, sxLaneKey = '';
-const sxLaneOn = () => asongOn() && SX.secs && arrEl.clientWidth >= 560;
+const sxLaneOn = () => SX.secs && (asongOn() ? arrEl.clientWidth >= 560 : SX.side && view === 'tracker' && document.body.classList.contains('arrvis') && arrEl.clientWidth >= 180);
 // SECTIONS LANE WIDTH: run by drawArr before it measures anything, so the columns and the boxes are laid out once at the
 // right width. The lane is as wide as its longest name needs (the label's width while there are none).
 let sxWKey = '', sxMeas = null;
 function sxLaneSize(){
   const on = sxLaneOn(); document.body.classList.toggle('sxsecs', on); if (!on) return;
   if (!sxLane){ sxLane = el('div', 'sxlane'); sxLane.setAttribute('aria-label', 'Song sections'); arrEl.append(sxLane); sxLaneWire(); }
-  const L = sxSecs(), small = document.body.classList.contains('arrsmall');
+  sxLane.hidden = false;   // (measured while hidden, every name came out 0 wide: beside Phrase the lane started hidden)
+  const L = sxSecs(), small = document.body.classList.contains('arrsmall') || !asongOn();   // beside a screen: the narrow lane
   const key = [L.map(q => q.n).join('\n'), small, tScale, document.fonts ? document.fonts.status : ''].join('|');
   if (key === sxWKey) return; sxWKey = key;
   if (!sxMeas || !sxMeas.isConnected){ sxMeas = el('button', 'sxsec sxm'); sxMeas.type = 'button'; sxMeas.tabIndex = -1; sxMeas.setAttribute('aria-hidden', 'true'); sxMeas.append(el('span')); }
@@ -28010,6 +28024,7 @@ function cmdCtx(e){
   e.preventDefault();
   if (!$('gedit').hidden) geditToggle(false);
   { const rn = tv === 'song' && e.target.closest('[data-r]'); if (rn){ rowColour(+rn.dataset.r); return; } }   // ROW COLOURS (3 Nov): the Song's row numbers
+  if (tv === 'phrase' && SX.pvcol && typeof pvActive === 'function' && pvActive() && e.target.closest('.pvrn, .pvrow')){ rowColour(cs.song.y); return; }   // ROW COLOUR IN PATTERN: this pattern's song row
   const sel = selA && selA.v === tv;
   // RIGHT-CLICK (menu audit, 2 Nov): the commands for what's under the pointer; Undo / Redo, selecting, value steps,
   // previous / next and play stay on their keys and in Edit ▾.
@@ -29003,6 +29018,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [407, '3 Nov', ['Row colours: right-clicking anywhere in Arrange’s row-number column opens the colour (only the digits did, so it often seemed to do nothing).', 'Pattern view: right-click a row number (or SONG ROW) to colour this pattern’s song row; SONG ROW shows the colour (Settings → ROW COLOUR IN PATTERN, on).', 'Settings → SECTIONS BESIDE PHRASE (off): the SECT lane in Arrange beside the phrase too.']],
   [406, '3 Nov', ['Command bar: REMOVE takes out the selected rows (or the cursor’s row) and the rows below move up, in a phrase, Pattern view, a sect or the song.', 'Settings: ARRANGE ON STOP, the same choice as PHRASE ON STOP for Arrange; both say STAYS or PLAYHEAD.']],
   [405, '3 Nov', ['FX bar: each graph sits on a clean screen of its own (near white on light skins), and its animation plays only inside it, so the values stay clear.', 'Keys: on Phrase (Pattern view too) and Song, ⌥/Alt+▲▼ now go to the pattern above / below, as Shift+⌥+▲▼ do; elsewhere they still change screen.']],
   [404, '3 Nov', ['FX bar: each effect’s animation now plays lightly over its graph instead of hiding behind it.', 'Settings: STOP CURSOR is now PHRASE ON STOP (STAYS or PLAYHEAD).']],
@@ -29688,6 +29704,7 @@ const pvFitS = (s, w) => s.length > w ? s.slice(0, w) : s.padEnd(w);
 function pvBarDraw(y, rows, lpb, warn, warnT){
   let nm = ''; try { nm = typeof songSecName === 'function' ? String(songSecName(y) || '') : ''; } catch(e){}
   pvTxt(pvB.row, 'SONG ROW ' + rS(y, 3));
+  { const rc = rowCol(y), st = pvB.row.style; if (st.getPropertyValue('--rnc') !== rc){ if (rc) st.setProperty('--rnc', rc); else st.removeProperty('--rnc'); } pvB.row.classList.toggle('rnc', !!rc); }   // ROW COLOURS
   pvB.tag.hidden = !nm; pvTxt(pvB.tag, nm.toUpperCase());
   pvTxt(pvB.len, rows + ' ROWS · LPB ' + lpb);
   pvB.warn.hidden = !warn; pvTxt(pvB.warn, warn ? '!' : ''); pvB.warn.title = warnT || warn; pvB.warn.setAttribute('aria-label', warn || 'No pattern length mismatch');

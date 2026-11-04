@@ -119,6 +119,19 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (34): row colour fixes, Pattern view row colour, sections beside Phrase (build 407, on `beta`)
+
+- Owner: right-clicking Arrange's row number "no right click menu showed up". Only the digits (`[data-ry]`, as wide as
+  "000") took it; the number column is wider, so a click beside them hit `.ar` and nothing happened. The capture handler
+  on `#tArrGrid` now takes anything in the row left of its first block. Checked headless beside Phrase (row 6, in the gap).
+- **ROW COLOUR IN PATTERN** (`SX.pvcol`, key `thunderplus-pvrowcol-v1`, default on): cmdCtx, on Phrase in Pattern view,
+  right-click on `.pvrn` (row numbers) or `.pvrow` (the bar's SONG ROW) → `rowColour(cs.song.y)`. pvBarDraw puts the row's
+  colour on SONG ROW (`.pvrow.rnc`).
+- **SECTIONS BESIDE PHRASE** (`SX.side`, key `thunderplus-songsecs-side-v1`, default off): `sxLaneOn` also allows the
+  lane when Arrange is beside a screen (`body.arrvis`, width ≥ 180); `body.sxsecs .tarr` padding no longer needs
+  `.asong`. Beside a screen the lane uses the narrow (60 px max) width. sxLaneSize now unhides the lane before measuring
+  (names measured 0 wide while it was hidden, so the lane came out at its minimum).
+
 ## 3 Nov (33): REMOVE rows; ARRANGE ON STOP (build 406, on `beta`)
 
 - Owner: 'add a "remove" to the small control bar that "removes these rows" to selections'. `rowsRemove()` (above
