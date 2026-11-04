@@ -7947,7 +7947,14 @@ $('ckMobWv').addEventListener('change', e => setMobEd('waves', e.target.checked)
 const cache = [], dirty = [], bufs = [];
 function slotAt(a, i){ while (a.length < nslots()) a.push(null); return a[i]; }
 let clipVoice = null, clipLayer = null;
-const ex = {sr:48000, bits:24, norm:true, noteName:false};
+// FIX (UI sweep, 4 Nov): the export / render settings (rate, bits, normalise, + note) are kept on this device like the other
+// settings; they went back to 48k / 24 / normalise on every reload. exSave() after each change.
+const EXK = 'thunderplus-export-v1';
+const ex = (() => { const d = {sr:48000, bits:24, norm:true, noteName:false};
+  try { const j = JSON.parse(localStorage.getItem(EXK) || 'null');
+    if (j){ if (j.sr === 44100 || j.sr === 48000) d.sr = j.sr; if (j.bits === 16 || j.bits === 24) d.bits = j.bits; if (typeof j.norm === 'boolean') d.norm = j.norm; if (typeof j.noteName === 'boolean') d.noteName = j.noteName; } } catch(e){}
+  return d; })();
+const exSave = () => { try { localStorage.setItem(EXK, JSON.stringify(ex)); } catch(e){} };
 const noteName = m => NOTE[((m % 12) + 12) % 12].replace('♯', '#') + (Math.floor(m / 12) - 1);
 const V = () => kit.voices[cur];
 const Lc = () => V().layers[V().sel];
@@ -12626,6 +12633,8 @@ document.addEventListener('keydown', e => {
     if (e.shiftKey && view === 'synth'){ play(cur); return; }
     if (tp.on) tStop(); else tStart('song', {row:songRow()}); return; }
   if (e.altKey && /^Digit[1-7]$/.test(e.code)){ e.preventDefault(); setView('tracker'); go(VIEWS[+e.code.slice(5) - 1]); return; }
+  // FIX (UI sweep, 4 Nov): Alt/⌥+S, Song settings "from any screen" (owner, 3 Nov), the Synth page too (it was the tracker's only)
+  if (e.altKey && !e.shiftKey && e.code === 'KeyS' && view === 'synth'){ e.preventDefault(); if (!pbOpen) setSheet('song'); return; }
   // F-KEYS OFF THE TRACKER (1 Nov, audit #1): F2–F4 go to Phrase / Mixer / Inst, F5 plays the song from the top, F6 this screen
   // (the pad here), F7 the song from the tracker's cursor, F8 stops (again: panic), F9 arms REC, as in the tracker. F5 used to
   // reload the page here.
@@ -13224,10 +13233,10 @@ if (inAI){
   $('bExPad').textContent = 'Save this pad (WAV in .zip)';
   $('exNote').textContent = 'Inside AI, files come out as .zip (WAV inside). Open the zip in Files, then import the WAVs into Koala or a SunVox Sampler. The standalone copy saves plain WAVs and can share straight to Koala.';
 }
-makeSeg($('segRate'), [[44100,'44.1k'],[48000,'48k']], () => ex.sr, v => ex.sr = v);
-makeSeg($('segBits'), [[16,'16'],[24,'24']], () => ex.bits, v => ex.bits = v);
-makeSeg($('segNorm'), [[true,'Normalise'],[false,'As is']], () => ex.norm, v => ex.norm = v);
-makeSeg($('segNoteName'), [[false,'Pad name'],[true,'+ note']], () => ex.noteName, v => ex.noteName = v);
+makeSeg($('segRate'), [[44100,'44.1k'],[48000,'48k']], () => ex.sr, v => { ex.sr = v; exSave(); });
+makeSeg($('segBits'), [[16,'16'],[24,'24']], () => ex.bits, v => { ex.bits = v; exSave(); });
+makeSeg($('segNorm'), [[true,'Normalise'],[false,'As is']], () => ex.norm, v => { ex.norm = v; exSave(); });
+makeSeg($('segNoteName'), [[false,'Pad name'],[true,'+ note']], () => ex.noteName, v => { ex.noteName = v; exSave(); });
 
 /* ---------- settings (synth page): Kit, MIDI, Export, Skin and Audio under one button ---------- */
 /* ---------- settings: one dropdown menu under the gear, on every screen ---------- */
@@ -13948,13 +13957,23 @@ const wheelEl = t => t && t.closest ? t.closest('input[type=range], [data-wheel]
 const wheelOk = r => !!r && (r.hasAttribute('data-wheel') ? r.isConnected && typeof r._wheel === 'function' : sliderOk(r));
 const wheelOff = () => { clearTimeout(wheelT); wheelT = 0; if (wheelR) wheelR.classList.remove('wheelon'); wheelR = null; };
 const wheelArm = r => { clearTimeout(wheelT); wheelCand = r; wheelT = setTimeout(() => { if (wheelCand === r && wheelOk(r)){ wheelR = r; r.classList.add('wheelon'); } }, 350); };
+// FIX (UI sweep, 4 Nov): a control the wheel moves can slide out from under a still pointer (the Mixer's VOL and OUT bars
+// are 3 px and move with their level), which dropped the focus after two or three notches and the wheel stopped. While the
+// pointer hasn't moved since the last wheel step (and that was under 0.6 s ago), the focused control keeps the wheel.
+let wheelLast = null;   // {t, x, y} of the last wheel step taken
+const wheelHeld = e => {
+  if (!wheelLast || performance.now() - wheelLast.t > 600 || Math.abs(e.clientX - wheelLast.x) > 1 || Math.abs(e.clientY - wheelLast.y) > 1) return false;
+  // a redraw that rebuilt the control (the master OUT bar): its new copy at the same place takes over, already rested on
+  if (wheelLast.r && !wheelLast.r.isConnected && wheelLast.cls){ const n = document.querySelector('.' + wheelLast.cls.trim().split(/\s+/).join('.') + (wheelLast.r.dataset.t != null ? `[data-t="${wheelLast.r.dataset.t}"]` : ''));
+    if (n && wheelOk(n)){ wheelR = wheelCand = n; n.classList.add('wheelon'); wheelLast.r = n; } }
+  return !!(wheelR && wheelR.isConnected && wheelR === wheelLast.r); };
 document.addEventListener('pointerover', e => {
-  if (e.pointerType !== 'mouse') return;
+  if (e.pointerType !== 'mouse' || wheelHeld(e)) return;
   const r = wheelEl(e.target);
   if (r !== wheelCand){ wheelOff(); wheelCand = null; }
   if (wheelOk(r) && r !== wheelR) wheelArm(r);
 }, true);
-document.addEventListener('pointerout', e => { const r = wheelEl(e.target); if (r && r === wheelCand && !(e.relatedTarget && r.contains(e.relatedTarget))){ wheelOff(); wheelCand = null; } }, true);
+document.addEventListener('pointerout', e => { if (wheelHeld(e)) return; const r = wheelEl(e.target); if (r && r === wheelCand && !(e.relatedTarget && r.contains(e.relatedTarget))){ wheelOff(); wheelCand = null; } }, true);
 /* WHEEL ON A SCROLLBAR (owner, 3 Nov): with the pointer on a scroll bar the wheel scrolls that bar, whatever the area
    under it does with the wheel otherwise (Arrange's song cursor, the tracker's rows, the FX bar's values, sliders…). A
    vertical bar scrolls up and down; a horizontal one scrolls sideways with the wheel's up/down (Shift+wheel too). This
@@ -13991,9 +14010,10 @@ addEventListener('wheel', sbWheel, {capture:true, passive:false});
 // trackpad pinch sends Ctrl with small deltas, and that stays a zoom.
 const wheelBig = e => { if (MACK) return e.metaKey; const px = Math.abs((e.deltaY || e.deltaX) * (e.deltaMode === 1 ? 40 : 1)); return e.ctrlKey && px >= 50; };
 document.addEventListener('wheel', e => {
-  const r = wheelEl(e.target); if (!wheelOk(r) || (e.ctrlKey && !wheelBig(e))) return;
+  const r = wheelHeld(e) ? wheelR : wheelEl(e.target); if (!wheelOk(r) || (e.ctrlKey && !wheelBig(e))) return;
   if (r !== wheelR){ if (r === wheelCand) wheelArm(r); return; }   // still scrolling past: let the page scroll, and wait again
   if (!(e.deltaY || e.deltaX)) return; e.preventDefault();
+  wheelLast = {t:performance.now(), x:e.clientX, y:e.clientY, r, cls:r.className.replace(' wheelon', '')};
   const n = wheelSteps(r, e); if (!n) return;
   if (r.hasAttribute('data-wheel')){ r._wheel(-n, e); return; }   // up raises it
   const mn = r.min === '' ? 0 : +r.min, mx = r.max === '' ? 100 : +r.max, st = r.step === 'any' || !+r.step ? (mx - mn) / 1000 : +r.step;
@@ -19652,7 +19672,9 @@ function coreStart(mode, o, t0, rs){
   coreSyncAll();
   rt.pl.clkReset(ctx.currentTime);   // the core's clock takes over (a RESUME step played here may have started this one)
   if (perfLive.init) corePost({op:'perf', xf:perfLive.xf, mac:perfLive.mac, fill:perfLive.fill});
-  const oo = {}; for (const k of ['row', 'loop', 'once', 'only']) if (o && o[k] != null) oo[k] = o[k];
+  // FIX (UI sweep, 4 Nov): track, phrase and sect too. Without them PLAY on a phrase or a sect (Shift+Space, F6, the Phrase
+  // screen's PLAY) threw in the core (makeSeq: tr[undefined]), so nothing played on the audio thread, the default sequencer.
+  const oo = {}; for (const k of ['row', 'loop', 'once', 'only', 'track', 'phrase', 'sect']) if (o && o[k] != null) oo[k] = o[k];
   core.gen++; corePost({op:'play', gen:core.gen, mode, o:oo, t0, rs}); coreWire(true);
   // tp.seq stands in for the sequencer: the page reads its clock, tempo and ticks, and sets the loop and tempo through it
   const P = {time:t0, tks:tp.tks, base:null, btT:null, _bpm:tp.bpm, _alive:true, alive(){ return this._alive; }, step(){ return {t:this.time, evs:[], pos:null}; },
@@ -21647,9 +21669,9 @@ function projRows(){
     // GAIN STAGING (27 Oct): the master fader, after the limiter (the Mixer's OUT and its bar, the bottom panel's master strip)
     {l:'MASTER OUT', get:() => S.mout == null ? 255 : S.mout, set:v => S.mout = v, min:0, max:255, big:16, d:255, after:() => moApply(), info:v => 'Master OUT ' + dB(curve(v)) + ': the master fader, after the limiter and mastering (FF is 0 dB, no boost)'},
     {l:'RENDER FROM', sec:'Render & export', get:() => S.renderFrom, set:v => S.renderFrom = v, min:0, max:255, big:16, d:0, fmt:v => 'ROW ' + rS(v, 3), gap:true, info:() => 'Renders play from this row until each track reaches an empty row'},
-    {l:'RATE', get:() => ex.sr === 48000 ? 1 : 0, set:v => ex.sr = v ? 48000 : 44100, min:0, max:1, tog:true, d:1, fmt:v => v ? '48K' : '44.1K', info:() => 'Sample rate for renders (shared with the synth’s export)'},
-    {l:'BITS', get:() => ex.bits === 24 ? 1 : 0, set:v => ex.bits = v ? 24 : 16, min:0, max:1, tog:true, d:1, fmt:v => v ? '24' : '16', info:() => 'Bit depth for renders'},
-    {l:'NORMALISE', get:() => ex.norm ? 1 : 0, set:v => ex.norm = !!v, min:0, max:1, tog:true, d:1, fmt:onOff, info:() => 'Raise the mix to just under 0 dB. Stems get the same gain, so they still add up to the mix'},
+    {l:'RATE', get:() => ex.sr === 48000 ? 1 : 0, set:v => { ex.sr = v ? 48000 : 44100; exSave(); }, min:0, max:1, tog:true, d:1, fmt:v => v ? '48K' : '44.1K', info:() => 'Sample rate for renders (shared with the synth’s export)'},
+    {l:'BITS', get:() => ex.bits === 24 ? 1 : 0, set:v => { ex.bits = v ? 24 : 16; exSave(); }, min:0, max:1, tog:true, d:1, fmt:v => v ? '24' : '16', info:() => 'Bit depth for renders'},
+    {l:'NORMALISE', get:() => ex.norm ? 1 : 0, set:v => { ex.norm = !!v; exSave(); }, min:0, max:1, tog:true, d:1, fmt:onOff, info:() => 'Raise the mix to just under 0 dB. Stems get the same gain, so they still add up to the mix'},
     {l:'› RENDER SONG', act:() => renderOut(false), gap:true, info:() => 'Stereo WAV of the song, from RENDER FROM to the end'},
     {l:'› RENDER STEMS', act:() => renderOut(true), info:() => 'A zip with the mix plus one stereo WAV per track, all the same length'},
     {l:'› EXPORT MIDI FILE', act:exportMidiFile, info:() => 'The song from RENDER FROM as a .mid file, a track per tracker track (drum pads on channel 10), to finish in a DAW or load on the MPC'},
@@ -27143,7 +27165,9 @@ arrGrid.addEventListener('contextmenu', e => e.preventDefault());
   th.addEventListener('click', e => { const i = e.target.closest('i[data-t]'); if (!i || pt !== 'mouse') return; const t = +i.dataset.t, m = S.mix[t]; if (!m) return;
     if (e.altKey){ m.mute = !m.mute; mixChanged(); draw(); toast(`Track ${d2(t + 1)} ${m.mute ? 'muted' : 'unmuted'} · right-click solos it`); return; }
     cs.song.x = t; if (!(apReady && apF)) cTrack = t; draw(); if (hdDbl(t)) nameTrack(t); });
-  th.addEventListener('contextmenu', e => { const i = e.target.closest('i[data-t]'); if (!i) return; e.preventDefault(); if (pt === 'mouse') soloTrack(+i.dataset.t); });
+  // FIX (UI sweep, 4 Nov): stopPropagation. On the Song screen Arrange sits inside the tracker screen, and the solo redraws the
+  // header, so the event reached cmdCtx from a detached number (its #tArr check missed) and the Edit menu opened over the solo.
+  th.addEventListener('contextmenu', e => { const i = e.target.closest('i[data-t]'); if (!i) return; e.preventDefault(); e.stopPropagation(); if (pt === 'mouse') soloTrack(+i.dataset.t); });
   }   // TRACK NAMES: a double-click names it (hdDbl, in the click above)
 
 /* ===== SONG EXTRAS (16 Oct): mouse editing, section names, drag-to-loop and the phrase peek on the Song screen =====
@@ -29844,7 +29868,10 @@ function pvFollow(P, own){   // the song row follows; the cursor keeps its track
 let pvMap = [];
 // PATTERN VIEW + MOUSE (21 Oct): a track's band (its number and name over the columns): Alt-click mutes it, right-click solos
 // it, a double-click names it. A plain click still opens that track (below).
-const pvBandT = (e, s) => { if (!pvActive() || !s) return -1; const p = pvSpanAt(s, e.clientX); return p && p.m.t >= 0 && p.m.t < MT ? p.m.t : -1; };
+// FIX (UI sweep, 4 Nov): the open track's own band (.pvhc) has no map entry (a tap on it does nothing), so its Alt-click,
+// right-click and double-click missed it: the right-click opened the Edit menu instead of soloing. It is cTrack.
+const pvBandT = (e, s) => { if (!pvActive() || !s) return -1; if (s.classList.contains('pvhc') && s.classList.contains('pvh')) return cTrack < MT ? cTrack : -1;
+  const p = pvSpanAt(s, e.clientX); return p && p.m.t >= 0 && p.m.t < MT ? p.m.t : -1; };
 grid.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'mouse' || e.button !== 0) return;
   const t = pvBandT(e, e.target.closest('.pvh')); if (t < 0) return;
