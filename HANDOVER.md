@@ -26,6 +26,10 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.78** (3 Nov 2026; owner: "push from beta to web and build a desktop"; Run workflow through the API with version 1.2.78,
+  from `main` after merging `beta` at build 408): FX graph screens and animations (404–405), ⌥▲▼ between patterns, CURSOR ON
+  STOP → PHRASE / ARRANGE ON STOP, REMOVE rows, row colour fixes and Pattern view row colour, sections beside Phrase,
+  duplicate track from the block menu, master OFF blocks.
 - **v1.2.77** (3 Nov 2026; owner: "let's push to main and build"; Run workflow through the API with version 1.2.77, from `main`
   after merging `beta` at build 403): the Table engine's Load wavetable… (402) and the 30 AKWF starter tables (403).
 - **v1.2.76** (3 Nov 2026; owner: "merge and build desktop"; from `main` after merging `beta` at build 401): side panel
