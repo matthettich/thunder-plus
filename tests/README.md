@@ -16,6 +16,9 @@ device, so it runs in about 15 seconds.
 | `perform.test.js` | the 1 Nov Perform block (targets, scenes and the crossfader, macros, parts, LFO shapes, the song fields), latency compensation's plan, and source guards for the sequencer's new commands (CND, NUD, RTV, SLC, XFD, MAC, LK1–LK4, PRT, the track LFO) |
 | `gain-staging.test.js` | the 27 Oct gain staging (`docs/GAIN-STAGING.md`): TRIM's scale, `applyMix` (TRIM, VOL, the PRE tap with mute and solo), the CHN crossfade's ramps and node lifetimes, `busPlan().pre`, and source guards for the per-track graph, the master OUT (live and in renders), the Mixer rows and the song file |
 
+`tests/sweep/` holds slower headless-Chrome sweeps (every engine, preset and effect through the app itself), not run by
+`npm test`: see `tests/sweep/README.md`.
+
 ## Golden hashes
 
 Audio tests hash the exact float bits of what a module renders and compare to `tests/golden/*.json`. A refactor that changes any
