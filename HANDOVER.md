@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.83** (3 Nov 2026; owner: "push it and build a desktop app"; Run workflow through the API, from `main` at build 421; v1.2.82
+  went out minutes before at build 420): the bus bars from the group bar, centred in the gaps, no white edge (419–421).
 - **v1.2.81** (3 Nov 2026; owner: "merge build"; Run workflow through the API with version 1.2.81, from `main` after merging `beta`
   at build 418): the bolder bus frame in Arrange.
 - **v1.2.80** (3 Nov 2026; owner: "merge and build!"; Run workflow through the API with version 1.2.80, from `main` after merging
