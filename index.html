@@ -29853,7 +29853,10 @@ function pvFollow(P, own){   // the song row follows; the cursor keeps its track
 let pvMap = [];
 // PATTERN VIEW + MOUSE (21 Oct): a track's band (its number and name over the columns): Alt-click mutes it, right-click solos
 // it, a double-click names it. A plain click still opens that track (below).
-const pvBandT = (e, s) => { if (!pvActive() || !s) return -1; const p = pvSpanAt(s, e.clientX); return p && p.m.t >= 0 && p.m.t < MT ? p.m.t : -1; };
+// FIX (UI sweep, 4 Nov): the open track's own band (.pvhc) has no map entry (a tap on it does nothing), so its Alt-click,
+// right-click and double-click missed it: the right-click opened the Edit menu instead of soloing. It is cTrack.
+const pvBandT = (e, s) => { if (!pvActive() || !s) return -1; if (s.classList.contains('pvhc') && s.classList.contains('pvh')) return cTrack < MT ? cTrack : -1;
+  const p = pvSpanAt(s, e.clientX); return p && p.m.t >= 0 && p.m.t < MT ? p.m.t : -1; };
 grid.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'mouse' || e.button !== 0) return;
   const t = pvBandT(e, e.target.closest('.pvh')); if (t < 0) return;
