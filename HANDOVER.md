@@ -119,6 +119,18 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (35): duplicate track from the block menu; master OFF blocks (build 408)
+
+- Owner: "a right click option to duplicate a track, including the patterns/phrases in it … keep the mute behavior".
+  `sxCtx` (Song screen and Arrange beside a screen, via apRun) has **Duplicate this track with its patterns** →
+  `dupTrack(true, t)`; dupTrack takes an optional track (`tAt`) and moves the Song cursor to the copy. Track-number
+  right-click is unchanged (solo). Edit ▾ / Phrase right-click label now "Duplicate the track with its patterns". One undo
+  step (snap batches). Checked headless from Song and beside Phrase (track 10 → 11, 56 unique blocks; one Ctrl+Z back).
+- Owner: "my master track is drawing patterns with only FLX 00 on them as full colored phrases". The master column never
+  had OFF-only looks. `fxOnOff` / `isOffCmdPhrase` / `sectMstOff`: a master block is `o` when its phrases switch something
+  off (FLX 00, GAT 00, RTG 0Y, FXO X0) and nothing on (FLX/GAT/RTG/FXO to a pattern or on); other commands (VOL FF…)
+  don't count. ELECTRO: MST rows 0 and 8 (FLX 00 + VOL FF) now black with the stop bar.
+
 ## 3 Nov (34): row colour fixes, Pattern view row colour, sections beside Phrase (build 407, on `beta`)
 
 - Owner: right-clicking Arrange's row number "no right click menu showed up". Only the digits (`[data-ry]`, as wide as
