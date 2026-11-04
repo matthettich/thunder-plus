@@ -85,7 +85,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const CC_CMDS = ['CCA', 'CCB', 'CCC', 'CCD'];
 const NCC = CC_CMDS.length;
 const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
-  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT'];
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP'];
 const SIGNED = new Set(['PBN','TSP','PIT','FIN','NUD','RTV']);
 const s8 = v => v > 127 ? v - 256 : v;
 const RSTEP = {TIC:1, DEL:1, KIL:1, OFF:1, PSL:1, RET:1, PBN:1, TSP:1, PIT:1, FIN:4, ARP:1, HOP:1, INS:1, PGM:1, CSL:1, DIR:1};
@@ -325,6 +325,7 @@ function makeSeq(S, mode, o){
   }
   // The row a track is about to play, and the value of a TIC command on it (null when there is none).
   const r0 = (T, pid) => { const ph = pid >= 0 ? S.phrases[pid] : null; return ph ? ph[T.step] : null; };
+  const ENDI = FXC.indexOf('END'), JMPI = FXC.indexOf('JMP');
   const TICI = FXC.indexOf('TIC');
   const ticCmd = r => { let v = null; for (let k = FX0; k < RW; k += 2) if (r[k] === TICI) v = Math.max(0, r[k + 1]); return v; };
   // Each call plays the next line of every track that is due. Tracks keep their own clocks, so a phrase
@@ -337,6 +338,19 @@ function makeSeq(S, mode, o){
     let rel0 = Infinity; for (const T of tr) if (T.on && T.rel < rel0) rel0 = T.rel;
     if (rel0 === Infinity) rel0 = api.time - api.base;
     if (wakeOk) wake(rel0);   // LIVE SONG EDITS: a track given a block while the song plays joins in
+    /* END / JMP (owner, 3 Nov: "do we have a stop song command?" → "let's add the end command"): looked for on the rows due
+       now, before any of them plays, and only when the whole song plays (not a phrase or sect on its own, nor the LOOP
+       pattern). END: every track stops, so the song ends here (the page stops when the sequencer has no more, as at a
+       song's end) and a render ends here. JMP XX: every track starts again at song row XX now, as PLAY from that row does,
+       and this row doesn't play; in a render (once) a jump back to this row or earlier ends it instead of looping for ever. */
+    if (mode === 'song' && !loop){ let jc = null;
+      for (let t = 0; t <= MT && !jc; t++){ const T = tr[t]; if (!T.on || T.empty || T.rel > rel0 + 1e-9) continue;
+        const cid = sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null, r = r0(T, chRow ? chRow[0] : -1); if (!r) continue;
+        for (let k = FX0; k + 1 < RW; k += 2){ if (r[k] === ENDI){ jc = {end:true}; break; } if (r[k] === JMPI){ jc = {to:clamp(r[k + 1], 0, 255), from:T.row}; break; } } }
+      if (jc){
+        if (jc.end || (once && jc.to <= jc.from)) for (const T of tr) T.on = false;
+        else { const y = jc.to; for (let t = 0; t <= MT; t++){ const T = tr[t]; Object.assign(T, fresh()); T.row = y; T.rel = rel0; T.r0 = rel0;
+            if ((t < (S.ntr || 16) || t === MT) && S.song[y] && S.song[y][t] >= 0 && (!o.only || o.only.has(t))){ T.on = true; settle(T, t); } } } } }
     const t0 = api.base + rel0, evs = [], pos = new Array(NT + 1).fill(null), {amt:sw, beat:swB} = swingOf();
     let nb = api.bpm, ngrv = api.grv, pdl = 0; const tks0 = api.tks;   // pdl: PDL, the rows every track waits
     // The song position in beats at this step, for the player's beat clock (tempo-locked effects).

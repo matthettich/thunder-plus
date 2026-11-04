@@ -442,6 +442,11 @@ class Win {
     this.redoBtn = this.button('REDO', () => this.undo(1)); this.redoBtn.small = true; this.redoBtn.tip = 'Redo (Shift+Ctrl/Cmd+Z or Ctrl+Y)';
     this.abSeg = this.add(new Seg(null, ['A', 'B'])); this.abSeg.getFn = () => this.ab.sel; this.abSeg.setFn = i => this.selectAB(i); this.abSeg.tip = 'Compare two settings: A and B';
     this.copyBtn = this.button('COPY', () => this.copyAB()); this.copyBtn.small = true; this.copyBtn.tip = 'Copy this setting to the other slot';
+    // CHAIN (owner, 3 Nov: the MASTERING button opens pump MASTER, "but i want to be able to open the other pump master fx"):
+    // the track's other …pump effects with a window (the master's EQ → CALM → COMP → TONE → MASTER), one click to open one
+    const cm = this.chainMenu = this.add(new Menu(null)); cm.tip = 'The other …pump effects on ' + (this.tname || 'this track') + ': pick one to open its window';
+    cm.itemsFn = () => this.chainRows().map(r => r.label); cm.getFn = () => this.chainRows().findIndex(r => r.k === this.k);
+    cm.setFn = i => { const r = this.chainRows()[i]; if (r && r.k !== this.k) FX.open(this.t, r.k); }; cm.textFn = () => 'CHAIN';
     this.helpBtn = this.button('?', () => { this.help = !this.help; }, () => this.help); this.helpBtn.small = true; this.helpBtn.tip = 'Mouse and keyboard shortcuts (?)';
     this.darkBtn = this.button('DARK', () => this.setDark(!this.dark), () => this.dark); this.darkBtn.small = true;
     this.darkBtn.tip = 'pump’s own light or dark colours (remembered on this device; Ctrl/Cmd-click: follow Thunder’s skin again, the default)';
@@ -452,6 +457,7 @@ class Win {
   }
   setDark(d, noStore){ if (!noStore){ try { localStorage.setItem(THEME_KEY, d ? 'dark' : 'light'); } catch(e){} for (const w of wins.values()) if (w !== this) w.setDark(d, true); } this.th = themeFor(this.type); this.dark = this.th.dark;
     this.styleDom(); this.dirty = true; }
+  chainRows(){ let L = []; try { L = (FX.slots ? FX.slots(this.t) : []).filter(q => defs[q.type]); } catch(e){} return L.map(q => ({k:q.k, label:(q.k + 1) + '  ' + q.name + (q.on ? '' : '  (off)')})); }
   get headH(){ return this.narrow ? HEAD_N : HEAD; }
   kindLines(){ const k = String(this.fx.long || '').toUpperCase(); if (!k) return []; const i = k.indexOf(' '); return i < 0 ? [k] : [k.slice(0, i), k.slice(i + 1)]; }
   tagRight(){ return 14 + this.textW('…pump', 'bold', 21) + 10 + this.textW(this.fx.name, 'bold', 15) + 16; }
@@ -460,17 +466,21 @@ class Win {
     const W = this.W, h = 28;
     let rx = W - 12; const right = (c, w, y) => { if (!c) return; c.r = R(rx - w, y, w, h); rx -= w + 8; };
     if (!this.narrow){
-      const y = 9; let x = this.brandRight() + 18; const pw = Math.min(280, W * 0.25);
+      const y = 9;
+      // the right-hand buttons first (CHAIN among them), then the preset menu takes what's left, so nothing overlaps
+      right(this.closeBtn, 30, y); right(this.bypBtn, 74, y); right(this.darkBtn, 56, y); right(this.helpBtn, 30, y);
+      this.chainMenu.visible = this.chainRows().length > 1; if (this.chainMenu.visible) right(this.chainMenu, 84, y); rx -= 4;
+      let x = this.brandRight() + 18; const pw = Math.max(110, Math.min(280, W * 0.25, rx - x - 264 - 6));
       this.presetMenu.r = R(x, y, pw, h); x += pw + 14;
       this.undoBtn.r = R(x, y, 50, h); x += 56; this.redoBtn.r = R(x, y, 50, h); x += 64;
       this.abSeg.r = R(x, y, 56, h); x += 64; this.copyBtn.r = R(x, y, 52, h); x += 66;
-      right(this.closeBtn, 30, y); right(this.bypBtn, 74, y); right(this.darkBtn, 56, y); right(this.helpBtn, 30, y); rx -= 4;
       this.headerExtra = R(x, y, Math.max(0, rx - x), h);
     } else {
       const y = 8, y2 = 46;
       right(this.closeBtn, 30, y); right(this.bypBtn, 70, y); right(this.darkBtn, 52, y); right(this.helpBtn, 30, y); rx -= 4;
       this.headerExtra = R(Math.min(rx, this.brandRight() + 10), y, Math.max(0, rx - this.brandRight() - 10), h);
       let x2 = W - 12; const left = (c, w) => { c.r = R(x2 - w, y2, w, h); x2 -= w + 6; };
+      this.chainMenu.visible = this.chainRows().length > 1; if (this.chainMenu.visible){ left(this.chainMenu, 76); x2 -= 4; }
       left(this.copyBtn, 50); left(this.abSeg, 52); x2 -= 4; left(this.redoBtn, 48); left(this.undoBtn, 48); x2 -= 4;
       this.presetMenu.r = R(12, y2, Math.max(100, x2 - 12), h);
     }
