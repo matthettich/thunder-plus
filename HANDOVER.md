@@ -119,6 +119,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (42): warn on a phrase shared between tracks (build 415, on `beta`)
+
+- Owner: "If the same phrase is used on multiple tracks, can we throw up a similar error?" `mstShareWarn` also warns
+  (once per phrase a session) when the phrase plays on a track other than `cTrack`, naming them and pointing at UNIQ. Only
+  a warning: placing a track's block on another track still shares it, as it always has (paste, Arrange copies).
+  Checked headless (track 1's block put on track 16, an edit on track 1 → "also plays on track 16").
+
 ## 3 Nov (41): the master column never shares a block with tracks (build 414, on `beta`)
 
 - The owner's "VOL 00 on a bus mutes the song" (beta testing ELECTRO, bus track 08, song row 59): block 15 (phrase 15, FLX 00

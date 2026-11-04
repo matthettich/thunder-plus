@@ -20758,7 +20758,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 414;
+const BUILD = 415;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -21091,9 +21091,14 @@ function phraseKinds(p){   // where phrase p plays: on the master column, on tra
       if (t === MT) mst = true; else trk.add(t); } }
   return {mst, trk};
 }
+// (owner, 3 Nov: "If the same phrase is used on multiple tracks, can we throw up a similar error?") also when it plays on
+// another track: an edit here changes it there. The same phrase down one track (repeats) is normal and says nothing.
 function mstShareWarn(p){
-  if (mstShared.has(p)) return; const k = phraseKinds(p); if (!k.mst || !k.trk.size) return; mstShared.add(p);
+  if (mstShared.has(p)) return; const k = phraseKinds(p), others = [...k.trk].filter(t => t !== cTrack).sort((a, b) => a - b);
+  if (!(k.mst && k.trk.size) && !(cTrack !== MT && others.length)) return; mstShared.add(p);
   const ts = [...k.trk].sort((a, b) => a - b).map(t => d2(t + 1)).join(', ');
+  if (!k.mst){ const os = others.map(t => d2(t + 1)).join(', ');
+    setTimeout(() => toast(`Phrase ${hp(p)} also plays on track${others.length > 1 ? 's' : ''} ${os}: what you write here changes there too. UNIQ on this block (Song or Arrange) gives this track its own copy.`, 7000), 60); return; }
   setTimeout(() => toast(cTrack === MT
     ? `Phrase ${hp(p)} also plays on track${k.trk.size > 1 ? 's' : ''} ${ts}: what you write here changes there too (VOL turns their notes down). UNIQ on the block gives the master its own copy.`
     : `Phrase ${hp(p)} also plays in the master column: there VOL is the whole song's level and FLX / FXO the master's effects. UNIQ on this block (Song or Arrange) gives the track its own copy.`, 7000), 60);
@@ -29143,6 +29148,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [415, '3 Nov', ['Typing into a phrase that also plays on another track says so once, with how to give this track its own copy (UNIQ). The same phrase repeated down one track says nothing.']],
   [414, '3 Nov', ['Master column: a block placed there that tracks also use (or on a track when the master column uses it) gets its own copy, so the master’s VOL, FLX and FXO can’t reach the tracks, and theirs can’t reach the master.', 'Typing into a phrase that the master column already shares with tracks (an older song) says so once, with how to split it (UNIQ).']],
   [413, '3 Nov', ['FX bar: its on-switches, graphs, curves and animations use the skin’s own accent colour instead of one fixed orange (M8 cyan, Bauhaus red, Matrix green…); skins without one use their ink.']],
   [412, '3 Nov', ['Effect commands: an FLX 00 (or any FXO / GAT / RTG) above a later one is no longer lost when the effect is built as the song starts, so the effect stays off until the later command.', 'Phrase: Enter twice on an effect’s value (the number beside it) opens the effect list too.']],
