@@ -18251,7 +18251,10 @@ function makePlayer(ac, out, getBuf, live){
   // FIRST PLAY (owner, 31 Oct: after opening a song, the master's first FLX was lost): an FXO / FLX / GAT / RTG sent before
   // its track's (or the master's) effect node exists waits here, and the node takes it when it is made.
   const fxcPend = new Map();
-  const fxcFlush = (t, n) => { if (!n || !n.parameters || !fxcPend.size) return; for (const [k, ev] of fxcPend){ const [tt, p] = k.split(':'); if (+tt !== t) continue; fxcPend.delete(k); const q = n.parameters.get(p); if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} } };
+  // EVERY ONE, IN ORDER (owner, 3 Nov: "I have a flx 00 above the current flx command" and the FLX "takes effect above it"):
+  // the pending list kept only the LAST command per param, so an FLX 00 booked before a later FLX was dropped and the slot
+  // wasn't held off until the later one. Each param now keeps its commands, and they're all booked at their own times.
+  const fxcFlush = (t, n) => { if (!n || !n.parameters || !fxcPend.size) return; for (const [k, L] of fxcPend){ const [tt, p] = k.split(':'); if (+tt !== t) continue; fxcPend.delete(k); const q = n.parameters.get(p); if (q) for (const ev of L) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} } };
   const setMfx = n => { if (mfx && mfx !== n) fxDrop(mfx); mfx = n || null; clockTo(mfx); if (mfx){ fxKeySync(mfx, S.mfx); fxcFlush(MT, mfx); } };   // SOURCE: the master's effect slots
   const fxNodeOf = t => t >= MT ? mfx : buses[t] && buses[t].fx;
   const FXP = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'sw6', 'sw7', 'flx', 'gat', 'rtg'];
@@ -18477,7 +18480,7 @@ function makePlayer(ac, out, getBuf, live){
       return; }
     if (ev.type === 'fxc'){ const n = fxNodeOf(ev.track), q = n && n.parameters && n.parameters.get(ev.p);
       if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){}
-      else fxcPend.set(ev.track + ':' + ev.p, ev);   // FIRST PLAY (owner, 31 Oct): the effect isn't built yet: it gets the value when it is
+      else { const k = ev.track + ':' + ev.p, L = fxcPend.get(k) || []; L.push(ev); fxcPend.set(k, L); }   // FIRST PLAY (owner, 31 Oct): the effect isn't built yet: it gets the values when it is
       return; }
     if (ev.type === 'chc'){ const b = buses[ev.track], n = b && b.chn, q = n && n.parameters && n.parameters.get(ev.p); if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} return; }   // BYP
     // The master column's VOL: the master level, with a 4 ms glide so it doesn't click.
@@ -20738,7 +20741,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 411;
+const BUILD = 412;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -21897,6 +21900,7 @@ function editDouble(wasEmpty){
   }
   if (tv === 'phrase' && c.y >= 0 && PK[c.x] === 'note'){ setCell('phrase', c.x, c.y, OFF); return after('note', 'phrase', c.x, c.y, OFF); }
   if (tv === 'phrase' && c.y >= 0 && PK[c.x] === 'fxc') return fxpOpen(c.x, c.y);   // Enter twice on an effect: the picker
+  if (tv === 'phrase' && c.y >= 0 && PK[c.x] === 'fxv' && PK[c.x - 1] === 'fxc') return fxpOpen(c.x - 1, c.y);   // (owner, 3 Nov) and on its value, the number beside it
   const r = rowsOf(tv)[c.y]; if (r && r.act && r.dbl) r.act();
 }
 // EDIT×2 on the song with sects hidden: a new block is a sect with one new phrase (numbered alike when
@@ -29077,6 +29081,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [412, '3 Nov', ['Effect commands: an FLX 00 (or any FXO / GAT / RTG) above a later one is no longer lost when the effect is built as the song starts, so the effect stays off until the later command.', 'Phrase: Enter twice on an effect’s value (the number beside it) opens the effect list too.']],
   [411, '3 Nov', ['Phrase / Pattern view: ⌥/Alt+▲▼ step from the pattern on screen, even when Arrange’s cursor is somewhere else (Arrange holding the keys, PIN, or a phrase used in more than one place); the keys go back to the phrase.']],
   [410, '3 Nov', ['…chains: moving a Track In / Chain Out to another track (or deleting it) switches the old track’s CHN off, so the Mixer no longer shows MISS for it and the track plays as before.']],
   [409, '3 Nov', ['Mastering: an older song’s MASTERING window has SWITCH TO …PUMP: the song takes the …pump chain new songs have (EQ → CALM → COMP → TONE → MASTER, the auto master last) in the master’s last five FX slots, and its old mastering is switched off. It asks first if those slots hold effects; Undo takes it back.']],

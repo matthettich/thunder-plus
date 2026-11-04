@@ -119,6 +119,20 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (39): pending effect commands kept in order; Enter twice on an effect value (build 412, on `beta`)
+
+- Owner: "the flx command i dropped in the pattern seems to take effect above it when played … I have a flx 00 above the
+  current flx command". makePlayer's `fxcPend` (an `fxc` booked before the track's effect node exists: the first PLAY, a
+  rebuilt node; the core hands those to the page too) was a Map key → ONE event, so FLX 00 on row 0 was replaced by the
+  FLX on a later row; when the node arrived only the later one was booked and the slot (STARTS: AT PLAY in older songs)
+  played its own PATTERN above it. Now key → list, `fxcFlush` books every one at its own time. `fxreset` still clears them.
+- Owner: "pressing enter twice on the number next to an effect column opens the fx selector menu". The Enter-twice handler
+  opens `fxpOpen(c.x - 1, c.y)` on a `fxv` cell too. Checked headless: Phrase and Pattern view, FX1 command and value.
+- **Open:** owner reports VOL 00 in a bus track mutes the whole song, wherever it is in the track (and VOL 85 at the top
+  doesn't help). Not reproduced: ELECTRO's bus (track 4, fed by 1, 2, 3, 7) with VOL 85 / VOL 00 in its phrase changes
+  nothing, offline (pass) or live (headless, master meter). On a bus, VOL becomes a `mod` on that track's own voices
+  (none). Asked the owner for the song file. (TVL is the command for a track's mixer level.)
+
 ## 3 Nov (38): ⌥▲▼ from the pattern on screen (build 411, on `beta`)
 
 - Owner: ⌥+arrows "navigated to the patterns around where the cursor was in arrange, but it should move from the pattern
