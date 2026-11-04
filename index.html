@@ -19656,7 +19656,9 @@ function coreStart(mode, o, t0, rs){
   coreSyncAll();
   rt.pl.clkReset(ctx.currentTime);   // the core's clock takes over (a RESUME step played here may have started this one)
   if (perfLive.init) corePost({op:'perf', xf:perfLive.xf, mac:perfLive.mac, fill:perfLive.fill});
-  const oo = {}; for (const k of ['row', 'loop', 'once', 'only']) if (o && o[k] != null) oo[k] = o[k];
+  // FIX (UI sweep, 4 Nov): track, phrase and sect too. Without them PLAY on a phrase or a sect (Shift+Space, F6, the Phrase
+  // screen's PLAY) threw in the core (makeSeq: tr[undefined]), so nothing played on the audio thread, the default sequencer.
+  const oo = {}; for (const k of ['row', 'loop', 'once', 'only', 'track', 'phrase', 'sect']) if (o && o[k] != null) oo[k] = o[k];
   core.gen++; corePost({op:'play', gen:core.gen, mode, o:oo, t0, rs}); coreWire(true);
   // tp.seq stands in for the sequencer: the page reads its clock, tempo and ticks, and sets the loop and tempo through it
   const P = {time:t0, tks:tp.tks, base:null, btT:null, _bpm:tp.bpm, _alive:true, alive(){ return this._alive; }, step(){ return {t:this.time, evs:[], pos:null}; },
