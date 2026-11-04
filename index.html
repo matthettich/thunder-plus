@@ -13954,13 +13954,23 @@ const wheelEl = t => t && t.closest ? t.closest('input[type=range], [data-wheel]
 const wheelOk = r => !!r && (r.hasAttribute('data-wheel') ? r.isConnected && typeof r._wheel === 'function' : sliderOk(r));
 const wheelOff = () => { clearTimeout(wheelT); wheelT = 0; if (wheelR) wheelR.classList.remove('wheelon'); wheelR = null; };
 const wheelArm = r => { clearTimeout(wheelT); wheelCand = r; wheelT = setTimeout(() => { if (wheelCand === r && wheelOk(r)){ wheelR = r; r.classList.add('wheelon'); } }, 350); };
+// FIX (UI sweep, 4 Nov): a control the wheel moves can slide out from under a still pointer (the Mixer's VOL and OUT bars
+// are 3 px and move with their level), which dropped the focus after two or three notches and the wheel stopped. While the
+// pointer hasn't moved since the last wheel step (and that was under 0.6 s ago), the focused control keeps the wheel.
+let wheelLast = null;   // {t, x, y} of the last wheel step taken
+const wheelHeld = e => {
+  if (!wheelLast || performance.now() - wheelLast.t > 600 || Math.abs(e.clientX - wheelLast.x) > 1 || Math.abs(e.clientY - wheelLast.y) > 1) return false;
+  // a redraw that rebuilt the control (the master OUT bar): its new copy at the same place takes over, already rested on
+  if (wheelLast.r && !wheelLast.r.isConnected && wheelLast.cls){ const n = document.querySelector('.' + wheelLast.cls.trim().split(/\s+/).join('.') + (wheelLast.r.dataset.t != null ? `[data-t="${wheelLast.r.dataset.t}"]` : ''));
+    if (n && wheelOk(n)){ wheelR = wheelCand = n; n.classList.add('wheelon'); wheelLast.r = n; } }
+  return !!(wheelR && wheelR.isConnected && wheelR === wheelLast.r); };
 document.addEventListener('pointerover', e => {
-  if (e.pointerType !== 'mouse') return;
+  if (e.pointerType !== 'mouse' || wheelHeld(e)) return;
   const r = wheelEl(e.target);
   if (r !== wheelCand){ wheelOff(); wheelCand = null; }
   if (wheelOk(r) && r !== wheelR) wheelArm(r);
 }, true);
-document.addEventListener('pointerout', e => { const r = wheelEl(e.target); if (r && r === wheelCand && !(e.relatedTarget && r.contains(e.relatedTarget))){ wheelOff(); wheelCand = null; } }, true);
+document.addEventListener('pointerout', e => { if (wheelHeld(e)) return; const r = wheelEl(e.target); if (r && r === wheelCand && !(e.relatedTarget && r.contains(e.relatedTarget))){ wheelOff(); wheelCand = null; } }, true);
 /* WHEEL ON A SCROLLBAR (owner, 3 Nov): with the pointer on a scroll bar the wheel scrolls that bar, whatever the area
    under it does with the wheel otherwise (Arrange's song cursor, the tracker's rows, the FX bar's values, sliders…). A
    vertical bar scrolls up and down; a horizontal one scrolls sideways with the wheel's up/down (Shift+wheel too). This
@@ -13997,9 +14007,10 @@ addEventListener('wheel', sbWheel, {capture:true, passive:false});
 // trackpad pinch sends Ctrl with small deltas, and that stays a zoom.
 const wheelBig = e => { if (MACK) return e.metaKey; const px = Math.abs((e.deltaY || e.deltaX) * (e.deltaMode === 1 ? 40 : 1)); return e.ctrlKey && px >= 50; };
 document.addEventListener('wheel', e => {
-  const r = wheelEl(e.target); if (!wheelOk(r) || (e.ctrlKey && !wheelBig(e))) return;
+  const r = wheelHeld(e) ? wheelR : wheelEl(e.target); if (!wheelOk(r) || (e.ctrlKey && !wheelBig(e))) return;
   if (r !== wheelR){ if (r === wheelCand) wheelArm(r); return; }   // still scrolling past: let the page scroll, and wait again
   if (!(e.deltaY || e.deltaX)) return; e.preventDefault();
+  wheelLast = {t:performance.now(), x:e.clientX, y:e.clientY, r, cls:r.className.replace(' wheelon', '')};
   const n = wheelSteps(r, e); if (!n) return;
   if (r.hasAttribute('data-wheel')){ r._wheel(-n, e); return; }   // up raises it
   const mn = r.min === '' ? 0 : +r.min, mx = r.max === '' ? 100 : +r.max, st = r.step === 'any' || !+r.step ? (mx - mn) / 1000 : +r.step;
