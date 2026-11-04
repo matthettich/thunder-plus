@@ -1962,6 +1962,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .mwhead > b{font-size:var(--fs-4); letter-spacing:.08em}
 .mwon{min-height:30px; padding:0 14px; font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--panel)}
 .mwon.on{background:var(--ink); color:var(--inv)}
+.mwpump{min-height:30px; padding:0 12px; font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--panel)}   /* SWITCH TO …PUMP */
 .mwchain{display:flex; align-items:stretch; gap:0; flex:1 1 auto; min-width:0; flex-wrap:wrap}
 .mwst{display:flex; align-items:center; gap:7px; min-height:34px; padding:0 10px; border:1px solid var(--line); background:var(--panel); font-size:var(--fs-3); letter-spacing:.05em; cursor:pointer}
 .mwst + .mwarrow + .mwst{margin-left:0}
@@ -3092,6 +3093,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <button type="button" class="mwon" id="mwOn" aria-pressed="false" title="Mastering on the master bus (renders include it)">OFF</button>
     <div class="mwchain" id="mwChain" role="tablist" aria-label="Mastering chain"></div>
     <div class="mwread" id="mwRead" aria-live="off"></div>
+    <button type="button" class="mwpump" id="mwPump" title="Use the …pump mastering chain for this song instead: pEQ → CALM → COMP → TONE → MASTER (the auto master) in the master’s last five FX slots, as new songs have. The old chain is switched off; Undo takes it all back">SWITCH TO …PUMP</button>
     <button type="button" class="mwx" id="mwX" aria-label="Close mastering" title="Close (Esc, or Back on a phone)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg><span>CLOSE</span></button>
   </div>
   <div class="mwbody" id="mwBody">
@@ -20731,7 +20733,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 408;
+const BUILD = 409;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24605,8 +24607,28 @@ function openMst(stage){
   $('mstWin').hidden = false; mwOpenNow = true; mwBuild(); mwLoop();
   try { gsetToggle(false); } catch(e){}
 }
+/* SWITCH TO …PUMP (owner, 3 Nov: "when i open it from the mixer it is the old one… build it"): an older song (no
+   S.mstPump) takes the …pump mastering chain new songs get: MST_PUMP in the master's last five FX slots (the auto master
+   last), on; the old stage switched off; MASTERING then opens pump MASTER. Slots are not shifted (FXO / FXV commands point
+   at slot numbers), so effects already in those five slots are named and replaced only if you say so. One undo step. */
+async function mstToPump(){
+  if (S.mstPump) return openMst();
+  if (!MST_PUMP.every(k => TFX[k])) return toast('The …pump effects aren’t loaded in this build.');
+  const A = S.mfx = normChainFx(S.mfx), at = FXSLOTS - MST_PUMP.length, busy = [];
+  for (let k = at; k < FXSLOTS; k++) if (A[k] && A[k].type !== MST_PUMP[k - at]) busy.push(`slot ${k + 1} (${fxNameOf(A[k].type)})`);
+  const ok = await askSheet({title:'Switch to …pump mastering', body:'This song’s master gets pEQ → CALM → COMP → TONE → MASTER (the auto master) in its FX slots '
+    + `${at + 1}–${FXSLOTS}, switched on, and its old mastering is switched off. ` + (busy.length ? `This replaces what is in ${busy.join(', ')}. ` : '')
+    + 'The master will sound different. Undo takes it all back.'}, {ok:'Switch'});
+  if (ok == null) return;
+  MST_PUMP.forEach((k, i) => { const f = A[at + i]; if (!(f && f.type === k)) A[at + i] = freshTfx(k); A[at + i].on = true; });
+  S.mst.on = false; S.mstPump = true;
+  fxChanged(NT); mstChanged(); saveS();
+  closeMst(); toast('This song now masters with …pump: EQ → CALM → COMP → TONE → MASTER');
+  setTimeout(() => openMst(), 60);
+}
 function closeMst(){ $('mstWin').hidden = true; mwOpenNow = false; cancelAnimationFrame(mwRaf); draw(); }
 $('mwX').addEventListener('click', closeMst);
+$('mwPump').addEventListener('click', () => mstToPump());   // SWITCH TO …PUMP
 document.addEventListener('keydown', e => { if (mwOpenNow && e.key === 'Escape' && !typing(e)){ e.preventDefault(); e.stopPropagation(); closeMst(); } }, true);
 $('mwOn').addEventListener('click', () => { S.mst.on = !S.mst.on; if (S.mst.on && !S.mst.eq.on && !mstNeedsWk(S.mst)) S.mst.eq.on = true; mstChanged(); mwBuild();
   toast(S.mst.on ? 'Mastering on. Renders of the song include it.' : 'Mastering off: the master bus as before.'); });
@@ -29034,6 +29056,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [409, '3 Nov', ['Mastering: an older song’s MASTERING window has SWITCH TO …PUMP: the song takes the …pump chain new songs have (EQ → CALM → COMP → TONE → MASTER, the auto master last) in the master’s last five FX slots, and its old mastering is switched off. It asks first if those slots hold effects; Undo takes it back.']],
   [408, '3 Nov', ['Arrange and Song: right-click a block → Duplicate this track with its patterns: the track goes into the next empty track of its kind with its volume, pan, effects and every block as a unique copy (also Ctrl/⌘+Alt+D on Phrase, Mixer and FX). Right-click on a track number still solos.', 'Master column: a block that turns effects off (FLX 00, GAT 00, RTG 00, FXO X0) and turns nothing on draws like an OFF-only block, black with the stop bar.']],
   [407, '3 Nov', ['Row colours: right-clicking anywhere in Arrange’s row-number column opens the colour (only the digits did, so it often seemed to do nothing).', 'Pattern view: right-click a row number (or SONG ROW) to colour this pattern’s song row; SONG ROW shows the colour (Settings → ROW COLOUR IN PATTERN, on).', 'Settings → SECTIONS BESIDE PHRASE (off): the SECT lane in Arrange beside the phrase too.']],
   [406, '3 Nov', ['Command bar: REMOVE takes out the selected rows (or the cursor’s row) and the rows below move up, in a phrase, Pattern view, a sect or the song.', 'Settings: ARRANGE ON STOP, the same choice as PHRASE ON STOP for Arrange; both say STAYS or PLAYHEAD.']],
