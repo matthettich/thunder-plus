@@ -147,10 +147,13 @@ class NoteSlider extends Ctl {
   }
   drag(ui, x, y, m){
     if (!this.dragging) return; const [lw, vw] = this.dims(ui), bw = Math.max(40, this.r.w - lw - vw - 6);
-    this.set(this.v0 + (x - this.x0) / bw * (this.mx - this.mn) * (m.shift ? 0.15 : 1)); ui.status = this.label + '  ' + this.fmtV(this.get());
+    // FIX (UI sweep, 4 Nov): the ONE RULE (kit.js dragMul): each move adds on, Shift a tenth, Cmd/Ctrl held four times; it
+    // measured from the press with Shift ×0.15, so pressing Shift mid-drag jumped and Cmd/Ctrl did nothing.
+    this.v0 = Math.max(this.mn, Math.min(this.mx, this.v0 + (x - this.x0) / bw * (this.mx - this.mn) * (m.shift ? 0.1 : m.cmd ? 4 : 1))); this.x0 = x;
+    this.set(this.v0); ui.status = this.label + '  ' + this.fmtV(this.get());
   }
   up(){ if (this.dragging){ this.dragging = false; this.end(); } }
-  wheel(ui, dy, m){ const v = this.get(); if (!Number.isFinite(v)) return true; this.begin(); this.set(v + (dy > 0 ? 1 : -1) * (this.mx - this.mn) * (m.shift ? 0.005 : 0.05)); this.end(); ui.status = this.label + '  ' + this.fmtV(this.get()); return true; }
+  wheel(ui, dy, m){ const v = this.get(); if (!Number.isFinite(v)) return true; this.begin(); this.set(v + (dy > 0 ? 1 : -1) * (this.mx - this.mn) * (m.shift ? 0.005 : m.cmd ? 0.2 : 0.05)); this.end(); ui.status = this.label + '  ' + this.fmtV(this.get()); return true; }
 }
 
 const FOLLOW_KEY = 'thunderplus-pump-tune-follow-v1', DEG = ['', '2nd', '3rd', '4th', '5th', '6th', '7th', '8ve'], NV = 4, HIST = 360, B = 5;
