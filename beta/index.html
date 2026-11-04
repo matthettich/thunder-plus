@@ -17384,6 +17384,10 @@ function demoSong(){
   for (let i = 0; i < 3; i++){ S.chains[i] = freshSect(); S.chains[i][0][0] = i; S.song[0][i] = i; }
   return S;
 }
+// PERFORM's sizes and LFO lists, set early (PERFORM below sets the same again): the saved song is read just below, before the
+// PERFORM block runs, and normSong saw them undefined then: scenes A / B came back empty, parts shrank to one, and a song with
+// a track LFO threw (PLFO_SHAPES.length), so the app opened the starter beat instead and autosaved it over the song.
+var PERF_SCENES = 16, PERF_MACROS = 8, PERF_PARTS = 16, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
 // FIRST RUN (owner, 31 Oct): with no song saved yet the app opens the bundled ELECTRO project (sounds/ELECTRO.thunder);
 // the starter beat stays underneath until it has loaded (and if it can't be fetched).
 let FIRST_SONG = false;
@@ -17703,7 +17707,7 @@ const SWINGB = ['8ths', '16ths', 'Triplet', 'Dotted-8th', 'Half', 'Wide-6', 'Wid
      lk  {track: [id, id, id, id]}: what LK1–LK4 on that track's rows set
      lfo {track: {id, sh, rt, dp}}: a track LFO (shape, rate as an index of PLFO_RATES in beats a cycle, depth)
    S.parts (saved in the song): 16 parts {n, insts, mix:[[vol, pan]…], fx:{'t:s':{k:v}}}: a sound setup PRT switches to. */
-// (var and function: normSong reads the saved song at start-up, before this line runs)
+// (var and function: normSong reads the saved song at start-up, before this line runs; the vars are also set before that: FIRST RUN)
 var PERF_SCENES = 16, PERF_MACROS = 8, PERF_PARTS = 16;
 var PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_RATE_NAMES = ['1/32', '1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars', '8 bars'];
 var PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
@@ -19571,7 +19575,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '1v409bi';
+const CORE_REV = '1wuhej6';
 const CORE_WANT = 6;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -20805,7 +20809,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 423;
+const BUILD = 424;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29213,6 +29217,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [424, '4 Nov', ['Reopening the app keeps the song you were working on: Perform scenes and parts came back empty, and a song with a track LFO was replaced by the starter beat.']],
   [423, '4 Nov', ['Playing a phrase or a sect (Shift+Space, F6, PLAY on the Phrase screen) works again on the audio-thread sequencer.',
     'Right-click on a track number in Arrange on the Song screen solos it without opening the Edit menu; in Pattern view the open track’s own band takes right-click solo, Alt-click mute and double-click name too.',
     'The wheel keeps turning a Mixer VOL or OUT bar while the pointer stays still.',

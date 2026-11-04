@@ -153,6 +153,9 @@ const isPolyT = t => t >= polyFrom() && t < NT;
 const isBusT = t => t >= 0 && t < NT && busPlan().feeds.has(t);
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;
 const flxCap = v => S && S.flxOld ? Math.min(16, v) : Math.min(255, v);
+var PERF_SCENES = 16;
+var PERF_MACROS = 8;
+var PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32];
 const niOf = Sx => clamp((Sx && Sx.ni) | 0 || 16, 16, NI);
 const plpbOf = (Sx, id) => (id >= 0 && Sx.plpb && Sx.plpb[id]) || Sx.lpb || 4;
 const blockMuted = (Sx, y, t) => {
@@ -160,9 +163,6 @@ const blockMuted = (Sx, y, t) => {
   if (t < 32) return !!((Sx.smute[y] >> t) & 1);
   const w = Sx.smuteX && Sx.smuteX[y]; return !!(w && (w[(t - 32) >> 5] >> ((t - 32) & 31)) & 1);
 };
-var PERF_SCENES = 16;
-var PERF_MACROS = 8;
-var PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32];
 function freshPerf(){ return {sc:Array.from({length:PERF_SCENES}, (_, i) => ({n:'', v:{}})), xa:0, xb:1, xf:0,
   mac:Array.from({length:PERF_MACROS}, (_, i) => ({n:'M' + (i + 1), v:0, tg:[]})), lk:{}, lfo:{}}; }
 function tgtOk(id){ return typeof id === 'string' && /^(vol|pan|cut|res|dec):\d+$|^fx:\d+:\d+:\d+$/.test(id); }
