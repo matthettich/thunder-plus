@@ -20738,7 +20738,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 410;
+const BUILD = 411;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22743,7 +22743,7 @@ function songViewRows(){
 }
 function optDir(dir, grid){
   const d = dir === 'right' || dir === 'up' ? 1 : -1, big = dir === 'up' || dir === 'down';
-  if (tv === 'phrase' && !(grid && patNavOn) && pvActive()) return pvRow(dir === 'up' ? -1 : dir === 'down' ? 1 : d);   // PATTERN VIEW: Ctrl+▲▼, [ ], ‹ › step song rows
+  if (tv === 'phrase' && !(grid && patNavOn) && pvActive()){ phShownGo(); return pvRow(dir === 'up' ? -1 : dir === 'down' ? 1 : d); }   // PATTERN VIEW: Ctrl+▲▼, [ ], ‹ › step song rows
   // Mixer FX row: OPTION+▲▶ turn effects on in order (up to eight), OPTION+▼◀ turn the last one back off.
   if (tv === 'mixer'){ if (cs.mixer.y === 5) fxActiveStep(cs.mixer.x, d); return; }
   // The Song screen (and Arrange holding the keys on Phrase): PAD mode's OPTION+arrows move like the phrase editor's,
@@ -22755,6 +22755,7 @@ function optDir(dir, grid){
   // they jump 16 patterns, as before. OPTION+◀▶ and KEYS-mode Ctrl/⌘+▲▼ always step one.
   // PAD mode's OPTION+arrows (grid): move on the Song grid to the nearest phrase above, below, left or right of
   // this one (phraseGrid). A phrase not placed in the song steps by number as before, so it can still be left.
+  if (tv === 'phrase' && grid && (dir === 'up' || dir === 'down')) phShownGo();   // SHOWN PATTERN: from the pattern on screen, not Arrange's cursor
   if (tv === 'phrase' && grid && patNavOn && phraseGrid(dir)) return;
   if (tv === 'phrase'){ const step = big ? (patNavOn ? 1 : 16) : 1; cPhrase = clamp(cPhrase + d * step, 0, NPH - 1); selA = null; followPhraseBlock(); return draw(); }
   if (tv === 'inst'){ cInst = last.inst = clamp(cInst + d, 0, NI - 1); instPicked = true; return draw(); }
@@ -23656,10 +23657,20 @@ function playhead(){
     if (has(cs.song.y)) rows[t] = cs.song.y; else for (let y = 0; y < 256; y++) if (has(y)){ rows[t] = y; break; } }
   return rows.some(y => y >= 0) ? rows : null;
 }
+/* SHOWN PATTERN (owner, 3 Nov: ⌥+arrows "navigated to the patterns around where the cursor was in arrange, but it should
+   move from the pattern currently displayed on the phrase or pattern window"): the song row and track of the pattern the
+   Phrase screen / Pattern view shows, kept as it's drawn. Arrange's cursor can be elsewhere (Arrange holding the keys,
+   PIN), and a phrase used more than once was found nearest that cursor. phShownGo() puts the song cursor back on it. */
+let phShown = null;
+function phShownGo(){
+  const s = phShown; if (!s || s.p !== cPhrase || !pvHas(s.y, s.x, cPhrase)) return false;
+  cs.song.x = s.x; cs.song.y = s.y; cTrack = s.x; return true;
+}
 function draw(){
   if (view !== 'tracker') return;
   document.body.classList.toggle('tvph', tv === 'phrase');   // EDIT OFF looks apply to the Phrase screen
   if (apHold){ apDirty = true; return; }   // ARRANGE PAGING: a song command run for Arrange draws once, at its end
+  try { if (tv === 'phrase' && !(apReady && apF) && pvHas(cs.song.y, cTrack, cPhrase)) phShown = {x:cTrack, y:cs.song.y, p:cPhrase}; } catch(e){}   // SHOWN PATTERN (pvHas is defined further down the script)
   if (arrPlace()) scheduleRefit(false);   // Arrange moved into (or out of) the Song screen: size the text again next frame
   if (spSync()) fit();   // SIMPLE PHRASE: on or off for this screen, so the phrase is sized again (and Arrange hides)
   pvSync();   // PATTERN VIEW: its buttons and bar, and the text size when it turns on or off
@@ -28746,6 +28757,11 @@ function apBack(){
 { const f = release; release = (...a) => apRun(f, a); }
 { const f = dirPress; dirPress = (...a) => apRun(f, a); }
 { const f = globalKeys; globalKeys = (...a) => apRun(f, a); }
+// SHOWN PATTERN: ⌥+▲▼ (no Shift) on Phrase step from the pattern the phrase / Pattern view shows, even while Arrange holds
+// the keys (they go back to the phrase). Runs before apRun turns the keys into the Song screen's.
+{ const f = globalKeys; globalKeys = (...a) => { const e = a[0];
+  if (e && apF && !apSong && tv === 'phrase' && e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')){ apFocus(null); phShownGo(); }
+  return f(...a); }; }
 { const f = cmdAction; cmdAction = (...a) => apRun(f, a); }
 { const f = kpAction; kpAction = (...a) => apRun(f, a); }
 { const f = toggleLoop; toggleLoop = (...a) => apRun(f, a); }   // LOOP SEL (top bar): Arrange's song selection, as on the Song screen
@@ -29061,6 +29077,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [411, '3 Nov', ['Phrase / Pattern view: ⌥/Alt+▲▼ step from the pattern on screen, even when Arrange’s cursor is somewhere else (Arrange holding the keys, PIN, or a phrase used in more than one place); the keys go back to the phrase.']],
   [410, '3 Nov', ['…chains: moving a Track In / Chain Out to another track (or deleting it) switches the old track’s CHN off, so the Mixer no longer shows MISS for it and the track plays as before.']],
   [409, '3 Nov', ['Mastering: an older song’s MASTERING window has SWITCH TO …PUMP: the song takes the …pump chain new songs have (EQ → CALM → COMP → TONE → MASTER, the auto master last) in the master’s last five FX slots, and its old mastering is switched off. It asks first if those slots hold effects; Undo takes it back.']],
   [408, '3 Nov', ['Arrange and Song: right-click a block → Duplicate this track with its patterns: the track goes into the next empty track of its kind with its volume, pan, effects and every block as a unique copy (also Ctrl/⌘+Alt+D on Phrase, Mixer and FX). Right-click on a track number still solos.', 'Master column: a block that turns effects off (FLX 00, GAT 00, RTG 00, FXO X0) and turns nothing on draws like an OFF-only block, black with the stop bar.']],
@@ -29769,6 +29786,7 @@ function pvLines(c, L, cc, rsel, playRows){
     try { return pvLines(c, L, cc, rsel, playRows); } finally { pvLinesIn = false; s.x = k.x; s.y = k.y; s.top = k.top; } }
   if (!pvHas(cs.song.y, cTrack, cPhrase) && !pvPend()) pvAlign();
   const Y = cs.song.y, row = S.song[Y] || [], uses = pvUsesLast = pvUses(), k = pvSectRow();
+  phShown = {x:cTrack, y:Y, p:cPhrase};   // SHOWN PATTERN (also while Arrange holds the keys: the row this view shows)
   const psr = selA && selA.v === 'phrase' && selA.pat ? selRect() : null;   // TRACKER KEYS: a pattern selection shows on every track
   const onRow = pvHas(Y, cTrack, cPhrase), pend = !onRow && pvPend();
   if (onRow) cs.song.x = cTrack;
