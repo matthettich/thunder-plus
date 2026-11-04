@@ -20809,7 +20809,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 424;
+const BUILD = 425;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25277,7 +25277,9 @@ function deckStrip(){
   const fy = stPos(m.vol); stVol.querySelector('.stcap').style.bottom = fy + 'px'; stVol.querySelector('.stfill').style.height = Math.max(0, fy - 8) + 'px';
   const gain = mst ? curve(m.vol) : trackGain(m.vol);
   stVol.querySelector('.st0').style.bottom = stPos(mst ? 255 : TRK_UNITY) + 'px'; stVol.setAttribute('aria-valuenow', m.vol); stVol.setAttribute('aria-valuetext', dB(gain));
-  if (document.activeElement !== stPan) stPan.value = m.pan;
+  // FIX (sweep, 4 Nov): only while the pan is being dragged. It kept focus after a drag, so a track change, Undo or the
+  // Mixer left it showing the old pan, and the next drag or wheel step started from that (the pan jumped).
+  if (!stPan.matches(':active')) stPan.value = m.pan;
   $('stVolV').textContent = dB(gain).replace(/^(\d)/, '+$1');
   $('stPanV').textContent = mst ? '—' : m.pan === 128 ? 'C' : m.pan < 128 ? 'L' + Math.round((128 - m.pan) / 128 * 100) : 'R' + Math.round((m.pan - 128) / 127 * 100);
   const mu = $('stMute'), so = $('stSolo'); mu.classList.toggle('on', !!m.mute); so.classList.toggle('on', !!m.solo);
@@ -29217,6 +29219,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [425, '4 Nov', ['The PAN slider in the bottom strip follows the pan when it changes elsewhere (another track, Undo, the Mixer); it could keep the old value after a drag and jump back on the next one.']],
   [424, '4 Nov', ['Reopening the app keeps the song you were working on: Perform scenes and parts came back empty, and a song with a track LFO was replaced by the starter beat.']],
   [423, '4 Nov', ['Playing a phrase or a sect (Shift+Space, F6, PLAY on the Phrase screen) works again on the audio-thread sequencer.',
     'Right-click on a track number in Arrange on the Song screen solos it without opening the Edit menu; in Pattern view the open track’s own band takes right-click solo, Alt-click mute and double-click name too.',
