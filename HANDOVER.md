@@ -136,6 +136,22 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (44): END / JMP; …pump CHAIN menu (build 417, on `beta`)
+
+- Owner: "do we have a stop song command?" → "let's add the end command". FXC gets **END** and **JMP** at the end (saved
+  numbers unchanged); FXB / value descriptions, group Play order, MST_FXC. In makeSeq's `api.step`, before t0: when the whole
+  song plays (`mode === 'song' && !loop`), the rows due now are scanned (`r0` of each track due at rel0); END → every
+  track `on = false` (the page stops as at a song's end; renders end); JMP XX → every track `fresh()` at row XX, `rel` /
+  `r0` = rel0, `settle` (as PLAY from that row), and the END/JMP row itself doesn't play. In `once` (renders, chase) a JMP
+  to its own row or earlier ends instead of looping for ever. `node tools/make-core.mjs` re-run (CORE_REV 1v409bi).
+  Checked headless on ELECTRO: END on row 4 → rows 0–3 then stop; JMP 01 on row 4 live → 1,2,3,1,2,3…; once → ends;
+  JMP 06 on row 2 → 0,1,6,7…
+- Owner: MASTERING shows only the auto master: "I want to be able to open the other pump master fx". `PumpFX.slots(t)`
+  (the track's …pump slots in order) and, in pump/ui/kit.js, a **CHAIN ▾** Menu in every window's header (right side,
+  only when the track has more than one …pump effect with a window): picks open `FX.open(t, k)`. The desktop header is
+  now laid out right to left first and the preset menu takes the space left (it overlapped A/B/COPY in MASTER's width).
+  kit.js `?v=7`. MASTERING still opens pump MASTER.
+
 ## 3 Nov (43): UNIQUE PER TRACK (build 416, on `beta`)
 
 - Owner: "make a unique pattern if copying from one track to another, I'll probably mess that up all the time if not.
