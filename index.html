@@ -7944,7 +7944,14 @@ $('ckMobWv').addEventListener('change', e => setMobEd('waves', e.target.checked)
 const cache = [], dirty = [], bufs = [];
 function slotAt(a, i){ while (a.length < nslots()) a.push(null); return a[i]; }
 let clipVoice = null, clipLayer = null;
-const ex = {sr:48000, bits:24, norm:true, noteName:false};
+// FIX (UI sweep, 4 Nov): the export / render settings (rate, bits, normalise, + note) are kept on this device like the other
+// settings; they went back to 48k / 24 / normalise on every reload. exSave() after each change.
+const EXK = 'thunderplus-export-v1';
+const ex = (() => { const d = {sr:48000, bits:24, norm:true, noteName:false};
+  try { const j = JSON.parse(localStorage.getItem(EXK) || 'null');
+    if (j){ if (j.sr === 44100 || j.sr === 48000) d.sr = j.sr; if (j.bits === 16 || j.bits === 24) d.bits = j.bits; if (typeof j.norm === 'boolean') d.norm = j.norm; if (typeof j.noteName === 'boolean') d.noteName = j.noteName; } } catch(e){}
+  return d; })();
+const exSave = () => { try { localStorage.setItem(EXK, JSON.stringify(ex)); } catch(e){} };
 const noteName = m => NOTE[((m % 12) + 12) % 12].replace('♯', '#') + (Math.floor(m / 12) - 1);
 const V = () => kit.voices[cur];
 const Lc = () => V().layers[V().sel];
@@ -13221,10 +13228,10 @@ if (inAI){
   $('bExPad').textContent = 'Save this pad (WAV in .zip)';
   $('exNote').textContent = 'Inside AI, files come out as .zip (WAV inside). Open the zip in Files, then import the WAVs into Koala or a SunVox Sampler. The standalone copy saves plain WAVs and can share straight to Koala.';
 }
-makeSeg($('segRate'), [[44100,'44.1k'],[48000,'48k']], () => ex.sr, v => ex.sr = v);
-makeSeg($('segBits'), [[16,'16'],[24,'24']], () => ex.bits, v => ex.bits = v);
-makeSeg($('segNorm'), [[true,'Normalise'],[false,'As is']], () => ex.norm, v => ex.norm = v);
-makeSeg($('segNoteName'), [[false,'Pad name'],[true,'+ note']], () => ex.noteName, v => ex.noteName = v);
+makeSeg($('segRate'), [[44100,'44.1k'],[48000,'48k']], () => ex.sr, v => { ex.sr = v; exSave(); });
+makeSeg($('segBits'), [[16,'16'],[24,'24']], () => ex.bits, v => { ex.bits = v; exSave(); });
+makeSeg($('segNorm'), [[true,'Normalise'],[false,'As is']], () => ex.norm, v => { ex.norm = v; exSave(); });
+makeSeg($('segNoteName'), [[false,'Pad name'],[true,'+ note']], () => ex.noteName, v => { ex.noteName = v; exSave(); });
 
 /* ---------- settings (synth page): Kit, MIDI, Export, Skin and Audio under one button ---------- */
 /* ---------- settings: one dropdown menu under the gear, on every screen ---------- */
@@ -21644,9 +21651,9 @@ function projRows(){
     // GAIN STAGING (27 Oct): the master fader, after the limiter (the Mixer's OUT and its bar, the bottom panel's master strip)
     {l:'MASTER OUT', get:() => S.mout == null ? 255 : S.mout, set:v => S.mout = v, min:0, max:255, big:16, d:255, after:() => moApply(), info:v => 'Master OUT ' + dB(curve(v)) + ': the master fader, after the limiter and mastering (FF is 0 dB, no boost)'},
     {l:'RENDER FROM', sec:'Render & export', get:() => S.renderFrom, set:v => S.renderFrom = v, min:0, max:255, big:16, d:0, fmt:v => 'ROW ' + rS(v, 3), gap:true, info:() => 'Renders play from this row until each track reaches an empty row'},
-    {l:'RATE', get:() => ex.sr === 48000 ? 1 : 0, set:v => ex.sr = v ? 48000 : 44100, min:0, max:1, tog:true, d:1, fmt:v => v ? '48K' : '44.1K', info:() => 'Sample rate for renders (shared with the synth’s export)'},
-    {l:'BITS', get:() => ex.bits === 24 ? 1 : 0, set:v => ex.bits = v ? 24 : 16, min:0, max:1, tog:true, d:1, fmt:v => v ? '24' : '16', info:() => 'Bit depth for renders'},
-    {l:'NORMALISE', get:() => ex.norm ? 1 : 0, set:v => ex.norm = !!v, min:0, max:1, tog:true, d:1, fmt:onOff, info:() => 'Raise the mix to just under 0 dB. Stems get the same gain, so they still add up to the mix'},
+    {l:'RATE', get:() => ex.sr === 48000 ? 1 : 0, set:v => { ex.sr = v ? 48000 : 44100; exSave(); }, min:0, max:1, tog:true, d:1, fmt:v => v ? '48K' : '44.1K', info:() => 'Sample rate for renders (shared with the synth’s export)'},
+    {l:'BITS', get:() => ex.bits === 24 ? 1 : 0, set:v => { ex.bits = v ? 24 : 16; exSave(); }, min:0, max:1, tog:true, d:1, fmt:v => v ? '24' : '16', info:() => 'Bit depth for renders'},
+    {l:'NORMALISE', get:() => ex.norm ? 1 : 0, set:v => { ex.norm = !!v; exSave(); }, min:0, max:1, tog:true, d:1, fmt:onOff, info:() => 'Raise the mix to just under 0 dB. Stems get the same gain, so they still add up to the mix'},
     {l:'› RENDER SONG', act:() => renderOut(false), gap:true, info:() => 'Stereo WAV of the song, from RENDER FROM to the end'},
     {l:'› RENDER STEMS', act:() => renderOut(true), info:() => 'A zip with the mix plus one stereo WAV per track, all the same length'},
     {l:'› EXPORT MIDI FILE', act:exportMidiFile, info:() => 'The song from RENDER FROM as a .mid file, a track per tracker track (drum pads on channel 10), to finish in a DAW or load on the MPC'},
