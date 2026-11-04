@@ -15274,7 +15274,7 @@ const CC_NAMES = {0:'bank select', 1:'mod wheel', 2:'breath', 4:'foot', 5:'glide
 // A port letter's cable on this device, for INST.
 const portName = p => { const o = midiOut(p); return o ? (o.name || 'connected') : midi.outIds[p] ? 'not connected now' : 'no cable: Settings › MIDI'; };
 const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
-  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT'];   // new commands go on the end, so saved songs keep their numbers
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP'];   // new commands go on the end, so saved songs keep their numbers
 const FXC_V1 = ['RET','DEL','CUT','CHA','PSL','RND','OFS','REV','PAN','TPO','HOP'];   // song files before v2
 const V1NAME = {CUT:'KIL', OFS:'STA', REV:'PLY'};
 const SIGNED = new Set(['PBN','TSP','PIT','FIN','NUD','RTV']);
@@ -15325,6 +15325,8 @@ const FXI = {
   XFD:v => `Crossfader to ${Math.round(v / 2.55)}% (scene A → B)`,
   MAC:v => (v >> 4) >= 1 && (v >> 4) <= 8 ? `Macro ${v >> 4} (${(perfOf().mac[(v >> 4) - 1] || {}).n || ''}) to ${Math.round((v & 15) * 100 / 15)}%` : 'Macro X (1–8) to Y (0–F)',
   LK1:v => 'Lock 1 to ' + hx(v), LK2:v => 'Lock 2 to ' + hx(v), LK3:v => 'Lock 3 to ' + hx(v), LK4:v => 'Lock 4 to ' + hx(v),
+  END:v => 'End of the song: playing the song stops here (this row doesn’t play); a render ends here too',
+  JMP:v => `Jump: the whole song goes on from song row ${rS(v, 3)} (every track, from the top of its block); in a render, a jump back ends it`,
   PRT:v => v ? `Switch to part ${v}${S.parts && S.parts[v - 1] ? '' : ' (empty: the song’s own)'}` : 'Back to the song’s own sound (no part)',
   RET:v => (v & 15) ? `Retrigger every ${ticksS(v & 15)} to the end of the step` + ((v >> 4) ? `, ${v >> 4}/16 quieter a hit` : '') : 'RET XY: retrigger every Y ticks, X fades each hit',
   REP:v => `Repeat the track’s last command, adding ${hx(v)} each time`,
@@ -16317,6 +16319,9 @@ const PumpFX = window.PumpFX = (() => {
     // handlers leave this key alone, see typing()) and backHook() (true: Back closed a window).
     undo(dir){ undoStep(dir < 0 ? -1 : 1); },
     toast(msg, ms){ toast(msg, ms); },
+    // CHAIN (owner, 3 Nov: "I want to be able to open the other pump master fx"): the track's (or the master's) …pump slots,
+    // in order, for the windows' CHAIN menu
+    slots(t){ const A = arr(t) || []; const out = []; A.forEach((f, k) => { if (f && isPumpT(f.type)){ const ty = TFX[f.type].pump; out.push({k, type:ty, name:pumpFx(ty).name, on:f.on !== false}); } }); return out; },
     trackName(t){ if (t >= NT) return 'MASTER'; const n = tName(t); return 'TRACK ' + d2(t + 1) + (isBusT(t) ? ' BUS' : '') + (n ? ' · ' + n : ''); },
     ownsKey:null, backHook:null,
     _notifyAll(src){ for (let t = 0; t <= NT; t++) notify(t, src); },
@@ -17892,6 +17897,7 @@ function makeSeq(S, mode, o){
   }
   // The row a track is about to play, and the value of a TIC command on it (null when there is none).
   const r0 = (T, pid) => { const ph = pid >= 0 ? S.phrases[pid] : null; return ph ? ph[T.step] : null; };
+  const ENDI = FXC.indexOf('END'), JMPI = FXC.indexOf('JMP');
   const TICI = FXC.indexOf('TIC');
   const ticCmd = r => { let v = null; for (let k = FX0; k < RW; k += 2) if (r[k] === TICI) v = Math.max(0, r[k + 1]); return v; };
   // Each call plays the next line of every track that is due. Tracks keep their own clocks, so a phrase
@@ -17904,6 +17910,19 @@ function makeSeq(S, mode, o){
     let rel0 = Infinity; for (const T of tr) if (T.on && T.rel < rel0) rel0 = T.rel;
     if (rel0 === Infinity) rel0 = api.time - api.base;
     if (wakeOk) wake(rel0);   // LIVE SONG EDITS: a track given a block while the song plays joins in
+    /* END / JMP (owner, 3 Nov: "do we have a stop song command?" → "let's add the end command"): looked for on the rows due
+       now, before any of them plays, and only when the whole song plays (not a phrase or sect on its own, nor the LOOP
+       pattern). END: every track stops, so the song ends here (the page stops when the sequencer has no more, as at a
+       song's end) and a render ends here. JMP XX: every track starts again at song row XX now, as PLAY from that row does,
+       and this row doesn't play; in a render (once) a jump back to this row or earlier ends it instead of looping for ever. */
+    if (mode === 'song' && !loop){ let jc = null;
+      for (let t = 0; t <= MT && !jc; t++){ const T = tr[t]; if (!T.on || T.empty || T.rel > rel0 + 1e-9) continue;
+        const cid = sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null, r = r0(T, chRow ? chRow[0] : -1); if (!r) continue;
+        for (let k = FX0; k + 1 < RW; k += 2){ if (r[k] === ENDI){ jc = {end:true}; break; } if (r[k] === JMPI){ jc = {to:clamp(r[k + 1], 0, 255), from:T.row}; break; } } }
+      if (jc){
+        if (jc.end || (once && jc.to <= jc.from)) for (const T of tr) T.on = false;
+        else { const y = jc.to; for (let t = 0; t <= MT; t++){ const T = tr[t]; Object.assign(T, fresh()); T.row = y; T.rel = rel0; T.r0 = rel0;
+            if ((t < (S.ntr || 16) || t === MT) && S.song[y] && S.song[y][t] >= 0 && (!o.only || o.only.has(t))){ T.on = true; settle(T, t); } } } } }
     const t0 = api.base + rel0, evs = [], pos = new Array(NT + 1).fill(null), {amt:sw, beat:swB} = swingOf();
     let nb = api.bpm, ngrv = api.grv, pdl = 0; const tks0 = api.tks;   // pdl: PDL, the rows every track waits
     // The song position in beats at this step, for the player's beat clock (tempo-locked effects).
@@ -19526,7 +19545,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'hfz4eb';
+const CORE_REV = '1v409bi';
 const CORE_WANT = 6;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -20758,7 +20777,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 416;
+const BUILD = 417;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -21771,7 +21790,7 @@ function bump(d, big){
 // EDIT on a phrase FX column opens a list of every command with a short note on what it does.
 // Touch: tap one to highlight it, tap it again to choose. Pad: ▲▼ move, EDIT chooses, OPTION closes.
 // Keyboard: arrows, Enter chooses, Esc closes, a letter jumps. Mouse: a click chooses.
-const FXB = {FDI:'Fade the note in over XX ticks', TRM:'Tremolo on the note: X speed (cycles a beat), Y depth', APN:'Auto-pan the note: X speed (cycles a beat), Y depth', TVL:'Track level from here on: 00 silent – FF the mixer’s', TPN:'Track pan from here on: 00 left, 80 centre, FF right (back to the mixer’s at stop)', STP:'Stop: 00 every note on this track, 01 every note on every track', LPB:'Lines per beat for every track from here on (01–10; 00 the phrases’ own)', PDL:'Pause the song for XX rows (every track waits)', ONE:'Play one note of this row’s chord, picked at random', MPB:'MIDI pitch bend: 00 down, 80 centre, FF up', MAT:'MIDI channel pressure 00–7F', FXS:'Effect parameter to move: X the slot (1–8), Y its parameter (1–F, as listed on the FX screen)', FXV:'Set the parameter FXS picked: 00 its lowest – FF its highest', SCA:'Scale for this track from here on: X the root (0 C … B), Y the scale (0 off, 1 major, 2 minor…)', SCG:'Scale for every track from here on, as SCA', CUT:'Low-pass the pad from here on: 00 dark – FF open (off)', RES:'Filter resonance for CUT, from here on', DEC:'Shorten the pad from here on: 00 a click – FF its own length', MUT:'Mutate: the note plays variation XX of its pad (INST › RANGE says how far)', GEN:'Generate: the note plays a fresh sound XX of the instrument’s GEN TYPE (INST › FAMILY, RANGE)', PRB:'Chance the command to the left happens (00 never – FF always)', ARP:'Arpeggio: the note, +X and +Y semitones', ARC:'Arpeggio shape (X) and speed in ticks (Y)', CHA:'Chance the note plays (00 never – FF always)',
+const FXB = {END:'End of the song: playing stops at this row', JMP:'Jump: the whole song goes on from song row XX (JMP 00: back to the top)', FDI:'Fade the note in over XX ticks', TRM:'Tremolo on the note: X speed (cycles a beat), Y depth', APN:'Auto-pan the note: X speed (cycles a beat), Y depth', TVL:'Track level from here on: 00 silent – FF the mixer’s', TPN:'Track pan from here on: 00 left, 80 centre, FF right (back to the mixer’s at stop)', STP:'Stop: 00 every note on this track, 01 every note on every track', LPB:'Lines per beat for every track from here on (01–10; 00 the phrases’ own)', PDL:'Pause the song for XX rows (every track waits)', ONE:'Play one note of this row’s chord, picked at random', MPB:'MIDI pitch bend: 00 down, 80 centre, FF up', MAT:'MIDI channel pressure 00–7F', FXS:'Effect parameter to move: X the slot (1–8), Y its parameter (1–F, as listed on the FX screen)', FXV:'Set the parameter FXS picked: 00 its lowest – FF its highest', SCA:'Scale for this track from here on: X the root (0 C … B), Y the scale (0 off, 1 major, 2 minor…)', SCG:'Scale for every track from here on, as SCA', CUT:'Low-pass the pad from here on: 00 dark – FF open (off)', RES:'Filter resonance for CUT, from here on', DEC:'Shorten the pad from here on: 00 a click – FF its own length', MUT:'Mutate: the note plays variation XX of its pad (INST › RANGE says how far)', GEN:'Generate: the note plays a fresh sound XX of the instrument’s GEN TYPE (INST › FAMILY, RANGE)', PRB:'Chance the command to the left happens (00 never – FF always)', ARP:'Arpeggio: the note, +X and +Y semitones', ARC:'Arpeggio shape (X) and speed in ticks (Y)', CHA:'Chance the note plays (00 never – FF always)',
   DEL:'Delay the note by ticks', GRV:'Groove: ticks on even (X) and odd (Y) steps', GGR:'Groove for every track at once', HOP:'End the phrase here; the next starts at row Y',
   INS:'Play the note with this instrument', KIL:'Cut the note after ticks', OFF:'Fade the note out after ticks', NTH:'Play only on pass Y of every X times',
   RET:'Retrigger every Y ticks; X fades each hit', REP:'Repeat the track’s last command, adding the value', RND:'Randomise the command to the left (or the pitch)',
@@ -21798,7 +21817,7 @@ const FXC_GROUPS = [
   ['Perform', ['XFD', 'MAC', 'LK1', 'LK2', 'LK3', 'LK4', 'PRT']],
   ['Effects', ['FXO', 'FXS', 'FXV', 'BYP', 'FLX', 'GAT', 'RTG']],
   ['Tempo and groove', ['TPO', 'TIC', 'LPB', 'PDL', 'GRV', 'GGR']],
-  ['Play order', ['HOP', 'DIR']],
+  ['Play order', ['HOP', 'DIR', 'END', 'JMP']],
   ['MIDI', ['PGM', 'CCA', 'CCB', 'CCC', 'CCD', 'CSL', 'MPB', 'MAT']]];
 const fxcGroup = n => { for (const [g, l] of FXC_GROUPS) if (l.includes(n)) return g; return 'More'; };
 // The names gathered by group, the groups in the order they first appear in names.
@@ -21806,7 +21825,7 @@ const fxcByGroup = names => [...new Set(names.map(fxcGroup))].flatMap(g => names
 const FXLIST_ALL = [-1, ...fxcByGroup([...FXC_GROUPS.flatMap(([, l]) => l), ...FXC.filter(n => fxcGroup(n) === 'More').sort()])
   .map(n => FXC.indexOf(n)).filter(i => i >= 0)];
 // Master phrases offer only the commands that mean something on the master bus: its level and effects first, then timing.
-const MST_FXC = ['VOL', 'FXO', 'FLX', 'GAT', 'RTG', 'TPO', 'TIC', 'GGR', 'HOP', 'DEL', 'CHA', 'NTH', 'CND', 'REP', 'RND', 'RNL', 'SED', 'PRB', 'FXS', 'FXV', 'SCG', 'LPB', 'PDL', 'STP', 'XFD', 'MAC', 'PRT', 'LK1', 'LK2', 'LK3', 'LK4'];
+const MST_FXC = ['END', 'JMP', 'VOL', 'FXO', 'FLX', 'GAT', 'RTG', 'TPO', 'TIC', 'GGR', 'HOP', 'DEL', 'CHA', 'NTH', 'CND', 'REP', 'RND', 'RNL', 'SED', 'PRB', 'FXS', 'FXV', 'SCG', 'LPB', 'PDL', 'STP', 'XFD', 'MAC', 'PRT', 'LK1', 'LK2', 'LK3', 'LK4'];
 const FXLIST_MST = [-1, ...fxcByGroup(MST_FXC).map(n => FXC.indexOf(n)).filter(i => i >= 0)];
 let FXLIST = FXLIST_ALL;
 const fxListNow = () => (FXLIST = mstView() ? FXLIST_MST : FXLIST_ALL);
@@ -29155,6 +29174,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [417, '3 Nov', ['New commands: END stops the song at its row (a render ends there too); JMP XX carries the whole song on from song row XX (JMP 00: back to the top), so a song can loop a part or skip ahead. In the effect list under Play order, and in the master column.', '…pump windows: a CHAIN menu in the header lists the track’s (or the master’s) other …pump effects; from MASTERING’s auto master it opens EQ, CALM, COMP and TONE.']],
   [416, '3 Nov', ['Settings → UNIQUE PER TRACK (on): a block pasted, cloned, dragged or typed onto a track when another track already uses it gets its own copy, so editing one never changes the other. The same block down its own track still repeats.']],
   [415, '3 Nov', ['Typing into a phrase that also plays on another track says so once, with how to give this track its own copy (UNIQ). The same phrase repeated down one track says nothing.']],
   [414, '3 Nov', ['Master column: a block placed there that tracks also use (or on a track when the master column uses it) gets its own copy, so the master’s VOL, FLX and FXO can’t reach the tracks, and theirs can’t reach the master.', 'Typing into a phrase that the master column already shares with tracks (an older song) says so once, with how to split it (UNIQ).']],
@@ -30247,7 +30267,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
      is the shared window kit (sets PumpFX.openHook); multiband.js what BAND, WIDE and HEAT share (load it before them);
      one file per plugin (docs/PUMP-FX.md, "The pop-up kit"). A type without a file says its window comes later. Add new
      ones here, in sw.js FILES, with ?v= like these. -->
-<script src="pump/ui/kit.js?v=6"></script>
+<script src="pump/ui/kit.js?v=7"></script>
 <script src="pump/ui/eq.js?v=2"></script>
 <script src="pump/ui/comp.js?v=1"></script>
 <script src="pump/ui/limit.js?v=1"></script>
