@@ -19657,7 +19657,7 @@ function tStop(quiet){
     tp.paused = ref >= 0 ? {pos:P, ref, row:P[ref].row, step:P[ref].step, key:curKey()} : null;
   }
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
-  const stopP = !quiet && stopCurOn && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
+  const stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
   tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null;
   if (tp.core){ tp.core = false; core.gen++; coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }
   else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
@@ -20719,7 +20719,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 405;
+const BUILD = 406;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -20760,6 +20760,12 @@ let resumeOn = (() => { try { return localStorage.getItem(RSK) === '1'; } catch(
 const STOPCUR_K = 'thunderplus-stopcur-v2';
 let stopCurOn = (() => { try { return localStorage.getItem(STOPCUR_K) === '1'; } catch(e){ return false; } })();
 function setStopCur(on){ stopCurOn = on; try { localStorage.setItem(STOPCUR_K, on ? '1' : '0'); } catch(e){} draw(); }
+// ARRANGE ON STOP (owner, 3 Nov: "add a similar setting … that does the same thing in the arrange window"): its own choice
+// for the Song / Arrange screen and for Arrange holding the keys beside Phrase; PHRASE ON STOP (stopCurOn) is the rest.
+const STOPARR_K = 'thunderplus-stoparr-v1';
+let stopArrOn = (() => { try { return localStorage.getItem(STOPARR_K) === '1'; } catch(e){ return false; } })();
+function setStopArr(on){ stopArrOn = on; try { localStorage.setItem(STOPARR_K, on ? '1' : '0'); } catch(e){} draw(); }
+const stopToPlayhead = () => (tv === 'song' || (typeof apReady !== 'undefined' && apReady && apF === 'arr')) ? stopArrOn : stopCurOn;
 // The edit cursor onto a playing (or stopped) position: P = per-track positions, mode = the sequencer's mode. Returns true when it moved.
 function curToPlay(P, mode){
   if (!P || !P.some(Boolean)) return false;
@@ -21488,8 +21494,10 @@ function projRows(){
       info:() => 'In a phrase. TRACKS (as Renoise): Tab / Shift+Tab go to the next / previous track’s phrase. COLUMNS: they step note → instrument → FX1 → FX2 → FX3, so the instrument is one press away'},
     {l:'RESUME', ck:'Playback resumes from pause', get:() => resumeOn ? 1 : 0, set:v => setResume(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'ON: after you stop the song, PLAY carries on from where it stopped (the playhead stays there to show it), unless you have moved the cursor since. OFF: PLAY starts from the cursor, as before. Either way the stopped spot stays lit'},
-    {l:'CURSOR ON STOP', segs:true, get:() => stopCurOn ? 1 : 0, set:v => setStopCur(!!v), min:0, max:1, d:1, fmt:v => v ? 'GOES TO PLAYHEAD' : 'STAYS PUT',   // CLEARER (owner, 3 Nov: "what is this supposed to communicate?"): was STOP CURSOR, STAYS / THERE
-      info:() => 'Where the edit cursor goes when you stop the song. STAYS PUT: it stays where you were editing. GOES TO PLAYHEAD: it jumps to where the song stopped (the song row, your track’s phrase and step), ready to edit there. STOP twice still goes to the top; Alt+G puts the cursor on the playhead at any time'},
+    {l:'PHRASE ON STOP', segs:true, get:() => stopCurOn ? 1 : 0, set:v => setStopCur(!!v), min:0, max:1, d:1, fmt:v => v ? 'PLAYHEAD' : 'STAYS',   // CLEARER (owner, 3 Nov: "what is this supposed to communicate?"): was STOP CURSOR, STAYS / THERE
+      info:() => 'Where the edit cursor goes when you stop the song while editing a phrase (and on the other screens). STAYS: it stays where you were editing. PLAYHEAD: it jumps to where the song stopped (the song row, your track’s phrase and step), ready to edit there. ARRANGE ON STOP is the same for Arrange. STOP twice still goes to the top; Alt+G puts the cursor on the playhead at any time'},
+    {l:'ARRANGE ON STOP', segs:true, get:() => stopArrOn ? 1 : 0, set:v => setStopArr(!!v), min:0, max:1, d:1, fmt:v => v ? 'PLAYHEAD' : 'STAYS',
+      info:() => 'The same for Arrange (the Song screen, or Arrange holding the keys beside the phrase): where its cursor goes when you stop the song. STAYS: where you left it. PLAYHEAD: the song row where the song stopped, on your track. Alt+G puts the cursor on the playhead at any time'},
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. A poly track shows its whole chord: all four notes when there is room (unfolded, desktop), otherwise one letter per voice (capital = natural, small = sharp, so CEGa is C E G A#; · is an empty voice, × a note off). Only to look at; they can’t be edited'},
     {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText({title:'Rename the song'}, S.name, 40, 'Rename'); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); } }, info:() => 'EDIT renames the song'},
@@ -22173,6 +22181,26 @@ function rowOp(op){
   } else return del();
   if (op === 'clear') down1();
   saveS(); draw();
+}
+/* REMOVE ROWS (owner, 3 Nov: 'add a "remove" to the small control bar that "removes these rows" to selections'): the
+   selected rows (or the cursor's row) go and the rows below move up. Phrase: whole lines of this phrase, within its LEN
+   (as rowOp's remove); a Pattern view selection (selA.pat) does the same in every track's phrase on this song row. Sect:
+   its rows. Song: every track and the master (songRowRemove). One undo step (saveS). */
+function rowsRemove(){
+  if (onPset()) return;
+  if (tv === 'song') return songRowRemove();
+  if (tv !== 'phrase' && tv !== 'sect') return toast('Removing rows works in Song, Sect and Phrase.');
+  const c = cs[tv], sel = !!(selA && selA.v === tv), r = sel ? selRect() : {y0:c.y, y1:c.y}, pat = sel && tv === 'phrase' && !!selA.pat;
+  const one = (A, L) => { const y1 = Math.min(r.y1, L - 1), h = y1 - r.y0 + 1; if (r.y0 >= L || h <= 0) return 0;
+    A.splice(r.y0, h); for (let i = 0; i < h; i++) A.splice(L - h + i, 0, rowBlank(tv)); return h; };
+  let h = 0;
+  if (tv === 'phrase'){
+    h = one(S.phrases[cPhrase], Math.min(S.phrases[cPhrase].length, plen(cPhrase)));
+    if (pat) for (const {p} of patParts()) one(S.phrases[p], Math.min(S.phrases[p].length, plen(p)));
+  } else { const A = rowsArr(tv); h = one(A, A.length); }
+  selA = null; c.y = r.y0;
+  if (!h){ draw(); return toast('Nothing to remove here.'); }
+  saveS(); draw(); toast((h > 1 ? `Removed rows ${rS(r.y0)}–${rS(r.y0 + h - 1)}` : `Removed row ${rS(r.y0)}`) + (pat ? ' in every track' : '') + ' · the rows below moved up');
 }
 function toggleSel(){
   if (onPset()) return;
@@ -22951,7 +22979,7 @@ function setCmdBar(on){ cmdBar = !!on; try { localStorage.setItem(CBK, cmdBar ? 
 const cmdMini = () => inMode === 'keys' && cmdBar;
 const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b:-1', '−', 'Change the value down (EDIT+◀)'], ['b:1', '+', 'Change the value up (EDIT+▶)'],
   ['b:16', '++', 'Change the value up a lot (EDIT+▲)'], ['prev', '‹', 'Previous: the block above in the song; the previous sect, phrase, instrument or FX track elsewhere (OPTION+▲ on the song, OPTION+◀ elsewhere)'], ['next', '›', 'Next: the block below in the song; the next sect, phrase, instrument or FX track elsewhere (OPTION+▼ on the song, OPTION+▶ elsewhere)'],
-  ['clr', 'CLEAR', 'Clear (OPTION+EDIT)'], ['sel', 'SELECT', 'Start or cancel a selection (SHIFT+OPTION)'],
+  ['clr', 'CLEAR', 'Clear (OPTION+EDIT)'], ['rrow', 'REMOVE', 'Remove these rows: the selected rows (or the cursor’s row) go and the rows below move up. Phrase, Pattern view, Sect and Song'], ['sel', 'SELECT', 'Start or cancel a selection (SHIFT+OPTION)'],
   ['uniq', 'UNIQ', 'Make unique: each selected block (or picked cells) gets new phrases, in place'], ['clone', 'CLN', 'Clone: copies the block (or the selected blocks); PASTE then puts a unique copy with new numbers at the cursor (Ctrl/⌘+Alt+C)'],
   ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on a new row below; the rows below move down (Ctrl/⌘+Shift+C)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (OPTION)'],
   ['cut', 'CUT', 'Cut the selection, or what is under the cursor (OPTION+EDIT)'], ['paste', 'PASTE', 'Paste (SHIFT+EDIT)'],
@@ -22969,6 +22997,7 @@ function cmdAction(a){
     return optDir(d > 0 ? 'right' : 'left');
   }
   if (c === 'clr') return del();
+  if (c === 'rrow') return rowsRemove();
   if (c === 'rmv') return tv === 'song' ? songDelete(songCells(), true) : undefined;
   if (c === 'sel') return toggleSel();
   if (c === 'copy' || c === 'cut') return copyHere(c === 'cut');
@@ -22985,8 +23014,8 @@ for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type
 const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'uniq', 'clone', 'cldn', 'copy', 'cut', 'paste', 'clr', 'undo', 'redo', 'song'];
 const CMD_PAD_SHORT = {clr:'CLR', sel:'SEL', paste:'PST', undo:'↶', redo:'↷'};
 // COMMAND BAR: the Edit menu's order (undo · clipboard · select · clones · value · previous / next · play) and words.
-const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'sel', 'uniq', 'clone', 'cldn', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
-const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
+const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'sel', 'uniq', 'clone', 'cldn', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
+const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', rrow:'REMOVE', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
 const cmdSongLab = () => cmdMini() ? (tp.on ? '■ STOP' : '▶ SONG') : tp.on ? '■' : '▶';
 function applyCmdOrder(){
   const host = $('tCmd'), by = {}, mini = cmdMini();
@@ -22996,6 +23025,7 @@ function applyCmdOrder(){
   host.classList.toggle('cpad', inMode === 'pad'); host.classList.toggle('cmini', mini);
   const lab = Object.fromEntries(CMDS.map(c => [c[0], c[1]])), tip = Object.fromEntries(CMDS.map(c => [c[0], c[2]]));
   for (const a in by){ by[a].innerHTML = (mini && CMD_MINI_LAB[a]) || (inMode === 'pad' && CMD_PAD_SHORT[a]) || lab[a]; if (!mini) by[a].title = tip[a]; }
+  if (by.rrow) by.rrow.hidden = inMode === 'pad';   // (PAD's phone row is full; REMOVE is in KEYS mode's row and bar)
   cmdTipKey = '';
   const sb = by.song; if (sb){ sb.textContent = cmdSongLab(); sb.classList.toggle('on', tp.on); }
   if (typeof cmdBarState === 'function') cmdBarState();
@@ -23092,7 +23122,7 @@ function cmdItems(full){
     ...(full ? [{h:'Rows'}, onSong ? {a:'rins', l:'Insert a song row (rows below move down)', k:keyHint('mod+shift+Enter'), f:songRowInsert}
         : {a:'rins', l:'Insert a row', k:keyHint('mod+Enter'), f:() => rowOp('insert'), off:!rowsOk || !!selA},
       onSong ? {a:'rmrow', l:'Remove the song row (rows below move up)', k:keyHint('mod+shift+Backspace'), f:songRowRemove}
-        : {a:'rdel', l:'Remove the row (rows below move up)', k:keyHint('mod+Backspace'), f:() => rowOp('remove'), off:!rowsOk || !!selA}] : []),
+        : selA ? {a:'rrow', l:'Remove these rows (rows below move up)', k:'', f:rowsRemove, off:!rowsOk} : {a:'rdel', l:'Remove the row (rows below move up)', k:keyHint('mod+Backspace'), f:() => rowOp('remove'), off:!rowsOk}] : []),
     ...(onSong || full ? [{h:'Song blocks'}, it('clone', 'Clone (paste puts a unique copy)', 'mod+alt+C', {off:!onSong}), it('cldn', 'Clone down (into a new row below)', 'mod+shift+C', {off:!onSong}),
       {a:'dup', l:'Duplicate the pattern (insert below)', k:keyHint('mod+D'), f:() => dupKey(false), off:!onSong}, {a:'insp', l:'Insert paste (new rows below)', k:keyHint('mod+alt+V'), f:insertPaste, off:!onSong || !(clip && clip.v === 'song')},
       ...(onSong && !full ? [{a:'rmrow', l:'Remove the row (rows below move up)', k:keyHint('mod+shift+Backspace'), f:songRowRemove}] : [])] : []),
@@ -28973,8 +29003,9 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [406, '3 Nov', ['Command bar: REMOVE takes out the selected rows (or the cursor’s row) and the rows below move up, in a phrase, Pattern view, a sect or the song.', 'Settings: ARRANGE ON STOP, the same choice as PHRASE ON STOP for Arrange; both say STAYS or PLAYHEAD.']],
   [405, '3 Nov', ['FX bar: each graph sits on a clean screen of its own (near white on light skins), and its animation plays only inside it, so the values stay clear.', 'Keys: on Phrase (Pattern view too) and Song, ⌥/Alt+▲▼ now go to the pattern above / below, as Shift+⌥+▲▼ do; elsewhere they still change screen.']],
-  [404, '3 Nov', ['FX bar: each effect’s animation now plays lightly over its graph instead of hiding behind it.', 'Settings: STOP CURSOR is now CURSOR ON STOP, with STAYS PUT or GOES TO PLAYHEAD.']],
+  [404, '3 Nov', ['FX bar: each effect’s animation now plays lightly over its graph instead of hiding behind it.', 'Settings: STOP CURSOR is now PHRASE ON STOP (STAYS or PLAYHEAD).']],
   [403, '3 Nov', ['Table engine: Starter tables… picks one of 30 ready-made tables (saws, squares, FM, voice, organ, bass, chip and more), made from the free Adventure Kid single-cycle waves.']],
   [402, '3 Nov', ['Table engine: Load wavetable… makes the pad’s own table (Table → Loaded), saved with the kit: Serum or WaveEdit tables, single-cycle waves (pick several to stack them) or any sound, cut into cycles.']],
   [401, '3 Nov', ['Side panel: instrument names show in full: a size smaller, and a long one takes a second line (hover still shows the pad).', 'FX bar: the pitch animation shows every voice, so the Harmonizer’s two intervals both show, each as bright as its level.']],
