@@ -6,3 +6,4 @@ tests/golden/out/
 electron/link/
 link/sdk/
 link/build/
+tests/sweep/out/
