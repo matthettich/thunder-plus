@@ -1750,10 +1750,14 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkFxBar .dkfc .fviz{flex:1 1 0; min-height:0; position:relative; margin:0 6px 6px}
 /* SPRING (owner, 3 Nov): a spring reverb's column has its springs drawn behind its values (dkSpring), hanging down the
    box and shaking with the sound; the values sit over them with a halo of the panel colour so they stay readable. */
-#dkFxBar .dkfc canvas.fspr{position:absolute; left:0; width:100%; pointer-events:none; z-index:0; display:block}
-#dkFxBar .dkfc.spr .fcb, #dkFxBar .dkfc.spr .fviz{position:relative; z-index:1}
+/* ON TOP (owner, 3 Nov: "display the animations lightly on top of the orange visuals… it would make the animations look
+   intentional"): the canvas sits over the graph box (.fviz) instead of behind it, under the values (.fcb). Its marks are
+   already faint ink, so they read as a light layer over the curve; it never takes clicks. */
+#dkFxBar .dkfc canvas.fspr{position:absolute; left:0; width:100%; pointer-events:none; z-index:2; display:block; opacity:.6}
+#dkFxBar .dkfc.spr .fviz{position:relative; z-index:1}
+#dkFxBar .dkfc.spr .fcb{position:relative; z-index:3}
 #dkFxBar .dkfc.spr .fr:not(.sel) b, #dkFxBar .dkfc.spr .fr:not(.sel) span{text-shadow:0 0 3px var(--panel), 0 0 2px var(--panel), 0 0 1px var(--panel)}
-#dkFxBar .dkfc.spr.off canvas.fspr{opacity:.4}
+#dkFxBar .dkfc.spr.off canvas.fspr{opacity:.25}
 #dkFxBar .dkfc .fviz canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
 #dkFxBar .dkfc.off .fviz{opacity:.4}
 #dkFxBar .dkfc.dyn .fcb, #dkFxBar .dkfc.dyn .fviz{margin-right:44px}
@@ -20715,7 +20719,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 403;
+const BUILD = 404;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -21484,8 +21488,8 @@ function projRows(){
       info:() => 'In a phrase. TRACKS (as Renoise): Tab / Shift+Tab go to the next / previous track’s phrase. COLUMNS: they step note → instrument → FX1 → FX2 → FX3, so the instrument is one press away'},
     {l:'RESUME', ck:'Playback resumes from pause', get:() => resumeOn ? 1 : 0, set:v => setResume(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'ON: after you stop the song, PLAY carries on from where it stopped (the playhead stays there to show it), unless you have moved the cursor since. OFF: PLAY starts from the cursor, as before. Either way the stopped spot stays lit'},
-    {l:'STOP CURSOR', segs:true, get:() => stopCurOn ? 1 : 0, set:v => setStopCur(!!v), min:0, max:1, d:1, fmt:v => v ? 'THERE' : 'STAYS',
-      info:() => 'THERE: when you stop the song, the edit cursor goes to where it stopped (the song row, your track’s phrase and step), ready to edit. STAYS: the cursor stays where you left it. STOP twice still goes to the top; Alt+G puts the cursor on the playhead at any time'},
+    {l:'CURSOR ON STOP', segs:true, get:() => stopCurOn ? 1 : 0, set:v => setStopCur(!!v), min:0, max:1, d:1, fmt:v => v ? 'GOES TO PLAYHEAD' : 'STAYS PUT',   // CLEARER (owner, 3 Nov: "what is this supposed to communicate?"): was STOP CURSOR, STAYS / THERE
+      info:() => 'Where the edit cursor goes when you stop the song. STAYS PUT: it stays where you were editing. GOES TO PLAYHEAD: it jumps to where the song stopped (the song row, your track’s phrase and step), ready to edit there. STOP twice still goes to the top; Alt+G puts the cursor on the playhead at any time'},
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. A poly track shows its whole chord: all four notes when there is room (unfolded, desktop), otherwise one letter per voice (capital = natural, small = sharp, so CEGa is C E G A#; · is an empty voice, × a note off). Only to look at; they can’t be edited'},
     {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText({title:'Rename the song'}, S.name, 40, 'Rename'); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); } }, info:() => 'EDIT renames the song'},
@@ -28953,6 +28957,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [404, '3 Nov', ['FX bar: each effect’s animation now plays lightly over its graph instead of hiding behind it.', 'Settings: STOP CURSOR is now CURSOR ON STOP, with STAYS PUT or GOES TO PLAYHEAD.']],
   [403, '3 Nov', ['Table engine: Starter tables… picks one of 30 ready-made tables (saws, squares, FM, voice, organ, bass, chip and more), made from the free Adventure Kid single-cycle waves.']],
   [402, '3 Nov', ['Table engine: Load wavetable… makes the pad’s own table (Table → Loaded), saved with the kit: Serum or WaveEdit tables, single-cycle waves (pick several to stack them) or any sound, cut into cycles.']],
   [401, '3 Nov', ['Side panel: instrument names show in full: a size smaller, and a long one takes a second line (hover still shows the pad).', 'FX bar: the pitch animation shows every voice, so the Harmonizer’s two intervals both show, each as bright as its level.']],
