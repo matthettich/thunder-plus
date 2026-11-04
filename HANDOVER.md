@@ -138,6 +138,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (45): bolder bus frame in Arrange (build 418, on `beta`)
+
+- Owner: "can we make the bus outline a little more pronounced? It's around track 8 but hard to see". `.agbus`: 2 px at 90 %
+  ink (was 1 px at 65 %), radius 4, and a 1 px panel-colour halo outside and inside so it reads over filled blocks.
+- Owner: "can it end at the top mono bar instead of sitting on top of it?" arrBoxes: the frame's top is now the lower of
+  the track number's top and the group bar's bottom (`#tArrGp`), so it starts under MONO / POLY.
+
 ## 3 Nov (44): END / JMP; …pump CHAIN menu (build 417, on `beta`)
 
 - Owner: "do we have a stop song command?" → "let's add the end command". FXC gets **END** and **JMP** at the end (saved
