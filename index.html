@@ -72,8 +72,8 @@ body:not(.menuhelp) #gsecProj > p.note{display:none}
 body:not(.menuhelp) :is(#pMaster,#pApp,#pKit,#pSkin,#pMidi,#pExport,#pAudio) .pbody > p.note{display:none}
 body:not(.menuhelp) :is(#pMaster,#pApp,#pKit,#pSkin,#pMidi,#pExport,#pAudio) .bar{cursor:help}
 /* FX SCREEN: the slot being edited, highlighted; a slot dragged to another one */
-.tscr .tgrid .ln.fxsel{background:color-mix(in srgb, #ff5a1f 16%, transparent); box-shadow:inset 4px 0 0 #ff5a1f} .tscr .tgrid .ln.fxsel span{font-weight:700}
-.tscr .tgrid .ln.fxdrag{opacity:.5} .tscr .tgrid .ln.fxdrop{box-shadow:inset 0 -3px 0 #ff5a1f, inset 0 3px 0 #ff5a1f}
+.tscr .tgrid .ln.fxsel{background:color-mix(in srgb, var(--fxac, #ff5a1f) 16%, transparent); box-shadow:inset 4px 0 0 var(--fxac, #ff5a1f)} .tscr .tgrid .ln.fxsel span{font-weight:700}
+.tscr .tgrid .ln.fxdrag{opacity:.5} .tscr .tgrid .ln.fxdrop{box-shadow:inset 0 -3px 0 var(--fxac, #ff5a1f), inset 0 3px 0 var(--fxac, #ff5a1f)}
 body.edoff #tGrid{box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--rec, #d0302a) 70%, transparent)}
 /* EDIT OFF, easier to see (owner, 2 Nov: "make something look different when you push escape and turn off edit"): on the
    Phrase screen (where it applies) the cursor turns hollow, a dashed red box instead of the filled block, the notes dim a
@@ -1735,8 +1735,8 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkFxBar .dkfc{flex:1 1 230px; max-width:300px; min-width:150px; position:relative; border:1.5px solid var(--line); background:var(--panel); color:var(--ink); box-shadow:4px 4px 0 0 #fff, 4px 4px 0 1.5px var(--line)}
 #dkFxBar .dkfc .fch{background:var(--ink); color:var(--inv); border-bottom:0; min-height:26px; padding:0 8px; gap:8px}
 #dkFxBar .dkfc .fch .fon{width:12px; height:12px; min-width:0; min-height:0; border-radius:0; border:2px solid currentColor; background:transparent; box-shadow:none}
-#dkFxBar .dkfc .fch .fon.on{background:#ff5a1f !important; border-color:#ff5a1f !important; box-shadow:none !important}
-#dkFxBar .dkfc .fch .fon{position:relative} #dkFxBar .dkfc .fch .fon.on::after{content:''; position:absolute; inset:1px; background:#ff5a1f}   /* (a skin's button.on fill would hide it) */
+#dkFxBar .dkfc .fch .fon.on{background:var(--fxac, #ff5a1f) !important; border-color:var(--fxac, #ff5a1f) !important; box-shadow:none !important}
+#dkFxBar .dkfc .fch .fon{position:relative} #dkFxBar .dkfc .fch .fon.on::after{content:''; position:absolute; inset:1px; background:var(--fxac, #ff5a1f)}   /* (a skin's button.on fill would hide it) */
 #dkFxBar .dkfc .fch .fnm{color:inherit; background:transparent; border:0; box-shadow:none; padding:0; min-height:0; height:auto; font-size:var(--fs-3); letter-spacing:.06em; text-align:left; cursor:pointer}
 #dkFxBar .dkfc .fch .fnm:hover{text-decoration:underline}
 #dkFxBar .dkfc.off .fch{background:repeating-linear-gradient(135deg, var(--panel2) 0 6px, var(--track) 6px 12px); color:var(--muted)}
@@ -1768,7 +1768,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkFxBar .dkadd{flex:0 0 96px; align-self:stretch; border:1.5px dashed var(--line); background:transparent; color:var(--ink); font-weight:700; font-size:var(--fs-3); letter-spacing:.06em; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px}
 #dkFxBar .dkadd small{font-family:var(--mono); font-weight:400; font-size:var(--fs-1); color:var(--muted)}
 #dkFxBar .dkadd:hover{background:var(--panel)}
-#dkFxBar .dkfc .fch{cursor:grab} #dkFxBar .dkfc.dragging{opacity:.55} #dkFxBar .droptgt{outline:3px solid #ff5a1f; outline-offset:2px}
+#dkFxBar .dkfc .fch{cursor:grab} #dkFxBar .dkfc.dragging{opacity:.55} #dkFxBar .droptgt{outline:3px solid var(--fxac, #ff5a1f); outline-offset:2px}
 /* …CHAINS RAIL (3 Nov, FX bar): the track's …chains modules in signal order as small blocks on the same dock and offset
    blocks as the effects beside it (deckChains / deckChnFold, dkChnRail). IN and OUT are plain tags at the ends; a block's
    square light is on (orange) or bypassed (hollow, hatched). Folded …CHAINS: a narrow rail beside the title. */
@@ -1781,7 +1781,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
   border:1.5px solid var(--line); background:var(--panel); color:var(--ink); box-shadow:3px 3px 0 0 #fff, 3px 3px 0 1.5px var(--line); font:inherit; font-weight:700; letter-spacing:.04em; text-align:left; cursor:pointer}
 .dkcrail .dkcb span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0}
 .dkcrail .dkcb .fon{flex:none; width:10px; height:10px; border:2px solid currentColor; box-sizing:border-box}
-.dkcrail .dkcb .fon.on{background:#ff5a1f; border-color:#ff5a1f}
+.dkcrail .dkcb .fon.on{background:var(--fxac, #ff5a1f); border-color:var(--fxac, #ff5a1f)}
 .dkcrail .dkcb.off{background:repeating-linear-gradient(135deg, var(--panel2) 0 6px, var(--track) 6px 12px); color:var(--muted)}
 .dkcrail .dkcb:hover span{text-decoration:underline}
 .dkcrail.chnoff .dkcb{opacity:.55}
@@ -13765,12 +13765,29 @@ function alignTabs(){
 addEventListener('resize', () => requestAnimationFrame(alignTabs));
 try { new ResizeObserver(() => requestAnimationFrame(alignTabs)).observe(document.getElementById('tTabs')); } catch(e){}
 try { document.fonts.ready.then(() => alignTabs()); } catch(e){}
+/* SKIN ACCENT FOR THE FX BAR (owner, 3 Nov: "the fx bar doesn't match the skin's accent colors"): its on-switches, graphs,
+   curves and animations used one fixed orange. Each skin's accent is read from its swatch dots: the most coloured one (chroma) that
+   stands out from its background (the third dot breaks ties, the usual accent); a skin with no such colour (Monotone, the
+   greys, Pastel) uses its ink. CSS gets it as --fxac, the FX bar's canvases through fxAc(). */
+let fxAcV = '#ff5a1f';
+const fxAc = () => fxAcV;
+function skinAccent(sk){
+  const rgb = h => { const m = /^#?([0-9a-f]{6})$/i.exec(h || ''); if (!m) return null; const n = parseInt(m[1], 16); return [n >> 16 & 255, n >> 8 & 255, n & 255].map(v => v / 255); };
+  const lum = c => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  const D = (sk && sk.dots) || [], bg = rgb(D[0]); if (!bg) return null;
+  let best = null, bs = 0;
+  D.slice(1).forEach((h, i) => { const c = rgb(h); if (!c) return; const ch = Math.max(...c) - Math.min(...c), dl = Math.abs(lum(c) - lum(bg)); if (ch < 0.3 || dl < 0.08) return;   // chroma: how coloured, not how pale
+    const sc = ch + Math.min(dl, 0.4) + (i === 1 ? 0.08 : 0); if (sc > bs){ bs = sc; best = h; } });
+  return best;
+}
 function applySkin(id){
   const sk = SKINS.find(k => k.id === id) || SKINS[2]; skin = sk.id;
   const de = document.documentElement;
   if (sk.id === 'minimal'){ de.removeAttribute('data-skin'); de.removeAttribute('data-skinbase'); }
   else { de.setAttribute('data-skin', sk.id); de.setAttribute('data-skinbase', sk.base || sk.id); }
   try { localStorage.setItem(SKK, sk.id); } catch(e){}
+  { let ac = skinAccent(sk); if (!ac) try { ac = getComputedStyle(de).getPropertyValue('--ink').trim(); } catch(e){}   // SKIN ACCENT FOR THE FX BAR
+    fxAcV = ac || '#ff5a1f'; de.style.setProperty('--fxac', fxAcV); }
   document.querySelectorAll('#skins .skin').forEach(b => b.setAttribute('aria-checked', String(b.dataset.id === sk.id)));
   try { drawWave(); renderPads(); } catch(e){}
   rbWheel();
@@ -20741,7 +20758,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 412;
+const BUILD = 413;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25511,7 +25528,7 @@ function dkDynMeters(cv, f, k, node, now){
     g.fillStyle = 'rgba(128,128,128,.22)'; g.fillRect(x, top, bw, bh);
     if (i === 1){   // GR hangs from the top: 0 to 24 dB (the level-only effects: the change, ±12 dB)
       const fr = lv ? Math.min(1, Math.abs(v) / 12) : Math.min(1, Math.max(0, -v) / FXD_GR), hf = lv ? Math.min(1, Math.abs(hv) / 12) : Math.min(1, Math.max(0, -hv) / FXD_GR);
-      g.fillStyle = '#ff5a1f'; g.fillRect(x, top, bw, Math.round(fr * bh));
+      g.fillStyle = fxAc(); g.fillRect(x, top, bw, Math.round(fr * bh));
       g.fillStyle = ink; g.fillRect(x, top + Math.round(hf * bh) - 1, bw, 2);
     } else {
       const y = lvY(v), hy = lvY(hv);
@@ -25523,9 +25540,9 @@ function dkDynMeters(cv, f, k, node, now){
     g.fillText(i !== 1 && hv <= FXD_LO ? '−∞' : (val > .05 ? '+' : val < -.05 ? '−' : '') + Math.abs(val).toFixed(i === 1 ? 1 : 0), x + bw / 2, bot + 3);
   });
   if (c && c.thr != null){   // THRESHOLD across IN and OUT, labelled
-    const ty = Math.round(lvY(c.thr)) + .5; g.strokeStyle = '#ff5a1f'; g.lineWidth = 1.5; g.setLineDash([3, 2]);
+    const ty = Math.round(lvY(c.thr)) + .5; g.strokeStyle = fxAc(); g.lineWidth = 1.5; g.setLineDash([3, 2]);
     g.beginPath(); g.moveTo(0, ty); g.lineTo(bw, ty); g.moveTo(2 * (bw + gap), ty); g.lineTo(W, ty); g.stroke(); g.setLineDash([]);
-    g.fillStyle = '#ff5a1f'; g.textAlign = 'left'; g.font = '700 7px ' + font; g.fillText('T', bw + 1, Math.max(top, ty - 4));
+    g.fillStyle = fxAc(); g.textAlign = 'left'; g.font = '700 7px ' + font; g.fillText('T', bw + 1, Math.max(top, ty - 4));
   }
 }
 /* PICTURES BY EFFECT TYPE (owner, 2 Nov: "the visual displays are mostly the same… something helpful for each"): drawn
@@ -25583,7 +25600,7 @@ function dkAnim(col, f, now, lv){
   const bx = dkAnimBox(col, cv); if (!bx) return; const W = bx.W, H = bx.H;
   const dpr = devicePixelRatio || 1; if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-  const v = (re, d) => { const x = dkFxVal(f, re); return x == null ? d : x; }, C = fxDynPal(), ink = a => 'rgba(' + C.ink + ',' + a + ')', AC = '#ff5a1f';
+  const v = (re, d) => { const x = dkFxVal(f, re); return x == null ? d : x; }, C = fxDynPal(), ink = a => 'rgba(' + C.ink + ',' + a + ')', AC = fxAc();
   const dt = A.t ? Math.min(0.1, (now - A.t) / 1000) : 0; A.t = now; const ts = now / 1000;
   const dec = v(/decay|time|size|length|feed|fb|regen|sustain/i, .5), tau = 0.12 + dec * 2.4;
   A.e = Math.max(f.on ? Math.min(1, (lv || 0) * 1.4) : 0, A.e * Math.exp(-dt / tau)); const e = A.e;
@@ -25735,7 +25752,7 @@ function dkSpring(col, f, now, lv){
   // the kick: follows the level up at once, dies away over DECAY (0.15–3 s)
   const dt = S2.t ? Math.min(0.1, (now - S2.t) / 1000) : 0; S2.t = now;
   const tau = 0.15 + dec * 2.85; S2.e = Math.max(f.on ? Math.min(1, (lv || 0) * 1.4) : 0, S2.e * Math.exp(-dt / tau));
-  const C = fxDynPal(), ink = 'rgba(' + C.ink + ',', AC = '#ff5a1f', e = S2.e, ts = now / 1000;
+  const C = fxDynPal(), ink = 'rgba(' + C.ink + ',', AC = fxAc(), e = S2.e, ts = now / 1000;
   const coils = Math.round(14 + ten * 22), R = Math.min(W / (nS * 2 + 1) * 0.55, 18), y0 = 10, y1 = H - 10, L = y1 - y0, k = 2 * Math.PI * coils / L;
   const spd = 3 + ten * 9, A = (2 + 7 * e) * (1 - ten * 0.4);   // the wave's speed down the coil and its size
   for (let j = 0; j < nS; j++){
@@ -25771,10 +25788,10 @@ function dkFxVal(f, re){ const D = TFX[f.type]; if (!D || !D.ps) return null; co
 function dkFxPic(g, W, H, f, C, F, font, now, lvNow){
   if (!f || isPumpT(f.type)) return false;
   const grp = fxtGroup(f.type), v = re => dkFxVal(f, re), pad = 6, x0 = pad, x1 = W - pad, y0 = 12, y1 = H - 8, w = x1 - x0, h = y1 - y0;
-  const label = t => { g.font = '600 9px ' + font; g.textBaseline = 'top'; g.fillStyle = F(.55); g.fillText(t, 4, 2); g.fillStyle = '#ff5a1f'; };
-  const grid = () => { g.strokeStyle = F(.1); g.lineWidth = 1; g.beginPath(); for (let q = 1; q < 4; q++){ const y = Math.round(y0 + h * q / 4) + .5; g.moveTo(x0, y); g.lineTo(x1, y); } g.stroke(); g.strokeStyle = g.fillStyle = '#ff5a1f'; g.lineWidth = 1.8; };
+  const label = t => { g.font = '600 9px ' + font; g.textBaseline = 'top'; g.fillStyle = F(.55); g.fillText(t, 4, 2); g.fillStyle = fxAc(); };
+  const grid = () => { g.strokeStyle = F(.1); g.lineWidth = 1; g.beginPath(); for (let q = 1; q < 4; q++){ const y = Math.round(y0 + h * q / 4) + .5; g.moveTo(x0, y); g.lineTo(x1, y); } g.stroke(); g.strokeStyle = g.fillStyle = fxAc(); g.lineWidth = 1.8; };
   const level = () => { g.fillStyle = '#4fd18a'; g.globalAlpha = .8; g.fillRect(x0, H - 4, w * clamp(lvNow || 0, 0, 1), 3); g.globalAlpha = 1; };
-  const AC = '#ff5a1f'; g.lineWidth = 1.8; g.strokeStyle = AC; g.fillStyle = AC;
+  const AC = fxAc(); g.lineWidth = 1.8; g.strokeStyle = AC; g.fillStyle = AC;
   if (grp === 'Delays'){
     const tm = v(/time|delay|rate|^del/i), fb = v(/feed|fb|repeat|regen/i); if (tm == null) return false;
     grid(); label('ECHOES'); const step = w * (0.08 + 0.32 * tm), k = fb == null ? 0.5 : 0.15 + 0.8 * fb;
@@ -26055,7 +26072,7 @@ function dkFxResp(col, cv, g, W, H, f, font){
   if (col._rk === key) return true;
   const now = performance.now(); if (col._rk && now - (col._rt || 0) < 90) return true;   // while a value is dragged: at most ~11 pictures a second
   col._rk = key; col._rt = now; dkFxCurveN++;
-  const F = a => 'rgba(' + C.ink + ',' + a + ')', AC = '#ff5a1f', pad = 6, x0 = pad, x1 = W - pad, y0 = 14, y1 = H - 13, w = x1 - x0, h = y1 - y0;
+  const F = a => 'rgba(' + C.ink + ',' + a + ')', AC = fxAc(), pad = 6, x0 = pad, x1 = W - pad, y0 = 14, y1 = H - 13, w = x1 - x0, h = y1 - y0;
   g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
   const txt = (s, x, y, al, a, sz = 9, wt = 600) => { g.font = wt + ' ' + sz + 'px ' + font; g.textBaseline = 'top'; g.textAlign = al; g.fillStyle = F(a); g.fillText(s, x, y); };
   const tp = dkFxTaps(f, sr, bpm);
@@ -26134,13 +26151,13 @@ function dkFxPat(col, cv, g, W, H, f, k, font){
   if (beat != null && L){   // the playhead: where in the bar the song is now (and, on a time map, the point it plays from)
     const p = ((beat % 4) + 4) % 4, x = L.x0 + p / 4 * L.w;
     g.fillStyle = 'rgba(' + C.ink + ',.85)'; g.fillRect(Math.round(x) - 1, L.y0, 2, L.y1 - L.y0);
-    if (L.fx && st.on && !st.wait){ const y = L.fx(p); if (y != null){ g.beginPath(); g.arc(x, y, 3, 0, 7); g.fillStyle = '#ff5a1f'; g.fill(); } }
+    if (L.fx && st.on && !st.wait){ const y = L.fx(p); if (y != null){ g.beginPath(); g.arc(x, y, 3, 0, 7); g.fillStyle = fxAc(); g.fill(); } }
   }
   return true;
 }
 // The still part of the picture; returns where the playhead goes ({x0, w, y0, y1, fx: bar position → y of the point})
 function dkFxPatDraw(g, W, H, f, st, C, font, bar){
-  const F = a => 'rgba(' + C.ink + ',' + a + ')', AC = '#ff5a1f', dim = !st.on || st.wait, A0 = dim ? .35 : 1;
+  const F = a => 'rgba(' + C.ink + ',' + a + ')', AC = fxAc(), dim = !st.on || st.wait, A0 = dim ? .35 : 1;
   const pad = 5, x0 = pad, x1 = W - pad, w = x1 - x0, y0 = 23, ln = Math.max(6, Math.min(14, Math.round(H * 0.16))), yL1 = H - 4, yL0 = yL1 - ln, y1 = yL0 - 4, h = Math.max(6, y1 - y0);
   g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
   const txt = (s, x, y, al, a, sz = 9, wt = 600) => { g.font = wt + ' ' + sz + 'px ' + font; g.textBaseline = 'top'; g.textAlign = al; g.fillStyle = F(a); g.fillText(s, x, y); };
@@ -29081,6 +29098,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [413, '3 Nov', ['FX bar: its on-switches, graphs, curves and animations use the skin’s own accent colour instead of one fixed orange (M8 cyan, Bauhaus red, Matrix green…); skins without one use their ink.']],
   [412, '3 Nov', ['Effect commands: an FLX 00 (or any FXO / GAT / RTG) above a later one is no longer lost when the effect is built as the song starts, so the effect stays off until the later command.', 'Phrase: Enter twice on an effect’s value (the number beside it) opens the effect list too.']],
   [411, '3 Nov', ['Phrase / Pattern view: ⌥/Alt+▲▼ step from the pattern on screen, even when Arrange’s cursor is somewhere else (Arrange holding the keys, PIN, or a phrase used in more than one place); the keys go back to the phrase.']],
   [410, '3 Nov', ['…chains: moving a Track In / Chain Out to another track (or deleting it) switches the old track’s CHN off, so the Mixer no longer shows MISS for it and the track plays as before.']],

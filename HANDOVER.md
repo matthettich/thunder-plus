@@ -119,6 +119,17 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (40): the FX bar in the skin's accent (build 413, on `beta`)
+
+- Owner: "the fx bar doesn't match the skin's accent colors". Skins have no accent variable, so `skinAccent(sk)` reads
+  it from the skin's SKINS `dots`: of dots 1–3, the highest chroma (≥ 0.3) that differs from dots[0] (the background) in
+  luminance by ≥ 0.08, plus a little for dots[2] (usually the accent); none → the skin's `--ink`. `applySkin` sets
+  `fxAcV` / `fxAc()` and `--fxac` on :root. Swapped for the fixed #ff5a1f: the FX bar's on-switch, drop outline and
+  …chains rail switch (CSS), the FX screen's edited-slot highlight and drop line, and every canvas in dkAnim, dkSpring,
+  dkDynMeters, dkFxResp, dkFxPic, dkFxPat, dkFxPatDraw. Elsewhere the orange stays (OFF-only blocks, the brand mark…).
+  Results: IDM #ff4d00, M8 #2ce0f0, Matrix #00ff41, Neon #00f0ff, Bauhaus #d7261e, DX7 #5bbfae; Pastel, Monotone, the
+  greys, Plum and Winter use ink. Checked headless in IDM, M8, Bauhaus.
+
 ## 3 Nov (39): pending effect commands kept in order; Enter twice on an effect value (build 412, on `beta`)
 
 - Owner: "the flx command i dropped in the pattern seems to take effect above it when played … I have a flx 00 above the
