@@ -140,6 +140,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (46): bus bars from the group bar (build 419, on `beta`)
+
+- Owner: "make the bar end at the black mono bar, instead of curving around… two black bars heading down from the mono
+  bar… the same from poly down in poly's color". `.agbus` is now left/right borders only (2 px, no top, no radius; the
+  panel-colour halo removed at the owner's ask) in `--abc`; arrBoxes sets `--abc` to the bus's group tab's computed background (`#tArrGp b.gm` /
+  `b.gp`, so it follows the skin) and starts the bars at that tab's bottom. Checked on the Song screen and beside Phrase.
+
 ## 3 Nov (45): bolder bus frame in Arrange (build 418, on `beta`)
 
 - Owner: "can we make the bus outline a little more pronounced? It's around track 8 but hard to see". `.agbus`: 2 px at 90 %
