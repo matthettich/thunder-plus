@@ -119,6 +119,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (31): FX bar animations over the graphs; CURSOR ON STOP (build 404, on `beta`)
+
+- Owner: "display the animations lightly on top of the orange visuals in fx … it would make the animations look
+  intentional". `canvas.fspr` is now z-index 2 (over `.fviz`, 1) and under the values (`.fcb`, 3), at opacity .6
+  (.25 when the slot is off). It still never takes clicks. Drawing code unchanged.
+- Owner, on STOP CURSOR (STAYS / THERE): "what is this language supposed to communicate?". Renamed in Settings to
+  **CURSOR ON STOP**: STAYS PUT (default, `stopCurOn` false) / GOES TO PLAYHEAD; info and README reworded. Same key
+  (`thunderplus-stopcur-v2`), so nobody's choice changes. Code comments still say STOP CURSOR.
+
 ## 3 Nov (30): starter wavetables from AKWF (build 403, on `beta`)
 
 Owner: "Build a starter set in" (after build 402's Load wavetable…).
