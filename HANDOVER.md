@@ -119,6 +119,20 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (33): REMOVE rows; ARRANGE ON STOP (build 406, on `beta`)
+
+- Owner: 'add a "remove" to the small control bar that "removes these rows" to selections'. `rowsRemove()` (above
+  toggleSel): Song → `songRowRemove()`; Phrase → the selected lines (selRect y0..y1, or the cursor row) of cPhrase within
+  its LEN, blank rows in at the end (rowOp's rule); a Pattern view selection (`selA.pat`) also does every `patParts()`
+  phrase; Sect → its rows. One saveS (undo). Command id `rrow`, label REMOVE, after CLEAR in CMDS / CMD_MINI_ORDER; hidden
+  in PAD mode (its packed phone row). Edit ▾ shows "Remove these rows" in place of "Remove the row" while selecting (that
+  one cleared instead). Ctrl/⌘+Backspace with a selection still clears (unchanged). Checked headless: rows 2–3 out, the
+  rest up, undo back.
+- Owner: "add a similar setting … that does the same thing in the arrange window" and "change the text to Stays and
+  Playhead". Settings: **PHRASE ON STOP** (was CURSOR ON STOP, `stopCurOn`, key unchanged) and new **ARRANGE ON STOP**
+  (`stopArrOn`, key `thunderplus-stoparr-v1`, default STAYS), both STAYS / PLAYHEAD. `stopToPlayhead()` picks: Arrange's
+  when tv is 'song' or Arrange has the keys (`apF === 'arr'`), else Phrase's. The move itself is curToPlay as before.
+
 ## 3 Nov (32): FX graph screens, animations inside them; ⌥▲▼ between patterns (build 405, on `beta`)
 
 - Owner: "the orange graphics in the fx should be over white backgrounds so that it looks less jumbled" → "do that change".
