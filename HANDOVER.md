@@ -119,6 +119,17 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (43): UNIQUE PER TRACK (build 416, on `beta`)
+
+- Owner: "make a unique pattern if copying from one track to another, I'll probably mess that up all the time if not.
+  Maybe we make it a setting". `SX.uniq` (key `thunderplus-uniqtrack-v1`, default on; Settings → UNIQUE PER TRACK, after
+  ROW COLOUR IN PATTERN): `blockMixed` also counts another TRACK using the block, so setCell('song') gives it a copy
+  (mstUniq) wherever it lands — typing, paste, clone, drag, generators. Down its own track it stays shared. A drag that
+  moves a track's only use of a block to another track also renumbers it (the source cell is cleared after the copy):
+  harmless, same contents. The master column rule (414) holds whatever this is set to.
+- Checked headless on the owner's song: track 1's block onto track 16 → 2DE; again on track 1 → shared; setting off →
+  shared on track 15.
+
 ## 3 Nov (42): warn on a phrase shared between tracks (build 415, on `beta`)
 
 - Owner: "If the same phrase is used on multiple tracks, can we throw up a similar error?" `mstShareWarn` also warns

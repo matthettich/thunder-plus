@@ -20758,7 +20758,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 415;
+const BUILD = 416;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -21065,13 +21065,18 @@ function getCell(v, x, y){
    - typing into a phrase the master column shares with tracks (an older song) says so once (mstShareWarn). */
 const mstShared = new Set();   // phrases already warned about this session
 let mstUniqIn = false;
+// UNIQUE PER TRACK (owner, 3 Nov: "make a unique pattern if copying from one track to another, I'll probably mess that up
+// all the time… Maybe we make it a setting"): with SX.uniq on (the default) a block also gets its own copy when another
+// TRACK already uses it. The same block down its own track (repeats) stays shared.
 function blockMixed(cid, x, y){
-  const isM = x === MT;
+  const isM = x === MT, uq = !isM && SX.uniq;
   for (let r = 0; r < 256; r++){ const row = S.song[r]; if (!row) continue;
     if (isM){ for (let t = 0; t < MT; t++) if (row[t] === cid) return true; }
-    else if (row[MT] === cid && r !== y) return true; }
+    else { if (row[MT] === cid && r !== y) return true;
+      if (uq) for (let t = 0; t < MT; t++) if (t !== x && row[t] === cid) return true; } }
   return false;
 }
+const blockOnMst = cid => S.song.some(r => r && r[MT] === cid);
 function mstUniq(src){   // newBlock's copy (a new sect and new phrases), without moving the cursor or saying anything
   let cid = freeSectNear(src); if (cid < 0) cid = freeSect(); if (cid < 0) return -1;
   S.chains[cid] = clone(S.chains[src] || freshSect());
@@ -21108,7 +21113,7 @@ function setCell(v, x, y, val){
     if (val >= 0 && !mstUniqIn && S.song[y][x] !== val && blockMixed(val, x, y)){
       mstUniqIn = true; try { const nc = mstUniq(val); if (nc >= 0){ const was = val; val = nc;
         setTimeout(() => toast(x === MT ? `Block ${hp(songShown(was))} is also on tracks, so the master column got its own copy, ${hp(songShown(nc))}: its VOL and FLX can't reach the tracks.`
-          : `Block ${hp(songShown(was))} is also in the master column, so this track got its own copy, ${hp(songShown(nc))}.`, 5000), 60); } } finally { mstUniqIn = false; } }
+          : `Block ${hp(songShown(was))} is also used ${blockOnMst(was) ? 'in the master column' : 'on another track'}, so this track got its own copy, ${hp(songShown(nc))}` + (blockOnMst(was) ? '.' : ' (Settings → UNIQUE PER TRACK).'), 5000), 60); } } finally { mstUniqIn = false; } }
     S.song[y][x] = val; if (val < 0 && x < MT) setBlockMute(y, x, false); }
   else if (v === 'sect'){ sectRowEdit(cSect, y)[x] = val; }
   else { if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase(); S.phrases[cPhrase][y][x] = val; if (val >= 0) mstShareWarn(cPhrase); }
@@ -21554,6 +21559,8 @@ function projRows(){
       info:() => 'With SECTIONS on: the SECT lane also shows in Arrange beside the phrase (it takes a little of Arrange’s width), so section names are there while you edit. Off: only on the Song screen'},
     {l:'ROW COLOUR IN PATTERN', ck:'Pattern view: right-click a row number to colour the song row', get:() => SX.pvcol ? 1 : 0, set:v => sxSet('pvcol', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'In Pattern view, right-click a row number (or SONG ROW in its bar) to colour this pattern’s song row, the same as right-clicking the row number in Arrange; SONG ROW then shows in that colour. Off: the right-click menu as usual'},
+    {l:'UNIQUE PER TRACK', ck:'A block put on another track gets its own copy', get:() => SX.uniq ? 1 : 0, set:v => sxSet('uniq', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'ON: a block pasted, cloned, dragged or typed onto a track when another track already uses it gets its own copy (new phrase numbers), so editing one never changes the other; the same block down its own track still repeats. OFF: tracks can share blocks, as before. The master column always keeps its own'},
     {l:'LOOP DRAG', ck:'Song: drag the row numbers to loop', get:() => SX.loop ? 1 : 0, set:v => sxSet('loop', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Drag down the Song screen’s row numbers to loop those rows (PLAY on this screen loops them; LOOP SEL turns it off). A tap still plays from that row'},
     {l:'SONG PEEK', ck:'Song: the phrase under the cursor beside it (not the dogs)', get:() => SX.peek ? 1 : 0, set:v => sxSet('peek', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
@@ -27112,11 +27119,11 @@ arrGrid.addEventListener('contextmenu', e => e.preventDefault());
    stageKind / stageLayout / stageCanvas, draw's peek refresh, the peek markup in #tStage, freshSong / normSong's
    `secs`, startScroll's skip). info() is wrapped inside this block.
    A song's sections (S.secs) stay in its file either way, and older versions just ignore them. */
-const SXK = {mouse:'thunderplus-songmouse-v1', secs:'thunderplus-songsecs-v1', loop:'thunderplus-loopdrag-v1', peek:'thunderplus-songpeek-v1', side:'thunderplus-songsecs-side-v1', pvcol:'thunderplus-pvrowcol-v1'};
+const SXK = {mouse:'thunderplus-songmouse-v1', secs:'thunderplus-songsecs-v1', loop:'thunderplus-loopdrag-v1', peek:'thunderplus-songpeek-v1', side:'thunderplus-songsecs-side-v1', pvcol:'thunderplus-pvrowcol-v1', uniq:'thunderplus-uniqtrack-v1'};
 const sxGet = (k, d) => { try { const v = localStorage.getItem(SXK[k]); return v == null ? d : v === '1'; } catch(e){ return d; } };
 // SECTIONS BESIDE PHRASE (owner, 3 Nov: an option, off by default): the SECT lane in Arrange beside the phrase too.
 // ROW COLOUR IN PATTERN (owner, 3 Nov: an option, on by default): right-click Pattern view's row numbers colours its song row.
-const SX = {mouse:sxGet('mouse', true), secs:sxGet('secs', true), loop:sxGet('loop', true), peek:sxGet('peek', false), side:sxGet('side', false), pvcol:sxGet('pvcol', true)};
+const SX = {mouse:sxGet('mouse', true), secs:sxGet('secs', true), loop:sxGet('loop', true), peek:sxGet('peek', false), side:sxGet('side', false), pvcol:sxGet('pvcol', true), uniq:sxGet('uniq', true)};   // UNIQUE PER TRACK (owner, 3 Nov), on
 function sxSet(k, on){ SX[k] = !!on; try { localStorage.setItem(SXK[k], on ? '1' : '0'); } catch(e){} arrSig = ''; arrBoxKey = ''; layoutSig = ''; arrLayout(true); draw(); stageLayout(); }
 const sxRect = () => selA && selA.v === 'song' ? selRect() : null;
 const sxIn = (r, y, t) => !!r && y >= r.y0 && y <= r.y1 && t >= r.x0 && t <= r.x1;
@@ -29148,6 +29155,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [416, '3 Nov', ['Settings → UNIQUE PER TRACK (on): a block pasted, cloned, dragged or typed onto a track when another track already uses it gets its own copy, so editing one never changes the other. The same block down its own track still repeats.']],
   [415, '3 Nov', ['Typing into a phrase that also plays on another track says so once, with how to give this track its own copy (UNIQ). The same phrase repeated down one track says nothing.']],
   [414, '3 Nov', ['Master column: a block placed there that tracks also use (or on a track when the master column uses it) gets its own copy, so the master’s VOL, FLX and FXO can’t reach the tracks, and theirs can’t reach the master.', 'Typing into a phrase that the master column already shares with tracks (an older song) says so once, with how to split it (UNIQ).']],
   [413, '3 Nov', ['FX bar: its on-switches, graphs, curves and animations use the skin’s own accent colour instead of one fixed orange (M8 cyan, Bauhaus red, Matrix green…); skins without one use their ink.']],
