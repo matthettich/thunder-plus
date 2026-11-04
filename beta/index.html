@@ -20805,7 +20805,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 422;
+const BUILD = 423;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29213,6 +29213,12 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [423, '4 Nov', ['Playing a phrase or a sect (Shift+Space, F6, PLAY on the Phrase screen) works again on the audio-thread sequencer.',
+    'Right-click on a track number in Arrange on the Song screen solos it without opening the Edit menu; in Pattern view the open track’s own band takes right-click solo, Alt-click mute and double-click name too.',
+    'The wheel keeps turning a Mixer VOL or OUT bar while the pointer stays still.',
+    'Render and export settings (rate, bits, normalise, + note) are remembered on this device.',
+    'Alt+S opens Song settings from the Synth page too.',
+    '…pump windows: value boxes and TUNE’s note sliders follow the same mouse rule as every other control (Shift fine, Ctrl/⌘ big steps, no jump).']],
   [422, '4 Nov', ['Blip: the filter no longer crackles or blows up with Filter near HP 8 kHz or a nearly open LP and low Resonance (also in …chains and …waves).']],
   [421, '3 Nov', ['Arrange: the bus bars sit in the gaps either side of the bus column, so they no longer cut into its blocks.']],
   [420, '3 Nov', ['Arrange: the bus bars no longer have a white edge.']],
@@ -30314,7 +30320,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
      is the shared window kit (sets PumpFX.openHook); multiband.js what BAND, WIDE and HEAT share (load it before them);
      one file per plugin (docs/PUMP-FX.md, "The pop-up kit"). A type without a file says its window comes later. Add new
      ones here, in sw.js FILES, with ?v= like these. -->
-<script src="pump/ui/kit.js?v=7"></script>
+<script src="pump/ui/kit.js?v=8"></script>
 <script src="pump/ui/eq.js?v=2"></script>
 <script src="pump/ui/comp.js?v=1"></script>
 <script src="pump/ui/limit.js?v=1"></script>
@@ -30327,7 +30333,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
 <script src="pump/ui/heat.js?v=1"></script>
 <script src="pump/ui/master.js?v=2"></script>
 <script src="pump/ui/gate.js?v=1"></script>
-<script src="pump/ui/tune.js?v=1"></script>
+<script src="pump/ui/tune.js?v=2"></script>
 <script src="pump/ui/chop.js?v=1"></script>
 <script>
 if ('serviceWorker' in navigator && location.protocol === 'https:'){
