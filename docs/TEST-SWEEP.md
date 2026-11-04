@@ -1,11 +1,11 @@
-# Full test sweep (4 Nov 2026, builds 421 → 424)
+# Full test sweep (4 Nov 2026, builds 421 → 425)
 
 Owner (3 Nov, night): "go through and test every feature and command… fix the bugs. I don't want anything we made
 deliberately function a certain way changed… report any clunky or awkward behaviour but don't fix those unless they are an
 obvious bug. Document everything."
 
 The sweep ran on `beta` from build 421 (`eba0f5c`), in headless Chrome and Node. Its scripts are in
-[`tests/sweep/`](../tests/sweep/README.md) and can be rerun. It found and fixed nine bugs (builds 422–424). After every build,
+[`tests/sweep/`](../tests/sweep/README.md) and can be rerun. It found and fixed ten bugs (builds 422–425). After every build,
 `npm test` passed (127, 1 skipped) and `tools/seq-golden.mjs` matched on both the main thread and `--core`. No golden output
 changed. Deliberate behaviour was checked against HANDOVER.md, the README and the owner notes in the code before each fix.
 
@@ -22,6 +22,7 @@ changed. Deliberate behaviour was checked against HANDOVER.md, the README and th
 | 7 | Render/export rate, bits, normalise and "+ note" were reset on every reload. | They were kept in memory only. Fix: they're stored in `thunderplus-export-v1`. | 423 · `4eb6726` |
 | 8 | Alt+S (Song settings) did nothing on the Synth page, against the 3 Nov "from any screen" decision. | Tracker-only key. Fix: added to the Synth-page key handler. | 423 · `0b5f169` |
 | 9 | …pump value boxes (`Field`) and TUNE note sliders jumped when Shift was pressed mid-drag, and ignored Ctrl/⌘ (TUNE fine was ×0.15). | They measured from the press. Fix: they now follow the one rule (`dragMul`): Shift ×0.1, Ctrl/⌘ ×4. | 423 · `80fa4fd` |
+| 10 | The strip PAN slider kept its old value after a drag, so after a track change, Undo or the Mixer, the next drag or wheel step jumped back. Found in the re-check run after the merge. | `stPan` kept focus and `deckStrip` skipped it while focused → it's now skipped only while `:active`. | 425 · `ed62264` |
 
 ## Found, not fixed (owner decisions)
 
@@ -59,6 +60,15 @@ changed. Deliberate behaviour was checked against HANDOVER.md, the README and th
 - **Low-contrast skins:** mustard and complement (~2.6:1), lcdgreen 3.3, greywhite 3.45, miami / citrus / sunset 3.6–3.9. The
   Phrase grid's empty-cell dashes are about 1:1 on most skins.
 - **`docs/MENU-AUDIT.md`** still lists proposals 2–5 as not built.
+
+## Re-check after the merge
+
+On merged `beta` (build 425): `commands.mjs` 185/185, `editing.mjs` 61/61, `files.mjs` 29/29, `mouse.mjs` 96/96 (after fix 10), `effects.mjs --only=ui,master` 176/176 (every effect UI and …pump window after the
+kit.js / tune.js fix). In
+`keys.mjs`, 139/140 pass. The one failure, "Ctrl+D on Phrase", reads the toast while an earlier toast is still showing; the
+duplicate itself and its "No empty mono track" refusal pass in `editing.mjs`. In `menus.mjs`, 573/576 pass. The 3 failures were
+also there before the sweep and are harness gaps, not app bugs: a "Phrases…" item that playwright reports as covered, and two
+selectors (Synth layer strip, side panel map) that need updating.
 
 ## Coverage
 

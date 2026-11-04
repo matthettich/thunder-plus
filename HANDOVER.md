@@ -149,7 +149,7 @@ offered the Drive integration and/or SoundFonts in the song file.
   bar is its own `.agbus` (a background, no border), centred in the gap between the bus column's header cell and its
   neighbour's (`#tArrTh i[data-t]` ±1), as wide as the gap up to 2 px; a column at the edge uses a 2 px gap.
 
-## 4 Nov (1): full test sweep; nine fixes (builds 422–424, on `beta`)
+## 4 Nov (1): full test sweep; ten fixes (builds 422–425, on `beta`)
 
 - Owner (3 Nov, night): test every feature and command, fix the bugs, don't change anything deliberate, report clunky
   behaviour without fixing it, document everything; fixes go into the beta. **Report: [`docs/TEST-SWEEP.md`](docs/TEST-SWEEP.md)**
@@ -158,9 +158,9 @@ offered the Drive integration and/or SoundFonts in the song file.
   PLAY on a phrase/sect on the core (`coreStart` passes track/phrase/sect; 423); Blip SVF stability cap (pads + chains, synced
   to waves; 422); Arrange track-number right-click no longer opens Edit; Pattern view open-track band takes solo/mute/name;
   Mixer bar wheel focus holds; render/export settings stored (`thunderplus-export-v1`); Alt+S on the Synth page; …pump Field
-  and TUNE NoteSlider on the one rule (423).
+  and TUNE NoteSlider on the one rule (423); the strip PAN slider no longer keeps a stale value after a drag (`:active`, 425).
 - Cache-busters now: `chains-worklet.js?v=43`, `waves-worklet.js?v=33`, `pump/ui/kit.js?v=8`, `pump/ui/tune.js?v=2`; cache
-  `thunderplus-v424`; CORE_REV `1wuhej6`.
+  `thunderplus-v425`; CORE_REV `1wuhej6`.
 - **Open for the owner** (details in the report): HOP code vs docs (low digit or whole value); Fold cover top bar overflow with
   the editors on; a toast when an effect node fails in a render; Ctrl+D listed twice in Edit ▾; Shift-wheel ratios; hot
   presets (Voice Laser choir / Buzz box, pVOX Talkbox lead, pSWIRL Metal comb, Phaser Deep 8-pole).
