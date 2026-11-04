@@ -119,6 +119,17 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (36): SWITCH TO …PUMP for older songs (build 409, on `beta`)
+
+- Owner: "when i open it from the mixer it is the old one but I thought we brought the pump fx over, including the auto
+  master" → "build it". Songs from before 358 have no `S.mstPump`, so MASTERING opens the old `#mstWin`. Its header now
+  has **SWITCH TO …PUMP** (`#mwPump` → `mstToPump()`): MST_PUMP into master slots 4–8 (the same slots `mstPumpFresh` uses;
+  slots aren't shifted, because FXO / FXV point at slot numbers), all on; `S.mst.on = false`, `S.mstPump = true`;
+  fxChanged(NT) + mstChanged; closes the old window and opens pump MASTER. Asks first (askSheet) and names any other
+  effects it would replace in those slots; a pump stage already in its own slot keeps its settings. One undo step.
+- Checked headless: old song with Room in slot 8 → the ask names it → slots 4–8 peq/pcalm/pcomp/ptone/pmaster, old off,
+  pump MASTER open; Ctrl+Z back to the old chain and the reverb.
+
 ## 3 Nov (35): duplicate track from the block menu; master OFF blocks (build 408)
 
 - Owner: "a right click option to duplicate a track, including the patterns/phrases in it … keep the mute behavior".
