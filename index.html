@@ -1266,8 +1266,11 @@ body.asong .tagrid .rn{text-align:right; padding-right:7px}
 .agbox.gm{--tk:var(--tk-mono)} .agbox.gp{--tk:var(--tk-poly)} .agbox.gx{--tk:var(--tk-mst)}
 /* BUS FRAME IN ARRANGE (owner, 3 Nov): one hairline box down each bus column, from its number to the bottom (it was an
    outline on every cell, which looked odd moving through a bus's empty blocks) */
-.agbus{position:absolute; box-sizing:border-box; border:2px solid color-mix(in srgb, var(--ar-ink, #111) 90%, transparent); border-radius:4px;
-  box-shadow:0 0 0 1px color-mix(in srgb, var(--ar-bg, #fff) 70%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--ar-bg, #fff) 55%, transparent)}   /* MORE PRONOUNCED (owner, 3 Nov: "hard to see"): 2 px in near-full ink, with a thin panel-colour halo either side so it reads over filled blocks */
+/* BUS BARS (owner, 3 Nov: "make the bar end at the black mono bar, instead of curving around… two black bars heading down
+   from the mono bar… the same from poly down in poly's color"): two straight 2 px bars down the bus column's sides from
+   the bottom of its MONO / POLY bar, in that bar's colour (--abc, set by arrBoxes), no top, no corners. */
+.agbus{position:absolute; box-sizing:border-box; border:solid var(--abc, var(--ar-ink, #111)); border-width:0 2px; border-radius:0;
+  box-shadow:-1px 0 0 0 color-mix(in srgb, var(--ar-bg, #fff) 70%, transparent), 1px 0 0 0 color-mix(in srgb, var(--ar-bg, #fff) 70%, transparent)}   /* MORE PRONOUNCED (owner, 3 Nov: "hard to see"): 2 px in near-full ink, with a thin panel-colour halo either side so it reads over filled blocks */
 body.asong .tagrid .rn, body.asong .tath{font-size:var(--fs-2)}
 /* The song selection in its own colour (owner, 21 Oct, mustard skin): it was the cursor's colour, which on the Simple and
    Matrix skins is the blocks' colour too, so a selection looked like more blocks. Amber, or sky blue on the amber and
@@ -20778,7 +20781,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 418;
+const BUILD = 419;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26880,8 +26883,11 @@ function arrBoxes(){
   const top = gp.top - a.top - 1, bot = g.bottom - a.top + 3; let html = '';
   // BUS FRAME (3 Nov): from the bus's number down to the bottom of the grid, a pixel outside its column (inside the clip)
   for (const i of buses){ const r = i.getBoundingClientRect(); if (!r.width) continue; const l = Math.max(r.left, g.left) - a.left - 2, rr = Math.min(r.right, g.right) - a.left + 2; if (rr - l < 4) continue;
-    const t0 = Math.max(r.top - a.top - 2, gp.bottom - a.top + 1), b0 = g.top - a.top + arrGrid.clientHeight + 1;   // (owner, 3 Nov) it starts under the MONO / POLY bar, not on it
-    html += `<div class="agbus" style="left:${l.toFixed(1)}px;top:${t0.toFixed(1)}px;width:${(rr - l).toFixed(1)}px;height:${(b0 - t0).toFixed(1)}px"></div>`; }
+    // BUS BARS: from the bottom of the group bar (they meet it) down to the bottom of the grid, in the group bar's colour
+    const tab = $('tArrGp').querySelector(i.classList.contains('gp') ? 'b.gp' : 'b.gm'), tr = tab && tab.getBoundingClientRect();
+    let col = ''; try { col = tab ? getComputedStyle(tab).backgroundColor : ''; } catch(e){}
+    const t0 = (tr && tr.height ? tr.bottom : gp.bottom) - a.top, b0 = g.top - a.top + arrGrid.clientHeight + 1;
+    html += `<div class="agbus" style="left:${l.toFixed(1)}px;top:${t0.toFixed(1)}px;width:${(rr - l).toFixed(1)}px;height:${(b0 - t0).toFixed(1)}px${col ? ';--abc:' + col : ''}"></div>`; }
   if (ms) for (const k of ['gm', 'gp', 'gx']){ const L = G[k]; if (!L.length) continue;
     const l = L[0].left - a.left - 4, r = L[L.length - 1].right - a.left + 4;
     html += `<div class="agbox ${k}" style="left:${l.toFixed(1)}px;top:${top.toFixed(1)}px;width:${(r - l).toFixed(1)}px;height:${(bot - top).toFixed(1)}px"></div>`; }
@@ -29175,6 +29181,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [419, '3 Nov', ['Arrange: a bus is marked by two straight bars down its column from the MONO or POLY bar, in that bar’s colour, instead of a box around it.']],
   [418, '3 Nov', ['Arrange: the frame around a bus track is bolder (2 px with a light edge either side), so it shows over filled blocks, and it starts under the MONO / POLY bar instead of over it.']],
   [417, '3 Nov', ['New commands: END stops the song at its row (a render ends there too); JMP XX carries the whole song on from song row XX (JMP 00: back to the top), so a song can loop a part or skip ahead. In the effect list under Play order, and in the master column.', '…pump windows: a CHAIN menu in the header lists the track’s (or the master’s) other …pump effects; from MASTERING’s auto master it opens EQ, CALM, COMP and TONE.']],
   [416, '3 Nov', ['Settings → UNIQUE PER TRACK (on): a block pasted, cloned, dragged or typed onto a track when another track already uses it gets its own copy, so editing one never changes the other. The same block down its own track still repeats.']],
