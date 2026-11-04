@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.81** (3 Nov 2026; owner: "merge build"; Run workflow through the API with version 1.2.81, from `main` after merging `beta`
+  at build 418): the bolder bus frame in Arrange.
 - **v1.2.80** (3 Nov 2026; owner: "merge and build!"; Run workflow through the API with version 1.2.80, from `main` after merging
   `beta` at build 417): END / JMP commands and the …pump CHAIN menu.
 - **v1.2.79** (3 Nov 2026; owner: "Push all to main and build a desktop build"; Run workflow through the API with version 1.2.79,
