@@ -119,6 +119,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (47): bus bars centred in the gaps (builds 420–421)
+
+- 420: the bars' white halo removed (owner). 421: "it intersects the phrase blocks in an awkward way… center them": each
+  bar is its own `.agbus` (a background, no border), centred in the gap between the bus column's header cell and its
+  neighbour's (`#tArrTh i[data-t]` ±1), as wide as the gap up to 2 px; a column at the edge uses a 2 px gap.
+
 ## 3 Nov (46): bus bars from the group bar (build 419, on `beta`)
 
 - Owner: "make the bar end at the black mono bar, instead of curving around… two black bars heading down from the mono
