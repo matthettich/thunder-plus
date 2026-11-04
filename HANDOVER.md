@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.84** (4 Nov 2026; owner: "push to the main and start a desktop build"; Run workflow through the API with version 1.2.84,
+  from `main` after merging `beta` at build 427): the full test sweep's ten fixes (422–425), HOP docs (426) and the follow-up (427).
 - **v1.2.74** (3 Nov 2026; owner: "merge beta and the app and build a desktop version"; Run workflow through the API with
   version 1.2.74, from `main` after merging `beta` at build 378): everything in the 3 Nov entries (audio-thread FXV / BYP /
   MUT / GEN / SoundFonts, Ableton Link (its optional addon step: check it built on Mac / Windows), FX bar curves and Flex
