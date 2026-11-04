@@ -27150,7 +27150,9 @@ arrGrid.addEventListener('contextmenu', e => e.preventDefault());
   th.addEventListener('click', e => { const i = e.target.closest('i[data-t]'); if (!i || pt !== 'mouse') return; const t = +i.dataset.t, m = S.mix[t]; if (!m) return;
     if (e.altKey){ m.mute = !m.mute; mixChanged(); draw(); toast(`Track ${d2(t + 1)} ${m.mute ? 'muted' : 'unmuted'} · right-click solos it`); return; }
     cs.song.x = t; if (!(apReady && apF)) cTrack = t; draw(); if (hdDbl(t)) nameTrack(t); });
-  th.addEventListener('contextmenu', e => { const i = e.target.closest('i[data-t]'); if (!i) return; e.preventDefault(); if (pt === 'mouse') soloTrack(+i.dataset.t); });
+  // FIX (UI sweep, 4 Nov): stopPropagation. On the Song screen Arrange sits inside the tracker screen, and the solo redraws the
+  // header, so the event reached cmdCtx from a detached number (its #tArr check missed) and the Edit menu opened over the solo.
+  th.addEventListener('contextmenu', e => { const i = e.target.closest('i[data-t]'); if (!i) return; e.preventDefault(); e.stopPropagation(); if (pt === 'mouse') soloTrack(+i.dataset.t); });
   }   // TRACK NAMES: a double-click names it (hdDbl, in the click above)
 
 /* ===== SONG EXTRAS (16 Oct): mouse editing, section names, drag-to-loop and the phrase peek on the Song screen =====
