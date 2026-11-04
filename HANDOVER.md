@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.80** (3 Nov 2026; owner: "merge and build!"; Run workflow through the API with version 1.2.80, from `main` after merging
+  `beta` at build 417): END / JMP commands and the …pump CHAIN menu.
 - **v1.2.79** (3 Nov 2026; owner: "Push all to main and build a desktop build"; Run workflow through the API with version 1.2.79,
   from `main` after merging `beta` at build 416): SWITCH TO …PUMP (409), CHN off when a track leaves …chains (410), ⌥▲▼ from
   the pattern on screen (411), pending FX commands kept + Enter twice on an effect value (412), FX bar in the skin's accent
