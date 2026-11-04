@@ -323,9 +323,11 @@ class Field extends Ctl {
     if (this.label){ ui.text(r.x + 8, r.cy + 0.5, this.label, 'label', 10, this.enabled ? t.ink2 : t.dim, 'left', 0.8); ui.text(r.r - 8, r.cy + 0.5, s, 'mono', 11.5, this.enabled ? t.ink : t.dim, 'right'); }
     else ui.text(r.cx, r.cy + 0.5, s, 'mono', 11.5, t.ink, 'center'); }
   down(ui, x, y, btn){ if (btn !== 0) return false; this.v0 = ui.value(this.sym); this.y0 = y; ui.begin(); return true; }
-  drag(ui, x, y, m){ let v = this.v0 + (this.y0 - y) * (m.shift ? 0.01 : 0.1); if (this.round) v = Math.round(v * 10) / 10; ui.setParam(this.sym, v); if (m.shift){ this.v0 = ui.value(this.sym); this.y0 = y; } }
+  // FIX (UI sweep, 4 Nov): the ONE RULE as Dial / Row: each move adds to the unrounded value (v0), Shift a tenth, Cmd/Ctrl
+  // held four times. It measured from the press, so pressing Shift mid-drag jumped back, and Cmd/Ctrl did nothing.
+  drag(ui, x, y, m){ this.v0 = FX.clamp(ui.type, this.sym, this.v0 + (this.y0 - y) * 0.1 * dragMul(m)); this.y0 = y; let v = this.v0; if (this.round) v = Math.round(v * 10) / 10; ui.setParam(this.sym, v); }
   up(ui){ ui.end(); }
-  wheel(ui, dy, m){ ui.setGesture(this.sym, ui.value(this.sym) + (dy > 0 ? 1 : -1) * (m.shift ? 0.1 : 0.5)); return true; }
+  wheel(ui, dy, m){ ui.setGesture(this.sym, ui.value(this.sym) + (dy > 0 ? 1 : -1) * (m.shift ? 0.1 : m.cmd ? 2 : 0.5)); return true; }   // (Cmd/Ctrl: big steps, as Dial)
 }
 
 /* ---------------------------------------------------------------- the window */
