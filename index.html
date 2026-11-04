@@ -1258,6 +1258,7 @@ body.asong .tagrid .rn{text-align:right; padding-right:7px}
    sections change; a bar on its left too, so it reads at a glance */
 .tagrid .rn.rc, .tagrid .rn.rc.r4{color:var(--rnc); font-weight:800; box-shadow:inset 3px 0 0 var(--rnc)}
 .tgrid span.rn.rnc{color:var(--rnc); font-weight:800; box-shadow:inset 3px 0 0 var(--rnc)}
+.tscr .pvbar .pvrow.rnc{color:var(--rnc); font-weight:800; box-shadow:inset 3px 0 0 var(--rnc); padding-left:5px}
 .tagp b.gx{font-size:8px; letter-spacing:0}   /* also in the side panel (MASTER IN ARRANGE) */
 .agboxes{position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:2}
 .agboxes[hidden]{display:none}
@@ -1297,7 +1298,7 @@ body.asong .tagrid .rn, body.asong .tath{font-size:var(--fs-2)}
 .sxmenu hr{border:0; border-top:1px solid color-mix(in srgb, var(--line) 30%, transparent); margin:4px 0; width:100%}
 /* SECTIONS LANE WIDTH (owner, 21 Oct: on the phone the empty lane and its long label pushed the song grid off centre): --sxw is
    set by sxLaneSize() from the longest section name (narrow while there are none), at most 88px (60px under 900px). */
-body.asong.sxsecs .tarr{padding-left:calc(var(--sxw, 88px) + 4px)}
+body.sxsecs .tarr{padding-left:calc(var(--sxw, 88px) + 4px)}   /* (beside Phrase too, with SECTIONS BESIDE PHRASE) */
 .sxlane{position:absolute; left:0; top:0; bottom:0; width:var(--sxw, 88px); z-index:3}
 .sxlane[hidden]{display:none}
 .sxlane .sxlh{position:absolute; left:4px; font:700 var(--fs-1)/16px var(--mono); letter-spacing:.06em; color:var(--ar-dim)}
@@ -1750,10 +1751,14 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkFxBar .dkfc .fviz{flex:1 1 0; min-height:0; position:relative; margin:0 6px 6px}
 /* SPRING (owner, 3 Nov): a spring reverb's column has its springs drawn behind its values (dkSpring), hanging down the
    box and shaking with the sound; the values sit over them with a halo of the panel colour so they stay readable. */
-#dkFxBar .dkfc canvas.fspr{position:absolute; left:0; width:100%; pointer-events:none; z-index:0; display:block}
-#dkFxBar .dkfc.spr .fcb, #dkFxBar .dkfc.spr .fviz{position:relative; z-index:1}
+/* ON TOP (owner, 3 Nov: "display the animations lightly on top of the orange visuals… it would make the animations look
+   intentional"): the canvas sits over the graph box (.fviz) instead of behind it, under the values (.fcb). Its marks are
+   already faint ink, so they read as a light layer over the curve; it never takes clicks. */
+#dkFxBar .dkfc canvas.fspr{position:absolute; left:0; width:100%; pointer-events:none; z-index:2; display:block; opacity:.6}
+#dkFxBar .dkfc.spr .fviz{position:relative; z-index:1}
+#dkFxBar .dkfc.spr .fcb{position:relative; z-index:3}
 #dkFxBar .dkfc.spr .fr:not(.sel) b, #dkFxBar .dkfc.spr .fr:not(.sel) span{text-shadow:0 0 3px var(--panel), 0 0 2px var(--panel), 0 0 1px var(--panel)}
-#dkFxBar .dkfc.spr.off canvas.fspr{opacity:.4}
+#dkFxBar .dkfc.spr.off canvas.fspr{opacity:.25}
 #dkFxBar .dkfc .fviz canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
 #dkFxBar .dkfc.off .fviz{opacity:.4}
 #dkFxBar .dkfc.dyn .fcb, #dkFxBar .dkfc.dyn .fviz{margin-right:44px}
@@ -2994,7 +2999,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Alt + 1–7</dt><dd>Song, Sect, Phrase, Inst, Mixer, FX, Project · Alt+0 the synth · Alt+8 …waves · Alt+9 …chains · Alt+` back to the last view</dd>
         <dt>F2 F3 F4</dt><dd>Phrase, Mixer, Inst</dd>
         <dt>F5 F6 F7 F8</dt><dd>play song · play this screen · song from cursor · stop (F8 again: all notes off)</dd>
-        <dt>Arrows</dt><dd>move · Alt/⌥+arrows change screen (◀▶ in tab order, ▲ Project, ▼ Mixer)</dd>
+        <dt>Arrows</dt><dd>move · Alt/⌥+arrows change screen (◀▶ in tab order, ▲ Project, ▼ Mixer; on Phrase and Song ⌥+▲▼ go to the pattern above / below, as Shift+⌥+▲▼ do)</dd>
         <dt>Shift + arrows</dt><dd>select cells from the cursor: ▲▼ up and down, ◀▶ sideways, in Song, Sect, Phrase · Shift+▲ on a phrase's top row wraps round and selects all of it (Shift+▼ on the bottom row too)</dd>
         <dt>Ctrl/⌘ + Shift + ▲▼</dt><dd>select whole lines (then Shift+▲▼ grows them too); tap row numbers on a touch screen</dd>
         <dt>Alt + S</dt><dd>Song settings (name, tracks, tempo, swing, scale, pattern length…)</dd>
@@ -17479,6 +17484,17 @@ const isEmptyPhrase = p => !p || p.every(r => r.every(v => v < 0));
 // block. Arrange draws it unlike both a playing block and an empty one.
 // (2 Nov, later: also a phrase with only effect commands, or only OFFs and commands: anything that plays no note)
 const isOffPhrase = p => !!p && !isEmptyPhrase(p) && p.every(r => r.slice(0, NCOL).every(v => v < 0 || v === OFF));
+// MASTER OFF BLOCKS (owner, 3 Nov: "my master track is drawing patterns with only FLX 00 on them as full colored phrases"):
+// the master column is all commands, so there a block looks like an OFF-only block when it switches something off
+// (FLX 00 Flex off, GAT 00 step gate off, RTG 0Y retrigger off, FXO X0 an effect slot off) and switches nothing on (FLX,
+// GAT, RTG or FXO to a pattern / on). Other commands (VOL FF back to full, TPO…) don't count either way.
+const fxOnOff = (c, v) => { const n = FXC[c]; if (n === 'FLX' || n === 'GAT') return v === 0 ? -1 : 1; if (n === 'RTG') return (v >> 4) === 0 ? -1 : 1;
+  if (n === 'FXO') return (v >> 4) === 0 ? 0 : (v & 15) === 0 ? -1 : 1; return 0; };
+const isOffCmdPhrase = p => { if (!p || isEmptyPhrase(p)) return false; let off = 0;
+  for (const r of p){ for (let k = 0; k < NCOL; k++) if (r[k] >= 0 && r[k] !== OFF) return false;
+    for (let k = FX0; k + 1 < RW; k += 2) if (r[k] >= 0){ const q = fxOnOff(r[k], r[k + 1]); if (q > 0) return false; if (q < 0) off++; } }
+  return off > 0; };
+const sectMstOff = v => { const c = S.chains[v]; if (!c) return false; const P = c.filter(r => r[0] >= 0).map(r => S.phrases[r[0]]); return P.length > 0 && P.some(isOffCmdPhrase) && P.every(p => isEmptyPhrase(p) || isOffCmdPhrase(p)); };
 const sectOffOnly = v => { const c = S.chains[v]; if (!c) return false; const P = c.filter(r => r[0] >= 0).map(r => S.phrases[r[0]]); return P.length > 0 && P.some(isOffPhrase) && P.every(p => isEmptyPhrase(p) || isOffPhrase(p)); };
 const plen = id => id >= 0 && S.plen ? clamp(S.plen[id] || S.dlen || 16, 1, PROWS) : (S.dlen || 16);
 const plpbOf = (Sx, id) => (id >= 0 && Sx.plpb && Sx.plpb[id]) || Sx.lpb || 4;
@@ -19653,7 +19669,7 @@ function tStop(quiet){
     tp.paused = ref >= 0 ? {pos:P, ref, row:P[ref].row, step:P[ref].step, key:curKey()} : null;
   }
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
-  const stopP = !quiet && stopCurOn && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
+  const stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
   tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null;
   if (tp.core){ tp.core = false; core.gen++; coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }
   else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
@@ -20715,7 +20731,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 403;
+const BUILD = 408;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -20756,6 +20772,12 @@ let resumeOn = (() => { try { return localStorage.getItem(RSK) === '1'; } catch(
 const STOPCUR_K = 'thunderplus-stopcur-v2';
 let stopCurOn = (() => { try { return localStorage.getItem(STOPCUR_K) === '1'; } catch(e){ return false; } })();
 function setStopCur(on){ stopCurOn = on; try { localStorage.setItem(STOPCUR_K, on ? '1' : '0'); } catch(e){} draw(); }
+// ARRANGE ON STOP (owner, 3 Nov: "add a similar setting … that does the same thing in the arrange window"): its own choice
+// for the Song / Arrange screen and for Arrange holding the keys beside Phrase; PHRASE ON STOP (stopCurOn) is the rest.
+const STOPARR_K = 'thunderplus-stoparr-v1';
+let stopArrOn = (() => { try { return localStorage.getItem(STOPARR_K) === '1'; } catch(e){ return false; } })();
+function setStopArr(on){ stopArrOn = on; try { localStorage.setItem(STOPARR_K, on ? '1' : '0'); } catch(e){} draw(); }
+const stopToPlayhead = () => (tv === 'song' || (typeof apReady !== 'undefined' && apReady && apF === 'arr')) ? stopArrOn : stopCurOn;
 // The edit cursor onto a playing (or stopped) position: P = per-track positions, mode = the sequencer's mode. Returns true when it moved.
 function curToPlay(P, mode){
   if (!P || !P.some(Boolean)) return false;
@@ -21451,6 +21473,10 @@ function projRows(){
       info:() => 'With a mouse on the Song screen: drag across empty cells to select, drag a block or the selection to move it, Alt-drag to copy it, right-click for a menu (copy, paste, clone, mute, loop, open, name a section, clear). Off: clicks only, as before'},
     {l:'SECTIONS', ck:'Song: section names beside the rows', get:() => SX.secs ? 1 : 0, set:v => sxSet('secs', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'The SECT lane left of the row numbers names runs of rows (INTRO, DROP…): tap the + on the cursor’s row (or tap the empty lane, double-click it, right-click a block) to name the section from that row; click a name to go there; hold or right-click a name to rename, loop or remove it. The lane is only as wide as its names. Needs a wide screen. Off hides the lane; the names stay in the song'},
+    {l:'SECTIONS BESIDE PHRASE', ck:'Arrange beside the phrase: the SECT lane too', get:() => SX.side ? 1 : 0, set:v => sxSet('side', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
+      info:() => 'With SECTIONS on: the SECT lane also shows in Arrange beside the phrase (it takes a little of Arrange’s width), so section names are there while you edit. Off: only on the Song screen'},
+    {l:'ROW COLOUR IN PATTERN', ck:'Pattern view: right-click a row number to colour the song row', get:() => SX.pvcol ? 1 : 0, set:v => sxSet('pvcol', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'In Pattern view, right-click a row number (or SONG ROW in its bar) to colour this pattern’s song row, the same as right-clicking the row number in Arrange; SONG ROW then shows in that colour. Off: the right-click menu as usual'},
     {l:'LOOP DRAG', ck:'Song: drag the row numbers to loop', get:() => SX.loop ? 1 : 0, set:v => sxSet('loop', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Drag down the Song screen’s row numbers to loop those rows (PLAY on this screen loops them; LOOP SEL turns it off). A tap still plays from that row'},
     {l:'SONG PEEK', ck:'Song: the phrase under the cursor beside it (not the dogs)', get:() => SX.peek ? 1 : 0, set:v => sxSet('peek', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
@@ -21484,8 +21510,10 @@ function projRows(){
       info:() => 'In a phrase. TRACKS (as Renoise): Tab / Shift+Tab go to the next / previous track’s phrase. COLUMNS: they step note → instrument → FX1 → FX2 → FX3, so the instrument is one press away'},
     {l:'RESUME', ck:'Playback resumes from pause', get:() => resumeOn ? 1 : 0, set:v => setResume(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'ON: after you stop the song, PLAY carries on from where it stopped (the playhead stays there to show it), unless you have moved the cursor since. OFF: PLAY starts from the cursor, as before. Either way the stopped spot stays lit'},
-    {l:'STOP CURSOR', segs:true, get:() => stopCurOn ? 1 : 0, set:v => setStopCur(!!v), min:0, max:1, d:1, fmt:v => v ? 'THERE' : 'STAYS',
-      info:() => 'THERE: when you stop the song, the edit cursor goes to where it stopped (the song row, your track’s phrase and step), ready to edit. STAYS: the cursor stays where you left it. STOP twice still goes to the top; Alt+G puts the cursor on the playhead at any time'},
+    {l:'PHRASE ON STOP', segs:true, get:() => stopCurOn ? 1 : 0, set:v => setStopCur(!!v), min:0, max:1, d:1, fmt:v => v ? 'PLAYHEAD' : 'STAYS',   // CLEARER (owner, 3 Nov: "what is this supposed to communicate?"): was STOP CURSOR, STAYS / THERE
+      info:() => 'Where the edit cursor goes when you stop the song while editing a phrase (and on the other screens). STAYS: it stays where you were editing. PLAYHEAD: it jumps to where the song stopped (the song row, your track’s phrase and step), ready to edit there. ARRANGE ON STOP is the same for Arrange. STOP twice still goes to the top; Alt+G puts the cursor on the playhead at any time'},
+    {l:'ARRANGE ON STOP', segs:true, get:() => stopArrOn ? 1 : 0, set:v => setStopArr(!!v), min:0, max:1, d:1, fmt:v => v ? 'PLAYHEAD' : 'STAYS',
+      info:() => 'The same for Arrange (the Song screen, or Arrange holding the keys beside the phrase): where its cursor goes when you stop the song. STAYS: where you left it. PLAYHEAD: the song row where the song stopped, on your track. Alt+G puts the cursor on the playhead at any time'},
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. A poly track shows its whole chord: all four notes when there is room (unfolded, desktop), otherwise one letter per voice (capital = natural, small = sharp, so CEGa is C E G A#; · is an empty voice, × a note off). Only to look at; they can’t be edited'},
     {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText({title:'Rename the song'}, S.name, 40, 'Rename'); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); } }, info:() => 'EDIT renames the song'},
@@ -22017,10 +22045,11 @@ function dupPattern(){
 // same kind (mono or poly) that has nothing on the song. It gets the volume, pan, sidechain-out and the track's effects
 // (not mute or solo); with notes, every block of the track too, as unique copies on the same rows (block mutes kept).
 // …chains isn't copied: its patch is one for the whole song.
-function dupTrack(notes){
-  const mst = tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
+// tAt: the track to copy (the Song / Arrange right-click menu's block), else the screen's own track.
+function dupTrack(notes, tAt){
+  const mst = tAt != null ? tAt === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
   if (mst) return toast('The master can’t be duplicated.');
-  const t = dkTrack(), PF = polyFrom(), poly = t >= PF, end = poly ? ntr() : PF;
+  const t = tAt != null ? tAt : dkTrack(), PF = polyFrom(), poly = t >= PF, end = poly ? ntr() : PF;
   let to = -1; for (let u = t + 1; u < end; u++) if (S.song.every(row => row[u] < 0)){ to = u; break; }
   if (to < 0) return toast(`No empty ${poly ? 'poly' : 'mono'} track to the right of track ${d2(t + 1)} to duplicate it into.`);
   const a = S.mix[t], b = S.mix[to]; b.vol = a.vol; b.trim = a.trim; b.pan = a.pan; b.sc = a.sc;   // trim: GAIN STAGING
@@ -22031,6 +22060,7 @@ function dupTrack(notes){
   mixChanged(); rtFx(to);
   // The cursor goes to the new track, as in Renoise.
   if (tv === 'mixer') cs.mixer.x = to;
+  else if (tv === 'song') cs.song.x = to;
   else if (tv === 'fx') cFxT = to;
   else if (tv === 'phrase' && pvActive()) pvGo(to, cs.song.y, 'first', null);
   else if (tv === 'phrase' && S.song[cs.song.y][to] >= 0){ const ph = firstPhrase(S.song[cs.song.y][to]); if (ph >= 0){ cTrack = to; cs.song.x = to; cSect = S.song[cs.song.y][to]; cPhrase = ph; } }
@@ -22169,6 +22199,26 @@ function rowOp(op){
   } else return del();
   if (op === 'clear') down1();
   saveS(); draw();
+}
+/* REMOVE ROWS (owner, 3 Nov: 'add a "remove" to the small control bar that "removes these rows" to selections'): the
+   selected rows (or the cursor's row) go and the rows below move up. Phrase: whole lines of this phrase, within its LEN
+   (as rowOp's remove); a Pattern view selection (selA.pat) does the same in every track's phrase on this song row. Sect:
+   its rows. Song: every track and the master (songRowRemove). One undo step (saveS). */
+function rowsRemove(){
+  if (onPset()) return;
+  if (tv === 'song') return songRowRemove();
+  if (tv !== 'phrase' && tv !== 'sect') return toast('Removing rows works in Song, Sect and Phrase.');
+  const c = cs[tv], sel = !!(selA && selA.v === tv), r = sel ? selRect() : {y0:c.y, y1:c.y}, pat = sel && tv === 'phrase' && !!selA.pat;
+  const one = (A, L) => { const y1 = Math.min(r.y1, L - 1), h = y1 - r.y0 + 1; if (r.y0 >= L || h <= 0) return 0;
+    A.splice(r.y0, h); for (let i = 0; i < h; i++) A.splice(L - h + i, 0, rowBlank(tv)); return h; };
+  let h = 0;
+  if (tv === 'phrase'){
+    h = one(S.phrases[cPhrase], Math.min(S.phrases[cPhrase].length, plen(cPhrase)));
+    if (pat) for (const {p} of patParts()) one(S.phrases[p], Math.min(S.phrases[p].length, plen(p)));
+  } else { const A = rowsArr(tv); h = one(A, A.length); }
+  selA = null; c.y = r.y0;
+  if (!h){ draw(); return toast('Nothing to remove here.'); }
+  saveS(); draw(); toast((h > 1 ? `Removed rows ${rS(r.y0)}–${rS(r.y0 + h - 1)}` : `Removed row ${rS(r.y0)}`) + (pat ? ' in every track' : '') + ' · the rows below moved up');
 }
 function toggleSel(){
   if (onPset()) return;
@@ -22947,7 +22997,7 @@ function setCmdBar(on){ cmdBar = !!on; try { localStorage.setItem(CBK, cmdBar ? 
 const cmdMini = () => inMode === 'keys' && cmdBar;
 const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b:-1', '−', 'Change the value down (EDIT+◀)'], ['b:1', '+', 'Change the value up (EDIT+▶)'],
   ['b:16', '++', 'Change the value up a lot (EDIT+▲)'], ['prev', '‹', 'Previous: the block above in the song; the previous sect, phrase, instrument or FX track elsewhere (OPTION+▲ on the song, OPTION+◀ elsewhere)'], ['next', '›', 'Next: the block below in the song; the next sect, phrase, instrument or FX track elsewhere (OPTION+▼ on the song, OPTION+▶ elsewhere)'],
-  ['clr', 'CLEAR', 'Clear (OPTION+EDIT)'], ['sel', 'SELECT', 'Start or cancel a selection (SHIFT+OPTION)'],
+  ['clr', 'CLEAR', 'Clear (OPTION+EDIT)'], ['rrow', 'REMOVE', 'Remove these rows: the selected rows (or the cursor’s row) go and the rows below move up. Phrase, Pattern view, Sect and Song'], ['sel', 'SELECT', 'Start or cancel a selection (SHIFT+OPTION)'],
   ['uniq', 'UNIQ', 'Make unique: each selected block (or picked cells) gets new phrases, in place'], ['clone', 'CLN', 'Clone: copies the block (or the selected blocks); PASTE then puts a unique copy with new numbers at the cursor (Ctrl/⌘+Alt+C)'],
   ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on a new row below; the rows below move down (Ctrl/⌘+Shift+C)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (OPTION)'],
   ['cut', 'CUT', 'Cut the selection, or what is under the cursor (OPTION+EDIT)'], ['paste', 'PASTE', 'Paste (SHIFT+EDIT)'],
@@ -22965,6 +23015,7 @@ function cmdAction(a){
     return optDir(d > 0 ? 'right' : 'left');
   }
   if (c === 'clr') return del();
+  if (c === 'rrow') return rowsRemove();
   if (c === 'rmv') return tv === 'song' ? songDelete(songCells(), true) : undefined;
   if (c === 'sel') return toggleSel();
   if (c === 'copy' || c === 'cut') return copyHere(c === 'cut');
@@ -22981,8 +23032,8 @@ for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type
 const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'uniq', 'clone', 'cldn', 'copy', 'cut', 'paste', 'clr', 'undo', 'redo', 'song'];
 const CMD_PAD_SHORT = {clr:'CLR', sel:'SEL', paste:'PST', undo:'↶', redo:'↷'};
 // COMMAND BAR: the Edit menu's order (undo · clipboard · select · clones · value · previous / next · play) and words.
-const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'sel', 'uniq', 'clone', 'cldn', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
-const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
+const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'sel', 'uniq', 'clone', 'cldn', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
+const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', rrow:'REMOVE', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
 const cmdSongLab = () => cmdMini() ? (tp.on ? '■ STOP' : '▶ SONG') : tp.on ? '■' : '▶';
 function applyCmdOrder(){
   const host = $('tCmd'), by = {}, mini = cmdMini();
@@ -22992,6 +23043,7 @@ function applyCmdOrder(){
   host.classList.toggle('cpad', inMode === 'pad'); host.classList.toggle('cmini', mini);
   const lab = Object.fromEntries(CMDS.map(c => [c[0], c[1]])), tip = Object.fromEntries(CMDS.map(c => [c[0], c[2]]));
   for (const a in by){ by[a].innerHTML = (mini && CMD_MINI_LAB[a]) || (inMode === 'pad' && CMD_PAD_SHORT[a]) || lab[a]; if (!mini) by[a].title = tip[a]; }
+  if (by.rrow) by.rrow.hidden = inMode === 'pad';   // (PAD's phone row is full; REMOVE is in KEYS mode's row and bar)
   cmdTipKey = '';
   const sb = by.song; if (sb){ sb.textContent = cmdSongLab(); sb.classList.toggle('on', tp.on); }
   if (typeof cmdBarState === 'function') cmdBarState();
@@ -23088,14 +23140,14 @@ function cmdItems(full){
     ...(full ? [{h:'Rows'}, onSong ? {a:'rins', l:'Insert a song row (rows below move down)', k:keyHint('mod+shift+Enter'), f:songRowInsert}
         : {a:'rins', l:'Insert a row', k:keyHint('mod+Enter'), f:() => rowOp('insert'), off:!rowsOk || !!selA},
       onSong ? {a:'rmrow', l:'Remove the song row (rows below move up)', k:keyHint('mod+shift+Backspace'), f:songRowRemove}
-        : {a:'rdel', l:'Remove the row (rows below move up)', k:keyHint('mod+Backspace'), f:() => rowOp('remove'), off:!rowsOk || !!selA}] : []),
+        : selA ? {a:'rrow', l:'Remove these rows (rows below move up)', k:'', f:rowsRemove, off:!rowsOk} : {a:'rdel', l:'Remove the row (rows below move up)', k:keyHint('mod+Backspace'), f:() => rowOp('remove'), off:!rowsOk}] : []),
     ...(onSong || full ? [{h:'Song blocks'}, it('clone', 'Clone (paste puts a unique copy)', 'mod+alt+C', {off:!onSong}), it('cldn', 'Clone down (into a new row below)', 'mod+shift+C', {off:!onSong}),
       {a:'dup', l:'Duplicate the pattern (insert below)', k:keyHint('mod+D'), f:() => dupKey(false), off:!onSong}, {a:'insp', l:'Insert paste (new rows below)', k:keyHint('mod+alt+V'), f:insertPaste, off:!onSong || !(clip && clip.v === 'song')},
       ...(onSong && !full ? [{a:'rmrow', l:'Remove the row (rows below move up)', k:keyHint('mod+shift+Backspace'), f:songRowRemove}] : [])] : []),
     {h:'Track'},
     ...(isBus ? [{a:'unbus', l:'Make this track a normal track (not a bus)', k:'', f:() => unBus(onSong ? cs.song.x : dkTrack())}] : []),   // BUS BACK TO A TRACK
     ...(trk || full ? [{a:'dup', l:'Duplicate the track (no notes)', k:keyHint('mod+D'), f:() => dupKey(false), off:!trk},
-      {a:'dupn', l:'Duplicate the track with its notes', k:keyHint('mod+alt+D'), f:() => dupKey(true), off:!trk}] : []),
+      {a:'dupn', l:'Duplicate the track with its patterns', k:keyHint('mod+alt+D'), f:() => dupKey(true), off:!trk}] : []),
     ...(full ? [{a:'newph', l:'New phrase on the next empty track', k:keyHint('alt+T'), f:newPhraseRight},
       {a:'mute', l:'Mute / unmute this track', k:'/', f:muteKey}, {a:'solo', l:'Solo / unsolo this track', k:keyHint('mod+/'), f:() => soloKey(false)}] : []),
     ...(['song', 'phrase', 'mixer', 'fx'].includes(tv) || full ? [{a:'tname', l:'Name this track…', k:'', f:nameTrackHere, off:!['song', 'phrase', 'mixer', 'fx'].includes(tv)}] : []),
@@ -24390,7 +24442,9 @@ function fxSkinRgb(name){
   if (n.length < 3) return null;
   return /^color\(/.test(c) ? [n[0] * 255, n[1] * 255, n[2] * 255] : [n[0], n[1], n[2]];
 }
+let fxPalScr = false, fxPalScrV = null;   // true while dkFxViz draws: fxDynPal gives the screen colours
 function fxDynPal(){
+  if (fxPalScr){ fxPalScr = false; try { fxDynPal(); } finally { fxPalScr = true; } return fxPalScrV; }
   const key = skin + '|' + (document.documentElement.getAttribute('data-skin') || '');
   if (fxPalV && fxPalSkin === key) return fxPalV;
   const bg = fxSkinRgb('--ts-bg') || [11, 12, 14], ink = fxSkinRgb('--ts-ink') || [255, 255, 255];
@@ -24401,6 +24455,10 @@ function fxDynPal(){
   const hot = fxSkinRgb('--ts-mute') || [229, 72, 77], mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
   const rgb = q => 'rgb(' + q.map(Math.round).join(',') + ')';
   fxPalSkin = key;
+  // SCREEN (owner, 3 Nov: "the orange graphics in the fx should be over white backgrounds so that it looks less jumbled"):
+  // the FX bar's graphs sit on a screen of their own: near white on a light skin, a deeper shade on a dark one.
+  const lum = (0.2126 * bg[0] + 0.7152 * bg[1] + 0.0722 * bg[2]) / 255, scr = lum > 0.5 ? mix(bg, [255, 255, 255], 0.8) : mix(bg, [0, 0, 0], 0.35);
+  fxPalScrV = {bg:rgb(scr), audio:rgb(audio), gr:rgb(gr), hot:rgb(hot), ink:ink.map(Math.round).join(',')};
   return fxPalV = {bg:rgb(mix(bg, ink, 0.035)), audio:rgb(audio), gr:rgb(gr), hot:rgb(hot), ink:ink.map(Math.round).join(',')};
 }
 // The display, in CSS pixels at (x, y), W × H, in the skin's colours (fxDynPal).
@@ -25467,12 +25525,20 @@ function fxAnimKind(f){
   if (g === 'Utility') return 'field';
   return 'lfo';
 }
+/* IN THE SCREEN (owner, 3 Nov): the animation is drawn only over the graph's screen (.fviz), so the values above stay
+   clean and the motion reads as part of the display; a card without a graph keeps the old place (below its header). */
+function dkAnimBox(col, cv){
+  const vz = col.querySelector('.fviz'); let x = 0, y, W, H;
+  if (vz && vz.offsetHeight >= 24){ x = vz.offsetLeft; y = vz.offsetTop; W = vz.offsetWidth; H = vz.offsetHeight; }
+  else { const hd = col.querySelector('.fch'), fm = col.querySelector('.fm'); y = (hd ? hd.offsetHeight : 26) + (fm ? fm.offsetHeight : 4); W = col.clientWidth; H = col.clientHeight - y; }
+  if (W < 40 || H < 20) return null;
+  const st = cv.style, px = v => Math.round(v) + 'px';
+  if (st.left !== px(x)) st.left = px(x); if (st.top !== px(y)) st.top = px(y); if (st.width !== px(W)) st.width = px(W); if (st.height !== px(H)) st.height = px(H);
+  return {W:Math.round(W), H:Math.round(H)};
+}
 function dkAnim(col, f, now, lv){
   const A = col._spr, cv = A.cv; if (!f) return;
-  const hd = col.querySelector('.fch'), fm = col.querySelector('.fm'), top = (hd ? hd.offsetHeight : 26) + (fm ? fm.offsetHeight : 4);
-  const W = col.clientWidth, H = col.clientHeight - top; if (W < 40 || H < 40) return;
-  if (cv.style.top !== top + 'px') cv.style.top = top + 'px';
-  cv.style.height = H + 'px';
+  const bx = dkAnimBox(col, cv); if (!bx) return; const W = bx.W, H = bx.H;
   const dpr = devicePixelRatio || 1; if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
   const v = (re, d) => { const x = dkFxVal(f, re); return x == null ? d : x; }, C = fxDynPal(), ink = a => 'rgba(' + C.ink + ',' + a + ')', AC = '#ff5a1f';
@@ -25617,10 +25683,7 @@ function dkAnim(col, f, now, lv){
 const isSpringFx = f => !!f && !!TFX[f.type] && (/spring|sprg/i.test(f.type) || TFX[f.type].pump === 'spring' || /^S?PRG$|SPRG/.test(TFX[f.type].n || ''));
 function dkSpring(col, f, now, lv){
   const S2 = col._spr, cv = S2.cv; if (!f) return;
-  const hd = col.querySelector('.fch'), fm = col.querySelector('.fm'), top = (hd ? hd.offsetHeight : 26) + (fm ? fm.offsetHeight : 4);
-  const W = col.clientWidth, H = col.clientHeight - top; if (W < 40 || H < 40) return;
-  if (cv.style.top !== top + 'px'){ cv.style.top = top + 'px'; }
-  cv.style.height = H + 'px';
+  const bx = dkAnimBox(col, cv); if (!bx) return; const W = bx.W, H = bx.H;
   const dpr = devicePixelRatio || 1; if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
   const v = (re, d) => { const x = dkFxVal(f, re); return x == null ? d : x; };
@@ -26096,7 +26159,8 @@ function dkFxPatDraw(g, W, H, f, st, C, font, bar){
 /* FX BAR pictures, in the room under each effect's values (none when the values fill the box). Dynamics (the FX stage's own
    display, fxDynPaint): the transfer curve with the live input dot and the reduction history; every other effect: its
    output level over the last ~3 s, so you can see what it is doing to the sound. Colours from the skin's screen (fxDynPal). */
-function dkFxViz(col, f, k, node, now){
+function dkFxViz(col, f, k, node, now){ fxPalScr = true; try { dkFxViz0(col, f, k, node, now); } finally { fxPalScr = false; } }
+function dkFxViz0(col, f, k, node, now){
   const cv = col.querySelector('.fviz canvas'); if (!cv || !f) return;
   const dm = col.querySelector('canvas.fdm');
   if (dm && isFxDyn(f.type)) try { dkDynMeters(dm, f, k, node, now); } catch(e){}
@@ -26623,7 +26687,7 @@ function drawArr(PH){
       h += `<b class="${cls.trim()}"${sty} data-y="${y}" data-t="${t}">${lab}</b>`;
     }
     if (mx){ const v = S.song[y][MT];   // the master column: commands only, never muted
-      h += `<span></span><b class="gx${v < 0 ? '' : isEmptySect(S.chains[v]) ? ' z' : ' f'}" data-y="${y}" data-t="${MT}">${v < 0 ? '' : hp(songShown(v))}</b>`; }
+      h += `<span></span><b class="gx${v < 0 ? '' : isEmptySect(S.chains[v]) ? ' z' : sectMstOff(v) ? ' o' : ' f'}" data-y="${y}" data-t="${MT}">${v < 0 ? '' : hp(songShown(v))}</b>`; }
     h += '</div>';
   }
   const PF = polyFrom();
@@ -26939,9 +27003,11 @@ arrGrid.addEventListener('contextmenu', e => e.preventDefault());
    stageKind / stageLayout / stageCanvas, draw's peek refresh, the peek markup in #tStage, freshSong / normSong's
    `secs`, startScroll's skip). info() is wrapped inside this block.
    A song's sections (S.secs) stay in its file either way, and older versions just ignore them. */
-const SXK = {mouse:'thunderplus-songmouse-v1', secs:'thunderplus-songsecs-v1', loop:'thunderplus-loopdrag-v1', peek:'thunderplus-songpeek-v1'};
+const SXK = {mouse:'thunderplus-songmouse-v1', secs:'thunderplus-songsecs-v1', loop:'thunderplus-loopdrag-v1', peek:'thunderplus-songpeek-v1', side:'thunderplus-songsecs-side-v1', pvcol:'thunderplus-pvrowcol-v1'};
 const sxGet = (k, d) => { try { const v = localStorage.getItem(SXK[k]); return v == null ? d : v === '1'; } catch(e){ return d; } };
-const SX = {mouse:sxGet('mouse', true), secs:sxGet('secs', true), loop:sxGet('loop', true), peek:sxGet('peek', false)};
+// SECTIONS BESIDE PHRASE (owner, 3 Nov: an option, off by default): the SECT lane in Arrange beside the phrase too.
+// ROW COLOUR IN PATTERN (owner, 3 Nov: an option, on by default): right-click Pattern view's row numbers colours its song row.
+const SX = {mouse:sxGet('mouse', true), secs:sxGet('secs', true), loop:sxGet('loop', true), peek:sxGet('peek', false), side:sxGet('side', false), pvcol:sxGet('pvcol', true)};
 function sxSet(k, on){ SX[k] = !!on; try { localStorage.setItem(SXK[k], on ? '1' : '0'); } catch(e){} arrSig = ''; arrBoxKey = ''; layoutSig = ''; arrLayout(true); draw(); stageLayout(); }
 const sxRect = () => selA && selA.v === 'song' ? selRect() : null;
 const sxIn = (r, y, t) => !!r && y >= r.y0 && y <= r.y1 && t >= r.x0 && t <= r.x1;
@@ -27217,7 +27283,13 @@ async function rowColour(y){
   saveS(); arrSig = ''; gridHTML = null; draw();
 }
 arrGrid.addEventListener('contextmenu', e => {
-  const rn = e.target.closest && e.target.closest('[data-ry]'); if (!rn || (e.pointerType && e.pointerType === 'touch')) return;
+  if (e.pointerType && e.pointerType === 'touch') return;
+  // FIX (owner, 3 Nov: "no right click menu showed up"): only the digits took it; a click beside them, still in the number
+  // column, landed on the row and did nothing. Anywhere left of the row's first block now counts.
+  let rn = e.target.closest && e.target.closest('[data-ry]');
+  if (!rn){ const ar = e.target.closest && e.target.closest('.ar'), s2 = ar && ar.querySelector('[data-ry]'), b1 = ar && ar.querySelector('b');
+    if (s2 && e.clientX < (b1 ? b1.getBoundingClientRect().left : s2.getBoundingClientRect().right + 6)) rn = s2; }
+  if (!rn) return;
   e.preventDefault(); e.stopImmediatePropagation(); rowColour(+rn.dataset.ry);
 }, true);
 // BLOCK COLOURS (owner, 31 Oct): right-click → Colour… gives the block (every block of the selection) one of the track
@@ -27252,6 +27324,9 @@ function sxCtx(y, t){
     {l:'Clone down (into a new row below)', k:ks ? keyHint('mod+shift+C') : '', f:() => cloneDown(), off:!n},
     null,
     {l:'Swap instrument in this track…', f:() => swapDialog(t, y), off:t === MT || multi},
+    // DUPLICATE TRACK (owner, 3 Nov: "a right click option to duplicate a track, including the patterns/phrases in it"):
+    // into the next empty track of its kind, every block as a unique copy (dupTrack with notes)
+    {l:'Duplicate this track with its patterns', f:() => dupTrack(true, t), off:t === MT},
     {l:'Mute / unmute', k:ks ? 'M' : '', f:() => sxMuteRect(r), off:!n || (t === MT && !multi)},
     {l:'Loop these rows', f:() => sxLoopRows(r.y0, r.y1), off:r.y1 <= r.y0},
     {l:'Open the phrase', k:ks ? keyHint('alt+→') : '', f:sxOpen, off:multi || !filled},
@@ -27285,14 +27360,15 @@ async function sxSecEdit(y){
 }
 function sxSecRemove(y){ S.secs = (S.secs || []).filter(q => q.y !== y); saveS(); draw(); toast('Section removed'); }
 let sxLane = null, sxLaneKey = '';
-const sxLaneOn = () => asongOn() && SX.secs && arrEl.clientWidth >= 560;
+const sxLaneOn = () => SX.secs && (asongOn() ? arrEl.clientWidth >= 560 : SX.side && view === 'tracker' && document.body.classList.contains('arrvis') && arrEl.clientWidth >= 180);
 // SECTIONS LANE WIDTH: run by drawArr before it measures anything, so the columns and the boxes are laid out once at the
 // right width. The lane is as wide as its longest name needs (the label's width while there are none).
 let sxWKey = '', sxMeas = null;
 function sxLaneSize(){
   const on = sxLaneOn(); document.body.classList.toggle('sxsecs', on); if (!on) return;
   if (!sxLane){ sxLane = el('div', 'sxlane'); sxLane.setAttribute('aria-label', 'Song sections'); arrEl.append(sxLane); sxLaneWire(); }
-  const L = sxSecs(), small = document.body.classList.contains('arrsmall');
+  sxLane.hidden = false;   // (measured while hidden, every name came out 0 wide: beside Phrase the lane started hidden)
+  const L = sxSecs(), small = document.body.classList.contains('arrsmall') || !asongOn();   // beside a screen: the narrow lane
   const key = [L.map(q => q.n).join('\n'), small, tScale, document.fonts ? document.fonts.status : ''].join('|');
   if (key === sxWKey) return; sxWKey = key;
   if (!sxMeas || !sxMeas.isConnected){ sxMeas = el('button', 'sxsec sxm'); sxMeas.type = 'button'; sxMeas.tabIndex = -1; sxMeas.setAttribute('aria-hidden', 'true'); sxMeas.append(el('span')); }
@@ -27964,6 +28040,7 @@ function cmdCtx(e){
   e.preventDefault();
   if (!$('gedit').hidden) geditToggle(false);
   { const rn = tv === 'song' && e.target.closest('[data-r]'); if (rn){ rowColour(+rn.dataset.r); return; } }   // ROW COLOURS (3 Nov): the Song's row numbers
+  if (tv === 'phrase' && SX.pvcol && typeof pvActive === 'function' && pvActive() && e.target.closest('.pvrn, .pvrow')){ rowColour(cs.song.y); return; }   // ROW COLOUR IN PATTERN: this pattern's song row
   const sel = selA && selA.v === tv;
   // RIGHT-CLICK (menu audit, 2 Nov): the commands for what's under the pointer; Undo / Redo, selecting, value steps,
   // previous / next and play stay on their keys and in Edit ▾.
@@ -28394,6 +28471,10 @@ function keysDown(e, pad){
     if (e.shiftKey){ if (!shiftSel(arrow)){ const m = {up:[0, -1], down:[0, 1], left:[-1, 0], right:[1, 0]}[arrow]; move(m[0], m[1]); } }
     // ⌥/Alt + arrows change screen (◀▶ in tab order, ▲ Project, ▼ Mixer; from Phrase ◀ gives Arrange the keys, as
     // SHIFT+◀ does on the pad). Option moves, Command edits (owner, 19 Oct; they were the other way round that morning).
+    // PATTERNS ON ⌥▲▼ (owner, 3 Nov: "I'd like to keep [Shift+⌥+▲▼] and also use opt + up/down this way and jump between
+    // patterns"): on Phrase (and its Pattern view) and Song, ⌥+▲▼ do what Shift+⌥+▲▼ do; ⌥+◀▶, and ⌥+▲▼ on the other
+    // screens, still change screen.
+    else if (e.altKey && (arrow === 'up' || arrow === 'down') && (tv === 'phrase' || tv === 'song')){ if (tv === 'phrase') optDir(arrow, true); else shiftAltArrow(arrow); }
     else if (e.altKey) nav(arrow);
     else { if (keyTransArrow(arrow)) return true; if (selA) selA = null; /* SELECT RELEASE (owner, 24 Oct): a plain arrow lets any selection go (blocks grew before) */ const m = {up:[0, -1], down:[0, 1], left:[-1, 0], right:[1, 0]}[arrow]; move(m[0], m[1]); }
     return true;
@@ -28953,6 +29034,11 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [408, '3 Nov', ['Arrange and Song: right-click a block → Duplicate this track with its patterns: the track goes into the next empty track of its kind with its volume, pan, effects and every block as a unique copy (also Ctrl/⌘+Alt+D on Phrase, Mixer and FX). Right-click on a track number still solos.', 'Master column: a block that turns effects off (FLX 00, GAT 00, RTG 00, FXO X0) and turns nothing on draws like an OFF-only block, black with the stop bar.']],
+  [407, '3 Nov', ['Row colours: right-clicking anywhere in Arrange’s row-number column opens the colour (only the digits did, so it often seemed to do nothing).', 'Pattern view: right-click a row number (or SONG ROW) to colour this pattern’s song row; SONG ROW shows the colour (Settings → ROW COLOUR IN PATTERN, on).', 'Settings → SECTIONS BESIDE PHRASE (off): the SECT lane in Arrange beside the phrase too.']],
+  [406, '3 Nov', ['Command bar: REMOVE takes out the selected rows (or the cursor’s row) and the rows below move up, in a phrase, Pattern view, a sect or the song.', 'Settings: ARRANGE ON STOP, the same choice as PHRASE ON STOP for Arrange; both say STAYS or PLAYHEAD.']],
+  [405, '3 Nov', ['FX bar: each graph sits on a clean screen of its own (near white on light skins), and its animation plays only inside it, so the values stay clear.', 'Keys: on Phrase (Pattern view too) and Song, ⌥/Alt+▲▼ now go to the pattern above / below, as Shift+⌥+▲▼ do; elsewhere they still change screen.']],
+  [404, '3 Nov', ['FX bar: each effect’s animation now plays lightly over its graph instead of hiding behind it.', 'Settings: STOP CURSOR is now PHRASE ON STOP (STAYS or PLAYHEAD).']],
   [403, '3 Nov', ['Table engine: Starter tables… picks one of 30 ready-made tables (saws, squares, FM, voice, organ, bass, chip and more), made from the free Adventure Kid single-cycle waves.']],
   [402, '3 Nov', ['Table engine: Load wavetable… makes the pad’s own table (Table → Loaded), saved with the kit: Serum or WaveEdit tables, single-cycle waves (pick several to stack them) or any sound, cut into cycles.']],
   [401, '3 Nov', ['Side panel: instrument names show in full: a size smaller, and a long one takes a second line (hover still shows the pad).', 'FX bar: the pitch animation shows every voice, so the Harmonizer’s two intervals both show, each as bright as its level.']],
@@ -29635,6 +29721,7 @@ const pvFitS = (s, w) => s.length > w ? s.slice(0, w) : s.padEnd(w);
 function pvBarDraw(y, rows, lpb, warn, warnT){
   let nm = ''; try { nm = typeof songSecName === 'function' ? String(songSecName(y) || '') : ''; } catch(e){}
   pvTxt(pvB.row, 'SONG ROW ' + rS(y, 3));
+  { const rc = rowCol(y), st = pvB.row.style; if (st.getPropertyValue('--rnc') !== rc){ if (rc) st.setProperty('--rnc', rc); else st.removeProperty('--rnc'); } pvB.row.classList.toggle('rnc', !!rc); }   // ROW COLOURS
   pvB.tag.hidden = !nm; pvTxt(pvB.tag, nm.toUpperCase());
   pvTxt(pvB.len, rows + ' ROWS · LPB ' + lpb);
   pvB.warn.hidden = !warn; pvTxt(pvB.warn, warn ? '!' : ''); pvB.warn.title = warnT || warn; pvB.warn.setAttribute('aria-label', warn || 'No pattern length mismatch');
@@ -29792,7 +29879,7 @@ function pvInfo(){
     + (pvPend() ? ' · a new phrase: it goes on the song at this row when it has a note' : u > 1 ? ` · this phrase is on the song ${u} times, so edits change every copy` : '');
 }
 const pvHint = () => inMode === 'keys'
-  ? 'Arrows move across tracks · Tab next track · Shift+Alt+↑↓ other song row · type notes as in Phrase · Shift+arrows select · Alt+←→ other screens · Shift+wheel scrolls across · PHRASE | PATTERN switches · click a track to edit it'
+  ? 'Arrows move across tracks · Tab next track · Alt+↑↓ (or Shift+Alt+↑↓) other song row · type notes as in Phrase · Shift+arrows select · Alt+←→ other screens · Shift+wheel scrolls across · PHRASE | PATTERN switches · click a track to edit it'
   : 'EDIT add note · ◀▶ across tracks · OPT+▲▼ other song row · SHIFT+◀▶ other screens · PHRASE | PATTERN switches · tap a track to edit it';
 /* ===== end PATTERN VIEW ===== */
 applyPlatform();

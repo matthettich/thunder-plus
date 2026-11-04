@@ -128,6 +128,69 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (35): duplicate track from the block menu; master OFF blocks (build 408)
+
+- Owner: "a right click option to duplicate a track, including the patterns/phrases in it … keep the mute behavior".
+  `sxCtx` (Song screen and Arrange beside a screen, via apRun) has **Duplicate this track with its patterns** →
+  `dupTrack(true, t)`; dupTrack takes an optional track (`tAt`) and moves the Song cursor to the copy. Track-number
+  right-click is unchanged (solo). Edit ▾ / Phrase right-click label now "Duplicate the track with its patterns". One undo
+  step (snap batches). Checked headless from Song and beside Phrase (track 10 → 11, 56 unique blocks; one Ctrl+Z back).
+- Owner: "my master track is drawing patterns with only FLX 00 on them as full colored phrases". The master column never
+  had OFF-only looks. `fxOnOff` / `isOffCmdPhrase` / `sectMstOff`: a master block is `o` when its phrases switch something
+  off (FLX 00, GAT 00, RTG 0Y, FXO X0) and nothing on (FLX/GAT/RTG/FXO to a pattern or on); other commands (VOL FF…)
+  don't count. ELECTRO: MST rows 0 and 8 (FLX 00 + VOL FF) now black with the stop bar.
+
+## 3 Nov (34): row colour fixes, Pattern view row colour, sections beside Phrase (build 407, on `beta`)
+
+- Owner: right-clicking Arrange's row number "no right click menu showed up". Only the digits (`[data-ry]`, as wide as
+  "000") took it; the number column is wider, so a click beside them hit `.ar` and nothing happened. The capture handler
+  on `#tArrGrid` now takes anything in the row left of its first block. Checked headless beside Phrase (row 6, in the gap).
+- **ROW COLOUR IN PATTERN** (`SX.pvcol`, key `thunderplus-pvrowcol-v1`, default on): cmdCtx, on Phrase in Pattern view,
+  right-click on `.pvrn` (row numbers) or `.pvrow` (the bar's SONG ROW) → `rowColour(cs.song.y)`. pvBarDraw puts the row's
+  colour on SONG ROW (`.pvrow.rnc`).
+- **SECTIONS BESIDE PHRASE** (`SX.side`, key `thunderplus-songsecs-side-v1`, default off): `sxLaneOn` also allows the
+  lane when Arrange is beside a screen (`body.arrvis`, width ≥ 180); `body.sxsecs .tarr` padding no longer needs
+  `.asong`. Beside a screen the lane uses the narrow (60 px max) width. sxLaneSize now unhides the lane before measuring
+  (names measured 0 wide while it was hidden, so the lane came out at its minimum).
+
+## 3 Nov (33): REMOVE rows; ARRANGE ON STOP (build 406, on `beta`)
+
+- Owner: 'add a "remove" to the small control bar that "removes these rows" to selections'. `rowsRemove()` (above
+  toggleSel): Song → `songRowRemove()`; Phrase → the selected lines (selRect y0..y1, or the cursor row) of cPhrase within
+  its LEN, blank rows in at the end (rowOp's rule); a Pattern view selection (`selA.pat`) also does every `patParts()`
+  phrase; Sect → its rows. One saveS (undo). Command id `rrow`, label REMOVE, after CLEAR in CMDS / CMD_MINI_ORDER; hidden
+  in PAD mode (its packed phone row). Edit ▾ shows "Remove these rows" in place of "Remove the row" while selecting (that
+  one cleared instead). Ctrl/⌘+Backspace with a selection still clears (unchanged). Checked headless: rows 2–3 out, the
+  rest up, undo back.
+- Owner: "add a similar setting … that does the same thing in the arrange window" and "change the text to Stays and
+  Playhead". Settings: **PHRASE ON STOP** (was CURSOR ON STOP, `stopCurOn`, key unchanged) and new **ARRANGE ON STOP**
+  (`stopArrOn`, key `thunderplus-stoparr-v1`, default STAYS), both STAYS / PLAYHEAD. `stopToPlayhead()` picks: Arrange's
+  when tv is 'song' or Arrange has the keys (`apF === 'arr'`), else Phrase's. The move itself is curToPlay as before.
+
+## 3 Nov (32): FX graph screens, animations inside them; ⌥▲▼ between patterns (build 405, on `beta`)
+
+- Owner: "the orange graphics in the fx should be over white backgrounds so that it looks less jumbled" → "do that change".
+  `fxDynPal()` also builds `fxPalScrV` (bg near white on a light skin: bg 80 % to white; on a dark skin bg 35 % to black);
+  `dkFxViz` is now a wrapper that sets `fxPalScr` while `dkFxViz0` (the old body) draws, so every FX bar graph path
+  (dyn displays, Flex patterns, curves, pictures) fills with the screen colour. Elsewhere fxDynPal is unchanged.
+- The animation canvas (`canvas.fspr`) now covers only the graph box: `dkAnimBox(col, cv)` sets its left/top/width/height
+  to `.fviz` (falls back to below the header when a card has no graph) for both `dkAnim` and `dkSpring`. The z-order from
+  404 stays (over the graph, under the values; opacity .6). Animations scale to the smaller box.
+- Owner: "I'd like to keep [Shift+⌥+▲▼] and also use opt + up/down this way and jump between patterns". keysDown (KEYS
+  mode): ⌥+▲▼ on tv 'phrase' → `optDir(arrow, true)`, on 'song' → `shiftAltArrow(arrow)`, i.e. the Shift+⌥ behaviour.
+  ⌥+◀▶ and ⌥+▲▼ on other screens still `nav()` (▲ Project, ▼ Mixer). PAD mode unchanged (its Alt+arrows were optDir
+  already). Help text, Pattern view hint and README updated. Checked headless: Pattern view ⌥▼▼▲▲ → song rows 1,2,1,0,
+  stays on Phrase.
+
+## 3 Nov (31): FX bar animations over the graphs; CURSOR ON STOP (build 404, on `beta`)
+
+- Owner: "display the animations lightly on top of the orange visuals in fx … it would make the animations look
+  intentional". `canvas.fspr` is now z-index 2 (over `.fviz`, 1) and under the values (`.fcb`, 3), at opacity .6
+  (.25 when the slot is off). It still never takes clicks. Drawing code unchanged.
+- Owner, on STOP CURSOR (STAYS / THERE): "what is this language supposed to communicate?". Renamed in Settings to
+  **CURSOR ON STOP**: STAYS PUT (default, `stopCurOn` false) / GOES TO PLAYHEAD; info and README reworded. Same key
+  (`thunderplus-stopcur-v2`), so nobody's choice changes. Code comments still say STOP CURSOR.
+
 ## 3 Nov (30): starter wavetables from AKWF (build 403, on `beta`)
 
 Owner: "Build a starter set in" (after build 402's Load wavetable…).
