@@ -72,8 +72,8 @@ body:not(.menuhelp) #gsecProj > p.note{display:none}
 body:not(.menuhelp) :is(#pMaster,#pApp,#pKit,#pSkin,#pMidi,#pExport,#pAudio) .pbody > p.note{display:none}
 body:not(.menuhelp) :is(#pMaster,#pApp,#pKit,#pSkin,#pMidi,#pExport,#pAudio) .bar{cursor:help}
 /* FX SCREEN: the slot being edited, highlighted; a slot dragged to another one */
-.tscr .tgrid .ln.fxsel{background:color-mix(in srgb, #ff5a1f 16%, transparent); box-shadow:inset 4px 0 0 #ff5a1f} .tscr .tgrid .ln.fxsel span{font-weight:700}
-.tscr .tgrid .ln.fxdrag{opacity:.5} .tscr .tgrid .ln.fxdrop{box-shadow:inset 0 -3px 0 #ff5a1f, inset 0 3px 0 #ff5a1f}
+.tscr .tgrid .ln.fxsel{background:color-mix(in srgb, var(--fxac, #ff5a1f) 16%, transparent); box-shadow:inset 4px 0 0 var(--fxac, #ff5a1f)} .tscr .tgrid .ln.fxsel span{font-weight:700}
+.tscr .tgrid .ln.fxdrag{opacity:.5} .tscr .tgrid .ln.fxdrop{box-shadow:inset 0 -3px 0 var(--fxac, #ff5a1f), inset 0 3px 0 var(--fxac, #ff5a1f)}
 body.edoff #tGrid{box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--rec, #d0302a) 70%, transparent)}
 /* EDIT OFF, easier to see (owner, 2 Nov: "make something look different when you push escape and turn off edit"): on the
    Phrase screen (where it applies) the cursor turns hollow, a dashed red box instead of the filled block, the notes dim a
@@ -1735,8 +1735,8 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkFxBar .dkfc{flex:1 1 230px; max-width:300px; min-width:150px; position:relative; border:1.5px solid var(--line); background:var(--panel); color:var(--ink); box-shadow:4px 4px 0 0 #fff, 4px 4px 0 1.5px var(--line)}
 #dkFxBar .dkfc .fch{background:var(--ink); color:var(--inv); border-bottom:0; min-height:26px; padding:0 8px; gap:8px}
 #dkFxBar .dkfc .fch .fon{width:12px; height:12px; min-width:0; min-height:0; border-radius:0; border:2px solid currentColor; background:transparent; box-shadow:none}
-#dkFxBar .dkfc .fch .fon.on{background:#ff5a1f !important; border-color:#ff5a1f !important; box-shadow:none !important}
-#dkFxBar .dkfc .fch .fon{position:relative} #dkFxBar .dkfc .fch .fon.on::after{content:''; position:absolute; inset:1px; background:#ff5a1f}   /* (a skin's button.on fill would hide it) */
+#dkFxBar .dkfc .fch .fon.on{background:var(--fxac, #ff5a1f) !important; border-color:var(--fxac, #ff5a1f) !important; box-shadow:none !important}
+#dkFxBar .dkfc .fch .fon{position:relative} #dkFxBar .dkfc .fch .fon.on::after{content:''; position:absolute; inset:1px; background:var(--fxac, #ff5a1f)}   /* (a skin's button.on fill would hide it) */
 #dkFxBar .dkfc .fch .fnm{color:inherit; background:transparent; border:0; box-shadow:none; padding:0; min-height:0; height:auto; font-size:var(--fs-3); letter-spacing:.06em; text-align:left; cursor:pointer}
 #dkFxBar .dkfc .fch .fnm:hover{text-decoration:underline}
 #dkFxBar .dkfc.off .fch{background:repeating-linear-gradient(135deg, var(--panel2) 0 6px, var(--track) 6px 12px); color:var(--muted)}
@@ -1768,7 +1768,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 #dkFxBar .dkadd{flex:0 0 96px; align-self:stretch; border:1.5px dashed var(--line); background:transparent; color:var(--ink); font-weight:700; font-size:var(--fs-3); letter-spacing:.06em; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px}
 #dkFxBar .dkadd small{font-family:var(--mono); font-weight:400; font-size:var(--fs-1); color:var(--muted)}
 #dkFxBar .dkadd:hover{background:var(--panel)}
-#dkFxBar .dkfc .fch{cursor:grab} #dkFxBar .dkfc.dragging{opacity:.55} #dkFxBar .droptgt{outline:3px solid #ff5a1f; outline-offset:2px}
+#dkFxBar .dkfc .fch{cursor:grab} #dkFxBar .dkfc.dragging{opacity:.55} #dkFxBar .droptgt{outline:3px solid var(--fxac, #ff5a1f); outline-offset:2px}
 /* …CHAINS RAIL (3 Nov, FX bar): the track's …chains modules in signal order as small blocks on the same dock and offset
    blocks as the effects beside it (deckChains / deckChnFold, dkChnRail). IN and OUT are plain tags at the ends; a block's
    square light is on (orange) or bypassed (hollow, hatched). Folded …CHAINS: a narrow rail beside the title. */
@@ -1781,7 +1781,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
   border:1.5px solid var(--line); background:var(--panel); color:var(--ink); box-shadow:3px 3px 0 0 #fff, 3px 3px 0 1.5px var(--line); font:inherit; font-weight:700; letter-spacing:.04em; text-align:left; cursor:pointer}
 .dkcrail .dkcb span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0}
 .dkcrail .dkcb .fon{flex:none; width:10px; height:10px; border:2px solid currentColor; box-sizing:border-box}
-.dkcrail .dkcb .fon.on{background:#ff5a1f; border-color:#ff5a1f}
+.dkcrail .dkcb .fon.on{background:var(--fxac, #ff5a1f); border-color:var(--fxac, #ff5a1f)}
 .dkcrail .dkcb.off{background:repeating-linear-gradient(135deg, var(--panel2) 0 6px, var(--track) 6px 12px); color:var(--muted)}
 .dkcrail .dkcb:hover span{text-decoration:underline}
 .dkcrail.chnoff .dkcb{opacity:.55}
@@ -1962,6 +1962,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .mwhead > b{font-size:var(--fs-4); letter-spacing:.08em}
 .mwon{min-height:30px; padding:0 14px; font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--panel)}
 .mwon.on{background:var(--ink); color:var(--inv)}
+.mwpump{min-height:30px; padding:0 12px; font-weight:700; letter-spacing:.06em; border:1px solid var(--line); background:var(--panel)}   /* SWITCH TO …PUMP */
 .mwchain{display:flex; align-items:stretch; gap:0; flex:1 1 auto; min-width:0; flex-wrap:wrap}
 .mwst{display:flex; align-items:center; gap:7px; min-height:34px; padding:0 10px; border:1px solid var(--line); background:var(--panel); font-size:var(--fs-3); letter-spacing:.05em; cursor:pointer}
 .mwst + .mwarrow + .mwst{margin-left:0}
@@ -3092,6 +3093,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <button type="button" class="mwon" id="mwOn" aria-pressed="false" title="Mastering on the master bus (renders include it)">OFF</button>
     <div class="mwchain" id="mwChain" role="tablist" aria-label="Mastering chain"></div>
     <div class="mwread" id="mwRead" aria-live="off"></div>
+    <button type="button" class="mwpump" id="mwPump" title="Use the …pump mastering chain for this song instead: pEQ → CALM → COMP → TONE → MASTER (the auto master) in the master’s last five FX slots, as new songs have. The old chain is switched off; Undo takes it all back">SWITCH TO …PUMP</button>
     <button type="button" class="mwx" id="mwX" aria-label="Close mastering" title="Close (Esc, or Back on a phone)"><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg><span>CLOSE</span></button>
   </div>
   <div class="mwbody" id="mwBody">
@@ -13763,12 +13765,29 @@ function alignTabs(){
 addEventListener('resize', () => requestAnimationFrame(alignTabs));
 try { new ResizeObserver(() => requestAnimationFrame(alignTabs)).observe(document.getElementById('tTabs')); } catch(e){}
 try { document.fonts.ready.then(() => alignTabs()); } catch(e){}
+/* SKIN ACCENT FOR THE FX BAR (owner, 3 Nov: "the fx bar doesn't match the skin's accent colors"): its on-switches, graphs,
+   curves and animations used one fixed orange. Each skin's accent is read from its swatch dots: the most coloured one (chroma) that
+   stands out from its background (the third dot breaks ties, the usual accent); a skin with no such colour (Monotone, the
+   greys, Pastel) uses its ink. CSS gets it as --fxac, the FX bar's canvases through fxAc(). */
+let fxAcV = '#ff5a1f';
+const fxAc = () => fxAcV;
+function skinAccent(sk){
+  const rgb = h => { const m = /^#?([0-9a-f]{6})$/i.exec(h || ''); if (!m) return null; const n = parseInt(m[1], 16); return [n >> 16 & 255, n >> 8 & 255, n & 255].map(v => v / 255); };
+  const lum = c => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  const D = (sk && sk.dots) || [], bg = rgb(D[0]); if (!bg) return null;
+  let best = null, bs = 0;
+  D.slice(1).forEach((h, i) => { const c = rgb(h); if (!c) return; const ch = Math.max(...c) - Math.min(...c), dl = Math.abs(lum(c) - lum(bg)); if (ch < 0.3 || dl < 0.08) return;   // chroma: how coloured, not how pale
+    const sc = ch + Math.min(dl, 0.4) + (i === 1 ? 0.08 : 0); if (sc > bs){ bs = sc; best = h; } });
+  return best;
+}
 function applySkin(id){
   const sk = SKINS.find(k => k.id === id) || SKINS[2]; skin = sk.id;
   const de = document.documentElement;
   if (sk.id === 'minimal'){ de.removeAttribute('data-skin'); de.removeAttribute('data-skinbase'); }
   else { de.setAttribute('data-skin', sk.id); de.setAttribute('data-skinbase', sk.base || sk.id); }
   try { localStorage.setItem(SKK, sk.id); } catch(e){}
+  { let ac = skinAccent(sk); if (!ac) try { ac = getComputedStyle(de).getPropertyValue('--ink').trim(); } catch(e){}   // SKIN ACCENT FOR THE FX BAR
+    fxAcV = ac || '#ff5a1f'; de.style.setProperty('--fxac', fxAcV); }
   document.querySelectorAll('#skins .skin').forEach(b => b.setAttribute('aria-checked', String(b.dataset.id === sk.id)));
   try { drawWave(); renderPads(); } catch(e){}
   rbWheel();
@@ -15071,7 +15090,12 @@ let chainAutoBefore = null;
 function chainsAutoOn(before){
   if (chainAutoBefore) return; chainAutoBefore = before;
   setTimeout(() => { const b = chainAutoBefore; chainAutoBefore = null; let any = false;
-    for (const t of chainsAutoTracks()) if (!b.has(t) && !S.chainOn[t]){ S.chainOn[t] = true; any = true; toast('Track ' + (t + 1) + ' now runs through …chains (Mixer → CHN is on).'); }
+    const now = chainsAutoTracks();
+    for (const t of now) if (!b.has(t) && !S.chainOn[t]){ S.chainOn[t] = true; any = true; toast('Track ' + (t + 1) + ' now runs through …chains (Mixer → CHN is on).'); }
+    // AND OFF AGAIN (owner, 3 Nov: "if a track is added to chains and then the input is changed to a different track, the
+    // track still says MISS in the mixer"): an edit that takes a track out of the patch (its Track In / Chain Out moved to
+    // another track, or deleted) switches its CHN off, so it plays as before instead of showing MISS.
+    for (const t of b) if (!now.has(t) && S.chainOn[t]){ S.chainOn[t] = false; any = true; toast('Track ' + (t + 1) + ' no longer runs through …chains (Mixer → CHN is off).'); }
     if (any){ saveS(); chainsPush(); if (view === 'tracker') draw(); } }, 0);
 }
 window.thunderChains = {
@@ -18244,7 +18268,10 @@ function makePlayer(ac, out, getBuf, live){
   // FIRST PLAY (owner, 31 Oct: after opening a song, the master's first FLX was lost): an FXO / FLX / GAT / RTG sent before
   // its track's (or the master's) effect node exists waits here, and the node takes it when it is made.
   const fxcPend = new Map();
-  const fxcFlush = (t, n) => { if (!n || !n.parameters || !fxcPend.size) return; for (const [k, ev] of fxcPend){ const [tt, p] = k.split(':'); if (+tt !== t) continue; fxcPend.delete(k); const q = n.parameters.get(p); if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} } };
+  // EVERY ONE, IN ORDER (owner, 3 Nov: "I have a flx 00 above the current flx command" and the FLX "takes effect above it"):
+  // the pending list kept only the LAST command per param, so an FLX 00 booked before a later FLX was dropped and the slot
+  // wasn't held off until the later one. Each param now keeps its commands, and they're all booked at their own times.
+  const fxcFlush = (t, n) => { if (!n || !n.parameters || !fxcPend.size) return; for (const [k, L] of fxcPend){ const [tt, p] = k.split(':'); if (+tt !== t) continue; fxcPend.delete(k); const q = n.parameters.get(p); if (q) for (const ev of L) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} } };
   const setMfx = n => { if (mfx && mfx !== n) fxDrop(mfx); mfx = n || null; clockTo(mfx); if (mfx){ fxKeySync(mfx, S.mfx); fxcFlush(MT, mfx); } };   // SOURCE: the master's effect slots
   const fxNodeOf = t => t >= MT ? mfx : buses[t] && buses[t].fx;
   const FXP = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'sw6', 'sw7', 'flx', 'gat', 'rtg'];
@@ -18470,7 +18497,7 @@ function makePlayer(ac, out, getBuf, live){
       return; }
     if (ev.type === 'fxc'){ const n = fxNodeOf(ev.track), q = n && n.parameters && n.parameters.get(ev.p);
       if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){}
-      else fxcPend.set(ev.track + ':' + ev.p, ev);   // FIRST PLAY (owner, 31 Oct): the effect isn't built yet: it gets the value when it is
+      else { const k = ev.track + ':' + ev.p, L = fxcPend.get(k) || []; L.push(ev); fxcPend.set(k, L); }   // FIRST PLAY (owner, 31 Oct): the effect isn't built yet: it gets the values when it is
       return; }
     if (ev.type === 'chc'){ const b = buses[ev.track], n = b && b.chn, q = n && n.parameters && n.parameters.get(ev.p); if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} return; }   // BYP
     // The master column's VOL: the master level, with a 4 ms glide so it doesn't click.
@@ -20731,7 +20758,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 408;
+const BUILD = 416;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -21031,10 +21058,65 @@ function getCell(v, x, y){
   if (v === 'sect'){ const r = sectRow(cSect, y); return r ? r[x] : (x ? 0 : -1); }
   const p = S.phrases[cPhrase]; return p ? p[y][x] : -1;
 }
+/* MASTER COLUMN, OWN BLOCKS (owner, 3 Nov: a VOL 00 typed on a bus muted the whole song: its block was also in the MST
+   column, where VOL is the master level, and on three other tracks). Two guards:
+   - a block placed in the master column that tracks use (or on a track when the master column uses it) gets a unique copy
+     there (mstUniq), so the master and the tracks never share a phrase from now on;
+   - typing into a phrase the master column shares with tracks (an older song) says so once (mstShareWarn). */
+const mstShared = new Set();   // phrases already warned about this session
+let mstUniqIn = false;
+// UNIQUE PER TRACK (owner, 3 Nov: "make a unique pattern if copying from one track to another, I'll probably mess that up
+// all the time… Maybe we make it a setting"): with SX.uniq on (the default) a block also gets its own copy when another
+// TRACK already uses it. The same block down its own track (repeats) stays shared.
+function blockMixed(cid, x, y){
+  const isM = x === MT, uq = !isM && SX.uniq;
+  for (let r = 0; r < 256; r++){ const row = S.song[r]; if (!row) continue;
+    if (isM){ for (let t = 0; t < MT; t++) if (row[t] === cid) return true; }
+    else { if (row[MT] === cid && r !== y) return true;
+      if (uq) for (let t = 0; t < MT; t++) if (t !== x && row[t] === cid) return true; } }
+  return false;
+}
+const blockOnMst = cid => S.song.some(r => r && r[MT] === cid);
+function mstUniq(src){   // newBlock's copy (a new sect and new phrases), without moving the cursor or saying anything
+  let cid = freeSectNear(src); if (cid < 0) cid = freeSect(); if (cid < 0) return -1;
+  S.chains[cid] = clone(S.chains[src] || freshSect());
+  const map = new Map(); let first = true;
+  for (const r of S.chains[cid]){ if (r[0] < 0) continue;
+    if (map.has(r[0])){ r[0] = map.get(r[0]); continue; }
+    const op = r[0]; let np = first && phraseFree(cid) ? cid : -1; if (np < 0) np = freePhraseNear(op); if (np < 0) np = freePhrase(); first = false;
+    if (np < 0) break;
+    r[0] = np; S.phrases[np] = clone(S.phrases[op] || freshPhrase()); S.plen[np] = plen(op); S.plpb[np] = S.plpb[op] || 0; map.set(op, np); }
+  if (!S.chains[cid].some(r => r[0] >= 0)) ensureSectPhrase(cid);
+  return cid;
+}
+function phraseKinds(p){   // where phrase p plays: on the master column, on tracks (their numbers)
+  let mst = false; const trk = new Set();
+  for (let r = 0; r < 256; r++){ const row = S.song[r]; if (!row) continue;
+    for (let t = 0; t <= MT; t++){ const cid = row[t]; if (!(cid >= 0)) continue; const ch = S.chains[cid]; if (!ch || !ch.some(q => q[0] === p)) continue;
+      if (t === MT) mst = true; else trk.add(t); } }
+  return {mst, trk};
+}
+// (owner, 3 Nov: "If the same phrase is used on multiple tracks, can we throw up a similar error?") also when it plays on
+// another track: an edit here changes it there. The same phrase down one track (repeats) is normal and says nothing.
+function mstShareWarn(p){
+  if (mstShared.has(p)) return; const k = phraseKinds(p), others = [...k.trk].filter(t => t !== cTrack).sort((a, b) => a - b);
+  if (!(k.mst && k.trk.size) && !(cTrack !== MT && others.length)) return; mstShared.add(p);
+  const ts = [...k.trk].sort((a, b) => a - b).map(t => d2(t + 1)).join(', ');
+  if (!k.mst){ const os = others.map(t => d2(t + 1)).join(', ');
+    setTimeout(() => toast(`Phrase ${hp(p)} also plays on track${others.length > 1 ? 's' : ''} ${os}: what you write here changes there too. UNIQ on this block (Song or Arrange) gives this track its own copy.`, 7000), 60); return; }
+  setTimeout(() => toast(cTrack === MT
+    ? `Phrase ${hp(p)} also plays on track${k.trk.size > 1 ? 's' : ''} ${ts}: what you write here changes there too (VOL turns their notes down). UNIQ on the block gives the master its own copy.`
+    : `Phrase ${hp(p)} also plays in the master column: there VOL is the whole song's level and FLX / FXO the master's effects. UNIQ on this block (Song or Arrange) gives the track its own copy.`, 7000), 60);
+}
 function setCell(v, x, y, val){
-  if (v === 'song'){ S.song[y][x] = val; if (val < 0 && x < MT) setBlockMute(y, x, false); }
+  if (v === 'song'){
+    if (val >= 0 && !mstUniqIn && S.song[y][x] !== val && blockMixed(val, x, y)){
+      mstUniqIn = true; try { const nc = mstUniq(val); if (nc >= 0){ const was = val; val = nc;
+        setTimeout(() => toast(x === MT ? `Block ${hp(songShown(was))} is also on tracks, so the master column got its own copy, ${hp(songShown(nc))}: its VOL and FLX can't reach the tracks.`
+          : `Block ${hp(songShown(was))} is also used ${blockOnMst(was) ? 'in the master column' : 'on another track'}, so this track got its own copy, ${hp(songShown(nc))}` + (blockOnMst(was) ? '.' : ' (Settings → UNIQUE PER TRACK).'), 5000), 60); } } finally { mstUniqIn = false; } }
+    S.song[y][x] = val; if (val < 0 && x < MT) setBlockMute(y, x, false); }
   else if (v === 'sect'){ sectRowEdit(cSect, y)[x] = val; }
-  else { if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase(); S.phrases[cPhrase][y][x] = val; }
+  else { if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase(); S.phrases[cPhrase][y][x] = val; if (val >= 0) mstShareWarn(cPhrase); }
   saveS();
 }
 function instRows(){
@@ -21477,6 +21559,8 @@ function projRows(){
       info:() => 'With SECTIONS on: the SECT lane also shows in Arrange beside the phrase (it takes a little of Arrange’s width), so section names are there while you edit. Off: only on the Song screen'},
     {l:'ROW COLOUR IN PATTERN', ck:'Pattern view: right-click a row number to colour the song row', get:() => SX.pvcol ? 1 : 0, set:v => sxSet('pvcol', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'In Pattern view, right-click a row number (or SONG ROW in its bar) to colour this pattern’s song row, the same as right-clicking the row number in Arrange; SONG ROW then shows in that colour. Off: the right-click menu as usual'},
+    {l:'UNIQUE PER TRACK', ck:'A block put on another track gets its own copy', get:() => SX.uniq ? 1 : 0, set:v => sxSet('uniq', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'ON: a block pasted, cloned, dragged or typed onto a track when another track already uses it gets its own copy (new phrase numbers), so editing one never changes the other; the same block down its own track still repeats. OFF: tracks can share blocks, as before. The master column always keeps its own'},
     {l:'LOOP DRAG', ck:'Song: drag the row numbers to loop', get:() => SX.loop ? 1 : 0, set:v => sxSet('loop', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Drag down the Song screen’s row numbers to loop those rows (PLAY on this screen loops them; LOOP SEL turns it off). A tap still plays from that row'},
     {l:'SONG PEEK', ck:'Song: the phrase under the cursor beside it (not the dogs)', get:() => SX.peek ? 1 : 0, set:v => sxSet('peek', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
@@ -21890,6 +21974,7 @@ function editDouble(wasEmpty){
   }
   if (tv === 'phrase' && c.y >= 0 && PK[c.x] === 'note'){ setCell('phrase', c.x, c.y, OFF); return after('note', 'phrase', c.x, c.y, OFF); }
   if (tv === 'phrase' && c.y >= 0 && PK[c.x] === 'fxc') return fxpOpen(c.x, c.y);   // Enter twice on an effect: the picker
+  if (tv === 'phrase' && c.y >= 0 && PK[c.x] === 'fxv' && PK[c.x - 1] === 'fxc') return fxpOpen(c.x - 1, c.y);   // (owner, 3 Nov) and on its value, the number beside it
   const r = rowsOf(tv)[c.y]; if (r && r.act && r.dbl) r.act();
 }
 // EDIT×2 on the song with sects hidden: a new block is a sect with one new phrase (numbered alike when
@@ -22736,7 +22821,7 @@ function songViewRows(){
 }
 function optDir(dir, grid){
   const d = dir === 'right' || dir === 'up' ? 1 : -1, big = dir === 'up' || dir === 'down';
-  if (tv === 'phrase' && !(grid && patNavOn) && pvActive()) return pvRow(dir === 'up' ? -1 : dir === 'down' ? 1 : d);   // PATTERN VIEW: Ctrl+▲▼, [ ], ‹ › step song rows
+  if (tv === 'phrase' && !(grid && patNavOn) && pvActive()){ phShownGo(); return pvRow(dir === 'up' ? -1 : dir === 'down' ? 1 : d); }   // PATTERN VIEW: Ctrl+▲▼, [ ], ‹ › step song rows
   // Mixer FX row: OPTION+▲▶ turn effects on in order (up to eight), OPTION+▼◀ turn the last one back off.
   if (tv === 'mixer'){ if (cs.mixer.y === 5) fxActiveStep(cs.mixer.x, d); return; }
   // The Song screen (and Arrange holding the keys on Phrase): PAD mode's OPTION+arrows move like the phrase editor's,
@@ -22748,6 +22833,7 @@ function optDir(dir, grid){
   // they jump 16 patterns, as before. OPTION+◀▶ and KEYS-mode Ctrl/⌘+▲▼ always step one.
   // PAD mode's OPTION+arrows (grid): move on the Song grid to the nearest phrase above, below, left or right of
   // this one (phraseGrid). A phrase not placed in the song steps by number as before, so it can still be left.
+  if (tv === 'phrase' && grid && (dir === 'up' || dir === 'down')) phShownGo();   // SHOWN PATTERN: from the pattern on screen, not Arrange's cursor
   if (tv === 'phrase' && grid && patNavOn && phraseGrid(dir)) return;
   if (tv === 'phrase'){ const step = big ? (patNavOn ? 1 : 16) : 1; cPhrase = clamp(cPhrase + d * step, 0, NPH - 1); selA = null; followPhraseBlock(); return draw(); }
   if (tv === 'inst'){ cInst = last.inst = clamp(cInst + d, 0, NI - 1); instPicked = true; return draw(); }
@@ -23649,10 +23735,20 @@ function playhead(){
     if (has(cs.song.y)) rows[t] = cs.song.y; else for (let y = 0; y < 256; y++) if (has(y)){ rows[t] = y; break; } }
   return rows.some(y => y >= 0) ? rows : null;
 }
+/* SHOWN PATTERN (owner, 3 Nov: ⌥+arrows "navigated to the patterns around where the cursor was in arrange, but it should
+   move from the pattern currently displayed on the phrase or pattern window"): the song row and track of the pattern the
+   Phrase screen / Pattern view shows, kept as it's drawn. Arrange's cursor can be elsewhere (Arrange holding the keys,
+   PIN), and a phrase used more than once was found nearest that cursor. phShownGo() puts the song cursor back on it. */
+let phShown = null;
+function phShownGo(){
+  const s = phShown; if (!s || s.p !== cPhrase || !pvHas(s.y, s.x, cPhrase)) return false;
+  cs.song.x = s.x; cs.song.y = s.y; cTrack = s.x; return true;
+}
 function draw(){
   if (view !== 'tracker') return;
   document.body.classList.toggle('tvph', tv === 'phrase');   // EDIT OFF looks apply to the Phrase screen
   if (apHold){ apDirty = true; return; }   // ARRANGE PAGING: a song command run for Arrange draws once, at its end
+  try { if (tv === 'phrase' && !(apReady && apF) && pvHas(cs.song.y, cTrack, cPhrase)) phShown = {x:cTrack, y:cs.song.y, p:cPhrase}; } catch(e){}   // SHOWN PATTERN (pvHas is defined further down the script)
   if (arrPlace()) scheduleRefit(false);   // Arrange moved into (or out of) the Song screen: size the text again next frame
   if (spSync()) fit();   // SIMPLE PHRASE: on or off for this screen, so the phrase is sized again (and Arrange hides)
   pvSync();   // PATTERN VIEW: its buttons and bar, and the text size when it turns on or off
@@ -24605,8 +24701,28 @@ function openMst(stage){
   $('mstWin').hidden = false; mwOpenNow = true; mwBuild(); mwLoop();
   try { gsetToggle(false); } catch(e){}
 }
+/* SWITCH TO …PUMP (owner, 3 Nov: "when i open it from the mixer it is the old one… build it"): an older song (no
+   S.mstPump) takes the …pump mastering chain new songs get: MST_PUMP in the master's last five FX slots (the auto master
+   last), on; the old stage switched off; MASTERING then opens pump MASTER. Slots are not shifted (FXO / FXV commands point
+   at slot numbers), so effects already in those five slots are named and replaced only if you say so. One undo step. */
+async function mstToPump(){
+  if (S.mstPump) return openMst();
+  if (!MST_PUMP.every(k => TFX[k])) return toast('The …pump effects aren’t loaded in this build.');
+  const A = S.mfx = normChainFx(S.mfx), at = FXSLOTS - MST_PUMP.length, busy = [];
+  for (let k = at; k < FXSLOTS; k++) if (A[k] && A[k].type !== MST_PUMP[k - at]) busy.push(`slot ${k + 1} (${fxNameOf(A[k].type)})`);
+  const ok = await askSheet({title:'Switch to …pump mastering', body:'This song’s master gets pEQ → CALM → COMP → TONE → MASTER (the auto master) in its FX slots '
+    + `${at + 1}–${FXSLOTS}, switched on, and its old mastering is switched off. ` + (busy.length ? `This replaces what is in ${busy.join(', ')}. ` : '')
+    + 'The master will sound different. Undo takes it all back.'}, {ok:'Switch'});
+  if (ok == null) return;
+  MST_PUMP.forEach((k, i) => { const f = A[at + i]; if (!(f && f.type === k)) A[at + i] = freshTfx(k); A[at + i].on = true; });
+  S.mst.on = false; S.mstPump = true;
+  fxChanged(NT); mstChanged(); saveS();
+  closeMst(); toast('This song now masters with …pump: EQ → CALM → COMP → TONE → MASTER');
+  setTimeout(() => openMst(), 60);
+}
 function closeMst(){ $('mstWin').hidden = true; mwOpenNow = false; cancelAnimationFrame(mwRaf); draw(); }
 $('mwX').addEventListener('click', closeMst);
+$('mwPump').addEventListener('click', () => mstToPump());   // SWITCH TO …PUMP
 document.addEventListener('keydown', e => { if (mwOpenNow && e.key === 'Escape' && !typing(e)){ e.preventDefault(); e.stopPropagation(); closeMst(); } }, true);
 $('mwOn').addEventListener('click', () => { S.mst.on = !S.mst.on; if (S.mst.on && !S.mst.eq.on && !mstNeedsWk(S.mst)) S.mst.eq.on = true; mstChanged(); mwBuild();
   toast(S.mst.on ? 'Mastering on. Renders of the song include it.' : 'Mastering off: the master bus as before.'); });
@@ -25469,7 +25585,7 @@ function dkDynMeters(cv, f, k, node, now){
     g.fillStyle = 'rgba(128,128,128,.22)'; g.fillRect(x, top, bw, bh);
     if (i === 1){   // GR hangs from the top: 0 to 24 dB (the level-only effects: the change, ±12 dB)
       const fr = lv ? Math.min(1, Math.abs(v) / 12) : Math.min(1, Math.max(0, -v) / FXD_GR), hf = lv ? Math.min(1, Math.abs(hv) / 12) : Math.min(1, Math.max(0, -hv) / FXD_GR);
-      g.fillStyle = '#ff5a1f'; g.fillRect(x, top, bw, Math.round(fr * bh));
+      g.fillStyle = fxAc(); g.fillRect(x, top, bw, Math.round(fr * bh));
       g.fillStyle = ink; g.fillRect(x, top + Math.round(hf * bh) - 1, bw, 2);
     } else {
       const y = lvY(v), hy = lvY(hv);
@@ -25481,9 +25597,9 @@ function dkDynMeters(cv, f, k, node, now){
     g.fillText(i !== 1 && hv <= FXD_LO ? '−∞' : (val > .05 ? '+' : val < -.05 ? '−' : '') + Math.abs(val).toFixed(i === 1 ? 1 : 0), x + bw / 2, bot + 3);
   });
   if (c && c.thr != null){   // THRESHOLD across IN and OUT, labelled
-    const ty = Math.round(lvY(c.thr)) + .5; g.strokeStyle = '#ff5a1f'; g.lineWidth = 1.5; g.setLineDash([3, 2]);
+    const ty = Math.round(lvY(c.thr)) + .5; g.strokeStyle = fxAc(); g.lineWidth = 1.5; g.setLineDash([3, 2]);
     g.beginPath(); g.moveTo(0, ty); g.lineTo(bw, ty); g.moveTo(2 * (bw + gap), ty); g.lineTo(W, ty); g.stroke(); g.setLineDash([]);
-    g.fillStyle = '#ff5a1f'; g.textAlign = 'left'; g.font = '700 7px ' + font; g.fillText('T', bw + 1, Math.max(top, ty - 4));
+    g.fillStyle = fxAc(); g.textAlign = 'left'; g.font = '700 7px ' + font; g.fillText('T', bw + 1, Math.max(top, ty - 4));
   }
 }
 /* PICTURES BY EFFECT TYPE (owner, 2 Nov: "the visual displays are mostly the same… something helpful for each"): drawn
@@ -25541,7 +25657,7 @@ function dkAnim(col, f, now, lv){
   const bx = dkAnimBox(col, cv); if (!bx) return; const W = bx.W, H = bx.H;
   const dpr = devicePixelRatio || 1; if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-  const v = (re, d) => { const x = dkFxVal(f, re); return x == null ? d : x; }, C = fxDynPal(), ink = a => 'rgba(' + C.ink + ',' + a + ')', AC = '#ff5a1f';
+  const v = (re, d) => { const x = dkFxVal(f, re); return x == null ? d : x; }, C = fxDynPal(), ink = a => 'rgba(' + C.ink + ',' + a + ')', AC = fxAc();
   const dt = A.t ? Math.min(0.1, (now - A.t) / 1000) : 0; A.t = now; const ts = now / 1000;
   const dec = v(/decay|time|size|length|feed|fb|regen|sustain/i, .5), tau = 0.12 + dec * 2.4;
   A.e = Math.max(f.on ? Math.min(1, (lv || 0) * 1.4) : 0, A.e * Math.exp(-dt / tau)); const e = A.e;
@@ -25693,7 +25809,7 @@ function dkSpring(col, f, now, lv){
   // the kick: follows the level up at once, dies away over DECAY (0.15–3 s)
   const dt = S2.t ? Math.min(0.1, (now - S2.t) / 1000) : 0; S2.t = now;
   const tau = 0.15 + dec * 2.85; S2.e = Math.max(f.on ? Math.min(1, (lv || 0) * 1.4) : 0, S2.e * Math.exp(-dt / tau));
-  const C = fxDynPal(), ink = 'rgba(' + C.ink + ',', AC = '#ff5a1f', e = S2.e, ts = now / 1000;
+  const C = fxDynPal(), ink = 'rgba(' + C.ink + ',', AC = fxAc(), e = S2.e, ts = now / 1000;
   const coils = Math.round(14 + ten * 22), R = Math.min(W / (nS * 2 + 1) * 0.55, 18), y0 = 10, y1 = H - 10, L = y1 - y0, k = 2 * Math.PI * coils / L;
   const spd = 3 + ten * 9, A = (2 + 7 * e) * (1 - ten * 0.4);   // the wave's speed down the coil and its size
   for (let j = 0; j < nS; j++){
@@ -25729,10 +25845,10 @@ function dkFxVal(f, re){ const D = TFX[f.type]; if (!D || !D.ps) return null; co
 function dkFxPic(g, W, H, f, C, F, font, now, lvNow){
   if (!f || isPumpT(f.type)) return false;
   const grp = fxtGroup(f.type), v = re => dkFxVal(f, re), pad = 6, x0 = pad, x1 = W - pad, y0 = 12, y1 = H - 8, w = x1 - x0, h = y1 - y0;
-  const label = t => { g.font = '600 9px ' + font; g.textBaseline = 'top'; g.fillStyle = F(.55); g.fillText(t, 4, 2); g.fillStyle = '#ff5a1f'; };
-  const grid = () => { g.strokeStyle = F(.1); g.lineWidth = 1; g.beginPath(); for (let q = 1; q < 4; q++){ const y = Math.round(y0 + h * q / 4) + .5; g.moveTo(x0, y); g.lineTo(x1, y); } g.stroke(); g.strokeStyle = g.fillStyle = '#ff5a1f'; g.lineWidth = 1.8; };
+  const label = t => { g.font = '600 9px ' + font; g.textBaseline = 'top'; g.fillStyle = F(.55); g.fillText(t, 4, 2); g.fillStyle = fxAc(); };
+  const grid = () => { g.strokeStyle = F(.1); g.lineWidth = 1; g.beginPath(); for (let q = 1; q < 4; q++){ const y = Math.round(y0 + h * q / 4) + .5; g.moveTo(x0, y); g.lineTo(x1, y); } g.stroke(); g.strokeStyle = g.fillStyle = fxAc(); g.lineWidth = 1.8; };
   const level = () => { g.fillStyle = '#4fd18a'; g.globalAlpha = .8; g.fillRect(x0, H - 4, w * clamp(lvNow || 0, 0, 1), 3); g.globalAlpha = 1; };
-  const AC = '#ff5a1f'; g.lineWidth = 1.8; g.strokeStyle = AC; g.fillStyle = AC;
+  const AC = fxAc(); g.lineWidth = 1.8; g.strokeStyle = AC; g.fillStyle = AC;
   if (grp === 'Delays'){
     const tm = v(/time|delay|rate|^del/i), fb = v(/feed|fb|repeat|regen/i); if (tm == null) return false;
     grid(); label('ECHOES'); const step = w * (0.08 + 0.32 * tm), k = fb == null ? 0.5 : 0.15 + 0.8 * fb;
@@ -26013,7 +26129,7 @@ function dkFxResp(col, cv, g, W, H, f, font){
   if (col._rk === key) return true;
   const now = performance.now(); if (col._rk && now - (col._rt || 0) < 90) return true;   // while a value is dragged: at most ~11 pictures a second
   col._rk = key; col._rt = now; dkFxCurveN++;
-  const F = a => 'rgba(' + C.ink + ',' + a + ')', AC = '#ff5a1f', pad = 6, x0 = pad, x1 = W - pad, y0 = 14, y1 = H - 13, w = x1 - x0, h = y1 - y0;
+  const F = a => 'rgba(' + C.ink + ',' + a + ')', AC = fxAc(), pad = 6, x0 = pad, x1 = W - pad, y0 = 14, y1 = H - 13, w = x1 - x0, h = y1 - y0;
   g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
   const txt = (s, x, y, al, a, sz = 9, wt = 600) => { g.font = wt + ' ' + sz + 'px ' + font; g.textBaseline = 'top'; g.textAlign = al; g.fillStyle = F(a); g.fillText(s, x, y); };
   const tp = dkFxTaps(f, sr, bpm);
@@ -26092,13 +26208,13 @@ function dkFxPat(col, cv, g, W, H, f, k, font){
   if (beat != null && L){   // the playhead: where in the bar the song is now (and, on a time map, the point it plays from)
     const p = ((beat % 4) + 4) % 4, x = L.x0 + p / 4 * L.w;
     g.fillStyle = 'rgba(' + C.ink + ',.85)'; g.fillRect(Math.round(x) - 1, L.y0, 2, L.y1 - L.y0);
-    if (L.fx && st.on && !st.wait){ const y = L.fx(p); if (y != null){ g.beginPath(); g.arc(x, y, 3, 0, 7); g.fillStyle = '#ff5a1f'; g.fill(); } }
+    if (L.fx && st.on && !st.wait){ const y = L.fx(p); if (y != null){ g.beginPath(); g.arc(x, y, 3, 0, 7); g.fillStyle = fxAc(); g.fill(); } }
   }
   return true;
 }
 // The still part of the picture; returns where the playhead goes ({x0, w, y0, y1, fx: bar position → y of the point})
 function dkFxPatDraw(g, W, H, f, st, C, font, bar){
-  const F = a => 'rgba(' + C.ink + ',' + a + ')', AC = '#ff5a1f', dim = !st.on || st.wait, A0 = dim ? .35 : 1;
+  const F = a => 'rgba(' + C.ink + ',' + a + ')', AC = fxAc(), dim = !st.on || st.wait, A0 = dim ? .35 : 1;
   const pad = 5, x0 = pad, x1 = W - pad, w = x1 - x0, y0 = 23, ln = Math.max(6, Math.min(14, Math.round(H * 0.16))), yL1 = H - 4, yL0 = yL1 - ln, y1 = yL0 - 4, h = Math.max(6, y1 - y0);
   g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
   const txt = (s, x, y, al, a, sz = 9, wt = 600) => { g.font = wt + ' ' + sz + 'px ' + font; g.textBaseline = 'top'; g.textAlign = al; g.fillStyle = F(a); g.fillText(s, x, y); };
@@ -27003,11 +27119,11 @@ arrGrid.addEventListener('contextmenu', e => e.preventDefault());
    stageKind / stageLayout / stageCanvas, draw's peek refresh, the peek markup in #tStage, freshSong / normSong's
    `secs`, startScroll's skip). info() is wrapped inside this block.
    A song's sections (S.secs) stay in its file either way, and older versions just ignore them. */
-const SXK = {mouse:'thunderplus-songmouse-v1', secs:'thunderplus-songsecs-v1', loop:'thunderplus-loopdrag-v1', peek:'thunderplus-songpeek-v1', side:'thunderplus-songsecs-side-v1', pvcol:'thunderplus-pvrowcol-v1'};
+const SXK = {mouse:'thunderplus-songmouse-v1', secs:'thunderplus-songsecs-v1', loop:'thunderplus-loopdrag-v1', peek:'thunderplus-songpeek-v1', side:'thunderplus-songsecs-side-v1', pvcol:'thunderplus-pvrowcol-v1', uniq:'thunderplus-uniqtrack-v1'};
 const sxGet = (k, d) => { try { const v = localStorage.getItem(SXK[k]); return v == null ? d : v === '1'; } catch(e){ return d; } };
 // SECTIONS BESIDE PHRASE (owner, 3 Nov: an option, off by default): the SECT lane in Arrange beside the phrase too.
 // ROW COLOUR IN PATTERN (owner, 3 Nov: an option, on by default): right-click Pattern view's row numbers colours its song row.
-const SX = {mouse:sxGet('mouse', true), secs:sxGet('secs', true), loop:sxGet('loop', true), peek:sxGet('peek', false), side:sxGet('side', false), pvcol:sxGet('pvcol', true)};
+const SX = {mouse:sxGet('mouse', true), secs:sxGet('secs', true), loop:sxGet('loop', true), peek:sxGet('peek', false), side:sxGet('side', false), pvcol:sxGet('pvcol', true), uniq:sxGet('uniq', true)};   // UNIQUE PER TRACK (owner, 3 Nov), on
 function sxSet(k, on){ SX[k] = !!on; try { localStorage.setItem(SXK[k], on ? '1' : '0'); } catch(e){} arrSig = ''; arrBoxKey = ''; layoutSig = ''; arrLayout(true); draw(); stageLayout(); }
 const sxRect = () => selA && selA.v === 'song' ? selRect() : null;
 const sxIn = (r, y, t) => !!r && y >= r.y0 && y <= r.y1 && t >= r.x0 && t <= r.x1;
@@ -28719,6 +28835,11 @@ function apBack(){
 { const f = release; release = (...a) => apRun(f, a); }
 { const f = dirPress; dirPress = (...a) => apRun(f, a); }
 { const f = globalKeys; globalKeys = (...a) => apRun(f, a); }
+// SHOWN PATTERN: ⌥+▲▼ (no Shift) on Phrase step from the pattern the phrase / Pattern view shows, even while Arrange holds
+// the keys (they go back to the phrase). Runs before apRun turns the keys into the Song screen's.
+{ const f = globalKeys; globalKeys = (...a) => { const e = a[0];
+  if (e && apF && !apSong && tv === 'phrase' && e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')){ apFocus(null); phShownGo(); }
+  return f(...a); }; }
 { const f = cmdAction; cmdAction = (...a) => apRun(f, a); }
 { const f = kpAction; kpAction = (...a) => apRun(f, a); }
 { const f = toggleLoop; toggleLoop = (...a) => apRun(f, a); }   // LOOP SEL (top bar): Arrange's song selection, as on the Song screen
@@ -29034,6 +29155,14 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [416, '3 Nov', ['Settings → UNIQUE PER TRACK (on): a block pasted, cloned, dragged or typed onto a track when another track already uses it gets its own copy, so editing one never changes the other. The same block down its own track still repeats.']],
+  [415, '3 Nov', ['Typing into a phrase that also plays on another track says so once, with how to give this track its own copy (UNIQ). The same phrase repeated down one track says nothing.']],
+  [414, '3 Nov', ['Master column: a block placed there that tracks also use (or on a track when the master column uses it) gets its own copy, so the master’s VOL, FLX and FXO can’t reach the tracks, and theirs can’t reach the master.', 'Typing into a phrase that the master column already shares with tracks (an older song) says so once, with how to split it (UNIQ).']],
+  [413, '3 Nov', ['FX bar: its on-switches, graphs, curves and animations use the skin’s own accent colour instead of one fixed orange (M8 cyan, Bauhaus red, Matrix green…); skins without one use their ink.']],
+  [412, '3 Nov', ['Effect commands: an FLX 00 (or any FXO / GAT / RTG) above a later one is no longer lost when the effect is built as the song starts, so the effect stays off until the later command.', 'Phrase: Enter twice on an effect’s value (the number beside it) opens the effect list too.']],
+  [411, '3 Nov', ['Phrase / Pattern view: ⌥/Alt+▲▼ step from the pattern on screen, even when Arrange’s cursor is somewhere else (Arrange holding the keys, PIN, or a phrase used in more than one place); the keys go back to the phrase.']],
+  [410, '3 Nov', ['…chains: moving a Track In / Chain Out to another track (or deleting it) switches the old track’s CHN off, so the Mixer no longer shows MISS for it and the track plays as before.']],
+  [409, '3 Nov', ['Mastering: an older song’s MASTERING window has SWITCH TO …PUMP: the song takes the …pump chain new songs have (EQ → CALM → COMP → TONE → MASTER, the auto master last) in the master’s last five FX slots, and its old mastering is switched off. It asks first if those slots hold effects; Undo takes it back.']],
   [408, '3 Nov', ['Arrange and Song: right-click a block → Duplicate this track with its patterns: the track goes into the next empty track of its kind with its volume, pan, effects and every block as a unique copy (also Ctrl/⌘+Alt+D on Phrase, Mixer and FX). Right-click on a track number still solos.', 'Master column: a block that turns effects off (FLX 00, GAT 00, RTG 00, FXO X0) and turns nothing on draws like an OFF-only block, black with the stop bar.']],
   [407, '3 Nov', ['Row colours: right-clicking anywhere in Arrange’s row-number column opens the colour (only the digits did, so it often seemed to do nothing).', 'Pattern view: right-click a row number (or SONG ROW) to colour this pattern’s song row; SONG ROW shows the colour (Settings → ROW COLOUR IN PATTERN, on).', 'Settings → SECTIONS BESIDE PHRASE (off): the SECT lane in Arrange beside the phrase too.']],
   [406, '3 Nov', ['Command bar: REMOVE takes out the selected rows (or the cursor’s row) and the rows below move up, in a phrase, Pattern view, a sect or the song.', 'Settings: ARRANGE ON STOP, the same choice as PHRASE ON STOP for Arrange; both say STAYS or PLAYHEAD.']],
@@ -29740,6 +29869,7 @@ function pvLines(c, L, cc, rsel, playRows){
     try { return pvLines(c, L, cc, rsel, playRows); } finally { pvLinesIn = false; s.x = k.x; s.y = k.y; s.top = k.top; } }
   if (!pvHas(cs.song.y, cTrack, cPhrase) && !pvPend()) pvAlign();
   const Y = cs.song.y, row = S.song[Y] || [], uses = pvUsesLast = pvUses(), k = pvSectRow();
+  phShown = {x:cTrack, y:Y, p:cPhrase};   // SHOWN PATTERN (also while Arrange holds the keys: the row this view shows)
   const psr = selA && selA.v === 'phrase' && selA.pat ? selRect() : null;   // TRACKER KEYS: a pattern selection shows on every track
   const onRow = pvHas(Y, cTrack, cPhrase), pend = !onRow && pvPend();
   if (onRow) cs.song.x = cTrack;

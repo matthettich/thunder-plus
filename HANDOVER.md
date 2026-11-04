@@ -132,6 +132,98 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (43): UNIQUE PER TRACK (build 416, on `beta`)
+
+- Owner: "make a unique pattern if copying from one track to another, I'll probably mess that up all the time if not.
+  Maybe we make it a setting". `SX.uniq` (key `thunderplus-uniqtrack-v1`, default on; Settings → UNIQUE PER TRACK, after
+  ROW COLOUR IN PATTERN): `blockMixed` also counts another TRACK using the block, so setCell('song') gives it a copy
+  (mstUniq) wherever it lands — typing, paste, clone, drag, generators. Down its own track it stays shared. A drag that
+  moves a track's only use of a block to another track also renumbers it (the source cell is cleared after the copy):
+  harmless, same contents. The master column rule (414) holds whatever this is set to.
+- Checked headless on the owner's song: track 1's block onto track 16 → 2DE; again on track 1 → shared; setting off →
+  shared on track 15.
+
+## 3 Nov (42): warn on a phrase shared between tracks (build 415, on `beta`)
+
+- Owner: "If the same phrase is used on multiple tracks, can we throw up a similar error?" `mstShareWarn` also warns
+  (once per phrase a session) when the phrase plays on a track other than `cTrack`, naming them and pointing at UNIQ. Only
+  a warning: placing a track's block on another track still shares it, as it always has (paste, Arrange copies).
+  Checked headless (track 1's block put on track 16, an edit on track 1 → "also plays on track 16").
+
+## 3 Nov (41): the master column never shares a block with tracks (build 414, on `beta`)
+
+- The owner's "VOL 00 on a bus mutes the song" (beta testing ELECTRO, bus track 08, song row 59): block 15 (phrase 15, FLX 00
+  on line 0) was on tracks 7, 8 (the bus), 11, 12 and in MST on 46 rows. The VOL typed on the bus was in the master's copy
+  (→ `mvol`, the master level) and turned down tracks 7, 11, 12's notes (`mod`); on the bus itself it did nothing. Not an
+  engine bug; the open item in (39) is closed.
+- Owner: "Do those!" — `setCell('song')`: a block placed where `blockMixed(cid, x, y)` (the master column and tracks would
+  share it) gets `mstUniq(src)` (newBlock's sect + phrases copy, quiet) and a toast; `mstUniqIn` guards re-entry. Every
+  placement goes through it (typing, Enter, paste, clone, drag, generators). `setCell` on a phrase: `mstShareWarn(p)` once
+  per phrase a session when `phraseKinds(p)` has both MST and tracks.
+- Checked on the owner's song headless: typing in phrase 15 → the warning; block 15 into an empty MST row → copy 2DE; MST's
+  block onto track 16 → copy 2DF; an ordinary block on a track unchanged. Tests pass.
+- VOL on a bus still does nothing (a bus has no notes); TVL is the bus's level. Offered the owner: VOL on a bus = its level.
+
+## 3 Nov (40): the FX bar in the skin's accent (build 413, on `beta`)
+
+- Owner: "the fx bar doesn't match the skin's accent colors". Skins have no accent variable, so `skinAccent(sk)` reads
+  it from the skin's SKINS `dots`: of dots 1–3, the highest chroma (≥ 0.3) that differs from dots[0] (the background) in
+  luminance by ≥ 0.08, plus a little for dots[2] (usually the accent); none → the skin's `--ink`. `applySkin` sets
+  `fxAcV` / `fxAc()` and `--fxac` on :root. Swapped for the fixed #ff5a1f: the FX bar's on-switch, drop outline and
+  …chains rail switch (CSS), the FX screen's edited-slot highlight and drop line, and every canvas in dkAnim, dkSpring,
+  dkDynMeters, dkFxResp, dkFxPic, dkFxPat, dkFxPatDraw. Elsewhere the orange stays (OFF-only blocks, the brand mark…).
+  Results: IDM #ff4d00, M8 #2ce0f0, Matrix #00ff41, Neon #00f0ff, Bauhaus #d7261e, DX7 #5bbfae; Pastel, Monotone, the
+  greys, Plum and Winter use ink. Checked headless in IDM, M8, Bauhaus.
+
+## 3 Nov (39): pending effect commands kept in order; Enter twice on an effect value (build 412, on `beta`)
+
+- Owner: "the flx command i dropped in the pattern seems to take effect above it when played … I have a flx 00 above the
+  current flx command". makePlayer's `fxcPend` (an `fxc` booked before the track's effect node exists: the first PLAY, a
+  rebuilt node; the core hands those to the page too) was a Map key → ONE event, so FLX 00 on row 0 was replaced by the
+  FLX on a later row; when the node arrived only the later one was booked and the slot (STARTS: AT PLAY in older songs)
+  played its own PATTERN above it. Now key → list, `fxcFlush` books every one at its own time. `fxreset` still clears them.
+- Owner: "pressing enter twice on the number next to an effect column opens the fx selector menu". The Enter-twice handler
+  opens `fxpOpen(c.x - 1, c.y)` on a `fxv` cell too. Checked headless: Phrase and Pattern view, FX1 command and value.
+- **Open:** owner reports VOL 00 in a bus track mutes the whole song, wherever it is in the track (and VOL 85 at the top
+  doesn't help). Not reproduced: ELECTRO's bus (track 4, fed by 1, 2, 3, 7) with VOL 85 / VOL 00 in its phrase changes
+  nothing, offline (pass) or live (headless, master meter). On a bus, VOL becomes a `mod` on that track's own voices
+  (none). Asked the owner for the song file. (TVL is the command for a track's mixer level.)
+
+## 3 Nov (38): ⌥▲▼ from the pattern on screen (build 411, on `beta`)
+
+- Owner: ⌥+arrows "navigated to the patterns around where the cursor was in arrange, but it should move from the pattern
+  currently displayed on the phrase or pattern window". Two causes: with Arrange holding the keys, the keys run as the
+  Song screen (apRun), so ⌥▲▼ moved Arrange's cursor; and phraseGrid / pvRow start from `cs.song`, which is Arrange's
+  cursor (PIN, an empty cell, or a phrase used twice: followPhraseBlock takes the use nearest that cursor).
+- `phShown` {x, y, p}: the pattern the phrase screen shows, set in draw (Phrase, Arrange not holding the keys, the cursor
+  on the phrase's block) and in pvLines (after pvAlign, also while Arrange holds the keys). `phShownGo()` puts cs.song
+  and cTrack back on it when it still holds cPhrase.
+- A wrapper on `globalKeys` (outside apRun): ⌥+▲▼ without Shift on Phrase while Arrange has the keys → `apFocus(null)` +
+  phShownGo, then the key goes on as the phrase's. optDir calls phShownGo before phraseGrid (▲▼) and before pvRow.
+  Shift+⌥+▲▼ unchanged.
+- Checked headless: Pattern view on row 0, Arrange pinned with its cursor at 20 and the keys → ⌥▼▼▲ = rows 1, 2, 1.
+  (Without PIN, any key run for Arrange makes the phrase follow its cursor first, as before.)
+
+## 3 Nov (37): CHN off when a track leaves the …chains patch (build 410, on `beta`)
+
+- Owner: "if a track is added to chains and then the input is changed to a different track, the track still says MISS in
+  the mixer". `chainsAutoOn` only ever switched CHN on (a track newly in `chainsAutoTracks()`); the old track kept
+  `S.chainOn` true with nothing in the patch → MISS. It now also switches CHN off for a track that was in the patch
+  before the edit and isn't after (Track In / Chain Out moved or deleted), with a toast. Same deferred check as before,
+  so a passing state while a module snaps doesn't count. A whole-patch replace (undo, import) is unchanged.
+- Checked headless: Track In + Chain Out on track 1 (CHN on) moved to 3 → CHN on 3 only, no MISS in the Mixer.
+
+## 3 Nov (36): SWITCH TO …PUMP for older songs (build 409, on `beta`)
+
+- Owner: "when i open it from the mixer it is the old one but I thought we brought the pump fx over, including the auto
+  master" → "build it". Songs from before 358 have no `S.mstPump`, so MASTERING opens the old `#mstWin`. Its header now
+  has **SWITCH TO …PUMP** (`#mwPump` → `mstToPump()`): MST_PUMP into master slots 4–8 (the same slots `mstPumpFresh` uses;
+  slots aren't shifted, because FXO / FXV point at slot numbers), all on; `S.mst.on = false`, `S.mstPump = true`;
+  fxChanged(NT) + mstChanged; closes the old window and opens pump MASTER. Asks first (askSheet) and names any other
+  effects it would replace in those slots; a pump stage already in its own slot keeps its settings. One undo step.
+- Checked headless: old song with Room in slot 8 → the ask names it → slots 4–8 peq/pcalm/pcomp/ptone/pmaster, old off,
+  pump MASTER open; Ctrl+Z back to the old chain and the reverb.
+
 ## 3 Nov (35): duplicate track from the block menu; master OFF blocks (build 408)
 
 - Owner: "a right click option to duplicate a track, including the patterns/phrases in it … keep the mute behavior".
