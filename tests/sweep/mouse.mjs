@@ -39,10 +39,11 @@ async function rules(name, c) {
     await put(mid); b = await box(c.grab ? c.grab : c.sel);
     await page.mouse.click(b.x, b.y, { button: 'right' }); await page.waitForTimeout(250);
     const items = await menuItems(); const has = items && items.some(t => /^Reset/.test(t)) && items.some(t => /^Type/.test(t)), hasReset = items && items.some(t => /^Reset/.test(t));
-    T.add(`${name}: right-click Reset / Type${c.learn ? ' / Learn' : ''}`, !!has && (!c.learn || items.some(t => /^Learn/.test(t))), items ? items.join(' · ') : 'no menu');
+    const typeOn = await page.evaluate(() => [...document.querySelectorAll('.sxmenu button')].some(b => /^Type/.test(b.textContent) && !b.disabled));
+    T.add(`${name}: right-click Reset / Type${c.learn ? ' / Learn' : ''}`, !has ? false : !typeOn ? 'NOTE' : !c.learn || items.some(t => /^Learn/.test(t)), (items ? items.join(' · ') : 'no menu') + (has && !typeOn ? ' (Type a value… greyed out: a slider with no menu of its own gets Reset only, HANDOVER 3 Nov (8))' : ''));
     if (hasReset) { await page.locator('.sxmenu button', { hasText: /^Reset/ }).click(); await page.waitForTimeout(200); v = await get(); T.add(`${name}: menu Reset works`, v === def, `→ ${v}`); }
     await closeMenus();
-    if (has) { await put(mid); b = await box(c.grab ? c.grab : c.sel); await page.mouse.click(b.x, b.y, { button: 'right' }); await page.waitForTimeout(200);
+    if (has && typeOn) { await put(mid); b = await box(c.grab ? c.grab : c.sel); await page.mouse.click(b.x, b.y, { button: 'right' }); await page.waitForTimeout(200);
       await page.locator('.sxmenu button:not([disabled])', { hasText: /^Type/ }).click({ timeout: 3000 }); await page.waitForTimeout(300);
       const dlg = await A(`!!document.querySelector('.ask input, .row output input, .pumpedit:not([hidden])')`); T.add(`${name}: menu Type opens a box`, dlg, '');
       await page.keyboard.press('Escape'); await closeMenus(); }
