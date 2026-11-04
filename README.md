@@ -202,7 +202,7 @@ Tap **Tracker** at the top for a sequencer that plays the kit. 16 tracks:
 | | | | |
 |---|---|---|---|
 | `ARP` arpeggio (+X, +Y semitones) | `ARC` arpeggio pattern (X: up, down, up-down, random) and speed (Y ticks) | `CHA` chance the note plays | `DEL` delay in ticks |
-| `GRV` / `GGR` groove: X ticks on even steps, Y on odd | `HOP` end the phrase, next one starts at row Y | `INS` play with instrument XX | `KIL` stop the note after XX ticks |
+| `GRV` / `GGR` groove: X ticks on even steps, Y on odd | `HOP` end the phrase, next one starts at row XX (00–1F; row 00 if that's past its length) | `INS` play with instrument XX | `KIL` stop the note after XX ticks |
 | `OFF` fade the note out after XX ticks | `NTH` play on pass Y of every X | `RET` retrigger every Y ticks, X fades | `REP` repeat the last command, adding XX |
 | `RND` randomise the command to the left (alone: the note's pitch), −X / +Y | `RNL` the same as a random walk | `PSL` pitch slide | `PBN` pitch bend across the step |
 | `PVB` vibrato (X speed, Y depth) | `SED` seed the random numbers | `TPO` tempo from this row on | `TSP` transpose the track from here on |

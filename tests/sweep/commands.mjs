@@ -76,11 +76,11 @@ try {
   const HOPR = `const N = E.filter(e => e.type === 'note' && e.track === 0 && e.t < 3).map(e => Math.round(12 * Math.log2(e.rate)));`;
   C('HOP', 0x00, `${HOPR} return [N[4] === 4 && N[5] === 0, 'HOP 00 on row 4: rows played ' + N.slice(0, 8).join(',')];`, { row: 4, rowsPitch: true });
   C('HOP', 0x08, `${HOPR} return [N[5] === 8, 'HOP 08 on row 4: next phrase from row ' + N[5] + ' (rows ' + N.slice(0, 8).join(',') + ')'];`, { row: 4, rowsPitch: true });
-  // HOP XX: the code takes the whole byte as the row (capped at the phrase's rows: past its LEN the next pass starts at 00);
-  // README / Help / the hint line say "row Y" (the low digit). Documented here as the code plays it; see the sweep report.
-  C('HOP', 0x18, `${HOPR} return [N[5] === 0, 'HOP 18: the code plays row 0x18 = 24, past LEN 16, so the next pass starts at 00 (the hint says row 8): ' + N[5]];`, { row: 4, rowsPitch: true });
+  // HOP XX: the whole value is the row (capped at 1F, a phrase's 32 rows; past the next phrase's LEN it starts at 00).
+  // The owner chose this over the low digit on 4 Nov (needed for 32-row patterns); README / Help / the hint say the same.
+  C('HOP', 0x18, `${HOPR} return [N[5] === 0, 'HOP 18: row 0x18 = 24 is past LEN 16, so the next pass starts at 00: ' + N[5]];`, { row: 4, rowsPitch: true });
   C('HOP', 0x0F, `${HOPR} return [N[5] === 15, 'HOP 0F: next from row ' + N[5]];`, { row: 4, rowsPitch: true });
-  C('HOP', 0xFF, `${HOPR} return [N[5] === 0, 'HOP FF: row 31 is past LEN 16, so 00 (the hint says row F): ' + N[5]];`, { row: 4, rowsPitch: true });
+  C('HOP', 0xFF, `${HOPR} return [N[5] === 0, 'HOP FF: capped at row 1F, past LEN 16, so 00: ' + N[5]];`, { row: 4, rowsPitch: true });
   C('INS', 0x03, `${T0} return [N0[0].ii === 3, 'instrument ' + N0[0].ii];`);
   C('INS', 0xFF, `${T0} return [N0[0].ii === niOf(S) - 1 || N0[0].ii <= 63, 'clamped to ' + N0[0].ii];`);
   for (const v of [0, 4, 0xFF]) C('KIL', v, `${T0} const tick = 0.125/6; return [Math.abs((N0[0].cut - N0[0].t) / tick - ${v}) < 1e-3, 'cut at ' + ((N0[0].cut - N0[0].t) / tick).toFixed(2) + ' ticks'];`);
