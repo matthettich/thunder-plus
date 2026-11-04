@@ -5366,3 +5366,11 @@ marked `BATTERY (27 Oct)`:
   all pass. Not yet tried on the Fold: check a pad tap after coming back to the app sounds at once, and that the
   battery use in Android's settings drops.
 - Left for later: the idle dogs' endless breathe/wag animation (open item 11).
+
+## 4 Nov: transparent app icon (web + desktop)
+
+- Owner: "background for the thunder plus icon (the yellow part) transparent, so it's just the dogs faces". `icons/plus-icon-512.png`
+  and `-192.png` (favicon, manifest "any" icons, media-session artwork, Electron app icon) now have the yellow removed,
+  with the outline's anti-aliased edge kept as semi-transparent ink. Yellow kept where transparency fails: the Apple
+  touch icon (iOS fills it black) and the maskable icon (Android needs a full-bleed background). Icon refs ?v=3,
+  manifest ?v=9, cache v428.
