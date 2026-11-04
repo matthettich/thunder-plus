@@ -17484,6 +17484,17 @@ const isEmptyPhrase = p => !p || p.every(r => r.every(v => v < 0));
 // block. Arrange draws it unlike both a playing block and an empty one.
 // (2 Nov, later: also a phrase with only effect commands, or only OFFs and commands: anything that plays no note)
 const isOffPhrase = p => !!p && !isEmptyPhrase(p) && p.every(r => r.slice(0, NCOL).every(v => v < 0 || v === OFF));
+// MASTER OFF BLOCKS (owner, 3 Nov: "my master track is drawing patterns with only FLX 00 on them as full colored phrases"):
+// the master column is all commands, so there a block looks like an OFF-only block when it switches something off
+// (FLX 00 Flex off, GAT 00 step gate off, RTG 0Y retrigger off, FXO X0 an effect slot off) and switches nothing on (FLX,
+// GAT, RTG or FXO to a pattern / on). Other commands (VOL FF back to full, TPO…) don't count either way.
+const fxOnOff = (c, v) => { const n = FXC[c]; if (n === 'FLX' || n === 'GAT') return v === 0 ? -1 : 1; if (n === 'RTG') return (v >> 4) === 0 ? -1 : 1;
+  if (n === 'FXO') return (v >> 4) === 0 ? 0 : (v & 15) === 0 ? -1 : 1; return 0; };
+const isOffCmdPhrase = p => { if (!p || isEmptyPhrase(p)) return false; let off = 0;
+  for (const r of p){ for (let k = 0; k < NCOL; k++) if (r[k] >= 0 && r[k] !== OFF) return false;
+    for (let k = FX0; k + 1 < RW; k += 2) if (r[k] >= 0){ const q = fxOnOff(r[k], r[k + 1]); if (q > 0) return false; if (q < 0) off++; } }
+  return off > 0; };
+const sectMstOff = v => { const c = S.chains[v]; if (!c) return false; const P = c.filter(r => r[0] >= 0).map(r => S.phrases[r[0]]); return P.length > 0 && P.some(isOffCmdPhrase) && P.every(p => isEmptyPhrase(p) || isOffCmdPhrase(p)); };
 const sectOffOnly = v => { const c = S.chains[v]; if (!c) return false; const P = c.filter(r => r[0] >= 0).map(r => S.phrases[r[0]]); return P.length > 0 && P.some(isOffPhrase) && P.every(p => isEmptyPhrase(p) || isOffPhrase(p)); };
 const plen = id => id >= 0 && S.plen ? clamp(S.plen[id] || S.dlen || 16, 1, PROWS) : (S.dlen || 16);
 const plpbOf = (Sx, id) => (id >= 0 && Sx.plpb && Sx.plpb[id]) || Sx.lpb || 4;
@@ -20720,7 +20731,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 407;
+const BUILD = 408;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22034,10 +22045,11 @@ function dupPattern(){
 // same kind (mono or poly) that has nothing on the song. It gets the volume, pan, sidechain-out and the track's effects
 // (not mute or solo); with notes, every block of the track too, as unique copies on the same rows (block mutes kept).
 // …chains isn't copied: its patch is one for the whole song.
-function dupTrack(notes){
-  const mst = tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
+// tAt: the track to copy (the Song / Arrange right-click menu's block), else the screen's own track.
+function dupTrack(notes, tAt){
+  const mst = tAt != null ? tAt === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
   if (mst) return toast('The master can’t be duplicated.');
-  const t = dkTrack(), PF = polyFrom(), poly = t >= PF, end = poly ? ntr() : PF;
+  const t = tAt != null ? tAt : dkTrack(), PF = polyFrom(), poly = t >= PF, end = poly ? ntr() : PF;
   let to = -1; for (let u = t + 1; u < end; u++) if (S.song.every(row => row[u] < 0)){ to = u; break; }
   if (to < 0) return toast(`No empty ${poly ? 'poly' : 'mono'} track to the right of track ${d2(t + 1)} to duplicate it into.`);
   const a = S.mix[t], b = S.mix[to]; b.vol = a.vol; b.trim = a.trim; b.pan = a.pan; b.sc = a.sc;   // trim: GAIN STAGING
@@ -22048,6 +22060,7 @@ function dupTrack(notes){
   mixChanged(); rtFx(to);
   // The cursor goes to the new track, as in Renoise.
   if (tv === 'mixer') cs.mixer.x = to;
+  else if (tv === 'song') cs.song.x = to;
   else if (tv === 'fx') cFxT = to;
   else if (tv === 'phrase' && pvActive()) pvGo(to, cs.song.y, 'first', null);
   else if (tv === 'phrase' && S.song[cs.song.y][to] >= 0){ const ph = firstPhrase(S.song[cs.song.y][to]); if (ph >= 0){ cTrack = to; cs.song.x = to; cSect = S.song[cs.song.y][to]; cPhrase = ph; } }
@@ -23134,7 +23147,7 @@ function cmdItems(full){
     {h:'Track'},
     ...(isBus ? [{a:'unbus', l:'Make this track a normal track (not a bus)', k:'', f:() => unBus(onSong ? cs.song.x : dkTrack())}] : []),   // BUS BACK TO A TRACK
     ...(trk || full ? [{a:'dup', l:'Duplicate the track (no notes)', k:keyHint('mod+D'), f:() => dupKey(false), off:!trk},
-      {a:'dupn', l:'Duplicate the track with its notes', k:keyHint('mod+alt+D'), f:() => dupKey(true), off:!trk}] : []),
+      {a:'dupn', l:'Duplicate the track with its patterns', k:keyHint('mod+alt+D'), f:() => dupKey(true), off:!trk}] : []),
     ...(full ? [{a:'newph', l:'New phrase on the next empty track', k:keyHint('alt+T'), f:newPhraseRight},
       {a:'mute', l:'Mute / unmute this track', k:'/', f:muteKey}, {a:'solo', l:'Solo / unsolo this track', k:keyHint('mod+/'), f:() => soloKey(false)}] : []),
     ...(['song', 'phrase', 'mixer', 'fx'].includes(tv) || full ? [{a:'tname', l:'Name this track…', k:'', f:nameTrackHere, off:!['song', 'phrase', 'mixer', 'fx'].includes(tv)}] : []),
@@ -26674,7 +26687,7 @@ function drawArr(PH){
       h += `<b class="${cls.trim()}"${sty} data-y="${y}" data-t="${t}">${lab}</b>`;
     }
     if (mx){ const v = S.song[y][MT];   // the master column: commands only, never muted
-      h += `<span></span><b class="gx${v < 0 ? '' : isEmptySect(S.chains[v]) ? ' z' : ' f'}" data-y="${y}" data-t="${MT}">${v < 0 ? '' : hp(songShown(v))}</b>`; }
+      h += `<span></span><b class="gx${v < 0 ? '' : isEmptySect(S.chains[v]) ? ' z' : sectMstOff(v) ? ' o' : ' f'}" data-y="${y}" data-t="${MT}">${v < 0 ? '' : hp(songShown(v))}</b>`; }
     h += '</div>';
   }
   const PF = polyFrom();
@@ -27311,6 +27324,9 @@ function sxCtx(y, t){
     {l:'Clone down (into a new row below)', k:ks ? keyHint('mod+shift+C') : '', f:() => cloneDown(), off:!n},
     null,
     {l:'Swap instrument in this track…', f:() => swapDialog(t, y), off:t === MT || multi},
+    // DUPLICATE TRACK (owner, 3 Nov: "a right click option to duplicate a track, including the patterns/phrases in it"):
+    // into the next empty track of its kind, every block as a unique copy (dupTrack with notes)
+    {l:'Duplicate this track with its patterns', f:() => dupTrack(true, t), off:t === MT},
     {l:'Mute / unmute', k:ks ? 'M' : '', f:() => sxMuteRect(r), off:!n || (t === MT && !multi)},
     {l:'Loop these rows', f:() => sxLoopRows(r.y0, r.y1), off:r.y1 <= r.y0},
     {l:'Open the phrase', k:ks ? keyHint('alt+→') : '', f:sxOpen, off:multi || !filled},
@@ -29018,6 +29034,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [408, '3 Nov', ['Arrange and Song: right-click a block → Duplicate this track with its patterns: the track goes into the next empty track of its kind with its volume, pan, effects and every block as a unique copy (also Ctrl/⌘+Alt+D on Phrase, Mixer and FX). Right-click on a track number still solos.', 'Master column: a block that turns effects off (FLX 00, GAT 00, RTG 00, FXO X0) and turns nothing on draws like an OFF-only block, black with the stop bar.']],
   [407, '3 Nov', ['Row colours: right-clicking anywhere in Arrange’s row-number column opens the colour (only the digits did, so it often seemed to do nothing).', 'Pattern view: right-click a row number (or SONG ROW) to colour this pattern’s song row; SONG ROW shows the colour (Settings → ROW COLOUR IN PATTERN, on).', 'Settings → SECTIONS BESIDE PHRASE (off): the SECT lane in Arrange beside the phrase too.']],
   [406, '3 Nov', ['Command bar: REMOVE takes out the selected rows (or the cursor’s row) and the rows below move up, in a phrase, Pattern view, a sect or the song.', 'Settings: ARRANGE ON STOP, the same choice as PHRASE ON STOP for Arrange; both say STAYS or PLAYHEAD.']],
   [405, '3 Nov', ['FX bar: each graph sits on a clean screen of its own (near white on light skins), and its animation plays only inside it, so the values stay clear.', 'Keys: on Phrase (Pattern view too) and Song, ⌥/Alt+▲▼ now go to the pattern above / below, as Shift+⌥+▲▼ do; elsewhere they still change screen.']],
