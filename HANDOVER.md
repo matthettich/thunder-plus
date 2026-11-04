@@ -28,6 +28,29 @@ Keep this file up to date at the end of a work session.
 
 - **v1.2.84** (4 Nov 2026; owner: "push to the main and start a desktop build"; Run workflow through the API with version 1.2.84,
   from `main` after merging `beta` at build 427): the full test sweep's ten fixes (422–425), HOP docs (426) and the follow-up (427).
+- **v1.2.83** (3 Nov 2026; owner: "push it and build a desktop app"; Run workflow through the API, from `main` at build 421; v1.2.82
+  went out minutes before at build 420): the bus bars from the group bar, centred in the gaps, no white edge (419–421).
+- **v1.2.81** (3 Nov 2026; owner: "merge build"; Run workflow through the API with version 1.2.81, from `main` after merging `beta`
+  at build 418): the bolder bus frame in Arrange.
+- **v1.2.80** (3 Nov 2026; owner: "merge and build!"; Run workflow through the API with version 1.2.80, from `main` after merging
+  `beta` at build 417): END / JMP commands and the …pump CHAIN menu.
+- **v1.2.79** (3 Nov 2026; owner: "Push all to main and build a desktop build"; Run workflow through the API with version 1.2.79,
+  from `main` after merging `beta` at build 416): SWITCH TO …PUMP (409), CHN off when a track leaves …chains (410), ⌥▲▼ from
+  the pattern on screen (411), pending FX commands kept + Enter twice on an effect value (412), FX bar in the skin's accent
+  (413), the master column's own blocks + shared-phrase warnings (414–415), UNIQUE PER TRACK (416).
+- **v1.2.78** (3 Nov 2026; owner: "push from beta to web and build a desktop"; Run workflow through the API with version 1.2.78,
+  from `main` after merging `beta` at build 408): FX graph screens and animations (404–405), ⌥▲▼ between patterns, CURSOR ON
+  STOP → PHRASE / ARRANGE ON STOP, REMOVE rows, row colour fixes and Pattern view row colour, sections beside Phrase,
+  duplicate track from the block menu, master OFF blocks.
+- **v1.2.77** (3 Nov 2026; owner: "let's push to main and build"; Run workflow through the API with version 1.2.77, from `main`
+  after merging `beta` at build 403): the Table engine's Load wavetable… (402) and the 30 AKWF starter tables (403).
+- **v1.2.76** (3 Nov 2026; owner: "merge and build desktop"; from `main` after merging `beta` at build 401): side panel
+  instrument names in full, the Harmonizer's voices in the pitch animation.
+- **v1.2.75** (3 Nov 2026; owner: "push a new merge and desktop build"; Run workflow through the API with version 1.2.75,
+  from `main` after merging `beta` at build 400): the mouse audit follow-ups (builds 379–400): Arrange paging and bus frame,
+  vintage samplers (VSAMP), FX bar animations for every effect, row colours, solo/mute rules, Acid generator from the song's
+  key, side panel restyle, transpose lock, slow double-click fix, Enter picks up patterns, Alt+B / Alt+S, STOP CURSOR stays,
+  FX bar keys, …chains folded I/O titles, and the …waves live engine.
 - **v1.2.74** (3 Nov 2026; owner: "merge beta and the app and build a desktop version"; Run workflow through the API with
   version 1.2.74, from `main` after merging `beta` at build 378): everything in the 3 Nov entries (audio-thread FXV / BYP /
   MUT / GEN / SoundFonts, Ableton Link (its optional addon step: check it built on Mac / Windows), FX bar curves and Flex
