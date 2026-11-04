@@ -12633,6 +12633,8 @@ document.addEventListener('keydown', e => {
     if (e.shiftKey && view === 'synth'){ play(cur); return; }
     if (tp.on) tStop(); else tStart('song', {row:songRow()}); return; }
   if (e.altKey && /^Digit[1-7]$/.test(e.code)){ e.preventDefault(); setView('tracker'); go(VIEWS[+e.code.slice(5) - 1]); return; }
+  // FIX (UI sweep, 4 Nov): Alt/⌥+S, Song settings "from any screen" (owner, 3 Nov), the Synth page too (it was the tracker's only)
+  if (e.altKey && !e.shiftKey && e.code === 'KeyS' && view === 'synth'){ e.preventDefault(); if (!pbOpen) setSheet('song'); return; }
   // F-KEYS OFF THE TRACKER (1 Nov, audit #1): F2–F4 go to Phrase / Mixer / Inst, F5 plays the song from the top, F6 this screen
   // (the pad here), F7 the song from the tracker's cursor, F8 stops (again: panic), F9 arms REC, as in the tracker. F5 used to
   // reload the page here.
