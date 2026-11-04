@@ -99,7 +99,8 @@ try {
   await op('Song: Delete keeps shared phrase', { setup: SONG + `S.song[100][0] = S.song[0][0]; saveS(); window.__b = S.song[0][0]; window.__p = JSON.stringify(S.phrases[firstPhrase(window.__b)]);`, run: `cmdAction('clr')`, verify: `return [S.song[100][0] === window.__b && JSON.stringify(S.phrases[firstPhrase(window.__b)]) === window.__p, 'other copy still plays it']` });
   await op('Song: Mute block (M / menu)', { setup: SONG, run: `sxMuteRect({x0:0, x1:0, y0:0, y1:0})`, verify: `return [blockMuted(S, 0, 0), 'muted']` });
   await op('Song: Duplicate track with patterns', { setup: SONG + `cs.song.x = 9;`, run: `dupTrack(true, 9)`, verify: `const to = 10; return [S.song.every((r, y) => (r[9] >= 0) === (r[to] >= 0)) && S.song.every(r => r[9] < 0 || r[to] !== r[9]), 'track 10 -> 11, unique blocks on the same rows']` });
-  await op('Song: Duplicate track, none free (refused)', { setup: SONG, run: `dupTrack(true, 0)`, noChange: true, verify: `return [true, 'ELECTRO uses every mono track: "No empty mono track" (nothing changes)']` });
+  // owner, 4 Nov: with no empty track of its kind, a mono and a poly track are added and the copy goes in the new one
+  await op('Song: Duplicate track, none free (adds a mono + poly)', { setup: SONG, run: `dupTrack(true, 0)`, verify: `const m = polyFrom() - 1; return [ntr() === 18 && S.song.every((r, y) => (r[0] >= 0) === (r[m] >= 0)), 'TRACKS ' + ntr() + ', copy on track ' + (m + 1)]` });
   await op('Song: Mute track (/)', { setup: SONG, run: `muteKey()`, verify: `return [S.mix[0].mute === true, 'mix mute']` });
   await op('Song: Solo track (Ctrl+/)', { setup: SONG, run: `soloKey(false)`, verify: `return [S.mix[0].solo === true, 'mix solo']` });
   await op('Song: Name track', { setup: SONG, run: `const p = nameTrackHere(); await p;`, answers: ['KICKS'], verify: `return [JSON.stringify(S).includes('KICKS'), 'name stored']` });

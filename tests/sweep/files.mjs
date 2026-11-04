@@ -223,7 +223,7 @@ try {
     const r = await page.evaluate(async () => { const t = window.__seqTest;
       t.ev(`followMode = 0; setView('tracker'); go('song'); for (let y = 0; y < 256; y++) if (y >= 64) S.song[y].fill(-1); S.bpm = 300; saveS(); cs.song.y = 0; cs.song.top = 0; selA = null; arrHandT = -1e9; arrActT = -1e9; draw();`);
       const rows = t.state().rows; t.ev(`tStart('song', {row:Math.max(0, ${0})})`); const tops = []; const t0 = performance.now();
-      while (performance.now() - t0 < 25000) { const s = t.state(); tops.push([s.row, s.top]); if (s.row != null && s.row > rows + 2) break; await new Promise(r => setTimeout(r, 200)); }
+      while (performance.now() - t0 < 45000) { const s = t.state(); tops.push([s.row, s.top]); if (s.row != null && s.row > rows + 2) break; await new Promise(r => setTimeout(r, 200)); }
       const last = t.state(); t.ev('tStop(true)'); return {rows, last, tops:tops.filter((x, i) => i % 5 === 0).slice(0, 30)}; });
     const paged = r.last.row != null && r.last.row >= r.rows ? r.last.top > 0 : null;
     add('Arrange pages with FOLLOW off', paged !== false, paged === null ? `playhead did not pass the page (${r.rows} rows) in time: ` + JSON.stringify(r.last) : `page top ${r.last.top} with playhead at row ${r.last.row} (page ${r.rows} rows)`);
@@ -235,7 +235,7 @@ try {
     // a minute after the last key / click / wheel it pages again: back-date the last action by 61 s
     const r3 = await page.evaluate(async () => { const t = window.__seqTest;
       t.ev(`followMode = 0; go('song'); cs.song.y = 0; cs.song.top = 0; selA = null; arrActT = performance.now(); arrHandT = -1e9; draw();`); const rows = t.state().rows; t.ev(`tStart('song', {row:0})`); const t0 = performance.now(); let s, early = null;
-      while (performance.now() - t0 < 25000) { s = t.state(); if (s.row != null && s.row > rows + 1 && early == null) { early = s.top; t.ev('arrActT = performance.now() - 61000'); } if (early != null && s.top > 0) break; await new Promise(r => setTimeout(r, 200)); }
+      while (performance.now() - t0 < 45000) { s = t.state(); if (s.row != null && s.row > rows + 1 && early == null) { early = s.top; t.ev('arrActT = performance.now() - 61000'); } if (early != null && s.top > 0) break; await new Promise(r => setTimeout(r, 200)); }
       t.ev('tStop(true)'); return {rows, early, s}; });
     add('Arrange pages again after a minute idle', r3.early === 0 && r3.s.top > 0, `top while working ${r3.early}, after 61 s idle ${r3.s.top} (playhead ${r3.s.row})`);
     add('Arrange does not page while you work', !(r2.s.row > r2.rows) || r2.s.top === 0, `page top ${r2.s.top} playhead ${r2.s.row} (hand moved just now)`);

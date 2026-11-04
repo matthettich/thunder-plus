@@ -1,4 +1,4 @@
-# Full test sweep (4 Nov 2026, builds 421 → 425)
+# Full test sweep (4 Nov 2026, builds 421 → 427)
 
 Owner (3 Nov, night): "go through and test every feature and command… fix the bugs. I don't want anything we made
 deliberately function a certain way changed… report any clunky or awkward behaviour but don't fix those unless they are an
@@ -23,6 +23,40 @@ changed. Deliberate behaviour was checked against HANDOVER.md, the README and th
 | 8 | Alt+S (Song settings) did nothing on the Synth page, against the 3 Nov "from any screen" decision. | Tracker-only key. Fix: added to the Synth-page key handler. | 423 · `0b5f169` |
 | 9 | …pump value boxes (`Field`) and TUNE note sliders jumped when Shift was pressed mid-drag, and ignored Ctrl/⌘ (TUNE fine was ×0.15). | They measured from the press. Fix: they now follow the one rule (`dragMul`): Shift ×0.1, Ctrl/⌘ ×4. | 423 · `80fa4fd` |
 | 10 | The strip PAN slider kept its old value after a drag, so after a track change, Undo or the Mixer, the next drag or wheel step jumped back. Found in the re-check run after the merge. | `stPan` kept focus and `deckStrip` skipped it while focused → it's now skipped only while `:active`. | 425 · `ed62264` |
+
+## Owner follow-up (4 Nov, morning): open items and clunky spots changed (builds 426–427)
+
+The owner read the report and asked for the HOP docs to follow the code, for all the found bugs to be fixed, and for every
+clunky spot to be changed. Duplicate track should add a track of its kind ("ok if it created a mono and poly track").
+
+| Item | What changed | Build |
+|---|---|---|
+| `HOP` code vs docs | Kept the code (whole value = row, 00–1F; needed for 32-row patterns); hint, Help and README say so | 426 |
+| Fold cover top bar | At ≤ 520 px in the Mobile setup the screen tabs shrink and scroll inside themselves, so ⚙ and CPU stay on screen | 427 |
+| Effect node that can't start | `processorerror` on the track-effect node toasts once per audio context (render or live) | 427 |
+| Ctrl+D listed twice in Edit ▾ | The shortcut shows only on the duplicate it does on this screen | 427 |
+| Effects cut out at high gain | …pump effects and modules: a finite output up to ±64 is clipped at ±8 (`hotClip`) instead of restarting the effect; only NaN, infinity or ±64+ restarts it. The track-input guard clips instead of zeroing too. The built-in (wasm) effects' own guard in `dsp/tfx/tfx.cc` still zeroes samples past ±8: changing it needs a wasm rebuild | 427 |
+| Song Shift+Del hint | Says "clear, step down" (one column on the Song is the 21 Oct design) | 427 |
+| Song hex entry | One or two digits are placed after a 1.2 s pause (5 → 005) | 427 |
+| Acid line… | The phrase goes into the song only when GENERATE writes it | 427 |
+| Right-click on Mixer / FX / Inst / Project | Cut / Copy / Paste only on Song, Sect and Phrase (Edit ▾ greys them elsewhere) | 427 |
+| Alt+▲ from the Mixer | Help says the moves are one step at a time (the screen grid is as designed) | 427 |
+| ⚙ − / + steppers | Grey out at the ends of their range | 427 |
+| `GRV` / `GGR` | Groove the row they are on too (pre-scan of the rows due, as TIC does); `core/seq-core.js` regenerated; goldens unchanged | 427 |
+| Save picker failing | Falls back to a download | 427 |
+| Duplicate track with no free track | TRACKS goes up by two (a mono and a poly), the copy goes in the new one; one undo step | 427 |
+| ELECTRO FLX message | `sounds/ELECTRO.thunder` stored with FLX 10 written and `flx256` (it was already shown once per song name; the file no longer needs it). `?v=2` | 427 |
+| First-run box on phones | Sits under the top bar, clear of the pad | 427 |
+| Skins | `--mx` / `--mx2` darkened to ≥ 4.5:1 on Mustard, Complement, LCD green, Grey white, Miami, Citrus, Sunset; empty cells mixed 25 % toward the ink on every skin | 427 |
+| MENU-AUDIT.md | Status line: all built | 427 |
+
+Left as they are, with the reason:
+- **Shift-wheel ratios.** Faders and FX bar values step 4 a notch and Shift 1, which is already the smallest step those
+  0–255 values have (×0.25). The tracker's Alt+Shift-drag stays at 48 px a step (×0.33); 160 px a step would make it hard
+  to use.
+- **Presets over full scale** (Voice Laser choir, pVOX Talkbox lead, pSWIRL Metal comb, Phaser Deep 8-pole…). These are
+  levels inside the mix in floating point; the master limiter follows, and changing them would change how they sound.
+- **ELECTRO sect F3** is the bus track's phrase: a bus has no notes, so an empty phrase is right.
 
 ## Found, not fixed (owner decisions)
 

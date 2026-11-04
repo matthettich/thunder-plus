@@ -2,7 +2,7 @@
 
 Owner: "Too much text in the Audio & MIDI menu. Audit Edit, View, right-click menus on different screens, and Settings
 for redundancy and organization… they feel cumbersome and a little unprofessional." Taken from the menus as they render
-in build 356 on a 1600 px desktop window. Nothing here is built yet; it is a proposal to agree with the owner first.
+in build 356 on a 1600 px desktop window. It started as a proposal; everything in it has since been built (see Status at the end).
 
 ## What makes them feel cumbersome (the patterns)
 
@@ -73,3 +73,6 @@ in build 356 on a 1600 px desktop window. Nothing here is built yet; it is a pro
 3. Right-click menus trimmed to their context.
 4. Edit ▾ regrouped, labels shortened, Ctrl+D conflict resolved.
 5. ⚙ → Preferences, with the moves above.
+
+**Status (4 Nov, from HANDOVER):** all five are built: 1 on 3 Nov, 2–5 in build 358. Since then Ctrl+D in Edit ▾ shows only
+on the duplicate it does on the screen you're on (build 427). The proposals above are kept as the record of why.

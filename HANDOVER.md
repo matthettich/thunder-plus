@@ -149,6 +149,17 @@ offered the Drive integration and/or SoundFonts in the song file.
   bar is its own `.agbus` (a background, no border), centred in the gap between the bus column's header cell and its
   neighbour's (`#tArrTh i[data-t]` ±1), as wide as the gap up to 2 px; a column at the edge uses a 2 px gap.
 
+## 4 Nov (2): the sweep's open items and clunky spots changed (builds 426–427, on `beta`, then `main` + desktop)
+
+- Owner: keep HOP's code and fix its docs (32-row patterns); fix every found bug; change every clunky spot; duplicate track
+  should make a track of its kind ("ok if it created a mono and poly track"); then push to main and build the desktop app.
+- Details and the three things left as they are: [`docs/TEST-SWEEP.md`](docs/TEST-SWEEP.md), "Owner follow-up".
+- New: `hotBad` / `hotClip` in TFX_SRC (…pump and module slots clip finite output at ±8, restart only past ±64 or non-finite);
+  `tfxErrAc` + `onprocessorerror` on `tfxNode`; `songHexT` (Song hex pause); `setNtr` returns the track remap (dupTrack uses
+  it); `cmdV` / `grvOf` and a GGR pre-scan in makeSeq (CORE_REV `rwv3ky`); `exSave`; Fold cover CSS for `#segView`.
+- Cache-busters now: `sounds/ELECTRO.thunder?v=2`; cache `thunderplus-v427`. The wasm effects' own ±8 zeroing
+  (`dsp/tfx/tfx.cc` `tfx_process`) is unchanged: it needs a rebuild of `tfx.wasm` (see `dsp/build.sh`).
+
 ## 4 Nov (1): full test sweep; ten fixes (builds 422–425, on `beta`)
 
 - Owner (3 Nov, night): test every feature and command, fix the bugs, don't change anything deliberate, report clunky

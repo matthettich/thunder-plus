@@ -328,6 +328,10 @@ function makeSeq(S, mode, o){
   const ENDI = FXC.indexOf('END'), JMPI = FXC.indexOf('JMP');
   const TICI = FXC.indexOf('TIC');
   const ticCmd = r => { let v = null; for (let k = FX0; k < RW; k += 2) if (r[k] === TICI) v = Math.max(0, r[k + 1]); return v; };
+  // GROOVE ON ITS OWN ROW (sweep, 4 Nov): GRV / GGR shape the row they are on too, as TIC does (they started on the next step)
+  const GRVI = FXC.indexOf('GRV'), GGRI = FXC.indexOf('GGR');
+  const cmdV = (r, ci) => { let v = null; if (r) for (let k = FX0; k < RW; k += 2) if (r[k] === ci) v = Math.max(0, r[k + 1]); return v; };
+  const grvOf = (v, tks) => v ? [(v >> 4) || tks, (v & 15) || tks] : null;
   // Each call plays the next line of every track that is due. Tracks keep their own clocks, so a phrase
   // can use its own lines per beat (LPB) and every track its own groove.
   // The MPC swing factor (50–75%): how late the off-beat lands. The SWING NOTE setting below picks the
@@ -382,6 +386,11 @@ function makeSeq(S, mode, o){
         for (let k = X ? X : 1; k <= (X ? X : 15); k++){ evs.push({type:'chc', t:at, track:t, p:'b' + k, v:Y >= 2 ? 2 : Y});
           if (Y >= 2) evs.push({type:'chc', t:at + Y * line, track:t, p:'b' + k, v:-1}); } }
     };
+    // GGR on a row due now (any track, often the master column, which comes last) grooves every track's step from this one
+    for (let t = 0; t <= MT; t++){ const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
+      const cid = mode === 'phrase' ? -1 : sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null;
+      const g = cmdV(r0(T, mode === 'phrase' ? o.phrase : (!T.empty && chRow ? chRow[0] : -1)), GGRI);
+      if (g != null) api.grv = ngrv = grvOf(g, api.tks); }
     for (let t = 0; t <= MT; t++){
       const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
       const cid = mode === 'phrase' ? -1 : sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null;
@@ -389,6 +398,7 @@ function makeSeq(S, mode, o){
       const line = 60 / api.bpm / (api.lpb || plpbOf(S, pid));   // LPB: every track's lines per beat from here on
       // TIC on this row changes the ticks a step from here on (for every track, like TPO), and counts already for this row.
       if (r0(T, pid)){ const tc = ticCmd(r0(T, pid)); if (tc != null) api.tks = tc ? clamp(tc, 1, 32) : clamp(S.ticks || TICKS, 1, 32); }
+      { const g = cmdV(r0(T, pid), GRVI); if (g != null) T.grv = grvOf(g, api.tks); }
       const tick = line / api.tks, gv = T.grv || api.grv;
     // The MPC shuffle: the off-beat step borrows (sw − 50%) of the swing pair and hands it to the beat.
     // sw = 50%: every step lasts one line (straight). sw = 66⅔% on 16ths: the classic triplet feel.
