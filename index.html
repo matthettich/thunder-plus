@@ -3187,7 +3187,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
 
-<script src="waves/waves-worklet.js?v=32"></script>
+<script src="waves/waves-worklet.js?v=33"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -8093,7 +8093,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=32', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=33', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -16761,7 +16761,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=42')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=43')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       await ac.audioWorklet.addModule(chnURL);
@@ -19119,7 +19119,7 @@ let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bass
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=7', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the …waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
-const WAVES_WK = 'waves/waves-worklet.js?v=32', wlOK = new WeakSet(), wlSent = new WeakSet();
+const WAVES_WK = 'waves/waves-worklet.js?v=33', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* …PUMP SYNTHS live, THE SAFETY NET (owner, 26 Oct): while the song plays, once a second: if the audio is dropping out or
    the audio thread is nearly full, and the live …pump nodes are a real part of that, twice in a row, the live engines
    switch to their renders for the rest of this visit (psLive.off): their nodes go, and the next notes play the pads'
@@ -20783,7 +20783,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 421;
+const BUILD = 422;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29189,6 +29189,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [422, '4 Nov', ['Blip: the filter no longer crackles or blows up with Filter near HP 8 kHz or a nearly open LP and low Resonance (also in …chains and …waves).']],
   [421, '3 Nov', ['Arrange: the bus bars sit in the gaps either side of the bus column, so they no longer cut into its blocks.']],
   [420, '3 Nov', ['Arrange: the bus bars no longer have a white edge.']],
   [419, '3 Nov', ['Arrange: a bus is marked by two plain bars down its column from the MONO or POLY bar, in that bar’s colour, instead of a box around it.']],
