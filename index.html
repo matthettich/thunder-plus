@@ -20758,7 +20758,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 413;
+const BUILD = 414;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -21058,10 +21058,55 @@ function getCell(v, x, y){
   if (v === 'sect'){ const r = sectRow(cSect, y); return r ? r[x] : (x ? 0 : -1); }
   const p = S.phrases[cPhrase]; return p ? p[y][x] : -1;
 }
+/* MASTER COLUMN, OWN BLOCKS (owner, 3 Nov: a VOL 00 typed on a bus muted the whole song: its block was also in the MST
+   column, where VOL is the master level, and on three other tracks). Two guards:
+   - a block placed in the master column that tracks use (or on a track when the master column uses it) gets a unique copy
+     there (mstUniq), so the master and the tracks never share a phrase from now on;
+   - typing into a phrase the master column shares with tracks (an older song) says so once (mstShareWarn). */
+const mstShared = new Set();   // phrases already warned about this session
+let mstUniqIn = false;
+function blockMixed(cid, x, y){
+  const isM = x === MT;
+  for (let r = 0; r < 256; r++){ const row = S.song[r]; if (!row) continue;
+    if (isM){ for (let t = 0; t < MT; t++) if (row[t] === cid) return true; }
+    else if (row[MT] === cid && r !== y) return true; }
+  return false;
+}
+function mstUniq(src){   // newBlock's copy (a new sect and new phrases), without moving the cursor or saying anything
+  let cid = freeSectNear(src); if (cid < 0) cid = freeSect(); if (cid < 0) return -1;
+  S.chains[cid] = clone(S.chains[src] || freshSect());
+  const map = new Map(); let first = true;
+  for (const r of S.chains[cid]){ if (r[0] < 0) continue;
+    if (map.has(r[0])){ r[0] = map.get(r[0]); continue; }
+    const op = r[0]; let np = first && phraseFree(cid) ? cid : -1; if (np < 0) np = freePhraseNear(op); if (np < 0) np = freePhrase(); first = false;
+    if (np < 0) break;
+    r[0] = np; S.phrases[np] = clone(S.phrases[op] || freshPhrase()); S.plen[np] = plen(op); S.plpb[np] = S.plpb[op] || 0; map.set(op, np); }
+  if (!S.chains[cid].some(r => r[0] >= 0)) ensureSectPhrase(cid);
+  return cid;
+}
+function phraseKinds(p){   // where phrase p plays: on the master column, on tracks (their numbers)
+  let mst = false; const trk = new Set();
+  for (let r = 0; r < 256; r++){ const row = S.song[r]; if (!row) continue;
+    for (let t = 0; t <= MT; t++){ const cid = row[t]; if (!(cid >= 0)) continue; const ch = S.chains[cid]; if (!ch || !ch.some(q => q[0] === p)) continue;
+      if (t === MT) mst = true; else trk.add(t); } }
+  return {mst, trk};
+}
+function mstShareWarn(p){
+  if (mstShared.has(p)) return; const k = phraseKinds(p); if (!k.mst || !k.trk.size) return; mstShared.add(p);
+  const ts = [...k.trk].sort((a, b) => a - b).map(t => d2(t + 1)).join(', ');
+  setTimeout(() => toast(cTrack === MT
+    ? `Phrase ${hp(p)} also plays on track${k.trk.size > 1 ? 's' : ''} ${ts}: what you write here changes there too (VOL turns their notes down). UNIQ on the block gives the master its own copy.`
+    : `Phrase ${hp(p)} also plays in the master column: there VOL is the whole song's level and FLX / FXO the master's effects. UNIQ on this block (Song or Arrange) gives the track its own copy.`, 7000), 60);
+}
 function setCell(v, x, y, val){
-  if (v === 'song'){ S.song[y][x] = val; if (val < 0 && x < MT) setBlockMute(y, x, false); }
+  if (v === 'song'){
+    if (val >= 0 && !mstUniqIn && S.song[y][x] !== val && blockMixed(val, x, y)){
+      mstUniqIn = true; try { const nc = mstUniq(val); if (nc >= 0){ const was = val; val = nc;
+        setTimeout(() => toast(x === MT ? `Block ${hp(songShown(was))} is also on tracks, so the master column got its own copy, ${hp(songShown(nc))}: its VOL and FLX can't reach the tracks.`
+          : `Block ${hp(songShown(was))} is also in the master column, so this track got its own copy, ${hp(songShown(nc))}.`, 5000), 60); } } finally { mstUniqIn = false; } }
+    S.song[y][x] = val; if (val < 0 && x < MT) setBlockMute(y, x, false); }
   else if (v === 'sect'){ sectRowEdit(cSect, y)[x] = val; }
-  else { if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase(); S.phrases[cPhrase][y][x] = val; }
+  else { if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase(); S.phrases[cPhrase][y][x] = val; if (val >= 0) mstShareWarn(cPhrase); }
   saveS();
 }
 function instRows(){
@@ -29098,6 +29143,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [414, '3 Nov', ['Master column: a block placed there that tracks also use (or on a track when the master column uses it) gets its own copy, so the master’s VOL, FLX and FXO can’t reach the tracks, and theirs can’t reach the master.', 'Typing into a phrase that the master column already shares with tracks (an older song) says so once, with how to split it (UNIQ).']],
   [413, '3 Nov', ['FX bar: its on-switches, graphs, curves and animations use the skin’s own accent colour instead of one fixed orange (M8 cyan, Bauhaus red, Matrix green…); skins without one use their ink.']],
   [412, '3 Nov', ['Effect commands: an FLX 00 (or any FXO / GAT / RTG) above a later one is no longer lost when the effect is built as the song starts, so the effect stays off until the later command.', 'Phrase: Enter twice on an effect’s value (the number beside it) opens the effect list too.']],
   [411, '3 Nov', ['Phrase / Pattern view: ⌥/Alt+▲▼ step from the pattern on screen, even when Arrange’s cursor is somewhere else (Arrange holding the keys, PIN, or a phrase used in more than one place); the keys go back to the phrase.']],

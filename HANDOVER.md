@@ -119,6 +119,20 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+## 3 Nov (41): the master column never shares a block with tracks (build 414, on `beta`)
+
+- The owner's "VOL 00 on a bus mutes the song" (beta testing ELECTRO, bus track 08, song row 59): block 15 (phrase 15, FLX 00
+  on line 0) was on tracks 7, 8 (the bus), 11, 12 and in MST on 46 rows. The VOL typed on the bus was in the master's copy
+  (→ `mvol`, the master level) and turned down tracks 7, 11, 12's notes (`mod`); on the bus itself it did nothing. Not an
+  engine bug; the open item in (39) is closed.
+- Owner: "Do those!" — `setCell('song')`: a block placed where `blockMixed(cid, x, y)` (the master column and tracks would
+  share it) gets `mstUniq(src)` (newBlock's sect + phrases copy, quiet) and a toast; `mstUniqIn` guards re-entry. Every
+  placement goes through it (typing, Enter, paste, clone, drag, generators). `setCell` on a phrase: `mstShareWarn(p)` once
+  per phrase a session when `phraseKinds(p)` has both MST and tracks.
+- Checked on the owner's song headless: typing in phrase 15 → the warning; block 15 into an empty MST row → copy 2DE; MST's
+  block onto track 16 → copy 2DF; an ordinary block on a track unchanged. Tests pass.
+- VOL on a bus still does nothing (a bus has no notes); TVL is the bus's level. Offered the owner: VOL on a bus = its level.
+
 ## 3 Nov (40): the FX bar in the skin's accent (build 413, on `beta`)
 
 - Owner: "the fx bar doesn't match the skin's accent colors". Skins have no accent variable, so `skinAccent(sk)` reads
