@@ -1458,7 +1458,10 @@ class BlipVoice {
     const p = this.p, sr = this.sr, inv = 1 / sr, kd = Math.exp(-inv * 1000 / Math.max(1, p.kickT)), ad = Math.exp(-inv * 1000 * 6.9 / Math.max(2, p.decay));
     const atk = Math.max(1, p.atk / 1000 * sr), fmI = p.fm * 8, dr = p.drive * 8, dn = dr ? 1 / Math.tanh(dr) : 1;
     const filt = Math.max(-1, Math.min(1, p.filt)), fc = filt < 0 ? 20000 * Math.pow(0.004, -filt) : 20 * Math.pow(400, filt);
-    const f = 2 * Math.sin(Math.PI * Math.min(0.45, fc / sr)), q = 2 - 1.95 * Math.max(0, Math.min(1, p.res)), gT = Math.max(5, p.grainT) / 1000 * sr, rc = Math.sqrt(q / 2);   // rc: resonance doesn't jump the level
+    const q = 2 - 1.95 * Math.max(0, Math.min(1, p.res)), gT = Math.max(5, p.grainT) / 1000 * sr, rc = Math.sqrt(q / 2);   // rc: resonance doesn't jump the level
+    // FIX (sweep, 4 Nov): the filter blew up (a crackle at ~8× full scale) with Filter near HP 8 kHz or a nearly open LP and
+    // little Resonance: this state-variable filter is only stable for f² + 2fq < 4, so f stops just under that
+    const f = Math.min(2 * Math.sin(Math.PI * Math.min(0.45, fc / sr)), 0.98 * (Math.sqrt(q * q + 4) - q));
     for (let i = a; i < b; i++){
       const t = this.t;
       // grain: the hit starts again every Grain time, each repeat quieter
