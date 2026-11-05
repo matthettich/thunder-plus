@@ -149,6 +149,21 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 5 Nov (3): App Nap held off while playing (build 432, on `beta`; desktop needs a build)
+
+- Owner: stutters with the Electron app in the background on an M4, "maybe when using the flx command". The Chromium side
+  was already covered (31 Oct: backgroundThrottling false, disable-renderer-backgrounding / -background-timer-throttling /
+  -backgrounding-occluded-windows), and FLX itself is on the audio thread (seq-core `fxc` → `tcParam`). What wasn't:
+  macOS **App Nap**, which coalesces a hidden app's timers (Worker ones too: the 25 ms pump) and lowers thread QoS below
+  anything Chromium's switches reach. Still page-booked while the core plays: live engines, …pump FXV, SYNC-stretched
+  notes, MIDI out, plus whatever the core hands back (fxcPend).
+- Fix: electron/main.js `setPlaying` holds `powerSaveBlocker.start('prevent-app-suspension')` while `thunder:playing` is
+  true; preload `app.playing(on)`; the page calls it from `songBtn()` (every start / stop goes through it) on a change.
+  Released on STOP so an idle app can nap (the BATTERY rule, 27 Oct).
+- **Not verified on a Mac** (no Mac here): the owner to try a background run with FLX after the desktop build. If it still
+  stutters, next suspects: what the core hands to the page around an FLX row, and the audio thread's CPU at that bar
+  (Settings → Audio's CPU meter).
+
 ## 5 Nov (2): bus feeders in the Mixer; meter click → VOL fader; type in place on the FX bar (build 431, on `beta`)
 
 - Owner: tracks that feed a bus should look like the bus column but lighter. `tkm` adds `mfeed` for `busPlan().targets`
