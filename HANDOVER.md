@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.86** (5 Nov 2026; owner: "can we merge and build desktop?"; Run workflow through the API with version 1.2.86,
+  from `main` after merging `beta` at build 430): the narrow-window deck fix and the Arrange paged-out look.
 - **v1.2.85** (4 Nov 2026; owner: "Give me a desktop release please!"; Run workflow through the API with version 1.2.85,
   from `main` at cache v428): the transparent app icon (yellow kept on the Apple touch and maskable icons).
 - **v1.2.84** (4 Nov 2026; owner: "push to the main and start a desktop build"; Run workflow through the API with version 1.2.84,
