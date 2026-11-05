@@ -151,6 +151,24 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 5 Nov (5): keys play everywhere; Enter types a value there; New MIDI instrument (build 434, on `beta`)
+
+- Owner: "key input plays the current instrument no matter what screen you are on, but only inputs notes on the pattern or
+  phrase screen… the computer keyboard ends up being your controller". Asked: hex typing on INST / Mixer / FX clashed with
+  the piano keys → owner chose **piano wins** (values by Ctrl/⌘+arrows, mouse, or Enter to type), and **the screen's
+  track** for routing. `KPLAYV` (inst, mixer, fx) in keysDown, before Enter: `keyPlay` → `preview(…, hold, trk)` (new
+  `trk`: the note goes to that track's bus, so its mixer / …chains / FX; `h.tr` for the off). `keyPlayTrack`: Mixer cursor
+  (master row: dry), FX `cFxT` (master: dry), INST `instTracks(cInst)[0]`. Instrument: INST `cInst`, else `last.inst`.
+  Hex keys there do nothing now. `keyType` (Enter on a plain value): Mixer TRIM / PAN / VOL / MASTER / OUT as hex through
+  typeHex; INST / FX rows with get/set (not act / tog / opts / show) via `fbParse` (as shown, or the number). Help + hints.
+- Owner liked both MIDI ideas: `newMidiInst` (INST action row + Edit ▾ → Make): first instrument with no phrase use and
+  not MIDI, `mo 1`, port A, first channel no MIDI instrument has, opens INST at MIDI CH, connects MIDI if needed.
+  `midiTag(i)`: INST subtitle and the NOW line (the INST LIST already said MIDI).
+- Connect MIDI (Settings → MIDI) asks the browser for MIDI access (in and out), remembers it (`midi.want`), so it is the
+  switch for both; asked by the owner, answered in chat.
+- Checked headless: Z on Mixer / INST / FX plays on track 1 / 0 / 0; newMidiInst on ELECTRO → inst 02, ch 1; Enter types
+  TRANSPOSE +7 and PAN 40. Tests pass.
+
 ## 5 Nov (4): one colour per bus everywhere; sends striped; Arrange bus bars stop at the grid (build 433, on `beta`)
 
 - Owner: the Arrange bus outline ran into the hint text under the panel. `arrBusBot(g)`: the bars end at the grid's
