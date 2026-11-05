@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.88** (5 Nov 2026; owner: "Merge and build please"; Run workflow through the API with version 1.2.88,
+  from `main` after merging `beta` at build 434): bus / send colours everywhere (433), keys play on INST / Mixer / FX, New MIDI instrument (434).
 - **v1.2.87** (5 Nov 2026; owner: "merge it and build a new desktop"; Run workflow through the API with version 1.2.87,
   from `main` after merging `beta` at build 432): bus feeders in the Mixer, meter click → VOL, FX bar type in place, App Nap held off while playing.
 - **v1.2.86** (5 Nov 2026; owner: "can we merge and build desktop?"; Run workflow through the API with version 1.2.86,
