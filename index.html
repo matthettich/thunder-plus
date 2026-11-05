@@ -1563,25 +1563,39 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root .tarr .tagrid b.bg.f:not(.p){background:var(--bgc)!important; color:#fff}   /* (!important: the rainbow skins colour every block that way) */
 :root .tarr .tagrid b.bg.f.p{background:#fff!important; color:var(--bgc); box-shadow:inset 0 0 0 2px var(--bgc)}
 .tath i.bg{box-shadow:inset 0 -3px 0 var(--bgc); color:var(--bgc); font-weight:800}
-.tgrid span.mbus:not(.cur):not(.sel){background-color:color-mix(in srgb, var(--tk) 22%, transparent)}
-.tgrid span.mfeed:not(.cur):not(.sel){background-color:color-mix(in srgb, var(--tk) 11%, transparent)}   /* feeds a bus: half the bus column's tint */
+.tgrid span.mbus:not(.cur):not(.sel){background-color:color-mix(in srgb, var(--bc, var(--tk)) 26%, transparent)}
+.tgrid span.mfeed:not(.cur):not(.sel){background-color:color-mix(in srgb, var(--bc, var(--tk)) 11%, transparent)}   /* feeds a bus: its bus's colour, lighter (BUS COLOURS) */
+.tgrid span.mfeed.snd:not(.cur):not(.sel){background-color:transparent; background-image:repeating-linear-gradient(135deg, color-mix(in srgb, var(--bc) 24%, transparent) 0 3px, transparent 3px 7px)}   /* a send: the same, striped */
 .tgrid span.th.bus{font-weight:800; text-decoration:underline; text-underline-offset:2px}
+.tgrid span.th.bus[class*=" bc"]{text-decoration-color:var(--bc); text-decoration-thickness:2px}   /* BUS COLOURS: the bus's number underlined in its colour (Mixer, Song) */
 #tArrTh i.bus{filter:brightness(.7); font-weight:800; text-decoration:underline; text-underline-offset:2px}
+/* SENDS (5 Nov): their bus's colour in stripes: the line under the number dashed, the blocks striped */
+.tath i.bg.bgs{box-shadow:none; background-image:repeating-linear-gradient(90deg, var(--bgc) 0 5px, transparent 5px 8px); background-size:100% 3px; background-position:bottom; background-repeat:no-repeat}
+:root .tarr .tagrid b.bg.bgs:not(.f):not(.p):not(.m){background:repeating-linear-gradient(135deg, color-mix(in srgb, var(--bgc) 34%, var(--panel, #fff)) 0 4px, var(--panel, #fff) 4px 8px)}
+:root .tarr .tagrid b.bg.bgs.f:not(.p){background:repeating-linear-gradient(135deg, var(--bgc) 0 5px, color-mix(in srgb, var(--bgc) 72%, #fff) 5px 9px)!important}
 /* BUS in PATTERN VIEW (owner, 22 Oct): Arrange shows buses darker; in Pattern view a bus takes its own colour (--tk-bus: cyan,
    or the skin's --mxbus where cyan is already one of its track colours): its bands, a light tint down its columns and a
    line either side. */
 .tscr{--tk-bus:#1f9bb0}
 :root[data-skinbase="term"] .tscr{--tk-bus:var(--mxbus, #1f9bb0)}
+/* BUS COLOURS (5 Nov): each bus and the tracks feeding it in that bus's Arrange colour (--busN, set from BUS_COLORS);
+   a send is the same colour in stripes */
+.bc1{--bc:var(--bus1)} .bc2{--bc:var(--bus2)} .bc3{--bc:var(--bus3)} .bc4{--bc:var(--bus4)} .bc5{--bc:var(--bus5)} .bc6{--bc:var(--bus6)} .bc7{--bc:var(--bus7)} .bc8{--bc:var(--bus8)}
 :root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="espresso"]){--mxbus:#4fd8eb} :root[data-skin="matrixlight"]{--mxbus:#0a7f95}
 :root[data-skin="night"]{--mxbus:#ff7ab6} :root[data-skin="midnight"]{--mxbus:#ffc857}
 :root[data-skin="ocean"]{--mxbus:#7a4fc9} :root[data-skin="miami"]{--mxbus:#5b5be0} :root:is([data-skin="tomato"],[data-skin="desert"]){--mxbus:#2f6fd6}
 :root[data-skin="winter"]{--mxbus:#c0568f}
-.tgrid.pvon span.bus{--tk:var(--tk-bus); filter:none}
-.tgrid.pvon span.pvbus{--tk:var(--tk-bus)}
-.tgrid.pvon span.pvbus:not(.cur):not(.sel):not(.pl):not(.pvnow){background-color:color-mix(in srgb, var(--tk-bus) 12%, transparent)}
+.tgrid.pvon span.bus{--tk:var(--bc, var(--tk-bus)); filter:none}
+.tgrid.pvon span.pvbus{--tk:var(--bc, var(--tk-bus))}
+.tgrid.pvon span.pvbus:not(.cur):not(.sel):not(.pl):not(.pvnow){background-color:color-mix(in srgb, var(--bc, var(--tk-bus)) 12%, transparent)}
+/* a track that feeds a bus: a lighter wash of the bus's colour down its columns and a bar under its band (owner, 5 Nov) */
+.tgrid.pvon span.pvfeed:not(.cur):not(.sel):not(.pl):not(.pvnow){background-color:color-mix(in srgb, var(--bc) 9%, transparent)}
+.tgrid.pvon span.pvh.pvfd{box-shadow:inset 0 -3px 0 var(--bc)}
+.tgrid.pvon span.pvfeed.snd:not(.cur):not(.sel):not(.pl):not(.pvnow){background-color:transparent; background-image:repeating-linear-gradient(135deg, color-mix(in srgb, var(--bc) 16%, transparent) 0 3px, transparent 3px 8px)}
+.tgrid.pvon span.pvh.pvfd.snd{box-shadow:none; background-image:repeating-linear-gradient(90deg, var(--bc) 0 6px, transparent 6px 10px); background-size:100% 3px; background-position:bottom; background-repeat:no-repeat}
 /* BUS FRAME (owner, 31 Oct: the bus column's lines were wavy): one frame per bus column, drawn over the grid (pvBusFrame),
    instead of a line on each row's cell (cells a hair different in width, from the fonts, made them zigzag) */
-.pvbframe{position:absolute; pointer-events:none; z-index:2; box-sizing:border-box; border-left:2px solid var(--tk-bus); border-right:2px solid var(--tk-bus)}
+.pvbframe{position:absolute; pointer-events:none; z-index:2; box-sizing:border-box; border-left:2px solid var(--bc, var(--tk-bus)); border-right:2px solid var(--bc, var(--tk-bus))}
 /* ===== PATTERN VIEW (setting PATTERN VIEW; to remove: delete this CSS block, the JS block of the same name and the
    lines marked "PATTERN VIEW" in the script) =====
    The Phrase screen as a pattern: every track's phrase for one song row side by side (Renoise-style), a column group per
@@ -16911,11 +16925,16 @@ function busGroups(){
   for (const b of [...P.feeds.keys()].sort((a, c) => a - c)){ const c = BUS_COLORS[k++ % BUS_COLORS.length]; out.set(b, c); }
   // SENDS (owner, 1 Nov): a track heard on its own AND through a bus (its Chain Out kept, plus a cable to another track's:
   // a send / return) takes the send colour instead, so sends stand apart from the tracks that only play through the bus.
-  for (const [, src] of P.feeds) for (const t of src) if (!P.pure.has(t) && !P.feeds.has(t)) out.set(t, SEND_COLOR);
+  // (5 Nov, owner: each bus and send should look different from the others) a send now takes its bus's colour too, and is
+  // told apart by stripes (isSendT, class bgs / snd) instead of one olive for every send.
   for (const [b, src] of P.feeds) for (const t of src) if (!out.has(t)) out.set(t, out.get(b));
   return out;
 }
-const SEND_COLOR = '#7a8a00';   // olive: none of the BUS_COLORS
+const SEND_COLOR = '#7a8a00';   // (no longer used: sends take their bus's colour, striped)
+// A send: heard on its own and through a bus (its own Chain Out kept), not a bus itself.
+const isSendT = t => { const P = busPlan(); return t >= 0 && t < NT && P.targets.has(t) && !P.pure.has(t) && !P.feeds.has(t); };
+// BUS COLOURS as CSS (--bus1 …): the Mixer and Pattern view use the same colours as Arrange's BUS GROUPS
+try { BUS_COLORS.forEach((c, i) => document.documentElement.style.setProperty('--bus' + (i + 1), c)); } catch(e){}
 function chnDiff(prev, next){
   if (!next) return [];
   // STEREO: the engine patched an older (no st2) patch's right sides itself; once the editor saves them (st2), reload
@@ -17145,6 +17164,12 @@ const polyFrom = () => Math.ceil(ntr() / 2), isPolyT = t => t >= polyFrom() && t
 // screen and says BUS, so it isn't mistaken for a track to program (its own notes still play).
 const isBusT = t => t >= 0 && t < NT && busPlan().feeds.has(t);
 const trkKind = t => isBusT(t) ? ' BUS' : isPolyT(t) ? ' POLY' : ' MONO';
+// BUS COLOURS (owner, 5 Nov: with several buses or sends, each looks different on every screen): Arrange's BUS GROUPS
+// colours (BUS_COLORS, buses in track order) carried to the Mixer and Pattern view. A track that feeds one takes its bus's
+// (the first, if it feeds more); a send also gets ' snd' (striped). The class bcN sets --bc (--busN, set from BUS_COLORS).
+const busCls = t => { if (!(t >= 0 && t < NT)) return ''; const P = busPlan(); const b = P.feeds.has(t) ? t : (P.targets.get(t) || [])[0]; if (b == null) return '';
+  const i = [...P.feeds.keys()].sort((x, y) => x - y).indexOf(b); return i < 0 ? '' : ' bc' + (i % BUS_COLORS.length + 1) + (isSendT(t) ? ' snd' : ''); };
+const feedsBus = t => t >= 0 && t < NT && !isBusT(t) && busPlan().targets.has(t);
 const busOf = t => { const f = busPlan().feeds.get(t) || []; return f.length ? 'bus of ' + (f.length > 1 ? 'tracks ' : 'track ') + f.map(u => d2(u + 1)).join(', ') : ''; };
 // freshInst needs the pad count, but nslots() (with the song state, below) isn't initialized yet when the
 // first song is made — the default instrument layout only needs the classic 16 anyway.
@@ -20851,7 +20876,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 432;
+const BUILD = 433;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23817,7 +23842,7 @@ function pvBusFrame(rebuilt){
   const last = all[all.length - 1].getBoundingClientRect();
   for (const h of H){ let r = h.getBoundingClientRect(), right = r.right;
     if (!h.classList.contains('pvbr')){ for (let e = h.nextElementSibling; e; e = e.nextElementSibling){ const q = e.getBoundingClientRect(); right = q.right; if (e.classList.contains('pvbr')) break; } }
-    const d = document.createElement('div'); d.className = 'pvbframe';
+    const d = document.createElement('div'); d.className = 'pvbframe' + ((h.className.match(/ bc\d/) || [''])[0]);   // BUS COLOURS
     d.style.cssText = `left:${Math.round(r.left - g.left + sx)}px;top:${Math.round(r.top - g.top + sy)}px;width:${Math.round(right - r.left)}px;height:${Math.round(last.bottom - r.top)}px`;
     grid.append(d); }
 }
@@ -23874,10 +23899,10 @@ function draw(){
   const rsel = y => sr && selA.line && y >= sr.y0 && y <= sr.y1 ? ' sel' : '';
   const cc = (x, y, base) => base + (sr && x >= sr.x0 && x <= sr.x1 && y >= sr.y0 && y <= sr.y1 ? ' sel' : '') + (c.x === x && c.y === y && !(tv === 'mixer' && mixFv()) ? ' cur' : '');
   const mc = t => (S.mix[t].mute ? ' mu' : '') + (S.mix[t].solo ? ' so' : '');
-  const tk = t => t === MT ? ' gx' : (isPolyT(t) ? ' gp' : ' gm') + (isBusT(t) ? ' bus' : '');   // the track's group: pink mono, green poly; BUS darker
+  const tk = t => t === MT ? ' gx' : (isPolyT(t) ? ' gp' : ' gm') + (isBusT(t) ? ' bus' + busCls(t) : '');   // the track's group: pink mono, green poly; BUS darker
   // the mixer's cells are bare text: a bus column gets a tint, and a track that feeds a bus a lighter one (owner, 5 Nov)
   const mxFeed = tv === 'mixer' ? busPlan().targets : null;
-  const tkm = t => tk(t) + (t !== MT && isBusT(t) ? ' mbus' : mxFeed && mxFeed.has(t) ? ' mfeed' : '');
+  const tkm = t => tk(t) + (t !== MT && isBusT(t) ? ' mbus' : mxFeed && mxFeed.has(t) ? ' mfeed' + busCls(t) : '');
   const playRows = test => { const s = new Set(); if (P) P.forEach(p => { const r = p && test(p); if (r != null) s.add(r); }); return s; };
   // Sect and Phrase light the playing row in place after the grid is built (see below), so the grid's text does
   // not change every row and is not rebuilt (innerHTML + layout, ~20 ms on a phone) 16 times a bar.
@@ -26933,7 +26958,7 @@ function drawArr(PH){
       if (spAt(t)) h += '<span></span>';
       const v = S.song[y][t];
       let cls = (t < PFg ? 'gm ' : 'gp ') + (BUS.has(t) ? 'bus ' : ''), lab = '', sty = '';
-      const grp = BG.get(t); if (grp){ cls += 'bg '; sty = ` style="--bgc:${grp}"`; }
+      const grp = BG.get(t); if (grp){ cls += 'bg ' + (isSendT(t) ? 'bgs ' : ''); sty = ` style="--bgc:${grp}"`; }
       if (v >= 0){
         const empty = isEmptySect(S.chains[v]) || !sectHasData(v), ph = firstPhrase(v);   // EMPTY BLOCKS (31 Oct): a block whose phrases have nothing in them is striped
         const offb = !empty && sectOffOnly(v);   // OFF-ONLY BLOCKS (2 Nov)
@@ -26957,7 +26982,7 @@ function drawArr(PH){
     h += '</div>';
   }
   const PF = polyFrom();
-  const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (spAt(t) ? '<span></span>' : '') + `<i data-t="${t}"${BG.get(t) ? ` style="--bgc:${BG.get(t)}"` : ''} class="${BG.get(t) ? 'bg ' : ''}${t < PF ? 'gm' : 'gp'}${m.mute ? ' mu' : ''}${m.solo ? ' so' : ''}${tCol(t) ? ' tcl' : ''}${isBusT(t) ? ' bus' : ''}" title="${esc(trkTip(t))}${isBusT(t) ? ' (' + busOf(t) + ')' : ''} · click mutes, right-click solos, double-click names"${tCol(t) ? ` style="--tc:${tCol(t)}"` : ''}>${t + 1}</i>`).join('') + (mx ? '<span></span><i class="gx">MS</i>' : '');
+  const th = '<span></span>' + S.mix.slice(0, NA).map((m, t) => (spAt(t) ? '<span></span>' : '') + `<i data-t="${t}"${BG.get(t) ? ` style="--bgc:${BG.get(t)}"` : ''} class="${BG.get(t) ? 'bg ' : ''}${t < PF ? 'gm' : 'gp'}${m.mute ? ' mu' : ''}${m.solo ? ' so' : ''}${tCol(t) ? ' tcl' : ''}${isBusT(t) ? ' bus' : ''}${isSendT(t) ? ' bgs' : ''}" title="${esc(trkTip(t))}${isBusT(t) ? ' (' + busOf(t) + ')' : ''} · click mutes, right-click solos, double-click names"${tCol(t) ? ` style="--tc:${tCol(t)}"` : ''}>${t + 1}</i>`).join('') + (mx ? '<span></span><i class="gx">MS</i>' : '');
   // MONO and POLY tabs spanning their tracks' columns (track t sits in grid column 2 + t + one per 8-track gap before it).
   const col = t => 2 + t + (t >= PF && PF > 0 ? 1 : 0), rng = (a, b) => d2(a) + (b > a ? '–' + d2(b) : '');
   let gp = '';
@@ -26997,6 +27022,14 @@ function arrSbw(){ const w = Math.max(0, arrGrid.offsetWidth - arrGrid.clientWid
 // The MONO / POLY / MST boxes around Arrange's columns when it is the Song screen: drawn over the panel from the group
 // tabs down to the last whole row, measured from the track-number cells (only when something that moves them changed).
 let arrBoxKey = '';
+// BUS BARS' FOOT (owner, 5 Nov: the bus outline ran into the hint text under Arrange): the grid's own visible bottom, and
+// never past the top of the hint line under it.
+function arrBusBot(g){ let b = Math.min(g.bottom, g.top + arrGrid.clientHeight);
+  const f = arrEl.querySelector('.tafx'), fr = f && f.offsetParent ? f.getBoundingClientRect() : null; if (fr && fr.height && fr.top > g.top) b = Math.min(b, fr.top - 2);
+  return b; }
+// ...and they follow the grid when the panel's layout moves without a redraw (the hint growing a line when Arrange takes or
+// gives the keys, a font arriving, the window resizing): the bars were left where the grid used to end.
+try { new ResizeObserver(() => { arrBoxKey = ''; arrBoxes(); }).observe(arrGrid); } catch(e){}
 function arrBoxes(){
   let host = arrEl.querySelector('.agboxes');
   const ms = asongOn(), buses = [...$('tArrTh').querySelectorAll('i.bus')];
@@ -27014,8 +27047,8 @@ function arrBoxes(){
     // each centred in the gap between the bus column and its neighbour (owner, 3 Nov: "it intersects the phrase blocks in
     // an awkward way… center them"), as wide as that gap allows (2 px at most)
     const tab = $('tArrGp').querySelector(i.classList.contains('gp') ? 'b.gp' : 'b.gm'), tr = tab && tab.getBoundingClientRect();
-    let col = ''; try { col = tab ? getComputedStyle(tab).backgroundColor : ''; } catch(e){}
-    const t0 = (tr && tr.height ? tr.bottom : gp.bottom) - a.top, b0 = g.top - a.top + arrGrid.clientHeight + 1, tn = +i.dataset.t;
+    let col = ''; try { col = getComputedStyle(i).getPropertyValue('--bgc').trim() || (tab ? getComputedStyle(tab).backgroundColor : ''); } catch(e){}   // BUS COLOURS (5 Nov): the bus's own colour (was the group bar's), so each bus's bars differ
+    const t0 = (tr && tr.height ? tr.bottom : gp.bottom) - a.top, b0 = arrBusBot(g) - a.top, tn = +i.dataset.t;
     const nb = d => { const q = $('tArrTh').querySelector(`i[data-t="${tn + d}"]`); const b = q && q.getBoundingClientRect(); return b && b.width ? b : null; };
     const P = nb(-1), N = nb(1), bar = (x0, x1) => { const gap = Math.max(1, x1 - x0), w = Math.min(2, gap), cx = (x0 + x1) / 2;
       if (cx < g.left - 2 || cx > g.right + 2) return;
@@ -29319,6 +29352,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [433, '5 Nov', ['Buses and sends each in their own colour on every screen: Arrange’s bus colours now carry to the Mixer (the bus column, and a lighter wash on the tracks feeding it) and the Pattern view (the bus’s band, frame and wash; a feeding track gets a line under its band and a light wash). A send is its bus’s colour in stripes, so you can tell which bus it goes to (sends were all one olive).', 'Arrange: the bars either side of a bus are in that bus’s colour, and they no longer run into the hint text under the panel.']],
   [432, '5 Nov', ['Desktop app on a Mac: while the song plays, macOS is asked not to put the app to sleep (App Nap) when it is in the background, which could slow its timing and cause stutters. Stopping lets it rest again.']],
   [431, '5 Nov', ['Mixer: a track that feeds a bus gets a lighter version of the bus column’s grey, so you can see which tracks go where.', 'Mixer: a click on a track’s meter puts the cursor on its VOL fader (Alt/⌘-click mutes it).', 'FX bar: a double-click on a value turns it into a text box. Type it as it shows (2.5k, -6, 40%, a name) or the raw number; Enter sets it, Esc leaves it. Alt/⌘-click and the right-click menu still reset.']],
   [430, '5 Nov', ['A narrow desktop window: the bottom panel (…CHAINS, FX, the track strip) stays side by side with a scrollbar again; it had turned into the phone’s one-at-a-time swipe view, with no way to swipe, so FX was out of reach and a folded …CHAINS filled the width. Phones keep the swipe view, and a folded part stays a strip there too.', 'Arrange has the keys: the phrase beside it stays readable (it was faded to under half). It loses its colour, gets a light lavender hatch and a dashed lavender frame instead.']],
@@ -30045,7 +30079,7 @@ grid.addEventListener('pointerdown', e => {
 // The column under character ch of a track group's row (a column's leading space counts as that column).
 function pvColAt(g, ch){ let pos = 0; for (let j = 0; j < g.C.length; j++){ const x = g.C[j], end = pos + (j ? 1 : 0) + pvW(x); if (ch < end) return x; pos = end; } return g.C[g.C.length - 1]; }
 let pvUsesLast = null, pvSig = '', pvHoldX = false;   // pvHoldX: this draw keeps the sideways scroll (the wheel moved the row)
-const pvTk = t => t === MT ? ' gx' : (isPolyT(t) ? ' gp' : ' gm') + (isBusT(t) ? ' bus' : '');
+const pvTk = t => t === MT ? ' gx' : (isPolyT(t) ? ' gp' : ' gm') + (isBusT(t) ? ' bus' + busCls(t) : feedsBus(t) ? ' pvfd' + busCls(t) : '');
 const pvFitS = (s, w) => s.length > w ? s.slice(0, w) : s.padEnd(w);
 function pvBarDraw(y, rows, lpb, warn, warnT){
   let nm = ''; try { nm = typeof songSecName === 'function' ? String(songSecName(y) || '') : ''; } catch(e){}
@@ -30137,7 +30171,7 @@ function pvLines(c, L, cc, rsel, playRows){
   // {t, y, g, c0}: the run starts c0 characters into track group g). The cursor's cell stays a span of its own, the phrase
   // editor's data-x / data-y cell, so dragging it still changes its value (gridDown).
   const cells = (g, y, C) => {   // C: [[x, text, cls], …] in column order; the space between two columns joins the run before it
-    const tint = (g.cur ? ' pvc' + pvTk(g.t) : '') + (g.bus ? ' pvbus' : ''), i0 = ln.length;   // BUS: its own colour down its columns
+    const tint = (g.cur ? ' pvc' + pvTk(g.t) : '') + (g.bus ? ' pvbus' + busCls(g.t) : feedsBus(g.t) ? ' pvfeed' + busCls(g.t) : ''), i0 = ln.length;   // BUS: its own colour down its columns; a track feeding one, a lighter wash of it
     let run = null, pos = 0;
     const flush = () => { if (run) put(run.t, run.cls || 'pvsp' + tint, {t:g.t, y:y >= 0 ? y : null, g, c0:run.c0}); run = null; };
     C.forEach(([x, s, cls], j) => {
@@ -30164,7 +30198,7 @@ function pvLines(c, L, cc, rsel, playRows){
     put(rS(r) + ' ', 'rn pvrn' + (r % 4 ? '' : ' rn4') + (r < curLen ? rsel(r) : ''), null, r < curLen ? {r} : null); put(' ', '');
     G.forEach((g, i) => { if (i) put('  ', 'pvg');
       if (g.fold) return put(' '.repeat(stripW(g)), 'pvf', to(g, null, r));
-      if (g.ph >= 0 && r >= g.len) return put(pvFitS(r === g.len ? (g.w >= 9 ? 'ENDS HERE' : 'END') : '', g.w), 'pvz' + (g.bus ? ' pvbus pvbl pvbr' : ''), to(g, null, r));
+      if (g.ph >= 0 && r >= g.len) return put(pvFitS(r === g.len ? (g.w >= 9 ? 'ENDS HERE' : 'END') : '', g.w), 'pvz' + (g.bus ? ' pvbus pvbl pvbr' + busCls(g.t) : ''), to(g, null, r));
       const q = g.p ? g.p[r] : null;
       cells(g, r, g.C.map(x => {
         const v = q ? q[x] : -1, kd = PK[x];

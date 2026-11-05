@@ -151,6 +151,20 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 5 Nov (4): one colour per bus everywhere; sends striped; Arrange bus bars stop at the grid (build 433, on `beta`)
+
+- Owner: the Arrange bus outline ran into the hint text under the panel. `arrBusBot(g)`: the bars end at the grid's
+  visible bottom and 2 px above `.tafx`; a ResizeObserver on `arrGrid` redraws them when the panel's layout moves without
+  a redraw (the hint gaining a line when Arrange takes the keys; seen headless: bars left short or long).
+- Owner: feeders styled in Pattern view too, then "can each bus or send look different… in the mixer, arrange, and pattern
+  view and anywhere else". Arrange already had BUS GROUPS (31 Oct: BUS_COLORS per bus, sends all `SEND_COLOR` olive).
+  Now one system: `--bus1…8` set on :root from BUS_COLORS; `busCls(t)` → ` bcN` (the track's bus, first if several) plus
+  ` snd` for a send (`isSendT`: feeds a bus, not pure, not a bus). Mixer: `mbus` 26% / `mfeed` 11% of `--bc`, sends striped.
+  Pattern view: `.bus` / `.pvbus` / `.pvbframe` take `--bc` (fallback `--tk-bus`), feeders `pvfeed` 9% wash + `pvh.pvfd`
+  bar under the band (dashed for a send). Arrange: sends take their bus's colour with `bgs` (dashed header line, striped
+  blocks); the bus bars are the bus's `--bgc` (were the group bar's colour, 3 Nov). `SEND_COLOR` kept, unused.
+- Checked headless with a stubbed busPlan (3 buses, pure feeders and sends) on Mixer, Pattern view and Arrange. Tests pass.
+
 ## 5 Nov (3): App Nap held off while playing (build 432, on `beta`; desktop needs a build)
 
 - Owner: stutters with the Electron app in the background on an M4, "maybe when using the flx command". The Chromium side
