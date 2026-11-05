@@ -842,7 +842,7 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .trk :is(input,textarea,[contenteditable]){user-select:text; -webkit-user-select:text}
 .trk{flex:1; min-height:0; min-width:0; overflow:hidden; display:flex; flex-direction:column; background:var(--bench)}
 .ttabs{display:flex; flex:none; border-bottom:1px solid var(--line); background:var(--ttl); overflow-x:auto; scrollbar-width:none}
-.ttabs button{border:0; border-right:1px solid var(--line); background:none; min-height:36px; padding:0 14px; font-weight:500; font-size:var(--fs-4); letter-spacing:.04em; flex:none}
+.ttabs button{border:0; border-right:1px solid var(--line); background:none; min-height:36px; padding:0 calc(14px + var(--tabx, 0px)); font-weight:500; font-size:var(--fs-4); letter-spacing:.04em; flex:none}
 .ttabs button.on{background:var(--ink); color:var(--inv)}
 .tbody{flex:1; min-height:0; display:flex}
 .tscr{flex:1; min-width:0; font-family:var(--mono); font-size:14px; padding:8px 12px;
@@ -1058,6 +1058,12 @@ body:not(.legon) .tside .tlegend{display:none}
 .keys.wide{grid-template-columns:repeat(4,calc(var(--kw, var(--k)) * 1.02))}
 /* The nav/edit pad: the command row inverted. A darker grey panel; buttons in a screen's colour, on white outlined offset blocks. */
 .tctl{background:color-mix(in srgb, var(--side) 84%, #000)}
+/* FX BAR IN THE PAGE COLOUR (owner, 5 Nov, mockup C): with the bottom panel showing, its area is the page colour, divided
+   from the tracker by a 3px rule in the ink colour; PAD mode's keypad keeps the darker grey. The tab strip is the page
+   colour too. */
+.tctl:has(> #tDeck:not([hidden])), .tctl:has(#tDeck:not([hidden])){background:var(--panel); border-top:3px solid var(--ink)!important}
+#tDeck .dks, #tDeck .dkcrail, #tDeck #dkFxBar, #tDeck.fxbar #dkFx.col{background:var(--panel)}
+.ttabs, .ttabbar{background:var(--panel)}
 #tPad .k{background:var(--sh, var(--voice)); color:#1b2130; box-shadow:4px 4px 0 0 #fff, 4px 4px 0 1.5px var(--line); transition:transform .06s, box-shadow .06s}
 #tPad .k.dn{transform:translate(3px,3px); box-shadow:1px 1px 0 0 #fff, 1px 1px 0 1.5px var(--line)}
 #tPad .k.dn, #tPad .k.on{background:var(--ink); color:var(--inv)}
@@ -1595,7 +1601,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .tgrid.pvon span.pvh.pvfd.snd{box-shadow:none; background-image:repeating-linear-gradient(90deg, var(--bc) 0 6px, transparent 6px 10px); background-size:100% 3px; background-position:bottom; background-repeat:no-repeat}
 /* BUS FRAME (owner, 31 Oct: the bus column's lines were wavy): one frame per bus column, drawn over the grid (pvBusFrame),
    instead of a line on each row's cell (cells a hair different in width, from the fonts, made them zigzag) */
-.pvbframe{position:absolute; pointer-events:none; z-index:2; box-sizing:border-box; border-left:2px solid var(--bc, var(--tk-bus)); border-right:2px solid var(--bc, var(--tk-bus))}
+.pvbframe{position:absolute; pointer-events:none; z-index:2; box-sizing:border-box; --bfc:color-mix(in srgb, var(--bc, var(--tk-bus)) 45%, transparent); border-left:2px solid var(--bfc); border-right:2px solid var(--bfc)}   /* see-through (owner, 5 Nov): the letters at a bus's edge show through it */
 /* ===== PATTERN VIEW (setting PATTERN VIEW; to remove: delete this CSS block, the JS block of the same name and the
    lines marked "PATTERN VIEW" in the script) =====
    The Phrase screen as a pattern: every track's phrase for one song row side by side (Renoise-style), a column group per
@@ -20876,7 +20882,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 434;
+const BUILD = 436;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -21149,6 +21155,20 @@ for (const id of ['tInlSide', 'tInlPad']) $(id).addEventListener('click', e => {
   const b = e.target.closest('[data-i]'); if (!b) return;
   cInst = +b.dataset.i; go('inst');
 });
+// TABS LINE UP WITH THE VIEW BUTTONS (owner, 5 Nov): SONG … PROJECT widen evenly so the last tab ends where the
+// Tracker / Synth / Waves / Chains buttons end, while the header sits on one row above them (not when it wraps, or when
+// that would stretch them past 1.8×).
+function tabAlign(){
+  const nav = $('tTabs'), seg = $('segView'); if (!nav || !seg) return;
+  nav.style.removeProperty('--tabx');
+  const bs = [...nav.children].filter(b => b.offsetWidth); if (!bs.length) return;
+  const sr = seg.getBoundingClientRect(), nr = nav.getBoundingClientRect(); if (!sr.width || !nr.width || sr.bottom > nr.top + 1) return;
+  const L = bs[0].getBoundingClientRect().left, nat = bs[bs.length - 1].getBoundingClientRect().right - L, R = sr.right - L;
+  if (R <= nat + 1 || R > nat * 1.8) return;
+  nav.style.setProperty('--tabx', ((R - nat) / (2 * bs.length)).toFixed(2) + 'px');
+}
+try { const ro = new ResizeObserver(() => tabAlign()); ro.observe($('tTabs')); ro.observe($('segView'));
+  new MutationObserver(() => tabAlign()).observe($('tTabs'), {childList:true}); } catch(e){}
 function setStepDec(on){ stepDec = on; try { localStorage.setItem(SDK, on ? '1' : '0'); } catch(e){} arrSig = ''; draw(); }
 function setTScale(v){ tScale = clamp(Math.round(v / 10) * 10, 60, 200); try { localStorage.setItem(TSK, String(tScale)); } catch(e){} fit(); draw(); }
 function setMixScale(v){ mixScale = clamp(Math.round(v / 10) * 10, 60, 200); try { localStorage.setItem(MSK, String(mixScale)); } catch(e){} fit(); draw(); }
@@ -29405,6 +29425,8 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [436, '5 Nov', ['The bottom panel (…CHAINS, FX, the track strip) is in the page colour now, set off from the tracker by a black rule; the strip behind the screen tabs is the page colour too.', 'SONG … PROJECT widen so the last tab ends in line with the Tracker / Synth / Waves / Chains buttons above.']],
+  [435, '5 Nov', ['Pattern view: the outline down a bus’s sides is see-through, so the letters at its edge (OFF, FLX…) show through it.']],
   [434, '5 Nov', ['The computer keyboard plays the instrument on INST, Mixer and FX too, through that screen’s track (Mixer: the cursor’s track; FX: the track whose effects are open; INST: the first track using it), so you hear the mixer and effects as you change them. Only Phrase and the Pattern view write notes. On those three screens Enter on a value lets you type it, since the letter and number keys play now.', 'New MIDI instrument (INST › NEW MIDI INSTRUMENT, or Edit ▾): takes the next free instrument, sets it to send MIDI on port A and the next free channel, and opens it at MIDI CH. A MIDI instrument shows MIDI, its port and channel next to its number on INST and in the NOW line.']],
   [433, '5 Nov', ['Buses and sends each in their own colour on every screen: Arrange’s bus colours now carry to the Mixer (the bus column, and a lighter wash on the tracks feeding it) and the Pattern view (the bus’s band, frame and wash; a feeding track gets a line under its band and a light wash). A send is its bus’s colour in stripes, so you can tell which bus it goes to (sends were all one olive).', 'Arrange: the bars either side of a bus are in that bus’s colour, and they no longer run into the hint text under the panel.']],
   [432, '5 Nov', ['Desktop app on a Mac: while the song plays, macOS is asked not to put the app to sleep (App Nap) when it is in the background, which could slow its timing and cause stutters. Stopping lets it rest again.']],
