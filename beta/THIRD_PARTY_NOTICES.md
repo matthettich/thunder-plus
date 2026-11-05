@@ -161,6 +161,14 @@ SIL Open Font License 1.1, included as `fonts/OFL-ShareTechMono.txt`.
   others in 2011), and Chaos (the Lorenz, Rössler, Chua, Thomas and Duffing systems and the logistic and Hénon maps,
   integrated from their published equations).
 
+## Third-party sounds: Adventure Kid Waveforms (AKWF), the Table engine's starter tables
+
+`wavetables/*.json` are the Table engine's starter tables, made by `tools/akwf-tables.mjs` from single-cycle waveforms of
+AKWF-FREE by Kristoffer Ekstrand (Adventure Kid), https://github.com/KristofferKarlAxelEkstrand/AKWF-FREE, dedicated to the
+public domain under **CC0 1.0 Universal** (full text in `wavetables/AKWF-LICENSE.md`). CC0 asks for nothing, so they need
+no notice; the credit is a courtesy. The waves are stacked into tables, reordered, thinned to 64 frames and stored as
+partials; a pad that loads one keeps its own copy in the song.
+
 ## Third-party sounds: FluidR3 Mono GM (General MIDI SoundFont)
 
 `sounds/FluidR3Mono_GM.sf3` is the General MIDI sound set used by Engine: SoundFont (downloaded by the app on first use).

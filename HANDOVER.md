@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.85** (4 Nov 2026; owner: "Give me a desktop release please!"; Run workflow through the API with version 1.2.85,
+  from `main` at cache v428): the transparent app icon (yellow kept on the Apple touch and maskable icons).
 - **v1.2.84** (4 Nov 2026; owner: "push to the main and start a desktop build"; Run workflow through the API with version 1.2.84,
   from `main` after merging `beta` at build 427): the full test sweep's ten fixes (422–425), HOP docs (426) and the follow-up (427).
 - **v1.2.83** (3 Nov 2026; owner: "push it and build a desktop app"; Run workflow through the API, from `main` at build 421; v1.2.82
@@ -5366,3 +5368,11 @@ marked `BATTERY (27 Oct)`:
   all pass. Not yet tried on the Fold: check a pad tap after coming back to the app sounds at once, and that the
   battery use in Android's settings drops.
 - Left for later: the idle dogs' endless breathe/wag animation (open item 11).
+
+## 4 Nov: transparent app icon (web + desktop)
+
+- Owner: "background for the thunder plus icon (the yellow part) transparent, so it's just the dogs faces". `icons/plus-icon-512.png`
+  and `-192.png` (favicon, manifest "any" icons, media-session artwork, Electron app icon) now have the yellow removed,
+  with the outline's anti-aliased edge kept as semi-transparent ink. Yellow kept where transparency fails: the Apple
+  touch icon (iOS fills it black) and the maskable icon (Android needs a full-bleed background). Icon refs ?v=3,
+  manifest ?v=9, cache v428.

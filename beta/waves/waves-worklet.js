@@ -1357,7 +1357,10 @@ class BlipVoice {
     const p = this.p, sr = this.sr, inv = 1 / sr, kd = Math.exp(-inv * 1000 / Math.max(1, p.kickT)), ad = Math.exp(-inv * 1000 * 6.9 / Math.max(2, p.decay));
     const atk = Math.max(1, p.atk / 1000 * sr), fmI = p.fm * 8, dr = p.drive * 8, dn = dr ? 1 / Math.tanh(dr) : 1;
     const filt = Math.max(-1, Math.min(1, p.filt)), fc = filt < 0 ? 20000 * Math.pow(0.004, -filt) : 20 * Math.pow(400, filt);
-    const f = 2 * Math.sin(Math.PI * Math.min(0.45, fc / sr)), q = 2 - 1.95 * Math.max(0, Math.min(1, p.res)), gT = Math.max(5, p.grainT) / 1000 * sr, rc = Math.sqrt(q / 2);   // rc: resonance doesn't jump the level
+    const q = 2 - 1.95 * Math.max(0, Math.min(1, p.res)), gT = Math.max(5, p.grainT) / 1000 * sr, rc = Math.sqrt(q / 2);   // rc: resonance doesn't jump the level
+    // FIX (sweep, 4 Nov): the filter blew up (a crackle at ~8× full scale) with Filter near HP 8 kHz or a nearly open LP and
+    // little Resonance: this state-variable filter is only stable for f² + 2fq < 4, so f stops just under that
+    const f = Math.min(2 * Math.sin(Math.PI * Math.min(0.45, fc / sr)), 0.98 * (Math.sqrt(q * q + 4) - q));
     for (let i = a; i < b; i++){
       const t = this.t;
       // grain: the hit starts again every Grain time, each repeat quieter
@@ -4876,7 +4879,93 @@ class WavesProcessor extends AudioWorkletProcessor {
     return true;
   }
 }
-registerProcessor('waves', WavesProcessor);
+try { registerProcessor('waves', WavesProcessor); } catch (_) {}   // (loaded twice into one context: once is enough)
+
+/* …WAVES LIVE (Thunder Plus, 3 Nov): the …waves patch played live as a tracker instrument, as the …pump live engines are
+   (thunder-psyn): one node per track and pad, notes arriving as AudioParam automation (so an export plays them at the same
+   samples as live), four lanes (a poly track's four notes; a mono track uses lane 0), each with r (playback rate against
+   the pad's pitch), g (gate), t (a counter that steps on every note), l (legato: a slide into this note), v (velocity,
+   1-127). Each node runs the whole patch and plays one of its 8 buses (the pad's Bus), the patch's voices taking the
+   notes: a lane's pitch is the pad's (C-4 = the patch's C-2, as a …waves layer renders) moved by 12 log2 r, followed every
+   block, so slides, bends and arpeggios move it. THUNDER CORE drives it like the others (cid, __tcOv, __tcPost). */
+const WL_LANES = 4;
+class WavesLiveProc extends AudioWorkletProcessor {
+  static get parameterDescriptors(){
+    const d = [];
+    for (let j = 0; j < WL_LANES; j++) d.push(
+      {name:'r' + j, defaultValue:1, minValue:0, maxValue:256, automationRate:'a-rate'},
+      {name:'g' + j, defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
+      {name:'t' + j, defaultValue:0, automationRate:'a-rate'},
+      {name:'l' + j, defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
+      {name:'v' + j, defaultValue:100, minValue:1, maxValue:127, automationRate:'a-rate'});
+    d.push({name:'bpm', defaultValue:120, minValue:10, maxValue:999, automationRate:'k-rate'});
+    return d;
+  }
+  constructor(options){
+    super();
+    const o = options.processorOptions || {};
+    if (o.cid){ this.__cid = o.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(o.cid, this); }
+    if (!globalThis.__wlInit && (o.dspModule || o.dspBytes)){ wasmInit(o); globalThis.__wlInit = true; }
+    this.p = o.p || {}; this.dead = false;
+    this.e = new WavesEngine(sampleRate, { hosted:false, maxVoices:8, transport:{ tempo:120, lpb:4, ticks:6, playing:false } });
+    try { if (o.doc) this.e.loadPatch(o.doc); } catch (_) {}
+    this.lane = Array.from({length:WL_LANES}, () => ({row:-1, lt:0, lg:false}));
+    this.quiet = 1e9; this.ms = 0; this.fr = 0; this.bpm = 0;
+    this.port.onmessage = ev => { const d = ev.data || {};
+      if (d.set) this.p = d.set;
+      if (d.doc){ try { this.e.loadPatch(d.doc); for (const l of this.lane) l.row = -1; } catch (_) {} }
+      if (d.dispose){ if (this.__cid && globalThis.__tcNodes && globalThis.__tcNodes.get(this.__cid) === this) globalThis.__tcNodes.delete(this.__cid); this.dead = true; } };
+  }
+  pitch(r){ return 36 + (+this.p.tune || 0) + 12 * Math.log2(r > 1e-6 ? r : 1e-6) - 60; }
+  process(_ins, outs, P){
+    if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);
+    const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, e = this.e, V = e.voices;
+    if (this.dead){ try { e.dispose(); } catch (_) {} return false; }
+    const t0 = Date.now();
+    const bpm = P.bpm ? P.bpm[0] : 120; if (bpm !== this.bpm){ e.setTransport({ tempo:bpm }); this.bpm = bpm; }
+    const at = (A, i) => A.length > 1 ? A[i] : A[0];
+    let any = false;
+    for (let j = 0; j < WL_LANES; j++){
+      const ln = this.lane[j], T = P['t' + j], G = P['g' + j];
+      if (!(T.length === 1 && G.length === 1 && T[0] === ln.lt && (G[0] >= 0.5) === ln.lg)){
+        // notes land on the block (the engine runs a block at a time): the first change in it counts
+        for (let i = 0; i < n; i++){
+          const tg = at(T, i), ga = at(G, i) >= 0.5;
+          if (tg === ln.lt && ga === ln.lg) continue;
+          if ((tg !== ln.lt && ga) || (ga && !ln.lg)){
+            const leg = tg !== ln.lt && ln.lg && at(P['l' + j], i) >= 0.5 && ln.row >= 0 && V.rows[ln.row].gate;
+            const pt = this.pitch(at(P['r' + j], i)), vel = Math.max(1, Math.min(127, at(P['v' + j], i))) / 127;
+            if (leg){ const rw = V.rows[ln.row]; rw.pitch = pt; }
+            else {
+              if (ln.row >= 0){ const rw = V.rows[ln.row]; if (rw.gate && rw.lane === j){ rw.gate = 0; rw.offAt = V.now; } }
+              const k = V.on(pt, vel); V.rows[k].lane = j; ln.row = k;
+              for (const l2 of this.lane) if (l2 !== ln && l2.row === k) l2.row = -1;   // a stolen voice
+            }
+            any = true;
+          } else if (!ga && ln.lg){ if (ln.row >= 0){ const rw = V.rows[ln.row]; if (rw.lane === j && rw.gate){ rw.gate = 0; rw.offAt = V.now; } } ln.row = -1; }
+          ln.lt = tg; ln.lg = ga;
+        }
+      }
+      // the pitch between notes: the lane's rate at the end of the block (slides, bends, vibrato)
+      if (ln.row >= 0){ const rw = V.rows[ln.row]; if (rw.gate && rw.lane === j){ const rr = P['r' + j]; rw.pitch = this.pitch(rr[rr.length - 1]); } }
+    }
+    const held = this.lane.some(l => l.row >= 0 && V.rows[l.row].gate);
+    if (!held && !any && this.quiet > sampleRate * 2){ L.fill(0); if (R !== L) R.fill(0); return true; }
+    try { e.process(BLOCK); } catch (_) { e.busesL.fill(0); e.busesR.fill(0); }
+    const bus = Math.min(BUS_COUNT, Math.max(1, (+this.p.bus | 0) || 1)), off = (bus - 1) * BLOCK;
+    const g = Math.pow(10, (+this.p.level || 0) / 20), dv = +this.p.drive || 0, dr = dv > 0.001 ? 1 + dv * dv * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1;
+    let pk = 0;
+    for (let i = 0; i < n; i++){
+      let a = e.busesL[off + i] * g, b = e.busesR[off + i] * g; if (dr){ a = Math.tanh(a * dr) * dn; b = Math.tanh(b * dr) * dn; }
+      a = soft(a); b = soft(b); L[i] = a; if (R !== L) R[i] = b; const m = (a < 0 ? -a : a) + (b < 0 ? -b : b); if (m > pk) pk = m; }
+    this.quiet = held || pk > 2e-5 ? 0 : this.quiet + n;
+    this.ms += Date.now() - t0; this.fr += n;
+    if (this.__ov && globalThis.__tcPost) globalThis.__tcPost(this, outs[0]);
+    if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
+    return true;
+  }
+}
+try { registerProcessor('thunder-wlive', WavesLiveProc); } catch (_) {}
 } else if (typeof globalThis !== 'undefined'){
   globalThis.WavesDSP = { WavesEngine, wasmInit, modsPrepare, MODULES, WASM, BUS_COUNT };
 }

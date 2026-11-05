@@ -85,7 +85,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const CC_CMDS = ['CCA', 'CCB', 'CCC', 'CCD'];
 const NCC = CC_CMDS.length;
 const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
-  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT'];
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP'];
 const SIGNED = new Set(['PBN','TSP','PIT','FIN','NUD','RTV']);
 const s8 = v => v > 127 ? v - 256 : v;
 const RSTEP = {TIC:1, DEL:1, KIL:1, OFF:1, PSL:1, RET:1, PBN:1, TSP:1, PIT:1, FIN:4, ARP:1, HOP:1, INS:1, PGM:1, CSL:1, DIR:1};
@@ -153,6 +153,9 @@ const isPolyT = t => t >= polyFrom() && t < NT;
 const isBusT = t => t >= 0 && t < NT && busPlan().feeds.has(t);
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;
 const flxCap = v => S && S.flxOld ? Math.min(16, v) : Math.min(255, v);
+var PERF_SCENES = 16;
+var PERF_MACROS = 8;
+var PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32];
 const niOf = Sx => clamp((Sx && Sx.ni) | 0 || 16, 16, NI);
 const plpbOf = (Sx, id) => (id >= 0 && Sx.plpb && Sx.plpb[id]) || Sx.lpb || 4;
 const blockMuted = (Sx, y, t) => {
@@ -160,9 +163,6 @@ const blockMuted = (Sx, y, t) => {
   if (t < 32) return !!((Sx.smute[y] >> t) & 1);
   const w = Sx.smuteX && Sx.smuteX[y]; return !!(w && (w[(t - 32) >> 5] >> ((t - 32) & 31)) & 1);
 };
-var PERF_SCENES = 16;
-var PERF_MACROS = 8;
-var PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32];
 function freshPerf(){ return {sc:Array.from({length:PERF_SCENES}, (_, i) => ({n:'', v:{}})), xa:0, xb:1, xf:0,
   mac:Array.from({length:PERF_MACROS}, (_, i) => ({n:'M' + (i + 1), v:0, tg:[]})), lk:{}, lfo:{}}; }
 function tgtOk(id){ return typeof id === 'string' && /^(vol|pan|cut|res|dec):\d+$|^fx:\d+:\d+:\d+$/.test(id); }
@@ -325,8 +325,13 @@ function makeSeq(S, mode, o){
   }
   // The row a track is about to play, and the value of a TIC command on it (null when there is none).
   const r0 = (T, pid) => { const ph = pid >= 0 ? S.phrases[pid] : null; return ph ? ph[T.step] : null; };
+  const ENDI = FXC.indexOf('END'), JMPI = FXC.indexOf('JMP');
   const TICI = FXC.indexOf('TIC');
   const ticCmd = r => { let v = null; for (let k = FX0; k < RW; k += 2) if (r[k] === TICI) v = Math.max(0, r[k + 1]); return v; };
+  // GROOVE ON ITS OWN ROW (sweep, 4 Nov): GRV / GGR shape the row they are on too, as TIC does (they started on the next step)
+  const GRVI = FXC.indexOf('GRV'), GGRI = FXC.indexOf('GGR');
+  const cmdV = (r, ci) => { let v = null; if (r) for (let k = FX0; k < RW; k += 2) if (r[k] === ci) v = Math.max(0, r[k + 1]); return v; };
+  const grvOf = (v, tks) => v ? [(v >> 4) || tks, (v & 15) || tks] : null;
   // Each call plays the next line of every track that is due. Tracks keep their own clocks, so a phrase
   // can use its own lines per beat (LPB) and every track its own groove.
   // The MPC swing factor (50–75%): how late the off-beat lands. The SWING NOTE setting below picks the
@@ -337,6 +342,19 @@ function makeSeq(S, mode, o){
     let rel0 = Infinity; for (const T of tr) if (T.on && T.rel < rel0) rel0 = T.rel;
     if (rel0 === Infinity) rel0 = api.time - api.base;
     if (wakeOk) wake(rel0);   // LIVE SONG EDITS: a track given a block while the song plays joins in
+    /* END / JMP (owner, 3 Nov: "do we have a stop song command?" → "let's add the end command"): looked for on the rows due
+       now, before any of them plays, and only when the whole song plays (not a phrase or sect on its own, nor the LOOP
+       pattern). END: every track stops, so the song ends here (the page stops when the sequencer has no more, as at a
+       song's end) and a render ends here. JMP XX: every track starts again at song row XX now, as PLAY from that row does,
+       and this row doesn't play; in a render (once) a jump back to this row or earlier ends it instead of looping for ever. */
+    if (mode === 'song' && !loop){ let jc = null;
+      for (let t = 0; t <= MT && !jc; t++){ const T = tr[t]; if (!T.on || T.empty || T.rel > rel0 + 1e-9) continue;
+        const cid = sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null, r = r0(T, chRow ? chRow[0] : -1); if (!r) continue;
+        for (let k = FX0; k + 1 < RW; k += 2){ if (r[k] === ENDI){ jc = {end:true}; break; } if (r[k] === JMPI){ jc = {to:clamp(r[k + 1], 0, 255), from:T.row}; break; } } }
+      if (jc){
+        if (jc.end || (once && jc.to <= jc.from)) for (const T of tr) T.on = false;
+        else { const y = jc.to; for (let t = 0; t <= MT; t++){ const T = tr[t]; Object.assign(T, fresh()); T.row = y; T.rel = rel0; T.r0 = rel0;
+            if ((t < (S.ntr || 16) || t === MT) && S.song[y] && S.song[y][t] >= 0 && (!o.only || o.only.has(t))){ T.on = true; settle(T, t); } } } } }
     const t0 = api.base + rel0, evs = [], pos = new Array(NT + 1).fill(null), {amt:sw, beat:swB} = swingOf();
     let nb = api.bpm, ngrv = api.grv, pdl = 0; const tks0 = api.tks;   // pdl: PDL, the rows every track waits
     // The song position in beats at this step, for the player's beat clock (tempo-locked effects).
@@ -368,6 +386,11 @@ function makeSeq(S, mode, o){
         for (let k = X ? X : 1; k <= (X ? X : 15); k++){ evs.push({type:'chc', t:at, track:t, p:'b' + k, v:Y >= 2 ? 2 : Y});
           if (Y >= 2) evs.push({type:'chc', t:at + Y * line, track:t, p:'b' + k, v:-1}); } }
     };
+    // GGR on a row due now (any track, often the master column, which comes last) grooves every track's step from this one
+    for (let t = 0; t <= MT; t++){ const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
+      const cid = mode === 'phrase' ? -1 : sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null;
+      const g = cmdV(r0(T, mode === 'phrase' ? o.phrase : (!T.empty && chRow ? chRow[0] : -1)), GGRI);
+      if (g != null) api.grv = ngrv = grvOf(g, api.tks); }
     for (let t = 0; t <= MT; t++){
       const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
       const cid = mode === 'phrase' ? -1 : sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null;
@@ -375,6 +398,7 @@ function makeSeq(S, mode, o){
       const line = 60 / api.bpm / (api.lpb || plpbOf(S, pid));   // LPB: every track's lines per beat from here on
       // TIC on this row changes the ticks a step from here on (for every track, like TPO), and counts already for this row.
       if (r0(T, pid)){ const tc = ticCmd(r0(T, pid)); if (tc != null) api.tks = tc ? clamp(tc, 1, 32) : clamp(S.ticks || TICKS, 1, 32); }
+      { const g = cmdV(r0(T, pid), GRVI); if (g != null) T.grv = grvOf(g, api.tks); }
       const tick = line / api.tks, gv = T.grv || api.grv;
     // The MPC shuffle: the off-beat step borrows (sw − 50%) of the swing pair and hands it to the beat.
     // sw = 50%: every step lasts one line (straight). sw = 66⅔% on 16ths: the classic triplet feel.
@@ -592,7 +616,7 @@ const ntr = () => S.ntr || 16;
 const voiceForTrack = t => vtrk ? NPAD + t : t % NSLOT;
 const FX_NEEDS = {FLX:'flex', GAT:'sgate', RTG:'retrig'};
 
-// FXV: the effects' map() functions, from TFX in index.html (44 of them)
+// FXV: the effects' map() functions, from TFX in index.html (45 of them)
 const TFX_MAP = {
   "eq":f => [u8(f.treble), u8(f.mid), u8(f.bass), u8(f.lowpass), u8(f.tfreq), u8(f.bfreq), u8(f.hipass), u8(f.out)],
   "comp":f => [u8(f.press), u8(f.speed), u8(f.mew), u8(f.out), u8(f.mix)],
@@ -611,6 +635,7 @@ const TFX_MAP = {
   "glitch":f => [f.div, u8(f.chance), u8(f.stut), u8(f.rev), u8(f.pitch), u8(f.tape), u8(f.crush), u8(f.gate), f.vary, f.seed, u8(f.mix)],
   "retrig":f => [f.mode, f.div, u8(f.decay), f.pitch - 24, u8(f.gate), u8(f.mix)],
   "degrade":f => [f.bits, f.rate >= 255 ? 48000 : 300 * Math.pow(160, u8(f.rate)), u8(f.noise), u8(f.color), u8(f.follow), u8(f.dry), u8(f.wet)],
+  "vsamp":f => [f.model, f.drive, f.filter, 0.25 + u8(f.rate) * 0.75, u8(f.noise), u8(f.mix)],
   "crush":f => [u8(f.down), f.bits, f.smooth, u8(f.mix)],
   "rings":f => [f.model, [1, 2, 4][f.poly] || 1, f.note, u8(f.structure), u8(f.bright), u8(f.damp), u8(f.pos), u8(f.input) * 2, u8(f.mix)],
   "clouds":f => [f.mode, f.lofi, f.freeze, u8(f.pos), u8(f.size), f.pitch, u8(f.density), u8(f.texture), u8(f.blend), u8(f.fb), u8(f.verb), u8(f.spread)],
