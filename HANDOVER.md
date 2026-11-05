@@ -153,6 +153,18 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 5 Nov (6): bus outline see-through; bottom panel in the page colour (mockup C); tabs line up (builds 435–436, on `beta`)
+
+- Owner: the Pattern view's bus outline covered the letters at its edge → `.pvbframe` borders at 45% of the bus colour.
+- Owner: the darker grey FX bar looked odd but the division was good; mocked up (rendered from the real app) A: page
+  colour + 8px grey band, B: lighter band + page-colour tab strip, C: B with a black rule. **Owner chose C.**
+  `.tctl:has(#tDeck:not([hidden]))`: --panel with `border-top:3px solid var(--ink)!important` (another rule set 1px);
+  `#tDeck .dks / .dkcrail / #dkFxBar / #dkFx.col` --panel; `.ttabs, .ttabbar` --panel. PAD mode's keypad (same .tctl,
+  no deck) keeps the grey.
+- Owner: the end of Chains should line up with PROJECT. `tabAlign()`: `--tabx` adds to each tab's side padding so the last
+  visible tab ends at `#segView`'s right edge, when segView sits above the tabs and the stretch is under 1.8×. Runs from a
+  ResizeObserver (tabs, segView) and a MutationObserver (tab list).
+
 ## 5 Nov (5): keys play everywhere; Enter types a value there; New MIDI instrument (build 434, on `beta`)
 
 - Owner: "key input plays the current instrument no matter what screen you are on, but only inputs notes on the pattern or
