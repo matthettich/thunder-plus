@@ -19522,7 +19522,9 @@ function chaseFx(row, at){ for (const e of chaseEvs(row, at)) rt.pl.play(e); }
 // The SONG button in the synth's top bar: play the song from the tracker's cursor row, or stop it.
 // The label (Song / Stop) is switched by the .on class in CSS, so the button's size and position never
 // change with the transport state.
-function songBtn(){ document.documentElement.classList.toggle('tpon', !!tp.on);   // PLAYING: skins can light the play buttons (IDM: neon pink)
+let napOn = null;   // APP NAP (5 Nov): the desktop app is told when the song plays, so macOS doesn't nap it in the background
+function songBtn(){ document.documentElement.classList.toggle('tpon', !!tp.on);
+  { const on = !!tp.on, D = window.thunderDesktop; if (on !== napOn && D && D.app && D.app.playing){ napOn = on; try { D.app.playing(on); } catch(e){} } }   // PLAYING: skins can light the play buttons (IDM: neon pink)
   const b = $('tSong'); if (!b) return; b.hidden = false; b.classList.toggle('on', tp.on);
 }
 // The pump's 25 ms tick comes from a Worker: a page timer is slowed to once a second (or frozen) when the app is in
@@ -20849,7 +20851,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 431;
+const BUILD = 432;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29317,6 +29319,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [432, '5 Nov', ['Desktop app on a Mac: while the song plays, macOS is asked not to put the app to sleep (App Nap) when it is in the background, which could slow its timing and cause stutters. Stopping lets it rest again.']],
   [431, '5 Nov', ['Mixer: a track that feeds a bus gets a lighter version of the bus column’s grey, so you can see which tracks go where.', 'Mixer: a click on a track’s meter puts the cursor on its VOL fader (Alt/⌘-click mutes it).', 'FX bar: a double-click on a value turns it into a text box. Type it as it shows (2.5k, -6, 40%, a name) or the raw number; Enter sets it, Esc leaves it. Alt/⌘-click and the right-click menu still reset.']],
   [430, '5 Nov', ['A narrow desktop window: the bottom panel (…CHAINS, FX, the track strip) stays side by side with a scrollbar again; it had turned into the phone’s one-at-a-time swipe view, with no way to swipe, so FX was out of reach and a folded …CHAINS filled the width. Phones keep the swipe view, and a folded part stays a strip there too.', 'Arrange has the keys: the phrase beside it stays readable (it was faded to under half). It loses its colour, gets a light lavender hatch and a dashed lavender frame instead.']],
   [429, '5 Nov', ['IDM pink & green is the skin a first visit starts on (it was IDM). A skin you’ve picked is kept.']],
