@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.87** (5 Nov 2026; owner: "merge it and build a new desktop"; Run workflow through the API with version 1.2.87,
+  from `main` after merging `beta` at build 432): bus feeders in the Mixer, meter click → VOL, FX bar type in place, App Nap held off while playing.
 - **v1.2.86** (5 Nov 2026; owner: "can we merge and build desktop?"; Run workflow through the API with version 1.2.86,
   from `main` after merging `beta` at build 430): the narrow-window deck fix and the Arrange paged-out look.
 - **v1.2.85** (4 Nov 2026; owner: "Give me a desktop release please!"; Run workflow through the API with version 1.2.85,
