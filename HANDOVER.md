@@ -146,6 +146,19 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+
+## 5 Nov: narrow-window deck; Arrange paged-out look (build 430, on `beta`)
+
+- Owner (screenshot of a ~690px Mac window): "When I compress the screen, it does this to the fx bar". The phones' deck
+  carousel (`@media (max-width:700px)`: every part 100% wide, scroll-snap, no scrollbar) hit desktop windows too: only
+  …CHAINS showed (folded, its strip stretched full width), FX and the track strip were off to the right with no way there.
+  Now `(max-width:700px) and (pointer:coarse)` only; a desktop window keeps the row (FX shrinks, the body scrolls), and in
+  the carousel a folded part (`.dks.col`) stays 26px.
+- Owner: liked the phrase greying when Arrange has the keys but wanted "the tracker sequences" more visible while still
+  obviously paged out. `body.apf .tscr .tgrid`: opacity .45 → .9, `saturate(.3)`, a 20% lavender hatch and a 2px dashed
+  #9a63ff outline (Arrange's own focus outline is solid). Edit OFF (.72, colour kept, no frame) still looks different.
+- Checked headless at 690 and 1360 (ELECTRO, Phrase, …CHAINS folded, Arrange clicked). Tests pass.
+
 ## 3 Nov (48): plan, not built: sharing songs between devices (Google Drive)
 
 Owner asked how hard saving to Google Drive would be, and whether imported samples stay with the song file. Wants to pick

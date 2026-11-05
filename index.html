@@ -1910,9 +1910,11 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .stpan{grid-row:3; grid-column:1 / 7; display:grid; grid-template-columns:24px minmax(0,1fr) 34px; align-items:center; gap:6px; font-size:var(--fs-2)}
 .stpan input{margin:0; height:18px; accent-color:var(--ink)} .stpan output{text-align:right; font-variant-numeric:tabular-nums}
 .stpan span{color:var(--muted); letter-spacing:.06em}
-/* Phones: one section at a time, swipe sideways between them, so the tracker keeps its room. */
-@media (max-width:700px){ .dkbody{overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:none}
-  .dkbody > .dks{flex:0 0 100%!important; width:auto!important; scroll-snap-align:start} .dkw{display:none} }
+/* Phones: one section at a time, swipe sideways between them, so the tracker keeps its room. Touch screens only (5 Nov:
+   a narrow desktop window got it too: no scrollbar, no swipe, so FX and the track strip were out of reach past a
+   full-width …CHAINS, and a folded part's strip filled the whole width). A folded part stays a strip here as well. */
+@media (max-width:700px) and (pointer:coarse){ .dkbody{overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:none}
+  .dkbody > .dks{flex:0 0 100%!important; width:auto!important; scroll-snap-align:start} .dkbody > .dks.col{flex:0 0 26px!important; width:26px!important} .dkw{display:none} }
 
 /* ---------- the stage: the space beside the tracker grid on big screens ----------
    Two dancing dogs (outline cartoons of the pittie-dachshund and the husky) that hop on every beat while the song
@@ -2468,8 +2470,12 @@ body.apfa #tArr .tagrid b.c{outline:2px solid #9a63ff; background:#9a63ff !impor
 body.apf .tscr .cur{background:transparent; color:var(--ts-ink); outline:2px solid var(--ts-cur-bg); outline-offset:-2px}
 body.apf #tTitle{opacity:.55}
 /* The phrase is only on show while the song has the keys: it fades back so the eye goes to the song (18 Oct). */
-.tscr .tgrid{transition:opacity .15s}
-body.apf .tscr .tgrid{opacity:.45}
+.tscr .tgrid{transition:opacity .15s, filter .15s}
+/* 5 Nov (owner: keep it obvious the keys are away, but the sequences readable): the notes stay at most of their
+   strength and the colour drains out instead, inside a dashed frame in Arrange's lavender (Arrange's own is solid).
+   Edit OFF (.72, colour kept, no frame) still reads differently. */
+body.apf .tscr .tgrid{opacity:.9; filter:saturate(.3); outline:2px dashed #9a63ff; outline-offset:-1px;
+  background-image:repeating-linear-gradient(135deg, color-mix(in srgb, #9a63ff 20%, transparent) 0 2px, transparent 2px 9px)}
 .aptag{align-self:center; font:700 .62em/1 var(--mono); font-size:max(8px, .62em); letter-spacing:.08em; padding:.3em .55em; border-radius:3px; background:#9a63ff; color:#fff}
 .aptag[hidden]{display:none}
 /* PIN, in Arrange's header and the strip's: the phrase stays up while the song cursor moves. */
@@ -20841,7 +20847,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 429;
+const BUILD = 430;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29269,6 +29275,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [430, '5 Nov', ['A narrow desktop window: the bottom panel (…CHAINS, FX, the track strip) stays side by side with a scrollbar again; it had turned into the phone’s one-at-a-time swipe view, with no way to swipe, so FX was out of reach and a folded …CHAINS filled the width. Phones keep the swipe view, and a folded part stays a strip there too.', 'Arrange has the keys: the phrase beside it stays readable (it was faded to under half). It loses its colour, gets a light lavender hatch and a dashed lavender frame instead.']],
   [429, '5 Nov', ['IDM pink & green is the skin a first visit starts on (it was IDM). A skin you’ve picked is kept.']],
   [427, '4 Nov', ['Duplicate track: with no empty track of its kind, a mono and a poly track are added and the copy goes in the new one.',
     'GRV and GGR groove the row they are on too, not only the rows after it.',
