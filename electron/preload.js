@@ -21,7 +21,8 @@ contextBridge.exposeInMainWorld('thunderDesktop', {
     onCloseAsk: cb => { ipcRenderer.on('thunder:close-ask', () => cb()); },
     closeAck: () => ipcRenderer.send('thunder:close-ack'),                         // the page heard it (else the window closes after 3 s)
     closeReply: ok => ipcRenderer.send('thunder:close-reply', !!ok),              // true: close (and quit, if quitting); false: stay
-    onOpenPath: cb => { ipcRenderer.on('thunder:open-path', (e, p) => cb(p)); }
+    onOpenPath: cb => { ipcRenderer.on('thunder:open-path', (e, p) => cb(p)); },
+    playing: on => ipcRenderer.send('thunder:playing', !!on)                      // APP NAP: the song plays / stopped (macOS keeps the app awake while it plays)
   },
   // ABLETON LINK (3 Nov): the session lives in the main process (link-session.js). available: false when this build has no
   // Link addon (or it didn't load here; why says what happened). Times are Link's clock in µs; the page maps them itself.

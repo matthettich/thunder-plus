@@ -1,5 +1,5 @@
 // ...Thunder Plus as a desktop app: one window running the same index.html as the website.
-const { app, BrowserWindow, session, shell, Menu, protocol, net, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, session, shell, Menu, protocol, net, ipcMain, dialog, powerSaveBlocker } = require('electron');
 const path = require('path');
 const fs = require('fs'), fsp = fs.promises;
 const { pathToFileURL } = require('url');
@@ -28,6 +28,15 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+// APP NAP (owner, 5 Nov: stutters on an M4 with the app in the background, FLX rows especially): the switches above are
+// Chromium's own; macOS's App Nap is a level below them and still slows a hidden app's timers (the page's 25 ms pump and the
+// rows it books ahead: live engines, …pump FXV, MIDI out) and lowers its threads' priority. While the song plays the page
+// asks for 'prevent-app-suspension' (thunder:playing), and lets it go on STOP so an idle app can still nap.
+let napBlock = -1;
+function setPlaying(on){
+  if (on && napBlock < 0){ try { napBlock = powerSaveBlocker.start('prevent-app-suspension'); } catch (e) { napBlock = -1; } }
+  else if (!on && napBlock >= 0){ try { powerSaveBlocker.stop(napBlock); } catch (e) {} napBlock = -1; }
+}
 
 // Web MIDI, the save/open dialogs, the output device list and audio are allowed; nothing else is asked for.
 const ALLOW = new Set(['midi', 'midiSysex', 'fileSystem', 'clipboard-sanitized-write', 'clipboard-read', 'speaker-selection']);   // no 'media': the app never uses the mic or camera
@@ -175,6 +184,7 @@ app.whenReady().then(() => {
   ipcMain.handle('thunder:link-stop', () => link ? link.stop() : false);
   ipcMain.handle('thunder:link-now', () => LINK_ADDON ? LINK_ADDON.now() : 0);   // Link's clock now (µs): the page's clock ping
   app.on('will-quit', () => { if (link) link.off(); });
+  ipcMain.on('thunder:playing', (e, on) => setPlaying(!!on));   // APP NAP: held while the song plays
   ipcMain.on('thunder:page-ready', () => { pageReady = true; if (pendingPath && win){ const p = pendingPath; pendingPath = null; win.webContents.send('thunder:open-path', p); } });
   ipcMain.on('thunder:close-ack', () => clearTimeout(ackT));
   ipcMain.on('thunder:close-reply', (e, ok) => { clearTimeout(ackT); if (!ok){ quitting = false; return; } closeOk = true; if (win) win.close(); if (quitting) app.quit(); });
