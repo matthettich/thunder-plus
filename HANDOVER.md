@@ -149,6 +149,17 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 5 Nov (2): bus feeders in the Mixer; meter click → VOL fader; type in place on the FX bar (build 431, on `beta`)
+
+- Owner: tracks that feed a bus should look like the bus column but lighter. `tkm` adds `mfeed` for `busPlan().targets`
+  tracks (the bus keeps `mbus`): their --tk at 11% (the bus has 22% plus .bus's brightness .78).
+- Owner: a click on the meter under the control rows should put the cursor on that track's VOL. A capture pointerdown on
+  `span.mt` (index in `meterEls` % mixN) sets cs.mixer x / y 6 / fv; Alt / ⌘-click mutes. The fader bar keeps its drag.
+- Owner: double-click an FX bar value for text entry. Double-click used to reset (ONE RULE, 3 Nov); on the FX bar it now
+  opens an inline input (`input.fred`): `fbParse` takes a name, a number matched against the values as they show (nearest;
+  k = ×1000) or the raw number. Reset stays on Alt / ⌘-click and the right-click menu. Help and the FX setting's info say so.
+- Checked headless on ELECTRO (bus 04, feeders 01 02 03 07). Tests pass.
+
 ## 5 Nov: narrow-window deck; Arrange paged-out look (build 430, on `beta`)
 
 - Owner (screenshot of a ~690px Mac window): "When I compress the screen, it does this to the fx bar". The phones' deck
