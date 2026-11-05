@@ -13756,7 +13756,7 @@ const SKINS = [
   {id:'rainbowdyn', name:'Simple rainbow dynamic', base:'term', dots:['#e8b52f', '#3aa85a', '#4c6ee6', '#b04ce6']},
 ];
 const SKK = 'thunderplus-skin-v1';
-let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k => k.id === v)) return v; } catch(e){} return 'idm'; })();   // IDM for a first visit (owner, 31 Oct; it was Simple rainbow)   // Simple rainbow for a first visit (owner, 27 Oct; it was Simple grey). A saved pick is kept
+let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k => k.id === v)) return v; } catch(e){} return 'idmpg'; })();   // IDM pink & green for a first visit (owner, 5 Nov; it was IDM, 31 Oct, and Simple rainbow before that)   // Simple rainbow for a first visit (owner, 27 Oct; it was Simple grey). A saved pick is kept
 // Simple rainbow dynamic: a hue-rotate filter on the page goes once round the colour wheel every 20 seconds, so the
 // colours visibly drift. Greys and white stay put; only the colours move. It's set twenty times a second in 0.9° steps,
 // below a visible step, so the drift looks continuous at a third of the repaints of a per-frame animation. Paused while
@@ -20841,7 +20841,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 427;
+const BUILD = 429;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29269,6 +29269,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [429, '5 Nov', ['IDM pink & green is the skin a first visit starts on (it was IDM). A skin you’ve picked is kept.']],
   [427, '4 Nov', ['Duplicate track: with no empty track of its kind, a mono and a poly track are added and the copy goes in the new one.',
     'GRV and GGR groove the row they are on too, not only the rows after it.',
     'Effects: a very loud signal through a lot of Output or Makeup gain is clipped instead of cutting out (…pump effects and modules).',

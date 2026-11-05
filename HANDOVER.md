@@ -176,6 +176,12 @@ offered the Drive integration and/or SoundFonts in the song file.
   bar is its own `.agbus` (a background, no border), centred in the gap between the bus column's header cell and its
   neighbour's (`#tArrTh i[data-t]` ±1), as wide as the gap up to 2 px; a column at the edge uses a 2 px gap.
 
+## 5 Nov (1): IDM pink & green is the first-visit skin (build 429, on `beta`)
+
+- Owner: "make the idm pink skin the default"; chose **IDM pink & green** (`idmpg`) over IDM pink paper (`idmpink`).
+  `let skin` falls back to `'idmpg'` (was `'idm'`); a stored `thunderplus-skin-v1` still wins, so existing installs keep
+  their pick. Beta shares localStorage with main, so it only shows on a fresh profile. Cache `thunderplus-v429`.
+
 ## 4 Nov (2): the sweep's open items and clunky spots changed (builds 426–427, on `beta`, then `main` + desktop)
 
 - Owner: keep HOP's code and fix its docs (32-row patterns); fix every found bug; change every clunky spot; duplicate track
