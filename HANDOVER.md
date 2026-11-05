@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.85** (4 Nov 2026; owner: "Give me a desktop release please!"; Run workflow through the API with version 1.2.85,
+  from `main` at cache v428): the transparent app icon (yellow kept on the Apple touch and maskable icons).
 - **v1.2.84** (4 Nov 2026; owner: "push to the main and start a desktop build"; Run workflow through the API with version 1.2.84,
   from `main` after merging `beta` at build 427): the full test sweep's ten fixes (422–425), HOP docs (426) and the follow-up (427).
 - **v1.2.83** (3 Nov 2026; owner: "push it and build a desktop app"; Run workflow through the API, from `main` at build 421; v1.2.82
