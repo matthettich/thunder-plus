@@ -1595,7 +1595,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .tgrid.pvon span.pvh.pvfd.snd{box-shadow:none; background-image:repeating-linear-gradient(90deg, var(--bc) 0 6px, transparent 6px 10px); background-size:100% 3px; background-position:bottom; background-repeat:no-repeat}
 /* BUS FRAME (owner, 31 Oct: the bus column's lines were wavy): one frame per bus column, drawn over the grid (pvBusFrame),
    instead of a line on each row's cell (cells a hair different in width, from the fonts, made them zigzag) */
-.pvbframe{position:absolute; pointer-events:none; z-index:2; box-sizing:border-box; border-left:2px solid var(--bc, var(--tk-bus)); border-right:2px solid var(--bc, var(--tk-bus))}
+.pvbframe{position:absolute; pointer-events:none; z-index:2; box-sizing:border-box; --bfc:color-mix(in srgb, var(--bc, var(--tk-bus)) 45%, transparent); border-left:2px solid var(--bfc); border-right:2px solid var(--bfc)}   /* see-through (owner, 5 Nov): the letters at a bus's edge show through it */
 /* ===== PATTERN VIEW (setting PATTERN VIEW; to remove: delete this CSS block, the JS block of the same name and the
    lines marked "PATTERN VIEW" in the script) =====
    The Phrase screen as a pattern: every track's phrase for one song row side by side (Renoise-style), a column group per
@@ -20876,7 +20876,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 434;
+const BUILD = 435;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29405,6 +29405,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [435, '5 Nov', ['Pattern view: the outline down a bus’s sides is see-through, so the letters at its edge (OFF, FLX…) show through it.']],
   [434, '5 Nov', ['The computer keyboard plays the instrument on INST, Mixer and FX too, through that screen’s track (Mixer: the cursor’s track; FX: the track whose effects are open; INST: the first track using it), so you hear the mixer and effects as you change them. Only Phrase and the Pattern view write notes. On those three screens Enter on a value lets you type it, since the letter and number keys play now.', 'New MIDI instrument (INST › NEW MIDI INSTRUMENT, or Edit ▾): takes the next free instrument, sets it to send MIDI on port A and the next free channel, and opens it at MIDI CH. A MIDI instrument shows MIDI, its port and channel next to its number on INST and in the NOW line.']],
   [433, '5 Nov', ['Buses and sends each in their own colour on every screen: Arrange’s bus colours now carry to the Mixer (the bus column, and a lighter wash on the tracks feeding it) and the Pattern view (the bus’s band, frame and wash; a feeding track gets a line under its band and a light wash). A send is its bus’s colour in stripes, so you can tell which bus it goes to (sends were all one olive).', 'Arrange: the bars either side of a bus are in that bus’s colour, and they no longer run into the hint text under the panel.']],
   [432, '5 Nov', ['Desktop app on a Mac: while the song plays, macOS is asked not to put the app to sleep (App Nap) when it is in the background, which could slow its timing and cause stutters. Stopping lets it rest again.']],
