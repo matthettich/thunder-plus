@@ -160,6 +160,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 5 Nov (15): Edit… button, orange wave / blue selection, FX-card waveform window (build 445)
+- Owner asked how to open the editor on a loaded sample, to flip colours (sample orange, selection blue), and to style the waveform window like the FX bar boxes / pad mode buttons.
+- `#bEditSmp` "Edit…" in the layer header (shown when the layer is a sample with data) → `rcdPanel(cur, {edit:{pad:cur, li:V().sel}})`. Edit sample… in the Sample section still works.
+- `rcdCols`: wave = --mxcur / --smp / --noise (needs 1.6:1 contrast), selection = --mxbus / --std / #2a6cff / --smpc (1.3:1); greys are skipped so 909 gets orange/blue, not grey.
+- `.recwin` card (1.5px line border, offset shadow like `#dkFxBar .dkfc`) with `.rech` ink title bar (colour square, name, length · channels · rate) wraps overview, waveform and toolbar.
+- Checked: npm test, browser-check, recorder-check --core; screenshots of IDM, IDM pink paper, IDM pink & green, 909.
+
 ## 5 Nov (14): editor in the skin's accents, layout pass; Song button in the recorder and on the phone Synth page (build 444, desktop v1.2.91)
 
 - Owner: "draw the waveform and selection in the accent colors of the skin. The layout is way better but probably could use a
