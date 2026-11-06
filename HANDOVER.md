@@ -156,6 +156,28 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 5 Nov (14): editor in the skin's accents, layout pass; Song button in the recorder and on the phone Synth page (build 444, desktop v1.2.91)
+
+- Owner: "draw the waveform and selection in the accent colors of the skin. The layout is way better but probably could use a
+  revision or two"; uses IDM, IDM pink paper, IDM pink & green and 909 most; "a play/stop button to the sampler for when it
+  starts recording with playback"; on mobile "a play/stop button to the synth page as well"; drop the kit name ("the part that
+  says thunder") "Just when folded"; then "push these things to main and make a desktop build".
+- **Colours** (`rcdCols`, cached per skin / theme): the wave in the skin's --mxbus (the terminal skins' second colour: IDM blue,
+  pink & green green), else --smp, else --std; the selection / cursor in --mxcur (IDM orange), else --smpc, else --std. The wave
+  needs 2:1 against the panel (else the ink), a grey accent (909's) is swapped for the ink; the selection fill may be 1.3:1
+  (a tint) and its edges / the cursor use it taken 45 % toward the ink when under 2.5:1. Checked in IDM, IDM pink paper,
+  IDM pink & green, 909, Pastel (auto), Minimal black.
+- **Layout:** recording settings in `.recset` (two columns from 760 px); the toolbar `.recbar` = Play, readout, Undo, zoom;
+  tools in `.recg` groups of joined `.seg.recseg` buttons sized to their content, a grid of two per row; footers with a
+  `.recsp` spacer (record: Pad + Discard / Keep; edit: Revert | Apply, Close). Subtitle: length · channels · kHz.
+- **Song button in the recorder:** `.recsong` beside Record, runs the top bar's handler (apRun → tStop / tStart('song',
+  {row:songRow()})); a 150 ms poll keeps its label. rcdStart from stopped also uses songRow() now.
+- **Phone Synth page:** setView toggles body.synv; CSS shows #tSong on body.mob.synv up to 780 px (the tracker keeps it hidden:
+  its PLAY key does it) and hides #kitName up to 520 px (folded). The kit is renamed only in that box (no other place), so
+  folded phones rename it unfolded.
+- Checks: npm test 187; browser-check 22, recorder-check 12, sampler-check 10, all ok. Screenshots checked at 412 / 360 / 884 /
+  1400 px.
+
 ## 5 Nov (13): sampler stage 4: edit a loaded sample; a proper editor with zoom; every edit exposed (build 443)
 
 - Owner: apply the take edits "to a loaded sample"; "Expose all of those functions that are hidden"; make the window "feel
