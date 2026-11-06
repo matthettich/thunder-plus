@@ -156,6 +156,31 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 5 Nov (10): sampler stage 1: stereo samples, 2 minutes, sample loops (build 440)
+
+- Owner asked how developed the sampler is, then to work through the gaps (stereo, length, loops, recording synced to the
+  pattern like Renoise with edit tools, a sample browser; key zones last; the wave editor on hold). Stage 1 is this build.
+- **Stereo:** a sample is {data, data2?, sr, name}: data2 the right channel (absent = mono; `smpChannels` reads an AudioBuffer,
+  identical channels stay mono, 5.1+ folded). `renderVoice` (Layers path) renders once as before (`renderLayersOnly`) and, when
+  an on layer of type sample / grains / pwm has data2, again with each such sample's data2 swapped in; the right render rides
+  as `.r` on the returned array. Every layer is seeded (`seed` per layer), so non-sample layers come out the same in both:
+  centred. The Worker posts it as data2; `install()` keeps `c.data2`. Players: `stBuf(ac, d, d2, sr)` (NOT mkBuf: that name
+  is a different function further down; the first attempt overrode it and every Page-sequencer note threw — tests/sampler
+  checks there is one mkBuf) in buffer(), rtBufPlain, rtBuf (stretchData on both, deterministic); the core gets data2 with
+  'buf' and plays it with `stBal(pan)`, the StereoPannerNode's stereo-input law (balance), in both its fast and slow paths.
+  Saved: `b64r` in project / kit files, `pcm2` in IndexedDB (resolveSamples and the preset loader read it). Pad export writes a
+  stereo WAV for a stereo pad. …chains Resample and Render to a slot keep stereo (were summed). MUT / GEN variations stay mono.
+- **Length:** `SMP_MAX = 120` s (inside the ENGINE section: the render Worker only has that). Max len and layer Hold go to 120 s.
+  Two old caps cut long pads: pad effects' buffer at 12 s and the voice-amp release room at 32 s; both now SMP_MAX + margin.
+  Memory: a 2-minute stereo pad holds ~5 float copies (sample, render, AudioBuffer, core, rtB) ≈ 230 MB at 48 kHz.
+- **Loops** (layer params lpMode 0/1/2, lpS, lpE, lpX; section 'Sample loop' under Vintage sampler, sample layers only):
+  forward with a crossfade from just before the loop start (X ≤ the audio before the start), or ping-pong; reversed, the
+  ends swap. The loop lasts as long as the layer's envelope; turning Loop on makes an AHD layer ADSR at sustain 1 (synth
+  slots hold to note-off, drum pads for their Gate). Not looped: the Vintage sampler modes (vintOsc), Grains, PWM.
+- **Checks:** tests/sampler.test.js (pan law, channel reader, b64r round trip, the players' wiring, SMP_MAX's place);
+  `node tools/sampler-check.mjs` (headless, both sequencers: a left-only stereo sample stays left, ≥ 40 dB; a mono one
+  centred; a 40 s stereo sample with a pad effect renders to 40 s; loops still sound 1.5 s in with no step at the seam).
+
 ## 5 Nov (9): FLY, Flex's second bank of 255 IDM patterns (build 439)
 
 - Owner: "if there are any other IDM, aphex twin, autechre type effects that we don't have commands for, I'd love to add

@@ -96,6 +96,9 @@ class Auto {
    r/g/t/l/v + lane on the …pump synth), read in its process() through __tcOv, from the time the core first set each one;
    and the note's level and pan (the page's GainNode and StereoPanner after the node, which the core can't reach), applied
    to its output by __tcPost (the page sets those nodes to 1 and centre when the core takes the node over). */
+// STEREO SAMPLES (5 Nov): the StereoPannerNode's law for a stereo input (Web Audio spec), as [L→L, R→L, L→R, R→R]:
+// panned left the right channel folds into the left, panned right the left into the right; centred, each stays put.
+function stBal(pan){ if (pan <= 0){ const a = (pan + 1) * Math.PI / 2; return [1, Math.cos(a), 0, Math.sin(a)]; } const a = pan * Math.PI / 2; return [Math.cos(a), 0, Math.sin(a), 1]; }
 const tcNodes = () => globalThis.__tcNodes || (globalThis.__tcNodes = new Map());
 function tcOver(proc){ return proc.__ov || (proc.__ov = {p:new Map(), buf:new Map(), g:new Auto(1), pn:new Auto(0), until:Infinity}); }
 globalThis.__tcOv = (proc, P, n) => {
@@ -198,7 +201,7 @@ class ThunderCore extends AudioWorkletProcessor {
         busPlanH = null; busPlanVal = null; return; }
       case 'vars': if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } return;
       case 'kit': this.kv = d.kv || []; kit = {voices:this.kv}; return;
-      case 'buf': if (d.data) coreBufs.set(d.pad, {data:d.data, sr:d.sr}); else coreBufs.delete(d.pad); varDrop(d.pad); return;
+      case 'buf': if (d.data) coreBufs.set(d.pad, {data:d.data, data2:d.data2 || null, sr:d.sr}); else coreBufs.delete(d.pad); varDrop(d.pad); return;   // data2: a stereo pad's right channel
       case 'vbuf': varIn(d); return;   // MUT / GEN: a variation the page rendered
       case 'sf': if (d.data) sfPads.set(d.pad, d.data); else sfPads.delete(d.pad); return;   // SOUNDFONTS: a pad's preset
       case 'vdrop': varDrop(d.pad); return;
@@ -412,6 +415,7 @@ class ThunderCore extends AudioWorkletProcessor {
     const ck = kv.choke || 0;
     if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of this.T(k)) if (v.choke === ck) this.kill(v, ev.t);
     const data = ev.rev ? (c.rev || (c.rev = c.data.slice().reverse())) : c.data, dur = data.length / c.sr;
+    const data2 = c.data2 ? (ev.rev ? (c.rev2 || (c.rev2 = c.data2.slice().reverse())) : c.data2) : null;   // STEREO SAMPLES (5 Nov)
     const r = new Auto(ev.rate), g = new Auto(ev.gain), f = new Auto(1), pn = new Auto(Math.max(-1, Math.min(1, (ev.pan - 128) / 127)));
     if (ev.slide && ev.slide.dur > 0){ r.set(ev.slide.from, ev.t); r.lin(ev.rate, ev.t + ev.slide.dur); }
     const t0n = Math.max(ev.t, currentTime), hz = x => ((x >> 4) || 1) * (this.seq ? this.seq.bpm : S.bpm) / 60, dep = x => (x & 15) / 15;
@@ -419,7 +423,7 @@ class ThunderCore extends AudioWorkletProcessor {
     if (ev.fdi > 0){ g.set(0, t0n); g.lin(ev.gain, t0n + ev.fdi); }
     if (ev.trm && dep(ev.trm) > 0){ const k = dep(ev.trm) / 2; trm = {hz:hz(ev.trm), d:ev.gain * k, t:t0n}; if (!(ev.fdi > 0)) g.v0 = ev.gain * (1 - k); }
     if (ev.apn && dep(ev.apn) > 0) apn = {hz:hz(ev.apn), d:dep(ev.apn), t:t0n};
-    const syn = !!kv.syn, v = {data, sr:c.sr, r, g, f, pn, trm, apn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn ? kv.rel || 0 : 0, track:ev.track, end:Infinity, pos:0, t0:0};
+    const syn = !!kv.syn, v = {data, data2, sr:c.sr, r, g, f, pn, trm, apn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn ? kv.rel || 0 : 0, track:ev.track, end:Infinity, pos:0, t0:0};
     if (!ev.slide) this.pitchMods(v, ev.t, ev.rate, ev);
     const off = ev.ofsSec != null ? (ev.rev ? Math.max(0, dur - ev.ofsSec - ev.durSec) : ev.ofsSec) : Math.max(0, Math.min(255, ev.ofs || 0)) / 256 * dur;
     if (off > 0.0005){ f.set(0, t0n); f.lin(1, t0n + 0.0015); }
@@ -586,7 +590,10 @@ class ThunderCore extends AudioWorkletProcessor {
       const gc = v.trm ? null : v.g.constFrom(tb0), fc = v.f.constFrom(tb0), pc = v.apn ? null : v.pn.constFrom(tb0), rc = v.r.constFrom(tb0);
       if (gc != null && fc != null && pc != null && rc != null && v.t0 <= tb0 && v.end >= tb1){
         const k = gc * fc, a = (pc + 1) * Math.PI / 4, kl = k * Math.cos(a), kr = k * Math.sin(a), inc = rc * inc0; let p = v.pos;
-        for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, x = D[j] + (D[j + 1] - D[j]) * (p - j); L[i] += x * kl; R[i] += x * kr; p += inc; }
+        if (v.data2){ const D2 = v.data2, [ll, rl, lr, rr] = stBal(pc);   // a stereo pad: the StereoPannerNode's balance law, as the page plays it
+          for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, f = p - j, x = D[j] + (D[j + 1] - D[j]) * f, y = D2[j] + (D2[j + 1] - D2[j]) * f;
+            L[i] += (x * ll + y * rl) * k; R[i] += (x * lr + y * rr) * k; p += inc; } }
+        else for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, x = D[j] + (D[j + 1] - D[j]) * (p - j); L[i] += x * kl; R[i] += x * kr; p += inc; }
         v.pos = p;
         if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const q = T.indexOf(v); if (q >= 0) T.splice(q, 1); } }
         continue;
@@ -596,11 +603,13 @@ class ThunderCore extends AudioWorkletProcessor {
         const t = currentTime + i * dt;
         if (t < v.t0) continue;
         if (t >= v.end || v.pos >= len - 1){ v.ended = true; break; }
-        const p = v.pos, j = p | 0, x = D[j] + (D[j + 1] - D[j]) * (p - j);
+        const p = v.pos, j = p | 0, x = D[j] + (D[j + 1] - D[j]) * (p - j), D2 = v.data2;
         let g = v.g.at(t); if (v.trm) g += v.trm.d * Math.sin(2 * Math.PI * v.trm.hz * (t - v.trm.t));
         let pan = v.pn.at(t); if (v.apn) pan = Math.max(-1, Math.min(1, pan + v.apn.d * Math.sin(2 * Math.PI * v.apn.hz * (t - v.apn.t))));
-        const y = x * g * v.f.at(t), a = (pan + 1) * Math.PI / 4;   // StereoPannerNode, mono in: equal power
-        L[i] += y * Math.cos(a); R[i] += y * Math.sin(a);
+        const gf = g * v.f.at(t);
+        if (D2){ const y2 = D2[j] + (D2[j + 1] - D2[j]) * (p - j), [ll, rl, lr, rr] = stBal(pan); L[i] += (x * ll + y2 * rl) * gf; R[i] += (x * lr + y2 * rr) * gf; }
+        else { const y = x * gf, a = (pan + 1) * Math.PI / 4;   // StereoPannerNode, mono in: equal power
+          L[i] += y * Math.cos(a); R[i] += y * Math.sin(a); }
         v.pos += v.r.at(t) * inc0;
       }
       if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const k = T.indexOf(v); if (k >= 0) T.splice(k, 1); } }
