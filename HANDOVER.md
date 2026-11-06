@@ -155,6 +155,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 5 Nov (7): BPM box in the page colour; a line before LEFT (build 437, on `beta`)
+
+- Owner (screenshot): the BPM / LPB box was still the darker grey, and no line between ROWS + and LEFT. The 436 rule
+  `.ttabs, .ttabbar{background:var(--panel)}` lost to `.ttabbar`'s own later rule, so `#tPat` (transparent) showed the
+  old --ttl grey, also in the gap beside `#tLen`. Now `!important`, plus `.tpat .tlen{border-left:1px solid var(--line)}`.
+
 ## 5 Nov (6): bus outline see-through; bottom panel in the page colour (mockup C); tabs line up (builds 435–436, on `beta`)
 
 - Owner: the Pattern view's bus outline covered the letters at its edge → `.pvbframe` borders at 45% of the bus colour.
