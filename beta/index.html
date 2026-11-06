@@ -15562,7 +15562,11 @@ class FlexCore {
         case 'stop': { const a = o.C ? cs(o.C) : o.a, W = o.C || o.b - o.a;
           if (p >= a){ const u = Math.min(p - a, W); r = a + u - u * u / (2 * W); if (u > W * 0.85) g = Math.max(0, (W - u) / (W * 0.15)); } } break;
         case 'start': { const a = o.C ? cs(o.C) : o.a, W = o.C || o.b - o.a;
-          if (p >= a && p < a + W){ const u = p - a; r = a - W / 2 + u * u / (2 * W); g = Math.min(1, u / (W * 0.2)); } else if (!o.C && p >= a + W) r = p - W / 2; } break;
+          // FLX CHECK 2 (5 Nov, owner: "FLX 76 sort of feels broken … flx lags"): the spin-up read the half-length before it
+          // at 0 → 1× speed, so it never caught up: the rest of the bar (76 TAPE START BEAT 1, 77 HALF BAR) played straight
+          // but 1/8 or a 1/4 late, and the EVERY versions only ever played the tail of the beat before. Now speed 4t − 3t²
+          // (0 → peak 1.33× → 1×): it starts from the spin-up's own downbeat, never reads ahead (r ≤ p) and lands on the grid.
+          if (p >= a && p < a + W){ const u = p - a, t = u / W; r = a + W * t * t * (2 - t); g = Math.min(1, u / (W * 0.2)); } } break;
         case 'wow': r = p - o.d * (1 - Math.cos(2 * Math.PI * p / o.T)) / 2 - (o.d2 ? o.d2 * (1 - Math.cos(2 * Math.PI * p / o.T2)) / 2 : 0); break;
         case 'scr': { const C = o.C, c = cs(C), u = (p - c) / C; r = c - C * o.d + C * o.d * (1 - Math.cos(2 * Math.PI * o.k * u)) / 2;
           if (o.gt === 1) g = Math.sin(2 * Math.PI * o.k * u) >= 0 ? 1 : 0; else if (o.gt === 2) g = (p * 16) % 1 < 0.5 ? 1 : 0; } break;
@@ -15586,7 +15590,7 @@ class FlexCore {
             r = src * G + (rv ? G - u : u); } } break;
         case 'swing': { const C = o.C, c = cs(C), u = (p - c) / C, h = 0.5 + o.a;
           r = c + C * (u < h ? u * 0.5 / h : 0.5 + (u - h) * 0.5 / (1 - h)); } break;
-        case 'tup': { const C = o.C, c = cs(C), u = (p - c) / C, j = Math.min(o.q - 1, Math.floor(u * o.q + 1e-9)), sj = o.q === 5 ? [0, 1, 2, 3, 3][j] : j;
+        case 'tup': { const C = o.C, c = cs(C), u = (p - c) / C, j = Math.min(o.q - 1, Math.floor(u * o.q + 1e-9)), sj = o.q === 5 ? [0, 0, 1, 2, 3][j] : j;   // FLX CHECK 2: was [0,1,2,3,3]: notes 2–4 read ahead (clamped: mostly straight with jumps); now the downbeat doubles and 2–4 land late, as a quintuplet does
           r = c + C * (sj / 4 + (u - j / o.q)); } break;
         case 'drunk': { const s = Math.floor(p * 4); r = p - FlexCore.hh(bar & 3, s, 41) * 0.06; } break;
         case 'lag': r = (p % 1) >= 0.5 ? p - 1/16 : p; break;
@@ -15609,7 +15613,9 @@ class FlexCore {
       case 7: r = Math.floor(p) - p % 1; break;
       case 8: r = Math.floor(p * 2) / 2 - p % 0.5; break;
       case 9: if (p >= 3){ u = p - 3; r = 3 - 2.5 * u * u; g = 1 - u * u; } break;
-      case 10: { const b = Math.floor(p * 2) / 2; u = (p - b) * 2; r = b + 0.125 * (1 - Math.cos(2 * Math.PI * u)); } break;
+      // FLX CHECK 2 (5 Nov): depth 0.125 ran ahead of the playhead for part of each push (clamped to "now": a flat spot then
+      // a jump); 0.105 is the most that stays behind it (0.1098), so the push and pull are smooth.
+      case 10: { const b = Math.floor(p * 2) / 2; u = (p - b) * 2; r = b + 0.105 * (1 - Math.cos(2 * Math.PI * u)); } break;
       case 11: g = p % 0.25 < 0.125 ? 1 : 0; break;
       case 12: g = (0xB6B6 >> (15 - Math.floor(p * 4))) & 1; break;
       case 13: { const s = Math.floor(p * 4); r = [0, 1, 2, 3, 4, 5, 2, 7, 8, 9, 10, 11, 8, 13, 6, 15][s] * 0.25 + p % 0.25; } break;
@@ -19647,7 +19653,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'rwv3ky';
+const CORE_REV = 'i7d2qg';
 const CORE_WANT = 6;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -20883,7 +20889,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 437;
+const BUILD = 438;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29426,6 +29432,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [438, '5 Nov', ['FLX on the Audio thread sequencer: the beat clock every tempo-locked effect follows (Flex, Step gate, Retrigger, synced delays) restarted at each row inside every audio block, so FLX patterns stuttered and lagged; it now runs smoothly, and ramps on live engines (fades, glides) move as written.', 'FLX 76–7A (TAPE START) spin up and land back on the beat instead of leaving the rest of the bar an 1/8 or a 1/4 late; FLX 0A SCRATCH and E8 5-TUPLET FEEL no longer skip.', 'Pattern view: a poly track keeps one width (the most note columns it uses in the song), so stepping song rows no longer slides the tracks sideways.']],
   [437, '5 Nov', ['The BPM / LPB box and the strip around LEFT are the page colour like the rest of the bar (the grey tab strip still showed there), and a line divides ROWS + from LEFT.']],
   [436, '5 Nov', ['The bottom panel (…CHAINS, FX, the track strip) is in the page colour now, set off from the tracker by a black rule; the strip behind the screen tabs is the page colour too.', 'SONG … PROJECT widen so the last tab ends in line with the Tracker / Synth / Waves / Chains buttons above.']],
   [435, '5 Nov', ['Pattern view: the outline down a bus’s sides is see-through, so the letters at its edge (OFF, FLX…) show through it.']],
@@ -30053,11 +30060,20 @@ function pvUses(){
   return n;
 }
 function pvNotes(p, len){ let m = 0; if (p) for (let y = 0; y < len && y < p.length; y++) for (let q = NCOL - 1; q >= m; q--) if (p[y][q] >= 0){ m = q + 1; break; } return m; }
-// A track's columns: its notes (the open poly track all four, other poly tracks the ones in use), V, I, FX1 (+FX2, FX3).
-function pvColsOf(t, p, len, cur){
+// STEADY WIDTHS (owner, 5 Nov: "when I scroll up and down the pattern editor sort of wobbles"): a poly track was as wide as
+// the note columns its phrase on THIS song row uses, so stepping rows (N1 N2 N3+ on one, N1+ on the next) slid every
+// track to its right sideways. Now each poly track is as wide as the most note columns it uses anywhere in the song.
+function pvSongNotes(){
+  const m = new Array(MT + 1).fill(0), seen = new Map();
+  for (const r of S.song) for (let t = 0; t <= MT; t++){ const cid = r[t]; if (cid < 0 || !isPolyT(t) || m[t] >= NCOL) continue; const ch = S.chains[cid]; if (!ch) continue;
+    for (const q of ch){ const p = q[0]; if (p < 0) continue; let n = seen.get(p); if (n == null){ n = pvNotes(S.phrases[p], plen(p)); seen.set(p, n); } if (n > m[t]) m[t] = n; } }
+  return m;
+}
+// A track's columns: its notes (the open poly track all four, other poly tracks the most the song uses), V, I, FX1 (+FX2, FX3).
+function pvColsOf(t, p, len, cur, sn){
   const all = [FX0, FX0 + 1, FX0 + 2, FX0 + 3, FX0 + 4, FX0 + 5], fx = pvFx ? all : [FX0, FX0 + 1];
   if (t === MT || (busTrack(t) && !hasNotes(p))) return all;   // BUS FX ONLY: the master and a commands-only bus always show FX1–FX3 (owner, 31 Oct)
-  const nn = !isPolyT(t) ? 1 : cur ? NCOL : Math.max(1, pvNotes(p, len));
+  const nn = !isPolyT(t) ? 1 : cur ? NCOL : Math.max(1, pvNotes(p, len), sn ? sn[t] : 0);
   return [...Array.from({length:nn}, (_, i) => i), VC, IC, ...fx];
 }
 const pvW = x => PK[x] === 'note' || PK[x] === 'fxc' ? 3 : 2;
@@ -30180,7 +30196,7 @@ function pvLines(c, L, cc, rsel, playRows){
   if (apReady && apF && !pvLinesIn){ const s = cs.song, k = {x:s.x, y:s.y, top:s.top}; pvLinesIn = true;
     try { return pvLines(c, L, cc, rsel, playRows); } finally { pvLinesIn = false; s.x = k.x; s.y = k.y; s.top = k.top; } }
   if (!pvHas(cs.song.y, cTrack, cPhrase) && !pvPend()) pvAlign();
-  const Y = cs.song.y, row = S.song[Y] || [], uses = pvUsesLast = pvUses(), k = pvSectRow();
+  const Y = cs.song.y, row = S.song[Y] || [], uses = pvUsesLast = pvUses(), k = pvSectRow(), sn = pvSongNotes();
   phShown = {x:cTrack, y:Y, p:cPhrase};   // SHOWN PATTERN (also while Arrange holds the keys: the row this view shows)
   const psr = selA && selA.v === 'phrase' && selA.pat ? selRect() : null;   // TRACKER KEYS: a pattern selection shows on every track
   const onRow = pvHas(Y, cTrack, cPhrase), pend = !onRow && pvPend();
@@ -30195,7 +30211,7 @@ function pvLines(c, L, cc, rsel, playRows){
       continue;
     }
     const ph = cur ? cPhrase : cid >= 0 ? pvPhraseIn(cid, k) : -1, p = ph >= 0 ? S.phrases[ph] : null, len = ph >= 0 ? plen(ph) : 0;
-    const C = pvColsOf(t, p, len, cur), w = C.reduce((a, x) => a + pvW(x), 0) + C.length - 1;
+    const C = pvColsOf(t, p, len, cur, sn), w = C.reduce((a, x) => a + pvW(x), 0) + C.length - 1;
     let inst = -1, more = false;
     if (p) for (let r = 0; r < len; r++){ const q = p[r]; if (inst < 0 && q[IC] >= 0) inst = q[IC]; if (!pvFx && !more) for (let m = FX0 + 2; m < RW; m++) if (q[m] >= 0){ more = true; break; } }
     G.push({t, cid, cur, ph, p, len, C, w, inst, more, bus:busTrack(t), dim:!cur && ((t < NT && !!(S.mix[t] && S.mix[t].mute)) || blockMuted(S, Y, t))});

@@ -724,15 +724,21 @@ class Auto {
   // was walked for every sample): what is over is folded into one value, keeping a fade in progress and a curve running.
   prune(t){
     const A = this.ev; if (!A.length || A[0].t > t) return;
-    let v = this.v0, st = null, cur = null, i = 0;
+    let v = this.v0, st = null, cur = null, i = 0, pt = 0;
     const val = x => st ? st.to + (st.from - st.to) * Math.exp(-(x - st.t) / st.tc) : v;
     for (; i < A.length; i++){ const e = A[i];
-      if (e.k === 1){ if (e.t > t) break; v = e.v; st = null; continue; }
+      if (e.k === 1){ if (e.t > t) break; v = e.v; st = null; pt = e.t; continue; }
       if (e.t > t) break;
-      if (e.k === 0){ v = e.v; st = null; cur = null; }
+      if (e.k === 0){ v = e.v; st = null; cur = null; pt = e.t; }
       else if (e.k === 2){ st = {from:val(e.t), t:e.t, to:e.v, tc:e.tc}; cur = null; }
-      else if (e.k === 3){ if (e.t + e.d > t){ cur = e; } else { v = e.fn(e.t + e.d); st = null; cur = null; } } }
+      else if (e.k === 3){ if (e.t + e.d > t){ cur = e; } else { v = e.fn(e.t + e.d); st = null; cur = null; pt = e.t + e.d; } } }
     if (i === 0) return;
+    // FLX CHECK 2 (5 Nov, owner: FLX stutters / "feels like it lags"): a linear ramp still running (the next event a k:1
+    // later than t) starts from the last point's TIME, not t. Folding it to {t, v} restarted the ramp from v at every block,
+    // so the beat clock (one 'beat' ramp a row) sat at the row's value at each block start and sawed inside it: Flex,
+    // Step gate, Retrigger and every tempo-locked effect on the Audio thread sequencer heard a staircase, and ramps on live
+    // engines (level fades, glides) crawled. Keep the point where it was.
+    if (!st && !cur && i < A.length && A[i].k === 1){ this.v0 = v; this.ev = [{k:0, t:pt, v}].concat(A.slice(i)); return; }
     const now = cur ? cur.fn(t) : val(t), head = [{k:0, t, v:now}];
     if (st) head.push({k:2, t, v:st.to, tc:st.tc});
     if (cur) head.push(cur);
