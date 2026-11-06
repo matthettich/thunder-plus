@@ -156,6 +156,33 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 5 Nov (8): FLX check 2: the core's beat clock, TAPE START, 0A / E8; Pattern view steady widths (build 438)
+
+- Owner: stutter "when a flex command is activated", "sometimes it feels like flx lags", "FLX 76 sort of feels broken" (fine if
+  deliberate, but most should feel deliberately broken); Pattern view "wobbles" scrolling up and down (screen recording).
+- **The clock (the real one): `Auto.prune` (core/core-processor.js) folded a linear ramp still running into {k:0, t:now, v:the
+  last point's value}**, so every block restarted the ramp from the last point at the block's start. The beat clock is one
+  `lin` per row (seq-core `type:'beat'`), so on the Audio thread sequencer (the default) the clock sat at the row's value at
+  each block start and sawed inside the block (jumps of a row, 0.25 beat, between blocks). Flex's phase lock snapped back each
+  block (`|e| > 0.004`), so FLX repeated block-sized bits: the stutter and the lag. Step gate, Retrigger and every clocked
+  effect heard the same; live-engine ramps (level fades, glides) crawled. Now a pending ramp keeps its last point's time
+  (`pt`); targets and curves fold as before (checked: same values as the old code there, exact on plain ramps).
+  `node tools/make-core.mjs` regenerated seq-core.js. The Page sequencer (ConstantSource ramps) was never affected.
+- Why flex-check passed: its reference FlexCore runs on the RECORDED clock, so a broken clock matched itself. It now checks
+  the clock against the tempo too (`beat clock: off by up to …`; fails above 0.002 beats a sample): the old core fails it
+  (0.258), the new one is exact. It also saw NaN samples (one a block, a few blocks, random bars) on the old core; gone now.
+- **TAPE START (76–7A):** read the half-length before at 0 → 1× and never caught up: 76 / 77 left the rest of the bar 1/8 or a
+  1/4 late (straight, off the grid: "broken"), 79 / 7A only ever played the beat before's tail. Now r = a + W·t²(2 − t)
+  (speed 4t − 3t²: 0 → 1.33× → 1×): never reads ahead, lands on the grid at 1×.
+- **0A SCRATCH** depth 0.125 → 0.105 (0.125 read ahead of now for part of each push: clamped, a flat spot and a jump; 0.1098 is
+  the most that stays behind). **E8 5-TUPLET FEEL** mapped notes 2–4 ahead of now (clamped: mostly straight with jumps); now
+  [0, 0, 1, 2, 3]: the downbeat doubles, the rest land late. A scan of all 255 patterns: nothing else reads ahead.
+- Old songs using 76–7A, 0A or E8 sound different (the intended way). Not touched: …chains / …waves FlexCore copies.
+- **Pattern view widths:** `pvColsOf` sized a poly track by the note columns of its phrase on THIS song row, so stepping rows
+  (N1 N2 N3+ → N1+) slid every track to its right. `pvSongNotes()` (per draw, like pvUses) gives each poly track the most it
+  uses anywhere in the song. Still moving by design: FOLD (empty tracks fold per row).
+- Checks: npm test; `node tools/flex-check.mjs` (+76–79, E8): core exact; Page's known cold-bar miss now and then.
+
 ## 5 Nov (7): BPM box in the page colour; a line before LEFT (build 437, on `beta`)
 
 - Owner (screenshot): the BPM / LPB box was still the darker grey, and no line between ROWS + and LEFT. The 436 rule
