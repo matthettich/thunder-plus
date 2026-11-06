@@ -23,7 +23,7 @@ if (!PW) { console.error('playwright not found: set PLAYWRIGHT'); process.exit(2
 const { chromium } = await import(pathToFileURL(PW).href);
 const MODES = process.argv.includes('--page') ? ['page'] : process.argv.includes('--core') ? ['core'] : ['page', 'core'];
 // The patterns: the original sixteen, then two of every 256-family (the second digit 2 and 9), and the last one
-const PATS = [...Array.from({ length: 16 }, (_, i) => i + 1), ...Array.from({ length: 15 }, (_, i) => [(i + 1) * 16 + 2, (i + 1) * 16 + 9]).flat(), 0xFF];
+const PATS = [...Array.from({ length: 16 }, (_, i) => i + 1), ...Array.from({ length: 15 }, (_, i) => [(i + 1) * 16 + 2, (i + 1) * 16 + 9]).flat(), 0x76, 0x77, 0x78, 0x79, 0xE8, 0xFF];   // + the FLX CHECK 2 fixes (5 Nov)
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm', '.json': 'application/json', '.woff2': 'font/woff2', '.png': 'image/png' };
 const srv = http.createServer((q, r) => {
@@ -80,6 +80,11 @@ try {
         // which bar each block is in: the clock unwrapped (−1 = stopped)
         let base = 0, last = -1; const bar = [];
         for (const B of blocks) { const c = B[4][0]; if (c < 0) { bar.push(-1); continue; } if (last >= 0 && c < last - 8) base += 16; last = c; bar.push(Math.floor((base + c) / 4 + 1e-6)); }
+        // FLX CHECK 2 (5 Nov): the clock itself, against the tempo. The reference below runs on the recorded clock, so a broken
+        // clock (the core's Auto.prune restarted each row's ramp at every block: a staircase) passed as long as both agreed.
+        // Every sample of a playing stretch should move by BPM / 60 / sr (a wrap at 16 aside); worst miss in beats.
+        let clkErr = 0; { const step = BPM / 60 / sr; let prev = null;
+          for (const B of blocks) for (const c of B[4]) { if (c < 0 || prev == null || prev < 0) { prev = c; continue; } let d = c - prev; if (d < -8) d += 16; clkErr = Math.max(clkErr, Math.abs(d - step)); prev = c; } }
         const off = bar.find(b => b >= 0) ?? 0, b0 = row;   // the clock counts from the start row's bar
         // the reference: FlexCore on the same input and clock, with the pattern each bar should play (off while stopped)
         const ref = new FC(sr), stats = new Map(); let stopped = { e: 0, a: 0 }, seen = false;
@@ -92,7 +97,7 @@ try {
           let e = 0, a = 0; for (let q = 0; q < n; q++) { const dl = B[2][q] - Lr[q], dr = B[3][q] - Rr[q]; e += dl * dl + dr * dr; a += Lr[q] * Lr[q] + Rr[q] * Rr[q] + 1e-12; }
           const st = stats.get(b) || { e: 0, a: 0 }; st.e += e; st.a += a; stats.set(b, st);
         }
-        return { corePlaying, blocks: blocks.length, stopped: stopped.a ? db(stopped.e, stopped.a) : null,
+        return { clkErr, corePlaying, blocks: blocks.length, stopped: stopped.a ? db(stopped.e, stopped.a) : null,
           bars: [...stats].map(([b, st]) => ({ bar: b, k: kAt(b), name: names[kAt(b)] + (WAIT && b < 3 ? ' (waiting: no FLX yet)' : WAIT && b === 4 ? ' (carried on from bar 3)' : ''), db: db(st.e, st.a) })).sort((x, y) => x.bar - y.bar) };
       }
       const out = { sr, coreOk, passes: [] };
@@ -107,6 +112,9 @@ try {
     if (res.err) { console.log(`FAIL ${mode}: ${res.err}`); failed = true; await page.close(); continue; }
     for (const [what, P] of res.passes) {
       const bad = P.bars.filter(r => !(r.db < -40)), stopBad = P.stopped != null && !(P.stopped < -40);
+      const clkBad = P.clkErr > 0.002;   // a step a sample is ~7e-5 beats at 180 BPM; a row's jump is 0.25
+      if (clkBad) failed = true;
+      console.log(`${clkBad ? 'FAIL' : 'ok  '} ${mode} beat clock: off by up to ${P.clkErr.toFixed(5)} beats in a sample`);
       console.log(`${bad.length || stopBad ? 'FAIL' : 'ok  '} ${mode} (played by: ${P.corePlaying ? 'the audio thread' : 'the page'}), ${what}: ${P.bars.length} bars at ${res.sr} Hz, ${bad.length} differ from FlexCore's own pattern; stopped: ${P.stopped} dB`);
       for (const r of (process.argv.includes('-v') ? P.bars : bad)) console.log(`   bar ${String(r.bar).padStart(2)} FLX ${r.k.toString(16).toUpperCase().padStart(2, '0')} ${r.name.padEnd(44)} ${r.db} dB`);
       if (bad.length || stopBad) failed = true;
