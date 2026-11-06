@@ -2,6 +2,7 @@
 //   FOLDER   a folder handle (a stand-in: headless Chrome has no folder picker) with a subfolder: every audio file found,
 //            search narrows them, ▼ auditions, Enter loads into the pad
 //   FILES    ＋ Files… with two WAVs: both listed in RECENT for this session; one loads
+//   EDIT     Edit sample… on a looped layer: crop moves Start and the loop with the audio; Apply, Undo; Snap, Invert, To mono
 //   RECENT   what was loaded is at the top of RECENT, stereo noted; after a reload it is still there and loads from the
 //            app's sample store
 // Needs Chrome and playwright: CHROME=/path/to/chrome PLAYWRIGHT=/path/to/playwright/index.mjs
@@ -78,6 +79,53 @@ try {
     return { rows, v5: E('(() => { const L = kit.voices[5].layers[kit.voices[5].sel]; return L.sample ? {name:L.sample.name, st:!!L.sample.data2, n:L.sample.data.length} : null; })()') }; });
   say(r3.rows.includes('r:Kick stereo') && r3.rows.includes('r:Hat mono') && !r3.rows.some(x => x.startsWith('s:')), `RECENT after a reload: ${JSON.stringify(r3.rows)} (this session's files are gone, as they should be)`);
   say(r3.v5 && r3.v5.name === 'Kick stereo' && r3.v5.st && r3.v5.n === 22050, `RECENT: loads from the store into pad 05: ${JSON.stringify(r3.v5)}`);
+  // EDIT SAMPLE: pad 05's stereo sample with a loop; crop off the first 20 %: the loop and Start move with the audio
+  const r4 = await page.evaluate(async () => { const E = s => window.__seqTest.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
+    if (E('askOpen')) E('askOpen(null)');
+    E(`(() => { select(5); const v = kit.voices[5], L = v.layers[v.sel]; L.lpMode = 1; L.lpS = 0.5; L.lpE = 0.75; L.a = 0.1; L.mode = 'ADSR'; })()`);
+    await E('rcdPanel(5, {edit:{pad:5, li:kit.voices[5].sel}})');
+    const n0 = E('RCD.take.data.length'), hidden = E('RCD.ui.rec.hidden'), mk0 = E('RCD.take.mk');
+    E(`RCD.sel = [Math.round(${n0} * 0.2), ${n0}]; rcdUi();`); E("[...document.querySelectorAll('.recops button')].find(b => b.textContent === 'Crop').click()");
+    const mk1 = E('RCD.take.mk'), n1 = E('RCD.take.data.length');
+    E("[...document.querySelectorAll('.recedit button')].find(b => b.textContent === 'Apply to the layer').click()"); await wait(300);
+    const L = E('(() => { const v = kit.voices[5], L = v.layers[v.sel]; return {n:L.sample.data.length, st:!!L.sample.data2, a:L.a, lpS:L.lpS, lpE:L.lpE}; })()');
+    // the newly exposed ones: To mono, Snap, Invert (on the editor's take)
+    E("[...document.querySelectorAll('.recops button')].find(b => b.textContent === 'To mono').click()"); const mono = E('!RCD.take.data2');
+    E("[...document.querySelectorAll('.recops button')].find(b => b.textContent === 'Snap').click()");
+    E(`RCD.sel = [1001, 5003]; rcdSnapSel();`); const sel = E('RCD.sel'), d = E('Array.from(RCD.take.data.slice(RCD.sel[0] - 1, RCD.sel[0] + 1))');
+    const before = E('RCD.take.data[1234]'); E("[...document.querySelectorAll('.recops button')].find(b => b.textContent === 'Invert').click()"); const after = E('RCD.take.data[1234]');
+    // ZOOM: the wheel at a point keeps that frame under the pointer; a click places the cursor and + zooms there; Shift+wheel
+    // scrolls; two touch points pinch; a click on the overview moves there; FIT shows it all
+    const zoom = await (async () => { const w = document.querySelector('.recwave'), r = w.getBoundingClientRect(), y = r.top + r.height / 2, at = x => r.left + x * r.width;
+      const frameAt = x => { const [a, b] = E('rcdView()'); return a + x * (b - a); };
+      E('RCD.view = null; RCD.sel = null; RCD.cursor = null; rcdUi();'); const f0 = frameAt(0.3);
+      w.dispatchEvent(new WheelEvent('wheel', {deltaY:-300, clientX:at(0.3), clientY:y, bubbles:true, cancelable:true})); const v1 = E('rcdView()'), f1 = frameAt(0.3);
+      const pe = (t, x, id, type) => w.dispatchEvent(new PointerEvent(t, {clientX:x, clientY:y, pointerId:id, pointerType:type || 'mouse', isPrimary:id === 1, bubbles:true}));
+      pe('pointerdown', at(0.6), 1); pe('pointerup', at(0.6), 1); const cur = E('RCD.cursor');
+      E('RCD.ui.edit.querySelectorAll(".recz button")[1].click()'); const [za, zb] = E('rcdView()'), zoomedAtCursor = cur > za && cur < zb && (zb - za) < (v1[1] - v1[0]);
+      w.dispatchEvent(new WheelEvent('wheel', {deltaY:200, shiftKey:true, clientX:at(0.5), clientY:y, bubbles:true, cancelable:true})); const [sa] = E('rcdView()'), scrolled = sa > za;
+      E('RCD.view = null; rcdUi();'); pe('pointerdown', at(0.4), 11, 'touch'); pe('pointerdown', at(0.6), 12, 'touch'); pe('pointermove', at(0.2), 11, 'touch'); pe('pointermove', at(0.8), 12, 'touch');
+      pe('pointerup', at(0.2), 11, 'touch'); pe('pointerup', at(0.8), 12, 'touch'); const [pa, pb] = E('rcdView()'), n = E('RCD.take.data.length'), pinched = (pb - pa) < n * 0.4 && (pb - pa) > n * 0.25;
+      const o = document.querySelector('.recov'), orc = o.getBoundingClientRect(); o.dispatchEvent(new PointerEvent('pointerdown', {clientX:orc.left + orc.width * 0.9, clientY:orc.top + 5, pointerId:3, bubbles:true}));
+      o.dispatchEvent(new PointerEvent('pointerup', {clientX:orc.left + orc.width * 0.9, clientY:orc.top + 5, pointerId:3, bubbles:true})); const [oa, ob] = E('rcdView()'), moved = (oa + ob) / 2 > n * 0.6;
+      E('RCD.ui.edit.querySelectorAll(".recz button")[2].click()'); const fit = E('RCD.view === null');
+      return {px:(v1[1] - v1[0]) / r.width, f0, f1, zoomedIn:(v1[1] - v1[0]) < E('RCD.take.data.length'), cur, zoomedAtCursor, scrolled, pinched, moved, fit}; })();
+    E("askOpen && askOpen(null)"); const cleared = E('RCD.take === null');
+    await wait(1200); E('undoStep(-1)'); await wait(400);
+    const undone = E('(() => { const v = kit.voices[5], L = v.layers[v.sel]; return L.sample.data.length; })()');
+    return {n0, hidden, mk0, mk1, n1, L, mono, sel, d, before, after, cleared, undone, zoom}; });
+  const near = (a, b) => Math.abs(a - b) < 2e-4;
+  say(r4.hidden && JSON.stringify(r4.mk0) === JSON.stringify([2205, 11025, 16538]), `EDIT: opens on the layer's sample without the record button; markers ${JSON.stringify(r4.mk0)} (Start, Loop start, Loop end)`);
+  say(r4.n1 === 17640 && JSON.stringify(r4.mk1) === JSON.stringify([0, 6615, 12128]), `EDIT: crop the first 20 %: ${r4.n1} frames, markers move with the audio ${JSON.stringify(r4.mk1)}`);
+  say(r4.L.n === 17640 && r4.L.st && r4.L.a === 0 && near(r4.L.lpS, 6615 / 17640) && near(r4.L.lpE, 12128 / 17640), `EDIT: Apply writes it back: ${JSON.stringify(r4.L)}`);
+  say(r4.mono, 'EDIT: To mono leaves one channel');
+  say(r4.sel[0] !== 1001 && Math.sign(r4.d[0]) !== Math.sign(r4.d[1]) || r4.d[1] === 0, `EDIT: Snap moves the selection to zero crossings: ${JSON.stringify(r4.sel)} (around the start: ${r4.d.map(x => x.toFixed(4))})`);
+  say(Math.abs(r4.before + r4.after) < 1e-9 && r4.before !== 0, `EDIT: Invert flips the polarity (${r4.before.toFixed(4)} → ${r4.after.toFixed(4)})`);
+  { const z = r4.zoom; say(z.zoomedIn && Math.abs(z.f0 - z.f1) < z.px, `ZOOM: the wheel zooms in at the pointer (frame there ${Math.round(z.f0)} → ${Math.round(z.f1)}, within a pixel: ${z.px.toFixed(1)} frames)`);
+    say(z.cur != null && z.zoomedAtCursor, `ZOOM: a click places the cursor (${z.cur}) and + zooms in around it`);
+    say(z.scrolled, 'ZOOM: Shift+wheel scrolls'); say(z.pinched, 'ZOOM: two fingers pinching apart zoom in'); say(z.moved, 'ZOOM: a click on the overview moves the view there'); say(z.fit, 'ZOOM: FIT shows the whole take'); }
+  say(r4.cleared, 'EDIT: closing lets the edit go (Record a sample… starts clean)');
+  say(r4.undone === 22050, `EDIT: the Synth page's Undo takes the Apply back (${r4.undone} frames)`);
   await c.close();
 } finally { await browser.close(); srv.close(); fs.rmSync(dir, { recursive: true, force: true }); }
 process.exit(failed ? 1 : 0);

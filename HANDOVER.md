@@ -156,6 +156,32 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 5 Nov (13): sampler stage 4: edit a loaded sample; a proper editor with zoom; every edit exposed (build 443)
+
+- Owner: apply the take edits "to a loaded sample"; "Expose all of those functions that are hidden"; make the window "feel
+  professional, make the waveform big enough to edit, and make sure you can zoom … scroll wheel, two finger pinch, and some
+  zoom buttons to zoom in at the point of a click".
+- **Edit sample…** (button at the top of the layer card's 'Sample' section, sample layers only) → `rcdPanel(cur, {edit:{pad, li}})`:
+  the recorder panel without its recording rows / Record button; the take is the layer's sample (`takeOf`: arrays shared,
+  se* never mutate) with `mk` = [Start, Loop start, Loop end] in frames and `lp` (loop on). `rcdEdit(f, map)`: map says where an
+  old frame lands (Crop x−a; Cut; Reverse a+b−1−x; Auto-trim x−found.a); others keep frames. APPLY (`rcdApply`): a new sample
+  (new id, so the kit undo keeps the old one; smbAdd puts it in RECENT and the store), L.a / lpS / lpE from mk, an AHD Hold
+  that equalled the old length follows the new one; changed(pad). REVERT reloads the layer's; closing clears RCD.take.
+- **Editor** (both modes): overview canvas `.recov` (whole take, view boxed; click / drag moves), waveform `.recwave`
+  (clamp(180px, 34vh, 300px); ruler with adaptive steps; channels; selection; S / L / E markers; cursor; playhead), readout +
+  zoom buttons (− + at `rcdAnchor()` = selection middle, else cursor, else view middle; FIT; SEL). View: RCD.view [a, b)
+  frames or null; `rcdClampView`, `rcdZoom(f, at)` keeps `at` in place. Wheel zooms at the pointer (ctrlKey = trackpad pinch,
+  faster), Shift+wheel / deltaX scrolls; two touch pointers pinch + pan; a click (no drag) places RCD.cursor, Shift-click
+  stretches from it. Zoomed out, `rcdPeaks` (min/max per 256 frames, cached on the array) feeds the drawing; under 1.5
+  frames a pixel it draws the line, under 0.25 the sample dots. Keys in the panel: + / − / 0. Tools in labelled groups (Play,
+  Edit, Level, Process, Channels); new: Snap (`rcdSnapSel` → seZeroCross on both edges), Remove DC, Invert, To mono, To stereo,
+  Append file… (decoded at ctx rate, resampled to the take's, capped at SMP_MAX). setPointerCapture is in try (a pointer the
+  browser doesn't know throws and would have stopped the gesture).
+- **Checks:** tools/browser-check.mjs gained EDIT (open on a looped layer, crop moves the markers, Apply, To mono, Snap, Invert,
+  close clears, the Synth page's undoStep(-1) takes Apply back) and ZOOM (wheel keeps the frame under the pointer within a
+  pixel, click + '+' zooms at the cursor, Shift+wheel scrolls, a two-finger pinch zooms, the overview moves, FIT). npm test
+  (187), sampler-check, recorder-check pass.
+
 ## 5 Nov (12): sampler stage 3: the sample browser; 5-minute samples (build 442)
 
 - Owner: the library from "a folder on the computer, but I also want to be able to pick files from elsewhere … less awkward
