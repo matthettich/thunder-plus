@@ -26,6 +26,10 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.91** (5 Nov 2026; owner: "push these things to main and make a desktop build"; Run workflow through the API with version 1.2.91,
+  from `main` at build 444, run 42170846534): FLX clock fix and FLY (438–439), the sampler (stereo, 5-minute samples, loops,
+  Record a sample… with pattern sync, the sample browser, the sample editor: 440–444); the desktop app now allows audio input
+  (audio only) and has the macOS microphone usage string.
 - **v1.2.90** (5 Nov 2026; owner: "merge and build"; from `main` at build 437): BPM box in the page colour, a line before LEFT.
 - **v1.2.89** (5 Nov 2026; owner: "merge it, please" / "and build desktop"; from `main` at build 436): bus outline
   see-through, bottom panel in the page colour with a black rule, tabs line up with the view buttons.
