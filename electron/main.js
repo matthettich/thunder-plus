@@ -39,7 +39,9 @@ function setPlaying(on){
 }
 
 // Web MIDI, the save/open dialogs, the output device list and audio are allowed; nothing else is asked for.
-const ALLOW = new Set(['midi', 'midiSysex', 'fileSystem', 'clipboard-sanitized-write', 'clipboard-read', 'speaker-selection']);   // no 'media': the app never uses the mic or camera
+const ALLOW = new Set(['midi', 'midiSysex', 'fileSystem', 'clipboard-sanitized-write', 'clipboard-read', 'speaker-selection']);
+// RECORD INTO A PAD (5 Nov): the sampler's recorder needs an audio input, so 'media' is allowed for audio only (never the camera)
+const audioOnly = d => !!d && ((Array.isArray(d.mediaTypes) && d.mediaTypes.length > 0 && d.mediaTypes.every(t => t === 'audio')) || d.mediaType === 'audio');
 
 /* CONTENT SECURITY POLICY, report-only (so nothing can break): the console lists what it WOULD block, to read before it is ever
    enforced. Everything the app loads is its own (app://thunder/), so there are no outside origins to allow. What it can't do
@@ -130,8 +132,8 @@ app.whenReady().then(() => {
     if (!file.startsWith(ROOT + path.sep)) return new Response('Not found', { status:404 });
     return net.fetch(pathToFileURL(file).toString()).then(res => /\.html?$/i.test(file) ? withCsp(res) : res);
   });
-  session.defaultSession.setPermissionRequestHandler((wc, perm, cb) => cb(ALLOW.has(perm)));
-  session.defaultSession.setPermissionCheckHandler((wc, perm) => ALLOW.has(perm));
+  session.defaultSession.setPermissionRequestHandler((wc, perm, cb, d) => cb(ALLOW.has(perm) || (perm === 'media' && audioOnly(d))));
+  session.defaultSession.setPermissionCheckHandler((wc, perm, origin, d) => ALLOW.has(perm) || (perm === 'media' && audioOnly(d)));
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null);   // the Mac keeps its menu so ⌘C / ⌘V / ⌘Q work
   createWindow();
   // New versions come from the GitHub Releases page (see updater.js). The page asks through preload.js.

@@ -79,7 +79,10 @@
         }
       ],
       "category": "public.app-category.music",
-      "icon": "app/icons/plus-icon-512.png"
+      "icon": "app/icons/plus-icon-512.png",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "...Thunder Plus uses an audio input only when you record a sample into a pad."
+      }
     },
     "linux": {
       "target": [

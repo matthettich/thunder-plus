@@ -156,6 +156,35 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 5 Nov (11): sampler stage 2: Record a sample… (build 441)
+
+- Owner: record into a pad "as long as we have some edit capabilities", liking how "Renoise can sync recording to pattern
+  start and end"; reusing the simple recorder's capture where it fits (less likely to have bugs). Owner OK'd a hybrid with
+  sub-agents: one studied matthettich/simple-recorder's capture (verified against its source), one wrote the edit functions
+  with 52 tests (verified, run here), one researched Renoise's recorder (tutorials.renoise.com Sampler_Waveform: Sync start &
+  stop = Pattern only while playing, starts at the next pattern, Stop at the next pattern after; latency compensation + extra
+  ms; new instrument per take). Integration and the sync design are here.
+- **SMP EDIT** (`/* ===SMP EDIT START=== */` … END, before the recorder): se* functions on {data, data2, sr}, new arrays out,
+  ranges [a, b) clamped / swapped. tests/smp-edit.test.js cuts the block out of index.html.
+- **RECORD INTO A PAD** (block of the same name; names rcd* / RCD — rec* were taken by the MIDI note recorder: recSave,
+  recStep, recTake already existed and a first draft clashed): `rcdOpen` opens the input like the simple recorder (no echo
+  cancelling / noise suppression / AGC, channelCount ideal 2, the picked deviceId exact else default) on the song's own ctx;
+  worklet 'thunder-rec' sends 1 s chunks with their currentFrame (`f0`) and peaks for the meter. Monitor: input → gain →
+  master (off by default). STEREO keeps both (identical channels = mono), MONO / LEFT / RIGHT.
+  PATTERN: `rcdStep(e)` is called after every tp.q push (3 sites: page timer, core, RESUME first step): an edge is a new song
+  row, or the same row with the steps going back (LOOP). Armed → the next edge is t0; then each edge counts a pattern, and
+  Stop (stopReq) or LENGTH N ends at an edge (t1). Pressed while stopped: tStart from cs.song.y with RCD.starting set, as
+  tStart calls tStop (which ends a take: `rcdSongStopped` in tStop). The take is frames [(t0 + L)·sr, (t1 + L)·sr) of the
+  ctx clock, L = outputLatency (or baseLatency) + the track's reported input latency + EXTRA LATENCY ms. FREE: Record to
+  Stop (auto-stops at SMP_MAX). Keep → assignSample into the pad's selected layer (a non-Layers pad is switched to Layers);
+  FIT TO TEMPO sets that pad's instruments SYNC 1, BEATS = the take's beats. Settings in localStorage thunderplus-rec-v1.
+- Desktop: electron/main.js allows 'media' for audio only (`audioOnly`); package.json mac.extendInfo has
+  NSMicrophoneUsageDescription. Needs a desktop build to take effect (not built: owner said not yet).
+- **Checks:** `node tools/recorder-check.mjs` (headless Chrome's fake mic, both sequencers): FREE ~1.2 s; PATTERN ×1 from
+  stopped = exactly one pattern (88200 frames at 44.1 kHz for 2 s); armed mid-pattern waits and takes exactly one; UNTIL
+  STOP stopped in the 2nd = exactly two; KEEP fills pad 3 and fits its instruments to 8 beats. Not checkable headless: real
+  input latency (the fake mic has none); the owner should check a take lines up and nudge EXTRA LATENCY if not.
+
 ## 5 Nov (10): sampler stage 1: stereo samples, 2 minutes, sample loops (build 440)
 
 - Owner asked how developed the sampler is, then to work through the gaps (stereo, length, loops, recording synced to the
