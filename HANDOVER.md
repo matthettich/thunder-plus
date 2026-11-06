@@ -26,6 +26,7 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.90** (5 Nov 2026; owner: "merge and build"; from `main` at build 437): BPM box in the page colour, a line before LEFT.
 - **v1.2.89** (5 Nov 2026; owner: "merge it, please" / "and build desktop"; from `main` at build 436): bus outline
   see-through, bottom panel in the page colour with a black rule, tabs line up with the view buttons.
 - **v1.2.88** (5 Nov 2026; owner: "Merge and build please"; Run workflow through the API with version 1.2.88,
