@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.92** (5 Nov 2026; owner: "let's push a desktop as well"; from `main` at build 445, run 42173205344): the Edit… button on sample
+  layers, orange wave / blue selection, the FX-card waveform window (445).
 - **v1.2.91** (5 Nov 2026; owner: "push these things to main and make a desktop build"; Run workflow through the API with version 1.2.91,
   from `main` at build 444, run 42170846534): FLX clock fix and FLY (438–439), the sampler (stereo, 5-minute samples, loops,
   Record a sample… with pattern sync, the sample browser, the sample editor: 440–444); the desktop app now allows audio input
