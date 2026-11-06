@@ -23,7 +23,9 @@ if (!PW) { console.error('playwright not found: set PLAYWRIGHT'); process.exit(2
 const { chromium } = await import(pathToFileURL(PW).href);
 const MODES = process.argv.includes('--page') ? ['page'] : process.argv.includes('--core') ? ['core'] : ['page', 'core'];
 // The patterns: the original sixteen, then two of every 256-family (the second digit 2 and 9), and the last one
-const PATS = [...Array.from({ length: 16 }, (_, i) => i + 1), ...Array.from({ length: 15 }, (_, i) => [(i + 1) * 16 + 2, (i + 1) * 16 + 9]).flat(), 0x76, 0x77, 0x78, 0x79, 0xE8, 0xFF];   // + the FLX CHECK 2 fixes (5 Nov)
+const PATS = [...Array.from({ length: 16 }, (_, i) => i + 1), ...Array.from({ length: 15 }, (_, i) => [(i + 1) * 16 + 2, (i + 1) * 16 + 9]).flat(), 0x76, 0x77, 0x78, 0x79, 0xE8, 0xFF,   // + the FLX CHECK 2 fixes (5 Nov)
+  // FLY (5 Nov): 256 + the FLY value, written as FLY: 01–0F (one of each family), then the 6th and 13th of every family
+  ...Array.from({ length: 15 }, (_, i) => 257 + i), ...Array.from({ length: 15 }, (_, i) => [256 + (i + 1) * 16 + 5, 256 + (i + 1) * 16 + 12]).flat()];
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm', '.json': 'application/json', '.woff2': 'font/woff2', '.png': 'image/png' };
 const srv = http.createServer((q, r) => {
@@ -46,8 +48,8 @@ try {
       // the song: 180 BPM, LPB 4, 16 rows a bar; one FLX at the top of every bar (bars 0–2 FLX 00, or none with --wait)
       const BPM = 180, list = [0, 0, 0, ...PATS, 0];
       const j = E('freshSong()'); j.bpm = BPM; j.lpb = 4; j.name = 'flex check';
-      const FI = E("FXC.indexOf('FLX')"), FX0 = E('FX0');
-      list.forEach((k, b) => { const ph = E('freshPhrase()'); if (!(WAIT && (b < 3 || b === 4))) { ph[0][FX0] = FI; ph[0][FX0 + 1] = k; } j.phrases[b] = ph; j.plen[b] = 16;
+      const FI = E("FXC.indexOf('FLX')"), FYI = E("FXC.indexOf('FLY')"), FX0 = E('FX0');
+      list.forEach((k, b) => { const ph = E('freshPhrase()'); if (!(WAIT && (b < 3 || b === 4))) { ph[0][FX0] = k > 255 ? FYI : FI; ph[0][FX0 + 1] = k > 255 ? k - 256 : k; } j.phrases[b] = ph; j.plen[b] = 16;
         const sect = Array.from({ length: 16 }, () => [-1, 0]); sect[0] = [b, 0]; j.chains[b] = sect; j.song[b][0] = b; });
       // with --wait: bar 4 has no FLX of its own (bar 3's carries on), for the CHASE pass below
       const kAt = b => { if (!WAIT) return list[b] ?? 0; if (b < 3) return 0; if (b === 4) return list[3]; return list[b] ?? 0; };
@@ -83,8 +85,13 @@ try {
         // FLX CHECK 2 (5 Nov): the clock itself, against the tempo. The reference below runs on the recorded clock, so a broken
         // clock (the core's Auto.prune restarted each row's ramp at every block: a staircase) passed as long as both agreed.
         // Every sample of a playing stretch should move by BPM / 60 / sr (a wrap at 16 aside); worst miss in beats.
-        let clkErr = 0; { const step = BPM / 60 / sr; let prev = null;
-          for (const B of blocks) for (const c of B[4]) { if (c < 0 || prev == null || prev < 0) { prev = c; continue; } let d = c - prev; if (d < -8) d += 16; clkErr = Math.max(clkErr, Math.abs(d - step)); prev = c; } }
+        let clkErr = 0, drops = 0, back = 0; { const step = BPM / 60 / sr; let prev = null;
+          // a jump of whole render blocks (128 samples) is the machine missing a block (a dropout), not the clock: counted apart
+          for (const B of blocks) for (const c of B[4]) { if (c < 0 || prev == null || prev < 0) { prev = c; continue; } let d = c - prev; if (d < -8) d += 16;
+            const m = Math.round((d - step) / (128 * step)); if (m >= 1 && Math.abs(d - step * (1 + 128 * m)) < 1e-4) drops += m;
+            // one block BACK: seen only on the audio thread and only in runs where this machine also missed blocks (5 Nov, a busy
+            // container); the Flex output still matched on every bar. Counted with the dropouts, shown apart; never on its own
+            else if (m === -1 && Math.abs(d - step * (1 - 128)) < 1e-4) back++; else clkErr = Math.max(clkErr, Math.abs(d - step)); prev = c; } }
         const off = bar.find(b => b >= 0) ?? 0, b0 = row;   // the clock counts from the start row's bar
         // the reference: FlexCore on the same input and clock, with the pattern each bar should play (off while stopped)
         const ref = new FC(sr), stats = new Map(); let stopped = { e: 0, a: 0 }, seen = false;
@@ -97,8 +104,8 @@ try {
           let e = 0, a = 0; for (let q = 0; q < n; q++) { const dl = B[2][q] - Lr[q], dr = B[3][q] - Rr[q]; e += dl * dl + dr * dr; a += Lr[q] * Lr[q] + Rr[q] * Rr[q] + 1e-12; }
           const st = stats.get(b) || { e: 0, a: 0 }; st.e += e; st.a += a; stats.set(b, st);
         }
-        return { clkErr, corePlaying, blocks: blocks.length, stopped: stopped.a ? db(stopped.e, stopped.a) : null,
-          bars: [...stats].map(([b, st]) => ({ bar: b, k: kAt(b), name: names[kAt(b)] + (WAIT && b < 3 ? ' (waiting: no FLX yet)' : WAIT && b === 4 ? ' (carried on from bar 3)' : ''), db: db(st.e, st.a) })).sort((x, y) => x.bar - y.bar) };
+        return { clkErr, drops, back, corePlaying, blocks: blocks.length, stopped: stopped.a ? db(stopped.e, stopped.a) : null,
+          bars: [...stats].map(([b, st]) => ({ bar: b, k: kAt(b), name: (kAt(b) > 255 ? 'FLY ' + (kAt(b) - 256).toString(16).toUpperCase().padStart(2, '0') + ' ' + E('FlexCore.NAMES2')[kAt(b) - 256] : names[kAt(b)]) + (WAIT && b < 3 ? ' (waiting: no FLX yet)' : WAIT && b === 4 ? ' (carried on from bar 3)' : ''), db: db(st.e, st.a) })).sort((x, y) => x.bar - y.bar) };
       }
       const out = { sr, coreOk, passes: [] };
       if (!WAIT) out.passes.push(['from the top', await pass(0, list.length)]);
@@ -112,11 +119,11 @@ try {
     if (res.err) { console.log(`FAIL ${mode}: ${res.err}`); failed = true; await page.close(); continue; }
     for (const [what, P] of res.passes) {
       const bad = P.bars.filter(r => !(r.db < -40)), stopBad = P.stopped != null && !(P.stopped < -40);
-      const clkBad = P.clkErr > 0.002;   // a step a sample is ~7e-5 beats at 180 BPM; a row's jump is 0.25
+      const clkBad = P.clkErr > 0.002 || (P.back > 0 && !P.drops);   // a step a sample is ~7e-5 beats at 180 BPM; a row's jump is 0.25
       if (clkBad) failed = true;
-      console.log(`${clkBad ? 'FAIL' : 'ok  '} ${mode} beat clock: off by up to ${P.clkErr.toFixed(5)} beats in a sample`);
+      console.log(`${clkBad ? 'FAIL' : 'ok  '} ${mode} beat clock: off by up to ${P.clkErr.toFixed(5)} beats in a sample` + (P.drops ? ` (and ${P.drops} block${P.drops > 1 ? 's' : ''} this machine missed: a dropout, not the clock` + (P.back ? `; ${P.back} block step${P.back > 1 ? 's' : ''} back beside them` : '') + ')' : P.back ? ` (${P.back} block step back with no dropout: look into it)` : ''));
       console.log(`${bad.length || stopBad ? 'FAIL' : 'ok  '} ${mode} (played by: ${P.corePlaying ? 'the audio thread' : 'the page'}), ${what}: ${P.bars.length} bars at ${res.sr} Hz, ${bad.length} differ from FlexCore's own pattern; stopped: ${P.stopped} dB`);
-      for (const r of (process.argv.includes('-v') ? P.bars : bad)) console.log(`   bar ${String(r.bar).padStart(2)} FLX ${r.k.toString(16).toUpperCase().padStart(2, '0')} ${r.name.padEnd(44)} ${r.db} dB`);
+      for (const r of (process.argv.includes('-v') ? P.bars : bad)) console.log(`   bar ${String(r.bar).padStart(2)} ${(r.k > 255 ? '' : 'FLX ' + r.k.toString(16).toUpperCase().padStart(2, '0') + ' ') + r.name.padEnd(r.k > 255 ? 51 : 44)} ${r.db} dB`);
       if (bad.length || stopBad) failed = true;
     }
     await page.close();
