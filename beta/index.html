@@ -3213,7 +3213,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p><b>…chains modules:</b> every effect module in a …chains patch has a <b>BYP</b> button on its title bar with a number: it bypasses the module (its dry sound passes). From a phrase, <code>BYP 31</code> bypasses module 3 on that track's chain, <code>BYP 30</code> puts it back, and <code>BYP 34</code> switches it the other way from the patch for four rows, so a trance gate left bypassed plays for four rows. <code>BYP 0Y</code> does every numbered module. Stopping the song puts them back as the patch has them.</p>
 <p><b>Presets and sidechains in …chains:</b> effects and sound sources have a <b>Preset</b> row: factory presets, Default, and your own (Save as a preset keeps them on this device, for every patch). Every sidechain user has a <b>Source</b>: <b>Self</b>, <b>Send 1–8</b> (what a <b>Sidechain Out</b> in any chain sends) or one <b>track</b>'s own sound, before its effects and fader, so a muted ghost kick still drives it. That goes for <b>Sidechain In</b> (its meter shows what it hears before you patch it), Sidechain Comp, the compressors, the noise gate and the envelope filter, in …chains and as track or master effects. The Mixer's <b>SC</b> row lights when a track is a source for something. The light beside a module's <b>SC</b> input flashes with the sidechain it hears.</p>
 <h3>Flex, Step gate and Retrigger</h3>
-<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (256 patterns; <code>FLX</code> picks one from a row: 01–10 the originals, then families by the first hex digit, after the OP-Z and Pocket Operator punch-ins: 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops and wow, 8 scratches, 9 gates and pumps, A filter sweeps, B bit crush, C fading repeats, D juggles, E swing and feel, F chaos). <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT 01</code>–<code>0F</code> pick a pattern, <code>GAT 10</code> the CUSTOM steps, and <code>GAT 00</code> stops it (the gate opens until the next GAT). <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot. Pattern names give note values: <i>ROLL 1/16</i> rolls sixteenth notes, <i>STUTTER 1/32 EVERY 1/4</i> repeats a 32nd at the start of every quarter. <b>STARTS</b> on a Flex or Step gate: <b>ON FLX</b> / <b>ON GAT</b> (new slots) keeps it off (Step gate: open) until a command turns it on in the song, or <code>FXO</code> switches its slot on (then it plays its own PATTERN); it stays on until <code>FLX 00</code> (or FXO off), and waits again after STOP. Starting mid-song, the last command before that row is played at the start. <b>AT PLAY</b> (slots from songs made before 3 Nov) plays its PATTERN from PLAY, as before. Retrigger's MODE: RTG ONLY works the same way. In the FX bar, each of these slots draws the pattern it plays now with a playhead: Flex as a time map (where in the bar it plays from: repeats are saw teeth, reverses fall, half speed is a shallower line), its level along the bottom and its filter or crush; Step gate its steps; Retrigger its repeats.</p>
+<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (256 patterns; <code>FLX</code> picks one from a row: 01–10 the originals, then families by the first hex digit, after the OP-Z and Pocket Operator punch-ins: 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops and wow, 8 scratches, 9 gates and pumps, A filter sweeps, B bit crush, C fading repeats, D juggles, E swing and feel, F chaos). <code>FLY</code> is Flex's second bank, 255 more for IDM, in the spirit of Aphex Twin and Autechre: <code>FLY 01</code>–<code>0F</code> are one of each family to try first, then by the first digit 1 pitch rolls (drill'n'bass: every repeat a step higher or lower), 2 euclidean gates (REPEAT holds the last hit instead of a gap), 3 probability (slices muted, repeated or ratcheted by chance), 4 slice pitch (slices jump to octaves, fifths or anywhere), 5 freeze, buzz and smear, 6 CD skips and dropouts, 7 bouncing, speeding and slowing rolls, 8 mutating shuffles (a little different each bar), 9 stutter edits, A polymeter (a loop of 3/16, 5/16… against the bar), B warp (every slice bends in pitch), C reverse rolls and rewinds, D grains, E texture (crush, filters and chops on random slices), F chaos 2. Most change every bar over a four-bar cycle; FIXED ones repeat the same every bar. FLX and FLY drive the same Flex, so the last one written plays. <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT 01</code>–<code>0F</code> pick a pattern, <code>GAT 10</code> the CUSTOM steps, and <code>GAT 00</code> stops it (the gate opens until the next GAT). <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot. Pattern names give note values: <i>ROLL 1/16</i> rolls sixteenth notes, <i>STUTTER 1/32 EVERY 1/4</i> repeats a 32nd at the start of every quarter. <b>STARTS</b> on a Flex or Step gate: <b>ON FLX</b> / <b>ON GAT</b> (new slots) keeps it off (Step gate: open) until a command turns it on in the song, or <code>FXO</code> switches its slot on (then it plays its own PATTERN); it stays on until <code>FLX 00</code> (or FXO off), and waits again after STOP. Starting mid-song, the last command before that row is played at the start. <b>AT PLAY</b> (slots from songs made before 3 Nov) plays its PATTERN from PLAY, as before. Retrigger's MODE: RTG ONLY works the same way. In the FX bar, each of these slots draws the pattern it plays now with a playhead: Flex as a time map (where in the bar it plays from: repeats are saw teeth, reverses fall, half speed is a shallower line), its level along the bottom and its filter or crush; Step gate its steps; Retrigger its repeats.</p>
 <h3>Track effects</h3>
 <p>Each track and the master have 8 effect slots (FX screen, or the Mixer’s FX row): 73 effects on a track and 82 on a bus or the master (with the nine …pump ones; …pump EQ goes on any track), in groups: dynamics and EQ (compressors, Bus and Glue Comp, limiter, noise gate, transient shaper, multiband, air), filters (filter, ladder, low and high cut, auto-wah, vowel, envelope filter), drive and lo-fi (saturation, drive, overdrive, tube, tape, wavefolder, bitcrush, lo-fi, degrade, vintage sampler (an SP-1200, SP-12, MPC60, SP-202 at each of its grades, or Emulator II: their rate and bit depth, converters, filters and noise), vinyl, dub tape, cab), modulation (chorus, ensemble, dimension, flanger, phaser, tremolo, auto-pan, rotary, ring mod, cross-mod, frequency shifter), delays (simple, tape, BBD, pitch, granular, reverse echo), reverbs (room, plate, spring, space, Galactic, pitch reverb, convolution), pitch and voice (pitch shifter, harmonizer, pitch correct), resonators (resonator, comb, Rings), spectral and granular (Clouds, Beads, spectral, extreme stretch), rhythmic (Flex, Step gate, Retrigger, trance gate, pump, Beat grains, Beat scramble, Glitch sequencer) and utility (stereo width, utility). The pad's Add effect menu has 65 of them. On the Mixer’s FX row, OPTION (Ctrl/⌘ in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter. For drums and IDM: <b>Beat grains</b> (a rhythmic grain cloud in time with the song, after Output Portal: rate, density, size, position, spray, pitch and random pitch, reverse, shape, stereo, freeze), <b>Beat scramble</b> (re-orders the last bar's slices, some reversed; keep the beats, new every bar or looped) and <b>Glitch sequencer</b> (each step may stutter, reverse, jump an octave, tape-stop, crush or drop out). Under a slot's controls, <b>› PRESET</b> lists INIT, factory presets (over 230 across the effects) and the song's own, and <b>› SAVE AS PRESET…</b> keeps the slot's settings for that effect. <b>› EQ WINDOW</b> (at the bottom of the FX screen, on any track) opens the track's …pump EQ in its own window, adding one to a free slot if needed; …pump EQ works on every track, the other …pump effects on buses and the master.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
@@ -15336,7 +15336,7 @@ const CC_NAMES = {0:'bank select', 1:'mod wheel', 2:'breath', 4:'foot', 5:'glide
 // A port letter's cable on this device, for INST.
 const portName = p => { const o = midiOut(p); return o ? (o.name || 'connected') : midi.outIds[p] ? 'not connected now' : 'no cable: Settings › MIDI'; };
 const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
-  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP'];   // new commands go on the end, so saved songs keep their numbers
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY'];   // new commands go on the end, so saved songs keep their numbers
 const FXC_V1 = ['RET','DEL','CUT','CHA','PSL','RND','OFS','REV','PAN','TPO','HOP'];   // song files before v2
 const V1NAME = {CUT:'KIL', OFS:'STA', REV:'PLY'};
 const SIGNED = new Set(['PBN','TSP','PIT','FIN','NUD','RTV']);
@@ -15414,6 +15414,7 @@ const FXI = {
     return Y === 0 ? `Switch ${w} off` : Y === 1 ? `Switch ${w} on` : `Switch ${w} on for ${Y} rows, then back as set (momentary)`; },
   BYP:v => { const X = v >> 4, Y = v & 15, w = X ? `…chains module ${hx(X).slice(1)}` : 'every numbered …chains module';
     return (Y === 0 ? `Put ${w} back in` : Y === 1 ? `Bypass ${w} (its dry sound passes)` : `Switch ${w} the other way from the patch for ${Y} rows, then back`) + ' on this track'; },
+  FLY:v => `Flex FLY pattern ${hx(v)}: ${FlexCore.NAMES2[v]} (the second bank: IDM; on this track's Flex effect; in the MST column, the master's)`,
   FLX:v => { const k = flxCap(v); return `Flex pattern ${hx(k)}: ${FlexCore.NAMES[k]}${k !== v ? ' (this song keeps FLX 11–FF as pattern 10: Project → FLX 11–FF)' : ''} (on this track's Flex effect; in the MST column, the master's)`; },
   GAT:v => v === 0 ? 'Step gate off: the gate opens until the next GAT' : v >= 16 ? 'Step gate: the slot’s CUSTOM steps (STEPS 1-8, 9-16)' : `Step gate pattern ${v}: ${StepGateCore.NAMES[v]}`,
   RTG:v => { const X = v >> 4, Y = v & 15; return !X ? 'Retrigger off' : `Retrigger every ${RetrigCore.NAMES[Math.min(8, X) - 1]}` + (Y ? ` for ${Y} rows` : ' until RTG 00') + ' (X: 1 = 1/4 … 5 = 1/64, 6–8 triplets)'; },
@@ -15491,7 +15492,7 @@ class FlexCore {
         const t = x * d * 1.5; if (Math.abs(t - 1) < 1e-9) return '1/' + d + 'T'; }
       return fr(b) + ' BEAT'; };
     const st = s => { const v = Math.round(12 * Math.log2(s)); return (v > 0 ? '+' : '') + v; };
-    const T = new Array(256).fill(null), put = (X, list) => list.forEach((o, y) => { if (X * 16 + y > 16) T[X * 16 + y] = o; });
+    const T = new Array(512).fill(null), put = (X, list) => list.forEach((o, y) => { if (X * 16 + y > 16) T[X * 16 + y] = o; });
     put(1, [null, ...[[3, 1/2], [3, 1/3], [3, 1/4], [3, 1/6], [3, 1/8], [3, 1/12], [3, 1/16], [3, 1/32], [2, 1/4], [2, 1/8], [2, 1/16], [3.5, 1/16], [3.5, 1/32], [3.5, 1/64], [0, 1/16]]
       .map(([s, L]) => ({f:'roll', s, L, n:`ROLL ${nv(L)} FROM BEAT ${s + 1}`}))]);
     put(2, [[1, 1/3], [1, 1/4], [1, 1/8], [1, 1/16], [1/2, 1/4], [1/2, 1/6], [1/2, 1/8], [1/2, 1/16], [2, 1], [2, 1/2], [2, 1/4], [4, 1/2], [4, 1/3], [4, 3/4], [4, 1/8], [1/4, 1/16]]
@@ -15535,6 +15536,70 @@ class FlexCore {
       {f:'drunk', n:'DRUNK'}, {f:'lag', n:'LAID-BACK OFFBEATS'}, {f:'swing', C:1/2, a:0.22, n:'SWING 1/8 EXTREME'}, {f:'swing', C:1/4, a:0.22, n:'SWING 1/16 EXTREME'}]);
     put(15, Array.from({length:16}, (_, y) => { const G = y < 4 ? 1 : y < 10 ? 1/2 : 1/4, c = 0.25 + 0.5 * ((y < 4 ? y : y < 10 ? y - 4 : y - 10) / (y < 4 ? 3 : 5)), nb = y & 1;
       return {f:'chaos', G, c, nb, seed:y, n:`CHAOS ${fr(G / 4)} ${Math.round(c * 100)}%` + (nb ? ' NEW EVERY BAR' : '')}; }));
+    // FLY (owner, 5 Nov: "IDM, Aphex Twin, Autechre type effects … let's make 0-0F a variety selection and then arrange them
+    // in categories after"): a second bank of 255, played by the same Flex effect (the flx param 256 + FLY value; 0 = off).
+    // 01–0F: one of each family. 10–FF: the families by the first hex digit. "NEW EVERY BAR" follows the beat clock's
+    // four-bar cycle. Every one reads only what has played (r ≤ p): tests/flex.test.js scans all 255.
+    // 1 PITCH ROLL (drill'n'bass: each repeat a step higher or lower) · 2 EUCLID (gates; REPEAT holds the last hit) ·
+    // 3 PROB (slices muted, repeated or ratcheted by chance) · 4 SLICE PITCH (slices jump to other pitches) · 5 FREEZE /
+    // SMEAR (a grain held, or crawled through) · 6 CD SKIP · 7 BOUNCE (rolls that speed up, slow down, die away) · 8 MUTATE
+    // (a shuffle that changes a little every bar) · 9 STUTTER EDIT · A POLYMETER (a loop out of step with the bar) · B WARP
+    // (each slice bends in pitch) · C REVERSE ROLL / REWIND · D GRAINS · E TEXTURE (crush, filter, chop on slices) · F CHAOS 2.
+    const put2 = (X, list) => list.forEach((o, y) => { T[256 + X * 16 + y] = o; });
+    const st2 = v => (v > 0 ? '+' : '') + v;
+    put2(1, [[3, 1/4, 1], [3, 1/4, 2], [3, 1/4, -1], [3, 1/4, -2], [3, 1/8, 1], [3, 1/8, -1], [2, 1/4, 1], [2, 1/4, -1], [3.5, 1/8, 2], [3.5, 1/16, 1],
+      [2, 1/2, 3], [3, 1/6, 1], [3, 1/6, -2], [0, 1/2, 1], [0, 1/4, -0.5], [2, 1/3, 2]]
+      .map(([a, L, s]) => ({f:'proll', a, L, s, n:`PITCH ROLL ${nv(L)} ${st2(s)}` + (a ? ` FROM BEAT ${a + 1}` : ' BAR')})));
+    put2(2, [[3, 8], [5, 8], [5, 16], [7, 16], [9, 16], [11, 16], [5, 12], [7, 12], [4, 9], [5, 11], [7, 13], [3, 16, 0, 2],
+      [3, 8, 1], [5, 16, 1], [7, 16, 1], [5, 12, 1]]
+      .map(([k, N, h, rot]) => ({f:'euc', k, N, h:h || 0, rot:rot || 0, n:`EUCLID ${h ? 'REPEAT ' : ''}${k}/${N}` + (rot ? ` +${rot}` : '')})));
+    put2(3, [['mute', 1/4, .25], ['mute', 1/4, .5], ['mute', 1/8, .33], ['rep', 1/4, .25], ['rep', 1/4, .5], ['rep', 1/4, .75], ['rep', 1/2, .5],
+      ['rat', 1/4, .33, 2], ['rat', 1/4, .33, 3], ['rat', 1/4, .25, 4], ['rat', 1/2, .5, 3], ['any', 1/4, .25], ['any', 1/4, .5], ['any', 1/4, .75], ['any', 1/8, .5], ['any', 1/3, .5]]
+      .map(([op, G, c, x]) => ({f:'prob', op, G, c, x:x || 0, n:`PROB ${{mute:'MUTE', rep:'REPEAT', rat:'RATCHET', any:'ANY'}[op]} ${nv(G)}${x ? ' ×' + x : ''} ${Math.round(c * 100)}%`})));
+    const PS = {OCTAVES:[-12, 12], 'OCT+5TH':[-12, -5, 7, 12], DOWN:[-12, -7, -5], UP:[5, 7, 12], CHROMATIC:[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], WIDE:[-24, -19, -12, -7, 7, 12, 19], DETUNE:[-0.6, -0.3, 0.3, 0.6]};
+    put2(4, [['OCTAVES', 1/4, .5], ['OCT+5TH', 1/4, .5], ['DOWN', 1/4, .5], ['UP', 1/4, .5], ['CHROMATIC', 1/4, .6], ['WIDE', 1/4, .5], ['DETUNE', 1/4, 1], ['OCTAVES', 1/2, .5],
+      ['OCT+5TH', 1/2, .6], ['CHROMATIC', 1/2, .75], ['WIDE', 1/8, .5], ['OCTAVES', 1/8, .4], ['OCT+5TH', 1/4, 1], ['DOWN', 1/2, .7], ['CHROMATIC', 1/4, .6, 1], ['WIDE', 1/3, .6]]
+      .map(([s, G, c, fx]) => ({f:'spitch', S:PS[s].map(v => Math.pow(2, v / 12)), G, c, nb:fx ? 0 : 1, n:`SLICE PITCH ${s} ${nv(G)}` + (c < 1 ? ` ${Math.round(c * 100)}%` : '') + (fx ? ' FIXED' : '')})));
+    put2(5, [{a:3, b:4, w:1/16, n:'FREEZE BEAT 4'}, {a:3.5, b:4, w:1/32, n:'FREEZE LAST 1/8'}, {a:2, b:4, w:1/8, n:'FREEZE HALF BAR'}, {C:1, h:.5, w:1/32, n:'FREEZE EVERY 2ND 1/8'},
+      {C:1/2, h:.5, w:1/64, n:'FREEZE EVERY 2ND 1/16'}, {a:3, b:4, w:1/128, n:'BUZZ BEAT 4'}, {C:1, h:.75, w:1/128, n:'BUZZ END OF EVERY BEAT'}, {a:3, b:4, w:1/8, rho:.25, n:'SMEAR BEAT 4'},
+      {a:2, b:4, w:1/8, rho:.5, n:'SMEAR HALF BAR'}, {a:0, b:4, w:1/4, rho:.5, n:'SMEAR BAR'}, {C:1, h:0, w:1/16, rho:.5, n:'SMEAR EVERY BEAT'}, {C:2, h:0, w:1/8, rho:.5, n:'STRETCH ×2 EVERY 2 BEATS'},
+      {C:1/2, h:.25, w:1/32, pr:.4, n:'FREEZE RANDOM 1/8S'}, {C:1/4, h:0, w:1/64, pr:.35, n:'FREEZE RANDOM 1/16S'}, {a:3, b:4, w:1/16, sw:.85, n:'FREEZE RISING BEAT 4'}, {a:0, b:4, w:1/16, n:'FREEZE BAR'}]
+      .map(o => Object.assign({f:'frz', rho:0, pr:1, sw:0}, o)));
+    put2(6, [[1/4, .2], [1/4, .35], [1/4, .5], [1/4, .7], [1/2, .35], [1/2, .6], [1/8, .3], [1/8, .5], [1/4, .9], [1/4, .5, 'stuck'], [1/8, .5, 'stuck'], [1/4, .4, 'drop'],
+      [1/8, .5, 'drop'], [1/4, .5, 'jump'], [1/2, .5, 'jump'], [1/4, .5, '', 1]]
+      .map(([G, d, only, fx]) => ({f:'skip', G, d, only:only || '', nb:fx ? 0 : 1, n:`${{'':'CD SKIP', stuck:'CD STUCK', drop:'DROPOUTS', jump:'SKIP BACK'}[only || '']} ${nv(G)} ${Math.round(d * 100)}%${fx ? ' FIXED' : ''}`})));
+    put2(7, [{a:3, L0:1/2, q:.75, dk:.8, n:'BOUNCE BEAT 4'}, {a:2, L0:1/2, q:.8, dk:.85, n:'BOUNCE HALF BAR'}, {a:0, L0:1, q:.8, dk:.88, n:'BOUNCE BAR'}, {a:3, L0:1/4, q:.7, dk:.8, n:'BOUNCE BEAT 4 FAST'},
+      {a:3, L0:1/4, q:.85, n:'ACCEL ROLL BEAT 4'}, {a:2, L0:1/2, q:.85, n:'ACCEL ROLL HALF BAR'}, {a:0, L0:1/2, q:.9, n:'ACCEL ROLL BAR'}, {a:3, L0:1/4, q:.7, n:'ACCEL TO BUZZ BEAT 4'},
+      {a:2, L0:1/16, q:1.3, n:'DECEL ROLL HALF BAR'}, {a:0, L0:1/16, q:1.25, n:'DECEL ROLL BAR'}, {a:3, L0:1/32, q:1.4, n:'DECEL ROLL BEAT 4'}, {C:2, L0:1/2, q:.75, dk:.85, n:'BOUNCE EVERY 2 BEATS'},
+      {C:1, L0:1/4, q:.7, dk:.8, n:'BOUNCE EVERY BEAT'}, {C:1, L0:1/4, q:.8, n:'ACCEL EVERY BEAT'}, {C:1, L0:1/16, q:1.35, n:'DECEL EVERY BEAT'}, {a:3, L0:1/4, q:.85, sw:1, n:'SWELL ROLL BEAT 4'}]
+      .map(o => Object.assign({f:'bnc', dk:1, sw:0}, o)));
+    put2(8, [[1/4, .5, .15], [1/4, .5, .3], [1/4, .5, .5], [1/2, .6, .2], [1/2, .6, .4], [1/3, .55, .3], [1/8, .5, .3], [1/4, .5, .3, .25], [1/2, .6, .3, .3], [1/4, .5, .3, 0, 2],
+      [1/4, .5, .3, 0, 4], [1/2, .6, .4, 0, 4], [1/4, .35, .1], [1/4, .8, .3], [1/4, 1, .25, .2], [1/6, .55, .35]]
+      .map(([G, c, m, rv, cyc]) => ({f:'mut', G, c, m, rv:rv || 0, cyc:cyc || 0, n:`MUTATE ${nv(G)} ${Math.round(m * 100)}%` + (c >= 1 ? ' ALL' : '') + (rv ? ' REVERSE' : '') + (cyc ? ` CYCLE ${cyc}` : '')})));
+    put2(9, [[1/4, .25], [1/4, .4], [1/4, .6], [1/2, .3], [1/2, .5], [1, .4], [1/4, .4, 2], [1/4, .4, -2], [1/2, .4, 1], [1/2, .4, -3], [1/4, .4, 0, .7], [1/2, .5, 0, .75],
+      [1/8, .5], [1/3, .45], [1/4, .4, 0, 0, 1], [1/4, .4, 0, 0, 0, 1]]
+      .map(([G, d, s, fd, gt, fx]) => ({f:'sted', G, d, s:s || 0, fd:fd || 0, gt:gt || 0, nb:fx ? 0 : 1,
+        n:`STUTTER EDIT ${nv(G)} ${Math.round(d * 100)}%` + (s ? ' ' + st2(s) : '') + (fd ? ' FADE' : '') + (gt ? ' GATED' : '') + (fx ? ' FIXED' : '')})));
+    put2(10, [[3/4, 0], [5/4, 0], [3/2, 0], [7/4, 0], [9/4, 0], [5/2, 0], [11/4, 0], [13/4, 0], [3/4, 2], [5/4, 2], [3/4, 3], [2/3, 0], [3/4, 0, 1], [5/4, 0, 1], [7/4, 0, 1], [5/6, 0]]
+      .map(([M, a, pp]) => ({f:'poly', M, a, pp:pp || 0, n:`POLYMETER ${nv(M)}` + (a ? ` FROM BEAT ${a + 1}` : '') + (pp ? ' PING-PONG' : '')})));
+    put2(11, [[1/4, .5, 'UP'], [1/4, .5, 'DOWN'], [1/4, .5, 'ZIGZAG'], [1/4, .5, 'RANDOM'], [1/2, .5, 'UP'], [1/2, .5, 'DOWN'], [1/2, .5, 'ZIGZAG'], [1/2, .5, 'RANDOM'],
+      [1, .4, 'UP'], [1, .4, 'DOWN'], [1, .4, 'RANDOM'], [2, .3, 'UP'], [2, .3, 'DOWN'], [1/3, .5, 'RANDOM'], [1/8, .6, 'RANDOM'], [4, .25, 'DOWN']]
+      .map(([G, k, d]) => ({f:'warp', G, k, d, n:`WARP ${d} ${nv(G)}`})));
+    put2(12, [{a:3, L:1/4, m:'rev'}, {a:3, L:1/2, m:'rev'}, {a:3, L:1/8, m:'rev'}, {a:2, L:1/4, m:'rev'}, {a:3, L:1/4, m:'pp'}, {a:2, L:1/2, m:'pp'}, {a:3, L:1/8, m:'pp'},
+      {a:3, L:1/4, m:'rev', s:-1}, {a:2, L:1/2, m:'rev', s:-2}, {a:3, k:2, m:'rew', n:'REWIND BEAT 4'}, {a:2, k:1.5, m:'rew', n:'REWIND HALF BAR'}, {a:3.5, k:3, m:'rew', n:'REWIND LAST 1/8'},
+      {C:1, h:.5, k:2, m:'rew', n:'REWIND EVERY 2ND 1/8'}, {a:2, L:1/4, m:'rev', sw:1}, {a:3, L:1/3, m:'rev'}, {a:0, L:1/2, m:'pp'}]
+      .map(o => Object.assign({f:'rroll', s:0, sw:0}, o, {n:o.n || `${o.m === 'pp' ? 'PING-PONG ROLL' : o.sw ? 'REVERSE SWELL' : 'REVERSE ROLL'} ${nv(o.L)}` + (o.s ? ' ' + st2(o.s) : '') + (o.a ? ` FROM BEAT ${o.a + 1}` : ' BAR')})));
+    put2(13, [[1/16, 1, 0, 0, 'FROM 1 BEAT'], [1/8, 1, 0, 0, 'FROM 1 BEAT'], [1/4, 4, 0, 0, 'FROM 1 BAR'], [1/16, 4, 0, 0, 'FROM 1 BAR'], [1/32, 1/2, 0, 0, 'FROM 1/8'],
+      [1/8, 1, .5, 0, 'REVERSE 50%'], [1/16, 1, .5, 0, 'REVERSE 50%'], [1/8, 1, 0, .4, 'GAPS 40%'], [1/16, 1, 0, .6, 'SPARSE'], [1/4, 8, .3, 0, 'CLOUD FROM 2 BARS'],
+      [1/16, 1, 0, 0, 'BEAT 4', 3], [1/8, 1, 0, 0, 'HALF BAR', 2], [1/32, 1, 0, 0, 'DENSE'], [1/8, 1, 1, 0, 'ALL REVERSE'], [1/32, 1/4, .5, 0, 'SHIMMER'], [1/2, 4, 0, .3, 'GAPS 30%']]
+      .map(([w, W, rv, gap, t, a]) => ({f:'grain', w, W, rv, gap, a:a || 0, n:`GRAINS ${nv(w)} ${t}`})));
+    put2(14, [[1/4, .3, 'all'], [1/4, .5, 'all'], [1/4, .75, 'all'], [1/2, .5, 'all'], [1/8, .4, 'all'], [1/4, .5, 'crush'], [1/2, .6, 'crush'], [1/4, .5, 'filt'],
+      [1/2, .6, 'filt'], [1/4, .5, 'chop'], [1/4, .6, 'cf'], [1/3, .5, 'all'], [1/4, 1, 'all'], [1/4, .5, 'all', 1], [1/2, .25, 'all'], [1/8, .75, 'all']]
+      .map(([G, d, set, fx]) => ({f:'tex', G, d, set, nb:fx ? 0 : 1, n:`${{all:'TEXTURE', crush:'CRUSH SLICES', filt:'FILTER SLICES', chop:'CHOP SLICES', cf:'CRUSH+FILTER SLICES'}[set]} ${nv(G)} ${Math.round(d * 100)}%${fx ? ' FIXED' : ''}`})));
+    put2(15, [[1/4, .25], [1/4, .4], [1/4, .55], [1/4, .7], [1/4, .85], [1/4, 1], [1/2, .4], [1/2, .6], [1/2, .8], [1/8, .4], [1/8, .6], [1/3, .5], [1/4, .5, 1], [1/2, .5, 1], [1, .5], [1/4, .6, 0, 1]]
+      .map(([G, d, fx, slow]) => ({f:'chaos2', G, d, nb:fx ? 0 : 1, slow:slow || 0, n:`CHAOS 2 ${nv(G)} ${Math.round(d * 100)}%` + (fx ? ' FIXED' : slow ? ' SLOW' : '')})));
+    // 01–0F: one of each family
+    [0x10, 0x22, 0x34, 0x41, 0x50, 0x61, 0x70, 0x81, 0x91, 0xA0, 0xB3, 0xC0, 0xD1, 0xE1, 0xF2].forEach((x, i) => { T[256 + 1 + i] = T[256 + x]; });
     return T;
   }
   static get NAMES(){
@@ -15544,6 +15609,8 @@ class FlexCore {
     for (let k = 17; k < 256; k++) N[k] = T[k] ? T[k].n : 'OFF';
     return (FlexCore._N = N);
   }
+  // FLY's names, 00–FF (the flx param plays FLY v as 256 + v)
+  static get NAMES2(){ if (FlexCore._N2) return FlexCore._N2; const T = FlexCore.SPEC(), N = ['OFF']; for (let v = 1; v < 256; v++) N[v] = T[256 + v] ? T[256 + v].n : 'OFF'; return (FlexCore._N2 = N); }
   static hh(a, b, c){ let h = Math.imul((a | 0) * 73856093 ^ (b | 0) * 19349663 ^ (c | 0) * 83492791, 2654435761) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h = (h ^ (h >>> 13)) >>> 0; return h / 4294967296; }
   // 17–255: sets this.pg (gain), this.plp / this.php (filter, 0–1; 1 / 0 = open), this.pcr / this.pbt (hold, bits; 1 / 0 = clean); returns the read position
   ext(k, p, bar){
@@ -15598,6 +15665,67 @@ class FlexCore {
           if (FlexCore.hh(o.seed, s, key * 7 + 3) < o.c){ const op = Math.floor(FlexCore.hh(o.seed, s, key * 7 + 4) * 7);
             if (op === 0) r = p - G; else if (op === 1) r = c - u; else if (op === 2) r = c - G + u * 2; else if (op === 3) r = c + u / 2;
             else if (op === 4) r = c + u % (G / 4); else if (op === 5) g = u < G / 2 ? 1 : 0; else r = c + u - u * u / (2 * G); } } break;
+        // ===== FLY (5 Nov): k 257–511. Each reads only what has played (r ≤ p); see the notes by SPEC's FLY families.
+        case 'proll': if (p >= o.a){ const n = Math.floor((p - o.a) / o.L + 1e-9), u = p - o.a - n * o.L;   // repeat n: speed ≤ n + 1 keeps it behind now
+          if (n > 0) r = o.a + u * Math.min(n + 1, Math.max(0.25, Math.pow(2, n * o.s / 12))); } break;
+        case 'euc': { const N = o.N, step = 4 / N, s = Math.min(N - 1, Math.floor(p / step + 1e-9)), on = j => ((((j + o.rot) % N) * o.k) % N) < o.k;
+          if (!o.h) g = on(s) ? 1 : 0;
+          else if (!on(s)){ let j = s - 1; while (j >= 0 && !on(j)) j--; if (j >= 0){ const c0 = j * step; r = c0 + (p - c0) % step; } } } break;
+        case 'prob': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = bar & 255;
+          if (FlexCore.hh(k, s, B * 13 + 1) < o.c){ let op = o.op; if (op === 'any') op = ['mute', 'rep', 'rat'][Math.floor(FlexCore.hh(k, s, B * 13 + 2) * 3)];
+            if (op === 'mute') g = 0; else if (op === 'rep') r = p - G; else r = c0 + u % (G / (o.x || 2 + Math.floor(FlexCore.hh(k, s, B * 13 + 3) * 3))); } } break;
+        case 'spitch': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? bar & 255 : 0;
+          if (FlexCore.hh(k, s, B * 17 + 1) < o.c){ const sp = o.S[Math.floor(FlexCore.hh(k, s, B * 17 + 2) * o.S.length)]; r = sp > 1 ? c0 - G * (sp - 1) + u * sp : c0 + u * sp; } } break;
+        case 'frz': { let a, b; if (o.C){ const c = cs(o.C); a = c + o.h * o.C; b = c + o.C; } else { a = o.a; b = o.b; }
+          if (p >= a && p < b && (o.pr >= 1 || FlexCore.hh(k, Math.round(a * 64), bar & 255) < o.pr)){ const u = p - a, w = o.sw ? o.w * (1 - o.sw * u / (b - a)) : o.w;
+            r = a + Math.floor(u / w + 1e-9) * w * o.rho + u % w; } } break;
+        case 'skip': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? bar & 255 : 0;
+          if (FlexCore.hh(k, s, B * 19 + 1) < o.d){ const op = o.only || ['stuck', 'jump', 'drop', 'prev'][Math.floor(FlexCore.hh(k, s, B * 19 + 2) * 4)];
+            if (op === 'stuck') r = c0 + u % (G / 8); else if (op === 'jump') r = p - G * (1 + Math.floor(FlexCore.hh(k, s, B * 19 + 3) * 3)) / 2;
+            else if (op === 'drop') g = u < G * 0.35 ? 0 : 1; else r = c0 - G / 4 + u % (G / 4); } } break;
+        case 'bnc': { const a = o.C ? cs(o.C) : o.a, b = o.C ? a + o.C : 4;
+          if (p >= a && p < b){ const x = p - a, q = o.q, Lm = 1 / 128; let n, c;   // repeat n lasts L0·qⁿ (q < 1 faster, > 1 slower)
+            if (q > 1){ n = Math.floor(Math.log(1 + x * (q - 1) / o.L0) / Math.log(q) + 1e-9); c = o.L0 * (Math.pow(q, n) - 1) / (q - 1); }
+            else { const nm = Math.max(0, Math.ceil(Math.log(Lm / o.L0) / Math.log(q))), Sm = o.L0 * (1 - Math.pow(q, nm)) / (1 - q);
+              if (x < Sm){ n = Math.floor(Math.log(1 - x * (1 - q) / o.L0) / Math.log(q) + 1e-9); c = o.L0 * (1 - Math.pow(q, n)) / (1 - q); }
+              else { const m = Math.floor((x - Sm) / Lm + 1e-9); n = nm + m; c = Sm + m * Lm; if (o.dk < 1) g = 0; } }   // a bounce stops; a roll buzzes on
+            if (c > x) c = x;
+            r = a + x - c; if (o.dk < 1 && g) g = Math.pow(o.dk, n); if (o.sw) g = Math.min(1, 0.25 * Math.pow(1.2, n)); } } break;
+        case 'mut': { const G = o.G, per = Math.round(4 / G), s = Math.min(per - 1, Math.floor(p / G + 1e-9)), u = p - s * G; let key = 0;
+          if (o.cyc){ const B = bar % o.cyc; if (B && FlexCore.hh(k, s, 97 + B) < o.m) key = 100 + B; }
+          else for (let B = bar & 3; B > 0; B--) if (FlexCore.hh(k, s, 97 + B) < o.m){ key = 100 + B; break; }   // the changes add up over the four bars
+          if (FlexCore.hh(k, s, key * 7 + 11) < o.c){ const src = s - 1 - Math.floor(FlexCore.hh(k, s, key * 7 + 23) * (per - 1)), rv = FlexCore.hh(k, s, key * 7 + 31) < o.rv;
+            r = src * G + (rv ? G - u : u); } } break;
+        case 'sted': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? bar & 255 : 0;
+          if (FlexCore.hh(k, s, B * 23 + 1) < o.d){ const Lr = G * [1/2, 1/3, 1/4, 1/6, 1/8, 1/12, 1/16][Math.floor(FlexCore.hh(k, s, B * 23 + 2) * 7)], n = Math.floor(u / Lr + 1e-9), v = u - n * Lr;
+            r = c0 + v * (o.s && n > 0 ? Math.min(n + 1, Math.max(0.25, Math.pow(2, n * o.s / 12))) : 1);
+            if (o.fd) g = Math.pow(o.fd, n); if (o.gt) g = v < Lr / 2 ? 1 : 0; } } break;
+        case 'poly': if (p >= o.a){ const x = p - o.a, n = Math.floor(x / o.M + 1e-9), u = x - n * o.M; r = o.a + (o.pp && (n & 1) ? o.M - u : u); } break;
+        case 'warp': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, K = o.k;
+          const up = o.d === 'UP' ? true : o.d === 'DOWN' ? false : o.d === 'ZIGZAG' ? !(s & 1) : FlexCore.hh(k, s, (bar & 255) * 29 + 1) < 0.5;
+          r = up ? c0 + (1 - K) * u + K * u * u / G : c0 - K * G / 4 + (1 + K) * u - K * u * u / G; } break;   // up: slow → fast, lands on the grid; down: fast → slow
+        case 'rroll': if (o.m === 'rew'){ const a = o.C ? cs(o.C) + o.h * o.C : o.a, b = o.C ? cs(o.C) + o.C : 4;
+            if (p >= a && p < b){ r = a - o.k * (p - a); g = Math.min(1, (b - p) / ((b - a) * 0.1)); } }
+          else if (p >= o.a){ const L = o.L, n = Math.floor((p - o.a) / L + 1e-9), u = p - o.a - n * L;
+            if (n > 0){ const sp = o.s ? Math.max(0.25, Math.pow(2, n * o.s / 12)) : 1; r = o.m === 'rev' || (n & 1) ? o.a + L - u * sp : o.a + u;
+              if (o.sw) g = Math.min(1, 0.2 + 0.8 * (p - o.a) / (4 - o.a)); } } break;
+        case 'grain': if (p >= o.a){ const w = o.w, j = Math.floor(p / w + 1e-9), u = p - j * w, B = bar & 255, off = w + FlexCore.hh(k, j, B * 31 + 1) * (o.W - w);
+          r = FlexCore.hh(k, j, B * 31 + 2) < o.rv ? p - off + w - 2 * u : p - off; if (o.gap && FlexCore.hh(k, j, B * 31 + 3) < o.gap) g = 0; } break;
+        case 'tex': { const G = o.G, s = Math.floor(p / G + 1e-9), u = p - s * G, B = o.nb ? bar & 255 : 0;
+          if (FlexCore.hh(k, s, B * 37 + 1) < o.d){ const h2 = FlexCore.hh(k, s, B * 37 + 2), h3 = FlexCore.hh(k, s, B * 37 + 3);
+            const op = o.set === 'all' ? ['crush', 'lp', 'hp', 'chop'][Math.floor(h2 * 4)] : o.set === 'cf' ? ['crush', 'lp', 'hp'][Math.floor(h2 * 3)] : o.set === 'filt' ? (h2 < 0.5 ? 'lp' : 'hp') : o.set;
+            if (op === 'crush'){ cr = 3 + Math.floor(h3 * 22); bt = h3 < 0.5 ? 4 + Math.floor(h3 * 8) : 0; } else if (op === 'lp') lp = 0.2 + h3 * 0.35; else if (op === 'hp') hp = 0.5 + h3 * 0.3;
+            else g = u < G * (0.25 + h3 * 0.4) ? 1 : 0; } } break;
+        case 'chaos2': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? (o.slow ? (bar >> 1) & 1 : bar & 255) : 0;
+          if (FlexCore.hh(k, s, B * 41 + 1) < o.d){ const op = Math.floor(FlexCore.hh(k, s, B * 41 + 2) * 8), h3 = FlexCore.hh(k, s, B * 41 + 3);
+            if (op === 0){ const sp = [0.5, 0.75, 1.5, 2][Math.floor(h3 * 4)]; r = sp > 1 ? c0 - G * (sp - 1) + u * sp : c0 + u * sp; }   // pitch
+            else if (op === 1) r = c0 + u % (G / 8);            // freeze
+            else if (op === 2) r = p - G / 2;                   // skip back
+            else if (op === 3) r = c0 - u;                      // the slice before, backwards
+            else if (op === 4) r = c0 + 0.5 * u + 0.5 * u * u / G;   // warp up
+            else if (op === 5) g = u < G / 2 ? 1 : 0;           // gate
+            else if (op === 6){ cr = 6 + Math.floor(h3 * 16); bt = 5; }   // crush
+            else r = c0 + u % (G / 3); } } break;               // ratchet
       } }
     this.pg = g; this.plp = lp; this.php = hp; this.pcr = cr; this.pbt = bt; return r;
   }
@@ -15640,7 +15768,7 @@ class FlexCore {
     const N = this.N, bL = this.bL, bR = this.bR, bp = tr && tr.bp, spb = clkSpb(this, bp, n), live = !!(bp && bp.length > 1);
     // WAITS FOR ITS COMMAND (owner, 3 Nov): STARTS ON FLX (dp.wait) plays nothing until an FLX sets a pattern or an FXO
     // switches the slot on (tr.sw: that slot's FXO, then its own PATTERN); the switches go back to −1 on STOP, so it waits again.
-    const k = !dp ? 0 : tr && tr.flx >= 0 ? Math.min(255, Math.round(tr.flx)) : dp.wait && !(tr && tr.sw > 0.5) ? 0 : dp.pat | 0, mix = dp ? dp.mix : 0, fsk = 1 - Math.exp(-1 / (this.sr * 0.015)), fs = this.fs, nyq = this.sr * 0.45;
+    const k = !dp ? 0 : tr && tr.flx >= 0 ? Math.min(511, Math.round(tr.flx)) : dp.wait && !(tr && tr.sw > 0.5) ? 0 : dp.pat | 0, mix = dp ? dp.mix : 0, fsk = 1 - Math.exp(-1 / (this.sr * 0.015)), fs = this.fs, nyq = this.sr * 0.45;
     const XF = Math.max(16, Math.round(this.sr * (dp ? dp.xf : 5) / 1000)), gk = 1 - Math.exp(-1 / (this.sr * 0.002));
     // Lock our position to the clock: gently while close (the clock's own float32 steps stay out), at once when it jumps.
     const q0 = live ? bp[0] : -1;
@@ -16522,7 +16650,7 @@ class ThunderFx extends AudioWorkletProcessor {
   // FLEX CHECK (3 Nov): maxValue was 64 for all of them, so on the Page sequencer (whose setValueAtTime the AudioParam
   // clamps) FLX 41–FF all played pattern 40; the core's values skip the AudioParam and were right. 255 now (tests/flex.test.js).
   static get parameterDescriptors(){ const k = (name, d) => ({name, defaultValue:d, minValue:-1, maxValue:255, automationRate:'k-rate'});
-    return [{name:'bp', defaultValue:0, minValue:-2, maxValue:64, automationRate:'a-rate'}, ...[0, 1, 2, 3, 4, 5, 6, 7].map(i => k('sw' + i, -1)), k('flx', -1), k('gat', -1), k('rtg', -1)]; }
+    return [{name:'bp', defaultValue:0, minValue:-2, maxValue:64, automationRate:'a-rate'}, ...[0, 1, 2, 3, 4, 5, 6, 7].map(i => k('sw' + i, -1)), {...k('flx', -1), maxValue:511}, k('gat', -1), k('rtg', -1)]; }
   constructor(o){
     super();
     const op = o.processorOptions || {};
@@ -17613,7 +17741,7 @@ const isOffPhrase = p => !!p && !isEmptyPhrase(p) && p.every(r => r.slice(0, NCO
 // the master column is all commands, so there a block looks like an OFF-only block when it switches something off
 // (FLX 00 Flex off, GAT 00 step gate off, RTG 0Y retrigger off, FXO X0 an effect slot off) and switches nothing on (FLX,
 // GAT, RTG or FXO to a pattern / on). Other commands (VOL FF back to full, TPO…) don't count either way.
-const fxOnOff = (c, v) => { const n = FXC[c]; if (n === 'FLX' || n === 'GAT') return v === 0 ? -1 : 1; if (n === 'RTG') return (v >> 4) === 0 ? -1 : 1;
+const fxOnOff = (c, v) => { const n = FXC[c]; if (n === 'FLX' || n === 'FLY' || n === 'GAT') return v === 0 ? -1 : 1; if (n === 'RTG') return (v >> 4) === 0 ? -1 : 1;
   if (n === 'FXO') return (v >> 4) === 0 ? 0 : (v & 15) === 0 ? -1 : 1; return 0; };
 const isOffCmdPhrase = p => { if (!p || isEmptyPhrase(p)) return false; let off = 0;
   for (const r of p){ for (let k = 0; k < NCOL; k++) if (r[k] >= 0 && r[k] !== OFF) return false;
@@ -18045,6 +18173,7 @@ function makeSeq(S, mode, o){
       const slotWake = (cmd, on) => { if (!on) return; const A = t >= MT ? S.mfx : S.tfx[t], ty = FX_NEEDS[cmd];
         (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at, track:t, p:'sw' + k, v:-1}); }); };
       if (fx.FLX != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:flxCap(fx.FLX)}); slotWake('FLX', fx.FLX > 0); }
+      if (fx.FLY != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:fx.FLY ? 256 + fx.FLY : 0}); slotWake('FLY', fx.FLY > 0); }   // FLY (5 Nov): the Flex's second bank, 256 + v
       if (fx.GAT != null){ evs.push({type:'fxc', t:at, track:t, p:'gat', v:fx.GAT === 0 ? 0 : fx.GAT >= 16 ? 16 : fx.GAT}); slotWake('GAT', fx.GAT !== 0); }   // GAT 00 stops it, 10 and up: the CUSTOM steps
       if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', X > 0);
         if (X && Y) evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); }
@@ -19653,7 +19782,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'i7d2qg';
+const CORE_REV = 'sng6wv';
 const CORE_WANT = 6;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -20889,7 +21018,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 438;
+const BUILD = 439;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -21805,7 +21934,7 @@ function defInst(){
    the master's) FX slots, and without one they did nothing at all, which read as the command being broken. Typing one of
    them now puts that effect in the first free slot of the track being edited (the master on the master column), with a
    toast, once the cell has held it for a moment (scrolling or typing past it does nothing). A slot that already has it is left alone (an off one is only pointed out: FXO may have turned it off on purpose). */
-const FX_NEEDS = {FLX:'flex', GAT:'sgate', RTG:'retrig'};
+const FX_NEEDS = {FLX:'flex', FLY:'flex', GAT:'sgate', RTG:'retrig'};
 let fxNeedT = 0;
 function fxNeed(t, type){
   if (!(t >= 0) || t > MT || !TFX[type]) return;
@@ -21942,7 +22071,7 @@ const FXB = {END:'End of the song: playing stops at this row', JMP:'Jump: the wh
   PVB:'Vibrato: X speed, Y depth', SED:'Seed the randomness so it repeats the same way', TPO:'Set the tempo in BPM (hex)', TSP:'Transpose the track from here on',
   VOL:'Set the volume (also of a playing note)', PIT:'Pitch the note ± semitones', FIN:'Fine tune ± cents', PLY:'Play reversed (01) or forwards (00)',
   STA:'Start part way into the sound', PAN:'Pan left or right (80 centre)', TIC:'Ticks a step from here on', WOB:'Bass wobble rate from here on (00 the voice’s own)',
-  FXO:'Effect slot X (1–8, 9 = all) off (Y 0), on (1) or on for Y rows; FXO 00: every slot back as set', BYP:'…chains module X (its number on BYP, 0 = all) in (Y 0), bypassed (1), or the other way from the patch for Y rows', FLX:'Flex pattern (00 off, 01–10 the first sixteen; 11–FF: first digit the family, second the variant; lengths are note values). A Flex set to STARTS ON FLX is off until the first FLX', GAT:'Step gate pattern (00 custom, 01–0F); STARTS ON GAT: open until the first GAT', RTG:'Retrigger: X rate (1 = 1/4 … 8 = 1/32T), Y rows (0 = until RTG 00)',
+  FXO:'Effect slot X (1–8, 9 = all) off (Y 0), on (1) or on for Y rows; FXO 00: every slot back as set', BYP:'…chains module X (its number on BYP, 0 = all) in (Y 0), bypassed (1), or the other way from the patch for Y rows', FLX:'Flex pattern (00 off, 01–10 the first sixteen; 11–FF: first digit the family, second the variant; lengths are note values). A Flex set to STARTS ON FLX is off until the first FLX', FLY:'Flex, second bank: IDM patterns (00 off, 01–0F one of each family; 10–FF: 1 pitch rolls, 2 euclid, 3 probability, 4 slice pitch, 5 freeze and smear, 6 CD skips, 7 bounces, 8 mutating shuffles, 9 stutter edits, A polymeter, B warp, C reverse rolls and rewinds, D grains, E texture, F chaos 2). Plays on the same Flex as FLX: the later one wins', GAT:'Step gate pattern (00 custom, 01–0F); STARTS ON GAT: open until the first GAT', RTG:'Retrigger: X rate (1 = 1/4 … 8 = 1/32T), Y rows (0 = until RTG 00)',
   PGM:'MIDI program change (00–7F)', CSL:'MIDI CC glide: this row’s CCA–CCD move to their value over XY ticks (00 the step)',
   CND:'Condition: 0 FILL, 1 !FILL, 2 PRE, 3 !PRE, 4 NEI, 5 !NEI, 6 1ST, 7 !1ST (NEI: X the track, 0 = the left one)', NUD:'Nudge ± ticks (early or late)',
   RTV:'Retrigger curve: + rises to the last hit, − fades', SLC:'Play slice XX of a sliced sound', XFD:'Crossfader 00 scene A … FF scene B',
@@ -21959,7 +22088,7 @@ const FXC_GROUPS = [
   ['Sound', ['INS', 'STA', 'SLC', 'PLY', 'WOB', 'MUT', 'GEN', 'CUT', 'RES', 'DEC']],
   ['Chance and random', ['CHA', 'PRB', 'CND', 'ONE', 'NTH', 'RND', 'RNL', 'SED', 'REP']],
   ['Perform', ['XFD', 'MAC', 'LK1', 'LK2', 'LK3', 'LK4', 'PRT']],
-  ['Effects', ['FXO', 'FXS', 'FXV', 'BYP', 'FLX', 'GAT', 'RTG']],
+  ['Effects', ['FXO', 'FXS', 'FXV', 'BYP', 'FLX', 'FLY', 'GAT', 'RTG']],
   ['Tempo and groove', ['TPO', 'TIC', 'LPB', 'PDL', 'GRV', 'GGR']],
   ['Play order', ['HOP', 'DIR', 'END', 'JMP']],
   ['MIDI', ['PGM', 'CCA', 'CCB', 'CCC', 'CCD', 'CSL', 'MPB', 'MAT']]];
@@ -21969,7 +22098,7 @@ const fxcByGroup = names => [...new Set(names.map(fxcGroup))].flatMap(g => names
 const FXLIST_ALL = [-1, ...fxcByGroup([...FXC_GROUPS.flatMap(([, l]) => l), ...FXC.filter(n => fxcGroup(n) === 'More').sort()])
   .map(n => FXC.indexOf(n)).filter(i => i >= 0)];
 // Master phrases offer only the commands that mean something on the master bus: its level and effects first, then timing.
-const MST_FXC = ['END', 'JMP', 'VOL', 'FXO', 'FLX', 'GAT', 'RTG', 'TPO', 'TIC', 'GGR', 'HOP', 'DEL', 'CHA', 'NTH', 'CND', 'REP', 'RND', 'RNL', 'SED', 'PRB', 'FXS', 'FXV', 'SCG', 'LPB', 'PDL', 'STP', 'XFD', 'MAC', 'PRT', 'LK1', 'LK2', 'LK3', 'LK4'];
+const MST_FXC = ['END', 'JMP', 'VOL', 'FXO', 'FLX', 'FLY', 'GAT', 'RTG', 'TPO', 'TIC', 'GGR', 'HOP', 'DEL', 'CHA', 'NTH', 'CND', 'REP', 'RND', 'RNL', 'SED', 'PRB', 'FXS', 'FXV', 'SCG', 'LPB', 'PDL', 'STP', 'XFD', 'MAC', 'PRT', 'LK1', 'LK2', 'LK3', 'LK4'];
 const FXLIST_MST = [-1, ...fxcByGroup(MST_FXC).map(n => FXC.indexOf(n)).filter(i => i >= 0)];
 let FXLIST = FXLIST_ALL;
 const fxListNow = () => (FXLIST = mstView() ? FXLIST_MST : FXLIST_ALL);
@@ -26402,7 +26531,8 @@ function dkFxPatState(f, k, t, at){
   const sw = fxcNow(t, 'sw' + k, at), on = sw < -0.5 ? !!f.on : sw > 0.5;
   if (f.type === 'flex'){ const c = fxcNow(t, 'flx', at), wait = c < 0 && !!f.wait && !(sw > 0.5);
     const p = c >= 0 ? Math.min(255, Math.round(c)) : wait ? 0 : f.pat | 0;
-    return {on, wait, src:c >= 0 ? 'FLX' : wait ? 'WAITS FOR FLX' : 'PATTERN', p, name:'FLX ' + hx(p) + ' · ' + (FlexCore.NAMES[p] || '?')}; }
+    const fly = p >= 256;   // FLY: the param carries 256 + its value
+    return {on, wait, src:c >= 0 ? (fly ? 'FLY' : 'FLX') : wait ? 'WAITS FOR FLX' : 'PATTERN', p, name:(fly ? 'FLY ' + hx(p - 256) + ' · ' + (FlexCore.NAMES2[p - 256] || '?') : 'FLX ' + hx(p) + ' · ' + (FlexCore.NAMES[p] || '?'))}; }
   if (f.type === 'sgate'){ const c = fxcNow(t, 'gat', at), g = c >= 0 ? Math.round(c) : -1, wait = g === 0 || (g < 0 && !!f.wait && !(sw > 0.5)), p = g > 0 ? (g >= 16 ? 0 : g) : f.pat | 0;
     return {on, wait, src:g === 0 ? 'GAT 00' : c >= 0 ? 'GAT' : wait ? 'WAITS FOR GAT' : 'PATTERN', p, name:wait ? 'OPEN' : (g >= 16 ? 'GAT 10' : 'GAT ' + hx(p)) + ' · ' + StepGateCore.NAMES[p]}; }
   if (f.type === 'retrig'){ const c = fxcNow(t, 'rtg', at), eng = c > 0.5 ? true : c > -0.5 ? false : (f.mode | 0) === 1, di = c > 0.5 ? Math.min(7, Math.round(c) - 1) : Math.min(7, f.div | 0);
@@ -26415,7 +26545,7 @@ function dkFxPat(col, cv, g, W, H, f, k, font){
   const st = dkFxPatState(f, k, t, at); if (!st) return false;
   const beat = tp.on ? fxcBeat(at) : null, bar = beat == null ? 0 : Math.floor(beat / 4);
   const C = fxDynPal(), dpr = devicePixelRatio || 1, vals = TFX[f.type].ps.map(q => f[q.k]).join(',');
-  const rnd = f.type === 'flex' && (st.p === 16 || st.p === 0xEC || (st.p >= 0xF0 && (st.p & 1)));   // patterns that change bar to bar
+  const rnd = f.type === 'flex' && (st.p === 16 || st.p === 0xEC || (st.p >= 0xF0 && st.p < 256 && (st.p & 1)) || st.p > 256);   // patterns that change bar to bar (FLY: most do; one redraw a bar is cheap)
   const key = [f.type, st.p, st.src, st.on, vals, cv.width, cv.height, C.bg, C.ink, font, rnd ? bar & 3 : 0].join('|');
   if (col._pk !== key){
     col._pk = key; dkPatN++;
@@ -29432,6 +29562,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [439, '5 Nov', ['New command FLY: 255 more Flex patterns for IDM, played by the same Flex as FLX. FLY 01–0F are one of each family to try first; then by the first digit: 1 pitch rolls, 2 euclidean gates, 3 probability, 4 slice pitch, 5 freeze and smear, 6 CD skips, 7 bounces, 8 mutating shuffles, 9 stutter edits, A polymeter, B warp, C reverse rolls and rewinds, D grains, E texture, F chaos 2. Most change every bar over four bars; FIXED ones repeat. The FX bar draws whichever is playing.']],
   [438, '5 Nov', ['FLX on the Audio thread sequencer: the beat clock every tempo-locked effect follows (Flex, Step gate, Retrigger, synced delays) restarted at each row inside every audio block, so FLX patterns stuttered and lagged; it now runs smoothly, and ramps on live engines (fades, glides) move as written.', 'FLX 76–7A (TAPE START) spin up and land back on the beat instead of leaving the rest of the bar an 1/8 or a 1/4 late; FLX 0A SCRATCH and E8 5-TUPLET FEEL no longer skip.', 'Pattern view: a poly track keeps one width (the most note columns it uses in the song), so stepping song rows no longer slides the tracks sideways.']],
   [437, '5 Nov', ['The BPM / LPB box and the strip around LEFT are the page colour like the rest of the bar (the grey tab strip still showed there), and a line divides ROWS + from LEFT.']],
   [436, '5 Nov', ['The bottom panel (…CHAINS, FX, the track strip) is in the page colour now, set off from the tracker by a black rule; the strip behind the screen tabs is the page colour too.', 'SONG … PROJECT widen so the last tab ends in line with the Tracker / Synth / Waves / Chains buttons above.']],
