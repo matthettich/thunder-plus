@@ -2716,7 +2716,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <button id="bShPad" hidden>Share pad…</button>
         <button id="bShKit" hidden>Share all pads…</button>
       </div>
-      <p class="note" id="exNote">How pads export (File → Export this pad / all pads): mono WAV one-shots, trimmed at the tail. In Koala, import them from Files into a sample pad; in SunVox, load them into a Sampler module.</p>
+      <p class="note" id="exNote">How pads export (File → Export this pad / all pads): WAV one-shots (stereo when the pad holds a stereo sample, else mono), trimmed at the tail. In Koala, import them from Files into a sample pad; in SunVox, load them into a Sampler module.</p>
     </div>
   </section>
 
@@ -3716,6 +3716,20 @@ function makeOsc(L, sr, pre){
     case 'sample': { const S = L.sample; if (!S || !S.data || !S.data.length) return {blk:nop, s:() => 0};
       if ((L.vint | 0) > 0) return vintOsc(L, S, A, B, sr);
       const d = S.data, len = d.length, rev = B >= 0.5, k = S.sr / BASE; let pos = A * len;
+      // SAMPLE LOOP (5 Nov): loop between Loop start and Loop end (fractions of the sample, as it plays: reversed, the ends
+      // swap), forward with a crossfade into the loop end from just before the loop start, or ping-pong. The loop goes on
+      // for as long as the layer's envelope lasts (ADSR: while the note, or the pad's Gate, is held).
+      const lm = L.lpMode | 0, s0 = Math.floor(Math.max(0, Math.min(1, L.lpS || 0)) * len), e0 = Math.floor(Math.max(0, Math.min(1, L.lpE == null ? 1 : L.lpE)) * (len - 1));
+      if (lm && e0 - s0 >= 32){
+        const ls = rev ? len - 1 - e0 : s0, le = rev ? len - 1 - s0 : e0, LL = le - ls, X = lm === 1 ? Math.min(Math.floor(Math.max(0, Math.min(0.5, L.lpX || 0)) * LL), ls) : 0;
+        const at = p => { const i = Math.max(0, Math.min(len - 2, p | 0)), f = Math.max(0, Math.min(1, p - i)), a = rev ? d[len-1-i] : d[i], b = rev ? d[len-2-i] : d[i+1]; return a + (b - a) * f; };
+        let dir = 1;
+        return {blk:nop, s(inc){ let y;
+          if (lm === 1){ if (pos >= le) pos -= LL * Math.max(1, Math.floor((pos - ls) / LL));
+            if (X > 0 && pos >= le - X){ const w = (pos - (le - X)) / X; y = at(pos) * (1 - w) + at(pos - LL) * w; } else y = at(pos);
+            pos += inc * k; return y; }
+          if (dir > 0 && pos >= le){ pos = Math.max(ls, 2 * le - pos); dir = -1; } else if (dir < 0 && pos <= ls){ pos = Math.min(le, 2 * ls - pos); dir = 1; }
+          y = at(pos); pos += dir * inc * k; return y; }}; }
       return {blk:nop, s(inc){ if (pos >= len - 1) return 0; const i = pos | 0, f = pos - i;
         const a = rev ? d[len-1-i] : d[i], b = rev ? d[Math.max(len-2-i, 0)] : d[i+1]; pos += inc * k; return a + (b - a) * f; }}; }
   }
@@ -4404,7 +4418,7 @@ function voiceAmp(V, sr, out, N){
 const engFx = V => isBlipV(V) || (isXEngV(V) && !(XENG[V.engine] && XENG[V.engine].live));
 function padFx(V, out, sr, stages){
   if (!(V.fx || []).some(f => f.on && fxReady(f)) || !out || !out.length) return out;
-  const N = out.length, tailN = Math.round((V.tail || 0) * sr), ext = new Float32Array(Math.min(N + tailN, sr * 12)); ext.set(out.subarray(0, Math.min(N, ext.length)));
+  const N = out.length, tailN = Math.round((V.tail || 0) * sr), ext = new Float32Array(Math.min(N + tailN, sr * (SMP_MAX + 12))); ext.set(out.subarray(0, Math.min(N, ext.length)));   // was 12 s in all: pad effects cut a long sample at 12 s
   let buf = ext;
   for (const f of V.fx) if (f.on && FX[f.type]){ buf = applyFx(f, buf, sr); if (stages) stages.set(f, blockPeaks(buf)); }
   let end = buf.length; while (end > 1 && Math.abs(buf[end-1]) < 1e-4) end--;
@@ -4412,17 +4426,30 @@ function padFx(V, out, sr, stages){
   for (let i = 0; i < fl; i++) res[res.length - 1 - i] *= i / fl;
   return res;
 }
+const SMP_MAX = 120;   // SAMPLER: the longest sample, in seconds (see smpChannels)
 function renderVoice(V, sr, stages, hold){
   if (isBassV(V)) return renderBass(V, sr, hold);
   if (isVoxV(V)) return renderVox(V, sr);
   if (isBlipV(V)) return padFx(V, renderBlip(V, sr), sr, stages);
   if (isXEngV(V)){ const d = renderX(V, sr, hold); return engFx(V) ? padFx(V, d, sr, stages) : d; }
+  // STEREO SAMPLES (5 Nov): a layer whose sample has a right channel (data2) makes the pad stereo: the voice is rendered
+  // again with each such sample's right channel, and that render rides on the result as .r (the Worker sends it as
+  // data2; install() keeps it as c.data2). Every other layer is seeded, so it comes out the same in both: centred.
+  const a = renderLayersOnly(V, sr, stages, hold);
+  if (!V.layers.some(L => L.on && L.level > 0 && L.sample && L.sample.data && L.sample.data2 && smpLayerT(L.type))) return a;
+  const VR = Object.assign({}, V, {layers:V.layers.map(L => L.sample && L.sample.data2 ? Object.assign({}, L, {sample:Object.assign({}, L.sample, {data:L.sample.data2, data2:null, _vint:null})}) : L)});
+  const b = renderLayersOnly(VR, sr, null, hold), n = Math.max(a.length, b.length);
+  const A = a.length === n ? a : (() => { const x = new Float32Array(n); x.set(a); return x; })(), B = b.length === n ? b : (() => { const x = new Float32Array(n); x.set(b); return x; })();
+  A.r = B; return A;
+}
+const smpLayerT = t => t === 'sample' || t === 'grains' || t === 'pwm';
+function renderLayersOnly(V, sr, stages, hold){
   if (hold) V = Object.assign({}, V, {gate:hold * 1000, len:hold});
   // The voice-wide filter is open by default and the voice-wide amp is off, so a default voice renders
   // exactly as its layers alone would; turning either on only adds shaping across all the layers.
   const gFilt = V.gLpCut < 19900 || V.gLpEnv !== 0, gAmpOn = !!V.gAmpOn, gRel = Math.max(V.gRel || 1, 1) / 1000;
   let N = Math.max(1, Math.ceil(voiceLen(V) * sr));
-  if (gAmpOn) N = Math.min(Math.ceil(Math.max(voiceLen(V), V.gate / 1000 + gRel) * sr), sr * 32);   // room for the voice's release
+  if (gAmpOn) N = Math.min(Math.ceil(Math.max(voiceLen(V), V.gate / 1000 + gRel) * sr), sr * (SMP_MAX + 32));   // room for the voice's release (was 32 s in all: a long sample was cut)
   const out = new Float32Array(N);
   for (const L of V.layers) if (L.on && L.level > 0) renderLayer(L, V, sr, out, N);
   if (gFilt) voiceFilter(V, sr, out, N);
@@ -4433,7 +4460,7 @@ function renderVoice(V, sr, stages, hold){
   let buf = out;
   const fxOn = (V.fx || []).some(f => f.on && fxReady(f));
   if (fxOn){
-    const tailN = Math.round((V.tail || 0) * sr), ext = new Float32Array(Math.min(N + tailN, sr * 12)); ext.set(out.subarray(0, Math.min(N, ext.length)));
+    const tailN = Math.round((V.tail || 0) * sr), ext = new Float32Array(Math.min(N + tailN, sr * (SMP_MAX + 12))); ext.set(out.subarray(0, Math.min(N, ext.length)));   // was 12 s in all: pad effects cut a long sample at 12 s
     buf = ext;
     for (const f of V.fx) if (f.on && FX[f.type]){ buf = applyFx(f, buf, sr); if (stages) stages.set(f, blockPeaks(buf)); }
   }
@@ -4450,7 +4477,7 @@ function freshLayer(o){
     lpCut:20000, lpRes:0, lpEnv:0, hpCut:20, hpRes:0, hpEnv:0, fAtk:0.5, fDec:200,
     delay:0, burst:0, spacing:10,
     pEng:8, pHarm:0.5, pTim:0.5, pMor:0.5, pDecay:0.5, pLpg:0.5, pFm:0, pTimEnv:0, pMorEnv:0, pStrike:true, pAux:false,
-    wtBend:0, wtUni:1, wtSpread:0.3, wtSub:0, wtNoise:0, vint:0, vintF:0.5,
+    wtBend:0, wtUni:1, wtSpread:0.3, wtSub:0, wtNoise:0, vint:0, vintF:0.5, lpMode:0, lpS:0, lpE:1, lpX:0.05,
     eModel:0, eStrength:0.8, eContour:0, eBow:0, eBlow:0, eStrike:0.8, eBowT:0.5, eFlow:0.5, eBlowT:0.5, eMallet:0.5, eStrikeT:0.5,
     eGeo:0.3, eBright:0.5, eDamp:0.6, ePos:0.3, eSpace:0.3,
     seed:(_seed = (_seed * 1103515245 + 12345) >>> 0) || 1, sample:null}, o || {});
@@ -7803,7 +7830,7 @@ const P = {
   pAmt:{l:'Env amt', min:-48, max:48, c:'half', d:0, f:st},
   pDec:{l:'Env time', min:1, max:2000, c:'log', d:60, f:ms},
   atk:{l:'Attack', min:0.1, max:2000, c:'log', d:0.5, f:ms},
-  hold:{l:'Hold', min:0, max:30000, c:'sq', d:0, f:ms},
+  hold:{l:'Hold', min:0, max:120000, c:'sq', d:0, f:ms},
   dec:{l:'Decay', min:1, max:6000, c:'log', d:300, f:ms},
   sus:{l:'Sustain', min:0, max:1, c:'lin', d:0.6, f:pct},
   rel:{l:'Release', min:1, max:6000, c:'log', d:150, f:ms},
@@ -7827,6 +7854,10 @@ const P = {
   pMorEnv:{l:'Env→Morph', min:-1, max:1, c:'lin', d:0, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'},
   pFm:{l:'Env→Pitch', min:-1, max:1, c:'lin', d:0, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'},
   vint:{l:'Sampler', min:0, max:VINT.length - 1, c:'int', d:0, f:v => VINT[Math.round(v)][0]},
+  lpMode:{l:'Loop', min:0, max:2, c:'int', d:0, f:v => ['Off', 'Forward', 'Ping-pong'][Math.round(v)]},
+  lpS:{l:'Loop start', min:0, max:1, c:'lin', d:0, f:v => smpPosF(v)},
+  lpE:{l:'Loop end', min:0, max:1, c:'lin', d:1, f:v => smpPosF(v)},
+  lpX:{l:'Crossfade', min:0, max:0.5, c:'lin', d:0.05, f:v => Math.round(v * 100) + '% of the loop'},
   vintF:{l:'Colour', min:0, max:1, c:'lin', d:0.5, f:v => v < 0.48 ? 'Darker ' + Math.round((0.5 - v) * 200) + '%' : v > 0.52 ? 'Brighter ' + Math.round((v - 0.5) * 200) + '%' : 'As the machine'},
   wtBend:{l:'Bend', min:-1, max:1, c:'lin', d:0, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'},
   wtUni:{l:'Unison', min:1, max:8, c:'int', d:1, f:v => Math.round(v) + '×'},
@@ -7848,7 +7879,7 @@ const VP = {
   tune:{l:'Tune', min:-24, max:24, c:'int', d:0, f:st},
   drive:{l:'Drive', min:0, max:1, c:'lin', d:0, f:pct},
   gate:{l:'Gate', min:5, max:4000, c:'log', d:200, f:ms},
-  len:{l:'Max len', min:0.1, max:30, c:'sq', d:4, f:v => v.toFixed(2) + ' s'},
+  len:{l:'Max len', min:0.1, max:120, c:'sq', d:4, f:v => v.toFixed(2) + ' s'},
 };
 // Voice-wide rows (the amp rows reuse P.atk…P.rel). These edit the whole voice, not one layer.
 // Each envelope has an Amount slider: how far its envelope is applied to pitch, filter or amp.
@@ -8121,7 +8152,7 @@ self.onmessage = async e => {
       S = {bpm:m.bpm || 120}; WV.doc = m.waves || null;
       const st = m.stages ? new Map() : null, d = renderVoice(m.v, m.sr, st, m.hold), sts = [];
       if (st) (m.v.fx || []).forEach((f, k) => { const pk = st.get(f); if (pk) sts.push([k, pk]); });
-      postMessage({op:'done', id:m.id, data:d, st:sts}, [d.buffer]);
+      const d2 = d.r || null; postMessage({op:'done', id:m.id, data:d, data2:d2, st:sts}, d2 ? [d.buffer, d2.buffer] : [d.buffer]);
     } catch(err){ postMessage({op:'fail', id:m.id, err:String(err && err.message || err)}); }
   }
 };`;
@@ -8133,7 +8164,7 @@ self.onmessage = async e => {
       const m = e.data;
       if (m.op === 'ready'){ if (m.errs) for (const x of m.errs) tpLog('render worker', x); PW.ready = !!(m.pl || !plMod) && !!(m.tx || !txMod); PW.wv = !!m.wv; PW.lx = !!m.lx; PW.ps = !!m.ps; try { if ((S.irs || []).some(Boolean)) w.postMessage({op:'irs', v:irsLive()}); } catch(e){} if (PW.ready) prerender(); return; }
       const j = PW.jobs.get(m.id); if (!j) return; PW.jobs.delete(m.id);
-      if (m.op === 'done') j.ok({data:m.data, st:m.st}); else j.no(new Error(m.err));
+      if (m.op === 'done') j.ok({data:m.data, data2:m.data2 || null, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
     w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=33', location.href).href});
@@ -8170,7 +8201,7 @@ function bgRender(i){
     pend[i] = false;
     if (kit.voices[i] !== v || (padRev[i] || 0) !== r0){ if (stale(i)) bgRender(i); return; }   // another kit, or rendered here meanwhile
     if (dirty[i] || padSR() !== sr || padBpm(i) !== tb){ dirty[i] = true; bgRender(i); return; }   // edited meanwhile: go again
-    install(i, {sr, bpm:tb, data:r.data, st:new Map(r.st.map(([k, pk]) => [v.fx[k], pk]))});
+    install(i, {sr, bpm:tb, data:r.data, data2:r.data2 || null, st:new Map(r.st.map(([k, pk]) => [v.fx[k], pk]))});
     rendered(i);
   }, () => { pend[i] = false; if (kit.voices[i] === v){ dirty[i] = true; ensure(i); rendered(i); } });
 }
@@ -8204,7 +8235,7 @@ function ensure(i){
   if (!kit.voices[i]) return null;   // a pad the kit doesn't have (yet): silent rather than throwing in the sequencer
   if (stale(i) || slotAt(pend, i)){
     const v = kit.voices[i], st = new Map();
-    install(i, {sr:padSR(), bpm:padBpm(i), data:renderVoice(v, padSR(), st, isSyn(i) ? v.len : 0), st});
+    const d = renderVoice(v, padSR(), st, isSyn(i) ? v.len : 0); install(i, {sr:padSR(), bpm:padBpm(i), data:d, data2:d.r || null, st});
   }
   return cache[i];
 }
@@ -8227,7 +8258,7 @@ function ensurePlay(i){
 }
 function buffer(i){
   const c = ensureLive(i); if (!c) return null;
-  if (!slotAt(bufs, i) || bufs[i]._d !== c.data){ const b = ctx.createBuffer(1, c.data.length, c.sr); b.copyToChannel(c.data, 0); b._d = c.data; bufs[i] = b; }
+  if (!slotAt(bufs, i) || bufs[i]._d !== c.data){ const b = stBuf(ctx, c.data, c.data2, c.sr); b._d = c.data; bufs[i] = b; }
   return bufs[i];
 }
 /* Pads and notes played live (the Synth page, the keys, MIDI, pad taps) meet on one bus before the output: it runs
@@ -8698,6 +8729,16 @@ const wtRows = section('Wavetable', ['wtBend','wtUni','wtSpread','wtSub','wtNois
 const wtSec = secs.lastChild;
 section('Vintage sampler', ['vint', 'vintF'], s => s.append(el('p', 'note', 'Plays the sample as an old sampler would: re-recorded at its rate and bits, pitched by changing its clock (no smoothing, so low notes step and alias), through its output filter.')));
 const vintSec = secs.lastChild;
+// SAMPLE LOOP (5 Nov): its own rows; turning the loop on makes an AHD layer ADSR at full sustain, so it holds while played.
+// Position values show the time in the selected layer's sample.
+function smpPosF(v){ try { const L = Lc(), S = L && L.sample; if (S && S.data && S.sr) return (v * S.data.length / S.sr).toFixed(3) + ' s'; } catch(e){} return Math.round(v * 100) + '%'; }
+const lpSec = (() => { const s = el('div', 'sec'); s.append(el('h3', null, 'Sample loop'));
+  for (const k of ['lpMode', 'lpS', 'lpE', 'lpX']){ const r = makeRow(P[k], k, Lc, {idp:'l', on:() => {
+      const L = Lc(); if (k === 'lpMode' && (L.lpMode | 0) && L.mode !== 'ADSR'){ L.mode = 'ADSR'; L.sus = 1; L.rel = Math.max(L.rel || 0, 60); refreshLayer(); }
+      if (k === 'lpS' && L.lpS > (L.lpE == null ? 1 : L.lpE)) L.lpE = L.lpS; if (k === 'lpE' && L.lpE < (L.lpS || 0)) L.lpS = L.lpE;
+      changed(); } }); s.append(r.r); }
+  s.append(el('p', 'note', 'Loops the sample between Loop start and Loop end for as long as the layer’s envelope lasts. Turning it on sets the layer to ADSR at full sustain, so it holds while a synth slot’s note is held, or for a pad’s Gate. Crossfade blends the loop’s end into the sound just before its start (it needs some sound before the start to blend). Ping-pong plays the loop back and forth.'));
+  secs.append(s); return s; })();
 section('…waves', [], s => {
   const br = el('div', 'selrow'); br.append(el('span', null, 'Output'));
   const bs = document.createElement('select'); bs.id = 'wvBus'; bs.setAttribute('aria-label', '…waves output');
@@ -10871,7 +10912,7 @@ async function presetSmpFill(){
   try { const P = SP(), refs = new Set();
     for (const p of P.voices) for (const l of (p.v && p.v.layers) || []) if (l.sample && l.sample.ref) refs.add(l.sample.ref);
     for (const p of P.layers) if (p.l && p.l.sample && p.l.sample.ref) refs.add(p.l.sample.ref);
-    for (const id of refs) if (!smpById(id)){ const r = await smpGet(id); if (r && r.pcm){ const q = new Int16Array(r.pcm), d = new Float32Array(q.length); for (let k = 0; k < q.length; k++) d[k] = q[k] / 32767; smpHeld.set(id, {sr:r.sr || 48000, name:r.name, id, data:d}); } }
+    for (const id of refs) if (!smpById(id)){ const r = await smpGet(id); if (r && r.pcm){ const f32 = b => { const q = new Int16Array(b), d = new Float32Array(q.length); for (let k = 0; k < q.length; k++) d[k] = q[k] / 32767; return d; }; const h = {sr:r.sr || 48000, name:r.name, id, data:f32(r.pcm)}; if (r.pcm2) h.data2 = f32(r.pcm2); smpHeld.set(id, h); } }
   } catch(e){}
 }
 // Presets that arrive with their audio inside (an import, or a project file from another device): the audio goes to
@@ -12457,7 +12498,7 @@ function refreshLayer(){
   const isEl = L.type === 'elements';
   const isWv = L.type === 'waves';
   plSec.hidden = !isPl; elExSec.hidden = elResSec.hidden = !isEl; srcRows.a.r.hidden = srcRows.b.r.hidden = isPl || isEl || isWv;
-  wtSec.hidden = L.type !== 'wavetable'; vintSec.hidden = L.type !== 'sample';
+  wtSec.hidden = L.type !== 'wavetable'; vintSec.hidden = L.type !== 'sample'; lpSec.hidden = L.type !== 'sample';
   wvSec.hidden = !isWv;
   if (isWv){ $('wvBus').value = String(L.wBus || 1); $('wvStat').textContent = wvStatus(); }
   if (isEl) elModelUpd();
@@ -12571,7 +12612,7 @@ function renderStrip(){
     const l1 = el('div', 'l1'); const b = el('b', null, String(i + 1)); const tg = el('span', 'tog' + (L.on ? ' on' : ''));
     tg.setAttribute('role', 'switch'); tg.setAttribute('aria-checked', L.on); tg.title = L.on ? 'Turn off' : 'Turn on';
     l1.append(b, tg);
-    const tn = el('div', 'tn', L.type === 'pwm' ? 'PWM · ' + (L.sample ? (L.sample.name || 'Sample') : 'Cymbal') : L.type === 'grains' ? 'Grains · ' + (L.sample ? (L.sample.name || 'Sample') : 'load a sample') : L.type === 'sample' && L.sample ? (L.sample.name || 'Sample') : L.type === 'plaits' ? PL_NAMES[L.pEng | 0] : L.type === 'elements' ? ['Elements modal','Elements string','Elements strings'][L.eModel | 0] : T.name);
+    const tn = el('div', 'tn', L.type === 'pwm' ? 'PWM · ' + (L.sample ? (L.sample.name || 'Sample') : 'Cymbal') : L.type === 'grains' ? 'Grains · ' + (L.sample ? (L.sample.name || 'Sample') : 'load a sample') : L.type === 'sample' && L.sample ? (L.sample.name || 'Sample') + (L.sample.data2 ? ' · ST' : '') : L.type === 'plaits' ? PL_NAMES[L.pEng | 0] : L.type === 'elements' ? ['Elements modal','Elements string','Elements strings'][L.eModel | 0] : T.name);
     const lv = el('div', 'lv'); const bar = el('i'); bar.style.width = Math.round(L.level * 100) + '%'; lv.append(bar);
     c.append(l1, tn, lv);
     tg.addEventListener('click', e => { e.stopPropagation(); L.on = !L.on; if (i === v.sel) refreshLayer(); changed(); });
@@ -12935,11 +12976,15 @@ function randVoice(v){
 /* ---------- serialisation ---------- */
 function smpToJSON(S){
   if (!S.data) return {sr:S.sr, name:S.name || 'Sample', ref:S.id};   // still loading from IndexedDB: keep the reference
-  const d = S.data, i16 = new Int16Array(d.length);
+  const o = {sr:S.sr, name:S.name || 'Sample', id:S.id, b64:smpB64(S.data)}; if (S.data2) o.b64r = smpB64(S.data2);   // STEREO SAMPLES: the right channel
+  return o;
+}
+function smpB64(d){
+  const i16 = new Int16Array(d.length);
   for (let i = 0; i < d.length; i++) i16[i] = Math.max(-32768, Math.min(32767, Math.round(d[i] * 32767)));
   const u8 = new Uint8Array(i16.buffer); let s = '';
   for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
-  return {sr:S.sr, name:S.name || 'Sample', id:S.id, b64:btoa(s)};
+  return btoa(s);
 }
 // Samples get an id when they arrive; the kit kept in localStorage refers to them by id, and the sound itself
 // lives in IndexedDB (see "samples in IndexedDB"). A {ref} sample starts with no data and is filled in when it loads.
@@ -12947,9 +12992,13 @@ function smpId(){ return Date.now().toString(36) + Math.random().toString(36).sl
 function smpFromJSON(j){
   if (j && j.ref && !j.b64) return {sr:j.sr || 48000, name:j.name, id:j.ref, data:null};
   if (!j || !j.b64) return null;
-  const s = atob(j.b64), u8 = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
+  const S = {sr:j.sr || 48000, name:j.name, id:j.id || smpId(), data:smpUnB64(j.b64)}; if (j.b64r) S.data2 = smpUnB64(j.b64r);
+  return S;
+}
+function smpUnB64(b){
+  const s = atob(b), u8 = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
   const i16 = new Int16Array(u8.buffer), d = new Float32Array(i16.length); for (let i = 0; i < i16.length; i++) d[i] = i16[i] / 32767;
-  return {sr:j.sr || 48000, name:j.name, id:j.id || smpId(), data:d};
+  return d;
 }
 // Plain functions (not consts), so the saved kit can be read at start-up, before this part of the script has run.
 // noSmp: false = the sound inside (files), true = no samples, 'ref' = samples by id (the copy kept in localStorage).
@@ -13026,8 +13075,9 @@ function smpDb(){ return sdbP || (sdbP = idbOpen(SDB)); }
 function smpPut(S){
   if (!S.id) S.id = smpId();
   if (smpStored.has(S.id) || !S.data) return Promise.resolve();
-  const d = S.data, pcm = new Int16Array(d.length); for (let i = 0; i < d.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, Math.round(d[i] * 32767)));
-  return smpDb().then(db => new Promise((res, rej) => { const tx = db.transaction('smp', 'readwrite'); tx.objectStore('smp').put({sr:S.sr, name:S.name, pcm:pcm.buffer}, S.id);
+  const i16 = d => { const pcm = new Int16Array(d.length); for (let i = 0; i < d.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, Math.round(d[i] * 32767))); return pcm.buffer; };
+  const rec = {sr:S.sr, name:S.name, pcm:i16(S.data)}; if (S.data2) rec.pcm2 = i16(S.data2);   // STEREO SAMPLES: the right channel
+  return smpDb().then(db => new Promise((res, rej) => { const tx = db.transaction('smp', 'readwrite'); tx.objectStore('smp').put(rec, S.id);
     tx.oncomplete = () => { smpStored.add(S.id); res(); }; tx.onerror = tx.onabort = () => rej(tx.error); }));
 }
 function idbGet(name, id){ return idbOpen(name).then(db => new Promise(res => { const q = db.transaction('smp').objectStore('smp').get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); })).catch(() => null); }
@@ -13045,7 +13095,7 @@ async function resolveSamples(){
     for (let i = 0; i < kit.voices.length; i++) for (const L of kit.voices[i].layers){
       const S = L.sample; if (!S || S.data || !S.id) continue;
       const r = await smpGet(S.id);
-      if (r && r.pcm){ const p = new Int16Array(r.pcm), d = new Float32Array(p.length); for (let k = 0; k < p.length; k++) d[k] = p[k] / 32767; S.data = d; S.sr = r.sr || S.sr; if (r.own) smpStored.add(S.id); else borrowed = true; dirty[i] = true; }
+      if (r && r.pcm){ const f32 = b => { const p = new Int16Array(b), d = new Float32Array(p.length); for (let k = 0; k < p.length; k++) d[k] = p[k] / 32767; return d; }; S.data = f32(r.pcm); if (r.pcm2) S.data2 = f32(r.pcm2); S.sr = r.sr || S.sr; if (r.own) smpStored.add(S.id); else borrowed = true; dirty[i] = true; }
       else missing++;
     }
     refreshAll();
@@ -13174,12 +13224,12 @@ function padNote(v){
 }
 const safe = s => (s || 'pad').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').trim().slice(0, 60) || 'pad';
 function padWav(i){
-  const v = kit.voices[i], d = renderVoice(v, ex.sr);
-  let pk = 0; for (let k = 0; k < d.length; k++){ const a = Math.abs(d[k]); if (a > pk) pk = a; }
+  const v = kit.voices[i], d = renderVoice(v, ex.sr), chs = d.r ? [d, d.r] : [d];   // STEREO SAMPLES: a stereo pad exports in stereo
+  let pk = 0; for (const c of chs) for (let k = 0; k < c.length; k++){ const a = Math.abs(c[k]); if (a > pk) pk = a; }
   const g = ex.norm ? (pk > 0 ? 0.966 / pk : 1) : (pk > 1 ? 0.999 / pk : 1);
-  if (g !== 1) for (let k = 0; k < d.length; k++) d[k] *= g;
+  if (g !== 1) for (const c of chs) for (let k = 0; k < c.length; k++) c[k] *= g;
   const nt = ex.noteName ? ' ' + padNote(v) : '';
-  return {name: `${String(i + 1).padStart(2, '0')} ${safe(v.name)}${nt}.wav`, data: wavBytes(d, ex.sr, ex.bits)};
+  return {name: `${String(i + 1).padStart(2, '0')} ${safe(v.name)}${nt}.wav`, data: chs.length > 1 ? wavN(chs, ex.sr, ex.bits) : wavBytes(d, ex.sr, ex.bits)};
 }
 /* RENDER TO (owner, 31 Oct: renders went to the browser's downloads, with no say in where): a render or export asks where
    to save first. Desktop app: the system Save dialog (it remembers the last folder), then the file is written there and a
@@ -13904,15 +13954,28 @@ function clearKit(){ setKit({name:'New kit', slots:kit.slots, held:kit.held, voi
 $('bClearKit').addEventListener('click', () => ask(`Clear all ${nslots()} slots?`, clearKit));
 
 /* ---------- load an audio file as a sample layer ---------- */
-function assignSample(vi, data, sr, name){
+/* SAMPLER (owner, 5 Nov: stereo, longer samples): a sample is {data, data2, sr, name}: data the left channel (or the only
+   one), data2 the right one or absent (mono). Up to SMP_MAX seconds (was 30, mono). A pad holding a stereo sample renders
+   in stereo (renderVoice: a second pass with each sample's right channel), and every player takes both. */
+// An AudioBuffer → {d, d2, n}: its first SMP_MAX seconds, left and right (d2 null for mono, or a "stereo" file whose two
+// channels are the same).
+function smpChannels(b){
+  const n = Math.min(b.length, Math.round(b.sampleRate * SMP_MAX)), d = new Float32Array(n);
+  if (b.numberOfChannels < 2){ d.set(b.getChannelData(0).subarray(0, n)); return {d, d2:null, n}; }
+  const l = b.getChannelData(0), r = b.getChannelData(1), d2 = new Float32Array(n); let diff = 0;
+  for (let i = 0; i < n; i++){ d[i] = l[i]; d2[i] = r[i]; if (!diff && Math.abs(l[i] - r[i]) > 1e-6) diff = 1; }
+  if (b.numberOfChannels > 2) for (let c = 2; c < b.numberOfChannels; c++){ const ch = b.getChannelData(c), k = c & 1 ? d2 : d; for (let i = 0; i < n; i++) k[i] += ch[i] * 0.5; }   // 5.1 and up: folded onto the two
+  return {d, d2:diff || b.numberOfChannels > 2 ? d2 : null, n};
+}
+function assignSample(vi, data, sr, name, data2){
   const v = kit.voices[vi], li = v.sel;
-  const lenMs = data.length / sr * 1000;
+  const lenMs = data.length / sr * 1000, smp = {data, sr, name}; if (data2) smp.data2 = data2;
   // A PWM sampler layer keeps its clock and mode and just takes the new sound.
-  if (v.layers[li] && (v.layers[li].type === 'pwm' || v.layers[li].type === 'grains')){ v.layers[li].sample = {data, sr, name}; v.layers[li].on = true;
-    v.len = Math.max(v.len, Math.min(30, data.length / sr + 0.1)); cur = vi; changed(vi); refreshAll(); return; }
-  v.layers[li] = freshLayer({on:true, type:'sample', level:0.9, mode:'AHD', atk:0.1, hold:Math.min(30000, Math.round(lenMs)), dec:40,
-    sample:{data, sr, name}});
-  v.len = Math.max(v.len, Math.min(30, data.length / sr + 0.1));
+  if (v.layers[li] && (v.layers[li].type === 'pwm' || v.layers[li].type === 'grains')){ v.layers[li].sample = smp; v.layers[li].on = true;
+    v.len = Math.max(v.len, Math.min(SMP_MAX, data.length / sr + 0.1)); cur = vi; changed(vi); refreshAll(); return; }
+  v.layers[li] = freshLayer({on:true, type:'sample', level:0.9, mode:'AHD', atk:0.1, hold:Math.min(SMP_MAX * 1000, Math.round(lenMs)), dec:40,
+    sample:smp});
+  v.len = Math.max(v.len, Math.min(SMP_MAX, data.length / sr + 0.1));
   cur = vi; changed(vi); refreshAll();
 }
 $('bLoad').addEventListener('click', () => $('fileIn').click());
@@ -13925,11 +13988,10 @@ async function loadAudioInto(f, pad){
   try {
     audio();
     const ab = await f.arrayBuffer(), b = await new Promise((res, rej) => { const p = ctx.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
-    const n = Math.min(b.length, Math.round(b.sampleRate * 30)), d = new Float32Array(n);   // up to 30 s (breaks, loops)
-    for (let c = 0; c < b.numberOfChannels; c++){ const ch = b.getChannelData(c); for (let i = 0; i < n; i++) d[i] += ch[i] / b.numberOfChannels; }
+    const {d, d2, n} = smpChannels(b);
     if (pad !== cur) select(pad);
-    assignSample(pad, d, b.sampleRate, f.name.replace(/\.[^.]+$/, '').slice(0, 24));
-    toast(`Loaded ${f.name} into pad ${hx(pad)}, layer ${kit.voices[pad].sel + 1}` + (b.length > n ? ' (first 30 s)' : ''));
+    assignSample(pad, d, b.sampleRate, f.name.replace(/\.[^.]+$/, '').slice(0, 24), d2);
+    toast(`Loaded ${f.name} into pad ${hx(pad)}, layer ${kit.voices[pad].sel + 1}` + (d2 ? ', stereo' : '') + (b.length > n ? ` (first ${SMP_MAX} s)` : ''));
     playFresh(pad);
   } catch(err){ toast('Couldn’t read that audio file.'); }
 }
@@ -17163,10 +17225,9 @@ function resampleApply(v){
     if (m){ m.params = Object.assign({}, m.params, {rec:0}); saveS();
       if (rt) rt.pl.buses.forEach(b => { if (b && b.chn && b.chn._send){ b.chn._send({target:'chains-host', op:'param', id:v.id, name:'rec', value:0}); if (b.chn._sent) b.chn._sent = chnClone(S.chainPatch); } }); } } catch(e){}
   if (v.peak < 0.0005){ toast('Resample recorded silence. Is the track playing into it?', 5000); return; }
-  const pad = Math.min(v.pad | 0, kit.voices.length - 1), n = v.L.length, d = new Float32Array(n);
-  for (let i = 0; i < n; i++) d[i] = (v.L[i] + v.R[i]) * 0.5;
+  const pad = Math.min(v.pad | 0, kit.voices.length - 1), d = Float32Array.from(v.L), d2 = Float32Array.from(v.R);   // STEREO SAMPLES: kept in stereo (was summed to mono)
   const vo = kit.voices[pad]; vo.layers.forEach(L => { L.on = false; }); vo.sel = 0; vo.name = 'Resample ' + v.bars + (v.bars === 1 ? ' bar' : ' bars');
-  assignSample(pad, d, v.sr, 'Resample');
+  assignSample(pad, d, v.sr, 'Resample', d2);
   const ins = []; S.insts.forEach((I, i) => { if (I.pad === pad){ I.slc = v.slices || 0; I.smode = 0; I.beats = v.bars * 4; ins.push(i); } });
   saveS(); draw();
   toast(`Resampled ${v.bars} bar${v.bars === 1 ? '' : 's'} into pad ${hx(pad)}` + (v.slices ? `, ${v.slices} slices` : '') +
@@ -19150,12 +19211,14 @@ function applyChop(ev, I, pad, n, semis, bpm, data, sr){
   const end = ev.t + ev.durSec / ev.rate; ev.cut = ev.cut == null ? end : Math.min(ev.cut, end);
   return ev;
 }
+// An AudioBuffer from one channel (mono) or two (STEREO SAMPLES: d2 the right one). (Not mkBuf: that name is taken further down.)
+function stBuf(ac, d, d2, sr){ const b = ac.createBuffer(d2 ? 2 : 1, d.length, sr); b.copyToChannel(d, 0); if (d2) b.copyToChannel(d2.length === d.length ? d2 : (() => { const x = new Float32Array(d.length); x.set(d2.subarray(0, d.length)); return x; })(), 1); return b; }
 function rtBuf(pad, rev, st){
   if (st){
     const c = ensurePlay(pad); if (!c) return null;
     const k = pad + (rev ? 'r' : 'f') + stKey(st); let e = rtB.get(k);
-    if (!e || e.d !== c.data){ let d = stretchData(c.data, c.sr, loopSecs(pad, c.data, c.sr), st); if (rev) d = d.reverse();
-      const b = ctx.createBuffer(1, d.length, c.sr); b.copyToChannel(d, 0); e = {d:c.data, b}; rtB.set(k, e);
+    if (!e || e.d !== c.data){ const ls = loopSecs(pad, c.data, c.sr); let d = stretchData(c.data, c.sr, ls, st), d2 = c.data2 ? stretchData(c.data2, c.sr, ls, st) : null; if (rev){ d = d.reverse(); if (d2) d2 = d2.reverse(); }
+      const b = stBuf(ctx, d, d2, c.sr); e = {d:c.data, b}; rtB.set(k, e);
       if (rtB.size > 96) rtB.delete(rtB.keys().next().value); }
     return e.b;
   }
@@ -19166,7 +19229,7 @@ function rtBufPlain(pad, rev){
   const k = pad + (rev ? 'r' : 'f');
   let e = rtB.get(k);
   if (!e || e.d !== c.data){
-    const d = rev ? c.data.slice().reverse() : c.data, b = ctx.createBuffer(1, d.length, c.sr); b.copyToChannel(d, 0);
+    const d = rev ? c.data.slice().reverse() : c.data, d2 = c.data2 ? (rev ? c.data2.slice().reverse() : c.data2) : null, b = stBuf(ctx, d, d2, c.sr);
     e = {d:c.data, b}; rtB.set(k, e);
   }
   return e.b;
@@ -19782,7 +19845,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'sng6wv';
+const CORE_REV = '1p9fr3l';
 const CORE_WANT = 6;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -19857,7 +19920,7 @@ function coreVar(ev, rec){ if (!core.ready || !rec || !rec.data || ev.ii == null
   const d = rec.data.slice(); corePost({op:'vbuf', k, pad:ev.pad, data:d, sr:rec.sr}, [d.buffer]); }
 // A pad's render, when the core doesn't have this one yet (a copy: the page keeps playing it too)
 function coreBuf(i){ if (!core.ready) return; const c = slotAt(cache, i); if (!c || !c.data){ if (core.sent.has(i)){ core.sent.delete(i); coreVarGone(i); corePost({op:'buf', pad:i, data:null}); } return; }
-  if (core.sent.get(i) === c.data) return; core.sent.set(i, c.data); coreVarGone(i); const d = c.data.slice(); corePost({op:'buf', pad:i, data:d, sr:c.sr}, [d.buffer]); }
+  if (core.sent.get(i) === c.data) return; core.sent.set(i, c.data); coreVarGone(i); const d = c.data.slice(), d2 = c.data2 ? c.data2.slice() : null; corePost({op:'buf', pad:i, data:d, data2:d2, sr:c.sr}, d2 ? [d.buffer, d2.buffer] : [d.buffer]); }
 /* SONG SYNC (owner, Fold, 2 Nov: stutters on STOP, on Shift-navigating, on the screen going off and on, and a late note
    preview). Posting the whole song after every save made the audio thread unpack hundreds of KB in its own time: a glitch
    each time. Now only what changed goes: top-level fields whole, and the big lists (phrases, chains, song rows,
@@ -20436,9 +20499,9 @@ async function renderPart(dest){
       lastR = [{name:fname, data}];
       await deliver(fname, new Blob([data], {type:'audio/wav'})); return toast(`Rendered ${part.label} (${secs} s) as ${fname}`);
     }
-    const d = new Float32Array(chs[0].length); for (let i = 0; i < d.length; i++) d[i] = (chs[0][i] + (chs[1] ? chs[1][i] : chs[0][i])) * 0.5;
+    const d = chs[0], d2 = chs[1] || null;   // STEREO SAMPLES: the render goes in as it is (was summed to mono)
     const vo = kit.voices[pad]; vo.layers.forEach(L => { L.on = false; }); vo.sel = 0; vo.name = part.name.slice(0, 24);
-    assignSample(pad, d, sr, part.name);
+    assignSample(pad, d, sr, part.name, d2);
     // An instrument to play it: one that already plays the slot, else the first one no phrase uses (that slot's own number first).
     let ins = S.insts.findIndex(I => I.pad === pad);
     if (ins < 0){ const usedI = new Set(); for (const p of S.phrases) if (p) for (const r of p) if (r && r[IC] >= 0) usedI.add(r[IC]);
@@ -21018,7 +21081,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 439;
+const BUILD = 440;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29562,6 +29625,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [440, '5 Nov', ['Samples keep their stereo: a stereo file plays in stereo (the layer shows · ST), from the pads, both sequencers, renders and pad exports. Render to a slot and …chains Resample keep stereo too.', 'Samples can be up to 2 minutes (was 30 s), and pad effects no longer cut a pad at 12 s.', 'Sample loop: Loop (Forward or Ping-pong), Loop start, Loop end and Crossfade on a sample layer. A looped layer holds while the note is held (or for the pad’s Gate).']],
   [439, '5 Nov', ['New command FLY: 255 more Flex patterns for IDM, played by the same Flex as FLX. FLY 01–0F are one of each family to try first; then by the first digit: 1 pitch rolls, 2 euclidean gates, 3 probability, 4 slice pitch, 5 freeze and smear, 6 CD skips, 7 bounces, 8 mutating shuffles, 9 stutter edits, A polymeter, B warp, C reverse rolls and rewinds, D grains, E texture, F chaos 2. Most change every bar over four bars; FIXED ones repeat. The FX bar draws whichever is playing.']],
   [438, '5 Nov', ['FLX on the Audio thread sequencer: the beat clock every tempo-locked effect follows (Flex, Step gate, Retrigger, synced delays) restarted at each row inside every audio block, so FLX patterns stuttered and lagged; it now runs smoothly, and ramps on live engines (fades, glides) move as written.', 'FLX 76–7A (TAPE START) spin up and land back on the beat instead of leaving the rest of the bar an 1/8 or a 1/4 late; FLX 0A SCRATCH and E8 5-TUPLET FEEL no longer skip.', 'Pattern view: a poly track keeps one width (the most note columns it uses in the song), so stepping song rows no longer slides the tracks sideways.']],
   [437, '5 Nov', ['The BPM / LPB box and the strip around LEFT are the page colour like the rest of the bar (the grey tab strip still showed there), and a line divides ROWS + from LEFT.']],
