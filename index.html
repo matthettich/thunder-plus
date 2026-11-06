@@ -752,7 +752,6 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .acidask .acidf .seg button{padding:3px 8px}
 .acidask .btnrow{margin-top:12px}
 /* RECORD INTO A PAD (5 Nov): the level meter (two bars, peak hold, CLIP), the take's waveform and its edit buttons */
-.recask .askbox{max-width:min(640px, calc(100vw - 32px))}
 .recask .acidr b{width:auto; min-width:3.2em; white-space:nowrap}
 .recmeter{display:grid; gap:3px; position:relative}
 .recm{position:relative; height:7px; background:color-mix(in srgb, var(--ink) 12%, transparent); border-radius:2px; overflow:hidden}
@@ -760,9 +759,17 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .recm b{position:absolute; top:0; bottom:0; width:2px; left:0; background:var(--ink)}
 .recclip{position:absolute; right:0; top:-15px; font-size:10px; font-weight:700; color:#fff; background:var(--meter-hot, #e5484d); padding:0 4px; border-radius:2px}
 .recstate{margin-top:6px; min-height:1.3em}
-.recwave{display:block; width:100%; height:110px; margin:8px 0 6px; border:1px solid color-mix(in srgb, var(--ink) 25%, transparent); border-radius:3px; cursor:crosshair; touch-action:none}
-.recops{flex-wrap:wrap; gap:6px; margin-top:4px}
-.recops button{padding:4px 8px}
+.recask .askbox{width:min(980px, calc(100vw - 24px)); max-width:none}
+.recov{display:block; width:100%; height:34px; margin:10px 0 4px; border:1px solid color-mix(in srgb, var(--ink) 25%, transparent); border-radius:3px; cursor:pointer; touch-action:none}
+.recwave{display:block; width:100%; height:clamp(180px, 34vh, 300px); margin:0; border:1px solid color-mix(in srgb, var(--ink) 25%, transparent); border-radius:3px; cursor:crosshair; touch-action:none}
+.recbar{display:flex; align-items:center; gap:10px; margin:6px 0 10px}
+.recrd{flex:1; min-width:0; font-variant-numeric:tabular-nums; opacity:.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.recz{display:flex; gap:4px} .recz button{min-width:2.4em; padding:3px 8px}
+.recops{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px 14px}
+.recg{display:flex; flex-wrap:wrap; gap:5px; align-items:center; align-content:flex-start}
+.recgl{flex:0 0 100%; font-size:10px; letter-spacing:.08em; text-transform:uppercase; opacity:.6}
+.recops button{padding:4px 9px}
+.reckeep{margin-top:14px; padding-top:10px; border-top:1px solid color-mix(in srgb, var(--ink) 18%, transparent); align-items:center; flex-wrap:wrap; gap:6px}
 .recedit .btnrow select{min-height:30px; max-width:14em}
 /* SAMPLE BROWSER (5 Nov): tabs + search, the folder / file buttons, a scrolling list, the pad and Load */
 .smbask .askbox{width:min(560px, calc(100vw - 32px)); max-width:none}
@@ -3242,7 +3249,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p><b>…chains modules:</b> every effect module in a …chains patch has a <b>BYP</b> button on its title bar with a number: it bypasses the module (its dry sound passes). From a phrase, <code>BYP 31</code> bypasses module 3 on that track's chain, <code>BYP 30</code> puts it back, and <code>BYP 34</code> switches it the other way from the patch for four rows, so a trance gate left bypassed plays for four rows. <code>BYP 0Y</code> does every numbered module. Stopping the song puts them back as the patch has them.</p>
 <p><b>Presets and sidechains in …chains:</b> effects and sound sources have a <b>Preset</b> row: factory presets, Default, and your own (Save as a preset keeps them on this device, for every patch). Every sidechain user has a <b>Source</b>: <b>Self</b>, <b>Send 1–8</b> (what a <b>Sidechain Out</b> in any chain sends) or one <b>track</b>'s own sound, before its effects and fader, so a muted ghost kick still drives it. That goes for <b>Sidechain In</b> (its meter shows what it hears before you patch it), Sidechain Comp, the compressors, the noise gate and the envelope filter, in …chains and as track or master effects. The Mixer's <b>SC</b> row lights when a track is a source for something. The light beside a module's <b>SC</b> input flashes with the sidechain it hears.</p>
 <h3>Flex, Step gate and Retrigger</h3>
-<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (256 patterns; <code>FLX</code> picks one from a row: 01–10 the originals, then families by the first hex digit, after the OP-Z and Pocket Operator punch-ins: 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops and wow, 8 scratches, 9 gates and pumps, A filter sweeps, B bit crush, C fading repeats, D juggles, E swing and feel, F chaos). <b>Load sample</b> opens the sample browser (or File › Samples…): FOLDER is your sample folder with its subfolders, set once and remembered (where the browser asks again after a restart, press Reconnect); RECENT is every sample you've loaded or recorded, from anywhere; ＋ Files… adds files from anywhere (one file loads straight into the pad). Type to search, ▲▼ to walk the list (AUDITION plays each), Enter or a double-click loads into the pad picked at the bottom. Phones get RECENT and ＋ Files…. <b>Record a sample…</b> (Synth page beside Load sample, or File): an input, STEREO / MONO / LEFT / RIGHT, monitoring (headphones) and a level meter; FREE records until Stop; PATTERN records whole patterns in time with the song, as Renoise's pattern sync: playing, it starts at the next pattern and Stop ends it at the end of one (or after the LENGTH set); stopped, it starts the song from the cursor's pattern. EXTRA LATENCY moves the take if it lands early or late. The take can then be edited (drag across it to select) and kept in a pad; FIT TO TEMPO sets the pad's instruments to SYNC with the take's beats. <code>FLY</code> is Flex's second bank, 255 more for IDM, in the spirit of Aphex Twin and Autechre: <code>FLY 01</code>–<code>0F</code> are one of each family to try first, then by the first digit 1 pitch rolls (drill'n'bass: every repeat a step higher or lower), 2 euclidean gates (REPEAT holds the last hit instead of a gap), 3 probability (slices muted, repeated or ratcheted by chance), 4 slice pitch (slices jump to octaves, fifths or anywhere), 5 freeze, buzz and smear, 6 CD skips and dropouts, 7 bouncing, speeding and slowing rolls, 8 mutating shuffles (a little different each bar), 9 stutter edits, A polymeter (a loop of 3/16, 5/16… against the bar), B warp (every slice bends in pitch), C reverse rolls and rewinds, D grains, E texture (crush, filters and chops on random slices), F chaos 2. Most change every bar over a four-bar cycle; FIXED ones repeat the same every bar. FLX and FLY drive the same Flex, so the last one written plays. <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT 01</code>–<code>0F</code> pick a pattern, <code>GAT 10</code> the CUSTOM steps, and <code>GAT 00</code> stops it (the gate opens until the next GAT). <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot. Pattern names give note values: <i>ROLL 1/16</i> rolls sixteenth notes, <i>STUTTER 1/32 EVERY 1/4</i> repeats a 32nd at the start of every quarter. <b>STARTS</b> on a Flex or Step gate: <b>ON FLX</b> / <b>ON GAT</b> (new slots) keeps it off (Step gate: open) until a command turns it on in the song, or <code>FXO</code> switches its slot on (then it plays its own PATTERN); it stays on until <code>FLX 00</code> (or FXO off), and waits again after STOP. Starting mid-song, the last command before that row is played at the start. <b>AT PLAY</b> (slots from songs made before 3 Nov) plays its PATTERN from PLAY, as before. Retrigger's MODE: RTG ONLY works the same way. In the FX bar, each of these slots draws the pattern it plays now with a playhead: Flex as a time map (where in the bar it plays from: repeats are saw teeth, reverses fall, half speed is a shallower line), its level along the bottom and its filter or crush; Step gate its steps; Retrigger its repeats.</p>
+<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (256 patterns; <code>FLX</code> picks one from a row: 01–10 the originals, then families by the first hex digit, after the OP-Z and Pocket Operator punch-ins: 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops and wow, 8 scratches, 9 gates and pumps, A filter sweeps, B bit crush, C fading repeats, D juggles, E swing and feel, F chaos). <b>Load sample</b> opens the sample browser (or File › Samples…): FOLDER is your sample folder with its subfolders, set once and remembered (where the browser asks again after a restart, press Reconnect); RECENT is every sample you've loaded or recorded, from anywhere; ＋ Files… adds files from anywhere (one file loads straight into the pad). Type to search, ▲▼ to walk the list (AUDITION plays each), Enter or a double-click loads into the pad picked at the bottom. Phones get RECENT and ＋ Files…. <b>Record a sample…</b> (Synth page beside Load sample, or File): an input, STEREO / MONO / LEFT / RIGHT, monitoring (headphones) and a level meter; FREE records until Stop; PATTERN records whole patterns in time with the song, as Renoise's pattern sync: playing, it starts at the next pattern and Stop ends it at the end of one (or after the LENGTH set); stopped, it starts the song from the cursor's pattern. EXTRA LATENCY moves the take if it lands early or late. The take can then be edited and kept in a pad; <b>Edit sample…</b> on a sample layer opens the same editor on a loaded sample (APPLY writes it back, and Start and the loop points move with the audio). In the editor: drag to select, click to place the cursor (Shift-click stretches the selection); the wheel or a pinch zooms at the pointer, − / + zoom at the cursor, FIT shows all, SEL the selection; Shift+wheel or a sideways swipe scrolls, and the overview above moves the view. Tools: crop, cut, silence, snap to zero crossings, auto-trim, normalise, ±3 dB, fades, reverse, invert, remove DC, to mono / stereo, append a file, undo; FIT TO TEMPO sets the pad's instruments to SYNC with the take's beats. <code>FLY</code> is Flex's second bank, 255 more for IDM, in the spirit of Aphex Twin and Autechre: <code>FLY 01</code>–<code>0F</code> are one of each family to try first, then by the first digit 1 pitch rolls (drill'n'bass: every repeat a step higher or lower), 2 euclidean gates (REPEAT holds the last hit instead of a gap), 3 probability (slices muted, repeated or ratcheted by chance), 4 slice pitch (slices jump to octaves, fifths or anywhere), 5 freeze, buzz and smear, 6 CD skips and dropouts, 7 bouncing, speeding and slowing rolls, 8 mutating shuffles (a little different each bar), 9 stutter edits, A polymeter (a loop of 3/16, 5/16… against the bar), B warp (every slice bends in pitch), C reverse rolls and rewinds, D grains, E texture (crush, filters and chops on random slices), F chaos 2. Most change every bar over a four-bar cycle; FIXED ones repeat the same every bar. FLX and FLY drive the same Flex, so the last one written plays. <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT 01</code>–<code>0F</code> pick a pattern, <code>GAT 10</code> the CUSTOM steps, and <code>GAT 00</code> stops it (the gate opens until the next GAT). <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot. Pattern names give note values: <i>ROLL 1/16</i> rolls sixteenth notes, <i>STUTTER 1/32 EVERY 1/4</i> repeats a 32nd at the start of every quarter. <b>STARTS</b> on a Flex or Step gate: <b>ON FLX</b> / <b>ON GAT</b> (new slots) keeps it off (Step gate: open) until a command turns it on in the song, or <code>FXO</code> switches its slot on (then it plays its own PATTERN); it stays on until <code>FLX 00</code> (or FXO off), and waits again after STOP. Starting mid-song, the last command before that row is played at the start. <b>AT PLAY</b> (slots from songs made before 3 Nov) plays its PATTERN from PLAY, as before. Retrigger's MODE: RTG ONLY works the same way. In the FX bar, each of these slots draws the pattern it plays now with a playhead: Flex as a time map (where in the bar it plays from: repeats are saw teeth, reverses fall, half speed is a shallower line), its level along the bottom and its filter or crush; Step gate its steps; Retrigger its repeats.</p>
 <h3>Track effects</h3>
 <p>Each track and the master have 8 effect slots (FX screen, or the Mixer’s FX row): 73 effects on a track and 82 on a bus or the master (with the nine …pump ones; …pump EQ goes on any track), in groups: dynamics and EQ (compressors, Bus and Glue Comp, limiter, noise gate, transient shaper, multiband, air), filters (filter, ladder, low and high cut, auto-wah, vowel, envelope filter), drive and lo-fi (saturation, drive, overdrive, tube, tape, wavefolder, bitcrush, lo-fi, degrade, vintage sampler (an SP-1200, SP-12, MPC60, SP-202 at each of its grades, or Emulator II: their rate and bit depth, converters, filters and noise), vinyl, dub tape, cab), modulation (chorus, ensemble, dimension, flanger, phaser, tremolo, auto-pan, rotary, ring mod, cross-mod, frequency shifter), delays (simple, tape, BBD, pitch, granular, reverse echo), reverbs (room, plate, spring, space, Galactic, pitch reverb, convolution), pitch and voice (pitch shifter, harmonizer, pitch correct), resonators (resonator, comb, Rings), spectral and granular (Clouds, Beads, spectral, extreme stretch), rhythmic (Flex, Step gate, Retrigger, trance gate, pump, Beat grains, Beat scramble, Glitch sequencer) and utility (stereo width, utility). The pad's Add effect menu has 65 of them. On the Mixer’s FX row, OPTION (Ctrl/⌘ in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter. For drums and IDM: <b>Beat grains</b> (a rhythmic grain cloud in time with the song, after Output Portal: rate, density, size, position, spray, pitch and random pitch, reverse, shape, stereo, freeze), <b>Beat scramble</b> (re-orders the last bar's slices, some reversed; keep the beats, new every bar or looped) and <b>Glitch sequencer</b> (each step may stutter, reverse, jump an octave, tape-stop, crush or drop out). Under a slot's controls, <b>› PRESET</b> lists INIT, factory presets (over 230 across the effects) and the song's own, and <b>› SAVE AS PRESET…</b> keeps the slot's settings for that effect. <b>› EQ WINDOW</b> (at the bottom of the FX screen, on any track) opens the track's …pump EQ in its own window, adding one to a free slot if needed; …pump EQ works on every track, the other …pump effects on buses and the master.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
@@ -8761,7 +8768,9 @@ const vintSec = secs.lastChild;
 // SAMPLE LOOP (5 Nov): its own rows; turning the loop on makes an AHD layer ADSR at full sustain, so it holds while played.
 // Position values show the time in the selected layer's sample.
 function smpPosF(v){ try { const L = Lc(), S = L && L.sample; if (S && S.data && S.sr) return (v * S.data.length / S.sr).toFixed(3) + ' s'; } catch(e){} return Math.round(v * 100) + '%'; }
-const lpSec = (() => { const s = el('div', 'sec'); s.append(el('h3', null, 'Sample loop'));
+const lpSec = (() => { const s = el('div', 'sec'); s.append(el('h3', null, 'Sample'));
+  { const b = el('button', 'sm', 'Edit sample…'); b.type = 'button'; b.title = 'Crop, cut, fade, normalise, reverse… this layer’s sample';
+    b.addEventListener('click', () => rcdPanel(cur, {edit:{pad:cur, li:V().sel}})); s.append(b); }   // EDIT SAMPLE (5 Nov)
   for (const k of ['lpMode', 'lpS', 'lpE', 'lpX']){ const r = makeRow(P[k], k, Lc, {idp:'l', on:() => {
       const L = Lc(); if (k === 'lpMode' && (L.lpMode | 0) && L.mode !== 'ADSR'){ L.mode = 'ADSR'; L.sus = 1; L.rel = Math.max(L.rel || 0, 60); refreshLayer(); }
       if (k === 'lpS' && L.lpS > (L.lpE == null ? 1 : L.lpE)) L.lpE = L.lpS; if (k === 'lpE' && L.lpE < (L.lpS || 0)) L.lpS = L.lpE;
@@ -14504,10 +14513,15 @@ function rcdAbort(){ RCD.sync = null; RCD.onDone = null; if (RCD.on && RCD.node)
 function rcdTake(t, how, beats, pats){
   if (!t){ toast('Nothing was recorded.'); rcdUi(); return; }
   if (sePeak({data:t.data, data2:t.data2, sr:ctx.sampleRate}).peak < 1e-4) toast('The take is silent: is the right input picked, and is it turned up?', 5000);
-  RCD.take = {data:t.data, data2:t.data2, sr:ctx.sampleRate, how, beats, pats}; RCD.undo = []; RCD.sel = null; rcdUi();
+  RCD.take = {data:t.data, data2:t.data2, sr:ctx.sampleRate, how, beats, pats}; RCD.undo = []; RCD.sel = null; RCD.view = null; RCD.cursor = null; rcdUi();
 }
 // TAKE EDITS (the SMP EDIT functions): on the selection, or the whole take
-function rcdEdit(f){ const T = RCD.take; if (!T) return; RCD.undo.push(T); if (RCD.undo.length > 8) RCD.undo.shift(); RCD.take = Object.assign(f(T), {how:T.how, beats:T.beats, pats:T.pats}); rcdUi(); }   // undo: eight steps (takes can be 2 minutes of stereo)
+// map: where a frame of the take before the edit is after it (crop, cut, reverse, trim move the layer's markers with the audio)
+function rcdEdit(f, map){ const T = RCD.take; if (!T) return; RCD.undo.push(T); if (RCD.undo.length > 8) RCD.undo.shift();   // undo: eight steps (takes can be minutes of stereo)
+  const N = f(T), n = N.data.length;
+  RCD.take = Object.assign(N, {how:T.how, beats:T.beats, pats:T.pats, name:T.name, lp:T.lp, mk:T.mk ? T.mk.map(x => Math.max(0, Math.min(n, Math.round(map ? map(x) : x)))) : null}); rcdUi(); }
+// SNAP: the selection's edges to the nearest zero crossings
+function rcdSnapSel(){ const T = RCD.take, s = RCD.sel; if (!T || !s) return; const a = seZeroCross(T, s[0], 0), b = seZeroCross(T, s[1], 0); RCD.sel = b - a > 8 ? [a, b] : s; rcdUi(); }
 const rcdRange = () => { const T = RCD.take, s = RCD.sel; return s && s[1] - s[0] > 8 ? [s[0], s[1]] : [0, T.data.length]; };
 function rcdKeep(pad){
   const T = RCD.take; if (!T) return;
@@ -14524,9 +14538,22 @@ function rcdKeep(pad){
   toast(`Kept the take in pad ${hx(pad)}, layer ${kit.voices[pad].sel + 1} (${(T.data.length / T.sr).toFixed(2)} s${T.data2 ? ', stereo' : ''})` + (fit ? `, fitted to ${Math.round(T.beats)} beats` : '') + (eng ? '; the pad is on the Layers engine now' : ''), 5000);
   playFresh(pad);
 }
+function rcdApply(E){
+  const T = RCD.take, v = kit.voices[E.pad], L = v && v.layers[E.li]; if (!T || !L) return;
+  const n = T.data.length; if (n < 32) return toast('The sample is too short to use.');
+  const old = L.sample, oldMs = old && old.data ? old.data.length / old.sr * 1000 : 0;
+  const S2 = {data:T.data, sr:T.sr, name:T.name || (old && old.name) || 'Sample', id:smpId()}; if (T.data2) S2.data2 = T.data2;
+  L.sample = S2;
+  if (T.mk){ L.a = T.mk[0] / n; L.lpS = T.mk[1] / n; L.lpE = T.mk[2] / n; }
+  if (L.mode !== 'ADSR' && Math.abs((L.hold || 0) - oldMs) < 2) L.hold = Math.min(SMP_MAX * 1000, Math.round(n / T.sr * 1000));   // a Hold that was the sample's length follows it
+  v.len = Math.max(v.len, Math.min(SMP_MAX, n / T.sr + 0.1));
+  smbAdd(S2); if (E.pad !== cur) select(E.pad); changed(E.pad); refreshAll();
+  toast(`Applied to pad ${hx(E.pad)}, layer ${E.li + 1} (${(n / T.sr).toFixed(2)} s). Ctrl/⌘+Z on the Synth page takes it back.`, 4500);
+  playFresh(E.pad);
+}
 let rcdPrev = null;
 function rcdPlay(){ if (rcdPrev){ try { rcdPrev.stop(); } catch(e){} rcdPrev = null; rcdUi(); return; }
-  const T = RCD.take; if (!T) return; const [a, b] = rcdRange(); audio();
+  const T = RCD.take; if (!T) return; const [a, b] = RCD.sel ? rcdRange() : [Math.min(RCD.cursor || 0, T.data.length - 1), T.data.length]; audio();
   const src = ctx.createBufferSource(); src.buffer = stBuf(ctx, T.data.subarray(a, b), T.data2 ? T.data2.subarray(a, b) : null, T.sr); src.connect(master); src.start();
   src.onended = () => { if (rcdPrev === src){ rcdPrev = null; rcdUi(); } }; rcdPrev = src; rcdPrev.t0 = ctx.currentTime; rcdPrev.a = a; rcdPrev.b = b; rcdUi(); rcdAnim(); }
 function rcdAnim(){ if (!rcdPrev || !RCD.ui) return; rcdDrawWave(); requestAnimationFrame(rcdAnim); }
@@ -14537,17 +14564,55 @@ function rcdMeter(){
   U.clip.hidden = !(performance.now() - RCD.clip < 1500);
   if (RCD.on && !RCD.sync){ const n = RCD.chunks.reduce((a, c) => a + c.ch[0].length, 0); U.state.textContent = `● Recording · ${(n / ctx.sampleRate).toFixed(1)} s`; }
 }
+// THE EDITOR'S VIEW: [a, b) frames of the take in view (RCD.view null = all of it), at least 32 frames wide
+function rcdClampView(a, b){ const n = RCD.take ? RCD.take.data.length : 0; let w = Math.max(32, Math.min(n, b - a)); a = Math.max(0, Math.min(n - w, a)); return n && w < n ? [a, a + w] : null; }
+const rcdView = () => { const n = RCD.take ? RCD.take.data.length : 0, v = RCD.view; return v && v[1] <= n ? v : [0, n]; };
+// Zoom by f (< 1 in) keeping frame `at` where it is on screen
+function rcdZoom(f, at){ const [va, vb] = rcdView(), span = vb - va; if (at == null) at = (va + vb) / 2; const s2 = span * f, r = (at - va) / (span || 1); RCD.view = rcdClampView(at - r * s2, at - r * s2 + s2); rcdUi(); }
+// Where − and + zoom: the cursor, else the selection's middle, else the middle of the view
+const rcdAnchor = () => { if (RCD.sel) return (RCD.sel[0] + RCD.sel[1]) / 2; if (RCD.cursor != null) return RCD.cursor; const [a, b] = rcdView(); return (a + b) / 2; };
+// Min / max per 256 frames, made once per take (zoomed out, a pixel reads these instead of thousands of frames)
+function rcdPeaks(d){ if (d._pk) return d._pk; const B = 256, m = Math.ceil(d.length / B), lo = new Float32Array(m), hi = new Float32Array(m);
+  for (let k = 0; k < m; k++){ let a = 0, b = 0; const e = Math.min(d.length, (k + 1) * B); for (let i = k * B; i < e; i++){ const y = d[i]; if (y < a) a = y; if (y > b) b = y; } lo[k] = a; hi[k] = b; }
+  return (d._pk = {B, lo, hi}); }
+function rcdFit(cv){ const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return null;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); return {g, W, H}; }
+// One channel's wave over frames [a, b) into the box x 0–W, y top–top + h
+function rcdWave(g, d, a, b, W, top, h){
+  const fpp = (b - a) / W, mid = top + h / 2, k = h / 2 * 0.94;
+  if (fpp <= 1.5){ g.beginPath(); for (let i = Math.floor(a); i <= Math.min(d.length - 1, Math.ceil(b)); i++){ const x = (i - a) / fpp, y = mid - d[i] * k; i === Math.floor(a) ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke();
+    if (fpp < 0.25) for (let i = Math.ceil(a); i < Math.min(d.length, b); i++) g.fillRect((i - a) / fpp - 1.5, mid - d[i] * k - 1.5, 3, 3); return; }   // close in: the samples themselves
+  const P = fpp >= 256 ? rcdPeaks(d) : null;
+  for (let x = 0; x < W; x++){ const s0 = Math.floor(a + x * fpp), s1 = Math.min(d.length, Math.floor(a + (x + 1) * fpp) + 1); let lo = 0, hi = 0;
+    if (P){ for (let q = Math.floor(s0 / P.B), qe = Math.min(P.lo.length, Math.ceil(s1 / P.B)); q < qe; q++){ if (P.lo[q] < lo) lo = P.lo[q]; if (P.hi[q] > hi) hi = P.hi[q]; } }
+    else for (let i = s0; i < s1; i++){ const y = d[i]; if (y < lo) lo = y; if (y > hi) hi = y; }
+    g.fillRect(x, mid - hi * k, 1, Math.max(1, (hi - lo) * k)); } }
 function rcdDrawWave(){
-  const U = RCD.ui, T = RCD.take; if (!U || !T) return; const cv = U.wave, dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
-  if (!W || !H) return; if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
-  const g = cv.getContext('2d'), cs2 = getComputedStyle(document.documentElement), ink = cs2.getPropertyValue('--ink').trim() || '#222', mut = cs2.getPropertyValue('--muted').trim() || '#888';
-  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-  const n = T.data.length, chs = T.data2 ? [T.data, T.data2] : [T.data], h = H / chs.length;
-  if (RCD.sel){ g.fillStyle = mut; g.globalAlpha = 0.25; g.fillRect(RCD.sel[0] / n * W, 0, (RCD.sel[1] - RCD.sel[0]) / n * W, H); g.globalAlpha = 1; }
-  g.fillStyle = ink; chs.forEach((d, c) => { const mid = h * c + h / 2, k = n / W;
-    for (let x = 0; x < W; x++){ let lo = 0, hi = 0; const a = Math.floor(x * k), b = Math.min(n, Math.floor((x + 1) * k) + 1); for (let i = a; i < b; i += Math.max(1, (b - a) >> 6)){ const y = d[i]; if (y < lo) lo = y; if (y > hi) hi = y; }
-      g.fillRect(x, mid - hi * h / 2, 1, Math.max(1, (hi - lo) * h / 2)); } });
-  if (rcdPrev){ const x = (rcdPrev.a + (ctx.currentTime - rcdPrev.t0) * T.sr) / n * W; if (x <= W){ g.fillStyle = mut; g.fillRect(x, 0, 2, H); } }
+  const U = RCD.ui, T = RCD.take; if (!U || !T) return;
+  const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue('--ink').trim() || '#222', mut = css.getPropertyValue('--muted').trim() || '#888', font = css.getPropertyValue('--mono').trim() || 'monospace';
+  const n = T.data.length, chs = T.data2 ? [T.data, T.data2] : [T.data], [va, vb] = rcdView();
+  // the waveform: ruler, channels, selection, markers, cursor, playhead
+  const M = rcdFit(U.wave); if (M){ const {g, W, H} = M, RH = 18, ch = (H - RH) / chs.length, X = f => (f - va) / (vb - va) * W;
+    g.fillStyle = mut; g.globalAlpha = 0.1; g.fillRect(0, 0, W, RH); g.globalAlpha = 1;
+    const secs = (vb - va) / T.sr, steps = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60], st = steps.find(s => secs / s <= W / 90) || 60;
+    g.font = '10px ' + font; g.textBaseline = 'middle';
+    for (let t = Math.ceil(va / T.sr / st) * st; t * T.sr < vb; t += st){ const x = X(t * T.sr); g.fillRect(x, RH - 5, 1, 5); g.fillText(st < 0.01 ? t.toFixed(3) : st < 0.1 ? t.toFixed(2) : st < 1 ? t.toFixed(1) : t.toFixed(0), x + 3, RH / 2); }
+    if (RCD.sel){ const a = X(RCD.sel[0]), b = X(RCD.sel[1]); g.fillStyle = mut; g.globalAlpha = 0.28; g.fillRect(a, RH, b - a, H - RH); g.globalAlpha = 1; g.fillRect(a, RH, 1, H - RH); g.fillRect(b, RH, 1, H - RH); }
+    g.strokeStyle = mut; g.globalAlpha = 0.35; for (let c = 0; c < chs.length; c++){ const y = RH + ch * c + ch / 2; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); if (c){ g.beginPath(); g.moveTo(0, RH + ch * c); g.lineTo(W, RH + ch * c); g.stroke(); } } g.globalAlpha = 1;
+    g.fillStyle = ink; g.strokeStyle = ink; g.lineWidth = 1; chs.forEach((d, c) => rcdWave(g, d, va, vb, W, RH + ch * c, ch));
+    if (T.mk){ g.fillStyle = mut; const mark = (f, t) => { if (f < va || f > vb) return; const x = X(f); g.fillRect(x, RH, 1, H - RH); g.fillText(t, Math.min(W - 10, x + 3), RH + 9); };
+      if (T.mk[0] > 0) mark(T.mk[0], 'S'); if (T.lp){ mark(T.mk[1], 'L'); mark(T.mk[2], 'E'); } }   // EDIT SAMPLE: Start, Loop start, Loop end
+    if (RCD.cursor != null && !RCD.sel && RCD.cursor >= va && RCD.cursor <= vb){ g.fillStyle = ink; g.fillRect(X(RCD.cursor) - 0.5, 0, 1.5, H); }
+    if (rcdPrev){ const f = rcdPrev.a + (ctx.currentTime - rcdPrev.t0) * T.sr; if (f >= va && f <= vb){ g.fillStyle = mut; g.fillRect(X(f), 0, 2, H); } } }
+  // the overview: the whole take, the part in view boxed
+  const O = rcdFit(U.ov); if (O){ const {g, W, H} = O; g.fillStyle = ink; g.globalAlpha = 0.55; rcdWave(g, T._ov || (T._ov = T.data2 ? T.data.map((x, i) => (x + T.data2[i]) / 2) : T.data), 0, n, W, 0, H); g.globalAlpha = 1;
+    if (RCD.sel){ g.fillStyle = mut; g.globalAlpha = 0.3; g.fillRect(RCD.sel[0] / n * W, 0, (RCD.sel[1] - RCD.sel[0]) / n * W, H); g.globalAlpha = 1; }
+    if (vb - va < n){ g.strokeStyle = ink; g.lineWidth = 1.5; g.strokeRect(va / n * W + 0.75, 0.75, Math.max(3, (vb - va) / n * W - 1.5), H - 1.5); } }
+  // the readout
+  const t = f => (f / T.sr).toFixed(3) + ' s';
+  U.rd.textContent = (RCD.sel ? `Selection ${t(RCD.sel[0])} – ${t(RCD.sel[1])} (${t(RCD.sel[1] - RCD.sel[0])})` : RCD.cursor != null ? `Cursor ${t(RCD.cursor)}` : `Length ${t(n)}`)
+    + (vb - va < n ? ` · view ${t(va)} – ${t(vb)}` : '');
 }
 function rcdUi(){
   const U = RCD.ui; if (!U) return; const R = RCD.sync, T = RCD.take;
@@ -14555,18 +14620,23 @@ function rcdUi(){
   U.rec.classList.toggle('on', !!(RCD.on || R));
   U.state.textContent = R ? (R.phase === 'armed' ? (tp.on ? 'Armed: records from the next pattern…' : 'Starting the song…') : R.phase === 'closing' ? 'Finishing the take…'
       : `● Recording pattern ${R.n + 1}` + (R.pats > 0 ? ` of ${R.pats}` : '') + (R.stopReq ? ' · stops at its end' : ' · Stop ends it at the end of a pattern'))
-    : RCD.on ? '● Recording' : T ? `Take: ${(T.data.length / T.sr).toFixed(2)} s, ${T.data2 ? 'stereo' : 'mono'}` + (T.how === 'sync' ? ` · ${T.pats} pattern${T.pats === 1 ? '' : 's'}, ${T.beats} beats` : '') + (RCD.sel ? ` · selection ${((RCD.sel[1] - RCD.sel[0]) / T.sr).toFixed(3)} s` : '')
+    : RCD.on ? '● Recording' : T ? `${T.how === 'edit' ? 'Sample' : 'Take'}: ${(T.data.length / T.sr).toFixed(2)} s, ${T.data2 ? 'stereo' : 'mono'}` + (T.how === 'sync' ? ` · ${T.pats} pattern${T.pats === 1 ? '' : 's'}, ${T.beats} beats` : '') + (RCD.sel ? ` · selection ${((RCD.sel[1] - RCD.sel[0]) / T.sr).toFixed(3)} s` : '')
     : RCD.stream ? 'Ready.' : 'Pick an input and press Record.';
   U.edit.hidden = !T || !!(RCD.on || R);
   U.undoB.disabled = !RCD.undo.length; U.playB.textContent = rcdPrev ? '■' : '▶ Play';
   for (const b of U.lock) b.disabled = !!(RCD.on || R);
   rcdDrawWave();
 }
-async function rcdPanel(pad){
+// EDIT SAMPLE (5 Nov, owner: apply the edits "to a loaded sample"): opts.edit {pad, li} opens the same panel on that layer's
+// sample, without the recording rows; APPLY writes it back (a new sample, so the layer's undo still has the old one), and
+// the layer's Start, Loop start and Loop end ride along with every edit (rcdEdit's map); REVERT goes back to the layer's.
+async function rcdPanel(pad, opts){
   if (askOpen) askOpen(null);
   pad = pad == null ? cur : pad;
-  const wrap = el('div', 'ask acidask recask'), box = el('div', 'askbox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Record a sample');
-  box.append(el('div', 'asktitle', 'Record a sample'));
+  const E = opts && opts.edit, EL = E && kit.voices[E.pad] && kit.voices[E.pad].layers[E.li], ES = EL && EL.sample;
+  if (E && !(ES && ES.data && ES.data.length)) return toast('That layer has no sample to edit.');
+  const wrap = el('div', 'ask acidask recask'), box = el('div', 'askbox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', E ? 'Edit sample' : 'Record a sample');
+  box.append(el('div', 'asktitle', E ? 'Edit sample · ' + (ES.name || 'Sample') : 'Record a sample'));
   const field = (label, ctl) => { const f = el('label', 'acidf'); f.append(el('span', null, label), ctl); box.append(f); return ctl; };
   const seg = (label, opts, get, set) => { const s = el('div', 'seg'); const draw = () => [...s.children].forEach((b, i) => { const on = get() === opts[i][0]; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     opts.forEach(([v, t]) => { const b = el('button', null, t); b.type = 'button'; b.addEventListener('click', () => { set(v); rcdSave(); draw(); }); s.append(b); }); draw(); field(label, s); return s; };
@@ -14591,50 +14661,108 @@ async function rcdPanel(pad){
   const latW = el('span', 'acidr'); latW.append(latR, latV); const latF = field('Extra latency', latW).parentElement;
   const fitF = seg('Fit to tempo', [[1, 'ON'], [0, 'OFF']], () => rcdSet.fit | 0, v => { rcdSet.fit = v; }).parentElement;
   patF.hidden = latF.hidden = fitF.hidden = rcdSet.mode !== 'sync';
+  const recRows = [...box.querySelectorAll('.acidf')];   // EDIT SAMPLE hides these
   const state = el('div', 'askmsg recstate'); box.append(state);
-  // the take: its waveform (drag to select), the edits, and where it goes
+  // THE EDITOR (5 Nov, owner: "make sure it feels professional, make the waveform big enough to edit … zoom … scroll wheel, two
+  // finger pinch, and some zoom buttons to zoom in at the point of a click"): an overview of the whole take (the part in view
+  // boxed; click or drag it to move there), the waveform with a time ruler (drag to select, click to place the cursor,
+  // Shift-click to stretch the selection; the wheel or a trackpad pinch zooms at the pointer, Shift+wheel or a sideways swipe
+  // scrolls, two fingers pinch and pan on a touch screen), a readout and the zoom buttons (− and + zoom at the cursor, or the
+  // selection's middle; FIT shows all of it, SEL the selection), then the tools in groups.
   const edit = el('div', 'recedit'); edit.hidden = true;
-  const wave = el('canvas', 'recwave'); wave.setAttribute('aria-label', 'The take: drag to select a part');
-  { let a = null; const fr = e => { const r = wave.getBoundingClientRect(), T = RCD.take; return T ? Math.round(clamp((e.clientX - r.left) / r.width, 0, 1) * T.data.length) : 0; };
-    wave.addEventListener('pointerdown', e => { if (!RCD.take) return; a = fr(e); RCD.sel = null; wave.setPointerCapture(e.pointerId); rcdUi(); });
-    wave.addEventListener('pointermove', e => { if (a == null) return; const b = fr(e); RCD.sel = [Math.min(a, b), Math.max(a, b)]; rcdUi(); });
-    wave.addEventListener('pointerup', () => { a = null; if (RCD.sel && RCD.sel[1] - RCD.sel[0] < 8) RCD.sel = null; rcdUi(); }); }
-  edit.append(wave);
-  const ops = el('div', 'btnrow recops'), op = (t, f, tip) => { const b = el('button', null, t); b.type = 'button'; if (tip) b.title = tip; b.addEventListener('click', () => { f(); }); ops.append(b); return b; };
+  const ov = el('canvas', 'recov'); ov.setAttribute('aria-label', 'The whole take: click or drag to move the view');
+  const wave = el('canvas', 'recwave'); wave.setAttribute('aria-label', 'The take: drag to select, click to place the cursor, wheel or pinch to zoom');
+  const bar = el('div', 'recbar'), rd = el('span', 'recrd'), zb = el('div', 'recz');
+  const zbtn = (t, f, tip) => { const b = el('button', null, t); b.type = 'button'; b.title = tip; b.addEventListener('click', f); zb.append(b); return b; };
+  zbtn('−', () => rcdZoom(2, rcdAnchor()), 'Zoom out (at the cursor)'); zbtn('+', () => rcdZoom(0.5, rcdAnchor()), 'Zoom in (at the cursor, or the selection)');
+  zbtn('FIT', () => { RCD.view = null; rcdUi(); }, 'Show the whole take'); zbtn('SEL', () => { if (RCD.sel){ const m = (RCD.sel[1] - RCD.sel[0]) * 0.05; RCD.view = rcdClampView(RCD.sel[0] - m, RCD.sel[1] + m); rcdUi(); } }, 'Zoom to the selection');
+  bar.append(rd, zb); edit.append(ov, wave, bar);
+  { const fx = e => { const r = wave.getBoundingClientRect(), [va, vb] = rcdView(); return va + clamp((e.clientX - r.left) / r.width, 0, 1) * (vb - va); };
+    const P = new Map(); let drag = null, pinch = null;
+    wave.addEventListener('pointerdown', e => { if (!RCD.take) return; e.preventDefault(); try { wave.setPointerCapture(e.pointerId); } catch(err){} P.set(e.pointerId, e);
+      if (P.size === 2){ drag = null; const [p1, p2] = [...P.values()], [va, vb] = rcdView(), r = wave.getBoundingClientRect();
+        pinch = {d:Math.abs(p1.clientX - p2.clientX) || 1, m:(p1.clientX + p2.clientX) / 2, va, vb, w:r.width, l:r.left}; return; }
+      const f = Math.round(fx(e)); drag = {f, x:e.clientX, moved:false, shift:e.shiftKey}; });
+    wave.addEventListener('pointermove', e => { if (!P.has(e.pointerId)) return; P.set(e.pointerId, e);
+      if (pinch && P.size === 2){ const [p1, p2] = [...P.values()], d = Math.abs(p1.clientX - p2.clientX) || 1, m = (p1.clientX + p2.clientX) / 2, span = (pinch.vb - pinch.va) * pinch.d / d;
+        const at = pinch.va + (pinch.m - pinch.l) / pinch.w * (pinch.vb - pinch.va), a = at - (m - pinch.l) / pinch.w * span; RCD.view = rcdClampView(a, a + span); rcdUi(); return; }
+      if (!drag) return; if (!drag.moved && Math.abs(e.clientX - drag.x) < 3) return; drag.moved = true;
+      const b = Math.round(fx(e)), a0 = drag.shift && RCD.cursor != null ? RCD.cursor : drag.f; RCD.sel = [Math.min(a0, b), Math.max(a0, b)]; rcdUi(); });
+    const up = e => { P.delete(e.pointerId); if (P.size < 2) pinch = null; if (!drag || P.size) return;
+      if (!drag.moved){ if (drag.shift && RCD.cursor != null){ RCD.sel = [Math.min(RCD.cursor, drag.f), Math.max(RCD.cursor, drag.f)]; } else { RCD.cursor = drag.f; RCD.sel = null; } }
+      drag = null; if (RCD.sel && RCD.sel[1] - RCD.sel[0] < 8) RCD.sel = null; if (RCD.snap && RCD.sel) rcdSnapSel(); rcdUi(); };
+    wave.addEventListener('pointerup', up); wave.addEventListener('pointercancel', up);
+    wave.addEventListener('wheel', e => { if (!RCD.take) return; e.preventDefault(); const [va, vb] = rcdView(), span = vb - va;
+      if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)){ const d = (e.shiftKey ? e.deltaY : e.deltaX) / Math.max(1, wave.clientWidth) * span * 1.2; RCD.view = rcdClampView(va + d, vb + d); rcdUi(); return; }
+      rcdZoom(Math.exp(e.deltaY * (e.ctrlKey ? 0.01 : 0.0025)), fx(e)); }, {passive:false});
+    const ovGo = e => { const r = ov.getBoundingClientRect(), T = RCD.take; if (!T) return; const [va, vb] = rcdView(), c = clamp((e.clientX - r.left) / r.width, 0, 1) * T.data.length, h = (vb - va) / 2; RCD.view = rcdClampView(c - h, c + h); rcdUi(); };
+    let ovOn = false; ov.addEventListener('pointerdown', e => { ovOn = true; try { ov.setPointerCapture(e.pointerId); } catch(err){} ovGo(e); });
+    ov.addEventListener('pointermove', e => { if (ovOn) ovGo(e); }); ov.addEventListener('pointerup', () => { ovOn = false; }); }
+  const ops = el('div', 'recops'); let og = ops;
+  const grp = name => { og = el('div', 'recg'); og.append(el('span', 'recgl', name)); ops.append(og); };
+  const op = (t, f, tip) => { const b = el('button', null, t); b.type = 'button'; if (tip) b.title = tip; b.addEventListener('click', () => { f(); }); og.append(b); return b; };
   const ms = x => Math.round(x * RCD.take.sr / 1000);
-  const playB = op('▶ Play', rcdPlay, 'Play the selection, or the whole take');
-  op('Crop', () => { const [a, b] = rcdRange(); rcdEdit(T => seCrop(T, a, b)); RCD.sel = null; rcdUi(); }, 'Keep only the selection');
-  op('Cut', () => { if (!RCD.sel) return toast('Drag across the take to select what to cut.'); const [a, b] = rcdRange(); rcdEdit(T => seCut(T, a, b)); RCD.sel = null; rcdUi(); }, 'Remove the selection');
+  grp('Play');
+  const playB = op('▶ Play', rcdPlay, 'Play the selection, or from the cursor, or the whole take');
+  const undoB = op('Undo', () => { if (!RCD.undo.length) return; RCD.take = RCD.undo.pop(); RCD.sel = null; rcdUi(); }, 'Undo the last edit (Ctrl/⌘+Z)');
+  grp('Edit');
+  op('Crop', () => { const [a, b] = rcdRange(); rcdEdit(T => seCrop(T, a, b), x => x - a); RCD.sel = null; RCD.view = null; rcdUi(); }, 'Keep only the selection');
+  op('Cut', () => { if (!RCD.sel) return toast('Drag across the take to select what to cut.'); const [a, b] = rcdRange(); rcdEdit(T => seCut(T, a, b), x => x < a ? x : x < b ? a : x - (b - a)); RCD.cursor = a; RCD.sel = null; rcdUi(); }, 'Remove the selection');
   op('Silence', () => { if (!RCD.sel) return toast('Drag across the take to select what to silence.'); const [a, b] = rcdRange(); rcdEdit(T => seSilence(T, a, b)); }, 'Make the selection silent');
+  const snapB = op('Snap', () => { RCD.snap = !RCD.snap; snapB.classList.toggle('on', !!RCD.snap); snapB.setAttribute('aria-pressed', !!RCD.snap); if (RCD.snap && RCD.sel) rcdSnapSel(); }, 'Selections snap to zero crossings (no clicks where you cut, crop or fade)');
+  snapB.classList.toggle('on', !!RCD.snap); snapB.setAttribute('aria-pressed', !!RCD.snap);
+  op('Auto-trim', () => { const r = seFindTrim(RCD.take, -50, 5); rcdEdit(T => seAutoTrim(T, -50, 5, 3), x => x - r.a); RCD.view = null; rcdUi(); }, 'Cut the silence before and after, with short fades');
+  grp('Level');
   op('Normalise', () => { const [a, b] = rcdRange(); rcdEdit(T => seNormalize(T, -0.3, a, b)); }, 'Loudest point to −0.3 dB (the selection, or the whole take)');
+  op('−3 dB', () => { const [a, b] = rcdRange(); rcdEdit(T => seGain(T, -3, a, b)); }); op('+3 dB', () => { const [a, b] = rcdRange(); rcdEdit(T => seGain(T, 3, a, b)); });
   op('Fade in', () => { const r = RCD.sel; rcdEdit(T => r && r[0] < 8 ? seFadeIn(T, r[1], 'equal') : seFadeIn(T, ms(10), 'equal')); }, 'Fade in over the selection from the start, else 10 ms');
   op('Fade out', () => { const r = RCD.sel, T0 = RCD.take; rcdEdit(T => r && r[1] > T0.data.length - 8 ? seFadeOut(T, r[1] - r[0], 'equal') : seFadeOut(T, ms(10), 'equal')); }, 'Fade out over the selection to the end, else 10 ms');
-  op('−3 dB', () => { const [a, b] = rcdRange(); rcdEdit(T => seGain(T, -3, a, b)); }); op('+3 dB', () => { const [a, b] = rcdRange(); rcdEdit(T => seGain(T, 3, a, b)); });
-  op('Reverse', () => { const [a, b] = rcdRange(); rcdEdit(T => seReverse(T, a, b)); });
-  op('Auto-trim', () => rcdEdit(T => seAutoTrim(T, -50, 5, 3)), 'Cut the silence before and after, with short fades');
-  const undoB = op('Undo', () => { if (!RCD.undo.length) return; RCD.take = RCD.undo.pop(); RCD.sel = null; rcdUi(); });
+  grp('Process');
+  op('Reverse', () => { const [a, b] = rcdRange(); rcdEdit(T => seReverse(T, a, b), x => x >= a && x < b ? a + b - 1 - x : x); });
+  op('Invert', () => rcdEdit(T => seInvert(T)), 'Flip the polarity');
+  op('Remove DC', () => rcdEdit(T => seRemoveDC(T)), 'Take out a DC offset (sound sitting off the centre line)');
+  grp('Channels');
+  op('To mono', () => { if (!RCD.take.data2) return toast('It’s already mono.'); rcdEdit(T => seToMono(T)); }, 'Average the two sides into one');
+  op('To stereo', () => { if (RCD.take.data2) return toast('It’s already stereo.'); rcdEdit(T => seToStereo(T)); }, 'The same on both sides (to edit or pan them apart later)');
+  const apIn = el('input'); apIn.type = 'file'; apIn.accept = 'audio/*,.wav,.aif,.aiff,.flac,.mp3,.ogg,.m4a,.opus'; apIn.hidden = true; edit.append(apIn);
+  apIn.addEventListener('change', async () => { const f = apIn.files[0]; apIn.value = ''; if (!f || !RCD.take) return;
+    try { audio(); const ab = await f.arrayBuffer(), b = await new Promise((ok, no) => { const q = ctx.decodeAudioData(ab, ok, no); if (q && q.then) q.then(ok, no); });
+      let {d, d2} = smpChannels(b); const T = RCD.take;
+      if (b.sampleRate !== T.sr){ const k = b.sampleRate / T.sr, n = Math.floor(d.length / k), rs = x => { const o = new Float32Array(n); for (let i = 0; i < n; i++){ const p = i * k, j = p | 0, fr = p - j; o[i] = x[j] + ((x[j + 1] || 0) - x[j]) * fr; } return o; }; d = rs(d); if (d2) d2 = rs(d2); }
+      const room = SMP_MAX * T.sr - T.data.length; if (room <= 0) return toast(`It’s already ${SMP_MAX} s, the longest a sample can be.`);
+      if (d.length > room){ d = d.slice(0, room); if (d2) d2 = d2.slice(0, room); toast(`Joined the first ${(room / T.sr).toFixed(1)} s of it (a sample can be ${SMP_MAX} s).`); }
+      rcdEdit(T => seConcat(T, {data:d, data2:d2, sr:T.sr})); RCD.view = null; rcdUi(); toast('Joined ' + f.name + ' onto the end.'); }
+    catch(e){ toast('Couldn’t read that audio file.'); } });
+  op('Append file…', () => apIn.click(), 'Join another sample onto the end');
   edit.append(ops);
   const padS = el('select'); for (let k = 0; k < kit.voices.length; k++) padS.append(new Option(hx(k) + ' ' + (kit.voices[k].name || ''), k)); padS.value = pad;
-  const keepRow = el('div', 'btnrow'), keepB = el('button', 'ok', 'Keep in this pad'); keepB.type = 'button'; keepB.addEventListener('click', () => rcdKeep(+padS.value));
-  const discB = el('button', null, 'Discard'); discB.type = 'button'; discB.addEventListener('click', () => { RCD.take = null; RCD.undo = []; RCD.sel = null; rcdUi(); });
+  const keepRow = el('div', 'btnrow reckeep'), keepB = el('button', 'ok', 'Keep in this pad'); keepB.type = 'button'; keepB.addEventListener('click', () => rcdKeep(+padS.value));
+  const discB = el('button', null, 'Discard'); discB.type = 'button'; discB.addEventListener('click', () => { RCD.take = null; RCD.undo = []; RCD.sel = null; RCD.view = null; rcdUi(); });
   keepRow.append(el('span', null, 'Pad'), padS, keepB, discB); edit.append(keepRow);
   box.append(edit);
+  const takeOf = L => { const S0 = L.sample, n = S0.data.length; return {data:S0.data, data2:S0.data2 || null, sr:S0.sr, name:S0.name, how:'edit', beats:0, pats:0, lp:L.lpMode | 0,
+    mk:[Math.round((L.a || 0) * n), Math.round((L.lpS || 0) * n), Math.round((L.lpE == null ? 1 : L.lpE) * n)]}; };
+  if (E){ for (const f of recRows) f.hidden = true;
+    keepRow.textContent = ''; const apB = el('button', 'ok', 'Apply to the layer'), rvB = el('button', null, 'Revert'); apB.type = rvB.type = 'button';
+    apB.addEventListener('click', () => rcdApply(E)); rvB.addEventListener('click', () => { const L = kit.voices[E.pad].layers[E.li]; if (!L || !L.sample) return; RCD.take = takeOf(L); RCD.undo = []; RCD.sel = null; rcdUi(); });
+    keepRow.append(apB, rvB); RCD.take = takeOf(EL); RCD.undo = []; RCD.sel = null; RCD.view = null; RCD.cursor = null; }
   const row = el('div', 'btnrow'), rec = el('button', 'ok', '● Record'); rec.type = 'button';
   rec.addEventListener('click', () => { if (RCD.on || RCD.sync) rcdStop(); else rcdStart().then(() => fillIn()); });
-  const close = el('button', null, 'Close'); close.type = 'button'; row.append(rec, close); box.append(row);
-  Object.assign(RCD.ui, {rec, state, edit, wave, playB, undoB, lock});
-  const done = () => { if (askOpen !== done) return; askOpen = null; rcdAbort(); if (rcdPrev){ try { rcdPrev.stop(); } catch(e){} rcdPrev = null; } rcdClose(); RCD.ui = null; wrap.remove(); document.removeEventListener('keydown', key, true); };
+  const close = el('button', null, 'Close'); close.type = 'button'; row.append(rec, close); box.append(row); if (E){ rec.hidden = true; keepRow.append(close); row.hidden = true; }   // EDIT SAMPLE: Close beside Apply / Revert
+  Object.assign(RCD.ui, {rec, state, edit, wave, ov, rd, playB, undoB, lock, E});
+  const done = () => { if (askOpen !== done) return; askOpen = null; rcdAbort(); if (rcdPrev){ try { rcdPrev.stop(); } catch(e){} rcdPrev = null; } rcdClose(); RCD.ui = null; if (E){ RCD.take = null; RCD.undo = []; RCD.sel = null; } wrap.remove(); document.removeEventListener('keydown', key, true); };
   close.addEventListener('click', done);
   // Keys stay in the panel: R records / stops, Space plays the song, Esc closes (a take not kept is let go)
   const key = e => { const tag = e.target && e.target.tagName;
     if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); return done(); }
-    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'r' || e.key === 'R') && tag !== 'SELECT'){ e.preventDefault(); e.stopPropagation(); return rec.click(); }
+    if (!E && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'r' || e.key === 'R') && tag !== 'SELECT'){ e.preventDefault(); e.stopPropagation(); return rec.click(); }
     if (e.key === ' ' && tag !== 'BUTTON'){ e.preventDefault(); e.stopPropagation(); return playCtx(); }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z') && RCD.undo.length){ e.preventDefault(); e.stopPropagation(); return undoB.click(); }
+    if (RCD.take && !e.ctrlKey && !e.metaKey && tag !== 'INPUT' && tag !== 'SELECT' && (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '0')){ e.preventDefault(); e.stopPropagation(); if (e.key === '0'){ RCD.view = null; return rcdUi(); } return rcdZoom(e.key === '-' ? 2 : 0.5, rcdAnchor()); }
     e.stopPropagation(); };
   askOpen = done; document.addEventListener('keydown', key, true);
   wrap.append(box); document.body.append(wrap); rcdUi(); setTimeout(() => rec.focus(), 0);
-  new ResizeObserver(() => rcdDrawWave()).observe(wave);
+  { const ro = new ResizeObserver(() => rcdDrawWave()); ro.observe(wave); ro.observe(ov); }
 }
 /* ===== end RECORD INTO A PAD ===== */
 /* ===== SLIDER MOUSE (21 Oct): the synth sliders with a mouse, as in a DAW =====
@@ -21724,7 +21852,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 442;
+const BUILD = 443;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -30268,6 +30396,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [443, '5 Nov', ['Edit sample… (on a sample layer): the take editor on a loaded sample. Apply writes it back (Undo on the Synth page takes it back); Start, Loop start and Loop end move with the audio when you crop, cut, reverse or trim.', 'The editor is bigger, with an overview of the whole sample and a time ruler. Zoom with the wheel or a pinch (at the pointer), − / + at the cursor (a click places it), FIT and SEL; Shift+wheel or a sideways swipe scrolls; drag the overview to move.', 'New edits: Snap (selections land on zero crossings), Remove DC, Invert, To mono, To stereo, Append file….']],
   [442, '5 Nov', ['Load sample opens the sample browser (also File › Samples…): FOLDER shows your sample folder and its subfolders (set it once; after a restart one press of Reconnect where the browser asks), RECENT every sample you’ve loaded or recorded, from anywhere. ＋ Files… brings in files from anywhere (one goes straight into the pad). Search, ▲▼ to audition, Enter or double-click to load.', 'Samples can be up to 5 minutes (was 2).']],
   [441, '5 Nov', ['Record a sample… (Synth page, next to Load sample; File menu): pick an input, its channels and monitoring, watch the level, and record FREE or PATTERN. PATTERN works like Renoise’s sync: with the song playing it starts at the next pattern and Stop ends it at the end of a pattern (or set a length in patterns); pressed while stopped, the song starts from the cursor’s pattern. Then edit the take (drag to select: crop, cut, silence, normalise, fades, gain, reverse, auto-trim, undo) and keep it in a pad, fitted to the tempo.']],
   [440, '5 Nov', ['Samples keep their stereo: a stereo file plays in stereo (the layer shows · ST), from the pads, both sequencers, renders and pad exports. Render to a slot and …chains Resample keep stereo too.', 'Samples can be up to 2 minutes (was 30 s), and pad effects no longer cut a pad at 12 s.', 'Sample loop: Loop (Forward or Ping-pong), Loop start, Loop end and Crossfade on a sample layer. A looped layer holds while the note is held (or for the pad’s Gate).']],
