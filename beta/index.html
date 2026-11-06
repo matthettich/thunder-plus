@@ -1063,7 +1063,8 @@ body:not(.legon) .tside .tlegend{display:none}
    colour too. */
 .tctl:has(> #tDeck:not([hidden])), .tctl:has(#tDeck:not([hidden])){background:var(--panel); border-top:3px solid var(--ink)!important}
 #tDeck .dks, #tDeck .dkcrail, #tDeck #dkFxBar, #tDeck.fxbar #dkFx.col{background:var(--panel)}
-.ttabs, .ttabbar{background:var(--panel)}
+.ttabs, .ttabbar, .ttabbar .ttabs{background:var(--panel)!important}   /* (!: .ttabbar's own rule comes later) */
+.tpat .tlen{border-left:1px solid var(--line)!important; margin-left:0!important}   /* a line between ROWS + and LEFT (owner, 5 Nov) */
 #tPad .k{background:var(--sh, var(--voice)); color:#1b2130; box-shadow:4px 4px 0 0 #fff, 4px 4px 0 1.5px var(--line); transition:transform .06s, box-shadow .06s}
 #tPad .k.dn{transform:translate(3px,3px); box-shadow:1px 1px 0 0 #fff, 1px 1px 0 1.5px var(--line)}
 #tPad .k.dn, #tPad .k.on{background:var(--ink); color:var(--inv)}
@@ -20882,7 +20883,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 436;
+const BUILD = 437;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29425,6 +29426,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [437, '5 Nov', ['The BPM / LPB box and the strip around LEFT are the page colour like the rest of the bar (the grey tab strip still showed there), and a line divides ROWS + from LEFT.']],
   [436, '5 Nov', ['The bottom panel (…CHAINS, FX, the track strip) is in the page colour now, set off from the tracker by a black rule; the strip behind the screen tabs is the page colour too.', 'SONG … PROJECT widen so the last tab ends in line with the Tracker / Synth / Waves / Chains buttons above.']],
   [435, '5 Nov', ['Pattern view: the outline down a bus’s sides is see-through, so the letters at its edge (OFF, FLX…) show through it.']],
   [434, '5 Nov', ['The computer keyboard plays the instrument on INST, Mixer and FX too, through that screen’s track (Mixer: the cursor’s track; FX: the track whose effects are open; INST: the first track using it), so you hear the mixer and effects as you change them. Only Phrase and the Pattern view write notes. On those three screens Enter on a value lets you type it, since the letter and number keys play now.', 'New MIDI instrument (INST › NEW MIDI INSTRUMENT, or Edit ▾): takes the next free instrument, sets it to send MIDI on port A and the next free channel, and opens it at MIDI CH. A MIDI instrument shows MIDI, its port and channel next to its number on INST and in the NOW line.']],
