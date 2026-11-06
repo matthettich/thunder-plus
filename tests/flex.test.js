@@ -112,3 +112,41 @@ test('FX bar: the pattern a Flex / Step gate / Retrigger slot plays now (command
   s = mk({})({ type: 'retrig', on: true, mode: 0, div: 2 }, 0, 0, 0); assert.equal(s.src, 'WAITS FOR RTG');
   s = mk({ rtg: 2 })({ type: 'retrig', on: true, mode: 0, div: 2 }, 0, 0, 0); assert.equal(s.name, 'REPEATING 1/8');
 });
+
+// FLY (5 Nov): Flex's second bank, k 257–511 on the same param (256 + the FLY value; FLY 00 is 0, off).
+test('FLY: every pattern 01–FF has a name, and 01–0F are one of each family 1–F', () => {
+  const T = FlexCore.SPEC(), N2 = FlexCore.NAMES2;
+  assert.equal(N2.length, 256); assert.equal(N2[0], 'OFF');
+  for (let v = 1; v < 256; v++) { assert.ok(T[256 + v] && N2[v] && N2[v] !== 'OFF', 'FLY ' + v.toString(16)); assert.equal(N2[v], T[256 + v].n); }
+  for (let v = 1; v < 16; v++) assert.ok(T.slice(256 + v * 16, 256 + v * 16 + 16).includes(T[256 + v]), `FLY 0${v.toString(16)} is a pattern of family ${v.toString(16)}`);
+  const d = cut(/\{\.\.\.k\('flx', -1\), maxValue:(\d+)\}/, "the flx param's FLY range"); assert.ok(+/maxValue:(\d+)/.exec(d)[1] >= 511);
+});
+
+test('FLY: no pattern plays ahead of the song (reads only what has played), none gives NaN, none is mostly silent', () => {
+  const f = new FlexCore(48000);
+  for (let v = 1; v < 256; v++) { let g = 0, n = 0;
+    for (let bar = 0; bar < 4; bar++) for (let i = 0; i < 2000; i++) { const p = i / 500, r = f.ext(256 + v, p, bar); n++; g += f.pg;
+      assert.ok(Number.isFinite(r) && Number.isFinite(f.pg) && Number.isFinite(f.plp) && Number.isFinite(f.php) && Number.isFinite(f.pcr), `FLY ${v.toString(16)} at ${p}`);
+      assert.ok(p - r > -1e-9, `FLY ${v.toString(16)} ${FlexCore.NAMES2[v]} reads ahead at bar ${bar}, ${p}: ${r}`); }
+    assert.ok(g / n > 0.15, `FLY ${v.toString(16)} is mostly silent`); }
+});
+
+test('FLY: names match the patterns (lengths in note values, percentages, semitones)', () => {
+  const T = FlexCore.SPEC(), N2 = FlexCore.NAMES2; let m;
+  for (let v = 16; v < 256; v++) { const o = T[256 + v], nm = N2[v];
+    switch (o.f) {
+      case 'proll': m = /^PITCH ROLL (\S+) ([-+][\d.]+)(?: FROM BEAT ([\d.]+)| BAR)$/.exec(nm); near(beatsOf(m[1]), o.L, nm); near(+m[2], o.s, nm); near(m[3] ? +m[3] - 1 : 0, o.a, nm); break;
+      case 'euc': m = /^EUCLID (REPEAT )?(\d+)\/(\d+)/.exec(nm); assert.equal(+m[2], o.k, nm); assert.equal(+m[3], o.N, nm); assert.equal(!!m[1], !!o.h, nm); break;
+      case 'prob': case 'skip': case 'sted': case 'tex': case 'chaos2': m = /(\d+\/\d+T?|BAR)(?: ×\d+)? (\d+)%/.exec(nm); near(beatsOf(m[1]), o.G, nm); assert.equal(+m[2], Math.round((o.c ?? o.d) * 100), nm); break;
+      case 'poly': m = /^POLYMETER (\S+(?: BEAT)?)/.exec(nm); if (!/BEAT/.test(m[1])) near(beatsOf(m[1]), o.M, nm); break;
+      case 'warp': m = /^WARP \S+ (\S+)$/.exec(nm); near(beatsOf(m[1]), o.G, nm); break;
+      case 'mut': m = /^MUTATE (\S+) (\d+)%/.exec(nm); near(beatsOf(m[1]), o.G, nm); assert.equal(+m[2], Math.round(o.m * 100), nm); break;
+    } }
+});
+
+test('FLY reaches the Flex: FLY v books the flx param at 256 + v (00 off), after FLX on the same row', () => {
+  const ev = cut(/if \(fx\.FLY != null\)\{[^\n]*/, 'the FLY event');
+  assert.match(ev, /p:'flx', v:fx\.FLY \? 256 \+ fx\.FLY : 0/);
+  assert.match(src, /const FX_NEEDS = \{[^}]*FLY:'flex'/);
+  assert.match(cut(/const FXC = \[[\s\S]*?\];/, 'FXC'), /'JMP','FLY'\]/);   // on the end: saved songs keep their command numbers
+});

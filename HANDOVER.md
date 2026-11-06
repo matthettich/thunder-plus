@@ -156,6 +156,35 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 5 Nov (9): FLY, Flex's second bank of 255 IDM patterns (build 439)
+
+- Owner: "if there are any other IDM, aphex twin, autechre type effects that we don't have commands for, I'd love to add
+  more" → yes to a second command: "fill it with these. let's make 0-0F a variety selection and then arrange them in
+  categories after".
+- **How it plays:** FLY is a new command (on the END of FXC, so saved songs keep their numbers) that books the SAME `flx`
+  param as FLX at 256 + its value (FLY 00 = 0, off). So chase, RESUME, renders, fxcPend, STARTS ON FLX, the FX bar timeline,
+  AUTO SLOT (FX_NEEDS FLY:'flex'), master OFF blocks (fxOnOff) and MST_FXC all work unchanged; the later of FLX / FLY wins.
+  The tfx `flx` param's maxValue is 511; FlexCore's k goes to 511 and `ext` handles 257–511 from T[256 + v] (SPEC builds 512).
+  `FlexCore.NAMES2` names them. The slot's own PATTERN list stays FLX-only.
+- **The families** (comments by SPEC's FLY block, DSP in `ext` after 'chaos'): 01–0F copies of one per family (10, 22, 34, 41,
+  50, 61, 70, 81, 91, A0, B3, C0, D1, E1, F2). 1 PITCH ROLL (repeat n at 2^(n·s/12), speed capped at n + 1 so it never reads
+  ahead) · 2 EUCLID k/N (((j + rot) % N)·k % N < k; REPEAT holds the last hit) · 3 PROB mute / repeat / ratchet / any · 4 SLICE
+  PITCH (speed > 1 reads back G(sp − 1) and lands on the grid) · 5 FREEZE / BUZZ / SMEAR (a + ⌊u/w⌋·w·ρ + u mod w; RISING
+  shrinks w) · 6 CD SKIP stuck / jump / drop / prev · 7 BOUNCE / ACCEL / DECEL (closed-form geometric repeats, a bounce stops
+  below 1/128 beat, a roll buzzes on) · 8 MUTATE (a juggle whose slices change a little each bar and add up over four; CYCLE
+  2 / 4 don't add up) · 9 STUTTER EDIT (random slices, random lengths G/2…G/16; ± pitch, FADE, GATED) · A POLYMETER (loop of
+  M from a; PING-PONG reverses odd loops) · B WARP (up: c + (1−k)u + ku²/G; down starts kG/4 back) · C REVERSE ROLL / PING-PONG /
+  REWIND (r = a − k·u) · D GRAINS (off ∈ [w, W]; reverse; gaps) · E TEXTURE (crush / LP / HP / chop per slice) · F CHAOS 2.
+  "NEW EVERY BAR" is the beat clock's four-bar cycle (bar = 0–3); FIXED ones use bar 0 always.
+- **Checks:** tests/flex.test.js (names exist and match the specs, 01–0F one per family, the param range, the event, FXC on
+  the end; a scan of every FLY at every bar of the cycle: r ≤ p, no NaN, none mostly silent). Cost ~75 ns a sample.
+  `node tools/flex-check.mjs` now plays FLY 01–0F and two of every family too (102 bars): the audio thread matches FlexCore
+  on every bar. The clock check now counts whole-block jumps as the machine's dropouts; on a busy container the audio
+  thread's recording also showed one-block steps BACK paired with the skips (equal counts, output still exact): a recording
+  shuffle under overload, reported beside the dropouts (a back step with no dropout fails). The Page sequencer misses bars
+  in proportion to the blocks the machine drops (0 on a quiet run).
+- Not changed: …chains' / …waves' FlexCore copies; the Flex's PATTERN list (FLX only).
+
 ## 5 Nov (8): FLX check 2: the core's beat clock, TAPE START, 0A / E8; Pattern view steady widths (build 438)
 
 - Owner: stutter "when a flex command is activated", "sometimes it feels like flx lags", "FLX 76 sort of feels broken" (fine if
