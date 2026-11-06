@@ -760,14 +760,19 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .recclip{position:absolute; right:0; top:-15px; font-size:10px; font-weight:700; color:#fff; background:var(--meter-hot, #e5484d); padding:0 4px; border-radius:2px}
 .recstate{margin-top:6px; min-height:1.3em}
 .recask .askbox{width:min(980px, calc(100vw - 24px)); max-width:none}
-.recov{display:block; width:100%; height:34px; margin:10px 0 4px; border:1px solid color-mix(in srgb, var(--ink) 25%, transparent); border-radius:3px; cursor:pointer; touch-action:none}
-.recwave{display:block; width:100%; height:clamp(180px, 34vh, 300px); margin:0; border:1px solid color-mix(in srgb, var(--ink) 25%, transparent); border-radius:3px; cursor:crosshair; touch-action:none}
+.recov{display:block; width:100%; height:34px; margin:0; border-bottom:1px solid color-mix(in srgb, var(--line) 35%, transparent); cursor:pointer; touch-action:none}
+.recwave{display:block; width:100%; height:clamp(180px, 34vh, 300px); margin:0; cursor:crosshair; touch-action:none}
 .recset{display:grid; grid-template-columns:1fr; column-gap:28px}
 @media (min-width:760px){ .recset{grid-template-columns:1fr 1fr} }
 .recset .acidf{margin:6px 0}
 .recstate{margin:2px 0 4px; opacity:.75; font-variant-numeric:tabular-nums}
 .recsp{flex:1}
-.recbar{display:flex; align-items:center; gap:8px; margin:8px 0 12px}
+.recbar{display:flex; align-items:center; gap:8px; margin:0; padding:7px 8px; border-top:1px solid color-mix(in srgb, var(--line) 35%, transparent)}
+/* THE WINDOW: the FX bar's card (#dkFxBar .dkfc): a line border on the white offset block, a solid title bar with a square */
+.recwin{margin:12px 6px 18px 0; border:1.5px solid var(--line); background:var(--panel); color:var(--ink); box-shadow:4px 4px 0 0 var(--mxbg, #fff), 4px 4px 0 1.5px var(--line)}
+.rech{display:flex; align-items:center; gap:8px; min-height:26px; padding:0 8px; background:var(--ink); color:var(--inv); font-size:var(--fs-3); letter-spacing:.06em; text-transform:uppercase; white-space:nowrap}
+.rech i{flex:none; width:12px; height:12px; background:var(--rcw, var(--fxac, #ff5a1f))}
+.rechn{font-weight:700; overflow:hidden; text-overflow:ellipsis; min-width:0} .rechi{margin-left:auto; opacity:.75; font-variant-numeric:tabular-nums}
 .recbar .recplay{min-width:5.5em}
 .recrd{flex:1; min-width:0; font-variant-numeric:tabular-nums; opacity:.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .recz{display:flex; gap:4px} .recz button{min-width:2.4em; padding:3px 8px}
@@ -2889,6 +2894,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <button type="button" id="lPre" class="sm presel" title="Layer presets: replace this layer">Layer presets…</button>
         <button class="sm" id="bLoad">Load sample</button>
         <button class="sm" id="bRecSmp" title="Record a sample into this pad (free, or synced to the pattern)">Record…</button>
+        <button class="sm" id="bEditSmp" title="Edit this layer’s sample: crop, cut, fade, normalise, reverse…" hidden>Edit…</button>
         <button class="sm" id="lRand">Random</button>
         <button class="sm" id="lCopy">Copy</button>
         <button class="sm" id="lPaste">Paste</button>
@@ -12548,7 +12554,7 @@ function refreshLayer(){
   const isEl = L.type === 'elements';
   const isWv = L.type === 'waves';
   plSec.hidden = !isPl; elExSec.hidden = elResSec.hidden = !isEl; srcRows.a.r.hidden = srcRows.b.r.hidden = isPl || isEl || isWv;
-  wtSec.hidden = L.type !== 'wavetable'; vintSec.hidden = L.type !== 'sample'; lpSec.hidden = L.type !== 'sample';
+  wtSec.hidden = L.type !== 'wavetable'; vintSec.hidden = L.type !== 'sample'; lpSec.hidden = L.type !== 'sample'; $('bEditSmp').hidden = !(L.type === 'sample' && L.sample && L.sample.data);
   wvSec.hidden = !isWv;
   if (isWv){ $('wvBus').value = String(L.wBus || 1); $('wvStat').textContent = wvStatus(); }
   if (isEl) elModelUpd();
@@ -14034,6 +14040,7 @@ function assignSample(vi, data, sr, name, data2, id){
 }
 $('bLoad').addEventListener('click', () => smbPanel(cur));   // SAMPLE BROWSER (was the file picker: ＋ Files… in the panel)
 $('bRecSmp').addEventListener('click', () => rcdPanel(cur));
+$('bEditSmp').addEventListener('click', () => rcdPanel(cur, {edit:{pad:cur, li:V().sel}}));   // EDIT SAMPLE (5 Nov, owner: "How do I open the sample editor")
 $('fileIn').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   loadAudioInto(f, cur);
@@ -14576,9 +14583,9 @@ function rcdMeter(){
   U.clip.hidden = !(performance.now() - RCD.clip < 1500);
   if (RCD.on && !RCD.sync){ const n = RCD.chunks.reduce((a, c) => a + c.ch[0].length, 0); U.state.textContent = `● Recording · ${(n / ctx.sampleRate).toFixed(1)} s`; }
 }
-// SKIN ACCENTS: the tracker's own pair where a skin has them (--mxbus for the wave, --mxcur for the selection: IDM blue and
-// orange), else the Sample family's colour and its complement (--smp, --smpc); either falls back to the ink when it would
-// be too faint on the panel (contrast under 2:1)
+// SKIN ACCENTS: the tracker's own pair where a skin has them (--mxcur for the wave, --mxbus for the selection: IDM orange and
+// blue), else the Sample family's colour and the standard blue; greys are passed over, and either falls back to the ink when
+// it would be too faint on the panel (contrast under 2:1)
 function rcdCols(){
   const key = (document.documentElement.dataset.skin || '') + '|' + (document.documentElement.dataset.theme || '') + '|' + matchMedia('(prefers-color-scheme: dark)').matches; if (RCD._ck === key && RCD._c) return RCD._c;   // once per skin
   const css = getComputedStyle(document.documentElement), v = k => css.getPropertyValue(k).trim(), ink = v('--ink') || '#222';
@@ -14586,13 +14593,15 @@ function rcdCols(){
   const rgb = c => { const x = document.createElement('canvas').getContext('2d'); x.fillStyle = '#000'; x.fillStyle = c; const h = x.fillStyle; if (h[0] === '#') return [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); const m = h.match(/[\d.]+/g); return m ? m.slice(0, 3).map(Number) : [0, 0, 0]; };
   const lum = c => { const [r, g, b] = rgb(c).map(x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
   const ok = (c, m) => { if (!c) return false; const a = lum(c), b = lum(box || '#fff'); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) >= m; };
-  const pick = (m, ...k) => { for (const c of k.map(v)) if (ok(c, m)) return c; return ink; };
+  const grey = c => { const [r, g, b] = rgb(c); return Math.max(r, g, b) - Math.min(r, g, b) < 40; };   // (909's second colour is a grey: skipped)
+  const pick = (m, ...k) => { for (const c of k.map(x => x.startsWith('--') ? v(x) : x)) if (ok(c, m) && !grey(c)) return c; return ink; };   // (a literal colour can end the list)
   // a selection is mostly a wide tint, so it may be paler (1.3:1); its edges and the cursor are that colour taken 45 % toward the ink
   const edge = c => { const a = rgb(c), b = rgb(ink); return 'rgb(' + a.map((x, i) => Math.round(x + (b[i] - x) * 0.45)).join(',') + ')'; };
-  const sel = pick(1.3, '--mxcur', '--smpc', '--std');
-  // a grey accent (909's) would only dull the wave: then the ink, crisp
-  const grey = c => { const [r, g, b] = rgb(c); return Math.max(r, g, b) - Math.min(r, g, b) < 40; }, w0 = pick(2, '--mxbus', '--smp', '--std');
-  RCD._ck = key; return (RCD._c = {wave:grey(w0) ? ink : w0, sel, selEdge:ok(sel, 2.5) ? sel : edge(sel)});
+  // (owner, 5 Nov: "the sample is orange and the selection blue"): the wave in the skin's first colour (--mxcur: IDM's orange),
+  // else the Sample family's; the selection in its second (--mxbus: IDM's blue), else the standard blue
+  // the wave is a filled shape, so 1.6:1 is enough (909's orange on its silver); a skin with no blue at all still gets one
+  const sel = pick(1.3, '--mxbus', '--std', '#2a6cff', '--smpc'), wave = pick(1.6, '--mxcur', '--smp', '--noise');
+  RCD._ck = key; return (RCD._c = {wave, sel, selEdge:ok(sel, 2.5) ? sel : edge(sel)});
 }
 // THE EDITOR'S VIEW: [a, b) frames of the take in view (RCD.view null = all of it), at least 32 frames wide
 function rcdClampView(a, b){ const n = RCD.take ? RCD.take.data.length : 0; let w = Math.max(32, Math.min(n, b - a)); a = Math.max(0, Math.min(n - w, a)); return n && w < n ? [a, a + w] : null; }
@@ -14652,9 +14661,11 @@ function rcdUi(){
   U.rec.classList.toggle('on', !!(RCD.on || R));
   U.state.textContent = R ? (R.phase === 'armed' ? (tp.on ? 'Armed: records from the next pattern…' : 'Starting the song…') : R.phase === 'closing' ? 'Finishing the take…'
       : `● Recording pattern ${R.n + 1}` + (R.pats > 0 ? ` of ${R.pats}` : '') + (R.stopReq ? ' · stops at its end' : ' · Stop ends it at the end of a pattern'))
-    : RCD.on ? '● Recording' : T ? (T.how === 'edit' ? '' : 'Take · ') + `${(T.data.length / T.sr).toFixed(2)} s · ${T.data2 ? 'stereo' : 'mono'} · ${(T.sr / 1000).toFixed(1)} kHz` + (T.how === 'sync' ? ` · ${T.pats} pattern${T.pats === 1 ? '' : 's'}, ${T.beats} beats` : '')
+    : RCD.on ? '● Recording' : T ? (T.how === 'sync' ? '' : '') + (T.how === 'sync' ? ` · ${T.pats} pattern${T.pats === 1 ? '' : 's'}, ${T.beats} beats` : '')
     : RCD.stream ? 'Ready.' : 'Pick an input and press Record.';
   U.edit.hidden = !T || !!(RCD.on || R);
+  U.state.hidden = !U.state.textContent;
+  if (T && U.whn){ U.whn.textContent = T.how === 'edit' ? (T.name || 'Sample') : 'Take'; U.whi.textContent = `${(T.data.length / T.sr).toFixed(2)} s · ${T.data2 ? 'stereo' : 'mono'} · ${(T.sr / 1000).toFixed(1)} kHz`; U.win.style.setProperty('--rcw', rcdCols().wave); }
   U.undoB.disabled = !RCD.undo.length; U.playB.textContent = rcdPrev ? '■' : '▶ Play';
   for (const b of U.lock) b.disabled = !!(RCD.on || R);
   rcdDrawWave();
@@ -14709,7 +14720,10 @@ async function rcdPanel(pad, opts){
   const zbtn = (t, f, tip) => { const b = el('button', null, t); b.type = 'button'; b.title = tip; b.addEventListener('click', f); zb.append(b); return b; };
   zbtn('−', () => rcdZoom(2, rcdAnchor()), 'Zoom out (at the cursor)'); zbtn('+', () => rcdZoom(0.5, rcdAnchor()), 'Zoom in (at the cursor, or the selection)');
   zbtn('FIT', () => { RCD.view = null; rcdUi(); }, 'Show the whole take'); zbtn('SEL', () => { if (RCD.sel){ const m = (RCD.sel[1] - RCD.sel[0]) * 0.05; RCD.view = rcdClampView(RCD.sel[0] - m, RCD.sel[1] + m); rcdUi(); } }, 'Zoom to the selection');
-  edit.append(ov, wave, bar);
+  // THE WINDOW (owner, 5 Nov: "like the fx boxes in the fx bar and pad mode buttons"): one card, a solid title bar with a
+  // square in the wave's colour, the overview, the waveform and the toolbar inside
+  const win = el('div', 'recwin'), wh = el('div', 'rech'), whn = el('span', 'rechn'), whi = el('span', 'rechi'); wh.append(el('i'), whn, whi);
+  win.append(wh, ov, wave, bar); edit.append(win);
   { const fx = e => { const r = wave.getBoundingClientRect(), [va, vb] = rcdView(); return va + clamp((e.clientX - r.left) / r.width, 0, 1) * (vb - va); };
     const P = new Map(); let drag = null, pinch = null;
     wave.addEventListener('pointerdown', e => { if (!RCD.take) return; e.preventDefault(); try { wave.setPointerCapture(e.pointerId); } catch(err){} P.set(e.pointerId, e);
@@ -14788,7 +14802,7 @@ async function rcdPanel(pad, opts){
   songB.addEventListener('click', () => { apRun(() => { if (tp.on) tStop(); else tStart('song', {row:songRow()}); }, []); songBtn(); rcdUi(); });
   rec.addEventListener('click', () => { if (RCD.on || RCD.sync) rcdStop(); else rcdStart().then(() => fillIn()); });
   const close = el('button', null, 'Close'); close.type = 'button'; row.append(songB, el('span', 'recsp'), rec, close); box.append(row); if (E){ rec.hidden = true; keepRow.append(close); row.hidden = true; }   // EDIT SAMPLE: Close beside Apply / Revert
-  Object.assign(RCD.ui, {rec, state, edit, wave, ov, rd, playB, undoB, lock, E, songB});
+  Object.assign(RCD.ui, {rec, state, edit, wave, ov, rd, playB, undoB, lock, E, songB, win, whn, whi});
   const songT = setInterval(() => { if (!RCD.ui){ clearInterval(songT); return; } const on = !!tp.on; if (songB._on !== on){ songB._on = on; songB.textContent = on ? '■ Song' : '▶ Song'; songB.classList.toggle('on', on); } }, 150);   // follows the song, however it was started
   const done = () => { if (askOpen !== done) return; askOpen = null; rcdAbort(); if (rcdPrev){ try { rcdPrev.stop(); } catch(e){} rcdPrev = null; } rcdClose(); RCD.ui = null; if (E){ RCD.take = null; RCD.undo = []; RCD.sel = null; } wrap.remove(); document.removeEventListener('keydown', key, true); };
   close.addEventListener('click', done);
@@ -21892,7 +21906,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 444;
+const BUILD = 445;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -30437,6 +30451,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [445, '5 Nov', ['Sample layers have an Edit… button beside Load sample and Record… that opens the sample editor.', 'The editor draws the waveform orange and the selection blue, and the waveform sits in a card styled like the FX bar boxes: a dark title bar with the sample’s name, length, channels and rate.']],
   [444, '5 Nov', ['The sample editor draws in your skin’s accent colours (IDM: blue wave, orange selection) and is laid out more cleanly: one toolbar over the waveform (Play, the readout, Undo, zoom), tools in joined groups, the recording settings in two columns, Revert on the left and Apply / Close on the right.', 'Record a sample… has a ▶ Song / ■ Song button to start or stop the song from the panel.', 'Phone: the Synth page has the Song play / stop button in its top bar; on a folded phone the kit name makes room for it.']],
   [443, '5 Nov', ['Edit sample… (on a sample layer): the take editor on a loaded sample. Apply writes it back (Undo on the Synth page takes it back); Start, Loop start and Loop end move with the audio when you crop, cut, reverse or trim.', 'The editor is bigger, with an overview of the whole sample and a time ruler. Zoom with the wheel or a pinch (at the pointer), − / + at the cursor (a click places it), FIT and SEL; Shift+wheel or a sideways swipe scrolls; drag the overview to move.', 'New edits: Snap (selections land on zero crossings), Remove DC, Invert, To mono, To stereo, Append file….']],
   [442, '5 Nov', ['Load sample opens the sample browser (also File › Samples…): FOLDER shows your sample folder and its subfolders (set it once; after a restart one press of Reconnect where the browser asks), RECENT every sample you’ve loaded or recorded, from anywhere. ＋ Files… brings in files from anywhere (one goes straight into the pad). Search, ▲▼ to audition, Enter or double-click to load.', 'Samples can be up to 5 minutes (was 2).']],
