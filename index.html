@@ -764,6 +764,21 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .recops{flex-wrap:wrap; gap:6px; margin-top:4px}
 .recops button{padding:4px 8px}
 .recedit .btnrow select{min-height:30px; max-width:14em}
+/* SAMPLE BROWSER (5 Nov): tabs + search, the folder / file buttons, a scrolling list, the pad and Load */
+.smbask .askbox{width:min(560px, calc(100vw - 32px)); max-width:none}
+.smbtop{display:flex; gap:8px; align-items:center; margin:6px 0} .smbtop .seg button{padding:3px 10px}
+.smbq{flex:1; min-width:0; min-height:30px}
+.smbacts{justify-content:flex-start; margin-top:4px; flex-wrap:wrap; gap:6px}
+.smbinfo{margin:6px 0 4px; min-height:1.3em}
+.smblist{height:min(46vh, 380px); overflow:auto; border:1px solid color-mix(in srgb, var(--ink) 25%, transparent); border-radius:3px; outline:none}
+.smblist:focus-visible{box-shadow:0 0 0 2px var(--ink)}
+.smbrow{display:flex; gap:10px; align-items:baseline; padding:4px 8px; cursor:pointer; user-select:none}
+.smbrow:hover{background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.smbrow.on{background:var(--ink); color:var(--panel, #fff)}
+.smbn{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.smbs{flex:none; max-width:45%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; opacity:.65; font-size:.9em}
+.smbempty{padding:12px; opacity:.7}
+.smbfoot{flex-wrap:wrap; gap:6px; align-items:center} .smbfoot select{min-height:30px; max-width:14em}
 .ask .ok{background:var(--pl); color:var(--inv); border-color:var(--pl); font-weight:600}
 /* First launch: the three gestures the whole app rests on, shown once over the tracker; any tap closes it. */
 .welcome{position:fixed; inset:0; z-index:65; display:flex; align-items:flex-end; justify-content:center; background:rgba(0,0,0,.42); padding:16px; padding-bottom:calc(130px + env(safe-area-inset-bottom,0px))}
@@ -3227,7 +3242,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p><b>…chains modules:</b> every effect module in a …chains patch has a <b>BYP</b> button on its title bar with a number: it bypasses the module (its dry sound passes). From a phrase, <code>BYP 31</code> bypasses module 3 on that track's chain, <code>BYP 30</code> puts it back, and <code>BYP 34</code> switches it the other way from the patch for four rows, so a trance gate left bypassed plays for four rows. <code>BYP 0Y</code> does every numbered module. Stopping the song puts them back as the patch has them.</p>
 <p><b>Presets and sidechains in …chains:</b> effects and sound sources have a <b>Preset</b> row: factory presets, Default, and your own (Save as a preset keeps them on this device, for every patch). Every sidechain user has a <b>Source</b>: <b>Self</b>, <b>Send 1–8</b> (what a <b>Sidechain Out</b> in any chain sends) or one <b>track</b>'s own sound, before its effects and fader, so a muted ghost kick still drives it. That goes for <b>Sidechain In</b> (its meter shows what it hears before you patch it), Sidechain Comp, the compressors, the noise gate and the envelope filter, in …chains and as track or master effects. The Mixer's <b>SC</b> row lights when a track is a source for something. The light beside a module's <b>SC</b> input flashes with the sidechain it hears.</p>
 <h3>Flex, Step gate and Retrigger</h3>
-<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (256 patterns; <code>FLX</code> picks one from a row: 01–10 the originals, then families by the first hex digit, after the OP-Z and Pocket Operator punch-ins: 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops and wow, 8 scratches, 9 gates and pumps, A filter sweeps, B bit crush, C fading repeats, D juggles, E swing and feel, F chaos). <b>Record a sample…</b> (Synth page beside Load sample, or File): an input, STEREO / MONO / LEFT / RIGHT, monitoring (headphones) and a level meter; FREE records until Stop; PATTERN records whole patterns in time with the song, as Renoise's pattern sync: playing, it starts at the next pattern and Stop ends it at the end of one (or after the LENGTH set); stopped, it starts the song from the cursor's pattern. EXTRA LATENCY moves the take if it lands early or late. The take can then be edited (drag across it to select) and kept in a pad; FIT TO TEMPO sets the pad's instruments to SYNC with the take's beats. <code>FLY</code> is Flex's second bank, 255 more for IDM, in the spirit of Aphex Twin and Autechre: <code>FLY 01</code>–<code>0F</code> are one of each family to try first, then by the first digit 1 pitch rolls (drill'n'bass: every repeat a step higher or lower), 2 euclidean gates (REPEAT holds the last hit instead of a gap), 3 probability (slices muted, repeated or ratcheted by chance), 4 slice pitch (slices jump to octaves, fifths or anywhere), 5 freeze, buzz and smear, 6 CD skips and dropouts, 7 bouncing, speeding and slowing rolls, 8 mutating shuffles (a little different each bar), 9 stutter edits, A polymeter (a loop of 3/16, 5/16… against the bar), B warp (every slice bends in pitch), C reverse rolls and rewinds, D grains, E texture (crush, filters and chops on random slices), F chaos 2. Most change every bar over a four-bar cycle; FIXED ones repeat the same every bar. FLX and FLY drive the same Flex, so the last one written plays. <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT 01</code>–<code>0F</code> pick a pattern, <code>GAT 10</code> the CUSTOM steps, and <code>GAT 00</code> stops it (the gate opens until the next GAT). <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot. Pattern names give note values: <i>ROLL 1/16</i> rolls sixteenth notes, <i>STUTTER 1/32 EVERY 1/4</i> repeats a 32nd at the start of every quarter. <b>STARTS</b> on a Flex or Step gate: <b>ON FLX</b> / <b>ON GAT</b> (new slots) keeps it off (Step gate: open) until a command turns it on in the song, or <code>FXO</code> switches its slot on (then it plays its own PATTERN); it stays on until <code>FLX 00</code> (or FXO off), and waits again after STOP. Starting mid-song, the last command before that row is played at the start. <b>AT PLAY</b> (slots from songs made before 3 Nov) plays its PATTERN from PLAY, as before. Retrigger's MODE: RTG ONLY works the same way. In the FX bar, each of these slots draws the pattern it plays now with a playhead: Flex as a time map (where in the bar it plays from: repeats are saw teeth, reverses fall, half speed is a shallower line), its level along the bottom and its filter or crush; Step gate its steps; Retrigger its repeats.</p>
+<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (256 patterns; <code>FLX</code> picks one from a row: 01–10 the originals, then families by the first hex digit, after the OP-Z and Pocket Operator punch-ins: 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops and wow, 8 scratches, 9 gates and pumps, A filter sweeps, B bit crush, C fading repeats, D juggles, E swing and feel, F chaos). <b>Load sample</b> opens the sample browser (or File › Samples…): FOLDER is your sample folder with its subfolders, set once and remembered (where the browser asks again after a restart, press Reconnect); RECENT is every sample you've loaded or recorded, from anywhere; ＋ Files… adds files from anywhere (one file loads straight into the pad). Type to search, ▲▼ to walk the list (AUDITION plays each), Enter or a double-click loads into the pad picked at the bottom. Phones get RECENT and ＋ Files…. <b>Record a sample…</b> (Synth page beside Load sample, or File): an input, STEREO / MONO / LEFT / RIGHT, monitoring (headphones) and a level meter; FREE records until Stop; PATTERN records whole patterns in time with the song, as Renoise's pattern sync: playing, it starts at the next pattern and Stop ends it at the end of one (or after the LENGTH set); stopped, it starts the song from the cursor's pattern. EXTRA LATENCY moves the take if it lands early or late. The take can then be edited (drag across it to select) and kept in a pad; FIT TO TEMPO sets the pad's instruments to SYNC with the take's beats. <code>FLY</code> is Flex's second bank, 255 more for IDM, in the spirit of Aphex Twin and Autechre: <code>FLY 01</code>–<code>0F</code> are one of each family to try first, then by the first digit 1 pitch rolls (drill'n'bass: every repeat a step higher or lower), 2 euclidean gates (REPEAT holds the last hit instead of a gap), 3 probability (slices muted, repeated or ratcheted by chance), 4 slice pitch (slices jump to octaves, fifths or anywhere), 5 freeze, buzz and smear, 6 CD skips and dropouts, 7 bouncing, speeding and slowing rolls, 8 mutating shuffles (a little different each bar), 9 stutter edits, A polymeter (a loop of 3/16, 5/16… against the bar), B warp (every slice bends in pitch), C reverse rolls and rewinds, D grains, E texture (crush, filters and chops on random slices), F chaos 2. Most change every bar over a four-bar cycle; FIXED ones repeat the same every bar. FLX and FLY drive the same Flex, so the last one written plays. <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT 01</code>–<code>0F</code> pick a pattern, <code>GAT 10</code> the CUSTOM steps, and <code>GAT 00</code> stops it (the gate opens until the next GAT). <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot. Pattern names give note values: <i>ROLL 1/16</i> rolls sixteenth notes, <i>STUTTER 1/32 EVERY 1/4</i> repeats a 32nd at the start of every quarter. <b>STARTS</b> on a Flex or Step gate: <b>ON FLX</b> / <b>ON GAT</b> (new slots) keeps it off (Step gate: open) until a command turns it on in the song, or <code>FXO</code> switches its slot on (then it plays its own PATTERN); it stays on until <code>FLX 00</code> (or FXO off), and waits again after STOP. Starting mid-song, the last command before that row is played at the start. <b>AT PLAY</b> (slots from songs made before 3 Nov) plays its PATTERN from PLAY, as before. Retrigger's MODE: RTG ONLY works the same way. In the FX bar, each of these slots draws the pattern it plays now with a playhead: Flex as a time map (where in the bar it plays from: repeats are saw teeth, reverses fall, half speed is a shallower line), its level along the bottom and its filter or crush; Step gate its steps; Retrigger its repeats.</p>
 <h3>Track effects</h3>
 <p>Each track and the master have 8 effect slots (FX screen, or the Mixer’s FX row): 73 effects on a track and 82 on a bus or the master (with the nine …pump ones; …pump EQ goes on any track), in groups: dynamics and EQ (compressors, Bus and Glue Comp, limiter, noise gate, transient shaper, multiband, air), filters (filter, ladder, low and high cut, auto-wah, vowel, envelope filter), drive and lo-fi (saturation, drive, overdrive, tube, tape, wavefolder, bitcrush, lo-fi, degrade, vintage sampler (an SP-1200, SP-12, MPC60, SP-202 at each of its grades, or Emulator II: their rate and bit depth, converters, filters and noise), vinyl, dub tape, cab), modulation (chorus, ensemble, dimension, flanger, phaser, tremolo, auto-pan, rotary, ring mod, cross-mod, frequency shifter), delays (simple, tape, BBD, pitch, granular, reverse echo), reverbs (room, plate, spring, space, Galactic, pitch reverb, convolution), pitch and voice (pitch shifter, harmonizer, pitch correct), resonators (resonator, comb, Rings), spectral and granular (Clouds, Beads, spectral, extreme stretch), rhythmic (Flex, Step gate, Retrigger, trance gate, pump, Beat grains, Beat scramble, Glitch sequencer) and utility (stereo width, utility). The pad's Add effect menu has 65 of them. On the Mixer’s FX row, OPTION (Ctrl/⌘ in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter. For drums and IDM: <b>Beat grains</b> (a rhythmic grain cloud in time with the song, after Output Portal: rate, density, size, position, spray, pitch and random pitch, reverse, shape, stereo, freeze), <b>Beat scramble</b> (re-orders the last bar's slices, some reversed; keep the beats, new every bar or looped) and <b>Glitch sequencer</b> (each step may stutter, reverse, jump an octave, tape-stop, crush or drop out). Under a slot's controls, <b>› PRESET</b> lists INIT, factory presets (over 230 across the effects) and the song's own, and <b>› SAVE AS PRESET…</b> keeps the slot's settings for that effect. <b>› EQ WINDOW</b> (at the bottom of the FX screen, on any track) opens the track's …pump EQ in its own window, adding one to a free slot if needed; …pump EQ works on every track, the other …pump effects on buses and the master.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
@@ -4440,7 +4455,7 @@ function padFx(V, out, sr, stages){
   for (let i = 0; i < fl; i++) res[res.length - 1 - i] *= i / fl;
   return res;
 }
-const SMP_MAX = 120;   // SAMPLER: the longest sample, in seconds (see smpChannels)
+const SMP_MAX = 300;   // SAMPLER: the longest sample, in seconds (see smpChannels; owner, 5 Nov: 5 minutes)
 function renderVoice(V, sr, stages, hold){
   if (isBassV(V)) return renderBass(V, sr, hold);
   if (isVoxV(V)) return renderVox(V, sr);
@@ -7844,7 +7859,7 @@ const P = {
   pAmt:{l:'Env amt', min:-48, max:48, c:'half', d:0, f:st},
   pDec:{l:'Env time', min:1, max:2000, c:'log', d:60, f:ms},
   atk:{l:'Attack', min:0.1, max:2000, c:'log', d:0.5, f:ms},
-  hold:{l:'Hold', min:0, max:120000, c:'sq', d:0, f:ms},
+  hold:{l:'Hold', min:0, max:300000, c:'sq', d:0, f:ms},
   dec:{l:'Decay', min:1, max:6000, c:'log', d:300, f:ms},
   sus:{l:'Sustain', min:0, max:1, c:'lin', d:0.6, f:pct},
   rel:{l:'Release', min:1, max:6000, c:'log', d:150, f:ms},
@@ -7893,7 +7908,7 @@ const VP = {
   tune:{l:'Tune', min:-24, max:24, c:'int', d:0, f:st},
   drive:{l:'Drive', min:0, max:1, c:'lin', d:0, f:pct},
   gate:{l:'Gate', min:5, max:4000, c:'log', d:200, f:ms},
-  len:{l:'Max len', min:0.1, max:120, c:'sq', d:4, f:v => v.toFixed(2) + ' s'},
+  len:{l:'Max len', min:0.1, max:300, c:'sq', d:4, f:v => v.toFixed(2) + ' s'},
 };
 // Voice-wide rows (the amp rows reuse P.atk…P.rel). These edit the whole voice, not one layer.
 // Each envelope has an Amount slider: how far its envelope is applied to pitch, filter or amp.
@@ -13133,6 +13148,7 @@ function smpTidy(){
   // Samples seen this session (a kit just replaced, undo steps) and the song's impulse responses are kept too: Undo
   // brings a replaced kit back with its audio while the app is open. They go at the first tidy after a restart.
   for (const id of smpHeld.keys()) used.add(id);
+  for (const r of smbRecent()) used.add(r.id);   // SAMPLE BROWSER: RECENT keeps its samples
   try { for (const e of S.irs || []) if (e) for (const c of [e.L, e.R]) if (c && c.ref) used.add(c.ref); } catch(e){}
   try { const P = S.presets || {}; for (const p of P.voices || []) for (const l of (p.v && p.v.layers) || []) if (l.sample && l.sample.ref) used.add(l.sample.ref); for (const p of P.layers || []) if (p.l && p.l.sample && p.l.sample.ref) used.add(p.l.sample.ref); } catch(e){}
   try { for (const k of [KEY, TK]){ const j = localStorage.getItem(k) || ''; for (const m of j.matchAll(/"ref":"([^"]+)"/g)) used.add(m[1]); } } catch(e){}
@@ -13530,6 +13546,7 @@ function fileItems(){
       {l:'ELECTRO (demo project)', f:guardLeave('ELECTRO', loadElectro)},
       {l:'Funk breaks…', f:pickBreak},
       {l:'Breaks to chop (…pump BREAK)…', f:pickChopBreak}]},
+    {l:'Samples… (browse and load)', f:() => smbPanel(typeof cur === 'number' ? cur : 0)},   // SAMPLE BROWSER (5 Nov)
     {l:'Record a sample…', f:() => rcdPanel(typeof cur === 'number' ? cur : 0)},   // RECORD INTO A PAD (5 Nov)
     {h:'Render'},
     {l:'Render song (WAV)', f:() => renderOut(false)}, {l:'Render stems (.zip)', f:() => renderOut(true)},
@@ -13982,9 +13999,10 @@ function smpChannels(b){
   if (b.numberOfChannels > 2) for (let c = 2; c < b.numberOfChannels; c++){ const ch = b.getChannelData(c), k = c & 1 ? d2 : d; for (let i = 0; i < n; i++) k[i] += ch[i] * 0.5; }   // 5.1 and up: folded onto the two
   return {d, d2:diff || b.numberOfChannels > 2 ? d2 : null, n};
 }
-function assignSample(vi, data, sr, name, data2){
+function assignSample(vi, data, sr, name, data2, id){
   const v = kit.voices[vi], li = v.sel;
-  const lenMs = data.length / sr * 1000, smp = {data, sr, name}; if (data2) smp.data2 = data2;
+  const lenMs = data.length / sr * 1000, smp = {data, sr, name}; if (data2) smp.data2 = data2; if (id) smp.id = id;
+  smbAdd(smp);   // SAMPLE BROWSER: to the top of RECENT (and the sample store)
   // A PWM sampler layer keeps its clock and mode and just takes the new sound.
   if (v.layers[li] && (v.layers[li].type === 'pwm' || v.layers[li].type === 'grains')){ v.layers[li].sample = smp; v.layers[li].on = true;
     v.len = Math.max(v.len, Math.min(SMP_MAX, data.length / sr + 0.1)); cur = vi; changed(vi); refreshAll(); return; }
@@ -13993,7 +14011,7 @@ function assignSample(vi, data, sr, name, data2){
   v.len = Math.max(v.len, Math.min(SMP_MAX, data.length / sr + 0.1));
   cur = vi; changed(vi); refreshAll();
 }
-$('bLoad').addEventListener('click', () => $('fileIn').click());
+$('bLoad').addEventListener('click', () => smbPanel(cur));   // SAMPLE BROWSER (was the file picker: ＋ Files… in the panel)
 $('bRecSmp').addEventListener('click', () => rcdPanel(cur));
 $('fileIn').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
@@ -14228,6 +14246,149 @@ function seConcat(a, b) {
   return seMake(a, d1, d2);
 }
 /* ===SMP EDIT END=== */
+/* ===== SAMPLE BROWSER (owner, 5 Nov: "a folder on the computer, but I also want to be able to pick files from elsewhere …
+   less awkward than it sounds") =====
+   Load sample opens it. One list, two sources: FOLDER, the sample folder (picked once, its subfolders read; the handle is
+   kept in IndexedDB, so after a restart one press of RECONNECT allows it again, where the browser asks) and RECENT, every
+   sample loaded or recorded into a pad, wherever it came from (kept in this app's sample store, up to SMB_MAX; smpTidy
+   keeps them), plus files added with ＋ FILES… this session. Search filters either; ▲▼ walk the list and play each one
+   (AUDITION); Enter, a double-click or LOAD puts it into the pad's selected layer, as Load sample did. Phones and browsers
+   without folder access (no showDirectoryPicker) get RECENT and ＋ FILES… only. To remove: this block, its smpTidy line,
+   the assignSample hook (smbAdd) and bLoad's handler (back to the file picker). */
+const SMB_K = 'thunderplus-recent-v1', SMB_MAX = 40, SMB_EXT = /\.(wav|wave|aif|aiff|aifc|flac|mp3|ogg|oga|opus|m4a|aac|caf|webm)$/i;
+const SMB = {tab:'folder', q:'', files:null, scanning:false, dir:null, perm:'', session:[], sel:0, aud:true, prev:null, ui:null};
+const smbRecent = () => { try { const a = JSON.parse(localStorage.getItem(SMB_K) || '[]'); return Array.isArray(a) ? a : []; } catch(e){ return []; } };
+// A sample a pad just took: to the top of RECENT, and into the sample store now (so it's there even if the pad changes first)
+function smbAdd(S){
+  if (!S || !S.data) return;
+  if (!S.id) S.id = smpId();
+  const a = smbRecent().filter(r => r.id !== S.id);
+  a.unshift({id:S.id, name:S.name || 'Sample', secs:+(S.data.length / S.sr).toFixed(2), st:S.data2 ? 1 : 0, t:Date.now()});
+  try { localStorage.setItem(SMB_K, JSON.stringify(a.slice(0, SMB_MAX))); } catch(e){}
+  try { smpPut(S).catch(() => {}); } catch(e){}
+}
+const smbDb = () => idbOpen('thunderplus-browser');   // (its store is called 'smp' too: idbOpen makes that one; here it holds the folder handle)
+async function smbKv(k, v){ try { const db = await smbDb(); return await new Promise(res => { const tx = db.transaction('smp', v === undefined ? 'readonly' : 'readwrite'), st = tx.objectStore('smp');
+  if (v === undefined){ const q = st.get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); } else { st.put(v, k); tx.oncomplete = () => res(true); tx.onerror = () => res(false); } }); } catch(e){ return null; } }
+const smbCanDir = () => typeof window.showDirectoryPicker === 'function';
+async function smbPerm(ask){ const d = SMB.dir; if (!d) return (SMB.perm = '');
+  try { let p = await d.queryPermission({mode:'read'}); if (p !== 'granted' && ask) p = await d.requestPermission({mode:'read'}); return (SMB.perm = p); } catch(e){ return (SMB.perm = 'denied'); } }
+async function smbPickDir(){
+  try { const d = await window.showDirectoryPicker({id:'thunder-samples', mode:'read'}); SMB.dir = d; SMB.files = null; await smbKv('folder', d); SMB.perm = 'granted'; smbScan(); }
+  catch(e){ if (e && e.name !== 'AbortError') toast('Couldn’t open that folder.'); }
+}
+// Every audio file under the folder (subfolders too, up to 8 deep and 20,000 files), sorted by path
+async function smbScan(){
+  if (!SMB.dir || SMB.scanning) return; if ((await smbPerm(false)) !== 'granted'){ smbUi(); return; }
+  SMB.scanning = true; SMB.files = []; smbUi(); const out = [];
+  const walk = async (d, pre, depth) => { if (depth > 8 || out.length >= 20000) return;
+    try { for await (const [n, h] of d.entries()){ if (n.startsWith('.')) continue;
+      if (h.kind === 'directory') await walk(h, pre + n + '/', depth + 1); else if (SMB_EXT.test(n)) out.push({name:n.replace(SMB_EXT, ''), path:pre, h});
+      if (out.length % 500 === 0){ SMB.files = out.slice(); smbUi(); } } } catch(e){} };
+  await walk(SMB.dir, '', 0);
+  out.sort((a, b) => (a.path + a.name).localeCompare(b.path + b.name, undefined, {numeric:true, sensitivity:'base'}));
+  SMB.files = out; SMB.scanning = false; smbUi();
+}
+// The rows the list shows now
+function smbRows(){
+  const q = SMB.q.trim().toLowerCase(), hit = s => !q || q.split(/\s+/).every(w => s.toLowerCase().includes(w));
+  if (SMB.tab === 'folder') return (SMB.files || []).filter(f => hit(f.path + f.name)).slice(0, 3000).map(f => ({k:'f', name:f.name, sub:f.path, f}));
+  const sess = SMB.session.filter(f => hit(f.name)).map(f => ({k:'s', name:f.name.replace(SMB_EXT, ''), sub:'added this session', file:f}));
+  return sess.concat(smbRecent().filter(r => hit(r.name)).map(r => ({k:'r', name:r.name, sub:`${r.secs} s${r.st ? ' · stereo' : ''}`, r})));
+}
+// A row → {buf (AudioBuffer, for audition), load()}. Recent ones come from the sample store.
+const smbCache = new Map();
+async function smbOpen(row){
+  const key = row.k === 'r' ? 'r:' + row.r.id : row.k === 'f' ? 'f:' + row.sub + row.f.h.name : 's:' + row.file.name + row.file.size;
+  if (smbCache.has(key)) return smbCache.get(key);
+  let res;
+  if (row.k === 'r'){ const held = smpById(row.r.id); let d, d2, sr;
+    if (held){ d = held.data; d2 = held.data2 || null; sr = held.sr; }
+    else { const r = await smpGet(row.r.id); if (!r || !r.pcm) return null; const f32 = b => { const p = new Int16Array(b), x = new Float32Array(p.length); for (let k = 0; k < p.length; k++) x[k] = p[k] / 32767; return x; };
+      d = f32(r.pcm); d2 = r.pcm2 ? f32(r.pcm2) : null; sr = r.sr || 48000; }
+    audio(); res = {buf:stBuf(ctx, d, d2, sr), load:pad => { assignSample(pad, d.slice(), sr, row.r.name, d2 ? d2.slice() : null, row.r.id); toast(`Loaded ${row.r.name} into pad ${hx(pad)}`); playFresh(pad); }}; }
+  else { const file = row.k === 'f' ? await row.f.h.getFile() : row.file; audio(); const ab = await file.arrayBuffer();
+    const b = await new Promise((ok, no) => { const p = ctx.decodeAudioData(ab, ok, no); if (p && p.then) p.then(ok, no); });
+    res = {buf:b, load:pad => loadAudioInto(file, pad)}; }
+  smbCache.set(key, res); if (smbCache.size > 12) smbCache.delete(smbCache.keys().next().value);
+  return res;
+}
+function smbStop(){ if (SMB.prev){ try { SMB.prev.stop(); } catch(e){} SMB.prev = null; } }
+async function smbAudition(i){
+  const row = smbRows()[i]; if (!row) return; smbStop();
+  try { const o = await smbOpen(row); if (!o || SMB.sel !== i || !SMB.ui) return; const src = ctx.createBufferSource(); src.buffer = o.buf; src.connect(master); src.start(); SMB.prev = src; }
+  catch(e){ toast('Couldn’t read ' + row.name + '.'); }
+}
+async function smbLoad(i){
+  const row = smbRows()[i]; if (!row) return; const pad = SMB.ui ? +SMB.ui.padS.value : cur;
+  try { const o = await smbOpen(row); if (!o) return toast(`${row.name} is no longer in this app’s sample store.`); smbStop(); o.load(pad); }
+  catch(e){ toast('Couldn’t read ' + row.name + '.'); }
+}
+function smbUi(){
+  const U = SMB.ui; if (!U) return;
+  [...U.tabs.children].forEach(b => { const on = b.dataset.t === SMB.tab; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  const fold = SMB.tab === 'folder', can = smbCanDir();
+  U.setB.hidden = !fold || !can; U.recB.hidden = !(fold && SMB.dir && SMB.perm && SMB.perm !== 'granted');
+  U.setB.textContent = SMB.dir ? 'Change folder…' : 'Set sample folder…';
+  U.info.textContent = !fold ? 'Samples you’ve loaded or recorded, from anywhere (newest first), and files added with ＋ Files….'
+    : !can ? 'This browser can’t keep a folder: use ＋ Files…, and everything you load is kept in Recent.'
+    : !SMB.dir ? 'Set a sample folder once: it’s remembered, with its subfolders.'
+    : SMB.perm !== 'granted' ? `The folder “${SMB.dir.name}” needs to be allowed again: press Reconnect.`
+    : SMB.scanning ? `Reading “${SMB.dir.name}”… ${(SMB.files || []).length} files so far` : `${SMB.dir.name}: ${(SMB.files || []).length} files`;
+  const rows = smbRows(); SMB.sel = Math.max(0, Math.min(SMB.sel, rows.length - 1));
+  U.list.textContent = '';
+  if (!rows.length){ U.list.append(el('div', 'smbempty', fold ? (SMB.dir ? (SMB.q ? 'Nothing matches.' : '') : '') : SMB.q ? 'Nothing matches.' : 'Nothing yet: load or record a sample, or add files.')); return; }
+  const frag = document.createDocumentFragment();
+  rows.forEach((r, i) => { const d = el('div', 'smbrow' + (i === SMB.sel ? ' on' : '')); d.dataset.i = i; d.setAttribute('role', 'option'); d.setAttribute('aria-selected', i === SMB.sel);
+    d.append(el('span', 'smbn', r.name), el('span', 'smbs', r.sub)); frag.append(d); });
+  U.list.append(frag);
+  const on = U.list.children[SMB.sel]; if (on && on.scrollIntoView) on.scrollIntoView({block:'nearest'});
+}
+async function smbPanel(pad){
+  if (askOpen) askOpen(null);
+  pad = pad == null ? cur : pad;
+  if (!SMB.dir && smbCanDir()){ SMB.dir = await smbKv('folder'); if (SMB.dir) await smbPerm(false); }
+  const wrap = el('div', 'ask acidask smbask'), box = el('div', 'askbox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Samples');
+  box.append(el('div', 'asktitle', 'Samples'));
+  const top = el('div', 'smbtop'), tabs = el('div', 'seg');
+  for (const [t, n] of [['folder', 'FOLDER'], ['recent', 'RECENT']]){ const b = el('button', null, n); b.type = 'button'; b.dataset.t = t; b.addEventListener('click', () => { SMB.tab = t; SMB.sel = 0; smbUi(); list.focus(); }); tabs.append(b); }
+  const qI = el('input', 'smbq'); qI.type = 'search'; qI.placeholder = 'Search'; qI.value = SMB.q; qI.setAttribute('aria-label', 'Search samples');
+  qI.addEventListener('input', () => { SMB.q = qI.value; SMB.sel = 0; smbUi(); });
+  top.append(tabs, qI); box.append(top);
+  const acts = el('div', 'btnrow smbacts'), mk = (t, f, cls) => { const b = el('button', cls || null, t); b.type = 'button'; b.addEventListener('click', f); acts.append(b); return b; };
+  const setB = mk('Set sample folder…', smbPickDir), recB = mk('Reconnect', async () => { if ((await smbPerm(true)) === 'granted') smbScan(); else smbUi(); }, 'ok');
+  const fIn = el('input'); fIn.type = 'file'; fIn.multiple = true; fIn.accept = 'audio/*,.wav,.aif,.aiff,.flac,.mp3,.ogg,.m4a,.opus'; fIn.hidden = true;
+  fIn.addEventListener('change', () => { const F = [...fIn.files]; fIn.value = ''; if (!F.length) return;
+    if (F.length === 1){ loadAudioInto(F[0], +padS.value); SMB.tab = 'recent'; SMB.sel = 0; setTimeout(smbUi, 400); return; }   // one file: straight in, as Load sample did
+    SMB.session = F.concat(SMB.session.filter(x => !F.some(f => f.name === x.name && f.size === x.size))); SMB.tab = 'recent'; SMB.sel = 0; smbUi(); });
+  mk('＋ Files…', () => fIn.click()); box.append(acts, fIn);
+  const info = el('div', 'askmsg smbinfo'); box.append(info);
+  const list = el('div', 'smblist'); list.tabIndex = 0; list.setAttribute('role', 'listbox'); list.setAttribute('aria-label', 'Samples'); box.append(list);
+  list.addEventListener('click', e => { const r = e.target.closest('.smbrow'); if (!r) return; SMB.sel = +r.dataset.i; smbUi(); if (SMB.aud) smbAudition(SMB.sel); });
+  list.addEventListener('dblclick', e => { const r = e.target.closest('.smbrow'); if (r) smbLoad(+r.dataset.i); });
+  const foot = el('div', 'btnrow smbfoot'), padS = el('select'); for (let k = 0; k < kit.voices.length; k++) padS.append(new Option(hx(k) + ' ' + (kit.voices[k].name || ''), k)); padS.value = pad;
+  const audB = el('button', SMB.aud ? 'on' : null, 'AUDITION'); audB.type = 'button'; audB.setAttribute('aria-pressed', SMB.aud);
+  audB.addEventListener('click', () => { SMB.aud = !SMB.aud; audB.classList.toggle('on', SMB.aud); audB.setAttribute('aria-pressed', SMB.aud); if (!SMB.aud) smbStop(); });
+  const loadB = el('button', 'ok', 'Load'), close = el('button', null, 'Close'); loadB.type = close.type = 'button';
+  loadB.addEventListener('click', () => smbLoad(SMB.sel));
+  foot.append(audB, el('span', null, 'Pad'), padS, loadB, close); box.append(foot);
+  SMB.ui = {tabs, setB, recB, info, list, padS};
+  const done = () => { if (askOpen !== done) return; askOpen = null; smbStop(); SMB.ui = null; wrap.remove(); document.removeEventListener('keydown', key, true); };
+  close.addEventListener('click', done);
+  // Keys: ▲▼ walk (and play), Enter loads, Esc closes; typing goes to the search box
+  const key = e => { const tag = e.target && e.target.tagName, n = smbRows().length;
+    if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); return done(); }
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && tag !== 'SELECT'){ e.preventDefault(); e.stopPropagation(); if (!n) return; SMB.sel = Math.max(0, Math.min(n - 1, SMB.sel + (e.key === 'ArrowDown' ? 1 : -1))); smbUi(); if (SMB.aud) smbAudition(SMB.sel); return; }
+    if (e.key === 'Enter' && tag !== 'BUTTON' && tag !== 'SELECT'){ e.preventDefault(); e.stopPropagation(); return smbLoad(SMB.sel); }
+    if (e.key === ' ' && tag !== 'INPUT' && tag !== 'BUTTON'){ e.preventDefault(); e.stopPropagation(); return SMB.prev ? smbStop() : smbAudition(SMB.sel); }
+    e.stopPropagation(); };
+  askOpen = done; document.addEventListener('keydown', key, true);
+  wrap.append(box); document.body.append(wrap);
+  if (SMB.dir && SMB.perm === 'granted' && !SMB.files) smbScan();
+  if (!SMB.dir || !smbCanDir()) SMB.tab = SMB.tab === 'folder' && !smbRecent().length && !SMB.session.length ? 'folder' : SMB.dir ? SMB.tab : 'recent';
+  smbUi(); setTimeout(() => list.focus(), 0);
+}
+/* ===== end SAMPLE BROWSER ===== */
 /* ===== RECORD INTO A PAD (owner, 5 Nov: "recording … as long as we have some edit capabilities. I like how Renoise can
    sync recording to pattern start and end") =====
    The panel (rcdPanel): an input, its channels, monitoring and a level meter; PATTERN or FREE; then the take, edited in place
@@ -21563,7 +21724,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 441;
+const BUILD = 442;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -30107,6 +30268,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [442, '5 Nov', ['Load sample opens the sample browser (also File › Samples…): FOLDER shows your sample folder and its subfolders (set it once; after a restart one press of Reconnect where the browser asks), RECENT every sample you’ve loaded or recorded, from anywhere. ＋ Files… brings in files from anywhere (one goes straight into the pad). Search, ▲▼ to audition, Enter or double-click to load.', 'Samples can be up to 5 minutes (was 2).']],
   [441, '5 Nov', ['Record a sample… (Synth page, next to Load sample; File menu): pick an input, its channels and monitoring, watch the level, and record FREE or PATTERN. PATTERN works like Renoise’s sync: with the song playing it starts at the next pattern and Stop ends it at the end of a pattern (or set a length in patterns); pressed while stopped, the song starts from the cursor’s pattern. Then edit the take (drag to select: crop, cut, silence, normalise, fades, gain, reverse, auto-trim, undo) and keep it in a pad, fitted to the tempo.']],
   [440, '5 Nov', ['Samples keep their stereo: a stereo file plays in stereo (the layer shows · ST), from the pads, both sequencers, renders and pad exports. Render to a slot and …chains Resample keep stereo too.', 'Samples can be up to 2 minutes (was 30 s), and pad effects no longer cut a pad at 12 s.', 'Sample loop: Loop (Forward or Ping-pong), Loop start, Loop end and Crossfade on a sample layer. A looped layer holds while the note is held (or for the pad’s Gate).']],
   [439, '5 Nov', ['New command FLY: 255 more Flex patterns for IDM, played by the same Flex as FLX. FLY 01–0F are one of each family to try first; then by the first digit: 1 pitch rolls, 2 euclidean gates, 3 probability, 4 slice pitch, 5 freeze and smear, 6 CD skips, 7 bounces, 8 mutating shuffles, 9 stutter edits, A polymeter, B warp, C reverse rolls and rewinds, D grains, E texture, F chaos 2. Most change every bar over four bars; FIXED ones repeat. The FX bar draws whichever is playing.']],

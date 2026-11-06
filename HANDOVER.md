@@ -156,6 +156,31 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 5 Nov (12): sampler stage 3: the sample browser; 5-minute samples (build 442)
+
+- Owner: the library from "a folder on the computer, but I also want to be able to pick files from elsewhere … less awkward
+  than it sounds"; a panel is right; samples up to 5 minutes; skip key zones for now (FUTURE WORK below).
+- **SAMPLE BROWSER** (block of that name, names smb* / SMB; before RECORD INTO A PAD): `smbPanel(pad)` from bLoad (was the file
+  picker) and File › Samples…. FOLDER: `showDirectoryPicker` once; the handle is kept in IndexedDB 'thunderplus-browser'
+  (store 'smp', key 'folder'); `smbPerm` queryPermission / requestPermission (RECONNECT button when not 'granted' after a
+  restart); `smbScan` walks subfolders (8 deep, 20,000 files, SMB_EXT audio types), sorted by path. RECENT: localStorage
+  'thunderplus-recent-v1' [{id, name, secs, st, t}] (SMB_MAX 40), written by `smbAdd(S)` from assignSample (every load,
+  record, resample) which also smpPut()s the sample at once; smpTidy keeps those ids. A Recent row loads from smpById (in
+  memory) or smpGet (the store), into assignSample with the same id (no second copy). ＋ FILES…: one file loads at once;
+  several go to RECENT for this session (File objects, not kept). Audition: decode (cached, 12) → BufferSource → master.
+  assignSample gained a 6th argument, id. No folder access (phones, Firefox, Safari): RECENT and ＋ FILES… only.
+- `SMP_MAX = 300` (5 min); Max len and Hold follow. A 5-minute stereo sample adds ~75 MB to a project file (int16 base64)
+  and ~575 MB of memory while loaded (sample, render, AudioBuffer, core copy, rtB).
+- **Checks:** `node tools/browser-check.mjs` (a stand-in folder handle with a subfolder: scan, search, ▼ audition, Enter loads
+  stereo; ＋ Files with two; RECENT newest first, survives a reload and loads from the store). npm test, sampler-check and
+  recorder-check pass.
+- **FUTURE WORK (owner: skipped for now): key zones, velocity layers, round robin.** Owner's options were per sample layer (each
+  layer a key range, velocity range and round-robin group; up to 8 zones a pad, fits how pads render) or a new multi-sample
+  engine (many zones, SFZ / Kontakt-like; bigger). Pads are rendered per note pitch today (one render, repitched by the
+  players), so zones need either a render per zone with the players choosing by note / velocity / RR counter (both
+  sequencers: page makePlayer and core-processor noteOn), or zones handled in the players directly. The SoundFont engine
+  (engine 'sf', sfVoice / sfNote in both players) already does zones by key and velocity and is the closest model.
+
 ## 5 Nov (11): sampler stage 2: Record a sample… (build 441)
 
 - Owner: record into a pad "as long as we have some edit capabilities", liking how "Renoise can sync recording to pattern
