@@ -762,14 +762,20 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .recask .askbox{width:min(980px, calc(100vw - 24px)); max-width:none}
 .recov{display:block; width:100%; height:34px; margin:10px 0 4px; border:1px solid color-mix(in srgb, var(--ink) 25%, transparent); border-radius:3px; cursor:pointer; touch-action:none}
 .recwave{display:block; width:100%; height:clamp(180px, 34vh, 300px); margin:0; border:1px solid color-mix(in srgb, var(--ink) 25%, transparent); border-radius:3px; cursor:crosshair; touch-action:none}
-.recbar{display:flex; align-items:center; gap:10px; margin:6px 0 10px}
+.recset{display:grid; grid-template-columns:1fr; column-gap:28px}
+@media (min-width:760px){ .recset{grid-template-columns:1fr 1fr} }
+.recset .acidf{margin:6px 0}
+.recstate{margin:2px 0 4px; opacity:.75; font-variant-numeric:tabular-nums}
+.recsp{flex:1}
+.recbar{display:flex; align-items:center; gap:8px; margin:8px 0 12px}
+.recbar .recplay{min-width:5.5em}
 .recrd{flex:1; min-width:0; font-variant-numeric:tabular-nums; opacity:.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .recz{display:flex; gap:4px} .recz button{min-width:2.4em; padding:3px 8px}
-.recops{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px 14px}
-.recg{display:flex; flex-wrap:wrap; gap:5px; align-items:center; align-content:flex-start}
-.recgl{flex:0 0 100%; font-size:10px; letter-spacing:.08em; text-transform:uppercase; opacity:.6}
-.recops button{padding:4px 9px}
-.reckeep{margin-top:14px; padding-top:10px; border-top:1px solid color-mix(in srgb, var(--ink) 18%, transparent); align-items:center; flex-wrap:wrap; gap:6px}
+.recops{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 400px), max-content)); gap:12px 28px; justify-content:start}
+.recg{display:flex; flex-direction:column; gap:4px}
+.recseg{flex-wrap:wrap; width:max-content; max-width:100%} .recseg button{padding:4px 10px; flex:0 0 auto}
+.recgl{font-size:10px; letter-spacing:.08em; text-transform:uppercase; opacity:.6}
+.reckeep{margin-top:16px; padding-top:12px; border-top:1px solid color-mix(in srgb, var(--ink) 18%, transparent); align-items:center; flex-wrap:wrap; gap:8px; justify-content:flex-start}
 .recedit .btnrow select{min-height:30px; max-width:14em}
 /* SAMPLE BROWSER (5 Nov): tabs + search, the folder / file buttons, a scrolling list, the pad and Load */
 .smbask .askbox{width:min(560px, calc(100vw - 32px)); max-width:none}
@@ -1218,6 +1224,12 @@ body.mob .top .tcpu .cpuw{display:none}
 body.mob .top{gap:6px} body.mob .top .tcpu{min-width:52px; padding:0 6px} body.mob #bFile, body.mob .top #bSet{padding:0 9px}
 body.mob .ttabs button{padding:0 9px; letter-spacing:.02em}   /* the tabs make room for the strip beside them */
 @media (max-width:780px){ body.mob .top #tSong{display:none} }
+/* SONG ON THE SYNTH PAGE, PHONE (owner, 5 Nov): the tracker hides ▶ Song on a phone (its own PLAY key does it), but the Synth
+   page has no PLAY key, so there it stays: a compact icon; the kit name gives up the room. */
+/* (owner, 5 Nov: "We can get rid of the part that says thunder" … "Just when folded"): on the Fold's cover screen the kit name box
+   goes from the Synth page's bar, for the Song button and the tabs; unfolded it stays (and is where the kit is renamed). */
+@media (max-width:780px){ body.mob.synv .top #tSong:not([hidden]){display:inline-grid; padding:0 12px; flex:0 0 auto} body.mob.synv .top #kitName{min-width:0; flex:1 1 auto} }
+@media (max-width:520px){ body.mob.synv .top #kitName{display:none} }   /* folded only (owner: "Just when folded"); unfolded keeps it, where it is renamed */
 /* TOP BAR, PHONE (owner, Fold unfolded, 2 Nov): ? stayed on a second line, the meter's scale was squashed, LEFT / TO was a
    smaller box than File. One line that doesn't wrap; File is its ▾ alone (the unsaved dot stays); LEFT / TO is a box like
    File's; the meter gets the room File gave up. */
@@ -14501,7 +14513,7 @@ async function rcdStart(){
   RCD.on = true; RCD.node.port.postMessage('go');
   if (playing){ const last = tp.q.length ? tp.q[tp.q.length - 1] : (tp.pos ? {pos:tp.pos} : null);
     if (last && last.pos){ let row = -1, st = -1; for (const p of last.pos) if (p){ if (p.row > row) row = p.row; if (p.step > st) st = p.step; } if (row >= 0){ R.row = row; R.st = st; } } }
-  else { RCD.starting = true; try { tStart('song', {row:clamp(cs.song.y | 0, 0, 255)}); } finally { RCD.starting = false; } }   // (tStart stops first: not an end)
+  else { RCD.starting = true; try { tStart('song', {row:songRow()}); } finally { RCD.starting = false; } }   // (the Song button's row: the cursor's, or the next pattern with something in it)   // (tStart stops first: not an end)
   rcdUi();
 }
 function rcdStop(){
@@ -14564,6 +14576,24 @@ function rcdMeter(){
   U.clip.hidden = !(performance.now() - RCD.clip < 1500);
   if (RCD.on && !RCD.sync){ const n = RCD.chunks.reduce((a, c) => a + c.ch[0].length, 0); U.state.textContent = `● Recording · ${(n / ctx.sampleRate).toFixed(1)} s`; }
 }
+// SKIN ACCENTS: the tracker's own pair where a skin has them (--mxbus for the wave, --mxcur for the selection: IDM blue and
+// orange), else the Sample family's colour and its complement (--smp, --smpc); either falls back to the ink when it would
+// be too faint on the panel (contrast under 2:1)
+function rcdCols(){
+  const key = (document.documentElement.dataset.skin || '') + '|' + (document.documentElement.dataset.theme || '') + '|' + matchMedia('(prefers-color-scheme: dark)').matches; if (RCD._ck === key && RCD._c) return RCD._c;   // once per skin
+  const css = getComputedStyle(document.documentElement), v = k => css.getPropertyValue(k).trim(), ink = v('--ink') || '#222';
+  const box = RCD.ui && RCD.ui.wave ? getComputedStyle(RCD.ui.wave.closest('.askbox') || document.body).backgroundColor : v('--panel');
+  const rgb = c => { const x = document.createElement('canvas').getContext('2d'); x.fillStyle = '#000'; x.fillStyle = c; const h = x.fillStyle; if (h[0] === '#') return [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); const m = h.match(/[\d.]+/g); return m ? m.slice(0, 3).map(Number) : [0, 0, 0]; };
+  const lum = c => { const [r, g, b] = rgb(c).map(x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const ok = (c, m) => { if (!c) return false; const a = lum(c), b = lum(box || '#fff'); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) >= m; };
+  const pick = (m, ...k) => { for (const c of k.map(v)) if (ok(c, m)) return c; return ink; };
+  // a selection is mostly a wide tint, so it may be paler (1.3:1); its edges and the cursor are that colour taken 45 % toward the ink
+  const edge = c => { const a = rgb(c), b = rgb(ink); return 'rgb(' + a.map((x, i) => Math.round(x + (b[i] - x) * 0.45)).join(',') + ')'; };
+  const sel = pick(1.3, '--mxcur', '--smpc', '--std');
+  // a grey accent (909's) would only dull the wave: then the ink, crisp
+  const grey = c => { const [r, g, b] = rgb(c); return Math.max(r, g, b) - Math.min(r, g, b) < 40; }, w0 = pick(2, '--mxbus', '--smp', '--std');
+  RCD._ck = key; return (RCD._c = {wave:grey(w0) ? ink : w0, sel, selEdge:ok(sel, 2.5) ? sel : edge(sel)});
+}
 // THE EDITOR'S VIEW: [a, b) frames of the take in view (RCD.view null = all of it), at least 32 frames wide
 function rcdClampView(a, b){ const n = RCD.take ? RCD.take.data.length : 0; let w = Math.max(32, Math.min(n, b - a)); a = Math.max(0, Math.min(n - w, a)); return n && w < n ? [a, a + w] : null; }
 const rcdView = () => { const n = RCD.take ? RCD.take.data.length : 0, v = RCD.view; return v && v[1] <= n ? v : [0, n]; };
@@ -14591,6 +14621,7 @@ function rcdWave(g, d, a, b, W, top, h){
 function rcdDrawWave(){
   const U = RCD.ui, T = RCD.take; if (!U || !T) return;
   const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue('--ink').trim() || '#222', mut = css.getPropertyValue('--muted').trim() || '#888', font = css.getPropertyValue('--mono').trim() || 'monospace';
+  const C = rcdCols(), acc = C.wave, hot = C.sel, hotE = C.selEdge;   // SKIN ACCENTS (owner, 5 Nov): the wave in one, the selection / cursor / playhead in the other
   const n = T.data.length, chs = T.data2 ? [T.data, T.data2] : [T.data], [va, vb] = rcdView();
   // the waveform: ruler, channels, selection, markers, cursor, playhead
   const M = rcdFit(U.wave); if (M){ const {g, W, H} = M, RH = 18, ch = (H - RH) / chs.length, X = f => (f - va) / (vb - va) * W;
@@ -14598,16 +14629,17 @@ function rcdDrawWave(){
     const secs = (vb - va) / T.sr, steps = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60], st = steps.find(s => secs / s <= W / 90) || 60;
     g.font = '10px ' + font; g.textBaseline = 'middle';
     for (let t = Math.ceil(va / T.sr / st) * st; t * T.sr < vb; t += st){ const x = X(t * T.sr); g.fillRect(x, RH - 5, 1, 5); g.fillText(st < 0.01 ? t.toFixed(3) : st < 0.1 ? t.toFixed(2) : st < 1 ? t.toFixed(1) : t.toFixed(0), x + 3, RH / 2); }
-    if (RCD.sel){ const a = X(RCD.sel[0]), b = X(RCD.sel[1]); g.fillStyle = mut; g.globalAlpha = 0.28; g.fillRect(a, RH, b - a, H - RH); g.globalAlpha = 1; g.fillRect(a, RH, 1, H - RH); g.fillRect(b, RH, 1, H - RH); }
+    g.fillStyle = acc; g.globalAlpha = 0.05; g.fillRect(0, RH, W, H - RH); g.globalAlpha = 1;
+    if (RCD.sel){ const a = X(RCD.sel[0]), b = X(RCD.sel[1]); g.fillStyle = hot; g.globalAlpha = 0.22; g.fillRect(a, RH, b - a, H - RH); g.fillRect(a, 0, b - a, RH); g.globalAlpha = 1; g.fillStyle = hotE; g.fillRect(a, 0, 1.5, H); g.fillRect(b - 1.5, 0, 1.5, H); }
     g.strokeStyle = mut; g.globalAlpha = 0.35; for (let c = 0; c < chs.length; c++){ const y = RH + ch * c + ch / 2; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); if (c){ g.beginPath(); g.moveTo(0, RH + ch * c); g.lineTo(W, RH + ch * c); g.stroke(); } } g.globalAlpha = 1;
-    g.fillStyle = ink; g.strokeStyle = ink; g.lineWidth = 1; chs.forEach((d, c) => rcdWave(g, d, va, vb, W, RH + ch * c, ch));
+    g.fillStyle = acc; g.strokeStyle = acc; g.lineWidth = 1.25; chs.forEach((d, c) => rcdWave(g, d, va, vb, W, RH + ch * c, ch));
     if (T.mk){ g.fillStyle = mut; const mark = (f, t) => { if (f < va || f > vb) return; const x = X(f); g.fillRect(x, RH, 1, H - RH); g.fillText(t, Math.min(W - 10, x + 3), RH + 9); };
       if (T.mk[0] > 0) mark(T.mk[0], 'S'); if (T.lp){ mark(T.mk[1], 'L'); mark(T.mk[2], 'E'); } }   // EDIT SAMPLE: Start, Loop start, Loop end
-    if (RCD.cursor != null && !RCD.sel && RCD.cursor >= va && RCD.cursor <= vb){ g.fillStyle = ink; g.fillRect(X(RCD.cursor) - 0.5, 0, 1.5, H); }
-    if (rcdPrev){ const f = rcdPrev.a + (ctx.currentTime - rcdPrev.t0) * T.sr; if (f >= va && f <= vb){ g.fillStyle = mut; g.fillRect(X(f), 0, 2, H); } } }
+    if (RCD.cursor != null && !RCD.sel && RCD.cursor >= va && RCD.cursor <= vb){ g.fillStyle = hotE; g.fillRect(X(RCD.cursor) - 1, 0, 2, H); }
+    if (rcdPrev){ const f = rcdPrev.a + (ctx.currentTime - rcdPrev.t0) * T.sr; if (f >= va && f <= vb){ g.fillStyle = ink; g.fillRect(X(f) - 1, 0, 2, H); } } }
   // the overview: the whole take, the part in view boxed
-  const O = rcdFit(U.ov); if (O){ const {g, W, H} = O; g.fillStyle = ink; g.globalAlpha = 0.55; rcdWave(g, T._ov || (T._ov = T.data2 ? T.data.map((x, i) => (x + T.data2[i]) / 2) : T.data), 0, n, W, 0, H); g.globalAlpha = 1;
-    if (RCD.sel){ g.fillStyle = mut; g.globalAlpha = 0.3; g.fillRect(RCD.sel[0] / n * W, 0, (RCD.sel[1] - RCD.sel[0]) / n * W, H); g.globalAlpha = 1; }
+  const O = rcdFit(U.ov); if (O){ const {g, W, H} = O; g.fillStyle = acc; g.globalAlpha = 0.7; rcdWave(g, T._ov || (T._ov = T.data2 ? T.data.map((x, i) => (x + T.data2[i]) / 2) : T.data), 0, n, W, 0, H); g.globalAlpha = 1;
+    if (RCD.sel){ g.fillStyle = hot; g.globalAlpha = 0.3; g.fillRect(RCD.sel[0] / n * W, 0, (RCD.sel[1] - RCD.sel[0]) / n * W, H); g.globalAlpha = 1; }
     if (vb - va < n){ g.strokeStyle = ink; g.lineWidth = 1.5; g.strokeRect(va / n * W + 0.75, 0.75, Math.max(3, (vb - va) / n * W - 1.5), H - 1.5); } }
   // the readout
   const t = f => (f / T.sr).toFixed(3) + ' s';
@@ -14620,7 +14652,7 @@ function rcdUi(){
   U.rec.classList.toggle('on', !!(RCD.on || R));
   U.state.textContent = R ? (R.phase === 'armed' ? (tp.on ? 'Armed: records from the next pattern…' : 'Starting the song…') : R.phase === 'closing' ? 'Finishing the take…'
       : `● Recording pattern ${R.n + 1}` + (R.pats > 0 ? ` of ${R.pats}` : '') + (R.stopReq ? ' · stops at its end' : ' · Stop ends it at the end of a pattern'))
-    : RCD.on ? '● Recording' : T ? `${T.how === 'edit' ? 'Sample' : 'Take'}: ${(T.data.length / T.sr).toFixed(2)} s, ${T.data2 ? 'stereo' : 'mono'}` + (T.how === 'sync' ? ` · ${T.pats} pattern${T.pats === 1 ? '' : 's'}, ${T.beats} beats` : '') + (RCD.sel ? ` · selection ${((RCD.sel[1] - RCD.sel[0]) / T.sr).toFixed(3)} s` : '')
+    : RCD.on ? '● Recording' : T ? (T.how === 'edit' ? '' : 'Take · ') + `${(T.data.length / T.sr).toFixed(2)} s · ${T.data2 ? 'stereo' : 'mono'} · ${(T.sr / 1000).toFixed(1)} kHz` + (T.how === 'sync' ? ` · ${T.pats} pattern${T.pats === 1 ? '' : 's'}, ${T.beats} beats` : '')
     : RCD.stream ? 'Ready.' : 'Pick an input and press Record.';
   U.edit.hidden = !T || !!(RCD.on || R);
   U.undoB.disabled = !RCD.undo.length; U.playB.textContent = rcdPrev ? '■' : '▶ Play';
@@ -14637,7 +14669,8 @@ async function rcdPanel(pad, opts){
   if (E && !(ES && ES.data && ES.data.length)) return toast('That layer has no sample to edit.');
   const wrap = el('div', 'ask acidask recask'), box = el('div', 'askbox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', E ? 'Edit sample' : 'Record a sample');
   box.append(el('div', 'asktitle', E ? 'Edit sample · ' + (ES.name || 'Sample') : 'Record a sample'));
-  const field = (label, ctl) => { const f = el('label', 'acidf'); f.append(el('span', null, label), ctl); box.append(f); return ctl; };
+  const rset = el('div', 'recset'); box.append(rset);   // LAYOUT (5 Nov): the recording settings, two columns where there's room
+  const field = (label, ctl) => { const f = el('label', 'acidf'); f.append(el('span', null, label), ctl); rset.append(f); return ctl; };
   const seg = (label, opts, get, set) => { const s = el('div', 'seg'); const draw = () => [...s.children].forEach((b, i) => { const on = get() === opts[i][0]; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     opts.forEach(([v, t]) => { const b = el('button', null, t); b.type = 'button'; b.addEventListener('click', () => { set(v); rcdSave(); draw(); }); s.append(b); }); draw(); field(label, s); return s; };
   const lock = [];
@@ -14661,7 +14694,7 @@ async function rcdPanel(pad, opts){
   const latW = el('span', 'acidr'); latW.append(latR, latV); const latF = field('Extra latency', latW).parentElement;
   const fitF = seg('Fit to tempo', [[1, 'ON'], [0, 'OFF']], () => rcdSet.fit | 0, v => { rcdSet.fit = v; }).parentElement;
   patF.hidden = latF.hidden = fitF.hidden = rcdSet.mode !== 'sync';
-  const recRows = [...box.querySelectorAll('.acidf')];   // EDIT SAMPLE hides these
+  const recRows = [rset];   // EDIT SAMPLE hides these
   const state = el('div', 'askmsg recstate'); box.append(state);
   // THE EDITOR (5 Nov, owner: "make sure it feels professional, make the waveform big enough to edit … zoom … scroll wheel, two
   // finger pinch, and some zoom buttons to zoom in at the point of a click"): an overview of the whole take (the part in view
@@ -14676,7 +14709,7 @@ async function rcdPanel(pad, opts){
   const zbtn = (t, f, tip) => { const b = el('button', null, t); b.type = 'button'; b.title = tip; b.addEventListener('click', f); zb.append(b); return b; };
   zbtn('−', () => rcdZoom(2, rcdAnchor()), 'Zoom out (at the cursor)'); zbtn('+', () => rcdZoom(0.5, rcdAnchor()), 'Zoom in (at the cursor, or the selection)');
   zbtn('FIT', () => { RCD.view = null; rcdUi(); }, 'Show the whole take'); zbtn('SEL', () => { if (RCD.sel){ const m = (RCD.sel[1] - RCD.sel[0]) * 0.05; RCD.view = rcdClampView(RCD.sel[0] - m, RCD.sel[1] + m); rcdUi(); } }, 'Zoom to the selection');
-  bar.append(rd, zb); edit.append(ov, wave, bar);
+  edit.append(ov, wave, bar);
   { const fx = e => { const r = wave.getBoundingClientRect(), [va, vb] = rcdView(); return va + clamp((e.clientX - r.left) / r.width, 0, 1) * (vb - va); };
     const P = new Map(); let drag = null, pinch = null;
     wave.addEventListener('pointerdown', e => { if (!RCD.take) return; e.preventDefault(); try { wave.setPointerCapture(e.pointerId); } catch(err){} P.set(e.pointerId, e);
@@ -14699,12 +14732,14 @@ async function rcdPanel(pad, opts){
     let ovOn = false; ov.addEventListener('pointerdown', e => { ovOn = true; try { ov.setPointerCapture(e.pointerId); } catch(err){} ovGo(e); });
     ov.addEventListener('pointermove', e => { if (ovOn) ovGo(e); }); ov.addEventListener('pointerup', () => { ovOn = false; }); }
   const ops = el('div', 'recops'); let og = ops;
-  const grp = name => { og = el('div', 'recg'); og.append(el('span', 'recgl', name)); ops.append(og); };
+  // tools in groups, each a row of joined buttons
+  const grp = name => { const g = el('div', 'recg'); g.append(el('span', 'recgl', name)); og = el('div', 'seg recseg'); g.append(og); ops.append(g); };
   const op = (t, f, tip) => { const b = el('button', null, t); b.type = 'button'; if (tip) b.title = tip; b.addEventListener('click', () => { f(); }); og.append(b); return b; };
   const ms = x => Math.round(x * RCD.take.sr / 1000);
-  grp('Play');
-  const playB = op('▶ Play', rcdPlay, 'Play the selection, or from the cursor, or the whole take');
-  const undoB = op('Undo', () => { if (!RCD.undo.length) return; RCD.take = RCD.undo.pop(); RCD.sel = null; rcdUi(); }, 'Undo the last edit (Ctrl/⌘+Z)');
+  const tb = (t, f, tip, cls) => { const b = el('button', cls || null, t); b.type = 'button'; b.title = tip; b.addEventListener('click', f); return b; };
+  const playB = tb('▶ Play', rcdPlay, 'Play the selection, or from the cursor, or the whole take (Space plays the song)', 'recplay');
+  const undoB = tb('Undo', () => { if (!RCD.undo.length) return; RCD.take = RCD.undo.pop(); RCD.sel = null; rcdUi(); }, 'Undo the last edit (Ctrl/⌘+Z)');
+  bar.append(playB, rd, undoB, zb);
   grp('Edit');
   op('Crop', () => { const [a, b] = rcdRange(); rcdEdit(T => seCrop(T, a, b), x => x - a); RCD.sel = null; RCD.view = null; rcdUi(); }, 'Keep only the selection');
   op('Cut', () => { if (!RCD.sel) return toast('Drag across the take to select what to cut.'); const [a, b] = rcdRange(); rcdEdit(T => seCut(T, a, b), x => x < a ? x : x < b ? a : x - (b - a)); RCD.cursor = a; RCD.sel = null; rcdUi(); }, 'Remove the selection');
@@ -14738,18 +14773,23 @@ async function rcdPanel(pad, opts){
   const padS = el('select'); for (let k = 0; k < kit.voices.length; k++) padS.append(new Option(hx(k) + ' ' + (kit.voices[k].name || ''), k)); padS.value = pad;
   const keepRow = el('div', 'btnrow reckeep'), keepB = el('button', 'ok', 'Keep in this pad'); keepB.type = 'button'; keepB.addEventListener('click', () => rcdKeep(+padS.value));
   const discB = el('button', null, 'Discard'); discB.type = 'button'; discB.addEventListener('click', () => { RCD.take = null; RCD.undo = []; RCD.sel = null; RCD.view = null; rcdUi(); });
-  keepRow.append(el('span', null, 'Pad'), padS, keepB, discB); edit.append(keepRow);
+  keepRow.append(el('span', null, 'Pad'), padS, el('span', 'recsp'), discB, keepB); edit.append(keepRow);
   box.append(edit);
   const takeOf = L => { const S0 = L.sample, n = S0.data.length; return {data:S0.data, data2:S0.data2 || null, sr:S0.sr, name:S0.name, how:'edit', beats:0, pats:0, lp:L.lpMode | 0,
     mk:[Math.round((L.a || 0) * n), Math.round((L.lpS || 0) * n), Math.round((L.lpE == null ? 1 : L.lpE) * n)]}; };
   if (E){ for (const f of recRows) f.hidden = true;
     keepRow.textContent = ''; const apB = el('button', 'ok', 'Apply to the layer'), rvB = el('button', null, 'Revert'); apB.type = rvB.type = 'button';
     apB.addEventListener('click', () => rcdApply(E)); rvB.addEventListener('click', () => { const L = kit.voices[E.pad].layers[E.li]; if (!L || !L.sample) return; RCD.take = takeOf(L); RCD.undo = []; RCD.sel = null; rcdUi(); });
-    keepRow.append(apB, rvB); RCD.take = takeOf(EL); RCD.undo = []; RCD.sel = null; RCD.view = null; RCD.cursor = null; }
+    keepRow.append(rvB, el('span', 'recsp'), apB); RCD.take = takeOf(EL); RCD.undo = []; RCD.sel = null; RCD.view = null; RCD.cursor = null; }
   const row = el('div', 'btnrow'), rec = el('button', 'ok', '● Record'); rec.type = 'button';
+  // SONG (owner, 5 Nov: "a play/stop button … for when it starts recording with playback"): plays or stops the song from here,
+  // as the top bar's Song button does. Stopping it while a PATTERN take records ends the take there.
+  const songB = el('button', 'recsong', '▶ Song'); songB.type = 'button'; songB.title = 'Play or stop the song (from the cursor’s song row). Stopping it ends a PATTERN take where it stops.';
+  songB.addEventListener('click', () => { apRun(() => { if (tp.on) tStop(); else tStart('song', {row:songRow()}); }, []); songBtn(); rcdUi(); });
   rec.addEventListener('click', () => { if (RCD.on || RCD.sync) rcdStop(); else rcdStart().then(() => fillIn()); });
-  const close = el('button', null, 'Close'); close.type = 'button'; row.append(rec, close); box.append(row); if (E){ rec.hidden = true; keepRow.append(close); row.hidden = true; }   // EDIT SAMPLE: Close beside Apply / Revert
-  Object.assign(RCD.ui, {rec, state, edit, wave, ov, rd, playB, undoB, lock, E});
+  const close = el('button', null, 'Close'); close.type = 'button'; row.append(songB, el('span', 'recsp'), rec, close); box.append(row); if (E){ rec.hidden = true; keepRow.append(close); row.hidden = true; }   // EDIT SAMPLE: Close beside Apply / Revert
+  Object.assign(RCD.ui, {rec, state, edit, wave, ov, rd, playB, undoB, lock, E, songB});
+  const songT = setInterval(() => { if (!RCD.ui){ clearInterval(songT); return; } const on = !!tp.on; if (songB._on !== on){ songB._on = on; songB.textContent = on ? '■ Song' : '▶ Song'; songB.classList.toggle('on', on); } }, 150);   // follows the song, however it was started
   const done = () => { if (askOpen !== done) return; askOpen = null; rcdAbort(); if (rcdPrev){ try { rcdPrev.stop(); } catch(e){} rcdPrev = null; } rcdClose(); RCD.ui = null; if (E){ RCD.take = null; RCD.undo = []; RCD.sel = null; } wrap.remove(); document.removeEventListener('keydown', key, true); };
   close.addEventListener('click', done);
   // Keys stay in the panel: R records / stops, Space plays the song, Esc closes (a take not kept is let go)
@@ -21852,7 +21892,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 443;
+const BUILD = 444;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -30300,6 +30340,7 @@ function setView(v){
   $('kitName').hidden = tr || wv || ch;
   if (tr || wv || ch){ gsetToggle(false); gfileToggle(false); }
   document.body.classList.toggle('wvv', wv);
+  document.body.classList.toggle('synv', view === 'synth');   // SYNTH PAGE: the phone keeps the Song button there (no PLAY key)
   document.body.classList.toggle('chv', ch);
   document.body.classList.toggle('trv', tr);   // EDIT LOGO: the logo shows edit mode on the tracker
   if (wv) showWaves(); else if (was === 'waves') leaveWaves();
@@ -30396,6 +30437,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [444, '5 Nov', ['The sample editor draws in your skin’s accent colours (IDM: blue wave, orange selection) and is laid out more cleanly: one toolbar over the waveform (Play, the readout, Undo, zoom), tools in joined groups, the recording settings in two columns, Revert on the left and Apply / Close on the right.', 'Record a sample… has a ▶ Song / ■ Song button to start or stop the song from the panel.', 'Phone: the Synth page has the Song play / stop button in its top bar; on a folded phone the kit name makes room for it.']],
   [443, '5 Nov', ['Edit sample… (on a sample layer): the take editor on a loaded sample. Apply writes it back (Undo on the Synth page takes it back); Start, Loop start and Loop end move with the audio when you crop, cut, reverse or trim.', 'The editor is bigger, with an overview of the whole sample and a time ruler. Zoom with the wheel or a pinch (at the pointer), − / + at the cursor (a click places it), FIT and SEL; Shift+wheel or a sideways swipe scrolls; drag the overview to move.', 'New edits: Snap (selections land on zero crossings), Remove DC, Invert, To mono, To stereo, Append file….']],
   [442, '5 Nov', ['Load sample opens the sample browser (also File › Samples…): FOLDER shows your sample folder and its subfolders (set it once; after a restart one press of Reconnect where the browser asks), RECENT every sample you’ve loaded or recorded, from anywhere. ＋ Files… brings in files from anywhere (one goes straight into the pad). Search, ▲▼ to audition, Enter or double-click to load.', 'Samples can be up to 5 minutes (was 2).']],
   [441, '5 Nov', ['Record a sample… (Synth page, next to Load sample; File menu): pick an input, its channels and monitoring, watch the level, and record FREE or PATTERN. PATTERN works like Renoise’s sync: with the song playing it starts at the next pattern and Stop ends it at the end of a pattern (or set a length in patterns); pressed while stopped, the song starts from the cursor’s pattern. Then edit the take (drag to select: crop, cut, silence, normalise, fades, gain, reverse, auto-trim, undo) and keep it in a pad, fitted to the tempo.']],
