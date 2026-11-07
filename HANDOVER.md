@@ -166,6 +166,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (6): phrase on the cursor after a song loads (build 451, on `beta`)
+
+- Owner (Fold): a new song opened on the Phrase screen let notes go into a phrase not on the song. `phraseToCursor()` in
+  setSong (after resetCursors): the block under the song cursor (row cs.song.y, cTrack) opens its first phrase; an empty cell
+  gets freePhrase() with pendPlace, so the first note puts it on the song there (placePending via saveS). Buses / master skipped.
+
 ## 6 Nov (5): clearer unsaved prompt; no FLX pop-up (build 450, on `beta`)
 
 - Owner: closing with recorded, unsaved samples gave a confusing message (`okToLeave` read "…, and closing the app replaces
