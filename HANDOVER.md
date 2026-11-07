@@ -166,6 +166,18 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (10): playback report; core confirmed (build 456, beta + main)
+
+- Owner: with Settings → Audio → Sequencer on Page (old) the screen-off trouble goes away; back on Audio thread it returns
+  (a bit less since 454's ramp). So it is the core path. Still not reproduced headless (hidden page, a 5 s frozen page,
+  700 ms audio-thread stalls ×3 via a local-only 'stall' op: STOP silent every time).
+- Added PB (the playback report): pbLog ring (400 lines) of visibility, ctx statechange, PLAY / STOP, a 2-second summary of
+  core rows (count, how late the latest came, notes dropped as late, how far ahead, core skips: rows now carry `skips`,
+  voices alive: pl.aliveN()), level and voices 1 s and 3 s after STOP, and rows arriving after STOP or from an older gen
+  (stray: logged, and with nothing playing the core gets {op:'stop'} again and is disconnected). Settings → Audio → Copy
+  playback report (clipboard, else a .txt). Waiting on the owner's report from the Fold.
+- GEN menu above the key (455). Generators Mutate + Drum pattern: owner said go (my picks), not started yet; the core bug first.
+
 ## 6 Nov (9): screen-off lead ramps up (build 454, on `beta`, merged to `main`)
 
 - Owner: "as the screen is turning off, the cpu spikes". The page pump's lookahead and the core's LEAD jumped 0.25 → 1.2 s

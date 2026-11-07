@@ -2794,7 +2794,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="segrow" id="psLiveRow" hidden><span>…pump live</span><div class="seg" id="segPsLive"></div></div>
       <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread: the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Applies when audio restarts (reloads; song and kit kept)</span><button id="audRestart" class="on">Apply (reload)</button></div>
-      <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every voice and effect from scratch (song and kit are untouched)">Reset audio engine</button></div>
+      <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every voice and effect from scratch (song and kit are untouched)">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short log of what playback did (screen on / off, the audio engine's state, how late the audio thread's rows came, what still sounded after STOP), to paste into a bug report">Copy playback report</button></div>
     </div>
   </section>
 
@@ -8162,7 +8162,7 @@ function audio(){
     try { if (ctx.renderCapacity){ ctx.renderCapacity.addEventListener('update', e => { cpu.cap = {avg:e.averageLoad, peak:e.peakLoad, under:e.underrunRatio, t:performance.now()}; }); ctx.renderCapacity.start({updateInterval:0.5}); } else cpuProbe(ctx); } catch(e){}   // no renderCapacity: time the audio thread
     master = ctx.createGain(); master.gain.value = clamp(aset.vol, 0, 100) / 100; master.connect(ctx.destination);
     try { mwReady(ctx); } catch(e){ tpLog('safety limiter did not start', e); }   // the safety limiter's worklet, loading before the first note needs it
-    ctx.addEventListener && ctx.addEventListener('statechange', () => { audStatus(); if (typeof audioInterrupted === 'function') audioInterrupted(); });
+    ctx.addEventListener && ctx.addEventListener('statechange', () => { try { pbLog('engine ' + ctx.state + ' · ' + pbState()); } catch(e){} audStatus(); if (typeof audioInterrupted === 'function') audioInterrupted(); });
     prerender();   // ensure() re-renders only the pads whose rate differs from this context's
   }
   if (ctx.state === 'suspended') ctx.resume();
@@ -13835,6 +13835,7 @@ function psLiveNote(){
 psLiveNote();
 $('audRestart').addEventListener('click', () => { try { save(); } catch(e){ tpLog('save before restart failed', e); } applyUpdate(); });
 $('audReset').addEventListener('click', () => resetAudio());
+$('audReport').addEventListener('click', () => pbCopy());
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (!$('pAudio').hidden) audRefresh(); });
 /* ---------- skins (the ...Seeds set) ---------- */
 const SKINS = [
@@ -20049,7 +20050,7 @@ function makePlayer(ac, out, getBuf, live){
     for (const [t, pad, poly] of list){ const V = kit.voices[pad]; if (!V || !isLivePad(pad) || !buses[t]) continue;
       try { if (poly && isVoxV(V)) for (let j = 1; j <= POLY; j++) bassNode(t, pad, j); else bassNode(t, pad); } catch(e){ tpLog('live warm', e); } }
     made = bassN.size - n0; return made; }   // how many were new (they start up on the audio thread over the next moment)
-  return {play, warm, coreTake, clkBus, clkReset, out, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop, wlDoc};
+  return {aliveN:() => alive.size, play, warm, coreTake, clkBus, clkReset, out, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop, wlDoc};
 }
 
 /* ---------- live playback ---------- */
@@ -20628,7 +20629,8 @@ function tStart(mode, o){
   }
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
   tp.core = false;
-  if (aset.core === 'core' && core.ready) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);   // not loaded yet: this PLAY as before, the core loads at STOP
+  if (aset.core === 'core' && core.ready) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
+  pbLog('PLAY ' + mode + ' · ' + pbState());   // not loaded yet: this PLAY as before, the core loads at STOP
   if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
   tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
   bgPlay(true);   // BACKGROUND PLAY
@@ -20768,7 +20770,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'sqxnqt';
+const CORE_REV = 'xoklun';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -20884,7 +20886,32 @@ function coreStart(mode, o, t0, rs){
   Object.defineProperty(P, 'bpm', {get(){ return this._bpm; }, set(v){ this._bpm = v; corePost({op:'bpm', v}); }});
   tp.seq = P; tp.core = true;
 }
+/* PLAYBACK REPORT (owner, 6 Nov, Fold: with the audio-thread sequencer, turning the screen off while playing stutters, then
+   speeds up, and after STOP layers keep playing to about the end of the song; Page (old) doesn't). Not reproduced on a
+   computer, so this keeps a short log to copy from Settings → Audio → Copy playback report: screen on / off, the engine's
+   state, a 2-second summary of the core's rows while playing (how many, how late or early, notes dropped as late, the
+   core's catch-up skips), rows still arriving after STOP (and the STOP sent again then), and the level and live voices 1 and
+   3 seconds after a STOP. */
+const PB = {log:[], n:0, late:0, drop:0, ahead:0, stray:0, strayT:0, skips:0, t:0};
+function pbLog(s){ try { PB.log.push((performance.now() / 1000).toFixed(2) + ' ' + s); if (PB.log.length > 400) PB.log.splice(0, 100); } catch(e){} }
+const pbState = () => `ctx ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(2) : '-'} on=${tp.on ? 1 : 0} core=${tp.core ? 1 : 0} seq=${aset.core} hidden=${document.hidden ? 1 : 0}`;
+function pbLevel(){ try { const A = rt && rt.man; if (!A) return '-'; let m = 0; for (const a of A){ const b = new Float32Array(a.fftSize); a.getFloatTimeDomainData(b); for (const x of b) m = Math.max(m, Math.abs(x)); } return m ? (20 * Math.log10(m)).toFixed(1) + ' dB' : 'silent'; } catch(e){ return '?'; } }
+function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; PB.t = now;
+  if (PB.n) pbLog(`rows ${PB.n} · latest note ${(PB.late * 1000).toFixed(0)} ms late · dropped ${PB.drop} · ahead ${(PB.ahead * 1000).toFixed(0)} ms · core skips ${PB.skips} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'}`);
+  PB.n = PB.late = PB.drop = PB.ahead = 0; }
+function pbAfterStop(){ pbLog('STOP · ' + pbState()); for (const ms of [1000, 3000]) setTimeout(() => pbLog(`${ms / 1000} s after STOP: level ${pbLevel()} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'} · stray rows ${PB.stray} · ` + pbState()), ms); }
+async function pbCopy(){
+  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms' : '-'} · ${pbState()}\n`;
+  const txt = head + PB.log.join('\n');
+  try { await navigator.clipboard.writeText(txt); toast('Playback report copied: paste it into the chat.', 3500); }
+  catch(e){ try { await deliver('thunder-playback-report.txt', new Blob([txt], {type:'text/plain'})); } catch(e2){ toast('Couldn’t copy the report here.'); } }
+}
+document.addEventListener('visibilitychange', () => pbLog((document.hidden ? 'screen off / hidden · ' : 'screen on / visible · ') + pbState()));
 function coreMsg(d){
+  // PLAYBACK REPORT: rows the core sends after STOP (or from an older PLAY) mean it is still stepping: say so, and stop it again
+  if (d.op === 'rows' && (!tp.on || !tp.core || d.gen !== core.gen)){ PB.stray += d.rows.length;
+    const now = performance.now(); if (now - PB.strayT > 1000){ PB.strayT = now; pbLog(`stray rows from the core (gen ${d.gen}, now ${core.gen}, playing ${tp.on ? 1 : 0}) · ${pbState()}`);
+      if (!tp.on || !tp.core) try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); if (!core.wired) core.node.disconnect(); } catch(e){} } }
   if (d.op === 'ready'){ core.v = d.v; if (d.v !== CORE_WANT){ core.ready = false; toast('The audio-thread sequencer here is an older copy: reload the app to use it. Playing as before.', 5000); } return; }
   if (d.op === 'error'){ tpLog('core: ' + d.where, new Error(d.message)); return; }
   if ((d.op !== 'rows' && d.op !== 'end' && d.op !== 'held') || !tp.on || !tp.core || d.gen !== core.gen) return;
@@ -20905,7 +20932,7 @@ function coreMsg(d){
       // LATE (owner, Fold: back from another app it sped up and stuttered): rows held up while the app was in the background
       // arrive together; a note whose time has passed is dropped, not played at once in a burst (the old pump skips ahead
       // the same way). Commands that set a state (effects, levels, OFF) still apply.
-      if (e.type === 'note' && e.t < ctx.currentTime - 0.03) continue;
+      if (e.type === 'note' && e.t < ctx.currentTime - 0.03){ PB.drop++; continue; }
       rt.pl.play(e); if (e.type === 'note') padBlink(e);
     }
     tp.q.push({t:r.t, pos:r.pos, bpm:r.bpm, tks:r.tks, line:r.line}); rcdStep(tp.q[tp.q.length - 1]);
@@ -20913,6 +20940,7 @@ function coreMsg(d){
     if (rec.on) recHist(r);
   }
   s.time = d.time; s._bpm = d.bpm; s.tks = d.tks; s.base = d.base; s.btT = d.btT; s._alive = d.alive;
+  { const r0 = d.rows[0], r1 = d.rows[d.rows.length - 1], ct = ctx.currentTime; PB.n += d.rows.length; if (r0) PB.late = Math.max(PB.late, ct - r0.t); if (r1) PB.ahead = Math.max(PB.ahead, r1.t - ct); if (d.skips != null) PB.skips = d.skips; pbSum(); }
   corePump();
 }
 // The pump tick while the core plays: what is booked from the song clock rather than from rows
@@ -20940,6 +20968,7 @@ function tStop(quiet){
   // RECORD INTO A PAD: a pattern take ends where the song stops. Only a song that was playing: FIX (6 Nov) the first PLAY of
   // a session with live pads starts a moment later (LIVE WARM-UP), and its tStop(true) dropped the take Record had armed.
   if (RCD.sync && !RCD.starting && tp.on) rcdSongStopped();
+  if (tp.on && !quiet) pbAfterStop();
   if (tp.on && lk && !lk.restart) lkStopped();   // ABLETON LINK: start / stop sync
   if (tp.timer) tp.timer.stop();
   // RESUME: where the song stopped (the positions last heard), the track it follows, and the cursor then
@@ -22030,7 +22059,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 455;
+const BUILD = 456;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -30595,6 +30624,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [456, '6 Nov', ['Settings → Audio → Copy playback report: a short log of what playback did (screen off and on, the audio engine, the audio thread’s timing, what still sounded after STOP), to paste into a bug report. If the audio-thread sequencer is still sending rows after STOP, it’s stopped again.']],
   [455, '6 Nov', ['The GEN key’s menu opens above the key, out from under your finger, and ignores taps for a moment.']],
   [454, '6 Nov', ['Screen off while playing: the sequencers work further ahead gradually (over about a second) instead of all at once, which spiked the CPU just as the phone slowed down.']],
   [453, '6 Nov', ['PAD mode has a GEN key, under SEMI + and beside LOOP: it opens the generators (Acid line, Euclidean fill…) for the phrase.']],
