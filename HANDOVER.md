@@ -166,6 +166,17 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (9): screen-off lead ramps up (build 454, on `beta`, merged to `main`)
+
+- Owner: "as the screen is turning off, the cpu spikes". The page pump's lookahead and the core's LEAD jumped 0.25 → 1.2 s
+  on visibilitychange, booking (and building voices for) a second of notes at once. Page: `tp.ahead` grows by 0.75 s per second
+  of wall time to the target, drops at once when visible (reset in tStop). Core: `coreLead` steps 0.45, 0.65 … 1.2 every 200 ms.
+- Owner's figures: Settings → Audio reads 21 ms + 43 ms output both fresh and after the screen-off trouble, so it is NOT a
+  high-latency output buffer. The trouble: stutter, then speed-up, and after STOP "layers" (maybe the poly tracks) keep
+  playing to about the end of the song. Still open; suspects: notes booked far ahead that STOP doesn't take back (live
+  …pump / …waves lanes? notes booked with past times firing at once?). Asked the owner to try Settings → Audio → Page (old)
+  and …pump live → Render to narrow it down.
+
 ## 6 Nov (8): GEN key in PAD mode (build 453, on `beta`)
 
 - Owner: a GEN button in PAD mode, beside LOOP and below SEMI, for the generators. `#kGen` (data-b="gen") in the empty
