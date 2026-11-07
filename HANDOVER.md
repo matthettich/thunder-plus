@@ -182,7 +182,9 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
   everywhere (optDir `dn`: Sect / Inst / FX / phrase-by-number flipped); SHIFT+▲▼ on the pad = Project / Mixer on every screen
   (M8; dirPress no longer calls lineSel; select = SHIFT+OPTION or SEL; keyboard Ctrl/⌘+Shift+▲▼ still selects lines); pad
   EDIT double tap 450 ms (Enter keeps 380); Mixer OPTION off the FX row: a toast. Skipped (owner): an Arrange-has-the-keys
-  indicator. Asked, not built: EDIT picks up notes (drop with EDIT on an empty cell).
+  indicator.
+- 474 PICK UP, DROP: the pad's EDIT on a filled note picks it up (pickUp, lastTap reset: no note off on a quick second tap);
+  on an OFF it still writes the current note. Shift+Enter keeps stamping: editTap(enter, stamp). Headless ok.
 - 473 HOLD BEFORE A DRAG EDITS (touch only): gridDown's drag gets `wait`; 250 ms timer arms it (navigator.vibrate(12)); a
   move > 8 px before that hands the gesture to sdrag from its start point (scroll). Headless synthetic touch: swipe scrolls,
   value kept; hold + drag 48 → 51.
