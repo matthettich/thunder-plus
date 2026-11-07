@@ -750,6 +750,7 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .acidask .acidf select{min-height:30px; width:100%}
 .acidask .acidr{display:flex; align-items:center; gap:8px} .acidask .acidr input{flex:1; min-width:0} .acidask .acidr b{width:3.2em; text-align:right; font-weight:500}
 .acidask .acidf .seg button{padding:3px 8px}
+.genask .genpart{display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.4fr); gap:6px} .genask .genpart select{min-height:30px; width:100%; min-width:0}
 .acidask .btnrow{margin-top:12px}
 /* RECORD INTO A PAD (5 Nov): the level meter (two bars, peak hold, CLIP), the take's waveform and its edit buttons */
 .recask .acidr b{width:auto; min-width:3.2em; white-space:nowrap}
@@ -22129,7 +22130,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 461;
+const BUILD = 462;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24616,7 +24617,9 @@ function genMenu(){
 }
 function genItems(full){
   const ph = tv === 'phrase', mst = ph && mstView();
-  return ph && !mst || full ? [{a:'acid', l:'Acid line… (a random bass line)', k:keyHint('alt+B'), f:acidLine, off:!ph || mst}, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill, off:!ph || mst}] : [];
+  const dr = tv === 'song' || tv === 'sect' || ph;
+  return ph && !mst || full || tv === 'song' ? [{a:'drum', l:'Drum pattern… (a beat across tracks)', k:'', f:drumPattern, off:!dr || mst}, {a:'acid', l:'Acid line… (a random bass line)', k:keyHint('alt+B'), f:acidLine, off:!ph || mst},
+    {a:'mut', l:'Mutate… (a variation of this phrase)', k:'', f:mutatePhrase, off:!ph || mst}, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill, off:!ph || mst}] : [];
 }
 function toolItems(full){
   const ph = tv === 'phrase', phSel = !!(selA && selA.v === 'phrase'), sg = tv === 'song', mst = ph && mstView();
@@ -24715,6 +24718,148 @@ async function euclidFill(){
   for (let y = y0; y <= y1; y++){ const r = P[y]; if (pat[(y - y0) % n]){ r[col] = note; if (r[IC] < 0 || insPick != null) r[IC] = ins; } else r[col] = -1; }
   saveS(); draw(); toast(`Euclidean ${k} in ${n}${rot ? ', rotated ' + rot : ''}: rows ${rS(y0)}–${rS(y1)}, ${noteS(note)}`);
 }
+
+/* ===== GENERATORS: MUTATE and DRUM PATTERN (owner, 6 Nov: "let's do it", the picks from the generator list) =====
+   Both open as panels like Acid line (they stay open, so you can roll again while the song plays) and each roll is one
+   undo step. To remove: this block, their two lines in genItems() and the .gen* styles. */
+
+// A small panel shell shared by the two: title, a line of context, fields, and a row of buttons. keys: {letter: fn}.
+function genPanel(title, msg, build, buttons, keys){
+  if (askOpen) askOpen(null);
+  const wrap = el('div', 'ask acidask genask'), box = el('div', 'askbox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', title);
+  const msgEl = el('div', 'askmsg', msg); box.append(el('div', 'asktitle', title), msgEl);
+  const field = (label, ctl) => { const f = el('label', 'acidf'); f.append(el('span', null, label), ctl); box.append(f); return ctl; };
+  const slider = (label, get, set) => { const w = el('span', 'acidr'), r = el('input'), v = el('b', null, get() + '%'); r.type = 'range'; r.min = 0; r.max = 100; r.value = get();
+    r.addEventListener('input', () => { set(+r.value); v.textContent = r.value + '%'; }); w.append(r, v); field(label, w); return r; };
+  build({box, field, slider, msgEl});
+  const row = el('div', 'btnrow'); let first = null;
+  const done = () => { if (askOpen !== done) return; askOpen = null; wrap.remove(); document.removeEventListener('keydown', key, true); };
+  for (const [t, f, cls] of buttons){ const b = el('button', cls || null, t); b.type = 'button'; b.addEventListener('click', () => f(done)); row.append(b); if (cls === 'ok') first = b; }
+  const dn = el('button', null, 'Done'); dn.type = 'button'; dn.addEventListener('click', done); row.append(dn); box.append(row);
+  const key = e => { const tag = e.target && e.target.tagName;
+    if (e.key === 'Escape' || (e.key === 'Enter' && tag !== 'BUTTON' && tag !== 'SELECT')){ e.preventDefault(); e.stopPropagation(); return done(); }
+    const k = !e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1 ? e.key.toLowerCase() : '';
+    if (k && keys[k] && tag !== 'SELECT' && tag !== 'INPUT'){ e.preventDefault(); e.stopPropagation(); return keys[k](); }
+    if (e.key === ' ' && tag !== 'BUTTON'){ e.preventDefault(); e.stopPropagation(); return keys[' '] ? keys[' ']() : playCtx(); }
+    e.stopPropagation(); if (!(e.target && e.target.closest && e.target.closest('.ask'))) e.preventDefault(); };
+  askOpen = done; document.addEventListener('keydown', key, true);
+  const t0 = performance.now(); wrap.addEventListener('pointerdown', e => { if (e.target === wrap && performance.now() - t0 > 400){ e.preventDefault(); done(); } });
+  wrap.append(box); document.body.append(wrap); setTimeout(() => first && first.focus(), 0);
+  return done;
+}
+const isNoteV = v => v >= 0 && v < 120;
+
+/* MUTATE: a variation of the open phrase (the selection, else the whole phrase), as much as AMOUNT says, in the lanes lit:
+   PITCH moves a note to a neighbouring note of the key (the song's, found as Acid line finds it; else a step or an octave),
+   HITS drops a note now and then and adds one on an empty row (the note before it, quieter, on the off-steps more often),
+   TIME nudges a note a row earlier or later onto an empty row, VOLUME varies the volume column (more ghosts than accents).
+   Each press mutates what is there now (press again for more); ORIGINAL puts back the phrase as it was when the panel opened. */
+const mutSet = {amt:30, lanes:{pitch:true, hits:true, time:false, vol:true}};
+function mutatePhrase(){
+  if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Mutate makes a variation of it.');
+  if (busTrack(cTrack)) return busSay();
+  const P = S.phrases[cPhrase]; if (!P || isEmptyPhrase(P)) return toast('This phrase is empty: there is nothing to vary yet (try Acid line or Drum pattern).');
+  let y0 = 0, y1 = plen(cPhrase) - 1; if (selA && selA.v === 'phrase'){ const R = selRect(); y0 = R.y0; y1 = Math.min(R.y1, y1); }
+  const ph0 = cPhrase, orig = P.map(r => r.slice()), cols = isPolyT(cTrack) ? NCOL : 1;
+  const found = songKey(cPhrase), sc = found ? ACID_SCALES[found.scale][1] : null, root = found ? found.root : 0;
+  const lpb = plpbOf(S, cPhrase), spr = Math.max(1, Math.round(lpb / 4));
+  const near = (n, dir) => { if (!sc){ const st = Math.random() < 0.7 ? (Math.random() < 0.5 ? 1 : 2) : 12; return n + dir * st; }
+    for (let d = 1; d <= 12; d++){ const m = n + dir * d; if (sc.includes((((m - root) % 12) + 12) % 12)) return m; } return n + dir * 12; };
+  const roll = () => {
+    if (cPhrase !== ph0 || S.phrases[ph0] !== P) return toast('The phrase changed: close Mutate and open it again.');
+    const a = mutSet.amt / 100, L = mutSet.lanes, rnd = Math.random; let nP = 0, nD = 0, nA = 0, nT = 0, nV = 0;
+    const emptyRow = r => { for (let c = 0; c < cols; c++) if (r[c] >= 0) return false; return true; };
+    for (let y = y0; y <= y1; y++){ const r = P[y];
+      for (let c = 0; c < cols; c++){ const n = r[c]; if (!isNoteV(n)) continue;
+        if (L.pitch && rnd() < a * 0.5){ const up = rnd() < 0.5, m = rnd() < 0.15 ? n + (up ? 12 : -12) : near(n, up ? 1 : -1); if (isNoteV(m)){ r[c] = m; nP++; } }
+        if (L.hits && rnd() < a * 0.22 && !(y === y0 && c === 0)){ r[c] = -1; nD++; if (emptyRow(r)){ r[VC] = -1; } continue; }
+        if (L.vol && rnd() < a * 0.5){ const u = rnd(); r[VC] = u < 0.65 ? 0x40 + Math.floor(rnd() * 0x50) : u < 0.85 ? 0xA0 + Math.floor(rnd() * 0x40) : 0xFF; nV++; }
+        if (L.time && rnd() < a * 0.25){ const d = rnd() < 0.5 ? -1 : 1, z = y + d; if (z >= y0 && z <= y1 && P[z][c] < 0 && (c > 0 || emptyRow(P[z]))){
+          const q = P[z]; q[c] = r[c]; if (q[IC] < 0) q[IC] = r[IC]; if (r[VC] >= 0 && q[VC] < 0) q[VC] = r[VC]; r[c] = -1; if (emptyRow(r)) r[VC] = -1; nT++; if (d > 0) y++; } } } }
+    if (L.hits){ let prev = null;
+      for (let y = y0; y <= y1; y++){ const r = P[y]; if (isNoteV(r[0])){ prev = {n:r[0], i:r[IC] >= 0 ? r[IC] : prev && prev.i}; continue; }
+        const off = Math.floor((y - y0) / spr) % 2 === 1;
+        if (prev && emptyRow(r) && r[0] !== OFF && rnd() < a * (off ? 0.2 : 0.07)){ r[0] = prev.n; if (prev.i != null && prev.i >= 0) r[IC] = prev.i; r[VC] = 0x50 + Math.floor(rnd() * 0x40); nA++; } } }
+    saveS(); draw();
+    toast(`Mutated rows ${rS(y0)}–${rS(y1)}: ${nP} pitch, ${nD} dropped, ${nA} added, ${nT} moved, ${nV} volumes` + (found ? ' · in ' + found.name : ''), 3500); };
+  const original = () => { if (S.phrases[ph0] !== P) return; orig.forEach((r, y) => { P[y] = r.slice(); }); saveS(); draw(); toast('Back to the phrase as it was.'); };
+  genPanel('Mutate', `A variation of rows ${rS(y0)}–${rS(y1)} of this phrase` + (found ? `, in ${found.name} (${found.from})` : ', in steps and octaves (no key found in the song yet)') + '. Each press varies what is there now; Original puts it back.',
+    ({field, slider}) => {
+      slider('Amount', () => mutSet.amt, v => { mutSet.amt = v; });
+      const seg = el('div', 'seg'); [['pitch', 'PITCH'], ['hits', 'HITS'], ['time', 'TIME'], ['vol', 'VOLUME']].forEach(([k, t]) => { const b = el('button', mutSet.lanes[k] ? 'on' : null, t); b.type = 'button'; b.setAttribute('aria-pressed', !!mutSet.lanes[k]);
+        b.addEventListener('click', () => { mutSet.lanes[k] = !mutSet.lanes[k]; b.classList.toggle('on', mutSet.lanes[k]); b.setAttribute('aria-pressed', mutSet.lanes[k]); }); seg.append(b); });
+      field('Vary', seg); },
+    [['▶ / ■', () => playCtx()], ['Original', () => original()], ['Mutate (M)', () => roll(), 'ok']], {m:roll, g:roll, o:original});
+}
+
+/* DRUM PATTERN: a beat across the tracks on the song cursor's row: KICK, SNARE, HATS and PERC each go to a track and an
+   instrument (found from the kit's pad names, all changeable; OFF leaves a part out). STYLE picks the feel, DENSITY how
+   busy, VARIATION how much the bars after the first change (and a fill in the last). Main hits play full; ghost notes and the
+   quieter hats get a volume. A track with no block on this row gets a new phrase there (the length of the phrase you're in);
+   one with a block has its first note column rewritten (its effect columns stay). */
+const DRUM_STYLES = ['Four on the floor', 'Broken beat', 'Jungle', 'Footwork', 'Halftime', 'IDM (euclidean)'];
+const DRUM_PARTS = [['kick', 'Kick', /kick|\bbd\b|bass ?drum|\b808\b/i], ['snare', 'Snare', /snare|\bsd\b|clap/i], ['hats', 'Hats', /hat|\bhh\b|cymb|ride|shaker/i], ['perc', 'Perc', /perc|tom|rim|conga|cow|bongo|clave|block|shaker|clap/i]];
+const drumSet = {style:1, dens:50, vari:30, parts:{}};
+// [step, chance (scaled by density when < 1), ghost]: main hits are 1, the rest grow with DENSITY
+const DRUM_P = [
+  {kick:[[0,1],[4,1],[8,1],[12,1],[14,.25],[3,.15],[11,.15]], snare:[[4,1],[12,1],[7,.25,1],[15,.3,1]], hats:[[2,1],[6,1],[10,1],[14,1],[0,.5,1],[4,.5,1],[8,.5,1],[12,.5,1],[1,.3,1],[9,.3,1]], perc:[[3,.2],[11,.25],[13,.15]]},
+  {kick:[[0,1],[6,.9],[10,.8],[3,.3],[13,.3]], snare:[[4,1],[12,1],[14,.35,1],[9,.25,1],[11,.25,1]], hats:[[0,.9],[2,.8,1],[4,.9],[6,.8,1],[8,.9],[10,.8,1],[12,.9],[14,.8,1],[1,.35,1],[5,.35,1],[13,.35,1]], perc:[[7,.3],[15,.3],[3,.15]]},
+  {kick:[[0,1],[10,.9],[2,.5],[11,.3]], snare:[[4,1],[12,1],[7,.45,1],[9,.45,1],[15,.45,1],[14,.3]], hats:[[0,.9],[1,.5,1],[2,.9],[3,.5,1],[4,.9],[5,.5,1],[6,.9],[7,.5,1],[8,.9],[9,.5,1],[10,.9],[11,.5,1],[12,.9],[13,.5,1],[14,.9],[15,.5,1]], perc:[[6,.2],[13,.2]]},
+  {kick:[[0,.95],[3,.9],[6,.9],[10,.9],[13,.85],[8,.4]], snare:[[12,1],[4,.5]], hats:[[2,.8],[6,.8],[10,.8],[14,.8],[0,.3,1],[5,.3,1],[9,.3,1],[13,.3,1]], perc:[[1,.3],[5,.3],[9,.3],[15,.2]]},
+  {kick:[[0,1],[10,.6],[3,.5],[14,.3]], snare:[[8,1],[11,.25,1],[15,.25,1]], hats:[[0,.9],[2,.9,1],[4,.9],[6,.9,1],[8,.9],[10,.9,1],[12,.9],[14,.9,1],[5,.3,1],[13,.3,1]], perc:[[6,.15],[12,.15]]},
+  null];
+function drumBar(style, part, d, rnd, vary, last){
+  const out = new Array(16).fill(null);
+  if (style === 5){   // IDM: euclidean layers, rotated, with a ratchet now and then
+    const K = {kick:[3, 6], snare:[2, 4], hats:[7, 13], perc:[3, 7]}[part], k = Math.round(K[0] + (K[1] - K[0]) * d * (0.6 + 0.4 * rnd())), rot = Math.floor(rnd() * 16);
+    const e = euclid(k, 16, part === 'snare' ? 4 + rot % 3 : rot); for (let i = 0; i < 16; i++) if (e[i]) out[i] = {g:part === 'hats' && rnd() < 0.5};
+    if (part === 'kick') out[0] = {g:false};
+    return out; }
+  const P = DRUM_P[style][part];
+  for (const [s, p, g] of P){ const ch = p >= 1 ? 1 : p * (0.4 + 1.2 * d) * (vary ? 0.6 + 0.8 * rnd() : 1); if (rnd() < ch) out[s] = {g:!!g}; }
+  if (last && part === 'snare' && rnd() < 0.5 + d * 0.4) for (const s of [13, 14, 15]) if (rnd() < 0.7) out[s] = {g:s !== 15};   // a fill
+  return out;
+}
+function drumPattern(){
+  if (view !== 'tracker' || !['phrase', 'song', 'sect'].includes(tv)) return toast('Open the Song or a phrase first: Drum pattern writes on the song row under the cursor.');
+  const y = cs.song.y, n = ntr(), vox = k => { const I = S.insts[k], v = I && kit.voices[I.pad]; return v ? (v.name || '') : ''; };
+  // defaults: an instrument whose pad name fits, and a track: the cursor's and the next free ones that aren't buses
+  const used = new Set(), trs = []; for (let t = (tv === 'song' ? cs.song.x : cTrack); t < n && trs.length < 4; t++) if (t !== MT && !isBusT(t)) trs.push(t);
+  for (let t = 0; t < n && trs.length < 4; t++) if (!isBusT(t) && !trs.includes(t)) trs.push(t);
+  DRUM_PARTS.forEach(([k, , re], i) => { const D = drumSet.parts[k] || (drumSet.parts[k] = {});
+    if (!(D.i >= 0 && S.insts[D.i])){ let f = -1; for (let j = 0; j < S.insts.length; j++) if (!used.has(j) && re.test(vox(j))){ f = j; break; } D.i = f >= 0 ? f : (k === 'perc' ? -1 : i); }
+    if (D.i >= 0) used.add(D.i);
+    if (!(D.t >= -1 && D.t < n) || D.t == null || (D.t >= 0 && isBusT(D.t))) D.t = trs[i] != null ? trs[i] : -1; if (D.i < 0) D.t = -1; });
+  const L0 = tv === 'phrase' ? plen(cPhrase) : (S.dlen || 16), lpb = (tv === 'phrase' ? plpbOf(S, cPhrase) : S.lpb) || 4, spr = Math.max(1, Math.round(lpb / 4));
+  const roll = () => {
+    const rnd = Math.random, d = drumSet.dens / 100, v = drumSet.vari / 100, st = drumSet.style | 0, wrote = [];
+    for (const [k, nm] of DRUM_PARTS){ const D = drumSet.parts[k]; if (!(D.t >= 0) || !(D.i >= 0)) continue; const t = D.t;
+      if (isBusT(t) || t === MT) continue;
+      let cid = S.song[y] ? S.song[y][t] : -1, p = cid >= 0 ? firstPhrase(cid) : -1;
+      if (p < 0){ p = freePhrase(); if (p < 0){ toast('No free phrases left.'); break; } S.phrases[p] = freshPhrase(); if (S.plen) S.plen[p] = L0; setSongPhrase(t, y, p); }
+      if (!S.phrases[p]) S.phrases[p] = freshPhrase();
+      const P = S.phrases[p], L = plen(p), Ls = Math.max(1, Math.floor(L / spr)), bars = Math.ceil(Ls / 16);
+      const base = drumBar(st, k, d, rnd, false, false); let hits = 0;
+      for (let yy = 0; yy < L; yy++){ P[yy][0] = -1; if (P[yy][IC] >= 0 && P[yy].slice(1, NCOL).every(x => x < 0)) P[yy][IC] = -1; if (P[yy].slice(0, NCOL).every(x => x < 0)) P[yy][VC] = -1; }
+      for (let b = 0; b < bars; b++){ const lastB = b === bars - 1 && bars > 1, bar = b === 0 || rnd() >= v ? (lastB && rnd() < v ? drumBar(st, k, d, rnd, true, true) : base) : drumBar(st, k, d, rnd, true, lastB);
+        for (let s = 0; s < 16; s++){ const step = b * 16 + s; if (step >= Ls || !bar[s]) continue; const row = P[step * spr]; if (!row) continue;
+          row[0] = ROOT; row[IC] = D.i; row[VC] = bar[s].g ? (k === 'hats' ? 0x70 + Math.floor(rnd() * 0x30) : 0x48 + Math.floor(rnd() * 0x28)) : -1; hits++; } }
+      wrote.push(`${nm} ${d2(t + 1)} (${hits})`); }
+    if (!wrote.length) return toast('Give at least one part a track and an instrument.');
+    saveS(); draw(); toast(`${DRUM_STYLES[st]} on song row ${rS(y, 3)}: ` + wrote.join(', '), 3500); };
+  genPanel('Drum pattern', `Writes a beat on song row ${rS(y, 3)}, one track per part. A track with nothing on this row gets a new ${L0}-row phrase there; one with a phrase has its first note column rewritten (shared phrases change everywhere they play).`,
+    ({field, slider}) => {
+      const sel = (opts, val, set) => { const s = el('select'); opts.forEach(([v2, t]) => s.append(new Option(t, v2))); s.value = val; s.addEventListener('change', () => set(+s.value)); return s; };
+      field('Style', sel(DRUM_STYLES.map((t, i) => [i, t]), drumSet.style, x => { drumSet.style = x; }));
+      slider('Density', () => drumSet.dens, x => { drumSet.dens = x; });
+      slider('Variation', () => drumSet.vari, x => { drumSet.vari = x; });
+      for (const [k, nm] of DRUM_PARTS){ const D = drumSet.parts[k], w = el('span', 'genpart');
+        const tS = sel([[-1, 'Off'], ...Array.from({length:n}, (_, t) => t).filter(t => !isBusT(t)).map(t => [t, 'Track ' + d2(t + 1) + trkKind(t)])], D.t, x => { D.t = x; });
+        const iS = sel(S.insts.map((_, j) => [j, instLabel(j)]), Math.max(0, D.i), x => { D.i = x; try { const h = preview(x, ROOT, -1, false, null, true); if (h) setTimeout(() => previewOff(h), 200); } catch(e){} });
+        w.append(tS, iS); field(nm, w); } },
+    [['▶ / ■ pattern', () => playPatLoop()], ['Generate (G)', () => roll(), 'ok']], {g:roll, r:roll, ' ':() => playPatLoop()});
+}
+/* ===== end GENERATORS ===== */
 
 /* ACID LINE (owner, 30 Oct): pump ACID's random pattern generator (plugins/acid/AcidParams.hpp, randomizeSteps and
    mutateSteps), writing a bass line into the open phrase for an Acid pad. Acid-line logic, as a hardware bass line's random
@@ -30696,6 +30841,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [462, '6 Nov', ['Two new generators (GEN, or Edit ▾ → Generators): Drum pattern writes a beat across tracks on the song row (Four on the floor, Broken beat, Jungle, Footwork, Halftime, IDM euclidean; density, variation, a fill; a track and an instrument per part, found from your pad names), and Mutate makes a variation of the open phrase (pitch in the song’s key, hits dropped and added, timing, volume; Original puts it back).']],
   [461, '6 Nov', ['On a phone or tablet the song moves from the audio-thread sequencer to the page sequencer the moment the app goes out of view (screen off, another app), at the next step to sound, so it keeps time and STOP always works; the next PLAY is on the audio thread again. Computers are unchanged.']],
   [460, '6 Nov', ['KEEP SCREEN ON holds after a quick STOP and PLAY (it could let go, and the screen then timed out mid-song); while the song plays it is checked every 2 s.']],
   [459, '6 Nov', ['The audio-thread sequencer: when the phone’s audio clock runs out of step with real time (after the screen times out on its own, on the Fold), the song carries on from its row on the page sequencer until the app reloads; and if the audio-thread sequencer keeps going after STOP, it’s let go and a fresh one loads.']],
