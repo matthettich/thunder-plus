@@ -580,7 +580,7 @@ class ThunderCore extends AudioWorkletProcessor {
         for (const e of r.evs) if (this.ev(e)) e.core = true;
         rows.push({t:r.t, evs:r.evs, pos:r.pos, tks:r.tks, line:r.line, bpm:s.bpm});
       }
-      if (rows.length) this.port.postMessage({op:'rows', gen:this.gen, rows, time:s.time, bpm:s.bpm, tks:s.tks, base:s.base, btT:s.btT, alive:s.alive()});
+      if (rows.length) this.port.postMessage({op:'rows', gen:this.gen, rows, time:s.time, bpm:s.bpm, tks:s.tks, base:s.base, btT:s.btT, alive:s.alive(), skips:this.skips || 0});
       if (held) this.port.postMessage({op:'held', gen:this.gen, t:held.t, pos:held.pos});
       if (!held && !s.alive() && !this.ended){ this.ended = true; this.port.postMessage({op:'end', gen:this.gen, time:s.time}); }
     }
