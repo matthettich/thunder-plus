@@ -162,6 +162,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov: FOLLOW PATTERN moves the Pattern view's song row (build 446, on `beta`)
+
+- Owner: "pattern follow didn't update in the pattern screen until I paged into it". The Pattern view draws song row
+  `cs.song.y`; `followPlay()`'s FOLLOW PATTERN branch (followMode 1) only switched `cPhrase` to what the open track played and
+  returned before the `pvFollow()` call that FOLLOW ON reaches, so the other tracks stayed on the old pattern. That branch now
+  calls `pvFollow(P, own)` too (same guard: song mode, Pattern view, not while Arrange has the keys). No scrolling added.
+- Not changed: FOLLOW ON with Arrange holding the keys still leaves the song row alone (by design, 31 Oct).
+- Checks: npm test (187 pass, 1 skipped).
+
 ## 5 Nov (15): Edit… button, orange wave / blue selection, FX-card waveform window (build 445)
 - Owner asked how to open the editor on a loaded sample, to flip colours (sample orange, selection blue), and to style the waveform window like the FX bar boxes / pad mode buttons.
 - `#bEditSmp` "Edit…" in the layer header (shown when the layer is a sample with data) → `rcdPanel(cur, {edit:{pad:cur, li:V().sel}})`. Edit sample… in the Sample section still works.

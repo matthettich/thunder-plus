@@ -21906,7 +21906,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 445;
+const BUILD = 446;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22013,6 +22013,10 @@ function followPlay(){
     // ...and beside Phrase / Pattern view while Arrange has the keys (owner, 31 Oct: then only the phrase followed): the
     // selected block goes to the row playing on its own track
     if (tv !== 'song' && apReady && apF === 'arr' && tp.mode === 'song' && performance.now() - arrHandT > 4000){ const q = P[cs.song.x] || own; if (q && q.row >= 0 && cs.song.y !== q.row){ cs.song.y = q.row; apLastKey = ''; } }
+    // PATTERN VIEW (owner, 6 Nov: "pattern follow didn't update in the pattern screen until I paged into it"): the Pattern view
+    // draws the song row cs.song.y, and FOLLOW PATTERN only switched the open track's phrase, so the other tracks stayed on the
+    // old pattern. The song row follows now too, as with FOLLOW ON (rows don't scroll; the cursor keeps its row and track).
+    if (tv === 'phrase' && tp.mode === 'song' && own.row >= 0 && pvActive() && !(apReady && apF)) pvFollow(P, own);
     arrFollowPage(own);
     return; }
   // EDIT WHILE FOLLOWING (owner, 31 Oct): the screen follows the playhead (the song row, the sect, the phrase the cursor's
@@ -30451,6 +30455,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [446, '6 Nov', ['FOLLOW PATTERN in the Pattern view: the song row follows the playing pattern, so every track shows what is playing (only the open track switched; the rest stayed on the old pattern until you paged there).']],
   [445, '5 Nov', ['Sample layers have an Edit… button beside Load sample and Record… that opens the sample editor.', 'The editor draws the waveform orange and the selection blue, and the waveform sits in a card styled like the FX bar boxes: a dark title bar with the sample’s name, length, channels and rate.']],
   [444, '5 Nov', ['The sample editor draws in your skin’s accent colours (IDM: blue wave, orange selection) and is laid out more cleanly: one toolbar over the waveform (Play, the readout, Undo, zoom), tools in joined groups, the recording settings in two columns, Revert on the left and Apply / Close on the right.', 'Record a sample… has a ▶ Song / ■ Song button to start or stop the song from the panel.', 'Phone: the Synth page has the Song play / stop button in its top bar; on a folded phone the kit name makes room for it.']],
   [443, '5 Nov', ['Edit sample… (on a sample layer): the take editor on a loaded sample. Apply writes it back (Undo on the Synth page takes it back); Start, Loop start and Loop end move with the audio when you crop, cut, reverse or trim.', 'The editor is bigger, with an overview of the whole sample and a time ruler. Zoom with the wheel or a pinch (at the pointer), − / + at the cursor (a click places it), FIT and SEL; Shift+wheel or a sideways swipe scrolls; drag the overview to move.', 'New edits: Snap (selections land on zero crossings), Remove DC, Invert, To mono, To stereo, Append file….']],
