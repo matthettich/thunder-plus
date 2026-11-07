@@ -26,6 +26,9 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.97** (7 Nov 2026; owner: "once this is done, merge to main and make a new desktop build"; from `main` at build 467,
+  run 42396748681): the recorder-cut fixes from CodeRabbit (PR #9, merged) on top of v1.2.96. From now on: beta → main by PR
+  so CodeRabbit reviews it.
 - **v1.2.96** (7 Nov 2026; owner: overnight stability pass, merge and a desktop build when done; from `main` at build 466,
   run 42352114563): the stability pass (465) and its review fixes (466) on top of v1.2.95.
 - **v1.2.95** (6 Nov 2026; owner: merge and a desktop build when the punch list is done; from `main` at build 463, run
