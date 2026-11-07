@@ -882,7 +882,9 @@ class ThunderCore extends AudioWorkletProcessor {
         this.port.postMessage({op:'test', id:d.id, rows}); return; }
       case 'play': return this.play(d);
       case 'hold': this.hold = true; return;   // EXACT STOP (6 Nov): stop at the next pattern edge, tell the page {op:'held', t, pos}
-      case 'stop': { this.seq = null; const at = d.at == null ? currentTime : d.at; this.stopAll(at); this.clkOn = false; this.clk.cancel(at); this.clk.set(0, at); return; }
+      case 'stop': { this.seq = null; const at = d.at == null ? currentTime : d.at; this.stopAll(at); this.clkOn = false; this.clk.cancel(at); this.clk.set(0, at);
+        if (d.rel) this.release(at);   // HAND-OVER (7 Nov): the page plays on from `at`, so the live engines are its own from then
+        return; }
       case 'loop': if (this.seq) this.seq.setLoop(d.l || null); return;
       case 'bpm': if (this.seq) this.seq.bpm = d.v; return;
       case 'perf': if (!perfLive.init) perfLiveInit(); if (d.xf != null) perfLive.xf = d.xf; if (d.mac) perfLive.mac = d.mac.slice(); if (d.fill != null) perfLive.fill = !!d.fill; return;
@@ -890,7 +892,7 @@ class ThunderCore extends AudioWorkletProcessor {
       case 'stats': this.port.postMessage({op:'stats', id:d.id, nodes:[...tcNodes().keys()], n:this.nN || 0, late:this.nLate || 0, worst:this.worst || 0, voices:this.alive.size, lead:this.leadMin == null ? null : this.leadMin, skips:this.skips || 0, lnodes:this.lnodes.size, vs:this.vs.reduce((a, T) => a + (T ? T.length : 0), 0), ovEv:[...tcNodes().values()].reduce((a, p) => a + (p.__ov ? [...p.__ov.p.values()].reduce((b, A) => b + A.ev.length, 0) + p.__ov.g.ev.length + p.__ov.pn.ev.length : 0), 0), clk:this.clk.ev.length, ms:this.pms || 0, blocks:this.pbl || 0}); this.pms = 0; this.pbl = 0; this.nN = this.nLate = this.worst = 0; this.leadMin = null; return;
       case 'sig': { const j = JSON.stringify(S); let h = 0; for (let i = 0; i < j.length; i++) h = (h * 31 + j.charCodeAt(i)) | 0; this.port.postMessage({op:'sig', len:j.length, h}); return; }
       case 'dbg': this.noSampler = !!d.noSampler; return;   // measuring: the page plays every note (the core only sequences)
-      case 'die': this.dead = true; this.seq = null; this.alive.clear(); return;   // the page let this core go (Reset audio engine)
+      case 'die': this.release(currentTime); this.dead = true; this.seq = null; this.alive.clear(); return;   // the page let this core go (Reset audio engine)
       case 'lead': this.LEAD = Math.max(0.05, Math.min(2, +d.s || 0.25)); return;
     }
   }
@@ -920,6 +922,7 @@ class ThunderCore extends AudioWorkletProcessor {
     if (M) fill(M[0], this.mm, 0);
   }
   play(d){
+    const ms0 = Date.now(), at0 = currentTime;   // PLAYBACK REPORT: how late this PLAY reached the audio thread, and how long it took
     this.stopAll(currentTime); this.mixReset(); this.clkOn = false; this.clk.cancel(currentTime); this.clk.set(0, currentTime);
     const seq = makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}));
     // RESUME: run silently up to the step the song stopped on; the page played that step, the core carries on after it
@@ -929,6 +932,7 @@ class ThunderCore extends AudioWorkletProcessor {
       else seq.time = d.t0; }
     else seq.time = d.t0;
     this.seq = seq; this.ended = false; this.gen = d.gen | 0; this.hold = false; this.lr = null; this.ls = null;
+    this.port.postMessage({op:'started', gen:this.gen, late:at0 - d.t0, ms:Date.now() - ms0});
   }
 
   /* ---- the sampler: the page player's rendered-pad path (makePlayer: startNote, kill, pitchMods, modVoice, play) ---- */
@@ -1151,6 +1155,9 @@ class ThunderCore extends AudioWorkletProcessor {
     if (this.liveNote(ev)) return true;
     this.take(ev); return false;
   }
+  // the live-engine and effect overrides end at `at` instead of after the release (stopAll's at + 4 / + 0.5): the page's own notes
+  // on those nodes from then aren't held shut by the core's gates
+  release(at){ for (const proc of tcNodes().values()) if (proc && proc.__ov) proc.__ov.until = Math.min(proc.__ov.until, at); }
   stopAll(at){ for (const v of this.alive) this.kill(v, at); for (const T of this.vs) if (T) T.length = 0;
     for (const L of this.lnodes.values()){ if (L.cur) this.kill(L.cur, at); if (L.lanes) for (const q of L.lanes) if (q.cur) this.kill(q.cur, at); L.sylN = 0;
       const ov = L.proc.__ov; if (!ov) continue;   // and whatever is still booked on it: gates shut now, no note after this

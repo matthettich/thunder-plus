@@ -2698,6 +2698,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <h3>Layout</h3>
       <div class="btnrow"><label class="cb" title="Mobile is ...Thunder: the …waves and …chains editors are hidden (tick Show …chains or Show …waves on Mobile to keep one) and the tracker switches to PAD input. Kits and songs keep their …waves layers and …chains effects, and they still play, so files open and sound the same either way. Turn it off for Desktop (...Thunder Plus) to edit those patches. This is saved for this browser."><input type="checkbox" id="ckMobile">Mobile (...Thunder)</label></div>
       <div class="btnrow" id="mobEdRow"><label class="cb" title="Shows the …chains editor on Mobile (a big screen like the unfolded Fold has room for it). Off: the song's …chains effects still play."><input type="checkbox" id="ckMobCh">Show …chains on Mobile</label><label class="cb" title="Shows the …waves editor on Mobile. Off: the kit's …waves layers still play."><input type="checkbox" id="ckMobWv">Show …waves on Mobile</label></div>
+      <h3>Playing</h3>
+      <div class="btnrow"><label class="cb" title="While the song plays, the screen doesn't time out by itself (the power button still turns it off). Also on the tracker's PROJECT screen."><input type="checkbox" id="ckWake">Keep screen on while playing</label><label class="cb" title="While the song plays, Android shows a playback notification so the song keeps going when you switch apps. Also on the tracker's PROJECT screen."><input type="checkbox" id="ckBgPlay">Background play</label></div>
       <h3>Updates &amp; help</h3>
       <div class="btnrow"><button type="button" id="updBtn">Check for update</button><button type="button" id="helpBtn2">Help &amp; keys</button><span class="lbl setbuildL" id="appBuild"></span></div>
       <div class="btnrow" id="installRow" hidden><button type="button" id="installBtn" hidden>Install app</button><span class="lbl" id="installMsg"></span></div>
@@ -3219,7 +3221,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="help" id="help" hidden role="dialog" aria-modal="true" aria-label="Help">
   <div class="hhead"><b>HELP</b>
-    <div class="seg" id="helpNav"><button type="button" data-h="hStart">Start</button><button type="button" data-h="hAll">Everywhere</button><button type="button" data-h="hKeys">KEYS mode</button><button type="button" data-h="hPad">PAD mode</button><button type="button" data-h="hFx">FX</button><button type="button" data-h="hSynth">Synth</button></div>
+    <div class="seg" id="helpNav"><button type="button" data-h="hStart">Start</button><button type="button" data-h="hAll">Everywhere</button><button type="button" data-h="hKeys">KEYS mode</button><button type="button" data-h="hPad">PAD mode</button><button type="button" data-h="hFx">FX</button><button type="button" data-h="hGen">Generate</button><button type="button" data-h="hSynth">Synth</button></div>
     <div class="sp"></div><button type="button" id="helpNew" class="sm">What’s new</button><button type="button" id="helpX" aria-label="Close help"><span class="hx">Close </span><svg class="ic" aria-hidden="true"><use href="#ic-close"/></svg></button></div>
   <div class="hbody" id="helpBody" tabindex="-1"><div class="hwrap">
     <section id="hStart">
@@ -3282,6 +3284,23 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p>Each track and the master have 8 effect slots (FX screen, or the Mixer’s FX row): 73 effects on a track and 82 on a bus or the master (with the nine …pump ones; …pump EQ goes on any track), in groups: dynamics and EQ (compressors, Bus and Glue Comp, limiter, noise gate, transient shaper, multiband, air), filters (filter, ladder, low and high cut, auto-wah, vowel, envelope filter), drive and lo-fi (saturation, drive, overdrive, tube, tape, wavefolder, bitcrush, lo-fi, degrade, vintage sampler (an SP-1200, SP-12, MPC60, SP-202 at each of its grades, or Emulator II: their rate and bit depth, converters, filters and noise), vinyl, dub tape, cab), modulation (chorus, ensemble, dimension, flanger, phaser, tremolo, auto-pan, rotary, ring mod, cross-mod, frequency shifter), delays (simple, tape, BBD, pitch, granular, reverse echo), reverbs (room, plate, spring, space, Galactic, pitch reverb, convolution), pitch and voice (pitch shifter, harmonizer, pitch correct), resonators (resonator, comb, Rings), spectral and granular (Clouds, Beads, spectral, extreme stretch), rhythmic (Flex, Step gate, Retrigger, trance gate, pump, Beat grains, Beat scramble, Glitch sequencer) and utility (stereo width, utility). The pad's Add effect menu has 65 of them. On the Mixer’s FX row, OPTION (Ctrl/⌘ in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter. For drums and IDM: <b>Beat grains</b> (a rhythmic grain cloud in time with the song, after Output Portal: rate, density, size, position, spray, pitch and random pitch, reverse, shape, stereo, freeze), <b>Beat scramble</b> (re-orders the last bar's slices, some reversed; keep the beats, new every bar or looped) and <b>Glitch sequencer</b> (each step may stutter, reverse, jump an octave, tape-stop, crush or drop out). Under a slot's controls, <b>› PRESET</b> lists INIT, factory presets (over 230 across the effects) and the song's own, and <b>› SAVE AS PRESET…</b> keeps the slot's settings for that effect. <b>› EQ WINDOW</b> (at the bottom of the FX screen, on any track) opens the track's …pump EQ in its own window, adding one to a free slot if needed; …pump EQ works on every track, the other …pump effects on buses and the master.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
 <p><b>…chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback. Its <b>Resample</b> module records what passes through it into a pad, starting on the next bar, and slices it so you can chop it like a breakbeat.</p></section>
+    <section id="hGen"><h2>Generators</h2><p>GEN (PAD mode, beside LOOP), Edit ▾ → Generators, or a right-click. Each opens a panel that stays up while the song plays: <kbd>G</kbd> rolls again, <kbd>Space</kbd> plays, <kbd>Esc</kbd> or Done closes, and each roll is one undo step. They write into the selected rows, else the whole phrase (Drum pattern: the song row under the cursor).</p><table>
+<tr><td>Drum pattern</td><td>A beat across tracks: KICK, SNARE, HATS and PERC each get a track and an instrument (found from your pad names). STYLE (Four on the floor, Broken beat, Jungle, Footwork, Halftime, IDM euclidean), DENSITY, VARIATION (later bars change, a fill at the end). A track with nothing on the row gets a new phrase; a block that also plays elsewhere is made a unique copy first (SHARED), unless you choose to rewrite it everywhere</td></tr>
+<tr><td>Acid line</td><td>A bass line in the song's key, in the styles of a 303 (accents, slides, octaves)</td></tr>
+<tr><td>Mutate</td><td>A variation of the phrase: PITCH (to neighbours in the key), HITS (some dropped, quiet ones added), TIME (a row early or late), VOLUME. Each <kbd>M</kbd> varies further; ORIGINAL puts it back</td></tr>
+<tr><td>Markov melody</td><td>A new line that moves the way the song's melodies do (it learns from every phrase played by an instrument with KEY FOLLOW; drums are left out). NEW: how often it steps outside what it learned</td></tr>
+<tr><td>Arp</td><td>A chord written out as notes: root, shape, pattern (up, down, up and down, converge, random), rate, octaves, legato or short</td></tr>
+<tr><td>Chords</td><td>A progression by key and mood, triads, sevenths or spread, up to four notes on a poly track (a mono track gets the roots)</td></tr>
+<tr><td>Polymeter</td><td>A rhythm of 3–13 steps and a cycle of 1–7 notes repeated across the phrase, drifting against the bar; ROTATE (<kbd>R</kbd>) moves the hits</td></tr>
+<tr><td>Ratchet</td><td>Rolls (RET) on the hits that are there, with speed and fade; DELAYS pushes some a few ticks late (DEL) for flams</td></tr>
+<tr><td>Probability fill</td><td>Quiet ghost notes on the empty rows, offbeats likelier: always, or each by chance (CHA)</td></tr>
+<tr><td>Euclidean fill</td><td>HITS in STEPS (rotated) in the note column under the cursor</td></tr></table>
+<h3>Playing on a phone</h3><table>
+<tr><td>Keep screen on</td><td>While the song plays the screen doesn't time out by itself (the power button still turns it off). Settings → App, or the PROJECT screen</td></tr>
+<tr><td>Out of view</td><td>On a phone or tablet the song moves from the audio-thread sequencer to the page sequencer the moment the app is hidden (screen off, another app), at the next step, so STOP always works; the next PLAY uses the audio thread again. Phones slow down out of view, so a busy song can still stutter there</td></tr>
+<tr><td>Background play</td><td>Android's playback notification, so the song keeps going when you switch apps. Settings → App, or the PROJECT screen</td></tr>
+<tr><td>Playhead offset</td><td>Settings → Screen: moves the playhead to match what you hear (+ later, for Bluetooth or a slow screen; − earlier)</td></tr>
+<tr><td>Playback report</td><td>Settings → Audio → Copy playback report: a short log of what playback did, to paste into a bug report</td></tr></table></section>
     <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots; on a computer, where they are a list down the left, ▲▼ do too)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the pad as it is (<kbd>Space</kbd> plays or stops the song, as everywhere)</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr><tr><td><kbd>F2</kbd>–<kbd>F9</kbd></td><td>As in the tracker: F2–F4 Phrase, Mixer, Inst; F5 the song from the top, F6 the pad, F7 the song from the cursor, F8 stop, F9 REC</td></tr><tr><td><kbd>Alt</kbd> <kbd>8</kbd> · <kbd>9</kbd> · <kbd>0</kbd> · <kbd>`</kbd></td><td>…waves · …chains · the synth · back to the last view (these and Alt+1–7 work from …waves and …chains too)</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound. It starts with one group per drum type (Kicks, Snares, Claps &amp; snaps, Rims &amp; sticks, Closed hats, Open hats, Cymbals, Toms, Hand drums, Shakers &amp; tambourines, Cowbells, blocks &amp; metal), gathering every drum the app has from its own designs, the drum engines and the classic and acoustic kits; then IDM and glitch hits, basses, pads, chords, keys, leads and each engine's sounds. The search box finds any of them by name. <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once. <b>Drum kits…</b> (File ▾, or ⚙ Settings → Kit) puts a CR-78-, 808-, 606-, 909-, 707-, 727- or 505-style kit, or a clean acoustic kit (Funk, Studio, Jazz), on pads 1–8 and keeps the synth slots; every sound of each kit is also in the Presets list, filed under its type (808 Kick under Kicks). <b>Funk breaks…</b> (File ▾) loads one of twelve original breaks, with swing, ghost notes and a laid-back snare, as a new song with its acoustic kit, or adds its four bars to this song. <b>Breaks to chop</b> (File ▾) has the fourteen breaks of …pump BREAK, rendered by its own kit with room and tape, as a one-bar loop in a slot, cut into 16 slices (C-4 plays slice 1) and synced to the tempo, ready to re-sequence. <b>Acid line…</b> (Edit ▾ or right-click on a phrase) writes a random bass line into the phrase the way …pump ACID does — scale, root, density, accents, slides and octave jumps; Roll (R) again or Mutate (M) a few steps, and light only the lanes you want changed — for an Acid pad (accents are volume FF, slides PSL).</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modelled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. <b>Drift</b> is a two-line analog pad synth laid out like the big 1970s CS-series polysynths (two oscillator lines per voice, a high-pass and a low-pass with their own envelope, up to four drifting unison voices) followed by a tape stage — <b>Wow</b> and <b>Flutter</b> on the pitch, chorus, saturation, <b>Age</b> (worn top and bottom, the odd dropout) and hiss — for warm, wobbly, faded pads; its presets are in the pad Presets list under Drift (tape pads). <b>…pump</b> (group in the engine list) has the pump plugins' instruments with their own sound and presets: <b>Mono</b> (three oscillators, four filters), <b>Poly</b> (two oscillators, poly-mod, unison, chorus) and <b>Coil</b> (tuned springs kicked by the note). Each renders a note like the other engines (<b>Hit</b> is how hard it is played), and each has a <b>live</b> twin that plays the plugin in the tracker note by note, with the VOL column as velocity, slides and bends as pitch bend, and glide (Coil live also sets how many <b>Voices</b> ring at once, 1–16). A twin shares its values with the rendered engine; if the device can't keep up, the live ones fall back to their renders and say so (Settings → Audio → …pump live). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. Notes side by side in different columns sing together; a new note in the same column takes over that column's singer. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
@@ -8072,6 +8091,10 @@ function applyPlatform(){
 }
 $('ckMobile').addEventListener('change', e => setPlatform(e.target.checked ? 'mobile' : 'desktop'));
 $('ckMobCh').addEventListener('change', e => setMobEd('chains', e.target.checked));
+// KEEP SCREEN ON / BACKGROUND PLAY here too (stability pass: they were only on the PROJECT screen); ticked from their settings each time the panel shows
+{ const w = $('ckWake'), b = $('ckBgPlay'), sync = () => { try { w.checked = !!wlOn; b.checked = !!bgOn; } catch(e){} };
+  w.addEventListener('change', () => { setWlOn(w.checked); draw(); }); b.addEventListener('change', () => { setBgOn(b.checked); draw(); });
+  new MutationObserver(sync).observe($('pApp'), {attributes:true, attributeFilter:['hidden']}); sync(); }
 $('ckMobWv').addEventListener('change', e => setMobEd('waves', e.target.checked));
 // Per-slot render state follows the slot count (grows when a voice per track is on); slotAt pads or
 // trims so every index the UI touches has an entry.
@@ -14729,7 +14752,7 @@ function rcdUi(){
 // out so neither end clicks. What plays is the selection, or the take from its Start marker (an edited sample) or the top.
 function rcdKeyOn(k, note){
   const T = RCD.take; if (!T) return; audio(); rcdKeyOff(k);
-  const n = T.data.length, a = RCD.sel ? RCD.sel[0] : Math.min(n - 32, Math.max(0, T.mk ? T.mk[0] : 0)), b = RCD.sel ? RCD.sel[1] : n; if (b - a < 32) return;
+  const n = T.data.length, a = RCD.sel ? RCD.sel[0] : Math.max(0, Math.min(n - 32, T.mk ? T.mk[0] : 0)), b = RCD.sel ? RCD.sel[1] : n; if (b - a < 32) return;
   const src = ctx.createBufferSource(), g = ctx.createGain(), t = ctx.currentTime;
   // REVIEW (6 Nov): one buffer per take and range, not a copy per key press (a 5-minute stereo take is ~110 MB a copy)
   const K = RCD.kb; if (!K || K.T !== T || K.d !== T.data || K.a !== a || K.b !== b) RCD.kb = {T, d:T.data, a, b, buf:stBuf(ctx, T.data.subarray(a, b), T.data2 ? T.data2.subarray(a, b) : null, T.sr)};
@@ -18697,6 +18720,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden){ flus
 let pendPlace = null;
 function placePending(){
   const q = pendPlace; if (!q) return;
+  if (q.p !== cPhrase){ pendPlace = null; return; }   // (only the phrase being edited: review, 7 Nov, a stale one doubled a block)
   if (!S.song[q.y] || S.song[q.y][q.x] >= 0){ pendPlace = null; return; }
   if (isEmptyPhrase(S.phrases[q.p])) return;
   pendPlace = null; setSongPhrase(q.x, q.y, q.p);
@@ -18740,6 +18764,7 @@ function freeSect(){
 }
 function freePhrase(){
   const used = new Set(); for (const c of S.chains) if (c) for (const r of c) if (r[0] >= 0) used.add(r[0]);
+  if (pendPlace) used.add(pendPlace.p);   // (spoken for: waiting for its first note)
   for (let i = 0; i < NPH; i++) if (!used.has(i) && isEmptyPhrase(S.phrases[i])) return i;
   return -1;
 }
@@ -20619,8 +20644,10 @@ function tStart(mode, o){
   let t0start = lkp ? lkp.t : ctx.currentTime + 0.08 + ci + (warmNew ? 0.15 : 0);   // (nodes made just now: a moment to start up)
   // HAND-OVER: o.rz is the last step the audio thread booked, at o.rzT; the page carries on from the first step after it that
   // is still ahead, at that step's own time (no step twice, none moved: the gap is only the start-up moment)
+  let rsDup = false;
   if (rzH && o.rzT != null && rsFirst){ const f0 = rsFirst.t; let g = 0;
     while (seq.alive() && g++ < 512 && (g === 1 || o.rzT + (rsFirst.t - f0) < t0start - 1e-4)){ for (const e of rsFirst.evs) if (CHASE_T.has(e.type)) rsFx.set(e.type + ':' + e.track + ':' + (e.p || ''), e); rsFirst = seq.step(); }
+    rsDup = g === 0;   // (the core booked the song's last step: nothing after it, so the page doesn't play that step again)
     t0start = o.rzT + (rsFirst.t - f0); }
   if (rsFirst){ const d = t0start - rsFirst.t; seq.base += d; seq.time += d; if (seq.btT != null) seq.btT += d; }
   else seq.time = t0start;
@@ -20631,7 +20658,7 @@ function tStart(mode, o){
   if (rsFirst){   // RESUME: the effect commands passed on the way, then the step it stopped on, now
     for (const e of rsFx.values()) rt.pl.play(Object.assign({}, e, {t:t0start}));
     const d = t0start - rsFirst.t;
-    for (const e of rsFirst.evs){ const q = Object.assign({}, e, {t:e.t + d}); for (const k of ['cut', 'rel']) if (q[k] != null) q[k] += d; if (moEv(q)) continue; rt.pl.play(q); }
+    if (!rsDup) for (const e of rsFirst.evs){ const q = Object.assign({}, e, {t:e.t + d}); for (const k of ['cut', 'rel']) if (q[k] != null) q[k] += d; if (moEv(q)) continue; rt.pl.play(q); }
     tp.q.push({t:t0start, pos:rsFirst.pos, bpm:seq.bpm, tks:rsFirst.tks, line:rsFirst.line}); rcdStep(tp.q[tp.q.length - 1]);
   }
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
@@ -20639,7 +20666,7 @@ function tStart(mode, o){
   if (aset.core === 'core' && core.ready && !core.bad && !(o && o.page)) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
   pbLog('PLAY ' + mode + ' · ' + pbState());   // not loaded yet: this PLAY as before, the core loads at STOP
   if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
-  tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
+  tp.timer = pumpTimer(); pump(); if (!handing) draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();   // (a hand-over happens out of view: no draw, which was most of its time)
   bgPlay(true);   // BACKGROUND PLAY
   wakeLock(true);   // KEEP SCREEN ON
   void r;
@@ -20778,7 +20805,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'xoklun';
+const CORE_REV = '11virm3';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -20887,6 +20914,10 @@ function coreStart(mode, o, t0, rs){
   // FIX (UI sweep, 4 Nov): track, phrase and sect too. Without them PLAY on a phrase or a sect (Shift+Space, F6, the Phrase
   // screen's PLAY) threw in the core (makeSeq: tr[undefined]), so nothing played on the audio thread, the default sequencer.
   const oo = {}; for (const k of ['row', 'loop', 'once', 'only', 'track', 'phrase', 'sect']) if (o && o[k] != null) oo[k] = o[k];
+  // FIRST NOTES (stability pass): the page is busiest just after PLAY (the start-up, the first draws), so the core's first rows
+  // reached it up to 250 ms after they were booked and live-engine notes went missing; the core books 0.6 s ahead for the
+  // first 1.5 s, then the usual (coreLead)
+  corePost({op:'lead', s:0.6}); clearTimeout(coreLeadT); coreLeadT = setTimeout(coreLead, 1500);
   core.gen++; corePost({op:'play', gen:core.gen, mode, o:oo, t0, rs}); coreWire(true);
   // tp.seq stands in for the sequencer: the page reads its clock, tempo and ticks, and sets the loop and tempo through it
   const P = {time:t0, tks:tp.tks, base:null, btT:null, _bpm:tp.bpm, _alive:true, alive(){ return this._alive; }, step(){ return {t:this.time, evs:[], pos:null}; },
@@ -20912,10 +20943,14 @@ function pbLevel(){ try { const A = rt && rt.man; if (!A) return '-'; let m = 0;
    a desktop browser: hiding the window changes nothing there), not while a pattern take or MIDI recording runs, with
    Ableton Link, or with a loop other than LOOP (pattern); the clock watch below still covers those. */
 var handing = null;   // var: tStop() can run before this line
-const seqHandHere = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof isMobile === 'function' && isMobile() && !DESK_APP);
+// The device, not the layout setting: a computer with the Mobile layout ticked stays on the core. (Review, 7 Nov.) A phone or
+// tablet showing the desktop site has a touch screen and no hover, and that counts too; Electron never does.
+function seqHandHere(){ if (window.thunderDesktop && window.thunderDesktop.app) return false; const n = navigator, ua = n.userAgent || '';
+  if ((n.userAgentData && n.userAgentData.mobile) || /Android|iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && n.maxTouchPoints > 1)) return true;
+  try { return n.maxTouchPoints > 0 && matchMedia('(hover: none) and (pointer: coarse)').matches; } catch(e){ return false; } }   // (a declaration: tStart reads it)
 function seqHandover(){
   if (!document.hidden || !tp.on || !tp.core || tp.mode !== 'song' || !ctx || !seqHandHere()) return false;
-  if (RCD.sync || RCD.on || (typeof rec !== 'undefined' && rec.on) || (typeof lkLive === 'function' && lkLive()) || (tp.loopV && tp.loopV !== 'pat')) return false;
+  if (RCD.sync || RCD.on || (typeof rec !== 'undefined' && rec.on) || (typeof lkLive === 'function' && lkLive()) || (tp.loopV && tp.loopV !== 'pat') || (typeof clkWanted === 'function' && clkWanted())) return false;   // (MIDI clock out: gear would get Stop + Continue)
   let q = null; for (const e of tp.q) if (e.pos && (!q || e.t > q.t)) q = e;   // the last step the core booked
   const P = q ? q.pos : tp.pos; if (!P) return false;
   const ref = P.findIndex((p, i) => p && p.row >= 0 && i !== MT); if (ref < 0) return false;
@@ -20923,7 +20958,7 @@ function seqHandover(){
   handing = {}; try { tStop(true); tStart('song', {row:rz.row, rz, rzT, page:true}); } finally { handing = null; }
   // the core plays on up to the page's first step, then stops there and is unplugged
   const T0 = tp.q[0] ? tp.q[0].t : ctx.currentTime; PB.handT0 = T0; PB.handW = performance.now();
-  try { core.node.port.postMessage({op:'stop', at:T0}); } catch(e){}
+  try { core.node.port.postMessage({op:'stop', at:T0, rel:true}); } catch(e){}
   setTimeout(() => { if (!tp.core) coreWire(false); }, Math.max(0, (T0 - ctx.currentTime) * 1000) + 60);
   pbLog(`hidden: the song moved to the page sequencer after row ${rz.row} step ${rz.step} (${Math.round(performance.now() - w0)} ms to start; its first step ${tp.q[0] && rzT != null ? Math.round((tp.q[0].t - rzT) * 1000) + ' ms after the core’s last' : '?'})`);
   return true; }
@@ -20932,7 +20967,7 @@ document.addEventListener('visibilitychange', () => { try { seqHandover(); } cat
    real time, and the core (stepping on that clock, and too busy to read messages) sped up and wouldn't stop. While the core
    plays, the audio clock is compared with the real one every 2 s; off by more than 15 % twice running, the song carries on
    from its row on the page sequencer, the core is let go, and the page sequencer plays until the app reloads. */
-function pbClock(){ if (!tp.on || !tp.core || !ctx || core.bad) { PB.ck = null; return; }
+function pbClock(){ if (!tp.on || !tp.core || !ctx || core.bad || ctx.state !== 'running' || !seqHandHere()) { PB.ck = null; PB.ckBad = 0; return; }   // (phones only: a computer's clock can stall on a device switch)
   const w = performance.now() / 1000, a = ctx.currentTime, c = PB.ck; PB.ck = {w, a};
   if (!c || w - c.w < 1.5) return; const r = (a - c.a) / (w - c.w);
   if (r > 0.85 && r < 1.15){ PB.ckBad = 0; return; }
@@ -20940,7 +20975,7 @@ function pbClock(){ if (!tp.on || !tp.core || !ctx || core.bad) { PB.ck = null; 
   core.bad = true; let row = -1; for (const q of tp.pos || []) if (q && q.row > row) row = q.row;
   pbLog('switched to the page sequencer from row ' + row); try { tStop(true); } catch(e){} try { coreDrop(); } catch(e){}
   if (row >= 0) tStart('song', {row});
-  toast('The phone’s audio clock went out of step, so the song moved to the page sequencer (until the app reloads).', 5000); }
+  toast('The audio clock went out of step, so the song moved to the page sequencer (until the app reloads).', 5000); }
 setInterval(() => { try { pbClock(); } catch(e){} }, 2000);
 function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; PB.t = now;
   if (PB.n) pbLog(`rows ${PB.n} · latest note ${(PB.late * 1000).toFixed(0)} ms late · dropped ${PB.drop} · ahead ${(PB.ahead * 1000).toFixed(0)} ms · core skips ${PB.skips} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'}`);
@@ -20955,16 +20990,17 @@ async function pbCopy(){
 document.addEventListener('visibilitychange', () => pbLog((document.hidden ? 'screen off / hidden · ' : 'screen on / visible · ') + pbState()));
 function coreMsg(d){
   // PLAYBACK REPORT: rows the core sends after STOP (or from an older PLAY) mean it is still stepping: say so, and stop it again
-  if (d.op === 'rows' && (!tp.on || !tp.core || d.gen !== core.gen)){ PB.stray += d.rows.length;
+  if (d.op === 'rows' && (!tp.on || !tp.core || d.gen !== core.gen)){ PB.stray += d.rows.length; PB.strayN = (PB.strayN || 0) + 1;
     const now = performance.now(); if (now - PB.strayT > 1000){ PB.strayT = now; pbLog(`stray rows from the core (gen ${d.gen}, now ${core.gen}, playing ${tp.on ? 1 : 0}) · ${pbState()}`);
       if ((!tp.on || !tp.core) && !(PB.handT0 && ctx.currentTime < PB.handT0 + 0.2)) try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); if (!core.wired) core.node.disconnect(); } catch(e){} }
     if (tp.on && !tp.core && PB.handW && now - PB.handW > 1500){ pbLog('the audio-thread sequencer didn’t stop after the hand-over: dropped it'); PB.handW = 0; try { coreDrop(); } catch(e){} return; }
     // DEAF CORE (owner's report, 6 Nov, Fold: after the screen timed out mid-song, the core kept stepping for 18 s+ after STOP,
     // re-sent STOPs included: its audio thread was too busy to read messages). Still at it 1.5 s after STOP: let it go (it is
     // cut off from the tracks and the page) and load a fresh one for the next PLAY.
-    if (!tp.on && PB.stopT && now - PB.stopT > 1500){ pbLog('the audio-thread sequencer didn’t stop: dropped it, a fresh one loads'); try { coreDrop(); } catch(e){} setTimeout(() => { try { if (!tp.on && aset.core === 'core') coreLoad(); } catch(e){} }, 300); return; } }
+    if (!tp.on && PB.stopT && now - PB.stopT > 1500 && PB.strayN >= 3){ /* (still sending, batch after batch: not one late batch) */ pbLog('the audio-thread sequencer didn’t stop: dropped it, a fresh one loads'); try { coreDrop(); } catch(e){} setTimeout(() => { try { if (!tp.on && aset.core === 'core') coreLoad(); } catch(e){} }, 300); return; } }
   if (d.op === 'ready'){ core.v = d.v; if (d.v !== CORE_WANT){ core.ready = false; toast('The audio-thread sequencer here is an older copy: reload the app to use it. Playing as before.', 5000); } return; }
   if (d.op === 'error'){ tpLog('core: ' + d.where, new Error(d.message)); return; }
+  if (d.op === 'started'){ pbLog(`core PLAY: reached the audio thread ${Math.round(-d.late * 1000)} ms before its start, took ${d.ms} ms`); return; }
   if ((d.op !== 'rows' && d.op !== 'end' && d.op !== 'held') || !tp.on || !tp.core || d.gen !== core.gen) return;
   if (d.op === 'held'){ rcdHeldAt(d.t, d.pos); return; }   // EXACT STOP: the core stopped at the pattern's edge
   const s = tp.seq;
@@ -20983,7 +21019,10 @@ function coreMsg(d){
       // LATE (owner, Fold: back from another app it sped up and stuttered): rows held up while the app was in the background
       // arrive together; a note whose time has passed is dropped, not played at once in a burst (the old pump skips ahead
       // the same way). Commands that set a state (effects, levels, OFF) still apply.
-      if (e.type === 'note' && e.t < ctx.currentTime - 0.03){ PB.drop++; continue; }
+      // FIRST NOTES (stability pass, 6 Nov: the owner's reports had the first row after PLAY 27 ms late, 141 ms after a quick
+      // STOP → PLAY, so live-engine notes of the first beat went missing): a note up to 150 ms late plays at once; later than
+      // that it is a backlog (back from the background) and is still dropped.
+      if (e.type === 'note' && e.t < ctx.currentTime - 0.15){ PB.drop++; continue; }
       rt.pl.play(e); if (e.type === 'note') padBlink(e);
     }
     tp.q.push({t:r.t, pos:r.pos, bpm:r.bpm, tks:r.tks, line:r.line}); rcdStep(tp.q[tp.q.length - 1]);
@@ -21019,7 +21058,7 @@ function tStop(quiet){
   // RECORD INTO A PAD: a pattern take ends where the song stops. Only a song that was playing: FIX (6 Nov) the first PLAY of
   // a session with live pads starts a moment later (LIVE WARM-UP), and its tStop(true) dropped the take Record had armed.
   if (RCD.sync && !RCD.starting && tp.on) rcdSongStopped();
-  if (tp.on && !quiet) pbAfterStop();
+  if (tp.on){ PB.stopT = performance.now(); PB.strayN = 0; if (!quiet) pbAfterStop(); }   // (every stop, quiet ones too: the deaf-core check counts from the latest)
   if (tp.on && lk && !lk.restart) lkStopped();   // ABLETON LINK: start / stop sync
   if (tp.timer) tp.timer.stop();
   // RESUME: where the song stopped (the positions last heard), the track it follows, and the cursor then
@@ -21241,11 +21280,13 @@ function setWlOn(on){ wlOn = !!on; try { localStorage.setItem('thunderplus-wakel
 let wlQ = Promise.resolve();
 function wakeLock(on){ wlQ = wlQ.then(() => wakeLock1(on)).catch(() => {}); return wlQ; }
 setInterval(() => { if (tp.on && wlOn && !wlLock && !document.hidden) wakeLock(true); }, 2000);
+// Phones and tablets only (a computer's screen sleeping doesn't touch playback, and Electron refuses it). (A phone's refusal,
+// e.g. in battery saver, is tried again every 2 s, as the saver may be turned off.)
 async function wakeLock1(on){
   try {
-    if (on && wlOn && !wlLock && navigator.wakeLock && !document.hidden){ const l = await navigator.wakeLock.request('screen'); if (!tp.on){ l.release().catch(() => {}); return; } wlLock = l; l.addEventListener('release', () => { if (wlLock === l) wlLock = null; }); try { pbLog('screen kept on'); } catch(e){} }
+    if (on && wlOn && !wlLock && navigator.wakeLock && !document.hidden && seqHandHere()){ const l = await navigator.wakeLock.request('screen'); if (!tp.on){ l.release().catch(() => {}); return; } wlLock = l; l.addEventListener('release', () => { if (wlLock === l) wlLock = null; }); wakeLock1.last = null; try { pbLog('screen kept on'); } catch(e){} }
     else if (!on && wlLock){ const l = wlLock; wlLock = null; await l.release(); }
-  } catch(e){ try { pbLog('screen wake lock refused: ' + (e && e.message)); } catch(e2){} }
+  } catch(e){ try { const m = 'screen wake lock refused: ' + (e && e.message); if (m !== wakeLock1.last) pbLog(m); wakeLock1.last = m; } catch(e2){} }
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && tp.on) wakeLock(true); });
 // hold (20 Oct): the note sounds until previewOff(handle) instead of a fixed moment, for keys held down (a MIDI keyboard
@@ -22130,7 +22171,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 464;
+const BUILD = 466;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24745,6 +24786,7 @@ function genPanel(title, msg, build, buttons, keys){
   const dn = el('button', null, 'Done'); dn.type = 'button'; dn.addEventListener('click', done); row.append(dn); box.append(row);
   const key = e => { const tag = e.target && e.target.tagName;
     if (e.key === 'Escape' || (e.key === 'Enter' && tag !== 'BUTTON' && tag !== 'SELECT')){ e.preventDefault(); e.stopPropagation(); return done(); }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && /^[zy]$/i.test(e.key)){ e.preventDefault(); e.stopPropagation(); return undoStep(e.key.toLowerCase() === 'y' || e.shiftKey ? 1 : -1); }   // (a roll is one undo step: undo it here)
     const k = !e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1 ? e.key.toLowerCase() : '';
     if (k && keys[k] && tag !== 'SELECT' && tag !== 'INPUT'){ e.preventDefault(); e.stopPropagation(); return keys[k](); }
     if (e.key === ' ' && tag !== 'BUTTON'){ e.preventDefault(); e.stopPropagation(); return keys[' '] ? keys[' ']() : playCtx(); }
@@ -24806,7 +24848,12 @@ function mutatePhrase(){
    one with a block has its first note column rewritten (its effect columns stay). */
 const DRUM_STYLES = ['Four on the floor', 'Broken beat', 'Jungle', 'Footwork', 'Halftime', 'IDM (euclidean)'];
 const DRUM_PARTS = [['kick', 'Kick', /kick|\bbd\b|bass ?drum|\b808\b/i], ['snare', 'Snare', /snare|\bsd\b|clap/i], ['hats', 'Hats', /hat|\bhh\b|cymb|ride|shaker/i], ['perc', 'Perc', /perc|tom|rim|conga|cow|bongo|clave|block|shaker|clap/i]];
-const drumSet = {style:1, dens:50, vari:30, parts:{}};
+const drumSet = {style:1, dens:50, vari:30, parts:{}, uniq:1};
+// is the block at (t, y) or its first phrase used anywhere else in the song? (then DRUM PATTERN makes it a unique copy)
+function blockShared(t, y){ const cid = S.song[y] ? S.song[y][t] : -1; if (cid < 0) return false; const p = firstPhrase(cid);
+  for (let r = 0; r < 256; r++){ const row = S.song[r]; if (!row) continue; for (let x = 0; x <= MT; x++) if (row[x] === cid && !(r === y && x === t)) return true; }
+  if (p >= 0) for (let c = 0; c < S.chains.length; c++){ if (c === cid || !S.chains[c]) continue; if (S.chains[c].some(q => q && q[0] === p) && S.song.some(row => row && row.includes(c))) return true; }
+  return false; }
 // [step, chance (scaled by density when < 1), ghost]: main hits are 1, the rest grow with DENSITY
 const DRUM_P = [
   {kick:[[0,1],[4,1],[8,1],[12,1],[14,.25],[3,.15],[11,.15]], snare:[[4,1],[12,1],[7,.25,1],[15,.3,1]], hats:[[2,1],[6,1],[10,1],[14,1],[0,.5,1],[4,.5,1],[8,.5,1],[12,.5,1],[1,.3,1],[9,.3,1]], perc:[[3,.2],[11,.25],[13,.15]]},
@@ -24842,6 +24889,9 @@ function drumPattern(){
     const rnd = Math.random, d = drumSet.dens / 100, v = drumSet.vari / 100, st = drumSet.style | 0, wrote = [];
     for (const [k, nm] of DRUM_PARTS){ const D = drumSet.parts[k]; if (!(D.t >= 0) || !(D.i >= 0)) continue; const t = D.t;
       if (isBusT(t) || t === MT) continue;
+      // SHARED (stability pass): a block or phrase that also plays elsewhere gets a unique copy here first (UNIQUE), so the beat
+      // only lands on this row; REWRITE changes it everywhere, as before
+      if (drumSet.uniq && blockShared(t, y)){ const nc = mstUniq(S.song[y][t]); if (nc < 0){ wrote.full = (wrote.full || 0) + 1; continue; } S.song[y][t] = nc; wrote.uq = (wrote.uq || 0) + 1; }   // (no room for a copy: that part is left as it was)
       let cid = S.song[y] ? S.song[y][t] : -1, p = cid >= 0 ? firstPhrase(cid) : -1;
       if (p < 0){ p = freePhrase(); if (p < 0){ toast('No free phrases left.'); break; } S.phrases[p] = freshPhrase(); if (S.plen) S.plen[p] = L0; setSongPhrase(t, y, p); }
       if (!S.phrases[p]) S.phrases[p] = freshPhrase();
@@ -24852,17 +24902,19 @@ function drumPattern(){
         for (let s = 0; s < 16; s++){ const step = b * 16 + s; if (step >= Ls || !bar[s]) continue; const row = P[step * spr]; if (!row) continue;
           row[0] = ROOT; row[IC] = D.i; row[VC] = bar[s].g ? (k === 'hats' ? 0x70 + Math.floor(rnd() * 0x30) : 0x48 + Math.floor(rnd() * 0x28)) : -1; hits++; } }
       wrote.push(`${nm} ${d2(t + 1)} (${hits})`); }
-    if (!wrote.length) return toast('Give at least one part a track and an instrument.');
-    saveS(); draw(); toast(`${DRUM_STYLES[st]} on song row ${rS(y, 3)}: ` + wrote.join(', '), 3500); };
-  genPanel('Drum pattern', `Writes a beat on song row ${rS(y, 3)}, one track per part. A track with nothing on this row gets a new ${L0}-row phrase there; one with a phrase has its first note column rewritten (shared phrases change everywhere they play).`,
+    const full = wrote.full ? ` · ${wrote.full} shared block${wrote.full > 1 ? 's' : ''} left alone: no room for a copy (pick “Rewrite it everywhere”)` : '';
+    if (!wrote.length) return toast(wrote.full ? full.slice(3) : 'Give at least one part a track and an instrument.', wrote.full ? 4000 : undefined);
+    saveS(); draw(); toast(`${DRUM_STYLES[st]} on song row ${rS(y, 3)}: ` + wrote.join(', ') + (wrote.uq ? ` · ${wrote.uq} shared block${wrote.uq > 1 ? 's' : ''} made unique` : '') + full, 3500); };
+  genPanel('Drum pattern', `Writes a beat on song row ${rS(y, 3)}, one track per part. A track with nothing on this row gets a new ${L0}-row phrase there; one with a phrase has its first note column rewritten.`,
     ({field, slider}) => {
       const sel = (opts, val, set) => { const s = el('select'); opts.forEach(([v2, t]) => s.append(new Option(t, v2))); s.value = val; s.addEventListener('change', () => set(+s.value)); return s; };
       field('Style', sel(DRUM_STYLES.map((t, i) => [i, t]), drumSet.style, x => { drumSet.style = x; }));
       slider('Density', () => drumSet.dens, x => { drumSet.dens = x; });
       slider('Variation', () => drumSet.vari, x => { drumSet.vari = x; });
+      field('Shared', sel([[1, 'Make a unique copy on this row'], [0, 'Rewrite it everywhere it plays']], drumSet.uniq, x => { drumSet.uniq = x; }));
       for (const [k, nm] of DRUM_PARTS){ const D = drumSet.parts[k], w = el('span', 'genpart');
         const tS = sel([[-1, 'Off'], ...Array.from({length:n}, (_, t) => t).filter(t => !isBusT(t)).map(t => [t, 'Track ' + d2(t + 1) + trkKind(t)])], D.t, x => { D.t = x; });
-        const iS = sel(S.insts.map((_, j) => [j, instLabel(j)]), Math.max(0, D.i), x => { D.i = x; try { const h = preview(x, ROOT, -1, false, null, true); if (h) setTimeout(() => previewOff(h), 200); } catch(e){} });
+        const iS = sel([[-1, '— instrument'], ...S.insts.map((_, j) => [j, instLabel(j)])], D.i >= 0 ? D.i : -1, x => { if (x < 0){ D.i = -1; return; } D.i = x; try { const h = preview(x, ROOT, -1, false, null, true); if (h) setTimeout(() => previewOff(h), 200); } catch(e){} });
         w.append(tS, iS); field(nm, w); } },
     [['▶ / ■ pattern', () => playPatLoop()], ['Generate (G)', () => roll(), 'ok']], {g:roll, r:roll, ' ':() => playPatLoop()});
 }
@@ -31029,13 +31081,22 @@ function welcome(force){
   ok.addEventListener('click', close); more.addEventListener('click', () => { close(); showHelp('hStart'); });
   wrap.addEventListener('pointerdown', e => { if (e.target === wrap){ e.preventDefault(); close(); } });
   document.body.append(wrap);
+  // ON TOP OF NOTHING (stability pass): a panel opened while it shows (a generator, Settings, the recorder) takes its place:
+  // the tips go, unseen, and come back the next time the app opens
+  if (!force){ const mo = new MutationObserver(() => { if (!wrap.isConnected){ mo.disconnect(); return; } if (welcomeBusy()){ mo.disconnect(); wrap.remove(); } });
+    mo.observe(document.body, {childList:true}); }
 }
-setTimeout(() => { if (view === 'tracker' && !helpOpen() && !inAI) welcome(false); }, 900);
+// Something else on screen: a dialog or panel (.ask), Settings, Help, a menu
+const welcomeBusy = () => !!(askOpen || document.querySelector('.ask, .sxmenu') || (typeof helpOpen === 'function' && helpOpen()) || (typeof gsetOpen === 'function' && gsetOpen()));
+// First launch: shown once the app is idle on the tracker, waiting while a panel is open (stability pass: it opened over them)
+{ let tries = 0; const go = () => { if (view === 'tracker' && !inAI && !welcomeBusy()) return welcome(false); if (++tries < 120) setTimeout(go, 1500); }; setTimeout(go, 900); }
 $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); });
 /* WHAT'S NEW (owner, 30 Oct): after an update, a short list of what changed since the build this device last ran, once
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [466, '7 Nov', ['Fixes from a review: PLAY tells …chains the song started again (tempo-synced modules restart on the downbeat).', 'A computer never switches to the page sequencer or holds the screen on by itself: that is for phones and tablets.', 'After a phone moves to the page sequencer, bass, voice, acid and …pump synth notes sound straight away (they were muted for a few seconds).', 'Generators: Ctrl/⌘+Z undoes a roll with the panel open; Drum pattern’s Perc shows “— instrument” until you pick one, and says when a shared block has no room for a copy.']],
+  [465, '7 Nov', ['The audio-thread sequencer books further ahead for the first moments after PLAY, and a note that arrives a little late still plays, so the first beat no longer loses notes on live engines.', 'On a phone the move to the page sequencer when the app goes out of view is quicker (it no longer redraws the hidden screen), so no steps are skipped.', 'Keep screen on and Background play are also in Settings → App.', 'The first-launch tips wait until nothing else is open, and step aside if a panel opens.', 'Drum pattern makes a unique copy of a block that also plays elsewhere (SHARED; or rewrite it everywhere, as before).', 'Help has a Generators page (and playing on a phone).']],
   [464, '6 Nov', ['Settings → Screen → PLAYHEAD OFFSET: nudge the playhead in 5 ms steps (−100 to +300 ms, this device) so it lines up with what you hear.']],
   [463, '6 Nov', ['Six more generators (GEN, or Edit ▾ → Generators): Markov melody (a new line that moves the way your song’s melodies do), Arp (a chord written out up / down / converge / random), Chords (a progression for a poly track, by key and mood), Polymeter (a rhythm and a pitch cycle that drift against the bar), Ratchet (rolls and flams on the hits: RET, DEL) and Probability fill (ghost notes on the empty rows, fixed or by chance: CHA).']],
   [462, '6 Nov', ['Two new generators (GEN, or Edit ▾ → Generators): Drum pattern writes a beat across tracks on the song row (Four on the floor, Broken beat, Jungle, Footwork, Halftime, IDM euclidean; density, variation, a fill; a track and an instrument per part, found from your pad names), and Mutate makes a variation of the open phrase (pitch in the song’s key, hits dropped and added, timing, volume; Original puts it back).']],
