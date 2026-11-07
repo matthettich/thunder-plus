@@ -166,6 +166,17 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (7): playhead on the sound (build 452, on `beta`)
+
+- Owner (Fold): the playhead passes a note noticeably before it's heard; "the audio got out of sync with the rest of the app".
+  frame() drained tp.q at ctx.currentTime with no output latency; now currentTime − min(1 s, outputLatency || baseLatency),
+  as pad blinks / meters already did.
+- LEAD for the open screen-off bug (6 Nov (5)): the symptoms (stop leaves chunks, the next song plays over the old one,
+  sound behind the screen, choppy) fit Android moving the output to a high-latency power-saving buffer when the screen goes
+  off: audio already handed to the device keeps draining after STOP. Asked the owner for Settings → Audio's readout
+  (latency + output ms) fresh vs after it happens. If confirmed: a suspend/resume of the context while stopped, or a new
+  AudioContext, to get a low-latency stream back.
+
 ## 6 Nov (6): phrase on the cursor after a song loads (build 451, on `beta`)
 
 - Owner (Fold): a new song opened on the Phrase screen let notes go into a phrase not on the song. `phraseToCursor()` in
