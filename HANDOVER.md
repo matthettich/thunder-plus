@@ -169,6 +169,20 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (14): six more generators (build 463, beta + main, desktop v1.2.95)
+
+- Shared: genScope() (phrase guard, rows: selection or plen, instrument, cursor note, songKey scale), fxPut / fxDrop (an
+  effect column for RET, DEL, CHA), rowEmpty, segToggles, selOf, scaleStep.
+- RATCHET: RET (X fade, Y 1–3 ticks or mixed) on a share of hits, DEL 1–3 ticks optional; re-roll clears RET / DEL in range.
+- PROBABILITY FILL: ghost notes (volume 28–67) on empty rows, off-steps likelier, the previous note; CHANCE adds CHA 40–AF.
+  A re-roll takes back the rows this panel filled (a Map in the closure).
+- ARP: root (cursor note / key), 10 shapes, up / down / up-down / converge / random, 16th / 8th / beat, 1–3 octaves, gate OFF.
+- CHORDS: moods by scale degree (major / minor), a random one of each mood's progressions per roll; triads / sevenths / spread;
+  every 4–32 sixteenths; poly track: up to 4 columns; mono: roots an octave down.
+- POLYMETER: euclid(hits, steps, rot) × a pitch cycle of 1–7 scale notes around the root; Rotate (R) steps the rotation.
+- MARKOV MELODY: first-order transitions + gaps from every KEY FOLLOW phrase (drums out); needs 12 notes; NEW = chance of a
+  scale step / random gap; a repeat is re-drawn (up to 3) and kept only half the time; gaps ≤ a beat.
+
 ## 6 Nov (13): generators Mutate and Drum pattern (build 462, beta + main)
 
 - `genPanel()` (a shared .ask shell: fields, sliders, buttons, letter keys, Space, Esc/Enter). In genItems: Drum pattern
