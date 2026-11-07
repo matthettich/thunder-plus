@@ -26,6 +26,9 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.97** (7 Nov 2026; owner: "once this is done, merge to main and make a new desktop build"; from `main` at build 467,
+  run 42396748681): the recorder-cut fixes from CodeRabbit (PR #9, merged) on top of v1.2.96. From now on: beta → main by PR
+  so CodeRabbit reviews it.
 - **v1.2.96** (7 Nov 2026; owner: overnight stability pass, merge and a desktop build when done; from `main` at build 466,
   run 42352114563): the stability pass (465) and its review fixes (466) on top of v1.2.95.
 - **v1.2.95** (6 Nov 2026; owner: merge and a desktop build when the punch list is done; from `main` at build 463, run
@@ -172,6 +175,26 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+
+## 7 Nov (2): core WATCHDOG; Pattern view arrows into empty tracks; Arrange EDIT makes new, not a copy (builds 468–469, beta)
+
+- Owner, Fold, screen ON: audio thread stuttered, sped up, slowed, glitched, then played on after STOP. The page's clock watch
+  and deaf-core drop both needed the core to READ messages ('stop', 'die'), and an overloaded audio thread doesn't; the core
+  also drives the live engines in-scope (tcAt / __ov), so unplugging its outputs never silenced the poly tracks.
+  468: core `watchdog()` (phones: play {watch: seqHandHere()}): lets go by itself when audio ÷ wall time is outside
+  0.8–1.25 for two 1 s windows, or no {op:'ack'} (the page acks every rows batch) for 3 s of audio time. Lets go = stopAll +
+  release at now (as the hand-over), posts {op:'self', gen, why}; the page's coreFail() (shared with pbClock) moves the
+  song to the page sequencer until reload. CORE_V unchanged (additive ops). Not reproduced headless yet.
+- 469 Pattern view: ◀ ▶ step into the adjacent track even when folded/empty (pvNextTrack(dx, all)); pvGo's pendPlace then
+  puts a new unused phrase on the song at the first note. Tab still skips folded tracks. Headless: ok.
+- 469 Arrange: a single EDIT / Enter on an empty cell placed last.sect, and UNIQUE PER TRACK cloned it (00's notes in 01, 02).
+  Now it is newBlock(c, -1) unless a block was picked up with Enter on purpose (`sectPicked === last.sect`); newBlock(-1)
+  clears sectPicked. Headless: 01 empty.
+- 469 Chords: only in the GEN menu on poly tracks (isPolyT(cTrack)); chordGen on a mono track says so.
+- 470 HEARD: owner, page sequencer on the Fold: playhead AHEAD of the sound. Every display site used `outputLatency || baseLatency`
+  (43 of the Fold's 21 + 43 ms). `heardLat()`: base + output, or the getOutputTimestamp() lag when larger (< 0.6 s), smoothed;
+  playhead, pad blinks, meters, scope. Not rcdLat (recorder calibration kept). Settings → Audio and the playback report show it.
+  If still ahead: PLAYHEAD OFFSET +; if it wobbles, suspect draw() cost on the phone.
 
 ## 7 Nov (1): stability pass, overnight (build 465+, beta)
 

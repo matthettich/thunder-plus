@@ -3290,7 +3290,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <tr><td>Mutate</td><td>A variation of the phrase: PITCH (to neighbours in the key), HITS (some dropped, quiet ones added), TIME (a row early or late), VOLUME. Each <kbd>M</kbd> varies further; ORIGINAL puts it back</td></tr>
 <tr><td>Markov melody</td><td>A new line that moves the way the song's melodies do (it learns from every phrase played by an instrument with KEY FOLLOW; drums are left out). NEW: how often it steps outside what it learned</td></tr>
 <tr><td>Arp</td><td>A chord written out as notes: root, shape, pattern (up, down, up and down, converge, random), rate, octaves, legato or short</td></tr>
-<tr><td>Chords</td><td>A progression by key and mood, triads, sevenths or spread, up to four notes on a poly track (a mono track gets the roots)</td></tr>
+<tr><td>Chords</td><td>A progression by key and mood, triads, sevenths or spread, up to four notes; on poly tracks only (it isn’t in the menu on a mono track)</td></tr>
 <tr><td>Polymeter</td><td>A rhythm of 3–13 steps and a cycle of 1–7 notes repeated across the phrase, drifting against the bar; ROTATE (<kbd>R</kbd>) moves the hits</td></tr>
 <tr><td>Ratchet</td><td>Rolls (RET) on the hits that are there, with speed and fade; DELAYS pushes some a few ticks late (DEL) for flams</td></tr>
 <tr><td>Probability fill</td><td>Quiet ghost notes on the empty rows, offbeats likelier: always, or each by chance (CHA)</td></tr>
@@ -12969,7 +12969,7 @@ function sndSpecPaint(){
   }
   // where each sounding note is in the render: a line with the screen colour either side, so it shows on any part
   if (sndPH.length && ctx){
-    const t = ctx.currentTime - (ctx.outputLatency || ctx.baseLatency || 0);
+    const t = ctx.currentTime - heardLat();
     for (const p of sndPH){
       if (t < p.t0 || p.c !== c) continue;
       const pos = p.from + (t - p.t0) * p.rate * (p.to < p.from ? -1 : 1), x = pos / (c.data.length / c.sr) * W;
@@ -13013,7 +13013,7 @@ function sndSoon(){ if (!sndQ) sndQ = requestAnimationFrame(() => { sndQ = 0; if
 function sndWake(){ if (!sndRaf && sndOn()) sndRaf = requestAnimationFrame(sndFrame); }
 function sndFrame(){
   sndRaf = 0; if (!sndOn()) return; if (!sndCol) sndColours();
-  const t = ctx ? ctx.currentTime - (ctx.outputLatency || ctx.baseLatency || 0) : 0;
+  const t = ctx ? ctx.currentTime - heardLat() : 0;
   for (let i = sndPH.length - 1; i >= 0; i--) if (t > sndPH[i].end) sndPH.splice(i, 1);
   const live = !!ctx && (tp.on || performance.now() - audioWake < 1500 || sndPH.length > 0);
   sndSpecPaint(); sndScopePaint(live);
@@ -13782,13 +13782,27 @@ window.addEventListener('pointerdown', e => { if (!$('gedit').hidden && !$('gedi
 
 /* ---------- audio settings panel ---------- */
 const sinkOk = !!(window.AudioContext && 'setSinkId' in AudioContext.prototype);
+/* HEARD (owner, 7 Nov, Fold, page sequencer: the playhead runs ahead of the sound). How long a sample takes from the engine to
+   the speaker. It used outputLatency alone (base latency left out), and Android's reported figures undershoot; the output
+   timestamp says which moment is coming out of the speaker now, so that is used when it is sane, never less than the two
+   reported figures together. Smoothed; the playhead, pad blinks, meters and scope read it (not the recorder: its alignment
+   is calibrated on the old figure). */
+var hlT = 0, hlV = 0, hlTs = false;
+function heardLat(){
+  if (!ctx) return 0;
+  const now = performance.now(); if (now - hlT < 100 && hlV) return hlV; hlT = now;
+  let v = (ctx.baseLatency || 0) + (ctx.outputLatency || 0); hlTs = false;
+  try { const ts = ctx.state === 'running' && ctx.getOutputTimestamp ? ctx.getOutputTimestamp() : null;
+    if (ts && ts.contextTime > 0 && ts.performanceTime > 0){ const d = ctx.currentTime - (ts.contextTime + (now - ts.performanceTime) / 1000);
+      if (d > v && d < 0.6){ v = d; hlTs = true; } } } catch(e){}
+  v = Math.min(1, Math.max(0, v)); hlV = hlV ? hlV * 0.85 + v * 0.15 : v; return hlV; }
 let audDevs = [];
 function audStatus(){
   const st = $('audStat'); if (!st) return;
   if (!ctx){ st.textContent = 'Audio starts with the first sound'; return; }
   const ms = v => Math.round(v * 1000);
   st.textContent = `${(ctx.sampleRate / 1000).toFixed(ctx.sampleRate % 1000 ? 1 : 0)} kHz · latency ${ms(ctx.baseLatency || 0)} ms` +
-    (ctx.outputLatency ? ` + ${ms(ctx.outputLatency)} ms output` : '') + (ctx.state !== 'running' ? ' · ' + ctx.state : '');
+    (ctx.outputLatency ? ` + ${ms(ctx.outputLatency)} ms output` : '') + (hlTs ? ` · ${ms(heardLat())} ms to the speaker` : '') + (ctx.state !== 'running' ? ' · ' + ctx.state : '');
   const sel = $('audOut');
   if (ctx.sinkId != null && typeof ctx.sinkId === 'string' && sel.value !== ctx.sinkId && [...sel.options].some(o => o.value === ctx.sinkId)) sel.value = ctx.sinkId;
 }
@@ -15446,7 +15460,7 @@ function mapUpd(){
   if (!ctx) return 0;
   let pt = 0, ct = 0;
   try { const o = ctx.getOutputTimestamp(); pt = o.performanceTime; ct = o.contextTime; } catch(e){}
-  if (!pt){ pt = performance.now(); ct = ctx.currentTime - (ctx.outputLatency || ctx.baseLatency || 0); }
+  if (!pt){ pt = performance.now(); ct = ctx.currentTime - heardLat(); }
   const o = pt - ct * 1000;
   if (amap.off == null || Math.abs(o - amap.off) > 50) amap.off = o; else amap.off += (o - amap.off) * 0.02;
   return amap.off;
@@ -20795,7 +20809,7 @@ function padBlink(e){
   if (view === 'tracker'){ if (inlOn && e.ii != null) inlBlink(e); return; }   // INST LIST: the instrument flashes (3 Nov)
   if (!padEls[e.pad]) return;
   if (sndOn()){ let au = true; try { au = audible(e.track); } catch(err){} if (au) sndHit(e.pad, e.t, e.rate, false, e); sndWake(); }   // the sound view's line, and its scope
-  const ms = Math.max(0, (e.t - ctx.currentTime + (ctx.outputLatency || ctx.baseLatency || 0)) * 1000);
+  const ms = Math.max(0, (e.t - ctx.currentTime + heardLat()) * 1000);
   setTimeout(() => { if (tp.on && view !== 'tracker' && audible(e.track)) flash(e.pad); }, ms);
 }
 /* ===== THUNDER CORE, LIVE (plan phase 2b; Settings → Audio → Sequencer: Audio thread β) =====
@@ -20808,7 +20822,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '1l1znga';
+const CORE_REV = '1yb8h04';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -20921,7 +20935,7 @@ function coreStart(mode, o, t0, rs){
   // reached it up to 250 ms after they were booked and live-engine notes went missing; the core books 0.6 s ahead for the
   // first 1.5 s, then the usual (coreLead)
   corePost({op:'lead', s:0.6}); clearTimeout(coreLeadT); coreLeadT = setTimeout(coreLead, 1500);
-  core.gen++; corePost({op:'play', gen:core.gen, mode, o:oo, t0, rs}); coreWire(true);
+  core.gen++; corePost({op:'play', gen:core.gen, mode, o:oo, t0, rs, watch:seqHandHere()}); coreWire(true);   // (watch: the core's own WATCHDOG, phones only)
   // tp.seq stands in for the sequencer: the page reads its clock, tempo and ticks, and sets the loop and tempo through it
   const P = {time:t0, tks:tp.tks, base:null, btT:null, _bpm:tp.bpm, _alive:true, alive(){ return this._alive; }, step(){ return {t:this.time, evs:[], pos:null}; },
     setLoop(l){ corePost({op:'loop', l:l || null}); } };
@@ -20975,17 +20989,23 @@ function pbClock(){ if (!tp.on || !tp.core || !ctx || core.bad || ctx.state !== 
   if (!c || w - c.w < 1.5) return; const r = (a - c.a) / (w - c.w);
   if (r > 0.85 && r < 1.15){ PB.ckBad = 0; return; }
   pbLog(`audio clock at ${r.toFixed(2)}× real time`); if (++PB.ckBad < 2) return;
+  coreFail(); }
+// The core is let go (the clock watch here, or its own WATCHDOG): the song carries on from its row on the page sequencer, which
+// plays until the app reloads. self: the core already stopped itself (and gave the live engines back) at audio time selfT.
+function coreFail(self){
   core.bad = true; let row = -1; for (const q of tp.pos || []) if (q && q.row > row) row = q.row;
-  pbLog('switched to the page sequencer from row ' + row); try { tStop(true); } catch(e){} try { coreDrop(); } catch(e){}
-  if (row >= 0) tStart('song', {row});
-  toast('The audio clock went out of step, so the song moved to the page sequencer (until the app reloads).', 5000); }
+  const mode = tp.mode;
+  pbLog('switched to the page sequencer from row ' + row + (self ? ' (the audio-thread sequencer stopped itself: ' + self.why + ')' : '')); try { tStop(true); } catch(e){} try { coreDrop(); } catch(e){}
+  if (row >= 0 && mode === 'song') tStart('song', {row});
+  const went = row >= 0 && mode === 'song' ? 'the song moved to the page sequencer' : 'playback stopped; PLAY uses the page sequencer';
+  toast((self && self.why === 'deaf' ? 'The audio thread got too busy to hear the app, so ' : 'The audio clock went out of step, so ') + went + ' (until the app reloads).', 5000); }
 setInterval(() => { try { pbClock(); } catch(e){} }, 2000);
 function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; PB.t = now;
   if (PB.n) pbLog(`rows ${PB.n} · latest note ${(PB.late * 1000).toFixed(0)} ms late · dropped ${PB.drop} · ahead ${(PB.ahead * 1000).toFixed(0)} ms · core skips ${PB.skips} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'}`);
   PB.n = PB.late = PB.drop = PB.ahead = 0; }
 function pbAfterStop(){ PB.stopT = performance.now(); pbLog('STOP · ' + pbState()); for (const ms of [1000, 3000]) setTimeout(() => pbLog(`${ms / 1000} s after STOP: level ${pbLevel()} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'} · stray rows ${PB.stray} · ` + pbState()), ms); }
 async function pbCopy(){
-  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms' : '-'} · ${pbState()}\n`;
+  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · ${pbState()}\n`;
   const txt = head + PB.log.join('\n');
   try { await navigator.clipboard.writeText(txt); toast('Playback report copied: paste it into the chat.', 3500); }
   catch(e){ try { await deliver('thunder-playback-report.txt', new Blob([txt], {type:'text/plain'})); } catch(e2){ toast('Couldn’t copy the report here.'); } }
@@ -21004,10 +21024,14 @@ function coreMsg(d){
   if (d.op === 'ready'){ core.v = d.v; if (d.v !== CORE_WANT){ core.ready = false; toast('The audio-thread sequencer here is an older copy: reload the app to use it. Playing as before.', 5000); } return; }
   if (d.op === 'error'){ tpLog('core: ' + d.where, new Error(d.message)); return; }
   if (d.op === 'started'){ pbLog(`core PLAY: reached the audio thread ${Math.round(-d.late * 1000)} ms before its start, took ${d.ms} ms`); return; }
+  // WATCHDOG (the core's own, phones): it let go of the song by itself; an older PLAY's (after a STOP or a hand-over) is only logged
+  if (d.op === 'self'){ pbLog(`the audio-thread sequencer stopped itself (${d.why}) · gen ${d.gen}, now ${core.gen} · ` + pbState());
+    if (tp.on && tp.core && d.gen === core.gen) coreFail(d); return; }
   if ((d.op !== 'rows' && d.op !== 'end' && d.op !== 'held') || !tp.on || !tp.core || d.gen !== core.gen) return;
   if (d.op === 'held'){ rcdHeldAt(d.t, d.pos); return; }   // EXACT STOP: the core stopped at the pattern's edge
   const s = tp.seq;
   if (d.op === 'end'){ s._alive = false; s.time = d.time; return; }
+  corePost({op:'ack'});   // WATCHDOG: the core goes on only while the page hears it
   audioWake = performance.now();
   for (const r of d.rows){
     // RECORDER CUT (CodeRabbit, 7 Nov): the row is counted first, so the edge a held STOP waits for is known before its notes
@@ -22180,7 +22204,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 467;
+const BUILD = 470;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22442,7 +22466,7 @@ function instList(){
 }
 // The INST LIST's instrument lights as its note sounds (at the note's time, through the output latency), as the Synth page's pads do.
 function inlBlink(e){
-  const ms = Math.max(0, (e.t - ctx.currentTime + (ctx.outputLatency || ctx.baseLatency || 0)) * 1000), ii = e.ii;
+  const ms = Math.max(0, (e.t - ctx.currentTime + heardLat()) * 1000), ii = e.ii;
   setTimeout(() => { if (!tp.on || view !== 'tracker') return; let au = true; try { au = audible(e.track); } catch(err){} if (!au) return;
     for (const id of ['tInlSide', 'tInlPad']){ const b = $(id).querySelector(`[data-i="${ii}"]`); if (!b || b.hidden) continue; b.classList.add('hit'); clearTimeout(b._hit); b._hit = setTimeout(() => b.classList.remove('hit'), 110); } }, ms);
 }
@@ -23374,6 +23398,7 @@ $('fxPickList').addEventListener('pointerup', e => {
 });
 $('fxPickX').addEventListener('click', fxpClose);
 let lastTap = {t:0, key:'', empty:false};
+let sectPicked = -1;   // a song block picked up with Enter on purpose (NEW, NOT A COPY)
 // enter: the Enter key (the computer's, or the KEYS keypad's ENT), not the EDIT button. On a filled phrase note Enter
 // picks the note and its instrument up as the current ones; EDIT stamps the current ones over it (owner, 19 Oct).
 function editTap(enter){
@@ -23404,11 +23429,15 @@ function editTap(enter){
     }
     // ENTER PICKS UP A PATTERN (owner, 3 Nov: as Enter on a note does): on the Song screen and Arrange, Enter on a block makes it
     // the current one, so Enter on an empty cell places it (keyboard arranging). Enter twice still makes a unique copy.
-    if (tv === 'song' && enter && v >= 0){ const nm = sectsOn ? 'sect ' + hp(v) : 'pattern ' + hp(firstPhrase(v));
+    if (tv === 'song' && enter && v >= 0){ const nm = sectsOn ? 'sect ' + hp(v) : 'pattern ' + hp(firstPhrase(v)); sectPicked = v;   // (picked up on purpose: Enter on an empty cell places this one, see below)
       if (last.sect === v) toast('Already current: ' + nm + ' · Enter on an empty cell places it', 1600);
       else { last.sect = v; toast('Now current: ' + nm + ' · Enter on an empty cell places it · Enter twice makes a unique copy', 2000); draw(); }
       return; }
     if (tv === 'phrase') pickUp(c.x, c.y);
+    // NEW, NOT A COPY (owner, 7 Nov: from the Pattern view into Arrange, EDIT on empty cells on tracks 2 and 3 gave 01 and 02 with
+    // 00's notes: the "current" block was placed, and UNIQUE PER TRACK copied it). An empty block gets a new empty pattern,
+    // unless a pattern was picked up with Enter on purpose (keyboard arranging, 3 Nov): then that one is placed.
+    if (tv === 'song' && !sectsOn && k !== 'tsp' && v < 0 && !(sectPicked >= 0 && sectPicked === last.sect && S.chains[sectPicked])){ lastTap = {t:0, key:'', empty:false}; return newBlock(c, -1); }
     if (k !== 'tsp' && v < 0){ lastTap.empty = true; insertAt(c.x, c.y, k); }
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
@@ -23463,6 +23492,7 @@ function newBlock(c, src){
   if (cid < 0) return toast('No free sects left.');
   if (src < 0){
     if (pid < 0) return toast('No free phrases left.');
+    sectPicked = -1;   // (a new pattern: Enter on the next empty cell makes another new one, not a copy of a block picked earlier)
     S.chains[cid] = freshSect(); S.chains[cid][0][0] = pid;
     S.phrases[pid] = freshPhrase(); S.plen[pid] = S.dlen || 16; S.plpb[pid] = 0;
   } else {
@@ -24674,7 +24704,7 @@ function genItems(full){
   const dr = tv === 'song' || tv === 'sect' || ph;
   return ph && !mst || full || tv === 'song' ? [{a:'drum', l:'Drum pattern… (a beat across tracks)', k:'', f:drumPattern, off:!dr || mst}, {a:'acid', l:'Acid line… (a random bass line)', k:keyHint('alt+B'), f:acidLine, off:!ph || mst},
     {a:'mut', l:'Mutate… (a variation of this phrase)', k:'', f:mutatePhrase, off:!ph || mst}, {a:'mark', l:'Markov melody… (learned from the song)', k:'', f:markovGen, off:!ph || mst},
-    {a:'arp', l:'Arp… (a chord as notes)', k:'', f:arpGen, off:!ph || mst}, {a:'chd', l:'Chords… (a progression)', k:'', f:chordGen, off:!ph || mst},
+    {a:'arp', l:'Arp… (a chord as notes)', k:'', f:arpGen, off:!ph || mst}, ...(ph && !mst && !isPolyT(cTrack) ? [] : [{a:'chd', l:'Chords… (a progression)', k:'', f:chordGen, off:!ph || mst}]),   // CHORDS: poly tracks only (owner, 7 Nov: a mono track only got single notes)
     {a:'poly', l:'Polymeter… (cycles that drift)', k:'', f:polyGen, off:!ph || mst}, {a:'rat', l:'Ratchet… (rolls on the hits)', k:'', f:ratchetGen, off:!ph || mst},
     {a:'fill', l:'Probability fill… (ghost notes)', k:'', f:probFill, off:!ph || mst}, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill, off:!ph || mst}] : [];
 }
@@ -25040,6 +25070,7 @@ const CHORD_MOODS = [
   ['IDM (anywhere in the key)', -1, null]];
 const chordSet = {mood:1, every:8, voicing:1, root:-1, minor:-1};
 function chordGen(){
+  if (tv === 'phrase' && !isPolyT(cTrack)) return toast('Chords needs a poly track (from track ' + d2(polyFrom() + 1) + ' on): a mono track plays one note at a time.', 3500);   // (owner, 7 Nov)
   const G = genScope('Chords'); if (!G) return;
   if (chordSet.root < 0) chordSet.root = G.root; const keyMinor = G.key ? ![6].includes(G.key.scale) && ACID_SCALES[G.key.scale][1].includes(3) : true;
   const MAJ = [0, 2, 4, 5, 7, 9, 11], MIN = [0, 2, 3, 5, 7, 8, 10];
@@ -26104,7 +26135,7 @@ function stageTick(now){
   if (!stgKindNow || $('tStage').hidden) return;
   if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (now - stgFrameT > 45){ stgFrameT = now; stageCanvas(false); } return; }
   if ((stgKindNow !== 'dogs' && stgKindNow !== 'drum') || !tp.on || !ctx) return;
-  const lat = ctx.outputLatency || ctx.baseLatency || 0, t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
+  const lat = heardLat(), t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
   if (bpm !== stgBpm){ const b = (t - stgT0) * stgBpm / 60; stgBpm = bpm; stgT0 = t - b * 60 / bpm; }
   const per = 60 / bpm, b = Math.floor((t - stgT0) / per);
   if (b < 0 || b === stgBeat) return; stgBeat = b;
@@ -28069,7 +28100,7 @@ function dkFxPatState(f, k, t, at){
 }
 function dkFxPat(col, cv, g, W, H, f, k, font){
   if (!f || (f.type !== 'flex' && f.type !== 'sgate' && f.type !== 'retrig') || W < 60 || H < 34){ col._pk = ''; return false; }
-  const t = dkMst() ? NT : dkTrack(), lat = ctx ? (ctx.outputLatency || ctx.baseLatency || 0) : 0, at = ctx ? ctx.currentTime - lat : 0;
+  const t = dkMst() ? NT : dkTrack(), lat = ctx ? heardLat() : 0, at = ctx ? ctx.currentTime - lat : 0;
   const st = dkFxPatState(f, k, t, at); if (!st) return false;
   const beat = tp.on ? fxcBeat(at) : null, bar = beat == null ? 0 : Math.floor(beat / 4);
   const C = fxDynPal(), dpr = devicePixelRatio || 1, vals = TFX[f.type].ps.map(q => f[q.k]).join(',');
@@ -29641,7 +29672,7 @@ function frame(){
     // Bluetooth more) is taken off, as the pad blinks and meters already do.
     // PLAYHEAD OFFSET (owner, 6 Nov: "it would be great to be able to tweak the visual alignment"): Settings → Screen, in 5 ms
     // steps, this device: + moves the playhead later (Bluetooth, a slow screen), − earlier
-    const hear = ctx.currentTime + 0.01 - Math.min(1, ctx.outputLatency || ctx.baseLatency || 0) - phOff / 1000;
+    const hear = ctx.currentTime + 0.01 - heardLat() - phOff / 1000;
     while (tp.q.length && tp.q[0].t <= hear){ const e = tp.q.shift(); if (!tp.pos) tp.pos = new Array(NT).fill(null); e.pos.forEach((q, i) => { if (q){ tp.pos[i] = q; sndKeep(i, q); } }); tp.bpm = e.bpm; tp.tks = e.tks; tp.line = e.line; tp.st = e.t; ch = true;
       // the song's timer starts again when the song wraps back up (owner, 31 Oct: it stayed at 0:00 after the first time through)
       if (tp.mode === 'song'){ let mx = -1; e.pos.forEach((q, i) => { if (q && i !== MT && q.row > mx) mx = q.row; });
@@ -31104,6 +31135,9 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [470, '7 Nov', ['The playhead (and pad blinks and meters) lines up with what you hear on phones: the delay to the speaker is now measured from the audio output itself, and the base latency is no longer left out (it ran ahead of the sound). Settings → Audio shows the measured figure; PLAYHEAD OFFSET still fine-tunes it.']],
+  [469, '7 Nov', ['Generators: Chords is only offered on poly tracks (a mono track only got single notes).', 'Arrange: EDIT / Enter on an empty cell makes a new empty pattern again (coming from the Pattern view it placed a copy of the last pattern, notes and all). To place an existing pattern, pick it up with Enter on its block first.', 'Pattern view: ◀ ▶ now step into the track right beside, even an empty (folded) one; type a note there and a new phrase of its own goes into Arrange on that song row. Tab still jumps over empty tracks.']],
+  [468, '7 Nov', ['Audio-thread sequencer on phones: when the audio thread gets overloaded (the timing stutters, speeds up or slows down), it now notices within about 2 seconds and lets go by itself, so the song carries on from its row on the page sequencer and STOP always stops, the synth tracks included (they used to play on after STOP).']],
   [467, '7 Nov', ['Record into a pad, Until Stop on the audio-thread sequencer: pressing Stop just before a pattern ends no longer lets a moment of the next pattern play (not even a blip of its first beat).']],
   [466, '7 Nov', ['Fixes from a review: PLAY tells …chains the song started again (tempo-synced modules restart on the downbeat).', 'A computer never switches to the page sequencer or holds the screen on by itself: that is for phones and tablets.', 'After a phone moves to the page sequencer, bass, voice, acid and …pump synth notes sound straight away (they were muted for a few seconds).', 'Generators: Ctrl/⌘+Z undoes a roll with the panel open; Drum pattern’s Perc shows “— instrument” until you pick one, and says when a shared block has no room for a copy.']],
   [465, '7 Nov', ['The audio-thread sequencer books further ahead for the first moments after PLAY, and a note that arrives a little late still plays, so the first beat no longer loses notes on live engines.', 'On a phone the move to the page sequencer when the app goes out of view is quicker (it no longer redraws the hidden screen), so no steps are skipped.', 'Keep screen on and Background play are also in Settings → App.', 'The first-launch tips wait until nothing else is open, and step aside if a panel opens.', 'Drum pattern makes a unique copy of a block that also plays elsewhere (SHARED; or rewrite it everywhere, as before).', 'Help has a Generators page (and playing on a phone).']],
@@ -31782,16 +31816,18 @@ const pvNear = (C, x) => C.reduce((a, b) => Math.abs(b - x) < Math.abs(a - x) ? 
 const pvOrder = () => [...Array.from({length:ntr()}, (_, i) => i), MT];
 // The next track left or right that shows (folded empty tracks are stepped over). A bus and the master are never stepped
 // over (owner, 22 Oct): they rarely have a block of their own on the row, so the arrows and Tab could never reach them.
-function pvNextTrack(dx){
+// ARROWS INTO EMPTY TRACKS (owner, 7 Nov): ◀ ▶ (all) go to the track right beside, empty or not: an empty one opens with a new,
+// unused phrase that goes into Arrange on its first note (pvGo, placePending). Tab still steps over the folded ones.
+function pvNextTrack(dx, all){
   const O = pvOrder(), y = cs.song.y; let i = O.indexOf(cTrack); if (i < 0) return null;
-  for (i += dx; i >= 0 && i < O.length; i += dx){ const t = O[i]; if (!pvFold || (S.song[y] && S.song[y][t] >= 0) || t === MT || isBusT(t)) return t; }
+  for (i += dx; i >= 0 && i < O.length; i += dx){ const t = O[i]; if (all || !pvFold || (S.song[y] && S.song[y][t] >= 0) || t === MT || isBusT(t)) return t; }
   return null;
 }
 function pvMoveX(dx){
   const c = cs.phrase, C = pvColsOf(cTrack, S.phrases[cPhrase], plen(cPhrase), true), i = C.indexOf(c.x);
   if (i < 0){ c.x = pvNear(C, c.x); return draw(); }
   if (i + dx >= 0 && i + dx < C.length){ c.x = C[i + dx]; return draw(); }
-  const t = pvNextTrack(dx); if (t == null) return draw();
+  const t = pvNextTrack(dx, true); if (t == null) return draw();
   pvGo(t, cs.song.y, dx > 0 ? 'first' : 'last', null);
 }
 // Tab / Shift+Tab: the next or previous track's first column (Renoise-style).
