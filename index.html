@@ -14562,7 +14562,10 @@ function rcdEdgeAhead(R){
    the tidy-up for the screen. */
 function rcdCutAt(t, booked){
   tp.stopAt = t; try { if (rt) rt.pl.stopAll(t); } catch(e){}
-  if (booked && tp.core) corePost({op:'stop', at:t});   // the core booked up to the edge already: stop it there
+  // the core stops there too, whichever way the edge came (CodeRabbit, 7 Nov): a 'hold' that reached it after it had booked the
+  // edge would only stop it at the NEXT edge, and its own samples / live notes past t aren't the page's to take back. (After a
+  // 'held' it has stopped already: one more stop at t changes nothing.)
+  if (tp.core) corePost({op:'stop', at:t});
   rcdSongStopAt(t); }
 // The page's pump, before it plays step r: is it the edge a held STOP waits for? Then the take ends and the song stops there.
 function rcdGateEdge(r){
@@ -22171,7 +22174,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 466;
+const BUILD = 467;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31095,6 +31098,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [467, '7 Nov', ['Record into a pad, Until Stop on the audio-thread sequencer: pressing Stop just before a pattern ends no longer lets a moment of the next pattern play.']],
   [466, '7 Nov', ['Fixes from a review: PLAY tells …chains the song started again (tempo-synced modules restart on the downbeat).', 'A computer never switches to the page sequencer or holds the screen on by itself: that is for phones and tablets.', 'After a phone moves to the page sequencer, bass, voice, acid and …pump synth notes sound straight away (they were muted for a few seconds).', 'Generators: Ctrl/⌘+Z undoes a roll with the panel open; Drum pattern’s Perc shows “— instrument” until you pick one, and says when a shared block has no room for a copy.']],
   [465, '7 Nov', ['The audio-thread sequencer books further ahead for the first moments after PLAY, and a note that arrives a little late still plays, so the first beat no longer loses notes on live engines.', 'On a phone the move to the page sequencer when the app goes out of view is quicker (it no longer redraws the hidden screen), so no steps are skipped.', 'Keep screen on and Background play are also in Settings → App.', 'The first-launch tips wait until nothing else is open, and step aside if a panel opens.', 'Drum pattern makes a unique copy of a block that also plays elsewhere (SHARED; or rewrite it everywhere, as before).', 'Help has a Generators page (and playing on a phone).']],
   [464, '6 Nov', ['Settings → Screen → PLAYHEAD OFFSET: nudge the playhead in 5 ms steps (−100 to +300 ms, this device) so it lines up with what you hear.']],
