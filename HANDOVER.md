@@ -191,7 +191,10 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
   Now it is newBlock(c, -1) unless a block was picked up with Enter on purpose (`sectPicked === last.sect`); newBlock(-1)
   clears sectPicked. Headless: 01 empty.
 - 469 Chords: only in the GEN menu on poly tracks (isPolyT(cTrack)); chordGen on a mono track says so.
-- Open: owner says audio is very out of sync with the display on the page sequencer (phone). Asked which way and how much.
+- 470 HEARD: owner, page sequencer on the Fold: playhead AHEAD of the sound. Every display site used `outputLatency || baseLatency`
+  (43 of the Fold's 21 + 43 ms). `heardLat()`: base + output, or the getOutputTimestamp() lag when larger (< 0.6 s), smoothed;
+  playhead, pad blinks, meters, scope. Not rcdLat (recorder calibration kept). Settings → Audio and the playback report show it.
+  If still ahead: PLAYHEAD OFFSET +; if it wobbles, suspect draw() cost on the phone.
 
 ## 7 Nov (1): stability pass, overnight (build 465+, beta)
 
