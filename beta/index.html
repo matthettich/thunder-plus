@@ -22130,7 +22130,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 463;
+const BUILD = 464;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22200,6 +22200,8 @@ function playheadKey(){
   if (!tp.on && tp.paused) tp.paused.key = curKey();   // RESUME still carries on from there
   draw(); }   // off unless turned on (owner, 31 Oct: it was on by default)
 function setResume(on){ resumeOn = on; try { localStorage.setItem(RSK, on ? '1' : '0'); } catch(e){} draw(); }
+var phOff = (() => { try { return clamp(parseInt(localStorage.getItem('thunderplus-phoff-v1') || '0', 10) || 0, -100, 300); } catch(e){ return 0; } })();   // PLAYHEAD OFFSET, ms
+function setPhOff(v){ phOff = clamp(Math.round((v | 0) / 5) * 5, -100, 300); try { localStorage.setItem('thunderplus-phoff-v1', String(phOff)); } catch(e){} }
 const curKey = () => [tv, cs.song.x, cs.song.y, cs.phrase.y, cs.sect.y, cPhrase, cSect, cTrack].join(',');
 // Pads mode: OPTION + arrows move around the Song grid, in the phrase editor (phraseGrid) and on the Song screen (songGridDir).
 // On by default; off restores the old OPTION+arrow behaviour (phrase: jump 16 patterns; Song: ◀▶ prev/next block, ▲▼ 16 rows). KEYS mode's
@@ -22981,6 +22983,8 @@ function projRows(){
       info:() => 'Size of the text and lines on the tracker screen (the Mixer has its own size: MIXER SIZE). Bigger shows fewer rows (and scrolls sideways when a line no longer fits); drag a finger up or down anywhere on the screen to scroll'},
     {l:'MIXER SIZE', get:() => mixScale, set:v => setMixScale(v), min:60, max:200, step:10, big:20, d:mixScaleDef(), fmt:v => v + '%',
       info:() => 'Size of the Mixer only, separate from TEXT SIZE: 100 % fills the screen, which is already larger than the 80 % Desktop text size gave it. Above that it takes whatever room is left, never past the screen (all its rows stay visible); bigger shows fewer tracks at once, and the window follows the cursor (TRK nn–nn of 32 ◀▶)'},
+    {l:'PLAYHEAD OFFSET', get:() => phOff, set:v => setPhOff(v), min:-100, max:300, step:5, big:25, d:0, fmt:v => v ? sgn(v) + ' ms' : '0 ms',
+      info:() => 'Moves the playhead to match what you hear, on this device: + later (Bluetooth headphones, a slow screen), − earlier. The app already allows for the output latency it is told about'},
     {l:'FOLLOW', segs:true, get:() => followMode, set:v => setFollow(v), min:0, max:2, d:0, fmt:v => ['OFF', 'PATTERN', 'ON'][v] || 'OFF',
       info:() => 'While the song plays. ON: Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. PATTERN: Phrase (and Sect) switch to what the cursor’s track is playing and Arrange turns its pages with the song, but the phrase’s rows stay where you put them. OFF: the screen stays where you put it, except that Arrange still turns its pages when the playhead runs off it. While you work in Arrange it waits until you’ve left it alone for a minute. The cursor stays on its row in every mode, so you can edit while it plays'},
     {l:'TAB', segs:true, get:() => tabTracks ? 1 : 0, set:v => setTabTracks(!!v), min:0, max:1, d:1, fmt:v => v ? 'TRACKS' : 'COLUMNS',
@@ -29574,7 +29578,9 @@ function frame(){
     // PLAYHEAD ON THE SOUND (owner, 6 Nov, Fold: "the playhead passes the note enough before we hear it that it is noticeable"):
     // a row shows when it reaches the speaker, not when the engine renders it: the output latency (Android's often 50–200 ms,
     // Bluetooth more) is taken off, as the pad blinks and meters already do.
-    const hear = ctx.currentTime + 0.01 - Math.min(1, ctx.outputLatency || ctx.baseLatency || 0);
+    // PLAYHEAD OFFSET (owner, 6 Nov: "it would be great to be able to tweak the visual alignment"): Settings → Screen, in 5 ms
+    // steps, this device: + moves the playhead later (Bluetooth, a slow screen), − earlier
+    const hear = ctx.currentTime + 0.01 - Math.min(1, ctx.outputLatency || ctx.baseLatency || 0) - phOff / 1000;
     while (tp.q.length && tp.q[0].t <= hear){ const e = tp.q.shift(); if (!tp.pos) tp.pos = new Array(NT).fill(null); e.pos.forEach((q, i) => { if (q){ tp.pos[i] = q; sndKeep(i, q); } }); tp.bpm = e.bpm; tp.tks = e.tks; tp.line = e.line; tp.st = e.t; ch = true;
       // the song's timer starts again when the song wraps back up (owner, 31 Oct: it stayed at 0:00 after the first time through)
       if (tp.mode === 'song'){ let mx = -1; e.pos.forEach((q, i) => { if (q && i !== MT && q.row > mx) mx = q.row; });
@@ -31030,6 +31036,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [464, '6 Nov', ['Settings → Screen → PLAYHEAD OFFSET: nudge the playhead in 5 ms steps (−100 to +300 ms, this device) so it lines up with what you hear.']],
   [463, '6 Nov', ['Six more generators (GEN, or Edit ▾ → Generators): Markov melody (a new line that moves the way your song’s melodies do), Arp (a chord written out up / down / converge / random), Chords (a progression for a poly track, by key and mood), Polymeter (a rhythm and a pitch cycle that drift against the bar), Ratchet (rolls and flams on the hits: RET, DEL) and Probability fill (ghost notes on the empty rows, fixed or by chance: CHA).']],
   [462, '6 Nov', ['Two new generators (GEN, or Edit ▾ → Generators): Drum pattern writes a beat across tracks on the song row (Four on the floor, Broken beat, Jungle, Footwork, Halftime, IDM euclidean; density, variation, a fill; a track and an instrument per part, found from your pad names), and Mutate makes a variation of the open phrase (pitch in the song’s key, hits dropped and added, timing, volume; Original puts it back).']],
   [461, '6 Nov', ['On a phone or tablet the song moves from the audio-thread sequencer to the page sequencer the moment the app goes out of view (screen off, another app), at the next step to sound, so it keeps time and STOP always works; the next PLAY is on the audio thread again. Computers are unchanged.']],
@@ -31294,7 +31301,7 @@ const SHEETS = {
   screen:{title:'Screen', about:'Layout and panels, the Phrase and Song screens, text size and colour', groups:[
     ['Text & colour', ['TEXT SIZE', 'MIXER SIZE', 'STEP NUMBERS', 'SCREEN']],
     ['Layout & panels', ['ARRANGE', 'ARRANGE SIDE', 'SIDE PANEL', 'INST LIST', 'SECT', 'KEYS KEYPAD', 'COMMAND BAR', 'BOTTOM PANEL', 'BOTTOM BAR', 'PERFORM PART', 'STAGE']],
-    ['Phrase screen', ['SIMPLE PHRASE', 'NEIGHBORS', 'PATTERN VIEW', 'ARRANGE FOCUS', 'SONG STRIP']],
+    ['Phrase screen', ['SIMPLE PHRASE', 'NEIGHBORS', 'PATTERN VIEW', 'ARRANGE FOCUS', 'SONG STRIP', 'PLAYHEAD OFFSET']],
     ['Song screen', ['CLASSIC SONG', 'SECTIONS', 'SONG PEEK']]]},
   // MENUS (1 Nov, audit #4): how keys and the mouse behave is Input's (FOLLOW, TAB, SONG MOUSE and LOOP DRAG were under
   // Screen), and RESUME is playback (it was left over in the View menu)
