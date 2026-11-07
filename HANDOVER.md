@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.95** (6 Nov 2026; owner: merge and a desktop build when the punch list is done; from `main` at build 463, run
+  42341637417): the six more generators (463) on top of v1.2.94.
 - **v1.2.94** (6 Nov 2026; owner: "check-in, merge, and push a desktop build"; Run workflow through the API with version 1.2.94,
   from `main` at build 462, run 42341079747): unsaved-samples prompt, no FLX pop-up, phrase on the cursor, playhead on the sound,
   GEN key, screen-off ramp, playback report, keep screen on, clock watch, hybrid (phones only), Drum pattern and Mutate (450–462).
