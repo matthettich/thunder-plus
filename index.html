@@ -2419,7 +2419,12 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skinbase="term"] body{background:var(--mxbg); color:var(--mx); font-family:var(--font); text-shadow:var(--mxglow)}
 :root[data-skinbase="term"] :is(button,select,input,textarea){font-family:var(--font)}
 :root[data-skinbase="term"] :is(kbd,code,.tscr,.fxpick){font-family:var(--mono)}
-:root[data-skinbase="term"] :is(button,select,input[type=text],input[type=number],textarea){background:var(--mxbg); color:var(--mx); border-color:var(--mxline, var(--mx))}
+:root[data-skinbase="term"] :is(button,input[type=text],input[type=number],textarea){background:var(--mxbg); color:var(--mx); border-color:var(--mxline, var(--mx))}
+/* DROP-DOWN ARROWS (owner, 6 Nov: "can we add a down arrow to the length dropdown?"): selects take only the colour here. The
+   `background` shorthand wiped the ▾ the Fit and finish rule draws, on every drop-down in these skins. (A first fix forced the ▾
+   back on every select with !important; review: it drew it over the text of the compact ones that drop it on purpose with
+   small padding: …chains rows, the FX picker, the MIDI settings.) */
+:root[data-skinbase="term"] select{background-color:var(--mxbg); color:var(--mx); border-color:var(--mxline, var(--mx))}
 :root[data-skinbase="term"] :is(button.on,.seg button.on,.ttabs button.on,.ttabs button[data-v].on,.tmap button[data-v].on,#bFile.on,.top #bSet.on){
   background:var(--mx)!important; color:var(--mxon)!important; border-color:var(--mxline, var(--mx)); text-shadow:none; box-shadow:0 0 12px var(--mxglowc)}
 :root[data-skinbase="term"] :is(.ttabs button[data-v],.tmap button[data-v]){background:var(--mxbg); color:var(--mx)}
@@ -2532,13 +2537,6 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skinbase="term"] .tagrid b.f.p, :root[data-skinbase="term"] .tagrid b.f.p[style]{background:transparent; color:var(--mx); box-shadow:inset 0 0 0 2px var(--mx)}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b.f.p{background:#fff!important; color:oklch(.45 .16 var(--rbh)); box-shadow:inset 0 0 0 2px oklch(.62 .16 var(--rbh))}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b:not(.f){--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg + var(--rbo, 0deg)); background:oklch(.94 .03 var(--rbh))}
-/* DROP-DOWN ARROWS (owner, 6 Nov: "can we add a down arrow to the length dropdown?"): the term skins (IDM, 909…) set the
-   drop-downs' `background` shorthand, which wiped the ▾ drawn by the Fit and finish rule, so every drop-down there showed
-   none (its padding was still kept for it). Drawn again here, after every skin, on computers (phones keep the native ones). */
-@media (pointer:fine){
-  :root select:not([multiple]):not([size]){background-image:linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%)!important;
-    background-position:right 12px center, right 7px center!important; background-size:5px 5px!important; background-repeat:no-repeat!important}
-}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <style>
@@ -12773,7 +12771,7 @@ document.addEventListener('keydown', e => {
   if (e.code === 'Space' && !e.altKey && (e.shiftKey || !(e.target.matches && e.target.matches('button')))){
     e.preventDefault();
     if (e.shiftKey && view === 'synth'){ play(cur); return; }
-    if (tp.on) tStop(); else tStart('song', {row:songRow()}); return; }
+    if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); return; }
   if (e.altKey && /^Digit[1-7]$/.test(e.code)){ e.preventDefault(); setView('tracker'); go(VIEWS[+e.code.slice(5) - 1]); return; }
   // FIX (UI sweep, 4 Nov): Alt/⌥+S, Song settings "from any screen" (owner, 3 Nov), the Synth page too (it was the tracker's only)
   if (e.altKey && !e.shiftKey && e.code === 'KeyS' && view === 'synth'){ e.preventDefault(); if (!pbOpen) setSheet('song'); return; }
@@ -14505,17 +14503,30 @@ function rcdStep(e){
   const edge = R.row == null || row !== R.row || st < R.st; R.row = row; R.st = st;
   if (!edge) return;
   if (R.phase === 'armed'){ R.t0 = e.t; R.phase = 'rec'; R.n = 0; R.bpm = e.bpm || tp.bpm || S.bpm; rcdUi(); return; }
-  if (R.phase === 'rec'){ R.n++; if (R.stopReq || (R.pats > 0 && R.n >= R.pats)){ rcdEndAt(e.t); if (R.songStop) rcdSongStopAt(e.t); } else rcdUi(); }
+  if (R.phase === 'rec'){ R.edgeT = e.t; R.n++; if (R.stopReq || (R.pats > 0 && R.n >= R.pats)){ rcdEndAt(e.t); if (R.songStop) rcdSongStopAt(e.t); } else rcdUi(); }
 }
 // FINISH THE PATTERN (owner, 6 Nov: "press stop and have the recording conclude at the end of that pattern (like renoise)"):
 // with LENGTH on Until Stop (finish the pattern) or a number of patterns, stopping the SONG (Space, the Song buttons) while a
 // PATTERN take records holds the song on to the end of the pattern playing: the take ends there and the song stops with it.
 // Stop again stops both at once. Until Stop (cut right there) is the old way: the take ends where the song stops.
-function rcdHoldStop(quiet){
-  const R = RCD.sync; if (quiet || RCD.starting || !R || R.phase !== 'rec' || R.songStop || (rcdSet.pats | 0) < 0) return false;
+// REVIEW (6 Nov): only the user's own STOP (tStopUser: Space, the Song buttons, PLAY keys, …chains' Space) is held. It was
+// in tStop(), so every internal stop was held too: rendering, MIDI export, an audio interruption, a playback error, MIDI clock
+// STOP and Ableton Link peers all left the song running (an interrupted context never reaches the edge: it never stopped).
+function tStopUser(){ if (rcdHoldStop()) return; tStop(); }
+function rcdHoldStop(){
+  const R = RCD.sync; if (RCD.starting || !R || R.phase !== 'rec' || R.songStop || (rcdSet.pats | 0) < 0) return false;
   if (!tp.on || tp.mode !== 'song' || !(tp.seq && tp.seq.alive && tp.seq.alive())) return false;   // (the song running out ends it as before)
-  R.songStop = true; R.stopReq = true; rcdUi(); toast('Recording to the end of this pattern, then stopping. Stop again to stop now.', 3000); return true; }
-function rcdSongStopAt(t){ const go = () => { if (tp.on) apRun(() => tStop(), []); try { songBtn(); } catch(e){} rcdUi(); };
+  R.songStop = true;
+  if (rcdEdgeAhead(R)) return true;
+  R.stopReq = true; rcdUi(); toast('Recording to the end of this pattern, then stopping. Stop again to stop now.', 3000); return true; }
+// REVIEW (6 Nov): the sequencer books steps ahead (0.25 s, 1.2 s in a hidden tab) and rcdStep counts an edge when it is
+// BOOKED, so a Stop pressed just before the downbeat (the usual moment) came after the edge was counted and recorded a whole
+// extra pattern. When the last edge is still ahead of what's heard, the take ends there (and the song with it, if held).
+function rcdEdgeAhead(R){
+  if (R.edgeT == null || R.edgeT <= ctx.currentTime) return false;   // (R.n already counts that edge: it ends pattern R.n)
+  R.stopReq = true; rcdEndAt(R.edgeT); if (R.songStop) rcdSongStopAt(R.edgeT); return true; }
+function rcdSongStopAt(t){ const seq = tp.seq;   // REVIEW (6 Nov): only the run it was set for (a PLAY in between started another)
+  const go = () => { if (tp.on && tp.seq === seq) apRun(() => tStop(), []); try { songBtn(); } catch(e){} rcdUi(); };
   const ms = (t - ctx.currentTime) * 1000 - 12; ms > 0 ? setTimeout(go, ms) : go(); }   // (just before the next pattern's first notes)
 // The song stopped while armed or recording
 function rcdSongStopped(){ const R = RCD.sync; if (!R) return; if (R.phase === 'rec') rcdEndAt(ctx.currentTime); else if (R.phase === 'armed'){ rcdAbort(); rcdUi(); } }
@@ -14543,7 +14554,7 @@ async function rcdStart(){
   rcdUi();
 }
 function rcdStop(){
-  if (RCD.sync){ const R = RCD.sync; if (R.phase === 'armed'){ rcdAbort(); rcdUi(); } else if (R.phase === 'rec'){ if (R.pats < 0) rcdEndAt(ctx.currentTime); else { R.stopReq = true; rcdUi(); } } return; }   // PATTERN: at the next edge (CUT RIGHT THERE: now)
+  if (RCD.sync){ const R = RCD.sync; if (R.phase === 'armed'){ rcdAbort(); rcdUi(); } else if (R.phase === 'rec' && !R.stopReq){ if (R.pats < 0) rcdEndAt(ctx.currentTime); else if (!rcdEdgeAhead(R)){ R.stopReq = true; rcdUi(); } } return; }   // PATTERN: at the next edge (CUT RIGHT THERE: now)
   if (!RCD.on) return; RCD.on = false;
   RCD.onDone = () => rcdTake(rcdCollect(), 'free', 0, 0); RCD.node.port.postMessage('stop'); rcdUi();
 }
@@ -14695,13 +14706,16 @@ function rcdKeyOn(k, note){
   const T = RCD.take; if (!T) return; audio(); rcdKeyOff(k);
   const n = T.data.length, a = RCD.sel ? RCD.sel[0] : Math.min(n - 32, Math.max(0, T.mk ? T.mk[0] : 0)), b = RCD.sel ? RCD.sel[1] : n; if (b - a < 32) return;
   const src = ctx.createBufferSource(), g = ctx.createGain(), t = ctx.currentTime;
-  src.buffer = stBuf(ctx, T.data.subarray(a, b), T.data2 ? T.data2.subarray(a, b) : null, T.sr); src.playbackRate.value = Math.pow(2, (note - 48) / 12);
+  // REVIEW (6 Nov): one buffer per take and range, not a copy per key press (a 5-minute stereo take is ~110 MB a copy)
+  const K = RCD.kb; if (!K || K.T !== T || K.d !== T.data || K.a !== a || K.b !== b) RCD.kb = {T, d:T.data, a, b, buf:stBuf(ctx, T.data.subarray(a, b), T.data2 ? T.data2.subarray(a, b) : null, T.sr)};
+  src.buffer = RCD.kb.buf; src.playbackRate.value = Math.pow(2, (note - 48) / 12);
   g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.003); src.connect(g); g.connect(master); src.start(t);
   const v = {src, g}; src.onended = () => { if (RCD.kv && RCD.kv.get(k) === v) RCD.kv.delete(k); try { g.disconnect(); } catch(e){} };
   (RCD.kv || (RCD.kv = new Map())).set(k, v); }
 function rcdKeyOff(k){ const v = RCD.kv && RCD.kv.get(k); if (!v) return; RCD.kv.delete(k); const t = ctx.currentTime;
   try { v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(v.g.gain.value, t); v.g.gain.linearRampToValueAtTime(0, t + 0.03); v.src.stop(t + 0.035); } catch(e){} }
 function rcdKeysOff(){ if (RCD.kv) for (const k of [...RCD.kv.keys()]) rcdKeyOff(k); }
+const rcdOct = d => { kOct = clamp(kOct + d, 0, 8); try { $('tOctN').textContent = kOct; } catch(e){} kpSig = ''; };   // (the tracker's OCT readout too)
 // EDIT SAMPLE (5 Nov, owner: apply the edits "to a loaded sample"): opts.edit {pad, li} opens the same panel on that layer's
 // sample, without the recording rows; APPLY writes it back (a new sample, so the layer's undo still has the old one), and
 // the layer's Start, Loop start and Loop end ride along with every edit (rcdEdit's map); REVERT goes back to the layer's.
@@ -14788,7 +14802,7 @@ async function rcdPanel(pad, opts){
   // OCTAVE (owner, 6 Nov): the note keys play the take chromatically (rcdKeyOn); this is the app's octave (kOct), so it
   // stays the same here and in the tracker. Z plays C-<oct>; C-4 is the take as recorded. Numpad / and * move it too.
   const octW = el('div', 'recoct'), octN = el('b'), octSay = () => { octN.textContent = kOct; };
-  const octB = (t, d, tip) => { const b = el('button', null, t); b.type = 'button'; b.title = tip; b.addEventListener('click', () => { kOct = clamp(kOct + d, 0, 8); octSay(); }); return b; };
+  const octB = (t, d, tip) => { const b = el('button', null, t); b.type = 'button'; b.title = tip; b.addEventListener('click', () => { rcdOct(d); octSay(); }); return b; };
   octW.title = 'Octave for the note keys: Z plays C-' + kOct + ' (C-4 is the take as recorded)'; octW.append(el('small', null, 'OCT'), octB('−', -1, 'Octave down (numpad /)'), octN, octB('+', 1, 'Octave up (numpad *)')); octSay();
   zb.prepend(el('small', 'reczl', 'ZOOM')); bar.append(playB, octW, rd, undoB, zb);   // (the octave by Play, so its − + don't read as zoom)
   grp('Edit');
@@ -14836,28 +14850,31 @@ async function rcdPanel(pad, opts){
   // SONG (owner, 5 Nov: "a play/stop button … for when it starts recording with playback"): plays or stops the song from here,
   // as the top bar's Song button does. Stopping it while a PATTERN take records ends the take there.
   const songB = el('button', 'recsong', '▶ Song'); songB.type = 'button'; songB.title = 'Play or stop the song (from the cursor’s song row). While a PATTERN take records, stopping it finishes the pattern first (press again to stop now), unless LENGTH is Until Stop · cut right there.';
-  songB.addEventListener('click', () => { apRun(() => { if (tp.on) tStop(); else tStart('song', {row:songRow()}); }, []); songBtn(); rcdUi(); });
+  songB.addEventListener('click', () => { apRun(() => { if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); }, []); songBtn(); rcdUi(); });
   rec.addEventListener('click', () => { if (RCD.on || RCD.sync) rcdStop(); else rcdStart().then(() => fillIn()); });
   const close = el('button', null, 'Close'); close.type = 'button'; row.append(songB, el('span', 'recsp'), rec, close); box.append(row); if (E){ rec.hidden = true; keepRow.append(close); row.hidden = true; }   // EDIT SAMPLE: Close beside Apply / Revert
   Object.assign(RCD.ui, {rec, state, edit, wave, ov, rd, playB, undoB, lock, E, songB, win, whn, whi});
   const songT = setInterval(() => { if (!RCD.ui){ clearInterval(songT); return; } const on = !!tp.on; if (songB._on !== on){ songB._on = on; songB.textContent = on ? '■ Song' : '▶ Song'; songB.classList.toggle('on', on); } }, 150);   // follows the song, however it was started
-  const done = () => { if (askOpen !== done) return; askOpen = null; rcdKeysOff(); document.removeEventListener('keyup', keyUp, true); rcdAbort(); if (rcdPrev){ try { rcdPrev.stop(); } catch(e){} rcdPrev = null; } rcdClose(); RCD.ui = null; if (E){ RCD.take = null; RCD.undo = []; RCD.sel = null; } wrap.remove(); document.removeEventListener('keydown', key, true); };
+  const done = () => { if (askOpen !== done) return; askOpen = null; rcdKeysOff(); RCD.kb = null; document.removeEventListener('keyup', keyUp, true); window.removeEventListener('blur', blurOff); rcdAbort(); if (rcdPrev){ try { rcdPrev.stop(); } catch(e){} rcdPrev = null; } rcdClose(); RCD.ui = null; if (E){ RCD.take = null; RCD.undo = []; RCD.sel = null; } wrap.remove(); document.removeEventListener('keydown', key, true); };
   close.addEventListener('click', done);
   // Keys stay in the panel: R records / stops, Space plays the song, Esc closes (a take not kept is let go); the piano keys play the take (R stays Record in Record a sample…), numpad / * the octave
   const key = e => { const tag = e.target && e.target.tagName;
     if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); return done(); }
-    if (!E && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'r' || e.key === 'R') && tag !== 'SELECT'){ e.preventDefault(); e.stopPropagation(); return rec.click(); }
+    // REVIEW (6 Nov): with a take on screen R is a note key (F in the upper row): as Record it threw the take away mid-melody,
+    // with no undo. ● Record still records again; R records when there's no take, and stops a recording.
+    if (!E && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'r' || e.key === 'R') && tag !== 'SELECT' && (!RCD.take || RCD.on || RCD.sync)){ e.preventDefault(); e.stopPropagation(); return rec.click(); }
     if (e.key === ' ' && tag !== 'BUTTON'){ e.preventDefault(); e.stopPropagation(); return playCtx(); }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z') && RCD.undo.length){ e.preventDefault(); e.stopPropagation(); return undoB.click(); }
     if (RCD.take && !e.ctrlKey && !e.metaKey && tag !== 'INPUT' && tag !== 'SELECT' && (e.key === '+' || e.key === '=' || e.key === '-')){ e.preventDefault(); e.stopPropagation(); return rcdZoom(e.key === '-' ? 2 : 0.5, rcdAnchor()); }
     // NOTE KEYS (owner, 6 Nov: "pressing keys on the keyboard plays the sample chromatically like in the other windows"): the
     // piano keys play the take (the selection, else from Start) at that note, held while the key is down. Not while recording.
     if (RCD.take && !RCD.on && !RCD.sync && !e.ctrlKey && !e.metaKey && !e.altKey && tag !== 'INPUT' && tag !== 'SELECT'){
-      if (e.code === 'NumpadDivide' || e.code === 'NumpadMultiply'){ e.preventDefault(); e.stopPropagation(); kOct = clamp(kOct + (e.code === 'NumpadMultiply' ? 1 : -1), 0, 8); return octSay(); }
+      if (e.code === 'NumpadDivide' || e.code === 'NumpadMultiply'){ e.preventDefault(); e.stopPropagation(); rcdOct(e.code === 'NumpadMultiply' ? 1 : -1); return octSay(); }
       const pn = pianoOf(e); if (pn !== undefined){ e.preventDefault(); e.stopPropagation(); if (!e.repeat) rcdKeyOn(e.code || e.key, kOct * 12 + pn); return; } }
     e.stopPropagation(); };
   const keyUp = e => { if (RCD.kv && RCD.kv.has(e.code || e.key)){ e.stopPropagation(); rcdKeyOff(e.code || e.key); } };
-  askOpen = done; document.addEventListener('keydown', key, true); document.addEventListener('keyup', keyUp, true);
+  const blurOff = () => rcdKeysOff();   // REVIEW (6 Nov): a key held as the window loses focus never sends its keyup
+  askOpen = done; document.addEventListener('keydown', key, true); document.addEventListener('keyup', keyUp, true); window.addEventListener('blur', blurOff);
   wrap.append(box); document.body.append(wrap); rcdUi(); setTimeout(() => rec.focus(), 0);
   { const ro = new ResizeObserver(() => rcdDrawWave()); ro.observe(wave); ro.observe(ov); }
 }
@@ -16014,7 +16031,7 @@ function editorKey(e){
     return false;
   }
   if (e.altKey) return false;
-  if (e.key === ' '){ if (tp.on) tStop(); else tStart('song', {row:songRow()}); return true; }
+  if (e.key === ' '){ if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); return true; }
   if (e.key === 'F9'){ setRec(!rec.on); return true; }
   if (/^F[5-8]$/.test(e.key)){
     if (e.key === 'F5') tStart('song', {row:0}); else if (e.key === 'F6'){ if (tp.on) tStop(); playCtx(); }
@@ -16147,7 +16164,7 @@ window.thunderChains = {
   deck(){ dkChnSig = ''; try { deckChains(); } catch(e){} },
   close: () => closeChains(),
   /* Transport from the …chains screen: Space starts/stops the song from the tracker's cursor row. */
-  play(){ if (tp.on) tStop(); else tStart('song', {row:songRow()}); },
+  play(){ if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); },
   playing: () => tp.on
 };
 const chApi = () => { try { return CH.frame && CH.frame.contentWindow && (CH.frame.contentWindow.chainsEmbed || CH.frame.contentWindow.wavesEmbed); } catch(e){ return null; } };
@@ -20875,7 +20892,6 @@ function panic(){
 let stopTapT = 0;
 function toTop(){ tp.paused = null; cs.song.y = 0; cs.song.top = 0; try { draw(); } catch(e){} toast('Back to the top of the song.', 1500); }
 function tStop(quiet){
-  if (rcdHoldStop(quiet)) return;   // RECORD INTO A PAD: FINISH THE PATTERN holds the song on to the pattern's end
   // RECORD INTO A PAD: a pattern take ends where the song stops. Only a song that was playing: FIX (6 Nov) the first PLAY of
   // a session with live pads starts a moment later (LIVE WARM-UP), and its tStop(true) dropped the take Record had armed.
   if (RCD.sync && !RCD.starting && tp.on) rcdSongStopped();
@@ -21952,7 +21968,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 447;
+const BUILD = 448;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23571,7 +23587,7 @@ function toggleLoopPat(){
 // from the cursor's row, every track, repeating that row; pressed again it stops, like Space. LOOP stays on (Alt+L turns it off).
 // Ctrl+Space on a Mac too: macOS keeps ⌘+Space for Spotlight unless that shortcut has been moved.
 function playPatLoop(){
-  if (tp.on){ tStop(); if (loopPat) toggleLoopPat(); return; }   // (owner, 30 Oct) stopping turns LOOP off too, so the next plain PLAY plays on
+  if (tp.on){ tStopUser(); if (loopPat) toggleLoopPat(); return; }   // (owner, 30 Oct) stopping turns LOOP off too, so the next plain PLAY plays on
   if (!loopPat) toggleLoopPat();
   const r = S.song[cs.song.y];
   tStart('song', {row:r && r.some(v => v >= 0) ? cs.song.y : songRow()});
@@ -24217,14 +24233,14 @@ function playKeySwap(){ return true; }
 // FIX (26 Oct): on the Phrase and Sect screens this is the old Space (playCtx), so LOOP SEL, BUS PLAY and a sect still play
 // as they did; on the Song screen the block's phrase plays on the block's own track (it played on cTrack, which can be another).
 function playPhraseNow(){
-  if (tp.on) return tStop();
+  if (tp.on) return tStopUser();
   if (tv === 'phrase' || tv === 'sect') return playCtx();
   const cid = tv === 'song' && S.song[cs.song.y] ? S.song[cs.song.y][cs.song.x] : -1;
   const ph = cid >= 0 ? firstPhrase(cid) : -1;
   return tStart('phrase', {phrase:ph >= 0 ? ph : cPhrase, track:ph >= 0 ? cs.song.x : cTrack});
 }
 function playCtx(){
-  if (tp.on) return tStop();
+  if (tp.on) return tStopUser();
   const lp = loopFor(tv);
   if (!lp && (tv === 'phrase' || tv === 'sect') && cTrack < NT && isBusT(cTrack)) return busPlay();   // BUS PLAY
   if (lp){
@@ -24282,7 +24298,7 @@ function press(b, fromKey){
     // its top (the cursor on row 00, RESUME's stopped spot forgotten), so the next PLAY starts the song from the beginning.
     if (!tp.on && performance.now() - stopTapT < 450){ stopTapT = 0; toTop(); return; }
     if (tp.on) stopTapT = performance.now();
-    if (mod('shift')){ used.shift = true; takeLatch(); if (tp.on) tStop(); else tStart('song', {row:songRow()}); } else playCtx(); return; }
+    if (mod('shift')){ used.shift = true; takeLatch(); if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); } else playCtx(); return; }
   // LOOP is a sticky toggle, not a held key: a tap flips it (the pattern loop; LOOP SEL is in the tab bar on a computer).
   if (b === 'loop'){ toggleLoopPat(); clearTimeout(rep); return; }
   if (b === 'xposeUp'){ transposeSel(1, true); clearTimeout(rep); return; }
@@ -24349,7 +24365,7 @@ function cmdAction(a){
   if (c === 'uniq') return makeUnique();
   if (c === 'clone') return cloneHere();
   if (c === 'cldn') return cloneDown();
-  if (c === 'song'){ if (tp.on) tStop(); else tStart('song', {row:songRow()}); }
+  if (c === 'song'){ if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); }
 }
 for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type = 'button'; b.dataset.c = a; b.setAttribute('aria-label', lbl); b.title = lbl; $('tCmd').append(b); }
 // In PAD mode CLEAR moves between PASTE and UNDO, so a thumb can reach it on a phone; KEYS mode keeps
@@ -29940,7 +29956,7 @@ function keysDown(e, pad){
   if (e.altKey) return false;
   // PLAY KEYS: Space plays the song and Shift+Space this phrase (25 Oct with a mouse in KEYS mode; 27 Oct everywhere, owner).
   // To swap back, make playKeySwap() return false.
-  if (k === ' '){ if (!e.repeat){ const sw = playKeySwap(); if (sw && !e.shiftKey && tv === 'song') playCtx(); else if (sw ? !e.shiftKey : e.shiftKey){ if (tp.on) tStop(); else tStart('song', {row:songRow()}); } else if (sw) playPhraseNow(); else playCtx(); } return true; }   // (swapped, on the Song screen Space is playCtx: the song from the cursor, or LOOP SEL's rows)
+  if (k === ' '){ if (!e.repeat){ const sw = playKeySwap(); if (sw && !e.shiftKey && tv === 'song') playCtx(); else if (sw ? !e.shiftKey : e.shiftKey){ if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); } else if (sw) playPhraseNow(); else playCtx(); } return true; }   // (swapped, on the Song screen Space is playCtx: the song from the cursor, or LOOP SEL's rows)
   // KEYS PLAY EVERYWHERE: INST, Mixer and FX play the note keys (held: as long as the key is down)
   if (KPLAYV.has(tv) && !fxp.open){ const pn = e.code === 'Slash' ? 16 : pianoOf(e); if (pn !== undefined){ if (!e.repeat){ audKey = e.code; try { keyPlay(pn, e.code); } finally { audKey = null; } } return true; } }
   if (k === 'Enter' && KPLAYV.has(tv) && !e.shiftKey && !e.repeat){ keyType().then(done => { if (!done) editTap(true); }); return true; }   // a plain value: type it
@@ -30049,7 +30065,7 @@ $('tKp').addEventListener('pointerdown', e => {
   b.classList.add('dn'); setTimeout(() => b.classList.remove('dn'), 110); kpAction(b.dataset.a);
 });
 $('tKp').addEventListener('click', e => { const b = e.target.closest('button[data-a]'); if (b && !ptrJust() && !b.disabled) kpAction(b.dataset.a); });
-$('tSong').addEventListener('click', () => { apRun(() => { if (tp.on) tStop(); else tStart('song', {row:songRow()}); }, []); songBtn(); });
+$('tSong').addEventListener('click', () => { apRun(() => { if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); }, []); songBtn(); });
 $('tLoopTop').addEventListener('click', () => toggleLoop());
 $('tKeyTrans').addEventListener('click', () => toggleKeyTrans());
 const HINTK = {
@@ -30501,6 +30517,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [448, '6 Nov', ['Fixes from a review of 446–447: only your own STOP waits for the pattern’s end; rendering, MIDI export, MIDI clock STOP, Ableton Link, an audio interruption or an error stop the song at once again (they waited too, and an interrupted song never stopped).', 'A STOP pressed just before the downbeat no longer records a whole extra pattern.', 'A PLAY pressed while a stop was waiting is no longer stopped a moment later.', 'R in Record a sample… plays its note while a take is showing (it threw the take away); ● Record records again.', 'Drop-down arrows: only the skins that hid them get them back (the compact drop-downs in …chains, the FX picker and the MIDI settings had an arrow drawn over their text).', 'The note keys in the sample editor reuse one buffer (long takes were copied on every press); a key held as the window loses focus is let go; the tracker’s OCT shows the octave set there.']],
   [447, '6 Nov', ['Record a sample… LENGTH: Until Stop · finish the pattern (and the set lengths) now finish the pattern playing when you stop the song too (Space, the Song buttons): the song plays on to the pattern’s end and stops with the take, as in Renoise. Stop again to stop at once. Until Stop · cut right there ends the take where you stop, as before.', 'The first Record of a session (song stopped, live pads in the kit) no longer starts the song without recording.', 'The note keys play the take in the sample editor (Record a sample… and Edit sample…), chromatically, held while the key is down: C-4 is the take as recorded. OCT − + beside Play (numpad / * too); it’s the same octave as the tracker’s.', 'Drop-downs show their ▾ in the IDM / 909 / terminal skins again (the length and pad pickers, the input, and every other one); the pad picker under the take lost its “Pad” label and lines up with ▶ Song.']],
   [446, '6 Nov', ['FOLLOW PATTERN in the Pattern view: the song row follows the playing pattern, so every track shows what is playing (only the open track switched; the rest stayed on the old pattern until you paged there).']],
   [445, '5 Nov', ['Sample layers have an Edit… button beside Load sample and Record… that opens the sample editor.', 'The editor draws the waveform orange and the selection blue, and the waveform sits in a card styled like the FX bar boxes: a dark title bar with the sample’s name, length, channels and rate.']],

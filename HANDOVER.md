@@ -162,6 +162,29 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (3): review of 446–447 (build 448, on `beta`)
+
+Owner asked for a hard review. Found and fixed:
+- **Hold in the wrong place:** `rcdHoldStop` sat in `tStop()`, so every non-quiet stop was held: render (`rendering = true;
+  tStop()`), MIDI export, MIDI clock 0xFC, Link peers, the audio-interrupted timer, the playback error catch. An interrupted
+  context never reaches the edge, so the song never stopped. Now `tStopUser()` (hold, else tStop) at the user's transport
+  sites only: Synth page Space, PLAY keys Space, playCtx, playPhraseNow, playPatLoop, the keypad Shift+PLAY, the command row
+  `song`, …chains' play(), the top-bar and panel Song buttons. tests/usability.test.js:162 accepts tStopUser.
+- **Lookahead:** steps are booked 0.25 s ahead (1.2 s hidden) and `rcdStep` counts an edge when booked; Stop in that window
+  recorded a whole extra pattern. `R.edgeT`; `rcdEdgeAhead(R)` ends at the booked edge (R.n already counts it). Panel ■ Stop too.
+- **Stale timer:** `rcdSongStopAt` stopped whatever was playing when it fired (a PLAY in between). Keyed to `tp.seq` now.
+- **R key:** with a take showing it threw the take away mid-melody (R = F-5). Now a note key then; ● Record still re-records.
+- **CSS:** the global `!important` ▾ drew over compact selects that drop it on purpose (`#dkChnRows .row select` padding 2px,
+  `.fxsel`, `.mwband`, the MIDI settings). Removed; the term skin's select rule uses `background-color` instead of the
+  `background` shorthand, which is what wiped the ▾.
+- Note keys: one cached AudioBuffer per take/range (`RCD.kb`; a 5-min stereo take was copied per press); window blur releases
+  held keys; `rcdOct` updates `#tOctN`.
+- Left as is (reported): ● Record discards an unkept take without asking (older); FOLLOW PATTERN's pvFollow moves the Arrange
+  cursor like FOLLOW ON; `0` no longer FITs in the editor; a hidden tab's timer may stop the song up to ~1 s late (the take is
+  still cut at the edge).
+- Checks: npm test 187/0; recorder-check 12 ok; sampler-check 10 ok; headless: held stop, internal stop, stop 0.18 s before
+  the downbeat (1 pattern), restart survives the old timer, R with a take, blur, ▾ in term.
+
 ## 6 Nov (2): finish-the-pattern song stop, note keys in the sample editor, drop-down arrows (build 447, on `beta`)
 
 - Owner: stop should end a PATTERN take at the end of that pattern (like Renoise), as well as the set lengths, maybe as a
