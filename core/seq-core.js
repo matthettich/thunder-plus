@@ -691,7 +691,7 @@ const TFX_MAP = {
      {op:'ready', v}  ·  {op:'rows', rows, time, bpm, tks, alive}  ·  {op:'end'}  ·  {op:'test', id, rows}  ·
      {op:'error', where, message} */
 
-const CORE_V = 6;   // the message set's version: index.html's CORE_WANT must match (3: patch sync; 4: the mix outputs NT+1..NT+3; 5: FXV, BYP, tempo; 6: SoundFonts)
+const CORE_V = 7;   // the message set's version: index.html's CORE_WANT must match (3: patch sync; 4: the mix outputs NT+1..NT+3; 5: FXV, BYP, tempo; 6: SoundFonts; 7: hold / held, the exact STOP)
 const coreNum = v => Math.round(v * 1e6) / 1e6;
 const corePlain = e => { const o = {}; for (const k of Object.keys(e).sort()){ const v = e[k];
   if (typeof v === 'number') o[k] = coreNum(v); else if (typeof v === 'string' || typeof v === 'boolean' || v === null) o[k] = v;
@@ -881,6 +881,7 @@ class ThunderCore extends AudioWorkletProcessor {
           return out; });
         this.port.postMessage({op:'test', id:d.id, rows}); return; }
       case 'play': return this.play(d);
+      case 'hold': this.hold = true; return;   // EXACT STOP (6 Nov): stop at the next pattern edge, tell the page {op:'held', t, pos}
       case 'stop': { this.seq = null; const at = d.at == null ? currentTime : d.at; this.stopAll(at); this.clkOn = false; this.clk.cancel(at); this.clk.set(0, at); return; }
       case 'loop': if (this.seq) this.seq.setLoop(d.l || null); return;
       case 'bpm': if (this.seq) this.seq.bpm = d.v; return;
@@ -927,7 +928,7 @@ class ThunderCore extends AudioWorkletProcessor {
       if (first){ const dt = d.t0 - first.t; seq.base += dt; seq.time += dt; if (seq.btT != null) seq.btT += dt; }
       else seq.time = d.t0; }
     else seq.time = d.t0;
-    this.seq = seq; this.ended = false; this.gen = d.gen | 0;
+    this.seq = seq; this.ended = false; this.gen = d.gen | 0; this.hold = false; this.lr = null; this.ls = null;
   }
 
   /* ---- the sampler: the page player's rendered-pad path (makePlayer: startNote, kill, pitchMods, modVoice, play) ---- */
@@ -1237,14 +1238,20 @@ class ThunderCore extends AudioWorkletProcessor {
       // The audio thread itself was held up (a screenshot, the system busy): rather than racing through the rows it missed
       // (owner, Fold: "the speed increased"), the song moves on from now, as the page's pump does.
       if (s.alive() && s.base != null && s.time < currentTime - 0.03){ this.skips = (this.skips || 0) + 1; const d = currentTime + 0.02 - s.time; s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
-      const rows = []; let n = 0;
+      const rows = []; let n = 0, held = null;
       while (s.alive() && s.time < currentTime + this.LEAD && n++ < 3){   // at most 3 steps a block: a longer LEAD (screen off) fills over a few blocks, not in one burst that overruns it
         const r = s.step();
+        // EXACT STOP (6 Nov): the pattern edge (a new song row, or the same one again) is where a held STOP ends the song:
+        // that step isn't played, every voice lets go at its time, and the page is told
+        if (r.pos){ let row = -1, st = -1; for (const p of r.pos) if (p){ if (p.row > row) row = p.row; if (p.step > st) st = p.step; }
+          if (row >= 0){ const edge = this.lr != null && (row !== this.lr || st < this.ls); this.lr = row; this.ls = st;
+            if (edge && this.hold){ held = {t:r.t, pos:r.pos}; this.hold = false; this.seq = null; this.stopAll(r.t); this.clkOn = false; this.clk.cancel(r.t); this.clk.set(0, r.t); break; } } }
         for (const e of r.evs) if (this.ev(e)) e.core = true;
         rows.push({t:r.t, evs:r.evs, pos:r.pos, tks:r.tks, line:r.line, bpm:s.bpm});
       }
       if (rows.length) this.port.postMessage({op:'rows', gen:this.gen, rows, time:s.time, bpm:s.bpm, tks:s.tks, base:s.base, btT:s.btT, alive:s.alive()});
-      if (!s.alive() && !this.ended){ this.ended = true; this.port.postMessage({op:'end', gen:this.gen, time:s.time}); }
+      if (held) this.port.postMessage({op:'held', gen:this.gen, t:held.t, pos:held.pos});
+      if (!held && !s.alive() && !this.ended){ this.ended = true; this.port.postMessage({op:'end', gen:this.gen, time:s.time}); }
     }
     // 2. sound the voices into their tracks' outputs
     const N = (outputs[0] && outputs[0][0] && outputs[0][0].length) || 128, sr = sampleRate, dt = 1 / sr;

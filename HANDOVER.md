@@ -162,6 +162,75 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (4): the review's open items, owner chose the picks (build 449, on `beta`)
+
+- **Ask first:** ● Record (or R with no take) over an unkept take shows `.recconf` in the panel: Cancel (Esc) / Keep in pad XX
+  and record (`rcdKeep` then record) / Discard and record. `T.kept` is set by rcdKeep; an edit makes a new take, so it asks
+  again. Not in Edit sample….
+- **F = FIT** in the editor (0 is a note key since 447).
+- **Exact STOP:** the held stop no longer depends on a page timer. `tp.stopAt` (cleared in tStop): the page pump books nothing
+  from then and calls tStop() once it passes; `rcdGateEdge(r)` checks each step BEFORE its notes are played and, at the edge,
+  `rcdHeldAt` → rcdStep ends the take → `rcdCutAt(t)`: stopAll(t) (takes back notes booked past t) + the screen tidy-up.
+  Core: `{op:'hold'}` → core-processor checks each step for the edge (lr / ls), stops there (stopAll(t), seq null) and posts
+  `{op:'held', t, pos}`; the page's coreMsg passes it to rcdHeldAt. Edge already booked (rcdEdgeAhead): rcdCutAt(edgeT, true)
+  also posts `{op:'stop', at:edgeT}` to the core. **CORE_V / CORE_WANT 6 → 7** (an older core would never answer hold);
+  core/seq-core.js rebuilt with tools/make-core.mjs.
+- Checks: npm test 187/0, recorder-check 12, sampler-check 10; headless page + core with the page timer disabled (as a hidden
+  tab): nothing booked past the edge, the song stops within ~80 ms of it, 1 pattern; stop 0.16 s before the downbeat on the
+  core: 1 pattern; ask first: shows, Esc, Keep and record, kept take doesn't ask.
+
+## 6 Nov (3): review of 446–447 (build 448, on `beta`)
+
+Owner asked for a hard review. Found and fixed:
+- **Hold in the wrong place:** `rcdHoldStop` sat in `tStop()`, so every non-quiet stop was held: render (`rendering = true;
+  tStop()`), MIDI export, MIDI clock 0xFC, Link peers, the audio-interrupted timer, the playback error catch. An interrupted
+  context never reaches the edge, so the song never stopped. Now `tStopUser()` (hold, else tStop) at the user's transport
+  sites only: Synth page Space, PLAY keys Space, playCtx, playPhraseNow, playPatLoop, the keypad Shift+PLAY, the command row
+  `song`, …chains' play(), the top-bar and panel Song buttons. tests/usability.test.js:162 accepts tStopUser.
+- **Lookahead:** steps are booked 0.25 s ahead (1.2 s hidden) and `rcdStep` counts an edge when booked; Stop in that window
+  recorded a whole extra pattern. `R.edgeT`; `rcdEdgeAhead(R)` ends at the booked edge (R.n already counts it). Panel ■ Stop too.
+- **Stale timer:** `rcdSongStopAt` stopped whatever was playing when it fired (a PLAY in between). Keyed to `tp.seq` now.
+- **R key:** with a take showing it threw the take away mid-melody (R = F-5). Now a note key then; ● Record still re-records.
+- **CSS:** the global `!important` ▾ drew over compact selects that drop it on purpose (`#dkChnRows .row select` padding 2px,
+  `.fxsel`, `.mwband`, the MIDI settings). Removed; the term skin's select rule uses `background-color` instead of the
+  `background` shorthand, which is what wiped the ▾.
+- Note keys: one cached AudioBuffer per take/range (`RCD.kb`; a 5-min stereo take was copied per press); window blur releases
+  held keys; `rcdOct` updates `#tOctN`.
+- Left as is (reported): ● Record discards an unkept take without asking (older); FOLLOW PATTERN's pvFollow moves the Arrange
+  cursor like FOLLOW ON; `0` no longer FITs in the editor; a hidden tab's timer may stop the song up to ~1 s late (the take is
+  still cut at the edge).
+- Checks: npm test 187/0; recorder-check 12 ok; sampler-check 10 ok; headless: held stop, internal stop, stop 0.18 s before
+  the downbeat (1 pattern), restart survives the old timer, R with a take, blur, ▾ in term.
+
+## 6 Nov (2): finish-the-pattern song stop, note keys in the sample editor, drop-down arrows (build 447, on `beta`)
+
+- Owner: stop should end a PATTERN take at the end of that pattern (like Renoise), as well as the set lengths, maybe as a
+  LENGTH choice. The panel's own ■ Stop already waited for the edge; the song's STOP (Space, Song buttons) cut the take at
+  once. LENGTH now: `0` Until Stop · finish the pattern (default), `-1` Until Stop · cut right there (old behaviour, the panel's
+  Stop cuts too), 1–16 patterns. `rcdHoldStop()` at the top of `tStop()`: a user stop (not quiet) during phase `rec`, with the
+  sequencer alive, sets `R.songStop` + `stopReq` and returns; `rcdStep` ends the take at the edge and `rcdSongStopAt(e.t)` stops
+  the song 12 ms before it. A second stop goes through (`songStop` already set).
+- FIX found while testing: `tStop()` called `rcdSongStopped()` even with nothing playing, so the first PLAY of a session with
+  live pads (LIVE WARM-UP defers `tStart`, whose `tStop(true)` ran outside `RCD.starting`) aborted the armed take: the song
+  started, nothing recorded. Now only when `tp.on`.
+- Owner: note keys play the sample chromatically in the editor, with an octave control. `rcdKeyOn/Off/KeysOff`: one
+  BufferSource per held key (`RCD.kv`, keyed by e.code), C-4 (48) = rate 1, the selection or from the Start marker; 3 ms in,
+  30 ms out. Octave is the app's `kOct` (OCT − n + by Play; numpad / *). R stays Record in Record a sample…; `0` no longer
+  FITs (it's a piano key; FIT button). Not while recording.
+- Owner: arrows on the LENGTH and pad drop-downs; no "Pad" text so it lines up with ▶ Song. Cause: the term skins'
+  `:is(button,select,…){background:…}` shorthand wiped the Fit and finish ▾ on EVERY select (padding kept). A rule at the end of
+  the main stylesheet (pointer:fine) puts the ▾ back with !important: every drop-down in those skins has it again.
+- Checks: npm test; tools/recorder-check.mjs, tools/sampler-check.mjs; a headless run of finish / double stop / cut.
+
+## 6 Nov: FOLLOW PATTERN moves the Pattern view's song row (build 446, on `beta`)
+
+- Owner: "pattern follow didn't update in the pattern screen until I paged into it". The Pattern view draws song row
+  `cs.song.y`; `followPlay()`'s FOLLOW PATTERN branch (followMode 1) only switched `cPhrase` to what the open track played and
+  returned before the `pvFollow()` call that FOLLOW ON reaches, so the other tracks stayed on the old pattern. That branch now
+  calls `pvFollow(P, own)` too (same guard: song mode, Pattern view, not while Arrange has the keys). No scrolling added.
+- Not changed: FOLLOW ON with Arrange holding the keys still leaves the song row alone (by design, 31 Oct).
+- Checks: npm test (187 pass, 1 skipped).
+
 ## 5 Nov (15): Edit… button, orange wave / blue selection, FX-card waveform window (build 445)
 - Owner asked how to open the editor on a loaded sample, to flip colours (sample orange, selection blue), and to style the waveform window like the FX bar boxes / pad mode buttons.
 - `#bEditSmp` "Edit…" in the layer header (shown when the layer is a sample with data) → `rcdPanel(cur, {edit:{pad:cur, li:V().sel}})`. Edit sample… in the Sample section still works.
