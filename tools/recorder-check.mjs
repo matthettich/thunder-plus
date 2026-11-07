@@ -58,7 +58,7 @@ try {
       await until(() => E('!!RCD.take'), 8000); out.sync2 = take(); E('tStop(true)'); await wait(300);
       // UNTIL STOP: Stop pressed during the 2nd pattern
       E("RCD.take = null; rcdSet.pats = 0; cs.song.y = 0;"); await E('rcdStart()');
-      await until(() => E('RCD.sync && RCD.sync.phase === "rec" && RCD.sync.n >= 1'), 8000); await wait(500); E('rcdStop()');
+      await until(() => E('RCD.sync && RCD.sync.phase === "rec" && RCD.sync.n >= 1 && ctx.currentTime > RCD.sync.edgeT'), 8000); await wait(500); E('rcdStop()');   // (the 2nd pattern heard, not only booked: the core books ahead)
       await until(() => E('!!RCD.take'), 8000); out.until = take(); E('tStop(true)'); await wait(200);
       // KEEP into pad 3
       E("rcdKeep(3)"); out.keep = E(`(() => { const v = kit.voices[3], L = v.layers[v.sel]; const I = S.insts.filter(I => I.pad === 3);

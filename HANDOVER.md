@@ -171,6 +171,22 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 7 Nov (1): stability pass, overnight (build 465+, beta)
+
+Owner (6 Nov 23:08): feature freeze; one stability pass, everything double-checked for usability, stability and phone
+efficiency; check-in at 2:40 (scheduled task "Thunder Plus stability pass check-in").
+- FIRST NOTES: the core reached PLAY 65–218 ms early (a 'started' report from the core now says so), but the page was busy
+  just after PLAY and got the core's first rows up to 250 ms late, dropping live-engine notes (rule: > 30 ms late).
+  coreStart posts lead 0.6 for 1.5 s (then coreLead), and a note ≤ 150 ms late plays at once. Headless: 0 / 29 ms late after.
+- HAND-OVER: 2/3 of its 158 ms was draw() of the hidden screen → `if (!handing) draw()` in tStart: 57 ms.
+- Keep screen on / Background play also in gear → App (#ckWake, #ckBgPlay, kept in step by a MutationObserver on #pApp).
+- WELCOME: waits until welcomeBusy() is false (askOpen, .ask, .sxmenu, Help, Settings), retrying 3 minutes; a panel
+  opening while it shows removes it unseen.
+- DRUM PATTERN: SHARED (default: unique copy via mstUniq when blockShared(t, y); or rewrite everywhere).
+- Help → Generate page (hGen): the ten generators, playing on a phone.
+- tools/recorder-check.mjs UNTIL STOP now waits until the 2nd pattern is HEARD (ctx.currentTime > edgeT): with the core
+  booking ahead, "n ≥ 1" was only booked, and the new booked-edge STOP rightly ended at the first pattern.
+
 ## 6 Nov (14): six more generators (build 463, beta + main, desktop v1.2.95)
 
 - Shared: genScope() (phrase guard, rows: selection or plen, instrument, cursor note, songKey scale), fxPut / fxDrop (an
