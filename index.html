@@ -3089,6 +3089,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>LP. SEL</dt><dd>loop the selection (sticky); PLAY then loops it</dd>
         <dt>OPTION + arrows</dt><dd>go to the nearest block that way: up / down the track, left / right along the row (Song and Phrase; PATTERN NAV in Settings)</dd>
         <dt>SEMI + −</dt><dd>transpose the phrase selection a semitone at once</dd>
+        <dt>GEN</dt><dd>the generators (Acid line, Euclidean fill…) for the phrase</dd>
         <dt>◀ ▶ (FX screen)</dt><dd>open the slot's controls · back to the slot list (a sideways swipe too)</dd>
         <dt>Sticky keys</dt><dd>tap SHIFT or OPTION alone and it stays lit for the next button</dd>
         <dt>Command row</dt><dd>buttons for change, clear, select, copy (no selection: what is under the cursor; a note brings its instrument), cut, paste, undo, redo · CLN (clone) and CLN↓ (clone to the row below) on the song</dd>
@@ -3179,7 +3180,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="tinl tinlp" id="tInlPad" hidden aria-label="Instruments and their pads"></div>
     <div class="keys wide">
       <button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
-      <span></span><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
+      <button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: the pattern generators (Acid line, Euclidean fill…) for this phrase">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
     </div>
     </div>
   </div>
@@ -10021,7 +10022,7 @@ async function pickBreak(){
   const how = await askPick({title:b[0], body:`A new song plays it at ${b[1]} BPM with its swing, and puts the ${kitTag(b[3]).toLowerCase()} kit on pads 1–8 (the synth slots stay); Undo brings your song back. Adding it puts its four bars in this song at row ${rS(y, 3)}, at this song's tempo and swing, on the pads you have.`},
     ['New song with this break', 'Add to this song']);
   if (how === 0){
-    if (!await okToLeave('the break’s new song')) return;   // FILE SAFETY
+    if (!await okToLeave('making the break’s new song')) return;   // FILE SAFETY
     setSong(breakSong(i), '');
     const k = drumKits().findIndex(K => K[0] === b[3]); if (k >= 0) loadClassicKit(k);
     toast(`${b[0]}: ${b[1]} BPM, ${kitTag(b[3]).toLowerCase()} kit on pads 1–8. Press play.`);
@@ -13577,8 +13578,8 @@ function fileItems(){
     ...(canShareProj() ? [{l:'Share project…', f:shareProj}] : []),
     ...(typeof defSongItems === 'function' ? defSongItems() : []),
     {l:'Examples', sub:[
-      {l:'Demo song (the starter beat)', f:guardLeave('the demo song', () => { setSong(demoSong(), 'Loaded the starter beat.'); setDirty(false); }), ask:'song'},
-      {l:'ELECTRO (demo project)', f:guardLeave('ELECTRO', loadElectro)},
+      {l:'Demo song (the starter beat)', f:guardLeave('loading the demo song', () => { setSong(demoSong(), 'Loaded the starter beat.'); setDirty(false); }), ask:'song'},
+      {l:'ELECTRO (demo project)', f:guardLeave('loading ELECTRO', loadElectro)},
       {l:'Funk breaks…', f:pickBreak},
       {l:'Breaks to chop (…pump BREAK)…', f:pickChopBreak}]},
     {l:'Samples… (browse and load)', f:() => smbPanel(typeof cur === 'number' ? cur : 0)},   // SAMPLE BROWSER (5 Nov)
@@ -13601,7 +13602,7 @@ function fileItems(){
       {l:'Presets…', f:() => $('presetIn').click()},
       ...(typeof LxrCore !== 'undefined' ? [{l:'LXR kit (.snd)…', f:pickLxrKit}] : []),
       ...(noChains() ? [] : [{l:'Chains…', f:() => $('chainsIn').click()}]),
-      ...(hasThunderWork() ? [null, {l:'...Thunder’s saved work…', f:guardLeave('...Thunder’s saved work', () => thunderImport(false))}] : [])]},
+      ...(hasThunderWork() ? [null, {l:'...Thunder’s saved work…', f:guardLeave('opening ...Thunder’s saved work', () => thunderImport(false))}] : [])]},
     {l:'Kit', sub:[
       {l:'Save kit…', f:() => $('bSaveKit').click()}, {l:'Load kit…', f:() => $('kitIn').click()},
       null,
@@ -14035,6 +14036,7 @@ function smpChannels(b){
   return {d, d2:diff || b.numberOfChannels > 2 ? d2 : null, n};
 }
 function assignSample(vi, data, sr, name, data2, id){
+  if (typeof markSmpNew === 'function') markSmpNew();   // (the close prompt: unsaved samples)
   const v = kit.voices[vi], li = v.sel;
   const lenMs = data.length / sr * 1000, smp = {data, sr, name}; if (data2) smp.data2 = data2; if (id) smp.id = id;
   smbAdd(smp);   // SAMPLE BROWSER: to the top of RECENT (and the sample store)
@@ -14613,7 +14615,7 @@ function rcdApply(E){
   const n = T.data.length; if (n < 32) return toast('The sample is too short to use.');
   const old = L.sample, oldMs = old && old.data ? old.data.length / old.sr * 1000 : 0;
   const S2 = {data:T.data, sr:T.sr, name:T.name || (old && old.name) || 'Sample', id:smpId()}; if (T.data2) S2.data2 = T.data2;
-  L.sample = S2;
+  L.sample = S2; markSmpNew();
   if (T.mk){ L.a = T.mk[0] / n; L.lpS = T.mk[1] / n; L.lpE = T.mk[2] / n; }
   if (L.mode !== 'ADSR' && Math.abs((L.hold || 0) - oldMs) < 2) L.hold = Math.min(SMP_MAX * 1000, Math.round(n / T.sr * 1000));   // a Hold that was the sample's length follows it
   v.len = Math.max(v.len, Math.min(SMP_MAX, n / T.sr + 0.1));
@@ -18528,7 +18530,8 @@ function normSong(j){
   if (j.flxOld) S.flxOld = true;
   else if (!j.flx256){ const FI = FXC.indexOf('FLX'); let n = 0;
     for (const ph of S.phrases) if (ph) for (const r of ph) for (let m = FX0; m < RW; m += 2) if (r[m] === FI && r[m + 1] > 16){ r[m + 1] = 16; n++; }
-    if (n) setTimeout(() => { try { toastOnce('flx-' + (S.name || ''), `${n} FLX above 10 are now written FLX 10, the pattern they have always played (FLX 11–FF are the new Flex patterns).`, 6000); } catch(e){} }, 1500); }
+    // (owner, 6 Nov: no pop-up about it any more; the cells are still rewritten, silently, so they play as they always did)
+    if (n) try { tpLog('song load', 'FLX 11–FF written as FLX 10 (' + n + ')'); } catch(e){} }
   S.flx256 = true;
   // GAT 00 STOPS (owner, 3 Nov: "make gat 00 stop gat"): GAT 00 used to be the slot's CUSTOM steps; it now opens the gate
   // (off) until the next GAT, and CUSTOM is GAT 10. An older song's GAT 00 cells become GAT 10, so they sound as they did.
@@ -20734,7 +20737,11 @@ function pumpRun(){
   // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate. With the app in the
   // background (owner, 31 Oct: stutters there) 1.2 s: the system runs a hidden page's thread late and in bursts, and
   // nothing is being edited then. Coming back to the front, it drops to 250 ms as the booked notes play out.
-  const ahead = document.hidden ? 1.2 : 0.25;
+  // SCREEN OFF (owner, 6 Nov, Fold: "as the screen is turning off, the cpu spikes"): the jump from 0.25 to 1.2 s booked a
+  // second of notes (and built their voices) in one tick, just as the phone lowers its clocks. It now grows over about a
+  // second (0.75 s of lead per second); coming back, it drops at once as before.
+  const want = document.hidden ? 1.2 : 0.25, nowP = performance.now(), dtP = tp.aheadT ? Math.min(2, (nowP - tp.aheadT) / 1000) : 0; tp.aheadT = nowP;
+  const ahead = tp.ahead = want <= (tp.ahead || 0.25) ? want : Math.min(want, (tp.ahead || 0.25) + 0.75 * dtP);
   while (tp.stopAt == null && s.alive() && s.time < ctx.currentTime + ahead && n++ < (document.hidden ? 256 : 64)){
     const r = s.step(); if (rcdGateEdge(r)) break; for (const e of r.evs){ if (moEv(e)) continue; rt.pl.play(e); if (e.type === 'note') padBlink(e); } tp.q.push({t:r.t, pos:r.pos, bpm:s.bpm, tks:r.tks, line:r.line}); rcdStep(tp.q[tp.q.length - 1]);
     mx.pend.forEach((P, t) => { if (P && P.length) pendFlush(t, r.t); });   // ARP returns due by this row, on tracks the row left alone
@@ -20853,7 +20860,12 @@ function coreDiff(){
 }
 function coreSyncAll(){ if (!core.ready) return;
   if (!core.mir){ coreDiff(); corePost({op:'load', S, vars:coreVars()}); } else { const ops = coreOps(coreDiff()); if (ops.length) corePost({op:'patch', ops}); corePost({op:'vars', vars:{vtrk, NSLOT}}); } coreKit(); for (let i = 0; i < nslots(); i++) coreBuf(i); corePost({op:'lxp', st:lxp.st | 0}); coreLead(); }
-const coreLead = () => { if (core.ready) corePost({op:'lead', s:document.hidden ? 1.2 : 0.25}); };
+// SCREEN OFF (6 Nov): the core's lead grows to 1.2 s in steps over about a second, not at once (a CPU spike as the screen
+// went off: a second of notes booked, and sent up to the page to build, in one go); back on, 0.25 at once
+let coreLeadT = 0;
+const coreLead = () => { clearTimeout(coreLeadT); if (!core.ready) return;
+  if (!document.hidden) return corePost({op:'lead', s:0.25});
+  let s = 0.25; const up = () => { if (!document.hidden || !core.ready) return; s = Math.min(1.2, s + 0.2); corePost({op:'lead', s}); if (s < 1.2) coreLeadT = setTimeout(up, 200); }; up(); };
 document.addEventListener('visibilitychange', coreLead);
 // After an edit: the song again (in place, so the running sequencer reads it), at most every 40 ms
 function coreSong(){ if (!tp.core || !core.mir || core.sT) return;   // only while the core plays (BATTERY): PLAY syncs the rest
@@ -20938,7 +20950,7 @@ function tStop(quiet){
   }
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
   const stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
-  tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null;
+  tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
   if (tp.core){ tp.core = false; core.gen++; coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }
   else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
   if (rt) rt.pl.stopAll(ctx.currentTime);
@@ -21491,7 +21503,10 @@ function projSet(path, handle){
 let projDirty = (() => { try { return localStorage.getItem(DTK) === '1'; } catch(e){ return false; } })(), dirtyArmed = false, bkDirty = false;
 setTimeout(() => { dirtyArmed = true; }, 2500);
 function markChange(){ if (!dirtyArmed) return; bkDirty = true; if (!projDirty) setDirty(true); else dirtyShow(); }
-function setDirty(on){ projDirty = !!on; try { localStorage.setItem(DTK, projDirty ? '1' : '0'); } catch(e){} dirtyShow(); }
+function setDirty(on){ projDirty = !!on; if (!projDirty) smpNew = false; try { localStorage.setItem(DTK, projDirty ? '1' : '0'); localStorage.setItem(DTK + '-smp', smpNew ? '1' : '0'); } catch(e){} dirtyShow(); }
+// a sample recorded or loaded since the last save (the close prompt says so); cleared with the dirty mark
+var smpNew = (() => { try { return localStorage.getItem(DTK + '-smp') === '1'; } catch(e){ return false; } })();
+function markSmpNew(){ smpNew = true; try { localStorage.setItem(DTK + '-smp', '1'); } catch(e){} }
 function dirtyShow(){
   try { const app = isMobile() ? '...Thunder' : '...Thunder Plus', t = (projDirty ? '• ' : '') + (S.name || 'Song') + ' — ' + app; if (document.title !== t) document.title = t;
     const b = $('bFile'); if (b){ b.classList.toggle('dirty', projDirty); b.title = 'File: new, open, save, share, render and export' + (projDirty ? ' · the song has unsaved changes' : ''); } } catch(e){}
@@ -21500,7 +21515,13 @@ function dirtyShow(){
 // A backup of what was there is made either way, so even "Don't save" can be brought back (File ▾ → Restore a backup…).
 async function okToLeave(what){
   if (!projDirty) return true;
-  const i = await askPick({title:'Save changes to “' + (S.name || 'Song') + '”?', body:'It has changes that aren’t in a project file' + (projLabel() ? ' (' + projLabel() + ')' : '') + (what ? ', and ' + what + ' replaces it' : '') + '. If you don’t save, a backup is kept (File ▾ → Restore a backup…).'}, ['Save', 'Don’t save']);
+  // CLEARER (owner, 6 Nov: closing with recorded samples "pops up a very confusing message"; it read "…, and closing the app
+  // replaces it"): says what isn't saved (new samples, or song changes) and what's about to happen, and asks to save
+  const nm = '“' + (S.name || 'Song') + '”', lbl = projLabel() ? ' (' + projLabel() + ')' : '';
+  const i = await askPick(smpNew
+    ? {title:'You have unsaved samples', body:'Samples you recorded or loaded aren’t saved in a project file yet. Save the song and kit' + lbl + (what ? ' before ' + what : '') + '? If you don’t, a backup is kept (File ▾ → Restore a backup…).'}
+    : {title:'Save changes to ' + nm + '?', body:'The song has changes that aren’t saved in a project file yet' + lbl + '. Save the song and kit' + (what ? ' before ' + what : '') + '? If you don’t, a backup is kept (File ▾ → Restore a backup…).'},
+    ['Save song and kit', 'Don’t save']);
   if (i < 0) return false;
   if (i === 1){ await backupNow(true); return true; }
   return await saveProj(false);
@@ -21527,7 +21548,7 @@ async function defSongForget(){
   const ok = await askYes({title:'Forget the default song?', body:'New song starts from the blank song again.'}, 'Forget');
   if (!ok) return; try { localStorage.removeItem(DSK); } catch(e){} toast('New song starts blank again.');
 }
-function newSong(){ return guardLeave('a new song', () => {
+function newSong(){ return guardLeave('starting a new song', () => {
   const t = defSongTxt(); let d = null; if (t) try { d = normSong(JSON.parse(t)); d.name = freshSong().name; } catch(e){ d = null; tpLog('the default song could not be read', e); }
   setSong(d || freshSong(), d ? 'New song from your default. The kit is unchanged.' : 'New song. The kit is unchanged.'); setDirty(false); })(); }
 let saving = false;
@@ -21626,7 +21647,7 @@ async function restoreBackup(){
   const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
   const k = await askPick({title:'Restore a backup', body:'Song and kit as they were. The newest is first.'}, idx.map(e => `${e.name} · ${new Date(e.at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} (${ago(e.at)})`));
   if (k < 0) return;
-  if (!await okToLeave('the backup')) return;
+  if (!await okToLeave('restoring the backup')) return;
   const text = await kvGet(idx[k].k); if (!text) return toast('That backup couldn’t be read.');
   if (await loadProjText(text, idx[k].name, {dirty:true})) toast('Restored the backup of ' + idx[k].name + ' from ' + ago(idx[k].at) + '. Save it to keep it in a file.', 5000);
 }
@@ -21881,6 +21902,14 @@ function loadCur(){
     if (o.cs) for (const k in cs) if (o.cs[k]) Object.assign(cs[k], {x:int(o.cs[k].x, 0), y:int(o.cs[k].y, 0)});
   } catch(e){}
 }
+// PHRASE ON THE CURSOR (owner, 6 Nov: a new song on the Fold, opened on the Phrase screen, let notes go into a phrase that
+// wasn't on the song): after a song loads, the phrase screen opens what's under the song cursor (its row, the cursor's
+// track); an empty cell gets a fresh phrase that goes on the song there with its first note (pendPlace, as Shift+Alt+arrows).
+function phraseToCursor(){
+  pendPlace = null; const x = cTrack, y = cs.song.y, cid = S.song[y] ? S.song[y][x] : -1;
+  if (x >= MT || (typeof isBusT === 'function' && isBusT(x))) return;
+  if (cid >= 0){ const p = firstPhrase(cid); cSect = cid; if (p >= 0) cPhrase = p; return; }
+  const fp = freePhrase(); if (fp < 0) return; cPhrase = fp; cs.phrase.y = 0; pendPlace = {x, y, p:fp}; }
 function resetCursors(){ cSect = cPhrase = cInst = cTrack = cFxT = cFxS = 0; for (const k in cs) Object.assign(cs[k], {x:0, y:0, top:0}); selA = null; }
 // A song's pattern numbering starts at 00. last.sect/last.phrase are the last sect/phrase NUMBER placed, and
 // they seed the first empty cell you type into — so a new song used to inherit the old song's number (a new
@@ -21943,7 +21972,7 @@ function irsUI(sec){
   }
   sec.append(box);
 }
-function setSong(s, msg){ tStop(true); tp.paused = null; irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
+function setSong(s, msg){ tStop(true); tp.paused = null; irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -22001,7 +22030,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 449;
+const BUILD = 454;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22764,8 +22793,8 @@ function projRows(){
     {l:'› IMPORT CHAINS', act:() => $('chainsIn').click(), info:() => 'Load a .chains.json file into this song (…waves patches work too, keeping their effects)'}]),
     ...(canShareProj() ? [{l:'› SHARE PROJECT', act:shareProj, info:() => 'Send the project file (song and kit) to Drive, email, a chat or your other device, then open it there with LOAD PROJECT'}] : []),
     {l:'› NEW SONG', dbl:true, act:newSong, info:() => 'Clears the song, keeps the kit. Tap EDIT twice · Ctrl/⌘+N'},
-    {l:'› LOAD DEMO', dbl:true, act:guardLeave('the demo song', () => { setSong(demoSong(), 'Loaded the starter beat.'); setDirty(false); }), info:() => 'Replaces the song with the starter beat. Tap EDIT twice'},
-    {l:'› LOAD ELECTRO', dbl:true, act:guardLeave('ELECTRO', loadElectro), info:() => 'Opens the ELECTRO demo project (song and kit). Tap EDIT twice'},
+    {l:'› LOAD DEMO', dbl:true, act:guardLeave('loading the demo song', () => { setSong(demoSong(), 'Loaded the starter beat.'); setDirty(false); }), info:() => 'Replaces the song with the starter beat. Tap EDIT twice'},
+    {l:'› LOAD ELECTRO', dbl:true, act:guardLeave('loading ELECTRO', loadElectro), info:() => 'Opens the ELECTRO demo project (song and kit). Tap EDIT twice'},
     {l:'INPUT', sec:'Input', gap:true, get:() => inMode === 'keys' ? 1 : 0, set:v => setInput(v ? 'keys' : 'pad'), min:0, max:1, tog:true, d:0, fmt:v => v ? 'KEYS' : 'PAD', info:() => 'PAD: on-screen d-pad and four keys; the keyboard still types notes and hex (Z = OPTION, X = EDIT, Alt+arrows page). KEYS: type notes and hex, with an on-screen keypad on touch screens'},
     // COMMAND BAR (menu audit, 2 Nov): one choice instead of two checkboxes. OFF · THIN (one line above the bottom panel,
     // KEYS mode; PAD mode shows none) · BIG (the COMMANDS buttons)
@@ -24334,6 +24363,7 @@ function press(b, fromKey){
     if (mod('shift')){ used.shift = true; takeLatch(); if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); } else playCtx(); return; }
   // LOOP is a sticky toggle, not a held key: a tap flips it (the pattern loop; LOOP SEL is in the tab bar on a computer).
   if (b === 'loop'){ toggleLoopPat(); clearTimeout(rep); return; }
+  if (b === 'gen'){ clearTimeout(rep); genMenu(); return; }   // GEN (owner, 6 Nov): the generators, under SEMI + beside LOOP
   if (b === 'xposeUp'){ transposeSel(1, true); clearTimeout(rep); return; }
   if (b === 'xposeDn'){ transposeSel(-1, true); clearTimeout(rep); return; }
   const l = takeLatch();
@@ -24342,7 +24372,7 @@ function press(b, fromKey){
   if (!fromKey) rep = setTimeout(function r(){ dirPress(b, l); rep = setTimeout(r, 70); }, 330);
 }
 function release(b, fromKey){
-  if (b === 'loop' || b === 'xposeUp' || b === 'xposeDn'){ keyVis(); return; }
+  if (b === 'loop' || b === 'gen' || b === 'xposeUp' || b === 'xposeDn'){ keyVis(); return; }
   if (b in held){
     if (!held[b]) return;
     held[b] = false;
@@ -24472,6 +24502,12 @@ function keyHint(s){
    Tools ▸ group (in Edit ▾: the top bar has no room for a Tools menu on a 13" laptop). */
 // GENERATORS (owner, 2 Nov: "call that generators", findable from a right-click in the phrase or pattern editor): the
 // pattern writers, in their own group of Edit ▾ and the right-click menu, before Tools.
+// GEN key (PAD mode): the Generators menu (Acid line, Euclidean fill…) over the key; off the Phrase screen they say why
+function genMenu(){
+  const b = $('kGen'), r = b ? b.getBoundingClientRect() : {left:20, top:200};
+  if (typeof sxMenu !== 'function') return acidLine();
+  sxMenu(r.left, r.top, 'GENERATE', genItems(true).map(it => ({l:it.l, f:it.off ? () => toast('Open a phrase first: the generators write into it.') : it.f})));
+}
 function genItems(full){
   const ph = tv === 'phrase', mst = ph && mstView();
   return ph && !mst || full ? [{a:'acid', l:'Acid line… (a random bass line)', k:keyHint('alt+B'), f:acidLine, off:!ph || mst}, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill, off:!ph || mst}] : [];
@@ -25291,7 +25327,7 @@ function draw(){
     let i = 0; $('tCmd').querySelectorAll('button[data-c]').forEach(b => { const on = !(onSong ? b.dataset.c === 'b:-16' || b.dataset.c === 'b:16' : b.dataset.c === 'clone' || b.dataset.c === 'cldn');
       if (on) b.style.setProperty('--sh', TCV[seq[i++ % seq.length]]); });
     // The pad takes the same colours in turn, except PLAY is always green (Phrase): it swaps with whichever key had green.
-    const pc = {}; i = 0; for (const k of ['up', 'left', 'down', 'right', 'xposeUp', 'xposeDn', 'shift', 'play', 'loop', 'opt', 'edit']) pc[k] = TCV[seq[i++ % seq.length]];
+    const pc = {}; i = 0; for (const k of ['up', 'left', 'down', 'right', 'xposeUp', 'xposeDn', 'shift', 'play', 'loop', 'opt', 'edit', 'gen']) pc[k] = TCV[seq[i++ % seq.length]];
     const g = Object.keys(pc).reverse().find(k => pc[k] === TCV.phrase && k !== 'play'); if (g && pc.play !== TCV.phrase){ pc[g] = pc.play; pc.play = TCV.phrase; }
     for (const k in pc){ const b = $('tPad').querySelector(`.k[data-b=${k}]`); if (b) b.style.setProperty('--sh', pc[k]); } }
   $('tCmd').querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = onSong);
@@ -29095,7 +29131,11 @@ function frame(){
   if (frameIdle()){ raf = -1; rafT = setTimeout(() => { raf = 0; frame(); }, 100); } else raf = requestAnimationFrame(frame);
   if (tp.on && ctx){
     let ch = false;
-    while (tp.q.length && tp.q[0].t <= ctx.currentTime + 0.01){ const e = tp.q.shift(); if (!tp.pos) tp.pos = new Array(NT).fill(null); e.pos.forEach((q, i) => { if (q){ tp.pos[i] = q; sndKeep(i, q); } }); tp.bpm = e.bpm; tp.tks = e.tks; tp.line = e.line; tp.st = e.t; ch = true;
+    // PLAYHEAD ON THE SOUND (owner, 6 Nov, Fold: "the playhead passes the note enough before we hear it that it is noticeable"):
+    // a row shows when it reaches the speaker, not when the engine renders it: the output latency (Android's often 50–200 ms,
+    // Bluetooth more) is taken off, as the pad blinks and meters already do.
+    const hear = ctx.currentTime + 0.01 - Math.min(1, ctx.outputLatency || ctx.baseLatency || 0);
+    while (tp.q.length && tp.q[0].t <= hear){ const e = tp.q.shift(); if (!tp.pos) tp.pos = new Array(NT).fill(null); e.pos.forEach((q, i) => { if (q){ tp.pos[i] = q; sndKeep(i, q); } }); tp.bpm = e.bpm; tp.tks = e.tks; tp.line = e.line; tp.st = e.t; ch = true;
       // the song's timer starts again when the song wraps back up (owner, 31 Oct: it stayed at 0:00 after the first time through)
       if (tp.mode === 'song'){ let mx = -1; e.pos.forEach((q, i) => { if (q && i !== MT && q.row > mx) mx = q.row; });
         if (mx >= 0){ if (tp.hiRow != null && mx < tp.hiRow){ tp.row0 = mx; tp.t0 = e.t; tp.lenTot = null; } tp.hiRow = mx; } } }
@@ -30550,6 +30590,11 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [454, '6 Nov', ['Screen off while playing: the sequencers work further ahead gradually (over about a second) instead of all at once, which spiked the CPU just as the phone slowed down.']],
+  [453, '6 Nov', ['PAD mode has a GEN key, under SEMI + and beside LOOP: it opens the generators (Acid line, Euclidean fill…) for the phrase.']],
+  [452, '6 Nov', ['The playhead moves with what you hear: the device’s output latency is taken off (on phones it ran ahead of the sound).']],
+  [451, '6 Nov', ['A song you load or start opens the Phrase screen on what’s under the song cursor: the phrase there, or, on an empty cell, a fresh phrase that goes on the song in that cell with its first note (it let notes go into a phrase that wasn’t on the song).']],
+  [450, '6 Nov', ['Closing the app (or opening another song) with unsaved work asks plainly: “You have unsaved samples” when you’ve recorded or loaded samples since the last save, else “Save changes to …?”, then Save song and kit / Don’t save (it read “…and closing the app replaces it”).', 'No more pop-up about FLX above 10 when a song opens.']],
   [449, '6 Nov', ['Record a sample…: ● Record over a take you haven’t kept asks first: Keep in the pad and record, Discard and record, or Cancel (Esc).', 'A held STOP now stops the song exactly at the pattern’s end, in a background tab too: both sequencers stop booking notes there (it relied on a page timer, which a hidden tab runs up to a second late).', 'F fits the whole take in the sample editor (0 is a note key).']],
   [448, '6 Nov', ['Fixes from a review of 446–447: only your own STOP waits for the pattern’s end; rendering, MIDI export, MIDI clock STOP, Ableton Link, an audio interruption or an error stop the song at once again (they waited too, and an interrupted song never stopped).', 'A STOP pressed just before the downbeat no longer records a whole extra pattern.', 'A PLAY pressed while a stop was waiting is no longer stopped a moment later.', 'R in Record a sample… plays its note while a take is showing (it threw the take away); ● Record records again.', 'Drop-down arrows: only the skins that hid them get them back (the compact drop-downs in …chains, the FX picker and the MIDI settings had an arrow drawn over their text).', 'The note keys in the sample editor reuse one buffer (long takes were copied on every press); a key held as the window loses focus is let go; the tracker’s OCT shows the octave set there.']],
   [447, '6 Nov', ['Record a sample… LENGTH: Until Stop · finish the pattern (and the set lengths) now finish the pattern playing when you stop the song too (Space, the Song buttons): the song plays on to the pattern’s end and stops with the take, as in Renoise. Stop again to stop at once. Until Stop · cut right there ends the take where you stop, as before.', 'The first Record of a session (song stopped, live pads in the kit) no longer starts the song without recording.', 'The note keys play the take in the sample editor (Record a sample… and Edit sample…), chromatically, held while the key is down: C-4 is the take as recorded. OCT − + beside Play (numpad / * too); it’s the same octave as the tracker’s.', 'Drop-downs show their ▾ in the IDM / 909 / terminal skins again (the length and pad pickers, the input, and every other one); the pad picker under the take lost its “Pad” label and lines up with ▶ Song.']],

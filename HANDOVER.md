@@ -166,6 +166,54 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (9): screen-off lead ramps up (build 454, on `beta`, merged to `main`)
+
+- Owner: "as the screen is turning off, the cpu spikes". The page pump's lookahead and the core's LEAD jumped 0.25 → 1.2 s
+  on visibilitychange, booking (and building voices for) a second of notes at once. Page: `tp.ahead` grows by 0.75 s per second
+  of wall time to the target, drops at once when visible (reset in tStop). Core: `coreLead` steps 0.45, 0.65 … 1.2 every 200 ms.
+- Owner's figures: Settings → Audio reads 21 ms + 43 ms output both fresh and after the screen-off trouble, so it is NOT a
+  high-latency output buffer. The trouble: stutter, then speed-up, and after STOP "layers" (maybe the poly tracks) keep
+  playing to about the end of the song. Still open; suspects: notes booked far ahead that STOP doesn't take back (live
+  …pump / …waves lanes? notes booked with past times firing at once?). Asked the owner to try Settings → Audio → Page (old)
+  and …pump live → Render to narrow it down.
+
+## 6 Nov (8): GEN key in PAD mode (build 453, on `beta`)
+
+- Owner: a GEN button in PAD mode, beside LOOP and below SEMI, for the generators. `#kGen` (data-b="gen") in the empty
+  cell of `.keys.wide`; press → `genMenu()`: sxMenu over the key with genItems(true) (Acid line…, Euclidean fill…); off a
+  phrase they toast. Colour: 'gen' appended to the pad colour list (others unchanged). Owner's Settings → Audio latency
+  after a fresh open: 21 ms (waiting for the figure after a screen-off goes wrong).
+
+## 6 Nov (7): playhead on the sound (build 452, on `beta`)
+
+- Owner (Fold): the playhead passes a note noticeably before it's heard; "the audio got out of sync with the rest of the app".
+  frame() drained tp.q at ctx.currentTime with no output latency; now currentTime − min(1 s, outputLatency || baseLatency),
+  as pad blinks / meters already did.
+- LEAD for the open screen-off bug (6 Nov (5)): the symptoms (stop leaves chunks, the next song plays over the old one,
+  sound behind the screen, choppy) fit Android moving the output to a high-latency power-saving buffer when the screen goes
+  off: audio already handed to the device keeps draining after STOP. Asked the owner for Settings → Audio's readout
+  (latency + output ms) fresh vs after it happens. If confirmed: a suspend/resume of the context while stopped, or a new
+  AudioContext, to get a low-latency stream back.
+
+## 6 Nov (6): phrase on the cursor after a song loads (build 451, on `beta`)
+
+- Owner (Fold): a new song opened on the Phrase screen let notes go into a phrase not on the song. `phraseToCursor()` in
+  setSong (after resetCursors): the block under the song cursor (row cs.song.y, cTrack) opens its first phrase; an empty cell
+  gets freePhrase() with pendPlace, so the first note puts it on the song there (placePending via saveS). Buses / master skipped.
+
+## 6 Nov (5): clearer unsaved prompt; no FLX pop-up (build 450, on `beta`)
+
+- Owner: closing with recorded, unsaved samples gave a confusing message (`okToLeave` read "…, and closing the app replaces
+  it"). Now `smpNew` (localStorage DTK + '-smp'; set by assignSample and rcdApply, cleared by setDirty(false)) picks
+  "You have unsaved samples" or "Save changes to “name”?"; the body says "Save the song and kit before <what>?"; buttons
+  Save song and kit / Don't save (Cancel as before). Callers' `what` are verb phrases now (starting a new song, loading ELECTRO…).
+- Owner: removed the FLX above 10 toast on load; the old-song rewrite (FLX 11–FF → 10) still runs, logged with tpLog.
+- OPEN (owner, same evening, Android Fold, web): screen off while playing → tempo sped up, settled, then slow and choppy; STOP
+  left chunks playing; a newly loaded song played over parts of the old one (a lead synth line, clicking). Not reproduced in
+  headless Chrome (hidden page simulated, core and page sequencers: stop and new song silent). Suspects: a frozen page then a
+  backlog of core 'rows' (non-note events still applied late), or a second sequencer left running. Asked the owner for the
+  build, the sequencer setting, and whether Page (old) does it too.
+
 ## 6 Nov (4): the review's open items, owner chose the picks (build 449, on `beta`)
 
 - **Ask first:** ● Record (or R with no take) over an unkept take shows `.recconf` in the panel: Cancel (Esc) / Keep in pad XX
