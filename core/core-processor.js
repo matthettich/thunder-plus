@@ -370,6 +370,9 @@ class ThunderCore extends AudioWorkletProcessor {
       const B = v.live, L = v.L, ov = tcOver(L.proc), t = Math.max(at, currentTime), G = tcParam(ov, this.pn(L, v.lane, 'gate'), t); v.stopAt = at;
       if (t < B.lastOn - 1e-6){ G.cancel(t); tcParam(ov, this.pn(L, v.lane, 'trig'), t).cancel(t); }
       G.set(0, t); return; }
+    // a voice booked to start at or after the stop never sounds (CodeRabbit, 7 Nov: the fade below began at full level, so the
+    // next pattern's downbeat blipped); one already sounding fades as before
+    if (v.t0 >= at - 1e-6){ v.stopAt = at; v.end = Math.min(v.end, v.t0); return; }
     v.stopAt = at; at = Math.max(at, currentTime);
     v.f.cancel(at); v.f.set(1, at); v.f.target(0, at, tc); v.end = Math.min(v.end, at + tc * 12);
   }
