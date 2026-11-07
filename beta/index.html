@@ -20737,7 +20737,11 @@ function pumpRun(){
   // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate. With the app in the
   // background (owner, 31 Oct: stutters there) 1.2 s: the system runs a hidden page's thread late and in bursts, and
   // nothing is being edited then. Coming back to the front, it drops to 250 ms as the booked notes play out.
-  const ahead = document.hidden ? 1.2 : 0.25;
+  // SCREEN OFF (owner, 6 Nov, Fold: "as the screen is turning off, the cpu spikes"): the jump from 0.25 to 1.2 s booked a
+  // second of notes (and built their voices) in one tick, just as the phone lowers its clocks. It now grows over about a
+  // second (0.75 s of lead per second); coming back, it drops at once as before.
+  const want = document.hidden ? 1.2 : 0.25, nowP = performance.now(), dtP = tp.aheadT ? Math.min(2, (nowP - tp.aheadT) / 1000) : 0; tp.aheadT = nowP;
+  const ahead = tp.ahead = want <= (tp.ahead || 0.25) ? want : Math.min(want, (tp.ahead || 0.25) + 0.75 * dtP);
   while (tp.stopAt == null && s.alive() && s.time < ctx.currentTime + ahead && n++ < (document.hidden ? 256 : 64)){
     const r = s.step(); if (rcdGateEdge(r)) break; for (const e of r.evs){ if (moEv(e)) continue; rt.pl.play(e); if (e.type === 'note') padBlink(e); } tp.q.push({t:r.t, pos:r.pos, bpm:s.bpm, tks:r.tks, line:r.line}); rcdStep(tp.q[tp.q.length - 1]);
     mx.pend.forEach((P, t) => { if (P && P.length) pendFlush(t, r.t); });   // ARP returns due by this row, on tracks the row left alone
@@ -20856,7 +20860,12 @@ function coreDiff(){
 }
 function coreSyncAll(){ if (!core.ready) return;
   if (!core.mir){ coreDiff(); corePost({op:'load', S, vars:coreVars()}); } else { const ops = coreOps(coreDiff()); if (ops.length) corePost({op:'patch', ops}); corePost({op:'vars', vars:{vtrk, NSLOT}}); } coreKit(); for (let i = 0; i < nslots(); i++) coreBuf(i); corePost({op:'lxp', st:lxp.st | 0}); coreLead(); }
-const coreLead = () => { if (core.ready) corePost({op:'lead', s:document.hidden ? 1.2 : 0.25}); };
+// SCREEN OFF (6 Nov): the core's lead grows to 1.2 s in steps over about a second, not at once (a CPU spike as the screen
+// went off: a second of notes booked, and sent up to the page to build, in one go); back on, 0.25 at once
+let coreLeadT = 0;
+const coreLead = () => { clearTimeout(coreLeadT); if (!core.ready) return;
+  if (!document.hidden) return corePost({op:'lead', s:0.25});
+  let s = 0.25; const up = () => { if (!document.hidden || !core.ready) return; s = Math.min(1.2, s + 0.2); corePost({op:'lead', s}); if (s < 1.2) coreLeadT = setTimeout(up, 200); }; up(); };
 document.addEventListener('visibilitychange', coreLead);
 // After an edit: the song again (in place, so the running sequencer reads it), at most every 40 ms
 function coreSong(){ if (!tp.core || !core.mir || core.sT) return;   // only while the core plays (BATTERY): PLAY syncs the rest
@@ -20941,7 +20950,7 @@ function tStop(quiet){
   }
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
   const stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
-  tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null;
+  tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
   if (tp.core){ tp.core = false; core.gen++; coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }
   else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
   if (rt) rt.pl.stopAll(ctx.currentTime);
@@ -22021,7 +22030,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 453;
+const BUILD = 454;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -30581,6 +30590,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [454, '6 Nov', ['Screen off while playing: the sequencers work further ahead gradually (over about a second) instead of all at once, which spiked the CPU just as the phone slowed down.']],
   [453, '6 Nov', ['PAD mode has a GEN key, under SEMI + and beside LOOP: it opens the generators (Acid line, Euclidean fill…) for the phrase.']],
   [452, '6 Nov', ['The playhead moves with what you hear: the device’s output latency is taken off (on phones it ran ahead of the sound).']],
   [451, '6 Nov', ['A song you load or start opens the Phrase screen on what’s under the song cursor: the phrase there, or, on an empty cell, a fresh phrase that goes on the song in that cell with its first note (it let notes go into a phrase that wasn’t on the song).']],
