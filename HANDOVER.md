@@ -162,6 +162,23 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (4): the review's open items, owner chose the picks (build 449, on `beta`)
+
+- **Ask first:** ● Record (or R with no take) over an unkept take shows `.recconf` in the panel: Cancel (Esc) / Keep in pad XX
+  and record (`rcdKeep` then record) / Discard and record. `T.kept` is set by rcdKeep; an edit makes a new take, so it asks
+  again. Not in Edit sample….
+- **F = FIT** in the editor (0 is a note key since 447).
+- **Exact STOP:** the held stop no longer depends on a page timer. `tp.stopAt` (cleared in tStop): the page pump books nothing
+  from then and calls tStop() once it passes; `rcdGateEdge(r)` checks each step BEFORE its notes are played and, at the edge,
+  `rcdHeldAt` → rcdStep ends the take → `rcdCutAt(t)`: stopAll(t) (takes back notes booked past t) + the screen tidy-up.
+  Core: `{op:'hold'}` → core-processor checks each step for the edge (lr / ls), stops there (stopAll(t), seq null) and posts
+  `{op:'held', t, pos}`; the page's coreMsg passes it to rcdHeldAt. Edge already booked (rcdEdgeAhead): rcdCutAt(edgeT, true)
+  also posts `{op:'stop', at:edgeT}` to the core. **CORE_V / CORE_WANT 6 → 7** (an older core would never answer hold);
+  core/seq-core.js rebuilt with tools/make-core.mjs.
+- Checks: npm test 187/0, recorder-check 12, sampler-check 10; headless page + core with the page timer disabled (as a hidden
+  tab): nothing booked past the edge, the song stops within ~80 ms of it, 1 pattern; stop 0.16 s before the downbeat on the
+  core: 1 pattern; ask first: shows, Esc, Keep and record, kept take doesn't ask.
+
 ## 6 Nov (3): review of 446–447 (build 448, on `beta`)
 
 Owner asked for a hard review. Found and fixed:
