@@ -166,6 +166,19 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (5): clearer unsaved prompt; no FLX pop-up (build 450, on `beta`)
+
+- Owner: closing with recorded, unsaved samples gave a confusing message (`okToLeave` read "…, and closing the app replaces
+  it"). Now `smpNew` (localStorage DTK + '-smp'; set by assignSample and rcdApply, cleared by setDirty(false)) picks
+  "You have unsaved samples" or "Save changes to “name”?"; the body says "Save the song and kit before <what>?"; buttons
+  Save song and kit / Don't save (Cancel as before). Callers' `what` are verb phrases now (starting a new song, loading ELECTRO…).
+- Owner: removed the FLX above 10 toast on load; the old-song rewrite (FLX 11–FF → 10) still runs, logged with tpLog.
+- OPEN (owner, same evening, Android Fold, web): screen off while playing → tempo sped up, settled, then slow and choppy; STOP
+  left chunks playing; a newly loaded song played over parts of the old one (a lead synth line, clicking). Not reproduced in
+  headless Chrome (hidden page simulated, core and page sequencers: stop and new song silent). Suspects: a frozen page then a
+  backlog of core 'rows' (non-note events still applied late), or a second sequencer left running. Asked the owner for the
+  build, the sequencer setting, and whether Page (old) does it too.
+
 ## 6 Nov (4): the review's open items, owner chose the picks (build 449, on `beta`)
 
 - **Ask first:** ● Record (or R with no take) over an unkept take shows `.recconf` in the panel: Cancel (Esc) / Keep in pad XX
