@@ -162,6 +162,26 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (2): finish-the-pattern song stop, note keys in the sample editor, drop-down arrows (build 447, on `beta`)
+
+- Owner: stop should end a PATTERN take at the end of that pattern (like Renoise), as well as the set lengths, maybe as a
+  LENGTH choice. The panel's own ■ Stop already waited for the edge; the song's STOP (Space, Song buttons) cut the take at
+  once. LENGTH now: `0` Until Stop · finish the pattern (default), `-1` Until Stop · cut right there (old behaviour, the panel's
+  Stop cuts too), 1–16 patterns. `rcdHoldStop()` at the top of `tStop()`: a user stop (not quiet) during phase `rec`, with the
+  sequencer alive, sets `R.songStop` + `stopReq` and returns; `rcdStep` ends the take at the edge and `rcdSongStopAt(e.t)` stops
+  the song 12 ms before it. A second stop goes through (`songStop` already set).
+- FIX found while testing: `tStop()` called `rcdSongStopped()` even with nothing playing, so the first PLAY of a session with
+  live pads (LIVE WARM-UP defers `tStart`, whose `tStop(true)` ran outside `RCD.starting`) aborted the armed take: the song
+  started, nothing recorded. Now only when `tp.on`.
+- Owner: note keys play the sample chromatically in the editor, with an octave control. `rcdKeyOn/Off/KeysOff`: one
+  BufferSource per held key (`RCD.kv`, keyed by e.code), C-4 (48) = rate 1, the selection or from the Start marker; 3 ms in,
+  30 ms out. Octave is the app's `kOct` (OCT − n + by Play; numpad / *). R stays Record in Record a sample…; `0` no longer
+  FITs (it's a piano key; FIT button). Not while recording.
+- Owner: arrows on the LENGTH and pad drop-downs; no "Pad" text so it lines up with ▶ Song. Cause: the term skins'
+  `:is(button,select,…){background:…}` shorthand wiped the Fit and finish ▾ on EVERY select (padding kept). A rule at the end of
+  the main stylesheet (pointer:fine) puts the ▾ back with !important: every drop-down in those skins has it again.
+- Checks: npm test; tools/recorder-check.mjs, tools/sampler-check.mjs; a headless run of finish / double stop / cut.
+
 ## 6 Nov: FOLLOW PATTERN moves the Pattern view's song row (build 446, on `beta`)
 
 - Owner: "pattern follow didn't update in the pattern screen until I paged into it". The Pattern view draws song row
