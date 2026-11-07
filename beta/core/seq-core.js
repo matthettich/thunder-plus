@@ -1033,15 +1033,15 @@ class ThunderCore extends AudioWorkletProcessor {
   }
   relTc(v){ return v.syn ? v.rel / 4.6 : 0.004; }
   live1(v, at){ return v && !v.ended && !(v.stopAt != null && v.stopAt <= at); }
-  kill(v, at, tc = 0.004){
+  kill(v, at, tc = 0.004, stop = false){
     if (!v || v.ended || (v.stopAt != null && v.stopAt <= at)) return;
     if (v.live){   // a live engine's note lets go (its release is the engine's own); stopping before a booked note takes it back
       const B = v.live, L = v.L, ov = tcOver(L.proc), t = Math.max(at, currentTime), G = tcParam(ov, this.pn(L, v.lane, 'gate'), t); v.stopAt = at;
       if (t < B.lastOn - 1e-6){ G.cancel(t); tcParam(ov, this.pn(L, v.lane, 'trig'), t).cancel(t); }
       G.set(0, t); return; }
-    // a voice booked to start at or after the stop never sounds (CodeRabbit, 7 Nov: the fade below began at full level, so the
+    // STOP (stopAll): a voice booked to start at or after the stop never sounds (CodeRabbit, 7 Nov: the fade below began at full level, so the
     // next pattern's downbeat blipped); one already sounding fades as before
-    if (v.t0 >= at - 1e-6){ v.stopAt = at; v.end = Math.min(v.end, v.t0); return; }
+    if (stop && v.t0 >= at - 1e-6){ v.stopAt = at; v.end = Math.min(v.end, v.t0); return; }   // (transport stops only: a note's own OFF / cut keeps its release)
     v.stopAt = at; at = Math.max(at, currentTime);
     v.f.cancel(at); v.f.set(1, at); v.f.target(0, at, tc); v.end = Math.min(v.end, at + tc * 12);
   }
@@ -1161,7 +1161,7 @@ class ThunderCore extends AudioWorkletProcessor {
   // the live-engine and effect overrides end at `at` instead of after the release (stopAll's at + 4 / + 0.5): the page's own notes
   // on those nodes from then aren't held shut by the core's gates
   release(at){ for (const proc of tcNodes().values()) if (proc && proc.__ov) proc.__ov.until = Math.min(proc.__ov.until, at); }
-  stopAll(at){ for (const v of this.alive) this.kill(v, at); for (const T of this.vs) if (T) T.length = 0;
+  stopAll(at){ for (const v of this.alive) this.kill(v, at, 0.004, true); for (const T of this.vs) if (T) T.length = 0;
     for (const L of this.lnodes.values()){ if (L.cur) this.kill(L.cur, at); if (L.lanes) for (const q of L.lanes) if (q.cur) this.kill(q.cur, at); L.sylN = 0;
       const ov = L.proc.__ov; if (!ov) continue;   // and whatever is still booked on it: gates shut now, no note after this
       for (const [k, A] of ov.p){ if (/^(gate|g\d)$/.test(k)){ A.cancel(at); A.set(0, at); } else if (/^(trig|t\d)$/.test(k)) A.cancel(at); }
