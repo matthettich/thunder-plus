@@ -26,6 +26,9 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.94** (6 Nov 2026; owner: "check-in, merge, and push a desktop build"; Run workflow through the API with version 1.2.94,
+  from `main` at build 462, run 42341079747): unsaved-samples prompt, no FLX pop-up, phrase on the cursor, playhead on the sound,
+  GEN key, screen-off ramp, playback report, keep screen on, clock watch, hybrid (phones only), Drum pattern and Mutate (450–462).
 - **v1.2.93** (6 Nov 2026; owner: "can we push to main and make a new build?"; Run workflow through the API with version 1.2.93,
   from `main` after merging `beta` at build 449, run 42331534670): FOLLOW PATTERN in Pattern view (446); Record a sample…
   finish-the-pattern STOP, note keys + OCT in the editor, drop-down ▾ (447); the review fixes (448); ask first, exact STOP
