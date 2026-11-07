@@ -166,6 +166,19 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (13): generators Mutate and Drum pattern (build 462, beta + main)
+
+- `genPanel()` (a shared .ask shell: fields, sliders, buttons, letter keys, Space, Esc/Enter). In genItems: Drum pattern
+  (Song / Sect / Phrase), Acid line, Mutate, Euclidean fill; GEN's menu shows all four.
+- MUTATE `mutatePhrase()`: the selection or whole phrase; AMOUNT; lanes PITCH (neighbour in songKey()'s scale, else ±1–2 /
+  octave), HITS (drop; add the previous note quieter on empty rows, off-steps likelier), TIME (±1 row onto an empty row),
+  VOLUME (mostly ghosts 40–8F). Cumulative; ORIGINAL restores the snapshot from opening. Mono tracks: column 0; poly: all 4.
+- DRUM PATTERN `drumPattern()`: song row cs.song.y; parts kick / snare / hats / perc, each a track + instrument (defaults from
+  pad names, DRUM_PARTS regexes; tracks from the cursor's, buses skipped). Styles DRUM_P tables [step, chance, ghost] on a
+  16-step bar (16ths: spr = LPB / 4 rows), or IDM: euclid per part. VARIATION re-rolls later bars, a snare fill in the last.
+  Empty cell → freePhrase() of the current phrase's length placed with setSongPhrase; existing phrase: column 0 rewritten.
+  Note ROOT, ghost volumes 48–6F (hats 70–9F), main hits no volume.
+
 ## 6 Nov (12): HYBRID sequencer on phones (builds 460–461, beta + main)
 
 - 459 report: the wake lock was lost after a STOP + PLAY within 0.5 s (no "screen kept on" after it), so the screen timed out;
