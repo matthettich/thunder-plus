@@ -176,6 +176,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 7 Nov (3): merged 468–470 to main (PR #10); CodeRabbit review PR #11; EDIT on effects like Enter (build 471, beta)
+
+- PR #10 (beta → main) merged at once on request, so CodeRabbit got no pass: PR #11 is review-only (head main, base
+  review-base-1107 = main just before the merge, 64d2acd). Close it once reviewed; fixes go on beta.
+- 471: owner: EDIT on a phrase effect command opening the picker at once lost the phone's grab-and-drop. The pad's EDIT now
+  does what Enter does there (one tap picks up / drops the current command, two open the list; nothing current: opens at once).
+
 ## 7 Nov (2): core WATCHDOG; Pattern view arrows into empty tracks; Arrange EDIT makes new, not a copy (builds 468–469, beta)
 
 - Owner, Fold, screen ON: audio thread stuttered, sped up, slowed, glitched, then played on after STOP. The page's clock watch

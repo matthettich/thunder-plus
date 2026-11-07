@@ -22204,7 +22204,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 470;
+const BUILD = 471;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23419,12 +23419,13 @@ function editTap(enter){
       return;
     }
     // ENTER ON AN EFFECT (owner, 30 Oct), as on a note: Enter on a command picks it up (command and value become the current
-    // ones); Enter on an empty command cell writes the current one. A quick second Enter opens the picker (editDouble), and
-    // the pad's EDIT still opens it at once.
+    // ones); Enter on an empty command cell writes the current one. A quick second Enter opens the picker (editDouble).
+    // EDIT TOO (owner, 7 Nov: the pad's EDIT opening the picker at once lost the quick grab-and-drop of an effect on the phone):
+    // the pad's EDIT does the same, one tap picks up or drops, two open the list. With nothing current, it opens at once.
     if (tv === 'phrase' && k === 'fxc'){
       const okHere = last.fxc >= 0 && FXC[last.fxc] && (!mstView() || MST_FXC.includes(FXC[last.fxc]));
-      if (enter && v >= 0){ pickUp(c.x, c.y, true); return; }
-      if (enter && okHere){ lastTap.empty = true; insertAt(c.x, c.y, k); clipCellQuiet(c.x, c.y); return; }
+      if (v >= 0){ pickUp(c.x, c.y, true); return; }
+      if (okHere){ lastTap.empty = true; insertAt(c.x, c.y, k); clipCellQuiet(c.x, c.y); return; }
       lastTap = {t:0, key:'', empty:false}; return fxpOpen(c.x, c.y);
     }
     // ENTER PICKS UP A PATTERN (owner, 3 Nov: as Enter on a note does): on the Song screen and Arrange, Enter on a block makes it
@@ -31135,6 +31136,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [471, '7 Nov', ['Phrase, effect commands: EDIT works like Enter again: one tap on a command picks it up, one tap on an empty command cell drops it there, a quick double tap opens the effect list (it opened at once when nothing is picked up yet).']],
   [470, '7 Nov', ['The playhead (and pad blinks and meters) lines up with what you hear on phones: the delay to the speaker is now measured from the audio output itself, and the base latency is no longer left out (it ran ahead of the sound). Settings → Audio shows the measured figure; PLAYHEAD OFFSET still fine-tunes it.']],
   [469, '7 Nov', ['Generators: Chords is only offered on poly tracks (a mono track only got single notes).', 'Arrange: EDIT / Enter on an empty cell makes a new empty pattern again (coming from the Pattern view it placed a copy of the last pattern, notes and all). To place an existing pattern, pick it up with Enter on its block first.', 'Pattern view: ◀ ▶ now step into the track right beside, even an empty (folded) one; type a note there and a new phrase of its own goes into Arrange on that song row. Tab still jumps over empty tracks.']],
   [468, '7 Nov', ['Audio-thread sequencer on phones: when the audio thread gets overloaded (the timing stutters, speeds up or slows down), it now notices within about 2 seconds and lets go by itself, so the song carries on from its row on the page sequencer and STOP always stops, the synth tracks included (they used to play on after STOP).']],
