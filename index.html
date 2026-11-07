@@ -20808,7 +20808,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '1wuy45f';
+const CORE_REV = '1ex9rty';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -21010,7 +21010,12 @@ function coreMsg(d){
   if (d.op === 'end'){ s._alive = false; s.time = d.time; return; }
   audioWake = performance.now();
   for (const r of d.rows){
-    if (tp.stopAt != null && r.t >= tp.stopAt - 1e-6) break;   // past a recorder cut (CodeRabbit, 7 Nov): nothing from here is the page's to play
+    // RECORDER CUT (CodeRabbit, 7 Nov): the row is counted first, so the edge a held STOP waits for is known before its notes
+    // go out; from the cut on nothing is the page's to play (rt.pl.stopAll(t) can't be relied on for notes booked at t)
+    const cut = () => tp.stopAt != null && r.t >= tp.stopAt - 1e-6;
+    if (cut()) break;
+    tp.q.push({t:r.t, pos:r.pos, bpm:r.bpm, tks:r.tks, line:r.line}); rcdStep(tp.q[tp.q.length - 1]);
+    if (cut()) break;
     for (const e of r.evs){
       if (e.vk && !e.core) try { varWant(e); const r = VAR.map.get(varKey(e)); if (r) coreVar(e, r); } catch(err){}   // MUT / GEN: the core gets it for the next time
       { const k = (e.core ? 'core ' : 'page ') + e.type + (e.type === 'note' && (e.vk || e.tw) ? ' var' : '') + (e.type === 'note' && !e.core ? ' pad ' + e.pad : ''); core.tally.set(k, (core.tally.get(k) || 0) + 1); }
@@ -21029,7 +21034,6 @@ function coreMsg(d){
       if (e.type === 'note' && e.t < ctx.currentTime - 0.15){ PB.drop++; continue; }
       rt.pl.play(e); if (e.type === 'note') padBlink(e);
     }
-    tp.q.push({t:r.t, pos:r.pos, bpm:r.bpm, tks:r.tks, line:r.line}); rcdStep(tp.q[tp.q.length - 1]);
     mx.pend.forEach((P, t) => { if (P && P.length) pendFlush(t, r.t); });
     if (rec.on) recHist(r);
   }
