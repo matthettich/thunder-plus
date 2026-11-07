@@ -3089,6 +3089,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>LP. SEL</dt><dd>loop the selection (sticky); PLAY then loops it</dd>
         <dt>OPTION + arrows</dt><dd>go to the nearest block that way: up / down the track, left / right along the row (Song and Phrase; PATTERN NAV in Settings)</dd>
         <dt>SEMI + −</dt><dd>transpose the phrase selection a semitone at once</dd>
+        <dt>GEN</dt><dd>the generators (Acid line, Euclidean fill…) for the phrase</dd>
         <dt>◀ ▶ (FX screen)</dt><dd>open the slot's controls · back to the slot list (a sideways swipe too)</dd>
         <dt>Sticky keys</dt><dd>tap SHIFT or OPTION alone and it stays lit for the next button</dd>
         <dt>Command row</dt><dd>buttons for change, clear, select, copy (no selection: what is under the cursor; a note brings its instrument), cut, paste, undo, redo · CLN (clone) and CLN↓ (clone to the row below) on the song</dd>
@@ -3179,7 +3180,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="tinl tinlp" id="tInlPad" hidden aria-label="Instruments and their pads"></div>
     <div class="keys wide">
       <button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
-      <span></span><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
+      <button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: the pattern generators (Acid line, Euclidean fill…) for this phrase">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
     </div>
     </div>
   </div>
@@ -22020,7 +22021,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 452;
+const BUILD = 453;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24353,6 +24354,7 @@ function press(b, fromKey){
     if (mod('shift')){ used.shift = true; takeLatch(); if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); } else playCtx(); return; }
   // LOOP is a sticky toggle, not a held key: a tap flips it (the pattern loop; LOOP SEL is in the tab bar on a computer).
   if (b === 'loop'){ toggleLoopPat(); clearTimeout(rep); return; }
+  if (b === 'gen'){ clearTimeout(rep); genMenu(); return; }   // GEN (owner, 6 Nov): the generators, under SEMI + beside LOOP
   if (b === 'xposeUp'){ transposeSel(1, true); clearTimeout(rep); return; }
   if (b === 'xposeDn'){ transposeSel(-1, true); clearTimeout(rep); return; }
   const l = takeLatch();
@@ -24361,7 +24363,7 @@ function press(b, fromKey){
   if (!fromKey) rep = setTimeout(function r(){ dirPress(b, l); rep = setTimeout(r, 70); }, 330);
 }
 function release(b, fromKey){
-  if (b === 'loop' || b === 'xposeUp' || b === 'xposeDn'){ keyVis(); return; }
+  if (b === 'loop' || b === 'gen' || b === 'xposeUp' || b === 'xposeDn'){ keyVis(); return; }
   if (b in held){
     if (!held[b]) return;
     held[b] = false;
@@ -24491,6 +24493,12 @@ function keyHint(s){
    Tools ▸ group (in Edit ▾: the top bar has no room for a Tools menu on a 13" laptop). */
 // GENERATORS (owner, 2 Nov: "call that generators", findable from a right-click in the phrase or pattern editor): the
 // pattern writers, in their own group of Edit ▾ and the right-click menu, before Tools.
+// GEN key (PAD mode): the Generators menu (Acid line, Euclidean fill…) over the key; off the Phrase screen they say why
+function genMenu(){
+  const b = $('kGen'), r = b ? b.getBoundingClientRect() : {left:20, top:200};
+  if (typeof sxMenu !== 'function') return acidLine();
+  sxMenu(r.left, r.top, 'GENERATE', genItems(true).map(it => ({l:it.l, f:it.off ? () => toast('Open a phrase first: the generators write into it.') : it.f})));
+}
 function genItems(full){
   const ph = tv === 'phrase', mst = ph && mstView();
   return ph && !mst || full ? [{a:'acid', l:'Acid line… (a random bass line)', k:keyHint('alt+B'), f:acidLine, off:!ph || mst}, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill, off:!ph || mst}] : [];
@@ -25310,7 +25318,7 @@ function draw(){
     let i = 0; $('tCmd').querySelectorAll('button[data-c]').forEach(b => { const on = !(onSong ? b.dataset.c === 'b:-16' || b.dataset.c === 'b:16' : b.dataset.c === 'clone' || b.dataset.c === 'cldn');
       if (on) b.style.setProperty('--sh', TCV[seq[i++ % seq.length]]); });
     // The pad takes the same colours in turn, except PLAY is always green (Phrase): it swaps with whichever key had green.
-    const pc = {}; i = 0; for (const k of ['up', 'left', 'down', 'right', 'xposeUp', 'xposeDn', 'shift', 'play', 'loop', 'opt', 'edit']) pc[k] = TCV[seq[i++ % seq.length]];
+    const pc = {}; i = 0; for (const k of ['up', 'left', 'down', 'right', 'xposeUp', 'xposeDn', 'shift', 'play', 'loop', 'opt', 'edit', 'gen']) pc[k] = TCV[seq[i++ % seq.length]];
     const g = Object.keys(pc).reverse().find(k => pc[k] === TCV.phrase && k !== 'play'); if (g && pc.play !== TCV.phrase){ pc[g] = pc.play; pc.play = TCV.phrase; }
     for (const k in pc){ const b = $('tPad').querySelector(`.k[data-b=${k}]`); if (b) b.style.setProperty('--sh', pc[k]); } }
   $('tCmd').querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = onSong);
@@ -30573,6 +30581,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [453, '6 Nov', ['PAD mode has a GEN key, under SEMI + and beside LOOP: it opens the generators (Acid line, Euclidean fill…) for the phrase.']],
   [452, '6 Nov', ['The playhead moves with what you hear: the device’s output latency is taken off (on phones it ran ahead of the sound).']],
   [451, '6 Nov', ['A song you load or start opens the Phrase screen on what’s under the song cursor: the phrase there, or, on an empty cell, a fresh phrase that goes on the song in that cell with its first note (it let notes go into a phrase that wasn’t on the song).']],
   [450, '6 Nov', ['Closing the app (or opening another song) with unsaved work asks plainly: “You have unsaved samples” when you’ve recorded or loaded samples since the last save, else “Save changes to …?”, then Save song and kit / Don’t save (it read “…and closing the app replaces it”).', 'No more pop-up about FLX above 10 when a song opens.']],

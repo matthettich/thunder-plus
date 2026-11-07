@@ -166,6 +166,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (8): GEN key in PAD mode (build 453, on `beta`)
+
+- Owner: a GEN button in PAD mode, beside LOOP and below SEMI, for the generators. `#kGen` (data-b="gen") in the empty
+  cell of `.keys.wide`; press → `genMenu()`: sxMenu over the key with genItems(true) (Acid line…, Euclidean fill…); off a
+  phrase they toast. Colour: 'gen' appended to the pad colour list (others unchanged). Owner's Settings → Audio latency
+  after a fresh open: 21 ms (waiting for the figure after a screen-off goes wrong).
+
 ## 6 Nov (7): playhead on the sound (build 452, on `beta`)
 
 - Owner (Fold): the playhead passes a note noticeably before it's heard; "the audio got out of sync with the rest of the app".
