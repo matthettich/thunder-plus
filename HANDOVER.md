@@ -190,6 +190,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - 469 Arrange: a single EDIT / Enter on an empty cell placed last.sect, and UNIQUE PER TRACK cloned it (00's notes in 01, 02).
   Now it is newBlock(c, -1) unless a block was picked up with Enter on purpose (`sectPicked === last.sect`); newBlock(-1)
   clears sectPicked. Headless: 01 empty.
+- 469 Chords: only in the GEN menu on poly tracks (isPolyT(cTrack)); chordGen on a mono track says so.
 - Open: owner says audio is very out of sync with the display on the page sequencer (phone). Asked which way and how much.
 
 ## 7 Nov (1): stability pass, overnight (build 465+, beta)
