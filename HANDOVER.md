@@ -176,6 +176,28 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 7 Nov (4): mobile navigation audit, first fixes (build 472, beta)
+
+- Audit doc (Claude Doc "Thunder Plus — mobile navigation audit"). Owner's picks: help updated; OPTION+▲ = above / earlier
+  everywhere (optDir `dn`: Sect / Inst / FX / phrase-by-number flipped); SHIFT+▲▼ on the pad = Project / Mixer on every screen
+  (M8; dirPress no longer calls lineSel; select = SHIFT+OPTION or SEL; keyboard Ctrl/⌘+Shift+▲▼ still selects lines); pad
+  EDIT double tap 450 ms (Enter keeps 380); Mixer OPTION off the FX row: a toast. Skipped (owner): an Arrange-has-the-keys
+  indicator.
+- 474 PICK UP, DROP: the pad's EDIT on a filled note picks it up (pickUp, lastTap reset: no note off on a quick second tap);
+  on an OFF it still writes the current note. Shift+Enter keeps stamping: editTap(enter, stamp). Headless ok.
+- 473 HOLD BEFORE A DRAG EDITS (touch only): gridDown's drag gets `wait`; 250 ms timer arms it (navigator.vibrate(12)); a
+  move > 8 px before that hands the gesture to sdrag from its start point (scroll). Headless synthetic touch: swipe scrolls,
+  value kept; hold + drag 48 → 51.
+- Careful: a `//` comment pasted mid-line swallowed the rest of editTap's double-tap line (caught by make-core's parse, not
+  by npm test). Run `node tools/make-core.mjs --check` after any index.html edit.
+
+## 7 Nov (3): merged 468–470 to main (PR #10); CodeRabbit review PR #11; EDIT on effects like Enter (build 471, beta)
+
+- PR #10 (beta → main) merged at once on request, so CodeRabbit got no pass: PR #11 is review-only (head main, base
+  review-base-1107 = main just before the merge, 64d2acd). Close it once reviewed; fixes go on beta.
+- 471: owner: EDIT on a phrase effect command opening the picker at once lost the phone's grab-and-drop. The pad's EDIT now
+  does what Enter does there (one tap picks up / drops the current command, two open the list; nothing current: opens at once).
+
 ## 7 Nov (2): core WATCHDOG; Pattern view arrows into empty tracks; Arrange EDIT makes new, not a copy (builds 468–469, beta)
 
 - Owner, Fold, screen ON: audio thread stuttered, sped up, slowed, glitched, then played on after STOP. The page's clock watch
