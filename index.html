@@ -22190,7 +22190,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 468;
+const BUILD = 469;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23384,6 +23384,7 @@ $('fxPickList').addEventListener('pointerup', e => {
 });
 $('fxPickX').addEventListener('click', fxpClose);
 let lastTap = {t:0, key:'', empty:false};
+let sectPicked = -1;   // a song block picked up with Enter on purpose (NEW, NOT A COPY)
 // enter: the Enter key (the computer's, or the KEYS keypad's ENT), not the EDIT button. On a filled phrase note Enter
 // picks the note and its instrument up as the current ones; EDIT stamps the current ones over it (owner, 19 Oct).
 function editTap(enter){
@@ -23415,10 +23416,15 @@ function editTap(enter){
     // ENTER PICKS UP A PATTERN (owner, 3 Nov: as Enter on a note does): on the Song screen and Arrange, Enter on a block makes it
     // the current one, so Enter on an empty cell places it (keyboard arranging). Enter twice still makes a unique copy.
     if (tv === 'song' && enter && v >= 0){ const nm = sectsOn ? 'sect ' + hp(v) : 'pattern ' + hp(firstPhrase(v));
+      sectPicked = v;   // (picked up on purpose: Enter on an empty cell places this one, see below)
       if (last.sect === v) toast('Already current: ' + nm + ' · Enter on an empty cell places it', 1600);
       else { last.sect = v; toast('Now current: ' + nm + ' · Enter on an empty cell places it · Enter twice makes a unique copy', 2000); draw(); }
       return; }
     if (tv === 'phrase') pickUp(c.x, c.y);
+    // NEW, NOT A COPY (owner, 7 Nov: from the Pattern view into Arrange, EDIT on empty cells on tracks 2 and 3 gave 01 and 02 with
+    // 00's notes: the "current" block was placed, and UNIQUE PER TRACK copied it). An empty block gets a new empty pattern,
+    // unless a pattern was picked up with Enter on purpose (keyboard arranging, 3 Nov): then that one is placed.
+    if (tv === 'song' && !sectsOn && k !== 'tsp' && v < 0 && !(sectPicked >= 0 && sectPicked === last.sect && S.chains[sectPicked])){ lastTap = {t:0, key:'', empty:false}; return newBlock(c, -1); }
     if (k !== 'tsp' && v < 0){ lastTap.empty = true; insertAt(c.x, c.y, k); }
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
@@ -23473,6 +23479,7 @@ function newBlock(c, src){
   if (cid < 0) return toast('No free sects left.');
   if (src < 0){
     if (pid < 0) return toast('No free phrases left.');
+    sectPicked = -1;   // (a new pattern: Enter on the next empty cell makes another new one, not a copy of a block picked earlier)
     S.chains[cid] = freshSect(); S.chains[cid][0][0] = pid;
     S.phrases[pid] = freshPhrase(); S.plen[pid] = S.dlen || 16; S.plpb[pid] = 0;
   } else {
@@ -31114,6 +31121,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [469, '7 Nov', ['Arrange: EDIT / Enter on an empty cell makes a new empty pattern again (coming from the Pattern view it placed a copy of the last pattern, notes and all). To place an existing pattern, pick it up with Enter on its block first.', 'Pattern view: ◀ ▶ now step into the track right beside, even an empty (folded) one; type a note there and a new phrase of its own goes into Arrange on that song row. Tab still jumps over empty tracks.']],
   [468, '7 Nov', ['Audio-thread sequencer on phones: when the audio thread gets overloaded (the timing stutters, speeds up or slows down), it now notices within about 2 seconds and lets go by itself, so the song carries on from its row on the page sequencer and STOP always stops, the synth tracks included (they used to play on after STOP).']],
   [467, '7 Nov', ['Record into a pad, Until Stop on the audio-thread sequencer: pressing Stop just before a pattern ends no longer lets a moment of the next pattern play (not even a blip of its first beat).']],
   [466, '7 Nov', ['Fixes from a review: PLAY tells …chains the song started again (tempo-synced modules restart on the downbeat).', 'A computer never switches to the page sequencer or holds the screen on by itself: that is for phones and tablets.', 'After a phone moves to the page sequencer, bass, voice, acid and …pump synth notes sound straight away (they were muted for a few seconds).', 'Generators: Ctrl/⌘+Z undoes a roll with the panel open; Drum pattern’s Perc shows “— instrument” until you pick one, and says when a shared block has no room for a copy.']],
@@ -31793,16 +31801,18 @@ const pvNear = (C, x) => C.reduce((a, b) => Math.abs(b - x) < Math.abs(a - x) ? 
 const pvOrder = () => [...Array.from({length:ntr()}, (_, i) => i), MT];
 // The next track left or right that shows (folded empty tracks are stepped over). A bus and the master are never stepped
 // over (owner, 22 Oct): they rarely have a block of their own on the row, so the arrows and Tab could never reach them.
-function pvNextTrack(dx){
+// ARROWS INTO EMPTY TRACKS (owner, 7 Nov): ◀ ▶ (all) go to the track right beside, empty or not: an empty one opens with a new,
+// unused phrase that goes into Arrange on its first note (pvGo, placePending). Tab still steps over the folded ones.
+function pvNextTrack(dx, all){
   const O = pvOrder(), y = cs.song.y; let i = O.indexOf(cTrack); if (i < 0) return null;
-  for (i += dx; i >= 0 && i < O.length; i += dx){ const t = O[i]; if (!pvFold || (S.song[y] && S.song[y][t] >= 0) || t === MT || isBusT(t)) return t; }
+  for (i += dx; i >= 0 && i < O.length; i += dx){ const t = O[i]; if (all || !pvFold || (S.song[y] && S.song[y][t] >= 0) || t === MT || isBusT(t)) return t; }
   return null;
 }
 function pvMoveX(dx){
   const c = cs.phrase, C = pvColsOf(cTrack, S.phrases[cPhrase], plen(cPhrase), true), i = C.indexOf(c.x);
   if (i < 0){ c.x = pvNear(C, c.x); return draw(); }
   if (i + dx >= 0 && i + dx < C.length){ c.x = C[i + dx]; return draw(); }
-  const t = pvNextTrack(dx); if (t == null) return draw();
+  const t = pvNextTrack(dx, true); if (t == null) return draw();
   pvGo(t, cs.song.y, dx > 0 ? 'first' : 'last', null);
 }
 // Tab / Shift+Tab: the next or previous track's first column (Renoise-style).

@@ -176,6 +176,22 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 7 Nov (2): core WATCHDOG; Pattern view arrows into empty tracks; Arrange EDIT makes new, not a copy (builds 468–469, beta)
+
+- Owner, Fold, screen ON: audio thread stuttered, sped up, slowed, glitched, then played on after STOP. The page's clock watch
+  and deaf-core drop both needed the core to READ messages ('stop', 'die'), and an overloaded audio thread doesn't; the core
+  also drives the live engines in-scope (tcAt / __ov), so unplugging its outputs never silenced the poly tracks.
+  468: core `watchdog()` (phones: play {watch: seqHandHere()}): lets go by itself when audio ÷ wall time is outside
+  0.8–1.25 for two 1 s windows, or no {op:'ack'} (the page acks every rows batch) for 3 s of audio time. Lets go = stopAll +
+  release at now (as the hand-over), posts {op:'self', gen, why}; the page's coreFail() (shared with pbClock) moves the
+  song to the page sequencer until reload. CORE_V unchanged (additive ops). Not reproduced headless yet.
+- 469 Pattern view: ◀ ▶ step into the adjacent track even when folded/empty (pvNextTrack(dx, all)); pvGo's pendPlace then
+  puts a new unused phrase on the song at the first note. Tab still skips folded tracks. Headless: ok.
+- 469 Arrange: a single EDIT / Enter on an empty cell placed last.sect, and UNIQUE PER TRACK cloned it (00's notes in 01, 02).
+  Now it is newBlock(c, -1) unless a block was picked up with Enter on purpose (`sectPicked === last.sect`); newBlock(-1)
+  clears sectPicked. Headless: 01 empty.
+- Open: owner says audio is very out of sync with the display on the page sequencer (phone). Asked which way and how much.
+
 ## 7 Nov (1): stability pass, overnight (build 465+, beta)
 
 Owner (6 Nov 23:08): feature freeze; one stability pass, everything double-checked for usability, stability and phone
