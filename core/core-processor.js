@@ -134,12 +134,39 @@ globalThis.__tcPost = (proc, o) => {
    instruments or a new render of the pad drops the core's copies (the page sends them again as notes ask). CUT / RES /
    DEC shape the sound here with the page's own shapeData. A note whose variation the core doesn't have yet: the page
    plays it, as before. */
-const varBufs = new Map(), varShaped = new Map(); let varBytes = 0;
+const varBufs = new Map(), varShaped = new Map(); let varBytes = 0;   // (varShaped: no longer filled, 7 Nov; Rd shapes as it plays)
 /* SOUNDFONTS (3 Nov): a SoundFont pad's preset, as the page has it once its font is loaded and the preset decoded: the
    pad's controls (P), the zones, the sample headers they read, and the decoded samples ({d, sr, ls, le}). The voice is
    the page's sfNote, played here: sfPick / sfVoice (copied from index.html by make-core) choose the zones and their
    numbers, and each zone runs its sample (looped where the font says), its volume envelope, the font's low-pass with its
    mod envelope and its own pan. Until a pad's preset arrives, the page plays its notes. */
+/* Rd: a voice's sample read in playback order, without copying it on the audio thread. REVERSE reads it back to front; SHAPED
+   (CUT / RES / DEC) runs shapeData's filter and decay sample by sample as the note reaches them (into a ring), from where
+   the note starts (with a short warm-up before an offset start), and ends it where shapeData would have cut it (N). */
+const RD_RING = 16384, RD_M = RD_RING - 1;
+class Rd {
+  constructor(src, src2, sr, tw, rev, start){
+    this.src = src; this.src2 = src2; this.rev = rev; this.len = src.length; this.N = this.len; this.tw = tw;
+    if (!tw) return;
+    const tau = tw.dec != null ? decSec(tw.dec) : 0; this.tau = tau; this.N = tau ? Math.min(this.len, Math.ceil(tau * 9.3 * sr)) : this.len;
+    this.f = tw.cut != null;
+    if (this.f){ const fc = Math.min(cutHz(tw.cut), sr * 0.45), g = Math.tan(Math.PI * fc / sr), k = 2 - 2 * Math.min(clamp(tw.res | 0, 0, 255) / 255 * 0.97, 0.97);
+      this.a1 = 1 / (1 + g * (g + k)); this.a2 = g * this.a1; this.a3 = g * this.a2; }
+    this.l1 = 0; this.l2 = 0; this.ring = new Float32Array(RD_RING);
+    const s0 = Math.max(0, Math.floor(start) - 4096); this.hi = s0; this.lo = s0;   // (the filter settles in the warm-up)
+    this.kd = tau ? Math.exp(-1 / (tau * sr)) : 1; this.e = tau ? Math.pow(this.kd, s0) : 1;
+  }
+  raw(c, i){ const D = c ? this.src2 : this.src; if (!D || i < 0 || i >= this.len) return 0; return D[this.rev ? this.len - 1 - i : i]; }
+  at(c, i){
+    if (!this.tw) return this.raw(c, i);
+    if (c || i < 0 || i >= this.N) return 0;
+    while (this.hi <= i){ const n = this.hi; let x = n < this.len ? this.src[n] : 0;
+      if (this.f){ const v3 = x - this.l2, v1 = this.a1 * this.l1 + this.a2 * v3, v2 = this.l2 + this.a2 * this.l1 + this.a3 * v3; this.l1 = 2 * v1 - this.l1; this.l2 = 2 * v2 - this.l2; x = v2; }
+      if (this.tau){ x *= this.e; this.e *= this.kd; const m = this.N - 1 - n; if (m < 64) x *= m / Math.min(this.N, 64); }
+      this.ring[n & RD_M] = x; this.hi = n + 1; }
+    return i < this.hi - RD_RING ? 0 : this.ring[i & RD_M];
+  }
+}
 const sfPads = new Map();
 function varDrop(pad){ for (const [k, r] of varBufs) if (pad == null || r.pad === pad){ varBufs.delete(k); varBytes -= r.data.length * 4; }
   for (const k of [...varShaped.keys()]) if (pad == null || k.split(':')[2] === String(pad)) varShaped.delete(k); }
@@ -155,9 +182,12 @@ function varRec(ev){
     varBufs.delete(key); varBufs.set(key, base); }   // most recent last
   else { base = coreBufs.get(ev.pad); key = 'p:' + ev.pad + ':' + ev.pad; if (!base) return null; }
   if (!ev.tw) return base;
-  const k2 = key + ':c' + ev.tw.cut + ':q' + ev.tw.res + ':d' + ev.tw.dec; let r2 = varShaped.get(k2);
-  if (!r2 || r2.src !== base.data){ r2 = {sr:base.sr, data:shapeData(base.data, base.sr, ev.tw), src:base.data}; varShaped.set(k2, r2); if (varShaped.size > 192) varShaped.delete(varShaped.keys().next().value); }
-  return r2;
+  // NO WHOLE-SAMPLE WORK HERE (owner, 7 Nov: stutters, then faster, then deaf to STOP, on a three-track sample song). CUT / RES
+  // / DEC shaped the WHOLE sample (shapeData) inside one audio block, a fresh copy per value, up to 192 kept: a long sample
+  // stalled the thread. Now the voice shapes as it plays (Rd, below), a block at a time. Reversed AND shaped: the page plays it
+  // (it shapes, then reverses, which can't be streamed from the start).
+  if (ev.rev) return null;
+  return {data:base.data, data2:null, sr:base.sr, tw:ev.tw};   // (mono, as the page's shaped notes)
 }
 // A message for another processor in this scope, handled at audio time `at` (its process() takes the due ones at the
 // start of each block: proc.__q, sorted by time). FXV's settings and …chains' tempo go this way instead of a timer on the
@@ -427,8 +457,8 @@ class ThunderCore extends AudioWorkletProcessor {
     else while (T.length >= POLY) this.kill(T.shift(), ev.t, 0.006);
     const ck = kv.choke || 0;
     if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of this.T(k)) if (v.choke === ck) this.kill(v, ev.t);
-    const data = ev.rev ? (c.rev || (c.rev = c.data.slice().reverse())) : c.data, dur = data.length / c.sr;
-    const data2 = c.data2 ? (ev.rev ? (c.rev2 || (c.rev2 = c.data2.slice().reverse())) : c.data2) : null;   // STEREO SAMPLES (5 Nov)
+    // REVERSE (7 Nov): read back to front by the voice's reader (Rd) instead of a reversed copy of the whole sample made here
+    const data = c.data, dur = data.length / c.sr, data2 = c.data2 || null;   // STEREO SAMPLES (5 Nov)
     const r = new Auto(ev.rate), g = new Auto(ev.gain), f = new Auto(1), pn = new Auto(Math.max(-1, Math.min(1, (ev.pan - 128) / 127)));
     if (ev.slide && ev.slide.dur > 0){ r.set(ev.slide.from, ev.t); r.lin(ev.rate, ev.t + ev.slide.dur); }
     const t0n = Math.max(ev.t, currentTime), hz = x => ((x >> 4) || 1) * (this.seq ? this.seq.bpm : S.bpm) / 60, dep = x => (x & 15) / 15;
@@ -441,6 +471,7 @@ class ThunderCore extends AudioWorkletProcessor {
     const off = ev.ofsSec != null ? (ev.rev ? Math.max(0, dur - ev.ofsSec - ev.durSec) : ev.ofsSec) : Math.max(0, Math.min(255, ev.ofs || 0)) / 256 * dur;
     if (off > 0.0005){ f.set(0, t0n); f.lin(1, t0n + 0.0015); }
     v.t0 = t0n; v.pos = Math.min(off, Math.max(0, dur - 0.001)) * c.sr;
+    if (ev.rev || c.tw) v.rd = new Rd(c.data, c.data2 || null, c.sr, c.tw || null, !!ev.rev, v.pos);   // (see Rd)
     this.alive.add(v);
     if (ev.cut != null) this.kill(v, ev.cut);
     if (ev.rel != null) this.kill(v, ev.rel, syn ? this.relTc(v) : 0.05);
@@ -628,12 +659,17 @@ class ThunderCore extends AudioWorkletProcessor {
     for (const v of this.alive){
       const out = outputs[v.track]; if (!out || !out[0]){ continue; }
       if (v.sf){ this.sfRun(v, out, N); if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const q = T.indexOf(v); if (q >= 0) T.splice(q, 1); } } continue; }   // SOUNDFONTS
-      const L = out[0], R = out[1] || out[0], D = v.data, len = D.length, inc0 = v.sr / sr;
+      const L = out[0], R = out[1] || out[0], D = v.data, RD = v.rd, len = RD ? RD.N : D.length, inc0 = v.sr / sr;
       // FAST PATH (the usual case: a note that is just playing): gain, fade, pan and pitch don't move in this block
       const gc = v.trm ? null : v.g.constFrom(tb0), fc = v.f.constFrom(tb0), pc = v.apn ? null : v.pn.constFrom(tb0), rc = v.r.constFrom(tb0);
       if (gc != null && fc != null && pc != null && rc != null && v.t0 <= tb0 && v.end >= tb1){
         const k = gc * fc, a = (pc + 1) * Math.PI / 4, kl = k * Math.cos(a), kr = k * Math.sin(a), inc = rc * inc0; let p = v.pos;
-        if (v.data2){ const D2 = v.data2, [ll, rl, lr, rr] = stBal(pc);   // a stereo pad: the StereoPannerNode's balance law, as the page plays it
+        if (RD){ const st = !RD.tw && v.data2, [ll, rl, lr, rr] = st ? stBal(pc) : [0, 0, 0, 0];   // REVERSED / SHAPED (Rd): the same, read through the reader
+          for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, f = p - j, d0 = RD.at(0, j), x = d0 + (RD.at(0, j + 1) - d0) * f;
+            if (st){ const e0 = RD.at(1, j), y = e0 + (RD.at(1, j + 1) - e0) * f; L[i] += (x * ll + y * rl) * k; R[i] += (x * lr + y * rr) * k; }
+            else { L[i] += x * kl; R[i] += x * kr; }
+            p += inc; } }
+        else if (v.data2){ const D2 = v.data2, [ll, rl, lr, rr] = stBal(pc);   // a stereo pad: the StereoPannerNode's balance law, as the page plays it
           for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, f = p - j, x = D[j] + (D[j + 1] - D[j]) * f, y = D2[j] + (D2[j + 1] - D2[j]) * f;
             L[i] += (x * ll + y * rl) * k; R[i] += (x * lr + y * rr) * k; p += inc; } }
         else for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, x = D[j] + (D[j + 1] - D[j]) * (p - j); L[i] += x * kl; R[i] += x * kr; p += inc; }
@@ -646,11 +682,11 @@ class ThunderCore extends AudioWorkletProcessor {
         const t = currentTime + i * dt;
         if (t < v.t0) continue;
         if (t >= v.end || v.pos >= len - 1){ v.ended = true; break; }
-        const p = v.pos, j = p | 0, x = D[j] + (D[j + 1] - D[j]) * (p - j), D2 = v.data2;
+        const p = v.pos, j = p | 0, d0 = RD ? RD.at(0, j) : D[j], d1 = RD ? RD.at(0, j + 1) : D[j + 1], x = d0 + (d1 - d0) * (p - j), D2 = RD && RD.tw ? null : v.data2;
         let g = v.g.at(t); if (v.trm) g += v.trm.d * Math.sin(2 * Math.PI * v.trm.hz * (t - v.trm.t));
         let pan = v.pn.at(t); if (v.apn) pan = Math.max(-1, Math.min(1, pan + v.apn.d * Math.sin(2 * Math.PI * v.apn.hz * (t - v.apn.t))));
         const gf = g * v.f.at(t);
-        if (D2){ const y2 = D2[j] + (D2[j + 1] - D2[j]) * (p - j), [ll, rl, lr, rr] = stBal(pan); L[i] += (x * ll + y2 * rl) * gf; R[i] += (x * lr + y2 * rr) * gf; }
+        if (D2){ const e0 = RD ? RD.at(1, j) : D2[j], e1 = RD ? RD.at(1, j + 1) : D2[j + 1], y2 = e0 + (e1 - e0) * (p - j), [ll, rl, lr, rr] = stBal(pan); L[i] += (x * ll + y2 * rl) * gf; R[i] += (x * lr + y2 * rr) * gf; }
         else { const y = x * gf, a = (pan + 1) * Math.PI / 4;   // StereoPannerNode, mono in: equal power
           L[i] += y * Math.cos(a); R[i] += y * Math.sin(a); }
         v.pos += v.r.at(t) * inc0;
