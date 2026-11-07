@@ -20629,11 +20629,12 @@ function tStart(mode, o){
   }
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
   tp.core = false;
-  if (aset.core === 'core' && core.ready) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
+  if (aset.core === 'core' && core.ready && !core.bad) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
   pbLog('PLAY ' + mode + ' · ' + pbState());   // not loaded yet: this PLAY as before, the core loads at STOP
   if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
   tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
   bgPlay(true);   // BACKGROUND PLAY
+  wakeLock(true);   // KEEP SCREEN ON
   void r;
 }
 /* FX BAR · PATTERN EFFECTS (3 Nov): the FLX / GAT / RTG / FXO values booked on each track's (and the master's) effect node,
@@ -20892,14 +20893,28 @@ function coreStart(mode, o, t0, rs){
    state, a 2-second summary of the core's rows while playing (how many, how late or early, notes dropped as late, the
    core's catch-up skips), rows still arriving after STOP (and the STOP sent again then), and the level and live voices 1 and
    3 seconds after a STOP. */
-const PB = {log:[], n:0, late:0, drop:0, ahead:0, stray:0, strayT:0, skips:0, t:0};
+const PB = {ck:null, ckBad:0, stopT:0, log:[], n:0, late:0, drop:0, ahead:0, stray:0, strayT:0, skips:0, t:0};
 function pbLog(s){ try { PB.log.push((performance.now() / 1000).toFixed(2) + ' ' + s); if (PB.log.length > 400) PB.log.splice(0, 100); } catch(e){} }
 const pbState = () => `ctx ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(2) : '-'} on=${tp.on ? 1 : 0} core=${tp.core ? 1 : 0} seq=${aset.core} hidden=${document.hidden ? 1 : 0}`;
 function pbLevel(){ try { const A = rt && rt.man; if (!A) return '-'; let m = 0; for (const a of A){ const b = new Float32Array(a.fftSize); a.getFloatTimeDomainData(b); for (const x of b) m = Math.max(m, Math.abs(x)); } return m ? (20 * Math.log10(m)).toFixed(1) + ' dB' : 'silent'; } catch(e){ return '?'; } }
+/* CLOCK WATCH (owner's report, 6 Nov): after the Fold's screen timed out on its own, its audio clock ran at 0.8× and then 1.4–1.6×
+   real time, and the core (stepping on that clock, and too busy to read messages) sped up and wouldn't stop. While the core
+   plays, the audio clock is compared with the real one every 2 s; off by more than 15 % twice running, the song carries on
+   from its row on the page sequencer, the core is let go, and the page sequencer plays until the app reloads. */
+function pbClock(){ if (!tp.on || !tp.core || !ctx || core.bad) { PB.ck = null; return; }
+  const w = performance.now() / 1000, a = ctx.currentTime, c = PB.ck; PB.ck = {w, a};
+  if (!c || w - c.w < 1.5) return; const r = (a - c.a) / (w - c.w);
+  if (r > 0.85 && r < 1.15){ PB.ckBad = 0; return; }
+  pbLog(`audio clock at ${r.toFixed(2)}× real time`); if (++PB.ckBad < 2) return;
+  core.bad = true; let row = -1; for (const q of tp.pos || []) if (q && q.row > row) row = q.row;
+  pbLog('switched to the page sequencer from row ' + row); try { tStop(true); } catch(e){} try { coreDrop(); } catch(e){}
+  if (row >= 0) tStart('song', {row});
+  toast('The phone’s audio clock went out of step, so the song moved to the page sequencer (until the app reloads).', 5000); }
+setInterval(() => { try { pbClock(); } catch(e){} }, 2000);
 function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; PB.t = now;
   if (PB.n) pbLog(`rows ${PB.n} · latest note ${(PB.late * 1000).toFixed(0)} ms late · dropped ${PB.drop} · ahead ${(PB.ahead * 1000).toFixed(0)} ms · core skips ${PB.skips} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'}`);
   PB.n = PB.late = PB.drop = PB.ahead = 0; }
-function pbAfterStop(){ pbLog('STOP · ' + pbState()); for (const ms of [1000, 3000]) setTimeout(() => pbLog(`${ms / 1000} s after STOP: level ${pbLevel()} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'} · stray rows ${PB.stray} · ` + pbState()), ms); }
+function pbAfterStop(){ PB.stopT = performance.now(); pbLog('STOP · ' + pbState()); for (const ms of [1000, 3000]) setTimeout(() => pbLog(`${ms / 1000} s after STOP: level ${pbLevel()} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'} · stray rows ${PB.stray} · ` + pbState()), ms); }
 async function pbCopy(){
   const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms' : '-'} · ${pbState()}\n`;
   const txt = head + PB.log.join('\n');
@@ -20911,7 +20926,11 @@ function coreMsg(d){
   // PLAYBACK REPORT: rows the core sends after STOP (or from an older PLAY) mean it is still stepping: say so, and stop it again
   if (d.op === 'rows' && (!tp.on || !tp.core || d.gen !== core.gen)){ PB.stray += d.rows.length;
     const now = performance.now(); if (now - PB.strayT > 1000){ PB.strayT = now; pbLog(`stray rows from the core (gen ${d.gen}, now ${core.gen}, playing ${tp.on ? 1 : 0}) · ${pbState()}`);
-      if (!tp.on || !tp.core) try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); if (!core.wired) core.node.disconnect(); } catch(e){} } }
+      if (!tp.on || !tp.core) try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); if (!core.wired) core.node.disconnect(); } catch(e){} }
+    // DEAF CORE (owner's report, 6 Nov, Fold: after the screen timed out mid-song, the core kept stepping for 18 s+ after STOP,
+    // re-sent STOPs included: its audio thread was too busy to read messages). Still at it 1.5 s after STOP: let it go (it is
+    // cut off from the tracks and the page) and load a fresh one for the next PLAY.
+    if (!tp.on && PB.stopT && now - PB.stopT > 1500){ pbLog('the audio-thread sequencer didn’t stop: dropped it, a fresh one loads'); try { coreDrop(); } catch(e){} setTimeout(() => { try { if (!tp.on && aset.core === 'core') coreLoad(); } catch(e){} }, 300); return; } }
   if (d.op === 'ready'){ core.v = d.v; if (d.v !== CORE_WANT){ core.ready = false; toast('The audio-thread sequencer here is an older copy: reload the app to use it. Playing as before.', 5000); } return; }
   if (d.op === 'error'){ tpLog('core: ' + d.where, new Error(d.message)); return; }
   if ((d.op !== 'rows' && d.op !== 'end' && d.op !== 'held') || !tp.on || !tp.core || d.gen !== core.gen) return;
@@ -20989,6 +21008,7 @@ function tStop(quiet){
   songBtn();
   chainsTempo();
   bgPlay(false);   // BACKGROUND PLAY
+  wakeLock(false);   // KEEP SCREEN ON
   if (stopP) try { if (curToPlay(stopP.P, stopP.mode) && tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
   if (!quiet) draw();
 }
@@ -21177,6 +21197,19 @@ function bgPlay(on){
   } else if (bgEl && !bgEl.paused) bgEl.pause();
 }
 /* ===== END BACKGROUND PLAY ===== */
+/* KEEP SCREEN ON (owner, 6 Nov, Fold: "when the screen is just turned off, nothing bad happens, but when it turns off on its
+   own playback gets messed up"): while the song plays, a screen wake lock keeps the phone from timing the screen out (the
+   power button still turns it off). Released at STOP; the system drops it when the app is hidden, so it is taken again
+   when the app comes back while playing. Setting KEEP SCREEN ON (App section), on by default. */
+var wlOn = (() => { try { return localStorage.getItem('thunderplus-wakelock-v1') !== '0'; } catch(e){ return true; } })(), wlLock = null;
+function setWlOn(on){ wlOn = !!on; try { localStorage.setItem('thunderplus-wakelock-v1', wlOn ? '1' : '0'); } catch(e){} wakeLock(wlOn && tp.on); }
+async function wakeLock(on){
+  try {
+    if (on && wlOn && !wlLock && navigator.wakeLock && !document.hidden){ const l = await navigator.wakeLock.request('screen'); if (!tp.on){ l.release().catch(() => {}); return; } wlLock = l; l.addEventListener('release', () => { if (wlLock === l) wlLock = null; }); try { pbLog('screen kept on'); } catch(e){} }
+    else if (!on && wlLock){ const l = wlLock; wlLock = null; await l.release(); }
+  } catch(e){ try { pbLog('screen wake lock refused: ' + (e && e.message)); } catch(e2){} }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && tp.on) wakeLock(true); });
 // hold (20 Oct): the note sounds until previewOff(handle) instead of a fixed moment, for keys held down (a MIDI keyboard
 // playing the current instrument, a computer key typing a note). Each held note is its own column on the preview bus,
 // so letting one key go leaves the others sounding. Drum pads ring out as before.
@@ -22059,7 +22092,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 457;
+const BUILD = 459;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22953,6 +22986,8 @@ function projRows(){
     {l:'› IMPORT MIDI FILE', act:() => $('midIn').click(), info:() => 'Puts a .mid file’s tracks into the track under the cursor and the next ones, from the song cursor’s row down, as phrases'},
     ...(canShare && lastR ? [{l:'› SHARE LAST RENDER', act:shareLast, info:() => 'Send the last render to Koala, SunVox or another app'}] : []),
     {l:'› UPDATE APP', sec:'App', gap:true, act:() => checkUpdate(true), info:() => 'Reloads with the newest version (your song and kit are kept). The app also checks by itself when it opens'},
+    {l:'KEEP SCREEN ON', ck:'While the song plays, the screen doesn’t time out', get:() => wlOn ? 1 : 0, set:v => setWlOn(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'While the song plays, the phone doesn’t turn the screen off by itself (the power button still does). On phones a screen timing out mid-song upset the audio-thread sequencer'},
     {l:'BACKGROUND PLAY', ck:'Keep playing when you switch apps', get:() => bgOn ? 1 : 0, set:v => setBgOn(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'While the song plays, Android shows a playback notification (play / stop) so the song keeps going when you switch apps. OFF: no notification, as before'},
   ];
@@ -30624,6 +30659,8 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [459, '6 Nov', ['The audio-thread sequencer: when the phone’s audio clock runs out of step with real time (after the screen times out on its own, on the Fold), the song carries on from its row on the page sequencer until the app reloads; and if the audio-thread sequencer keeps going after STOP, it’s let go and a fresh one loads.']],
+  [458, '6 Nov', ['KEEP SCREEN ON (Project → App, on by default): while the song plays the screen doesn’t time out by itself; the power button still turns it off. On the phone a screen that timed out mid-song upset the audio-thread sequencer.']],
   [457, '6 Nov', ['Copy playback report looks like Reset audio engine beside it.']],
   [456, '6 Nov', ['Settings → Audio → Copy playback report: a short log of what playback did (screen off and on, the audio engine, the audio thread’s timing, what still sounded after STOP), to paste into a bug report. If the audio-thread sequencer is still sending rows after STOP, it’s stopped again.']],
   [455, '6 Nov', ['The GEN key’s menu opens above the key, out from under your finger, and ignores taps for a moment.']],

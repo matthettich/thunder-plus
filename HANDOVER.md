@@ -166,6 +166,21 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (11): the screen-off bug found; wake lock, clock watch, deaf-core drop (builds 458–459, beta + main)
+
+- Owner: turning the screen off with the power button is fine; it goes wrong when the screen times out ON ITS OWN. Reports
+  (456): manual off: the audio clock kept pace with performance.now, STOP clean. Timed out: the audio clock ran ~0.8× then
+  1.4–1.6× real time (core rows per 2 s 28 → 53), and after STOP the core kept sending rows for 18 s+ despite a STOP re-sent
+  every second (its audio thread too busy to read messages), 3 s after STOP the level was −11.6 dB. Background play off made
+  no difference. Page (old) is fine (no messages needed to stop it).
+- 458 KEEP SCREEN ON (Project → App, default on): `wakeLock()` takes a screen wake lock at PLAY (and again when the app comes
+  back while playing), released at STOP: the screen doesn't time out mid-song, the trigger.
+- 459 CLOCK WATCH `pbClock()` every 2 s while the core plays: audio clock ÷ real clock outside 0.85–1.15 twice running →
+  `core.bad` (the page sequencer until reload), tStop(true), coreDrop(), tStart from the playing row, a toast. DEAF CORE:
+  stray rows 1.5 s after STOP → coreDrop() and a fresh coreLoad(). Both logged in the playback report.
+- Checks: npm test; headless: the watch switches on the second bad reading and the next PLAY stays on the page; a stray row
+  after STOP drops the core and a fresh one is ready.
+
 ## 6 Nov (10): playback report; core confirmed (build 456, beta + main)
 
 - Owner: with Settings → Audio → Sequencer on Page (old) the screen-off trouble goes away; back on Audio thread it returns
