@@ -26,6 +26,8 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.96** (7 Nov 2026; owner: overnight stability pass, merge and a desktop build when done; from `main` at build 466,
+  run 42352114563): the stability pass (465) and its review fixes (466) on top of v1.2.95.
 - **v1.2.95** (6 Nov 2026; owner: merge and a desktop build when the punch list is done; from `main` at build 463, run
   42341637417): the six more generators (463) on top of v1.2.94.
 - **v1.2.94** (6 Nov 2026; owner: "check-in, merge, and push a desktop build"; Run workflow through the API with version 1.2.94,
