@@ -20822,7 +20822,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '1yb8h04';
+const CORE_REV = 'x761n5';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -22204,7 +22204,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 474;
+const BUILD = 476;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31150,6 +31150,8 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [476, '7 Nov', ['Audio-thread sequencer: a sample note with CUT, RES or DEC, or played reversed, no longer makes the audio thread process the whole sample at once (with long samples that stalled it: stutters, a speed-up, STOP not heard). The filter and decay now run as the note plays.']],
+  [475, '7 Nov', ['(Testing only) ?pbshow in the address shows the playback report on screen with PLAY / STOP, for testing on remote phones.']],
   [474, '7 Nov', ['PAD mode: EDIT on a filled note picks it up (note and instrument) instead of writing the current note over it, as it already did on instruments, volumes and effects; EDIT on an empty note drops it. One tap to grab, one to drop, across the whole row.']],
   [473, '7 Nov', ['Touch: dragging the cursor’s cell changes its value only after you rest your finger on it for a moment (a short buzz says it’s ready); a swipe that starts there scrolls like anywhere else. A tap still edits.']],
   [472, '7 Nov', ['PAD mode: SHIFT + ▲▼ now goes to Project / Mixer from every screen, as on the M8 (it selected lines on Song, Sect and Phrase); select with SHIFT + OPTION or SEL.', 'OPTION + ▲ always means the one above or before: on Sect, Inst and FX it now goes to the previous number, as it already went to the pattern above on Phrase and Song.', 'The pad’s EDIT double tap allows a little more time (450 ms).', 'Mixer: OPTION + arrows off the FX row say what they do there.', 'Help: PAD mode and the key legend match builds 469–472.']],
@@ -32200,6 +32202,20 @@ else if (FIRST_SONG) setTimeout(async () => {
   try { const r = await fetch('sounds/ELECTRO.thunder?v=2'); if (!r.ok) return; const t = await r.text();
     if (FIRST_SONG && !projDirty) await loadProjText(t, 'ELECTRO.thunder'); } catch(e){ tpLog('the first-run song could not be loaded', e); }
 }, 0);
+/* PLAYBACK REPORT ON SCREEN (7 Nov, testing on BrowserStack's real phones): only with ?pbshow in the URL, inert otherwise. A strip
+   at the top with PLAY (the song from the top) and STOP, and the playback report (the same lines Copy playback report copies),
+   refreshed every second, so a remote device session can read it off the page. */
+if (new URLSearchParams(location.search).has('pbshow')){ try {
+  const box = document.createElement('div'); box.id = 'pbShow';
+  box.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#000;color:#0f0;font:11px/1.25 monospace;max-height:38vh;overflow:auto;padding:4px;opacity:.92';
+  box.innerHTML = '<button type="button" id="pbPlay">PLAY</button> <button type="button" id="pbStop">STOP</button> <span id="pbHead"></span><pre id="pbText" style="margin:2px 0 0;white-space:pre-wrap"></pre>';
+  document.body.append(box);
+  box.querySelector('#pbPlay').onclick = () => { try { if (tp.on) tStop(true); tStart('song', {row:0}); } catch(e){ pbLog('pbshow play: ' + e); } };
+  box.querySelector('#pbStop').onclick = () => { try { tStopUser(); } catch(e){ pbLog('pbshow stop: ' + e); } };
+  setInterval(() => { try {
+    $('pbHead').textContent = `build ${BUILD} · seq ${aset.core} · core ${core.ready ? 'ready' : '-'}${core.bad ? ' BAD' : ''} · ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(1) + ' heard ' + Math.round(heardLat() * 1000) + 'ms' : 'no audio yet'} · on=${tp.on ? 1 : 0} core=${tp.core ? 1 : 0}`;
+    $('pbText').textContent = PB.log.slice(-80).join('\n'); } catch(e){} }, 1000);
+} catch(e){} }
 /* SEQUENCER GOLDEN TEST (docs/NATIVE-DESKTOP-PLAN.md, phase 0): only with ?seqtest in the URL, used by
    tools/seq-golden.mjs. Loads a song and steps makeSeq in sim mode (no renders, no sound) to the end, returning every
    event as plain data. When the sequencer moves to the audio thread (phase 2) and to C++ (phase 3), this stream must

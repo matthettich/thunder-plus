@@ -176,6 +176,30 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 7 Nov (6): no whole-sample work on the audio thread (build 476, beta)
+
+- Owner: the stutter happened on a song of three sample tracks, so not load. Found: the core's varRec ran shapeData over the
+  WHOLE sample inside one audio block for any note with CUT / RES / DEC (a new copy per value, up to 192 cached: a 60 s
+  mono sample ~20 ms on a desktop, many times that on a phone; a 5-minute stereo sample far worse), and a reversed note
+  copied + reversed the whole sample (c.rev / c.rev2) the first time. Either can stall the audio thread: the clock lurches
+  and messages (STOP) wait. Not proven to be the owner's trigger (couldn't reproduce on the Fold again today).
+- Fix: `Rd` in core-processor.js, a per-voice reader: REVERSE maps the index; SHAPED runs shapeData's SVF + decay + end fade
+  sample by sample into a 16384-sample ring from the note's start (4096-sample warm-up before an offset start), N = shapeData's
+  cut length. Voices with a reader use their own fast path (and the slow path reads through it). Reversed AND shaped → varRec
+  null (the page plays it: it shapes, then reverses). Shaped notes stay mono, as the page's. varShaped no longer filled.
+- Checks: Node, the generated core with stubs: Rd vs shapeData max diff ≤ 3e-8 (cut, dec, both, 255, 254); through
+  ThunderCore.process(): CUT/RES, DEC, REV, plain all match within 1.5e-8, medians ~0.01–0.02 ms per block. npm test,
+  sampler-check, recorder-check ok. Page side still shapes whole samples on the main thread (varBuf): a UI hitch, not audio.
+
+## 7 Nov (5): BrowserStack real-phone run (build 475)
+
+- 475 `?pbshow`: a strip at the top with PLAY (song from the top) / STOP and the last 80 playback-report lines, refreshed every
+  second (inert without the param), so a remote device session can read the report off the page.
+- BrowserStack (owner connected it; free plan): devicecontrol session on a Samsung Galaxy S25 Ultra, Android 15, Chrome 152,
+  beta/?pbshow, the first-open song, audio-thread sequencer: 80 s steady (35–36 rows per 2 s, 0 late, 0 dropped, 0 core
+  skips, lead 250 ms), STOP clean (no stray rows, −63 dB after 1 s). heardLat() 76 ms there. Did NOT reproduce the Fold's
+  bug: next, the owner's own song on the Fold with ?pbshow. Session ended (delete_session) to save minutes.
+
 ## 7 Nov (4): mobile navigation audit, first fixes (build 472, beta)
 
 - Audit doc (Claude Doc "Thunder Plus — mobile navigation audit"). Owner's picks: help updated; OPTION+▲ = above / earlier
