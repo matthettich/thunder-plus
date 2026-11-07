@@ -26,6 +26,10 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.98** (7 Nov 2026; owner: "push it to main, build a desktop app"; Run workflow through the API with version 1.2.98,
+  from `main` after PR #13 at build 476, run 42414595840): builds 468–476 on top of v1.2.97 (core watchdog, Pattern view arrows,
+  Arrange new patterns, Chords on poly, playhead latency, EDIT pick-up / drop, PAD navigation, hold before drag, ?pbshow,
+  no whole-sample work on the audio thread). Pump effect port: owner said hold off.
 - **v1.2.97** (7 Nov 2026; owner: "once this is done, merge to main and make a new desktop build"; from `main` at build 467,
   run 42396748681): the recorder-cut fixes from CodeRabbit (PR #9, merged) on top of v1.2.96. From now on: beta → main by PR
   so CodeRabbit reviews it.
