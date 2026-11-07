@@ -251,6 +251,7 @@ class ThunderCore extends AudioWorkletProcessor {
     if (M) fill(M[0], this.mm, 0);
   }
   play(d){
+    const ms0 = Date.now(), at0 = currentTime;   // PLAYBACK REPORT: how late this PLAY reached the audio thread, and how long it took
     this.stopAll(currentTime); this.mixReset(); this.clkOn = false; this.clk.cancel(currentTime); this.clk.set(0, currentTime);
     const seq = makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}));
     // RESUME: run silently up to the step the song stopped on; the page played that step, the core carries on after it
@@ -260,6 +261,7 @@ class ThunderCore extends AudioWorkletProcessor {
       else seq.time = d.t0; }
     else seq.time = d.t0;
     this.seq = seq; this.ended = false; this.gen = d.gen | 0; this.hold = false; this.lr = null; this.ls = null;
+    this.port.postMessage({op:'started', gen:this.gen, late:at0 - d.t0, ms:Date.now() - ms0});
   }
 
   /* ---- the sampler: the page player's rendered-pad path (makePlayer: startNote, kill, pitchMods, modVoice, play) ---- */
