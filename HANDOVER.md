@@ -186,6 +186,22 @@ efficiency; check-in at 2:40 (scheduled task "Thunder Plus stability pass check-
 - Help → Generate page (hGen): the ten generators, playing on a phone.
 - tools/recorder-check.mjs UNTIL STOP now waits until the 2nd pattern is HEARD (ctx.currentTime > edgeT): with the core
   booking ahead, "n ≥ 1" was only booked, and the new booked-edge STOP rightly ended at the first pattern.
+- REVIEW (separate agent, git diff 9628668..465) → build 466:
+  - HIGH: a `//` comment in tStart had swallowed `chainsTempo(); frameWake()` on PLAY (…chains never heard playing:true). Restored.
+  - pendPlace: placePending only for the phrase being edited (q.p === cPhrase); freePhrase skips pendPlace.p (a stale one
+    from phraseToCursor doubled a block when Drum pattern filled the same free phrase).
+  - Deaf core: PB.stopT set on every stop (quiet too); dropped only after ≥ 3 stray batches and 1.5 s (PB.strayN).
+  - Core 'stop' {rel:true} (hand-over) and 'die' call release(at): every tcNodes override ends at `at` (was at + 4 for live
+    engines: the page's bass / voice / acid / pump-synth notes were held shut ~4 s after the hand-over). CORE_V unchanged
+    (an older core ignores rel).
+  - seqHandHere(): the device (userAgentData.mobile, UA, iPadOS, or touch + no hover), never the Mobile layout setting;
+    Electron never. pbClock and the wake lock only where seqHandHere() (and pbClock only with ctx running); toast neutral.
+  - Hand-over: not with MIDI clock out (clkWanted: gear would get Stop + Continue); on the song's last step (g === 0) the
+    page doesn't play that step again (rsDup).
+  - genPanel: Ctrl/⌘+Z / Y = undoStep with the panel open. Drum pattern: "— instrument" option (Perc with no match); a
+    shared block with no room for a unique copy is left alone and said (wrote.full). rcdKeyOn: a < 0 on a < 32-sample take.
+  - Left: MIDI notes / clock booked past a recorder edge aren't taken back (up to 1.2 s of the next pattern on external gear);
+    generators leave IC on cleared rows (cosmetic).
 
 ## 6 Nov (14): six more generators (build 463, beta + main, desktop v1.2.95)
 

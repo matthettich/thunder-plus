@@ -14752,7 +14752,7 @@ function rcdUi(){
 // out so neither end clicks. What plays is the selection, or the take from its Start marker (an edited sample) or the top.
 function rcdKeyOn(k, note){
   const T = RCD.take; if (!T) return; audio(); rcdKeyOff(k);
-  const n = T.data.length, a = RCD.sel ? RCD.sel[0] : Math.min(n - 32, Math.max(0, T.mk ? T.mk[0] : 0)), b = RCD.sel ? RCD.sel[1] : n; if (b - a < 32) return;
+  const n = T.data.length, a = RCD.sel ? RCD.sel[0] : Math.max(0, Math.min(n - 32, T.mk ? T.mk[0] : 0)), b = RCD.sel ? RCD.sel[1] : n; if (b - a < 32) return;
   const src = ctx.createBufferSource(), g = ctx.createGain(), t = ctx.currentTime;
   // REVIEW (6 Nov): one buffer per take and range, not a copy per key press (a 5-minute stereo take is ~110 MB a copy)
   const K = RCD.kb; if (!K || K.T !== T || K.d !== T.data || K.a !== a || K.b !== b) RCD.kb = {T, d:T.data, a, b, buf:stBuf(ctx, T.data.subarray(a, b), T.data2 ? T.data2.subarray(a, b) : null, T.sr)};
@@ -18720,6 +18720,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden){ flus
 let pendPlace = null;
 function placePending(){
   const q = pendPlace; if (!q) return;
+  if (q.p !== cPhrase){ pendPlace = null; return; }   // (only the phrase being edited: review, 7 Nov, a stale one doubled a block)
   if (!S.song[q.y] || S.song[q.y][q.x] >= 0){ pendPlace = null; return; }
   if (isEmptyPhrase(S.phrases[q.p])) return;
   pendPlace = null; setSongPhrase(q.x, q.y, q.p);
@@ -18763,6 +18764,7 @@ function freeSect(){
 }
 function freePhrase(){
   const used = new Set(); for (const c of S.chains) if (c) for (const r of c) if (r[0] >= 0) used.add(r[0]);
+  if (pendPlace) used.add(pendPlace.p);   // (spoken for: waiting for its first note)
   for (let i = 0; i < NPH; i++) if (!used.has(i) && isEmptyPhrase(S.phrases[i])) return i;
   return -1;
 }
@@ -20642,8 +20644,10 @@ function tStart(mode, o){
   let t0start = lkp ? lkp.t : ctx.currentTime + 0.08 + ci + (warmNew ? 0.15 : 0);   // (nodes made just now: a moment to start up)
   // HAND-OVER: o.rz is the last step the audio thread booked, at o.rzT; the page carries on from the first step after it that
   // is still ahead, at that step's own time (no step twice, none moved: the gap is only the start-up moment)
+  let rsDup = false;
   if (rzH && o.rzT != null && rsFirst){ const f0 = rsFirst.t; let g = 0;
     while (seq.alive() && g++ < 512 && (g === 1 || o.rzT + (rsFirst.t - f0) < t0start - 1e-4)){ for (const e of rsFirst.evs) if (CHASE_T.has(e.type)) rsFx.set(e.type + ':' + e.track + ':' + (e.p || ''), e); rsFirst = seq.step(); }
+    rsDup = g === 0;   // (the core booked the song's last step: nothing after it, so the page doesn't play that step again)
     t0start = o.rzT + (rsFirst.t - f0); }
   if (rsFirst){ const d = t0start - rsFirst.t; seq.base += d; seq.time += d; if (seq.btT != null) seq.btT += d; }
   else seq.time = t0start;
@@ -20654,7 +20658,7 @@ function tStart(mode, o){
   if (rsFirst){   // RESUME: the effect commands passed on the way, then the step it stopped on, now
     for (const e of rsFx.values()) rt.pl.play(Object.assign({}, e, {t:t0start}));
     const d = t0start - rsFirst.t;
-    for (const e of rsFirst.evs){ const q = Object.assign({}, e, {t:e.t + d}); for (const k of ['cut', 'rel']) if (q[k] != null) q[k] += d; if (moEv(q)) continue; rt.pl.play(q); }
+    if (!rsDup) for (const e of rsFirst.evs){ const q = Object.assign({}, e, {t:e.t + d}); for (const k of ['cut', 'rel']) if (q[k] != null) q[k] += d; if (moEv(q)) continue; rt.pl.play(q); }
     tp.q.push({t:t0start, pos:rsFirst.pos, bpm:seq.bpm, tks:rsFirst.tks, line:rsFirst.line}); rcdStep(tp.q[tp.q.length - 1]);
   }
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
@@ -20662,7 +20666,7 @@ function tStart(mode, o){
   if (aset.core === 'core' && core.ready && !core.bad && !(o && o.page)) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
   pbLog('PLAY ' + mode + ' · ' + pbState());   // not loaded yet: this PLAY as before, the core loads at STOP
   if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
-  tp.timer = pumpTimer(); pump(); if (!handing) draw(); songBtn();   // (a hand-over happens out of view: no draw, which was most of its time) chainsTempo(); if (typeof frameWake === 'function') frameWake();
+  tp.timer = pumpTimer(); pump(); if (!handing) draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();   // (a hand-over happens out of view: no draw, which was most of its time)
   bgPlay(true);   // BACKGROUND PLAY
   wakeLock(true);   // KEEP SCREEN ON
   void r;
@@ -20801,7 +20805,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '1u8g45u';
+const CORE_REV = '11virm3';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -20939,10 +20943,14 @@ function pbLevel(){ try { const A = rt && rt.man; if (!A) return '-'; let m = 0;
    a desktop browser: hiding the window changes nothing there), not while a pattern take or MIDI recording runs, with
    Ableton Link, or with a loop other than LOOP (pattern); the clock watch below still covers those. */
 var handing = null;   // var: tStop() can run before this line
-function seqHandHere(){ return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof isMobile === 'function' && isMobile() && !(window.thunderDesktop && window.thunderDesktop.app)); }   // (a declaration: tStart reads it)
+// The device, not the layout setting: a computer with the Mobile layout ticked stays on the core. (Review, 7 Nov.) A phone or
+// tablet showing the desktop site has a touch screen and no hover, and that counts too; Electron never does.
+function seqHandHere(){ if (window.thunderDesktop && window.thunderDesktop.app) return false; const n = navigator, ua = n.userAgent || '';
+  if ((n.userAgentData && n.userAgentData.mobile) || /Android|iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && n.maxTouchPoints > 1)) return true;
+  try { return n.maxTouchPoints > 0 && matchMedia('(hover: none) and (pointer: coarse)').matches; } catch(e){ return false; } }   // (a declaration: tStart reads it)
 function seqHandover(){
   if (!document.hidden || !tp.on || !tp.core || tp.mode !== 'song' || !ctx || !seqHandHere()) return false;
-  if (RCD.sync || RCD.on || (typeof rec !== 'undefined' && rec.on) || (typeof lkLive === 'function' && lkLive()) || (tp.loopV && tp.loopV !== 'pat')) return false;
+  if (RCD.sync || RCD.on || (typeof rec !== 'undefined' && rec.on) || (typeof lkLive === 'function' && lkLive()) || (tp.loopV && tp.loopV !== 'pat') || (typeof clkWanted === 'function' && clkWanted())) return false;   // (MIDI clock out: gear would get Stop + Continue)
   let q = null; for (const e of tp.q) if (e.pos && (!q || e.t > q.t)) q = e;   // the last step the core booked
   const P = q ? q.pos : tp.pos; if (!P) return false;
   const ref = P.findIndex((p, i) => p && p.row >= 0 && i !== MT); if (ref < 0) return false;
@@ -20950,7 +20958,7 @@ function seqHandover(){
   handing = {}; try { tStop(true); tStart('song', {row:rz.row, rz, rzT, page:true}); } finally { handing = null; }
   // the core plays on up to the page's first step, then stops there and is unplugged
   const T0 = tp.q[0] ? tp.q[0].t : ctx.currentTime; PB.handT0 = T0; PB.handW = performance.now();
-  try { core.node.port.postMessage({op:'stop', at:T0}); } catch(e){}
+  try { core.node.port.postMessage({op:'stop', at:T0, rel:true}); } catch(e){}
   setTimeout(() => { if (!tp.core) coreWire(false); }, Math.max(0, (T0 - ctx.currentTime) * 1000) + 60);
   pbLog(`hidden: the song moved to the page sequencer after row ${rz.row} step ${rz.step} (${Math.round(performance.now() - w0)} ms to start; its first step ${tp.q[0] && rzT != null ? Math.round((tp.q[0].t - rzT) * 1000) + ' ms after the core’s last' : '?'})`);
   return true; }
@@ -20959,7 +20967,7 @@ document.addEventListener('visibilitychange', () => { try { seqHandover(); } cat
    real time, and the core (stepping on that clock, and too busy to read messages) sped up and wouldn't stop. While the core
    plays, the audio clock is compared with the real one every 2 s; off by more than 15 % twice running, the song carries on
    from its row on the page sequencer, the core is let go, and the page sequencer plays until the app reloads. */
-function pbClock(){ if (!tp.on || !tp.core || !ctx || core.bad) { PB.ck = null; return; }
+function pbClock(){ if (!tp.on || !tp.core || !ctx || core.bad || ctx.state !== 'running' || !seqHandHere()) { PB.ck = null; PB.ckBad = 0; return; }   // (phones only: a computer's clock can stall on a device switch)
   const w = performance.now() / 1000, a = ctx.currentTime, c = PB.ck; PB.ck = {w, a};
   if (!c || w - c.w < 1.5) return; const r = (a - c.a) / (w - c.w);
   if (r > 0.85 && r < 1.15){ PB.ckBad = 0; return; }
@@ -20967,7 +20975,7 @@ function pbClock(){ if (!tp.on || !tp.core || !ctx || core.bad) { PB.ck = null; 
   core.bad = true; let row = -1; for (const q of tp.pos || []) if (q && q.row > row) row = q.row;
   pbLog('switched to the page sequencer from row ' + row); try { tStop(true); } catch(e){} try { coreDrop(); } catch(e){}
   if (row >= 0) tStart('song', {row});
-  toast('The phone’s audio clock went out of step, so the song moved to the page sequencer (until the app reloads).', 5000); }
+  toast('The audio clock went out of step, so the song moved to the page sequencer (until the app reloads).', 5000); }
 setInterval(() => { try { pbClock(); } catch(e){} }, 2000);
 function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; PB.t = now;
   if (PB.n) pbLog(`rows ${PB.n} · latest note ${(PB.late * 1000).toFixed(0)} ms late · dropped ${PB.drop} · ahead ${(PB.ahead * 1000).toFixed(0)} ms · core skips ${PB.skips} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'}`);
@@ -20982,14 +20990,14 @@ async function pbCopy(){
 document.addEventListener('visibilitychange', () => pbLog((document.hidden ? 'screen off / hidden · ' : 'screen on / visible · ') + pbState()));
 function coreMsg(d){
   // PLAYBACK REPORT: rows the core sends after STOP (or from an older PLAY) mean it is still stepping: say so, and stop it again
-  if (d.op === 'rows' && (!tp.on || !tp.core || d.gen !== core.gen)){ PB.stray += d.rows.length;
+  if (d.op === 'rows' && (!tp.on || !tp.core || d.gen !== core.gen)){ PB.stray += d.rows.length; PB.strayN = (PB.strayN || 0) + 1;
     const now = performance.now(); if (now - PB.strayT > 1000){ PB.strayT = now; pbLog(`stray rows from the core (gen ${d.gen}, now ${core.gen}, playing ${tp.on ? 1 : 0}) · ${pbState()}`);
       if ((!tp.on || !tp.core) && !(PB.handT0 && ctx.currentTime < PB.handT0 + 0.2)) try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); if (!core.wired) core.node.disconnect(); } catch(e){} }
     if (tp.on && !tp.core && PB.handW && now - PB.handW > 1500){ pbLog('the audio-thread sequencer didn’t stop after the hand-over: dropped it'); PB.handW = 0; try { coreDrop(); } catch(e){} return; }
     // DEAF CORE (owner's report, 6 Nov, Fold: after the screen timed out mid-song, the core kept stepping for 18 s+ after STOP,
     // re-sent STOPs included: its audio thread was too busy to read messages). Still at it 1.5 s after STOP: let it go (it is
     // cut off from the tracks and the page) and load a fresh one for the next PLAY.
-    if (!tp.on && PB.stopT && now - PB.stopT > 1500){ pbLog('the audio-thread sequencer didn’t stop: dropped it, a fresh one loads'); try { coreDrop(); } catch(e){} setTimeout(() => { try { if (!tp.on && aset.core === 'core') coreLoad(); } catch(e){} }, 300); return; } }
+    if (!tp.on && PB.stopT && now - PB.stopT > 1500 && PB.strayN >= 3){ /* (still sending, batch after batch: not one late batch) */ pbLog('the audio-thread sequencer didn’t stop: dropped it, a fresh one loads'); try { coreDrop(); } catch(e){} setTimeout(() => { try { if (!tp.on && aset.core === 'core') coreLoad(); } catch(e){} }, 300); return; } }
   if (d.op === 'ready'){ core.v = d.v; if (d.v !== CORE_WANT){ core.ready = false; toast('The audio-thread sequencer here is an older copy: reload the app to use it. Playing as before.', 5000); } return; }
   if (d.op === 'error'){ tpLog('core: ' + d.where, new Error(d.message)); return; }
   if (d.op === 'started'){ pbLog(`core PLAY: reached the audio thread ${Math.round(-d.late * 1000)} ms before its start, took ${d.ms} ms`); return; }
@@ -21050,7 +21058,7 @@ function tStop(quiet){
   // RECORD INTO A PAD: a pattern take ends where the song stops. Only a song that was playing: FIX (6 Nov) the first PLAY of
   // a session with live pads starts a moment later (LIVE WARM-UP), and its tStop(true) dropped the take Record had armed.
   if (RCD.sync && !RCD.starting && tp.on) rcdSongStopped();
-  if (tp.on && !quiet) pbAfterStop();
+  if (tp.on){ PB.stopT = performance.now(); PB.strayN = 0; if (!quiet) pbAfterStop(); }   // (every stop, quiet ones too: the deaf-core check counts from the latest)
   if (tp.on && lk && !lk.restart) lkStopped();   // ABLETON LINK: start / stop sync
   if (tp.timer) tp.timer.stop();
   // RESUME: where the song stopped (the positions last heard), the track it follows, and the cursor then
@@ -21272,11 +21280,13 @@ function setWlOn(on){ wlOn = !!on; try { localStorage.setItem('thunderplus-wakel
 let wlQ = Promise.resolve();
 function wakeLock(on){ wlQ = wlQ.then(() => wakeLock1(on)).catch(() => {}); return wlQ; }
 setInterval(() => { if (tp.on && wlOn && !wlLock && !document.hidden) wakeLock(true); }, 2000);
+// Phones and tablets only (a computer's screen sleeping doesn't touch playback, and Electron refuses it). (A phone's refusal,
+// e.g. in battery saver, is tried again every 2 s, as the saver may be turned off.)
 async function wakeLock1(on){
   try {
-    if (on && wlOn && !wlLock && navigator.wakeLock && !document.hidden){ const l = await navigator.wakeLock.request('screen'); if (!tp.on){ l.release().catch(() => {}); return; } wlLock = l; l.addEventListener('release', () => { if (wlLock === l) wlLock = null; }); try { pbLog('screen kept on'); } catch(e){} }
+    if (on && wlOn && !wlLock && navigator.wakeLock && !document.hidden && seqHandHere()){ const l = await navigator.wakeLock.request('screen'); if (!tp.on){ l.release().catch(() => {}); return; } wlLock = l; l.addEventListener('release', () => { if (wlLock === l) wlLock = null; }); wakeLock1.last = null; try { pbLog('screen kept on'); } catch(e){} }
     else if (!on && wlLock){ const l = wlLock; wlLock = null; await l.release(); }
-  } catch(e){ try { pbLog('screen wake lock refused: ' + (e && e.message)); } catch(e2){} }
+  } catch(e){ try { const m = 'screen wake lock refused: ' + (e && e.message); if (m !== wakeLock1.last) pbLog(m); wakeLock1.last = m; } catch(e2){} }
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && tp.on) wakeLock(true); });
 // hold (20 Oct): the note sounds until previewOff(handle) instead of a fixed moment, for keys held down (a MIDI keyboard
@@ -22161,7 +22171,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 465;
+const BUILD = 466;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24776,6 +24786,7 @@ function genPanel(title, msg, build, buttons, keys){
   const dn = el('button', null, 'Done'); dn.type = 'button'; dn.addEventListener('click', done); row.append(dn); box.append(row);
   const key = e => { const tag = e.target && e.target.tagName;
     if (e.key === 'Escape' || (e.key === 'Enter' && tag !== 'BUTTON' && tag !== 'SELECT')){ e.preventDefault(); e.stopPropagation(); return done(); }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && /^[zy]$/i.test(e.key)){ e.preventDefault(); e.stopPropagation(); return undoStep(e.key.toLowerCase() === 'y' || e.shiftKey ? 1 : -1); }   // (a roll is one undo step: undo it here)
     const k = !e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1 ? e.key.toLowerCase() : '';
     if (k && keys[k] && tag !== 'SELECT' && tag !== 'INPUT'){ e.preventDefault(); e.stopPropagation(); return keys[k](); }
     if (e.key === ' ' && tag !== 'BUTTON'){ e.preventDefault(); e.stopPropagation(); return keys[' '] ? keys[' ']() : playCtx(); }
@@ -24880,7 +24891,7 @@ function drumPattern(){
       if (isBusT(t) || t === MT) continue;
       // SHARED (stability pass): a block or phrase that also plays elsewhere gets a unique copy here first (UNIQUE), so the beat
       // only lands on this row; REWRITE changes it everywhere, as before
-      if (drumSet.uniq && blockShared(t, y)){ const nc = mstUniq(S.song[y][t]); if (nc >= 0){ S.song[y][t] = nc; wrote.uq = (wrote.uq || 0) + 1; } }
+      if (drumSet.uniq && blockShared(t, y)){ const nc = mstUniq(S.song[y][t]); if (nc < 0){ wrote.full = (wrote.full || 0) + 1; continue; } S.song[y][t] = nc; wrote.uq = (wrote.uq || 0) + 1; }   // (no room for a copy: that part is left as it was)
       let cid = S.song[y] ? S.song[y][t] : -1, p = cid >= 0 ? firstPhrase(cid) : -1;
       if (p < 0){ p = freePhrase(); if (p < 0){ toast('No free phrases left.'); break; } S.phrases[p] = freshPhrase(); if (S.plen) S.plen[p] = L0; setSongPhrase(t, y, p); }
       if (!S.phrases[p]) S.phrases[p] = freshPhrase();
@@ -24891,8 +24902,9 @@ function drumPattern(){
         for (let s = 0; s < 16; s++){ const step = b * 16 + s; if (step >= Ls || !bar[s]) continue; const row = P[step * spr]; if (!row) continue;
           row[0] = ROOT; row[IC] = D.i; row[VC] = bar[s].g ? (k === 'hats' ? 0x70 + Math.floor(rnd() * 0x30) : 0x48 + Math.floor(rnd() * 0x28)) : -1; hits++; } }
       wrote.push(`${nm} ${d2(t + 1)} (${hits})`); }
-    if (!wrote.length) return toast('Give at least one part a track and an instrument.');
-    saveS(); draw(); toast(`${DRUM_STYLES[st]} on song row ${rS(y, 3)}: ` + wrote.join(', ') + (wrote.uq ? ` · ${wrote.uq} shared block${wrote.uq > 1 ? 's' : ''} made unique` : ''), 3500); };
+    const full = wrote.full ? ` · ${wrote.full} shared block${wrote.full > 1 ? 's' : ''} left alone: no room for a copy (pick “Rewrite it everywhere”)` : '';
+    if (!wrote.length) return toast(wrote.full ? full.slice(3) : 'Give at least one part a track and an instrument.', wrote.full ? 4000 : undefined);
+    saveS(); draw(); toast(`${DRUM_STYLES[st]} on song row ${rS(y, 3)}: ` + wrote.join(', ') + (wrote.uq ? ` · ${wrote.uq} shared block${wrote.uq > 1 ? 's' : ''} made unique` : '') + full, 3500); };
   genPanel('Drum pattern', `Writes a beat on song row ${rS(y, 3)}, one track per part. A track with nothing on this row gets a new ${L0}-row phrase there; one with a phrase has its first note column rewritten.`,
     ({field, slider}) => {
       const sel = (opts, val, set) => { const s = el('select'); opts.forEach(([v2, t]) => s.append(new Option(t, v2))); s.value = val; s.addEventListener('change', () => set(+s.value)); return s; };
@@ -24902,7 +24914,7 @@ function drumPattern(){
       field('Shared', sel([[1, 'Make a unique copy on this row'], [0, 'Rewrite it everywhere it plays']], drumSet.uniq, x => { drumSet.uniq = x; }));
       for (const [k, nm] of DRUM_PARTS){ const D = drumSet.parts[k], w = el('span', 'genpart');
         const tS = sel([[-1, 'Off'], ...Array.from({length:n}, (_, t) => t).filter(t => !isBusT(t)).map(t => [t, 'Track ' + d2(t + 1) + trkKind(t)])], D.t, x => { D.t = x; });
-        const iS = sel(S.insts.map((_, j) => [j, instLabel(j)]), Math.max(0, D.i), x => { D.i = x; try { const h = preview(x, ROOT, -1, false, null, true); if (h) setTimeout(() => previewOff(h), 200); } catch(e){} });
+        const iS = sel([[-1, '— instrument'], ...S.insts.map((_, j) => [j, instLabel(j)])], D.i >= 0 ? D.i : -1, x => { if (x < 0){ D.i = -1; return; } D.i = x; try { const h = preview(x, ROOT, -1, false, null, true); if (h) setTimeout(() => previewOff(h), 200); } catch(e){} });
         w.append(tS, iS); field(nm, w); } },
     [['▶ / ■ pattern', () => playPatLoop()], ['Generate (G)', () => roll(), 'ok']], {g:roll, r:roll, ' ':() => playPatLoop()});
 }
@@ -31083,6 +31095,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [466, '7 Nov', ['Fixes from a review: PLAY tells …chains the song started again (tempo-synced modules restart on the downbeat).', 'A computer never switches to the page sequencer or holds the screen on by itself: that is for phones and tablets.', 'After a phone moves to the page sequencer, bass, voice, acid and …pump synth notes sound straight away (they were muted for a few seconds).', 'Generators: Ctrl/⌘+Z undoes a roll with the panel open; Drum pattern’s Perc shows “— instrument” until you pick one, and says when a shared block has no room for a copy.']],
   [465, '7 Nov', ['The audio-thread sequencer books further ahead for the first moments after PLAY, and a note that arrives a little late still plays, so the first beat no longer loses notes on live engines.', 'On a phone the move to the page sequencer when the app goes out of view is quicker (it no longer redraws the hidden screen), so no steps are skipped.', 'Keep screen on and Background play are also in Settings → App.', 'The first-launch tips wait until nothing else is open, and step aside if a panel opens.', 'Drum pattern makes a unique copy of a block that also plays elsewhere (SHARED; or rewrite it everywhere, as before).', 'Help has a Generators page (and playing on a phone).']],
   [464, '6 Nov', ['Settings → Screen → PLAYHEAD OFFSET: nudge the playhead in 5 ms steps (−100 to +300 ms, this device) so it lines up with what you hear.']],
   [463, '6 Nov', ['Six more generators (GEN, or Edit ▾ → Generators): Markov melody (a new line that moves the way your song’s melodies do), Arp (a chord written out up / down / converge / random), Chords (a progression for a poly track, by key and mood), Polymeter (a rhythm and a pitch cycle that drift against the bar), Ratchet (rolls and flams on the hits: RET, DEL) and Probability fill (ghost notes on the empty rows, fixed or by chance: CHA).']],
