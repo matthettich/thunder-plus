@@ -22020,7 +22020,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 451;
+const BUILD = 452;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29114,7 +29114,11 @@ function frame(){
   if (frameIdle()){ raf = -1; rafT = setTimeout(() => { raf = 0; frame(); }, 100); } else raf = requestAnimationFrame(frame);
   if (tp.on && ctx){
     let ch = false;
-    while (tp.q.length && tp.q[0].t <= ctx.currentTime + 0.01){ const e = tp.q.shift(); if (!tp.pos) tp.pos = new Array(NT).fill(null); e.pos.forEach((q, i) => { if (q){ tp.pos[i] = q; sndKeep(i, q); } }); tp.bpm = e.bpm; tp.tks = e.tks; tp.line = e.line; tp.st = e.t; ch = true;
+    // PLAYHEAD ON THE SOUND (owner, 6 Nov, Fold: "the playhead passes the note enough before we hear it that it is noticeable"):
+    // a row shows when it reaches the speaker, not when the engine renders it: the output latency (Android's often 50–200 ms,
+    // Bluetooth more) is taken off, as the pad blinks and meters already do.
+    const hear = ctx.currentTime + 0.01 - Math.min(1, ctx.outputLatency || ctx.baseLatency || 0);
+    while (tp.q.length && tp.q[0].t <= hear){ const e = tp.q.shift(); if (!tp.pos) tp.pos = new Array(NT).fill(null); e.pos.forEach((q, i) => { if (q){ tp.pos[i] = q; sndKeep(i, q); } }); tp.bpm = e.bpm; tp.tks = e.tks; tp.line = e.line; tp.st = e.t; ch = true;
       // the song's timer starts again when the song wraps back up (owner, 31 Oct: it stayed at 0:00 after the first time through)
       if (tp.mode === 'song'){ let mx = -1; e.pos.forEach((q, i) => { if (q && i !== MT && q.row > mx) mx = q.row; });
         if (mx >= 0){ if (tp.hiRow != null && mx < tp.hiRow){ tp.row0 = mx; tp.t0 = e.t; tp.lenTot = null; } tp.hiRow = mx; } } }
@@ -30569,6 +30573,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [452, '6 Nov', ['The playhead moves with what you hear: the device’s output latency is taken off (on phones it ran ahead of the sound).']],
   [451, '6 Nov', ['A song you load or start opens the Phrase screen on what’s under the song cursor: the phrase there, or, on an empty cell, a fresh phrase that goes on the song in that cell with its first note (it let notes go into a phrase that wasn’t on the song).']],
   [450, '6 Nov', ['Closing the app (or opening another song) with unsaved work asks plainly: “You have unsaved samples” when you’ve recorded or loaded samples since the last save, else “Save changes to …?”, then Save song and kit / Don’t save (it read “…and closing the app replaces it”).', 'No more pop-up about FLX above 10 when a song opens.']],
   [449, '6 Nov', ['Record a sample…: ● Record over a take you haven’t kept asks first: Keep in the pad and record, Discard and record, or Cancel (Esc).', 'A held STOP now stops the song exactly at the pattern’s end, in a background tab too: both sequencers stop booking notes there (it relied on a page timer, which a hidden tab runs up to a second late).', 'F fits the whole take in the sample editor (0 is a note key).']],
