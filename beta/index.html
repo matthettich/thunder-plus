@@ -20822,7 +20822,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '1yb8h04';
+const CORE_REV = 'x761n5';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -22204,7 +22204,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 475;
+const BUILD = 476;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31150,6 +31150,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [476, '7 Nov', ['Audio-thread sequencer: a sample note with CUT, RES or DEC, or played reversed, no longer makes the audio thread process the whole sample at once (with long samples that stalled it: stutters, a speed-up, STOP not heard). The filter and decay now run as the note plays.']],
   [475, '7 Nov', ['(Testing only) ?pbshow in the address shows the playback report on screen with PLAY / STOP, for testing on remote phones.']],
   [474, '7 Nov', ['PAD mode: EDIT on a filled note picks it up (note and instrument) instead of writing the current note over it, as it already did on instruments, volumes and effects; EDIT on an empty note drops it. One tap to grab, one to drop, across the whole row.']],
   [473, '7 Nov', ['Touch: dragging the cursor’s cell changes its value only after you rest your finger on it for a moment (a short buzz says it’s ready); a swipe that starts there scrolls like anywhere else. A tap still edits.']],
