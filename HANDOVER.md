@@ -176,6 +176,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 7 Nov (5): BrowserStack real-phone run (build 475)
+
+- 475 `?pbshow`: a strip at the top with PLAY (song from the top) / STOP and the last 80 playback-report lines, refreshed every
+  second (inert without the param), so a remote device session can read the report off the page.
+- BrowserStack (owner connected it; free plan): devicecontrol session on a Samsung Galaxy S25 Ultra, Android 15, Chrome 152,
+  beta/?pbshow, the first-open song, audio-thread sequencer: 80 s steady (35–36 rows per 2 s, 0 late, 0 dropped, 0 core
+  skips, lead 250 ms), STOP clean (no stray rows, −63 dB after 1 s). heardLat() 76 ms there. Did NOT reproduce the Fold's
+  bug: next, the owner's own song on the Fold with ?pbshow. Session ended (delete_session) to save minutes.
+
 ## 7 Nov (4): mobile navigation audit, first fixes (build 472, beta)
 
 - Audit doc (Claude Doc "Thunder Plus — mobile navigation audit"). Owner's picks: help updated; OPTION+▲ = above / earlier
