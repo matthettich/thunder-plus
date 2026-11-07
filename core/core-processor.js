@@ -365,14 +365,14 @@ class ThunderCore extends AudioWorkletProcessor {
   relTc(v){ return v.syn ? v.rel / 4.6 : 0.004; }
   live1(v, at){ return v && !v.ended && !(v.stopAt != null && v.stopAt <= at); }
   kill(v, at, tc = 0.004, stop = false){
+    // STOP (stopAll): a voice booked to start at or after the stop never sounds (CodeRabbit, 7 Nov: a fade began at full level, so the
+    // next pattern's downbeat blipped); one already sounding fades as before
+    if (stop && v && !v.ended && !v.live && v.t0 >= at - 1e-6){ v.stopAt = at; v.end = Math.min(v.end, v.t0); return; }   // (before the check below: a note's own OFF booked at its start doesn't let it through)
     if (!v || v.ended || (v.stopAt != null && v.stopAt <= at)) return;
     if (v.live){   // a live engine's note lets go (its release is the engine's own); stopping before a booked note takes it back
       const B = v.live, L = v.L, ov = tcOver(L.proc), t = Math.max(at, currentTime), G = tcParam(ov, this.pn(L, v.lane, 'gate'), t); v.stopAt = at;
       if (t < B.lastOn - 1e-6){ G.cancel(t); tcParam(ov, this.pn(L, v.lane, 'trig'), t).cancel(t); }
       G.set(0, t); return; }
-    // STOP (stopAll): a voice booked to start at or after the stop never sounds (CodeRabbit, 7 Nov: the fade below began at full level, so the
-    // next pattern's downbeat blipped); one already sounding fades as before
-    if (stop && v.t0 >= at - 1e-6){ v.stopAt = at; v.end = Math.min(v.end, v.t0); return; }   // (transport stops only: a note's own OFF / cut keeps its release)
     v.stopAt = at; at = Math.max(at, currentTime);
     v.f.cancel(at); v.f.set(1, at); v.f.target(0, at, tc); v.end = Math.min(v.end, at + tc * 12);
   }

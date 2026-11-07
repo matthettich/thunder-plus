@@ -20808,7 +20808,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '1ex9rty';
+const CORE_REV = '1l1znga';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -21012,7 +21012,7 @@ function coreMsg(d){
   for (const r of d.rows){
     // RECORDER CUT (CodeRabbit, 7 Nov): the row is counted first, so the edge a held STOP waits for is known before its notes
     // go out; from the cut on nothing is the page's to play (rt.pl.stopAll(t) can't be relied on for notes booked at t)
-    const cut = () => tp.stopAt != null && r.t >= tp.stopAt - 1e-6;
+    const cut = () => !tp.on || !tp.core || (tp.stopAt != null && r.t >= tp.stopAt - 1e-6);   // (or the song already stopped: rcdSongStopAt stops at once when the cut is due)
     if (cut()) break;
     tp.q.push({t:r.t, pos:r.pos, bpm:r.bpm, tks:r.tks, line:r.line}); rcdStep(tp.q[tp.q.length - 1]);
     if (cut()) break;
@@ -21037,6 +21037,7 @@ function coreMsg(d){
     mx.pend.forEach((P, t) => { if (P && P.length) pendFlush(t, r.t); });
     if (rec.on) recHist(r);
   }
+  if (!tp.on || !tp.core) return;   // (stopped while reading these rows)
   s.time = d.time; s._bpm = d.bpm; s.tks = d.tks; s.base = d.base; s.btT = d.btT; s._alive = d.alive;
   { const r0 = d.rows[0], r1 = d.rows[d.rows.length - 1], ct = ctx.currentTime; PB.n += d.rows.length; if (r0) PB.late = Math.max(PB.late, ct - r0.t); if (r1) PB.ahead = Math.max(PB.ahead, r1.t - ct); if (d.skips != null) PB.skips = d.skips; pbSum(); }
   corePump();
