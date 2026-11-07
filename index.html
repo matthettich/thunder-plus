@@ -22030,7 +22030,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 454;
+const BUILD = 455;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24507,6 +24507,11 @@ function genMenu(){
   const b = $('kGen'), r = b ? b.getBoundingClientRect() : {left:20, top:200};
   if (typeof sxMenu !== 'function') return acidLine();
   sxMenu(r.left, r.top, 'GENERATE', genItems(true).map(it => ({l:it.l, f:it.off ? () => toast('Open a phrase first: the generators write into it.') : it.f})));
+  // ABOVE THE FINGER (owner, 6 Nov: "the generator menu pops up under the finger, which makes it almost impossible not to
+  // hit by accident"): the menu sits above the key (below it only when there's no room), and takes no taps for 400 ms
+  const m = sxMenuEl; if (!m) return; const h = m.getBoundingClientRect().height;
+  const top = r.top - h - 8 >= 4 ? r.top - h - 8 : Math.min(innerHeight - h - 4, r.bottom + 8);
+  m.style.top = Math.max(4, top) + 'px'; m.style.pointerEvents = 'none'; setTimeout(() => { if (m.isConnected) m.style.pointerEvents = ''; }, 400);
 }
 function genItems(full){
   const ph = tv === 'phrase', mst = ph && mstView();
@@ -30590,6 +30595,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [455, '6 Nov', ['The GEN key’s menu opens above the key, out from under your finger, and ignores taps for a moment.']],
   [454, '6 Nov', ['Screen off while playing: the sequencers work further ahead gradually (over about a second) instead of all at once, which spiked the CPU just as the phone slowed down.']],
   [453, '6 Nov', ['PAD mode has a GEN key, under SEMI + and beside LOOP: it opens the generators (Acid line, Euclidean fill…) for the phrase.']],
   [452, '6 Nov', ['The playhead moves with what you hear: the device’s output latency is taken off (on phones it ran ahead of the sound).']],
