@@ -166,6 +166,22 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 6 Nov (12): HYBRID sequencer on phones (builds 460–461, beta + main)
+
+- 459 report: the wake lock was lost after a STOP + PLAY within 0.5 s (no "screen kept on" after it), so the screen timed out;
+  460 serializes wake-lock calls (wlQ) and re-takes it every 2 s while playing. Owner's report also showed the PAGE sequencer
+  ran at ~0.83× with the screen off: the phone simply slows down out of view (CPU), whichever sequencer.
+- Owner chose the hybrid, "make sure we don't break anything on desktop". `seqHandover()` on visibilitychange: only where
+  `seqHandHere()` (Android / iOS UA, or the Mobile setup outside Electron); only song mode, not with a pattern take, MIDI REC,
+  Link live (`lkLive()`: `lk` is always an object) or a loop other than LOOP (pattern). The last step the core booked
+  (max t in tp.q) → tStart('song', {rz:{ref,row,step}, rzT, page:true}) with `handing` set: tStop skips stopAll, the core
+  STOP and bgPlay/wakeLock off, so booked notes ring on; tStart's resume seeks rz, then ALWAYS one step on and on until it
+  is at or after its t0start, and t0start becomes that step's own time (rzT + its offset): no step twice, none moved. Then the
+  core gets {op:'stop', at:T0} and is unplugged 60 ms after T0. Stray-row re-STOPs wait until T0 + 0.2; a core still
+  sending rows 1.5 s after a hand-over is dropped. The next PLAY uses the core (o.page only for that start). Logged.
+- Checks: npm test 187/0, recorder 12, sampler 10, seq-golden, link-test all ok; headless Android UA: "its first step 57 ms
+  after the core's last" (one step at 57.3 ms), STOP silent; desktop UA: no hand-over.
+
 ## 6 Nov (11): the screen-off bug found; wake lock, clock watch, deaf-core drop (builds 458–459, beta + main)
 
 - Owner: turning the screen off with the power button is fine; it goes wrong when the screen times out ON ITS OWN. Reports

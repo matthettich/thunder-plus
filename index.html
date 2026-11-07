@@ -20589,8 +20589,9 @@ function tStart(mode, o){
   const wasOn = tp.on;   // REC: no count-in when PLAY jumps somewhere else mid-song
   if (lk) lk.restart = true; try { tStop(true); } finally { if (lk) lk.restart = false; }   // ABLETON LINK: a restart is no STOP for the peers
   // RESUME: carry on from where the song stopped, if the cursor hasn't moved since (and not for a loop)
-  const pz = tp.paused; tp.paused = null;
-  const resume = mode === 'song' && resumeOn && !wasOn && pz && !(o && o.loop) && pz.key === curKey() && S.song[pz.row] && S.song[pz.row][pz.ref] >= 0;
+  // HAND-OVER (o.rz): carry on at that exact step, whatever RESUME is set to (seqHandover)
+  const pz0 = tp.paused; tp.paused = null; const rzH = !!(o && o.rz), pz = rzH ? o.rz : pz0;
+  const resume = mode === 'song' && pz && S.song[pz.row] && S.song[pz.row][pz.ref] >= 0 && (rzH || (resumeOn && !wasOn && !(o && o.loop) && pz.key === curKey()));
   if (resume) o = Object.assign({}, o, {row:pz.row});
   const r = rtInit();
   const seq = makeSeq(S, mode, Object.assign({}, o, {live:true}));   // live: chops never render on this thread (ensurePlay)
@@ -20607,14 +20608,19 @@ function tStart(mode, o){
   // RESUME: run the sequencer silently up to the step it stopped on (keeping the effect commands it passes). That step has
   // then been worked out already: its events are moved to play now, and the sequencer's clock with them.
   let rsFirst = null, rsFx = null;
-  if (resume && pz.step > 0){ rsFx = new Map(); let g = 0;
+  if (resume && (pz.step > 0 || rzH)){ rsFx = new Map(); let g = 0;
     while (seq.alive() && g++ < 4096){
       const r = seq.step(), p = r.pos && r.pos[pz.ref];
       if (p && (p.row > pz.row || (p.row === pz.row && p.step >= pz.step))){ rsFirst = r; break; }
       for (const e of r.evs) if (CHASE_T.has(e.type)) rsFx.set(e.type + ':' + e.track + ':' + (e.p || ''), e); } }
   // ABLETON LINK: on the session's next bar when there are peers (or the bar a peer starts on); lkPlan is null with Link off
   const lkp = lk ? lkPlan(wasOn, ci) : null;
-  const t0start = lkp ? lkp.t : ctx.currentTime + 0.08 + ci + (warmNew ? 0.15 : 0);   // (nodes made just now: a moment to start up)
+  let t0start = lkp ? lkp.t : ctx.currentTime + 0.08 + ci + (warmNew ? 0.15 : 0);   // (nodes made just now: a moment to start up)
+  // HAND-OVER: o.rz is the last step the audio thread booked, at o.rzT; the page carries on from the first step after it that
+  // is still ahead, at that step's own time (no step twice, none moved: the gap is only the start-up moment)
+  if (rzH && o.rzT != null && rsFirst){ const f0 = rsFirst.t; let g = 0;
+    while (seq.alive() && g++ < 512 && (g === 1 || o.rzT + (rsFirst.t - f0) < t0start - 1e-4)){ for (const e of rsFirst.evs) if (CHASE_T.has(e.type)) rsFx.set(e.type + ':' + e.track + ':' + (e.p || ''), e); rsFirst = seq.step(); }
+    t0start = o.rzT + (rsFirst.t - f0); }
   if (rsFirst){ const d = t0start - rsFirst.t; seq.base += d; seq.time += d; if (seq.btT != null) seq.btT += d; }
   else seq.time = t0start;
   stageStart(t0start);
@@ -20629,7 +20635,7 @@ function tStart(mode, o){
   }
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
   tp.core = false;
-  if (aset.core === 'core' && core.ready && !core.bad) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
+  if (aset.core === 'core' && core.ready && !core.bad && !(o && o.page)) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
   pbLog('PLAY ' + mode + ' · ' + pbState());   // not loaded yet: this PLAY as before, the core loads at STOP
   if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
   tp.timer = pumpTimer(); pump(); draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();
@@ -20893,10 +20899,34 @@ function coreStart(mode, o, t0, rs){
    state, a 2-second summary of the core's rows while playing (how many, how late or early, notes dropped as late, the
    core's catch-up skips), rows still arriving after STOP (and the STOP sent again then), and the level and live voices 1 and
    3 seconds after a STOP. */
-const PB = {ck:null, ckBad:0, stopT:0, log:[], n:0, late:0, drop:0, ahead:0, stray:0, strayT:0, skips:0, t:0};
+const PB = {handT0:0, handW:0, ck:null, ckBad:0, stopT:0, log:[], n:0, late:0, drop:0, ahead:0, stray:0, strayT:0, skips:0, t:0};
 function pbLog(s){ try { PB.log.push((performance.now() / 1000).toFixed(2) + ' ' + s); if (PB.log.length > 400) PB.log.splice(0, 100); } catch(e){} }
 const pbState = () => `ctx ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(2) : '-'} on=${tp.on ? 1 : 0} core=${tp.core ? 1 : 0} seq=${aset.core} hidden=${document.hidden ? 1 : 0}`;
 function pbLevel(){ try { const A = rt && rt.man; if (!A) return '-'; let m = 0; for (const a of A){ const b = new Float32Array(a.fftSize); a.getFloatTimeDomainData(b); for (const x of b) m = Math.max(m, Math.abs(x)); } return m ? (20 * Math.log10(m)).toFixed(1) + ' dB' : 'silent'; } catch(e){ return '?'; } }
+/* HYBRID (owner, 6 Nov: "Build the hybrid and make sure we don't break anything on desktop"): on a phone or tablet, the
+   moment the app is hidden (the screen off, another app, the shade) while the audio-thread sequencer plays the song, the
+   song carries on from the next step not yet sounding on the page sequencer, at that step's own time, so nothing is
+   skipped or played twice; the core lets go. The next PLAY uses the audio thread again. Phones slow down out of view, and
+   the core then fell out of step and stopped hearing STOP; the page sequencer always stops. Not on a computer (Electron or
+   a desktop browser: hiding the window changes nothing there), not while a pattern take or MIDI recording runs, with
+   Ableton Link, or with a loop other than LOOP (pattern); the clock watch below still covers those. */
+var handing = null;   // var: tStop() can run before this line
+const seqHandHere = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof isMobile === 'function' && isMobile() && !DESK_APP);
+function seqHandover(){
+  if (!document.hidden || !tp.on || !tp.core || tp.mode !== 'song' || !ctx || !seqHandHere()) return false;
+  if (RCD.sync || RCD.on || (typeof rec !== 'undefined' && rec.on) || (typeof lkLive === 'function' && lkLive()) || (tp.loopV && tp.loopV !== 'pat')) return false;
+  let q = null; for (const e of tp.q) if (e.pos && (!q || e.t > q.t)) q = e;   // the last step the core booked
+  const P = q ? q.pos : tp.pos; if (!P) return false;
+  const ref = P.findIndex((p, i) => p && p.row >= 0 && i !== MT); if (ref < 0) return false;
+  const rz = {ref, row:P[ref].row, step:P[ref].step}, rzT = q ? q.t : null, t0 = ctx.currentTime, w0 = performance.now();
+  handing = {}; try { tStop(true); tStart('song', {row:rz.row, rz, rzT, page:true}); } finally { handing = null; }
+  // the core plays on up to the page's first step, then stops there and is unplugged
+  const T0 = tp.q[0] ? tp.q[0].t : ctx.currentTime; PB.handT0 = T0; PB.handW = performance.now();
+  try { core.node.port.postMessage({op:'stop', at:T0}); } catch(e){}
+  setTimeout(() => { if (!tp.core) coreWire(false); }, Math.max(0, (T0 - ctx.currentTime) * 1000) + 60);
+  pbLog(`hidden: the song moved to the page sequencer after row ${rz.row} step ${rz.step} (${Math.round(performance.now() - w0)} ms to start; its first step ${tp.q[0] && rzT != null ? Math.round((tp.q[0].t - rzT) * 1000) + ' ms after the core’s last' : '?'})`);
+  return true; }
+document.addEventListener('visibilitychange', () => { try { seqHandover(); } catch(e){ tpLog('hand-over', e); } });
 /* CLOCK WATCH (owner's report, 6 Nov): after the Fold's screen timed out on its own, its audio clock ran at 0.8× and then 1.4–1.6×
    real time, and the core (stepping on that clock, and too busy to read messages) sped up and wouldn't stop. While the core
    plays, the audio clock is compared with the real one every 2 s; off by more than 15 % twice running, the song carries on
@@ -20926,7 +20956,8 @@ function coreMsg(d){
   // PLAYBACK REPORT: rows the core sends after STOP (or from an older PLAY) mean it is still stepping: say so, and stop it again
   if (d.op === 'rows' && (!tp.on || !tp.core || d.gen !== core.gen)){ PB.stray += d.rows.length;
     const now = performance.now(); if (now - PB.strayT > 1000){ PB.strayT = now; pbLog(`stray rows from the core (gen ${d.gen}, now ${core.gen}, playing ${tp.on ? 1 : 0}) · ${pbState()}`);
-      if (!tp.on || !tp.core) try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); if (!core.wired) core.node.disconnect(); } catch(e){} }
+      if ((!tp.on || !tp.core) && !(PB.handT0 && ctx.currentTime < PB.handT0 + 0.2)) try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); if (!core.wired) core.node.disconnect(); } catch(e){} }
+    if (tp.on && !tp.core && PB.handW && now - PB.handW > 1500){ pbLog('the audio-thread sequencer didn’t stop after the hand-over: dropped it'); PB.handW = 0; try { coreDrop(); } catch(e){} return; }
     // DEAF CORE (owner's report, 6 Nov, Fold: after the screen timed out mid-song, the core kept stepping for 18 s+ after STOP,
     // re-sent STOPs included: its audio thread was too busy to read messages). Still at it 1.5 s after STOP: let it go (it is
     // cut off from the tracks and the page) and load a fresh one for the next PLAY.
@@ -20999,16 +21030,16 @@ function tStop(quiet){
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
   const stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
   tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
-  if (tp.core){ tp.core = false; core.gen++; coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }
+  // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
+  if (tp.core){ tp.core = false; core.gen++; if (!handing){ coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} } }
   else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
-  if (rt) rt.pl.stopAll(ctx.currentTime);
+  if (rt && !handing) rt.pl.stopAll(ctx.currentTime);
   fxcTL.m.clear(); fxcTL.beats.length = 0;   // FX BAR: STOP puts the switches back (resetSeq)
   moStop();
   try { metStop(); recEndTake(); clearTimeout(rec.cntT); rec.cnt = 0; recBtn(); } catch(e){}   // REC: clicks booked ahead stop, the take is one undo step
   songBtn();
   chainsTempo();
-  bgPlay(false);   // BACKGROUND PLAY
-  wakeLock(false);   // KEEP SCREEN ON
+  if (!handing){ bgPlay(false); wakeLock(false); }   // BACKGROUND PLAY, KEEP SCREEN ON (a hand-over plays on)
   if (stopP) try { if (curToPlay(stopP.P, stopP.mode) && tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
   if (!quiet) draw();
 }
@@ -22098,7 +22129,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 460;
+const BUILD = 461;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -30665,6 +30696,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [461, '6 Nov', ['On a phone or tablet the song moves from the audio-thread sequencer to the page sequencer the moment the app goes out of view (screen off, another app), at the next step to sound, so it keeps time and STOP always works; the next PLAY is on the audio thread again. Computers are unchanged.']],
   [460, '6 Nov', ['KEEP SCREEN ON holds after a quick STOP and PLAY (it could let go, and the screen then timed out mid-song); while the song plays it is checked every 2 s.']],
   [459, '6 Nov', ['The audio-thread sequencer: when the phone’s audio clock runs out of step with real time (after the screen times out on its own, on the Fold), the song carries on from its row on the page sequencer until the app reloads; and if the audio-thread sequencer keeps going after STOP, it’s let go and a fresh one loads.']],
   [458, '6 Nov', ['KEEP SCREEN ON (Project → App, on by default): while the song plays the screen doesn’t time out by itself; the power button still turns it off. On the phone a screen that timed out mid-song upset the audio-thread sequencer.']],
