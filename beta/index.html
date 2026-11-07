@@ -776,6 +776,8 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .recbar .recplay{min-width:5.5em}
 .recrd{flex:1; min-width:0; font-variant-numeric:tabular-nums; opacity:.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .recz{display:flex; gap:4px} .recz button{min-width:2.4em; padding:3px 8px}
+.recz{align-items:center} .reczl{font-size:10px; letter-spacing:.08em; opacity:.6; margin:0 2px 0 6px}
+.recoct{display:flex; align-items:center; gap:4px} .recoct small{font-size:10px; letter-spacing:.08em; opacity:.6; margin-right:2px} .recoct button{min-width:2.2em; padding:3px 6px} .recoct b{min-width:1.2em; text-align:center; font-variant-numeric:tabular-nums}
 .recops{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 400px), max-content)); gap:12px 28px; justify-content:start}
 .recg{display:flex; flex-direction:column; gap:4px}
 .recseg{flex-wrap:wrap; width:max-content; max-width:100%} .recseg button{padding:4px 10px; flex:0 0 auto}
@@ -2530,6 +2532,13 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 :root[data-skinbase="term"] .tagrid b.f.p, :root[data-skinbase="term"] .tagrid b.f.p[style]{background:transparent; color:var(--mx); box-shadow:inset 0 0 0 2px var(--mx)}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b.f.p{background:#fff!important; color:oklch(.45 .16 var(--rbh)); box-shadow:inset 0 0 0 2px oklch(.62 .16 var(--rbh))}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b:not(.f){--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg + var(--rbo, 0deg)); background:oklch(.94 .03 var(--rbh))}
+/* DROP-DOWN ARROWS (owner, 6 Nov: "can we add a down arrow to the length dropdown?"): the term skins (IDM, 909…) set the
+   drop-downs' `background` shorthand, which wiped the ▾ drawn by the Fit and finish rule, so every drop-down there showed
+   none (its padding was still kept for it). Drawn again here, after every skin, on computers (phones keep the native ones). */
+@media (pointer:fine){
+  :root select:not([multiple]):not([size]){background-image:linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%)!important;
+    background-position:right 12px center, right 7px center!important; background-size:5px 5px!important; background-repeat:no-repeat!important}
+}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <style>
@@ -3267,7 +3276,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p><b>…chains modules:</b> every effect module in a …chains patch has a <b>BYP</b> button on its title bar with a number: it bypasses the module (its dry sound passes). From a phrase, <code>BYP 31</code> bypasses module 3 on that track's chain, <code>BYP 30</code> puts it back, and <code>BYP 34</code> switches it the other way from the patch for four rows, so a trance gate left bypassed plays for four rows. <code>BYP 0Y</code> does every numbered module. Stopping the song puts them back as the patch has them.</p>
 <p><b>Presets and sidechains in …chains:</b> effects and sound sources have a <b>Preset</b> row: factory presets, Default, and your own (Save as a preset keeps them on this device, for every patch). Every sidechain user has a <b>Source</b>: <b>Self</b>, <b>Send 1–8</b> (what a <b>Sidechain Out</b> in any chain sends) or one <b>track</b>'s own sound, before its effects and fader, so a muted ghost kick still drives it. That goes for <b>Sidechain In</b> (its meter shows what it hears before you patch it), Sidechain Comp, the compressors, the noise gate and the envelope filter, in …chains and as track or master effects. The Mixer's <b>SC</b> row lights when a track is a source for something. The light beside a module's <b>SC</b> input flashes with the sidechain it hears.</p>
 <h3>Flex, Step gate and Retrigger</h3>
-<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (256 patterns; <code>FLX</code> picks one from a row: 01–10 the originals, then families by the first hex digit, after the OP-Z and Pocket Operator punch-ins: 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops and wow, 8 scratches, 9 gates and pumps, A filter sweeps, B bit crush, C fading repeats, D juggles, E swing and feel, F chaos). <b>Load sample</b> opens the sample browser (or File › Samples…): FOLDER is your sample folder with its subfolders, set once and remembered (where the browser asks again after a restart, press Reconnect); RECENT is every sample you've loaded or recorded, from anywhere; ＋ Files… adds files from anywhere (one file loads straight into the pad). Type to search, ▲▼ to walk the list (AUDITION plays each), Enter or a double-click loads into the pad picked at the bottom. Phones get RECENT and ＋ Files…. <b>Record a sample…</b> (Synth page beside Load sample, or File): an input, STEREO / MONO / LEFT / RIGHT, monitoring (headphones) and a level meter; FREE records until Stop; PATTERN records whole patterns in time with the song, as Renoise's pattern sync: playing, it starts at the next pattern and Stop ends it at the end of one (or after the LENGTH set); stopped, it starts the song from the cursor's pattern. EXTRA LATENCY moves the take if it lands early or late. The take can then be edited and kept in a pad; <b>Edit sample…</b> on a sample layer opens the same editor on a loaded sample (APPLY writes it back, and Start and the loop points move with the audio). In the editor: drag to select, click to place the cursor (Shift-click stretches the selection); the wheel or a pinch zooms at the pointer, − / + zoom at the cursor, FIT shows all, SEL the selection; Shift+wheel or a sideways swipe scrolls, and the overview above moves the view. Tools: crop, cut, silence, snap to zero crossings, auto-trim, normalise, ±3 dB, fades, reverse, invert, remove DC, to mono / stereo, append a file, undo; FIT TO TEMPO sets the pad's instruments to SYNC with the take's beats. <code>FLY</code> is Flex's second bank, 255 more for IDM, in the spirit of Aphex Twin and Autechre: <code>FLY 01</code>–<code>0F</code> are one of each family to try first, then by the first digit 1 pitch rolls (drill'n'bass: every repeat a step higher or lower), 2 euclidean gates (REPEAT holds the last hit instead of a gap), 3 probability (slices muted, repeated or ratcheted by chance), 4 slice pitch (slices jump to octaves, fifths or anywhere), 5 freeze, buzz and smear, 6 CD skips and dropouts, 7 bouncing, speeding and slowing rolls, 8 mutating shuffles (a little different each bar), 9 stutter edits, A polymeter (a loop of 3/16, 5/16… against the bar), B warp (every slice bends in pitch), C reverse rolls and rewinds, D grains, E texture (crush, filters and chops on random slices), F chaos 2. Most change every bar over a four-bar cycle; FIXED ones repeat the same every bar. FLX and FLY drive the same Flex, so the last one written plays. <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT 01</code>–<code>0F</code> pick a pattern, <code>GAT 10</code> the CUSTOM steps, and <code>GAT 00</code> stops it (the gate opens until the next GAT). <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot. Pattern names give note values: <i>ROLL 1/16</i> rolls sixteenth notes, <i>STUTTER 1/32 EVERY 1/4</i> repeats a 32nd at the start of every quarter. <b>STARTS</b> on a Flex or Step gate: <b>ON FLX</b> / <b>ON GAT</b> (new slots) keeps it off (Step gate: open) until a command turns it on in the song, or <code>FXO</code> switches its slot on (then it plays its own PATTERN); it stays on until <code>FLX 00</code> (or FXO off), and waits again after STOP. Starting mid-song, the last command before that row is played at the start. <b>AT PLAY</b> (slots from songs made before 3 Nov) plays its PATTERN from PLAY, as before. Retrigger's MODE: RTG ONLY works the same way. In the FX bar, each of these slots draws the pattern it plays now with a playhead: Flex as a time map (where in the bar it plays from: repeats are saw teeth, reverses fall, half speed is a shallower line), its level along the bottom and its filter or crush; Step gate its steps; Retrigger its repeats.</p>
+<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (256 patterns; <code>FLX</code> picks one from a row: 01–10 the originals, then families by the first hex digit, after the OP-Z and Pocket Operator punch-ins: 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops and wow, 8 scratches, 9 gates and pumps, A filter sweeps, B bit crush, C fading repeats, D juggles, E swing and feel, F chaos). <b>Load sample</b> opens the sample browser (or File › Samples…): FOLDER is your sample folder with its subfolders, set once and remembered (where the browser asks again after a restart, press Reconnect); RECENT is every sample you've loaded or recorded, from anywhere; ＋ Files… adds files from anywhere (one file loads straight into the pad). Type to search, ▲▼ to walk the list (AUDITION plays each), Enter or a double-click loads into the pad picked at the bottom. Phones get RECENT and ＋ Files…. <b>Record a sample…</b> (Synth page beside Load sample, or File): an input, STEREO / MONO / LEFT / RIGHT, monitoring (headphones) and a level meter; FREE records until Stop; PATTERN records whole patterns in time with the song, as Renoise's pattern sync: playing, it starts at the next pattern and Stop ends it at the end of one (or after the LENGTH set); stopped, it starts the song from the cursor's pattern. Stopping the song while it records plays on to the end of the pattern and stops there with the take (stop again to stop at once), unless LENGTH is Until Stop · cut right there. EXTRA LATENCY moves the take if it lands early or late. The take can then be edited and kept in a pad; <b>Edit sample…</b> on a sample layer opens the same editor on a loaded sample (APPLY writes it back, and Start and the loop points move with the audio). In the editor: drag to select, click to place the cursor (Shift-click stretches the selection); the wheel or a pinch zooms at the pointer, − / + zoom at the cursor, FIT shows all, SEL the selection; Shift+wheel or a sideways swipe scrolls, and the overview above moves the view. Tools: crop, cut, silence, snap to zero crossings, auto-trim, normalise, ±3 dB, fades, reverse, invert, remove DC, to mono / stereo, append a file, undo; FIT TO TEMPO sets the pad's instruments to SYNC with the take's beats. The note keys play the take chromatically (C-4 as recorded), OCT − + beside Play. <code>FLY</code> is Flex's second bank, 255 more for IDM, in the spirit of Aphex Twin and Autechre: <code>FLY 01</code>–<code>0F</code> are one of each family to try first, then by the first digit 1 pitch rolls (drill'n'bass: every repeat a step higher or lower), 2 euclidean gates (REPEAT holds the last hit instead of a gap), 3 probability (slices muted, repeated or ratcheted by chance), 4 slice pitch (slices jump to octaves, fifths or anywhere), 5 freeze, buzz and smear, 6 CD skips and dropouts, 7 bouncing, speeding and slowing rolls, 8 mutating shuffles (a little different each bar), 9 stutter edits, A polymeter (a loop of 3/16, 5/16… against the bar), B warp (every slice bends in pitch), C reverse rolls and rewinds, D grains, E texture (crush, filters and chops on random slices), F chaos 2. Most change every bar over a four-bar cycle; FIXED ones repeat the same every bar. FLX and FLY drive the same Flex, so the last one written plays. <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex bytes (STEPS 1-8 and 9-16, a 1 bit is an open step); <code>GAT 01</code>–<code>0F</code> pick a pattern, <code>GAT 10</code> the CUSTOM steps, and <code>GAT 00</code> stops it (the gate opens until the next GAT). <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot. Pattern names give note values: <i>ROLL 1/16</i> rolls sixteenth notes, <i>STUTTER 1/32 EVERY 1/4</i> repeats a 32nd at the start of every quarter. <b>STARTS</b> on a Flex or Step gate: <b>ON FLX</b> / <b>ON GAT</b> (new slots) keeps it off (Step gate: open) until a command turns it on in the song, or <code>FXO</code> switches its slot on (then it plays its own PATTERN); it stays on until <code>FLX 00</code> (or FXO off), and waits again after STOP. Starting mid-song, the last command before that row is played at the start. <b>AT PLAY</b> (slots from songs made before 3 Nov) plays its PATTERN from PLAY, as before. Retrigger's MODE: RTG ONLY works the same way. In the FX bar, each of these slots draws the pattern it plays now with a playhead: Flex as a time map (where in the bar it plays from: repeats are saw teeth, reverses fall, half speed is a shallower line), its level along the bottom and its filter or crush; Step gate its steps; Retrigger its repeats.</p>
 <h3>Track effects</h3>
 <p>Each track and the master have 8 effect slots (FX screen, or the Mixer’s FX row): 73 effects on a track and 82 on a bus or the master (with the nine …pump ones; …pump EQ goes on any track), in groups: dynamics and EQ (compressors, Bus and Glue Comp, limiter, noise gate, transient shaper, multiband, air), filters (filter, ladder, low and high cut, auto-wah, vowel, envelope filter), drive and lo-fi (saturation, drive, overdrive, tube, tape, wavefolder, bitcrush, lo-fi, degrade, vintage sampler (an SP-1200, SP-12, MPC60, SP-202 at each of its grades, or Emulator II: their rate and bit depth, converters, filters and noise), vinyl, dub tape, cab), modulation (chorus, ensemble, dimension, flanger, phaser, tremolo, auto-pan, rotary, ring mod, cross-mod, frequency shifter), delays (simple, tape, BBD, pitch, granular, reverse echo), reverbs (room, plate, spring, space, Galactic, pitch reverb, convolution), pitch and voice (pitch shifter, harmonizer, pitch correct), resonators (resonator, comb, Rings), spectral and granular (Clouds, Beads, spectral, extreme stretch), rhythmic (Flex, Step gate, Retrigger, trance gate, pump, Beat grains, Beat scramble, Glitch sequencer) and utility (stereo width, utility). The pad's Add effect menu has 65 of them. On the Mixer’s FX row, OPTION (Ctrl/⌘ in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and OPTION + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter. For drums and IDM: <b>Beat grains</b> (a rhythmic grain cloud in time with the song, after Output Portal: rate, density, size, position, spray, pitch and random pitch, reverse, shape, stereo, freeze), <b>Beat scramble</b> (re-orders the last bar's slices, some reversed; keep the beats, new every bar or looped) and <b>Glitch sequencer</b> (each step may stutter, reverse, jump an octave, tape-stop, crush or drop out). Under a slot's controls, <b>› PRESET</b> lists INIT, factory presets (over 230 across the effects) and the song's own, and <b>› SAVE AS PRESET…</b> keeps the slot's settings for that effect. <b>› EQ WINDOW</b> (at the bottom of the FX screen, on any track) opens the track's …pump EQ in its own window, adding one to a free slot if needed; …pump EQ works on every track, the other …pump effects on buses and the master.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
@@ -14496,8 +14505,18 @@ function rcdStep(e){
   const edge = R.row == null || row !== R.row || st < R.st; R.row = row; R.st = st;
   if (!edge) return;
   if (R.phase === 'armed'){ R.t0 = e.t; R.phase = 'rec'; R.n = 0; R.bpm = e.bpm || tp.bpm || S.bpm; rcdUi(); return; }
-  if (R.phase === 'rec'){ R.n++; if (R.stopReq || (R.pats > 0 && R.n >= R.pats)) rcdEndAt(e.t); else rcdUi(); }
+  if (R.phase === 'rec'){ R.n++; if (R.stopReq || (R.pats > 0 && R.n >= R.pats)){ rcdEndAt(e.t); if (R.songStop) rcdSongStopAt(e.t); } else rcdUi(); }
 }
+// FINISH THE PATTERN (owner, 6 Nov: "press stop and have the recording conclude at the end of that pattern (like renoise)"):
+// with LENGTH on Until Stop (finish the pattern) or a number of patterns, stopping the SONG (Space, the Song buttons) while a
+// PATTERN take records holds the song on to the end of the pattern playing: the take ends there and the song stops with it.
+// Stop again stops both at once. Until Stop (cut right there) is the old way: the take ends where the song stops.
+function rcdHoldStop(quiet){
+  const R = RCD.sync; if (quiet || RCD.starting || !R || R.phase !== 'rec' || R.songStop || (rcdSet.pats | 0) < 0) return false;
+  if (!tp.on || tp.mode !== 'song' || !(tp.seq && tp.seq.alive && tp.seq.alive())) return false;   // (the song running out ends it as before)
+  R.songStop = true; R.stopReq = true; rcdUi(); toast('Recording to the end of this pattern, then stopping. Stop again to stop now.', 3000); return true; }
+function rcdSongStopAt(t){ const go = () => { if (tp.on) apRun(() => tStop(), []); try { songBtn(); } catch(e){} rcdUi(); };
+  const ms = (t - ctx.currentTime) * 1000 - 12; ms > 0 ? setTimeout(go, ms) : go(); }   // (just before the next pattern's first notes)
 // The song stopped while armed or recording
 function rcdSongStopped(){ const R = RCD.sync; if (!R) return; if (R.phase === 'rec') rcdEndAt(ctx.currentTime); else if (R.phase === 'armed'){ rcdAbort(); rcdUi(); } }
 function rcdEndAt(t1){
@@ -14524,7 +14543,7 @@ async function rcdStart(){
   rcdUi();
 }
 function rcdStop(){
-  if (RCD.sync){ const R = RCD.sync; if (R.phase === 'armed'){ rcdAbort(); rcdUi(); } else if (R.phase === 'rec'){ R.stopReq = true; rcdUi(); } return; }   // PATTERN: at the next edge
+  if (RCD.sync){ const R = RCD.sync; if (R.phase === 'armed'){ rcdAbort(); rcdUi(); } else if (R.phase === 'rec'){ if (R.pats < 0) rcdEndAt(ctx.currentTime); else { R.stopReq = true; rcdUi(); } } return; }   // PATTERN: at the next edge (CUT RIGHT THERE: now)
   if (!RCD.on) return; RCD.on = false;
   RCD.onDone = () => rcdTake(rcdCollect(), 'free', 0, 0); RCD.node.port.postMessage('stop'); rcdUi();
 }
@@ -14660,7 +14679,7 @@ function rcdUi(){
   U.rec.textContent = R ? (R.phase === 'armed' ? '■ Cancel' : R.stopReq ? '■ Stopping…' : '■ Stop') : RCD.on ? '■ Stop' : '● Record';
   U.rec.classList.toggle('on', !!(RCD.on || R));
   U.state.textContent = R ? (R.phase === 'armed' ? (tp.on ? 'Armed: records from the next pattern…' : 'Starting the song…') : R.phase === 'closing' ? 'Finishing the take…'
-      : `● Recording pattern ${R.n + 1}` + (R.pats > 0 ? ` of ${R.pats}` : '') + (R.stopReq ? ' · stops at its end' : ' · Stop ends it at the end of a pattern'))
+      : `● Recording pattern ${R.n + 1}` + (R.pats > 0 ? ` of ${R.pats}` : '') + (R.stopReq ? (R.songStop ? ' · the take and the song stop at its end' : ' · stops at its end') : R.pats < 0 ? ' · Stop ends it right there' : ' · Stop ends it at the end of the pattern'))
     : RCD.on ? '● Recording' : T ? (T.how === 'sync' ? '' : '') + (T.how === 'sync' ? ` · ${T.pats} pattern${T.pats === 1 ? '' : 's'}, ${T.beats} beats` : '')
     : RCD.stream ? 'Ready.' : 'Pick an input and press Record.';
   U.edit.hidden = !T || !!(RCD.on || R);
@@ -14670,6 +14689,19 @@ function rcdUi(){
   for (const b of U.lock) b.disabled = !!(RCD.on || R);
   rcdDrawWave();
 }
+// NOTE KEYS IN THE EDITOR (6 Nov): one voice per held key; C-4 (note 48) plays the take as recorded. A short fade in and
+// out so neither end clicks. What plays is the selection, or the take from its Start marker (an edited sample) or the top.
+function rcdKeyOn(k, note){
+  const T = RCD.take; if (!T) return; audio(); rcdKeyOff(k);
+  const n = T.data.length, a = RCD.sel ? RCD.sel[0] : Math.min(n - 32, Math.max(0, T.mk ? T.mk[0] : 0)), b = RCD.sel ? RCD.sel[1] : n; if (b - a < 32) return;
+  const src = ctx.createBufferSource(), g = ctx.createGain(), t = ctx.currentTime;
+  src.buffer = stBuf(ctx, T.data.subarray(a, b), T.data2 ? T.data2.subarray(a, b) : null, T.sr); src.playbackRate.value = Math.pow(2, (note - 48) / 12);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.003); src.connect(g); g.connect(master); src.start(t);
+  const v = {src, g}; src.onended = () => { if (RCD.kv && RCD.kv.get(k) === v) RCD.kv.delete(k); try { g.disconnect(); } catch(e){} };
+  (RCD.kv || (RCD.kv = new Map())).set(k, v); }
+function rcdKeyOff(k){ const v = RCD.kv && RCD.kv.get(k); if (!v) return; RCD.kv.delete(k); const t = ctx.currentTime;
+  try { v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(v.g.gain.value, t); v.g.gain.linearRampToValueAtTime(0, t + 0.03); v.src.stop(t + 0.035); } catch(e){} }
+function rcdKeysOff(){ if (RCD.kv) for (const k of [...RCD.kv.keys()]) rcdKeyOff(k); }
 // EDIT SAMPLE (5 Nov, owner: apply the edits "to a loaded sample"): opts.edit {pad, li} opens the same panel on that layer's
 // sample, without the recording rows; APPLY writes it back (a new sample, so the layer's undo still has the old one), and
 // the layer's Start, Loop start and Loop end ride along with every edit (rcdEdit's map); REVERT goes back to the layer's.
@@ -14696,7 +14728,7 @@ async function rcdPanel(pad, opts){
   { const m = el('div', 'recmeter'), bars = [], holds = []; for (let c = 0; c < 2; c++){ const r = el('div', 'recm'), b = el('i'), h = el('b'); r.append(b, h); m.append(r); bars.push(b); holds.push(h); }
     const clip = el('span', 'recclip', 'CLIP'); clip.hidden = true; m.append(clip); field('Level', m); RCD.ui = {bars, holds, clip}; }
   seg('Sync', [['sync', 'PATTERN'], ['free', 'FREE']], () => rcdSet.mode, v => { rcdSet.mode = v; patF.hidden = latF.hidden = fitF.hidden = v !== 'sync'; });
-  const patS = el('select'); [[0, 'Until Stop (whole patterns)'], [1, '1 pattern'], [2, '2 patterns'], [3, '3 patterns'], [4, '4 patterns'], [8, '8 patterns'], [16, '16 patterns']].forEach(([v, t]) => patS.append(new Option(t, v)));
+  const patS = el('select'); [[0, 'Until Stop · finish the pattern'], [-1, 'Until Stop · cut right there'], [1, '1 pattern'], [2, '2 patterns'], [3, '3 patterns'], [4, '4 patterns'], [8, '8 patterns'], [16, '16 patterns']].forEach(([v, t]) => patS.append(new Option(t, v)));
   patS.value = rcdSet.pats | 0; patS.addEventListener('change', () => { rcdSet.pats = +patS.value; rcdSave(); });
   const patF = field('Length', patS).parentElement; lock.push(patS);
   const latR = el('input'), latV = el('b'); latR.type = 'range'; latR.min = -50; latR.max = 250; latR.value = rcdSet.lat | 0;
@@ -14753,7 +14785,12 @@ async function rcdPanel(pad, opts){
   const tb = (t, f, tip, cls) => { const b = el('button', cls || null, t); b.type = 'button'; b.title = tip; b.addEventListener('click', f); return b; };
   const playB = tb('▶ Play', rcdPlay, 'Play the selection, or from the cursor, or the whole take (Space plays the song)', 'recplay');
   const undoB = tb('Undo', () => { if (!RCD.undo.length) return; RCD.take = RCD.undo.pop(); RCD.sel = null; rcdUi(); }, 'Undo the last edit (Ctrl/⌘+Z)');
-  bar.append(playB, rd, undoB, zb);
+  // OCTAVE (owner, 6 Nov): the note keys play the take chromatically (rcdKeyOn); this is the app's octave (kOct), so it
+  // stays the same here and in the tracker. Z plays C-<oct>; C-4 is the take as recorded. Numpad / and * move it too.
+  const octW = el('div', 'recoct'), octN = el('b'), octSay = () => { octN.textContent = kOct; };
+  const octB = (t, d, tip) => { const b = el('button', null, t); b.type = 'button'; b.title = tip; b.addEventListener('click', () => { kOct = clamp(kOct + d, 0, 8); octSay(); }); return b; };
+  octW.title = 'Octave for the note keys: Z plays C-' + kOct + ' (C-4 is the take as recorded)'; octW.append(el('small', null, 'OCT'), octB('−', -1, 'Octave down (numpad /)'), octN, octB('+', 1, 'Octave up (numpad *)')); octSay();
+  zb.prepend(el('small', 'reczl', 'ZOOM')); bar.append(playB, octW, rd, undoB, zb);   // (the octave by Play, so its − + don't read as zoom)
   grp('Edit');
   op('Crop', () => { const [a, b] = rcdRange(); rcdEdit(T => seCrop(T, a, b), x => x - a); RCD.sel = null; RCD.view = null; rcdUi(); }, 'Keep only the selection');
   op('Cut', () => { if (!RCD.sel) return toast('Drag across the take to select what to cut.'); const [a, b] = rcdRange(); rcdEdit(T => seCut(T, a, b), x => x < a ? x : x < b ? a : x - (b - a)); RCD.cursor = a; RCD.sel = null; rcdUi(); }, 'Remove the selection');
@@ -14787,7 +14824,7 @@ async function rcdPanel(pad, opts){
   const padS = el('select'); for (let k = 0; k < kit.voices.length; k++) padS.append(new Option(hx(k) + ' ' + (kit.voices[k].name || ''), k)); padS.value = pad;
   const keepRow = el('div', 'btnrow reckeep'), keepB = el('button', 'ok', 'Keep in this pad'); keepB.type = 'button'; keepB.addEventListener('click', () => rcdKeep(+padS.value));
   const discB = el('button', null, 'Discard'); discB.type = 'button'; discB.addEventListener('click', () => { RCD.take = null; RCD.undo = []; RCD.sel = null; RCD.view = null; rcdUi(); });
-  keepRow.append(el('span', null, 'Pad'), padS, el('span', 'recsp'), discB, keepB); edit.append(keepRow);
+  padS.title = 'The pad to keep the take in'; padS.setAttribute('aria-label', 'Pad'); keepRow.append(padS, el('span', 'recsp'), discB, keepB); edit.append(keepRow);   // (owner, 6 Nov: no "Pad" text, so it lines up with ▶ Song below)
   box.append(edit);
   const takeOf = L => { const S0 = L.sample, n = S0.data.length; return {data:S0.data, data2:S0.data2 || null, sr:S0.sr, name:S0.name, how:'edit', beats:0, pats:0, lp:L.lpMode | 0,
     mk:[Math.round((L.a || 0) * n), Math.round((L.lpS || 0) * n), Math.round((L.lpE == null ? 1 : L.lpE) * n)]}; };
@@ -14798,23 +14835,29 @@ async function rcdPanel(pad, opts){
   const row = el('div', 'btnrow'), rec = el('button', 'ok', '● Record'); rec.type = 'button';
   // SONG (owner, 5 Nov: "a play/stop button … for when it starts recording with playback"): plays or stops the song from here,
   // as the top bar's Song button does. Stopping it while a PATTERN take records ends the take there.
-  const songB = el('button', 'recsong', '▶ Song'); songB.type = 'button'; songB.title = 'Play or stop the song (from the cursor’s song row). Stopping it ends a PATTERN take where it stops.';
+  const songB = el('button', 'recsong', '▶ Song'); songB.type = 'button'; songB.title = 'Play or stop the song (from the cursor’s song row). While a PATTERN take records, stopping it finishes the pattern first (press again to stop now), unless LENGTH is Until Stop · cut right there.';
   songB.addEventListener('click', () => { apRun(() => { if (tp.on) tStop(); else tStart('song', {row:songRow()}); }, []); songBtn(); rcdUi(); });
   rec.addEventListener('click', () => { if (RCD.on || RCD.sync) rcdStop(); else rcdStart().then(() => fillIn()); });
   const close = el('button', null, 'Close'); close.type = 'button'; row.append(songB, el('span', 'recsp'), rec, close); box.append(row); if (E){ rec.hidden = true; keepRow.append(close); row.hidden = true; }   // EDIT SAMPLE: Close beside Apply / Revert
   Object.assign(RCD.ui, {rec, state, edit, wave, ov, rd, playB, undoB, lock, E, songB, win, whn, whi});
   const songT = setInterval(() => { if (!RCD.ui){ clearInterval(songT); return; } const on = !!tp.on; if (songB._on !== on){ songB._on = on; songB.textContent = on ? '■ Song' : '▶ Song'; songB.classList.toggle('on', on); } }, 150);   // follows the song, however it was started
-  const done = () => { if (askOpen !== done) return; askOpen = null; rcdAbort(); if (rcdPrev){ try { rcdPrev.stop(); } catch(e){} rcdPrev = null; } rcdClose(); RCD.ui = null; if (E){ RCD.take = null; RCD.undo = []; RCD.sel = null; } wrap.remove(); document.removeEventListener('keydown', key, true); };
+  const done = () => { if (askOpen !== done) return; askOpen = null; rcdKeysOff(); document.removeEventListener('keyup', keyUp, true); rcdAbort(); if (rcdPrev){ try { rcdPrev.stop(); } catch(e){} rcdPrev = null; } rcdClose(); RCD.ui = null; if (E){ RCD.take = null; RCD.undo = []; RCD.sel = null; } wrap.remove(); document.removeEventListener('keydown', key, true); };
   close.addEventListener('click', done);
-  // Keys stay in the panel: R records / stops, Space plays the song, Esc closes (a take not kept is let go)
+  // Keys stay in the panel: R records / stops, Space plays the song, Esc closes (a take not kept is let go); the piano keys play the take (R stays Record in Record a sample…), numpad / * the octave
   const key = e => { const tag = e.target && e.target.tagName;
     if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); return done(); }
     if (!E && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'r' || e.key === 'R') && tag !== 'SELECT'){ e.preventDefault(); e.stopPropagation(); return rec.click(); }
     if (e.key === ' ' && tag !== 'BUTTON'){ e.preventDefault(); e.stopPropagation(); return playCtx(); }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z') && RCD.undo.length){ e.preventDefault(); e.stopPropagation(); return undoB.click(); }
-    if (RCD.take && !e.ctrlKey && !e.metaKey && tag !== 'INPUT' && tag !== 'SELECT' && (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '0')){ e.preventDefault(); e.stopPropagation(); if (e.key === '0'){ RCD.view = null; return rcdUi(); } return rcdZoom(e.key === '-' ? 2 : 0.5, rcdAnchor()); }
+    if (RCD.take && !e.ctrlKey && !e.metaKey && tag !== 'INPUT' && tag !== 'SELECT' && (e.key === '+' || e.key === '=' || e.key === '-')){ e.preventDefault(); e.stopPropagation(); return rcdZoom(e.key === '-' ? 2 : 0.5, rcdAnchor()); }
+    // NOTE KEYS (owner, 6 Nov: "pressing keys on the keyboard plays the sample chromatically like in the other windows"): the
+    // piano keys play the take (the selection, else from Start) at that note, held while the key is down. Not while recording.
+    if (RCD.take && !RCD.on && !RCD.sync && !e.ctrlKey && !e.metaKey && !e.altKey && tag !== 'INPUT' && tag !== 'SELECT'){
+      if (e.code === 'NumpadDivide' || e.code === 'NumpadMultiply'){ e.preventDefault(); e.stopPropagation(); kOct = clamp(kOct + (e.code === 'NumpadMultiply' ? 1 : -1), 0, 8); return octSay(); }
+      const pn = pianoOf(e); if (pn !== undefined){ e.preventDefault(); e.stopPropagation(); if (!e.repeat) rcdKeyOn(e.code || e.key, kOct * 12 + pn); return; } }
     e.stopPropagation(); };
-  askOpen = done; document.addEventListener('keydown', key, true);
+  const keyUp = e => { if (RCD.kv && RCD.kv.has(e.code || e.key)){ e.stopPropagation(); rcdKeyOff(e.code || e.key); } };
+  askOpen = done; document.addEventListener('keydown', key, true); document.addEventListener('keyup', keyUp, true);
   wrap.append(box); document.body.append(wrap); rcdUi(); setTimeout(() => rec.focus(), 0);
   { const ro = new ResizeObserver(() => rcdDrawWave()); ro.observe(wave); ro.observe(ov); }
 }
@@ -20832,7 +20875,10 @@ function panic(){
 let stopTapT = 0;
 function toTop(){ tp.paused = null; cs.song.y = 0; cs.song.top = 0; try { draw(); } catch(e){} toast('Back to the top of the song.', 1500); }
 function tStop(quiet){
-  if (RCD.sync && !RCD.starting) rcdSongStopped();   // RECORD INTO A PAD: a pattern take ends where the song stops
+  if (rcdHoldStop(quiet)) return;   // RECORD INTO A PAD: FINISH THE PATTERN holds the song on to the pattern's end
+  // RECORD INTO A PAD: a pattern take ends where the song stops. Only a song that was playing: FIX (6 Nov) the first PLAY of
+  // a session with live pads starts a moment later (LIVE WARM-UP), and its tStop(true) dropped the take Record had armed.
+  if (RCD.sync && !RCD.starting && tp.on) rcdSongStopped();
   if (tp.on && lk && !lk.restart) lkStopped();   // ABLETON LINK: start / stop sync
   if (tp.timer) tp.timer.stop();
   // RESUME: where the song stopped (the positions last heard), the track it follows, and the cursor then
@@ -21906,7 +21952,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 446;
+const BUILD = 447;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -30455,6 +30501,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [447, '6 Nov', ['Record a sample… LENGTH: Until Stop · finish the pattern (and the set lengths) now finish the pattern playing when you stop the song too (Space, the Song buttons): the song plays on to the pattern’s end and stops with the take, as in Renoise. Stop again to stop at once. Until Stop · cut right there ends the take where you stop, as before.', 'The first Record of a session (song stopped, live pads in the kit) no longer starts the song without recording.', 'The note keys play the take in the sample editor (Record a sample… and Edit sample…), chromatically, held while the key is down: C-4 is the take as recorded. OCT − + beside Play (numpad / * too); it’s the same octave as the tracker’s.', 'Drop-downs show their ▾ in the IDM / 909 / terminal skins again (the length and pad pickers, the input, and every other one); the pad picker under the take lost its “Pad” label and lines up with ▶ Song.']],
   [446, '6 Nov', ['FOLLOW PATTERN in the Pattern view: the song row follows the playing pattern, so every track shows what is playing (only the open track switched; the rest stayed on the old pattern until you paged there).']],
   [445, '5 Nov', ['Sample layers have an Edit… button beside Load sample and Record… that opens the sample editor.', 'The editor draws the waveform orange and the selection blue, and the waveform sits in a card styled like the FX bar boxes: a dark title bar with the sample’s name, length, channels and rate.']],
   [444, '5 Nov', ['The sample editor draws in your skin’s accent colours (IDM: blue wave, orange selection) and is laid out more cleanly: one toolbar over the waveform (Play, the readout, Undo, zoom), tools in joined groups, the recording settings in two columns, Revert on the left and Apply / Close on the right.', 'Record a sample… has a ▶ Song / ■ Song button to start or stop the song from the panel.', 'Phone: the Synth page has the Song play / stop button in its top bar; on a folded phone the kit name makes room for it.']],
