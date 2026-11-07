@@ -22130,7 +22130,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 462;
+const BUILD = 463;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24619,7 +24619,10 @@ function genItems(full){
   const ph = tv === 'phrase', mst = ph && mstView();
   const dr = tv === 'song' || tv === 'sect' || ph;
   return ph && !mst || full || tv === 'song' ? [{a:'drum', l:'Drum pattern… (a beat across tracks)', k:'', f:drumPattern, off:!dr || mst}, {a:'acid', l:'Acid line… (a random bass line)', k:keyHint('alt+B'), f:acidLine, off:!ph || mst},
-    {a:'mut', l:'Mutate… (a variation of this phrase)', k:'', f:mutatePhrase, off:!ph || mst}, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill, off:!ph || mst}] : [];
+    {a:'mut', l:'Mutate… (a variation of this phrase)', k:'', f:mutatePhrase, off:!ph || mst}, {a:'mark', l:'Markov melody… (learned from the song)', k:'', f:markovGen, off:!ph || mst},
+    {a:'arp', l:'Arp… (a chord as notes)', k:'', f:arpGen, off:!ph || mst}, {a:'chd', l:'Chords… (a progression)', k:'', f:chordGen, off:!ph || mst},
+    {a:'poly', l:'Polymeter… (cycles that drift)', k:'', f:polyGen, off:!ph || mst}, {a:'rat', l:'Ratchet… (rolls on the hits)', k:'', f:ratchetGen, off:!ph || mst},
+    {a:'fill', l:'Probability fill… (ghost notes)', k:'', f:probFill, off:!ph || mst}, {a:'euc', l:'Euclidean fill…', k:'', f:euclidFill, off:!ph || mst}] : [];
 }
 function toolItems(full){
   const ph = tv === 'phrase', phSel = !!(selA && selA.v === 'phrase'), sg = tv === 'song', mst = ph && mstView();
@@ -24860,6 +24863,192 @@ function drumPattern(){
     [['▶ / ■ pattern', () => playPatLoop()], ['Generate (G)', () => roll(), 'ok']], {g:roll, r:roll, ' ':() => playPatLoop()});
 }
 /* ===== end GENERATORS ===== */
+/* ===== MORE GENERATORS (owner, 6 Nov: "we were going to make more generators, right?"): Ratchet, Probability fill, Arp,
+   Chords, Polymeter and Markov melody, in genPanel like Mutate. They write into the open phrase (the selection's rows, else
+   the whole phrase); each roll is one undo step. Shared bits first. ===== */
+function genScope(what){
+  if (view !== 'tracker' || tv !== 'phrase' || mstView()){ toast('Open a phrase first: ' + what + ' writes into it.'); return null; }
+  if (busTrack(cTrack)){ busSay(); return null; }
+  let y0 = 0, y1 = plen(cPhrase) - 1; if (selA && selA.v === 'phrase'){ const R = selRect(); y0 = R.y0; y1 = Math.min(R.y1, y1); }
+  const P0 = S.phrases[cPhrase] || freshPhrase(), ph = cPhrase, lpb = plpbOf(S, cPhrase), spr = Math.max(1, Math.round(lpb / 4));
+  const ins = (() => { const r = P0[cs.phrase.y]; if (r && r[IC] >= 0) return r[IC]; const f = P0.find(q => q[IC] >= 0); return f ? f[IC] : defInst(); })();
+  const curNote = (() => { for (let y = cs.phrase.y; y >= 0; y--) if (isNoteV(P0[y][0])) return P0[y][0]; const f = P0.find(q => isNoteV(q[0])); return f ? f[0] : null; })();
+  const key = songKey(cPhrase), sc = key ? ACID_SCALES[key.scale][1] : ACID_SCALES[0][1], root = key ? key.root : 0;
+  return {y0, y1, ph, spr, ins, curNote, key, sc, root, P:() => { if (!S.phrases[ph]) S.phrases[ph] = P0; return S.phrases[ph]; }, ok:() => cPhrase === ph};
+}
+const genRange = G => `rows ${rS(G.y0)}–${rS(G.y1)}`;
+// the effect column a command goes in on a row: the one that has it already, else the first empty (null when full)
+function fxSlot(r, cmd){ const ci = FXC.indexOf(cmd); for (let m = FX0; m < RW; m += 2) if (r[m] === ci) return m; for (let m = FX0; m < RW; m += 2) if (r[m] < 0) return m; return null; }
+function fxPut(r, cmd, v){ const m = fxSlot(r, cmd); if (m == null) return false; r[m] = FXC.indexOf(cmd); r[m + 1] = clamp(v | 0, 0, 255); return true; }
+function fxDrop(r, cmd){ const ci = FXC.indexOf(cmd); for (let m = FX0; m < RW; m += 2) if (r[m] === ci){ r[m] = r[m + 1] = -1; } }
+const rowEmpty = (r, cols = NCOL) => { for (let c = 0; c < cols; c++) if (r[c] >= 0) return false; return true; };
+const segToggles = (obj, list) => { const s = el('div', 'seg'); list.forEach(([k, t]) => { const b = el('button', obj[k] ? 'on' : null, t); b.type = 'button'; b.setAttribute('aria-pressed', !!obj[k]);
+  b.addEventListener('click', () => { obj[k] = !obj[k]; b.classList.toggle('on', obj[k]); b.setAttribute('aria-pressed', obj[k]); }); s.append(b); }); return s; };
+const selOf = (opts, val, set) => { const s = el('select'); opts.forEach(([v, t]) => s.append(new Option(t, v))); s.value = val; s.addEventListener('change', () => set(isNaN(+s.value) ? s.value : +s.value)); return s; };
+// a scale note near n (the song's key): steps up (d > 0) or down the scale
+const scaleStep = (G, n, d) => { let m = n; const dir = Math.sign(d); for (let k = 0; k < Math.abs(d); k++){ do { m += dir; } while (!G.sc.includes((((m - G.root) % 12) + 12) % 12) && Math.abs(m - n) < 24); } return m; };
+
+/* RATCHET: rolls on the hits that are there. ROLLS writes RET (retrigger every Y ticks: 1 fast, 2, 3 slower; X fades each
+   hit) on a share of the notes (AMOUNT, the off-steps a little likelier); DELAYS pushes some notes late by 1–3 ticks (DEL),
+   for flams and a looser feel. Re-rolling clears the RET / DEL it wrote before in the range. */
+const ratSet = {amt:35, speed:0, fade:2, lanes:{roll:true, del:false}};
+function ratchetGen(){
+  const G = genScope('Ratchet'); if (!G) return;
+  const roll = () => { if (!G.ok()) return; const P = G.P(), a = ratSet.amt / 100, rnd = Math.random; let nR = 0, nD = 0, hits = 0;
+    for (let y = G.y0; y <= G.y1; y++){ const r = P[y]; fxDrop(r, 'RET'); fxDrop(r, 'DEL'); if (!isNoteV(r[0]) && !(isPolyT(cTrack) && r.slice(1, NCOL).some(isNoteV))) continue; hits++;
+      const off = Math.floor((y - G.y0) / G.spr) % 2 === 1;
+      if (ratSet.lanes.roll && rnd() < a * (off ? 0.8 : 0.6)){ const yv = ratSet.speed ? ratSet.speed : 1 + Math.floor(rnd() * 3); if (fxPut(r, 'RET', (ratSet.fade & 15) * 16 + yv)) nR++; }
+      else if (ratSet.lanes.del && rnd() < a * 0.5){ if (fxPut(r, 'DEL', 1 + Math.floor(rnd() * 3))) nD++; } }
+    if (!hits) return toast('No notes in ' + genRange(G) + ': Ratchet rolls the hits that are there.');
+    saveS(); draw(); toast(`Ratchet: ${nR} rolls, ${nD} delays on ${hits} hits · ${genRange(G)}`); };
+  genPanel('Ratchet', `Rolls on the hits in ${genRange(G)} of this phrase: RET (retrigger) and DEL (late by a few ticks). Rolling again replaces the ones it wrote.`,
+    ({field, slider}) => {
+      slider('Amount', () => ratSet.amt, v => { ratSet.amt = v; });
+      field('Speed', selOf([[0, 'Mixed'], [1, 'Fast (every tick)'], [2, 'Medium (2 ticks)'], [3, 'Slow (3 ticks)']], ratSet.speed, v => { ratSet.speed = v; }));
+      field('Fade', selOf([[0, 'None'], [2, 'A little'], [5, 'More'], [9, 'Lots']], ratSet.fade, v => { ratSet.fade = v; }));
+      field('Write', segToggles(ratSet.lanes, [['roll', 'ROLLS'], ['del', 'DELAYS']])); },
+    [['▶ / ■', () => playCtx()], ['Ratchet (G)', () => roll(), 'ok']], {g:roll, r:roll});
+}
+
+/* PROBABILITY FILL: quiet notes on the empty rows, offbeats likelier (the 16th between the 8ths most). FIXED writes them as
+   they are; CHANCE adds CHA so each plays only some of the time, a different pattern on every pass. The note is the last
+   one before it (the phrase's first, or the song's key root); re-rolling clears the fills it wrote (volume under 70 with
+   no other command). */
+const fillSet = {dens:40, mode:1};
+function probFill(){
+  const G = genScope('Probability fill'); if (!G) return;
+  const mine = new Map();   // the rows this panel filled: rolling again takes them back first
+  const roll = () => { if (!G.ok()) return; const P = G.P(), d = fillSet.dens / 100, rnd = Math.random; let n = 0, prev = null;
+    for (const [y, w] of mine){ const r = P[y]; if (r && r[0] === w.n && r[VC] === w.v){ r[0] = -1; r[VC] = -1; fxDrop(r, 'CHA'); if (rowEmpty(r) && w.i) r[IC] = -1; } } mine.clear();
+    for (let y = G.y0; y <= G.y1; y++){ const r = P[y]; if (isNoteV(r[0])){ prev = {n:r[0], i:r[IC] >= 0 ? r[IC] : (prev ? prev.i : G.ins)}; continue; }
+      if (!rowEmpty(r) || r[0] === OFF) continue; const k = Math.floor((y - G.y0) / G.spr), onRow = (y - G.y0) % G.spr === 0;
+      const w = !onRow ? 0.15 : k % 4 === 0 ? 0.08 : k % 2 === 0 ? 0.35 : 0.6;
+      if (rnd() < w * d * 1.4){ const src = prev || {n:G.curNote != null ? G.curNote : ROOT + G.root, i:G.ins};
+        const setI = r[IC] < 0; r[0] = src.n; if (src.i != null && setI) r[IC] = src.i; r[VC] = 0x28 + Math.floor(rnd() * 0x40); if (fillSet.mode) fxPut(r, 'CHA', 0x40 + Math.floor(rnd() * 0x70)); mine.set(y, {n:r[0], v:r[VC], i:setI}); n++; } }
+    saveS(); draw(); toast(`Probability fill: ${n} ghost notes` + (fillSet.mode ? ' (each plays by chance: CHA)' : '') + ' · ' + genRange(G)); };
+  genPanel('Probability fill', `Ghost notes on the empty rows of ${genRange(G)}, offbeats likelier, quiet (volume 28–67).`,
+    ({field, slider}) => {
+      slider('Density', () => fillSet.dens, v => { fillSet.dens = v; });
+      field('Notes', selOf([[1, 'Chance: each plays some passes (CHA)'], [0, 'Fixed: always play']], fillSet.mode, v => { fillSet.mode = v; })); },
+    [['▶ / ■', () => playCtx()], ['Fill (G)', () => roll(), 'ok']], {g:roll, r:roll});
+}
+
+/* ARP: a chord written out as single notes in the first note column. The chord: its ROOT (the note under the cursor, else
+   the song's key) and SHAPE; PATTERN up / down / up-down / converge / random; RATE a note every 1, 2 or 4 sixteenths;
+   OCTAVES 1–3; GATE leaves a note OFF between notes (staccato) or lets each ring until the next. */
+const ARP_SHAPES = [['Major', [0, 4, 7]], ['Minor', [0, 3, 7]], ['Major 7', [0, 4, 7, 11]], ['Minor 7', [0, 3, 7, 10]], ['Dominant 7', [0, 4, 7, 10]], ['Sus 4', [0, 5, 7]], ['Sus 2', [0, 2, 7]], ['Minor 9', [0, 3, 7, 10, 14]], ['Diminished', [0, 3, 6]], ['Fifths', [0, 7, 12]]];
+const arpSet = {shape:1, pat:2, rate:1, oct:2, gate:0, root:-1};
+function arpGen(){
+  const G = genScope('Arp'); if (!G) return;
+  const rootDef = G.curNote != null ? G.curNote : ROOT + G.root + (G.key && G.key.scale === 6 ? 0 : 0);
+  if (arpSet.root < 0) arpSet.root = rootDef;
+  const roll = () => { if (!G.ok()) return; const P = G.P(), sh = ARP_SHAPES[arpSet.shape][1], notes = [];
+    for (let o = 0; o < arpSet.oct; o++) for (const iv of sh) notes.push(arpSet.root + iv + 12 * o);
+    const N = notes.filter(isNoteV); if (!N.length) return;
+    const pat = arpSet.pat, seq = pat === 0 ? N : pat === 1 ? N.slice().reverse() : pat === 2 ? N.concat(N.slice(1, -1).reverse()) : pat === 3 ? (() => { const o = []; let a = 0, b = N.length - 1; while (a <= b){ o.push(N[a++]); if (a <= b) o.push(N[b--]); } return o; })() : null;
+    const every = arpSet.rate * G.spr; let k = 0, n = 0;
+    for (let y = G.y0; y <= G.y1; y++){ const r = P[y]; r[0] = -1; if (rowEmpty(r)) r[VC] = -1; }
+    for (let y = G.y0; y <= G.y1; y += every){ const r = P[y]; r[0] = seq ? seq[k++ % seq.length] : N[Math.floor(Math.random() * N.length)]; r[IC] = G.ins; n++;
+      if (arpSet.gate && every > 1 && y + Math.max(1, Math.floor(every / 2)) <= G.y1){ const q = P[y + Math.max(1, Math.floor(every / 2))]; if (q[0] < 0) q[0] = OFF; } }
+    saveS(); draw(); toast(`Arp: ${n} notes, ${ARP_SHAPES[arpSet.shape][0]} on ${noteS(arpSet.root)} · ${genRange(G)}`); };
+  genPanel('Arp', `A chord written out as notes, in the first note column of ${genRange(G)}, instrument ${hx(G.ins)}.`,
+    ({field}) => {
+      field('Root', selOf(Array.from({length:61}, (_, i) => 24 + i).map(n => [n, noteS(n)]), arpSet.root, v => { arpSet.root = v; }));
+      field('Shape', selOf(ARP_SHAPES.map(([t], i) => [i, t]), arpSet.shape, v => { arpSet.shape = v; }));
+      field('Pattern', selOf([[0, 'Up'], [1, 'Down'], [2, 'Up and down'], [3, 'Converge'], [4, 'Random']], arpSet.pat, v => { arpSet.pat = v; }));
+      field('Rate', selOf([[1, 'Every 16th'], [2, 'Every 8th'], [4, 'Every beat']], arpSet.rate, v => { arpSet.rate = v; }));
+      field('Octaves', selOf([[1, '1'], [2, '2'], [3, '3']], arpSet.oct, v => { arpSet.oct = v; }));
+      field('Gate', selOf([[0, 'Legato (ring on)'], [1, 'Short (an OFF between)']], arpSet.gate, v => { arpSet.gate = v; })); },
+    [['▶ / ■', () => playCtx()], ['Write (G)', () => roll(), 'ok']], {g:roll, r:roll});
+}
+
+/* CHORDS: a progression for a poly track: each chord in the note columns (up to four notes) at the start of its rows.
+   KEY: the song's (as Acid line finds it) or set; MOOD picks the progression (by scale degree, minor or major); EVERY how
+   many rows a chord lasts; VOICING triads, sevenths or spread (the third up an octave). Re-rolling picks another of the
+   mood's progressions. On a mono track only the chords' roots go in (a bass line under them). */
+const CHORD_MOODS = [
+  ['Pop (I V vi IV)', 0, [[0, 4, 5, 3], [0, 5, 3, 4], [5, 3, 0, 4]]],
+  ['Sad (i VI III VII)', 1, [[0, 5, 2, 6], [0, 3, 5, 4], [0, 6, 5, 6]]],
+  ['Dark (i iv v)', 1, [[0, 3, 4, 0], [0, 0, 3, 4], [0, 5, 3, 4]]],
+  ['Dreamy (I IV, sevenths)', 0, [[0, 3, 0, 3], [0, 5, 3, 1], [3, 0, 5, 1]]],
+  ['Jazz (ii V I)', 0, [[1, 4, 0, 0], [1, 4, 0, 5], [5, 1, 4, 0]]],
+  ['IDM (anywhere in the key)', -1, null]];
+const chordSet = {mood:1, every:8, voicing:1, root:-1, minor:-1};
+function chordGen(){
+  const G = genScope('Chords'); if (!G) return;
+  if (chordSet.root < 0) chordSet.root = G.root; const keyMinor = G.key ? ![6].includes(G.key.scale) && ACID_SCALES[G.key.scale][1].includes(3) : true;
+  const MAJ = [0, 2, 4, 5, 7, 9, 11], MIN = [0, 2, 3, 5, 7, 8, 10];
+  const roll = () => { if (!G.ok()) return; const P = G.P(), M = CHORD_MOODS[chordSet.mood], minor = M[1] < 0 ? keyMinor : M[1] === 1, sc = minor ? MIN : MAJ;
+    const prog = M[2] ? M[2][Math.floor(Math.random() * M[2].length)] : Array.from({length:4}, (_, i) => i === 0 ? 0 : Math.floor(Math.random() * 7));
+    const every = chordSet.every * G.spr, cols = isPolyT(cTrack) ? NCOL : 1, base = 48 + chordSet.root; let k = 0, n = 0;
+    for (let y = G.y0; y <= G.y1; y++){ const r = P[y]; for (let c = 0; c < NCOL; c++) r[c] = -1; r[VC] = -1; }
+    for (let y = G.y0; y <= G.y1; y += every){ const dg = prog[k++ % prog.length], deg = i => sc[(dg + i) % 7] + 12 * Math.floor((dg + i) / 7);
+      let ch = [deg(0), deg(2), deg(4)]; if (chordSet.voicing >= 1 || chordSet.mood === 3 || chordSet.mood === 4) ch.push(deg(6)); if (chordSet.voicing === 2){ ch = [ch[0] - 12, ch[2], ch[1] + 12, ch[3] != null ? ch[3] : ch[0] + 12]; }
+      const r = P[y], notes = ch.map(x => base + x).filter(isNoteV).slice(0, cols); if (cols === 1) notes.splice(0, notes.length, base + deg(0) - 12);
+      notes.forEach((x, c) => { r[c] = x; }); r[IC] = G.ins; n++; }
+    saveS(); draw(); toast(`Chords: ${n} in ${ROOTS[chordSet.root]} ${minor ? 'minor' : 'major'} (${M[0]})` + (cols === 1 ? ' · a mono track: roots only' : '') + ' · ' + genRange(G)); };
+  genPanel('Chords', `A progression in the note columns of ${genRange(G)}` + (isPolyT(cTrack) ? ` (track ${d2(cTrack + 1)} is poly: up to four notes a chord)` : ` (track ${d2(cTrack + 1)} is mono: the roots only)`) + (G.key ? `; the song is in ${G.key.name}.` : '.'),
+    ({field}) => {
+      field('Key', selOf(ROOTS.map((t, i) => [i, t]), chordSet.root, v => { chordSet.root = v; }));
+      field('Mood', selOf(CHORD_MOODS.map(([t], i) => [i, t]), chordSet.mood, v => { chordSet.mood = v; }));
+      field('Every', selOf([[4, '4 sixteenths (a beat)'], [8, '8 (half a bar)'], [16, '16 (a bar)'], [32, '32 (two bars)']], chordSet.every, v => { chordSet.every = v; }));
+      field('Voicing', selOf([[0, 'Triads'], [1, 'Sevenths'], [2, 'Spread (open)']], chordSet.voicing, v => { chordSet.voicing = v; })); },
+    [['▶ / ■', () => playCtx()], ['Chords (G)', () => roll(), 'ok']], {g:roll, r:roll});
+}
+
+/* POLYMETER: a rhythm cycle of N steps (HITS of them, euclidean) and a pitch cycle of M notes, both repeated across the rows
+   of 16ths, so with N or M not dividing 16 they drift against the bar and against each other and the line keeps changing
+   (3 against 4, 5 against 16…). The notes come from the key around the root (the cursor's note, else the key's), SPREAD
+   wide. */
+const polySet = {steps:5, hits:3, pitch:3, spread:4, rot:0};
+function polyGen(){
+  const G = genScope('Polymeter'); if (!G) return;
+  const root = G.curNote != null ? G.curNote : 48 + G.root;
+  const roll = (fresh) => { if (!G.ok()) return; const P = G.P(), N = polySet.steps, K = clamp(polySet.hits, 1, N), M = polySet.pitch, rnd = Math.random;
+    if (fresh !== false) polySet.rot = Math.floor(rnd() * N);
+    const rh = euclid(K, N, polySet.rot), tones = Array.from({length:M}, (_, i) => i === 0 ? root : scaleStep(G, root, Math.round((rnd() * 2 - 1) * polySet.spread)));
+    let n = 0, h = 0;
+    for (let y = G.y0; y <= G.y1; y++){ const r = P[y]; r[0] = -1; if (rowEmpty(r)) r[VC] = -1; }
+    for (let s = 0; G.y0 + s * G.spr <= G.y1; s++){ if (!rh[s % N]) continue; const r = P[G.y0 + s * G.spr], x = tones[h++ % M]; if (!isNoteV(x)) continue; r[0] = x; r[IC] = G.ins; n++; }
+    saveS(); draw(); toast(`Polymeter: ${K} in ${N} against ${M} notes · ${n} notes · ${genRange(G)}`); };
+  genPanel('Polymeter', `A ${polySet.steps}-step rhythm and a pitch cycle repeated over ${genRange(G)}, drifting against the bar.`,
+    ({field}) => {
+      field('Rhythm', selOf([3, 5, 6, 7, 9, 10, 11, 12, 13].map(v => [v, v + ' steps']), polySet.steps, v => { polySet.steps = v; if (polySet.hits > v) polySet.hits = v; }));
+      field('Hits', selOf([1, 2, 3, 4, 5, 6, 7].map(v => [v, v + (v === 1 ? ' hit' : ' hits')]), polySet.hits, v => { polySet.hits = v; }));
+      field('Pitches', selOf([1, 2, 3, 4, 5, 7].map(v => [v, v === 1 ? 'One note' : v + ' notes']), polySet.pitch, v => { polySet.pitch = v; }));
+      field('Spread', selOf([[1, 'Close'], [4, 'Some'], [7, 'Wide (an octave)']], polySet.spread, v => { polySet.spread = v; })); },
+    [['▶ / ■', () => playCtx()], ['Rotate', () => { polySet.rot = (polySet.rot + 1) % polySet.steps; roll(false); }], ['Write (G)', () => roll(), 'ok']], {g:roll, r:() => { polySet.rot = (polySet.rot + 1) % polySet.steps; roll(false); }});
+}
+
+/* MARKOV MELODY: a new line that moves the way the song's own melodies do. It reads every melodic phrase in the song
+   (instruments with KEY FOLLOW: drums left out): which note follows which, and the gaps between notes, then walks those
+   (a first-order Markov chain), starting from the note the song plays most. NEW takes a step outside them now and then (a
+   neighbour in the key, or a gap length it hasn't used). Needs about a dozen melodic notes somewhere in the song. */
+const markSet = {nov:20, oct:0};
+function markovGen(){
+  const G = genScope('Markov melody'); if (!G) return;
+  const T = new Map(), gaps = [], count = new Map(); let tot = 0;
+  for (let p = 0; p < S.phrases.length; p++){ const ph = S.phrases[p]; if (!ph || p === G.ph) continue; let last = null, lastY = -1, ci = -1; const L = plen(p);
+    for (let y = 0; y < L; y++){ const r = ph[y]; if (r[IC] >= 0) ci = r[IC]; const n = r[0]; if (!isNoteV(n)) continue; const I = S.insts[ci >= 0 ? ci : r[IC]]; if (!I || !I.kf) { last = null; continue; }
+      if (last != null){ if (!T.has(last)) T.set(last, []); T.get(last).push(n); gaps.push(y - lastY); }
+      count.set(n, (count.get(n) || 0) + 1); tot++; last = n; lastY = y; } }
+  if (tot < 12) return toast('Markov melody learns from the song’s melodies, and there are only ' + tot + ' melodic notes so far (drums don’t count): write a few phrases first, or try Arp or Acid line.', 5000);
+  const top = [...count.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  const roll = () => { if (!G.ok()) return; const P = G.P(), rnd = Math.random, nov = markSet.nov / 100; let n = top, y = G.y0, k = 0;
+    for (let z = G.y0; z <= G.y1; z++){ const r = P[z]; r[0] = -1; if (rowEmpty(r)) r[VC] = -1; }
+    while (y <= G.y1){ const r = P[y], x = n + 12 * markSet.oct; if (isNoteV(x)){ r[0] = x; r[IC] = G.ins; k++; }
+      // (a song's lines repeat a note a lot: a repeat is taken half the time, so the walk moves)
+      const nx = T.get(n); let m = n; for (let t = 0; t < 3 && m === n; t++) m = nx && nx.length && rnd() >= nov ? nx[Math.floor(rnd() * nx.length)] : scaleStep(G, n, rnd() < 0.5 ? 1 : -1); if (m === n && rnd() < 0.5) m = scaleStep(G, n, rnd() < 0.5 ? 1 : -1); n = m;
+      const gp = gaps.length && rnd() >= nov * 0.6 ? gaps[Math.floor(rnd() * gaps.length)] : G.spr * (1 + Math.floor(rnd() * 3)); y += Math.max(1, Math.min(4 * G.spr, gp)); }
+    saveS(); draw(); toast(`Markov melody: ${k} notes from ${tot} in the song · ${genRange(G)}`); };
+  genPanel('Markov melody', `A new line in ${genRange(G)} that moves the way the song’s melodies do (learned from ${tot} notes, ${T.size} of them with somewhere to go next).`,
+    ({field, slider}) => {
+      slider('New', () => markSet.nov, v => { markSet.nov = v; });
+      field('Octave', selOf([[-1, 'Down one'], [0, 'As the song'], [1, 'Up one']], markSet.oct, v => { markSet.oct = v; })); },
+    [['▶ / ■', () => playCtx()], ['Generate (G)', () => roll(), 'ok']], {g:roll, r:roll});
+}
+/* ===== end MORE GENERATORS ===== */
+
 
 /* ACID LINE (owner, 30 Oct): pump ACID's random pattern generator (plugins/acid/AcidParams.hpp, randomizeSteps and
    mutateSteps), writing a bass line into the open phrase for an Acid pad. Acid-line logic, as a hardware bass line's random
@@ -30841,6 +31030,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [463, '6 Nov', ['Six more generators (GEN, or Edit ▾ → Generators): Markov melody (a new line that moves the way your song’s melodies do), Arp (a chord written out up / down / converge / random), Chords (a progression for a poly track, by key and mood), Polymeter (a rhythm and a pitch cycle that drift against the bar), Ratchet (rolls and flams on the hits: RET, DEL) and Probability fill (ghost notes on the empty rows, fixed or by chance: CHA).']],
   [462, '6 Nov', ['Two new generators (GEN, or Edit ▾ → Generators): Drum pattern writes a beat across tracks on the song row (Four on the floor, Broken beat, Jungle, Footwork, Halftime, IDM euclidean; density, variation, a fill; a track and an instrument per part, found from your pad names), and Mutate makes a variation of the open phrase (pitch in the song’s key, hits dropped and added, timing, volume; Original puts it back).']],
   [461, '6 Nov', ['On a phone or tablet the song moves from the audio-thread sequencer to the page sequencer the moment the app goes out of view (screen off, another app), at the next step to sound, so it keeps time and STOP always works; the next PLAY is on the audio thread again. Computers are unchanged.']],
   [460, '6 Nov', ['KEEP SCREEN ON holds after a quick STOP and PLAY (it could let go, and the screen then timed out mid-song); while the song plays it is checked every 2 s.']],
