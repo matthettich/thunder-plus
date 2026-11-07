@@ -20808,7 +20808,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '1l1znga';
+const CORE_REV = '1yb8h04';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -20921,7 +20921,7 @@ function coreStart(mode, o, t0, rs){
   // reached it up to 250 ms after they were booked and live-engine notes went missing; the core books 0.6 s ahead for the
   // first 1.5 s, then the usual (coreLead)
   corePost({op:'lead', s:0.6}); clearTimeout(coreLeadT); coreLeadT = setTimeout(coreLead, 1500);
-  core.gen++; corePost({op:'play', gen:core.gen, mode, o:oo, t0, rs}); coreWire(true);
+  core.gen++; corePost({op:'play', gen:core.gen, mode, o:oo, t0, rs, watch:seqHandHere()}); coreWire(true);   // (watch: the core's own WATCHDOG, phones only)
   // tp.seq stands in for the sequencer: the page reads its clock, tempo and ticks, and sets the loop and tempo through it
   const P = {time:t0, tks:tp.tks, base:null, btT:null, _bpm:tp.bpm, _alive:true, alive(){ return this._alive; }, step(){ return {t:this.time, evs:[], pos:null}; },
     setLoop(l){ corePost({op:'loop', l:l || null}); } };
@@ -20975,10 +20975,16 @@ function pbClock(){ if (!tp.on || !tp.core || !ctx || core.bad || ctx.state !== 
   if (!c || w - c.w < 1.5) return; const r = (a - c.a) / (w - c.w);
   if (r > 0.85 && r < 1.15){ PB.ckBad = 0; return; }
   pbLog(`audio clock at ${r.toFixed(2)}× real time`); if (++PB.ckBad < 2) return;
+  coreFail(); }
+// The core is let go (the clock watch here, or its own WATCHDOG): the song carries on from its row on the page sequencer, which
+// plays until the app reloads. self: the core already stopped itself (and gave the live engines back) at audio time selfT.
+function coreFail(self){
   core.bad = true; let row = -1; for (const q of tp.pos || []) if (q && q.row > row) row = q.row;
-  pbLog('switched to the page sequencer from row ' + row); try { tStop(true); } catch(e){} try { coreDrop(); } catch(e){}
-  if (row >= 0) tStart('song', {row});
-  toast('The audio clock went out of step, so the song moved to the page sequencer (until the app reloads).', 5000); }
+  const mode = tp.mode;
+  pbLog('switched to the page sequencer from row ' + row + (self ? ' (the audio-thread sequencer stopped itself: ' + self.why + ')' : '')); try { tStop(true); } catch(e){} try { coreDrop(); } catch(e){}
+  if (row >= 0 && mode === 'song') tStart('song', {row});
+  const went = row >= 0 && mode === 'song' ? 'the song moved to the page sequencer' : 'playback stopped; PLAY uses the page sequencer';
+  toast((self && self.why === 'deaf' ? 'The audio thread got too busy to hear the app, so ' : 'The audio clock went out of step, so ') + went + ' (until the app reloads).', 5000); }
 setInterval(() => { try { pbClock(); } catch(e){} }, 2000);
 function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; PB.t = now;
   if (PB.n) pbLog(`rows ${PB.n} · latest note ${(PB.late * 1000).toFixed(0)} ms late · dropped ${PB.drop} · ahead ${(PB.ahead * 1000).toFixed(0)} ms · core skips ${PB.skips} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'}`);
@@ -21004,10 +21010,14 @@ function coreMsg(d){
   if (d.op === 'ready'){ core.v = d.v; if (d.v !== CORE_WANT){ core.ready = false; toast('The audio-thread sequencer here is an older copy: reload the app to use it. Playing as before.', 5000); } return; }
   if (d.op === 'error'){ tpLog('core: ' + d.where, new Error(d.message)); return; }
   if (d.op === 'started'){ pbLog(`core PLAY: reached the audio thread ${Math.round(-d.late * 1000)} ms before its start, took ${d.ms} ms`); return; }
+  // WATCHDOG (the core's own, phones): it let go of the song by itself; an older PLAY's (after a STOP or a hand-over) is only logged
+  if (d.op === 'self'){ pbLog(`the audio-thread sequencer stopped itself (${d.why}) · gen ${d.gen}, now ${core.gen} · ` + pbState());
+    if (tp.on && tp.core && d.gen === core.gen) coreFail(d); return; }
   if ((d.op !== 'rows' && d.op !== 'end' && d.op !== 'held') || !tp.on || !tp.core || d.gen !== core.gen) return;
   if (d.op === 'held'){ rcdHeldAt(d.t, d.pos); return; }   // EXACT STOP: the core stopped at the pattern's edge
   const s = tp.seq;
   if (d.op === 'end'){ s._alive = false; s.time = d.time; return; }
+  corePost({op:'ack'});   // WATCHDOG: the core goes on only while the page hears it
   audioWake = performance.now();
   for (const r of d.rows){
     // RECORDER CUT (CodeRabbit, 7 Nov): the row is counted first, so the edge a held STOP waits for is known before its notes
@@ -22180,7 +22190,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 467;
+const BUILD = 468;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31104,6 +31114,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [468, '7 Nov', ['Audio-thread sequencer on phones: when the audio thread gets overloaded (the timing stutters, speeds up or slows down), it now notices within about 2 seconds and lets go by itself, so the song carries on from its row on the page sequencer and STOP always stops, the synth tracks included (they used to play on after STOP).']],
   [467, '7 Nov', ['Record into a pad, Until Stop on the audio-thread sequencer: pressing Stop just before a pattern ends no longer lets a moment of the next pattern play (not even a blip of its first beat).']],
   [466, '7 Nov', ['Fixes from a review: PLAY tells …chains the song started again (tempo-synced modules restart on the downbeat).', 'A computer never switches to the page sequencer or holds the screen on by itself: that is for phones and tablets.', 'After a phone moves to the page sequencer, bass, voice, acid and …pump synth notes sound straight away (they were muted for a few seconds).', 'Generators: Ctrl/⌘+Z undoes a roll with the panel open; Drum pattern’s Perc shows “— instrument” until you pick one, and says when a shared block has no room for a copy.']],
   [465, '7 Nov', ['The audio-thread sequencer books further ahead for the first moments after PLAY, and a note that arrives a little late still plays, so the first beat no longer loses notes on live engines.', 'On a phone the move to the page sequencer when the app goes out of view is quicker (it no longer redraws the hidden screen), so no steps are skipped.', 'Keep screen on and Background play are also in Settings → App.', 'The first-launch tips wait until nothing else is open, and step aside if a panel opens.', 'Drum pattern makes a unique copy of a block that also plays elsewhere (SHARED; or rewrite it everywhere, as before).', 'Help has a Generators page (and playing on a phone).']],

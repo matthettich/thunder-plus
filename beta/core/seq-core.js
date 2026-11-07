@@ -684,11 +684,13 @@ const TFX_MAP = {
      {op:'vars', vars}           the page settings again (each PLAY)
      {op:'kit', kv}              per pad: {choke, syn, rel, live, sf} (what decides whether the core can play it)
      {op:'buf', pad, data, sr}   a pad's render (mono), or data:null when it has none
-     {op:'play', gen, mode, o, t0, rs}  start: o as makeSeq takes it; rs {ref, row, step}: RESUME (the page played that step)
+     {op:'play', gen, mode, o, t0, rs, watch}  start: o as makeSeq takes it; rs {ref, row, step}: RESUME (the page played that step); watch: the WATCHDOG (phones)
+     {op:'ack'}                  the page read a batch of rows (WATCHDOG)
      {op:'stop', at}  ·  {op:'loop', l}  ·  {op:'bpm', v}  ·  {op:'perf', xf, mac, fill}  ·  {op:'lxp', st}  ·  {op:'lead', s}
      {op:'test', id, mode, max, opt}  run the sequencer at once (sim, seeded random): tools/seq-golden.mjs --core
    Messages out:
      {op:'ready', v}  ·  {op:'rows', rows, time, bpm, tks, alive}  ·  {op:'end'}  ·  {op:'test', id, rows}  ·
+     {op:'self', gen, why, t}  the WATCHDOG let go of the song at audio time t (why: 'deaf' or 'clock <ratio>')  ·
      {op:'error', where, message} */
 
 const CORE_V = 7;   // the message set's version: index.html's CORE_WANT must match (3: patch sync; 4: the mix outputs NT+1..NT+3; 5: FXV, BYP, tempo; 6: SoundFonts; 7: hold / held, the exact STOP)
@@ -893,6 +895,7 @@ class ThunderCore extends AudioWorkletProcessor {
       case 'sig': { const j = JSON.stringify(S); let h = 0; for (let i = 0; i < j.length; i++) h = (h * 31 + j.charCodeAt(i)) | 0; this.port.postMessage({op:'sig', len:j.length, h}); return; }
       case 'dbg': this.noSampler = !!d.noSampler; return;   // measuring: the page plays every note (the core only sequences)
       case 'die': this.release(currentTime); this.dead = true; this.seq = null; this.alive.clear(); return;   // the page let this core go (Reset audio engine)
+      case 'ack': this.ackT = currentTime; return;   // WATCHDOG: the page read our rows
       case 'lead': this.LEAD = Math.max(0.05, Math.min(2, +d.s || 0.25)); return;
     }
   }
@@ -932,6 +935,8 @@ class ThunderCore extends AudioWorkletProcessor {
       else seq.time = d.t0; }
     else seq.time = d.t0;
     this.seq = seq; this.ended = false; this.gen = d.gen | 0; this.hold = false; this.lr = null; this.ls = null;
+    // WATCHDOG (phones; owner, 7 Nov, Fold, screen on: stutter, faster, slower, then it played on after STOP)
+    this.watch = !!d.watch; this.ackT = currentTime; this.ckW = Date.now(); this.ckA = currentTime; this.ckBad = 0;
     this.port.postMessage({op:'started', gen:this.gen, late:at0 - d.t0, ms:Date.now() - ms0});
   }
 
@@ -1241,7 +1246,28 @@ class ThunderCore extends AudioWorkletProcessor {
     if (this.dead) return false;
     const __t0 = Date.now(); try { return this.process1(inputs, outputs); } finally { this.pms = (this.pms || 0) + Date.now() - __t0; this.pbl = (this.pbl || 0) + 1; }
   }
+  /* WATCHDOG (phones only: the page sends watch:true where it hands over, seqHandHere). The page's own checks needed this
+     thread to read their messages, and an overloaded audio thread doesn't: its clock lurches (0.8×, then 1.5×) and STOP,
+     re-sent or not, waits behind the rendering, while the core keeps driving the live engines (the poly tracks), which
+     unplugging the core doesn't silence. So the core watches itself and lets go on its own:
+     - CLOCK: audio time ÷ wall time outside 0.8–1.25 over two 1-second windows running;
+     - DEAF: the page hasn't acknowledged a row for 3 s of audio time (it can't hear us, or we can't hear it: a STOP may be
+       stuck behind us, or the page dropped this core).
+     Letting go is a hand-over stop: every voice and booked note ends now, and the live engines go back to the page's own
+     params at once (silent when stopped; the page sequencer's notes when it carries on). The page is told ('self'). */
+  watchdog(){
+    const s = this.seq; if (!s || !this.watch) return false;
+    let why = null;
+    if (currentTime - (this.ackT || 0) > 3) why = 'deaf';
+    else { const w = Date.now(); if (w - this.ckW >= 1000){ const r = (currentTime - this.ckA) / ((w - this.ckW) / 1000); this.ckW = w; this.ckA = currentTime;
+      if (r < 0.8 || r > 1.25){ if (++this.ckBad >= 2) why = 'clock ' + r.toFixed(2); } else this.ckBad = 0; } }
+    if (!why) return false;
+    const at = currentTime; this.seq = null; this.hold = false; this.stopAll(at); this.release(at); this.clkOn = false; this.clk.cancel(at); this.clk.set(0, at);
+    this.port.postMessage({op:'self', gen:this.gen, why, t:at});
+    return true;
+  }
   process1(inputs, outputs){
+    this.watchdog();
     // 1. step the song up to LEAD ahead: the core books its own notes, the rows go up for the page's part
     const s = this.seq;
     if (s){
