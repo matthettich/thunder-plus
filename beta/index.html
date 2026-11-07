@@ -21892,6 +21892,14 @@ function loadCur(){
     if (o.cs) for (const k in cs) if (o.cs[k]) Object.assign(cs[k], {x:int(o.cs[k].x, 0), y:int(o.cs[k].y, 0)});
   } catch(e){}
 }
+// PHRASE ON THE CURSOR (owner, 6 Nov: a new song on the Fold, opened on the Phrase screen, let notes go into a phrase that
+// wasn't on the song): after a song loads, the phrase screen opens what's under the song cursor (its row, the cursor's
+// track); an empty cell gets a fresh phrase that goes on the song there with its first note (pendPlace, as Shift+Alt+arrows).
+function phraseToCursor(){
+  pendPlace = null; const x = cTrack, y = cs.song.y, cid = S.song[y] ? S.song[y][x] : -1;
+  if (x >= MT || (typeof isBusT === 'function' && isBusT(x))) return;
+  if (cid >= 0){ const p = firstPhrase(cid); cSect = cid; if (p >= 0) cPhrase = p; return; }
+  const fp = freePhrase(); if (fp < 0) return; cPhrase = fp; cs.phrase.y = 0; pendPlace = {x, y, p:fp}; }
 function resetCursors(){ cSect = cPhrase = cInst = cTrack = cFxT = cFxS = 0; for (const k in cs) Object.assign(cs[k], {x:0, y:0, top:0}); selA = null; }
 // A song's pattern numbering starts at 00. last.sect/last.phrase are the last sect/phrase NUMBER placed, and
 // they seed the first empty cell you type into — so a new song used to inherit the old song's number (a new
@@ -21954,7 +21962,7 @@ function irsUI(sec){
   }
   sec.append(box);
 }
-function setSong(s, msg){ tStop(true); tp.paused = null; irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
+function setSong(s, msg){ tStop(true); tp.paused = null; irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -22012,7 +22020,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 450;
+const BUILD = 451;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -30561,6 +30569,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [451, '6 Nov', ['A song you load or start opens the Phrase screen on what’s under the song cursor: the phrase there, or, on an empty cell, a fresh phrase that goes on the song in that cell with its first note (it let notes go into a phrase that wasn’t on the song).']],
   [450, '6 Nov', ['Closing the app (or opening another song) with unsaved work asks plainly: “You have unsaved samples” when you’ve recorded or loaded samples since the last save, else “Save changes to …?”, then Save song and kit / Don’t save (it read “…and closing the app replaces it”).', 'No more pop-up about FLX above 10 when a song opens.']],
   [449, '6 Nov', ['Record a sample…: ● Record over a take you haven’t kept asks first: Keep in the pad and record, Discard and record, or Cancel (Esc).', 'A held STOP now stops the song exactly at the pattern’s end, in a background tab too: both sequencers stop booking notes there (it relied on a page timer, which a hidden tab runs up to a second late).', 'F fits the whole take in the sample editor (0 is a note key).']],
   [448, '6 Nov', ['Fixes from a review of 446–447: only your own STOP waits for the pattern’s end; rendering, MIDI export, MIDI clock STOP, Ableton Link, an audio interruption or an error stop the song at once again (they waited too, and an interrupted song never stopped).', 'A STOP pressed just before the downbeat no longer records a whole extra pattern.', 'A PLAY pressed while a stop was waiting is no longer stopped a moment later.', 'R in Record a sample… plays its note while a take is showing (it threw the take away); ● Record records again.', 'Drop-down arrows: only the skins that hid them get them back (the compact drop-downs in …chains, the FX picker and the MIDI settings had an arrow drawn over their text).', 'The note keys in the sample editor reuse one buffer (long takes were copied on every press); a key held as the window loses focus is let go; the tracker’s OCT shows the octave set there.']],
