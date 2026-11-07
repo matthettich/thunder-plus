@@ -26,6 +26,10 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.93** (6 Nov 2026; owner: "can we push to main and make a new build?"; Run workflow through the API with version 1.2.93,
+  from `main` after merging `beta` at build 449, run 42331534670): FOLLOW PATTERN in Pattern view (446); Record a sample…
+  finish-the-pattern STOP, note keys + OCT in the editor, drop-down ▾ (447); the review fixes (448); ask first, exact STOP
+  (core v7), F fits (449).
 - **v1.2.92** (5 Nov 2026; owner: "let's push a desktop as well"; from `main` at build 445, run 42173205344): the Edit… button on sample
   layers, orange wave / blue selection, the FX-card waveform window (445).
 - **v1.2.91** (5 Nov 2026; owner: "push these things to main and make a desktop build"; Run workflow through the API with version 1.2.91,
