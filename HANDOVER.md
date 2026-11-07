@@ -176,6 +176,16 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 7 Nov (4): mobile navigation audit, first fixes (build 472, beta)
+
+- Audit doc (Claude Doc "Thunder Plus — mobile navigation audit"). Owner's picks: help updated; OPTION+▲ = above / earlier
+  everywhere (optDir `dn`: Sect / Inst / FX / phrase-by-number flipped); SHIFT+▲▼ on the pad = Project / Mixer on every screen
+  (M8; dirPress no longer calls lineSel; select = SHIFT+OPTION or SEL; keyboard Ctrl/⌘+Shift+▲▼ still selects lines); pad
+  EDIT double tap 450 ms (Enter keeps 380); Mixer OPTION off the FX row: a toast. Skipped (owner): an Arrange-has-the-keys
+  indicator. Asked, not built: EDIT picks up notes (drop with EDIT on an empty cell), and a hold before a drag edits.
+- Careful: a `//` comment pasted mid-line swallowed the rest of editTap's double-tap line (caught by make-core's parse, not
+  by npm test). Run `node tools/make-core.mjs --check` after any index.html edit.
+
 ## 7 Nov (3): merged 468–470 to main (PR #10); CodeRabbit review PR #11; EDIT on effects like Enter (build 471, beta)
 
 - PR #10 (beta → main) merged at once on request, so CodeRabbit got no pass: PR #11 is review-only (head main, base
