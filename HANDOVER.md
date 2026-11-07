@@ -202,6 +202,13 @@ efficiency; check-in at 2:40 (scheduled task "Thunder Plus stability pass check-
     page doesn't play that step again (rsDup).
   - genPanel: Ctrl/⌘+Z / Y = undoStep with the panel open. Drum pattern: "— instrument" option (Perc with no match); a
     shared block with no room for a unique copy is left alone and said (wrote.full). rcdKeyOn: a < 0 on a < 32-sample take.
+  - CodeRabbit (installed 7 Nov; PR #8, review-only, main vs snapshot branch review-base-1105) → build 467: rcdCutAt posts the
+    core stop at t on every path (a 'hold' that arrived after the core booked the edge only stopped it at the next edge).
+    PR #9 (beta → main), CodeRabbit's second pass: coreMsg stops at the first row at or past tp.stopAt (rows after the cut in
+    the same batch were still played by the page); core kill() of a voice that starts at or after the stop ends it unheard
+    (v.end = v.t0; it was a fade from full level: a blip of the next downbeat).
+    Third pass: the unheard-voice rule is for transport stops only (kill(v, at, tc, stop) from stopAll; a note's own OFF / cut
+    keeps its release); coreMsg counts each row (tp.q + rcdStep) before its events, so the edge row itself isn't played.
   - Left: MIDI notes / clock booked past a recorder edge aren't taken back (up to 1.2 s of the next pattern on external gear);
     generators leave IC on cleared rows (cosmetic).
 

@@ -14562,7 +14562,10 @@ function rcdEdgeAhead(R){
    the tidy-up for the screen. */
 function rcdCutAt(t, booked){
   tp.stopAt = t; try { if (rt) rt.pl.stopAll(t); } catch(e){}
-  if (booked && tp.core) corePost({op:'stop', at:t});   // the core booked up to the edge already: stop it there
+  // the core stops there too, whichever way the edge came (CodeRabbit, 7 Nov): a 'hold' that reached it after it had booked the
+  // edge would only stop it at the NEXT edge, and its own samples / live notes past t aren't the page's to take back. (After a
+  // 'held' it has stopped already: one more stop at t changes nothing.)
+  if (tp.core) corePost({op:'stop', at:t});
   rcdSongStopAt(t); }
 // The page's pump, before it plays step r: is it the edge a held STOP waits for? Then the take ends and the song stops there.
 function rcdGateEdge(r){
@@ -20805,7 +20808,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '11virm3';
+const CORE_REV = '1l1znga';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -21007,6 +21010,12 @@ function coreMsg(d){
   if (d.op === 'end'){ s._alive = false; s.time = d.time; return; }
   audioWake = performance.now();
   for (const r of d.rows){
+    // RECORDER CUT (CodeRabbit, 7 Nov): the row is counted first, so the edge a held STOP waits for is known before its notes
+    // go out; from the cut on nothing is the page's to play (rt.pl.stopAll(t) can't be relied on for notes booked at t)
+    const cut = () => !tp.on || !tp.core || (tp.stopAt != null && r.t >= tp.stopAt - 1e-6);   // (or the song already stopped: rcdSongStopAt stops at once when the cut is due)
+    if (cut()) break;
+    tp.q.push({t:r.t, pos:r.pos, bpm:r.bpm, tks:r.tks, line:r.line}); rcdStep(tp.q[tp.q.length - 1]);
+    if (cut()) break;
     for (const e of r.evs){
       if (e.vk && !e.core) try { varWant(e); const r = VAR.map.get(varKey(e)); if (r) coreVar(e, r); } catch(err){}   // MUT / GEN: the core gets it for the next time
       { const k = (e.core ? 'core ' : 'page ') + e.type + (e.type === 'note' && (e.vk || e.tw) ? ' var' : '') + (e.type === 'note' && !e.core ? ' pad ' + e.pad : ''); core.tally.set(k, (core.tally.get(k) || 0) + 1); }
@@ -21025,10 +21034,10 @@ function coreMsg(d){
       if (e.type === 'note' && e.t < ctx.currentTime - 0.15){ PB.drop++; continue; }
       rt.pl.play(e); if (e.type === 'note') padBlink(e);
     }
-    tp.q.push({t:r.t, pos:r.pos, bpm:r.bpm, tks:r.tks, line:r.line}); rcdStep(tp.q[tp.q.length - 1]);
     mx.pend.forEach((P, t) => { if (P && P.length) pendFlush(t, r.t); });
     if (rec.on) recHist(r);
   }
+  if (!tp.on || !tp.core) return;   // (stopped while reading these rows)
   s.time = d.time; s._bpm = d.bpm; s.tks = d.tks; s.base = d.base; s.btT = d.btT; s._alive = d.alive;
   { const r0 = d.rows[0], r1 = d.rows[d.rows.length - 1], ct = ctx.currentTime; PB.n += d.rows.length; if (r0) PB.late = Math.max(PB.late, ct - r0.t); if (r1) PB.ahead = Math.max(PB.ahead, r1.t - ct); if (d.skips != null) PB.skips = d.skips; pbSum(); }
   corePump();
@@ -22171,7 +22180,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 466;
+const BUILD = 467;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31095,6 +31104,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [467, '7 Nov', ['Record into a pad, Until Stop on the audio-thread sequencer: pressing Stop just before a pattern ends no longer lets a moment of the next pattern play (not even a blip of its first beat).']],
   [466, '7 Nov', ['Fixes from a review: PLAY tells …chains the song started again (tempo-synced modules restart on the downbeat).', 'A computer never switches to the page sequencer or holds the screen on by itself: that is for phones and tablets.', 'After a phone moves to the page sequencer, bass, voice, acid and …pump synth notes sound straight away (they were muted for a few seconds).', 'Generators: Ctrl/⌘+Z undoes a roll with the panel open; Drum pattern’s Perc shows “— instrument” until you pick one, and says when a shared block has no room for a copy.']],
   [465, '7 Nov', ['The audio-thread sequencer books further ahead for the first moments after PLAY, and a note that arrives a little late still plays, so the first beat no longer loses notes on live engines.', 'On a phone the move to the page sequencer when the app goes out of view is quicker (it no longer redraws the hidden screen), so no steps are skipped.', 'Keep screen on and Background play are also in Settings → App.', 'The first-launch tips wait until nothing else is open, and step aside if a panel opens.', 'Drum pattern makes a unique copy of a block that also plays elsewhere (SHARED; or rewrite it everywhere, as before).', 'Help has a Generators page (and playing on a phone).']],
   [464, '6 Nov', ['Settings → Screen → PLAYHEAD OFFSET: nudge the playhead in 5 ms steps (−100 to +300 ms, this device) so it lines up with what you hear.']],
