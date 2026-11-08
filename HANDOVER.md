@@ -233,6 +233,11 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+- **Punch list (owner, 7 Nov 18:22): one wheel direction everywhere.** Arrange went up while the Mixer went down. Found: every
+  handler agrees on deltaY, but macOS Natural scrolling flips deltaY, and Arrange's wheel moves a cursor (the selected block)
+  while the Mixer scrolls content natively, so with Natural scrolling on they feel opposite. Owner will try turning Natural
+  scrolling off for the mouse first (18:28). If they want Natural scrolling kept, the fix is the Electron main process reading
+  `defaults read -g com.apple.swipescrolldirection` and the page flipping its cursor-moving wheel handlers to match.
 - **Track reordering** (moving a track next to its bus, as other DAWs do). Big job: every song row, mixer, send, bus
   group, block mute and MIDI mapping refers to tracks by index, so it all has to be renumbered together. Owner (2 Nov):
   later, not while stabilising.
