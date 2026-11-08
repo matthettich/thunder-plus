@@ -147,6 +147,7 @@ transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner 
 - 11:00: "Measure button takes a couple of pushes" (asked: what the first push shows) and an "Audio engine reset" message after
   two runs: the reset after Measure is deliberate (7 Nov: opening the input moves macOS's output timing); build 508 does it
   quietly (`resetAudio(true)`), and resetAudio now reconnects the recorder's monitor to the new master (it stayed on the old one).
+  Build 509 (CodeRabbit): a queued open whose window closed before it began never starts.
 - 11:02: "If I monitor directly, it's spot on, but through [the app's] monitor MIDI sounds late": so the MIDI timing is right
   (Gear delay as measured); the app's own monitoring is late by its input path + 20 ms cushion + output latency (by design:
   use the interface's direct monitoring when tracking). A lower-latency monitor option could come later if wanted.

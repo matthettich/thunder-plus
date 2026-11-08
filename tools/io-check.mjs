@@ -166,6 +166,12 @@ try {
       E('rcdClose()'); await wait(100); window.__ioOpenDelay = 600; const p1 = E('rcdOpen()'); await wait(150); E('rcdClose()');
       const r2 = await E('rcdOpen()'); const r1 = await p1; return {r1, r2, io:E('!!RCD.io')}; });
     ok(reo.r1 === false && reo.r2 === true && reo.io, 'reopening straight after closing mid-open opens the input afresh: ' + JSON.stringify(reo));
+    // ...and a queued open whose window closed too before it began never starts (CodeRabbit)
+    const q2 = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
+      E('rcdClose()'); await wait(100); window.__ioOpenDelay = 600; const p1 = E('rcdOpen()'); await wait(100); E('rcdClose()');
+      const p2 = E('rcdOpen()'); await wait(50); E('rcdClose()'); const r = [await p1, await p2]; await wait(300);
+      const out = {r, io:E('!!RCD.io'), mon:E('!!RCD.mon')}; await E('rcdOpen()'); return out; });
+    ok(q2.r.join() === 'false,false' && !q2.io && !q2.mon, 'an open queued behind one whose window closed, and closed itself before starting, never opens: ' + JSON.stringify(q2));
     await page.evaluate(async () => { await window.__seqTest.ev('rcdOpen()'); });
     // ONE OPEN (owner's beta.4 test: 4–8 microphone prompts, "wouldn't open: no answer"): two opens at once are one open; an input
     // that hasn't sent audio yet (macOS still asking for the microphone) isn't reopened as stale
