@@ -13,7 +13,7 @@ const make = addon => { const out = []; const h = createIoHelper({ loadAddon: ()
 
 test('io helper: addon loads → hello available with its version, then devices arrive with the request id', () => {
   const { h, out } = make({ version: () => '0.1.0', devices: () => DEVS });
-  assert.deepEqual(h.hello, { op: 'hello', available: true, version: '0.1.0' });
+  assert.deepEqual(h.hello, { op: 'hello', available: true, version: '0.1.0', midi: false });
   h.handle({ op: 'devices', id: 7 });
   assert.deepEqual(out, [{ op: 'devices', id: 7, devices: DEVS }]);
   assert.equal(out[0].devices.length, 2);
@@ -155,4 +155,55 @@ test('io helper wiring: chunks go to the Electron port WITHOUT a transfer list (
   const wiring = src.slice(src.indexOf('if (process.parentPort)'));
   assert.match(wiring, /post: m => \{ if \(port\) port\.postMessage\(m\); \}/);
   assert.doesNotMatch(wiring, /port\.postMessage\(m, t/);
+});
+
+// ---- MIDI (phase B) ----
+function makeMidi() {
+  const out = [], calls = [], inQ = []; let ivs = [], next = 1;
+  const timers = { setInterval: (f, ms) => { const h = { f, ms }; ivs.push(h); return h; }, clearInterval: h => { ivs = ivs.filter(x => x !== h); } };
+  const addon = { version: () => '4', devices: () => [],
+    midiPorts: () => ({ outs: [{ id: 'Gear', name: 'Gear' }], ins: [{ id: 'Clock', name: 'Clock' }] }),
+    midiOpenOut: n => n === 'Gear' ? { ok: true, port: next++ } : { ok: false, why: 'no MIDI output called ' + n },
+    midiOpenIn: n => n === 'Clock' ? { ok: true, port: next++ } : { ok: false, why: 'no MIDI input called ' + n },
+    midiSend: (p, b, at) => { calls.push(['send', p, Array.from(b), at]); return true; },
+    midiClear: p => { calls.push(['clear', p]); return 0; }, midiClose: p => calls.push(['close', p]),
+    midiRead: () => inQ.length ? inQ.splice(0) : null };
+  const h = createIoHelper({ loadAddon: () => addon, post: m => out.push(m), timers });
+  return { h, out, calls, inQ, tick: () => ivs.forEach(i => i.f()), ivs: () => ivs };
+}
+
+test('io helper MIDI: hello says midi; ports; open out / in with ids; a bad name is {ok:false, why}', () => {
+  const { h, out } = makeMidi();
+  assert.equal(h.hello.midi, true);
+  h.handle({ op: 'midiPorts', id: 1 }); assert.deepEqual(out[0], { op: 'midiPorts', id: 1, outs: [{ id: 'Gear', name: 'Gear' }], ins: [{ id: 'Clock', name: 'Clock' }] });
+  h.handle({ op: 'midiOpenOut', id: 2, name: 'Gear' }); assert.deepEqual(out[1], { op: 'midiOpened', id: 2, ok: true, port: 1 });
+  h.handle({ op: 'midiOpenOut', id: 3, name: 'Nope' }); assert.deepEqual(out[2], { op: 'midiOpened', id: 3, ok: false, why: 'no MIDI output called Nope' });
+});
+
+test('io helper MIDI: sends (one and many) and clear reach the addon in order, with no answer', () => {
+  const { h, out, calls } = makeMidi();
+  h.handle({ op: 'midiOpenOut', id: 1, name: 'Gear' }); out.length = 0;
+  h.handle({ op: 'midiSend', port: 1, bytes: [0x90, 60, 100], at: 5e9 });
+  h.handle({ op: 'midiSendMany', list: [[1, [0x80, 60, 0], 6e9], [1, [0xF8], 0]] });
+  h.handle({ op: 'midiClear', port: 1 });
+  assert.deepEqual(calls, [['send', 1, [0x90, 60, 100], 5e9], ['send', 1, [0x80, 60, 0], 6e9], ['send', 1, [0xF8], 0], ['clear', 1]]);
+  assert.equal(out.length, 0, 'streams get no answer');
+});
+
+test('io helper MIDI: an open input polls; what came is posted as one midiIn batch; shutdown clears and closes every port', () => {
+  const { h, out, calls, inQ, tick, ivs } = makeMidi();
+  h.handle({ op: 'midiOpenOut', id: 1, name: 'Gear' }); h.handle({ op: 'midiOpenIn', id: 2, name: 'Clock' }); out.length = 0;
+  assert.equal(ivs().length, 1, 'one MIDI-in poll');
+  tick(); assert.equal(out.length, 0, 'nothing came: nothing posted');
+  inQ.push({ port: 2, bytes: [0xF8], ns: 1e9 }, { port: 2, bytes: [0xF8], ns: 1.02e9 }); tick();
+  assert.deepEqual(out, [{ op: 'midiIn', list: [{ port: 2, bytes: [0xF8], ns: 1e9 }, { port: 2, bytes: [0xF8], ns: 1.02e9 }] }]);
+  calls.length = 0; h.shutdown();
+  assert.deepEqual(calls, [['clear', 0], ['close', 1], ['close', 2]]); assert.equal(ivs().length, 0, 'poll stopped');
+});
+
+test('io helper MIDI: an addon without MIDI (older build) refuses the requests, ignores the streams', () => {
+  const { h, out } = make({ version: () => '3', devices: () => [] });
+  assert.equal(h.hello.midi, false);
+  h.handle({ op: 'midiSend', port: 1, bytes: [0xF8] }); h.handle({ op: 'midiClear', port: 0 }); assert.equal(out.length, 0);
+  h.handle({ op: 'midiPorts', id: 4 }); assert.equal(out[0].op, 'error'); assert.equal(out[0].id, 4);
 });

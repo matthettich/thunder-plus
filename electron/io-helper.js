@@ -8,14 +8,31 @@
 // loadAddon(): the addon, or throws. post(msg, transfer): to the page's port. Returns {hello, handle}: hello is what the
 // wiring posts on every new port; when hello.available is false the wiring exits the process after posting it.
 // timers: {setInterval, clearInterval}, injectable so tests tick the input poll by hand. shutdown() closes any open input.
-const POLL_MS = 5, MAX_READS_PER_TICK = 8;
+const POLL_MS = 5, MAX_READS_PER_TICK = 8, MIDI_POLL_MS = 2;
 function createIoHelper({ loadAddon, post, timers }) {
   const T = timers || { setInterval: (f, ms) => setInterval(f, ms), clearInterval: h => clearInterval(h) };
-  let addon = null, hello, poll = null, inputOpen = false;
-  try { addon = loadAddon(); hello = { op: 'hello', available: true, version: String(addon && addon.version ? addon.version() : '') }; }
+  let addon = null, hello, poll = null, inputOpen = false, midiPoll = null;
+  const midiPorts = new Set();   // every MIDI port this page opened (closed with it: a reload, shutdown)
+  try { addon = loadAddon(); hello = { op: 'hello', available: true, version: String(addon && addon.version ? addon.version() : ''), midi: !!(addon && typeof addon.midiPorts === 'function') }; }   // (midi: phase B; an older addon has none)
   catch (e) { addon = null; hello = { op: 'hello', available: false, why: String((e && e.message) || e) }; }
   const err = (id, e) => post({ op: 'error', id, why: typeof e === 'string' ? e : String((e && e.message) || e) });
   function stopPoll() { if (poll !== null) { T.clearInterval(poll); poll = null; } }
+  // MIDI IN (phase B): the addon stamps each message with the OS time it came; they're handed on in batches every 2 ms
+  function midiTick() {
+    let list; try { list = addon.midiRead(); } catch (e) { return; }
+    if (list && list.length) post({ op: 'midiIn', list });
+  }
+  function midiPollSet(on) {
+    if (on && midiPoll === null) midiPoll = T.setInterval(midiTick, MIDI_POLL_MS);
+    else if (!on && midiPoll !== null) { T.clearInterval(midiPoll); midiPoll = null; }
+  }
+  function closeMidi() {
+    if (!addon || typeof addon.midiClose !== 'function') return;
+    try { addon.midiClear(0); } catch (_) {}
+    for (const p of midiPorts) { try { addon.midiClose(p); } catch (_) {} }
+    midiPorts.clear(); midiPollSet(false);
+  }
+  const hasMidi = () => !!addon && typeof addon.midiPorts === 'function';
   function closeInput() {
     stopPoll();
     if (!inputOpen) return;
@@ -57,9 +74,28 @@ function createIoHelper({ loadAddon, post, timers }) {
     } else if (op === 'devices') {
       if (!addon) return err(id, hello.why || 'not available');
       try { post({ op: 'devices', id, devices: addon.devices() }); } catch (e) { err(id, e); }
+    // MIDI (phase B). midiSend / midiSendMany / midiClear get no answer (they come in streams: notes, clock).
+    } else if (op === 'midiSend') {
+      if (hasMidi()) { try { addon.midiSend(msg.port, msg.bytes, msg.at || 0); } catch (_) {} }
+    } else if (op === 'midiSendMany') {   // [[port, bytes, at], …]: one port message for a whole booking pass
+      if (hasMidi() && Array.isArray(msg.list)) for (const m of msg.list) { try { addon.midiSend(m[0], m[1], m[2] || 0); } catch (_) {} }
+    } else if (op === 'midiClear') {
+      if (hasMidi()) { try { addon.midiClear(msg.port || 0); } catch (_) {} }
+    } else if (op === 'midiPorts') {
+      if (!hasMidi()) return err(id, hello.why || 'no MIDI in this helper');
+      try { const r = addon.midiPorts(); post({ op: 'midiPorts', id, outs: r.outs, ins: r.ins }); } catch (e) { err(id, e); }
+    } else if (op === 'midiOpenOut' || op === 'midiOpenIn') {
+      if (!hasMidi()) return err(id, hello.why || 'no MIDI in this helper');
+      let r; try { r = op === 'midiOpenOut' ? addon.midiOpenOut(String(msg.name || '')) : addon.midiOpenIn(String(msg.name || '')); } catch (e) { return err(id, e); }
+      if (r && r.ok) { midiPorts.add(r.port); if (op === 'midiOpenIn') midiPollSet(true); }
+      post({ op: 'midiOpened', id, ...r });
+    } else if (op === 'midiClose') {
+      if (hasMidi()) { try { addon.midiClose(msg.port); } catch (_) {} midiPorts.delete(msg.port); }
+      if (id != null) post({ op: 'midiClosed', id });
     } else err(id, 'unknown op');
   }
-  return { hello, handle, shutdown: closeInput };
+  const shutdown = () => { closeInput(); closeMidi(); };
+  return { hello, handle, shutdown };
 }
 
 // main.js's "restart once" rule, pure so it can be tested: the first death is answered by a fresh start on the next
