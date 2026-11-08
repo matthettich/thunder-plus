@@ -112,9 +112,9 @@ installation" (the step is continue-on-error, so Windows builds ship without the
 **PICK UP HERE: EVERYTHING STILL NEEDED (updated 7 Nov 23:30).** Read this list first; the paragraphs below it are the detail.
 
 **NEXT STEPS, in order:**
-1. The owner tests **1.3.0-beta.17**: the items item 0 says failed or changed on beta.14 (the rest passed), the two skipped
+1. The owner tests **1.3.0-beta.18**: the items item 0 says failed or changed on beta.14 (the rest passed), the two skipped
    (unplug the 500R8 mid-take; Measure with Engine Browser), Playing in (a MIDI keyboard), then Windows: the recording list (item 1) and the MIDI list (item 5, "Owner's test").
-   Start a session by asking for the results; fix on `io-helper`, then a NEW pre-release number (beta.18, then beta.19…: never reuse one,
+   Start a session by asking for the results; fix on `io-helper`, then a NEW pre-release number (beta.19, then beta.20…: never reuse one,
    the workflow would replace a release's files without moving its tag), and check the macOS and Windows job
    logs for "thunder_io.node built" (both), "adhoc-sign: signed" (macOS) and "thunder_link.node built" (both).
 2. When both lists pass: merge PR #14 into `beta` (item 3), then `beta` → `main` and a normal desktop release only when the
@@ -123,7 +123,7 @@ installation" (the step is continue-on-error, so Windows builds ship without the
 4. Later / low priority: Linux ALSA in CI (item 5, skipped on the owner's word); phase C (audio output through the helper)
    only if MIDI vs audio timing is still off after B, and then more likely the native desktop app (docs/NATIVE-DESKTOP-PLAN.md).
 
-*State now:* branch `io-helper` (build 507: phase B MIDI built and reviewed, item 5; desktop pre-release **1.3.0-beta.17** (build 507). beta.16 = 506; beta.15 = 505; beta.14 = 504; beta.13 = 503; beta.12 = 502; beta.11 = 501; beta.10 = 500; beta.9 = 499; beta.8 = 498 (first with MIDI, Windows with Link and the helper again); beta.7 = 496, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
+*State now:* branch `io-helper` (build 508: phase B MIDI built and reviewed, item 5; desktop pre-release **1.3.0-beta.18** (build 508). beta.17 = 507; beta.16 = 506; beta.15 = 505; beta.14 = 504; beta.13 = 503; beta.12 = 502; beta.11 = 501; beta.10 = 500; beta.9 = 499; beta.8 = 498 (first with MIDI, Windows with Link and the helper again); beta.7 = 496, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
 CodeRabbit fix that was the real cause of the beta.2/3 failures (the helper died on the first chunk: MessagePortMain can't
 transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner tests beta.7 when convenient (item 1). PR #14
 (`io-helper` → `beta`) is open. `beta` is at build 488 plus a CLAUDE.md line ("continue the helper"); `main` is at build 485
@@ -144,6 +144,12 @@ transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner 
   without permission, so the browser engine dropped them; native passed them on. Build 505: `nmValid` (whole messages only,
   data bytes < 0x80, lengths by status, no F0 / F7) in the native output's send, thrown as TypeError like Web MIDI.
 - Keep in this pad played the whole pad once (playFresh): owner, 10:37: "Don't play anything" (build 506: removed).
+- 11:00: "Measure button takes a couple of pushes" (asked: what the first push shows) and an "Audio engine reset" message after
+  two runs: the reset after Measure is deliberate (7 Nov: opening the input moves macOS's output timing); build 508 does it
+  quietly (`resetAudio(true)`), and resetAudio now reconnects the recorder's monitor to the new master (it stayed on the old one).
+- 11:02: "If I monitor directly, it's spot on, but through [the app's] monitor MIDI sounds late": so the MIDI timing is right
+  (Gear delay as measured); the app's own monitoring is late by its input path + 20 ms cushion + output latency (by design:
+  use the interface's direct monitoring when tracking). A lower-latency monitor option could come later if wanted.
 - CodeRabbit on build 505: the `RCD.gen` comment had swallowed rcdClose's disconnect line (monitor left on the master,
   beta.15 only). Fixed in 506, with an io-check that closing disconnects the monitor and node. Build 507 (CodeRabbit): the
   browser-input path checks `gone()` after getUserMedia and the worklet load too. Measure "closer but not perfect": the owner is checking again by ear; with only the gear on the input it trusts the
@@ -173,7 +179,7 @@ https://github.com/matthettich/thunder-plus/releases/tag/v1.3.0-beta.7. Record a
       and still on the grid at the end. Optionally 1–2 minutes through the 500R8 on an ADAT pair (load).
 - [ ] When convenient: unplug the 500R8 mid-take (the take so far is kept); run the 500R8 at 44.1 kHz with the app at 48 (the
       window warns that the input is converted).
-→ Problems: fix on `io-helper`, run the checks (below), pre-release the next unused number (`1.3.0-beta.18`…) (Run workflow `desktop.yml`, ref
+→ Problems: fix on `io-helper`, run the checks (below), pre-release the next unused number (`1.3.0-beta.19`…) (Run workflow `desktop.yml`, ref
   `io-helper`, `version`, `prerelease: true`); in the macOS job log confirm both "thunder_io.node built" and "adhoc-sign: signed"
   (both steps can fail without failing the build).
 

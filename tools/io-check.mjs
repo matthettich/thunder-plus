@@ -155,6 +155,12 @@ try {
       await E('rcdOpen()'); const mon = E('RCD.mon'), node = E('RCD.node'); let disc = false; const d0 = mon.disconnect.bind(mon); mon.disconnect = (...a) => { disc = true; return d0(...a); };
       E('rcdClose()'); return {disc, onmsg:node ? node.port.onmessage === null : null, mon:E('!!RCD.mon')}; });
     ok(cl.disc && cl.onmsg === true && !cl.mon, 'closing the recorder disconnects its monitor and node: ' + JSON.stringify(cl));
+    // RESET AUDIO keeps the monitor: it follows the new master (it stayed on the old one)
+    const rs = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
+      await E('rcdOpen()'); E('rcdSet.mon = 1; rcdMonSet();'); const old = E('master'); E('resetAudio(true)'); await wait(100);
+      const an = E('ctx.createAnalyser()'); E('master').connect(an); await wait(400); const a = new Float32Array(2048); an.getFloatTimeDomainData(a);
+      let m = 0; for (const v of a) m = Math.max(m, Math.abs(v)); E('rcdSet.mon = 0; rcdMonSet();'); return {newMaster:E('master') !== old, lvl:+m.toFixed(3)}; });
+    ok(rs.newMaster && rs.lvl > 0.005, 'after Reset audio engine the monitor still reaches the (new) master: ' + JSON.stringify(rs));
     // ...and reopening straight after the close opens afresh (it doesn't get the old open's "gave up")
     const reo = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
       E('rcdClose()'); await wait(100); window.__ioOpenDelay = 600; const p1 = E('rcdOpen()'); await wait(150); E('rcdClose()');

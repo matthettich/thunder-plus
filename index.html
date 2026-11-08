@@ -14819,7 +14819,7 @@ function midiLatPanel(){
       // AFTER (owner, 7 Nov: Measure "made things worse", Reset audio engine put it right): opening the interface's input can
       // make macOS reconfigure the device and move the output's timing, so the engine is rebuilt here, and the MIDI clock
       // mapping measured again (unless Record a sample is open: it still uses the input)
-      if (!RCD.ui){ try { resetAudio(); amap.off = null; } catch(e){} }
+      if (!RCD.ui){ try { resetAudio(true); amap.off = null; } catch(e){} }   // (quietly: owner, 8 Nov, the "Audio engine reset" message after Measure was alarming; it's routine here)
       busy = false; }, 'ok'],
     ['Apply', () => { if (!res) return MLT.say('Measure first.'); midi.lats[res.p] = res.want; const r = $('midiLat' + res.p); if (r) r.value = res.want; saveMidi(); toast(`Gear delay for port ${PORTL[res.p]}: ${res.want} ms`); }],
   ]);
@@ -20803,7 +20803,7 @@ function safeLim(ac, dest){
 // Reset audio engine (Settings → Audio): stop, tear the live graph down (every track's voices, live synth nodes, track
 // and master effects, …chains, mastering) and build it again from the song. Clears a stuck note, a runaway effect tail
 // or a frozen worklet without reloading the page; the song, kit and settings are untouched.
-function resetAudio(){
+function resetAudio(quiet){
   try { tStop(true); } catch(e){}
   if (!ctx){ toast('Audio hasn’t started yet: nothing to reset.'); return; }
   const now = ctx.currentTime;
@@ -20818,8 +20818,10 @@ function resetAudio(){
   }
   try { master.disconnect(); } catch(e){}
   master = ctx.createGain(); master.gain.value = clamp(aset.vol, 0, 100) / 100; master.connect(ctx.destination);
+  // THE RECORDER'S MONITOR follows the new master (it stayed on the old one: monitoring went silent after a reset with Record a sample open)
+  if (RCD.mon){ try { RCD.mon.disconnect(); RCD.mon.connect(master); } catch(e){} }
   rtInit(); if (ctx.state !== 'running' && ctx.resume) ctx.resume();
-  toast('Audio engine reset: every note and effect cleared.');
+  if (!quiet) toast('Audio engine reset: every note and effect cleared.');
 }
 function rtInit(){
   audio();
@@ -22795,7 +22797,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 507;
+const BUILD = 508;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31771,6 +31773,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [508, '8 Nov', ['Measure… no longer shows “Audio engine reset” when it finishes (it still refreshes the audio engine quietly, as before); Reset audio engine keeps Record a sample’s monitoring connected.']],
   [507, '8 Nov', ['Record a sample: Keep in this pad no longer plays the pad; closing the window really disconnects its input monitoring (beta.15 left it connected); closing it while the browser’s input is still opening no longer leaves that input on.']],
   [505, '8 Nov', ['Space always plays and stops the song, even right after clicking a menu or button; solo and mute keys work on every screen.', 'Desktop app: Apply (reload) in Settings › Audio works; a sample-rate mismatch on the native input pops up a message; long takes show up in RECENT even when storage is full.', 'Desktop app, native MIDI: malformed messages and SysEx are dropped as the browser engine drops them (a Cirklon showed “Sysex interrupt”); closing Record a sample while its input is still opening no longer leaves it half-open.']],
   [504, '8 Nov', ['Desktop app, native MIDI: with two devices of the same name, a port letter set to the one that was unplugged waits for it (shown as not connected) instead of moving to the other.']],
