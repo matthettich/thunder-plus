@@ -26,6 +26,9 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.100** (7 Nov 2026; owner: "push a desktop build so I can continue to test for bugs"; Run workflow through the API with
+  version 1.2.100, from `main` at build 481, run 42429798901): Caps Lock on a Mac (480) and kit kinds to the core while playing
+  (481) on top of v1.2.99.
 - **v1.2.99** (7 Nov 2026; owner: "merge to main for me and make a desktop"; beta merged into `main` directly (gh had no token, so
   no PR / CodeRabbit pass) and released through Run workflow with version 1.2.99): builds 477–479 on top of v1.2.98 (INST layout by OUTPUT,
   recorder INPUTS, Ctrl/⌘+G generators, MIDI outbox, Measure gear delay, wider Gear delay boxes, MIDI after the output chain's latency).
