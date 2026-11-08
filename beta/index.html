@@ -15098,9 +15098,18 @@ function sliderSet(r, v){
 /* WHEEL (27 Oct, audit M2): the movement is added up and a step is taken per 100 px of it (a mouse notch), not one per
    event: a trackpad flick sends 30-100 events, which moved a slider 60-200 %. A pause or a change of direction starts the
    count again. The …pump windows do the same (pump/ui/kit.js, pWheel). */
+/* ONE WHEEL DIRECTION (owner, 7 Nov: "if I'm pulling down it scrolls down"; Arrange went up, the Mixer down): with macOS
+   Natural scrolling the wheel's deltaY is flipped. Scrolled content (lists, the Mixer, …chains) follows it by itself, but
+   wheels that move a cursor or a value read deltaY as "down", so they went the other way. In the desktop app on a Mac the
+   main process reads the setting (on start and when the window comes back) and these wheels flip with it: pulling down
+   moves the cursor down and lowers a value, like the content around it. window.thunderWheelSign is read by pump/ui/kit.js. */
+let wheelSign = 1; window.thunderWheelSign = 1;
+{ const D = window.thunderDesktop && window.thunderDesktop.app;
+  const rd = () => { try { D.naturalScroll().then(n => { wheelSign = window.thunderWheelSign = n ? -1 : 1; }).catch(() => {}); } catch(e){} };
+  if (D && D.naturalScroll){ rd(); addEventListener('focus', rd); } }
 const wheelAcc = new WeakMap();
 function wheelSteps(key, e, per = 100){
-  const raw = e.deltaY || e.deltaX, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
+  const raw = (e.deltaY || e.deltaX) * wheelSign, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
   const now = performance.now(), a = wheelAcc.get(key) || {v:0, t:0};
   if (now - a.t > 250 || Math.sign(a.v) !== Math.sign(px)) a.v = 0;
   a.v += px; a.t = now; const n = Math.trunc(a.v / per); a.v -= n * per; wheelAcc.set(key, a);
@@ -15109,7 +15118,7 @@ function wheelSteps(key, e, per = 100){
 // ONE A NOTCH (mouse audit, 3 Nov): rows and values in the tracker take a step per mouse notch, as Arrange and the FX slots do:
 // a big delta (a notch: 100 px on Windows, a line on Firefox) is one step, small ones (trackpads) add up per 100 px.
 function wheelNotch(key, e){
-  const raw = e.deltaY || e.deltaX, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
+  const raw = (e.deltaY || e.deltaX) * wheelSign, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
   if (Math.abs(px) >= 50){ wheelAcc.set(key, {v:0, t:performance.now()}); return Math.sign(px); }
   return wheelSteps(key, e);
 }
@@ -22358,7 +22367,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 487;
+const BUILD = 488;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26882,10 +26891,10 @@ function mwHit(G, ex, ey){ let best = -1, bd = 1e9; S.mst.eq.bands.forEach((b, i
     mstChanged(); mwEqPanel(true); });
   const end = e => { if (mwDrag && e.pointerId === mwDrag.id) mwDrag = null; };
   c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
-  c.addEventListener('wheel', e => { const b = S.mst.eq.bands[mwBand]; if (!b) return; e.preventDefault();
-    if (b.type === 'bell') b.q = clamp(b.q * Math.exp(-e.deltaY * 0.0025), 0.1, 18);
-    else if (b.type.endsWith('cut')){ const sl = [12, 24, 48], k = sl.indexOf(b.slope); b.slope = sl[clamp(k + (e.deltaY > 0 ? -1 : 1), 0, 2)]; }
-    else b.g = clamp(Math.round((b.g - e.deltaY * 0.01) * 10) / 10, -18, 18);
+  c.addEventListener('wheel', e => { const b = S.mst.eq.bands[mwBand]; if (!b) return; e.preventDefault(); const wy = e.deltaY * wheelSign;
+    if (b.type === 'bell') b.q = clamp(b.q * Math.exp(-wy * 0.0025), 0.1, 18);
+    else if (b.type.endsWith('cut')){ const sl = [12, 24, 48], k = sl.indexOf(b.slope); b.slope = sl[clamp(k + (wy > 0 ? -1 : 1), 0, 2)]; }
+    else b.g = clamp(Math.round((b.g - wy * 0.01) * 10) / 10, -18, 18);
     mstChanged(); mwEqPanel(true); }, {passive:false});
   c.addEventListener('dblclick', e => { const {G, x, y} = pt(e), i = mwHit(G, x, y);
     if (i >= 0){ S.mst.eq.bands[i].on = !S.mst.eq.bands[i].on; }
@@ -29124,7 +29133,7 @@ arrGrid.addEventListener('wheel', e => {
     return; }
   e.preventDefault();
   if (e.shiftKey){ const d = e.deltaY || e.deltaX; arrGrid.scrollTop += e.deltaMode === 1 ? d * 40 : d; arrHandT = performance.now(); return; }   // Shift: scroll only
-  const dy = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY; let n;
+  const dy = (e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY) * wheelSign; let n;
   if (Math.abs(dy) >= 50){ n = Math.sign(dy); arrWAcc = 0; } else { arrWAcc += dy; n = Math.trunc(arrWAcc / 100); if (!n) return; arrWAcc -= n * 100; }
   const c = cs.song, y = clamp(c.y + n, 0, 255); if (y === c.y) return;
   c.y = y; arrUserT = -1e9; c.pg = false; arrHandT = performance.now();
@@ -30360,7 +30369,7 @@ scr.addEventListener('wheel', e => {
     // FX SLOTS (owner, 31 Oct: too easy to change an effect by accident): over a slot the wheel moves between the slots,
     // it never swaps the effect (EDIT, the effect list or EDIT+arrows still do)
     if (v && grid.contains(v) && tv === 'fx' && y >= 1 && y <= FXSLOTS && !e.ctrlKey){ e.preventDefault();
-      const dy = e.deltaMode === 1 ? (e.deltaY || e.deltaX) * 40 : (e.deltaY || e.deltaX); let n;   // one slot a notch; a trackpad's small steps add up
+      const dy = (e.deltaMode === 1 ? (e.deltaY || e.deltaX) * 40 : (e.deltaY || e.deltaX)) * wheelSign; let n;   // one slot a notch; a trackpad's small steps add up
       if (Math.abs(dy) >= 50){ n = Math.sign(dy); vAcc = 0; } else { vAcc += dy; n = Math.trunc(vAcc / 100); if (!n) return; vAcc -= n * 100; }
       const c = cs.fx, ny = clamp((c.y >= 1 && c.y <= FXSLOTS ? c.y : y) + n, 1, FXSLOTS); if (ny !== c.y){ c.y = ny; draw(); } return; }
     // WHEEL ON VALUES (owner, 31 Oct): only with Alt/⌥ held (as an Alt-drag changes them): a plain wheel moves on, so
@@ -31325,6 +31334,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [488, '7 Nov', ['Desktop app on a Mac: the mouse wheel goes one way everywhere. With Natural scrolling on, Arrange, the tracker rows and values went the opposite way to the lists and the Mixer; they now follow it too (pulling down moves down, and lowers a value).']],
   [487, '7 Nov', ['FOLLOW PATTERN jumps only when what a track plays changes: with a single phrase (or block) playing on a track, you can move the cursor off it again.']],
   [485, '7 Nov', ['MIDI timing (desktop app on a Mac): MIDI went out early by about the audio latency shown in Settings › Audio (base + output), so it needed a negative Gear delay. It now waits for that latency itself: set the Gear delay back to 0 (or what Measure… says).']],
   [484, '7 Nov', ['Measure gear delay rebuilds the audio engine when it finishes (as Settings › Audio › Reset audio engine does): opening the interface’s input could leave the timing off until then.']],
@@ -32532,7 +32542,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
      is the shared window kit (sets PumpFX.openHook); multiband.js what BAND, WIDE and HEAT share (load it before them);
      one file per plugin (docs/PUMP-FX.md, "The pop-up kit"). A type without a file says its window comes later. Add new
      ones here, in sw.js FILES, with ?v= like these. -->
-<script src="pump/ui/kit.js?v=8"></script>
+<script src="pump/ui/kit.js?v=9"></script>
 <script src="pump/ui/eq.js?v=2"></script>
 <script src="pump/ui/comp.js?v=1"></script>
 <script src="pump/ui/limit.js?v=1"></script>

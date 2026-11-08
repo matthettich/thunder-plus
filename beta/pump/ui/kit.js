@@ -766,8 +766,9 @@ class Win {
   }
   // WHEEL (27 Oct, Thunder Plus audit M2): the movement is added up and a step taken per 100 px (a mouse notch), as the
   // host's sliders do; one step per event made a trackpad flick (30-100 events) run a control across its whole range.
+  // Thunder Plus: window.thunderWheelSign is -1 with macOS Natural scrolling (index.html, ONE WHEEL DIRECTION)
   wheelN(e){
-    const raw = e.deltaY || e.deltaX, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
+    const raw = (e.deltaY || e.deltaX) * (typeof window !== 'undefined' && window.thunderWheelSign === -1 ? -1 : 1), px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
     const now = performance.now(); if (now - (this.wT || 0) > 250 || Math.sign(this.wAcc || 0) !== Math.sign(px)) this.wAcc = 0;
     this.wAcc += px; this.wT = now; const n = Math.trunc(this.wAcc / 100); this.wAcc -= n * 100; return clamp(n, -8, 8);
   }
