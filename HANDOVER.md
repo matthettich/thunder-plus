@@ -94,7 +94,7 @@ hid it): recheck on beta.3. tools/io-check.mjs covers 3–5 with the fake helper
 
 **ROOT CAUSE of the owner's beta.2 / beta.3 failures (CodeRabbit, PR #14, 7 Nov 21:05):** the helper posted chunks with
 `[data.buffer]` as the transfer list, but Electron's MessagePortMain only transfers ports, so the first audio chunk threw and
-killed the helper; after the second death the page fell back to the browser input (inputs 1–2). Fixed in build 492 / beta.4:
+killed the helper; after the second death the page fell back to the browser input (inputs 1–2). Fixed in build 492 / beta.4 (out 7 Nov 21:22, Mac addon confirmed built):
 chunks are copied (structured clone); `tests/io.test.js` guards the wiring. Lesson: the fake ports in tests accept transfers the
 real MessagePortMain doesn't; test the Electron wiring itself when possible. Also from that review: rcdOpenIo closes the device
 in the helper if the worklet setup fails; io/README documents the input API. Skipped: its libremidi findings (vendored upstream
@@ -105,7 +105,9 @@ CoreAudio's input device latency + safety offset + first stream's latency (`Inpu
 it; `opened.latencyMs` shows in Record a sample's Extra latency line. (b) Unplugged mid-take: miniaudio's stopped notification
 (not caused by us) sets `inputLost()`; the helper drains what arrived, then posts `closed` with why; the page ends the take where
 it is and keeps it, then closes. (c) Rate mismatch: the window says when `opened.deviceRate` differs from the app's rate.
-Tests: io-check (unplug, rate, latency line), tests/io.test.js (inputLost). Left for A2: Windows WASAPI check, Linux build.
+Tests: io-check (unplug, rate, latency line), tests/io.test.js (inputLost). Left for A2: Windows (the addon doesn't build on the windows-latest runner: node-gyp "Could not find any Visual Studio
+installation" (the step is continue-on-error, so Windows builds ship without the helper; probably the same for Link: try
+`npm config set msvs_version 2022` or setup-msbuild before it), then a WASAPI check; Linux builds fine.
 
 **PICK UP HERE (7 Nov 19:41).** State: desktop pre-release **1.3.0-beta.2** (build 489, from `io-helper`) is out for the owner's
 A1.5 test (the list below). PR #14 (`io-helper` → `beta`): CodeRabbit re-asked at 02:37 UTC (`@coderabbitai review`; it skips
