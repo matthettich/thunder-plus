@@ -111,18 +111,22 @@ installation" (the step is continue-on-error, so Windows builds ship without the
 
 **PICK UP HERE: EVERYTHING STILL NEEDED (updated 8 Nov 11:30).** Read this list first; the paragraphs below it are the detail.
 
+**RELEASED (8 Nov, 11:52, owner: "Can we push a new main and desktop build"):** PR #14 merged into `beta`, `beta` merged into
+`main` by PR, and desktop **v1.3.0** (normal release, auto-update) built from `main` (build 511 = beta.20 + two small Measure
+fixes). Day-to-day work goes back to the `beta` branch; `io-helper` is history. The owner's tests below now run on v1.3.0.
+
 **NEXT STEPS, in order:**
-1. The owner tests **1.3.0-beta.20** with the checklist page https://claude.ai/artifact/6CgCLiVo8HEH3ywky5znWM ("Copy results"
+1. The owner tests **v1.3.0** (same as 1.3.0-beta.20 plus two small Measure fixes) with the checklist page https://claude.ai/artifact/6CgCLiVo8HEH3ywky5znWM ("Copy results"
    gives the report to paste). It lists: the beta.14 fixes to confirm (monitoring after reopening the window, Space and
    solo / mute keys, Apply (reload) and the rate message, Keep in this pad silent, no Cirklon "Sysex interrupt", Measure quiet,
    its new status line and a re-run by ear, long takes in RECENT), the beta.14 skips (unplug mid-take, Measure with Engine
    Browser, Playing in), clock in once more, and Windows. Everything else passed on beta.14 (item 0).
-   Start a session by asking for the results; fix on `io-helper`, then a NEW pre-release number (beta.21, then beta.22…: never
-   reuse one, the workflow would replace a release's files without moving its tag), and check the macOS and Windows job logs
+   Start a session by asking for the results; fix on `beta`, then a NEW desktop version (1.3.1-beta.1 for a pre-release, 1.3.1 for a
+   release: never reuse one, the workflow would replace a release's files without moving its tag), and check the macOS and Windows job logs
    for "thunder_io.node built" (both), "adhoc-sign: signed" (macOS) and "thunder_link.node built" (both). Ask CodeRabbit with
    "@coderabbitai review" after each push (it skips PRs into `beta` otherwise) and fix its real findings.
-2. When both lists pass: merge PR #14 into `beta` (item 3), then `beta` → `main` and a normal desktop release only when the
-   owner asks.
+2. Merged and released already (above). Next `beta` → `main` + desktop release only when the owner asks (beta → main by PR so
+   CodeRabbit sees it; ask it with "@coderabbitai review").
 3. Windows: the owner tests recording (WASAPI) and MIDI (WinMM) on the Windows PC (the build is fixed: windows-2022).
 4. Later / low priority: Linux ALSA in CI (item 5, skipped on the owner's word); phase C (audio output through the helper)
    only if MIDI vs audio timing is still off after B, and then more likely the native desktop app (docs/NATIVE-DESKTOP-PLAN.md).
