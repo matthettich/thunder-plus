@@ -233,6 +233,8 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+- **Punch list (owner, 7 Nov 18:17): FOLLOW PATTERN traps the cursor.** With FOLLOW PATTERN on and a track that has only
+  one phrase, the cursor can't be moved off that phrase. Not looked at yet (the helper work was in progress).
 - **Track reordering** (moving a track next to its bus, as other DAWs do). Big job: every song row, mixer, send, bus
   group, block mute and MIDI mapping refers to tracks by index, so it all has to be renumbered together. Owner (2 Nov):
   later, not while stabilising.
