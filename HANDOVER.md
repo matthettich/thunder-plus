@@ -80,6 +80,9 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.2.101** (7 Nov 2026; for the owner's MIDI testing; Run workflow through the API with version 1.2.101, from `main` at build
+  485, run 42432167168): Measure's note (482), INPUTS wording (483), Measure resets the engine (484), MIDI mapping floored at
+  the reported latency (485) on top of v1.2.100.
 - **v1.2.100** (7 Nov 2026; owner: "push a desktop build so I can continue to test for bugs"; Run workflow through the API with
   version 1.2.100, from `main` at build 481, run 42429798901): Caps Lock on a Mac (480) and kit kinds to the core while playing
   (481) on top of v1.2.99.
