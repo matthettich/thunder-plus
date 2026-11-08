@@ -102,8 +102,9 @@ and licences, 7 tests, 8 risks, 9 decisions for the owner. File and function nam
 - **Latency** for PATTERN sync (`rcdLat`): the helper path knows its parts exactly (the device's input latency from
   `latencyFrames`, the jitter ring's fill), so `RCD.inLat` is set from those instead of `getSettings().latency`.
   Measure… (`midiLatRun`) keeps working unchanged: it records through `rcdOpen` either way.
-- Settings › Audio › INPUT ENGINE: AUTO (helper when available) / BROWSER (always `getUserMedia`), so the old path is
-  one click away if the helper misbehaves.
+- INPUT ENGINE: AUTO (helper when available) / BROWSER (always `getUserMedia`), so the old path is one click away if the
+  helper misbehaves. **In Record a sample, beside Input / Inputs** (owner, 7 Nov: engine and inputs apart was confusing);
+  A0 put it in Settings › Audio, A1.4 moves it.
 
 ## 4. Clocks
 

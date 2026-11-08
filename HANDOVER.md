@@ -75,6 +75,12 @@ it may touch (nothing else); the functions / messages / settings it must produce
 "don't change `index.html` outside the named functions"; "report the diff and the test output". Keep cards small (one row
 each); never hand a subagent the whole phase.
 
+**A0 DONE (7 Nov 18:46, owner's screenshot from desktop 1.3.0-beta.1, build 486):** "Input engine: native (500R8, 28 inputs) ·
+Core Audio · thunder_io 1 / miniaudio 0.11.26". PR #14 (io-helper → beta) open; CodeRabbit had to be asked (`@coderabbitai
+review`: it skips PRs not aimed at main); its two findings fixed. **Owner feedback for A1.4:** "it's confusing that the engine
+and inputs are separated": move INPUT ENGINE (Auto / Browser) into Record a sample beside Input / Inputs (the Input list
+shows "500R8 (native, 28 inputs)", Inputs lists every channel and pair from it), and take the row out of Settings › Audio.
+
 **Settled 7 Nov (build 485):** MIDI was early by the reported base + output latency on the Mac; `mapUpd` now floors the
 clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure… once the helper's MIDI (B) lands.
 
