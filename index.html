@@ -3304,7 +3304,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <tr><td>Background play</td><td>Android's playback notification, so the song keeps going when you switch apps. Settings → App, or the PROJECT screen</td></tr>
 <tr><td>Playhead offset</td><td>Settings → Screen: moves the playhead to match what you hear (+ later, for Bluetooth or a slow screen; − earlier)</td></tr>
 <tr><td>Playback report</td><td>Settings → Audio → Copy playback report: a short log of what playback did, to paste into a bug report</td></tr>
-<tr><td>Input engine</td><td>Desktop app: Settings → Audio shows its native input engine and the interface’s inputs. INPUT ENGINE Browser keeps the browser’s own input</td></tr></table></section>
+<tr><td>Input engine</td><td>Desktop app: Record a sample → Engine Native records from every input of an audio interface; Browser uses the browser’s own input (inputs 1–2)</td></tr></table></section>
     <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots; on a computer, where they are a list down the left, ▲▼ do too)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the pad as it is (<kbd>Space</kbd> plays or stops the song, as everywhere)</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr><tr><td><kbd>F2</kbd>–<kbd>F9</kbd></td><td>As in the tracker: F2–F4 Phrase, Mixer, Inst; F5 the song from the top, F6 the pad, F7 the song from the cursor, F8 stop, F9 REC</td></tr><tr><td><kbd>Alt</kbd> <kbd>8</kbd> · <kbd>9</kbd> · <kbd>0</kbd> · <kbd>`</kbd></td><td>…waves · …chains · the synth · back to the last view (these and Alt+1–7 work from …waves and …chains too)</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound. It starts with one group per drum type (Kicks, Snares, Claps &amp; snaps, Rims &amp; sticks, Closed hats, Open hats, Cymbals, Toms, Hand drums, Shakers &amp; tambourines, Cowbells, blocks &amp; metal), gathering every drum the app has from its own designs, the drum engines and the classic and acoustic kits; then IDM and glitch hits, basses, pads, chords, keys, leads and each engine's sounds. The search box finds any of them by name. <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once. <b>Drum kits…</b> (File ▾, or ⚙ Settings → Kit) puts a CR-78-, 808-, 606-, 909-, 707-, 727- or 505-style kit, or a clean acoustic kit (Funk, Studio, Jazz), on pads 1–8 and keeps the synth slots; every sound of each kit is also in the Presets list, filed under its type (808 Kick under Kicks). <b>Funk breaks…</b> (File ▾) loads one of twelve original breaks, with swing, ghost notes and a laid-back snare, as a new song with its acoustic kit, or adds its four bars to this song. <b>Breaks to chop</b> (File ▾) has the fourteen breaks of …pump BREAK, rendered by its own kit with room and tape, as a one-bar loop in a slot, cut into 16 slices (C-4 plays slice 1) and synced to the tempo, ready to re-sequence. <b>Acid line…</b> (Edit ▾ or right-click on a phrase) writes a random bass line into the phrase the way …pump ACID does — scale, root, density, accents, slides and octave jumps; Roll (R) again or Mutate (M) a few steps, and light only the lanes you want changed — for an Acid pad (accents are volume FF, slides PSL).</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modelled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. <b>Drift</b> is a two-line analog pad synth laid out like the big 1970s CS-series polysynths (two oscillator lines per voice, a high-pass and a low-pass with their own envelope, up to four drifting unison voices) followed by a tape stage — <b>Wow</b> and <b>Flutter</b> on the pitch, chorus, saturation, <b>Age</b> (worn top and bottom, the odd dropout) and hiss — for warm, wobbly, faded pads; its presets are in the pad Presets list under Drift (tape pads). <b>…pump</b> (group in the engine list) has the pump plugins' instruments with their own sound and presets: <b>Mono</b> (three oscillators, four filters), <b>Poly</b> (two oscillators, poly-mod, unison, chorus) and <b>Coil</b> (tuned springs kicked by the note). Each renders a note like the other engines (<b>Hit</b> is how hard it is played), and each has a <b>live</b> twin that plays the plugin in the tracker note by note, with the VOL column as velocity, slides and bends as pitch bend, and glide (Coil live also sets how many <b>Voices</b> ring at once, 1–16). A twin shares its values with the rendered engine; if the device can't keep up, the live ones fall back to their renders and say so (Settings → Audio → …pump live). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. Notes side by side in different columns sing together; a new note in the same column takes over that column's singer. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
@@ -13823,7 +13823,6 @@ async function audRefresh(){
   if (!sinkOk) $('audOutRow').title = 'This browser plays through the system’s output and doesn’t let a web app pick another one. On Android, choose the output in the system’s media output switcher (or plug in the interface); on a computer, Chrome and Edge (and the desktop app) can pick it here.';
   $('audLvl').value = aset.vol; audLvlShow();
   updLat(); updARate(); updPdc(); audRestartRow(); audStatus();
-  if (IOAPI){ inEngBuild(); if (inEngUi) inEngUi(); if (aset.inEngine !== 'browser') iohStart(); }   // desktop app: the helper is forked on first need
 }
 function audLvlShow(){ const v = aset.vol; $('audLvlV').textContent = v <= 0 ? '−∞ dB' : (20 * Math.log10(v / 100)).toFixed(1) + ' dB'; }
 function audRestartRow(){ $('audRestartRow').hidden = !(ctx && aLive && (aLive.lat !== latOf() || aLive.rate !== aset.rate)); }
@@ -14512,7 +14511,7 @@ async function rcdOpen(){
       Object.assign(RCD, {node, mon, ctx, inLat:0});
       if (await rcdOpenIo(node, mon)){
         RCD.nch = RCD.io.opened.channels; if (!rcdSet.nchs || typeof rcdSet.nchs !== 'object') rcdSet.nchs = {};
-        rcdSet.nchs['io:' + RCD.io.dev.inId] = RCD.nch; rcdSave(); rcdRoute(); if (RCD.ui && RCD.ui.fillCh) RCD.ui.fillCh();
+        rcdSet.nchs['io:' + RCD.io.dev.inId] = RCD.nch; rcdSave(); rcdRoute(); if (RCD.ui && RCD.ui.fillCh) RCD.ui.fillCh(); if (RCD.ui && RCD.ui.latSay) RCD.ui.latSay();
         return true; }
       try { mon.disconnect(); node.port.onmessage = null; } catch(e){} Object.assign(RCD, {node:null, mon:null});
     } catch(e){ tpLog('native input', e); rcdCloseIo(); Object.assign(RCD, {node:null, mon:null}); }
@@ -14545,8 +14544,8 @@ function rcdClose(){ rcdCloseIo(); try { if (RCD.src) RCD.src.disconnect(); if (
 function rcdPick(n){
   const m = /^([ps])(\d+)$/.exec(rcdSet.inCh || ''), k = m ? m[1] : 'p', a = m ? +m[2] : 0;
   return (k === 'p' ? a + 1 < n || a === 0 : a < n) ? [k, a] : ['p', 0]; }
-function rcdInOpts(n){
-  if (n <= 2) return [['p0', n < 2 ? '1 (all the app is given)' : '1+2 (all the app is given)']];   // (owner, 7 Nov: "wrongly thinks my audio interface only has two inputs": it's what the browser engine hands over, not the device)
+function rcdInOpts(n, nat){
+  if (n <= 2) return [['p0', nat ? (n < 2 ? '1' : '1+2') : n < 2 ? '1 (all the app is given)' : '1+2 (all the app is given)']];   // (nat: the native input has the device's own channels: nothing was held back)   // (owner, 7 Nov: "wrongly thinks my audio interface only has two inputs": it's what the browser engine hands over, not the device)
   const o = []; for (let a = 0; a + 1 < n; a += 2) o.push(['p' + a, 'IN ' + (a + 1) + '+' + (a + 2)]);
   for (let a = 0; a < n; a++) o.push(['s' + a, 'IN ' + (a + 1) + ' (mono)']); return o; }
 function rcdRoute(){
@@ -14873,13 +14872,14 @@ function rcdUi(){
   U.state.textContent = R ? (R.phase === 'armed' ? (tp.on ? 'Armed: records from the next pattern…' : 'Starting the song…') : R.phase === 'closing' ? 'Finishing the take…'
       : `● Recording pattern ${R.n + 1}` + (R.pats > 0 ? ` of ${R.pats}` : '') + (R.stopReq ? (R.songStop ? ' · the take and the song stop at its end' : ' · stops at its end') : R.pats < 0 ? ' · Stop ends it right there' : ' · Stop ends it at the end of the pattern'))
     : RCD.on ? '● Recording' : T ? (T.how === 'sync' ? '' : '') + (T.how === 'sync' ? ` · ${T.pats} pattern${T.pats === 1 ? '' : 's'}, ${T.beats} beats` : '')
-    : RCD.stream ? 'Ready.' : 'Pick an input and press Record.';
+    : (RCD.stream || RCD.io) ? 'Ready.' : RCD.note || 'Pick an input and press Record.';
   U.edit.hidden = !T || !!(RCD.on || R);
   U.state.hidden = !U.state.textContent;
   if (T && U.whn){ U.whn.textContent = T.how === 'edit' ? (T.name || 'Sample') : 'Take'; U.whi.textContent = `${(T.data.length / T.sr).toFixed(2)} s · ${T.data2 ? 'stereo' : 'mono'} · ${(T.sr / 1000).toFixed(1)} kHz`; U.win.style.setProperty('--rcw', rcdCols().wave); }
   U.undoB.disabled = !RCD.undo.length; U.playB.textContent = rcdPrev ? '■' : '▶ Play';
   for (const b of U.lock) b.disabled = !!(RCD.on || R);
   if (U.fillCh) U.fillCh();
+  if (U.latSay) U.latSay();
   rcdDrawWave();
 }
 // NOTE KEYS IN THE EDITOR (6 Nov): one voice per held key; C-4 (note 48) plays the take as recorded. A short fade in and
@@ -14913,21 +14913,44 @@ async function rcdPanel(pad, opts){
   const seg = (label, opts, get, set) => { const s = el('div', 'seg'); const draw = () => [...s.children].forEach((b, i) => { const on = get() === opts[i][0]; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     opts.forEach(([v, t]) => { const b = el('button', null, t); b.type = 'button'; b.addEventListener('click', () => { set(v); rcdSave(); draw(); }); s.append(b); }); draw(); field(label, s); return s; };
   const lock = [];
-  // INPUT: labels only show once the browser has been allowed an input; the list is read again after Record opens one
-  const inSel = el('select'); const fillIn = async () => { const L = await rcdInputs(); inSel.textContent = ''; inSel.append(new Option('Default input', ''));
+  // ENGINE (desktop app only; owner, 7 Nov: "it's confusing that the engine and inputs are separated"): Native records every input
+  // of the interface through the desktop app's helper, Browser uses the browser's own input (inputs 1–2)
+  let nat = false, natDevs = [], fillTok = 0, fillIn = null, fillCh = null;
+  if (IOAPI && !E){ const eng = seg('Engine', [['auto', 'Native'], ['browser', 'Browser']], () => aset.inEngine === 'browser' ? 'browser' : 'auto',
+      v => { aset.inEngine = v === 'browser' ? 'browser' : 'auto'; asetSave(); rcdAbort(); rcdClose(); RCD.note = ''; fillIn(); rcdUi(); });
+    eng.title = 'Native records from every input of an audio interface, through the desktop app. Browser uses the browser’s own input (inputs 1–2)'; lock.push(...eng.children); }
+  // INPUT: labels only show once the browser has been allowed an input; the list is read again after Record opens one.
+  // With the native engine it lists the helper's devices (value = the helper's input id, kept as rcdSet.ioDev)
+  const inSel = el('select'); fillIn = async () => { const tok = ++fillTok; nat = false; let L = null;
+    if (IOAPI && !E && aset.inEngine !== 'browser'){
+      if (await iohReady()){
+        if (tok !== fillTok) return;
+        natDevs = IOH.devices.filter(d => d.inId && d.inputs > 0);
+        if (natDevs.length){
+          let lab = ''; try { L = await rcdInputs(); const b = L.find(x => x.deviceId === rcdSet.input); lab = (b && b.label) || ''; } catch(e){}
+          if (tok !== fillTok) return;
+          inSel.textContent = ''; natDevs.forEach(d => inSel.append(new Option(`${d.name} (native, ${d.inputs} input${d.inputs === 1 ? '' : 's'})`, d.inId)));
+          const pick = iohInDev(lab); inSel.value = pick ? pick.inId : natDevs[0].inId;
+          nat = true; RCD.note = ''; fillCh(); if (RCD.ui && RCD.ui.rec) rcdUi(); return; }
+        RCD.note = 'Native input not available (no input device found): using the browser’s input.';
+      } else { if (tok !== fillTok) return; RCD.note = `Native input not available (${IOH.why || 'no answer'}): using the browser’s input.`; }
+    } else RCD.note = '';
+    L = await rcdInputs(); if (tok !== fillTok) return; inSel.textContent = ''; inSel.append(new Option('Default input', ''));
     L.forEach((d, i) => { if (d.deviceId && d.deviceId !== 'default') inSel.append(new Option(d.label || 'Input ' + (i + 1), d.deviceId)); });
-    inSel.value = [...inSel.options].some(o => o.value === rcdSet.input) ? rcdSet.input : ''; };
-  inSel.addEventListener('change', async () => { rcdSet.input = inSel.value; rcdSave(); if (RCD.stream && !RCD.on && !RCD.sync){ rcdClose(); await rcdOpen(); } });
-  field('Input', inSel); lock.push(inSel); fillIn();
+    inSel.value = [...inSel.options].some(o => o.value === rcdSet.input) ? rcdSet.input : '';
+    fillCh(); if (RCD.ui && RCD.ui.rec) rcdUi(); };
+  inSel.addEventListener('change', async () => { if (nat) rcdSet.ioDev = inSel.value; else rcdSet.input = inSel.value; rcdSave(); fillCh(); if ((RCD.stream || RCD.io) && !RCD.on && !RCD.sync){ rcdClose(); await rcdOpen(); } });
+  field('Input', inSel); lock.push(inSel);
   const chSel = el('select'); chSel.setAttribute('aria-label', 'Which channels of the input to record');
   let chKey = '';
-  const fillCh = () => { const n = RCD.stream ? RCD.nch || 2 : ((rcdSet.nchs || {})[rcdSet.input || ''] || 2), O = rcdInOpts(n);
-    if (chKey !== n + ''){ chKey = n + ''; chSel.textContent = ''; O.forEach(([v, t]) => chSel.append(new Option(t, v))); }   // (rcdUi calls it often: an open list isn't rebuilt)
+  // (the native input: the device's own channel count, from the helper's list before it opens, RCD.nch after)
+  fillCh = () => { const nd = nat && !RCD.stream ? (RCD.io ? RCD.nch : (natDevs.find(d => d.inId === inSel.value) || {}).inputs) : 0;
+    const n = nd || (RCD.stream || RCD.io ? RCD.nch || 2 : ((rcdSet.nchs || {})[rcdSet.input || ''] || 2)), nn = !!nd, O = rcdInOpts(n, nn);
+    if (chKey !== n + '/' + nn){ chKey = n + '/' + nn; chSel.textContent = ''; O.forEach(([v, t]) => chSel.append(new Option(t, v))); }   // (rcdUi calls it often: an open list isn't rebuilt)
     chSel.value = rcdPick(n)[0] + rcdPick(n)[1]; chSel.disabled = O.length < 2 || !!(RCD.on || RCD.sync);
-    chSel.title = O.length < 2 ? 'The browser engine (in the desktop app too) only hands the app two channels of an interface, its inputs 1 and 2, whatever it has. To record another input, route it to 1/2 in the interface’s own mixer software for now' : ''; };
+    chSel.title = O.length < 2 && !nn ? 'The browser engine (in the desktop app too) only hands the app two channels of an interface, its inputs 1 and 2, whatever it has. To record another input, route it to 1/2 in the interface’s own mixer software for now' : ''; };
   chSel.addEventListener('change', () => { rcdSet.inCh = chSel.value; rcdSave(); rcdRoute(); });
-  inSel.addEventListener('change', fillCh);
-  field('Inputs', chSel); fillCh();
+  field('Inputs', chSel); fillCh(); fillIn();
   seg('Channels', [['stereo', 'STEREO'], ['mono', 'MONO'], ['left', 'LEFT'], ['right', 'RIGHT']], () => rcdSet.ch, v => { rcdSet.ch = v; });
   seg('Monitor', [[0, 'OFF'], [1, 'ON']], () => rcdSet.mon | 0, v => { rcdSet.mon = v; if (RCD.mon) RCD.mon.gain.setTargetAtTime(v ? 1 : 0, ctx.currentTime, 0.01); if (v) toast('Monitoring: use headphones, or the speakers feed back into the input.', 4000); });
   { const m = el('div', 'recmeter'), bars = [], holds = []; for (let c = 0; c < 2; c++){ const r = el('div', 'recm'), b = el('i'), h = el('b'); r.append(b, h); m.append(r); bars.push(b); holds.push(h); }
@@ -15053,7 +15076,7 @@ async function rcdPanel(pad, opts){
   confKeep.addEventListener('click', () => { rcdKeep(+padS.value); recGo(); });
   rec.addEventListener('click', () => { if (RCD.on || RCD.sync) return rcdStop(); if (!E && RCD.take && !RCD.take.kept) return confShow(conf.hidden); recGo(); });
   const close = el('button', null, 'Close'); close.type = 'button'; row.append(songB, el('span', 'recsp'), rec, close); box.append(conf, row); if (E){ rec.hidden = true; keepRow.append(close); row.hidden = true; }   // EDIT SAMPLE: Close beside Apply / Revert
-  Object.assign(RCD.ui, {rec, state, edit, wave, ov, rd, playB, undoB, lock, E, songB, win, whn, whi, fillCh});
+  Object.assign(RCD.ui, {rec, state, edit, wave, ov, rd, playB, undoB, lock, E, songB, win, whn, whi, fillCh, latSay});
   const songT = setInterval(() => { if (!RCD.ui){ clearInterval(songT); return; } const on = !!tp.on; if (songB._on !== on){ songB._on = on; songB.textContent = on ? '■ Song' : '▶ Song'; songB.classList.toggle('on', on); } }, 150);   // follows the song, however it was started
   const done = () => { if (askOpen !== done) return; askOpen = null; rcdKeysOff(); RCD.kb = null; document.removeEventListener('keyup', keyUp, true); window.removeEventListener('blur', blurOff); rcdAbort(); if (rcdPrev){ try { rcdPrev.stop(); } catch(e){} rcdPrev = null; } rcdClose(); RCD.ui = null; if (E){ RCD.take = null; RCD.undo = []; RCD.sel = null; } wrap.remove(); document.removeEventListener('keydown', key, true); };
   close.addEventListener('click', done);
@@ -16180,7 +16203,7 @@ const IOAPI = (window.thunderDesktop && window.thunderDesktop.io) || null;
 const IOH = {state:'off', why:'', version:'', devices:[], port:null};   // state: off | starting | ready | unavailable
 let iohSeq = 0, iohPend = new Map(), iohGo = null, iohHelloT = 0;
 const iohUse = () => !!IOAPI && aset.inEngine !== 'browser' && IOH.state === 'ready';
-function iohUi(){ try { if (typeof inEngUi === 'function') inEngUi(); } catch(e){} }
+function iohUi(){}   // (the Input engine row moved to Record a sample, which asks iohReady itself)
 function iohPort(p){
   if (IOH.port && IOH.port !== p){ try { IOH.port.onmessage = null; IOH.port.close(); } catch(e){} }
   iohPend.forEach(r => r(null)); iohPend.clear();
@@ -16309,30 +16332,6 @@ function rcdCloseIo(){ const io = RCD.io; if (!io) return; RCD.io = null; clearI
   try { io.node.port.onmessage = null; io.node.disconnect(); } catch(e){} iohAsk({op:'close'}); }
 // The recorder starts or stops: the native input's anchor holds still while a take records
 function rcdGo(m){ if (RCD.node) RCD.node.port.postMessage(m); if (RCD.io) RCD.io.node.port.postMessage({rec:m === 'go'}); }
-// Settings → Audio → Input engine (desktop app only; the rows are not drawn on the website)
-let inEngUi = null;
-function inEngBuild(){
-  if (!IOAPI || inEngUi || !$('audRestartRow')) return;
-  const seg = el('div', 'seg'), row = el('div', 'segrow'), st = el('div', 'lbl'), sub = el('div', 'lbl');
-  row.id = 'inEngRow'; seg.id = 'segInEng'; st.id = 'inEngStat'; sub.id = 'inEngSub'; st.setAttribute('aria-live', 'polite');
-  row.title = 'Auto records through the desktop app’s own input engine when it is available, so every input of an interface can be used. Browser keeps the browser’s input (inputs 1–2)';
-  row.append(el('span', null, 'Input engine'), seg);
-  const at = $('audRestartRow'); at.before(row); at.before(st); at.before(sub);
-  sub.style.fontSize = 'var(--fs-2)';
-  const upd = makeSeg(seg, [['auto', 'Auto'], ['browser', 'Browser']], () => aset.inEngine === 'browser' ? 'browser' : 'auto', v => { aset.inEngine = v; asetSave(); if (v === 'auto') iohStart(); inEngUi(); });
-  inEngUi = () => {
-    upd(); sub.textContent = '';
-    if (aset.inEngine === 'browser'){ st.textContent = 'Input engine: browser (inputs 1–2)'; return; }
-    if (IOH.state === 'ready'){
-      let d = null; for (const x of IOH.devices) if (!d || (x.inputs || 0) > (d.inputs || 0) || ((x.inputs || 0) === (d.inputs || 0) && x.isDefaultIn && !d.isDefaultIn)) d = x;
-      const di = IOH.devices.find(x => x.isDefaultIn); if (!d || !(d.inputs > 0)) d = di || d;
-      st.textContent = d ? `Input engine: native (${d.name}, ${d.inputs} input${d.inputs === 1 ? '' : 's'})` : 'Input engine: native (no input device found)';
-      sub.textContent = [d && d.backend, IOH.version].filter(Boolean).join(' · ');
-    } else if (IOH.state === 'unavailable') st.textContent = 'Input engine: browser — native helper not available: ' + IOH.why;
-    else st.textContent = 'Input engine: checking…';
-  };
-  inEngUi();
-}
 // Settings → MIDI: a cable for each port letter, and which letters get clock.
 function moPorts(){
   const opts = [['', 'None']]; if (midi.access) midi.access.outputs.forEach(o => opts.push([o.id, o.name || o.id]));
@@ -22547,7 +22546,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 488;
+const BUILD = 489;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31514,6 +31513,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [489, '7 Nov', ['Desktop app: Record a sample can record from every input of your audio interface (Engine: Native): the Input list shows the interface with all its inputs, and Inputs every pair and channel. Takes are placed by the interface’s own timestamps. The Input engine row moved here from Settings › Audio.']],
   [488, '7 Nov', ['Desktop app on a Mac: the mouse wheel goes one way everywhere. With Natural scrolling on, Arrange, the tracker rows and values went the opposite way to the lists and the Mixer; they now follow it too (pulling down moves down, and lowers a value).']],
   [487, '7 Nov', ['FOLLOW PATTERN jumps only when what a track plays changes: with a single phrase (or block) playing on a track, you can move the cursor off it again.']],
   [486, '7 Nov', ['Desktop app: Settings → Audio has an Input engine row (Auto or Browser) and shows the native input engine and the inputs of your audio interface. Nothing records through it yet.']],
