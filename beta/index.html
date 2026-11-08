@@ -770,6 +770,8 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .recset .acidf{margin:6px 0}
 .recstate{margin:2px 0 4px; opacity:.75; font-variant-numeric:tabular-nums}
 .recsp{flex:1}
+.rectime{font:600 15px/1 ui-monospace,Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; min-width:5.2em; text-align:right; padding:0 6px; white-space:nowrap}
+.rectime.wait{opacity:.5; font-weight:400}
 .recbar{display:flex; align-items:center; gap:8px; margin:0; padding:7px 8px; border-top:1px solid color-mix(in srgb, var(--line) 35%, transparent)}
 /* THE WINDOW: the FX bar's card (#dkFxBar .dkfc): a line border on the white offset block, a solid title bar with a square */
 .recwin{margin:12px 6px 18px 0; border:1.5px solid var(--line); background:var(--panel); color:var(--ink); box-shadow:4px 4px 0 0 var(--mxbg, #fff), 4px 4px 0 1.5px var(--line)}
@@ -14696,7 +14698,7 @@ function rcdSongStopped(){ const R = RCD.sync; if (!R) return; if (R.phase === '
 function rcdEndAt(t1){
   const R = RCD.sync; if (!R || R.phase !== 'rec') return; R.phase = 'closing'; R.t1 = t1; rcdUi();
   const lat = rcdLat(), wait = () => { if (!RCD.sync) return; if (ctx.currentTime < t1 + lat + 0.06) return void setTimeout(wait, 40);
-    RCD.onDone = () => { const sr = ctx.sampleRate, t = rcdCollect(Math.round((R.t0 + lat) * sr), Math.round((t1 + lat) * sr)); RCD.on = false; RCD.sync = null;
+    RCD.onDone = () => { const sr = ctx.sampleRate, t = rcdCollect(Math.round((R.t0 + lat) * sr), Math.round((t1 + lat) * sr)); RCD.on = false; RCD.sync = null; RCD.clkF = t1 - R.t0;
       const beats = Math.max(0.25, Math.round((t1 - R.t0) * (R.bpm || S.bpm) / 60 * 4) / 4);
       rcdTake(t, 'sync', beats, R.n); };
     rcdGo('stop'); };
@@ -14706,11 +14708,11 @@ async function rcdStart(){
   if (RCD.on || RCD.sync) return;
   if (!(await rcdOpen())) return;
   RCD.chunks = []; RCD.take = null; RCD.undo = [];
-  if (rcdSet.mode === 'free'){ RCD.on = true; RCD.t0w = ctx.currentTime; rcdGo('go'); rcdUi(); return; }
+  if (rcdSet.mode === 'free'){ RCD.on = true; RCD.t0w = ctx.currentTime; rcdGo('go'); RCD.clkF = null; rcdUi(); return; }
   // PATTERN: armed; the next pattern edge starts it. Stopped: play from the cursor's song row (its top is the edge).
   const playing = tp.on && tp.mode === 'song'; if (tp.on && !playing) tStop(true);   // (before arming: tStop ends an armed take)
   const R = RCD.sync = {phase:'armed', pats:rcdSet.pats | 0, n:0, row:null, st:null, stopReq:false};
-  RCD.on = true; rcdGo('go');
+  RCD.on = true; RCD.clkF = null; rcdGo('go');
   if (playing){ const last = tp.q.length ? tp.q[tp.q.length - 1] : (tp.pos ? {pos:tp.pos} : null);
     if (last && last.pos){ let row = -1, st = -1; for (const p of last.pos) if (p){ if (p.row > row) row = p.row; if (p.step > st) st = p.step; } if (row >= 0){ R.row = row; R.st = st; } } }
   else { RCD.starting = true; try { tStart('song', {row:songRow()}); } finally { RCD.starting = false; } }   // (the Song button's row: the cursor's, or the next pattern with something in it)   // (tStart stops first: not an end)
@@ -14718,10 +14720,10 @@ async function rcdStart(){
 }
 function rcdStop(){
   if (RCD.sync){ const R = RCD.sync; if (R.phase === 'armed'){ rcdAbort(); rcdUi(); } else if (R.phase === 'rec' && !R.stopReq){ if (R.pats < 0) rcdEndAt(ctx.currentTime); else if (!rcdEdgeAhead(R)){ R.stopReq = true; rcdUi(); } } return; }   // PATTERN: at the next edge (CUT RIGHT THERE: now)
-  if (!RCD.on) return; RCD.on = false;
+  if (!RCD.on) return; RCD.clkF = rcdFreeSecs(); RCD.on = false;   // (the length is left up after Stop until the next take)
   RCD.onDone = () => rcdTake(rcdCollect(), 'free', 0, 0); rcdGo('stop'); rcdUi();
 }
-function rcdAbort(){ RCD.sync = null; RCD.onDone = null; if (RCD.on && RCD.node) rcdGo('stop'); RCD.on = false; RCD.chunks = []; }
+function rcdAbort(){ RCD.sync = null; RCD.onDone = null; if (RCD.on && RCD.node) rcdGo('stop'); RCD.on = false; RCD.chunks = []; RCD.clkF = null; rcdClk(); }
 function rcdTake(t, how, beats, pats){
   if (!t){ toast('Nothing was recorded.'); rcdUi(); return; }
   if (sePeak({data:t.data, data2:t.data2, sr:ctx.sampleRate}).peak < 1e-4) toast('The take is silent: is the right input picked, and is it turned up?', 5000);
@@ -14972,6 +14974,7 @@ function rcdUi(){
     : RCD.on ? '● Recording' : T ? (T.how === 'sync' ? '' : '') + (T.how === 'sync' ? ` · ${T.pats} pattern${T.pats === 1 ? '' : 's'}, ${T.beats} beats` : '')
     : (RCD.stream || RCD.io) ? RCD.note || (rm && rm.msg) || 'Ready.' : RCD.note || 'Pick an input and press Record.';   // (a native note, e.g. the rate, stays up while ready)
   U.edit.hidden = !T || !!(RCD.on || R);
+  rcdClk();
   U.state.hidden = !U.state.textContent;
   if (T && U.whn){ U.whn.textContent = T.how === 'edit' ? (T.name || 'Sample') : 'Take'; U.whi.textContent = `${(T.data.length / T.sr).toFixed(2)} s · ${T.data2 ? 'stereo' : 'mono'} · ${(T.sr / 1000).toFixed(1)} kHz`; U.win.style.setProperty('--rcw', rcdCols().wave); }
   U.undoB.disabled = !RCD.undo.length; U.playB.textContent = rcdPrev ? '■' : '▶ Play';
@@ -14979,6 +14982,21 @@ function rcdUi(){
   if (U.fillCh) U.fillCh();
   if (U.latSay) U.latSay();
   rcdDrawWave();
+}
+// RECORDING COUNTER (owner, 7 Nov: "while a take records, show how long it is so far in minutes and seconds ... so a long take's length is visible as it goes"; again 8 Nov).
+// All on the audio clock (ctx.currentTime, so the same on the browser worklet and the native input). FREE: since 'go' was sent (capture starts at its next audio block). PATTERN: from the edge the take starts at (R.t0), "waiting…" until then. One text node,
+// written only when the text changes; the timer (4 a second) runs only while a take records and is cleared the moment it doesn't, or the window closes.
+function rcdFreeSecs(){ return Math.max(0, ctx.currentTime - RCD.t0w); }   // (not counted from the chunks: the worklet hands them over a second at a time, and the native path has its own steps)
+function rcdFmt(t){ t = Math.floor(Math.max(0, t) + 1e-6); const h = t / 3600 | 0, m = (t / 60 | 0) % 60, s = t % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`; }
+function rcdClk(){
+  const U = RCD.ui, R = RCD.sync, act = !!(U && U.time && (RCD.on || R));
+  if (!act && RCD.clkT){ clearInterval(RCD.clkT); RCD.clkT = 0; }
+  if (!U || !U.time) return;
+  const txt = R ? (R.phase === 'armed' ? 'waiting…' : rcdFmt(R.phase === 'closing' ? R.t1 - R.t0 : ctx.currentTime - R.t0)) : RCD.on ? rcdFmt(rcdFreeSecs()) : rcdFmt(RCD.clkF || 0);
+  if (U.time._t !== txt){ U.time._t = txt; U.time.textContent = txt; }
+  U.time.classList.toggle('wait', !!R && R.phase === 'armed');
+  U.time.style.visibility = act || RCD.clkF != null ? '' : 'hidden';   // (idle: its room stays, so the window doesn't change size)
+  if (act && !RCD.clkT) RCD.clkT = setInterval(rcdClk, 250);
 }
 // NOTE KEYS IN THE EDITOR (6 Nov): one voice per held key; C-4 (note 48) plays the take as recorded. A short fade in and
 // out so neither end clicks. What plays is the selection, or the take from its Start marker (an edited sample) or the top.
@@ -15153,7 +15171,7 @@ async function rcdPanel(pad, opts){
   edit.append(ops);
   const padS = el('select'); for (let k = 0; k < kit.voices.length; k++) padS.append(new Option(hx(k) + ' ' + (kit.voices[k].name || ''), k)); padS.value = pad;
   const keepRow = el('div', 'btnrow reckeep'), keepB = el('button', 'ok', 'Keep in this pad'); keepB.type = 'button'; keepB.addEventListener('click', () => rcdKeep(+padS.value));
-  const discB = el('button', null, 'Discard'); discB.type = 'button'; discB.addEventListener('click', () => { RCD.take = null; RCD.undo = []; RCD.sel = null; RCD.view = null; rcdUi(); });
+  const discB = el('button', null, 'Discard'); discB.type = 'button'; discB.addEventListener('click', () => { RCD.take = null; RCD.clkF = null; RCD.undo = []; RCD.sel = null; RCD.view = null; rcdUi(); });
   padS.title = 'The pad to keep the take in'; padS.setAttribute('aria-label', 'Pad'); keepRow.append(padS, el('span', 'recsp'), discB, keepB); edit.append(keepRow);   // (owner, 6 Nov: no "Pad" text, so it lines up with ▶ Song below)
   box.append(edit);
   const takeOf = L => { const S0 = L.sample, n = S0.data.length; return {data:S0.data, data2:S0.data2 || null, sr:S0.sr, name:S0.name, how:'edit', beats:0, pats:0, lp:L.lpMode | 0,
@@ -15177,10 +15195,11 @@ async function rcdPanel(pad, opts){
   confDisc.addEventListener('click', recGo);
   confKeep.addEventListener('click', () => { rcdKeep(+padS.value); recGo(); });
   rec.addEventListener('click', () => { if (RCD.on || RCD.sync) return rcdStop(); if (!E && RCD.take && !RCD.take.kept) return confShow(conf.hidden); recGo(); });
-  const close = el('button', null, 'Close'); close.type = 'button'; row.append(songB, el('span', 'recsp'), rec, close); box.append(conf, row); if (E){ rec.hidden = true; keepRow.append(close); row.hidden = true; }   // EDIT SAMPLE: Close beside Apply / Revert
-  Object.assign(RCD.ui, {rec, state, edit, wave, ov, rd, playB, undoB, lock, E, songB, win, whn, whi, fillCh, latSay});
+  const close = el('button', null, 'Close'); close.type = 'button'; const rtime = el('span', 'rectime', '0:00'); rtime.style.visibility = 'hidden'; rtime.setAttribute('role', 'timer'); rtime.title = 'How long the take is so far';
+  row.append(songB, el('span', 'recsp'), rtime, rec, close); box.append(conf, row); if (E){ rec.hidden = true; keepRow.append(close); row.hidden = true; }   // EDIT SAMPLE: Close beside Apply / Revert
+  Object.assign(RCD.ui, {time:rtime, rec, state, edit, wave, ov, rd, playB, undoB, lock, E, songB, win, whn, whi, fillCh, latSay});
   const songT = setInterval(() => { if (!RCD.ui){ clearInterval(songT); return; } const on = !!tp.on; if (songB._on !== on){ songB._on = on; songB.textContent = on ? '■ Song' : '▶ Song'; songB.classList.toggle('on', on); } }, 150);   // follows the song, however it was started
-  const done = () => { if (askOpen !== done) return; askOpen = null; rcdKeysOff(); RCD.kb = null; document.removeEventListener('keyup', keyUp, true); window.removeEventListener('blur', blurOff); rcdAbort(); if (rcdPrev){ try { rcdPrev.stop(); } catch(e){} rcdPrev = null; } rcdClose(); RCD.ui = null; if (E){ RCD.take = null; RCD.undo = []; RCD.sel = null; } wrap.remove(); document.removeEventListener('keydown', key, true); };
+  const done = () => { if (askOpen !== done) return; askOpen = null; rcdKeysOff(); RCD.kb = null; document.removeEventListener('keyup', keyUp, true); window.removeEventListener('blur', blurOff); rcdAbort(); if (rcdPrev){ try { rcdPrev.stop(); } catch(e){} rcdPrev = null; } rcdClose(); RCD.ui = null; rcdClk(); if (E){ RCD.take = null; RCD.undo = []; RCD.sel = null; } wrap.remove(); document.removeEventListener('keydown', key, true); };
   close.addEventListener('click', done);
   // Keys stay in the panel: R records / stops, Space plays the song, Esc closes (a take not kept is let go); the piano keys play the take (R stays Record in Record a sample…), numpad / * the octave
   const key = e => { const tag = e.target && e.target.tagName;
@@ -22808,7 +22827,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 511;
+const BUILD = 512;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31784,6 +31803,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [512, '8 Nov', ['Record a sample: a recording timer beside Record shows how long the take is so far (0:00 → 4:37); PATTERN takes show “waiting…” until they start at the pattern.']],
   [511, '8 Nov', ['Measure…: the window keeps its size when you press Measure, and says what it is doing (opening the input, then hit by hit).']],
   [509, '8 Nov', ['Measure… no longer shows “Audio engine reset” when it finishes (it still refreshes the audio engine quietly, as before); Reset audio engine keeps Record a sample’s monitoring connected.']],
   [507, '8 Nov', ['Record a sample: Keep in this pad no longer plays the pad; closing the window really disconnects its input monitoring (beta.15 left it connected); closing it while the browser’s input is still opening no longer leaves that input on.']],
