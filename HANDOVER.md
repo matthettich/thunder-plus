@@ -198,6 +198,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - A song (bETA tESTING eLECTRO) went silent after loading on v1.2.98 (a blip, then nothing; the playback report showed the
   sequencer fine: rows, no late / dropped notes, engine running; after-STOP levels a steady −80 dB). After updating to v1.2.99
   it plays; headless on build 481 it plays at −3…−20 dB. Not reproduced: if it comes back, the report from that moment.
+- Owner: Measure "made things worse"; Reset audio engine fixed it ("close now"). Measure opening the interface's input likely
+  made macOS reconfigure the device (output timing moved). Promised: Measure rebuilds the engine itself when it finishes
+  (not done yet). Owner: the recorder "wrongly thinks my audio interface only has two inputs": Chromium (Electron too) gives
+  getUserMedia 2 channels on the owner's Mac whatever is asked (ideal 32). Build 483 only rewords INPUTS ("all the app is
+  given") and its hover (route the input to 1/2 in the interface's mixer). The real fix is NATIVE-DESKTOP-PLAN 14.2 option 2
+  (the input side of the native helper).
 - That song's master chain (flex, peq, pcalm, pcomp, ptone, pmaster) is 103 ms of lookahead: at 120 BPM, LPB 8 a row is
   62.5 ms, so with the owner's +27 ms Gear delay MIDI was ~2 rows early: the 7 Nov "two lines" report, fixed by moFxLat (479).
 
