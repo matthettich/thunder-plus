@@ -81,6 +81,17 @@ review`: it skips PRs not aimed at main); its two findings fixed. **Owner feedba
 and inputs are separated": move INPUT ENGINE (Auto / Browser) into Record a sample beside Input / Inputs (the Input list
 shows "500R8 (native, 28 inputs)", Inputs lists every channel and pair from it), and take the row out of Settings › Audio.
 
+**OWNER'S BETA.2 TEST (7 Nov 19:50) and the fixes in 1.3.0-beta.3 (build 490):** (1) "the audio interface gets reset":
+miniaudio set the device's buffer size (kAudioDevicePropertyBufferFrameSize, device-wide on CoreAudio); now it asks for the
+size the device already has (`CurrentBufferFrames` in thunder_io.cc). (2) "enable the microphone 28 times": main asks macOS once
+(`systemPreferences.askForMediaAccess`) before forking the helper. (3) "Discard and record doesn't do anything" / "close the
+window to get the inputs again": a stalled native input (no chunk for 1 s) or one on a rebuilt audio engine is closed and
+reopened by the next Record. (4) "meters don't work until Record": the native input opens with the window. (5) "kicking the
+inputs back to 1&2": a failed native open fell back silently to the browser's input; now it says why and records nothing.
+(6) "multiple layers on the same pad are the same sample": most likely the old take kept after a Record that failed to open
+(rcdStart returns before clearing RCD.take): recheck on beta.3. ADAT inputs: not confirmed yet (the owner thinks these bugs
+hid it): recheck on beta.3. tools/io-check.mjs covers 3–5 with the fake helper.
+
 **PICK UP HERE (7 Nov 19:41).** State: desktop pre-release **1.3.0-beta.2** (build 489, from `io-helper`) is out for the owner's
 A1.5 test (the list below). PR #14 (`io-helper` → `beta`): CodeRabbit re-asked at 02:37 UTC (`@coderabbitai review`; it skips
 when a push lands right after the ask, so push first, then ask). First job for the next session:
