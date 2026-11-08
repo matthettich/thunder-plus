@@ -9,3 +9,6 @@ link/build/
 tests/sweep/out/
 io/build/
 electron/io/
+
+# agent worktrees made by Claude sessions (never part of the app)
+.claude/worktrees/
