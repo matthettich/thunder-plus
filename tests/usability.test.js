@@ -381,3 +381,24 @@ test('build 398: …waves live engine', () => {
   assert.match(src, /ps = isPsV\(v\) \|\| isWlV\(v\)/);
   assert.ok(!/waves-worklet\.js\?v=31/.test(src));
 });
+
+/* ───────── FOLLOW PATTERN jumps on a change only (owner, 7 Nov: one phrase on a track trapped the cursor) ───────── */
+test('FOLLOW PATTERN: a track playing one phrase lets the cursor move off it; a new phrase or row still pulls it over', () => {
+  const blk = cut('index.html', /var fpMem = null;[\s\S]*?\nfunction followPlay\(\)\{[\s\S]*?\n\}\n(?=\/\/ ARRANGE PAGES)/, 'fpMem and followPlay');
+  const c = run(`var tp = {on:true, mode:'song', pos:null}, sdrag = 0, drag = 0, tv = 'phrase', cTrack = 0, followMode = 1, selA = null,
+    cSect = 0, cPhrase = 0, arrHandT = -1e9, apReady = false, apF = '', apLastKey = '', cs = {phrase:{y:0}, song:{x:0, y:0}};
+    const plen = () => 16, pvActive = () => false, pvFollow = () => {}, arrFollowPage = () => {}, asongOn = () => false;
+    ${blk}
+    this.api = { step(P){ tp.pos = P; followPlay(); }, st: () => ({cPhrase, y: cs.song.y}), set(o){ if ('cPhrase' in o) cPhrase = o.cPhrase; if ('y' in o) cs.song.y = o.y; if ('tv' in o) tv = o.tv; },
+      stop(){ tp.on = false; fpMem = null; tp.on = true; } };`, { performance: { now: () => 1e6 } });
+  const P = (phrase, row) => [{ phrase, row, step: 0, sect: 0 }];
+  c.api.step(P(3, 0)); assert.equal(c.api.st().cPhrase, 3, 'the first step shows what plays');
+  c.api.set({ cPhrase: 7 });
+  for (let i = 0; i < 8; i++) c.api.step(P(3, 0));
+  assert.equal(c.api.st().cPhrase, 7, 'the same phrase playing on: the cursor stays where it was moved');
+  c.api.step(P(4, 1)); assert.equal(c.api.st().cPhrase, 4, 'a new phrase on the track still follows');
+  c.api.set({ tv: 'song' }); c.api.step(P(4, 1)); c.api.set({ y: 9 });
+  for (let i = 0; i < 8; i++) c.api.step(P(4, 1));
+  assert.equal(c.api.st().y, 9, 'Song screen: one block playing, the cursor stays on the row it was moved to');
+  c.api.step(P(5, 2)); assert.equal(c.api.st().y, 2, 'the next row playing still moves it');
+});
