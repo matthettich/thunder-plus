@@ -14726,7 +14726,7 @@ function midiLatPanel(){
   let p = mine ? portOf(mine) : ports[0], ch = mine ? (mine.mch | 0) & 15 : 0, note = 60, n = 24, busy = false, res = null;
   const recall = () => { const m = mem[p]; if (m){ if (!mine || portOf(mine) !== p) ch = clamp(m.ch | 0, 0, 15); note = clamp(m.note == null ? 60 : m.note | 0, 0, 127); } };
   recall();
-  genPanel('Measure gear delay', 'Plays a click through ...Thunder and, 250 ms later, the note below on the gear (pick one your gear answers, such as a drum’s trigger note), again and again, and listens on the input chosen in Record a sample (Input and Inputs there). Send the mixer’s output, or anything that hears both, into that input; a short, loud patch on the gear works best.', ({field, msgEl}) => {
+  genPanel('Measure gear delay', 'Plays a click through ...Thunder and, 250 ms later, the note below on the gear (pick one your gear answers, such as a drum’s trigger note), again and again, and listens on the Inputs below (the input device is the one chosen in Record a sample). Both the click and the gear must reach those inputs: send the mixer’s output, or anything that hears both, into them; a short, loud patch on the gear works best.', ({field, msgEl}) => {
     const pS = el('select'), cS = el('select'), kS = el('select');
     ports.forEach(q => pS.append(new Option(PORTL[q] + '  ' + portName(q), q))); pS.value = p;
     for (let c = 0; c < 16; c++) cS.append(new Option(d2(c + 1), c)); cS.value = ch;
@@ -14736,7 +14736,18 @@ function midiLatPanel(){
     cS.addEventListener('change', () => { ch = +cS.value; keep(); });
     kS.addEventListener('change', () => { note = +kS.value; keep(); });
     const nS = el('select'); [[24, '24 hits · 15 s'], [100, '100 hits · 1 min (drift)']].forEach(([v, t]) => nS.append(new Option(t, v))); nS.value = n; nS.addEventListener('change', () => { n = +nS.value; });
-    field('Port', pS); field('Channel', cS); field('Note', kS); field('Length', nS);
+    // INPUTS (owner, 7 Nov: "Measure needs the ability to change inputs"): the pair or channel that hears the click and the gear,
+    // the same setting as Record a sample's Inputs (rcdSet.inCh), listed from the input's channel count
+    const iS = el('select'); iS.setAttribute('aria-label', 'Which inputs hear the click and the gear');
+    const fillI = async () => { let n = 2, nat = false, dn = '';
+      if (RCD.io || RCD.stream){ n = RCD.nch || 2; nat = !!RCD.io; dn = RCD.io ? RCD.io.dev.name : ''; }
+      else if (IOAPI && aset.inEngine !== 'browser' && await iohReady()){ const d = iohInDev(''); if (d){ n = (rcdSet.nchs || {})['io:' + d.inId] || d.inputs || 2; nat = true; dn = d.name; } }
+      else n = (rcdSet.nchs || {})[rcdSet.input || ''] || 2;
+      iS.textContent = ''; rcdInOpts(n, nat).forEach(([v, t]) => iS.append(new Option(t, v))); const [k, a] = rcdPick(n); iS.value = k + a;
+      iS.disabled = iS.options.length < 2; iS.title = dn ? dn + (nat ? ' (native)' : '') : ''; };
+    iS.addEventListener('change', () => { rcdSet.inCh = iS.value; rcdSave(); rcdRoute(); });
+    fillI();
+    field('Port', pS); field('Channel', cS); field('Note', kS); field('Inputs', iS); field('Length', nS);
     MLT.say = t => { msgEl.textContent = t; }; }, [
     ['Measure', async () => { if (busy) return; if (tp.on) tStop(); busy = true; MLT.say('Measuring… keep quiet near any microphone.');
       try { const r = await midiLatRun(p, ch, note, n), ok = r.length;
@@ -22577,7 +22588,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 493;
+const BUILD = 495;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31544,6 +31555,8 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [495, '7 Nov', ['Mac app: signed ad hoc (still no Apple certificate), so macOS sees one app and asks for the microphone once instead of once per part of the app.']],
+  [494, '7 Nov', ['Settings › MIDI › Measure…: an Inputs list picks the pair or channel that hears the click and the gear (the same setting as Record a sample’s Inputs).']],
   [493, '7 Nov', ['Desktop app, Engine Native: the input is opened once, not again each time Record is pressed or while macOS is still asking for the microphone (the extra microphone prompts and “wouldn’t open: no answer”); opening waits for that prompt; and more room against the input falling behind mid-take (the take is still placed on the beat).']],
   [492, '7 Nov', ['Desktop app, Engine Native: the helper no longer stops on the first moment of audio (the cause of the inputs falling back to 1+2 on beta.2 and beta.3).']],
   [491, '7 Nov', ['Desktop app, Record a sample with Engine Native: the interface’s own delay (as the Mac reports it) is taken into account, so PATTERN takes land on the beat without setting Extra latency; unplugging the interface mid-take keeps the take so far; and the window says when the interface runs at another sample rate than the app.']],

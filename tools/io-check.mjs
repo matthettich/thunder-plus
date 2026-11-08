@@ -146,6 +146,17 @@ try {
       return {note:E('RCD.note || ""'), lat:[...document.querySelectorAll('.recset b')].map(b => b.textContent).join('|')}; });
     ok(/runs at (44\.1|48) kHz and the app at/.test(rate.note) && /converted/.test(rate.note), 'a rate mismatch is said: ' + rate.note);
     ok(/2\.0 ms interface latency included/.test(rate.lat), 'the interface latency is shown: ' + rate.lat);
+    // MEASURE'S INPUTS (owner, 7 Nov: "Measure needs the ability to change inputs"): the list is the native input's 28 channels,
+    // and picking one sets the recorder's pair
+    const ms = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
+      E("midi.access = midi.access || {outputs:new Map(), inputs:new Map()}; midi.access.outputs.set('fake', {id:'fake', name:'Fake gear', send(){}}); midi.outIds[0] = 'fake';"); E('midiLatPanel()'); await wait(400);
+      const sel = [...document.querySelectorAll('.genask label')].find(l => l.firstChild && l.firstChild.textContent === 'Inputs');
+      if (!sel) return null; const s = sel.querySelector('select'); const n = s.options.length;
+      s.value = 's11'; s.dispatchEvent(new Event('change')); const after = E('rcdSet.inCh');
+      [...document.querySelectorAll('.genask button')].find(b => b.textContent === 'Done').click();
+      E("rcdSet.inCh = 'p16'; rcdRoute(); midi.outIds[0] = ''; midi.access.outputs.delete('fake');"); return {n, after, txt:s.options[0].textContent}; });
+    ok(ms && ms.n === 14 + 28 && ms.after === 's11', "Measure… has an Inputs list (the native input's pairs and channels) that sets the recorder's pick: " + JSON.stringify(ms));
+    await openRec(page);   // (Measure's window closed Record a sample)
     await page.evaluate(async () => { const E = s => window.__seqTest.ev(s); E('rcdClose()'); await E('rcdOpen()'); });
     // Engine: Browser
     await page.evaluate(() => { window.__ioOps.length = 0; });
