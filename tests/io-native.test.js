@@ -16,3 +16,7 @@ test('io ring: a producer thread against the reader, in order, no torn samples, 
 test('io input: null-backend open / read / close in real time', { skip: !fs.existsSync(path.join(R, 'electron/io/thunder_io.node')) && 'addon not built' }, () => {
   assert.match(execFileSync(process.execPath, [path.join(R, 'io/test/input.js')], { encoding: 'utf8' }), /input ok/);
 });
+
+test('io MIDI: the loopback port, sends at their OS time, same-moment order, clear, close', { skip: !fs.existsSync(path.join(R, 'electron/io/thunder_io.node')) && 'addon not built' }, () => {
+  assert.match(execFileSync(process.execPath, [path.join(R, 'io/test/midi.js')], { encoding: 'utf8', env: Object.assign({}, process.env, { THUNDER_IO_TEST: '1' }) }), /midi ok/);
+});

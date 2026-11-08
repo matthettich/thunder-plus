@@ -42,5 +42,9 @@ try {
   // the input opens and closes on the null backend (A1.1: no device is touched; the frames themselves: io/test/input.js)
   const op = I.openInput('', { rate: 48000, backend: 'null' }); I.closeInput();
   if (!op || !op.ok || op.rate !== 48000) fail('thunder_io.node: openInput on the null backend: ' + ((op && op.why) || 'no answer'));
+  // MIDI (phase B): the port list answers, and the loopback test port opens, sends and closes (no MIDI device is touched)
+  const mp = I.midiPorts(); if (!mp || !Array.isArray(mp.outs) || !Array.isArray(mp.ins)) fail('thunder_io.node: midiPorts() returned ' + JSON.stringify(mp));
+  const mo = I.midiOpenOut('test:loop'); if (!mo || !mo.ok || !I.midiSend(mo.port, [0xF8], 0)) fail('thunder_io.node: the MIDI test port did not open or send');
+  I.midiClose(mo.port);
 } catch (e) { fail('io/build.js failed: ' + ((e && e.message) || e)); }
 console.log('electron/io/thunder_io.node built (' + Math.round(fs.statSync(dst).size / 1024) + ' KB): ' + v);

@@ -1,5 +1,5 @@
 // thunder_io.node: Thunder Plus's native audio and MIDI I/O helper: devices(), now(), and (A1) the audio input:
-// openInput() / read() / closeInput(). Plain N-API (node_api.h, no node-addon-api), no C++ exceptions. The only thread is
+// openInput() / read() / closeInput(); (B) MIDI in midi.cc. Plain N-API (node_api.h, no node-addon-api), no C++ exceptions. The only thread is
 // the OS audio callback, which never calls into JS: it copies into a lock-free ring (ring.h) that read() drains.
 // See docs/NATIVE-IO-HELPER-PLAN.md.
 #define MINIAUDIO_IMPLEMENTATION
@@ -30,7 +30,7 @@
 // The OS clock in nanoseconds, the clock the audio callback's timestamps will use later: macOS mach_absolute_time (the
 // same clock as CoreAudio's mHostTime), Windows QueryPerformanceCounter, elsewhere CLOCK_MONOTONIC. Whole seconds and the
 // remainder are converted separately, so the 64-bit integer math never overflows; only the final value is made a double.
-static uint64_t HostNowNs(void) {
+uint64_t HostNowNs(void) {   // (not static: midi.cc stamps and schedules on it too)
 #if defined(__APPLE__)
   static mach_timebase_info_data_t tb = {0, 0};
   if (tb.denom == 0) mach_timebase_info(&tb);
@@ -553,11 +553,11 @@ static napi_value CloseInput(napi_env env, napi_callback_info info) {
 
 // ---------------------------------------------------------------------------------------------------------------------
 
-// version() -> "thunder_io 3 / miniaudio 0.11.26"
+// version() -> "thunder_io 4 / miniaudio 0.11.26 / libremidi"
 static napi_value Version(napi_env env, napi_callback_info info) {
   (void)info;
   napi_value out;
-  napi_create_string_utf8(env, "thunder_io 3 / miniaudio " MA_VERSION_STRING, NAPI_AUTO_LENGTH, &out);
+  napi_create_string_utf8(env, "thunder_io 4 / miniaudio " MA_VERSION_STRING " / libremidi", NAPI_AUTO_LENGTH, &out);
   return out;
 }
 
@@ -567,6 +567,7 @@ static void Export(napi_env env, napi_value exports, const char* name, napi_call
   napi_set_named_property(env, exports, name, fn);
 }
 
+void MidiExport(napi_env env, napi_value exports);   // midi.cc (phase B)
 static napi_value Init(napi_env env, napi_value exports) {
   Export(env, exports, "version", Version);
   Export(env, exports, "devices", Devices);
@@ -575,6 +576,7 @@ static napi_value Init(napi_env env, napi_value exports) {
   Export(env, exports, "read", Read);
   Export(env, exports, "closeInput", CloseInput);
   Export(env, exports, "inputLost", InputLost);
+  MidiExport(env, exports);
   return exports;
 }
 
