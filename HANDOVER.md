@@ -109,17 +109,65 @@ Tests: io-check (unplug, rate, latency line), tests/io.test.js (inputLost). Left
 installation" (the step is continue-on-error, so Windows builds ship without the helper; probably the same for Link: try
 `npm config set msvs_version 2022` or setup-msbuild before it), then a WASAPI check; Linux builds fine.
 
-**PICK UP HERE (7 Nov 19:41).** State: desktop pre-release **1.3.0-beta.2** (build 489, from `io-helper`) is out for the owner's
-A1.5 test (the list below). PR #14 (`io-helper` → `beta`): CodeRabbit re-asked at 02:37 UTC (`@coderabbitai review`; it skips
-when a push lands right after the ask, so push first, then ask). First job for the next session:
-1. Read CodeRabbit's newest review on PR #14 (`gh api repos/matthettich/thunder-plus/pulls/14/comments`, `/reviews`, `/issues/14/comments`);
-   fix real findings on `io-helper`, run `npm test` and `node tools/io-check.mjs`, push, reply on the PR.
-2. Take the owner's test results. Works on the 500R8 → merge PR #14 into `beta` (REST API: `gh api -X PUT
-   repos/matthettich/thunder-plus/pulls/14/merge`; GraphQL is blocked here), then `beta` → `main` and a normal desktop release
-   only when the owner asks. Problems → fix on `io-helper`, pre-release `1.3.0-beta.3` (Run workflow `desktop.yml`, ref
-   `io-helper`, `version`, `prerelease: true`).
-3. Then A2 (below), then B (MIDI), same lead / delegate split as the task table.
-Working copies used this session: `/home/claude/thunder-plus` (io-helper) and a `beta` worktree at `/home/claude/tp-beta`.
+**PICK UP HERE: EVERYTHING STILL NEEDED (updated 7 Nov 20:57).** Read this list first; the paragraphs below it are the detail.
+
+*State now:* branch `io-helper` (build 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
+CodeRabbit fix that was the real cause of the beta.2/3 failures (the helper died on the first chunk: MessagePortMain can't
+transfer an ArrayBuffer). Desktop pre-release **1.3.0-beta.4** (build 492) is out; the owner will test it later. PR #14
+(`io-helper` → `beta`) is open. `beta` is at build 488 plus a CLAUDE.md line ("continue the helper"); `main` is at build 485
+(desktop v1.2.101).
+
+**1. Owner's test of beta.4 (waiting on the owner; the next session starts by asking for the results).** With Record a sample
+→ Engine Native:
+- [ ] Opening the window: the interface is NOT reset, one microphone prompt at most, the meters move before Record.
+- [ ] An ADAT input (e.g. IN 12) and a pair (IN 17+18) record what was picked; the Inputs list stays on the pick.
+- [ ] PATTERN takes start on the beat; Extra latency's line shows "… ms interface latency included" (if takes are still
+      off by a constant amount, note it: CoreAudio's reported latency may not be the whole story for the 500R8).
+- [ ] Discard and record works; takes in two layers of one pad are different (the old "same sample" report is believed to
+      be the stalled-input bug).
+- [ ] A 5-minute take (the built-in mic is fine: tests drift), plus 1–2 minutes through the 500R8 with its 28 channels (tests
+      load): no clicks, still on the grid at the end.
+- [ ] Monitoring through the app: usable? (expected ~50–80 ms late; the interface's own monitoring is the fallback).
+- [ ] Measure… (Settings › MIDI) through the native input.
+- [ ] When convenient: unplug mid-take (the take so far is kept); the rate warning (500R8 at another rate than the app).
+→ Problems: fix on `io-helper`, run the checks (below), pre-release `1.3.0-beta.5` (Run workflow `desktop.yml`, ref
+  `io-helper`, `version`, `prerelease: true`), and confirm in the macOS job log that "thunder_io.node built" appears (the step
+  is continue-on-error: a compile error ships an app without the helper).
+
+**2. CodeRabbit on the newest commits.** Its last review (02:54 UTC) covered A1 up to build 489; A2 (build 491) and the build-492
+fix were pushed after it. Ask with a PR comment `@coderabbitai review` (REST: `gh api -X POST repos/matthettich/thunder-plus/
+issues/14/comments -f body=...`), and only after the last push of a batch: a push right after the ask makes it skip ("Head
+commit changed"). It skips PRs into `beta` unless asked. Read `pulls/14/comments` and `/reviews`; fix real findings.
+Its libremidi findings (vendored, not compiled) wait for phase B.
+
+**3. Merge, when the owner says beta.4 works.** PR #14 into `beta` (REST: `gh api -X PUT repos/matthettich/thunder-plus/pulls/14/merge`;
+GraphQL is blocked from these sessions). Expect small conflicts: BUILD / CHANGES / sw.js CACHE (take io-helper's 492 and keep
+every CHANGES line) and CLAUDE.md (keep both helper lines). Then `beta` → `main` and a normal desktop release (`1.3.0`) only when
+the owner asks (beta → main by PR so CodeRabbit sees it). The punch-list fixes (FOLLOW PATTERN 487, wheel direction 488) are
+on `beta` and in the helper betas but in no normal desktop release yet.
+
+**4. Rest of A2.**
+- [ ] Windows: the addon doesn't build on GitHub's windows-latest runner ("Could not find any Visual Studio installation";
+      Windows builds ship without the helper and fall back to the browser input). Try `npm config set msvs_version 2022` or an
+      MSBuild setup step before `node io/build.js`; check Link's step too (probably the same). Then a WASAPI test (WASAPI only,
+      no ASIO: owner's decision).
+- [ ] Linux: builds; untested on hardware (low priority).
+
+**5. Phase B: MIDI through the helper** (plan §5 item 4; after A is merged). libremidi out / in, `midiSend(port, bytes, atNs)`
+on a high-priority thread, `midiClear` on STOP (OUTBOX unneeded on that path), `msend` and clock-in on the helper when present,
+Settings › MIDI lists the helper's ports (port letters unchanged in songs). Re-check the MIDI Gear delay with Measure… after it
+(7 Nov (16)). Same lead / delegate split: the scheduler thread is the lead's. Look at CodeRabbit's libremidi findings then
+and record any local patch in `io/VERSIONS`.
+
+**6. Known limits to keep in mind.** Monitoring through the app is D + output latency late (D = base + output latency + 40 ms,
+raised between takes if chunks arrive late). The interface at another rate than the app is converted (warned). The Mac build
+is unsigned: macOS may still ask for the microphone per launch until the Apple Developer membership (owner: waiting).
+
+**Checks to run before any push:** `npm test`, `node tools/io-check.mjs`, `node tools/recorder-check.mjs`,
+`node tools/browser-check.mjs` (and `node tools/link-test.mjs` if Link code moved). The addon: `NODEDIR=/opt/node22 node
+io/build.js`, `node io/test/input.js`. Lesson from beta.2/3: fakes accept things the real Electron ports don't; when the
+helper's wiring changes, read Electron's API for it, not only the tests.
+Working copies used: `/home/claude/thunder-plus` (io-helper) and a `beta` worktree at `/home/claude/tp-beta`.
 
 **A1 BUILT, waiting for the owner's test (7 Nov, evening; branch `io-helper`, PR #14, desktop pre-release 1.3.0-beta.2, build 489).**
 Tasks A1.1–A1.4 done; A1.5 (owner on the 500R8) is next. What's where:
@@ -317,7 +365,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
   change it needs.
 - Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
-- **Native I/O helper** (7 Nov): A0 done on the 500R8; A1 built (1.3.0-beta.2), waiting for the owner's test (see the START HERE brief).
+- **Native I/O helper** (7 Nov): A0 done on the 500R8; A1 + part of A2 built (1.3.0-beta.4), waiting for the owner's test: "PICK UP HERE: EVERYTHING STILL NEEDED" in the START HERE brief.
   Was: the brief is "Build the native I/O helper — START HERE" near the top of this file; design in `docs/NATIVE-IO-HELPER-PLAN.md`: phase A every input channel in Record a
   sample (the owner's interface has no mixer, so inputs 3+ can't be routed to 1/2), B MIDI out / in, C output only if needed.
   Owner answered its section 9 on 7 Nov (recorded there and in the brief).
