@@ -191,7 +191,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
   250 ms) is now added to every timed msend (notes, CCs, clock). Starter song: 64 ms. A track's own lookahead effects without
   LATENCY COMP are still not followed (it is later than the rest of the mix too). Owner should reset Gear delay towards 0 and
   use Measure…. The playhead / heardLat doesn't include this chain latency either (left as is).
-- v1.2.99's first run (42428730990, from build 478) was cancelled so the release carries this.
+- v1.2.99's first run (42428730990, from build 478) was cancelled so the release carries this; rebuilt as run 42428951611 from main at 2e87d61.
 
 ## 7 Nov (8): MIDI outbox, Measure gear delay, wider delay boxes (build 478, beta)
 
