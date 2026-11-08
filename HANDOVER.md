@@ -112,8 +112,9 @@ installation" (the step is continue-on-error, so Windows builds ship without the
 **PICK UP HERE: EVERYTHING STILL NEEDED (updated 7 Nov 23:30).** Read this list first; the paragraphs below it are the detail.
 
 **NEXT STEPS, in order:**
-1. The owner tests **1.3.0-beta.10** (has everything): the recording list (item 1) and the MIDI list (item 5, "Owner's test").
-   Start a session by asking for the results; fix on `io-helper`, pre-release beta.10, and check the macOS and Windows job
+1. The owner tests **1.3.0-beta.11** (has everything; beta.10 is the same but for one small MIDI fix): the recording list (item 1) and the MIDI list (item 5, "Owner's test").
+   Start a session by asking for the results; fix on `io-helper`, then a NEW pre-release number (beta.12, then beta.13…: never reuse one,
+   the workflow would replace a release's files without moving its tag), and check the macOS and Windows job
    logs for "thunder_io.node built" (both), "adhoc-sign: signed" (macOS) and "thunder_link.node built" (both).
 2. When both lists pass: merge PR #14 into `beta` (item 3), then `beta` → `main` and a normal desktop release only when the
    owner asks.
@@ -121,7 +122,7 @@ installation" (the step is continue-on-error, so Windows builds ship without the
 4. Later / low priority: Linux ALSA in CI (item 5, skipped on the owner's word); phase C (audio output through the helper)
    only if MIDI vs audio timing is still off after B, and then more likely the native desktop app (docs/NATIVE-DESKTOP-PLAN.md).
 
-*State now:* branch `io-helper` (build 499: phase B MIDI built and reviewed, item 5; desktop pre-release **1.3.0-beta.10** (build 500). beta.9 = 499; beta.8 = 498 (first with MIDI, Windows with Link and the helper again); beta.7 = 496, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
+*State now:* branch `io-helper` (build 501: phase B MIDI built and reviewed, item 5; desktop pre-release **1.3.0-beta.11** (build 501). beta.10 = 500; beta.9 = 499; beta.8 = 498 (first with MIDI, Windows with Link and the helper again); beta.7 = 496, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
 CodeRabbit fix that was the real cause of the beta.2/3 failures (the helper died on the first chunk: MessagePortMain can't
 transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner tests beta.7 when convenient (item 1). PR #14
 (`io-helper` → `beta`) is open. `beta` is at build 488 plus a CLAUDE.md line ("continue the helper"); `main` is at build 485
@@ -144,7 +145,7 @@ https://github.com/matthettich/thunder-plus/releases/tag/v1.3.0-beta.7. Record a
       and still on the grid at the end. Optionally 1–2 minutes through the 500R8 on an ADAT pair (load).
 - [ ] When convenient: unplug the 500R8 mid-take (the take so far is kept); run the 500R8 at 44.1 kHz with the app at 48 (the
       window warns that the input is converted).
-→ Problems: fix on `io-helper`, run the checks (below), pre-release `1.3.0-beta.8` (Run workflow `desktop.yml`, ref
+→ Problems: fix on `io-helper`, run the checks (below), pre-release the next unused number (`1.3.0-beta.12`…) (Run workflow `desktop.yml`, ref
   `io-helper`, `version`, `prerelease: true`); in the macOS job log confirm both "thunder_io.node built" and "adhoc-sign: signed"
   (both steps can fail without failing the build).
 
@@ -246,6 +247,8 @@ Started before the owner's beta.7 test, by the owner's choice; the risk is only 
   first of two same-name devices is unplugged; the 15 s clock re-measure replaces the offset (±0.2 ms) rather than smoothing.
   CodeRabbit's second pass (build 500): `NM.scanning` holds the access being scanned (a leftover scan of an old access no longer
   holds up the new one), no midiRemap from a scan whose access has gone, and the helper's dead transfer-list argument removed.
+  Third pass (build 501): opens in flight are kept per access (`acc.opening`), and a scan whose access has gone stops before
+  opening inputs. CodeRabbit has reviewed every commit up to 263f208.
 - **Linux: skipped for now (owner, 7 Nov 23:09: "not as important"; still needs to happen).** The Linux addon builds without
   ALSA (no ALSA headers on ubuntu-latest), so Linux has no native MIDI ports (Web MIDI still works, Engine Browser). To do:
   `sudo apt-get install -y libasound2-dev` before "Native I/O helper addon (optional)" in desktop.yml, Linux runner only,

@@ -16306,7 +16306,7 @@ async function iohStart(){
    (moRelease on STOP), so msend skips the OUTBOX; an input's onmidimessage gets {data, timeStamp} with the time the helper
    stamped on arrival. Ids are 'n:' + the port's name; saved Web MIDI choices are mapped by name (midiRemap), and back.
    Ports are looked at again every 3 s (plugged in or out: onstatechange, as Web MIDI). No microphone is asked for. */
-const NM = {acc:null, byPort:new Map(), scanT:0, clkT:0, miss:0, scanning:null, opening:new Set(), late:0};   // late: MIDI messages the helper sent > 2 ms after their booked time, since the app started
+const NM = {acc:null, byPort:new Map(), scanT:0, clkT:0, miss:0, scanning:null, late:0};   // late: MIDI messages the helper sent > 2 ms after their booked time, since the app started
 const nmWanted = () => !!IOAPI && aset.midiEngine !== 'browser';
 const nmPost = m => { try { if (IOH.port) IOH.port.postMessage(m); } catch(e){} };
 const nmNs = ms => Math.max(0, (ms - IOH.clk) * 1e6);   // performance.now() (ms) → the helper's OS clock (ns)
@@ -16334,14 +16334,16 @@ async function nmScan1(acc, first){
   if (!r){ if (++NM.miss >= 2) nmLost(); return; }
   NM.miss = 0; if (r.op !== 'midiPorts') return;
   let ch = false;
+  const opening = acc.opening || (acc.opening = new Set());   // opens in flight, per access (CodeRabbit: a shared set let an old scan's opens hide the new access's ports)
   const sync = (map, list, open) => { const want = new Set(list.map(p => 'n:' + p.id)), jobs = [];
     for (const [id, x] of map) if (!want.has(id)){ nmPost({op:'midiClose', port:x.port}); map.delete(id); NM.byPort.delete(x.port); ch = true; }
-    for (const p of list){ const id = 'n:' + p.id, key = open + id; if (map.has(id) || NM.opening.has(key)) continue; NM.opening.add(key);
-      jobs.push(iohAsk({op:open, name:p.id}).then(o => { NM.opening.delete(key);
+    for (const p of list){ const id = 'n:' + p.id, key = open + id; if (map.has(id) || opening.has(key)) continue; opening.add(key);
+      jobs.push(iohAsk({op:open, name:p.id}).then(o => { opening.delete(key);
         if (o && o.ok && (NM.acc !== acc || map.has(id))){ nmPost({op:'midiClose', port:o.port}); return; }   // (opened after a switch or a reconnect: closed, not leaked)
         if (!o || !o.ok) return; map.set(id, nmPort(id, p.name, o.port, open === 'midiOpenOut')); ch = true; })); }
     return Promise.all(jobs); };
-  await sync(acc.outputs, r.outs || [], 'midiOpenOut'); await sync(acc.inputs, r.ins || [], 'midiOpenIn');
+  await sync(acc.outputs, r.outs || [], 'midiOpenOut'); if (NM.acc !== acc) return;   // (switched away meanwhile: a stale scan opens no inputs)
+  await sync(acc.inputs, r.ins || [], 'midiOpenIn'); if (NM.acc !== acc) return;
   if (ch && !first && NM.acc === acc){ try { await midiRemap(acc); } catch(e){} if (acc.onstatechange) try { acc.onstatechange(); } catch(e){} }   // (a saved port plugged in later finds its letter)
   const st = await iohAsk({op:'midiStats'}); if (st && st.op === 'midiStats' && NM.acc === acc) NM.late = st.late | 0;
   nmLateShow();   // (also each scan: hookInputs may just have rewritten the status without it)
@@ -22722,7 +22724,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 500;
+const BUILD = 501;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31689,6 +31691,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [501, '8 Nov', ['Desktop app, native MIDI: switching Engine back and forth quickly no longer delays the input ports.']],
   [500, '7 Nov', ['Desktop app, native MIDI: after switching Engine the port list fills in at once, and a switch mid-scan no longer changes your saved port choices.']],
   [499, '7 Nov', ['Desktop app, native MIDI: sturdier (a port can’t be opened twice or left open after switching Engine; a device plugged in later gets its port letter back; if the helper stops, MIDI reconnects by itself), notes keep their timing while a controller is plugged in, and Settings › MIDI shows how many messages went out late, if any.']],
   [498, '7 Nov', ['Desktop app: MIDI through the app itself (Settings › MIDI › Engine: Native, the default; Browser is the old Web MIDI). Each message leaves at its exact time from the app’s own high-priority thread, STOP takes back notes booked ahead, and MIDI clock in is timed where it arrived. Your port choices carry over by name. Connecting MIDI no longer asks for the microphone.', 'Windows desktop builds include Ableton Link and the native input again.']],
