@@ -27,8 +27,8 @@ Keep this file up to date at the end of a work session.
 ## Desktop releases
 
 - **v1.2.99** (7 Nov 2026; owner: "merge to main for me and make a desktop"; beta merged into `main` directly (gh had no token, so
-  no PR / CodeRabbit pass) and released by pushing tag v1.2.99): builds 477–478 on top of v1.2.98 (INST layout by OUTPUT,
-  recorder INPUTS, Ctrl/⌘+G generators, MIDI outbox, Measure gear delay, wider Gear delay boxes).
+  no PR / CodeRabbit pass) and released through Run workflow with version 1.2.99): builds 477–479 on top of v1.2.98 (INST layout by OUTPUT,
+  recorder INPUTS, Ctrl/⌘+G generators, MIDI outbox, Measure gear delay, wider Gear delay boxes, MIDI after the output chain's latency).
 - **v1.2.98** (7 Nov 2026; owner: "push it to main, build a desktop app"; Run workflow through the API with version 1.2.98,
   from `main` after PR #13 at build 476, run 42414595840): builds 468–476 on top of v1.2.97 (core watchdog, Pattern view arrows,
   Arrange new patterns, Chords on poly, playhead latency, EDIT pick-up / drop, PAD navigation, hold before drag, ?pbshow,
@@ -182,6 +182,16 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+
+## 7 Nov (9): MIDI waits for the output chain's latency (build 479, beta + main, desktop v1.2.99)
+
+- Owner: MIDI and audio "align if I move the synth/audio up two lines" (with Gear delay +27 ms), "at least on this track".
+  Cause: the live output chain looks ahead (mastering: CALM 2560 samples + limiter lookahead; the master's …pump effects;
+  the safety limiter's 3 ms; LATENCY COMP's pdcPlan().T when on), and msend timed MIDI at the booked time. `moFxLat()` (cached
+  250 ms) is now added to every timed msend (notes, CCs, clock). Starter song: 64 ms. A track's own lookahead effects without
+  LATENCY COMP are still not followed (it is later than the rest of the mix too). Owner should reset Gear delay towards 0 and
+  use Measure…. The playhead / heardLat doesn't include this chain latency either (left as is).
+- v1.2.99's first run (42428730990, from build 478) was cancelled so the release carries this.
 
 ## 7 Nov (8): MIDI outbox, Measure gear delay, wider delay boxes (build 478, beta)
 
