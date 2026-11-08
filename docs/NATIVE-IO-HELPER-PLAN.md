@@ -175,6 +175,17 @@ Rough total for what's needed now (A0–A2): **2–3 weeks** of sessions; B anot
 
 ## 9. Decisions for the owner
 
+**Answers (7 Nov, 17:51):** 1. go ahead with phase A now, MIDI after. 2. Apple Developer membership: considering, waiting
+for now (the repeat microphone prompts stay until then). 3. Windows: WASAPI only, unless ASIO can be used without paying.
+4. The interface: **Cranborne Audio 500R8**, USB, presents **28 inputs** (8 from its 500-series slots, 2 S/PDIF, 16 ADAT,
+2 from its analogue summing mixer's output; Sound On Sound's review), with **two 8-channel lightpipe preamps** on the ADAT
+ins. No mixer software (its mixing is the hardware summing mixer), so inputs can't be routed onto 1/2: phase A's reason.
+ADAT gives 16 channels only at 44.1 / 48 kHz (8 with S/MUX at 88.2 / 96), so A1 is checked at 48 kHz with all 28. The owner
+also asked whether the build could be delegated to cheaper models with this session verifying (see HANDOVER 7 Nov (15)).
+Also from the owner: the right MIDI Gear delay was "a combination of both latency numbers" (Measure's result and Settings ›
+Audio's heard ms): MIDI may still be missing the output latency on the Mac; to check with numbers before changing `msend`.
+
+
 1. **Go ahead with phase A (inputs) now**, B (MIDI) after? Suggested: yes, A first; B once A is stable.
 2. **Apple Developer membership** (US$99 / year) to sign and notarise the Mac build: stops the repeated microphone
    prompts and Gatekeeper warnings, and is needed for the native host later anyway. Suggested: yes, before A1 ships.

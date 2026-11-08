@@ -192,6 +192,18 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 7 Nov (15): helper answers; delegating the build
+
+- Owner answered NATIVE-IO-HELPER-PLAN section 9 (recorded there): phase A now, MIDI after; no Apple membership yet; WASAPI
+  only; the interface is a Cranborne 500R8 (28 USB inputs at 48 kHz, two 8-channel lightpipe preamps, no mixer software).
+- Owner asked if the helper could be planned here and built by cheaper models, this session reviewing. Answer given: yes for
+  well-fenced pieces (build script and CI, the utility process and port plumbing, the fake-addon tests, Settings UI, the
+  device list) with exact specs and acceptance tests; the real-time parts (the C++ ring and input callback, timestamps onto
+  the audio clock, the jitter ring worklet) written or line-by-line reviewed here; the owner's Mac + 500R8 is the final test
+  (no CI can hear it). Waiting for the owner's go on that split.
+- Owner: the right Gear delay was "a combination of both latency numbers" (Measure + Settings › Audio's heard ms). Not
+  changed yet: ask for the numbers (Measure's result, heard ms, the delay that's right) before touching msend's mapping.
+
 ## 7 Nov (14): native I/O helper planned (docs only)
 
 - Owner: "we are going to need to write that helper sooner rather than later- my interface doesn't have an internal mixer.
