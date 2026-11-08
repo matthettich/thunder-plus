@@ -49,6 +49,9 @@ function createIoHelper({ loadAddon, post, timers }) {
     } else if (op === 'close') {
       closeInput();
       post({ op: 'closed', id });
+    } else if (op === 'now') {   // the page lines up its clock with the addon's (hostNs) by a few of these round trips
+      if (!addon) return err(id, hello.why || 'not available');
+      try { post({ op: 'now', id, ns: addon.now() }); } catch (e) { err(id, e); }
     } else if (op === 'devices') {
       if (!addon) return err(id, hello.why || 'not available');
       try { post({ op: 'devices', id, devices: addon.devices() }); } catch (e) { err(id, e); }

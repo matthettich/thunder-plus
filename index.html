@@ -14500,9 +14500,24 @@ registerProcessor('thunder-rec',ThRec);`;
 async function rcdInputs(){ try { return (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch(e){ return []; } }
 // The input (the simple recorder's openMic): the picked device, else the default; everything a phone does to clean up speech off
 async function rcdOpen(){
-  if (RCD.stream) return true;
-  const md = navigator.mediaDevices; if (!md || !md.getUserMedia){ toast('This browser can’t record audio.'); return false; }
+  if (RCD.stream || RCD.io) return true;
   audio(); try { if (ctx.state !== 'running') await ctx.resume(); } catch(e){}
+  // NATIVE INPUT (desktop app, INPUT ENGINE Auto): every channel of the interface, through the helper; the browser's input otherwise
+  if (IOAPI && aset.inEngine !== 'browser'){
+    try {
+      if (RCD.mod !== ctx){ await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([RCD_WORKLET], {type:'application/javascript'}))); RCD.mod = ctx; }
+      const node = new AudioWorkletNode(ctx, 'thunder-rec', {numberOfInputs:1, numberOfOutputs:0, channelCount:2, channelCountMode:'explicit', channelInterpretation:'speakers'});
+      const mon = ctx.createGain(); mon.gain.value = rcdSet.mon ? 1 : 0; mon.connect(master);
+      node.port.onmessage = e => rcdMsg(e.data);
+      Object.assign(RCD, {node, mon, ctx, inLat:0});
+      if (await rcdOpenIo(node, mon)){
+        RCD.nch = RCD.io.opened.channels; if (!rcdSet.nchs || typeof rcdSet.nchs !== 'object') rcdSet.nchs = {};
+        rcdSet.nchs['io:' + RCD.io.dev.inId] = RCD.nch; rcdSave(); rcdRoute(); if (RCD.ui && RCD.ui.fillCh) RCD.ui.fillCh();
+        return true; }
+      try { mon.disconnect(); node.port.onmessage = null; } catch(e){} Object.assign(RCD, {node:null, mon:null});
+    } catch(e){ tpLog('native input', e); rcdCloseIo(); Object.assign(RCD, {node:null, mon:null}); }
+  }
+  const md = navigator.mediaDevices; if (!md || !md.getUserMedia){ toast('This browser can’t record audio.'); return false; }
   const base = {echoCancellation:false, noiseSuppression:false, autoGainControl:false, channelCount:{ideal:32}};   // INPUTS: every channel it has
   let s = null;
   if (rcdSet.input){ try { s = await md.getUserMedia({audio:Object.assign({}, base, {deviceId:{exact:rcdSet.input}})}); } catch(e){} }
@@ -14520,7 +14535,7 @@ async function rcdOpen(){
     return true;
   } catch(e){ s.getTracks().forEach(t => t.stop()); tpLog('recorder', e); toast('Couldn’t start recording here.'); return false; }
 }
-function rcdClose(){ try { if (RCD.src) RCD.src.disconnect(); if (RCD.spl) RCD.spl.disconnect(); if (RCD.mrg) RCD.mrg.disconnect(); if (RCD.mon) RCD.mon.disconnect(); if (RCD.node){ RCD.node.port.onmessage = null; } } catch(e){}
+function rcdClose(){ rcdCloseIo(); try { if (RCD.src) RCD.src.disconnect(); if (RCD.spl) RCD.spl.disconnect(); if (RCD.mrg) RCD.mrg.disconnect(); if (RCD.mon) RCD.mon.disconnect(); if (RCD.node){ RCD.node.port.onmessage = null; } } catch(e){}
   if (RCD.stream) RCD.stream.getTracks().forEach(t => t.stop()); Object.assign(RCD, {stream:null, src:null, node:null, mon:null, spl:null, mrg:null}); }
 /* INPUTS (owner, 7 Nov: "choose the audio input on a multi-channel audio interface"): the input is opened with every channel
    the browser will give (some only give 2, whatever the interface has), and INPUTS picks a pair (1+2, 3+4…) or one channel,
@@ -14535,6 +14550,7 @@ function rcdInOpts(n){
   const o = []; for (let a = 0; a + 1 < n; a += 2) o.push(['p' + a, 'IN ' + (a + 1) + '+' + (a + 2)]);
   for (let a = 0; a < n; a++) o.push(['s' + a, 'IN ' + (a + 1) + ' (mono)']); return o; }
 function rcdRoute(){
+  if (RCD.io){ const [k, a] = rcdPick(RCD.nch || 2); RCD.io.node.port.postMessage({pick:[a, k === 'p' ? a + 1 : a]}); return; }   // NATIVE: picked in its worklet
   const src = RCD.src; if (!src || !RCD.node) return; const n = RCD.nch || 2, [k, a] = rcdPick(n);
   try { src.disconnect(); if (RCD.spl) RCD.spl.disconnect(); if (RCD.mrg) RCD.mrg.disconnect(); } catch(e){}
   RCD.spl = RCD.mrg = null;
@@ -14542,7 +14558,7 @@ function rcdRoute(){
   const spl = ctx.createChannelSplitter(n), mrg = ctx.createChannelMerger(2);
   src.connect(spl); spl.connect(mrg, a, 0); spl.connect(mrg, k === 'p' ? a + 1 : a, 1); mrg.connect(RCD.node); mrg.connect(RCD.mon);
   RCD.spl = spl; RCD.mrg = mrg; }
-const rcdLat = () => Math.max(-0.5, (ctx.outputLatency || ctx.baseLatency || 0) + (RCD.inLat || 0) + (rcdSet.lat || 0) / 1000);
+const rcdLat = () => Math.max(-0.5, (RCD.io ? RCD.io.D : (ctx.outputLatency || ctx.baseLatency || 0) + (RCD.inLat || 0)) + (rcdSet.lat || 0) / 1000);   // NATIVE: frames are placed by their timestamps, D behind
 function rcdMsg(m){
   if (m.pk){ for (let c = 0; c < 2; c++){ RCD.pk[c] = m.pk[c]; RCD.hold[c] = Math.max(RCD.hold[c] * 0.92, m.pk[c]); } if (m.pk[0] >= 0.999 || m.pk[1] >= 0.999) RCD.clip = performance.now(); rcdMeter(); return; }
   if (m.ch && m.ch.length){ if (!RCD.chunks.length) RCD.firstF = m.f0; RCD.chunks.push({f0:m.f0, ch:m.ch}); }
@@ -14627,18 +14643,18 @@ function rcdEndAt(t1){
     RCD.onDone = () => { const sr = ctx.sampleRate, t = rcdCollect(Math.round((R.t0 + lat) * sr), Math.round((t1 + lat) * sr)); RCD.on = false; RCD.sync = null;
       const beats = Math.max(0.25, Math.round((t1 - R.t0) * (R.bpm || S.bpm) / 60 * 4) / 4);
       rcdTake(t, 'sync', beats, R.n); };
-    RCD.node.port.postMessage('stop'); };
+    rcdGo('stop'); };
   wait();
 }
 async function rcdStart(){
   if (RCD.on || RCD.sync) return;
   if (!(await rcdOpen())) return;
   RCD.chunks = []; RCD.take = null; RCD.undo = [];
-  if (rcdSet.mode === 'free'){ RCD.on = true; RCD.t0w = ctx.currentTime; RCD.node.port.postMessage('go'); rcdUi(); return; }
+  if (rcdSet.mode === 'free'){ RCD.on = true; RCD.t0w = ctx.currentTime; rcdGo('go'); rcdUi(); return; }
   // PATTERN: armed; the next pattern edge starts it. Stopped: play from the cursor's song row (its top is the edge).
   const playing = tp.on && tp.mode === 'song'; if (tp.on && !playing) tStop(true);   // (before arming: tStop ends an armed take)
   const R = RCD.sync = {phase:'armed', pats:rcdSet.pats | 0, n:0, row:null, st:null, stopReq:false};
-  RCD.on = true; RCD.node.port.postMessage('go');
+  RCD.on = true; rcdGo('go');
   if (playing){ const last = tp.q.length ? tp.q[tp.q.length - 1] : (tp.pos ? {pos:tp.pos} : null);
     if (last && last.pos){ let row = -1, st = -1; for (const p of last.pos) if (p){ if (p.row > row) row = p.row; if (p.step > st) st = p.step; } if (row >= 0){ R.row = row; R.st = st; } } }
   else { RCD.starting = true; try { tStart('song', {row:songRow()}); } finally { RCD.starting = false; } }   // (the Song button's row: the cursor's, or the next pattern with something in it)   // (tStart stops first: not an end)
@@ -14647,9 +14663,9 @@ async function rcdStart(){
 function rcdStop(){
   if (RCD.sync){ const R = RCD.sync; if (R.phase === 'armed'){ rcdAbort(); rcdUi(); } else if (R.phase === 'rec' && !R.stopReq){ if (R.pats < 0) rcdEndAt(ctx.currentTime); else if (!rcdEdgeAhead(R)){ R.stopReq = true; rcdUi(); } } return; }   // PATTERN: at the next edge (CUT RIGHT THERE: now)
   if (!RCD.on) return; RCD.on = false;
-  RCD.onDone = () => rcdTake(rcdCollect(), 'free', 0, 0); RCD.node.port.postMessage('stop'); rcdUi();
+  RCD.onDone = () => rcdTake(rcdCollect(), 'free', 0, 0); rcdGo('stop'); rcdUi();
 }
-function rcdAbort(){ RCD.sync = null; RCD.onDone = null; if (RCD.on && RCD.node) RCD.node.port.postMessage('stop'); RCD.on = false; RCD.chunks = []; }
+function rcdAbort(){ RCD.sync = null; RCD.onDone = null; if (RCD.on && RCD.node) rcdGo('stop'); RCD.on = false; RCD.chunks = []; }
 function rcdTake(t, how, beats, pats){
   if (!t){ toast('Nothing was recorded.'); rcdUi(); return; }
   if (sePeak({data:t.data, data2:t.data2, sr:ctx.sampleRate}).peak < 1e-4) toast('The take is silent: is the right input picked, and is it turned up?', 5000);
@@ -14672,13 +14688,13 @@ async function midiLatRun(p, ch, note, n){
   const sr = ctx.sampleRate, buf = ctx.createBuffer(1, Math.round(sr * 0.004), sr), d = buf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = (i & 1 ? -0.9 : 0.9) * (1 - i / d.length);   // a 4 ms, full-scale click
   const monWas = RCD.mon.gain.value; RCD.mon.gain.value = 0;   // (monitoring would feed the click back in)
-  mapUpd(); RCD.chunks = []; RCD.on = true; RCD.node.port.postMessage('go');
+  mapUpd(); RCD.chunks = []; RCD.on = true; rcdGo('go');
   const t0 = ctx.currentTime + 0.6, T = [];
   for (let k = 0; k < n; k++){ const tc = t0 + k * MLT.PER, src = ctx.createBufferSource(); src.buffer = buf; src.connect(master); src.start(tc);
     msend([0x90 | ch, note, 127], tc + MLT.GAP, true, p); msend([0x80 | ch, note, 0], tc + MLT.GAP + 0.08, true, p); T.push(tc); }
   const end = t0 + n * MLT.PER + rcdLat() + 0.4;
   await new Promise(r => { const w = () => ctx.currentTime >= end ? r() : setTimeout(w, 50); w(); });
-  const take = await new Promise(r => { RCD.onDone = () => r(rcdCollect(null, null)); RCD.node.port.postMessage('stop'); }); RCD.on = false;
+  const take = await new Promise(r => { RCD.onDone = () => r(rcdCollect(null, null)); rcdGo('stop'); }); RCD.on = false;
   try { RCD.mon.gain.value = monWas; } catch(e){} if (!RCD.ui) rcdClose();
   if (!take) throw new Error('nothing recorded');
   const L = take.data, R = take.data2, x = new Float32Array(L.length); for (let i = 0; i < x.length; i++) x[i] = R ? Math.max(Math.abs(L[i]), Math.abs(R[i])) : L[i];
@@ -14921,7 +14937,7 @@ async function rcdPanel(pad, opts){
   patS.value = rcdSet.pats | 0; patS.addEventListener('change', () => { rcdSet.pats = +patS.value; rcdSave(); });
   const patF = field('Length', patS).parentElement; lock.push(patS);
   const latR = el('input'), latV = el('b'); latR.type = 'range'; latR.min = -50; latR.max = 250; latR.value = rcdSet.lat | 0;
-  const latSay = () => { latV.textContent = (rcdSet.lat | 0) + ' ms' + (ctx ? ` (+ ${Math.round(((ctx.outputLatency || ctx.baseLatency || 0) + (RCD.inLat || 0)) * 1000)} ms found)` : ''); };
+  const latSay = () => { latV.textContent = (rcdSet.lat | 0) + ' ms' + (RCD.io ? ` (native input, placed by its timestamps)` : ctx ? ` (+ ${Math.round(((ctx.outputLatency || ctx.baseLatency || 0) + (RCD.inLat || 0)) * 1000)} ms found)` : ''); };
   latR.addEventListener('input', () => { rcdSet.lat = +latR.value; rcdSave(); latSay(); }); latSay();
   const latW = el('span', 'acidr'); latW.append(latR, latV); const latF = field('Extra latency', latW).parentElement;
   const fitF = seg('Fit to tempo', [[1, 'ON'], [0, 'OFF']], () => rcdSet.fit | 0, v => { rcdSet.fit = v; }).parentElement;
@@ -16175,7 +16191,9 @@ function iohPort(p){
       clearTimeout(iohHelloT);
       if (m.available){ IOH.state = 'ready'; IOH.version = String(m.version || ''); IOH.why = ''; iohUi(); iohDevices().then(iohUi); }
       else { IOH.state = 'unavailable'; IOH.why = String(m.why || 'unknown'); IOH.devices = []; iohUi(); }
-    } else if (m.id != null && iohPend.has(m.id)){ const r = iohPend.get(m.id); iohPend.delete(m.id); r(m); }
+    } else if (m.op === 'in'){ if (IOH.onIn) IOH.onIn(m); }   // NATIVE INPUT (A1.3): a chunk of every input channel
+    else if (m.id != null && iohPend.has(m.id)){ const r = iohPend.get(m.id); iohPend.delete(m.id); r(m); }
+    else if (m.op === 'closed' || m.op === 'error'){ if (IOH.onGone) IOH.onGone(m.why || 'the input stopped'); }   // the device went away
   };
   try { p.start && p.start(); } catch(e){}
 }
@@ -16202,6 +16220,95 @@ async function iohStart(){
   })();
   return iohGo;
 }
+
+/* ===== NATIVE INPUT (A1.3; plan §3.3, §4): every input of the interface, placed on the audio clock =====
+   The helper streams chunks of every channel with the OS time each first frame reached the computer (hostNs). The page's
+   audio clock is defined by when a sound is HEARD (mapUpd / p2a), so a frame that arrived at OS time P belongs to the song
+   moment p2a(P): what the player heard while playing it. The worklet below plays each frame out at exactly p2a(P) + D on the
+   audio clock (D: a safety delay, so every chunk is there in time), and the recorder above it is the same as for the
+   browser's input, with rcdLat() = D: a take is cut where the song says, without guessing the input's latency.
+   TAKES STAY WHOLE: the input keeps its own frames back to back (no resampling). Where it sits on the audio clock (the
+   anchor) is set from the timestamps and re-set freely between takes; while a take records it moves only if it drifts more
+   than 20 ms (two crystals: a few ms in 5 minutes). MONITOR: a second output plays the input as soon as it can (a ~12 ms
+   jitter cushion), nudged a frame at a time to follow the drift; it never touches the take. */
+const IOIN_WORKLET = `class ThIoIn extends AudioWorkletProcessor{
+  constructor(){super();const sr=sampleRate;let c=1;while(c<sr*8)c<<=1;this.cap=c;this.mask=c-1;this.L=new Float32Array(c);this.R=new Float32Array(c);
+    this.wHi=null;this.A=null;this.D=0.06;this.rec=false;this.pick=[0,1];this.m=null;this.J=Math.round(0.012*sr);
+    this.late=0;this.under=0;this.jumps=0;this.k=0;this.lastJ=0;
+    this.port.onmessage=e=>{const d=e.data;if(d.D!=null){this.D=d.D}if(d.rec!=null)this.rec=d.rec;if(d.pick)this.pick=d.pick;if(d.reset){this.wHi=this.A=this.m=null}if(d.data)this.put(d)}}
+  put(d){const n=d.n,ch=d.nch,x=d.data,a=Math.min(this.pick[0],ch-1),b=Math.min(this.pick[1],ch-1),M=this.mask;
+    if(this.wHi==null)this.wHi=d.f0;
+    if(d.f0>this.wHi){let g=Math.min(d.f0-this.wHi,this.cap);for(let f=d.f0-g;f<d.f0;f++){this.L[f&M]=0;this.R[f&M]=0}}   // a gap the helper reported: silence, at its true place
+    for(let i=0;i<n;i++){const f=(d.f0+i)&M;this.L[f]=x[i*ch+a];this.R[f]=x[i*ch+b]}
+    if(d.f0+n>this.wHi)this.wHi=d.f0+n;
+    const want=Math.round((d.t+this.D)*sampleRate)-d.f0;   // this chunk's anchor: input frame f plays at audio frame f + A
+    if(this.A==null)this.A=want;else{const err=want-this.A,thr=(this.rec?0.02:0.001)*sampleRate;if(err>thr||err<-thr){this.A=want;this.jumps++;this.lastJ=err}}}
+  process(ins,outs){const o=outs[0],q=outs[1],n=(o[0]||q[0]).length,M=this.mask;
+    if(this.A!=null&&this.wHi!=null){for(let i=0;i<n;i++){const f=currentFrame+i-this.A;
+      if(f>=this.wHi){if(f-this.wHi+1>this.late)this.late=f-this.wHi+1;this.under++;continue}
+      if(f<this.wHi-this.cap)continue;o[0][i]=this.L[f&M];if(o[1])o[1][i]=this.R[f&M]}}
+    if(this.wHi!=null&&q[0]){let av=this.m==null?-1:this.wHi-this.m;
+      if(this.m==null||av>this.J+0.06*sampleRate||av<0){this.m=this.wHi-this.J;av=this.J}
+      if(av>=n){for(let i=0;i<n;i++){const f=(this.m+i)&M;q[0][i]=this.L[f];if(q[1])q[1][i]=this.R[f]}this.m+=n;
+        const d=this.wHi-this.m;if(d>this.J+0.004*sampleRate)this.m++;else if(d<this.J-0.004*sampleRate)this.m--}}
+    if(++this.k>=150){this.port.postMessage({late:this.late,under:this.under,jumps:this.jumps,lastJ:this.lastJ,A:this.A});this.late=this.under=0;this.k=0}
+    return true}}
+registerProcessor('thunder-io-in',ThIoIn);`;
+// the addon's clock (hostNs, ns) → performance.now() (ms): a few round trips, the shortest one wins
+async function iohClock(){
+  let best = null;
+  for (let k = 0; k < 8; k++){ const t0 = performance.now(), m = await iohAsk({op:'now'}), t1 = performance.now();
+    if (!m || m.op !== 'now') continue; if (!best || t1 - t0 < best.rtt) best = {rtt:t1 - t0, off:(t0 + t1) / 2 - m.ns / 1e6}; }
+  if (best) IOH.clk = best.off; return !!best;
+}
+// Wait (up to 3 s) for the helper to say whether it is there
+async function iohReady(){
+  if (!IOAPI || aset.inEngine === 'browser') return false;
+  iohStart(); const t0 = performance.now();
+  while (IOH.state === 'starting' || IOH.state === 'off'){ if (performance.now() - t0 > 3000) break; await new Promise(r => setTimeout(r, 30)); }
+  if (IOH.state === 'ready' && !IOH.devices.length) await iohDevices();
+  return IOH.state === 'ready';
+}
+// Which of the helper's devices to open: the one picked in Record a sample (ioDev), else the one whose name the browser's
+// pick starts with (500R8 (323a:0010) → 500R8), else the default input, else the one with the most inputs.
+function iohInDev(lab){
+  const D = IOH.devices.filter(d => d.inId && d.inputs > 0); if (!D.length) return null;
+  const byId = rcdSet.ioDev && D.find(d => d.inId === rcdSet.ioDev); if (byId) return byId;
+  const byName = lab && D.find(d => lab.startsWith(d.name)); if (byName) return byName;
+  return D.find(d => d.isDefaultIn) || D.reduce((a, b) => (b.inputs > a.inputs ? b : a));
+}
+// Open the native input for the recorder: the recorder worklet and the monitor hang off the worklet's two outputs, exactly
+// where the browser input's source node was. Returns false (and the browser input is used) if anything is missing.
+async function rcdOpenIo(rec, mon){
+  if (!(await iohReady())) return false;
+  let lab = ''; try { const L = await rcdInputs(), b = L.find(x => x.deviceId === rcdSet.input); lab = (b && b.label) || ''; } catch(e){}
+  const dev = iohInDev(lab); if (!dev) return false;
+  if (!(await iohClock())) return false;
+  const o = await iohAsk({op:'open', dev:dev.inId, rate:ctx.sampleRate, block:0});
+  if (!o || !o.ok){ if (o && o.why) toast('Native input: ' + o.why + '. Using the browser’s input.', 4000); return false; }
+  if (RCD.iomod !== ctx){ await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([IOIN_WORKLET], {type:'application/javascript'}))); RCD.iomod = ctx; }
+  const node = new AudioWorkletNode(ctx, 'thunder-io-in', {numberOfInputs:0, numberOfOutputs:2, outputChannelCount:[2, 2]});
+  const D = Math.min(0.25, (ctx.baseLatency || 0) + (ctx.outputLatency || 0) + 0.04);   // the output's own latency + room for the hops
+  const io = {node, dev, D, opened:o, under:0, jumps:0, sync:0};
+  node.port.postMessage({D});
+  node.port.onmessage = e => { const m = e.data; io.stat = m;
+    // LATE: chunks arrived after their place came round. Between takes: more delay (up to 250 ms); during one: a toast.
+    if (m.under){ io.under += m.under;
+      if (!RCD.on && io.D < 0.25){ io.D = Math.min(0.25, io.D + 0.02); node.port.postMessage({D:io.D}); }
+      else if (RCD.on) toast('The input fell behind for a moment: that part of the take is silent.', 4000); }
+    if (m.jumps) io.jumps = m.jumps; };
+  node.connect(rec, 0); node.connect(mon, 1);
+  IOH.onIn = m => { if (!RCD.io || RCD.io.node !== node) return;
+    node.port.postMessage({f0:m.frame0, t:p2a(m.hostNs / 1e6 + IOH.clk), n:m.frames, nch:m.channels, data:m.data}, [m.data.buffer]); };
+  IOH.onGone = why => { if (!RCD.io || RCD.io.node !== node) return; toast('The audio input went away (' + why + ').', 5000); rcdAbort(); rcdClose(); rcdUi(); };
+  io.tick = setInterval(() => { mapUpd(); if (++io.sync % 20 === 0 && !RCD.on) iohClock(); }, 500);   // the clocks, kept lined up
+  RCD.io = io;
+  return true;
+}
+function rcdCloseIo(){ const io = RCD.io; if (!io) return; RCD.io = null; clearInterval(io.tick); IOH.onIn = IOH.onGone = null;
+  try { io.node.port.onmessage = null; io.node.disconnect(); } catch(e){} iohAsk({op:'close'}); }
+// The recorder starts or stops: the native input's anchor holds still while a take records
+function rcdGo(m){ if (RCD.node) RCD.node.port.postMessage(m); if (RCD.io) RCD.io.node.port.postMessage({rec:m === 'go'}); }
 // Settings → Audio → Input engine (desktop app only; the rows are not drawn on the website)
 let inEngUi = null;
 function inEngBuild(){
