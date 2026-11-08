@@ -182,12 +182,25 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
   change it needs.
 - Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
+- **Native I/O helper, wanted soon** (7 Nov): plan in `docs/NATIVE-IO-HELPER-PLAN.md`: phase A every input channel in Record a
+  sample (the owner's interface has no mixer, so inputs 3+ can't be routed to 1/2), B MIDI out / in, C output only if needed.
+  Owner to answer its section 9 (go ahead, Apple Developer membership, WASAPI only, the interface's make / model).
 - **A more stable desktop app, when the owner wants one** (7 Nov): `docs/NATIVE-DESKTOP-PLAN.md` section 14 lists which of
   7 Nov's bugs came from the web platform, and the options cheapest first: stay web; a native I/O helper inside Electron
   (MIDI out first, then inputs, maybe audio out), built like the `link/` addon; or the full native host (phases 3–6).
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+
+## 7 Nov (14): native I/O helper planned (docs only)
+
+- Owner: "we are going to need to write that helper sooner rather than later- my interface doesn't have an internal mixer.
+  Can you develop a plan for it?" Written: `docs/NATIVE-IO-HELPER-PLAN.md` (Electron utilityProcess + a plain N-API addon
+  `io/` with miniaudio and libremidi; a MessagePort straight to the page; a `thunder-io-in` AudioWorklet in front of the
+  recorder; input frames placed on the audio clock by OS timestamps; phases A0–A2 inputs ≈2–3 weeks, B MIDI ≈1 week,
+  C output deferred to the native host). Linked from NATIVE-DESKTOP-PLAN 14.2 and the To-do.
+- Owner: "if i set the midi delay to the latency reported it is perfect" (which number was asked: Measure's result, or
+  Settings › Audio's heard ms).
 
 ## 7 Nov (13): Measure's note; the silent song (build 482, beta + main)
 

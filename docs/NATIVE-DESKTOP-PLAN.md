@@ -559,7 +559,7 @@ mid-song (`coreKitCheck`); the INST screen's layout.
 
 1. **Stay web, keep patching** (today). Right while the feature freeze lasts and the owner is making music; the 7 Nov
    workarounds cover what has come up.
-2. **A native I/O helper inside the Electron app (new; "phase 3½")**. Keep the page, the sequencer and every engine as
+2. **A native I/O helper inside the Electron app (new; "phase 3½")**. **Planned in detail (7 Nov, owner: needed soon, the interface has no mixer to route inputs 3+ onto 1/2): [`NATIVE-IO-HELPER-PLAN.md`](NATIVE-IO-HELPER-PLAN.md)** (a utility process with miniaudio + libremidi, not the main process). Keep the page, the sequencer and every engine as
    they are; move only the desktop's *edges* into a native addon, the way `link/` already runs Ableton Link as an N-API
    addon in Electron (`link/src/thunder_link.cc`, `fetch-sdk.sh`, built in CI by `desktop.yml`):
    - **MIDI out (and clock out)**: the page hands the addon `{port, bytes, audioTime}`; the addon sends on its own
