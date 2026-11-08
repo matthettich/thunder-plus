@@ -3303,7 +3303,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <tr><td>Out of view</td><td>On a phone or tablet the song moves from the audio-thread sequencer to the page sequencer the moment the app is hidden (screen off, another app), at the next step, so STOP always works; the next PLAY uses the audio thread again. Phones slow down out of view, so a busy song can still stutter there</td></tr>
 <tr><td>Background play</td><td>Android's playback notification, so the song keeps going when you switch apps. Settings → App, or the PROJECT screen</td></tr>
 <tr><td>Playhead offset</td><td>Settings → Screen: moves the playhead to match what you hear (+ later, for Bluetooth or a slow screen; − earlier)</td></tr>
-<tr><td>Playback report</td><td>Settings → Audio → Copy playback report: a short log of what playback did, to paste into a bug report</td></tr></table></section>
+<tr><td>Playback report</td><td>Settings → Audio → Copy playback report: a short log of what playback did, to paste into a bug report</td></tr>
+<tr><td>Input engine</td><td>Desktop app: Settings → Audio shows its native input engine and the interface’s inputs. INPUT ENGINE Browser keeps the browser’s own input</td></tr></table></section>
     <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots; on a computer, where they are a list down the left, ▲▼ do too)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the pad as it is (<kbd>Space</kbd> plays or stops the song, as everywhere)</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr><tr><td><kbd>F2</kbd>–<kbd>F9</kbd></td><td>As in the tracker: F2–F4 Phrase, Mixer, Inst; F5 the song from the top, F6 the pad, F7 the song from the cursor, F8 stop, F9 REC</td></tr><tr><td><kbd>Alt</kbd> <kbd>8</kbd> · <kbd>9</kbd> · <kbd>0</kbd> · <kbd>`</kbd></td><td>…waves · …chains · the synth · back to the last view (these and Alt+1–7 work from …waves and …chains too)</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound. It starts with one group per drum type (Kicks, Snares, Claps &amp; snaps, Rims &amp; sticks, Closed hats, Open hats, Cymbals, Toms, Hand drums, Shakers &amp; tambourines, Cowbells, blocks &amp; metal), gathering every drum the app has from its own designs, the drum engines and the classic and acoustic kits; then IDM and glitch hits, basses, pads, chords, keys, leads and each engine's sounds. The search box finds any of them by name. <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once. <b>Drum kits…</b> (File ▾, or ⚙ Settings → Kit) puts a CR-78-, 808-, 606-, 909-, 707-, 727- or 505-style kit, or a clean acoustic kit (Funk, Studio, Jazz), on pads 1–8 and keeps the synth slots; every sound of each kit is also in the Presets list, filed under its type (808 Kick under Kicks). <b>Funk breaks…</b> (File ▾) loads one of twelve original breaks, with swing, ghost notes and a laid-back snare, as a new song with its acoustic kit, or adds its four bars to this song. <b>Breaks to chop</b> (File ▾) has the fourteen breaks of …pump BREAK, rendered by its own kit with room and tape, as a one-bar loop in a slot, cut into 16 slices (C-4 plays slice 1) and synced to the tempo, ready to re-sequence. <b>Acid line…</b> (Edit ▾ or right-click on a phrase) writes a random bass line into the phrase the way …pump ACID does — scale, root, density, accents, slides and octave jumps; Roll (R) again or Mutate (M) a few steps, and light only the lanes you want changed — for an Acid pad (accents are volume FF, slides PSL).</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modelled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. <b>Drift</b> is a two-line analog pad synth laid out like the big 1970s CS-series polysynths (two oscillator lines per voice, a high-pass and a low-pass with their own envelope, up to four drifting unison voices) followed by a tape stage — <b>Wow</b> and <b>Flutter</b> on the pitch, chorus, saturation, <b>Age</b> (worn top and bottom, the odd dropout) and hiss — for warm, wobbly, faded pads; its presets are in the pad Presets list under Drift (tape pads). <b>…pump</b> (group in the engine list) has the pump plugins' instruments with their own sound and presets: <b>Mono</b> (three oscillators, four filters), <b>Poly</b> (two oscillators, poly-mod, unison, chorus) and <b>Coil</b> (tuned springs kicked by the note). Each renders a note like the other engines (<b>Hit</b> is how hard it is played), and each has a <b>live</b> twin that plays the plugin in the tracker note by note, with the VOL column as velocity, slides and bends as pitch bend, and glide (Coil live also sets how many <b>Voices</b> ring at once, 1–16). A twin shares its values with the rendered engine; if the device can't keep up, the live ones fall back to their renders and say so (Settings → Audio → …pump live). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. Notes side by side in different columns sing together; a new note in the same column takes over that column's singer. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
@@ -8120,7 +8121,7 @@ const Lc = () => V().layers[V().sel];
 // Output device, level, latency and sample rate. Latency and rate are fixed when the AudioContext is made,
 // so changing them asks for a restart; the output device and level change live.
 const AUK = 'thunderplus-audio-v1';
-const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false, core:'core', link:false, linkSync:true};   // link, linkSync: ABLETON LINK (desktop app), off by default   // core: THUNDER CORE, 'core' (default from build 362, owner) or 'page' (the old pump)   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
+const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false, core:'core', link:false, linkSync:true, inEngine:'auto'};   // link, linkSync: ABLETON LINK (desktop app), off by default   // core: THUNDER CORE, 'core' (default from build 362, owner) or 'page' (the old pump)   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
   try { const o = JSON.parse(localStorage.getItem(AUK) || '{}'); return Object.assign(d, o && typeof o === 'object' ? o : {}); } catch(e){ return d; } })();
 // Latency: what the person picked, else Balanced in the Mobile setup (phones click at Lowest when busy) and Lowest on desktop.
 // The desktop app starts on Balanced too (owner, 31 Oct: playback stuttered in the desktop app and not in the browser on the
@@ -13822,6 +13823,7 @@ async function audRefresh(){
   if (!sinkOk) $('audOutRow').title = 'This browser plays through the system’s output and doesn’t let a web app pick another one. On Android, choose the output in the system’s media output switcher (or plug in the interface); on a computer, Chrome and Edge (and the desktop app) can pick it here.';
   $('audLvl').value = aset.vol; audLvlShow();
   updLat(); updARate(); updPdc(); audRestartRow(); audStatus();
+  if (IOAPI){ inEngBuild(); if (inEngUi) inEngUi(); if (aset.inEngine !== 'browser') iohStart(); }   // desktop app: the helper is forked on first need
 }
 function audLvlShow(){ const v = aset.vol; $('audLvlV').textContent = v <= 0 ? '−∞ dB' : (20 * Math.log10(v / 100)).toFixed(1) + ' dB'; }
 function audRestartRow(){ $('audRestartRow').hidden = !(ctx && aLive && (aLive.lat !== latOf() || aLive.rate !== aset.rate)); }
@@ -16143,6 +16145,77 @@ if (LINKAPI && $('segLink')){
   if (LINKAPI.available){ LINKAPI.onState(lkState); LINKAPI.onTime(lkTime); }
   lkUi();
   setTimeout(() => { if (aset.link && LINKAPI.available) lkEnable(true); }, 0);   // after the song (S) is loaded
+}
+/* ===== NATIVE INPUT ENGINE, page side (desktop app only; plan: docs/NATIVE-IO-HELPER-PLAN.md §3.3) =====
+   window.thunderDesktop.io.start() forks the audio helper (first need only: Settings → Audio opened, or AUTO picked) and a
+   MessagePort comes back as a window message ({thunderIo:true}, ports[0]). Its first message is the hello ({op:'hello',
+   available, version | why}); then {op:'devices', id} lists the interface's inputs. The website has no IOAPI: nothing here runs
+   and no row is drawn. Nothing records through it yet: iohUse() is for the recorder to ask. */
+const IOAPI = (window.thunderDesktop && window.thunderDesktop.io) || null;
+const IOH = {state:'off', why:'', version:'', devices:[], port:null};   // state: off | starting | ready | unavailable
+let iohSeq = 0, iohPend = new Map(), iohGo = null, iohHelloT = 0;
+const iohUse = () => !!IOAPI && aset.inEngine !== 'browser' && IOH.state === 'ready';
+function iohUi(){ try { if (typeof inEngUi === 'function') inEngUi(); } catch(e){} }
+function iohPort(p){
+  if (IOH.port && IOH.port !== p){ try { IOH.port.onmessage = null; IOH.port.close(); } catch(e){} }
+  iohPend.forEach(r => r(null)); iohPend.clear();
+  IOH.port = p;
+  p.onmessage = ev => {
+    const m = ev.data; if (!m || typeof m !== 'object') return;
+    if (m.op === 'hello'){
+      clearTimeout(iohHelloT);
+      if (m.available){ IOH.state = 'ready'; IOH.version = String(m.version || ''); IOH.why = ''; iohUi(); iohDevices().then(iohUi); }
+      else { IOH.state = 'unavailable'; IOH.why = String(m.why || 'unknown'); IOH.devices = []; iohUi(); }
+    } else if (m.id != null && iohPend.has(m.id)){ const r = iohPend.get(m.id); iohPend.delete(m.id); r(m); }
+  };
+  try { p.start && p.start(); } catch(e){}
+}
+function iohAsk(msg){
+  return new Promise(res => {
+    if (!IOH.port){ res(null); return; }
+    const id = ++iohSeq; iohPend.set(id, res);
+    try { IOH.port.postMessage(Object.assign({id}, msg)); } catch(e){ iohPend.delete(id); res(null); return; }
+    setTimeout(() => { if (iohPend.has(id)){ iohPend.delete(id); res(null); } }, 5000);
+  });
+}
+function iohDevices(){
+  return iohAsk({op:'devices'}).then(m => { if (m && m.op === 'devices' && Array.isArray(m.devices)) IOH.devices = m.devices; return IOH.devices; });
+}
+async function iohStart(){
+  if (!IOAPI || IOH.state !== 'off') return iohGo;
+  IOH.state = 'starting'; iohUi();
+  window.addEventListener('message', e => { if (e.data && e.data.thunderIo && e.ports && e.ports[0]) iohPort(e.ports[0]); });
+  const fail = why => { if (IOH.state === 'starting'){ IOH.state = 'unavailable'; IOH.why = why; iohUi(); } };
+  iohHelloT = setTimeout(() => fail('no answer'), 3000);
+  iohGo = (async () => {
+    try { const r = await IOAPI.start(); if (r && r.ok === false){ clearTimeout(iohHelloT); fail(String(r.why || 'could not start')); } }
+    catch(e){ clearTimeout(iohHelloT); fail(String((e && e.message) || e)); }
+  })();
+  return iohGo;
+}
+// Settings → Audio → Input engine (desktop app only; the rows are not drawn on the website)
+let inEngUi = null;
+function inEngBuild(){
+  if (!IOAPI || inEngUi || !$('audRestartRow')) return;
+  const seg = el('div', 'seg'), row = el('div', 'segrow'), st = el('div', 'lbl'), sub = el('div', 'lbl');
+  row.id = 'inEngRow'; seg.id = 'segInEng'; st.id = 'inEngStat'; sub.id = 'inEngSub'; st.setAttribute('aria-live', 'polite');
+  row.title = 'Auto records through the desktop app’s own input engine when it is available, so every input of an interface can be used. Browser keeps the browser’s input (inputs 1–2)';
+  row.append(el('span', null, 'Input engine'), seg);
+  const at = $('audRestartRow'); at.before(row); at.before(st); at.before(sub);
+  sub.style.fontSize = 'var(--fs-2)';
+  const upd = makeSeg(seg, [['auto', 'Auto'], ['browser', 'Browser']], () => aset.inEngine === 'browser' ? 'browser' : 'auto', v => { aset.inEngine = v; asetSave(); if (v === 'auto') iohStart(); inEngUi(); });
+  inEngUi = () => {
+    upd(); sub.textContent = '';
+    if (aset.inEngine === 'browser'){ st.textContent = 'Input engine: browser (inputs 1–2)'; return; }
+    if (IOH.state === 'ready'){
+      let d = null; for (const x of IOH.devices) if (!d || (x.inputs || 0) > (d.inputs || 0) || ((x.inputs || 0) === (d.inputs || 0) && x.isDefaultIn && !d.isDefaultIn)) d = x;
+      const di = IOH.devices.find(x => x.isDefaultIn); if (!d || !(d.inputs > 0)) d = di || d;
+      st.textContent = d ? `Input engine: native (${d.name}, ${d.inputs} input${d.inputs === 1 ? '' : 's'})` : 'Input engine: native (no input device found)';
+      sub.textContent = [d && d.backend, IOH.version].filter(Boolean).join(' · ');
+    } else if (IOH.state === 'unavailable') st.textContent = 'Input engine: browser — native helper not available: ' + IOH.why;
+    else st.textContent = 'Input engine: checking…';
+  };
+  inEngUi();
 }
 // Settings → MIDI: a cable for each port letter, and which letters get clock.
 function moPorts(){
@@ -22358,7 +22431,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 485;
+const BUILD = 486;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31321,6 +31394,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [486, '7 Nov', ['Desktop app: Settings → Audio has an Input engine row (Auto or Browser) and shows the native input engine and the inputs of your audio interface. Nothing records through it yet.']],
   [485, '7 Nov', ['MIDI timing (desktop app on a Mac): MIDI went out early by about the audio latency shown in Settings › Audio (base + output), so it needed a negative Gear delay. It now waits for that latency itself: set the Gear delay back to 0 (or what Measure… says).']],
   [484, '7 Nov', ['Measure gear delay rebuilds the audio engine when it finishes (as Settings › Audio › Reset audio engine does): opening the interface’s input could leave the timing off until then.']],
   [483, '7 Nov', ['Record a sample: INPUTS no longer says the interface has only 2 channels: the browser engine only gives the app inputs 1 and 2 (hover the list for how to record another input).']],
