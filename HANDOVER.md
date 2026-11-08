@@ -258,7 +258,8 @@ Started before the owner's beta.7 test, by the owner's choice; the risk is only 
   set to "Gear" plays the one still there. The real fix is a stable device identity from the addon (libremidi's
   port_information: `port` / `container` / `device_name` where the backend gives them), kept in midiPorts() and used by the
   page for its ids, with names only as the fallback. Skipped: its "docstring coverage" pre-merge check (this codebase comments
-  inline). CodeRabbit has reviewed every commit up to d6c170a.
+  inline). CodeRabbit has reviewed every commit up to 276c33c (build 504): its last pass had no new findings and marked
+  the earlier ones addressed; only its docstring-coverage check remains, skipped on purpose.
 - **Linux: skipped for now (owner, 7 Nov 23:09: "not as important"; still needs to happen).** The Linux addon builds without
   ALSA (no ALSA headers on ubuntu-latest), so Linux has no native MIDI ports (Web MIDI still works, Engine Browser). To do:
   `sudo apt-get install -y libasound2-dev` before "Native I/O helper addon (optional)" in desktop.yml, Linux runner only,
