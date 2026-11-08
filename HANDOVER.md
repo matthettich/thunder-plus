@@ -111,13 +111,26 @@ installation" (the step is continue-on-error, so Windows builds ship without the
 
 **PICK UP HERE: EVERYTHING STILL NEEDED (updated 7 Nov 20:57).** Read this list first; the paragraphs below it are the detail.
 
-*State now:* branch `io-helper` (build 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
+*State now:* branch `io-helper` (build 493; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
 CodeRabbit fix that was the real cause of the beta.2/3 failures (the helper died on the first chunk: MessagePortMain can't
 transfer an ArrayBuffer). Desktop pre-release **1.3.0-beta.4** (build 492) is out; the owner will test it later. PR #14
 (`io-helper` → `beta`) is open. `beta` is at build 488 plus a CLAUDE.md line ("continue the helper"); `main` is at build 485
 (desktop v1.2.101).
 
-**1. Owner's test of beta.4 (waiting on the owner; the next session starts by asking for the results).** With Record a sample
+**1. Owner's test: beta.4 RESULTS (7 Nov 21:24) → fixed in build 493 / beta.5, retest.**
+- Worked: IN 12 and IN 17+18 in PATTERN, inputs stay on the pick, takes on the beat; Discard and record; two layers differ;
+  monitoring through the app usable. Not done yet: the 5-minute take, Measure….
+- 4–8 microphone prompts on opening (meters fine after) and once "500R8 wouldn't open: no answer". Cause: the window's
+  meter open (fillIn, not awaited) and Record's open ran at the same time (two opens), and the STALE rule (no audio for 1 s →
+  reopen) reopened an input still waiting on macOS's prompt, which asked again; the open gave up at 5 s under the prompt.
+  Fix: `rcdOpen` is single-flight (`rcdOpening`); STALE only after audio has come (`io.got`) and 2 s without it; `open`
+  waits 30 s (a toast after 2.5 s says to allow the microphone) and closes the device if it timed out.
+- "The input fell behind for a moment" during a PATTERN take: D was output latency + 40 ms; now + 120 ms (cap 500 ms, +50 ms
+  steps between takes). D costs the take nothing (rcdLat = D), only a little more wait after a PATTERN take ends.
+- Retest on beta.5: prompts on opening (expect one per launch at most while unsigned), Record right after opening the
+  window, the 5-minute take (no "fell behind" toast), Measure….
+
+**1a. (was) Owner's test of beta.4.** With Record a sample
 → Engine Native:
 - [ ] Opening the window: the interface is NOT reset, one microphone prompt at most, the meters move before Record.
 - [ ] An ADAT input (e.g. IN 12) and a pair (IN 17+18) record what was picked; the Inputs list stays on the pick.

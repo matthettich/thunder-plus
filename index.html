@@ -14498,10 +14498,14 @@ const RCD_WORKLET = `class ThRec extends AudioWorkletProcessor{
 registerProcessor('thunder-rec',ThRec);`;
 async function rcdInputs(){ try { return (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch(e){ return []; } }
 // The input (the simple recorder's openMic): the picked device, else the default; everything a phone does to clean up speech off
-async function rcdOpen(){
+// ONE OPEN AT A TIME (owner's beta.4 test, 7 Nov: 4–8 microphone prompts, "500R8 wouldn't open: no answer"): the window opens
+// the input for its meters without waiting, and Record asked again before that had finished: two opens of the interface
+let rcdOpening = null;
+function rcdOpen(){ if (!rcdOpening) rcdOpening = rcdOpen1().finally(() => { rcdOpening = null; }); return rcdOpening; }
+async function rcdOpen1(){
   // STALE (owner, 7 Nov: "you have to close the recording window to get access to the inputs again"): the native input can stop
   // under us (the interface reconfigured, the audio engine rebuilt); then it is closed and opened again, not trusted
-  if ((RCD.io || RCD.stream) && !RCD.on && !RCD.sync && (RCD.ctx !== ctx || (RCD.io && performance.now() - (RCD.io.lastIn || 0) > 1000))) rcdClose();
+  if ((RCD.io || RCD.stream) && !RCD.on && !RCD.sync && (RCD.ctx !== ctx || (RCD.io && RCD.io.got && performance.now() - (RCD.io.lastIn || 0) > 2000))) rcdClose();   // (only once audio had come: an input still waiting on macOS's microphone prompt isn't stale, and reopening it asked again)
   if (RCD.stream || RCD.io) return true;
   audio(); try { if (ctx.state !== 'running') await ctx.resume(); } catch(e){}
   // NATIVE INPUT (desktop app, INPUT ENGINE Auto): every channel of the interface, through the helper; the browser's input otherwise
@@ -16233,12 +16237,12 @@ function iohPort(p){
   };
   try { p.start && p.start(); } catch(e){}
 }
-function iohAsk(msg){
+function iohAsk(msg, ms){
   return new Promise(res => {
     if (!IOH.port){ res(null); return; }
     const id = ++iohSeq; iohPend.set(id, res);
     try { IOH.port.postMessage(Object.assign({id}, msg)); } catch(e){ iohPend.delete(id); res(null); return; }
-    setTimeout(() => { if (iohPend.has(id)){ iohPend.delete(id); res(null); } }, 5000);
+    setTimeout(() => { if (iohPend.has(id)){ iohPend.delete(id); res(null); } }, ms || 5000);
   });
 }
 function iohDevices(){
@@ -16323,24 +16327,26 @@ async function rcdOpenIo(rec, mon){
   let lab = ''; try { const L = await rcdInputs(), b = L.find(x => x.deviceId === rcdSet.input); lab = (b && b.label) || ''; } catch(e){}
   const dev = iohInDev(lab); if (!dev){ RCD.ioWhy = 'no input device found'; return false; }
   if (!(await iohClock())){ RCD.ioWhy = 'the helper didn’t answer'; return false; }
-  const o = await iohAsk({op:'open', dev:dev.inId, rate:ctx.sampleRate, block:0});
-  if (!o || !o.ok){ RCD.ioWhy = dev.name + ' wouldn’t open: ' + ((o && o.why) || 'no answer'); return false; }
+  // OPENING WAITS FOR macOS (beta.4: "no answer"): starting the device can sit on the microphone prompt; 5 s gave up under it
+  const slow = setTimeout(() => toast('Opening ' + dev.name + '… if macOS asks for the microphone, allow it.', 6000), 2500);
+  const o = await iohAsk({op:'open', dev:dev.inId, rate:ctx.sampleRate, block:0}, 30000); clearTimeout(slow);
+  if (!o || !o.ok){ RCD.ioWhy = dev.name + ' wouldn’t open: ' + ((o && o.why) || 'no answer'); if (!o) iohAsk({op:'close'}); return false; }
   let node;
   try {   // (CodeRabbit, PR #14: if the worklet can't be set up after the device opened, close it in the helper too)
     if (RCD.iomod !== ctx){ await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([IOIN_WORKLET], {type:'application/javascript'}))); RCD.iomod = ctx; }
     node = new AudioWorkletNode(ctx, 'thunder-io-in', {numberOfInputs:0, numberOfOutputs:2, outputChannelCount:[2, 2]});
   } catch(e){ iohAsk({op:'close'}); throw e; }
-  const D = Math.min(0.25, (ctx.baseLatency || 0) + (ctx.outputLatency || 0) + 0.04);   // the output's own latency + room for the hops
+  const D = Math.min(0.5, (ctx.baseLatency || 0) + (ctx.outputLatency || 0) + 0.12);   // the output's own latency + room for the hops (beta.4: 40 ms fell behind mid-take; D costs the take nothing, rcdLat takes it back)
   const io = {node, dev, D, opened:o, under:0, jumps:0, sync:0, lastIn:performance.now() + 1000};   // (a second's grace to start)
   node.port.postMessage({D});
   node.port.onmessage = e => { const m = e.data; io.stat = m;
-    // LATE: chunks arrived after their place came round. Between takes: more delay (up to 250 ms); during one: a toast.
+    // LATE: chunks arrived after their place came round. Between takes: more delay (up to 500 ms); during one: a toast.
     if (m.under){ io.under += m.under;
-      if (!RCD.on && io.D < 0.25){ io.D = Math.min(0.25, io.D + 0.02); node.port.postMessage({D:io.D}); }
+      if (!RCD.on && io.D < 0.5){ io.D = Math.min(0.5, io.D + 0.05); node.port.postMessage({D:io.D}); }
       else if (RCD.on) toast('The input fell behind for a moment: that part of the take is silent.', 4000); }
     if (m.jumps) io.jumps = m.jumps; };
   node.connect(rec, 0); node.connect(mon, 1);
-  IOH.onIn = m => { if (!RCD.io || RCD.io.node !== node) return; io.lastIn = performance.now();
+  IOH.onIn = m => { if (!RCD.io || RCD.io.node !== node) return; io.lastIn = performance.now(); io.got = true;
     node.port.postMessage({f0:m.frame0, t:p2a(m.hostNs / 1e6 + IOH.clk), n:m.frames, nch:m.channels, data:m.data}, [m.data.buffer]); };
   // UNPLUGGED MID-TAKE (A2): the take so far is kept (the recorder ends it where it is), then the input is closed
   IOH.onGone = why => { if (!RCD.io || RCD.io.node !== node) return;
@@ -22571,7 +22577,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 492;
+const BUILD = 493;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31538,6 +31544,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [493, '7 Nov', ['Desktop app, Engine Native: the input is opened once, not again each time Record is pressed or while macOS is still asking for the microphone (the extra microphone prompts and “wouldn’t open: no answer”); opening waits for that prompt; and more room against the input falling behind mid-take (the take is still placed on the beat).']],
   [492, '7 Nov', ['Desktop app, Engine Native: the helper no longer stops on the first moment of audio (the cause of the inputs falling back to 1+2 on beta.2 and beta.3).']],
   [491, '7 Nov', ['Desktop app, Record a sample with Engine Native: the interface’s own delay (as the Mac reports it) is taken into account, so PATTERN takes land on the beat without setting Extra latency; unplugging the interface mid-take keeps the take so far; and the window says when the interface runs at another sample rate than the app.']],
   [490, '7 Nov', ['Desktop app, Record a sample with Engine Native: the interface is no longer reset when the input opens (its buffer size is left as it is); the app asks for the microphone once; the input opens with the window, so the meters work before Record; and an input that stopped is opened again, so Record and Discard and record work without closing the window. If the native input can’t open, the window says why instead of quietly using inputs 1–2.']],

@@ -112,11 +112,19 @@ try {
     // STALE INPUT (owner, 7 Nov: "you have to close the recording window to get access to the inputs again"): the stream stops
     // under the window; the next Record opens it again and records
     const again = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
-      window.__ioStall = true; await wait(1300); window.__ioStall = false; window.__ioOps.length = 0;
+      window.__ioStall = true; await wait(2300); window.__ioStall = false; window.__ioOps.length = 0;
       E("RCD.take = null;"); await E('rcdStart()'); await wait(500); E('rcdStop()');
       for (let i = 0; i < 80 && !E('!!RCD.take'); i++) await wait(50);
       return {ops:window.__ioOps.slice(), take:E('RCD.take ? (() => { const t = RCD.take; let l = 0; for (const v of t.data) l = Math.max(l, v); return {n:t.data.length, l}; })() : null')}; });
     ok(again.ops.includes('close') && again.ops.includes('open') && again.take && Math.abs(again.take.l - 0.17) < 0.005, 'a stopped input is reopened by the next Record, which records: ' + JSON.stringify(again));
+    // ONE OPEN (owner's beta.4 test: 4–8 microphone prompts, "wouldn't open: no answer"): two opens at once are one open; an input
+    // that hasn't sent audio yet (macOS still asking for the microphone) isn't reopened as stale
+    const once = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
+      E('rcdClose()'); await wait(100); window.__ioOps.length = 0; window.__ioStall = true;
+      await Promise.all([E('rcdOpen()'), E('rcdOpen()'), E('rcdOpen()')]);
+      await wait(2500); await E('rcdOpen()'); const ops = window.__ioOps.filter(o => o === 'open' || o === 'close');
+      window.__ioStall = false; await wait(300); return {ops, got:E('!!(RCD.io && RCD.io.got)')}; });
+    ok(once.ops.join() === 'open' && once.got, 'three opens at once open the interface once; no reopen while it waits for its first audio: ' + JSON.stringify(once));
     // NO SILENT FALLBACK (owner, 7 Nov: "kicking the inputs back to just 1&2"): a native open that fails says why and records
     // nothing; it never drops to the browser's input (inputs 1–2) on its own
     const nofb = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
