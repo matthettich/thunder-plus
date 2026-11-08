@@ -81,6 +81,18 @@ review`: it skips PRs not aimed at main); its two findings fixed. **Owner feedba
 and inputs are separated": move INPUT ENGINE (Auto / Browser) into Record a sample beside Input / Inputs (the Input list
 shows "500R8 (native, 28 inputs)", Inputs lists every channel and pair from it), and take the row out of Settings › Audio.
 
+**PICK UP HERE (7 Nov 19:41).** State: desktop pre-release **1.3.0-beta.2** (build 489, from `io-helper`) is out for the owner's
+A1.5 test (the list below). PR #14 (`io-helper` → `beta`): CodeRabbit re-asked at 02:37 UTC (`@coderabbitai review`; it skips
+when a push lands right after the ask, so push first, then ask). First job for the next session:
+1. Read CodeRabbit's newest review on PR #14 (`gh api repos/matthettich/thunder-plus/pulls/14/comments`, `/reviews`, `/issues/14/comments`);
+   fix real findings on `io-helper`, run `npm test` and `node tools/io-check.mjs`, push, reply on the PR.
+2. Take the owner's test results. Works on the 500R8 → merge PR #14 into `beta` (REST API: `gh api -X PUT
+   repos/matthettich/thunder-plus/pulls/14/merge`; GraphQL is blocked here), then `beta` → `main` and a normal desktop release
+   only when the owner asks. Problems → fix on `io-helper`, pre-release `1.3.0-beta.3` (Run workflow `desktop.yml`, ref
+   `io-helper`, `version`, `prerelease: true`).
+3. Then A2 (below), then B (MIDI), same lead / delegate split as the task table.
+Working copies used this session: `/home/claude/thunder-plus` (io-helper) and a `beta` worktree at `/home/claude/tp-beta`.
+
 **A1 BUILT, waiting for the owner's test (7 Nov, evening; branch `io-helper`, PR #14, desktop pre-release 1.3.0-beta.2, build 489).**
 Tasks A1.1–A1.4 done; A1.5 (owner on the 500R8) is next. What's where:
 - **A1.1 addon capture** (lead): `io/src/ring.h` (SPSC sample ring + block-header ring; a callback goes in whole or is dropped
