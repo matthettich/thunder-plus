@@ -39,7 +39,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: windows-latest, args: --win }
+          - { os: windows-2022,   args: --win }   # (windows-latest has Visual Studio 2026, "version 18", which node-gyp 11 can't find: the Link and helper addons failed there)
           - { os: macos-latest,   args: --mac }
           - { os: ubuntu-latest,  args: --linux }
     runs-on: ${{ matrix.os }}
@@ -67,6 +67,14 @@ jobs:
         run: |
           sh link/fetch-sdk.sh
           node link/build.js
+      # NATIVE I/O HELPER (optional; plan: docs/NATIVE-IO-HELPER-PLAN.md): the addon with every input of the audio interface,
+      # into electron/io/. Vendored miniaudio + libremidi (permissive), nothing to fetch. If it fails, the app still builds and
+      # the recorder uses the browser's input (inputs 1-2), as before.
+      - name: Native I/O helper addon (optional)
+        if: hashFiles('io/build.js') != ''
+        continue-on-error: true
+        shell: bash
+        run: node io/build.js
       - name: Build
         working-directory: ${{ env.APP_DIR }}
         shell: bash
