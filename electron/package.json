@@ -28,11 +28,14 @@
       "updater.js",
       "preload.js",
       "link-session.js",
+      "io-helper.js",
       "link/**/*",
+      "io/**/*",
       "app/**/*"
     ],
     "asarUnpack": [
-      "link/*.node"
+      "link/*.node",
+      "io/*.node"
     ],
     "directories": {
       "output": "dist",
