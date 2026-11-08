@@ -182,9 +182,20 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
   change it needs.
 - Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
+- **A more stable desktop app, when the owner wants one** (7 Nov): `docs/NATIVE-DESKTOP-PLAN.md` section 14 lists which of
+  7 Nov's bugs came from the web platform, and the options cheapest first: stay web; a native I/O helper inside Electron
+  (MIDI out first, then inputs, maybe audio out), built like the `link/` addon; or the full native host (phases 3–6).
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+
+## 7 Nov (12): web vs native, written down (docs only)
+
+- Owner: "would many of these bugs be easier to fix if we were not making a webapp?", then asked for the suggestions in the
+  handover "so if i want to make a desktop version that is more stable, we can". Written as `docs/NATIVE-DESKTOP-PLAN.md`
+  section 14 (the 7 Nov evidence table; options: stay web / native I/O helper in Electron / full native host; what to
+  measure first) and a To-do line. Answer given: about half of 7 Nov's bugs were web-platform (MIDI can't be cancelled, two
+  clocks, 2-channel inputs, the mic prompt, Caps Lock), half would happen in any app; not now, keep making music.
 
 ## 7 Nov (11): kit kinds to the core while playing (build 481, beta + main; not in a desktop build yet)
 
