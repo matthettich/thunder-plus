@@ -75,9 +75,8 @@ it may touch (nothing else); the functions / messages / settings it must produce
 "don't change `index.html` outside the named functions"; "report the diff and the test output". Keep cards small (one row
 each); never hand a subagent the whole phase.
 
-**Open item to settle on the way (B, or sooner):** the owner found the right Gear delay was "a combination of both latency
-numbers" (Measure's result + Settings › Audio's heard ms), so MIDI may still miss the output latency on the Mac. Ask the
-owner for the three numbers (Measure's result, heard ms, the delay that sounds right) before changing `msend` / `a2p`.
+**Settled 7 Nov (build 485):** MIDI was early by the reported base + output latency on the Mac; `mapUpd` now floors the
+clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure… once the helper's MIDI (B) lands.
 
 ## Desktop releases
 
@@ -246,6 +245,14 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+
+## 7 Nov (16): MIDI mapping never sooner than the reported latency (build 485, beta + main)
+
+- Owner (Electron, Mac): Settings › Audio shows "10 ms + 21 ms output" and the Gear delay that sounds right is −27 ms, so MIDI
+  was early by about base + output latency: `getOutputTimestamp` there implied only a few ms between the engine and the
+  speaker. `mapUpd` now applies heardLat()'s floor: the implied latency (currentTime − the timestamp's context time, aged to
+  now) is raised to baseLatency + outputLatency when below it. `a2p` / `p2a` (MIDI out, clock in) follow. Owner to set the
+  Gear delay back to 0 and re-Measure. This also settles 7 Nov (15)'s "combination of both latency numbers".
 
 ## 7 Nov (15): helper answers; delegating the build
 
