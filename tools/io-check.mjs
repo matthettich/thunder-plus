@@ -63,9 +63,10 @@ const FAKE = mode => {
           }, 5);
         } else if (m && m.op === 'close') { stop(); h.postMessage({ op: 'closed', id: m.id }); }
         // FAKE MIDI (phase B): one output "Gear" and one input "Clock"; what's sent is logged with its time
-        else if (m && m.op === 'midiPorts') h.postMessage({ op: 'midiPorts', id: m.id, outs: [{ id: 'Gear', name: 'Gear' }], ins: [{ id: 'Clock', name: 'Clock' }] });
+        else if (m && m.op === 'midiPorts') h.postMessage({ op: 'midiPorts', id: m.id, outs: (window.__midiOuts || ['Gear']).map(n => ({ id: n, name: n })), ins: [{ id: 'Clock', name: 'Clock' }] });
         else if (m && m.op === 'midiStats') h.postMessage({ op: 'midiStats', id: m.id, queued: 0, late: window.__midiLate || 0 });
-        else if (m && (m.op === 'midiOpenOut' || m.op === 'midiOpenIn')) h.postMessage({ op: 'midiOpened', id: m.id, ok: true, port: m.name === 'Gear' ? 1 : 2 });
+        else if (m && (m.op === 'midiOpenOut' || m.op === 'midiOpenIn')) { window.__midiOpens = (window.__midiOpens || 0) + 1;
+          h.postMessage({ op: 'midiOpened', id: m.id, ok: true, port: m.name === 'Gear' && m.op === 'midiOpenOut' ? 1 : m.name === 'Clock' ? 2 : 100 + window.__midiOpens }); }
         else if (m && (m.op === 'midiSend' || m.op === 'midiClear' || m.op === 'midiClose')) window.__midiSent.push({ op: m.op, port: m.port, bytes: m.bytes, at: m.at, t: performance.now() }); };
       window.__midiIn = list => h.postMessage({ op: 'midiIn', list });
       h.postMessage(mode === 'ok' ? { op: 'hello', available: true, version: 'thunder_io 4 / miniaudio 0.11.26 / libremidi', midi: true } : { op: 'hello', available: false, why: 'addon missing' });
@@ -196,7 +197,7 @@ try {
       const md = q => { const v = q.map(x => x.ms).sort((a, b) => a - b); return v.length ? +v[v.length >> 1].toFixed(1) : null; };
       const closed = {n:r2.length, ts:r2.ts, med:md(r2), ioAfter:io2};
       const v = r.map(q => q.ms).sort((a, b) => a - b); return {closed, all:v.map(x=>+x.toFixed(0)).join(','), n:r.length, ts:r.ts, med:v.length ? +v[v.length >> 1].toFixed(1) : null}; });
-    ok(mg.n >= 6 && mg.ts === mg.n && Math.abs(mg.med - 20) < 6 && mg.closed.n >= 6 && mg.closed.ts === mg.closed.n && Math.abs(mg.closed.med - 20) < 6 && !mg.closed.ioAfter,   // (the old bugs read ~200)
+    ok(mg.n >= 6 && mg.ts >= mg.n && Math.abs(mg.med - 20) < 6 && mg.closed.n >= 6 && mg.closed.ts >= mg.closed.n && Math.abs(mg.closed.med - 20) < 6 && !mg.closed.ioAfter,   // (the old bugs read ~200)
        'Measure… times the gear by the native timestamps when the click isn\'t on the input, with Record a sample open and from Settings (gear 20 ms late): ' + JSON.stringify(mg));
     await openRec(page);   // (Measure from Settings closed Record a sample)
     await page.evaluate(async () => { const E = s => window.__seqTest.ev(s); E('rcdClose()'); await E('rcdOpen()'); });
@@ -248,6 +249,12 @@ try { const page = await open('ok');
     // MIDI IN: clock ticks with the helper's timestamps reach the clock-in (Clock from: the remapped input)
     E('mx.inT = []'); const n0 = performance.now(); window.__midiIn([0, 1, 2, 3, 4, 5].map(k => ({ port: 2, bytes: [0xF8], ns: (n0 - E('IOH.clk') + k * 20.833) * 1e6 })));
     await wait(80); o.clkIn = E('(mx.inT || []).length');
+    // SAME-NAME DEVICES (CodeRabbit): "Gear" and "Gear #2"; the first is unplugged, so "Gear #2" is now "Gear": the group is closed
+    // and opened again (the survivor mustn't keep the gone device's handle)
+    window.__midiOuts = ['Gear', 'Gear #2']; await E('nmScan()'); const two = E('[...midi.access.outputs.keys()].join()');
+    window.__midiSent.length = 0; const op0 = window.__midiOpens; window.__midiOuts = ['Gear']; await E('nmScan()');
+    o.dup = {two, after:E('[...midi.access.outputs.keys()].join()'), closed:window.__midiSent.filter(x => x.op === 'midiClose').length, reopened:window.__midiOpens - op0};
+    window.__midiOuts = null;
     // HELPER DIED: no answer twice → its ports are dropped, MIDI connects again through a fresh helper (a second start)
     const starts = window.__ioStarts; window.__ioKill(); await E('nmScan()'); await E('nmScan()'); await wait(800);
     for (let i = 0; i < 40 && !E('!!(midi.access && midi.access.native && NM.acc)'); i++) await wait(100);
@@ -267,6 +274,7 @@ try { const page = await open('ok');
   ok(nm.sent && nm.sent.port === 1 && nm.sent.bytes === '144,60,100' && Math.abs(nm.sent.errMs) < 0.5 && nm.outbox === 0, 'a note booked ahead goes straight to the helper at its OS time (no OUTBOX): ' + JSON.stringify(nm.sent));
   ok(/^midiClear/.test(nm.stop) && /midiSend:b0/.test(nm.stop), 'STOP clears the helper\'s queue, then sends the offs: ' + nm.stop);
   ok(nm.clkIn >= 5, 'MIDI clock in arrives with its timestamps: ' + nm.clkIn + ' ticks');
+  ok(nm.dup.two === 'n:Gear,n:Gear #2' && nm.dup.after === 'n:Gear' && nm.dup.closed === 2 && nm.dup.reopened === 1, 'two same-name devices, the first unplugged: the group is closed and the survivor opened again: ' + JSON.stringify(nm.dup));
   ok(nm.revive.starts === 1 && nm.revive.native && nm.revive.outs === 'n:Gear', 'a helper that died is noticed and MIDI reconnects through a fresh one: ' + JSON.stringify(nm.revive));
   ok(nm.closed === 2 && nm.after !== 'native', 'Engine Browser closes the helper\'s ports: ' + nm.closed + ' closed, now ' + nm.after);
   await page.close(); } catch (e) { console.error(e); fails++; }

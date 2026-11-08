@@ -9,20 +9,20 @@
 'use strict';
 const { execFileSync } = require('child_process'), fs = require('fs'), path = require('path');
 const D = __dirname, OUT = path.join(D, '..', 'electron', 'io');
-if (!fs.existsSync(path.join(D, 'vendor', 'miniaudio', 'miniaudio.h'))) { console.error('io/vendor/miniaudio/miniaudio.h is missing: the vendored sources are not in the tree'); process.exit(1); }
+const dst = path.join(OUT, 'thunder_io.node'), parts = ['arm64', 'x64'].map(a => path.join(OUT, `thunder_io-${a}.node`));
+// A FAILED BUILD SHIPS NOTHING (CodeRabbit, PR #14): electron-builder packs every io/*.node, so on any failure (a missing
+// prerequisite too, CodeRabbit: an addon from an earlier build would otherwise ship) the staged addon and its parts are removed.
+const fail = msg => { for (const f of [dst, ...parts]) { try { fs.unlinkSync(f); } catch (e) {} } console.error(msg); process.exit(1); };
+if (!fs.existsSync(path.join(D, 'vendor', 'miniaudio', 'miniaudio.h'))) fail('io/vendor/miniaudio/miniaudio.h is missing: the vendored sources are not in the tree');
 const gyp = process.env.NODE_GYP || [path.join(path.dirname(process.execPath), '..', 'lib', 'node_modules', 'npm', 'node_modules', 'node-gyp', 'bin', 'node-gyp.js'),
   path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'node_modules', 'node-gyp', 'bin', 'node-gyp.js')].find(f => fs.existsSync(f));
-if (!gyp) { console.error('node-gyp not found: set NODE_GYP'); process.exit(1); }
+if (!gyp) fail('node-gyp not found: set NODE_GYP');
 const nd = process.env.NODEDIR ? ['--nodedir=' + process.env.NODEDIR] : [];
 const build = arch => {
   execFileSync(process.execPath, [gyp, 'rebuild', '--release', ...nd, ...(arch ? ['--arch=' + arch] : [])], { cwd: D, stdio: 'inherit' });
   return path.join(D, 'build', 'Release', 'thunder_io.node');
 };
 fs.mkdirSync(OUT, { recursive: true });
-const dst = path.join(OUT, 'thunder_io.node'), parts = ['arm64', 'x64'].map(a => path.join(OUT, `thunder_io-${a}.node`));
-// A FAILED BUILD SHIPS NOTHING (CodeRabbit, PR #14): electron-builder packs every io/*.node, so on any failure below (a build,
-// lipo, or the smoke test) the staged addon and the per-arch parts are removed, and the app says the helper isn't available.
-const fail = msg => { for (const f of [dst, ...parts]) { try { fs.unlinkSync(f); } catch (e) {} } console.error(msg); process.exit(1); };
 let v;
 try {
   if (process.platform === 'darwin') {

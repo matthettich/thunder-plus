@@ -16336,7 +16336,11 @@ async function nmScan1(acc, first){
   let ch = false;
   const opening = acc.opening || (acc.opening = new Set());   // opens in flight, per access (CodeRabbit: a shared set let an old scan's opens hide the new access's ports)
   const sync = (map, list, open) => { const want = new Set(list.map(p => 'n:' + p.id)), jobs = [];
-    for (const [id, x] of map) if (!want.has(id)){ nmPost({op:'midiClose', port:x.port}); map.delete(id); NM.byPort.delete(x.port); ch = true; }
+    // SAME-NAME DEVICES (CodeRabbit): ids are names, " #2" for the second of two. When one of a group goes, the others' ids shift, so
+    // the whole group is closed and opened again by its new ids (the survivor would otherwise keep the gone device's handle)
+    const base = id => id.replace(/ #\d+$/, ''), gone = new Set();
+    for (const id of map.keys()) if (!want.has(id)) gone.add(base(id));
+    for (const [id, x] of map) if (!want.has(id) || gone.has(base(id))){ nmPost({op:'midiClose', port:x.port}); map.delete(id); NM.byPort.delete(x.port); ch = true; }
     for (const p of list){ const id = 'n:' + p.id, key = open + id; if (map.has(id) || opening.has(key)) continue; opening.add(key);
       jobs.push(iohAsk({op:open, name:p.id}).then(o => { opening.delete(key);
         if (o && o.ok && (NM.acc !== acc || map.has(id))){ nmPost({op:'midiClose', port:o.port}); return; }   // (opened after a switch or a reconnect: closed, not leaked)
@@ -22724,7 +22728,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 501;
+const BUILD = 502;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31691,6 +31695,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [502, '8 Nov', ['Desktop app, native MIDI: with two devices of the same name, unplugging the first no longer silences the second.']],
   [501, '8 Nov', ['Desktop app, native MIDI: switching Engine back and forth quickly no longer delays the input ports.']],
   [500, '7 Nov', ['Desktop app, native MIDI: after switching Engine the port list fills in at once, and a switch mid-scan no longer changes your saved port choices.']],
   [499, '7 Nov', ['Desktop app, native MIDI: sturdier (a port can’t be opened twice or left open after switching Engine; a device plugged in later gets its port letter back; if the helper stops, MIDI reconnects by itself), notes keep their timing while a controller is plugged in, and Settings › MIDI shows how many messages went out late, if any.']],
