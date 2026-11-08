@@ -14575,8 +14575,10 @@ async function rcdOpen1(){
   let s = null;
   if (rcdSet.input){ try { s = await md.getUserMedia({audio:Object.assign({}, base, {deviceId:{exact:rcdSet.input}})}); } catch(e){} }
   if (!s){ try { s = await md.getUserMedia({audio:base}); } catch(e){ toast(e && e.name === 'NotAllowedError' ? 'Recording needs permission to use an audio input.' : 'Couldn’t open an audio input.', 5000); return false; } }
+  if (gone()){ s.getTracks().forEach(t => t.stop()); return false; }   // (closed while the browser asked: CodeRabbit)
   try {
     if (RCD.mod !== ctx){ await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([RCD_WORKLET], {type:'application/javascript'}))); RCD.mod = ctx; }
+    if (gone()){ s.getTracks().forEach(t => t.stop()); return false; }
     const src = ctx.createMediaStreamSource(s), node = new AudioWorkletNode(ctx, 'thunder-rec', {numberOfInputs:1, numberOfOutputs:0, channelCount:2, channelCountMode:'explicit', channelInterpretation:'speakers'});
     const mon = ctx.createGain(); mon.gain.value = rcdSet.mon ? 1 : 0; mon.connect(master);
     node.port.onmessage = e => rcdMsg(e.data);
@@ -22793,7 +22795,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 506;
+const BUILD = 507;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31769,7 +31771,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
-  [506, '8 Nov', ['Record a sample: Keep in this pad no longer plays the pad; closing the window really disconnects its input monitoring (beta.15 left it connected).']],
+  [507, '8 Nov', ['Record a sample: Keep in this pad no longer plays the pad; closing the window really disconnects its input monitoring (beta.15 left it connected); closing it while the browser’s input is still opening no longer leaves that input on.']],
   [505, '8 Nov', ['Space always plays and stops the song, even right after clicking a menu or button; solo and mute keys work on every screen.', 'Desktop app: Apply (reload) in Settings › Audio works; a sample-rate mismatch on the native input pops up a message; long takes show up in RECENT even when storage is full.', 'Desktop app, native MIDI: malformed messages and SysEx are dropped as the browser engine drops them (a Cirklon showed “Sysex interrupt”); closing Record a sample while its input is still opening no longer leaves it half-open.']],
   [504, '8 Nov', ['Desktop app, native MIDI: with two devices of the same name, a port letter set to the one that was unplugged waits for it (shown as not connected) instead of moving to the other.']],
   [503, '8 Nov', ['Desktop app, native MIDI: with two devices of the same name, unplugging the first no longer silences the second.']],
