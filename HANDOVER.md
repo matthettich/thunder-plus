@@ -112,8 +112,8 @@ installation" (the step is continue-on-error, so Windows builds ship without the
 **PICK UP HERE: EVERYTHING STILL NEEDED (updated 7 Nov 23:30).** Read this list first; the paragraphs below it are the detail.
 
 **NEXT STEPS, in order:**
-1. The owner tests **1.3.0-beta.14** (has everything; beta.10–13 differ only by small MIDI fixes): the recording list (item 1) and the MIDI list (item 5, "Owner's test").
-   Start a session by asking for the results; fix on `io-helper`, then a NEW pre-release number (beta.15, then beta.16…: never reuse one,
+1. The owner tests **1.3.0-beta.15**: the items item 0 says failed or changed on beta.14 (the rest passed), then Windows: the recording list (item 1) and the MIDI list (item 5, "Owner's test").
+   Start a session by asking for the results; fix on `io-helper`, then a NEW pre-release number (beta.16, then beta.17…: never reuse one,
    the workflow would replace a release's files without moving its tag), and check the macOS and Windows job
    logs for "thunder_io.node built" (both), "adhoc-sign: signed" (macOS) and "thunder_link.node built" (both).
 2. When both lists pass: merge PR #14 into `beta` (item 3), then `beta` → `main` and a normal desktop release only when the
@@ -122,7 +122,7 @@ installation" (the step is continue-on-error, so Windows builds ship without the
 4. Later / low priority: Linux ALSA in CI (item 5, skipped on the owner's word); phase C (audio output through the helper)
    only if MIDI vs audio timing is still off after B, and then more likely the native desktop app (docs/NATIVE-DESKTOP-PLAN.md).
 
-*State now:* branch `io-helper` (build 504: phase B MIDI built and reviewed, item 5; desktop pre-release **1.3.0-beta.14** (build 504). beta.13 = 503; beta.12 = 502; beta.11 = 501; beta.10 = 500; beta.9 = 499; beta.8 = 498 (first with MIDI, Windows with Link and the helper again); beta.7 = 496, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
+*State now:* branch `io-helper` (build 505: phase B MIDI built and reviewed, item 5; desktop pre-release **1.3.0-beta.15** (build 505). beta.14 = 504; beta.13 = 503; beta.12 = 502; beta.11 = 501; beta.10 = 500; beta.9 = 499; beta.8 = 498 (first with MIDI, Windows with Link and the helper again); beta.7 = 496, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
 CodeRabbit fix that was the real cause of the beta.2/3 failures (the helper died on the first chunk: MessagePortMain can't
 transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner tests beta.7 when convenient (item 1). PR #14
 (`io-helper` → `beta`) is open. `beta` is at build 488 plus a CLAUDE.md line ("continue the helper"); `main` is at build 485
@@ -136,7 +136,8 @@ transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner 
 - **Monitoring distorted and clicky after closing and reopening the window once; the song silent until Restart audio** (not
   reproduced by the owner after an app restart). Found: closing the window while the input is still opening (waiting on macOS /
   the helper) left a half-open input (the open carried on after rcdClose). Build 505: `RCD.gen` (rcdClose bumps it; rcdOpen1
-  undoes what it opened and tells the helper to close when it changed). Not proven to be the cause: if it happens again, ask
+  undoes what it opened and tells the helper to close when it changed; `rcdOpen` starts a fresh open after a stale in-flight one
+  instead of handing back its "gave up"). Not proven to be the cause: if it happens again, ask
   for Settings › Audio › Copy report BEFORE restarting audio.
 - **Cirklon "Sysex interrupt" the first time native MIDI reached it.** Web MIDI's send() throws on malformed messages and SysEx
   without permission, so the browser engine dropped them; native passed them on. Build 505: `nmValid` (whole messages only,
@@ -146,7 +147,11 @@ transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner 
   output latency macOS reports (patching the click in too measures against what is heard).
 - Delegated to Sonnet subagents (checked by the lead): Space always plays / stops even with a menu button focused, solo / mute
   keys on every screen; Apply (reload) did nothing in the desktop app; the rate warning only a status line (now a toast too);
-  the 5-minute take missing from RECENT.
+  the 5-minute take missing from RECENT. Found: Apply (reload) was cancelled by main.js's will-navigate guard (now
+  `thunderDesktop.app.reload()` → `thunder:reload` → sender.reload()); the rate note was cleared by fillIn on reopen (now
+  `rcdRateMsg()`, a toast once per device + rate pair, and the status line); RECENT: a long take stores fine (16-bit PCM),
+  the likely cause is localStorage full (the RECENT list write was swallowed): now retried smaller, kept in memory
+  (`SMB_MEM`) and held (`smpHeld`). Not proven to be the owner's cause.
 
 **1. OWNER'S TEST OF 1.3.0-beta.7 (build 496; waiting on the owner; the next session starts by asking for the results).**
 https://github.com/matthettich/thunder-plus/releases/tag/v1.3.0-beta.7. Record a sample → Engine Native unless it says otherwise.
@@ -165,7 +170,7 @@ https://github.com/matthettich/thunder-plus/releases/tag/v1.3.0-beta.7. Record a
       and still on the grid at the end. Optionally 1–2 minutes through the 500R8 on an ADAT pair (load).
 - [ ] When convenient: unplug the 500R8 mid-take (the take so far is kept); run the 500R8 at 44.1 kHz with the app at 48 (the
       window warns that the input is converted).
-→ Problems: fix on `io-helper`, run the checks (below), pre-release the next unused number (`1.3.0-beta.15`…) (Run workflow `desktop.yml`, ref
+→ Problems: fix on `io-helper`, run the checks (below), pre-release the next unused number (`1.3.0-beta.16`…) (Run workflow `desktop.yml`, ref
   `io-helper`, `version`, `prerelease: true`); in the macOS job log confirm both "thunder_io.node built" and "adhoc-sign: signed"
   (both steps can fail without failing the build).
 
