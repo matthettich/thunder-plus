@@ -127,7 +127,7 @@ installation" (the step is continue-on-error, so Windows builds ship without the
 4. Later / low priority: Linux ALSA in CI (item 5, skipped on the owner's word); phase C (audio output through the helper)
    only if MIDI vs audio timing is still off after B, and then more likely the native desktop app (docs/NATIVE-DESKTOP-PLAN.md).
 
-*State now:* branch `io-helper` (build 510: phase B MIDI built and reviewed, item 5; desktop pre-release **1.3.0-beta.20** (build 510). beta.19 = 509; beta.18 = 508; beta.17 = 507; beta.16 = 506; beta.15 = 505; beta.14 = 504; beta.13 = 503; beta.12 = 502; beta.11 = 501; beta.10 = 500; beta.9 = 499; beta.8 = 498 (first with MIDI, Windows with Link and the helper again); beta.7 = 496, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
+*State now:* branch `io-helper` (build 511: phase B MIDI built and reviewed, item 5; desktop pre-release **1.3.0-beta.20** (build 510; build 511 has two small Measure fixes, no beta yet). beta.19 = 509; beta.18 = 508; beta.17 = 507; beta.16 = 506; beta.15 = 505; beta.14 = 504; beta.13 = 503; beta.12 = 502; beta.11 = 501; beta.10 = 500; beta.9 = 499; beta.8 = 498 (first with MIDI, Windows with Link and the helper again); beta.7 = 496, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
 CodeRabbit fix that was the real cause of the beta.2/3 failures (the helper died on the first chunk: MessagePortMain can't
 transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner tests beta.7 when convenient (item 1). PR #14
 (`io-helper` → `beta`) is open. `beta` is at build 488 plus a CLAUDE.md line ("continue the helper"); `main` is at build 485
@@ -155,7 +155,9 @@ transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner 
   the helper). CodeRabbit has reviewed every commit up to 4ab28ab (beta.19); its last pass had only a test nitpick, done.
 - 11:26: Measure: "The window changes shape on first click, and it doesn't start measuring until later": the status replaced the long
   explanation (the window shrank under the pointer) and opening the input takes a few seconds. Build 510: a fixed-height status
-  line below the fields; "Opening the input…", then "hit k of n", then "Working it out…".
+  line below the fields; "Opening the input…", then "hit k of n", then "Working it out…". Build 511 (CodeRabbit): the line is a fixed
+  height and scrolls; progress goes to the panel that started the run. CodeRabbit again raised same-name devices (ids reused
+  after an unplug): deferred, it needs the stable device identity listed under item 5.
 - 11:02: "If I monitor directly, it's spot on, but through [the app's] monitor MIDI sounds late": so the MIDI timing is right
   (Gear delay as measured); the app's own monitoring is late by its input path + 20 ms cushion + output latency (by design:
   use the interface's direct monitoring when tracking). A lower-latency monitor option could come later if wanted.

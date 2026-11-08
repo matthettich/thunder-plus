@@ -14743,7 +14743,7 @@ function mltOnset(x, a, b, sr){   // the first frame in [a, b) above half the wi
   const fl = q[Math.floor(q.length * 0.3)] || 0; if (pk < 0.01 || pk < fl * 6 + 0.005) return null; let i = a; while (i < b && Math.abs(x[i]) < pk * 0.5) i++;
   const lim = Math.max(a, i - Math.round(sr * 0.004)); while (i > lim && Math.abs(x[i - 1]) >= pk * 0.1) i--; return i; }
 async function midiLatRun(p, ch, note, n){
-  const say = t => { try { if (MLT.say) MLT.say(t); } catch(e){} };
+  const say0 = MLT.say, say = t => { try { if (say0) say0(t); } catch(e){} };   // (the panel that started this run: a reopened one isn't told about it, CodeRabbit)
   if (!midiOut(p)) throw new Error('no port');
   if (!RCD.io && !RCD.stream) say('Opening the input… (the first time can take a few seconds)');
   if (!(await rcdOpen())) throw new Error('no input');
@@ -14813,7 +14813,8 @@ function midiLatPanel(){
     // STATUS LINE (owner, 8 Nov: "The window changes shape on first click of measure, and it doesn't start measuring until later"):
     // the status used to replace the long explanation, so the window shrank under the pointer and the buttons moved; now it has its
     // own line of fixed height below the fields, and says what is happening while the input opens and hit by hit
-    const st = el('div', 'askmsg'); st.style.minHeight = '5.6em'; st.setAttribute('aria-live', 'polite'); st.textContent = 'Press Measure to start.';
+    const st = el('div', 'askmsg'); st.style.height = '5.6em'; st.style.overflowY = 'auto';   // (fixed, scrolling when a long result wraps: CodeRabbit)
+    st.setAttribute('aria-live', 'polite'); st.textContent = 'Press Measure to start.';
     box.append(st); MLT.say = t => { st.textContent = t; }; }, [
     ['Measure', async () => { if (busy) return; if (tp.on) tStop(); busy = true; MLT.say('Starting…');
       try { const r = await midiLatRun(p, ch, note, n), ok = r.length;
@@ -22807,7 +22808,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 510;
+const BUILD = 511;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31783,7 +31784,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
-  [510, '8 Nov', ['Measure…: the window keeps its size when you press Measure, and says what it is doing (opening the input, then hit by hit).']],
+  [511, '8 Nov', ['Measure…: the window keeps its size when you press Measure, and says what it is doing (opening the input, then hit by hit).']],
   [509, '8 Nov', ['Measure… no longer shows “Audio engine reset” when it finishes (it still refreshes the audio engine quietly, as before); Reset audio engine keeps Record a sample’s monitoring connected.']],
   [507, '8 Nov', ['Record a sample: Keep in this pad no longer plays the pad; closing the window really disconnects its input monitoring (beta.15 left it connected); closing it while the browser’s input is still opening no longer leaves that input on.']],
   [505, '8 Nov', ['Space always plays and stops the song, even right after clicking a menu or button; solo and mute keys work on every screen.', 'Desktop app: Apply (reload) in Settings › Audio works; a sample-rate mismatch on the native input pops up a message; long takes show up in RECENT even when storage is full.', 'Desktop app, native MIDI: malformed messages and SysEx are dropped as the browser engine drops them (a Cirklon showed “Sysex interrupt”); closing Record a sample while its input is still opening no longer leaves it half-open.']],
