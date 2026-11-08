@@ -92,6 +92,14 @@ inputs back to 1&2": a failed native open fell back silently to the browser's in
 (rcdStart returns before clearing RCD.take): recheck on beta.3. ADAT inputs: not confirmed yet (the owner thinks these bugs
 hid it): recheck on beta.3. tools/io-check.mjs covers 3–5 with the fake helper.
 
+**ROOT CAUSE of the owner's beta.2 / beta.3 failures (CodeRabbit, PR #14, 7 Nov 21:05):** the helper posted chunks with
+`[data.buffer]` as the transfer list, but Electron's MessagePortMain only transfers ports, so the first audio chunk threw and
+killed the helper; after the second death the page fell back to the browser input (inputs 1–2). Fixed in build 492 / beta.4:
+chunks are copied (structured clone); `tests/io.test.js` guards the wiring. Lesson: the fake ports in tests accept transfers the
+real MessagePortMain doesn't; test the Electron wiring itself when possible. Also from that review: rcdOpenIo closes the device
+in the helper if the worklet setup fails; io/README documents the input API. Skipped: its libremidi findings (vendored upstream
+code, not compiled yet; look again when phase B compiles libremidi, and record any local patch in io/VERSIONS).
+
 **A2 (part) built after beta.3 (build 491, not in a desktop pre-release yet):** (a) the interface's own delay: the addon reads
 CoreAudio's input device latency + safety offset + first stream's latency (`InputLatencyFrames`) and moves every hostNs back by
 it; `opened.latencyMs` shows in Record a sample's Extra latency line. (b) Unplugged mid-take: miniaudio's stopped notification

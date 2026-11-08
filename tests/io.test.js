@@ -148,3 +148,11 @@ test('io helper input: the device going away (inputLost) drains what arrived, th
   assert.match(t.out[t.out.length - 1].why, /went away/);
   assert.equal(t.running(), false); assert.equal(count(t.calls, 'close'), 1);
 });
+
+test('io helper wiring: chunks go to the Electron port WITHOUT a transfer list (MessagePortMain only transfers ports)', () => {
+  // CodeRabbit, PR #14: an ArrayBuffer in the list threw on the first chunk and killed the helper in the real app
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'electron', 'io-helper.js'), 'utf8');
+  const wiring = src.slice(src.indexOf('if (process.parentPort)'));
+  assert.match(wiring, /post: m => \{ if \(port\) port\.postMessage\(m\); \}/);
+  assert.doesNotMatch(wiring, /port\.postMessage\(m, t/);
+});

@@ -75,7 +75,10 @@ module.exports = { createIoHelper, createRestartGate };
 if (process.parentPort) {
   const parent = process.parentPort, addonPath = process.argv.find(a => /\.node$/i.test(a)) || '';
   let port = null;
-  const helper = createIoHelper({ loadAddon: () => require(addonPath), post: (m, t) => { if (port) port.postMessage(m, t || []); } });
+  // NO TRANSFER LIST (CodeRabbit, PR #14; the owner's beta.2 failures): Electron's MessagePortMain only transfers ports, so an
+  // ArrayBuffer in the list threw on the first audio chunk and the helper died (twice, then the page fell back to inputs 1–2).
+  // The chunk is copied instead (structured clone): ~5 MB/s for 28 channels at 48 kHz, nothing for this process.
+  const helper = createIoHelper({ loadAddon: () => require(addonPath), post: m => { if (port) port.postMessage(m); } });
   process.on('exit', () => helper.shutdown());
   parent.on('message', e => {
     if (!(e.data && e.data.op === 'port') || !e.ports || !e.ports[0]) return;

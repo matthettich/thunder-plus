@@ -16,7 +16,7 @@ app build, with `continue-on-error`: a failure here never stops a release, the a
 
 ```js
 const io = require('electron/io/thunder_io.node');
-io.version();                    // "thunder_io 1 / miniaudio 0.11.26"
+io.version();                    // "thunder_io 3 / miniaudio 0.11.26"
 io.now();                        // Number: the OS clock in ns (macOS mach_absolute_time, Windows QueryPerformanceCounter,
                                  // else CLOCK_MONOTONIC): the clock the audio callback's timestamps will use
 io.devices();                    // every input and output device, real backends (CoreAudio / WASAPI / ALSA / Pulse ...)
@@ -39,4 +39,14 @@ io.devices({ backend: 'null' }); // a throwaway null-backend context, for CI smo
 Test: `node io/test/devices.js` prints `devices()`, `devices({backend:'null'})` and two `now()` calls. `build.js`'s smoke
 test checks the null backend returns an entry with numeric `inputs` / `outputs` and that `now()` increases.
 
-The audio surface that follows (`openInput`, `read`, `closeInput`) comes in the next phases.
+The audio input (phase A1–A2):
+
+```js
+io.openInput(inId, {rate, block})  // → {ok, rate, channels, deviceRate, block, bufferFrames, latencyFrames, latencyMs, name} | {ok:false, why}
+                                   //   every input channel of the device, float32 interleaved, at `rate` (converted if the
+                                   //   device runs at another); latencyFrames / latencyMs: the interface's own delay (macOS)
+io.read()                          // → null | {frame0, hostNs, channels, frames, rate, data: Float32Array, overruns}
+                                   //   one contiguous run since the last read; hostNs: the OS time frame0 was captured
+io.inputLost()                     // → true when the device stopped by itself (unplugged)
+io.closeInput()                    // stops and frees it (safe when nothing is open)
+```

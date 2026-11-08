@@ -16325,8 +16325,11 @@ async function rcdOpenIo(rec, mon){
   if (!(await iohClock())){ RCD.ioWhy = 'the helper didn’t answer'; return false; }
   const o = await iohAsk({op:'open', dev:dev.inId, rate:ctx.sampleRate, block:0});
   if (!o || !o.ok){ RCD.ioWhy = dev.name + ' wouldn’t open: ' + ((o && o.why) || 'no answer'); return false; }
-  if (RCD.iomod !== ctx){ await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([IOIN_WORKLET], {type:'application/javascript'}))); RCD.iomod = ctx; }
-  const node = new AudioWorkletNode(ctx, 'thunder-io-in', {numberOfInputs:0, numberOfOutputs:2, outputChannelCount:[2, 2]});
+  let node;
+  try {   // (CodeRabbit, PR #14: if the worklet can't be set up after the device opened, close it in the helper too)
+    if (RCD.iomod !== ctx){ await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([IOIN_WORKLET], {type:'application/javascript'}))); RCD.iomod = ctx; }
+    node = new AudioWorkletNode(ctx, 'thunder-io-in', {numberOfInputs:0, numberOfOutputs:2, outputChannelCount:[2, 2]});
+  } catch(e){ iohAsk({op:'close'}); throw e; }
   const D = Math.min(0.25, (ctx.baseLatency || 0) + (ctx.outputLatency || 0) + 0.04);   // the output's own latency + room for the hops
   const io = {node, dev, D, opened:o, under:0, jumps:0, sync:0, lastIn:performance.now() + 1000};   // (a second's grace to start)
   node.port.postMessage({D});
@@ -22568,7 +22571,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 491;
+const BUILD = 492;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31535,6 +31538,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [492, '7 Nov', ['Desktop app, Engine Native: the helper no longer stops on the first moment of audio (the cause of the inputs falling back to 1+2 on beta.2 and beta.3).']],
   [491, '7 Nov', ['Desktop app, Record a sample with Engine Native: the interface’s own delay (as the Mac reports it) is taken into account, so PATTERN takes land on the beat without setting Extra latency; unplugging the interface mid-take keeps the take so far; and the window says when the interface runs at another sample rate than the app.']],
   [490, '7 Nov', ['Desktop app, Record a sample with Engine Native: the interface is no longer reset when the input opens (its buffer size is left as it is); the app asks for the microphone once; the input opens with the window, so the meters work before Record; and an input that stopped is opened again, so Record and Discard and record work without closing the window. If the native input can’t open, the window says why instead of quietly using inputs 1–2.']],
   [489, '7 Nov', ['Desktop app: Record a sample can record from every input of your audio interface (Engine: Native): the Input list shows the interface with all its inputs, and Inputs every pair and channel. Takes are placed by the interface’s own timestamps. The Input engine row moved here from Settings › Audio.']],
