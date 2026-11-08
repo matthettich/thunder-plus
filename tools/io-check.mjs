@@ -42,6 +42,7 @@ const FAKE = mode => {
           { name: 'Built-in', inputs: 2, outputs: 2, backend: 'Core Audio', inId: 'in:bb', outId: 'out:bb', id: 'in:bb', rates: [48000], isDefaultIn: false, isDefaultOut: false },
           { name: '500R8', inputs: 28, outputs: 28, backend: 'Core Audio', inId: 'in:aa', outId: 'out:aa', id: 'in:aa', rates: [44100, 48000], isDefaultIn: true, isDefaultOut: true }] });
         else if (m && m.op === 'now') h.postMessage({ op: 'now', id: m.id, ns: performance.now() * 1e6 });
+        else if (m && m.op === 'open' && window.__ioOpenFail) h.postMessage({ op: 'opened', id: m.id, ok: false, why: 'device busy' });
         else if (m && m.op === 'open') {
           const rate = m.rate; stop(); frame0 = 0;
           h.postMessage({ op: 'opened', id: m.id, ok: true, rate, channels: 28, deviceRate: rate, block: 256, latencyFrames: 256, name: '500R8' });
@@ -116,6 +117,13 @@ try {
       for (let i = 0; i < 80 && !E('!!RCD.take'); i++) await wait(50);
       return {ops:window.__ioOps.slice(), take:E('RCD.take ? (() => { const t = RCD.take; let l = 0; for (const v of t.data) l = Math.max(l, v); return {n:t.data.length, l}; })() : null')}; });
     ok(again.ops.includes('close') && again.ops.includes('open') && again.take && Math.abs(again.take.l - 0.17) < 0.005, 'a stopped input is reopened by the next Record, which records: ' + JSON.stringify(again));
+    // NO SILENT FALLBACK (owner, 7 Nov: "kicking the inputs back to just 1&2"): a native open that fails says why and records
+    // nothing; it never drops to the browser's input (inputs 1–2) on its own
+    const nofb = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
+      E('rcdClose()'); window.__ioOpenFail = true; const ok = await E('rcdOpen()'); window.__ioOpenFail = false; await wait(100);
+      return {ok, stream:E('!!RCD.stream'), io:E('!!RCD.io'), note:E('RCD.note || ""')}; });
+    ok(nofb.ok === false && !nofb.stream && !nofb.io && /device busy/.test(nofb.note), 'a failed native open says why and does not fall back to inputs 1–2: ' + JSON.stringify(nofb));
+    await page.evaluate(async () => { await window.__seqTest.ev('rcdOpen()'); });
     // Engine: Browser
     await page.evaluate(() => { window.__ioOps.length = 0; });
     await page.locator('.recset .seg').first().getByText('Browser', { exact: true }).click();

@@ -14513,11 +14513,15 @@ async function rcdOpen(){
       node.port.onmessage = e => rcdMsg(e.data);
       Object.assign(RCD, {node, mon, ctx, inLat:0});
       if (await rcdOpenIo(node, mon)){
+        RCD.note = '';
         RCD.nch = RCD.io.opened.channels; if (!rcdSet.nchs || typeof rcdSet.nchs !== 'object') rcdSet.nchs = {};
         rcdSet.nchs['io:' + RCD.io.dev.inId] = RCD.nch; rcdSave(); rcdRoute(); if (RCD.ui && RCD.ui.fillCh) RCD.ui.fillCh(); if (RCD.ui && RCD.ui.latSay) RCD.ui.latSay();
         return true; }
       try { mon.disconnect(); node.port.onmessage = null; } catch(e){} Object.assign(RCD, {node:null, mon:null});
-    } catch(e){ tpLog('native input', e); rcdCloseIo(); Object.assign(RCD, {node:null, mon:null}); }
+    } catch(e){ tpLog('native input', e); rcdCloseIo(); Object.assign(RCD, {node:null, mon:null}); RCD.ioWhy = String((e && e.message) || e); }
+    // NO SILENT FALLBACK: with Engine Native and the helper there, a failed open says why and records nothing (the browser's input
+    // would have quietly given only inputs 1–2). Without the helper at all, the browser's input is used, as the window says.
+    if (IOH.state === 'ready'){ RCD.note = 'Native input: ' + (RCD.ioWhy || 'it didn’t open') + '. Try again, or pick Engine Browser.'; toast(RCD.note, 6000); return false; }
   }
   const md = navigator.mediaDevices; if (!md || !md.getUserMedia){ toast('This browser can’t record audio.'); return false; }
   const base = {echoCancellation:false, noiseSuppression:false, autoGainControl:false, channelCount:{ideal:32}};   // INPUTS: every channel it has
@@ -16310,13 +16314,15 @@ function iohInDev(lab){
 }
 // Open the native input for the recorder: the recorder worklet and the monitor hang off the worklet's two outputs, exactly
 // where the browser input's source node was. Returns false (and the browser input is used) if anything is missing.
+// RCD.ioWhy: why it didn't open, for the window (owner, 7 Nov: "kicking the inputs back to just 1&2": it fell back in silence)
 async function rcdOpenIo(rec, mon){
-  if (!(await iohReady())) return false;
+  RCD.ioWhy = '';
+  if (!(await iohReady())){ RCD.ioWhy = 'the helper isn’t available (' + (IOH.why || 'no answer') + ')'; return false; }
   let lab = ''; try { const L = await rcdInputs(), b = L.find(x => x.deviceId === rcdSet.input); lab = (b && b.label) || ''; } catch(e){}
-  const dev = iohInDev(lab); if (!dev) return false;
-  if (!(await iohClock())) return false;
+  const dev = iohInDev(lab); if (!dev){ RCD.ioWhy = 'no input device found'; return false; }
+  if (!(await iohClock())){ RCD.ioWhy = 'the helper didn’t answer'; return false; }
   const o = await iohAsk({op:'open', dev:dev.inId, rate:ctx.sampleRate, block:0});
-  if (!o || !o.ok){ if (o && o.why) toast('Native input: ' + o.why + '. Using the browser’s input.', 4000); return false; }
+  if (!o || !o.ok){ RCD.ioWhy = dev.name + ' wouldn’t open: ' + ((o && o.why) || 'no answer'); return false; }
   if (RCD.iomod !== ctx){ await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([IOIN_WORKLET], {type:'application/javascript'}))); RCD.iomod = ctx; }
   const node = new AudioWorkletNode(ctx, 'thunder-io-in', {numberOfInputs:0, numberOfOutputs:2, outputChannelCount:[2, 2]});
   const D = Math.min(0.25, (ctx.baseLatency || 0) + (ctx.outputLatency || 0) + 0.04);   // the output's own latency + room for the hops
@@ -31521,7 +31527,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
-  [490, '7 Nov', ['Desktop app, Record a sample with Engine Native: the interface is no longer reset when the input opens (its buffer size is left as it is); the app asks for the microphone once; the input opens with the window, so the meters work before Record; and an input that stopped is opened again, so Record and Discard and record work without closing the window.']],
+  [490, '7 Nov', ['Desktop app, Record a sample with Engine Native: the interface is no longer reset when the input opens (its buffer size is left as it is); the app asks for the microphone once; the input opens with the window, so the meters work before Record; and an input that stopped is opened again, so Record and Discard and record work without closing the window. If the native input can’t open, the window says why instead of quietly using inputs 1–2.']],
   [489, '7 Nov', ['Desktop app: Record a sample can record from every input of your audio interface (Engine: Native): the Input list shows the interface with all its inputs, and Inputs every pair and channel. Takes are placed by the interface’s own timestamps. The Input engine row moved here from Settings › Audio.']],
   [488, '7 Nov', ['Desktop app on a Mac: the mouse wheel goes one way everywhere. With Natural scrolling on, Arrange, the tracker rows and values went the opposite way to the lists and the Mixer; they now follow it too (pulling down moves down, and lowers a value).']],
   [487, '7 Nov', ['FOLLOW PATTERN jumps only when what a track plays changes: with a single phrase (or block) playing on a track, you can move the cursor off it again.']],
