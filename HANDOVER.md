@@ -109,63 +109,62 @@ Tests: io-check (unplug, rate, latency line), tests/io.test.js (inputLost). Left
 installation" (the step is continue-on-error, so Windows builds ship without the helper; probably the same for Link: try
 `npm config set msvs_version 2022` or setup-msbuild before it), then a WASAPI check; Linux builds fine.
 
-**PICK UP HERE: EVERYTHING STILL NEEDED (updated 7 Nov 20:57).** Read this list first; the paragraphs below it are the detail.
+**PICK UP HERE: EVERYTHING STILL NEEDED (updated 7 Nov 22:25).** Read this list first; the paragraphs below it are the detail.
 
-*State now:* branch `io-helper` (build 493; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
+*State now:* branch `io-helper` (build 496 = desktop pre-release **1.3.0-beta.7**, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
 CodeRabbit fix that was the real cause of the beta.2/3 failures (the helper died on the first chunk: MessagePortMain can't
-transfer an ArrayBuffer). Desktop pre-release **1.3.0-beta.4** (build 492) is out; the owner will test it later. PR #14
+transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner tests beta.7 when convenient (item 1). PR #14
 (`io-helper` → `beta`) is open. `beta` is at build 488 plus a CLAUDE.md line ("continue the helper"); `main` is at build 485
 (desktop v1.2.101).
 
-**1. Owner's test: beta.4 RESULTS (7 Nov 21:24) → fixed in build 493 / beta.5, retest.**
-- Worked: IN 12 and IN 17+18 in PATTERN, inputs stay on the pick, takes on the beat; Discard and record; two layers differ;
-  monitoring through the app usable. Not done yet: the 5-minute take, Measure….
-- 4–8 microphone prompts on opening (meters fine after) and once "500R8 wouldn't open: no answer". Cause: the window's
-  meter open (fillIn, not awaited) and Record's open ran at the same time (two opens), and the STALE rule (no audio for 1 s →
-  reopen) reopened an input still waiting on macOS's prompt, which asked again; the open gave up at 5 s under the prompt.
-  Fix: `rcdOpen` is single-flight (`rcdOpening`); STALE only after audio has come (`io.got`) and 2 s without it; `open`
-  waits 30 s (a toast after 2.5 s says to allow the microphone) and closes the device if it timed out.
-- "The input fell behind for a moment" during a PATTERN take: D was output latency + 40 ms; now + 120 ms (cap 500 ms, +50 ms
-  steps between takes). D costs the take nothing (rcdLat = D), only a little more wait after a PATTERN take ends.
-- beta.5 (21:40): still **6 microphone prompts** on opening the window, so the double open wasn't the whole cause. The Mac app was
-  fully unsigned (CSC_IDENTITY_AUTO_DISCOVERY false, no identity): TCC can't keep a grant for it and its helper processes look like
-  separate unsigned programs. Build 495 tried `build.mac.identity: "-"`: electron-builder 26 SKIPPED signing ("no valid identity with this name"), so beta.6 is still unsigned. Build 496: `electron/scripts/adhoc-sign.js` (afterPack: `codesign --force --deep --sign -` on the merged universal app only, then `--verify`; check the macOS job log for "adhoc-sign: signed"), `hardenedRuntime: false` (hardened runtime would need
-  JIT / library-validation entitlements for the .node addons). Expect one prompt per update (each build's code hash differs) until
-  a Developer ID. The updater downloads the .dmg itself (no Squirrel), so signing doesn't touch updates. If it still prompts
-  repeatedly: ask the owner what the prompt names (Thunder Plus vs a Helper) and whether System Settings › Microphone lists it.
-- beta.5 results (21:43–21:51): the **5-minute take worked** (owner still to listen for clicks / grid). **Monitoring went silent after a
-  PATTERN take** (meters still moving; Monitor OFF → ON brought it back): not reproduced with the fake; build 496 sets the monitor
-  level outright (cancelScheduledValues + setValueAtTime, `rcdMonSet`) and restarts the native monitor's read point at every take's
-  start and end; monitor cushion 12 → 20 ms. **Measure ~200 ms explained** (reproduced with the fake): `mltOnset` took any input above
-  0.01 (hum, DC) as the click at the window's start (−120 ms), and the click skips the master's lookahead while MIDI waits for it
-  (`moFxLat`, ~64 ms by default). Build 496: onset must clear 6× the window's 30th-percentile floor; `moFxLat` subtracted; with the
-  native input a missing click falls back to the timestamps (`out.ts`). io-check has a fake gear (20 ms) for it. Owner: re-run
-  Measure on beta.6 (Gear delay set back first).
-- Kept takes go into the pad's SELECTED layer and RECENT (owner: "it looks like it saved only layer 2": asked).
-- Build 494: Measure… has its own Inputs list (owner: "Measure needs the ability to change inputs": it only listened on Record a
-  sample's pick, which was why it read ~200 ms).
-- Measure… (beta.4, native) set the Gear delay to ~200 ms: that is the clamp ceiling, so probably not a clean reading (most
-  likely the Inputs pair didn't hear both the click and the gear). OPEN, not blocking (owner, 7 Nov 21:33: may not get to
-  it soon; proceed without). When retested: get the whole result line (hits, spread, drift) and compare Engine Browser.
-- Retest on beta.5: prompts on opening (expect one per launch at most while unsigned), Record right after opening the
-  window, the 5-minute take (no "fell behind" toast), Measure….
+**1. OWNER'S TEST OF 1.3.0-beta.7 (build 496; waiting on the owner; the next session starts by asking for the results).**
+https://github.com/matthettich/thunder-plus/releases/tag/v1.3.0-beta.7. Record a sample → Engine Native unless it says otherwise.
+- [ ] **Microphone prompts.** Install beta.7, open Record a sample: one prompt at most (new ad-hoc signature), then none when the
+      window is opened again or the app restarted. If it still prompts several times: what does the prompt name (Thunder Plus or
+      a "Helper"), and is Thunder Plus listed in System Settings › Privacy & Security › Microphone?
+- [ ] **Record right after opening the window** (before the meters settle): no "wouldn't open: no answer".
+- [ ] **Monitoring after a PATTERN take.** Monitor ON, a PATTERN take, then a FREE take: the input is still heard after each,
+      without switching Monitor OFF → ON. Also: any dropouts in monitoring while the song plays?
+- [ ] **Measure…** (Settings › MIDI). First set the port's Gear delay back to its old value (or 0): beta.4 set it to ~200 ms,
+      which was a bug. Pick the pair the gear is on in Measure's new **Inputs** list; with the native input only the gear needs to
+      reach it. Send the whole result line (ms late / early, hits, spread, drift, "timed by the native input's timestamps" or
+      not). If the click is patched in too, it is used instead: a second run with Engine Browser (gear + click on IN 1+2) would
+      confirm both paths agree.
+- [ ] **Listen to the 5-minute take** (beta.5; kept in the pad's layer 3, also in File › Samples… › RECENT): no clicks or gaps,
+      and still on the grid at the end. Optionally 1–2 minutes through the 500R8 on an ADAT pair (load).
+- [ ] When convenient: unplug the 500R8 mid-take (the take so far is kept); run the 500R8 at 44.1 kHz with the app at 48 (the
+      window warns that the input is converted).
+→ Problems: fix on `io-helper`, run the checks (below), pre-release `1.3.0-beta.8` (Run workflow `desktop.yml`, ref
+  `io-helper`, `version`, `prerelease: true`); in the macOS job log confirm both "thunder_io.node built" and "adhoc-sign: signed"
+  (both steps can fail without failing the build).
 
-**1a. (was) Owner's test of beta.4.** With Record a sample
-→ Engine Native:
-- [ ] Opening the window: the interface is NOT reset, one microphone prompt at most, the meters move before Record.
-- [ ] An ADAT input (e.g. IN 12) and a pair (IN 17+18) record what was picked; the Inputs list stays on the pick.
-- [ ] PATTERN takes start on the beat; Extra latency's line shows "… ms interface latency included" (if takes are still
-      off by a constant amount, note it: CoreAudio's reported latency may not be the whole story for the 500R8).
-- [ ] Discard and record works; takes in two layers of one pad are different (the old "same sample" report is believed to
-      be the stalled-input bug).
-- [ ] A 5-minute take (the built-in mic is fine: tests drift), plus 1–2 minutes through the 500R8 with its 28 channels (tests
-      load): no clicks, still on the grid at the end.
-- [ ] Monitoring through the app: usable? (expected ~50–80 ms late; the interface's own monitoring is the fallback).
-- [ ] Measure… (Settings › MIDI) through the native input.
-- [ ] When convenient: unplug mid-take (the take so far is kept); the rate warning (500R8 at another rate than the app).
-→ Problems: fix on `io-helper`, run the checks (below), pre-release `1.3.0-beta.5` (Run workflow `desktop.yml`, ref
-  `io-helper`, `version`, `prerelease: true`), and confirm in the macOS job log that "thunder_io.node built" appears (the step
-  is continue-on-error: a compile error ships an app without the helper).
+**1b. Already confirmed by the owner (beta.4 / beta.5, 7 Nov).** ADAT input (IN 12) and a pair (IN 17+18) in PATTERN, inputs stay
+on the pick, takes on the beat; Discard and record; two layers of one pad differ; monitoring usable; a 5-minute take recorded
+without errors (not yet listened to). Kept takes go into the pad's SELECTED layer (the owner's 5-minute take: layer 3) and RECENT:
+not a bug.
+
+**1c. What tonight's tests found and how each was fixed (builds 493–496).**
+- 4–8, then 6 microphone prompts on opening: (a) the window's meter open (fillIn, not awaited) and Record's open ran at once,
+  and the STALE rule (no audio for 1 s → reopen) reopened an input still waiting on macOS's prompt; fix (493): `rcdOpen` is
+  single-flight (`rcdOpening`), STALE only after audio has come (`io.got`) and 2 s without it. (b) The Mac app was fully unsigned
+  (CSC_IDENTITY_AUTO_DISCOVERY false): macOS can't keep a grant for it. `build.mac.identity: "-"` (495) was SKIPPED by
+  electron-builder 26 ("no valid identity"), so beta.6 is unsigned too; 496: `electron/scripts/adhoc-sign.js` (afterPack:
+  `codesign --force --deep --sign -` on the merged universal app only, then `--verify`), `hardenedRuntime: false` (hardened runtime
+  would need JIT / library-validation entitlements for the .node addons). One prompt per update (each build's code hash differs)
+  until a Developer ID. The updater downloads the .dmg itself (no Squirrel), so signing doesn't touch updates.
+- "500R8 wouldn't open: no answer": the open gave up at 5 s while macOS's prompt was up; now waits 30 s (a toast after 2.5 s
+  says to allow the microphone) and closes the device if it timed out (493).
+- "The input fell behind for a moment" mid-take: D was output latency + 40 ms; now + 120 ms (cap 500 ms, +50 ms steps between
+  takes). D costs the take nothing (rcdLat = D), only a little more wait after a PATTERN take ends (493).
+- Monitoring silent after a PATTERN take (meters moving; Monitor OFF → ON fixed it): not reproduced with the fake; `rcdMonSet`
+  sets the monitor level outright (cancelScheduledValues + setValueAtTime) and restarts the native monitor's read point at every
+  take's start and end; monitor cushion 12 → 20 ms (496). If it still happens, the cause is elsewhere: look at what changes when
+  the song stops after a PATTERN take.
+- Measure… read ~200 ms (reproduced with the fake: 194–232 ms for a gear 20 ms late): `mltOnset` took any input above 0.01 (hum,
+  DC) as the click, at the window's start (−120 ms), and the click skips the master's lookahead while MIDI waits for it
+  (`moFxLat`, ~64 ms by default). Fix (496): the onset must clear 6× the window's 30th-percentile level; `moFxLat` is subtracted;
+  with the native input a missing click falls back to the timestamps (`out.ts`). Measure has its own Inputs list (494: it only
+  listened on Record a sample's pick). io-check has a fake gear (20 ms late) for it; the fake's own timing jitter gives ±10 ms.
 
 **2. CodeRabbit on the newest commits.** Its last review (02:54 UTC) covered A1 up to build 489; A2 (build 491) and the build-492
 fix were pushed after it. Ask with a PR comment `@coderabbitai review` (REST: `gh api -X POST repos/matthettich/thunder-plus/
@@ -400,7 +399,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
   change it needs.
 - Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
-- **Native I/O helper** (7 Nov): A0 done on the 500R8; A1 + part of A2 built (1.3.0-beta.4), waiting for the owner's test: "PICK UP HERE: EVERYTHING STILL NEEDED" in the START HERE brief.
+- **Native I/O helper** (7 Nov): A0 done on the 500R8; A1 + part of A2 built (1.3.0-beta.7), waiting for the owner's test: "PICK UP HERE: EVERYTHING STILL NEEDED" in the START HERE brief.
   Was: the brief is "Build the native I/O helper — START HERE" near the top of this file; design in `docs/NATIVE-IO-HELPER-PLAN.md`: phase A every input channel in Record a
   sample (the owner's interface has no mixer, so inputs 3+ can't be routed to 1/2), B MIDI out / in, C output only if needed.
   Owner answered its section 9 on 7 Nov (recorded there and in the brief).
