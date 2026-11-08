@@ -81,6 +81,38 @@ review`: it skips PRs not aimed at main); its two findings fixed. **Owner feedba
 and inputs are separated": move INPUT ENGINE (Auto / Browser) into Record a sample beside Input / Inputs (the Input list
 shows "500R8 (native, 28 inputs)", Inputs lists every channel and pair from it), and take the row out of Settings › Audio.
 
+**A1 BUILT, waiting for the owner's test (7 Nov, evening; branch `io-helper`, PR #14, desktop pre-release 1.3.0-beta.2, build 489).**
+Tasks A1.1–A1.4 done; A1.5 (owner on the 500R8) is next. What's where:
+- **A1.1 addon capture** (lead): `io/src/ring.h` (SPSC sample ring + block-header ring; a callback goes in whole or is dropped
+  and counted, so a drop is an exact gap at its true device frame); `thunder_io.cc` `openInput(id, {rate, block, backend})`
+  (every channel, float32, interleaved, miniaudio resamples to the page's rate and never changes the device's own rate),
+  `read()` (one contiguous run per call), `closeInput()`. **Frame times:** the stream's frame-0 time on the OS clock is a lower
+  envelope of callback time (`start = min(start + 100 ppm of elapsed, now - frames/rate)`): late callbacks can't push it, crystal
+  drift can. `latencyFrames` is only what miniaudio knows (period x periods); driver / converter latency is left to Measure….
+  Tests: `io/test/ring-test.cc` (real producer thread, TSan clean, 3M frames), `io/test/input.js` (null backend, real time),
+  both run by `tests/io-native.test.js`; `io/build.js` smoke-opens the null input.
+- **A1.2 helper** (delegated): `open` / `close` / `now` ops, 5 ms poll, up to 8 reads a tick, chunks transferred; `shutdown()` on
+  a new port and on exit. Tests in `tests/io.test.js`.
+- **A1.3 worklet** (lead): `IOIN_WORKLET` in index.html. The page's clock means "when heard" (`p2a`), so a frame that reached the
+  computer at OS time P belongs to song time `p2a(P)`; the worklet plays it at `p2a(P) + D`, and on this path `rcdLat()` is `D`
+  (+ Extra latency). `D` = base + output latency + 40 ms, raised 20 ms (max 250 ms) between takes when chunks arrive late.
+  **Takes stay whole:** the anchor (audio frame - input frame) is re-set when the timestamps disagree by > 1 ms between takes,
+  > 20 ms during one (`rcdGo` tells it). Monitor = the worklet's second output, ~12 ms cushion, nudged a frame for drift.
+  Clock line-up: `iohClock()` (8 `now` pings, shortest round trip), re-done every 10 s between takes; `mapUpd()` every 500 ms.
+  Tests: `tests/io-worklet.test.js` runs the real worklet source frame by frame (exact placement, drift held in a take, gaps,
+  late count, monitor).
+- **A1.4 Record a sample** (delegated, line-reviewed): Engine Native / Browser row (desktop only; owner: engine and inputs
+  belonged together), Input lists the helper's devices ("500R8 (native, 28 inputs)", `rcdSet.ioDev`), Inputs every pair and
+  channel; Settings › Audio's row removed. `tools/io-check.mjs` drives it with a fake helper streaming 28 channels and checks
+  a FREE take on IN 17+18 comes back as channels 17 and 18.
+- **Owner's test for A1.5:** an ADAT input (e.g. 12) and a pair (17+18) in PATTERN sync against the click; Measure… through the
+  native input; a 5-minute take (no clicks, still on the grid at the end); monitoring latency acceptable? If PATTERN takes are
+  consistently early or late by a few ms, that is the interface's converter latency: set it once as Extra latency (or we
+  read it from CoreAudio's kAudioDevicePropertyLatency + safety offset in A2).
+- **Known limits:** monitoring through the app is ~D + output latency late (use the interface's own monitoring when tracking);
+  the device must run at the app's rate for zero resampling (miniaudio converts otherwise: A2 to warn); Windows / Linux untested.
+- **Next:** A2 (unplug mid-take keeps the take; rate mismatch warning; Windows WASAPI; CoreAudio input latency), then B (MIDI).
+
 **Settled 7 Nov (build 485):** MIDI was early by the reported base + output latency on the Mac; `mapUpd` now floors the
 clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure… once the helper's MIDI (B) lands.
 
@@ -245,7 +277,8 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
   change it needs.
 - Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
-- **Native I/O helper, wanted soon** (7 Nov): the brief is "Build the native I/O helper — START HERE" near the top of this file; design in `docs/NATIVE-IO-HELPER-PLAN.md`: phase A every input channel in Record a
+- **Native I/O helper** (7 Nov): A0 done on the 500R8; A1 built (1.3.0-beta.2), waiting for the owner's test (see the START HERE brief).
+  Was: the brief is "Build the native I/O helper — START HERE" near the top of this file; design in `docs/NATIVE-IO-HELPER-PLAN.md`: phase A every input channel in Record a
   sample (the owner's interface has no mixer, so inputs 3+ can't be routed to 1/2), B MIDI out / in, C output only if needed.
   Owner answered its section 9 on 7 Nov (recorded there and in the brief).
 - **A more stable desktop app, when the owner wants one** (7 Nov): `docs/NATIVE-DESKTOP-PLAN.md` section 14 lists which of
@@ -254,6 +287,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+
+## 7 Nov (18): native helper A0 and A1 (branch io-helper, PR #14; desktop pre-releases 1.3.0-beta.1 / beta.2)
+
+- A0: the addon, helper process, CI step; owner confirmed "native (500R8, 28 inputs)" on beta.1. CodeRabbit: had to be asked
+  with `@coderabbitai review` (it skips PRs into `beta`); its two findings fixed (a failed build ships no addon; README).
+- A1: capture, streaming, the timestamp worklet and Record a sample's Engine / Input / Inputs: details in the START HERE brief.
+- `beta` (487–488) merged into `io-helper` first so they don't drift; PR #14 still to be merged into `beta` after the owner's test.
 
 ## 7 Nov (17): punch list: FOLLOW PATTERN, one wheel direction (builds 487–488, beta; not in a desktop build yet)
 
