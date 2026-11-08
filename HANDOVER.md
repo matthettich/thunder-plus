@@ -127,6 +127,9 @@ transfer an ArrayBuffer). Desktop pre-release **1.3.0-beta.4** (build 492) is ou
   waits 30 s (a toast after 2.5 s says to allow the microphone) and closes the device if it timed out.
 - "The input fell behind for a moment" during a PATTERN take: D was output latency + 40 ms; now + 120 ms (cap 500 ms, +50 ms
   steps between takes). D costs the take nothing (rcdLat = D), only a little more wait after a PATTERN take ends.
+- Measure… (beta.4, native) set the Gear delay to ~200 ms: that is the clamp ceiling, so probably not a clean reading (most
+  likely the Inputs pair didn't hear both the click and the gear). OPEN, not blocking (owner, 7 Nov 21:33: may not get to
+  it soon; proceed without). When retested: get the whole result line (hits, spread, drift) and compare Engine Browser.
 - Retest on beta.5: prompts on opening (expect one per launch at most while unsigned), Record right after opening the
   window, the 5-minute take (no "fell behind" toast), Measure….
 
