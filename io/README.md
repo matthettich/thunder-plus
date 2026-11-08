@@ -16,7 +16,7 @@ app build, with `continue-on-error`: a failure here never stops a release, the a
 
 ```js
 const io = require('electron/io/thunder_io.node');
-io.version();                    // "thunder_io 3 / miniaudio 0.11.26"
+io.version();                    // "thunder_io 4 / miniaudio 0.11.26 / libremidi"
 io.now();                        // Number: the OS clock in ns (macOS mach_absolute_time, Windows QueryPerformanceCounter,
                                  // else CLOCK_MONOTONIC): the clock the audio callback's timestamps will use
 io.devices();                    // every input and output device, real backends (CoreAudio / WASAPI / ALSA / Pulse ...)
@@ -50,3 +50,24 @@ io.read()                          // → null | {frame0, hostNs, channels, fram
 io.inputLost()                     // → true when the device stopped by itself (unplugged)
 io.closeInput()                    // stops and frees it (safe when nothing is open)
 ```
+
+MIDI (phase B, `src/midi.cc`, libremidi: CoreMIDI on macOS, WinMM on Windows, ALSA on Linux when its headers were there at
+build time, else no ports):
+
+```js
+io.midiPorts()                   // → {outs:[{id, name}], ins:[{id, name}]}; id = the port's name (" #2"… when two share one)
+io.midiOpenOut(id)               // → {ok, port} | {ok:false, why}
+io.midiOpenIn(id)                // → {ok, port} | {ok:false, why}; its messages come back from midiRead()
+io.midiSend(port, bytes, atNs)   // → true | false; bytes: Uint8Array or [numbers]; atNs on now()'s clock (0 or past: now)
+io.midiClear(port)               // → how many queued messages were dropped (port 0: every port). STOP.
+io.midiClose(port)               // an output (its queue dropped) or an input
+io.midiRead()                    // → null | [{port, bytes, ns}]: what came in since the last call, ns = when it arrived
+io.midiStats()                   // → {queued, late}: waiting now, sent more than 2 ms late since loading
+```
+
+One sender thread for every output, at the OS's highest normal priority (macOS QoS user-interactive; Windows time-critical
+with a 1 ms timer): it sleeps until 0.5 ms before a message's time and spins the rest. Messages for the same time keep their
+order. `test:loop` (listed when `THUNDER_IO_TEST` is set; always openable) is an output whose messages come back from
+`midiRead()` as input `test:loop`, stamped with when they went out: `io/test/midi.js` checks the timing, order, clear and close
+with no MIDI hardware. libremidi needs C++20 and exceptions (`binding.gyp`); every call into it is inside a try.
+

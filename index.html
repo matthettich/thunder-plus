@@ -2742,6 +2742,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="bar"><span class="ttl">MIDI</span><span class="lbl" id="midiStat">Not connected</span></div>
     <div class="pbody">
       <div class="audrow" title="Plug a controller in (USB-C on the phone) and connect: pads 00–07 answer notes 36–43, other notes play the selected synth"><span>Connect</span><button id="bMidiOn">Connect MIDI</button></div>
+      <div class="segrow" id="midiEngRow" hidden title="Native: the desktop app sends MIDI itself, each message at its exact time, and STOP takes back notes booked ahead. Browser: the browser’s Web MIDI, as on the website"><span>Engine</span><div class="seg" id="segMidiEng"></div></div>
       <h3>Input</h3>
       <div class="audrow" title="Which input and channel play notes and knobs. The others are ignored, so gear that sends its own notes or echoes ours can’t play the pads"><span>Notes in</span><select id="midiInSel" aria-label="Which MIDI input plays notes"><option value="">Every input</option></select><select id="midiInCh" class="mch" aria-label="Which channel plays notes"></select></div>
       <div class="audrow" title="In the tracker a keyboard plays the instrument you’re on (a MIDI instrument plays its gear, with bend, mod wheel, aftertouch and sustain passed through); or the pads, as on the Synth page"><span>Keys play</span><select id="midiKeysSel" aria-label="What a MIDI keyboard plays in the tracker"><option value="1" title="The instrument you are on: its pad, or its MIDI gear">Current instrument</option><option value="0" title="Pads on notes 36–43, the selected synth on the rest">Pads + selected synth</option></select></div>
@@ -8121,7 +8122,7 @@ const Lc = () => V().layers[V().sel];
 // Output device, level, latency and sample rate. Latency and rate are fixed when the AudioContext is made,
 // so changing them asks for a restart; the output device and level change live.
 const AUK = 'thunderplus-audio-v1';
-const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false, core:'core', link:false, linkSync:true, inEngine:'auto'};   // link, linkSync: ABLETON LINK (desktop app), off by default   // core: THUNDER CORE, 'core' (default from build 362, owner) or 'page' (the old pump)   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
+const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false, core:'core', link:false, linkSync:true, inEngine:'auto', midiEngine:'native'};   // midiEngine: NATIVE MIDI (desktop app, helper phase B), 'native' or 'browser' (Web MIDI)   // link, linkSync: ABLETON LINK (desktop app), off by default   // core: THUNDER CORE, 'core' (default from build 362, owner) or 'page' (the old pump)   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
   try { const o = JSON.parse(localStorage.getItem(AUK) || '{}'); return Object.assign(d, o && typeof o === 'object' ? o : {}); } catch(e){ return d; } })();
 // Latency: what the person picked, else Balanced in the Mobile setup (phones click at Lowest when busy) and Lowest on desktop.
 // The desktop app starts on Balanced too (owner, 31 Oct: playback stuttered in the desktop app and not in the browser on the
@@ -15381,7 +15382,7 @@ const NPORT = 4, PORTL = 'ABCD';
 // input Clock in follows ('' = the first one heard, kept until it goes quiet); keys: what a keyboard plays in the tracker
 // (1 the current instrument, 0 the pads as before); lats: Gear delay per output port (ms; lat was one for all of them).
 const midi = {on:false, learn:false, target:-1, ccTarget:'', notes:DEFNOTES.slice(), cc:{}, vel:true, access:null,
-  outIds:new Array(NPORT).fill(''), clk:new Array(NPORT).fill(false), clkIn:false, lat:0, lats:new Array(NPORT).fill(0), inId:'', inCh:-1, clkId:'', keys:1};
+  outIds:new Array(NPORT).fill(''), clk:new Array(NPORT).fill(false), clkIn:false, lat:0, lats:new Array(NPORT).fill(0), inId:'', inCh:-1, clkId:'', keys:1, names:{}};   // names: a Web MIDI port id → its name (NATIVE MIDI maps saved choices by name)
 const mLatOf = p => midi.lats[p | 0] || 0;
 try { const m = JSON.parse(localStorage.getItem(MKEY) || 'null');
   if (m && Array.isArray(m.notes)){ midi.notes = Array.from({length:Math.min(MAXSLOT, Math.max(16, m.notes.length))}, (_, i) => Number.isInteger(m.notes[i]) ? m.notes[i] : i < 16 ? DEFNOTES[i] : -1); midi.vel = m.vel !== false; midi.want = !!m.want; }
@@ -15395,13 +15396,14 @@ try { const m = JSON.parse(localStorage.getItem(MKEY) || 'null');
     midi.lats = midi.lats.map((_, p) => Math.max(-50, Math.min(200, Array.isArray(m.lats) && Number.isFinite(+m.lats[p]) ? +m.lats[p] : midi.lat)));
     if (typeof m.inId === 'string') midi.inId = m.inId; if (Number.isInteger(m.inCh)) midi.inCh = Math.max(-1, Math.min(15, m.inCh));
     if (typeof m.clkId === 'string') midi.clkId = m.clkId;
+    if (m.names && typeof m.names === 'object') for (const k in m.names) if (typeof m.names[k] === 'string') midi.names[k] = m.names[k];
     // Keys play: the current instrument by default; someone who learned pads to their own notes keeps playing the pads.
     if (m.keys === 0 || m.keys === 1) midi.keys = m.keys; else if (midi.notes.some((v, i) => v !== (i < 16 ? DEFNOTES[i] : -1))) midi.keys = 0;
   }
 } catch(e){}
 // outId / clkOut (port A) and lat (port A's delay) are still written for an older copy of the app on this device.
 const saveMidi = () => { try { localStorage.setItem(MKEY, JSON.stringify({notes:midi.notes, cc:midi.cc, vel:midi.vel, want:midi.on, outIds:midi.outIds, clk:midi.clk,
-  outId:midi.outIds[0], clkOut:midi.clk[0], clkIn:midi.clkIn, lat:midi.lats[0], lats:midi.lats, inId:midi.inId, inCh:midi.inCh, clkId:midi.clkId, keys:midi.keys})); } catch(e){} };
+  outId:midi.outIds[0], clkOut:midi.clk[0], clkIn:midi.clkIn, lat:midi.lats[0], lats:midi.lats, inId:midi.inId, inCh:midi.inCh, clkId:midi.clkId, keys:midi.keys, names:midi.names})); } catch(e){} };
 function midiStatus(msg){ $('midiStat').textContent = msg; }
 const ccName = k => { const [ch, n] = k.split(':'); return 'CC ' + n + (+ch ? ' ch ' + (+ch + 1) : ''); };
 const rowLabel = id => { const e = document.getElementById(id), r = e && e.closest('.row'), l = r && r.querySelector('label'); return l ? l.textContent : id; };
@@ -15559,7 +15561,7 @@ function kbPass(ty, d1, d2){
 function hookInputs(){
   let n = 0; midi.access.inputs.forEach(inp => { inp.onmidimessage = e => onMidi(e, inp.id); n++; });
   moPorts(); miPorts();
-  midiStatus(n ? `${n} controller${n > 1 ? 's' : ''} connected` : 'No controller found. Plug one in.');
+  midiStatus((n ? `${n} controller${n > 1 ? 's' : ''} connected` : 'No controller found. Plug one in.') + (midi.access.native ? ' · native' : ''));
 }
 // Settings → MIDI: Notes in (input and channel) and Clock from. A saved input that isn't plugged in now stays picked.
 function miPorts(){
@@ -15572,12 +15574,20 @@ function miPorts(){
   if (ch) ch.value = String(midi.inCh);
   const ks = $('midiKeysSel'); if (ks) ks.value = String(midi.keys);
 }
-async function connectMidi(){
+let midiConnecting = null;
+function connectMidi(){ if (!midiConnecting) midiConnecting = connectMidi1().finally(() => { midiConnecting = null; }); return midiConnecting; }
+async function connectMidi1(){
   if (midi.access){ hookInputs(); return; }
+  // NATIVE MIDI (desktop app, Settings › MIDI › Engine Native): the helper's ports, notes sent at their exact time from its own
+  // thread and taken back on STOP; Web MIDI when the helper or its MIDI isn't there
+  if (nmWanted()){ const acc = await nmConnect();
+    if (acc){ await midiRemap(acc); midi.access = acc; midi.on = true; saveMidi(); hookInputs(); renderPads();
+      $('bMidiOn').textContent = 'Connected'; $('bMidiOn').classList.add('on'); acc.onstatechange = hookInputs; return; }
+    tpLog('native MIDI', IOH.why || (IOH.state === 'ready' ? 'this helper has no MIDI' : 'helper not available')); }
   if (!navigator.requestMIDIAccess){ midiStatus(inAI ? 'MIDI is blocked inside AI. Use the installed app.' : 'This browser has no MIDI support.'); return; }
   try {
-    midi.access = await navigator.requestMIDIAccess();
-    midi.on = true; saveMidi(); hookInputs(); renderPads();
+    const acc = await navigator.requestMIDIAccess(); midiNames(acc); await midiRemap(acc);
+    midi.access = acc; midi.on = true; saveMidi(); hookInputs(); renderPads();
     $('bMidiOn').textContent = 'Connected'; $('bMidiOn').classList.add('on');
     midi.access.onstatechange = hookInputs;
   } catch(err){ midiStatus(inAI ? 'MIDI is blocked inside AI. Use the installed app.' : 'MIDI permission was refused. Allow it for this site in Chrome.'); }
@@ -15611,7 +15621,7 @@ $('bMidiReset').addEventListener('click', async () => {
   midi.notes = DEFNOTES.slice(); midi.cc = {}; saveMidi(); renderPads(); ccBadges(); midiStatus('Pads reset to notes 36–43; knobs forgotten.');
 });
 makeCk($('ckVel'), () => midi.vel, v => { midi.vel = v; saveMidi(); });
-if (midi.want && navigator.requestMIDIAccess) connectMidi();
+if (midi.want && (navigator.requestMIDIAccess || window.thunderDesktop)) setTimeout(() => connectMidi(), 0);   // (after the whole script: NATIVE MIDI needs the helper's code below)
 setTimeout(() => { try { songBeatsSoon(1); } catch(e){} }, 4000);   // song positions ready before the first PLAY, with clock on
 
 /* ---------- MIDI out and MIDI clock ---------- */
@@ -15677,7 +15687,7 @@ const p2a = p => (p - (amap.off == null ? mapUpd() : amap.off)) / 1000;
 function msend(bytes, t, early, p){
   const o = midiOut(p); if (!o || !ctx) return;
   const at = t == null ? 0 : a2p(t + moFxLat()) - (early ? mLatOf(p) : 0), now = performance.now();
-  if (at - now > MOB_AHEAD && !document.hidden) return mobPut(o, bytes, at);
+  if (!o.native && at - now > MOB_AHEAD && !document.hidden) return mobPut(o, bytes, at);   // (NATIVE MIDI: the helper's queue is cleared on STOP itself)
   try { o.send(bytes, Math.max(now, at)); } catch(e){}
 }
 /* FX LATENCY (owner, 7 Nov: MIDI early; "midi and audio seem to align if I move the synth/audio up two lines"). Everything
@@ -16253,9 +16263,10 @@ function iohPort(p){
     const m = ev.data; if (!m || typeof m !== 'object') return;
     if (m.op === 'hello'){
       clearTimeout(iohHelloT);
-      if (m.available){ IOH.state = 'ready'; IOH.version = String(m.version || ''); IOH.why = ''; iohUi(); iohDevices().then(iohUi); }
+      if (m.available){ IOH.state = 'ready'; IOH.version = String(m.version || ''); IOH.why = ''; IOH.midi = !!m.midi; iohUi(); iohDevices().then(iohUi); }
       else { IOH.state = 'unavailable'; IOH.why = String(m.why || 'unknown'); IOH.devices = []; iohUi(); }
     } else if (m.op === 'in'){ if (IOH.onIn) IOH.onIn(m); }   // NATIVE INPUT (A1.3): a chunk of every input channel
+    else if (m.op === 'midiIn'){ if (IOH.onMidi) IOH.onMidi(m.list); }   // NATIVE MIDI (B): what came in since the last batch
     else if (m.id != null && iohPend.has(m.id)){ const r = iohPend.get(m.id); iohPend.delete(m.id); r(m); }
     else if (m.op === 'closed' || m.op === 'error'){ if (IOH.onGone) IOH.onGone(m.why || 'the input stopped'); }   // the device went away
   };
@@ -16284,6 +16295,79 @@ async function iohStart(){
   })();
   return iohGo;
 }
+
+/* ===== NATIVE MIDI (helper phase B; plan §3.3, §4): the helper's MIDI ports, looking like Web MIDI's access to the rest =====
+   midi.access becomes {native:true, outputs, inputs, onstatechange}: an output's send(bytes, timeStamp) books the message for
+   that performance.now() moment on the helper's sender thread (its OS clock: IOH.clk), clear() drops what it still has queued
+   (moRelease on STOP), so msend skips the OUTBOX; an input's onmidimessage gets {data, timeStamp} with the time the helper
+   stamped on arrival. Ids are 'n:' + the port's name; saved Web MIDI choices are mapped by name (midiRemap), and back.
+   Ports are looked at again every 3 s (plugged in or out: onstatechange, as Web MIDI). No microphone is asked for. */
+const NM = {acc:null, byPort:new Map(), scanT:0, clkT:0};
+const nmWanted = () => !!IOAPI && aset.midiEngine !== 'browser';
+const nmPost = m => { try { if (IOH.port) IOH.port.postMessage(m); } catch(e){} };
+const nmNs = ms => Math.max(0, (ms - IOH.clk) * 1e6);   // performance.now() (ms) → the helper's OS clock (ns)
+async function nmConnect(){
+  if (NM.acc) return NM.acc;
+  iohStart(); const t0 = performance.now();
+  while (IOH.state === 'starting' || IOH.state === 'off'){ if (performance.now() - t0 > 3000) break; await new Promise(r => setTimeout(r, 30)); }
+  if (IOH.state !== 'ready' || !IOH.midi || !(await iohClock())) return null;
+  const acc = {native:true, outputs:new Map(), inputs:new Map(), onstatechange:null};
+  NM.acc = acc; NM.byPort.clear();
+  IOH.onMidi = list => { for (const m of list){ const inp = NM.byPort.get(m.port);
+    if (inp && inp.onmidimessage) try { inp.onmidimessage({data:Uint8Array.from(m.bytes), timeStamp:m.ns / 1e6 + IOH.clk}); } catch(e){ tpLog('MIDI in', e); } } };
+  await nmScan(true);
+  NM.scanT = setInterval(nmScan, 3000);
+  NM.clkT = setInterval(() => { IOH.clkT = 0; iohClock(); }, 15000);   // the two clocks, measured again now and then
+  return acc;
+}
+async function nmScan(first){
+  const acc = NM.acc; if (!acc) return;
+  const r = await iohAsk({op:'midiPorts'}); if (!r || r.op !== 'midiPorts' || NM.acc !== acc) return;
+  let ch = false;
+  const sync = (map, list, open) => { const want = new Set(list.map(p => 'n:' + p.id)), jobs = [];
+    for (const [id, x] of map) if (!want.has(id)){ nmPost({op:'midiClose', port:x.port}); map.delete(id); NM.byPort.delete(x.port); ch = true; }
+    for (const p of list){ const id = 'n:' + p.id; if (map.has(id)) continue;
+      jobs.push(iohAsk({op:open, name:p.id}).then(o => { if (!o || !o.ok || NM.acc !== acc) return; map.set(id, nmPort(id, p.name, o.port, open === 'midiOpenOut')); ch = true; })); }
+    return Promise.all(jobs); };
+  await sync(acc.outputs, r.outs || [], 'midiOpenOut'); await sync(acc.inputs, r.ins || [], 'midiOpenIn');
+  if (ch && !first && acc.onstatechange) try { acc.onstatechange(); } catch(e){}
+}
+function nmPort(id, name, port, out){
+  if (out) return {id, name, port, native:true, type:'output',
+    send(b, ts){ nmPost({op:'midiSend', port, bytes:Array.from(b), at:ts ? nmNs(ts) : 0}); },
+    clear(){ nmPost({op:'midiClear', port}); }};
+  const inp = {id, name, port, native:true, type:'input', onmidimessage:null}; NM.byPort.set(port, inp); return inp;
+}
+function nmClose(){ const acc = NM.acc; if (!acc) return; NM.acc = null; clearInterval(NM.scanT); clearInterval(NM.clkT); IOH.onMidi = null;
+  nmPost({op:'midiClear', port:0}); for (const m of [acc.outputs, acc.inputs]) for (const x of m.values()) nmPost({op:'midiClose', port:x.port});
+  NM.byPort.clear(); }
+// Saved port choices (Settings › MIDI › Ports, Notes in, Clock from) in the other engine's ids, mapped by name: Web MIDI ids by
+// the names remembered for them (midi.names; read from Web MIDI once when missing), native ids by their own name
+function midiNames(acc){ try { acc.outputs.forEach(o => { midi.names[o.id] = o.name || ''; }); acc.inputs.forEach(i => { midi.names[i.id] = i.name || ''; }); } catch(e){} }
+async function midiRemap(acc){
+  const nat = !!acc.native, foreign = id => id && (nat ? !id.startsWith('n:') : id.startsWith('n:'));
+  const ids = [...midi.outIds, midi.inId, midi.clkId].filter(foreign); if (!ids.length) return;
+  if (nat && ids.some(id => !midi.names[id]) && navigator.requestMIDIAccess){ try { midiNames(await navigator.requestMIDIAccess()); } catch(e){} }
+  const nameOf = id => id.startsWith('n:') ? id.slice(2).replace(/ #\d+$/, '') : (midi.names[id] || '');
+  const find = (map, id) => { const nm = nameOf(id); if (!nm) return id; let hit = '';
+    map.forEach((x, k) => { if (!hit && (x.name || '') === nm) hit = k; });
+    if (!hit){ const l = nm.toLowerCase(); map.forEach((x, k) => { const xl = (x.name || '').toLowerCase(); if (!hit && xl && (xl.includes(l) || l.includes(xl))) hit = k; }); }
+    return hit || id; };   // (not there now: the choice stays, shown as "(not connected)")
+  midi.outIds = midi.outIds.map(id => foreign(id) ? find(acc.outputs, id) : id);
+  if (foreign(midi.inId)) midi.inId = find(acc.inputs, midi.inId);
+  if (foreign(midi.clkId)) midi.clkId = find(acc.inputs, midi.clkId);
+  saveMidi();
+}
+// Settings › MIDI › Engine changed: the old access goes (its inputs fall silent, queued notes are dropped), the new one connects
+function midiEngineSet(v){
+  aset.midiEngine = v === 'browser' ? 'browser' : 'native'; asetSave();
+  try { moRelease(); } catch(e){}
+  const a = midi.access; midi.access = null;
+  if (a){ try { a.onstatechange = null; a.inputs.forEach(i => { i.onmidimessage = null; }); } catch(e){} if (a.native) nmClose(); }
+  if (midi.on || midi.want) connectMidi(); else { moPorts(); miPorts(); }
+}
+if (IOAPI && $('segMidiEng')){ $('midiEngRow').hidden = false;
+  makeSeg($('segMidiEng'), [['native', 'Native'], ['browser', 'Browser']], () => aset.midiEngine === 'browser' ? 'browser' : 'native', midiEngineSet); }
 
 /* ===== NATIVE INPUT (A1.3; plan §3.3, §4): every input of the interface, placed on the audio clock =====
    The helper streams chunks of every channel with the OS time each first frame reached the computer (hostNs). The page's
@@ -16351,6 +16435,8 @@ async function rcdOpenIo(rec, mon){
   let lab = ''; try { const L = await rcdInputs(), b = L.find(x => x.deviceId === rcdSet.input); lab = (b && b.label) || ''; } catch(e){}
   const dev = iohInDev(lab); if (!dev){ RCD.ioWhy = 'no input device found'; return false; }
   if (!(await iohClock())){ RCD.ioWhy = 'the helper didn’t answer'; return false; }
+  // THE MICROPHONE IS ASKED FOR HERE (phase B): the helper also starts for MIDI alone, which mustn't ask for it
+  if (IOAPI.mic){ let r = null; try { r = await IOAPI.mic(); } catch(e){} if (r && r.ok === false){ RCD.ioWhy = String(r.why || 'no microphone access'); return false; } }
   // OPENING WAITS FOR macOS (beta.4: "no answer"): starting the device can sit on the microphone prompt; 5 s gave up under it
   const slow = setTimeout(() => toast('Opening ' + dev.name + '… if macOS asks for the microphone, allow it.', 6000), 2500);
   const o = await iohAsk({op:'open', dev:dev.inId, rate:ctx.sampleRate, block:0}, 30000); clearTimeout(slow);
@@ -22606,7 +22692,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 497;
+const BUILD = 498;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31573,6 +31659,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [498, '7 Nov', ['Desktop app: MIDI through the app itself (Settings › MIDI › Engine: Native, the default; Browser is the old Web MIDI). Each message leaves at its exact time from the app’s own high-priority thread, STOP takes back notes booked ahead, and MIDI clock in is timed where it arrived. Your port choices carry over by name. Connecting MIDI no longer asks for the microphone.', 'Windows desktop builds include Ableton Link and the native input again.']],
   [497, '7 Nov', ['Settings › MIDI › Measure… run from Settings (Record a sample closed) with the native input: it looked for the click in the wrong place and couldn’t time the gear without the click (a third cause of the ~200 ms reading).']],
   [496, '7 Nov', ['Settings › MIDI › Measure…: a noisy input is no longer mistaken for the click (that read about 200 ms), the master effects’ lookahead is no longer counted as the gear’s, and with the desktop app’s native input only the gear needs to reach the input. Record a sample: monitoring no longer goes silent after a PATTERN take (its level is set again at every take’s start and end); Measure… really mutes monitoring while it measures; the native monitor has a little more cushion against dropouts.']],
   [495, '7 Nov', ['Mac app: signed ad hoc (still no Apple certificate), so macOS sees one app and asks for the microphone once instead of once per part of the app.']],

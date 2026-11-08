@@ -111,7 +111,7 @@ installation" (the step is continue-on-error, so Windows builds ship without the
 
 **PICK UP HERE: EVERYTHING STILL NEEDED (updated 7 Nov 22:25).** Read this list first; the paragraphs below it are the detail.
 
-*State now:* branch `io-helper` (build 496 = desktop pre-release **1.3.0-beta.7**, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
+*State now:* branch `io-helper` (build 498: phase B MIDI built, item 5; desktop pre-release **1.3.0-beta.8**. beta.7 = 496, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
 CodeRabbit fix that was the real cause of the beta.2/3 failures (the helper died on the first chunk: MessagePortMain can't
 transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner tests beta.7 when convenient (item 1). PR #14
 (`io-helper` → `beta`) is open. `beta` is at build 488 plus a CLAUDE.md line ("continue the helper"); `main` is at build 485
@@ -191,11 +191,41 @@ on `beta` and in the helper betas but in no normal desktop release yet.
       no ASIO: owner's decision).
 - [ ] Linux: builds; untested on hardware (low priority).
 
-**5. Phase B: MIDI through the helper** (plan §5 item 4; after A is merged). libremidi out / in, `midiSend(port, bytes, atNs)`
-on a high-priority thread, `midiClear` on STOP (OUTBOX unneeded on that path), `msend` and clock-in on the helper when present,
-Settings › MIDI lists the helper's ports (port letters unchanged in songs). Re-check the MIDI Gear delay with Measure… after it
-(7 Nov (16)). Same lead / delegate split: the scheduler thread is the lead's. Look at CodeRabbit's libremidi findings then
-and record any local patch in `io/VERSIONS`.
+**5. Phase B: MIDI through the helper: BUILT (7 Nov night, build 498, on `io-helper`; owner go-ahead 22:44 "Do it!").**
+Started before the owner's beta.7 test, by the owner's choice; the risk is only that a problem found in the shared plumbing
+(helper process, port) may need the MIDI side adjusted.
+- **B1 addon** (`io/src/midi.cc`, libremidi header-only; C++20 and exceptions on in `binding.gyp`, every libremidi call in a
+  try): `midiPorts / midiOpenOut / midiOpenIn / midiSend(port, bytes, atNs) / midiClear(port|0) / midiClose / midiRead /
+  midiStats`. One sender thread for every output (QoS user-interactive on macOS; TIME_CRITICAL + timeBeginPeriod(1) on
+  Windows), a multimap by OS time (same-time order kept), sleeps to 0.5 ms before, spins the rest. Shared state is heap-
+  allocated and never freed (a running thread at exit aborted Node). Past / zero times: now, in the order sent. MIDI in:
+  libremidi callback stamps HostNowNs() and queues. Test port `test:loop` (listed with THUNDER_IO_TEST, always openable):
+  `io/test/midi.js` (timing on this workspace: median 0.001 ms, worst ≤ 2 ms; order; clear; close; bad input), run by
+  `tests/io-native.test.js` and smoke-checked in `io/build.js`. Linux builds ALSA only when its headers exist (this workspace
+  has none: dummy backend, no ports); the workflow doesn't install libasound2-dev (Linux low priority).
+- **B2 helper** (`electron/io-helper.js`): hello has `midi:true`; ops midiPorts / midiOpenOut / midiOpenIn (answered),
+  midiSend / midiSendMany / midiClear (streams, no answer), midiClose; MIDI in polled every 2 ms and posted as one
+  `{op:'midiIn', list}`; shutdown (page reload, exit) clears and closes every MIDI port. `tests/io.test.js` (4 tests).
+- **B3 page**: `NM` / `nmConnect` / `nmScan` / `nmPort` / `nmClose` / `midiRemap` / `midiEngineSet` (next to the IOH code).
+  midi.access is a stand-in for Web MIDI's (`native:true`; outputs `send(bytes, ts)` → midiSend at `(ts − IOH.clk)·1e6` ns,
+  `clear()` → midiClear; inputs get `{data, timeStamp}` with the helper's arrival time), so msend, the clock out, clock in,
+  Measure… and KEYS PLAY are unchanged; msend skips the OUTBOX for native outputs (moRelease already calls `clear()`, then
+  the offs). Ports rescanned every 3 s (onstatechange = hookInputs); the clock offset re-measured every 15 s. Ids `n:` +
+  name; saved Web MIDI ids mapped by name (`midi.names`, read from Web MIDI once when missing) and back on Engine Browser.
+  Settings › MIDI › **Engine: Native / Browser** (desktop only; `aset.midiEngine`, default native). `connectMidi` is
+  single-flight and first runs after the whole script (TDZ: it used IOAPI before its line).
+- **Microphone**: no longer asked when the helper starts (MIDI alone would have prompted): `thunder:io-mic` (main.js,
+  preload `io.mic()`), called by `rcdOpenIo` just before an input opens.
+- io-check's fake helper speaks MIDI too: connect (no microphone), remap by name, a note booked 200 ms ahead reaches the
+  helper at its OS time (0.0 ms off) with no OUTBOX, STOP = midiClear then the offs, clock in with timestamps, Engine
+  Browser closes the ports.
+- **Owner's test (after beta.7's):** Settings › MIDI shows Engine Native and "· native" in the status; the port letters still
+  point at the same gear; notes on the gear in time with the song (compare with Engine Browser); STOP: nothing plays on after
+  it; MIDI clock out to the MPC / Force steady (and clock in from it, if used); then Measure… again (Gear delay should come out
+  small: the helper sends at the booked time; the owner once said the right delay was "a combination of both latency numbers":
+  check whether that is still so). Windows: the same through WinMM.
+- Not done: `midiStats().late` isn't shown anywhere; Linux CI without ALSA (no ports); a helper that dies and restarts leaves
+  the page's MIDI access pointing at old port numbers (switch Engine off and on, or reload; a restart is rare).
 
 **6. Known limits to keep in mind.** Monitoring through the app is D + output latency late (D = base + output latency + 40 ms,
 raised between takes if chunks arrive late). The interface at another rate than the app is converted (warned). The Mac build

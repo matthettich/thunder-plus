@@ -195,14 +195,11 @@ app.whenReady().then(() => {
   app.on('will-quit', () => { if (link) link.off(); ioStop(); });
   // NATIVE I/O HELPER: fork on the first start; every start (also a page reload) hands both ends a fresh MessagePort. One restart
   // if it died, then {ok:false}. The helper's own hello (available or not, and why) comes to the page over the port.
-  // ONE MICROPHONE ASK (owner, 7 Nov: "enable the microphone 28 times"): the app asks macOS once, before the helper opens an
-  // interface (the helper is the app's child, so it shares the answer); otherwise the unsigned helper set off prompt after prompt.
+  // ONE MICROPHONE ASK (owner, 7 Nov: "enable the microphone 28 times"): the app asks macOS once (thunder:io-mic, below), before
+  // the helper opens an interface (the helper is the app's child, so it shares the answer).
   ipcMain.handle('thunder:io-start', async () => {
     try {
       if (!win || win.isDestroyed()) return { ok: false, why: 'no window' };
-      if (process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('microphone') !== 'granted') {
-        if (!(await systemPreferences.askForMediaAccess('microphone'))) return { ok: false, why: 'microphone access is off for Thunder Plus (System Settings › Privacy & Security › Microphone)' };
-      }
       if (!ioChild) {
         if (!ioGate.canStart()) return { ok: false, why: 'helper stopped' };
         const child = utilityProcess.fork(path.join(__dirname, 'io-helper.js'), [ioAddonPath()], { serviceName: 'thunder-io' });
@@ -212,6 +209,15 @@ app.whenReady().then(() => {
       const { port1, port2 } = new MessageChannelMain();
       ioChild.postMessage({ op: 'port' }, [port1]);
       win.webContents.postMessage('thunder:io-port', null, [port2]);
+      return { ok: true };
+    } catch (err) { return { ok: false, why: String((err && err.message) || err) }; }
+  });
+  // THE MICROPHONE (phase B): asked for when the recorder opens an input, not when the helper starts (it also runs for MIDI)
+  ipcMain.handle('thunder:io-mic', async () => {
+    try {
+      if (process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('microphone') !== 'granted') {
+        if (!(await systemPreferences.askForMediaAccess('microphone'))) return { ok: false, why: 'microphone access is off for Thunder Plus (System Settings › Privacy & Security › Microphone)' };
+      }
       return { ok: true };
     } catch (err) { return { ok: false, why: String((err && err.message) || err) }; }
   });

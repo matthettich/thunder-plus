@@ -30,8 +30,8 @@ const port = srv.address().port;
 
 // The fake, in the page before the app runs. mode: 'ok' | 'off' (hello available:false) | 'silent' (no port at all)
 const FAKE = mode => {
-  window.__ioStarts = 0; window.__ioOps = [];
-  window.thunderDesktop = { io: { available: true, start() {
+  window.__ioStarts = 0; window.__ioOps = []; window.__micAsks = 0; window.__midiSent = [];
+  window.thunderDesktop = { io: { available: true, mic() { window.__micAsks++; return Promise.resolve({ ok: true }); }, start() {
     window.__ioStarts++;
     if (mode === 'silent') return Promise.resolve({ ok: true });
     setTimeout(() => {
@@ -60,8 +60,13 @@ const FAKE = mode => {
             h.postMessage({ op: 'in', frame0, hostNs: h0 * 1e6, channels: 28, frames, data, overruns: 0 }, [data.buffer]);
             frame0 += frames;
           }, 5);
-        } else if (m && m.op === 'close') { stop(); h.postMessage({ op: 'closed', id: m.id }); } };
-      h.postMessage(mode === 'ok' ? { op: 'hello', available: true, version: 'thunder_io 1 / miniaudio 0.11.26' } : { op: 'hello', available: false, why: 'addon missing' });
+        } else if (m && m.op === 'close') { stop(); h.postMessage({ op: 'closed', id: m.id }); }
+        // FAKE MIDI (phase B): one output "Gear" and one input "Clock"; what's sent is logged with its time
+        else if (m && m.op === 'midiPorts') h.postMessage({ op: 'midiPorts', id: m.id, outs: [{ id: 'Gear', name: 'Gear' }], ins: [{ id: 'Clock', name: 'Clock' }] });
+        else if (m && (m.op === 'midiOpenOut' || m.op === 'midiOpenIn')) h.postMessage({ op: 'midiOpened', id: m.id, ok: true, port: m.name === 'Gear' ? 1 : 2 });
+        else if (m && (m.op === 'midiSend' || m.op === 'midiClear' || m.op === 'midiClose')) window.__midiSent.push({ op: m.op, port: m.port, bytes: m.bytes, at: m.at, t: performance.now() }); };
+      window.__midiIn = list => h.postMessage({ op: 'midiIn', list });
+      h.postMessage(mode === 'ok' ? { op: 'hello', available: true, version: 'thunder_io 4 / miniaudio 0.11.26 / libremidi', midi: true } : { op: 'hello', available: false, why: 'addon missing' });
       window.__ioPort = h; window.postMessage({ thunderIo: true }, '*', [ch.port2]);
     }, 20);
     return Promise.resolve({ ok: true });
@@ -107,6 +112,7 @@ try {
     ok(await page.evaluate(() => window.__ioStarts) === 1, 'the helper was started once, by the window');
     // METERS AT ONCE (owner, 7 Nov): the native input opens with the window, before Record
     ok(await until(page, () => true, 50) && await page.evaluate(async () => { for (let i = 0; i < 40 && !window.__ioOps.includes('open'); i++) await new Promise(r => setTimeout(r, 50)); return window.__ioOps.includes('open'); }), 'the native input opens with the window (meters before Record)');
+    ok(await page.evaluate(() => window.__micAsks) >= 1, 'opening the native input asks for the microphone (thunder:io-mic)');
     // IN 17+18, a FREE take of ~0.5 s
     await page.selectOption('.recset label:has(> span:text-is("Inputs")) select', 'p16');
     const take = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
@@ -216,5 +222,44 @@ try {
     const txt = await page.evaluate(() => ({ t: /input engine/i.test(document.body.innerText), io: window.thunderDesktop || null }));
     ok(!txt.t, "website: no 'Input engine' text on the page"); ok(txt.io === null, 'website: no thunderDesktop'); await page.close(); }
 } catch (e) { console.error(e); fails++; }
+// NATIVE MIDI (phase B) against the fake helper
+{ const page = await open('ok');
+  const nm = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
+    const o = {};
+    o.row = !document.getElementById('midiEngRow').hidden;
+    // a saved Web MIDI choice ("web1", named Gear) on port A, and Clock from "web2" (named Clock)
+    E("midi.outIds[0] = 'web1'; midi.inId = ''; midi.clkId = 'web2'; midi.names = {web1:'Gear', web2:'Clock'}; midi.clkIn = true;");
+    await E('connectMidi()');
+    o.native = E('!!(midi.access && midi.access.native)'); o.outs = E('[...midi.access.outputs.keys()].join()'); o.ins = E('[...midi.access.inputs.keys()].join()');
+    o.remap = E('midi.outIds[0] + "|" + midi.clkId'); o.mic = window.__micAsks; o.stat = document.getElementById('midiStat').textContent;
+    // a note booked 200 ms ahead: straight to the helper (no OUTBOX), at the right OS time
+    window.__midiSent.length = 0; E('audio()'); await wait(200);
+    const t = E('ctx.currentTime + 0.2'); E('msend([0x90, 60, 100], ' + t + ', false, 0)');
+    const want = E('a2p(' + t + ' + moFxLat())'), clk = E('IOH.clk'); await wait(50);
+    const s1 = window.__midiSent.find(x => x.op === 'midiSend');
+    o.sent = s1 ? {port:s1.port, bytes:s1.bytes.join(), errMs:+((s1.at / 1e6 + clk) - want).toFixed(3)} : null; o.outbox = E('MOB.q.length');
+    // STOP: the queue is cleared first, then the note offs
+    window.__midiSent.length = 0; E('mx.used.add(0); moRelease()'); await wait(50);
+    o.stop = window.__midiSent.map(x => x.op + (x.bytes ? ':' + x.bytes[0].toString(16) : '')).slice(0, 3).join(',');
+    // MIDI IN: clock ticks with the helper's timestamps reach the clock-in (Clock from: the remapped input)
+    E('mx.inT = []'); const n0 = performance.now(); window.__midiIn([0, 1, 2, 3, 4, 5].map(k => ({ port: 2, bytes: [0xF8], ns: (n0 - E('IOH.clk') + k * 20.833) * 1e6 })));
+    await wait(80); o.clkIn = E('(mx.inT || []).length');
+    // Engine Browser: the helper's ports are closed
+    window.__midiSent.length = 0; E("midiEngineSet('browser')"); await wait(100);
+    o.closed = window.__midiSent.filter(x => x.op === 'midiClose').length; o.after = E('midi.access ? (midi.access.native ? "native" : "web") : "none"');
+    E("aset.midiEngine = 'native'; asetSave();");
+    return o; });
+  console.log('native MIDI', JSON.stringify(nm));
+  ok(nm.row, 'Settings › MIDI shows the Engine row in the desktop app');
+  ok(nm.native && nm.outs === 'n:Gear' && nm.ins === 'n:Clock', 'MIDI connects through the helper: ' + nm.outs + ' / ' + nm.ins);
+  ok(nm.remap === 'n:Gear|n:Clock', 'saved Web MIDI choices are mapped to the helper\'s ports by name: ' + nm.remap);
+  ok(nm.mic === 0, 'connecting MIDI asks for no microphone');
+  ok(/· native/.test(nm.stat), 'the status says native: ' + nm.stat);
+  ok(nm.sent && nm.sent.port === 1 && nm.sent.bytes === '144,60,100' && Math.abs(nm.sent.errMs) < 0.5 && nm.outbox === 0, 'a note booked ahead goes straight to the helper at its OS time (no OUTBOX): ' + JSON.stringify(nm.sent));
+  ok(/^midiClear/.test(nm.stop) && /midiSend:b0/.test(nm.stop), 'STOP clears the helper\'s queue, then sends the offs: ' + nm.stop);
+  ok(nm.clkIn >= 5, 'MIDI clock in arrives with its timestamps: ' + nm.clkIn + ' ticks');
+  ok(nm.closed === 2 && nm.after !== 'native', 'Engine Browser closes the helper\'s ports: ' + nm.closed + ' closed, now ' + nm.after);
+  await page.close(); }
+
 await browser.close(); srv.close();
 console.log(fails ? fails + ' FAILED' : 'all ok'); process.exit(fails ? 1 : 0);

@@ -12,7 +12,8 @@ desktop app loads, if it is there, to open audio interfaces and MIDI ports with 
   (Unlicense) or MIT-0. Full text: [LICENSES/miniaudio.txt](LICENSES/miniaudio.txt).
 - **libremidi** v5.4.3 (`vendor/libremidi/include/`), Copyright (c) Jean-Michaël Celerier and the libremidi contributors:
   BSD 2-Clause, with the parts it derives from RtMidi (MIT) and ModernMidi (BSD 2-Clause), whose notices are kept in the
-  same file. Full text: [LICENSES/libremidi.txt](LICENSES/libremidi.txt). Not compiled in phase A0.
+  same file. Full text: [LICENSES/libremidi.txt](LICENSES/libremidi.txt). Compiled in from phase B (src/midi.cc), header-only,
+  unchanged (no local patch).
 
 Both libraries are permissive; their notices must stay with any build that ships the addon.
 
