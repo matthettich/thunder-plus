@@ -1772,7 +1772,8 @@ if (EMBED) window.addEventListener('keydown', e => {
 if (EMBED) window.addEventListener('keydown', e => {
   if (!TW || !TW.appKey || e.repeat || typing(e) || document.querySelector('.dlgov')) return;
   const mod = e.ctrlKey || e.metaKey, k = (e.key || '').toLowerCase();
-  const app = (/^F[2-9]$/.test(e.key) && !mod && !e.altKey) || (mod && !e.altKey && (k === 's' || ((k === 'o' || k === 'n') && !e.shiftKey)));
+  const app = (/^F[2-9]$/.test(e.key) && !mod && !e.altKey) || (mod && !e.altKey && (k === 's' || ((k === 'o' || k === 'n') && !e.shiftKey))) ||
+    (!e.altKey && (e.key === '/' || e.key === '\\' || e.code === 'Slash' || e.code === 'Backslash') && e.code !== 'NumpadDivide');   // SOLO / MUTE (owner, 8 Nov): Ctrl/⌘+/ \ solo, / \ mute, on every screen (the app decides)
   if (!app) return;
   if (TW.appKey({key:e.key, code:e.code, shiftKey:e.shiftKey, ctrlKey:e.ctrlKey, metaKey:e.metaKey, altKey:e.altKey})){ e.preventDefault(); e.stopPropagation(); }
 }, true);

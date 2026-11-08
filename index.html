@@ -12796,13 +12796,16 @@ function refreshAll(){
   try { ccBadges(); } catch(e){}   // sliders may have been rebuilt (another layer type or effect)
 }
 document.addEventListener('keydown', e => {
-  if (view === 'tracker' || typing(e) || e.repeat || e.ctrlKey || e.metaKey) return;
+  if (view === 'tracker' || typing(e) || e.repeat) return;
+  if (e.ctrlKey || e.metaKey){ if (soloMuteKey(e)) e.preventDefault(); return; }   // (only the solo keys, Ctrl/⌘+/ \, are used with Ctrl here)
   // SPACE (owner, 27 Oct, Phase 2): Space plays or stops the song on every screen; Shift+Space plays this screen, which on
   // the Synth page is the selected pad (it was Space there, and Shift+Space the song).
-  if (e.code === 'Space' && !e.altKey && (e.shiftKey || !(e.target.matches && e.target.matches('button')))){
+  if (e.code === 'Space' && !e.altKey){   // (a focused button no longer keeps Space: spaceBtn, by the menu keys, plays first)
     e.preventDefault();
     if (e.shiftKey && view === 'synth'){ play(cur); return; }
     if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); return; }
+  // SOLO / MUTE (owner, 8 Nov): on this screen too, for the track the panel follows (see soloMuteKey)
+  if (soloMuteKey(e)){ e.preventDefault(); return; }
   if (e.altKey && /^Digit[1-7]$/.test(e.code)){ e.preventDefault(); setView('tracker'); go(VIEWS[+e.code.slice(5) - 1]); return; }
   // FIX (UI sweep, 4 Nov): Alt/⌥+S, Song settings "from any screen" (owner, 3 Nov), the Synth page too (it was the tracker's only)
   if (e.altKey && !e.shiftKey && e.code === 'KeyS' && view === 'synth'){ e.preventDefault(); if (!pbOpen) setSheet('song'); return; }
@@ -13764,12 +13767,29 @@ $('bEdit').addEventListener('click', () => geditToggle());
    its first item. In an open menu ▲▼ move, ▶ / ◀ open and close a group (at the top level they go to the next or previous
    menu), Home / End jump, Enter / Space pick, Esc closes back to its button and Tab closes. */
 const TOPM = [['bFile', 'gfile', o => gfileToggle(o)], ['bEdit', 'gedit', o => geditToggle(o)]];
+/* SPACE ALWAYS PLAYS (owner, 8 Nov, desktop app: "Space bar when menu is selected opens menu, but would be better if locked to
+   start and stop the song always"). A focused button took Space as a click (the browser fires it on keyUP), so after clicking
+   File ▾ / Edit ▾ / Audio & MIDI or any tab or toggle, Space opened or flipped that instead of playing. Now Space on a button
+   plays or stops the song (the same call as the other Space handlers) and the button's click is cancelled on keydown and keyup.
+   Left alone: typing (typing(): text fields, selects, PumpFX), an open File / Edit / right-click menu and its items, and any
+   dialog but the Settings pop-up (an ask / sheet / picker uses Space on its own buttons), where Space on a focused button is
+   still a click. Shift+Space (play this screen) and Ctrl/⌘+Space (loop the pattern) are not touched. */
+const spaceBtn = e => { const t = e.target;
+  if (e.code !== 'Space' && e.key !== ' ') return false;
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || !t || !t.closest || !t.closest('button, [role=button], [role=tab], summary, input[type=button], input[type=checkbox], input[type=radio]')) return false;
+  if (typing(e) || sxMenuEl || askOpen || pbOpen || t.closest('#gfile, #gedit, [role=dialog]:not(#gset), [aria-modal=true], .ask, .swapov, .pbs')) return false;
+  return true; };
+window.addEventListener('keydown', e => {
+  if (!spaceBtn(e)) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (!e.repeat){ if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); } }, true);
+window.addEventListener('keyup', e => { if (spaceBtn(e)){ e.preventDefault(); e.stopImmediatePropagation(); } }, true);   // the click a button fires on Space keyUP
 window.addEventListener('keydown', e => {
   if (sxMenuEl || typing(e)) return;
   const open = TOPM.find(([, g]) => !$(g).hidden), act = document.activeElement;
   const first = g => { const L = menuNavList($(g)); if (L[0]) L[0].focus(); };
   if (!open){ const foc = TOPM.find(([b]) => act === $(b));
-    if (foc && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); e.stopImmediatePropagation(); foc[2](true); first(foc[1]); }
+    if (foc && (e.key === 'ArrowDown' || e.key === 'Enter')){ /* (Space plays: spaceBtn) */ e.preventDefault(); e.stopImmediatePropagation(); foc[2](true); first(foc[1]); }
     return; }
   const m = $(open[1]), inM = m.contains(act);
   if (e.key === 'Escape'){ e.preventDefault(); e.stopImmediatePropagation(); open[2](false); $(open[0]).focus(); return; }
@@ -16636,6 +16656,7 @@ function patchKey(d){ if (!d) return 'null'; try { const c = Object.assign({}, d
    project (they acted on the patch). True when the key was used. */
 function editorKey(e){
   const mod = e.ctrlKey || e.metaKey, k = (e.key || '').toLowerCase();
+  if (soloMuteKey(e)) return true;   // SOLO / MUTE on every screen (owner, 8 Nov): Ctrl/⌘+/ \, / and \ from inside the editor too
   if (mod && !e.altKey){
     if (k === 's'){ saveProj(e.shiftKey); return true; }
     if (k === 'o' && !e.shiftKey){ openProj(); return true; }
@@ -30793,11 +30814,12 @@ const PAGEK = {F2:'phrase', F3:'mixer', F4:'inst'};
 // FILL key state (Shift+Alt+F): a tap toggles, a hold lasts while held
 const fillKey = {down:false, t:0, was:false};
 addEventListener('keyup', e => { if (!fillKey.down || (e.code !== 'KeyF' && e.key !== 'Alt' && e.key !== 'Shift')) return; fillKey.down = false; if (performance.now() - fillKey.t > 350 || fillKey.was) perfFill(false); }, true);
-function globalKeys(e){
+// SOLO / MUTE ON EVERY SCREEN (owner, 8 Nov: "Solo and mute key commands should persist despite the screen we are on"): Ctrl/⌘+/ (or \)
+// solos, Ctrl/⌘+Shift+/ clears every solo, / or \ mutes: Renoise's keys. They lived in globalKeys, which only runs on the tracker
+// screens, so the Synth page and the …waves / …chains screens ignored them. One function now, called from both key paths; it acts on
+// the track the panel follows (dkTrack: the last tracker screen's). True when the key was used.
+function soloMuteKey(e){
   const mod = e.ctrlKey || e.metaKey;
-  if (e.altKey && !mod && /^Digit[1-7]$/.test(e.code)){ go(VIEWS[+e.code.slice(5) - 1]); return true; }
-  if (e.altKey && !mod && e.code === 'Digit0'){ setView('synth'); return true; }
-  if (mod && !e.altKey && !e.shiftKey && (e.code === 'Space' || e.key === ' ')){ if (!e.repeat) playPatLoop(); return true; }   // play this pattern, looped
   // Ctrl/⌘+/ solos the track you're on (Renoise's key), again un-solos it; Ctrl/⌘+Shift+/ clears every solo.
   if (mod && !e.altKey && (e.code === 'Slash' || e.key === '/' || e.key === '?' || e.code === 'Backslash' || e.key === '\\' || e.key === '|')){ if (!e.repeat) soloKey(e.shiftKey); return true; }   // Ctrl/⌘+\ too (owner, 24 Oct)
   // / mutes the track you're on (Renoise's key, owner 20 Oct), on every cell: it was the lower piano row's last note, E an
@@ -30805,6 +30827,14 @@ function globalKeys(e){
   if (!mod && !e.altKey && !e.shiftKey && e.key === '/' && e.code !== 'NumpadDivide'){ if (!e.repeat) muteKey(); return true; }
   // \ mutes it too (owner, 24 Oct: one key, on Windows and Mac keyboards alike; Ctrl/⌘+\ solos, above)
   if (!mod && !e.altKey && !e.shiftKey && (e.code === 'Backslash' || e.key === '\\')){ if (!e.repeat) muteKey(); return true; }
+  return false;
+}
+function globalKeys(e){
+  const mod = e.ctrlKey || e.metaKey;
+  if (e.altKey && !mod && /^Digit[1-7]$/.test(e.code)){ go(VIEWS[+e.code.slice(5) - 1]); return true; }
+  if (e.altKey && !mod && e.code === 'Digit0'){ setView('synth'); return true; }
+  if (mod && !e.altKey && !e.shiftKey && (e.code === 'Space' || e.key === ' ')){ if (!e.repeat) playPatLoop(); return true; }   // play this pattern, looped
+  if (soloMuteKey(e)) return true;   // (Ctrl/⌘+/ solo, / and \ mute: soloMuteKey, above, shared with the other screens)
   // Alt+L loops the pattern, Shift+Alt+L the selection; Alt+, / Alt+. transpose the selection down / up a semitone. They
   // work on every cell (plain L , . are piano keys on a note cell). e.code, since Alt changes e.key on a Mac.
   // Alt+A (owner, 30 Oct): Arrange takes the keys from any tracker screen and the screen beside it stays (the Mixer, FX, a

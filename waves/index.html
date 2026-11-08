@@ -1682,6 +1682,7 @@ if (EMBED) window.addEventListener('keydown', e => {
   if (e.key === ' ' && e.target && e.target.closest && e.target.closest('button, [role=button], [role=option], [tabindex]')) return;   // Space on a focused item works it (the module list adds the module)
   const mod = e.ctrlKey || e.metaKey, k = (e.key || '').toLowerCase();
   const app = (/^F[2-9]$/.test(e.key) && !mod && !e.altKey) || (mod && !e.altKey && (k === 's' || ((k === 'o' || k === 'n') && !e.shiftKey))) ||
+    (!e.altKey && (e.key === '/' || e.key === '\\' || e.code === 'Slash' || e.code === 'Backslash') && e.code !== 'NumpadDivide') ||   // SOLO / MUTE (owner, 8 Nov): Ctrl/⌘+/ \ solo, / \ mute, on every screen (the app decides)
     (e.key === ' ' && !mod && !e.altKey);
   if (!app) return;
   if (TW.appKey({key:e.key, code:e.code, shiftKey:e.shiftKey, ctrlKey:e.ctrlKey, metaKey:e.metaKey, altKey:e.altKey})){ e.preventDefault(); e.stopPropagation(); }
