@@ -24,6 +24,61 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## Build the native I/O helper — START HERE when the owner says "I want to build the helper"
+
+Owner, 7 Nov: "make it so when I say 'I want to build the helper' the whole plan is clear to the next agent". This section
+is the brief. The design is in [`docs/NATIVE-IO-HELPER-PLAN.md`](docs/NATIVE-IO-HELPER-PLAN.md) (read all of it first; its
+section numbers are used below); the bigger picture is [`docs/NATIVE-DESKTOP-PLAN.md`](docs/NATIVE-DESKTOP-PLAN.md) §14.
+
+**Why.** Record a sample only ever gets inputs 1 and 2: Chromium (Electron 44) gives `getUserMedia` two channels whatever
+the device has. The owner's **Cranborne Audio 500R8** presents 28 inputs over USB at 44.1 / 48 kHz (8 from its 500 slots,
+16 ADAT from two 8-channel lightpipe preamps, 2 S/PDIF, 2 from its summing mixer) and has **no mixer software**, so other
+inputs can't be routed onto 1/2. Only a native helper fixes it.
+
+**Owner's decisions (7 Nov, plan §9):** phase A (inputs) now, phase B (MIDI) after; Mac stays **unsigned** for now (no
+Apple Developer membership yet: expect macOS to re-ask for the microphone); Windows **WASAPI only** (no ASIO unless it's
+free to use); test at **48 kHz with all 28 inputs**; **delegate** the plumbing to cheaper models, this (lead) session
+writes or line-reviews the real-time parts and approves everything; the owner's Mac + 500R8 is the final test.
+
+**Rules (as for all Thunder Plus work):** permissive licences only (miniaudio MIT-0 / Unlicense, libremidi BSD-2-Clause;
+add both to `THIRD_PARTY_NOTICES.md`); the phone and the web app must not change behaviour; a desktop build without the
+helper, or where it fails, works exactly as today (`getUserMedia`); keep `npm test`, `tools/recorder-check.mjs` and
+`tools/browser-check.mjs` passing; changelog line + `BUILD` + `sw.js` cache bump per page change, as usual.
+
+**Branches and releases.** Work on a branch `io-helper` off `beta`; merge into `beta` (PR, CodeRabbit) when a phase passes.
+Desktop test builds for the owner as **pre-releases** (Run workflow `desktop.yml` with `version` like `1.3.0-beta.1` and
+`prerelease: true`: installed copies ignore it, the owner downloads it from the Releases page), so the normal update channel
+never gets a half-built helper. Merge to `main` and a normal release only when the owner says A1 works on the 500R8.
+
+**Tasks.** L = the lead session (Opus) does it; D = delegate (the Agent tool with `model: "sonnet"`; `"haiku"` only for the
+mechanical ones marked D-h) with the card below as its prompt plus the plan file. The lead reviews every diff, runs the
+tests itself (never trusts a subagent's "tests pass"), and sends it back with specific fixes until it's right.
+
+| # | Task | Who | Plan § | Done when |
+|---|---|---|---|---|
+| A0.1 | `io/` skeleton: vendored `miniaudio.h` + libremidi (pinned versions, licences in `io/LICENSES/`), `binding.gyp`, `io/build.js` copied from `link/build.js` (Mac arm64 + x86_64 joined), `io/README.md`, `io/NOTICE.md` | D-h | 3.1, 6 | `node io/build.js` builds on Linux in this workspace; a stub `thunder_io.node` loads in Node |
+| A0.2 | N-API `devices()` and `now()` in `io/src/thunder_io.cc` (no threads yet) | D | 3.1 | Node prints the device list (miniaudio null backend in CI: one fake device) |
+| A0.3 | `desktop.yml`: build `io/` like Link (continue-on-error, `hashFiles('io/build.js')`), copy to `electron/io/`; `electron/package.json` `asarUnpack` adds `io/*.node`, `files` adds `io-helper.js` | D-h | 6 | a CI test build (no `version`) is green on all three OSes and the Mac app contains `io/thunder_io.node` |
+| A0.4 | `electron/io-helper.js` (utilityProcess, loads the addon in a try, answers `devices`), `main.js` forks it lazily on `thunder:io-start`, MessageChannelMain port to the utility and to the window; `preload.js` forwards the port into the page (`window.postMessage({thunderIo:true}, '*', ports)`) and exposes `thunderDesktop.io.start()` / `.available` | D | 2, 3.2 | `tests/io.test.js` (fake addon, as `tests/link.test.js`): start → devices arrive on the page side; addon missing → `{available:false, why}` |
+| A0.5 | Page: Settings › Audio row "Input engine: native (500R8, 28 inputs)" / "browser" + why; INPUT ENGINE AUTO / BROWSER setting | D | 3.3 | headless check with a fake `thunderDesktop.io`; the web app (no `thunderDesktop`) shows nothing new |
+| A0.6 | Review A0, pre-release `1.3.0-beta.1`, owner confirms the 500R8 is listed with 28 inputs | L | — | owner's screenshot |
+| A1.1 | The SPSC float ring (`io/src/ring.h`) and `openInput` / `read` / `closeInput` with the miniaudio capture callback (all channels, interleaved, `frame0`, `hostNs` per callback, overrun counter) | **L** | 3.1, 4 | a C++ unit test pushes from a thread and reads in order with no tearing; null-backend open / read / close in CI |
+| A1.2 | `io-helper.js`: 5 ms poll of `read()`, post `{op:'in', frame0, hostNs, channels, frames, data}` transferring `data.buffer`; `open` / `close` messages; restart-once on crash | D | 2, 3.2 | `tests/io.test.js`: scripted chunks arrive in order, close stops the poll, a crash restarts once then reports |
+| A1.3 | AudioWorklet `thunder-io-in`: chunks in through its port, a ~30 ms jitter ring, outputs the picked pair / single channel; each frame placed at its audio time from `hostNs` (via the page's `amap` / `p2a`, plan §4); drift handled by drop / repeat in the monitor path only | **L** | 3.3, 4 | `tools/io-check.mjs` (headless, fake chunks with known timestamps): a PATTERN take starts on the right frame (exact), pair / single picks, ±10 ms drift without touching the take |
+| A1.4 | `rcdOpen()` helper path (no `getUserMedia`), `rcdInputs()` from the helper's devices, `RCD.nch` = real count so INPUTS lists all 28, `RCD.inLat` from the helper's latency, `rcdRoute` unchanged above the source | D, lead reviews line by line | 3.3 | `tools/recorder-check.mjs` passes on both paths (fake helper and browser) |
+| A1.5 | Review, pre-release `1.3.0-beta.2`; owner records an ADAT input (e.g. 12) and a pair (e.g. 17+18) in PATTERN sync, runs Measure… through the helper, a 5-minute take | L + owner | 5 | owner says it works on the 500R8 |
+| A2 | Unplug mid-take (keep the take, toast), sample-rate mismatch (resample in the worklet or ask), Windows WASAPI check, Linux build | D (+L review) | 5 | the cases in plan §7's last bullet |
+| B | MIDI out / in through the helper (`midiSend(port, bytes, atNs)`, `midiClear` on STOP, `msend` and clock-in on the helper when present) | after A, same split: the scheduler thread is L | 4, 5 | plan §5 item 4 |
+
+**Prompt for each D task** (the lead fills it in): the task row; "read `docs/NATIVE-IO-HELPER-PLAN.md` §…"; the exact files
+it may touch (nothing else); the functions / messages / settings it must produce, with names; the test it must add and run;
+"don't change `index.html` outside the named functions"; "report the diff and the test output". Keep cards small (one row
+each); never hand a subagent the whole phase.
+
+**Open item to settle on the way (B, or sooner):** the owner found the right Gear delay was "a combination of both latency
+numbers" (Measure's result + Settings › Audio's heard ms), so MIDI may still miss the output latency on the Mac. Ask the
+owner for the three numbers (Measure's result, heard ms, the delay that sounds right) before changing `msend` / `a2p`.
+
 ## Desktop releases
 
 - **v1.2.100** (7 Nov 2026; owner: "push a desktop build so I can continue to test for bugs"; Run workflow through the API with
@@ -182,9 +237,9 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
   change it needs.
 - Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
-- **Native I/O helper, wanted soon** (7 Nov): plan in `docs/NATIVE-IO-HELPER-PLAN.md`: phase A every input channel in Record a
+- **Native I/O helper, wanted soon** (7 Nov): the brief is "Build the native I/O helper — START HERE" near the top of this file; design in `docs/NATIVE-IO-HELPER-PLAN.md`: phase A every input channel in Record a
   sample (the owner's interface has no mixer, so inputs 3+ can't be routed to 1/2), B MIDI out / in, C output only if needed.
-  Owner to answer its section 9 (go ahead, Apple Developer membership, WASAPI only, the interface's make / model).
+  Owner answered its section 9 on 7 Nov (recorded there and in the brief).
 - **A more stable desktop app, when the owner wants one** (7 Nov): `docs/NATIVE-DESKTOP-PLAN.md` section 14 lists which of
   7 Nov's bugs came from the web platform, and the options cheapest first: stay web; a native I/O helper inside Electron
   (MIDI out first, then inputs, maybe audio out), built like the `link/` addon; or the full native host (phases 3–6).
