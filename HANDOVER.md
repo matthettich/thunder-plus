@@ -540,6 +540,23 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 8 Nov: …waves live per-bus running; "Live engines" setting (build 513, beta only)
+
+Owner: make the live/rendered switch's name cover …waves live, and cut phone CPU by sharing one running patch across pads.
+- **Sharing a patch was NOT done, on purpose:** every voice sums into every Out, so one shared WavesEngine would play pad A's
+  notes through pad B's bus too (doubled or wrong sound). Separating them needs per-voice output, and mono sections after the
+  voices can't be split at all.
+- **Done instead, same saving when pads use different buses, same sound:** `WavesEngine.setOnly(slot)` / `_cull()` (waves-worklet.js,
+  outside the shared block): walks back from the bus's Out modules and runs only those (`only`; null runs everything, the
+  default, so the editor, renders and goldens are untouched). WavesLiveProc calls it from `busOf()` at start and on `{set}`;
+  `_cullDirty` is set by `_sync`, `loadPatch` and a `slot` setParam. Always kept: `def.playsNotes` (the Sequencer, which calls
+  noteOn with no cable). Runs everything if an Out's slot is modulated, or if no voice audio exit would be left (voice sleep).
+  Two pads on the SAME bus still run two copies; idle copies already sleep after 2 s.
+- Measured in Node: 3 pads on 3 buses (Plaits + VCO + reverb each), one held note each: 14.0 s → 4.9 s of CPU for 8 s of audio.
+  Not measured on a phone.
+- Settings → Audio row is now **Live engines** (`aset.psLive` unchanged, so saved settings carry over); tooltips and the fallback
+  toast name …waves live. `waves-worklet.js?v=34`, cache `thunderplus-v513`. Tests in tests/waves.test.js.
+
 ## 7 Nov (18): native helper A0 and A1 (branch io-helper, PR #14; desktop pre-releases 1.3.0-beta.1 / beta.2)
 
 - A0: the addon, helper process, CI step; owner confirmed "native (500R8, 28 inputs)" on beta.1. CodeRabbit: had to be asked
