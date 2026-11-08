@@ -199,8 +199,8 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
   sequencer fine: rows, no late / dropped notes, engine running; after-STOP levels a steady −80 dB). After updating to v1.2.99
   it plays; headless on build 481 it plays at −3…−20 dB. Not reproduced: if it comes back, the report from that moment.
 - Owner: Measure "made things worse"; Reset audio engine fixed it ("close now"). Measure opening the interface's input likely
-  made macOS reconfigure the device (output timing moved). Promised: Measure rebuilds the engine itself when it finishes
-  (not done yet). Owner: the recorder "wrongly thinks my audio interface only has two inputs": Chromium (Electron too) gives
+  made macOS reconfigure the device (output timing moved). Build 484: Measure calls resetAudio() and drops amap.off when it
+  finishes (not when Record a sample is open). Owner: the recorder "wrongly thinks my audio interface only has two inputs": Chromium (Electron too) gives
   getUserMedia 2 channels on the owner's Mac whatever is asked (ideal 32). Build 483 only rewords INPUTS ("all the app is
   given") and its hover (route the input to 1/2 in the interface's mixer). The real fix is NATIVE-DESKTOP-PLAN 14.2 option 2
   (the input side of the native helper).
