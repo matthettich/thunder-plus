@@ -13891,11 +13891,11 @@ const updCore = makeSeg($('segCore'), [['core', 'Audio thread'], ['page', 'Page 
   aset.core = v; asetSave();
   if (v === 'core'){ if (ctx) coreLoad(); toast('Sequencer: audio thread, from the next PLAY.', 3000); } else toast('Sequencer: page, from the next PLAY.', 2500); });
 function psLiveNote(){
-  const on = typeof PsynCore !== 'undefined'; $('psLiveRow').hidden = !on; if (!on) return;
+  $('psLiveRow').hidden = false;   // …waves live uses it too, with or without the …pump engines
   $('psLiveRow').title = aset.psLive === 'render'
-    ? 'Live engines: Rendered. On this device Mono live, Poly live, Coil live and …waves live play their rendered sound: lighter on the battery. Auto plays them live.'
+    ? 'Live engines: Rendered. On this device the …pump live engines and …waves live play their rendered sound: lighter on the battery. Auto plays them live.'
     : psLive.off ? 'Live engines: Auto, but playing their renders for now: this device couldn’t keep up with them live. Tap Auto to try live again.'
-    : 'Live engines: Auto. Mono live, Poly live, Coil live and …waves live play live, and switch to their rendered sound if this device can’t keep up (it says so). Rendered always plays their renders, lighter on the battery.';
+    : 'Live engines: Auto. The …pump live engines and …waves live play live, and switch to their rendered sound if this device can’t keep up (it says so). Rendered always plays their renders, lighter on the battery.';
 }
 psLiveNote();
 $('audRestart').addEventListener('click', () => { try { save(); } catch(e){ tpLog('save before restart failed', e); } applyUpdate(); });
@@ -21004,7 +21004,7 @@ function psFallback(why){
   if (psLive.off) return; psLive.off = true; psLive.strikes = 0;
   try { if (rt && rt.pl) rt.pl.psDrop(); } catch(e){}
   tpLog('pump synths live: playing the renders', why);
-  toast('The live engines (Mono live, Poly live, Coil live, …waves live) are playing their rendered sound for now: ' + why + '. Settings → Audio → Live engines: tap Auto to try live again.', 8000);
+  toast('The …pump live engines and …waves live are playing their rendered sound for now: ' + why + '. Settings → Audio → Live engines: tap Auto to try live again.', 8000);
   try { psLiveNote(); } catch(e){}
 }
 function bassReady(ac){
@@ -22827,7 +22827,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 513;
+const BUILD = 514;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31803,6 +31803,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [514, '8 Nov', ['Live engines: the setting always shows, and its help and message name every …pump live engine as well as …waves live.']],
   [513, '8 Nov', ['Settings → Audio → Live engines (it was called …pump live): the name now says what it does, and it covers …waves live too, as does the message when a device can’t keep up.', '…waves live is lighter: each pad now runs only the part of the patch that feeds its Bus, with the same sound.']],
   [512, '8 Nov', ['Record a sample: a recording timer beside Record shows how long the take is so far (0:00 → 4:37); PATTERN takes show “waiting…” until they start at the pattern.']],
   [511, '8 Nov', ['Measure…: the window keeps its size when you press Measure, and says what it is doing (opening the input, then hit by hit).']],
