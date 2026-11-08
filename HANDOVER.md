@@ -183,6 +183,18 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 7 Nov (10): Caps Lock on a Mac by state change (build 480, beta + main; not in a desktop build yet)
+
+- Owner (Electron, Mac): Caps Lock's note off "works intermittently". The keyup pairing (400 ms, same state) lost presses.
+  Now (FLIPS) a Mac counts a press when getModifierState('CapsLock') is seen to change, from the keydown (capture listener
+  sets `capsNew`, read once in keysDown) or the keyup; other keys keep `capsLast` in step. Headless with platform MacIntel,
+  three event styles (only changes; both with the old state on keydown; both with the new): 4 presses → 4 offs each.
+- v1.2.99 released (run 42428951611 succeeded) from build 479.
+- Owner sees the macOS microphone prompt "basically every time i play new sound" in the desktop app and clicks Allow.
+  Nothing in the page asks for the mic on play (getUserMedia only in the recorder, Measure, and the device-names button).
+  Suspect: setSinkId to a named output (aset.sink) going through Chromium's media-device permission → macOS microphone
+  (TCC), and the unsigned build not keeping the answer. Owner is trying Output = System default to confirm.
+
 ## 7 Nov (9): MIDI waits for the output chain's latency (build 479, beta + main, desktop v1.2.99)
 
 - Owner: MIDI and audio "align if I move the synth/audio up two lines" (with Gear delay +27 ms), "at least on this track".
