@@ -36,7 +36,7 @@ const FAKE = mode => {
     if (mode === 'silent') return Promise.resolve({ ok: true });
     setTimeout(() => {
       const ch = new MessageChannel(), h = ch.port1; let timer = null, frame0 = 0, dead = false, nextH = 1;
-      window.__midiDev = {};   // handle -> the physical device it was opened on (a new handle every open, as the addon does)
+      window.__midiDev = {}; const openH = new Set();   // handle -> the physical device it was opened on (a new handle every open, as the addon does); the open ones
       window.__ioKill = () => { dead = true; if (timer) clearInterval(timer); };   // this helper dies: no answer to anything any more
       const stop = () => { if (timer) clearInterval(timer); timer = null; };
       h.onmessage = e => { if (dead) return; const m = e.data; if (m && m.op) window.__ioOps.push(m.op);
@@ -70,8 +70,12 @@ const FAKE = mode => {
         else if (m && (m.op === 'midiOpenOut' || m.op === 'midiOpenIn')) { window.__midiOpens = (window.__midiOpens || 0) + 1; const port = nextH++;
           if (m.op === 'midiOpenOut') { const k = m.name === 'Gear' ? 0 : +(/#(\d+)$/.exec(m.name) || [0, 0])[1] - 1; window.__midiDev[port] = (window.__midiPhys || ['A'])[k]; }
           else window.__midiDev[port] = 'clock';
+          openH.add(port);
           h.postMessage({ op: 'midiOpened', id: m.id, ok: true, port }); }
-        else if (m && (m.op === 'midiSend' || m.op === 'midiClear' || m.op === 'midiClose')) window.__midiSent.push({ op: m.op, port: m.port, bytes: m.bytes, at: m.at, t: performance.now() }); };
+        else if (m && (m.op === 'midiSend' || m.op === 'midiClear' || m.op === 'midiClose')) {
+          if (m.op === 'midiSend' && !openH.has(m.port)) return;   // (a closed handle sends nothing, as in the addon)
+          if (m.op === 'midiClose') openH.delete(m.port);
+          window.__midiSent.push({ op: m.op, port: m.port, bytes: m.bytes, at: m.at, t: performance.now() }); } };
       window.__midiIn = list => h.postMessage({ op: 'midiIn', list });
       h.postMessage(mode === 'ok' ? { op: 'hello', available: true, version: 'thunder_io 4 / miniaudio 0.11.26 / libremidi', midi: true } : { op: 'hello', available: false, why: 'addon missing' });
       window.__ioPort = h; window.postMessage({ thunderIo: true }, '*', [ch.port2]);
@@ -256,11 +260,11 @@ try { const page = await open('ok');
     // SAME-NAME DEVICES (CodeRabbit): "Gear" and "Gear #2"; the first is unplugged, so "Gear #2" is now "Gear": the group is closed
     // and opened again (the survivor mustn't keep the gone device's handle)
     window.__midiPhys = ['A', 'B']; await E('nmScan()'); const two = E('[...midi.access.outputs.keys()].join()');
-    E("midi.outIds[1] = 'n:Gear #2'");   // port B is set to the second Gear (device B)
+    E("midi.outIds[0] = 'n:Gear'; midi.outIds[1] = 'n:Gear #2'");   // letter A on the first Gear (device A), B on the second (device B)
     window.__midiSent.length = 0; window.__midiPhys = ['B']; await E('nmScan()');   // device A unplugged: B is now "Gear"
-    window.__midiSent.length = 0; E('msend([0x90, 64, 100], null, false, 1)'); await wait(30);
-    const s2 = window.__midiSent.find(x => x.op === 'midiSend');
-    o.dup = {two, after:E('[...midi.access.outputs.keys()].join()'), letter:E('midi.outIds[1]'), to:s2 ? window.__midiDev[s2.port] : null};
+    window.__midiSent.length = 0; E('msend([0x90, 64, 100], null, false, 0); msend([0x90, 65, 100], null, false, 1)'); await wait(30);
+    const sends = window.__midiSent.filter(x => x.op === 'midiSend');
+    o.dup = {two, after:E('[...midi.access.outputs.keys()].join()'), letters:E('midi.outIds.slice(0, 2).join()'), to:sends.map(x => window.__midiDev[x.port] + ':' + x.bytes[1]).join()};
     window.__midiPhys = null; E("midi.outIds[1] = ''");
     // HELPER DIED: no answer twice → its ports are dropped, MIDI connects again through a fresh helper (a second start)
     const starts = window.__ioStarts; window.__ioKill(); await E('nmScan()'); await E('nmScan()'); await wait(800);
@@ -281,7 +285,7 @@ try { const page = await open('ok');
   ok(nm.sent && nm.sent.port === 1 && nm.sent.bytes === '144,60,100' && Math.abs(nm.sent.errMs) < 0.5 && nm.outbox === 0, 'a note booked ahead goes straight to the helper at its OS time (no OUTBOX): ' + JSON.stringify(nm.sent));
   ok(/^midiClear/.test(nm.stop) && /midiSend:b0/.test(nm.stop), 'STOP clears the helper\'s queue, then sends the offs: ' + nm.stop);
   ok(nm.clkIn >= 5, 'MIDI clock in arrives with its timestamps: ' + nm.clkIn + ' ticks');
-  ok(nm.dup.two === 'n:Gear,n:Gear #2' && nm.dup.after === 'n:Gear' && nm.dup.letter === 'n:Gear' && nm.dup.to === 'B', 'two same-name devices, the first unplugged: the port letter follows and a note reaches the surviving device: ' + JSON.stringify(nm.dup));
+  ok(nm.dup.two === 'n:Gear,n:Gear #2' && nm.dup.after === 'n:Gear' && nm.dup.letters === 'n:Gear,n:Gear #2' && nm.dup.to === 'B:64', 'two same-name devices, one unplugged: the group is reopened (a note on "Gear" reaches the device still there, through an open handle) and no choice is moved: ' + JSON.stringify(nm.dup));
   ok(nm.revive.starts === 1 && nm.revive.native && nm.revive.outs === 'n:Gear', 'a helper that died is noticed and MIDI reconnects through a fresh one: ' + JSON.stringify(nm.revive));
   ok(nm.closed === 2 && nm.after !== 'native', 'Engine Browser closes the helper\'s ports: ' + nm.closed + ' closed, now ' + nm.after);
   await page.close(); } catch (e) { console.error(e); fails++; }
