@@ -359,6 +359,8 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+- **Recording counter in Record a sample** (owner, 7 Nov 21:18): while a take records, show how long it is so far in minutes and
+  seconds (e.g. 0:00 → 4:37), so a long take's length is visible as it goes. Both engines (Native and Browser), FREE and PATTERN.
 - **Track reordering** (moving a track next to its bus, as other DAWs do). Big job: every song row, mixer, send, bus
   group, block mute and MIDI mapping refers to tracks by index, so it all has to be renumbered together. Owner (2 Nov):
   later, not while stabilising.
