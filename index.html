@@ -431,6 +431,8 @@ body:not(.nowv) .wvMobNote{display:none}
 #pAudio .btnrow:has(#audReset) > .lbl{display:none}
 #pAudio :is(#audReset, #audReport){min-height:30px; padding:0 10px; font-size:var(--fs-3)}   /* (MENU PASS 2: the same size as Test sound) */
 :is(#pAudio,#pMidi) .audrow .mlat input{width:52px}
+/* GEAR DELAY (owner, 7 Nov: a negative delay's − or digits were cut off): room for −50 and the number spinner, everywhere it shows */
+.mlat input[type=number]{width:74px!important; min-width:74px; box-sizing:border-box; text-align:right}
 #pAudio .audrow input[type=range]{flex-basis:120px; min-width:80px}
 .segrow{min-width:0}
 .fxgrid .segrow{grid-column:1 / -1}
@@ -2754,6 +2756,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <span class="mpL">C</span><select id="midiOutSel2" aria-label="MIDI output port C"><option value="">None</option></select><label class="mlat" title="Gear delay for port C, in ms"><input type="number" class="numsmall" id="midiLat2" min="-50" max="200" step="1" aria-label="Gear delay for port C, in milliseconds"><i>ms</i></label><input type="checkbox" class="mck" id="midiClk2" aria-label="Send clock to port C" title="Send clock, Start and Stop to port C">
         <span class="mpL">D</span><select id="midiOutSel3" aria-label="MIDI output port D"><option value="">None</option></select><label class="mlat" title="Gear delay for port D, in ms"><input type="number" class="numsmall" id="midiLat3" min="-50" max="200" step="1" aria-label="Gear delay for port D, in milliseconds"><i>ms</i></label><input type="checkbox" class="mck" id="midiClk3" aria-label="Send clock to port D" title="Send clock, Start and Stop to port D">
       </div>
+      <div class="audrow" title="Measures how early or late each port's gear sounds against ...Thunder, through an audio input, and sets its Gear delay"><span>Gear delay</span><button type="button" id="bMidiLat">Measure…</button></div>
       <div class="lbl mclkh" id="segClkOut" aria-live="polite"></div>
       <div class="audrow mclk" title="Clock in follows another device’s clock: its Start and Stop run PLAY (Continue after a Song Position Pointer plays from there) and its tempo sets ours. From: the input to follow; the first one that sends keeps it until it goes quiet, so two devices sending clock can’t double the tempo"><span>Clock in</span><input type="checkbox" class="msw1" id="ckClkIn" aria-label="Follow MIDI clock in"><span class="mclkf">from</span><select id="midiClkSel" aria-label="Which MIDI input Clock in follows"><option value="" title="The first input that sends clock keeps it until it goes quiet">First that sends</option></select></div>
       <div id="linkBox" hidden>
@@ -14540,7 +14543,7 @@ function rcdRoute(){
 const rcdLat = () => Math.max(-0.5, (ctx.outputLatency || ctx.baseLatency || 0) + (RCD.inLat || 0) + (rcdSet.lat || 0) / 1000);
 function rcdMsg(m){
   if (m.pk){ for (let c = 0; c < 2; c++){ RCD.pk[c] = m.pk[c]; RCD.hold[c] = Math.max(RCD.hold[c] * 0.92, m.pk[c]); } if (m.pk[0] >= 0.999 || m.pk[1] >= 0.999) RCD.clip = performance.now(); rcdMeter(); return; }
-  if (m.ch && m.ch.length) RCD.chunks.push({f0:m.f0, ch:m.ch});
+  if (m.ch && m.ch.length){ if (!RCD.chunks.length) RCD.firstF = m.f0; RCD.chunks.push({f0:m.f0, ch:m.ch}); }
   if (RCD.on && RCD.chunks.length && !RCD.sync){   // FREE: the longest sample there can be
     const n = RCD.chunks.reduce((a, c) => a + c.ch[0].length, 0); if (n >= SMP_MAX * ctx.sampleRate){ toast(`Stopped at ${SMP_MAX} s, the longest a sample can be.`); rcdStop(); } }
   if (m.done && RCD.onDone){ const f = RCD.onDone; RCD.onDone = null; f(); }
@@ -14649,6 +14652,64 @@ function rcdTake(t, how, beats, pats){
   if (!t){ toast('Nothing was recorded.'); rcdUi(); return; }
   if (sePeak({data:t.data, data2:t.data2, sr:ctx.sampleRate}).peak < 1e-4) toast('The take is silent: is the right input picked, and is it turned up?', 5000);
   RCD.take = {data:t.data, data2:t.data2, sr:ctx.sampleRate, how, beats, pats}; RCD.undo = []; RCD.sel = null; RCD.view = null; RCD.cursor = null; rcdUi();
+}
+/* MEASURE GEAR DELAY (owner, 7 Nov: MIDI notes sounded early against the engines, "different on every stop and start"; on
+   Electron). Settings › MIDI › Measure… plays a loud click through the master and, 250 ms later, a MIDI note on the port, again
+   and again, while recording the input picked in Record a sample (its INPUTS too). Wire whatever hears both (the mixer's out,
+   or the gear and a loopback of ...Thunder's out summed) into that input: click and note then share one input path, so the
+   input's own latency cancels. Each hit gives how late the gear sounds against ...Thunder (with the Gear delay already set);
+   the median is the correction, the spread the jitter, the slope across the run any drift. A short, loud, percussive patch on
+   the gear measures best. The click goes to the master, so it is as late as the engines (master effects included). */
+const MLT = {GAP:0.25, PER:0.6};
+function mltOnset(x, a, b, sr){   // the first frame in [a, b) above half the window's peak, refined to where it rises above a tenth
+  a = Math.max(0, a | 0); b = Math.min(x.length, b | 0); let pk = 0, ip = -1; for (let i = a; i < b; i++){ const v = Math.abs(x[i]); if (v > pk){ pk = v; ip = i; } }
+  if (pk < 0.01) return null; let i = a; while (i < b && Math.abs(x[i]) < pk * 0.5) i++;
+  const lim = Math.max(a, i - Math.round(sr * 0.004)); while (i > lim && Math.abs(x[i - 1]) >= pk * 0.1) i--; return i; }
+async function midiLatRun(p, ch, note, n){
+  if (!midiOut(p)) throw new Error('no port'); if (!(await rcdOpen())) throw new Error('no input');
+  const sr = ctx.sampleRate, buf = ctx.createBuffer(1, Math.round(sr * 0.004), sr), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (i & 1 ? -0.9 : 0.9) * (1 - i / d.length);   // a 4 ms, full-scale click
+  const monWas = RCD.mon.gain.value; RCD.mon.gain.value = 0;   // (monitoring would feed the click back in)
+  mapUpd(); RCD.chunks = []; RCD.on = true; RCD.node.port.postMessage('go');
+  const t0 = ctx.currentTime + 0.6, T = [];
+  for (let k = 0; k < n; k++){ const tc = t0 + k * MLT.PER, src = ctx.createBufferSource(); src.buffer = buf; src.connect(master); src.start(tc);
+    msend([0x90 | ch, note, 127], tc + MLT.GAP, true, p); msend([0x80 | ch, note, 0], tc + MLT.GAP + 0.08, true, p); T.push(tc); }
+  const end = t0 + n * MLT.PER + rcdLat() + 0.4;
+  await new Promise(r => { const w = () => ctx.currentTime >= end ? r() : setTimeout(w, 50); w(); });
+  const take = await new Promise(r => { RCD.onDone = () => r(rcdCollect(null, null)); RCD.node.port.postMessage('stop'); }); RCD.on = false;
+  try { RCD.mon.gain.value = monWas; } catch(e){} if (!RCD.ui) rcdClose();
+  if (!take) throw new Error('nothing recorded');
+  const L = take.data, R = take.data2, x = new Float32Array(L.length); for (let i = 0; i < x.length; i++) x[i] = R ? Math.max(Math.abs(L[i]), Math.abs(R[i])) : L[i];
+  // where the recording starts on the audio clock: the first chunk's frame; the click is searched for near its expected place
+  const f0 = RCD.firstF != null ? RCD.firstF : 0, lat = rcdLat(), out = [];
+  for (const tc of T){ const e = Math.round((tc + lat) * sr) - f0;
+    const c = mltOnset(x, e - sr * 0.12, e + sr * 0.15, sr); if (c == null) continue;
+    const m = mltOnset(x, c + sr * (MLT.GAP - 0.1), c + sr * (MLT.GAP + 0.3), sr); if (m == null) continue;
+    out.push({t:tc - t0, ms:((m - c) / sr - MLT.GAP) * 1000}); }
+  return out; }
+function midiLatPanel(){
+  const ports = [...Array(NPORT).keys()].filter(q => midiOut(q)); if (!ports.length) return toast('Pick a MIDI device for a port first (Settings › MIDI › Ports).', 4000);
+  const mi = S.insts[cInst], mine = mi && (mi.mo | 0) ? mi : null;
+  let p = mine ? portOf(mine) : ports[0], ch = mine ? (mine.mch | 0) & 15 : 0, n = 24, busy = false, res = null;
+  genPanel('Measure gear delay', 'Plays a click through ...Thunder and, 250 ms later, a note on the gear, again and again, and listens on the input chosen in Record a sample (Input and Inputs there). Send the mixer’s output, or anything that hears both, into that input; a short, loud patch on the gear works best.', ({field, msgEl}) => {
+    const pS = el('select'); ports.forEach(q => pS.append(new Option(PORTL[q] + '  ' + portName(q), q))); pS.value = p; pS.addEventListener('change', () => { p = +pS.value; });
+    const cS = el('select'); for (let c = 0; c < 16; c++) cS.append(new Option(d2(c + 1), c)); cS.value = ch; cS.addEventListener('change', () => { ch = +cS.value; });
+    const nS = el('select'); [[24, '24 hits · 15 s'], [100, '100 hits · 1 min (drift)']].forEach(([v, t]) => nS.append(new Option(t, v))); nS.value = n; nS.addEventListener('change', () => { n = +nS.value; });
+    field('Port', pS); field('Channel', cS); field('Length', nS);
+    MLT.say = t => { msgEl.textContent = t; }; }, [
+    ['Measure', async () => { if (busy) return; if (tp.on) tStop(); busy = true; MLT.say('Measuring… keep quiet near any microphone.');
+      try { const r = await midiLatRun(p, ch, 48, n), ok = r.length;
+        if (ok < Math.max(4, n / 3)) { MLT.say(`Only ${ok} of ${n} hits were heard clearly: check the input and its level, and that the gear is loud and short.`); busy = false; return; }
+        const v = r.map(q => q.ms).sort((a, b) => a - b), med = v[v.length >> 1], q1 = v[Math.floor(v.length * 0.1)], q9 = v[Math.floor(v.length * 0.9)];
+        const mt = r.reduce((a, q) => a + q.t, 0) / ok, mm = r.reduce((a, q) => a + q.ms, 0) / ok, sl = r.reduce((a, q) => a + (q.t - mt) * (q.ms - mm), 0) / Math.max(1e-9, r.reduce((a, q) => a + (q.t - mt) ** 2, 0));
+        const now = mLatOf(p), want = clamp(Math.round(now + med), -50, 200);
+        res = {want, p};
+        MLT.say(`Port ${PORTL[p]}: the gear sounds ${Math.abs(med).toFixed(1)} ms ${med >= 0 ? 'late' : 'early'} against ...Thunder (Gear delay now ${now} ms), from ${ok} hits. Spread ${q1.toFixed(1)} to ${q9.toFixed(1)} ms (most hits); drift ${(sl * 60).toFixed(1)} ms a minute. ` +
+          (Math.abs(med) < 0.6 ? 'It already lines up.' : `Apply sets the Gear delay to ${want} ms.`) + (q9 - q1 > 4 ? ' The spread is wide: the gear or its MIDI path is jittery, or the patch is slow to start.' : '')); }
+      catch(e){ MLT.say(e && e.message === 'no input' ? 'Couldn’t open the input: check Record a sample’s Input.' : 'The measurement stopped: ' + ((e && e.message) || e)); }
+      busy = false; }, 'ok'],
+    ['Apply', () => { if (!res) return MLT.say('Measure first.'); midi.lats[res.p] = res.want; const r = $('midiLat' + res.p); if (r) r.value = res.want; saveMidi(); toast(`Gear delay for port ${PORTL[res.p]}: ${res.want} ms`); }],
+  ]);
 }
 // TAKE EDITS (the SMP EDIT functions): on the selection, or the whole take
 // map: where a frame of the take before the edit is after it (crop, cut, reverse, trim move the layer's markers with the audio)
@@ -15503,9 +15564,25 @@ const p2a = p => (p - (amap.off == null ? mapUpd() : amap.off)) / 1000;
 // One message to port p (A = 0) at audio time t (null: now); early: less the Gear delay (notes and what goes with them).
 function msend(bytes, t, early, p){
   const o = midiOut(p); if (!o || !ctx) return;
-  const at = t == null ? 0 : a2p(t) - (early ? mLatOf(p) : 0);
-  try { o.send(bytes, Math.max(performance.now(), at)); } catch(e){}
+  const at = t == null ? 0 : a2p(t) - (early ? mLatOf(p) : 0), now = performance.now();
+  if (at - now > MOB_AHEAD && !document.hidden) return mobPut(o, bytes, at);
+  try { o.send(bytes, Math.max(now, at)); } catch(e){}
 }
+/* OUTBOX (owner, 7 Nov: "midi notes keep playing for a couple of notes after stop"). The sequencers book notes up to 0.25 s
+   ahead (more in a hidden tab), and a message handed to Web MIDI can't be taken back (Chrome / Electron have no clear()), so a
+   STOP left the booked notes to play out on the gear. Messages more than MOB_AHEAD ms ahead now wait here and go to Web MIDI,
+   still with their exact timestamps, once they are within it; moRelease (STOP, panic) drops what is waiting. Hidden (timers
+   throttled): sent straight away as before, and anything waiting goes out when the page hides. */
+const MOB_AHEAD = 60, MOB = {q:[], tm:0};
+function mobPut(o, b, at){
+  const q = MOB.q; let lo = 0, hi = q.length; while (lo < hi){ const m = (lo + hi) >> 1; if (q[m].at <= at) lo = m + 1; else hi = m; }   // after equal times: order kept (an OFF before the next ON)
+  q.splice(lo, 0, {o, b, at}); if (!MOB.tm) MOB.tm = setInterval(mobFlush, 15); }
+function mobFlush(all){
+  const q = MOB.q, now = performance.now(), lim = all === true ? Infinity : now + MOB_AHEAD; let i = 0;
+  while (i < q.length && q[i].at <= lim){ const x = q[i++]; try { x.o.send(x.b, Math.max(now, x.at)); } catch(e){} }
+  if (i) q.splice(0, i); if (!q.length && MOB.tm){ clearInterval(MOB.tm); MOB.tm = 0; } }
+function mobDrop(){ MOB.q.length = 0; if (MOB.tm){ clearInterval(MOB.tm); MOB.tm = 0; } }
+document.addEventListener('visibilitychange', () => { if (document.hidden && MOB.q.length) mobFlush(true); });
 const msendClk = (bytes, t) => { for (const p of clkPorts()) msend(bytes, t, false, p); };
 const moEnd = e => Math.min(e.cut != null ? e.cut : Infinity, e.rel != null ? e.rel : Infinity);
 function offOne(h, at){ if (h.end <= at) return; msend([0x80 | h.ch, h.n, 0], Math.max(at, h.t + 0.001), true, h.p); h.end = at; }
@@ -15840,6 +15917,7 @@ function moLfo(s){
 // STOP), and bent channels go back to the middle.
 function moRelease(){
   const now = ctx ? ctx.currentTime : 0, cleared = new Set();
+  if (!tp.on) mobDrop();   // OUTBOX: the notes still waiting never go
   if (!tp.on) for (let p = 0; p < NPORT; p++){ const o = midiOut(p); if (!o || cleared.has(o)) continue; cleared.add(o);
     try { if (typeof o.clear === 'function') o.clear(); } catch(e){} }   // drop what was booked ahead (not every browser can)
   for (const H of mx.held) if (H) for (const h of H) if (h.end > now){
@@ -16074,6 +16152,7 @@ makeCk($('ckClkIn'), () => midi.clkIn, v => { midi.clkIn = v; mx.inT = []; mx.sl
 // Gear delay, one per port (20 Oct: it was one for every port; MPC over USB and a synth on a DIN cable lag differently).
 for (let p = 0; p < NPORT; p++){ const r = $('midiLat' + p); if (!r) continue; r.value = mLatOf(p);
   r.addEventListener('change', () => { midi.lats[p] = clamp(Math.round(+r.value || 0), -50, 200); r.value = midi.lats[p]; saveMidi(); }); }
+$('bMidiLat').addEventListener('click', () => midiLatPanel());
 $('midiInSel').addEventListener('change', e => { midi.inId = e.target.value; releaseKeys(); saveMidi(); });
 $('midiInCh').addEventListener('change', e => { midi.inCh = clamp(+e.target.value, -1, 15); releaseKeys(); saveMidi(); });
 $('midiClkSel').addEventListener('change', e => { midi.clkId = e.target.value; mx.clkSrc = ''; mx.inT = []; saveMidi(); });
@@ -22236,7 +22315,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 477;
+const BUILD = 478;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31194,6 +31273,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [478, '7 Nov', ['MIDI: STOP no longer lets the notes already booked ahead play out on the gear: notes wait in the app until they are about 60 ms away (still sent with exact timestamps), and a stop drops the rest.', 'Settings › MIDI › Gear delay › Measure…: plays a click through ...Thunder and a note on the gear, listens on Record a sample’s input, and says how early or late the gear is, how much it wanders and whether it drifts; Apply sets the port’s Gear delay.', 'The Gear delay boxes are wide enough for −50.']],
   [477, '7 Nov', ['INST: OUTPUT comes first and decides what the screen shows, as in Renoise. PAD shows the pad settings, MIDI only the MIDI ones (channel, port, bend, CCs, LFO, echo), PAD+MIDI both. VOLUME and PAN are with the pad (they never changed MIDI). Hidden settings are kept for when you switch back.', 'Record a sample: INPUTS picks the channels of a multi-channel interface: a pair (1+2, 3+4…) or one channel. The list fills in once the input has been opened (Record) and is remembered per interface; some browsers only give 2 channels.', 'Ctrl/⌘+G opens the generators (Drum pattern, Acid line, Euclidean fill…) under the cursor.']],
   [476, '7 Nov', ['Audio-thread sequencer: a sample note with CUT, RES or DEC, or played reversed, no longer makes the audio thread process the whole sample at once (with long samples that stalled it: stutters, a speed-up, STOP not heard). The filter and decay now run as the note plays.']],
   [475, '7 Nov', ['(Testing only) ?pbshow in the address shows the playback report on screen with PLAY / STOP, for testing on remote phones.']],

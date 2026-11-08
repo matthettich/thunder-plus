@@ -180,6 +180,20 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 7 Nov (8): MIDI outbox, Measure gear delay, wider delay boxes (build 478, beta)
+
+- Owner (Electron, notes only, no clock): MIDI early against the engines, −7 ms Gear delay "wasn't quite right… it's
+  different on every stop and start", and "midi notes keep playing for a couple of notes after stop".
+- OUTBOX (`msend` → `mobPut` / `mobFlush` / `mobDrop`): messages more than MOB_AHEAD (60 ms) ahead wait on the page and go to
+  Web MIDI with their exact timestamps once within it (15 ms interval while anything waits). moRelease drops the queue when
+  stopped (Chrome / Electron have no MIDIOutput.clear()). Hidden page: straight to Web MIDI as before; hiding flushes.
+- MEASURE (`midiLatPanel` / `midiLatRun`, Settings › MIDI › Gear delay › Measure…): a 4 ms click to `master`, a MIDI note
+  250 ms later, N times (24 or 100), recorded through the recorder's input / INPUTS; onsets per hit (mltOnset), median →
+  Apply sets midi.lats. Click and note share the input path, so the input latency cancels. Headless check with a fake port
+  scheduling a click into the recorder: 7 ms late measured 7.5; −12 measured −10.0…−11.7 (the a2p mapping's wobble).
+- The per-start variation isn't explained yet: Measure run twice (or 100 hits) should say whether it's the clock mapping
+  (amap, smoothed 0.02 per pump step, reset on a >50 ms jump) or the sequencer. `.mlat input` now 74 px everywhere.
+
 ## 7 Nov (7): INST layout by OUTPUT, recorder INPUTS, Ctrl/⌘+G generators (build 477, beta)
 
 - Owner: the INST screen "is a little strange… choosing midi means you're still on an instrument that holds a pad sound"; chose
