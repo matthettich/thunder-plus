@@ -14529,7 +14529,7 @@ function rcdPick(n){
   const m = /^([ps])(\d+)$/.exec(rcdSet.inCh || ''), k = m ? m[1] : 'p', a = m ? +m[2] : 0;
   return (k === 'p' ? a + 1 < n || a === 0 : a < n) ? [k, a] : ['p', 0]; }
 function rcdInOpts(n){
-  if (n <= 2) return [['p0', n < 2 ? '1 (this input has 1 channel)' : '1+2 (this input has 2 channels)']];
+  if (n <= 2) return [['p0', n < 2 ? '1 (all the app is given)' : '1+2 (all the app is given)']];   // (owner, 7 Nov: "wrongly thinks my audio interface only has two inputs": it's what the browser engine hands over, not the device)
   const o = []; for (let a = 0; a + 1 < n; a += 2) o.push(['p' + a, 'IN ' + (a + 1) + '+' + (a + 2)]);
   for (let a = 0; a < n; a++) o.push(['s' + a, 'IN ' + (a + 1) + ' (mono)']); return o; }
 function rcdRoute(){
@@ -14902,7 +14902,7 @@ async function rcdPanel(pad, opts){
   const fillCh = () => { const n = RCD.stream ? RCD.nch || 2 : ((rcdSet.nchs || {})[rcdSet.input || ''] || 2), O = rcdInOpts(n);
     if (chKey !== n + ''){ chKey = n + ''; chSel.textContent = ''; O.forEach(([v, t]) => chSel.append(new Option(t, v))); }   // (rcdUi calls it often: an open list isn't rebuilt)
     chSel.value = rcdPick(n)[0] + rcdPick(n)[1]; chSel.disabled = O.length < 2 || !!(RCD.on || RCD.sync);
-    chSel.title = O.length < 2 ? 'Only one choice here: a multi-channel interface shows its inputs once it has been opened (Record), if the browser gives them all' : ''; };
+    chSel.title = O.length < 2 ? 'The browser engine (in the desktop app too) only hands the app two channels of an interface, its inputs 1 and 2, whatever it has. To record another input, route it to 1/2 in the interface’s own mixer software for now' : ''; };
   chSel.addEventListener('change', () => { rcdSet.inCh = chSel.value; rcdSave(); rcdRoute(); });
   inSel.addEventListener('change', fillCh);
   field('Inputs', chSel); fillCh();
@@ -22348,7 +22348,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 482;
+const BUILD = 483;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31311,6 +31311,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [483, '7 Nov', ['Record a sample: INPUTS no longer says the interface has only 2 channels: the browser engine only gives the app inputs 1 and 2 (hover the list for how to record another input).']],
   [482, '7 Nov', ['Measure gear delay: pick the NOTE it plays on the gear (for gear that only answers certain notes, such as a drum module), remembered per port with the channel. It used to play C-3.']],
   [481, '7 Nov', ['Audio-thread sequencer: changing a pad’s engine on the Synth page while the song plays takes effect within a moment (a pad that went from a rendered sound to a live engine, or back, kept the old sound until STOP and PLAY).']],
   [480, '7 Nov', ['Mac: Caps Lock types a note off on every press again. A Mac reports Caps Lock in odd ways (sometimes only when it turns on, sometimes both key events), and some presses were lost; now each press counts once however the events come.']],
