@@ -14359,15 +14359,24 @@ function seConcat(a, b) {
    the assignSample hook (smbAdd) and bLoad's handler (back to the file picker). */
 const SMB_K = 'thunderplus-recent-v1', SMB_MAX = 40, SMB_EXT = /\.(wav|wave|aif|aiff|aifc|flac|mp3|ogg|oga|opus|m4a|aac|caf|webm)$/i;
 const SMB = {tab:'folder', q:'', files:null, scanning:false, dir:null, perm:'', session:[], sel:0, aud:true, prev:null, ui:null};
-const smbRecent = () => { try { const a = JSON.parse(localStorage.getItem(SMB_K) || '[]'); return Array.isArray(a) ? a : []; } catch(e){ return []; } };
+// RECENT lives in localStorage, which is ~5 MB for the whole origin and shared with the kit, the song and their backups. A write that fails
+// there (full) used to be swallowed, so a take simply never appeared ("5 minute take wasn't in recent samples", 8 Nov: nothing is wrong with a
+// long sample itself, the store holds it as 16-bit PCM and the list entry is 80 bytes). So the list is also kept in memory, and a failed write
+// retries with fewer entries; smbRecent() reads whichever is newer, so the take is there at least until the page closes.
+var SMB_MEM = null;
+const smbRecent = () => { let a = []; try { a = JSON.parse(localStorage.getItem(SMB_K) || '[]'); if (!Array.isArray(a)) a = []; } catch(e){ a = []; }
+  if (SMB_MEM && SMB_MEM.length && (!a.length || SMB_MEM[0].t >= a[0].t)) return SMB_MEM;   // (the memory copy is newer only when the last write failed)
+  return a; };
 // A sample a pad just took: to the top of RECENT, and into the sample store now (so it's there even if the pad changes first)
 function smbAdd(S){
   if (!S || !S.data) return;
   if (!S.id) S.id = smpId();
-  const a = smbRecent().filter(r => r.id !== S.id);
+  const a = smbRecent().filter(r => r.id !== S.id).slice(0, SMB_MAX - 1);
   a.unshift({id:S.id, name:S.name || 'Sample', secs:+(S.data.length / S.sr).toFixed(2), st:S.data2 ? 1 : 0, t:Date.now()});
-  try { localStorage.setItem(SMB_K, JSON.stringify(a.slice(0, SMB_MAX))); } catch(e){}
-  try { smpPut(S).catch(() => {}); } catch(e){}
+  let ok = false; for (const n of [SMB_MAX, 10, 3, 1]){ try { localStorage.setItem(SMB_K, JSON.stringify(a.slice(0, n))); ok = true; break; } catch(e){} }
+  SMB_MEM = ok ? null : a; if (!ok) tpLog('RECENT could not be saved (storage full): kept for this session only');
+  smpHeld.set(S.id, S);   // (so a RECENT row loads from memory even if the store write below is slow or fails; the minute-by-minute prune lets it go once no pad names it)
+  try { smpPut(S).catch(e => { tpLog('could not store the sample for RECENT', e); toast('This sample is too big for the browser’s storage: RECENT will only have it until the app closes.', 7000); }); } catch(e){}
 }
 const smbDb = () => idbOpen('thunderplus-browser');   // (its store is called 'smp' too: idbOpen makes that one; here it holds the folder handle)
 async function smbKv(k, v){ try { const db = await smbDb(); return await new Promise(res => { const tx = db.transaction('smp', v === undefined ? 'readonly' : 'readwrite'), st = tx.objectStore('smp');
@@ -14930,14 +14939,20 @@ function rcdDrawWave(){
   U.rd.textContent = (RCD.sel ? `Selection ${t(RCD.sel[0])} – ${t(RCD.sel[1])} (${t(RCD.sel[1] - RCD.sel[0])})` : RCD.cursor != null ? `Cursor ${t(RCD.cursor)}` : `Length ${t(n)}`)
     + (vb - va < n ? ` · view ${t(va)} – ${t(vb)}` : '');
 }
+// RATE NOTE (owner, 8 Nov: "Sample-rate mismatch: saw no window"): rcdOpen1 sets RCD.note, a small status line inside the window that
+// fillIn clears again when the window is reopened over a still-open input. So the rate message is worked out here from the open input, shown
+// as that line whenever there is no other note, and as a toast once per device + rate pair (again only when the rates change).
+function rcdRateMsg(){ const o = RCD.io && RCD.io.opened, dr = o ? o.deviceRate | 0 : 0, ar = ctx ? ctx.sampleRate | 0 : 0;
+  return dr && ar && dr !== ar ? { key: RCD.io.dev.inId + ':' + dr + '>' + ar, msg: `${RCD.io.dev.name} runs at ${dr / 1000} kHz and the app at ${ar / 1000} kHz: the input is converted. Set them the same (Settings › Audio › Rate, or the interface) for a clean take.` } : null; }
 function rcdUi(){
+  const rm = rcdRateMsg(); if (rm && RCD.rateToast !== rm.key){ RCD.rateToast = rm.key; toast(rm.msg, 8000); }
   const U = RCD.ui; if (!U) return; const R = RCD.sync, T = RCD.take;
   U.rec.textContent = R ? (R.phase === 'armed' ? '■ Cancel' : R.stopReq ? '■ Stopping…' : '■ Stop') : RCD.on ? '■ Stop' : '● Record';
   U.rec.classList.toggle('on', !!(RCD.on || R));
   U.state.textContent = R ? (R.phase === 'armed' ? (tp.on ? 'Armed: records from the next pattern…' : 'Starting the song…') : R.phase === 'closing' ? 'Finishing the take…'
       : `● Recording pattern ${R.n + 1}` + (R.pats > 0 ? ` of ${R.pats}` : '') + (R.stopReq ? (R.songStop ? ' · the take and the song stop at its end' : ' · stops at its end') : R.pats < 0 ? ' · Stop ends it right there' : ' · Stop ends it at the end of the pattern'))
     : RCD.on ? '● Recording' : T ? (T.how === 'sync' ? '' : '') + (T.how === 'sync' ? ` · ${T.pats} pattern${T.pats === 1 ? '' : 's'}, ${T.beats} beats` : '')
-    : (RCD.stream || RCD.io) ? RCD.note || 'Ready.' : RCD.note || 'Pick an input and press Record.';   // (a native note, e.g. the rate, stays up while ready)
+    : (RCD.stream || RCD.io) ? RCD.note || (rm && rm.msg) || 'Ready.' : RCD.note || 'Pick an input and press Record.';   // (a native note, e.g. the rate, stays up while ready)
   U.edit.hidden = !T || !!(RCD.on || R);
   U.state.hidden = !U.state.textContent;
   if (T && U.whn){ U.whn.textContent = T.how === 'edit' ? (T.name || 'Sample') : 'Take'; U.whi.textContent = `${(T.data.length / T.sr).toFixed(2)} s · ${T.data2 ? 'stereo' : 'mono'} · ${(T.sr / 1000).toFixed(1)} kHz`; U.win.style.setProperty('--rcw', rcdCols().wave); }
@@ -32736,7 +32751,10 @@ const hadSW = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
 // Samples, SoundFonts and the song live in this origin's storage; ask the browser to keep it when the device runs low
 // on space (Chrome grants this silently to an installed app) instead of evicting it like a visited site's cache.
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch(e){}
-function applyUpdate(){ try { flushS(); flushKit(); saveCur(); } catch(e){ tpLog('saving before the update reload failed', e); } selfReload = true; location.reload(); }
+function applyUpdate(){ try { flushS(); flushKit(); saveCur(); } catch(e){ tpLog('saving before the update reload failed', e); } selfReload = true;
+  // the desktop shell reloads its own window: location.reload() hits main.js's will-navigate guard, which cancels every navigation ("Apply (reload) button did nothing")
+  try { if (DESK_APP && DESK_APP.reload){ DESK_APP.reload(); return; } } catch(e){ tpLog('desktop reload failed, using location.reload', e); }
+  location.reload(); }
 /* FIX (27 Oct, audit B8): a browser tab with unsaved project changes asks before it closes or reloads (F5, Ctrl+R, the tab's
    ✕). The song and kit are always kept in the browser; this is about the project file. The desktop app asks its own way,
    and the app's own reloads (an update) don't ask. */

@@ -225,6 +225,9 @@ app.whenReady().then(() => {
   // Scrolled content follows it already; the page flips its cursor and value wheels to match. No key = Natural (macOS default).
   ipcMain.handle('thunder:natural-scroll', () => process.platform !== 'darwin' ? false : new Promise(res =>
     require('child_process').execFile('defaults', ['read', '-g', 'com.apple.swipescrolldirection'], { timeout: 2000 }, (err, out) => res(err ? true : String(out).trim() !== '0'))));
+  // "Apply (reload) did nothing" (8 Nov): the page's location.reload() raises will-navigate, which createWindow() preventDefaults for every
+  // URL (so a dropped file can't replace the app). The shell reloads the sender's own window instead; webContents.reload() doesn't go through it.
+  ipcMain.on('thunder:reload', e => { try { if (!e.sender.isDestroyed()) e.sender.reload(); } catch (_) {} });
   ipcMain.on('thunder:playing', (e, on) => setPlaying(!!on));   // APP NAP: held while the song plays
   ipcMain.on('thunder:page-ready', () => { pageReady = true; if (pendingPath && win){ const p = pendingPath; pendingPath = null; win.webContents.send('thunder:open-path', p); } });
   ipcMain.on('thunder:close-ack', () => clearTimeout(ackT));

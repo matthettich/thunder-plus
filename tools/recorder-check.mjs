@@ -64,6 +64,25 @@ try {
       E("rcdKeep(3)"); out.keep = E(`(() => { const v = kit.voices[3], L = v.layers[v.sel]; const I = S.insts.filter(I => I.pad === 3);
         return {n:L.sample && L.sample.data.length, st:!!(L.sample && L.sample.data2), type:L.type, eng:v.engine || '', fit:I.length ? I.every(I => I.sync === 1) : null, beats:I.length ? I[0].beats : null, nI:I.length}; })()`);
       E('rcdClose()');
+      // RATE NOTE (8 Nov): a native input at another rate than the app's is announced by a toast, once per device + rate pair
+      E("window.__toasts = []; window.__toast0 = toast; toast = (m, ms) => { window.__toasts.push([m, ms]); };");
+      E("RCD.io = {dev:{name:'Test interface', inId:'t1'}, opened:{deviceRate:(ctx.sampleRate === 44100 ? 48000 : 44100), channels:2}}; RCD.rateToast = null; RCD.note = ''; rcdUi(); rcdUi();");
+      out.rate1 = E('window.__toasts.slice()');
+      E("RCD.note = ''; rcdUi();"); out.rate2 = E('window.__toasts.length');   // window reopened: note cleared, no second toast
+      E("RCD.io.opened.deviceRate = 96000; rcdUi();"); out.rate3 = E('window.__toasts.length');
+      E("RCD.io.opened.deviceRate = ctx.sampleRate; rcdUi();"); out.rate4 = E('window.__toasts.length'); E("RCD.io = null; RCD.rateToast = null; toast = window.__toast0;");
+      // LONG TAKES IN RECENT (8 Nov: "5 minute take wasn't in recent samples"): a 5-minute stereo take is listed and loads back, even when localStorage is full
+      E("localStorage.removeItem(SMB_K); SMB_MEM = null; SMB.tab = 'recent'; SMB.q = '';");
+      E("assignSample(4, new Float32Array(48000 * 300).fill(0.25), 48000, 'Rec long', new Float32Array(48000 * 300).fill(-0.25))");
+      out.long1 = E('smbRows().map(r => [r.name, r.r.secs, r.r.st])');
+      await until(() => E('smpStored.has(smbRecent()[0].id)'), 20000); out.longStored = E('smpStored.has(smbRecent()[0].id)');
+      E("kit.voices[4].layers[kit.voices[4].sel].sample = null; smpHeld.clear();");   // no pad and no memory copy: only the store has it
+      out.longLoad = await E('smbOpen(smbRows()[0]).then(r => r ? r.buf.length + "x" + r.buf.numberOfChannels : null, e => String(e))');
+      let n = 0; try { for (let sz = 1 << 20; sz >= 1; sz >>= 1) for (;;) { try { localStorage.setItem('fill' + (n++), 'x'.repeat(sz)); } catch(e){ break; } } } catch(e){}
+      E("localStorage.removeItem(SMB_K);"); let full = false; try { localStorage.setItem(SMB_K, 'y'.repeat(100)); } catch(e){ full = true; } out.full = full; E("localStorage.removeItem(SMB_K);");
+      E("assignSample(5, new Float32Array(48000 * 300), 48000, 'Rec full', new Float32Array(48000 * 300))");
+      out.longFull = E('smbRecent().map(r => r.name)');
+      for (const k of Object.keys(localStorage)) if (/^fill/.test(k)) localStorage.removeItem(k);
       return out;
     }, mode).catch(err => ({ err: String(err && err.message || err) }));
     if (res.err) { say(false, `${mode}: ${res.err}`); await ctxB.close(); continue; }
@@ -74,6 +93,11 @@ try {
     say(res.armedState === 'armed' && res.sync2 && Math.abs(res.sync2.n - P) <= 1, `${who}: PATTERN ×1 armed mid-pattern: waited (${res.armedState}), took ${res.sync2 ? res.sync2.n : 'nothing'} frames`);
     say(res.until && Math.abs(res.until.n - 2 * P) <= 1 && res.until.pats === 2, `${who}: UNTIL STOP, stopped in the 2nd pattern: ${res.until ? res.until.n + ' frames, ' + res.until.pats + ' patterns' : 'missing'} (two are ${2 * P})`);
     say(res.keep && res.keep.n === res.until.n && res.keep.type === 'sample' && (res.keep.nI === 0 || (res.keep.fit && res.keep.beats === 8)), `${who}: KEEP into pad 3: ${JSON.stringify(res.keep)}`);
+    say(res.rate1 && res.rate1.length === 1 && res.rate1[0][1] === 8000 && / kHz and the app at/.test(res.rate1[0][0]), `${mode}: the sample-rate mismatch shows once as an 8 s toast: ${JSON.stringify(res.rate1)}`);
+    say(res.rate2 === 1 && res.rate3 === 2 && res.rate4 === 2, `${mode}: no repeat for the same pair (${res.rate2}), again when the rate changes (${res.rate3}), none when they match (${res.rate4})`);
+    say(res.long1 && res.long1.length === 1 && res.long1[0][0] === 'Rec long' && res.long1[0][1] === 300 && res.long1[0][2] === 1 && res.longStored, `${mode}: a 5-minute stereo take is in RECENT (${JSON.stringify(res.long1)}) and in the sample store (${res.longStored})`);
+    say(res.longLoad === '14400000x2', `${mode}: and RECENT loads it back from the store alone: ${res.longLoad}`);
+    say(res.full && Array.isArray(res.longFull) && res.longFull[0] === 'Rec full', `${mode}: with localStorage full (${res.full}) the take is still listed in RECENT: ${JSON.stringify(res.longFull)}`);
     await ctxB.close();
   }
 } finally { await browser.close(); srv.close(); }
