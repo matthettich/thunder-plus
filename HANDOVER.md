@@ -112,7 +112,7 @@ installation" (the step is continue-on-error, so Windows builds ship without the
 **PICK UP HERE: EVERYTHING STILL NEEDED (updated 7 Nov 23:30).** Read this list first; the paragraphs below it are the detail.
 
 **NEXT STEPS, in order:**
-1. The owner tests **1.3.0-beta.9** (has everything): the recording list (item 1) and the MIDI list (item 5, "Owner's test").
+1. The owner tests **1.3.0-beta.10** (has everything): the recording list (item 1) and the MIDI list (item 5, "Owner's test").
    Start a session by asking for the results; fix on `io-helper`, pre-release beta.10, and check the macOS and Windows job
    logs for "thunder_io.node built" (both), "adhoc-sign: signed" (macOS) and "thunder_link.node built" (both).
 2. When both lists pass: merge PR #14 into `beta` (item 3), then `beta` → `main` and a normal desktop release only when the
@@ -121,7 +121,7 @@ installation" (the step is continue-on-error, so Windows builds ship without the
 4. Later / low priority: Linux ALSA in CI (item 5, skipped on the owner's word); phase C (audio output through the helper)
    only if MIDI vs audio timing is still off after B, and then more likely the native desktop app (docs/NATIVE-DESKTOP-PLAN.md).
 
-*State now:* branch `io-helper` (build 499: phase B MIDI built and reviewed, item 5; desktop pre-release **1.3.0-beta.9**. beta.8 = 498 (first with MIDI, Windows with Link and the helper again); beta.7 = 496, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
+*State now:* branch `io-helper` (build 499: phase B MIDI built and reviewed, item 5; desktop pre-release **1.3.0-beta.10** (build 500). beta.9 = 499; beta.8 = 498 (first with MIDI, Windows with Link and the helper again); beta.7 = 496, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
 CodeRabbit fix that was the real cause of the beta.2/3 failures (the helper died on the first chunk: MessagePortMain can't
 transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner tests beta.7 when convenient (item 1). PR #14
 (`io-helper` → `beta`) is open. `beta` is at build 488 plus a CLAUDE.md line ("continue the helper"); `main` is at build 485
@@ -244,6 +244,8 @@ Started before the owner's beta.7 test, by the owner's choice; the risk is only 
   once (a second one answered every waiting request with null). Delegated to a Sonnet subagent and checked by the lead:
   helper op `midiStats`, Settings › MIDI status "· N late" (`NM.late`, `nmLateShow`). Not changed (noted): ids shift when the
   first of two same-name devices is unplugged; the 15 s clock re-measure replaces the offset (±0.2 ms) rather than smoothing.
+  CodeRabbit's second pass (build 500): `NM.scanning` holds the access being scanned (a leftover scan of an old access no longer
+  holds up the new one), no midiRemap from a scan whose access has gone, and the helper's dead transfer-list argument removed.
 - **Linux: skipped for now (owner, 7 Nov 23:09: "not as important"; still needs to happen).** The Linux addon builds without
   ALSA (no ALSA headers on ubuntu-latest), so Linux has no native MIDI ports (Web MIDI still works, Engine Browser). To do:
   `sudo apt-get install -y libasound2-dev` before "Native I/O helper addon (optional)" in desktop.yml, Linux runner only,

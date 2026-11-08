@@ -73,7 +73,7 @@ function makeIn(over = {}) {
 }
 const count = (calls, k) => calls.filter(c => c[0] === k).length;
 
-test('io helper input: open → opened with the channel count; chunks posted in order with the buffer transferred', () => {
+test('io helper input: open → opened with the channel count; chunks posted in order', () => {
   const t = makeIn();
   t.h.handle({ op: 'open', id: 1, dev: 'a', rate: 48000, block: 128 });
   assert.deepEqual(t.out[0], { op: 'opened', id: 1, ok: true, rate: 48000, channels: 8, block: 128, latencyFrames: 64 });
@@ -85,7 +85,7 @@ test('io helper input: open → opened with the channel count; chunks posted in 
   assert.equal(ins.length, 2);
   assert.equal(ins[0].frame0, 0); assert.equal(ins[1].frame0, 128);
   assert.equal(ins[1].hostNs, 1e9 + 1); assert.equal(ins[0].channels, 8); assert.equal(ins[0].frames, 128);
-  assert.equal(ins[0].data, c0.data); assert.equal(ins[0]._t[0], c0.data.buffer); assert.equal(ins[1]._t[0], c1.data.buffer);
+  assert.equal(ins[0].data, c0.data); assert.equal(ins[1].data, c1.data);
 });
 
 test('io helper input: at most 8 reads that return data per tick; the rest on the next tick', () => {

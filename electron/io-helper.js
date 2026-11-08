@@ -52,8 +52,7 @@ function createIoHelper({ loadAddon, post, timers }) {
         return;
       }
       if (!c) { if (lost) { closeInput(); post({ op: 'closed', why: 'the interface went away (unplugged or switched off)' }); } return; }
-      post({ op: 'in', frame0: c.frame0, hostNs: c.hostNs, channels: c.channels, frames: c.frames, data: c.data, overruns: c.overruns },
-        c.data && c.data.buffer ? [c.data.buffer] : []);
+      post({ op: 'in', frame0: c.frame0, hostNs: c.hostNs, channels: c.channels, frames: c.frames, data: c.data, overruns: c.overruns });   // (copied, not transferred: see the wiring below)
     }
   }
   function handle(msg) {
