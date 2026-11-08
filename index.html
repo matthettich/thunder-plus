@@ -14743,7 +14743,10 @@ function mltOnset(x, a, b, sr){   // the first frame in [a, b) above half the wi
   const fl = q[Math.floor(q.length * 0.3)] || 0; if (pk < 0.01 || pk < fl * 6 + 0.005) return null; let i = a; while (i < b && Math.abs(x[i]) < pk * 0.5) i++;
   const lim = Math.max(a, i - Math.round(sr * 0.004)); while (i > lim && Math.abs(x[i - 1]) >= pk * 0.1) i--; return i; }
 async function midiLatRun(p, ch, note, n){
-  if (!midiOut(p)) throw new Error('no port'); if (!(await rcdOpen())) throw new Error('no input');
+  const say = t => { try { if (MLT.say) MLT.say(t); } catch(e){} };
+  if (!midiOut(p)) throw new Error('no port');
+  if (!RCD.io && !RCD.stream) say('Opening the input… (the first time can take a few seconds)');
+  if (!(await rcdOpen())) throw new Error('no input');
   const sr = ctx.sampleRate, buf = ctx.createBuffer(1, Math.round(sr * 0.004), sr), d = buf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = (i & 1 ? -0.9 : 0.9) * (1 - i / d.length);   // a 4 ms, full-scale click
   rcdMonSet(0);   // (monitoring would feed the click back in)
@@ -14752,7 +14755,10 @@ async function midiLatRun(p, ch, note, n){
   for (let k = 0; k < n; k++){ const tc = t0 + k * MLT.PER, src = ctx.createBufferSource(); src.buffer = buf; src.connect(master); src.start(tc);
     msend([0x90 | ch, note, 127], tc + MLT.GAP, true, p); msend([0x80 | ch, note, 0], tc + MLT.GAP + 0.08, true, p); T.push(tc); }
   const end = t0 + n * MLT.PER + rcdLat() + 0.4;
-  await new Promise(r => { const w = () => ctx.currentTime >= end ? r() : setTimeout(w, 50); w(); });
+  await new Promise(r => { let k0 = -1; const w = () => { const now = ctx.currentTime;
+    const k = Math.min(n, Math.max(0, Math.floor((now - t0) / MLT.PER) + 1)); if (k !== k0){ k0 = k; say(k ? `Measuring: hit ${k} of ${n}… keep quiet near any microphone.` : 'Starting… keep quiet near any microphone.'); }
+    now >= end ? r() : setTimeout(w, 50); }; w(); });
+  say('Working it out…');
   const take = await new Promise(r => { RCD.onDone = () => r(rcdCollect(null, null)); rcdGo('stop'); rcdMonSet(0); }); RCD.on = false;
   // READ BEFORE CLOSING (CodeRabbit, PR #14): run from Settings (Record a sample closed) the input closes here, and after that RCD.io is
   // null: the timestamp fallback never ran, and rcdLat() gave the browser's latency, so the click was looked for D (≥ 120 ms) off
@@ -14782,7 +14788,7 @@ function midiLatPanel(){
   let p = mine ? portOf(mine) : ports[0], ch = mine ? (mine.mch | 0) & 15 : 0, note = 60, n = 24, busy = false, res = null;
   const recall = () => { const m = mem[p]; if (m){ if (!mine || portOf(mine) !== p) ch = clamp(m.ch | 0, 0, 15); note = clamp(m.note == null ? 60 : m.note | 0, 0, 127); } };
   recall();
-  genPanel('Measure gear delay', 'Plays a click through ...Thunder and, 250 ms later, the note below on the gear (pick one your gear answers, such as a drum’s trigger note), again and again, and listens on the Inputs below (the input device is the one chosen in Record a sample). The gear must reach those inputs. With the desktop app’s native input that is enough (it knows when each sound was heard); with the browser’s input the click must reach them too (send the mixer’s output, or anything that hears both). A short, loud patch on the gear works best.', ({field, msgEl}) => {
+  genPanel('Measure gear delay', 'Plays a click through ...Thunder and, 250 ms later, the note below on the gear (pick one your gear answers, such as a drum’s trigger note), again and again, and listens on the Inputs below (the input device is the one chosen in Record a sample). The gear must reach those inputs. With the desktop app’s native input that is enough (it knows when each sound was heard); with the browser’s input the click must reach them too (send the mixer’s output, or anything that hears both). A short, loud patch on the gear works best.', ({box, field, msgEl}) => {
     const pS = el('select'), cS = el('select'), kS = el('select');
     ports.forEach(q => pS.append(new Option(PORTL[q] + '  ' + portName(q), q))); pS.value = p;
     for (let c = 0; c < 16; c++) cS.append(new Option(d2(c + 1), c)); cS.value = ch;
@@ -14804,8 +14810,12 @@ function midiLatPanel(){
     iS.addEventListener('change', () => { rcdSet.inCh = iS.value; rcdSave(); rcdRoute(); });
     fillI();
     field('Port', pS); field('Channel', cS); field('Note', kS); field('Inputs', iS); field('Length', nS);
-    MLT.say = t => { msgEl.textContent = t; }; }, [
-    ['Measure', async () => { if (busy) return; if (tp.on) tStop(); busy = true; MLT.say('Measuring… keep quiet near any microphone.');
+    // STATUS LINE (owner, 8 Nov: "The window changes shape on first click of measure, and it doesn't start measuring until later"):
+    // the status used to replace the long explanation, so the window shrank under the pointer and the buttons moved; now it has its
+    // own line of fixed height below the fields, and says what is happening while the input opens and hit by hit
+    const st = el('div', 'askmsg'); st.style.minHeight = '5.6em'; st.setAttribute('aria-live', 'polite'); st.textContent = 'Press Measure to start.';
+    box.append(st); MLT.say = t => { st.textContent = t; }; }, [
+    ['Measure', async () => { if (busy) return; if (tp.on) tStop(); busy = true; MLT.say('Starting…');
       try { const r = await midiLatRun(p, ch, note, n), ok = r.length;
         if (ok < Math.max(4, n / 3)) { MLT.say(`Only ${ok} of ${n} hits were heard clearly: check that the gear reaches the Inputs picked here, its level, and that the gear is loud and short.` + (RCD.io || IOAPI && aset.inEngine !== 'browser' ? '' : ' With the browser’s input the click must reach the input too.')); busy = false; return; }
         const v = r.map(q => q.ms).sort((a, b) => a - b), med = v[v.length >> 1], q1 = v[Math.floor(v.length * 0.1)], q9 = v[Math.floor(v.length * 0.9)];
@@ -22797,7 +22807,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 509;
+const BUILD = 510;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31773,6 +31783,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [510, '8 Nov', ['Measure…: the window keeps its size when you press Measure, and says what it is doing (opening the input, then hit by hit).']],
   [509, '8 Nov', ['Measure… no longer shows “Audio engine reset” when it finishes (it still refreshes the audio engine quietly, as before); Reset audio engine keeps Record a sample’s monitoring connected.']],
   [507, '8 Nov', ['Record a sample: Keep in this pad no longer plays the pad; closing the window really disconnects its input monitoring (beta.15 left it connected); closing it while the browser’s input is still opening no longer leaves that input on.']],
   [505, '8 Nov', ['Space always plays and stops the song, even right after clicking a menu or button; solo and mute keys work on every screen.', 'Desktop app: Apply (reload) in Settings › Audio works; a sample-rate mismatch on the native input pops up a message; long takes show up in RECENT even when storage is full.', 'Desktop app, native MIDI: malformed messages and SysEx are dropped as the browser engine drops them (a Cirklon showed “Sysex interrupt”); closing Record a sample while its input is still opening no longer leaves it half-open.']],
