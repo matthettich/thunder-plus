@@ -16334,12 +16334,12 @@ async function nmScan1(acc, first){
   if (!r){ if (++NM.miss >= 2) nmLost(); return; }
   NM.miss = 0; if (r.op !== 'midiPorts') return;
   let ch = false;
-  const opening = acc.opening || (acc.opening = new Set());   // opens in flight, per access (CodeRabbit: a shared set let an old scan's opens hide the new access's ports)
+  const opening = acc.opening || (acc.opening = new Set()), regroup = new Set();   // opens in flight, per access (CodeRabbit: a shared set let an old scan's opens hide the new access's ports)
   const sync = (map, list, open) => { const want = new Set(list.map(p => 'n:' + p.id)), jobs = [];
     // SAME-NAME DEVICES (CodeRabbit): ids are names, " #2" for the second of two. When one of a group goes, the others' ids shift, so
     // the whole group is closed and opened again by its new ids (the survivor would otherwise keep the gone device's handle)
     const base = id => id.replace(/ #\d+$/, ''), gone = new Set();
-    for (const id of map.keys()) if (!want.has(id)) gone.add(base(id));
+    for (const id of map.keys()) if (!want.has(id)){ gone.add(base(id)); regroup.add(base(id)); }
     for (const [id, x] of map) if (!want.has(id) || gone.has(base(id))){ nmPost({op:'midiClose', port:x.port}); map.delete(id); NM.byPort.delete(x.port); ch = true; }
     for (const p of list){ const id = 'n:' + p.id, key = open + id; if (map.has(id) || opening.has(key)) continue; opening.add(key);
       jobs.push(iohAsk({op:open, name:p.id}).then(o => { opening.delete(key);
@@ -16348,6 +16348,14 @@ async function nmScan1(acc, first){
     return Promise.all(jobs); };
   await sync(acc.outputs, r.outs || [], 'midiOpenOut'); if (NM.acc !== acc) return;   // (switched away meanwhile: a stale scan opens no inputs)
   await sync(acc.inputs, r.ins || [], 'midiOpenIn'); if (NM.acc !== acc) return;
+  // ...AND THE SAVED CHOICES FOLLOW (CodeRabbit): a choice that pointed into a renumbered group and is gone ("Gear #2" after the first
+  // "Gear" went) moves to the group's last remaining id (the survivor of two). Names can't tell which one physically left; with two
+  // of the same device either is the same gear.
+  if (regroup.size){ const fix = (id, map) => { if (!id || !id.startsWith('n:') || map.has(id)) return id; const b = id.replace(/ #\d+$/, '');
+      if (!regroup.has(b)) return id; const left = [...map.keys()].filter(k => k.replace(/ #\d+$/, '') === b); return left.length ? left[left.length - 1] : id; };
+    const was = JSON.stringify([midi.outIds, midi.inId, midi.clkId]);
+    midi.outIds = midi.outIds.map(id => fix(id, acc.outputs)); midi.inId = fix(midi.inId, acc.inputs); midi.clkId = fix(midi.clkId, acc.inputs);
+    if (JSON.stringify([midi.outIds, midi.inId, midi.clkId]) !== was){ saveMidi(); ch = true; } }
   if (ch && !first && NM.acc === acc){ try { await midiRemap(acc); } catch(e){} if (acc.onstatechange) try { acc.onstatechange(); } catch(e){} }   // (a saved port plugged in later finds its letter)
   const st = await iohAsk({op:'midiStats'}); if (st && st.op === 'midiStats' && NM.acc === acc) NM.late = st.late | 0;
   nmLateShow();   // (also each scan: hookInputs may just have rewritten the status without it)
@@ -22728,7 +22736,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 502;
+const BUILD = 503;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31695,6 +31703,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [503, '8 Nov', ['Desktop app, native MIDI: with two devices of the same name, unplugging the first no longer silences the second, and a port letter set to the second keeps working.']],
   [502, '8 Nov', ['Desktop app, native MIDI: with two devices of the same name, unplugging the first no longer silences the second.']],
   [501, '8 Nov', ['Desktop app, native MIDI: switching Engine back and forth quickly no longer delays the input ports.']],
   [500, '7 Nov', ['Desktop app, native MIDI: after switching Engine the port list fills in at once, and a switch mid-scan no longer changes your saved port choices.']],
