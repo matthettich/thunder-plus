@@ -247,7 +247,9 @@ Started before the owner's beta.7 test, by the owner's choice; the risk is only 
 - **Linux: skipped for now (owner, 7 Nov 23:09: "not as important"; still needs to happen).** The Linux addon builds without
   ALSA (no ALSA headers on ubuntu-latest), so Linux has no native MIDI ports (Web MIDI still works, Engine Browser). To do:
   `sudo apt-get install -y libasound2-dev` before "Native I/O helper addon (optional)" in desktop.yml, Linux runner only,
-  continue-on-error (a subagent wrote exactly this on branch b-extras, commit f038baf; it was left out on the owner's word).
+  continue-on-error. The step (written and then left out on the owner's word):
+  `- name: ALSA headers for the helper's Linux MIDI (optional)` / `if: runner.os == 'Linux'` / `continue-on-error: true` /
+  `run: sudo apt-get update && sudo apt-get install -y libasound2-dev`.
   Also untested on Linux hardware: the audio input.
 - io/test/midi.js judges timing by percentile (median ≤ 0.5 ms, 95% ≤ 1 ms, none over 10 ms): on this 2-CPU workspace with
   Chrome running alongside, single messages came 2–6 ms late (the OS pausing the thread); idle, 95% ≤ 0.005 ms, worst ≤ 1 ms.
