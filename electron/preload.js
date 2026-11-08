@@ -41,6 +41,9 @@ contextBridge.exposeInMainWorld('thunderDesktop', {
       onTime: on('thunder:link-time')      // every 20 ms while on: {beat, phase, tempo, at, hostNow}
     };
   })(),
+  // NATIVE I/O HELPER: start() forks the helper (first call) and hands the page a MessagePort, which arrives as a window
+  // 'message' ({thunderIo:true}, ports[0]; the first thing on it is the helper's hello). available: this app has the helper path.
+  io: { start: () => ipcRenderer.invoke('thunder:io-start'), available: true },
   updates: {
     state: () => ipcRenderer.invoke('thunder:upd-state'),   // {version, avail, ready, notifyOnly, dl (0–1 while downloading), file}
     check: () => ipcRenderer.invoke('thunder:upd-check'),   // check now and say the result in a box
@@ -48,3 +51,5 @@ contextBridge.exposeInMainWorld('thunderDesktop', {
     on: cb => { const f = (e, s) => cb(s); ipcRenderer.on('thunder:upd', f); return () => ipcRenderer.removeListener('thunder:upd', f); }
   }
 });
+// the port from main.js, forwarded to the page's own message listeners (the page can't reach ipcRenderer)
+ipcRenderer.on('thunder:io-port', e => window.postMessage({ thunderIo: true }, '*', e.ports));
