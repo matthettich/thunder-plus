@@ -204,6 +204,8 @@ test('…waves live: what can\'t be skipped safely keeps running', () => {
   assert.ok(playBus(D, seq, 1, 1).only.includes('s'), 'the Sequencer plays voices with no cable, so it stays');
   const lfoDoc = twoBusDoc({ modules: [{ id: 'l', type: 'lfo', scope: 'mono', params: {} }], cables: [{ from: ['l', Object.keys(D.MODULES.lfo.outputs)[0]], to: ['o1', 'p:slot'] }] });
   assert.equal(playBus(D, lfoDoc, 1, 1).only, null, 'an Out whose slot is modulated: everything runs');
+  const noExit = twoBusDoc(); noExit.cables = noExit.cables.filter(c => c.to[0] !== 'o1');
+  assert.equal(playBus(D, noExit, 1, 1).only, null, 'no voice audio left on this bus: everything runs');
   const e = new D.WavesEngine(48000, { maxVoices: 4, transport: TRANSPORT, costCeiling: Infinity });
   e.loadPatch(twoBusDoc()); e.setOnly(1); e.process(128); assert.ok(e.only.has('a'));
   e.setOnly(2); e.process(128); assert.ok(!e.only.has('a') && e.only.has('b'), 'changing the Bus follows');

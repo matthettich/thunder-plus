@@ -554,6 +554,7 @@ Owner: make the live/rendered switch's name cover …waves live, and cut phone C
   Two pads on the SAME bus still run two copies; idle copies already sleep after 2 s.
 - Measured in Node: 3 pads on 3 buses (Plaits + VCO + reverb each), one held note each: 14.0 s → 4.9 s of CPU for 8 s of audio.
   Not measured on a phone.
+- CodeRabbit on PR #17 (review-only, base `review/base-513`; it needs `@coderabbitai review` off the default branch), fixed in build 514: the row always shows (it was hidden without PsynCore), text names all …pump live engines, a test for the no-exit fallback. Owner wants future Thunder Plus changes to go through PRs.
 - Settings → Audio row is now **Live engines** (`aset.psLive` unchanged, so saved settings carry over); tooltips and the fallback
   toast name …waves live. `waves-worklet.js?v=34`, cache `thunderplus-v513`. Tests in tests/waves.test.js.
 
