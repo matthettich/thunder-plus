@@ -189,6 +189,18 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 7 Nov (13): Measure's note; the silent song (build 482, beta + main)
+
+- Owner: "can we make the note for the click in the midi latency measurer user set? Some of my gear only responds to certain
+  notes". midiLatPanel has NOTE (0–127, named as on INST: C-4 = 60, default 60; it used to send 48), remembered per port with
+  the channel in localStorage `thunderplus-mlt-v1`. Headless: the panel lists Port / Channel / Note / Length; a picked note
+  comes back on reopening.
+- A song (bETA tESTING eLECTRO) went silent after loading on v1.2.98 (a blip, then nothing; the playback report showed the
+  sequencer fine: rows, no late / dropped notes, engine running; after-STOP levels a steady −80 dB). After updating to v1.2.99
+  it plays; headless on build 481 it plays at −3…−20 dB. Not reproduced: if it comes back, the report from that moment.
+- That song's master chain (flex, peq, pcalm, pcomp, ptone, pmaster) is 103 ms of lookahead: at 120 BPM, LPB 8 a row is
+  62.5 ms, so with the owner's +27 ms Gear delay MIDI was ~2 rows early: the 7 Nov "two lines" report, fixed by moFxLat (479).
+
 ## 7 Nov (12): web vs native, written down (docs only)
 
 - Owner: "would many of these bugs be easier to fix if we were not making a webapp?", then asked for the suggestions in the

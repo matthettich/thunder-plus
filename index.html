@@ -14690,15 +14690,26 @@ async function midiLatRun(p, ch, note, n){
 function midiLatPanel(){
   const ports = [...Array(NPORT).keys()].filter(q => midiOut(q)); if (!ports.length) return toast('Pick a MIDI device for a port first (Settings › MIDI › Ports).', 4000);
   const mi = S.insts[cInst], mine = mi && (mi.mo | 0) ? mi : null;
-  let p = mine ? portOf(mine) : ports[0], ch = mine ? (mine.mch | 0) & 15 : 0, n = 24, busy = false, res = null;
-  genPanel('Measure gear delay', 'Plays a click through ...Thunder and, 250 ms later, a note on the gear, again and again, and listens on the input chosen in Record a sample (Input and Inputs there). Send the mixer’s output, or anything that hears both, into that input; a short, loud patch on the gear works best.', ({field, msgEl}) => {
-    const pS = el('select'); ports.forEach(q => pS.append(new Option(PORTL[q] + '  ' + portName(q), q))); pS.value = p; pS.addEventListener('change', () => { p = +pS.value; });
-    const cS = el('select'); for (let c = 0; c < 16; c++) cS.append(new Option(d2(c + 1), c)); cS.value = ch; cS.addEventListener('change', () => { ch = +cS.value; });
+  // NOTE (owner, 7 Nov: "some of my gear only responds to certain notes"): picked here, remembered per port with the channel
+  const MK = 'thunderplus-mlt-v1', mem = (() => { try { return JSON.parse(localStorage.getItem(MK) || '{}'); } catch(e){ return {}; } })();
+  const memSave = () => { try { localStorage.setItem(MK, JSON.stringify(mem)); } catch(e){} };
+  let p = mine ? portOf(mine) : ports[0], ch = mine ? (mine.mch | 0) & 15 : 0, note = 60, n = 24, busy = false, res = null;
+  const recall = () => { const m = mem[p]; if (m){ if (!mine || portOf(mine) !== p) ch = clamp(m.ch | 0, 0, 15); note = clamp(m.note == null ? 60 : m.note | 0, 0, 127); } };
+  recall();
+  genPanel('Measure gear delay', 'Plays a click through ...Thunder and, 250 ms later, the note below on the gear (pick one your gear answers, such as a drum’s trigger note), again and again, and listens on the input chosen in Record a sample (Input and Inputs there). Send the mixer’s output, or anything that hears both, into that input; a short, loud patch on the gear works best.', ({field, msgEl}) => {
+    const pS = el('select'), cS = el('select'), kS = el('select');
+    ports.forEach(q => pS.append(new Option(PORTL[q] + '  ' + portName(q), q))); pS.value = p;
+    for (let c = 0; c < 16; c++) cS.append(new Option(d2(c + 1), c)); cS.value = ch;
+    for (let m = 0; m < 128; m++) kS.append(new Option(NN[m % 12] + (Math.floor(m / 12) - 1) + '  (' + m + ')', m)); kS.value = note;   // C-4 is MIDI 60, as on INST
+    const keep = () => { mem[p] = {ch, note}; memSave(); };
+    pS.addEventListener('change', () => { p = +pS.value; recall(); cS.value = ch; kS.value = note; });
+    cS.addEventListener('change', () => { ch = +cS.value; keep(); });
+    kS.addEventListener('change', () => { note = +kS.value; keep(); });
     const nS = el('select'); [[24, '24 hits · 15 s'], [100, '100 hits · 1 min (drift)']].forEach(([v, t]) => nS.append(new Option(t, v))); nS.value = n; nS.addEventListener('change', () => { n = +nS.value; });
-    field('Port', pS); field('Channel', cS); field('Length', nS);
+    field('Port', pS); field('Channel', cS); field('Note', kS); field('Length', nS);
     MLT.say = t => { msgEl.textContent = t; }; }, [
     ['Measure', async () => { if (busy) return; if (tp.on) tStop(); busy = true; MLT.say('Measuring… keep quiet near any microphone.');
-      try { const r = await midiLatRun(p, ch, 48, n), ok = r.length;
+      try { const r = await midiLatRun(p, ch, note, n), ok = r.length;
         if (ok < Math.max(4, n / 3)) { MLT.say(`Only ${ok} of ${n} hits were heard clearly: check the input and its level, and that the gear is loud and short.`); busy = false; return; }
         const v = r.map(q => q.ms).sort((a, b) => a - b), med = v[v.length >> 1], q1 = v[Math.floor(v.length * 0.1)], q9 = v[Math.floor(v.length * 0.9)];
         const mt = r.reduce((a, q) => a + q.t, 0) / ok, mm = r.reduce((a, q) => a + q.ms, 0) / ok, sl = r.reduce((a, q) => a + (q.t - mt) * (q.ms - mm), 0) / Math.max(1e-9, r.reduce((a, q) => a + (q.t - mt) ** 2, 0));
@@ -22337,7 +22348,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 481;
+const BUILD = 482;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31300,6 +31311,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [482, '7 Nov', ['Measure gear delay: pick the NOTE it plays on the gear (for gear that only answers certain notes, such as a drum module), remembered per port with the channel. It used to play C-3.']],
   [481, '7 Nov', ['Audio-thread sequencer: changing a pad’s engine on the Synth page while the song plays takes effect within a moment (a pad that went from a rendered sound to a live engine, or back, kept the old sound until STOP and PLAY).']],
   [480, '7 Nov', ['Mac: Caps Lock types a note off on every press again. A Mac reports Caps Lock in odd ways (sometimes only when it turns on, sometimes both key events), and some presses were lost; now each press counts once however the events come.']],
   [479, '7 Nov', ['MIDI out waits for ...Thunder’s own output: the mastering, the master’s …pump effects and the safety limiter look ahead, so everything ...Thunder plays is heard that much later, and MIDI notes (and clock) went out early by the same amount. Now they line up, and the Gear delay is only your gear’s own lag (start it from 0 and use Measure…). With LATENCY COMP on, its delay is included too.']],
