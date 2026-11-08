@@ -529,3 +529,58 @@ GC, a dialog). Phase 2's target: 0 late at every stall size, and edits heard on 
    - **2d:** edits and mutes as `song.patch` messages (heard on the next block), chops (`applyChop` with the buffer data
      the core already holds), PERFORM's live state, REC's step history from `pos` events; then the pump goes.
 3. Owner answers 11.1 before phase 4.
+
+---
+
+## 14. Field evidence (7 Nov 2026) and a smaller first step
+
+Owner, 7 Nov, after a session of MIDI and recording bugs in the Electron app on a Mac: "would many of these bugs be
+easier to fix if we were not making a webapp?" and then: write the suggestions down "so if i want to make a desktop
+version that is more stable, we can". This section is that record. Nothing here is decided; it adds evidence to
+sections 2–3 and a cheaper option before phase 4.
+
+### 14.1 What 7 Nov showed (builds 477–481)
+
+Bugs that came from the web platform (a native host fixes them at the root; the web fixes are workarounds):
+
+| Bug (7 Nov) | Web cause | Web workaround now | Native fix |
+|---|---|---|---|
+| MIDI notes played on after STOP | Web MIDI can't take back a sent, timestamped message (no `MIDIOutput.clear()` in Chromium) | OUTBOX: messages wait on the page until ~60 ms ahead (`mobPut` / `mobFlush`), STOP drops the rest | MIDI sent from the host's own scheduler; STOP just doesn't send |
+| MIDI early / "different on every stop and start" | Two clocks (audio `currentTime`, `performance.now()` for MIDI) joined by a smoothed estimate (`amap`, `getOutputTimestamp`); the browser under-reports the interface's real output latency | `moFxLat()` adds the output chain's lookahead; Gear delay per port; Settings › MIDI › Measure… finds the rest through an input | One clock: MIDI scheduled from the audio callback with the driver's reported latency (CoreAudio / ASIO), as DAWs do |
+| Multi-channel interface: only inputs 1+2 | Chromium's `getUserMedia` often gives a page 2 channels whatever the device has | INPUTS asks for up to 32 and routes a pair or one channel (`rcdRoute`); still capped if the browser gives 2 | Every input channel of the device |
+| macOS microphone prompt "every time i play new sound" | Picking a named output (`setSinkId`) goes through Chromium's media-device permission, which reaches the Mac's microphone permission; the build is unsigned, so macOS doesn't keep the answer | Owner keeps Output on System default (confirmed: no prompt then) | Output chosen in the host's device layer, no web permission; a signed, notarised app |
+| Caps Lock's note off lost on some presses (Mac) | Chromium on a Mac reports Caps Lock as a state change, not a press, and not the same way every time | FLIPS: a press counts when `getModifierState('CapsLock')` changes | Real key events |
+
+Bugs that would have happened in any app (the same work native): MIDI not following the master's lookahead latency
+(a native app needs the same compensation, `moFxLat`'s job); the audio-thread core not hearing a pad's engine change
+mid-song (`coreKitCheck`); the INST screen's layout.
+
+### 14.2 Options, cheapest first
+
+1. **Stay web, keep patching** (today). Right while the feature freeze lasts and the owner is making music; the 7 Nov
+   workarounds cover what has come up.
+2. **A native I/O helper inside the Electron app (new; "phase 3½")**. Keep the page, the sequencer and every engine as
+   they are; move only the desktop's *edges* into a native addon, the way `link/` already runs Ableton Link as an N-API
+   addon in Electron (`link/src/thunder_link.cc`, `fetch-sdk.sh`, built in CI by `desktop.yml`):
+   - **MIDI out (and clock out)**: the page hands the addon `{port, bytes, audioTime}`; the addon sends on its own
+     high-priority thread through RtMidi / libremidi (CoreMIDI, WinMM / WinRT), and can cancel what is queued on STOP.
+     Time base: the addon also opens the audio output (below), so audio time and MIDI time are one clock.
+   - **Audio output and input**: RtAudio / miniaudio (permissive) with a real device list, buffer size, every input
+     channel, ASIO on Windows (licence: section 9, item 7). Hard part: the engines live in Web Audio, so the page's
+     master output has to reach the addon (an AudioWorklet writing into a SharedArrayBuffer ring the addon reads), which
+     adds a fixed, known latency instead of a guessed one. If that ring proves fragile, keep Web Audio for output and use
+     the addon for MIDI + input only: that still fixes STOP, the input channels and most of the MIDI drift.
+   - **Mac signing**: an Apple Developer membership (11.2) so the microphone answer sticks and Gatekeeper is quiet.
+   - Size: a few weeks; nothing on the phone changes; thrown away (or reused) at phase 4.
+3. **The full plan** (phases 3–6 above): the C++ core and a native host, Electron retired. Months; the real fix for
+   timing, plugins and drivers.
+
+Suggested order when the owner wants a more stable desktop: option 2's **MIDI part first** (smallest, fixes the most
+reported pain), then its input side, then decide between its audio-output ring and going straight to phase 4.
+
+### 14.3 What to measure first (before choosing)
+
+- Settings › MIDI › Measure…, several runs per session and across STOP / PLAY: if the result moves between runs, the
+  clock mapping (`amap`) is the problem and option 2's MIDI part is worth it; if it is steady, Gear delay is enough.
+- Record a sample's INPUTS on the owner's interface: if Electron only ever offers 1+2, the input side of option 2 is
+  needed for multitrack recording.
