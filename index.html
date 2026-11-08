@@ -22327,7 +22327,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 479;
+const BUILD = 480;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -30481,13 +30481,18 @@ document.addEventListener('keyup', e => { if (view !== 'tracker' || typing(e)) r
 // off, so on a Mac a keyup is a press too. (The first fix counted a keyup only with no keydown before it, but the
 // turning-on keydown of the press before was always there, so every other press was still lost.) If a Chromium on a Mac
 // ever sends both for one press, the pair (close together, the same Caps Lock state) counts once.
-let capsDnT = -1e9, capsDnS = null;
+// FLIPS (owner, 7 Nov, Electron on a Mac: "works intermittently"): the pairing above still lost presses (a keydown that
+// reports the state before the change, then a keyup with the new one, and the 400 ms window). Now a Mac counts a press
+// when Caps Lock's state is seen to CHANGE, from whichever event shows it (keydown or keyup): every press flips it, so each
+// press counts once, whatever events this browser sends. Other keys keep the known state in step (Caps Lock pressed while
+// the app wasn't focused).
+let capsLast = null, capsNew = false;   // capsNew: this keydown changed it (read once by keysDown, which sees a copy of the event)
 const capsState = e => typeof e.getModifierState === 'function' ? e.getModifierState('CapsLock') : null;
-document.addEventListener('keydown', e => { if (e.key === 'CapsLock'){ capsDnT = performance.now(); capsDnS = capsState(e); } }, true);
+const capsFlip = e => { const st = capsState(e); if (st == null) return e.type === 'keydown'; if (st === capsLast) return false; capsLast = st; return true; };
+document.addEventListener('keydown', e => { if (e.key === 'CapsLock'){ capsNew = MACK && capsFlip(e); } else { const st = capsState(e); if (st != null) capsLast = st; } }, true);
 document.addEventListener('keyup', e => {
   if (e.key !== 'CapsLock' || !MACK) return;
-  const paired = performance.now() - capsDnT < 400 && capsState(e) === capsDnS; capsDnT = -1e9;
-  if (paired || view !== 'tracker' || typing(e) || fxp.open || apF) return;   // apF: Arrange has the keys, not the phrase
+  if (!capsFlip(e) || view !== 'tracker' || typing(e) || fxp.open || apF) return;   // apF: Arrange has the keys, not the phrase
   if (curKind() === 'note'){ e.preventDefault(); typeOff(); }
 });
 window.addEventListener('blur', releaseAll);
@@ -30758,7 +30763,7 @@ function keysDown(e, pad){
   if (k === 'PageUp' || k === 'PageDown'){ if (GRIDV.has(tv) || tv === 'mixer') move(0, k === 'PageUp' ? -16 : 16); else move(0, k === 'PageUp' ? -8 : 8); return true; }
   if (k === '{' || k === '}'){ kStep = clamp(kStep + (k === '}' ? 1 : -1), 0, 16); toast('Edit step ' + kStep); draw(); return true; }
   if (e.code === 'NumpadDivide' || e.code === 'NumpadMultiply'){ setOct(kOct + (e.code === 'NumpadMultiply' ? 1 : -1)); return true; }
-  if (k === 'CapsLock' && curKind() === 'note'){ typeOff(); return true; }
+  if (k === 'CapsLock' && curKind() === 'note'){ const nw = capsNew; capsNew = false; if (!MACK || nw) typeOff(); return true; }   // (a Mac: only a press that changed the state, see FLIPS)
   if (k === '[' || k === ']'){ optDir(k === ']' ? 'right' : 'left'); return true; }
   if (k === '-' || k === '_'){ setOct(kOct - 1); return true; }
   if (k === '=' || k === '+'){ setOct(kOct + 1); return true; }
@@ -31285,6 +31290,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [480, '7 Nov', ['Mac: Caps Lock types a note off on every press again. A Mac reports Caps Lock in odd ways (sometimes only when it turns on, sometimes both key events), and some presses were lost; now each press counts once however the events come.']],
   [479, '7 Nov', ['MIDI out waits for ...Thunder’s own output: the mastering, the master’s …pump effects and the safety limiter look ahead, so everything ...Thunder plays is heard that much later, and MIDI notes (and clock) went out early by the same amount. Now they line up, and the Gear delay is only your gear’s own lag (start it from 0 and use Measure…). With LATENCY COMP on, its delay is included too.']],
   [478, '7 Nov', ['MIDI: STOP no longer lets the notes already booked ahead play out on the gear: notes wait in the app until they are about 60 ms away (still sent with exact timestamps), and a stop drops the rest.', 'Settings › MIDI › Gear delay › Measure…: plays a click through ...Thunder and a note on the gear, listens on Record a sample’s input, and says how early or late the gear is, how much it wanders and whether it drifts; Apply sets the port’s Gear delay.', 'The Gear delay boxes are wide enough for −50.']],
   [477, '7 Nov', ['INST: OUTPUT comes first and decides what the screen shows, as in Renoise. PAD shows the pad settings, MIDI only the MIDI ones (channel, port, bend, CCs, LFO, echo), PAD+MIDI both. VOLUME and PAN are with the pad (they never changed MIDI). Hidden settings are kept for when you switch back.', 'Record a sample: INPUTS picks the channels of a multi-channel interface: a pair (1+2, 3+4…) or one channel. The list fills in once the input has been opened (Record) and is remembered per interface; some browsers only give 2 channels.', 'Ctrl/⌘+G opens the generators (Drum pattern, Acid line, Euclidean fill…) under the cursor.']],
