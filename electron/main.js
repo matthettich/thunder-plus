@@ -1,10 +1,11 @@
 // ...Thunder Plus as a desktop app: one window running the same index.html as the website.
-const { app, BrowserWindow, session, shell, Menu, protocol, net, ipcMain, dialog, powerSaveBlocker } = require('electron');
+const { app, BrowserWindow, session, shell, Menu, protocol, net, ipcMain, dialog, powerSaveBlocker, utilityProcess, MessageChannelMain, systemPreferences } = require('electron');
 const path = require('path');
 const fs = require('fs'), fsp = fs.promises;
 const { pathToFileURL } = require('url');
 const { setupUpdates } = require('./updater');
 const { linkSession } = require('./link-session');
+const { createRestartGate } = require('./io-helper');
 /* ABLETON LINK (3 Nov; desktop only, off until the page turns it on): the native addon in ./link (built from the repo's link/
    folder, GPL-2.0-or-later, see link/NOTICE.md) is OPTIONAL. A build without it, or one whose file won't load on this
    computer, runs as before and the page says Link is not available in this build. Packaged, a .node file is read from
@@ -13,6 +14,12 @@ let LINK_ADDON = null, LINK_WHY = '';
 try { LINK_ADDON = require(path.join(__dirname, 'link', 'thunder_link.node').replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep)); }
 catch (e) { LINK_WHY = String((e && e.code) || (e && e.message) || e); }
 const link = LINK_ADDON ? linkSession(LINK_ADDON, (ch, m) => { if (win && !win.isDestroyed()) win.webContents.send(ch, m); }) : null;
+
+/* NATIVE I/O HELPER (plan: docs/NATIVE-IO-HELPER-PLAN.md): the addon (electron/io/thunder_io.node) lives in a utility process
+   (io-helper.js), forked the first time the page asks (thunder:io-start) so a session that never records never runs it. Same
+   unpacked-path rule as Link's. */
+const ioAddonPath = () => path.join(__dirname, 'io', 'thunder_io.node').replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep);
+let ioChild = null; const ioGate = createRestartGate();
 
 // The app is served from app://thunder/ rather than opened as plain files. Plain files can't fetch each
 // other, load audio worklets or talk across frames, which the …waves and …chains editors (frames inside
@@ -119,7 +126,7 @@ function createWindow(){
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   // The window only ever shows the app: a dropped file (file://) or anything else must not navigate it away.
   win.webContents.on('will-navigate', (e, url) => { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); });
-  win.on('closed', () => { win = null; if (link) link.off(); });
+  win.on('closed', () => { win = null; if (link) link.off(); ioStop(); });
 }
 
 app.on('second-instance', (e, argv) => { if (win){ if (win.isMinimized()) win.restore(); win.focus(); } const p = argPath(argv); if (p) sendPath(p); });
@@ -185,15 +192,47 @@ app.whenReady().then(() => {
   ipcMain.handle('thunder:link-start', (e, at, sync) => link ? link.start(at, sync) : 0);
   ipcMain.handle('thunder:link-stop', () => link ? link.stop() : false);
   ipcMain.handle('thunder:link-now', () => LINK_ADDON ? LINK_ADDON.now() : 0);   // Link's clock now (µs): the page's clock ping
-  app.on('will-quit', () => { if (link) link.off(); });
+  app.on('will-quit', () => { if (link) link.off(); ioStop(); });
+  // NATIVE I/O HELPER: fork on the first start; every start (also a page reload) hands both ends a fresh MessagePort. One restart
+  // if it died, then {ok:false}. The helper's own hello (available or not, and why) comes to the page over the port.
+  // ONE MICROPHONE ASK (owner, 7 Nov: "enable the microphone 28 times"): the app asks macOS once (thunder:io-mic, below), before
+  // the helper opens an interface (the helper is the app's child, so it shares the answer).
+  ipcMain.handle('thunder:io-start', async () => {
+    try {
+      if (!win || win.isDestroyed()) return { ok: false, why: 'no window' };
+      if (!ioChild) {
+        if (!ioGate.canStart()) return { ok: false, why: 'helper stopped' };
+        const child = utilityProcess.fork(path.join(__dirname, 'io-helper.js'), [ioAddonPath()], { serviceName: 'thunder-io' });
+        ioChild = child;
+        child.once('exit', () => { if (ioChild !== child) return; ioChild = null; ioGate.died(); });   // ioStop's kills aren't deaths
+      }
+      const { port1, port2 } = new MessageChannelMain();
+      ioChild.postMessage({ op: 'port' }, [port1]);
+      win.webContents.postMessage('thunder:io-port', null, [port2]);
+      return { ok: true };
+    } catch (err) { return { ok: false, why: String((err && err.message) || err) }; }
+  });
+  // THE MICROPHONE (phase B): asked for when the recorder opens an input, not when the helper starts (it also runs for MIDI)
+  ipcMain.handle('thunder:io-mic', async () => {
+    try {
+      if (process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('microphone') !== 'granted') {
+        if (!(await systemPreferences.askForMediaAccess('microphone'))) return { ok: false, why: 'microphone access is off for Thunder Plus (System Settings › Privacy & Security › Microphone)' };
+      }
+      return { ok: true };
+    } catch (err) { return { ok: false, why: String((err && err.message) || err) }; }
+  });
   // WHEEL DIRECTION (owner, 7 Nov: Arrange went up while the Mixer went down): macOS Natural scrolling flips the wheel's deltaY.
   // Scrolled content follows it already; the page flips its cursor and value wheels to match. No key = Natural (macOS default).
   ipcMain.handle('thunder:natural-scroll', () => process.platform !== 'darwin' ? false : new Promise(res =>
     require('child_process').execFile('defaults', ['read', '-g', 'com.apple.swipescrolldirection'], { timeout: 2000 }, (err, out) => res(err ? true : String(out).trim() !== '0'))));
+  // "Apply (reload) did nothing" (8 Nov): the page's location.reload() raises will-navigate, which createWindow() preventDefaults for every
+  // URL (so a dropped file can't replace the app). The shell reloads the sender's own window instead; webContents.reload() doesn't go through it.
+  ipcMain.on('thunder:reload', e => { try { if (!e.sender.isDestroyed()) e.sender.reload(); } catch (_) {} });
   ipcMain.on('thunder:playing', (e, on) => setPlaying(!!on));   // APP NAP: held while the song plays
   ipcMain.on('thunder:page-ready', () => { pageReady = true; if (pendingPath && win){ const p = pendingPath; pendingPath = null; win.webContents.send('thunder:open-path', p); } });
   ipcMain.on('thunder:close-ack', () => clearTimeout(ackT));
   ipcMain.on('thunder:close-reply', (e, ok) => { clearTimeout(ackT); if (!ok){ quitting = false; return; } closeOk = true; if (win) win.close(); if (quitting) app.quit(); });
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
+function ioStop(){ const c = ioChild; ioChild = null; if (c){ try { c.kill(); } catch (e) {} } }
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

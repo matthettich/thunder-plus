@@ -7,3 +7,5 @@ electron/link/
 link/sdk/
 link/build/
 tests/sweep/out/
+io/build/
+electron/io/

@@ -102,8 +102,9 @@ and licences, 7 tests, 8 risks, 9 decisions for the owner. File and function nam
 - **Latency** for PATTERN sync (`rcdLat`): the helper path knows its parts exactly (the device's input latency from
   `latencyFrames`, the jitter ring's fill), so `RCD.inLat` is set from those instead of `getSettings().latency`.
   Measure… (`midiLatRun`) keeps working unchanged: it records through `rcdOpen` either way.
-- Settings › Audio › INPUT ENGINE: AUTO (helper when available) / BROWSER (always `getUserMedia`), so the old path is
-  one click away if the helper misbehaves.
+- INPUT ENGINE: AUTO (helper when available) / BROWSER (always `getUserMedia`), so the old path is one click away if the
+  helper misbehaves. **In Record a sample, beside Input / Inputs** (owner, 7 Nov: engine and inputs apart was confusing);
+  A0 put it in Settings › Audio, A1.4 moves it.
 
 ## 4. Clocks
 
@@ -133,7 +134,7 @@ Three clocks meet: the interface's sample clock (input), the output device's sam
    the interface: every input, a PATTERN take against the click (Measure… through the helper), a 5-minute take.
 3. **A2, polish (≈2–3 days).** Device unplugged mid-take (the take so far is kept, a toast), sample-rate mismatch
    between the interface and the engine (resample in the worklet, or ask to match), Windows (WASAPI) and Linux check.
-4. **B, MIDI (≈1 week).** libremidi out and in, `msend` and the clock-in path on the helper when present, STOP clears,
+4. **B, MIDI (≈1 week). Built 7 Nov (build 498, HANDOVER item 5); waiting for the owner's test.** libremidi out and in, `msend` and the clock-in path on the helper when present, STOP clears,
    Settings › MIDI lists the helper's ports (port letters unchanged in songs).
 5. **C, output (decide later).** Only if MIDI vs. audio timing is still not right after B: the master's audio to the
    helper means a page → utility audio stream (≈20–40 ms extra latency through ports), which is likely worse than the

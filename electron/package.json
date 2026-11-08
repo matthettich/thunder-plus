@@ -28,11 +28,14 @@
       "updater.js",
       "preload.js",
       "link-session.js",
+      "io-helper.js",
       "link/**/*",
+      "io/**/*",
       "app/**/*"
     ],
     "asarUnpack": [
-      "link/*.node"
+      "link/*.node",
+      "io/*.node"
     ],
     "directories": {
       "output": "dist",
@@ -82,7 +85,8 @@
       "icon": "app/icons/plus-icon-512.png",
       "extendInfo": {
         "NSMicrophoneUsageDescription": "...Thunder Plus uses an audio input only when you record a sample into a pad."
-      }
+      },
+      "hardenedRuntime": false
     },
     "linux": {
       "target": [
@@ -107,7 +111,8 @@
         "role": "Editor",
         "mimeType": "application/x-thunder-plus"
       }
-    ]
+    ],
+    "afterPack": "scripts/adhoc-sign.js"
   },
   "dependencies": {
     "electron-updater": "6.6.2"

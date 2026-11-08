@@ -75,6 +75,292 @@ it may touch (nothing else); the functions / messages / settings it must produce
 "don't change `index.html` outside the named functions"; "report the diff and the test output". Keep cards small (one row
 each); never hand a subagent the whole phase.
 
+**A0 DONE (7 Nov 18:46, owner's screenshot from desktop 1.3.0-beta.1, build 486):** "Input engine: native (500R8, 28 inputs) ·
+Core Audio · thunder_io 1 / miniaudio 0.11.26". PR #14 (io-helper → beta) open; CodeRabbit had to be asked (`@coderabbitai
+review`: it skips PRs not aimed at main); its two findings fixed. **Owner feedback for A1.4:** "it's confusing that the engine
+and inputs are separated": move INPUT ENGINE (Auto / Browser) into Record a sample beside Input / Inputs (the Input list
+shows "500R8 (native, 28 inputs)", Inputs lists every channel and pair from it), and take the row out of Settings › Audio.
+
+**OWNER'S BETA.2 TEST (7 Nov 19:50) and the fixes in 1.3.0-beta.3 (build 490):** (1) "the audio interface gets reset":
+miniaudio set the device's buffer size (kAudioDevicePropertyBufferFrameSize, device-wide on CoreAudio); now it asks for the
+size the device already has (`CurrentBufferFrames` in thunder_io.cc). (2) "enable the microphone 28 times": main asks macOS once
+(`systemPreferences.askForMediaAccess`) before forking the helper. (3) "Discard and record doesn't do anything" / "close the
+window to get the inputs again": a stalled native input (no chunk for 1 s) or one on a rebuilt audio engine is closed and
+reopened by the next Record. (4) "meters don't work until Record": the native input opens with the window. (5) "kicking the
+inputs back to 1&2": a failed native open fell back silently to the browser's input; now it says why and records nothing.
+(6) "multiple layers on the same pad are the same sample": most likely the old take kept after a Record that failed to open
+(rcdStart returns before clearing RCD.take): recheck on beta.3. ADAT inputs: not confirmed yet (the owner thinks these bugs
+hid it): recheck on beta.3. tools/io-check.mjs covers 3–5 with the fake helper.
+
+**ROOT CAUSE of the owner's beta.2 / beta.3 failures (CodeRabbit, PR #14, 7 Nov 21:05):** the helper posted chunks with
+`[data.buffer]` as the transfer list, but Electron's MessagePortMain only transfers ports, so the first audio chunk threw and
+killed the helper; after the second death the page fell back to the browser input (inputs 1–2). Fixed in build 492 / beta.4 (out 7 Nov 21:22, Mac addon confirmed built):
+chunks are copied (structured clone); `tests/io.test.js` guards the wiring. Lesson: the fake ports in tests accept transfers the
+real MessagePortMain doesn't; test the Electron wiring itself when possible. Also from that review: rcdOpenIo closes the device
+in the helper if the worklet setup fails; io/README documents the input API. Skipped: its libremidi findings (vendored upstream
+code, not compiled yet; look again when phase B compiles libremidi, and record any local patch in io/VERSIONS).
+
+**A2 (part) built after beta.3 (build 491, not in a desktop pre-release yet):** (a) the interface's own delay: the addon reads
+CoreAudio's input device latency + safety offset + first stream's latency (`InputLatencyFrames`) and moves every hostNs back by
+it; `opened.latencyMs` shows in Record a sample's Extra latency line. (b) Unplugged mid-take: miniaudio's stopped notification
+(not caused by us) sets `inputLost()`; the helper drains what arrived, then posts `closed` with why; the page ends the take where
+it is and keeps it, then closes. (c) Rate mismatch: the window says when `opened.deviceRate` differs from the app's rate.
+Tests: io-check (unplug, rate, latency line), tests/io.test.js (inputLost). Left for A2: Windows (the addon doesn't build on the windows-latest runner: node-gyp "Could not find any Visual Studio
+installation" (the step is continue-on-error, so Windows builds ship without the helper; probably the same for Link: try
+`npm config set msvs_version 2022` or setup-msbuild before it), then a WASAPI check; Linux builds fine.
+
+**PICK UP HERE: EVERYTHING STILL NEEDED (updated 8 Nov 11:30).** Read this list first; the paragraphs below it are the detail.
+
+**RELEASED (8 Nov, 11:52, owner: "Can we push a new main and desktop build"):** PR #14 merged into `beta`, `beta` merged into
+`main` by PR, and desktop **v1.3.0** (normal release, auto-update) built from `main` (build 511 = beta.20 + two small Measure
+fixes). Day-to-day work goes back to the `beta` branch; `io-helper` is history. The owner's tests below now run on v1.3.0.
+
+**NEXT STEPS, in order:**
+1. The owner tests **v1.3.0** (same as 1.3.0-beta.20 plus two small Measure fixes) with the checklist page https://claude.ai/artifact/6CgCLiVo8HEH3ywky5znWM ("Copy results"
+   gives the report to paste). It lists: the beta.14 fixes to confirm (monitoring after reopening the window, Space and
+   solo / mute keys, Apply (reload) and the rate message, Keep in this pad silent, no Cirklon "Sysex interrupt", Measure quiet,
+   its new status line and a re-run by ear, long takes in RECENT), the beta.14 skips (unplug mid-take, Measure with Engine
+   Browser, Playing in), clock in once more, and Windows. Everything else passed on beta.14 (item 0).
+   Start a session by asking for the results; fix on `beta`, then a NEW desktop version (1.3.1-beta.1 for a pre-release, 1.3.1 for a
+   release: never reuse one, the workflow would replace a release's files without moving its tag), and check the macOS and Windows job logs
+   for "thunder_io.node built" (both), "adhoc-sign: signed" (macOS) and "thunder_link.node built" (both). Ask CodeRabbit with
+   "@coderabbitai review" after each push (it skips PRs into `beta` otherwise) and fix its real findings.
+2. Merged and released already (above). Next `beta` → `main` + desktop release only when the owner asks (beta → main by PR so
+   CodeRabbit sees it; ask it with "@coderabbitai review").
+3. Windows: the owner tests recording (WASAPI) and MIDI (WinMM) on the Windows PC (the build is fixed: windows-2022).
+4. Later / low priority: Linux ALSA in CI (item 5, skipped on the owner's word); phase C (audio output through the helper)
+   only if MIDI vs audio timing is still off after B, and then more likely the native desktop app (docs/NATIVE-DESKTOP-PLAN.md).
+
+*State now:* branch `io-helper` (build 511: phase B MIDI built and reviewed, item 5; desktop pre-release **1.3.0-beta.20** (build 510; build 511 has two small Measure fixes, no beta yet). beta.19 = 509; beta.18 = 508; beta.17 = 507; beta.16 = 506; beta.15 = 505; beta.14 = 504; beta.13 = 503; beta.12 = 502; beta.11 = 501; beta.10 = 500; beta.9 = 499; beta.8 = 498 (first with MIDI, Windows with Link and the helper again); beta.7 = 496, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
+CodeRabbit fix that was the real cause of the beta.2/3 failures (the helper died on the first chunk: MessagePortMain can't
+transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner tests beta.7 when convenient (item 1). PR #14
+(`io-helper` → `beta`) is open. `beta` is at build 488 plus a CLAUDE.md line ("continue the helper"); `main` is at build 485
+(desktop v1.2.101).
+
+**0. OWNER'S TEST OF beta.14 (8 Nov, 10:13): RESULTS and what was done (build 505).**
+- Passed: install; one microphone prompt; Record straight away; monitoring while the song plays; no "fell behind"; a new 5-minute
+  take sounds good (one noisy bit, the owner thinks from a MIDI device); Measure picks the input and reads 5.5 ms; native MIDI on,
+  setup carried over, timing (Browser "maybe a little tighter by ear"), Stop clean, clock out, plug / unplug, engine switching,
+  "· 4 late". Clock in "seemed out of sync slightly". Windows: not tested yet. Unplug mid-take, Browser Measure: skipped.
+- **Monitoring distorted and clicky after closing and reopening the window once; the song silent until Restart audio** (not
+  reproduced by the owner after an app restart). Found: closing the window while the input is still opening (waiting on macOS /
+  the helper) left a half-open input (the open carried on after rcdClose). Build 505: `RCD.gen` (rcdClose bumps it; rcdOpen1
+  undoes what it opened and tells the helper to close when it changed; `rcdOpen` starts a fresh open after a stale in-flight one
+  instead of handing back its "gave up"). Not proven to be the cause: if it happens again, ask
+  for Settings › Audio › Copy report BEFORE restarting audio.
+- **Cirklon "Sysex interrupt" the first time native MIDI reached it.** Web MIDI's send() throws on malformed messages and SysEx
+  without permission, so the browser engine dropped them; native passed them on. Build 505: `nmValid` (whole messages only,
+  data bytes < 0x80, lengths by status, no F0 / F7) in the native output's send, thrown as TypeError like Web MIDI.
+- Keep in this pad played the whole pad once (playFresh): owner, 10:37: "Don't play anything" (build 506: removed).
+- 11:00: "Measure button takes a couple of pushes" (asked: what the first push shows) and an "Audio engine reset" message after
+  two runs: the reset after Measure is deliberate (7 Nov: opening the input moves macOS's output timing); build 508 does it
+  quietly (`resetAudio(true)`), and resetAudio now reconnects the recorder's monitor to the new master (it stayed on the old one).
+  Build 509 (CodeRabbit): a queued open whose window closed before it began never starts (io-check proves it never reaches
+  the helper). CodeRabbit has reviewed every commit up to 4ab28ab (beta.19); its last pass had only a test nitpick, done.
+- 11:26: Measure: "The window changes shape on first click, and it doesn't start measuring until later": the status replaced the long
+  explanation (the window shrank under the pointer) and opening the input takes a few seconds. Build 510: a fixed-height status
+  line below the fields; "Opening the input…", then "hit k of n", then "Working it out…". Build 511 (CodeRabbit): the line is a fixed
+  height and scrolls; progress goes to the panel that started the run. CodeRabbit again raised same-name devices (ids reused
+  after an unplug): deferred, it needs the stable device identity listed under item 5.
+- 11:02: "If I monitor directly, it's spot on, but through [the app's] monitor MIDI sounds late": so the MIDI timing is right
+  (Gear delay as measured); the app's own monitoring is late by its input path + 20 ms cushion + output latency (by design:
+  use the interface's direct monitoring when tracking). A lower-latency monitor option could come later if wanted.
+- CodeRabbit on build 505: the `RCD.gen` comment had swallowed rcdClose's disconnect line (monitor left on the master,
+  beta.15 only). Fixed in 506, with an io-check that closing disconnects the monitor and node. Build 507 (CodeRabbit): the
+  browser-input path checks `gone()` after getUserMedia and the worklet load too. Measure "closer but not perfect": the owner is checking again by ear; with only the gear on the input it trusts the
+  output latency macOS reports (patching the click in too measures against what is heard).
+- Delegated to Sonnet subagents (checked by the lead): Space always plays / stops even with a menu button focused, solo / mute
+  keys on every screen; Apply (reload) did nothing in the desktop app; the rate warning only a status line (now a toast too);
+  the 5-minute take missing from RECENT. Found: Apply (reload) was cancelled by main.js's will-navigate guard (now
+  `thunderDesktop.app.reload()` → `thunder:reload` → sender.reload()); the rate note was cleared by fillIn on reopen (now
+  `rcdRateMsg()`, a toast once per device + rate pair, and the status line); RECENT: a long take stores fine (16-bit PCM),
+  the likely cause is localStorage full (the RECENT list write was swallowed): now retried smaller, kept in memory
+  (`SMB_MEM`) and held (`smpHeld`). Not proven to be the owner's cause.
+
+**1. OWNER'S TEST OF 1.3.0-beta.7 (build 496; waiting on the owner; the next session starts by asking for the results).**
+https://github.com/matthettich/thunder-plus/releases/tag/v1.3.0-beta.7. Record a sample → Engine Native unless it says otherwise.
+- [ ] **Microphone prompts.** Install beta.7, open Record a sample: one prompt at most (new ad-hoc signature), then none when the
+      window is opened again or the app restarted. If it still prompts several times: what does the prompt name (Thunder Plus or
+      a "Helper"), and is Thunder Plus listed in System Settings › Privacy & Security › Microphone?
+- [ ] **Record right after opening the window** (before the meters settle): no "wouldn't open: no answer".
+- [ ] **Monitoring after a PATTERN take.** Monitor ON, a PATTERN take, then a FREE take: the input is still heard after each,
+      without switching Monitor OFF → ON. Also: any dropouts in monitoring while the song plays?
+- [ ] **Measure…** (Settings › MIDI). First set the port's Gear delay back to its old value (or 0): beta.4 set it to ~200 ms,
+      which was a bug. Pick the pair the gear is on in Measure's new **Inputs** list; with the native input only the gear needs to
+      reach it. Send the whole result line (ms late / early, hits, spread, drift, "timed by the native input's timestamps" or
+      not). If the click is patched in too, it is used instead: a second run with Engine Browser (gear + click on IN 1+2) would
+      confirm both paths agree.
+- [ ] **Listen to the 5-minute take** (beta.5; kept in the pad's layer 3, also in File › Samples… › RECENT): no clicks or gaps,
+      and still on the grid at the end. Optionally 1–2 minutes through the 500R8 on an ADAT pair (load).
+- [ ] When convenient: unplug the 500R8 mid-take (the take so far is kept); run the 500R8 at 44.1 kHz with the app at 48 (the
+      window warns that the input is converted).
+→ Problems: fix on `io-helper`, run the checks (below), pre-release the next unused number (`1.3.0-beta.21`…) (Run workflow `desktop.yml`, ref
+  `io-helper`, `version`, `prerelease: true`); in the macOS job log confirm both "thunder_io.node built" and "adhoc-sign: signed"
+  (both steps can fail without failing the build).
+
+**1b. Already confirmed by the owner (beta.4 / beta.5, 7 Nov).** ADAT input (IN 12) and a pair (IN 17+18) in PATTERN, inputs stay
+on the pick, takes on the beat; Discard and record; two layers of one pad differ; monitoring usable; a 5-minute take recorded
+without errors (not yet listened to). Kept takes go into the pad's SELECTED layer (the owner's 5-minute take: layer 3) and RECENT:
+not a bug.
+
+**1c. What tonight's tests found and how each was fixed (builds 493–496).**
+- 4–8, then 6 microphone prompts on opening: (a) the window's meter open (fillIn, not awaited) and Record's open ran at once,
+  and the STALE rule (no audio for 1 s → reopen) reopened an input still waiting on macOS's prompt; fix (493): `rcdOpen` is
+  single-flight (`rcdOpening`), STALE only after audio has come (`io.got`) and 2 s without it. (b) The Mac app was fully unsigned
+  (CSC_IDENTITY_AUTO_DISCOVERY false): macOS can't keep a grant for it. `build.mac.identity: "-"` (495) was SKIPPED by
+  electron-builder 26 ("no valid identity"), so beta.6 is unsigned too; 496: `electron/scripts/adhoc-sign.js` (afterPack:
+  `codesign --force --deep --sign -` on the merged universal app only, then `--verify`), `hardenedRuntime: false` (hardened runtime
+  would need JIT / library-validation entitlements for the .node addons). One prompt per update (each build's code hash differs)
+  until a Developer ID. The updater downloads the .dmg itself (no Squirrel), so signing doesn't touch updates.
+- "500R8 wouldn't open: no answer": the open gave up at 5 s while macOS's prompt was up; now waits 30 s (a toast after 2.5 s
+  says to allow the microphone) and closes the device if it timed out (493).
+- "The input fell behind for a moment" mid-take: D was output latency + 40 ms; now + 120 ms (cap 500 ms, +50 ms steps between
+  takes). D costs the take nothing (rcdLat = D), only a little more wait after a PATTERN take ends (493).
+- Monitoring silent after a PATTERN take (meters moving; Monitor OFF → ON fixed it): not reproduced with the fake; `rcdMonSet`
+  sets the monitor level outright (cancelScheduledValues + setValueAtTime) and restarts the native monitor's read point at every
+  take's start and end; monitor cushion 12 → 20 ms (496). If it still happens, the cause is elsewhere: look at what changes when
+  the song stops after a PATTERN take.
+- Measure… read ~200 ms (reproduced with the fake: 194–232 ms for a gear 20 ms late): `mltOnset` took any input above 0.01 (hum,
+  DC) as the click, at the window's start (−120 ms), and the click skips the master's lookahead while MIDI waits for it
+  (`moFxLat`, ~64 ms by default). Fix (496): the onset must clear 6× the window's 30th-percentile level; `moFxLat` is subtracted;
+  with the native input a missing click falls back to the timestamps (`out.ts`). Measure has its own Inputs list (494: it only
+  listened on Record a sample's pick). Build 497 (CodeRabbit): run from Settings (Record a sample closed) the input closed BEFORE
+  the analysis, so `RCD.io` was null (no timestamp fallback) and `rcdLat()` gave the browser's latency: the click was looked for
+  D (≥ 120 ms) off. Likely the third cause of beta.4's 200 ms. ts / lat / f0 are now read before the close. io-check's fake now has
+  a device clock (frames at the true rate, stamped t0 + frame / rate): Measure reads 20.0 ms on every hit, open and from Settings.
+- Desktop build: Windows now on `windows-2022` (windows-latest has Visual Studio 2026 / "version 18", which node-gyp 11 can't find:
+  neither Link nor the helper addon built on Windows). Check on the next build: "thunder_io.node built" in the Windows job.
+- `adhoc-sign.js` signs every finished Mac app (single-arch builds too), skipping only the universal build's -temp halves.
+
+**2. CodeRabbit on the newest commits.** Its last review (02:54 UTC) covered A1 up to build 489; A2 (build 491) and the build-492
+fix were pushed after it. Ask with a PR comment `@coderabbitai review` (REST: `gh api -X POST repos/matthettich/thunder-plus/
+issues/14/comments -f body=...`), and only after the last push of a batch: a push right after the ask makes it skip ("Head
+commit changed"). It skips PRs into `beta` unless asked. Read `pulls/14/comments` and `/reviews`; fix real findings.
+Its libremidi findings (vendored, not compiled) wait for phase B.
+
+**3. Merge, when the owner says beta.4 works.** PR #14 into `beta` (REST: `gh api -X PUT repos/matthettich/thunder-plus/pulls/14/merge`;
+GraphQL is blocked from these sessions). Expect small conflicts: BUILD / CHANGES / sw.js CACHE (take io-helper's 492 and keep
+every CHANGES line) and CLAUDE.md (keep both helper lines). Then `beta` → `main` and a normal desktop release (`1.3.0`) only when
+the owner asks (beta → main by PR so CodeRabbit sees it). The punch-list fixes (FOLLOW PATTERN 487, wheel direction 488) are
+on `beta` and in the helper betas but in no normal desktop release yet.
+
+**4. Rest of A2.**
+- [x] Windows build: fixed by building on `windows-2022` (windows-latest's Visual Studio 2026 isn't found by node-gyp 11); beta.8's
+      log shows both thunder_link.node and thunder_io.node built. [ ] The owner's WASAPI test (WASAPI only, no ASIO).
+- [ ] Linux: builds (no ALSA: no MIDI ports); untested on hardware (low priority, owner).
+
+**5. Phase B: MIDI through the helper: BUILT (7 Nov night, build 498, on `io-helper`; owner go-ahead 22:44 "Do it!").**
+Started before the owner's beta.7 test, by the owner's choice; the risk is only that a problem found in the shared plumbing
+(helper process, port) may need the MIDI side adjusted.
+- **B1 addon** (`io/src/midi.cc`, libremidi header-only; C++20 and exceptions on in `binding.gyp`, every libremidi call in a
+  try): `midiPorts / midiOpenOut / midiOpenIn / midiSend(port, bytes, atNs) / midiClear(port|0) / midiClose / midiRead /
+  midiStats`. One sender thread for every output (QoS user-interactive on macOS; TIME_CRITICAL + timeBeginPeriod(1) on
+  Windows), a multimap by OS time (same-time order kept), sleeps to 0.5 ms before, spins the rest. Shared state is heap-
+  allocated and never freed (a running thread at exit aborted Node). Past / zero times: now, in the order sent. MIDI in:
+  libremidi callback stamps HostNowNs() and queues. Test port `test:loop` (listed with THUNDER_IO_TEST, always openable):
+  `io/test/midi.js` (timing on this workspace: median 0.001 ms, worst ≤ 2 ms; order; clear; close; bad input), run by
+  `tests/io-native.test.js` and smoke-checked in `io/build.js`. Linux builds ALSA only when its headers exist (this workspace
+  has none: dummy backend, no ports); the workflow doesn't install libasound2-dev (Linux low priority).
+- **B2 helper** (`electron/io-helper.js`): hello has `midi:true`; ops midiPorts / midiOpenOut / midiOpenIn (answered),
+  midiSend / midiSendMany / midiClear (streams, no answer), midiClose; MIDI in polled every 2 ms and posted as one
+  `{op:'midiIn', list}`; shutdown (page reload, exit) clears and closes every MIDI port. `tests/io.test.js` (4 tests).
+- **B3 page**: `NM` / `nmConnect` / `nmScan` / `nmPort` / `nmClose` / `midiRemap` / `midiEngineSet` (next to the IOH code).
+  midi.access is a stand-in for Web MIDI's (`native:true`; outputs `send(bytes, ts)` → midiSend at `(ts − IOH.clk)·1e6` ns,
+  `clear()` → midiClear; inputs get `{data, timeStamp}` with the helper's arrival time), so msend, the clock out, clock in,
+  Measure… and KEYS PLAY are unchanged; msend skips the OUTBOX for native outputs (moRelease already calls `clear()`, then
+  the offs). Ports rescanned every 3 s (onstatechange = hookInputs); the clock offset re-measured every 15 s. Ids `n:` +
+  name; saved Web MIDI ids mapped by name (`midi.names`, read from Web MIDI once when missing) and back on Engine Browser.
+  Settings › MIDI › **Engine: Native / Browser** (desktop only; `aset.midiEngine`, default native). `connectMidi` is
+  single-flight and first runs after the whole script (TDZ: it used IOAPI before its line).
+- **Microphone**: no longer asked when the helper starts (MIDI alone would have prompted): `thunder:io-mic` (main.js,
+  preload `io.mic()`), called by `rcdOpenIo` just before an input opens.
+- io-check's fake helper speaks MIDI too: connect (no microphone), remap by name, a note booked 200 ms ahead reaches the
+  helper at its OS time (0.0 ms off) with no OUTBOX, STOP = midiClear then the offs, clock in with timestamps, Engine
+  Browser closes the ports.
+- **Owner's test (after beta.7's):** Settings › MIDI shows Engine Native and "· native" in the status; the port letters still
+  point at the same gear; notes on the gear in time with the song (compare with Engine Browser); STOP: nothing plays on after
+  it; MIDI clock out to the MPC / Force steady (and clock in from it, if used); then Measure… again (Gear delay should come out
+  small: the helper sends at the booked time; the owner once said the right delay was "a combination of both latency numbers":
+  check whether that is still so). Windows: the same through WinMM.
+- **Review round (build 499).** A Sonnet subagent reviewed B1–B3 read-only (findings checked by the lead before fixing) and
+  CodeRabbit reviewed PR #14; both agreed on the main points. Fixed: `nmScan` single-flight (`NM.scanning`) with opens in
+  flight remembered (`NM.opening`), a port that opens after a switch / reconnect is closed (not leaked), Engine switched while
+  a connect is in flight (`midiAccessDrop`; connectMidi1 drops an access of the wrong engine), `midiRemap` again when ports
+  change (a device plugged in later gets its letter; name substring match only for names ≥ 4 chars; the Web MIDI name lookup
+  bounded to 3 s); addon: `MidiOpenIn` scans and opens without g_mx, `SendNow` sends without g_mx (device held by a
+  shared_ptr copy), atNs clamped to an hour ahead, `timeEndPeriod` on Windows; helper: the MIDI-in poll stops with the last
+  input; page: a DEAD HELPER (no answer to midiPorts twice) is noticed by `nmLost`, which drops the access locally, resets IOH
+  and connects again (a fresh helper; main.js allows one restart; Web MIDI otherwise); `iohStart` adds its window listener
+  once (a second one answered every waiting request with null). Delegated to a Sonnet subagent and checked by the lead:
+  helper op `midiStats`, Settings › MIDI status "· N late" (`NM.late`, `nmLateShow`). Not changed (noted): the 15 s clock re-measure
+  replaces the offset (±0.2 ms) rather than smoothing.
+  CodeRabbit's second pass (build 500): `NM.scanning` holds the access being scanned (a leftover scan of an old access no longer
+  holds up the new one), no midiRemap from a scan whose access has gone, and the helper's dead transfer-list argument removed.
+  Third pass (build 501): opens in flight are kept per access (`acc.opening`), and a scan whose access has gone stops before
+  opening inputs. Fourth pass (build 502): two same-name devices (ids "Name", "Name #2"): when one of the group goes, the
+  whole group is closed and opened again by its new ids (the survivor kept the gone device's handle); io/build.js removes a
+  staged addon on a missing prerequisite too. Fifth / sixth passes (builds 503–504): CodeRabbit first asked for saved choices to
+  follow a renumbered group, then (rightly) that names can't tell which device left; build 504 keeps a gone choice as it is
+  ("(not connected)", back when the device is); the group is still reopened so the device that's there works under its new
+  id. io-check's fake gives a new handle per open, models the physical devices and refuses sends on closed handles.
+  **Still to do (rare: two identical MIDI devices):** ids are names, so after the first of two "Gear"s is unplugged, a letter
+  set to "Gear" plays the one still there. The real fix is a stable device identity from the addon (libremidi's
+  port_information: `port` / `container` / `device_name` where the backend gives them), kept in midiPorts() and used by the
+  page for its ids, with names only as the fallback. Skipped: its "docstring coverage" pre-merge check (this codebase comments
+  inline). CodeRabbit has reviewed every commit up to 276c33c (build 504): its last pass had no new findings and marked
+  the earlier ones addressed; only its docstring-coverage check remains, skipped on purpose.
+- **Linux: skipped for now (owner, 7 Nov 23:09: "not as important"; still needs to happen).** The Linux addon builds without
+  ALSA (no ALSA headers on ubuntu-latest), so Linux has no native MIDI ports (Web MIDI still works, Engine Browser). To do:
+  `sudo apt-get install -y libasound2-dev` before "Native I/O helper addon (optional)" in desktop.yml, Linux runner only,
+  continue-on-error. The step (written and then left out on the owner's word):
+  `- name: ALSA headers for the helper's Linux MIDI (optional)` / `if: runner.os == 'Linux'` / `continue-on-error: true` /
+  `run: sudo apt-get update && sudo apt-get install -y libasound2-dev`.
+  Also untested on Linux hardware: the audio input.
+- io/test/midi.js judges timing by percentile (median ≤ 0.5 ms, 95% ≤ 1 ms, none over 10 ms): on this 2-CPU workspace with
+  Chrome running alongside, single messages came 2–6 ms late (the OS pausing the thread); idle, 95% ≤ 0.005 ms, worst ≤ 1 ms.
+
+**6. Known limits to keep in mind.** Monitoring through the app is D + output latency late (D = base + output latency + 40 ms,
+raised between takes if chunks arrive late). The interface at another rate than the app is converted (warned). The Mac build
+is unsigned: macOS may still ask for the microphone per launch until the Apple Developer membership (owner: waiting).
+
+**Checks to run before any push:** `npm test`, `node tools/io-check.mjs`, `node tools/recorder-check.mjs`,
+`node tools/browser-check.mjs` (and `node tools/link-test.mjs` if Link code moved). The addon: `NODEDIR=/opt/node22 node
+io/build.js`, `node io/test/input.js`. Lesson from beta.2/3: fakes accept things the real Electron ports don't; when the
+helper's wiring changes, read Electron's API for it, not only the tests.
+Working copies used: `/home/claude/thunder-plus` (io-helper) and a `beta` worktree at `/home/claude/tp-beta`.
+
+**A1 BUILT, waiting for the owner's test (7 Nov, evening; branch `io-helper`, PR #14, desktop pre-release 1.3.0-beta.2, build 489).**
+Tasks A1.1–A1.4 done; A1.5 (owner on the 500R8) is next. What's where:
+- **A1.1 addon capture** (lead): `io/src/ring.h` (SPSC sample ring + block-header ring; a callback goes in whole or is dropped
+  and counted, so a drop is an exact gap at its true device frame); `thunder_io.cc` `openInput(id, {rate, block, backend})`
+  (every channel, float32, interleaved, miniaudio resamples to the page's rate and never changes the device's own rate),
+  `read()` (one contiguous run per call), `closeInput()`. **Frame times:** the stream's frame-0 time on the OS clock is a lower
+  envelope of callback time (`start = min(start + 100 ppm of elapsed, now - frames/rate)`): late callbacks can't push it, crystal
+  drift can. `latencyFrames` is only what miniaudio knows (period x periods); driver / converter latency is left to Measure….
+  Tests: `io/test/ring-test.cc` (real producer thread, TSan clean, 3M frames), `io/test/input.js` (null backend, real time),
+  both run by `tests/io-native.test.js`; `io/build.js` smoke-opens the null input.
+- **A1.2 helper** (delegated): `open` / `close` / `now` ops, 5 ms poll, up to 8 reads a tick, chunks transferred; `shutdown()` on
+  a new port and on exit. Tests in `tests/io.test.js`.
+- **A1.3 worklet** (lead): `IOIN_WORKLET` in index.html. The page's clock means "when heard" (`p2a`), so a frame that reached the
+  computer at OS time P belongs to song time `p2a(P)`; the worklet plays it at `p2a(P) + D`, and on this path `rcdLat()` is `D`
+  (+ Extra latency). `D` = base + output latency + 40 ms, raised 20 ms (max 250 ms) between takes when chunks arrive late.
+  **Takes stay whole:** the anchor (audio frame - input frame) is re-set when the timestamps disagree by > 1 ms between takes,
+  > 20 ms during one (`rcdGo` tells it). Monitor = the worklet's second output, ~12 ms cushion, nudged a frame for drift.
+  Clock line-up: `iohClock()` (8 `now` pings, shortest round trip), re-done every 10 s between takes; `mapUpd()` every 500 ms.
+  Tests: `tests/io-worklet.test.js` runs the real worklet source frame by frame (exact placement, drift held in a take, gaps,
+  late count, monitor).
+- **A1.4 Record a sample** (delegated, line-reviewed): Engine Native / Browser row (desktop only; owner: engine and inputs
+  belonged together), Input lists the helper's devices ("500R8 (native, 28 inputs)", `rcdSet.ioDev`), Inputs every pair and
+  channel; Settings › Audio's row removed. `tools/io-check.mjs` drives it with a fake helper streaming 28 channels and checks
+  a FREE take on IN 17+18 comes back as channels 17 and 18.
+- **Owner's test for A1.5:** an ADAT input (e.g. 12) and a pair (17+18) in PATTERN sync against the click; Measure… through the
+  native input; a 5-minute take (no clicks, still on the grid at the end); monitoring latency acceptable? If PATTERN takes are
+  consistently early or late by a few ms, that is the interface's converter latency: set it once as Extra latency (or we
+  read it from CoreAudio's kAudioDevicePropertyLatency + safety offset in A2).
+- **Known limits:** monitoring through the app is ~D + output latency late (use the interface's own monitoring when tracking);
+  the device must run at the app's rate for zero resampling (miniaudio converts otherwise: A2 to warn); Windows / Linux untested.
+- **Next:** A2 (unplug mid-take keeps the take; rate mismatch warning; Windows WASAPI; CoreAudio input latency), then B (MIDI).
+
 **Settled 7 Nov (build 485):** MIDI was early by the reported base + output latency on the Mac; `mapUpd` now floors the
 clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure… once the helper's MIDI (B) lands.
 
@@ -241,7 +527,8 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
   change it needs.
 - Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
-- **Native I/O helper, wanted soon** (7 Nov): the brief is "Build the native I/O helper — START HERE" near the top of this file; design in `docs/NATIVE-IO-HELPER-PLAN.md`: phase A every input channel in Record a
+- **Native I/O helper** (7 Nov): A0 done on the 500R8; A1 + part of A2 built (1.3.0-beta.7), waiting for the owner's test: "PICK UP HERE: EVERYTHING STILL NEEDED" in the START HERE brief.
+  Was: the brief is "Build the native I/O helper — START HERE" near the top of this file; design in `docs/NATIVE-IO-HELPER-PLAN.md`: phase A every input channel in Record a
   sample (the owner's interface has no mixer, so inputs 3+ can't be routed to 1/2), B MIDI out / in, C output only if needed.
   Owner answered its section 9 on 7 Nov (recorded there and in the brief).
 - **A more stable desktop app, when the owner wants one** (7 Nov): `docs/NATIVE-DESKTOP-PLAN.md` section 14 lists which of
@@ -250,6 +537,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+
+## 7 Nov (18): native helper A0 and A1 (branch io-helper, PR #14; desktop pre-releases 1.3.0-beta.1 / beta.2)
+
+- A0: the addon, helper process, CI step; owner confirmed "native (500R8, 28 inputs)" on beta.1. CodeRabbit: had to be asked
+  with `@coderabbitai review` (it skips PRs into `beta`); its two findings fixed (a failed build ships no addon; README).
+- A1: capture, streaming, the timestamp worklet and Record a sample's Engine / Input / Inputs: details in the START HERE brief.
+- `beta` (487–488) merged into `io-helper` first so they don't drift; PR #14 still to be merged into `beta` after the owner's test.
 
 ## 7 Nov (17): punch list: FOLLOW PATTERN, one wheel direction (builds 487–488, beta; not in a desktop build yet)
 
@@ -262,7 +556,6 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
   `wheelSign` / `window.thunderWheelSign` = -1, applied in `wheelSteps`, `wheelNotch`, Arrange's wheel, the FX slots, the
   mastering EQ canvas and kit.js `wheelN` (v=9). Scroll / pan wheels unchanged. The website can't read the setting (Chrome
   doesn't expose it): unchanged there.
-- The io-helper branch's HANDOVER also has these two as punch-list lines: drop them when PR #14 merges.
 
 ## 7 Nov (16): MIDI mapping never sooner than the reported latency (build 485, beta + main)
 
