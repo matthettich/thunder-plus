@@ -26,6 +26,9 @@ Keep this file up to date at the end of a work session.
 
 ## Desktop releases
 
+- **v1.2.99** (7 Nov 2026; owner: "merge to main for me and make a desktop"; beta merged into `main` directly (gh had no token, so
+  no PR / CodeRabbit pass) and released by pushing tag v1.2.99): builds 477–478 on top of v1.2.98 (INST layout by OUTPUT,
+  recorder INPUTS, Ctrl/⌘+G generators, MIDI outbox, Measure gear delay, wider Gear delay boxes).
 - **v1.2.98** (7 Nov 2026; owner: "push it to main, build a desktop app"; Run workflow through the API with version 1.2.98,
   from `main` after PR #13 at build 476, run 42414595840): builds 468–476 on top of v1.2.97 (core watchdog, Pattern view arrows,
   Arrange new patterns, Chords on poly, playhead latency, EDIT pick-up / drop, PAD navigation, hold before drag, ?pbshow,
