@@ -92,6 +92,13 @@ inputs back to 1&2": a failed native open fell back silently to the browser's in
 (rcdStart returns before clearing RCD.take): recheck on beta.3. ADAT inputs: not confirmed yet (the owner thinks these bugs
 hid it): recheck on beta.3. tools/io-check.mjs covers 3–5 with the fake helper.
 
+**A2 (part) built after beta.3 (build 491, not in a desktop pre-release yet):** (a) the interface's own delay: the addon reads
+CoreAudio's input device latency + safety offset + first stream's latency (`InputLatencyFrames`) and moves every hostNs back by
+it; `opened.latencyMs` shows in Record a sample's Extra latency line. (b) Unplugged mid-take: miniaudio's stopped notification
+(not caused by us) sets `inputLost()`; the helper drains what arrived, then posts `closed` with why; the page ends the take where
+it is and keeps it, then closes. (c) Rate mismatch: the window says when `opened.deviceRate` differs from the app's rate.
+Tests: io-check (unplug, rate, latency line), tests/io.test.js (inputLost). Left for A2: Windows WASAPI check, Linux build.
+
 **PICK UP HERE (7 Nov 19:41).** State: desktop pre-release **1.3.0-beta.2** (build 489, from `io-helper`) is out for the owner's
 A1.5 test (the list below). PR #14 (`io-helper` → `beta`): CodeRabbit re-asked at 02:37 UTC (`@coderabbitai review`; it skips
 when a push lands right after the ask, so push first, then ask). First job for the next session:

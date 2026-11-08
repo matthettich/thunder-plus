@@ -23,6 +23,8 @@ function createIoHelper({ loadAddon, post, timers }) {
     try { addon.closeInput(); } catch (_) {}
   }
   function tick() {
+    // UNPLUGGED (A2): the addon says the device stopped by itself: what arrived is drained first, then the page is told
+    const lost = typeof addon.inputLost === 'function' && addon.inputLost();
     for (let i = 0; i < MAX_READS_PER_TICK; i++) {
       let c;
       try { c = addon.read(); }
@@ -32,7 +34,7 @@ function createIoHelper({ loadAddon, post, timers }) {
         post({ op: 'closed', why: String((e && e.message) || e) });
         return;
       }
-      if (!c) return;
+      if (!c) { if (lost) { closeInput(); post({ op: 'closed', why: 'the interface went away (unplugged or switched off)' }); } return; }
       post({ op: 'in', frame0: c.frame0, hostNs: c.hostNs, channels: c.channels, frames: c.frames, data: c.data, overruns: c.overruns },
         c.data && c.data.buffer ? [c.data.buffer] : []);
     }

@@ -294,6 +294,10 @@ struct Input {
   std::atomic<int64_t> startNs{0};      // the lower envelope of the stream's frame-0 time, ns
   std::atomic<bool> stamped{false};
   int64_t lastNow = 0;                  // audio thread only
+  int64_t hwLatNs = 0;                  // the interface's own delay (A2): time stamps are moved back by it
+  unsigned hwLatFrames = 0;
+  std::atomic<bool> closing{false};
+  std::atomic<bool> lost{false};        // the device stopped by itself (unplugged, switched off)
 };
 Input* g_in = nullptr;
 }
@@ -315,10 +319,18 @@ static void OnCapture(ma_device* d, void* out, const void* in, ma_uint32 n) {
   I->frames.store(f0 + n, std::memory_order_release);
 }
 
+// UNPLUGGED (A2): miniaudio says the device stopped; if we didn't stop it, it went away. read() / inputLost() report it.
+static void OnNotify(const ma_device_notification* n) {
+  if (!n || !n->pDevice) return;
+  Input* I = (Input*)n->pDevice->pUserData;
+  if (I && n->type == ma_device_notification_type_stopped && !I->closing.load()) I->lost.store(true);
+}
+
 static void CloseInputNow(void) {
   Input* I = g_in;
   if (!I) return;
   g_in = nullptr;
+  I->closing.store(true);
   if (I->up) ma_device_uninit(&I->dev);   // waits for the callback to finish: nothing touches the ring after this
   if (I->usesNullCtx) ma_context_uninit(&I->nullCtx);
   I->ring.free_();
@@ -346,7 +358,7 @@ static bool HexId(const char* s, size_t len, ma_device_id* id) {
 // (kAudioDevicePropertyBufferFrameSize) to the period it asks for, and on CoreAudio that is the whole device's setting, so the
 // interface reconfigured under the app's own output (and anything else using it). Asking for the size it already has makes
 // that a no-op. Returns 0 when it can't tell (then the system picks, as before).
-static unsigned CurrentBufferFrames(const ma_device_id* id) {
+static AudioObjectID DeviceObject(const ma_device_id* id) {
   AudioObjectID dev = kAudioObjectUnknown;
   UInt32 sz = sizeof(dev);
   if (id) {
@@ -362,11 +374,36 @@ static unsigned CurrentBufferFrames(const ma_device_id* id) {
     AudioObjectPropertyAddress a = { kAudioHardwarePropertyDefaultInputDevice, kAudioObjectPropertyScopeGlobal, 0 };
     if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &a, 0, NULL, &sz, &dev) != noErr) return 0;
   }
+  return dev;
+}
+static unsigned CurrentBufferFrames(const ma_device_id* id) {
+  AudioObjectID dev = DeviceObject(id);
   if (dev == kAudioObjectUnknown) return 0;
-  UInt32 frames = 0; sz = sizeof(frames);
+  UInt32 frames = 0, sz = sizeof(frames);
   AudioObjectPropertyAddress b = { kAudioDevicePropertyBufferFrameSize, kAudioObjectPropertyScopeInput, 0 };
   if (AudioObjectGetPropertyData(dev, &b, 0, NULL, &sz, &frames) != noErr) return 0;
   return frames;
+}
+// THE INTERFACE'S OWN DELAY (A2): how long a sound takes from the converter to the buffer CoreAudio hands over, as the device
+// reports it: device latency + safety offset + the first input stream's latency (all in frames, input scope). Read time stamps
+// mark when frames reach that buffer, so they are moved back by this much. 0 when the device doesn't say.
+static unsigned InputLatencyFrames(const ma_device_id* id) {
+  AudioObjectID dev = DeviceObject(id);
+  if (dev == kAudioObjectUnknown) return 0;
+  unsigned total = 0; UInt32 v = 0, sz;
+  AudioObjectPropertyAddress a = { kAudioDevicePropertyLatency, kAudioObjectPropertyScopeInput, 0 };
+  sz = sizeof(v); if (AudioObjectGetPropertyData(dev, &a, 0, NULL, &sz, &v) == noErr) total += v;
+  a.mSelector = kAudioDevicePropertySafetyOffset; v = 0;
+  sz = sizeof(v); if (AudioObjectGetPropertyData(dev, &a, 0, NULL, &sz, &v) == noErr) total += v;
+  a.mSelector = kAudioDevicePropertyStreams; sz = 0;
+  if (AudioObjectGetPropertyDataSize(dev, &a, 0, NULL, &sz) == noErr && sz >= sizeof(AudioStreamID)) {
+    AudioStreamID streams[64]; if (sz > sizeof(streams)) sz = sizeof(streams);
+    if (AudioObjectGetPropertyData(dev, &a, 0, NULL, &sz, streams) == noErr) {
+      AudioObjectPropertyAddress l = { kAudioStreamPropertyLatency, kAudioObjectPropertyScopeGlobal, 0 };
+      v = 0; UInt32 s2 = sizeof(v); if (AudioObjectGetPropertyData(streams[0], &l, 0, NULL, &s2, &v) == noErr) total += v;
+    }
+  }
+  return total < 48000 ? total : 0;   // (a nonsense figure is ignored)
 }
 #endif
 
@@ -436,6 +473,7 @@ static napi_value OpenInput(napi_env env, napi_callback_info info) {
   cfg.noPreSilencedOutputBuffer = MA_TRUE;
   cfg.noClip = MA_TRUE;
   cfg.dataCallback = OnCapture;
+  cfg.notificationCallback = OnNotify;
   cfg.pUserData = I;
 
   ma_result r = ma_device_init(ctx, &cfg, &I->dev);
@@ -448,6 +486,11 @@ static napi_value OpenInput(napi_env env, napi_callback_info info) {
     ma_device_uninit(&I->dev); if (I->usesNullCtx) ma_context_uninit(&I->nullCtx); delete I;
     return Result(env, false, "could not set up the input buffer");
   }
+#if defined(__APPLE__)
+  if (!useNull) { I->hwLatFrames = InputLatencyFrames(haveId ? &id : NULL);
+    double devRate = (double)I->dev.capture.internalSampleRate; if (devRate <= 0) devRate = I->rate;
+    I->hwLatNs = (int64_t)((double)I->hwLatFrames * 1e9 / devRate); }
+#endif
   g_in = I;
   r = ma_device_start(&I->dev);
   if (r != MA_SUCCESS) { CloseInputNow(); return Result(env, false, ma_result_description(r)); }
@@ -459,7 +502,10 @@ static napi_value OpenInput(napi_env env, napi_callback_info info) {
   SetNum(env, o, "block", I->dev.capture.internalPeriodSizeInFrames);
   // what the system buffers before the callback, as far as miniaudio knows (the driver / converter latency is not
   // exposed: Measure… finds the rest)
-  SetNum(env, o, "latencyFrames", (double)I->dev.capture.internalPeriodSizeInFrames * (I->dev.capture.internalPeriods ? I->dev.capture.internalPeriods : 1));
+  SetNum(env, o, "bufferFrames", (double)I->dev.capture.internalPeriodSizeInFrames * (I->dev.capture.internalPeriods ? I->dev.capture.internalPeriods : 1));
+  // the interface's own delay (converter + driver, as the device reports it), already taken off every hostNs; 0 if unknown
+  SetNum(env, o, "latencyFrames", I->hwLatFrames);
+  SetNum(env, o, "latencyMs", (double)I->hwLatNs / 1e6);
   napi_create_string_utf8(env, I->dev.capture.name, NAPI_AUTO_LENGTH, &v);
   napi_set_named_property(env, o, "name", v);
   return o;
@@ -484,13 +530,18 @@ static napi_value Read(napi_env env, napi_callback_info info) {
   napi_create_typedarray(env, napi_float32_array, (size_t)got * I->channels, ab, 0, &data);
   napi_create_object(env, &o);
   SetNum(env, o, "frame0", (double)frame0);
-  SetNum(env, o, "hostNs", (double)I->startNs.load(std::memory_order_acquire) + (double)frame0 * 1e9 / I->rate);
+  SetNum(env, o, "hostNs", (double)(I->startNs.load(std::memory_order_acquire) - I->hwLatNs) + (double)frame0 * 1e9 / I->rate);
   SetNum(env, o, "channels", I->channels);
   SetNum(env, o, "frames", got);
   SetNum(env, o, "rate", I->rate);
   SetNum(env, o, "overruns", (double)I->ring.lost());
   napi_set_named_property(env, o, "data", data);
   return o;
+}
+
+// inputLost() -> true when the open input stopped by itself (unplugged); the helper then reports it and closes it
+static napi_value InputLost(napi_env env, napi_callback_info info) {
+  (void)info; napi_value b; napi_get_boolean(env, g_in && g_in->lost.load(), &b); return b;
 }
 
 // closeInput(): stops and frees the input (safe when none is open)
@@ -502,11 +553,11 @@ static napi_value CloseInput(napi_env env, napi_callback_info info) {
 
 // ---------------------------------------------------------------------------------------------------------------------
 
-// version() -> "thunder_io 2 / miniaudio 0.11.26"
+// version() -> "thunder_io 3 / miniaudio 0.11.26"
 static napi_value Version(napi_env env, napi_callback_info info) {
   (void)info;
   napi_value out;
-  napi_create_string_utf8(env, "thunder_io 2 / miniaudio " MA_VERSION_STRING, NAPI_AUTO_LENGTH, &out);
+  napi_create_string_utf8(env, "thunder_io 3 / miniaudio " MA_VERSION_STRING, NAPI_AUTO_LENGTH, &out);
   return out;
 }
 
@@ -523,6 +574,7 @@ static napi_value Init(napi_env env, napi_value exports) {
   Export(env, exports, "openInput", OpenInput);
   Export(env, exports, "read", Read);
   Export(env, exports, "closeInput", CloseInput);
+  Export(env, exports, "inputLost", InputLost);
   return exports;
 }
 

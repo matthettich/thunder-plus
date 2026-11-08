@@ -14513,7 +14513,9 @@ async function rcdOpen(){
       node.port.onmessage = e => rcdMsg(e.data);
       Object.assign(RCD, {node, mon, ctx, inLat:0});
       if (await rcdOpenIo(node, mon)){
-        RCD.note = '';
+        // RATE (A2): the interface at another rate than the app's audio is converted (and ADAT carries 16 inputs only at 44.1 / 48 kHz)
+        const op = RCD.io.opened, dr = op.deviceRate | 0, ar = ctx.sampleRate | 0;
+        RCD.note = dr && dr !== ar ? `${RCD.io.dev.name} runs at ${dr / 1000} kHz and the app at ${ar / 1000} kHz: the input is converted. Set them the same (Settings › Audio › Rate, or the interface) for a clean take.` : '';
         RCD.nch = RCD.io.opened.channels; if (!rcdSet.nchs || typeof rcdSet.nchs !== 'object') rcdSet.nchs = {};
         rcdSet.nchs['io:' + RCD.io.dev.inId] = RCD.nch; rcdSave(); rcdRoute(); if (RCD.ui && RCD.ui.fillCh) RCD.ui.fillCh(); if (RCD.ui && RCD.ui.latSay) RCD.ui.latSay();
         return true; }
@@ -14879,7 +14881,7 @@ function rcdUi(){
   U.state.textContent = R ? (R.phase === 'armed' ? (tp.on ? 'Armed: records from the next pattern…' : 'Starting the song…') : R.phase === 'closing' ? 'Finishing the take…'
       : `● Recording pattern ${R.n + 1}` + (R.pats > 0 ? ` of ${R.pats}` : '') + (R.stopReq ? (R.songStop ? ' · the take and the song stop at its end' : ' · stops at its end') : R.pats < 0 ? ' · Stop ends it right there' : ' · Stop ends it at the end of the pattern'))
     : RCD.on ? '● Recording' : T ? (T.how === 'sync' ? '' : '') + (T.how === 'sync' ? ` · ${T.pats} pattern${T.pats === 1 ? '' : 's'}, ${T.beats} beats` : '')
-    : (RCD.stream || RCD.io) ? 'Ready.' : RCD.note || 'Pick an input and press Record.';
+    : (RCD.stream || RCD.io) ? RCD.note || 'Ready.' : RCD.note || 'Pick an input and press Record.';   // (a native note, e.g. the rate, stays up while ready)
   U.edit.hidden = !T || !!(RCD.on || R);
   U.state.hidden = !U.state.textContent;
   if (T && U.whn){ U.whn.textContent = T.how === 'edit' ? (T.name || 'Sample') : 'Take'; U.whi.textContent = `${(T.data.length / T.sr).toFixed(2)} s · ${T.data2 ? 'stereo' : 'mono'} · ${(T.sr / 1000).toFixed(1)} kHz`; U.win.style.setProperty('--rcw', rcdCols().wave); }
@@ -14971,7 +14973,7 @@ async function rcdPanel(pad, opts){
   patS.value = rcdSet.pats | 0; patS.addEventListener('change', () => { rcdSet.pats = +patS.value; rcdSave(); });
   const patF = field('Length', patS).parentElement; lock.push(patS);
   const latR = el('input'), latV = el('b'); latR.type = 'range'; latR.min = -50; latR.max = 250; latR.value = rcdSet.lat | 0;
-  const latSay = () => { latV.textContent = (rcdSet.lat | 0) + ' ms' + (RCD.io ? ` (native input, placed by its timestamps)` : ctx ? ` (+ ${Math.round(((ctx.outputLatency || ctx.baseLatency || 0) + (RCD.inLat || 0)) * 1000)} ms found)` : ''); };
+  const latSay = () => { latV.textContent = (rcdSet.lat | 0) + ' ms' + (RCD.io ? ` (native: placed by its timestamps${RCD.io.opened && RCD.io.opened.latencyMs > 0 ? `, ${RCD.io.opened.latencyMs.toFixed(1)} ms interface latency included` : ''})` : ctx ? ` (+ ${Math.round(((ctx.outputLatency || ctx.baseLatency || 0) + (RCD.inLat || 0)) * 1000)} ms found)` : ''); };
   latR.addEventListener('input', () => { rcdSet.lat = +latR.value; rcdSave(); latSay(); }); latSay();
   const latW = el('span', 'acidr'); latW.append(latR, latV); const latF = field('Extra latency', latW).parentElement;
   const fitF = seg('Fit to tempo', [[1, 'ON'], [0, 'OFF']], () => rcdSet.fit | 0, v => { rcdSet.fit = v; }).parentElement;
@@ -16337,7 +16339,13 @@ async function rcdOpenIo(rec, mon){
   node.connect(rec, 0); node.connect(mon, 1);
   IOH.onIn = m => { if (!RCD.io || RCD.io.node !== node) return; io.lastIn = performance.now();
     node.port.postMessage({f0:m.frame0, t:p2a(m.hostNs / 1e6 + IOH.clk), n:m.frames, nch:m.channels, data:m.data}, [m.data.buffer]); };
-  IOH.onGone = why => { if (!RCD.io || RCD.io.node !== node) return; toast('The audio input went away (' + why + ').', 5000); rcdAbort(); rcdClose(); rcdUi(); };
+  // UNPLUGGED MID-TAKE (A2): the take so far is kept (the recorder ends it where it is), then the input is closed
+  IOH.onGone = why => { if (!RCD.io || RCD.io.node !== node) return;
+    const rec = RCD.on || !!RCD.sync;
+    if (RCD.sync && RCD.sync.phase === 'rec') rcdEndAt(ctx.currentTime); else if (RCD.sync) { rcdAbort(); } else if (RCD.on) rcdStop();
+    toast('The audio input went away (' + why + ')' + (rec ? ': the take so far is kept.' : '.'), 6000);
+    rcdCloseIo();   // the recorder itself stays until the take is in, then closes
+    const fin = () => { if (RCD.on || RCD.sync || RCD.onDone) return void setTimeout(fin, 100); if (!RCD.io) rcdClose(); rcdUi(); }; fin(); };
   io.tick = setInterval(() => { mapUpd(); if (++io.sync % 20 === 0 && !RCD.on){ IOH.clkT = 0; iohClock(); } }, 500);   // the clocks, kept lined up
   RCD.io = io;
   return true;
@@ -22560,7 +22568,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 490;
+const BUILD = 491;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31527,6 +31535,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [491, '7 Nov', ['Desktop app, Record a sample with Engine Native: the interface’s own delay (as the Mac reports it) is taken into account, so PATTERN takes land on the beat without setting Extra latency; unplugging the interface mid-take keeps the take so far; and the window says when the interface runs at another sample rate than the app.']],
   [490, '7 Nov', ['Desktop app, Record a sample with Engine Native: the interface is no longer reset when the input opens (its buffer size is left as it is); the app asks for the microphone once; the input opens with the window, so the meters work before Record; and an input that stopped is opened again, so Record and Discard and record work without closing the window. If the native input can’t open, the window says why instead of quietly using inputs 1–2.']],
   [489, '7 Nov', ['Desktop app: Record a sample can record from every input of your audio interface (Engine: Native): the Input list shows the interface with all its inputs, and Inputs every pair and channel. Takes are placed by the interface’s own timestamps. The Input engine row moved here from Settings › Audio.']],
   [488, '7 Nov', ['Desktop app on a Mac: the mouse wheel goes one way everywhere. With Natural scrolling on, Arrange, the tracker rows and values went the opposite way to the lists and the Mixer; they now follow it too (pulling down moves down, and lowers a value).']],

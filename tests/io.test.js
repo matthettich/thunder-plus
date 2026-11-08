@@ -63,6 +63,7 @@ function makeIn(over = {}) {
     openInput: (dev, o) => { calls.push(['open', dev, o]); return over.open || { ok: true, rate: o.rate, channels: 8, block: o.block, latencyFrames: 64 }; },
     read: () => { calls.push(['read']); if (over.readThrows) throw new Error(over.readThrows); return queue.length ? queue.shift() : null; },
     closeInput: () => calls.push(['close']),
+    inputLost: () => !!over.lost && over.lost(),
   };
   let fn = null, cleared = 0;
   const timers = { setInterval: (f, ms) => { fn = f; timers.ms = ms; return 42; }, clearInterval: h => { if (h === 42) { fn = null; cleared++; } } };
@@ -136,4 +137,14 @@ test('io helper input: shutdown() with an input open closes it and stops the pol
   t.h.shutdown();
   assert.equal(count(t.calls, 'close'), 1); assert.equal(t.running(), false);
   t.h.shutdown(); assert.equal(count(t.calls, 'close'), 1);
+});
+
+test('io helper input: the device going away (inputLost) drains what arrived, then closes and tells the page why (A2)', () => {
+  let gone = false; const t = makeIn({ lost: () => gone });
+  t.h.handle({ op: 'open', id: 1, dev: 'a', rate: 48000, block: 128 });
+  t.queue.push(t.chunk(0), t.chunk(1)); gone = true; t.tick();
+  const ops = t.out.slice(1).map(m => m.op);
+  assert.deepEqual(ops, ['in', 'in', 'closed'], 'the last chunks first, then closed');
+  assert.match(t.out[t.out.length - 1].why, /went away/);
+  assert.equal(t.running(), false); assert.equal(count(t.calls, 'close'), 1);
 });

@@ -45,7 +45,7 @@ const FAKE = mode => {
         else if (m && m.op === 'open' && window.__ioOpenFail) h.postMessage({ op: 'opened', id: m.id, ok: false, why: 'device busy' });
         else if (m && m.op === 'open') {
           const rate = m.rate; stop(); frame0 = 0;
-          h.postMessage({ op: 'opened', id: m.id, ok: true, rate, channels: 28, deviceRate: rate, block: 256, latencyFrames: 256, name: '500R8' });
+          h.postMessage({ op: 'opened', id: m.id, ok: true, rate, channels: 28, deviceRate: window.__ioDevRate || rate, block: 256, latencyFrames: 96, latencyMs: 2, name: '500R8' });
           timer = setInterval(() => { if (window.__ioStall) return;
             const frames = 256, data = new Float32Array(frames * 28);
             for (let f = 0; f < frames; f++) for (let c = 0; c < 28; c++) data[f * 28 + c] = 0.01 * (c + 1);
@@ -54,7 +54,7 @@ const FAKE = mode => {
           }, 5);
         } else if (m && m.op === 'close') { stop(); h.postMessage({ op: 'closed', id: m.id }); } };
       h.postMessage(mode === 'ok' ? { op: 'hello', available: true, version: 'thunder_io 1 / miniaudio 0.11.26' } : { op: 'hello', available: false, why: 'addon missing' });
-      window.postMessage({ thunderIo: true }, '*', [ch.port2]);
+      window.__ioPort = h; window.postMessage({ thunderIo: true }, '*', [ch.port2]);
     }, 20);
     return Promise.resolve({ ok: true });
   } } };
@@ -108,7 +108,7 @@ try {
       const lat = document.querySelector('.recset b') && [...document.querySelectorAll('.recset b')].map(b => b.textContent).join('|');
       return E('RCD.take ? (() => { const t = RCD.take, n = t.data.length; let l = 0, r = 0; for (let i = 0; i < n; i++){ l = Math.max(l, t.data[i]); r = Math.max(r, t.data2 ? t.data2[i] : NaN); } return {n, sr:t.sr, l, r, io:!!RCD.io, lat:' + JSON.stringify(lat) + '}; })() : null'); });
     ok(take && take.n > take.sr * 0.3 && Math.abs(take.l - 0.17) < 0.005 && Math.abs(take.r - 0.18) < 0.005, 'IN 17+18 FREE take: ' + JSON.stringify(take));
-    ok(take && take.io && /native input, placed by its timestamps/.test(take.lat), 'latency line says native once the input is open: ' + (take && take.lat));
+    ok(take && take.io && /native: placed by its timestamps/.test(take.lat), 'latency line says native once the input is open: ' + (take && take.lat));
     // STALE INPUT (owner, 7 Nov: "you have to close the recording window to get access to the inputs again"): the stream stops
     // under the window; the next Record opens it again and records
     const again = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
@@ -124,6 +124,21 @@ try {
       return {ok, stream:E('!!RCD.stream'), io:E('!!RCD.io'), note:E('RCD.note || ""')}; });
     ok(nofb.ok === false && !nofb.stream && !nofb.io && /device busy/.test(nofb.note), 'a failed native open says why and does not fall back to inputs 1–2: ' + JSON.stringify(nofb));
     await page.evaluate(async () => { await window.__seqTest.ev('rcdOpen()'); });
+    // UNPLUGGED MID-TAKE (A2): the helper says the device went away during a FREE take: the take so far is kept, the input closes
+    const unp = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
+      E("RCD.take = null;"); await E('rcdStart()'); await wait(400);
+      window.__ioStall = true; window.__ioPort.postMessage({op:'closed', why:'the interface went away (unplugged or switched off)'});
+      for (let i = 0; i < 60 && !E('!!RCD.take'); i++) await wait(50);
+      await wait(300); window.__ioStall = false;
+      return {take:E('RCD.take ? RCD.take.data.length : 0'), sr:E('ctx.sampleRate'), io:E('!!RCD.io'), node:E('!!RCD.node')}; });
+    ok(unp.take > unp.sr * 0.2 && !unp.io && !unp.node, 'unplugged mid-take: the take so far is kept and the input closed: ' + JSON.stringify(unp));
+    // RATE (A2): the interface at 44.1 kHz with the app at 48: the window says so
+    const rate = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
+      window.__ioDevRate = E('ctx.sampleRate') === 44100 ? 48000 : 44100; E('rcdClose()'); await E('rcdOpen()'); E('rcdUi()'); await wait(100); window.__ioDevRate = 0;
+      return {note:E('RCD.note || ""'), lat:[...document.querySelectorAll('.recset b')].map(b => b.textContent).join('|')}; });
+    ok(/runs at (44\.1|48) kHz and the app at/.test(rate.note) && /converted/.test(rate.note), 'a rate mismatch is said: ' + rate.note);
+    ok(/2\.0 ms interface latency included/.test(rate.lat), 'the interface latency is shown: ' + rate.lat);
+    await page.evaluate(async () => { const E = s => window.__seqTest.ev(s); E('rcdClose()'); await E('rcdOpen()'); });
     // Engine: Browser
     await page.evaluate(() => { window.__ioOps.length = 0; });
     await page.locator('.recset .seg').first().getByText('Browser', { exact: true }).click();
