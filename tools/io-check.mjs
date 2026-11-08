@@ -49,7 +49,10 @@ const FAKE = mode => {
           timer = setInterval(() => { if (window.__ioStall) return;
             const frames = 256, data = new Float32Array(frames * 28);
             for (let f = 0; f < frames; f++) for (let c = 0; c < 28; c++) data[f * 28 + c] = 0.01 * (c + 1);
-            h.postMessage({ op: 'in', frame0, hostNs: performance.now() * 1e6 - (frames / rate) * 1e9, channels: 28, frames, data, overruns: 0 }, [data.buffer]);
+            // FAKE GEAR (Measure): a 3 ms burst on channels 1–2 at each OS time in __gearT (ms, performance.now's clock)
+            const h0 = performance.now() - frames / rate * 1000; for (const g of (window.__gearT || [])) { const f1 = Math.round((g - h0) / 1000 * rate);
+              for (let f = Math.max(0, f1); f < Math.min(frames, f1 + 144); f++) { const v = 0.9 * (1 - (f - f1) / 144); data[f * 28] = v; data[f * 28 + 1] = v; } }
+            h.postMessage({ op: 'in', frame0, hostNs: h0 * 1e6, channels: 28, frames, data, overruns: 0 }, [data.buffer]);
             frame0 += frames;
           }, 5);
         } else if (m && m.op === 'close') { stop(); h.postMessage({ op: 'closed', id: m.id }); } };
@@ -146,6 +149,16 @@ try {
       return {note:E('RCD.note || ""'), lat:[...document.querySelectorAll('.recset b')].map(b => b.textContent).join('|')}; });
     ok(/runs at (44\.1|48) kHz and the app at/.test(rate.note) && /converted/.test(rate.note), 'a rate mismatch is said: ' + rate.note);
     ok(/2\.0 ms interface latency included/.test(rate.lat), 'the interface latency is shown: ' + rate.lat);
+    // MONITOR AFTER A TAKE (owner's beta.5 test: silent after a PATTERN take until Monitor OFF → ON): a monitor level left at 0 by a
+    // stuck curve is set back at the take's end, and the monitor plays the input again
+    const mn = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
+      for (let i = 0; i < 60 && !E('!!RCD.io'); i++) await wait(50);
+      E("rcdSet.mon = 1; rcdSet.mode = 'free'; rcdSet.inCh = 'p16'; rcdRoute(); window.__an = ctx.createAnalyser(); RCD.mon.connect(window.__an);");
+      const lvl = () => E("(() => { const a = new Float32Array(2048); window.__an.getFloatTimeDomainData(a); let m = 0; for (const v of a) m = Math.max(m, Math.abs(v)); return +m.toFixed(3); })()");
+      E('RCD.mon.gain.cancelScheduledValues(0); RCD.mon.gain.setValueAtTime(0, ctx.currentTime);'); await wait(300); const stuck = lvl();
+      E('RCD.take = null'); await E('rcdStart()'); await wait(300); E('rcdStop()'); for (let i = 0; i < 80 && !E('!!RCD.take'); i++) await wait(50);
+      await wait(400); const after = lvl(); E('rcdSet.mon = 0; rcdMonSet();'); return {stuck, after}; });
+    ok(mn.stuck === 0 && mn.after > 0.15, 'monitoring comes back after a take even if its level was stuck at 0: ' + JSON.stringify(mn));
     // MEASURE'S INPUTS (owner, 7 Nov: "Measure needs the ability to change inputs"): the list is the native input's 28 channels,
     // and picking one sets the recorder's pair
     const ms = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
@@ -157,6 +170,16 @@ try {
       E("rcdSet.inCh = 'p16'; rcdRoute(); midi.outIds[0] = ''; midi.access.outputs.delete('fake');"); return {n, after, txt:s.options[0].textContent}; });
     ok(ms && ms.n === 14 + 28 && ms.after === 's11', "Measure… has an Inputs list (the native input's pairs and channels) that sets the recorder's pick: " + JSON.stringify(ms));
     await openRec(page);   // (Measure's window closed Record a sample)
+    // MEASURE WITHOUT THE CLICK ON THE INPUT (owner, 7 Nov: "Measure isn't seeing input even though I see the meters move"): the fake
+    // gear sounds 20 ms after each note's MIDI time, only the gear reaches IN 1+2; the native timestamps time it
+    const mg = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
+      window.__gearT = []; E("midi.access = midi.access || {outputs:new Map(), inputs:new Map()}; midi.access.outputs.set('fake', {id:'fake', name:'Fake gear', send(b, ts){ if ((b[0] & 0xF0) === 0x90 && b[2]) window.__gearT.push((ts || performance.now()) + 20); }}); midi.outIds[0] = 'fake'; midi.lats[0] = 0; rcdSet.inCh = 'p0'; rcdRoute();");
+      for (let i = 0; i < 60 && !E('!!RCD.io'); i++) await wait(50);
+      const r = await E('midiLatRun(0, 0, 60, 8)'); window.__gearT = [];
+      E("midi.outIds[0] = ''; midi.access.outputs.delete('fake'); rcdSet.inCh = 'p16'; rcdRoute();");
+      const v = r.map(q => q.ms).sort((a, b) => a - b); return {all:v.map(x=>+x.toFixed(0)).join(','), n:r.length, ts:r.ts, med:v.length ? +v[v.length >> 1].toFixed(1) : null}; });
+    ok(mg.n >= 6 && mg.ts === mg.n && Math.abs(mg.med - 20) < 15,   // (the fake stamps each chunk when it's sent: ±10 ms jitter; the old bug read ~200)
+       'Measure… times the gear by the native timestamps when the click isn\'t on the input (gear 20 ms late): ' + JSON.stringify(mg));
     await page.evaluate(async () => { const E = s => window.__seqTest.ev(s); E('rcdClose()'); await E('rcdOpen()'); });
     // Engine: Browser
     await page.evaluate(() => { window.__ioOps.length = 0; });

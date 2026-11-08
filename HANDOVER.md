@@ -133,6 +133,15 @@ transfer an ArrayBuffer). Desktop pre-release **1.3.0-beta.4** (build 492) is ou
   JIT / library-validation entitlements for the .node addons). Expect one prompt per update (each build's code hash differs) until
   a Developer ID. The updater downloads the .dmg itself (no Squirrel), so signing doesn't touch updates. If it still prompts
   repeatedly: ask the owner what the prompt names (Thunder Plus vs a Helper) and whether System Settings › Microphone lists it.
+- beta.5 results (21:43–21:51): the **5-minute take worked** (owner still to listen for clicks / grid). **Monitoring went silent after a
+  PATTERN take** (meters still moving; Monitor OFF → ON brought it back): not reproduced with the fake; build 496 sets the monitor
+  level outright (cancelScheduledValues + setValueAtTime, `rcdMonSet`) and restarts the native monitor's read point at every take's
+  start and end; monitor cushion 12 → 20 ms. **Measure ~200 ms explained** (reproduced with the fake): `mltOnset` took any input above
+  0.01 (hum, DC) as the click at the window's start (−120 ms), and the click skips the master's lookahead while MIDI waits for it
+  (`moFxLat`, ~64 ms by default). Build 496: onset must clear 6× the window's 30th-percentile floor; `moFxLat` subtracted; with the
+  native input a missing click falls back to the timestamps (`out.ts`). io-check has a fake gear (20 ms) for it. Owner: re-run
+  Measure on beta.6 (Gear delay set back first).
+- Kept takes go into the pad's SELECTED layer and RECENT (owner: "it looks like it saved only layer 2": asked).
 - Build 494: Measure… has its own Inputs list (owner: "Measure needs the ability to change inputs": it only listened on Record a
   sample's pick, which was why it read ~200 ms).
 - Measure… (beta.4, native) set the Gear delay to ~200 ms: that is the clamp ceiling, so probably not a clean reading (most

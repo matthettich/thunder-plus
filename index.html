@@ -14690,32 +14690,41 @@ function rcdTake(t, how, beats, pats){
    input's own latency cancels. Each hit gives how late the gear sounds against ...Thunder (with the Gear delay already set);
    the median is the correction, the spread the jitter, the slope across the run any drift. A short, loud, percussive patch on
    the gear measures best. The click goes to the master, so it is as late as the engines (master effects included). */
-const MLT = {GAP:0.25, PER:0.6};
+const MLT = {GAP:0.25, PER:0.6};   // (the click is placed fx = moFxLat() before the engines' time in midiLatRun)
 function mltOnset(x, a, b, sr){   // the first frame in [a, b) above half the window's peak, refined to where it rises above a tenth
   a = Math.max(0, a | 0); b = Math.min(x.length, b | 0); let pk = 0, ip = -1; for (let i = a; i < b; i++){ const v = Math.abs(x[i]); if (v > pk){ pk = v; ip = i; } }
-  if (pk < 0.01) return null; let i = a; while (i < b && Math.abs(x[i]) < pk * 0.5) i++;
+  // ABOVE THE FLOOR (owner's 500R8: Measure read ~200 ms): an input's hum or noise above 0.01 was taken for the click, at the very start
+  // of the window. The hit must stand well clear of the window's quiet part (its 30th-percentile level).
+  if (b - a < 16) return null; const q = []; for (let i = a; i < b; i += 4) q.push(Math.abs(x[i])); q.sort((u, w) => u - w);
+  const fl = q[Math.floor(q.length * 0.3)] || 0; if (pk < 0.01 || pk < fl * 6 + 0.005) return null; let i = a; while (i < b && Math.abs(x[i]) < pk * 0.5) i++;
   const lim = Math.max(a, i - Math.round(sr * 0.004)); while (i > lim && Math.abs(x[i - 1]) >= pk * 0.1) i--; return i; }
 async function midiLatRun(p, ch, note, n){
   if (!midiOut(p)) throw new Error('no port'); if (!(await rcdOpen())) throw new Error('no input');
   const sr = ctx.sampleRate, buf = ctx.createBuffer(1, Math.round(sr * 0.004), sr), d = buf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = (i & 1 ? -0.9 : 0.9) * (1 - i / d.length);   // a 4 ms, full-scale click
-  const monWas = RCD.mon.gain.value; RCD.mon.gain.value = 0;   // (monitoring would feed the click back in)
-  mapUpd(); RCD.chunks = []; RCD.on = true; rcdGo('go');
+  rcdMonSet(0);   // (monitoring would feed the click back in)
+  mapUpd(); RCD.chunks = []; RCD.on = true; rcdGo('go'); rcdMonSet(0);
   const t0 = ctx.currentTime + 0.6, T = [];
   for (let k = 0; k < n; k++){ const tc = t0 + k * MLT.PER, src = ctx.createBufferSource(); src.buffer = buf; src.connect(master); src.start(tc);
     msend([0x90 | ch, note, 127], tc + MLT.GAP, true, p); msend([0x80 | ch, note, 0], tc + MLT.GAP + 0.08, true, p); T.push(tc); }
   const end = t0 + n * MLT.PER + rcdLat() + 0.4;
   await new Promise(r => { const w = () => ctx.currentTime >= end ? r() : setTimeout(w, 50); w(); });
-  const take = await new Promise(r => { RCD.onDone = () => r(rcdCollect(null, null)); rcdGo('stop'); }); RCD.on = false;
-  try { RCD.mon.gain.value = monWas; } catch(e){} if (!RCD.ui) rcdClose();
+  const take = await new Promise(r => { RCD.onDone = () => r(rcdCollect(null, null)); rcdGo('stop'); rcdMonSet(0); }); RCD.on = false;
+  rcdMonSet(); if (!RCD.ui) rcdClose();
   if (!take) throw new Error('nothing recorded');
   const L = take.data, R = take.data2, x = new Float32Array(L.length); for (let i = 0; i < x.length; i++) x[i] = R ? Math.max(Math.abs(L[i]), Math.abs(R[i])) : L[i];
   // where the recording starts on the audio clock: the first chunk's frame; the click is searched for near its expected place
   const f0 = RCD.firstF != null ? RCD.firstF : 0, lat = rcdLat(), out = [];
+  // NO CLICK ON THE INPUT (owner, 7 Nov: "Measure isn't seeing input even though I see the meters move": the gear was there, the
+  // app's output wasn't patched back in): the native input places every frame where it was heard (its timestamps), so the click's
+  // place is known without hearing it; the browser's input has no such timing and still needs the click
+  // MASTER LOOKAHEAD: the click goes straight to the output, the engines (and so every timed MIDI note, msend) wait moFxLat() for the
+  // master's effects; the gear is measured against the engines, so that wait isn't the gear's
+  const ts = !!RCD.io, fx = moFxLat(); out.ts = 0;
   for (const tc of T){ const e = Math.round((tc + lat) * sr) - f0;
-    const c = mltOnset(x, e - sr * 0.12, e + sr * 0.15, sr); if (c == null) continue;
+    let c = mltOnset(x, e - sr * 0.12, e + sr * 0.15, sr); if (c == null && ts){ c = e; out.ts++; } if (c == null) continue;
     const m = mltOnset(x, c + sr * (MLT.GAP - 0.1), c + sr * (MLT.GAP + 0.3), sr); if (m == null) continue;
-    out.push({t:tc - t0, ms:((m - c) / sr - MLT.GAP) * 1000}); }
+    out.push({t:tc - t0, ms:((m - c) / sr - MLT.GAP - fx) * 1000}); }
   return out; }
 function midiLatPanel(){
   const ports = [...Array(NPORT).keys()].filter(q => midiOut(q)); if (!ports.length) return toast('Pick a MIDI device for a port first (Settings › MIDI › Ports).', 4000);
@@ -14726,7 +14735,7 @@ function midiLatPanel(){
   let p = mine ? portOf(mine) : ports[0], ch = mine ? (mine.mch | 0) & 15 : 0, note = 60, n = 24, busy = false, res = null;
   const recall = () => { const m = mem[p]; if (m){ if (!mine || portOf(mine) !== p) ch = clamp(m.ch | 0, 0, 15); note = clamp(m.note == null ? 60 : m.note | 0, 0, 127); } };
   recall();
-  genPanel('Measure gear delay', 'Plays a click through ...Thunder and, 250 ms later, the note below on the gear (pick one your gear answers, such as a drum’s trigger note), again and again, and listens on the Inputs below (the input device is the one chosen in Record a sample). Both the click and the gear must reach those inputs: send the mixer’s output, or anything that hears both, into them; a short, loud patch on the gear works best.', ({field, msgEl}) => {
+  genPanel('Measure gear delay', 'Plays a click through ...Thunder and, 250 ms later, the note below on the gear (pick one your gear answers, such as a drum’s trigger note), again and again, and listens on the Inputs below (the input device is the one chosen in Record a sample). The gear must reach those inputs. With the desktop app’s native input that is enough (it knows when each sound was heard); with the browser’s input the click must reach them too (send the mixer’s output, or anything that hears both). A short, loud patch on the gear works best.', ({field, msgEl}) => {
     const pS = el('select'), cS = el('select'), kS = el('select');
     ports.forEach(q => pS.append(new Option(PORTL[q] + '  ' + portName(q), q))); pS.value = p;
     for (let c = 0; c < 16; c++) cS.append(new Option(d2(c + 1), c)); cS.value = ch;
@@ -14751,12 +14760,13 @@ function midiLatPanel(){
     MLT.say = t => { msgEl.textContent = t; }; }, [
     ['Measure', async () => { if (busy) return; if (tp.on) tStop(); busy = true; MLT.say('Measuring… keep quiet near any microphone.');
       try { const r = await midiLatRun(p, ch, note, n), ok = r.length;
-        if (ok < Math.max(4, n / 3)) { MLT.say(`Only ${ok} of ${n} hits were heard clearly: check the input and its level, and that the gear is loud and short.`); busy = false; return; }
+        if (ok < Math.max(4, n / 3)) { MLT.say(`Only ${ok} of ${n} hits were heard clearly: check that the gear reaches the Inputs picked here, its level, and that the gear is loud and short.` + (RCD.io || IOAPI && aset.inEngine !== 'browser' ? '' : ' With the browser’s input the click must reach the input too.')); busy = false; return; }
         const v = r.map(q => q.ms).sort((a, b) => a - b), med = v[v.length >> 1], q1 = v[Math.floor(v.length * 0.1)], q9 = v[Math.floor(v.length * 0.9)];
         const mt = r.reduce((a, q) => a + q.t, 0) / ok, mm = r.reduce((a, q) => a + q.ms, 0) / ok, sl = r.reduce((a, q) => a + (q.t - mt) * (q.ms - mm), 0) / Math.max(1e-9, r.reduce((a, q) => a + (q.t - mt) ** 2, 0));
         const now = mLatOf(p), want = clamp(Math.round(now + med), -50, 200);
         res = {want, p};
         MLT.say(`Port ${PORTL[p]}: the gear sounds ${Math.abs(med).toFixed(1)} ms ${med >= 0 ? 'late' : 'early'} against ...Thunder (Gear delay now ${now} ms), from ${ok} hits. Spread ${q1.toFixed(1)} to ${q9.toFixed(1)} ms (most hits); drift ${(sl * 60).toFixed(1)} ms a minute. ` +
+          (r.ts ? (r.ts >= ok ? 'Timed by the native input’s timestamps (no click on the input). ' : `${r.ts} hit${r.ts === 1 ? '' : 's'} timed by the native input’s timestamps (no click heard). `) : '') +
           (Math.abs(med) < 0.6 ? 'It already lines up.' : `Apply sets the Gear delay to ${want} ms.`) + (q9 - q1 > 4 ? ' The spread is wide: the gear or its MIDI path is jittery, or the patch is slow to start.' : '')); }
       catch(e){ MLT.say(e && e.message === 'no input' ? 'Couldn’t open the input: check Record a sample’s Input.' : 'The measurement stopped: ' + ((e && e.message) || e)); }
       // AFTER (owner, 7 Nov: Measure "made things worse", Reset audio engine put it right): opening the interface's input can
@@ -14980,7 +14990,7 @@ async function rcdPanel(pad, opts){
   chSel.addEventListener('change', () => { rcdSet.inCh = chSel.value; rcdSave(); rcdRoute(); });
   field('Inputs', chSel); fillCh(); fillIn();
   seg('Channels', [['stereo', 'STEREO'], ['mono', 'MONO'], ['left', 'LEFT'], ['right', 'RIGHT']], () => rcdSet.ch, v => { rcdSet.ch = v; });
-  seg('Monitor', [[0, 'OFF'], [1, 'ON']], () => rcdSet.mon | 0, v => { rcdSet.mon = v; if (RCD.mon) RCD.mon.gain.setTargetAtTime(v ? 1 : 0, ctx.currentTime, 0.01); if (v) toast('Monitoring: use headphones, or the speakers feed back into the input.', 4000); });
+  seg('Monitor', [[0, 'OFF'], [1, 'ON']], () => rcdSet.mon | 0, v => { rcdSet.mon = v; rcdMonSet(); if (v) toast('Monitoring: use headphones, or the speakers feed back into the input.', 4000); });
   { const m = el('div', 'recmeter'), bars = [], holds = []; for (let c = 0; c < 2; c++){ const r = el('div', 'recm'), b = el('i'), h = el('b'); r.append(b, h); m.append(r); bars.push(b); holds.push(h); }
     const clip = el('span', 'recclip', 'CLIP'); clip.hidden = true; m.append(clip); field('Level', m); RCD.ui = {bars, holds, clip}; }
   seg('Sync', [['sync', 'PATTERN'], ['free', 'FREE']], () => rcdSet.mode, v => { rcdSet.mode = v; patF.hidden = latF.hidden = fitF.hidden = v !== 'sync'; });
@@ -16281,12 +16291,12 @@ async function iohStart(){
    TAKES STAY WHOLE: the input keeps its own frames back to back (no resampling). Where it sits on the audio clock (the
    anchor) is set from the timestamps and re-set freely between takes; while a take records it moves only if it drifts more
    than 20 ms (two crystals: a few ms in 5 minutes). MONITOR: a second output plays the input as soon as it can (a ~12 ms
-   jitter cushion), nudged a frame at a time to follow the drift; it never touches the take. */
+   jitter cushion, 20 ms since beta.5), nudged a frame at a time to follow the drift; it never touches the take. */
 const IOIN_WORKLET = `class ThIoIn extends AudioWorkletProcessor{
   constructor(){super();const sr=sampleRate;let c=1;while(c<sr*8)c<<=1;this.cap=c;this.mask=c-1;this.L=new Float32Array(c);this.R=new Float32Array(c);
-    this.wHi=null;this.A=null;this.D=0.06;this.rec=false;this.pick=[0,1];this.m=null;this.J=Math.round(0.012*sr);
+    this.wHi=null;this.A=null;this.D=0.06;this.rec=false;this.pick=[0,1];this.m=null;this.J=Math.round(0.02*sr);
     this.late=0;this.under=0;this.jumps=0;this.k=0;this.lastJ=0;
-    this.port.onmessage=e=>{const d=e.data;if(d.D!=null){this.D=d.D}if(d.rec!=null)this.rec=d.rec;if(d.pick)this.pick=d.pick;if(d.reset){this.wHi=this.A=this.m=null}if(d.data)this.put(d)}}
+    this.port.onmessage=e=>{const d=e.data;if(d.D!=null){this.D=d.D}if(d.rec!=null)this.rec=d.rec;if(d.pick)this.pick=d.pick;if(d.reset){this.wHi=this.A=this.m=null}if(d.mreset)this.m=null;if(d.data)this.put(d)}}
   put(d){const n=d.n,ch=d.nch,x=d.data,a=Math.min(this.pick[0],ch-1),b=Math.min(this.pick[1],ch-1),M=this.mask;
     if(this.wHi==null)this.wHi=d.f0;
     if(d.f0>this.wHi){let g=Math.min(d.f0-this.wHi,this.cap);for(let f=d.f0-g;f<d.f0;f++){this.L[f&M]=0;this.R[f&M]=0}}   // a gap the helper reported: silence, at its true place
@@ -16373,7 +16383,12 @@ async function rcdOpenIo(rec, mon){
 function rcdCloseIo(){ const io = RCD.io; if (!io) return; RCD.io = null; clearInterval(io.tick); IOH.onIn = IOH.onGone = null;
   try { io.node.port.onmessage = null; io.node.disconnect(); } catch(e){} iohAsk({op:'close'}); }
 // The recorder starts or stops: the native input's anchor holds still while a take records
-function rcdGo(m){ if (RCD.node) RCD.node.port.postMessage(m); if (RCD.io) RCD.io.node.port.postMessage({rec:m === 'go'}); }
+function rcdGo(m){ if (RCD.node) RCD.node.port.postMessage(m); if (RCD.io) RCD.io.node.port.postMessage({rec:m === 'go'}); rcdMonSet(); }
+// MONITOR LEVEL, FOR SURE (owner's beta.5 test: monitoring went silent after a PATTERN take, meters still moving, and Monitor OFF → ON
+// brought it back): the level is set outright (any curve still scheduled is dropped) and the native monitor restarts its read
+// point, at every take's start and end. A plain .value = is ignored by Chrome once a curve was scheduled (the Monitor button's).
+function rcdMonSet(v){ if (!RCD.mon) return; const g = RCD.mon.gain, t = ctx.currentTime, w = v == null ? (rcdSet.mon ? 1 : 0) : v;
+  try { g.cancelScheduledValues(t); g.setValueAtTime(w, t); } catch(e){} if (RCD.io && w) RCD.io.node.port.postMessage({mreset:true}); }
 // Settings → MIDI: a cable for each port letter, and which letters get clock.
 function moPorts(){
   const opts = [['', 'None']]; if (midi.access) midi.access.outputs.forEach(o => opts.push([o.id, o.name || o.id]));
@@ -22588,7 +22603,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 495;
+const BUILD = 496;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31555,6 +31570,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [496, '7 Nov', ['Settings › MIDI › Measure…: a noisy input is no longer mistaken for the click (that read about 200 ms), the master effects’ lookahead is no longer counted as the gear’s, and with the desktop app’s native input only the gear needs to reach the input. Record a sample: monitoring no longer goes silent after a PATTERN take (its level is set again at every take’s start and end); Measure… really mutes monitoring while it measures; the native monitor has a little more cushion against dropouts.']],
   [495, '7 Nov', ['Mac app: signed ad hoc (still no Apple certificate), so macOS sees one app and asks for the microphone once instead of once per part of the app.']],
   [494, '7 Nov', ['Settings › MIDI › Measure…: an Inputs list picks the pair or channel that hears the click and the gear (the same setting as Record a sample’s Inputs).']],
   [493, '7 Nov', ['Desktop app, Engine Native: the input is opened once, not again each time Record is pressed or while macOS is still asking for the microphone (the extra microphone prompts and “wouldn’t open: no answer”); opening waits for that prompt; and more room against the input falling behind mid-take (the take is still placed on the beat).']],
