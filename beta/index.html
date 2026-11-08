@@ -14718,6 +14718,10 @@ function midiLatPanel(){
         MLT.say(`Port ${PORTL[p]}: the gear sounds ${Math.abs(med).toFixed(1)} ms ${med >= 0 ? 'late' : 'early'} against ...Thunder (Gear delay now ${now} ms), from ${ok} hits. Spread ${q1.toFixed(1)} to ${q9.toFixed(1)} ms (most hits); drift ${(sl * 60).toFixed(1)} ms a minute. ` +
           (Math.abs(med) < 0.6 ? 'It already lines up.' : `Apply sets the Gear delay to ${want} ms.`) + (q9 - q1 > 4 ? ' The spread is wide: the gear or its MIDI path is jittery, or the patch is slow to start.' : '')); }
       catch(e){ MLT.say(e && e.message === 'no input' ? 'Couldn’t open the input: check Record a sample’s Input.' : 'The measurement stopped: ' + ((e && e.message) || e)); }
+      // AFTER (owner, 7 Nov: Measure "made things worse", Reset audio engine put it right): opening the interface's input can
+      // make macOS reconfigure the device and move the output's timing, so the engine is rebuilt here, and the MIDI clock
+      // mapping measured again (unless Record a sample is open: it still uses the input)
+      if (!RCD.ui){ try { resetAudio(); amap.off = null; } catch(e){} }
       busy = false; }, 'ok'],
     ['Apply', () => { if (!res) return MLT.say('Measure first.'); midi.lats[res.p] = res.want; const r = $('midiLat' + res.p); if (r) r.value = res.want; saveMidi(); toast(`Gear delay for port ${PORTL[res.p]}: ${res.want} ms`); }],
   ]);
@@ -22348,7 +22352,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 483;
+const BUILD = 484;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31311,6 +31315,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [484, '7 Nov', ['Measure gear delay rebuilds the audio engine when it finishes (as Settings › Audio › Reset audio engine does): opening the interface’s input could leave the timing off until then.']],
   [483, '7 Nov', ['Record a sample: INPUTS no longer says the interface has only 2 channels: the browser engine only gives the app inputs 1 and 2 (hover the list for how to record another input).']],
   [482, '7 Nov', ['Measure gear delay: pick the NOTE it plays on the gear (for gear that only answers certain notes, such as a drum module), remembered per port with the channel. It used to play C-3.']],
   [481, '7 Nov', ['Audio-thread sequencer: changing a pad’s engine on the Synth page while the song plays takes effect within a moment (a pad that went from a rendered sound to a live engine, or back, kept the old sound until STOP and PLAY).']],
