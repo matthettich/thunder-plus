@@ -150,6 +150,11 @@ try {
       const p = E('rcdOpen()'); await wait(150); E('rcdClose()'); const r = await p; await wait(300);
       return {r, io:E('!!RCD.io'), node:E('!!RCD.node'), mon:E('!!RCD.mon'), closes:window.__ioOps.filter(o => o === 'close').length}; });
     ok(cwo.r === false && !cwo.io && !cwo.node && !cwo.mon && cwo.closes >= 1, 'closing the window while the input opens leaves nothing half-open: ' + JSON.stringify(cwo));
+    // CLOSE REALLY CLEANS UP (CodeRabbit: a comment had swallowed rcdClose's disconnects, so the monitor stayed on the master)
+    const cl = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s);
+      await E('rcdOpen()'); const mon = E('RCD.mon'), node = E('RCD.node'); let disc = false; const d0 = mon.disconnect.bind(mon); mon.disconnect = (...a) => { disc = true; return d0(...a); };
+      E('rcdClose()'); return {disc, onmsg:node ? node.port.onmessage === null : null, mon:E('!!RCD.mon')}; });
+    ok(cl.disc && cl.onmsg === true && !cl.mon, 'closing the recorder disconnects its monitor and node: ' + JSON.stringify(cl));
     // ...and reopening straight after the close opens afresh (it doesn't get the old open's "gave up")
     const reo = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
       E('rcdClose()'); await wait(100); window.__ioOpenDelay = 600; const p1 = E('rcdOpen()'); await wait(150); E('rcdClose()');

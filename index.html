@@ -14588,7 +14588,8 @@ async function rcdOpen1(){
     return true;
   } catch(e){ s.getTracks().forEach(t => t.stop()); tpLog('recorder', e); toast('Couldn’t start recording here.'); return false; }
 }
-function rcdClose(){ RCD.gen = (RCD.gen | 0) + 1; rcdCloseIo();   // (gen: an open still in flight sees it was closed meanwhile) try { if (RCD.src) RCD.src.disconnect(); if (RCD.spl) RCD.spl.disconnect(); if (RCD.mrg) RCD.mrg.disconnect(); if (RCD.mon) RCD.mon.disconnect(); if (RCD.node){ RCD.node.port.onmessage = null; } } catch(e){}
+function rcdClose(){ RCD.gen = (RCD.gen | 0) + 1; rcdCloseIo();   // (gen: an open still in flight sees it was closed meanwhile)
+  try { if (RCD.src) RCD.src.disconnect(); if (RCD.spl) RCD.spl.disconnect(); if (RCD.mrg) RCD.mrg.disconnect(); if (RCD.mon) RCD.mon.disconnect(); if (RCD.node){ RCD.node.port.onmessage = null; } } catch(e){}
   if (RCD.stream) RCD.stream.getTracks().forEach(t => t.stop()); Object.assign(RCD, {stream:null, src:null, node:null, mon:null, spl:null, mrg:null}); }
 /* INPUTS (owner, 7 Nov: "choose the audio input on a multi-channel audio interface"): the input is opened with every channel
    the browser will give (some only give 2, whatever the interface has), and INPUTS picks a pair (1+2, 3+4…) or one channel,
@@ -14843,7 +14844,7 @@ function rcdKeep(pad){
   if (fit) saveS();
   T.kept = true;   // (Record then doesn't ask: ASK FIRST)
   toast(`Kept the take in pad ${hx(pad)}, layer ${kit.voices[pad].sel + 1} (${(T.data.length / T.sr).toFixed(2)} s${T.data2 ? ', stereo' : ''})` + (fit ? `, fitted to ${Math.round(T.beats)} beats` : '') + (eng ? '; the pad is on the Layers engine now' : ''), 5000);
-  playFresh(pad);
+  // (no preview: owner, 8 Nov: "Don't play anything when pressing keep in pad"; it played the whole pad, every layer)
 }
 function rcdApply(E){
   const T = RCD.take, v = kit.voices[E.pad], L = v && v.layers[E.li]; if (!T || !L) return;
@@ -22792,7 +22793,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 505;
+const BUILD = 506;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31768,6 +31769,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [506, '8 Nov', ['Record a sample: Keep in this pad no longer plays the pad; closing the window really disconnects its input monitoring (beta.15 left it connected).']],
   [505, '8 Nov', ['Space always plays and stops the song, even right after clicking a menu or button; solo and mute keys work on every screen.', 'Desktop app: Apply (reload) in Settings › Audio works; a sample-rate mismatch on the native input pops up a message; long takes show up in RECENT even when storage is full.', 'Desktop app, native MIDI: malformed messages and SysEx are dropped as the browser engine drops them (a Cirklon showed “Sysex interrupt”); closing Record a sample while its input is still opening no longer leaves it half-open.']],
   [504, '8 Nov', ['Desktop app, native MIDI: with two devices of the same name, a port letter set to the one that was unplugged waits for it (shown as not connected) instead of moving to the other.']],
   [503, '8 Nov', ['Desktop app, native MIDI: with two devices of the same name, unplugging the first no longer silences the second.']],
