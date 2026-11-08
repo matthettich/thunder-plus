@@ -1,7 +1,7 @@
 # io/: native audio and MIDI I/O for the desktop app (optional)
 
-A native Node addon, `thunder_io.node`, that opens audio interfaces (and, later, MIDI ports) for the desktop app, loaded
-by the main process when present. Plan and design: [docs/NATIVE-IO-HELPER-PLAN.md](../docs/NATIVE-IO-HELPER-PLAN.md).
+A native Node addon, `thunder_io.node`, that opens audio interfaces (and, later, MIDI ports) for the desktop app. The main
+process starts a utility process (`electron/io-helper.js`), and that process loads the addon when present. Plan and design: [docs/NATIVE-IO-HELPER-PLAN.md](../docs/NATIVE-IO-HELPER-PLAN.md).
 Licences: [NOTICE.md](NOTICE.md). Vendored versions: [VERSIONS](VERSIONS).
 
 ```

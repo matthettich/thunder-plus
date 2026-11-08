@@ -19,20 +19,25 @@ const build = arch => {
   return path.join(D, 'build', 'Release', 'thunder_io.node');
 };
 fs.mkdirSync(OUT, { recursive: true });
-const dst = path.join(OUT, 'thunder_io.node');
-if (process.platform === 'darwin') {
-  const parts = [];
-  for (const a of ['arm64', 'x64']) { const f = path.join(OUT, `thunder_io-${a}.node`); fs.copyFileSync(build(a), f); parts.push(f); }
-  execFileSync('lipo', ['-create', ...parts, '-output', dst], { stdio: 'inherit' });
-  for (const f of parts) fs.unlinkSync(f);
-} else fs.copyFileSync(build(), dst);
-for (const f of fs.readdirSync(path.join(D, 'LICENSES'))) fs.copyFileSync(path.join(D, 'LICENSES', f), path.join(OUT, f));
-fs.copyFileSync(path.join(D, 'NOTICE.md'), path.join(OUT, 'NOTICE.md'));
-// Smoke test: it loads and answers (no device is opened, so nothing is touched)
-const I = require(dst), v = I.version();
-if (typeof v !== 'string' || !v.startsWith('thunder_io')) { console.error('thunder_io.node loaded but does not answer'); process.exit(1); }
-const dv = I.devices({ backend: 'null' });
-if (!Array.isArray(dv) || !dv.some(d => typeof d.inputs === 'number' && typeof d.outputs === 'number')) { console.error('thunder_io.node: devices({backend:"null"}) returned no usable entry'); process.exit(1); }
-const t0 = I.now(), t1 = I.now();
-if (typeof t0 !== 'number' || !(t1 > t0)) { console.error('thunder_io.node: now() does not increase'); process.exit(1); }
+const dst = path.join(OUT, 'thunder_io.node'), parts = ['arm64', 'x64'].map(a => path.join(OUT, `thunder_io-${a}.node`));
+// A FAILED BUILD SHIPS NOTHING (CodeRabbit, PR #14): electron-builder packs every io/*.node, so on any failure below (a build,
+// lipo, or the smoke test) the staged addon and the per-arch parts are removed, and the app says the helper isn't available.
+const fail = msg => { for (const f of [dst, ...parts]) { try { fs.unlinkSync(f); } catch (e) {} } console.error(msg); process.exit(1); };
+let v;
+try {
+  if (process.platform === 'darwin') {
+    ['arm64', 'x64'].forEach((a, i) => fs.copyFileSync(build(a), parts[i]));
+    execFileSync('lipo', ['-create', ...parts, '-output', dst], { stdio: 'inherit' });
+    for (const f of parts) fs.unlinkSync(f);
+  } else fs.copyFileSync(build(), dst);
+  for (const f of fs.readdirSync(path.join(D, 'LICENSES'))) fs.copyFileSync(path.join(D, 'LICENSES', f), path.join(OUT, f));
+  fs.copyFileSync(path.join(D, 'NOTICE.md'), path.join(OUT, 'NOTICE.md'));
+  // Smoke test: it loads and answers (no device is opened, so nothing is touched)
+  const I = require(dst); v = I.version();
+  if (typeof v !== 'string' || !v.startsWith('thunder_io')) fail('thunder_io.node loaded but does not answer');
+  const dv = I.devices({ backend: 'null' });
+  if (!Array.isArray(dv) || !dv.some(d => typeof d.inputs === 'number' && typeof d.outputs === 'number')) fail('thunder_io.node: devices({backend:"null"}) returned no usable entry');
+  const t0 = I.now(), t1 = I.now();
+  if (typeof t0 !== 'number' || !(t1 >= t0)) fail('thunder_io.node: now() runs backwards');
+} catch (e) { fail('io/build.js failed: ' + ((e && e.message) || e)); }
 console.log('electron/io/thunder_io.node built (' + Math.round(fs.statSync(dst).size / 1024) + ' KB): ' + v);
