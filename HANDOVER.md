@@ -128,6 +128,26 @@ transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner 
 (`io-helper` → `beta`) is open. `beta` is at build 488 plus a CLAUDE.md line ("continue the helper"); `main` is at build 485
 (desktop v1.2.101).
 
+**0. OWNER'S TEST OF beta.14 (8 Nov, 10:13): RESULTS and what was done (build 505).**
+- Passed: install; one microphone prompt; Record straight away; monitoring while the song plays; no "fell behind"; a new 5-minute
+  take sounds good (one noisy bit, the owner thinks from a MIDI device); Measure picks the input and reads 5.5 ms; native MIDI on,
+  setup carried over, timing (Browser "maybe a little tighter by ear"), Stop clean, clock out, plug / unplug, engine switching,
+  "· 4 late". Clock in "seemed out of sync slightly". Windows: not tested yet. Unplug mid-take, Browser Measure: skipped.
+- **Monitoring distorted and clicky after closing and reopening the window once; the song silent until Restart audio** (not
+  reproduced by the owner after an app restart). Found: closing the window while the input is still opening (waiting on macOS /
+  the helper) left a half-open input (the open carried on after rcdClose). Build 505: `RCD.gen` (rcdClose bumps it; rcdOpen1
+  undoes what it opened and tells the helper to close when it changed). Not proven to be the cause: if it happens again, ask
+  for Settings › Audio › Copy report BEFORE restarting audio.
+- **Cirklon "Sysex interrupt" the first time native MIDI reached it.** Web MIDI's send() throws on malformed messages and SysEx
+  without permission, so the browser engine dropped them; native passed them on. Build 505: `nmValid` (whole messages only,
+  data bytes < 0x80, lengths by status, no F0 / F7) in the native output's send, thrown as TypeError like Web MIDI.
+- Keep in this pad plays the whole pad once (playFresh, a preview by design): the owner was asked whether to play only the
+  take or nothing. Measure "closer but not perfect": asked early or late; with only the gear on the input it trusts the
+  output latency macOS reports (patching the click in too measures against what is heard).
+- Delegated to Sonnet subagents (checked by the lead): Space always plays / stops even with a menu button focused, solo / mute
+  keys on every screen; Apply (reload) did nothing in the desktop app; the rate warning only a status line (now a toast too);
+  the 5-minute take missing from RECENT.
+
 **1. OWNER'S TEST OF 1.3.0-beta.7 (build 496; waiting on the owner; the next session starts by asking for the results).**
 https://github.com/matthettich/thunder-plus/releases/tag/v1.3.0-beta.7. Record a sample → Engine Native unless it says otherwise.
 - [ ] **Microphone prompts.** Install beta.7, open Record a sample: one prompt at most (new ad-hoc signature), then none when the

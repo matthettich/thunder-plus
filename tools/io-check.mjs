@@ -45,6 +45,7 @@ const FAKE = mode => {
           { name: '500R8', inputs: 28, outputs: 28, backend: 'Core Audio', inId: 'in:aa', outId: 'out:aa', id: 'in:aa', rates: [44100, 48000], isDefaultIn: true, isDefaultOut: true }] });
         else if (m && m.op === 'now') h.postMessage({ op: 'now', id: m.id, ns: performance.now() * 1e6 });
         else if (m && m.op === 'open' && window.__ioOpenFail) h.postMessage({ op: 'opened', id: m.id, ok: false, why: 'device busy' });
+        else if (m && m.op === 'open' && window.__ioOpenDelay && !m.__late) { const d = window.__ioOpenDelay; window.__ioOpenDelay = 0; setTimeout(() => h.onmessage({ data: Object.assign({}, m, { __late: true }) }), d); }   // (the answer comes late: macOS still asking)
         else if (m && m.op === 'open') {
           const rate = m.rate; stop(); frame0 = 0;
           h.postMessage({ op: 'opened', id: m.id, ok: true, rate, channels: 28, deviceRate: window.__ioDevRate || rate, block: 256, latencyFrames: 96, latencyMs: 2, name: '500R8' });
@@ -142,6 +143,14 @@ try {
       for (let i = 0; i < 80 && !E('!!RCD.take'); i++) await wait(50);
       return {ops:window.__ioOps.slice(), take:E('RCD.take ? (() => { const t = RCD.take; let l = 0; for (const v of t.data) l = Math.max(l, v); return {n:t.data.length, l}; })() : null')}; });
     ok(again.ops.includes('close') && again.ops.includes('open') && again.take && Math.abs(again.take.l - 0.17) < 0.005, 'a stopped input is reopened by the next Record, which records: ' + JSON.stringify(again));
+    // CLOSED WHILE OPENING (owner's beta.14 test: distorted monitoring after closing and reopening the window): rcdClose while an open
+    // waits leaves nothing open (no input, no monitor on the master, the helper told to close)
+    const cwo = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
+      E('rcdClose()'); await wait(100); window.__ioOps.length = 0; window.__ioOpenDelay = 600;
+      const p = E('rcdOpen()'); await wait(150); E('rcdClose()'); const r = await p; await wait(300);
+      return {r, io:E('!!RCD.io'), node:E('!!RCD.node'), mon:E('!!RCD.mon'), closes:window.__ioOps.filter(o => o === 'close').length}; });
+    ok(cwo.r === false && !cwo.io && !cwo.node && !cwo.mon && cwo.closes >= 1, 'closing the window while the input opens leaves nothing half-open: ' + JSON.stringify(cwo));
+    await page.evaluate(async () => { await window.__seqTest.ev('rcdOpen()'); });
     // ONE OPEN (owner's beta.4 test: 4–8 microphone prompts, "wouldn't open: no answer"): two opens at once are one open; an input
     // that hasn't sent audio yet (macOS still asking for the microphone) isn't reopened as stale
     const once = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
@@ -251,6 +260,11 @@ try { const page = await open('ok');
     const want = E('a2p(' + t + ' + moFxLat())'), clk = E('IOH.clk'); await wait(50);
     const s1 = window.__midiSent.find(x => x.op === 'midiSend');
     o.sent = s1 ? {port:s1.port, bytes:s1.bytes.join(), errMs:+((s1.at / 1e6 + clk) - want).toFixed(3)} : null; o.outbox = E('MOB.q.length');
+    // VALID MESSAGES ONLY (owner's beta.14 test: "Sysex interrupt" on the Cirklon): what Web MIDI would refuse throws and isn't sent
+    window.__midiSent.length = 0; const g = E('midi.access.outputs.get("n:Gear")'); const bad = [];
+    for (const b of [[0x90, 60, 128], [0xF0, 0x7E, 0xF7], [0x90, 60], [0x3C, 1, 2], [0xF7], [0xB0, 7, 100, 0x90]]) { try { g.send(b); bad.push('sent'); } catch(e){ bad.push('thrown'); } }
+    let good = 0; for (const b of [[0x90, 60, 100], [0xF8], [0xB0, 7, 100, 0xC0, 5], [0xF2, 0, 1]]) { try { g.send(b); good++; } catch(e){} }
+    await wait(30); o.valid = {bad:bad.join(), good, sent:window.__midiSent.filter(x => x.op === 'midiSend').length};
     // STOP: the queue is cleared first, then the note offs
     window.__midiSent.length = 0; E('mx.used.add(0); moRelease()'); await wait(50);
     o.stop = window.__midiSent.map(x => x.op + (x.bytes ? ':' + x.bytes[0].toString(16) : '')).slice(0, 3).join(',');
@@ -283,6 +297,7 @@ try { const page = await open('ok');
   ok(/· native/.test(nm.stat), 'the status says native: ' + nm.stat);
   ok(/ · native · 3 late$/.test(nm.late), 'late MIDI messages show in the status: ' + nm.late);
   ok(nm.sent && nm.sent.port === 1 && nm.sent.bytes === '144,60,100' && Math.abs(nm.sent.errMs) < 0.5 && nm.outbox === 0, 'a note booked ahead goes straight to the helper at its OS time (no OUTBOX): ' + JSON.stringify(nm.sent));
+  ok(nm.valid.bad === 'thrown,thrown,thrown,thrown,thrown,thrown' && nm.valid.good === 4 && nm.valid.sent === 4, 'malformed MIDI and SysEx are refused as Web MIDI refuses them; valid messages go out: ' + JSON.stringify(nm.valid));
   ok(/^midiClear/.test(nm.stop) && /midiSend:b0/.test(nm.stop), 'STOP clears the helper\'s queue, then sends the offs: ' + nm.stop);
   ok(nm.clkIn >= 5, 'MIDI clock in arrives with its timestamps: ' + nm.clkIn + ' ticks');
   ok(nm.dup.two === 'n:Gear,n:Gear #2' && nm.dup.after === 'n:Gear' && nm.dup.letters === 'n:Gear,n:Gear #2' && nm.dup.to === 'B:64', 'two same-name devices, one unplugged: the group is reopened (a note on "Gear" reaches the device still there, through an open handle) and no choice is moved: ' + JSON.stringify(nm.dup));

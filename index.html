@@ -14508,6 +14508,9 @@ async function rcdOpen1(){
   // under us (the interface reconfigured, the audio engine rebuilt); then it is closed and opened again, not trusted
   if ((RCD.io || RCD.stream) && !RCD.on && !RCD.sync && (RCD.ctx !== ctx || (RCD.io && RCD.io.got && performance.now() - (RCD.io.lastIn || 0) > 2000))) rcdClose();   // (only once audio had come: an input still waiting on macOS's microphone prompt isn't stale, and reopening it asked again)
   if (RCD.stream || RCD.io) return true;
+  // CLOSED WHILE OPENING (owner's beta.14 test: monitoring distorted and the song silent after closing and reopening the window):
+  // the window can close (rcdClose) while this waits on macOS or the helper; what this open then made is undone, not left half-open
+  const gen = RCD.gen | 0, gone = () => (RCD.gen | 0) !== gen;
   audio(); try { if (ctx.state !== 'running') await ctx.resume(); } catch(e){}
   // NATIVE INPUT (desktop app, INPUT ENGINE Auto): every channel of the interface, through the helper; the browser's input otherwise
   if (IOAPI && aset.inEngine !== 'browser'){
@@ -14517,7 +14520,11 @@ async function rcdOpen1(){
       const mon = ctx.createGain(); mon.gain.value = rcdSet.mon ? 1 : 0; mon.connect(master);
       node.port.onmessage = e => rcdMsg(e.data);
       Object.assign(RCD, {node, mon, ctx, inLat:0});
-      if (await rcdOpenIo(node, mon)){
+      const okIo = await rcdOpenIo(node, mon);
+      if (gone()){ if (RCD.io && RCD.io.node){ const io = RCD.io; RCD.io = null; clearInterval(io.tick); try { io.node.port.onmessage = null; io.node.disconnect(); } catch(e){} }
+        IOH.onIn = IOH.onGone = null; iohAsk({op:'close'});   // (always: the helper may have opened the device even if this side gave up; rcdOpen is single-flight, so nothing newer is open)
+        try { mon.disconnect(); node.port.onmessage = null; } catch(e){} if (RCD.node === node) Object.assign(RCD, {node:null, mon:null}); return false; }
+      if (okIo){
         // RATE (A2): the interface at another rate than the app's audio is converted (and ADAT carries 16 inputs only at 44.1 / 48 kHz)
         const op = RCD.io.opened, dr = op.deviceRate | 0, ar = ctx.sampleRate | 0;
         RCD.note = dr && dr !== ar ? `${RCD.io.dev.name} runs at ${dr / 1000} kHz and the app at ${ar / 1000} kHz: the input is converted. Set them the same (Settings › Audio › Rate, or the interface) for a clean take.` : '';
@@ -14548,7 +14555,7 @@ async function rcdOpen1(){
     return true;
   } catch(e){ s.getTracks().forEach(t => t.stop()); tpLog('recorder', e); toast('Couldn’t start recording here.'); return false; }
 }
-function rcdClose(){ rcdCloseIo(); try { if (RCD.src) RCD.src.disconnect(); if (RCD.spl) RCD.spl.disconnect(); if (RCD.mrg) RCD.mrg.disconnect(); if (RCD.mon) RCD.mon.disconnect(); if (RCD.node){ RCD.node.port.onmessage = null; } } catch(e){}
+function rcdClose(){ RCD.gen = (RCD.gen | 0) + 1; rcdCloseIo();   // (gen: an open still in flight sees it was closed meanwhile) try { if (RCD.src) RCD.src.disconnect(); if (RCD.spl) RCD.spl.disconnect(); if (RCD.mrg) RCD.mrg.disconnect(); if (RCD.mon) RCD.mon.disconnect(); if (RCD.node){ RCD.node.port.onmessage = null; } } catch(e){}
   if (RCD.stream) RCD.stream.getTracks().forEach(t => t.stop()); Object.assign(RCD, {stream:null, src:null, node:null, mon:null, spl:null, mrg:null}); }
 /* INPUTS (owner, 7 Nov: "choose the audio input on a multi-channel audio interface"): the input is opened with every channel
    the browser will give (some only give 2, whatever the interface has), and INPUTS picks a pair (1+2, 3+4…) or one channel,
@@ -16363,9 +16370,22 @@ function nmLateShow(){
   const want = NM.acc && NM.late > 0 && / · native$/.test(t) ? t + ' · ' + NM.late + ' late' : t;
   if (want !== el.textContent) el.textContent = want;
 }
+// VALID MESSAGES ONLY, AS WEB MIDI (owner's beta.14 test: the Cirklon showed "Sysex interrupt" the first time native MIDI reached it):
+// Web MIDI's send() throws on a malformed message (a data byte ≥ 0x80, a wrong length) and on SysEx without permission, so the
+// browser engine quietly dropped anything odd; the native engine passed it all on. Same rules here, thrown the same way (every
+// sender already catches). Several whole messages in one send are allowed, as in Web MIDI.
+const NM_LEN = st => st < 0xC0 ? 3 : st < 0xE0 ? 2 : st < 0xF0 ? 3 : ({0xF1:2, 0xF2:3, 0xF3:2, 0xF6:1, 0xF8:1, 0xFA:1, 0xFB:1, 0xFC:1, 0xFE:1, 0xFF:1})[st] || 0;
+function nmValid(b){
+  if (!b || !b.length) return false;
+  for (let i = 0; i < b.length;){ const st = b[i]; if (!(st >= 0x80 && st <= 0xFF) || st === 0xF0 || st === 0xF7) return false;
+    const n = NM_LEN(st); if (!n || i + n > b.length) return false;
+    for (let k = 1; k < n; k++){ const d = b[i + k]; if (!(d >= 0 && d < 0x80)) return false; }
+    i += n; }
+  return true; }
 function nmPort(id, name, port, out){
   if (out) return {id, name, port, native:true, type:'output',
-    send(b, ts){ nmPost({op:'midiSend', port, bytes:Array.from(b), at:ts ? nmNs(ts) : 0}); },
+    send(b, ts){ const a = Array.from(b, x => +x); if (!nmValid(a)) throw new TypeError('invalid MIDI message: ' + a.join(','));
+      nmPost({op:'midiSend', port, bytes:a, at:ts ? nmNs(ts) : 0}); },
     clear(){ nmPost({op:'midiClear', port}); }};
   const inp = {id, name, port, native:true, type:'input', onmidimessage:null}; NM.byPort.set(port, inp); return inp;
 }
