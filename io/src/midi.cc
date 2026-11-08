@@ -91,7 +91,7 @@ void PushIn(int port, const uint8_t* b, size_t n, uint64_t ns) {
 // ---------------------------------------------------------------------------------------------------------------------
 // Outbound: the ports and the sender thread
 
-struct Out { std::unique_ptr<libremidi::midi_out> dev; bool loop = false; int loopIn = 0; };
+struct Out { std::shared_ptr<libremidi::midi_out> dev; bool loop = false; int loopIn = 0; };   // (shared: the sender holds it while sending without the lock)
 struct Msg { int port; uint64_t seq; std::vector<uint8_t> bytes; };
 
 std::mutex& g_mx = *new std::mutex;    // guards everything below
@@ -114,16 +114,24 @@ void Priority() {
 #endif
 }
 
-void SendNow(int port, const std::vector<uint8_t>& b, uint64_t at) {
-  // (g_mx held) the device sends straight away; the test port loops back into midiRead()
+// SENT WITHOUT THE LOCK (review): a send that blocks (WinMM sysex is synchronous) must not hold up midiSend / midiClear on the
+// helper's JS thread. Called with g_mx held; drops it around the send and takes it back. The device is kept alive by a
+// shared_ptr copy, so a midiClose meanwhile can't free it under the send. One sender thread: the order stays as booked.
+void SendNow(std::unique_lock<std::mutex>& l, int port, const std::vector<uint8_t>& b, uint64_t at) {
   auto it = g_outs.find(port); if (it == g_outs.end()) return;
   uint64_t now = HostNowNs(); if (now > at + 2000000) g_late++;
   if (it->second.loop) { PushIn(it->second.loopIn ? it->second.loopIn : port, b.data(), b.size(), now); return; }
-  if (it->second.dev) { try { it->second.dev->send_message(b.data(), b.size()); } catch (...) {} }
+  std::shared_ptr<libremidi::midi_out> dev = it->second.dev; if (!dev) return;
+  l.unlock(); try { dev->send_message(b.data(), b.size()); } catch (...) {} l.lock();
 }
 
 void Loop() {
   Priority();
+  struct PeriodEnd { ~PeriodEnd() {
+#if defined(_WIN32)
+    timeEndPeriod(1);   // (review: paired with Priority's timeBeginPeriod)
+#endif
+  } } periodEnd;
   std::unique_lock<std::mutex> l(g_mx);
   while (g_run) {
     if (g_q.empty()) { g_cv.wait(l); continue; }
@@ -135,7 +143,7 @@ void Loop() {
       l.unlock(); while (HostNowNs() < at) std::this_thread::yield(); l.lock(); continue;
     }
     while (!g_q.empty() && g_q.begin()->first <= HostNowNs()) {   // everything due, in order
-      auto n = g_q.extract(g_q.begin()); SendNow(n.mapped().port, n.mapped().bytes, n.key());
+      auto n = g_q.extract(g_q.begin()); SendNow(l, n.mapped().port, n.mapped().bytes, n.key());
     }
   }
 }
@@ -209,7 +217,7 @@ napi_value MidiOpenOut(napi_env env, napi_callback_info info) {
     PortList L = Scan(); auto ids = Ids(L.outs); size_t i = 0; for (; i < ids.size() && ids[i] != id; i++) {}
     if (i == ids.size()) return Res(env, false, "no MIDI output called " + id, 0);
     try {
-      auto dev = std::make_unique<libremidi::midi_out>(libremidi::output_configuration{});
+      auto dev = std::make_shared<libremidi::midi_out>(libremidi::output_configuration{});
       if (auto err = dev->open_port(L.outs[i]); err != stdx::error{}) return Res(env, false, "couldn't open " + id, 0);
       o.dev = std::move(dev);
     } catch (...) { return Res(env, false, "couldn't open " + id, 0); }
@@ -223,9 +231,10 @@ napi_value MidiOpenOut(napi_env env, napi_callback_info info) {
 napi_value MidiOpenIn(napi_env env, napi_callback_info info) {
   napi_value a[1]; if (!Args(env, info, 1, a)) return Res(env, false, "no port id", 0);
   std::string id = GetStr(env, a[0]);
-  std::lock_guard<std::mutex> l(g_mx);
-  int h = g_next++;
-  if (id == kLoop) { for (auto& [k, o] : g_outs) if (o.loop) o.loopIn = h; g_ins[h] = nullptr; return Res(env, true, "", h); }
+  int h; { std::lock_guard<std::mutex> l(g_mx); h = g_next++;
+    if (id == kLoop) { for (auto& [k, o] : g_outs) if (o.loop) o.loopIn = h; g_ins[h] = nullptr; return Res(env, true, "", h); } }
+  // SCANNED AND OPENED WITHOUT THE LOCK (review): CoreMIDI can take tens of ms here, and the sender thread needs g_mx to send
+  // the notes already booked. The callback only ever takes g_inMx.
   PortList L = Scan(); auto ids = Ids(L.ins); size_t i = 0; for (; i < ids.size() && ids[i] != id; i++) {}
   if (i == ids.size()) return Res(env, false, "no MIDI input called " + id, 0);
   libremidi::input_configuration cfg;
@@ -234,7 +243,7 @@ napi_value MidiOpenIn(napi_env env, napi_callback_info info) {
   try {
     auto dev = std::make_unique<libremidi::midi_in>(cfg);
     if (auto err = dev->open_port(L.ins[i]); err != stdx::error{}) return Res(env, false, "couldn't open " + id, 0);
-    g_ins[h] = std::move(dev);
+    std::lock_guard<std::mutex> l(g_mx); g_ins[h] = std::move(dev);
   } catch (...) { return Res(env, false, "couldn't open " + id, 0); }
   return Res(env, true, "", h);
 }
@@ -259,7 +268,8 @@ napi_value MidiSend(napi_env env, napi_callback_info info) {
   double at = 0; if (argc >= 3) napi_get_value_double(env, a[2], &at);
   { std::lock_guard<std::mutex> l(g_mx);
     if (!g_outs.count(h)) return f;
-    uint64_t now = HostNowNs(), t = at > (double)now ? (uint64_t)at : now;   // 0 or past: now, in the order sent
+    uint64_t now = HostNowNs(); double lim = (double)now + 3600e9;   // (at most an hour ahead: a cast of Infinity is undefined)
+    uint64_t t = at > (double)now ? (uint64_t)(at < lim ? at : lim) : now;   // 0 or past: now, in the order sent
     bool first = g_q.empty() || t < g_q.begin()->first;
     g_q.emplace(t, Msg{h, ++g_seq, std::move(b)});
     if (first) g_cv.notify_all(); }

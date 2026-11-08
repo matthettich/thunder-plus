@@ -15576,7 +15576,11 @@ function miPorts(){
 }
 let midiConnecting = null;
 function connectMidi(){ if (!midiConnecting) midiConnecting = connectMidi1().finally(() => { midiConnecting = null; }); return midiConnecting; }
+// ENGINE CHANGED MID-CONNECT (review): the connect in flight belongs to the old engine; once it's in, it is dropped and the new one connects
+function midiAccessDrop(){ const a = midi.access; midi.access = null; if (!a) return;
+  try { a.onstatechange = null; a.inputs.forEach(i => { i.onmidimessage = null; }); } catch(e){} if (a.native) nmClose(); }
 async function connectMidi1(){
+  if (midi.access && !!midi.access.native !== nmWanted()){ try { moRelease(); } catch(e){} midiAccessDrop(); }
   if (midi.access){ hookInputs(); return; }
   // NATIVE MIDI (desktop app, Settings › MIDI › Engine Native): the helper's ports, notes sent at their exact time from its own
   // thread and taken back on STOP; Web MIDI when the helper or its MIDI isn't there
@@ -16286,7 +16290,7 @@ function iohDevices(){
 async function iohStart(){
   if (!IOAPI || IOH.state !== 'off') return iohGo;
   IOH.state = 'starting'; iohUi();
-  window.addEventListener('message', e => { if (e.data && e.data.thunderIo && e.ports && e.ports[0]) iohPort(e.ports[0]); });
+  if (!IOH.lis){ IOH.lis = true; window.addEventListener('message', e => { if (e.data && e.data.thunderIo && e.ports && e.ports[0]) iohPort(e.ports[0]); }); }   // (once: a second start after the helper died added a second listener, which answered every waiting request with null)
   const fail = why => { if (IOH.state === 'starting'){ IOH.state = 'unavailable'; IOH.why = why; iohUi(); } };
   iohHelloT = setTimeout(() => fail('no answer'), 3000);
   iohGo = (async () => {
@@ -16302,7 +16306,7 @@ async function iohStart(){
    (moRelease on STOP), so msend skips the OUTBOX; an input's onmidimessage gets {data, timeStamp} with the time the helper
    stamped on arrival. Ids are 'n:' + the port's name; saved Web MIDI choices are mapped by name (midiRemap), and back.
    Ports are looked at again every 3 s (plugged in or out: onstatechange, as Web MIDI). No microphone is asked for. */
-const NM = {acc:null, byPort:new Map(), scanT:0, clkT:0};
+const NM = {acc:null, byPort:new Map(), scanT:0, clkT:0, miss:0, scanning:false, opening:new Set()};
 const nmWanted = () => !!IOAPI && aset.midiEngine !== 'browser';
 const nmPost = m => { try { if (IOH.port) IOH.port.postMessage(m); } catch(e){} };
 const nmNs = ms => Math.max(0, (ms - IOH.clk) * 1e6);   // performance.now() (ms) → the helper's OS clock (ns)
@@ -16321,22 +16325,40 @@ async function nmConnect(){
   return acc;
 }
 async function nmScan(first){
-  const acc = NM.acc; if (!acc) return;
-  const r = await iohAsk({op:'midiPorts'}); if (!r || r.op !== 'midiPorts' || NM.acc !== acc) return;
+  const acc = NM.acc; if (!acc || NM.scanning) return;   // ONE SCAN AT A TIME (review): a slow one overlapping the next opened a port twice
+  NM.scanning = true; try { await nmScan1(acc, first); } finally { NM.scanning = false; } }
+async function nmScan1(acc, first){
+  const r = await iohAsk({op:'midiPorts'}); if (NM.acc !== acc) return;
+  // HELPER GONE (it died: no answer twice in a row): its port numbers mean nothing to a new one, so the ports are dropped here
+  // (nothing is sent to it) and MIDI connects again, which starts a fresh helper (main.js allows one restart), else Web MIDI
+  if (!r){ if (++NM.miss >= 2) nmLost(); return; }
+  NM.miss = 0; if (r.op !== 'midiPorts') return;
   let ch = false;
   const sync = (map, list, open) => { const want = new Set(list.map(p => 'n:' + p.id)), jobs = [];
     for (const [id, x] of map) if (!want.has(id)){ nmPost({op:'midiClose', port:x.port}); map.delete(id); NM.byPort.delete(x.port); ch = true; }
-    for (const p of list){ const id = 'n:' + p.id; if (map.has(id)) continue;
-      jobs.push(iohAsk({op:open, name:p.id}).then(o => { if (!o || !o.ok || NM.acc !== acc) return; map.set(id, nmPort(id, p.name, o.port, open === 'midiOpenOut')); ch = true; })); }
+    for (const p of list){ const id = 'n:' + p.id, key = open + id; if (map.has(id) || NM.opening.has(key)) continue; NM.opening.add(key);
+      jobs.push(iohAsk({op:open, name:p.id}).then(o => { NM.opening.delete(key);
+        if (o && o.ok && (NM.acc !== acc || map.has(id))){ nmPost({op:'midiClose', port:o.port}); return; }   // (opened after a switch or a reconnect: closed, not leaked)
+        if (!o || !o.ok) return; map.set(id, nmPort(id, p.name, o.port, open === 'midiOpenOut')); ch = true; })); }
     return Promise.all(jobs); };
   await sync(acc.outputs, r.outs || [], 'midiOpenOut'); await sync(acc.inputs, r.ins || [], 'midiOpenIn');
-  if (ch && !first && acc.onstatechange) try { acc.onstatechange(); } catch(e){}
+  if (ch && !first){ try { await midiRemap(acc); } catch(e){} if (acc.onstatechange) try { acc.onstatechange(); } catch(e){} }   // (a saved port plugged in later finds its letter)
 }
 function nmPort(id, name, port, out){
   if (out) return {id, name, port, native:true, type:'output',
     send(b, ts){ nmPost({op:'midiSend', port, bytes:Array.from(b), at:ts ? nmNs(ts) : 0}); },
     clear(){ nmPost({op:'midiClear', port}); }};
   const inp = {id, name, port, native:true, type:'input', onmidimessage:null}; NM.byPort.set(port, inp); return inp;
+}
+function nmLost(){
+  const a = NM.acc; if (!a) return; NM.acc = null; NM.miss = 0; clearInterval(NM.scanT); clearInterval(NM.clkT); IOH.onMidi = null; NM.byPort.clear();
+  try { a.onstatechange = null; a.inputs.forEach(i => { i.onmidimessage = null; }); } catch(e){}
+  if (midi.access === a){ midi.access = null; try { mx.held = []; mx.pend = []; } catch(e){} }
+  if (IOH.port){ try { IOH.port.onmessage = null; IOH.port.close(); } catch(e){} }
+  iohPend.forEach(r => r(null)); iohPend.clear();
+  Object.assign(IOH, {state:'off', port:null, midi:false, clk:null, clkT:0});
+  toast('The desktop app’s MIDI helper stopped: connecting MIDI again.', 5000);
+  connectMidi();
 }
 function nmClose(){ const acc = NM.acc; if (!acc) return; NM.acc = null; clearInterval(NM.scanT); clearInterval(NM.clkT); IOH.onMidi = null;
   nmPost({op:'midiClear', port:0}); for (const m of [acc.outputs, acc.inputs]) for (const x of m.values()) nmPost({op:'midiClose', port:x.port});
@@ -16347,11 +16369,11 @@ function midiNames(acc){ try { acc.outputs.forEach(o => { midi.names[o.id] = o.n
 async function midiRemap(acc){
   const nat = !!acc.native, foreign = id => id && (nat ? !id.startsWith('n:') : id.startsWith('n:'));
   const ids = [...midi.outIds, midi.inId, midi.clkId].filter(foreign); if (!ids.length) return;
-  if (nat && ids.some(id => !midi.names[id]) && navigator.requestMIDIAccess){ try { midiNames(await navigator.requestMIDIAccess()); } catch(e){} }
+  if (nat && ids.some(id => !midi.names[id]) && navigator.requestMIDIAccess){ try { const w = await Promise.race([navigator.requestMIDIAccess(), new Promise(r => setTimeout(r, 3000))]); if (w) midiNames(w); } catch(e){} }   // (bounded: a permission prompt left open mustn't hold the connect)
   const nameOf = id => id.startsWith('n:') ? id.slice(2).replace(/ #\d+$/, '') : (midi.names[id] || '');
   const find = (map, id) => { const nm = nameOf(id); if (!nm) return id; let hit = '';
     map.forEach((x, k) => { if (!hit && (x.name || '') === nm) hit = k; });
-    if (!hit){ const l = nm.toLowerCase(); map.forEach((x, k) => { const xl = (x.name || '').toLowerCase(); if (!hit && xl && (xl.includes(l) || l.includes(xl))) hit = k; }); }
+    if (!hit && nm.length >= 4){ const l = nm.toLowerCase(); map.forEach((x, k) => { const xl = (x.name || '').toLowerCase(); if (!hit && xl.length >= 4 && (xl.includes(l) || l.includes(xl))) hit = k; }); }
     return hit || id; };   // (not there now: the choice stays, shown as "(not connected)")
   midi.outIds = midi.outIds.map(id => foreign(id) ? find(acc.outputs, id) : id);
   if (foreign(midi.inId)) midi.inId = find(acc.inputs, midi.inId);
@@ -16362,9 +16384,8 @@ async function midiRemap(acc){
 function midiEngineSet(v){
   aset.midiEngine = v === 'browser' ? 'browser' : 'native'; asetSave();
   try { moRelease(); } catch(e){}
-  const a = midi.access; midi.access = null;
-  if (a){ try { a.onstatechange = null; a.inputs.forEach(i => { i.onmidimessage = null; }); } catch(e){} if (a.native) nmClose(); }
-  if (midi.on || midi.want) connectMidi(); else { moPorts(); miPorts(); }
+  midiAccessDrop();
+  if (midi.on || midi.want){ if (midiConnecting) midiConnecting.then(() => connectMidi()); else connectMidi(); } else { moPorts(); miPorts(); }
 }
 if (IOAPI && $('segMidiEng')){ $('midiEngRow').hidden = false;
   makeSeg($('segMidiEng'), [['native', 'Native'], ['browser', 'Browser']], () => aset.midiEngine === 'browser' ? 'browser' : 'native', midiEngineSet); }

@@ -12,7 +12,7 @@ const POLL_MS = 5, MAX_READS_PER_TICK = 8, MIDI_POLL_MS = 2;
 function createIoHelper({ loadAddon, post, timers }) {
   const T = timers || { setInterval: (f, ms) => setInterval(f, ms), clearInterval: h => clearInterval(h) };
   let addon = null, hello, poll = null, inputOpen = false, midiPoll = null;
-  const midiPorts = new Set();   // every MIDI port this page opened (closed with it: a reload, shutdown)
+  const midiPorts = new Set(), midiIns = new Set();   // every MIDI port this page opened (closed with it: a reload, shutdown); the inputs among them
   try { addon = loadAddon(); hello = { op: 'hello', available: true, version: String(addon && addon.version ? addon.version() : ''), midi: !!(addon && typeof addon.midiPorts === 'function') }; }   // (midi: phase B; an older addon has none)
   catch (e) { addon = null; hello = { op: 'hello', available: false, why: String((e && e.message) || e) }; }
   const err = (id, e) => post({ op: 'error', id, why: typeof e === 'string' ? e : String((e && e.message) || e) });
@@ -30,7 +30,7 @@ function createIoHelper({ loadAddon, post, timers }) {
     if (!addon || typeof addon.midiClose !== 'function') return;
     try { addon.midiClear(0); } catch (_) {}
     for (const p of midiPorts) { try { addon.midiClose(p); } catch (_) {} }
-    midiPorts.clear(); midiPollSet(false);
+    midiPorts.clear(); midiIns.clear(); midiPollSet(false);
   }
   const hasMidi = () => !!addon && typeof addon.midiPorts === 'function';
   function closeInput() {
@@ -87,10 +87,10 @@ function createIoHelper({ loadAddon, post, timers }) {
     } else if (op === 'midiOpenOut' || op === 'midiOpenIn') {
       if (!hasMidi()) return err(id, hello.why || 'no MIDI in this helper');
       let r; try { r = op === 'midiOpenOut' ? addon.midiOpenOut(String(msg.name || '')) : addon.midiOpenIn(String(msg.name || '')); } catch (e) { return err(id, e); }
-      if (r && r.ok) { midiPorts.add(r.port); if (op === 'midiOpenIn') midiPollSet(true); }
+      if (r && r.ok) { midiPorts.add(r.port); if (op === 'midiOpenIn') { midiIns.add(r.port); midiPollSet(true); } }
       post({ op: 'midiOpened', id, ...r });
     } else if (op === 'midiClose') {
-      if (hasMidi()) { try { addon.midiClose(msg.port); } catch (_) {} midiPorts.delete(msg.port); }
+      if (hasMidi()) { try { addon.midiClose(msg.port); } catch (_) {} midiPorts.delete(msg.port); if (midiIns.delete(msg.port) && !midiIns.size) midiPollSet(false); }   // (the last input closed: no more polling)
       if (id != null) post({ op: 'midiClosed', id });
     } else err(id, 'unknown op');
   }
