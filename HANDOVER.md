@@ -180,6 +180,22 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 7 Nov (7): INST layout by OUTPUT, recorder INPUTS, Ctrl/⌘+G generators (build 477, beta)
+
+- Owner: the INST screen "is a little strange… choosing midi means you're still on an instrument that holds a pad sound"; chose
+  the Renoise approach (pad, MIDI, or both). `instRows()`: OUTPUT is the first row; then IN USE, TRANSPOSE, KEY FOLLOW, HUMAN;
+  then the PAD block (PAD, PAD SHARED, VOLUME, PAN, REVERSE, GEN rows on PAD only, START…PLAY SLICES) when OUTPUT is PAD or
+  PAD+MIDI; then the MIDI block (MIDI CH…ECHO) when MIDI or PAD+MIDI; › EDIT PAD IN SYNTH only with a pad. VOLUME / PAN moved
+  to the pad block because MIDI velocity never used them (moNote: volume column × HUMAN VEL). Hidden values are kept.
+- Owner: "choose the audio input on a multi-channel audio interface within the record a sample screen". `rcdOpen` asks for
+  channelCount ideal 32, keeps `RCD.nch` from the track's settings and remembers it per device (`rcdSet.nchs`); INPUTS
+  (`rcdSet.inCh`: 'p<a>' pair, 's<a>' one channel) routes through a ChannelSplitter / Merger (`rcdRoute`) into the worklet
+  and monitor. ≤2 channels and 1+2: wired as before (a mono mic still fills both sides). Only tried with Chrome's fake
+  2-channel device and a simulated 6-channel count: the owner to check on the real interface (Chrome / Electron may cap at 2).
+- Ctrl/⌘+G opens genMenu (was the browser's Find next), placed under the cursor cell; help Keys table updated.
+- Owner: MIDI notes sounded early against the engines; set port A Gear delay −7 ms, then felt it wasn't right / might drift
+  (notes only, no clock). Not investigated in code yet: amap is refreshed every pump step (moClock → mapUpd), smoothed 0.02.
+
 ## 7 Nov (6): no whole-sample work on the audio thread (build 476, beta)
 
 - Owner: the stutter happened on a song of three sample tracks, so not load. Found: the core's varRec ran shapeData over the
