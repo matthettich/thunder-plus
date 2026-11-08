@@ -20991,11 +20991,20 @@ function coreMixOff(){ const M = core.mix; if (!M) return; core.mix = null;
 function coreDrop(){ coreMixOff(); const n = core.node; if (n){ try { n.port.postMessage({op:'die'}); n.port.onmessage = null; n.disconnect(); } catch(e){} }
   Object.assign(core, {node:null, ready:false, loading:null, mir:null, wired:null, v:0, vsent:null, sfSent:null}); core.sent.clear(); }
 const corePost = (m, tr) => { try { core.node.port.postMessage(m, tr || []); } catch(e){ tpLog('core post', e); } };
-function coreKit(){ const kv = [];
+function coreKit(){ const kv = coreKitV(); core.kitSig = JSON.stringify(kv);
+  corePost({op:'kit', kv}); for (let i = 0; i < kv.length; i++) if (kv[i] && kv[i].sf || (core.sfSent && core.sfSent.has(i))) coreSf(i); }
+/* KIT WHILE PLAYING (owner, 7 Nov: "changing a synth engine on the synth screen during playback would hold the old sound until
+   the song was stopped and restarted"). The core learns each pad's kind (live engine or rendered, which live node, held or
+   one-shot, choke, release) from 'kit', which only went at PLAY; a new render reached it (coreBuf) but a pad that changed
+   kind kept playing the old way. While the core plays, the page looks at most 5 times a second whether that list changed
+   and sends it again (coreKitCheck, from the rows it gets). */
+function coreKitCheck(){ const now = performance.now(); if (now - (core.kitT || 0) < 200) return; core.kitT = now;
+  try { if (JSON.stringify(coreKitV()) !== core.kitSig) coreKit(); } catch(e){ tpLog('core kit', e); } }
+function coreKitV(){ const kv = [];
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; let live = false; try { live = isLivePad(i); } catch(e){}
     let lk = null; if (live && v){ const vx = isVoxV(v), lx = liveX(v), ps = isPsV(v) || isWlV(v); lk = {kind:vx ? 'vox' : lx ? v.engine : 'bass', vox:vx, ps, vel:ps ? (xParams(v).vel || 100) : 0}; }   // LIVE ENGINES: the node the core drives
     kv.push(v ? {choke:v.choke | 0, syn:isSyn(i), rel:isSyn(i) ? relOf(v) : 0, live, lk, sf:v.engine === 'sf'} : null); }
-  corePost({op:'kit', kv}); for (let i = 0; i < kv.length; i++) if (kv[i] && kv[i].sf || (core.sfSent && core.sfSent.has(i))) coreSf(i); }
+  return kv; }
 // The core dropped its variations (of pad i, or all of them: an instrument changed): send them again when asked
 function coreVarGone(i){ const V = core.vsent; if (!V) return; if (i == null){ V.clear(); return; } for (const k of [...V.keys()]) if (k.endsWith(':' + i)) V.delete(k); }
 const coreOps = ops => { if (ops.some(o => o[0] === 'insts')) coreVarGone(null); return ops; };
@@ -21155,6 +21164,7 @@ function coreMsg(d){
   const s = tp.seq;
   if (d.op === 'end'){ s._alive = false; s.time = d.time; return; }
   corePost({op:'ack'});   // WATCHDOG: the core goes on only while the page hears it
+  coreKitCheck();   // KIT WHILE PLAYING
   audioWake = performance.now();
   for (const r of d.rows){
     // RECORDER CUT (CodeRabbit, 7 Nov): the row is counted first, so the edge a held STOP waits for is known before its notes
@@ -22327,7 +22337,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 480;
+const BUILD = 481;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31290,6 +31300,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [481, '7 Nov', ['Audio-thread sequencer: changing a pad’s engine on the Synth page while the song plays takes effect within a moment (a pad that went from a rendered sound to a live engine, or back, kept the old sound until STOP and PLAY).']],
   [480, '7 Nov', ['Mac: Caps Lock types a note off on every press again. A Mac reports Caps Lock in odd ways (sometimes only when it turns on, sometimes both key events), and some presses were lost; now each press counts once however the events come.']],
   [479, '7 Nov', ['MIDI out waits for ...Thunder’s own output: the mastering, the master’s …pump effects and the safety limiter look ahead, so everything ...Thunder plays is heard that much later, and MIDI notes (and clock) went out early by the same amount. Now they line up, and the Gear delay is only your gear’s own lag (start it from 0 and use Measure…). With LATENCY COMP on, its delay is included too.']],
   [478, '7 Nov', ['MIDI: STOP no longer lets the notes already booked ahead play out on the gear: notes wait in the app until they are about 60 ms away (still sent with exact timestamps), and a stop drops the rest.', 'Settings › MIDI › Gear delay › Measure…: plays a click through ...Thunder and a note on the gear, listens on Record a sample’s input, and says how early or late the gear is, how much it wanders and whether it drifts; Apply sets the port’s Gear delay.', 'The Gear delay boxes are wide enough for −50.']],

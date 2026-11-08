@@ -183,6 +183,16 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 7 Nov (11): kit kinds to the core while playing (build 481, beta + main; not in a desktop build yet)
+
+- Owner: changing a synth engine during playback "would hold the old sound until the song was stopped and restarted".
+  The core's 'kit' (live or rendered, live kind, held, choke, release per pad) only went at PLAY (coreSyncAll); coreBuf sent
+  new renders but not a change of kind. coreKitV() builds it, coreKit() posts it and keeps core.kitSig; coreKitCheck() (from
+  each 'rows' message, at most 5 Hz) resends when it changed. Headless: synth slot NPAD layers → bass mid-song: the core's
+  kit shows it live within 800 ms.
+- Owner confirmed the microphone prompt doesn't happen with Output = System default: the named output (setSinkId) is the
+  trigger. Not fixed yet in electron/.
+
 ## 7 Nov (10): Caps Lock on a Mac by state change (build 480, beta + main; not in a desktop build yet)
 
 - Owner (Electron, Mac): Caps Lock's note off "works intermittently". The keyup pairing (400 ms, same state) lost presses.
