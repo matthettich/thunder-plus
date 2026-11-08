@@ -21256,7 +21256,7 @@ function tStop(quiet){
   }
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
   const stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
-  tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
+  tp.timer = 0; tp.on = false; fpMem = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing){ coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} } }
   else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
@@ -22358,7 +22358,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 485;
+const BUILD = 487;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22383,7 +22383,7 @@ const FLK = 'thunderplus-follow-v1';
 // followMode 0 / 1 / 2; followOn: ON, the full follow (the paging checks read it). Stored '1' (ON, as before) or 'p'.
 let followMode = (() => { try { const v = localStorage.getItem(FLK); return v === '1' ? 2 : v === 'p' ? 1 : 0; } catch(e){ return 0; } })();
 let followOn = followMode === 2;
-function setFollow(m){ m = m === true ? 2 : m === false ? 0 : clamp(m | 0, 0, 2); followMode = m; followOn = m === 2;
+function setFollow(m){ m = m === true ? 2 : m === false ? 0 : clamp(m | 0, 0, 2); followMode = m; followOn = m === 2; fpMem = null;
   try { localStorage.setItem(FLK, m === 2 ? '1' : m === 1 ? 'p' : '0'); } catch(e){} if (m) followPlay(); draw(); }
 /* RESUME (owner, 31 Oct): stopping the song leaves the playhead showing where it stopped (tp.paused), on every screen.
    PLAYBACK RESUMES FROM PAUSE (off by default since build 318, this device): PLAY then carries on from that spot, to the step, as long as
@@ -22450,6 +22450,7 @@ let kpOn = (() => { try { const v = localStorage.getItem(KPOK); if (v === '0' ||
 function setKp(on){ kpOn = !!on; try { localStorage.setItem(KPOK, kpOn ? '1' : '0'); } catch(e){} draw(); fit(); draw(); }
 // Song: the cursor's row follows its track. Sect and Phrase: they switch to what the cursor's track is
 // playing and the cursor rides along. Not while a selection is being made.
+var fpMem = null;   // FOLLOW PATTERN: what each track last played (cleared on STOP and when the follow mode changes)
 function followPlay(){
   if (!tp.on || !tp.pos || sdrag || drag) return;
   const P = tp.pos, own = P[tv === 'song' ? cs.song.x : cTrack] || (tp.loopV === 'bus' ? null : P.find(Boolean)); if (!own) return;   // BUS PLAY: an empty bus stays put
@@ -22459,14 +22460,17 @@ function followPlay(){
   // (owner, 2 Nov: after selecting rows, Arrange stopped paging even with FOLLOW on: this used to return before paging).
   if (selA){ arrFollowPage(own); return; }
   if (followMode === 1){   // FOLLOW PATTERN: only which phrase / sect is shown follows the cursor's track; nothing scrolls
-    if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0) cSect = own.sect; }
-    else if (tv === 'phrase'){ const mine = P[cTrack]; if (mine && mine.phrase >= 0 && mine.phrase !== cPhrase){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); } }
+    // ON A CHANGE ONLY (owner, 7 Nov: "a single phrase on a track, I can't move the cursor off of that phrase"): it jumps when
+    // what the track plays changes, not on every step, so with one phrase (or one block) playing you can move away from it.
+    const fp = fpMem || (fpMem = {}), fch = (k, v) => { const c = fp[k] !== v; fp[k] = v; return c; };
+    if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0 && fch('s', own.sect)) cSect = own.sect; }
+    else if (tv === 'phrase'){ const mine = P[cTrack]; if (mine && mine.phrase >= 0 && fch('p' + cTrack, mine.phrase) && mine.phrase !== cPhrase){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); } }
     // Arrange follows the playing pattern too: on the Song screen the selected block moves to the row playing on its track
     // (owner, 31 Oct), unless you've just moved it yourself; Arrange turns its pages with it
-    else if (tv === 'song' && tp.mode === 'song' && own.row >= 0 && cs.song.y !== own.row && performance.now() - arrHandT > 4000 && !selA){ cs.song.y = own.row; }
+    else if (tv === 'song' && tp.mode === 'song' && own.row >= 0 && fch('r' + cs.song.x, own.row) && cs.song.y !== own.row && performance.now() - arrHandT > 4000 && !selA){ cs.song.y = own.row; }
     // ...and beside Phrase / Pattern view while Arrange has the keys (owner, 31 Oct: then only the phrase followed): the
     // selected block goes to the row playing on its own track
-    if (tv !== 'song' && apReady && apF === 'arr' && tp.mode === 'song' && performance.now() - arrHandT > 4000){ const q = P[cs.song.x] || own; if (q && q.row >= 0 && cs.song.y !== q.row){ cs.song.y = q.row; apLastKey = ''; } }
+    if (tv !== 'song' && apReady && apF === 'arr' && tp.mode === 'song' && performance.now() - arrHandT > 4000){ const q = P[cs.song.x] || own; if (q && q.row >= 0 && fch('a' + cs.song.x, q.row) && cs.song.y !== q.row){ cs.song.y = q.row; apLastKey = ''; } }
     // PATTERN VIEW (owner, 6 Nov: "pattern follow didn't update in the pattern screen until I paged into it"): the Pattern view
     // draws the song row cs.song.y, and FOLLOW PATTERN only switched the open track's phrase, so the other tracks stayed on the
     // old pattern. The song row follows now too, as with FOLLOW ON (rows don't scroll; the cursor keeps its row and track).
@@ -31321,6 +31325,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [487, '7 Nov', ['FOLLOW PATTERN jumps only when what a track plays changes: with a single phrase (or block) playing on a track, you can move the cursor off it again.']],
   [485, '7 Nov', ['MIDI timing (desktop app on a Mac): MIDI went out early by about the audio latency shown in Settings › Audio (base + output), so it needed a negative Gear delay. It now waits for that latency itself: set the Gear delay back to 0 (or what Measure… says).']],
   [484, '7 Nov', ['Measure gear delay rebuilds the audio engine when it finishes (as Settings › Audio › Reset audio engine does): opening the interface’s input could leave the timing off until then.']],
   [483, '7 Nov', ['Record a sample: INPUTS no longer says the interface has only 2 channels: the browser engine only gives the app inputs 1 and 2 (hover the list for how to record another input).']],
