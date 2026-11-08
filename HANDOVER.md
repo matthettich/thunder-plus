@@ -129,7 +129,7 @@ transfer an ArrayBuffer). Desktop pre-release **1.3.0-beta.4** (build 492) is ou
   steps between takes). D costs the take nothing (rcdLat = D), only a little more wait after a PATTERN take ends.
 - beta.5 (21:40): still **6 microphone prompts** on opening the window, so the double open wasn't the whole cause. The Mac app was
   fully unsigned (CSC_IDENTITY_AUTO_DISCOVERY false, no identity): TCC can't keep a grant for it and its helper processes look like
-  separate unsigned programs. Build 495: `build.mac.identity: "-"` (ad-hoc), `hardenedRuntime: false` (hardened runtime would need
+  separate unsigned programs. Build 495 tried `build.mac.identity: "-"`: electron-builder 26 SKIPPED signing ("no valid identity with this name"), so beta.6 is still unsigned. Build 496: `electron/scripts/adhoc-sign.js` (afterPack: `codesign --force --deep --sign -` on the merged universal app only, then `--verify`; check the macOS job log for "adhoc-sign: signed"), `hardenedRuntime: false` (hardened runtime would need
   JIT / library-validation entitlements for the .node addons). Expect one prompt per update (each build's code hash differs) until
   a Developer ID. The updater downloads the .dmg itself (no Squirrel), so signing doesn't touch updates. If it still prompts
   repeatedly: ask the owner what the prompt names (Thunder Plus vs a Helper) and whether System Settings › Microphone lists it.
