@@ -39,5 +39,8 @@ try {
   if (!Array.isArray(dv) || !dv.some(d => typeof d.inputs === 'number' && typeof d.outputs === 'number')) fail('thunder_io.node: devices({backend:"null"}) returned no usable entry');
   const t0 = I.now(), t1 = I.now();
   if (typeof t0 !== 'number' || !(t1 >= t0)) fail('thunder_io.node: now() runs backwards');
+  // the input opens and closes on the null backend (A1.1: no device is touched; the frames themselves: io/test/input.js)
+  const op = I.openInput('', { rate: 48000, backend: 'null' }); I.closeInput();
+  if (!op || !op.ok || op.rate !== 48000) fail('thunder_io.node: openInput on the null backend: ' + ((op && op.why) || 'no answer'));
 } catch (e) { fail('io/build.js failed: ' + ((e && e.message) || e)); }
 console.log('electron/io/thunder_io.node built (' + Math.round(fs.statSync(dst).size / 1024) + ' KB): ' + v);
