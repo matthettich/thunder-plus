@@ -64,6 +64,19 @@ try {
       E("rcdKeep(3)"); out.keep = E(`(() => { const v = kit.voices[3], L = v.layers[v.sel]; const I = S.insts.filter(I => I.pad === 3);
         return {n:L.sample && L.sample.data.length, st:!!(L.sample && L.sample.data2), type:L.type, eng:v.engine || '', fit:I.length ? I.every(I => I.sync === 1) : null, beats:I.length ? I[0].beats : null, nI:I.length}; })()`);
       E('rcdClose()');
+      // RECORDING COUNTER (8 Nov): the window's m:ss readout counts a FREE take on the audio clock, stops with it, and a PATTERN take waits
+      const txt = () => E('RCD.ui.time.textContent'), btn = n => [...document.querySelectorAll('.recask button')].find(b => b.textContent.trim() === n);
+      E("RCD.take = null; RCD.clkF = null; rcdSet.mode = 'free'; rcdPanel(0);"); await wait(300);
+      out.clk0 = {txt:txt(), vis:E('RCD.ui.time.style.visibility'), timer:E('!!RCD.clkT')};
+      btn('● Record').click(); await until(() => E('RCD.on'), 4000); await wait(2500); out.clk1 = {txt:txt(), vis:E('RCD.ui.time.style.visibility'), timer:E('!!RCD.clkT')};
+      btn('■ Stop').click(); await until(() => E('!!RCD.take'), 4000); await wait(100); out.clk2 = {txt:txt(), timer:E('!!RCD.clkT')};
+      await wait(900); out.clk3 = txt();
+      E("RCD.take.kept = true"); btn('● Record').click(); await wait(400); out.clk4 = txt();   // the next take starts from 0
+      btn('Close').click(); await wait(100); out.clk5 = {timer:E('!!RCD.clkT'), on:E('RCD.on'), ui:E('!!RCD.ui')};
+      E("RCD.take = null; rcdSet.mode = 'sync'; rcdSet.pats = 1; cs.song.y = 2; rcdPanel(0);"); await wait(300);
+      E(`tStart('song', {row:2})`); await wait(900); btn('● Record').click(); await until(() => E('RCD.sync'), 4000); out.clk6 = txt(); await until(() => E('RCD.sync && RCD.sync.phase === "rec" && ctx.currentTime > RCD.sync.t0 + 0.7'), 8000); await wait(260); out.clk7 = txt();
+      await until(() => E('!!RCD.take'), 8000); await wait(100); out.clk8 = {txt:txt(), timer:E('!!RCD.clkT')};
+      btn('Close').click(); E('tStop(true)'); await wait(200);
       // RATE NOTE (8 Nov): a native input at another rate than the app's is announced by a toast, once per device + rate pair
       E("window.__toasts = []; window.__toast0 = toast; toast = (m, ms) => { window.__toasts.push([m, ms]); };");
       E("RCD.io = {dev:{name:'Test interface', inId:'t1'}, opened:{deviceRate:(ctx.sampleRate === 44100 ? 48000 : 44100), channels:2}}; RCD.rateToast = null; RCD.note = ''; rcdUi(); rcdUi();");
@@ -93,6 +106,12 @@ try {
     say(res.armedState === 'armed' && res.sync2 && Math.abs(res.sync2.n - P) <= 1, `${who}: PATTERN ×1 armed mid-pattern: waited (${res.armedState}), took ${res.sync2 ? res.sync2.n : 'nothing'} frames`);
     say(res.until && Math.abs(res.until.n - 2 * P) <= 1 && res.until.pats === 2, `${who}: UNTIL STOP, stopped in the 2nd pattern: ${res.until ? res.until.n + ' frames, ' + res.until.pats + ' patterns' : 'missing'} (two are ${2 * P})`);
     say(res.keep && res.keep.n === res.until.n && res.keep.type === 'sample' && (res.keep.nI === 0 || (res.keep.fit && res.keep.beats === 8)), `${who}: KEEP into pad 3: ${JSON.stringify(res.keep)}`);
+    say(res.clk0 && res.clk0.vis === 'hidden' && !res.clk0.timer && res.clk1 && /^0:0[12]$/.test(res.clk1.txt) && res.clk1.vis === '' && res.clk1.timer, `${mode}: recording counter: idle hidden (room kept), FREE after 2.5 s shows ${res.clk1 && res.clk1.txt}, timer running ${res.clk1 && res.clk1.timer}`);
+    say(res.clk1 && res.clk1.txt === '0:02', `${mode}: FREE take at ~2.5 s reads exactly 0:02 (${res.clk1 && res.clk1.txt})`);
+    say(res.clk2 && res.clk2.txt === res.clk3 && !res.clk2.timer, `${mode}: after Stop the length stays (${res.clk2 && res.clk2.txt} then ${res.clk3}) and the timer is cleared (${res.clk2 && res.clk2.timer})`);
+    say(res.clk4 === '0:00', `${mode}: the next take starts again from ${res.clk4}`);
+    say(res.clk5 && !res.clk5.timer && !res.clk5.on && !res.clk5.ui, `${mode}: closing the window mid-take clears the timer and ends the take: ${JSON.stringify(res.clk5)}`);
+    say(res.clk6 === 'waiting…' && /^0:0[01]$/.test(res.clk7) && res.clk8 && !res.clk8.timer, `${mode}: PATTERN take shows "${res.clk6}" before capture, then ${res.clk7} while capturing; after it ${res.clk8 && res.clk8.txt}, timer ${res.clk8 && res.clk8.timer}`);
     say(res.rate1 && res.rate1.length === 1 && res.rate1[0][1] === 8000 && / kHz and the app at/.test(res.rate1[0][0]), `${mode}: the sample-rate mismatch shows once as an 8 s toast: ${JSON.stringify(res.rate1)}`);
     say(res.rate2 === 1 && res.rate3 === 2 && res.rate4 === 2, `${mode}: no repeat for the same pair (${res.rate2}), again when the rate changes (${res.rate3}), none when they match (${res.rate4})`);
     say(res.long1 && res.long1.length === 1 && res.long1[0][0] === 'Rec long' && res.long1[0][1] === 300 && res.long1[0][2] === 1 && res.longStored, `${mode}: a 5-minute stereo take is in RECENT (${JSON.stringify(res.long1)}) and in the sample store (${res.longStored})`);
