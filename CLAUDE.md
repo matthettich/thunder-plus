@@ -6,6 +6,6 @@
   `docs/NATIVE-IO-HELPER-PLAN.md`. It has the owner's answers, the task list (who does what, delegated vs. lead), and when
   each task counts as done.
 - **If the owner says "continue the helper"** (or reports how the helper beta went): start at "PICK UP HERE" in the START HERE
-  section of `HANDOVER.md` (on the `io-helper` branch until PR #14 is merged into `beta`).
+  section of `HANDOVER.md` (PR #14, the helper, is merged into `beta` and `main` as of 8 Nov; the `io-helper` branch is history).
 - Day-to-day work goes on the `beta` branch; `main` only by merging `beta` when the owner asks. Keep `HANDOVER.md` up to
   date at the end of a session.
