@@ -46,11 +46,16 @@ const FAKE = mode => {
         else if (m && m.op === 'open') {
           const rate = m.rate; stop(); frame0 = 0;
           h.postMessage({ op: 'opened', id: m.id, ok: true, rate, channels: 28, deviceRate: window.__ioDevRate || rate, block: 256, latencyFrames: 96, latencyMs: 2, name: '500R8' });
-          timer = setInterval(() => { if (window.__ioStall) return;
-            const frames = 256, data = new Float32Array(frames * 28);
+          // A DEVICE'S CLOCK: frames at the true rate (as much as real time has made), each stamped on that steady clock (t0 + frame /
+          // rate), as the addon does; a stall stops the stream and restarts the clock after it (the stale tests)
+          let t0 = performance.now(), stalled = false;
+          timer = setInterval(() => { if (window.__ioStall) { stalled = true; return; } const now = performance.now();
+            if (stalled) { t0 = now - frame0 / rate * 1000; stalled = false; }
+            const frames = Math.min(4096, Math.floor((now - t0) / 1000 * rate) - frame0); if (frames < 64) return;
+            const data = new Float32Array(frames * 28);
             for (let f = 0; f < frames; f++) for (let c = 0; c < 28; c++) data[f * 28 + c] = 0.01 * (c + 1);
             // FAKE GEAR (Measure): a 3 ms burst on channels 1–2 at each OS time in __gearT (ms, performance.now's clock)
-            const h0 = performance.now() - frames / rate * 1000; for (const g of (window.__gearT || [])) { const f1 = Math.round((g - h0) / 1000 * rate);
+            const h0 = t0 + frame0 / rate * 1000; for (const g of (window.__gearT || [])) { const f1 = Math.round((g - h0) / 1000 * rate);
               for (let f = Math.max(0, f1); f < Math.min(frames, f1 + 144); f++) { const v = 0.9 * (1 - (f - f1) / 144); data[f * 28] = v; data[f * 28 + 1] = v; } }
             h.postMessage({ op: 'in', frame0, hostNs: h0 * 1e6, channels: 28, frames, data, overruns: 0 }, [data.buffer]);
             frame0 += frames;
@@ -176,10 +181,16 @@ try {
       window.__gearT = []; E("midi.access = midi.access || {outputs:new Map(), inputs:new Map()}; midi.access.outputs.set('fake', {id:'fake', name:'Fake gear', send(b, ts){ if ((b[0] & 0xF0) === 0x90 && b[2]) window.__gearT.push((ts || performance.now()) + 20); }}); midi.outIds[0] = 'fake'; midi.lats[0] = 0; rcdSet.inCh = 'p0'; rcdRoute();");
       for (let i = 0; i < 60 && !E('!!RCD.io'); i++) await wait(50);
       const r = await E('midiLatRun(0, 0, 60, 8)'); window.__gearT = [];
+      // and from Settings (Record a sample closed: the input opens for Measure and closes before the analysis; CodeRabbit, PR #14)
+      E('askOpen && askOpen(null)'); for (let i = 0; i < 20 && E('!!RCD.ui'); i++) await wait(50);
+      const r2 = await E('midiLatRun(0, 0, 60, 8)'); window.__gearT = []; const io2 = E('!!RCD.io');
       E("midi.outIds[0] = ''; midi.access.outputs.delete('fake'); rcdSet.inCh = 'p16'; rcdRoute();");
-      const v = r.map(q => q.ms).sort((a, b) => a - b); return {all:v.map(x=>+x.toFixed(0)).join(','), n:r.length, ts:r.ts, med:v.length ? +v[v.length >> 1].toFixed(1) : null}; });
-    ok(mg.n >= 6 && mg.ts === mg.n && Math.abs(mg.med - 20) < 15,   // (the fake stamps each chunk when it's sent: ±10 ms jitter; the old bug read ~200)
-       'Measure… times the gear by the native timestamps when the click isn\'t on the input (gear 20 ms late): ' + JSON.stringify(mg));
+      const md = q => { const v = q.map(x => x.ms).sort((a, b) => a - b); return v.length ? +v[v.length >> 1].toFixed(1) : null; };
+      const closed = {n:r2.length, ts:r2.ts, med:md(r2), ioAfter:io2};
+      const v = r.map(q => q.ms).sort((a, b) => a - b); return {closed, all:v.map(x=>+x.toFixed(0)).join(','), n:r.length, ts:r.ts, med:v.length ? +v[v.length >> 1].toFixed(1) : null}; });
+    ok(mg.n >= 6 && mg.ts === mg.n && Math.abs(mg.med - 20) < 6 && mg.closed.n >= 6 && mg.closed.ts === mg.closed.n && Math.abs(mg.closed.med - 20) < 6 && !mg.closed.ioAfter,   // (the old bugs read ~200)
+       'Measure… times the gear by the native timestamps when the click isn\'t on the input, with Record a sample open and from Settings (gear 20 ms late): ' + JSON.stringify(mg));
+    await openRec(page);   // (Measure from Settings closed Record a sample)
     await page.evaluate(async () => { const E = s => window.__seqTest.ev(s); E('rcdClose()'); await E('rcdOpen()'); });
     // Engine: Browser
     await page.evaluate(() => { window.__ioOps.length = 0; });

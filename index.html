@@ -14710,17 +14710,20 @@ async function midiLatRun(p, ch, note, n){
   const end = t0 + n * MLT.PER + rcdLat() + 0.4;
   await new Promise(r => { const w = () => ctx.currentTime >= end ? r() : setTimeout(w, 50); w(); });
   const take = await new Promise(r => { RCD.onDone = () => r(rcdCollect(null, null)); rcdGo('stop'); rcdMonSet(0); }); RCD.on = false;
+  // READ BEFORE CLOSING (CodeRabbit, PR #14): run from Settings (Record a sample closed) the input closes here, and after that RCD.io is
+  // null: the timestamp fallback never ran, and rcdLat() gave the browser's latency, so the click was looked for D (≥ 120 ms) off
+  const ts = !!RCD.io, lat = rcdLat(), f0 = RCD.firstF != null ? RCD.firstF : 0;
   rcdMonSet(); if (!RCD.ui) rcdClose();
   if (!take) throw new Error('nothing recorded');
   const L = take.data, R = take.data2, x = new Float32Array(L.length); for (let i = 0; i < x.length; i++) x[i] = R ? Math.max(Math.abs(L[i]), Math.abs(R[i])) : L[i];
   // where the recording starts on the audio clock: the first chunk's frame; the click is searched for near its expected place
-  const f0 = RCD.firstF != null ? RCD.firstF : 0, lat = rcdLat(), out = [];
+  const out = [];
   // NO CLICK ON THE INPUT (owner, 7 Nov: "Measure isn't seeing input even though I see the meters move": the gear was there, the
   // app's output wasn't patched back in): the native input places every frame where it was heard (its timestamps), so the click's
   // place is known without hearing it; the browser's input has no such timing and still needs the click
   // MASTER LOOKAHEAD: the click goes straight to the output, the engines (and so every timed MIDI note, msend) wait moFxLat() for the
   // master's effects; the gear is measured against the engines, so that wait isn't the gear's
-  const ts = !!RCD.io, fx = moFxLat(); out.ts = 0;
+  const fx = moFxLat(); out.ts = 0;
   for (const tc of T){ const e = Math.round((tc + lat) * sr) - f0;
     let c = mltOnset(x, e - sr * 0.12, e + sr * 0.15, sr); if (c == null && ts){ c = e; out.ts++; } if (c == null) continue;
     const m = mltOnset(x, c + sr * (MLT.GAP - 0.1), c + sr * (MLT.GAP + 0.3), sr); if (m == null) continue;
@@ -22603,7 +22606,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 496;
+const BUILD = 497;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31570,6 +31573,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [497, '7 Nov', ['Settings › MIDI › Measure… run from Settings (Record a sample closed) with the native input: it looked for the click in the wrong place and couldn’t time the gear without the click (a third cause of the ~200 ms reading).']],
   [496, '7 Nov', ['Settings › MIDI › Measure…: a noisy input is no longer mistaken for the click (that read about 200 ms), the master effects’ lookahead is no longer counted as the gear’s, and with the desktop app’s native input only the gear needs to reach the input. Record a sample: monitoring no longer goes silent after a PATTERN take (its level is set again at every take’s start and end); Measure… really mutes monitoring while it measures; the native monitor has a little more cushion against dropouts.']],
   [495, '7 Nov', ['Mac app: signed ad hoc (still no Apple certificate), so macOS sees one app and asks for the microphone once instead of once per part of the app.']],
   [494, '7 Nov', ['Settings › MIDI › Measure…: an Inputs list picks the pair or channel that hears the click and the gear (the same setting as Record a sample’s Inputs).']],

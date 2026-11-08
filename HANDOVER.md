@@ -164,7 +164,13 @@ not a bug.
   DC) as the click, at the window's start (−120 ms), and the click skips the master's lookahead while MIDI waits for it
   (`moFxLat`, ~64 ms by default). Fix (496): the onset must clear 6× the window's 30th-percentile level; `moFxLat` is subtracted;
   with the native input a missing click falls back to the timestamps (`out.ts`). Measure has its own Inputs list (494: it only
-  listened on Record a sample's pick). io-check has a fake gear (20 ms late) for it; the fake's own timing jitter gives ±10 ms.
+  listened on Record a sample's pick). Build 497 (CodeRabbit): run from Settings (Record a sample closed) the input closed BEFORE
+  the analysis, so `RCD.io` was null (no timestamp fallback) and `rcdLat()` gave the browser's latency: the click was looked for
+  D (≥ 120 ms) off. Likely the third cause of beta.4's 200 ms. ts / lat / f0 are now read before the close. io-check's fake now has
+  a device clock (frames at the true rate, stamped t0 + frame / rate): Measure reads 20.0 ms on every hit, open and from Settings.
+- Desktop build: Windows now on `windows-2022` (windows-latest has Visual Studio 2026 / "version 18", which node-gyp 11 can't find:
+  neither Link nor the helper addon built on Windows). Check on the next build: "thunder_io.node built" in the Windows job.
+- `adhoc-sign.js` signs every finished Mac app (single-arch builds too), skipping only the universal build's -temp halves.
 
 **2. CodeRabbit on the newest commits.** Its last review (02:54 UTC) covered A1 up to build 489; A2 (build 491) and the build-492
 fix were pushed after it. Ask with a PR comment `@coderabbitai review` (REST: `gh api -X POST repos/matthettich/thunder-plus/
