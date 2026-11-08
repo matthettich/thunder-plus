@@ -84,6 +84,9 @@ function createIoHelper({ loadAddon, post, timers }) {
     } else if (op === 'midiPorts') {
       if (!hasMidi()) return err(id, hello.why || 'no MIDI in this helper');
       try { const r = addon.midiPorts(); post({ op: 'midiPorts', id, outs: r.outs, ins: r.ins }); } catch (e) { err(id, e); }
+    } else if (op === 'midiStats') {   // {queued, late}: late = sent more than 2 ms after their booked time, since the addon loaded
+      if (!hasMidi() || typeof addon.midiStats !== 'function') return err(id, hello.why || 'no MIDI in this helper');
+      try { const r = addon.midiStats(); post({ op: 'midiStats', id, queued: r.queued, late: r.late }); } catch (e) { err(id, e); }
     } else if (op === 'midiOpenOut' || op === 'midiOpenIn') {
       if (!hasMidi()) return err(id, hello.why || 'no MIDI in this helper');
       let r; try { r = op === 'midiOpenOut' ? addon.midiOpenOut(String(msg.name || '')) : addon.midiOpenIn(String(msg.name || '')); } catch (e) { return err(id, e); }

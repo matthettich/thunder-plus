@@ -16306,7 +16306,7 @@ async function iohStart(){
    (moRelease on STOP), so msend skips the OUTBOX; an input's onmidimessage gets {data, timeStamp} with the time the helper
    stamped on arrival. Ids are 'n:' + the port's name; saved Web MIDI choices are mapped by name (midiRemap), and back.
    Ports are looked at again every 3 s (plugged in or out: onstatechange, as Web MIDI). No microphone is asked for. */
-const NM = {acc:null, byPort:new Map(), scanT:0, clkT:0, miss:0, scanning:false, opening:new Set()};
+const NM = {acc:null, byPort:new Map(), scanT:0, clkT:0, miss:0, scanning:false, opening:new Set(), late:0};   // late: MIDI messages the helper sent > 2 ms after their booked time, since the app started
 const nmWanted = () => !!IOAPI && aset.midiEngine !== 'browser';
 const nmPost = m => { try { if (IOH.port) IOH.port.postMessage(m); } catch(e){} };
 const nmNs = ms => Math.max(0, (ms - IOH.clk) * 1e6);   // performance.now() (ms) → the helper's OS clock (ns)
@@ -16343,6 +16343,15 @@ async function nmScan1(acc, first){
     return Promise.all(jobs); };
   await sync(acc.outputs, r.outs || [], 'midiOpenOut'); await sync(acc.inputs, r.ins || [], 'midiOpenIn');
   if (ch && !first){ try { await midiRemap(acc); } catch(e){} if (acc.onstatechange) try { acc.onstatechange(); } catch(e){} }   // (a saved port plugged in later finds its letter)
+  const st = await iohAsk({op:'midiStats'}); if (st && st.op === 'midiStats' && NM.acc === acc) NM.late = st.late | 0;
+  nmLateShow();   // (also each scan: hookInputs may just have rewritten the status without it)
+}
+// Settings › MIDI's status, when it shows a native connection (hookInputs: "… · native"): " · N late" after it while N > 0
+function nmLateShow(){
+  const el = $('midiStat'); if (!el) return;
+  const t = el.textContent.replace(/ · \d+ late$/, '');
+  const want = NM.acc && NM.late > 0 && / · native$/.test(t) ? t + ' · ' + NM.late + ' late' : t;
+  if (want !== el.textContent) el.textContent = want;
 }
 function nmPort(id, name, port, out){
   if (out) return {id, name, port, native:true, type:'output',
@@ -22713,7 +22722,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 498;
+const BUILD = 499;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31680,6 +31689,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [499, '7 Nov', ['Desktop app, native MIDI: sturdier (a port can’t be opened twice or left open after switching Engine; a device plugged in later gets its port letter back; if the helper stops, MIDI reconnects by itself), notes keep their timing while a controller is plugged in, and Settings › MIDI shows how many messages went out late, if any.']],
   [498, '7 Nov', ['Desktop app: MIDI through the app itself (Settings › MIDI › Engine: Native, the default; Browser is the old Web MIDI). Each message leaves at its exact time from the app’s own high-priority thread, STOP takes back notes booked ahead, and MIDI clock in is timed where it arrived. Your port choices carry over by name. Connecting MIDI no longer asks for the microphone.', 'Windows desktop builds include Ableton Link and the native input again.']],
   [497, '7 Nov', ['Settings › MIDI › Measure… run from Settings (Record a sample closed) with the native input: it looked for the click in the wrong place and couldn’t time the gear without the click (a third cause of the ~200 ms reading).']],
   [496, '7 Nov', ['Settings › MIDI › Measure…: a noisy input is no longer mistaken for the click (that read about 200 ms), the master effects’ lookahead is no longer counted as the gear’s, and with the desktop app’s native input only the gear needs to reach the input. Record a sample: monitoring no longer goes silent after a PATTERN take (its level is set again at every take’s start and end); Measure… really mutes monitoring while it measures; the native monitor has a little more cushion against dropouts.']],

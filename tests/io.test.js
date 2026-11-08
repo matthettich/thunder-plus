@@ -167,6 +167,7 @@ function makeMidi() {
     midiOpenIn: n => n === 'Clock' ? { ok: true, port: next++ } : { ok: false, why: 'no MIDI input called ' + n },
     midiSend: (p, b, at) => { calls.push(['send', p, Array.from(b), at]); return true; },
     midiClear: p => { calls.push(['clear', p]); return 0; }, midiClose: p => calls.push(['close', p]),
+    midiStats: () => ({ queued: 2, late: 3 }),
     midiRead: () => inQ.length ? inQ.splice(0) : null };
   const h = createIoHelper({ loadAddon: () => addon, post: m => out.push(m), timers });
   return { h, out, calls, inQ, tick: () => ivs.forEach(i => i.f()), ivs: () => ivs };
@@ -206,4 +207,11 @@ test('io helper MIDI: an addon without MIDI (older build) refuses the requests, 
   assert.equal(h.hello.midi, false);
   h.handle({ op: 'midiSend', port: 1, bytes: [0xF8] }); h.handle({ op: 'midiClear', port: 0 }); assert.equal(out.length, 0);
   h.handle({ op: 'midiPorts', id: 4 }); assert.equal(out[0].op, 'error'); assert.equal(out[0].id, 4);
+});
+
+test('io helper MIDI: midiStats answers {queued, late} with the id; an addon without MIDI answers an error with the id', () => {
+  const { h, out } = makeMidi();
+  h.handle({ op: 'midiStats', id: 9 }); assert.deepEqual(out[0], { op: 'midiStats', id: 9, queued: 2, late: 3 });
+  const o2 = make({ version: () => '3', devices: () => [] });
+  o2.h.handle({ op: 'midiStats', id: 5 }); assert.equal(o2.out[0].op, 'error'); assert.equal(o2.out[0].id, 5);
 });

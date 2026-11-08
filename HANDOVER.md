@@ -109,9 +109,19 @@ Tests: io-check (unplug, rate, latency line), tests/io.test.js (inputLost). Left
 installation" (the step is continue-on-error, so Windows builds ship without the helper; probably the same for Link: try
 `npm config set msvs_version 2022` or setup-msbuild before it), then a WASAPI check; Linux builds fine.
 
-**PICK UP HERE: EVERYTHING STILL NEEDED (updated 7 Nov 22:25).** Read this list first; the paragraphs below it are the detail.
+**PICK UP HERE: EVERYTHING STILL NEEDED (updated 7 Nov 23:30).** Read this list first; the paragraphs below it are the detail.
 
-*State now:* branch `io-helper` (build 498: phase B MIDI built, item 5; desktop pre-release **1.3.0-beta.8**. beta.7 = 496, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
+**NEXT STEPS, in order:**
+1. The owner tests **1.3.0-beta.9** (has everything): the recording list (item 1) and the MIDI list (item 5, "Owner's test").
+   Start a session by asking for the results; fix on `io-helper`, pre-release beta.10, and check the macOS and Windows job
+   logs for "thunder_io.node built" (both), "adhoc-sign: signed" (macOS) and "thunder_link.node built" (both).
+2. When both lists pass: merge PR #14 into `beta` (item 3), then `beta` → `main` and a normal desktop release only when the
+   owner asks.
+3. Windows: the owner tests recording (WASAPI) and MIDI (WinMM) on the Windows PC (the build is fixed: windows-2022).
+4. Later / low priority: Linux ALSA in CI (item 5, skipped on the owner's word); phase C (audio output through the helper)
+   only if MIDI vs audio timing is still off after B, and then more likely the native desktop app (docs/NATIVE-DESKTOP-PLAN.md).
+
+*State now:* branch `io-helper` (build 499: phase B MIDI built and reviewed, item 5; desktop pre-release **1.3.0-beta.9**. beta.8 = 498 (first with MIDI, Windows with Link and the helper again); beta.7 = 496, ad-hoc signed; beta.4 = 492) = `beta` 485–488 + the helper (A0, A1, part of A2) + the beta.2/beta.3 test fixes + the
 CodeRabbit fix that was the real cause of the beta.2/3 failures (the helper died on the first chunk: MessagePortMain can't
 transfer an ArrayBuffer) + tonight's test fixes (493–496, item 1c). The owner tests beta.7 when convenient (item 1). PR #14
 (`io-helper` → `beta`) is open. `beta` is at build 488 plus a CLAUDE.md line ("continue the helper"); `main` is at build 485
@@ -185,11 +195,9 @@ the owner asks (beta → main by PR so CodeRabbit sees it). The punch-list fixes
 on `beta` and in the helper betas but in no normal desktop release yet.
 
 **4. Rest of A2.**
-- [ ] Windows: the addon doesn't build on GitHub's windows-latest runner ("Could not find any Visual Studio installation";
-      Windows builds ship without the helper and fall back to the browser input). Try `npm config set msvs_version 2022` or an
-      MSBuild setup step before `node io/build.js`; check Link's step too (probably the same). Then a WASAPI test (WASAPI only,
-      no ASIO: owner's decision).
-- [ ] Linux: builds; untested on hardware (low priority).
+- [x] Windows build: fixed by building on `windows-2022` (windows-latest's Visual Studio 2026 isn't found by node-gyp 11); beta.8's
+      log shows both thunder_link.node and thunder_io.node built. [ ] The owner's WASAPI test (WASAPI only, no ASIO).
+- [ ] Linux: builds (no ALSA: no MIDI ports); untested on hardware (low priority, owner).
 
 **5. Phase B: MIDI through the helper: BUILT (7 Nov night, build 498, on `io-helper`; owner go-ahead 22:44 "Do it!").**
 Started before the owner's beta.7 test, by the owner's choice; the risk is only that a problem found in the shared plumbing
@@ -224,8 +232,25 @@ Started before the owner's beta.7 test, by the owner's choice; the risk is only 
   it; MIDI clock out to the MPC / Force steady (and clock in from it, if used); then Measure… again (Gear delay should come out
   small: the helper sends at the booked time; the owner once said the right delay was "a combination of both latency numbers":
   check whether that is still so). Windows: the same through WinMM.
-- Not done: `midiStats().late` isn't shown anywhere; Linux CI without ALSA (no ports); a helper that dies and restarts leaves
-  the page's MIDI access pointing at old port numbers (switch Engine off and on, or reload; a restart is rare).
+- **Review round (build 499).** A Sonnet subagent reviewed B1–B3 read-only (findings checked by the lead before fixing) and
+  CodeRabbit reviewed PR #14; both agreed on the main points. Fixed: `nmScan` single-flight (`NM.scanning`) with opens in
+  flight remembered (`NM.opening`), a port that opens after a switch / reconnect is closed (not leaked), Engine switched while
+  a connect is in flight (`midiAccessDrop`; connectMidi1 drops an access of the wrong engine), `midiRemap` again when ports
+  change (a device plugged in later gets its letter; name substring match only for names ≥ 4 chars; the Web MIDI name lookup
+  bounded to 3 s); addon: `MidiOpenIn` scans and opens without g_mx, `SendNow` sends without g_mx (device held by a
+  shared_ptr copy), atNs clamped to an hour ahead, `timeEndPeriod` on Windows; helper: the MIDI-in poll stops with the last
+  input; page: a DEAD HELPER (no answer to midiPorts twice) is noticed by `nmLost`, which drops the access locally, resets IOH
+  and connects again (a fresh helper; main.js allows one restart; Web MIDI otherwise); `iohStart` adds its window listener
+  once (a second one answered every waiting request with null). Delegated to a Sonnet subagent and checked by the lead:
+  helper op `midiStats`, Settings › MIDI status "· N late" (`NM.late`, `nmLateShow`). Not changed (noted): ids shift when the
+  first of two same-name devices is unplugged; the 15 s clock re-measure replaces the offset (±0.2 ms) rather than smoothing.
+- **Linux: skipped for now (owner, 7 Nov 23:09: "not as important"; still needs to happen).** The Linux addon builds without
+  ALSA (no ALSA headers on ubuntu-latest), so Linux has no native MIDI ports (Web MIDI still works, Engine Browser). To do:
+  `sudo apt-get install -y libasound2-dev` before "Native I/O helper addon (optional)" in desktop.yml, Linux runner only,
+  continue-on-error (a subagent wrote exactly this on branch b-extras, commit f038baf; it was left out on the owner's word).
+  Also untested on Linux hardware: the audio input.
+- io/test/midi.js judges timing by percentile (median ≤ 0.5 ms, 95% ≤ 1 ms, none over 10 ms): on this 2-CPU workspace with
+  Chrome running alongside, single messages came 2–6 ms late (the OS pausing the thread); idle, 95% ≤ 0.005 ms, worst ≤ 1 ms.
 
 **6. Known limits to keep in mind.** Monitoring through the app is D + output latency late (D = base + output latency + 40 ms,
 raised between takes if chunks arrive late). The interface at another rate than the app is converted (warned). The Mac build
