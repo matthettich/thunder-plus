@@ -519,8 +519,10 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
-- **Recording counter in Record a sample** (owner, 7 Nov 21:18): while a take records, show how long it is so far in minutes and
-  seconds (e.g. 0:00 → 4:37), so a long take's length is visible as it goes. Both engines (Native and Browser), FREE and PATTERN.
+- [x] **Recording counter in Record a sample** (owner, 7 Nov 21:18; built 8 Nov, build 512, by a Sonnet subagent, checked by the
+  lead): `.rectime` beside Record (m:ss, h:mm:ss past an hour), on the audio clock from capture start (`RCD.t0w`; PATTERN from
+  the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
+  final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 - **Track reordering** (moving a track next to its bus, as other DAWs do). Big job: every song row, mixer, send, bus
   group, block mute and MIDI mapping refers to tracks by index, so it all has to be renumbered together. Owner (2 Nov):
   later, not while stabilising.
