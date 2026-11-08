@@ -1,5 +1,5 @@
 // ...Thunder Plus as a desktop app: one window running the same index.html as the website.
-const { app, BrowserWindow, session, shell, Menu, protocol, net, ipcMain, dialog, powerSaveBlocker, utilityProcess, MessageChannelMain } = require('electron');
+const { app, BrowserWindow, session, shell, Menu, protocol, net, ipcMain, dialog, powerSaveBlocker, utilityProcess, MessageChannelMain, systemPreferences } = require('electron');
 const path = require('path');
 const fs = require('fs'), fsp = fs.promises;
 const { pathToFileURL } = require('url');
@@ -195,9 +195,14 @@ app.whenReady().then(() => {
   app.on('will-quit', () => { if (link) link.off(); ioStop(); });
   // NATIVE I/O HELPER: fork on the first start; every start (also a page reload) hands both ends a fresh MessagePort. One restart
   // if it died, then {ok:false}. The helper's own hello (available or not, and why) comes to the page over the port.
-  ipcMain.handle('thunder:io-start', () => {
+  // ONE MICROPHONE ASK (owner, 7 Nov: "enable the microphone 28 times"): the app asks macOS once, before the helper opens an
+  // interface (the helper is the app's child, so it shares the answer); otherwise the unsigned helper set off prompt after prompt.
+  ipcMain.handle('thunder:io-start', async () => {
     try {
       if (!win || win.isDestroyed()) return { ok: false, why: 'no window' };
+      if (process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('microphone') !== 'granted') {
+        if (!(await systemPreferences.askForMediaAccess('microphone'))) return { ok: false, why: 'microphone access is off for Thunder Plus (System Settings › Privacy & Security › Microphone)' };
+      }
       if (!ioChild) {
         if (!ioGate.canStart()) return { ok: false, why: 'helper stopped' };
         const child = utilityProcess.fork(path.join(__dirname, 'io-helper.js'), [ioAddonPath()], { serviceName: 'thunder-io' });

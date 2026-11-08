@@ -45,7 +45,7 @@ const FAKE = mode => {
         else if (m && m.op === 'open') {
           const rate = m.rate; stop(); frame0 = 0;
           h.postMessage({ op: 'opened', id: m.id, ok: true, rate, channels: 28, deviceRate: rate, block: 256, latencyFrames: 256, name: '500R8' });
-          timer = setInterval(() => {
+          timer = setInterval(() => { if (window.__ioStall) return;
             const frames = 256, data = new Float32Array(frames * 28);
             for (let f = 0; f < frames; f++) for (let c = 0; c < 28; c++) data[f * 28 + c] = 0.01 * (c + 1);
             h.postMessage({ op: 'in', frame0, hostNs: performance.now() * 1e6 - (frames / rate) * 1e9, channels: 28, frames, data, overruns: 0 }, [data.buffer]);
@@ -96,6 +96,8 @@ try {
     ok(r.Inputs && r.Inputs.opts.includes('IN 27+28') && r.Inputs.opts.includes('IN 28 (mono)') && r.Inputs.opts.length === 14 + 28, 'Inputs lists every pair and channel (' + (r.Inputs && r.Inputs.opts.length) + ')');
     ok(!/all the app is given/.test(JSON.stringify(r)), "no '(all the app is given)' on the native path");
     ok(await page.evaluate(() => window.__ioStarts) === 1, 'the helper was started once, by the window');
+    // METERS AT ONCE (owner, 7 Nov): the native input opens with the window, before Record
+    ok(await until(page, () => true, 50) && await page.evaluate(async () => { for (let i = 0; i < 40 && !window.__ioOps.includes('open'); i++) await new Promise(r => setTimeout(r, 50)); return window.__ioOps.includes('open'); }), 'the native input opens with the window (meters before Record)');
     // IN 17+18, a FREE take of ~0.5 s
     await page.selectOption('.recset label:has(> span:text-is("Inputs")) select', 'p16');
     const take = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
@@ -106,6 +108,14 @@ try {
       return E('RCD.take ? (() => { const t = RCD.take, n = t.data.length; let l = 0, r = 0; for (let i = 0; i < n; i++){ l = Math.max(l, t.data[i]); r = Math.max(r, t.data2 ? t.data2[i] : NaN); } return {n, sr:t.sr, l, r, io:!!RCD.io, lat:' + JSON.stringify(lat) + '}; })() : null'); });
     ok(take && take.n > take.sr * 0.3 && Math.abs(take.l - 0.17) < 0.005 && Math.abs(take.r - 0.18) < 0.005, 'IN 17+18 FREE take: ' + JSON.stringify(take));
     ok(take && take.io && /native input, placed by its timestamps/.test(take.lat), 'latency line says native once the input is open: ' + (take && take.lat));
+    // STALE INPUT (owner, 7 Nov: "you have to close the recording window to get access to the inputs again"): the stream stops
+    // under the window; the next Record opens it again and records
+    const again = await page.evaluate(async () => { const T = window.__seqTest, E = s => T.ev(s), wait = ms => new Promise(r => setTimeout(r, ms));
+      window.__ioStall = true; await wait(1300); window.__ioStall = false; window.__ioOps.length = 0;
+      E("RCD.take = null;"); await E('rcdStart()'); await wait(500); E('rcdStop()');
+      for (let i = 0; i < 80 && !E('!!RCD.take'); i++) await wait(50);
+      return {ops:window.__ioOps.slice(), take:E('RCD.take ? (() => { const t = RCD.take; let l = 0; for (const v of t.data) l = Math.max(l, v); return {n:t.data.length, l}; })() : null')}; });
+    ok(again.ops.includes('close') && again.ops.includes('open') && again.take && Math.abs(again.take.l - 0.17) < 0.005, 'a stopped input is reopened by the next Record, which records: ' + JSON.stringify(again));
     // Engine: Browser
     await page.evaluate(() => { window.__ioOps.length = 0; });
     await page.locator('.recset .seg').first().getByText('Browser', { exact: true }).click();

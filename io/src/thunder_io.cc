@@ -17,6 +17,7 @@
 
 #if defined(__APPLE__)
   #include <mach/mach_time.h>
+  #include <CoreAudio/CoreAudio.h>
 #elif defined(_WIN32)
   // windows.h is already pulled in by miniaudio.h's implementation (QueryPerformanceCounter lives there)
 #else
@@ -340,6 +341,35 @@ static bool HexId(const char* s, size_t len, ma_device_id* id) {
   return true;
 }
 
+#if defined(__APPLE__)
+// LEAVE THE INTERFACE AS IT IS (owner, 7 Nov: "the audio interface gets reset"): miniaudio sets the device's I/O buffer size
+// (kAudioDevicePropertyBufferFrameSize) to the period it asks for, and on CoreAudio that is the whole device's setting, so the
+// interface reconfigured under the app's own output (and anything else using it). Asking for the size it already has makes
+// that a no-op. Returns 0 when it can't tell (then the system picks, as before).
+static unsigned CurrentBufferFrames(const ma_device_id* id) {
+  AudioObjectID dev = kAudioObjectUnknown;
+  UInt32 sz = sizeof(dev);
+  if (id) {
+    CFStringRef uid = CFStringCreateWithCString(NULL, id->coreaudio, kCFStringEncodingUTF8);
+    if (!uid) return 0;
+    AudioValueTranslation t = { &uid, sizeof(uid), &dev, sizeof(dev) };
+    AudioObjectPropertyAddress a = { kAudioHardwarePropertyDeviceForUID, kAudioObjectPropertyScopeGlobal, 0 };
+    sz = sizeof(t);
+    OSStatus st = AudioObjectGetPropertyData(kAudioObjectSystemObject, &a, 0, NULL, &sz, &t);
+    CFRelease(uid);
+    if (st != noErr) return 0;
+  } else {
+    AudioObjectPropertyAddress a = { kAudioHardwarePropertyDefaultInputDevice, kAudioObjectPropertyScopeGlobal, 0 };
+    if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &a, 0, NULL, &sz, &dev) != noErr) return 0;
+  }
+  if (dev == kAudioObjectUnknown) return 0;
+  UInt32 frames = 0; sz = sizeof(frames);
+  AudioObjectPropertyAddress b = { kAudioDevicePropertyBufferFrameSize, kAudioObjectPropertyScopeInput, 0 };
+  if (AudioObjectGetPropertyData(dev, &b, 0, NULL, &sz, &frames) != noErr) return 0;
+  return frames;
+}
+#endif
+
 static napi_value Result(napi_env env, bool ok, const char* why) {
   napi_value o, v;
   napi_create_object(env, &o);
@@ -399,6 +429,9 @@ static napi_value OpenInput(napi_env env, napi_callback_info info) {
   cfg.capture.shareMode = ma_share_mode_shared;
   cfg.sampleRate = (ma_uint32)rate;            // 0: the device's own
   cfg.periodSizeInFrames = (ma_uint32)block;
+#if defined(__APPLE__)
+  if (!useNull) { unsigned cur = CurrentBufferFrames(haveId ? &id : NULL); if (cur) cfg.periodSizeInFrames = cur; }   // never resize the interface
+#endif
   cfg.performanceProfile = ma_performance_profile_low_latency;
   cfg.noPreSilencedOutputBuffer = MA_TRUE;
   cfg.noClip = MA_TRUE;
