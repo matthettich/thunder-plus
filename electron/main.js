@@ -210,6 +210,10 @@ app.whenReady().then(() => {
       return { ok: true };
     } catch (err) { return { ok: false, why: String((err && err.message) || err) }; }
   });
+  // WHEEL DIRECTION (owner, 7 Nov: Arrange went up while the Mixer went down): macOS Natural scrolling flips the wheel's deltaY.
+  // Scrolled content follows it already; the page flips its cursor and value wheels to match. No key = Natural (macOS default).
+  ipcMain.handle('thunder:natural-scroll', () => process.platform !== 'darwin' ? false : new Promise(res =>
+    require('child_process').execFile('defaults', ['read', '-g', 'com.apple.swipescrolldirection'], { timeout: 2000 }, (err, out) => res(err ? true : String(out).trim() !== '0'))));
   ipcMain.on('thunder:playing', (e, on) => setPlaying(!!on));   // APP NAP: held while the song plays
   ipcMain.on('thunder:page-ready', () => { pageReady = true; if (pendingPath && win){ const p = pendingPath; pendingPath = null; win.webContents.send('thunder:open-path', p); } });
   ipcMain.on('thunder:close-ack', () => clearTimeout(ackT));

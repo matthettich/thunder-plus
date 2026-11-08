@@ -239,11 +239,6 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
-- **Punch list (owner, 7 Nov 18:17): FOLLOW PATTERN traps the cursor.** With FOLLOW PATTERN on and a track that has only
-  one phrase, the cursor can't be moved off that phrase. Not looked at yet (the helper work was in progress).
-- **Punch list (owner, 7 Nov 18:22): one wheel direction everywhere.** The mouse wheel scrolls different ways on different
-  screens; the owner wants every screen to follow the wheel ("if I'm pulling down it scrolls down"). Audit every wheel
-  handler (scroll areas and wheel-on-value controls alike) so they all agree. Not looked at yet.
 - **Track reordering** (moving a track next to its bus, as other DAWs do). Big job: every song row, mixer, send, bus
   group, block mute and MIDI mapping refers to tracks by index, so it all has to be renumbered together. Owner (2 Nov):
   later, not while stabilising.
@@ -259,6 +254,18 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+
+## 7 Nov (17): punch list: FOLLOW PATTERN, one wheel direction (builds 487–488, beta; not in a desktop build yet)
+
+- **FOLLOW PATTERN trapped the cursor** (owner: a single phrase on a track, the cursor couldn't leave it): `followPlay` re-applied
+  "show what plays" every step. Now it jumps only when what the track plays changes (`fpMem`, cleared on STOP and when the
+  follow mode changes). Test: usability.test.js "FOLLOW PATTERN".
+- **Wheel direction** (owner: Arrange went up, the Mixer down; "pulling down scrolls down" everywhere): macOS Natural scrolling
+  flips deltaY; native scrolling follows it, cursor / value wheels didn't. Desktop app on a Mac: main reads
+  `defaults read -g com.apple.swipescrolldirection` (`thunder:natural-scroll`, re-read on window focus), the page sets
+  `wheelSign` / `window.thunderWheelSign` = -1, applied in `wheelSteps`, `wheelNotch`, Arrange's wheel, the FX slots, the
+  mastering EQ canvas and kit.js `wheelN` (v=9). Scroll / pan wheels unchanged. The website can't read the setting (Chrome
+  doesn't expose it): unchanged there.
 
 ## 7 Nov (16): MIDI mapping never sooner than the reported latency (build 485, beta + main)
 

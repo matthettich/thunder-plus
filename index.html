@@ -15100,9 +15100,18 @@ function sliderSet(r, v){
 /* WHEEL (27 Oct, audit M2): the movement is added up and a step is taken per 100 px of it (a mouse notch), not one per
    event: a trackpad flick sends 30-100 events, which moved a slider 60-200 %. A pause or a change of direction starts the
    count again. The …pump windows do the same (pump/ui/kit.js, pWheel). */
+/* ONE WHEEL DIRECTION (owner, 7 Nov: "if I'm pulling down it scrolls down"; Arrange went up, the Mixer down): with macOS
+   Natural scrolling the wheel's deltaY is flipped. Scrolled content (lists, the Mixer, …chains) follows it by itself, but
+   wheels that move a cursor or a value read deltaY as "down", so they went the other way. In the desktop app on a Mac the
+   main process reads the setting (on start and when the window comes back) and these wheels flip with it: pulling down
+   moves the cursor down and lowers a value, like the content around it. window.thunderWheelSign is read by pump/ui/kit.js. */
+let wheelSign = 1; window.thunderWheelSign = 1;
+{ const D = window.thunderDesktop && window.thunderDesktop.app;
+  const rd = () => { try { D.naturalScroll().then(n => { wheelSign = window.thunderWheelSign = n ? -1 : 1; }).catch(() => {}); } catch(e){} };
+  if (D && D.naturalScroll){ rd(); addEventListener('focus', rd); } }
 const wheelAcc = new WeakMap();
 function wheelSteps(key, e, per = 100){
-  const raw = e.deltaY || e.deltaX, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
+  const raw = (e.deltaY || e.deltaX) * wheelSign, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
   const now = performance.now(), a = wheelAcc.get(key) || {v:0, t:0};
   if (now - a.t > 250 || Math.sign(a.v) !== Math.sign(px)) a.v = 0;
   a.v += px; a.t = now; const n = Math.trunc(a.v / per); a.v -= n * per; wheelAcc.set(key, a);
@@ -15111,7 +15120,7 @@ function wheelSteps(key, e, per = 100){
 // ONE A NOTCH (mouse audit, 3 Nov): rows and values in the tracker take a step per mouse notch, as Arrange and the FX slots do:
 // a big delta (a notch: 100 px on Windows, a line on Firefox) is one step, small ones (trackpads) add up per 100 px.
 function wheelNotch(key, e){
-  const raw = e.deltaY || e.deltaX, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
+  const raw = (e.deltaY || e.deltaX) * wheelSign, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
   if (Math.abs(px) >= 50){ wheelAcc.set(key, {v:0, t:performance.now()}); return Math.sign(px); }
   return wheelSteps(key, e);
 }
@@ -21329,7 +21338,7 @@ function tStop(quiet){
   }
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
   const stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
-  tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
+  tp.timer = 0; tp.on = false; fpMem = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing){ coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} } }
   else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
@@ -22431,7 +22440,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 486;
+const BUILD = 488;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22456,7 +22465,7 @@ const FLK = 'thunderplus-follow-v1';
 // followMode 0 / 1 / 2; followOn: ON, the full follow (the paging checks read it). Stored '1' (ON, as before) or 'p'.
 let followMode = (() => { try { const v = localStorage.getItem(FLK); return v === '1' ? 2 : v === 'p' ? 1 : 0; } catch(e){ return 0; } })();
 let followOn = followMode === 2;
-function setFollow(m){ m = m === true ? 2 : m === false ? 0 : clamp(m | 0, 0, 2); followMode = m; followOn = m === 2;
+function setFollow(m){ m = m === true ? 2 : m === false ? 0 : clamp(m | 0, 0, 2); followMode = m; followOn = m === 2; fpMem = null;
   try { localStorage.setItem(FLK, m === 2 ? '1' : m === 1 ? 'p' : '0'); } catch(e){} if (m) followPlay(); draw(); }
 /* RESUME (owner, 31 Oct): stopping the song leaves the playhead showing where it stopped (tp.paused), on every screen.
    PLAYBACK RESUMES FROM PAUSE (off by default since build 318, this device): PLAY then carries on from that spot, to the step, as long as
@@ -22523,6 +22532,7 @@ let kpOn = (() => { try { const v = localStorage.getItem(KPOK); if (v === '0' ||
 function setKp(on){ kpOn = !!on; try { localStorage.setItem(KPOK, kpOn ? '1' : '0'); } catch(e){} draw(); fit(); draw(); }
 // Song: the cursor's row follows its track. Sect and Phrase: they switch to what the cursor's track is
 // playing and the cursor rides along. Not while a selection is being made.
+var fpMem = null;   // FOLLOW PATTERN: what each track last played (cleared on STOP and when the follow mode changes)
 function followPlay(){
   if (!tp.on || !tp.pos || sdrag || drag) return;
   const P = tp.pos, own = P[tv === 'song' ? cs.song.x : cTrack] || (tp.loopV === 'bus' ? null : P.find(Boolean)); if (!own) return;   // BUS PLAY: an empty bus stays put
@@ -22532,14 +22542,17 @@ function followPlay(){
   // (owner, 2 Nov: after selecting rows, Arrange stopped paging even with FOLLOW on: this used to return before paging).
   if (selA){ arrFollowPage(own); return; }
   if (followMode === 1){   // FOLLOW PATTERN: only which phrase / sect is shown follows the cursor's track; nothing scrolls
-    if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0) cSect = own.sect; }
-    else if (tv === 'phrase'){ const mine = P[cTrack]; if (mine && mine.phrase >= 0 && mine.phrase !== cPhrase){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); } }
+    // ON A CHANGE ONLY (owner, 7 Nov: "a single phrase on a track, I can't move the cursor off of that phrase"): it jumps when
+    // what the track plays changes, not on every step, so with one phrase (or one block) playing you can move away from it.
+    const fp = fpMem || (fpMem = {}), fch = (k, v) => { const c = fp[k] !== v; fp[k] = v; return c; };
+    if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0 && fch('s', own.sect)) cSect = own.sect; }
+    else if (tv === 'phrase'){ const mine = P[cTrack]; if (mine && mine.phrase >= 0 && fch('p' + cTrack, mine.phrase) && mine.phrase !== cPhrase){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); } }
     // Arrange follows the playing pattern too: on the Song screen the selected block moves to the row playing on its track
     // (owner, 31 Oct), unless you've just moved it yourself; Arrange turns its pages with it
-    else if (tv === 'song' && tp.mode === 'song' && own.row >= 0 && cs.song.y !== own.row && performance.now() - arrHandT > 4000 && !selA){ cs.song.y = own.row; }
+    else if (tv === 'song' && tp.mode === 'song' && own.row >= 0 && fch('r' + cs.song.x, own.row) && cs.song.y !== own.row && performance.now() - arrHandT > 4000 && !selA){ cs.song.y = own.row; }
     // ...and beside Phrase / Pattern view while Arrange has the keys (owner, 31 Oct: then only the phrase followed): the
     // selected block goes to the row playing on its own track
-    if (tv !== 'song' && apReady && apF === 'arr' && tp.mode === 'song' && performance.now() - arrHandT > 4000){ const q = P[cs.song.x] || own; if (q && q.row >= 0 && cs.song.y !== q.row){ cs.song.y = q.row; apLastKey = ''; } }
+    if (tv !== 'song' && apReady && apF === 'arr' && tp.mode === 'song' && performance.now() - arrHandT > 4000){ const q = P[cs.song.x] || own; if (q && q.row >= 0 && fch('a' + cs.song.x, q.row) && cs.song.y !== q.row){ cs.song.y = q.row; apLastKey = ''; } }
     // PATTERN VIEW (owner, 6 Nov: "pattern follow didn't update in the pattern screen until I paged into it"): the Pattern view
     // draws the song row cs.song.y, and FOLLOW PATTERN only switched the open track's phrase, so the other tracks stayed on the
     // old pattern. The song row follows now too, as with FOLLOW ON (rows don't scroll; the cursor keeps its row and track).
@@ -26951,10 +26964,10 @@ function mwHit(G, ex, ey){ let best = -1, bd = 1e9; S.mst.eq.bands.forEach((b, i
     mstChanged(); mwEqPanel(true); });
   const end = e => { if (mwDrag && e.pointerId === mwDrag.id) mwDrag = null; };
   c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
-  c.addEventListener('wheel', e => { const b = S.mst.eq.bands[mwBand]; if (!b) return; e.preventDefault();
-    if (b.type === 'bell') b.q = clamp(b.q * Math.exp(-e.deltaY * 0.0025), 0.1, 18);
-    else if (b.type.endsWith('cut')){ const sl = [12, 24, 48], k = sl.indexOf(b.slope); b.slope = sl[clamp(k + (e.deltaY > 0 ? -1 : 1), 0, 2)]; }
-    else b.g = clamp(Math.round((b.g - e.deltaY * 0.01) * 10) / 10, -18, 18);
+  c.addEventListener('wheel', e => { const b = S.mst.eq.bands[mwBand]; if (!b) return; e.preventDefault(); const wy = e.deltaY * wheelSign;
+    if (b.type === 'bell') b.q = clamp(b.q * Math.exp(-wy * 0.0025), 0.1, 18);
+    else if (b.type.endsWith('cut')){ const sl = [12, 24, 48], k = sl.indexOf(b.slope); b.slope = sl[clamp(k + (wy > 0 ? -1 : 1), 0, 2)]; }
+    else b.g = clamp(Math.round((b.g - wy * 0.01) * 10) / 10, -18, 18);
     mstChanged(); mwEqPanel(true); }, {passive:false});
   c.addEventListener('dblclick', e => { const {G, x, y} = pt(e), i = mwHit(G, x, y);
     if (i >= 0){ S.mst.eq.bands[i].on = !S.mst.eq.bands[i].on; }
@@ -29193,7 +29206,7 @@ arrGrid.addEventListener('wheel', e => {
     return; }
   e.preventDefault();
   if (e.shiftKey){ const d = e.deltaY || e.deltaX; arrGrid.scrollTop += e.deltaMode === 1 ? d * 40 : d; arrHandT = performance.now(); return; }   // Shift: scroll only
-  const dy = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY; let n;
+  const dy = (e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY) * wheelSign; let n;
   if (Math.abs(dy) >= 50){ n = Math.sign(dy); arrWAcc = 0; } else { arrWAcc += dy; n = Math.trunc(arrWAcc / 100); if (!n) return; arrWAcc -= n * 100; }
   const c = cs.song, y = clamp(c.y + n, 0, 255); if (y === c.y) return;
   c.y = y; arrUserT = -1e9; c.pg = false; arrHandT = performance.now();
@@ -30429,7 +30442,7 @@ scr.addEventListener('wheel', e => {
     // FX SLOTS (owner, 31 Oct: too easy to change an effect by accident): over a slot the wheel moves between the slots,
     // it never swaps the effect (EDIT, the effect list or EDIT+arrows still do)
     if (v && grid.contains(v) && tv === 'fx' && y >= 1 && y <= FXSLOTS && !e.ctrlKey){ e.preventDefault();
-      const dy = e.deltaMode === 1 ? (e.deltaY || e.deltaX) * 40 : (e.deltaY || e.deltaX); let n;   // one slot a notch; a trackpad's small steps add up
+      const dy = (e.deltaMode === 1 ? (e.deltaY || e.deltaX) * 40 : (e.deltaY || e.deltaX)) * wheelSign; let n;   // one slot a notch; a trackpad's small steps add up
       if (Math.abs(dy) >= 50){ n = Math.sign(dy); vAcc = 0; } else { vAcc += dy; n = Math.trunc(vAcc / 100); if (!n) return; vAcc -= n * 100; }
       const c = cs.fx, ny = clamp((c.y >= 1 && c.y <= FXSLOTS ? c.y : y) + n, 1, FXSLOTS); if (ny !== c.y){ c.y = ny; draw(); } return; }
     // WHEEL ON VALUES (owner, 31 Oct): only with Alt/⌥ held (as an Alt-drag changes them): a plain wheel moves on, so
@@ -31394,6 +31407,8 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [488, '7 Nov', ['Desktop app on a Mac: the mouse wheel goes one way everywhere. With Natural scrolling on, Arrange, the tracker rows and values went the opposite way to the lists and the Mixer; they now follow it too (pulling down moves down, and lowers a value).']],
+  [487, '7 Nov', ['FOLLOW PATTERN jumps only when what a track plays changes: with a single phrase (or block) playing on a track, you can move the cursor off it again.']],
   [486, '7 Nov', ['Desktop app: Settings → Audio has an Input engine row (Auto or Browser) and shows the native input engine and the inputs of your audio interface. Nothing records through it yet.']],
   [485, '7 Nov', ['MIDI timing (desktop app on a Mac): MIDI went out early by about the audio latency shown in Settings › Audio (base + output), so it needed a negative Gear delay. It now waits for that latency itself: set the Gear delay back to 0 (or what Measure… says).']],
   [484, '7 Nov', ['Measure gear delay rebuilds the audio engine when it finishes (as Settings › Audio › Reset audio engine does): opening the interface’s input could leave the timing off until then.']],
@@ -32601,7 +32616,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
      is the shared window kit (sets PumpFX.openHook); multiband.js what BAND, WIDE and HEAT share (load it before them);
      one file per plugin (docs/PUMP-FX.md, "The pop-up kit"). A type without a file says its window comes later. Add new
      ones here, in sw.js FILES, with ?v= like these. -->
-<script src="pump/ui/kit.js?v=8"></script>
+<script src="pump/ui/kit.js?v=9"></script>
 <script src="pump/ui/eq.js?v=2"></script>
 <script src="pump/ui/comp.js?v=1"></script>
 <script src="pump/ui/limit.js?v=1"></script>

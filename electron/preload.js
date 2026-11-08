@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('thunderDesktop', {
     closeAck: () => ipcRenderer.send('thunder:close-ack'),                         // the page heard it (else the window closes after 3 s)
     closeReply: ok => ipcRenderer.send('thunder:close-reply', !!ok),              // true: close (and quit, if quitting); false: stay
     onOpenPath: cb => { ipcRenderer.on('thunder:open-path', (e, p) => cb(p)); },
+    naturalScroll: () => ipcRenderer.invoke('thunder:natural-scroll'),          // macOS Natural scrolling on (the page's cursor / value wheels follow it)
     playing: on => ipcRenderer.send('thunder:playing', !!on)                      // APP NAP: the song plays / stopped (macOS keeps the app awake while it plays)
   },
   // ABLETON LINK (3 Nov): the session lives in the main process (link-session.js). available: false when this build has no

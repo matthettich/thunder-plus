@@ -38,7 +38,7 @@ test('toast (B3): honours the time asked for, keeps a long message up, queues th
 /* ───────── M2: the mouse wheel adds up movement (a trackpad flick no longer runs a slider end to end) ───────── */
 test('wheel (M2): host sliders take a step per 100 px (a mouse notch), trackpad deltas add up, and a pause or turn starts again', () => {
   const blk = cut('index.html', /const wheelAcc = new WeakMap\(\);\nfunction wheelSteps\(key, e, per = 100\)\{[\s\S]*?\n\}\n/, 'wheelSteps');
-  let now = 1000; const c = run(blk + '\nthis.wheelSteps = wheelSteps;', { WeakMap, performance: { now: () => now } });
+  let now = 1000; const c = run('var wheelSign = 1;\n' + blk + '\nthis.wheelSteps = wheelSteps; this.sign = v => { wheelSign = v; };', { WeakMap, performance: { now: () => now } });
   const k1 = {}, k2 = {}, sum = (k, ev, n, dt = 8) => { let s = 0; for (let i = 0; i < n; i++){ now += dt; s += c.wheelSteps(k, ev); } return s; };
   assert.equal(c.wheelSteps(k1, { deltaY: 100, deltaMode: 0 }), 1, 'a mouse notch: one step');
   now += 500; assert.equal(sum(k1, { deltaY: 6, deltaMode: 0 }, 60), 3, 'a trackpad flick of 60 events x 6 px: 3 steps (was 60)');
@@ -48,6 +48,11 @@ test('wheel (M2): host sliders take a step per 100 px (a mouse notch), trackpad 
   now += 500; c.wheelSteps(k1, { deltaY: 60, deltaMode: 0 }); assert.equal(c.wheelSteps(k2, { deltaY: 60, deltaMode: 0 }), 0, 'each slider adds up its own');
   now += 500; assert.equal(c.wheelSteps(k1, { deltaY: -5000, deltaMode: 0 }), -8, 'one huge event: at most 8 steps');
   assert.equal(c.wheelSteps(k1, { deltaY: 0, deltaX: 0 }), 0);
+  // ONE WHEEL DIRECTION (owner, 7 Nov): with macOS Natural scrolling the deltaY comes flipped, so the steps flip back with it
+  c.sign(-1); now += 500; assert.equal(c.wheelSteps(k1, { deltaY: -100, deltaMode: 0 }), 1, 'Natural scrolling: pulling down (deltaY < 0) still steps down');
+  assert.match(H.read('index.html'), /function wheelNotch\(key, e\)\{\n  const raw = \(e\.deltaY \|\| e\.deltaX\) \* wheelSign,/, 'rows and tracker values flip too');
+  assert.match(H.read('index.html'), /const dy = \(e\.deltaMode === 1 \? e\.deltaY \* 40 : e\.deltaY\) \* wheelSign;/, 'Arrange flips too');
+  assert.match(H.read('electron/preload.js'), /naturalScroll: \(\) => ipcRenderer\.invoke\('thunder:natural-scroll'\)/, 'the desktop app reads the setting');
 });
 
 test('wheel (M2): …pump windows do the same for their knobs (kit.js wheelN)', () => {
@@ -380,4 +385,25 @@ test('build 398: …waves live engine', () => {
   assert.match(src, /if \(isWlV\(V\)\) return wlNode\(t, pad, V, kind, key\)/);
   assert.match(src, /ps = isPsV\(v\) \|\| isWlV\(v\)/);
   assert.ok(!/waves-worklet\.js\?v=31/.test(src));
+});
+
+/* ───────── FOLLOW PATTERN jumps on a change only (owner, 7 Nov: one phrase on a track trapped the cursor) ───────── */
+test('FOLLOW PATTERN: a track playing one phrase lets the cursor move off it; a new phrase or row still pulls it over', () => {
+  const blk = cut('index.html', /var fpMem = null;[\s\S]*?\nfunction followPlay\(\)\{[\s\S]*?\n\}\n(?=\/\/ ARRANGE PAGES)/, 'fpMem and followPlay');
+  const c = run(`var tp = {on:true, mode:'song', pos:null}, sdrag = 0, drag = 0, tv = 'phrase', cTrack = 0, followMode = 1, selA = null,
+    cSect = 0, cPhrase = 0, arrHandT = -1e9, apReady = false, apF = '', apLastKey = '', cs = {phrase:{y:0}, song:{x:0, y:0}};
+    const plen = () => 16, pvActive = () => false, pvFollow = () => {}, arrFollowPage = () => {}, asongOn = () => false;
+    ${blk}
+    this.api = { step(P){ tp.pos = P; followPlay(); }, st: () => ({cPhrase, y: cs.song.y}), set(o){ if ('cPhrase' in o) cPhrase = o.cPhrase; if ('y' in o) cs.song.y = o.y; if ('tv' in o) tv = o.tv; },
+      stop(){ tp.on = false; fpMem = null; tp.on = true; } };`, { performance: { now: () => 1e6 } });
+  const P = (phrase, row) => [{ phrase, row, step: 0, sect: 0 }];
+  c.api.step(P(3, 0)); assert.equal(c.api.st().cPhrase, 3, 'the first step shows what plays');
+  c.api.set({ cPhrase: 7 });
+  for (let i = 0; i < 8; i++) c.api.step(P(3, 0));
+  assert.equal(c.api.st().cPhrase, 7, 'the same phrase playing on: the cursor stays where it was moved');
+  c.api.step(P(4, 1)); assert.equal(c.api.st().cPhrase, 4, 'a new phrase on the track still follows');
+  c.api.set({ tv: 'song' }); c.api.step(P(4, 1)); c.api.set({ y: 9 });
+  for (let i = 0; i < 8; i++) c.api.step(P(4, 1));
+  assert.equal(c.api.st().y, 9, 'Song screen: one block playing, the cursor stays on the row it was moved to');
+  c.api.step(P(5, 2)); assert.equal(c.api.st().y, 2, 'the next row playing still moves it');
 });
