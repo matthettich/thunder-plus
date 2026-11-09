@@ -1168,6 +1168,8 @@ body:not(.legon) .tside .tlegend{display:none}
 .tcmd.cmini button:is(.on,.dn), :root[data-skinbase] .tcmd.cmini button:is(.on,.dn):not(#zz){background:var(--ink)!important; color:var(--inv)}
 .tcmd.cmini button.off, :root[data-skinbase] .tcmd.cmini button.off:not(#zz){opacity:.32; pointer-events:none}
 .tcmd button[hidden]{display:none} .tcmd button[data-c=song]{font-size:var(--fs-5)} .tcmd.cpad :is([data-c=undo],[data-c=redo]){font-size:20px; font-weight:500; line-height:1} .tcmd :is([data-c=prev],[data-c=next]){font-size:24px; font-weight:500; line-height:1}
+/* (owner, 9 Nov) PAD mode on a small screen: no ▶ in COMMANDS, the pad's PLAY right below it plays the song (and the Song screen loses a third row). */
+@media (max-width:699px){ .tcmd.cpad:not(.cmini) button[data-c=song]{display:none} }
 /* One row on wide screens. */
 @media (min-width:700px){
   .tcmd{grid-template-columns:repeat(14,minmax(0,1fr))} .tcmd.song{grid-template-columns:repeat(15,minmax(0,1fr))}
@@ -1252,7 +1254,9 @@ body.mob #tSong .tl{font-size:0} body.mob #tSong .tl .ic{width:16px; height:16px
 body.mob .top .tcpu .cpuw{display:none}
 body.mob .top{gap:6px} body.mob .top .tcpu{min-width:52px; padding:0 6px} body.mob #bFile, body.mob .top #bSet{padding:0 9px}
 body.mob .ttabs button{padding:0 9px; letter-spacing:.02em}   /* the tabs make room for the strip beside them */
-@media (max-width:780px){ body.mob .top #tSong{display:none} }
+/* (owner, 9 Nov) ▶ stays on a folded phone too: it plays this screen, which the pad's PLAY no longer does. Compact, so the Tracker / Synth switch keeps its words. */
+@media (max-width:780px){ body.mob .top #tSong{padding:0 7px; margin:0} }
+@media (max-width:400px){ body.mob .top #tSong{padding:0 6px} body.mob .top #segView button{padding-inline:3px!important; letter-spacing:0} body.mob .top .setwrap button{padding-inline:5px; min-width:0} body.mob .top .tcpu{min-width:34px} }
 /* SONG ON THE SYNTH PAGE, PHONE (owner, 5 Nov): the tracker hides ▶ Song on a phone (its own PLAY key does it), but the Synth
    page has no PLAY key, so there it stays: a compact icon; the kit name gives up the room. */
 /* (owner, 5 Nov: "We can get rid of the part that says thunder" … "Just when folded"): on the Fold's cover screen the kit name box
@@ -2767,7 +2771,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   </div>
   <button type="button" class="tsong" id="tLoopTop" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Shift+Alt+L)" hidden>Loop</button>
   <button type="button" class="tsong" id="tKeyTrans" aria-label="Key transpose" title="Transpose lock: while it is on, ▲ up / ▼ down transposes the selection a semitone and plays its first note (Esc or a tap turns it off)" hidden>Transpose ▲▼</button>
-  <button type="button" class="tsong" id="tSong" aria-label="Play or stop the song" title="Play the song from the tracker's cursor row, or stop it" hidden><span class="tl"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Song</span><span class="tl alt" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>Stop</span></button>
+  <button type="button" class="tsong" id="tSong" aria-label="Play this screen, or stop" title="Play this screen (on Phrase, the phrase), or stop" hidden><span class="tl"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</span><span class="tl alt" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>Stop</span></button>
   <button type="button" class="tcpu" id="tCpu" aria-label="Audio load"><span><em class="cpuw">CPU </em>0%</span><i></i></button>
   <button type="button" id="bHelp" aria-label="Help and keys (?)" title="Help and keys (? or F1)">?</button>
 </div>
@@ -22984,7 +22988,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 538;
+const BUILD = 539;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26312,19 +26316,19 @@ grid.addEventListener('scroll', e => { if (e.target.classList && e.target.classL
 let CW = 0.6, meterEls = [], masterEls = [], trimEls = [], trimLit = '';
 const MH = 8, MW = 36;
 const HINT = {
-  song:'EDIT add · EDIT×2 new sect · OPT+EDIT clear · EDIT+◀▶ ±1 ▲▼ ±16 · SHIFT+▶ open · OPT+arrows next block',
-  songP:'EDIT add · EDIT×2 new phrase (on a block: unique copy) · OPT+EDIT clear · EDIT+◀▶ ±1 · SHIFT+▶ open phrase · OPT+arrows next block',
-  sect:'EDIT add phrase · EDIT×2 new · EDIT+arrows change · SHIFT+▶ open · SHIFT+◀ song · OPT+◀▶ other sect',
-  phraseM:'Master phrase: commands only · EDIT add a command (VOL level, FXO effects on/off, FLX GAT RTG patterns) · EDIT+◀▶ ±1 ▲▼ ±more · OPT+EDIT clear',
-  phrase:'EDIT add note · EDIT×2 note off · EDIT+◀▶ ±1 ▲▼ ±octave · OPT+EDIT clear · OPT+arrows go to phrase · SHIFT+▶ inst',
-  inst:'EDIT+◀▶ ±1 ▲▼ ±more · EDIT on › runs it · OPT+◀▶ other instrument · SHIFT+◀ phrase',
-  mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · ▼ from SC: the VOL fader · OPT+arrows other track · FX row: OPT+▲ FX on (up to 8), OPT+▼ off · EDIT mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (EDIT says for what) · OPT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
-  fx:'EDIT adds · ▶ opens its controls · EDIT+◀▶ change · OPT+EDIT remove or reset · OPT+◀▶ other track · SHIFT+◀ mixer',
+  song:'EDIT add · EDIT×2 new sect · ALT+EDIT clear · EDIT+◀▶ ±1 ▲▼ ±16 · SHIFT+▶ open · ALT+arrows next block',
+  songP:'EDIT add · EDIT×2 new phrase (on a block: unique copy) · ALT+EDIT clear · EDIT+◀▶ ±1 · SHIFT+▶ open phrase · ALT+arrows next block',
+  sect:'EDIT add phrase · EDIT×2 new · EDIT+arrows change · SHIFT+▶ open · SHIFT+◀ song · ALT+◀▶ other sect',
+  phraseM:'Master phrase: commands only · EDIT add a command (VOL level, FXO effects on/off, FLX GAT RTG patterns) · EDIT+◀▶ ±1 ▲▼ ±more · ALT+EDIT clear',
+  phrase:'EDIT add note · EDIT×2 note off · EDIT+◀▶ ±1 ▲▼ ±octave · ALT+EDIT clear · ALT+arrows go to phrase · SHIFT+▶ inst',
+  inst:'EDIT+◀▶ ±1 ▲▼ ±more · EDIT on › runs it · ALT+◀▶ other instrument · SHIFT+◀ phrase',
+  mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · ▼ from SC: the VOL fader · ALT+arrows other track · FX row: ALT+▲ FX on (up to 8), ALT+▼ off · EDIT mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (EDIT says for what) · ALT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
+  fx:'EDIT adds · ▶ opens its controls · EDIT+◀▶ change · ALT+EDIT remove or reset · ALT+◀▶ other track · SHIFT+◀ mixer',
   mod:'EDIT on TARGET picks what it moves · EDIT+◀▶ ±1 ▲▼ ±more · ALT+EDIT removes the LFO · ALT+◀▶ other track · SHIFT+◀ fx · SHIFT+▶ project',
-  project:'EDIT on › runs it · EDIT+◀▶ change · OPT+EDIT reset · SHIFT+▼ back',
+  project:'EDIT on › runs it · EDIT+◀▶ change · ALT+EDIT reset · SHIFT+▼ back',
 };
 // PATTERN NAV off: the Song hint names the old ALT keys (◀▶ previous/next block, ▲▼ page 16 rows).
-const songHintOld = t => t.replace('OPT+arrows next block', 'OPT+◀▶ next block ▲▼ page');
+const songHintOld = t => t.replace('ALT+arrows next block', 'ALT+◀▶ next block ▲▼ page');
 function info(){
   const c = cs[tv];
   if (selA){
@@ -26353,7 +26357,7 @@ function info(){
   }
   if (tv === 'mixer'){
     if (c.y === 7 && c.mx === 1) return 'Mastering ' + (S.mst.on ? 'on' : 'off') + ' · ' + mstChainTxt() + ' · EDIT opens it · EDIT+◀▶ off / on';
-    if (c.y === 7 && c.mx === 2){ const mo = S.mout == null ? 255 : S.mout; return 'Master OUT ' + hx(mo) + ' · ' + dB(curve(mo)) + ' · the master fader, after the limiter (no boost: FF is 0 dB) · drag its bar on the meter · OPT+EDIT 0 dB'; }   // GAIN STAGING
+    if (c.y === 7 && c.mx === 2){ const mo = S.mout == null ? 255 : S.mout; return 'Master OUT ' + hx(mo) + ' · ' + dB(curve(mo)) + ' · the master fader, after the limiter (no boost: FF is 0 dB) · drag its bar on the meter · ALT+EDIT 0 dB'; }   // GAIN STAGING
     if (c.y === 7) return 'Master ' + dB(curve(S.master)) + ' into ' + (S.mst.on && S.mst.lim && S.mst.lim.on ? 'mastering’s limiter' : S.limiter ? 'the limiter' : 'OUT (no limiter)') + (fxCount(S.mfx) ? ' · FX ' + fxList(S.mfx) : '') + ' · SHIFT+▶ master effects · ▶▶ OUT, the fader after it';
     if (c.y === 4){
       const on = chainsFeed(c.x), flag = !!(S.chainOn && S.chainOn[c.x]);
@@ -26741,7 +26745,7 @@ function draw(){
   $('tInfo').textContent = info();
   if (tv === 'phrase' && pvActive()) $('tInfo').textContent = pvInfo();   // PATTERN VIEW: the track and phrase first
   let hintTxt = (tv === 'song' && !sectsOn) ? (inMode === 'keys' ? HINTK.songP : HINT.songP) : (inMode === 'keys' ? HINTK : HINT)[tv];
-  if (tv === 'phrase' && inMode !== 'keys' && !patNavOn) hintTxt = hintTxt.replace('OPT+arrows go to phrase', 'OPT+▲▼ page');
+  if (tv === 'phrase' && inMode !== 'keys' && !patNavOn) hintTxt = hintTxt.replace('ALT+arrows go to phrase', 'ALT+▲▼ page');
   if (tv === 'song' && inMode !== 'keys' && !patNavOn) hintTxt = songHintOld(hintTxt);   // PATTERN NAV off: the old ALT keys
   if (asongOn()) hintTxt += inMode === 'keys' ? ' · double-click opens · Alt-click mutes' : ' · tap twice opens · hold mutes';
   const mstP = tv === 'phrase' && mstView();
@@ -31658,7 +31662,8 @@ $('tKp').addEventListener('pointerdown', e => {
   b.classList.add('dn'); setTimeout(() => b.classList.remove('dn'), 110); kpAction(b.dataset.a);
 });
 $('tKp').addEventListener('click', e => { const b = e.target.closest('button[data-a]'); if (b && !ptrJust() && !b.disabled) kpAction(b.dataset.a); });
-$('tSong').addEventListener('click', () => { apRun(() => { if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); }, []); songBtn(); });
+// The control bar's Play (owner, 9 Nov): this screen, one tap, as the pad's SHIFT+PLAY is two; the pad's PLAY has the song.
+$('tSong').addEventListener('click', () => { apRun(() => { if (view === 'tracker') playCtx(); else if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); }, []); songBtn(); });
 $('tLoopTop').addEventListener('click', () => toggleLoop());
 $('tKeyTrans').addEventListener('click', () => toggleKeyTrans());
 const HINTK = {
@@ -32125,7 +32130,8 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
-  [538, '9 Nov', ['New screen: MOD, between FX and PROJECT. Four LFOs a track, one a row: pick a target, then SHAPE, RATE and DEPTH. Right-click an effect parameter on the FX screen (or its value on the FX bar) → Add LFO… puts one on it, and a ~ marks the parameters an LFO moves. Alt+7 is MOD (PROJECT: its tab, or SHIFT+▶ from MOD).']],
+  [539, '9 Nov', ['New screen: MOD, between FX and PROJECT. Four LFOs a track, one a row: pick a target, then SHAPE, RATE and DEPTH. Right-click an effect parameter on the FX screen (or its value on the FX bar) → Add LFO… puts one on it, and a ~ marks the parameters an LFO moves. Alt+7 is MOD (PROJECT: its tab, or SHIFT+▶ from MOD).']],
+  [538, '9 Nov', ['The control bar’s Play button plays this screen (the phrase on Phrase); the pad’s PLAY plays the song. On a small screen in PAD mode, COMMANDS has no ▶ of its own. Hints say ALT.']],
   [537, '9 Nov', ['Pad: PLAY now plays the song and SHIFT+PLAY this screen, the same as Space and Shift+Space. OPTION is now called ALT, to match the keyboard.']],
   [536, '9 Nov', ['Clearer wording in menus, tooltips and notifications, with American spelling throughout. The names lose their dots: Thunder, Thunder Plus, pump, chains and waves.']],
   [535, '9 Nov', ['Phone: moving around while a song plays does much less work, to keep the playhead and notes steady. The playback report notes any stall.']],
@@ -33121,7 +33127,7 @@ function pvInfo(){
 }
 const pvHint = () => inMode === 'keys'
   ? 'Arrows move across tracks · Tab next track · Alt+↑↓ (or Shift+Alt+↑↓) other song row · type notes as in Phrase · Shift+arrows select · Alt+←→ other screens · Shift+wheel scrolls across · PHRASE | PATTERN switches · click a track to edit it'
-  : 'EDIT add note · ◀▶ across tracks · OPT+▲▼ other song row · SHIFT+◀▶ other screens · PHRASE | PATTERN switches · tap a track to edit it';
+  : 'EDIT add note · ◀▶ across tracks · ALT+▲▼ other song row · SHIFT+◀▶ other screens · PHRASE | PATTERN switches · tap a track to edit it';
 /* ===== end PATTERN VIEW ===== */
 applyPlatform();
 /* ===TRACKER END=== */

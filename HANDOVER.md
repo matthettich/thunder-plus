@@ -526,7 +526,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 The owner's top priority to add is the MOD screen. Work down the list; ask before reordering it. The owner will run the tests listed under "Tests the owner will run" below.
 
-1. **MOD screen: LFOs assignable to FX parameters** (owner, 8 Nov; first version built 9 Nov, build 538, see "9 Nov: MOD screen" below. Still to come, one step at a time: …pump effects as targets, live engines' own filter and envelope via item 2's per-engine map, renders matching live, smoothing where steps are audible). The original brief: A new screen named
+1. **MOD screen: LFOs assignable to FX parameters** (owner, 8 Nov; first version built 9 Nov, build 539, see "9 Nov: MOD screen" below. Still to come, one step at a time: …pump effects as targets, live engines' own filter and envelope via item 2's per-engine map, renders matching live, smoothing where steps are audible). The original brief: A new screen named
   **MOD between FX and PROJECT**; PROJECT can become PROJ if the tabs need room (six already fill a folded phone: check at real size; hide the tab when
   folded, SHIFT+◀▶ still reaching it, only if it's still too tight). Suggested: one LFO per row (track, slot, parameter, shape, rate, depth), an "Add LFO…"
   on an FX parameter's value menu opening MOD with that target, a small mark on modulated parameters. Alternative was a pop-up by the parameter. Already
@@ -581,7 +581,7 @@ Start a session by asking for results. Fix on `beta`.
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
 
-## 9 Nov: MOD screen, first version (build 538, PR from `feat/mod-screen`)
+## 9 Nov: MOD screen, first version (build 539, PR from `feat/mod-screen`)
 
 Owner: four LFOs per track for now; internal FX and instruments, …pump later; build stepwise and verify before the harder parts, knowingly past the feature freeze. Sonnet subagents built it, the lead reviewed.
 - **Data:** `S.perf.lfo[t]` is now an array of up to `PLFO_MAX` (4) `{id, sh, rt, dp}`, no holes; `normPerf` still reads the old single object. Perform's lock sheet edits entry 0 only.
@@ -599,6 +599,11 @@ Written up from the commits on 9 Nov; none of it has been tried on a real Fold.
 - **533:** With Low power display on and the app on screen, the audio engine sleeps after 30 s of silence. Not while playing, rendering, recording or with MIDI input connected; it stays awake while a pad is sounding. Off keeps the old behaviour.
 - **534:** Low power display picks the Low power skin; it applies even if storage fails, and a stale saved skin is cleared.
 - **535:** Phone: less layout work while playing; the playback report logs stalls.
+
+## 9 Nov: control bar Play plays this screen (build 538)
+
+Owner's call: `#tSong`, labeled Play, runs `playCtx` in the tracker (the phrase on Phrase, the song on Song), so the phrase stays one tap on a
+phone now that the pad's PLAY has the song. Outside the tracker it still plays the song. It now also shows on a folded phone (it used to be hidden there because the pad's PLAY did its job); the top bar is tightened under 400 px to fit. Under 700 px in PAD mode the COMMANDS row drops its ▶, since the pad's PLAY sits right below it (owner chose this over hiding REDO; saves the Song screen a third row). `tests/play-keys.test.js` guards all this. If it goes unused it can be removed.
 
 ## 9 Nov: pad PLAY matches Space, OPTION is ALT (build 537, same PR as the wording audit)
 
