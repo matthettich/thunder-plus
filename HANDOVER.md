@@ -522,6 +522,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+- [ ] **Tracker commands that control the live instruments** (owner, 8 Nov: "I would love commands that can control the live instruments"). Today CUT / RES reach live engines only as a low-pass on their output (`liveCut`), and ATK / REL / DEC work on rendered sounds only. Wanted: commands driving each live engine's own filter and envelope (…pump live synths, …waves live, bass, vox); each engine's parameters differ, so it needs a per-engine map.
 - [ ] **MOD screen: LFOs assignable to FX parameters** (owner, 8 Nov: "I will want to do this"; not built, after the stability work). A new screen named
   **MOD between FX and PROJECT**; PROJECT can become PROJ if the tabs need room (six already fill a folded phone: check at real size; hide the tab when
   folded, SHIFT+◀▶ still reaching it, only if it's still too tight). Suggested: one LFO per row (track, slot, parameter, shape, rate, depth), an "Add LFO…"
@@ -548,6 +549,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+
+## 9 Nov: the owner's phone bug list (build 529 on, branch `fix/mobile-list`, PR into `beta`)
+
+Delegated to Sonnet agents, each diff reviewed by the lead: arrow columns (`move()` stepped the phrase twice), pad and title bar, Arrange and master, battery and retrigger labels.
+Lead: playhead now takes off `moFxLat()` (master lookahead and PDC; the picture was ahead of the sound by it). FOLLOW holds `FOLLOW_HOLD` 4 s after a key or a press on grid, pad or Arrange (`workT`); a follow mode pages Arrange after that hold, FOLLOW OFF keeps its minute. `curToPlay` clears `.pg`. Empty cell beside Phrase: `phraseToCursor` (pendPlace), which is why acid lines and notes went into the last open phrase. LEFT: `songLenTab`, re-anchored on each row and LOOP repeat. Page sequencer: lead and re-anchor scale with output latency (Safest). ATK / REL appended to FXC. `liveCut` for CUT / RES on live engines.
+**Not reproduced or not proven on a device:** note and instrument gone after LOOP (not reproduced stopped; suspected the empty-cell bug), the stutter that stops under LOOP (headless profile didn't separate them; `apPanel` layout read cached during playhead redraws), volume drop after switching to Safest (cause not found; the lead / re-anchor change addresses the stutter part only). Ask the owner to retest these, and what exactly was wrong with PHRASE / ARRANGE ON STOP.
 
 ## 8 Nov: dialog sliders on touch (build 515)
 
