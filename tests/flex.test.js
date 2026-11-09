@@ -150,3 +150,9 @@ test('FLY reaches the Flex: FLY v books the flx param at 256 + v (00 off), after
   assert.match(src, /const FX_NEEDS = \{[^}]*FLY:'flex'/);
   assert.match(cut(/const FXC = \[[\s\S]*?\];/, 'FXC'), /'JMP','FLY'\]/);   // on the end: saved songs keep their command numbers
 });
+
+test('FLX and FLY on one row: the rightmost plays, and the FX bar can show FLY', () => {
+  const src = H.read('index.html');
+  assert.match(src, /if \(q\.c === 'FLX'\) delete fx\.FLY; else if \(q\.c === 'FLY'\) delete fx\.FLX;/, 'column order decides');
+  assert.match(src, /const p = c >= 0 \? Math\.min\(511, Math\.round\(c\)\)/, 'the bar keeps FLY values');
+});
