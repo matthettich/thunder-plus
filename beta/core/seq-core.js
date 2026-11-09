@@ -85,7 +85,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const CC_CMDS = ['CCA', 'CCB', 'CCC', 'CCD'];
 const NCC = CC_CMDS.length;
 const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
-  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY'];
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL'];
 const SIGNED = new Set(['PBN','TSP','PIT','FIN','NUD','RTV']);
 const s8 = v => v > 127 ? v - 256 : v;
 const RSTEP = {TIC:1, DEL:1, KIL:1, OFF:1, PSL:1, RET:1, PBN:1, TSP:1, PIT:1, FIN:4, ARP:1, HOP:1, INS:1, PGM:1, CSL:1, DIR:1};
@@ -374,13 +374,13 @@ function makeSeq(S, mode, o){
         else if (X <= FXSLOTS || X === 9) for (const k of X === 9 ? all : [X - 1]){ evs.push({type:'fxc', t:at, track:t, p:'sw' + k, v:Y ? 1 : 0});
           if (Y >= 2) evs.push({type:'fxc', t:at + Y * line, track:t, p:'sw' + k, v:-1}); } }
       // FLX / GAT / RTG (owner, 31 Oct): a pattern given to an effect switched off by FXO switches its slot back as set (on)
-      const slotWake = (cmd, on) => { if (!on) return; const A = t >= MT ? S.mfx : S.tfx[t], ty = FX_NEEDS[cmd];
-        (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at, track:t, p:'sw' + k, v:-1}); }); };
+      const slotWake = (cmd, on, sw = -1, at2 = at) => { if (!on) return; const A = t >= MT ? S.mfx : S.tfx[t], ty = FX_NEEDS[cmd];
+        (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at2, track:t, p:'sw' + k, v:sw}); }); };
       if (fx.FLX != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:flxCap(fx.FLX)}); slotWake('FLX', fx.FLX > 0); }
       if (fx.FLY != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:fx.FLY ? 256 + fx.FLY : 0}); slotWake('FLY', fx.FLY > 0); }   // FLY (5 Nov): the Flex's second bank, 256 + v
       if (fx.GAT != null){ evs.push({type:'fxc', t:at, track:t, p:'gat', v:fx.GAT === 0 ? 0 : fx.GAT >= 16 ? 16 : fx.GAT}); slotWake('GAT', fx.GAT !== 0); }   // GAT 00 stops it, 10 and up: the CUSTOM steps
-      if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', X > 0);
-        if (X && Y) evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); }
+      if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', true, X ? 1 : -1);   /* (9 Nov, owner: a new RTG switches the slot on, even one saved off; RTG 00 puts it back as saved) */
+        if (X && Y){ evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); slotWake('RTG', true, -1, at + Y * line); } }
       if (t === MT && fx.VOL != null) evs.push({type:'mvol', t:at, v:fx.VOL});
       // BYP XY (…chains module bypass): X the module's number (0 = all), Y 0 in, 1 bypassed, 2–F flipped for Y rows
       if (fx.BYP != null && t < MT){ const X = fx.BYP >> 4, Y = fx.BYP & 15;
@@ -454,6 +454,8 @@ function makeSeq(S, mode, o){
         if (fx.CUT != null) T.cut = fx.CUT >= 255 ? null : fx.CUT;
         if (fx.RES != null) T.res = fx.RES;
         if (fx.DEC != null) T.dec = fx.DEC >= 255 ? null : fx.DEC;
+        if (fx.ATK != null) T.cAtk = fx.ATK >= 255 ? null : fx.ATK;
+        if (fx.REL != null) T.cRel = fx.REL >= 255 ? null : fx.REL;
         if (fx.ARC != null) T.arc = {mode:fx.ARC >> 4, spd:(fx.ARC & 15) || 1};
         if (fx.DIR != null){ T.dir = Math.min(3, fx.DIR); T.pp = T.dir === 1 ? -1 : 1; }   // DIR: from the next row on
         if (fx.HOP != null) hop = Math.min(fx.HOP, PROWS - 1);
@@ -530,7 +532,7 @@ function makeSeq(S, mode, o){
             if (!q) firstRate = rate;
             const ev = {type:'note', t:nat, track:t, poly, col:ncol[q], pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain:gain * hg, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? nat + fx.KIL * tick : null, rel:fx.OFF != null ? nat + fx.OFF * tick : null,
-              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, vk:fx.GEN != null ? 'g' + fx.GEN : fx.MUT != null ? 'm' + fx.MUT : null, tw:pc != null || pdc != null ? {cut:pc, res:prs, dec:pdc} : null, slc:fx.SLC != null ? fx.SLC : null, fdi:fx.FDI ? fx.FDI * tick : 0, trm:fx.TRM || 0, apn:fx.APN || 0, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
+              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, vk:fx.GEN != null ? 'g' + fx.GEN : fx.MUT != null ? 'm' + fx.MUT : null, tw:pc != null || pdc != null ? {cut:pc, res:prs, dec:pdc} : null, ...(T.cRel != null ? {rlo:decSec(T.cRel)} : {}), slc:fx.SLC != null ? fx.SLC : null, fdi:fx.FDI != null ? fx.FDI * tick : T.cAtk != null ? decSec(T.cAtk) : 0, trm:fx.TRM || 0, apn:fx.APN || 0, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
               ii, mn:note + 12 + ntc / 100, vel:hg * (fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255, tick, vc:fx.VOL != null ? fx.VOL : r[VC]};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out; tick: NOTE LEN
             if (!o.sim && ((I.slc | 0) > 1 || I.sync)){ const c = o.live ? ensurePlay(ev.pad) : ensure(ev.pad); if (c){ applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; } }
             if (ev.vk && o.live && !o.sim) try { varWant(ev); } catch(e){}   // MUT / GEN: start its render now, ahead of the note
@@ -1136,7 +1138,7 @@ class ThunderCore extends AudioWorkletProcessor {
     if (ev.fdi > 0){ g.set(0, t0n); g.lin(ev.gain, t0n + ev.fdi); }
     if (ev.trm && dep(ev.trm) > 0){ const k = dep(ev.trm) / 2; trm = {hz:hz(ev.trm), d:ev.gain * k, t:t0n}; if (!(ev.fdi > 0)) g.v0 = ev.gain * (1 - k); }
     if (ev.apn && dep(ev.apn) > 0) apn = {hz:hz(ev.apn), d:dep(ev.apn), t:t0n};
-    const syn = !!kv.syn, v = {data, data2, sr:c.sr, r, g, f, pn, trm, apn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn ? kv.rel || 0 : 0, track:ev.track, end:Infinity, pos:0, t0:0};
+    const syn = !!kv.syn, v = {data, data2, sr:c.sr, r, g, f, pn, trm, apn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn ? (ev.rlo != null ? ev.rlo : kv.rel || 0) : 0, track:ev.track, end:Infinity, pos:0, t0:0};
     if (!ev.slide) this.pitchMods(v, ev.t, ev.rate, ev);
     const off = ev.ofsSec != null ? (ev.rev ? Math.max(0, dur - ev.ofsSec - ev.durSec) : ev.ofsSec) : Math.max(0, Math.min(255, ev.ofs || 0)) / 256 * dur;
     if (off > 0.0005){ f.set(0, t0n); f.lin(1, t0n + 0.0015); }
