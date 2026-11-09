@@ -3382,7 +3382,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p><b>chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback. Its <b>Resample</b> module records what passes through it into a pad, starting on the next bar, and slices it so you can chop it like a breakbeat.</p></section>
     <section id="hGen"><h2>Generators</h2><p>GEN (PAD mode, beside LOOP), Edit ▾ → Generators, or a right-click. Each opens a panel that stays up while the song plays: <kbd>G</kbd> rolls again, <kbd>Space</kbd> plays, <kbd>Esc</kbd> or Done closes, and each roll is one undo step. They write into the selected rows, else the whole phrase (Drum pattern: the song row under the cursor).</p><table>
 <tr><td>Drum pattern</td><td>A beat across tracks: KICK, SNARE, HATS and PERC each get a track and an instrument (found from your pad names). STYLE (Four on the floor, Broken beat, Jungle, Footwork, Halftime, IDM euclidean), DENSITY, VARIATION (later bars change, a fill at the end). A track with nothing on the row gets a new phrase; a block that also plays elsewhere is made a unique copy first (SHARED), unless you choose to rewrite it everywhere</td></tr>
-<tr><td>Acid line</td><td>A bass line in the song's key, in the styles of a 303 (accents, slides, octaves)</td></tr>
+<tr><td>Acid line</td><td>A bass line in the song's key, in the styles of a 303 (accents, slides, octaves). Generate (<kbd>G</kbd>) writes a new one. Mutate (<kbd>M</kbd>) changes the line that is there: MUTATE INTENSITY says how many steps change (1 at the lowest on a 16-step line, every step at 100). Notes move to a near note of the scale, farther at higher intensity, so the new line stays related to the old one. Volumes, effects and instrument changes you added by hand stay on the rows Mutate doesn't change. Each press changes it further; Original (<kbd>O</kbd>) puts back the phrase as it was when the panel opened</td></tr>
 <tr><td>Mutate</td><td>A variation of the phrase: PITCH (to neighbors in the key), HITS (some dropped, quiet ones added), TIME (a row early or late), VOLUME. Each press of <kbd>M</kbd> varies it further; ORIGINAL puts it back</td></tr>
 <tr><td>Markov melody</td><td>A new line that moves the way the song's melodies do (it learns from every phrase played by an instrument with KEY FOLLOW; drums are left out). NEW: how often it steps outside what it learned</td></tr>
 <tr><td>Arp</td><td>A chord written out as notes: root, shape, pattern (up, down, up and down, converge, random), rate, octaves, legato or short</td></tr>
@@ -22988,7 +22988,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 539;
+const BUILD = 541;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26072,7 +26072,7 @@ const ACID_SCALES = [['Minor', [0, 2, 3, 5, 7, 8, 10]], ['Phrygian', [0, 1, 3, 5
   ['Harmonic minor', [0, 2, 3, 5, 7, 8, 11]], ['Minor pentatonic', [0, 3, 5, 7, 10]], ['Blues', [0, 3, 5, 6, 7, 10]], ['Major', [0, 2, 4, 5, 7, 9, 11]],
   ['Chromatic', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]], ['Root & fifth', [0, 7]], ['Octaves', [0]]];
 const ACID_LANES = [['notes', 'NOTES'], ['oct', 'OCTAVES'], ['acc', 'ACCENTS'], ['slide', 'SLIDES'], ['time', 'TIME']];
-const acidSet = {auto:true, scale:0, root:0, base:ROOT, density:45, accent:30, slide:25, octave:30, style:1, lanes:{notes:true, oct:true, acc:true, slide:true, time:true}};
+const acidSet = {auto:true, scale:0, root:0, base:ROOT, density:45, accent:30, slide:25, octave:30, mut:25, style:1, lanes:{notes:true, oct:true, acc:true, slide:true, time:true}};
 /* STYLES (owner, 2 Nov: "patterns that sound more like the Basebot hardware 303 clone"): rules on top of pump ACID's,
    after how hardware 303 sequences tend to sit. CLASSIC 303: the root (and its octave) most of the time, minor 3rd / 5th /
    7th, a chromatic step into the next note now and then, notes on the downbeats more often, accents mostly off the beat,
@@ -26160,7 +26160,47 @@ function acidRoll(st, L, lanes, R, rnd, only){
     s.slide = rnd() < R.slide * sl * (Math.abs(nx.note - s.note) >= 7 ? 1.5 : 1); }
   for (const s of st) if (s.gate === ACID_REST){ s.accent = false; s.slide = false; }
 }
-function acidMutate(st, L, lanes, R, rnd){ const only = new Array(L).fill(false), n = Math.max(2, Math.floor(L / 4)); for (let k = 0; k < n; k++) only[Math.floor(rnd() * L)] = true; acidRoll(st, L, lanes, R, rnd, only); }
+/* MUTATE INTENSITY (owner, 9 Nov: "generate a new acid line, make some small tweaks ... and then use a mutator to change it
+   slightly on the 4th pattern, or mutate it a bit more for the chorus"). INTENSITY (1-100) says how many steps change:
+   round(L x intensity / 100) distinct steps, at least 1, none twice. A sounding step that is picked moves to a near note of the
+   scale (one scale degree at low intensity, up to an octave's worth at 100, small moves likelier); the OCTAVES lane may jump it
+   an octave, by chance scaled with intensity. TIME, ACCENTS and SLIDES re-roll only on the picked steps, with the panel's
+   odds and the style's rules (acidRoll with `only`); a step that was a rest or a tie gets its pitch from those rules.
+   A slide belongs to the row it slides INTO, so a picked step only ever touches its own row (see acidWriteMut). Plain Generate
+   (acidRoll without `only`) is not touched. */
+const acidMutN = (L, inten) => Math.min(L, Math.max(1, Math.round(L * inten / 100)));
+const acidMutDeg = (n, inten) => 1 + Math.round((n - 1) * inten / 100);   // the most scale degrees a note may move
+function acidNear(note, sc, root, inten, rnd){
+  const ls = []; for (let v = -12; v <= 24; v++) if (sc.includes(acidPc(v - root))) ls.push(v);
+  if (!ls.length) return note;
+  let k = 0; for (let j = 1; j < ls.length; j++) if (Math.abs(ls[j] - note) < Math.abs(ls[k] - note)) k = j;   // a note outside the scale starts from its nearest scale note
+  const md = acidMutDeg(sc.length, inten); let tot = 0; for (let d = 1; d <= md; d++) tot += 1 / (d * d);
+  let u = rnd() * tot, d = 1; for (; d < md; d++){ u -= 1 / (d * d); if (u < 0) break; }   // small moves likelier
+  const dir = rnd() < 0.5 ? 1 : -1; let t = k + dir * d; if (t < 0 || t >= ls.length) t = k - dir * d; if (t < 0 || t >= ls.length) t = k > 0 ? k - 1 : k + 1;
+  return ls[t];
+}
+function acidMutate(st, L, lanes, R, rnd, inten = 25){
+  inten = clamp(Math.round(+inten) || 25, 1, 100);
+  const n = acidMutN(L, inten), idx = Array.from({length:L}, (_, i) => i), only = new Array(L).fill(false);
+  for (let k = 0; k < L - 1; k++){ const j = k + Math.floor(rnd() * (L - k)); const t = idx[k]; idx[k] = idx[j]; idx[j] = t; }
+  if (!lanes.time) idx.sort((a, b) => (st[b].gate === ACID_NOTE) - (st[a].gate === ACID_NOTE));   // rhythm locked: a rest can't change, so notes go first
+  for (let k = 0; k < n; k++) only[idx[k]] = true;
+  const old = st.map(s => Object.assign({}, s)), fresh = st.map(s => Object.assign({}, s)), sc = ACID_SCALES[R.scale][1], sty = R.style | 0;
+  acidRoll(fresh, L, Object.assign({}, lanes, {slide:false}), R, rnd, only);
+  for (let i = 0; i < L; i++){ if (!only[i]) continue; const s = st[i], f = fresh[i], o = old[i];
+    if (lanes.time) s.gate = f.gate;
+    if (lanes.acc) s.accent = f.accent;
+    if (s.gate === ACID_NOTE){
+      if (o.gate === ACID_NOTE){
+        if (lanes.notes) s.note = acidNear(o.note, sc, R.root, inten, rnd);
+        if (lanes.oct && rnd() < R.octave * inten / 100){ const up = rnd() < 0.5; s.note = up ? (s.note + 12 <= 24 ? s.note + 12 : s.note - 12) : (s.note - 12 >= -12 ? s.note - 12 : s.note + 12); } }
+      else if (lanes.notes || lanes.oct) s.note = f.note; }
+    else s.accent = false;
+    const pv = st[(i + L - 1) % L];
+    if (L > 1){ if (s.gate !== ACID_NOTE || pv.gate === ACID_REST){ if (lanes.slide || lanes.time) pv.slide = false; }
+      else if (lanes.slide){ const sl = sty === 1 ? (s.note !== pv.note ? 1.3 : 0.4) : sty === 2 ? 0.6 : sty === 3 ? 1.8 : 1; pv.slide = rnd() < R.slide * sl * (Math.abs(s.note - pv.note) >= 7 ? 1.5 : 1); } } }
+  return only;
+}
 // The phrase's rows y0..y0+L-1 as steps, and back.
 const PSL_I = () => FXC.indexOf('PSL');
 // ON THE 16TH GRID (owner, 3 Nov: "most notes fell on odd numbered steps, which put them off of the clock"): a step is a
@@ -26189,6 +26229,25 @@ function acidWrite(P, y0, L, base, st, ins, spr = 1){
     else { r[0] = s.gate === ACID_REST && prev.gate !== ACID_REST ? OFF : -1; r[VC] = -1; r[IC] = -1; }   // a tie: empty (the note holds); a rest: OFF after a sounding step
   }
   return over;
+}
+// MUTATE's write: only the rows of the steps that were picked (`only`), and in them only what changed against `st0` (the
+// steps as read before the roll). Volumes, instrument changes, other FX and note-offs the roll did not change stay as they
+// were; the rows between steps and every row not picked are not touched. Returns {over, rows}.
+function acidWriteMut(P, y0, base, st0, st, ins, spr, only){
+  const psl = PSL_I(), L = st.length; let over = 0, rows = 0;
+  for (let i = 0; i < L; i++){ if (!only[i]) continue; const r = P[y0 + i * spr]; if (!r) continue;
+    const o = st0[i], s = st[i], po = st0[(i - 1 + L) % L], pn = st[(i - 1 + L) % L]; let ch = false;
+    if (s.gate === ACID_NOTE){
+      if (o.gate !== ACID_NOTE || s.note !== o.note){ r[0] = clamp(base + s.note, 0, 119); ch = true; }
+      if (o.gate !== ACID_NOTE){ r[IC] = ins; r[VC] = s.accent ? 0xFF : -1; ch = true; }
+      else if (s.accent !== o.accent){ r[VC] = s.accent ? 0xFF : -1; ch = true; } }
+    else if (s.gate !== o.gate){ r[0] = s.gate === ACID_REST && pn.gate !== ACID_REST ? OFF : -1; r[VC] = -1; r[IC] = -1; ch = true; }
+    if (L > 1){ const was = po.slide, now = pn.slide && s.gate === ACID_NOTE;
+      if (was !== now){ ch = true;
+        if (was) for (let m = FX0; m < RW; m += 2) if (r[m] === psl){ r[m] = -1; r[m + 1] = -1; }
+        if (now && !(() => { for (let m = FX0; m < RW; m += 2) if (r[m] === psl) return true; return false; })()){ let m = FX0; while (m < RW && r[m] >= 0) m += 2; if (m >= RW){ m = RW - 2; over++; } r[m] = psl; r[m + 1] = 3; } } }
+    if (ch) rows++; }
+  return {over, rows};
 }
 /* KEY FROM THE SONG (owner, 3 Nov: "make the generative acid baseline understand the key by looking at the rest of the
    song"). The song's own SCALE / SCALE ROOT (Project) when set; otherwise the key is worked out from the notes the song's
@@ -26240,11 +26299,13 @@ function acidLine(){
   const roll = mut => {
     const st = acidRead(P(), y0, Ls, acidSet.base, spr), lanes = acidSet.lanes;
     if (!ACID_LANES.some(([k]) => lanes[k])) return toast('Light at least one lane: NOTES, OCTAVES, ACCENTS, SLIDES or TIME.');
-    if (mut) acidMutate(st, Ls, lanes, R(), Math.random); else acidRoll(st, Ls, lanes, R(), Math.random);
+    const st0 = st.map(s => Object.assign({}, s)), inten = clamp(Math.round(+acidSet.mut) || 25, 1, 100); let only = null;
+    if (mut){ const j0 = JSON.stringify(st0); for (let k = 0; k < 8; k++){ st.splice(0, st.length, ...st0.map(q => Object.assign({}, q))); only = acidMutate(st, Ls, lanes, R(), Math.random, inten); if (JSON.stringify(st) !== j0) break; } }   // a press always changes something, if it can
+    else acidRoll(st, Ls, lanes, R(), Math.random);
     if (!S.phrases[cPhrase] && cPhrase === ph0) S.phrases[cPhrase] = P0;
-    const over = acidWrite(P(), y0, Ls, acidSet.base, st, ins, spr); saveS(); draw();
+    const wm = mut ? acidWriteMut(P(), y0, acidSet.base, st0, st, ins, spr, only) : null, over = mut ? wm.over : acidWrite(P(), y0, Ls, acidSet.base, st, ins, spr); saveS(); draw();
     const nN = st.filter(s => s.gate === ACID_NOTE).length;
-    toast(`${mut ? 'Mutated' : 'Generated'}: ${nN} note${nN === 1 ? '' : 's'}, ${st.filter(s => s.accent).length} accent${st.filter(s => s.accent).length === 1 ? '' : 's'}, ${st.filter(s => s.slide).length} slide${st.filter(s => s.slide).length === 1 ? '' : 's'} · rows ${rS(y0)}–${rS(y0 + L - 1)}` + (over ? ` · ${over} slide${over === 1 ? '' : 's'} replaced FX3 on a full row` : ''), over ? 3000 : 1600);
+    toast(`${mut ? 'Mutated ' + wm.rows + ' of ' + Ls + ' steps (' + inten + '%)' : 'Generated'}: ${nN} note${nN === 1 ? '' : 's'}, ${st.filter(s => s.accent).length} accent${st.filter(s => s.accent).length === 1 ? '' : 's'}, ${st.filter(s => s.slide).length} slide${st.filter(s => s.slide).length === 1 ? '' : 's'} · rows ${rS(y0)}–${rS(y0 + L - 1)}` + (over ? ` · ${over} slide${over === 1 ? '' : 's'} replaced FX3 on a full row` : ''), over ? 3000 : 1600);
   };
   // the panel: an .ask dialog that stays open, so the line can be rolled again while it plays
   if (askOpen) askOpen(null);
@@ -26274,19 +26335,29 @@ function acidLine(){
   for (const [k, label] of [['density', 'Density'], ['accent', 'Accents'], ['slide', 'Slides'], ['octave', 'Octave jumps']]){
     const w = el('span', 'acidr'), r = el('input'), v = el('b', null, acidSet[k] + '%'); r.type = 'range'; r.min = 0; r.max = 100; r.value = acidSet[k];
     r.addEventListener('input', () => { acidSet[k] = +r.value; v.textContent = r.value + '%'; }); w.append(r, v); field(label, w); }
+  { const w = el('span', 'acidr'), r = el('input'), v = el('b', null, ''); r.type = 'range'; r.min = 1; r.max = 100; r.setAttribute('aria-label', 'Mutate intensity');
+    const cur = () => clamp(Math.round(+acidSet.mut) || 25, 1, 100); r.value = cur(); v.textContent = cur() + '%';
+    r.addEventListener('input', () => { acidSet.mut = clamp(Math.round(+r.value) || 25, 1, 100); v.textContent = acidSet.mut + '%'; }); w.append(r, v); field('Mutate intensity', w); }
   const lanes = el('div', 'seg'); lanes.setAttribute('aria-label', 'Lanes to roll');
   ACID_LANES.forEach(([k, t]) => { const b = el('button', acidSet.lanes[k] ? 'on' : null, t); b.type = 'button'; b.setAttribute('aria-pressed', !!acidSet.lanes[k]);
     b.addEventListener('click', () => { acidSet.lanes[k] = !acidSet.lanes[k]; b.classList.toggle('on', acidSet.lanes[k]); b.setAttribute('aria-pressed', acidSet.lanes[k]); }); lanes.append(b); });
   field('Generate', lanes);
   const row = el('div', 'btnrow'), mk = (t, f, cls) => { const b = el('button', cls || null, t); b.type = 'button'; b.addEventListener('click', f); row.append(b); return b; };
   const done = () => { if (askOpen !== done) return; askOpen = null; wrap.remove(); document.removeEventListener('keydown', key, true); };
-  mk('▶ / ■', () => playCtx()); mk('Mutate (M)', () => roll(true)); const go = mk('Generate (G)', () => roll(false), 'ok'); mk('Done', done);
+  // ORIGINAL, as Mutate's: the phrase as it was when the panel opened (an empty phrase that is not in the song yet stays out of it)
+  const orig = P().map(r => r.slice());
+  const original = () => { const T = S.phrases[ph0];
+    if (cPhrase !== ph0 || (T && T.length !== orig.length)) return toast('The phrase changed: close Acid line and open it again.');
+    if (!T) return toast('Nothing to go back to: the phrase is still as it was.');
+    orig.forEach((r, y) => { T[y] = r.slice(); }); saveS(); draw(); toast('Back to the phrase as it was.'); };
+  mk('▶ / ■', () => playCtx()); mk('Original (O)', original); mk('Mutate (M)', () => roll(true)); const go = mk('Generate (G)', () => roll(false), 'ok'); mk('Done', done);
   box.append(row);
-  // Keys stay in the panel: R rolls, M mutates, Space plays or stops the phrase, Esc / Enter close.
+  // Keys stay in the panel: R rolls, M mutates, O puts the phrase back, Space plays or stops the phrase, Esc / Enter close.
   const key = e => { const tag = e.target && e.target.tagName;
     if (e.key === 'Escape' || (e.key === 'Enter' && tag !== 'BUTTON' && tag !== 'SELECT')){ e.preventDefault(); e.stopPropagation(); return done(); }
     if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'g' || e.key === 'G' || e.key === 'r' || e.key === 'R')){ e.preventDefault(); e.stopPropagation(); return roll(false); }
     if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'm' || e.key === 'M')){ e.preventDefault(); e.stopPropagation(); return roll(true); }
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'o' || e.key === 'O')){ e.preventDefault(); e.stopPropagation(); return original(); }
     if (e.key === ' ' && tag !== 'BUTTON'){ e.preventDefault(); e.stopPropagation(); return playCtx(); }
     e.stopPropagation();
     if (!(e.target && e.target.closest && e.target.closest('.ask'))) e.preventDefault(); };
@@ -32130,6 +32201,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [541, '9 Nov', ['Acid line: MUTATE INTENSITY (1–100) sets how many steps Mutate changes, from one step to the whole line. A changed note moves to a near note of the scale (farther at higher intensity), so the line stays related to the one you had. Mutate leaves the volumes, effects and instrument changes you added by hand on the rows it doesn’t change, and Original (O) puts back the phrase as it was when the panel opened.']],
   [539, '9 Nov', ['New screen: MOD, between FX and PROJECT. Four LFOs a track, one a row: pick a target, then SHAPE, RATE and DEPTH. Right-click an effect parameter on the FX screen (or its value on the FX bar) → Add LFO… puts one on it, and a ~ marks the parameters an LFO moves. Alt+7 is MOD (PROJECT: its tab, or SHIFT+▶ from MOD).']],
   [538, '9 Nov', ['The control bar’s Play button plays this screen (the phrase on Phrase); the pad’s PLAY plays the song. On a small screen in PAD mode, COMMANDS has no ▶ of its own. Hints say ALT.']],
   [537, '9 Nov', ['Pad: PLAY now plays the song and SHIFT+PLAY this screen, the same as Space and Shift+Space. OPTION is now called ALT, to match the keyboard.']],

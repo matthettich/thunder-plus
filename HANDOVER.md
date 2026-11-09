@@ -581,6 +581,10 @@ Start a session by asking for results. Fix on `beta`.
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
 
+## 9 Nov: acid Mutate intensity (build 541)
+
+Owner: Mutate should make changes from small to large that relate to the line, keeping hand tweaks. In `acidLine`: "Mutate intensity" (`acidSet.mut`, 1–100, default 25, session only) and Original (O), as in `mutatePhrase`. `acidMutate(…, inten)` picks exactly round(L × intensity / 100) distinct steps (notes first when TIME is off; a press retries up to 8 times if nothing changed). `acidNear` moves a sounding note within the scale, at most `acidMutDeg` degrees, small moves likelier. `acidWriteMut` writes only the picked rows and only what changed: the old path rewrote every step row, losing hand volumes, instruments, note-offs, other poly columns and PSL parameters. Generate is unchanged. A slide re-rolls as "slide into the picked step", so writes stay on picked rows. Tests: `tests/acid-mutate.test.js`.
+
 ## 9 Nov: MOD screen, first version (build 539, PR from `feat/mod-screen`)
 
 Owner: four LFOs per track for now; internal FX and instruments, …pump later; build stepwise and verify before the harder parts, knowingly past the feature freeze. Sonnet subagents built it, the lead reviewed.
