@@ -21506,7 +21506,7 @@ function bgIdle(){
   if ((!document.hidden && !lpOn) || !ctx || ctx.state !== 'running') return;
   const midiIn = !!(midi.access && midi.access.inputs && midi.access.inputs.size);
   const busy = tp.on || rendering || midi.clkIn || midiIn || midiHeld.size || kb.held.size || synHeld.some(Boolean)
-    || (typeof RCD !== 'undefined' && (RCD.stream || RCD.io));
+    || (typeof RCD !== 'undefined' && (RCD.stream || RCD.io)) || padSrcs.some(s => s && s.size);   // (a sample can run for 5 minutes)
   const left = Math.max(lastSnd, audioWake) + bgWait() - performance.now();
   if (busy || left > 0){ bgSusT = setTimeout(bgIdle, busy ? bgWait() : left + 50); return; }
   bgSus = true; ctx.suspend().catch(() => { bgSus = false; });
