@@ -1916,6 +1916,12 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .dkcrail .dkcadd{flex:none; align-self:flex-start; min-height:0; height:24px; padding:0 10px; margin:0; border:1.5px dashed var(--line); border-radius:0; background:transparent; color:var(--ink); box-shadow:none;
   font:inherit; font-weight:700; letter-spacing:.06em; cursor:pointer}
 .dkcrail .dkcadd:hover{background:var(--panel)}
+/* Lines (…CHAINS rail): the patch's real cables between the tags and the blocks, on one SVG layer behind them (dkcDraw). It never takes a click. */
+.dkcrail{position:relative}
+.dkcrail > :not(.dkclines){position:relative; z-index:1}
+.dkcrail > .dkclines{position:absolute; left:0; top:0; z-index:0; pointer-events:none; overflow:visible}
+.dkclines path{fill:none; stroke:var(--fxac, var(--ts-hot, #ff5a1f)); stroke-width:1.25; stroke-linecap:round}
+.dkcrail.chnoff .dkclines{opacity:.5}
 /* folded: the title strip, then the rail (blocks only, narrower) */
 #tDeck.fxbar #dkChn.col.hasrail{flex:0 0 auto; width:auto; min-width:26px; flex-direction:row}
 #tDeck.fxbar #dkChn.col.hasrail > .dkh{flex:0 0 26px; border-right:1px solid var(--line)}
@@ -3378,7 +3384,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <h3>Track effects</h3>
 <p>Each track and the master have 8 effect slots (FX screen, or the Mixer’s FX row): 73 effects on a track and 82 on a bus or the master (with the nine pump ones; pump EQ goes on any track), in groups: dynamics and EQ (compressors, Bus and Glue Comp, limiter, noise gate, transient shaper, multiband, air), filters (filter, ladder, low and high cut, auto-wah, vowel, envelope filter), drive and lo-fi (saturation, drive, overdrive, tube, tape, wavefolder, bitcrush, lo-fi, degrade, vintage sampler (an SP-1200, SP-12, MPC60, SP-202 at each of its grades, or Emulator II: their rate and bit depth, converters, filters and noise), vinyl, dub tape, cab), modulation (chorus, ensemble, dimension, flanger, phaser, tremolo, auto-pan, rotary, ring mod, cross-mod, frequency shifter), delays (simple, tape, BBD, pitch, granular, reverse echo), reverbs (room, plate, spring, space, Galactic, pitch reverb, convolution), pitch and voice (pitch shifter, harmonizer, pitch correct), resonators (resonator, comb, Rings), spectral and granular (Clouds, Beads, spectral, extreme stretch), rhythmic (Flex, Step gate, Retrigger, trance gate, pump, Beat grains, Beat scramble, Glitch sequencer) and utility (stereo width, utility). The pad's Add effect menu has 65 of them. On the Mixer’s FX row, ALT (Ctrl/⌘ in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and ALT + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter. For drums and IDM: <b>Beat grains</b> (a rhythmic grain cloud in time with the song, after Output Portal: rate, density, size, position, spray, pitch and random pitch, reverse, shape, stereo, freeze), <b>Beat scramble</b> (re-orders the last bar's slices, some reversed; keep the beats, new every bar or looped) and <b>Glitch sequencer</b> (each step may stutter, reverse, jump an octave, tape-stop, crush or drop out). Under a slot's controls, <b>› PRESET</b> lists INIT, factory presets (over 230 across the effects) and the song's own, and <b>› SAVE AS PRESET…</b> keeps the slot's settings for that effect. <b>› EQ WINDOW</b> (at the bottom of the FX screen, on any track) opens the track's pump EQ in its own window, adding one to a free slot if needed; pump EQ works on every track, the other pump effects on buses and the master.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
-<p><b>The MOD screen</b> (between FX and PROJECT) lists the track's four LFOs, one a row: TARGET (EDIT or a click opens the target list; it starts at this track), SHAPE, RATE (a cycle every 1/32 … 8 bars, in time with the song) and DEPTH (00–FF). EDIT+arrows or a drag change a value, Delete takes the LFO out, ALT+◀▶ picks another track (the master too), and it follows the FX screen's track. Right-click an effect parameter on the FX screen (or its value on the FX bar) → <b>Add LFO…</b> puts one on it; a ~ after a parameter's name shows that an LFO moves it. …pump effects aren't targets yet.</p>
+<p><b>The MOD screen</b> (between FX and PROJECT) lists the track's four LFOs, one a row: TARGET (EDIT or a click opens the target list; it starts at this track), SHAPE, RATE (a cycle every 1/32 … 8 bars, in time with the song) and DEPTH (00–FF). EDIT+arrows or a drag change a value (on TARGET they step through the target list, ▲▼ eight at a time), Delete takes the LFO out, ALT+◀▶ picks another track (the master too), and it follows the FX screen's track. Right-click an effect parameter on the FX screen (or its value on the FX bar) → <b>Add LFO…</b> puts one on it; a ~ after a parameter's name shows that an LFO moves it. …pump effects aren't targets yet.</p>
 <p><b>chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback. Its <b>Resample</b> module records what passes through it into a pad, starting on the next bar, and slices it so you can chop it like a breakbeat.</p></section>
     <section id="hGen"><h2>Generators</h2><p>GEN (PAD mode, beside LOOP), Edit ▾ → Generators, or a right-click. Each opens a panel that stays up while the song plays: <kbd>G</kbd> rolls again, <kbd>Space</kbd> plays, <kbd>Esc</kbd> or Done closes, and each roll is one undo step. They write into the selected rows, else the whole phrase (Drum pattern: the song row under the cursor).</p><table>
 <tr><td>Drum pattern</td><td>A beat across tracks: KICK, SNARE, HATS and PERC each get a track and an instrument (found from your pad names). STYLE (Four on the floor, Broken beat, Jungle, Footwork, Halftime, IDM euclidean), DENSITY, VARIATION (later bars change, a fill at the end). A track with nothing on the row gets a new phrase; a block that also plays elsewhere is made a unique copy first (SHARED), unless you choose to rewrite it everywhere</td></tr>
@@ -22988,7 +22994,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 539;
+const BUILD = 540;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23954,8 +23960,16 @@ function modDel(y){
 }
 function modBump(d, big){
   const c = cs.mod, L = modArr()[c.y];
+  if (c.x === 0){   // TARGET: Ctrl+arrows step through the picker's list (each track's, then the master's); an empty row takes the first
+    const t = modT(), ids = []; for (let k = 0; k < ntr(); k++) for (const [id] of tgtList(k)) ids.push(id); for (const [id] of tgtList(MT)) ids.push(id);
+    if (!ids.length) return;
+    if (!L){ const a = modArr(); if (a.length >= PLFO_MAX) return toast('LFO ' + (c.y + 1) + ' is empty: EDIT on TARGET picks what it moves.', 2500);
+      const own = t === MT ? tgtList(MT) : tgtList(t), id = (own[0] || [ids[0]])[0], P = perfOf(); (P.lfo[t] || (P.lfo[t] = [])).push({id, sh:0, rt:3, dp:128}); cs.mod.y = P.lfo[t].length - 1; saveS(); draw(); return; }
+    let i = ids.indexOf(L.id); if (i < 0){ const own = tgtList(t); i = Math.max(0, ids.indexOf((own[0] || [ids[0]])[0])); }
+    i = clamp(i + d * (big ? 8 : 1), 0, ids.length - 1);
+    L.id = ids[i]; saveS(); draw(); return;
+  }
   if (!L) return toast('LFO ' + (c.y + 1) + ' is empty: EDIT on TARGET picks what it moves.', 2500);
-  if (c.x === 0) return toast('EDIT on TARGET picks another target.', 2000);
   if (c.x === 1) L.sh = clamp(L.sh + d, 0, PLFO_SHAPES.length - 1);
   else if (c.x === 2) L.rt = clamp(L.rt + d, 0, PLFO_RATES.length - 1);
   else L.dp = clamp(L.dp + d * (big ? 16 : 1), 0, 255);
@@ -29252,25 +29266,81 @@ function chainOrder(t, act){
   }
   return res.map(k => by.get(k));
 }
+/* Lines between the tags and the blocks, from the patch's own cables (those whose two ends are both in this track's modules).
+   dkChnRail records which cable joins which element (rail._dk); dkcDraw does the one layout read and draws them. It runs when
+   the rail is put in the page and when the rail's size changes (dkcWire), never on a tick. The Track In tag stands for all
+   its Track In modules, one line each (12 at most); any other pair draws one line per cable, 2 at most. */
+function dkcDraw(rail){
+  const D = rail && rail._dk; if (!D || !rail.isConnected) return;
+  const W = rail.clientWidth, H = rail.clientHeight; if (!W || !H) return;   // folded away: it draws when it has a size
+  const kids = [...rail.children].filter(c => c !== D.svg), cs = getComputedStyle(rail);
+  rail.style.rowGap = ''; for (const c of kids) c.style.marginTop = '';
+  if (kids.length > 1){   // room to spare: spread the blocks (up to 34px apart); too many: keep today's tight gap and the cut-off
+    const base = parseFloat(cs.rowGap) || 7, avail = H - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+    let tot = 0; for (const c of kids) tot += c.offsetHeight;
+    const gap = Math.min(34, Math.floor((avail - tot) / (kids.length - 1)));
+    if (gap > base){ rail.style.rowGap = gap + 'px'; const ad = kids.find(c => c.classList.contains('dkcadd')); if (ad) ad.style.marginTop = (base - gap) + 'px'; }
+  }
+  const R = rail.getBoundingClientRect(), box = new Map(), outs = new Map(), ins = new Map(), L = [];
+  for (const el of D.nodes.values()) if (!box.has(el)){ const r = el.getBoundingClientRect(); box.set(el, {l:r.left - R.left + rail.scrollLeft, t:r.top - R.top + rail.scrollTop, w:r.width, h:r.height}); }
+  for (const e of D.edges){ const a = D.nodes.get(e.a), b = D.nodes.get(e.b); if (!a || !b || a === b) continue;
+    for (let i = 0; i < e.n; i++){ const l = {a, b}; L.push(l); if (!outs.has(a)) outs.set(a, []); if (!ins.has(b)) ins.set(b, []); outs.get(a).push(l); ins.get(b).push(l); } }
+  const at = (el, list, l, bottom) => { const r = box.get(el), i = list.indexOf(l), n = list.length, pad = Math.min(8, r.w / 4);
+    return [r.l + (n < 2 ? r.w / 2 : pad + (r.w - 2 * pad) * i / (n - 1)), bottom ? r.t + r.h : r.t]; };
+  let svg = D.svg; if (!svg){ svg = D.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'dkclines'); svg.setAttribute('aria-hidden', 'true'); rail.prepend(svg); }
+  svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  const f = n => Math.round(n * 10) / 10; let d = '';
+  for (const l of L){
+    const A = box.get(l.a), B = box.get(l.b);
+    if (Math.abs(A.l - B.l) > 20){   // another column: from the side of one to the side of the other
+      const ar = B.l > A.l, x1 = ar ? A.l + A.w : A.l, y1 = A.t + A.h / 2, x2 = ar ? B.l : B.l + B.w, y2 = B.t + B.h / 2, m = (x1 + x2) / 2;
+      d += 'M' + f(x1) + ' ' + f(y1) + 'C' + f(m) + ' ' + f(y1) + ' ' + f(m) + ' ' + f(y2) + ' ' + f(x2) + ' ' + f(y2);
+      continue;
+    }
+    const down = B.t >= A.t + A.h - 1; if (!down && !(A.t >= B.t + B.h - 1)) continue;   // (up: a cable back up the list)
+    const p = at(l.a, outs.get(l.a), l, down), q = at(l.b, ins.get(l.b), l, !down), m = (p[1] + q[1]) / 2;
+    d += 'M' + f(p[0]) + ' ' + f(p[1]) + 'C' + f(p[0]) + ' ' + f(m) + ' ' + f(q[0]) + ' ' + f(m) + ' ' + f(q[0]) + ' ' + f(q[1]);
+  }
+  svg.replaceChildren(); if (d){ const pa = document.createElementNS('http://www.w3.org/2000/svg', 'path'); pa.setAttribute('d', d); svg.append(pa); }
+  D.key = W + 'x' + H + '|' + rail.children.length;
+}
+function dkcWire(rail){   // once the rail is in the page: draw, then again only when its size changes
+  if (!rail || !rail._dk) return;
+  try { dkcDraw(rail); } catch(e){}
+  if (typeof ResizeObserver !== 'function') return;
+  const D = rail._dk; D.ro = new ResizeObserver(() => { if (!rail.isConnected){ D.ro.disconnect(); return; }
+    if (rail.clientWidth + 'x' + rail.clientHeight + '|' + rail.children.length === D.key) return; try { dkcDraw(rail); } catch(e){} });
+  D.ro.observe(rail);
+}
 function dkcReveal(id){ if (noChains()) return; openChains(); if (!id) return; const go = () => { const a = chApi(); return !!(a && a.reveal && a.reveal(id)); }; if (!go()){ setTimeout(go, 200); setTimeout(go, 600); } }
 function dkChnRail(t, act, folded){
   const mods = chainOrder(t, act), on = !!(S.chainOn && S.chainOn[t]), rail = el('div', 'dkcrail' + (on ? '' : ' chnoff') + (folded ? ' fold' : ''));
   const ins = mods.filter(m => m.type === 'trackIn'), outs = mods.filter(m => m.type === 'chainOut'), mid = mods.filter(m => m.type !== 'trackIn' && m.type !== 'chainOut');
-  const end = (txt, tip) => { const e = el('span', 'dkcend', txt); e.title = tip; rail.append(e); };
+  const nodes = new Map(), end = (txt, tip, ids) => { const e = el('span', 'dkcend', txt); e.title = tip; rail.append(e); for (const m of ids) nodes.set(m.id, e); };
   const tr = m => d2(clamp(int(m.params && m.params.track, 1), 1, NT));
-  if (ins.length) end((folded ? 'IN ' : 'IN · TRACK ') + ins.map(tr).join(' '), 'Track In: the sound coming in' + (on ? '' : ' (CHN is off on the Mixer: chains is not heard on this track)'));
+  if (ins.length) end((folded ? 'IN ' : 'IN · TRACK ') + ins.map(tr).join(' '), 'Track In: the sound coming in' + (on ? '' : ' (CHN is off on the Mixer: chains is not heard on this track)'), ins);
   for (const m of mid){
     const byp = ((m.params && m.params._byp) || 0) >= .5, b = el('button', 'dkcb' + (byp ? ' off' : ''));
     b.type = 'button'; b.append(el('i', 'fon' + (byp ? '' : ' on')), el('span', null, dkcLab(m)));
     b.title = dkcLab(m) + (byp ? ' (bypassed)' : '') + (noChains() ? '' : ' · open it in chains');
-    b.addEventListener('click', e => { e.stopPropagation(); dkcReveal(m.id); }); rail.append(b);
+    b.addEventListener('click', e => { e.stopPropagation(); dkcReveal(m.id); }); rail.append(b); nodes.set(m.id, b);
   }
-  if (outs.length) end((folded ? 'OUT ' : 'OUT · TRACK ') + outs.map(tr).join(' '), 'Chain Out: where it goes (a bus when it is another track)');
+  if (outs.length) end((folded ? 'OUT ' : 'OUT · TRACK ') + outs.map(tr).join(' '), 'Chain Out: where it goes (a bus when it is another track)', outs);
   if (!mods.length && !folded && !noChains()){ const ad = el('button', 'dkcadd', '+ …CHAINS'); ad.type = 'button'; ad.title = 'No chains on track ' + d2(t + 1) + ': open chains to patch one';
     ad.addEventListener('click', e => { e.stopPropagation(); openChains(); }); rail.append(ad); }
   else if (!folded && !noChains()){ const ad = el('button', 'dkcadd sm', '+ CONTROLS'); ad.type = 'button';
     ad.title = 'In chains, right-click a control or a module → Add to the bottom panel; it shows here for the track whose chain it is in';
     ad.addEventListener('click', e => { e.stopPropagation(); openChains(); }); rail.append(ad); }
+  // The cables between these modules, one entry per pair as drawn (Track In: one per module; other pairs: one line per cable, 2 at most)
+  const inId = new Set(ins.map(m => m.id)), grp = new Map(), d = S.chainPatch;
+  for (const c of (d && d.cables) || []){
+    if (!c || !Array.isArray(c.from) || !Array.isArray(c.to) || !nodes.has(c.from[0]) || !nodes.has(c.to[0]) || nodes.get(c.from[0]) === nodes.get(c.to[0])) continue;
+    const a = c.from[0], b = nodes.get(c.to[0]) === nodes.get(outs[0] && outs[0].id) ? 'OUT' : c.to[0], k = a + '>' + b;
+    if (!grp.has(k)) grp.set(k, {a, b: c.to[0], ports:new Set()}); grp.get(k).ports.add(c.from[1] + '>' + c.to[1]);
+  }
+  const edges = [...grp.values()].map(g => ({a:g.a, b:g.b, n:inId.has(g.a) ? 1 : Math.min(2, g.ports.size)}));
+  edges.sort((x, y) => (inId.has(y.a) ? 1 : 0) - (inId.has(x.a) ? 1 : 0));   // (stable: Track In lines first, in the patch's order)
+  let nIn = 0; rail._dk = {nodes, edges: edges.filter(e => !inId.has(e.a) || ++nIn <= 12)};
   return rail;
 }
 const dkChnRailSig = (t, act) => { const d = S.chainPatch; if (!d || !act.size) return t + '|-'; const c = (d.cables || []).filter(x => x && x.from && act.has(x.from[0])).map(x => x.from[0] + '>' + x.to[0]).join(',');
@@ -29284,7 +29354,7 @@ function deckChnFold(){   // FX BAR, …CHAINS folded: the rail beside its title
   if (r) r.remove();
   const has = [...act].some(id => { const m = S.chainPatch.modules.find(q => q && q.id === id); return m && m.type !== 'trackIn' && m.type !== 'chainOut'; });
   sec.classList.toggle('hasrail', has); if (!has) return;
-  r = dkChnRail(t, act, true); r.id = 'dkChnRail'; sec.append(r);
+  r = dkChnRail(t, act, true); r.id = 'dkChnRail'; sec.append(r); dkcWire(r);
 }
 function deckChains(){
   try { deckChnFold(); } catch(e){}
@@ -29299,7 +29369,7 @@ function deckChains(){
   if (sig !== dkChnSig){
     dkChnSig = sig; dkChnT = t; const box = $('dkChnRows'); box.replaceChildren(); dkChnRows = [];
     box.classList.toggle('hasrail', !!deck.fxbar && !here.length);
-    if (!here.length && deck.fxbar){ box.append(dkChnRail(t, act, false)); return; }   // FX BAR: the rail instead of the help text
+    if (!here.length && deck.fxbar){ const rl = dkChnRail(t, act, false); box.append(rl); dkcWire(rl); return; }   // FX BAR: the rail instead of the help text
     if (!here.length){
       // Fit and finish (2 Nov): one line and a button instead of a paragraph; the how-to is the button's tooltip
       const p = el('p', 'note dkempty', !act.size ? 'No chains on track ' + d2(t + 1) : 'No controls here yet' + (elsewhere ? ' (' + elsewhere + ' on other tracks)' : ''));
@@ -31674,7 +31744,7 @@ const HINTK = {
   inst:'Notes Z–; Q–P play it · Ctrl+arrows change · Enter types a value or runs › rows · [ ] other instrument · Alt+← phrase',
   mixer:'Notes play through the track · Ctrl+arrows change · Enter types TRIM / PAN / VOL, mutes, solos, toggles CHN or opens FX · FX row: Ctrl+▲ on, Ctrl+▼ off · SC row: Enter says what it feeds · Del resets · Alt+→ FX',
   fx:'Notes play through its effects · Ctrl+arrows change · Enter adds or types a value · → opens its controls · Del removes or resets · [ ] other track · Alt+← mixer',
-  mod:'Ctrl+arrows change · Enter on TARGET picks one, on SHAPE / RATE steps on, on DEPTH types hex · Del removes the LFO · [ ] other track · Alt+← fx · Alt+→ project',
+  mod:'Ctrl+arrows change (on TARGET they step through the list) · Enter on TARGET picks one, on SHAPE / RATE steps on, on DEPTH types hex · Del removes the LFO · [ ] other track · Alt+← fx · Alt+→ project',
   project:'Ctrl+arrows change · Enter runs › rows · Del resets · Ctrl+S save · Shift+Ctrl+S save as · Ctrl+O open · Ctrl+N new song',
 };
 
@@ -32130,6 +32200,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [540, '9 Nov', ['…chains on the bottom panel: lines now join Track In, the modules and Chain Out, drawn from the patch’s real cables in the skin’s accent color, and the blocks spread out a little when there’s room. MOD: Ctrl/⌘+arrows on TARGET step through the target list.']],
   [539, '9 Nov', ['New screen: MOD, between FX and PROJECT. Four LFOs a track, one a row: pick a target, then SHAPE, RATE and DEPTH. Right-click an effect parameter on the FX screen (or its value on the FX bar) → Add LFO… puts one on it, and a ~ marks the parameters an LFO moves. Alt+7 is MOD (PROJECT: its tab, or SHIFT+▶ from MOD).']],
   [538, '9 Nov', ['The control bar’s Play button plays this screen (the phrase on Phrase); the pad’s PLAY plays the song. On a small screen in PAD mode, COMMANDS has no ▶ of its own. Hints say ALT.']],
   [537, '9 Nov', ['Pad: PLAY now plays the song and SHIFT+PLAY this screen, the same as Space and Shift+Space. OPTION is now called ALT, to match the keyboard.']],
