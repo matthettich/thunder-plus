@@ -126,5 +126,5 @@ test('acid panel: the slider, Original and O are wired in index.html', () => {
   assert.match(src, /mut:25, style:1/, 'default 25');
   assert.match(src, /field\('Mutate intensity', w\)/); assert.match(src, /r\.min = 1; r\.max = 100; r\.setAttribute\('aria-label', 'Mutate intensity'\)/);
   assert.match(src, /mk\('Original \(O\)', original\)/); assert.match(src, /e\.key === 'o' \|\| e\.key === 'O'\)\)\{ e\.preventDefault\(\); e\.stopPropagation\(\); return original\(\)/);
-  assert.match(src, /if \(mut\) only = acidMutate\(st, Ls, lanes, R\(\), Math\.random, inten\); else acidRoll\(st, Ls, lanes, R\(\), Math\.random\);/);
+  assert.match(src, /only = acidMutate\(st, Ls, lanes, R\(\), Math\.random, inten\); if \(JSON\.stringify\(st\) !== j0\) break;/);
 });
