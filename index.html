@@ -22842,7 +22842,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 526;
+const BUILD = 527;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25189,7 +25189,9 @@ function dirPress(b, l = {}){
   const m = {up:[0, -1], down:[0, 1], left:[-1, 0], right:[1, 0]}[b]; move(m[0], m[1]);
 }
 function press(b, fromKey){
-  if (fxp.open){ clearTimeout(rep); if (b !== 'play') return void fxpPad(b); fxpClose(); }
+  if (fxp.open){ clearTimeout(rep); if (b !== 'play'){ fxpPad(b);   // a held ▲ or ▼ runs through the list (owner, 8 Nov)
+      if (!fromKey && (b === 'up' || b === 'down')) rep = setTimeout(function r(){ if (!fxp.open) return; fxpPad(b); rep = setTimeout(r, 70); }, 330);
+      return; } fxpClose(); }
   if (b in held){
     held[b] = true; used[b] = false;
     if ((b === 'opt' && mod('shift')) || (b === 'shift' && mod('opt'))){ used.shift = used.opt = true; takeLatch(); toggleSel(); }
@@ -31834,6 +31836,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
   [519, '8 Nov', ['The pad has MUTE and SOLO buttons on unfolded and larger screens: pink and green when off, black when on. Tap to latch, tap again to undo.']],
+  [527, '8 Nov', ['Holding ▲ or ▼ on the pad runs through the effect and command lists.']],
   [526, '8 Nov', ['Mobile: SHIFT + ▲ now goes to the Arrange panel beside the screen when it is showing.', 'Mixer: OPTION + arrows go to another track, as on FX. On the FX row, OPTION + ▲▼ still turn effects on and off.']],
   [518, '8 Nov', ['Mobile: SHIFT + ▲ goes to Arrange from every tracker screen.']],
   [514, '8 Nov', ['Live engines: the setting always shows, and its help and message name every …pump live engine as well as …waves live.']],
