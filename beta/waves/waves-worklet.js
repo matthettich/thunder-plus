@@ -461,7 +461,7 @@ const Attenuverter = {
 /* Step sequencer: plays its notes through Host In, like a keyboard, and sends clock, pitch and gate out. */
 const RATES = [1, 2, 3, 4, 6, 8];
 const Sequencer = {
-  type:'seq', scope:'mono', cost:.05,
+  type:'seq', playsNotes:true, scope:'mono', cost:.05,
   inputs:{ clock:'gate', reset:'gate' }, outputs:{ pitch:'cv', gate:'gate', clock:'gate' },
   params:{ run:[1,0,1,1], rate:[3,0,5,1], steps:[8,1,8,1], length:[.5,.05,1,.01],
     s1:[0,-25,24,1], s2:[3,-25,24,1], s3:[7,-25,24,1], s4:[12,-25,24,1], s5:[10,-25,24,1], s6:[7,-25,24,1], s7:[3,-25,24,1], s8:[-25,-25,24,1] },
@@ -4583,6 +4583,7 @@ class WavesEngine {
     this.costCeiling = opts.costCeiling ?? .9;
     this.voices = new VoicePool(opts.maxVoices ?? 8); this.voicesMax0 = this.voices.max;
     this.graph = new Graph();
+    this.onlyBus = 0; this.only = null; this._cullDirty = false;   // setOnly: see _cull
     this.busesL = new Float32Array(BUS_COUNT * BLOCK); this.busesR = new Float32Array(BUS_COUNT * BLOCK);
     this.load = 0; this.telemetryOn = false;
     this._ios = new Map(); this._states = new Map();
@@ -4601,11 +4602,12 @@ class WavesEngine {
   removeModule(id){ this._drop(id); this.graph.remove(id); this._sync(); }
   connect(a, b){ this.graph.connect(a, b); this._sync(); }
   disconnect(a, b){ this.graph.disconnect(a, b); this._sync(); }
-  setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number') m.inst.params[name] = v; }
+  setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number'){ m.inst.params[name] = v; if (name === 'slot') this._cullDirty = true; } }
   setParams(list){ for (const [id, name, v] of list) this.setParam(id, name, v); }
   setTransport(t){ Object.assign(this.transport, t); }
   /* Keep every module's state (oscillator phases, reverb tails) when the patch changes; only drop what no longer fits. */
   _sync(){
+    this._cullDirty = true;
     for (const [key, io] of this._ios){ const id = key.split('#')[0], m = this.graph.mods.get(id); if (!m || m.poly !== io.poly) this._ios.delete(key); }
     for (const [key, s] of this._states){
       const id = key.split('#')[0], m = this.graph.mods.get(id);
@@ -4618,7 +4620,7 @@ class WavesEngine {
   /* Frees the effects' WebAssembly slots. Call when an engine is thrown away (offline renders). */
   dispose(){ this._reset(); this.graph = new Graph(); }
   loadPatch(doc){
-    this._reset(); this.graph = new Graph();
+    this._reset(); this.graph = new Graph(); this._cullDirty = true;
     for (const m of doc.modules || []) this.addModule(m.id, m.type, m);
     for (const c of doc.cables || []) this.connect(c.from, c.to);
     for (const c of stereoUpCables(doc)) this.connect(c.from, c.to);   // STEREO: an older patch's right sides (the editor saves them)
@@ -4636,6 +4638,24 @@ class WavesEngine {
   processHost(frames = BLOCK){ this.process(frames); }
   bus(slot){ return this.busesL.subarray((slot - 1) * BLOCK, slot * BLOCK); }
   busR(slot){ return this.busesR.subarray((slot - 1) * BLOCK, slot * BLOCK); }
+
+  /* …WAVES LIVE: a node plays one Out bus, so it needn't run what only feeds the others (setOnly(slot); 0 runs everything).
+     Walk back along the cables from the Out modules on that bus; only those modules run. (The Sequencer always runs: it plays the voices with no cable.) What the bus carries doesn't change.
+     Runs everything when it can't tell: an Out whose slot is modulated, or when none of the voices' audio exits would be left
+     (a released voice would then stop being listened to and go to sleep sooner than it does today). */
+  setOnly(slot){ this.onlyBus = slot | 0; this._cullDirty = true; }
+  _cull(){
+    this._cullDirty = false; this.only = null; if (!this.onlyBus) return;
+    const G = this.graph, keep = new Set(), stack = [];
+    for (const m of G.mods.values()){ if (m.def.playsNotes){ keep.add(m.id); stack.push(m.id); } if (m.def !== Out) continue;
+      if ((G.inc.get(m.id) || []).some(c => c.b[1] === 'p:slot')) return;
+      if (clamp(m.inst.params.slot | 0, 1, BUS_COUNT) === this.onlyBus){ keep.add(m.id); stack.push(m.id); } }
+    while (stack.length) for (const c of G.inc.get(stack.pop()) || []) if (!keep.has(c.a[0]) && G.mods.has(c.a[0])){ keep.add(c.a[0]); stack.push(c.a[0]); }
+    let exits = false, kept = false;
+    for (const m of G.mods.values()) if (m.poly && m.exits){ exits = true; if (keep.has(m.id)) kept = true; }
+    if (exits && !kept) return;
+    this.only = keep;
+  }
 
   _bufs(m, v){
     const key = m.id + (v >= 0 ? '#' + v : '');
@@ -4695,7 +4715,8 @@ class WavesEngine {
     } else { io.p = io.base; io.mods = null; }
   }
   _render(frames){
-    const ctx = this._ctx, meter = this.telemetryOn === true;
+    if (this._cullDirty) this._cull();
+    const ctx = this._ctx, meter = this.telemetryOn === true, only = this.only;
     ctx.block = frames; ctx.quality = this.quality; ctx.notes = this.voices.rows; ctx.transport = this.transport;
     this.voices.now += frames;
     const hold = this.sr * 12, quietFor = this.sr * 0.25;
@@ -4704,7 +4725,7 @@ class WavesEngine {
       const row = this.voices.rows[v], awake = this.voices.awake(v, hold);
       let peak = 0;
       for (const id of this.graph.order){
-        const m = this.graph.mods.get(id); if (!m.poly) continue;
+        const m = this.graph.mods.get(id); if (!m.poly || (only && !only.has(id))) continue;
         const io = this._bufs(m, v);
         // Silent voices are skipped (their outputs go quiet) to save CPU.
         if (!awake){ if (!io.asleep){ for (const k in io.out) io.out[k].fill(0); io.asleep = true; } continue; }
@@ -4721,7 +4742,7 @@ class WavesEngine {
     }
     ctx.voice = 0;
     for (const id of this.graph.order){
-      const m = this.graph.mods.get(id); if (m.poly) continue;
+      const m = this.graph.mods.get(id); if (m.poly || (only && !only.has(id))) continue;
       const io = this._bufs(m, -1); this._gather(m, io, -1);
       m.def.process(this._state(m, -1), io, ctx);
       if (meter) this._jackPeaks(m.id, io, frames);
@@ -4909,13 +4930,15 @@ class WavesLiveProc extends AudioWorkletProcessor {
     this.p = o.p || {}; this.dead = false;
     this.e = new WavesEngine(sampleRate, { hosted:false, maxVoices:8, transport:{ tempo:120, lpb:4, ticks:6, playing:false } });
     try { if (o.doc) this.e.loadPatch(o.doc); } catch (_) {}
+    this.e.setOnly(this.busOf());   // only what feeds this pad's Bus runs
     this.lane = Array.from({length:WL_LANES}, () => ({row:-1, lt:0, lg:false}));
     this.quiet = 1e9; this.ms = 0; this.fr = 0; this.bpm = 0;
     this.port.onmessage = ev => { const d = ev.data || {};
-      if (d.set) this.p = d.set;
+      if (d.set){ this.p = d.set; this.e.setOnly(this.busOf()); }
       if (d.doc){ try { this.e.loadPatch(d.doc); for (const l of this.lane) l.row = -1; } catch (_) {} }
       if (d.dispose){ if (this.__cid && globalThis.__tcNodes && globalThis.__tcNodes.get(this.__cid) === this) globalThis.__tcNodes.delete(this.__cid); this.dead = true; } };
   }
+  busOf(){ return Math.min(BUS_COUNT, Math.max(1, (+this.p.bus | 0) || 1)); }
   pitch(r){ return 36 + (+this.p.tune || 0) + 12 * Math.log2(r > 1e-6 ? r : 1e-6) - 60; }
   process(_ins, outs, P){
     if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);
@@ -4952,7 +4975,7 @@ class WavesLiveProc extends AudioWorkletProcessor {
     const held = this.lane.some(l => l.row >= 0 && V.rows[l.row].gate);
     if (!held && !any && this.quiet > sampleRate * 2){ L.fill(0); if (R !== L) R.fill(0); return true; }
     try { e.process(BLOCK); } catch (_) { e.busesL.fill(0); e.busesR.fill(0); }
-    const bus = Math.min(BUS_COUNT, Math.max(1, (+this.p.bus | 0) || 1)), off = (bus - 1) * BLOCK;
+    const bus = this.busOf(), off = (bus - 1) * BLOCK;
     const g = Math.pow(10, (+this.p.level || 0) / 20), dv = +this.p.drive || 0, dr = dv > 0.001 ? 1 + dv * dv * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1;
     let pk = 0;
     for (let i = 0; i < n; i++){

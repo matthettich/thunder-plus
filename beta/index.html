@@ -145,7 +145,7 @@ body.mob .deskmenu{display:none}
 :is(#gset,.rlock) input[type=range]:not(.unl){pointer-events:none; opacity:.5}
 /* ONE SLIDER (27 Oct, Phase 2): a vertical swipe over a slider scrolls the page; the value tip while dragging; the slider the
    wheel will move (it rested under the pointer) is outlined */
-input[type=range], .row:has(> input[type=range]){touch-action:pan-y}
+input[type=range], .row:has(> input[type=range]), .acidr, .acidf:has(input[type=range]){touch-action:pan-y}
 @media (pointer:coarse){ input[type=range]:not(:is(#gset, .rlock) *){pointer-events:none} }
 .sldtip{position:fixed; z-index:140; transform:translate(-50%, calc(-100% - 6px)); padding:2px 7px; border-radius:4px; background:var(--ink, #222); color:var(--panel, #fff); font:600 12px/1.5 var(--font); pointer-events:none; white-space:nowrap}
 input[type=range].wheelon, [data-wheel].wheelon{outline:2px solid var(--ink); outline-offset:2px; border-radius:4px}
@@ -770,6 +770,8 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .recset .acidf{margin:6px 0}
 .recstate{margin:2px 0 4px; opacity:.75; font-variant-numeric:tabular-nums}
 .recsp{flex:1}
+.rectime{font:600 15px/1 ui-monospace,Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; min-width:5.2em; text-align:right; padding:0 6px; white-space:nowrap}
+.rectime.wait{opacity:.5; font-weight:400}
 .recbar{display:flex; align-items:center; gap:8px; margin:0; padding:7px 8px; border-top:1px solid color-mix(in srgb, var(--line) 35%, transparent)}
 /* THE WINDOW: the FX bar's card (#dkFxBar .dkfc): a line border on the white offset block, a solid title bar with a square */
 .recwin{margin:12px 6px 18px 0; border:1.5px solid var(--line); background:var(--panel); color:var(--ink); box-shadow:4px 4px 0 0 var(--mxbg, #fff), 4px 4px 0 1.5px var(--line)}
@@ -2742,6 +2744,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="bar"><span class="ttl">MIDI</span><span class="lbl" id="midiStat">Not connected</span></div>
     <div class="pbody">
       <div class="audrow" title="Plug a controller in (USB-C on the phone) and connect: pads 00–07 answer notes 36–43, other notes play the selected synth"><span>Connect</span><button id="bMidiOn">Connect MIDI</button></div>
+      <div class="segrow" id="midiEngRow" hidden title="Native: the desktop app sends MIDI itself, each message at its exact time, and STOP takes back notes booked ahead. Browser: the browser’s Web MIDI, as on the website"><span>Engine</span><div class="seg" id="segMidiEng"></div></div>
       <h3>Input</h3>
       <div class="audrow" title="Which input and channel play notes and knobs. The others are ignored, so gear that sends its own notes or echoes ours can’t play the pads"><span>Notes in</span><select id="midiInSel" aria-label="Which MIDI input plays notes"><option value="">Every input</option></select><select id="midiInCh" class="mch" aria-label="Which channel plays notes"></select></div>
       <div class="audrow" title="In the tracker a keyboard plays the instrument you’re on (a MIDI instrument plays its gear, with bend, mod wheel, aftertouch and sustain passed through); or the pads, as on the Synth page"><span>Keys play</span><select id="midiKeysSel" aria-label="What a MIDI keyboard plays in the tracker"><option value="1" title="The instrument you are on: its pad, or its MIDI gear">Current instrument</option><option value="0" title="Pads on notes 36–43, the selected synth on the rest">Pads + selected synth</option></select></div>
@@ -2797,7 +2800,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="segrow" title="Lowest answers the pads fastest; Safest uses a bigger buffer if you hear crackles. Changes when audio restarts"><span>Latency</span><div class="seg" id="segLat"></div></div>
       <div class="segrow" title="Device uses the output’s own rate. Changes when audio restarts"><span>Rate</span><div class="seg" id="segARate"></div></div>
       <div class="audrow" title="Lines up tracks and buses whose …pump effects look ahead (LIMIT, CALM, TONE, linear-phase EQ…) by delaying everything else to match. Off: those tracks play a little late, as before. Renders follow the same setting."><span>Latency comp</span><input type="checkbox" class="msw1" id="ckPdc" aria-label="Latency compensation"></div>
-      <div class="segrow" id="psLiveRow" hidden><span>…pump live</span><div class="seg" id="segPsLive"></div></div>
+      <div class="segrow" id="psLiveRow" hidden><span>Live engines</span><div class="seg" id="segPsLive"></div></div>
       <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread: the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Applies when audio restarts (reloads; song and kit kept)</span><button id="audRestart" class="on">Apply (reload)</button></div>
       <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every voice and effect from scratch (song and kit are untouched)">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short log of what playback did (screen on / off, the audio engine's state, how late the audio thread's rows came, what still sounded after STOP), to paste into a bug report">Copy playback report</button></div>
@@ -3303,13 +3306,14 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <tr><td>Out of view</td><td>On a phone or tablet the song moves from the audio-thread sequencer to the page sequencer the moment the app is hidden (screen off, another app), at the next step, so STOP always works; the next PLAY uses the audio thread again. Phones slow down out of view, so a busy song can still stutter there</td></tr>
 <tr><td>Background play</td><td>Android's playback notification, so the song keeps going when you switch apps. Settings → App, or the PROJECT screen</td></tr>
 <tr><td>Playhead offset</td><td>Settings → Screen: moves the playhead to match what you hear (+ later, for Bluetooth or a slow screen; − earlier)</td></tr>
-<tr><td>Playback report</td><td>Settings → Audio → Copy playback report: a short log of what playback did, to paste into a bug report</td></tr></table></section>
-    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots; on a computer, where they are a list down the left, ▲▼ do too)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the pad as it is (<kbd>Space</kbd> plays or stops the song, as everywhere)</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr><tr><td><kbd>F2</kbd>–<kbd>F9</kbd></td><td>As in the tracker: F2–F4 Phrase, Mixer, Inst; F5 the song from the top, F6 the pad, F7 the song from the cursor, F8 stop, F9 REC</td></tr><tr><td><kbd>Alt</kbd> <kbd>8</kbd> · <kbd>9</kbd> · <kbd>0</kbd> · <kbd>`</kbd></td><td>…waves · …chains · the synth · back to the last view (these and Alt+1–7 work from …waves and …chains too)</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound. It starts with one group per drum type (Kicks, Snares, Claps &amp; snaps, Rims &amp; sticks, Closed hats, Open hats, Cymbals, Toms, Hand drums, Shakers &amp; tambourines, Cowbells, blocks &amp; metal), gathering every drum the app has from its own designs, the drum engines and the classic and acoustic kits; then IDM and glitch hits, basses, pads, chords, keys, leads and each engine's sounds. The search box finds any of them by name. <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once. <b>Drum kits…</b> (File ▾, or ⚙ Settings → Kit) puts a CR-78-, 808-, 606-, 909-, 707-, 727- or 505-style kit, or a clean acoustic kit (Funk, Studio, Jazz), on pads 1–8 and keeps the synth slots; every sound of each kit is also in the Presets list, filed under its type (808 Kick under Kicks). <b>Funk breaks…</b> (File ▾) loads one of twelve original breaks, with swing, ghost notes and a laid-back snare, as a new song with its acoustic kit, or adds its four bars to this song. <b>Breaks to chop</b> (File ▾) has the fourteen breaks of …pump BREAK, rendered by its own kit with room and tape, as a one-bar loop in a slot, cut into 16 slices (C-4 plays slice 1) and synced to the tempo, ready to re-sequence. <b>Acid line…</b> (Edit ▾ or right-click on a phrase) writes a random bass line into the phrase the way …pump ACID does — scale, root, density, accents, slides and octave jumps; Roll (R) again or Mutate (M) a few steps, and light only the lanes you want changed — for an Acid pad (accents are volume FF, slides PSL).</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modelled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. <b>Drift</b> is a two-line analog pad synth laid out like the big 1970s CS-series polysynths (two oscillator lines per voice, a high-pass and a low-pass with their own envelope, up to four drifting unison voices) followed by a tape stage — <b>Wow</b> and <b>Flutter</b> on the pitch, chorus, saturation, <b>Age</b> (worn top and bottom, the odd dropout) and hiss — for warm, wobbly, faded pads; its presets are in the pad Presets list under Drift (tape pads). <b>…pump</b> (group in the engine list) has the pump plugins' instruments with their own sound and presets: <b>Mono</b> (three oscillators, four filters), <b>Poly</b> (two oscillators, poly-mod, unison, chorus) and <b>Coil</b> (tuned springs kicked by the note). Each renders a note like the other engines (<b>Hit</b> is how hard it is played), and each has a <b>live</b> twin that plays the plugin in the tracker note by note, with the VOL column as velocity, slides and bends as pitch bend, and glide (Coil live also sets how many <b>Voices</b> ring at once, 1–16). A twin shares its values with the rendered engine; if the device can't keep up, the live ones fall back to their renders and say so (Settings → Audio → …pump live). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. Notes side by side in different columns sing together; a new note in the same column takes over that column's singer. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
+<tr><td>Playback report</td><td>Settings → Audio → Copy playback report: a short log of what playback did, to paste into a bug report</td></tr>
+<tr><td>Input engine</td><td>Desktop app: Record a sample → Engine Native records from every input of an audio interface; Browser uses the browser’s own input (inputs 1–2)</td></tr></table></section>
+    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots; on a computer, where they are a list down the left, ▲▼ do too)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the pad as it is (<kbd>Space</kbd> plays or stops the song, as everywhere)</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr><tr><td><kbd>F2</kbd>–<kbd>F9</kbd></td><td>As in the tracker: F2–F4 Phrase, Mixer, Inst; F5 the song from the top, F6 the pad, F7 the song from the cursor, F8 stop, F9 REC</td></tr><tr><td><kbd>Alt</kbd> <kbd>8</kbd> · <kbd>9</kbd> · <kbd>0</kbd> · <kbd>`</kbd></td><td>…waves · …chains · the synth · back to the last view (these and Alt+1–7 work from …waves and …chains too)</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound. It starts with one group per drum type (Kicks, Snares, Claps &amp; snaps, Rims &amp; sticks, Closed hats, Open hats, Cymbals, Toms, Hand drums, Shakers &amp; tambourines, Cowbells, blocks &amp; metal), gathering every drum the app has from its own designs, the drum engines and the classic and acoustic kits; then IDM and glitch hits, basses, pads, chords, keys, leads and each engine's sounds. The search box finds any of them by name. <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves all 16 pads at once. <b>Drum kits…</b> (File ▾, or ⚙ Settings → Kit) puts a CR-78-, 808-, 606-, 909-, 707-, 727- or 505-style kit, or a clean acoustic kit (Funk, Studio, Jazz), on pads 1–8 and keeps the synth slots; every sound of each kit is also in the Presets list, filed under its type (808 Kick under Kicks). <b>Funk breaks…</b> (File ▾) loads one of twelve original breaks, with swing, ghost notes and a laid-back snare, as a new song with its acoustic kit, or adds its four bars to this song. <b>Breaks to chop</b> (File ▾) has the fourteen breaks of …pump BREAK, rendered by its own kit with room and tape, as a one-bar loop in a slot, cut into 16 slices (C-4 plays slice 1) and synced to the tempo, ready to re-sequence. <b>Acid line…</b> (Edit ▾ or right-click on a phrase) writes a random bass line into the phrase the way …pump ACID does — scale, root, density, accents, slides and octave jumps; Roll (R) again or Mutate (M) a few steps, and light only the lanes you want changed — for an Acid pad (accents are volume FF, slides PSL).</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modelled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modelled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. <b>Drift</b> is a two-line analog pad synth laid out like the big 1970s CS-series polysynths (two oscillator lines per voice, a high-pass and a low-pass with their own envelope, up to four drifting unison voices) followed by a tape stage — <b>Wow</b> and <b>Flutter</b> on the pitch, chorus, saturation, <b>Age</b> (worn top and bottom, the odd dropout) and hiss — for warm, wobbly, faded pads; its presets are in the pad Presets list under Drift (tape pads). <b>…pump</b> (group in the engine list) has the pump plugins' instruments with their own sound and presets: <b>Mono</b> (three oscillators, four filters), <b>Poly</b> (two oscillators, poly-mod, unison, chorus) and <b>Coil</b> (tuned springs kicked by the note). Each renders a note like the other engines (<b>Hit</b> is how hard it is played), and each has a <b>live</b> twin that plays the plugin in the tracker note by note, with the VOL column as velocity, slides and bends as pitch bend, and glide (Coil live also sets how many <b>Voices</b> ring at once, 1–16). A twin shares its values with the rendered engine; if the device can't keep up, the live ones fall back to their renders and say so (Settings → Audio → Live engines). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. Notes side by side in different columns sing together; a new note in the same column takes over that column's singer. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
 
-<script src="waves/waves-worklet.js?v=33"></script>
+<script src="waves/waves-worklet.js?v=34"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -8120,7 +8124,7 @@ const Lc = () => V().layers[V().sel];
 // Output device, level, latency and sample rate. Latency and rate are fixed when the AudioContext is made,
 // so changing them asks for a restart; the output device and level change live.
 const AUK = 'thunderplus-audio-v1';
-const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false, core:'core', link:false, linkSync:true};   // link, linkSync: ABLETON LINK (desktop app), off by default   // core: THUNDER CORE, 'core' (default from build 362, owner) or 'page' (the old pump)   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
+const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psLive:'auto', pdc:false, core:'core', link:false, linkSync:true, inEngine:'auto', midiEngine:'native'};   // midiEngine: NATIVE MIDI (desktop app, helper phase B), 'native' or 'browser' (Web MIDI)   // link, linkSync: ABLETON LINK (desktop app), off by default   // core: THUNDER CORE, 'core' (default from build 362, owner) or 'page' (the old pump)   // psLive: …PUMP SYNTHS live, 'auto' or 'render' (this device)
   try { const o = JSON.parse(localStorage.getItem(AUK) || '{}'); return Object.assign(d, o && typeof o === 'object' ? o : {}); } catch(e){ return d; } })();
 // Latency: what the person picked, else Balanced in the Mobile setup (phones click at Lowest when busy) and Lowest on desktop.
 // The desktop app starts on Balanced too (owner, 31 Oct: playback stuttered in the desktop app and not in the browser on the
@@ -8257,7 +8261,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, data2:m.data2 || null, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=33', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=34', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -12794,13 +12798,16 @@ function refreshAll(){
   try { ccBadges(); } catch(e){}   // sliders may have been rebuilt (another layer type or effect)
 }
 document.addEventListener('keydown', e => {
-  if (view === 'tracker' || typing(e) || e.repeat || e.ctrlKey || e.metaKey) return;
+  if (view === 'tracker' || typing(e) || e.repeat) return;
+  if (e.ctrlKey || e.metaKey){ if (soloMuteKey(e)) e.preventDefault(); return; }   // (only the solo keys, Ctrl/⌘+/ \, are used with Ctrl here)
   // SPACE (owner, 27 Oct, Phase 2): Space plays or stops the song on every screen; Shift+Space plays this screen, which on
   // the Synth page is the selected pad (it was Space there, and Shift+Space the song).
-  if (e.code === 'Space' && !e.altKey && (e.shiftKey || !(e.target.matches && e.target.matches('button')))){
+  if (e.code === 'Space' && !e.altKey){   // (a focused button no longer keeps Space: spaceBtn, by the menu keys, plays first)
     e.preventDefault();
     if (e.shiftKey && view === 'synth'){ play(cur); return; }
     if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); return; }
+  // SOLO / MUTE (owner, 8 Nov): on this screen too, for the track the panel follows (see soloMuteKey)
+  if (soloMuteKey(e)){ e.preventDefault(); return; }
   if (e.altKey && /^Digit[1-7]$/.test(e.code)){ e.preventDefault(); setView('tracker'); go(VIEWS[+e.code.slice(5) - 1]); return; }
   // FIX (UI sweep, 4 Nov): Alt/⌥+S, Song settings "from any screen" (owner, 3 Nov), the Synth page too (it was the tracker's only)
   if (e.altKey && !e.shiftKey && e.code === 'KeyS' && view === 'synth'){ e.preventDefault(); if (!pbOpen) setSheet('song'); return; }
@@ -13762,12 +13769,29 @@ $('bEdit').addEventListener('click', () => geditToggle());
    its first item. In an open menu ▲▼ move, ▶ / ◀ open and close a group (at the top level they go to the next or previous
    menu), Home / End jump, Enter / Space pick, Esc closes back to its button and Tab closes. */
 const TOPM = [['bFile', 'gfile', o => gfileToggle(o)], ['bEdit', 'gedit', o => geditToggle(o)]];
+/* SPACE ALWAYS PLAYS (owner, 8 Nov, desktop app: "Space bar when menu is selected opens menu, but would be better if locked to
+   start and stop the song always"). A focused button took Space as a click (the browser fires it on keyUP), so after clicking
+   File ▾ / Edit ▾ / Audio & MIDI or any tab or toggle, Space opened or flipped that instead of playing. Now Space on a button
+   plays or stops the song (the same call as the other Space handlers) and the button's click is cancelled on keydown and keyup.
+   Left alone: typing (typing(): text fields, selects, PumpFX), an open File / Edit / right-click menu and its items, and any
+   dialog but the Settings pop-up (an ask / sheet / picker uses Space on its own buttons), where Space on a focused button is
+   still a click. Shift+Space (play this screen) and Ctrl/⌘+Space (loop the pattern) are not touched. */
+const spaceBtn = e => { const t = e.target;
+  if (e.code !== 'Space' && e.key !== ' ') return false;
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || !t || !t.closest || !t.closest('button, [role=button], [role=tab], summary, input[type=button], input[type=checkbox], input[type=radio]')) return false;
+  if (typing(e) || sxMenuEl || askOpen || pbOpen || t.closest('#gfile, #gedit, [role=dialog]:not(#gset), [aria-modal=true], .ask, .swapov, .pbs')) return false;
+  return true; };
+window.addEventListener('keydown', e => {
+  if (!spaceBtn(e)) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (!e.repeat){ if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); } }, true);
+window.addEventListener('keyup', e => { if (spaceBtn(e)){ e.preventDefault(); e.stopImmediatePropagation(); } }, true);   // the click a button fires on Space keyUP
 window.addEventListener('keydown', e => {
   if (sxMenuEl || typing(e)) return;
   const open = TOPM.find(([, g]) => !$(g).hidden), act = document.activeElement;
   const first = g => { const L = menuNavList($(g)); if (L[0]) L[0].focus(); };
   if (!open){ const foc = TOPM.find(([b]) => act === $(b));
-    if (foc && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); e.stopImmediatePropagation(); foc[2](true); first(foc[1]); }
+    if (foc && (e.key === 'ArrowDown' || e.key === 'Enter')){ /* (Space plays: spaceBtn) */ e.preventDefault(); e.stopImmediatePropagation(); foc[2](true); first(foc[1]); }
     return; }
   const m = $(open[1]), inM = m.contains(act);
   if (e.key === 'Escape'){ e.preventDefault(); e.stopImmediatePropagation(); open[2](false); $(open[0]).focus(); return; }
@@ -13867,11 +13891,11 @@ const updCore = makeSeg($('segCore'), [['core', 'Audio thread'], ['page', 'Page 
   aset.core = v; asetSave();
   if (v === 'core'){ if (ctx) coreLoad(); toast('Sequencer: audio thread, from the next PLAY.', 3000); } else toast('Sequencer: page, from the next PLAY.', 2500); });
 function psLiveNote(){
-  const on = typeof PsynCore !== 'undefined'; $('psLiveRow').hidden = !on; if (!on) return;
+  $('psLiveRow').hidden = false;   // …waves live uses it too, with or without the …pump engines
   $('psLiveRow').title = aset.psLive === 'render'
-    ? '…pump live: Rendered. On this device Mono live, Poly live and Coil live play their rendered sound (the same values, as the rendered engines play them): lighter on the battery. Auto plays them live.'
-    : psLive.off ? '…pump live: Auto, but playing their renders for now: this device couldn’t keep up with them live. Tap Auto to try live again.'
-    : '…pump live: Auto. Mono live, Poly live and Coil live play live, and switch to their rendered sound if this device can’t keep up (it says so). Rendered always plays their renders, lighter on the battery.';
+    ? 'Live engines: Rendered. On this device the …pump live engines and …waves live play their rendered sound: lighter on the battery. Auto plays them live.'
+    : psLive.off ? 'Live engines: Auto, but playing their renders for now: this device couldn’t keep up with them live. Tap Auto to try live again.'
+    : 'Live engines: Auto. The …pump live engines and …waves live play live, and switch to their rendered sound if this device can’t keep up (it says so). Rendered always plays their renders, lighter on the battery.';
 }
 psLiveNote();
 $('audRestart').addEventListener('click', () => { try { save(); } catch(e){ tpLog('save before restart failed', e); } applyUpdate(); });
@@ -14337,15 +14361,24 @@ function seConcat(a, b) {
    the assignSample hook (smbAdd) and bLoad's handler (back to the file picker). */
 const SMB_K = 'thunderplus-recent-v1', SMB_MAX = 40, SMB_EXT = /\.(wav|wave|aif|aiff|aifc|flac|mp3|ogg|oga|opus|m4a|aac|caf|webm)$/i;
 const SMB = {tab:'folder', q:'', files:null, scanning:false, dir:null, perm:'', session:[], sel:0, aud:true, prev:null, ui:null};
-const smbRecent = () => { try { const a = JSON.parse(localStorage.getItem(SMB_K) || '[]'); return Array.isArray(a) ? a : []; } catch(e){ return []; } };
+// RECENT lives in localStorage, which is ~5 MB for the whole origin and shared with the kit, the song and their backups. A write that fails
+// there (full) used to be swallowed, so a take simply never appeared ("5 minute take wasn't in recent samples", 8 Nov: nothing is wrong with a
+// long sample itself, the store holds it as 16-bit PCM and the list entry is 80 bytes). So the list is also kept in memory, and a failed write
+// retries with fewer entries; smbRecent() reads whichever is newer, so the take is there at least until the page closes.
+var SMB_MEM = null;
+const smbRecent = () => { let a = []; try { a = JSON.parse(localStorage.getItem(SMB_K) || '[]'); if (!Array.isArray(a)) a = []; } catch(e){ a = []; }
+  if (SMB_MEM && SMB_MEM.length && (!a.length || SMB_MEM[0].t >= a[0].t)) return SMB_MEM;   // (the memory copy is newer only when the last write failed)
+  return a; };
 // A sample a pad just took: to the top of RECENT, and into the sample store now (so it's there even if the pad changes first)
 function smbAdd(S){
   if (!S || !S.data) return;
   if (!S.id) S.id = smpId();
-  const a = smbRecent().filter(r => r.id !== S.id);
+  const a = smbRecent().filter(r => r.id !== S.id).slice(0, SMB_MAX - 1);
   a.unshift({id:S.id, name:S.name || 'Sample', secs:+(S.data.length / S.sr).toFixed(2), st:S.data2 ? 1 : 0, t:Date.now()});
-  try { localStorage.setItem(SMB_K, JSON.stringify(a.slice(0, SMB_MAX))); } catch(e){}
-  try { smpPut(S).catch(() => {}); } catch(e){}
+  let ok = false; for (const n of [SMB_MAX, 10, 3, 1]){ try { localStorage.setItem(SMB_K, JSON.stringify(a.slice(0, n))); ok = true; break; } catch(e){} }
+  SMB_MEM = ok ? null : a; if (!ok) tpLog('RECENT could not be saved (storage full): kept for this session only');
+  smpHeld.set(S.id, S);   // (so a RECENT row loads from memory even if the store write below is slow or fails; the minute-by-minute prune lets it go once no pad names it)
+  try { smpPut(S).catch(e => { tpLog('could not store the sample for RECENT', e); toast('This sample is too big for the browser’s storage: RECENT will only have it until the app closes.', 7000); }); } catch(e){}
 }
 const smbDb = () => idbOpen('thunderplus-browser');   // (its store is called 'smp' too: idbOpen makes that one; here it holds the folder handle)
 async function smbKv(k, v){ try { const db = await smbDb(); return await new Promise(res => { const tx = db.transaction('smp', v === undefined ? 'readonly' : 'readwrite'), st = tx.objectStore('smp');
@@ -14497,16 +14530,57 @@ const RCD_WORKLET = `class ThRec extends AudioWorkletProcessor{
 registerProcessor('thunder-rec',ThRec);`;
 async function rcdInputs(){ try { return (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch(e){ return []; } }
 // The input (the simple recorder's openMic): the picked device, else the default; everything a phone does to clean up speech off
-async function rcdOpen(){
-  if (RCD.stream) return true;
-  const md = navigator.mediaDevices; if (!md || !md.getUserMedia){ toast('This browser can’t record audio.'); return false; }
+// ONE OPEN AT A TIME (owner's beta.4 test, 7 Nov: 4–8 microphone prompts, "500R8 wouldn't open: no answer"): the window opens
+// the input for its meters without waiting, and Record asked again before that had finished: two opens of the interface
+let rcdOpening = null;
+function rcdOpen(){ const g = RCD.gen | 0;
+  if (rcdOpening && rcdOpening.gen === g) return rcdOpening;
+  // (an open from before a close gives up when it sees the close: a new one waits for it to finish, then opens afresh)
+  const prev = rcdOpening, p = (prev ? prev.catch(() => {}).then(() => (RCD.gen | 0) === g ? rcdOpen1() : false) : rcdOpen1()).finally(() => { if (rcdOpening === p) rcdOpening = null; });   // (a queued open whose window closed before it started doesn't start: CodeRabbit)
+  p.gen = g; rcdOpening = p; return p; }
+async function rcdOpen1(){
+  // STALE (owner, 7 Nov: "you have to close the recording window to get access to the inputs again"): the native input can stop
+  // under us (the interface reconfigured, the audio engine rebuilt); then it is closed and opened again, not trusted
+  if ((RCD.io || RCD.stream) && !RCD.on && !RCD.sync && (RCD.ctx !== ctx || (RCD.io && RCD.io.got && performance.now() - (RCD.io.lastIn || 0) > 2000))) rcdClose();   // (only once audio had come: an input still waiting on macOS's microphone prompt isn't stale, and reopening it asked again)
+  if (RCD.stream || RCD.io) return true;
+  // CLOSED WHILE OPENING (owner's beta.14 test: monitoring distorted and the song silent after closing and reopening the window):
+  // the window can close (rcdClose) while this waits on macOS or the helper; what this open then made is undone, not left half-open
+  const gen = RCD.gen | 0, gone = () => (RCD.gen | 0) !== gen;
   audio(); try { if (ctx.state !== 'running') await ctx.resume(); } catch(e){}
+  // NATIVE INPUT (desktop app, INPUT ENGINE Auto): every channel of the interface, through the helper; the browser's input otherwise
+  if (IOAPI && aset.inEngine !== 'browser'){
+    try {
+      if (RCD.mod !== ctx){ await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([RCD_WORKLET], {type:'application/javascript'}))); RCD.mod = ctx; }
+      const node = new AudioWorkletNode(ctx, 'thunder-rec', {numberOfInputs:1, numberOfOutputs:0, channelCount:2, channelCountMode:'explicit', channelInterpretation:'speakers'});
+      const mon = ctx.createGain(); mon.gain.value = rcdSet.mon ? 1 : 0; mon.connect(master);
+      node.port.onmessage = e => rcdMsg(e.data);
+      Object.assign(RCD, {node, mon, ctx, inLat:0});
+      const okIo = await rcdOpenIo(node, mon);
+      if (gone()){ if (RCD.io && RCD.io.node){ const io = RCD.io; RCD.io = null; clearInterval(io.tick); try { io.node.port.onmessage = null; io.node.disconnect(); } catch(e){} }
+        IOH.onIn = IOH.onGone = null; iohAsk({op:'close'});   // (always: the helper may have opened the device even if this side gave up; rcdOpen is single-flight, so nothing newer is open)
+        try { mon.disconnect(); node.port.onmessage = null; } catch(e){} if (RCD.node === node) Object.assign(RCD, {node:null, mon:null}); return false; }
+      if (okIo){
+        // RATE (A2): the interface at another rate than the app's audio is converted (and ADAT carries 16 inputs only at 44.1 / 48 kHz)
+        const op = RCD.io.opened, dr = op.deviceRate | 0, ar = ctx.sampleRate | 0;
+        RCD.note = dr && dr !== ar ? `${RCD.io.dev.name} runs at ${dr / 1000} kHz and the app at ${ar / 1000} kHz: the input is converted. Set them the same (Settings › Audio › Rate, or the interface) for a clean take.` : '';
+        RCD.nch = RCD.io.opened.channels; if (!rcdSet.nchs || typeof rcdSet.nchs !== 'object') rcdSet.nchs = {};
+        rcdSet.nchs['io:' + RCD.io.dev.inId] = RCD.nch; rcdSave(); rcdRoute(); if (RCD.ui && RCD.ui.fillCh) RCD.ui.fillCh(); if (RCD.ui && RCD.ui.latSay) RCD.ui.latSay();
+        return true; }
+      try { mon.disconnect(); node.port.onmessage = null; } catch(e){} Object.assign(RCD, {node:null, mon:null});
+    } catch(e){ tpLog('native input', e); rcdCloseIo(); Object.assign(RCD, {node:null, mon:null}); RCD.ioWhy = String((e && e.message) || e); }
+    // NO SILENT FALLBACK: with Engine Native and the helper there, a failed open says why and records nothing (the browser's input
+    // would have quietly given only inputs 1–2). Without the helper at all, the browser's input is used, as the window says.
+    if (IOH.state === 'ready'){ RCD.note = 'Native input: ' + (RCD.ioWhy || 'it didn’t open') + '. Try again, or pick Engine Browser.'; toast(RCD.note, 6000); return false; }
+  }
+  const md = navigator.mediaDevices; if (!md || !md.getUserMedia){ toast('This browser can’t record audio.'); return false; }
   const base = {echoCancellation:false, noiseSuppression:false, autoGainControl:false, channelCount:{ideal:32}};   // INPUTS: every channel it has
   let s = null;
   if (rcdSet.input){ try { s = await md.getUserMedia({audio:Object.assign({}, base, {deviceId:{exact:rcdSet.input}})}); } catch(e){} }
   if (!s){ try { s = await md.getUserMedia({audio:base}); } catch(e){ toast(e && e.name === 'NotAllowedError' ? 'Recording needs permission to use an audio input.' : 'Couldn’t open an audio input.', 5000); return false; } }
+  if (gone()){ s.getTracks().forEach(t => t.stop()); return false; }   // (closed while the browser asked: CodeRabbit)
   try {
     if (RCD.mod !== ctx){ await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([RCD_WORKLET], {type:'application/javascript'}))); RCD.mod = ctx; }
+    if (gone()){ s.getTracks().forEach(t => t.stop()); return false; }
     const src = ctx.createMediaStreamSource(s), node = new AudioWorkletNode(ctx, 'thunder-rec', {numberOfInputs:1, numberOfOutputs:0, channelCount:2, channelCountMode:'explicit', channelInterpretation:'speakers'});
     const mon = ctx.createGain(); mon.gain.value = rcdSet.mon ? 1 : 0; mon.connect(master);
     node.port.onmessage = e => rcdMsg(e.data);
@@ -14518,7 +14592,8 @@ async function rcdOpen(){
     return true;
   } catch(e){ s.getTracks().forEach(t => t.stop()); tpLog('recorder', e); toast('Couldn’t start recording here.'); return false; }
 }
-function rcdClose(){ try { if (RCD.src) RCD.src.disconnect(); if (RCD.spl) RCD.spl.disconnect(); if (RCD.mrg) RCD.mrg.disconnect(); if (RCD.mon) RCD.mon.disconnect(); if (RCD.node){ RCD.node.port.onmessage = null; } } catch(e){}
+function rcdClose(){ RCD.gen = (RCD.gen | 0) + 1; rcdCloseIo();   // (gen: an open still in flight sees it was closed meanwhile)
+  try { if (RCD.src) RCD.src.disconnect(); if (RCD.spl) RCD.spl.disconnect(); if (RCD.mrg) RCD.mrg.disconnect(); if (RCD.mon) RCD.mon.disconnect(); if (RCD.node){ RCD.node.port.onmessage = null; } } catch(e){}
   if (RCD.stream) RCD.stream.getTracks().forEach(t => t.stop()); Object.assign(RCD, {stream:null, src:null, node:null, mon:null, spl:null, mrg:null}); }
 /* INPUTS (owner, 7 Nov: "choose the audio input on a multi-channel audio interface"): the input is opened with every channel
    the browser will give (some only give 2, whatever the interface has), and INPUTS picks a pair (1+2, 3+4…) or one channel,
@@ -14528,11 +14603,12 @@ function rcdClose(){ try { if (RCD.src) RCD.src.disconnect(); if (RCD.spl) RCD.s
 function rcdPick(n){
   const m = /^([ps])(\d+)$/.exec(rcdSet.inCh || ''), k = m ? m[1] : 'p', a = m ? +m[2] : 0;
   return (k === 'p' ? a + 1 < n || a === 0 : a < n) ? [k, a] : ['p', 0]; }
-function rcdInOpts(n){
-  if (n <= 2) return [['p0', n < 2 ? '1 (all the app is given)' : '1+2 (all the app is given)']];   // (owner, 7 Nov: "wrongly thinks my audio interface only has two inputs": it's what the browser engine hands over, not the device)
+function rcdInOpts(n, nat){
+  if (n <= 2) return [['p0', nat ? (n < 2 ? '1' : '1+2') : n < 2 ? '1 (all the app is given)' : '1+2 (all the app is given)']];   // (nat: the native input has the device's own channels: nothing was held back)   // (owner, 7 Nov: "wrongly thinks my audio interface only has two inputs": it's what the browser engine hands over, not the device)
   const o = []; for (let a = 0; a + 1 < n; a += 2) o.push(['p' + a, 'IN ' + (a + 1) + '+' + (a + 2)]);
   for (let a = 0; a < n; a++) o.push(['s' + a, 'IN ' + (a + 1) + ' (mono)']); return o; }
 function rcdRoute(){
+  if (RCD.io){ const [k, a] = rcdPick(RCD.nch || 2); RCD.io.node.port.postMessage({pick:[a, k === 'p' ? a + 1 : a]}); return; }   // NATIVE: picked in its worklet
   const src = RCD.src; if (!src || !RCD.node) return; const n = RCD.nch || 2, [k, a] = rcdPick(n);
   try { src.disconnect(); if (RCD.spl) RCD.spl.disconnect(); if (RCD.mrg) RCD.mrg.disconnect(); } catch(e){}
   RCD.spl = RCD.mrg = null;
@@ -14540,7 +14616,7 @@ function rcdRoute(){
   const spl = ctx.createChannelSplitter(n), mrg = ctx.createChannelMerger(2);
   src.connect(spl); spl.connect(mrg, a, 0); spl.connect(mrg, k === 'p' ? a + 1 : a, 1); mrg.connect(RCD.node); mrg.connect(RCD.mon);
   RCD.spl = spl; RCD.mrg = mrg; }
-const rcdLat = () => Math.max(-0.5, (ctx.outputLatency || ctx.baseLatency || 0) + (RCD.inLat || 0) + (rcdSet.lat || 0) / 1000);
+const rcdLat = () => Math.max(-0.5, (RCD.io ? RCD.io.D : (ctx.outputLatency || ctx.baseLatency || 0) + (RCD.inLat || 0)) + (rcdSet.lat || 0) / 1000);   // NATIVE: frames are placed by their timestamps, D behind
 function rcdMsg(m){
   if (m.pk){ for (let c = 0; c < 2; c++){ RCD.pk[c] = m.pk[c]; RCD.hold[c] = Math.max(RCD.hold[c] * 0.92, m.pk[c]); } if (m.pk[0] >= 0.999 || m.pk[1] >= 0.999) RCD.clip = performance.now(); rcdMeter(); return; }
   if (m.ch && m.ch.length){ if (!RCD.chunks.length) RCD.firstF = m.f0; RCD.chunks.push({f0:m.f0, ch:m.ch}); }
@@ -14622,21 +14698,21 @@ function rcdSongStopped(){ const R = RCD.sync; if (!R) return; if (R.phase === '
 function rcdEndAt(t1){
   const R = RCD.sync; if (!R || R.phase !== 'rec') return; R.phase = 'closing'; R.t1 = t1; rcdUi();
   const lat = rcdLat(), wait = () => { if (!RCD.sync) return; if (ctx.currentTime < t1 + lat + 0.06) return void setTimeout(wait, 40);
-    RCD.onDone = () => { const sr = ctx.sampleRate, t = rcdCollect(Math.round((R.t0 + lat) * sr), Math.round((t1 + lat) * sr)); RCD.on = false; RCD.sync = null;
+    RCD.onDone = () => { const sr = ctx.sampleRate, t = rcdCollect(Math.round((R.t0 + lat) * sr), Math.round((t1 + lat) * sr)); RCD.on = false; RCD.sync = null; RCD.clkF = t1 - R.t0;
       const beats = Math.max(0.25, Math.round((t1 - R.t0) * (R.bpm || S.bpm) / 60 * 4) / 4);
       rcdTake(t, 'sync', beats, R.n); };
-    RCD.node.port.postMessage('stop'); };
+    rcdGo('stop'); };
   wait();
 }
 async function rcdStart(){
   if (RCD.on || RCD.sync) return;
   if (!(await rcdOpen())) return;
   RCD.chunks = []; RCD.take = null; RCD.undo = [];
-  if (rcdSet.mode === 'free'){ RCD.on = true; RCD.t0w = ctx.currentTime; RCD.node.port.postMessage('go'); rcdUi(); return; }
+  if (rcdSet.mode === 'free'){ RCD.on = true; RCD.t0w = ctx.currentTime; rcdGo('go'); RCD.clkF = null; rcdUi(); return; }
   // PATTERN: armed; the next pattern edge starts it. Stopped: play from the cursor's song row (its top is the edge).
   const playing = tp.on && tp.mode === 'song'; if (tp.on && !playing) tStop(true);   // (before arming: tStop ends an armed take)
   const R = RCD.sync = {phase:'armed', pats:rcdSet.pats | 0, n:0, row:null, st:null, stopReq:false};
-  RCD.on = true; RCD.node.port.postMessage('go');
+  RCD.on = true; RCD.clkF = null; rcdGo('go');
   if (playing){ const last = tp.q.length ? tp.q[tp.q.length - 1] : (tp.pos ? {pos:tp.pos} : null);
     if (last && last.pos){ let row = -1, st = -1; for (const p of last.pos) if (p){ if (p.row > row) row = p.row; if (p.step > st) st = p.step; } if (row >= 0){ R.row = row; R.st = st; } } }
   else { RCD.starting = true; try { tStart('song', {row:songRow()}); } finally { RCD.starting = false; } }   // (the Song button's row: the cursor's, or the next pattern with something in it)   // (tStart stops first: not an end)
@@ -14644,10 +14720,10 @@ async function rcdStart(){
 }
 function rcdStop(){
   if (RCD.sync){ const R = RCD.sync; if (R.phase === 'armed'){ rcdAbort(); rcdUi(); } else if (R.phase === 'rec' && !R.stopReq){ if (R.pats < 0) rcdEndAt(ctx.currentTime); else if (!rcdEdgeAhead(R)){ R.stopReq = true; rcdUi(); } } return; }   // PATTERN: at the next edge (CUT RIGHT THERE: now)
-  if (!RCD.on) return; RCD.on = false;
-  RCD.onDone = () => rcdTake(rcdCollect(), 'free', 0, 0); RCD.node.port.postMessage('stop'); rcdUi();
+  if (!RCD.on) return; RCD.clkF = rcdFreeSecs(); RCD.on = false;   // (the length is left up after Stop until the next take)
+  RCD.onDone = () => rcdTake(rcdCollect(), 'free', 0, 0); rcdGo('stop'); rcdUi();
 }
-function rcdAbort(){ RCD.sync = null; RCD.onDone = null; if (RCD.on && RCD.node) RCD.node.port.postMessage('stop'); RCD.on = false; RCD.chunks = []; }
+function rcdAbort(){ RCD.sync = null; RCD.onDone = null; if (RCD.on && RCD.node) rcdGo('stop'); RCD.on = false; RCD.chunks = []; RCD.clkF = null; rcdClk(); }
 function rcdTake(t, how, beats, pats){
   if (!t){ toast('Nothing was recorded.'); rcdUi(); return; }
   if (sePeak({data:t.data, data2:t.data2, sr:ctx.sampleRate}).peak < 1e-4) toast('The take is silent: is the right input picked, and is it turned up?', 5000);
@@ -14660,32 +14736,50 @@ function rcdTake(t, how, beats, pats){
    input's own latency cancels. Each hit gives how late the gear sounds against ...Thunder (with the Gear delay already set);
    the median is the correction, the spread the jitter, the slope across the run any drift. A short, loud, percussive patch on
    the gear measures best. The click goes to the master, so it is as late as the engines (master effects included). */
-const MLT = {GAP:0.25, PER:0.6};
+const MLT = {GAP:0.25, PER:0.6};   // (the click is placed fx = moFxLat() before the engines' time in midiLatRun)
 function mltOnset(x, a, b, sr){   // the first frame in [a, b) above half the window's peak, refined to where it rises above a tenth
   a = Math.max(0, a | 0); b = Math.min(x.length, b | 0); let pk = 0, ip = -1; for (let i = a; i < b; i++){ const v = Math.abs(x[i]); if (v > pk){ pk = v; ip = i; } }
-  if (pk < 0.01) return null; let i = a; while (i < b && Math.abs(x[i]) < pk * 0.5) i++;
+  // ABOVE THE FLOOR (owner's 500R8: Measure read ~200 ms): an input's hum or noise above 0.01 was taken for the click, at the very start
+  // of the window. The hit must stand well clear of the window's quiet part (its 30th-percentile level).
+  if (b - a < 16) return null; const q = []; for (let i = a; i < b; i += 4) q.push(Math.abs(x[i])); q.sort((u, w) => u - w);
+  const fl = q[Math.floor(q.length * 0.3)] || 0; if (pk < 0.01 || pk < fl * 6 + 0.005) return null; let i = a; while (i < b && Math.abs(x[i]) < pk * 0.5) i++;
   const lim = Math.max(a, i - Math.round(sr * 0.004)); while (i > lim && Math.abs(x[i - 1]) >= pk * 0.1) i--; return i; }
 async function midiLatRun(p, ch, note, n){
-  if (!midiOut(p)) throw new Error('no port'); if (!(await rcdOpen())) throw new Error('no input');
+  const say0 = MLT.say, say = t => { try { if (say0) say0(t); } catch(e){} };   // (the panel that started this run: a reopened one isn't told about it, CodeRabbit)
+  if (!midiOut(p)) throw new Error('no port');
+  if (!RCD.io && !RCD.stream) say('Opening the input… (the first time can take a few seconds)');
+  if (!(await rcdOpen())) throw new Error('no input');
   const sr = ctx.sampleRate, buf = ctx.createBuffer(1, Math.round(sr * 0.004), sr), d = buf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = (i & 1 ? -0.9 : 0.9) * (1 - i / d.length);   // a 4 ms, full-scale click
-  const monWas = RCD.mon.gain.value; RCD.mon.gain.value = 0;   // (monitoring would feed the click back in)
-  mapUpd(); RCD.chunks = []; RCD.on = true; RCD.node.port.postMessage('go');
+  rcdMonSet(0);   // (monitoring would feed the click back in)
+  mapUpd(); RCD.chunks = []; RCD.on = true; rcdGo('go'); rcdMonSet(0);
   const t0 = ctx.currentTime + 0.6, T = [];
   for (let k = 0; k < n; k++){ const tc = t0 + k * MLT.PER, src = ctx.createBufferSource(); src.buffer = buf; src.connect(master); src.start(tc);
     msend([0x90 | ch, note, 127], tc + MLT.GAP, true, p); msend([0x80 | ch, note, 0], tc + MLT.GAP + 0.08, true, p); T.push(tc); }
   const end = t0 + n * MLT.PER + rcdLat() + 0.4;
-  await new Promise(r => { const w = () => ctx.currentTime >= end ? r() : setTimeout(w, 50); w(); });
-  const take = await new Promise(r => { RCD.onDone = () => r(rcdCollect(null, null)); RCD.node.port.postMessage('stop'); }); RCD.on = false;
-  try { RCD.mon.gain.value = monWas; } catch(e){} if (!RCD.ui) rcdClose();
+  await new Promise(r => { let k0 = -1; const w = () => { const now = ctx.currentTime;
+    const k = Math.min(n, Math.max(0, Math.floor((now - t0) / MLT.PER) + 1)); if (k !== k0){ k0 = k; say(k ? `Measuring: hit ${k} of ${n}… keep quiet near any microphone.` : 'Starting… keep quiet near any microphone.'); }
+    now >= end ? r() : setTimeout(w, 50); }; w(); });
+  say('Working it out…');
+  const take = await new Promise(r => { RCD.onDone = () => r(rcdCollect(null, null)); rcdGo('stop'); rcdMonSet(0); }); RCD.on = false;
+  // READ BEFORE CLOSING (CodeRabbit, PR #14): run from Settings (Record a sample closed) the input closes here, and after that RCD.io is
+  // null: the timestamp fallback never ran, and rcdLat() gave the browser's latency, so the click was looked for D (≥ 120 ms) off
+  const ts = !!RCD.io, lat = rcdLat(), f0 = RCD.firstF != null ? RCD.firstF : 0;
+  rcdMonSet(); if (!RCD.ui) rcdClose();
   if (!take) throw new Error('nothing recorded');
   const L = take.data, R = take.data2, x = new Float32Array(L.length); for (let i = 0; i < x.length; i++) x[i] = R ? Math.max(Math.abs(L[i]), Math.abs(R[i])) : L[i];
   // where the recording starts on the audio clock: the first chunk's frame; the click is searched for near its expected place
-  const f0 = RCD.firstF != null ? RCD.firstF : 0, lat = rcdLat(), out = [];
+  const out = [];
+  // NO CLICK ON THE INPUT (owner, 7 Nov: "Measure isn't seeing input even though I see the meters move": the gear was there, the
+  // app's output wasn't patched back in): the native input places every frame where it was heard (its timestamps), so the click's
+  // place is known without hearing it; the browser's input has no such timing and still needs the click
+  // MASTER LOOKAHEAD: the click goes straight to the output, the engines (and so every timed MIDI note, msend) wait moFxLat() for the
+  // master's effects; the gear is measured against the engines, so that wait isn't the gear's
+  const fx = moFxLat(); out.ts = 0;
   for (const tc of T){ const e = Math.round((tc + lat) * sr) - f0;
-    const c = mltOnset(x, e - sr * 0.12, e + sr * 0.15, sr); if (c == null) continue;
+    let c = mltOnset(x, e - sr * 0.12, e + sr * 0.15, sr); if (c == null && ts){ c = e; out.ts++; } if (c == null) continue;
     const m = mltOnset(x, c + sr * (MLT.GAP - 0.1), c + sr * (MLT.GAP + 0.3), sr); if (m == null) continue;
-    out.push({t:tc - t0, ms:((m - c) / sr - MLT.GAP) * 1000}); }
+    out.push({t:tc - t0, ms:((m - c) / sr - MLT.GAP - fx) * 1000}); }
   return out; }
 function midiLatPanel(){
   const ports = [...Array(NPORT).keys()].filter(q => midiOut(q)); if (!ports.length) return toast('Pick a MIDI device for a port first (Settings › MIDI › Ports).', 4000);
@@ -14696,7 +14790,7 @@ function midiLatPanel(){
   let p = mine ? portOf(mine) : ports[0], ch = mine ? (mine.mch | 0) & 15 : 0, note = 60, n = 24, busy = false, res = null;
   const recall = () => { const m = mem[p]; if (m){ if (!mine || portOf(mine) !== p) ch = clamp(m.ch | 0, 0, 15); note = clamp(m.note == null ? 60 : m.note | 0, 0, 127); } };
   recall();
-  genPanel('Measure gear delay', 'Plays a click through ...Thunder and, 250 ms later, the note below on the gear (pick one your gear answers, such as a drum’s trigger note), again and again, and listens on the input chosen in Record a sample (Input and Inputs there). Send the mixer’s output, or anything that hears both, into that input; a short, loud patch on the gear works best.', ({field, msgEl}) => {
+  genPanel('Measure gear delay', 'Plays a click through ...Thunder and, 250 ms later, the note below on the gear (pick one your gear answers, such as a drum’s trigger note), again and again, and listens on the Inputs below (the input device is the one chosen in Record a sample). The gear must reach those inputs. With the desktop app’s native input that is enough (it knows when each sound was heard); with the browser’s input the click must reach them too (send the mixer’s output, or anything that hears both). A short, loud patch on the gear works best.', ({box, field, msgEl}) => {
     const pS = el('select'), cS = el('select'), kS = el('select');
     ports.forEach(q => pS.append(new Option(PORTL[q] + '  ' + portName(q), q))); pS.value = p;
     for (let c = 0; c < 16; c++) cS.append(new Option(d2(c + 1), c)); cS.value = ch;
@@ -14706,22 +14800,39 @@ function midiLatPanel(){
     cS.addEventListener('change', () => { ch = +cS.value; keep(); });
     kS.addEventListener('change', () => { note = +kS.value; keep(); });
     const nS = el('select'); [[24, '24 hits · 15 s'], [100, '100 hits · 1 min (drift)']].forEach(([v, t]) => nS.append(new Option(t, v))); nS.value = n; nS.addEventListener('change', () => { n = +nS.value; });
-    field('Port', pS); field('Channel', cS); field('Note', kS); field('Length', nS);
-    MLT.say = t => { msgEl.textContent = t; }; }, [
-    ['Measure', async () => { if (busy) return; if (tp.on) tStop(); busy = true; MLT.say('Measuring… keep quiet near any microphone.');
+    // INPUTS (owner, 7 Nov: "Measure needs the ability to change inputs"): the pair or channel that hears the click and the gear,
+    // the same setting as Record a sample's Inputs (rcdSet.inCh), listed from the input's channel count
+    const iS = el('select'); iS.setAttribute('aria-label', 'Which inputs hear the click and the gear');
+    const fillI = async () => { let n = 2, nat = false, dn = '';
+      if (RCD.io || RCD.stream){ n = RCD.nch || 2; nat = !!RCD.io; dn = RCD.io ? RCD.io.dev.name : ''; }
+      else if (IOAPI && aset.inEngine !== 'browser' && await iohReady()){ const d = iohInDev(''); if (d){ n = (rcdSet.nchs || {})['io:' + d.inId] || d.inputs || 2; nat = true; dn = d.name; } }
+      else n = (rcdSet.nchs || {})[rcdSet.input || ''] || 2;
+      iS.textContent = ''; rcdInOpts(n, nat).forEach(([v, t]) => iS.append(new Option(t, v))); const [k, a] = rcdPick(n); iS.value = k + a;
+      iS.disabled = iS.options.length < 2; iS.title = dn ? dn + (nat ? ' (native)' : '') : ''; };
+    iS.addEventListener('change', () => { rcdSet.inCh = iS.value; rcdSave(); rcdRoute(); });
+    fillI();
+    field('Port', pS); field('Channel', cS); field('Note', kS); field('Inputs', iS); field('Length', nS);
+    // STATUS LINE (owner, 8 Nov: "The window changes shape on first click of measure, and it doesn't start measuring until later"):
+    // the status used to replace the long explanation, so the window shrank under the pointer and the buttons moved; now it has its
+    // own line of fixed height below the fields, and says what is happening while the input opens and hit by hit
+    const st = el('div', 'askmsg'); st.style.height = '5.6em'; st.style.overflowY = 'auto';   // (fixed, scrolling when a long result wraps: CodeRabbit)
+    st.setAttribute('aria-live', 'polite'); st.textContent = 'Press Measure to start.';
+    box.append(st); MLT.say = t => { st.textContent = t; }; }, [
+    ['Measure', async () => { if (busy) return; if (tp.on) tStop(); busy = true; MLT.say('Starting…');
       try { const r = await midiLatRun(p, ch, note, n), ok = r.length;
-        if (ok < Math.max(4, n / 3)) { MLT.say(`Only ${ok} of ${n} hits were heard clearly: check the input and its level, and that the gear is loud and short.`); busy = false; return; }
+        if (ok < Math.max(4, n / 3)) { MLT.say(`Only ${ok} of ${n} hits were heard clearly: check that the gear reaches the Inputs picked here, its level, and that the gear is loud and short.` + (RCD.io || IOAPI && aset.inEngine !== 'browser' ? '' : ' With the browser’s input the click must reach the input too.')); busy = false; return; }
         const v = r.map(q => q.ms).sort((a, b) => a - b), med = v[v.length >> 1], q1 = v[Math.floor(v.length * 0.1)], q9 = v[Math.floor(v.length * 0.9)];
         const mt = r.reduce((a, q) => a + q.t, 0) / ok, mm = r.reduce((a, q) => a + q.ms, 0) / ok, sl = r.reduce((a, q) => a + (q.t - mt) * (q.ms - mm), 0) / Math.max(1e-9, r.reduce((a, q) => a + (q.t - mt) ** 2, 0));
         const now = mLatOf(p), want = clamp(Math.round(now + med), -50, 200);
         res = {want, p};
         MLT.say(`Port ${PORTL[p]}: the gear sounds ${Math.abs(med).toFixed(1)} ms ${med >= 0 ? 'late' : 'early'} against ...Thunder (Gear delay now ${now} ms), from ${ok} hits. Spread ${q1.toFixed(1)} to ${q9.toFixed(1)} ms (most hits); drift ${(sl * 60).toFixed(1)} ms a minute. ` +
+          (r.ts ? (r.ts >= ok ? 'Timed by the native input’s timestamps (no click on the input). ' : `${r.ts} hit${r.ts === 1 ? '' : 's'} timed by the native input’s timestamps (no click heard). `) : '') +
           (Math.abs(med) < 0.6 ? 'It already lines up.' : `Apply sets the Gear delay to ${want} ms.`) + (q9 - q1 > 4 ? ' The spread is wide: the gear or its MIDI path is jittery, or the patch is slow to start.' : '')); }
       catch(e){ MLT.say(e && e.message === 'no input' ? 'Couldn’t open the input: check Record a sample’s Input.' : 'The measurement stopped: ' + ((e && e.message) || e)); }
       // AFTER (owner, 7 Nov: Measure "made things worse", Reset audio engine put it right): opening the interface's input can
       // make macOS reconfigure the device and move the output's timing, so the engine is rebuilt here, and the MIDI clock
       // mapping measured again (unless Record a sample is open: it still uses the input)
-      if (!RCD.ui){ try { resetAudio(); amap.off = null; } catch(e){} }
+      if (!RCD.ui){ try { resetAudio(true); amap.off = null; } catch(e){} }   // (quietly: owner, 8 Nov, the "Audio engine reset" message after Measure was alarming; it's routine here)
       busy = false; }, 'ok'],
     ['Apply', () => { if (!res) return MLT.say('Measure first.'); midi.lats[res.p] = res.want; const r = $('midiLat' + res.p); if (r) r.value = res.want; saveMidi(); toast(`Gear delay for port ${PORTL[res.p]}: ${res.want} ms`); }],
   ]);
@@ -14748,7 +14859,7 @@ function rcdKeep(pad){
   if (fit) saveS();
   T.kept = true;   // (Record then doesn't ask: ASK FIRST)
   toast(`Kept the take in pad ${hx(pad)}, layer ${kit.voices[pad].sel + 1} (${(T.data.length / T.sr).toFixed(2)} s${T.data2 ? ', stereo' : ''})` + (fit ? `, fitted to ${Math.round(T.beats)} beats` : '') + (eng ? '; the pad is on the Layers engine now' : ''), 5000);
-  playFresh(pad);
+  // (no preview: owner, 8 Nov: "Don't play anything when pressing keep in pad"; it played the whole pad, every layer)
 }
 function rcdApply(E){
   const T = RCD.take, v = kit.voices[E.pad], L = v && v.layers[E.li]; if (!T || !L) return;
@@ -14848,21 +14959,44 @@ function rcdDrawWave(){
   U.rd.textContent = (RCD.sel ? `Selection ${t(RCD.sel[0])} – ${t(RCD.sel[1])} (${t(RCD.sel[1] - RCD.sel[0])})` : RCD.cursor != null ? `Cursor ${t(RCD.cursor)}` : `Length ${t(n)}`)
     + (vb - va < n ? ` · view ${t(va)} – ${t(vb)}` : '');
 }
+// RATE NOTE (owner, 8 Nov: "Sample-rate mismatch: saw no window"): rcdOpen1 sets RCD.note, a small status line inside the window that
+// fillIn clears again when the window is reopened over a still-open input. So the rate message is worked out here from the open input, shown
+// as that line whenever there is no other note, and as a toast once per device + rate pair (again only when the rates change).
+function rcdRateMsg(){ const o = RCD.io && RCD.io.opened, dr = o ? o.deviceRate | 0 : 0, ar = ctx ? ctx.sampleRate | 0 : 0;
+  return dr && ar && dr !== ar ? { key: RCD.io.dev.inId + ':' + dr + '>' + ar, msg: `${RCD.io.dev.name} runs at ${dr / 1000} kHz and the app at ${ar / 1000} kHz: the input is converted. Set them the same (Settings › Audio › Rate, or the interface) for a clean take.` } : null; }
 function rcdUi(){
+  const rm = rcdRateMsg(); if (rm && RCD.rateToast !== rm.key){ RCD.rateToast = rm.key; toast(rm.msg, 8000); }
   const U = RCD.ui; if (!U) return; const R = RCD.sync, T = RCD.take;
   U.rec.textContent = R ? (R.phase === 'armed' ? '■ Cancel' : R.stopReq ? '■ Stopping…' : '■ Stop') : RCD.on ? '■ Stop' : '● Record';
   U.rec.classList.toggle('on', !!(RCD.on || R));
   U.state.textContent = R ? (R.phase === 'armed' ? (tp.on ? 'Armed: records from the next pattern…' : 'Starting the song…') : R.phase === 'closing' ? 'Finishing the take…'
       : `● Recording pattern ${R.n + 1}` + (R.pats > 0 ? ` of ${R.pats}` : '') + (R.stopReq ? (R.songStop ? ' · the take and the song stop at its end' : ' · stops at its end') : R.pats < 0 ? ' · Stop ends it right there' : ' · Stop ends it at the end of the pattern'))
     : RCD.on ? '● Recording' : T ? (T.how === 'sync' ? '' : '') + (T.how === 'sync' ? ` · ${T.pats} pattern${T.pats === 1 ? '' : 's'}, ${T.beats} beats` : '')
-    : RCD.stream ? 'Ready.' : 'Pick an input and press Record.';
+    : (RCD.stream || RCD.io) ? RCD.note || (rm && rm.msg) || 'Ready.' : RCD.note || 'Pick an input and press Record.';   // (a native note, e.g. the rate, stays up while ready)
   U.edit.hidden = !T || !!(RCD.on || R);
+  rcdClk();
   U.state.hidden = !U.state.textContent;
   if (T && U.whn){ U.whn.textContent = T.how === 'edit' ? (T.name || 'Sample') : 'Take'; U.whi.textContent = `${(T.data.length / T.sr).toFixed(2)} s · ${T.data2 ? 'stereo' : 'mono'} · ${(T.sr / 1000).toFixed(1)} kHz`; U.win.style.setProperty('--rcw', rcdCols().wave); }
   U.undoB.disabled = !RCD.undo.length; U.playB.textContent = rcdPrev ? '■' : '▶ Play';
   for (const b of U.lock) b.disabled = !!(RCD.on || R);
   if (U.fillCh) U.fillCh();
+  if (U.latSay) U.latSay();
   rcdDrawWave();
+}
+// RECORDING COUNTER (owner, 7 Nov: "while a take records, show how long it is so far in minutes and seconds ... so a long take's length is visible as it goes"; again 8 Nov).
+// All on the audio clock (ctx.currentTime, so the same on the browser worklet and the native input). FREE: since 'go' was sent (capture starts at its next audio block). PATTERN: from the edge the take starts at (R.t0), "waiting…" until then. One text node,
+// written only when the text changes; the timer (4 a second) runs only while a take records and is cleared the moment it doesn't, or the window closes.
+function rcdFreeSecs(){ return Math.max(0, ctx.currentTime - RCD.t0w); }   // (not counted from the chunks: the worklet hands them over a second at a time, and the native path has its own steps)
+function rcdFmt(t){ t = Math.floor(Math.max(0, t) + 1e-6); const h = t / 3600 | 0, m = (t / 60 | 0) % 60, s = t % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`; }
+function rcdClk(){
+  const U = RCD.ui, R = RCD.sync, act = !!(U && U.time && (RCD.on || R));
+  if (!act && RCD.clkT){ clearInterval(RCD.clkT); RCD.clkT = 0; }
+  if (!U || !U.time) return;
+  const txt = R ? (R.phase === 'armed' ? 'waiting…' : rcdFmt(R.phase === 'closing' ? R.t1 - R.t0 : ctx.currentTime - R.t0)) : RCD.on ? rcdFmt(rcdFreeSecs()) : rcdFmt(RCD.clkF || 0);
+  if (U.time._t !== txt){ U.time._t = txt; U.time.textContent = txt; }
+  U.time.classList.toggle('wait', !!R && R.phase === 'armed');
+  U.time.style.visibility = act || RCD.clkF != null ? '' : 'hidden';   // (idle: its room stays, so the window doesn't change size)
+  if (act && !RCD.clkT) RCD.clkT = setInterval(rcdClk, 250);
 }
 // NOTE KEYS IN THE EDITOR (6 Nov): one voice per held key; C-4 (note 48) plays the take as recorded. A short fade in and
 // out so neither end clicks. What plays is the selection, or the take from its Start marker (an edited sample) or the top.
@@ -14895,23 +15029,50 @@ async function rcdPanel(pad, opts){
   const seg = (label, opts, get, set) => { const s = el('div', 'seg'); const draw = () => [...s.children].forEach((b, i) => { const on = get() === opts[i][0]; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     opts.forEach(([v, t]) => { const b = el('button', null, t); b.type = 'button'; b.addEventListener('click', () => { set(v); rcdSave(); draw(); }); s.append(b); }); draw(); field(label, s); return s; };
   const lock = [];
-  // INPUT: labels only show once the browser has been allowed an input; the list is read again after Record opens one
-  const inSel = el('select'); const fillIn = async () => { const L = await rcdInputs(); inSel.textContent = ''; inSel.append(new Option('Default input', ''));
+  // ENGINE (desktop app only; owner, 7 Nov: "it's confusing that the engine and inputs are separated"): Native records every input
+  // of the interface through the desktop app's helper, Browser uses the browser's own input (inputs 1–2)
+  let nat = false, natDevs = [], fillTok = 0, fillIn = null, fillCh = null;
+  if (IOAPI && !E){ const eng = seg('Engine', [['auto', 'Native'], ['browser', 'Browser']], () => aset.inEngine === 'browser' ? 'browser' : 'auto',
+      v => { aset.inEngine = v === 'browser' ? 'browser' : 'auto'; asetSave(); rcdAbort(); rcdClose(); RCD.note = ''; fillIn(); rcdUi(); });
+    eng.title = 'Native records from every input of an audio interface, through the desktop app. Browser uses the browser’s own input (inputs 1–2)'; lock.push(...eng.children); }
+  // INPUT: labels only show once the browser has been allowed an input; the list is read again after Record opens one.
+  // With the native engine it lists the helper's devices (value = the helper's input id, kept as rcdSet.ioDev)
+  const inSel = el('select'); fillIn = async () => { const tok = ++fillTok; nat = false; let L = null;
+    if (IOAPI && !E && aset.inEngine !== 'browser'){
+      if (await iohReady()){
+        if (tok !== fillTok) return;
+        natDevs = IOH.devices.filter(d => d.inId && d.inputs > 0);
+        if (natDevs.length){
+          let lab = ''; try { L = await rcdInputs(); const b = L.find(x => x.deviceId === rcdSet.input); lab = (b && b.label) || ''; } catch(e){}
+          if (tok !== fillTok) return;
+          inSel.textContent = ''; natDevs.forEach(d => inSel.append(new Option(`${d.name} (native, ${d.inputs} input${d.inputs === 1 ? '' : 's'})`, d.inId)));
+          const pick = iohInDev(lab); inSel.value = pick ? pick.inId : natDevs[0].inId;
+          nat = true; RCD.note = ''; fillCh(); if (RCD.ui && RCD.ui.rec) rcdUi();
+          // METERS AT ONCE (owner, 7 Nov: "the meters do not work until you press record"): the native input opens with the window
+          // (no prompt: the app asked for the microphone once), so the meter moves and Record starts without waiting to open it
+          if (!RCD.on && !RCD.sync && RCD.ui) rcdOpen().then(() => { if (RCD.ui && RCD.ui.rec) rcdUi(); });
+          return; }
+        RCD.note = 'Native input not available (no input device found): using the browser’s input.';
+      } else { if (tok !== fillTok) return; RCD.note = `Native input not available (${IOH.why || 'no answer'}): using the browser’s input.`; }
+    } else RCD.note = '';
+    L = await rcdInputs(); if (tok !== fillTok) return; inSel.textContent = ''; inSel.append(new Option('Default input', ''));
     L.forEach((d, i) => { if (d.deviceId && d.deviceId !== 'default') inSel.append(new Option(d.label || 'Input ' + (i + 1), d.deviceId)); });
-    inSel.value = [...inSel.options].some(o => o.value === rcdSet.input) ? rcdSet.input : ''; };
-  inSel.addEventListener('change', async () => { rcdSet.input = inSel.value; rcdSave(); if (RCD.stream && !RCD.on && !RCD.sync){ rcdClose(); await rcdOpen(); } });
-  field('Input', inSel); lock.push(inSel); fillIn();
+    inSel.value = [...inSel.options].some(o => o.value === rcdSet.input) ? rcdSet.input : '';
+    fillCh(); if (RCD.ui && RCD.ui.rec) rcdUi(); };
+  inSel.addEventListener('change', async () => { if (nat) rcdSet.ioDev = inSel.value; else rcdSet.input = inSel.value; rcdSave(); fillCh(); if ((RCD.stream || RCD.io) && !RCD.on && !RCD.sync){ rcdClose(); await rcdOpen(); } });
+  field('Input', inSel); lock.push(inSel);
   const chSel = el('select'); chSel.setAttribute('aria-label', 'Which channels of the input to record');
   let chKey = '';
-  const fillCh = () => { const n = RCD.stream ? RCD.nch || 2 : ((rcdSet.nchs || {})[rcdSet.input || ''] || 2), O = rcdInOpts(n);
-    if (chKey !== n + ''){ chKey = n + ''; chSel.textContent = ''; O.forEach(([v, t]) => chSel.append(new Option(t, v))); }   // (rcdUi calls it often: an open list isn't rebuilt)
+  // (the native input: the device's own channel count, from the helper's list before it opens, RCD.nch after)
+  fillCh = () => { const nd = nat && !RCD.stream ? (RCD.io ? RCD.nch : (natDevs.find(d => d.inId === inSel.value) || {}).inputs) : 0;
+    const n = nd || (RCD.stream || RCD.io ? RCD.nch || 2 : ((rcdSet.nchs || {})[rcdSet.input || ''] || 2)), nn = !!nd, O = rcdInOpts(n, nn);
+    if (chKey !== n + '/' + nn){ chKey = n + '/' + nn; chSel.textContent = ''; O.forEach(([v, t]) => chSel.append(new Option(t, v))); }   // (rcdUi calls it often: an open list isn't rebuilt)
     chSel.value = rcdPick(n)[0] + rcdPick(n)[1]; chSel.disabled = O.length < 2 || !!(RCD.on || RCD.sync);
-    chSel.title = O.length < 2 ? 'The browser engine (in the desktop app too) only hands the app two channels of an interface, its inputs 1 and 2, whatever it has. To record another input, route it to 1/2 in the interface’s own mixer software for now' : ''; };
+    chSel.title = O.length < 2 && !nn ? 'The browser engine (in the desktop app too) only hands the app two channels of an interface, its inputs 1 and 2, whatever it has. To record another input, route it to 1/2 in the interface’s own mixer software for now' : ''; };
   chSel.addEventListener('change', () => { rcdSet.inCh = chSel.value; rcdSave(); rcdRoute(); });
-  inSel.addEventListener('change', fillCh);
-  field('Inputs', chSel); fillCh();
+  field('Inputs', chSel); fillCh(); fillIn();
   seg('Channels', [['stereo', 'STEREO'], ['mono', 'MONO'], ['left', 'LEFT'], ['right', 'RIGHT']], () => rcdSet.ch, v => { rcdSet.ch = v; });
-  seg('Monitor', [[0, 'OFF'], [1, 'ON']], () => rcdSet.mon | 0, v => { rcdSet.mon = v; if (RCD.mon) RCD.mon.gain.setTargetAtTime(v ? 1 : 0, ctx.currentTime, 0.01); if (v) toast('Monitoring: use headphones, or the speakers feed back into the input.', 4000); });
+  seg('Monitor', [[0, 'OFF'], [1, 'ON']], () => rcdSet.mon | 0, v => { rcdSet.mon = v; rcdMonSet(); if (v) toast('Monitoring: use headphones, or the speakers feed back into the input.', 4000); });
   { const m = el('div', 'recmeter'), bars = [], holds = []; for (let c = 0; c < 2; c++){ const r = el('div', 'recm'), b = el('i'), h = el('b'); r.append(b, h); m.append(r); bars.push(b); holds.push(h); }
     const clip = el('span', 'recclip', 'CLIP'); clip.hidden = true; m.append(clip); field('Level', m); RCD.ui = {bars, holds, clip}; }
   seg('Sync', [['sync', 'PATTERN'], ['free', 'FREE']], () => rcdSet.mode, v => { rcdSet.mode = v; patF.hidden = latF.hidden = fitF.hidden = v !== 'sync'; });
@@ -14919,7 +15080,7 @@ async function rcdPanel(pad, opts){
   patS.value = rcdSet.pats | 0; patS.addEventListener('change', () => { rcdSet.pats = +patS.value; rcdSave(); });
   const patF = field('Length', patS).parentElement; lock.push(patS);
   const latR = el('input'), latV = el('b'); latR.type = 'range'; latR.min = -50; latR.max = 250; latR.value = rcdSet.lat | 0;
-  const latSay = () => { latV.textContent = (rcdSet.lat | 0) + ' ms' + (ctx ? ` (+ ${Math.round(((ctx.outputLatency || ctx.baseLatency || 0) + (RCD.inLat || 0)) * 1000)} ms found)` : ''); };
+  const latSay = () => { latV.textContent = (rcdSet.lat | 0) + ' ms' + (RCD.io ? ` (native: placed by its timestamps${RCD.io.opened && RCD.io.opened.latencyMs > 0 ? `, ${RCD.io.opened.latencyMs.toFixed(1)} ms interface latency included` : ''})` : ctx ? ` (+ ${Math.round(((ctx.outputLatency || ctx.baseLatency || 0) + (RCD.inLat || 0)) * 1000)} ms found)` : ''); };
   latR.addEventListener('input', () => { rcdSet.lat = +latR.value; rcdSave(); latSay(); }); latSay();
   const latW = el('span', 'acidr'); latW.append(latR, latV); const latF = field('Extra latency', latW).parentElement;
   const fitF = seg('Fit to tempo', [[1, 'ON'], [0, 'OFF']], () => rcdSet.fit | 0, v => { rcdSet.fit = v; }).parentElement;
@@ -15010,7 +15171,7 @@ async function rcdPanel(pad, opts){
   edit.append(ops);
   const padS = el('select'); for (let k = 0; k < kit.voices.length; k++) padS.append(new Option(hx(k) + ' ' + (kit.voices[k].name || ''), k)); padS.value = pad;
   const keepRow = el('div', 'btnrow reckeep'), keepB = el('button', 'ok', 'Keep in this pad'); keepB.type = 'button'; keepB.addEventListener('click', () => rcdKeep(+padS.value));
-  const discB = el('button', null, 'Discard'); discB.type = 'button'; discB.addEventListener('click', () => { RCD.take = null; RCD.undo = []; RCD.sel = null; RCD.view = null; rcdUi(); });
+  const discB = el('button', null, 'Discard'); discB.type = 'button'; discB.addEventListener('click', () => { RCD.take = null; RCD.clkF = null; RCD.undo = []; RCD.sel = null; RCD.view = null; rcdUi(); });
   padS.title = 'The pad to keep the take in'; padS.setAttribute('aria-label', 'Pad'); keepRow.append(padS, el('span', 'recsp'), discB, keepB); edit.append(keepRow);   // (owner, 6 Nov: no "Pad" text, so it lines up with ▶ Song below)
   box.append(edit);
   const takeOf = L => { const S0 = L.sample, n = S0.data.length; return {data:S0.data, data2:S0.data2 || null, sr:S0.sr, name:S0.name, how:'edit', beats:0, pats:0, lp:L.lpMode | 0,
@@ -15034,10 +15195,11 @@ async function rcdPanel(pad, opts){
   confDisc.addEventListener('click', recGo);
   confKeep.addEventListener('click', () => { rcdKeep(+padS.value); recGo(); });
   rec.addEventListener('click', () => { if (RCD.on || RCD.sync) return rcdStop(); if (!E && RCD.take && !RCD.take.kept) return confShow(conf.hidden); recGo(); });
-  const close = el('button', null, 'Close'); close.type = 'button'; row.append(songB, el('span', 'recsp'), rec, close); box.append(conf, row); if (E){ rec.hidden = true; keepRow.append(close); row.hidden = true; }   // EDIT SAMPLE: Close beside Apply / Revert
-  Object.assign(RCD.ui, {rec, state, edit, wave, ov, rd, playB, undoB, lock, E, songB, win, whn, whi, fillCh});
+  const close = el('button', null, 'Close'); close.type = 'button'; const rtime = el('span', 'rectime', '0:00'); rtime.style.visibility = 'hidden'; rtime.setAttribute('role', 'timer'); rtime.title = 'How long the take is so far';
+  row.append(songB, el('span', 'recsp'), rtime, rec, close); box.append(conf, row); if (E){ rec.hidden = true; keepRow.append(close); row.hidden = true; }   // EDIT SAMPLE: Close beside Apply / Revert
+  Object.assign(RCD.ui, {time:rtime, rec, state, edit, wave, ov, rd, playB, undoB, lock, E, songB, win, whn, whi, fillCh, latSay});
   const songT = setInterval(() => { if (!RCD.ui){ clearInterval(songT); return; } const on = !!tp.on; if (songB._on !== on){ songB._on = on; songB.textContent = on ? '■ Song' : '▶ Song'; songB.classList.toggle('on', on); } }, 150);   // follows the song, however it was started
-  const done = () => { if (askOpen !== done) return; askOpen = null; rcdKeysOff(); RCD.kb = null; document.removeEventListener('keyup', keyUp, true); window.removeEventListener('blur', blurOff); rcdAbort(); if (rcdPrev){ try { rcdPrev.stop(); } catch(e){} rcdPrev = null; } rcdClose(); RCD.ui = null; if (E){ RCD.take = null; RCD.undo = []; RCD.sel = null; } wrap.remove(); document.removeEventListener('keydown', key, true); };
+  const done = () => { if (askOpen !== done) return; askOpen = null; rcdKeysOff(); RCD.kb = null; document.removeEventListener('keyup', keyUp, true); window.removeEventListener('blur', blurOff); rcdAbort(); if (rcdPrev){ try { rcdPrev.stop(); } catch(e){} rcdPrev = null; } rcdClose(); RCD.ui = null; rcdClk(); if (E){ RCD.take = null; RCD.undo = []; RCD.sel = null; } wrap.remove(); document.removeEventListener('keydown', key, true); };
   close.addEventListener('click', done);
   // Keys stay in the panel: R records / stops, Space plays the song, Esc closes (a take not kept is let go); the piano keys play the take (R stays Record in Record a sample…), numpad / * the octave
   const key = e => { const tag = e.target && e.target.tagName;
@@ -15066,7 +15228,9 @@ async function rcdPanel(pad, opts){
    Right-click a slider for Reset / Type a value / Learn a MIDI knob (makeRow); the wheel nudges the slider the pointer rests
    on (WHEEL FOCUS; one only passed over doesn't take it, so the page still scrolls); a drag is relative, Shift a tenth (ONE SLIDER).
    Not the settings menus' sliders (they lock against stray touches). To remove: this block and the contextmenu in makeRow. */
-const sliderOk = r => !!r && r.matches && r.matches('input[type=range]') && !r.disabled && !r.closest('#gset, .rlock, .ask');
+// Dialogs (.ask: the generators, Record…) keep the browser's own slider under a mouse; on a touch screen CSS takes their touches away
+// like every other slider's, so the drag below has to serve them too (8 Nov: Acid line's sliders couldn't be moved on a phone).
+const sliderOk = (r, touch) => !!r && r.matches && r.matches('input[type=range]') && !r.disabled && !r.closest(touch ? '#gset, .rlock' : '#gset, .rlock, .ask');
 /* ONE RULE FOR VALUE CONTROLS (owner, mouse audit 3 Nov): sliders, faders, the FX bar's values and the …pump windows'
    controls all take the mouse the same way:
    - a drag moves the value from where it is; Shift held is ten times finer and Ctrl/⌘ held four times coarser, read on
@@ -15098,9 +15262,18 @@ function sliderSet(r, v){
 /* WHEEL (27 Oct, audit M2): the movement is added up and a step is taken per 100 px of it (a mouse notch), not one per
    event: a trackpad flick sends 30-100 events, which moved a slider 60-200 %. A pause or a change of direction starts the
    count again. The …pump windows do the same (pump/ui/kit.js, pWheel). */
+/* ONE WHEEL DIRECTION (owner, 7 Nov: "if I'm pulling down it scrolls down"; Arrange went up, the Mixer down): with macOS
+   Natural scrolling the wheel's deltaY is flipped. Scrolled content (lists, the Mixer, …chains) follows it by itself, but
+   wheels that move a cursor or a value read deltaY as "down", so they went the other way. In the desktop app on a Mac the
+   main process reads the setting (on start and when the window comes back) and these wheels flip with it: pulling down
+   moves the cursor down and lowers a value, like the content around it. window.thunderWheelSign is read by pump/ui/kit.js. */
+let wheelSign = 1; window.thunderWheelSign = 1;
+{ const D = window.thunderDesktop && window.thunderDesktop.app;
+  const rd = () => { try { D.naturalScroll().then(n => { wheelSign = window.thunderWheelSign = n ? -1 : 1; }).catch(() => {}); } catch(e){} };
+  if (D && D.naturalScroll){ rd(); addEventListener('focus', rd); } }
 const wheelAcc = new WeakMap();
 function wheelSteps(key, e, per = 100){
-  const raw = e.deltaY || e.deltaX, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
+  const raw = (e.deltaY || e.deltaX) * wheelSign, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
   const now = performance.now(), a = wheelAcc.get(key) || {v:0, t:0};
   if (now - a.t > 250 || Math.sign(a.v) !== Math.sign(px)) a.v = 0;
   a.v += px; a.t = now; const n = Math.trunc(a.v / per); a.v -= n * per; wheelAcc.set(key, a);
@@ -15109,7 +15282,7 @@ function wheelSteps(key, e, per = 100){
 // ONE A NOTCH (mouse audit, 3 Nov): rows and values in the tracker take a step per mouse notch, as Arrange and the FX slots do:
 // a big delta (a notch: 100 px on Windows, a line on Firefox) is one step, small ones (trackpads) add up per 100 px.
 function wheelNotch(key, e){
-  const raw = e.deltaY || e.deltaX, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
+  const raw = (e.deltaY || e.deltaX) * wheelSign, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
   if (Math.abs(px) >= 50){ wheelAcc.set(key, {v:0, t:performance.now()}); return Math.sign(px); }
   return wheelSteps(key, e);
 }
@@ -15222,7 +15395,7 @@ function sliderAt(e){
 }
 document.addEventListener('pointerdown', e => {
   const r = sliderAt(e);
-  if (e.button !== 0 || !sliderOk(r)) return;
+  if (e.button !== 0 || !sliderOk(r, e.pointerType === 'touch')) return;
   e.preventDefault(); e.stopPropagation();
   if (ctxPress(e)) return;   // Ctrl+click on a Mac is the right-click: the menu opens, the value stays (3 Nov)
   const touch = e.pointerType === 'touch';
@@ -15290,7 +15463,7 @@ const NPORT = 4, PORTL = 'ABCD';
 // input Clock in follows ('' = the first one heard, kept until it goes quiet); keys: what a keyboard plays in the tracker
 // (1 the current instrument, 0 the pads as before); lats: Gear delay per output port (ms; lat was one for all of them).
 const midi = {on:false, learn:false, target:-1, ccTarget:'', notes:DEFNOTES.slice(), cc:{}, vel:true, access:null,
-  outIds:new Array(NPORT).fill(''), clk:new Array(NPORT).fill(false), clkIn:false, lat:0, lats:new Array(NPORT).fill(0), inId:'', inCh:-1, clkId:'', keys:1};
+  outIds:new Array(NPORT).fill(''), clk:new Array(NPORT).fill(false), clkIn:false, lat:0, lats:new Array(NPORT).fill(0), inId:'', inCh:-1, clkId:'', keys:1, names:{}};   // names: a Web MIDI port id → its name (NATIVE MIDI maps saved choices by name)
 const mLatOf = p => midi.lats[p | 0] || 0;
 try { const m = JSON.parse(localStorage.getItem(MKEY) || 'null');
   if (m && Array.isArray(m.notes)){ midi.notes = Array.from({length:Math.min(MAXSLOT, Math.max(16, m.notes.length))}, (_, i) => Number.isInteger(m.notes[i]) ? m.notes[i] : i < 16 ? DEFNOTES[i] : -1); midi.vel = m.vel !== false; midi.want = !!m.want; }
@@ -15304,13 +15477,14 @@ try { const m = JSON.parse(localStorage.getItem(MKEY) || 'null');
     midi.lats = midi.lats.map((_, p) => Math.max(-50, Math.min(200, Array.isArray(m.lats) && Number.isFinite(+m.lats[p]) ? +m.lats[p] : midi.lat)));
     if (typeof m.inId === 'string') midi.inId = m.inId; if (Number.isInteger(m.inCh)) midi.inCh = Math.max(-1, Math.min(15, m.inCh));
     if (typeof m.clkId === 'string') midi.clkId = m.clkId;
+    if (m.names && typeof m.names === 'object') for (const k in m.names) if (typeof m.names[k] === 'string') midi.names[k] = m.names[k];
     // Keys play: the current instrument by default; someone who learned pads to their own notes keeps playing the pads.
     if (m.keys === 0 || m.keys === 1) midi.keys = m.keys; else if (midi.notes.some((v, i) => v !== (i < 16 ? DEFNOTES[i] : -1))) midi.keys = 0;
   }
 } catch(e){}
 // outId / clkOut (port A) and lat (port A's delay) are still written for an older copy of the app on this device.
 const saveMidi = () => { try { localStorage.setItem(MKEY, JSON.stringify({notes:midi.notes, cc:midi.cc, vel:midi.vel, want:midi.on, outIds:midi.outIds, clk:midi.clk,
-  outId:midi.outIds[0], clkOut:midi.clk[0], clkIn:midi.clkIn, lat:midi.lats[0], lats:midi.lats, inId:midi.inId, inCh:midi.inCh, clkId:midi.clkId, keys:midi.keys})); } catch(e){} };
+  outId:midi.outIds[0], clkOut:midi.clk[0], clkIn:midi.clkIn, lat:midi.lats[0], lats:midi.lats, inId:midi.inId, inCh:midi.inCh, clkId:midi.clkId, keys:midi.keys, names:midi.names})); } catch(e){} };
 function midiStatus(msg){ $('midiStat').textContent = msg; }
 const ccName = k => { const [ch, n] = k.split(':'); return 'CC ' + n + (+ch ? ' ch ' + (+ch + 1) : ''); };
 const rowLabel = id => { const e = document.getElementById(id), r = e && e.closest('.row'), l = r && r.querySelector('label'); return l ? l.textContent : id; };
@@ -15468,7 +15642,7 @@ function kbPass(ty, d1, d2){
 function hookInputs(){
   let n = 0; midi.access.inputs.forEach(inp => { inp.onmidimessage = e => onMidi(e, inp.id); n++; });
   moPorts(); miPorts();
-  midiStatus(n ? `${n} controller${n > 1 ? 's' : ''} connected` : 'No controller found. Plug one in.');
+  midiStatus((n ? `${n} controller${n > 1 ? 's' : ''} connected` : 'No controller found. Plug one in.') + (midi.access.native ? ' · native' : ''));
 }
 // Settings → MIDI: Notes in (input and channel) and Clock from. A saved input that isn't plugged in now stays picked.
 function miPorts(){
@@ -15481,12 +15655,24 @@ function miPorts(){
   if (ch) ch.value = String(midi.inCh);
   const ks = $('midiKeysSel'); if (ks) ks.value = String(midi.keys);
 }
-async function connectMidi(){
+let midiConnecting = null;
+function connectMidi(){ if (!midiConnecting) midiConnecting = connectMidi1().finally(() => { midiConnecting = null; }); return midiConnecting; }
+// ENGINE CHANGED MID-CONNECT (review): the connect in flight belongs to the old engine; once it's in, it is dropped and the new one connects
+function midiAccessDrop(){ const a = midi.access; midi.access = null; if (!a) return;
+  try { a.onstatechange = null; a.inputs.forEach(i => { i.onmidimessage = null; }); } catch(e){} if (a.native) nmClose(); }
+async function connectMidi1(){
+  if (midi.access && !!midi.access.native !== nmWanted()){ try { moRelease(); } catch(e){} midiAccessDrop(); }
   if (midi.access){ hookInputs(); return; }
+  // NATIVE MIDI (desktop app, Settings › MIDI › Engine Native): the helper's ports, notes sent at their exact time from its own
+  // thread and taken back on STOP; Web MIDI when the helper or its MIDI isn't there
+  if (nmWanted()){ const acc = await nmConnect();
+    if (acc){ await midiRemap(acc); midi.access = acc; midi.on = true; saveMidi(); hookInputs(); renderPads();
+      $('bMidiOn').textContent = 'Connected'; $('bMidiOn').classList.add('on'); acc.onstatechange = hookInputs; return; }
+    tpLog('native MIDI', IOH.why || (IOH.state === 'ready' ? 'this helper has no MIDI' : 'helper not available')); }
   if (!navigator.requestMIDIAccess){ midiStatus(inAI ? 'MIDI is blocked inside AI. Use the installed app.' : 'This browser has no MIDI support.'); return; }
   try {
-    midi.access = await navigator.requestMIDIAccess();
-    midi.on = true; saveMidi(); hookInputs(); renderPads();
+    const acc = await navigator.requestMIDIAccess(); midiNames(acc); await midiRemap(acc);
+    midi.access = acc; midi.on = true; saveMidi(); hookInputs(); renderPads();
     $('bMidiOn').textContent = 'Connected'; $('bMidiOn').classList.add('on');
     midi.access.onstatechange = hookInputs;
   } catch(err){ midiStatus(inAI ? 'MIDI is blocked inside AI. Use the installed app.' : 'MIDI permission was refused. Allow it for this site in Chrome.'); }
@@ -15520,7 +15706,7 @@ $('bMidiReset').addEventListener('click', async () => {
   midi.notes = DEFNOTES.slice(); midi.cc = {}; saveMidi(); renderPads(); ccBadges(); midiStatus('Pads reset to notes 36–43; knobs forgotten.');
 });
 makeCk($('ckVel'), () => midi.vel, v => { midi.vel = v; saveMidi(); });
-if (midi.want && navigator.requestMIDIAccess) connectMidi();
+if (midi.want && (navigator.requestMIDIAccess || window.thunderDesktop)) setTimeout(() => connectMidi(), 0);   // (after the whole script: NATIVE MIDI needs the helper's code below)
 setTimeout(() => { try { songBeatsSoon(1); } catch(e){} }, 4000);   // song positions ready before the first PLAY, with clock on
 
 /* ---------- MIDI out and MIDI clock ---------- */
@@ -15586,7 +15772,7 @@ const p2a = p => (p - (amap.off == null ? mapUpd() : amap.off)) / 1000;
 function msend(bytes, t, early, p){
   const o = midiOut(p); if (!o || !ctx) return;
   const at = t == null ? 0 : a2p(t + moFxLat()) - (early ? mLatOf(p) : 0), now = performance.now();
-  if (at - now > MOB_AHEAD && !document.hidden) return mobPut(o, bytes, at);
+  if (!o.native && at - now > MOB_AHEAD && !document.hidden) return mobPut(o, bytes, at);   // (NATIVE MIDI: the helper's queue is cleared on STOP itself)
   try { o.send(bytes, Math.max(now, at)); } catch(e){}
 }
 /* FX LATENCY (owner, 7 Nov: MIDI early; "midi and audio seem to align if I move the synth/audio up two lines"). Everything
@@ -16144,6 +16330,288 @@ if (LINKAPI && $('segLink')){
   lkUi();
   setTimeout(() => { if (aset.link && LINKAPI.available) lkEnable(true); }, 0);   // after the song (S) is loaded
 }
+/* ===== NATIVE INPUT ENGINE, page side (desktop app only; plan: docs/NATIVE-IO-HELPER-PLAN.md §3.3) =====
+   window.thunderDesktop.io.start() forks the audio helper (first need only: Settings → Audio opened, or AUTO picked) and a
+   MessagePort comes back as a window message ({thunderIo:true}, ports[0]). Its first message is the hello ({op:'hello',
+   available, version | why}); then {op:'devices', id} lists the interface's inputs. The website has no IOAPI: nothing here runs
+   and no row is drawn. Nothing records through it yet: iohUse() is for the recorder to ask. */
+const IOAPI = (window.thunderDesktop && window.thunderDesktop.io) || null;
+const IOH = {state:'off', why:'', version:'', devices:[], port:null};   // state: off | starting | ready | unavailable
+let iohSeq = 0, iohPend = new Map(), iohGo = null, iohHelloT = 0;
+const iohUse = () => !!IOAPI && aset.inEngine !== 'browser' && IOH.state === 'ready';
+function iohUi(){}   // (the Input engine row moved to Record a sample, which asks iohReady itself)
+function iohPort(p){
+  if (IOH.port && IOH.port !== p){ try { IOH.port.onmessage = null; IOH.port.close(); } catch(e){} }
+  iohPend.forEach(r => r(null)); iohPend.clear();
+  IOH.port = p;
+  p.onmessage = ev => {
+    const m = ev.data; if (!m || typeof m !== 'object') return;
+    if (m.op === 'hello'){
+      clearTimeout(iohHelloT);
+      if (m.available){ IOH.state = 'ready'; IOH.version = String(m.version || ''); IOH.why = ''; IOH.midi = !!m.midi; iohUi(); iohDevices().then(iohUi); }
+      else { IOH.state = 'unavailable'; IOH.why = String(m.why || 'unknown'); IOH.devices = []; iohUi(); }
+    } else if (m.op === 'in'){ if (IOH.onIn) IOH.onIn(m); }   // NATIVE INPUT (A1.3): a chunk of every input channel
+    else if (m.op === 'midiIn'){ if (IOH.onMidi) IOH.onMidi(m.list); }   // NATIVE MIDI (B): what came in since the last batch
+    else if (m.id != null && iohPend.has(m.id)){ const r = iohPend.get(m.id); iohPend.delete(m.id); r(m); }
+    else if (m.op === 'closed' || m.op === 'error'){ if (IOH.onGone) IOH.onGone(m.why || 'the input stopped'); }   // the device went away
+  };
+  try { p.start && p.start(); } catch(e){}
+}
+function iohAsk(msg, ms){
+  return new Promise(res => {
+    if (!IOH.port){ res(null); return; }
+    const id = ++iohSeq; iohPend.set(id, res);
+    try { IOH.port.postMessage(Object.assign({id}, msg)); } catch(e){ iohPend.delete(id); res(null); return; }
+    setTimeout(() => { if (iohPend.has(id)){ iohPend.delete(id); res(null); } }, ms || 5000);
+  });
+}
+function iohDevices(){
+  return iohAsk({op:'devices'}).then(m => { if (m && m.op === 'devices' && Array.isArray(m.devices)) IOH.devices = m.devices; return IOH.devices; });
+}
+async function iohStart(){
+  if (!IOAPI || IOH.state !== 'off') return iohGo;
+  IOH.state = 'starting'; iohUi();
+  if (!IOH.lis){ IOH.lis = true; window.addEventListener('message', e => { if (e.data && e.data.thunderIo && e.ports && e.ports[0]) iohPort(e.ports[0]); }); }   // (once: a second start after the helper died added a second listener, which answered every waiting request with null)
+  const fail = why => { if (IOH.state === 'starting'){ IOH.state = 'unavailable'; IOH.why = why; iohUi(); } };
+  iohHelloT = setTimeout(() => fail('no answer'), 3000);
+  iohGo = (async () => {
+    try { const r = await IOAPI.start(); if (r && r.ok === false){ clearTimeout(iohHelloT); fail(String(r.why || 'could not start')); } }
+    catch(e){ clearTimeout(iohHelloT); fail(String((e && e.message) || e)); }
+  })();
+  return iohGo;
+}
+
+/* ===== NATIVE MIDI (helper phase B; plan §3.3, §4): the helper's MIDI ports, looking like Web MIDI's access to the rest =====
+   midi.access becomes {native:true, outputs, inputs, onstatechange}: an output's send(bytes, timeStamp) books the message for
+   that performance.now() moment on the helper's sender thread (its OS clock: IOH.clk), clear() drops what it still has queued
+   (moRelease on STOP), so msend skips the OUTBOX; an input's onmidimessage gets {data, timeStamp} with the time the helper
+   stamped on arrival. Ids are 'n:' + the port's name; saved Web MIDI choices are mapped by name (midiRemap), and back.
+   Ports are looked at again every 3 s (plugged in or out: onstatechange, as Web MIDI). No microphone is asked for. */
+const NM = {acc:null, byPort:new Map(), scanT:0, clkT:0, miss:0, scanning:null, late:0};   // late: MIDI messages the helper sent > 2 ms after their booked time, since the app started
+const nmWanted = () => !!IOAPI && aset.midiEngine !== 'browser';
+const nmPost = m => { try { if (IOH.port) IOH.port.postMessage(m); } catch(e){} };
+const nmNs = ms => Math.max(0, (ms - IOH.clk) * 1e6);   // performance.now() (ms) → the helper's OS clock (ns)
+async function nmConnect(){
+  if (NM.acc) return NM.acc;
+  iohStart(); const t0 = performance.now();
+  while (IOH.state === 'starting' || IOH.state === 'off'){ if (performance.now() - t0 > 3000) break; await new Promise(r => setTimeout(r, 30)); }
+  if (IOH.state !== 'ready' || !IOH.midi || !(await iohClock())) return null;
+  const acc = {native:true, outputs:new Map(), inputs:new Map(), onstatechange:null};
+  NM.acc = acc; NM.byPort.clear();
+  IOH.onMidi = list => { for (const m of list){ const inp = NM.byPort.get(m.port);
+    if (inp && inp.onmidimessage) try { inp.onmidimessage({data:Uint8Array.from(m.bytes), timeStamp:m.ns / 1e6 + IOH.clk}); } catch(e){ tpLog('MIDI in', e); } } };
+  await nmScan(true);
+  NM.scanT = setInterval(nmScan, 3000);
+  NM.clkT = setInterval(() => { IOH.clkT = 0; iohClock(); }, 15000);   // the two clocks, measured again now and then
+  return acc;
+}
+async function nmScan(first){
+  const acc = NM.acc; if (!acc || NM.scanning === acc) return;   // ONE SCAN AT A TIME PER ACCESS (review, CodeRabbit): a slow one overlapping the next opened a port twice; one left from an old access mustn't hold up the new one
+  NM.scanning = acc; try { await nmScan1(acc, first); } finally { if (NM.scanning === acc) NM.scanning = null; } }
+async function nmScan1(acc, first){
+  const r = await iohAsk({op:'midiPorts'}); if (NM.acc !== acc) return;
+  // HELPER GONE (it died: no answer twice in a row): its port numbers mean nothing to a new one, so the ports are dropped here
+  // (nothing is sent to it) and MIDI connects again, which starts a fresh helper (main.js allows one restart), else Web MIDI
+  if (!r){ if (++NM.miss >= 2) nmLost(); return; }
+  NM.miss = 0; if (r.op !== 'midiPorts') return;
+  let ch = false;
+  const opening = acc.opening || (acc.opening = new Set()), regroup = new Set();   // opens in flight, per access (CodeRabbit: a shared set let an old scan's opens hide the new access's ports)
+  const sync = (map, list, open) => { const want = new Set(list.map(p => 'n:' + p.id)), jobs = [];
+    // SAME-NAME DEVICES (CodeRabbit): ids are names, " #2" for the second of two. When one of a group goes, the others' ids shift, so
+    // the whole group is closed and opened again by its new ids (the survivor would otherwise keep the gone device's handle)
+    const base = id => id.replace(/ #\d+$/, ''), gone = new Set();
+    for (const id of map.keys()) if (!want.has(id)){ gone.add(base(id)); regroup.add(base(id)); }
+    for (const [id, x] of map) if (!want.has(id) || gone.has(base(id))){ nmPost({op:'midiClose', port:x.port}); map.delete(id); NM.byPort.delete(x.port); ch = true; }
+    for (const p of list){ const id = 'n:' + p.id, key = open + id; if (map.has(id) || opening.has(key)) continue; opening.add(key);
+      jobs.push(iohAsk({op:open, name:p.id}).then(o => { opening.delete(key);
+        if (o && o.ok && (NM.acc !== acc || map.has(id))){ nmPost({op:'midiClose', port:o.port}); return; }   // (opened after a switch or a reconnect: closed, not leaked)
+        if (!o || !o.ok) return; map.set(id, nmPort(id, p.name, o.port, open === 'midiOpenOut')); ch = true; })); }
+    return Promise.all(jobs); };
+  await sync(acc.outputs, r.outs || [], 'midiOpenOut'); if (NM.acc !== acc) return;   // (switched away meanwhile: a stale scan opens no inputs)
+  await sync(acc.inputs, r.ins || [], 'midiOpenIn'); if (NM.acc !== acc) return;
+  // A CHOICE WHOSE DEVICE IS GONE STAYS (CodeRabbit, second look): names can't tell which of two same-name devices left, so a choice
+  // isn't moved to the other one (notes could reach the wrong gear); it shows "(not connected)" and works again when it's back.
+  // Proper fix: a stable device identity from the addon (HANDOVER, phase B).
+  if (regroup.size) ch = true;
+  if (ch && !first && NM.acc === acc){ try { await midiRemap(acc); } catch(e){} if (acc.onstatechange) try { acc.onstatechange(); } catch(e){} }   // (a saved port plugged in later finds its letter)
+  const st = await iohAsk({op:'midiStats'}); if (st && st.op === 'midiStats' && NM.acc === acc) NM.late = st.late | 0;
+  nmLateShow();   // (also each scan: hookInputs may just have rewritten the status without it)
+}
+// Settings › MIDI's status, when it shows a native connection (hookInputs: "… · native"): " · N late" after it while N > 0
+function nmLateShow(){
+  const el = $('midiStat'); if (!el) return;
+  const t = el.textContent.replace(/ · \d+ late$/, '');
+  const want = NM.acc && NM.late > 0 && / · native$/.test(t) ? t + ' · ' + NM.late + ' late' : t;
+  if (want !== el.textContent) el.textContent = want;
+}
+// VALID MESSAGES ONLY, AS WEB MIDI (owner's beta.14 test: the Cirklon showed "Sysex interrupt" the first time native MIDI reached it):
+// Web MIDI's send() throws on a malformed message (a data byte ≥ 0x80, a wrong length) and on SysEx without permission, so the
+// browser engine quietly dropped anything odd; the native engine passed it all on. Same rules here, thrown the same way (every
+// sender already catches). Several whole messages in one send are allowed, as in Web MIDI.
+const NM_LEN = st => st < 0xC0 ? 3 : st < 0xE0 ? 2 : st < 0xF0 ? 3 : ({0xF1:2, 0xF2:3, 0xF3:2, 0xF6:1, 0xF8:1, 0xFA:1, 0xFB:1, 0xFC:1, 0xFE:1, 0xFF:1})[st] || 0;
+function nmValid(b){
+  if (!b || !b.length) return false;
+  for (let i = 0; i < b.length;){ const st = b[i]; if (!(st >= 0x80 && st <= 0xFF) || st === 0xF0 || st === 0xF7) return false;
+    const n = NM_LEN(st); if (!n || i + n > b.length) return false;
+    for (let k = 1; k < n; k++){ const d = b[i + k]; if (!(d >= 0 && d < 0x80)) return false; }
+    i += n; }
+  return true; }
+function nmPort(id, name, port, out){
+  if (out) return {id, name, port, native:true, type:'output',
+    send(b, ts){ const a = Array.from(b, x => +x); if (!nmValid(a)) throw new TypeError('invalid MIDI message: ' + a.join(','));
+      nmPost({op:'midiSend', port, bytes:a, at:ts ? nmNs(ts) : 0}); },
+    clear(){ nmPost({op:'midiClear', port}); }};
+  const inp = {id, name, port, native:true, type:'input', onmidimessage:null}; NM.byPort.set(port, inp); return inp;
+}
+function nmLost(){
+  const a = NM.acc; if (!a) return; NM.acc = null; NM.miss = 0; clearInterval(NM.scanT); clearInterval(NM.clkT); IOH.onMidi = null; NM.byPort.clear();
+  try { a.onstatechange = null; a.inputs.forEach(i => { i.onmidimessage = null; }); } catch(e){}
+  if (midi.access === a){ midi.access = null; try { mx.held = []; mx.pend = []; } catch(e){} }
+  if (IOH.port){ try { IOH.port.onmessage = null; IOH.port.close(); } catch(e){} }
+  iohPend.forEach(r => r(null)); iohPend.clear();
+  Object.assign(IOH, {state:'off', port:null, midi:false, clk:null, clkT:0});
+  toast('The desktop app’s MIDI helper stopped: connecting MIDI again.', 5000);
+  connectMidi();
+}
+function nmClose(){ const acc = NM.acc; if (!acc) return; NM.acc = null; clearInterval(NM.scanT); clearInterval(NM.clkT); IOH.onMidi = null;
+  nmPost({op:'midiClear', port:0}); for (const m of [acc.outputs, acc.inputs]) for (const x of m.values()) nmPost({op:'midiClose', port:x.port});
+  NM.byPort.clear(); }
+// Saved port choices (Settings › MIDI › Ports, Notes in, Clock from) in the other engine's ids, mapped by name: Web MIDI ids by
+// the names remembered for them (midi.names; read from Web MIDI once when missing), native ids by their own name
+function midiNames(acc){ try { acc.outputs.forEach(o => { midi.names[o.id] = o.name || ''; }); acc.inputs.forEach(i => { midi.names[i.id] = i.name || ''; }); } catch(e){} }
+async function midiRemap(acc){
+  const nat = !!acc.native, foreign = id => id && (nat ? !id.startsWith('n:') : id.startsWith('n:'));
+  const ids = [...midi.outIds, midi.inId, midi.clkId].filter(foreign); if (!ids.length) return;
+  if (nat && ids.some(id => !midi.names[id]) && navigator.requestMIDIAccess){ try { const w = await Promise.race([navigator.requestMIDIAccess(), new Promise(r => setTimeout(r, 3000))]); if (w) midiNames(w); } catch(e){} }   // (bounded: a permission prompt left open mustn't hold the connect)
+  const nameOf = id => id.startsWith('n:') ? id.slice(2).replace(/ #\d+$/, '') : (midi.names[id] || '');
+  const find = (map, id) => { const nm = nameOf(id); if (!nm) return id; let hit = '';
+    map.forEach((x, k) => { if (!hit && (x.name || '') === nm) hit = k; });
+    if (!hit && nm.length >= 4){ const l = nm.toLowerCase(); map.forEach((x, k) => { const xl = (x.name || '').toLowerCase(); if (!hit && xl.length >= 4 && (xl.includes(l) || l.includes(xl))) hit = k; }); }
+    return hit || id; };   // (not there now: the choice stays, shown as "(not connected)")
+  midi.outIds = midi.outIds.map(id => foreign(id) ? find(acc.outputs, id) : id);
+  if (foreign(midi.inId)) midi.inId = find(acc.inputs, midi.inId);
+  if (foreign(midi.clkId)) midi.clkId = find(acc.inputs, midi.clkId);
+  saveMidi();
+}
+// Settings › MIDI › Engine changed: the old access goes (its inputs fall silent, queued notes are dropped), the new one connects
+function midiEngineSet(v){
+  aset.midiEngine = v === 'browser' ? 'browser' : 'native'; asetSave();
+  try { moRelease(); } catch(e){}
+  midiAccessDrop();
+  if (midi.on || midi.want){ if (midiConnecting) midiConnecting.then(() => connectMidi()); else connectMidi(); } else { moPorts(); miPorts(); }
+}
+if (IOAPI && $('segMidiEng')){ $('midiEngRow').hidden = false;
+  makeSeg($('segMidiEng'), [['native', 'Native'], ['browser', 'Browser']], () => aset.midiEngine === 'browser' ? 'browser' : 'native', midiEngineSet); }
+
+/* ===== NATIVE INPUT (A1.3; plan §3.3, §4): every input of the interface, placed on the audio clock =====
+   The helper streams chunks of every channel with the OS time each first frame reached the computer (hostNs). The page's
+   audio clock is defined by when a sound is HEARD (mapUpd / p2a), so a frame that arrived at OS time P belongs to the song
+   moment p2a(P): what the player heard while playing it. The worklet below plays each frame out at exactly p2a(P) + D on the
+   audio clock (D: a safety delay, so every chunk is there in time), and the recorder above it is the same as for the
+   browser's input, with rcdLat() = D: a take is cut where the song says, without guessing the input's latency.
+   TAKES STAY WHOLE: the input keeps its own frames back to back (no resampling). Where it sits on the audio clock (the
+   anchor) is set from the timestamps and re-set freely between takes; while a take records it moves only if it drifts more
+   than 20 ms (two crystals: a few ms in 5 minutes). MONITOR: a second output plays the input as soon as it can (a ~12 ms
+   jitter cushion, 20 ms since beta.5), nudged a frame at a time to follow the drift; it never touches the take. */
+const IOIN_WORKLET = `class ThIoIn extends AudioWorkletProcessor{
+  constructor(){super();const sr=sampleRate;let c=1;while(c<sr*8)c<<=1;this.cap=c;this.mask=c-1;this.L=new Float32Array(c);this.R=new Float32Array(c);
+    this.wHi=null;this.A=null;this.D=0.06;this.rec=false;this.pick=[0,1];this.m=null;this.J=Math.round(0.02*sr);
+    this.late=0;this.under=0;this.jumps=0;this.k=0;this.lastJ=0;
+    this.port.onmessage=e=>{const d=e.data;if(d.D!=null){this.D=d.D}if(d.rec!=null)this.rec=d.rec;if(d.pick)this.pick=d.pick;if(d.reset){this.wHi=this.A=this.m=null}if(d.mreset)this.m=null;if(d.data)this.put(d)}}
+  put(d){const n=d.n,ch=d.nch,x=d.data,a=Math.min(this.pick[0],ch-1),b=Math.min(this.pick[1],ch-1),M=this.mask;
+    if(this.wHi==null)this.wHi=d.f0;
+    if(d.f0>this.wHi){let g=Math.min(d.f0-this.wHi,this.cap);for(let f=d.f0-g;f<d.f0;f++){this.L[f&M]=0;this.R[f&M]=0}}   // a gap the helper reported: silence, at its true place
+    for(let i=0;i<n;i++){const f=(d.f0+i)&M;this.L[f]=x[i*ch+a];this.R[f]=x[i*ch+b]}
+    if(d.f0+n>this.wHi)this.wHi=d.f0+n;
+    const want=Math.round((d.t+this.D)*sampleRate)-d.f0;   // this chunk's anchor: input frame f plays at audio frame f + A
+    if(this.A==null)this.A=want;else{const err=want-this.A,thr=(this.rec?0.02:0.001)*sampleRate;if(err>thr||err<-thr){this.A=want;this.jumps++;this.lastJ=err}}}
+  process(ins,outs){const o=outs[0],q=outs[1],n=(o[0]||q[0]).length,M=this.mask;
+    if(this.A!=null&&this.wHi!=null){for(let i=0;i<n;i++){const f=currentFrame+i-this.A;
+      if(f>=this.wHi){if(f-this.wHi+1>this.late)this.late=f-this.wHi+1;this.under++;continue}
+      if(f<this.wHi-this.cap)continue;o[0][i]=this.L[f&M];if(o[1])o[1][i]=this.R[f&M]}}
+    if(this.wHi!=null&&q[0]){let av=this.m==null?-1:this.wHi-this.m;
+      if(this.m==null||av>this.J+0.06*sampleRate||av<0){this.m=this.wHi-this.J;av=this.J}
+      if(av>=n){for(let i=0;i<n;i++){const f=(this.m+i)&M;q[0][i]=this.L[f];if(q[1])q[1][i]=this.R[f]}this.m+=n;
+        const d=this.wHi-this.m;if(d>this.J+0.004*sampleRate)this.m++;else if(d<this.J-0.004*sampleRate)this.m--}}
+    if(++this.k>=150){this.port.postMessage({late:this.late,under:this.under,jumps:this.jumps,lastJ:this.lastJ,A:this.A});this.late=this.under=0;this.k=0}
+    return true}}
+registerProcessor('thunder-io-in',ThIoIn);`;
+// the addon's clock (hostNs, ns) → performance.now() (ms): a few round trips, the shortest one wins
+async function iohClock(){
+  if (IOH.clk != null && performance.now() - (IOH.clkT || 0) < 10000) return true;   // (a fresh one is kept: opening stays quick)
+  let best = null;
+  for (let k = 0; k < 8; k++){ const t0 = performance.now(), m = await iohAsk({op:'now'}), t1 = performance.now();
+    if (!m || m.op !== 'now') continue; if (!best || t1 - t0 < best.rtt) best = {rtt:t1 - t0, off:(t0 + t1) / 2 - m.ns / 1e6}; }
+  if (best){ IOH.clk = best.off; IOH.clkT = performance.now(); } return !!best;
+}
+// Wait (up to 3 s) for the helper to say whether it is there
+async function iohReady(){
+  if (!IOAPI || aset.inEngine === 'browser') return false;
+  iohStart(); const t0 = performance.now();
+  while (IOH.state === 'starting' || IOH.state === 'off'){ if (performance.now() - t0 > 3000) break; await new Promise(r => setTimeout(r, 30)); }
+  if (IOH.state === 'ready' && !IOH.devices.length) await iohDevices();
+  return IOH.state === 'ready';
+}
+// Which of the helper's devices to open: the one picked in Record a sample (ioDev), else the one whose name the browser's
+// pick starts with (500R8 (323a:0010) → 500R8), else the default input, else the one with the most inputs.
+function iohInDev(lab){
+  const D = IOH.devices.filter(d => d.inId && d.inputs > 0); if (!D.length) return null;
+  const byId = rcdSet.ioDev && D.find(d => d.inId === rcdSet.ioDev); if (byId) return byId;
+  const byName = lab && D.find(d => lab.startsWith(d.name)); if (byName) return byName;
+  return D.find(d => d.isDefaultIn) || D.reduce((a, b) => (b.inputs > a.inputs ? b : a));
+}
+// Open the native input for the recorder: the recorder worklet and the monitor hang off the worklet's two outputs, exactly
+// where the browser input's source node was. Returns false (and the browser input is used) if anything is missing.
+// RCD.ioWhy: why it didn't open, for the window (owner, 7 Nov: "kicking the inputs back to just 1&2": it fell back in silence)
+async function rcdOpenIo(rec, mon){
+  RCD.ioWhy = '';
+  if (!(await iohReady())){ RCD.ioWhy = 'the helper isn’t available (' + (IOH.why || 'no answer') + ')'; return false; }
+  let lab = ''; try { const L = await rcdInputs(), b = L.find(x => x.deviceId === rcdSet.input); lab = (b && b.label) || ''; } catch(e){}
+  const dev = iohInDev(lab); if (!dev){ RCD.ioWhy = 'no input device found'; return false; }
+  if (!(await iohClock())){ RCD.ioWhy = 'the helper didn’t answer'; return false; }
+  // THE MICROPHONE IS ASKED FOR HERE (phase B): the helper also starts for MIDI alone, which mustn't ask for it
+  if (IOAPI.mic){ let r = null; try { r = await IOAPI.mic(); } catch(e){} if (r && r.ok === false){ RCD.ioWhy = String(r.why || 'no microphone access'); return false; } }
+  // OPENING WAITS FOR macOS (beta.4: "no answer"): starting the device can sit on the microphone prompt; 5 s gave up under it
+  const slow = setTimeout(() => toast('Opening ' + dev.name + '… if macOS asks for the microphone, allow it.', 6000), 2500);
+  const o = await iohAsk({op:'open', dev:dev.inId, rate:ctx.sampleRate, block:0}, 30000); clearTimeout(slow);
+  if (!o || !o.ok){ RCD.ioWhy = dev.name + ' wouldn’t open: ' + ((o && o.why) || 'no answer'); if (!o) iohAsk({op:'close'}); return false; }
+  let node;
+  try {   // (CodeRabbit, PR #14: if the worklet can't be set up after the device opened, close it in the helper too)
+    if (RCD.iomod !== ctx){ await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([IOIN_WORKLET], {type:'application/javascript'}))); RCD.iomod = ctx; }
+    node = new AudioWorkletNode(ctx, 'thunder-io-in', {numberOfInputs:0, numberOfOutputs:2, outputChannelCount:[2, 2]});
+  } catch(e){ iohAsk({op:'close'}); throw e; }
+  const D = Math.min(0.5, (ctx.baseLatency || 0) + (ctx.outputLatency || 0) + 0.12);   // the output's own latency + room for the hops (beta.4: 40 ms fell behind mid-take; D costs the take nothing, rcdLat takes it back)
+  const io = {node, dev, D, opened:o, under:0, jumps:0, sync:0, lastIn:performance.now() + 1000};   // (a second's grace to start)
+  node.port.postMessage({D});
+  node.port.onmessage = e => { const m = e.data; io.stat = m;
+    // LATE: chunks arrived after their place came round. Between takes: more delay (up to 500 ms); during one: a toast.
+    if (m.under){ io.under += m.under;
+      if (!RCD.on && io.D < 0.5){ io.D = Math.min(0.5, io.D + 0.05); node.port.postMessage({D:io.D}); }
+      else if (RCD.on) toast('The input fell behind for a moment: that part of the take is silent.', 4000); }
+    if (m.jumps) io.jumps = m.jumps; };
+  node.connect(rec, 0); node.connect(mon, 1);
+  IOH.onIn = m => { if (!RCD.io || RCD.io.node !== node) return; io.lastIn = performance.now(); io.got = true;
+    node.port.postMessage({f0:m.frame0, t:p2a(m.hostNs / 1e6 + IOH.clk), n:m.frames, nch:m.channels, data:m.data}, [m.data.buffer]); };
+  // UNPLUGGED MID-TAKE (A2): the take so far is kept (the recorder ends it where it is), then the input is closed
+  IOH.onGone = why => { if (!RCD.io || RCD.io.node !== node) return;
+    const rec = RCD.on || !!RCD.sync;
+    if (RCD.sync && RCD.sync.phase === 'rec') rcdEndAt(ctx.currentTime); else if (RCD.sync) { rcdAbort(); } else if (RCD.on) rcdStop();
+    toast('The audio input went away (' + why + ')' + (rec ? ': the take so far is kept.' : '.'), 6000);
+    rcdCloseIo();   // the recorder itself stays until the take is in, then closes
+    const fin = () => { if (RCD.on || RCD.sync || RCD.onDone) return void setTimeout(fin, 100); if (!RCD.io) rcdClose(); rcdUi(); }; fin(); };
+  io.tick = setInterval(() => { mapUpd(); if (++io.sync % 20 === 0 && !RCD.on){ IOH.clkT = 0; iohClock(); } }, 500);   // the clocks, kept lined up
+  RCD.io = io;
+  return true;
+}
+function rcdCloseIo(){ const io = RCD.io; if (!io) return; RCD.io = null; clearInterval(io.tick); IOH.onIn = IOH.onGone = null;
+  try { io.node.port.onmessage = null; io.node.disconnect(); } catch(e){} iohAsk({op:'close'}); }
+// The recorder starts or stops: the native input's anchor holds still while a take records
+function rcdGo(m){ if (RCD.node) RCD.node.port.postMessage(m); if (RCD.io) RCD.io.node.port.postMessage({rec:m === 'go'}); rcdMonSet(); }
+// MONITOR LEVEL, FOR SURE (owner's beta.5 test: monitoring went silent after a PATTERN take, meters still moving, and Monitor OFF → ON
+// brought it back): the level is set outright (any curve still scheduled is dropped) and the native monitor restarts its read
+// point, at every take's start and end. A plain .value = is ignored by Chrome once a curve was scheduled (the Monitor button's).
+function rcdMonSet(v){ if (!RCD.mon) return; const g = RCD.mon.gain, t = ctx.currentTime, w = v == null ? (rcdSet.mon ? 1 : 0) : v;
+  try { g.cancelScheduledValues(t); g.setValueAtTime(w, t); } catch(e){} if (RCD.io && w) RCD.io.node.port.postMessage({mreset:true}); }
 // Settings → MIDI: a cable for each port letter, and which letters get clock.
 function moPorts(){
   const opts = [['', 'None']]; if (midi.access) midi.access.outputs.forEach(o => opts.push([o.id, o.name || o.id]));
@@ -16242,6 +16710,7 @@ function patchKey(d){ if (!d) return 'null'; try { const c = Object.assign({}, d
    project (they acted on the patch). True when the key was used. */
 function editorKey(e){
   const mod = e.ctrlKey || e.metaKey, k = (e.key || '').toLowerCase();
+  if (soloMuteKey(e)) return true;   // SOLO / MUTE on every screen (owner, 8 Nov): Ctrl/⌘+/ \, / and \ from inside the editor too
   if (mod && !e.altKey){
     if (k === 's'){ saveProj(e.shiftKey); return true; }
     if (k === 'o' && !e.shiftKey){ openProj(); return true; }
@@ -19399,7 +19868,8 @@ function makeSeq(S, mode, o){
           }
           T.last = {c, v}; cmds.push({c, v});
         }
-        const fx = {}; for (const q of cmds) fx[q.c] = q.v;
+        // FLX and FLY share one Flex, so on one row the rightmost of the two is the one that plays (8 Nov)
+        const fx = {}; for (const q of cmds){ if (q.c === 'FLX') delete fx.FLY; else if (q.c === 'FLY') delete fx.FLX; fx[q.c] = q.v; }
         if (fx.TPO != null && fx.TPO >= 40) nb = fx.TPO;
         if (fx.GRV != null) T.grv = fx.GRV ? [(fx.GRV >> 4) || api.tks, (fx.GRV & 15) || api.tks] : null;
         if (fx.GGR != null) ngrv = fx.GGR ? [(fx.GGR >> 4) || api.tks, (fx.GGR & 15) || api.tks] : null;
@@ -19742,7 +20212,7 @@ function makePlayer(ac, out, getBuf, live){
      An export (an offline context) always plays live: it has all the time it needs. */
   function psNode(t, pad, V, kind, key){
     const sp = PsynCore.liveSpec(kind), by = PsynCore.bytes();
-    if (!sp || !by || !psOK.has(ac) || (ac === ctx && (psLive.off || aset.psLive === 'render'))) return null;   // (Settings → Audio → …pump live)
+    if (!sp || !by || !psOK.has(ac) || (ac === ctx && (psLive.off || aset.psLive === 'render'))) return null;   // (Settings → Audio → Live engines)
     try {
       const node = new AudioWorkletNode(ac, 'thunder-psyn', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2],
         processorOptions:Object.assign({p:xParams(V), cid:live ? key : null}, sp, psSent.has(ac) ? {} : {bytes:by}, frzSample(V) ? {file:{d:frzSample(V).data, sr:frzSample(V).sr}} : {})});
@@ -19757,7 +20227,7 @@ function makePlayer(ac, out, getBuf, live){
     } catch(e){ tpLog('pump synth live node', e); return null; }
   }
   /* …WAVES LIVE: as psNode, a node per track and pad with four lanes, running the song's …waves patch (WV.doc) and playing
-     the pad's Bus. The same safety net (psLive) and setting (Settings → Audio → …pump live) as the …pump live engines. */
+     the pad's Bus. The same safety net (psLive) and setting (Settings → Audio → Live engines) as the …pump live engines. */
   function wlNode(t, pad, V, kind, key){
     if (!wlOK.has(ac) || !WV.doc || (ac === ctx && (psLive.off || aset.psLive === 'render'))) return null;
     const M = globalThis.__wlMods; if (!wlSent.has(ac) && !(M && M.dsp)) return null;   // the wasm isn't compiled yet
@@ -20366,7 +20836,7 @@ function safeLim(ac, dest){
 // Reset audio engine (Settings → Audio): stop, tear the live graph down (every track's voices, live synth nodes, track
 // and master effects, …chains, mastering) and build it again from the song. Clears a stuck note, a runaway effect tail
 // or a frozen worklet without reloading the page; the song, kit and settings are untouched.
-function resetAudio(){
+function resetAudio(quiet){
   try { tStop(true); } catch(e){}
   if (!ctx){ toast('Audio hasn’t started yet: nothing to reset.'); return; }
   const now = ctx.currentTime;
@@ -20381,8 +20851,10 @@ function resetAudio(){
   }
   try { master.disconnect(); } catch(e){}
   master = ctx.createGain(); master.gain.value = clamp(aset.vol, 0, 100) / 100; master.connect(ctx.destination);
+  // THE RECORDER'S MONITOR follows the new master (it stayed on the old one: monitoring went silent after a reset with Record a sample open)
+  if (RCD.mon){ try { RCD.mon.disconnect(); RCD.mon.connect(master); } catch(e){} }
   rtInit(); if (ctx.state !== 'running' && ctx.resume) ctx.resume();
-  toast('Audio engine reset: every note and effect cleared.');
+  if (!quiet) toast('Audio engine reset: every note and effect cleared.');
 }
 function rtInit(){
   audio();
@@ -20517,7 +20989,7 @@ let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bass
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=7', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the …waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
-const WAVES_WK = 'waves/waves-worklet.js?v=33', wlOK = new WeakSet(), wlSent = new WeakSet();
+const WAVES_WK = 'waves/waves-worklet.js?v=34', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* …PUMP SYNTHS live, THE SAFETY NET (owner, 26 Oct): while the song plays, once a second: if the audio is dropping out or
    the audio thread is nearly full, and the live …pump nodes are a real part of that, twice in a row, the live engines
    switch to their renders for the rest of this visit (psLive.off): their nodes go, and the next notes play the pads'
@@ -20535,7 +21007,7 @@ function psFallback(why){
   if (psLive.off) return; psLive.off = true; psLive.strikes = 0;
   try { if (rt && rt.pl) rt.pl.psDrop(); } catch(e){}
   tpLog('pump synths live: playing the renders', why);
-  toast('Mono live, Poly live and Coil live are playing their rendered sound for now: ' + why + '. Settings → Audio → …pump live: tap Auto to try live again.', 8000);
+  toast('The …pump live engines and …waves live are playing their rendered sound for now: ' + why + '. Settings → Audio → Live engines: tap Auto to try live again.', 8000);
   try { psLiveNote(); } catch(e){}
 }
 function bassReady(ac){
@@ -20966,7 +21438,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'x761n5';
+const CORE_REV = 'rl3y62';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -21256,7 +21728,7 @@ function tStop(quiet){
   }
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
   const stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
-  tp.timer = 0; tp.on = false; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
+  tp.timer = 0; tp.on = false; fpMem = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing){ coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} } }
   else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
@@ -22358,7 +22830,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 485;
+const BUILD = 515;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22383,7 +22855,7 @@ const FLK = 'thunderplus-follow-v1';
 // followMode 0 / 1 / 2; followOn: ON, the full follow (the paging checks read it). Stored '1' (ON, as before) or 'p'.
 let followMode = (() => { try { const v = localStorage.getItem(FLK); return v === '1' ? 2 : v === 'p' ? 1 : 0; } catch(e){ return 0; } })();
 let followOn = followMode === 2;
-function setFollow(m){ m = m === true ? 2 : m === false ? 0 : clamp(m | 0, 0, 2); followMode = m; followOn = m === 2;
+function setFollow(m){ m = m === true ? 2 : m === false ? 0 : clamp(m | 0, 0, 2); followMode = m; followOn = m === 2; fpMem = null;
   try { localStorage.setItem(FLK, m === 2 ? '1' : m === 1 ? 'p' : '0'); } catch(e){} if (m) followPlay(); draw(); }
 /* RESUME (owner, 31 Oct): stopping the song leaves the playhead showing where it stopped (tp.paused), on every screen.
    PLAYBACK RESUMES FROM PAUSE (off by default since build 318, this device): PLAY then carries on from that spot, to the step, as long as
@@ -22450,6 +22922,7 @@ let kpOn = (() => { try { const v = localStorage.getItem(KPOK); if (v === '0' ||
 function setKp(on){ kpOn = !!on; try { localStorage.setItem(KPOK, kpOn ? '1' : '0'); } catch(e){} draw(); fit(); draw(); }
 // Song: the cursor's row follows its track. Sect and Phrase: they switch to what the cursor's track is
 // playing and the cursor rides along. Not while a selection is being made.
+var fpMem = null;   // FOLLOW PATTERN: what each track last played (cleared on STOP and when the follow mode changes)
 function followPlay(){
   if (!tp.on || !tp.pos || sdrag || drag) return;
   const P = tp.pos, own = P[tv === 'song' ? cs.song.x : cTrack] || (tp.loopV === 'bus' ? null : P.find(Boolean)); if (!own) return;   // BUS PLAY: an empty bus stays put
@@ -22459,14 +22932,17 @@ function followPlay(){
   // (owner, 2 Nov: after selecting rows, Arrange stopped paging even with FOLLOW on: this used to return before paging).
   if (selA){ arrFollowPage(own); return; }
   if (followMode === 1){   // FOLLOW PATTERN: only which phrase / sect is shown follows the cursor's track; nothing scrolls
-    if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0) cSect = own.sect; }
-    else if (tv === 'phrase'){ const mine = P[cTrack]; if (mine && mine.phrase >= 0 && mine.phrase !== cPhrase){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); } }
+    // ON A CHANGE ONLY (owner, 7 Nov: "a single phrase on a track, I can't move the cursor off of that phrase"): it jumps when
+    // what the track plays changes, not on every step, so with one phrase (or one block) playing you can move away from it.
+    const fp = fpMem || (fpMem = {}), fch = (k, v) => { const c = fp[k] !== v; fp[k] = v; return c; };
+    if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0 && fch('s', own.sect)) cSect = own.sect; }
+    else if (tv === 'phrase'){ const mine = P[cTrack]; if (mine && mine.phrase >= 0 && fch('p' + cTrack, mine.phrase) && mine.phrase !== cPhrase){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); } }
     // Arrange follows the playing pattern too: on the Song screen the selected block moves to the row playing on its track
     // (owner, 31 Oct), unless you've just moved it yourself; Arrange turns its pages with it
-    else if (tv === 'song' && tp.mode === 'song' && own.row >= 0 && cs.song.y !== own.row && performance.now() - arrHandT > 4000 && !selA){ cs.song.y = own.row; }
+    else if (tv === 'song' && tp.mode === 'song' && own.row >= 0 && fch('r' + cs.song.x, own.row) && cs.song.y !== own.row && performance.now() - arrHandT > 4000 && !selA){ cs.song.y = own.row; }
     // ...and beside Phrase / Pattern view while Arrange has the keys (owner, 31 Oct: then only the phrase followed): the
     // selected block goes to the row playing on its own track
-    if (tv !== 'song' && apReady && apF === 'arr' && tp.mode === 'song' && performance.now() - arrHandT > 4000){ const q = P[cs.song.x] || own; if (q && q.row >= 0 && cs.song.y !== q.row){ cs.song.y = q.row; apLastKey = ''; } }
+    if (tv !== 'song' && apReady && apF === 'arr' && tp.mode === 'song' && performance.now() - arrHandT > 4000){ const q = P[cs.song.x] || own; if (q && q.row >= 0 && fch('a' + cs.song.x, q.row) && cs.song.y !== q.row){ cs.song.y = q.row; apLastKey = ''; } }
     // PATTERN VIEW (owner, 6 Nov: "pattern follow didn't update in the pattern screen until I paged into it"): the Pattern view
     // draws the song row cs.song.y, and FOLLOW PATTERN only switched the open track's phrase, so the other tracks stayed on the
     // old pattern. The song row follows now too, as with FOLLOW ON (rows don't scroll; the cursor keeps its row and track).
@@ -23394,7 +23870,8 @@ function bump(d, big){
       case 'tsp': v = clamp(v + d * (big ? 12 : 1), -128, 127); break;
       case 'note': v = v === OFF ? last.note : clamp(v + d * (big ? 12 : 1), 0, 119); break;
       // NI instruments (00–3F): the big step jumps 8 at a time (00–07 the drum pads, 08–0F the synths, and on).
-      case 'inst': { const nv = clamp(v + d * (big ? 8 : 1), 0, NI - 1); if (nv === v) toast(`Instruments go 00–${hx(NI - 1)} (${NI} of them, in hex: 0F is 15, 10 is 16). Each plays the slot set on INST › PAD.`); v = nv; break; }
+      // A big step that would run past either end does nothing (owner, 8 Nov: a slip onto ▼ while editing sent low numbers to 00).
+      case 'inst': { if (big && (v + d * 8 < 0 || v + d * 8 > NI - 1)) return; const nv = clamp(v + d * (big ? 8 : 1), 0, NI - 1); if (nv === v) toast(`Instruments go 00–${hx(NI - 1)} (${NI} of them, in hex: 0F is 15, 10 is 16). Each plays the slot set on INST › PAD.`); v = nv; break; }
       case 'fxc': if (mstView()){ const L = FXLIST_MST.slice(1), n = L.length, i = Math.max(0, L.indexOf(v)); v = L[((i + d * (big ? 4 : 1)) % n + n) % n]; }
         else v = ((v + d * (big ? 4 : 1)) % FXC.length + FXC.length) % FXC.length; break;
     }
@@ -26878,10 +27355,10 @@ function mwHit(G, ex, ey){ let best = -1, bd = 1e9; S.mst.eq.bands.forEach((b, i
     mstChanged(); mwEqPanel(true); });
   const end = e => { if (mwDrag && e.pointerId === mwDrag.id) mwDrag = null; };
   c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
-  c.addEventListener('wheel', e => { const b = S.mst.eq.bands[mwBand]; if (!b) return; e.preventDefault();
-    if (b.type === 'bell') b.q = clamp(b.q * Math.exp(-e.deltaY * 0.0025), 0.1, 18);
-    else if (b.type.endsWith('cut')){ const sl = [12, 24, 48], k = sl.indexOf(b.slope); b.slope = sl[clamp(k + (e.deltaY > 0 ? -1 : 1), 0, 2)]; }
-    else b.g = clamp(Math.round((b.g - e.deltaY * 0.01) * 10) / 10, -18, 18);
+  c.addEventListener('wheel', e => { const b = S.mst.eq.bands[mwBand]; if (!b) return; e.preventDefault(); const wy = e.deltaY * wheelSign;
+    if (b.type === 'bell') b.q = clamp(b.q * Math.exp(-wy * 0.0025), 0.1, 18);
+    else if (b.type.endsWith('cut')){ const sl = [12, 24, 48], k = sl.indexOf(b.slope); b.slope = sl[clamp(k + (wy > 0 ? -1 : 1), 0, 2)]; }
+    else b.g = clamp(Math.round((b.g - wy * 0.01) * 10) / 10, -18, 18);
     mstChanged(); mwEqPanel(true); }, {passive:false});
   c.addEventListener('dblclick', e => { const {G, x, y} = pt(e), i = mwHit(G, x, y);
     if (i >= 0){ S.mst.eq.bands[i].on = !S.mst.eq.bands[i].on; }
@@ -28256,7 +28733,7 @@ let dkFlexC = null, dkPatN = 0;   // dkPatN: pictures drawn (test hook)
 function dkFxPatState(f, k, t, at){
   const sw = fxcNow(t, 'sw' + k, at), on = sw < -0.5 ? !!f.on : sw > 0.5;
   if (f.type === 'flex'){ const c = fxcNow(t, 'flx', at), wait = c < 0 && !!f.wait && !(sw > 0.5);
-    const p = c >= 0 ? Math.min(255, Math.round(c)) : wait ? 0 : f.pat | 0;
+    const p = c >= 0 ? Math.min(511, Math.round(c)) : wait ? 0 : f.pat | 0;
     const fly = p >= 256;   // FLY: the param carries 256 + its value
     return {on, wait, src:c >= 0 ? (fly ? 'FLY' : 'FLX') : wait ? 'WAITS FOR FLX' : 'PATTERN', p, name:(fly ? 'FLY ' + hx(p - 256) + ' · ' + (FlexCore.NAMES2[p - 256] || '?') : 'FLX ' + hx(p) + ' · ' + (FlexCore.NAMES[p] || '?'))}; }
   if (f.type === 'sgate'){ const c = fxcNow(t, 'gat', at), g = c >= 0 ? Math.round(c) : -1, wait = g === 0 || (g < 0 && !!f.wait && !(sw > 0.5)), p = g > 0 ? (g >= 16 ? 0 : g) : f.pat | 0;
@@ -29120,7 +29597,7 @@ arrGrid.addEventListener('wheel', e => {
     return; }
   e.preventDefault();
   if (e.shiftKey){ const d = e.deltaY || e.deltaX; arrGrid.scrollTop += e.deltaMode === 1 ? d * 40 : d; arrHandT = performance.now(); return; }   // Shift: scroll only
-  const dy = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY; let n;
+  const dy = (e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY) * wheelSign; let n;
   if (Math.abs(dy) >= 50){ n = Math.sign(dy); arrWAcc = 0; } else { arrWAcc += dy; n = Math.trunc(arrWAcc / 100); if (!n) return; arrWAcc -= n * 100; }
   const c = cs.song, y = clamp(c.y + n, 0, 255); if (y === c.y) return;
   c.y = y; arrUserT = -1e9; c.pg = false; arrHandT = performance.now();
@@ -30356,7 +30833,7 @@ scr.addEventListener('wheel', e => {
     // FX SLOTS (owner, 31 Oct: too easy to change an effect by accident): over a slot the wheel moves between the slots,
     // it never swaps the effect (EDIT, the effect list or EDIT+arrows still do)
     if (v && grid.contains(v) && tv === 'fx' && y >= 1 && y <= FXSLOTS && !e.ctrlKey){ e.preventDefault();
-      const dy = e.deltaMode === 1 ? (e.deltaY || e.deltaX) * 40 : (e.deltaY || e.deltaX); let n;   // one slot a notch; a trackpad's small steps add up
+      const dy = (e.deltaMode === 1 ? (e.deltaY || e.deltaX) * 40 : (e.deltaY || e.deltaX)) * wheelSign; let n;   // one slot a notch; a trackpad's small steps add up
       if (Math.abs(dy) >= 50){ n = Math.sign(dy); vAcc = 0; } else { vAcc += dy; n = Math.trunc(vAcc / 100); if (!n) return; vAcc -= n * 100; }
       const c = cs.fx, ny = clamp((c.y >= 1 && c.y <= FXSLOTS ? c.y : y) + n, 1, FXSLOTS); if (ny !== c.y){ c.y = ny; draw(); } return; }
     // WHEEL ON VALUES (owner, 31 Oct): only with Alt/⌥ held (as an Alt-drag changes them): a plain wheel moves on, so
@@ -30395,11 +30872,12 @@ const PAGEK = {F2:'phrase', F3:'mixer', F4:'inst'};
 // FILL key state (Shift+Alt+F): a tap toggles, a hold lasts while held
 const fillKey = {down:false, t:0, was:false};
 addEventListener('keyup', e => { if (!fillKey.down || (e.code !== 'KeyF' && e.key !== 'Alt' && e.key !== 'Shift')) return; fillKey.down = false; if (performance.now() - fillKey.t > 350 || fillKey.was) perfFill(false); }, true);
-function globalKeys(e){
+// SOLO / MUTE ON EVERY SCREEN (owner, 8 Nov: "Solo and mute key commands should persist despite the screen we are on"): Ctrl/⌘+/ (or \)
+// solos, Ctrl/⌘+Shift+/ clears every solo, / or \ mutes: Renoise's keys. They lived in globalKeys, which only runs on the tracker
+// screens, so the Synth page and the …waves / …chains screens ignored them. One function now, called from both key paths; it acts on
+// the track the panel follows (dkTrack: the last tracker screen's). True when the key was used.
+function soloMuteKey(e){
   const mod = e.ctrlKey || e.metaKey;
-  if (e.altKey && !mod && /^Digit[1-7]$/.test(e.code)){ go(VIEWS[+e.code.slice(5) - 1]); return true; }
-  if (e.altKey && !mod && e.code === 'Digit0'){ setView('synth'); return true; }
-  if (mod && !e.altKey && !e.shiftKey && (e.code === 'Space' || e.key === ' ')){ if (!e.repeat) playPatLoop(); return true; }   // play this pattern, looped
   // Ctrl/⌘+/ solos the track you're on (Renoise's key), again un-solos it; Ctrl/⌘+Shift+/ clears every solo.
   if (mod && !e.altKey && (e.code === 'Slash' || e.key === '/' || e.key === '?' || e.code === 'Backslash' || e.key === '\\' || e.key === '|')){ if (!e.repeat) soloKey(e.shiftKey); return true; }   // Ctrl/⌘+\ too (owner, 24 Oct)
   // / mutes the track you're on (Renoise's key, owner 20 Oct), on every cell: it was the lower piano row's last note, E an
@@ -30407,6 +30885,14 @@ function globalKeys(e){
   if (!mod && !e.altKey && !e.shiftKey && e.key === '/' && e.code !== 'NumpadDivide'){ if (!e.repeat) muteKey(); return true; }
   // \ mutes it too (owner, 24 Oct: one key, on Windows and Mac keyboards alike; Ctrl/⌘+\ solos, above)
   if (!mod && !e.altKey && !e.shiftKey && (e.code === 'Backslash' || e.key === '\\')){ if (!e.repeat) muteKey(); return true; }
+  return false;
+}
+function globalKeys(e){
+  const mod = e.ctrlKey || e.metaKey;
+  if (e.altKey && !mod && /^Digit[1-7]$/.test(e.code)){ go(VIEWS[+e.code.slice(5) - 1]); return true; }
+  if (e.altKey && !mod && e.code === 'Digit0'){ setView('synth'); return true; }
+  if (mod && !e.altKey && !e.shiftKey && (e.code === 'Space' || e.key === ' ')){ if (!e.repeat) playPatLoop(); return true; }   // play this pattern, looped
+  if (soloMuteKey(e)) return true;   // (Ctrl/⌘+/ solo, / and \ mute: soloMuteKey, above, shared with the other screens)
   // Alt+L loops the pattern, Shift+Alt+L the selection; Alt+, / Alt+. transpose the selection down / up a semitone. They
   // work on every cell (plain L , . are piano keys on a note cell). e.code, since Alt changes e.key on a Mac.
   // Alt+A (owner, 30 Oct): Arrange takes the keys from any tracker screen and the screen beside it stays (the Mixer, FX, a
@@ -31321,6 +31807,32 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [514, '8 Nov', ['Live engines: the setting always shows, and its help and message name every …pump live engine as well as …waves live.']],
+  [513, '8 Nov', ['Settings → Audio → Live engines (it was called …pump live): the name now says what it does, and it covers …waves live too, as does the message when a device can’t keep up.', '…waves live is lighter: each pad now runs only the part of the patch that feeds its Bus, with the same sound.']],
+  [512, '8 Nov', ['Record a sample: a recording timer beside Record shows how long the take is so far (0:00 → 4:37); PATTERN takes show “waiting…” until they start at the pattern.']],
+  [511, '8 Nov', ['Measure…: the window keeps its size when you press Measure, and says what it is doing (opening the input, then hit by hit).']],
+  [509, '8 Nov', ['Measure… no longer shows “Audio engine reset” when it finishes (it still refreshes the audio engine quietly, as before); Reset audio engine keeps Record a sample’s monitoring connected.']],
+  [507, '8 Nov', ['Record a sample: Keep in this pad no longer plays the pad; closing the window really disconnects its input monitoring (beta.15 left it connected); closing it while the browser’s input is still opening no longer leaves that input on.']],
+  [505, '8 Nov', ['Space always plays and stops the song, even right after clicking a menu or button; solo and mute keys work on every screen.', 'Desktop app: Apply (reload) in Settings › Audio works; a sample-rate mismatch on the native input pops up a message; long takes show up in RECENT even when storage is full.', 'Desktop app, native MIDI: malformed messages and SysEx are dropped as the browser engine drops them (a Cirklon showed “Sysex interrupt”); closing Record a sample while its input is still opening no longer leaves it half-open.']],
+  [504, '8 Nov', ['Desktop app, native MIDI: with two devices of the same name, a port letter set to the one that was unplugged waits for it (shown as not connected) instead of moving to the other.']],
+  [503, '8 Nov', ['Desktop app, native MIDI: with two devices of the same name, unplugging the first no longer silences the second.']],
+  [502, '8 Nov', ['Desktop app, native MIDI: with two devices of the same name, unplugging the first no longer silences the second.']],
+  [501, '8 Nov', ['Desktop app, native MIDI: switching Engine back and forth quickly no longer delays the input ports.']],
+  [500, '7 Nov', ['Desktop app, native MIDI: after switching Engine the port list fills in at once, and a switch mid-scan no longer changes your saved port choices.']],
+  [499, '7 Nov', ['Desktop app, native MIDI: sturdier (a port can’t be opened twice or left open after switching Engine; a device plugged in later gets its port letter back; if the helper stops, MIDI reconnects by itself), notes keep their timing while a controller is plugged in, and Settings › MIDI shows how many messages went out late, if any.']],
+  [498, '7 Nov', ['Desktop app: MIDI through the app itself (Settings › MIDI › Engine: Native, the default; Browser is the old Web MIDI). Each message leaves at its exact time from the app’s own high-priority thread, STOP takes back notes booked ahead, and MIDI clock in is timed where it arrived. Your port choices carry over by name. Connecting MIDI no longer asks for the microphone.', 'Windows desktop builds include Ableton Link and the native input again.']],
+  [497, '7 Nov', ['Settings › MIDI › Measure… run from Settings (Record a sample closed) with the native input: it looked for the click in the wrong place and couldn’t time the gear without the click (a third cause of the ~200 ms reading).']],
+  [496, '7 Nov', ['Settings › MIDI › Measure…: a noisy input is no longer mistaken for the click (that read about 200 ms), the master effects’ lookahead is no longer counted as the gear’s, and with the desktop app’s native input only the gear needs to reach the input. Record a sample: monitoring no longer goes silent after a PATTERN take (its level is set again at every take’s start and end); Measure… really mutes monitoring while it measures; the native monitor has a little more cushion against dropouts.']],
+  [495, '7 Nov', ['Mac app: signed ad hoc (still no Apple certificate), so macOS sees one app and asks for the microphone once instead of once per part of the app.']],
+  [494, '7 Nov', ['Settings › MIDI › Measure…: an Inputs list picks the pair or channel that hears the click and the gear (the same setting as Record a sample’s Inputs).']],
+  [493, '7 Nov', ['Desktop app, Engine Native: the input is opened once, not again each time Record is pressed or while macOS is still asking for the microphone (the extra microphone prompts and “wouldn’t open: no answer”); opening waits for that prompt; and more room against the input falling behind mid-take (the take is still placed on the beat).']],
+  [492, '7 Nov', ['Desktop app, Engine Native: the helper no longer stops on the first moment of audio (the cause of the inputs falling back to 1+2 on beta.2 and beta.3).']],
+  [491, '7 Nov', ['Desktop app, Record a sample with Engine Native: the interface’s own delay (as the Mac reports it) is taken into account, so PATTERN takes land on the beat without setting Extra latency; unplugging the interface mid-take keeps the take so far; and the window says when the interface runs at another sample rate than the app.']],
+  [490, '7 Nov', ['Desktop app, Record a sample with Engine Native: the interface is no longer reset when the input opens (its buffer size is left as it is); the app asks for the microphone once; the input opens with the window, so the meters work before Record; and an input that stopped is opened again, so Record and Discard and record work without closing the window. If the native input can’t open, the window says why instead of quietly using inputs 1–2.']],
+  [489, '7 Nov', ['Desktop app: Record a sample can record from every input of your audio interface (Engine: Native): the Input list shows the interface with all its inputs, and Inputs every pair and channel. Takes are placed by the interface’s own timestamps. The Input engine row moved here from Settings › Audio.']],
+  [488, '7 Nov', ['Desktop app on a Mac: the mouse wheel goes one way everywhere. With Natural scrolling on, Arrange, the tracker rows and values went the opposite way to the lists and the Mixer; they now follow it too (pulling down moves down, and lowers a value).']],
+  [487, '7 Nov', ['FOLLOW PATTERN jumps only when what a track plays changes: with a single phrase (or block) playing on a track, you can move the cursor off it again.']],
+  [486, '7 Nov', ['Desktop app: Settings → Audio has an Input engine row (Auto or Browser) and shows the native input engine and the inputs of your audio interface. Nothing records through it yet.']],
   [485, '7 Nov', ['MIDI timing (desktop app on a Mac): MIDI went out early by about the audio latency shown in Settings › Audio (base + output), so it needed a negative Gear delay. It now waits for that latency itself: set the Gear delay back to 0 (or what Measure… says).']],
   [484, '7 Nov', ['Measure gear delay rebuilds the audio engine when it finishes (as Settings › Audio › Reset audio engine does): opening the interface’s input could leave the timing off until then.']],
   [483, '7 Nov', ['Record a sample: INPUTS no longer says the interface has only 2 channels: the browser engine only gives the app inputs 1 and 2 (hover the list for how to record another input).']],
@@ -31422,7 +31934,7 @@ const CHANGES = [
   [401, '3 Nov', ['Side panel: instrument names show in full: a size smaller, and a long one takes a second line (hover still shows the pad).', 'FX bar: the pitch animation shows every voice, so the Harmonizer’s two intervals both show, each as bright as its level.']],
   [400, '3 Nov', ['FX bar: a click on a value gives the bar the keys until you click elsewhere or press Esc: ▲▼ pick the value above or below, ◀▶ the same value in the next effect, Ctrl/⌘+arrows change it. With the FX screen open above, it follows the value you pick (its slot and row).']],
   [399, '3 Nov', ['FX bar: every effect without a display of its own now has a calm animation behind its values. EQs and filters: the track’s spectrum with the response curve and its points over it; delays: the echoes, lit in turn as each hit runs along them; modulation: its LFO (autopan: a dot swinging L to R); rhythmic effects: the bar’s 16 steps with the one playing lit; pitch: the semitones with the note and where it moves to; width and utility: the stereo field.']],
-  [398, '3 Nov', ['New engine: …waves live (Synths, and Modular in the engine list). It plays the song’s …waves patch live in the tracker, as the …pump live engines do: each pad picks one of the patch’s 8 Out buses, a poly track plays up to four notes, slides and pitch commands move the notes, the VOL column is the velocity, and an edit to the patch is heard at once. A song with no …waves patch gets the editor’s starter patch. It shares the …pump live safety net (Settings → Audio → …pump live) and plays its render when live isn’t possible.']],
+  [398, '3 Nov', ['New engine: …waves live (Synths, and Modular in the engine list). It plays the song’s …waves patch live in the tracker, as the …pump live engines do: each pad picks one of the patch’s 8 Out buses, a poly track plays up to four notes, slides and pitch commands move the notes, the VOL column is the velocity, and an edit to the patch is heard at once. A song with no …waves patch gets the editor’s starter patch. It shares the …pump live safety net (Settings → Audio → Live engines) and plays its render when live isn’t possible.']],
   [397, '3 Nov', ['Side panel: the INSTRUMENTS card always has room for about 16 instruments in two columns; on a short window the side panel scrolls instead of squeezing it.']],
   [396, '3 Nov', ['…chains: a folded Track In, Chain Out, Sidechain In or Sidechain Out shows what it is connected to in its title (Track In · Track 5).']],
   [395, '3 Nov', ['Song and Arrange: Enter on a block makes it the current pattern, as Enter on a note does, so Enter on an empty cell places it: arrange from the keyboard. Enter twice on a block still makes a unique copy.', 'Stopping with the cursor on an empty track (STOP CURSOR: THERE) keeps it on its track; only the row follows.', 'Side panel: on a short window the INSTRUMENTS list scrolls instead of squeezing the instruments to unreadable slivers.']],
@@ -32289,7 +32801,10 @@ const hadSW = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
 // Samples, SoundFonts and the song live in this origin's storage; ask the browser to keep it when the device runs low
 // on space (Chrome grants this silently to an installed app) instead of evicting it like a visited site's cache.
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch(e){}
-function applyUpdate(){ try { flushS(); flushKit(); saveCur(); } catch(e){ tpLog('saving before the update reload failed', e); } selfReload = true; location.reload(); }
+function applyUpdate(){ try { flushS(); flushKit(); saveCur(); } catch(e){ tpLog('saving before the update reload failed', e); } selfReload = true;
+  // the desktop shell reloads its own window: location.reload() hits main.js's will-navigate guard, which cancels every navigation ("Apply (reload) button did nothing")
+  try { if (DESK_APP && DESK_APP.reload){ DESK_APP.reload(); return; } } catch(e){ tpLog('desktop reload failed, using location.reload', e); }
+  location.reload(); }
 /* FIX (27 Oct, audit B8): a browser tab with unsaved project changes asks before it closes or reloads (F5, Ctrl+R, the tab's
    ✕). The song and kit are always kept in the browser; this is about the project file. The desktop app asks its own way,
    and the app's own reloads (an update) don't ask. */
@@ -32527,7 +33042,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
      is the shared window kit (sets PumpFX.openHook); multiband.js what BAND, WIDE and HEAT share (load it before them);
      one file per plugin (docs/PUMP-FX.md, "The pop-up kit"). A type without a file says its window comes later. Add new
      ones here, in sw.js FILES, with ?v= like these. -->
-<script src="pump/ui/kit.js?v=8"></script>
+<script src="pump/ui/kit.js?v=9"></script>
 <script src="pump/ui/eq.js?v=2"></script>
 <script src="pump/ui/comp.js?v=1"></script>
 <script src="pump/ui/limit.js?v=1"></script>

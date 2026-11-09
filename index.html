@@ -18707,7 +18707,10 @@ function busGroups(){
 }
 const SEND_COLOR = '#7a8a00';   // (no longer used: sends take their bus's colour, striped)
 // A send: heard on its own and through a bus (its own Chain Out kept), not a bus itself.
-const isSendT = t => { const P = busPlan(); return t >= 0 && t < NT && P.targets.has(t) && !P.pure.has(t) && !P.feeds.has(t); };
+// A long draw asks about buses once per block and track, and busPlan re-hashes the patch each time: during drawArr it's asked once (8 Nov)
+let busMemoOn = false, busMemoV = null;
+const busPlanM = () => busMemoOn ? (busMemoV || (busMemoV = busPlan())) : busPlan();
+const isSendT = t => { const P = busPlanM(); return t >= 0 && t < NT && P.targets.has(t) && !P.pure.has(t) && !P.feeds.has(t); };
 // BUS COLOURS as CSS (--bus1 …): the Mixer and Pattern view use the same colours as Arrange's BUS GROUPS
 try { BUS_COLORS.forEach((c, i) => document.documentElement.style.setProperty('--bus' + (i + 1), c)); } catch(e){}
 function chnDiff(prev, next){
@@ -21402,7 +21405,8 @@ function pumpRun(){
   const s = tp.seq; let n = 0;
   // The page was stopped for a while (a frozen tab, a long pause, a system dialog): rather than playing every row
   // missed in that time at once, move the timeline on so the song continues from where it was.
-  if (s.alive() && s.time < ctx.currentTime - 0.5 && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
+  // On a touch screen it moves on sooner (8 Nov): a stall of 0.7 s played nine overdue notes at once, heard as the song rushing and clicking.
+  if (s.alive() && s.time < ctx.currentTime - (COARSE ? 0.15 : 0.5) && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
   // Schedule 250 ms ahead, so a busy moment on the UI thread can't make notes late (it was 150 ms on a computer).
   // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate. With the app in the
   // background (owner, 31 Oct: stutters there) 1.2 s: the system runs a hidden page's thread late and in bursts, and
@@ -22830,7 +22834,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 515;
+const BUILD = 516;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29311,8 +29315,16 @@ function padUses(pad){ const PT = phraseTracks(), out = [];
 const trkList = ts => ts.map(t => d2(t + 1)).join(' ');
 // Instrument colours: spread round the wheel so neighbouring numbers differ; the terminal skins use shades of their one colour.
 const instHue = i => `hsl(${Math.round((i * 137.508) % 360)} 52% 44%)`;
+/* MOBILE STALLS (8 Nov; owner: stutter, then rushing, while moving around during playback): the Arrange redraw was most of the main
+   thread's work on every row played. On a touch screen a redraw caused only by the playhead now runs about four times a second. */
+const COARSE = matchMedia('(pointer:coarse)').matches;
+let playDraw = false, arrPlayT = 0;
 function drawArr(PH){
   if (!arrShown()) return;
+  if (playDraw && COARSE){ const t = performance.now(); if (t - arrPlayT < 240) return; arrPlayT = t; }
+  busMemoOn = true; try { drawArr0(PH); } finally { busMemoOn = false; busMemoV = null; }
+}
+function drawArr0(PH){
   arrEl.classList.toggle('dk', tScreen === 'dark');
   // Blocks grow with the panel: row height follows the column width (16–40px).
   const NA = ntr(), ms = asongOn(), mx = ms || arrSideMst();   // ms: Arrange is the Song screen; mx: it shows the master column
@@ -30321,7 +30333,7 @@ function frame(){
       // the song's timer starts again when the song wraps back up (owner, 31 Oct: it stayed at 0:00 after the first time through)
       if (tp.mode === 'song'){ let mx = -1; e.pos.forEach((q, i) => { if (q && i !== MT && q.row > mx) mx = q.row; });
         if (mx >= 0){ if (tp.hiRow != null && mx < tp.hiRow){ tp.row0 = mx; tp.t0 = e.t; tp.lenTot = null; } tp.hiRow = mx; } } }
-    if (!tp.seq.alive() && !tp.q.length && ctx.currentTime > tp.seq.time + 0.3) tStop(); else if (ch){ followPlay(); draw(); }
+    if (!tp.seq.alive() && !tp.q.length && ctx.currentTime > tp.seq.time + 0.3) tStop(); else if (ch){ followPlay(); playDraw = true; try { draw(); } finally { playDraw = false; } }
   }
   tickDots(); tickLen();
   cpuMeter();
