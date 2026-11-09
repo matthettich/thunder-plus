@@ -424,3 +424,7 @@ test('mobile stalls: playhead-only Arrange redraws are thinned on touch, and the
   assert.match(src, /if \(playDraw && COARSE\)\{ const t = performance\.now\(\); if \(t - arrPlayT < 240\) return;/);
   assert.match(src, /s\.time < ctx\.currentTime - \(COARSE \? 0\.15 : 0\.5\)/, 'desktop keeps 0.5 s');
 });
+
+test('Mobile: SHIFT+▲ goes to Arrange from every screen', () => {
+  assert.match(H.read('index.html'), /if \(dir === 'up' && isMobile\(\)\) return tv !== 'song' \? go\('song'\) : null;/);
+});
