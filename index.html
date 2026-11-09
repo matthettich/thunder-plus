@@ -21527,7 +21527,7 @@ function pumpRun(){
   if (tp.stopAt != null && ctx.currentTime >= tp.stopAt - 0.005) return tStop();   // EXACT STOP: its time has come
   if (tp.core) return corePump();   // THUNDER CORE: the audio thread steps the song; this tick only books MIDI clock, LFOs, clicks
   audioWake = performance.now();
-  { const P = PB.pg || (PB.pg = {n:0, gap:0, lead:9, re:0, skip:0, w:0}), w = Date.now() / 1000; if (P.w) P.gap = Math.max(P.gap, w - P.w); P.w = w; P.n++; if (tp.seq.alive()) P.lead = Math.min(P.lead, tp.seq.time - ctx.currentTime); }
+  { const P = PB.pg || (PB.pg = {n:0, gap:0, lead:9, re:0, skip:0, w:0}), w = Date.now() / 1000; if (P.w){ P.gap = Math.max(P.gap, w - P.w); if (w - P.w > 0.4) pbLog(`stall ${(w - P.w).toFixed(2)} s · last touch or key ${((performance.now() - workT) / 1000).toFixed(1)} s ago · ${tv} ${apF || ''} · ` + pbState()); } P.w = w; P.n++; if (tp.seq.alive()) P.lead = Math.min(P.lead, tp.seq.time - ctx.currentTime); }
   if ((view !== 'tracker' || document.hidden) && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open (or the app is hidden: no frames)
   const s = tp.seq; let n = 0;
   // The page was stopped for a while (a frozen tab, a long pause, a system dialog): rather than playing every row
@@ -22975,7 +22975,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 534;
+const BUILD = 535;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25022,7 +25022,7 @@ const lenFresh = () => lenVer === songVer && lenS === S;
 let lenTab = null;
 function songLenTab(top){
   const now = performance.now(), fresh = lenTab && lenTab.top === top && lenTab.S === S;
-  if (fresh && (lenTab.v === songVer || now - lenTab.w < 5000)) return lenTab;   // edits while playing: at most one pass per 5 s
+  if (fresh && (lenTab.v === songVer || now - lenTab.w < 5000 || (COARSE && tp.on))) return lenTab;   // edits while playing: at most one pass per 5 s; on a phone, none until STOP
   const at = new Map(); let end = 0;
   try { const seq = makeSeq(S, 'song', {row:top, once:true, sim:true}), t0 = seq.time; let g = 0;
     for (; seq.alive() && g < 200000 && end < 7200; g++){ const r = seq.step(), o = r.t - t0; let mx = -1; r.pos.forEach((q, i) => { if (q && i !== MT && q.row > mx) mx = q.row; }); if (mx >= 0 && !at.has(mx)) at.set(mx, o); end = Math.max(end, o + r.line); } } catch(e){}
@@ -27054,6 +27054,7 @@ function drumsBeat(bar, ms){
 // playing doesn't force a layout.
 let thdSig = '', thdW = 0;
 function thdFit(){
+  if (COARSE && tp.on) return;   // (as hintFit)
   const hd = scr.querySelector('.thd'); if (!hd || !hd.offsetParent) return;
   const sw = $('tStagePs'), sub = $('tSub');
   const sig = [thdW, tv === 'mixer' ? mixScale : tScale, $('tTitle').textContent, psetHTML, sub.textContent, pvSeg.hidden, sw.hidden, [...sw.querySelectorAll('button')].map(b => b.hidden ? 0 : 1).join(''), [...scr.querySelector('.thl').children].map(e => e.hidden ? 0 : e.textContent.length).join(',')].join('|');   // (Arrange's FOLLOWS / PINNED tag too)
@@ -29609,7 +29610,8 @@ function drawArr0(PH){
 }
 // The block grid's vertical scrollbar width (Windows draws a real one; Mac and phones overlay theirs, 0 px): the headers
 // leave the same space on their right (--arsb), or their columns come out wider than the blocks and the boxes drift.
-function arrSbw(){ const w = Math.max(0, arrGrid.offsetWidth - arrGrid.clientWidth) + 'px';
+function arrSbw(){ if (COARSE) return;   // (phones' scrollbars take no width, and this forced a layout per redraw)
+  const w = Math.max(0, arrGrid.offsetWidth - arrGrid.clientWidth) + 'px';
   if (arrEl.style.getPropertyValue('--arsb') !== w) arrEl.style.setProperty('--arsb', w); }
 // The MONO / POLY / MST boxes around Arrange's columns when it is the Song screen: drawn over the panel from the group
 // tabs down to the last whole row, measured from the track-number cells (only when something that moves them changed).
@@ -31618,7 +31620,7 @@ function setApOn(on){ apOn = !!on; try { localStorage.setItem(APK, apOn ? '1' : 
 function setSsOn(on){ ssOn = !!on; try { localStorage.setItem(SSK, ssOn ? '1' : '0'); } catch(e){} if (!ssOn && apF === 'strip') apFocus(null); draw(); }
 // (9 Nov) offsetWidth forces a layout, and a playhead redraw asked many times over: read it at most twice a second then
 let apPW = -1, apPT = 0;
-const apPanel = () => { if (!(arrMode > 0)) return false; const n = performance.now(); if (playDraw && apPW >= 0 && n - apPT < 500) return apPW > 0; apPT = n; apPW = arrEl.offsetWidth; return apPW > 0; };
+const apPanel = () => { if (!(arrMode > 0)) return false; const n = performance.now(); if ((playDraw || (COARSE && tp.on)) && apPW >= 0 && n - apPT < 500) return apPW > 0; apPT = n; apPW = arrEl.offsetWidth; return apPW > 0; };
 const apArrOk = () => apOn && view === 'tracker' && tv !== 'song' && !asongOn() && apPanel();
 const apStripOk = () => ssOn && !spOn /* SIMPLE PHRASE */ && view === 'tracker' && tv === 'phrase' && !apPanel() && (isMobile() || innerWidth < 600);
 const apOk = f => f === 'arr' ? apArrOk() : f === 'strip' ? apStripOk() : false;
@@ -31837,7 +31839,10 @@ function apMarkSel(){   // the song selection in the panel (drawArr marks it onl
 function apHint(txt){ hintFit($('tHint'), txt); }
 /* HINT FIT (owner, 2 Nov: hint lines ended mid-word in "…"): a hint that doesn't fit drops whole " · " parts from its end
    until it does, so it never stops mid-sentence; the full text is the tooltip, and a tap shows it all. */
+// PHONE, PLAYING (9 Nov, owner: arrows in Arrange hung the playhead; his song's report: 4 s gaps): the measuring below forces a layout
+// on every cursor move while the page also books the notes. While a song plays a phone only sets the text; STOP's redraw fits it.
 function hintFit(h, txt){
+  if (COARSE && tp.on){ if (h.textContent !== txt){ h.dataset.full = ''; h.classList.remove('open', 'more'); h.textContent = txt; } return; }
   if (h.dataset.full === txt) return; h.dataset.full = txt; h.classList.remove('open', 'more'); h.textContent = txt;
   if (h.scrollHeight <= h.clientHeight + 1){ h.title = ''; return; }
   const P = txt.split(' · '); while (P.length > 1 && h.scrollHeight > h.clientHeight + 1){ P.pop(); h.textContent = P.join(' · '); }
@@ -32038,6 +32043,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [535, '9 Nov', ['Phone: moving around while a song plays does much less work, to keep the playhead and notes steady. The playback report notes any stall.']],
   [534, '9 Nov', ['Low power display also switches to the Low power (black) skin, and back to your skin when it’s turned off.']],
   [533, '9 Nov', ['Low power display: the audio engine also sleeps after 30 s of silence and wakes on the next note.']],
   [532, '9 Nov', ['Settings › Screen: LOW POWER DISPLAY draws playback at about 24 frames a second to save battery; the sound doesn’t change.', 'New skin: Low power (black), pure black and high contrast.']],
