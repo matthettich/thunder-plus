@@ -572,10 +572,14 @@ function makeSeq(S, mode, o){
       }
       // TRACK LFO (owner, 1 Nov; Perform → LFO): a few points a row (2 in a render) around the target's value now (its scene,
       // macro or own), in time with the song; a filter target (cut / res / dec) once a row, for the notes that start on it.
-      { const L = PFS.lfo[t]; if (L && tgtOk(L.id)){ const g = tgtParse(L.id), fl = g.k === 'cut' || g.k === 'res' || g.k === 'dec', n = fl ? 1 : PL ? Math.min(4, api.tks) : 2, per = PLFO_RATES[L.rt] || 1;
+      // Several LFOs on one target add around its one value (the first LFO of a target leads; the later ones are summed into its points).
+      { const La = PFS.lfo[t]; if (Array.isArray(La)) for (let i = 0; i < La.length; i++){ const L = La[i]; if (!L || !tgtOk(L.id)) continue;
+          let dup = false; for (let j = 0; j < i; j++) if (La[j] && La[j].id === L.id){ dup = true; break; } if (dup) continue;
+          const g = tgtParse(L.id), fl = g.k === 'cut' || g.k === 'res' || g.k === 'dec', n = fl ? 1 : PL ? Math.min(4, api.tks) : 2;
           const c = PF.sent.has(L.id) ? PF.sent.get(L.id) : tgtOwn(L.id, S);
-          for (let k = 0; k < n; k++){ const tt = t0 + dur * k / n, bt = (api.bt + (tt - t0) * api.bpm / 60) / per, cyc = Math.floor(bt);
-            evs.push(...tgtEvs(L.id, clamp(Math.round(c + lfoAt(L.sh, bt - cyc, cyc) * L.dp / 2), 0, 255), tt, PF.pno)); } } }
+          for (let k = 0; k < n; k++){ const tt = t0 + dur * k / n; let v = c;
+            for (let j = i; j < La.length; j++){ const M = La[j]; if (!M || M.id !== L.id) continue; const bt = (api.bt + (tt - t0) * api.bpm / 60) / (PLFO_RATES[M.rt] || 1), cyc = Math.floor(bt); v += lfoAt(M.sh, bt - cyc, cyc) * M.dp / 2; }
+            evs.push(...tgtEvs(L.id, clamp(Math.round(v), 0, 255), tt, PF.pno)); } } }
       if (muted){ evs.length = ev0; if (!T.mut) evs.push({type:'off', t:t0, track:t}); delete pos[t].sc; pos[t].off = true; }   // entering a muted block silences what is ringing
       T.mut = muted;
       const L = (mode === 'song' && pid < 0) ? emptyLen() : lenOf(pid);

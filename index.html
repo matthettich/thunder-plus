@@ -19313,7 +19313,7 @@ function demoSong(){
 // PERFORM's sizes and LFO lists, set early (PERFORM below sets the same again): the saved song is read just below, before the
 // PERFORM block runs, and normSong saw them undefined then: scenes A / B came back empty, parts shrank to one, and a song with
 // a track LFO threw (PLFO_SHAPES.length), so the app opened the starter beat instead and autosaved it over the song.
-var PERF_SCENES = 16, PERF_MACROS = 8, PERF_PARTS = 16, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
+var PERF_SCENES = 16, PERF_MACROS = 8, PERF_PARTS = 16, PLFO_MAX = 4, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
 // FIRST RUN (owner, 31 Oct): with no song saved yet the app opens the bundled ELECTRO project (sounds/ELECTRO.thunder);
 // the starter beat stays underneath until it has loaded (and if it can't be fetched).
 let FIRST_SONG = false;
@@ -19633,11 +19633,11 @@ const SWINGB = ['8ths', '16ths', 'Triplet', 'Dotted-8th', 'Half', 'Wide-6', 'Wid
      xa, xb, xf   the scenes on A and B, and the crossfader (00 = all A, FF = all B) the song starts with
      mac 8 macros {n, v (00–FF, the start value), tg:[{id, lo, hi}]}: one control, several targets, each between lo and hi
      lk  {track: [id, id, id, id]}: what LK1–LK4 on that track's rows set
-     lfo {track: {id, sh, rt, dp}}: a track LFO (shape, rate as an index of PLFO_RATES in beats a cycle, depth)
+     lfo {track: [{id, sh, rt, dp}, … up to PLFO_MAX]}: a track's LFOs (shape, rate as an index of PLFO_RATES in beats a cycle, depth)
    S.parts (saved in the song): 16 parts {n, insts, mix:[[vol, pan]…], fx:{'t:s':{k:v}}}: a sound setup PRT switches to. */
 // (var and function: normSong reads the saved song at start-up, before this line runs; the vars are also set before that: FIRST RUN)
 var PERF_SCENES = 16, PERF_MACROS = 8, PERF_PARTS = 16;
-var PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_RATE_NAMES = ['1/32', '1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars', '8 bars'];
+var PLFO_MAX = 4, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_RATE_NAMES = ['1/32', '1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars', '8 bars'];
 var PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
 function freshPerf(){ return {sc:Array.from({length:PERF_SCENES}, (_, i) => ({n:'', v:{}})), xa:0, xb:1, xf:0,
   mac:Array.from({length:PERF_MACROS}, (_, i) => ({n:'M' + (i + 1), v:0, tg:[]})), lk:{}, lfo:{}}; }
@@ -19650,8 +19650,10 @@ function normPerf(j){
   if (Array.isArray(j.mac)) j.mac.slice(0, PERF_MACROS).forEach((m, i) => { if (!m || typeof m !== 'object') return;
     P.mac[i] = {n:typeof m.n === 'string' && m.n.trim() ? m.n.slice(0, 12) : 'M' + (i + 1), v:v8(m.v), tg:(Array.isArray(m.tg) ? m.tg : []).filter(g => g && tgtOk(g.id)).slice(0, 8).map(g => ({id:g.id, lo:v8(g.lo), hi:v8(g.hi == null ? 255 : g.hi)}))}; });
   if (j.lk && typeof j.lk === 'object') for (const k in j.lk){ const t = int(k, -1); if (t >= 0 && t <= 128 && Array.isArray(j.lk[k])) P.lk[t] = [0, 1, 2, 3].map(n => tgtOk(j.lk[k][n]) ? j.lk[k][n] : null); }
-  if (j.lfo && typeof j.lfo === 'object') for (const k in j.lfo){ const t = int(k, -1), L = j.lfo[k]; if (t >= 0 && t <= 128 && L && tgtOk(L.id))
-    P.lfo[t] = {id:L.id, sh:clamp(int(L.sh, 0), 0, PLFO_SHAPES.length - 1), rt:clamp(int(L.rt, 3), 0, PLFO_RATES.length - 1), dp:v8(L.dp == null ? 128 : L.dp)}; }
+  if (j.lfo && typeof j.lfo === 'object') for (const k in j.lfo){ const t = int(k, -1);   // one object (the old shape) or an array of up to PLFO_MAX
+    const a = (Array.isArray(j.lfo[k]) ? j.lfo[k] : [j.lfo[k]]).filter(L => L && typeof L === 'object' && tgtOk(L.id)).slice(0, PLFO_MAX).map(L =>
+      ({id:L.id, sh:clamp(int(L.sh, 0), 0, PLFO_SHAPES.length - 1), rt:clamp(int(L.rt, 3), 0, PLFO_RATES.length - 1), dp:v8(L.dp == null ? 128 : L.dp)}));
+    if (t >= 0 && t <= 128 && a.length) P.lfo[t] = a; }
   return P;
 }
 function normParts(j){
@@ -20102,10 +20104,14 @@ function makeSeq(S, mode, o){
       }
       // TRACK LFO (owner, 1 Nov; Perform → LFO): a few points a row (2 in a render) around the target's value now (its scene,
       // macro or own), in time with the song; a filter target (cut / res / dec) once a row, for the notes that start on it.
-      { const L = PFS.lfo[t]; if (L && tgtOk(L.id)){ const g = tgtParse(L.id), fl = g.k === 'cut' || g.k === 'res' || g.k === 'dec', n = fl ? 1 : PL ? Math.min(4, api.tks) : 2, per = PLFO_RATES[L.rt] || 1;
+      // Several LFOs on one target add around its one value (the first LFO of a target leads; the later ones are summed into its points).
+      { const La = PFS.lfo[t]; if (Array.isArray(La)) for (let i = 0; i < La.length; i++){ const L = La[i]; if (!L || !tgtOk(L.id)) continue;
+          let dup = false; for (let j = 0; j < i; j++) if (La[j] && La[j].id === L.id){ dup = true; break; } if (dup) continue;
+          const g = tgtParse(L.id), fl = g.k === 'cut' || g.k === 'res' || g.k === 'dec', n = fl ? 1 : PL ? Math.min(4, api.tks) : 2;
           const c = PF.sent.has(L.id) ? PF.sent.get(L.id) : tgtOwn(L.id, S);
-          for (let k = 0; k < n; k++){ const tt = t0 + dur * k / n, bt = (api.bt + (tt - t0) * api.bpm / 60) / per, cyc = Math.floor(bt);
-            evs.push(...tgtEvs(L.id, clamp(Math.round(c + lfoAt(L.sh, bt - cyc, cyc) * L.dp / 2), 0, 255), tt, PF.pno)); } } }
+          for (let k = 0; k < n; k++){ const tt = t0 + dur * k / n; let v = c;
+            for (let j = i; j < La.length; j++){ const M = La[j]; if (!M || M.id !== L.id) continue; const bt = (api.bt + (tt - t0) * api.bpm / 60) / (PLFO_RATES[M.rt] || 1), cyc = Math.floor(bt); v += lfoAt(M.sh, bt - cyc, cyc) * M.dp / 2; }
+            evs.push(...tgtEvs(L.id, clamp(Math.round(v), 0, 255), tt, PF.pno)); } } }
       if (muted){ evs.length = ev0; if (!T.mut) evs.push({type:'off', t:t0, track:t}); delete pos[t].sc; pos[t].off = true; }   // entering a muted block silences what is ringing
       T.mut = muted;
       const L = (mode === 'song' && pid < 0) ? emptyLen() : lenOf(pid);
@@ -21570,7 +21576,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '5t6z46';
+const CORE_REV = '1c34aqt';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -27870,11 +27876,11 @@ function lockSheet(t = focusT()){
       r.append(el('span', 'pfl', 'LK' + (n + 1)), b);
       if (lk[n]){ const x = el('button', 'sm', '✕'); x.type = 'button'; x.addEventListener('click', () => { lk[n] = null; P.lk[t] = lk; if (lk.every(v => !v)) delete P.lk[t]; saveS(); render(); }); r.append(x); }
       list.append(r); }
-    const L = P.lfo[t]; list.append(el('h3', null, 'LFO'));
+    const L = (P.lfo[t] || [])[0]; list.append(el('h3', null, 'LFO'));   // the first of the track's LFOs; the others are left as they are
     const r = el('div', 'pfrow'), b = el('button', 'sm', L ? tgtLabel(L.id, true) : 'Pick a target…'); b.type = 'button';
-    b.addEventListener('click', () => { sh.done(); tgtPicker(id => { P.lfo[t] = Object.assign({sh:0, rt:3, dp:128}, P.lfo[t] || {}, {id}); saveS(); lockSheet(t); }, t === MT ? 99 : t); });
+    b.addEventListener('click', () => { sh.done(); tgtPicker(id => { const a = P.lfo[t] || (P.lfo[t] = []); a[0] = Object.assign({sh:0, rt:3, dp:128}, a[0] || {}, {id}); saveS(); lockSheet(t); }, t === MT ? 99 : t); });
     r.append(el('span', 'pfl', 'TARGET'), b);
-    if (L){ const x = el('button', 'sm', '✕'); x.type = 'button'; x.addEventListener('click', () => { delete P.lfo[t]; saveS(); render(); }); r.append(x); }
+    if (L){ const x = el('button', 'sm', '✕'); x.type = 'button'; x.addEventListener('click', () => { P.lfo[t].shift(); if (!P.lfo[t].length) delete P.lfo[t]; saveS(); render(); }); r.append(x); }
     list.append(r);
     if (L){ const sel = (lab, names, v, set) => { const rr = el('div', 'pfrow'), s = el('select'); names.forEach((n, i) => s.append(new Option(n, i))); s.value = v; s.addEventListener('change', () => { set(+s.value); saveS(); s.blur(); }); rr.append(el('span', 'pfl', lab), s); return rr; };
       list.append(sel('SHAPE', PLFO_SHAPES, L.sh, v => L.sh = v), sel('RATE', PLFO_RATE_NAMES, L.rt, v => L.rt = v), perfRow('DEPTH', L.dp, v => { L.dp = v; saveS(); }, null));
