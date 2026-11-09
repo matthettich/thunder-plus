@@ -428,3 +428,9 @@ test('mobile stalls: playhead-only Arrange redraws are thinned on touch, and the
 test('Mobile: SHIFT+▲ goes to Arrange from every screen', () => {
   assert.match(H.read('index.html'), /if \(dir === 'up' && isMobile\(\)\) return tv !== 'song' \? go\('song'\) : null;/);
 });
+
+test('the pad has latching MUTE and SOLO', () => {
+  const src = H.read('index.html');
+  assert.match(src, /data-b="mute" id="kMute"/); assert.match(src, /data-b="solo" id="kSolo"/);
+  assert.match(src, /if \(b === 'mute' \|\| b === 'solo'\)\{ clearTimeout\(rep\); b === 'mute' \? muteKey\(\) : soloKey\(\); return; \}/);
+});
