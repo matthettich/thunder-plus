@@ -121,7 +121,7 @@ fixes). Day-to-day work goes back to the `beta` branch; `io-helper` is history. 
    solo / mute keys, Apply (reload) and the rate message, Keep in this pad silent, no Cirklon "Sysex interrupt", Measure quiet,
    its new status line and a re-run by ear, long takes in RECENT), the beta.14 skips (unplug mid-take, Measure with Engine
    Browser, Playing in), clock in once more, and Windows. Everything else passed on beta.14 (item 0).
-   Start a session by asking for the results; fix on `beta`, then a NEW desktop version (1.3.1-beta.1 for a pre-release, 1.3.1 for a
+   Start a session by asking for the results; fix on `beta`, then a NEW desktop version (the next unused version, so no existing release is overwritten: `-beta.1` on it for a pre-release, plain for a
    release: never reuse one, the workflow would replace a release's files without moving its tag), and check the macOS and Windows job logs
    for "thunder_io.node built" (both), "adhoc-sign: signed" (macOS) and "thunder_link.node built" (both). Ask CodeRabbit with
    "@coderabbitai review" after each push (it skips PRs into `beta` otherwise) and fix its real findings.
@@ -366,6 +366,8 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.3** (8 Nov 2026; owner: update the desktop app at a stopping point; Run workflow through the API with version 1.3.3, from `main` at build 523): builds 517–523 on top of v1.3.2 (`· beta` label, Mobile SHIFT+▲, pad MUTE / SOLO, the review fixes).
+- **v1.3.2** (8 Nov 2026; owner: update the desktop app at a stopping point; Run workflow through the API with version 1.3.2, from `main` at build 516, run 42544191974, succeeded): builds 515–516 on top of v1.3.1 (touch sliders in dialogs, instrument big step, FLY label and same-row order, mobile stalls).
 - **v1.3.1** (8 Nov 2026; owner: "Build the main and desktop app"; PR #18 beta → main at build 514, Run workflow through the API with version 1.3.1, run 42522985460): Live engines setting and lighter …waves live (513–514) on top of v1.3.0. Owner wants Thunder Plus changes to go through PRs (ask CodeRabbit with "@coderabbitai review" on PRs into beta).
 - **v1.2.101** (7 Nov 2026; for the owner's MIDI testing; Run workflow through the API with version 1.2.101, from `main` at build
   485, run 42432167168): Measure's note (482), INPUTS wording (483), Measure resets the engine (484), MIDI mapping floored at
@@ -520,6 +522,12 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+- [ ] **MOD screen: LFOs assignable to FX parameters** (owner, 8 Nov: "I will want to do this"; not built, after the stability work). A new screen named
+  **MOD between FX and PROJECT**; PROJECT can become PROJ if the tabs need room (six already fill a folded phone: check at real size; hide the tab when
+  folded, SHIFT+◀▶ still reaching it, only if it's still too tight). Suggested: one LFO per row (track, slot, parameter, shape, rate, depth), an "Add LFO…"
+  on an FX parameter's value menu opening MOD with that target, a small mark on modulated parameters. Alternative was a pop-up by the parameter. Already
+  built: Perform → LFOs (`S.perf.lfo[t]` {id, sh, rt, dp}, one per track, `fx:t:s:p` targets, not …pump; 4 points a row live, 2 in renders, so steppy at fast
+  rates). Several per track means a save-format change, and audio-rate smoothing is per-effect work.
 - [x] **Recording counter in Record a sample** (owner, 7 Nov 21:18; built 8 Nov, build 512, by a Sonnet subagent, checked by the
   lead): `.rectime` beside Record (m:ss, h:mm:ss past an hour), on the audio clock from capture start (`RCD.t0w`; PATTERN from
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
@@ -547,6 +555,21 @@ Sliders in `.ask` dialogs (every generator, Record a sample) couldn't be moved o
 `pointer:coarse` and the shared drag skipped `.ask`. `sliderOk(r, touch)` now lets touch through for dialogs (a mouse keeps the
 native slider), and `.acidr` / `.acidf` carry `touch-action:pan-y`, or the browser cancels the drag as a pan. Checked with
 emulated touch drags on a Pixel 7 profile: no movement before, correct distance after, on Acid line and a generic `genPanel`.
+
+## 8 Nov, end of session: where things stand (build 523)
+
+- **Mobile hangs, partly fixed (build 516).** Owner's symptom on the Fold, Page sequencer, Render, Safest: stutter, slowdown, clicks, speed-up, a few
+  notes after Stop, mostly when navigating. Waiting on his phone test: does it come with SHIFT+arrows or plain arrows, and is Arrange lighter? In
+  simulation plain arrows were cheap and SHIFT+arrow screen changes were not, which doesn't quite match his report. Next: the per-screen cost of
+  `go()` / `draw()`; on the phone, whether `PW.ps` is false (pump synths then render on the main thread under Render). Notes after Stop: suspected
+  output buffer under Safest, not measured on a device; Stop kills voices at `currentTime`, not heard time.
+- **Mobile setting found off (8 Nov).** The owner's phone showed the desktop top bar. Nothing that day touches the setting (`platform` in localStorage,
+  default only if nothing is saved). Cause unknown; if it recurs after an update, look at storage.
+- **CodeRabbit on 515–522** (review-only PR #30, closed): two findings, both real and fixed in 523: the pad's MUTE muted picked Song blocks instead
+  of the track and stayed unlit (`muteKey(true)` is track only), and the stale 1.3.1 in the helper's next-steps above. Its docstring warning was ignored.
+  Reviews are skipped on PRs into `beta` and refused on closed PRs, and a new push to the head cancels one in progress, so for a merged run use a
+  review-only PR from a snapshot, as #30 did, and don't push until it finishes.
+- **Publishing:** `beta-web.yml` fails if `main` moves while it runs. Wait for it after merging into `beta`, before merging `beta` into `main`.
 
 ## 8 Nov: pad MUTE and SOLO (build 519)
 
