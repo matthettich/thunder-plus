@@ -581,6 +581,9 @@ Start a session by asking for results. Fix on `beta`.
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
 
+## 9 Nov: acid Mutate intensity (build 541)
+
+Owner: Mutate should make changes from small to large that relate to the line, keeping hand tweaks. In `acidLine`: "Mutate intensity" (`acidSet.mut`, 1–100, default 25, session only) and Original (O), as in `mutatePhrase`. `acidMutate(…, inten)` picks exactly round(L × intensity / 100) distinct steps (notes first when TIME is off; a press retries up to 8 times if nothing changed). `acidNear` moves a sounding note within the scale, at most `acidMutDeg` degrees, small moves likelier. `acidWriteMut` writes only the picked rows and only what changed: the old path rewrote every step row, losing hand volumes, instruments, note-offs, other poly columns and PSL parameters. Generate is unchanged. A slide re-rolls as "slide into the picked step", so writes stay on picked rows. Tests: `tests/acid-mutate.test.js`.
 ## 9 Nov: chains rail lines; MOD target steps (build 540)
 
 Owner: lines between the blocks in the chains rail, in an accent color, spread out when few. `dkChnRail` records which cable joins which tag or block (`rail._dk`, from `S.chainPatch.cables`), `dkcDraw` does one layout read and draws on an SVG layer behind them (`.dkclines`, no pointer events; straight lines, the owner's choice after trying curves and right angles, and he may go back to curves), `dkcWire` redraws on a size change only, never on a tick. The IN tag gets one line per Track In module (12 at most); other pairs one per cable, 2 at most. Gaps grow up to 34 px when there's room; with many modules, today's 7 px and cut-off. Accent on the 909 skin is the weakest against the rail (contrast 1.89); darken it there if the owner minds.
