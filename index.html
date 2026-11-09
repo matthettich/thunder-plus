@@ -2059,6 +2059,8 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .dogs .d1 .tail{transform-origin:0% 100%} .dogs .d2 .tail{transform-origin:0% 85%}
 .dogs.idle .bob{animation:dkBreath 3.4s ease-in-out infinite} .dogs.idle .d2 .bob{animation-delay:-1.7s}
 .dogs.idle .tail{animation:dkWag 2.6s ease-in-out infinite}
+/* BATTERY (8 Nov): on a phone the breath and tail rest after about 30 s of standing still (both keyframes start and end at the pose at rest, so nothing jumps); an infinite animation on SVG parts asks for a new display frame every refresh for as long as the stage is showing. */
+body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{animation-iteration-count:12}
 .dogs.dance .dog{--aL:112deg; --aR:-112deg}
 .dogs .al, .dogs .ar{transition:transform .14s ease-out}
 @keyframes dkBreath{0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.025)}}
@@ -3302,7 +3304,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <section id="hPad"><h2>Tracker · PAD mode</h2><table><tr><td>Arrows</td><td>Move</td></tr><tr><td>SHIFT + ◀▶</td><td>Change screen (through every screen in tab order)</td></tr><tr><td>SHIFT + ▲▼</td><td>Mobile: Arrange (▲). Otherwise Project (▲). Mixer (▼), from any screen, and back the same way (M8 style). To select, use SHIFT + OPTION or SEL</td></tr><tr><td>EDIT</td><td>Add, or run a › row · in a phrase, on a filled note, instrument, volume or effect, picks it up; on an empty one, drops it (EDIT + arrows changes a note in place) · on an empty Song / Arrange block, makes a new empty pattern (EDIT + arrows then changes its number) · tap twice (within about half a second) for a note off, the effect list on an effect, a unique copy of a song block, or a new sect</td></tr><tr><td>EDIT + arrows</td><td>Change the value (◀▶ by 1, ▲▼ by more)</td></tr><tr><td>OPTION + EDIT</td><td>Clear (with a selection: cut)</td></tr><tr><td>OPTION + arrows</td><td>Other sect, phrase, instrument or FX track: ▲ ◀ the one before, ▼ ▶ the one after · on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀) · in Song, the nearest block that way (PATTERN NAV; off: ◀▶ previous / next block in the track, ▲▼ 16 rows)</td></tr><tr><td>OPTION + arrows in Phrase</td><td>Go to the phrase above / below on this track (▲▼) or to the left / right on this row (◀▶), as laid out on the Song grid. A phrase not in the song steps by number. (Settings → Input → PATTERN NAV; off: ▲▼ jump 16 phrases)</td></tr><tr><td>SHIFT + OPTION + arrows</td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in KEYS mode</td></tr><tr><td>SHIFT + OPTION</td><td>Start or cancel a selection (SEL on the command row too); arrows grow it, OPTION copies, OPTION+EDIT cuts</td></tr><tr><td>SHIFT + EDIT</td><td>Paste</td></tr><tr><td>PLAY · SHIFT + PLAY</td><td>Play this screen · play the song · with LOOP on, PLAY loops the selected rows</td><tr><td>LOOP · SEMI +/−</td><td>Loop the selection (sticky) · transpose the phrase selection ±1 semitone at once</td></tr><tr><td>◀ ▶ on the FX screen</td><td>Open a slot's controls · back to the slot list (a sideways swipe does it too)</td></tr><tr><td>EDIT on an FX slot</td><td>A list of every effect (like the FX command list): pick one and its controls open; its own effect, marked NOW, keeps its settings; --- empties the slot</td></tr><tr><td>Row numbers</td><td>Tap to select whole lines, then COPY and PASTE</td></tr></table><p><b>One finger is enough.</b> With <b>Sticky keys</b> on, tap SHIFT or OPTION alone and it stays lit for the next button. The <b>command row</b> (Project → COMMANDS) gives every two-key command its own button: change, prev/next, clear, select, copy, cut, paste, play song, and on the SONG screen CLN↓ (clones the block, or the selected blocks, into new numbers on a new row below; the rows below move down) and CLN (clone): the block under the cursor is copied, phrases and all, to the next free number.</p><p>On a computer keyboard in PAD mode the keyboard is not disabled: arrows move, <kbd>Enter</kbd> opens, <kbd>Space</kbd> plays, typing letters and hex edits the cell, and <kbd>Shift</kbd> selects lines (so does <kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>▲▼</kbd>, as in KEYS mode). <kbd>Z</kbd> stays OPTION (not a note), <kbd>X</kbd> stays EDIT, and <kbd>Alt</kbd>+arrows page (OPTION+arrow) rather than change the value.</p><h3>Touch</h3><p>Tap a cell to move there; tap it again to open or add. To change the cursor’s cell by dragging, rest your finger on it a moment (a short buzz), then drag up or down; a quick swipe scrolls, from anywhere.</p></section>
     <section id="hFx"><h2>FX column commands</h2>
 <p>Each phrase row has three effect columns: a command and a hex value. The info line at the bottom of the screen explains the one under the cursor.</p>
-<div class="fxg"><div><code>CSL</code>MIDI CC glide: the <code>CCA</code>–<code>CCD</code> commands on the same row move to their value over XY ticks instead of jumping (00: across the step), from the value sent before</div><div><code>DIR</code>play direction for this track from the next row on: 00 forward, 01 backwards, 02 ping-pong, 03 a random row each step (a phrase still lasts as many steps as it has rows)</div><div><code>BYP</code>…chains module X (the number on its BYP button; 0 = all) in (Y 0), bypassed (Y 1), or the other way from the patch for Y rows then back</div><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FXS</code>pick what FXV moves on this track: slot X (1–8), its parameter Y (1–F, in the FX screen's order)</div><div><code>FXV</code>set that parameter, 00 its lowest – FF its highest (the slot's own value comes back when the song stops)</div><div><code>SCA</code>this track's scale from here on: X the root (0 = C … B), Y the scale (0 off, 1 major, 2 minor, 3 harmonic minor…); KEY FOLLOW instruments</div><div><code>SCG</code>every track's scale from here on, as SCA</div><div><code>CUT</code>low-pass the pad from here on, 00 dark – FF off</div><div><code>FDI</code>fade the note in over XX ticks</div><div><code>TRM</code>tremolo on the note: X cycles a beat, Y depth</div><div><code>APN</code>auto-pan the note: X cycles a beat, Y width</div><div><code>TVL</code>this track's level from here on, 00 silent – FF the mixer's (back at stop)</div><div><code>TPN</code>this track's pan from here on, 80 centre (back at stop)</div><div><code>STP</code>stop every note: 00 this track, 01 every track</div><div><code>LPB</code>lines per beat for every track from here on (00 the phrases' own)</div><div><code>PDL</code>the whole song waits XX rows</div><div><code>ONE</code>one note of the row's chord, at random</div><div><code>MPB</code>MIDI pitch bend, 80 centre</div><div><code>MAT</code>MIDI channel pressure</div><div><code>RES</code>resonance for CUT</div><div><code>DEC</code>shorten the pad from here on, 00 a click – FF its own length</div><div><code>FLX</code>Flex pattern: 00 off, 01–10, then 11–FF in families by the first digit: 1 roll, 2 stutter, 3 build, 4 reverse, 5 pitch down, 6 pitch up, 7 tape, 8 scratch, 9 gate, A filter, B crush, C fade repeat, D juggle, E groove, F chaos (the second digit picks the variant)</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>retrigger every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>PRB</code>chance the command to its left happens (as RND changes it; with none, the note's chance)</div><div><code>MUT</code>play variation XX of the pad's sound (INST › RANGE: how far); RND or RNL after it for a new one each time</div><div><code>GEN</code>play a fresh sound XX of the instrument's GEN TYPE (INST › GEN TYPE, FAMILY, RANGE)</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row XX (00–1F; row 00 if that’s past its length)</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div><div><code>CCA</code>–<code>CCD</code>MIDI CC: 00–7F to the instrument’s CC slot A–D (the CC numbers are on INST)</div><div><code>PGM</code>MIDI program change 00–7F, just before the row’s note</div><div><code>CND</code>a condition, as on the Elektron boxes: Y 0 FILL (plays while FILL is on), 1 !FILL, 2 PRE (this track’s last condition — NTH, CHA or 1ST — came out true), 3 !PRE, 4 NEI (the neighbour’s did: X its track number, 0 = the track to the left), 5 !NEI, 6 1ST (the first pass through this row since PLAY), 7 !1ST</div><div><code>NUD</code>nudge ± ticks: 01–7F late, FF–80 early (up to half a step)</div><div><code>RTV</code>the RET retriggers’ level: + rises to the last hit (the first ones softer), − fades, 1/32 a hit</div><div><code>SLC</code>on a sliced sound, play slice XX (00 the first); the note pitches it, C-4 as it is</div><div><code>XFD</code>the crossfader between scene A and scene B (Perform): 00 all A … FF all B</div><div><code>MAC</code>macro X (1–8) to Y (0 lowest – F highest)</div><div><code>LK1</code>–<code>LK4</code>set what this track’s lock 1–4 points at (Perform → Locks) to XX until the next note without it</div><div><code>PRT</code>switch to part XX (Perform → Parts: instruments, mixer and effect values); 00 back to the song’s own. STOP goes back too</div></div>
+<div class="fxg"><div><code>CSL</code>MIDI CC glide: the <code>CCA</code>–<code>CCD</code> commands on the same row move to their value over XY ticks instead of jumping (00: across the step), from the value sent before</div><div><code>DIR</code>play direction for this track from the next row on: 00 forward, 01 backwards, 02 ping-pong, 03 a random row each step (a phrase still lasts as many steps as it has rows)</div><div><code>BYP</code>…chains module X (the number on its BYP button; 0 = all) in (Y 0), bypassed (Y 1), or the other way from the patch for Y rows then back</div><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FXS</code>pick what FXV moves on this track: slot X (1–8), its parameter Y (1–F, in the FX screen's order)</div><div><code>FXV</code>set that parameter, 00 its lowest – FF its highest (the slot's own value comes back when the song stops)</div><div><code>SCA</code>this track's scale from here on: X the root (0 = C … B), Y the scale (0 off, 1 major, 2 minor, 3 harmonic minor…); KEY FOLLOW instruments</div><div><code>SCG</code>every track's scale from here on, as SCA</div><div><code>CUT</code>low-pass the pad from here on, 00 dark – FF off</div><div><code>FDI</code>fade the note in over XX ticks</div><div><code>TRM</code>tremolo on the note: X cycles a beat, Y depth</div><div><code>APN</code>auto-pan the note: X cycles a beat, Y width</div><div><code>TVL</code>this track's level from here on, 00 silent – FF the mixer's (back at stop)</div><div><code>TPN</code>this track's pan from here on, 80 centre (back at stop)</div><div><code>STP</code>stop every note: 00 this track, 01 every track</div><div><code>LPB</code>lines per beat for every track from here on (00 the phrases' own)</div><div><code>PDL</code>the whole song waits XX rows</div><div><code>ONE</code>one note of the row's chord, at random</div><div><code>MPB</code>MIDI pitch bend, 80 centre</div><div><code>MAT</code>MIDI channel pressure</div><div><code>RES</code>resonance for CUT</div><div><code>DEC</code>shorten the pad from here on, 00 a click – FF its own length</div><div><code>FLX</code>Flex pattern: 00 off, 01–10, then 11–FF in families by the first digit: 1 roll, 2 stutter, 3 build, 4 reverse, 5 pitch down, 6 pitch up, 7 tape, 8 scratch, 9 gate, A filter, B crush, C fade repeat, D juggle, E groove, F chaos (the second digit picks the variant)</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>FX stutter: the <b>Retrigger effect</b> in a slot repeats every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops. It needs that effect in a slot (typing RTG adds it to a free one)</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>PRB</code>chance the command to its left happens (as RND changes it; with none, the note's chance)</div><div><code>MUT</code>play variation XX of the pad's sound (INST › RANGE: how far); RND or RNL after it for a new one each time</div><div><code>GEN</code>play a fresh sound XX of the instrument's GEN TYPE (INST › GEN TYPE, FAMILY, RANGE)</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row XX (00–1F; row 00 if that’s past its length)</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>note repeat: the note itself retriggers every Y ticks, X fades each hit (needs no effect; RTG is the effect stutter)</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div><div><code>CCA</code>–<code>CCD</code>MIDI CC: 00–7F to the instrument’s CC slot A–D (the CC numbers are on INST)</div><div><code>PGM</code>MIDI program change 00–7F, just before the row’s note</div><div><code>CND</code>a condition, as on the Elektron boxes: Y 0 FILL (plays while FILL is on), 1 !FILL, 2 PRE (this track’s last condition — NTH, CHA or 1ST — came out true), 3 !PRE, 4 NEI (the neighbour’s did: X its track number, 0 = the track to the left), 5 !NEI, 6 1ST (the first pass through this row since PLAY), 7 !1ST</div><div><code>NUD</code>nudge ± ticks: 01–7F late, FF–80 early (up to half a step)</div><div><code>RTV</code>the RET note repeats’ level: + rises to the last hit (the first ones softer), − fades, 1/32 a hit</div><div><code>SLC</code>on a sliced sound, play slice XX (00 the first); the note pitches it, C-4 as it is</div><div><code>XFD</code>the crossfader between scene A and scene B (Perform): 00 all A … FF all B</div><div><code>MAC</code>macro X (1–8) to Y (0 lowest – F highest)</div><div><code>LK1</code>–<code>LK4</code>set what this track’s lock 1–4 points at (Perform → Locks) to XX until the next note without it</div><div><code>PRT</code>switch to part XX (Perform → Parts: instruments, mixer and effect values); 00 back to the song’s own. STOP goes back too</div></div>
 <p><b>MIDI instruments</b> (INST › OUTPUT MIDI or PAD+MIDI) send to their <b>PORT</b> A–D: ⚙ Settings → MIDI (on a computer, Audio &amp; MIDI ▾ in the top bar) says which cable each letter is on this device, so a song plays the same on the phone and the computer. <code>CCA</code>–<code>CCD</code> and <code>PGM</code> work on rows without a note too (on the track’s last instrument), and <code>RND</code>, <code>RNL</code> and <code>REP</code> change them like any command. <code>PSL</code>, <code>PBN</code>, <code>PVB</code>, <code>PIT</code>/<code>FIN</code> on a held note and fractions of a semitone are sent as pitch bend: set INST › <b>BEND RANGE</b> to the range your gear bends. <code>ARP</code> plays its steps as notes, then the note itself again (unless the next row retunes it or plays another note).</p>
 <p><b>LFO → CC:</b> INST › <b>LFO CC</b> (set a CC number) runs an LFO on that CC while the song plays: SHAPE, RATE in time with the song (T triplet, D dotted), DEPTH (127 is the whole range), CENTRE, and RESTART (FREE from PLAY, NOTE at each of the instrument’s notes). <b>Song position:</b> with clock out on, playing the song from a row partway into a block sends Song Position Pointer and Continue, so the gear starts at the same place; with clock in on, the other device’s Continue after a Song Position Pointer plays the song from there.</p>
 <p><b>Playing and recording from a MIDI keyboard:</b> ⚙ Settings → MIDI → <b>Keys play</b>: in the tracker the keyboard plays the instrument you're on (the INST screen's, or the cursor row's in a phrase) and holds it while the key is down; a MIDI instrument plays its gear, with bend, aftertouch, sustain and every unlearned knob passed through. <b>Notes in</b> picks the input and channel, <b>Clock from</b> the input Clock in follows, and each port has its own <b>delay</b>. <b>REC</b> on the top strip (F9): stopped, a note or chord goes in at the cursor and the cursor moves on when you let go; playing, notes land on the step they were played on in the track under the cursor, with velocity and OFFs (a take is one undo step). <b>CLICK</b> is the metronome; Settings → <b>Record &amp; play</b> has its level, the count-in, REC TIMING (STEP, or TICKS: the step plus a <code>DEL</code>) and LIVE TRANSPOSE (a key transposes the KEY FOLLOW instruments as the song plays).</p>
@@ -8228,7 +8230,7 @@ function audio(){
     prerender();   // ensure() re-renders only the pads whose rate differs from this context's
   }
   if (ctx.state === 'suspended') ctx.resume();
-  bgArm(); hmWake();   // BATTERY: a sound restarts the hidden-idle countdown and wakes the header meter at once
+  bgArm(); hmWake(); idleWake();   // BATTERY: a sound restarts the hidden-idle countdown and wakes the header meter and the sleeping timers at once
   return ctx;
 }
 /* ---------- pad rendering: a background Worker, with the UI thread as the fallback ----------
@@ -12448,7 +12450,7 @@ function bassUI(){
 let bvRaf = 0, bvCore = null;
 function bassVizKick(){ if (!bvRaf) bvRaf = requestAnimationFrame(bassViz); }
 function bassViz(){
-  bvRaf = 0;
+  bvRaf = 0; if (document.hidden) return;   // BATTERY: parked while hidden; the screen coming back kicks it (visibilitychange, end of file)
   const cv = $('bassCv'); if (!cv || $('bassWrap').hidden || view === 'tracker' || !isBassV(V())) return;
   const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
   if (cv.width !== Math.round(W * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
@@ -13054,7 +13056,7 @@ function sndColours(){
 function sndSoon(){ if (!sndQ) sndQ = requestAnimationFrame(() => { sndQ = 0; if (!sndOn()) return; sndColours(); sndSpecPaint(); sndScopePaint(false); sndWake(); }); }
 function sndWake(){ if (!sndRaf && sndOn()) sndRaf = requestAnimationFrame(sndFrame); }
 function sndFrame(){
-  sndRaf = 0; if (!sndOn()) return; if (!sndCol) sndColours();
+  sndRaf = 0; if (!sndOn() || document.hidden) return; if (!sndCol) sndColours();   // BATTERY: parked while hidden (sndWake on return)
   const t = ctx ? ctx.currentTime - heardLat() : 0;
   for (let i = sndPH.length - 1; i >= 0; i--) if (t > sndPH[i].end) sndPH.splice(i, 1);
   const live = !!ctx && (tp.on || performance.now() - audioWake < 1500 || sndPH.length > 0);
@@ -14014,9 +14016,13 @@ function rbWheel(){
   const de = document.documentElement;
   clearInterval(rbT); rbT = 0; de.style.removeProperty('filter'); de.style.removeProperty('--rbo');
   if (skin !== 'rainbowdyn' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const t0 = performance.now();
-  rbT = setInterval(() => { if (!document.hidden) de.style.setProperty('--rbo', ((performance.now() - t0) * 0.018 % 360).toFixed(1) + 'deg'); }, 100);
+  rbT0 = performance.now(); if (!document.hidden) rbRun();
 }
+// BATTERY (8 Nov): no timer at all while the app is hidden (it only skipped the write before); the colours carry on from the same
+// place when it comes back, as the phase is read from the clock.
+var rbT0;   // var, no initialiser: rbWheel() may run before this line
+function rbRun(){ const de = document.documentElement; clearInterval(rbT); rbT = setInterval(() => { de.style.setProperty('--rbo', ((performance.now() - rbT0) * 0.018 % 360).toFixed(1) + 'deg'); }, 100); }
+document.addEventListener('visibilitychange', () => { if (skin !== 'rainbowdyn' || !rbT0 || matchMedia('(prefers-reduced-motion: reduce)').matches) return; if (document.hidden){ clearInterval(rbT); rbT = 0; } else if (!rbT) rbRun(); });
 // MATRIX TABS (owner, 31 Oct): in the Matrix skins the screen tabs (Tracker … Chains) end where the tracker's tabs below
 // (… PROJECT) do: their buttons share out the difference. Other skins, or a gap too big to be the same row of tabs: as is.
 function alignTabs(){
@@ -17051,7 +17057,7 @@ const FXI = {
   // PERFORM and the Elektron conditions (1 Nov)
   CND:v => { const n = ['FILL','!FILL','PRE','!PRE','NEI','!NEI','1ST','!1ST'][Math.min(7, v & 15)], X = v >> 4; return 'Play only if ' + n + ' · ' + ({FILL:'FILL is on', '!FILL':'FILL is off', PRE:'this track’s last condition was true', '!PRE':'this track’s last condition was false', NEI:'the ' + (X ? 'track ' + X + '’s' : 'track to the left’s') + ' last condition was true', '!NEI':'the ' + (X ? 'track ' + X + '’s' : 'track to the left’s') + ' last condition was false', '1ST':'it’s the first pass since PLAY', '!1ST':'it’s not the first pass'})[n]; },
   NUD:v => { const n = s8(v); return n ? `Play ${Math.abs(n)} tick${Math.abs(n) === 1 ? '' : 's'} ${n < 0 ? 'early' : 'late'}` : 'On time'; },
-  RTV:v => { const n = s8(v); return n > 0 ? `Retriggers rise: the first ${n}/32 softer a hit` : n < 0 ? `Retriggers fade ${-n}/32 a hit` : 'Retriggers all at one level'; },
+  RTV:v => { const n = s8(v); return n > 0 ? `Note repeats (RET) rise: the first ${n}/32 softer a hit` : n < 0 ? `Note repeats (RET) fade ${-n}/32 a hit` : 'Note repeats (RET) all at one level'; },
   SLC:v => `Play slice ${v + 1} (the note pitches it)`,
   XFD:v => `Crossfader to ${Math.round(v / 2.55)}% (scene A → B)`,
   MAC:v => (v >> 4) >= 1 && (v >> 4) <= 8 ? `Macro ${v >> 4} (${(perfOf().mac[(v >> 4) - 1] || {}).n || ''}) to ${Math.round((v & 15) * 100 / 15)}%` : 'Macro X (1–8) to Y (0–F)',
@@ -17059,7 +17065,7 @@ const FXI = {
   END:v => 'End of the song: playing the song stops here (this row doesn’t play); a render ends here too',
   JMP:v => `Jump: the whole song goes on from song row ${rS(v, 3)} (every track, from the top of its block); in a render, a jump back ends it`,
   PRT:v => v ? `Switch to part ${v}${S.parts && S.parts[v - 1] ? '' : ' (empty: the song’s own)'}` : 'Back to the song’s own sound (no part)',
-  RET:v => (v & 15) ? `Retrigger every ${ticksS(v & 15)} to the end of the step` + ((v >> 4) ? `, ${v >> 4}/16 quieter a hit` : '') : 'RET XY: retrigger every Y ticks, X fades each hit',
+  RET:v => (v & 15) ? `Note repeat: the note retriggers every ${ticksS(v & 15)} to the end of the step` + ((v >> 4) ? `, ${v >> 4}/16 quieter a hit` : '') : 'RET XY: note repeat, the note retriggers every Y ticks, X fades each hit (for an effect stutter use RTG)',
   REP:v => `Repeat the track’s last command, adding ${hx(v)} each time`,
   RND:v => `Randomise the command to the left: down by up to ${v >> 4}, up by up to ${v & 15} (on its own, the note’s pitch in semitones)`,
   RNL:v => `Like RND, but each random value starts from the last one (a random walk): −${v >> 4} / +${v & 15}`,
@@ -17085,7 +17091,7 @@ const FXI = {
   FLY:v => `Flex FLY pattern ${hx(v)}: ${FlexCore.NAMES2[v]} (the second bank: IDM; on this track's Flex effect; in the MST column, the master's)`,
   FLX:v => { const k = flxCap(v); return `Flex pattern ${hx(k)}: ${FlexCore.NAMES[k]}${k !== v ? ' (this song keeps FLX 11–FF as pattern 10: Project → FLX 11–FF)' : ''} (on this track's Flex effect; in the MST column, the master's)`; },
   GAT:v => v === 0 ? 'Step gate off: the gate opens until the next GAT' : v >= 16 ? 'Step gate: the slot’s CUSTOM steps (STEPS 1-8, 9-16)' : `Step gate pattern ${v}: ${StepGateCore.NAMES[v]}`,
-  RTG:v => { const X = v >> 4, Y = v & 15; return !X ? 'Retrigger off' : `Retrigger every ${RetrigCore.NAMES[Math.min(8, X) - 1]}` + (Y ? ` for ${Y} rows` : ' until RTG 00') + ' (X: 1 = 1/4 … 5 = 1/64, 6–8 triplets)'; },
+  RTG:v => { const X = v >> 4, Y = v & 15; return !X ? 'FX stutter off (the Retrigger effect)' : `FX stutter: the Retrigger effect repeats every ${RetrigCore.NAMES[Math.min(8, X) - 1]}` + (Y ? ` for ${Y} rows` : ' until RTG 00') + ' (X: 1 = 1/4 … 5 = 1/64, 6–8 triplets; needs the Retrigger effect in a slot)'; },
   WOB:v => v ? `Bass wobble ${BASS_DIVN[Math.min(BASS_DIV.length, v) - 1]} from here on (01 = 4 bars … 0D = 1/32)` : 'WOB 00: back to the bass voice’s own wobble rate',
   PGM:v => `MIDI program change to ${Math.min(127, v)} (00–7F; most gear shows it as ${Math.min(127, v) + 1}), sent just before this row’s note`,
   CSL:v => v ? `The CCA–CCD commands on this row glide to their value over ${ticksS(v)} (from the value sent before)` : 'CSL 00: the CCA–CCD commands on this row glide to their value across the step',
@@ -21039,11 +21045,25 @@ let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bass
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=7', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the …waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
 const WAVES_WK = 'waves/waves-worklet.js?v=34', wlOK = new WeakSet(), wlSent = new WeakSet();
+/* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
+   screen open) had been waking the phone 2 to 16 times a second for nothing. idleTick(fn, fast, busy, slow) calls fn every
+   `fast` ms while busy() says so and every `slow` ms otherwise (fn runs either way, so its own reset-when-idle code still
+   runs). idleWake() brings the sleeping ones back to their fast pace at once: the screen coming back, a view change, PLAY (via
+   frameWake) and any new sound (audio()) call it. Nothing here touches the audio, the sequencer or what the timers compute. */
+var IDLE = null;
+function idleTick(fn, fast, busy, slow){
+  const o = {sleep:false, t:0};
+  const run = () => { o.t = 0; let b = true; try { fn(); } catch(e){} try { b = !!busy(); } catch(e){} o.sleep = !b; o.t = setTimeout(run, b ? fast : slow); };
+  o.wake = () => { if (!o.sleep) return; clearTimeout(o.t); o.sleep = false; o.t = setTimeout(run, fast); };
+  (IDLE || (IDLE = [])).push(o); o.t = setTimeout(run, fast); return o;
+}
+function idleWake(){ if (IDLE) for (const o of IDLE) o.wake(); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) idleWake(); });
 /* …PUMP SYNTHS live, THE SAFETY NET (owner, 26 Oct): while the song plays, once a second: if the audio is dropping out or
    the audio thread is nearly full, and the live …pump nodes are a real part of that, twice in a row, the live engines
    switch to their renders for the rest of this visit (psLive.off): their nodes go, and the next notes play the pads'
    renders, the same values' sound. Said once; a reload tries live again. An export always plays them live. */
-setInterval(() => {
+idleTick(() => {
   if (psLive.off || aset.psLive === 'render' || !rt || !rt.pl || !tp.on || !ctx || document.hidden) { psLive.strikes = 0; return; }
   const {load, nodes} = rt.pl.psLoad(); if (!nodes){ psLive.strikes = 0; return; }
   const now = performance.now(), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
@@ -21051,7 +21071,7 @@ setInterval(() => {
   const over = load > 0.12 && (drop || (whole != null && whole > 0.92) || load > 0.75);
   psLive.strikes = over ? psLive.strikes + 1 : 0;
   if (psLive.strikes >= 2) psFallback('this device couldn’t keep up with them live');
-}, 1000);
+}, 1000, () => tp.on && !document.hidden, 3000);   // BATTERY: a second's check only while the song plays
 function psFallback(why){
   if (psLive.off) return; psLive.off = true; psLive.strikes = 0;
   try { if (rt && rt.pl) rt.pl.psDrop(); } catch(e){}
@@ -21632,13 +21652,13 @@ const pbState = () => `ctx ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(2
 const pbPg = () => { const P = PB.pg; PB.pg = null; return P ? ` · page ticks ${P.n}, longest gap ${P.gap.toFixed(2)} s, least lead ${P.lead.toFixed(2)} s, moved on ${P.re}× (${P.skip.toFixed(2)} s)` : ''; };
 // CLOCK DETAIL (8 Nov): on the Fold the audio clock runs ahead of real time while playing. Once a second, while playing and for 5 s after STOP, a line goes in the
 // report if the clock moved more than 0.1 s away from real time (and every 10 s anyway): what the browser says about the output, to tell which side is racing.
-{ let w0 = 0, c0 = 0, n = 0; setInterval(() => { try {
+{ let w0 = 0, c0 = 0, n = 0; idleTick(() => { try {
   if (!ctx || (!tp.on && performance.now() - PB.stopT > 5000)){ w0 = 0; return; }
   const w = Date.now() / 1000, c = ctx.currentTime; if (!w0){ w0 = w; c0 = c; return; }
   const dw = w - w0, dc = c - c0; w0 = w; c0 = c; n++; if (Math.abs(dc - dw) < 0.1 && n % 10) return;
   const ts = ctx.getOutputTimestamp ? ctx.getOutputTimestamp() : {}, st = ctx.playbackStats, b = typeof bgEl !== 'undefined' && bgEl;
   pbLog(`clock +${dc.toFixed(2)} s in ${dw.toFixed(2)} s · out t=${(+ts.contextTime || 0).toFixed(2)} lat ${ctx.baseLatency.toFixed(3)}+${(ctx.outputLatency || 0).toFixed(3)} sr ${ctx.sampleRate}` + (st ? ` · stats total ${(+st.totalDuration || 0).toFixed(2)} underrun ${(+st.underrunDuration || 0).toFixed(2)} ×${st.underrunEvents | 0}` : '') + (b ? ` · bg ${b.paused ? 'paused' : 'on'} ${b.currentTime.toFixed(2)}` : '') + ' · ' + pbState());
-} catch(e){} }, 1000); }
+} catch(e){} }, 1000, () => !!ctx && (tp.on || performance.now() - PB.stopT <= 5000), 2500); }   // BATTERY: only while playing and 5 s after (also while hidden: that is what it is for)
 function pbLevel(){ try { const A = rt && rt.man; if (!A) return '-'; let m = 0; for (const a of A){ const b = new Float32Array(a.fftSize); a.getFloatTimeDomainData(b); for (const x of b) m = Math.max(m, Math.abs(x)); } return m ? (20 * Math.log10(m)).toFixed(1) + ' dB' : 'silent'; } catch(e){ return '?'; } }
 /* HYBRID (owner, 6 Nov: "Build the hybrid and make sure we don't break anything on desktop"): on a phone or tablet, the
    moment the app is hidden (the screen off, another app, the shade) while the audio-thread sequencer plays the song, the
@@ -21687,7 +21707,7 @@ function coreFail(self){
   if (row >= 0 && mode === 'song') tStart('song', {row});
   const went = row >= 0 && mode === 'song' ? 'the song moved to the page sequencer' : 'playback stopped; PLAY uses the page sequencer';
   toast((self && self.why === 'deaf' ? 'The audio thread got too busy to hear the app, so ' : 'The audio clock went out of step, so ') + went + ' (until the app reloads).', 5000); }
-setInterval(() => { try { pbClock(); } catch(e){} }, 2000);
+idleTick(() => { try { pbClock(); } catch(e){} }, 2000, () => tp.on, 4000);   // BATTERY: every 2 s while playing (hidden too), a slow reset check otherwise
 function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; PB.t = now;
   if (PB.n) pbLog(`rows ${PB.n} · latest note ${(PB.late * 1000).toFixed(0)} ms late · dropped ${PB.drop} · ahead ${(PB.ahead * 1000).toFixed(0)} ms · core skips ${PB.skips} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'}`);
   PB.n = PB.late = PB.drop = PB.ahead = 0; }
@@ -22001,7 +22021,7 @@ function setWlOn(on){ wlOn = !!on; try { localStorage.setItem('thunderplus-wakel
 // the lock is checked every 2 s and taken again if it's gone.)
 let wlQ = Promise.resolve();
 function wakeLock(on){ wlQ = wlQ.then(() => wakeLock1(on)).catch(() => {}); return wlQ; }
-setInterval(() => { if (tp.on && wlOn && !wlLock && !document.hidden) wakeLock(true); }, 2000);
+idleTick(() => { if (tp.on && wlOn && !wlLock && !document.hidden) wakeLock(true); }, 2000, () => tp.on, 5000);   // BATTERY: the check only matters while playing
 // Phones and tablets only (a computer's screen sleeping doesn't touch playback, and Electron refuses it). (A phone's refusal,
 // e.g. in battery saver, is tried again every 2 s, as the saver may be turned off.)
 async function wakeLock1(on){
@@ -23976,15 +23996,15 @@ function bump(d, big){
 const FXB = {ATK:'Fade notes in from here on: 00 quick – FE slow, FF its own attack (rendered sounds)', REL:'Synth note release from here on: 00 short – FE long, FF its own (rendered sounds)', END:'End of the song: playing stops at this row', JMP:'Jump: the whole song goes on from song row XX (JMP 00: back to the top)', FDI:'Fade the note in over XX ticks', TRM:'Tremolo on the note: X speed (cycles a beat), Y depth', APN:'Auto-pan the note: X speed (cycles a beat), Y depth', TVL:'Track level from here on: 00 silent – FF the mixer’s', TPN:'Track pan from here on: 00 left, 80 centre, FF right (back to the mixer’s at stop)', STP:'Stop: 00 every note on this track, 01 every note on every track', LPB:'Lines per beat for every track from here on (01–10; 00 the phrases’ own)', PDL:'Pause the song for XX rows (every track waits)', ONE:'Play one note of this row’s chord, picked at random', MPB:'MIDI pitch bend: 00 down, 80 centre, FF up', MAT:'MIDI channel pressure 00–7F', FXS:'Effect parameter to move: X the slot (1–8), Y its parameter (1–F, as listed on the FX screen)', FXV:'Set the parameter FXS picked: 00 its lowest – FF its highest', SCA:'Scale for this track from here on: X the root (0 C … B), Y the scale (0 off, 1 major, 2 minor…)', SCG:'Scale for every track from here on, as SCA', CUT:'Low-pass the pad from here on: 00 dark – FF open (off)', RES:'Filter resonance for CUT, from here on', DEC:'Shorten the pad from here on: 00 a click – FF its own length', MUT:'Mutate: the note plays variation XX of its pad (INST › RANGE says how far)', GEN:'Generate: the note plays a fresh sound XX of the instrument’s GEN TYPE (INST › FAMILY, RANGE)', PRB:'Chance the command to the left happens (00 never – FF always)', ARP:'Arpeggio: the note, +X and +Y semitones', ARC:'Arpeggio shape (X) and speed in ticks (Y)', CHA:'Chance the note plays (00 never – FF always)',
   DEL:'Delay the note by ticks', GRV:'Groove: ticks on even (X) and odd (Y) steps', GGR:'Groove for every track at once', HOP:'End the phrase here; the next starts at row XX',
   INS:'Play the note with this instrument', KIL:'Cut the note after ticks', OFF:'Fade the note out after ticks', NTH:'Play only on pass Y of every X times',
-  RET:'Retrigger every Y ticks; X fades each hit', REP:'Repeat the track’s last command, adding the value', RND:'Randomise the command to the left (or the pitch)',
+  RET:'Note repeat: retrigger the note every Y ticks within the step, X fades each hit (no effect needed)', REP:'Repeat the track’s last command, adding the value', RND:'Randomise the command to the left (or the pitch)',
   RNL:'Like RND, as a random walk from the last value', PSL:'Slide the pitch from the last note over ticks', PBN:'Bend the pitch ± semitones over the step',
   PVB:'Vibrato: X speed, Y depth', SED:'Seed the randomness so it repeats the same way', TPO:'Set the tempo in BPM (hex)', TSP:'Transpose the track from here on',
   VOL:'Set the volume (also of a playing note)', PIT:'Pitch the note ± semitones', FIN:'Fine tune ± cents', PLY:'Play reversed (01) or forwards (00)',
   STA:'Start part way into the sound', PAN:'Pan left or right (80 centre)', TIC:'Ticks a step from here on', WOB:'Bass wobble rate from here on (00 the voice’s own)',
-  FXO:'Effect slot X (1–8, 9 = all) off (Y 0), on (1) or on for Y rows; FXO 00: every slot back as set', BYP:'…chains module X (its number on BYP, 0 = all) in (Y 0), bypassed (1), or the other way from the patch for Y rows', FLX:'Flex pattern (00 off, 01–10 the first sixteen; 11–FF: first digit the family, second the variant; lengths are note values). A Flex set to STARTS ON FLX is off until the first FLX', FLY:'Flex, second bank: IDM patterns (00 off, 01–0F one of each family; 10–FF: 1 pitch rolls, 2 euclid, 3 probability, 4 slice pitch, 5 freeze and smear, 6 CD skips, 7 bounces, 8 mutating shuffles, 9 stutter edits, A polymeter, B warp, C reverse rolls and rewinds, D grains, E texture, F chaos 2). Plays on the same Flex as FLX: the later one wins', GAT:'Step gate pattern (00 custom, 01–0F); STARTS ON GAT: open until the first GAT', RTG:'Retrigger: X rate (1 = 1/4 … 8 = 1/32T), Y rows (0 = until RTG 00)',
+  FXO:'Effect slot X (1–8, 9 = all) off (Y 0), on (1) or on for Y rows; FXO 00: every slot back as set', BYP:'…chains module X (its number on BYP, 0 = all) in (Y 0), bypassed (1), or the other way from the patch for Y rows', FLX:'Flex pattern (00 off, 01–10 the first sixteen; 11–FF: first digit the family, second the variant; lengths are note values). A Flex set to STARTS ON FLX is off until the first FLX', FLY:'Flex, second bank: IDM patterns (00 off, 01–0F one of each family; 10–FF: 1 pitch rolls, 2 euclid, 3 probability, 4 slice pitch, 5 freeze and smear, 6 CD skips, 7 bounces, 8 mutating shuffles, 9 stutter edits, A polymeter, B warp, C reverse rolls and rewinds, D grains, E texture, F chaos 2). Plays on the same Flex as FLX: the later one wins', GAT:'Step gate pattern (00 custom, 01–0F); STARTS ON GAT: open until the first GAT', RTG:'FX stutter: switches the Retrigger effect on, X rate (1 = 1/4 … 8 = 1/32T), Y rows (0 = until RTG 00). Needs the Retrigger effect in a slot (added if one is free)',
   PGM:'MIDI program change (00–7F)', CSL:'MIDI CC glide: this row’s CCA–CCD move to their value over XY ticks (00 the step)',
   CND:'Condition: 0 FILL, 1 !FILL, 2 PRE, 3 !PRE, 4 NEI, 5 !NEI, 6 1ST, 7 !1ST (NEI: X the track, 0 = the left one)', NUD:'Nudge ± ticks (early or late)',
-  RTV:'Retrigger curve: + rises to the last hit, − fades', SLC:'Play slice XX of a sliced sound', XFD:'Crossfader 00 scene A … FF scene B',
+  RTV:'Note repeat (RET) curve: + rises to the last hit, − fades', SLC:'Play slice XX of a sliced sound', XFD:'Crossfader 00 scene A … FF scene B',
   MAC:'Macro X (1–8) to Y (0–F)', LK1:'Lock 1 (Perform → Locks) to XX', LK2:'Lock 2 to XX', LK3:'Lock 3 to XX', LK4:'Lock 4 to XX', PRT:'Switch to part XX (00 = the song’s own)',
   DIR:'Play direction from here on: 00 forward, 01 backwards, 02 ping-pong, 03 random'};
 for (const c of CC_CMDS) FXB[c] = `MIDI CC: send 00–7F to the instrument’s CC ${c[2]}`;
@@ -23994,11 +24014,11 @@ for (const c of CC_CMDS) FXB[c] = `MIDI CC: send 00–7F to the instrument’s C
 const FXC_GROUPS = [
   ['Volume and pan', ['VOL', 'PAN', 'FDI', 'TRM', 'APN', 'TVL', 'TPN']],
   ['Pitch and arpeggio', ['PIT', 'FIN', 'TSP', 'SCA', 'SCG', 'PSL', 'PBN', 'PVB', 'ARP', 'ARC']],
-  ['Note timing', ['DEL', 'NUD', 'KIL', 'OFF', 'RET', 'RTV', 'STP']],
+  ['Note timing and repeat', ['DEL', 'NUD', 'KIL', 'OFF', 'RET', 'RTV', 'STP']],
   ['Sound', ['INS', 'STA', 'SLC', 'PLY', 'WOB', 'MUT', 'GEN', 'CUT', 'RES', 'DEC', 'ATK', 'REL']],
   ['Chance and random', ['CHA', 'PRB', 'CND', 'ONE', 'NTH', 'RND', 'RNL', 'SED', 'REP']],
   ['Perform', ['XFD', 'MAC', 'LK1', 'LK2', 'LK3', 'LK4', 'PRT']],
-  ['Effects', ['FXO', 'FXS', 'FXV', 'BYP', 'FLX', 'FLY', 'GAT', 'RTG']],
+  ['Effects and FX patterns', ['FXO', 'FXS', 'FXV', 'BYP', 'FLX', 'FLY', 'GAT', 'RTG']],
   ['Tempo and groove', ['TPO', 'TIC', 'LPB', 'PDL', 'GRV', 'GGR']],
   ['Play order', ['HOP', 'DIR', 'END', 'JMP']],
   ['MIDI', ['PGM', 'CCA', 'CCB', 'CCC', 'CCD', 'CSL', 'MPB', 'MAT']]];
@@ -27579,6 +27599,7 @@ function mwLimDraw(){
 }
 function mwLoop(){
   if (!mwOpenNow) return;
+  if (document.hidden && !tp.on) return;   // BATTERY: parked while hidden and not playing (visibilitychange restarts it)
   mwRaf = requestAnimationFrame(mwLoop);
   const now = performance.now(); if (now - (mwLoop.t || 0) < 33) return; mwLoop.t = now;
   const m = mstMeter, live = !!(m && S.mst.on && (tp.on || now - audioWake < 1500));
@@ -27910,10 +27931,14 @@ function hmAttach(){
    brings it straight back (audio() calls hmWake(), and the next look catches anything else within 160 ms). */
 var hmSleepT = 0;   // var, not let: audio() calls hmWake() and may run before this line has
 function hmWake(){ if (hmSleepT){ clearTimeout(hmSleepT); hmSleepT = 0; requestAnimationFrame(hmFrame); } }
+// BATTERY (8 Nov): quiet, it looks again 5 times a second from a plain timer (no display frame is asked for: a rAF every 160 ms
+// made the screen compose a frame each time); hidden and not playing it parks, and the screen coming back restarts it.
+var hmParked = false;
 function hmFrame(now){
   hmDraw(now);
+  if (document.hidden && !tp.on){ hmParked = true; return; }
   const quiet = !tp.on && HM.lv[0] < 0.004 && HM.lv[1] < 0.004 && HM.pk[0] < 0.004 && HM.pk[1] < 0.004;
-  if (quiet) hmSleepT = setTimeout(() => { hmSleepT = 0; requestAnimationFrame(hmFrame); }, 160);
+  if (quiet) hmSleepT = setTimeout(() => { hmSleepT = 0; hmFrame(performance.now()); }, 200);
   else requestAnimationFrame(hmFrame);
 }
 function hmDraw(now){
@@ -29269,7 +29294,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', () => sched
 if (screen.orientation) screen.orientation.addEventListener('change', () => setTimeout(() => arrLayout(true), 150));
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(() => arrLayout(true), 150); });
 new ResizeObserver(() => scheduleRefit(false)).observe(document.documentElement);
-setInterval(() => { if (!document.hidden) arrLayout(); }, 1000);
+idleTick(() => { if (!document.hidden) arrLayout(); }, 1000, () => !document.hidden, 3000);   // BATTERY: nothing to check while hidden (the visibilitychange above lays out on return)
 // The line over the song's info and the line over ARRANGE's footer meet in one straight line across: whichever
 // block is shorter grows upward to the other's line.
 const tInfoBox = document.querySelector('.tinfo'), arrFoot = arrEl.querySelector('.tafoot');
@@ -30324,11 +30349,16 @@ function globalCpuValue(){
    (AudioContext.playbackStats) that count is used; otherwise the audio clock is compared with the page clock
    (getOutputTimestamp): when the audio thread falls behind, the audio clock slips back against real time. */
 const glitch = {n:0, t:-1e9, off:null, base:null};
+// BATTERY (8 Nov): the scan is for a song playing or a sound just made; with nothing sounding it drops to a slow check (below).
+// The count is rebased when it comes back from such a quiet stretch (a stall while silent is not a dropout), but never over a
+// stretch of PLAYBACK (a song playing with the screen off still has its dropouts counted when the screen comes back).
+const glitchBusy = () => tp.on || performance.now() - audioWake < 8000 || HM.lv[0] >= 0.004 || HM.lv[1] >= 0.004;
 function glitchScan(){
-  if (!ctx || ctx.state !== 'running' || document.hidden){ glitch.off = null; return; }
-  const ps = ctx.playbackStats;
+  if (!ctx || ctx.state !== 'running' || document.hidden || !glitchBusy()){ glitch.off = null; if (!tp.on) glitch.rb = true; return; }
+  const ps = ctx.playbackStats, rb = glitch.rb; glitch.rb = false;
   if (ps && typeof ps.underrunEvents === 'number'){
     if (glitch.base == null) glitch.base = ps.underrunEvents;
+    else if (rb) glitch.base = ps.underrunEvents - glitch.n;
     const k = ps.underrunEvents - glitch.base; if (k > glitch.n){ glitch.n = k; glitch.t = performance.now(); dropNote(); }
     return;
   }
@@ -30341,7 +30371,7 @@ function glitchScan(){
   else if (d < -12) glitch.off = off;          // a resume or a clock re-sync: start again from here
   else glitch.off += d * 0.05;                 // follow the two clocks' slow drift
 }
-setInterval(glitchScan, 100);
+idleTick(glitchScan, 100, () => !!ctx && ctx.state === 'running' && !document.hidden && glitchBusy(), 1500);
 /* DROPOUT TIP (owner's punch list, 2 Nov: phones that stutter). Four dropouts within a minute while the song plays, on a
    latency other than Safest: once (ever), a toast offers Safest, which gives the audio thread a bigger buffer. It reloads
    the app (the song and kit are saved first). */
@@ -30366,10 +30396,10 @@ function cpuMeter(){
   b.title = (cap ? 'Whole audio engine (Chrome’s render capacity), not just the effects.' : pr ? 'Whole audio engine: how much of each audio block the audio thread spends working (every sound, effect and voice). Over 100% means it can’t keep up.' : 'The time the audio engine’s own processing takes: track and master effects, …chains and bass voices (this browser doesn’t report the total audio load).')
     + (glitch.n ? ' Dropouts since the sound started: ' + glitch.n + '.' : '');
 }
-setInterval(() => { if (view !== 'tracker' && !document.hidden) cpuMeter(); }, 500);
+idleTick(() => { if (view !== 'tracker' && !document.hidden) cpuMeter(); }, 500, () => view !== 'tracker' && !document.hidden, 2000);   // BATTERY: the tracker's own frame loop updates it there
 // …chains screen meters: sample each routed track's chains return and push it into the frame.
 // Runs on its own timer (the tracker frame loop is off while the …chains screen is open).
-setInterval(() => {
+idleTick(() => {
   if (view !== 'chains' || document.hidden || !rt || !CH.frame) return;
   const out = new Array(NT).fill(0), inp = new Array(NT).fill(0);
   let any = false;
@@ -30402,7 +30432,7 @@ setInterval(() => {
   // BYP: modules bypassed now in any track engine (the editor lights their buttons, the tracker's switches included)
   const byp = new Set(); for (let t = 0; t < ntr(); t++){ const c = rt.pl.buses[t] && rt.pl.buses[t].chn; if (c && c.byp && c.modsT > fresh) for (const id of c.byp) byp.add(id); }
   if (any || chMeterWanted){ const api = chApi(); if (api && api.meters) api.meters({ peaks:out, peaksIn:inp, load:globalCpuValue(), mods, shows, jacks, byp:[...byp] }); }
-}, 60);
+}, 60, () => view === 'chains' && !document.hidden, 1500);   // BATTERY: 16 wake-ups a second only while the …chains screen is open (setView wakes it)
 $('tCpu').addEventListener('click', () => {
   const cap = cpu.cap, L = fxLoads().filter(x => x[1] > 0.0005).sort((a, b) => b[1] - a[1]);
   const fx = L.length ? 'By part: ' + L.map(([n, v]) => `${n} ${(v * 100).toFixed(1)}%`).join(' · ') : 'No track effects running.';
@@ -30418,10 +30448,13 @@ $('tCpu').addEventListener('click', () => {
 // a tail ringing out) the loop stays at full rate, read from the header meter.
 let rafT = 0;
 const frameIdle = () => !tp.on && !rendering && performance.now() - audioWake > 1500 && !(HM.lv[0] >= 0.004 || HM.lv[1] >= 0.004);
-function frameWake(){ if (raf === -1){ clearTimeout(rafT); raf = 0; } if (!raf && view === 'tracker') frame(); }
+// BATTERY (8 Nov): hidden and not playing, the loop parks (no timer at all); the screen coming back wakes it (visibilitychange,
+// near the end of the file). The idle check is 5 a second, not 10.
+function frameWake(){ idleWake(); if (raf === -1){ clearTimeout(rafT); raf = 0; } if (!raf && view === 'tracker') frame(); }
 function frame(){
   raf = 0; if (view !== 'tracker') return;
-  if (frameIdle()){ raf = -1; rafT = setTimeout(() => { raf = 0; frame(); }, 100); } else raf = requestAnimationFrame(frame);
+  if (document.hidden && !tp.on && !rendering) raf = -1;
+  else if (frameIdle()){ raf = -1; rafT = setTimeout(() => { raf = 0; frame(); }, 200); } else raf = requestAnimationFrame(frame);
   if (tp.on && ctx){
     let ch = false;
     // PLAYHEAD ON THE SOUND (owner, 6 Nov, Fold: "the playhead passes the note enough before we hear it that it is noticeable"):
@@ -31810,6 +31843,7 @@ document.addEventListener('keydown', e => {
 function setView(v){
   fxpClose();
   const was = view;
+  idleWake();   // BATTERY: the …chains meter timer and the CPU meter timer sleep except on their own screens
   if (v !== was) try { releaseKeys(); } catch(e){}   // KEYS PLAY: keys held on one screen don't hang on the next
   if (noEdFor(v)) v = 'synth';   // Mobile: no …waves / …chains editor unless Settings → App shows it (they still play)
   view = v === 'tracker' || v === 'waves' || v === 'chains' ? v : 'synth';
@@ -32950,6 +32984,13 @@ async function checkUpdate(manual){
 }
 if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadSW) updBanner(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(false); });
+// BATTERY (8 Nov): the screen coming back restarts every loop that parks while the app is hidden (the tracker frame loop, the header
+// meter, the bass picture, the sound editor's scope, the master window); each re-checks its own conditions.
+document.addEventListener('visibilitychange', () => { if (document.hidden) return;
+  try { frameWake(); } catch(e){}
+  try { if (hmParked){ hmParked = false; requestAnimationFrame(hmFrame); } } catch(e){}
+  try { bassVizKick(); sndWake(); } catch(e){}
+  try { if (mwOpenNow){ cancelAnimationFrame(mwRaf); mwLoop(); } } catch(e){} });
 setTimeout(() => checkUpdate(false), 3000);
 setTimeout(thunderOffer, 2500);
 setTimeout(() => { if (kit.voices.some(v => v && v.engine === 'sf')) sfPrepare(null); }, 1800);   // SoundFont pads: load their fonts (from this device) after start-up
