@@ -556,8 +556,8 @@ The owner asked for an audit of awkward menu and notification text, then for the
 longest pop-ups tightened. Owner's naming decisions: American spelling in visible text (code identifiers and CSS stay as they
 were); drop the dots from ...Thunder (…pump, …chains and …waves keep theirs for now); say "desktop app", not "helper", to users;
 "A voice per track" became "A kit slot per track" (the internal `vtrk` name is unchanged). Audio thread / Page stay as the
-sequencer names. The installed app's own name was already Thunder Plus, so `electron/package.json` was left alone apart from
-what it shows. Write new user-facing text in plain sentences: say what is true now, no "as before", no colon-joined clauses.
+sequencer names. The installed app's productName was already Thunder Plus; `electron/package.json` only had its
+descriptions and shortcut name changed. Write new user-facing text in plain sentences: say what is true now, no "as before", no colon-joined clauses.
 
 ## 9 Nov, end of session: what to test on the phone (build 530, on `beta`)
 
