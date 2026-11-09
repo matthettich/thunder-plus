@@ -1,4 +1,4 @@
-/* …pump MASTER pop-up (31 Oct 2026): plugins/master/UIMaster.cpp in the browser. The display shows the song's learned
+/* pump MASTER pop-up (31 Oct 2026): plugins/master/UIMaster.cpp in the browser. The display shows the song's learned
    balance (dim), the style's target (dotted) and the tone curve MASTER applies (coloured by frequency: boosts strong,
    cuts light) over the live output spectrum; the column beside it the loudness (the song as learned, the plan, the
    output now) or, in ADVANCED, a meter bridge. Below: LEARN, COMPARE, ADVANCED, INTENSITY and STYLE, then one panel per

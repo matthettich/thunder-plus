@@ -1,4 +1,4 @@
-/* …pump TUNE pop-up (31 Oct 2026): plugins/tune/UITune.cpp in the browser. One big screen with a keyboard down its side:
+/* pump TUNE pop-up (31 Oct 2026): plugins/tune/UITune.cpp in the browser. One big screen with a keyboard down its side:
    LIVE   the last six seconds: the pitch sung (thin ink), the pitch that comes out (neon), the target notes, the harmony
           voices (second colour); scale rows tinted, held MIDI notes lit on the keyboard.
    GRAPH  the song's timeline: CAPTURE records the voice's pitch while the song plays and finds its notes (the plugin's

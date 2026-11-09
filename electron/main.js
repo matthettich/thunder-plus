@@ -22,7 +22,7 @@ const ioAddonPath = () => path.join(__dirname, 'io', 'thunder_io.node').replace(
 let ioChild = null; const ioGate = createRestartGate();
 
 // The app is served from app://thunder/ rather than opened as plain files. Plain files can't fetch each
-// other, load audio worklets or talk across frames, which the …waves and …chains editors (frames inside
+// other, load audio worklets or talk across frames, which the waves and chains editors (frames inside
 // the app) and the mastering and bass engines need.
 const ROOT = path.join(__dirname, 'app');
 protocol.registerSchemesAsPrivileged([{ scheme:'app', privileges:{ standard:true, secure:true, supportFetchAPI:true, corsEnabled:true, stream:true } }]);
@@ -37,7 +37,7 @@ app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 // APP NAP (owner, 5 Nov: stutters on an M4 with the app in the background, FLX rows especially): the switches above are
 // Chromium's own; macOS's App Nap is a level below them and still slows a hidden app's timers (the page's 25 ms pump and the
-// rows it books ahead: live engines, …pump FXV, MIDI out) and lowers its threads' priority. While the song plays the page
+// rows it books ahead: live engines, pump FXV, MIDI out) and lowers its threads' priority. While the song plays the page
 // asks for 'prevent-app-suspension' (thunder:playing), and lets it go on STOP so an idle app can still nap.
 let napBlock = -1;
 function setPlaying(on){

@@ -1,4 +1,4 @@
-/* …pump COMP pop-up (stage 2): plugins/comp/UIComp.cpp in the browser. The scrolling level / gain-reduction history
+/* pump COMP pop-up (stage 2): plugins/comp/UIComp.cpp in the browser. The scrolling level / gain-reduction history
    with the draggable threshold line, the transfer-curve inset, In / Out / GR meters, the sidechain (Thunder's sends and
    tracks feed the External sidechain) and the controls. */
 (() => {

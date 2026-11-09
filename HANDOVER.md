@@ -550,11 +550,11 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
-## 9 Nov: wording audit (build 534, branch `fix/wording-audit`, PR into `beta`)
+## 9 Nov: wording audit (build 536, branch `fix/wording-audit`, PR into `beta`)
 
 The owner asked for an audit of awkward menu and notification text, then for the fixes. About 180 strings were rewritten and the
 longest pop-ups tightened. Owner's naming decisions: American spelling in visible text (code identifiers and CSS stay as they
-were); drop the dots from ...Thunder (…pump, …chains and …waves keep theirs for now); say "desktop app", not "helper", to users;
+were); no dots on any name (Thunder, Thunder Plus, pump, chains, waves); say "desktop app", not "helper", to users;
 "A voice per track" became "A kit slot per track" (the internal `vtrk` name is unchanged). Audio thread / Page stay as the
 sequencer names. The installed app's productName was already Thunder Plus; `electron/package.json` only had its
 descriptions and shortcut name changed. Write new user-facing text in plain sentences: say what is true now, no "as before", no colon-joined clauses.

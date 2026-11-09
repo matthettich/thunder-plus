@@ -6,7 +6,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="waves">
-<title>…waves</title>
+<title>waves</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icons/icon-192.png">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
@@ -15,7 +15,7 @@
 @font-face{font-family:Jost;src:url('./fonts/Jost-500.woff') format('woff');font-weight:500;font-display:swap}
 @font-face{font-family:Jost;src:url('./fonts/Jost-600.woff') format('woff');font-weight:600;font-display:swap}
 @font-face{font-family:Jost;src:url('./fonts/Jost-700.woff') format('woff');font-weight:700;font-display:swap}
-/* ═══ …waves skin: the Minimal skin of ...Seeds (white, square, line art) ═══ */
+/* ═══ waves skin: the Minimal skin of Seeds (white, square, line art) ═══ */
 :root{
   --bench:#ffffff; --panel:#ffffff; --panel-2:#f3f3f3; --edge:#111111; --ink:#111111; --muted:#555555; --track:#e6e6e6;
   --side:#efefef; --frame:#efefef; --glass:#050607;
@@ -282,7 +282,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 </head><body>
 
 <div class="bar">
-    <h1>...waves</h1>
+    <h1>waves</h1>
   <input id="pname" class="pname" aria-label="Patch name" maxlength="60" spellcheck="false">
   <span class="vsep" aria-hidden="true"></span>
   <div class="setwrap"><button class="tb" id="filebtn" aria-haspopup="true">File ▾</button>
@@ -310,10 +310,10 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
         <label class="setsel"><span>Quality</span><select id="setquality"><option value="full">Full quality</option><option value="draft">Draft (lighter on the CPU)</option></select></label>
         <label class="setsel"><span>Voices</span><select id="setvoices"></select></label>
         <label class="setsel"><span>Tempo</span><span><input type="number" id="settempo" class="numsmall" min="20" max="300" step="0.1"> BPM</span></label>
-        <div class="setsub">How many notes can sound at once. Changing it restarts the sound engine. When the CPU gets too busy, …waves drops voices by itself.</div>
+        <div class="setsub">How many notes can sound at once. Changing it restarts the sound engine. When the CPU gets too busy, waves drops voices by itself.</div>
         <div class="sethead">MIDI</div>
         <label class="setsel"><span>Controller</span><select id="setmidiin"><option value="all">All connected MIDI inputs</option></select></label>
-        <div class="setsub" id="setmidiinfo">Notes and CC from this controller play and control …waves.</div>
+        <div class="setsub" id="setmidiinfo">Notes and CC from this controller play and control waves.</div>
       </div>
       <div class="setsec">
         <div class="sethead">Backups</div>
@@ -322,7 +322,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
       </div>
     </div>
   </div>
-  <button class="tb" id="helpbtn" title="How to use …waves, and every module explained">Help</button>
+  <button class="tb" id="helpbtn" title="How to use waves, and every module explained">Help</button>
   <input type="file" id="fileload" accept=".json,application/json" hidden>
   <div class="spacer"></div>
   <span class="fps" id="cpuv" title="How busy the sound engine is">CPU –</span>
@@ -355,8 +355,8 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <div class="learnbar" id="learnbar" hidden><span id="learntext"></span><button class="tb" id="learndone">Done</button></div>
 <div class="ctxmenu" id="ctxmenu" hidden role="menu"></div>
 <script type="module">
-/* ═══ …waves ═══
-   The patch page works like the Patch page of ...Seeds (Minimal skin): module list on the
+/* ═══ waves ═══
+   The patch page works like the Patch page of Seeds (Minimal skin): module list on the
    left, modules with jacks on the edges, straight colored cables, right-click menu, lasso,
    pan and zoom. The sound engine lives in waves-worklet.js; this page only edits the patch
    document and sends changes to it through WavesBridge. */
@@ -386,9 +386,9 @@ const step = k => ({ l:'Step ' + k, f: v => v <= -25 ? 'Rest' : noteName(v) });
 
 /* ===SHARED EDITOR START===
    The same in chains/index.html and waves/index.html: the editor side of the shared modules (see the SHARED MODULES
-   block in the worklets). Edit it here, in …chains, and run tools/sync-shared.py to copy it into …waves. */
+   block in the worklets). Edit it here, in chains, and run tools/sync-shared.py to copy it into waves. */
 // SOURCE (21 Oct): what a compressor, gate or envelope filter listens to (sck): Self, Send 1–8 (a Sidechain Out) or a
-// track's own sound. …waves has no tracks or sends (TRK_N isn't defined there), so it lists only Self.
+// track's own sound. waves has no tracks or sends (TRK_N isn't defined there), so it lists only Self.
 const SCK_OPTS = self => [[0, self], ...(typeof TRK_N === 'number' ? [...Array.from({length:8}, (_, k) => [k + 1, 'Send ' + (k + 1)]), ...Array.from({length:TRK_N}, (_, k) => [k + 9, 'Track ' + (k + 1)])] : [])];
 const SCK_P = [0,0,136,1];
 const SHARED_FAMILY = {};
@@ -511,7 +511,7 @@ const SHARED_ABOUT = {
   envfol:'Turns sound into modulation: the louder the input, the higher the output. Attack and Release set how quickly it follows; Gate level sets where its gate output turns on. Patch the output into any slider’s modulation jack (a filter’s cutoff, say) and the sound drives it.',
   gateex:'Turns sound into a gate: on while the input stays above Threshold, off when it falls (Hysteresis stops it chattering). Env is a smoothed version. Use it to trigger envelopes, clocks or Sample & Hold from audio.',
   pitchtrk:'Tracks the pitch of a monophonic sound (a voice, a bass line, a whistle) more steadily than Pitch Follow, and gives it as Pitch (glides) and Note (snapped to the nearest semitone), both 0.5 = A4 and one octave = 0.125, plus Gate while it hears a pitch, Trig on each new note and Env, the level. Patch Note into an oscillator\u2019s pitch to double a voice, Trig into an envelope, or Pitch into a filter so it follows the singer. Transpose shifts both.',
-  pitchfol:'Follows the pitch of a monophonic sound and outputs it as modulation (0.5 = A4, one octave = 0.125), plus a voiced Gate. Best on simple tones. Patch it into an oscillator’s pitch on …waves, or into a Quantizer here.',
+  pitchfol:'Follows the pitch of a monophonic sound and outputs it as modulation (0.5 = A4, one octave = 0.125), plus a voiced Gate. Best on simple tones. Patch it into an oscillator’s pitch on waves, or into a Quantizer here.',
   slew:'Slows a modulation signal down, with separate Rise and Fall times. Smooths stepped or jittery control voltages.',
   snh:'Sample & Hold: takes a snapshot of the input on a Trigger rising edge (or at Rate) and holds it; Noise outputs a matching random step. Patch a stepped sequence into a filter for classic sample-and-hold sweeps.',
   quant:'Snaps a pitch modulation signal to the nearest note of a Scale (pitch CV: 0.5 = A4). Transpose shifts it in semitones; Depth scales the output.',
@@ -750,7 +750,7 @@ SHARED_PALETTE.find(g => g[0] === 'Reverbs')[1].push(['convolve', 'Convolution r
 
 /* Editor entries for chains/index.html, to paste inside the SHARED EDITOR block (after the existing
    `SHARED_PALETTE.find(g => g[0] === 'Rhythm and logic')…` line is a good place). Uses only names that block (or the
-   page above it, in both …chains and …waves) already defines: opts, pct, spct, secs, hz, cents, whole, wet, MIXP,
+   page above it, in both chains and waves) already defines: opts, pct, spct, secs, hz, cents, whole, wet, MIXP,
    STEREO, PP_NAMES, NOTE_NAMES. Params are identical to the worklet's. (Then run tools/sync-shared.py.) */
 
 /* Pitch correct, vowel filter, rotary speaker, granular delay, reverse echo and envelope filter (Oct 2026). */
@@ -800,7 +800,7 @@ Object.assign(SHARED_PORT_LABEL, { vowel:'Vowel', fast:'Fast', pitch:'Pitch', ga
 SHARED_PALETTE.push(['Voice and filters', [['autotune', 'Pitch correct'], ['vowel', 'Vowel filter'], ['envfilt', 'Envelope filter (auto-wah)']], 'audio']);
 SHARED_PALETTE.find(g => g[0] === 'Effects')[1].push(['rotary', 'Rotary speaker'], ['gdelay', 'Granular delay'], ['reverse', 'Reverse echo']);
 
-/* ═══ Bytebeat + Chaos: editor entries for …chains / …waves (Oct 2026) ═══
+/* ═══ Bytebeat + Chaos: editor entries for chains / waves (Oct 2026) ═══
    Paste into chains/index.html inside the ===SHARED EDITOR=== block, after the Blip drum / Life additions (anywhere
    after SHARED_FAMILY, SHARED_PORT_LABEL and SHARED_PALETTE exist; before `function mergeShared`), then run
    tools/sync-shared.py. Parameters, inputs and outputs match modules.js exactly. BB_NAMES must list the formulas in
@@ -822,19 +822,19 @@ Object.assign(SHARED_MODULES, {
 });
 Object.assign(SHARED_FAMILY, { bytebeat:'gen', chaos:'mod' });
 Object.assign(SHARED_PORT_LABEL, { x:'X', y:'Y', z:'Z', rate:'Rate' });
-// Sound sources: …waves has this group (its own VCO, FM…); …chains gets it made (an audio group, before Control).
+// Sound sources: waves has this group (its own VCO, FM…); chains gets it made (an audio group, before Control).
 SHARED_PALETTE.push(['Sound sources', [['bytebeat', 'Bytebeat']], 'audio']);
 // Chaos: with the modulation sources (both editors already have the group; GROUP_FAM marks it 'mod').
 SHARED_PALETTE.push(['Modulation sources', [['chaos', 'Chaos (Lorenz, Rössler…)']], 'control']);
 /* Notes for the integrator:
-   - …chains has no 'Sound sources' group: mergeShared makes it before §Control, and its family falls back to 'afx'
+   - chains has no 'Sound sources' group: mergeShared makes it before §Control, and its family falls back to 'afx'
      for the group colour unless 'Sound sources':'gen' is added to the fallback map inside mergeShared
      ({ 'Reverbs':'afx', … , 'Sound sources':'gen' }); the module's own colour comes from SHARED_FAMILY (gen) either way.
    - PORT_LABEL in each editor already has pitch, reset, out; mergeShared copies x/y/z/rate in (it never overrides). */
 
 /* Random generator and Function generator (based on Mutable Instruments Marbles and Tides 2, MIT). Goes in the SHARED
    EDITOR block of chains/index.html, anywhere after SHARED_PALETTE and SHARED_PORT_LABEL are made (e.g. just after the
-   Life / Blip drum lines), then tools/sync-shared.py copies it into …waves. Parameters match MarblesM and TidesM in the
+   Life / Blip drum lines), then tools/sync-shared.py copies it into waves. Parameters match MarblesM and TidesM in the
    worklet exactly. */
 const MARBLES_RATES = ['÷4', '÷3', '÷2', '×2/3', '×1', '×3/2', '×2', '×3', '×4'];
 const TIDES_RATIO_NAMES = ['÷16', '÷8', '÷6', '÷4', '÷3', '÷2', '×2/3', '×3/4', '×4/5', '×1', '×5/4', '×4/3', '×3/2', '×2', '×3', '×4', '×6', '×8', '×16'];
@@ -877,7 +877,7 @@ Object.assign(SHARED_FAMILY, { marbles:'mod', tides:'mod' });
 Object.assign(SHARED_PORT_LABEL, { xclock:'X clock', dejavu:'Déjà vu', x1:'X1', x2:'X2', x3:'X3', y:'Y', out1:'Out 1', out2:'Out 2', out3:'Out 3', out4:'Out 4' });
 SHARED_PALETTE.push(['Modulation sources', [['marbles', 'Random generator'], ['tides', 'Function generator']], 'control']);
 
-/* Optional, …chains only (outside the shared block, in PORT_TIP): t1–t3 share their labels with Blip drum's inputs
+/* Optional, chains only (outside the shared block, in PORT_TIP): t1–t3 share their labels with Blip drum's inputs
    ('1', '2', '3' in SHARED_PORT_LABEL), so give the Random generator's gates their own names and tips there:
   marbles:{ t1:{ l:'t1', t:'Random gate 1 (Model and Bias decide when it fires)' }, t2:{ l:'t2', t:'The clock: a gate on every tick' },
             t3:{ l:'t3', t:'Random gate 3 (the other side of the coin toss)' } },
@@ -1469,7 +1469,7 @@ function drawDyn(n){
 /* STEREO (owner, 19 Oct): VCF, VCA, Sidechain Comp, Blades, Meta and Phaser got In R / Out R. A patch made before
    (st2 not set) gets their right side patched once, wherever the left side is: a cable from X's Out to one of them
    gains X's Out R → its In R, and one from their Out to a module with an In R gains Out R → In R (when that In R is
-   free). Run once per patch (st2), from normalize. Shared with …waves (only Blades, Meta and Phaser match there). */
+   free). Run once per patch (st2), from normalize. Shared with waves (only Blades, Meta and Phaser match there). */
 function chainsStereoUp(d){
   if (!d || d.st2 || !Array.isArray(d.modules) || !Array.isArray(d.cables)) return d;
   const NEW = new Set(['vcf', 'vca', 'sccomp', 'blades', 'meta', 'phaser']), type = new Map(d.modules.map(m => [m && m.id, m && m.type]));
@@ -1594,7 +1594,7 @@ const plabel = (t, k) => (MODULES[t].ui[k] || {}).l || k;
 const fmtOf = (t, k) => (MODULES[t].ui[k] || {}).f || (v => (+v).toFixed(2));
 const choicesOf = (t, k) => (MODULES[t].ui[k] || {}).c || null;
 
-/* Families give each module its edge color, as in ...Seeds. */
+/* Families give each module its edge color, as in Seeds. */
 const FAMILY = { hostIn:'midi', seq:'midi', string:'gen', vco:'gen', fm:'gen', additive:'gen', noise:'gen', plaits:'gen', elements:'gen',
   vcf:'util', vca:'util', mixer:'util', lfo:'mod', adsr:'mod', random:'mod', atten:'mod', out:'aout' };
 Object.assign(FAMILY, SHARED_FAMILY);
@@ -1613,8 +1613,8 @@ const NOTES = {
   seq:'Plays its steps through Host In, like a keyboard. Set the tempo in Settings.',
   plaits: () => WASM_OK.dsp ? null : 'Couldn’t load the Plaits sound engine.',
   elements: () => WASM_OK.dsp ? null : 'Couldn’t load the Elements sound engine.',
-  out: m => EMBED ? 'Plays on Waves In ' + m.params.slot + '. In Thunder Plus, choose “…waves” as a layer’s oscillator and pick Waves In ' + m.params.slot + '.'
-    : 'Plays on Waves In ' + m.params.slot + '. On its own, …waves plays every output through your speakers. Patch only In for mono.'
+  out: m => EMBED ? 'Plays on Waves In ' + m.params.slot + '. In Thunder Plus, choose “waves” as a layer’s oscillator and pick Waves In ' + m.params.slot + '.'
+    : 'Plays on Waves In ' + m.params.slot + '. On its own, waves plays every output through your speakers. Patch only In for mono.'
 };
 for (const t in MODULES) if (MODULES[t].fx && !NOTES[t]) NOTES[t] = () => WASM_OK.tfx ? null : 'Couldn’t load the effects code (dsp/tfx.wasm), so this passes sound through unchanged.';
 let WASM_OK = { dsp:true, tfx:true };
@@ -1656,7 +1656,7 @@ const typing = e => e.target && e.target.closest && e.target.closest('input:not(
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const newId = p => (p || 'm') + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
 /* Inside Thunder Plus the editor runs in a frame: the patch lives in Thunder's kit (window.parent.thunderWaves),
-   and everything else is saved under its own names so it never mixes with the standalone …waves. */
+   and everything else is saved under its own names so it never mixes with the standalone waves. */
 const TW = (() => { try { return window.parent !== window && window.parent.thunderWaves || null; } catch (e) { return null; } })();
 const EMBED = !!TW, KP = EMBED ? 'thunderplus.waves.' : 'waves.';
 /* A save or load that fails is reported (console only) instead of vanishing. Inside Thunder Plus it goes to the page's own
@@ -1666,8 +1666,8 @@ const tpLog = (() => { const seen = new Set(); return (where, err) => { try {
   const msg = String(err && err.message || err), key = where + '|' + msg; if (seen.has(key) || seen.size >= 100) return; seen.add(key); console.warn('[waves] ' + where + ': ' + msg);
 } catch (_) { /* the logger must never throw */ } }; })();
 
-/* VIEW KEYS (owner, 22 Oct): inside Thunder Plus, Alt+0 the synth, Alt+1–7 the tracker's screens, Alt+8 …waves, Alt+9
-   …chains and Alt+` back to the last view work from here too: this page has the keys while it shows, so it passes them on. */
+/* VIEW KEYS (owner, 22 Oct): inside Thunder Plus, Alt+0 the synth, Alt+1–7 the tracker's screens, Alt+8 waves, Alt+9
+   chains and Alt+` back to the last view work from here too: this page has the keys while it shows, so it passes them on. */
 if (EMBED) window.addEventListener('keydown', e => {
   if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.repeat || !/^(Digit[0-9]|Backquote)$/.test(e.code) || !TW.viewKey) return;
   const t = e.target; if (t && t.closest && t.closest('input:not([type=range]):not([type=checkbox]), textarea, [contenteditable="true"]')) return;
@@ -1745,7 +1745,7 @@ class PatchStore {
   importFrom(file){
     return file.text().then(txt => {
       const d = JSON.parse(txt);
-      if (d.format !== 'waves.patch') throw new Error('That file isn’t a …waves patch.');
+      if (d.format !== 'waves.patch') throw new Error('That file isn’t a waves patch.');
       this.snapshot(); this._restore(JSON.stringify(d));
     });
   }
@@ -2963,7 +2963,7 @@ document.getElementById('fimpmods').addEventListener('click', () => pickFile('cu
 const pnameEl = document.getElementById('pname');
 {
   if (EMBED){
-    // Thunder Plus shows this page as its "…waves" screen: it pauses the sound when you switch away and saves into the kit.
+    // Thunder Plus shows this page as its "waves" screen: it pauses the sound when you switch away and saves into the kit.
     window.wavesEmbed = {
       pause(){ if (store){ clearTimeout(store._timer); if (store.dirty) store.save(); } held.forEach(p => bridge && bridge.noteOff(p)); held.clear(); if (bridge) bridge.ctx.suspend().catch(() => {}); },
       resume(){ if (bridge) bridge.resume(); },
@@ -3067,7 +3067,7 @@ const PAGE_ABOUT = {
   adsr:'An envelope: Attack, Decay, Sustain and Release shape each note from its Gate.',
   random:'A new random value at Rate, or each time Clock fires. Smooth glides between values.',
   atten:'Scales a modulation signal (negative turns it upside down) and adds an offset.',
-  out:'Sends sound out, in stereo if you patch In R. Output picks which Waves In bus it plays on (in Thunder each is its own input); on its own …waves plays them all.'
+  out:'Sends sound out, in stereo if you patch In R. Output picks which Waves In bus it plays on (in Thunder each is its own input); on its own waves plays them all.'
 };
 function helpDoc(){
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
@@ -3104,13 +3104,13 @@ function helpDoc(){
     '.io{display:flex; flex-wrap:wrap; gap:5px 10px; align-items:center; font-size:12.5px; margin-top:4px} .io b{font-size:12px; min-width:62px}' +
     '.pt{display:inline-flex; align-items:center; gap:5px; background:#fff; border:1.5px solid #111; padding:1px 7px} .pt i{width:9px; height:9px; border-radius:50%; display:inline-block}' +
     '@media (max-width:700px){ body{grid-template-columns:1fr} nav{display:none} main{padding:16px} }' +
-    '</style></head><body><nav><h1>…waves Help</h1>' + guide.map(([t], i) => '<a href="#g' + i + '">' + esc(t) + '</a>').join('') +
+    '</style></head><body><nav><h1>waves Help</h1>' + guide.map(([t], i) => '<a href="#g' + i + '">' + esc(t) + '</a>').join('') +
     '</nav><main><div class="guide">' + guide.map(([t, b], i) => '<h2 id="g' + i + '">' + esc(t) + '</h2><p>' + esc(b) + '</p>').join('') + '</div>' + groups + '</main></body></html>';
 }
 function openHelp(){
   let ov = document.getElementById('helpov');
   if (!ov){
-    ov = h('div', {class:'helpov', id:'helpov'}, h('iframe', {title:'…waves Help'}), h('button', {class:'tb helpx', text:'Close help', onclick: () => ov.hidden = true}));
+    ov = h('div', {class:'helpov', id:'helpov'}, h('iframe', {title:'waves Help'}), h('button', {class:'tb helpx', text:'Close help', onclick: () => ov.hidden = true}));
     document.body.append(ov);
     ov.querySelector('iframe').srcdoc = helpDoc();
   }
@@ -3159,10 +3159,10 @@ function onMeter(m){
   for (const n of nodes.values()) if (n.meter) n.meter.style.transform = 'scaleX(' + Math.min(1, busPeaks[(n.m.params.slot | 0) - 1] || 0) + ')';
 }
 
-/* Modulated sliders, as in ...Seeds: a cable in a slider's purple jack turns its value purple and bold, and a
+/* Modulated sliders, as in Seeds: a cable in a slider's purple jack turns its value purple and bold, and a
    purple mark under the slider shows the live position the LFO (or any control) is moving it to. A cabled slider
    is marked straight away, at its own value, until the engine reports live values (audio not started yet, or
-   …chains in Thunder Plus before a track runs through it). */
+   chains in Thunder Plus before a track runs through it). */
 let modded = new Map(), modSeen = 0;
 function paintMods(list){
   const now = new Map();
@@ -3336,7 +3336,7 @@ midi = new WavesMidi({
   onDevices: list => {
     midiSel.replaceChildren(h('option', {value:'all', text:'All connected MIDI inputs'}), ...list.map(i => h('option', {value: i.id, text: i.name})));
     midiSel.value = list.some(i => i.id === midi.selected) ? midi.selected : 'all';
-    document.getElementById('setmidiinfo').textContent = list.length ? 'Notes and CC from this controller play and control …waves.' : 'No MIDI controller is connected.';
+    document.getElementById('setmidiinfo').textContent = list.length ? 'Notes and CC from this controller play and control waves.' : 'No MIDI controller is connected.';
   }
 });
 midiSel.addEventListener('change', () => { midi.selected = midiSel.value; });

@@ -1,4 +1,4 @@
-/* …pump LIMIT pop-up (stage 2): plugins/limit/UILimit.cpp in the browser. The 5 s level / gain-reduction history with
+/* pump LIMIT pop-up (stage 2): plugins/limit/UILimit.cpp in the browser. The 5 s level / gain-reduction history with
    the draggable gain and ceiling, the loudness target and short-term line, In / GR / Out meters, the loudness screen
    and the controls below. */
 (() => {

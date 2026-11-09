@@ -1,4 +1,4 @@
-/* …pump CHOP pop-up (31 Oct 2026): plugins/chop/UIChop.cpp in the browser. REGION: the captured bar's waveform cut into
+/* pump CHOP pop-up (31 Oct 2026): plugins/chop/UIChop.cpp in the browser. REGION: the captured bar's waveform cut into
    its slices, the slices the held pads play lit, the playhead, the bar coming in now (pink outline, green write head)
    and whether it follows the song or is held. NOW: the pad playing (or LIVE). PADS: hold one (mouse, touch, its key or
    its MIDI note) to play it; each shows its slice, its note and key, and a LEARN box (then a note or a key). Below: the

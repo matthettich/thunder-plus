@@ -1,4 +1,4 @@
-/* …pump TONE pop-up (stage 3): plugins/tone/UITone.cpp in the browser. Input (dim) and output (neon) spectra, the live
+/* pump TONE pop-up (stage 3): plugins/tone/UITone.cpp in the browser. Input (dim) and output (neon) spectra, the live
    balance curve around 0 dB (boosts neon, cuts in the second colour; the auto level shown on its own), the target curve
    faint on the spectrum scale, Alt-hold listen (PumpFX.hold kind 1), and the five balance controls as big dials. */
 (() => {
