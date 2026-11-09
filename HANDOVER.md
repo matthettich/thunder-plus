@@ -563,13 +563,15 @@ Start a session by asking for results. Fix on `beta`.
 - **Mobile setting found off once** (8 Nov): cause unknown; look at storage if it recurs.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
-### Longer term and housekeeping
+### Longer-term priority (owner, 9 Nov: the bigger items, in this order)
 
-- **Native I/O helper** (7 Nov): phases A and B are released in desktop v1.3.0 (8 Nov). What remains is the owner's v1.3.0 and Windows tests, then phase C (audio output) only if MIDI vs audio timing is still off: "PICK UP HERE: EVERYTHING STILL NEEDED" in the START HERE brief, design in `docs/NATIVE-IO-HELPER-PLAN.md`.
-- **A more stable desktop app, when the owner wants one** (7 Nov): `docs/NATIVE-DESKTOP-PLAN.md` section 14 lists which of
+1. **Native desktop app, including its host framework decision and VST hosting.** **A more stable desktop app, when the owner wants one** (7 Nov): `docs/NATIVE-DESKTOP-PLAN.md` section 14 lists which of
   7 Nov's bugs came from the web platform, and the options cheapest first: stay web; a native I/O helper inside Electron
-  (MIDI out first, then inputs, maybe audio out), built like the `link/` addon; or the full native host (phases 3–6).
-- Skins cull (which to keep); the native host framework (plan section 11).
+  (MIDI out first, then inputs, maybe audio out), built like the `link/` addon; or the full native host (phases 3–6). Framework decision: plan section 11.
+2. **Helper phase C, audio output, only if timing is still off.** **Native I/O helper** (7 Nov): phases A and B are released in desktop v1.3.0 (8 Nov). What remains is the owner's v1.3.0 and Windows tests, then phase C (audio output) only if MIDI vs audio timing is still off: "PICK UP HERE: EVERYTHING STILL NEEDED" in the START HERE brief, design in `docs/NATIVE-IO-HELPER-PLAN.md`.
+3. **Skins cull** (which to keep).
+4. **Synth engine as a VST, then Android and iOS apps** (plan only so far): `docs/ENGINE-PLUGIN-PLAN.md`. Its engine port is phase 3 of `docs/NATIVE-DESKTOP-PLAN.md`, so do it once, in `core/`.
+5. **Before-selling checklist:** "Before a commercial release" above (renaming vintage sampler models, skins that name products, and the rest). Can wait; the owner has leaned away from selling.
 
 ### Done
 
