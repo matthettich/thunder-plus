@@ -22975,7 +22975,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 533;
+const BUILD = 534;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23054,7 +23054,10 @@ var phOff = (() => { try { return clamp(parseInt(localStorage.getItem('thunderpl
 var lpOn = (() => { try { return localStorage.getItem('thunderplus-lowpower-v1') === '1'; } catch(e){ return false; } })(), lpNext = 0, lpPend = false;
 var LP_MS = 1000 / 24, LP_GATE = 38;
 var lpHold = last => lpOn && tp.on && performance.now() - last < LP_GATE;   // a meter or animation asks: is it too soon to draw again?
-function setLowPower(on){ lpOn = !!on; lpNext = 0; lpPend = false; clearTimeout(bgSusT); bgSusT = 0; if (lpOn && ctx) bgSusT = setTimeout(bgIdle, bgWait()); else if (!lpOn && bgSus && !document.hidden){ bgSus = false; if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); } try { localStorage.setItem('thunderplus-lowpower-v1', on ? '1' : '0'); } catch(e){} }
+// (9 Nov, owner) turning it on picks the Low power skin; turning it off goes back to the skin you had. Any skin can still be chosen while it's on.
+const LP_SKIN_K = 'thunderplus-lowpower-skin-v1';
+function lpSkin(on){ try { if (on){ if (skin !== 'lowpower'){ localStorage.setItem(LP_SKIN_K, skin); applySkin('lowpower'); } } else if (skin === 'lowpower'){ const w = localStorage.getItem(LP_SKIN_K); if (w) applySkin(w); } } catch(e){} }
+function setLowPower(on){ if (!!on !== lpOn) lpSkin(!!on); lpOn = !!on; lpNext = 0; lpPend = false; clearTimeout(bgSusT); bgSusT = 0; if (lpOn && ctx) bgSusT = setTimeout(bgIdle, bgWait()); else if (!lpOn && bgSus && !document.hidden){ bgSus = false; if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); } try { localStorage.setItem('thunderplus-lowpower-v1', on ? '1' : '0'); } catch(e){} }
 function setPhOff(v){ phOff = clamp(Math.round((v | 0) / 5) * 5, -100, 300); try { localStorage.setItem('thunderplus-phoff-v1', String(phOff)); } catch(e){} }
 const curKey = () => [tv, cs.song.x, cs.song.y, cs.phrase.y, cs.sect.y, cPhrase, cSect, cTrack].join(',');
 // Pads mode: OPTION + arrows move around the Song grid, in the phrase editor (phraseGrid) and on the Song screen (songGridDir).
@@ -23865,7 +23868,7 @@ function projRows(){
     {l:'PLAYHEAD OFFSET', get:() => phOff, set:v => setPhOff(v), min:-100, max:300, step:5, big:25, d:0, fmt:v => v ? sgn(v) + ' ms' : '0 ms',
       info:() => 'Moves the playhead to match what you hear, on this device: + later (Bluetooth headphones, a slow screen), − earlier. The app already allows for the output latency it is told about'},
     {l:'LOW POWER DISPLAY', ck:'Low power display (saves battery): the picture is a little less smooth, and the audio engine sleeps after 30 s of silence, so the first note after that can start a moment late', get:() => lpOn ? 1 : 0, set:v => setLowPower(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // LOW POWER DISPLAY
-      info:() => 'ON: while a song plays, the screen redraws about 24 times a second instead of at the screen’s full rate. The audio engine also sleeps after 30 s of silence and wakes on the next note, which can start a moment late. That saves battery; the picture is a little less smooth, and the sound is unchanged. OFF (the default): as before. This device only'},
+      info:() => 'ON: while a song plays, the screen redraws about 24 times a second instead of at the screen’s full rate. It also switches to the Low power (black) skin, and back when turned off. The audio engine also sleeps after 30 s of silence and wakes on the next note, which can start a moment late. That saves battery; the picture is a little less smooth, and the sound is unchanged. OFF (the default): as before. This device only'},
     {l:'FOLLOW', segs:true, get:() => followMode, set:v => setFollow(v), min:0, max:2, d:0, fmt:v => ['OFF', 'PATTERN', 'ON'][v] || 'OFF',
       info:() => 'While the song plays. ON: Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. PATTERN: Phrase (and Sect) switch to what the cursor’s track is playing and Arrange turns its pages with the song, but the phrase’s rows stay where you put them. OFF: the screen stays where you put it, except that Arrange still turns its pages when the playhead runs off it. While you work in Arrange it waits until you’ve left it alone for a minute. The cursor stays on its row in every mode, so you can edit while it plays'},
     {l:'TAB', segs:true, get:() => tabTracks ? 1 : 0, set:v => setTabTracks(!!v), min:0, max:1, d:1, fmt:v => v ? 'TRACKS' : 'COLUMNS',
@@ -32035,6 +32038,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [534, '9 Nov', ['Low power display also switches to the Low power (black) skin, and back to your skin when it’s turned off.']],
   [533, '9 Nov', ['Low power display: the audio engine also sleeps after 30 s of silence and wakes on the next note.']],
   [532, '9 Nov', ['Settings › Screen: LOW POWER DISPLAY draws playback at about 24 frames a second to save battery; the sound doesn’t change.', 'New skin: Low power (black), pure black and high contrast.']],
   [531, '9 Nov', ['Pad: the Save key is the size of MUTE, beside it. LOOP, PLAY and the play-song button light up like MUTE and SOLO when engaged.']],
