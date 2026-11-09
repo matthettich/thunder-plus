@@ -1106,10 +1106,10 @@ body:not(.legon) .tside .tlegend{display:none}
    ~370px) 3 d-pad keys + 4 wide keys + gaps + padding came to ~380px and pushed PLAY/EDIT off the right edge.
    7.08 = 3 + 4 × 1.02 key widths; 66px = the 5 column gaps (45) + the d-pad/keys gap (16) + the 4px offset shadow + 1. */
 .tctl{container-type:inline-size}
-.tpad{--kw:min(var(--k), calc((100cqw - 75px) / 8.1))}   /* (8 Nov: MUTE / SOLO add a column: 8.1 key widths, one more 9px gap) */
+.tpad{--kw:min(var(--k), calc((100cqw - 66px) / 7.08))}
 .dpad{display:grid; grid-template-columns:repeat(3,var(--kw, var(--k))); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
 .keys{display:grid; grid-template-columns:repeat(2,calc(var(--kw, var(--k)) * 1.45)); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
-.keys.wide{grid-template-columns:repeat(5,calc(var(--kw, var(--k)) * 1.02))}
+.keys.wide{grid-template-columns:repeat(4,calc(var(--kw, var(--k)) * 1.02))}
 /* The nav/edit pad: the command row inverted. A darker grey panel; buttons in a screen's colour, on white outlined offset blocks. */
 .tctl{background:color-mix(in srgb, var(--side) 84%, #000)}
 /* FX BAR IN THE PAGE COLOUR (owner, 5 Nov, mockup C): with the bottom panel showing, its area is the page colour, divided
@@ -1125,7 +1125,12 @@ body:not(.legon) .tside .tlegend{display:none}
 #tPad .k.lt, #tPad #kPlay.on{background:var(--pl); color:var(--inv)}
 .k{min-height:0; padding:0; font-size:18px; font-weight:600; touch-action:none}
 .k.kw{font-size:var(--fs-2); letter-spacing:.04em}
-.keys.wide .k.kw{font-size:var(--fs-2); letter-spacing:0}
+.keys.wide .k.kw{font-size:var(--fs-2)}
+/* MUTE / SOLO (owner, 8 Nov): nice to have, so only where there's room (unfolded and larger). Pink / green when off, black when on. */
+#kMute, #kSolo{display:none}
+@container (min-width:600px){ .keys.wide{grid-template-columns:repeat(5,calc(var(--kw, var(--k)) * 1.02))} #kMute, #kSolo{display:inline-flex} .tpad{--kw:min(var(--k), calc((100cqw - 75px) / 8.1))} }
+#tPad #kMute{background:#ff2e93; color:#141414} #tPad #kSolo{background:#23a45c; color:#141414}
+#tPad #kMute.lt, #tPad #kSolo.lt{background:#141414; color:#fff}
 .k.dn,.k.on{background:var(--ink); color:var(--inv)}
 #kPlay.on{background:var(--pl); border-color:var(--line); color:var(--inv)}
 .k.lt{background:var(--pl); color:var(--inv); border-color:var(--line)}
@@ -3189,7 +3194,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="tinl tinlp" id="tInlPad" hidden aria-label="Instruments and their pads"></div>
     <div class="keys wide">
       <button type="button" class="k kw" data-b="mute" id="kMute" title="Mute this track; tap again to unmute">MUTE</button><button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
-      <button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo">SOLO</button><button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: the pattern generators (Acid line, Euclidean fill…) for this phrase">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt" aria-label="Option" title="Option">OPT</button><button type="button" class="k kw" data-b="edit">EDIT</button>
+      <button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo">SOLO</button><button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: the pattern generators (Acid line, Euclidean fill…) for this phrase">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
     </div>
     </div>
   </div>
@@ -22834,7 +22839,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 519;
+const BUILD = 520;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31823,7 +31828,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
-  [519, '8 Nov', ['The pad has MUTE and SOLO buttons: tap to latch, tap again to undo. They light for the current track.']],
+  [519, '8 Nov', ['The pad has MUTE and SOLO buttons on unfolded and larger screens: pink and green when off, black when on. Tap to latch, tap again to undo.']],
   [518, '8 Nov', ['Mobile: SHIFT + ▲ goes to Arrange from every tracker screen.']],
   [514, '8 Nov', ['Live engines: the setting always shows, and its help and message name every …pump live engine as well as …waves live.']],
   [513, '8 Nov', ['Settings → Audio → Live engines (it was called …pump live): the name now says what it does, and it covers …waves live too, as does the message when a device can’t keep up.', '…waves live is lighter: each pad now runs only the part of the patch that feeds its Bus, with the same sound.']],
