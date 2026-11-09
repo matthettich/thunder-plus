@@ -407,3 +407,10 @@ test('FOLLOW PATTERN: a track playing one phrase lets the cursor move off it; a 
   assert.equal(c.api.st().y, 9, 'Song screen: one block playing, the cursor stays on the row it was moved to');
   c.api.step(P(5, 2)); assert.equal(c.api.st().y, 2, 'the next row playing still moves it');
 });
+
+test('dialog sliders take touch: the shared drag serves .ask on touch, and the row doesn\'t let the browser pan it away', () => {
+  const src = H.read('index.html');
+  assert.match(src, /const sliderOk = \(r, touch\) =>[^\n]*touch \? '#gset, \.rlock' : '#gset, \.rlock, \.ask'/, 'touch reaches dialogs');
+  assert.match(src, /!sliderOk\(r, e\.pointerType === 'touch'\)/, 'the drag says it is a touch');
+  assert.match(src, /\.acidr, \.acidf:has\(input\[type=range\]\)\{touch-action:pan-y\}/, 'no horizontal pan cancels the drag');
+});

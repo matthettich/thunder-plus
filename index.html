@@ -145,7 +145,7 @@ body.mob .deskmenu{display:none}
 :is(#gset,.rlock) input[type=range]:not(.unl){pointer-events:none; opacity:.5}
 /* ONE SLIDER (27 Oct, Phase 2): a vertical swipe over a slider scrolls the page; the value tip while dragging; the slider the
    wheel will move (it rested under the pointer) is outlined */
-input[type=range], .row:has(> input[type=range]){touch-action:pan-y}
+input[type=range], .row:has(> input[type=range]), .acidr, .acidf:has(input[type=range]){touch-action:pan-y}
 @media (pointer:coarse){ input[type=range]:not(:is(#gset, .rlock) *){pointer-events:none} }
 .sldtip{position:fixed; z-index:140; transform:translate(-50%, calc(-100% - 6px)); padding:2px 7px; border-radius:4px; background:var(--ink, #222); color:var(--panel, #fff); font:600 12px/1.5 var(--font); pointer-events:none; white-space:nowrap}
 input[type=range].wheelon, [data-wheel].wheelon{outline:2px solid var(--ink); outline-offset:2px; border-radius:4px}
@@ -15228,7 +15228,9 @@ async function rcdPanel(pad, opts){
    Right-click a slider for Reset / Type a value / Learn a MIDI knob (makeRow); the wheel nudges the slider the pointer rests
    on (WHEEL FOCUS; one only passed over doesn't take it, so the page still scrolls); a drag is relative, Shift a tenth (ONE SLIDER).
    Not the settings menus' sliders (they lock against stray touches). To remove: this block and the contextmenu in makeRow. */
-const sliderOk = r => !!r && r.matches && r.matches('input[type=range]') && !r.disabled && !r.closest('#gset, .rlock, .ask');
+// Dialogs (.ask: the generators, Record…) keep the browser's own slider under a mouse; on a touch screen CSS takes their touches away
+// like every other slider's, so the drag below has to serve them too (8 Nov: Acid line's sliders couldn't be moved on a phone).
+const sliderOk = (r, touch) => !!r && r.matches && r.matches('input[type=range]') && !r.disabled && !r.closest(touch ? '#gset, .rlock' : '#gset, .rlock, .ask');
 /* ONE RULE FOR VALUE CONTROLS (owner, mouse audit 3 Nov): sliders, faders, the FX bar's values and the …pump windows'
    controls all take the mouse the same way:
    - a drag moves the value from where it is; Shift held is ten times finer and Ctrl/⌘ held four times coarser, read on
@@ -15393,7 +15395,7 @@ function sliderAt(e){
 }
 document.addEventListener('pointerdown', e => {
   const r = sliderAt(e);
-  if (e.button !== 0 || !sliderOk(r)) return;
+  if (e.button !== 0 || !sliderOk(r, e.pointerType === 'touch')) return;
   e.preventDefault(); e.stopPropagation();
   if (ctxPress(e)) return;   // Ctrl+click on a Mac is the right-click: the menu opens, the value stays (3 Nov)
   const touch = e.pointerType === 'touch';
@@ -22827,7 +22829,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 514;
+const BUILD = 515;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);

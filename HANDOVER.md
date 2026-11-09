@@ -541,6 +541,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 8 Nov: dialog sliders on touch (build 515)
+
+Sliders in `.ask` dialogs (every generator, Record a sample) couldn't be moved on a phone: CSS takes touches off sliders on
+`pointer:coarse` and the shared drag skipped `.ask`. `sliderOk(r, touch)` now lets touch through for dialogs (a mouse keeps the
+native slider), and `.acidr` / `.acidf` carry `touch-action:pan-y`, or the browser cancels the drag as a pan. Checked with
+emulated touch drags on a Pixel 7 profile: no movement before, correct distance after, on Acid line and a generic `genPanel`.
+
 ## 8 Nov: …waves live per-bus running; "Live engines" setting (build 513, beta only)
 
 Owner: make the live/rendered switch's name cover …waves live, and cut phone CPU by sharing one running patch across pads.
